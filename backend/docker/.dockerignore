@@ -1,0 +1,26 @@
+# Gradle build artifacts
+.gradle/
+build/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+src/test/
+
+# Runtime
+.env
+.env.local

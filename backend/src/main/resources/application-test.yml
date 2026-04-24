@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:againspring;MODE=MariaDB;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+
+logging:
+  level:
+    com.againspring: DEBUG
+    org.springframework: WARN
+
+springdoc:
+  swagger-ui:
+    enabled: false
+
+llm:
+  provider: mock
+  claude-code:
+    binary-path: /usr/local/bin/claude

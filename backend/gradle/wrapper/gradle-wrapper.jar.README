@@ -1,0 +1,15 @@
+# gradle-wrapper.jar
+
+This directory should contain gradle-wrapper.jar (the Gradle wrapper bootstrap JAR).
+
+In a normal gradle setup, this file is binary and checked into version control for offline builds.
+
+For this project, the JAR is not included. To generate it locally:
+
+```bash
+gradle wrapper --gradle-version 8.10
+```
+
+This will create gradle-wrapper.jar from the gradle distribution specified in gradle-wrapper.properties.
+
+Alternatively, the Gradle wrapper can bootstrap itself from the network on first run.

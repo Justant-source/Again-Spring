@@ -1,0 +1,50 @@
+# ===== Node / Next.js (frontend) =====
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+frontend/public/mockServiceWorker.js
+frontend/.env*.local
+frontend/.vercel
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# ===== Java / Gradle (backend) =====
+backend/.gradle/
+backend/build/
+backend/out/
+backend/bin/
+backend/*.log
+backend/HELP.md
+backend/.idea/
+backend/*.iml
+backend/.vscode/
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/target/
+
+# ===== Infra / secrets =====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.keystore
+
+# ===== Tool / OS =====
+.DS_Store
+Thumbs.db
+.history/
+.claude/worktrees/
+.request/
+.result/
+# ===== Editor caches =====
+.idea/
+*.iml
+.vscode/
+nbproject/
+*.swp
+*.swo

@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: againspring
+  datasource:
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/againspring?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
+    username: ${DB_USER:againspring}
+    password: ${DB_PASSWORD:changeme}
+    driver-class-name: org.mariadb.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MariaDBDialect
+        jdbc:
+          time_zone: UTC
+        format_sql: false
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+jwt:
+  secret: ${JWT_SECRET:dev-only-change-me-at-least-256-bits-long-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+  expiration-ms: 86400000
+
+app:
+  prompts:
+    path: ${PROMPTS_PATH:./shared/prompts}
+  safety:
+    enabled: true
+    forbidden-words-path: ${SAFETY_FORBIDDEN_WORDS_PATH:classpath:/safety/forbidden-words.yml}
+
+llm:
+  provider: ${LLM_PROVIDER:claude-code}
+  claude-code:
+    binary-path: ${CLAUDE_BIN:/usr/local/bin/claude}
+    pool-size: ${CLAUDE_POOL_SIZE:3}
+    default-timeout-ms: 30000
+  claude-api:
+    key: ${ANTHROPIC_API_KEY:}
+    model: ${CLAUDE_MODEL:claude-sonnet-4-5}
+
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO

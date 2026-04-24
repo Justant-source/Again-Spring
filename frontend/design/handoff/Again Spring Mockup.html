@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>다시봄 · Again Spring — Mockups</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  @keyframes blink { 50% { opacity: 0; } }
+  /* Make design canvas background match brief */
+  body { background: #EFE9DE; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="primitives.jsx"></script>
+<script type="text/babel" src="tone-L-screens.jsx"></script>
+<script type="text/babel" src="mediation-screens.jsx"></script>
+<script type="text/babel" src="tone-P-screens.jsx"></script>
+
+<script type="text/babel">
+/* global DesignCanvas, DCSection, DCArtboard, TweaksPanel, useTweaks, TweakSection, TweakRadio, TweakSlider,
+   LandingScreen, OnboardingSlider, OnboardingEmoji, OnboardingSentence,
+   TreeBig, TreeMid, TreeSmall, InputDescribe, InvitePick, WaitingB, BSummary,
+   MediationLetter, MediationBubble, MediationCards,
+   SignatureMap, ReportCards, ReportStory, ShareImage, SoloResult, NeedsMap2D */
+
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "relationship": "부부",
+  "temperature": 36.2,
+  "ratio_a": 55,
+  "pov": "A (서현)"
+}/*EDITMODE-END*/;
+
+const RELATIONSHIPS = ["연인", "부부", "친구", "가족", "부모자식"];
+
+function App() {
+  const [tweaks, setTweaks] = useTweaks(TWEAKS);
+
+  // Propagate tweaks to CSS vars (relationship color slight shift)
+  React.useEffect(() => {
+    const root = document.documentElement;
+    const map = {
+      "연인":   { a: '#F4A8B0', b: '#A8B8C8' },
+      "부부":   { a: '#F4A896', b: '#A8C8B4' },
+      "친구":   { a: '#F4C896', b: '#B0C8D8' },
+      "가족":   { a: '#E8B896', b: '#B8C4A8' },
+      "부모자식": { a: '#D8A8A8', b: '#A8B8A8' },
+    };
+    const c = map[tweaks.relationship] || map["부부"];
+    root.style.setProperty('--P-a', c.a);
+    root.style.setProperty('--P-b', c.b);
+  }, [tweaks.relationship]);
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="intro" title="다시봄 — 관계 회복 AI 중재자" subtitle="부부 · 육아 분담 샘플 케이스 · 반응형 웹앱 목업">
+          <DCArtboard id="cover" label="디자인 시스템 · 3-Tone Hybrid" width={520} height={760}>
+            <CoverArtboard />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="onboarding" title="① 랜딩 · 온보딩 (Tone L)" subtitle="편지지 톤 — Noto Serif KR + Pretendard">
+          <DCArtboard id="landing" label="랜딩" width={360} height={760}><LandingScreen /></DCArtboard>
+          <DCArtboard id="ob-slider" label="온보딩 · 5점 척도" width={360} height={760}><OnboardingSlider /></DCArtboard>
+          <DCArtboard id="ob-emoji" label="온보딩 · 이모지 선택" width={360} height={760}><OnboardingEmoji /></DCArtboard>
+          <DCArtboard id="ob-sentence" label="온보딩 · 문장형" width={360} height={760}><OnboardingSentence /></DCArtboard>
+        </DCSection>
+
+        <DCSection id="tree" title="② 관계 · 갈등 선택 트리 (Tone L)" subtitle="대 → 중 → 소분류 · 각 단계에서 '직접 입력' 포함">
+          <DCArtboard id="tree-1" label="대분류 — 관계 유형" width={360} height={760}><TreeBig /></DCArtboard>
+          <DCArtboard id="tree-2" label="중분류 — 갈등 카테고리" width={360} height={760}><TreeMid /></DCArtboard>
+          <DCArtboard id="tree-3" label="소분류 — 구체 상황" width={360} height={760}><TreeSmall /></DCArtboard>
+        </DCSection>
+
+        <DCSection id="input" title="③ 상황 서술 · 초대 · 대기 (Tone L)" subtitle="A의 입력 → 초대 링크 → B 도착까지">
+          <DCArtboard id="describe" label="A 상황 서술" width={360} height={760}><InputDescribe /></DCArtboard>
+          <DCArtboard id="invite" label="초대 메시지 3 톤" width={360} height={760}><InvitePick /></DCArtboard>
+          <DCArtboard id="wait" label="B 참여 대기 · Solo 전환" width={360} height={760}><WaitingB /></DCArtboard>
+          <DCArtboard id="bsum" label="B 도착 → 중재 요약 열람" width={360} height={760}><BSummary /></DCArtboard>
+        </DCSection>
+
+        <DCSection id="mediation" title="④ 6턴 멀티턴 중재 (Tone L) · 3 variations" subtitle="같은 턴 3의 순간을 다른 UI로">
+          <DCArtboard id="med-letter" label="편지지 풀화면" width={360} height={760}><MediationLetter /></DCArtboard>
+          <DCArtboard id="med-bubble" label="대화형 말풍선" width={360} height={760}><MediationBubble /></DCArtboard>
+          <DCArtboard id="med-cards" label="카드 스택 (스와이프)" width={360} height={760}><MediationCards /></DCArtboard>
+        </DCSection>
+
+        <DCSection id="signature" title="⑤ 시그니처 — 욕구 차이 지도 (Tone P) · 3 variations" subtitle="동일 데이터의 3가지 시각화">
+          <DCArtboard id="sig-2d" label="2D 좌표" width={360} height={760}><SignatureMap variant="2d" /></DCArtboard>
+          <DCArtboard id="sig-venn" label="벤 다이어그램" width={360} height={760}><SignatureMap variant="venn" /></DCArtboard>
+          <DCArtboard id="sig-bars" label="거리 막대 (축별)" width={360} height={760}><SignatureMap variant="bars" /></DCArtboard>
+        </DCSection>
+
+        <DCSection id="report" title="⑥ 결과 리포트 (Tone P) · 2 layouts" subtitle="카드형 vs 스토리형 · 같은 데이터">
+          <DCArtboard id="rep-card" label="카드형 리포트" width={360} height={760}><ReportCards /></DCArtboard>
+          <DCArtboard id="rep-story" label="스토리형 리포트" width={360} height={760}><ReportStory /></DCArtboard>
+          <DCArtboard id="solo" label="Solo 모드 결과" width={360} height={760}><SoloResult /></DCArtboard>
+        </DCSection>
+
+        <DCSection id="share" title="⑦ 카톡 공유 이미지 9:16 · 3종 (Tone P)" subtitle="갈등 원문 노출 없음 · 1080×1920 비율 축소">
+          <DCArtboard id="sh-map" label="욕구 차이 지도" width={300} height={520}>
+            <div style={{ padding: 15, background: '#EFE9DE', height: '100%' }}><ShareImage variant="map" /></div>
+          </DCArtboard>
+          <DCArtboard id="sh-temp" label="관계 온도 스티커" width={300} height={520}>
+            <div style={{ padding: 15, background: '#EFE9DE', height: '100%' }}><ShareImage variant="temp" /></div>
+          </DCArtboard>
+          <DCArtboard id="sh-style" label="커뮤니케이션 스타일" width={300} height={520}>
+            <div style={{ padding: 15, background: '#EFE9DE', height: '100%' }}><ShareImage variant="style" /></div>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="responsive" title="⑧ 반응형 웹 — 데스크톱 프리뷰" subtitle="모바일 우선이지만 데스크톱에서도 동작">
+          <DCArtboard id="desk" label="데스크톱 랜딩" width={1120} height={680}>
+            <DesktopLanding />
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="다시봄 Tweaks">
+        <TweakSection title="관계 유형">
+          <TweakRadio
+            value={tweaks.relationship}
+            options={RELATIONSHIPS}
+            onChange={(v) => setTweaks({ relationship: v })}
+          />
+        </TweakSection>
+        <TweakSection title="관계 온도">
+          <TweakSlider
+            value={tweaks.temperature} min={35.0} max={37.5} step={0.1}
+            suffix=" °C"
+            onChange={(v) => setTweaks({ temperature: v })}
+          />
+        </TweakSection>
+        <TweakSection title="화해 기여도 (A : B)">
+          <TweakSlider
+            value={tweaks.ratio_a} min={30} max={70} step={5}
+            suffix={` : ${100 - tweaks.ratio_a}`}
+            onChange={(v) => setTweaks({ ratio_a: v })}
+          />
+        </TweakSection>
+        <TweakSection title="관점 전환">
+          <TweakRadio
+            value={tweaks.pov}
+            options={["A (서현)", "B (준호)"]}
+            onChange={(v) => setTweaks({ pov: v })}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+// ─── Design system cover (artboard) ─────────────────────────
+function CoverArtboard() {
+  return (
+    <div style={{ padding: '40px 40px', background: 'var(--L-bg)', width: '100%', height: '100%', overflow: 'auto', fontFamily: 'var(--font-sans)' }}>
+      <div style={{ fontFamily: 'var(--font-serif)', fontSize: 12, color: 'var(--L-sub)', letterSpacing: '-0.01em' }}>
+        다시봄 · Again Spring
+      </div>
+      <div className="serif" style={{ fontSize: 32, lineHeight: 1.35, marginTop: 10, fontWeight: 500, color: 'var(--L-ink)' }}>
+        판결이 아니라, 중재입니다.<br />
+        <span style={{ color: 'var(--L-sub)' }}>"다름"을 "잘못"으로 만들지 않는.</span>
+      </div>
+
+      <hr style={{ border: 0, height: 1, background: 'var(--L-border)', margin: '28px 0' }} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+        {[
+          { n: 'Tone L · 편지지', bg: '#F5EFE6', ink: '#2B2B2B', sub: '#8A7F6B', use: '온보딩 · 입력 · 중재' },
+          { n: 'Tone P · 파스텔', bg: '#FBF3EC', ink: '#5C4030', sub: '#A08670', use: '결과 · 공유 · 온도' },
+          { n: 'Tone Q · 조용', bg: '#FAFAF7', ink: '#1A1A1A', sub: '#9B9890', use: 'PDF · Premium' },
+        ].map((t, i) => (
+          <div key={i} style={{ background: t.bg, padding: 18, borderRadius: i === 0 ? 3 : i === 1 ? 16 : 10, border: '1px solid rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 11, color: t.sub }}>{t.n}</div>
+            <div style={{ fontSize: 22, marginTop: 8, fontFamily: i === 0 ? 'var(--font-serif)' : 'var(--font-sans)', color: t.ink, fontWeight: 500 }}>
+              다시봄
+            </div>
+            <div style={{ fontSize: 11, color: t.sub, marginTop: 18 }}>{t.use}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 26, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--L-sub)', marginBottom: 10 }}>Type Pairing</div>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--L-ink)' }}>Noto Serif KR</div>
+          <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>제목 · 시적 인용 · 500</div>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 16, marginTop: 14, color: 'var(--L-ink)' }}>Pretendard Variable</div>
+          <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>본문 · UI 라벨 · 400 · 500</div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--L-sub)', marginBottom: 10 }}>시그니처 요소</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><IconTemp /> 관계 온도 · <b style={{ fontWeight: 500, fontFamily: 'var(--font-serif)' }}>36.2°C</b></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="8" cy="12" r="4"/><circle cx="16" cy="12" r="4"/></svg>
+              화해 기여도 · <b style={{ fontWeight: 500 }}>55 : 45</b> (5 단위 반올림)
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><IconMap /> 욕구 차이 지도 · 2D · A 피치 / B 세이지</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--L-sub)' }}>
+              <MotifWave size={18} /><MotifMountain size={18} /><MotifFlame size={18} /><MotifLeaf size={18} /><MotifMoon size={18} /><MotifStar size={18} />
+              <span style={{ fontSize: 11 }}>자연물 은유</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 22, padding: 14, background: 'var(--L-card)', border: '1px solid var(--L-border)', borderRadius: 3 }}>
+        <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>절대 금지</div>
+        <div style={{ fontSize: 12, color: 'var(--L-ink)', marginTop: 6, lineHeight: 1.7 }}>
+          하트 · 마스코트 · 무지개 그라데이션 · 다크모드 기본값 · 과실비율 · 가해자/피해자 · 나르시시스트 등 병리 용어
+        </div>
+      </div>
+
+      <div style={{ marginTop: 20, fontSize: 11, color: 'var(--L-sub)', lineHeight: 1.7 }}>
+        오른쪽 패널의 <b style={{ color: 'var(--L-ink)' }}>Tweaks</b>에서 관계 유형 · 온도 · 기여도 비율 · 관점을 실시간으로 바꿔볼 수 있어요.
+      </div>
+    </div>
+  );
+}
+
+// Desktop landing variant
+function DesktopLanding() {
+  return (
+    <div style={{ width: '100%', height: '100%', background: 'var(--L-bg)', padding: '40px 72px', overflow: 'hidden', fontFamily: 'var(--font-sans)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--L-ink)' }}>다시봄</div>
+        <div style={{ display: 'flex', gap: 28, fontSize: 13, color: 'var(--L-sub)' }}>
+          <span>서비스 소개</span>
+          <span>이용 방법</span>
+          <span>요금제</span>
+          <span style={{ color: 'var(--L-ink)' }}>로그인</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 80, marginTop: 80, alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 13, color: 'var(--L-sub)' }}>관계 회복 AI 중재자</div>
+          <div className="serif" style={{ fontSize: 54, lineHeight: 1.3, marginTop: 16, letterSpacing: '-0.02em', fontWeight: 500 }}>
+            싸운 두 사람 사이에,<br />
+            조용히 앉는<br />
+            <span style={{ color: 'var(--L-point)' }}>다시봄.</span>
+          </div>
+          <div style={{ fontSize: 16, color: 'var(--L-sub)', lineHeight: 1.8, marginTop: 24 }}>
+            판결이 아니라 중재입니다.<br />
+            두 분의 말을 따뜻하게 정제해 전해드려요.
+          </div>
+          <div style={{ marginTop: 32, display: 'flex', gap: 10 }}>
+            <button className="btn-L">이야기 시작하기</button>
+            <button className="btn-L ghost">서비스 소개 보기</button>
+          </div>
+          <div style={{ marginTop: 40, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {['연인', '부부', '친구', '가족', '부모자식'].map((t, i) => (
+              <span key={i} className="chip-L">{t}</span>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ position: 'relative' }}>
+          <div style={{
+            padding: 36, background: 'var(--L-card)', border: '1px solid var(--L-border)',
+            borderRadius: 3, transform: 'rotate(-1.5deg)',
+          }}>
+            <div className="quote-it" style={{ fontSize: 14, marginBottom: 14 }}>중재자의 편지 · 턴 3</div>
+            <div className="serif" style={{ fontSize: 17, lineHeight: 1.9 }}>
+              서현님은 주말에도 쉬지 못하는 날이<br />
+              이어지면서 서운함이 올라오셨대요.<br /><br />
+              준호님 입장에서는 그 시간이<br />
+              어떻게 보이고 있었는지,<br />
+              차분히 들려주실 수 있을까요.
+            </div>
+          </div>
+          <div style={{
+            position: 'absolute', right: -20, bottom: -20,
+            padding: 20, background: 'var(--P-card)',
+            border: '1px solid var(--P-border)', borderRadius: 18,
+            transform: 'rotate(3deg)',
+            width: 220,
+          }}>
+            <div style={{ fontSize: 10, color: 'var(--P-sub)', display: 'flex', alignItems: 'center', gap: 6 }}><IconTemp size={12} /> 관계 온도</div>
+            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 32, color: 'var(--P-ink)', fontWeight: 500 }}>36.2°C</div>
+            <div style={{ marginTop: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div style={{ width: 12, height: 12, borderRadius: 6, background: 'var(--P-a)' }} />
+              <div style={{ width: 12, height: 12, borderRadius: 6, background: 'var(--P-b)' }} />
+              <span style={{ fontSize: 11, color: 'var(--P-sub)' }}>55 : 45</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

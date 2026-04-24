@@ -1,0 +1,50 @@
+{
+  "name": "again-spring",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "lint:words": "node scripts/check-forbidden-words.js"
+  },
+  "dependencies": {
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.1",
+    "axios": "^1.7.7",
+    "framer-motion": "^11.11.17",
+    "lucide-react": "^0.454.0",
+    "recharts": "^2.13.3",
+    "react-hook-form": "^7.53.2",
+    "zod": "^3.23.8",
+    "@hookform/resolvers": "^3.9.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.4",
+    "class-variance-authority": "^0.7.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-radio-group": "^1.2.1",
+    "@radix-ui/react-dialog": "^1.1.2",
+    "@radix-ui/react-progress": "^1.1.0",
+    "@radix-ui/react-label": "^2.1.0",
+    "@radix-ui/react-toast": "^1.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "tailwindcss": "^3.4.14",
+    "postcss": "^8.4.49",
+    "autoprefixer": "^10.4.20",
+    "tailwindcss-animate": "^1.0.7",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.15",
+    "msw": "^2.6.4"
+  },
+  "msw": {
+    "workerDirectory": ["public"]
+  }
+}

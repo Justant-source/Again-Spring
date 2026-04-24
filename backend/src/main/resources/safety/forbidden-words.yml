@@ -1,0 +1,239 @@
+level1:
+  # Legal risk words - UI complete ban
+  - pattern: "과실비율"
+    category: LEGAL_RISK
+    crisis: false
+  - pattern: "판결"
+    category: LEGAL_RISK
+    crisis: false
+  - pattern: "판사"
+    category: LEGAL_RISK
+    crisis: false
+  - pattern: "유죄"
+    category: LEGAL_RISK
+    crisis: false
+  - pattern: "무죄"
+    category: LEGAL_RISK
+    crisis: false
+  - pattern: "가해자"
+    category: STIGMA
+    crisis: false
+  - pattern: "피해자"
+    category: STIGMA
+    crisis: false
+  - pattern: "고소"
+    category: LEGAL_RISK
+    crisis: false
+  - pattern: "소송"
+    category: LEGAL_RISK
+    crisis: false
+  - pattern: "증거"
+    category: LEGAL_RISK
+    crisis: false
+  - pattern: "심판"
+    category: LEGAL_RISK
+    crisis: false
+
+level2:
+  # Clinical/diagnostic terms - warning
+  - pattern: "나르시시스트"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "소시오패스"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "가스라이팅"
+    category: HARMFUL_BEHAVIOR
+    crisis: false
+  - pattern: "회피성성격"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "경계성성격"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "공의존"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "트라우마"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "PTSD"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "ADHD"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "자폐"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "우울증"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  - pattern: "조울증"
+    category: CLINICAL_DIAGNOSIS
+    crisis: false
+  # Legal/relationship termination terms
+  - pattern: "이혼"
+    category: LEGAL_DECISION
+    crisis: false
+  - pattern: "절연"
+    category: RELATIONSHIP_TERMINATION
+    crisis: false
+  - pattern: "신고"
+    category: LEGAL_ACTION
+    crisis: false
+  - pattern: "변호사"
+    category: LEGAL_ACTION
+    crisis: false
+
+level3:
+  # Judgment/win-lose language - for logging only
+  - pattern: "이겼다"
+    category: JUDGMENT_LANGUAGE
+    crisis: false
+  - pattern: "졌다"
+    category: JUDGMENT_LANGUAGE
+    crisis: false
+  - pattern: "승자"
+    category: JUDGMENT_LANGUAGE
+    crisis: false
+  - pattern: "패자"
+    category: JUDGMENT_LANGUAGE
+    crisis: false
+  - pattern: "맞다"
+    category: JUDGMENT_LANGUAGE
+    crisis: false
+  - pattern: "틀렸다"
+    category: JUDGMENT_LANGUAGE
+    crisis: false
+  - pattern: "정답"
+    category: JUDGMENT_LANGUAGE
+    crisis: false
+  - pattern: "오답"
+    category: JUDGMENT_LANGUAGE
+    crisis: false
+
+level4:
+  # Relationship termination encouragement - UI complete ban
+  - pattern: "헤어지세요"
+    category: RELATIONSHIP_TERMINATION
+    crisis: false
+  - pattern: "이혼추천"
+    category: RELATIONSHIP_TERMINATION
+    crisis: false
+  - pattern: "절교"
+    category: RELATIONSHIP_TERMINATION
+    crisis: false
+  - pattern: "손절"
+    category: RELATIONSHIP_TERMINATION
+    crisis: false
+  - pattern: "인연끊기"
+    category: RELATIONSHIP_TERMINATION
+    crisis: false
+
+crisis_keywords:
+  # Domestic violence
+  - pattern: "때리"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "때렸"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "맞았"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "맞고"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "폭행"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "폭력"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "학대"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "때릴"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "때려"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "구타"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "상해"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  # Sexual violence
+  - pattern: "강간"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "성폭행"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "성폭력"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "강제로"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  # Self-harm/suicide
+  - pattern: "죽고싶"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "자살"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "자해"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "뛰어내리"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "목매"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "약먹고죽"
+    category: SELF_HARM
+    crisis: true
+  # Child abuse
+  - pattern: "아이를때"
+    category: CHILD_ABUSE
+    crisis: true
+  - pattern: "애를때"
+    category: CHILD_ABUSE
+    crisis: true
+  - pattern: "아동학대"
+    category: CHILD_ABUSE
+    crisis: true
+
+output_filter:
+  # Replace legal terms in LLM output
+  - term: "과실비율"
+    replacement: "화해 기여도"
+  - term: "판결"
+    replacement: "결과"
+  - term: "판사"
+    replacement: "중재자"
+  - term: "증거"
+    replacement: "입력"
+  - term: "심판"
+    replacement: "중재"
+  - term: "이겼다"
+    replacement: "[제거]"
+  - term: "졌다"
+    replacement: "[제거]"
+  - term: "승자"
+    replacement: "[제거]"
+  - term: "패자"
+    replacement: "[제거]"
+  - term: "맞다"
+    replacement: "다르다"
+  - term: "틀렸다"
+    replacement: "각자의 관점"
+  - term: "정답"
+    replacement: "[제거]"
+  - term: "오답"
+    replacement: "[제거]"
