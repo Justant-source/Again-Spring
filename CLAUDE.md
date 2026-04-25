@@ -1,6 +1,7 @@
 # CLAUDE.md — 다시봄 프로젝트 개발 가이드
 
 **프로젝트**: 다시봄 · Again Spring  
+**도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)  
 **진행 상황**: 백엔드 전체 구현 완료, FE-BE 통합 및 배포 준비 중  
 **기준일**: 2026-04-25
 
@@ -35,6 +36,16 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 
 3. **금지어/위기 키워드 확인 필수**  
    → 코드/프롬프트 수정 시 `shared/docs/FORBIDDEN_WORDS.md` 참조
+
+4. **🚨 PROD 배포 절대 규칙 — 위반 금지**  
+   → 명시적으로 "prod에 배포해줘" 지시가 없는 한 prod 환경에 절대 배포하지 않음  
+   → 배포 순서: **dev 배포 → commit & push (main 브랜치) → prod 배포**  
+   → prod에는 반드시 main 브랜치 기준으로만 배포
+
+5. **환경별 격리**  
+   → dev: `infra/docker-compose.dev.yml` + `infra/.env.dev`  
+   → prod: `infra/docker-compose.prod.yml` + `infra/.env.prod`  
+   → `.env.prod`는 절대 git에 커밋 금지
 
 ---
 
@@ -194,30 +205,87 @@ npm run test
 
 ## 🌐 배포 / 환경 변수
 
-### 개발 (localhost)
+### 환경 구분
+
+| 환경 | 도메인 | compose 파일 | env 파일 | nginx 포트 |
+|---|---|---|---|---|
+| **로컬 개발** | localhost | `docker-compose.yml` | — | — |
+| **서버 dev** | `dev.againspring.net` | `docker-compose.dev.yml` | `.env.dev` | 8090 |
+| **서버 prod** | `againspring.net` | `docker-compose.prod.yml` | `.env.prod` | 8091 |
+
+### 컨테이너 명명 규칙
+
+| 컨테이너 | dev | prod |
+|---|---|---|
+| MariaDB | `againspring-mariadb-dev` | `againspring-mariadb-prod` |
+| Backend | `againspring-backend-dev` | `againspring-backend-prod` |
+| Frontend | `againspring-frontend-dev` | `againspring-frontend-prod` |
+| Nginx | `againspring-nginx-dev` | `againspring-nginx-prod` |
+
+### 🚀 배포 명령
+
+#### 1단계: dev 배포 (항상 먼저)
+
+```bash
+cd /home/justant/Data/Again-Spring/infra
+
+# env 파일 준비 (최초 1회)
+cp .env.dev.example .env.dev
+vi .env.dev  # 실제 값 입력
+
+# 빌드 & 실행
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+
+# 확인
+docker compose -f docker-compose.dev.yml ps
+curl http://localhost:8090/api/health
+```
+
+#### 2단계: commit & push to main
+
+```bash
+git add -A
+git commit -m "feat: 변경 내용 요약"
+git push origin main
+```
+
+#### 3단계: prod 배포 (명시적 지시 시에만)
+
+```bash
+cd /home/justant/Data/Again-Spring/infra
+
+# env 파일 준비 (최초 1회)
+cp .env.prod.example .env.prod
+vi .env.prod  # 실제 값 입력 (기본값 없음, 전부 필수)
+
+# 빌드 & 실행
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+# 확인
+docker compose -f docker-compose.prod.yml ps
+curl http://localhost:8091/api/health
+```
+
+### Cloudflare Tunnel 라우팅
+
+```
+dev.againspring.net  →  localhost:8090
+againspring.net      →  localhost:8091
+www.againspring.net  →  localhost:8091
+```
+
+상세 설정: `infra/cloudflare/tunnel.md` 참조.
+
+### 로컬 개발 환경 변수
 
 ```bash
 DB_URL=jdbc:mariadb://localhost:3306/againspring?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
 DB_USER=againspring
 DB_PASSWORD=changeme
-JWT_SECRET=dev_secret_key_change_in_prod
+JWT_SECRET=dev-only-change-me-at-least-256-bits-long-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 CLAUDE_BIN=/usr/local/bin/claude
 NODE_ENV=development
 ```
-
-### 프로덕션 (달콩님 홈서버)
-
-```bash
-DB_URL=jdbc:mariadb://mariadb:3306/againspring?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-DB_USER=againspring
-DB_PASSWORD=${SECURE_PASS}
-JWT_SECRET=${RANDOM_32_CHAR_STRING}
-CLAUDE_BIN=/home/user/claude        # 서버에서 로그인된 Claude CLI
-ANTHROPIC_API_KEY=${API_KEY}        # (향후 API 전환 시)
-CLOUDFLARE_TOKEN=${CF_TOKEN}        # Tunnel 설정
-```
-
-**배포 상세**: `infra/docker-compose.yml` 참조.
 
 ---
 
@@ -251,14 +319,23 @@ CLOUDFLARE_TOKEN=${CF_TOKEN}        # Tunnel 설정
 - [ ] `shared/docs/DATABASE_SCHEMA.md` 스키마 준수
 - [ ] 테스트 커버리지 80% 이상 유지
 
-### 배포 전 (최종)
+### dev 배포 전
 
-- [ ] Integration 테스트 모두 통과
-- [ ] 금지어/위험 키워드 최종 검사
-- [ ] 환경 변수 프로덕션 값 적용
-- [ ] Cloudflare Tunnel 설정 완료
-- [ ] MariaDB 볼륨 백업 확인
-- [ ] 모니터링 대시보드 구성
+- [ ] `./gradlew test` 통과
+- [ ] 금지어/위험 키워드 검사 (`npm run lint:words`)
+- [ ] `infra/.env.dev` 값 확인
+- [ ] `docker compose -f docker-compose.dev.yml up -d --build` 성공
+- [ ] `curl http://localhost:8090/api/health` 응답 확인
+
+### prod 배포 전 (명시적 지시 시에만 수행)
+
+- [ ] dev에서 충분히 검증 완료
+- [ ] main 브랜치에 commit & push 완료
+- [ ] `infra/.env.prod` 모든 값 입력 (기본값 없음)
+- [ ] MariaDB 볼륨 백업 (`docker exec againspring-mariadb-prod mariadb-dump ...`)
+- [ ] `docker compose -f docker-compose.prod.yml up -d --build` 성공
+- [ ] `curl http://localhost:8091/api/health` 응답 확인
+- [ ] Cloudflare Tunnel 라우팅 정상 확인
 
 ---
 

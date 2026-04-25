@@ -89,8 +89,11 @@ body {
 
 /* Progress dashes */
 .dash-row { display: flex; gap: 6px; }
-.dash { width: 28px; height: 3px; border-radius: 2px; background: var(--L-border); }
+.dash { width: 28px; height: 3px; border-radius: 2px; background: var(--L-border); border: none; padding: 0; }
 .dash.on { background: var(--L-ink); }
+.dash.current { background: var(--L-ink); height: 5px; }
+.dash.clickable { cursor: pointer; }
+.dash.clickable:hover { opacity: 0.7; }
 
 /* Buttons */
 .btn-L {

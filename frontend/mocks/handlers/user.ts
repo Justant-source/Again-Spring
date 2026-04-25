@@ -1,6 +1,9 @@
 import { http, HttpResponse, delay } from 'msw';
+import { generateGuestNickname } from '@/lib/utils/guestNickname';
 
 const USERS = new Map<string, any>();
+const GUEST_SESSIONS = new Map<string, string>(); // inviteToken → guestId
+
 const SESSION_HISTORY: any[] = [
   {
     id: 'sess_history_1',
@@ -31,7 +34,16 @@ const SESSION_HISTORY: any[] = [
   },
 ];
 
+function makeGuestId() {
+  return `Guest-${String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')}`;
+}
+
 export const userHandlers = [
+  http.post('/api/auth/send-verification', async ({ request }) => {
+    await delay(300);
+    return HttpResponse.json(null, { status: 200 });
+  }),
+
   http.post('/api/auth/signup', async ({ request }) => {
     await delay(600);
     const body: any = await request.json();
@@ -41,11 +53,15 @@ export const userHandlers = [
       email: body.email,
       nickname: body.nickname,
       isGuest: false,
+      onboardingCompletedAt: null,
       temperatureHistory: [],
       createdAt: new Date().toISOString(),
     };
     USERS.set(id, user);
-    return HttpResponse.json(user);
+    return HttpResponse.json({
+      user,
+      token: { accessToken: `mock-token-${id}`, expiresIn: 86400 },
+    });
   }),
 
   http.post('/api/auth/login', async ({ request }) => {
@@ -57,26 +73,80 @@ export const userHandlers = [
       nickname: '서현',
       isGuest: false,
       communicationStyle: 'wave',
+      onboardingCompletedAt: '2026-04-01T10:00:00.000Z',
       temperatureHistory: [],
       createdAt: new Date().toISOString(),
     };
-    return HttpResponse.json(user);
+    return HttpResponse.json({
+      user,
+      token: { accessToken: 'mock-token-user_demo', expiresIn: 86400 },
+    });
+  }),
+
+  // 소셜 로그인 콜백 mock
+  http.post('/api/auth/oauth2/:provider', async ({ params }) => {
+    await delay(500);
+    const provider = params.provider as string;
+    const id = `oauth_${provider}_${Date.now().toString(36)}`;
+    const user = {
+      id,
+      email: `demo@${provider}.com`,
+      nickname: `${provider}사용자`,
+      isGuest: false,
+      onboardingCompletedAt: null,
+      temperatureHistory: [],
+      createdAt: new Date().toISOString(),
+    };
+    return HttpResponse.json({
+      user,
+      token: { accessToken: `mock-token-${id}`, expiresIn: 86400 },
+    });
   }),
 
   http.post('/api/auth/guest', async ({ request }) => {
     await delay(200);
-    const body: any = await request.json();
+    const body: any = await request.json().catch(() => ({}));
+    const inviteToken: string | undefined = body?.inviteToken;
+
+    let guestId: string;
+    if (inviteToken) {
+      // 같은 초대 URL은 동일한 Guest ID 반환
+      if (!GUEST_SESSIONS.has(inviteToken)) {
+        GUEST_SESSIONS.set(inviteToken, makeGuestId());
+      }
+      guestId = GUEST_SESSIONS.get(inviteToken)!;
+    } else {
+      guestId = makeGuestId();
+    }
+
     return HttpResponse.json({
-      id: `guest_${Date.now().toString(36)}`,
-      nickname: body?.nickname || '손님',
-      isGuest: true,
-      temperatureHistory: [],
-      createdAt: new Date().toISOString(),
+      user: {
+        id: guestId,
+        nickname: body?.nickname?.trim() || generateGuestNickname(),
+        isGuest: true,
+        temperatureHistory: [],
+        createdAt: new Date().toISOString(),
+      },
+      token: { accessToken: `mock-guest-token-${guestId}`, expiresIn: 7200 },
     });
   }),
 
   http.get('/api/users/me/history', async () => {
     await delay(300);
     return HttpResponse.json(SESSION_HISTORY);
+  }),
+
+  http.get('/api/users/me', async () => {
+    await delay(200);
+    return HttpResponse.json({
+      id: 'user_demo',
+      email: 'demo@example.com',
+      nickname: '서현',
+      isGuest: false,
+      communicationStyle: 'wave',
+      onboardingCompletedAt: '2026-04-01T10:00:00.000Z',
+      temperatureHistory: [],
+      createdAt: new Date().toISOString(),
+    });
   }),
 ];

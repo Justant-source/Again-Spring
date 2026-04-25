@@ -107,8 +107,8 @@ export default function DescribePage() {
 
         <div className="serif" style={{ fontSize: 19, lineHeight: 1.5, marginBottom: 18 }}>
           {isBMode
-            ? '이번엔 당신의 이야기를<br />들려주세요.'
-            : '어떤 일이 있었는지<br />편한 말로 적어주세요.'}
+            ? <>이번엔 당신의 이야기를<br />들려주세요.</>
+            : <>어떤 일이 있었는지<br />편한 말로 적어주세요.</>}
         </div>
 
         {/* Crisis Modal - Level 1 */}

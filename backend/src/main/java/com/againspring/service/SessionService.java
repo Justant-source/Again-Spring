@@ -50,6 +50,13 @@ public class SessionService {
      * @throws BusinessException if description contains crisis keywords
      */
     public CreateSessionResponse createSession(String createdByUserId, CreateSessionRequest request) {
+        // A는 온보딩(성격검사)을 반드시 완료해야 세션을 생성할 수 있음
+        User creator = userRepository.findByIdAndDeletedAtIsNull(createdByUserId)
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다"));
+        if (creator.getOnboardingCompletedAt() == null) {
+            throw new BusinessException("ONBOARDING_REQUIRED", "성격검사를 먼저 완료해주세요", 403);
+        }
+
         // Validate relation type
         try {
             RelationType.fromValue(request.getRelationType());

@@ -20,6 +20,7 @@ export interface User {
   isGuest: boolean;
   communicationStyle?: CommunicationStyle;
   onboardingAnswers?: number[];
+  onboardingCompletedAt?: string | null;
   temperatureHistory: TemperatureEntry[];
   createdAt: string;
 }

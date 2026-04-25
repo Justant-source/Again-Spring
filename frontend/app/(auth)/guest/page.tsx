@@ -1,19 +1,29 @@
 // ✅ MOCKUP APPLIED — source: design/handoff/tone-L-screens.jsx (LandingScreen)
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
+import { generateGuestNickname } from '@/lib/utils/guestNickname';
 
 export default function GuestPage() {
   const router = useRouter();
   const setUser = useUserStore((s) => s.setUser);
 
-  const [nickname, setNickname] = useState('손님');
+  const [nickname, setNickname] = useState('');
+  const [placeholder, setPlaceholder] = useState('닉네임 (선택)');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setPlaceholder(generateGuestNickname());
+  }, []);
+
+  const handleShuffle = () => {
+    setPlaceholder(generateGuestNickname());
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,8 +31,9 @@ export default function GuestPage() {
 
     setLoading(true);
     try {
+      const finalNickname = nickname.trim() || placeholder;
       const response = await api.post('/api/auth/guest', {
-        nickname: nickname || '손님',
+        nickname: finalNickname,
       });
       setUser(response.data);
       router.push('/onboarding/intro');
@@ -52,7 +63,7 @@ export default function GuestPage() {
             <div>
               <input
                 type="text"
-                placeholder="닉네임 (선택)"
+                placeholder={placeholder}
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 style={{
@@ -68,8 +79,17 @@ export default function GuestPage() {
                 onFocus={(e) => (e.target.style.borderBottomColor = 'var(--L-ink)')}
                 onBlur={(e) => (e.target.style.borderBottomColor = 'var(--L-border)')}
               />
-              <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 4 }}>
-                입력하지 않으면 "손님"으로 설정돼요
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>
+                  비워두면 “{placeholder}”로 설정돼요
+                </div>
+                <button
+                  type="button"
+                  onClick={handleShuffle}
+                  style={{ background: 'none', border: 'none', color: 'var(--L-ink)', fontSize: 11, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                >
+                  다른 이름
+                </button>
               </div>
             </div>
 

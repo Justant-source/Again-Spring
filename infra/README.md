@@ -1,45 +1,71 @@
 # 다시봄 인프라
 
-로컬 개발 환경용 MongoDB 7 및 Neo4j 5 Docker Compose 설정.
+## 환경 구분
 
-## 빠른 시작
+| 환경 | 도메인 | compose 파일 | 호스트 포트 |
+|---|---|---|---|
+| 로컬 개발 | localhost | `docker-compose.yml` | DB 3306 |
+| 서버 dev | `dev.againspring.net` | `docker-compose.dev.yml` | nginx 8090, db 3309 |
+| 서버 prod | `againspring.net` | `docker-compose.prod.yml` | nginx 8091 |
+
+## 로컬 개발 (DB만)
 
 ```bash
-# .env 파일 작성
-cp .env.example .env
-# MONGO_PASSWORD, NEO4J_PASSWORD, JWT_SECRET 설정
+cd infra
+docker compose up -d        # MariaDB 3306
+docker compose logs -f
+docker compose down
+```
 
-# 서비스 시작
-docker compose up -d
+## 서버 dev 배포
+
+```bash
+# 최초 1회: env 파일 준비
+cp .env.dev.example .env.dev
+# .env.dev 편집
+
+# 빌드 & 실행
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 
 # 상태 확인
-docker compose ps
-docker compose logs -f
+docker compose -f docker-compose.dev.yml ps
+curl http://localhost:8090/api/health
+
+# 로그
+docker compose -f docker-compose.dev.yml logs -f
+
+# 중단
+docker compose -f docker-compose.dev.yml down
 ```
 
-## 접근 방법
+## 서버 prod 배포 (명시적 지시 시에만)
 
-- **MongoDB**: `mongodb://admin:changeme@localhost:27017/againspring?authSource=admin`
-- **Neo4j 브라우저**: http://localhost:7474 (사용자: neo4j, 비밀번호: `.env`의 `NEO4J_PASSWORD`)
-- **Neo4j Bolt**: `bolt://localhost:7687`
-
-## 정리
+> **주의**: dev 검증 → commit & push to main → prod 순서 준수
 
 ```bash
-# 컨테이너 및 볼륨 제거
-docker compose down -v
+# 최초 1회: env 파일 준비
+cp .env.prod.example .env.prod
+# .env.prod 편집 (기본값 없음, 전부 필수)
+
+# 빌드 & 실행
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+# 상태 확인
+docker compose -f docker-compose.prod.yml ps
+curl http://localhost:8091/api/health
 ```
-
-## 프로덕션 배포
-
-프로덕션 환경에서는 `-f docker-compose.prod.yml` 오버레이를 적용:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
-
-이 설정은 포트 노출을 최소화하고, 기본 비밀번호를 제거하며, 리소스 제한을 적용합니다.
 
 ## Cloudflare Tunnel
 
-원격 접근은 `cloudflare/` 디렉토리의 설정으로 관리합니다 (현재 TBD).
+`cloudflare/tunnel.md` 참조.
+
+## 포트 현황
+
+| 포트 | 서비스 |
+|---|---|
+| 3306 | againspring-mariadb (로컬 dev) |
+| 3308 | greenforest-mysql-dev |
+| 3309 | againspring-mariadb-dev |
+| 8080 | greenforest-nginx-dev |
+| 8090 | againspring-nginx-dev |
+| 8091 | againspring-nginx-prod |

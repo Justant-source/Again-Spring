@@ -33,11 +33,17 @@ public class User {
     @Column(length = 32)
     private String id;
 
-    @Column(length = 255, unique = true, nullable = false)
+    @Column(length = 255, unique = true)
     private String email;
 
     @Column(length = 255)
     private String passwordHash;
+
+    @Column(length = 50)
+    private String provider;
+
+    @Column(name = "provider_id", length = 255)
+    private String providerId;
 
     @Column(length = 100, nullable = false)
     private String nickname;

@@ -28,6 +28,8 @@ export default function InvitePage() {
   const [toneIdx, setToneIdx] = useState(
     inviteMessageTone === 'soft' ? 0 : inviteMessageTone === 'light' ? 1 : 2,
   );
+  const [message, setMessage] = useState(TONES[toneIdx].message);
+  const [edited, setEdited] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -40,18 +42,34 @@ export default function InvitePage() {
     return null;
   }
 
-  const shortToken = inviteToken.slice(-4);
-  const shareUrl = `again-spring.com/s/${shortToken}`;
+  const shareUrl = `http://100.99.33.127/session/join/${inviteToken}`;
 
   const handleToneChange = (idx: number) => {
+    if (edited && !window.confirm('편집한 내용이 사라져요. 새 말투로 바꿀까요?')) {
+      return;
+    }
     setToneIdx(idx);
+    setMessage(TONES[idx].message);
+    setEdited(false);
     const tones: Array<'soft' | 'light' | 'serious'> = ['soft', 'light', 'serious'];
     setInviteTone(tones[idx]);
   };
 
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
+    setEdited(true);
+  };
+
+  const handleResetMessage = () => {
+    setMessage(TONES[toneIdx].message);
+    setEdited(false);
+  };
+
+  const fullShareText = `${message}\n\n${shareUrl}`;
+
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(fullShareText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -94,13 +112,41 @@ export default function InvitePage() {
           ))}
         </div>
 
-        <div className="letter-card" style={{ padding: 22, marginBottom: 20 }}>
-          <div style={{ fontSize: 14, lineHeight: 1.8, whiteSpace: 'pre-line', fontFamily: 'var(--font-serif)' }}>
-            {TONES[toneIdx].message}
-          </div>
+        <div className="letter-card" style={{ padding: 22, marginBottom: 8 }}>
+          <textarea
+            value={message}
+            onChange={handleMessageChange}
+            rows={Math.max(4, message.split('\n').length)}
+            placeholder="상대방에게 전할 메시지를 적어주세요"
+            style={{
+              width: '100%',
+              fontSize: 14,
+              lineHeight: 1.8,
+              fontFamily: 'var(--font-serif)',
+              color: 'var(--L-ink)',
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              resize: 'none',
+              padding: 0,
+            }}
+          />
           <div style={{ marginTop: 14, fontSize: 12, color: 'var(--L-sub)', borderTop: '1px solid var(--L-border)', paddingTop: 10 }}>
             {shareUrl}
           </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, fontSize: 11, color: 'var(--L-sub)' }}>
+          <span>{edited ? '✎ 직접 편집한 메시지예요' : '바로 클릭해서 편집할 수 있어요'}</span>
+          {edited && (
+            <button
+              type="button"
+              onClick={handleResetMessage}
+              style={{ background: 'none', border: 'none', color: 'var(--L-ink)', textDecoration: 'underline', cursor: 'pointer', fontSize: 11, padding: 0 }}
+            >
+              원래대로
+            </button>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>

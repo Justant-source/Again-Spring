@@ -29,6 +29,10 @@ backend/target/
 .env
 .env.*
 !.env.example
+infra/.env.dev
+infra/.env.prod
+!infra/.env.dev.example
+!infra/.env.prod.example
 *.pem
 *.key
 *.p12

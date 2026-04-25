@@ -42,6 +42,9 @@ public class AuthResponse {
         @JsonProperty("isGuest")
         private boolean isGuest;
 
+        @JsonProperty("onboardingCompletedAt")
+        private Instant onboardingCompletedAt;
+
         @JsonProperty("createdAt")
         private Instant createdAt;
     }

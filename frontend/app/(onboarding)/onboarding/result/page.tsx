@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { STYLE_MOTIF } from '@/components/shared/Motif';
@@ -12,8 +12,12 @@ import type { CommunicationStyle } from '@/lib/types';
 
 export default function OnboardingResultPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useUserStore((s) => s.user);
   const [mounted, setMounted] = useState(false);
+
+  // ?next= 파라미터: 온보딩 완료 후 돌아갈 경로 (예: /session/new, /session/join/TOKEN)
+  const nextPath = searchParams.get('next') ?? '/session/new';
 
   useEffect(() => {
     setMounted(true);
@@ -135,7 +139,7 @@ export default function OnboardingResultPage() {
             animation: mounted ? 'fade-in-up 0.6s ease-out 0.5s both' : 'none',
           }}
         >
-          <Link href="/session/new" className="btn-L" style={{ textAlign: 'center', textDecoration: 'none', display: 'block' }}>
+          <Link href={nextPath} className="btn-L" style={{ textAlign: 'center', textDecoration: 'none', display: 'block' }}>
             세션 시작하기
           </Link>
           <button

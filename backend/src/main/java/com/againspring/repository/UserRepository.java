@@ -25,4 +25,9 @@ public interface UserRepository extends JpaRepository<User, String> {
      * 이메일 존재 여부 확인
      */
     boolean existsByEmail(String email);
+
+    /**
+     * OAuth provider + providerId로 사용자 조회
+     */
+    Optional<User> findByProviderAndProviderId(String provider, String providerId);
 }

@@ -27,4 +27,8 @@ public class SignupRequest {
 
     @NotBlank(message = "Nickname is required")
     private String nickname;
+
+    @NotBlank(message = "Verification code is required")
+    @Size(min = 6, max = 6, message = "Verification code must be 6 digits")
+    private String verificationCode;
 }

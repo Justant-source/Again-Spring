@@ -4,12 +4,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Guest token request DTO.
- */
 @Getter
 @Setter
 @NoArgsConstructor
 public class GuestRequest {
-    // Empty body — guest token issue is stateless
+
+    /** 초대 토큰 (같은 URL 재접속 시 동일 Guest ID 반환) */
+    private String inviteToken;
+
+    /** 게스트 닉네임 (선택) */
+    private String nickname;
 }

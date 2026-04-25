@@ -31,22 +31,46 @@ export default function OnboardingPage() {
   const currentAnswer = answers[currentIdx];
   const isAnswered = currentAnswer !== null;
   const isLastQuestion = currentIdx === 9;
+  const maxVisited = Math.max(
+    currentIdx,
+    answers.findLastIndex((a) => a !== null)
+  );
+
+  const submitAnswers = async (allAnswers: number[]) => {
+    setLoading(true);
+    try {
+      setOnboardingAnswers(allAnswers);
+      const style = determineStyle(allAnswers);
+      setStyle(style);
+      router.push('/onboarding/result');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelect = (val: number) => {
+    const newAnswers = [...answers];
+    newAnswers[currentIdx] = val;
+    setAnswers(newAnswers);
+
+    if (isLastQuestion) {
+      if (newAnswers.every((a) => a !== null)) {
+        submitAnswers(newAnswers as number[]);
+      }
+      return;
+    }
+
+    // Auto-advance after a short delay so user sees their selection
+    setTimeout(() => {
+      setCurrentIdx((idx) => (idx === currentIdx ? idx + 1 : idx));
+    }, 250);
+  };
 
   const handleNext = async () => {
     if (!isAnswered) return;
 
     if (isLastQuestion) {
-      // Submit all answers
-      setLoading(true);
-      try {
-        const allAnswers = answers as number[];
-        setOnboardingAnswers(allAnswers);
-        const style = determineStyle(allAnswers);
-        setStyle(style);
-        router.push('/onboarding/result');
-      } finally {
-        setLoading(false);
-      }
+      await submitAnswers(answers as number[]);
     } else {
       setCurrentIdx(currentIdx + 1);
     }
@@ -58,12 +82,23 @@ export default function OnboardingPage() {
     }
   };
 
+  const handleJumpTo = (idx: number) => {
+    if (idx <= maxVisited + 1 && idx < 10) {
+      setCurrentIdx(idx);
+    }
+  };
+
   return (
     <PhoneFrame tone="L">
       <PhoneHeader title="나의 대화 성향" back={false} />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ marginBottom: 28 }}>
-          <Dashes n={10} done={currentIdx} />
+          <Dashes
+            n={10}
+            done={answers.filter((a) => a !== null).length}
+            current={currentIdx}
+            onDashClick={handleJumpTo}
+          />
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--L-sub)' }}>
             {currentIdx + 1} / 10
           </div>
@@ -73,11 +108,7 @@ export default function OnboardingPage() {
           <LikertQuestion
             question={currentQuestion}
             value={currentAnswer}
-            onChange={(val) => {
-              const newAnswers = [...answers];
-              newAnswers[currentIdx] = val;
-              setAnswers(newAnswers);
-            }}
+            onChange={handleSelect}
           />
         </div>
 

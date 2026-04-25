@@ -2,9 +2,11 @@ package com.againspring.api;
 
 import com.againspring.api.dto.request.GuestRequest;
 import com.againspring.api.dto.request.LoginRequest;
+import com.againspring.api.dto.request.SendVerificationRequest;
 import com.againspring.api.dto.request.SignupRequest;
 import com.againspring.api.dto.response.AuthResponse;
 import com.againspring.service.AuthService;
+import com.againspring.service.EmailVerificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -30,6 +32,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final EmailVerificationService emailVerificationService;
+
+    /**
+     * Send email verification code.
+     *
+     * @param request send verification request
+     * @return 200 OK
+     */
+    @PostMapping("/send-verification")
+    @Operation(summary = "Send email verification code", description = "Send a 6-digit code to the email address")
+    @ApiResponse(responseCode = "200", description = "Code sent")
+    @ApiResponse(responseCode = "400", description = "Invalid email")
+    public ResponseEntity<Void> sendVerification(@Valid @RequestBody SendVerificationRequest request) {
+        emailVerificationService.sendCode(request.getEmail());
+        return ResponseEntity.ok().build();
+    }
 
     /**
      * User signup.
