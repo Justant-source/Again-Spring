@@ -77,8 +77,24 @@ export default function InvitePage() {
     }
   };
 
-  const handleKakaoShare = () => {
-    alert('카카오톡 연동은 배포 후 연결돼요');
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: '다시봄',
+          text: message,
+          url: shareUrl,
+        });
+      } catch (error) {
+        // User cancelled or sharing failed, fall back to copy
+        if ((error as Error).name !== 'AbortError') {
+          handleCopyLink();
+        }
+      }
+    } else {
+      // Fallback: copy to clipboard
+      handleCopyLink();
+    }
   };
 
   return (
@@ -152,13 +168,10 @@ export default function InvitePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
           <button
             className="btn-L"
-            style={{ background: '#FEE500', color: '#3C1E1E', width: '100%' }}
-            onClick={handleKakaoShare}
+            style={{ width: '100%' }}
+            onClick={handleNativeShare}
           >
-            카카오톡으로 보내기
-          </button>
-          <button className="btn-L ghost" style={{ width: '100%' }} onClick={handleCopyLink}>
-            {copied ? '링크를 복사했어요' : '문자 · 링크 복사'}
+            {copied ? '링크를 복사했어요' : '공유하기'}
           </button>
         </div>
 

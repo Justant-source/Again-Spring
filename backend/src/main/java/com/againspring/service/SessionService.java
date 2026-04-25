@@ -5,6 +5,7 @@ import com.againspring.api.dto.request.JoinSessionRequest;
 import com.againspring.api.dto.response.CreateSessionResponse;
 import com.againspring.api.dto.response.SessionListItemResponse;
 import com.againspring.api.dto.response.SessionResponse;
+import com.againspring.api.dto.response.SessionStatusResponse;
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.enums.RelationType;
 import com.againspring.domain.enums.SessionStatus;
@@ -222,6 +223,30 @@ public class SessionService {
         log.info("Session joined: id={}, invitee={}", saved.getId(), userId.orElse("guest"));
 
         return mapToSessionResponse(saved, userId.orElse("guest"));
+    }
+
+    /**
+     * Get session status (for polling).
+     *
+     * @param sessionId the session ID
+     * @return session status response
+     * @throws BusinessException if session not found
+     */
+    @Transactional(readOnly = true)
+    public SessionStatusResponse getSessionStatus(String sessionId) {
+        Session session = sessionRepository
+                .findById(sessionId)
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+
+        boolean hasPartnerJoined = session.getInviteeUserId() != null || session.getInviteeGuestName() != null;
+
+        return SessionStatusResponse.builder()
+                .id(session.getId())
+                .status(session.getStatus().getValue())
+                .currentTurn(session.getCurrentTurn())
+                .hasPartnerJoined(hasPartnerJoined)
+                .lastUpdatedAt(session.getUpdatedAt())
+                .build();
     }
 
     /**

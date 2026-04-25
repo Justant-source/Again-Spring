@@ -5,6 +5,7 @@ import com.againspring.api.dto.request.JoinSessionRequest;
 import com.againspring.api.dto.response.CreateSessionResponse;
 import com.againspring.api.dto.response.SessionListItemResponse;
 import com.againspring.api.dto.response.SessionResponse;
+import com.againspring.api.dto.response.SessionStatusResponse;
 import com.againspring.service.SessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -126,6 +127,23 @@ public class SessionController {
                 .map(UserDetails::getUsername);
 
         SessionResponse response = sessionService.joinSession(token, request, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get session status (polling endpoint).
+     * Public endpoint — returns basic status without full session details.
+     *
+     * @param sessionId the session ID
+     * @return session status response
+     */
+    @GetMapping("/{id}/status")
+    @Operation(summary = "Get session status", description = "Poll for session status updates (e.g., partner arrival)")
+    @ApiResponse(responseCode = "200", description = "Status retrieved")
+    @ApiResponse(responseCode = "404", description = "Session not found")
+    public ResponseEntity<SessionStatusResponse> getSessionStatus(
+            @PathVariable("id") String sessionId) {
+        SessionStatusResponse response = sessionService.getSessionStatus(sessionId);
         return ResponseEntity.ok(response);
     }
 

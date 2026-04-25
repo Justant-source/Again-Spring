@@ -19,8 +19,11 @@ export default function WaitPage() {
       router.push('/session/new');
       return;
     }
+
     const startTime = Date.now();
-    const interval = setInterval(() => {
+
+    // Timer for elapsed time
+    const timerInterval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       const hours = Math.floor(elapsed / 3600);
       const minutes = Math.floor((elapsed % 3600) / 60);
@@ -32,7 +35,25 @@ export default function WaitPage() {
       }
     }, 1000);
 
-    return () => clearInterval(interval);
+    // Polling for partner arrival (every 5 seconds)
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await api.get(`/sessions/${sessionId}/status`);
+        if (response.data?.hasPartnerJoined) {
+          clearInterval(timerInterval);
+          clearInterval(pollInterval);
+          router.push('/session/mediation?role=A');
+        }
+      } catch (error) {
+        // Silently ignore polling errors, just continue waiting
+        console.debug('Polling error (will retry):', error);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(timerInterval);
+      clearInterval(pollInterval);
+    };
   }, [sessionId, router]);
 
   if (!sessionId) {
