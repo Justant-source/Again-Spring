@@ -22,13 +22,6 @@ export const mockReports: Record<string, Report> = {
       interpretation:
         'A님은 관계에서 연결감을 더 원하시고, B님은 자율성을 더 중요하게 여기세요.',
     },
-    temperature: 35.6,
-    fourHorsemen: {
-      criticism: { detected: true, examples: ['저를 중요하게 생각 안 하는 것 같아요'] },
-      defensiveness: { detected: true, examples: ['친구 약속은 이미 몇 달 전부터…'] },
-      contempt: { detected: false },
-      stonewalling: { detected: false },
-    },
     nvcScripts: {
       bToA: {
         observation: '지난 3주 동안 세 번 주말 약속이 당일에 바뀌었어',
@@ -71,13 +64,6 @@ export const mockReports: Record<string, Report> = {
       positionB: { x: 60, y: 0 },
       interpretation:
         "두 분은 '연결 ↔ 자율' 축에서 서로 다른 자리에 계세요. 누가 맞고 틀린 게 아닙니다.",
-    },
-    temperature: 36.2,
-    fourHorsemen: {
-      criticism: { detected: false },
-      defensiveness: { detected: true, examples: ['나는 원래 그래'] },
-      contempt: { detected: false },
-      stonewalling: { detected: true, examples: ['그냥 쉬고 싶어'] },
     },
     nvcScripts: {
       aToB: {
@@ -122,13 +108,6 @@ export const mockReports: Record<string, Report> = {
       interpretation:
         "재정 관리에서 '안정성'과 '도전'에 대한 우선순위가 서로 다르세요.",
     },
-    temperature: 35.2,
-    fourHorsemen: {
-      criticism: { detected: true, examples: ['왜 이런 것도 안 말해'] },
-      defensiveness: { detected: true, examples: ['나도 너 생각해서 한 거야'] },
-      contempt: { detected: false },
-      stonewalling: { detected: false },
-    },
     nvcScripts: {
       aToB: {
         observation: '몇 달간 대출 사실을 공유받지 못했어',
@@ -163,13 +142,6 @@ export const mockReports: Record<string, Report> = {
       positionB: null,
       interpretation: 'B님의 입력이 있어야 완전한 분석이 가능해요.',
     },
-    temperature: null,
-    fourHorsemen: {
-      criticism: { detected: false },
-      defensiveness: { detected: false },
-      contempt: { detected: false },
-      stonewalling: { detected: false },
-    },
     repairSuggestions: [],
     isSoloMode: true,
     aPatternFeedback:
@@ -180,7 +152,7 @@ export const mockReports: Record<string, Report> = {
     createdAt: new Date().toISOString(),
   },
 
-  four_horsemen: {
+  conflict_intense: {
     id: 'rep_fourh',
     sessionId: 'sess_fourh',
     conflictType: 'mixed',
@@ -199,13 +171,6 @@ export const mockReports: Record<string, Report> = {
       positionB: { x: 55, y: -50 },
       interpretation:
         '두 분 모두 지침이 깊어 보여요. 전문가와 함께 안전한 대화 공간을 마련해보는 것도 좋겠습니다.',
-    },
-    temperature: 35.0,
-    fourHorsemen: {
-      criticism: { detected: true, examples: ['당신은 항상 그래'] },
-      defensiveness: { detected: true, examples: ['그건 네가 먼저야'] },
-      contempt: { detected: true, examples: ['그런 것도 몰라'] },
-      stonewalling: { detected: true, examples: ['말하기 싫어'] },
     },
     nvcScripts: {
       aToB: {
@@ -231,7 +196,7 @@ export const mockReports: Record<string, Report> = {
   },
 };
 
-const ORDER = ['factual', 'difference', 'mixed', 'solo', 'four_horsemen'] as const;
+const ORDER = ['factual', 'difference', 'mixed', 'solo', 'conflict_intense'] as const;
 
 /** Stable picker so the same sessionId always gets the same scenario. */
 export function pickReport(sessionId: string) {

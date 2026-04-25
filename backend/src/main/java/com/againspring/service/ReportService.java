@@ -102,7 +102,7 @@ public class ReportService {
 
         String userInput = "Please analyze the entire mediation session and provide a comprehensive report with: " +
                 "1. Contribution ratio (A% vs B%), 2. Four horsemen detection, 3. NVC scripts, 4. Needs map positions, " +
-                "5. Relationship temperature, 6. Repair suggestions.\n\n" + turnContext.toString();
+                "5. Repair suggestions.\n\n" + turnContext.toString();
 
         LLMRequest request = promptAssembler.assemble(
                 0, // Special turn number for report
@@ -179,13 +179,6 @@ public class ReportService {
             report.setNvcScripts(nvc);
         }
 
-        // Validate temperature and needs map
-        if (parsed.temperature != null && parsed.temperature >= 0 && parsed.temperature <= 100) {
-            report.setTemperature(parsed.temperature);
-        } else {
-            report.setTemperature(36.5); // Default body temperature
-        }
-
         if (parsed.needsMap != null && needsMapValidator.validateMap(convertParsedToReportNeedsMap(parsed.needsMap))) {
             report.setNeedsMap(convertParsedToReportNeedsMap(parsed.needsMap));
         }
@@ -227,8 +220,6 @@ public class ReportService {
         session.setReportId(saved.getId());
         sessionRepository.save(session);
 
-        // 6. Temperature history now recorded by SessionCompletedGraphListener via TemperatureHistory table.
-
         log.info("Report generated: id={}, session={}, duration={}ms", saved.getId(), sessionId,
                 saved.getGenerationDurationMs());
 
@@ -243,7 +234,6 @@ public class ReportService {
                 .sessionId(session.getId())
                 .conflictType(session.getConflictType())
                 .soloMode(Boolean.TRUE.equals(session.getSoloMode()))
-                .temperature(36.5)
                 .createdAt(Instant.now(clock))
                 .build();
     }

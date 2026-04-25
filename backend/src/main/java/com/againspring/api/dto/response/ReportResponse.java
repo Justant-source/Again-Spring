@@ -36,9 +36,6 @@ public class ReportResponse {
 
     private NeedsMapResponse needsMap;
 
-    private Double temperature;
-
-    private FourHorsemenResponse fourHorsemen;
 
     private NVCScriptsResponse nvcScripts;
 
@@ -112,30 +109,6 @@ public class ReportResponse {
         public static class Position {
             private int x;
             private int y;
-        }
-    }
-
-    /**
-     * Embedded DTO: Four Horsemen analysis.
-     */
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class FourHorsemenResponse {
-        private HorsemenItem criticism;
-        private HorsemenItem defensiveness;
-        private HorsemenItem contempt;
-        private HorsemenItem stonewalling;
-
-        @Data
-        @Builder
-        @NoArgsConstructor
-        @AllArgsConstructor
-        public static class HorsemenItem {
-            private boolean detected;
-            private String intensity;
-            private List<String> examples;
         }
     }
 

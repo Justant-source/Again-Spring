@@ -2,17 +2,13 @@ package com.againspring.service.graph;
 
 import com.againspring.api.dto.response.graph.PersonRelationshipSummary;
 import com.againspring.api.dto.response.graph.SessionHistoryItem;
-import com.againspring.api.dto.response.graph.TemperatureEntry;
 import com.againspring.domain.enums.ConflictType;
 import com.againspring.domain.enums.RelationType;
 import com.againspring.domain.relationship.ConflictHistory;
-import com.againspring.domain.relationship.TemperatureHistory;
 import com.againspring.domain.relationship.UserRelationship;
 import com.againspring.repository.ConflictHistoryRepository;
-import com.againspring.repository.TemperatureHistoryRepository;
 import com.againspring.repository.UserRelationshipRepository;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +26,6 @@ public class RelationshipGraphService {
 
     private final UserRelationshipRepository userRelationshipRepository;
     private final ConflictHistoryRepository conflictHistoryRepository;
-    private final TemperatureHistoryRepository temperatureHistoryRepository;
 
     /**
      * 관계 엔트리 생성 또는 업데이트
@@ -50,24 +45,22 @@ public class RelationshipGraphService {
                                 .userBId(userB)
                                 .relationshipType(relationType)
                                 .sessionCount(0)
-                                .averageTemperature(36.5)
                                 .build()
                 ));
     }
 
     /**
      * 갈등 기록 (세션 완료 시 호출)
-     * UserRelationship 업데이트 및 ConflictHistory, TemperatureHistory 저장
+     * UserRelationship 업데이트 및 ConflictHistory 저장
      */
     public void recordConflict(String userAIdInput, String userBIdInput, RelationType relationType,
-                               String sessionId, ConflictType conflictType, double temperature,
+                               String sessionId, ConflictType conflictType,
                                Instant startedAt, Instant endedAt) {
 
         // 정규화: 작은 ID를 userA로
         String userA = userAIdInput.compareTo(userBIdInput) <= 0 ? userAIdInput : userBIdInput;
         String userB = userA.equals(userAIdInput) ? userBIdInput : userAIdInput;
 
-        // UserRelationship 업서트 및 온도 통계 업데이트
         UserRelationship rel = upsertRelationship(userA, userB, relationType);
         rel.setLastSessionAt(endedAt);
         if (rel.getFirstSessionAt() == null) {
@@ -75,43 +68,19 @@ public class RelationshipGraphService {
         }
 
         int count = rel.getSessionCount() != null ? rel.getSessionCount() : 0;
-        double prevAvg = rel.getAverageTemperature() != null ? rel.getAverageTemperature() : temperature;
-        double newAvg = (prevAvg * count + temperature) / (count + 1);
-
         rel.setSessionCount(count + 1);
-        rel.setAverageTemperature(newAvg);
         userRelationshipRepository.save(rel);
 
-        // ConflictHistory 저장
         conflictHistoryRepository.save(ConflictHistory.builder()
                 .sessionId(sessionId)
                 .userAId(userA)
                 .userBId(userB)
                 .relationshipType(relationType.name())
                 .conflictType(conflictType != null ? conflictType.name() : null)
-                .temperature(temperature)
                 .createdAt(endedAt)
                 .build());
 
-        // TemperatureHistory 저장 (양방향)
-        temperatureHistoryRepository.save(TemperatureHistory.builder()
-                .userId(userA)
-                .relatedUserId(userB)
-                .sessionId(sessionId)
-                .temperature(temperature)
-                .recordedAt(endedAt)
-                .build());
-
-        temperatureHistoryRepository.save(TemperatureHistory.builder()
-                .userId(userB)
-                .relatedUserId(userA)
-                .sessionId(sessionId)
-                .temperature(temperature)
-                .recordedAt(endedAt)
-                .build());
-
-        log.info("Recorded conflict for users {} and {} in session {} (temp={})",
-                userA, userB, sessionId, temperature);
+        log.info("Recorded conflict for users {} and {} in session {}", userA, userB, sessionId);
     }
 
     /**
@@ -125,11 +94,10 @@ public class RelationshipGraphService {
                 .map(rel -> {
                     String counterpartId = rel.getUserAId().equals(userId) ? rel.getUserBId() : rel.getUserAId();
                     return PersonRelationshipSummary.builder()
-                            .personId(rel.getId())  // relationship ID as identifier
-                            .personNickname(counterpartId)  // fallback to ID since we don't have display name in SQL
+                            .personId(rel.getId())
+                            .personNickname(counterpartId)
                             .relationType(rel.getRelationshipType())
                             .sessionCount(rel.getSessionCount() != null ? rel.getSessionCount() : 0)
-                            .averageTemperature(rel.getAverageTemperature() != null ? rel.getAverageTemperature() : 36.5)
                             .lastSessionAt(rel.getLastSessionAt())
                             .build();
                 })
@@ -150,26 +118,10 @@ public class RelationshipGraphService {
         return conflicts.stream()
                 .map(conflict -> SessionHistoryItem.builder()
                         .sessionId(conflict.getSessionId())
-                        .temperature(conflict.getTemperature())
                         .conflictType(conflict.getConflictType() != null
                                 ? ConflictType.valueOf(conflict.getConflictType())
                                 : null)
                         .createdAt(conflict.getCreatedAt())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 관계 온도 추이 타임라인 (그래프용)
-     */
-    public List<TemperatureEntry> temperatureTimeline(String userId, String counterpartUserId) {
-        List<TemperatureHistory> temperatures = temperatureHistoryRepository
-                .findByUserIdAndRelatedUserIdOrderByRecordedAtAsc(userId, counterpartUserId);
-
-        return temperatures.stream()
-                .map(temp -> TemperatureEntry.builder()
-                        .date(temp.getRecordedAt().toString())
-                        .temperature(temp.getTemperature())
                         .build())
                 .collect(Collectors.toList());
     }

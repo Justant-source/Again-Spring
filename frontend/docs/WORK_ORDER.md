@@ -375,13 +375,6 @@ export interface Report {
     positionB: { x: number; y: number };
     interpretation: string;
   };
-  temperature: number; // 35.0 ~ 38.0
-  fourHorsemen: {
-    criticism: { detected: boolean; examples?: string[] };
-    defensiveness: { detected: boolean; examples?: string[] };
-    contempt: { detected: boolean; examples?: string[] };
-    stonewalling: { detected: boolean; examples?: string[] };
-  };
   nvcScripts: {
     aToB: NVCScript;
     bToA: NVCScript;
@@ -417,15 +410,7 @@ export interface User {
   isGuest: boolean;
   communicationStyle?: CommunicationStyle;
   onboardingAnswers?: number[]; // 10개의 1-5 점수
-  temperatureHistory: TemperatureEntry[];
   createdAt: Date;
-}
-
-export interface TemperatureEntry {
-  sessionId: string;
-  partnerId: string;
-  temperature: number;
-  recordedAt: Date;
 }
 ```
 
@@ -533,9 +518,7 @@ export interface TemperatureEntry {
 
 - [ ] **Task 8.1** `app/(session)/result/[id]/page.tsx` — 리포트 메인 페이지
 - [ ] **Task 8.2** `components/result/NeedsMap.tsx` — 🗺️ 욕구 차이 지도 (시그니처!)
-- [ ] **Task 8.3** `components/result/Temperature.tsx` — 관계 온도
-- [ ] **Task 8.4** `components/result/ContributionRatio.tsx` — 화해 기여도
-- [ ] **Task 8.5** `components/result/FourHorsemen.tsx`
+- [ ] **Task 8.3** `components/result/ContributionRatio.tsx` — 화해 기여도
 - [ ] **Task 8.6** `components/result/NVCScript.tsx` — NVC 재작성
 - [ ] **Task 8.7** `components/result/RepairSuggestions.tsx`
 - [ ] **Task 8.8** `components/result/ShareImage.tsx` — 공유 이미지 생성

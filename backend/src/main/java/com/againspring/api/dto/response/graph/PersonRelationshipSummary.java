@@ -24,8 +24,6 @@ public class PersonRelationshipSummary {
 
     private int sessionCount; // 이 사람과의 세션 횟수
 
-    private double averageTemperature; // 평균 관계 온도
-
     private Instant lastSessionAt; // 마지막 세션 날짜
 
 }

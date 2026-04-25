@@ -2,7 +2,6 @@ package com.againspring.api.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
-import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -37,28 +36,7 @@ public class UserResponse {
     @JsonProperty("onboardingCompleted")
     private boolean onboardingCompleted;
 
-    @JsonProperty("temperatureHistory")
-    private List<TemperatureEntry> temperatureHistory;
-
     @JsonProperty("createdAt")
     private Instant createdAt;
 
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class TemperatureEntry {
-        @JsonProperty("sessionId")
-        private String sessionId;
-
-        @JsonProperty("partnerId")
-        private String partnerId;
-
-        @JsonProperty("temperature")
-        private Double temperature;
-
-        @JsonProperty("recordedAt")
-        private Instant recordedAt;
-    }
 }

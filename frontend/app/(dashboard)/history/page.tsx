@@ -14,7 +14,6 @@ interface HistoryItem {
   partnerNickname: string;
   relationType: RelationType;
   conflictType: string | null;
-  temperature: number | null;
   completedAt: string;
   summary?: string;
 }
@@ -192,20 +191,6 @@ export default function HistoryPage() {
                     }}
                   >
                     {item.conflictType}
-                  </span>
-                )}
-                {item.temperature !== null && (
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      background: 'var(--L-card)',
-                      border: '1px solid var(--L-border)',
-                      borderRadius: '3px',
-                      padding: '4px 8px',
-                      color: 'var(--L-sub)',
-                    }}
-                  >
-                    {item.temperature.toFixed(1)}°C
                   </span>
                 )}
               </div>

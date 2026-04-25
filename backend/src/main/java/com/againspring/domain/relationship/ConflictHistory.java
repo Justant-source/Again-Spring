@@ -46,9 +46,6 @@ public class ConflictHistory {
     @Column(length = 32, name = "conflict_type")
     private String conflictType;
 
-    @Column(columnDefinition = "DECIMAL(3,1)", name = "temperature")
-    private Double temperature;
-
     @Column(nullable = false, updatable = false, name = "created_at")
     private Instant createdAt;
 

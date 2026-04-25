@@ -117,7 +117,7 @@ public class LLMRequest {
     private String userPrompt;         // 사용자 입력 또는 턴별 태스크
     private List<PromptContext> context; // RAG로 주입할 컨텍스트 (Gottman 지식)
     private Integer maxTokens;
-    private Double temperature;        // 0.0 ~ 1.0
+    private Double samplingTemperature; // LLM 생성 다양성 파라미터 (0.0 ~ 1.0)
     private String sessionId;          // 추적용 ID
     private String taskType;           // "turn_3_a", "final_report" 등
     private Duration timeout;          // 기본 30초

@@ -176,14 +176,6 @@ X-Request-ID: {uuid}
   "communicationStyle": "wave",
   "isGuest": false,
   "onboardingCompleted": true,
-  "temperatureHistory": [
-    {
-      "sessionId": "ses_123",
-      "partnerId": "usr_456",
-      "temperature": 36.2,
-      "recordedAt": "2026-04-20T15:00:00Z"
-    }
-  ],
   "createdAt": "2026-04-24T10:30:00Z"
 }
 ```
@@ -274,7 +266,6 @@ X-Request-ID: {uuid}
       "relationType": "couple",
       "partnerName": "상대방 이름",
       "status": "completed",
-      "temperature": 36.2,
       "createdAt": "2026-04-24T10:30:00Z",
       "completedAt": "2026-04-24T11:15:00Z"
     }
@@ -474,13 +465,6 @@ data: {"turnNumber":3,"content":"A님께 두 가지..."}
     "positionB": { "x": 60, "y": 0 },
     "interpretation": "두 분은 '연결성-자율성' 축에서 거리가 있어요"
   },
-  "temperature": 36.2,
-  "fourHorsemen": {
-    "criticism": { "detected": false },
-    "defensiveness": { "detected": true, "intensity": "mild" },
-    "contempt": { "detected": false },
-    "stonewalling": { "detected": true, "intensity": "moderate" }
-  },
   "nvcScripts": {
     "aToB": {
       "observation": "하루에 연락이 1-2번 정도 오고 있어",
@@ -536,14 +520,9 @@ data: {"turnNumber":3,"content":"A님께 두 가지..."}
   "sessions": [
     {
       "sessionId": "ses_abc123",
-      "temperature": 36.2,
       "conflictType": "difference",
       "createdAt": "2026-04-24T10:30:00Z"
     }
-  ],
-  "temperatureTrend": [
-    { "date": "2026-04-20", "temperature": 35.8 },
-    { "date": "2026-04-24", "temperature": 36.2 }
   ]
 }
 ```

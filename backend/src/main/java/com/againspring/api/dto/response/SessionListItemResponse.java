@@ -30,9 +30,6 @@ public class SessionListItemResponse {
     @JsonProperty("status")
     private String status;
 
-    @JsonProperty("temperature")
-    private Double temperature;
-
     @JsonProperty("createdAt")
     private Instant createdAt;
 

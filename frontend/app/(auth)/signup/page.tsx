@@ -94,7 +94,7 @@ export default function SignupPage() {
         password,
         verificationCode,
       });
-      setUser({ ...response.data.user, temperatureHistory: [] });
+      setUser(response.data.user);
       router.push('/');
     } catch (err: any) {
       setError(err.response?.data?.message || '회원가입에 실패했어요');

@@ -120,8 +120,6 @@ public class ReportController {
                 .participantB(mapParticipant(report.getParticipantB()))
                 .contributionRatio(mapContributionRatio(report.getContributionRatio()))
                 .needsMap(mapNeedsMap(report.getNeedsMap()))
-                .temperature(report.getTemperature())
-                .fourHorsemen(mapFourHorsemen(report.getFourHorsemen()))
                 .nvcScripts(mapNvcScripts(report.getNvcScripts()))
                 .repairSuggestions(report.getRepairSuggestions())
                 .aPatternFeedback(report.getAPatternFeedback())
@@ -176,30 +174,6 @@ public class ReportController {
                         .y(needsMap.positionB.y)
                         .build() : null)
                 .interpretation(needsMap.interpretation)
-                .build();
-    }
-
-    private ReportResponse.FourHorsemenResponse mapFourHorsemen(Report.FourHorsemenAnalysis horsemen) {
-        if (horsemen == null) {
-            return null;
-        }
-        return ReportResponse.FourHorsemenResponse.builder()
-                .criticism(mapHorsemenItem(horsemen.criticism))
-                .defensiveness(mapHorsemenItem(horsemen.defensiveness))
-                .contempt(mapHorsemenItem(horsemen.contempt))
-                .stonewalling(mapHorsemenItem(horsemen.stonewalling))
-                .build();
-    }
-
-    private ReportResponse.FourHorsemenResponse.HorsemenItem mapHorsemenItem(
-            Report.FourHorsemenAnalysis.HorsemenItem item) {
-        if (item == null) {
-            return null;
-        }
-        return ReportResponse.FourHorsemenResponse.HorsemenItem.builder()
-                .detected(item.detected)
-                .intensity(item.intensity)
-                .examples(item.examples)
                 .build();
     }
 

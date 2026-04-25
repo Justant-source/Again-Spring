@@ -55,9 +55,6 @@ public class Report {
     @Column(columnDefinition = "JSON")
     private NeedsMap needsMap;
 
-    @Column(columnDefinition = "DECIMAL(3,1)")
-    private Double temperature;
-
     @Type(JsonType.class)
     @Column(columnDefinition = "JSON")
     private FourHorsemenAnalysis fourHorsemen;

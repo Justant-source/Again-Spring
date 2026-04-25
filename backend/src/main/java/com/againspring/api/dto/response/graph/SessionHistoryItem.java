@@ -18,8 +18,6 @@ public class SessionHistoryItem {
 
     private String sessionId;
 
-    private double temperature; // 관계 온도
-
     private ConflictType conflictType; // factual, difference, mixed
 
     private Instant createdAt;

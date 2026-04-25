@@ -33,16 +33,6 @@
   onboardingAnswers: [4, 2, 3, 5, 2, 4, 3, 5, 4, 3],  // 10개 리커트
   onboardingCompletedAt: ISODate("2026-04-24T10:00:00Z"),
   
-  temperatureHistory: [
-    {
-      sessionId: "ses_abc123",
-      partnerUserId: "usr_456",      // 상대방이 게스트면 null, 대신 partnerGuestName
-      partnerGuestName: null,
-      temperature: 36.2,
-      recordedAt: ISODate("2026-04-24T11:15:00Z")
-    }
-  ],
-  
   roles: ["USER"],                   // USER, ADMIN
   
   createdAt: ISODate("2026-04-24T10:00:00Z"),
@@ -213,8 +203,6 @@ public void purgeOldContents() {
     interpretation: "두 분은 '연결성-자율성' 축에서 거리가 있어요"
   },
   
-  temperature: 36.2,
-  
   fourHorsemen: {
     criticism: { detected: false, intensity: null },
     defensiveness: { detected: true, intensity: "mild" },
@@ -364,7 +352,6 @@ Person 간의 관계 유형 표시. 세션이 생성될 때 없으면 자동 생
   sessionId: "ses_abc123",
   relationType: "couple",
   conflictType: "difference",
-  temperature: 36.2,
   createdAt: datetime("2026-04-24T10:30:00Z")
 }]->(b:Person)
 ```
@@ -385,31 +372,21 @@ RETURN c
 ORDER BY c.createdAt DESC
 ```
 
-**온도 추이**
-```cypher
-MATCH (me:Person {userId: $userId})-[c:HAD_CONFLICT]-(other:Person {userId: $partnerId})
-RETURN c.createdAt AS date, c.temperature AS temperature
-ORDER BY c.createdAt ASC
-```
-
-**관계 온도 갱신 (세션 완료 시)**
+**관계 세션 횟수 갱신 (세션 완료 시)**
 ```cypher
 MATCH (a:Person {userId: $userIdA})
 MATCH (b:Person {userId: $userIdB})
 MERGE (a)-[r:HAS_RELATIONSHIP {type: $relationType}]->(b)
 ON CREATE SET 
   r.firstSessionAt = $now,
-  r.sessionCount = 1,
-  r.averageTemperature = $temperature
+  r.sessionCount = 1
 ON MATCH SET
   r.lastSessionAt = $now,
-  r.sessionCount = r.sessionCount + 1,
-  r.averageTemperature = (r.averageTemperature * r.sessionCount + $temperature) / (r.sessionCount + 1)
+  r.sessionCount = r.sessionCount + 1
 CREATE (a)-[:HAD_CONFLICT {
   sessionId: $sessionId,
   relationType: $relationType,
   conflictType: $conflictType,
-  temperature: $temperature,
   createdAt: $now
 }]->(b)
 ```

@@ -10,7 +10,6 @@ const SESSION_HISTORY: any[] = [
     partnerNickname: '준호',
     relationType: 'marriage',
     conflictType: 'difference',
-    temperature: 36.2,
     completedAt: '2026-04-12T09:21:00.000Z',
     summary: '주말 집안일 분담에 대한 서로 다른 쉼의 정의',
   },
@@ -19,7 +18,6 @@ const SESSION_HISTORY: any[] = [
     partnerNickname: '지민',
     relationType: 'friend',
     conflictType: 'factual',
-    temperature: 35.8,
     completedAt: '2026-03-02T12:05:00.000Z',
     summary: '반복된 약속 취소와 신뢰 회복',
   },
@@ -28,7 +26,6 @@ const SESSION_HISTORY: any[] = [
     partnerNickname: '엄마',
     relationType: 'parent_child',
     conflictType: 'mixed',
-    temperature: 36.5,
     completedAt: '2026-02-17T18:40:00.000Z',
     summary: '독립 시기와 돌봄 방식의 간극',
   },
@@ -54,7 +51,6 @@ export const userHandlers = [
       nickname: body.nickname,
       isGuest: false,
       onboardingCompletedAt: null,
-      temperatureHistory: [],
       createdAt: new Date().toISOString(),
     };
     USERS.set(id, user);
@@ -74,7 +70,6 @@ export const userHandlers = [
       isGuest: false,
       communicationStyle: 'wave',
       onboardingCompletedAt: '2026-04-01T10:00:00.000Z',
-      temperatureHistory: [],
       createdAt: new Date().toISOString(),
     };
     return HttpResponse.json({
@@ -94,7 +89,6 @@ export const userHandlers = [
       nickname: `${provider}사용자`,
       isGuest: false,
       onboardingCompletedAt: null,
-      temperatureHistory: [],
       createdAt: new Date().toISOString(),
     };
     return HttpResponse.json({
@@ -124,8 +118,7 @@ export const userHandlers = [
         id: guestId,
         nickname: body?.nickname?.trim() || generateGuestNickname(),
         isGuest: true,
-        temperatureHistory: [],
-        createdAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
       },
       token: { accessToken: `mock-guest-token-${guestId}`, expiresIn: 7200 },
     });
@@ -145,7 +138,6 @@ export const userHandlers = [
       isGuest: false,
       communicationStyle: 'wave',
       onboardingCompletedAt: '2026-04-01T10:00:00.000Z',
-      temperatureHistory: [],
       createdAt: new Date().toISOString(),
     });
   }),

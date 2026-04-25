@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Parses LLM responses for report generation.
- * Extracts fields: ratio, horsemen, NVC scripts, needs map, temperature, repair suggestions.
+ * Extracts fields: ratio, horsemen, NVC scripts, needs map, repair suggestions.
  * Tolerant to schema drift with fallback values.
  */
 @Slf4j
@@ -60,12 +60,6 @@ public class ReportResponseParser {
             } catch (IllegalArgumentException e) {
                 log.warn("Invalid conflictType: {}", conflictTypeStr);
             }
-        }
-
-        // Extract temperature
-        Double temperature = getDoubleField(root, "temperature", null);
-        if (temperature != null && temperature >= 0 && temperature <= 100) {
-            builder.temperature(temperature);
         }
 
         // Extract NVC scripts
@@ -281,7 +275,6 @@ public class ReportResponseParser {
     public static class ParsedReport {
         public ConflictType conflictType;
         public ContributionRatio contributionRatio;
-        public Double temperature;
         public NVCScripts nvcScripts;
         public FourHorsemen fourHorsemen;
         public NeedsMap needsMap;
@@ -289,12 +282,11 @@ public class ReportResponseParser {
         public boolean fallback;
 
         @lombok.Builder
-        public ParsedReport(ConflictType conflictType, ContributionRatio contributionRatio, Double temperature,
+        public ParsedReport(ConflictType conflictType, ContributionRatio contributionRatio,
                            NVCScripts nvcScripts, FourHorsemen fourHorsemen, NeedsMap needsMap,
                            List<String> repairSuggestions, boolean fallback) {
             this.conflictType = conflictType;
             this.contributionRatio = contributionRatio;
-            this.temperature = temperature;
             this.nvcScripts = nvcScripts;
             this.fourHorsemen = fourHorsemen;
             this.needsMap = needsMap;

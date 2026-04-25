@@ -85,8 +85,6 @@ export interface Report {
   conflictType: ConflictType | null;
   contributionRatio: ContributionRatio | null;
   needsMap: NeedsMapPayload;
-  temperature: number | null;
-  fourHorsemen: HorsemenDetection;
   nvcScripts?: {
     aToB: NVCScript;
     bToA: NVCScript;

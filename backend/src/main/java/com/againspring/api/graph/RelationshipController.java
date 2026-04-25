@@ -2,7 +2,6 @@ package com.againspring.api.graph;
 
 import com.againspring.api.dto.response.graph.PersonRelationshipSummary;
 import com.againspring.api.dto.response.graph.SessionHistoryItem;
-import com.againspring.api.dto.response.graph.TemperatureEntry;
 import com.againspring.service.graph.RelationshipGraphService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -49,19 +48,6 @@ public class RelationshipController {
         String userId = getCurrentUserId();
         List<SessionHistoryItem> history = relationshipGraphService.historyWith(userId, counterpartUserId);
         return ResponseEntity.ok(history);
-    }
-
-    /**
-     * GET /api/users/me/relationships/{counterpartUserId}/temperature
-     * 특정 사용자와의 관계 온도 추이 (그래프용)
-     */
-    @GetMapping("/{counterpartUserId}/temperature")
-    public ResponseEntity<List<TemperatureEntry>> getTemperatureTimeline(
-            @PathVariable String counterpartUserId) {
-
-        String userId = getCurrentUserId();
-        List<TemperatureEntry> timeline = relationshipGraphService.temperatureTimeline(userId, counterpartUserId);
-        return ResponseEntity.ok(timeline);
     }
 
     /**

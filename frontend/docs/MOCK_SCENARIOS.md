@@ -84,13 +84,6 @@ Q2. 친구 약속은 우선순위로 두셨던 이유가 있을까요?
     "positionB": { "x": 50, "y": 0 },
     "interpretation": "A님은 관계에서 '연결감'을 더 원하시고, B님은 '자율성'을 더 중요하게 여기세요"
   },
-  "temperature": 35.6,
-  "fourHorsemen": {
-    "criticism": { "detected": true, "examples": ["저를 중요하게 생각 안 하는 것 같아요"] },
-    "defensiveness": { "detected": true, "examples": ["친구 약속은 이미 몇 달 전부터..."] },
-    "contempt": { "detected": false },
-    "stonewalling": { "detected": false }
-  },
   "nvcScripts": {
     "bToA": {
       "observation": "지난 3주 동안 세 번 주말 약속이 당일에 바뀌었어",
@@ -141,13 +134,6 @@ Q2. 친구 약속은 우선순위로 두셨던 이유가 있을까요?
     "positionA": { "x": -70, "y": 0 },
     "positionB": { "x": 60, "y": 0 },
     "interpretation": "두 분은 '연결성-자율성' 축에서 상당한 거리를 보여요. 누가 맞고 틀린 게 아니에요."
-  },
-  "temperature": 36.2,
-  "fourHorsemen": {
-    "criticism": { "detected": false },
-    "defensiveness": { "detected": true, "examples": ["나는 원래 그래"] },
-    "contempt": { "detected": false },
-    "stonewalling": { "detected": true, "examples": ["그냥 쉬고 싶어"] }
   },
   "nvcScripts": {
     "aToB": {
@@ -200,13 +186,6 @@ Q2. 친구 약속은 우선순위로 두셨던 이유가 있을까요?
     "positionB": { "x": -60, "y": 20 },
     "interpretation": "재정 관리에서 '안정성'과 '도전'에 대한 우선순위가 서로 다르세요"
   },
-  "temperature": 35.2,
-  "fourHorsemen": {
-    "criticism": { "detected": true, "examples": ["왜 이런 것도 안 말해"] },
-    "defensiveness": { "detected": true, "examples": ["나도 너 생각해서 한 거야"] },
-    "contempt": { "detected": false },
-    "stonewalling": { "detected": false }
-  },
   "nvcScripts": { /* ... */ },
   "repairSuggestions": [
     "재정에 대해 함께 정기적으로 대화하는 시간을 만들자.",
@@ -237,13 +216,6 @@ Q2. 친구 약속은 우선순위로 두셨던 이유가 있을까요?
     "positionB": null,
     "interpretation": "B님의 입력이 있어야 완전한 분석이 가능해요"
   },
-  "temperature": null,
-  "fourHorsemen": {
-    "criticism": { "detected": false },
-    "defensiveness": { "detected": false },
-    "contempt": { "detected": false },
-    "stonewalling": { "detected": false }
-  },
   "aPatternFeedback": "A님은 이 상황에서 조금 성급하게 판단하셨을 수 있어요. B에게 먼저 솔직하게 감정을 공유해보시는 건 어떨까요?",
   "suggestedApproach": "다음에 B님을 만나실 때 이렇게 시작해보세요: '요즘 우리 거리감이 생긴 것 같아서 얘기 좀 하고 싶어.'",
   "inviteAgainCTA": "지금이라도 B님을 초대하면 완전한 리포트가 생성돼요"
@@ -260,8 +232,7 @@ Q2. 친구 약속은 우선순위로 두셨던 이유가 있을까요?
 - 양쪽 모두 감정적으로 격앙된 입력
 
 ### 리포트 특징
-- 관계 온도: 35.0°C (경고 수준)
-- 모든 Four Horsemen 탐지됨
+- 모든 Four Horsemen 탐지됨 (내부 점수 산정용)
 - 리포트 상단에 **"관계 회복에 시간과 노력이 필요해 보여요. 전문 상담을 권해드려요."** 안내
 - 유료 상담 연결 CTA (제휴 준비 전까지는 정보 제공만)
 

@@ -9,13 +9,6 @@ export type CommunicationStyle =
   | 'moon'
   | 'star';
 
-export interface TemperatureEntry {
-  sessionId: string;
-  partnerId: string;
-  temperature: number;
-  recordedAt: string;
-}
-
 export interface User {
   id: string;
   email?: string;
@@ -23,6 +16,5 @@ export interface User {
   isGuest: boolean;
   communicationStyle?: CommunicationStyle;
   onboardingAnswers?: number[];
-  temperatureHistory: TemperatureEntry[];
   createdAt: string;
 }

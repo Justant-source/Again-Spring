@@ -9,8 +9,6 @@ import com.againspring.domain.User;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.StyleCalculator.CommunicationStyle;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -136,7 +134,6 @@ public class UserService {
                 .communicationStyle(user.getCommunicationStyle())
                 .isGuest(user.isGuest())
                 .onboardingCompleted(user.getOnboardingCompletedAt() != null)
-                .temperatureHistory(new ArrayList<>())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

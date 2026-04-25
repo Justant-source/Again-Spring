@@ -109,7 +109,6 @@ backend/src/main/java/com/againspring/
 | `reports` | 세션 완료 후 분석 리포트 (기여도, NVC, 4Horsemen) |
 | `user_relationships` | 두 사용자 간 관계 유형 + 상태 |
 | `conflict_history` | 세션별 갈등 이력 |
-| `temperature_history` | 관계 온도 이력 |
 | `llm_call_logs` | LLM 호출 감사 로그 |
 
 **추가 테이블** (V2/V3 마이그레이션):
@@ -119,7 +118,7 @@ backend/src/main/java/com/againspring/
 | `guest_sessions` | 초대 토큰별 Guest ID 일관성 (재방문 동일 ID 보장) |
 | `email_verifications` | 회원가입 이메일 인증코드 (10분 만료) |
 
-> 마이그레이션 파일: `backend/src/main/resources/db/migration/V1__init.sql` ~ `V3__add_email_verification.sql`
+> 마이그레이션 파일: `V1__init.sql` ~ `V5__remove_temperature.sql`
 
 ---
 
@@ -171,8 +170,8 @@ test(integration): 중재 API 시나리오 추가
   - ✅ 세션 관리 + 중재 흐름 (State Machine)
   - ✅ **LLM 브릿지 — Claude Haiku 4.5 (API 키 불필요, 호스트 ~/.claude 마운트)**
   - ✅ 위기 감지 + 금지어 가드
-  - ✅ 리포트 생성 (기여도, NVC, 4Horsemen)
-  - ✅ 관계 그래프 (MariaDB 관계 테이블)
+  - ✅ 리포트 생성 (기여도, NVC — 4Horsemen 내부 점수만 보존)
+  - ✅ 관계 그래프 (MariaDB: user_relationships, conflict_history)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
 - ✅ Docker 멀티 컨테이너 배포 (MariaDB / BE / FE / Nginx)
 - ✅ Cloudflare Tunnel (dev/prod 도메인 라우팅)

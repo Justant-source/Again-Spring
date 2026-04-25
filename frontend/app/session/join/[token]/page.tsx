@@ -126,7 +126,6 @@ export default function JoinPage({ params }: { params: { token: string } }) {
           id: guestId,
           nickname: name,
           isGuest: true,
-          temperatureHistory: [],
           createdAt: new Date().toISOString(),
         });
       }

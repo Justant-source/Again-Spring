@@ -3,7 +3,7 @@
 **프로젝트**: 다시봄 · Again Spring  
 **도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)  
 **진행 상황**: 백엔드 전체 구현 완료, FE-BE 통합 및 배포 준비 중  
-**기준일**: 2026-04-25
+**기준일**: 2026-04-26
 
 ---
 
@@ -346,17 +346,19 @@ APP_URL=https://dev.againspring.net
 - ✅ 프론트엔드 (Next.js 14 — MSW 프로토타입 + 실제 API 연동)
 - ✅ 백엔드 구현 완료
   - ✅ Spring Boot 3.3 + Java 21 + Gradle Kotlin DSL
-  - ✅ MariaDB 11 (JPA + Flyway V1/V2/V3)
+  - ✅ MariaDB 11 (JPA + Flyway V1~V5)
     - V1: 초기 스키마
     - V2: OAuth + Guest 세션 지속성 (`provider`, `provider_id`, `guest_sessions`)
     - V3: 이메일 인증 (`email_verifications`)
+    - V4: 보안 테이블
+    - V5: 관계 온도 컬럼 제거 (`temperature`, `average_temperature`, `temperature_history`)
   - ✅ JWT 인증 (회원가입 / 로그인 / 게스트 / Google OAuth)
   - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
   - ✅ 세션 관리 + 중재 State Machine
   - ✅ **LLM 브릿지 (Claude Haiku 4.5 + 호스트 ~/.claude 마운트, API 키 불필요)**
   - ✅ 위기 감지 (CrisisDetector) + 금지어 가드 (KeywordGuard)
-  - ✅ 리포트 생성 (기여도, NVC, 4Horsemen)
-  - ✅ 관계 그래프 (MariaDB: user_relationships, conflict_history, temperature_history)
+  - ✅ 리포트 생성 (기여도, NVC — 4Horsemen 내부 점수만 보존, UI 노출 없음)
+  - ✅ 관계 그래프 (MariaDB: user_relationships, conflict_history)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
   - ✅ OpenAPI / Swagger UI (`/swagger-ui.html`)
   - ✅ CORS 도메인 허용 + GlobalExceptionHandler 표준화
@@ -396,5 +398,5 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-04-25  
+**마지막 업데이트**: 2026-04-26  
 **담당**: Claude Code (Agent)

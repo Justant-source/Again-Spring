@@ -1,57 +1,69 @@
 # 다시봄 (Again Spring) — Backend
 
-다시봄 AI-mediated relationship conflict resolution backend service.
+다시봄 AI 중재 갈등 해소 백엔드 서비스.
 
-**Stack**: Java 21, Spring Boot 3.3+, Gradle, MongoDB, Neo4j, Claude Code CLI
+**Stack**: Java 21, Spring Boot 3.3, Gradle (Kotlin DSL), MariaDB 11, Claude Code CLI
 
 ## Quick Start
 
 ### Prerequisites
 
 - Java 21+
-- MongoDB 7+ (or Docker)
-- Neo4j 5+ (or Docker)
-- Claude Code CLI (logged in)
+- Docker & Docker Compose (MariaDB)
+- Claude Code CLI (호스트에서 1회 로그인 완료 — `~/.claude/` 디렉토리 필요)
 
 ### Development
 
 ```bash
-# Build
+# DB 시작 (infra/docker-compose.yml)
+cd ../infra && docker compose up -d
+
+# 빌드
 ./gradlew build
 
-# Run with dev profile
-./gradlew bootRun --args='--spring.profiles.active=dev'
+# dev 프로파일로 실행 (기본 env 자동 적용)
+./gradlew bootRun
 
-# Run tests
+# 테스트
 ./gradlew test
 
-# View Swagger UI
+# Swagger UI
 # http://localhost:8080/swagger-ui.html
 
-# Health check
+# 헬스 체크
 curl http://localhost:8080/api/health
 ```
 
 ### Profiles
 
-- `dev`: localhost MongoDB/Neo4j, debug logging, Swagger enabled
+- `dev`: localhost MariaDB, debug logging, Swagger enabled, LLM fallback 응답 지원
 - `prod`: env-driven config, minimal logging, Swagger disabled
-- `test`: testcontainers, mock LLM provider
 
 ### Environment Variables
 
-For production deployment:
-
 ```bash
-export MONGO_URI="mongodb://user:pass@host:27017/againspring?authSource=admin"
-export NEO4J_URI="bolt://host:7687"
-export NEO4J_USER="neo4j"
-export NEO4J_PASSWORD="changeme"
-export JWT_SECRET="<min-256-bit-random>"
-export LLM_PROVIDER="claude-code"  # or "claude-api" in future
-export CLAUDE_BIN="/usr/local/bin/claude"
-export CLAUDE_POOL_SIZE="3"
-export PROMPTS_PATH="/opt/againspring/shared/prompts"
+# DB
+DB_URL=jdbc:mariadb://localhost:3306/againspring?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+DB_USER=againspring
+DB_PASSWORD=changeme
+
+# JWT
+JWT_SECRET=dev_secret_key_change_in_prod
+
+# Claude Code CLI (API 키 불필요 — 호스트 ~/.claude 마운트)
+LLM_PROVIDER=claude-code
+CLAUDE_BIN=claude
+CLAUDE_MODEL=claude-haiku-4-5-20251001
+
+# OAuth2
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+
+# Email (Gmail App Password)
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=...@gmail.com
+MAIL_PASSWORD=...
 ```
 
 ## Project Structure
@@ -59,65 +71,74 @@ export PROMPTS_PATH="/opt/againspring/shared/prompts"
 ```
 src/main/java/com/againspring/
 ├── api/             # REST Controllers + DTOs
-├── service/         # Business logic
-├── llm/             # LLM Bridge (Phase 6+)
-├── domain/          # Entities (Phase 2+)
-├── repository/      # Data access
-├── security/        # Auth/Authz
-├── safety/          # Safety guards (Phase 9+)
-├── config/          # Spring configs
-└── common/          # Shared utilities & exceptions
+│   ├── dto/         # Request / Response 객체
+│   └── graph/       # 관계 그래프 컨트롤러
+├── domain/          # JPA 엔티티 (User, Session, Turn, Report, relationship/*)
+├── repository/      # JpaRepository 인터페이스
+├── service/         # 비즈니스 로직 (Mediation, Report, Session, User, Graph)
+├── llm/             # LLM 브릿지 (ClaudeCodeBridge, PromptSanitizer, FallbackResponses)
+├── safety/          # 위기 감지 + 금지어 가드 (CrisisDetector, KeywordGuard)
+├── security/        # JWT 인증 (JwtService, JwtAuthFilter, SecurityConfig)
+└── config/          # 설정 (CORS, JPA Auditing, Scheduling, OpenAPI)
 
 src/main/resources/
-├── application.yml                 # Base config
-├── application-{dev,prod,test}.yml # Profile-specific
-└── logback-spring.xml              # Logging
+├── application.yml                    # Base config
+├── application-{dev,prod,test}.yml    # Profile-specific
+└── db/migration/
+    ├── V1__init.sql                   # 초기 스키마
+    ├── V2__add_oauth_guest.sql        # OAuth + Guest 세션 지속성
+    ├── V3__add_email_verification.sql # 이메일 인증
+    ├── V4__add_security_tables.sql    # 보안 테이블
+    └── V5__remove_temperature.sql     # 관계 온도 컬럼 제거
 ```
 
-## Phases
+## DB Schema (MariaDB 11)
 
-See `/home/justant/Data/Again-Spring/.request/command_BE/BACKEND_WORK_ORDER.md` for full 16-phase roadmap.
+| 테이블 | 설명 |
+|---|---|
+| `users` | 회원 정보, 온보딩 답변(JSON), 소통 스타일 |
+| `sessions` | 중재 세션, 초대 토큰, 현재 턴 상태 |
+| `turns` | 세션별 대화 턴 (사용자 입력 + AI 응답) |
+| `reports` | 세션 완료 후 분석 리포트 (기여도, NVC, 4Horsemen 내부 점수) |
+| `user_relationships` | 두 사용자 간 관계 유형 + 상태 |
+| `conflict_history` | 세션별 갈등 이력 |
+| `guest_sessions` | 초대 토큰별 Guest ID 일관성 |
+| `email_verifications` | 이메일 인증코드 (10분 만료) |
+| `llm_call_logs` | LLM 호출 감사 로그 |
 
-**Phase 1 (current)**: Project setup, build files, basic health endpoint
-**Phase 2+**: Domain models, auth, APIs, LLM bridge, reports, safety guards, deployment
+자세한 스키마: `shared/docs/DATABASE_SCHEMA.md`
 
-## Related Docs
+## LLM Bridge
 
-- `BACKEND_WORK_ORDER.md` — Full 16-phase checklist
-- `DATABASE_SCHEMA.md` — MongoDB & Neo4j schema design
-- `LLM_BRIDGE_ARCHITECTURE.md` — Claude Code CLI integration
-- `DEPLOYMENT.md` — Docker, Kubernetes, Cloudflare Tunnel setup
+Claude Code CLI를 서브프로세스로 실행. API 키 없이 호스트 `~/.claude` 세션을 컨테이너에 볼륨 마운트해 공유.
 
-## Build Artifacts
+- **모델**: `claude-haiku-4-5-20251001` (기본, `CLAUDE_MODEL` 변경 가능)
+- **동시성**: `Semaphore(3)` — 최대 3개 병렬 프로세스
+- **타임아웃**: 60초
+- **Fallback**: Claude 불가 시 `FallbackResponses` 기본 응답 반환
 
-Gradle wrapper version: **8.10**
-
-```bash
-./gradlew bootJar
-# Output: build/libs/againspring-0.1.0.jar
-```
+자세한 설계: `shared/docs/LLM_BRIDGE_ARCHITECTURE.md`
 
 ## Testing
 
 ```bash
-# All tests
+# 전체 테스트
 ./gradlew test
 
-# Specific test class
+# 특정 테스트 클래스
 ./gradlew test --tests com.againspring.api.HealthControllerTest
 
-# With coverage (requires JaCoCo plugin)
+# 커버리지 리포트 (JaCoCo)
 ./gradlew test jacocoTestReport
 ```
 
-## Contributing
+## Build Artifacts
 
-- All Java files: package `com.againspring.*`
-- Use Lombok annotations for DTOs
-- Configuration classes: `@Configuration` + `@EnableXxx` as needed
-- Exceptions: extend `BusinessException` with code + message
+```bash
+./gradlew bootJar
+# Output: build/libs/againspring-*.jar
+```
 
 ---
 
-**작성**: Claude Code Agent (Phase 1)  
-**버전**: 0.1.0-alpha
+**버전**: Spring Boot 3.3, Java 21, MariaDB 11

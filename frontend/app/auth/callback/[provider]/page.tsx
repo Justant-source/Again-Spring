@@ -28,10 +28,7 @@ export default function OAuthCallbackPage() {
       .post(`/api/auth/oauth2/${provider}`, { code, redirectUri })
       .then((res) => {
         const data = res.data;
-        setUser({
-          ...data.user,
-          temperatureHistory: [],
-        });
+        setUser(data.user);
         if (data.token?.accessToken) {
           localStorage.setItem('again-spring-token', data.token.accessToken);
         }

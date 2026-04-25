@@ -26,14 +26,14 @@ npm run dev      # localhost:3000
 4. `/session/new → /session/category → /session/describe → /session/invite → /session/wait` — A 쪽 세션 시작 (Phase 5)
 5. `/session/join/[token]` — B 쪽 참여 (Phase 6)
 6. `/session/mediation` — 6턴 중재 UI (편지지/말풍선/카드 3가지 뷰, Phase 7)
-7. `/session/result/[id]` — 결과 리포트 (욕구 차이 지도 + 관계 온도 + 화해 기여도, Phase 8)
+7. `/session/result/[id]` — 결과 리포트 (욕구 차이 지도 + 화해 기여도, Phase 8)
 8. `/session/mediation/solo` — Solo 모드 3턴 (Phase 9)
 9. `/history`, `/profile` — 대시보드 (Phase 10)
 10. `/terms`, `/privacy` — 법적 안내 (Phase 12)
 
 ## Mock 시나리오 전환
 
-`/session/result/[id]?scenario=factual|difference|mixed|solo|four_horsemen` 로 리포트 시나리오를 강제할 수 있어요. Mock API는 기본적으로 `sessionId` 해시로 시나리오를 돌려가며 반환합니다.
+`/session/result/[id]?scenario=factual|difference|mixed|solo|conflict_intense` 로 리포트 시나리오를 강제할 수 있어요. Mock API는 기본적으로 `sessionId` 해시로 시나리오를 돌려가며 반환합니다.
 
 ## 폴더 구조
 
@@ -51,7 +51,7 @@ Again-Spring/
 │   ├── shared/             # PhoneFrame, PhoneHeader, Motif, Logo, Dashes 등
 │   ├── onboarding/         # LikertQuestion
 │   ├── mediation/          # MediatorMessage, TurnInput, ProgressBar 등
-│   └── result/             # NeedsMap, Temperature, ContributionRatio 등
+│   └── result/             # NeedsMap, ContributionRatio 등
 ├── lib/
 │   ├── types/              # TypeScript 타입
 │   ├── constants/          # CATEGORIES, ONBOARDING_QUESTIONS, styles, forbidden/crisis

@@ -63,7 +63,4 @@ public class UserRelationship {
     @Column(name = "session_count")
     @Builder.Default
     private Integer sessionCount = 0;
-
-    @Column(name = "average_temperature", columnDefinition = "DECIMAL(3,1)")
-    private Double averageTemperature;
 }

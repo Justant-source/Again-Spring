@@ -3,9 +3,7 @@
 
 import React from 'react';
 import type { Report, CommunicationStyle } from '@/lib/types';
-import { Temperature } from './Temperature';
 import { ContributionRatio } from './ContributionRatio';
-import { FourHorsemen } from './FourHorsemen';
 import { NVCScript } from './NVCScript';
 import { RepairSuggestions } from './RepairSuggestions';
 import { NeedsMap } from './NeedsMap';
@@ -53,11 +51,6 @@ export function ReportLayout({
           </div>
         </div>
 
-        {/* Temperature block */}
-        <div style={{ padding: '20px 26px', background: 'var(--P-card)', margin: '-20px -26px 0', borderRadius: 20 }}>
-          <Temperature value={report.temperature} />
-        </div>
-
         {/* Conflict type section */}
         {report.conflictType && (
           <div style={{ padding: '28px 26px', margin: '-20px -26px 0' }}>
@@ -92,22 +85,12 @@ export function ReportLayout({
   // Card variant (default)
   return (
     <div style={{ padding: '8px 22px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Temperature card */}
-      <div className="p-card">
-        <Temperature value={report.temperature} />
-      </div>
-
       {/* Contribution Ratio card */}
       {report.contributionRatio && (
         <div className="p-card">
           <ContributionRatio ratio={report.contributionRatio} nameA={nameA} nameB={nameB} />
         </div>
       )}
-
-      {/* Four Horsemen card */}
-      <div className="p-card">
-        <FourHorsemen detection={report.fourHorsemen} />
-      </div>
 
       {/* NVC Scripts cards */}
       {report.nvcScripts && (

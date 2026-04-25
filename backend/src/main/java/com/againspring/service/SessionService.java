@@ -340,7 +340,6 @@ public class SessionService {
                 .relationType(session.getRelationType().getValue())
                 .partnerName(partnerName)
                 .status(session.getStatus().getValue())
-                .temperature(null) // TODO Phase 6+: compute temperature
                 .createdAt(session.getCreatedAt())
                 .completedAt(session.getCompletedAt())
                 .build();
