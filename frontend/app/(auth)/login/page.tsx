@@ -149,6 +149,12 @@ export default function LoginPage() {
             게스트 입장
           </Link>
         </div>
+
+        <div style={{ marginTop: 16, textAlign: 'center', fontSize: 12 }}>
+          <Link href="/forgot-password" style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}>
+            비밀번호를 잊으셨나요?
+          </Link>
+        </div>
       </div>
     </PhoneFrame>
   );

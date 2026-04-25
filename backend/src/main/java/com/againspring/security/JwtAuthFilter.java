@@ -1,5 +1,6 @@
 package com.againspring.security;
 
+import com.againspring.repository.RevokedTokenRepository;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -35,6 +36,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final RevokedTokenRepository revokedTokenRepository;
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -78,12 +80,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     /**
      * Parse token, load user details, and set authentication.
+     * Checks if token is revoked before setting authentication.
      */
     private void authenticateWithToken(String token) throws JwtException, UsernameNotFoundException {
         Optional<String> userId = jwtService.extractUserId(token);
 
         if (userId.isEmpty()) {
             throw new JwtException("Cannot extract user ID from token");
+        }
+
+        // Check if token is revoked
+        Optional<String> jti = jwtService.extractJti(token);
+        if (jti.isPresent() && revokedTokenRepository.existsByJti(jti.get())) {
+            log.debug("Token is revoked: {}", jti.get());
+            throw new JwtException("Token has been revoked");
         }
 
         // Load user details by ID

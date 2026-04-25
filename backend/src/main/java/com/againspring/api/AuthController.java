@@ -1,12 +1,16 @@
 package com.againspring.api;
 
+import com.againspring.api.dto.request.ForgotPasswordRequest;
 import com.againspring.api.dto.request.GuestRequest;
 import com.againspring.api.dto.request.LoginRequest;
+import com.againspring.api.dto.request.ResetPasswordRequest;
 import com.againspring.api.dto.request.SendVerificationRequest;
 import com.againspring.api.dto.request.SignupRequest;
 import com.againspring.api.dto.response.AuthResponse;
 import com.againspring.service.AuthService;
 import com.againspring.service.EmailVerificationService;
+import com.againspring.service.LogoutService;
+import com.againspring.service.PasswordResetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,6 +38,8 @@ public class AuthController {
 
     private final AuthService authService;
     private final EmailVerificationService emailVerificationService;
+    private final PasswordResetService passwordResetService;
+    private final LogoutService logoutService;
 
     /**
      * Send email verification code.
@@ -99,16 +106,48 @@ public class AuthController {
     }
 
     /**
-     * Logout (stateless, no-op).
+     * Logout user by revoking JWT token.
      *
+     * @param authHeader Authorization header containing Bearer token
      * @return 204 No Content
      */
     @PostMapping("/logout")
-    @Operation(summary = "Logout", description = "Logout user (stateless — no-op for JWT)")
+    @Operation(summary = "Logout", description = "Logout user and revoke JWT token")
     @ApiResponse(responseCode = "204", description = "Logout successful")
-    public ResponseEntity<Void> logout() {
-        // Stateless JWT logout — token is simply discarded by client
-        // TODO Phase 7/8: Implement JWT blacklist for true logout if needed
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    public ResponseEntity<Void> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        logoutService.revokeToken(authHeader);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Request password reset.
+     *
+     * @param request forgot password request
+     * @return 200 OK (always, to prevent account enumeration)
+     */
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Request password reset", description = "Send password reset link to email")
+    @ApiResponse(responseCode = "200", description = "Reset email sent (or account not found)")
+    @ApiResponse(responseCode = "400", description = "Validation failed")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.requestReset(request.getEmail());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Reset password with token.
+     *
+     * @param request reset password request
+     * @return 200 OK
+     */
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password", description = "Reset password using reset token")
+    @ApiResponse(responseCode = "200", description = "Password reset successful")
+    @ApiResponse(responseCode = "400", description = "Validation failed")
+    @ApiResponse(responseCode = "400", description = "Invalid or expired token")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok().build();
     }
 }

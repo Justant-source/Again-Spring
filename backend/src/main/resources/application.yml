@@ -75,6 +75,7 @@ oauth2:
     client-secret: ${NAVER_CLIENT_SECRET:}
 
 app:
+  url: ${APP_URL:https://dev.againspring.net}
   prompts:
     path: ${PROMPTS_PATH:./shared/prompts}
   safety:

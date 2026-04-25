@@ -5,8 +5,10 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
+import java.util.UUID;
 import javax.crypto.SecretKey;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,6 +43,7 @@ public class JwtService {
     public String generateAccessToken(String userId, String email) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);
+        String jti = UUID.randomUUID().toString();
 
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
 
@@ -48,6 +51,7 @@ public class JwtService {
                 .subject(userId)
                 .claim("email", email)
                 .claim("type", "access")
+                .id(jti)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
@@ -137,6 +141,42 @@ public class JwtService {
         } catch (JwtException e) {
             log.debug("Failed to extract token type: {}", e.getMessage());
             return "unknown";
+        }
+    }
+
+    /**
+     * Extract JTI (JWT ID) from token.
+     *
+     * @param token the JWT token string
+     * @return Optional containing JTI if present, empty otherwise
+     */
+    public Optional<String> extractJti(String token) {
+        try {
+            Claims claims = parseToken(token);
+            return Optional.ofNullable(claims.getId());
+        } catch (JwtException e) {
+            log.debug("Failed to extract JTI from token: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Extract expiration timestamp from token.
+     *
+     * @param token the JWT token string
+     * @return Optional containing expiration instant if valid, empty otherwise
+     */
+    public Optional<Instant> extractExpiration(String token) {
+        try {
+            Claims claims = parseToken(token);
+            Date expiryDate = claims.getExpiration();
+            if (expiryDate != null) {
+                return Optional.of(expiryDate.toInstant());
+            }
+            return Optional.empty();
+        } catch (JwtException e) {
+            log.debug("Failed to extract expiration from token: {}", e.getMessage());
+            return Optional.empty();
         }
     }
 }

@@ -43,6 +43,8 @@ dependencies {
     testImplementation("ch.qos.logback:logback-core:1.4.11")
     testImplementation("ch.qos.logback:logback-classic:1.4.11")
 
+    implementation("com.github.vladimir-bukhtoyarov:bucket4j-core:7.6.0")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
 
