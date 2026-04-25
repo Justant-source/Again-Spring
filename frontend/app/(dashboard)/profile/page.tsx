@@ -199,7 +199,7 @@ export default function ProfilePage() {
         {/* Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
           <button
-            onClick={() => router.push('/onboarding')}
+            onClick={() => router.push('/onboarding/intro')}
             className="btn-L ghost"
             style={{ width: '100%' }}
           >

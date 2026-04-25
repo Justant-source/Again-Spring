@@ -7,7 +7,10 @@ import type {
   NeedsMapPayload,
   NVCScript,
   ContributionRatio,
+  MetaphorCard,
 } from './session';
+
+export type { MetaphorCard };
 
 export interface Report {
   id: string;
@@ -15,12 +18,14 @@ export interface Report {
   conflictType: ConflictType | null;
   contributionRatio: ContributionRatio | null;
   needsMap: NeedsMapPayload;
+  metaphorCards?: MetaphorCard[];
   nvcScripts?: {
     aToB: NVCScript;
     bToA: NVCScript;
   };
   repairSuggestions: string[];
   isSoloMode: boolean;
+  powerImbalanceDetected?: boolean;
   aPatternFeedback?: string;
   suggestedApproach?: string;
   inviteAgainCTA?: string;

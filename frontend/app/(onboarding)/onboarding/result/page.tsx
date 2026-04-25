@@ -14,6 +14,7 @@ export default function OnboardingResultPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const user = useUserStore((s) => s.user);
+  const setOnboardingCompleted = useUserStore((s) => s.setOnboardingCompleted);
   const [mounted, setMounted] = useState(false);
 
   // ?next= 파라미터: 온보딩 완료 후 돌아갈 경로 (예: /session/new, /session/join/TOKEN)
@@ -22,9 +23,13 @@ export default function OnboardingResultPage() {
   useEffect(() => {
     setMounted(true);
     if (!user?.communicationStyle) {
-      router.replace('/onboarding');
+      router.replace('/onboarding/intro');
+      return;
     }
-  }, [user, router]);
+    if (!user.onboardingCompletedAt) {
+      setOnboardingCompleted();
+    }
+  }, [user, router, setOnboardingCompleted]);
 
   if (!user?.communicationStyle) {
     return null;
@@ -33,6 +38,7 @@ export default function OnboardingResultPage() {
   const style = user.communicationStyle;
   const styleDef = COMMUNICATION_STYLES[style];
   const MotifIcon = STYLE_MOTIF[style];
+  const isMbti = user.onboardingMethod === 'mbti';
 
   const handleCopy = () => {
     const text = `나의 대화 성향은 "${styleDef.label}"이에요.\n\n${styleDef.description}`;
@@ -41,7 +47,7 @@ export default function OnboardingResultPage() {
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title="" back={true} onBack={() => router.push('/onboarding')} />
+      <PhoneHeader title="" back={true} onBack={() => router.push('/onboarding/intro')} />
       <div style={{ padding: '40px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Motif circle with fade-in-up animation */}
         <div
@@ -60,6 +66,23 @@ export default function OnboardingResultPage() {
         >
           <MotifIcon size={56} color="white" />
         </div>
+
+        {/* MBTI badge */}
+        {isMbti && user.mbtiType && (
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--L-accent)',
+              background: 'color-mix(in srgb, var(--L-accent) 10%, transparent)',
+              borderRadius: 20,
+              padding: '4px 12px',
+              marginBottom: 12,
+              animation: mounted ? 'fade-in-up 0.6s ease-out 0.05s both' : 'none',
+            }}
+          >
+            MBTI {user.mbtiType} 기준
+          </div>
+        )}
 
         {/* Label */}
         <div

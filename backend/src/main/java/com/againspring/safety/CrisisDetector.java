@@ -30,6 +30,12 @@ public class CrisisDetector {
 	private final KeywordGuard keywordGuard;
 	private final ApplicationEventPublisher eventPublisher;
 
+	public enum CrisisLevel {
+		NONE,
+		LEGAL_INQUIRY,   // "이혼 절차", "이혼 변호사" — 법률 상담 안내
+		IMMEDIATE_CRISIS // 폭력, 자해, 성폭력 — 즉각 위기 핫라인
+	}
+
 	/**
 	 * Detects crisis keywords in user input.
 	 *
@@ -63,5 +69,30 @@ public class CrisisDetector {
 
 		// Return crisis response with hotline information
 		return CrisisResponse.createStandardCrisisResponse();
+	}
+
+	/**
+	 * Detects crisis level from user input.
+	 *
+	 * @param userInput The text to scan
+	 * @return CrisisLevel indicating severity (NONE, LEGAL_INQUIRY, IMMEDIATE_CRISIS)
+	 */
+	public CrisisLevel detectLevel(String userInput) {
+		ScanResult result = keywordGuard.scanUserInput(userInput, "system");
+
+		if (result.isCrisis()) {
+			return CrisisLevel.IMMEDIATE_CRISIS;
+		}
+
+		// Legal inquiry keywords
+		if (userInput != null) {
+			String lower = userInput.toLowerCase();
+			if (lower.contains("이혼 절차") || lower.contains("이혼 변호사") ||
+				lower.contains("이혼 신청") || lower.contains("이혼 서류")) {
+				return CrisisLevel.LEGAL_INQUIRY;
+			}
+		}
+
+		return CrisisLevel.NONE;
 	}
 }

@@ -7,6 +7,8 @@ import { ContributionRatio } from './ContributionRatio';
 import { NVCScript } from './NVCScript';
 import { RepairSuggestions } from './RepairSuggestions';
 import { NeedsMap } from './NeedsMap';
+import { MetaphorCards } from './MetaphorCards';
+import { calculateDistanceLabel } from '@/lib/utils/needsMapDistance';
 
 interface ReportLayoutProps {
   report: Report;
@@ -16,6 +18,7 @@ interface ReportLayoutProps {
   styleA?: CommunicationStyle;
   styleB?: CommunicationStyle;
   variant: 'card' | 'story';
+  onInvite?: () => void;
 }
 
 export function ReportLayout({
@@ -26,13 +29,18 @@ export function ReportLayout({
   styleA,
   styleB,
   variant,
+  onInvite,
 }: ReportLayoutProps) {
   const myName = myRole === 'A' ? nameA : nameB;
   const partnerName = myRole === 'A' ? nameB : nameA;
 
-  // Determine NVC script order: show my perspective first, then partner's
   const myScript = myRole === 'A' ? report.nvcScripts?.aToB : report.nvcScripts?.bToA;
   const partnerScript = myRole === 'A' ? report.nvcScripts?.bToA : report.nvcScripts?.aToB;
+
+  const distanceInfo =
+    report.needsMap.positionB
+      ? calculateDistanceLabel(report.needsMap.positionA, report.needsMap.positionB)
+      : null;
 
   if (variant === 'story') {
     return (
@@ -77,22 +85,108 @@ export function ReportLayout({
             labelB={nameB}
             size={260}
           />
+          {distanceInfo && (
+            <div style={{ textAlign: 'center', marginTop: 18, fontSize: 13, color: 'var(--P-sub)' }}>
+              두 분의 거리: {distanceInfo.emoji} <strong style={{ color: 'var(--P-ink)' }}>{distanceInfo.label}</strong>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  // Card variant (default)
+  // Card variant
   return (
     <div style={{ padding: '8px 22px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Contribution Ratio card */}
-      {report.contributionRatio && (
+      {/* 1. Needs Map + distance label */}
+      <div className="p-card">
+        <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 12 }}>욕구 차이 지도</div>
+        <NeedsMap
+          positionA={report.needsMap.positionA}
+          positionB={report.needsMap.positionB}
+          axisX={report.needsMap.axisX}
+          axisY={report.needsMap.axisY}
+          labelA={nameA}
+          labelB={nameB}
+          size={240}
+        />
+        {distanceInfo && (
+          <div
+            style={{
+              marginTop: 16,
+              textAlign: 'center',
+              fontSize: 13,
+              color: 'var(--P-sub)',
+            }}
+          >
+            두 분의 거리: {distanceInfo.emoji}{' '}
+            <strong style={{ color: 'var(--P-ink)' }}>{distanceInfo.label}</strong>
+          </div>
+        )}
+        {report.needsMap.interpretation && (
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 12,
+              color: 'var(--P-sub)',
+              lineHeight: 1.6,
+              textAlign: 'center',
+            }}
+          >
+            {report.needsMap.interpretation}
+          </div>
+        )}
+      </div>
+
+      {/* 2. Metaphor Cards */}
+      {report.metaphorCards && report.metaphorCards.length > 0 && (
         <div className="p-card">
-          <ContributionRatio ratio={report.contributionRatio} nameA={nameA} nameB={nameB} />
+          <MetaphorCards
+            cards={report.metaphorCards}
+            mode={report.isSoloMode ? 'solo' : 'pair'}
+          />
         </div>
       )}
 
-      {/* NVC Scripts cards */}
+      {/* 3. Contribution Ratio */}
+      {!report.powerImbalanceDetected && (
+        <div className="p-card">
+          <ContributionRatio
+            ratio={report.contributionRatio}
+            nameA={nameA}
+            nameB={nameB}
+            conflictType={report.conflictType}
+            isSoloMode={report.isSoloMode}
+            onInvite={onInvite}
+          />
+        </div>
+      )}
+
+      {/* Power imbalance crisis resource */}
+      {report.powerImbalanceDetected && (
+        <div
+          style={{
+            background: '#FFF3F3',
+            border: '1px solid #FFBBBB',
+            borderRadius: 12,
+            padding: '18px 16px',
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#C0392B', marginBottom: 8 }}>
+            ⚠️ 중요한 안내
+          </div>
+          <div style={{ fontSize: 13, color: '#5A2D2D', lineHeight: 1.75, marginBottom: 12 }}>
+            말씀해주신 상황에는 도움이 더 필요해 보여요. AI의 분석보다 전문가의 도움이 훨씬 안전하고 정확해요.
+          </div>
+          <div style={{ fontSize: 13, color: '#C0392B', lineHeight: 1.9 }}>
+            📞 여성긴급전화 1366 (24시간)<br />
+            📞 정신건강위기상담 1577-0199<br />
+            📞 자살예방상담전화 1393
+          </div>
+        </div>
+      )}
+
+      {/* 4. NVC Scripts */}
       {report.nvcScripts && (
         <>
           {myScript && (
@@ -100,7 +194,7 @@ export function ReportLayout({
               <NVCScript script={myScript} from={myName} to={partnerName} />
             </div>
           )}
-          {partnerScript && (
+          {!report.isSoloMode && partnerScript && (
             <div className="p-card">
               <NVCScript script={partnerScript} from={partnerName} to={myName} />
             </div>
@@ -108,17 +202,12 @@ export function ReportLayout({
         </>
       )}
 
-      {/* Repair Suggestions card */}
+      {/* 5. Repair Suggestions */}
       {report.repairSuggestions && report.repairSuggestions.length > 0 && (
         <div className="p-card">
           <RepairSuggestions suggestions={report.repairSuggestions} />
         </div>
       )}
-
-      {/* Share CTA */}
-      <button className="btn-P" style={{ marginTop: 4 }}>
-        카톡으로 리포트 공유
-      </button>
     </div>
   );
 }

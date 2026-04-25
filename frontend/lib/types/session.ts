@@ -79,18 +79,26 @@ export interface ContributionRatio {
   };
 }
 
+export interface MetaphorCard {
+  title: string;
+  body: string;
+  color: 'lavender' | 'green' | 'pink';
+}
+
 export interface Report {
   id: string;
   sessionId: string;
   conflictType: ConflictType | null;
   contributionRatio: ContributionRatio | null;
   needsMap: NeedsMapPayload;
+  metaphorCards?: MetaphorCard[];
   nvcScripts?: {
     aToB: NVCScript;
     bToA: NVCScript;
   };
   repairSuggestions: string[];
   isSoloMode: boolean;
+  powerImbalanceDetected?: boolean;
   aPatternFeedback?: string;
   suggestedApproach?: string;
   inviteAgainCTA?: string;

@@ -81,3 +81,9 @@ export interface ContributionRatio {
     b: string;
   };
 }
+
+export interface MetaphorCard {
+  title: string;
+  body: string;
+  color: 'lavender' | 'green' | 'pink';
+}

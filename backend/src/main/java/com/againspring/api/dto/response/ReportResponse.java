@@ -39,6 +39,8 @@ public class ReportResponse {
 
     private NVCScriptsResponse nvcScripts;
 
+    private HorsemenObservationResponse horsemenObservation;
+
     private List<String> repairSuggestions;
 
     private String aPatternFeedback;
@@ -132,6 +134,29 @@ public class ReportResponse {
             private String feeling;
             private String need;
             private String request;
+        }
+    }
+
+    /**
+     * Embedded DTO: 4 Horsemen observation.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class HorsemenObservationResponse {
+        private HorsemenItemResponse criticism;
+        private HorsemenItemResponse defensiveness;
+        private HorsemenItemResponse contempt;
+        private HorsemenItemResponse stonewalling;
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class HorsemenItemResponse {
+            private int score; // 0-10: 0=none, 3=low, 6=medium, 9=high
+            private boolean detected;
         }
     }
 }

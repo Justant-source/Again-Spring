@@ -25,7 +25,7 @@ export default function ResultPage() {
   const [error, setError] = useState<string | null>(null);
   const [variant, setVariant] = useState<'card' | 'story'>('card');
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [shareVariant, setShareVariant] = useState<'map' | 'temp' | 'style'>('map');
+  const [shareVariant, setShareVariant] = useState<'map' | 'style'>('map');
 
   // Determine names
   const myRole = sessionStore.role || 'A';
@@ -212,7 +212,7 @@ export default function ResultPage() {
 
             {/* Share variant tabs */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              {(['map', 'temp', 'style'] as const).map((v) => (
+              {(['map', 'style'] as const).map((v) => (
                 <button
                   key={v}
                   onClick={() => setShareVariant(v)}
@@ -229,7 +229,6 @@ export default function ResultPage() {
                   }}
                 >
                   {v === 'map' && '지도'}
-                  {v === 'temp' && '온도'}
                   {v === 'style' && '스타일'}
                 </button>
               ))}

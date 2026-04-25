@@ -10,6 +10,7 @@ import { checkKeywords } from '@/lib/utils/keywordGuard';
 import { CRISIS_RESOURCES } from '@/lib/constants/crisisResources';
 import { api } from '@/lib/api/client';
 import { PhoneFrame, PhoneHeader, Dashes } from '@/components/shared';
+import { getDescribePlaceholder } from '@/lib/utils/describePlaceholder';
 
 export default function DescribePage() {
   const router = useRouter();
@@ -207,7 +208,7 @@ export default function DescribePage() {
         <div style={{ position: 'relative', marginBottom: 28 }}>
           <textarea
             className="ta-L"
-            placeholder={isBMode ? '' : '예: 둘 다 맞벌이인데...'}
+            placeholder={isBMode ? '' : getDescribePlaceholder(category?.majorId ?? '', category?.middleId ?? '')}
             value={text}
             onChange={(e) => handleTextChange(e.target.value)}
             style={{ minHeight: 160, maxHeight: 400 }}

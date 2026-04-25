@@ -16,5 +16,8 @@ export interface User {
   isGuest: boolean;
   communicationStyle?: CommunicationStyle;
   onboardingAnswers?: number[];
+  onboardingCompletedAt?: string | null;
+  mbtiType?: string;
+  onboardingMethod?: 'test' | 'mbti';
   createdAt: string;
 }

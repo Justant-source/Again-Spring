@@ -9,6 +9,8 @@ interface UserState {
   setUser: (u: User) => void;
   setStyle: (s: CommunicationStyle) => void;
   setOnboardingAnswers: (a: number[]) => void;
+  setOnboardingCompleted: () => void;
+  setMbtiType: (t: string) => void;
   clear: () => void;
 }
 
@@ -27,6 +29,31 @@ export const useUserStore = create<UserState>()(
         set((prev) =>
           prev.user
             ? { user: { ...prev.user, onboardingAnswers: a } }
+            : prev,
+        ),
+      setOnboardingCompleted: () =>
+        set((prev) =>
+          prev.user
+            ? {
+                user: {
+                  ...prev.user,
+                  onboardingCompletedAt: prev.user.onboardingCompletedAt ?? new Date().toISOString(),
+                  onboardingMethod: prev.user.onboardingMethod ?? 'test',
+                },
+              }
+            : prev,
+        ),
+      setMbtiType: (t) =>
+        set((prev) =>
+          prev.user
+            ? {
+                user: {
+                  ...prev.user,
+                  mbtiType: t,
+                  onboardingMethod: 'mbti',
+                  onboardingCompletedAt: prev.user.onboardingCompletedAt ?? new Date().toISOString(),
+                },
+              }
             : prev,
         ),
       clear: () => set({ user: null }),
