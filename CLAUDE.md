@@ -162,21 +162,49 @@ curl http://localhost:8080/actuator/health
 
 ### ClaudeCodeBridge 설계 원칙
 
+- **모델**: `claude-haiku-4-5-20251001` (기본). `CLAUDE_MODEL` 환경변수로 변경 가능.
+- **호출**: `claude --print --model <model> "<prompt>"` (프롬프트는 인자, stdin 미사용)
 - **프로세스 풀**: `Semaphore(3)` — 동시 최대 3개 Claude 프로세스
-- **타임아웃**: 30초
-- **호출**: `claude -p "프롬프트"` (Headless 모드)
+- **타임아웃**: 60초 (Haiku 평균 응답 ~3초, 안전 마진)
 - **Fallback**: Claude 불가 시 `FallbackResponses` 기본 응답 반환
+
+### 인증 방식 (API 키 없이)
+
+Claude Code CLI 자체 인증을 활용. 호스트의 `~/.claude` 디렉토리를 컨테이너 `/root/.claude`로 볼륨 마운트하여 호스트 로그인 세션 공유.
+
+```yaml
+# docker-compose.dev.yml / docker-compose.prod.yml
+backend-dev:
+  volumes:
+    - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
+```
+
+호스트에서 최초 1회 `claude` 명령으로 로그인 후, 컨테이너는 동일한 세션을 사용. ANTHROPIC_API_KEY 불필요.
+
+### 컨테이너에 Claude CLI 설치
+
+`backend/Dockerfile`의 runtime stage:
+```dockerfile
+RUN apk add --no-cache nodejs npm \
+ && npm install -g @anthropic-ai/claude-code
+```
 
 ### 보안 규칙
 
 ```
 ❌ 위험: 사용자 입력을 프롬프트에 직접 삽입
-  claude -p "사용자의 말: ${userInput}"
+  claude --print "사용자의 말: ${userInput}"
 
-✅ 안전: PromptSanitizer → 구조화된 JSON 삽입
+✅ 안전: PromptSanitizer → 구조화된 형태로 삽입
   sanitized = sanitizer.sanitize(userInput);
-  prompt = template + JSON.stringify(sanitized);
+  prompt = systemPrompt + "\n<user_input>\n" + sanitized + "\n</user_input>";
 ```
+
+### 프롬프트 프레이밍 주의
+
+Claude Code CLI는 SW 엔지니어링 작업에 최적화돼 있어 비기술 조언을 거부할 수 있음. 다시봄의 system prompt(`shared/prompts/system.md`)는 NVC 재구성/구조화 출력 형태로 프레임돼 있어 정상 동작.
+
+자세한 설계는 `shared/docs/LLM_BRIDGE_ARCHITECTURE.md` 참조.
 
 ---
 
@@ -276,15 +304,38 @@ www.againspring.net  →  localhost:8091
 
 상세 설정: `infra/cloudflare/tunnel.md` 참조.
 
-### 로컬 개발 환경 변수
+### 환경 변수 (`.env.dev` / `.env.prod`)
+
+전체 항목은 `infra/.env.dev.example` / `infra/.env.prod.example` 참조. 주요 항목:
 
 ```bash
-DB_URL=jdbc:mariadb://localhost:3306/againspring?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-DB_USER=againspring
-DB_PASSWORD=changeme
-JWT_SECRET=dev-only-change-me-at-least-256-bits-long-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-CLAUDE_BIN=/usr/local/bin/claude
-NODE_ENV=development
+# DB
+MARIADB_ROOT_PASSWORD=...
+MARIADB_DATABASE=againspring_dev
+MARIADB_USER=againspring
+MARIADB_PASSWORD=...
+
+# JWT
+JWT_SECRET=...
+
+# Claude Code CLI (API 키 불필요 — 호스트 ~/.claude 마운트)
+LLM_PROVIDER=claude-code
+CLAUDE_BIN=claude
+CLAUDE_MODEL=claude-haiku-4-5-20251001
+CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude
+
+# OAuth2 (Google만 사용 중)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+
+# Email (Gmail App Password)
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=...@gmail.com
+MAIL_PASSWORD=...   # 16자리 App Password
+
+# App URL (소셜 로그인 redirect_uri 기준)
+APP_URL=https://dev.againspring.net
 ```
 
 ---
@@ -292,20 +343,26 @@ NODE_ENV=development
 ## 📊 현재 진행 상황
 
 - ✅ 모노레포 구조 (frontend/, backend/, shared/, infra/)
-- ✅ 프론트엔드 MSW 프로토타입 (Next.js 14)
+- ✅ 프론트엔드 (Next.js 14 — MSW 프로토타입 + 실제 API 연동)
 - ✅ 백엔드 구현 완료
   - ✅ Spring Boot 3.3 + Java 21 + Gradle Kotlin DSL
-  - ✅ MariaDB 11 (JPA + Flyway V1__init.sql)
-  - ✅ JWT 인증 (회원가입 / 로그인 / 게스트)
+  - ✅ MariaDB 11 (JPA + Flyway V1/V2/V3)
+    - V1: 초기 스키마
+    - V2: OAuth + Guest 세션 지속성 (`provider`, `provider_id`, `guest_sessions`)
+    - V3: 이메일 인증 (`email_verifications`)
+  - ✅ JWT 인증 (회원가입 / 로그인 / 게스트 / Google OAuth)
+  - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
   - ✅ 세션 관리 + 중재 State Machine
-  - ✅ LLM 브릿지 (ClaudeCodeBridge, PromptSanitizer, Semaphore 풀)
+  - ✅ **LLM 브릿지 (Claude Haiku 4.5 + 호스트 ~/.claude 마운트, API 키 불필요)**
   - ✅ 위기 감지 (CrisisDetector) + 금지어 가드 (KeywordGuard)
   - ✅ 리포트 생성 (기여도, NVC, 4Horsemen)
   - ✅ 관계 그래프 (MariaDB: user_relationships, conflict_history, temperature_history)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
   - ✅ OpenAPI / Swagger UI (`/swagger-ui.html`)
-- ⏳ FE-BE API 통합 테스트
-- ⏳ 배포 (Cloudflare Tunnel + 홈서버 Docker Compose)
+  - ✅ CORS 도메인 허용 + GlobalExceptionHandler 표준화
+- ✅ Docker 멀티 컨테이너 배포 (MariaDB / Backend / Frontend / Nginx)
+- ✅ Cloudflare Tunnel — `dev.againspring.net`, `againspring.net`
+- ⏳ prod 배포 (명시적 지시 시에만)
 
 ---
 

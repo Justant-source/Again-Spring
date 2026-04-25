@@ -13,8 +13,9 @@ RUN chmod +x gradlew && ./gradlew bootJar -x test --no-daemon
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
 
-RUN addgroup -S spring && adduser -S spring -G spring
-USER spring
+# Install Node.js and Claude CLI
+RUN apk add --no-cache nodejs npm && \
+    npm install -g @anthropic-ai/claude-code
 
 COPY --from=build /app/build/libs/againspring-*.jar app.jar
 

@@ -84,9 +84,10 @@ app:
 llm:
   provider: ${LLM_PROVIDER:claude-code}
   claude-code:
-    binary-path: ${CLAUDE_BIN:/usr/local/bin/claude}
+    binary-path: ${CLAUDE_BIN:claude}
+    model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
     pool-size: ${CLAUDE_POOL_SIZE:3}
-    default-timeout-ms: 30000
+    default-timeout-ms: 60000
   claude-api:
     key: ${ANTHROPIC_API_KEY:}
     model: ${CLAUDE_MODEL:claude-sonnet-4-5}

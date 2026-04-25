@@ -25,47 +25,39 @@ Again-Spring/
 
 ### 필수 환경
 
-- Node.js 20+ (FE)
-- Java 21, Gradle (BE)
-- Docker & Docker Compose (인프라)
-- Claude CLI (BE LLM 통합용)
+- Node.js 20+ (FE 로컬 개발)
+- Java 21, Gradle (BE 로컬 개발)
+- Docker & Docker Compose (Dev/Prod 배포)
+- 호스트에 Claude CLI 인증된 상태 (`~/.claude/` 디렉토리 — `claude` 명령으로 1회 로그인)
 
-### 1. 인프라 (DB 먼저 시작)
+### A. 로컬 개발 (FE/BE 분리 실행)
+
+```bash
+# 1. DB 시작
+cd infra && docker compose up -d           # MariaDB 3306
+
+# 2. 백엔드
+cd backend && ./gradlew bootRun            # localhost:8080
+
+# 3. 프론트엔드
+cd frontend && npm install && npm run dev  # localhost:3000 (MSW 자동 활성)
+```
+
+dev 프로파일은 기본 환경변수가 자동 적용됩니다. 실제 LLM 호출이 필요하면 호스트의 `claude` CLI가 PATH에 있어야 합니다.
+
+### B. 통합 Dev 배포 (Docker, dev.againspring.net)
 
 ```bash
 cd infra
-docker compose up -d
-# MariaDB: localhost:3306 (DB: againspring)
+cp .env.dev.example .env.dev
+# .env.dev 편집: MARIADB_PASSWORD, JWT_SECRET, GOOGLE_CLIENT_*, MAIL_*, CLAUDE_HOST_CONFIG_DIR 등
+
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+
+curl http://localhost:8090/api/health      # nginx 경유
 ```
 
-### 2. 백엔드
-
-```bash
-cd backend
-./gradlew bootRun   # localhost:8080
-```
-
-필수 환경변수:
-
-```bash
-DB_URL=jdbc:mariadb://localhost:3306/againspring?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-DB_USER=againspring
-DB_PASSWORD=changeme
-JWT_SECRET=dev_secret_key_change_in_prod
-CLAUDE_BIN=/path/to/claude
-```
-
-> dev 프로파일(`spring.profiles.active=dev`)은 위 기본값을 자동 적용합니다.
-
-### 3. 프론트엔드
-
-```bash
-cd frontend
-npm install
-npm run dev         # localhost:3000
-```
-
-MSW(Mock Service Worker)가 `/api/*` 요청을 자동으로 가로챕니다. FE 독립 테스트 가능.
+자세한 배포/포트/Cloudflare Tunnel 설정은 `infra/README.md`, `CLAUDE.md` 참조.
 
 ---
 
@@ -85,9 +77,11 @@ MSW(Mock Service Worker)가 `/api/*` 요청을 자동으로 가로챕니다. FE 
 | | Spring Data JPA + Hibernate | — |
 | **Database** | MariaDB | 11 LTS |
 | | Flyway (마이그레이션) | — |
-| **LLM** | Claude Code CLI (subprocess pool) | Latest |
-| **Infrastructure** | Docker Compose | v2+ |
-| | Cloudflare Tunnel | (배포 시) |
+| **LLM** | Claude Code CLI (Haiku 4.5) | API 키 불필요, 호스트 ~/.claude 마운트 |
+| **Email** | Spring Mail (Gmail SMTP) | App Password 인증 |
+| **OAuth** | Google OAuth 2.0 | FE-driven code exchange |
+| **Infrastructure** | Docker Compose (멀티 컨테이너) | v2+ |
+| | Cloudflare Tunnel | dev/prod 도메인 라우팅 |
 
 ---
 
@@ -118,7 +112,14 @@ backend/src/main/java/com/againspring/
 | `temperature_history` | 관계 온도 이력 |
 | `llm_call_logs` | LLM 호출 감사 로그 |
 
-> 마이그레이션 파일: `backend/src/main/resources/db/migration/V1__init.sql`
+**추가 테이블** (V2/V3 마이그레이션):
+
+| 테이블 | 설명 |
+|---|---|
+| `guest_sessions` | 초대 토큰별 Guest ID 일관성 (재방문 동일 ID 보장) |
+| `email_verifications` | 회원가입 이메일 인증코드 (10분 만료) |
+
+> 마이그레이션 파일: `backend/src/main/resources/db/migration/V1__init.sql` ~ `V3__add_email_verification.sql`
 
 ---
 
@@ -162,14 +163,17 @@ test(integration): 중재 API 시나리오 추가
 ## 📊 진행 상황
 
 - ✅ 모노레포 구조 (frontend/, backend/, shared/, infra/)
-- ✅ 프론트엔드 MSW 프로토타입 (Next.js 14)
+- ✅ 프론트엔드 (Next.js 14, MSW + 실제 API 연동)
 - ✅ 백엔드 전체 구현 (Spring Boot 3.3 + MariaDB)
-  - ✅ JWT 인증 (회원가입/로그인/게스트)
+  - ✅ JWT 인증 (직접 회원가입 / 로그인 / 게스트 / Google OAuth)
+  - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
+  - ✅ 게스트 세션 지속성 (초대 URL별 동일 Guest-XXXXXX ID)
   - ✅ 세션 관리 + 중재 흐름 (State Machine)
-  - ✅ LLM 브릿지 (Claude Code CLI, Semaphore 풀)
+  - ✅ **LLM 브릿지 — Claude Haiku 4.5 (API 키 불필요, 호스트 ~/.claude 마운트)**
   - ✅ 위기 감지 + 금지어 가드
   - ✅ 리포트 생성 (기여도, NVC, 4Horsemen)
   - ✅ 관계 그래프 (MariaDB 관계 테이블)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
-- ⏳ FE-BE API 통합 테스트
-- ⏳ 배포 (Cloudflare Tunnel + 홈서버)
+- ✅ Docker 멀티 컨테이너 배포 (MariaDB / BE / FE / Nginx)
+- ✅ Cloudflare Tunnel (dev/prod 도메인 라우팅)
+- ⏳ Prod 배포 (명시적 지시 시에만)

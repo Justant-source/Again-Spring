@@ -3,14 +3,11 @@ package com.againspring.llm.bridge;
 import com.againspring.llm.*;
 import com.againspring.llm.bridge.exception.ClaudeCodeException;
 import com.againspring.llm.monitoring.LLMCallLogger;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;
@@ -19,7 +16,7 @@ import java.util.concurrent.CompletionException;
 
 /**
  * LLM Provider implementation using Claude Code CLI.
- * Invokes `claude -p <prompt>` via ProcessBuilder, reads stdout, parses JSON response.
+ * Invokes `claude --print --model <model> "<prompt>"` via ProcessBuilder, reads stdout.
  * Delegates to ClaudeCodeWorkerPool for concurrency management and timeout enforcement.
  */
 @Slf4j
@@ -30,12 +27,14 @@ public class ClaudeCodeBridge implements LLMProvider {
     private final ClaudeCodeWorkerPool workerPool;
     private final PromptSanitizer sanitizer;
     private final LLMCallLogger callLogger;
-    private final ObjectMapper objectMapper;
 
-    @Value("${llm.claude-code.binary-path:/usr/local/bin/claude}")
+    @Value("${llm.claude-code.binary-path:claude}")
     private String claudeBinaryPath;
 
-    @Value("${llm.claude-code.default-timeout-ms:30000}")
+    @Value("${llm.claude-code.model:claude-haiku-4-5-20251001}")
+    private String claudeModel;
+
+    @Value("${llm.claude-code.default-timeout-ms:60000}")
     private long defaultTimeoutMs;
 
     public ClaudeCodeBridge(ClaudeCodeWorkerPool workerPool, PromptSanitizer sanitizer,
@@ -43,7 +42,6 @@ public class ClaudeCodeBridge implements LLMProvider {
         this.workerPool = workerPool;
         this.sanitizer = sanitizer;
         this.callLogger = callLogger;
-        this.objectMapper = new ObjectMapper();
     }
 
     @Override
@@ -153,21 +151,19 @@ public class ClaudeCodeBridge implements LLMProvider {
 
     /**
      * Run Claude Code CLI subprocess and read output.
+     * Command format: claude --print --model <model> "<prompt>"
      */
     private String runClaudeCommand(String prompt) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(
-                claudeBinaryPath, "-p",
-                "--output-format", "json"
+                claudeBinaryPath,
+                "--print",
+                "--model",
+                claudeModel,
+                prompt
         );
         pb.redirectErrorStream(false);
 
         Process process = pb.start();
-
-        // Write prompt to stdin
-        try (OutputStream stdin = process.getOutputStream()) {
-            stdin.write(prompt.getBytes(StandardCharsets.UTF_8));
-            stdin.flush();
-        }
 
         // Read stdout
         String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -184,20 +180,7 @@ public class ClaudeCodeBridge implements LLMProvider {
                     null, exitCode, stderrExcerpt);
         }
 
-        // Parse JSON output (expect { "content": "..." } or similar)
-        try {
-            JsonNode jsonNode = objectMapper.readTree(stdout);
-            if (jsonNode.has("content")) {
-                return jsonNode.get("content").asText();
-            } else if (jsonNode.has("text")) {
-                return jsonNode.get("text").asText();
-            }
-            return stdout;  // Fallback to raw stdout
-        } catch (Exception e) {
-            // If JSON parsing fails, return raw stdout
-            log.warn("Failed to parse Claude output as JSON, returning raw: {}", e.getMessage());
-            return stdout;
-        }
+        return stdout.trim();
     }
 
     /**

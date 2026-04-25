@@ -59,6 +59,18 @@ curl http://localhost:8091/api/health
 
 `cloudflare/tunnel.md` 참조.
 
+## Claude Code CLI 인증 (LLM 브릿지)
+
+backend 컨테이너는 호스트의 `~/.claude` 디렉토리를 `/root/.claude`로 마운트해 Claude CLI 자체 인증을 공유합니다. **API 키 불필요**.
+
+**전제조건**:
+1. 호스트에 `claude` 명령으로 1회 로그인 완료 (`~/.claude/` 디렉토리 존재)
+2. `.env.dev` / `.env.prod`에 `CLAUDE_HOST_CONFIG_DIR=/home/<user>/.claude` 입력
+
+호출 형태: `claude --print --model claude-haiku-4-5-20251001 "<prompt>"`
+
+호스트 세션 만료 시: 호스트에서 `claude` 다시 실행해 재로그인 후 컨테이너 재시작.
+
 ## 포트 현황
 
 | 포트 | 서비스 |
