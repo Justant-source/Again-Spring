@@ -41,7 +41,7 @@ export default function OnboardingResultPage() {
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title="" back={false} />
+      <PhoneHeader title="" back={true} onBack={() => router.push('/onboarding')} />
       <div style={{ padding: '40px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Motif circle with fade-in-up animation */}
         <div

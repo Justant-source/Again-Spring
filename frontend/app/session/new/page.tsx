@@ -30,7 +30,7 @@ export default function NewSessionPage() {
   return (
     <PhoneFrame tone="L">
       <RelationshipColorSync type={relationType} />
-      <PhoneHeader title="어떤 관계인가요" />
+      <PhoneHeader title="어떤 관계인가요" onBack={() => router.push('/')} />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ marginBottom: 28 }}>
           <Dashes n={4} done={1} />

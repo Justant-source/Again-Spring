@@ -164,7 +164,7 @@ export default function JoinPage({ params }: { params: { token: string } }) {
   if (step === 'choose-mode') {
     return (
       <PhoneFrame tone="L">
-        <PhoneHeader title={`${inviterName}님이 보내온 초대`} back={false} />
+        <PhoneHeader title={`${inviterName}님이 보내온 초대`} back={true} onBack={() => router.push('/')} />
         <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div className="letter-card" style={{ padding: 24, marginBottom: 24 }}>
             <div className="quote-it" style={{ fontSize: 12, marginBottom: 12 }}>
@@ -254,7 +254,7 @@ export default function JoinPage({ params }: { params: { token: string } }) {
   // ── Step: nickname-input ──
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title={`${inviterName}님이 보내온 마음`} back={false} />
+      <PhoneHeader title={`${inviterName}님이 보내온 마음`} back={true} onBack={() => setStep('choose-mode')} />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 10 }}>
           중재자의 요약 · 원문은 서로의 답변 후 공개돼요

@@ -83,7 +83,7 @@ export default function InvitePage() {
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title="상대에게 어떻게 보낼까요" />
+      <PhoneHeader title="상대에게 어떻게 보낼까요" onBack={() => router.push('/session/describe')} />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         <div className="serif" style={{ fontSize: 18, lineHeight: 1.5, marginBottom: 20 }}>
           말투 하나에도<br />마음이 실리니까요.

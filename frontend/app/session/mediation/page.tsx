@@ -199,7 +199,8 @@ export default function MediationPage() {
     <PhoneFrame tone="L">
       <PhoneHeader
         title={turnLabel}
-        back={false}
+        back={true}
+        onBack={() => router.push('/session/wait')}
         right={<ViewToggle value={variant} onChange={setVariant} />}
       />
 

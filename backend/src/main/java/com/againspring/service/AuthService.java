@@ -59,13 +59,13 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException("AUTH_INVALID_CREDENTIALS", "Invalid email or password"));
+                .orElseThrow(() -> new BusinessException("AUTH_INVALID_CREDENTIALS", "Invalid email or password", 401));
 
         if (user.getDeletedAt() != null) {
             throw new BusinessException("USER_ALREADY_DELETED", "User account has been deleted");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new BusinessException("AUTH_INVALID_CREDENTIALS", "Invalid email or password");
+            throw new BusinessException("AUTH_INVALID_CREDENTIALS", "Invalid email or password", 401);
         }
 
         log.info("User login successful: {}", user.getId());

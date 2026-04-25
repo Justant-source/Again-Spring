@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Session service for CRUD operations.
@@ -98,7 +99,9 @@ public class SessionService {
                 : SessionStatus.WAITING_B;
 
         // Create session
+        String sessionId = "ses_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
         Session session = Session.builder()
+                .id(sessionId)
                 .inviteToken(inviteToken)
                 .inviteExpiresAt(expiresAt)
                 .createdByUserId(createdByUserId)
@@ -139,6 +142,7 @@ public class SessionService {
      * @return session response
      * @throws BusinessException if session not found or access denied
      */
+    @Transactional(readOnly = true)
     public SessionResponse getSession(String sessionId, String userId) {
         Session session = sessionRepository
                 .findById(sessionId)
@@ -159,6 +163,7 @@ public class SessionService {
      * @param userId the user ID
      * @return list of session list items, sorted by creation date descending
      */
+    @Transactional(readOnly = true)
     public List<SessionListItemResponse> getUserSessions(String userId) {
         List<Session> sessions = sessionRepository
                 .findByCreatedByUserIdOrInviteeUserIdOrderByCreatedAtDesc(userId, userId);

@@ -58,7 +58,7 @@ export default function WaitPage() {
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title="" back={false} />
+      <PhoneHeader title="" back={true} onBack={() => router.push('/session/invite')} />
       <div
         style={{
           padding: '40px 28px 28px',

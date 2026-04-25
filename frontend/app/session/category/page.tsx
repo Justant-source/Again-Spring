@@ -140,6 +140,7 @@ export default function CategoryPage() {
             <button
               key={minor.id}
               onClick={() => !minor.allowCustomInput && handleMinorSelect(minor.id, false)}
+              disabled={minor.allowCustomInput}
               style={{
                 padding: '14px 16px',
                 border: '1px solid',
@@ -150,6 +151,7 @@ export default function CategoryPage() {
                 cursor: minor.allowCustomInput ? 'default' : 'pointer',
                 textAlign: 'left',
                 transition: 'all 0.15s',
+                opacity: minor.allowCustomInput ? 0.5 : 1,
               }}
             >
               {minor.label}

@@ -1,4 +1,7 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 /**
@@ -45,8 +48,13 @@ export function PhoneHeader({
   right?: ReactNode;
   onBack?: () => void;
 }) {
+  const router = useRouter();
   const ink = tone === 'P' ? 'var(--P-ink)' : 'var(--L-ink)';
   const sub = tone === 'P' ? 'var(--P-sub)' : 'var(--L-sub)';
+
+  // Fallback to router.back() if onBack not provided
+  const handleBack = onBack ?? (() => router.back());
+
   return (
     <div
       className="flex items-center justify-between px-5 pt-5 pb-3.5"
@@ -54,7 +62,7 @@ export function PhoneHeader({
     >
       <button
         type="button"
-        onClick={onBack}
+        onClick={handleBack}
         aria-label="뒤로 가기"
         className="w-6 text-[18px] leading-none"
         style={{ color: sub, visibility: back ? 'visible' : 'hidden' }}

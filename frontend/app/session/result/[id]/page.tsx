@@ -78,7 +78,7 @@ export default function ResultPage() {
   if (loading) {
     return (
       <PhoneFrame tone="P">
-        <PhoneHeader title="우리의 오늘 리포트" tone="P" back={false} />
+        <PhoneHeader title="우리의 오늘 리포트" tone="P" back={true} onBack={() => router.back()} />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ textAlign: 'center', fontSize: 14, color: 'var(--P-ink)', fontFamily: 'var(--font-serif)' }}>
             리포트를 열어보는 중…
@@ -91,7 +91,7 @@ export default function ResultPage() {
   if (error || !report) {
     return (
       <PhoneFrame tone="P">
-        <PhoneHeader title="우리의 오늘 리포트" tone="P" back={false} />
+        <PhoneHeader title="우리의 오늘 리포트" tone="P" back={true} onBack={() => router.back()} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 22px' }}>
           <div style={{ fontSize: 14, color: 'var(--P-ink)', marginBottom: 24, textAlign: 'center' }}>
             {error || '리포트를 찾지 못했어요'}

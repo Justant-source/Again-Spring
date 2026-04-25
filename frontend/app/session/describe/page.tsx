@@ -25,6 +25,14 @@ export default function DescribePage() {
   const role = searchParams.get('role') as 'A' | 'B' | null;
   const isBMode = role === 'B';
 
+  const handleBack = () => {
+    if (isBMode) {
+      router.push('/session/invite');
+    } else {
+      router.push('/session/category');
+    }
+  };
+
   // Redirect if no category selected and not in B-mode
   if (!isBMode && !category) {
     router.push('/session/category');
@@ -93,7 +101,7 @@ export default function DescribePage() {
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title={isBMode ? '당신의 마음을 들려주세요' : '당신의 마음을 들려주세요'} />
+      <PhoneHeader title={isBMode ? '당신의 마음을 들려주세요' : '당신의 마음을 들려주세요'} onBack={handleBack} />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         <div style={{ marginBottom: 28 }}>
           <Dashes n={4} done={4} />
