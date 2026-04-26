@@ -76,6 +76,18 @@ export function ChatHeader({ isDuo, canFinalize, canInvite, onOpenInvite, onFina
             정리하기
           </button>
         )}
+        <Link
+          href="/history"
+          style={{
+            fontSize: 12,
+            padding: '6px 10px',
+            color: 'var(--P-sub)',
+            textDecoration: 'none',
+          }}
+          aria-label="이 세션 그만두기"
+        >
+          나가기
+        </Link>
       </div>
     </div>
   );

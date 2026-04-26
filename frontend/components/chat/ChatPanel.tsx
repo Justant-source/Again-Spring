@@ -226,7 +226,7 @@ export function ChatPanel({
       </div>
 
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={sending} />
+      <ChatInput onSend={handleSend} disabled={sending} onCrisis={() => setCrisisLevel1(true)} />
 
       {crisisLevel1 && (
         <CrisisModal onClose={() => setCrisisLevel1(false)} />
@@ -295,6 +295,10 @@ function EmptyChatPlaceholder() {
         편한 말로, 카톡처럼 한 줄씩 적어주세요.
         <br />
         제가 차분히 들을게요.
+        <br /><br />
+        <span style={{ fontSize: 12, color: 'var(--P-sub)', opacity: 0.8 }}>
+          AI는 누가 옳은지 판단하지 않아요. 정리가 어색하면 언제든 다시 말씀해 주세요.
+        </span>
       </div>
     </div>
   );

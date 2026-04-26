@@ -15,6 +15,8 @@ interface NeedsMapProps {
   axisY?: string;
   labelA?: string;
   labelB?: string;
+  reasonA?: string;
+  reasonB?: string;
   size?: number;
   variant?: '2d' | 'venn' | 'bars';
 }
@@ -26,6 +28,8 @@ export function NeedsMap({
   axisY = '연결',
   labelA = '서현',
   labelB = '준호',
+  reasonA,
+  reasonB,
   size = 280,
   variant = '2d',
 }: NeedsMapProps) {
@@ -264,9 +268,20 @@ export function NeedsMap({
             fontSize: 12,
             color: 'var(--P-ink)',
             fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
           }}
         >
           {labelA}
+          {reasonA && (
+            <span
+              title={reasonA}
+              style={{ cursor: 'help', fontSize: 10, color: 'var(--P-sub)', lineHeight: 1 }}
+            >
+              ?
+            </span>
+          )}
         </div>
       </div>
 
@@ -290,9 +305,20 @@ export function NeedsMap({
               fontSize: 12,
               color: 'var(--P-ink)',
               fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
             }}
           >
             {labelB}
+            {reasonB && (
+              <span
+                title={reasonB}
+                style={{ cursor: 'help', fontSize: 10, color: 'var(--P-sub)', lineHeight: 1 }}
+              >
+                ?
+              </span>
+            )}
           </div>
         </div>
       ) : (

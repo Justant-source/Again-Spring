@@ -17,10 +17,8 @@ export function CrisisModal({ onClose }: Props) {
         zIndex: 999,
         padding: 20,
       }}
-      onClick={onClose}
     >
       <div
-        onClick={e => e.stopPropagation()}
         style={{
           background: 'var(--P-bg)',
           borderRadius: 14,
@@ -112,7 +110,7 @@ export function CrisisModal({ onClose }: Props) {
             cursor: 'pointer',
           }}
         >
-          알겠어요
+          지금은 괜찮아요
         </button>
       </div>
     </div>

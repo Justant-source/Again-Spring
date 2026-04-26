@@ -6,9 +6,10 @@ import { checkKeywords } from '@/lib/utils/keywordGuard';
 interface Props {
   onSend: (content: string) => void;
   disabled?: boolean;
+  onCrisis?: () => void;
 }
 
-export function ChatInput({ onSend, disabled }: Props) {
+export function ChatInput({ onSend, disabled, onCrisis }: Props) {
   const [text, setText] = useState('');
 
   const handleSend = () => {
@@ -18,7 +19,7 @@ export function ChatInput({ onSend, disabled }: Props) {
     // Check for crisis keywords before sending
     const keywordCheck = checkKeywords(content);
     if (keywordCheck.level === 1) {
-      alert(`이 내용은 저보다 더 전문적인 도움이 필요해요.\n아래 번호로 전화해보세요.\n\n· 여성긴급전화: 1366\n· 자살예방상담: 1393\n· 가정폭력: 132\n· 아동학대: 112`);
+      onCrisis?.();
       return;
     }
 
@@ -28,13 +29,14 @@ export function ChatInput({ onSend, disabled }: Props) {
 
   return (
     <div style={{
-      padding: '12px 14px',
+      padding: '8px 14px 12px',
       borderTop: '1px solid var(--P-border)',
       background: 'var(--P-bg)',
-      display: 'flex',
-      gap: 8,
-      alignItems: 'flex-end',
     }}>
+      <div style={{ fontSize: 11, color: 'var(--P-sub)', marginBottom: 6, opacity: 0.75 }}>
+        이 글은 AI가 정리해서 전달돼요 — 원문은 전달되지 않아요
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
       <textarea
         value={text}
         onChange={e => setText(e.target.value)}
@@ -77,6 +79,7 @@ export function ChatInput({ onSend, disabled }: Props) {
       >
         전송
       </button>
+      </div>
     </div>
   );
 }
