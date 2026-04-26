@@ -337,33 +337,6 @@
 
 ---
 
-## Relationship Graph (`RelationshipController`)
-
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| GET | `/api/users/me/relationships` | ✓ | 내 관계 목록 (사람별 집계) |
-| GET | `/api/users/me/relationships/{counterpartUserId}/history` | ✓ | 특정 상대와의 세션 이력 |
-
-### 응답 예
-
-```jsonc
-{
-  "relationships": [
-    {
-      "personId": "usr_456",
-      "personNickname": "민수",
-      "relationType": "couple",
-      "sessionCount": 5,
-      "lastSessionAt": "..."
-    }
-  ]
-}
-```
-
-DB: `user_relationships` (집계), `conflict_history` (이력 행).
-
----
-
 ## Health (`HealthController`)
 
 | Method | Path | 인증 | 설명 |

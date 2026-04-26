@@ -33,9 +33,9 @@ frontend/design/
 05-invite/       # 초대 링크
 06-wait/         # B 참여 대기
 07-join-b/       # B 참여
-08-mediation/    # 6턴 중재
+08-chat/         # 카톡식 채팅 세션
 09-result/       # 결과 리포트
-10-solo-mode/    # Solo 모드
+10-solo-mode/    # Solo 모드 결과
 11-history/      # 세션 이력
 ```
 
@@ -46,7 +46,7 @@ frontend/design/
 모든 UI는 화면 성격에 따라 세 가지 톤 중 하나를 사용합니다. 절대 섞지 마세요.
 
 ### Tone L — 편지지 (Letter)
-**용도**: 온보딩, 입력 플로우, 6턴 중재 세션
+**용도**: 온보딩, 입력 플로우, 카톡식 채팅 세션
 
 팔레트:
 - 배경: `#F5EFE6` (크림 베이지)
@@ -121,9 +121,9 @@ frontend/design/
 | 05-invite | InviteFlow | `app/session/invite/page.tsx` | L |
 | 06-wait | WaitingB | `app/session/wait/page.tsx` | L |
 | 07-join-b | JoinB, PartnerSummary | `app/session/join/[token]/page.tsx` | L |
-| 08-mediation | MediationSession, TurnInput, MediatorMessage | `app/session/mediation/page.tsx` | L |
+| 08-chat | ChatLayout, ChatPanel, MessageBubble | `app/session/[sessionId]/page.tsx` | L |
 | 09-result | ReportLayout, NeedsMap, ContributionRatio | `app/session/result/[id]/page.tsx` | P |
-| 10-solo-mode | SoloResult | `app/session/mediation/solo/page.tsx` | L |
+| 10-solo-mode | SoloResult | `app/session/result/[id]/solo/page.tsx` | P |
 | 11-history | SessionHistory | `app/(dashboard)/history/page.tsx` | L |
 
 ---

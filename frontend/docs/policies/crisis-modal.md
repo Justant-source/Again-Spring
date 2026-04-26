@@ -98,7 +98,7 @@ export function CrisisResourceModal({ isOpen, onClose, detectedKeywords }: Crisi
 
 ### 호출 위치
 
-1. **입력 필드** (`components/mediation/TurnInput.tsx`)
+1. **채팅 입력 필드** (`components/chat/ChatInput.tsx`)
    ```tsx
    const [crisisKeywordsDetected, setCrisisKeywordsDetected] = useState(false);
    
@@ -110,7 +110,7 @@ export function CrisisResourceModal({ isOpen, onClose, detectedKeywords }: Crisi
    return (
      <>
        <textarea onChange={(e) => handleInput(e.target.value)} />
-       <CrisisResourceModal 
+       <CrisisModal 
          isOpen={crisisKeywordsDetected} 
          onClose={() => setCrisisKeywordsDetected(false)} 
        />
@@ -128,7 +128,7 @@ export function CrisisResourceModal({ isOpen, onClose, detectedKeywords }: Crisi
    };
    ```
 
-3. **Solo 모드** (`app/session/mediation/solo/page.tsx`)
+3. **Solo 모드 입력** (`app/session/result/[id]/solo/page.tsx`)
    - 동일한 로직 적용
 
 ---

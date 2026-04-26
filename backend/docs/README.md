@@ -25,4 +25,4 @@ cd backend
 ./gradlew test           # 전체 테스트
 ```
 
-자세한 로컬 개발 환경/도커 절차는 `../../infra/docs/local-dev.md` 참조.
+자세한 로컬 개발 환경/도커 절차는 `../../env/docs/local-dev.md` 참조.

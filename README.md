@@ -133,8 +133,8 @@ curl http://localhost:8090/api/health     # nginx 경유
   - ✅ **LLM 브릿지 — Claude Haiku 4.5 (API 키 불필요, 호스트 ~/.claude 마운트)**
   - ✅ 위기 감지 + 금지어 가드
   - ✅ 리포트 생성 (기여도, NVC — 4Horsemen 내부 점수만 보존)
-  - ✅ 관계 그래프 (MariaDB: user_relationships, conflict_history)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
+  - ✅ 데드코드 정리 완료 (V1.5 폐기 코드·관계 그래프·4Horsemen UI)
 - ✅ Docker 멀티 컨테이너 배포 (MariaDB / BE / FE / Nginx)
 - ✅ Cloudflare Tunnel (dev/prod 도메인 라우팅)
 - ⏳ Prod 배포 (명시적 지시 시에만)

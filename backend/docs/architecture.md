@@ -96,14 +96,14 @@ MariaDB (Flyway 관리 스키마)
 flowchart TB
     Start[POST /api/sessions]
     Solo["CHATTING_SOLO<br/>(Solo 모드)"]
-    Invite[POST /api/sessions/{id}/invite]
+    Invite[POST /api/sessions/{id}/messages<br/>with invite token]
     Duo["CHATTING_DUO<br/>(Duo 모드)"]
     Finalize["AWAITING_FINALIZATION<br/>(종료 권유)"]
     Completed["COMPLETED<br/>(완료)"]
     Terminated["TERMINATED<br/>(강제 종료)"]
     
     Start -->|세션 생성| Solo
-    Solo -->|상대 참여| Duo
+    Solo -->|상대가 invite로 참여| Duo
     Solo -->|사용자 결정| Completed
     Duo -->|/finalize 호출| Finalize
     Finalize -->|양쪽 agree| Completed
@@ -113,7 +113,7 @@ flowchart TB
 ```
 
 **상태 전이 규칙**:
-- `CHATTING_SOLO` → `CHATTING_DUO`: 상대가 초대 토큰으로 참여
+- `CHATTING_SOLO` → `CHATTING_DUO`: 상대가 초대 토큰으로 `/invite` 엔드포인트를 통해 참여
 - `CHATTING_SOLO` → `COMPLETED`: 사용자가 종료 결정 또는 충분히 대화 후 권유 수락
 - `CHATTING_DUO` → `AWAITING_FINALIZATION`: `/finalize` 호출 (종료 권유)
 - `AWAITING_FINALIZATION` → `COMPLETED`: 양쪽이 `/finalize/agree`
@@ -136,7 +136,6 @@ flowchart TB
 
 | 이벤트 | 발행 | 리스너 | 효과 |
 |---|---|---|---|
-| `SessionCompletedEvent` | turn_6 완료 시 | `SessionCompletedGraphListener` | `user_relationships` + `conflict_history` 갱신 |
 | `TurnCompletedEvent` | 매 턴 완료 시 | (현재 미사용 — 모니터링용 예약) | — |
 | `SafetyTriggerEvent` | KeywordGuard / RatioEnforcer 위반 시 | `SafetyAuditLogger` | safety 감사 로그 (마스킹) |
 | `CrisisDetectedEvent` | CrisisDetector 발동 시 | `SessionService.terminateForCrisis` | `SessionStatus.TERMINATED` 전이 |

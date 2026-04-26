@@ -29,14 +29,11 @@ LLM의 역할·말투·금기를 정의. 모든 호출에 포함.
 
 ### Layer 2 — Gottman 이론 (`gottman/`)
 - `four_horsemen.md` — 비난·경멸·방어·담쌓기 정의 + 해독제
-- `bids_and_repair.md` — 연결 요청 + 회복 시도
-- `sound_relationship_house.md` — 7층 구조 (Love Maps ~ Shared Meaning)
 
 ### Layer 3 — NVC 출력 템플릿 (`nvc/`)
 - `four_steps.md` — 모든 "상대에게 할 말" 조언을 4단계로 강제 (관찰·느낌·욕구·부탁)
 
-### Layer 3.5 — 사용자 프로필 (`profiles/`, 동적 주입)
-- `profile_template.md` — 가이드 문서 (실제 fragment는 코드 빌드)
+### Layer 3.5 — 사용자 프로필 (동적 주입)
 - `<user_profile>` 블록은 `UserProfileFragment.render(User)`가 코드로 빌드해 주입.
 - 6스타일(wave/mountain/flame/leaf/moon/star) label/emoji/strengths/caution은 `StyleCalculator.CommunicationStyle` enum이 권위본.
 - Solo는 본인 1블록, Duo는 `sender="USER_A"` / `sender="USER_B"` 두 블록 연속. 온보딩 미완료 사용자에게는 출력 생략.

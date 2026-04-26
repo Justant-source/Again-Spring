@@ -6,7 +6,7 @@
 
 | 패키지 | 책임 |
 |---|---|
-| `api/` | REST 컨트롤러 + DTO (request, response) |
+| `api/` | REST 컨트롤러 (8개: Auth/Health/Message/OAuth2/Report/Session/User/AdminPrompts) + DTO (request, response) |
 | `service/` | 비즈니스 로직, 트랜잭션 경계, State Machine |
 | `domain/` | JPA 엔티티 + Enum (도메인 모델) |
 | `repository/` | Spring Data JPA 인터페이스 |
@@ -27,7 +27,7 @@ com.againspring/
 │   ├── AdminPromptsController          # POST /api/admin/prompts/reload
 │   ├── AuthController                  # /api/auth/{signup,login,guest,logout,...}
 │   ├── HealthController                # GET /api/health
-│   ├── MediationController             # /api/sessions/{id}/turns, /stream
+│   ├── MessageController               # /api/sessions/{id}/messages, /invite
 │   ├── OAuth2Controller                # /api/auth/oauth2/{provider}
 │   ├── ReportController                # /api/sessions/{id}/report, /api/reports/{id}
 │   ├── SessionController               # /api/sessions, /me, /{id}, /join/{token}
@@ -41,27 +41,27 @@ com.againspring/
 │   │   │   ├── LoginRequest
 │   │   │   ├── OAuthCallbackRequest
 │   │   │   ├── OnboardingRequest
-│   │   │   ├── ProgressTurnRequest
-│   │   │   ├── ResetPasswordRequest
 │   │   │   ├── SendVerificationRequest
 │   │   │   ├── SignupRequest
 │   │   │   └── UpdateUserRequest
 │   │   └── response/
 │   │       ├── AuthResponse
+│   │       ├── ChatTurnResponse
 │   │       ├── CreateSessionResponse
 │   │       ├── CurrentTurnResponse
+│   │       ├── FinalizationResponse
+│   │       ├── InviteTokenResponse
+│   │       ├── MessageMetadataResponse
+│   │       ├── MessageResponse
 │   │       ├── OnboardingResponse
+│   │       ├── PartnerStatusResponse
 │   │       ├── ReportResponse
+│   │       ├── SessionHistoryResponse
 │   │       ├── SessionListItemResponse
 │   │       ├── SessionResponse
 │   │       ├── SessionStatusResponse
 │   │       ├── TurnResponse
-│   │       ├── UserResponse
-│   │       └── graph/
-│   │           ├── PersonRelationshipSummary
-│   │           └── SessionHistoryItem
-│   └── graph/
-│       └── RelationshipController      # /api/users/me/relationships
+│   │       └── UserResponse
 │
 ├── service/
 │   ├── AuthService                     # 회원가입/로그인/게스트, JWT 발급
@@ -75,13 +75,10 @@ com.againspring/
 │   ├── StyleCalculator                 # 온보딩 응답 → 6스타일 enum (label/emoji/strengths/caution 메타 포함)
 │   ├── UserService                     # User 조회/수정
 │   ├── crisis/
-│   │   └── CrisisDetector              # 위기 키워드 분석 (사전 safety/ 에서 이동)
+│   │   └── CrisisDetector              # 위기 키워드 분석
 │   ├── event/
 │   │   ├── SessionCompletedEvent
 │   │   └── TurnCompletedEvent
-│   ├── graph/
-│   │   ├── RelationshipGraphService    # user_relationships 집계 갱신
-│   │   └── SessionCompletedGraphListener
 │   ├── oauth/
 │   │   ├── OAuthProviderService
 │   │   └── OAuthUserInfo
@@ -97,7 +94,7 @@ com.againspring/
 │   │   ├── MetaphorSelector
 │   │   ├── NeedsMapValidator
 │   │   ├── NVCValidator
-│   │   ├── RatioEnforcer               # 화해 기여도 클리핑 (사전 safety/ 에서 이동)
+│   │   ├── RatioEnforcer               # 화해 기여도 클리핑
 │   │   ├── ReportGenerationService     # V1.5 리포트 (Sonnet, A/B 병렬)
 │   │   └── ReportResponseParser
 │   └── retention/
@@ -108,32 +105,30 @@ com.againspring/
 ├── domain/                             # JPA 엔티티 (Lombok @Entity)
 │   ├── EmailVerification
 │   ├── GuestSession
+│   ├── Message                         # V1.5 카톡식 메시지 (solo/duo)
 │   ├── PasswordResetToken
 │   ├── Report
 │   ├── RevokedToken
 │   ├── Session
-│   ├── Turn
 │   ├── User
 │   ├── enums/
 │   │   ├── ConflictType                # FACTUAL, DIFFERENCE, MIXED
 │   │   ├── RelationType                # COUPLE, MARRIAGE, FRIEND, FAMILY, PARENT_CHILD, KOREAN_SPECIFIC
-│   │   ├── SessionStatus               # WAITING_B, B_JOINED, IN_MEDIATION, COMPLETED, SOLO_MODE, TERMINATED
+│   │   ├── SessionStatus               # CHATTING_SOLO, CHATTING_DUO, AWAITING_FINALIZATION, COMPLETED, TERMINATED
 │   │   └── TurnRole                    # A, B, MEDIATOR
 │   └── relationship/
-│       ├── ConflictHistory             # 세션 단위 행
 │       ├── LlmCallLog                  # llm_call_logs
 │       └── UserRelationship            # A-B 집계
 │
 ├── repository/                         # 모두 JpaRepository<Entity, ID>
-│   ├── ConflictHistoryRepository
 │   ├── EmailVerificationRepository
 │   ├── GuestSessionRepository
 │   ├── LlmCallLogRepository
+│   ├── MessageRepository                # V1.5 메시지 저장소
 │   ├── PasswordResetTokenRepository
 │   ├── ReportRepository
 │   ├── RevokedTokenRepository
 │   ├── SessionRepository
-│   ├── TurnRepository
 │   ├── UserRelationshipRepository
 │   └── UserRepository
 │

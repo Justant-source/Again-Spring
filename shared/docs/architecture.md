@@ -66,13 +66,13 @@ flowchart TB
 
 ### 1) HTTP 요청 흐름
 
-1. 브라우저 → `https://dev.againspring.net/api/sessions/{id}/turns`
+1. 브라우저 → `https://dev.againspring.net/api/sessions/{id}/messages`
 2. Cloudflare Tunnel → 호스트 `localhost:8090`
 3. `againspring-nginx-dev` (`env/nginx/dev.conf`):
    - `/api/` 매치 → `http://againspring-backend-dev:8080`
    - 타임아웃 60s, `X-Forwarded-*` 헤더 주입
-4. `MediationController.progressTurn(...)` 진입
-5. `MediationService` → `ClaudeCodeBridge.invoke(...)` → `claude --print --model claude-haiku-4-5-20251001 "..."`
+4. `MessageController.sendMessage(...)` 진입
+5. `ChatService` → `ClaudeCodeBridge.invoke(...)` → `claude --print --model claude-haiku-4-5-20251001 "..."`
 6. 응답 직렬화 후 nginx 통해 브라우저 반환
 
 ### 2) 인증 흐름

@@ -47,10 +47,9 @@ frontend/
 │       ├── category/page.tsx
 │       ├── describe/page.tsx                # KeywordGuard 적용
 │       ├── invite/page.tsx
-│       ├── mediation/
-│       │   ├── page.tsx                      # 6턴 메인
-│       │   ├── loading.tsx
-│       │   └── solo/page.tsx                 # CrisisInline 적용
+│       ├── [sessionId]/
+│       │   ├── page.tsx                      # 채팅 메인 (ChatLayout)
+│       │   └── loading.tsx
 │       ├── join/[token]/page.tsx             # B 진입
 │       └── result/
 │           ├── [id]/page.tsx                 # 결과 리포트
@@ -72,24 +71,34 @@ frontend/
 │   │   ├── LikertQuestion.tsx                # 5점 리커트
 │   │   └── MbtiAxisSlider.tsx                # MBTI 4축
 │   │
-│   ├── mediation/
-│   │   ├── MediatorMessage.tsx               # 중재자 응답 버블
-│   │   ├── TurnInput.tsx                     # 입력 + KeywordGuard
-│   │   ├── CrisisInline.tsx                  # 인라인 위기 경고
-│   │   ├── ViewToggle.tsx                    # A/B 입력 전환 (디버그)
-│   │   └── ProgressBar.tsx                   # 1~6 턴 진행도
+│   ├── chat/
+│   │   ├── ChatLayout.tsx                    # 채팅 컨테이너 레이아웃
+│   │   ├── ChatPanel.tsx                     # A/B 채팅 패널
+│   │   ├── ChatHeader.tsx                    # 세션 정보 헤더
+│   │   ├── ChatInput.tsx                     # 입력 필드 + KeywordGuard
+│   │   ├── MessageBubble.tsx                 # 메시지 버블
+│   │   ├── PartnerPanel.tsx                  # B 참여 대기/진행 상태 패널
+│   │   ├── PartnerStatusBar.tsx              # B 온라인 상태 바
+│   │   ├── SwipeContainer.tsx                # 모바일 좌우 스와이프
+│   │   ├── CrisisModal.tsx                   # 위기 감지 모달 (채팅용)
+│   │   ├── InviteModal.tsx                   # 초대 링크 공유 모달
+│   │   ├── FinalizeSuggestionCard.tsx        # 세션 종료 제안
+│   │   ├── PartnerJoinedToast.tsx            # B 참여 알림
+│   │   └── PartnerJoinNoticeCard.tsx         # B 참여 공지 카드
 │   │
 │   ├── result/
 │   │   ├── ReportLayout.tsx                  # 결과 카드 레이아웃
 │   │   ├── StyleCombination.tsx              # 6×6 조합 해석
 │   │   ├── ContributionRatio.tsx             # 화해 기여도 도넛
-│   │   ├── FourHorsemenObservation.tsx       # 4 Horsemen 관찰 (정책 적용)
-│   │   ├── SoloResult.tsx
+│   │   ├── SoloResult.tsx                    # Solo 모드 결과
 │   │   ├── NeedsMap.tsx                      # 욕구 차이 지도
 │   │   ├── NVCScript.tsx                     # NVC 4단계 카드
-│   │   ├── MetaphorCards.tsx
-│   │   ├── RepairSuggestions.tsx
-│   │   └── ShareImage.tsx                    # 공유용 추상화 이미지
+│   │   ├── MetaphorCards.tsx                 # 은유 카드
+│   │   ├── RepairSuggestions.tsx             # 관계 회복 제안
+│   │   ├── ShareImage.tsx                    # 공유용 추상화 이미지
+│   │   ├── ShareCardRatio.tsx                # 공유 카드 (기여도)
+│   │   ├── ShareCardBlurredLetter.tsx        # 공유 카드 (편지형)
+│   │   └── ShareCardMetaphor.tsx             # 공유 카드 (은유형)
 │   │
 │   └── ui/                                    # 기본 UI 컴포넌트 (shadcn-ish)
 │
@@ -129,9 +138,10 @@ frontend/
 │   │   ├── index.ts                           # 핸들러 통합
 │   │   ├── user.ts                            # /api/users/*
 │   │   ├── session.ts                         # /api/sessions/*
-│   │   └── mediation.ts                       # /api/sessions/{id}/turns/*
+│   │   ├── chat.ts                            # /api/sessions/{id}/messages/*
+│   │   ├── historyMessages.ts                 # /api/sessions/{id}/messages/history
+│   │   └── mediation.ts                       # /api/sessions/{id}/report
 │   └── fixtures/
-│       ├── mockMediations.ts                  # 턴별 응답
 │       └── mockReports.ts                     # 시나리오별 리포트
 │
 ├── scripts/

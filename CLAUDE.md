@@ -390,8 +390,8 @@ APP_URL=https://dev.againspring.net
   - ✅ **중재 컨텍스트 강화 (Phase A/B/C)**: 사용자 프로필 주입(`UserProfileFragment`) + 턴 간 심리 점수 피드백(`PsychologyFeedbackFormatter`, `ChatTurnMetaParser`) + Duo 균형 추적(`DuoBalanceFormatter`)
   - ✅ 위기 감지 (CrisisDetector) + 금지어 가드 (KeywordGuard)
   - ✅ 리포트 생성 (기여도, NVC — 4Horsemen 내부 점수만 보존, UI 노출 없음)
-  - ✅ 관계 그래프 (MariaDB: user_relationships, conflict_history)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
+  - ✅ 데드코드 정리 완료 (V1.5 폐기 코드·관계 그래프·4Horsemen UI)
   - ✅ OpenAPI / Swagger UI (`/swagger-ui.html`)
   - ✅ CORS 도메인 허용 + GlobalExceptionHandler 표준화
 - ✅ Docker 멀티 컨테이너 배포 (MariaDB / Backend / Frontend / Nginx)

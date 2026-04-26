@@ -178,7 +178,7 @@ useEffect(() => {
    ↓ 링크 공유
 /session/wait (B 참여 대기)
    ↓ B 참여
-/session/mediation (6턴)
+/session/[sessionId] (카톡식 채팅)
    ↓ 완료
 /session/result/[id] (리포트)
 ```
@@ -191,7 +191,7 @@ useEffect(() => {
 /session/join/[token] (B 닉네임 입력)
    ↓ 게스트 또는 회원 선택
    ↓
-/session/mediation (B 입장)
+/session/[sessionId] (B 입장)
 ```
 
 ### 3) Solo 모드
@@ -199,9 +199,7 @@ useEffect(() => {
 ```
 B가 24h 내 미참여
    ↓ "혼자 진행하기"
-/session/mediation/solo (단축 2-3턴)
-   ↓
-/session/result/[id]/solo
+/session/result/[id]/solo (단축 분석)
 ```
 
 ## 인증 흐름

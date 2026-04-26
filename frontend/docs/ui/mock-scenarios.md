@@ -1,7 +1,7 @@
 # Mock API 시나리오 샘플
 
 Mock 단계에서 사용할 3가지 기본 시나리오와 확장 시나리오.
-`mocks/fixtures/mockMediations.ts`와 `mocks/fixtures/mockReports.ts`에 구현.
+`mocks/fixtures/mockReports.ts`에 구현.
 
 ---
 
@@ -13,59 +13,7 @@ Mock 단계에서 사용할 3가지 기본 시나리오와 확장 시나리오.
 - **A**: 약속 반복 취소당한 쪽
 - **B**: 약속 반복 취소한 쪽
 
-### 턴별 입력/응답
-
-**Turn 1 (A 입력)**
-```
-3주 연속 주말 데이트 약속을 당일에 취소했어요.
-매번 "피곤해서", "갑자기 일이 생겨서"라는 핑계로요.
-그런데 같은 날 친구랑은 만났더라고요.
-저를 중요하게 생각 안 하는 것 같아서 너무 서운해요.
-```
-
-**Turn 1 AI (B를 위한 요약)**
-```
-A님은 최근 반복된 일정 변경 때문에 관계에서의 우선순위에 
-대해 깊이 속상해하고 계세요. 자세한 맥락은 B님 답변 후 
-함께 공개됩니다.
-```
-
-**Turn 2 (B 입력)**
-```
-요즘 회사에서 프로젝트 마감이 있어서 정말 힘들었어요.
-친구 만난 날은 이미 몇 달 전부터 잡혔던 거라 못 미룬 거고,
-A한테는 주말에 쉬고 싶어서 취소한 건데...
-그 얘기를 이렇게 들으니 제가 나쁜 사람 같네요.
-```
-
-**Turn 2 AI (A를 위한 요약)**
-```
-B님은 최근 업무적 어려움과 체력적 한계에 대해 설명하셨어요.
-다만 A님께 그 상황을 충분히 공유하지 못한 점이 있을 수 있어요.
-```
-
-**Turn 3 (A에게 심화 질문)**
-```
-A님, 여기까지 솔직하게 써주셔서 감사해요.
-
-B님이 업무로 힘드셨다는 얘기를 잠깐 들었는데, 
-두 가지만 여쭤볼게요:
-
-Q1. B님이 그렇게 힘든 상황이었다는 걸 어느 정도 알고 계셨나요?
-Q2. 그 3주 동안 A님이 가장 필요했던 건 뭐였을까요?
-```
-
-**Turn 4 (B에게 심화 질문)**
-```
-B님, 답변 주셔서 감사해요.
-
-A님 얘기도 잠깐 들어봤는데, 두 가지 더 여쭐게요:
-
-Q1. 약속 취소하실 때 미리 알릴 수 있었을 상황이 있으셨나요?
-Q2. 친구 약속은 우선순위로 두셨던 이유가 있을까요?
-```
-
-### 최종 리포트
+### 리포트
 
 ```json
 {
@@ -237,15 +185,14 @@ Q2. 친구 약속은 우선순위로 두셨던 이유가 있을까요?
 
 ---
 
-## Mock 시나리오 5: Four Horsemen 모두 탐지 (경고형)
+## Mock 시나리오 5: 심각한 갈등 (권태기)
 
-### 입력
-- 관계: 부부
-- 카테고리: 부부 > 부부 관계·애정 문제 > 권태기
+### 세션 정보
+- **관계**: 부부
+- **카테고리**: 부부 > 부부 관계·애정 문제 > 권태기
 - 양쪽 모두 감정적으로 격앙된 입력
 
 ### 리포트 특징
-- 모든 Four Horsemen 탐지됨 (내부 점수 산정용)
 - 리포트 상단에 **"관계 회복에 시간과 노력이 필요해 보여요. 전문 상담을 권해드려요."** 안내
 - 유료 상담 연결 CTA (제휴 준비 전까지는 정보 제공만)
 
@@ -253,60 +200,43 @@ Q2. 친구 약속은 우선순위로 두셨던 이유가 있을까요?
 
 ## MSW Handler 구조
 
+현재 리포트 생성은 `mocks/handlers/mediation.ts`에서 `pickReport()`를 통해 시나리오별 리포트를 반환합니다.
+
 ```typescript
 // mocks/handlers/mediation.ts
 
-import { http, HttpResponse, delay } from 'msw';
-import { mockReports } from '../fixtures/mockReports';
-
 export const mediationHandlers = [
-  // 세션 생성
-  http.post('/api/sessions', async ({ request }) => {
-    await delay(800);
-    const body = await request.json();
-    return HttpResponse.json({
-      id: `session_${Date.now()}`,
-      inviteToken: `tok_${Math.random().toString(36).slice(2, 10)}`,
-      status: 'waiting_b',
-      ...body,
-    });
-  }),
-  
-  // 턴 진행
-  http.post('/api/sessions/:id/turns', async ({ params, request }) => {
-    await delay(1500); // AI 응답 시뮬레이션
-    const body = await request.json();
-    const turnNumber = body.turnNumber;
-    
-    // 턴별 고정 응답 반환
-    const mockResponse = getMockTurnResponse(turnNumber, body);
-    return HttpResponse.json(mockResponse);
-  }),
-  
-  // 리포트 생성 요청
+  // 리포트 POST 요청
   http.post('/api/sessions/:id/report', async ({ params }) => {
-    await delay(3000); // 리포트 생성 로딩감
-    
-    // 시나리오별로 하나 선택 (랜덤 또는 세션 기반)
-    const report = selectMockReport(params.id as string);
+    await delay(2400);
+    const report = pickReport(String(params.id));
     return HttpResponse.json(report);
   }),
-];
 
-function selectMockReport(sessionId: string) {
-  const scenarios = ['factual', 'difference', 'mixed'];
-  const index = sessionId.length % scenarios.length;
-  return mockReports[scenarios[index]];
-}
+  // 리포트 GET 요청
+  http.get('/api/sessions/:id/report', async ({ params }) => {
+    await delay(200);
+    const report = pickReport(String(params.id));
+    return HttpResponse.json(report);
+  }),
+
+  // 개발자 오버라이드: 특정 시나리오 강제 선택
+  http.get('/api/mock/report', async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get('scenario') ?? 'difference';
+    await delay(200);
+    return HttpResponse.json(pickReport(`force_${scenario}`));
+  }),
+];
 ```
 
 ---
 
 ## 개발 단계 디버깅 팁
 
-프론트 개발 중 시나리오 전환이 필요하면:
-- URL 쿼리로 시나리오 지정: `?mockScenario=factual|difference|mixed|solo`
-- 개발 모드에서만 "시나리오 선택" 디버그 패널 노출
+프론트 개발 중 리포트 시나리오를 강제로 선택하려면:
+- 개발자 오버라이드: `/api/mock/report?scenario=factual|difference|mixed`
+- 예: `http://localhost:3000/api/mock/report?scenario=factual`로 GET 요청하면 해당 시나리오의 리포트가 반환됨
 
 ---
 

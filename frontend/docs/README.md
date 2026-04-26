@@ -79,7 +79,7 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 
 ### 1. 디자인 시스템
 
-- **Tone L** (편지지): 온보딩, 입력, 중재
+- **Tone L** (편지지): 온보딩, 입력, 채팅
 - **Tone P** (파스텔): 결과 리포트
 - **Tone Q** (조용함): 고급 화면
 
@@ -118,7 +118,7 @@ FE는 이들을 **참조하고 구현**할 뿐, 독립적으로 정의하지 않
 
 - [ ] `npm run build` 성공 (no errors)
 - [ ] `npm run lint:words` 최종 확인
-- [ ] 전체 플로우 (온보딩 → 세션 → 중재 → 결과) 수동 테스트
+- [ ] 전체 플로우 (온보딩 → 세션 → 채팅 → 결과) 수동 테스트
 - [ ] 모바일 반응형 (PhoneFrame) 확인
 - [ ] 위기 모달 팝업 테스트
 
@@ -143,8 +143,8 @@ frontend/
 ├── components/            # React 컴포넌트
 │   ├── shared/            # Logo, PhoneFrame, CrisisResourceModal
 │   ├── onboarding/        # LikertQuestion
-│   ├── mediation/         # TurnInput, MediatorMessage
-│   ├── result/            # NeedsMap, ContributionRatio
+│   ├── chat/              # ChatPanel, ChatInput, MessageBubble
+│   ├── result/            # NeedsMap, ContributionRatio, NVCScript
 │   └── ui/                # 기본 UI (Radix)
 │
 ├── lib/
