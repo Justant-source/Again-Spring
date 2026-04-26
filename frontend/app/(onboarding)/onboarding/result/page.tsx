@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { STYLE_MOTIF } from '@/components/shared/Motif';
 import { COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
@@ -17,7 +16,6 @@ export default function OnboardingResultPage() {
   const setOnboardingCompleted = useUserStore((s) => s.setOnboardingCompleted);
   const [mounted, setMounted] = useState(false);
 
-  // ?next= 파라미터: 온보딩 완료 후 돌아갈 경로 (예: /session/new, /session/join/TOKEN)
   const nextPath = searchParams.get('next') ?? '/session/new';
 
   useEffect(() => {
@@ -38,37 +36,34 @@ export default function OnboardingResultPage() {
   const style = user.communicationStyle;
   const styleDef = COMMUNICATION_STYLES[style];
   const MotifIcon = STYLE_MOTIF[style];
-  const isMbti = user.onboardingMethod === 'mbti';
-
-  const handleCopy = () => {
-    const text = `나의 대화 성향은 "${styleDef.label}"이에요.\n\n${styleDef.description}`;
-    navigator.clipboard.writeText(text).catch(() => {});
-  };
+  const hasMbti = !!user.mbtiType;
+  const nextParam = `?next=${encodeURIComponent(nextPath)}`;
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title="" back={true} onBack={() => router.push('/onboarding/intro')} />
-      <div style={{ padding: '40px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {/* Motif circle with fade-in-up animation */}
+      <PhoneHeader title="" back={true} onBack={() => router.back()} />
+      <div style={{ padding: '32px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+
+        {/* Motif */}
         <div
           style={{
-            width: 96,
-            height: 96,
+            width: 88,
+            height: 88,
             borderRadius: '50%',
             background: 'var(--P-a)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: 28,
+            marginBottom: 24,
             animation: mounted ? 'fade-in-up 0.6s ease-out' : 'none',
             opacity: mounted ? 1 : 0,
           }}
         >
-          <MotifIcon size={56} color="white" />
+          <MotifIcon size={52} color="white" />
         </div>
 
         {/* MBTI badge */}
-        {isMbti && user.mbtiType && (
+        {hasMbti && user.mbtiType && (
           <div
             style={{
               fontSize: 12,
@@ -76,7 +71,7 @@ export default function OnboardingResultPage() {
               background: 'color-mix(in srgb, var(--L-accent) 10%, transparent)',
               borderRadius: 20,
               padding: '4px 12px',
-              marginBottom: 12,
+              marginBottom: 10,
               animation: mounted ? 'fade-in-up 0.6s ease-out 0.05s both' : 'none',
             }}
           >
@@ -84,18 +79,19 @@ export default function OnboardingResultPage() {
           </div>
         )}
 
-        {/* Label */}
+        {/* Style label */}
         <div
           className="serif"
           style={{
-            fontSize: 26,
+            fontSize: 24,
             lineHeight: 1.4,
-            marginBottom: 12,
+            marginBottom: 10,
             animation: mounted ? 'fade-in-up 0.6s ease-out 0.1s both' : 'none',
             textAlign: 'center',
+            color: 'var(--L-ink)',
           }}
         >
-          {styleDef.emoji} {styleDef.label}
+          {styleDef.label}
         </div>
 
         {/* Description */}
@@ -104,7 +100,7 @@ export default function OnboardingResultPage() {
             fontSize: 13,
             color: 'var(--L-sub)',
             textAlign: 'center',
-            marginBottom: 28,
+            marginBottom: 24,
             animation: mounted ? 'fade-in-up 0.6s ease-out 0.2s both' : 'none',
           }}
         >
@@ -115,17 +111,17 @@ export default function OnboardingResultPage() {
         <div
           style={{
             width: '100%',
-            marginBottom: 20,
+            marginBottom: 16,
             animation: mounted ? 'fade-in-up 0.6s ease-out 0.3s both' : 'none',
           }}
         >
-          <div className="quote-it" style={{ fontSize: 12, marginBottom: 10 }}>
+          <div className="quote-it" style={{ fontSize: 12, marginBottom: 8 }}>
             이런 점이 좋아요
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {styleDef.strengths.map((strength, i) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {styleDef.strengths.map((s, i) => (
               <div key={i} style={{ fontSize: 13, color: 'var(--L-ink)', lineHeight: 1.5 }}>
-                · {strength}
+                · {s}
               </div>
             ))}
           </div>
@@ -139,48 +135,99 @@ export default function OnboardingResultPage() {
             animation: mounted ? 'fade-in-up 0.6s ease-out 0.4s both' : 'none',
           }}
         >
-          <div className="quote-it" style={{ fontSize: 12, marginBottom: 10 }}>
+          <div className="quote-it" style={{ fontSize: 12, marginBottom: 8 }}>
             기억해주세요
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {styleDef.caution.map((item, i) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {styleDef.caution.map((c, i) => (
               <div key={i} style={{ fontSize: 13, color: 'var(--L-ink)', lineHeight: 1.5 }}>
-                · {item}
+                · {c}
               </div>
             ))}
           </div>
         </div>
 
-        {/* CTA Buttons */}
+        {/* MBTI enhancement section — shown only when MBTI not yet added */}
+        {!hasMbti && (
+          <div
+            style={{
+              width: '100%',
+              marginBottom: 20,
+              animation: mounted ? 'fade-in-up 0.6s ease-out 0.5s both' : 'none',
+            }}
+          >
+            <div
+              style={{
+                borderTop: '1px solid var(--L-rule)',
+                paddingTop: 20,
+                marginBottom: 14,
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--L-ink)', marginBottom: 4 }}>
+                정확도를 높이려면 MBTI를 추가해주세요
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--L-sub)', lineHeight: 1.6 }}>
+                10문항 결과에 MBTI를 더하면 더 세밀한 중재를 받을 수 있어요.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                {
+                  title: 'MBTI 직접 입력',
+                  desc: '알고 있는 유형을 슬라이더로 조절',
+                  href: `/onboarding/mbti-input${nextParam}`,
+                },
+                {
+                  title: 'MBTI 유형 검사 · 60문항',
+                  desc: '문항에 답하면 유형이 자동 분석돼요',
+                  href: `/onboarding/mbti-test${nextParam}`,
+                },
+              ].map((opt) => (
+                <button
+                  key={opt.title}
+                  onClick={() => router.push(opt.href)}
+                  style={{
+                    width: '100%',
+                    background: 'var(--L-bg)',
+                    border: '1.5px solid var(--L-rule)',
+                    borderRadius: 12,
+                    padding: '14px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--L-ink)', marginBottom: 2 }}>
+                      {opt.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--L-sub)' }}>{opt.desc}</div>
+                  </div>
+                  <span style={{ color: 'var(--L-sub)', fontSize: 16, marginLeft: 12, flexShrink: 0 }}>›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* CTA */}
         <div
           style={{
             width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
             marginTop: 'auto',
-            animation: mounted ? 'fade-in-up 0.6s ease-out 0.5s both' : 'none',
+            animation: mounted ? 'fade-in-up 0.6s ease-out 0.55s both' : 'none',
           }}
         >
-          <Link href={nextPath} className="btn-L" style={{ textAlign: 'center', textDecoration: 'none', display: 'block' }}>
-            세션 시작하기
-          </Link>
           <button
-            onClick={handleCopy}
-            className="btn-L ghost"
+            className={hasMbti ? 'btn-L' : 'btn-L ghost'}
             style={{ width: '100%' }}
+            onClick={() => router.push(nextPath)}
           >
-            공유하기
+            완료하기
           </button>
-          {user.isGuest && (
-            <button
-              onClick={() => router.push('/session/new')}
-              className="btn-L ghost"
-              style={{ width: '100%', fontSize: 12 }}
-            >
-              건너뛰기
-            </button>
-          )}
         </div>
       </div>
     </PhoneFrame>

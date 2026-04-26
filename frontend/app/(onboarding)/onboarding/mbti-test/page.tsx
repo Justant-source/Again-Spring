@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
-import { Dashes } from '@/components/shared/Dashes';
 import { MBTI_TEST_QUESTIONS, MBTI_TO_STYLE, deriveMbtiType } from '@/lib/constants/mbtiMapping';
 import { useUserStore } from '@/lib/store/userStore';
 
@@ -22,17 +21,17 @@ export default function MbtiTestPage() {
 
   const question = MBTI_TEST_QUESTIONS[currentIdx];
   const answered = Object.keys(answers).length;
+  const progress = Math.round((answered / TOTAL) * 100);
 
   const handleChoice = (letter: string) => {
     const newAnswers = { ...answers, [question.id]: letter };
     setAnswers(newAnswers);
 
     if (currentIdx < TOTAL - 1) {
-      setTimeout(() => setCurrentIdx((i) => i + 1), 280);
+      setTimeout(() => setCurrentIdx((i) => i + 1), 220);
       return;
     }
 
-    // Last question — derive MBTI and complete
     const mbtiType = deriveMbtiType(newAnswers);
     const style = MBTI_TO_STYLE[mbtiType] ?? 'leaf';
     setStyle(style);
@@ -50,7 +49,6 @@ export default function MbtiTestPage() {
 
   const currentAnswer = answers[question.id];
 
-  // Dimension label shown above question
   const DIM_LABEL: Record<string, string> = {
     EI: '외향 · 내향',
     SN: '감각 · 직관',
@@ -60,19 +58,29 @@ export default function MbtiTestPage() {
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title="MBTI 간이 검사" back={true} onBack={handleBack} />
+      <PhoneHeader title="MBTI 유형 검사" back={true} onBack={handleBack} />
       <div style={{ padding: '8px 28px 32px', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-        {/* Progress */}
-        <div style={{ marginBottom: 28 }}>
-          <Dashes
-            n={TOTAL}
-            done={answered}
-            current={currentIdx}
-            onDashClick={(idx) => {
-              if (idx <= answered) setCurrentIdx(idx);
+        {/* Progress bar */}
+        <div style={{ marginBottom: 24 }}>
+          <div
+            style={{
+              height: 3,
+              background: 'var(--L-rule)',
+              borderRadius: 2,
+              overflow: 'hidden',
             }}
-          />
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${progress}%`,
+                background: 'var(--L-accent)',
+                borderRadius: 2,
+                transition: 'width 0.25s ease',
+              }}
+            />
+          </div>
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--L-sub)' }}>
             {currentIdx + 1} / {TOTAL}
           </div>
@@ -117,14 +125,14 @@ export default function MbtiTestPage() {
                 onClick={() => handleChoice(opt.letter)}
                 style={{
                   width: '100%',
-                  padding: '18px 20px',
+                  padding: '16px 18px',
                   borderRadius: 12,
                   border: `1.5px solid ${isSelected ? 'var(--L-accent)' : 'var(--L-rule)'}`,
                   background: isSelected ? 'var(--L-accent)' : 'var(--L-bg)',
                   color: isSelected ? '#fff' : 'var(--L-ink)',
                   textAlign: 'left',
-                  fontSize: 15,
-                  lineHeight: 1.4,
+                  fontSize: 14,
+                  lineHeight: 1.5,
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                   display: 'flex',
@@ -134,14 +142,14 @@ export default function MbtiTestPage() {
               >
                 <span
                   style={{
-                    width: 28,
-                    height: 28,
+                    width: 26,
+                    height: 26,
                     borderRadius: '50%',
                     border: `1.5px solid ${isSelected ? 'rgba(255,255,255,0.5)' : 'var(--L-rule)'}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: 700,
                     flexShrink: 0,
                     color: isSelected ? '#fff' : 'var(--L-sub)',

@@ -100,7 +100,7 @@ export default function MbtiInputPage() {
           </div>
           {!isCenter && (
             <div style={{ fontSize: 13, color: 'var(--L-sub)' }}>
-              {COMMUNICATION_STYLES[mappedStyle].emoji} {COMMUNICATION_STYLES[mappedStyle].label} 성향과 연결돼요
+              {COMMUNICATION_STYLES[mappedStyle].label} 성향과 연결돼요
             </div>
           )}
           {isCenter && (
@@ -121,7 +121,7 @@ export default function MbtiInputPage() {
           style={{ marginTop: 8, fontSize: 12 }}
           onClick={() => router.push(`/onboarding/mbti-test${searchParams.get('next') ? `?next=${searchParams.get('next')}` : ''}`)}
         >
-          📋 8문항 간이 검사로 알아보기
+          60문항 검사로 알아보기
         </button>
       </div>
     </PhoneFrame>
