@@ -5,6 +5,7 @@ import com.againspring.api.dto.response.*;
 import com.againspring.domain.enums.MessageSender;
 import com.againspring.service.ChatService;
 import com.againspring.service.SessionRoleResolver;
+import com.againspring.service.SessionService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class MessageController {
 
     private final ChatService chatService;
     private final SessionRoleResolver roleResolver;
+    private final SessionService sessionService;
 
     @PostMapping("/messages")
     @SecurityRequirement(name = "bearer-jwt")
@@ -110,5 +112,15 @@ public class MessageController {
         var sender = roleResolver.resolveSender(sessionId, userDetails.getUsername());
         chatService.declineFinalize(sessionId, sender);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/invite")
+    @SecurityRequirement(name = "bearer-jwt")
+    public ResponseEntity<InviteTokenResponse> generateInvite(
+        @PathVariable String sessionId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        var response = sessionService.generateInviteForExistingSession(sessionId, userDetails.getUsername());
+        return ResponseEntity.ok(response);
     }
 }

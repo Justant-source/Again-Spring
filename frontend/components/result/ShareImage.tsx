@@ -3,10 +3,9 @@
 import { ShareCardBlurredLetter } from './ShareCardBlurredLetter';
 import { ShareCardMetaphor } from './ShareCardMetaphor';
 import { ShareCardRatio } from './ShareCardRatio';
-import { ShareCardHorsemen } from './ShareCardHorsemen';
 import type { Report, CommunicationStyle } from '@/lib/types';
 
-export type ShareCardVariant = 'b' | 'c' | 'd' | 'e';
+export type ShareCardVariant = 'b' | 'c' | 'd';
 
 interface ShareImageProps {
   variant: ShareCardVariant;
@@ -25,8 +24,6 @@ export function ShareImage({ variant, report, nameA, nameB }: ShareImageProps) {
       return <ShareCardMetaphor report={report} />;
     case 'd':
       return <ShareCardRatio report={report} nameA={nameA} nameB={nameB} />;
-    case 'e':
-      return <ShareCardHorsemen report={report} />;
     default:
       return null;
   }

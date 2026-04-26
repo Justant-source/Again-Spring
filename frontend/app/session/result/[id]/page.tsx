@@ -26,7 +26,7 @@ export default function ResultPage() {
   const [error, setError] = useState<string | null>(null);
   const [variant, setVariant] = useState<'card' | 'story'>('card');
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [shareVariant, setShareVariant] = useState<'b' | 'c' | 'd' | 'e'>('c');
+  const [shareVariant, setShareVariant] = useState<'b' | 'c' | 'd'>('c');
 
   // Determine names
   const myRole = sessionStore.role || 'A';
@@ -235,7 +235,6 @@ export default function ResultPage() {
                 { id: 'c', label: '비유' },
                 { id: 'b', label: '4문장' },
                 { id: 'd', label: '균형' },
-                { id: 'e', label: '거울' },
               ] as const).map((v) => (
                 <button
                   key={v.id}
