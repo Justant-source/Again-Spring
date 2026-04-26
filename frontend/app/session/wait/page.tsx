@@ -38,8 +38,8 @@ export default function WaitPage() {
     // Polling for partner arrival (every 5 seconds)
     const pollInterval = setInterval(async () => {
       try {
-        const response = await api.get(`/sessions/${sessionId}/status`);
-        if (response.data?.hasPartnerJoined) {
+        const response = await api.get(`/api/sessions/${sessionId}`);
+        if (response.data?.status !== 'waiting_b') {
           clearInterval(timerInterval);
           clearInterval(pollInterval);
           router.push('/session/mediation?role=A');
@@ -63,7 +63,7 @@ export default function WaitPage() {
   const handleSolo = async () => {
     setIsSubmitting(true);
     try {
-      await api.post(`/sessions/${sessionId}/solo`);
+      await api.post(`/api/sessions/${sessionId}/solo`);
       router.push('/session/mediation?role=A&solo=true');
     } catch (error) {
       console.error('Error switching to solo mode:', error);

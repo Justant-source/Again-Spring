@@ -50,7 +50,7 @@ export default function ResultPage() {
           res = await api.get(`/mock/report?scenario=${scenario}`);
         } else {
           // Prod mode: fetch actual report
-          res = await api.get(`/sessions/${sessionId}/report`);
+          res = await api.get(`/api/sessions/${sessionId}/report`);
         }
 
         setReport(res.data);

@@ -22,6 +22,7 @@ export default function DescribePage() {
   const [crisisLevel, setCrisisLevel] = useState<1 | 2 | null>(null);
   const [warningBannerDismissed, setWarningBannerDismissed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
   const role = searchParams.get('role') as 'A' | 'B' | null;
   const isBMode = role === 'B';
@@ -72,16 +73,15 @@ export default function DescribePage() {
     if (crisisLevel === 1) return; // Should not be able to submit
 
     setIsSubmitting(true);
+    setSubmitError(false);
 
     try {
       if (isBMode) {
-        // B-side: just set description and move to mediation
         setDescription(text);
         setRole('B');
         router.push('/session/mediation?role=B');
       } else {
-        // A-side: create session
-        const response = await api.post('/sessions', {
+        const response = await api.post('/api/sessions', {
           relationType,
           category,
           description: text,
@@ -95,6 +95,7 @@ export default function DescribePage() {
       }
     } catch (error) {
       console.error('Error submitting description:', error);
+      setSubmitError(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -232,8 +233,13 @@ export default function DescribePage() {
           disabled={text.length < 20 || crisisLevel === 1 || isSubmitting}
           onClick={handleSubmit}
         >
-          {isBMode ? '완료' : '다음 — 상대에게 초대 보내기'}
+          {isSubmitting ? '처리 중...' : isBMode ? '완료' : '다음 — 상대에게 초대 보내기'}
         </button>
+        {submitError && (
+          <div style={{ marginTop: 10, fontSize: 12, color: '#C0392B', textAlign: 'center' }}>
+            오류가 발생했어요. 잠시 후 다시 시도해주세요.
+          </div>
+        )}
       </div>
     </PhoneFrame>
   );

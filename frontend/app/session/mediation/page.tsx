@@ -94,7 +94,7 @@ export default function MediationPage() {
     setLoading(true);
 
     try {
-      const response = await api.post(`/sessions/${sessionId}/turns`, {
+      const response = await api.post(`/api/sessions/${sessionId}/turns`, {
         sessionId,
         turnNumber: currentTurn,
         role,
@@ -136,7 +136,7 @@ export default function MediationPage() {
     setLoading(true);
 
     try {
-      const response = await api.post(`/sessions/${sessionId}/turns`, {
+      const response = await api.post(`/api/sessions/${sessionId}/turns`, {
         sessionId,
         turnNumber: currentTurn,
         role,
@@ -180,7 +180,7 @@ export default function MediationPage() {
     const partnerRole = role === 'A' ? 'B' : 'A';
 
     try {
-      const response = await api.post(`/sessions/${sessionId}/turns`, {
+      const response = await api.post(`/api/sessions/${sessionId}/turns`, {
         sessionId,
         turnNumber: currentTurn,
         role: partnerRole,
