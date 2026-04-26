@@ -171,6 +171,7 @@ public class AuthService {
                         .email(user.getEmail())
                         .nickname(user.getNickname())
                         .isGuest(isGuest)
+                        .communicationStyle(user.getCommunicationStyle())
                         .onboardingCompletedAt(user.getOnboardingCompletedAt())
                         .createdAt(user.getCreatedAt())
                         .build())
