@@ -115,8 +115,30 @@ Gottman은 미국 백인 중산층 표본 기반. 한국 패턴 4종 별도:
 - 카테고리 코드: `frontend/lib/constants/categories.ts`, `backend/.../domain/enums/RelationType.java`
 - 추적 변수 처리: `backend/.../service/report/ReportResponseParser.java`, `safety/RatioEnforcer.java`
 
+## Solo 모드의 이론적 정당성 (V1.5)
+
+Solo Mode가 메인이 됨에 따라, "한쪽만 입력해도 의미있는 정리가 되는가"라는 학술적 근거 명시.
+
+### 근거
+
+1. **Gottman의 Self-Soothing 개념**: Gottman은 부부 둘 다 진정해야 갈등 해결이 시작된다고 봄. **혼자만의 자기진정**도 그 첫 단계로 인정.
+2. **NVC의 자기공감(Self-Empathy)**: Marshall Rosenberg의 NVC는 4단계를 **자기 자신에게 먼저** 적용하는 것을 권장. Solo는 이 단계를 직접 지원.
+3. **EFT의 일차 정서 환기**: 한쪽만 자신의 일차 정서(외로움, 인정 욕구)에 접근해도 관계 회복의 시작점이 됨.
+
+### Solo 모드의 한계 명시
+
+- 화해 기여도 비율은 계산하지 않음 (양쪽 데이터 부재)
+- 갈등 유형(factual/difference/mixed) 분류 불가
+- 리포트는 "A의 관점 정리"로 제한
+- 듀얼 모드 전환 권유로 한계 보완
+
+### 듀얼 모드의 역할
+
+V1.5 이후 듀얼 모드는 **고급 사용자(양쪽 합의 가능한 부부)**를 위한 보조 옵션. 양쪽 입력 시 화해 기여도 + 갈등 유형 + 양방향 NVC 메시지 생성.
+
 ## 변경 이력
 
 | 일자 | 변경 |
 |---|---|
 | 2026-04-26 | Gottman + NVC + EFT 통합, 한국 카테고리 4종 추가, 이혼 예측·gender-specific 권고 절대 금지 명시 |
+| 2026-04-26 | V1.5 Solo-First 전환 — Solo 모드 이론적 정당성 섹션 추가 |

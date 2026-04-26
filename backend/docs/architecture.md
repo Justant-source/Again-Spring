@@ -9,7 +9,7 @@
 | 빌드 | Gradle Kotlin DSL |
 | DB | MariaDB 11 LTS (utf8mb4, UTC) |
 | ORM | Spring Data JPA (Hibernate) |
-| 마이그레이션 | Flyway 10 (V1~V5) |
+| 마이그레이션 | Flyway 10 (V1~V9) |
 | 인증 | Spring Security + JWT (jjwt 0.12.5) |
 | 메일 | Spring Mail (Gmail SMTP) |
 | API 문서 | springdoc-openapi 2.6 (Swagger UI) |
@@ -88,36 +88,49 @@ MariaDB (Flyway 관리 스키마)
   public Turn saveMediatorResponse(...) { /* 결과 저장 */ }
   ```
 
-## Mediation State Machine
+## Mediation State Machine (V1.5 카톡식)
 
-`SessionStateMachine`이 `SessionStatus` 전이의 단일 진실.
+`SessionStateMachine`이 `SessionStatus` 전이의 단일 진실. V1.5부터 카톡 메시지 기반 흐름.
 
+```mermaid
+flowchart TB
+    Start[POST /api/sessions]
+    Solo["CHATTING_SOLO<br/>(Solo 모드)"]
+    Invite[POST /api/sessions/{id}/invite]
+    Duo["CHATTING_DUO<br/>(Duo 모드)"]
+    Finalize["AWAITING_FINALIZATION<br/>(종료 권유)"]
+    Completed["COMPLETED<br/>(완료)"]
+    Terminated["TERMINATED<br/>(강제 종료)"]
+    
+    Start -->|세션 생성| Solo
+    Solo -->|상대 참여| Duo
+    Solo -->|사용자 결정| Completed
+    Duo -->|/finalize 호출| Finalize
+    Finalize -->|양쪽 agree| Completed
+    Finalize -->|한쪽 decline| Duo
+    Solo -->|crisis detected| Terminated
+    Duo -->|crisis detected| Terminated
 ```
-WAITING_B
-   │ /sessions/join/{token}
-   ▼
-B_JOINED
-   │ /sessions/{id}/turns (turnNumber=1, role=A)
-   ▼
-IN_MEDIATION  ──── /turns 반복 (1~6) ────►  COMPLETED
-   │
-   │ (어느 시점이든)
-   │ CrisisDetectedEvent → 강제 종료
-   ▼
-TERMINATED
 
-(독자 흐름)
-WAITING_B → SOLO_MODE  ──── /turns 단축 (2~3) ────►  COMPLETED
-```
+**상태 전이 규칙**:
+- `CHATTING_SOLO` → `CHATTING_DUO`: 상대가 초대 토큰으로 참여
+- `CHATTING_SOLO` → `COMPLETED`: 사용자가 종료 결정 또는 충분히 대화 후 권유 수락
+- `CHATTING_DUO` → `AWAITING_FINALIZATION`: `/finalize` 호출 (종료 권유)
+- `AWAITING_FINALIZATION` → `COMPLETED`: 양쪽이 `/finalize/agree`
+- `AWAITING_FINALIZATION` → `CHATTING_DUO`: 한쪽이 `/finalize/decline`
+- **Any** → `TERMINATED`: CrisisDetector 발동 (위험 키워드)
 
-`SessionStatus` enum: `WAITING_B, B_JOINED, IN_MEDIATION, COMPLETED, SOLO_MODE, TERMINATED`
-
-`MediationController.progressTurn()` 진입 시:
-1. 현재 turn 일치 확인 (`TURN_MISMATCH` 422)
-2. KeywordGuard / CrisisDetector 실행
-3. LLM 호출 (트랜잭션 밖)
-4. 응답 저장 + 다음 턴으로 전이
-5. turn_6 완료 시 `SessionCompletedEvent` 발행 → `COMPLETED`
+**ChatService 처리 순서** (`POST /api/sessions/{id}/messages`):
+1. 현재 상태 확인 (CHATTING_SOLO 또는 CHATTING_DUO만 메시지 허용)
+2. CrisisDetector 실행 (위험 키워드) → level 1 시 즉시 차단, level 2는 메타 부착
+3. 사용자 메시지 저장 (`messages` 테이블) + 카운트 증가
+4. **사용자 프로필 로드** (`UserRepository.findByIdAndDeletedAtIsNull`) — Solo 1명 / Duo 2명
+5. **ChatPromptAssembler 호출** — system + gottman + nvc + `<user_profile>` + `<psychology_feedback>` + relations + chat/{solo,duo}_chat + history + current + `<duo_balance>` + 응답 형식 지시
+6. LLM 호출 (Haiku, 트랜잭션 밖, 60s timeout)
+7. **`ChatTurnMetaParser.parse()`** — 응답을 본문 + `<turn_meta>` JSON으로 분리
+8. 중재자 본문 저장 (`messages` 테이블) — meta 블록은 사용자에 노출되지 않음
+9. **세션 누적 갱신**: `horsemen_history`, `nvc_completion_history` append + Duo면 발신자별 `user_{a,b}_emotion_intensity` 누적 평균
+10. 필요시 `finalize_suggested_at` 설정 (AI가 종료 권유)
 
 ## 이벤트 흐름
 
@@ -134,7 +147,7 @@ WAITING_B → SOLO_MODE  ──── /turns 단축 (2~3) ────►  COMPL
 
 | 빈 | cron | 동작 |
 |---|---|---|
-| `RetentionScheduler.purgeExpiredContent` | `0 0 3 * * *` (매일 03:00 UTC) | 30일 경과 세션의 `turns.{content, mediator_message, mediator_summary_for_opponent}` NULL 처리 |
+| `RetentionScheduler.purgeExpiredContent` | `0 0 3 * * *` (매일 03:00 UTC) | 30일 경과 세션의 `messages.content` NULL 처리 (V1.5 이후) / `turns.{content, mediator_message}` NULL 처리 (V1.4 이전 히스토리) |
 | `RevokedTokenCleanupScheduler.cleanup` | `0 0 4 * * *` (매일 04:00 UTC) | 만료된 `revoked_tokens` 행 삭제 |
 
 `SchedulingConfig`의 `@EnableScheduling` 활성. 테스트 프로파일에서는 비활성.
@@ -169,6 +182,20 @@ WAITING_B → SOLO_MODE  ──── /turns 단축 (2~3) ────►  COMPL
 | `PromptSanitizer` | LLM 입력 inject 방지 | [policies/prompt-sanitizer.md](./policies/prompt-sanitizer.md) |
 | `RatioEnforcer` | 화해 기여도 클리핑 강제 | `shared/docs/policies/ratio-calculation.md` |
 | `SafetyAuditLogger` | 모든 safety 이벤트 마스킹 후 DB | — |
+
+## 중재 컨텍스트 강화 컴포넌트 (Phase A/B/C)
+
+| 컴포넌트 | 역할 | 위치 |
+|---|---|---|
+| `UserProfileFragment` | User → `<user_profile>` 자연어 블록 (Phase A) | `service/prompt/UserProfileFragment.java` |
+| `PsychologyFeedbackFormatter` | 누적 4 Horsemen·NVC 점수 → `<psychology_feedback>` 자연어 지시 (Phase B) | `service/prompt/PsychologyFeedbackFormatter.java` |
+| `DuoBalanceFormatter` | A·B 발화량/감정 강도 불균형 시 `<duo_balance>` 관심 분배 지시 (Phase C) | `service/prompt/DuoBalanceFormatter.java` |
+| `ChatTurnMetaParser` | LLM 응답 본문/`<turn_meta>` JSON 분리 + 누적 점수 추출 (Phase B) | `service/parser/ChatTurnMetaParser.java` |
+
+세션 누적 데이터:
+- `sessions.horsemen_history` (V8) — 턴별 4 Horsemen 강도 배열
+- `sessions.nvc_completion_history` (V8) — 턴별 NVC 4단계 완성 여부
+- `sessions.user_{a,b}_emotion_intensity` (V9) — A·B 누적 감정 강도 0.00–1.00
 
 ## 예외 처리
 

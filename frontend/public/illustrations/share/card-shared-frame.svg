@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 480" fill="none">
+
+  <rect x="0.5" y="0.5" width="269" height="479" rx="18" fill="#FBF3EC" stroke="#EADFD0" stroke-width="1"></rect>
+  <text x="22" y="32" font-family="&#39;Noto Serif KR&#39;, serif" font-size="11" fill="#A08670" font-weight="500">다시봄</text>
+  <text x="248" y="32" font-family="&#39;Pretendard&#39;, sans-serif" font-size="9" fill="#A08670" text-anchor="end">again-spring</text>
+  
+  <text x="135" y="455" font-family="&#39;Pretendard&#39;, sans-serif" font-size="11" fill="#A08670" text-anchor="middle">again-spring.com</text>
+
+</svg>

@@ -6,25 +6,25 @@
 flowchart TB
     Browser[Browser SPA<br/>Next.js 14]
     subgraph Backend["Spring Boot 3.3"]
-        API[REST Controller]
+        API[REST Controller<br/>/api/sessions/{id}/messages]
         Auth[Security / JWT]
-        Mediation[MediationService<br/>State Machine]
+        ChatService[ChatService<br/>Solo/Duo 모드]
         LLM[ClaudeCodeBridge<br/>Semaphore 3, 60s timeout]
-        Sanitizer[PromptSanitizer<br/>+ KeywordGuard]
+        Safety[PromptSanitizer<br/>KeywordGuard<br/>CrisisDetector]
         Retention[RetentionScheduler<br/>30d cron]
     end
-    DB[(MariaDB 11<br/>Flyway V1-V5)]
+    DB[(MariaDB 11<br/>V7: messages 테이블)]
     Claude[Claude CLI<br/>Haiku 4.5]
-    Prompts[shared/docs/prompts/<br/>system + gottman + nvc + relations + turns]
+    Prompts["shared/docs/prompts/<br/>system + gottman + nvc + relations<br/>+ chat/(solo|duo)_chat.md"]
 
     Browser -->|HTTPS + JWT| API
     API --> Auth
-    Auth --> Mediation
-    Mediation --> Sanitizer
-    Sanitizer --> LLM
+    Auth --> ChatService
+    ChatService --> Safety
+    Safety --> LLM
     LLM -->|--print --model| Claude
     LLM -.loads.-> Prompts
-    Mediation --> DB
+    ChatService --> DB
     Retention -.purge expired.-> DB
 ```
 
@@ -91,15 +91,17 @@ FE의 axios 인터셉터(`frontend/lib/api/client.ts`)가 `localStorage.again-sp
 ### 3) 세션 진행 (State Machine)
 
 ```
-[CREATED] ──/sessions──► [WAITING_B]
-                │
-                │ /sessions/join/{token}
-                ▼
-            [B_JOINED] ──turn 1──► [IN_MEDIATION (turn 1~6)] ──turn 6 done──► [COMPLETED] ──/report──► [REPORTED]
-                                          │
-                                          │ /solo (혼자 진행)
-                                          ▼
-                                   [SOLO_MODE]
+                              [V1.5 Solo-First]
+
+[CREATED]
+   │
+   ├──(default)──► [SOLO_MODE] ──3 turns──► [COMPLETED] ──/report──► [REPORTED]
+   │                    ▲
+   │                    │ (24h timeout fallback)
+   │                    │
+   └──(opt-in)──► [WAITING_B] ──/sessions/join/{token}──► [B_JOINED] ──turn 1~6──► [COMPLETED]
+
+   * 위기 키워드 감지 시 어디서든 → [TERMINATED]
 ```
 
 전이는 `service/SessionStateMachine`이 단일 진실로 강제. 위험 키워드 감지 시 `CrisisDetector` 발동 → `CrisisDetectedEvent` → `SessionStatus.TERMINATED`.

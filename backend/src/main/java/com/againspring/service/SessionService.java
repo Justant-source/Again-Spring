@@ -23,6 +23,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Includes state machine validation and keyword guard integration.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class SessionService {
 
@@ -39,6 +39,19 @@ public class SessionService {
     private final UserRepository userRepository;
     private final KeywordGuard keywordGuard;
     private final SessionStateMachine stateMachine;
+    private final ChatService chatService;
+
+    public SessionService(SessionRepository sessionRepository,
+                          UserRepository userRepository,
+                          KeywordGuard keywordGuard,
+                          SessionStateMachine stateMachine,
+                          @Lazy ChatService chatService) {
+        this.sessionRepository = sessionRepository;
+        this.userRepository = userRepository;
+        this.keywordGuard = keywordGuard;
+        this.stateMachine = stateMachine;
+        this.chatService = chatService;
+    }
 
     private static final long INVITE_TOKEN_TTL_MS = 86400000; // 24 hours
     private static final long CONTENT_EXPIRY_TTL_MS = 2592000000L; // 30 days
@@ -52,10 +65,10 @@ public class SessionService {
      * @throws BusinessException if description contains crisis keywords
      */
     public CreateSessionResponse createSession(String createdByUserId, CreateSessionRequest request) {
-        // A는 온보딩(성격검사)을 반드시 완료해야 세션을 생성할 수 있음
         User creator = userRepository.findByIdAndDeletedAtIsNull(createdByUserId)
                 .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다"));
-        if (creator.getOnboardingCompletedAt() == null) {
+        // 게스트는 온보딩 완료 여부 체크 없이 세션 생성 허용 (앱 내 10문항 흐름 병행)
+        if (!creator.isGuest() && creator.getOnboardingCompletedAt() == null) {
             throw new BusinessException("ONBOARDING_REQUIRED", "성격검사를 먼저 완료해주세요", 403);
         }
 
@@ -94,30 +107,28 @@ public class SessionService {
             category.customText = request.getCategory().getCustomMinor();
         }
 
-        // Determine initial status
-        SessionStatus initialStatus = (request.getSoloMode() != null && request.getSoloMode())
-                ? SessionStatus.SOLO_MODE
-                : SessionStatus.WAITING_B;
-
-        // Create session
+        // V1.5: 모든 세션은 CHATTING_SOLO로 시작 (초대 여부 무관)
+        // 상대 join은 별도 메서드로 처리 (generateInviteForExistingSession)
         String sessionId = "ses_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
         Session session = Session.builder()
                 .id(sessionId)
-                .inviteToken(inviteToken)
-                .inviteExpiresAt(expiresAt)
                 .createdByUserId(createdByUserId)
                 .relationType(RelationType.fromValue(request.getRelationType()))
                 .category(category)
-                .status(initialStatus)
-                .currentTurn(1)
-                .currentRole("A")
-                .soloMode(request.getSoloMode() != null && request.getSoloMode())
-                .turns(new ArrayList<>())
+                .status(SessionStatus.CHATTING_SOLO)  // V1.5: 항상 SOLO로 시작
+                .soloMode(true)                         // V1.5: default true
+                .userAMessageCount(0)
+                .userBMessageCount(0)
+                .finalizeAgreedByA(false)
+                .finalizeAgreedByB(false)
                 .crisisDetections(new ArrayList<>())
                 .createdAt(now)
                 .updatedAt(now)
                 .contentExpiresAt(now.plusMillis(CONTENT_EXPIRY_TTL_MS))
                 .build();
+
+        // V1.5: 초대 토큰은 필요시에 generateInviteForExistingSession으로 생성
+        // (createSession 단계에서는 생성하지 않음)
 
         Session saved = sessionRepository.save(session);
         log.info("Session created: id={}, token={}, creator={}", saved.getId(), inviteToken, createdByUserId);
@@ -176,6 +187,7 @@ public class SessionService {
 
     /**
      * Join a session via invite token (B joins or guest joins).
+     * V1.5: Solo→Duo 전이 (ChatService에 위임)
      *
      * @param inviteToken the invite token
      * @param request join request
@@ -183,46 +195,84 @@ public class SessionService {
      * @return session response
      * @throws BusinessException if token invalid/expired or session already joined
      */
+    @Transactional
     public SessionResponse joinSession(String inviteToken, JoinSessionRequest request, Optional<String> userId) {
         Session session = sessionRepository
                 .findByInviteToken(inviteToken)
                 .orElseThrow(() -> new BusinessException("INVITE_TOKEN_INVALID", "Invalid invite token"));
 
         // Check expiry
-        if (Instant.now().isAfter(session.getInviteExpiresAt())) {
-            throw new BusinessException("INVITE_TOKEN_INVALID", "Invite token has expired");
+        if (session.getInviteExpiresAt() != null && Instant.now().isAfter(session.getInviteExpiresAt())) {
+            throw new BusinessException("INVITE_TOKEN_EXPIRED", "Invite token has expired");
         }
 
-        // Check status
-        if (!session.getStatus().equals(SessionStatus.WAITING_B)) {
+        // V1.5: CHATTING_SOLO 상태에서만 join 가능
+        if (!session.getStatus().equals(SessionStatus.CHATTING_SOLO)) {
             throw new BusinessException(
                     "SESSION_INVALID_STATE",
-                    "Session is no longer waiting for B");
+                    "This session is no longer available for joining");
         }
 
-        // Check if already joined
-        if (session.getInviteeUserId() != null || session.getInviteeGuestName() != null) {
+        // Check if already joined (userB가 이미 있으면 안됨)
+        if (session.getUserBId() != null) {
             throw new BusinessException(
                     "SESSION_ALREADY_JOINED",
                     "Session already has a participant");
         }
 
-        // Set invitee info
-        if (userId.isPresent()) {
-            session.setInviteeUserId(userId.get());
-        } else {
+        // Set invitee info (userBId)
+        String userBId = userId.orElse(generateGuestUserId(request));
+        if (!userId.isPresent()) {
             session.setInviteeGuestName(request.getNickname() != null ? request.getNickname() : "게스트");
         }
-
-        // Transition state
-        stateMachine.validateTransition(session.getStatus(), SessionStatus.B_JOINED);
-        session.setStatus(SessionStatus.B_JOINED);
+        session.setInviteeUserId(userBId);
         session.setUpdatedAt(Instant.now());
+        sessionRepository.save(session);
 
-        Session saved = sessionRepository.save(session);
-        log.info("Session joined: id={}, invitee={}", saved.getId(), userId.orElse("guest"));
+        // Solo→Duo 전이: 상태 변경 + 양쪽 시스템 안내 메시지 삽입
+        chatService.onPartnerJoined(session.getId(), userBId);
+        log.info("Session joined: id={}, invitee={}", session.getId(), userBId);
 
-        return mapToSessionResponse(saved, userId.orElse("guest"));
+        return mapToSessionResponse(sessionRepository.findById(session.getId()).orElseThrow(), userBId);
+    }
+
+    /**
+     * 채팅 도중 초대 토큰 발급 (이미 채팅 중인 사용자가 "상대 초대하기" 누름)
+     * V1.5: CHATTING_SOLO 상태에서만 호출 가능
+     */
+    @Transactional
+    public com.againspring.api.dto.response.InviteTokenResponse generateInviteForExistingSession(
+            String sessionId, String userId) {
+        Session session = sessionRepository.findById(sessionId)
+            .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+
+        if (!session.getUserAId().equals(userId)) {
+            throw new BusinessException("SESSION_FORBIDDEN", "Only session owner can invite");
+        }
+
+        if (!session.getStatus().equals(SessionStatus.CHATTING_SOLO)) {
+            throw new BusinessException(
+                "SESSION_INVALID_STATE",
+                "Cannot invite when session is not in SOLO state");
+        }
+
+        // 이미 토큰이 있으면 재사용, 없으면 새로 발급
+        if (session.getInviteToken() == null) {
+            String newToken = "inv_" + UUID.randomUUID().toString().substring(0, 12);
+            Instant expiresAt = Instant.now().plusSeconds(259200);  // 72시간
+            session.setInviteToken(newToken);
+            session.setInviteExpiresAt(expiresAt);
+            sessionRepository.save(session);
+        }
+
+        return com.againspring.api.dto.response.InviteTokenResponse.builder()
+            .inviteToken(session.getInviteToken())
+            .inviteExpiresAt(session.getInviteExpiresAt())
+            .build();
+    }
+
+    private String generateGuestUserId(JoinSessionRequest request) {
+        return "guest_" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     /**
@@ -261,28 +311,14 @@ public class SessionService {
                 .findById(sessionId)
                 .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
 
-        // Only creator can delete
-        if (!session.getCreatedByUserId().equals(userId)) {
-            throw new BusinessException("SESSION_FORBIDDEN", "Only creator can delete");
+        boolean isCreator = session.getCreatedByUserId().equals(userId);
+        boolean isInvitee = userId.equals(session.getInviteeUserId());
+        if (!isCreator && !isInvitee) {
+            throw new BusinessException("SESSION_FORBIDDEN", "Access denied to this session");
         }
 
-        long ageMs = Instant.now().toEpochMilli() - session.getCreatedAt().toEpochMilli();
-        long tenMinutesMs = 600000;
-
-        if (ageMs <= tenMinutesMs && session.getStatus().equals(SessionStatus.WAITING_B)) {
-            // Hard delete if within 10 min
-            sessionRepository.deleteById(sessionId);
-            log.info("Session hard-deleted: {}", sessionId);
-        } else if (session.getStatus().equals(SessionStatus.WAITING_B)) {
-            // Soft cancel if past 10 min
-            session.setStatus(SessionStatus.TERMINATED);
-            sessionRepository.save(session);
-            log.info("Session soft-cancelled: {}", sessionId);
-        } else {
-            throw new BusinessException(
-                    "SESSION_INVALID_STATE",
-                    "Cannot delete session in current state");
-        }
+        sessionRepository.deleteById(sessionId);
+        log.info("Session deleted: {} by user {}", sessionId, userId);
     }
 
     private SessionResponse mapToSessionResponse(Session session, String userId) {
@@ -310,16 +346,8 @@ public class SessionService {
                         : (userRepository.findByIdAndDeletedAtIsNull(session.getCreatedByUserId())
                                 .map(User::getNickname)
                                 .orElse(null)))
-                .turns(session.getTurns().stream()
-                        .map(turn -> SessionResponse.TurnInfo.builder()
-                                .turnNumber(turn.getTurnNumber())
-                                .role(turn.getRole() != null ? turn.getRole().getValue() : null)
-                                .mediatorMessage(turn.getMediatorMessage())
-                                .myTurn(turn.getUserId() != null && turn.getUserId().equals(userId))
-                                .completed(turn.getCreatedAt() != null)
-                                .createdAt(turn.getCreatedAt())
-                                .build())
-                        .collect(Collectors.toList()))
+                // V1.5: turns 제거 (Message 테이블 사용)
+                .turns(new ArrayList<>())
                 .createdAt(session.getCreatedAt())
                 .build();
     }

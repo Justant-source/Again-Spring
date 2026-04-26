@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { MBTI_TEST_QUESTIONS, MBTI_TO_STYLE, deriveMbtiType } from '@/lib/constants/mbtiMapping';
 import { useUserStore } from '@/lib/store/userStore';
+import { api } from '@/lib/api/client';
 
 const TOTAL = MBTI_TEST_QUESTIONS.length;
 
-export default function MbtiTestPage() {
+function MbtiTestContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setStyle = useUserStore((s) => s.setStyle);
@@ -36,6 +37,10 @@ export default function MbtiTestPage() {
     const style = MBTI_TO_STYLE[mbtiType] ?? 'leaf';
     setStyle(style);
     setMbtiType(mbtiType);
+
+    // Sync to backend (fire-and-forget; errors are non-blocking)
+    api.post('/api/users/me/onboarding', { communicationStyle: style, mbtiType }).catch(() => {});
+
     router.push(`/onboarding/result?next=${encodeURIComponent(nextPath)}`);
   };
 
@@ -164,5 +169,13 @@ export default function MbtiTestPage() {
         </div>
       </div>
     </PhoneFrame>
+  );
+}
+
+export default function MbtiTestPage() {
+  return (
+    <Suspense fallback={null}>
+      <MbtiTestContent />
+    </Suspense>
   );
 }

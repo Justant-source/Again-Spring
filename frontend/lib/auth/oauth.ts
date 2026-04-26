@@ -1,21 +1,23 @@
 'use client';
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://100.99.33.127';
+function resolveBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (typeof window !== 'undefined' && window.location.origin) return window.location.origin;
+  return 'https://againspring.net';
+}
 
-const REDIRECT_URIS = {
-  google: `${BASE_URL}/auth/callback/google`,
-  kakao: `${BASE_URL}/auth/callback/kakao`,
-  naver: `${BASE_URL}/auth/callback/naver`,
-} as const;
+type Provider = 'google' | 'kakao' | 'naver';
 
-type Provider = keyof typeof REDIRECT_URIS;
+function redirectUriFor(provider: Provider): string {
+  return `${resolveBaseUrl()}/auth/callback/${provider}`;
+}
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
 const KAKAO_CLIENT_ID = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID ?? '';
 const NAVER_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID ?? '';
 
 export function oauthRedirect(provider: Provider) {
-  const redirectUri = REDIRECT_URIS[provider];
+  const redirectUri = redirectUriFor(provider);
   let url = '';
 
   if (provider === 'google') {
@@ -31,5 +33,5 @@ export function oauthRedirect(provider: Provider) {
 }
 
 export function getRedirectUri(provider: Provider): string {
-  return REDIRECT_URIS[provider];
+  return redirectUriFor(provider);
 }

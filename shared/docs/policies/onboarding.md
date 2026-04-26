@@ -95,6 +95,28 @@ STYLE_COMBINATION_INSIGHTS = {
 
 저장: `User.mbtiType` (nullable). LLM 프롬프트 컨텍스트로 보강 — **단독 결정 변수로는 사용하지 않음**.
 
+> 현 구현 상태: User 엔티티에 `mbtiType` 필드는 미구현. 프롬프트 주입은 6스타일(`communicationStyle`)만 활용 중. MBTI 추가는 별도 마이그레이션 후 `UserProfileFragment`에서 자동 노출됨.
+
+## LLM 프롬프트 활용 방식
+
+`UserProfileFragment` (`backend/.../service/prompt/UserProfileFragment.java`) 가 User 엔티티를 자연어 요약 블록으로 변환해 채팅·리포트 프롬프트에 주입.
+
+```
+<user_profile note="참고용 — 단독 결정 변수 아님, 사용자 발화 우선" sender="USER_A">
+- 커뮤니케이션 스타일: 파도형🌊
+  감정 표현이 풍부하고 즉각적인 스타일.
+- 강점: 진솔한 감정 표현, 따뜻한 공감 능력
+- 주의: 감정 격앙 시 휴식 필요, 상대에게 숨 돌릴 시간 주기
+</user_profile>
+```
+
+- 6스타일 메타(label/emoji/strengths/caution)는 `StyleCalculator.CommunicationStyle` enum이 권위본
+- Solo 모드: 본인 1블록 / Duo 모드: USER_A·USER_B 두 블록 연속
+- 온보딩 미완료(`communicationStyle == null`) 사용자는 블록 생략
+- LLM은 톤 미세 조정에만 참고하며 사용자에게 라벨을 인용·노출하지 않음 (`shared/docs/prompts/system.md` 6번 원칙)
+
+주입 위치는 `shared/docs/prompts/README.md` Layer 3.5 참조.
+
 ## API
 
 ### `POST /api/users/me/onboarding`

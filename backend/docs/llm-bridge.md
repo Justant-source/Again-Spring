@@ -292,14 +292,43 @@ public class ClaudeAPIProvider implements LLMProvider {
 
 정책 및 프롬프트 원본은 `shared/docs/prompts/` 하위:
 
-- `system.md` — 시스템 역할 정의
+- `system.md` — 시스템 역할 정의 (사용자 프로필 우선순위 포함)
 - `gottman/*.md` — Gottman 부부 치료 체계
 - `nvc/*.md` — 비폭력 대화 (NVC) 프레임워크
 - `relations/*.md` — 관계 유형별 고정 콘텍스트
-- `turns/*.md` — 턴별 역할별 프롬프트
+- `chat/{solo,duo}_chat.md`, `chat/{solo,duo}_report.md`, `chat/_response_instructions.md` — V1.5 카톡식
+- `profiles/profile_template.md` — 사용자 프로필 블록 가이드
+- `turns/*.md` — 레거시 6턴 모델 (V1.5 이후 미사용)
 
-자세한 설명은 `shared/docs/v1/SYSTEM_PROMPTS.md` 참조.
+상세 레이어 설계: `shared/docs/prompts/README.md`.
 
 ---
 
-**마지막 업데이트**: 2026-04-26
+## V1.5 응답 형식 (chat 흐름 전용)
+
+V1.5 카톡식 응답은 본문 + 메타 블록의 두 파트로 구성:
+
+```
+[한국어 응답 텍스트, 1~3문장]
+
+<turn_meta>
+{
+  "horsemen": {"criticism": 0.0, "contempt": 0.0, "defensiveness": 0.0, "stonewalling": 0.0},
+  "nvc_completion": {"observation": false, "feeling": false, "need": false, "request": false}
+}
+</turn_meta>
+```
+
+`ChatTurnMetaParser` (`service/parser/ChatTurnMetaParser.java`):
+- 본문과 `<turn_meta>` JSON 블록을 분리
+- 강도값은 `[0,1]`로 클램핑
+- `<mediator_response>...</mediator_response>` 래퍼가 있으면 풀어서 본문만 추출
+- 메타 누락·malformed JSON은 graceful fallback (본문만 사용)
+
+추출된 메타는 `Session.horsemenHistory` / `Session.nvcCompletionHistory`에 append되고, 다음 턴 프롬프트의 `<psychology_feedback>` / `<duo_balance>` 블록 입력으로 사용됨.
+
+**리포트 흐름**(`ReportGenerationService`)은 별도의 JSON 응답 형식을 사용 — `ReportResponseParser` 참조.
+
+---
+
+**마지막 업데이트**: 2026-04-27

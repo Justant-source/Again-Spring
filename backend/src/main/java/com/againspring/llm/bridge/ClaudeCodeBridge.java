@@ -94,6 +94,32 @@ public class ClaudeCodeBridge implements LLMProvider {
         }
     }
 
+    /**
+     * V1.5 카톡식: 단순 문자열 프롬프트로 모델을 직접 호출.
+     * Sanitization은 호출자(예: ChatPromptAssembler)에서 사용자 입력을 별도 처리한다고 가정.
+     */
+    public String invoke(String prompt) throws ClaudeCodeException {
+        return invoke(prompt, claudeModel);
+    }
+
+    public String invoke(String prompt, String model) throws ClaudeCodeException {
+        String correlationId = UUID.randomUUID().toString();
+        try {
+            java.time.Duration timeout = java.time.Duration.ofMillis(defaultTimeoutMs);
+            return workerPool.execute(
+                    () -> runClaudeCommand(prompt, model),
+                    timeout,
+                    correlationId);
+        } catch (ClaudeCodeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error in ClaudeCodeBridge.invoke(String): {}", e.getMessage(), e);
+            String detail = e.getMessage() == null ? "" : e.getMessage();
+            throw new ClaudeCodeException("UNKNOWN_ERROR", detail, correlationId, -1,
+                    detail.length() > 500 ? detail.substring(0, 500) : detail);
+        }
+    }
+
     @Override
     public CompletableFuture<LLMResponse> invokeAsync(LLMRequest request) {
         return CompletableFuture.supplyAsync(() -> {
@@ -154,11 +180,15 @@ public class ClaudeCodeBridge implements LLMProvider {
      * Command format: claude --print --model <model> "<prompt>"
      */
     private String runClaudeCommand(String prompt) throws Exception {
+        return runClaudeCommand(prompt, claudeModel);
+    }
+
+    private String runClaudeCommand(String prompt, String model) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(
                 claudeBinaryPath,
                 "--print",
                 "--model",
-                claudeModel,
+                model,
                 prompt
         );
         pb.redirectErrorStream(false);

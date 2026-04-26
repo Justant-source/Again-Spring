@@ -80,7 +80,37 @@ public class UserService {
                 .findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
 
-        // Validate and calculate style
+        // MBTI path: communicationStyle provided directly (no answers required)
+        if (request.getAnswers() == null && request.getCommunicationStyle() != null) {
+            user.setCommunicationStyle(request.getCommunicationStyle());
+            user.setOnboardingCompletedAt(Instant.now());
+            user.setUpdatedAt(Instant.now());
+            userRepository.save(user);
+            log.info("Onboarding completed via MBTI for user: {}", userId);
+
+            CommunicationStyle style;
+            try {
+                style = CommunicationStyle.valueOf(request.getCommunicationStyle().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException("ONBOARDING_INVALID_STYLE", "Invalid communication style: " + request.getCommunicationStyle());
+            }
+            return OnboardingResponse.builder()
+                    .communicationStyle(style.getValue())
+                    .styleInfo(OnboardingResponse.StyleInfo.builder()
+                            .emoji(style.getEmoji())
+                            .label(style.getLabel())
+                            .description(style.getDescription())
+                            .strengths(style.getStrengths())
+                            .caution(style.getCaution())
+                            .build())
+                    .build();
+        }
+
+        // 10-question path
+        if (request.getAnswers() == null) {
+            throw new BusinessException("ONBOARDING_INVALID_ANSWERS", "Either answers or communicationStyle is required");
+        }
+
         try {
             CommunicationStyle style = styleCalculator.calculateStyle(request.getAnswers());
 
@@ -89,7 +119,7 @@ public class UserService {
             user.setOnboardingCompletedAt(Instant.now());
             user.setUpdatedAt(Instant.now());
 
-            User updated = userRepository.save(user);
+            userRepository.save(user);
             log.info("Onboarding completed for user: {}", userId);
 
             return OnboardingResponse.builder()

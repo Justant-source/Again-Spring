@@ -78,6 +78,53 @@ public class Session {
     @Builder.Default
     private Boolean soloMode = false;
 
+    // ===== V1.5 신규 필드 (카톡식 채팅) =====
+
+    @Column(name = "user_a_message_count", nullable = false)
+    @Builder.Default
+    private Integer userAMessageCount = 0;
+
+    @Column(name = "user_b_message_count")
+    @Builder.Default
+    private Integer userBMessageCount = 0;
+
+    @Column(name = "partner_joined_at")
+    private Instant partnerJoinedAt;        // 상대 합류 시점 (Solo→Duo 전이 시각)
+
+    @Column(name = "finalize_suggested_at")
+    private Instant finalizeSuggestedAt;    // AI가 종료 권유한 시각
+
+    @Column(name = "finalize_agreed_by_a", nullable = false)
+    @Builder.Default
+    private Boolean finalizeAgreedByA = false;
+
+    @Column(name = "finalize_agreed_by_b", nullable = false)
+    @Builder.Default
+    private Boolean finalizeAgreedByB = false;
+
+    // ===== Phase B: 턴 간 심리 점수 누적 =====
+
+    @Type(JsonType.class)
+    @Column(name = "horsemen_history", columnDefinition = "JSON")
+    private List<HorsemenTurnEntry> horsemenHistory;
+
+    @Type(JsonType.class)
+    @Column(name = "nvc_completion_history", columnDefinition = "JSON")
+    private List<NvcTurnEntry> nvcCompletionHistory;
+
+    @Column(name = "current_focus", length = 50)
+    private String currentFocus;
+
+    // ===== Phase C: Duo 균형 추적 =====
+
+    @Column(name = "user_a_emotion_intensity", precision = 3, scale = 2)
+    private java.math.BigDecimal userAEmotionIntensity;
+
+    @Column(name = "user_b_emotion_intensity", precision = 3, scale = 2)
+    private java.math.BigDecimal userBEmotionIntensity;
+
+    // ===== 기존 필드 유지 =====
+
     @Column(length = 32, name = "report_id")
     private String reportId;
 
@@ -103,13 +150,53 @@ public class Session {
     @Column(nullable = false)
     private Instant updatedAt;
 
-    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @OrderBy("turnNumber ASC")
-    private List<Turn> turns = new ArrayList<>();
+    // ===== V1.5: 6턴 관계 제거 (Turn 엔티티 삭제됨) =====
+    // @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    // @OrderBy("turnNumber ASC")
+    // private List<Turn> turns = new ArrayList<>();
+    // public void addTurn(Turn turn) { ... } — REMOVED
 
-    public void addTurn(Turn turn) {
-        turn.setSession(this);
-        turns.add(turn);
+    // ===== Convenience methods =====
+
+    public String getUserAId() {
+        return createdByUserId;
+    }
+
+    public String getUserBId() {
+        return inviteeUserId;
+    }
+
+    public void setUserAId(String id) {
+        this.createdByUserId = id;
+    }
+
+    public void setUserBId(String id) {
+        this.inviteeUserId = id;
+    }
+
+    /**
+     * Per-turn 4 Horsemen intensity entry (Phase B).
+     * Intensities are 0.0–1.0; 0 if not detected.
+     */
+    public static class HorsemenTurnEntry {
+        public Integer turn;
+        public String sender;
+        public Double criticism;
+        public Double contempt;
+        public Double defensiveness;
+        public Double stonewalling;
+    }
+
+    /**
+     * Per-turn NVC 4-step completion entry (Phase B).
+     */
+    public static class NvcTurnEntry {
+        public Integer turn;
+        public String sender;
+        public Boolean observation;
+        public Boolean feeling;
+        public Boolean need;
+        public Boolean request;
     }
 
     /**

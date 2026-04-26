@@ -140,9 +140,10 @@ export function ReportLayout({
       </div>
 
       {/* 2. Metaphor Cards */}
-      {report.metaphorCards && report.metaphorCards.length > 0 && (
+      {(report.metaphorId || (report.metaphorCards && report.metaphorCards.length > 0)) && (
         <div className="p-card">
           <MetaphorCards
+            metaphorId={report.metaphorId}
             cards={report.metaphorCards}
             mode={report.isSoloMode ? 'solo' : 'pair'}
           />

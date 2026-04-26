@@ -4,24 +4,23 @@
 
 ## 개요
 
-다시봄 BE는 Claude Code CLI를 통해 다음 5개 레이어를 조합한 프롬프트를 매 호출마다 동적으로 조립합니다:
+다시봄 BE는 Claude Code CLI를 통해 다음 레이어를 조합한 프롬프트를 매 호출마다 동적으로 조립합니다 (V1.5 카톡식):
 
 ```
-<system>
-  system.md (역할·말투·금기)
-</system>
-
-<context>
-  gottman/           (갈등 이론 지식 베이스)
-  nvc/               (출력 템플릿)
-  relations/         (관계 유형별 가이드)
-  turns/             (턴별 태스크 지시)
-</context>
-
-<user_input>
-  PromptSanitizer이 정제한 사용자 입력
-</user_input>
+system.md                       # Layer 1 — 역할·말투·금기
+gottman/four_horsemen.md        # Layer 2 — 갈등 이론
+nvc/four_steps.md               # Layer 3 — 출력 템플릿
+[<user_profile>]                # Layer 3.5 — 사용자 프로필(있을 때만, 자연어 요약)
+[<psychology_feedback>]         # Layer 3.6 — 누적 점수 기반 톤 지시(임계 초과 시)
+relations/<type>.md             # Layer 4 — 관계 유형별 가이드
+chat/{solo,duo}_chat.md         # Layer 5 — 채팅 모드
+<conversation_history>          # 동적 — 본인(Solo) 또는 양쪽(Duo) 메시지
+<current_user_message>          # 동적 — 이번 사용자 발화
+chat/_response_instructions.md  # 형식 강제(본문 + <turn_meta> JSON)
+[<duo_balance>]                 # Duo 모드에서 불균형 감지 시 관심 분배 지시
 ```
+
+`[…]` 표시 블록은 조건부로 등장합니다.
 
 ## 레이어 설명
 
@@ -36,20 +35,36 @@ LLM의 역할·말투·금기를 정의. 모든 호출에 포함.
 ### Layer 3 — NVC 출력 템플릿 (`nvc/`)
 - `four_steps.md` — 모든 "상대에게 할 말" 조언을 4단계로 강제 (관찰·느낌·욕구·부탁)
 
+### Layer 3.5 — 사용자 프로필 (`profiles/`, 동적 주입)
+- `profile_template.md` — 가이드 문서 (실제 fragment는 코드 빌드)
+- `<user_profile>` 블록은 `UserProfileFragment.render(User)`가 코드로 빌드해 주입.
+- 6스타일(wave/mountain/flame/leaf/moon/star) label/emoji/strengths/caution은 `StyleCalculator.CommunicationStyle` enum이 권위본.
+- Solo는 본인 1블록, Duo는 `sender="USER_A"` / `sender="USER_B"` 두 블록 연속. 온보딩 미완료 사용자에게는 출력 생략.
+
+### Layer 3.6 — 누적 심리 피드백 (`<psychology_feedback>`, 동적 주입)
+- 코드 빌더: `PsychologyFeedbackFormatter.render(Session)`
+- 입력: `sessions.horsemen_history` + `sessions.nvc_completion_history` (V8)
+- 임계 초과 시(예: criticism 누적 평균 ≥ 0.4) "이번 턴에는 NVC 욕구 명시를 우선" 같은 자연어 지시 출력. 임계 미만이면 빈 문자열.
+
 ### Layer 4 — 관계 유형별 가이드 (`relations/`)
 - `couple.md` — 부부 관계 (Four Horsemen, Bids, Love Maps)
 - `family.md` — 가족 관계 (세대 차이, 용서)
 - `friend.md` — 친구 관계 (기대치 정렬, 경계)
 - `parent_child.md` — 부모-자식 관계 (권력 비대칭, 자율성)
 
-### Layer 5 — 턴별 태스크 지시 (`turns/`)
-- `turn_1_a.md` — A의 첫 입력 → 위험 감지 + B용 중립 요약
-- `turn_2_b.md` — B의 첫 입력 → A용 요약 + 갈등 유형 분류
-- `turn_3_a.md` — B의 답 기반 A용 심화 질문
-- `turn_4_b.md` — A의 답 기반 B용 심화 질문
-- `turn_5_a.md` — A용 조망수용 질문
-- `turn_6_b.md` — B용 조망수용 질문
-- `solo_mode.md` — 혼자 진행 모드 (2-3턴 단축)
+### Layer 5 — 채팅 모드 (`chat/`)
+
+**Solo 모드** (V1.5 부터):
+- `solo_chat.md` — Solo 카톡 시스템 프롬프트 (사용자 1인 상담)
+- `solo_report.md` — Solo 최종 리포트 (Sonnet 4)
+
+**Duo 모드** (양쪽 합류 후):
+- `duo_chat.md` — Duo 카톡 시스템 프롬프트 (양쪽 격리, 중재자만 통합)
+- `duo_report.md` — Duo 최종 리포트 (Sonnet 4, 화해 기여도 포함)
+- `<duo_balance>` 동적 블록 — 발화량/감정 강도가 한쪽으로 치우쳤을 때 `DuoBalanceFormatter`가 관심 분배 지시 주입 (편들기 금지)
+
+**공통**:
+- `_response_instructions.md` — 모든 카톡 응답의 공통 형식 지시. 본문(한국어 1~3문장) 뒤에 `<turn_meta>{"horsemen":{...},"nvc_completion":{...}}</turn_meta>` JSON 블록을 정확히 1회 첨부하도록 강제. 메타 블록은 `ChatTurnMetaParser`가 추출해 세션 누적에 사용하며, 실패 시 graceful (본문은 정상 표시).
 
 ## 프롬프트 계층화
 
@@ -60,7 +75,7 @@ flowchart TB
     L2[Layer 2: gottman/<br/>4 Horsemen, Bids, SRH]
     L3[Layer 3: nvc/four_steps.md<br/>출력 형식]
     L4[Layer 4: relations/<br/>couple/family/friend/parent_child]
-    L5[Layer 5: turns/<br/>solo_mode 또는 turn_N_a/b]
+    L5[Layer 5: chat/<br/>solo_chat 또는 duo_chat]
     User[user_input<br/>XML 래핑]
 
     L1 --> Final
@@ -84,10 +99,17 @@ POST /api/admin/prompts/reload
 
 ## 조립 및 실행
 
-`PromptAssembler.assemble(turn, role, conflictType, relationType)`이 필요한 레이어를 동적으로 조합하여 최종 프롬프트를 생성. `ClaudeCodeBridge`가 XML 태그로 래핑 후 Claude Code CLI에 전달.
+V1.5 카톡식 흐름은 `ChatPromptAssembler`가 담당:
+- `assembleSoloTurn(Session, User, currentMessage, recentMessages)` — Solo 모드
+- `assembleDuoTurn(Session, userA, userB, currentSender, currentMessage, allMessages)` — Duo 모드
+
+레이어 합성 후 `ClaudeCodeBridge`가 Claude Code CLI에 전달. 응답은 `ChatTurnMetaParser`가 본문/메타로 분리.
+
+리포트 생성은 `ReportGenerationService`가 동일 레이어 + `chat/{solo,duo}_report.md`를 사용해 Sonnet으로 호출.
+
+레거시 6턴 모델용 `PromptAssembler`는 `turns/` 레이어를 합성하나, V1.5 이후 신규 흐름에서는 사용되지 않음.
 
 ## 자세한 설계 문서
 
-전체 아키텍처, 에러 처리, PromptSanitizer 상세 설명:
-- `shared/docs/llm/system-prompts.md` — 5-레이어 설계 의도
-- `shared/docs/llm/bridge-architecture.md` — ClaudeCodeBridge 구현 상세
+- `backend/docs/llm-bridge.md` — ClaudeCodeBridge 구현 상세
+- `backend/docs/architecture.md` — Layer/State Machine 흐름

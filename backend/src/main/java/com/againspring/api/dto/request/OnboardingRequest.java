@@ -11,7 +11,7 @@ import lombok.Setter;
 
 /**
  * Onboarding request DTO.
- * Expects 10 Likert scale answers (1-5 each).
+ * Either provide 10 Likert answers (10-question path) OR communicationStyle (MBTI path).
  */
 @Getter
 @Setter
@@ -19,8 +19,13 @@ import lombok.Setter;
 @AllArgsConstructor
 public class OnboardingRequest {
 
-    @NotNull(message = "Answers are required")
     @Size(min = 10, max = 10, message = "Exactly 10 answers required")
     @JsonProperty("answers")
     private List<Integer> answers;
+
+    @JsonProperty("communicationStyle")
+    private String communicationStyle;
+
+    @JsonProperty("mbtiType")
+    private String mbtiType;
 }

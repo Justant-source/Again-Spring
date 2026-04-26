@@ -1,6 +1,7 @@
-// Phase 2: 은유 카드 3장 — 두 분의 욕구 · 함께 자라는 길 · 다음 한 걸음
 'use client';
 
+import Image from 'next/image';
+import { getMetaphorById, getMetaphorImagePath } from '@/lib/constants/metaphors';
 import type { MetaphorCard } from '@/lib/types';
 
 const COLORS = {
@@ -12,11 +13,58 @@ const COLORS = {
 const CARD_TITLES_DEFAULT = ['두 분의 욕구', '함께 자라는 길', '다음 한 걸음'];
 
 interface MetaphorCardsProps {
-  cards: MetaphorCard[];
+  metaphorId?: string; // V1.5: 12종 SVG 일러스트 기반
+  cards?: MetaphorCard[]; // 기존 텍스트 카드 (fallback)
   mode?: 'solo' | 'pair';
 }
 
-export function MetaphorCards({ cards, mode = 'pair' }: MetaphorCardsProps) {
+export function MetaphorCards({ metaphorId, cards, mode = 'pair' }: MetaphorCardsProps) {
+  // V1.5: metaphorId가 있으면 SVG 일러스트 카드 우선
+  if (metaphorId) {
+    const metaphor = getMetaphorById(metaphorId);
+    if (!metaphor) return null;
+
+    return (
+      <div>
+        <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 12 }}>
+          {mode === 'solo' ? '나의 마음은' : '두 분의 마음은'}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+            padding: '20px 0',
+          }}
+        >
+          <Image
+            src={getMetaphorImagePath(metaphor.filename)}
+            alt={metaphor.label}
+            width={200}
+            height={200}
+            style={{ display: 'block' }}
+          />
+          <div className="serif" style={{ fontSize: 20, textAlign: 'center', lineHeight: 1.4 }}>
+            <strong>{metaphor.label}</strong> 같아요
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              color: 'var(--P-sub)',
+              textAlign: 'center',
+              lineHeight: 1.7,
+              maxWidth: 240,
+            }}
+          >
+            {metaphor.meaning}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback: 기존 텍스트 카드
   if (!cards || cards.length === 0) return null;
 
   return (

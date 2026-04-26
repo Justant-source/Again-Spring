@@ -27,7 +27,7 @@ public class CreateSessionRequest {
     private String description; // optional, may be scanned for keywords
 
     @JsonProperty("soloMode")
-    private Boolean soloMode; // default false
+    private Boolean soloMode; // default true (Solo가 메인 동선, V1.5)
 
     @Getter
     @Setter

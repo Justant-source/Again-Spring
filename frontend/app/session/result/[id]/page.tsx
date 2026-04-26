@@ -22,10 +22,11 @@ export default function ResultPage() {
 
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [variant, setVariant] = useState<'card' | 'story'>('card');
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [shareVariant, setShareVariant] = useState<'map' | 'style'>('map');
+  const [shareVariant, setShareVariant] = useState<'b' | 'c' | 'd' | 'e'>('c');
 
   // Determine names
   const myRole = sessionStore.role || 'A';
@@ -37,34 +38,47 @@ export default function ResultPage() {
   const styleB = myRole === 'B' ? userStore.user?.communicationStyle : undefined;
 
   useEffect(() => {
-    const fetchReport = async () => {
-      setLoading(true);
-      setError(null);
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const fetchReport = async (attempt = 0) => {
+      if (cancelled) return;
+      if (attempt === 0) {
+        setLoading(true);
+        setError(null);
+        setGenerating(false);
+      }
 
       try {
-        let res;
         const scenario = searchParams.get('scenario');
-
-        if (scenario) {
-          // Dev mode: use mock endpoint
-          res = await api.get(`/mock/report?scenario=${scenario}`);
-        } else {
-          // Prod mode: fetch actual report
-          res = await api.get(`/api/sessions/${sessionId}/report`);
+        const url = scenario
+          ? `/api/mock/report?scenario=${scenario}`
+          : `/api/sessions/${sessionId}/report`;
+        const res = await api.get(url);
+        if (!cancelled) {
+          setReport(res.data);
+          setGenerating(false);
         }
-
-        setReport(res.data);
-      } catch (err) {
-        console.error('Failed to fetch report:', err);
-        setError('리포트를 찾지 못했어요');
+      } catch (err: any) {
+        if (cancelled) return;
+        // 404 → 리포트 생성 중, 최대 20회(60초) 폴링
+        if (err?.response?.status === 404 && attempt < 20) {
+          setGenerating(true);
+          pollTimer = setTimeout(() => fetchReport(attempt + 1), 3000);
+        } else {
+          setError('리포트를 불러오지 못했어요');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled && attempt === 0) setLoading(false);
       }
     };
 
-    if (sessionId) {
-      fetchReport();
-    }
+    if (sessionId) fetchReport();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
   }, [sessionId, searchParams]);
 
   const handleShareClick = () => {
@@ -75,14 +89,19 @@ export default function ResultPage() {
     setShareModalOpen(false);
   };
 
-  if (loading) {
+  if (loading || generating) {
     return (
       <PhoneFrame tone="P">
-        <PhoneHeader title="우리의 오늘 리포트" tone="P" back={true} onBack={() => router.back()} />
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <PhoneHeader title="우리의 오늘 리포트" tone="P" back={true} onBack={() => router.push('/')} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
           <div style={{ textAlign: 'center', fontSize: 14, color: 'var(--P-ink)', fontFamily: 'var(--font-serif)' }}>
-            리포트를 열어보는 중…
+            {generating ? '리포트를 생성하고 있어요…' : '리포트를 열어보는 중…'}
           </div>
+          {generating && (
+            <div style={{ fontSize: 12, color: 'var(--P-sub)', textAlign: 'center', lineHeight: 1.6 }}>
+              AI가 대화를 분석하고 있어요.<br />잠시만 기다려주세요.
+            </div>
+          )}
         </div>
       </PhoneFrame>
     );
@@ -91,15 +110,15 @@ export default function ResultPage() {
   if (error || !report) {
     return (
       <PhoneFrame tone="P">
-        <PhoneHeader title="우리의 오늘 리포트" tone="P" back={true} onBack={() => router.back()} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 22px' }}>
-          <div style={{ fontSize: 14, color: 'var(--P-ink)', marginBottom: 24, textAlign: 'center' }}>
+        <PhoneHeader title="우리의 오늘 리포트" tone="P" back={true} onBack={() => router.push('/')} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 22px', gap: 12 }}>
+          <div style={{ fontSize: 14, color: 'var(--P-ink)', marginBottom: 12, textAlign: 'center' }}>
             {error || '리포트를 찾지 못했어요'}
           </div>
-          <button
-            onClick={() => router.push('/')}
-            className="btn-P"
-          >
+          <button onClick={() => router.push('/history')} className="btn-P" style={{ width: '100%' }}>
+            지난 대화 보기
+          </button>
+          <button onClick={() => router.push('/')} className="btn-P ghost" style={{ width: '100%' }}>
             홈으로 돌아가기
           </button>
         </div>
@@ -211,25 +230,28 @@ export default function ResultPage() {
             </div>
 
             {/* Share variant tabs */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              {(['map', 'style'] as const).map((v) => (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+              {([
+                { id: 'c', label: '비유' },
+                { id: 'b', label: '4문장' },
+                { id: 'd', label: '균형' },
+                { id: 'e', label: '거울' },
+              ] as const).map((v) => (
                 <button
-                  key={v}
-                  onClick={() => setShareVariant(v)}
+                  key={v.id}
+                  onClick={() => setShareVariant(v.id)}
                   style={{
                     flex: 1,
-                    padding: '8px 12px',
-                    background: shareVariant === v ? 'var(--P-ink)' : 'var(--P-card)',
-                    color: shareVariant === v ? 'var(--P-card)' : 'var(--P-ink)',
-                    border: `1px solid ${shareVariant === v ? 'var(--P-ink)' : 'var(--P-border)'}`,
-                    borderRadius: 8,
+                    padding: '8px 0',
                     fontSize: 12,
+                    background: shareVariant === v.id ? 'var(--P-ink)' : 'transparent',
+                    color: shareVariant === v.id ? 'var(--P-bg)' : 'var(--P-sub)',
+                    border: `1px solid ${shareVariant === v.id ? 'var(--P-ink)' : 'var(--P-border)'}`,
+                    borderRadius: 8,
                     cursor: 'pointer',
-                    fontWeight: 500,
                   }}
                 >
-                  {v === 'map' && '지도'}
-                  {v === 'style' && '스타일'}
+                  {v.label}
                 </button>
               ))}
             </div>

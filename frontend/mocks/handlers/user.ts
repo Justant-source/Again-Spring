@@ -7,27 +7,33 @@ const GUEST_SESSIONS = new Map<string, string>(); // inviteToken → guestId
 const SESSION_HISTORY: any[] = [
   {
     id: 'sess_history_1',
+    status: 'completed',
     partnerNickname: '준호',
     relationType: 'marriage',
     conflictType: 'difference',
+    soloMode: false,
     completedAt: '2026-04-12T09:21:00.000Z',
-    summary: '주말 집안일 분담에 대한 서로 다른 쉼의 정의',
+    createdAt: '2026-04-12T08:00:00.000Z',
   },
   {
     id: 'sess_history_2',
+    status: 'completed',
     partnerNickname: '지민',
     relationType: 'friend',
     conflictType: 'factual',
+    soloMode: false,
     completedAt: '2026-03-02T12:05:00.000Z',
-    summary: '반복된 약속 취소와 신뢰 회복',
+    createdAt: '2026-03-02T11:00:00.000Z',
   },
   {
     id: 'sess_history_3',
+    status: 'completed',
     partnerNickname: '엄마',
     relationType: 'parent_child',
     conflictType: 'mixed',
+    soloMode: false,
     completedAt: '2026-02-17T18:40:00.000Z',
-    summary: '독립 시기와 돌봄 방식의 간극',
+    createdAt: '2026-02-17T17:30:00.000Z',
   },
 ];
 
@@ -139,6 +145,22 @@ export const userHandlers = [
       communicationStyle: 'wave',
       onboardingCompletedAt: '2026-04-01T10:00:00.000Z',
       createdAt: new Date().toISOString(),
+    });
+  }),
+
+  http.post('/api/users/me/onboarding', async ({ request }) => {
+    await delay(300);
+    const body: any = await request.json();
+    const style = body.communicationStyle ?? 'wave';
+    return HttpResponse.json({
+      communicationStyle: style,
+      styleInfo: {
+        emoji: '🌊',
+        label: '파도형',
+        description: '감정 표현이 풍부하고 즉각적인 스타일',
+        strengths: ['진솔한 감정 표현', '따뜻한 공감 능력'],
+        caution: ['감정 격앙 시 휴식 필요'],
+      },
     });
   }),
 ];

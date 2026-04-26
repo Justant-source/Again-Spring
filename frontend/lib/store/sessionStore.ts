@@ -4,9 +4,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type {
   RelationType,
-  ParticipantRole,
   SessionStatus,
-  Turn,
 } from '@/lib/types';
 
 export interface ActiveSessionCategory {
@@ -14,6 +12,18 @@ export interface ActiveSessionCategory {
   middleId: string;
   minorId: string;
   customText?: string;
+}
+
+// Legacy types for backward compatibility with sessionStore
+type ParticipantRole = 'A' | 'B';
+interface Turn {
+  turnNumber: number;
+  role: ParticipantRole;
+  content: string;
+  mediatorMessage?: string;
+  isPerspectiveTaking?: boolean;
+  skipped?: boolean;
+  createdAt: string;
 }
 
 interface SessionState {
@@ -28,6 +38,7 @@ interface SessionState {
   turns: Turn[];
   inviteMessageTone: 'soft' | 'light' | 'serious';
   partnerNickname?: string;
+  soloMode: boolean | null;
 
   setRelationType: (t: RelationType) => void;
   setCategory: (c: ActiveSessionCategory) => void;
@@ -39,6 +50,7 @@ interface SessionState {
   setCurrentTurn: (n: number) => void;
   setRole: (r: ParticipantRole) => void;
   setPartnerNickname: (n: string) => void;
+  setSoloMode: (mode: boolean) => void;
   reset: () => void;
 }
 
@@ -49,11 +61,12 @@ const initial = {
   category: null,
   description: '',
   role: null as ParticipantRole | null,
-  status: 'waiting_b' as SessionStatus,
+  status: 'chatting_solo' as SessionStatus,
   currentTurn: 1,
   turns: [] as Turn[],
   inviteMessageTone: 'soft' as const,
   partnerNickname: undefined as string | undefined,
+  soloMode: null as boolean | null,
 };
 
 export const useSessionStore = create<SessionState>()(
@@ -72,6 +85,7 @@ export const useSessionStore = create<SessionState>()(
       setCurrentTurn: (n) => set({ currentTurn: n }),
       setRole: (r) => set({ role: r }),
       setPartnerNickname: (n) => set({ partnerNickname: n }),
+      setSoloMode: (mode) => set({ soloMode: mode }),
       reset: () => set(initial),
     }),
     {

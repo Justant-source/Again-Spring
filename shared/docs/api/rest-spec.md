@@ -37,7 +37,6 @@
 | `FORBIDDEN` | 403 | 권한 없음 |
 | `NOT_FOUND` | 404 | 리소스 없음 |
 | `INVITE_EXPIRED` | 410 | 초대 토큰 만료 |
-| `TURN_MISMATCH` | 409 | 현재 턴이 아님 |
 | `CRISIS_DETECTED` | 422 | 위험 키워드 감지 — 세션 중단 |
 | `FORBIDDEN_WORD_DETECTED` | 422 | 금지어 감지 |
 | `LLM_UNAVAILABLE` | 503 | LLM 일시 불가 |
@@ -110,109 +109,183 @@
 
 ---
 
-## Session (`SessionController`)
-
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| POST | `/api/sessions` | ✓ | A가 세션 생성 |
-| GET | `/api/sessions/me` | ✓ | 내 세션 목록 |
-| GET | `/api/sessions/{id}` | ✓ | 세션 상세 |
-| GET | `/api/sessions/{id}/status` | ✓ | 세션 상태 (가벼운 폴링용) |
-| POST | `/api/sessions/join/{token}` | ✗ | B 참여 (JWT 발급도 함께) |
-| DELETE | `/api/sessions/{id}` | ✓ | 세션 삭제 |
+## Session (카톡 채팅 API)
 
 ### `POST /api/sessions`
 
-```jsonc
-// Request
+새로운 Solo 세션을 생성합니다.
+
+**Request**:
+```json
 {
   "relationType": "couple",
-  "category": {
-    "major": "couple",
-    "middle": "connection",
-    "minor": "infrequent_contact",
-    "customMinor": null
-  },
-  "description": "3주 동안 연락이 너무 적어서...",
-  "inviteMessage": { "tone": "soft", "customText": null }
-}
-
-// Response 201
-{
-  "id": "ses_abc123",
-  "inviteToken": "inv_xyz789",
-  "inviteUrl": "https://dev.againspring.net/session/join/inv_xyz789",
-  "inviteMessage": "우리 얘기 좀 정리해보고 싶어서...",
-  "status": "WAITING_B",
-  "currentTurn": 1,
-  "createdAt": "...",
-  "expiresAt": "..."   // 초대 토큰 24h
+  "category": { "major": "...", "middle": "...", "minor": "..." }
 }
 ```
 
-### `GET /api/sessions/{id}` 응답에서 주의
-
-- 상대방 `turns[].content`는 내가 같은 턴을 완료하기 전까지 응답에 포함되지 않음 (앵커링 방지)
-- 만료된 세션 (30일 경과)은 `turns[].content` = null
+**Response 201**:
+```json
+{
+  "id": "uuid",
+  "status": "chatting_solo",
+  "userAId": "user-id",
+  "userBId": null,
+  "userAMessageCount": 0,
+  "userBMessageCount": 0,
+  "inviteToken": null
+}
+```
 
 ---
 
-## Mediation (`MediationController`)
+### `POST /api/sessions/{id}/invite`
 
-`@RequestMapping("/api/sessions/{sessionId}")` 하위.
+상대를 초대하기 위한 초대 토큰을 생성합니다.
 
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| POST | `.../turns` | ✓ | 턴 진행 |
-| GET | `.../turns/current` | ✓ | 현재 턴 상태 |
-| GET | `.../stream` | ✓ | SSE 스트림 (턴 이벤트) |
-
-### `POST /api/sessions/{id}/turns`
-
-```jsonc
-// Request
-{ "turnNumber": 1, "content": "...", "skip": false }
-
-// Response 200 (정상)
+**Response 200**:
+```json
 {
-  "turn": { "turnNumber": 1, "role": "A", "completed": true, "createdAt": "..." },
-  "nextTurn": { "turnNumber": 2, "role": "B", "waitingFor": "partner" },
-  "mediatorMessage": "말씀해주셔서 감사해요. B님의 답변을 기다리고 있어요."
-}
-
-// Response 422 (위험 키워드)
-{
-  "error": {
-    "code": "CRISIS_DETECTED",
-    "message": "중요한 안내가 필요한 상황이 감지되었어요",
-    "crisisType": "domestic_violence",
-    "resources": [
-      { "name": "여성긴급전화", "phone": "1366", "available": "24시간" }
-    ]
-  }
+  "inviteToken": "inv_abc123",
+  "inviteExpiresAt": "2026-04-29T05:00:00Z"
 }
 ```
 
-### `GET .../stream` SSE 이벤트
+---
 
-| event | data |
-|---|---|
-| `turn_updated` | 상대방이 턴 완료 |
-| `mediator_thinking` | LLM 응답 생성 중 |
-| `mediator_response` | LLM 응답 완료 |
-| `session_status_changed` | 세션 상태 변경 |
-| `report_ready` | 리포트 생성 완료 |
+### `POST /api/sessions/join/{token}`
 
+초대 토큰을 사용해 세션에 참여합니다 (userB 역할).
+
+**Request**:
+```json
+{ "nickname": "선택" }
 ```
-event: turn_updated
-data: {"turnNumber":2,"role":"B","completedAt":"..."}
 
-event: mediator_thinking
-data: {"turnNumber":3,"estimatedSeconds":8}
-
-event: mediator_response
-data: {"turnNumber":3,"content":"A님께 두 가지..."}
+**Response 200**:
+```json
+{
+  "id": "uuid",
+  "status": "chatting_duo",
+  "userAId": "user-a-id",
+  "userBId": "user-b-id",
+  "userAMessageCount": 5,
+  "userBMessageCount": 0,
+  "inviteToken": null
+}
 ```
+
+---
+
+### `POST /api/sessions/{id}/messages`
+
+사용자 메시지를 입력하고 AI 중재자 응답을 받습니다.
+
+**Request**:
+```json
+{ "content": "..." }
+```
+
+**Response 200**:
+```json
+{
+  "userMessage": {
+    "id": 12,
+    "sender": "USER_A",
+    "content": "...",
+    "createdAt": "..."
+  },
+  "mediatorMessage": {
+    "id": 13,
+    "sender": "MEDIATOR_TO_A",
+    "content": "...",
+    "createdAt": "..."
+  },
+  "finalizeSuggested": false,
+  "crisisLevel": null
+}
+```
+
+**Response 409** (위험 키워드 감지):
+```json
+{
+  "crisisLevel": 1
+}
+```
+
+---
+
+### `GET /api/sessions/{id}/messages?since={epoch_ms}`
+
+본인이 보낸 메시지와 중재자 응답을 조회합니다.
+
+**Response 200**: 메시지 배열. 본인 메시지 + 본인 중재자 응답만 포함.
+
+---
+
+### `GET /api/sessions/{id}/partner-messages`
+
+상대방의 메시지 메타데이터를 조회합니다. **content 필드 절대 없음**.
+
+**Response 200**:
+```json
+[
+  { "id": 7, "sender": "USER_B", "charCount": 142, "createdAt": "..." },
+  { "id": 8, "sender": "MEDIATOR_TO_B", "charCount": 38, "createdAt": "..." }
+]
+```
+
+---
+
+### `GET /api/sessions/{id}/partner-status`
+
+상대방의 온라인 상태 및 활동 정보를 조회합니다.
+
+**Response 200**:
+```json
+{
+  "joined": true,
+  "isActive": true,
+  "inviteSent": false,
+  "messageCount": 4,
+  "lastActivityAt": "2026-04-26T05:02:33Z"
+}
+```
+
+---
+
+### `POST /api/sessions/{id}/finalize`
+
+종료 권유를 전송합니다.
+
+**Response 200**:
+```json
+{
+  "completed": true|false,
+  "awaitingPartner": true|false
+}
+```
+
+---
+
+### `POST /api/sessions/{id}/finalize/agree`
+
+상대방의 종료 권유에 동의합니다.
+
+**Response 200**:
+```json
+{
+  "completed": true|false,
+  "awaitingPartner": true|false
+}
+```
+
+---
+
+### `POST /api/sessions/{id}/finalize/decline`
+
+상대방의 종료 권유를 거절합니다.
+
+**Response 204**: No Content
 
 ---
 
@@ -229,33 +302,33 @@ data: {"turnNumber":3,"content":"A님께 두 가지..."}
 {
   "id": "rep_abc123",
   "sessionId": "ses_abc123",
-  "conflictType": "DIFFERENCE",
-  "isSoloMode": false,
-  "contributionRatio": {
-    "a": 55, "b": 45,
-    "label": { "a": "먼저 다가가면 좋은 쪽", "b": "마음 열고 기다려주면 좋은 쪽" }
+  "conflictType": "difference",
+  "isSoloMode": true,
+  "fourHorsemenObservation": {
+    "criticism": 2,
+    "contempt": 1,
+    "defensiveness": 3,
+    "stonewalling": 0
   },
-  "needsMap": {
-    "axisX": "connection_autonomy", "axisXLabel": "연결성-자율성",
-    "axisY": "stability_change",    "axisYLabel": "안정-변화",
-    "positionA": { "x": -70, "y": 0 }, "positionB": { "x": 60, "y": 0 },
-    "interpretation": "두 분은 '연결성-자율성' 축에서 거리가 있어요"
+  "bidResponseRate": 0.6,
+  "repairAttempts": 2,
+  "metaphorId": "locked-mailbox",
+  "metaphorReason": "...",
+  "nvcSuggestion": {
+    "observation": "...",
+    "feeling": "...",
+    "need": "...",
+    "request": "...",
+    "fourSentenceDraft": "..."
   },
-  "fourHorsemen": {
-    // 내부 점수, UI 노출 정책은 ratio-calculation.md
-    "criticism":     { "detected": false, "intensity": null },
-    "defensiveness": { "detected": true,  "intensity": "mild" },
-    "contempt":      { "detected": false, "intensity": null },
-    "stonewalling":  { "detected": true,  "intensity": "moderate" }
+  "patternFeedback": "...",
+  "suggestedApproach": "...",
+  "inviteAgainCta": "...",
+  "rawContributionRatio": {
+    "a": 60,
+    "b": 40
   },
-  "nvcScripts": {
-    "aToB": { "observation": "...", "feeling": "...", "need": "...", "request": "..." },
-    "bToA": { ... }
-  },
-  "repairSuggestions": [
-    "우리 서로 다른 게 문제가 아니라는 걸 인정하자",
-    "아침과 저녁, 하루 두 번 '안부 시간'을 정해볼까?"
-  ],
+  "perspectiveRespected": true,
   "createdAt": "..."
 }
 ```

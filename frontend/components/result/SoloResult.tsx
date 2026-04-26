@@ -2,6 +2,7 @@
 
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { useSessionStore } from '@/lib/store/sessionStore';
@@ -21,6 +22,26 @@ export function SoloResult({ report }: { report: Report }) {
   const user = useUserStore((s) => s.user);
   const sessionId = useSessionStore((s) => s.sessionId);
   const partnerNickname = useSessionStore((s) => s.partnerNickname);
+  const [copied, setCopied] = useState(false);
+
+  const nvcDraft = (() => {
+    if (!report.isSoloMode) return null;
+    const nvc = report.nvcScripts?.aToB;
+    if (!nvc) return null;
+    return report.nvcSuggestion?.fourSentenceDraft
+      ?? [nvc.observation, nvc.feeling, nvc.need, nvc.request].filter(Boolean).join('\n');
+  })();
+
+  const handleCopyNvcMessage = async () => {
+    if (!nvcDraft) return;
+    try {
+      await navigator.clipboard.writeText(nvcDraft);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   if (!report.isSoloMode) return null;
 
@@ -133,6 +154,44 @@ export function SoloResult({ report }: { report: Report }) {
           </div>
         </div>
       </div>
+
+      {/* NVC 4문장 카톡 복사 */}
+      {nvcDraft && (
+        <div
+          style={{
+            padding: '16px 18px',
+            background: 'var(--P-card)',
+            border: '1px solid var(--P-border)',
+            borderRadius: 12,
+          }}
+        >
+          <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 8 }}>
+            상대에게 보낼 수 있는 4문장 초안
+          </div>
+          <div
+            className="serif"
+            style={{
+              fontSize: 14,
+              lineHeight: 1.8,
+              color: 'var(--P-ink)',
+              whiteSpace: 'pre-line',
+              marginBottom: 14,
+            }}
+          >
+            {nvcDraft}
+          </div>
+          <button
+            onClick={handleCopyNvcMessage}
+            className="btn-P"
+            style={{ width: '100%', fontSize: 13 }}
+          >
+            {copied ? '복사됐어요. 카톡에 붙여넣기 하세요.' : '카톡으로 보내기 (복사)'}
+          </button>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--P-sub)', textAlign: 'center' }}>
+            그대로 보내도, 일부만 다듬어 보내도 좋아요.
+          </div>
+        </div>
+      )}
 
       {/* Style Card */}
       {style && MotifComponent && (

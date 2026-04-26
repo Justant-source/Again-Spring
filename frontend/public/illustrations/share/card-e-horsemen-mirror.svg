@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 480" fill="none">
+
+  <rect x="0.5" y="0.5" width="269" height="479" rx="18" fill="#FBF3EC" stroke="#EADFD0" stroke-width="1"></rect>
+  <text x="22" y="32" font-family="&#39;Noto Serif KR&#39;, serif" font-size="11" fill="#A08670" font-weight="500">다시봄</text>
+  <text x="22" y="80" font-family="&#39;Noto Serif KR&#39;, serif" font-size="18" fill="#5C4030" font-weight="500">내가 자주 쓴 표현</text>
+  <text x="22" y="100" font-family="&#39;Pretendard&#39;, sans-serif" font-size="11" fill="#A08670">대화 안에서 가만히 비춰본 거울</text>
+
+  
+      <text x="22" y="130" font-family="&#39;Pretendard&#39;, sans-serif" font-size="14" fill="#5C4030" font-weight="500">비난</text>
+      <text x="248" y="130" font-family="&#39;Pretendard&#39;, sans-serif" font-size="13" fill="#A08670" text-anchor="end">4 / 10</text>
+      <rect x="22" y="140" width="226" height="10" rx="5" fill="#FFF8F0" stroke="#EADFD0" stroke-width="1"></rect>
+      <rect x="22" y="140" width="90.4" height="10" rx="5" fill="#A08670" opacity="0.6000000000000001"></rect>
+    
+      <text x="22" y="200" font-family="&#39;Pretendard&#39;, sans-serif" font-size="14" fill="#5C4030" font-weight="500">경멸</text>
+      <text x="248" y="200" font-family="&#39;Pretendard&#39;, sans-serif" font-size="13" fill="#A08670" text-anchor="end">1 / 10</text>
+      <rect x="22" y="210" width="226" height="10" rx="5" fill="#FFF8F0" stroke="#EADFD0" stroke-width="1"></rect>
+      <rect x="22" y="210" width="22.6" height="10" rx="5" fill="#A08670" opacity="0.45"></rect>
+    
+      <text x="22" y="270" font-family="&#39;Pretendard&#39;, sans-serif" font-size="14" fill="#5C4030" font-weight="500">방어</text>
+      <text x="248" y="270" font-family="&#39;Pretendard&#39;, sans-serif" font-size="13" fill="#A08670" text-anchor="end">6 / 10</text>
+      <rect x="22" y="280" width="226" height="10" rx="5" fill="#FFF8F0" stroke="#EADFD0" stroke-width="1"></rect>
+      <rect x="22" y="280" width="135.6" height="10" rx="5" fill="#A08670" opacity="0.7"></rect>
+    
+      <text x="22" y="340" font-family="&#39;Pretendard&#39;, sans-serif" font-size="14" fill="#5C4030" font-weight="500">담쌓기</text>
+      <text x="248" y="340" font-family="&#39;Pretendard&#39;, sans-serif" font-size="13" fill="#A08670" text-anchor="end">3 / 10</text>
+      <rect x="22" y="350" width="226" height="10" rx="5" fill="#FFF8F0" stroke="#EADFD0" stroke-width="1"></rect>
+      <rect x="22" y="350" width="67.8" height="10" rx="5" fill="#A08670" opacity="0.55"></rect>
+    
+
+  <line x1="22" y1="395" x2="248" y2="395" stroke="#EADFD0" stroke-width="1"></line>
+  <text x="135" y="420" font-family="&#39;Pretendard&#39;, sans-serif" font-size="11" fill="#A08670" text-anchor="middle">이 표현들은 평범한 대화에서도</text>
+  <text x="135" y="436" font-family="&#39;Pretendard&#39;, sans-serif" font-size="11" fill="#A08670" text-anchor="middle">자연스럽게 나타나요.</text>
+
+  <text x="135" y="468" font-family="&#39;Pretendard&#39;, sans-serif" font-size="11" fill="#A08670" text-anchor="middle">again-spring.com</text>
+
+</svg>

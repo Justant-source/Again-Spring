@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { CATEGORIES } from '@/lib/constants/categories';
 import { PhoneFrame, PhoneHeader, Dashes } from '@/components/shared';
+import { api } from '@/lib/api/client';
 
 export default function CategoryPage() {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function CategoryPage() {
     setStage(2);
   };
 
-  const handleMinorSelect = (minorId: string, allowsCustom: boolean) => {
+  const handleMinorSelect = async (minorId: string, allowsCustom: boolean) => {
     if (allowsCustom && !customText.trim()) {
       // Require custom text for "direct input" options
       return;
@@ -43,7 +44,24 @@ export default function CategoryPage() {
       minorId,
       customText: customText.trim() || undefined,
     });
-    router.push('/session/describe');
+
+    // Create session and navigate to chat page
+    try {
+      const response = await api.post('/api/sessions', {
+        relationType,
+        category: {
+          majorId: major.id,
+          middleId: selectedMiddleId!,
+          minorId,
+          customText: customText.trim() || undefined,
+        },
+      });
+      const { id } = response.data;
+      router.push(`/session/chat/${id}`);
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      router.push('/session/new');
+    }
   };
 
   const handleBack = () => {

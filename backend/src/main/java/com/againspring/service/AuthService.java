@@ -13,6 +13,7 @@ import com.againspring.security.JwtService;
 import com.againspring.util.GuestNicknameGenerator;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -134,6 +135,18 @@ public class AuthService {
         } else {
             guestId = generateGuestId();
             log.info("Guest token issued (no invite): {}", guestId);
+        }
+
+        // 게스트 유저를 users 테이블에 저장 (없을 때만) — UserDetailsService/SessionService 인증 경로 공유
+        if (!userRepository.existsById(guestId)) {
+            User guestUser = User.builder()
+                    .id(guestId)
+                    .nickname(displayNickname)
+                    .isGuest(true)
+                    .roles(new ArrayList<>(List.of("USER")))
+                    .build();
+            userRepository.save(guestUser);
+            log.info("Guest user row created: {}", guestId);
         }
 
         String token = jwtService.generateGuestToken(guestId);

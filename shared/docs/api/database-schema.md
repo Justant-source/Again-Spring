@@ -27,6 +27,9 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | V3 | `V3__add_email_verification.sql` | email_verifications 신규 |
 | V4 | `V4__add_security_tables.sql` | password_reset_tokens, revoked_tokens 신규 |
 | V5 | `V5__remove_temperature.sql` | reports/user_relationships/conflict_history의 temperature 제거 + temperature_history 삭제 |
+| V7 | `V7__add_messages_table_and_session_columns.sql` | **V1.5 카톡식 전환**: messages 테이블 신규 + sessions 컬럼 6개 추가 + turns 표기 deprecated |
+| V8 | `V8__add_session_psychology_tracking.sql` | **턴 간 심리 점수 피드백**: sessions에 `horsemen_history` JSON, `nvc_completion_history` JSON, `current_focus` VARCHAR(50) 추가 |
+| V9 | `V9__add_duo_balance_tracking.sql` | **Duo 균형 추적**: sessions에 `user_a_emotion_intensity` DECIMAL(3,2), `user_b_emotion_intensity` DECIMAL(3,2) 추가 |
 
 **dev 프로파일은 Flyway disabled** (Hibernate ddl-auto=update 사용). prod 프로파일은 Flyway 적용 + ddl-auto=validate.
 
@@ -36,7 +39,8 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 |---|---|---|---|
 | `users` | 회원/게스트 계정 | `id` (VARCHAR 32) | `idx_users_email`, `uk_users_provider (provider, provider_id)` |
 | `sessions` | 중재 세션 메타 | `id` (VARCHAR 32) | `idx_sessions_invite_token`, `idx_sessions_status`, `idx_sessions_content_expires_at` |
-| `turns` | 세션의 턴 (1~6) | `id` (BIGINT auto) | `uk_turns_session_number (session_id, turn_number)` |
+| `messages` | 카톡 메시지 (V7) | `id` (BIGINT auto) | `(session_id, created_at)`, `(session_id, sender)` |
+| `turns` | **[DEPRECATED V1.5 이후]** 세션의 턴 (1~6) | `id` (BIGINT auto) | `uk_turns_session_number (session_id, turn_number)` |
 | `reports` | 분석 리포트 | `id` (VARCHAR 32) | `idx_reports_session_id` (UNIQUE), `idx_reports_created_at` |
 | `user_relationships` | A-B 관계 집계 | `id` (BIGINT auto) | `uk_user_relationships_a_b_type` |
 | `conflict_history` | 세션 이력 행 | `id` (BIGINT auto) | `idx_conflict_history_user_pair` |
@@ -66,7 +70,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 UNIQUE: `(provider, provider_id)` — OAuth 중복 가입 방지.
 
-### `sessions` (V1)
+### `sessions` (V1 + V7)
 
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
@@ -79,10 +83,20 @@ UNIQUE: `(provider, provider_id)` — OAuth 중복 가입 방지.
 | `relationship_type` | VARCHAR(32) | RelationType enum |
 | `conflict_type` | VARCHAR(32) | factual/difference/mixed |
 | `category` | JSON | `{major, middle, minor, customMinor?}` |
-| `status` | VARCHAR(32) | SessionStatus enum |
-| `current_turn` | INT | 0~6 |
-| `current_role` | VARCHAR(8) | A/B/MEDIATOR |
-| `solo_mode` | BOOLEAN | |
+| `status` | VARCHAR(32) | **V7**: 'chatting_solo' \| 'chatting_duo' \| 'awaiting_finalization' \| 'completed' \| 'terminated' (ENUM이 아닌 VARCHAR 32로 확장 가능) |
+| `description` | LONGTEXT | **V7**: NULL 허용 (V1.5는 첫 메시지로 대체) |
+| `solo_mode` | BOOLEAN | **V7**: DEFAULT TRUE |
+| `user_a_message_count` | INT | **V7**: DEFAULT 0 |
+| `user_b_message_count` | INT | **V7**: DEFAULT 0 |
+| `partner_joined_at` | TIMESTAMP(3) | **V7**: Solo→Duo 전이 시각 |
+| `finalize_suggested_at` | TIMESTAMP(3) | **V7**: 종료 권유 시각 |
+| `finalize_agreed_by_a` | BOOLEAN | **V7**: DEFAULT FALSE |
+| `finalize_agreed_by_b` | BOOLEAN | **V7**: DEFAULT FALSE |
+| `horsemen_history` | JSON | **V8**: 턴별 4 Horsemen 강도 누적 `[{turn, sender, criticism, contempt, defensiveness, stonewalling}, ...]` |
+| `nvc_completion_history` | JSON | **V8**: 턴별 NVC 4단계 완성 여부 `[{turn, sender, observation, feeling, need, request}, ...]` |
+| `current_focus` | VARCHAR(50) | **V8**: `early_grounding \| deepen \| perspective \| solution` |
+| `user_a_emotion_intensity` | DECIMAL(3,2) | **V9**: A 누적 감정 강도 0.00~1.00 (Duo 균형 보정용) |
+| `user_b_emotion_intensity` | DECIMAL(3,2) | **V9**: B 누적 감정 강도 0.00~1.00 |
 | `report_id` | VARCHAR(32) | |
 | `content_expires_at` | TIMESTAMP(3) | now+30일 (RetentionScheduler 기준) |
 | `crisis_flags` | JSON | List<String> |
@@ -108,6 +122,51 @@ UNIQUE: `(provider, provider_id)` — OAuth 중복 가입 방지.
 | `created_at` | TIMESTAMP(3) | 필수 |
 
 UNIQUE: `(session_id, turn_number)` — 같은 턴 중복 작성 방지.
+
+**주의**: V1.5 이후 신규 데이터는 `messages` 테이블에 저장됨. `turns` 테이블은 히스토리 보존만.
+
+### `messages` (V7, 카톡식 대화)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `session_id` | VARCHAR(32) | FK → sessions, ON DELETE CASCADE |
+| `sender` | VARCHAR(32) | USER_A, USER_B, MEDIATOR_TO_A, MEDIATOR_TO_B |
+| `content` | LONGTEXT | 메시지 본문 (**30일 후 NULL**) |
+| `char_count` | INT | 문자 수 (블러링 용도) |
+| `is_finalize_suggestion` | BOOLEAN | DEFAULT FALSE — 종료 권유 메시지 표시 |
+| `is_partner_join_notice` | BOOLEAN | DEFAULT FALSE — Solo→Duo 전이 알림 |
+| `crisis_level` | INT | NULL / 1(경고) / 2(위험) / 3(긴급) |
+| `llm_model` | VARCHAR(50) | claude-haiku-4-5-20251001 등 |
+| `tokens_used` | INT | LLM 소비 토큰 |
+| `llm_latency_ms` | BIGINT | LLM 응답 시간 |
+| `created_at` | TIMESTAMP(3) | 필수 |
+
+**인덱스**:
+- `(session_id, created_at)` — 메시지 조회
+- `(session_id, sender)` — 발신자별 필터링
+
+FK: `session_id` → `sessions(id)` ON DELETE CASCADE
+
+### `turns` (V1 — **DEPRECATED V1.5 이후**)
+
+**V1.5 카톡식 전환 이후 신규 데이터는 저장되지 않습니다.** 기존 운영 데이터는 보존되며, 마이그레이션이 필요한 경우 BE 팀에 문의하세요.
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `session_id` | VARCHAR(32) | FK → sessions, ON DELETE CASCADE |
+| `turn_number` | INT | 1~6 |
+| `role` | VARCHAR(32) | A/B/MEDIATOR |
+| `user_id` | VARCHAR(32) | nullable (mediator turn) |
+| `content` | LONGTEXT | **30일 후 NULL** (RetentionScheduler) |
+| `mediator_message` | LONGTEXT | **30일 후 NULL** |
+| `mediator_summary_for_opponent` | LONGTEXT | **30일 후 NULL** — 앵커링 방지 중립 요약 |
+| `is_perspective_taking` | BOOLEAN | Turn 5,6 표시 |
+| `skipped` | BOOLEAN | |
+| `tokens_used` | INT | LLM 토큰 추정 |
+| `llm_latency_ms` | BIGINT | |
+| `created_at` | TIMESTAMP(3) | 필수 |
 
 ### `reports` (V1, V5에서 temperature 제거)
 

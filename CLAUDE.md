@@ -2,8 +2,8 @@
 
 **프로젝트**: 다시봄 · Again Spring
 **도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)
-**진행 상황**: 백엔드 전체 구현 완료, FE-BE 통합 및 배포 준비 중
-**기준일**: 2026-04-26
+**진행 상황**: V1.5 카톡식 + 중재 컨텍스트 강화(Phase A/B/C) 적용. dev 배포 완료, 5종 시나리오 검증 단계.
+**기준일**: 2026-04-27
 
 ---
 
@@ -382,11 +382,12 @@ APP_URL=https://dev.againspring.net
 - ✅ 프론트엔드 (Next.js 14 — MSW 프로토타입 + 실제 API 연동)
 - ✅ 백엔드 구현 완료
   - ✅ Spring Boot 3.3 + Java 21 + Gradle Kotlin DSL
-  - ✅ MariaDB 11 (JPA + Flyway V1~V5)
+  - ✅ MariaDB 11 (JPA + Flyway V1~V9)
   - ✅ JWT 인증 (회원가입 / 로그인 / 게스트 / Google OAuth)
   - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
-  - ✅ 세션 관리 + 중재 State Machine
+  - ✅ V1.5 카톡식 채팅 (ChatService, MessageSender 4종, Solo→Duo 전이)
   - ✅ **LLM 브릿지 (Claude Haiku 4.5 + 호스트 ~/.claude 마운트, API 키 불필요)**
+  - ✅ **중재 컨텍스트 강화 (Phase A/B/C)**: 사용자 프로필 주입(`UserProfileFragment`) + 턴 간 심리 점수 피드백(`PsychologyFeedbackFormatter`, `ChatTurnMetaParser`) + Duo 균형 추적(`DuoBalanceFormatter`)
   - ✅ 위기 감지 (CrisisDetector) + 금지어 가드 (KeywordGuard)
   - ✅ 리포트 생성 (기여도, NVC — 4Horsemen 내부 점수만 보존, UI 노출 없음)
   - ✅ 관계 그래프 (MariaDB: user_relationships, conflict_history)
@@ -430,5 +431,5 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-04-26
+**마지막 업데이트**: 2026-04-27
 **담당**: Claude Code (Agent)

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 480" fill="none">
+
+  <rect x="0.5" y="0.5" width="269" height="479" rx="18" fill="#FBF3EC" stroke="#EADFD0" stroke-width="1"></rect>
+  <text x="22" y="32" font-family="&#39;Noto Serif KR&#39;, serif" font-size="11" fill="#A08670" font-weight="500">다시봄</text>
+  <text x="135" y="92" font-family="&#39;Pretendard&#39;, sans-serif" font-size="13" fill="#A08670" text-anchor="middle">함께 다가가는 균형</text>
+  <text x="135" y="124" font-family="&#39;Noto Serif KR&#39;, serif" font-size="20" fill="#5C4030" text-anchor="middle" font-weight="500">두 분의 회복 시작점</text>
+
+  
+  
+  <rect x="22" y="200" width="135.6" height="58" rx="10 0 0 10" fill="#F4A896"></rect>
+  <rect x="157.6" y="200" width="90.4" height="58" fill="#A8C8B4"></rect>
+  
+  <path d="M22 210 Q22 200 32 200 L246 200 Q258 200 258 212 L258 246 Q258 258 246 258 L32 258 Q22 258 22 248 Z" fill="none" stroke="#EADFD0" stroke-width="1"></path>
+
+  
+  <text x="42" y="226" font-family="&#39;Pretendard&#39;, sans-serif" font-size="13" fill="#5C4030" font-weight="500">서현</text>
+  <text x="42" y="246" font-family="&#39;Pretendard&#39;, sans-serif" font-size="20" fill="#5C4030" font-weight="500">60%</text>
+
+  <text x="232" y="226" font-family="&#39;Pretendard&#39;, sans-serif" font-size="13" fill="#5C4030" text-anchor="end" font-weight="500">준호</text>
+  <text x="232" y="246" font-family="&#39;Pretendard&#39;, sans-serif" font-size="20" fill="#5C4030" text-anchor="end" font-weight="500">40%</text>
+
+  
+  <text x="22" y="282" font-family="&#39;Pretendard&#39;, sans-serif" font-size="11" fill="#A08670">먼저 다가가면 좋은 쪽</text>
+  <text x="248" y="282" font-family="&#39;Pretendard&#39;, sans-serif" font-size="11" fill="#A08670" text-anchor="end">기다려주면 좋은 쪽</text>
+
+  
+  <line x1="22" y1="340" x2="248" y2="340" stroke="#EADFD0" stroke-width="1"></line>
+
+  <text x="135" y="380" font-family="&#39;Noto Serif KR&#39;, serif" font-size="13" fill="#5C4030" text-anchor="middle" font-style="italic">&#34;이건 잘잘못이 아닌</text>
+  <text x="135" y="400" font-family="&#39;Noto Serif KR&#39;, serif" font-size="13" fill="#5C4030" text-anchor="middle" font-style="italic">노력의 양이에요.&#34;</text>
+
+  <text x="135" y="455" font-family="&#39;Pretendard&#39;, sans-serif" font-size="11" fill="#A08670" text-anchor="middle">again-spring.com</text>
+
+</svg>

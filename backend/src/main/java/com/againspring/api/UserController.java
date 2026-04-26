@@ -3,7 +3,11 @@ package com.againspring.api;
 import com.againspring.api.dto.request.OnboardingRequest;
 import com.againspring.api.dto.request.UpdateUserRequest;
 import com.againspring.api.dto.response.OnboardingResponse;
+import com.againspring.api.dto.response.SessionHistoryResponse;
 import com.againspring.api.dto.response.UserResponse;
+import com.againspring.domain.Session;
+import com.againspring.repository.SessionRepository;
+import com.againspring.repository.UserRepository;
 import com.againspring.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -25,9 +29,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /**
  * User API controller.
- * Handles user profile, updates, and onboarding.
+ * Handles user profile, updates, onboarding, and session history.
  */
 @RestController
 @RequestMapping("/api/users")
@@ -37,79 +43,95 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final SessionRepository sessionRepository;
+    private final UserRepository userRepository;
 
-    /**
-     * Get current user profile.
-     *
-     * @param userDetails authenticated user
-     * @return user profile
-     */
     @GetMapping("/me")
-    @Operation(summary = "Get user profile", description = "Retrieve current user profile")
-    @ApiResponse(responseCode = "200", description = "User profile retrieved",
-            content = @Content(schema = @Schema(implementation = UserResponse.class)))
+    @Operation(summary = "Get user profile")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = UserResponse.class)))
     @ApiResponse(responseCode = "401", description = "Unauthorized")
     @ApiResponse(responseCode = "404", description = "User not found")
     public ResponseEntity<UserResponse> getUserProfile(@AuthenticationPrincipal UserDetails userDetails) {
-        UserResponse response = userService.getUserProfile(userDetails.getUsername());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(userService.getUserProfile(userDetails.getUsername()));
     }
 
-    /**
-     * Update user profile (PATCH).
-     *
-     * @param userDetails authenticated user
-     * @param request update request
-     * @return updated user profile
-     */
     @PatchMapping("/me")
-    @Operation(summary = "Update user profile", description = "Update nickname or communication style")
-    @ApiResponse(responseCode = "200", description = "Profile updated",
-            content = @Content(schema = @Schema(implementation = UserResponse.class)))
-    @ApiResponse(responseCode = "400", description = "Validation failed")
-    @ApiResponse(responseCode = "401", description = "Unauthorized")
-    @ApiResponse(responseCode = "404", description = "User not found")
+    @Operation(summary = "Update user profile")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = UserResponse.class)))
     public ResponseEntity<UserResponse> updateUserProfile(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody UpdateUserRequest request) {
-        UserResponse response = userService.updateUserProfile(userDetails.getUsername(), request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(userService.updateUserProfile(userDetails.getUsername(), request));
     }
 
-    /**
-     * Delete user account (soft delete).
-     *
-     * @param userDetails authenticated user
-     * @return 204 No Content
-     */
     @DeleteMapping("/me")
-    @Operation(summary = "Delete user account", description = "Soft-delete user account")
+    @Operation(summary = "Delete user account")
     @ApiResponse(responseCode = "204", description = "Account deleted")
-    @ApiResponse(responseCode = "401", description = "Unauthorized")
-    @ApiResponse(responseCode = "404", description = "User not found")
     public ResponseEntity<Void> deleteUserAccount(@AuthenticationPrincipal UserDetails userDetails) {
         userService.deleteUserAccount(userDetails.getUsername());
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Complete onboarding with 10-question answers.
-     *
-     * @param userDetails authenticated user
-     * @param request onboarding request
-     * @return onboarding response with communication style
-     */
     @PostMapping("/me/onboarding")
-    @Operation(summary = "Complete onboarding", description = "Save 10-question onboarding answers and compute communication style")
-    @ApiResponse(responseCode = "200", description = "Onboarding completed",
-            content = @Content(schema = @Schema(implementation = OnboardingResponse.class)))
-    @ApiResponse(responseCode = "400", description = "Validation failed")
-    @ApiResponse(responseCode = "401", description = "Unauthorized")
-    @ApiResponse(responseCode = "404", description = "User not found")
+    @Operation(summary = "Complete onboarding")
+    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = OnboardingResponse.class)))
     public ResponseEntity<OnboardingResponse> completeOnboarding(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody OnboardingRequest request) {
-        OnboardingResponse response = userService.completeOnboarding(userDetails.getUsername(), request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(userService.completeOnboarding(userDetails.getUsername(), request));
+    }
+
+    /**
+     * 내 세션 목록 조회 (완료 + 진행 중 모두 포함, 최신순).
+     * GET /api/users/me/history
+     */
+    @GetMapping("/me/history")
+    @Operation(summary = "Get my session history", description = "Returns all sessions (completed and active) for the current user")
+    @ApiResponse(responseCode = "200", description = "History retrieved")
+    public ResponseEntity<List<SessionHistoryResponse>> getMyHistory(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String userId = userDetails.getUsername();
+        List<Session> sessions = sessionRepository
+                .findByCreatedByUserIdOrInviteeUserIdOrderByCreatedAtDesc(userId, userId);
+
+        List<SessionHistoryResponse> items = sessions.stream()
+                .map(s -> {
+                    // 상대방 닉네임: 내가 A면 B(초대 수신자), 내가 B면 A(초대 발신자)
+                    String partnerNickname;
+                    if (userId.equals(s.getCreatedByUserId())) {
+                        // 내가 A — 상대는 B
+                        if (s.getInviteeGuestName() != null) {
+                            partnerNickname = s.getInviteeGuestName();
+                        } else if (s.getInviteeUserId() != null) {
+                            partnerNickname = userRepository
+                                    .findByIdAndDeletedAtIsNull(s.getInviteeUserId())
+                                    .map(u -> u.getNickname())
+                                    .orElse("상대방");
+                        } else {
+                            partnerNickname = null;
+                        }
+                    } else {
+                        // 내가 B — 상대는 A(creator)
+                        partnerNickname = userRepository
+                                .findByIdAndDeletedAtIsNull(s.getCreatedByUserId())
+                                .map(u -> u.getNickname())
+                                .orElse("상대방");
+                    }
+
+                    return SessionHistoryResponse.builder()
+                            .id(s.getId())
+                            .status(s.getStatus() != null ? s.getStatus().getValue() : "unknown")
+                            .relationType(s.getRelationType() != null ? s.getRelationType().getValue() : null)
+                            .conflictType(s.getConflictType() != null ? s.getConflictType().getValue() : null)
+                            .partnerNickname(partnerNickname)
+                            .soloMode(Boolean.TRUE.equals(s.getSoloMode()))
+                            .completedAt(s.getCompletedAt())
+                            .createdAt(s.getCreatedAt())
+                            .build();
+                })
+                .toList();
+
+        return ResponseEntity.ok(items);
     }
 }

@@ -87,6 +87,11 @@ public class ReportResponseParser {
         List<String> suggestions = extractSuggestions(root);
         builder.repairSuggestions(suggestions);
 
+        // Extract text feedback fields
+        builder.patternFeedback(getStringField(root, "patternFeedback", ""));
+        builder.suggestedApproach(getStringField(root, "suggestedApproach", ""));
+        builder.inviteAgainCta(getStringField(root, "inviteAgainCta", ""));
+
         return builder.fallback(false).build();
     }
 
@@ -279,20 +284,39 @@ public class ReportResponseParser {
         public FourHorsemen fourHorsemen;
         public NeedsMap needsMap;
         public List<String> repairSuggestions;
+        public String patternFeedback;
+        public String suggestedApproach;
+        public String inviteAgainCta;
         public boolean fallback;
 
         @lombok.Builder
         public ParsedReport(ConflictType conflictType, ContributionRatio contributionRatio,
                            NVCScripts nvcScripts, FourHorsemen fourHorsemen, NeedsMap needsMap,
-                           List<String> repairSuggestions, boolean fallback) {
+                           List<String> repairSuggestions, String patternFeedback,
+                           String suggestedApproach, String inviteAgainCta, boolean fallback) {
             this.conflictType = conflictType;
             this.contributionRatio = contributionRatio;
             this.nvcScripts = nvcScripts;
             this.fourHorsemen = fourHorsemen;
             this.needsMap = needsMap;
             this.repairSuggestions = repairSuggestions != null ? repairSuggestions : new ArrayList<>();
+            this.patternFeedback = patternFeedback;
+            this.suggestedApproach = suggestedApproach;
+            this.inviteAgainCta = inviteAgainCta;
             this.fallback = fallback;
         }
+
+        // Getters
+        public ConflictType getConflictType() { return conflictType; }
+        public ContributionRatio getContributionRatio() { return contributionRatio; }
+        public NVCScripts getNvcScripts() { return nvcScripts; }
+        public FourHorsemen getFourHorsemen() { return fourHorsemen; }
+        public NeedsMap getNeedsMap() { return needsMap; }
+        public List<String> getRepairSuggestions() { return repairSuggestions; }
+        public String getPatternFeedback() { return patternFeedback; }
+        public String getSuggestedApproach() { return suggestedApproach; }
+        public String getInviteAgainCta() { return inviteAgainCta; }
+        public boolean isFallback() { return fallback; }
 
         @lombok.Data
         @lombok.Builder

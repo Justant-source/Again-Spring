@@ -65,30 +65,41 @@ com.againspring/
 │
 ├── service/
 │   ├── AuthService                     # 회원가입/로그인/게스트, JWT 발급
+│   ├── ChatService                     # V1.5 카톡식 메시지 송수신, AI 응답, 종료 권유
 │   ├── EmailVerificationService        # 6자리 코드 발송/검증
 │   ├── LogoutService                   # 토큰 폐기 → revoked_tokens
-│   ├── MediationService                # 턴 진행, LLM 호출, 응답 저장
 │   ├── PasswordResetService            # 재설정 토큰 발급/검증
-│   ├── ReportService                   # 리포트 생성 (LLM 호출 + 파싱)
+│   ├── SessionRoleResolver             # 사용자가 USER_A인지 USER_B인지 판정
 │   ├── SessionService                  # 세션 CRUD + 초대 토큰
-│   ├── SessionStateMachine             # 상태 전이 단일 진실
-│   ├── StyleCalculator                 # 온보딩 응답 → 스타일
+│   ├── SessionStateMachine             # V1.5 카톡식 상태 전이 단일 진실
+│   ├── StyleCalculator                 # 온보딩 응답 → 6스타일 enum (label/emoji/strengths/caution 메타 포함)
 │   ├── UserService                     # User 조회/수정
+│   ├── crisis/
+│   │   └── CrisisDetector              # 위기 키워드 분석 (사전 safety/ 에서 이동)
 │   ├── event/
-│   │   ├── SessionCompletedEvent       # turn_6 완료 시 발행
+│   │   ├── SessionCompletedEvent
 │   │   └── TurnCompletedEvent
 │   ├── graph/
 │   │   ├── RelationshipGraphService    # user_relationships 집계 갱신
-│   │   └── SessionCompletedGraphListener  # SessionCompletedEvent 리스너
+│   │   └── SessionCompletedGraphListener
 │   ├── oauth/
-│   │   ├── OAuthProviderService        # google/kakao/naver 통합
-│   │   └── OAuthUserInfo               # provider 응답 정규화
+│   │   ├── OAuthProviderService
+│   │   └── OAuthUserInfo
 │   ├── parser/
-│   │   └── TurnResponseParser          # LLM 응답 JSON 추출
+│   │   ├── ChatTurnMetaParser          # V1.5 응답 본문/<turn_meta> JSON 분리 (Phase B)
+│   │   └── TurnResponseParser          # 레거시 6턴 모델 JSON 파서
+│   ├── prompt/
+│   │   ├── ChatPromptAssembler         # V1.5 카톡식 프롬프트 조립 (Solo/Duo)
+│   │   ├── DuoBalanceFormatter         # <duo_balance> 관심 분배 지시 (Phase C)
+│   │   ├── PsychologyFeedbackFormatter # <psychology_feedback> 누적 점수 지시 (Phase B)
+│   │   └── UserProfileFragment         # <user_profile> 자연어 블록 (Phase A)
 │   ├── report/
+│   │   ├── MetaphorSelector
 │   │   ├── NeedsMapValidator
-│   │   ├── NVCValidator                # NVC 4단계 구조 검증
-│   │   └── ReportResponseParser        # 리포트 LLM 응답 → ParsedReport
+│   │   ├── NVCValidator
+│   │   ├── RatioEnforcer               # 화해 기여도 클리핑 (사전 safety/ 에서 이동)
+│   │   ├── ReportGenerationService     # V1.5 리포트 (Sonnet, A/B 병렬)
+│   │   └── ReportResponseParser
 │   └── retention/
 │       ├── AccessLogService
 │       ├── RetentionScheduler          # @Scheduled cron 0 0 3 * * *

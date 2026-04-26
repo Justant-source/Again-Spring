@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+
+  <rect x="50" y="40" width="140" height="160" fill="#FFF8F0" stroke="#5C4030" stroke-width="1.8"></rect>
+  
+  <line x1="120" y1="40" x2="120" y2="200" stroke="#5C4030" stroke-width="1.4" opacity="0.6"></line>
+  <line x1="50" y1="120" x2="190" y2="120" stroke="#5C4030" stroke-width="1.4" opacity="0.6"></line>
+  
+  <line x1="105" y1="105" x2="60" y2="55" stroke="#A08670" stroke-width="1" stroke-linecap="round"></line>
+  <line x1="105" y1="105" x2="160" y2="50" stroke="#A08670" stroke-width="1" stroke-linecap="round"></line>
+  <line x1="105" y1="105" x2="180" y2="120" stroke="#A08670" stroke-width="1" stroke-linecap="round"></line>
+  <line x1="105" y1="105" x2="60" y2="180" stroke="#A08670" stroke-width="1" stroke-linecap="round"></line>
+  <line x1="105" y1="105" x2="125" y2="190" stroke="#A08670" stroke-width="1" stroke-linecap="round"></line>
+  <line x1="105" y1="105" x2="170" y2="170" stroke="#A08670" stroke-width="1" stroke-linecap="round"></line>
+  
+  <line x1="80" y1="80" x2="95" y2="65" stroke="#A08670" stroke-width="0.7" opacity="0.6"></line>
+  <line x1="135" y1="125" x2="150" y2="135" stroke="#A08670" stroke-width="0.7" opacity="0.6"></line>
+  
+  <circle cx="105" cy="105" r="4" fill="#F4A896"></circle>
+
+</svg>

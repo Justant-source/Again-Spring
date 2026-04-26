@@ -1,20 +1,26 @@
 // ✅ MOCKUP APPLIED — source: design/handoff/tone-L-screens.jsx (OnboardingSlider)
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { Dashes } from '@/components/shared/Dashes';
 import { LikertQuestion } from '@/components/onboarding/LikertQuestion';
 import { ONBOARDING_QUESTIONS } from '@/lib/constants/onboardingQuestions';
 import { useUserStore } from '@/lib/store/userStore';
 import { determineStyle } from '@/lib/utils/styleCalculator';
+import { api } from '@/lib/api/client';
 
-export default function OnboardingPage() {
+function OnboardingPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useUserStore((s) => s.user);
   const setOnboardingAnswers = useUserStore((s) => s.setOnboardingAnswers);
   const setStyle = useUserStore((s) => s.setStyle);
+
+  const nextParam = searchParams.get('next')
+    ? `?next=${encodeURIComponent(searchParams.get('next')!)}`
+    : '';
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([...Array(10)].map(() => null));
@@ -40,9 +46,19 @@ export default function OnboardingPage() {
     setLoading(true);
     try {
       setOnboardingAnswers(allAnswers);
-      const style = determineStyle(allAnswers);
-      setStyle(style);
-      router.push('/onboarding/result');
+      const localStyle = determineStyle(allAnswers);
+      setStyle(localStyle);
+
+      try {
+        const res = await api.post('/api/users/me/onboarding', { answers: allAnswers });
+        if (res.data?.communicationStyle) {
+          setStyle(res.data.communicationStyle);
+        }
+      } catch {
+        // offline / guest without token — local style already set above
+      }
+
+      router.push(`/onboarding/result${nextParam}`);
     } finally {
       setLoading(false);
     }
@@ -134,5 +150,13 @@ export default function OnboardingPage() {
         </div>
       </div>
     </PhoneFrame>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingPageContent />
+    </Suspense>
   );
 }

@@ -106,105 +106,149 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Communication style card */}
-        {style && MotifComponent && (
-          <div
-            className="letter-card"
-            style={{
-              padding: '18px 16px',
-            }}
-          >
-            <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 10 }}>
-              당신의 대화 스타일
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                marginBottom: 14,
-              }}
-            >
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: '50%',
-                  background: style.color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                }}
-              >
-                <MotifComponent size={28} color="white" />
-              </div>
-              <div>
-                <div
-                  className="serif"
-                  style={{
-                    fontSize: 16,
-                    color: 'var(--L-ink)',
-                    fontWeight: 500,
-                  }}
-                >
-                  {style.label}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--L-sub)', marginTop: 2 }}>
-                  {style.description}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--L-sub)' }}>
-              <div style={{ fontWeight: 500, marginBottom: 8 }}>강점</div>
-              <ul style={{ paddingLeft: '16px', marginBottom: 12 }}>
-                {style.strengths.map((s: string, i: number) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
-
-              <div style={{ fontWeight: 500, marginBottom: 8 }}>유의할 점</div>
-              <ul style={{ paddingLeft: '16px' }}>
-                {style.caution.map((c: string, i: number) => (
-                  <li key={i}>{c}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* Temperature history placeholder */}
+        {/* Communication style card — always shown */}
         <div
           className="letter-card"
           style={{
             padding: '18px 16px',
           }}
         >
-          <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 12 }}>
-            온도 추이
+          <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 10 }}>
+            당신의 대화 스타일
           </div>
-          <div
-            style={{
-              padding: '20px 0',
-              textAlign: 'center',
-              color: 'var(--L-sub)',
-              fontSize: '13px',
-            }}
-          >
-            아직 추이 데이터가 모이고 있어요.
-          </div>
+
+          {style && MotifComponent ? (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  marginBottom: 14,
+                }}
+              >
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    background: style.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                  }}
+                >
+                  <MotifComponent size={28} color="white" />
+                </div>
+                <div>
+                  <div
+                    className="serif"
+                    style={{
+                      fontSize: 16,
+                      color: 'var(--L-ink)',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {style.label}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--L-sub)', marginTop: 2 }}>
+                    {style.description}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--L-sub)', marginBottom: 16 }}>
+                <div style={{ fontWeight: 500, marginBottom: 8 }}>강점</div>
+                <ul style={{ paddingLeft: '16px', marginBottom: 12 }}>
+                  {style.strengths.map((s: string, i: number) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+
+                <div style={{ fontWeight: 500, marginBottom: 8 }}>유의할 점</div>
+                <ul style={{ paddingLeft: '16px' }}>
+                  {style.caution.map((c: string, i: number) => (
+                    <li key={i}>{c}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div
+                style={{
+                  border: '1px solid var(--L-rule)',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '10px 14px 8px',
+                    fontSize: 11,
+                    color: 'var(--L-sub)',
+                    borderBottom: '1px solid var(--L-rule)',
+                  }}
+                >
+                  스타일 다시 등록하기
+                </div>
+                {[
+                  {
+                    label: '10문항 다시 하기',
+                    desc: '갈등 상황 기반 검사 · 약 2분',
+                    href: '/onboarding?next=/profile',
+                  },
+                  {
+                    label: 'MBTI 수정하기',
+                    desc: '직접 입력으로 변경',
+                    href: '/onboarding/mbti-input?next=/profile',
+                  },
+                ].map((opt, i) => (
+                  <button
+                    key={opt.label}
+                    onClick={() => router.push(opt.href)}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      borderTop: i === 0 ? 'none' : '1px solid var(--L-rule)',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--L-ink)', marginBottom: 2 }}>
+                        {opt.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>{opt.desc}</div>
+                    </div>
+                    <span style={{ color: 'var(--L-sub)', fontSize: 16, marginLeft: 12, flexShrink: 0 }}>›</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, color: 'var(--L-sub)', lineHeight: 1.6, marginBottom: 14 }}>
+                아직 대화 스타일이 등록되지 않았어요.
+                <br />10문항으로 내 스타일을 파악해보세요.
+              </div>
+              <button
+                className="btn-L"
+                style={{ width: '100%' }}
+                onClick={() => router.push('/onboarding/intro?next=/profile')}
+              >
+                10문항 시작하기
+              </button>
+            </>
+          )}
         </div>
 
         {/* Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-          <button
-            onClick={() => router.push('/onboarding/intro')}
-            className="btn-L ghost"
-            style={{ width: '100%' }}
-          >
-            온보딩 다시 하기
-          </button>
           <button onClick={handleLogout} className="btn-L" style={{ width: '100%' }}>
             로그아웃
           </button>

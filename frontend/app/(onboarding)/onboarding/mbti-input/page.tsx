@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { MbtiAxisSlider } from '@/components/onboarding/MbtiAxisSlider';
 import { MBTI_TO_STYLE } from '@/lib/constants/mbtiMapping';
 import { COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
 import { useUserStore } from '@/lib/store/userStore';
+import { api } from '@/lib/api/client';
 import type { MbtiProfile } from '@/lib/types';
 
 const AXES = [
@@ -25,7 +26,7 @@ function calcType(profile: MbtiProfile): string {
   );
 }
 
-export default function MbtiInputPage() {
+function MbtiInputContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setStyle = useUserStore((s) => s.setStyle);
@@ -44,6 +45,7 @@ export default function MbtiInputPage() {
   const handleConfirm = () => {
     setStyle(mappedStyle);
     setMbtiType(mbtiType);
+    api.post('/api/users/me/onboarding', { communicationStyle: mappedStyle, mbtiType }).catch(() => {});
     router.push(`/onboarding/result?next=${encodeURIComponent(nextPath)}`);
   };
 
@@ -125,5 +127,13 @@ export default function MbtiInputPage() {
         </button>
       </div>
     </PhoneFrame>
+  );
+}
+
+export default function MbtiInputPage() {
+  return (
+    <Suspense fallback={null}>
+      <MbtiInputContent />
+    </Suspense>
   );
 }

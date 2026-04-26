@@ -76,9 +76,16 @@ export default function JoinPage({ params }: { params: { token: string } }) {
       })
       .finally(() => {
         setIsLoading(false);
-        // 이미 로그인된 경우 바로 참여 흐름으로
+        // 로그인 사용자: 스타일 등록 여부에 따라 분기
         if (user && !user.isGuest) {
-          setStep(user.onboardingCompletedAt ? 'nickname-input' : 'login-onboarding-prompt');
+          setStep(
+            user.onboardingCompletedAt && user.communicationStyle
+              ? 'nickname-input'
+              : 'login-onboarding-prompt',
+          );
+        } else if (user?.isGuest && user.communicationStyle) {
+          // 게스트가 이미 성격검사를 마친 경우(예: 온보딩 후 복귀) → 바로 참여 단계로
+          setStep('nickname-input');
         } else {
           setStep('choose-mode');
         }
@@ -98,7 +105,24 @@ export default function JoinPage({ params }: { params: { token: string } }) {
     setStep('nickname-input');
   };
 
-  const handleGuestDoOnboarding = () => {
+  const handleGuestDoOnboarding = async () => {
+    // 온보딩 결과(communicationStyle)가 user 객체에 저장되도록 게스트를 먼저 생성한다.
+    // 생성 실패해도 온보딩 자체는 진행 (handleJoin 시점에 다시 시도됨)
+    if (!user) {
+      try {
+        const tempName = generateGuestNickname();
+        const { guestId, token: guestJwt } = await getOrCreateGuestId(token, tempName);
+        localStorage.setItem('again-spring-token', guestJwt);
+        setUser({
+          id: guestId,
+          nickname: tempName,
+          isGuest: true,
+          createdAt: new Date().toISOString(),
+        });
+      } catch {
+        // 무시 — 온보딩 후 닉네임 입력 단계에서 다시 시도된다
+      }
+    }
     router.push(`/onboarding/intro?next=/session/join/${token}`);
   };
 
@@ -122,6 +146,8 @@ export default function JoinPage({ params }: { params: { token: string } }) {
         // 게스트: inviteToken별 Guest ID 재사용
         const { guestId, token: guestJwt } = await getOrCreateGuestId(token, name);
         authToken = guestJwt;
+        // 이후 채팅 페이지 API 호출에도 인증이 되도록 localStorage에도 저장
+        localStorage.setItem('again-spring-token', guestJwt);
         setUser({
           id: guestId,
           nickname: name,
@@ -139,7 +165,9 @@ export default function JoinPage({ params }: { params: { token: string } }) {
 
       setPartnerNickname(sessionData?.inviterName ?? '초대자');
       setRole('B');
-      router.push('/session/describe?role=B');
+      // BE는 sessionId 가 아닌 id 필드로 반환
+      const sessionId = res.data.id || sessionData?.id;
+      router.push(`/session/chat/${sessionId}`);
     } catch (err: any) {
       setError(err.response?.data?.message ?? '참여에 실패했어요. 다시 시도해주세요.');
     } finally {

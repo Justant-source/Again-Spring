@@ -8,22 +8,47 @@ export type RelationType =
 
 export type ConflictType = 'factual' | 'difference' | 'mixed';
 
-export type ParticipantRole = 'A' | 'B';
-
 export type SessionStatus =
-  | 'waiting_b'
-  | 'b_joined'
-  | 'in_mediation'
+  | 'chatting_solo'
+  | 'chatting_duo'
+  | 'awaiting_finalization'
   | 'completed'
-  | 'solo_mode'
   | 'terminated';
+
+export type MessageSender =
+  | 'USER_A'
+  | 'USER_B'
+  | 'MEDIATOR_TO_A'
+  | 'MEDIATOR_TO_B';
+
+export interface Message {
+  id: number;
+  sender: MessageSender;
+  content: string;
+  charCount: number;
+  isFinalizeSuggestion: boolean;
+  isPartnerJoinNotice: boolean;
+  createdAt: string;
+}
+
+export interface MessageMetadata {
+  id: number;
+  sender: MessageSender;
+  charCount: number;
+  createdAt: string;
+}
+
+export interface PartnerStatus {
+  joined: boolean;
+  isActive: boolean;
+  inviteSent: boolean;
+  messageCount: number;
+  lastActivityAt: string | null;
+}
 
 export interface Session {
   id: string;
-  createdBy: string;
-  inviteToken: string;
-  inviteeId?: string;
-  inviteeGuestName?: string;
+  status: SessionStatus;
   relationType: RelationType;
   category: {
     majorId: string;
@@ -31,22 +56,20 @@ export interface Session {
     minorId: string;
     customText?: string;
   };
-  status: SessionStatus;
-  currentTurn: number;
-  turns: Turn[];
+  createdByUserId: string;
+  inviteeUserId: string | null;
+  inviteToken: string | null;
+  inviteExpiresAt: string | null;
+  userAMessageCount: number;
+  userBMessageCount: number;
+  partnerJoinedAt: string | null;
+  finalizeSuggestedAt: string | null;
+  finalizeAgreedByA: boolean;
+  finalizeAgreedByB: boolean;
+  myRole?: 'USER_A' | 'USER_B';
   createdAt: string;
   completedAt?: string;
   reportId?: string;
-}
-
-export interface Turn {
-  turnNumber: number;
-  role: ParticipantRole;
-  content: string;
-  mediatorMessage?: string;
-  isPerspectiveTaking?: boolean;
-  skipped?: boolean;
-  createdAt: string;
 }
 
 export interface NVCScript {
@@ -54,6 +77,14 @@ export interface NVCScript {
   feeling: string;
   need: string;
   request: string;
+}
+
+export interface NvcSuggestion {
+  observation: string;
+  feeling: string;
+  need: string;
+  request: string;
+  fourSentenceDraft: string; // V1.5: 카톡에 그대로 보낼 수 있는 4문장 합성본
 }
 
 export interface HorsemenDetection {
@@ -109,6 +140,8 @@ export interface Report {
   isSoloMode: boolean;
   powerImbalanceDetected?: boolean;
   aPatternFeedback?: string;
+  nvcSuggestion?: NvcSuggestion;
+  metaphorId?: string; // V1.5: 12종 메타포 id (locked-mailbox, boiling-kettle, ...)
   suggestedApproach?: string;
   inviteAgainCTA?: string;
   createdAt: string;

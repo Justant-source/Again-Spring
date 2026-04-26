@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "lint:words": "node scripts/check-forbidden-words.js"
+    "lint:words": "node scripts/check-forbidden-words.js",
+    "verify:assets": "node scripts/verify-design-assets.js"
   },
   "dependencies": {
     "next": "14.2.15",

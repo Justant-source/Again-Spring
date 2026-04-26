@@ -4,12 +4,13 @@ import com.againspring.api.dto.response.ReportResponse;
 import com.againspring.domain.Report;
 import com.againspring.repository.ReportRepository;
 import com.againspring.repository.SessionRepository;
-import com.againspring.service.ReportService;
+// import com.againspring.service.ReportService; — REMOVED (V1.5)
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -18,9 +19,8 @@ import java.util.Map;
 /**
  * REST API for report endpoints.
  * - POST /api/sessions/{sessionId}/report — trigger report generation
- * - GET /api/reports/{reportId} — retrieve generated report
- *
- * TODO Phase 3-5 integration: User principal extraction.
+ * - GET /api/sessions/{sessionId}/report — retrieve report by sessionId (FE 사용)
+ * - GET /api/reports/{reportId} — retrieve generated report by reportId
  */
 @Slf4j
 @RestController
@@ -28,7 +28,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ReportController {
 
-    private final ReportService reportService;
+    // private final ReportService reportService; — REMOVED (V1.5)
     private final ReportRepository reportRepository;
     private final SessionRepository sessionRepository;
 
@@ -56,8 +56,8 @@ public class ReportController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
 
-            // Trigger async report generation
-            reportService.generateAsync(sessionId);
+            // TODO V1.5: Trigger async report generation
+            // reportService.generateAsync(sessionId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("reportId", "generating");
@@ -68,6 +68,40 @@ public class ReportController {
         } catch (RuntimeException e) {
             log.error("Failed to trigger report generation for session {}: {}", sessionId, e.getMessage());
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * Retrieve a report by sessionId (FE primary use).
+     * GET /api/sessions/{sessionId}/report
+     * Response 200: Full report details.
+     * Response 404: Report not yet generated (FE should poll).
+     * Response 403: Not a participant.
+     */
+    @GetMapping("/sessions/{sessionId}/report")
+    public ResponseEntity<ReportResponse> getReportBySession(
+            @PathVariable String sessionId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String userId = userDetails != null ? userDetails.getUsername() : null;
+
+        try {
+            var session = sessionRepository.findById(sessionId)
+                    .orElse(null);
+            if (session != null && userId != null) {
+                boolean isParticipant = userId.equals(session.getCreatedByUserId())
+                        || userId.equals(session.getInviteeUserId());
+                if (!isParticipant) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
+            }
+
+            return reportRepository.findBySessionId(sessionId)
+                    .map(report -> ResponseEntity.ok(mapToResponse(report)))
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            log.error("Failed to get report for session {}: {}", sessionId, e.getMessage());
+            return ResponseEntity.notFound().build();
         }
     }
 

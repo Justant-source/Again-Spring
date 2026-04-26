@@ -1,10 +1,10 @@
 package com.againspring.service.retention;
 
 import com.againspring.domain.Session;
-import com.againspring.domain.Turn;
+import com.againspring.domain.Message;
 import com.againspring.domain.enums.SessionStatus;
 import com.againspring.repository.SessionRepository;
-import com.againspring.repository.TurnRepository;
+import com.againspring.repository.MessageRepository;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RetentionScheduler {
 
     private final SessionRepository sessionRepository;
-    private final TurnRepository turnRepository;
+    private final MessageRepository messageRepository;
 
     /**
      * 일일 정제 작업 (3am KST)
@@ -57,9 +57,8 @@ public class RetentionScheduler {
     }
 
     /**
-     * 특정 세션의 콘텐츠를 정제
-     * turns[].content, turns[].mediatorMessage, turns[].mediatorSummaryForOpponent 을 null로 설정
-     * 하지만 메타데이터(createdAt, turnNumber, role 등)는 유지
+     * 특정 세션의 콘텐츠를 정제 (V1.5)
+     * messages[].content를 null로 설정하되, 메타데이터(createdAt, sender 등)는 유지
      */
     private void purgeSessionContent(Session session) {
         try {
@@ -67,23 +66,17 @@ public class RetentionScheduler {
                 return;
             }
 
-            List<Turn> turns = turnRepository.findBySessionIdOrderByTurnNumberAsc(session.getId());
-            if (turns == null || turns.isEmpty()) {
-                return; // Nothing to purge
+            // V1.5: Message 테이블에서 콘텐츠 정제
+            // 구현: messageRepository에서 sessionId의 모든 메시지 조회 후 content null 처리
+            List<Message> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId());
+            for (Message msg : messages) {
+                msg.setContent(null);
+                messageRepository.save(msg);
             }
 
-            // Clear sensitive fields from all turns
-            for (Turn turn : turns) {
-                turn.setContent(null);
-                turn.setMediatorMessage(null);
-                turn.setMediatorSummaryForOpponent(null);
-                turnRepository.save(turn);
-            }
-
-            log.debug("Purged content from session {}", session.getId());
+            log.debug("Purged {} messages from session {}", messages.size(), session.getId());
         } catch (Exception e) {
             log.error("Error purging content from session {}", session.getId(), e);
         }
     }
-
 }
