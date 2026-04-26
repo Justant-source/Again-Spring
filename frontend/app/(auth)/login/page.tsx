@@ -33,7 +33,11 @@ export default function LoginPage() {
         email,
         password,
       });
-      setUser(response.data);
+      const { user, token } = response.data;
+      if (token?.accessToken) {
+        localStorage.setItem('again-spring-token', token.accessToken);
+      }
+      setUser(user);
       router.push('/');
     } catch (err: any) {
       setError(err.response?.data?.message || '로그인에 실패했어요');
@@ -140,21 +144,25 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: 'var(--L-sub)', display: 'flex', gap: 16, justifyContent: 'center' }}>
-          <Link href="/signup" style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}>
+        <div style={{ marginTop: 16, textAlign: 'center', fontSize: 12, display: 'flex', gap: 16, justifyContent: 'center' }}>
+          <Link href="/signup" style={{ color: 'var(--L-sub)', textDecoration: 'underline' }}>
             회원가입
           </Link>
           <span style={{ color: 'var(--L-border)' }}>·</span>
-          <Link href="/guest" style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}>
-            게스트 입장
+          <Link href="/forgot-password" style={{ color: 'var(--L-sub)', textDecoration: 'underline' }}>
+            비밀번호 찾기
           </Link>
         </div>
 
-        <div style={{ marginTop: 16, textAlign: 'center', fontSize: 12 }}>
-          <Link href="/forgot-password" style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}>
-            비밀번호를 잊으셨나요?
-          </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 28, marginBottom: 16 }}>
+          <div style={{ flex: 1, height: 1, background: 'var(--L-border)' }} />
+          <span style={{ fontSize: 11, color: 'var(--L-sub)', whiteSpace: 'nowrap' }}>계정이 없으신가요?</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--L-border)' }} />
         </div>
+
+        <Link href="/guest" className="btn-L ghost" style={{ textAlign: 'center', textDecoration: 'none', display: 'block' }}>
+          게스트 모드로 시작
+        </Link>
       </div>
     </PhoneFrame>
   );

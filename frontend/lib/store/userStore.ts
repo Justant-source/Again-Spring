@@ -56,7 +56,12 @@ export const useUserStore = create<UserState>()(
               }
             : prev,
         ),
-      clear: () => set({ user: null }),
+      clear: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('again-spring-token');
+        }
+        return set({ user: null });
+      },
     }),
     {
       name: 'again-spring-user',

@@ -35,7 +35,11 @@ export default function GuestPage() {
       const response = await api.post('/api/auth/guest', {
         nickname: finalNickname,
       });
-      setUser(response.data);
+      const { user, token } = response.data;
+      if (token?.accessToken) {
+        localStorage.setItem('again-spring-token', token.accessToken);
+      }
+      setUser(user);
       router.push('/onboarding/intro');
     } catch (err: any) {
       setError(err.response?.data?.message || '게스트 입장에 실패했어요');

@@ -94,7 +94,11 @@ export default function SignupPage() {
         password,
         verificationCode,
       });
-      setUser(response.data.user);
+      const { user, token } = response.data;
+      if (token?.accessToken) {
+        localStorage.setItem('again-spring-token', token.accessToken);
+      }
+      setUser(user);
       router.push('/');
     } catch (err: any) {
       setError(err.response?.data?.message || '회원가입에 실패했어요');

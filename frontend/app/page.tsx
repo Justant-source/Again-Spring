@@ -3,6 +3,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { PhoneFrame } from '@/components/shared/PhoneFrame';
 import { Logo } from '@/components/shared/Logo';
 import { useUserStore } from '@/lib/store/userStore';
@@ -12,6 +13,19 @@ const CHIPS = ['연인', '부부', '친구', '가족', '부모자식'];
 export default function LandingPage() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !user) {
+      router.replace('/login');
+    }
+  }, [mounted, user, router]);
+
+  if (!mounted || !user) return null;
 
   const handleStartSession = () => {
     if (user && !user.isGuest && !user.onboardingCompletedAt) {
