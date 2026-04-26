@@ -1,15 +1,15 @@
 # CLAUDE.md — 다시봄 프로젝트 개발 가이드
 
-**프로젝트**: 다시봄 · Again Spring  
-**도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)  
-**진행 상황**: 백엔드 전체 구현 완료, FE-BE 통합 및 배포 준비 중  
+**프로젝트**: 다시봄 · Again Spring
+**도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)
+**진행 상황**: 백엔드 전체 구현 완료, FE-BE 통합 및 배포 준비 중
 **기준일**: 2026-04-26
 
 ---
 
 ## 🎯 프로젝트 한 줄 요약
 
-싸운 두 사람 사이에서 AI가 양쪽 이야기를 중립적으로 정리해 관계 회복을 돕는 웹앱.  
+싸운 두 사람 사이에서 AI가 양쪽 이야기를 중립적으로 정리해 관계 회복을 돕는 웹앱.
 FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + Claude Code LLM 브릿지.
 
 ---
@@ -18,72 +18,100 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 
 ### 작업 위치 규칙
 
-| 작업 범위 | 디렉토리 | 주요 문서 |
+| 작업 범위 | 코드 디렉토리 | 진입 문서 |
 |---|---|---|
-| **FE 기능/UI** | `frontend/` | `shared/docs/v1/API_SPEC.md` |
-| **BE 기능/API** | `backend/` | `shared/docs/v1/API_SPEC.md` |
-| **LLM 브릿지** | `backend/src/main/java/.../llm/` | `shared/docs/v1/LLM_BRIDGE_ARCHITECTURE.md` |
-| **공유 타입/스키마** | `shared/` | `shared/docs/v1/DATABASE_SCHEMA.md` |
-| **인프라** | `infra/` | `infra/docker-compose.yml` |
+| **FE 기능/UI** | `frontend/` | `frontend/docs/README.md` |
+| **BE 기능/API** | `backend/` | `backend/docs/README.md` |
+| **LLM 브릿지** | `backend/src/main/java/.../llm/` | `backend/docs/llm-bridge.md` |
+| **공유 타입/스키마/프롬프트** | `shared/` | `shared/docs/README.md` |
+| **환경/인프라/배포** | `env/` | `env/docs/README.md` |
 
 ### 절대 규칙
 
-1. **FE는 Claude Code를 직접 호출하지 않음**  
+1. **FE는 Claude Code를 직접 호출하지 않음**
    → 모든 LLM 요청은 BE 경유 (REST API)
 
-2. **BE만 Claude Code를 수행**  
+2. **BE만 Claude Code를 수행**
    → ClaudeCodeBridge: `backend/src/main/java/.../llm/bridge/ClaudeCodeBridge.java`
 
-3. **금지어/위기 키워드 확인 필수**  
-   → 코드/프롬프트 수정 시 `shared/docs/v1/FORBIDDEN_WORDS.md` 참조
+3. **금지어/위기 키워드 확인 필수**
+   → 코드/프롬프트 수정 시 `shared/docs/policies/forbidden-words.md`, `shared/docs/policies/crisis-detection.md` 참조
 
-4. **🚨 PROD 배포 절대 규칙 — 위반 금지**  
-   → 명시적으로 "prod에 배포해줘" 지시가 없는 한 prod 환경에 절대 배포하지 않음  
-   → 배포 순서: **dev 배포 → commit & push (main 브랜치) → prod 배포**  
+4. **🚨 PROD 배포 절대 규칙 — 위반 금지**
+   → 명시적으로 "prod에 배포해줘" 지시가 없는 한 prod 환경에 절대 배포하지 않음
+   → 배포 순서: **dev 배포 → commit & push (main 브랜치) → prod 배포**
    → prod에는 반드시 main 브랜치 기준으로만 배포
 
-5. **환경별 격리**  
-   → dev: `infra/docker-compose.dev.yml` + `infra/.env.dev`  
-   → prod: `infra/docker-compose.prod.yml` + `infra/.env.prod`  
+5. **환경별 격리**
+   → dev: `env/docker-compose.dev.yml` + `env/.env.dev`
+   → prod: `env/docker-compose.prod.yml` + `env/.env.prod`
    → `.env.prod`는 절대 git에 커밋 금지
+
+6. **문서 위치 규칙 — 4개 docs 디렉토리만 사용**
+   → `shared/docs/` (공통), `backend/docs/` (BE 특화), `frontend/docs/` (FE 특화), `env/docs/` (환경/배포)
+   → 루트는 `README.md`와 `CLAUDE.md`만 허용
+   → 모듈 루트의 `README.md`는 짧은 진입 가이드만 (~20줄)
+   → **권위본은 `shared/docs/policies/`** — backend/frontend 의 `policies/` 는 각 모듈의 구현 방법만 설명
 
 ---
 
 ## 📋 문서 위치 맵
 
-> **v1/** = 안정적 핵심 문서 · **v2/** = 리디자인/기획 문서
+### 공통 (BE+FE 모두 참조) — `shared/docs/`
 
-### API / 스키마
-- `shared/docs/v1/API_SPEC.md` — REST API 전체 명세 (엔드포인트, 요청/응답 스키마)
-- `shared/docs/v1/DATABASE_SCHEMA.md` — MariaDB 테이블 설명
+#### API / 스키마
+- `shared/docs/api/rest-spec.md` — REST API 전체 명세
+- `shared/docs/api/database-schema.md` — MariaDB 테이블 설명
 
-### LLM / AI
-- `shared/docs/v1/LLM_BRIDGE_ARCHITECTURE.md` — Claude Code 프로세스 풀, 에러 처리, PromptSanitizer
-- `shared/docs/v1/SYSTEM_PROMPTS.md` — Gottman + NVC 프롬프트 원본
-- `shared/docs/v1/RATIO_CALCULATION.md` — 화해 기여도 계산 규칙
+#### LLM / 프롬프트
+- `shared/docs/prompts/README.md` — 프롬프트 레이어링(시스템/Gottman/NVC/관계/턴) + 핫리로드
+- `shared/docs/prompts/system.md` — 시스템 프롬프트 (BE 런타임 로드)
+- `shared/docs/prompts/{gottman,nvc,relations,turns}/*.md` — 도메인별 프롬프트 파편
 
-### 기획 / 정책
-- `shared/docs/v1/FORBIDDEN_WORDS.md` — 금지어 · 위기 키워드 (필수!)
-- `shared/docs/v1/CATEGORIES.md` — 갈등/관계 카테고리 정의
-- `shared/docs/v1/ONBOARDING_MAPPING.md` — 온보딩 Q&A → 소통 스타일 매핑
-- `shared/docs/v1/TERMS_OF_SERVICE.md` — 서비스 이용약관
-- `shared/docs/v1/PSYCHOLOGY_MODEL_RATIONALE.md` — 심리학 모델 채택 근거
+#### 정책 (서비스 컨텐츠 룰 — **권위본**)
+- `shared/docs/policies/psychology-model.md` — 심리학 모델 (Gottman + NVC + EFT) 채택 근거
+- `shared/docs/policies/auth.md` — 이메일/게스트/OAuth 인증 정책
+- `shared/docs/policies/onboarding.md` — 온보딩 Q&A → 6스타일 매핑
+- `shared/docs/policies/categories.md` — 5+1 관계 카테고리
+- `shared/docs/policies/forbidden-words.md` — 4-tier 금지어 (필수!)
+- `shared/docs/policies/crisis-detection.md` — 위기 키워드 + 핫라인
+- `shared/docs/policies/ratio-calculation.md` — 화해 기여도 산식
+- `shared/docs/policies/data-retention.md` — 30일 보존 정책
+- `shared/docs/policies/terms-of-service.md` — 서비스 이용약관
 
-### FE 개발
-- `shared/docs/v1/MOCK_SCENARIOS.md` — MSW 목업 시나리오
-- `.request/design/` — UI 디자인 핸드오프 에셋 (HTML/JSX/CSS)
+#### 시스템 전체
+- `shared/docs/structure.md` — 모노레포 전체 구조 / 책임 분리
+- `shared/docs/architecture.md` — 시스템 아키텍처 한 장
 
-### 리디자인 / 기획 문서 (v2)
-- `shared/docs/v2/ONBOARDING_V2.md` — 온보딩 v2 기획
-- `shared/docs/v2/RESULT_CARDS_REDESIGN.md` — 결과 카드 리디자인
-- `shared/docs/v2/SOLO_FIRST_REDESIGN.md` — Solo-first 리디자인
-- `shared/docs/v2/REPAIR_DRIP_CAMPAIGN.md` — 관계 회복 드립 캠페인
-- `shared/docs/v2/REFINEMENT_WORK_ORDER.md` — 개선 작업 지시서
-- `shared/docs/v2/KAKAO_VIRAL_ASSETS.md` — 카카오 바이럴 에셋
+### 백엔드 특화 — `backend/docs/`
+- `backend/docs/structure.md` — Spring Boot 패키지 계층
+- `backend/docs/architecture.md` — Layer / JPA / Flyway / State Machine / 이벤트
+- `backend/docs/llm-bridge.md` — Claude Code CLI 통합 (프로세스 풀, 타임아웃, fallback)
+- `backend/docs/policies/{auth-jwt,oauth-google,keyword-guard,prompt-sanitizer}.md` — BE 구현 정책
+- `backend/docs/testing.md` — 테스트 전략 + 커버리지
+- `backend/docs/openapi.md` — Swagger UI + DTO 컨벤션
+
+### 프론트엔드 특화 — `frontend/docs/`
+- `frontend/docs/structure.md` — Next.js 14 App Router 레이아웃
+- `frontend/docs/architecture.md` — 상태/API 클라이언트/MSW
+- `frontend/docs/policies/{forbidden-words-lint,crisis-modal}.md` — FE UI 정책 구현
+- `frontend/docs/ui/{design-handoff,mock-scenarios}.md` — 디자인 핸드오프 + MSW 시나리오
+- `frontend/docs/testing.md` — FE 테스트 전략
+
+### 환경 / 배포 — `env/docs/`
+- `env/docs/structure.md` — env/ 디렉토리 레이아웃
+- `env/docs/architecture.md` — 배포 토폴로지 (Tunnel→nginx→FE/BE→DB)
+- `env/docs/docker.md` — compose 3-variant
+- `env/docs/environment-variables.md` — `.env.*` 변수 사전
+- `env/docs/local-dev.md` — 로컬 개발 실행법
+- `env/docs/deployment.md` — dev → main → prod 파이프라인
+- `env/docs/cloudflare.md` — Tunnel 라우팅 + 설치
 
 ---
 
 ## ⚠️ 금지어 및 법적 리스크 (필수 숙지)
+
+> 권위본: [`shared/docs/policies/forbidden-words.md`](shared/docs/policies/forbidden-words.md), [`shared/docs/policies/crisis-detection.md`](shared/docs/policies/crisis-detection.md)
 
 ### 절대 금지어 (UI 전면 차단)
 
@@ -117,7 +145,7 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 cd frontend
 npm run lint:words    # 금지어 자동 스캔
 
-# BE: PromptSanitizer (safety/KeywordGuard.java) 자동 적용
+# BE: PromptSanitizer + KeywordGuard (safety/) 자동 적용
 ```
 
 ---
@@ -127,7 +155,7 @@ npm run lint:words    # 금지어 자동 스캔
 ### 인프라 (DB)
 
 ```bash
-cd /home/justant/Data/Again-Spring/infra
+cd /home/justant/Data/Again-Spring/env
 docker compose up -d      # MariaDB 11 시작 (localhost:3306)
 docker compose logs -f    # 로그 확인
 docker compose down       # 종료
@@ -148,6 +176,7 @@ DB_USER=againspring
 DB_PASSWORD=changeme
 JWT_SECRET=dev_secret_key_change_in_prod
 CLAUDE_BIN=/path/to/claude
+PROMPTS_PATH=./shared/docs/prompts   # 기본값
 ```
 
 ### FE 개발
@@ -171,6 +200,8 @@ curl http://localhost:8080/actuator/health
 
 ## 🧠 LLM 브릿지 운영 주의사항
 
+> 자세한 설계: [`backend/docs/llm-bridge.md`](backend/docs/llm-bridge.md), 프롬프트 구조: [`shared/docs/prompts/README.md`](shared/docs/prompts/README.md)
+
 ### ClaudeCodeBridge 설계 원칙
 
 - **모델**: `claude-haiku-4-5-20251001` (기본). `CLAUDE_MODEL` 환경변수로 변경 가능.
@@ -178,27 +209,20 @@ curl http://localhost:8080/actuator/health
 - **프로세스 풀**: `Semaphore(3)` — 동시 최대 3개 Claude 프로세스
 - **타임아웃**: 60초 (Haiku 평균 응답 ~3초, 안전 마진)
 - **Fallback**: Claude 불가 시 `FallbackResponses` 기본 응답 반환
+- **프롬프트 경로**: `app.prompts.path` (기본 `./shared/docs/prompts`)
 
 ### 인증 방식 (API 키 없이)
 
 Claude Code CLI 자체 인증을 활용. 호스트의 `~/.claude` 디렉토리를 컨테이너 `/root/.claude`로 볼륨 마운트하여 호스트 로그인 세션 공유.
 
 ```yaml
-# docker-compose.dev.yml / docker-compose.prod.yml
+# env/docker-compose.dev.yml / docker-compose.prod.yml
 backend-dev:
   volumes:
     - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
 ```
 
 호스트에서 최초 1회 `claude` 명령으로 로그인 후, 컨테이너는 동일한 세션을 사용. ANTHROPIC_API_KEY 불필요.
-
-### 컨테이너에 Claude CLI 설치
-
-`backend/Dockerfile`의 runtime stage:
-```dockerfile
-RUN apk add --no-cache nodejs npm \
- && npm install -g @anthropic-ai/claude-code
-```
 
 ### 보안 규칙
 
@@ -213,9 +237,7 @@ RUN apk add --no-cache nodejs npm \
 
 ### 프롬프트 프레이밍 주의
 
-Claude Code CLI는 SW 엔지니어링 작업에 최적화돼 있어 비기술 조언을 거부할 수 있음. 다시봄의 system prompt(`shared/prompts/system.md`)는 NVC 재구성/구조화 출력 형태로 프레임돼 있어 정상 동작.
-
-자세한 설계는 `shared/docs/v1/LLM_BRIDGE_ARCHITECTURE.md` 참조.
+Claude Code CLI는 SW 엔지니어링 작업에 최적화돼 있어 비기술 조언을 거부할 수 있음. 다시봄의 system prompt(`shared/docs/prompts/system.md`)는 NVC 재구성/구조화 출력 형태로 프레임돼 있어 정상 동작.
 
 ---
 
@@ -232,25 +254,27 @@ Claude Code CLI는 SW 엔지니어링 작업에 최적화돼 있어 비기술 �
 
 ```bash
 # BE
-cd backend
-./gradlew test
+cd backend && ./gradlew test
 
 # FE
-cd frontend
-npm run test
+cd frontend && npm run test
 ```
+
+자세한 전략: [`backend/docs/testing.md`](backend/docs/testing.md), [`frontend/docs/testing.md`](frontend/docs/testing.md)
 
 ---
 
 ## 🌐 배포 / 환경 변수
 
+> 자세한 절차: [`env/docs/deployment.md`](env/docs/deployment.md), [`env/docs/environment-variables.md`](env/docs/environment-variables.md)
+
 ### 환경 구분
 
 | 환경 | 도메인 | compose 파일 | env 파일 | nginx 포트 |
 |---|---|---|---|---|
-| **로컬 개발** | localhost | `docker-compose.yml` | — | — |
-| **서버 dev** | `dev.againspring.net` | `docker-compose.dev.yml` | `.env.dev` | 8090 |
-| **서버 prod** | `againspring.net` | `docker-compose.prod.yml` | `.env.prod` | 8091 |
+| **로컬 개발** | localhost | `env/docker-compose.yml` | — | — |
+| **서버 dev** | `dev.againspring.net` | `env/docker-compose.dev.yml` | `env/.env.dev` | 8090 |
+| **서버 prod** | `againspring.net` | `env/docker-compose.prod.yml` | `env/.env.prod` | 8091 |
 
 ### 컨테이너 명명 규칙
 
@@ -266,7 +290,7 @@ npm run test
 #### 1단계: dev 배포 (항상 먼저)
 
 ```bash
-cd /home/justant/Data/Again-Spring/infra
+cd /home/justant/Data/Again-Spring/env
 
 # env 파일 준비 (최초 1회)
 cp .env.dev.example .env.dev
@@ -291,7 +315,7 @@ git push origin main
 #### 3단계: prod 배포 (명시적 지시 시에만)
 
 ```bash
-cd /home/justant/Data/Again-Spring/infra
+cd /home/justant/Data/Again-Spring/env
 
 # env 파일 준비 (최초 1회)
 cp .env.prod.example .env.prod
@@ -313,11 +337,11 @@ againspring.net      →  localhost:8091
 www.againspring.net  →  localhost:8091
 ```
 
-상세 설정: `infra/cloudflare/tunnel.md` 참조.
+상세 설정: [`env/docs/cloudflare.md`](env/docs/cloudflare.md)
 
 ### 환경 변수 (`.env.dev` / `.env.prod`)
 
-전체 항목은 `infra/.env.dev.example` / `infra/.env.prod.example` 참조. 주요 항목:
+전체 항목은 `env/.env.dev.example` / `env/.env.prod.example` 참조. 주요 항목:
 
 ```bash
 # DB
@@ -334,6 +358,7 @@ LLM_PROVIDER=claude-code
 CLAUDE_BIN=claude
 CLAUDE_MODEL=claude-haiku-4-5-20251001
 CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude
+PROMPTS_PATH=./shared/docs/prompts   # 기본값
 
 # OAuth2 (Google만 사용 중)
 GOOGLE_CLIENT_ID=...
@@ -353,16 +378,11 @@ APP_URL=https://dev.againspring.net
 
 ## 📊 현재 진행 상황
 
-- ✅ 모노레포 구조 (frontend/, backend/, shared/, infra/)
+- ✅ 모노레포 구조 (frontend/, backend/, shared/, env/)
 - ✅ 프론트엔드 (Next.js 14 — MSW 프로토타입 + 실제 API 연동)
 - ✅ 백엔드 구현 완료
   - ✅ Spring Boot 3.3 + Java 21 + Gradle Kotlin DSL
   - ✅ MariaDB 11 (JPA + Flyway V1~V5)
-    - V1: 초기 스키마
-    - V2: OAuth + Guest 세션 지속성 (`provider`, `provider_id`, `guest_sessions`)
-    - V3: 이메일 인증 (`email_verifications`)
-    - V4: 보안 테이블
-    - V5: 관계 온도 컬럼 제거 (`temperature`, `average_temperature`, `temperature_history`)
   - ✅ JWT 인증 (회원가입 / 로그인 / 게스트 / Google OAuth)
   - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
   - ✅ 세션 관리 + 중재 State Machine
@@ -375,6 +395,7 @@ APP_URL=https://dev.againspring.net
   - ✅ CORS 도메인 허용 + GlobalExceptionHandler 표준화
 - ✅ Docker 멀티 컨테이너 배포 (MariaDB / Backend / Frontend / Nginx)
 - ✅ Cloudflare Tunnel — `dev.againspring.net`, `againspring.net`
+- ✅ 문서 4-디렉토리 재구성 (shared/docs, backend/docs, frontend/docs, env/docs)
 - ⏳ prod 배포 (명시적 지시 시에만)
 
 ---
@@ -383,17 +404,17 @@ APP_URL=https://dev.againspring.net
 
 ### 백엔드 수정 시
 
-- [ ] `shared/docs/v1/API_SPEC.md` 명세와 일치하는지 확인
-- [ ] `shared/docs/v1/FORBIDDEN_WORDS.md` 금지어 없는지 확인
+- [ ] `shared/docs/api/rest-spec.md` 명세와 일치하는지 확인
+- [ ] `shared/docs/policies/forbidden-words.md` 금지어 없는지 확인
 - [ ] LLM 호출 시 PromptSanitizer 경유 여부 확인
-- [ ] `shared/docs/v1/DATABASE_SCHEMA.md` 스키마 준수
+- [ ] `shared/docs/api/database-schema.md` 스키마 준수
 - [ ] 테스트 커버리지 80% 이상 유지
 
 ### dev 배포 전
 
 - [ ] `./gradlew test` 통과
 - [ ] 금지어/위험 키워드 검사 (`npm run lint:words`)
-- [ ] `infra/.env.dev` 값 확인
+- [ ] `env/.env.dev` 값 확인
 - [ ] `docker compose -f docker-compose.dev.yml up -d --build` 성공
 - [ ] `curl http://localhost:8090/api/health` 응답 확인
 
@@ -401,7 +422,7 @@ APP_URL=https://dev.againspring.net
 
 - [ ] dev에서 충분히 검증 완료
 - [ ] main 브랜치에 commit & push 완료
-- [ ] `infra/.env.prod` 모든 값 입력 (기본값 없음)
+- [ ] `env/.env.prod` 모든 값 입력 (기본값 없음)
 - [ ] MariaDB 볼륨 백업 (`docker exec againspring-mariadb-prod mariadb-dump ...`)
 - [ ] `docker compose -f docker-compose.prod.yml up -d --build` 성공
 - [ ] `curl http://localhost:8091/api/health` 응답 확인
@@ -409,5 +430,5 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-04-26  
+**마지막 업데이트**: 2026-04-26
 **담당**: Claude Code (Agent)

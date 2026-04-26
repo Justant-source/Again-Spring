@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class PromptLoader {
 
-    @Value("${app.prompts.path:./shared/prompts}")
+    @Value("${app.prompts.path:./shared/docs/prompts}")
     public String promptsPath;
 
     private static class CacheEntry {

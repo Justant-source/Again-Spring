@@ -77,7 +77,7 @@ oauth2:
 app:
   url: ${APP_URL:https://dev.againspring.net}
   prompts:
-    path: ${PROMPTS_PATH:./shared/prompts}
+    path: ${PROMPTS_PATH:./shared/docs/prompts}
   safety:
     enabled: true
     forbidden-words-path: ${SAFETY_FORBIDDEN_WORDS_PATH:classpath:/safety/forbidden-words.yml}

@@ -1,120 +1,101 @@
-# Again Spring OpenAPI Documentation
+# OpenAPI / Swagger
 
-## Overview
+springdoc-openapi 2.6.0이 자동으로 OpenAPI 3.0 스펙을 생성하고 Swagger UI를 호스팅한다.
 
-The Again Spring backend exposes a comprehensive REST API documented via OpenAPI 3.0 (Swagger).
+## 접근
 
-## Accessing Documentation
+| 환경 | URL |
+|---|---|
+| local (`./gradlew bootRun`) | `http://localhost:8080/swagger-ui.html` |
+| dev 서버 | `https://dev.againspring.net/swagger-ui/` (nginx 라우팅) |
+| prod | **비활성** (`application-prod.yml`에서 `springdoc.swagger-ui.enabled: false`) |
 
-### Development Environment
+raw OpenAPI JSON: `/v3/api-docs` (모든 환경에서 동일 경로)
 
-When running the backend locally:
+## 설정
 
-- **Swagger UI**: http://localhost:8080/swagger-ui.html
-- **OpenAPI YAML**: http://localhost:8080/v3/api-docs.yaml
-- **OpenAPI JSON**: http://localhost:8080/v3/api-docs
+`backend/src/main/resources/application.yml`:
 
-### Export to Shared Schema
-
-To export the OpenAPI specification to the shared schemas directory:
-
-```bash
-./backend/scripts/export-openapi.sh
+```yaml
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
 ```
 
-This script:
-1. Checks if backend is running
-2. Fetches the OpenAPI YAML from `/v3/api-docs.yaml`
-3. Writes to `../shared/schemas/openapi.yaml`
-
-## API Structure
-
-### Security
-
-All authenticated endpoints require:
-
-```
-Authorization: Bearer {accessToken}
+prod 비활성:
+```yaml
+# application-prod.yml
+springdoc:
+  swagger-ui:
+    enabled: false
 ```
 
-The `{accessToken}` is obtained via:
-- POST `/api/auth/signup` — user registration
-- POST `/api/auth/login` — user login
-- POST `/api/auth/guest` — guest token (short-lived, 1 hour)
+## 빈 설정
 
-### Error Responses
+`config/OpenApiConfig.java`가 다음을 정의:
 
-Standard error format across all endpoints:
+- API 정보 (title, version, description)
+- 보안 스키마: `bearerAuth` (HTTP Bearer JWT)
+- 글로벌 보안 적용 (예외 엔드포인트는 컨트롤러에서 `@SecurityRequirement(name = "")`)
 
-```json
-{
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error message",
-    "timestamp": "2026-04-24T10:30:00Z",
-    "requestId": "req_abc123"
-  }
+`config/OpenApiExamples.java`는 응답 예시 모음 (Swagger UI에서 사용자가 바로 시도 가능).
+
+## DTO 어노테이션 컨벤션
+
+```java
+@Schema(description = "회원가입 요청")
+public class SignupRequest {
+
+    @Schema(description = "이메일", example = "user@example.com")
+    @Email @NotBlank
+    private String email;
+
+    @Schema(description = "비밀번호 (8자 이상, 영문+숫자+특수문자)", example = "Pass123!")
+    @Size(min = 8) @NotBlank
+    private String password;
+
+    @Schema(description = "이메일 인증 코드 (6자리)")
+    @Size(min = 6, max = 6)
+    private String code;
+
+    @Schema(description = "닉네임", example = "달콩")
+    @NotBlank
+    private String nickname;
 }
 ```
 
-Common error codes:
-- `INVALID_INPUT` (400) — Validation failed
-- `UNAUTHORIZED` (401) — Missing or invalid token
-- `FORBIDDEN` (403) — Permission denied
-- `NOT_FOUND` (404) — Resource not found
-- `CRISIS_DETECTED` (422) — Safety guard triggered
-- `INTERNAL_ERROR` (500) — Server error
+Controller 메서드:
 
-### Endpoints
-
-See `API_SPEC.md` for comprehensive endpoint documentation:
-- Auth
-- User Management
-- Session Management
-- Mediation (Multi-turn)
-- Reports
-- Relationships (Neo4j Graph)
-
-## Schema Generation
-
-The OpenAPI schema is auto-generated from:
-- Spring Boot controller annotations (`@RestController`, `@RequestMapping`)
-- Jackson DTOs and annotations
-- Javadoc comments
-
-### Custom Enrichment
-
-Phase 14 adds custom OpenAPI enhancements via `OpenApiExamples.java`:
-- Reusable `ErrorResponse` schema
-- Bearer JWT security scheme
-- Common response definitions
-
-## Development Workflow
-
-1. **Make API changes** in controllers or DTOs
-2. **Run backend**: `./gradlew bootRun`
-3. **Test in Swagger UI**: Navigate to http://localhost:8080/swagger-ui.html
-4. **Export updated spec**: Run `./backend/scripts/export-openapi.sh`
-5. **Commit** `shared/schemas/openapi.yaml` to version control
-
-## Integration with Frontend
-
-The frontend can:
-- Generate TypeScript client stubs from `openapi.yaml` using tools like `openapi-generator`
-- Display interactive API docs in development UI
-- Validate request/response shapes at build time
-
-Example (TypeScript codegen):
-
-```bash
-openapi-generator-cli generate \
-  -i shared/schemas/openapi.yaml \
-  -g typescript-axios \
-  -o frontend/src/api-client
+```java
+@Operation(summary = "회원가입", description = "이메일 인증 코드 검증 후 계정 생성")
+@ApiResponses({
+    @ApiResponse(responseCode = "201", description = "성공"),
+    @ApiResponse(responseCode = "400", description = "검증 실패"),
+    @ApiResponse(responseCode = "409", description = "이미 가입된 이메일")
+})
+@PostMapping("/signup")
+public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest req) { ... }
 ```
 
-## Further Reading
+## API 명세는 어디서 보나
 
-- [SpringDoc OpenAPI](https://springdoc.org/)
-- [OpenAPI 3.0 Specification](https://spec.openapis.org/oas/v3.0.3)
-- `API_SPEC.md` — Canonical API specification
+- **Swagger UI** = 클릭 가능한 인터랙티브 명세 (개발/QA용)
+- **`shared/docs/api/rest-spec.md`** = 엔드포인트 전체 표 + 정책 (사람용 빠른 참조)
+
+두 문서가 어긋나면 Swagger가 우선 (코드에서 자동 생성).
+
+## 정적 스냅샷 (선택)
+
+`shared/schemas/openapi.yaml`에 정적 스냅샷이 있을 수 있음 (commit 시점 기준). FE 코드 생성 (orval, openapi-typescript)에 활용 가능하지만 현재 FE는 자체 타입 사용.
+
+스냅샷 갱신:
+```bash
+cd backend && ./gradlew bootRun &
+sleep 10
+curl http://localhost:8080/v3/api-docs > ../shared/schemas/openapi.json
+# → openapi.yaml 변환 (선택)
+```

@@ -1,0 +1,127 @@
+# 서버 prod 스택 — againspring.net / www.againspring.net
+# 사용: docker compose -f docker-compose.prod.yml up -d --build
+# 환경변수: .env.prod 파일 필요 (.env.prod.example 참조)
+# ⚠️ 주의: 명시적 배포 요청 없이 절대 실행 금지
+
+name: againspring-prod
+
+services:
+  mariadb-prod:
+    image: mariadb:lts
+    container_name: againspring-mariadb-prod
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-againspring}
+      MARIADB_USER: ${MARIADB_USER:-againspring}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --default-time-zone=+00:00
+    volumes:
+      - mariadb_prod_data:/var/lib/mysql
+    # 외부 포트 노출 없음 (internal only)
+    restart: always
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    networks:
+      - againspring-prod
+
+  backend-prod:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: againspring-backend-prod
+    container_name: againspring-backend-prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      DB_USER: ${MARIADB_USER}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      LLM_PROVIDER: ${LLM_PROVIDER:-claude-code}
+      CLAUDE_BIN: ${CLAUDE_BIN:-claude}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5-20251001}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    volumes:
+      - ${CLAUDE_HOST_CONFIG_DIR:-/root/.claude}:/root/.claude
+      - ../shared/docs/prompts:/app/shared/docs/prompts:ro
+    depends_on:
+      mariadb-prod:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    networks:
+      - againspring-prod
+
+  frontend-prod:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${APP_URL:-https://againspring.net}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+        NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+        NEXT_PUBLIC_NAVER_CLIENT_ID: ${NAVER_CLIENT_ID}
+    image: againspring-frontend-prod
+    container_name: againspring-frontend-prod
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - backend-prod
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    networks:
+      - againspring-prod
+
+  nginx-prod:
+    image: nginx:alpine
+    container_name: againspring-nginx-prod
+    ports:
+      - "8091:80"    # Cloudflare Tunnel → localhost:8091 → againspring.net
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend-prod
+      - backend-prod
+    restart: always
+    networks:
+      - againspring-prod
+
+networks:
+  againspring-prod:
+    driver: bridge
+
+volumes:
+  mariadb_prod_data:
