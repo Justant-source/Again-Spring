@@ -508,6 +508,64 @@ export const CATEGORIES: MajorCategory[] = [
       },
     ],
   },
+  {
+    id: 'korean_specific',
+    label: '한국 특화 갈등',
+    relationType: 'korean_specific',
+    middles: [
+      {
+        id: 'in_law',
+        label: '시댁 · 처가 관련',
+        minors: [
+          { id: 'visit_freq', label: '시가/처가 방문 빈도 갈등', allowCustomInput: false },
+          { id: 'holiday_ritual', label: '명절 의례·분담 갈등', allowCustomInput: false },
+          { id: 'interference', label: '시가/처가의 부부 생활 간섭', allowCustomInput: false },
+          { id: 'event_cost', label: '경조사 비용·참여 갈등', allowCustomInput: false },
+          { id: 'parent_care', label: '시가/처가 부모 돌봄 문제', allowCustomInput: false },
+          { id: 'custom', label: '직접 입력', allowCustomInput: true },
+        ],
+      },
+      {
+        id: 'face',
+        label: '다른 사람 앞에서의 무시',
+        minors: [
+          { id: 'public_embarrass', label: '공개적으로 망신·무시당함', allowCustomInput: false },
+          { id: 'sns_humiliation', label: 'SNS에서 공개적으로 깎아내림', allowCustomInput: false },
+          { id: 'family_gathering', label: '친지·직장 모임에서의 무시', allowCustomInput: false },
+          { id: 'behind_back', label: '제3자에게 험담·비하', allowCustomInput: false },
+          { id: 'custom', label: '직접 입력', allowCustomInput: true },
+        ],
+      },
+      {
+        id: 'lingered',
+        label: '오래 묵힌 서운함',
+        minors: [
+          { id: 'accumulated', label: '오래전부터 쌓여온 서운함', allowCustomInput: false },
+          { id: 'repeated_pattern', label: '반복되는 같은 문제', allowCustomInput: false },
+          { id: 'never_resolved', label: '해결 안 된 채 지나간 갈등', allowCustomInput: false },
+          { id: 'custom', label: '직접 입력', allowCustomInput: true },
+        ],
+      },
+      {
+        id: 'generation',
+        label: '세대차 · 원가족 영향',
+        minors: [
+          { id: 'parenting_values', label: '양육관 차이 (원가족 영향)', allowCustomInput: false },
+          { id: 'money_values', label: '경제관 차이 (저축·소비 관습)', allowCustomInput: false },
+          { id: 'marriage_ritual', label: '결혼 의례·관습 가치관 차이', allowCustomInput: false },
+          { id: 'generation_gap', label: '세대 간 소통 방식 차이', allowCustomInput: false },
+          { id: 'custom', label: '직접 입력', allowCustomInput: true },
+        ],
+      },
+      {
+        id: 'korean_specific_custom',
+        label: '직접 입력',
+        minors: [
+          { id: 'custom', label: '직접 입력', allowCustomInput: true },
+        ],
+      },
+    ],
+  },
 ];
 
 export function findMajor(id: string) {

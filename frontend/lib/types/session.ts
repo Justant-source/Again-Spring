@@ -3,7 +3,8 @@ export type RelationType =
   | 'marriage'
   | 'friend'
   | 'family'
-  | 'parent_child';
+  | 'parent_child'
+  | 'korean_specific';
 
 export type ConflictType = 'factual' | 'difference' | 'mixed';
 
@@ -62,6 +63,13 @@ export interface HorsemenDetection {
   stonewalling: { detected: boolean; examples?: string[] };
 }
 
+export interface HorsemenObservation {
+  criticism: { score: number; detected: boolean };
+  defensiveness: { score: number; detected: boolean };
+  contempt: { score: number; detected: boolean };
+  stonewalling: { score: number; detected: boolean };
+}
+
 export interface NeedsMapPayload {
   axisX: string;
   axisY?: string;
@@ -96,6 +104,7 @@ export interface Report {
     aToB: NVCScript;
     bToA: NVCScript;
   };
+  horsemenObservation?: HorsemenObservation;
   repairSuggestions: string[];
   isSoloMode: boolean;
   powerImbalanceDetected?: boolean;

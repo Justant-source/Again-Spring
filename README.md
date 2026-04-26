@@ -14,7 +14,8 @@ Again-Spring/
 ├── frontend/              # Next.js 14 (App Router, TypeScript, Tailwind, MSW)
 ├── backend/               # Spring Boot 3.3 (Java 21, MariaDB, LLM 브릿지)
 ├── shared/                # FE/BE 공유 타입, 프롬프트, 스키마, 문서
-│   └── docs/              # API 명세, 시스템 프롬프트, 정책 문서
+│   ├── docs/v1/           # 안정적 핵심 문서 (API, 정책, 프롬프트 등)
+│   └── docs/v2/           # 리디자인/기획 문서
 ├── infra/                 # Docker Compose (MariaDB)
 └── .request/design/       # 디자인 핸드오프 에셋 (참조용)
 ```
@@ -124,18 +125,21 @@ backend/src/main/java/com/againspring/
 
 ## 📚 문서
 
+> `shared/docs/v1/` = 핵심 안정 문서 · `shared/docs/v2/` = 리디자인/기획 문서
+
 | 파일 | 내용 |
 |---|---|
-| `shared/docs/API_SPEC.md` | REST API 전체 명세 |
-| `shared/docs/SYSTEM_PROMPTS.md` | Gottman/NVC 기반 LLM 프롬프트 |
-| `shared/docs/FORBIDDEN_WORDS.md` | 금지어 · 위기 키워드 정책 |
-| `shared/docs/CATEGORIES.md` | 갈등/관계 카테고리 정의 |
-| `shared/docs/RATIO_CALCULATION.md` | 화해 기여도 계산 규칙 |
-| `shared/docs/LLM_BRIDGE_ARCHITECTURE.md` | Claude Code 연동 설계 |
-| `shared/docs/ONBOARDING_MAPPING.md` | 온보딩 Q&A → 소통 스타일 매핑 |
-| `shared/docs/DATABASE_SCHEMA.md` | DB 스키마 상세 설명 |
-| `shared/docs/MOCK_SCENARIOS.md` | FE MSW 목업 시나리오 |
-| `shared/docs/TERMS_OF_SERVICE.md` | 서비스 이용약관 |
+| `shared/docs/v1/API_SPEC.md` | REST API 전체 명세 |
+| `shared/docs/v1/SYSTEM_PROMPTS.md` | Gottman/NVC 기반 LLM 프롬프트 |
+| `shared/docs/v1/FORBIDDEN_WORDS.md` | 금지어 · 위기 키워드 정책 |
+| `shared/docs/v1/CATEGORIES.md` | 갈등/관계 카테고리 정의 |
+| `shared/docs/v1/RATIO_CALCULATION.md` | 화해 기여도 계산 규칙 |
+| `shared/docs/v1/LLM_BRIDGE_ARCHITECTURE.md` | Claude Code 연동 설계 |
+| `shared/docs/v1/ONBOARDING_MAPPING.md` | 온보딩 Q&A → 소통 스타일 매핑 |
+| `shared/docs/v1/DATABASE_SCHEMA.md` | DB 스키마 상세 설명 |
+| `shared/docs/v1/MOCK_SCENARIOS.md` | FE MSW 목업 시나리오 |
+| `shared/docs/v1/TERMS_OF_SERVICE.md` | 서비스 이용약관 |
+| `shared/docs/v1/PSYCHOLOGY_MODEL_RATIONALE.md` | 심리학 모델 채택 근거 (Gottman + NVC + EFT 통합 정당성) |
 | `.request/design/` | UI 디자인 핸드오프 에셋 |
 | `CLAUDE.md` | Claude Code 개발자 가이드 |
 

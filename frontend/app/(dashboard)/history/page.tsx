@@ -24,6 +24,7 @@ const RELATION_TYPE_LABEL: Record<RelationType, string> = {
   friend: '친구',
   family: '가족',
   parent_child: '부모·자식',
+  korean_specific: '한국 특화',
 };
 
 export default function HistoryPage() {

@@ -4,6 +4,7 @@
 import React from 'react';
 import type { Report, CommunicationStyle } from '@/lib/types';
 import { ContributionRatio } from './ContributionRatio';
+import { FourHorsemenObservation } from './FourHorsemenObservation';
 import { NVCScript } from './NVCScript';
 import { RepairSuggestions } from './RepairSuggestions';
 import { NeedsMap } from './NeedsMap';
@@ -202,7 +203,14 @@ export function ReportLayout({
         </>
       )}
 
-      {/* 5. Repair Suggestions */}
+      {/* 5. 4 Horsemen Observation */}
+      {report.horsemenObservation && (
+        <div className="p-card">
+          <FourHorsemenObservation horsemen={report.horsemenObservation} />
+        </div>
+      )}
+
+      {/* 6. Repair Suggestions */}
       {report.repairSuggestions && report.repairSuggestions.length > 0 && (
         <div className="p-card">
           <RepairSuggestions suggestions={report.repairSuggestions} />

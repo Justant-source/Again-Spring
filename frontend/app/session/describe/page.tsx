@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { CATEGORIES } from '@/lib/constants/categories';
 import { checkKeywords } from '@/lib/utils/keywordGuard';
-import { CRISIS_RESOURCES } from '@/lib/constants/crisisResources';
+import { CRISIS_RESOURCES_IMMEDIATE, CRISIS_RESOURCES_LEGAL } from '@/lib/constants/crisisResources';
 import { api } from '@/lib/api/client';
 import { PhoneFrame, PhoneHeader, Dashes } from '@/components/shared';
 import { getDescribePlaceholder } from '@/lib/utils/describePlaceholder';
@@ -151,19 +151,21 @@ export default function DescribePage() {
                 받아주세요.
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-                {CRISIS_RESOURCES.slice(0, 3).map((res) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--L-ink)', marginBottom: 4, textAlign: 'left' }}>즉각적 위기</div>
+                {CRISIS_RESOURCES_IMMEDIATE.map((res) => (
                   <div
                     key={res.phone}
                     style={{
-                      padding: 12,
+                      padding: 10,
                       border: '1px solid var(--L-border)',
                       borderRadius: 3,
                       fontSize: 12,
+                      textAlign: 'left',
                     }}
                   >
-                    <div style={{ fontWeight: 500, marginBottom: 4 }}>
-                      {res.label} {res.phone}
+                    <div style={{ fontWeight: 500, marginBottom: 2 }}>
+                      {res.label} · {res.phone}
                     </div>
                     <div style={{ color: 'var(--L-sub)', fontSize: 11 }}>{res.hours}</div>
                   </div>

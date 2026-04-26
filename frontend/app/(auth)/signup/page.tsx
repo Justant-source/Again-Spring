@@ -122,6 +122,22 @@ export default function SignupPage() {
             시작할 이름을<br />알려주세요
           </div>
 
+          <div
+            style={{
+              marginBottom: 20,
+              padding: '12px 14px',
+              background: 'color-mix(in srgb, var(--L-sub) 6%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--L-sub) 15%, transparent)',
+              borderRadius: 8,
+              fontSize: 12,
+              color: 'var(--L-sub)',
+              lineHeight: 1.7,
+            }}
+          >
+            <span style={{ color: 'var(--L-ink)', fontWeight: 500 }}>다시봄은 의료행위 또는 심리치료가 아니에요.</span>{' '}
+            두 분의 이야기를 정리하고 대화를 돕는 도구예요. 분석 결과는 참고용이며, 위기 상황에서는 전문 기관에 도움을 요청해주세요.
+          </div>
+
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
               <input

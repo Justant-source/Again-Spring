@@ -20,10 +20,10 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 
 | 작업 범위 | 디렉토리 | 주요 문서 |
 |---|---|---|
-| **FE 기능/UI** | `frontend/` | `shared/docs/API_SPEC.md` |
-| **BE 기능/API** | `backend/` | `shared/docs/API_SPEC.md` |
-| **LLM 브릿지** | `backend/src/main/java/.../llm/` | `shared/docs/LLM_BRIDGE_ARCHITECTURE.md` |
-| **공유 타입/스키마** | `shared/` | `shared/docs/DATABASE_SCHEMA.md` |
+| **FE 기능/UI** | `frontend/` | `shared/docs/v1/API_SPEC.md` |
+| **BE 기능/API** | `backend/` | `shared/docs/v1/API_SPEC.md` |
+| **LLM 브릿지** | `backend/src/main/java/.../llm/` | `shared/docs/v1/LLM_BRIDGE_ARCHITECTURE.md` |
+| **공유 타입/스키마** | `shared/` | `shared/docs/v1/DATABASE_SCHEMA.md` |
 | **인프라** | `infra/` | `infra/docker-compose.yml` |
 
 ### 절대 규칙
@@ -35,7 +35,7 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
    → ClaudeCodeBridge: `backend/src/main/java/.../llm/bridge/ClaudeCodeBridge.java`
 
 3. **금지어/위기 키워드 확인 필수**  
-   → 코드/프롬프트 수정 시 `shared/docs/FORBIDDEN_WORDS.md` 참조
+   → 코드/프롬프트 수정 시 `shared/docs/v1/FORBIDDEN_WORDS.md` 참조
 
 4. **🚨 PROD 배포 절대 규칙 — 위반 금지**  
    → 명시적으로 "prod에 배포해줘" 지시가 없는 한 prod 환경에 절대 배포하지 않음  
@@ -51,24 +51,35 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 
 ## 📋 문서 위치 맵
 
+> **v1/** = 안정적 핵심 문서 · **v2/** = 리디자인/기획 문서
+
 ### API / 스키마
-- `shared/docs/API_SPEC.md` — REST API 전체 명세 (엔드포인트, 요청/응답 스키마)
-- `shared/docs/DATABASE_SCHEMA.md` — MariaDB 테이블 설명
+- `shared/docs/v1/API_SPEC.md` — REST API 전체 명세 (엔드포인트, 요청/응답 스키마)
+- `shared/docs/v1/DATABASE_SCHEMA.md` — MariaDB 테이블 설명
 
 ### LLM / AI
-- `shared/docs/LLM_BRIDGE_ARCHITECTURE.md` — Claude Code 프로세스 풀, 에러 처리, PromptSanitizer
-- `shared/docs/SYSTEM_PROMPTS.md` — Gottman + NVC 프롬프트 원본
-- `shared/docs/RATIO_CALCULATION.md` — 화해 기여도 계산 규칙
+- `shared/docs/v1/LLM_BRIDGE_ARCHITECTURE.md` — Claude Code 프로세스 풀, 에러 처리, PromptSanitizer
+- `shared/docs/v1/SYSTEM_PROMPTS.md` — Gottman + NVC 프롬프트 원본
+- `shared/docs/v1/RATIO_CALCULATION.md` — 화해 기여도 계산 규칙
 
 ### 기획 / 정책
-- `shared/docs/FORBIDDEN_WORDS.md` — 금지어 · 위기 키워드 (필수!)
-- `shared/docs/CATEGORIES.md` — 갈등/관계 카테고리 정의
-- `shared/docs/ONBOARDING_MAPPING.md` — 온보딩 Q&A → 소통 스타일 매핑
-- `shared/docs/TERMS_OF_SERVICE.md` — 서비스 이용약관
+- `shared/docs/v1/FORBIDDEN_WORDS.md` — 금지어 · 위기 키워드 (필수!)
+- `shared/docs/v1/CATEGORIES.md` — 갈등/관계 카테고리 정의
+- `shared/docs/v1/ONBOARDING_MAPPING.md` — 온보딩 Q&A → 소통 스타일 매핑
+- `shared/docs/v1/TERMS_OF_SERVICE.md` — 서비스 이용약관
+- `shared/docs/v1/PSYCHOLOGY_MODEL_RATIONALE.md` — 심리학 모델 채택 근거
 
 ### FE 개발
-- `shared/docs/MOCK_SCENARIOS.md` — MSW 목업 시나리오
+- `shared/docs/v1/MOCK_SCENARIOS.md` — MSW 목업 시나리오
 - `.request/design/` — UI 디자인 핸드오프 에셋 (HTML/JSX/CSS)
+
+### 리디자인 / 기획 문서 (v2)
+- `shared/docs/v2/ONBOARDING_V2.md` — 온보딩 v2 기획
+- `shared/docs/v2/RESULT_CARDS_REDESIGN.md` — 결과 카드 리디자인
+- `shared/docs/v2/SOLO_FIRST_REDESIGN.md` — Solo-first 리디자인
+- `shared/docs/v2/REPAIR_DRIP_CAMPAIGN.md` — 관계 회복 드립 캠페인
+- `shared/docs/v2/REFINEMENT_WORK_ORDER.md` — 개선 작업 지시서
+- `shared/docs/v2/KAKAO_VIRAL_ASSETS.md` — 카카오 바이럴 에셋
 
 ---
 
@@ -204,7 +215,7 @@ RUN apk add --no-cache nodejs npm \
 
 Claude Code CLI는 SW 엔지니어링 작업에 최적화돼 있어 비기술 조언을 거부할 수 있음. 다시봄의 system prompt(`shared/prompts/system.md`)는 NVC 재구성/구조화 출력 형태로 프레임돼 있어 정상 동작.
 
-자세한 설계는 `shared/docs/LLM_BRIDGE_ARCHITECTURE.md` 참조.
+자세한 설계는 `shared/docs/v1/LLM_BRIDGE_ARCHITECTURE.md` 참조.
 
 ---
 
@@ -372,10 +383,10 @@ APP_URL=https://dev.againspring.net
 
 ### 백엔드 수정 시
 
-- [ ] `shared/docs/API_SPEC.md` 명세와 일치하는지 확인
-- [ ] `shared/docs/FORBIDDEN_WORDS.md` 금지어 없는지 확인
+- [ ] `shared/docs/v1/API_SPEC.md` 명세와 일치하는지 확인
+- [ ] `shared/docs/v1/FORBIDDEN_WORDS.md` 금지어 없는지 확인
 - [ ] LLM 호출 시 PromptSanitizer 경유 여부 확인
-- [ ] `shared/docs/DATABASE_SCHEMA.md` 스키마 준수
+- [ ] `shared/docs/v1/DATABASE_SCHEMA.md` 스키마 준수
 - [ ] 테스트 커버리지 80% 이상 유지
 
 ### dev 배포 전

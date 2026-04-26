@@ -9,6 +9,7 @@ const MAP: Record<RelationType, { a: string; b: string }> = {
   friend: { a: '#F4C896', b: '#B0C8D8' },
   family: { a: '#E8B896', b: '#B8C4A8' },
   parent_child: { a: '#D8A8A8', b: '#A8B8A8' },
+  korean_specific: { a: '#E8C8A8', b: '#A8C0B8' },
 };
 
 /** Applies the relationship-tinted --P-a / --P-b CSS vars to :root. */
