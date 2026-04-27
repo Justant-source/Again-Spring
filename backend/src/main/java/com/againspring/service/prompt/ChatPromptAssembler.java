@@ -22,6 +22,10 @@ public class ChatPromptAssembler {
     private final UserProfileFragment profileFragment;
     private final PsychologyFeedbackFormatter psychologyFeedback;
     private final DuoBalanceFormatter duoBalance;
+    // Phase D fragments — PR-1 골격 (빈 반환). PR-2/3/4에서 실제 로직 채워짐.
+    private final IssueContextFragment issueContextFragment;
+    private final UserStateFragment userStateFragment;
+    private final QuestionQueueFragment questionQueueFragment;
 
     /**
      * Solo 모드 — 본인 컨텍스트만 사용.
@@ -39,6 +43,13 @@ public class ChatPromptAssembler {
         if (!feedback.isEmpty()) {
             sb.append(feedback).append("\n");
         }
+        // Phase D: issue → state → queue (PR-1 빈 반환, PR-3/2/4에서 활성화)
+        String issue = issueContextFragment.render(session);
+        if (!issue.isEmpty()) sb.append(issue).append("\n");
+        String state = userStateFragment.render(session, false);
+        if (!state.isEmpty()) sb.append(state).append("\n");
+        String queue = questionQueueFragment.render(session, MessageSender.USER_A);
+        if (!queue.isEmpty()) sb.append(queue).append("\n");
         sb.append(safeLoad("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
         sb.append(safeLoad("chat/solo_chat.md")).append("\n\n");
 
@@ -73,6 +84,13 @@ public class ChatPromptAssembler {
         if (!feedback.isEmpty()) {
             sb.append(feedback).append("\n");
         }
+        // Phase D: issue → state → queue (PR-1 빈 반환, PR-3/2/4에서 활성화)
+        String issue = issueContextFragment.render(session);
+        if (!issue.isEmpty()) sb.append(issue).append("\n");
+        String state = userStateFragment.render(session, true);
+        if (!state.isEmpty()) sb.append(state).append("\n");
+        String queue = questionQueueFragment.render(session, currentUserSender);
+        if (!queue.isEmpty()) sb.append(queue).append("\n");
         sb.append(safeLoad("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
         sb.append(safeLoad("chat/duo_chat.md")).append("\n\n");
 

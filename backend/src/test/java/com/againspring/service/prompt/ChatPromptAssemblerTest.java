@@ -36,6 +36,15 @@ class ChatPromptAssemblerTest {
     @Spy
     private DuoBalanceFormatter duoBalance = new DuoBalanceFormatter();
 
+    @Spy
+    private IssueContextFragment issueContextFragment = new IssueContextFragment();
+
+    @Spy
+    private UserStateFragment userStateFragment = new UserStateFragment();
+
+    @Spy
+    private QuestionQueueFragment questionQueueFragment = new QuestionQueueFragment();
+
     @InjectMocks
     private ChatPromptAssembler assembler;
 
