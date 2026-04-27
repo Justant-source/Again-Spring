@@ -2,6 +2,7 @@ package com.againspring.service.context;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.againspring.config.PhaseDProperties;
 import com.againspring.domain.Session;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +15,7 @@ class QuestionQueueUpdaterTest {
 
     @BeforeEach
     void setUp() {
-        updater = new QuestionQueueUpdater(new QuestionPrioritizer(), new CategoryRuleEnforcer());
+        updater = new QuestionQueueUpdater(new QuestionPrioritizer(new PhaseDProperties()), new CategoryRuleEnforcer());
     }
 
     private QuestionQueueDelta deltaWithNew(Session.Intent intent, String target, String hook) {

@@ -14,6 +14,7 @@ import com.againspring.service.context.QuestionQueueUpdater;
 import com.againspring.service.context.UserStateAppender;
 import com.againspring.service.context.WelcomeMessageGenerator;
 import com.againspring.service.context.WelcomeQuestionResolver;
+import com.againspring.service.context.PhaseDMetrics;
 import com.againspring.safety.IsolationLintFilter;
 import com.againspring.service.crisis.CrisisDetector;
 import com.againspring.service.parser.ChatTurnMetaParser;
@@ -52,6 +53,7 @@ public class ChatService {
     private final IsolationLintFilter isolationLintFilter; // Phase D PR-4
     private final WelcomeQuestionResolver welcomeQuestionResolver; // Phase D PR-5
     private final WelcomeMessageGenerator welcomeMessageGenerator; // Phase D PR-5
+    private final PhaseDMetrics phaseDMetrics; // Phase D PR-6
 
     public ChatService(MessageRepository messageRepo, SessionRepository sessionRepo,
                       UserRepository userRepo,
@@ -64,7 +66,8 @@ public class ChatService {
                       QuestionQueueUpdater questionQueueUpdater,
                       IsolationLintFilter isolationLintFilter,
                       WelcomeQuestionResolver welcomeQuestionResolver,
-                      WelcomeMessageGenerator welcomeMessageGenerator) {
+                      WelcomeMessageGenerator welcomeMessageGenerator,
+                      PhaseDMetrics phaseDMetrics) {
         this.messageRepo = messageRepo;
         this.sessionRepo = sessionRepo;
         this.userRepo = userRepo;
@@ -81,6 +84,7 @@ public class ChatService {
         this.isolationLintFilter = isolationLintFilter;
         this.welcomeQuestionResolver = welcomeQuestionResolver;
         this.welcomeMessageGenerator = welcomeMessageGenerator;
+        this.phaseDMetrics = phaseDMetrics;
     }
 
     public static final int MIN_MESSAGES_TO_FINALIZE = 3;
@@ -170,6 +174,7 @@ public class ChatService {
         // Phase D PR-4: isolation 위반 감지 (3중 방어 3층)
         if (isolationLintFilter.violatesIsolation(mediatorResponse)) {
             log.error("Isolation violation detected in session {}", sessionId);
+            phaseDMetrics.recordIsolationViolation(); // Phase D PR-6
             mediatorResponse = "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?";
         }
 
@@ -177,6 +182,17 @@ public class ChatService {
         userStateAppender.append(session, parsed.userState()); // Phase D PR-2
         issueContextMerger.merge(session, parsed.issueDelta(), turnIndex); // Phase D PR-3
         questionQueueUpdater.update(session, parsed.queueDelta(), turnIndex); // Phase D PR-4
+
+        // Phase D PR-6: 메트릭 기록
+        if (parsed.userState() != null) {
+            phaseDMetrics.recordUserState(parsed.userState().state);
+        }
+        if (parsed.userState() != null || parsed.issueDelta() != null) {
+            phaseDMetrics.recordMetaPopulated();
+        }
+        if (parsed.queueDelta() != null && parsed.queueDelta().asked != null) {
+            phaseDMetrics.recordQueueAsked(parsed.queueDelta().asked.size());
+        }
 
         Message mediatorMsg = messageRepo.save(Message.builder()
             .sessionId(sessionId)

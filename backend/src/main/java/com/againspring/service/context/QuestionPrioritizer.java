@@ -1,19 +1,25 @@
 package com.againspring.service.context;
 
+import com.againspring.config.PhaseDProperties;
 import com.againspring.domain.Session;
 import com.againspring.domain.enums.MessageSender;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
  * Phase D PR-4 — 우선순위 산출식.
  * priority = base × stateMultiplier × categoryMultiplier
- * base = 0.5 × recency + 0.3 × urgency + 0.2 × coverageGap
+ * base = recencyWeight × recency + urgencyWeight × urgency + coverageGapWeight × coverageGap
+ * 가중치는 PhaseDProperties(app.phase-d.priority.*)로 외부화 (PR-6).
  *
  * 권위본: shared/docs/policies/context-algorithm.md §5.3
  */
 @Component
+@RequiredArgsConstructor
 public class QuestionPrioritizer {
+
+    private final PhaseDProperties props;
 
     public void rescore(List<Session.PendingQuestion> queue, Session session,
                         MessageSender target) {
@@ -32,7 +38,9 @@ public class QuestionPrioritizer {
             double urgency = urgencyOf(q.intent);
             double coverageGap = (q.hookFromIssue != null
                 && unresolvedThreadTexts.contains(q.hookFromIssue)) ? 1.0 : 0.3;
-            double base = 0.5 * recency + 0.3 * urgency + 0.2 * coverageGap;
+            double base = props.getRecencyWeight() * recency
+                        + props.getUrgencyWeight() * urgency
+                        + props.getCoverageGapWeight() * coverageGap;
             double stateMult = stateMultiplier(currentState, q.intent);
             double catMult = categoryMultiplier(q.intent, categoryMinor);
             q.priority = clamp01(base * stateMult * catMult);

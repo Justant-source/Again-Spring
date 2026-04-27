@@ -2,6 +2,7 @@ package com.againspring.service.context;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.againspring.config.PhaseDProperties;
 import com.againspring.domain.Session;
 import com.againspring.domain.enums.MessageSender;
 import java.util.ArrayList;
@@ -15,7 +16,7 @@ class QuestionPrioritizerTest {
 
     @BeforeEach
     void setUp() {
-        prioritizer = new QuestionPrioritizer();
+        prioritizer = new QuestionPrioritizer(new PhaseDProperties());
     }
 
     private Session.PendingQuestion q(Session.Intent intent, int age) {
