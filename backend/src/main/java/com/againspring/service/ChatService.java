@@ -9,6 +9,7 @@ import com.againspring.llm.bridge.ClaudeCodeBridge;
 import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
+import com.againspring.service.context.IssueContextMerger;
 import com.againspring.service.context.UserStateAppender;
 import com.againspring.service.crisis.CrisisDetector;
 import com.againspring.service.parser.ChatTurnMetaParser;
@@ -42,6 +43,7 @@ public class ChatService {
     private final SessionRoleResolver roleResolver;
     private final ChatTurnMetaParser turnMetaParser;
     private final UserStateAppender userStateAppender; // Phase D PR-2
+    private final IssueContextMerger issueContextMerger; // Phase D PR-3
 
     public ChatService(MessageRepository messageRepo, SessionRepository sessionRepo,
                       UserRepository userRepo,
@@ -49,7 +51,8 @@ public class ChatService {
                       ChatPromptAssembler promptAssembler, SessionStateMachine stateMachine,
                       ReportGenerationService reportService, SessionRoleResolver roleResolver,
                       ChatTurnMetaParser turnMetaParser,
-                      UserStateAppender userStateAppender) {
+                      UserStateAppender userStateAppender,
+                      IssueContextMerger issueContextMerger) {
         this.messageRepo = messageRepo;
         this.sessionRepo = sessionRepo;
         this.userRepo = userRepo;
@@ -61,6 +64,7 @@ public class ChatService {
         this.roleResolver = roleResolver;
         this.turnMetaParser = turnMetaParser;
         this.userStateAppender = userStateAppender;
+        this.issueContextMerger = issueContextMerger;
     }
 
     public static final int MIN_MESSAGES_TO_FINALIZE = 3;
@@ -148,6 +152,7 @@ public class ChatService {
             ? mediatorResponseRaw : parsed.mediatorMessage();
         appendPsychologyHistory(session, parsed);
         userStateAppender.append(session, parsed.userState()); // Phase D PR-2
+        issueContextMerger.merge(session, parsed.issueDelta(), turnIndex); // Phase D PR-3
 
         Message mediatorMsg = messageRepo.save(Message.builder()
             .sessionId(sessionId)

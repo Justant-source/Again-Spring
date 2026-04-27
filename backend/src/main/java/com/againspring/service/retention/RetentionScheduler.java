@@ -5,6 +5,7 @@ import com.againspring.domain.Message;
 import com.againspring.domain.enums.SessionStatus;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.MessageRepository;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -25,6 +26,7 @@ public class RetentionScheduler {
 
     private final SessionRepository sessionRepository;
     private final MessageRepository messageRepository;
+    private final EntityManager em; // Phase D PR-3 — Phase D 컬럼 native 만료 처리
 
     /**
      * 일일 정제 작업 (3am KST)
@@ -49,6 +51,24 @@ public class RetentionScheduler {
             for (Session session : sessions) {
                 purgeSessionContent(session);
             }
+
+            // Phase D PR-3 — Phase D JSON 컬럼 만료 처리
+            // issue_context는 headline만 보존(리포트에 가까운 요약), 나머지는 NULL
+            // data-retention.md §"30일 원문 만료" 준수
+            int phaseDPurged = em.createNativeQuery(
+                "UPDATE sessions SET " +
+                "user_state_history = NULL, " +
+                "question_queue_a = NULL, " +
+                "question_queue_b = NULL, " +
+                "issue_context = CASE " +
+                "  WHEN JSON_EXTRACT(issue_context, '$.headline') IS NOT NULL " +
+                "  THEN JSON_OBJECT('headline', JSON_UNQUOTE(JSON_EXTRACT(issue_context, '$.headline'))) " +
+                "  ELSE NULL END " +
+                "WHERE status IN ('COMPLETED', 'TERMINATED') " +
+                "AND content_expires_at < :threshold")
+                .setParameter("threshold", now)
+                .executeUpdate();
+            log.info("Phase D context purge completed. Updated {} sessions", phaseDPurged);
 
             log.info("Content purge job completed. Purged {} sessions", sessions.size());
         } catch (Exception e) {

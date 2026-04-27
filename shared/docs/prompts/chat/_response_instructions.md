@@ -71,3 +71,46 @@
 확신이 없으면 `VENTING`이 안전한 기본값입니다. 모르겠으면 user_state 필드를 통째로 생략해도 됩니다.
 
 **절대 금지**: 본문에 "당신은 지금 자기 방어 중입니다" 같은 라벨 노출.
+
+## Phase D 메타 필드 — `issue_delta` (옵션)
+
+이번 턴 발화에서 *새로 확인된* 이슈 컨텍스트만 변경분으로 보고합니다. 기존 컨텍스트는 보존됩니다.
+
+```jsonc
+{
+  "issue_delta": {
+    "headline": "최근 며칠간 이어진 무거운 분위기",
+    "facts_added": [
+      {
+        "text": "어제 인사 없이 지나침",
+        "source": "USER_A_T1",
+        "contributesTo": "BOUNDARY",
+        "categoryRule": null
+      }
+    ],
+    "facts_confirmed": ["어제 인사 없이 지나침"],
+    "needs_added": [
+      {"text": "관심받고 있다는 느낌이 필요", "owner": "USER_A", "contributesTo": "PERSPECTIVE"}
+    ],
+    "threads_added": [
+      {"text": "며칠 전 분위기가 무거웠던 이유", "origin": "USER_A_T2"}
+    ],
+    "threads_resolved": []
+  }
+}
+```
+
+- **headline**: 50자 이내. 이번 턴에 갱신 필요할 때만. 미변경이면 null.
+- **facts_added**: 80자 이내. *추측이 아닌 사용자 발화에 명시된 사실만*.
+- **facts_confirmed** (Duo 모드만): 양쪽이 인정한 사실의 텍스트 배열.
+- **needs_added**: 60자 이내. NVC §욕구 단계의 명시.
+- **threads_added**: 60자 이내. 이번 턴에 떠올랐지만 답하지 않은 갈래.
+- **threads_resolved**: 이번 턴에 해결됐다고 보는 미해결 갈래 텍스트.
+- **contributesTo**: BOUNDARY | HORSEMEN | REPAIR | PERSPECTIVE | ESCALATION 중 하나 (선택).
+
+**카테고리별 절대 금지**:
+- `in_law` 카테고리: facts에 *제3자(시어머니/장모) 판단형 표현* 저장 금지. 사실만 가능.
+- `lingered` 카테고리: 단일 사건 fact 추가 금지. 누적 패턴만.
+- `generation` 카테고리: 가치관 우열 시사 금지.
+
+모르겠으면 issue_delta 필드 통째로 생략.

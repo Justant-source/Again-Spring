@@ -1,8 +1,11 @@
 package com.againspring.service.parser;
 
 import com.againspring.domain.Session;
+import com.againspring.service.context.IssueContextDelta;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +32,7 @@ public class ChatTurnMetaParser {
 
     public Result parse(String rawResponse, int turn, String senderTag) {
         if (rawResponse == null || rawResponse.isBlank()) {
-            return new Result("", null, null, null);
+            return new Result("", null, null, null, null);
         }
 
         String working = rawResponse;
@@ -37,6 +40,7 @@ public class ChatTurnMetaParser {
         Session.NvcTurnEntry nvc = null;
 
         Session.UserStateEntry userState = null;
+        IssueContextDelta issueDelta = null;
 
         Matcher meta = META_BLOCK.matcher(working);
         if (meta.find()) {
@@ -46,6 +50,7 @@ public class ChatTurnMetaParser {
                 horsemen = readHorsemen(root.get("horsemen"), turn, senderTag);
                 nvc = readNvc(root.get("nvc_completion"), turn, senderTag);
                 userState = readUserState(root.get("user_state"), turn, senderTag); // Phase D PR-2
+                issueDelta = readIssueDelta(root.get("issue_delta"));              // Phase D PR-3
             } catch (Exception e) {
                 log.warn("turn_meta JSON parse failed (turn={}): {}", turn, e.getMessage());
             }
@@ -57,7 +62,7 @@ public class ChatTurnMetaParser {
             working = wrapper.group(1).trim();
         }
 
-        return new Result(working.strip(), horsemen, nvc, userState);
+        return new Result(working.strip(), horsemen, nvc, userState, issueDelta);
     }
 
     private Session.HorsemenTurnEntry readHorsemen(JsonNode node, int turn, String sender) {
@@ -82,6 +87,81 @@ public class ChatTurnMetaParser {
         e.need = readBool(node, "need");
         e.request = readBool(node, "request");
         return e;
+    }
+
+    private IssueContextDelta readIssueDelta(JsonNode node) {
+        if (node == null || !node.isObject()) return null;
+        IssueContextDelta d = new IssueContextDelta();
+        JsonNode hl = node.get("headline");
+        d.headline = (hl != null && !hl.isNull()) ? trimStr(hl.asText(), 50) : null;
+
+        d.factsAdded = new ArrayList<>();
+        JsonNode factsNode = node.get("facts_added");
+        if (factsNode != null && factsNode.isArray()) {
+            for (JsonNode fn : factsNode) {
+                Session.IssueFact f = new Session.IssueFact();
+                f.text = trimStr(textOf(fn, "text"), 80);
+                f.source = textOf(fn, "source");
+                f.contributesTo = ratioElementOf(fn, "contributesTo");
+                if (f.text != null && !f.text.isBlank()) d.factsAdded.add(f);
+            }
+        }
+
+        d.factsConfirmed = new ArrayList<>();
+        JsonNode fcNode = node.get("facts_confirmed");
+        if (fcNode != null && fcNode.isArray()) {
+            for (JsonNode fc : fcNode) {
+                if (fc.isTextual()) d.factsConfirmed.add(fc.asText());
+            }
+        }
+
+        d.needsAdded = new ArrayList<>();
+        JsonNode needsNode = node.get("needs_added");
+        if (needsNode != null && needsNode.isArray()) {
+            for (JsonNode nn : needsNode) {
+                Session.NeedSlot n = new Session.NeedSlot();
+                n.text = trimStr(textOf(nn, "text"), 60);
+                n.owner = textOf(nn, "owner");
+                n.contributesTo = ratioElementOf(nn, "contributesTo");
+                if (n.text != null && !n.text.isBlank()) d.needsAdded.add(n);
+            }
+        }
+
+        d.threadsAdded = new ArrayList<>();
+        JsonNode threadsNode = node.get("threads_added");
+        if (threadsNode != null && threadsNode.isArray()) {
+            for (JsonNode tn : threadsNode) {
+                Session.UnresolvedThread t = new Session.UnresolvedThread();
+                t.text = trimStr(textOf(tn, "text"), 60);
+                t.origin = textOf(tn, "origin");
+                if (t.text != null && !t.text.isBlank()) d.threadsAdded.add(t);
+            }
+        }
+
+        d.threadsResolved = new ArrayList<>();
+        JsonNode trNode = node.get("threads_resolved");
+        if (trNode != null && trNode.isArray()) {
+            for (JsonNode tr : trNode) {
+                if (tr.isTextual()) d.threadsResolved.add(tr.asText());
+            }
+        }
+
+        return d;
+    }
+
+    private String textOf(JsonNode node, String field) {
+        JsonNode v = node.get(field);
+        return (v != null && !v.isNull() && v.isTextual()) ? v.asText() : null;
+    }
+
+    private Session.RatioElement ratioElementOf(JsonNode node, String field) {
+        JsonNode v = node.get(field);
+        if (v == null || v.isNull() || !v.isTextual()) return null;
+        try {
+            return Session.RatioElement.valueOf(v.asText());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private Session.UserStateEntry readUserState(JsonNode node, int turn, String sender) {
@@ -134,5 +214,6 @@ public class ChatTurnMetaParser {
         String mediatorMessage,
         Session.HorsemenTurnEntry horsemen,
         Session.NvcTurnEntry nvc,
-        Session.UserStateEntry userState) {}
+        Session.UserStateEntry userState,
+        IssueContextDelta issueDelta) {}
 }
