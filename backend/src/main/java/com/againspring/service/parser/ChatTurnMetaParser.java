@@ -29,12 +29,14 @@ public class ChatTurnMetaParser {
 
     public Result parse(String rawResponse, int turn, String senderTag) {
         if (rawResponse == null || rawResponse.isBlank()) {
-            return new Result("", null, null);
+            return new Result("", null, null, null);
         }
 
         String working = rawResponse;
         Session.HorsemenTurnEntry horsemen = null;
         Session.NvcTurnEntry nvc = null;
+
+        Session.UserStateEntry userState = null;
 
         Matcher meta = META_BLOCK.matcher(working);
         if (meta.find()) {
@@ -43,6 +45,7 @@ public class ChatTurnMetaParser {
                 JsonNode root = objectMapper.readTree(json);
                 horsemen = readHorsemen(root.get("horsemen"), turn, senderTag);
                 nvc = readNvc(root.get("nvc_completion"), turn, senderTag);
+                userState = readUserState(root.get("user_state"), turn, senderTag); // Phase D PR-2
             } catch (Exception e) {
                 log.warn("turn_meta JSON parse failed (turn={}): {}", turn, e.getMessage());
             }
@@ -54,7 +57,7 @@ public class ChatTurnMetaParser {
             working = wrapper.group(1).trim();
         }
 
-        return new Result(working.strip(), horsemen, nvc);
+        return new Result(working.strip(), horsemen, nvc, userState);
     }
 
     private Session.HorsemenTurnEntry readHorsemen(JsonNode node, int turn, String sender) {
@@ -81,6 +84,33 @@ public class ChatTurnMetaParser {
         return e;
     }
 
+    private Session.UserStateEntry readUserState(JsonNode node, int turn, String sender) {
+        if (node == null || !node.isObject()) return null;
+        JsonNode stateNode = node.get("state");
+        if (stateNode == null || stateNode.isNull()) return null;
+        Session.UserStateEntry e = new Session.UserStateEntry();
+        e.turn = turn;
+        e.sender = sender;
+        try {
+            e.state = Session.UserState.valueOf(stateNode.asText());
+        } catch (IllegalArgumentException ex) {
+            log.warn("Unknown UserState '{}' in turn_meta (turn={})", stateNode.asText(), turn);
+            return null;
+        }
+        JsonNode evNode = node.get("evidence");
+        e.evidenceSnippet = (evNode != null && !evNode.isNull()) ? trimStr(evNode.asText(), 30) : null;
+        JsonNode confNode = node.get("confidence");
+        e.confidence = (confNode != null && !confNode.isNull() && confNode.isNumber())
+            ? Math.min(1.0, Math.max(0.0, confNode.asDouble())) : null;
+        JsonNode derNode = node.get("derived_from");
+        e.derivedFrom = (derNode != null && !derNode.isNull()) ? derNode.asText() : null;
+        return e;
+    }
+
+    private String trimStr(String s, int max) {
+        return s == null ? null : (s.length() <= max ? s : s.substring(0, max));
+    }
+
     private Double readDouble(JsonNode node, String field) {
         JsonNode v = node.get(field);
         if (v == null || v.isNull()) return 0.0;
@@ -103,5 +133,6 @@ public class ChatTurnMetaParser {
     public record Result(
         String mediatorMessage,
         Session.HorsemenTurnEntry horsemen,
-        Session.NvcTurnEntry nvc) {}
+        Session.NvcTurnEntry nvc,
+        Session.UserStateEntry userState) {}
 }

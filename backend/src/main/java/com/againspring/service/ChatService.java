@@ -9,6 +9,7 @@ import com.againspring.llm.bridge.ClaudeCodeBridge;
 import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
+import com.againspring.service.context.UserStateAppender;
 import com.againspring.service.crisis.CrisisDetector;
 import com.againspring.service.parser.ChatTurnMetaParser;
 import com.againspring.service.prompt.ChatPromptAssembler;
@@ -40,13 +41,15 @@ public class ChatService {
     private final ReportGenerationService reportService;
     private final SessionRoleResolver roleResolver;
     private final ChatTurnMetaParser turnMetaParser;
+    private final UserStateAppender userStateAppender; // Phase D PR-2
 
     public ChatService(MessageRepository messageRepo, SessionRepository sessionRepo,
                       UserRepository userRepo,
                       ClaudeCodeBridge llmBridge, CrisisDetector crisisDetector,
                       ChatPromptAssembler promptAssembler, SessionStateMachine stateMachine,
                       ReportGenerationService reportService, SessionRoleResolver roleResolver,
-                      ChatTurnMetaParser turnMetaParser) {
+                      ChatTurnMetaParser turnMetaParser,
+                      UserStateAppender userStateAppender) {
         this.messageRepo = messageRepo;
         this.sessionRepo = sessionRepo;
         this.userRepo = userRepo;
@@ -57,6 +60,7 @@ public class ChatService {
         this.reportService = reportService;
         this.roleResolver = roleResolver;
         this.turnMetaParser = turnMetaParser;
+        this.userStateAppender = userStateAppender;
     }
 
     public static final int MIN_MESSAGES_TO_FINALIZE = 3;
@@ -143,6 +147,7 @@ public class ChatService {
         String mediatorResponse = parsed.mediatorMessage().isBlank()
             ? mediatorResponseRaw : parsed.mediatorMessage();
         appendPsychologyHistory(session, parsed);
+        userStateAppender.append(session, parsed.userState()); // Phase D PR-2
 
         Message mediatorMsg = messageRepo.save(Message.builder()
             .sessionId(sessionId)
