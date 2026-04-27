@@ -238,17 +238,27 @@ export default function HistoryPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>{dateStr}</div>
-                  {active && (
+                  {active ? (
                     <span style={{
                       fontSize: 10,
-                      background: 'var(--L-accent)',
-                      color: 'white',
+                      background: 'var(--L-point)',
+                      color: '#fff',
                       borderRadius: 4,
                       padding: '2px 7px',
                     }}>
                       진행 중
                     </span>
-                  )}
+                  ) : item.completedAt ? (
+                    <span style={{
+                      fontSize: 10,
+                      background: 'var(--L-sub)',
+                      color: '#fff',
+                      borderRadius: 4,
+                      padding: '2px 7px',
+                    }}>
+                      완료
+                    </span>
+                  ) : null}
                 </div>
                 <div className="serif" style={{ fontSize: 15, color: 'var(--L-ink)', fontWeight: 500, marginBottom: 8 }}>
                   {item.soloMode

@@ -64,7 +64,7 @@ export function PhoneHeader({
         type="button"
         onClick={handleBack}
         aria-label="뒤로 가기"
-        className="w-6 text-[18px] leading-none"
+        className="w-14 text-[18px] leading-none flex-shrink-0"
         style={{ color: sub, visibility: back ? 'visible' : 'hidden' }}
       >
         ‹
@@ -75,7 +75,7 @@ export function PhoneHeader({
       >
         {title}
       </div>
-      <div className="w-6 text-right text-[13px]" style={{ color: sub }}>
+      <div className="w-14 text-right text-[13px] flex-shrink-0 whitespace-nowrap" style={{ color: sub }}>
         {right}
       </div>
     </div>
