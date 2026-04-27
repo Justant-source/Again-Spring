@@ -2,6 +2,7 @@ package com.againspring.service.parser;
 
 import com.againspring.domain.Session;
 import com.againspring.service.context.IssueContextDelta;
+import com.againspring.service.context.QuestionQueueDelta;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
@@ -32,7 +33,7 @@ public class ChatTurnMetaParser {
 
     public Result parse(String rawResponse, int turn, String senderTag) {
         if (rawResponse == null || rawResponse.isBlank()) {
-            return new Result("", null, null, null, null);
+            return new Result("", null, null, null, null, null);
         }
 
         String working = rawResponse;
@@ -41,6 +42,7 @@ public class ChatTurnMetaParser {
 
         Session.UserStateEntry userState = null;
         IssueContextDelta issueDelta = null;
+        QuestionQueueDelta queueDelta = null;
 
         Matcher meta = META_BLOCK.matcher(working);
         if (meta.find()) {
@@ -51,6 +53,7 @@ public class ChatTurnMetaParser {
                 nvc = readNvc(root.get("nvc_completion"), turn, senderTag);
                 userState = readUserState(root.get("user_state"), turn, senderTag); // Phase D PR-2
                 issueDelta = readIssueDelta(root.get("issue_delta"));              // Phase D PR-3
+                queueDelta = readQueueDelta(root.get("question_queue_delta"));     // Phase D PR-4
             } catch (Exception e) {
                 log.warn("turn_meta JSON parse failed (turn={}): {}", turn, e.getMessage());
             }
@@ -62,7 +65,7 @@ public class ChatTurnMetaParser {
             working = wrapper.group(1).trim();
         }
 
-        return new Result(working.strip(), horsemen, nvc, userState, issueDelta);
+        return new Result(working.strip(), horsemen, nvc, userState, issueDelta, queueDelta);
     }
 
     private Session.HorsemenTurnEntry readHorsemen(JsonNode node, int turn, String sender) {
@@ -210,10 +213,50 @@ public class ChatTurnMetaParser {
         return false;
     }
 
+    private QuestionQueueDelta readQueueDelta(JsonNode node) {
+        if (node == null || !node.isObject()) return null;
+        QuestionQueueDelta d = new QuestionQueueDelta();
+
+        d.asked = new ArrayList<>();
+        JsonNode askedNode = node.get("asked");
+        if (askedNode != null && askedNode.isArray()) {
+            for (JsonNode a : askedNode) {
+                if (a.isTextual()) d.asked.add(a.asText());
+            }
+        }
+
+        d.newQuestions = new ArrayList<>();
+        JsonNode newNode = node.get("new");
+        if (newNode != null && newNode.isArray()) {
+            for (JsonNode qn : newNode) {
+                Session.PendingQuestion q = new Session.PendingQuestion();
+                q.intent = intentOf(qn, "intent");
+                q.target = textOf(qn, "target");
+                q.text = trimStr(textOf(qn, "text"), 80);
+                q.hookFromIssue = textOf(qn, "hookFromIssue");
+                q.antidoteFor = ratioElementOf(qn, "antidoteFor");
+                if (q.intent != null && q.target != null) d.newQuestions.add(q);
+            }
+        }
+
+        return d;
+    }
+
+    private Session.Intent intentOf(JsonNode node, String field) {
+        JsonNode v = node.get(field);
+        if (v == null || v.isNull() || !v.isTextual()) return null;
+        try {
+            return Session.Intent.valueOf(v.asText());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     public record Result(
         String mediatorMessage,
         Session.HorsemenTurnEntry horsemen,
         Session.NvcTurnEntry nvc,
         Session.UserStateEntry userState,
-        IssueContextDelta issueDelta) {}
+        IssueContextDelta issueDelta,
+        QuestionQueueDelta queueDelta) {}
 }

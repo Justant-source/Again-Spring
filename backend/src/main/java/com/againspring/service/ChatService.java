@@ -10,7 +10,9 @@ import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.context.IssueContextMerger;
+import com.againspring.service.context.QuestionQueueUpdater;
 import com.againspring.service.context.UserStateAppender;
+import com.againspring.safety.IsolationLintFilter;
 import com.againspring.service.crisis.CrisisDetector;
 import com.againspring.service.parser.ChatTurnMetaParser;
 import com.againspring.service.prompt.ChatPromptAssembler;
@@ -44,6 +46,8 @@ public class ChatService {
     private final ChatTurnMetaParser turnMetaParser;
     private final UserStateAppender userStateAppender; // Phase D PR-2
     private final IssueContextMerger issueContextMerger; // Phase D PR-3
+    private final QuestionQueueUpdater questionQueueUpdater; // Phase D PR-4
+    private final IsolationLintFilter isolationLintFilter; // Phase D PR-4
 
     public ChatService(MessageRepository messageRepo, SessionRepository sessionRepo,
                       UserRepository userRepo,
@@ -52,7 +56,9 @@ public class ChatService {
                       ReportGenerationService reportService, SessionRoleResolver roleResolver,
                       ChatTurnMetaParser turnMetaParser,
                       UserStateAppender userStateAppender,
-                      IssueContextMerger issueContextMerger) {
+                      IssueContextMerger issueContextMerger,
+                      QuestionQueueUpdater questionQueueUpdater,
+                      IsolationLintFilter isolationLintFilter) {
         this.messageRepo = messageRepo;
         this.sessionRepo = sessionRepo;
         this.userRepo = userRepo;
@@ -65,6 +71,8 @@ public class ChatService {
         this.turnMetaParser = turnMetaParser;
         this.userStateAppender = userStateAppender;
         this.issueContextMerger = issueContextMerger;
+        this.questionQueueUpdater = questionQueueUpdater;
+        this.isolationLintFilter = isolationLintFilter;
     }
 
     public static final int MIN_MESSAGES_TO_FINALIZE = 3;
@@ -150,9 +158,17 @@ public class ChatService {
             mediatorResponseRaw, turnIndex, userSender.name());
         String mediatorResponse = parsed.mediatorMessage().isBlank()
             ? mediatorResponseRaw : parsed.mediatorMessage();
+
+        // Phase D PR-4: isolation 위반 감지 (3중 방어 3층)
+        if (isolationLintFilter.violatesIsolation(mediatorResponse)) {
+            log.error("Isolation violation detected in session {}", sessionId);
+            mediatorResponse = "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?";
+        }
+
         appendPsychologyHistory(session, parsed);
         userStateAppender.append(session, parsed.userState()); // Phase D PR-2
         issueContextMerger.merge(session, parsed.issueDelta(), turnIndex); // Phase D PR-3
+        questionQueueUpdater.update(session, parsed.queueDelta(), turnIndex); // Phase D PR-4
 
         Message mediatorMsg = messageRepo.save(Message.builder()
             .sessionId(sessionId)

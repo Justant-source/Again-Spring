@@ -114,3 +114,38 @@
 - `generation` 카테고리: 가치관 우열 시사 금지.
 
 모르겠으면 issue_delta 필드 통째로 생략.
+
+## Phase D 메타 필드 — `question_queue_delta` (옵션)
+
+`<pending_questions>` 블록을 받았다면 *가장 위 한 개*만 자연스럽게 다루고, 그 ID를 `asked`에 적어주세요. 다음 턴 이후 물을 새 질문 후보는 `new`에 넣어주세요.
+
+```jsonc
+{
+  "question_queue_delta": {
+    "asked": ["q-uuid-1"],
+    "new": [
+      {
+        "intent": "SEEK_NEED",
+        "target": "USER_A",
+        "text": "분위기가 무거워졌을 때 가장 원하셨던 건",
+        "hookFromIssue": "며칠 전 분위기가 무거웠던 이유",
+        "antidoteFor": "PERSPECTIVE"
+      }
+    ]
+  }
+}
+```
+
+- **asked**: 이번 턴에 발화한 `<pending_questions>` 항목의 ID 배열
+- **new[].intent**: SEEK_FACT | SEEK_FEELING | SEEK_NEED | BRIDGE_PERSPECTIVE | REFLECT_PATTERN | INVITE_REPAIR | WELCOME_PARTNER
+- **new[].target**: USER_A | USER_B (B는 합류 전이라도 미리 쌓아둘 수 있음)
+- **new[].text**: 80자 이내. *발화 그대로가 아닌 의도 단서*
+- **new[].hookFromIssue**: 어느 issue context 항목에서 나왔는지 (text 그대로)
+- **new[].antidoteFor**: BOUNDARY | HORSEMEN | REPAIR | PERSPECTIVE | ESCALATION (선택)
+
+**절대 금지**:
+- `<pending_questions>`의 text를 그대로 옮겨 적기
+- 한 응답에 두세 개 질문 몰아 묻기
+- `INVITE_REPAIR` Intent를 한 세션에 두 번 이상 발화
+
+모르겠으면 question_queue_delta 필드 통째로 생략.
