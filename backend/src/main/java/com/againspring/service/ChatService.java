@@ -296,7 +296,7 @@ public class ChatService {
         Session session = sessionRepo.findById(sessionId).orElseThrow();
         boolean isDuo = stateMachine.isDuo(session.getStatus());
 
-        // 자격 검증 — 이유별 메시지
+        // 자격 검증 — 요청자 본인의 메시지 수만 확인 (상대방 미참여여도 정리 가능)
         int aCount = session.getUserAMessageCount() == null ? 0 : session.getUserAMessageCount();
         int bCount = session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount();
         int myCount = requestingUser == MessageSender.USER_A ? aCount : bCount;
@@ -305,10 +305,6 @@ public class ChatService {
         if (myCount < MIN_MESSAGES_TO_FINALIZE) {
             throw new IllegalStateException(
                 "아직 대화가 충분하지 않아요. " + MIN_MESSAGES_TO_FINALIZE + "개 이상 이야기한 뒤 정리할 수 있어요.");
-        }
-        if (isDuo && partnerCount < MIN_MESSAGES_TO_FINALIZE) {
-            throw new IllegalStateException(
-                "상대방도 최소 " + MIN_MESSAGES_TO_FINALIZE + "개 메시지를 남긴 뒤 함께 정리할 수 있어요. 상대가 아직 충분히 이야기하지 않았어요.");
         }
 
         if (!isDuo) {
@@ -320,7 +316,12 @@ public class ChatService {
             return FinalizationResult.completedResult();
         }
 
-        // Duo: 한쪽 동의 표기
+        // Duo: 이미 동의 표기가 있으면 중복 알림 방지
+        boolean wasAlreadyAgreed = requestingUser == MessageSender.USER_A
+            ? Boolean.TRUE.equals(session.getFinalizeAgreedByA())
+            : Boolean.TRUE.equals(session.getFinalizeAgreedByB());
+
+        // 한쪽 동의 표기
         if (requestingUser == MessageSender.USER_A) session.setFinalizeAgreedByA(true);
         else session.setFinalizeAgreedByB(true);
 
@@ -336,6 +337,24 @@ public class ChatService {
             reportService.generateDuoReport(sessionId);
             return FinalizationResult.completedResult();
         }
+
+        // 처음 정리 요청인 경우에만 상대방에게 안내 메시지 전송
+        if (!wasAlreadyAgreed) {
+            MessageSender partnerSender = requestingUser == MessageSender.USER_A
+                ? MessageSender.MEDIATOR_TO_B
+                : MessageSender.MEDIATOR_TO_A;
+            String notice = partnerCount == 0
+                ? "상대방이 대화를 정리했어요. 아직 전하고 싶은 말이 있다면 더 이야기해도 괜찮아요. 없다면 함께 마무리해요."
+                : "상대방이 대화를 정리했어요. 컨텍스트를 더 뚜렷하게 하거나 상대방의 감정을 받아줄 의도가 아니라면, 함께 대화를 마무리해요.";
+            messageRepo.save(Message.builder()
+                .sessionId(sessionId)
+                .sender(partnerSender)
+                .content(notice)
+                .charCount(notice.length())
+                .isFinalizeSuggestion(true)
+                .build());
+        }
+
         return FinalizationResult.awaitingPartnerResult();
     }
 
@@ -493,20 +512,6 @@ public class ChatService {
         // Duo: 양쪽 모두의 메시지를 시간순으로 (AI는 양쪽 컨텍스트를 봄)
         var msgs = messageRepo.findBySessionIdOrderByCreatedAtAsc(sessionId);
         return msgs.size() <= limit ? msgs : msgs.subList(msgs.size() - limit, msgs.size());
-    }
-
-    private boolean isEligibleForFinalization(Session session, MessageSender user, boolean isDuo) {
-        int aCount = session.getUserAMessageCount() == null ? 0 : session.getUserAMessageCount();
-        int bCount = session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount();
-
-        if (!isDuo) {
-            // Solo: 본인이 ≥3개 메시지
-            return user == MessageSender.USER_A
-                ? aCount >= MIN_MESSAGES_TO_FINALIZE
-                : bCount >= MIN_MESSAGES_TO_FINALIZE;
-        }
-        // Duo: 양쪽 모두 ≥3개
-        return aCount >= MIN_MESSAGES_TO_FINALIZE && bCount >= MIN_MESSAGES_TO_FINALIZE;
     }
 
     private boolean detectExitIntent(String content) {
