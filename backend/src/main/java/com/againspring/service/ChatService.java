@@ -345,7 +345,7 @@ public class ChatService {
                 : MessageSender.MEDIATOR_TO_A;
             String notice = partnerCount == 0
                 ? "상대방이 대화를 정리했어요. 아직 전하고 싶은 말이 있다면 더 이야기해도 괜찮아요. 없다면 함께 마무리해요."
-                : "상대방이 대화를 정리했어요. 컨텍스트를 더 뚜렷하게 하거나 상대방의 감정을 받아줄 의도가 아니라면, 함께 대화를 마무리해요.";
+                : "상대방이 대화를 정리했어요. 더 전할 말이 있거나 상대방의 감정을 받아줄 의도가 아니라면, 함께 대화를 마무리해요.";
             messageRepo.save(Message.builder()
                 .sessionId(sessionId)
                 .sender(partnerSender)
