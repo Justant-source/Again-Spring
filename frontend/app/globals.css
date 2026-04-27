@@ -10,7 +10,7 @@
   --L-bg: #F5EFE6;
   --L-card: #FBF6EC;
   --L-ink: #2B2B2B;
-  --L-sub: #8A7F6B;
+  --L-sub: #6B6050;
   --L-border: #D9CFBD;
   --L-point: #8A3A1F;
 
@@ -20,7 +20,7 @@
   --P-a: #F4A896;
   --P-b: #A8C8B4;
   --P-ink: #5C4030;
-  --P-sub: #A08670;
+  --P-sub: #7A6252;
   --P-border: #EADFD0;
 
   /* Tone Q — Quiet */
@@ -265,3 +265,24 @@ body {
 }
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Report generation spinner */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse-scale {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+.report-spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--P-border);
+  border-top-color: var(--P-ink);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+.report-generating-text {
+  animation: pulse-scale 2s ease-in-out infinite;
+}

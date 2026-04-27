@@ -76,7 +76,7 @@ export default function SessionHistoryPage() {
   if (loading) {
     return (
       <PhoneFrame tone="P">
-        <PhoneHeader title="지난 대화" tone="P" back onBack={() => router.back()} />
+        <PhoneHeader title="지난 대화" tone="P" back onBack={() => router.push('/history')} />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--P-sub)', fontSize: 14 }}>
           불러오는 중...
         </div>
@@ -90,7 +90,7 @@ export default function SessionHistoryPage() {
         title={sessionTitle}
         tone="P"
         back
-        onBack={() => router.back()}
+        onBack={() => router.push('/history')}
         right={
           <button
             onClick={() => setShowDeleteConfirm(true)}

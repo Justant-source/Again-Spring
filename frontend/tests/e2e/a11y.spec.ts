@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import AxeBuilder from '@axe-core/playwright'
 
 // Pages to check for accessibility violations
@@ -181,17 +181,15 @@ test.describe('Accessibility (WCAG 2.1)', () => {
 
     await page.waitForTimeout(500)
 
-    // Check for error message
-    const errorMessage = page.locator('div').filter({
-      has: page.locator('text=/오류|입력해|실패|불일치/')
-    })
+    // Check for error message (use getByText to avoid strict mode on nested divs)
+    const errorMessage = page.getByText(/오류|입력해|실패|불일치/)
 
     const hasError = await errorMessage.isVisible({ timeout: 2000 }).catch(() => false)
     expect(hasError).toBe(true)
   })
 
   test('다이얼로그/모달이 올바르게 구성됨 @a11y', async ({ page }) => {
-    await page.goto('/session/chat/sess_history_1')
+    await page.goto('/session/chat/sess_active')
     await page.waitForTimeout(1000)
 
     // Trigger a modal (invite modal)
@@ -215,7 +213,7 @@ test.describe('Accessibility (WCAG 2.1)', () => {
   })
 
   test('위기 모달이 접근성 기준 충족 @a11y', async ({ page }) => {
-    await page.goto('/session/chat/sess_history_1')
+    await page.goto('/session/chat/sess_active')
     await page.waitForTimeout(1000)
 
     // Send crisis keyword to trigger modal

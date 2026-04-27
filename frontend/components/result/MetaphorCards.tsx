@@ -5,9 +5,9 @@ import { getMetaphorById, getMetaphorImagePath } from '@/lib/constants/metaphors
 import type { MetaphorCard } from '@/lib/types';
 
 const COLORS = {
-  lavender: { bg: '#F0ECFB', border: '#C4B5F5', accent: '#7C5CBF', badge: '#EDE8F8' },
-  green:    { bg: '#EDFBF0', border: '#A8D8B0', accent: '#3A8C4C', badge: '#E5F7E8' },
-  pink:     { bg: '#FDF0F4', border: '#F5C0CF', accent: '#C44A70', badge: '#FCEAF0' },
+  lavender: { bg: '#F0ECFB', border: '#C4B5F5', accent: '#6E52AF', badge: '#EDE8F8' },
+  green:    { bg: '#EDFBF0', border: '#A8D8B0', accent: '#2E7040', badge: '#E5F7E8' },
+  pink:     { bg: '#FDF0F4', border: '#F5C0CF', accent: '#B03060', badge: '#FCEAF0' },
 };
 
 const CARD_TITLES_DEFAULT = ['두 분의 욕구', '함께 자라는 길', '다음 한 걸음'];

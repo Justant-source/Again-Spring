@@ -9,6 +9,7 @@ import { api } from '@/lib/api/client';
 import type { Report, CommunicationStyle } from '@/lib/types';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { ReportLayout } from '@/components/result/ReportLayout';
+import { SoloResult } from '@/components/result/SoloResult';
 import { ShareImage } from '@/components/result/ShareImage';
 
 export default function ResultPage() {
@@ -93,15 +94,21 @@ export default function ResultPage() {
     return (
       <PhoneFrame tone="P">
         <PhoneHeader title="우리의 오늘 리포트" tone="P" back={true} onBack={() => router.push('/')} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
-          <div style={{ textAlign: 'center', fontSize: 14, color: 'var(--P-ink)', fontFamily: 'var(--font-serif)' }}>
-            {generating ? '리포트를 생성하고 있어요…' : '리포트를 열어보는 중…'}
-          </div>
-          {generating && (
-            <div style={{ fontSize: 12, color: 'var(--P-sub)', textAlign: 'center', lineHeight: 1.6 }}>
-              AI가 대화를 분석하고 있어요.<br />잠시만 기다려주세요.
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: 32 }}>
+          <div className="report-spinner" />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <div
+              className={generating ? 'report-generating-text' : undefined}
+              style={{ fontSize: 15, color: 'var(--P-ink)', fontFamily: 'var(--font-serif)', textAlign: 'center' }}
+            >
+              {generating ? '리포트를 생성하고 있어요…' : '리포트를 열어보는 중…'}
             </div>
-          )}
+            <div style={{ fontSize: 13, color: 'var(--P-sub)', textAlign: 'center', lineHeight: 1.7 }}>
+              {generating
+                ? <>AI가 대화를 분석하고 있어요.<br />잠시만 기다려주세요.</>
+                : '잠시만 기다려주세요.'}
+            </div>
+          </div>
         </div>
       </PhoneFrame>
     );
@@ -168,15 +175,19 @@ export default function ResultPage() {
       />
 
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        <ReportLayout
-          report={report}
-          myRole={myRole}
-          nameA={nameA}
-          nameB={nameB}
-          styleA={styleA}
-          styleB={styleB}
-          variant={variant}
-        />
+        {report.isSoloMode ? (
+          <SoloResult report={report} />
+        ) : (
+          <ReportLayout
+            report={report}
+            myRole={myRole}
+            nameA={nameA}
+            nameB={nameB}
+            styleA={styleA}
+            styleB={styleB}
+            variant={variant}
+          />
+        )}
       </div>
 
       {/* Fixed bottom footer */}

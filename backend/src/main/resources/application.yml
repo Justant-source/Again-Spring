@@ -89,8 +89,9 @@ llm:
   claude-code:
     binary-path: ${CLAUDE_BIN:claude}
     model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
+    report-model: ${REPORT_LLM_MODEL:claude-sonnet-4-6}
     pool-size: ${CLAUDE_POOL_SIZE:3}
-    default-timeout-ms: 60000
+    default-timeout-ms: 120000
   claude-api:
     key: ${ANTHROPIC_API_KEY:}
     model: ${CLAUDE_MODEL:claude-sonnet-4-5}

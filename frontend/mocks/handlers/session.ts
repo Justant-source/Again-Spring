@@ -3,7 +3,7 @@ import { HISTORY_MESSAGES_MOCK } from './historyMessages';
 
 const SESSIONS = new Map<string, any>();
 
-// 히스토리 데모 세션 (GET /api/sessions/:id 에서 반환)
+// 히스토리 데모 세션 + 활성 세션 (GET /api/sessions/:id 에서 반환)
 const HISTORY_SESSIONS: Record<string, any> = {
   sess_history_1: {
     id: 'sess_history_1',
@@ -37,6 +37,22 @@ const HISTORY_SESSIONS: Record<string, any> = {
     myRole: 'A',
     completedAt: '2026-02-17T18:40:00.000Z',
     createdAt: '2026-02-17T17:30:00.000Z',
+  },
+  // 활성 Solo 세션 — E2E 채팅 테스트용 (completed가 아니므로 채팅 페이지에서 리다이렉트 안 됨)
+  sess_active: {
+    id: 'sess_active',
+    status: 'chatting_solo',
+    relationType: 'couple',
+    category: {
+      majorId: 'couple',
+      middleId: 'couple_communication',
+      minorId: 'contact_too_little',
+    },
+    partnerNickname: '준호',
+    soloMode: true,
+    myRole: 'A',
+    inviteToken: 'tok_active_test',
+    createdAt: new Date().toISOString(),
   },
 };
 

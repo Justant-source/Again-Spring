@@ -16,6 +16,7 @@ import com.againspring.service.prompt.ChatPromptAssembler;
 import com.againspring.service.prompt.UserProfileFragment;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,7 +51,8 @@ public class ReportGenerationService {
     private final ChatPromptAssembler chatPromptAssembler;
     private final UserProfileFragment profileFragment;
 
-    private static final String MODEL_SONNET = "claude-sonnet-4-20250514";
+    @Value("${llm.claude-code.report-model:claude-sonnet-4-6}")
+    private String reportModel;
 
     private final ExecutorService reportExecutor = Executors.newFixedThreadPool(2);
 
@@ -79,7 +81,7 @@ public class ReportGenerationService {
             // Invoke LLM via ClaudeCodeBridge with Sonnet model
             String llmResponse;
             try {
-                llmResponse = invokeWithModel(prompt, MODEL_SONNET, sessionId);
+                llmResponse = invokeWithModel(prompt, reportModel, sessionId);
             } catch (Exception e) {
                 log.error("LLM call failed for solo report {}", sessionId, e);
                 llmResponse = "{}"; // Fallback empty JSON
@@ -123,7 +125,7 @@ public class ReportGenerationService {
             // Generate A and B perspective reports in parallel
             CompletableFuture<String> futureA = CompletableFuture.supplyAsync(() -> {
                 try {
-                    return invokeWithModel(promptA, MODEL_SONNET, sessionId);
+                    return invokeWithModel(promptA, reportModel, sessionId);
                 } catch (Exception e) {
                     log.error("LLM call failed for duo report A perspective {}", sessionId, e);
                     return "{}";
@@ -131,7 +133,7 @@ public class ReportGenerationService {
             }, reportExecutor);
             CompletableFuture<String> futureB = CompletableFuture.supplyAsync(() -> {
                 try {
-                    return invokeWithModel(promptB, MODEL_SONNET, sessionId);
+                    return invokeWithModel(promptB, reportModel, sessionId);
                 } catch (Exception e) {
                     log.error("LLM call failed for duo report B perspective {}", sessionId, e);
                     return "{}";

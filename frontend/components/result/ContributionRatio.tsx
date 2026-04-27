@@ -105,11 +105,11 @@ export function ContributionRatio({
 
       <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.7 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-          <span style={{ color: 'var(--P-a)', fontWeight: 500, minWidth: 56 }}>{nameA}</span>
+          <span style={{ color: '#A83020', fontWeight: 500, minWidth: 56 }}>{nameA}</span>
           <span>{ratio.label.a}</span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 6 }}>
-          <span style={{ color: '#6B9080', fontWeight: 500, minWidth: 56 }}>{nameB}</span>
+          <span style={{ color: '#2E7040', fontWeight: 500, minWidth: 56 }}>{nameB}</span>
           <span>{ratio.label.b}</span>
         </div>
       </div>

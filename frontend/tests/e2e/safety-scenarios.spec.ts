@@ -1,22 +1,11 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 
 test.describe('Safety Scenarios @safety', () => {
-  // Helper: navigate to a chat session
+  // Helper: navigate to an active chat session
+  // sess_active has status: 'chatting_solo' so it won't redirect to result page
   async function navigateToChatSession(page) {
-    await page.goto('/')
-    // Use history session if available, or create a new one
-    const historyLink = page.getByRole('link', { name: /지난 대화/ })
-    if (await historyLink.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await historyLink.click()
-      await page.waitForNavigation()
-      const firstSession = page.getByRole('button', { name: /대화|세션/ }).first()
-      await firstSession.click()
-      await page.waitForNavigation()
-    } else {
-      // Create a test session directly via navigation
-      // For E2E, we'll use a pre-created session ID from MSW
-      await page.goto('/session/chat/sess_history_1')
-    }
+    await page.goto('/session/chat/sess_active')
+    await page.waitForTimeout(800)
   }
 
   test('위기어(폭력) 입력 시 CrisisModal 표시', async ({ page }) => {
@@ -34,11 +23,11 @@ test.describe('Safety Scenarios @safety', () => {
     // CrisisModal should appear (ESC resistant)
     const crisisModal = page.locator('div').filter({
       has: page.locator('text=/안전|중요|위기/')
-    })
+    }).first()
     await expect(crisisModal).toBeVisible({ timeout: 3000 })
 
     // Verify hotline numbers are visible
-    await expect(page.getByText(/1366|1393|132|112/)).toBeVisible()
+    await expect(page.getByText(/1366|1393|132|112/).first()).toBeVisible()
 
     // Test that ESC does NOT close the modal (absolute safety rule)
     await page.keyboard.press('Escape')
@@ -67,7 +56,7 @@ test.describe('Safety Scenarios @safety', () => {
     // CrisisModal should appear
     const crisisModal = page.locator('div').filter({
       has: page.locator('text=/안전|위기|전문/')
-    })
+    }).first()
     await expect(crisisModal).toBeVisible({ timeout: 3000 })
 
     // Verify suicide prevention hotline (1393)
@@ -88,7 +77,7 @@ test.describe('Safety Scenarios @safety', () => {
     // CrisisModal should appear
     const crisisModal = page.locator('div').filter({
       has: page.locator('text=/안전|위기/')
-    })
+    }).first()
     await expect(crisisModal).toBeVisible({ timeout: 3000 })
 
     // Verify women's emergency hotline (1366)
@@ -109,7 +98,7 @@ test.describe('Safety Scenarios @safety', () => {
     // CrisisModal should appear
     const crisisModal = page.locator('div').filter({
       has: page.locator('text=/안전|위기/')
-    })
+    }).first()
     await expect(crisisModal).toBeVisible({ timeout: 3000 })
 
     // Verify child abuse hotline (112)
@@ -192,8 +181,8 @@ test.describe('Safety Scenarios @safety', () => {
   })
 
   test('결과 리포트에 처방 없음 (Solo 시점 기반)', async ({ page }) => {
-    // Navigate to a completed session result
-    await page.goto('/session/result/sess_history_1')
+    // Navigate to a solo-mode session result (sess_history_3 maps to solo report)
+    await page.goto('/session/result/sess_history_3')
 
     // Wait for report to load
     await page.waitForTimeout(1000)
@@ -226,10 +215,10 @@ test.describe('Safety Scenarios @safety', () => {
     // Wait for report to load
     await page.waitForTimeout(1000)
 
-    // Find the legal disclaimer box
+    // Find the legal disclaimer box (use first() to avoid strict mode on nested divs)
     const disclaimerBox = page.locator('div').filter({
       has: page.locator('text=/과실비율|법률|법정|무관|대체|상담/')
-    })
+    }).first()
 
     // The disclaimer should be visible
     const isVisible = await disclaimerBox.isVisible({ timeout: 1000 }).catch(() => false)
@@ -244,16 +233,9 @@ test.describe('Safety Scenarios @safety', () => {
   test('메시지 입력 필드에 안내 텍스트(원문 미전달)가 표시된다', async ({ page }) => {
     await navigateToChatSession(page)
 
-    // Find the input area with disclaimer
-    const inputArea = page.locator('div').filter({
-      has: page.locator('text=/원문|전달|AI|정리/')
-    })
-
-    await expect(inputArea).toBeVisible({ timeout: 5000 })
-
-    // Verify the specific disclaimer
-    const disclaimerText = await page.getByText(/원문은 전달되지 않아요|AI가 정리/)
-    await expect(disclaimerText).toBeVisible()
+    // Verify the specific disclaimer text
+    const disclaimerText = page.getByText(/원문은 전달되지 않아요|AI가 정리해서 전달/)
+    await expect(disclaimerText).toBeVisible({ timeout: 5000 })
   })
 
   test('위기 모달은 바깥 영역 클릭으로 닫히지 않는다', async ({ page }) => {
@@ -269,24 +251,16 @@ test.describe('Safety Scenarios @safety', () => {
 
     const crisisModal = page.locator('div').filter({
       has: page.locator('text=/안전|위기/')
-    })
+    }).first()
     await expect(crisisModal).toBeVisible({ timeout: 3000 })
 
     // Try clicking outside the modal (on backdrop)
-    const backdrop = page.locator('[role="dialog"]').or(
-      page.locator('div').filter({ has: crisisModal })
-    ).first()
-    const box = await backdrop.boundingBox()
+    await page.mouse.click(10, 10)
+    await page.waitForTimeout(300)
 
-    // Click outside modal area (if possible)
-    if (box) {
-      await page.mouse.click(10, 10)
-      await page.waitForTimeout(300)
-
-      // Modal should still be visible
-      const stillVisible = await crisisModal.isVisible()
-      expect(stillVisible).toBe(true)
-    }
+    // Modal should still be visible
+    const stillVisible = await crisisModal.isVisible()
+    expect(stillVisible).toBe(true)
   })
 
   test('AI 능력 한계 텍스트가 결과 페이지에 표시된다', async ({ page }) => {
