@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
@@ -32,20 +32,23 @@ const RELATION_TYPE_LABEL: Record<RelationType, string> = {
   korean_specific: '한국 특화',
 };
 
-function getCategoryLabel(majorId: string | null, middleId: string | null, minorId: string | null, customText: string | null): string | null {
-  if (!majorId) return null;
+function getMiddleLabel(majorId: string | null, middleId: string | null): string | null {
+  if (!majorId || !middleId) return null;
   const major = CATEGORIES.find(c => c.id === majorId);
   if (!major) return null;
-  if (!middleId) return major.label;
   const middle = major.middles.find(m => m.id === middleId);
-  if (!middle) return major.label;
-  if (!minorId || minorId === 'custom') {
-    const text = customText ? `${middle.label} · ${customText}` : middle.label;
-    return text;
-  }
+  return middle?.label ?? null;
+}
+
+function getMinorLabel(majorId: string | null, middleId: string | null, minorId: string | null, customText: string | null): string | null {
+  if (!majorId || !middleId || !minorId) return null;
+  if (minorId === 'custom') return customText?.trim() || null;
+  const major = CATEGORIES.find(c => c.id === majorId);
+  if (!major) return null;
+  const middle = major.middles.find(m => m.id === middleId);
+  if (!middle) return null;
   const minor = middle.minors.find(n => n.id === minorId);
-  if (!minor) return middle.label;
-  return `${middle.label} · ${minor.label}`;
+  return minor?.label ?? null;
 }
 
 const ACTIVE_STATUSES = new Set(['chatting_solo', 'chatting_duo', 'awaiting_finalization', 'waiting_b']);
@@ -188,7 +191,7 @@ export default function HistoryPage() {
               onClick={() => setSelectMode(true)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--L-sub)', fontSize: 13, padding: '4px 8px' }}
             >
-              선택
+              삭제
             </button>
           )
         }
@@ -227,35 +230,12 @@ export default function HistoryPage() {
                 cursor: 'pointer',
                 padding: '14px 16px',
                 display: 'flex',
-                alignItems: 'flex-start',
+                alignItems: 'center',
                 gap: 10,
-                outline: selectMode && isChecked ? '2px solid var(--L-accent)' : 'none',
+                outline: selectMode && isChecked ? '2px solid var(--L-point)' : 'none',
                 borderRadius: 12,
               }}
             >
-              {/* 체크박스 영역 */}
-              {selectMode && (
-                <div style={{
-                  flexShrink: 0,
-                  width: 20,
-                  height: 20,
-                  borderRadius: '50%',
-                  border: `2px solid ${isChecked ? 'var(--L-accent)' : 'var(--L-border)'}`,
-                  background: isChecked ? 'var(--L-accent)' : 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginTop: 2,
-                  transition: 'all 0.15s',
-                }}>
-                  {isChecked && (
-                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                      <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </div>
-              )}
-
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>{dateStr}</div>
@@ -302,22 +282,47 @@ export default function HistoryPage() {
                     </span>
                   )}
                   {(() => {
-                    const label = getCategoryLabel(item.majorCategoryId, item.middleCategoryId, item.minorCategoryId, item.customCategoryText);
-                    return label ? (
-                      <span style={{
-                        fontSize: '11px',
-                        background: 'var(--L-card)',
-                        border: '1px solid var(--L-border)',
-                        borderRadius: '3px',
-                        padding: '4px 8px',
-                        color: 'var(--L-sub)',
-                      }}>
-                        {label}
-                      </span>
-                    ) : null;
+                    const midLabel = getMiddleLabel(item.majorCategoryId, item.middleCategoryId);
+                    const minLabel = getMinorLabel(item.majorCategoryId, item.middleCategoryId, item.minorCategoryId, item.customCategoryText);
+                    const chipStyle: React.CSSProperties = {
+                      fontSize: '11px',
+                      background: 'var(--L-card)',
+                      border: '1px solid var(--L-border)',
+                      borderRadius: '3px',
+                      padding: '4px 8px',
+                      color: 'var(--L-sub)',
+                    };
+                    return (
+                      <>
+                        {midLabel && <span style={chipStyle}>{midLabel}</span>}
+                        {minLabel && <span style={chipStyle}>{minLabel}</span>}
+                      </>
+                    );
                   })()}
                 </div>
               </div>
+
+              {/* 체크박스 — 오른쪽 */}
+              {selectMode && (
+                <div style={{
+                  flexShrink: 0,
+                  width: 22,
+                  height: 22,
+                  borderRadius: '50%',
+                  border: `2px solid ${isChecked ? 'var(--L-point)' : 'var(--L-border)'}`,
+                  background: isChecked ? 'var(--L-point)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s',
+                }}>
+                  {isChecked && (
+                    <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+                      <path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

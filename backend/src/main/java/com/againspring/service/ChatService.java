@@ -339,10 +339,14 @@ public class ChatService {
         }
 
         // 처음 정리 요청인 경우에만 상대방에게 안내 메시지 전송
-        if (!wasAlreadyAgreed) {
-            MessageSender partnerSender = requestingUser == MessageSender.USER_A
-                ? MessageSender.MEDIATOR_TO_B
-                : MessageSender.MEDIATOR_TO_A;
+        // 상대방 측에 이미 finalizeSuggestion 카드(AI 자동 제안 또는 이전 알림)가 있으면 중복 생성 방지
+        MessageSender partnerSender = requestingUser == MessageSender.USER_A
+            ? MessageSender.MEDIATOR_TO_B
+            : MessageSender.MEDIATOR_TO_A;
+        boolean partnerAlreadyHasSuggestion = messageRepo
+            .existsBySessionIdAndSenderAndIsFinalizeSuggestionTrue(sessionId, partnerSender);
+
+        if (!wasAlreadyAgreed && !partnerAlreadyHasSuggestion) {
             String notice = partnerCount == 0
                 ? "상대방이 대화를 정리했어요. 아직 전하고 싶은 말이 있다면 더 이야기해도 괜찮아요. 없다면 함께 마무리해요."
                 : "상대방이 대화를 정리했어요. 더 전할 말이 있거나 상대방의 감정을 받아줄 의도가 아니라면, 함께 대화를 마무리해요.";

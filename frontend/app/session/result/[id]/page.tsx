@@ -63,7 +63,7 @@ export default function ResultPage() {
       } catch (err: any) {
         if (cancelled) return;
         // 404 → 리포트 생성 중, 최대 20회(60초) 폴링
-        if (err?.response?.status === 404 && attempt < 20) {
+        if (err?.response?.status === 404 && attempt < 60) {
           setGenerating(true);
           pollTimer = setTimeout(() => fetchReport(attempt + 1), 3000);
         } else {
@@ -114,13 +114,17 @@ export default function ResultPage() {
     );
   }
 
-  if (error || !report) {
+  const isFailedReport = report?.llmProvider === 'error-fallback';
+
+  if (error || !report || isFailedReport) {
     return (
       <PhoneFrame tone="P">
         <PhoneHeader title="우리의 오늘 리포트" tone="P" back={true} onBack={() => router.push('/')} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 22px', gap: 12 }}>
           <div style={{ fontSize: 14, color: 'var(--P-ink)', marginBottom: 12, textAlign: 'center' }}>
-            {error || '리포트를 찾지 못했어요'}
+            {isFailedReport
+              ? '리포트 생성에 실패했어요.\n잠시 후 다시 시도해 주세요.'
+              : error || '리포트를 찾지 못했어요'}
           </div>
           <button onClick={() => router.push('/history')} className="btn-P" style={{ width: '100%' }}>
             지난 대화 보기

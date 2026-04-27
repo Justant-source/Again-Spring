@@ -99,6 +99,17 @@ public class ReportGenerationService {
 
         } catch (Exception e) {
             log.error("Failed to generate solo report for session {}", sessionId, e);
+            try {
+                reportRepo.save(Report.builder()
+                    .id(UUID.randomUUID().toString())
+                    .sessionId(sessionId)
+                    .soloMode(true)
+                    .llmProvider("error-fallback")
+                    .createdAt(Instant.now())
+                    .build());
+            } catch (Exception saveFailure) {
+                log.error("Even fallback solo report save failed for session {}", sessionId, saveFailure);
+            }
         }
     }
 
@@ -163,6 +174,17 @@ public class ReportGenerationService {
 
         } catch (Exception e) {
             log.error("Failed to generate duo report for session {}", sessionId, e);
+            try {
+                reportRepo.save(Report.builder()
+                    .id(UUID.randomUUID().toString())
+                    .sessionId(sessionId)
+                    .soloMode(false)
+                    .llmProvider("error-fallback")
+                    .createdAt(Instant.now())
+                    .build());
+            } catch (Exception saveFailure) {
+                log.error("Even fallback duo report save failed for session {}", sessionId, saveFailure);
+            }
         }
     }
 

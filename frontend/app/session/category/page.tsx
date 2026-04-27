@@ -162,17 +162,23 @@ export default function CategoryPage() {
               style={{
                 padding: '14px 16px',
                 border: '1px solid',
-                borderColor: 'var(--L-border)',
+                borderColor: minor.allowCustomInput && customText.trim() ? 'var(--L-ink)' : 'var(--L-border)',
                 borderRadius: 3,
                 fontSize: 14,
                 background: 'transparent',
                 cursor: minor.allowCustomInput ? 'default' : 'pointer',
                 textAlign: 'left',
                 transition: 'all 0.15s',
-                opacity: minor.allowCustomInput ? 0.5 : 1,
+                opacity: minor.allowCustomInput && !customText.trim() ? 0.5 : 1,
+                ...(minor.allowCustomInput && customText.trim() ? {
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical' as const,
+                  overflow: 'hidden',
+                } : {}),
               }}
             >
-              {minor.label}
+              {minor.allowCustomInput && customText.trim() ? customText : minor.label}
             </button>
           ))}
         </div>

@@ -144,5 +144,6 @@ export interface Report {
   metaphorId?: string; // V1.5: 12종 메타포 id (locked-mailbox, boiling-kettle, ...)
   suggestedApproach?: string;
   inviteAgainCTA?: string;
+  llmProvider?: string;
   createdAt: string;
 }

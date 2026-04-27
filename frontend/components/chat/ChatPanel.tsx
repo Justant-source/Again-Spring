@@ -124,7 +124,8 @@ export function ChatPanel({
           createdAt: r.data.mediatorMessage.createdAt,
         },
       ]);
-      lastFetchRef.current = Date.now();
+      // 서버-클라 시계 드리프트로 인한 메시지 누락 방지: 다음 폴링 1회 전체 재동기화
+      lastFetchRef.current = 0;
       // 정리 제안이 트리거됐으면 별도 저장된 isFinalizeSuggestion 메시지를 즉시 불러옴
       if (r.data.finalizeSuggested) {
         lastFetchRef.current = 0;

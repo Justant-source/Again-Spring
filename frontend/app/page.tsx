@@ -10,7 +10,6 @@ import { Footer } from '@/components/shared/Footer';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
 
-const CHIPS = ['연인', '부부', '친구', '가족', '부모자식'];
 const ACTIVE_STATUSES = new Set(['chatting_solo', 'chatting_duo', 'awaiting_finalization']);
 
 export default function LandingPage() {
@@ -134,14 +133,6 @@ export default function LandingPage() {
             혼자서도, 함께라도 가능해요.<br />
             5분이면 충분합니다.
           </p>
-
-          <div className="mt-9 flex gap-2 flex-wrap">
-            {CHIPS.map((c) => (
-              <span key={c} className="chip-L">
-                {c}
-              </span>
-            ))}
-          </div>
 
           <div className="mt-12 letter-card" style={{ padding: 20 }}>
             <div className="quote-it" style={{ fontSize: 12, marginBottom: 10 }}>
