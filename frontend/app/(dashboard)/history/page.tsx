@@ -6,6 +6,7 @@ import { useUserStore } from '@/lib/store/userStore';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { api } from '@/lib/api/client';
 import type { RelationType } from '@/lib/types';
+import { CATEGORIES } from '@/lib/constants/categories';
 
 interface HistoryItem {
   id: string;
@@ -16,6 +17,10 @@ interface HistoryItem {
   soloMode: boolean;
   completedAt: string | null;
   createdAt: string;
+  majorCategoryId: string | null;
+  middleCategoryId: string | null;
+  minorCategoryId: string | null;
+  customCategoryText: string | null;
 }
 
 const RELATION_TYPE_LABEL: Record<RelationType, string> = {
@@ -26,6 +31,22 @@ const RELATION_TYPE_LABEL: Record<RelationType, string> = {
   parent_child: '부모·자식',
   korean_specific: '한국 특화',
 };
+
+function getCategoryLabel(majorId: string | null, middleId: string | null, minorId: string | null, customText: string | null): string | null {
+  if (!majorId) return null;
+  const major = CATEGORIES.find(c => c.id === majorId);
+  if (!major) return null;
+  if (!middleId) return major.label;
+  const middle = major.middles.find(m => m.id === middleId);
+  if (!middle) return major.label;
+  if (!minorId || minorId === 'custom') {
+    const text = customText ? `${middle.label} · ${customText}` : middle.label;
+    return text;
+  }
+  const minor = middle.minors.find(n => n.id === minorId);
+  if (!minor) return middle.label;
+  return `${middle.label} · ${minor.label}`;
+}
 
 const ACTIVE_STATUSES = new Set(['chatting_solo', 'chatting_duo', 'awaiting_finalization', 'waiting_b']);
 const isActive = (status: string) => ACTIVE_STATUSES.has(status);
@@ -280,18 +301,21 @@ export default function HistoryPage() {
                       {RELATION_TYPE_LABEL[item.relationType] ?? item.relationType}
                     </span>
                   )}
-                  {item.conflictType && (
-                    <span style={{
-                      fontSize: '11px',
-                      background: 'var(--L-card)',
-                      border: '1px solid var(--L-border)',
-                      borderRadius: '3px',
-                      padding: '4px 8px',
-                      color: 'var(--L-sub)',
-                    }}>
-                      {item.conflictType}
-                    </span>
-                  )}
+                  {(() => {
+                    const label = getCategoryLabel(item.majorCategoryId, item.middleCategoryId, item.minorCategoryId, item.customCategoryText);
+                    return label ? (
+                      <span style={{
+                        fontSize: '11px',
+                        background: 'var(--L-card)',
+                        border: '1px solid var(--L-border)',
+                        borderRadius: '3px',
+                        padding: '4px 8px',
+                        color: 'var(--L-sub)',
+                      }}>
+                        {label}
+                      </span>
+                    ) : null;
+                  })()}
                 </div>
               </div>
             </div>

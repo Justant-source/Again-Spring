@@ -119,6 +119,7 @@ public class UserController {
                                 .orElse("상대방");
                     }
 
+                    Session.Category cat = s.getCategory();
                     return SessionHistoryResponse.builder()
                             .id(s.getId())
                             .status(s.getStatus() != null ? s.getStatus().getValue() : "unknown")
@@ -128,6 +129,10 @@ public class UserController {
                             .soloMode(Boolean.TRUE.equals(s.getSoloMode()))
                             .completedAt(s.getCompletedAt())
                             .createdAt(s.getCreatedAt())
+                            .majorCategoryId(cat != null ? cat.majorId : null)
+                            .middleCategoryId(cat != null ? cat.middleId : null)
+                            .minorCategoryId(cat != null ? cat.minorId : null)
+                            .customCategoryText(cat != null ? cat.customText : null)
                             .build();
                 })
                 .toList();

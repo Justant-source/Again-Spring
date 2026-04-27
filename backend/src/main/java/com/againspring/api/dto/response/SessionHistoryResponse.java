@@ -24,4 +24,8 @@ public class SessionHistoryResponse {
     private boolean soloMode;
     private Instant completedAt;
     private Instant createdAt;
+    private String majorCategoryId;
+    private String middleCategoryId;
+    private String minorCategoryId;
+    private String customCategoryText;
 }
