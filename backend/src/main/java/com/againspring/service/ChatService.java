@@ -296,9 +296,19 @@ public class ChatService {
         Session session = sessionRepo.findById(sessionId).orElseThrow();
         boolean isDuo = stateMachine.isDuo(session.getStatus());
 
-        // 자격 검증
-        if (!isEligibleForFinalization(session, requestingUser, isDuo)) {
-            throw new IllegalStateException("최소 3개 메시지 이후에 정리할 수 있어요");
+        // 자격 검증 — 이유별 메시지
+        int aCount = session.getUserAMessageCount() == null ? 0 : session.getUserAMessageCount();
+        int bCount = session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount();
+        int myCount = requestingUser == MessageSender.USER_A ? aCount : bCount;
+        int partnerCount = requestingUser == MessageSender.USER_A ? bCount : aCount;
+
+        if (myCount < MIN_MESSAGES_TO_FINALIZE) {
+            throw new IllegalStateException(
+                "아직 대화가 충분하지 않아요. " + MIN_MESSAGES_TO_FINALIZE + "개 이상 이야기한 뒤 정리할 수 있어요.");
+        }
+        if (isDuo && partnerCount < MIN_MESSAGES_TO_FINALIZE) {
+            throw new IllegalStateException(
+                "상대방도 최소 " + MIN_MESSAGES_TO_FINALIZE + "개 메시지를 남긴 뒤 함께 정리할 수 있어요. 상대가 아직 충분히 이야기하지 않았어요.");
         }
 
         if (!isDuo) {

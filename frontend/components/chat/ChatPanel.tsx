@@ -41,6 +41,7 @@ export function ChatPanel({
   const [sending, setSending] = useState(false);
   const [crisisLevel1, setCrisisLevel1] = useState(false);
   const [finalizePending, setFinalizePending] = useState(false);
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastFetchRef = useRef<number>(0);
 
@@ -142,6 +143,7 @@ export function ChatPanel({
   };
 
   const handleFinalize = async () => {
+    setFinalizeError(null);
     try {
       const r = await api.post(`/api/sessions/${sessionId}/finalize`);
       if (r.data.completed) {
@@ -150,7 +152,10 @@ export function ChatPanel({
         setFinalizePending(true);
       }
     } catch (e: any) {
-      alert(e.response?.data?.message || '정리할 수 없어요');
+      const msg = e.response?.data?.error?.message
+                || e.response?.data?.message
+                || '정리할 수 없어요. 잠시 후 다시 시도해 주세요.';
+      setFinalizeError(msg);
     }
   };
 
@@ -225,6 +230,33 @@ export function ChatPanel({
         {sending && <TypingBubble />}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* 정리하기 에러 안내 */}
+      {finalizeError && (
+        <div
+          style={{
+            margin: '0 12px 6px',
+            padding: '10px 14px',
+            background: '#FFF3F0',
+            border: '1px solid #F5C0B0',
+            borderRadius: 10,
+            fontSize: 13,
+            color: '#8A2A10',
+            lineHeight: 1.6,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 8,
+          }}
+        >
+          <span>{finalizeError}</span>
+          <button
+            onClick={() => setFinalizeError(null)}
+            style={{ background: 'none', border: 'none', color: '#8A2A10', fontSize: 16, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}
+            aria-label="닫기"
+          >×</button>
+        </div>
+      )}
 
       {/* Input */}
       <ChatInput onSend={handleSend} disabled={sending} onCrisis={() => setCrisisLevel1(true)} />
