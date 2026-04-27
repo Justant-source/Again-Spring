@@ -1,0 +1,19 @@
+majors:
+  - id: couple
+    label: "연인 · 썸"
+    relationType: COUPLE
+    middles:
+      - id: couple_contact
+        label: "연락 · 관심"
+        minors:
+          - { id: contact_too_little, label: "연락이 너무 적어서 서운함", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+  - id: marriage
+    label: "부부"
+    relationType: MARRIAGE
+    middles:
+      - id: marriage_inlaws
+        label: "시가 · 처가"
+        minors:
+          - { id: visit_freq, label: "시가/처가 방문 빈도", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }

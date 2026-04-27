@@ -11,6 +11,7 @@ import com.againspring.domain.enums.MessageSender;
 import com.againspring.domain.enums.RelationType;
 import com.againspring.domain.enums.SessionStatus;
 import com.againspring.llm.prompt.PromptLoader;
+import com.againspring.service.category.CategoryCatalog;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.DefaultResourceLoader;
 
 @ExtendWith(MockitoExtension.class)
 class ChatPromptAssemblerTest {
@@ -44,6 +46,11 @@ class ChatPromptAssemblerTest {
 
     @Spy
     private QuestionQueueFragment questionQueueFragment = new QuestionQueueFragment();
+
+    // 빈 catalog (테스트 환경에서는 카테고리 컨텍스트 주입 불필요) → render() returns ""
+    @Spy
+    private CategoryContextFragment categoryContextFragment =
+            new CategoryContextFragment(new CategoryCatalog(new DefaultResourceLoader(), "classpath:nonexistent.yml"));
 
     @InjectMocks
     private ChatPromptAssembler assembler;

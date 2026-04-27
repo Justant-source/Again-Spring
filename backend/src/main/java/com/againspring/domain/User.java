@@ -51,6 +51,9 @@ public class User {
     @Column(length = 50)
     private String communicationStyle;
 
+    @Column(name = "mbti_type", length = 8)
+    private String mbtiType;
+
     @Type(JsonType.class)
     @Column(columnDefinition = "JSON")
     private List<Integer> onboardingAnswers;

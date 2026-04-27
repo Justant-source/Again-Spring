@@ -26,6 +26,7 @@ public class ChatPromptAssembler {
     private final IssueContextFragment issueContextFragment;
     private final UserStateFragment userStateFragment;
     private final QuestionQueueFragment questionQueueFragment;
+    private final CategoryContextFragment categoryContextFragment;
 
     /**
      * Solo 모드 — 본인 컨텍스트만 사용.
@@ -51,6 +52,8 @@ public class ChatPromptAssembler {
         String queue = questionQueueFragment.render(session, MessageSender.USER_A);
         if (!queue.isEmpty()) sb.append(queue).append("\n");
         sb.append(safeLoad("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
+        String categoryContext = categoryContextFragment.render(session);
+        if (!categoryContext.isEmpty()) sb.append(categoryContext).append("\n");
         sb.append(safeLoad("chat/solo_chat.md")).append("\n\n");
 
         sb.append("<conversation_history>\n");
@@ -92,6 +95,8 @@ public class ChatPromptAssembler {
         String queue = questionQueueFragment.render(session, currentUserSender);
         if (!queue.isEmpty()) sb.append(queue).append("\n");
         sb.append(safeLoad("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
+        String categoryContextDuo = categoryContextFragment.render(session);
+        if (!categoryContextDuo.isEmpty()) sb.append(categoryContextDuo).append("\n");
         sb.append(safeLoad("chat/duo_chat.md")).append("\n\n");
 
         // 양쪽 메시지를 시간순으로, 명확히 라벨링

@@ -19,6 +19,7 @@ services:
       - --collation-server=utf8mb4_unicode_ci
       - --skip-character-set-client-handshake
       - --default-time-zone=+00:00
+      - --max-connections=200
     volumes:
       - mariadb_prod_data:/var/lib/mysql
     # 외부 포트 노출 없음 (internal only)
@@ -53,6 +54,7 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-claude-code}
       CLAUDE_BIN: ${CLAUDE_BIN:-claude}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5-20251001}
+      CLAUDE_POOL_SIZE: ${CLAUDE_POOL_SIZE:-100}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
@@ -67,6 +69,7 @@ services:
     volumes:
       - ${CLAUDE_HOST_CONFIG_DIR:-/root/.claude}:/root/.claude
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro
+      - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro
     depends_on:
       mariadb-prod:
         condition: service_healthy
@@ -74,9 +77,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 6G
         reservations:
-          memory: 512M
+          memory: 2G
     networks:
       - againspring-prod
 

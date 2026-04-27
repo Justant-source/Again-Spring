@@ -86,4 +86,35 @@ class UserProfileFragmentTest {
         String out = fragment.render(u);
         assertTrue(out.contains("파도형"));
     }
+
+    @Test
+    void render_includesMbti_whenStyleAndMbtiSet() {
+        User u = User.builder().id("u1").nickname("n")
+                .communicationStyle("wave").mbtiType("INFP").build();
+        String out = fragment.render(u);
+        assertTrue(out.contains("MBTI: INFP"));
+        assertTrue(out.contains("보강 정보"));
+        assertTrue(out.contains("단독 결정 변수 아님"));
+    }
+
+    @Test
+    void render_omitsMbti_whenNull() {
+        User u = User.builder().id("u1").nickname("n").communicationStyle("wave").build();
+        String out = fragment.render(u);
+        assertFalse(out.contains("MBTI"));
+    }
+
+    @Test
+    void render_omitsMbti_whenBlank() {
+        User u = User.builder().id("u1").nickname("n")
+                .communicationStyle("wave").mbtiType("  ").build();
+        String out = fragment.render(u);
+        assertFalse(out.contains("MBTI"));
+    }
+
+    @Test
+    void render_returnsEmpty_whenStyleNullEvenIfMbtiSet() {
+        User u = User.builder().id("u1").nickname("n").mbtiType("INFP").build();
+        assertEquals("", fragment.render(u));
+    }
 }

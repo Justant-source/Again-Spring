@@ -95,7 +95,7 @@ STYLE_COMBINATION_INSIGHTS = {
 
 저장: `User.mbtiType` (nullable). LLM 프롬프트 컨텍스트로 보강 — **단독 결정 변수로는 사용하지 않음**.
 
-> 현 구현 상태: User 엔티티에 `mbtiType` 필드는 미구현. 프롬프트 주입은 6스타일(`communicationStyle`)만 활용 중. MBTI 추가는 별도 마이그레이션 후 `UserProfileFragment`에서 자동 노출됨.
+> 현 구현 상태 (2026-04-27 갱신): `User.mbtiType` 필드 구현 완료 (Flyway V11, `backend/.../service/prompt/UserProfileFragment.java` 보강). `UserProfileFragment`가 6스타일 + MBTI를 함께 주입. 단독 결정 변수가 아닌 보강 정보로 명시.
 
 ## LLM 프롬프트 활용 방식
 

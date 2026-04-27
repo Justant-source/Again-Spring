@@ -83,6 +83,7 @@ public class UserService {
         // MBTI path: communicationStyle provided directly (no answers required)
         if (request.getAnswers() == null && request.getCommunicationStyle() != null) {
             user.setCommunicationStyle(request.getCommunicationStyle());
+            if (request.getMbtiType() != null) user.setMbtiType(request.getMbtiType());
             user.setOnboardingCompletedAt(Instant.now());
             user.setUpdatedAt(Instant.now());
             userRepository.save(user);
@@ -116,6 +117,7 @@ public class UserService {
 
             user.setOnboardingAnswers(request.getAnswers());
             user.setCommunicationStyle(style.getValue());
+            if (request.getMbtiType() != null) user.setMbtiType(request.getMbtiType());
             user.setOnboardingCompletedAt(Instant.now());
             user.setUpdatedAt(Instant.now());
 

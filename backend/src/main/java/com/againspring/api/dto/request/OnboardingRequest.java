@@ -2,6 +2,7 @@ package com.againspring.api.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -26,6 +27,7 @@ public class OnboardingRequest {
     @JsonProperty("communicationStyle")
     private String communicationStyle;
 
+    @Pattern(regexp = "^[IE][NS][TF][JP]$", message = "MBTI 형식이 올바르지 않습니다 (예: INFP)")
     @JsonProperty("mbtiType")
     private String mbtiType;
 }

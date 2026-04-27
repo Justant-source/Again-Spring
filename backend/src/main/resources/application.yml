@@ -78,6 +78,8 @@ app:
   url: ${APP_URL:https://dev.againspring.net}
   prompts:
     path: ${PROMPTS_PATH:./shared/docs/prompts}
+  categories:
+    path: ${CATEGORIES_PATH:./shared/docs/categories.yml}
   safety:
     enabled: true
     forbidden-words-path: ${SAFETY_FORBIDDEN_WORDS_PATH:classpath:/safety/forbidden-words.yml}

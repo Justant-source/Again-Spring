@@ -1,0 +1,417 @@
+# 카테고리 catalog — FE/BE 공유 권위본
+# 권위본 정책: shared/docs/policies/categories.md
+# FE 동기화: frontend/lib/constants/categories.ts
+# BE 로드: backend/src/main/java/com/againspring/service/category/CategoryCatalog.java
+# 변경 시: categories.ts 와 본 파일 반드시 동시에 갱신
+
+majors:
+  - id: couple
+    label: "연인 · 썸"
+    relationType: COUPLE
+    middles:
+      - id: couple_contact
+        label: "연락 · 관심"
+        minors:
+          - { id: contact_too_little, label: "연락이 너무 적어서 서운함", allowCustomInput: false }
+          - { id: contact_push, label: "연락 강요가 부담스러움", allowCustomInput: false }
+          - { id: reply_speed, label: "답장 속도·성의 문제", allowCustomInput: false }
+          - { id: ghosting, label: "잠수·회피 문제", allowCustomInput: false }
+          - { id: sns_friction, label: "SNS 활동 관련 갈등", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: couple_time
+        label: "시간 · 우선순위"
+        minors:
+          - { id: friends_first, label: "친구 모임을 더 우선시", allowCustomInput: false }
+          - { id: hobby_time, label: "취미·게임·운동에 시간 많이 씀", allowCustomInput: false }
+          - { id: work_busy, label: "일·학업 때문에 시간 없음", allowCustomInput: false }
+          - { id: family_first, label: "가족 일정이 우선", allowCustomInput: false }
+          - { id: date_short, label: "데이트 시간이 적음", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: couple_money
+        label: "돈 · 경제"
+        minors:
+          - { id: date_cost, label: "데이트 비용 분담 문제", allowCustomInput: false }
+          - { id: spending, label: "상대의 소비 습관이 불만", allowCustomInput: false }
+          - { id: gift_cost, label: "선물·이벤트 비용 갈등", allowCustomInput: false }
+          - { id: loan, label: "빌려준 돈 문제", allowCustomInput: false }
+          - { id: money_sense, label: "경제관념 차이", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: couple_future
+        label: "미래 · 약속"
+        minors:
+          - { id: marriage_talk, label: "결혼 얘기에서 의견 차이", allowCustomInput: false }
+          - { id: cohabit, label: "동거 관련 갈등", allowCustomInput: false }
+          - { id: career_gap, label: "진로·취업 방향 차이", allowCustomInput: false }
+          - { id: no_plan, label: "장기 계획 없음에 대한 불안", allowCustomInput: false }
+          - { id: broken_promise, label: "약속을 자주 어김", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: couple_surround
+        label: "가족 · 주변 관계"
+        minors:
+          - { id: parents_friction, label: "상대의 부모님과 갈등", allowCustomInput: false }
+          - { id: friends_conflict, label: "상대 친구들과 불편함", allowCustomInput: false }
+          - { id: ex_issue, label: "전 연인 관련 문제", allowCustomInput: false }
+          - { id: opposite_sex, label: "이성 친구 문제", allowCustomInput: false }
+          - { id: intro_timing, label: "가족 소개 시점 갈등", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: couple_trust
+        label: "신뢰 · 거짓말"
+        minors:
+          - { id: small_lies, label: "작은 거짓말 반복", allowCustomInput: false }
+          - { id: suspicion_other, label: "이성 문제 의심", allowCustomInput: false }
+          - { id: break_promise_loop, label: "약속 반복적으로 어김", allowCustomInput: false }
+          - { id: secrets, label: "비밀이 많음", allowCustomInput: false }
+          - { id: past_issue, label: "과거 문제", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: couple_affection
+        label: "애정 표현 차이"
+        minors:
+          - { id: skinship_diff, label: "스킨십 빈도·강도 차이", allowCustomInput: false }
+          - { id: no_verbal, label: "말로 표현 안 함", allowCustomInput: false }
+          - { id: forget_anni, label: "기념일 안 챙김", allowCustomInput: false }
+          - { id: love_lang_diff, label: "사랑 표현 방식이 달라서 서운함", allowCustomInput: false }
+          - { id: pda_diff, label: "공개적 애정 표현 차이", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: couple_lifestyle
+        label: "생활 습관"
+        minors:
+          - { id: cleanliness, label: "청결·정리 기준 차이", allowCustomInput: false }
+          - { id: sleep, label: "수면 패턴 차이", allowCustomInput: false }
+          - { id: food, label: "식습관 차이", allowCustomInput: false }
+          - { id: routine, label: "규칙적/불규칙적 생활 차이", allowCustomInput: false }
+          - { id: time_sense, label: "시간관념 차이 (지각 등)", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: couple_custom
+        label: "직접 입력"
+        minors:
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+
+  - id: marriage
+    label: "부부"
+    relationType: MARRIAGE
+    middles:
+      - id: marriage_chores
+        label: "육아 · 집안일 분담"
+        minors:
+          - { id: cleaning, label: "청소·정리 분담 불공평", allowCustomInput: false }
+          - { id: cooking, label: "요리·식사 준비 갈등", allowCustomInput: false }
+          - { id: childcare_part, label: "육아 참여도 차이", allowCustomInput: false }
+          - { id: parenting_standard, label: "부모 역할 기준 차이", allowCustomInput: false }
+          - { id: pets, label: "반려동물 돌봄 분담", allowCustomInput: false }
+          - { id: chores_tilt, label: "집안일이 한쪽에 쏠림", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: marriage_money
+        label: "돈 · 재정"
+        minors:
+          - { id: spending, label: "소비 습관 차이", allowCustomInput: false }
+          - { id: savings, label: "저축·투자 방향 차이", allowCustomInput: false }
+          - { id: allowance, label: "용돈 제도 갈등", allowCustomInput: false }
+          - { id: debt, label: "대출·부채 문제", allowCustomInput: false }
+          - { id: transparency, label: "재정 투명성 문제", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: marriage_inlaws
+        label: "시가 · 처가"
+        minors:
+          - { id: visit_freq, label: "시가/처가 방문 빈도", allowCustomInput: false }
+          - { id: holidays, label: "명절 보내는 방식", allowCustomInput: false }
+          - { id: parent_care, label: "부모님 돌봄·간병", allowCustomInput: false }
+          - { id: intrusion, label: "시가/처가로부터 오는 간섭", allowCustomInput: false }
+          - { id: events_cost, label: "경조사 비용·참여", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: marriage_children
+        label: "자녀"
+        minors:
+          - { id: edu_direction, label: "자녀 교육 방향 차이", allowCustomInput: false }
+          - { id: discipline, label: "훈육 방식 갈등", allowCustomInput: false }
+          - { id: plan, label: "자녀 계획", allowCustomInput: false }
+          - { id: entrance, label: "입시·진로 관련 갈등", allowCustomInput: false }
+          - { id: onesided, label: "한쪽에게 편중된 양육", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: marriage_affection
+        label: "부부 관계 · 애정"
+        minors:
+          - { id: intimacy, label: "스킨십·부부관계 문제", allowCustomInput: false }
+          - { id: lack_talk, label: "대화 부족", allowCustomInput: false }
+          - { id: no_date, label: "데이트 시간 없음", allowCustomInput: false }
+          - { id: less_affection, label: "애정 표현 감소", allowCustomInput: false }
+          - { id: boredom, label: "권태기", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: marriage_lifestyle
+        label: "생활 습관"
+        minors:
+          - { id: cleanliness, label: "청결 기준 차이", allowCustomInput: false }
+          - { id: food, label: "식습관 차이", allowCustomInput: false }
+          - { id: sleep, label: "수면 패턴 차이", allowCustomInput: false }
+          - { id: hobby_time, label: "취미 시간 갈등", allowCustomInput: false }
+          - { id: home_rules, label: "집안 기준 차이", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: marriage_trust
+        label: "신뢰 · 외도 의심"
+        minors:
+          - { id: suspicious, label: "의심스러운 행동", allowCustomInput: false }
+          - { id: message, label: "메시지·전화 문제", allowCustomInput: false }
+          - { id: other, label: "이성 관계 의혹", allowCustomInput: false }
+          - { id: lies, label: "거짓말 반복", allowCustomInput: false }
+          - { id: hiding, label: "비밀·숨김", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: marriage_career
+        label: "직업 · 커리어"
+        minors:
+          - { id: work_stress, label: "배우자의 직장 일로 인한 갈등", allowCustomInput: false }
+          - { id: relocation, label: "이직·이사 결정", allowCustomInput: false }
+          - { id: dual_income, label: "맞벌이 관련 갈등", allowCustomInput: false }
+          - { id: retirement, label: "퇴직·전업 갈등", allowCustomInput: false }
+          - { id: contribution, label: "경제적 기여도 갈등", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: marriage_custom
+        label: "직접 입력"
+        minors:
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+
+  - id: friend
+    label: "친구"
+    relationType: FRIEND
+    middles:
+      - id: friend_distance
+        label: "연락 소홀 · 거리감"
+        minors:
+          - { id: less_contact, label: "연락이 뜸해짐", allowCustomInput: false }
+          - { id: one_sided, label: "내가 먼저 연락만 함", allowCustomInput: false }
+          - { id: not_shared, label: "중요한 일 공유 안 함", allowCustomInput: false }
+          - { id: other_friends, label: "다른 친구만 챙김", allowCustomInput: false }
+          - { id: felt_distance, label: "거리감 느껴짐", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_trust
+        label: "약속 · 신뢰"
+        minors:
+          - { id: break_promise, label: "약속을 자주 어김", allowCustomInput: false }
+          - { id: last_minute, label: "당일 취소 반복", allowCustomInput: false }
+          - { id: late, label: "지각 문제", allowCustomInput: false }
+          - { id: secret_leak, label: "비밀 누설", allowCustomInput: false }
+          - { id: trust_break, label: "신뢰 깨는 행동", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_words
+        label: "말실수 · 험담"
+        minors:
+          - { id: gossip, label: "뒷담화", allowCustomInput: false }
+          - { id: rude, label: "무례한 말", allowCustomInput: false }
+          - { id: looks, label: "외모·성격 지적", allowCustomInput: false }
+          - { id: sns, label: "SNS에서의 갈등", allowCustomInput: false }
+          - { id: joke_line, label: "농담이 선을 넘음", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_money
+        label: "돈 문제"
+        minors:
+          - { id: loan, label: "빌려준 돈 문제", allowCustomInput: false }
+          - { id: bill_split, label: "계산 관련 갈등", allowCustomInput: false }
+          - { id: gift_cost, label: "선물·경조사비 갈등", allowCustomInput: false }
+          - { id: shared_cost, label: "공동 지출 분담", allowCustomInput: false }
+          - { id: money_sense, label: "경제 관념 차이", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_social
+        label: "인간관계"
+        minors:
+          - { id: mutual_friend, label: "공동 친구와 관련된 갈등", allowCustomInput: false }
+          - { id: exclusion, label: "모임에서 배제당함", allowCustomInput: false }
+          - { id: jealousy, label: "삼각관계·질투", allowCustomInput: false }
+          - { id: new_friend, label: "새로운 친구로 인한 소외", allowCustomInput: false }
+          - { id: partner_vs_friend, label: "연인과 친구 사이 갈등", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_values
+        label: "가치관 차이"
+        minors:
+          - { id: politics, label: "정치 성향 차이", allowCustomInput: false }
+          - { id: religion, label: "종교 관련 갈등", allowCustomInput: false }
+          - { id: social_issue, label: "사회 이슈에 대한 입장 차이", allowCustomInput: false }
+          - { id: lifestyle, label: "라이프스타일 가치관 차이", allowCustomInput: false }
+          - { id: generation, label: "세대 차이", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_events
+        label: "경사 · 상사"
+        minors:
+          - { id: wedding, label: "결혼식 참석/축의금", allowCustomInput: false }
+          - { id: funeral, label: "장례식 관련", allowCustomInput: false }
+          - { id: baby, label: "출산·돌잔치 관련", allowCustomInput: false }
+          - { id: birthday, label: "생일·기념일 챙김 문제", allowCustomInput: false }
+          - { id: event_cost, label: "경조사 비용 차이", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_custom
+        label: "직접 입력"
+        minors:
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+
+  - id: family
+    label: "가족"
+    relationType: FAMILY
+    middles:
+      - id: family_money
+        label: "재산 · 상속"
+        minors:
+          - { id: inheritance, label: "유산 분배 갈등", allowCustomInput: false }
+          - { id: parent_asset, label: "부모님 재산 관리", allowCustomInput: false }
+          - { id: loan, label: "빌려준 돈 문제", allowCustomInput: false }
+          - { id: business, label: "사업 동업 갈등", allowCustomInput: false }
+          - { id: real_estate, label: "부동산·투자 관련", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: family_holiday
+        label: "명절 · 가족모임"
+        minors:
+          - { id: attend, label: "명절 참석 갈등", allowCustomInput: false }
+          - { id: food_prep, label: "음식·준비 분담 불공평", allowCustomInput: false }
+          - { id: gathering, label: "모임에서의 갈등 발언", allowCustomInput: false }
+          - { id: family_chat, label: "가족 단톡방 갈등", allowCustomInput: false }
+          - { id: attend_event, label: "경조사 참석 문제", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: family_parenting
+        label: "자녀 양육 · 교육"
+        minors:
+          - { id: compare, label: "조카·자녀 비교", allowCustomInput: false }
+          - { id: criticism, label: "양육 방식 비판", allowCustomInput: false }
+          - { id: edu_direction, label: "교육 방향 차이", allowCustomInput: false }
+          - { id: cousins, label: "사촌들 간 갈등", allowCustomInput: false }
+          - { id: favoritism, label: "한쪽 자녀 편애", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: family_care
+        label: "부모님 돌봄 · 간병"
+        minors:
+          - { id: share_care, label: "부모님 간병 분담", allowCustomInput: false }
+          - { id: money_share, label: "경제적 부담 분담", allowCustomInput: false }
+          - { id: care_style, label: "돌봄 방식 차이", allowCustomInput: false }
+          - { id: role_conflict, label: "형제간 역할 갈등", allowCustomInput: false }
+          - { id: onesided, label: "한쪽에게 편중된 돌봄", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: family_intrusion
+        label: "생활 간섭"
+        minors:
+          - { id: marriage_life, label: "내 결혼·연애 간섭", allowCustomInput: false }
+          - { id: career, label: "진로·직업 간섭", allowCustomInput: false }
+          - { id: parenting, label: "자녀 양육 방식 간섭", allowCustomInput: false }
+          - { id: looks, label: "외모·체형 지적", allowCustomInput: false }
+          - { id: finance, label: "경제생활 간섭", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: family_old_pain
+        label: "오래된 서운함"
+        minors:
+          - { id: childhood, label: "어린 시절 상처", allowCustomInput: false }
+          - { id: discrimination, label: "차별받았다고 느낌", allowCustomInput: false }
+          - { id: misunderstanding, label: "오래된 오해", allowCustomInput: false }
+          - { id: ignored, label: "무시당한 경험", allowCustomInput: false }
+          - { id: emotional_distance, label: "감정적 거리감", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: family_custom
+        label: "직접 입력"
+        minors:
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+
+  - id: parent_child
+    label: "부모 · 자식"
+    relationType: PARENT_CHILD
+    middles:
+      - id: pc_career
+        label: "진로 · 직업"
+        minors:
+          - { id: job_choice, label: "직업 선택 갈등", allowCustomInput: false }
+          - { id: grades, label: "공부·성적 압박", allowCustomInput: false }
+          - { id: quit_job, label: "이직·퇴사 갈등", allowCustomInput: false }
+          - { id: business, label: "사업·창업 반대", allowCustomInput: false }
+          - { id: dream_vs_reality, label: "자녀의 꿈 vs 현실 문제", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: pc_marriage
+        label: "결혼 · 연애"
+        minors:
+          - { id: partner_obj, label: "연인에 대한 반대", allowCustomInput: false }
+          - { id: timing, label: "결혼 시기 갈등", allowCustomInput: false }
+          - { id: criteria, label: "결혼 상대 기준 차이", allowCustomInput: false }
+          - { id: wedding, label: "결혼식·혼수 갈등", allowCustomInput: false }
+          - { id: pressure, label: "비혼·만혼에 대한 압박", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: pc_autonomy
+        label: "독립 · 자율성"
+        minors:
+          - { id: independence_timing, label: "독립 시기 갈등", allowCustomInput: false }
+          - { id: live_alone, label: "혼자 살고 싶은데 반대", allowCustomInput: false }
+          - { id: econ_indep, label: "경제적 독립 갈등", allowCustomInput: false }
+          - { id: life_intrusion, label: "생활 방식 간섭", allowCustomInput: false }
+          - { id: privacy, label: "사생활 침해", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: pc_money
+        label: "돈 · 경제"
+        minors:
+          - { id: allowance, label: "용돈·생활비 문제", allowCustomInput: false }
+          - { id: support, label: "경제적 지원 갈등", allowCustomInput: false }
+          - { id: support_parent, label: "부모 부양 문제", allowCustomInput: false }
+          - { id: support_child, label: "자녀 금전 지원 문제", allowCustomInput: false }
+          - { id: sense, label: "경제관념 차이", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: pc_lifestyle
+        label: "생활 간섭"
+        minors:
+          - { id: looks, label: "옷차림·외모 지적", allowCustomInput: false }
+          - { id: friends, label: "친구 관계 간섭", allowCustomInput: false }
+          - { id: sns, label: "SNS·취미 간섭", allowCustomInput: false }
+          - { id: sleep_food, label: "수면·식습관 지적", allowCustomInput: false }
+          - { id: room, label: "방·집안 정리 갈등", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: pc_tone
+        label: "표현 방식 · 말투"
+        minors:
+          - { id: hurtful, label: "말투가 상처됨", allowCustomInput: false }
+          - { id: dismissive, label: "무시하는 듯한 표현", allowCustomInput: false }
+          - { id: compare, label: "비교하는 말", allowCustomInput: false }
+          - { id: emotional, label: "감정적으로 격해짐", allowCustomInput: false }
+          - { id: cutoff, label: "소통 단절", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: pc_favoritism
+        label: "형제자매와의 차별"
+        minors:
+          - { id: feel, label: "형제 편애 느낌", allowCustomInput: false }
+          - { id: expectation, label: "기대치 차별", allowCustomInput: false }
+          - { id: support_diff, label: "지원 차별", allowCustomInput: false }
+          - { id: attention, label: "관심의 차별", allowCustomInput: false }
+          - { id: inherit_diff, label: "유산·재산 차별", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: pc_custom
+        label: "직접 입력"
+        minors:
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+
+  - id: korean_specific
+    label: "한국 특화 갈등"
+    relationType: KOREAN_SPECIFIC
+    middles:
+      - id: in_law
+        label: "시댁 · 처가 관련"
+        minors:
+          - { id: visit_freq, label: "시가/처가 방문 빈도 갈등", allowCustomInput: false }
+          - { id: holiday_ritual, label: "명절 의례·분담 갈등", allowCustomInput: false }
+          - { id: interference, label: "시가/처가의 부부 생활 간섭", allowCustomInput: false }
+          - { id: event_cost, label: "경조사 비용·참여 갈등", allowCustomInput: false }
+          - { id: parent_care, label: "시가/처가 부모 돌봄 문제", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: face
+        label: "다른 사람 앞에서의 무시"
+        minors:
+          - { id: public_embarrass, label: "공개적으로 망신·무시당함", allowCustomInput: false }
+          - { id: sns_humiliation, label: "SNS에서 공개적으로 깎아내림", allowCustomInput: false }
+          - { id: family_gathering, label: "친지·직장 모임에서의 무시", allowCustomInput: false }
+          - { id: behind_back, label: "제3자에게 험담·비하", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: lingered
+        label: "오래 묵힌 서운함"
+        minors:
+          - { id: accumulated, label: "오래전부터 쌓여온 서운함", allowCustomInput: false }
+          - { id: repeated_pattern, label: "반복되는 같은 문제", allowCustomInput: false }
+          - { id: never_resolved, label: "해결 안 된 채 지나간 갈등", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: generation
+        label: "세대차 · 원가족 영향"
+        minors:
+          - { id: parenting_values, label: "양육관 차이 (원가족 영향)", allowCustomInput: false }
+          - { id: money_values, label: "경제관 차이 (저축·소비 관습)", allowCustomInput: false }
+          - { id: marriage_ritual, label: "결혼 의례·관습 가치관 차이", allowCustomInput: false }
+          - { id: generation_gap, label: "세대 간 소통 방식 차이", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: korean_specific_custom
+        label: "직접 입력"
+        minors:
+          - { id: custom, label: "직접 입력", allowCustomInput: true }

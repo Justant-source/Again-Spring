@@ -37,6 +37,10 @@ public class UserProfileFragment {
         if (style.getCaution() != null && !style.getCaution().isEmpty()) {
             sb.append("- 주의: ").append(String.join(", ", style.getCaution())).append("\n");
         }
+        if (user.getMbtiType() != null && !user.getMbtiType().isBlank()) {
+            sb.append("- MBTI: ").append(user.getMbtiType())
+              .append(" (보강 정보 — 단독 결정 변수 아님, 사용자 발화 우선)\n");
+        }
         sb.append("</user_profile>\n");
         return sb.toString();
     }

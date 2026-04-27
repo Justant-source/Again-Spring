@@ -62,6 +62,7 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 #### API / 스키마
 - `shared/docs/api/rest-spec.md` — REST API 전체 명세
 - `shared/docs/api/database-schema.md` — MariaDB 테이블 설명
+- `shared/docs/categories.yml` — 카테고리 catalog (FE/BE 공유 권위본). 변경 시 `frontend/lib/constants/categories.ts` 동기화 필요
 
 #### LLM / 프롬프트
 - `shared/docs/prompts/README.md` — 프롬프트 레이어링(시스템/Gottman/NVC/관계/턴) + 핫리로드
@@ -435,6 +436,7 @@ APP_URL=https://dev.againspring.net
   - ✅ **LLM 브릿지 (Claude Haiku 4.5 + 호스트 ~/.claude 마운트, API 키 불필요)**
   - ✅ **중재 컨텍스트 강화 (Phase A/B/C)**: 사용자 프로필 주입(`UserProfileFragment`) + 턴 간 심리 점수 피드백(`PsychologyFeedbackFormatter`, `ChatTurnMetaParser`) + Duo 균형 추적(`DuoBalanceFormatter`)
   - ✅ **중재 컨텍스트 강화 Phase D**: UserState 7종 + IssueContext 4슬롯 + QuestionQueue (A·B 분리 PQ) + B 진입 시 환영+PQ top1 통합 메시지 + IsolationLintFilter 격리 3중 방어. 권위본: `shared/docs/policies/context-algorithm.md`
+  - ✅ **컨텍스트 주입 누락 수정 (2026-04-27)**: 카테고리(대/중/소분류 + 직접 입력) + MBTI + 누락 관계 가이드(marriage, korean_specific) 주입. `CategoryContextFragment`, `categories.yml`, Flyway V11, `UserProfileFragment` MBTI 보강. 권위본: `shared/docs/policies/categories.md`, `shared/docs/policies/onboarding.md`.
   - ✅ 위기 감지 (CrisisDetector) + 금지어 가드 (KeywordGuard)
   - ✅ 리포트 생성 (기여도, NVC — 4Horsemen 내부 점수만 보존, UI 노출 없음)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
