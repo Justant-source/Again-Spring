@@ -12,6 +12,8 @@ import com.againspring.repository.UserRepository;
 import com.againspring.service.context.IssueContextMerger;
 import com.againspring.service.context.QuestionQueueUpdater;
 import com.againspring.service.context.UserStateAppender;
+import com.againspring.service.context.WelcomeMessageGenerator;
+import com.againspring.service.context.WelcomeQuestionResolver;
 import com.againspring.safety.IsolationLintFilter;
 import com.againspring.service.crisis.CrisisDetector;
 import com.againspring.service.parser.ChatTurnMetaParser;
@@ -48,6 +50,8 @@ public class ChatService {
     private final IssueContextMerger issueContextMerger; // Phase D PR-3
     private final QuestionQueueUpdater questionQueueUpdater; // Phase D PR-4
     private final IsolationLintFilter isolationLintFilter; // Phase D PR-4
+    private final WelcomeQuestionResolver welcomeQuestionResolver; // Phase D PR-5
+    private final WelcomeMessageGenerator welcomeMessageGenerator; // Phase D PR-5
 
     public ChatService(MessageRepository messageRepo, SessionRepository sessionRepo,
                       UserRepository userRepo,
@@ -58,7 +62,9 @@ public class ChatService {
                       UserStateAppender userStateAppender,
                       IssueContextMerger issueContextMerger,
                       QuestionQueueUpdater questionQueueUpdater,
-                      IsolationLintFilter isolationLintFilter) {
+                      IsolationLintFilter isolationLintFilter,
+                      WelcomeQuestionResolver welcomeQuestionResolver,
+                      WelcomeMessageGenerator welcomeMessageGenerator) {
         this.messageRepo = messageRepo;
         this.sessionRepo = sessionRepo;
         this.userRepo = userRepo;
@@ -73,6 +79,8 @@ public class ChatService {
         this.issueContextMerger = issueContextMerger;
         this.questionQueueUpdater = questionQueueUpdater;
         this.isolationLintFilter = isolationLintFilter;
+        this.welcomeQuestionResolver = welcomeQuestionResolver;
+        this.welcomeMessageGenerator = welcomeMessageGenerator;
     }
 
     public static final int MIN_MESSAGES_TO_FINALIZE = 3;
@@ -226,9 +234,13 @@ public class ChatService {
             .llmModel(MODEL_HAIKU)
             .build());
 
-        // 시스템 안내 메시지 — B에게 (B가 이제 방금 들어왔으니 인사 + 시작 유도)
-        String bNotice = "함께 정리하러 와주셔서 고마워요. 천천히 마음을 들려주세요.\n"
-                       + "상대분이 적으신 내용은 제가 따로 듣고 있어요. 두 분의 이야기는 서로 보이지 않아요.";
+        // Phase D PR-5: B 진입 환영 + 첫 질문 — 동적 생성
+        Session.PendingQuestion welcomeQ = welcomeQuestionResolver.resolveOrCreate(session);
+        String bNotice = welcomeMessageGenerator.generate(session, welcomeQ);
+        welcomeQ.asked = true;
+        welcomeQ.askedTurn = 0;
+        sessionRepo.save(session);
+
         messageRepo.save(Message.builder()
             .sessionId(sessionId)
             .sender(MessageSender.MEDIATOR_TO_B)
