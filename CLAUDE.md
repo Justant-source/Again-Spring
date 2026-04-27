@@ -97,6 +97,8 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 - `frontend/docs/policies/{forbidden-words-lint,crisis-modal}.md` — FE UI 정책 구현
 - `frontend/docs/ui/{design-handoff,mock-scenarios}.md` — 디자인 핸드오프 + MSW 시나리오
 - `frontend/docs/testing.md` — FE 테스트 전략
+- **`frontend/docs/ux/principles.md`** — **FE UX 권위본** (4원칙군, 우선순위, 로드맵)
+- **`frontend/docs/ux/hax-checklist.md`** — **컴포넌트별 PR 체크리스트** (HAX 18 × 23개 컴포넌트)
 
 ### 환경 / 배포 — `env/docs/`
 - `env/docs/structure.md` — env/ 디렉토리 레이아웃
@@ -106,6 +108,50 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 - `env/docs/local-dev.md` — 로컬 개발 실행법
 - `env/docs/deployment.md` — dev → main → prod 파이프라인
 - `env/docs/cloudflare.md` — Tunnel 라우팅 + 설치
+
+---
+
+## 🎨 FE UX 정책 (프론트엔드 작업 시 항상 준수)
+
+> 권위본: [`frontend/docs/ux/principles.md`](frontend/docs/ux/principles.md) · 컴포넌트 체크리스트: [`frontend/docs/ux/hax-checklist.md`](frontend/docs/ux/hax-checklist.md)
+>
+> 다시봄의 사용자는 **갈등 한복판에 있는 두 사람**입니다. "선의의 디자인"으로는 부족하며, **악용 시나리오를 명시적으로 차단하는 디자인**이 필요합니다.
+
+### 4원칙군 우선순위
+
+| 순위 | 원칙군 | 기준 문헌 | 적용 시점 |
+|---|---|---|---|
+| **1순위 (즉시)** | AI 중재자 신뢰성 | Microsoft HAX 18 가이드라인 | 모든 FE 변경 시 |
+| **1순위 (즉시)** | 위기 사용자 보호 | Designing for Safety (PenzeyMoog) | 모든 FE 변경 시 |
+| **2순위 (플로우)** | 인지 부하 최소화 | GOV.UK Service Manual (question page / task list) | 화면 신규 추가 시 |
+| **3순위 (디테일)** | 카피·인터랙션 | NN/g wizard, SAMHSA 6원칙, Trauma-Informed | 카피·인터랙션 수정 시 |
+| **4순위 (장기)** | 결과 해석 안전성 | WCAG 2.2 cognitive, Do No Harm Guide | 결과 리포트 수정 시 |
+
+### 절대 불변 규칙 (코드에서 절대 되돌리지 않음)
+
+1. **위기 모달(CrisisModal, CrisisResourceModal)은 ESC·바깥 클릭으로 닫히지 않는다.**  
+   `onClick={onClose}` on backdrop, ESC keydown handler → 절대 추가 금지.
+
+2. **위기 감지는 FE(ChatInput)와 BE(KeywordGuard) 이중 구현을 유지한다.**  
+   클라이언트 우회 가능성을 가정. 어느 한쪽 제거 금지.
+
+3. **AI 메시지와 사용자 메시지는 시각적으로 명확히 구분된다.**  
+   `MEDIATOR_TO_A/B` sender를 사용자 메시지와 동일하게 표시 금지.
+
+4. **결과 리포트에 처방(prescription)을 쓰지 않는다.**  
+   "55:45이니 A님이 더 노력하셔야 합니다" 같은 수치→처방 패턴 금지.
+
+5. **`ContributionRatio` 법적 안내 박스는 항상 표시한다.**  
+   "과실비율과 무관합니다" 박스를 숨기거나 조건부로 만드는 것 금지.
+
+### 신규 화면/입력/공유 기능 추가 시 — Safety Check 4문
+
+PR 병합 전 필수 답변 (`.github/PULL_REQUEST_TEMPLATE.md`에 포함):
+
+- **Abuser**: 가해자가 이 기능을 무기로 쓸 수 있는가?
+- **Survivor**: 학대 상황의 사용자에게 새로운 위험이 생기는가?
+- **Roadblock**: 악용을 막거나 마찰을 어디에 두는가?
+- **Exit**: 이 화면에서 1탭으로 빠져나갈 수 있는가?
 
 ---
 
@@ -397,11 +443,22 @@ APP_URL=https://dev.againspring.net
 - ✅ Docker 멀티 컨테이너 배포 (MariaDB / Backend / Frontend / Nginx)
 - ✅ Cloudflare Tunnel — `dev.againspring.net`, `againspring.net`
 - ✅ 문서 4-디렉토리 재구성 (shared/docs, backend/docs, frontend/docs, env/docs)
+- ✅ **FE UX 정책 수립 및 Phase 1+2 적용** (HAX 18 + Designing for Safety — 위기 모달 dismiss 마찰, AI 한계 안내, 나가기 버튼, 데이터 흐름 안내, NeedsMap 근거 아이콘)
 - ⏳ prod 배포 (명시적 지시 시에만)
 
 ---
 
 ## 💡 개발 체크리스트
+
+### 프론트엔드 수정 시
+
+- [ ] 변경된 컴포넌트의 `frontend/docs/ux/hax-checklist.md` 해당 섹션을 읽고 체크
+- [ ] `shared/docs/policies/forbidden-words.md` 금지어 없는지 확인 (`npm run lint:words`)
+- [ ] **1순위**: 위기 모달 dismiss 마찰 유지, AI 능력/한계 안내 존재 여부 확인 (HAX G1·G2)
+- [ ] **1순위**: 새 화면/입력/공유 기능이면 Safety Check 4문 답변 (PR 템플릿)
+- [ ] **2순위**: 한 화면에 한 결정만 (GOV.UK one thing per page)
+- [ ] **2순위**: "잠시 멈추기 / 나가기"가 1탭 안에 (HAX G8·G17)
+- [ ] `npm run build` 성공 확인
 
 ### 백엔드 수정 시
 
@@ -433,3 +490,5 @@ APP_URL=https://dev.againspring.net
 
 **마지막 업데이트**: 2026-04-27
 **담당**: Claude Code (Agent)
+
+> UX 정책 관련 문의: `frontend/docs/ux/principles.md` (4원칙군 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트) 순으로 참조.

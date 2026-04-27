@@ -380,18 +380,19 @@ A 피치(`var(--P-a)`), B 세이지(`var(--P-b)`)의 구분은 적록 색맹 사
 
 본 문서의 모든 원칙을 한 번에 적용하지 않습니다. 다음 4단계로 점진적으로 도입합니다. **현재 코드베이스 진단**에 따라 갭이 있는 항목을 1순위로 둡니다.
 
-### Phase 1 — 즉시 (1군 + 2군의 *현재 갭*)
+### Phase 1 — 즉시 (1군 + 2군의 *현재 갭*) ✅ 완료 (2026-04-27)
 
-- §2.3 **위기 모달 dismiss 마찰 복원** — `chat/CrisisModal.tsx`의 `onClick={onClose}` 제거 + `shared/CrisisResourceModal.tsx`의 ESC 핸들러 수정. 두 모달 거동 통일.
-- §1.1 AI 능력·한계 카드 — `/session/chat/[id]` 첫 진입 1회 노출. 현재 `EmptyChatPlaceholder`에 한 줄 추가가 가장 자연스러운 위치.
-- §2.1 PR 템플릿에 4개 질문 추가.
+- §2.3 **위기 모달 dismiss 마찰 복원** — `chat/CrisisModal.tsx`의 `onClick={onClose}` 제거 + `shared/CrisisResourceModal.tsx`의 ESC 핸들러 제거. 두 모달 거동 통일.
+- §2.3 **ChatInput 위기 alert() 제거** — `onCrisis` 콜백으로 교체, CrisisModal과 거동 통일.
+- §1.1 **AI 능력·한계 안내** — `EmptyChatPlaceholder`에 "AI는 누가 옳은지 판단하지 않아요" 추가.
+- §2.1 **PR 템플릿** — `.github/PULL_REQUEST_TEMPLATE.md` 신규 생성, 4개 Safety Check 질문 포함.
 
-### Phase 2 — 보강
+### Phase 2 — 보강 ✅ 완료 (2026-04-27)
 
-- §1.2 `EmptyChatPlaceholder`에 "정리가 어색하면 이어서 말씀해 주세요" 카피.
-- §1.3 `NeedsMap` 점 옆 `?` 아이콘 추가 (G11 보강).
-- §1.4 `ChatHeader`에 "이 세션 그만두기" 메뉴 추가.
-- §2.2 `ChatInput`에 "이 글은 AI가 정리해서 전달돼요" 작은 안내.
+- §1.4 **`ChatHeader`에 "나가기" 버튼** — `/history` 이동 (HAX G8·G17).
+- §2.2 **`ChatInput` 데이터 흐름 안내** — "이 글은 AI가 정리해서 전달돼요" 상시 표시 (HAX G16).
+- §1.3 **`NeedsMap` `?` 아이콘** — `reasonA/B` prop 추가, hover 시 근거 한 줄 (HAX G11).
+- §1.2 `EmptyChatPlaceholder`에 "정리가 어색하면 이어서 말씀해 주세요" 카피 포함됨.
 
 ### Phase 3 — 카피·인터랙션 디테일
 
@@ -433,5 +434,6 @@ A 피치(`var(--P-a)`), B 세이지(`var(--P-b)`)의 구분은 적록 색맹 사
 
 ## 변경 이력
 
+- 2026-04-27 (v1.2) — Phase 1+2 완료 반영. `CrisisModal` baackdrop click/ESC 제거, `CrisisResourceModal` ESC 제거, `ChatInput` alert() → onCrisis 콜백, `EmptyChatPlaceholder` AI 한계 안내, `ChatHeader` 나가기 버튼, `ChatInput` 데이터 흐름 안내, `NeedsMap` reasonA/B + ? 아이콘, `.github/PULL_REQUEST_TEMPLATE.md` 신규 생성. 로드맵 Phase 1+2 ✅ 표시. `CLAUDE.md`·`frontend/README.md`에 4원칙군 정책 명시.
 - 2026-04-27 (v1.1) — V1.5 카톡식 채팅 + Phase A/B/C 중재 컨텍스트 강화 반영. 11화면 wizard 흐름 → 5화면 + 자유 채팅 흐름으로 갱신. `PartnerPanel` 블러 메타데이터, `ContributionRatio` 법적 안내 박스, `powerImbalanceDetected` 분기, `InviteModal` 3톤 등 V1.5의 *모범 구현*을 §2.2·§2.3·§2.4·§4.3·§4.4에 반영. 위기 모달 dismiss 마찰 갭을 §2.3에 명시.
 - 2026-04-27 (v1.0) — 초안 작성.
