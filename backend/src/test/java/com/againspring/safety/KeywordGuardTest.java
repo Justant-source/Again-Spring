@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Unit tests for KeywordGuard.
@@ -22,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  * - Output filter replacements
  */
 @SpringBootTest
+@ActiveProfiles("test")
 @DisplayName("KeywordGuard Tests")
 class KeywordGuardTest {
 
@@ -241,7 +243,7 @@ class KeywordGuardTest {
 	void testMatchPosition() {
 		ScanResult result = keywordGuard.scanUserInput("어제 때렸어", "user1");
 		assertTrue(result.getMatches().stream()
-			.anyMatch(m -> m.getPosition() == 2)); // "때렸" starts at index 2
+			.anyMatch(m -> m.getPosition() == 3)); // "때렸" starts at index 3 in "어제 때렸어"
 	}
 
 	@Test

@@ -47,6 +47,7 @@ export function ChatInput({ onSend, disabled, onCrisis }: Props) {
           }
         }}
         placeholder="편한 말로 적어주세요"
+        disabled={disabled}
         rows={1}
         style={{
           flex: 1,

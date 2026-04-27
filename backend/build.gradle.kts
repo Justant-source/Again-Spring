@@ -40,8 +40,8 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
 
     implementation("org.springframework.boot:spring-boot-starter-logging")
-    testImplementation("ch.qos.logback:logback-core:1.4.11")
-    testImplementation("ch.qos.logback:logback-classic:1.4.11")
+    // logback-classic은 spring-boot-starter-test가 이미 관리 버전(1.5.x)으로 포함함
+    // 명시적 1.4.11 고정은 StatusPrinter2 ClassNotFoundException 유발하므로 제거
 
     implementation("com.github.vladimir-bukhtoyarov:bucket4j-core:7.6.0")
 

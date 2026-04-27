@@ -6,7 +6,7 @@ import com.againspring.domain.Session;
 import com.againspring.domain.User;
 import com.againspring.domain.enums.ConflictType;
 import com.againspring.domain.enums.MessageSender;
-import com.againspring.llm.bridge.ClaudeCodeBridge;
+import com.againspring.llm.LLMProvider;
 import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.MessageRepository;
 import com.againspring.repository.ReportRepository;
@@ -31,14 +31,14 @@ import java.util.concurrent.Executors;
 /**
  * ReportGenerationService (V1.5 카톡식)
  * Async report generation using Claude Sonnet for duo/solo reports.
- * Calls ClaudeCodeBridge with custom model selection.
+ * Calls LLMProvider with custom model selection.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReportGenerationService {
 
-    private final ClaudeCodeBridge llmBridge;
+    private final LLMProvider llmBridge;
     private final MessageRepository messageRepo;
     private final ReportRepository reportRepo;
     private final SessionRepository sessionRepo;

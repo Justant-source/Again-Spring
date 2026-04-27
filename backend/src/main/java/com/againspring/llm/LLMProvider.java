@@ -19,6 +19,12 @@ public interface LLMProvider {
     CompletableFuture<LLMResponse> invokeAsync(LLMRequest request);
 
     /**
+     * Raw string invocation with explicit model selection.
+     * Used by ChatService and other services that assemble prompts directly.
+     */
+    String invoke(String prompt, String model) throws Exception;
+
+    /**
      * Provider identity for logging/monitoring.
      */
     String getProviderName();

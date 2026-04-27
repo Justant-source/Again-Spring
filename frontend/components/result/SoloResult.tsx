@@ -111,9 +111,9 @@ export function SoloResult({ report }: { report: Report }) {
               <IconEye size={15} />
             </span>
             <div>
-              <b style={{ fontWeight: 500 }}>관찰</b> ·{' '}
-              {report.nvcScripts?.aToB?.observation ||
-                '상황을 객관적으로 보셨어요'}
+              <b style={{ fontWeight: 500 }}>관찰</b>{' '}·{' '}
+              <span>{report.nvcScripts?.aToB?.observation ||
+                '상황을 객관적으로 보셨어요'}</span>
             </div>
           </div>
 
@@ -123,9 +123,9 @@ export function SoloResult({ report }: { report: Report }) {
               <IconDrop size={15} />
             </span>
             <div>
-              <b style={{ fontWeight: 500 }}>느낌</b> ·{' '}
-              {report.nvcScripts?.aToB?.feeling ||
-                '그때의 감정이 잘 정리되었어요'}
+              <b style={{ fontWeight: 500 }}>느낌</b>{' '}·{' '}
+              <span>{report.nvcScripts?.aToB?.feeling ||
+                '그때의 감정이 잘 정리되었어요'}</span>
             </div>
           </div>
 
@@ -135,9 +135,9 @@ export function SoloResult({ report }: { report: Report }) {
               <IconNeed size={15} />
             </span>
             <div>
-              <b style={{ fontWeight: 500 }}>욕구</b> ·{' '}
-              {report.nvcScripts?.aToB?.need ||
-                '진정한 필요가 드러났어요'}
+              <b style={{ fontWeight: 500 }}>욕구</b>{' '}·{' '}
+              <span>{report.nvcScripts?.aToB?.need ||
+                '진정한 필요가 드러났어요'}</span>
             </div>
           </div>
 
@@ -147,9 +147,9 @@ export function SoloResult({ report }: { report: Report }) {
               <IconAsk size={15} />
             </span>
             <div>
-              <b style={{ fontWeight: 500 }}>부탁</b> ·{' '}
-              {report.nvcScripts?.aToB?.request ||
-                '건설적인 요청이 있으셨어요'}
+              <b style={{ fontWeight: 500 }}>부탁</b>{' '}·{' '}
+              <span>{report.nvcScripts?.aToB?.request ||
+                '건설적인 요청이 있으셨어요'}</span>
             </div>
           </div>
         </div>

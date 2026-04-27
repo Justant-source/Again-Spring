@@ -67,10 +67,10 @@ export function MbtiAxisSlider({
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
         <span style={{ fontSize: 11, color: isLeft ? 'var(--L-accent)' : 'var(--L-sub)' }}>
-          {leftLabel} {leftPct}%
+          <span>{leftLabel}</span>{' '}<span>{leftPct}%</span>
         </span>
         <span style={{ fontSize: 11, color: !isLeft ? 'var(--L-accent)' : 'var(--L-sub)' }}>
-          {rightLabel} {rightPct}%
+          <span>{rightLabel}</span>{' '}<span>{rightPct}%</span>
         </span>
       </div>
     </div>

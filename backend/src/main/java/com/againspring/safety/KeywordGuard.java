@@ -317,6 +317,9 @@ public class KeywordGuard {
 		try {
 			if (configPath.startsWith("classpath:")) {
 				String resourcePath = configPath.replace("classpath:", "");
+				if (resourcePath.startsWith("/")) {
+					resourcePath = resourcePath.substring(1);
+				}
 				ClassLoader classLoader = getClass().getClassLoader();
 				java.net.URL url = classLoader.getResource(resourcePath);
 				if (url == null) {

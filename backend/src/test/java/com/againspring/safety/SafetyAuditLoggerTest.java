@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 import ch.qos.logback.classic.Logger;
@@ -28,6 +29,7 @@ import org.slf4j.LoggerFactory;
  * - All required fields are present in log
  */
 @SpringBootTest
+@ActiveProfiles("test")
 @TestPropertySource(properties = {
 	"logging.level.com.againspring.safety.audit=WARN"
 })
@@ -68,7 +70,7 @@ class SafetyAuditLoggerTest {
 
 		assertEquals(1, listAppender.list.size());
 		ILoggingEvent logEvent = listAppender.list.get(0);
-		String message = logEvent.getMessage();
+		String message = logEvent.getFormattedMessage();
 
 		assertTrue(message.contains("userId=user123"));
 		assertTrue(message.contains("sessionId=session456"));
@@ -92,7 +94,7 @@ class SafetyAuditLoggerTest {
 
 		assertEquals(1, listAppender.list.size());
 		ILoggingEvent logEvent = listAppender.list.get(0);
-		String message = logEvent.getMessage();
+		String message = logEvent.getFormattedMessage();
 
 		assertTrue(message.contains("userId=user789"));
 		assertTrue(message.contains("sessionId=session012"));
@@ -114,7 +116,7 @@ class SafetyAuditLoggerTest {
 		auditLogger.onCrisisDetected(event);
 
 		ILoggingEvent logEvent = listAppender.list.get(0);
-		String message = logEvent.getMessage();
+		String message = logEvent.getFormattedMessage();
 
 		// Verify key=value pattern
 		assertTrue(message.matches(".*userId=\\w+.*"));
@@ -136,7 +138,7 @@ class SafetyAuditLoggerTest {
 		auditLogger.onCrisisDetected(event);
 
 		ILoggingEvent logEvent = listAppender.list.get(0);
-		String message = logEvent.getMessage();
+		String message = logEvent.getFormattedMessage();
 
 		// Raw text should not be in log
 		assertFalse(message.contains("자살하고싶어"));
@@ -158,7 +160,7 @@ class SafetyAuditLoggerTest {
 		auditLogger.onCrisisDetected(event);
 
 		ILoggingEvent logEvent = listAppender.list.get(0);
-		String message = logEvent.getMessage();
+		String message = logEvent.getFormattedMessage();
 
 		// All pattern names should be in log
 		assertTrue(message.contains("patterns"));
@@ -178,7 +180,7 @@ class SafetyAuditLoggerTest {
 		auditLogger.onCrisisDetected(event);
 
 		ILoggingEvent logEvent = listAppender.list.get(0);
-		String message = logEvent.getMessage();
+		String message = logEvent.getFormattedMessage();
 
 		// Timestamp field should be present
 		assertTrue(message.contains("timestamp"));

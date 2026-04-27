@@ -5,7 +5,7 @@ import com.againspring.domain.Session;
 import com.againspring.domain.User;
 import com.againspring.domain.enums.MessageSender;
 import com.againspring.domain.enums.SessionStatus;
-import com.againspring.llm.bridge.ClaudeCodeBridge;
+import com.againspring.llm.LLMProvider;
 import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
@@ -40,7 +40,7 @@ public class ChatService {
     private final MessageRepository messageRepo;
     private final SessionRepository sessionRepo;
     private final UserRepository userRepo;
-    private final ClaudeCodeBridge llmBridge;
+    private final LLMProvider llmBridge;
     private final CrisisDetector crisisDetector;
     private final ChatPromptAssembler promptAssembler;
     private final SessionStateMachine stateMachine;
@@ -57,7 +57,7 @@ public class ChatService {
 
     public ChatService(MessageRepository messageRepo, SessionRepository sessionRepo,
                       UserRepository userRepo,
-                      ClaudeCodeBridge llmBridge, CrisisDetector crisisDetector,
+                      LLMProvider llmBridge, CrisisDetector crisisDetector,
                       ChatPromptAssembler promptAssembler, SessionStateMachine stateMachine,
                       ReportGenerationService reportService, SessionRoleResolver roleResolver,
                       ChatTurnMetaParser turnMetaParser,

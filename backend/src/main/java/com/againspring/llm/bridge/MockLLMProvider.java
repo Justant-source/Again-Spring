@@ -77,6 +77,12 @@ public class MockLLMProvider implements LLMProvider {
     }
 
     @Override
+    public String invoke(String prompt, String model) {
+        log.info("MockLLMProvider.invoke(String, String) called with model={}", model);
+        return "[Mock] 두 분의 이야기를 잘 들었어요. 서로의 마음을 조금 더 나눠보실 수 있을까요?";
+    }
+
+    @Override
     public String getProviderName() {
         return "mock";
     }

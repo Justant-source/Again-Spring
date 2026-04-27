@@ -1,7 +1,7 @@
 package com.againspring.service.context;
 
 import com.againspring.domain.Session;
-import com.againspring.llm.bridge.ClaudeCodeBridge;
+import com.againspring.llm.LLMProvider;
 import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.service.prompt.IssueContextFragment;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,7 @@ import static com.againspring.service.ChatService.MODEL_HAIKU;
 public class WelcomeMessageGenerator {
 
     private final PromptLoader loader;
-    private final ClaudeCodeBridge llmBridge;
+    private final LLMProvider llmBridge;
     private final IssueContextFragment issueFragment;
 
     public String generate(Session session, Session.PendingQuestion welcomeQ) {

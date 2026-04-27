@@ -103,7 +103,7 @@ level3:
   - pattern: "맞다"
     category: JUDGMENT_LANGUAGE
     crisis: false
-  - pattern: "틀렸다"
+  - pattern: "틀렸"
     category: JUDGMENT_LANGUAGE
     crisis: false
   - pattern: "정답"
