@@ -68,30 +68,34 @@ export function ChatLayout({ sessionId, session: initialSession }: Props) {
 
   return (
     <>
-      {/* 상단 상태바 (Duo 전환 시 자동 표시) */}
-      {isDuo && <PartnerStatusBar sessionId={sessionId} myRole={myRole} />}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        {/* 상단 상태바 — 자연스러운 플로우로 ChatHeader 위에 겹치지 않음 */}
+        {isDuo && <PartnerStatusBar sessionId={sessionId} myRole={myRole} />}
 
-      {!isDuo ? (
-        // Solo: 단일 패널
-        <ChatPanel
-          sessionId={sessionId}
-          session={session}
-          currentUserSender={myRole}
-          isDuo={false}
-          onOpenInvite={() => setShowInviteModal(true)}
-        />
-      ) : (
-        // Duo: 스와이프 분할
-        <SwipeContainer hint="← 스와이프하면 상대 진행도 볼 수 있어요">
-          <ChatPanel
-            sessionId={sessionId}
-            session={session}
-            currentUserSender={myRole}
-            isDuo={true}
-          />
-          <PartnerPanel sessionId={sessionId} myRole={myRole} />
-        </SwipeContainer>
-      )}
+        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+          {!isDuo ? (
+            // Solo: 단일 패널
+            <ChatPanel
+              sessionId={sessionId}
+              session={session}
+              currentUserSender={myRole}
+              isDuo={false}
+              onOpenInvite={() => setShowInviteModal(true)}
+            />
+          ) : (
+            // Duo: 스와이프 분할
+            <SwipeContainer hint="← 스와이프하면 상대 진행도 볼 수 있어요">
+              <ChatPanel
+                sessionId={sessionId}
+                session={session}
+                currentUserSender={myRole}
+                isDuo={true}
+              />
+              <PartnerPanel sessionId={sessionId} myRole={myRole} />
+            </SwipeContainer>
+          )}
+        </div>
+      </div>
 
       {/* 초대 모달 */}
       {showInviteModal && (

@@ -50,21 +50,17 @@ export function PartnerStatusBar({ sessionId, myRole }: Props) {
   return (
     <div
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
         padding: '6px 16px',
         background: 'var(--P-card)',
         borderBottom: '1px solid var(--P-border)',
         fontSize: 11,
         color: 'var(--P-sub)',
         textAlign: 'center',
-        zIndex: 100,
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
         gap: 6,
+        flexShrink: 0,
       }}
     >
       <div

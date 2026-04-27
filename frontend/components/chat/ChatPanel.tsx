@@ -170,6 +170,7 @@ export function ChatPanel({
   const handleDeclineFinalize = async () => {
     try {
       await api.post(`/api/sessions/${sessionId}/finalize/decline`);
+      setMessages(prev => prev.filter(m => !m.isFinalizeSuggestion));
     } catch (e) {
       console.error('Finalize decline failed:', e);
     }
@@ -180,7 +181,7 @@ export function ChatPanel({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        height: '100%',
         background: 'var(--P-bg)',
       }}
     >

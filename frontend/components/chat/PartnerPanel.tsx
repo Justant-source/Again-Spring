@@ -41,7 +41,7 @@ export function PartnerPanel({ sessionId, myRole }: Props) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        height: '100%',
         background: 'var(--P-bg)',
       }}
     >
