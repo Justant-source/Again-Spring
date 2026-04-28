@@ -114,6 +114,16 @@ public class MessageController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/invite")
+    @SecurityRequirement(name = "bearer-jwt")
+    public ResponseEntity<InviteTokenResponse> getInvite(
+        @PathVariable String sessionId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        var response = sessionService.getInviteForExistingSession(sessionId, userDetails.getUsername());
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/invite")
     @SecurityRequirement(name = "bearer-jwt")
     public ResponseEntity<InviteTokenResponse> generateInvite(

@@ -53,6 +53,9 @@ public class Message {
     @Builder.Default
     private Long llmLatencyMs = 0L;
 
+    @Column(name = "dismissed_at")
+    private Instant dismissedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

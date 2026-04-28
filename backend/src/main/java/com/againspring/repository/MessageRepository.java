@@ -28,4 +28,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     long countBySessionIdAndSender(String sessionId, MessageSender sender);
 
     boolean existsBySessionIdAndSenderAndIsFinalizeSuggestionTrue(String sessionId, MessageSender sender);
+
+    List<Message> findBySessionIdAndSenderAndIsFinalizeSuggestionTrueAndDismissedAtIsNull(
+            String sessionId, MessageSender sender);
 }

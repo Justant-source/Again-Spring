@@ -213,6 +213,14 @@ public class SessionService {
                     "This session is no longer available for joining");
         }
 
+        // 본인이 자기 세션에 join 불가
+        if (userId.isPresent() && userId.get().equals(session.getCreatedByUserId())) {
+            throw new BusinessException(
+                    "SESSION_SELF_JOIN_FORBIDDEN",
+                    "본인이 만든 세션에는 합류할 수 없어요. 상대방에게 링크를 공유해 주세요",
+                    400);
+        }
+
         // Check if already joined (userB가 이미 있으면 안됨)
         if (session.getUserBId() != null) {
             throw new BusinessException(
@@ -234,6 +242,45 @@ public class SessionService {
         log.info("Session joined: id={}, invitee={}", session.getId(), userBId);
 
         return mapToSessionResponse(sessionRepository.findById(session.getId()).orElseThrow(), userBId);
+    }
+
+    /**
+     * 초대 토큰 조회 (GET). 이미 발급된 토큰 재조회용.
+     * 만료됐으면 새로 발급, 없으면 새로 발급, 유효하면 그대로 반환.
+     * CHATTING_SOLO 상태에서만 활성.
+     */
+    @Transactional
+    public com.againspring.api.dto.response.InviteTokenResponse getInviteForExistingSession(
+            String sessionId, String userId) {
+        Session session = sessionRepository.findById(sessionId)
+            .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+
+        if (!session.getUserAId().equals(userId)) {
+            throw new BusinessException("SESSION_FORBIDDEN", "Only session owner can view invite");
+        }
+
+        if (!session.getStatus().equals(SessionStatus.CHATTING_SOLO)) {
+            throw new BusinessException(
+                "SESSION_INVALID_STATE",
+                "Cannot retrieve invite when session is not in SOLO state");
+        }
+
+        // 토큰 없거나 만료됐으면 새로 발급
+        boolean needsNew = session.getInviteToken() == null
+            || (session.getInviteExpiresAt() != null && Instant.now().isAfter(session.getInviteExpiresAt()));
+
+        if (needsNew) {
+            String newToken = "inv_" + UUID.randomUUID().toString().substring(0, 12);
+            Instant expiresAt = Instant.now().plusSeconds(259200); // 72시간
+            session.setInviteToken(newToken);
+            session.setInviteExpiresAt(expiresAt);
+            sessionRepository.save(session);
+        }
+
+        return com.againspring.api.dto.response.InviteTokenResponse.builder()
+            .inviteToken(session.getInviteToken())
+            .inviteExpiresAt(session.getInviteExpiresAt())
+            .build();
     }
 
     /**
@@ -349,19 +396,17 @@ public class SessionService {
                 // V1.5: turns 제거 (Message 테이블 사용)
                 .turns(new ArrayList<>())
                 .createdAt(session.getCreatedAt())
+                .finalizeAgreedByA(session.getFinalizeAgreedByA())
+                .finalizeAgreedByB(session.getFinalizeAgreedByB())
                 .build();
     }
 
     private SessionListItemResponse mapToSessionListItem(Session session) {
-        String partnerName = session.getCreatedByUserId().equals(session.getCreatedByUserId())
-                ? (session.getInviteeUserId() != null
-                        ? userRepository.findByIdAndDeletedAtIsNull(session.getInviteeUserId())
-                                .map(User::getNickname)
-                                .orElse(null)
-                        : session.getInviteeGuestName())
-                : userRepository.findByIdAndDeletedAtIsNull(session.getCreatedByUserId())
+        String partnerName = session.getInviteeUserId() != null
+                ? userRepository.findByIdAndDeletedAtIsNull(session.getInviteeUserId())
                         .map(User::getNickname)
-                        .orElse(null);
+                        .orElse(session.getInviteeGuestName())
+                : session.getInviteeGuestName();
 
         return SessionListItemResponse.builder()
                 .id(session.getId())

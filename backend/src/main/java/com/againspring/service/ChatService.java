@@ -88,6 +88,9 @@ public class ChatService {
     }
 
     public static final int MIN_MESSAGES_TO_FINALIZE = 3;
+    public static final int FINALIZE_SUGGEST_SOLO_MIN = 10;
+    public static final int FINALIZE_SUGGEST_DUO_TOTAL_MIN = 16;
+    public static final int FINALIZE_SUGGEST_DUO_PER_USER_MIN = 5;
     public static final String MODEL_HAIKU = "claude-haiku-4-5-20251001";
     public static final String MODEL_SONNET = "claude-sonnet-4-20250514";
 
@@ -359,6 +362,17 @@ public class ChatService {
                 .build());
         }
 
+        // 정리하기 요청 시 본인 측 finalizeSuggestion 카드 dismiss (재진입 시 카드 안 보임, 안내는 status로)
+        MessageSender myMediatorSender = (requestingUser == MessageSender.USER_A)
+            ? MessageSender.MEDIATOR_TO_A : MessageSender.MEDIATOR_TO_B;
+        var mySuggestions = messageRepo
+            .findBySessionIdAndSenderAndIsFinalizeSuggestionTrueAndDismissedAtIsNull(sessionId, myMediatorSender);
+        if (!mySuggestions.isEmpty()) {
+            Instant now = Instant.now();
+            mySuggestions.forEach(m -> m.setDismissedAt(now));
+            messageRepo.saveAll(mySuggestions);
+        }
+
         return FinalizationResult.awaitingPartnerResult();
     }
 
@@ -376,6 +390,17 @@ public class ChatService {
         session.setFinalizeAgreedByA(false);
         session.setFinalizeAgreedByB(false);
         sessionRepo.save(session);
+
+        // finalizeSuggestion 메시지를 본인 측에서 dismiss 처리 (DB 영속 → 재진입 시 카드 안 보임)
+        MessageSender senderToDismiss = (decliningUser == MessageSender.USER_A)
+            ? MessageSender.MEDIATOR_TO_A : MessageSender.MEDIATOR_TO_B;
+        var pending = messageRepo
+            .findBySessionIdAndSenderAndIsFinalizeSuggestionTrueAndDismissedAtIsNull(sessionId, senderToDismiss);
+        if (!pending.isEmpty()) {
+            Instant now = Instant.now();
+            pending.forEach(m -> m.setDismissedAt(now));
+            messageRepo.saveAll(pending);
+        }
     }
 
     /**
@@ -387,8 +412,10 @@ public class ChatService {
             ? List.of(MessageSender.USER_A, MessageSender.MEDIATOR_TO_A)
             : List.of(MessageSender.USER_B, MessageSender.MEDIATOR_TO_B);
 
+        Instant safeSince = since.minusMillis(1);
         return messageRepo.findBySessionIdAndSenderIn(sessionId, senders).stream()
-            .filter(m -> m.getCreatedAt().isAfter(since))
+            .filter(m -> m.getCreatedAt().isAfter(safeSince))
+            .filter(m -> m.getDismissedAt() == null)
             .toList();
     }
 
@@ -536,11 +563,11 @@ public class ChatService {
         boolean shouldSuggest;
 
         if (!isDuo) {
-            // Solo: 5턴쯤이면 권유 가능
-            shouldSuggest = aCount >= 5;
+            shouldSuggest = aCount >= FINALIZE_SUGGEST_SOLO_MIN;
         } else {
-            // Duo: 합쳐서 10턴 + 양쪽 ≥3턴
-            shouldSuggest = (aCount + bCount) >= 10 && aCount >= 3 && bCount >= 3;
+            shouldSuggest = (aCount + bCount) >= FINALIZE_SUGGEST_DUO_TOTAL_MIN
+                && aCount >= FINALIZE_SUGGEST_DUO_PER_USER_MIN
+                && bCount >= FINALIZE_SUGGEST_DUO_PER_USER_MIN;
         }
 
         if (shouldSuggest) {

@@ -40,7 +40,6 @@ export function ChatPanel({
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
   const [crisisLevel1, setCrisisLevel1] = useState(false);
-  const [finalizePending, setFinalizePending] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastFetchRef = useRef<number>(0);
@@ -66,12 +65,11 @@ export function ChatPanel({
 
   usePolling(fetchMessages, 3000);
 
-  // 상대가 정리를 거부하면 session.status가 chatting_duo로 돌아옴 → pending 초기화
-  useEffect(() => {
-    if (session?.status === 'chatting_duo') {
-      setFinalizePending(false);
-    }
-  }, [session?.status]);
+  // isFinalized: 본인이 정리하기를 누른 + 상대 동의 대기 중 → 입력창 비활성화
+  const myAgreed = currentUserSender === 'USER_A'
+    ? session?.finalizeAgreedByA
+    : session?.finalizeAgreedByB;
+  const isFinalized = session?.status === 'awaiting_finalization' && !!myAgreed;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -102,35 +100,14 @@ export function ChatPanel({
         content,
       });
       if (r.data.crisisLevel === 1) {
-        // 위기 메시지는 서버가 거절하므로 임시 메시지 제거
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+        setMessages(prev => prev.filter(m => m.id !== tempId));
         setCrisisLevel1(true);
         return;
       }
-      // 임시 메시지의 id만 서버 실제 id로 교체 (content/sender는 optimistic 값 유지)
-      // 미디에이터 메시지는 BE가 sender를 내려주지 않으므로 currentUserSender로 추론
-      const mediatorSender = (
-        currentUserSender === 'USER_A' ? 'MEDIATOR_TO_A' : 'MEDIATOR_TO_B'
-      ) as Message['sender'];
-      setMessages(prev => [
-        ...prev.map(m => m.id === tempId ? { ...m, id: r.data.userMessage.id } : m),
-        {
-          id: r.data.mediatorMessage.id,
-          sender: mediatorSender,
-          content: r.data.mediatorMessage.content,
-          charCount: r.data.mediatorMessage.charCount,
-          isFinalizeSuggestion: r.data.mediatorMessage.isFinalizeSuggestion ?? false,
-          isPartnerJoinNotice: false,
-          createdAt: r.data.mediatorMessage.createdAt,
-        },
-      ]);
-      // 서버-클라 시계 드리프트로 인한 메시지 누락 방지: 다음 폴링 1회 전체 재동기화
+      // optimistic 메시지 제거 후 BE 권위 데이터로 전체 재동기화 (이중 추가/누락 방지)
+      setMessages(prev => prev.filter(m => m.id !== tempId));
       lastFetchRef.current = 0;
-      // 정리 제안이 트리거됐으면 별도 저장된 isFinalizeSuggestion 메시지를 즉시 불러옴
-      if (r.data.finalizeSuggested) {
-        lastFetchRef.current = 0;
-        await fetchMessages();
-      }
+      await fetchMessages();
     } catch (e: any) {
       setMessages(prev => prev.filter(m => m.id !== tempId));
       if (e.response?.status === 409) {
@@ -150,7 +127,9 @@ export function ChatPanel({
       if (r.data.completed) {
         router.push(`/session/result/${sessionId}`);
       } else if (r.data.awaitingPartner) {
-        setFinalizePending(true);
+        // 본인 측 카드는 BE에서 dismiss됨 → 재폴링으로 반영 + session 갱신은 ChatLayout 5초 폴링 처리
+        lastFetchRef.current = 0;
+        await fetchMessages();
       }
     } catch (e: any) {
       const msg = e.response?.data?.error?.message
@@ -166,7 +145,8 @@ export function ChatPanel({
       if (r.data.completed) {
         router.push(`/session/result/${sessionId}`);
       } else if (r.data.awaitingPartner) {
-        setFinalizePending(true);
+        lastFetchRef.current = 0;
+        await fetchMessages();
       }
     } catch (e) {
       console.error('Finalize agree failed:', e);
@@ -176,7 +156,9 @@ export function ChatPanel({
   const handleDeclineFinalize = async () => {
     try {
       await api.post(`/api/sessions/${sessionId}/finalize/decline`);
-      setMessages(prev => prev.filter(m => !m.isFinalizeSuggestion));
+      // BE에서 dismiss 처리 → 재폴링으로 카드 사라짐 (클라이언트 filter 제거, DB 영속)
+      lastFetchRef.current = 0;
+      await fetchMessages();
     } catch (e) {
       console.error('Finalize decline failed:', e);
     }
@@ -216,7 +198,6 @@ export function ChatPanel({
                 message={msg}
                 onAgree={handleFinalize}
                 onDecline={handleDeclineFinalize}
-                pending={finalizePending}
               />
             );
           }
@@ -259,8 +240,29 @@ export function ChatPanel({
         </div>
       )}
 
+      {/* 정리하기 완료 후 대기 안내 (입력창 위) */}
+      {isFinalized && (
+        <div
+          style={{
+            margin: '0 12px 6px',
+            padding: '12px 16px',
+            background: 'var(--P-card)',
+            border: '1px solid var(--P-border)',
+            borderRadius: 10,
+            fontSize: 13,
+            color: 'var(--P-sub)',
+            lineHeight: 1.6,
+            textAlign: 'center',
+          }}
+        >
+          정리하기를 눌러 더 이상 대화를 이어갈 수 없어요.
+          <br />
+          상대방의 동의를 기다리고 있어요.
+        </div>
+      )}
+
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={sending} onCrisis={() => setCrisisLevel1(true)} />
+      <ChatInput onSend={handleSend} disabled={sending || isFinalized} onCrisis={() => setCrisisLevel1(true)} />
 
       {crisisLevel1 && (
         <CrisisModal onClose={() => setCrisisLevel1(false)} />
@@ -270,8 +272,14 @@ export function ChatPanel({
 }
 
 function mergeMessages(prev: Message[], incoming: Message[]): Message[] {
-  const ids = new Set(prev.map(m => m.id));
-  return [...prev, ...incoming.filter(m => !ids.has(m.id))];
+  const map = new Map<number, Message>();
+  for (const m of prev) map.set(m.id, m);
+  for (const m of incoming) map.set(m.id, m); // incoming이 권위 (BE 데이터 우선)
+  return Array.from(map.values()).sort((a, b) => {
+    const ta = new Date(a.createdAt).getTime();
+    const tb = new Date(b.createdAt).getTime();
+    return ta !== tb ? ta - tb : a.id - b.id;
+  });
 }
 
 function TypingBubble() {

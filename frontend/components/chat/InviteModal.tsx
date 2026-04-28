@@ -31,9 +31,14 @@ export function InviteModal({ sessionId, onClose }: Props) {
 
   useEffect(() => {
     api
-      .post(`/api/sessions/${sessionId}/invite`)
+      .get(`/api/sessions/${sessionId}/invite`)
       .then(r => setToken(r.data.inviteToken))
-      .catch(e => console.error('Invite failed:', e));
+      .catch(() =>
+        api
+          .post(`/api/sessions/${sessionId}/invite`)
+          .then(r => setToken(r.data.inviteToken))
+          .catch(e => console.error('Invite failed:', e))
+      );
   }, [sessionId]);
 
   const baseUrl =

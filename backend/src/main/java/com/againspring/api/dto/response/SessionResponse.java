@@ -49,6 +49,12 @@ public class SessionResponse {
     @JsonProperty("createdAt")
     private Instant createdAt;
 
+    @JsonProperty("finalizeAgreedByA")
+    private Boolean finalizeAgreedByA;
+
+    @JsonProperty("finalizeAgreedByB")
+    private Boolean finalizeAgreedByB;
+
     @Getter
     @Setter
     @NoArgsConstructor
