@@ -2,6 +2,8 @@ package com.againspring.llm.bridge;
 
 import com.againspring.llm.*;
 import com.againspring.llm.bridge.exception.ClaudeCodeException;
+import com.againspring.llm.bridge.exception.InvocationCanceledException;
+import com.againspring.llm.bridge.exception.LLMCapacityException;
 import com.againspring.llm.monitoring.LLMCallLogger;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -147,6 +149,74 @@ public class ClaudeCodeBridge implements LLMProvider {
             log.warn("Claude Code health check failed: {}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 취소 가능한 LLM 호출. 반환된 CancelableInvocation으로 외부에서 cancel() 가능.
+     * 기존 invoke(String, String)은 변경 없이 유지 — ReportGenerationService 등 다른 호출처 사용 중.
+     */
+    public CancelableInvocation invokeCancelable(String prompt, String model, String sessionId) {
+        CancelableInvocation inv = new CancelableInvocation(
+            UUID.randomUUID().toString(), sessionId);
+
+        CompletableFuture.runAsync(() -> {
+            boolean acquired = false;
+            try {
+                // 기존 Pool Semaphore에 참여 — 동시성 한도(3) 공유
+                acquired = workerPool.acquirePermit(2000L);
+                if (!acquired) {
+                    inv.getResultFuture().completeExceptionally(
+                        new LLMCapacityException("Worker pool exhausted", inv.getInvocationId()));
+                    return;
+                }
+                if (inv.isCanceled()) return;
+
+                String result = runClaudeCommandWithInvocation(prompt, model, inv);
+                if (!inv.isCanceled()) {
+                    inv.getResultFuture().complete(result);
+                }
+            } catch (InvocationCanceledException e) {
+                // cancel()이 이미 future를 completeExceptionally 했으므로 무시
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                inv.getResultFuture().completeExceptionally(e);
+            } catch (Exception e) {
+                if (!inv.isCanceled()) {
+                    inv.getResultFuture().completeExceptionally(e);
+                }
+            } finally {
+                if (acquired) workerPool.releasePermit();
+            }
+        });
+
+        return inv;
+    }
+
+    private String runClaudeCommandWithInvocation(
+            String prompt, String model, CancelableInvocation inv) throws Exception {
+
+        ProcessBuilder pb = new ProcessBuilder(claudeBinaryPath, "--print", "--model", model, prompt);
+        pb.redirectErrorStream(false);
+
+        Process process = pb.start();
+        inv.attachProcess(process);  // 이제 외부에서 destroyForcibly() 가능
+
+        String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        int exitCode = process.waitFor();
+
+        // isCanceled 플래그 우선 — destroyForcibly() 후 exitCode가 비정상일 수 있음
+        if (inv.isCanceled()) {
+            throw new InvocationCanceledException("Canceled mid-flight", inv.getInvocationId());
+        }
+
+        if (exitCode != 0) {
+            String stderrExcerpt = stderr.length() > 500 ? stderr.substring(0, 500) : stderr;
+            throw new ClaudeCodeException("CLAUDE_ERROR",
+                "Claude CLI exited with code " + exitCode, null, exitCode, stderrExcerpt);
+        }
+
+        return stdout.trim();
     }
 
     /**

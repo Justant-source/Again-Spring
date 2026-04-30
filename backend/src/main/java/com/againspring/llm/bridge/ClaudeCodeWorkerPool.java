@@ -96,6 +96,17 @@ public class ClaudeCodeWorkerPool {
     }
 
     /**
+     * invokeCancelable에서 Semaphore 직접 참여. 기존 풀과 동시성 제한 공유.
+     */
+    public boolean acquirePermit(long timeoutMs) throws InterruptedException {
+        return concurrencyLimit.tryAcquire(timeoutMs, TimeUnit.MILLISECONDS);
+    }
+
+    public void releasePermit() {
+        concurrencyLimit.release();
+    }
+
+    /**
      * Metrics exposure
      */
     public int getAvailablePermits() {

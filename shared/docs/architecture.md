@@ -106,24 +106,34 @@ FE의 axios 인터셉터(`frontend/lib/api/client.ts`)가 `localStorage.again-sp
 
 전이는 `service/SessionStateMachine`이 단일 진실로 강제. 위험 키워드 감지 시 `CrisisDetector` 발동 → `CrisisDetectedEvent` → `SessionStatus.TERMINATED`.
 
-### 4) LLM 호출 흐름
+### 4) LLM 호출 흐름 (Phase 1 V1.5: 비동기 + 취소)
 
-1. `MediationService.processTurn` 진입
-2. `PromptAssembler`가 다음 레이어를 조립 (`shared/docs/prompts/`에서 로드):
+**HTTP 응답 단계** (동기, <500ms):
+1. `POST /messages` → `MessageController.sendMessage()`
+2. `CancelableChatService.acceptUserMessage()` → 사용자 메시지만 DB 저장
+3. HTTP 응답 반환 (mediatorMessages 필드 없음)
+
+**LLM 실행 단계** (비동기, 응답 후):
+4. `CancelableChatService.beginInvocation()` 시작 (백그라운드)
+5. 진행 중 LLM이 있으면 `activeInvocations` 맵에서 `cancel()` → `destroyForcibly()`
+6. `PromptAssembler`가 누적 메시지(A+B) 기반으로 레이어 조립 (`shared/docs/prompts/`):
    - `system.md` (정체성/금기/말투)
    - `gottman/*.md` (관련 컨텍스트만)
    - `nvc/four_steps.md`
    - `relations/{relationType}.md`
-   - `turns/turn_{n}_{role}.md`
-3. `PromptSanitizer` → 사용자 입력에서 prompt-injection 패턴 차단
-4. `ClaudeCodeBridge.invoke` → `ClaudeCodeWorkerPool`에 위탁
-5. WorkerPool: `Semaphore(3)` 제한으로 동시 3개까지, 60s 타임아웃
-6. `ProcessBuilder("claude", "--print", "--model", model, prompt).start()` → stdout 읽기
-7. 응답을 `ReportResponseParser` / `TurnResponseParser`로 구조화
-8. `LLMCallLogger`가 `llm_call_logs`에 기록 (correlation_id, latency, outcome)
-9. 실패 시 `FallbackResponses`의 안전 기본값 반환
+   - `chat/{solo|duo}_chat.md`
+7. `PromptSanitizer` → 사용자 입력에서 prompt-injection 패턴 차단
+8. `ClaudeCodeBridge.invokeCancelable()` → `CancelableInvocation` 래핑
+9. WorkerPool: `Semaphore(3)` 제한으로 동시 3개까지, 60s 타임아웃
+10. `ProcessBuilder("claude", "--print", "--model", model, prompt).start()` → stdout 읽기
+11. 응답을 `TurnResponseParser`로 구조화 → DB 저장
+12. `LLMCallLogger`가 `llm_call_logs`에 기록 (correlation_id, latency, outcome)
+13. 실패 시 `FallbackResponses`의 안전 기본값 반환
 
-상세는 [llm/bridge-architecture.md](./llm/bridge-architecture.md) 및 [prompts/README.md](./prompts/README.md) 참조.
+**FE 수신 단계**:
+14. `GET /messages?since=` (폴링, 3초 주기) → mediator 응답 수신
+
+상세는 [`backend/docs/llm-bridge.md`](../backend/docs/llm-bridge.md) (취소 메커니즘) 및 [`shared/docs/prompts/README.md`](../shared/docs/prompts/README.md) (레이어 설계) 참조.
 
 ### 5) 데이터 보존
 

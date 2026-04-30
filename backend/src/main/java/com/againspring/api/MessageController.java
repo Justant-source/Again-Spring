@@ -3,6 +3,7 @@ package com.againspring.api;
 import com.againspring.api.dto.request.SendMessageRequest;
 import com.againspring.api.dto.response.*;
 import com.againspring.domain.enums.MessageSender;
+import com.againspring.service.CancelableChatService;
 import com.againspring.service.ChatService;
 import com.againspring.service.SessionRoleResolver;
 import com.againspring.service.SessionService;
@@ -26,6 +27,7 @@ import java.util.List;
 @Tag(name = "Chat", description = "Chat messaging endpoints")
 public class MessageController {
 
+    private final CancelableChatService cancelableChatService;
     private final ChatService chatService;
     private final SessionRoleResolver roleResolver;
     private final SessionService sessionService;
@@ -38,11 +40,18 @@ public class MessageController {
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         var sender = roleResolver.resolveSender(sessionId, userDetails.getUsername());
-        var result = chatService.sendUserMessage(sessionId, sender, request.getContent());
+
+        // 1) 사용자 메시지 즉시 저장 + 진행 중 invocation 취소 (<100ms)
+        var result = cancelableChatService.acceptUserMessage(sessionId, sender, request.getContent());
 
         if (result.crisisLevel() != null && result.crisisLevel() == 1) {
             return ResponseEntity.status(409).body(ChatTurnResponse.crisis());
         }
+
+        // 2) 새 LLM invocation 비동기 시작 (트랜잭션 커밋 후)
+        cancelableChatService.beginInvocation(sessionId, sender);
+
+        // mediatorMessages는 null → @JsonInclude(NON_NULL)로 JSON 제외, FE 폴링으로 수신
         return ResponseEntity.ok(ChatTurnResponse.from(result));
     }
 

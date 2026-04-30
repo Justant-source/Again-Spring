@@ -2,8 +2,8 @@
 
 **프로젝트**: 다시봄 · Again Spring
 **도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)
-**진행 상황**: V1.5 카톡식 + 중재 컨텍스트 강화(Phase A/B/C/D) 구현 완료. dev 배포 및 5종 시나리오 검증 필요.
-**기준일**: 2026-04-27
+**진행 상황**: V1.5 카톡식 + 중재 컨텍스트 강화(Phase A/B/C/D) + LLM 호출 취소 메커니즘 구현 완료. dev 배포 및 5종 시나리오 검증 필요.
+**기준일**: 2026-04-30
 
 ---
 
@@ -434,6 +434,7 @@ APP_URL=https://dev.againspring.net
   - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
   - ✅ V1.5 카톡식 채팅 (ChatService, MessageSender 4종, Solo→Duo 전이)
   - ✅ **LLM 브릿지 (Claude Haiku 4.5 + 호스트 ~/.claude 마운트, API 키 불필요)**
+  - ✅ **LLM 호출 취소 메커니즘 (Phase 1 V1.5)**: POST /messages <500ms 응답 + 새 메시지 도착 시 진행 중 Claude 프로세스 강제 종료 + 누적 메시지 재호출. `CancelableChatService`, `CancelableInvocation`.
   - ✅ **중재 컨텍스트 강화 (Phase A/B/C)**: 사용자 프로필 주입(`UserProfileFragment`) + 턴 간 심리 점수 피드백(`PsychologyFeedbackFormatter`, `ChatTurnMetaParser`) + Duo 균형 추적(`DuoBalanceFormatter`)
   - ✅ **중재 컨텍스트 강화 Phase D**: UserState 7종 + IssueContext 4슬롯 + QuestionQueue (A·B 분리 PQ) + B 진입 시 환영+PQ top1 통합 메시지 + IsolationLintFilter 격리 3중 방어. 권위본: `shared/docs/policies/context-algorithm.md`
   - ✅ **컨텍스트 주입 누락 수정 (2026-04-27)**: 카테고리(대/중/소분류 + 직접 입력) + MBTI + 누락 관계 가이드(marriage, korean_specific) 주입. `CategoryContextFragment`, `categories.yml`, Flyway V11, `UserProfileFragment` MBTI 보강. 권위본: `shared/docs/policies/categories.md`, `shared/docs/policies/onboarding.md`.
@@ -491,7 +492,7 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-04-27
+**마지막 업데이트**: 2026-04-30
 **담당**: Claude Code (Agent)
 
 > UX 정책 관련 문의: `frontend/docs/ux/principles.md` (4원칙군 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트) 순으로 참조.

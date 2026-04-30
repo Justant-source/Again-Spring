@@ -304,6 +304,191 @@ public class ClaudeAPIProvider implements LLMProvider {
 
 ---
 
+## LLM 호출 취소 메커니즘 (Phase 1 V1.5)
+
+### 문제: 동기적 블로킹 호출의 장지연
+
+이전 패턴:
+- `POST /messages` → `ChatService.sendUserMessage()` (동기) → LLM 호출 → 7~10초 대기 → HTTP 응답
+- 새 메시지 도착 시 → 이전 LLM이 여전히 실행 중 → 두 개의 응답 반환 (UX 혼란)
+
+### 해결책: 비동기 LLM + 취소 메커니즘
+
+새 패턴:
+1. **`POST /messages`** → `CancelableChatService.acceptUserMessage()` (트랜잭션, <100ms) → 사용자 메시지만 DB 저장 → HTTP 응답 `{success: true, userMessage: {...}}` (mediatorMessages 필드 없음)
+2. **LLM 실행** → 응답 후 `CancelableChatService.beginInvocation()` 시작 (백그라운드, 비동기)
+3. **취소** → 새 메시지 도착 중 LLM 실행 중 → `activeInvocations` 맵에서 조회 → `CancelableInvocation.cancel()` → OS 프로세스 `destroyForcibly()` → 새 LLM 호출 (누적 메시지 포함)
+4. **FE 폴링** → `GET /messages?since=` (3초 주기) → 완료된 mediator 응답 수신
+
+### 핵심 클래스
+
+#### `CancelableInvocation`
+
+```java
+public class CancelableInvocation {
+  private final AtomicReference<Process> process = new AtomicReference<>();
+  private final CompletableFuture<String> result;
+  private final String sessionId;
+  private volatile boolean canceled = false;
+
+  public void cancel() {
+    this.canceled = true;
+    Process p = process.get();
+    if (p != null && p.isAlive()) {
+      p.destroyForcibly();  // 강제 종료
+    }
+  }
+
+  public CompletableFuture<String> getResult() { return result; }
+}
+```
+
+#### `CancelableChatService`
+
+```java
+@Service
+public class CancelableChatService {
+  private final Map<String, CancelableInvocation> activeInvocations = new ConcurrentHashMap<>();
+
+  /**
+   * 사용자 메시지만 저장 (트랜잭션, <100ms)
+   * @return 저장된 UserMessage
+   */
+  @Transactional
+  public UserMessage acceptUserMessage(String sessionId, String content, String senderRole) {
+    // 1. 진행 중 LLM 취소
+    CancelableInvocation prev = activeInvocations.get(sessionId);
+    if (prev != null) {
+      prev.cancel();  // destroyForcibly()
+    }
+    
+    // 2. 메시지만 DB 저장
+    UserMessage msg = userMessageRepository.save(...);
+    return msg;
+  }
+
+  /**
+   * LLM 호출 시작 (비동기, 응답 후)
+   */
+  public void beginInvocation(String sessionId, Session session) {
+    CompletableFuture.runAsync(() -> {
+      try {
+        // 누적 메시지(A+B)를 프롬프트에 포함
+        String prompt = promptAssembler.assembleWithAllMessages(session, ...);
+        String llmResponse = claudeCodeBridge.invoke(prompt);
+        
+        // DB 저장 (mediator messages)
+        mediatorMessageRepository.save(...);
+      } catch (InvocationCanceledException e) {
+        // 정상 — 취소됨
+      } catch (Exception e) {
+        // fallback 처리
+      }
+    }, asyncExecutor);
+  }
+}
+```
+
+#### `ClaudeCodeBridge` — 취소 지원 추가 메서드
+
+```java
+public String invokeCancelable(String prompt, String model, String sessionId) 
+    throws LLMException, InvocationCanceledException {
+  CancelableInvocation invocation = new CancelableInvocation(sessionId);
+  
+  try {
+    // 프로세스를 AtomicReference에 저장
+    Process p = runClaudeCommandWithInvocation(prompt, model, invocation);
+    
+    // stdout 읽기
+    String response = readOutputBlocking(p, timeout);
+    return response;
+  } catch (ProcessKilledException e) {
+    throw new InvocationCanceledException("Process killed by cancel");
+  }
+}
+
+private Process runClaudeCommandWithInvocation(String prompt, String model, 
+    CancelableInvocation invocation) {
+  ProcessBuilder pb = new ProcessBuilder("claude", "--print", "--model", model, prompt);
+  Process p = pb.start();
+  invocation.setProcess(p);  // 취소 시 접근 가능하도록
+  return p;
+}
+```
+
+#### `InvocationCanceledException`
+
+```java
+public class InvocationCanceledException extends LLMException {
+  public InvocationCanceledException(String message) {
+    super(message);
+  }
+}
+```
+
+### Semaphore 공유 (기존 풀 재사용)
+
+`ClaudeCodeWorkerPool`의 `Semaphore(3)` 제한은 그대로 유지:
+- `acquirePermit(timeoutMs)`: 취소 메커니즘 시작 전 호출 → 동시 3개 제한
+- `releasePermit()`: LLM 완료 후 호출
+
+```java
+// CancelableChatService 내부
+pool.acquirePermit(5000);  // 5초 내 permit 획득
+try {
+  String response = claudeCodeBridge.invokeCancelable(prompt, model, sessionId);
+} finally {
+  pool.releasePermit();
+}
+```
+
+### 동작 흐름도
+
+```
+사용자 A의 메시지 (t=0ms)
+  │
+  ├─► acceptUserMessage() → DB 저장 → <500ms 응답
+  │
+  └─► beginInvocation() (비동기)
+        │
+        ├─► LLM 1 시작 (누적: A)
+        │   │
+        │   └─► 10초 실행 중...
+        │
+        └─► [t=3s] 사용자 B의 메시지 도착
+            │
+            ├─► acceptUserMessage() → DB 저장 → <500ms 응답
+            │
+            ├─► cancel() → LLM 1 프로세스 종료 (destroyForcibly)
+            │
+            └─► beginInvocation() (비동기)
+                  │
+                  └─► LLM 2 시작 (누적: A+B)
+                      │
+                      └─► 5초 실행 → 응답 저장 → FE 폴링으로 수신
+```
+
+### 테스트
+
+`CancelableChatServiceTest`:
+- ✅ acceptUserMessage: <100ms 응답 확인
+- ✅ 진행 중 LLM 취소: cancel() 호출 시 process 존재 → destroyForcibly()
+- ✅ 취소 후 재호출: 누적 메시지(A+B) 프롬프트 확인
+- ✅ InvocationCanceledException: 취소되면 catch 처리
+- ✅ 동시 호출 제한: Semaphore 공유 확인
+- ✅ activeInvocations 정리: 완료 후 맵에서 제거
+
+### FE UX 영향
+
+| 변경 | FE 적응 |
+|---|---|
+| POST /messages: mediatorMessages 필드 제거 | GET /messages?since= 폴링 의존 (이미 구현됨, 3초 주기) |
+| LLM 취소 시 이전 응답 버림 | 새 메시지 입력 시 "중재자 생각 중..." 상태 초기화 |
+| <500ms 응답 → 즉각 UI 피드백 | 사용자 메시지 즉시 화면 표시 (UX 개선) |
+
+---
+
 ## V1.5 응답 형식 (chat 흐름 전용)
 
 V1.5 카톡식 응답은 본문 + 메타 블록의 두 파트로 구성:
@@ -331,4 +516,4 @@ V1.5 카톡식 응답은 본문 + 메타 블록의 두 파트로 구성:
 
 ---
 
-**마지막 업데이트**: 2026-04-27
+**마지막 업데이트**: 2026-04-30
