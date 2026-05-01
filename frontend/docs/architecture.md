@@ -159,47 +159,37 @@ useEffect(() => {
 
 ### 1) 신규 사용자
 
-```
-/ (랜딩)
-   ↓ "시작하기"
-/onboarding (10문항)
-   ↓ 완료
-/onboarding/result (스타일 카드)
-   ↓ "회원가입"
-/auth/signup (이메일 + 코드)
-   ↓ 가입 완료
-/session/new (관계 유형)
-   ↓
-/session/category
-   ↓
-/session/describe (KeywordGuard)
-   ↓
-/session/invite (초대 링크)
-   ↓ 링크 공유
-/session/wait (B 참여 대기)
-   ↓ B 참여
-/session/[sessionId] (카톡식 채팅)
-   ↓ 완료
-/session/result/[id] (리포트)
+```mermaid
+flowchart TD
+    Land["/ 랜딩"] -->|시작하기| Onboard["/onboarding\n10문항"]
+    Onboard -->|완료| Result["/onboarding/result\n스타일 카드"]
+    Result -->|회원가입| Signup["/auth/signup\n이메일 + 코드"]
+    Signup -->|가입 완료| New["/session/new\n관계 유형 선택"]
+    New --> Category["/session/category\n갈등 유형"]
+    Category --> Describe["/session/describe\nKeywordGuard"]
+    Describe --> Invite["/session/invite\n초대 링크 공유"]
+    Invite -->|링크 공유 후 대기| Wait["/session/wait\nB 참여 대기"]
+    Wait -->|B 참여| Chat["/session/chat/{id}\n카톡식 채팅"]
+    Chat -->|완료| Report["/session/result/{id}\n리포트"]
 ```
 
 ### 2) B (초대받은 쪽) 진입
 
-```
-초대 링크 클릭
-   ↓
-/session/join/[token] (B 닉네임 입력)
-   ↓ 게스트 또는 회원 선택
-   ↓
-/session/[sessionId] (B 입장)
+```mermaid
+flowchart TD
+    Link([초대 링크 클릭]) --> Join["/session/join/{token}\nB 닉네임 입력"]
+    Join -->|회원 로그인| Login["/auth/login"]
+    Join -->|게스트로 참여| Guest["게스트 JWT 발급"]
+    Login --> Chat
+    Guest --> Chat["/session/chat/{id}\nB 입장"]
 ```
 
 ### 3) Solo 모드
 
-```
-B가 24h 내 미참여
-   ↓ "혼자 진행하기"
-/session/result/[id]/solo (단축 분석)
+```mermaid
+flowchart TD
+    Wait["B가 24h 내 미참여"] -->|혼자 진행하기| Solo["/session/result/{id}\nSolo 분석 리포트"]
+    Solo -->|초대 링크 다시 보내기| Invite["POST /api/sessions/{id}/invite\n링크 클립보드 복사"]
 ```
 
 ## 인증 흐름

@@ -11,6 +11,43 @@
 - FE: `frontend/lib/api/client.ts` (Bearer interceptor), `frontend/lib/store/userStore.ts` (token persist)
 - FE 페이지: `frontend/app/auth/{login,signup,guest,callback,forgot-password}/`
 
+## 인증 흐름 개요
+
+```mermaid
+flowchart TD
+    Start([요청]) --> Type{인증 방식}
+
+    Type -->|이메일 회원가입| Email["POST /api/auth/send-verification\n인증코드 이메일 발송"]
+    Email --> Code[사용자 코드 입력]
+    Code --> Signup["POST /api/auth/signup\nBCrypt 해시 + users 생성"]
+    Signup --> JWT
+
+    Type -->|이메일 로그인| LoginReq["POST /api/auth/login"]
+    LoginReq --> LoginOk{BCrypt 일치?}
+    LoginOk -->|실패 / 5회 초과| E401["401 / 429"]
+    LoginOk -->|성공| JWT
+
+    Type -->|게스트| GuestReq["POST /api/auth/guest\n임시 users 생성"]
+    GuestReq --> GuestJWT["JWT 1h 발급"]
+
+    Type -->|소셜 OAuth| OAuthRedir["FE → provider 동의 화면"]
+    OAuthRedir --> Callback["callback?code=..."]
+    Callback --> OAuthAPI["POST /api/auth/oauth2/{provider}\ncode→token→userinfo"]
+    OAuthAPI --> Upsert["(provider, providerId)\n신규: users 생성 / 기존: 조회"]
+    Upsert --> JWT
+
+    Type -->|비밀번호 재설정| Forgot["POST /api/auth/forgot-password\n토큰 생성 + 이메일 발송"]
+    Forgot --> ResetLink[이메일 링크 클릭]
+    ResetLink --> ResetPw["POST /api/auth/reset-password\n토큰 검증 + BCrypt 갱신"]
+    ResetPw --> LoginPage[로그인 이동]
+
+    Type -->|로그아웃| LogoutReq["POST /api/auth/logout\njti → revoked_tokens"]
+    LogoutReq --> Clear["localStorage 제거 + userStore.clear()"]
+
+    JWT["JWT 발급 (24h)"] --> Store["localStorage 저장\nBearer 헤더 자동 주입"]
+    GuestJWT --> Store
+```
+
 ## JWT
 
 | 항목 | 값 |

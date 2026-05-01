@@ -35,6 +35,22 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ## 테이블 일람
 
+```mermaid
+erDiagram
+    users ||--o{ sessions : "creates (user_a_id)"
+    users ||--o{ sessions : "invited (invitee_user_id)"
+    sessions ||--o{ messages : "has (ON DELETE CASCADE)"
+    sessions ||--o| reports : "1:1 (session_id UNIQUE)"
+    sessions ||--o{ turns : "deprecated V1.5"
+    sessions ||--o{ llm_call_logs : "logs"
+    sessions ||--o{ conflict_history : "records"
+    users ||--o{ user_relationships : "participant_a / b"
+    guest_sessions }o--|| sessions : "via invite_token"
+    email_verifications }o--|| users : "verifies email"
+    password_reset_tokens }o--|| users : "resets password"
+    revoked_tokens }o--|| users : "JWT 블랙리스트"
+```
+
 | 테이블 | 역할 | PK | 주요 인덱스 |
 |---|---|---|---|
 | `users` | 회원/게스트 계정 | `id` (VARCHAR 32) | `idx_users_email`, `uk_users_provider (provider, provider_id)` |

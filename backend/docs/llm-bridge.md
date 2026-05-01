@@ -445,28 +445,32 @@ try {
 
 ### 동작 흐름도
 
-```
-사용자 A의 메시지 (t=0ms)
-  │
-  ├─► acceptUserMessage() → DB 저장 → <500ms 응답
-  │
-  └─► beginInvocation() (비동기)
-        │
-        ├─► LLM 1 시작 (누적: A)
-        │   │
-        │   └─► 10초 실행 중...
-        │
-        └─► [t=3s] 사용자 B의 메시지 도착
-            │
-            ├─► acceptUserMessage() → DB 저장 → <500ms 응답
-            │
-            ├─► cancel() → LLM 1 프로세스 종료 (destroyForcibly)
-            │
-            └─► beginInvocation() (비동기)
-                  │
-                  └─► LLM 2 시작 (누적: A+B)
-                      │
-                      └─► 5초 실행 → 응답 저장 → FE 폴링으로 수신
+```mermaid
+sequenceDiagram
+    participant UA as 사용자 A
+    participant UB as 사용자 B
+    participant Svc as CancelableChatService
+    participant Map as activeInvocations
+    participant LLM as Claude CLI
+    participant FE as FE 폴링
+
+    UA->>Svc: POST /messages (t=0)
+    Svc->>Map: cancel(sessionId) — 없음
+    Svc-->>UA: HTTP 200 (< 500ms)
+    Svc->>LLM: beginInvocation [누적: A]
+    Note over LLM: 실행 중...
+
+    UB->>Svc: POST /messages (t=3s)
+    Svc->>Map: cancel(sessionId)
+    Map->>LLM: destroyForcibly() — LLM 1 종료
+    Svc-->>UB: HTTP 200 (< 500ms)
+    Svc->>LLM: beginInvocation [누적: A+B]
+
+    LLM-->>Svc: stdout 응답 (t=8s)
+    Svc->>Svc: mediator 메시지 DB 저장
+
+    FE->>Svc: GET /messages?since=...
+    Svc-->>FE: mediator 응답 반환
 ```
 
 ### 테스트

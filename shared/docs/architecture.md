@@ -90,23 +90,49 @@ FE의 axios 인터셉터(`frontend/lib/api/client.ts`)가 `localStorage.again-sp
 
 ### 3) 세션 진행 (State Machine)
 
-```
-                              [V1.5 Solo-First]
-
-[CREATED]
-   │
-   ├──(default)──► [SOLO_MODE] ──3 turns──► [COMPLETED] ──/report──► [REPORTED]
-   │                    ▲
-   │                    │ (24h timeout fallback)
-   │                    │
-   └──(opt-in)──► [WAITING_B] ──/sessions/join/{token}──► [B_JOINED] ──turn 1~6──► [COMPLETED]
-
-   * 위기 키워드 감지 시 어디서든 → [TERMINATED]
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> CHATTING_SOLO : POST /api/sessions
+    CHATTING_SOLO --> CHATTING_DUO : 상대가 초대 토큰으로 참여
+    CHATTING_SOLO --> COMPLETED : 사용자 종료 결정
+    CHATTING_DUO --> AWAITING_FINALIZATION : /finalize 호출
+    AWAITING_FINALIZATION --> COMPLETED : 양쪽 agree
+    AWAITING_FINALIZATION --> CHATTING_DUO : 한쪽 decline
+    CHATTING_SOLO --> TERMINATED : 위기 키워드 감지
+    CHATTING_DUO --> TERMINATED : 위기 키워드 감지
+    AWAITING_FINALIZATION --> TERMINATED : 위기 키워드 감지
+    COMPLETED --> [*]
+    TERMINATED --> [*]
 ```
 
 전이는 `service/SessionStateMachine`이 단일 진실로 강제. 위험 키워드 감지 시 `CrisisDetector` 발동 → `CrisisDetectedEvent` → `SessionStatus.TERMINATED`.
 
 ### 4) LLM 호출 흐름 (Phase 1 V1.5: 비동기 + 취소)
+
+```mermaid
+sequenceDiagram
+    participant FE as 브라우저 (FE)
+    participant Ctrl as MessageController
+    participant Svc as CancelableChatService
+    participant Map as activeInvocations
+    participant LLM as Claude CLI
+
+    FE->>Ctrl: POST /api/sessions/{id}/messages
+    Ctrl->>Svc: acceptUserMessage()
+    Svc->>Map: cancel(sessionId) — 진행 중 LLM 강제 종료
+    Svc-->>Ctrl: userMessage 저장 완료
+    Ctrl-->>FE: HTTP 200 (< 500ms)
+    Svc->>LLM: beginInvocation() 비동기 시작
+
+    loop FE 3초 폴링
+        FE->>Ctrl: GET /messages?since=...
+    end
+
+    LLM-->>Svc: stdout 응답 수신
+    Svc->>Svc: DB 저장 (mediator messages)
+    Ctrl-->>FE: 폴링 응답에 mediator 메시지 포함
+```
 
 **HTTP 응답 단계** (동기, <500ms):
 1. `POST /messages` → `MessageController.sendMessage()`

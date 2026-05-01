@@ -4,8 +4,20 @@
 
 ## 표준 흐름
 
-```
-dev 빌드/배포 → curl /api/health 검증 → main 브랜치에 commit & push → (명시 시) prod 빌드/배포
+```mermaid
+flowchart LR
+    Code([코드 변경]) --> DevBuild["① dev 빌드\ndocker compose -f dev.yml up -d --build"]
+    DevBuild --> DevHealth{curl :8090\n/api/health}
+    DevHealth -->|실패| Fix[문제 수정]
+    Fix --> DevBuild
+    DevHealth -->|성공| Commit["② commit & push\ngit push origin main"]
+    Commit --> Gate{명시적\nprod 배포 지시?}
+    Gate -->|아니오| DoneD([✅ dev 완료])
+    Gate -->|예| Backup["③ DB 백업\nmariadb-dump"]
+    Backup --> ProdBuild["④ prod 빌드\ndocker compose -f prod.yml up -d --build"]
+    ProdBuild --> ProdHealth{curl :8091\n/api/health}
+    ProdHealth -->|실패| Rollback["git revert\n+ 재빌드"]
+    ProdHealth -->|성공| DoneP([✅ prod 완료])
 ```
 
 prod 환경은 **반드시 main 브랜치 기준**으로만 빌드한다.

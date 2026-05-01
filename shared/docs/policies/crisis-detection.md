@@ -54,6 +54,30 @@ export const WARNING_KEYWORDS = {
 - 경고 배너 표시 ("법률 결정은 도와드릴 수 없어요")
 - LLM 입력에는 포함 (다른 검사로 처리)
 
+## 감지 흐름
+
+```mermaid
+flowchart TD
+    Input([사용자 입력]) --> FE{FE KeywordGuard\nLevel 1 포함?}
+
+    FE -->|"폭행·강간·자해·아동학대"| L1Crisis["🔴 즉각 위기 (Level 1)"]
+    L1Crisis --> Terminate[세션 TERMINATED]
+    Terminate --> Modal["CrisisResourceModal 표시\n1366 · 1393 · 112 등"]
+    Modal --> BlockLLM[LLM 호출 차단]
+    BlockLLM --> Audit1[SafetyAuditLogger\n개인정보 마스킹 후 기록]
+
+    FE -->|없음| FE2{FE Level 2 포함?}
+    FE2 -->|"이혼·고소·미치겠"| L2Warn["🟡 경고 (Level 2)"]
+    L2Warn --> Banner["경고 배너 표시\n법률 기관 안내"]
+
+    FE2 -->|없음| BE{BE CrisisDetector\n재검사}
+    Banner --> BE
+
+    BE -->|Level 1 감지| L1Crisis
+    BE -->|Level 2 감지| L2Warn
+    BE -->|없음| LLM[LLM에 전달]
+```
+
 ## 감지 로직
 
 ```typescript
