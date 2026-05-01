@@ -55,6 +55,7 @@ public class CancelableChatService {
     private final PhaseDMetrics phaseDMetrics;
     private final TransactionTemplate transactionTemplate;
 
+    // key = sessionId + ":" + sender.name() — A와 B 슬롯 독립 유지
     private final ConcurrentHashMap<String, CancelableInvocation> activeInvocations =
             new ConcurrentHashMap<>();
 
@@ -93,6 +94,8 @@ public class CancelableChatService {
      * 사용자 메시지 즉시 저장 — LLM 호출 없이 <100ms 응답.
      * 진행 중 invocation이 있으면 atomic하게 취소.
      * 위기 레벨 1이면 crisisBlocked 반환 (invocation 취소 없음).
+     *
+     * Bug C 수정: AWAITING_FINALIZATION 상태에서 새 메시지 → 상태 복귀 + 종료 요청 취소
      */
     @Transactional
     public ChatService.ChatTurnResult acceptUserMessage(
@@ -111,7 +114,17 @@ public class CancelableChatService {
             return ChatService.ChatTurnResult.crisisBlocked();
         }
 
-        cancelActiveInvocation(sessionId, "new_user_message");
+        // Bug C: AWAITING_FINALIZATION 상태에서 새 메시지 도착 → 종료 요청 묵시적 거절
+        if (session.getStatus() == com.againspring.domain.enums.SessionStatus.AWAITING_FINALIZATION) {
+            log.info("Session {} in AWAITING_FINALIZATION received new message — implicitly canceling finalization request",
+                    sessionId);
+            session.setStatus(com.againspring.domain.enums.SessionStatus.CHATTING_DUO);
+            session.setFinalizeAgreedByA(false);
+            session.setFinalizeAgreedByB(false);
+            sessionRepo.save(session);
+        }
+
+        cancelActiveInvocation(sessionId, sender, "new_user_message");
 
         Message userMsg = messageRepo.save(Message.builder()
                 .sessionId(sessionId)
@@ -170,15 +183,16 @@ public class CancelableChatService {
         CancelableInvocation inv = llmBridge.invokeCancelable(
                 prompt, ChatService.MODEL_HAIKU, sessionId);
 
-        CancelableInvocation displaced = activeInvocations.put(sessionId, inv);
+        String key = invocationKey(sessionId, sender);
+        CancelableInvocation displaced = activeInvocations.put(key, inv);
         if (displaced != null && !displaced.isCanceled()) {
-            log.warn("Displaced active invocation in beginInvocation for session {}", sessionId);
+            log.warn("Displaced active invocation in beginInvocation for session {} sender {}", sessionId, sender);
             displaced.cancel();
         }
 
         inv.getResultFuture().whenComplete((result, error) -> {
-            if (activeInvocations.get(sessionId) != inv) {
-                log.debug("Invocation {} superseded for session {}", inv.getInvocationId(), sessionId);
+            if (activeInvocations.get(key) != inv) {
+                log.debug("Invocation {} superseded for session {} sender {}", inv.getInvocationId(), sessionId, sender);
                 return;
             }
             try {
@@ -191,22 +205,27 @@ public class CancelableChatService {
             } catch (Exception e) {
                 log.error("Callback error for session {}", sessionId, e);
             } finally {
-                activeInvocations.remove(sessionId, inv);
+                activeInvocations.remove(key, inv);
             }
         });
     }
 
     public void cleanupSession(String sessionId) {
-        cancelActiveInvocation(sessionId, "session_cleanup");
+        cancelActiveInvocation(sessionId, MessageSender.USER_A, "session_cleanup");
+        cancelActiveInvocation(sessionId, MessageSender.USER_B, "session_cleanup");
     }
 
     // --- private helpers ---
 
-    private void cancelActiveInvocation(String sessionId, String reason) {
-        CancelableInvocation existing = activeInvocations.remove(sessionId);
+    private static String invocationKey(String sessionId, MessageSender sender) {
+        return sessionId + ":" + sender.name();
+    }
+
+    private void cancelActiveInvocation(String sessionId, MessageSender sender, String reason) {
+        CancelableInvocation existing = activeInvocations.remove(invocationKey(sessionId, sender));
         if (existing != null) {
-            log.info("Canceled LLM invocation {} for session {} (reason={})",
-                    existing.getInvocationId(), sessionId, reason);
+            log.info("Canceled LLM invocation {} for session {} sender {} (reason={})",
+                    existing.getInvocationId(), sessionId, sender, reason);
             existing.cancel();
         }
     }
@@ -243,7 +262,7 @@ public class CancelableChatService {
             List<String> chunks = new ArrayList<>();
             for (String c : rawChunks) {
                 String trimmed = c.strip();
-                if (!trimmed.isEmpty()) chunks.add(trimmed);
+                if (!trimmed.isEmpty()) chunks.addAll(splitLongChunk(trimmed));
             }
             if (chunks.isEmpty()) chunks.add(mediatorResponse);
 
@@ -419,5 +438,29 @@ public class CancelableChatService {
         }
         session.setFinalizeSuggestedAt(Instant.now());
         sessionRepo.save(session);
+    }
+
+    // 200자 초과 청크를 문장 경계에서 자동 분할
+    private static final int MAX_CHUNK_LEN = 200;
+
+    private static List<String> splitLongChunk(String chunk) {
+        if (chunk.length() <= MAX_CHUNK_LEN) return List.of(chunk);
+        List<String> parts = new ArrayList<>();
+        String remaining = chunk;
+        while (remaining.length() > MAX_CHUNK_LEN) {
+            int splitAt = -1;
+            for (int i = Math.min(MAX_CHUNK_LEN, remaining.length()) - 1; i >= MAX_CHUNK_LEN / 2; i--) {
+                char c = remaining.charAt(i);
+                if (c == '.' || c == '?' || c == '!' || c == '~' || c == '\n') {
+                    splitAt = i + 1;
+                    break;
+                }
+            }
+            if (splitAt <= 0) splitAt = MAX_CHUNK_LEN;
+            parts.add(remaining.substring(0, splitAt).trim());
+            remaining = remaining.substring(splitAt).trim();
+        }
+        if (!remaining.isEmpty()) parts.add(remaining);
+        return parts;
     }
 }

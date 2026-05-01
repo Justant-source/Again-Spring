@@ -1,6 +1,7 @@
 package com.againspring.api.dto.response;
 
 import com.againspring.domain.enums.ConflictType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,6 +27,7 @@ public class ReportResponse {
 
     private ConflictType conflictType;
 
+    @JsonProperty("isSoloMode")
     private boolean isSoloMode;
 
     private ParticipantSnapshot participantA;

@@ -1,5 +1,9 @@
 # backend/scripts/test-automation/personas.py
 
+# 자동 테스트에 사용하는 활성 페르소나 (3개)
+# test4~test10은 수동 다양성 검증용으로 보존되나 자동화 매트릭스에서 제외
+ACTIVE_PERSONAS = ["test1@again.com", "test2@again.com", "test3@again.com"]
+
 PERSONAS = [
     {"email": "test1@again.com", "password": "test123", "nickname": "서영",
      "age": 28, "gender": "여", "style": "분석적·길게", "input_pattern": "60-120자·텀길음"},

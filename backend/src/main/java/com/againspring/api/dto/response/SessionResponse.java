@@ -55,6 +55,8 @@ public class SessionResponse {
     @JsonProperty("finalizeAgreedByB")
     private Boolean finalizeAgreedByB;
 
+    private String reportId;
+
     @Getter
     @Setter
     @NoArgsConstructor

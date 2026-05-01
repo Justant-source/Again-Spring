@@ -3,9 +3,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { useSessionStore } from '@/lib/store/sessionStore';
+import { api } from '@/lib/api/client';
 import {
   IconEye,
   IconDrop,
@@ -18,11 +18,12 @@ import { COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
 import type { Report } from '@/lib/types';
 
 export function SoloResult({ report }: { report: Report }) {
-  const router = useRouter();
   const user = useUserStore((s) => s.user);
   const sessionId = useSessionStore((s) => s.sessionId);
   const partnerNickname = useSessionStore((s) => s.partnerNickname);
   const [copied, setCopied] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   const nvcDraft = (() => {
     if (!report.isSoloMode) return null;
@@ -54,8 +55,22 @@ export function SoloResult({ report }: { report: Report }) {
     ? STYLE_MOTIF[user.communicationStyle]
     : null;
 
-  const handleInviteClick = () => {
-    router.push(`/session/invite`);
+  const handleInviteClick = async () => {
+    if (!sessionId || inviteLoading) return;
+    setInviteLoading(true);
+    try {
+      const res = await api.post(`/api/sessions/${sessionId}/invite`);
+      const token = res.data?.token || res.data?.inviteToken;
+      if (!token) throw new Error('no token');
+      const link = `${window.location.origin}/session/join/${token}`;
+      await navigator.clipboard.writeText(link);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 3000);
+    } catch {
+      alert('링크 생성에 실패했어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setInviteLoading(false);
+    }
   };
 
   return (
@@ -93,7 +108,7 @@ export function SoloResult({ report }: { report: Report }) {
         }}
       >
         <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 12 }}>
-          {user?.nickname || '님'}님 입장에서의 정리
+          {user?.nickname ? `${user.nickname}님 입장에서의 정리` : '당신 입장에서의 정리'}
         </div>
         <div
           style={{
@@ -280,7 +295,7 @@ export function SoloResult({ report }: { report: Report }) {
             marginBottom: 12,
           }}
         >
-          지금이라도 {partnerNickname || '상대'}님을 초대하면<br />
+          지금이라도 {partnerNickname || '상대'}분을 초대하면<br />
           두 분의 리포트가 완성돼요.
         </div>
         <button
@@ -296,7 +311,7 @@ export function SoloResult({ report }: { report: Report }) {
             cursor: 'pointer',
           }}
         >
-          초대 링크 다시 보내기
+          {inviteLoading ? '링크 생성 중...' : inviteCopied ? '링크 복사됐어요. 카톡에 붙여넣기 하세요.' : '초대 링크 다시 보내기'}
         </button>
       </div>
     </div>

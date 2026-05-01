@@ -1,5 +1,6 @@
 package com.againspring.api;
 
+import com.againspring.api.dto.request.DeleteAccountRequest;
 import com.againspring.api.dto.request.OnboardingRequest;
 import com.againspring.api.dto.request.UpdateUserRequest;
 import com.againspring.api.dto.response.OnboardingResponse;
@@ -65,10 +66,13 @@ public class UserController {
     }
 
     @DeleteMapping("/me")
-    @Operation(summary = "Delete user account")
-    @ApiResponse(responseCode = "204", description = "Account deleted")
-    public ResponseEntity<Void> deleteUserAccount(@AuthenticationPrincipal UserDetails userDetails) {
-        userService.deleteUserAccount(userDetails.getUsername());
+    @Operation(summary = "Delete user account (anonymize PII)")
+    @ApiResponse(responseCode = "204", description = "Account anonymized")
+    @ApiResponse(responseCode = "401", description = "Invalid password")
+    public ResponseEntity<Void> deleteUserAccount(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody(required = false) DeleteAccountRequest request) {
+        userService.deleteUserAccount(userDetails.getUsername(), request);
         return ResponseEntity.noContent().build();
     }
 
@@ -133,6 +137,7 @@ public class UserController {
                             .middleCategoryId(cat != null ? cat.middleId : null)
                             .minorCategoryId(cat != null ? cat.minorId : null)
                             .customCategoryText(cat != null ? cat.customText : null)
+                            .reportId(s.getReportId())
                             .build();
                 })
                 .toList();

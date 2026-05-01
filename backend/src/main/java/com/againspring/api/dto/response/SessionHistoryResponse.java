@@ -28,4 +28,5 @@ public class SessionHistoryResponse {
     private String middleCategoryId;
     private String minorCategoryId;
     private String customCategoryText;
+    private String reportId;
 }

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUserStore } from '@/lib/store/userStore';
+import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { api } from '@/lib/api/client';
 import type { RelationType } from '@/lib/types';
@@ -21,6 +21,7 @@ interface HistoryItem {
   middleCategoryId: string | null;
   minorCategoryId: string | null;
   customCategoryText: string | null;
+  reportId: string | null;
 }
 
 const RELATION_TYPE_LABEL: Record<RelationType, string> = {
@@ -42,7 +43,10 @@ function getMiddleLabel(majorId: string | null, middleId: string | null): string
 
 function getMinorLabel(majorId: string | null, middleId: string | null, minorId: string | null, customText: string | null): string | null {
   if (!majorId || !middleId || !minorId) return null;
-  if (minorId === 'custom') return customText?.trim() || null;
+  if (minorId === 'custom') {
+    const text = customText?.trim();
+    return text ? `직접: ${text}` : '직접 입력';
+  }
   const major = CATEGORIES.find(c => c.id === majorId);
   if (!major) return null;
   const middle = major.middles.find(m => m.id === middleId);
@@ -57,6 +61,7 @@ const isActive = (status: string) => ACTIVE_STATUSES.has(status);
 export default function HistoryPage() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
+  const hasHydrated = useHasHydrated();
 
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +75,7 @@ export default function HistoryPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!user) {
       router.push('/login');
       return;
@@ -239,36 +245,58 @@ export default function HistoryPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>{dateStr}</div>
-                  {active ? (
-                    <span style={{
-                      fontSize: 10,
-                      background: 'var(--L-point)',
-                      color: '#fff',
-                      borderRadius: 4,
-                      padding: '2px 7px',
-                    }}>
-                      진행 중
-                    </span>
-                  ) : item.completedAt ? (
-                    <span style={{
-                      fontSize: 10,
-                      background: 'var(--L-sub)',
-                      color: '#fff',
-                      borderRadius: 4,
-                      padding: '2px 7px',
-                    }}>
-                      완료
-                    </span>
-                  ) : null}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {active ? (
+                      <span style={{
+                        fontSize: 10,
+                        background: 'var(--L-point)',
+                        color: '#fff',
+                        borderRadius: 4,
+                        padding: '2px 7px',
+                      }}>
+                        진행 중
+                      </span>
+                    ) : item.completedAt ? (
+                      <span style={{
+                        fontSize: 10,
+                        background: 'var(--L-sub)',
+                        color: '#fff',
+                        borderRadius: 4,
+                        padding: '2px 7px',
+                      }}>
+                        완료
+                      </span>
+                    ) : null}
+                    {!active && item.reportId && (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          router.push(`/session/result/${item.id}`);
+                        }}
+                        style={{
+                          fontSize: 10,
+                          padding: '2px 7px',
+                          background: 'var(--L-point)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 4,
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                        }}
+                      >
+                        결과 보기
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="serif" style={{ fontSize: 15, color: 'var(--L-ink)', fontWeight: 500, marginBottom: 8 }}>
                   {item.soloMode
                     ? '혼자 정리한 이야기'
                     : item.partnerNickname
-                      ? `${item.partnerNickname}님과의 대화`
+                      ? `${item.partnerNickname}분과의 대화`
                       : '상대방과의 대화'}
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   {item.relationType && (
                     <span style={{
                       fontSize: '11px',
@@ -292,6 +320,13 @@ export default function HistoryPage() {
                       padding: '4px 8px',
                       color: 'var(--L-sub)',
                     };
+                    if (!midLabel && !minLabel && item.majorCategoryId) {
+                      return (
+                        <span style={{ ...chipStyle, opacity: 0.55, fontStyle: 'italic' }}>
+                          세부 분류 없음
+                        </span>
+                      );
+                    }
                     return (
                       <>
                         {midLabel && <span style={chipStyle}>{midLabel}</span>}

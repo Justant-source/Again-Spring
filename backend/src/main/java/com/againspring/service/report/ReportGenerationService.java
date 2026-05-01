@@ -61,7 +61,6 @@ public class ReportGenerationService {
      * Triggered when user completes (≥3 messages).
      */
     @Async
-    @Transactional
     public void generateSoloReport(String sessionId) {
         log.info("Generating solo report for session {}", sessionId);
         Instant startTime = Instant.now();
@@ -94,6 +93,12 @@ public class ReportGenerationService {
             Report report = buildSoloReport(session, parsed, perspective);
             reportRepo.save(report);
 
+            // 세션에 reportId 연결
+            sessionRepo.findById(sessionId).ifPresent(s -> {
+                s.setReportId(report.getId());
+                sessionRepo.save(s);
+            });
+
             long duration = Instant.now().toEpochMilli() - startTime.toEpochMilli();
             log.info("Solo report generated for session {} in {}ms", sessionId, duration);
 
@@ -101,7 +106,7 @@ public class ReportGenerationService {
             log.error("Failed to generate solo report for session {}", sessionId, e);
             try {
                 reportRepo.save(Report.builder()
-                    .id(UUID.randomUUID().toString())
+                    .id("rep_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20))
                     .sessionId(sessionId)
                     .soloMode(true)
                     .llmProvider("error-fallback")
@@ -118,7 +123,6 @@ public class ReportGenerationService {
      * Triggered when both agree to finalize.
      */
     @Async
-    @Transactional
     public void generateDuoReport(String sessionId) {
         log.info("Generating duo report for session {}", sessionId);
         Instant startTime = Instant.now();
@@ -169,6 +173,12 @@ public class ReportGenerationService {
             Report report = buildDuoReport(session, parsedA, parsedB, ratio);
             reportRepo.save(report);
 
+            // 세션에 reportId 연결
+            sessionRepo.findById(sessionId).ifPresent(s -> {
+                s.setReportId(report.getId());
+                sessionRepo.save(s);
+            });
+
             long duration = Instant.now().toEpochMilli() - startTime.toEpochMilli();
             log.info("Duo report generated for session {} in {}ms", sessionId, duration);
 
@@ -176,7 +186,7 @@ public class ReportGenerationService {
             log.error("Failed to generate duo report for session {}", sessionId, e);
             try {
                 reportRepo.save(Report.builder()
-                    .id(UUID.randomUUID().toString())
+                    .id("rep_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20))
                     .sessionId(sessionId)
                     .soloMode(false)
                     .llmProvider("error-fallback")
@@ -202,7 +212,7 @@ public class ReportGenerationService {
         if (!soloProfile.isEmpty()) {
             sb.append(soloProfile).append("\n");
         }
-        sb.append(promptLoader.get("relations/" + session.getRelationType() + ".md")).append("\n\n");
+        sb.append(promptLoader.get("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
         sb.append(promptLoader.get("chat/solo_report.md")).append("\n\n");
 
         sb.append("<conversation_history>\n");
@@ -240,7 +250,7 @@ public class ReportGenerationService {
         if (!profileA.isEmpty()) sb.append(profileA);
         if (!profileB.isEmpty()) sb.append(profileB);
         if (!profileA.isEmpty() || !profileB.isEmpty()) sb.append("\n");
-        sb.append(promptLoader.get("relations/" + session.getRelationType() + ".md")).append("\n\n");
+        sb.append(promptLoader.get("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
         sb.append(promptLoader.get("chat/duo_report.md")).append("\n\n");
 
         sb.append("<conversation_history>\n");
@@ -284,7 +294,7 @@ public class ReportGenerationService {
      * Build Report entity for solo mode.
      */
     private Report buildSoloReport(Session session, ReportResponseParser.ParsedReport parsed, MessageSender perspective) {
-        String reportId = UUID.randomUUID().toString();
+        String reportId = "rep_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
 
         Report.Participant participantA = Report.Participant.builder()
             .userId(session.getCreatedByUserId())
@@ -363,7 +373,7 @@ public class ReportGenerationService {
      */
     private Report buildDuoReport(Session session, ReportResponseParser.ParsedReport parsedA,
                                   ReportResponseParser.ParsedReport parsedB, RatioEnforcer.Enforced ratio) {
-        String reportId = UUID.randomUUID().toString();
+        String reportId = "rep_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
 
         Report.Participant participantA = Report.Participant.builder()
             .userId(session.getCreatedByUserId())

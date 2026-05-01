@@ -20,10 +20,16 @@ import com.againspring.service.crisis.CrisisDetector;
 import com.againspring.service.parser.ChatTurnMetaParser;
 import com.againspring.service.prompt.ChatPromptAssembler;
 import com.againspring.service.report.ReportGenerationService;
+import com.againspring.service.event.PartnerJoinedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -55,6 +61,10 @@ public class ChatService {
     private final WelcomeMessageGenerator welcomeMessageGenerator; // Phase D PR-5
     private final PhaseDMetrics phaseDMetrics; // Phase D PR-6
 
+    // Bug E: Lazy-injected to avoid circular dependency with CancelableChatService
+    @Lazy
+    private CancelableChatService cancelableChatService;
+
     public ChatService(MessageRepository messageRepo, SessionRepository sessionRepo,
                       UserRepository userRepo,
                       LLMProvider llmBridge, CrisisDetector crisisDetector,
@@ -67,7 +77,8 @@ public class ChatService {
                       IsolationLintFilter isolationLintFilter,
                       WelcomeQuestionResolver welcomeQuestionResolver,
                       WelcomeMessageGenerator welcomeMessageGenerator,
-                      PhaseDMetrics phaseDMetrics) {
+                      PhaseDMetrics phaseDMetrics,
+                      @Lazy CancelableChatService cancelableChatService) {
         this.messageRepo = messageRepo;
         this.sessionRepo = sessionRepo;
         this.userRepo = userRepo;
@@ -85,9 +96,11 @@ public class ChatService {
         this.welcomeQuestionResolver = welcomeQuestionResolver;
         this.welcomeMessageGenerator = welcomeMessageGenerator;
         this.phaseDMetrics = phaseDMetrics;
+        this.cancelableChatService = cancelableChatService;
     }
 
-    public static final int MIN_MESSAGES_TO_FINALIZE = 3;
+    @Value("${app.session.min-messages-to-finalize:3}")
+    private int MIN_MESSAGES_TO_FINALIZE;
     public static final int FINALIZE_SUGGEST_SOLO_MIN = 10;
     public static final int FINALIZE_SUGGEST_DUO_TOTAL_MIN = 16;
     public static final int FINALIZE_SUGGEST_DUO_PER_USER_MIN = 5;
@@ -174,13 +187,6 @@ public class ChatService {
         String mediatorResponse = parsed.mediatorMessage().isBlank()
             ? mediatorResponseRaw : parsed.mediatorMessage();
 
-        // Phase D PR-4: isolation 위반 감지 (3중 방어 3층)
-        if (isolationLintFilter.violatesIsolation(mediatorResponse)) {
-            log.error("Isolation violation detected in session {}", sessionId);
-            phaseDMetrics.recordIsolationViolation(); // Phase D PR-6
-            mediatorResponse = "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?";
-        }
-
         appendPsychologyHistory(session, parsed);
         userStateAppender.append(session, parsed.userState()); // Phase D PR-2
         issueContextMerger.merge(session, parsed.issueDelta(), turnIndex); // Phase D PR-3
@@ -197,14 +203,36 @@ public class ChatService {
             phaseDMetrics.recordQueueAsked(parsed.queueDelta().asked.size());
         }
 
-        Message mediatorMsg = messageRepo.save(Message.builder()
-            .sessionId(sessionId)
-            .sender(mediatorSender)
-            .content(mediatorResponse)
-            .charCount(mediatorResponse.length())
-            .llmModel(MODEL_HAIKU)
-            .llmLatencyMs(latency)
-            .build());
+        // '---' 마커로 메시지 분할 저장 (200자 초과 시 자동 분할)
+        String[] rawChunks = mediatorResponse.split("(?m)^---\\s*$");
+        List<String> chunks = new ArrayList<>();
+        for (String c : rawChunks) {
+            String trimmed = c.strip();
+            if (!trimmed.isEmpty()) {
+                chunks.addAll(splitLongChunk(trimmed));
+            }
+        }
+        if (chunks.isEmpty()) {
+            chunks.add(mediatorResponse);
+        }
+
+        List<Message> mediatorMessages = new ArrayList<>();
+        for (int i = 0; i < chunks.size(); i++) {
+            String chunk = chunks.get(i);
+            if (isolationLintFilter.violatesIsolation(chunk)) {
+                log.warn("Isolation violation in chunk {} of session {}", i, sessionId);
+                chunk = "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?";
+            }
+            Message mediatorMsg = messageRepo.save(Message.builder()
+                .sessionId(sessionId)
+                .sender(mediatorSender)
+                .content(chunk)
+                .charCount(chunk.length())
+                .llmModel(MODEL_HAIKU)
+                .llmLatencyMs(i == 0 ? latency : null)
+                .build());
+            mediatorMessages.add(mediatorMsg);
+        }
 
         // 4. 종료 권유 검토 (카운트 기반) + 명시적 종료 요청 시 재트리거
         boolean finalizeSuggested = checkAndTriggerFinalizationSuggestion(session);
@@ -219,7 +247,24 @@ public class ChatService {
             }
         }
 
-        return ChatTurnResult.success(userMsg, mediatorMsg, finalizeSuggested);
+        return ChatTurnResult.success(userMsg, mediatorMessages, finalizeSuggested);
+    }
+
+    /**
+     * joinSession 트랜잭션 커밋 후 이벤트 기반 호출.
+     * join 트랜잭션이 완전히 커밋된 다음 LLM 호출이 시작되어야
+     * B의 첫 메시지 도착 시 SessionRoleResolver가 userBId를 정상 인식함.
+     * 실패 시 폴백 메시지를 저장하여 B가 빈 채팅방에 진입하지 않도록 함.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void onPartnerJoinedEvent(PartnerJoinedEvent event) {
+        try {
+            onPartnerJoined(event.getSessionId(), event.getUserBId());
+        } catch (Exception e) {
+            log.error("onPartnerJoined failed for session {}: {}", event.getSessionId(), e.getMessage(), e);
+            saveFallbackPartnerJoinMessages(event.getSessionId());
+        }
     }
 
     /**
@@ -316,6 +361,12 @@ public class ChatService {
             session.setCompletedAt(Instant.now());
             sessionRepo.save(session);
             reportService.generateSoloReport(sessionId);
+
+            // Bug E: Cleanup active invocations when session completes
+            if (cancelableChatService != null) {
+                cancelableChatService.cleanupSession(sessionId);
+            }
+
             return FinalizationResult.completedResult();
         }
 
@@ -338,6 +389,12 @@ public class ChatService {
             session.setCompletedAt(Instant.now());
             sessionRepo.save(session);
             reportService.generateDuoReport(sessionId);
+
+            // Bug E: Cleanup active invocations when session completes
+            if (cancelableChatService != null) {
+                cancelableChatService.cleanupSession(sessionId);
+            }
+
             return FinalizationResult.completedResult();
         }
 
@@ -604,20 +661,54 @@ public class ChatService {
         sessionRepo.save(session);
     }
 
+    /**
+     * onPartnerJoined 실패 시 폴백: 양쪽 채팅에 기본 환영 메시지 저장.
+     * LLM 호출 없이 순수 텍스트만 저장. 이 메서드에서 예외 발생해도 로그만 기록.
+     */
+    private void saveFallbackPartnerJoinMessages(String sessionId) {
+        try {
+            String aNotice = "상대분이 함께하러 오셨어요. 두 분의 이야기를 함께 들어볼게요.";
+            messageRepo.save(Message.builder()
+                .sessionId(sessionId)
+                .sender(MessageSender.MEDIATOR_TO_A)
+                .content(aNotice)
+                .charCount(aNotice.length())
+                .isPartnerJoinNotice(true)
+                .build());
+
+            String bNotice = "함께 이야기를 나눠볼까요? 편하게 마음을 들려주세요.";
+            messageRepo.save(Message.builder()
+                .sessionId(sessionId)
+                .sender(MessageSender.MEDIATOR_TO_B)
+                .content(bNotice)
+                .charCount(bNotice.length())
+                .isPartnerJoinNotice(true)
+                .build());
+
+            log.info("Fallback partner join messages saved for session {}", sessionId);
+        } catch (Exception ex) {
+            log.error("Fallback partner join messages also failed for session {}: {}",
+                    sessionId, ex.getMessage());
+        }
+    }
+
     // ==== DTOs ====
 
     public record ChatTurnResult(
         boolean success,
         Message userMsg,
-        Message mediatorMsg,
+        List<Message> mediatorMessages,
         boolean finalizeSuggested,
         Integer crisisLevel
     ) {
-        public static ChatTurnResult success(Message u, Message m, boolean suggest) {
-            return new ChatTurnResult(true, u, m, suggest, null);
+        public static ChatTurnResult success(Message u, List<Message> msgs, boolean suggest) {
+            return new ChatTurnResult(true, u, msgs, suggest, null);
         }
         public static ChatTurnResult crisisBlocked() {
             return new ChatTurnResult(false, null, null, false, 1);
+        }
+        public Message mediatorMsg() {
+            return (mediatorMessages != null && !mediatorMessages.isEmpty()) ? mediatorMessages.get(0) : null;
         }
     }
 
@@ -635,4 +726,28 @@ public class ChatService {
         int messageCount,
         Instant lastActivityAt
     ) {}
+
+    // 200자 초과 청크를 문장 경계에서 자동 분할
+    private static final int MAX_CHUNK_LEN = 200;
+
+    private static List<String> splitLongChunk(String chunk) {
+        if (chunk.length() <= MAX_CHUNK_LEN) return List.of(chunk);
+        List<String> parts = new ArrayList<>();
+        String remaining = chunk;
+        while (remaining.length() > MAX_CHUNK_LEN) {
+            int splitAt = -1;
+            for (int i = Math.min(MAX_CHUNK_LEN, remaining.length()) - 1; i >= MAX_CHUNK_LEN / 2; i--) {
+                char c = remaining.charAt(i);
+                if (c == '.' || c == '?' || c == '!' || c == '~' || c == '\n') {
+                    splitAt = i + 1;
+                    break;
+                }
+            }
+            if (splitAt <= 0) splitAt = MAX_CHUNK_LEN;
+            parts.add(remaining.substring(0, splitAt).trim());
+            remaining = remaining.substring(splitAt).trim();
+        }
+        if (!remaining.isEmpty()) parts.add(remaining);
+        return parts;
+    }
 }

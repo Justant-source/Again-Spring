@@ -15,14 +15,16 @@ import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.safety.KeywordGuard;
 import com.againspring.safety.ScanResult;
+import com.againspring.service.event.PartnerJoinedEvent;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,21 +42,27 @@ public class SessionService {
     private final KeywordGuard keywordGuard;
     private final SessionStateMachine stateMachine;
     private final ChatService chatService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public SessionService(SessionRepository sessionRepository,
                           UserRepository userRepository,
                           KeywordGuard keywordGuard,
                           SessionStateMachine stateMachine,
-                          @Lazy ChatService chatService) {
+                          @Lazy ChatService chatService,
+                          ApplicationEventPublisher eventPublisher) {
         this.sessionRepository = sessionRepository;
         this.userRepository = userRepository;
         this.keywordGuard = keywordGuard;
         this.stateMachine = stateMachine;
         this.chatService = chatService;
+        this.eventPublisher = eventPublisher;
     }
 
     private static final long INVITE_TOKEN_TTL_MS = 86400000; // 24 hours
     private static final long CONTENT_EXPIRY_TTL_MS = 2592000000L; // 30 days
+
+    @Value("${app.session.max-active:3}")
+    private int MAX_ACTIVE_SESSIONS_PER_USER;
 
     /**
      * Create a new session (A initiates).
@@ -70,6 +78,16 @@ public class SessionService {
         // 게스트는 온보딩 완료 여부 체크 없이 세션 생성 허용 (앱 내 10문항 흐름 병행)
         if (!creator.isGuest() && creator.getOnboardingCompletedAt() == null) {
             throw new BusinessException("ONBOARDING_REQUIRED", "성격검사를 먼저 완료해주세요", 403);
+        }
+
+        // 동시 진행 중인 세션 한도 체크
+        List<SessionStatus> activeStatuses = List.of(SessionStatus.CHATTING_SOLO, SessionStatus.CHATTING_DUO);
+        List<Session> createdSessions = sessionRepository.findByCreatedByUserIdAndStatusIn(createdByUserId, activeStatuses);
+        List<Session> joinedSessions = sessionRepository.findByInviteeUserIdAndStatusIn(createdByUserId, activeStatuses);
+        int activeSessions = createdSessions.size() + joinedSessions.size();
+        if (activeSessions >= MAX_ACTIVE_SESSIONS_PER_USER) {
+            throw new BusinessException("SESSION_LIMIT_EXCEEDED",
+                    "동시에 진행 중인 대화가 너무 많아요. 기존 대화를 먼저 마무리해 주세요.", 429);
         }
 
         // Validate relation type
@@ -101,10 +119,10 @@ public class SessionService {
         Session.Category category = null;
         if (request.getCategory() != null) {
             category = new Session.Category();
-            category.majorId = request.getCategory().getMajor();
-            category.middleId = request.getCategory().getMiddle();
-            category.minorId = request.getCategory().getMinor();
-            category.customText = request.getCategory().getCustomMinor();
+            category.majorId = request.getCategory().getMajorId();
+            category.middleId = request.getCategory().getMiddleId();
+            category.minorId = request.getCategory().getMinorId();
+            category.customText = request.getCategory().getCustomText();
         }
 
         // V1.5: 모든 세션은 CHATTING_SOLO로 시작 (초대 여부 무관)
@@ -121,6 +139,8 @@ public class SessionService {
                 .userBMessageCount(0)
                 .finalizeAgreedByA(false)
                 .finalizeAgreedByB(false)
+                .mediatorStyleX(request.getMediatorStyleX() != null ? request.getMediatorStyleX() : 50)
+                .mediatorStyleY(request.getMediatorStyleY() != null ? request.getMediatorStyleY() : 50)
                 .crisisDetections(new ArrayList<>())
                 .createdAt(now)
                 .updatedAt(now)
@@ -237,8 +257,10 @@ public class SessionService {
         session.setUpdatedAt(Instant.now());
         sessionRepository.save(session);
 
-        // Solo→Duo 전이: 상태 변경 + 양쪽 시스템 안내 메시지 삽입
-        chatService.onPartnerJoined(session.getId(), userBId);
+        // Solo→Duo 전이: 트랜잭션 커밋 후 이벤트 발행 (AFTER_COMMIT)
+        // join 트랜잭션이 완전히 커밋된 후 onPartnerJoined LLM 호출이 시작되어야
+        // B의 첫 메시지가 도착해도 SessionRoleResolver가 userBId를 정상 인식함
+        eventPublisher.publishEvent(new PartnerJoinedEvent(this, session.getId(), userBId));
         log.info("Session joined: id={}, invitee={}", session.getId(), userBId);
 
         return mapToSessionResponse(sessionRepository.findById(session.getId()).orElseThrow(), userBId);
@@ -297,10 +319,12 @@ public class SessionService {
             throw new BusinessException("SESSION_FORBIDDEN", "Only session owner can invite");
         }
 
-        if (!session.getStatus().equals(SessionStatus.CHATTING_SOLO)) {
+        boolean isSoloCompleted = session.getStatus().equals(SessionStatus.COMPLETED)
+                && Boolean.TRUE.equals(session.getSoloMode());
+        if (!session.getStatus().equals(SessionStatus.CHATTING_SOLO) && !isSoloCompleted) {
             throw new BusinessException(
                 "SESSION_INVALID_STATE",
-                "Cannot invite when session is not in SOLO state");
+                "Cannot invite when session is not in SOLO or completed-solo state");
         }
 
         // 이미 토큰이 있으면 재사용, 없으면 새로 발급
@@ -398,6 +422,7 @@ public class SessionService {
                 .createdAt(session.getCreatedAt())
                 .finalizeAgreedByA(session.getFinalizeAgreedByA())
                 .finalizeAgreedByB(session.getFinalizeAgreedByB())
+                .reportId(session.getReportId())
                 .build();
     }
 

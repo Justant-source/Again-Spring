@@ -2,95 +2,100 @@
 # backend/scripts/test-automation/run.py
 """
 Usage:
-  python run.py --scenario SC13 --persona test1@again.com   # dry run
-  python run.py --all --max-concurrent 5                     # 전체 실행
-  python run.py --scenarios SC13,SC14,SC15                   # 취소 시나리오만
+  python run.py --scenario SC-CANCEL-FAST                # 단일 시나리오
+  python run.py --scenarios SC-CANCEL-FAST,SC-FLOW-SOLO  # 복수 시나리오
+  python run.py --all                                     # 10개 전체 실행
+  python run.py --all --reset                             # 전체 실행 전 test 계정 데이터 삭제
+  python run.py --scenario SC-CANCEL-FAST --reset         # 단일 + 리셋
+
+카테고리:
+  mechanism/  — V1.5 취소 메커니즘 핵심 (3개, test1·test2)
+  flow/       — 정상 흐름 (4개, test1·test2)
+  validation/ — 검증/예외 (3개, test1·test3)
 """
 import argparse
 import asyncio
 import sys
 import os
 
-# 경로 설정
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import DEV_URL, MAX_CONCURRENT
 from personas import PERSONA_MAP, PERSONAS
 from runner.orchestrator import Orchestrator
 
-# 시나리오 임포트 — Normal
-from scenarios.normal.sc01_in_law_kitchen import SCENARIO_SC01
-from scenarios.normal.sc02_parenting_conflict import SCENARIO_SC02
-from scenarios.normal.sc03_friend_breakup import SCENARIO_SC03
-from scenarios.normal.sc04_workplace_conflict import SCENARIO_SC04
-from scenarios.normal.sc05_money_conflict import SCENARIO_SC05
-from scenarios.normal.sc06_career_difference import SCENARIO_SC06
-from scenarios.normal.sc07_roommate_conflict import SCENARIO_SC07
-from scenarios.normal.sc08_communication_issue import SCENARIO_SC08
-from scenarios.normal.sc09_sibling_unfair import SCENARIO_SC09
-from scenarios.normal.sc10_long_distance import SCENARIO_SC10
-from scenarios.normal.sc11_friend_betrayal import SCENARIO_SC11
-from scenarios.normal.sc12_boss_conflict import SCENARIO_SC12
+# 시나리오 임포트 — mechanism
+from scenarios.mechanism.sc_cancel_fast import SCENARIO_SC_CANCEL_FAST
+from scenarios.mechanism.sc_cancel_burst import SCENARIO_SC_CANCEL_BURST
+from scenarios.mechanism.sc_cancel_duo import SCENARIO_SC_CANCEL_DUO
 
-# Cancellation
-from scenarios.cancellation.sc13_two_messages_cancel import SCENARIO_SC13
-from scenarios.cancellation.sc14_five_quick_messages import SCENARIO_SC14
-from scenarios.cancellation.sc15_duo_cancel import SCENARIO_SC15
-from scenarios.cancellation.sc23_context_integration import SCENARIO_SC23
-from scenarios.cancellation.sc24_duo_isolation import SCENARIO_SC24
+# 시나리오 임포트 — flow
+from scenarios.flow.sc_flow_solo import SCENARIO_SC_FLOW_SOLO
+from scenarios.flow.sc_flow_duo_welcome import SCENARIO_SC_FLOW_DUO_WELCOME
+from scenarios.flow.sc_flow_duo_chat import SCENARIO_SC_FLOW_DUO_CHAT
+from scenarios.flow.sc_flow_finalize import SCENARIO_SC_FLOW_FINALIZE
 
-# Exception
-from scenarios.exception.sc16_external_resource import SCENARIO_SC16
-from scenarios.exception.sc17_forbidden_words import SCENARIO_SC17
-from scenarios.exception.sc18_inactive_session import SCENARIO_SC18
-from scenarios.exception.sc19_crisis_keyword import SCENARIO_SC19
-from scenarios.exception.sc20_empty_message import SCENARIO_SC20
-from scenarios.exception.sc21_very_long_message import SCENARIO_SC21
-from scenarios.exception.sc22_decline_finalize import SCENARIO_SC22
+# 시나리오 임포트 — validation
+from scenarios.validation.sc_valid_empty import SCENARIO_SC_VALID_EMPTY
+from scenarios.validation.sc_valid_crisis import SCENARIO_SC_VALID_CRISIS
+from scenarios.validation.sc_valid_limit import SCENARIO_SC_VALID_LIMIT
+
+# 시나리오 임포트 — context (멀티턴 컨텍스트 관리)
+from scenarios.context.sc_ctx_solo_depth import SCENARIO_SC_CTX_SOLO_DEPTH
+from scenarios.context.sc_ctx_duo_turns import SCENARIO_SC_CTX_DUO_TURNS
+from scenarios.context.sc_ctx_recall import SCENARIO_SC_CTX_RECALL
+
+# 시나리오 임포트 — flow (리포트 생성)
+from scenarios.flow.sc_flow_solo_report import SCENARIO_SC_FLOW_SOLO_REPORT
 
 ALL_SCENARIOS = {
-    "SC01": SCENARIO_SC01, "SC02": SCENARIO_SC02, "SC03": SCENARIO_SC03,
-    "SC04": SCENARIO_SC04, "SC05": SCENARIO_SC05, "SC06": SCENARIO_SC06,
-    "SC07": SCENARIO_SC07, "SC08": SCENARIO_SC08, "SC09": SCENARIO_SC09,
-    "SC10": SCENARIO_SC10, "SC11": SCENARIO_SC11, "SC12": SCENARIO_SC12,
-    "SC13": SCENARIO_SC13, "SC14": SCENARIO_SC14, "SC15": SCENARIO_SC15,
-    "SC16": SCENARIO_SC16, "SC17": SCENARIO_SC17, "SC18": SCENARIO_SC18,
-    "SC19": SCENARIO_SC19, "SC20": SCENARIO_SC20, "SC21": SCENARIO_SC21,
-    "SC22": SCENARIO_SC22, "SC23": SCENARIO_SC23, "SC24": SCENARIO_SC24,
+    # mechanism — 취소 메커니즘 핵심 (페르소나 무관, test1 고정)
+    "SC-CANCEL-FAST":    SCENARIO_SC_CANCEL_FAST,
+    "SC-CANCEL-BURST":   SCENARIO_SC_CANCEL_BURST,
+    "SC-CANCEL-DUO":     SCENARIO_SC_CANCEL_DUO,
+    # flow — 정상 흐름
+    "SC-FLOW-SOLO":      SCENARIO_SC_FLOW_SOLO,
+    "SC-FLOW-DUO-WELCOME": SCENARIO_SC_FLOW_DUO_WELCOME,
+    "SC-FLOW-DUO-CHAT":  SCENARIO_SC_FLOW_DUO_CHAT,
+    "SC-FLOW-FINALIZE":  SCENARIO_SC_FLOW_FINALIZE,
+    # validation — 검증/예외
+    "SC-VALID-EMPTY":    SCENARIO_SC_VALID_EMPTY,
+    "SC-VALID-CRISIS":   SCENARIO_SC_VALID_CRISIS,
+    "SC-VALID-LIMIT":    SCENARIO_SC_VALID_LIMIT,
+    # context — 멀티턴 컨텍스트 관리
+    "SC-CTX-SOLO-DEPTH": SCENARIO_SC_CTX_SOLO_DEPTH,
+    "SC-CTX-DUO-TURNS":  SCENARIO_SC_CTX_DUO_TURNS,
+    "SC-CTX-RECALL":     SCENARIO_SC_CTX_RECALL,
+    # flow — 리포트 생성
+    "SC-FLOW-SOLO-REPORT": SCENARIO_SC_FLOW_SOLO_REPORT,
 }
 
-# 시나리오별 실행 페르소나 매트릭스
+# 시나리오별 실행 페르소나 매트릭스 (최소화)
+# Duo 시나리오: 첫 번째 이메일 = A, test2@again.com = B (고정)
 SCENARIO_PERSONA_MAP = {
-    # Normal
-    "SC01": ["test1@again.com"],
-    "SC02": ["test5@again.com"],
-    "SC03": ["test3@again.com"],
-    "SC04": ["test4@again.com"],
-    "SC05": ["test6@again.com"],
-    "SC06": ["test6@again.com"],
-    "SC07": ["test7@again.com"],
-    "SC08": ["test3@again.com"],
-    "SC09": ["test8@again.com"],
-    "SC10": ["test5@again.com"],
-    "SC11": ["test3@again.com"],
-    "SC12": ["test4@again.com"],
-    # Cancellation
-    "SC13": ["test1@again.com", "test2@again.com", "test10@again.com"],
-    "SC14": ["test10@again.com", "test2@again.com"],
-    "SC15": ["test1@again.com"],  # Duo: test1 + test2
-    "SC23": ["test1@again.com"],
-    "SC24": ["test1@again.com"],  # Duo: test1 + test2
-    # Exception
-    "SC16": ["test1@again.com"],
-    "SC17": ["test1@again.com"],
-    "SC18": ["test1@again.com"],
-    "SC19": ["test9@again.com"],
-    "SC20": ["test1@again.com"],
-    "SC21": ["test1@again.com"],
-    "SC22": ["test1@again.com"],
+    # mechanism (페르소나 무관 — test1만)
+    "SC-CANCEL-FAST":    ["test1@again.com"],
+    "SC-CANCEL-BURST":   ["test1@again.com"],
+    "SC-CANCEL-DUO":     ["test1@again.com"],   # Duo: test1(A) + test2(B)
+    # flow
+    "SC-FLOW-SOLO":      ["test1@again.com"],
+    "SC-FLOW-DUO-WELCOME": ["test1@again.com"], # Duo: test1(A) + test2(B)
+    "SC-FLOW-DUO-CHAT":  ["test1@again.com"],   # Duo: test1(A) + test2(B)
+    "SC-FLOW-FINALIZE":  ["test1@again.com"],   # Duo: test1(A) + test2(B)
+    # validation
+    "SC-VALID-EMPTY":    ["test1@again.com"],
+    "SC-VALID-CRISIS":   ["test3@again.com"],
+    "SC-VALID-LIMIT":    ["test1@again.com"],
+    # context
+    "SC-CTX-SOLO-DEPTH": ["test1@again.com"],
+    "SC-CTX-DUO-TURNS":  ["test1@again.com"],   # Duo: test1(A) + test2(B)
+    "SC-CTX-RECALL":     ["test1@again.com"],
+    # flow — 리포트 생성
+    "SC-FLOW-SOLO-REPORT": ["test1@again.com"],
 }
 
-def build_runs(scenario_ids: list[str], persona_filter: str = None) -> list[dict]:
+
+def build_runs(scenario_ids: list, persona_filter: str = None) -> list:
     runs = []
     for sc_id in scenario_ids:
         scenario = ALL_SCENARIOS.get(sc_id)
@@ -105,7 +110,6 @@ def build_runs(scenario_ids: list[str], persona_filter: str = None) -> list[dict
             emails = [e for e in emails if e == persona_filter]
 
         if is_duo and len(emails) >= 1:
-            # Duo: Orchestrator._run_duo_pair() 가 세션 조율
             a_email = emails[0]
             b_email = "test2@again.com"
             a_persona = PERSONA_MAP.get(a_email, {})
@@ -117,7 +121,6 @@ def build_runs(scenario_ids: list[str], persona_filter: str = None) -> list[dict
                 "duo_password_a": a_persona.get("password", "test123"),
                 "duo_email_b": b_email,
                 "duo_password_b": b_persona.get("password", "test123"),
-                # _prelogin_all 이 email 필드를 사용하므로 A 이메일을 기본으로 노출
                 "email": a_email,
                 "password": a_persona.get("password", "test123"),
             })
@@ -132,14 +135,21 @@ def build_runs(scenario_ids: list[str], persona_filter: str = None) -> list[dict
 
     return runs
 
+
 async def main():
     parser = argparse.ArgumentParser(description="다시봄 자동화 테스트")
-    parser.add_argument("--scenario", help="단일 시나리오 ID (예: SC13)")
+    parser.add_argument("--scenario", help="단일 시나리오 ID (예: SC-CANCEL-FAST)")
     parser.add_argument("--scenarios", help="쉼표로 구분한 시나리오 IDs")
-    parser.add_argument("--all", action="store_true", help="모든 시나리오 실행")
+    parser.add_argument("--all", action="store_true", help="10개 시나리오 전체 실행")
     parser.add_argument("--persona", help="특정 페르소나만 실행")
+    parser.add_argument("--reset", action="store_true",
+                        help="실행 전 test 계정의 sessions/messages/reports 삭제")
     parser.add_argument("--max-concurrent", type=int, default=MAX_CONCURRENT)
     args = parser.parse_args()
+
+    if args.reset:
+        from runner.reset import reset_dev_test_data
+        await reset_dev_test_data()
 
     if args.all:
         scenario_ids = list(ALL_SCENARIOS.keys())
@@ -157,6 +167,7 @@ async def main():
     orch = Orchestrator(DEV_URL, args.max_concurrent)
     results = await orch.run_all(runs)
     orch.save_results(results)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

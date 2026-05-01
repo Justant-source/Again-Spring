@@ -25,6 +25,7 @@ export default function SessionHistoryPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [myRole, setMyRole] = useState<'USER_A' | 'USER_B'>('USER_A');
   const [sessionTitle, setSessionTitle] = useState('지난 대화');
+  const [hasReport, setHasReport] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -45,8 +46,10 @@ export default function SessionHistoryPage() {
         if (session.soloMode) {
           setSessionTitle('혼자 정리한 이야기');
         } else if (session.partnerNickname) {
-          setSessionTitle(`${session.partnerNickname}님과의 대화`);
+          setSessionTitle(`${session.partnerNickname}분과의 대화`);
         }
+
+        if (session.reportId) setHasReport(true);
 
         setMessages(msgRes.data || []);
       } catch {
@@ -151,16 +154,37 @@ export default function SessionHistoryPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 하단 읽기 전용 안내 */}
+      {/* 하단: 결과 보기 버튼 + 읽기 전용 안내 */}
       <div style={{
         padding: '12px 16px',
         borderTop: '1px solid var(--P-border)',
-        textAlign: 'center',
-        fontSize: 11,
-        color: 'var(--P-sub)',
         background: 'var(--P-bg)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        alignItems: 'center',
       }}>
-        지난 대화를 읽기 전용으로 보고 있어요
+        {hasReport && (
+          <button
+            onClick={() => router.push(`/session/result/${sessionId}`)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: 'var(--P-point)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            결과 보기
+          </button>
+        )}
+        <div style={{ fontSize: 11, color: 'var(--P-sub)' }}>
+          지난 대화를 읽기 전용으로 보고 있어요
+        </div>
       </div>
 
       {/* 삭제 확인 모달 */}

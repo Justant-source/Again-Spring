@@ -73,6 +73,13 @@ class PersonaBot:
                 verifier = ScenarioVerifier(rules)
                 result["verification"] = verifier.verify(all_messages, result, scenario)
 
+            # 세션 cleanup: 다음 시나리오가 세션 한도에 걸리지 않도록 TERMINATED 처리
+            if result.get("session_id") and not scenario.get("is_duo") and not scenario.get("skip_cleanup"):
+                try:
+                    await self.client.admin_terminate_session(result["session_id"])
+                except Exception:
+                    pass
+
         except Exception as e:
             result["error"] = str(e)
             result["completed_at"] = current_iso()
@@ -113,6 +120,20 @@ class PersonaBot:
             resp = await self.client.agree_finalize(session_id)
             return {"type": "finalize_agreed", "at": at, "resp": resp}
 
+        elif action_type == "poll_report":
+            max_wait = action.get("max_wait", 90)
+            interval = action.get("interval", 8)
+            waited = 0
+            while waited < max_wait:
+                await asyncio.sleep(interval)
+                waited += interval
+                report_resp = await self.client.get_report(session_id)
+                if report_resp.get("_http_status") == 200:
+                    result["report"] = report_resp
+                    return {"type": "report_received", "at": current_iso(), "waited_s": waited}
+            result["report"] = {"_http_status": 404}
+            return {"type": "report_timeout", "at": at, "waited_s": max_wait}
+
         elif action_type == "assert_status":
             status_resp = await self.client.get_session_status(session_id)
             actual = status_resp.get("status", "")
@@ -121,5 +142,16 @@ class PersonaBot:
             passed = actual == expected
             return {"type": "assert_status", "at": at,
                     "expected": expected, "actual": actual, "passed": passed}
+
+        elif action_type == "create_session":
+            rel = action.get("relation_type", "couple")
+            cat = action.get("category_data", {})
+            try:
+                status, body = await self.client.create_session_raw(rel, cat)
+                return {"type": "create_session", "at": at,
+                        "http_status": status, "body": body}
+            except Exception as e:
+                return {"type": "create_session", "at": at,
+                        "http_status": 500, "error": str(e)}
 
         return None
