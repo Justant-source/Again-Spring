@@ -17,9 +17,10 @@ import {
 import { COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
 import type { Report } from '@/lib/types';
 
-export function SoloResult({ report }: { report: Report }) {
+export function SoloResult({ report, sessionId: sessionIdProp }: { report: Report; sessionId?: string }) {
   const user = useUserStore((s) => s.user);
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const sessionIdFromStore = useSessionStore((s) => s.sessionId);
+  const sessionId = sessionIdProp || sessionIdFromStore;
   const partnerNickname = useSessionStore((s) => s.partnerNickname);
   const [copied, setCopied] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);

@@ -180,7 +180,7 @@ export default function ResultPage() {
 
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {report.isSoloMode ? (
-          <SoloResult report={report} />
+          <SoloResult report={report} sessionId={sessionId} />
         ) : (
           <ReportLayout
             report={report}
