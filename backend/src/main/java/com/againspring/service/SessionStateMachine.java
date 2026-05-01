@@ -31,7 +31,10 @@ public class SessionStateMachine {
                 || to == SessionStatus.CHATTING_DUO       // 한쪽 거부 → 채팅 복귀
                 || to == SessionStatus.TERMINATED;
 
-            case COMPLETED, TERMINATED -> false;
+            case COMPLETED ->
+                to == SessionStatus.CHATTING_DUO;    // 솔로 완료 후 파트너 재합류
+
+            case TERMINATED -> false;
 
             // 운영 호환 (기존 6턴 세션이 있으면 종료 처리만 허용)
             case WAITING_B, B_JOINED, IN_MEDIATION, SOLO_MODE ->

@@ -277,7 +277,9 @@ public class ChatService {
     public void onPartnerJoined(String sessionId, String userBId) {
         Session session = sessionRepo.findById(sessionId).orElseThrow();
 
-        if (session.getStatus() != SessionStatus.CHATTING_SOLO) {
+        boolean canTransitionToDuo = session.getStatus() == SessionStatus.CHATTING_SOLO
+                || (session.getStatus() == SessionStatus.COMPLETED && Boolean.TRUE.equals(session.getSoloMode()));
+        if (!canTransitionToDuo) {
             log.warn("Cannot transition to DUO from {}", session.getStatus());
             return;
         }

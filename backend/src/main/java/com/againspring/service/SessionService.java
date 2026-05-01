@@ -226,8 +226,10 @@ public class SessionService {
             throw new BusinessException("INVITE_TOKEN_EXPIRED", "Invite token has expired");
         }
 
-        // V1.5: CHATTING_SOLO 상태에서만 join 가능
-        if (!session.getStatus().equals(SessionStatus.CHATTING_SOLO)) {
+        // V1.5: CHATTING_SOLO 또는 COMPLETED(soloMode) 상태에서 join 가능
+        boolean isSoloCompleted = session.getStatus().equals(SessionStatus.COMPLETED)
+                && Boolean.TRUE.equals(session.getSoloMode());
+        if (!session.getStatus().equals(SessionStatus.CHATTING_SOLO) && !isSoloCompleted) {
             throw new BusinessException(
                     "SESSION_INVALID_STATE",
                     "This session is no longer available for joining");
