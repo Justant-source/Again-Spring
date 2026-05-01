@@ -243,8 +243,8 @@ public class SessionService {
                     400);
         }
 
-        // Check if already joined (userB가 이미 있으면 안됨)
-        if (session.getUserBId() != null) {
+        // Check if already joined — COMPLETED 솔로 세션 재합류는 허용 (초대 재발급 시 userBId 초기화됨)
+        if (session.getUserBId() != null && !isSoloCompleted) {
             throw new BusinessException(
                     "SESSION_ALREADY_JOINED",
                     "Session already has a participant");
@@ -329,14 +329,18 @@ public class SessionService {
                 "Cannot invite when session is not in SOLO or completed-solo state");
         }
 
-        // 이미 토큰이 있으면 재사용, 없으면 새로 발급
-        if (session.getInviteToken() == null) {
-            String newToken = "inv_" + UUID.randomUUID().toString().substring(0, 12);
-            Instant expiresAt = Instant.now().plusSeconds(259200);  // 72시간
-            session.setInviteToken(newToken);
-            session.setInviteExpiresAt(expiresAt);
-            sessionRepository.save(session);
+        // COMPLETED 솔로 세션: 새 초대 발급 시 B 참여자 정보 초기화 (재합류 허용)
+        if (isSoloCompleted) {
+            session.setInviteeUserId(null);
+            session.setInviteeGuestName(null);
         }
+
+        // 항상 새 토큰 발급 (COMPLETED 재합류 시 만료된 기존 토큰 갱신 포함)
+        String newToken = "inv_" + UUID.randomUUID().toString().substring(0, 12);
+        Instant expiresAt = Instant.now().plusSeconds(259200);  // 72시간
+        session.setInviteToken(newToken);
+        session.setInviteExpiresAt(expiresAt);
+        sessionRepository.save(session);
 
         return com.againspring.api.dto.response.InviteTokenResponse.builder()
             .inviteToken(session.getInviteToken())

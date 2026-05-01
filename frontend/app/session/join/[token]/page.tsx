@@ -169,7 +169,15 @@ export default function JoinPage({ params }: { params: { token: string } }) {
       const sessionId = res.data.id || sessionData?.id;
       router.push(`/session/chat/${sessionId}`);
     } catch (err: any) {
-      setError(err.response?.data?.message ?? '참여에 실패했어요. 다시 시도해주세요.');
+      const code = err.response?.data?.error?.code ?? err.response?.data?.code;
+      const errorMessages: Record<string, string> = {
+        INVITE_TOKEN_INVALID: '초대 링크가 유효하지 않아요. 링크를 다시 확인해주세요.',
+        INVITE_TOKEN_EXPIRED: '초대 링크가 만료됐어요. 상대방에게 새 링크를 요청해주세요.',
+        SESSION_ALREADY_JOINED: '이미 다른 분이 참여한 대화예요. 상대방에게 새 링크를 요청해주세요.',
+        SESSION_INVALID_STATE: '현재 참여할 수 없는 대화예요. 상대방에게 문의해주세요.',
+        SESSION_SELF_JOIN_FORBIDDEN: '본인이 만든 대화에는 참여할 수 없어요.',
+      };
+      setError(errorMessages[code] ?? '참여에 실패했어요. 잠시 후 다시 시도해주세요.');
     } finally {
       setIsSubmitting(false);
     }
