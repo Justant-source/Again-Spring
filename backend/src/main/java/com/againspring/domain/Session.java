@@ -123,6 +123,18 @@ public class Session {
     @Column(name = "user_b_emotion_intensity", precision = 3, scale = 2)
     private java.math.BigDecimal userBEmotionIntensity;
 
+    // ===== 중재자 성향 (2D 슬라이더) =====
+    // X축: 팩트/논리 기반 (0) ↔ 감정/공감 기반 (100), 기본값 50
+    // Y축: 경청·반영 중심 (0) ↔ 능동·질문 중심 (100), 기본값 50
+
+    @Column(name = "mediator_style_x", nullable = false)
+    @Builder.Default
+    private Integer mediatorStyleX = 50;
+
+    @Column(name = "mediator_style_y", nullable = false)
+    @Builder.Default
+    private Integer mediatorStyleY = 50;
+
     // ===== Phase D: 컨텍스트 알고리즘 =====
     // 권위본: shared/docs/policies/context-algorithm.md §4.1
     // 모두 *유도값* — psychology-model.md "추적 변수 4개 제한" 준수 (새 변수 아님, §1.3 참조)

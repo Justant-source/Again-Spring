@@ -175,10 +175,10 @@ V1.5 현재 두 개의 위기 모달이 공존합니다:
 - `components/chat/CrisisModal.tsx` — 채팅 sending이 거부될 때 표시
 - `components/shared/CrisisResourceModal.tsx` — 다른 진입점용
 
-**현재 구현의 갭**:
-- 두 모달 모두 **바깥 클릭과 ESC로 닫힙니다**. `chat/CrisisModal`은 `onClick={onClose}`로 명시적으로 바깥 클릭 닫기를 허용하고, `shared/CrisisResourceModal`은 `handleEscape` 핸들러가 `onClose()`를 호출합니다.
-- 이는 PenzeyMoog *Design for Safety*의 "사용자가 위기 상황에서 실수로 안전망을 떨쳐내지 못하게" 원칙과 충돌합니다.
-- `frontend/docs/policies/crisis-modal.md`의 *명시적 권장*("ESC 무시 — 사용자가 의도적으로만 닫을 수 있음")과도 코드가 일치하지 않습니다.
+**현재 구현 상태 (✅ 원칙 준수)**:
+- `chat/CrisisModal.tsx` — 백드롭에 `onClick` 핸들러 없음, ESC 핸들러 없음. "지금은 괜찮아요" 버튼만 닫기.
+- `shared/CrisisResourceModal.tsx` — 백드롭에 `onClick` 핸들러 없음, ESC 핸들러 없음. "닫기" 버튼만 닫기.
+- 두 모달 모두 PenzeyMoog *Design for Safety* 원칙과 일치합니다.
 
 **원칙으로 못 박아둘 사항**:
 - **위기 모달은 dismiss 마찰을 *의도적으로* 두어야 합니다.** ESC 키, 바깥 영역 클릭, 뒤로가기 어느 것으로도 닫히지 않으며 명시적 액션 버튼("알겠어요" 또는 "닫기")으로만 닫힙니다.

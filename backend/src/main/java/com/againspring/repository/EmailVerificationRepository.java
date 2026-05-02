@@ -9,4 +9,6 @@ public interface EmailVerificationRepository extends JpaRepository<EmailVerifica
 
     Optional<EmailVerification> findTopByEmailAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
             String email, Instant now);
+
+    void deleteByEmail(String email);
 }

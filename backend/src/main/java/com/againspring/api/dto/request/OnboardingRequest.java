@@ -30,4 +30,7 @@ public class OnboardingRequest {
     @Pattern(regexp = "^[IE][NS][TF][JP]$", message = "MBTI 형식이 올바르지 않습니다 (예: INFP)")
     @JsonProperty("mbtiType")
     private String mbtiType;
+
+    @JsonProperty("mbtiProfile")
+    private java.util.Map<String, Integer> mbtiProfile;
 }

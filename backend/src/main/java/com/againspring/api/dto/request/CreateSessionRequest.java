@@ -1,6 +1,8 @@
 package com.againspring.api.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -29,21 +31,31 @@ public class CreateSessionRequest {
     @JsonProperty("soloMode")
     private Boolean soloMode; // default true (Solo가 메인 동선, V1.5)
 
+    @Min(0)
+    @Max(100)
+    @JsonProperty("mediatorStyleX")
+    private Integer mediatorStyleX; // 팩트(0) ↔ 공감(100), 기본값 50
+
+    @Min(0)
+    @Max(100)
+    @JsonProperty("mediatorStyleY")
+    private Integer mediatorStyleY; // 경청(0) ↔ 능동(100), 기본값 50
+
     @Getter
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
     public static class CategoryRequest {
-        @JsonProperty("major")
-        private String major;
+        @JsonProperty("majorId")
+        private String majorId;
 
-        @JsonProperty("middle")
-        private String middle;
+        @JsonProperty("middleId")
+        private String middleId;
 
-        @JsonProperty("minor")
-        private String minor;
+        @JsonProperty("minorId")
+        private String minorId;
 
-        @JsonProperty("customMinor")
-        private String customMinor;
+        @JsonProperty("customText")
+        private String customText;
     }
 }

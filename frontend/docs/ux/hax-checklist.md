@@ -4,7 +4,7 @@
 >
 > **사용 방법**: 작업 중인 컴포넌트의 섹션을 찾아 해당 항목들을 하나씩 확인합니다. 18개 모든 가이드라인을 모든 컴포넌트에 적용할 필요는 없습니다 — 각 컴포넌트 섹션에는 *해당 컴포넌트에 진짜로 적용되는* 가이드라인만 포함되어 있습니다.
 >
-> **현재 기준**: V1.5 카톡식 채팅 + Phase A/B/C 중재 컨텍스트 강화 (2026-04-27).
+> **현재 기준**: V1.5 카톡식 채팅 + Phase A/B/C/D 중재 컨텍스트 강화 완료 (2026-04-30).
 >
 > **출처**: Microsoft Research, [HAX Toolkit — Guidelines for Human-AI Interaction](https://www.microsoft.com/en-us/haxtoolkit/ai-guidelines/) (Amershi et al., CHI 2019). 본 문서는 18개 가이드라인을 다시봄 도메인(갈등 중재 AI, 양방향 비대칭 사용자, 위기 사용자 가능성, V1.5 카톡식 자유 채팅 구조)에 맞게 재해석합니다.
 
@@ -529,7 +529,7 @@ V1.5 구조에 맞춰 컴포넌트는 **라우트 그룹**(B1~B11)과 **재사�
 
 - 본 문서의 모(母) 문서: [`./principles.md`](./principles.md) — 원칙 1군 §1.1~1.8 참조
 - 디자인 시스템: [`../ui/design-handoff.md`](../ui/design-handoff.md) — 카피 톤, 양쪽 호명 균형, 색상 동등성
-- 위기 모달 정책: [`../policies/crisis-modal.md`](../policies/crisis-modal.md) — G8 비적용의 근거
+- 위기 모달 정책: [`shared/docs/policies/crisis-detection.md`](../../../shared/docs/policies/crisis-detection.md) "FE 구현 가이드" — G8 비적용의 근거
 - 금지어 정책: [`../policies/forbidden-words-lint.md`](../policies/forbidden-words-lint.md) — G6·G9·G10 구현
 - 권위본 (다른 디렉토리): `shared/docs/policies/`
 

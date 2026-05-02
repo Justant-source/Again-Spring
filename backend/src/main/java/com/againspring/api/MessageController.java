@@ -2,6 +2,7 @@ package com.againspring.api;
 
 import com.againspring.api.dto.request.SendMessageRequest;
 import com.againspring.api.dto.response.*;
+import jakarta.validation.Valid;
 import com.againspring.domain.enums.MessageSender;
 import com.againspring.service.CancelableChatService;
 import com.againspring.service.ChatService;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -36,7 +38,7 @@ public class MessageController {
     @SecurityRequirement(name = "bearer-jwt")
     public ResponseEntity<ChatTurnResponse> sendMessage(
         @PathVariable String sessionId,
-        @RequestBody SendMessageRequest request,
+        @Valid @RequestBody SendMessageRequest request,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         var sender = roleResolver.resolveSender(sessionId, userDetails.getUsername());

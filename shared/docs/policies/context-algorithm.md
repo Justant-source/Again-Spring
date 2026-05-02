@@ -14,20 +14,15 @@
 
 이 알고리즘이 작동할 때 의사결정의 우선순위:
 
-```
-[최우선] crisis-detection.md         — Level 1 감지 시 모든 알고리즘 비활성, 세션 즉시 종료
-   ↓
-[2순위] forbidden-words.md           — 출력 검증, 위반 시 응답 블록
-   ↓
-[3순위] psychology-model.md          — 추적 변수 4개 제한, 출력 절대 금지 항목
-   ↓
-[4순위] data-retention.md            — 30일 만료, 보존 정책
-   ↓
-[5순위] ratio-calculation.md         — 리포트 생성 시 5개 요소 매핑 일관성
-   ↓
-[6순위] categories.md                — 카테고리별 주의사항·금지 룰
-   ↓
-[본 문서] context-algorithm.md       — 위 6개를 위반하지 않는 한도 안에서 컨텍스트 누적·우선순위 결정
+```mermaid
+flowchart TD
+    P1["🚨 최우선 — crisis-detection.md\nLevel 1 감지 시 모든 알고리즘 비활성\n세션 즉시 종료"]
+    P1 --> P2["2순위 — forbidden-words.md\n출력 검증 · 위반 시 응답 블록"]
+    P2 --> P3["3순위 — psychology-model.md\n추적 변수 4개 제한 · 출력 절대 금지 항목"]
+    P3 --> P4["4순위 — data-retention.md\n30일 만료 · 보존 정책"]
+    P4 --> P5["5순위 — ratio-calculation.md\n리포트 생성 시 5개 요소 매핑 일관성"]
+    P5 --> P6["6순위 — categories.md\n카테고리별 주의사항 · 금지 룰"]
+    P6 --> P7["본 문서 — context-algorithm.md\n위 6개를 위반하지 않는 한도 안에서\n컨텍스트 누적 · 우선순위 결정"]
 ```
 
 본 문서의 어떤 항목도 위 6개를 *완화*시키지 않습니다. 의심되는 경우 위 6개로 회귀합니다.
@@ -87,6 +82,21 @@ T+4  A: "그래도 너무 서운하긴 해요."
 본 알고리즘의 모든 요소는 다음 권위본의 학술 근거에 명시적으로 매핑됩니다.
 
 ### 2.1 UserState 7종의 학술 근거
+
+```mermaid
+stateDiagram-v2
+    [*] --> OPENING : 첫 메시지 (≤2턴)
+    OPENING --> VENTING : 감정 단어 빈도↑\nHorsemen ≤ 0.3
+    OPENING --> BLAMING : criticism ≥ 0.4\nor contempt ≥ 0.2
+    VENTING --> DEFENSIVE : defensiveness ≥ 0.4
+    VENTING --> REFLECTING : 자기 인정 어휘\n"사실 저도..." 감지
+    DEFENSIVE --> BLAMING : criticism 점수 상승
+    DEFENSIVE --> REFLECTING : defensiveness\n감소 추세
+    BLAMING --> REFLECTING : 자기 인정 어휘 +\ndefensiveness 감소
+    REFLECTING --> NEGOTIATING : NVC request\n단계 채워지기 시작
+    NEGOTIATING --> RESOLVING : 결심 어휘 패턴\n(detectExitIntent)
+    RESOLVING --> [*] : 세션 종료 권유 트리거
+```
 
 본 정책은 사용자 상태를 7개 라벨로 표현합니다. 각 라벨은 **psychology-model.md의 추적 변수**에서 유도됩니다.
 
@@ -316,6 +326,20 @@ public enum Intent {
 
 ### 5.1 매 턴 컨텍스트 갱신 흐름
 
+```mermaid
+flowchart TD
+    A["사용자 메시지 도착"] --> B["[1] CrisisDetector.detect()\nLevel 1 → 즉시 reject\nPhase D 전체 비활성"]
+    B -->|정상| C["[2] 메시지 저장 + 카운트 증가"]
+    C --> D["[3] ChatPromptAssembler\n프롬프트 조립"]
+    D --> D1["기존 블록\nsystem → gottman → nvc\n→ user_profile → psychology_feedback\n→ relations → chat → history"]
+    D --> D2["Phase D 추가 (psychology_feedback 직후)\nIssueContextFragment\nUserStateFragment\nQuestionQueueFragment"]
+    D1 & D2 --> E["[4] LLM 호출\nClaudeCodeBridge.invoke()"]
+    E --> F["[5] ChatTurnMetaParser.parse()\n기존: horsemen + nvc_completion\nPhase D: + user_state\n+ issue_delta + question_queue_delta"]
+    F --> G["[6] Session 갱신\nUserStateAppender.append()\nIssueContextMerger.merge() + CategoryRuleEnforcer\nQuestionQueueUpdater.update() + QuestionPrioritizer.rescore()"]
+    G --> H["[7] 종료 권유 검토\n양쪽 RESOLVING + confidence ≥ 0.7\n→ 가중 트리거"]
+    H --> I["[8] IsolationLintFilter 검사 후\n응답 반환"]
+```
+
 기존 `ChatService.sendUserMessage()` 흐름 안에 점선 박스가 추가됩니다.
 
 ```
@@ -447,6 +471,24 @@ public enum Intent {
 
 ### 5.3 우선순위 산출 식 (`QuestionPrioritizer`)
 
+```mermaid
+flowchart LR
+    Q["PendingQuestion"] --> BASE["base(q)\n= 0.5×recency\n+ 0.3×urgency\n+ 0.2×coverageGap"]
+    BASE --> SM["× stateMultiplier\n(intent, currentState)\n7 UserState × 7 Intent 매트릭스"]
+    SM --> CM["× categoryMultiplier\n(q, category)\n한국 고유 4종 보정"]
+    CM --> P["priority\n0.0 ~ 1.0"]
+
+    subgraph recency["recency"]
+        R["1.0 ÷ (1 + ageInTurns)"]
+    end
+    subgraph urgency["urgencyOf(intent)"]
+        U["WELCOME_PARTNER=1.0\nSEEK_NEED=0.7\nSEEK_FEELING=0.5\nBRIDGE_PERSPECTIVE=0.5\nSEEK_FACT=0.4\nINVITE_REPAIR=0.0 (강제 발화 금지)\nREFLECT_PATTERN=0.0 (강제 발화 금지)"]
+    end
+    subgraph coverageGap["coverageGap"]
+        C["1.0 — hookFromIssue가 미해결 thread\n0.3 — 그 외"]
+    end
+```
+
 ```
 priority(q, session) = base(q) × stateMultiplier(q.intent, currentState) × categoryMultiplier(q, category)
 ```
@@ -538,6 +580,32 @@ psychology-model.md §"Solo 모드의 이론적 정당성" 준수.
 ---
 
 ## 6. B 진입 시퀀스 (WELCOME_PARTNER)
+
+```mermaid
+sequenceDiagram
+    participant A as User A (Solo 진행)
+    participant SVC as ChatService
+    participant LLM as ClaudeCodeBridge
+    participant B as User B (신규 합류)
+
+    Note over A,SVC: Solo 진행 중 — 매 턴 questionQueueB에 B용 질문 축적
+    loop A의 각 메시지 턴
+        A->>SVC: 메시지 전송
+        SVC->>LLM: assembleSoloTurn() → invoke()
+        LLM-->>SVC: 응답 + question_queue_delta(target=USER_B)
+        SVC->>SVC: QuestionQueueB에 B용 질문 push
+    end
+
+    B->>SVC: 세션 합류 (onPartnerJoined)
+    SVC->>SVC: status: CHATTING_SOLO → CHATTING_DUO
+    SVC-->>A: MEDIATOR_TO_A (파트너 합류 안내)
+
+    SVC->>SVC: WelcomeQuestionResolver\n큐 최상단 WELCOME_PARTNER 격상\n(빈 큐면 IssueContext.headline 기반 fallback 생성)
+    SVC->>LLM: WelcomeMessageGenerator\n(welcome_partner.md 프롬프트 + IssueContext)
+    LLM-->>SVC: 환영 + 상황맥락 + 첫 질문 (2~4문장)
+    SVC-->>B: MEDIATOR_TO_B (동적 환영 메시지)
+    SVC->>SVC: welcomeQ.asked = true
+```
 
 사용자 요구사항 3번: *"b가 초대되었을때 약간의 환영 메시지와 함께 2번에서 생성한 현재 시점의 pq의 최상단 큐가 팝업되면서 질문해야한다"*
 

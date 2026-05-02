@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
-import { MBTI_TEST_QUESTIONS, MBTI_TO_STYLE, deriveMbtiType } from '@/lib/constants/mbtiMapping';
+import { MBTI_TEST_QUESTIONS, MBTI_TO_STYLE, deriveMbtiType, computeMbtiProfile } from '@/lib/constants/mbtiMapping';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
 
@@ -13,7 +13,7 @@ function MbtiTestContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setStyle = useUserStore((s) => s.setStyle);
-  const setMbtiType = useUserStore((s) => s.setMbtiType);
+  const setMbtiResult = useUserStore((s) => s.setMbtiResult);
 
   const nextPath = searchParams.get('next') ?? '/session/new';
 
@@ -34,12 +34,17 @@ function MbtiTestContent() {
     }
 
     const mbtiType = deriveMbtiType(newAnswers);
+    const profile = computeMbtiProfile(newAnswers);
     const style = MBTI_TO_STYLE[mbtiType] ?? 'leaf';
     setStyle(style);
-    setMbtiType(mbtiType);
+    setMbtiResult(mbtiType, profile);
 
     // Sync to backend (fire-and-forget; errors are non-blocking)
-    api.post('/api/users/me/onboarding', { communicationStyle: style, mbtiType }).catch(() => {});
+    api.post('/api/users/me/onboarding', {
+      communicationStyle: style,
+      mbtiType,
+      mbtiProfile: profile,
+    }).catch(() => {});
 
     router.push(`/onboarding/result?next=${encodeURIComponent(nextPath)}`);
   };

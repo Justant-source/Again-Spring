@@ -8,9 +8,10 @@ interface Props {
   canInvite: boolean;
   onOpenInvite?: () => void;
   onFinalize: () => void;
+  finalizing?: boolean;
 }
 
-export function ChatHeader({ isDuo, canFinalize, canInvite, onOpenInvite, onFinalize }: Props) {
+export function ChatHeader({ isDuo, canFinalize, canInvite, onOpenInvite, onFinalize, finalizing }: Props) {
   return (
     <div style={{
       padding: '12px 16px',
@@ -63,6 +64,7 @@ export function ChatHeader({ isDuo, canFinalize, canInvite, onOpenInvite, onFina
         {canFinalize && (
           <button
             onClick={onFinalize}
+            disabled={finalizing}
             style={{
               fontSize: 12,
               padding: '6px 10px',
@@ -70,24 +72,13 @@ export function ChatHeader({ isDuo, canFinalize, canInvite, onOpenInvite, onFina
               borderRadius: 6,
               background: 'var(--P-ink)',
               color: 'var(--P-bg)',
-              cursor: 'pointer',
+              cursor: finalizing ? 'not-allowed' : 'pointer',
+              opacity: finalizing ? 0.6 : 1,
             }}
           >
-            정리하기
+            {finalizing ? '정리 중...' : '정리하기'}
           </button>
         )}
-        <Link
-          href="/history"
-          style={{
-            fontSize: 12,
-            padding: '6px 10px',
-            color: 'var(--P-sub)',
-            textDecoration: 'none',
-          }}
-          aria-label="이 세션 그만두기"
-        >
-          나가기
-        </Link>
       </div>
     </div>
   );

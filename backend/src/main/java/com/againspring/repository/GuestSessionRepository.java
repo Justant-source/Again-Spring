@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface GuestSessionRepository extends JpaRepository<GuestSession, Long> {
 
     Optional<GuestSession> findByInviteToken(String inviteToken);
+
+    void deleteByGuestId(String guestId);
 }

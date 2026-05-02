@@ -1,17 +1,26 @@
 package com.againspring.service;
 
+import com.againspring.api.dto.request.DeleteAccountRequest;
 import com.againspring.api.dto.request.OnboardingRequest;
 import com.againspring.api.dto.request.UpdateUserRequest;
 import com.againspring.api.dto.response.OnboardingResponse;
 import com.againspring.api.dto.response.UserResponse;
 import com.againspring.common.exception.BusinessException;
+import com.againspring.domain.Session;
 import com.againspring.domain.User;
+import com.againspring.domain.enums.SessionStatus;
+import com.againspring.repository.EmailVerificationRepository;
+import com.againspring.repository.GuestSessionRepository;
+import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.StyleCalculator.CommunicationStyle;
 import java.time.Instant;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * User service for profile management and onboarding.
@@ -23,6 +32,10 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final StyleCalculator styleCalculator;
+    private final PasswordEncoder passwordEncoder;
+    private final SessionRepository sessionRepository;
+    private final EmailVerificationRepository emailVerificationRepository;
+    private final GuestSessionRepository guestSessionRepository;
 
     /**
      * Get user profile.
@@ -84,6 +97,7 @@ public class UserService {
         if (request.getAnswers() == null && request.getCommunicationStyle() != null) {
             user.setCommunicationStyle(request.getCommunicationStyle());
             if (request.getMbtiType() != null) user.setMbtiType(request.getMbtiType());
+            if (request.getMbtiProfile() != null) user.setMbtiProfile(request.getMbtiProfile());
             user.setOnboardingCompletedAt(Instant.now());
             user.setUpdatedAt(Instant.now());
             userRepository.save(user);
@@ -118,6 +132,7 @@ public class UserService {
             user.setOnboardingAnswers(request.getAnswers());
             user.setCommunicationStyle(style.getValue());
             if (request.getMbtiType() != null) user.setMbtiType(request.getMbtiType());
+            if (request.getMbtiProfile() != null) user.setMbtiProfile(request.getMbtiProfile());
             user.setOnboardingCompletedAt(Instant.now());
             user.setUpdatedAt(Instant.now());
 
@@ -141,21 +156,65 @@ public class UserService {
     }
 
     /**
-     * Soft-delete user account.
+     * Anonymize user account (soft-delete + PII masking).
+     * Password-based users must supply their password for verification.
+     * OAuth/guest users skip password check.
      *
      * @param userId the user ID
-     * @throws BusinessException if user not found or already deleted
+     * @param req    delete request (password optional for non-password users)
      */
-    public void deleteUserAccount(String userId) {
+    @Transactional
+    public void deleteUserAccount(String userId, DeleteAccountRequest req) {
         User user = userRepository
                 .findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
 
-        user.setDeletedAt(Instant.now());
+        // Password verification for email/password sign-up users
+        if (user.getPasswordHash() != null) {
+            if (req == null || req.getPassword() == null
+                    || !passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
+                throw new BusinessException("AUTH_INVALID_CREDENTIALS", "Password does not match", 401);
+            }
+        }
+
+        Instant now = Instant.now();
+        String originalEmail = user.getEmail();
+
+        // Cancel active sessions so the partner is not left waiting
+        List<SessionStatus> activeStatuses = List.of(
+                SessionStatus.CHATTING_SOLO, SessionStatus.CHATTING_DUO,
+                SessionStatus.AWAITING_FINALIZATION, SessionStatus.WAITING_B,
+                SessionStatus.B_JOINED, SessionStatus.IN_MEDIATION, SessionStatus.SOLO_MODE);
+        sessionRepository.findByCreatedByUserIdAndStatusIn(userId, activeStatuses)
+                .forEach(s -> { s.setStatus(SessionStatus.TERMINATED); s.setCompletedAt(now); });
+        sessionRepository.findByInviteeUserIdAndStatusIn(userId, activeStatuses)
+                .forEach(s -> { s.setStatus(SessionStatus.TERMINATED); s.setCompletedAt(now); });
+
+        // Anonymize PII — keep the row for statistics/audit
+        String shortId = userId.length() >= 8 ? userId.substring(0, 8) : userId;
+        user.setEmail("deleted-" + shortId + "@deleted.local");
+        user.setNickname("탈퇴한 사용자");
+        user.setPasswordHash(null);
+        user.setProvider(null);
+        user.setProviderId(null);
+        user.setCommunicationStyle(null);
+        user.setMbtiType(null);
+        user.setMbtiProfile(null);
+        user.setOnboardingAnswers(null);
+        user.setOnboardingCompletedAt(null);
+        user.setDeletedAt(now);
+        user.setUpdatedAt(now);
         userRepository.save(user);
 
-        log.info("User account soft-deleted: {}", userId);
-        // TODO Phase 10: Implement Neo4j cleanup event and cascade cancel pending sessions
+        // Remove leftover email verification codes (contains raw email)
+        if (originalEmail != null) {
+            emailVerificationRepository.deleteByEmail(originalEmail);
+        }
+
+        // Remove guest session mapping (guest users only; noop for regular users)
+        guestSessionRepository.deleteByGuestId(userId);
+
+        log.info("User account anonymized: {}", userId);
     }
 
     private UserResponse mapToUserResponse(User user) {
@@ -166,6 +225,9 @@ public class UserService {
                 .communicationStyle(user.getCommunicationStyle())
                 .isGuest(user.isGuest())
                 .onboardingCompleted(user.getOnboardingCompletedAt() != null)
+                .mbtiType(user.getMbtiType())
+                .mbtiProfile(user.getMbtiProfile())
+                .provider(user.getProvider())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

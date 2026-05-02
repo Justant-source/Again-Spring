@@ -51,4 +51,9 @@ public interface SessionRepository extends JpaRepository<Session, String> {
      * 사용자가 생성했으며 특정 상태인 세션 조회
      */
     List<Session> findByCreatedByUserIdAndStatusIn(String createdByUserId, List<SessionStatus> statuses);
+
+    /**
+     * 사용자가 초대 수신자이며 특정 상태인 세션 조회
+     */
+    List<Session> findByInviteeUserIdAndStatusIn(String inviteeUserId, List<SessionStatus> statuses);
 }

@@ -50,7 +50,7 @@ npm run lint
   - `userStore.ts` — 상태 변화, localStorage 동기화
   - `sessionStore.ts` — 세션 상태 초기화, 리셋
 
-#### 테스트 작성 예
+#### 향후 도입 시 참고 예시 (현재 미설정)
 
 ```typescript
 // lib/utils/__tests__/keywordGuard.test.ts
@@ -101,7 +101,7 @@ MSW는 이미 dev 모드에서 작동하고 있으므로, 실제 페이지 플�
 [ ] Solo 모드 전환 (B 미참여 24시간 후)
 ```
 
-#### 자동화 테스트 (Playwright, 향후)
+#### 자동화 테스트 (Playwright — 미설정, 향후)
 
 ```bash
 npm install -D @playwright/test

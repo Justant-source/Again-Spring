@@ -10,25 +10,25 @@
 
 ## 알고리즘 흐름
 
-```
-A 입력 + B 입력 + 카테고리
-   ↓
-[1] 갈등 유형 분류 (factual / difference / mixed)
-   ↓
-[2] 5개 요소별 0-10 스코어링
-   ↓
-[3] 가중평균 → 초기 비율 (A:B)
-   ↓
-[4] 유형별 클리핑 (코드 강제)
-   ↓
-[5] 5단위 반올림
-   ↓
-[6] 긍정 라벨 부여
-   ↓
-출력
+```mermaid
+flowchart TD
+    A["A 입력 + B 입력 + 카테고리"] --> B["[1] 갈등 유형 분류\nfactual / difference / mixed"]
+    B --> C["[2] 5개 요소별 0-10 스코어링\nboundary×0.30 + horsemen×0.25\n+ repair×0.15 + perspective×0.15\n+ escalation×0.15"]
+    C --> D["[3] 초기 비율 계산\nA% = scoreA ÷ total × 100"]
+    D --> E["[4] RatioEnforcer 클리핑\n유형별 상한 코드 강제"]
+    E --> F["[5] 5단위 반올림\nround(a ÷ 5) × 5"]
+    F --> G["[6] 긍정 라벨 부여\n먼저 다가가면 좋은 쪽 / 함께 다가가기 좋은 쪽"]
+    G --> H["출력\n{ ratio: A:B, labels }"]
 ```
 
 ## [1] 갈등 유형 분류
+
+```mermaid
+flowchart LR
+    A{갈등 유형 분류} -->|factual\n사실형| B["🔓 클리핑 없음\n100:0 가능\n명백한 약속 파기·거짓말"]
+    A -->|mixed\n혼합형| C["⚡ 최대 85:15\n사실 + 차이 혼재"]
+    A -->|difference\n차이형| D["⚖️ 최대 70:30\n성격·가치관 차이\n어느 쪽도 틀린 게 아님"]
+```
 
 LLM이 분류:
 

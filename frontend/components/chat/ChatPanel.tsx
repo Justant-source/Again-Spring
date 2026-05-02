@@ -10,6 +10,7 @@ import { CrisisModal } from './CrisisModal';
 import { PartnerJoinNoticeCard } from './PartnerJoinNoticeCard';
 import { api } from '@/lib/api/client';
 import { usePolling } from '@/lib/hooks/usePolling';
+import { splitMediatorMessage, calculateTypingDelay } from '@/lib/utils/messageSplitter';
 
 interface Message {
   id: number;
@@ -19,6 +20,22 @@ interface Message {
   isFinalizeSuggestion: boolean;
   isPartnerJoinNotice: boolean;
   createdAt: string;
+}
+
+interface SecondPart {
+  messageId: number; // 원본 메시지 ID
+  sender: 'MEDIATOR_TO_A' | 'MEDIATOR_TO_B';
+  content: string;
+  charCount: number;
+  createdAt: string;
+}
+
+interface PendingSplit {
+  messageId: number;
+  sender: 'MEDIATOR_TO_A' | 'MEDIATOR_TO_B';
+  secondPart: string;
+  createdAt: string;
+  delay: number;
 }
 
 interface Props {
@@ -38,11 +55,18 @@ export function ChatPanel({
 }: Props) {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [secondParts, setSecondParts] = useState<SecondPart[]>([]);
   const [sending, setSending] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [crisisLevel1, setCrisisLevel1] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [pendingSplits, setPendingSplits] = useState<PendingSplit[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastFetchRef = useRef<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const sendCountRef = useRef(0);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchMessages = async () => {
     try {
@@ -51,7 +75,9 @@ export function ChatPanel({
         : `/api/sessions/${sessionId}/messages`;
       const r = await api.get(url);
       if (r.data.length > 0) {
-        setMessages(prev => mergeMessages(prev, r.data));
+        const merged = mergeMessages(messages, r.data);
+        const processed = processMediatorMessages(merged, setPendingSplits);
+        setMessages(processed);
         lastFetchRef.current = Date.now();
       }
     } catch (e) {
@@ -65,6 +91,45 @@ export function ChatPanel({
 
   usePolling(fetchMessages, 3000);
 
+  // pendingSplits 큐 처리: 첫 번째 분할 항목 처리
+  useEffect(() => {
+    if (pendingSplits.length === 0) {
+      setIsTyping(false);
+      return;
+    }
+
+    const first = pendingSplits[0];
+
+    // 1단계: 타이핑 시작 (delay 전)
+    setIsTyping(true);
+
+    // 2단계: delay 후 isTyping false + 두 번째 부분 메시지 추가
+    const timeoutId = setTimeout(() => {
+      setIsTyping(false);
+
+      const secondPartMsg: SecondPart = {
+        messageId: first.messageId,
+        sender: first.sender,
+        content: first.secondPart,
+        charCount: first.secondPart.length,
+        createdAt: first.createdAt,
+      };
+
+      setSecondParts(prev => [...prev, secondPartMsg]);
+
+      // 큐에서 처리된 항목 제거
+      setPendingSplits(prev => prev.slice(1));
+    }, first.delay);
+
+    typingTimeoutRef.current = timeoutId;
+
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [pendingSplits]);
+
   // isFinalized: 본인이 정리하기를 누른 + 상대 동의 대기 중 → 입력창 비활성화
   const myAgreed = currentUserSender === 'USER_A'
     ? session?.finalizeAgreedByA
@@ -73,13 +138,20 @@ export function ChatPanel({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending]);
+  }, [messages, secondParts, sending, isTyping]);
 
   const myMessages = messages.filter(m => m.sender === currentUserSender);
   const canFinalize = myMessages.length >= 3;
 
   const handleSend = async (content: string) => {
-    if (sending) return;
+    // 진행 중인 요청이 있으면 취소하고 새 메시지로 재시작
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const myCount = ++sendCountRef.current;
     setSending(true);
 
     // Optimistic: 사용자 입력을 즉시 화면에 표시 (음수 ID는 임시 표식)
@@ -96,19 +168,51 @@ export function ChatPanel({
     setMessages(prev => [...prev, optimisticMsg]);
 
     try {
-      const r = await api.post(`/api/sessions/${sessionId}/messages`, {
-        content,
-      });
+      const r = await api.post(
+        `/api/sessions/${sessionId}/messages`,
+        { content },
+        { signal: controller.signal },
+      );
       if (r.data.crisisLevel === 1) {
         setMessages(prev => prev.filter(m => m.id !== tempId));
         setCrisisLevel1(true);
         return;
       }
-      // optimistic 메시지 제거 후 BE 권위 데이터로 전체 재동기화 (이중 추가/누락 방지)
+      // optimistic 메시지 제거
       setMessages(prev => prev.filter(m => m.id !== tempId));
-      lastFetchRef.current = 0;
-      await fetchMessages();
+
+      const mediatorMsgs: Message[] = r.data.mediatorMessages ?? [];
+
+      if (myCount === sendCountRef.current) {
+        setSending(false);
+      }
+
+      mediatorMsgs.forEach((m: Message, i: number) => {
+        setTimeout(() => {
+          setMessages(prev => {
+            const merged = mergeMessages(prev, [m]);
+            // mediator 메시지만 분할 처리
+            if (m.sender === 'MEDIATOR_TO_A' || m.sender === 'MEDIATOR_TO_B') {
+              const processed = processMediatorMessages(merged, setPendingSplits);
+              return processed;
+            }
+            return merged;
+          });
+        }, i * 1000);
+      });
+
+      // 마지막 chunk 도착 후 BE와 완전 동기화
+      setTimeout(() => {
+        lastFetchRef.current = 0;
+        fetchMessages();
+      }, mediatorMsgs.length * 1000 + 200);
+
+      return;
     } catch (e: any) {
+      // 연속 전송으로 인한 취소 — 이후 새 요청이 진행 중이므로 정리만
+      if (e.code === 'ERR_CANCELED' || e.name === 'CanceledError') {
+        return;
+      }
       setMessages(prev => prev.filter(m => m.id !== tempId));
       if (e.response?.status === 409) {
         setCrisisLevel1(true);
@@ -116,18 +220,23 @@ export function ChatPanel({
         console.error('Send failed:', e);
       }
     } finally {
-      setSending(false);
+      if (myCount === sendCountRef.current) {
+        setSending(false);
+      }
     }
   };
 
   const handleFinalize = async () => {
+    if (finalizing) return;
     setFinalizeError(null);
+    setFinalizing(true);
     try {
       const r = await api.post(`/api/sessions/${sessionId}/finalize`);
       if (r.data.completed) {
         router.push(`/session/result/${sessionId}`);
+        return;
       } else if (r.data.awaitingPartner) {
-        // 본인 측 카드는 BE에서 dismiss됨 → 재폴링으로 반영 + session 갱신은 ChatLayout 5초 폴링 처리
+        // 본인 측 카드는 BE에서 dismiss됨 → 재폴링으로 반영
         lastFetchRef.current = 0;
         await fetchMessages();
       }
@@ -136,6 +245,8 @@ export function ChatPanel({
                 || e.response?.data?.message
                 || '정리할 수 없어요. 잠시 후 다시 시도해 주세요.';
       setFinalizeError(msg);
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -180,6 +291,7 @@ export function ChatPanel({
         canInvite={!isDuo}
         onOpenInvite={onOpenInvite}
         onFinalize={handleFinalize}
+        finalizing={finalizing}
       />
 
       {/* Messages */}
@@ -202,14 +314,34 @@ export function ChatPanel({
             );
           }
           return (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              isMine={msg.sender === currentUserSender}
-            />
+            <div key={msg.id}>
+              <MessageBubble
+                message={msg}
+                isMine={msg.sender === currentUserSender}
+              />
+              {/* 같은 원본 메시지의 두 번째 부분 표시 */}
+              {secondParts
+                .filter(sp => sp.messageId === msg.id)
+                .map((sp, idx) => (
+                  <MessageBubble
+                    key={`${msg.id}-part2-${idx}`}
+                    message={{
+                      id: msg.id,
+                      sender: sp.sender,
+                      content: sp.content,
+                      charCount: sp.charCount,
+                      isFinalizeSuggestion: false,
+                      isPartnerJoinNotice: false,
+                      createdAt: sp.createdAt,
+                    }}
+                    isMine={msg.sender === currentUserSender}
+                  />
+                ))}
+            </div>
           );
         })}
         {sending && <TypingBubble />}
+        {isTyping && <TypingBubble />}
         <div ref={messagesEndRef} />
       </div>
 
@@ -262,7 +394,7 @@ export function ChatPanel({
       )}
 
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={sending || isFinalized} onCrisis={() => setCrisisLevel1(true)} />
+      <ChatInput onSend={handleSend} disabled={isFinalized} onCrisis={() => setCrisisLevel1(true)} />
 
       {crisisLevel1 && (
         <CrisisModal onClose={() => setCrisisLevel1(false)} />
@@ -280,6 +412,55 @@ function mergeMessages(prev: Message[], incoming: Message[]): Message[] {
     const tb = new Date(b.createdAt).getTime();
     return ta !== tb ? ta - tb : a.id - b.id;
   });
+}
+
+/**
+ * 중재자 메시지에서 분할이 필요한 메시지를 찾아 처리
+ * 분할이 필요하면: 첫 번째 부분만 messages에 추가, 두 번째 부분을 pendingSplits에 추가
+ * 분할이 불필요하면: 원본 메시지를 그대로 반환
+ */
+function processMediatorMessages(
+  messages: Message[],
+  setPendingSplits: (cb: (prev: PendingSplit[]) => PendingSplit[]) => void
+): Message[] {
+  const result: Message[] = [];
+
+  for (const msg of messages) {
+    // 중재자 메시지만 분할 처리
+    if (msg.sender === 'MEDIATOR_TO_A' || msg.sender === 'MEDIATOR_TO_B') {
+      const split = splitMediatorMessage(msg.content);
+
+      if (split) {
+        // 첫 번째 부분만 messages에 추가
+        result.push({
+          ...msg,
+          content: split.first,
+        });
+
+        // 두 번째 부분을 pendingSplits에 추가
+        const delay = calculateTypingDelay(split.second.length);
+        const mediatorSender: 'MEDIATOR_TO_A' | 'MEDIATOR_TO_B' = msg.sender;
+        setPendingSplits(prev => [
+          ...prev,
+          {
+            messageId: msg.id,
+            sender: mediatorSender,
+            secondPart: split.second,
+            createdAt: msg.createdAt,
+            delay,
+          },
+        ]);
+      } else {
+        // 분할 불필요 → 원본 그대로
+        result.push(msg);
+      }
+    } else {
+      // 일반 사용자 메시지
+      result.push(msg);
+    }
+  }
+
+  return result;
 }
 
 function TypingBubble() {

@@ -241,7 +241,7 @@ describe('SoloResult', () => {
     const report = createSoloModeReport()
     render(<SoloResult report={report} />)
 
-    expect(screen.getByText(/지금이라도 Partner님을 초대하면/)).toBeInTheDocument()
+    expect(screen.getByText(/지금이라도 Partner분을 초대하면/)).toBeInTheDocument()
   })
 
   it('displays invite button with partner name', () => {

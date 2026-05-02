@@ -47,6 +47,25 @@ public String generateToken(User user, Duration ttl) {
 
 호출처: `AuthService` (회원가입/로그인/게스트), `OAuth2Controller` (소셜)
 
+## JWT 생명주기
+
+```mermaid
+flowchart LR
+    A["AuthService\n(회원가입/로그인/게스트/OAuth)"] -->|generateToken| B["JWT\nHS256·24h\nJTI=UUID"]
+    B -->|localStorage 저장| C["FE axios 인터셉터\nBearer 헤더 자동 주입"]
+    C -->|모든 API 요청| D["JwtAuthFilter\nOncePerRequestFilter"]
+    D --> V{검증}
+    V -->|만료·서명 불일치| E["401 인증 실패"]
+    V -->|revoked_tokens 에 JTI 존재| E
+    V -->|유효| F["SecurityContextHolder\nAuthentication 설정"]
+    F --> G["보호 엔드포인트 접근 허용"]
+
+    H["POST /api/auth/logout\nLogoutService"] -->|JTI → revoked_tokens| I["RevokedToken DB"]
+    I --> D
+
+    J["RevokedTokenCleanupScheduler\n매일 04:00 UTC"] -->|만료 JTI 삭제| I
+```
+
 ## 검증 (`JwtAuthFilter`)
 
 `extends OncePerRequestFilter` — 모든 요청 1회 통과.

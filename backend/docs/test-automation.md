@@ -21,46 +21,19 @@
 
 ### 아키텍처
 
-```
-┌─────────────────────────────────────────────────┐
-│ run.py (메인 진입점)                             │
-│  - 시나리오·페르소나 파싱                         │
-│  - CLI 인자 처리                                │
-└──────────────┬──────────────────────────────────┘
-               │
-               ↓
-┌──────────────────────────────────────────────────┐
-│ Orchestrator (runner/orchestrator.py)             │
-│  - asyncio.Semaphore(max_concurrent)로 병렬 실행 │
-│  - _run_solo_pair() / _run_duo_pair() 세션 조율  │
-│  - PersonaBot 생성 및 시나리오 재생              │
-└──────────────┬──────────────────────────────────┘
-               │
-       ┌───────┼───────┐
-       │       │       │
-       ↓       ↓       ↓
-┌────────────┐ ┌──────────────┐ ┌──────────────┐
-│ PersonaBot │ │ APIClient    │ │ Verifier     │
-│(runner/)   │ │(runner/)     │ │(runner/)     │
-│ - 페르소나  │ │ - /sessions  │ │ - 검증 규칙 │
-│   시뮬레이션│ │ - /messages  │ │   (5종)      │
-│ - 메시지   │ │ - /auth      │ │ - 결과 수집  │
-│   송수신   │ │              │ │              │
-└────────────┘ └──────────────┘ └──────────────┘
-       │
-       └─────────────┬────────────────────────┐
-                     ↓                        ↓
-            ┌──────────────────┐   ┌──────────────────┐
-            │ BE (dev)          │   │ MariaDB (dev)    │
-            │ localhost:8090    │   │ localhost:3306   │
-            │ /api/sessions     │   │ againspring_dev  │
-            │ /api/messages     │   │                  │
-            │ /api/reports      │   │ (테스트 계정)    │
-            └──────────────────┘   └──────────────────┘
-                     │
-                     ↓
-            Claude Code CLI
-            (프로세스 풀)
+```mermaid
+flowchart TD
+    CLI["run.py\n(메인 진입점)\n시나리오·페르소나 파싱\nCLI 인자 처리"] --> ORC["Orchestrator\n(runner/orchestrator.py)\nasyncio.Semaphore(max_concurrent)\n_run_solo_pair() / _run_duo_pair()"]
+
+    ORC --> PB["PersonaBot\n페르소나 시뮬레이션\n메시지 송수신"]
+    ORC --> AC["APIClient\n/sessions /messages /auth"]
+    ORC --> VF["Verifier\n검증 규칙 5종\n결과 수집"]
+
+    PB & AC --> BE["BE (dev)\nlocalhost:8090\n/api/sessions\n/api/messages\n/api/reports"]
+    BE --> DB["MariaDB (dev)\nlocalhost:3306\nagainspring_dev\n테스트 계정 10개"]
+    BE --> LLM["Claude Code CLI\n프로세스 풀\nSemaphore(3)"]
+
+    VF --> OUT["results/{timestamp}/\nsummary.json\nPASS / FAIL 집계"]
 ```
 
 ### 기술 선택 근거
@@ -431,6 +404,41 @@ POST /messages → <100ms 응답 (메시지만 저장)
 
 ## 6. 시나리오 구조 및 정의
 
+### 6.0 디렉토리 구조
+
+시나리오는 **기능별 그룹**으로 분류됩니다. 레거시 시나리오(SC01~SC24)는 `archive/`에 보존되며 신규 추가 대상이 아닙니다.
+
+```
+scenarios/
+├── mechanism/      # 취소 메커니즘 검증 (sc_cancel_fast, sc_cancel_burst, sc_cancel_duo)
+├── flow/           # 정상 플로우 (sc_flow_solo, sc_flow_duo_chat, sc_flow_duo_welcome, sc_flow_finalize, sc_flow_solo_report)
+├── validation/     # 입력 검증 (sc_valid_crisis, sc_valid_empty, sc_valid_limit)
+├── context/        # Phase D 컨텍스트 (sc_ctx_solo_depth, sc_ctx_duo_turns, sc_ctx_recall)
+└── archive/        # 레거시 SC01~SC24 (참조 전용, 수정 금지)
+    ├── normal/
+    ├── cancellation/
+    └── exception/
+```
+
+**현재 활성 시나리오 (14개)**:
+
+| 그룹 | 파일 | 설명 |
+|---|---|---|
+| mechanism | `sc_cancel_fast` | 연속 2개 메시지 취소 |
+| mechanism | `sc_cancel_burst` | 5개 빠른 연속 취소 |
+| mechanism | `sc_cancel_duo` | Duo A 취소·B 응답 격리 |
+| flow | `sc_flow_solo` | Solo 전체 플로우 |
+| flow | `sc_flow_duo_chat` | Duo 채팅 플로우 |
+| flow | `sc_flow_duo_welcome` | B 합류 환영 메시지 |
+| flow | `sc_flow_finalize` | 종료 권유·동의 플로우 |
+| flow | `sc_flow_solo_report` | Solo 리포트 생성 |
+| validation | `sc_valid_crisis` | 위기 키워드 감지 차단 |
+| validation | `sc_valid_empty` | 빈 메시지 거부 |
+| validation | `sc_valid_limit` | 메시지 길이 한도 |
+| context | `sc_ctx_solo_depth` | Phase D Solo 컨텍스트 깊이 |
+| context | `sc_ctx_duo_turns` | Phase D Duo 턴간 상태 전이 |
+| context | `sc_ctx_recall` | Phase D IssueContext 재호출 |
+
 ### 6.1 시나리오 딕셔너리 포맷
 
 ```python
@@ -520,26 +528,31 @@ SCENARIO_SCXX = {
 
 ### 7.1 파일 생성
 
+기능 성격에 맞는 그룹 디렉토리에 추가합니다. `archive/`에는 추가하지 않습니다.
+
 ```bash
-# 정상 시나리오 추가
-touch backend/scripts/test-automation/scenarios/normal/scXX_시나리오명.py
+# 플로우 시나리오 추가
+touch backend/scripts/test-automation/scenarios/flow/sc_flow_new.py
 
-# 취소 시나리오 추가
-touch backend/scripts/test-automation/scenarios/cancellation/scXX_시나리오명.py
+# 검증 시나리오 추가
+touch backend/scripts/test-automation/scenarios/validation/sc_valid_new.py
 
-# 예외 시나리오 추가
-touch backend/scripts/test-automation/scenarios/exception/scXX_시나리오명.py
+# 컨텍스트 시나리오 추가
+touch backend/scripts/test-automation/scenarios/context/sc_ctx_new.py
+
+# 취소 메커니즘 시나리오 추가
+touch backend/scripts/test-automation/scenarios/mechanism/sc_cancel_new.py
 ```
 
-### 7.2 시나리오 정의 (예: SC25_new_scenario.py)
+### 7.2 시나리오 정의 (예: sc_flow_new.py)
 
 ```python
-# backend/scripts/test-automation/scenarios/normal/sc25_new_scenario.py
+# backend/scripts/test-automation/scenarios/flow/sc_flow_new.py
 
-SCENARIO_SC25 = {
-    "id": "SC25",
-    "title": "새 시나리오 제목",
-    "category": "normal",  # 또는 "cancellation", "exception"
+SCENARIO_FLOW_NEW = {
+    "id": "flow_new",
+    "title": "새 플로우 시나리오",
+    "category": "flow",  # "flow" | "mechanism" | "validation" | "context"
     "relation_type": "couple",
     "category_data": {
         "mainCategory": "가족·결혼",
@@ -573,27 +586,27 @@ SCENARIO_SC25 = {
 # backend/scripts/test-automation/run.py
 
 # 1. 임포트 추가
-from scenarios.normal.sc25_new_scenario import SCENARIO_SC25
+from scenarios.flow.sc_flow_new import SCENARIO_FLOW_NEW
 
 # 2. ALL_SCENARIOS 딕셔너리에 추가
 ALL_SCENARIOS = {
     # ... 기존
-    "SC25": SCENARIO_SC25,
+    "flow_new": SCENARIO_FLOW_NEW,
 }
 
 # 3. SCENARIO_PERSONA_MAP에 페르소나 지정
 SCENARIO_PERSONA_MAP = {
     # ... 기존
-    "SC25": ["test1@again.com"],  # 또는 Duo면 ["test1@again.com", "test2@again.com"]
+    "flow_new": ["test1@again.com"],  # Duo면 ["test1@again.com", "test2@again.com"]
 }
 ```
 
 ### 7.4 실행 확인
 
 ```bash
-python run.py --scenario SC25 --persona test1@again.com
+python run.py --scenario flow_new --persona test1@again.com
 
-# 또는 전체 재실행
+# 또는 전체 재실행 (최신 결과는 git log 및 run.py 출력 참조)
 python run.py --all
 ```
 

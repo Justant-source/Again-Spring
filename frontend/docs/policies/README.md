@@ -13,12 +13,8 @@
    - CI/CD 통합
    - **권위본**: `../../shared/docs/policies/forbidden-words.md`
 
-2. **[crisis-modal.md](./crisis-modal.md)**
-   - `CrisisResourceModal` 컴포넌트 동작
-   - 위기 키워드 감지 로직
-   - 핫라인 카드 구성 (1366, 1393, 132, 112, 1388, 1577-0199)
-   - 접근성 (포커스 트랩, ESC 비활성화)
-   - **권위본**: `../../shared/docs/policies/crisis-detection.md`
+
+> 위기 감지 모달 구현 가이드는 권위본에 통합되었습니다: [`../../shared/docs/policies/crisis-detection.md`](../../shared/docs/policies/crisis-detection.md) 의 "FE 구현 가이드" 절 참조.
 
 ---
 

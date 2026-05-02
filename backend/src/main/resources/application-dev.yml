@@ -18,3 +18,11 @@ logging:
 springdoc:
   swagger-ui:
     enabled: true
+
+app:
+  admin:
+    enabled: true
+  seed:
+    enabled: true
+  session:
+    min-messages-to-finalize: 1  # 자동화 테스트용 (prod 기본값: 3)

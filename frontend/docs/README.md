@@ -31,8 +31,8 @@
 
 4. **[policies/](./policies/)** — FE 정책 강제 방법
    - [forbidden-words-lint.md](./policies/forbidden-words-lint.md) — `npm run lint:words` 사용법, Level 1/2/3 금지어
-   - [crisis-modal.md](./policies/crisis-modal.md) — 위기 감지 모달, 핫라인 정보
    - [README.md](./policies/README.md) — 정책 문서 인덱스
+   - 위기 감지 모달 구현: [`shared/docs/policies/crisis-detection.md`](../../shared/docs/policies/crisis-detection.md) "FE 구현 가이드" 절
 
 ### 테스트 및 품질
 
@@ -71,7 +71,7 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 
 입력 필드에서 "때리", "자살" 등 감지 시 → `CrisisResourceModal` 자동 표시
 
-정책 상세: **[policies/crisis-modal.md](./policies/crisis-modal.md)**
+정책 상세: **[shared/docs/policies/crisis-detection.md](../../shared/docs/policies/crisis-detection.md)**
 
 ---
 
@@ -204,7 +204,6 @@ frontend/
 | [ui/design-handoff.md](./ui/design-handoff.md) | 디자이너·개발자 | 톤(L/P/Q), 색상, 타이포, 컴포넌트 매핑 |
 | [ui/mock-scenarios.md](./ui/mock-scenarios.md) | 개발자 | Mock API 샘플, MSW 구조 |
 | [policies/forbidden-words-lint.md](./policies/forbidden-words-lint.md) | 개발자 | 금지어 검사 방법, CI/CD 통합 |
-| [policies/crisis-modal.md](./policies/crisis-modal.md) | 개발자 | 위기 감지, 모달 구현, 접근성 |
 | [testing.md](./testing.md) | QA·개발자 | 테스트 전략, 체크리스트 |
 
 ---
@@ -217,15 +216,15 @@ frontend/
 ../../shared/docs/
 ├── policies/
 │   ├── forbidden-words.md          # 금지어 정의 (권위본)
-│   ├── crisis-detection.md         # 위기 감지 정책 (권위본)
-│   ├── onboarding-mapping.md       # 온보딩 Q&A → 스타일 매핑
+│   ├── crisis-detection.md         # 위기 감지 정책 (권위본) + FE 구현 가이드
+│   ├── onboarding.md               # 온보딩 Q&A → 스타일 매핑
 │   ├── categories.md               # 갈등 카테고리 (권위본)
 │   └── ratio-calculation.md        # 화해 기여도 계산
-└── v1/
-    ├── API_SPEC.md                 # REST API 명세
-    ├── DATABASE_SCHEMA.md          # BE 데이터베이스
-    ├── LLM_BRIDGE_ARCHITECTURE.md  # Claude Code 브릿지
-    └── SYSTEM_PROMPTS.md           # Gottman + NVC 프롬프트
+├── api/
+│   ├── rest-spec.md                # REST API 명세
+│   └── database-schema.md          # BE 데이터베이스
+└── prompts/
+    └── README.md                   # Gottman + NVC + 관계 프롬프트 구조
 ```
 
 ---

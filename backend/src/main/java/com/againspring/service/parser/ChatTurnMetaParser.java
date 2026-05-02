@@ -25,6 +25,11 @@ public class ChatTurnMetaParser {
         "<turn_meta>\\s*(\\{.*?})\\s*</turn_meta>",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
+    // LLM이 <turn_meta>를 코드 펜스로 감싸고 </turn_meta>를 생략하는 경우 처리
+    private static final Pattern META_BLOCK_CODE_FENCE = Pattern.compile(
+        "```\\w*[\\r\\n]*<turn_meta>[\\r\\n]*(\\{.*?})[\\r\\n]*(?:</turn_meta>[\\r\\n]*)?```",
+        Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+
     private static final Pattern WRAPPER_BLOCK = Pattern.compile(
         "<mediator_response>\\s*(.*?)\\s*</mediator_response>",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
@@ -44,20 +49,27 @@ public class ChatTurnMetaParser {
         IssueContextDelta issueDelta = null;
         QuestionQueueDelta queueDelta = null;
 
+        Matcher codeFenceMeta = META_BLOCK_CODE_FENCE.matcher(working);
         Matcher meta = META_BLOCK.matcher(working);
-        if (meta.find()) {
-            String json = meta.group(1);
+        String metaJson = null;
+        if (codeFenceMeta.find()) {
+            metaJson = codeFenceMeta.group(1);
+            working = META_BLOCK_CODE_FENCE.matcher(working).replaceAll("").trim();
+        } else if (meta.find()) {
+            metaJson = meta.group(1);
+            working = META_BLOCK.matcher(working).replaceAll("").trim();
+        }
+        if (metaJson != null) {
             try {
-                JsonNode root = objectMapper.readTree(json);
+                JsonNode root = objectMapper.readTree(metaJson);
                 horsemen = readHorsemen(root.get("horsemen"), turn, senderTag);
                 nvc = readNvc(root.get("nvc_completion"), turn, senderTag);
-                userState = readUserState(root.get("user_state"), turn, senderTag); // Phase D PR-2
-                issueDelta = readIssueDelta(root.get("issue_delta"));              // Phase D PR-3
-                queueDelta = readQueueDelta(root.get("question_queue_delta"));     // Phase D PR-4
+                userState = readUserState(root.get("user_state"), turn, senderTag);
+                issueDelta = readIssueDelta(root.get("issue_delta"));
+                queueDelta = readQueueDelta(root.get("question_queue_delta"));
             } catch (Exception e) {
                 log.warn("turn_meta JSON parse failed (turn={}): {}", turn, e.getMessage());
             }
-            working = META_BLOCK.matcher(working).replaceAll("").trim();
         }
 
         Matcher wrapper = WRAPPER_BLOCK.matcher(working);

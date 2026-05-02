@@ -101,3 +101,41 @@ export function deriveMbtiType(answers: Record<string, string>): string {
   }
   return (E >= I ? 'E' : 'I') + (S >= N ? 'S' : 'N') + (T >= F ? 'T' : 'F') + (J >= P ? 'J' : 'P');
 }
+
+/**
+ * 60문항 답변에서 4축 비율 계산 (0=좌측 우세, 100=우측 우세)
+ * e_i: 0=E, 100=I | s_n: 0=S, 100=N | t_f: 0=T, 100=F | j_p: 0=J, 100=P
+ */
+import type { MbtiProfile } from '@/lib/types';
+
+export function computeMbtiProfile(answers: Record<string, string>): MbtiProfile {
+  let E=0,I=0,S=0,N=0,T=0,F=0,J=0,P=0;
+  for (const q of MBTI_TEST_QUESTIONS) {
+    const ans = answers[q.id];
+    if (!ans) continue;
+    if (q.dimension === 'EI') { if (ans === 'E') E++; else I++; }
+    else if (q.dimension === 'SN') { if (ans === 'S') S++; else N++; }
+    else if (q.dimension === 'TF') { if (ans === 'T') T++; else F++; }
+    else if (q.dimension === 'JP') { if (ans === 'J') J++; else P++; }
+  }
+  const total = 15;
+  return {
+    e_i: Math.round((I / total) * 100),
+    s_n: Math.round((N / total) * 100),
+    t_f: Math.round((F / total) * 100),
+    j_p: Math.round((P / total) * 100),
+  };
+}
+
+/**
+ * 4글자 MBTI 유형 → 슬라이더 기본값 (mbtiProfile이 없을 때 fallback)
+ */
+export function mbtiTypeToProfile(type: string): MbtiProfile {
+  if (!type || type.length < 4) return { e_i: 50, s_n: 50, t_f: 50, j_p: 50 };
+  return {
+    e_i: type[0] === 'E' ? 25 : 75,
+    s_n: type[1] === 'S' ? 25 : 75,
+    t_f: type[2] === 'T' ? 25 : 75,
+    j_p: type[3] === 'J' ? 25 : 75,
+  };
+}

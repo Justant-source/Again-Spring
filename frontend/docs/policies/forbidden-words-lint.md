@@ -93,7 +93,7 @@ frontend/
 아동학대: "아이를 때", "아동학대"
 ```
 
-감지 시 → `CrisisResourceModal` 즉시 표시. 자세한 내용: `policies/crisis-modal.md`
+감지 시 → `CrisisResourceModal` 즉시 표시. 자세한 내용: `shared/docs/policies/crisis-detection.md` "FE 구현 가이드" 절
 
 ---
 

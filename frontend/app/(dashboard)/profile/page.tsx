@@ -2,9 +2,10 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUserStore } from '@/lib/store/userStore';
+import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
+import { DeleteAccountModal } from '@/components/profile/DeleteAccountModal';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { STYLE_MOTIF } from '@/components/shared/Motif';
 import { COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
@@ -14,14 +15,16 @@ export default function ProfilePage() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
   const clearUser = useUserStore((s) => s.clear);
+  const hasHydrated = useHasHydrated();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
-    if (!user) {
+    if (hasHydrated && !user) {
       router.push('/login');
     }
-  }, [user, router]);
+  }, [hasHydrated, user, router]);
 
-  if (!user) {
+  if (!hasHydrated || !user) {
     return null;
   }
 
@@ -253,23 +256,32 @@ export default function ProfilePage() {
             로그아웃
           </button>
           <button
-            disabled
+            onClick={() => setShowDeleteModal(true)}
             style={{
               width: '100%',
               padding: '12px 16px',
-              background: '#E8E6E0',
-              color: '#9B9890',
-              border: 'none',
+              background: 'transparent',
+              color: '#B94040',
+              border: '1px solid #B94040',
               borderRadius: '3px',
               fontSize: '14px',
               fontWeight: 500,
-              cursor: 'not-allowed',
+              cursor: 'pointer',
             }}
           >
             계정 삭제
           </button>
         </div>
       </div>
+      <DeleteAccountModal
+        open={showDeleteModal}
+        user={user}
+        onClose={() => setShowDeleteModal(false)}
+        onDeleted={() => {
+          clearUser();
+          router.push('/');
+        }}
+      />
     </PhoneFrame>
   );
 }

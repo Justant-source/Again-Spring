@@ -95,7 +95,7 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 ### 프론트엔드 특화 — `frontend/docs/`
 - `frontend/docs/structure.md` — Next.js 14 App Router 레이아웃
 - `frontend/docs/architecture.md` — 상태/API 클라이언트/MSW
-- `frontend/docs/policies/{forbidden-words-lint,crisis-modal}.md` — FE UI 정책 구현
+- `frontend/docs/policies/forbidden-words-lint.md` — FE 금지어 린트 구현
 - `frontend/docs/ui/{design-handoff,mock-scenarios}.md` — 디자인 핸드오프 + MSW 시나리오
 - `frontend/docs/testing.md` — FE 테스트 전략
 - **`frontend/docs/ux/principles.md`** — **FE UX 권위본** (4원칙군, 우선순위, 로드맵)

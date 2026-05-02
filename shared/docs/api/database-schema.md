@@ -20,6 +20,27 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ## Flyway 마이그레이션 흐름
 
+```mermaid
+flowchart LR
+    V1["V1\n초기 스키마\nusers·sessions\nturns·reports"] -->
+    V2["V2\nOAuth·게스트\nprovider_id\nguest_sessions"] -->
+    V3["V3\nemail_verifications"] -->
+    V4["V4\npassword_reset\nrevoked_tokens"] -->
+    V5["V5\ntemperature 제거"] -->
+    V6["V6\nsolo_mode DEFAULT TRUE\nV1.5 전환"] -->
+    V7["V7\n📨 messages 신규\nV1.5 카톡식"] -->
+    V8["V8\nhorsemen_history JSON\nnvc_completion_history JSON"] -->
+    V9["V9\nDuo 감정 강도\nuser_a/b_emotion_intensity"] -->
+    V10["V10\n🧠 Phase D\nuser_state_history\nissue_context\nquestion_queue_a/b"] -->
+    V11["V11\nmbti_type"] -->
+    V12["V12\ndismissed_at\ninvite 인덱스"] -->
+    V13["V13\nmbti_profile JSON"] -->
+    V14["V14\nmediator_style_x/y"]
+
+    style V7 fill:#e8f4f8
+    style V10 fill:#fff3e0
+```
+
 | 버전 | 파일 | 핵심 변경 |
 |---|---|---|
 | V1 | `V1__init.sql` | 초기 스키마: users, sessions, turns, reports, user_relationships, conflict_history, temperature_history, llm_call_logs |
@@ -27,9 +48,15 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | V3 | `V3__add_email_verification.sql` | email_verifications 신규 |
 | V4 | `V4__add_security_tables.sql` | password_reset_tokens, revoked_tokens 신규 |
 | V5 | `V5__remove_temperature.sql` | reports/user_relationships/conflict_history의 temperature 제거 + temperature_history 삭제 |
-| V7 | `V7__add_messages_table_and_session_columns.sql` | **V1.5 카톡식 전환**: messages 테이블 신규 + sessions 컬럼 6개 추가 + turns 표기 deprecated |
+| V6 | `V6__solo_mode_default_true.sql` | sessions.solo_mode NOT NULL DEFAULT TRUE (V1.5 솔로-퍼스트 전환) |
+| V7 | `V7__chat_messages.sql` | **V1.5 카톡식 전환**: messages 테이블 신규 + sessions 컬럼 6개 추가 + turns 표기 deprecated |
 | V8 | `V8__add_session_psychology_tracking.sql` | **턴 간 심리 점수 피드백**: sessions에 `horsemen_history` JSON, `nvc_completion_history` JSON, `current_focus` VARCHAR(50) 추가 |
 | V9 | `V9__add_duo_balance_tracking.sql` | **Duo 균형 추적**: sessions에 `user_a_emotion_intensity` DECIMAL(3,2), `user_b_emotion_intensity` DECIMAL(3,2) 추가 |
+| V10 | `V10__phase_d_context_algorithm.sql` | **Phase D 컨텍스트**: sessions에 `user_state_history` JSON, `issue_context` JSON, `question_queue_a` JSON, `question_queue_b` JSON 추가 |
+| V11 | `V11__add_user_mbti_type.sql` | users에 `mbti_type` VARCHAR(8) NULL 추가 (온보딩 선택 입력) |
+| V12 | `V12__finalize_dismiss_and_invite_index.sql` | messages에 `dismissed_at` TIMESTAMP NULL 추가 + `idx_messages_session_sender_dismissed` 인덱스 |
+| V13 | `V13__add_user_mbti_profile.sql` | users에 `mbti_profile` JSON NULL 추가 (4축 비율) |
+| V14 | `V14__add_mediator_style_to_sessions.sql` | sessions에 `mediator_style_x` TINYINT UNSIGNED DEFAULT 50, `mediator_style_y` TINYINT UNSIGNED DEFAULT 50 추가 |
 
 **dev 프로파일은 Flyway disabled** (Hibernate ddl-auto=update 사용). prod 프로파일은 Flyway 적용 + ddl-auto=validate.
 
@@ -80,6 +107,8 @@ erDiagram
 | `provider_id` | VARCHAR(255) | OAuth provider의 user id |
 | `communication_style` | VARCHAR(50) | wave/mountain/flame/leaf/moon/star |
 | `onboarding_answers` | JSON | List<Integer> |
+| `mbti_type` | VARCHAR(8) | **V11**: MBTI 16유형 (선택 입력, nullable) |
+| `mbti_profile` | JSON | **V13**: 4축 비율 `{e_i,s_n,t_f,j_p}` 0~100 (nullable) |
 | `roles` | JSON | List<String>, default `["USER"]` |
 | `deleted_at` | TIMESTAMP(3) | 소프트 삭제 |
 | `created_at`, `updated_at` | TIMESTAMP(3) | 필수 |
@@ -113,6 +142,12 @@ UNIQUE: `(provider, provider_id)` — OAuth 중복 가입 방지.
 | `current_focus` | VARCHAR(50) | **V8**: `early_grounding \| deepen \| perspective \| solution` |
 | `user_a_emotion_intensity` | DECIMAL(3,2) | **V9**: A 누적 감정 강도 0.00~1.00 (Duo 균형 보정용) |
 | `user_b_emotion_intensity` | DECIMAL(3,2) | **V9**: B 누적 감정 강도 0.00~1.00 |
+| `user_state_history` | JSON | **V10 Phase D**: UserState 전이 이력 (OPENING→VENTING→…→RESOLVING) |
+| `issue_context` | JSON | **V10 Phase D**: 누적 이슈 컨텍스트 4슬롯 |
+| `question_queue_a` | JSON | **V10 Phase D**: A에게 물을 질문 우선순위 큐 |
+| `question_queue_b` | JSON | **V10 Phase D**: B에게 물을 질문 우선순위 큐 |
+| `mediator_style_x` | TINYINT UNSIGNED | **V14**: 중재 스타일 X축(사실↔공감) 0~100, DEFAULT 50 |
+| `mediator_style_y` | TINYINT UNSIGNED | **V14**: 중재 스타일 Y축(경청↔적극) 0~100, DEFAULT 50 |
 | `report_id` | VARCHAR(32) | |
 | `content_expires_at` | TIMESTAMP(3) | now+30일 (RetentionScheduler 기준) |
 | `crisis_flags` | JSON | List<String> |
@@ -152,6 +187,7 @@ UNIQUE: `(session_id, turn_number)` — 같은 턴 중복 작성 방지.
 | `char_count` | INT | 문자 수 (블러링 용도) |
 | `is_finalize_suggestion` | BOOLEAN | DEFAULT FALSE — 종료 권유 메시지 표시 |
 | `is_partner_join_notice` | BOOLEAN | DEFAULT FALSE — Solo→Duo 전이 알림 |
+| `dismissed_at` | TIMESTAMP | **V12**: 종료 권유 dismiss 시각 (nullable) |
 | `crisis_level` | INT | NULL / 1(경고) / 2(위험) / 3(긴급) |
 | `llm_model` | VARCHAR(50) | claude-haiku-4-5-20251001 등 |
 | `tokens_used` | INT | LLM 소비 토큰 |
@@ -295,8 +331,8 @@ UNIQUE: `(user_a_id, user_b_id, relationship_type)` — 같은 페어 + 동일 �
 # 다음 버전 번호 확인
 ls backend/src/main/resources/db/migration/
 
-# V6__<descriptive_name>.sql 작성
-$EDITOR backend/src/main/resources/db/migration/V6__add_xxx.sql
+# V15__<descriptive_name>.sql 작성
+$EDITOR backend/src/main/resources/db/migration/V15__add_xxx.sql
 
 # dev에서 검증
 cd env

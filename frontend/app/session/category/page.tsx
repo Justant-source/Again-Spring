@@ -7,14 +7,16 @@ import { useState } from 'react';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { CATEGORIES } from '@/lib/constants/categories';
 import { PhoneFrame, PhoneHeader, Dashes } from '@/components/shared';
+import { MediatorStylePicker } from '@/components/session/MediatorStylePicker';
 import { api } from '@/lib/api/client';
 
 export default function CategoryPage() {
   const router = useRouter();
-  const { relationType, category, setCategory } = useSessionStore();
-  const [stage, setStage] = useState<1 | 2>(1); // 1 = middle selection, 2 = minor selection
+  const { relationType, category, setCategory, setMediatorStyle } = useSessionStore();
+  const [stage, setStage] = useState<1 | 2 | 3>(1); // 1 = middle, 2 = minor, 3 = mediator style
   const [selectedMiddleId, setSelectedMiddleId] = useState<string | null>(null);
   const [customText, setCustomText] = useState('');
+  const [mediatorStyle, setMediatorStyleLocal] = useState({ x: 50, y: 50 });
 
   // Redirect if no relationship type selected
   if (!relationType) {
@@ -33,7 +35,7 @@ export default function CategoryPage() {
     setStage(2);
   };
 
-  const handleMinorSelect = async (minorId: string, allowsCustom: boolean) => {
+  const handleMinorSelect = (minorId: string, allowsCustom: boolean) => {
     if (allowsCustom && !customText.trim()) {
       // Require custom text for "direct input" options
       return;
@@ -44,17 +46,24 @@ export default function CategoryPage() {
       minorId,
       customText: customText.trim() || undefined,
     });
+    setStage(3);
+  };
 
-    // Create session and navigate to chat page
+  const handleConfirmMediatorStyle = async () => {
+    setMediatorStyle(mediatorStyle.x, mediatorStyle.y);
+
+    // Now create session with mediator style
     try {
       const response = await api.post('/api/sessions', {
         relationType,
         category: {
           majorId: major.id,
           middleId: selectedMiddleId!,
-          minorId,
-          customText: customText.trim() || undefined,
+          minorId: category?.minorId,
+          customText: category?.customText,
         },
+        mediatorStyleX: mediatorStyle.x,
+        mediatorStyleY: mediatorStyle.y,
       });
       const { id } = response.data;
       router.push(`/session/chat/${id}`);
@@ -65,7 +74,9 @@ export default function CategoryPage() {
   };
 
   const handleBack = () => {
-    if (stage === 2) {
+    if (stage === 3) {
+      setStage(2);
+    } else if (stage === 2) {
       setStage(1);
       setSelectedMiddleId(null);
       setCustomText('');
@@ -138,6 +149,44 @@ export default function CategoryPage() {
   const selectedMinor = selectedMiddle.minors.find((m) => m.id === 'custom');
   const hasCustom = selectedMiddle.minors.some((m) => m.allowCustomInput);
 
+  // Stage 3: Mediator style selection
+  if (stage === 3) {
+    return (
+      <PhoneFrame tone="L">
+        <PhoneHeader title="중재자 성향 선택" onBack={handleBack} />
+        <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ marginBottom: 28 }}>
+            <Dashes n={4} done={4} />
+          </div>
+
+          <div className="serif" style={{ fontSize: 18, lineHeight: 1.5, marginBottom: 8 }}>
+            중재자의 성향을<br />선택해주세요.
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--L-sub)', marginBottom: 24 }}>
+            슬라이더를 움직여 원하는 중재자 유형을 선택하세요.
+          </div>
+
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 24, marginBottom: 28 }}>
+            <MediatorStylePicker
+              value={mediatorStyle}
+              onChange={setMediatorStyleLocal}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-L ghost" style={{ flex: 1 }} onClick={handleBack}>
+              이전
+            </button>
+            <button className="btn-L" style={{ flex: 1 }} onClick={handleConfirmMediatorStyle}>
+              대화 시작
+            </button>
+          </div>
+        </div>
+      </PhoneFrame>
+    );
+  }
+
+  // Stage 2: Minor selection
   return (
     <PhoneFrame tone="L">
       <PhoneHeader title="조금 더 구체적으로" onBack={handleBack} />

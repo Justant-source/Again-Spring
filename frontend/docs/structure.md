@@ -114,7 +114,7 @@ frontend/
 │   │   ├── onboardingQuestions.ts             # 10문항 (상세: ../../shared/docs/policies/onboarding-mapping.md)
 │   │   ├── communicationStyles.ts             # 6스타일 + 36조합
 │   │   ├── mbtiMapping.ts                     # MBTI 16유형
-│   │   ├── crisisResources.ts                 # 핫라인 카드 (상세: docs/policies/crisis-modal.md)
+│   │   ├── crisisResources.ts                 # 핫라인 카드 (상세: shared/docs/policies/crisis-detection.md)
 │   │   ├── categories.ts                      # 카테고리 (상세: ../../shared/docs/policies/categories.md)
 │   │   └── forbiddenWords.ts                  # 금지어 (상세: docs/policies/forbidden-words-lint.md)
 │   ├── types/
@@ -166,8 +166,7 @@ frontend/
 │   │   └── mock-scenarios.md
 │   └── policies/                              # FE 정책 구현 가이드
 │       ├── README.md
-│       ├── forbidden-words-lint.md
-│       └── crisis-modal.md
+│       └── forbidden-words-lint.md
 ```
 
 ## App Router 라우팅 정리

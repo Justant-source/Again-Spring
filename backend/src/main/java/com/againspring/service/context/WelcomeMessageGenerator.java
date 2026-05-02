@@ -28,6 +28,12 @@ public class WelcomeMessageGenerator {
 
     public String generate(Session session, Session.PendingQuestion welcomeQ) {
         StringBuilder p = new StringBuilder();
+        // system.md를 먼저 로드해야 Claude Code CLI가 SW 엔지니어링 역할을 거부하지 않음
+        try {
+            p.append(loader.get("system.md")).append("\n\n");
+        } catch (Exception e) {
+            log.warn("system.md load failed: {}", e.getMessage());
+        }
         try {
             p.append(loader.get("chat/welcome_partner.md")).append("\n\n");
         } catch (Exception e) {

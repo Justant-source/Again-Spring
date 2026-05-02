@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { MbtiAxisSlider } from '@/components/onboarding/MbtiAxisSlider';
-import { MBTI_TO_STYLE } from '@/lib/constants/mbtiMapping';
+import { MBTI_TO_STYLE, mbtiTypeToProfile } from '@/lib/constants/mbtiMapping';
 import { COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
@@ -29,12 +29,28 @@ function calcType(profile: MbtiProfile): string {
 function MbtiInputContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const user = useUserStore((s) => s.user);
+  const setMbtiResult = useUserStore((s) => s.setMbtiResult);
   const setStyle = useUserStore((s) => s.setStyle);
-  const setMbtiType = useUserStore((s) => s.setMbtiType);
 
   const nextPath = searchParams.get('next') ?? '/session/new';
 
-  const [profile, setProfile] = useState<MbtiProfile>({ e_i: 50, s_n: 50, t_f: 50, j_p: 50 });
+  // Default: mbtiProfile from store → fallback mbtiType → fallback center
+  const [profile, setProfile] = useState<MbtiProfile>(() => {
+    if (user?.mbtiProfile) return user.mbtiProfile;
+    if (user?.mbtiType) return mbtiTypeToProfile(user.mbtiType);
+    return { e_i: 50, s_n: 50, t_f: 50, j_p: 50 };
+  });
+
+  // Re-sync if store hydrates after first render (zustand persist)
+  useEffect(() => {
+    if (user?.mbtiProfile) {
+      setProfile(user.mbtiProfile);
+    } else if (user?.mbtiType) {
+      setProfile(mbtiTypeToProfile(user.mbtiType));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.mbtiProfile, user?.mbtiType]);
 
   const mbtiType = calcType(profile);
   const mappedStyle = MBTI_TO_STYLE[mbtiType];
@@ -44,8 +60,12 @@ function MbtiInputContent() {
 
   const handleConfirm = () => {
     setStyle(mappedStyle);
-    setMbtiType(mbtiType);
-    api.post('/api/users/me/onboarding', { communicationStyle: mappedStyle, mbtiType }).catch(() => {});
+    setMbtiResult(mbtiType, profile);
+    api.post('/api/users/me/onboarding', {
+      communicationStyle: mappedStyle,
+      mbtiType,
+      mbtiProfile: profile,
+    }).catch(() => {});
     router.push(`/onboarding/result?next=${encodeURIComponent(nextPath)}`);
   };
 

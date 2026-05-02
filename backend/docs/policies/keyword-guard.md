@@ -23,6 +23,23 @@ FE 측 동등 코드: `frontend/lib/constants/forbiddenWords.ts` — 변경 시 
 
 ## 동작 모드
 
+```mermaid
+flowchart TD
+    subgraph INPUT["입력 단계 (사용자 → BE)"]
+        U["사용자 입력"] --> KG1["KeywordGuard.scan(userInput)"]
+        KG1 -->|위반 없음| OK1["✅ 처리 계속"]
+        KG1 -->|위반 감지| ERR["422 FORBIDDEN_WORD_DETECTED\n인라인 경고 (FE)"]
+    end
+
+    subgraph RESPONSE["응답 단계 (LLM → 사용자)"]
+        L["LLM 응답"] --> KG2["KeywordGuard.scan(response)"]
+        KG2 -->|위반 없음| OK2["✅ 사용자에게 전달"]
+        KG2 -->|위반 감지| FB["FallbackResponses.get()\n안전 기본값 반환\nERROR 로그 + safety_audit_log"]
+    end
+
+    INPUT --> RESPONSE
+```
+
 ### 1. 입력 검사 (사용자 → BE)
 
 ```java

@@ -168,6 +168,26 @@ FE는 입력 단계에서 즉시 검사 → 모달/배너 표시. BE는 API 진�
 
 위기 키워드 감지 시 다시봄은 **핫라인을 안내**할 뿐, 직접 위기 개입 행위(상담, 출동, 신고 대행 등)는 하지 않는다. 이는 [terms-of-service.md](./terms-of-service.md) 제5~7조에 명시.
 
+## FE 구현 가이드
+
+### 컴포넌트 위치
+
+- `frontend/components/shared/CrisisResourceModal.tsx` — Level 1 풀스크린 모달 (핫라인 카드 목록)
+- `frontend/components/chat/CrisisModal.tsx` — 간략 버전 (ChatInput 내부 인라인 모달)
+
+### 호출 위치
+
+1. `components/chat/ChatInput.tsx` — 입력 중 실시간 감지 → CrisisModal 표시
+2. `app/session/result/[id]/solo/page.tsx` — Solo 리포트 화면에서 추가 입력 시
+
+### dismiss 정책 (절대 불변 규칙)
+
+- 백드롭 클릭 / ESC 키로 닫히지 않음 — backdrop `onClick` 핸들러 및 `keydown` ESC 핸들러 추가 금지
+- "지금은 괜찮아요" / "나중에" 명시적 버튼으로만 닫기 가능
+- 핫라인 링크(tel:) 클릭 후 자동 닫기 가능
+
+이중 안전장치: FE가 차단해도 BE `CrisisDetector`가 API 진입점에서 재검사.
+
 ## 변경 시 절차
 
 1. `frontend/lib/constants/crisisResources.ts` 갱신

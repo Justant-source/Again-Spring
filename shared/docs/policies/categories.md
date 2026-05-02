@@ -20,6 +20,23 @@ interface MinorCategory  { id; label; allowCustomInput: boolean }
 
 ## 5개 + 1 메이저
 
+```mermaid
+graph TD
+    ROOT[갈등 카테고리] --> C1["couple\n연인/썸"]
+    ROOT --> C2["marriage\n부부"]
+    ROOT --> C3["friend\n친구"]
+    ROOT --> C4["family\n가족"]
+    ROOT --> C5["parent_child\n부모-자식"]
+    ROOT --> C6["korean_specific\n한국 고유"]
+
+    C1 --> C1a["1-1 연락·관심"] & C1b["1-2 시간·우선순위"] & C1c["1-3 돈·경제"] & C1z["...1-10 직접입력"]
+    C2 --> C2a["2-1 가사·육아"] & C2b["2-2 돈·재정"] & C2c["2-3 시가·처가"] & C2z["...2-9 직접입력"]
+    C3 --> C3a["3-1 연락 소홀"] & C3b["3-2 약속·신뢰"] & C3z["...3-8 직접입력"]
+    C4 --> C4a["4-1 재산·상속"] & C4b["4-2 명절·가족모임"] & C4z["...4-7 직접입력"]
+    C5 --> C5a["5-1 진로·직업"] & C5b["5-2 결혼·연애"] & C5z["...5-8 직접입력"]
+    C6 --> K1["in_law\n시댁/처가"] & K2["face\n다른 사람 앞 무시"] & K3["lingered\n오래 묵힌 서운함"] & K4["generation\n세대차/원가족"]
+```
+
 | ID | 표시명 | RelationType |
 |---|---|---|
 | `couple` | 연인/썸 | `COUPLE` |

@@ -106,7 +106,11 @@ function OnboardingPageContent() {
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title="나의 대화 성향" back={false} />
+      <PhoneHeader
+        title="나의 대화 성향"
+        back={!!searchParams.get('next')}
+        onBack={() => router.back()}
+      />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ marginBottom: 28 }}>
           <Dashes

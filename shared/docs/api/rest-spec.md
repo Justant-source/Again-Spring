@@ -86,7 +86,9 @@
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
 | GET | `/api/users/me` | ✓ | 내 정보 |
+| PATCH | `/api/users/me` | ✓ | 프로필 수정 (닉네임, MBTI 등) |
 | POST | `/api/users/me/onboarding` | ✓ | 온보딩 결과 저장 → 스타일 반환 |
+| GET | `/api/users/me/history` | ✓ | 내 세션 이력 목록 |
 | DELETE | `/api/users/me` | ✓ | 탈퇴 (소프트 삭제 + 원문 즉시 삭제) |
 
 ### `POST /api/users/me/onboarding`
@@ -110,6 +112,24 @@
 ---
 
 ## Session (카톡 채팅 API)
+
+| Method | Path | 인증 | 설명 |
+|---|---|---|---|
+| POST | `/api/sessions` | ✓ | Solo 세션 생성 |
+| GET | `/api/sessions/me` | ✓ | 내 세션 목록 |
+| GET | `/api/sessions/{id}` | ✓ | 세션 상세 조회 |
+| GET | `/api/sessions/{id}/status` | ✓ | 세션 상태 폴링 (파트너 합류 감지 용도) |
+| DELETE | `/api/sessions/{id}` | ✓ | 세션 삭제 (종료·방치된 세션 정리) |
+| POST | `/api/sessions/{id}/invite` | ✓ | 초대 토큰 생성 |
+| GET | `/api/sessions/{id}/invite` | ✓ | 초대 토큰 메타 조회 |
+| POST | `/api/sessions/join/{token}` | ✓/✗ | 초대 토큰으로 참여 (B 진입) |
+| POST | `/api/sessions/{id}/messages` | ✓ | 메시지 전송 + AI 응답 |
+| GET | `/api/sessions/{id}/messages` | ✓ | 내 메시지 목록 (since 폴링) |
+| GET | `/api/sessions/{id}/partner-messages` | ✓ | 상대 메시지 메타 (content 없음) |
+| GET | `/api/sessions/{id}/partner-status` | ✓ | 상대 온라인·활동 상태 |
+| POST | `/api/sessions/{id}/finalize` | ✓ | 종료 권유 |
+| POST | `/api/sessions/{id}/finalize/agree` | ✓ | 종료 동의 |
+| POST | `/api/sessions/{id}/finalize/decline` | ✓ | 종료 거절 |
 
 ### `POST /api/sessions`
 
@@ -348,13 +368,19 @@ prod에서는 `/actuator/health`만 노출 (info, metrics, prometheus 등 비활
 
 ---
 
-## Admin (`AdminPromptsController`)
+## Admin (`AdminPromptsController`, `AdminTestController`)
 
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| POST | `/api/admin/prompts/reload` | ✓ (ADMIN) | `PromptLoader` 캐시 무효화 |
+| POST | `/api/admin/prompts/reload` | ✓ (ADMIN) | `PromptLoader` 캐시 무효화 — 컨테이너 재시작 없이 프롬프트 즉시 반영 |
+| POST | `/api/admin/test/reset` | ✓ (ADMIN) | 테스트 데이터 초기화 (dev only) |
+| POST | `/api/admin/test/sessions/{sessionId}/terminate` | ✓ (ADMIN) | 세션 강제 종료 (dev only) |
 
-`shared/prompts/*.md` 파일을 수정한 후 컨테이너 재시작 없이 즉시 반영.
+## Debug (`SessionContextDebugController`)
+
+| Method | Path | 인증 | 설명 |
+|---|---|---|---|
+| GET | `/api/sessions/{id}/context` | ✓ | Phase D 컨텍스트 상태 덤프 (dev 전용, prod 비활성) |
 
 ---
 

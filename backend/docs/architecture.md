@@ -9,7 +9,7 @@
 | 빌드 | Gradle Kotlin DSL |
 | DB | MariaDB 11 LTS (utf8mb4, UTC) |
 | ORM | Spring Data JPA (Hibernate) |
-| 마이그레이션 | Flyway 10 (V1~V9) |
+| 마이그레이션 | Flyway 10 (V1~V14) |
 | 인증 | Spring Security + JWT (jjwt 0.12.5) |
 | 메일 | Spring Mail (Gmail SMTP) |
 | API 문서 | springdoc-openapi 2.6 (Swagger UI) |
@@ -65,7 +65,6 @@ HTTP Request
 MariaDB (Flyway 관리 스키마)
 
    ◄── domain Event 발행 ──◄
-       SessionCompletedEvent → SessionCompletedGraphListener (관계 그래프 갱신)
        TurnCompletedEvent
        SafetyTriggerEvent → SafetyAuditLogger
        CrisisDetectedEvent → SessionService (TERMINATED 전이)
@@ -146,7 +145,7 @@ flowchart TB
 
 | 빈 | cron | 동작 |
 |---|---|---|
-| `RetentionScheduler.purgeExpiredContent` | `0 0 3 * * *` (매일 03:00 UTC) | 30일 경과 세션의 `messages.content` NULL 처리 (V1.5 이후) / `turns.{content, mediator_message}` NULL 처리 (V1.4 이전 히스토리) |
+| `RetentionScheduler.purgeExpiredContent` | `0 0 3 * * *` (매일 03:00 UTC) | 30일 경과 세션의 `messages.content` NULL 처리 (V1.5 이후) / `turns.{content, mediator_message}` NULL 처리 (V1.5 이전 레거시 히스토리) |
 | `RevokedTokenCleanupScheduler.cleanup` | `0 0 4 * * *` (매일 04:00 UTC) | 만료된 `revoked_tokens` 행 삭제 |
 
 `SchedulingConfig`의 `@EnableScheduling` 활성. 테스트 프로파일에서는 비활성.
@@ -181,6 +180,39 @@ flowchart TB
 | `PromptSanitizer` | LLM 입력 inject 방지 | [policies/prompt-sanitizer.md](./policies/prompt-sanitizer.md) |
 | `RatioEnforcer` | 화해 기여도 클리핑 강제 | `shared/docs/policies/ratio-calculation.md` |
 | `SafetyAuditLogger` | 모든 safety 이벤트 마스킹 후 DB | — |
+
+## Phase D 컨텍스트 추적
+
+권위본: [`shared/docs/policies/context-algorithm.md`](../../shared/docs/policies/context-algorithm.md)
+
+세션별로 사용자의 심리 상태를 추적하고 질문 큐를 관리해 매 턴 컨텍스트를 풍부하게 한다.
+
+```mermaid
+flowchart LR
+    MSG["사용자 메시지"] --> PARSER["ChatTurnMetaParser\n<turn_meta> JSON 파싱"]
+    PARSER --> US["UserStateAppender\nPhase D user_state"]
+    PARSER --> IC["IssueContextMerger\nPhase D issue_delta"]
+    PARSER --> QQ["QuestionQueueUpdater\nPhase D queue_delta"]
+    IC --> CRE["CategoryRuleEnforcer\nin_law/lingered/face/generation 검증"]
+    IC --> RET["RatioElementTagger\nfacts→RatioElement 매핑"]
+    QQ --> PRI["QuestionPrioritizer\npriority 재계산 (매 턴)"]
+    QQ --> EVT["evict: 큐 크기 5 제한\nageInTurns ≥ 8 + priority < 0.2 → 제거"]
+
+    US --> DB[("Sessions\nuser_state_history JSON\nissue_context JSON\nquestion_queue_a JSON\nquestion_queue_b JSON")]
+    IC --> DB
+    QQ --> DB
+
+    DB --> FRAG["Fragment 렌더링\nUserStateFragment\nIssueContextFragment\nQuestionQueueFragment"]
+    FRAG --> NEXT["다음 턴 프롬프트"]
+```
+
+| 컴포넌트 | 역할 |
+|---|---|
+| `UserState` (enum 7종) | `OPENING` → `VENTING` → `DEFENSIVE` → `BLAMING` → `REFLECTING` → `NEGOTIATING` → `RESOLVING` |
+| `IssueContext` (4슬롯) | headline · facts · namedNeeds · threads |
+| `QuestionQueue` (A·B 분리 PQ) | 사용자별 우선순위 질문 큐 — 중재자가 적시에 명확화 질문 삽입 |
+
+세션 컬럼(V10): `user_state_history` JSON, `issue_context` JSON, `question_queue_a` JSON, `question_queue_b` JSON
 
 ## 중재 컨텍스트 강화 컴포넌트 (Phase A/B/C)
 

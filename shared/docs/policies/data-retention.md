@@ -10,6 +10,26 @@
 - 인터셉터: `backend/.../config/AccessLogInterceptor.java`
 - DB: `sessions.content_expires_at`, `turns.{content, mediator_message, mediator_summary_for_opponent}` (Flyway V1)
 
+## 데이터 생명주기
+
+```mermaid
+flowchart TD
+    A["세션 생성\ncontent_expires_at = now() + 30일"] --> B["CHATTING_SOLO / DUO\n대화 진행 중\n원문 보존"]
+    B --> C{종료}
+    C -->|COMPLETED / TERMINATED| D["30일 카운트 시작"]
+    D --> E{"content_expires_at\n경과?"}
+    E -->|아니오| F["조회 가능\nturns.content 노출"]
+    E -->|예 (RetentionScheduler\n매일 03:00 UTC)| G["원문 NULL 처리\nturns.content / mediator_message\n/ mediator_summary_for_opponent"]
+    G --> H["이후 조회\n'30일이 지나 원문이\n자동 삭제되었어요' 표시"]
+
+    I["사용자 탈퇴\nDELETE /api/users/me"] --> J["즉시 소프트 삭제\nusers.deleted_at = now()"]
+    J --> K["해당 user 세션 원문 즉시 NULL"]
+    J --> L["reports 유지\n상대방 접근 보장"]
+    J --> M["탈퇴 사용자 닉네임\n→ '탈퇴한 사용자' 마스킹"]
+
+    N["reports 테이블"] -->|영구 보관| O["요약·기여도·NVC\n원문 없음"]
+```
+
 ## 30일 원문 만료
 
 ### 대상 컬럼

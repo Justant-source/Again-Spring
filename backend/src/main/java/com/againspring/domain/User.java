@@ -59,6 +59,10 @@ public class User {
     private List<Integer> onboardingAnswers;
 
     @Type(JsonType.class)
+    @Column(name = "mbti_profile", columnDefinition = "JSON")
+    private java.util.Map<String, Integer> mbtiProfile;
+
+    @Type(JsonType.class)
     @Column(columnDefinition = "JSON")
     @Builder.Default
     private List<String> roles = new ArrayList<>();

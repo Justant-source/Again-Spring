@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { MSWProvider } from '@/components/shared/MSWProvider';
+import { AuthBootstrap } from '@/components/shared/AuthBootstrap';
 
 export const metadata: Metadata = {
   title: '다시봄 · Again Spring',
@@ -29,7 +30,10 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <MSWProvider>{children}</MSWProvider>
+        <MSWProvider>
+          <AuthBootstrap />
+          {children}
+        </MSWProvider>
       </body>
     </html>
   );

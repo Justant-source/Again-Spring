@@ -65,6 +65,39 @@ class ChatTurnMetaParserTest {
     }
 
     @Test
+    void parse_stripsCodeFenceWrappedMeta_missingClosingTag() {
+        String raw = "남편분한테 꼭 전하고 싶은 게 뭘까요?\n\n"
+            + "```\n<turn_meta>\n"
+            + "{\"horsemen\":{\"criticism\":0.0,\"contempt\":0.0,\"defensiveness\":0.0,\"stonewalling\":0.0},"
+            + "\"nvc_completion\":{\"observation\":false,\"feeling\":false,\"need\":false,\"request\":false},"
+            + "\"user_state\":{\"state\":\"NEGOTIATING\",\"evidence\":\"함께 생각해볼 수 있을까요\",\"confidence\":0.85}}"
+            + "\n```";
+        var r = parser.parse(raw, 5, "USER_A");
+
+        assertTrue(r.mediatorMessage().contains("남편분한테"));
+        assertFalse(r.mediatorMessage().contains("turn_meta"));
+        assertFalse(r.mediatorMessage().contains("```"));
+        assertNotNull(r.horsemen());
+        assertNotNull(r.userState());
+        assertEquals("NEGOTIATING", r.userState().state.name());
+    }
+
+    @Test
+    void parse_stripsCodeFenceWrappedMeta_withClosingTag() {
+        String raw = "응답 텍스트입니다.\n"
+            + "```json\n<turn_meta>\n"
+            + "{\"horsemen\":{\"criticism\":0.3,\"contempt\":0.0,\"defensiveness\":0.0,\"stonewalling\":0.0}}\n"
+            + "</turn_meta>\n```";
+        var r = parser.parse(raw, 2, "USER_A");
+
+        assertTrue(r.mediatorMessage().contains("응답 텍스트"));
+        assertFalse(r.mediatorMessage().contains("turn_meta"));
+        assertFalse(r.mediatorMessage().contains("```"));
+        assertNotNull(r.horsemen());
+        assertEquals(0.3, r.horsemen().criticism);
+    }
+
+    @Test
     void parse_unwrapsMediatorResponseWrapperIfPresent() {
         String raw = "<mediator_response>그러셨겠어요.</mediator_response>"
             + "<turn_meta>{\"horsemen\":{\"criticism\":0,\"contempt\":0,\"defensiveness\":0,\"stonewalling\":0}}</turn_meta>";

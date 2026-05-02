@@ -39,6 +39,8 @@ interface SessionState {
   inviteMessageTone: 'soft' | 'light' | 'serious';
   partnerNickname?: string;
   soloMode: boolean | null;
+  mediatorStyleX: number;
+  mediatorStyleY: number;
 
   setRelationType: (t: RelationType) => void;
   setCategory: (c: ActiveSessionCategory) => void;
@@ -51,6 +53,7 @@ interface SessionState {
   setRole: (r: ParticipantRole) => void;
   setPartnerNickname: (n: string) => void;
   setSoloMode: (mode: boolean) => void;
+  setMediatorStyle: (x: number, y: number) => void;
   reset: () => void;
 }
 
@@ -67,6 +70,8 @@ const initial = {
   inviteMessageTone: 'soft' as const,
   partnerNickname: undefined as string | undefined,
   soloMode: null as boolean | null,
+  mediatorStyleX: 50,
+  mediatorStyleY: 50,
 };
 
 export const useSessionStore = create<SessionState>()(
@@ -86,6 +91,7 @@ export const useSessionStore = create<SessionState>()(
       setRole: (r) => set({ role: r }),
       setPartnerNickname: (n) => set({ partnerNickname: n }),
       setSoloMode: (mode) => set({ soloMode: mode }),
+      setMediatorStyle: (x, y) => set({ mediatorStyleX: x, mediatorStyleY: y }),
       reset: () => set(initial),
     }),
     {

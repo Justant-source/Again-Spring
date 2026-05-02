@@ -9,10 +9,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * ChatTurnResponse (V1.5 카톡식)
- * 사용자 메시지 + AI 응답 한 쌍
+ * 사용자 메시지 + AI 응답 한 쌍 (분할 메시지 지원)
  */
 @Getter @Builder
 @NoArgsConstructor @AllArgsConstructor
@@ -20,7 +22,7 @@ import java.time.Instant;
 public class ChatTurnResponse {
     private boolean success;
     private UserMessageDto userMessage;
-    private MediatorMessageDto mediatorMessage;
+    private List<MediatorMessageDto> mediatorMessages;
     private boolean finalizeSuggested;
     private Integer crisisLevel;
 
@@ -42,6 +44,17 @@ public class ChatTurnResponse {
     }
 
     public static ChatTurnResponse from(ChatService.ChatTurnResult result) {
+        List<MediatorMessageDto> mediatorDtos = null;
+        if (result.mediatorMessages() != null && !result.mediatorMessages().isEmpty()) {
+            mediatorDtos = result.mediatorMessages().stream()
+                .map(m -> MediatorMessageDto.builder()
+                    .id(m.getId())
+                    .content(m.getContent())
+                    .charCount(m.getCharCount())
+                    .createdAt(m.getCreatedAt())
+                    .build())
+                .collect(Collectors.toList());
+        }
         return ChatTurnResponse.builder()
             .success(result.success())
             .userMessage(result.userMsg() != null ? UserMessageDto.builder()
@@ -49,12 +62,7 @@ public class ChatTurnResponse {
                 .charCount(result.userMsg().getCharCount())
                 .createdAt(result.userMsg().getCreatedAt())
                 .build() : null)
-            .mediatorMessage(result.mediatorMsg() != null ? MediatorMessageDto.builder()
-                .id(result.mediatorMsg().getId())
-                .content(result.mediatorMsg().getContent())
-                .charCount(result.mediatorMsg().getCharCount())
-                .createdAt(result.mediatorMsg().getCreatedAt())
-                .build() : null)
+            .mediatorMessages(mediatorDtos)
             .finalizeSuggested(result.finalizeSuggested())
             .crisisLevel(result.crisisLevel())
             .build();

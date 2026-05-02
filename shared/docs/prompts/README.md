@@ -44,10 +44,12 @@ LLM의 역할·말투·금기를 정의. 모든 호출에 포함.
 - 임계 초과 시(예: criticism 누적 평균 ≥ 0.4) "이번 턴에는 NVC 욕구 명시를 우선" 같은 자연어 지시 출력. 임계 미만이면 빈 문자열.
 
 ### Layer 4 — 관계 유형별 가이드 (`relations/`)
-- `couple.md` — 부부 관계 (Four Horsemen, Bids, Love Maps)
+- `couple.md` — 부부/연인 관계 (Four Horsemen, Bids, Love Maps)
 - `family.md` — 가족 관계 (세대 차이, 용서)
 - `friend.md` — 친구 관계 (기대치 정렬, 경계)
 - `parent_child.md` — 부모-자식 관계 (권력 비대칭, 자율성)
+- `marriage.md` — 결혼 전·후 전환기 (역할 기대, 시댁·처가)
+- `korean_specific.md` — 한국 문화 특수 갈등 패턴 (서열·체면·눈치)
 
 ### Layer 5 — 채팅 모드 (`chat/`)
 
@@ -62,6 +64,8 @@ LLM의 역할·말투·금기를 정의. 모든 호출에 포함.
 
 **공통**:
 - `_response_instructions.md` — 모든 카톡 응답의 공통 형식 지시. 본문(한국어 1~3문장) 뒤에 `<turn_meta>{"horsemen":{...},"nvc_completion":{...}}</turn_meta>` JSON 블록을 정확히 1회 첨부하도록 강제. 메타 블록은 `ChatTurnMetaParser`가 추출해 세션 누적에 사용하며, 실패 시 graceful (본문은 정상 표시).
+- `welcome_partner.md` — B가 합류할 때 A와 B에게 각각 보내는 환영 메시지 (조건부, Duo 전이 시 1회).
+- `partner_joined_summary.md` — B 합류 시 B에게 Solo 대화 요약을 전달하는 메시지 (격리 원칙 준수).
 
 ## 프롬프트 계층화
 
@@ -71,16 +75,24 @@ flowchart TB
     L1[Layer 1: system.md<br/>정체성·톤·금기]
     L2[Layer 2: gottman/<br/>4 Horsemen, Bids, SRH]
     L3[Layer 3: nvc/four_steps.md<br/>출력 형식]
-    L4[Layer 4: relations/<br/>couple/family/friend/parent_child]
+    L35a["[Layer 3.5]: user_profile<br/>스타일·MBTI 자연어 (조건부)"]
+    L35b["[Layer 3.6]: psychology_feedback<br/>누적 Horsemen·NVC 초과 시 (조건부)"]
+    L4[Layer 4: relations/<br/>couple/family/friend/parent_child<br/>marriage/korean_specific]
     L5[Layer 5: chat/<br/>solo_chat 또는 duo_chat]
     User[user_input<br/>XML 래핑]
+    L5b["[duo_balance]: 불균형 감지 시 (조건부)"]
+    Fmt[_response_instructions.md]
 
     L1 --> Final
     L2 --> Final
     L3 --> Final
+    L35a --> Final
+    L35b --> Final
     L4 --> Final
     L5 --> Final
+    L5b --> Final
     User --> Final
+    Fmt --> Final
 ```
 
 ## 로딩 및 재로드
@@ -104,7 +116,7 @@ V1.5 카톡식 흐름은 `ChatPromptAssembler`가 담당:
 
 리포트 생성은 `ReportGenerationService`가 동일 레이어 + `chat/{solo,duo}_report.md`를 사용해 Sonnet으로 호출.
 
-레거시 6턴 모델용 `PromptAssembler`는 `turns/` 레이어를 합성하나, V1.5 이후 신규 흐름에서는 사용되지 않음.
+V1.5 이전 6턴 모델용 레거시 `PromptAssembler`는 더 이상 신규 흐름에서 사용되지 않음. 신규 흐름은 `ChatPromptAssembler`가 전담.
 
 ## 자세한 설계 문서
 

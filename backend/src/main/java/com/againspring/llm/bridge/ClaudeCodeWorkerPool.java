@@ -24,6 +24,13 @@ import java.util.concurrent.atomic.AtomicLong;
 @ConditionalOnProperty(name = "llm.provider", havingValue = "claude-code", matchIfMissing = true)
 public class ClaudeCodeWorkerPool {
 
+    /**
+     * Interface for tasks that manage a Process and need explicit cleanup on timeout.
+     */
+    public interface ProcessAwareCallable<T> extends Callable<T> {
+        void destroyProcessForcibly();
+    }
+
     @Value("${llm.claude-code.pool-size:3}")
     private int poolSize;
 
@@ -80,6 +87,12 @@ public class ClaudeCodeWorkerPool {
             } catch (TimeoutException e) {
                 log.warn("Task timeout ({}ms): correlation={}", timeout.toMillis(), correlationId);
                 future.cancel(true);  // Try to interrupt
+
+                // Bug D: ProcessAwareCallable인 경우 직접 Process 종료
+                if (task instanceof ProcessAwareCallable) {
+                    ((ProcessAwareCallable<?>) task).destroyProcessForcibly();
+                }
+
                 throw new LLMTimeoutException(
                         "LLM invocation exceeded timeout: " + timeout.toMillis() + "ms",
                         e, correlationId);

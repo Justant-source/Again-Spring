@@ -8,6 +8,40 @@
 2. **과적합 방지** — 추적 변수 4개로 제한 (5번째 변수 추가 금지)
 3. **한국 적용성** — 한국 표본 검증 연구가 있는 모델 우선
 
+## 모델 레이어 구조
+
+```mermaid
+flowchart TD
+    subgraph CORE["핵심 — Gottman Method"]
+        G1["4 Horsemen\n비난·경멸·방어·담쌓기\n(추적 변수 #1)"]
+        G2["Repair Attempt\n회복 시도 여부\n(추적 변수 #2)"]
+        G3["Bid for Connection\n연결 시도 응답률\n(추적 변수 #3)"]
+        G4["대화 시작 톤\nGentle vs Harsh Startup\n(추적 변수 #4)"]
+    end
+
+    subgraph OUTPUT["출력 재구성 — NVC"]
+        N1["관찰\n판단 아닌 사실"]
+        N2["감정\n느낌 단어"]
+        N3["욕구\n보편적 욕구"]
+        N4["요청\n구체적 행동"]
+    end
+
+    subgraph BOOST["보강 — EFT"]
+        E1["이면의 감정 환기\n비난·경멸 탐지 시\n세션당 최대 1회"]
+    end
+
+    subgraph KOR["한국 고유 패턴"]
+        K1["in_law 시댁/처가"]
+        K2["face 체면"]
+        K3["lingered 묵힌 서운함"]
+        K4["generation 세대차"]
+    end
+
+    CORE -->|관찰 결과를| OUTPUT
+    CORE -->|비난/경멸 탐지 시| BOOST
+    KOR -->|카테고리 보정| CORE
+```
+
 ## 채택 모델
 
 ### Gottman Method (핵심)

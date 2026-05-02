@@ -24,5 +24,6 @@ export interface User {
   mbtiType?: string;
   mbtiProfile?: MbtiProfile;
   onboardingMethod?: 'test' | 'mbti';
+  provider?: string | null;
   createdAt: string;
 }

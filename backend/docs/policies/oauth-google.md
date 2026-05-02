@@ -31,6 +31,33 @@ public record OAuthUserInfo(String provider, String providerId, String email, St
 
 ## 흐름 (모든 provider 공통)
 
+```mermaid
+sequenceDiagram
+    participant User as 사용자
+    participant FE as FE (Next.js)
+    participant Provider as OAuth Provider\n(Google/Kakao/Naver)
+    participant BE as BE (Spring Boot)
+    participant DB as MariaDB
+
+    User->>FE: "소셜 로그인" 클릭
+    FE->>Provider: 리다이렉트 (client_id, redirect_uri, scope)
+    Provider-->>User: 동의 화면
+    User-->>Provider: 동의
+    Provider-->>FE: code (callback redirect)
+
+    FE->>BE: POST /api/auth/oauth2/{provider}\n{ code }
+    BE->>Provider: POST token endpoint\n(code + client_secret)
+    Provider-->>BE: access_token
+    BE->>Provider: GET userinfo (Bearer access_token)
+    Provider-->>BE: { sub/id, email, nickname }
+    BE->>DB: findByProviderAndProviderId
+    alt 신규 사용자
+        BE->>DB: INSERT users
+    end
+    BE-->>FE: { user, token: JWT 24h }
+    FE->>FE: localStorage 저장\nuserStore.setUser()
+```
+
 ```
 [FE] 사용자가 "Google 로그인" 클릭
    → window.location = "https://accounts.google.com/o/oauth2/v2/auth?..."

@@ -52,3 +52,4 @@ Thumbs.db
 nbproject/
 *.swp
 *.swo
+backend/scripts/test-automation/results/

@@ -30,4 +30,9 @@ public interface UserRepository extends JpaRepository<User, String> {
      * OAuth provider + providerId로 사용자 조회
      */
     Optional<User> findByProviderAndProviderId(String provider, String providerId);
+
+    /**
+     * 이메일 prefix로 사용자 목록 조회 (dev 테스트 데이터 정리용)
+     */
+    java.util.List<User> findByEmailStartingWith(String prefix);
 }

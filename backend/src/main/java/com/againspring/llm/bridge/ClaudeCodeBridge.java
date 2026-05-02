@@ -26,6 +26,12 @@ import java.util.concurrent.CompletionException;
 @ConditionalOnProperty(name = "llm.provider", havingValue = "claude-code", matchIfMissing = true)
 public class ClaudeCodeBridge implements LLMProvider {
 
+    // Claude Code CLI의 기본 SW엔지니어링 시스템 프롬프트를 교체해 캐릭터 이탈 방지
+    private static final String DASIBOM_SYSTEM_ROLE =
+            "당신은 '다시봄' 감정 정리 도우미입니다. 사용자가 보내는 텍스트에 한국어로만 응답합니다. " +
+            "소프트웨어 개발 도움이 아닌, 사람 간의 감정과 관계를 다루는 대화를 합니다. " +
+            "아래 지시에 따라 즉시 응답을 시작하세요.";
+
     private final ClaudeCodeWorkerPool workerPool;
     private final PromptSanitizer sanitizer;
     private final LLMCallLogger callLogger;
@@ -195,7 +201,19 @@ public class ClaudeCodeBridge implements LLMProvider {
     private String runClaudeCommandWithInvocation(
             String prompt, String model, CancelableInvocation inv) throws Exception {
 
-        ProcessBuilder pb = new ProcessBuilder(claudeBinaryPath, "--print", "--model", model, prompt);
+        // <conversation_history> 태그 기준으로 시스템 지시(system-prompt)와
+        // 대화 이력+현재 메시지(user input)를 분리해 각각 올바른 위치로 전달
+        ProcessBuilder pb;
+        int splitIdx = prompt.indexOf("<conversation_history>");
+        if (splitIdx > 0) {
+            String systemPart = prompt.substring(0, splitIdx).trim();
+            String userPart = prompt.substring(splitIdx).trim();
+            pb = new ProcessBuilder(claudeBinaryPath, "--print", "--model", model,
+                    "--system-prompt", systemPart, userPart);
+        } else {
+            pb = new ProcessBuilder(claudeBinaryPath, "--print", "--model", model,
+                    "--system-prompt", DASIBOM_SYSTEM_ROLE, prompt);
+        }
         pb.redirectErrorStream(false);
 
         Process process = pb.start();
@@ -254,13 +272,17 @@ public class ClaudeCodeBridge implements LLMProvider {
     }
 
     private String runClaudeCommand(String prompt, String model) throws Exception {
-        ProcessBuilder pb = new ProcessBuilder(
-                claudeBinaryPath,
-                "--print",
-                "--model",
-                model,
-                prompt
-        );
+        ProcessBuilder pb;
+        int splitIdx = prompt.indexOf("<conversation_history>");
+        if (splitIdx > 0) {
+            String systemPart = prompt.substring(0, splitIdx).trim();
+            String userPart = prompt.substring(splitIdx).trim();
+            pb = new ProcessBuilder(claudeBinaryPath, "--print", "--model", model,
+                    "--system-prompt", systemPart, userPart);
+        } else {
+            pb = new ProcessBuilder(claudeBinaryPath, "--print", "--model", model,
+                    "--system-prompt", DASIBOM_SYSTEM_ROLE, prompt);
+        }
         pb.redirectErrorStream(false);
 
         Process process = pb.start();

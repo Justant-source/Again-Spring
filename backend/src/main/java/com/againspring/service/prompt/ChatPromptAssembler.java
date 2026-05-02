@@ -34,6 +34,11 @@ public class ChatPromptAssembler {
     public String assembleSoloTurn(Session session, User user, String currentMessage, List<Message> recentMessages) throws Exception {
         StringBuilder sb = new StringBuilder();
         sb.append(safeLoad("system.md")).append("\n\n");
+
+        // 중재자 성향 주입 (2D 슬라이더)
+        String mediatorStyle = buildMediatorStyleFragment(session.getMediatorStyleX(), session.getMediatorStyleY());
+        sb.append(mediatorStyle).append("\n\n");
+
         sb.append(safeLoad("gottman/four_horsemen.md")).append("\n\n");
         sb.append(safeLoad("nvc/four_steps.md")).append("\n\n");
         String profile = profileFragment.render(user);
@@ -76,6 +81,11 @@ public class ChatPromptAssembler {
                                    String currentMessage, List<Message> allRecentMessages) throws Exception {
         StringBuilder sb = new StringBuilder();
         sb.append(safeLoad("system.md")).append("\n\n");
+
+        // 중재자 성향 주입 (2D 슬라이더)
+        String mediatorStyle = buildMediatorStyleFragment(session.getMediatorStyleX(), session.getMediatorStyleY());
+        sb.append(mediatorStyle).append("\n\n");
+
         sb.append(safeLoad("gottman/four_horsemen.md")).append("\n\n");
         sb.append(safeLoad("nvc/four_steps.md")).append("\n\n");
         String profileA = profileFragment.render(userA, MessageSender.USER_A);
@@ -159,6 +169,25 @@ public class ChatPromptAssembler {
         sb.append("</solo_conversation_history>\n");
 
         return sb.toString();
+    }
+
+    private String buildMediatorStyleFragment(int styleX, int styleY) {
+        // X축 설명: 팩트(0) ↔ 공감(100)
+        String xDesc = styleX >= 70 ? "논리적 사실과 구체적 상황에 집중하며"
+                     : styleX <= 30 ? "상대방의 감정과 내면에 깊이 공감하며"
+                     : "사실과 감정을 균형있게 살피며";
+
+        // Y축 설명: 경청(0) ↔ 능동(100)
+        String yDesc = styleY >= 70 ? "탐색적 질문으로 상대방이 스스로 통찰을 얻도록 안내하는"
+                     : styleY <= 30 ? "대화를 정리하고 반영하여 명확한 이해를 돕는"
+                     : "경청과 질문을 균형있게 사용하는";
+
+        return String.format("""
+                <mediator_style>
+                당신은 %s %s 중재자입니다.
+                팩트/논리 성향: %d/100 (0=완전공감, 100=완전팩트)
+                경청/능동 성향: %d/100 (0=경청형, 100=능동형)
+                </mediator_style>""", xDesc, yDesc, styleX, styleY);
     }
 
     private String safeLoad(String path) {

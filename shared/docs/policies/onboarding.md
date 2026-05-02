@@ -13,11 +13,16 @@
 
 ## 흐름
 
-```
-landing → /onboarding (10문항 필수) → /onboarding/result (스타일 카드)
-                                          │
-                                          └─ /onboarding/mbti-test (선택, 4문항)
-                                          └─ /onboarding/mbti-input (선택, 직접 입력)
+```mermaid
+flowchart TD
+    A["/ 랜딩"] -->|시작하기| B["/onboarding\n10문항 필수"]
+    B -->|완료| C["/onboarding/result\n스타일 카드"]
+    C --> D{MBTI 추가 선택}
+    D -->|미니 테스트| E["/onboarding/mbti-test\n4문항 EI·SN·TF·JP"]
+    D -->|직접 입력| F["/onboarding/mbti-input\n16유형 선택"]
+    D -->|건너뛰기| G[세션 시작]
+    E --> G
+    F --> G
 ```
 
 10문항은 **필수**, MBTI는 결과 화면 이후 **선택 추가** (commit 68b19d5에서 변경).
@@ -51,6 +56,19 @@ landing → /onboarding (10문항 필수) → /onboarding/result (스타일 카�
 각 스타일은 `strengths`, `caution`, `color` 메타 보유 — 결과 카드와 조합 해석에 사용.
 
 ## 매핑 알고리즘 (요약)
+
+```mermaid
+flowchart LR
+    A["10문항 답변\nq1~q10"] --> B["calculateStyleAxes\n6축 점수 계산"]
+    B --> W["🌊 wave\n(6-q1 + q2 + 6-q5) ÷ 3 × 2"]
+    B --> M["🏔️ mountain\n(q1 + 6-q2) ÷ 2 × 2"]
+    B --> F["🔥 flame\n(q3 + 6-q5 + 6-q6) ÷ 3 × 2"]
+    B --> L["🌿 leaf\n(q4 + q6) ÷ 2 × 2"]
+    B --> O["🌙 moon\n(q5 + q10) ÷ 2 × 2"]
+    B --> S["⭐ star\n(q3 + q7) ÷ 2 × 2"]
+    W & M & F & L & O & S --> R["최대값 선택\n동점 시 wave 우선"]
+    R --> RESULT["단일 스타일 결정"]
+```
 
 ```typescript
 function calculateStyleAxes(answers: number[]): Record<Style, number> {
