@@ -1,7 +1,7 @@
 -- V7: 카톡식 메시지 테이블 + 세션 메타데이터 (V1.5 단일 흐름)
 
 -- 메시지 테이블 (카톡 채팅 히스토리)
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
     id BIGINT NOT NULL AUTO_INCREMENT,
     session_id VARCHAR(36) NOT NULL,
     sender VARCHAR(32) NOT NULL COMMENT 'USER_A | USER_B | MEDIATOR_TO_A | MEDIATOR_TO_B',
@@ -22,12 +22,12 @@ CREATE TABLE messages (
 
 -- 세션 메타데이터 추가 (V1.5 카톡식 채팅)
 ALTER TABLE sessions
-    ADD COLUMN user_a_message_count INT NOT NULL DEFAULT 0,
-    ADD COLUMN user_b_message_count INT NOT NULL DEFAULT 0,
-    ADD COLUMN partner_joined_at TIMESTAMP NULL DEFAULT NULL,
-    ADD COLUMN finalize_suggested_at TIMESTAMP NULL DEFAULT NULL,
-    ADD COLUMN finalize_agreed_by_a BOOLEAN NOT NULL DEFAULT FALSE,
-    ADD COLUMN finalize_agreed_by_b BOOLEAN NOT NULL DEFAULT FALSE;
+    ADD COLUMN IF NOT EXISTS user_a_message_count INT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS user_b_message_count INT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS partner_joined_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS finalize_suggested_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS finalize_agreed_by_a BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS finalize_agreed_by_b BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- status 컬럼: ENUM → VARCHAR로 변환 (신규 값 수용)
 -- 먼저 기존 ENUM 값을 문자로 매핑
@@ -38,5 +38,4 @@ ALTER TABLE sessions MODIFY COLUMN status VARCHAR(32) NOT NULL DEFAULT 'chatting
 UPDATE sessions SET status = 'chatting_solo' WHERE status IN ('waiting_b', 'b_joined', 'in_mediation', 'solo_mode');
 -- 'completed', 'terminated'은 그대로 유지
 
--- description 컬럼: NULL 허용 (V1.5는 첫 메시지로 대체)
-ALTER TABLE sessions MODIFY COLUMN description TEXT NULL;
+-- description 컬럼은 V1 초기 스키마에 없음 — 이 ALTER 제거됨

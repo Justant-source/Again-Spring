@@ -20,7 +20,7 @@
 
     <springProfile name="prod">
         <root level="${LOG_LEVEL}">
-            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="CONSOLE_PRETTY"/>
         </root>
     </springProfile>
 

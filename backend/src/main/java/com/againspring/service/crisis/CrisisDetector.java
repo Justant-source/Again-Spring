@@ -13,7 +13,7 @@ public class CrisisDetector {
 
     private static final List<String> LEVEL_1_KEYWORDS = List.of(
         "때리", "맞았", "학대", "폭행", "때렸", "강간", "성폭행",
-        "죽고 싶", "죽어버", "자해", "뛰어내리", "목매"
+        "죽고 싶", "죽고싶", "죽어버", "자살", "자해", "뛰어내리", "목매"
     );
 
     private static final List<String> LEVEL_2_KEYWORDS = List.of(
