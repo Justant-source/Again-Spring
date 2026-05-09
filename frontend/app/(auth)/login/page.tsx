@@ -40,7 +40,7 @@ export default function LoginPage() {
       setUser(user);
       router.push('/');
     } catch (err: any) {
-      setError(err.response?.data?.message || '로그인에 실패했어요');
+      setError(err.response?.data?.error?.message || '로그인에 실패했어요');
     } finally {
       setLoading(false);
     }

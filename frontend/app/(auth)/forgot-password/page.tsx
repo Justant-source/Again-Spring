@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
       await api.post('/api/auth/forgot-password', { email });
       setSubmitted(true);
     } catch (err: any) {
-      setError(err.response?.data?.message || '요청 중 오류가 발생했어요');
+      setError(err.response?.data?.error?.message || '요청 중 오류가 발생했어요');
     } finally {
       setLoading(false);
     }

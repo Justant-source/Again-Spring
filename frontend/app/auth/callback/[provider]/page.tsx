@@ -35,7 +35,7 @@ export default function OAuthCallbackPage() {
         router.replace('/');
       })
       .catch((err) => {
-        const msg = err.response?.data?.message ?? '소셜 로그인에 실패했어요';
+        const msg = err.response?.data?.error?.message ?? '소셜 로그인에 실패했어요';
         setError(msg);
       });
   }, []);

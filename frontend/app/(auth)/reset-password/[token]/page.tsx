@@ -47,7 +47,7 @@ export default function ResetPasswordPage() {
         router.push('/login');
       }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.message || '비밀번호 재설정에 실패했어요');
+      setError(err.response?.data?.error?.message || '비밀번호 재설정에 실패했어요');
     } finally {
       setLoading(false);
     }

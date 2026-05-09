@@ -42,7 +42,7 @@ export default function GuestPage() {
       setUser(user);
       router.push('/onboarding/intro');
     } catch (err: any) {
-      setError(err.response?.data?.message || '게스트 입장에 실패했어요');
+      setError(err.response?.data?.error?.message || '게스트 입장에 실패했어요');
     } finally {
       setLoading(false);
     }

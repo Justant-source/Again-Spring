@@ -47,7 +47,7 @@ public class UserService {
     public UserResponse getUserProfile(String userId) {
         User user = userRepository
                 .findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요."));
 
         return mapToUserResponse(user);
     }
@@ -63,7 +63,7 @@ public class UserService {
     public UserResponse updateUserProfile(String userId, UpdateUserRequest request) {
         User user = userRepository
                 .findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요."));
 
         if (request.getNickname() != null) {
             user.setNickname(request.getNickname());
@@ -91,7 +91,7 @@ public class UserService {
     public OnboardingResponse completeOnboarding(String userId, OnboardingRequest request) {
         User user = userRepository
                 .findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요."));
 
         // MBTI path: communicationStyle provided directly (no answers required)
         if (request.getAnswers() == null && request.getCommunicationStyle() != null) {
@@ -107,7 +107,7 @@ public class UserService {
             try {
                 style = CommunicationStyle.valueOf(request.getCommunicationStyle().toUpperCase());
             } catch (IllegalArgumentException e) {
-                throw new BusinessException("ONBOARDING_INVALID_STYLE", "Invalid communication style: " + request.getCommunicationStyle());
+                throw new BusinessException("ONBOARDING_INVALID_STYLE", "올바르지 않은 소통 스타일이에요: " + request.getCommunicationStyle());
             }
             return OnboardingResponse.builder()
                     .communicationStyle(style.getValue())
@@ -123,7 +123,7 @@ public class UserService {
 
         // 10-question path
         if (request.getAnswers() == null) {
-            throw new BusinessException("ONBOARDING_INVALID_ANSWERS", "Either answers or communicationStyle is required");
+            throw new BusinessException("ONBOARDING_INVALID_ANSWERS", "답변 또는 소통 스타일 중 하나를 입력해주세요.");
         }
 
         try {
@@ -167,13 +167,13 @@ public class UserService {
     public void deleteUserAccount(String userId, DeleteAccountRequest req) {
         User user = userRepository
                 .findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요."));
 
         // Password verification for email/password sign-up users
         if (user.getPasswordHash() != null) {
             if (req == null || req.getPassword() == null
                     || !passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
-                throw new BusinessException("AUTH_INVALID_CREDENTIALS", "Password does not match", 401);
+                throw new BusinessException("AUTH_INVALID_CREDENTIALS", "비밀번호가 올바르지 않아요.", 401);
             }
         }
 

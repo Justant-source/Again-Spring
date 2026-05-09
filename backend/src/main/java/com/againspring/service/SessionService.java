@@ -121,7 +121,7 @@ public class SessionService {
         try {
             RelationType.fromValue(request.getRelationType());
         } catch (IllegalArgumentException e) {
-            throw new BusinessException("INVALID_INPUT", "Invalid relation type");
+            throw new BusinessException("INVALID_INPUT", "올바르지 않은 관계 유형이에요.");
         }
 
         // Scan description for keywords (crisis detection)
@@ -205,12 +205,12 @@ public class SessionService {
     public SessionResponse getSession(String sessionId, String userId) {
         Session session = sessionRepository
                 .findById(sessionId)
-                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "세션을 찾을 수 없어요."));
 
         // Access control: creator or invitee only
         if (!session.getCreatedByUserId().equals(userId)
                 && !((session.getInviteeUserId() != null && session.getInviteeUserId().equals(userId)))) {
-            throw new BusinessException("SESSION_FORBIDDEN", "Access denied to this session");
+            throw new BusinessException("SESSION_FORBIDDEN", "이 세션에 접근할 권한이 없어요.");
         }
 
         return mapToSessionResponse(session, userId);
@@ -246,11 +246,11 @@ public class SessionService {
     public SessionResponse joinSession(String inviteToken, JoinSessionRequest request, Optional<String> userId) {
         Session session = sessionRepository
                 .findByInviteToken(inviteToken)
-                .orElseThrow(() -> new BusinessException("INVITE_TOKEN_INVALID", "Invalid invite token"));
+                .orElseThrow(() -> new BusinessException("INVITE_TOKEN_INVALID", "유효하지 않은 초대 링크예요."));
 
         // Check expiry
         if (session.getInviteExpiresAt() != null && Instant.now().isAfter(session.getInviteExpiresAt())) {
-            throw new BusinessException("INVITE_TOKEN_EXPIRED", "Invite token has expired");
+            throw new BusinessException("INVITE_TOKEN_EXPIRED", "초대 링크가 만료되었어요.");
         }
 
         // V1.5: CHATTING_SOLO 또는 COMPLETED(soloMode) 상태에서 join 가능
@@ -304,7 +304,7 @@ public class SessionService {
     public com.againspring.api.dto.response.InviteTokenResponse getInviteForExistingSession(
             String sessionId, String userId) {
         Session session = sessionRepository.findById(sessionId)
-            .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+            .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "세션을 찾을 수 없어요."));
 
         if (!session.getUserAId().equals(userId)) {
             throw new BusinessException("SESSION_FORBIDDEN", "Only session owner can view invite");
@@ -342,7 +342,7 @@ public class SessionService {
     public com.againspring.api.dto.response.InviteTokenResponse generateInviteForExistingSession(
             String sessionId, String userId) {
         Session session = sessionRepository.findById(sessionId)
-            .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+            .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "세션을 찾을 수 없어요."));
 
         if (!session.getUserAId().equals(userId)) {
             throw new BusinessException("SESSION_FORBIDDEN", "Only session owner can invite");
@@ -397,7 +397,7 @@ public class SessionService {
     public SessionStatusResponse getSessionStatus(String sessionId) {
         Session session = sessionRepository
                 .findById(sessionId)
-                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "세션을 찾을 수 없어요."));
 
         boolean hasPartnerJoined = session.getInviteeUserId() != null || session.getInviteeGuestName() != null;
 
@@ -420,12 +420,12 @@ public class SessionService {
     public void deleteSession(String sessionId, String userId) {
         Session session = sessionRepository
                 .findById(sessionId)
-                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "세션을 찾을 수 없어요."));
 
         boolean isCreator = session.getCreatedByUserId().equals(userId);
         boolean isInvitee = userId.equals(session.getInviteeUserId());
         if (!isCreator && !isInvitee) {
-            throw new BusinessException("SESSION_FORBIDDEN", "Access denied to this session");
+            throw new BusinessException("SESSION_FORBIDDEN", "이 세션에 접근할 권한이 없어요.");
         }
 
         sessionRepository.deleteById(sessionId);

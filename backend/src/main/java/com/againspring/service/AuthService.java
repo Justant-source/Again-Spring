@@ -39,7 +39,7 @@ public class AuthService {
         emailVerificationService.verifyCode(request.getEmail(), request.getVerificationCode());
 
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new BusinessException("USER_ALREADY_EXISTS", "Email already registered");
+            throw new BusinessException("USER_ALREADY_EXISTS", "이미 가입된 이메일이에요. 로그인해 주세요.");
         }
 
         Instant now = Instant.now();
@@ -66,13 +66,13 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException("AUTH_INVALID_CREDENTIALS", "Invalid email or password", 401));
+                .orElseThrow(() -> new BusinessException("AUTH_INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않아요.", 401));
 
         if (user.getDeletedAt() != null) {
-            throw new BusinessException("USER_ALREADY_DELETED", "User account has been deleted");
+            throw new BusinessException("USER_ALREADY_DELETED", "탈퇴한 계정이에요.");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new BusinessException("AUTH_INVALID_CREDENTIALS", "Invalid email or password", 401);
+            throw new BusinessException("AUTH_INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않아요.", 401);
         }
 
         log.info("User login successful: {}", user.getId());
@@ -104,7 +104,7 @@ public class AuthService {
                 });
 
         if (user.getDeletedAt() != null) {
-            throw new BusinessException("USER_ALREADY_DELETED", "User account has been deleted");
+            throw new BusinessException("USER_ALREADY_DELETED", "탈퇴한 계정이에요.");
         }
 
         log.info("OAuth login successful: {} via {}", user.getId(), provider);
@@ -194,7 +194,7 @@ public class AuthService {
     @Transactional
     public void reconfirmConsent(String userId, AgreeReconfirmRequest request) {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found", 404));
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요.", 404));
         Instant now = Instant.now();
         user.setTermsAgreedAt(now);
         user.setPrivacyAgreedAt(now);

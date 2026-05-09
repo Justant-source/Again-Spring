@@ -54,7 +54,7 @@ export default function SignupPage() {
       setCodeSent(true);
       setSentToEmail(email);
     } catch (err: any) {
-      setError(err.response?.data?.message || '인증코드 발송에 실패했어요');
+      setError(err.response?.data?.error?.message || '인증코드 발송에 실패했어요');
     } finally {
       setSendingCode(false);
     }
@@ -121,7 +121,7 @@ export default function SignupPage() {
         router.push('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || '회원가입에 실패했어요');
+      setError(err.response?.data?.error?.message || '회원가입에 실패했어요');
     } finally {
       setLoading(false);
     }
