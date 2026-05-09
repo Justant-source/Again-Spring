@@ -5,10 +5,7 @@
 
 import Link from 'next/link';
 import { CRISIS_RESOURCES } from '@/lib/constants/crisisResources';
-import { useUiStore } from '@/lib/store/uiStore';
-
 export function LegalFooter() {
-  const { showFeedbackModal } = useUiStore();
   // Find 1393 (자살예방상담) in crisis resources
   const crisisPhone = CRISIS_RESOURCES.find((r) => r.phone === '1393')?.phone;
 
@@ -73,24 +70,6 @@ export function LegalFooter() {
         </a>
       )}
 
-      <span style={{ opacity: 0.5 }}>·</span>
-
-      <button
-        onClick={() => showFeedbackModal()}
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          color: 'var(--Q-sub)',
-          fontSize: '11px',
-          cursor: 'pointer',
-          textDecoration: 'none',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-        onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-      >
-        의견 보내기
-      </button>
     </div>
   );
 }

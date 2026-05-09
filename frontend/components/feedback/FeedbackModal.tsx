@@ -5,12 +5,12 @@ import { submitFeedback } from '@/lib/api/feedbacks';
 import { useUiStore } from '@/lib/store/uiStore';
 
 const CATEGORIES = [
-  { value: 'ui_bug', label: '화면/버그 문제' },
+  { value: 'ui_bug',  label: '화면 / 버그 문제' },
   { value: 'feature', label: '기능 제안' },
   { value: 'content', label: '내용 관련' },
-  { value: 'praise', label: '칭찬/좋았어요' },
-  { value: 'crisis', label: '위기 관련 제보' },
-  { value: 'other', label: '기타' },
+  { value: 'praise',  label: '칭찬 / 좋았어요' },
+  { value: 'crisis',  label: '위기 관련 제보' },
+  { value: 'other',   label: '기타' },
 ];
 
 type Step = 'form' | 'done';
@@ -75,27 +75,33 @@ export function FeedbackModal() {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.5)',
+        background: 'rgba(43,43,43,0.45)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         justifyContent: 'center',
         zIndex: 9999,
-        padding: '16px',
+        padding: '0',
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'white',
-          borderRadius: '16px',
-          padding: '28px 24px',
-          maxWidth: '380px',
+          background: 'var(--L-card)',
+          borderRadius: '20px 20px 0 0',
+          padding: '28px 24px 36px',
           width: '100%',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          maxWidth: '420px',
+          boxShadow: '0 -4px 24px rgba(43,43,43,0.12)',
           maxHeight: '90vh',
           overflowY: 'auto',
         }}
       >
+        {/* 드래그 핸들 */}
+        <div style={{
+          width: 36, height: 4, borderRadius: 2,
+          background: 'var(--L-border)', margin: '0 auto 24px',
+        }} />
+
         {step === 'done' ? (
           <DoneView onClose={hideFeedbackModal} />
         ) : (
@@ -123,49 +129,24 @@ export function FeedbackModal() {
 
 function DoneView({ onClose }: { onClose: () => void }) {
   return (
-    <div style={{ textAlign: 'center', padding: '8px 0' }}>
-      <div style={{ fontSize: '32px', marginBottom: '12px' }}>감사해요</div>
-      <p style={{ fontSize: '15px', color: '#333', marginBottom: '8px', fontWeight: 600 }}>
+    <div style={{ textAlign: 'center', padding: '16px 0 8px' }}>
+      <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--L-ink)', marginBottom: '8px' }}>
         의견이 전달되었어요
       </p>
-      <p style={{ fontSize: '14px', color: '#666', lineHeight: 1.6, marginBottom: '24px' }}>
+      <p style={{ fontSize: '13px', color: 'var(--L-sub)', lineHeight: 1.7, marginBottom: '28px' }}>
         소중한 의견으로 다시봄이 더 나아질게요.
       </p>
-      <button
-        onClick={onClose}
-        style={{
-          width: '100%',
-          padding: '14px',
-          borderRadius: '10px',
-          background: '#1A1A2E',
-          color: 'white',
-          fontSize: '15px',
-          fontWeight: 600,
-          border: 'none',
-          cursor: 'pointer',
-        }}
-      >
-        닫기
-      </button>
+      <button onClick={onClose} style={primaryBtn}>확인</button>
     </div>
   );
 }
 
 interface FormViewProps {
-  category: string;
-  content: string;
-  contactConsent: boolean;
-  contactEmail: string;
-  contentTooShort: boolean;
-  canSubmit: boolean;
-  submitting: boolean;
-  error: string;
-  onCategoryChange: (v: string) => void;
-  onContentChange: (v: string) => void;
-  onContactConsentChange: (v: boolean) => void;
-  onContactEmailChange: (v: string) => void;
-  onSubmit: () => void;
-  onClose: () => void;
+  category: string; content: string; contactConsent: boolean; contactEmail: string;
+  contentTooShort: boolean; canSubmit: boolean; submitting: boolean; error: string;
+  onCategoryChange: (v: string) => void; onContentChange: (v: string) => void;
+  onContactConsentChange: (v: boolean) => void; onContactEmailChange: (v: string) => void;
+  onSubmit: () => void; onClose: () => void;
 }
 
 function FormView({
@@ -176,42 +157,41 @@ function FormView({
 }: FormViewProps) {
   return (
     <>
-      <div
-        id="feedback-modal-title"
-        style={{ fontSize: '18px', fontWeight: 700, marginBottom: '20px', color: '#111' }}
-      >
+      <p id="feedback-modal-title" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--L-ink)', marginBottom: '20px' }}>
         의견 보내기
-      </div>
+      </p>
 
+      {/* 유형 칩 선택 */}
       <div style={{ marginBottom: '16px' }}>
-        <label style={{ fontSize: '13px', color: '#555', display: 'block', marginBottom: '6px' }}>
-          유형
-        </label>
-        <select
-          value={category}
-          onChange={(e) => onCategoryChange(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '10px 12px',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-            fontSize: '14px',
-            color: category ? '#111' : '#999',
-            background: 'white',
-            appearance: 'none',
-          }}
-        >
-          <option value="">선택해주세요</option>
+        <p style={labelStyle}>유형</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
           {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
+            <button
+              key={c.value}
+              onClick={() => onCategoryChange(c.value)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontSize: '13px',
+                border: `1.5px solid ${category === c.value ? 'var(--L-point)' : 'var(--L-border)'}`,
+                background: category === c.value ? 'var(--L-point)' : 'transparent',
+                color: category === c.value ? '#fff' : 'var(--L-sub)',
+                cursor: 'pointer',
+                fontWeight: category === c.value ? 600 : 400,
+                transition: 'all 0.15s',
+              }}
+            >
+              {c.label}
+            </button>
           ))}
-        </select>
+        </div>
       </div>
 
+      {/* 내용 */}
       <div style={{ marginBottom: '16px' }}>
-        <label style={{ fontSize: '13px', color: '#555', display: 'block', marginBottom: '6px' }}>
-          내용 <span style={{ color: '#999', fontWeight: 400 }}>(10자 이상)</span>
-        </label>
+        <p style={labelStyle}>
+          내용 <span style={{ color: 'var(--L-sub)', fontWeight: 400, fontSize: '12px' }}>10자 이상</span>
+        </p>
         <textarea
           value={content}
           onChange={(e) => onContentChange(e.target.value)}
@@ -219,26 +199,32 @@ function FormView({
           rows={4}
           style={{
             width: '100%',
-            padding: '10px 12px',
-            borderRadius: '8px',
-            border: `1px solid ${contentTooShort ? '#e55' : '#ddd'}`,
+            padding: '12px',
+            borderRadius: '10px',
+            border: `1.5px solid ${contentTooShort ? 'var(--L-point)' : 'var(--L-border)'}`,
+            background: 'var(--L-bg)',
             fontSize: '14px',
+            color: 'var(--L-ink)',
             resize: 'none',
             boxSizing: 'border-box',
+            outline: 'none',
+            lineHeight: 1.6,
           }}
         />
         {contentTooShort && (
-          <p style={{ fontSize: '12px', color: '#e55', marginTop: '4px' }}>10자 이상 입력해주세요.</p>
+          <p style={{ fontSize: '12px', color: 'var(--L-point)', marginTop: '4px' }}>10자 이상 입력해주세요.</p>
         )}
       </div>
 
+      {/* 답변 동의 */}
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', cursor: 'pointer' }}>
         <input
           type="checkbox"
           checked={contactConsent}
           onChange={(e) => onContactConsentChange(e.target.checked)}
+          style={{ accentColor: 'var(--L-point)', width: 16, height: 16 }}
         />
-        <span style={{ fontSize: '13px', color: '#555' }}>답변을 받고 싶어요 (선택)</span>
+        <span style={{ fontSize: '13px', color: 'var(--L-sub)' }}>답변을 받고 싶어요 (선택)</span>
       </label>
 
       {contactConsent && (
@@ -250,56 +236,44 @@ function FormView({
             placeholder="이메일 주소"
             style={{
               width: '100%',
-              padding: '10px 12px',
-              borderRadius: '8px',
-              border: '1px solid #ddd',
+              padding: '12px',
+              borderRadius: '10px',
+              border: '1.5px solid var(--L-border)',
+              background: 'var(--L-bg)',
               fontSize: '14px',
+              color: 'var(--L-ink)',
               boxSizing: 'border-box',
+              outline: 'none',
             }}
           />
         </div>
       )}
 
       {error && (
-        <p style={{ fontSize: '13px', color: '#e55', marginBottom: '12px' }}>{error}</p>
+        <p style={{ fontSize: '13px', color: 'var(--L-point)', marginBottom: '12px' }}>{error}</p>
       )}
 
-      <button
-        onClick={onSubmit}
-        disabled={!canSubmit}
-        style={{
-          display: 'block',
-          width: '100%',
-          padding: '14px',
-          borderRadius: '10px',
-          background: canSubmit ? '#1A1A2E' : '#ccc',
-          color: 'white',
-          fontSize: '15px',
-          fontWeight: 600,
-          border: 'none',
-          cursor: canSubmit ? 'pointer' : 'not-allowed',
-          marginBottom: '10px',
-        }}
-      >
+      <button onClick={onSubmit} disabled={!canSubmit} style={{ ...primaryBtn, opacity: canSubmit ? 1 : 0.4, cursor: canSubmit ? 'pointer' : 'not-allowed', marginBottom: '10px' }}>
         {submitting ? '전송 중...' : '보내기'}
       </button>
-
-      <button
-        onClick={onClose}
-        style={{
-          display: 'block',
-          width: '100%',
-          padding: '12px',
-          borderRadius: '10px',
-          background: 'transparent',
-          color: '#666',
-          fontSize: '14px',
-          border: '1px solid #ddd',
-          cursor: 'pointer',
-        }}
-      >
-        닫기
-      </button>
+      <button onClick={onClose} style={ghostBtn}>닫기</button>
     </>
   );
 }
+
+const primaryBtn: React.CSSProperties = {
+  display: 'block', width: '100%', padding: '14px',
+  borderRadius: '12px', background: 'var(--L-ink)', color: '#fff',
+  fontSize: '15px', fontWeight: 600, border: 'none', cursor: 'pointer',
+};
+
+const ghostBtn: React.CSSProperties = {
+  display: 'block', width: '100%', padding: '13px',
+  borderRadius: '12px', background: 'transparent', color: 'var(--L-sub)',
+  fontSize: '14px', border: '1.5px solid var(--L-border)', cursor: 'pointer',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: '13px', color: 'var(--L-sub)', fontWeight: 600,
+  marginBottom: '8px',
+};
