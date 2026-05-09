@@ -4,7 +4,8 @@ export type RelationType =
   | 'friend'
   | 'family'
   | 'parent_child'
-  | 'korean_specific';
+  | 'korean_specific'
+  | 'work';
 
 export type ConflictType = 'factual' | 'difference' | 'mixed';
 

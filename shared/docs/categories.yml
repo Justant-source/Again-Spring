@@ -169,7 +169,7 @@ majors:
           - { id: custom, label: "직접 입력", allowCustomInput: true }
 
   - id: friend
-    label: "친구"
+    label: "친구 · 지인"
     relationType: FRIEND
     middles:
       - id: friend_distance
@@ -235,6 +235,31 @@ majors:
           - { id: birthday, label: "생일·기념일 챙김 문제", allowCustomInput: false }
           - { id: event_cost, label: "경조사 비용 차이", allowCustomInput: false }
           - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_acquaintance
+        label: "지인 갈등"
+        minors:
+          - { id: rude_act, label: "무례한 말·행동", allowCustomInput: false }
+          - { id: one_sided_favor, label: "부탁·부담 강요", allowCustomInput: false }
+          - { id: intro_friction, label: "소개받은 관계에서의 갈등", allowCustomInput: false }
+          - { id: boundary, label: "선 넘는 개인적 질문", allowCustomInput: false }
+          - { id: rumor, label: "소문·험담 유포", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_community
+        label: "온라인 · 커뮤니티 지인"
+        minors:
+          - { id: online_conflict, label: "온라인 지인과의 갈등", allowCustomInput: false }
+          - { id: community_club, label: "동호회·커뮤니티 갈등", allowCustomInput: false }
+          - { id: sns_block, label: "SNS 차단·무시 문제", allowCustomInput: false }
+          - { id: group_chat, label: "단체 채팅방 갈등", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: friend_casual
+        label: "직장 · 학교 지인"
+        minors:
+          - { id: work_acquaintance, label: "직장 지인과의 갈등", allowCustomInput: false }
+          - { id: alumni, label: "동창·동문 갈등", allowCustomInput: false }
+          - { id: neighbor, label: "이웃·지역 지인 갈등", allowCustomInput: false }
+          - { id: club_friction, label: "소모임·동아리 갈등", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
       - id: friend_custom
         label: "직접 입력"
         minors:
@@ -297,6 +322,24 @@ majors:
           - { id: misunderstanding, label: "오래된 오해", allowCustomInput: false }
           - { id: ignored, label: "무시당한 경험", allowCustomInput: false }
           - { id: emotional_distance, label: "감정적 거리감", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: family_parent
+        label: "부모"
+        minors:
+          - { id: parent_expectation, label: "부모님의 기대·압박", allowCustomInput: false }
+          - { id: parent_intrusion, label: "부모님의 과도한 간섭", allowCustomInput: false }
+          - { id: parent_communication, label: "부모님과의 소통 단절", allowCustomInput: false }
+          - { id: parent_old_wound, label: "어린 시절 상처·서운함", allowCustomInput: false }
+          - { id: parent_care_burden, label: "부모님 돌봄 부담", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: family_child
+        label: "자식"
+        minors:
+          - { id: child_disobey, label: "말을 안 듣는 자녀", allowCustomInput: false }
+          - { id: child_career_gap, label: "자녀의 진로 방향 차이", allowCustomInput: false }
+          - { id: child_independence, label: "자녀의 독립·생활 방식", allowCustomInput: false }
+          - { id: child_communication, label: "자녀와의 소통 단절", allowCustomInput: false }
+          - { id: child_support, label: "경제적 지원 문제", allowCustomInput: false }
           - { id: custom, label: "직접 입력", allowCustomInput: true }
       - id: family_custom
         label: "직접 입력"
@@ -371,6 +414,67 @@ majors:
           - { id: inherit_diff, label: "유산·재산 차별", allowCustomInput: false }
           - { id: custom, label: "직접 입력", allowCustomInput: true }
       - id: pc_custom
+        label: "직접 입력"
+        minors:
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+
+  - id: work
+    label: "직장"
+    relationType: WORK
+    middles:
+      - id: work_superior
+        label: "상사 · 부하 관계"
+        minors:
+          - { id: order_style, label: "지시·명령 방식이 불합리함", allowCustomInput: false }
+          - { id: unfair_eval, label: "업무 평가가 불공평함", allowCustomInput: false }
+          - { id: power_abuse, label: "갑질·권위적 태도", allowCustomInput: false }
+          - { id: ignore_opinion, label: "의견 무시·묵살", allowCustomInput: false }
+          - { id: responsibility_push, label: "책임 전가", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: work_colleague
+        label: "동료 관계"
+        minors:
+          - { id: teamwork_conflict, label: "팀 협업 갈등", allowCustomInput: false }
+          - { id: gossip, label: "뒷담화·험담", allowCustomInput: false }
+          - { id: credit_steal, label: "공 가로채기", allowCustomInput: false }
+          - { id: free_rider, label: "무임승차·업무 떠넘기기", allowCustomInput: false }
+          - { id: competition_jealous, label: "경쟁·시기 갈등", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: work_task
+        label: "업무 분담 · 평가"
+        minors:
+          - { id: unequal_load, label: "업무 불공평 분배", allowCustomInput: false }
+          - { id: overtime_forced, label: "야근·초과 근무 강요", allowCustomInput: false }
+          - { id: role_ambiguous, label: "역할·책임 범위 모호함", allowCustomInput: false }
+          - { id: perf_evaluation, label: "성과 평가 불만", allowCustomInput: false }
+          - { id: deadline_pressure, label: "무리한 기한 압박", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: work_harassment
+        label: "직장 내 괴롭힘"
+        minors:
+          - { id: verbal_abuse, label: "언어폭력·폭언", allowCustomInput: false }
+          - { id: exclusion, label: "따돌림·소외", allowCustomInput: false }
+          - { id: work_obstruct, label: "업무 방해·훼방", allowCustomInput: false }
+          - { id: personal_attack, label: "개인적 모욕·비하", allowCustomInput: false }
+          - { id: sexual_harassment, label: "성희롱·성차별", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: work_salary
+        label: "연봉 · 처우"
+        minors:
+          - { id: salary_negotiation, label: "연봉 협상 갈등", allowCustomInput: false }
+          - { id: bonus_unfair, label: "성과급·보너스 불만", allowCustomInput: false }
+          - { id: promotion_block, label: "승진 차별", allowCustomInput: false }
+          - { id: welfare_unfair, label: "복지·혜택 불공평", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: work_quit
+        label: "이직 · 퇴직"
+        minors:
+          - { id: quit_pressure, label: "퇴직 압박·권고사직", allowCustomInput: false }
+          - { id: career_change, label: "이직 관련 갈등", allowCustomInput: false }
+          - { id: notice_friction, label: "퇴사 통보 후 갈등", allowCustomInput: false }
+          - { id: noncompete, label: "경업 금지·계약 문제", allowCustomInput: false }
+          - { id: custom, label: "직접 입력", allowCustomInput: true }
+      - id: work_custom
         label: "직접 입력"
         minors:
           - { id: custom, label: "직접 입력", allowCustomInput: true }

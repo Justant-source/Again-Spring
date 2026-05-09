@@ -27,10 +27,11 @@ interface HistoryItem {
 const RELATION_TYPE_LABEL: Record<RelationType, string> = {
   couple: '연인',
   marriage: '부부',
-  friend: '친구',
+  friend: '친구·지인',
   family: '가족',
   parent_child: '부모·자식',
   korean_specific: '한국 특화',
+  work: '직장',
 };
 
 function getMiddleLabel(majorId: string | null, middleId: string | null): string | null {
