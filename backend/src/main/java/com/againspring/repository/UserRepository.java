@@ -35,4 +35,9 @@ public interface UserRepository extends JpaRepository<User, String> {
      * 이메일 prefix로 사용자 목록 조회 (dev 테스트 데이터 정리용)
      */
     java.util.List<User> findByEmailStartingWith(String prefix);
+
+    long countByIsGuestFalseAndCreatedAtBetween(java.time.Instant from, java.time.Instant to);
+
+    java.util.List<User> findByNicknameContainingIgnoreCaseOrEmailContainingIgnoreCaseAndDeletedAtIsNull(
+            String nickname, String email);
 }

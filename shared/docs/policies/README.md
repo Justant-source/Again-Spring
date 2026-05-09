@@ -14,4 +14,6 @@
 | `crisis-detection.md` | 위기 감지 기준 및 리소스 안내 |
 | `ratio-calculation.md` | 화해 기여도 계산 규칙 |
 | `data-retention.md` | 데이터 보존 및 만료 정책 |
-| `terms-of-service.md` | 서비스 이용약관 |
+| `terms-of-service.md` | 내부 운용 정책 (운영자용) |
+| `terms.md` | **이용약관 — 사용자 표시 본문** (베타 v1.0, 법무 검토 예정) |
+| `privacy.md` | **개인정보처리방침 — 사용자 표시 본문** (베타 v1.0) |

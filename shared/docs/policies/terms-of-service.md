@@ -4,9 +4,12 @@
 
 ## Source of truth
 
-- 실제 표시 페이지: `frontend/app/terms/page.tsx`
+- **사용자 표시 본문(권위본)**: [`terms.md`](./terms.md) — 베타 v1.0 법률 약관 전문
+- 사용자 표시 페이지: `frontend/app/terms/page.tsx` (terms.md를 fetch·렌더링)
 - 푸터 컴포넌트: `frontend/components/shared/LegalFooter.tsx`
 - 관련 정책: [psychology-model.md](./psychology-model.md), [crisis-detection.md](./crisis-detection.md), [data-retention.md](./data-retention.md), [forbidden-words.md](./forbidden-words.md)
+
+> 이 파일(`terms-of-service.md`)은 내부 운용 정책·설계 근거 문서입니다. 실제 사용자에게 표시되는 약관 본문은 `terms.md`를 참조하세요.
 
 ---
 

@@ -1,5 +1,6 @@
 package com.againspring.api;
 
+import com.againspring.api.dto.request.AgreeReconfirmRequest;
 import com.againspring.api.dto.request.ForgotPasswordRequest;
 import com.againspring.api.dto.request.GuestRequest;
 import com.againspring.api.dto.request.LoginRequest;
@@ -20,6 +21,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -148,6 +151,17 @@ public class AuthController {
     @ApiResponse(responseCode = "400", description = "Invalid or expired token")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/agree")
+    @Operation(summary = "Reconfirm consent", description = "기존 회원 동의 재확인 (NULL 컬럼 있을 때)")
+    @ApiResponse(responseCode = "200", description = "Consent recorded")
+    @ApiResponse(responseCode = "400", description = "Validation failed")
+    public ResponseEntity<Void> agreeReconfirm(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody AgreeReconfirmRequest request) {
+        authService.reconfirmConsent(userDetails.getUsername(), request);
         return ResponseEntity.ok().build();
     }
 }

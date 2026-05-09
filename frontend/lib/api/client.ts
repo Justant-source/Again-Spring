@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useUiStore } from '@/lib/store/uiStore';
 
 export const api = axios.create({
   baseURL: '',
@@ -14,6 +15,23 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const code = error.response?.data?.error?.code;
+    if (error.response?.status === 402 && code === 'GUEST_LIMIT_REACHED') {
+      const match = typeof window !== 'undefined'
+        ? window.location.pathname.match(/\/session\/chat\/([^/]+)/)
+        : null;
+      const sessionId = match ? match[1] : null;
+      useUiStore.getState().showGuestLimitModal(sessionId);
+    } else if (error.response?.status === 429 && code === 'DAILY_LIMIT_EXCEEDED') {
+      useUiStore.getState().showDailyLimitModal();
+    }
+    return Promise.reject(error);
+  },
+);
 
 export interface CreateSessionPayload {
   relationType: string;

@@ -3,6 +3,7 @@ package com.againspring.repository;
 import com.againspring.domain.Message;
 import com.againspring.domain.enums.MessageSender;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.time.Instant;
@@ -31,4 +32,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     List<Message> findBySessionIdAndSenderAndIsFinalizeSuggestionTrueAndDismissedAtIsNull(
             String sessionId, MessageSender sender);
+
+    @Modifying
+    @Query("UPDATE Message m SET m.content = NULL WHERE m.sessionId IN :sessionIds")
+    int nullifyContentBySessionIds(@Param("sessionIds") List<String> sessionIds);
 }

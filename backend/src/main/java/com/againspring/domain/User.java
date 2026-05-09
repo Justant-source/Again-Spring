@@ -77,6 +77,18 @@ public class User {
     @Column(name = "onboarding_completed_at")
     private Instant onboardingCompletedAt;
 
+    @Column(name = "terms_agreed_at")
+    private Instant termsAgreedAt;
+
+    @Column(name = "privacy_agreed_at")
+    private Instant privacyAgreedAt;
+
+    @Column(name = "disclaimer_agreed_at")
+    private Instant disclaimerAgreedAt;
+
+    @Column(name = "marketing_agreed_at")
+    private Instant marketingAgreedAt;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

@@ -56,8 +56,8 @@ services:
       NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:-}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_USERNAME: ${MAIL_USERNAME:-againspring2026@gmail.com}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
     volumes:
       - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro

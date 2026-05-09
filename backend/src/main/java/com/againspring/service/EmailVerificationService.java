@@ -3,14 +3,16 @@ package com.againspring.service;
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.EmailVerification;
 import com.againspring.repository.EmailVerificationRepository;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 import java.security.SecureRandom;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,8 +26,11 @@ public class EmailVerificationService {
     private final Environment environment;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    @Value("${spring.mail.username:}")
+    @Value("${spring.mail.username:againspring2026@gmail.com}")
     private String mailFrom;
+
+    @Value("${app.mail.from-name:다시봄 운영팀}")
+    private String fromName;
 
     @Transactional
     public void sendCode(String email) {
@@ -42,13 +47,15 @@ public class EmailVerificationService {
         boolean isDev = java.util.Arrays.asList(environment.getActiveProfiles()).contains("dev");
 
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            if (mailFrom != null && !mailFrom.isBlank()) {
-                message.setFrom(mailFrom);
-            }
-            message.setTo(email);
-            message.setSubject("[다시봄] 이메일 인증코드");
-            message.setText("안녕하세요 :)\n\n인증코드: " + code + "\n\n10분 내에 입력해주세요.\n\n다시봄 팀 드림");
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setFrom(new InternetAddress(mailFrom, fromName, "UTF-8"));
+            helper.setTo(email);
+            helper.setSubject("[다시봄] 이메일 인증코드");
+            helper.setText(
+                "안녕하세요 :)\n\n인증코드: " + code + "\n\n10분 내에 입력해주세요.\n\n"
+                + "문의: againspring2026@gmail.com\n다시봄 운영팀 드림"
+            );
             mailSender.send(message);
             log.info("Verification code sent to {}", email);
         } catch (Exception e) {

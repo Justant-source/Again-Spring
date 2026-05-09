@@ -29,8 +29,8 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    username: ${MAIL_USERNAME:againspring2026@gmail.com}
+    password: ${GMAIL_APP_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -83,6 +83,12 @@ app:
   safety:
     enabled: true
     forbidden-words-path: ${SAFETY_FORBIDDEN_WORDS_PATH:classpath:/safety/forbidden-words.yml}
+  crisis:
+    webhook-url: ${CRISIS_WEBHOOK_URL:}
+    email: ${CRISIS_EMAIL:}
+  mail:
+    from-name: "다시봄 운영팀"
+    support-email: againspring2026@gmail.com
 
 llm:
   provider: ${LLM_PROVIDER:claude-code}

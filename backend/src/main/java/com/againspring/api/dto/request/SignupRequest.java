@@ -1,5 +1,6 @@
 package com.againspring.api.dto.request;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -31,4 +32,15 @@ public class SignupRequest {
     @NotBlank(message = "Verification code is required")
     @Size(min = 6, max = 6, message = "Verification code must be 6 digits")
     private String verificationCode;
+
+    @AssertTrue(message = "이용약관에 동의해주세요.")
+    private boolean termsAgreed;
+
+    @AssertTrue(message = "개인정보 처리방침에 동의해주세요.")
+    private boolean privacyAgreed;
+
+    @AssertTrue(message = "면책 고지에 동의해주세요.")
+    private boolean disclaimerAgreed;
+
+    private boolean marketingAgreed;
 }

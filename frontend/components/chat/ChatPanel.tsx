@@ -7,6 +7,7 @@ import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { FinalizeSuggestionCard } from './FinalizeSuggestionCard';
 import { CrisisModal } from './CrisisModal';
+import { CrisisResourceModal } from '@/components/shared/CrisisResourceModal';
 import { PartnerJoinNoticeCard } from './PartnerJoinNoticeCard';
 import { api } from '@/lib/api/client';
 import { usePolling } from '@/lib/hooks/usePolling';
@@ -59,6 +60,7 @@ export function ChatPanel({
   const [sending, setSending] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [crisisLevel1, setCrisisLevel1] = useState(false);
+  const [showCrisisResource, setShowCrisisResource] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [pendingSplits, setPendingSplits] = useState<PendingSplit[]>([]);
@@ -292,6 +294,7 @@ export function ChatPanel({
         onOpenInvite={onOpenInvite}
         onFinalize={handleFinalize}
         finalizing={finalizing}
+        onOpenCrisis={() => setShowCrisisResource(true)}
       />
 
       {/* Messages */}
@@ -399,6 +402,7 @@ export function ChatPanel({
       {crisisLevel1 && (
         <CrisisModal onClose={() => setCrisisLevel1(false)} />
       )}
+      <CrisisResourceModal open={showCrisisResource} onClose={() => setShowCrisisResource(false)} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { useUserStore } from '@/lib/store/userStore';
@@ -11,6 +11,8 @@ import { oauthRedirect } from '@/lib/auth/oauth';
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromGuestSession = searchParams.get('fromGuestSession');
   const setUser = useUserStore((s) => s.setUser);
 
   const [nickname, setNickname] = useState('');
@@ -23,6 +25,11 @@ export default function SignupPage() {
   const [sendingCode, setSendingCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [sentToEmail, setSentToEmail] = useState('');
+  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [disclaimerAgreed, setDisclaimerAgreed] = useState(false);
+  const [marketingAgreed, setMarketingAgreed] = useState(false);
+  const [termsModalUrl, setTermsModalUrl] = useState<string | null>(null);
 
   const inputStyle = {
     width: '100%',
@@ -85,6 +92,10 @@ export default function SignupPage() {
       setError('비밀번호가 일치하지 않아요');
       return;
     }
+    if (!termsAgreed || !privacyAgreed || !disclaimerAgreed) {
+      setError('필수 동의 항목을 모두 체크해주세요');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -93,13 +104,22 @@ export default function SignupPage() {
         email,
         password,
         verificationCode,
+        termsAgreed,
+        privacyAgreed,
+        disclaimerAgreed,
+        marketingAgreed,
       });
       const { user, token } = response.data;
       if (token?.accessToken) {
         localStorage.setItem('again-spring-token', token.accessToken);
       }
       setUser(user);
-      router.push('/');
+      // 게스트 세션에서 업그레이드된 경우 새 세션 시작 안내 페이지로
+      if (fromGuestSession) {
+        router.push(`/?upgraded=true`);
+      } else {
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || '회원가입에 실패했어요');
     } finally {
@@ -230,15 +250,48 @@ export default function SignupPage() {
               />
             </div>
 
+            {/* 동의 체크박스 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 0', borderTop: '1px solid var(--L-border)' }}>
+              <ConsentRow
+                checked={termsAgreed}
+                onChange={setTermsAgreed}
+                label="이용약관"
+                required
+                onViewClick={() => setTermsModalUrl('/terms')}
+              />
+              <ConsentRow
+                checked={privacyAgreed}
+                onChange={setPrivacyAgreed}
+                label="개인정보 처리방침"
+                required
+                onViewClick={() => setTermsModalUrl('/privacy')}
+              />
+              <ConsentRow
+                checked={disclaimerAgreed}
+                onChange={setDisclaimerAgreed}
+                label="전문 상담·치료를 대체하지 않음을 이해합니다"
+                required
+              />
+              <ConsentRow
+                checked={marketingAgreed}
+                onChange={setMarketingAgreed}
+                label="마케팅 정보 수신 동의"
+                required={false}
+              />
+            </div>
+
             {error && (
               <div style={{ fontSize: 13, color: 'var(--L-point)' }}>{error}</div>
             )}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !termsAgreed || !privacyAgreed || !disclaimerAgreed}
               className="btn-L"
-              style={{ marginTop: 12 }}
+              style={{
+                marginTop: 12,
+                opacity: (!termsAgreed || !privacyAgreed || !disclaimerAgreed) ? 0.5 : 1,
+              }}
             >
               {loading ? '가입 중...' : '가입하기'}
             </button>
@@ -274,6 +327,73 @@ export default function SignupPage() {
           </Link>
         </div>
       </div>
+
+      {/* 약관 전문 보기 모달 */}
+      {termsModalUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setTermsModalUrl(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: 12, width: '90%', maxWidth: 480,
+              height: '75vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px' }}>
+              <button
+                onClick={() => setTermsModalUrl(null)}
+                style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#333' }}
+              >×</button>
+            </div>
+            <iframe src={termsModalUrl} style={{ flex: 1, border: 'none' }} title="약관 전문" />
+          </div>
+        </div>
+      )}
     </PhoneFrame>
+  );
+}
+
+function ConsentRow({
+  checked, onChange, label, required, onViewClick,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  required: boolean;
+  onViewClick?: () => void;
+}) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--L-ink)' }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        style={{ width: 15, height: 15, flexShrink: 0 }}
+      />
+      <span style={{ flex: 1 }}>
+        {required && <span style={{ color: 'var(--L-point)', marginRight: 3 }}>*</span>}
+        {label}
+      </span>
+      {onViewClick && (
+        <button
+          type="button"
+          onClick={onViewClick}
+          style={{
+            background: 'none', border: 'none', padding: 0,
+            fontSize: 11, color: 'var(--L-sub)', textDecoration: 'underline', cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          전문 보기
+        </button>
+      )}
+    </label>
   );
 }

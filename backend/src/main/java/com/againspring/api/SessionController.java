@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Optional;
@@ -58,9 +59,19 @@ public class SessionController {
     @ApiResponse(responseCode = "422", description = "Crisis detected in description")
     public ResponseEntity<CreateSessionResponse> createSession(
             @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody CreateSessionRequest request) {
-        CreateSessionResponse response = sessionService.createSession(userDetails.getUsername(), request);
+            @Valid @RequestBody CreateSessionRequest request,
+            HttpServletRequest httpRequest) {
+        String clientIp = extractClientIp(httpRequest);
+        CreateSessionResponse response = sessionService.createSession(userDetails.getUsername(), request, clientIp);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    private static String extractClientIp(HttpServletRequest req) {
+        String xff = req.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            return xff.split(",")[0].trim();
+        }
+        return req.getRemoteAddr();
     }
 
     /**

@@ -56,16 +56,17 @@ frontend도 build-time ARG로 `NEXT_PUBLIC_{GOOGLE,KAKAO,NAVER}_CLIENT_ID`를 �
 |---|---|---|---|
 | `APP_URL` | OAuth `redirect_uri` 베이스 + frontend `NEXT_PUBLIC_APP_URL` build ARG | `https://dev.againspring.net` | `https://againspring.net` |
 
-### Email (Spring Mail)
+### Email (Spring Mail) — 발신자 `againspring2026@gmail.com` 단일화
 
 | 변수 | 사용처 | dev | prod |
 |---|---|---|---|
 | `MAIL_HOST` | SMTP 호스트 | `smtp.gmail.com` | `smtp.gmail.com` |
 | `MAIL_PORT` | SMTP 포트 | `587` | `587` |
-| `MAIL_USERNAME` | 발신 계정 | 선택 (없으면 이메일 인증 비활성) | 필수 |
-| `MAIL_PASSWORD` | 16자리 Gmail App Password | 선택 | 필수 |
+| `MAIL_USERNAME` | 발신 계정 | `againspring2026@gmail.com` | `againspring2026@gmail.com` |
+| `GMAIL_APP_PASSWORD` | Gmail 앱 비밀번호 16자 | 선택 (없으면 이메일 발송 비활성) | 필수 |
 
-이메일 인증 흐름은 `EmailVerificationService`가 처리. SMTP 미설정 시 회원가입 인증 코드 발송 비활성.
+`GMAIL_APP_PASSWORD`: againspring2026@gmail.com → Google 계정 → 2단계 인증 → 앱 비밀번호 발급.
+이메일 인증·비밀번호 재설정 모두 단일 발신자. SMTP 미설정 시 dev에서는 로그로 코드 출력.
 
 ## prod 필수 항목 체크리스트
 
@@ -74,7 +75,7 @@ prod는 `application-prod.yml`이 모든 키에 기본값 없이 환경변수를
 - [ ] `MARIADB_ROOT_PASSWORD`, `MARIADB_PASSWORD`
 - [ ] `JWT_SECRET`
 - [ ] `GOOGLE_*`, `KAKAO_*`, `NAVER_*` (전체 OAuth)
-- [ ] `MAIL_USERNAME`, `MAIL_PASSWORD`
+- [ ] `MAIL_USERNAME` (againspring2026@gmail.com), `GMAIL_APP_PASSWORD`
 - [ ] `CLAUDE_HOST_CONFIG_DIR` 디렉토리가 호스트에 존재 + `claude` 1회 로그인 완료
 
 ## 변경 시 절차

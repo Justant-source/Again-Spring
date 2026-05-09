@@ -9,10 +9,12 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +33,11 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final Environment environment;
 
-    @Value("${spring.mail.username:}")
+    @Value("${spring.mail.username:againspring2026@gmail.com}")
     private String mailFrom;
+
+    @Value("${app.mail.from-name:다시봄 운영팀}")
+    private String fromName;
 
     @Value("${app.url:https://dev.againspring.net}")
     private String appUrl;
@@ -120,19 +125,18 @@ public class PasswordResetService {
         boolean isDev = java.util.Arrays.asList(environment.getActiveProfiles()).contains("dev");
 
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            if (mailFrom != null && !mailFrom.isBlank()) {
-                message.setFrom(mailFrom);
-            }
-            message.setTo(email);
-            message.setSubject("[다시봄] 비밀번호 재설정");
-            message.setText(
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setFrom(new InternetAddress(mailFrom, fromName, "UTF-8"));
+            helper.setTo(email);
+            helper.setSubject("[다시봄] 비밀번호 재설정");
+            helper.setText(
                     "안녕하세요 :)\n\n" +
                     "비밀번호를 재설정하시려면 아래 링크를 클릭해주세요.\n\n" +
                     resetLink + "\n\n" +
                     "이 링크는 30분 동안 유효합니다.\n\n" +
                     "본인이 요청하지 않으셨다면 이 이메일을 무시해주세요.\n\n" +
-                    "다시봄 팀 드림"
+                    "문의: againspring2026@gmail.com\n다시봄 운영팀 드림"
             );
             mailSender.send(message);
             log.info("Password reset email sent to {}", email);

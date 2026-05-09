@@ -8,6 +8,7 @@ import { SwipeContainer } from './SwipeContainer';
 import { PartnerStatusBar } from './PartnerStatusBar';
 import { InviteModal } from './InviteModal';
 import { PartnerJoinedToast } from './PartnerJoinedToast';
+import { GuestUpgradeModal } from '@/components/auth/GuestUpgradeModal';
 import { api } from '@/lib/api/client';
 import { usePolling } from '@/lib/hooks/usePolling';
 
@@ -109,6 +110,9 @@ export function ChatLayout({ sessionId, session: initialSession }: Props) {
       {showJoinedToast && (
         <PartnerJoinedToast onClose={() => setShowJoinedToast(false)} />
       )}
+
+      {/* 게스트 3턴 한도 도달 모달 */}
+      <GuestUpgradeModal />
     </>
   );
 }

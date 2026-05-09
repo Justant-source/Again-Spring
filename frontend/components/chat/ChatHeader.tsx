@@ -9,9 +9,10 @@ interface Props {
   onOpenInvite?: () => void;
   onFinalize: () => void;
   finalizing?: boolean;
+  onOpenCrisis?: () => void;
 }
 
-export function ChatHeader({ isDuo, canFinalize, canInvite, onOpenInvite, onFinalize, finalizing }: Props) {
+export function ChatHeader({ isDuo, canFinalize, canInvite, onOpenInvite, onFinalize, finalizing, onOpenCrisis }: Props) {
   return (
     <div style={{
       padding: '12px 16px',
@@ -45,6 +46,24 @@ export function ChatHeader({ isDuo, canFinalize, canInvite, onOpenInvite, onFina
       </div>
 
       <div style={{ display: 'flex', gap: 6 }}>
+        {onOpenCrisis && (
+          <button
+            onClick={onOpenCrisis}
+            title="위기 자원"
+            aria-label="위기 지원 연락처 보기"
+            style={{
+              fontSize: 12,
+              padding: '6px 8px',
+              border: '1px solid var(--P-border)',
+              borderRadius: 6,
+              background: 'transparent',
+              color: 'var(--P-sub)',
+              cursor: 'pointer',
+            }}
+          >
+            🆘
+          </button>
+        )}
         {canInvite && onOpenInvite && (
           <button
             onClick={onOpenInvite}

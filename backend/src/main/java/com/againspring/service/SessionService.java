@@ -7,6 +7,7 @@ import com.againspring.api.dto.response.SessionListItemResponse;
 import com.againspring.api.dto.response.SessionResponse;
 import com.againspring.api.dto.response.SessionStatusResponse;
 import com.againspring.common.exception.BusinessException;
+import com.againspring.common.exception.DailyLimitExceededException;
 import com.againspring.domain.enums.RelationType;
 import com.againspring.domain.enums.SessionStatus;
 import com.againspring.domain.Session;
@@ -17,6 +18,8 @@ import com.againspring.safety.KeywordGuard;
 import com.againspring.safety.ScanResult;
 import com.againspring.service.event.PartnerJoinedEvent;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -43,19 +46,22 @@ public class SessionService {
     private final SessionStateMachine stateMachine;
     private final ChatService chatService;
     private final ApplicationEventPublisher eventPublisher;
+    private final GuestSessionRateLimiter guestSessionRateLimiter;
 
     public SessionService(SessionRepository sessionRepository,
                           UserRepository userRepository,
                           KeywordGuard keywordGuard,
                           SessionStateMachine stateMachine,
                           @Lazy ChatService chatService,
-                          ApplicationEventPublisher eventPublisher) {
+                          ApplicationEventPublisher eventPublisher,
+                          GuestSessionRateLimiter guestSessionRateLimiter) {
         this.sessionRepository = sessionRepository;
         this.userRepository = userRepository;
         this.keywordGuard = keywordGuard;
         this.stateMachine = stateMachine;
         this.chatService = chatService;
         this.eventPublisher = eventPublisher;
+        this.guestSessionRateLimiter = guestSessionRateLimiter;
     }
 
     private static final long INVITE_TOKEN_TTL_MS = 86400000; // 24 hours
@@ -72,12 +78,33 @@ public class SessionService {
      * @return create session response with invite token
      * @throws BusinessException if description contains crisis keywords
      */
-    public CreateSessionResponse createSession(String createdByUserId, CreateSessionRequest request) {
+    public CreateSessionResponse createSession(String createdByUserId, CreateSessionRequest request, String clientIp) {
         User creator = userRepository.findByIdAndDeletedAtIsNull(createdByUserId)
                 .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다"));
         // 게스트는 온보딩 완료 여부 체크 없이 세션 생성 허용 (앱 내 10문항 흐름 병행)
         if (!creator.isGuest() && creator.getOnboardingCompletedAt() == null) {
             throw new BusinessException("ONBOARDING_REQUIRED", "성격검사를 먼저 완료해주세요", 403);
+        }
+
+        // 게스트 제한: IP당 24시간 3세션
+        if (creator.isGuest() && clientIp != null) {
+            if (!guestSessionRateLimiter.tryConsumeGuestSession(clientIp)) {
+                throw new BusinessException("GUEST_SESSION_LIMIT",
+                        "오늘 이용 가능한 체험 세션 횟수를 초과했습니다. 내일 다시 시도하거나 회원가입해 주세요.", 429);
+            }
+        }
+
+        // 회원 일일 세션 한도: KST 자정 기준 5세션
+        if (!creator.isGuest()) {
+            ZoneId kst = ZoneId.of("Asia/Seoul");
+            LocalDate today = LocalDate.now(kst);
+            Instant startOfDay = today.atStartOfDay(kst).toInstant();
+            Instant endOfDay = today.plusDays(1).atStartOfDay(kst).toInstant();
+            int todayCount = sessionRepository.countByCreatedByUserIdAndCreatedAtBetween(
+                    createdByUserId, startOfDay, endOfDay);
+            if (todayCount >= 5) {
+                throw new DailyLimitExceededException();
+            }
         }
 
         // 동시 진행 중인 세션 한도 체크
@@ -319,6 +346,13 @@ public class SessionService {
 
         if (!session.getUserAId().equals(userId)) {
             throw new BusinessException("SESSION_FORBIDDEN", "Only session owner can invite");
+        }
+
+        // 게스트는 Solo 전용 — 초대 토큰 발급 불가
+        User owner = userRepository.findByIdAndDeletedAtIsNull(userId).orElse(null);
+        if (owner != null && owner.isGuest()) {
+            throw new BusinessException("GUEST_SOLO_ONLY",
+                    "게스트는 Solo 모드만 이용 가능합니다. 회원가입 후 상대를 초대해보세요.", 403);
         }
 
         boolean isSoloCompleted = session.getStatus().equals(SessionStatus.COMPLETED)

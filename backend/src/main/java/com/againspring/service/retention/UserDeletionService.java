@@ -95,4 +95,22 @@ public class UserDeletionService {
         }
     }
 
+    /**
+     * Admin 요청에 의한 익명화 스케줄링 — 즉시 소프트 삭제 + 닉네임/이메일 익명화
+     * PIPA 규정: 탈퇴 후 24시간 내 처리
+     */
+    @Transactional
+    public void scheduleAnonymization(String userId) {
+        log.warn("[AdminUserDeletion] Anonymization requested for userId={}", userId);
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new com.againspring.common.exception.BusinessException(
+                        "USER_NOT_FOUND", "User not found: " + userId, 404));
+        user.setEmail("deleted_" + userId + "@anonymized.invalid");
+        user.setNickname("탈퇴한 사용자");
+        user.setPasswordHash(null);
+        user.setDeletedAt(Instant.now());
+        userRepository.save(user);
+        log.warn("[AdminUserDeletion] userId={} anonymized successfully", userId);
+    }
+
 }

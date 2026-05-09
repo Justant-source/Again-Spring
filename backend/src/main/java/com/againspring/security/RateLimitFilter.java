@@ -37,6 +37,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final String FORGOT_PASSWORD_ENDPOINT = "/api/auth/forgot-password";
     private static final String SEND_VERIFICATION_ENDPOINT = "/api/auth/send-verification";
     private static final String TURNS_ENDPOINT = "/api/sessions/";
+    private static final String FEEDBACKS_ENDPOINT = "/api/feedbacks";
 
     @Override
     protected void doFilterInternal(
@@ -60,6 +61,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 limit = 5;
             } else if (isCreateTurn(requestPath)) {
                 limit = 30; // 30 requests per minute
+            } else if (isFeedbacks(requestPath)) {
+                limit = 5; // 5 per hour (버킷을 1시간으로 별도 처리)
             }
         }
 
@@ -72,7 +75,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // 버킷 생성/조회
         String bucketKey = clientIp + ":" + getEndpointCategory(requestPath);
         final int finalLimit = limit;
-        Bucket bucket = cache.computeIfAbsent(bucketKey, k -> createNewBucket(finalLimit));
+        final boolean isHourlyBucket = isFeedbacks(requestPath);
+        Bucket bucket = cache.computeIfAbsent(bucketKey,
+                k -> isHourlyBucket ? createHourlyBucket(finalLimit) : createNewBucket(finalLimit));
 
         // 토큰 소비 시도
         if (!bucket.tryConsume(1)) {
@@ -94,10 +99,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * 새 버킷 생성
+     * 새 버킷 생성 (분 단위)
      */
     private Bucket createNewBucket(int tokensPerMinute) {
         Bandwidth limit = Bandwidth.classic(tokensPerMinute, Refill.intervally(tokensPerMinute, Duration.ofMinutes(1)));
+        return Bucket4j.builder()
+                .addLimit(limit)
+                .build();
+    }
+
+    /**
+     * 시간 단위 버킷 생성 (피드백 전용)
+     */
+    private Bucket createHourlyBucket(int tokensPerHour) {
+        Bandwidth limit = Bandwidth.classic(tokensPerHour, Refill.intervally(tokensPerHour, Duration.ofHours(1)));
         return Bucket4j.builder()
                 .addLimit(limit)
                 .build();
@@ -143,6 +158,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
+     * 피드백 제출 엔드포인트 확인
+     */
+    private boolean isFeedbacks(String path) {
+        return path.equals(FEEDBACKS_ENDPOINT);
+    }
+
+    /**
      * 엔드포인트 카테고리 추출
      */
     private String getEndpointCategory(String path) {
@@ -154,6 +176,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return SEND_VERIFICATION_ENDPOINT;
         } else if (isCreateTurn(path)) {
             return "TURNS";
+        } else if (isFeedbacks(path)) {
+            return FEEDBACKS_ENDPOINT;
         }
         return path;
     }

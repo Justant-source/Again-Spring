@@ -3,10 +3,13 @@ package com.againspring.service.retention;
 import com.againspring.domain.Session;
 import com.againspring.domain.Message;
 import com.againspring.domain.enums.SessionStatus;
+import com.againspring.repository.FeedbackRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.MessageRepository;
+import com.againspring.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,8 @@ public class RetentionScheduler {
 
     private final SessionRepository sessionRepository;
     private final MessageRepository messageRepository;
+    private final FeedbackRepository feedbackRepository;
+    private final UserRepository userRepository;
     private final EntityManager em; // Phase D PR-3 — Phase D 컬럼 native 만료 처리
 
     /**
@@ -74,6 +79,22 @@ public class RetentionScheduler {
         } catch (Exception e) {
             log.error("Error during content purge job", e);
         }
+    }
+
+    /**
+     * 6개월 경과 피드백 내용 삭제 (집계 메타는 daily_stats에 보존)
+     */
+    @Scheduled(cron = "0 30 3 * * *")
+    @Transactional
+    public void purge6MonthFeedbackContent() {
+        Instant cutoff = Instant.now().minus(180, ChronoUnit.DAYS);
+        feedbackRepository.findAll().stream()
+                .filter(f -> f.getCreatedAt() != null && f.getCreatedAt().isBefore(cutoff) && f.getContent() != null)
+                .forEach(f -> {
+                    f.setContent("[삭제됨]");
+                    feedbackRepository.save(f);
+                });
+        log.info("6-month feedback content purge completed");
     }
 
     /**

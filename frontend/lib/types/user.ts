@@ -26,4 +26,8 @@ export interface User {
   onboardingMethod?: 'test' | 'mbti';
   provider?: string | null;
   createdAt: string;
+  termsAgreedAt?: string | null;
+  privacyAgreedAt?: string | null;
+  disclaimerAgreedAt?: string | null;
+  marketingAgreedAt?: string | null;
 }

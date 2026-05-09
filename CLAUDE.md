@@ -411,11 +411,11 @@ PROMPTS_PATH=./shared/docs/prompts   # 기본값
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 
-# Email (Gmail App Password)
+# Email — 모든 발송 againspring2026@gmail.com 단일 발신자
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
-MAIL_USERNAME=...@gmail.com
-MAIL_PASSWORD=...   # 16자리 App Password
+MAIL_USERNAME=againspring2026@gmail.com
+GMAIL_APP_PASSWORD=...   # againspring2026 Gmail 2단계인증 앱 비밀번호 16자
 
 # App URL (소셜 로그인 redirect_uri 기준)
 APP_URL=https://dev.againspring.net
@@ -444,6 +444,8 @@ APP_URL=https://dev.againspring.net
   - ✅ 데드코드 정리 완료 (V1.5 폐기 코드·관계 그래프·4Horsemen UI)
   - ✅ OpenAPI / Swagger UI (`/swagger-ui.html`)
   - ✅ CORS 도메인 허용 + GlobalExceptionHandler 표준화
+  - ✅ **V10 베타 기능 (2026-05-08~09)**: 피드백 수집(`FeedbackService`, `FeedbackController`) + 관리자 대시보드(AdminFeedbackController, PMF 통계) + 일일 세션 제한(DailyStats, GuestSessionRateLimiter) + 게스트 1세션 제한 + 동의 재확인(ConsentReconfirmModal) + 베타 배너 + Flyway V16~V19
+  - ✅ **V10.2 Gmail 발신자 통합 (2026-05-09)**: 단일 발신자 `againspring2026@gmail.com`, `GMAIL_APP_PASSWORD` 환경변수, MimeMessageHelper 표시명("다시봄 운영팀"), 법률 MD 연결(`shared/docs/policies/terms.md`·`privacy.md` → `frontend/public/legal/`)
 - ✅ Docker 멀티 컨테이너 배포 (MariaDB / Backend / Frontend / Nginx)
 - ✅ Cloudflare Tunnel — `dev.againspring.net`, `againspring.net`
 - ✅ 문서 4-디렉토리 재구성 (shared/docs, backend/docs, frontend/docs, env/docs)
@@ -492,7 +494,7 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-04-30
+**마지막 업데이트**: 2026-05-09
 **담당**: Claude Code (Agent)
 
 > UX 정책 관련 문의: `frontend/docs/ux/principles.md` (4원칙군 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트) 순으로 참조.

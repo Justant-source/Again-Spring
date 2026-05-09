@@ -56,4 +56,36 @@ public interface SessionRepository extends JpaRepository<Session, String> {
      * 사용자가 초대 수신자이며 특정 상태인 세션 조회
      */
     List<Session> findByInviteeUserIdAndStatusIn(String inviteeUserId, List<SessionStatus> statuses);
+
+    /**
+     * 게스트가 만든 세션 중 cutoff 이전 생성된 것 조회 (7일 만료 정리용)
+     */
+    @Query("SELECT s FROM Session s WHERE s.createdByUserId IN " +
+           "(SELECT u.id FROM User u WHERE u.isGuest = true) AND s.createdAt < :cutoff")
+    List<Session> findOldGuestSessions(@Param("cutoff") Instant cutoff);
+
+    /**
+     * 사용자가 특정 기간에 만든 세션 수 (일일 세션 한도용)
+     */
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.createdByUserId = :userId " +
+           "AND s.createdAt >= :from AND s.createdAt < :to")
+    int countByCreatedByUserIdAndCreatedAtBetween(
+            @Param("userId") String userId,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
+
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.createdAt >= :from AND s.createdAt < :to")
+    long countByCreatedAtBetween(@Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.status = :status AND s.createdAt >= :from AND s.createdAt < :to")
+    long countByStatusAndCreatedAtBetween(@Param("status") SessionStatus status,
+            @Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.createdByUserId IN " +
+           "(SELECT u.id FROM User u WHERE u.isGuest = true) AND s.createdAt >= :from AND s.createdAt < :to")
+    long countGuestSessionsBetween(@Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("SELECT COALESCE(AVG(s.userAMessageCount + COALESCE(s.userBMessageCount, 0)), 0) " +
+           "FROM Session s WHERE s.createdAt >= :from AND s.createdAt < :to")
+    Double avgTurnsBetween(@Param("from") Instant from, @Param("to") Instant to);
 }

@@ -1,5 +1,6 @@
 package com.againspring.service;
 
+import com.againspring.api.dto.request.AgreeReconfirmRequest;
 import com.againspring.api.dto.request.GuestRequest;
 import com.againspring.api.dto.request.LoginRequest;
 import com.againspring.api.dto.request.SignupRequest;
@@ -41,6 +42,7 @@ public class AuthService {
             throw new BusinessException("USER_ALREADY_EXISTS", "Email already registered");
         }
 
+        Instant now = Instant.now();
         User user = User.builder()
                 .id(generateUserId())
                 .email(request.getEmail())
@@ -48,6 +50,10 @@ public class AuthService {
                 .nickname(request.getNickname())
                 .isGuest(false)
                 .roles(new ArrayList<>())
+                .termsAgreedAt(now)
+                .privacyAgreedAt(now)
+                .disclaimerAgreedAt(now)
+                .marketingAgreedAt(request.isMarketingAgreed() ? now : null)
                 .build();
         user.getRoles().add("USER");
 
@@ -183,6 +189,20 @@ public class AuthService {
                         .expiresIn(expiresIn)
                         .build())
                 .build();
+    }
+
+    @Transactional
+    public void reconfirmConsent(String userId, AgreeReconfirmRequest request) {
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found", 404));
+        Instant now = Instant.now();
+        user.setTermsAgreedAt(now);
+        user.setPrivacyAgreedAt(now);
+        user.setDisclaimerAgreedAt(now);
+        if (request.isMarketingAgreed()) {
+            user.setMarketingAgreedAt(now);
+        }
+        userRepository.save(user);
     }
 
     private String generateUserId() {

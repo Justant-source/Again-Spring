@@ -1,5 +1,6 @@
 package com.againspring.service;
 
+import com.againspring.common.exception.GuestLimitException;
 import com.againspring.domain.Message;
 import com.againspring.domain.Session;
 import com.againspring.domain.User;
@@ -106,6 +107,21 @@ public class CancelableChatService {
 
         if (!stateMachine.isActive(session.getStatus())) {
             throw new IllegalStateException("Session is not active: " + session.getStatus());
+        }
+
+        // 게스트 3턴 제한
+        String msgUserId = sender == MessageSender.USER_A
+                ? session.getUserAId() : session.getUserBId();
+        if (msgUserId != null) {
+            User msgUser = userRepo.findByIdAndDeletedAtIsNull(msgUserId).orElse(null);
+            if (msgUser != null && msgUser.isGuest()) {
+                int count = sender == MessageSender.USER_A
+                        ? (session.getUserAMessageCount() == null ? 0 : session.getUserAMessageCount())
+                        : (session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount());
+                if (count >= 3) {
+                    throw new GuestLimitException();
+                }
+            }
         }
 
         var crisis = crisisDetector.detect(content);

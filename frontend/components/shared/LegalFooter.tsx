@@ -1,10 +1,14 @@
-// Legal footer with links to terms, privacy, and crisis hotline.
+'use client';
+
+// Legal footer with links to terms, privacy, crisis hotline, and feedback.
 // Place manually at end of result pages. Tone Q styling.
 
 import Link from 'next/link';
 import { CRISIS_RESOURCES } from '@/lib/constants/crisisResources';
+import { useUiStore } from '@/lib/store/uiStore';
 
 export function LegalFooter() {
+  const { showFeedbackModal } = useUiStore();
   // Find 1393 (자살예방상담) in crisis resources
   const crisisPhone = CRISIS_RESOURCES.find((r) => r.phone === '1393')?.phone;
 
@@ -68,6 +72,25 @@ export function LegalFooter() {
           위기 상황이라면 1393
         </a>
       )}
+
+      <span style={{ opacity: 0.5 }}>·</span>
+
+      <button
+        onClick={() => showFeedbackModal()}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          color: 'var(--Q-sub)',
+          fontSize: '11px',
+          cursor: 'pointer',
+          textDecoration: 'none',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+        onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+      >
+        의견 보내기
+      </button>
     </div>
   );
 }
