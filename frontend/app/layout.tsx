@@ -42,7 +42,7 @@ export default function RootLayout({
           <FeedbackModal />
           <ConsentReconfirmModal />
           <LegalFooter />
-          <div style={{ paddingTop: '30px' }}>{children}</div>
+          <div style={{ paddingTop: '30px', paddingBottom: '44px' }}>{children}</div>
         </MSWProvider>
       </body>
     </html>
