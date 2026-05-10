@@ -251,20 +251,70 @@ body {
 
 /* Typing dots */
 @keyframes typing-dot {
-  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
-  30% { opacity: 1; transform: translateY(-2px); }
+  0%, 60%, 100% { opacity: 0.45; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
 }
 .typing-dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin: 0 2px;
+  width: 7px;
+  height: 7px;
+  margin: 0 3px;
   border-radius: 50%;
-  background: var(--P-sub);
-  animation: typing-dot 1.4s infinite;
+  background: var(--P-ink);
+  animation: typing-dot 1.2s infinite;
 }
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Range slider — 톤 L 통일 (MediatorStylePicker, MbtiAxisSlider 공통).
+   accentColor만으로는 브라우저별 thumb/track 격차가 커서 명시적 스타일 적용. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  background: var(--L-border);
+  border-radius: 2px;
+}
+input[type="range"]::-moz-range-track {
+  height: 3px;
+  background: var(--L-border);
+  border-radius: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--L-ink);
+  border: 2px solid var(--L-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  margin-top: -8px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--L-ink);
+  border: 2px solid var(--L-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.1); }
+input[type="range"]:active::-moz-range-thumb { transform: scale(1.1); }
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(43, 43, 43, 0.15), 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(43, 43, 43, 0.15), 0 1px 3px rgba(0, 0, 0, 0.15);
+}
 
 /* Report generation spinner */
 @keyframes spin {

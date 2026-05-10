@@ -69,7 +69,7 @@ export function ChatLayout({ sessionId, session: initialSession }: Props) {
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column' }}>
         {/* 상단 상태바 — 자연스러운 플로우로 ChatHeader 위에 겹치지 않음 */}
         {isDuo && <PartnerStatusBar sessionId={sessionId} myRole={myRole} />}
 

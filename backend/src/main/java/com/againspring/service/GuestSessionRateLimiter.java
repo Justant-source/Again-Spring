@@ -1,9 +1,11 @@
 package com.againspring.service;
 
+import com.againspring.config.UserPermissionsConfig;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Bucket4j;
 import io.github.bucket4j.Refill;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -11,12 +13,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * IP당 게스트 세션 생성 횟수 제한 — Bucket4j in-memory (단일 인스턴스 기준).
- * 24시간 내 동일 IP에서 최대 3회 게스트 세션 허용.
+ * 한도는 user-permissions.json의 tiers.guest.sessions.dailyLimit에서 로드.
  */
 @Component
+@RequiredArgsConstructor
 public class GuestSessionRateLimiter {
 
-    private static final int MAX_SESSIONS_PER_IP_PER_DAY = 3;
+    private final UserPermissionsConfig permissions;
     private final ConcurrentHashMap<String, Bucket> ipBuckets = new ConcurrentHashMap<>();
 
     /**
@@ -29,9 +32,10 @@ public class GuestSessionRateLimiter {
     }
 
     private Bucket newBucket(String ip) {
+        int max = permissions.getGuest().getSessions().getDailyLimit();
         Bandwidth limit = Bandwidth.classic(
-                MAX_SESSIONS_PER_IP_PER_DAY,
-                Refill.intervally(MAX_SESSIONS_PER_IP_PER_DAY, Duration.ofHours(24)));
+                max,
+                Refill.intervally(max, Duration.ofHours(24)));
         return Bucket4j.builder().addLimit(limit).build();
     }
 }

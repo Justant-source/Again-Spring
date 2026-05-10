@@ -46,7 +46,9 @@ export default function ForgotPasswordPage() {
                 메일을 확인해주세요
               </div>
               <div style={{ fontSize: 14, color: 'var(--L-sub)', lineHeight: 1.6, marginBottom: 28 }}>
-                {email}로 비밀번호 재설정 링크를 보내드렸어요. 이메일을 확인해주세요.
+                {email}로 임시 비밀번호를 보내드렸어요.<br />
+                메일에서 임시 비밀번호를 확인하시고 로그인해 주세요.<br />
+                로그인 직후 새 비밀번호를 설정하실 수 있어요.
               </div>
               <button
                 onClick={() => router.push('/login')}
@@ -60,7 +62,7 @@ export default function ForgotPasswordPage() {
             <>
               <div style={{ fontSize: 13, color: 'var(--L-sub)', marginBottom: 14 }}>비밀번호를 잊으셨나요?</div>
               <div className="serif" style={{ fontSize: 20, lineHeight: 1.6, marginBottom: 28 }}>
-                이메일로 재설정 링크를 보내드릴게요
+                가입하신 이메일로<br />임시 비밀번호를 보내드릴게요
               </div>
 
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -88,7 +90,7 @@ export default function ForgotPasswordPage() {
                 {error && <div style={{ fontSize: 13, color: 'var(--L-point)', marginTop: 8 }}>{error}</div>}
 
                 <button type="submit" disabled={loading} className="btn-L" style={{ marginTop: 12 }}>
-                  {loading ? '발송 중...' : '비밀번호 재설정 링크 받기'}
+                  {loading ? '발송 중...' : '임시 비밀번호 받기'}
                 </button>
               </form>
             </>

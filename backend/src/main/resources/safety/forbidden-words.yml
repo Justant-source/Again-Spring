@@ -132,17 +132,17 @@ level4:
     crisis: false
 
 crisis_keywords:
-  # Domestic violence
+  # Domestic violence — 명확한 동사/명사
   - pattern: "때리"
     category: DOMESTIC_VIOLENCE
     crisis: true
   - pattern: "때렸"
     category: DOMESTIC_VIOLENCE
     crisis: true
-  - pattern: "맞았"
+  - pattern: "때릴"
     category: DOMESTIC_VIOLENCE
     crisis: true
-  - pattern: "맞고"
+  - pattern: "때려"
     category: DOMESTIC_VIOLENCE
     crisis: true
   - pattern: "폭행"
@@ -154,19 +154,31 @@ crisis_keywords:
   - pattern: "학대"
     category: DOMESTIC_VIOLENCE
     crisis: true
-  - pattern: "때릴"
-    category: DOMESTIC_VIOLENCE
-    crisis: true
-  - pattern: "때려"
-    category: DOMESTIC_VIOLENCE
-    crisis: true
   - pattern: "구타"
     category: DOMESTIC_VIOLENCE
     crisis: true
-  - pattern: "상해"
+  # Domestic violence — 맥락 명확한 합성 표현
+  # (단독 '맞고/맞았/상해'는 '옳고/옳았/Shanghai/상해보험'과 동음 → 제외)
+  - pattern: "맞고 살"
     category: DOMESTIC_VIOLENCE
     crisis: true
-  # Sexual violence
+  - pattern: "맞고 자랐"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "맞고 컸"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "맞아 죽"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "두들겨 맞"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "손찌검"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  # Sexual violence — 명확한 명사 + 합성 표현
+  # (단독 '강제로'는 '강제로 야근' 등 일반 맥락과 충돌 → 제외)
   - pattern: "강간"
     category: SEXUAL_VIOLENCE
     crisis: true
@@ -176,7 +188,16 @@ crisis_keywords:
   - pattern: "성폭력"
     category: SEXUAL_VIOLENCE
     crisis: true
-  - pattern: "강제로"
+  - pattern: "강제로 옷"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "강제로 관계"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "강제로 끌"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "강제 추행"
     category: SEXUAL_VIOLENCE
     crisis: true
   # Self-harm/suicide

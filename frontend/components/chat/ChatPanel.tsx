@@ -12,6 +12,7 @@ import { PartnerJoinNoticeCard } from './PartnerJoinNoticeCard';
 import { api } from '@/lib/api/client';
 import { usePolling } from '@/lib/hooks/usePolling';
 import { splitMediatorMessage, calculateTypingDelay } from '@/lib/utils/messageSplitter';
+import { RelationshipColorSync } from '@/components/shared/RelationshipColorSync';
 
 interface Message {
   id: number;
@@ -69,6 +70,12 @@ export function ChatPanel({
   const abortControllerRef = useRef<AbortController | null>(null);
   const sendCountRef = useRef(0);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sendingRef = useRef(false);
+  const sendStartedAtRef = useRef<number>(0);
+
+  useEffect(() => {
+    sendingRef.current = sending;
+  }, [sending]);
 
   const fetchMessages = async () => {
     try {
@@ -77,6 +84,18 @@ export function ChatPanel({
         : `/api/sessions/${sessionId}/messages`;
       const r = await api.get(url);
       if (r.data.length > 0) {
+        // sending 상태일 때만, 송신 시작 후 도착한 새 중재자 메시지가 있으면 typing indicator 종료
+        // (새로고침 후 전체 fetch에 포함된 과거 중재자 메시지로 인한 오인 종료 방지)
+        if (sendingRef.current) {
+          const hasNewMediator = r.data.some(
+            (m: Message) =>
+              (m.sender === 'MEDIATOR_TO_A' || m.sender === 'MEDIATOR_TO_B') &&
+              new Date(m.createdAt).getTime() > sendStartedAtRef.current
+          );
+          if (hasNewMediator) {
+            setSending(false);
+          }
+        }
         const merged = mergeMessages(messages, r.data);
         const processed = processMediatorMessages(merged, setPendingSplits);
         setMessages(processed);
@@ -139,7 +158,7 @@ export function ChatPanel({
   const isFinalized = session?.status === 'awaiting_finalization' && !!myAgreed;
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
   }, [messages, secondParts, sending, isTyping]);
 
   const myMessages = messages.filter(m => m.sender === currentUserSender);
@@ -154,6 +173,8 @@ export function ChatPanel({
     abortControllerRef.current = controller;
 
     const myCount = ++sendCountRef.current;
+    // 송신 시작 시점을 1초 전으로 잡아 BE 처리 시점의 약간의 시계 오차를 흡수
+    sendStartedAtRef.current = Date.now() - 1000;
     setSending(true);
 
     // Optimistic: 사용자 입력을 즉시 화면에 표시 (음수 ID는 임시 표식)
@@ -178,36 +199,41 @@ export function ChatPanel({
       if (r.data.crisisLevel === 1) {
         setMessages(prev => prev.filter(m => m.id !== tempId));
         setCrisisLevel1(true);
+        if (myCount === sendCountRef.current) setSending(false);
         return;
       }
-      // optimistic 메시지 제거
+      // optimistic 메시지 제거 (서버 저장된 사용자 메시지가 폴링으로 옴)
       setMessages(prev => prev.filter(m => m.id !== tempId));
 
-      const mediatorMsgs: Message[] = r.data.mediatorMessages ?? [];
-
-      if (myCount === sendCountRef.current) {
-        setSending(false);
-      }
-
-      mediatorMsgs.forEach((m: Message, i: number) => {
-        setTimeout(() => {
-          setMessages(prev => {
-            const merged = mergeMessages(prev, [m]);
-            // mediator 메시지만 분할 처리
-            if (m.sender === 'MEDIATOR_TO_A' || m.sender === 'MEDIATOR_TO_B') {
-              const processed = processMediatorMessages(merged, setPendingSplits);
-              return processed;
-            }
-            return merged;
-          });
-        }, i * 1000);
-      });
-
-      // 마지막 chunk 도착 후 BE와 완전 동기화
-      setTimeout(() => {
-        lastFetchRef.current = 0;
+      // V1.5: BE는 즉시 응답하고 중재자 메시지는 폴링으로 도착
+      // sending=true 유지 → fetchMessages()가 중재자 메시지 수신 시 false 처리
+      // 즉시 1회 폴링 트리거 + 1초 후 재폴링으로 빠른 도착 감지
+      lastFetchRef.current = 0;
+      fetchMessages();
+      const fastPollId = setInterval(() => {
+        if (myCount !== sendCountRef.current) {
+          clearInterval(fastPollId);
+          return;
+        }
         fetchMessages();
-      }, mediatorMsgs.length * 1000 + 200);
+      }, 1000);
+
+      // 안전 타임아웃: 60초 후 강제 sending=false (네트워크/서버 장애 대비)
+      const safetyTimeoutId = setTimeout(() => {
+        clearInterval(fastPollId);
+        if (myCount === sendCountRef.current) {
+          setSending(false);
+        }
+      }, 60000);
+
+      // sending이 false가 되면 fastPoll/safetyTimeout 정리
+      const cleanupCheckId = setInterval(() => {
+        if (!sendingRef.current || myCount !== sendCountRef.current) {
+          clearInterval(fastPollId);
+          clearInterval(cleanupCheckId);
+          clearTimeout(safetyTimeoutId);
+        }
+      }, 500);
 
       return;
     } catch (e: any) {
@@ -221,10 +247,7 @@ export function ChatPanel({
       } else {
         console.error('Send failed:', e);
       }
-    } finally {
-      if (myCount === sendCountRef.current) {
-        setSending(false);
-      }
+      if (myCount === sendCountRef.current) setSending(false);
     }
   };
 
@@ -286,6 +309,7 @@ export function ChatPanel({
         background: 'var(--P-bg)',
       }}
     >
+      <RelationshipColorSync type={session?.relationType ?? null} />
       {/* Header */}
       <ChatHeader
         isDuo={isDuo}
@@ -473,7 +497,7 @@ function TypingBubble() {
       style={{
         display: 'flex',
         justifyContent: 'flex-start',
-        marginBottom: 10,
+        marginBottom: 12,
         alignItems: 'flex-end',
         gap: 6,
       }}
@@ -482,13 +506,14 @@ function TypingBubble() {
     >
       <div
         style={{
-          padding: '12px 16px',
-          borderRadius: 14,
+          padding: '14px 18px',
+          borderRadius: '4px 14px 14px 14px',
           background: 'var(--P-card)',
-          color: 'var(--P-ink)',
-          minWidth: 48,
+          border: '1px solid var(--P-border)',
+          minWidth: 56,
           display: 'flex',
           alignItems: 'center',
+          gap: 2,
         }}
       >
         <span className="typing-dot" />

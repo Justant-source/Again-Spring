@@ -2,6 +2,7 @@ package com.againspring.api.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -43,6 +44,9 @@ public class AuthResponse {
         @JsonProperty("isGuest")
         private boolean isGuest;
 
+        @JsonProperty("mustChangePassword")
+        private boolean mustChangePassword;
+
         @JsonProperty("communicationStyle")
         private String communicationStyle;
 
@@ -55,8 +59,23 @@ public class AuthResponse {
         @JsonProperty("provider")
         private String provider;
 
+        @JsonProperty("roles")
+        private List<String> roles;
+
         @JsonProperty("onboardingCompletedAt")
         private Instant onboardingCompletedAt;
+
+        @JsonProperty("termsAgreedAt")
+        private Instant termsAgreedAt;
+
+        @JsonProperty("privacyAgreedAt")
+        private Instant privacyAgreedAt;
+
+        @JsonProperty("disclaimerAgreedAt")
+        private Instant disclaimerAgreedAt;
+
+        @JsonProperty("marketingAgreedAt")
+        private Instant marketingAgreedAt;
 
         @JsonProperty("createdAt")
         private Instant createdAt;

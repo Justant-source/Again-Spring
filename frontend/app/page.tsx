@@ -8,6 +8,7 @@ import { PhoneFrame } from '@/components/shared/PhoneFrame';
 import { Logo } from '@/components/shared/Logo';
 import { Footer } from '@/components/shared/Footer';
 import { useUserStore } from '@/lib/store/userStore';
+import { permissionsFor } from '@/lib/constants/userPermissions';
 import { api } from '@/lib/api/client';
 
 const ACTIVE_STATUSES = new Set(['chatting_solo', 'chatting_duo', 'awaiting_finalization']);
@@ -22,6 +23,7 @@ export default function LandingPage() {
     setMounted(true);
   }, []);
 
+  // 활성 세션 폴링 — 게스트 외 모든 등급 (ADMIN도 일반 사용자처럼 동작)
   useEffect(() => {
     if (!user || user.isGuest) return;
     api.get('/api/users/me/history').then(r => {
@@ -44,8 +46,13 @@ export default function LandingPage() {
     router.push('/session/new');
   };
 
+  const perms = permissionsFor(user);
+  const showAdminEntry = perms.ui.showAdminEntryButton;
+  const showChatEntry = perms.ui.showLandingChatEntry;
+  const showHistoryMenu = perms.ui.showHistoryMenu;
   const needsOnboarding =
-    !!user && (!user.onboardingCompletedAt || !user.communicationStyle);
+    !!user && showChatEntry &&
+    (!user.onboardingCompletedAt || !user.communicationStyle);
 
   return (
     <PhoneFrame tone="L">
@@ -54,9 +61,11 @@ export default function LandingPage() {
           <Logo />
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Link href="/history" className="text-[12px]" style={{ color: 'var(--L-sub)' }}>
-                지난 대화
-              </Link>
+              {showHistoryMenu && (
+                <Link href="/history" className="text-[12px]" style={{ color: 'var(--L-sub)' }}>
+                  지난 대화
+                </Link>
+              )}
               <Link href="/profile" className="text-[12px]" style={{ color: 'var(--L-sub)' }}>
                 {user.nickname}
               </Link>
@@ -68,8 +77,39 @@ export default function LandingPage() {
           )}
         </div>
 
-        {/* 이어서 대화하기 배너 (활성 세션 있을 때) */}
-        {activeSessionId && !needsOnboarding && (
+        {/* 관리자 모드 진입 카드 — user-permissions.json의 ui.showAdminEntryButton */}
+        {showAdminEntry && (
+          <button
+            onClick={() => router.push('/admin')}
+            style={{
+              marginTop: 16,
+              width: '100%',
+              padding: '14px 18px',
+              background: 'var(--L-ink)',
+              color: 'var(--L-card)',
+              border: 'none',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.3 }}>
+                관리자 모드
+              </div>
+              <div style={{ fontSize: 11, marginTop: 3, opacity: 0.75 }}>
+                대시보드 · 의견함 · 사용자 · 위기 모니터링
+              </div>
+            </div>
+            <span style={{ fontSize: 18, opacity: 0.85 }}>›</span>
+          </button>
+        )}
+
+        {/* 이어서 대화하기 배너 (활성 세션 있을 때, 채팅 진입 가능 등급만) */}
+        {showChatEntry && activeSessionId && !needsOnboarding && (
           <button
             onClick={() => router.push(`/session/chat/${activeSessionId}`)}
             style={{
@@ -94,8 +134,8 @@ export default function LandingPage() {
           </button>
         )}
 
-        {/* 온보딩 안내 배너 (로그인 사용자, 미완료 시) */}
-        {needsOnboarding && (
+        {/* 온보딩 안내 배너 (로그인 사용자, 미완료 시, 채팅 진입 가능 등급만) */}
+        {showChatEntry && needsOnboarding && (
           <div
             style={{
               marginTop: 16,
@@ -119,61 +159,69 @@ export default function LandingPage() {
           </div>
         )}
 
-        <div className="flex-1 mt-20">
-          <div className="text-[13px] mb-3.5" style={{ color: 'var(--L-sub)' }}>
-            중재자와 대화
-          </div>
-          <h1
-            className="serif"
-            style={{ fontSize: 32, lineHeight: 1.35, letterSpacing: '-0.01em' }}
-          >
-            마음을<br />정리해요.
-          </h1>
-          <p className="mt-5 text-[14px] leading-[1.7]" style={{ color: 'var(--L-sub)' }}>
-            혼자서도, 함께라도 가능해요.<br />
-            5분이면 충분합니다.
-          </p>
+        {/* 일반 사용자 채팅 진입 본문 — admin은 노출 안 함 */}
+        {showChatEntry ? (
+          <>
+            <div className="flex-1 mt-20">
+              <div className="text-[13px] mb-3.5" style={{ color: 'var(--L-sub)' }}>
+                중재자와 대화
+              </div>
+              <h1
+                className="serif"
+                style={{ fontSize: 32, lineHeight: 1.35, letterSpacing: '-0.01em' }}
+              >
+                마음을<br />정리해요.
+              </h1>
+              <p className="mt-5 text-[14px] leading-[1.7]" style={{ color: 'var(--L-sub)' }}>
+                혼자서도, 함께라도 가능해요.<br />
+                5분이면 충분합니다.
+              </p>
 
-          <div className="mt-12 letter-card" style={{ padding: 20 }}>
-            <div className="quote-it" style={{ fontSize: 12, marginBottom: 10 }}>
-              다시봄은 이런 도구예요
+              <div className="mt-12 letter-card" style={{ padding: 20 }}>
+                <div className="quote-it" style={{ fontSize: 12, marginBottom: 10 }}>
+                  다시봄은 이런 도구예요
+                </div>
+                <ul className="serif" style={{ fontSize: 13, lineHeight: 1.9 }}>
+                  <li>· 중재자와 대화로 마음을 정리해요</li>
+                  <li>· 옳고 그름이 아니라 서로의 마음을 봐요</li>
+                  <li>· 이야기는 30일 후 자동으로 사라져요</li>
+                </ul>
+              </div>
             </div>
-            <ul className="serif" style={{ fontSize: 13, lineHeight: 1.9 }}>
-              <li>· 중재자와 대화로 마음을 정리해요</li>
-              <li>· 옳고 그름이 아니라 서로의 마음을 봐요</li>
-              <li>· 이야기는 30일 후 자동으로 사라져요</li>
-            </ul>
-          </div>
-        </div>
 
-        <div className="flex flex-col gap-2 pb-2 pt-4">
-          <button
-            onClick={handleStartSession}
-            disabled={!user || needsOnboarding}
-            className="btn-L text-center"
-          >
-            {needsOnboarding ? '먼저 10문항을 등록해주세요' : '마음 옮겨 적기 시작'}
-          </button>
-          {!user && (
-            <p className="text-center text-[11px]" style={{ color: 'var(--L-sub)' }}>
-              로그인하시거나 게스트로 시작해주세요
-            </p>
-          )}
-          {needsOnboarding && (
-            <Link
-              href="/onboarding/intro?next=/session/new"
-              className="text-center text-[12px] mt-1"
-              style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}
-            >
-              10문항 시작하기
-            </Link>
-          )}
-          {!user && (
-            <Link href="/guest" className="text-center text-[12px] mt-1" style={{ color: 'var(--L-sub)' }}>
-              게스트로 둘러보기
-            </Link>
-          )}
-        </div>
+            <div className="flex flex-col gap-2 pb-2 pt-4">
+              <button
+                onClick={handleStartSession}
+                disabled={!user || needsOnboarding}
+                className="btn-L text-center"
+              >
+                {needsOnboarding ? '먼저 10문항을 등록해주세요' : '마음 옮겨 적기 시작'}
+              </button>
+              {!user && (
+                <p className="text-center text-[11px]" style={{ color: 'var(--L-sub)' }}>
+                  로그인하시거나 게스트로 시작해주세요
+                </p>
+              )}
+              {needsOnboarding && (
+                <Link
+                  href="/onboarding/intro?next=/session/new"
+                  className="text-center text-[12px] mt-1"
+                  style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}
+                >
+                  10문항 시작하기
+                </Link>
+              )}
+              {!user && (
+                <Link href="/guest" className="text-center text-[12px] mt-1" style={{ color: 'var(--L-sub)' }}>
+                  게스트로 둘러보기
+                </Link>
+              )}
+            </div>
+          </>
+        ) : (
+          // admin 등 채팅 진입 비대상 — 빈 영역으로 [관리자 모드] 카드만 부각
+          <div className="flex-1" />
+        )}
       </div>
       <Footer />
     </PhoneFrame>

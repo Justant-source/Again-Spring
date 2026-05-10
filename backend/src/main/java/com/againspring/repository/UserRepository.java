@@ -2,6 +2,8 @@ package com.againspring.repository;
 
 import com.againspring.domain.User;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -40,4 +42,10 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     java.util.List<User> findByNicknameContainingIgnoreCaseOrEmailContainingIgnoreCaseAndDeletedAtIsNull(
             String nickname, String email);
+
+    /** Admin 전체 회원 목록 (게스트 제외, 탈퇴 제외, 최신 가입순) */
+    Page<User> findByIsGuestFalseAndDeletedAtIsNullOrderByCreatedAtDesc(Pageable pageable);
+
+    /** Admin 전체 사용자 목록 (게스트 포함, 탈퇴 제외, 최신 가입순) */
+    Page<User> findByDeletedAtIsNullOrderByCreatedAtDesc(Pageable pageable);
 }

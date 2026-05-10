@@ -74,6 +74,11 @@ public class User {
     @Builder.Default
     private boolean isGuest = false;
 
+    /** 임시 비밀번호 발급 후 강제 변경 필요 여부 (V20) */
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private boolean mustChangePassword = false;
+
     @Column(name = "onboarding_completed_at")
     private Instant onboardingCompletedAt;
 

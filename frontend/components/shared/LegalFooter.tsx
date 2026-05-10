@@ -4,8 +4,12 @@
 // Place manually at end of result pages. Tone Q styling.
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { CRISIS_RESOURCES } from '@/lib/constants/crisisResources';
 export function LegalFooter() {
+  const pathname = usePathname();
+  if (pathname?.startsWith('/session/chat')) return null;
+  if (pathname?.startsWith('/admin')) return null;
   // Find 1393 (자살예방상담) in crisis resources
   const crisisPhone = CRISIS_RESOURCES.find((r) => r.phone === '1393')?.phone;
 

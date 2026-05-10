@@ -217,6 +217,42 @@ public class UserService {
         log.info("User account anonymized: {}", userId);
     }
 
+    /**
+     * 비밀번호 변경.
+     * - 일반 변경: currentPassword가 현재 BCrypt 해시와 일치해야 함.
+     * - 임시 비번 첫 변경: 동일 로직 (mustChangePassword=true 사용자도 currentPassword에 임시 비번 입력).
+     * - 변경 성공 시 mustChangePassword=false 자동 해제.
+     */
+    @Transactional
+    public UserResponse changePassword(String userId,
+            com.againspring.api.dto.request.ChangePasswordRequest request) {
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요.", 404));
+
+        if (user.isGuest()) {
+            throw new BusinessException("GUEST_NO_PASSWORD", "게스트는 비밀번호를 변경할 수 없어요.", 400);
+        }
+        if (user.getProvider() != null && !user.getProvider().isBlank()) {
+            throw new BusinessException("OAUTH_NO_PASSWORD",
+                    "소셜 로그인 계정은 비밀번호를 변경할 수 없어요.", 400);
+        }
+        if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()
+                || !passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new BusinessException("PASSWORD_MISMATCH",
+                    "현재 비밀번호가 일치하지 않아요.", 401);
+        }
+        if (request.getNewPassword().equals(request.getCurrentPassword())) {
+            throw new BusinessException("SAME_PASSWORD",
+                    "새 비밀번호는 현재 비밀번호와 달라야 해요.", 400);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        User saved = userRepository.save(user);
+        log.info("Password changed for user {}", saved.getId());
+        return mapToUserResponse(saved);
+    }
+
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
@@ -224,10 +260,16 @@ public class UserService {
                 .nickname(user.getNickname())
                 .communicationStyle(user.getCommunicationStyle())
                 .isGuest(user.isGuest())
+                .mustChangePassword(user.isMustChangePassword())
                 .onboardingCompleted(user.getOnboardingCompletedAt() != null)
                 .mbtiType(user.getMbtiType())
                 .mbtiProfile(user.getMbtiProfile())
                 .provider(user.getProvider())
+                .roles(user.getRoles())
+                .termsAgreedAt(user.getTermsAgreedAt())
+                .privacyAgreedAt(user.getPrivacyAgreedAt())
+                .disclaimerAgreedAt(user.getDisclaimerAgreedAt())
+                .marketingAgreedAt(user.getMarketingAgreedAt())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

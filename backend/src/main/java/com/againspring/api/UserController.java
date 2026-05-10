@@ -65,6 +65,16 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUserProfile(userDetails.getUsername(), request));
     }
 
+    @PostMapping("/me/password")
+    @Operation(summary = "Change password (current → new). For temp password first change, currentPassword is the temp.")
+    @ApiResponse(responseCode = "200", description = "Password changed")
+    @ApiResponse(responseCode = "401", description = "Current password mismatch")
+    public ResponseEntity<UserResponse> changePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @jakarta.validation.Valid @RequestBody com.againspring.api.dto.request.ChangePasswordRequest request) {
+        return ResponseEntity.ok(userService.changePassword(userDetails.getUsername(), request));
+    }
+
     @DeleteMapping("/me")
     @Operation(summary = "Delete user account (anonymize PII)")
     @ApiResponse(responseCode = "204", description = "Account anonymized")

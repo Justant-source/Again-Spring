@@ -11,4 +11,7 @@ public interface EmailVerificationRepository extends JpaRepository<EmailVerifica
             String email, Instant now);
 
     void deleteByEmail(String email);
+
+    /** Admin 시스템 헬스 — 가장 최근 인증코드 발송 시각 (SMTP 살아있는지 신호) */
+    Optional<EmailVerification> findTopByOrderByCreatedAtDesc();
 }

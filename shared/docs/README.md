@@ -8,6 +8,9 @@
 - [structure.md](./structure.md) — 모노레포 4-분할 구조 (env/ backend/ frontend/ shared/)
 - [architecture.md](./architecture.md) — 시스템 전체 아키텍처 (브라우저↔Tunnel↔Nginx↔FE↔BE↔DB↔LLM)
 
+### 운영
+- [admin-dashboard.md](./admin-dashboard.md) — 관리자 대시보드 기능·운영 가이드 (KPI·의견함·사용자·위기 모니터링)
+
 ### [policies/](./policies/)
 서비스의 행동 규칙. 코드 변경 전에 읽어야 함.
 

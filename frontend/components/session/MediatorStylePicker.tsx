@@ -1,96 +1,97 @@
 'use client';
 
-import { MbtiAxisSlider } from '@/components/onboarding/MbtiAxisSlider';
-
-export interface MediatorStyle {
-  x: number; // 팩트(0) ↔ 공감(100)
-  y: number; // 경청(0) ↔ 능동(100)
-}
-
-export interface MediatorStylePickerProps {
-  value: MediatorStyle;
-  onChange: (v: MediatorStyle) => void;
-}
-
 /**
- * 중재자 성향 2D 슬라이더 선택 컴포넌트
- * X축: 팩트 기반 ↔ 공감 기반
- * Y축: 경청·반영 중심 ↔ 능동·질문 중심
+ * 중재자 성향(공감↔팩트) 단일 축 슬라이더.
+ * - x = 0: 팩트 중심 (객관적 정리)
+ * - x = 50: 균형 (기본값)
+ * - x = 100: 공감 중심 (감정 인정)
+ * - y는 본 picker에서 노출하지 않으며, 호출 측에서 50 고정으로 전송한다.
+ *
+ * 사용 등급(user-permissions.json):
+ *   - guest.mediator.styleSource = 'per_session' → 본 컴포넌트 사용
+ *   - registered.mediator.styleSource = 'profile' → 프로필 값 사용 (본 컴포넌트 미사용)
  */
+export interface MediatorStylePickerProps {
+  value: number; // 0 ~ 100
+  onChange: (x: number) => void;
+}
+
 export function MediatorStylePicker({ value, onChange }: MediatorStylePickerProps) {
-  const update = (axis: 'x' | 'y', val: number) => {
-    onChange({ ...value, [axis]: val });
-  };
-
-  // 성향 조합 이름 결정
-  const getStyleName = () => {
-    const x = value.x;
-    const y = value.y;
-
-    if (x <= 30 && y <= 30) {
-      return '공감하며 이야기를 부드럽게 받아주는 형';
-    } else if (x >= 70 && y >= 70) {
-      return '논리적으로 탐색 질문을 던지는 형';
-    } else if (x <= 30 && y >= 70) {
-      return '감정을 인식하며 적극적으로 질문하는 형';
-    } else if (x >= 70 && y <= 30) {
-      return '사실 중심으로 정리하며 듣는 형';
-    } else {
-      return '사실과 감정을 균형있게 다루는 형';
-    }
-  };
-
-  const isCenter = value.x === 50 && value.y === 50;
+  const label = describe(value);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <MbtiAxisSlider
-        axisLabel="의사소통 방식"
-        leftLetter="공"
-        leftLabel="공감 기반"
-        rightLetter="팩"
-        rightLabel="팩트 기반"
-        value={value.x}
-        onChange={(v) => update('x', v)}
+    <div style={{ width: '100%' }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 13, color: 'var(--L-sub)', marginBottom: 6 }}>
+          이번 대화의 중재자 톤
+        </div>
+        <div className="serif" style={{ fontSize: 16, color: 'var(--L-ink)' }}>
+          {label.title}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--L-sub)', marginTop: 4, lineHeight: 1.6 }}>
+          {label.description}
+        </div>
+      </div>
+
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label="중재자의 공감-팩트 비율 (0=팩트 중심, 100=공감 중심)"
+        style={{
+          width: '100%',
+          accentColor: 'var(--L-ink)',
+          marginBottom: 6,
+        }}
       />
 
-      <MbtiAxisSlider
-        axisLabel="중재 스타일"
-        leftLetter="경"
-        leftLabel="경청·반영"
-        rightLetter="능"
-        rightLabel="능동·질문"
-        value={value.y}
-        onChange={(v) => update('y', v)}
-      />
-
-      {/* Preview */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: 6,
-          minHeight: 60,
-          padding: '16px',
-          borderRadius: 3,
-          backgroundColor: 'var(--L-bkg)',
+          justifyContent: 'space-between',
+          fontSize: 11,
+          color: 'var(--L-sub)',
+          marginTop: 2,
         }}
       >
-        <div
-          style={{
-            fontSize: 14,
-            fontWeight: 500,
-            color: isCenter ? 'var(--L-sub)' : 'var(--L-ink)',
-            textAlign: 'center',
-            lineHeight: 1.5,
-            transition: 'color 0.2s',
-          }}
-        >
-          {getStyleName()}
-        </div>
+        <span>← 팩트 중심</span>
+        <span style={{ fontWeight: 500, color: 'var(--L-ink)' }}>{value} / 100</span>
+        <span>공감 중심 →</span>
       </div>
     </div>
   );
+}
+
+function describe(x: number): { title: string; description: string } {
+  if (x <= 25) {
+    return {
+      title: '팩트 중심',
+      description: '상황을 객관적으로 정리하고 사실 관계를 짚어드릴게요.',
+    };
+  }
+  if (x <= 45) {
+    return {
+      title: '약간 팩트 우세',
+      description: '감정도 듣지만, 상황 정리에 좀 더 무게를 둘게요.',
+    };
+  }
+  if (x <= 55) {
+    return {
+      title: '균형',
+      description: '감정 인정과 상황 정리를 같은 비중으로 다룰게요.',
+    };
+  }
+  if (x <= 75) {
+    return {
+      title: '약간 공감 우세',
+      description: '먼저 마음을 충분히 들어드린 뒤 정리에 들어갈게요.',
+    };
+  }
+  return {
+    title: '공감 중심',
+    description: '감정을 충분히 받아주고, 정리는 부드럽게 곁들일게요.',
+  };
 }

@@ -1,5 +1,6 @@
 package com.againspring.security;
 
+import com.againspring.config.UserPermissionsConfig;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -24,13 +25,15 @@ public class JwtService {
 
     private final String jwtSecret;
     private final long expirationMs;
-    private final long guestExpirationMs = 7200000; // 2 hours
+    private final UserPermissionsConfig permissions;
 
     public JwtService(
             @Value("${jwt.secret}") String jwtSecret,
-            @Value("${jwt.expiration-ms}") long expirationMs) {
+            @Value("${jwt.expiration-ms}") long expirationMs,
+            UserPermissionsConfig permissions) {
         this.jwtSecret = jwtSecret;
         this.expirationMs = expirationMs;
+        this.permissions = permissions;
     }
 
     /**
@@ -65,6 +68,7 @@ public class JwtService {
      * @return JWT token string (2h expiration)
      */
     public String generateGuestToken(String guestId) {
+        long guestExpirationMs = permissions.getGuest().getAuth().getTokenExpirationSeconds() * 1000L;
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + guestExpirationMs);
 

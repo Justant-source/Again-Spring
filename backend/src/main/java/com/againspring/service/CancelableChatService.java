@@ -55,6 +55,7 @@ public class CancelableChatService {
     private final IsolationLintFilter isolationLintFilter;
     private final PhaseDMetrics phaseDMetrics;
     private final TransactionTemplate transactionTemplate;
+    private final com.againspring.config.UserPermissionsConfig permissions;
 
     // key = sessionId + ":" + sender.name() — A와 B 슬롯 독립 유지
     private final ConcurrentHashMap<String, CancelableInvocation> activeInvocations =
@@ -74,7 +75,8 @@ public class CancelableChatService {
             QuestionQueueUpdater questionQueueUpdater,
             IsolationLintFilter isolationLintFilter,
             PhaseDMetrics phaseDMetrics,
-            PlatformTransactionManager txManager) {
+            PlatformTransactionManager txManager,
+            com.againspring.config.UserPermissionsConfig permissions) {
         this.messageRepo = messageRepo;
         this.sessionRepo = sessionRepo;
         this.userRepo = userRepo;
@@ -89,6 +91,7 @@ public class CancelableChatService {
         this.isolationLintFilter = isolationLintFilter;
         this.phaseDMetrics = phaseDMetrics;
         this.transactionTemplate = new TransactionTemplate(txManager);
+        this.permissions = permissions;
     }
 
     /**
@@ -109,17 +112,20 @@ public class CancelableChatService {
             throw new IllegalStateException("Session is not active: " + session.getStatus());
         }
 
-        // 게스트 3턴 제한
+        // 게스트 턴 제한 (user-permissions.json: tiers.guest.sessions.messageTurnLimit)
         String msgUserId = sender == MessageSender.USER_A
                 ? session.getUserAId() : session.getUserBId();
         if (msgUserId != null) {
             User msgUser = userRepo.findByIdAndDeletedAtIsNull(msgUserId).orElse(null);
             if (msgUser != null && msgUser.isGuest()) {
-                int count = sender == MessageSender.USER_A
-                        ? (session.getUserAMessageCount() == null ? 0 : session.getUserAMessageCount())
-                        : (session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount());
-                if (count >= 3) {
-                    throw new GuestLimitException();
+                Integer turnLimit = permissions.getGuest().getSessions().getMessageTurnLimit();
+                if (turnLimit != null) {
+                    int count = sender == MessageSender.USER_A
+                            ? (session.getUserAMessageCount() == null ? 0 : session.getUserAMessageCount())
+                            : (session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount());
+                    if (count >= turnLimit) {
+                        throw new GuestLimitException();
+                    }
                 }
             }
         }
@@ -305,12 +311,13 @@ public class CancelableChatService {
     private void saveFallbackMessage(String sessionId, MessageSender mediatorSender) {
         transactionTemplate.execute(status -> {
             String fallback = "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?";
+            // V11: '-fallback' 접미사로 LLM 호출 실패율 모니터링에서 식별
             messageRepo.save(Message.builder()
                     .sessionId(sessionId)
                     .sender(mediatorSender)
                     .content(fallback)
                     .charCount(fallback.length())
-                    .llmModel(ChatService.MODEL_HAIKU)
+                    .llmModel(ChatService.MODEL_HAIKU + "-fallback")
                     .build());
             return null;
         });

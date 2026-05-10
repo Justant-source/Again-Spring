@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
 import { DeleteAccountModal } from '@/components/profile/DeleteAccountModal';
+import { ChangePasswordSection } from '@/components/profile/ChangePasswordSection';
+import { permissionsFor } from '@/lib/constants/userPermissions';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { STYLE_MOTIF } from '@/components/shared/Motif';
 import { COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
@@ -28,6 +30,8 @@ export default function ProfilePage() {
     return null;
   }
 
+  const showStyleSection = permissionsFor(user).ui.showCommunicationStyleSection;
+
   const style = user.communicationStyle
     ? COMMUNICATION_STYLES[user.communicationStyle]
     : null;
@@ -43,7 +47,7 @@ export default function ProfilePage() {
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title="내 대화 성향" tone="L" onBack={() => router.back()} />
+      <PhoneHeader title={showStyleSection ? '내 대화 성향' : '프로필'} tone="L" onBack={() => router.back()} />
       <div
         style={{
           padding: '8px 28px 40px',
@@ -109,7 +113,8 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Communication style card — always shown */}
+        {/* Communication style card — admin은 정책으로 노출 안 함 */}
+        {showStyleSection && (
         <div
           className="letter-card"
           style={{
@@ -249,6 +254,10 @@ export default function ProfilePage() {
             </>
           )}
         </div>
+        )}
+
+        {/* 비밀번호 변경 (이메일 가입자만) */}
+        <ChangePasswordSection />
 
         {/* Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>

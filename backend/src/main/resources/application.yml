@@ -76,10 +76,13 @@ oauth2:
 
 app:
   url: ${APP_URL:https://dev.againspring.net}
+  admin-emails: ${ADMIN_EMAILS:againspring2026@gmail.com}
   prompts:
     path: ${PROMPTS_PATH:./shared/docs/prompts}
   categories:
     path: ${CATEGORIES_PATH:./shared/docs/categories.yml}
+  user-permissions:
+    path: ${USER_PERMISSIONS_PATH:./shared/docs/policies/user-permissions.json}
   safety:
     enabled: true
     forbidden-words-path: ${SAFETY_FORBIDDEN_WORDS_PATH:classpath:/safety/forbidden-words.yml}

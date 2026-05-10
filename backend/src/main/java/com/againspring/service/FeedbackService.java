@@ -3,6 +3,7 @@ package com.againspring.service;
 import com.againspring.domain.Feedback;
 import com.againspring.repository.FeedbackRepository;
 import com.againspring.service.notify.CrisisFeedbackNotifier;
+import com.againspring.service.notify.FeedbackEmailNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,7 @@ public class FeedbackService {
 
     private final FeedbackRepository feedbackRepository;
     private final CrisisFeedbackNotifier crisisFeedbackNotifier;
+    private final FeedbackEmailNotifier feedbackEmailNotifier;
 
     @Transactional
     public Feedback submit(Feedback feedback) {
@@ -34,6 +36,7 @@ public class FeedbackService {
 
         Feedback saved = feedbackRepository.save(feedback);
         crisisFeedbackNotifier.notifyIfCrisis(saved);
+        feedbackEmailNotifier.notifyNewFeedback(saved); // 운영자 메일 알림 (모든 카테고리)
         return saved;
     }
 

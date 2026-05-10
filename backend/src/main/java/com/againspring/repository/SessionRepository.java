@@ -88,4 +88,17 @@ public interface SessionRepository extends JpaRepository<Session, String> {
     @Query("SELECT COALESCE(AVG(s.userAMessageCount + COALESCE(s.userBMessageCount, 0)), 0) " +
            "FROM Session s WHERE s.createdAt >= :from AND s.createdAt < :to")
     Double avgTurnsBetween(@Param("from") Instant from, @Param("to") Instant to);
+
+    /** Admin 사용자 상세용 — 사용자가 관여한(생성/초대받은) 모든 세션 카운트 */
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.createdByUserId = :userId OR s.inviteeUserId = :userId")
+    long countByUserInvolvement(@Param("userId") String userId);
+
+    /** Admin 사용자 상세용 — 사용자 관여 세션 중 완료된 것 카운트 */
+    @Query("SELECT COUNT(s) FROM Session s WHERE (s.createdByUserId = :userId OR s.inviteeUserId = :userId) " +
+           "AND s.status = com.againspring.domain.enums.SessionStatus.COMPLETED")
+    long countCompletedByUserInvolvement(@Param("userId") String userId);
+
+    /** Admin 사용자 상세용 — 사용자 관여 세션 중 가장 최근 생성 시각 */
+    @Query("SELECT MAX(s.createdAt) FROM Session s WHERE s.createdByUserId = :userId OR s.inviteeUserId = :userId")
+    Optional<Instant> findLastSessionCreatedAt(@Param("userId") String userId);
 }

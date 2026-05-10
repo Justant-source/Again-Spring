@@ -20,6 +20,7 @@ export function ChatInput({ onSend, disabled, onCrisis }: Props) {
     const keywordCheck = checkKeywords(content);
     if (keywordCheck.level === 1) {
       onCrisis?.();
+      setText(''); // 동일 텍스트로 모달이 무한 재출력되지 않도록 입력 비우기
       return;
     }
 

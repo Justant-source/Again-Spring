@@ -18,6 +18,7 @@ export interface User {
   email?: string;
   nickname: string;
   isGuest: boolean;
+  mustChangePassword?: boolean;
   communicationStyle?: CommunicationStyle;
   onboardingAnswers?: number[];
   onboardingCompletedAt?: string | null;
@@ -25,6 +26,7 @@ export interface User {
   mbtiProfile?: MbtiProfile;
   onboardingMethod?: 'test' | 'mbti';
   provider?: string | null;
+  roles?: string[];
   createdAt: string;
   termsAgreedAt?: string | null;
   privacyAgreedAt?: string | null;

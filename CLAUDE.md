@@ -83,6 +83,7 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 #### 시스템 전체
 - `shared/docs/structure.md` — 모노레포 전체 구조 / 책임 분리
 - `shared/docs/architecture.md` — 시스템 아키텍처 한 장
+- `shared/docs/admin-dashboard.md` — 관리자 대시보드 기능·운영 가이드 (ADMIN 권한·5개 섹션·14개 API)
 
 ### 백엔드 특화 — `backend/docs/`
 - `backend/docs/structure.md` — Spring Boot 패키지 계층

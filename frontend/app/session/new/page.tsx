@@ -22,9 +22,10 @@ export default function NewSessionPage() {
   const options = [
     { id: 'couple', name: '연인 · 썸', desc: '함께 알아가는 사이' },
     { id: 'marriage', name: '부부', desc: '결혼으로 맺어진 사이' },
-    { id: 'friend', name: '친구', desc: '오래 곁에 있는 사이' },
+    { id: 'friend', name: '친구 · 지인', desc: '친구 혹은 지인과의 갈등' },
     { id: 'family', name: '가족', desc: '형제자매 · 친척' },
     { id: 'parent_child', name: '부모 · 자식', desc: '키우고 자란 사이' },
+    { id: 'work', name: '직장', desc: '직장 생활에서의 갈등' },
   ];
 
   return (

@@ -3,15 +3,19 @@ package com.againspring.service.admin;
 import com.againspring.domain.enums.SessionStatus;
 import com.againspring.repository.DailyStatsRepository;
 import com.againspring.repository.FeedbackRepository;
+import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Date;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +30,7 @@ public class PmfStatsService {
     private final UserRepository userRepository;
     private final FeedbackRepository feedbackRepository;
     private final DailyStatsRepository dailyStatsRepository;
+    private final MessageRepository messageRepository;
 
     @Transactional(readOnly = true)
     public Map<String, Object> getDashboardSummary() {
@@ -71,5 +76,40 @@ public class PmfStatsService {
                     return row;
                 })
                 .toList();
+    }
+
+    /**
+     * V11 — 최근 N일 LLM 호출 실패율 (KST 일별 그룹).
+     * 응답 row: { date, haikuTotal, haikuFallback, sonnetTotal, sonnetFallback }
+     * 현재 메시지에선 Haiku만 사용 → sonnet*는 0. (Sonnet은 Report 생성용, messages 외부)
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getLlmFailureRateLastDays(int days) {
+        int safeDays = Math.min(Math.max(days, 1), 30);
+        Instant since = Instant.now().minus(Duration.ofDays(safeDays));
+        List<Object[]> rows = messageRepository.aggregateMediatorByDay(since);
+
+        List<Map<String, Object>> result = new ArrayList<>(rows.size());
+        for (Object[] row : rows) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            // d: java.sql.Date, total: Number, fb: Number (or null)
+            Object dateObj = row[0];
+            String dateStr = dateObj instanceof Date sqlDate ? sqlDate.toString() : String.valueOf(dateObj);
+            entry.put("date", dateStr);
+            long total = toLong(row[1]);
+            long fb = toLong(row[2]);
+            entry.put("haikuTotal", total);
+            entry.put("haikuFallback", fb);
+            entry.put("sonnetTotal", 0L);
+            entry.put("sonnetFallback", 0L);
+            result.add(entry);
+        }
+        return result;
+    }
+
+    private static long toLong(Object o) {
+        if (o == null) return 0L;
+        if (o instanceof Number n) return n.longValue();
+        try { return Long.parseLong(o.toString()); } catch (NumberFormatException e) { return 0L; }
     }
 }

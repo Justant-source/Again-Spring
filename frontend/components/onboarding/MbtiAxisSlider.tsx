@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * MBTI 단일 축 슬라이더. MediatorStylePicker와 동일한 톤(L) 디자인 언어 사용.
+ * - 양 끝 글자(E/I 등)는 활성화 시 진한 잉크색, 비활성 시 약한 보조색
+ * - accentColor를 명시해 브라우저 기본 초록 제거
+ */
 export interface MbtiAxisSliderProps {
   axisLabel: string;
   leftLetter: string;
@@ -22,18 +27,37 @@ export function MbtiAxisSlider({
   const leftPct = 100 - value;
   const rightPct = value;
   const isLeft = value < 50;
+  const isCenter = value === 50;
 
   return (
-    <div>
-      <div style={{ fontSize: 11, color: 'var(--L-sub)', marginBottom: 10 }}>{axisLabel}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div style={{ width: '100%' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+        }}
+      >
+        <span style={{ fontSize: 11, color: 'var(--L-sub)', letterSpacing: 0.5 }}>
+          {axisLabel}
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--L-sub)' }}>
+          {isCenter ? '균형' : isLeft ? `${leftLetter} ${leftPct}` : `${rightLetter} ${rightPct}`}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span
+          className="serif"
           style={{
-            fontSize: 17,
-            fontWeight: 700,
-            color: isLeft ? 'var(--L-accent)' : 'var(--L-rule)',
-            minWidth: 22,
-            transition: 'color 0.2s',
+            fontSize: 18,
+            fontWeight: 600,
+            color: !isCenter && isLeft ? 'var(--L-ink)' : 'var(--L-sub)',
+            opacity: !isCenter && isLeft ? 1 : 0.4,
+            minWidth: 18,
+            textAlign: 'center',
+            transition: 'color 0.2s, opacity 0.2s',
           }}
         >
           {leftLetter}
@@ -45,32 +69,43 @@ export function MbtiAxisSlider({
           step={5}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
+          aria-label={`${axisLabel}: ${leftLetter} ↔ ${rightLetter}`}
           style={{
             flex: 1,
             height: 4,
-            accentColor: 'var(--L-accent)',
+            accentColor: 'var(--L-ink)',
             cursor: 'pointer',
           }}
         />
         <span
+          className="serif"
           style={{
-            fontSize: 17,
-            fontWeight: 700,
-            color: !isLeft ? 'var(--L-accent)' : 'var(--L-rule)',
-            minWidth: 22,
-            textAlign: 'right',
-            transition: 'color 0.2s',
+            fontSize: 18,
+            fontWeight: 600,
+            color: !isCenter && !isLeft ? 'var(--L-ink)' : 'var(--L-sub)',
+            opacity: !isCenter && !isLeft ? 1 : 0.4,
+            minWidth: 18,
+            textAlign: 'center',
+            transition: 'color 0.2s, opacity 0.2s',
           }}
         >
           {rightLetter}
         </span>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-        <span style={{ fontSize: 11, color: isLeft ? 'var(--L-accent)' : 'var(--L-sub)' }}>
-          <span>{leftLabel}</span>{' '}<span>{leftPct}%</span>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: 6,
+          fontSize: 11,
+        }}
+      >
+        <span style={{ color: !isCenter && isLeft ? 'var(--L-ink)' : 'var(--L-sub)' }}>
+          {leftLabel}
         </span>
-        <span style={{ fontSize: 11, color: !isLeft ? 'var(--L-accent)' : 'var(--L-sub)' }}>
-          <span>{rightLabel}</span>{' '}<span>{rightPct}%</span>
+        <span style={{ color: !isCenter && !isLeft ? 'var(--L-ink)' : 'var(--L-sub)' }}>
+          {rightLabel}
         </span>
       </div>
     </div>

@@ -33,6 +33,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
+    private final AdminRoleAssigner adminRoleAssigner;
     private final Random random = new Random();
 
     public AuthResponse signup(SignupRequest request) {
@@ -58,6 +59,7 @@ public class AuthService {
         user.getRoles().add("USER");
 
         User saved = userRepository.save(user);
+        saved = adminRoleAssigner.ensureAdminIfWhitelisted(saved);
         log.info("User signup successful: {}", saved.getId());
 
         String token = jwtService.generateAccessToken(saved.getId(), saved.getEmail());
@@ -75,6 +77,7 @@ public class AuthService {
             throw new BusinessException("AUTH_INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않아요.", 401);
         }
 
+        user = adminRoleAssigner.ensureAdminIfWhitelisted(user);
         log.info("User login successful: {}", user.getId());
         String token = jwtService.generateAccessToken(user.getId(), user.getEmail());
         return buildAuthResponse(user, token, 86400, false);
@@ -107,6 +110,7 @@ public class AuthService {
             throw new BusinessException("USER_ALREADY_DELETED", "탈퇴한 계정이에요.");
         }
 
+        user = adminRoleAssigner.ensureAdminIfWhitelisted(user);
         log.info("OAuth login successful: {} via {}", user.getId(), provider);
         String token = jwtService.generateAccessToken(user.getId(), user.getEmail());
         return buildAuthResponse(user, token, 86400, false);
@@ -177,11 +181,17 @@ public class AuthService {
                         .email(user.getEmail())
                         .nickname(user.getNickname())
                         .isGuest(isGuest)
+                        .mustChangePassword(user.isMustChangePassword())
                         .communicationStyle(user.getCommunicationStyle())
                         .mbtiType(user.getMbtiType())
                         .mbtiProfile(user.getMbtiProfile())
                         .provider(user.getProvider())
+                        .roles(user.getRoles())
                         .onboardingCompletedAt(user.getOnboardingCompletedAt())
+                        .termsAgreedAt(user.getTermsAgreedAt())
+                        .privacyAgreedAt(user.getPrivacyAgreedAt())
+                        .disclaimerAgreedAt(user.getDisclaimerAgreedAt())
+                        .marketingAgreedAt(user.getMarketingAgreedAt())
                         .createdAt(user.getCreatedAt())
                         .build())
                 .token(AuthResponse.TokenInfo.builder()

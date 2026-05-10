@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "version": "1.0",
+  "lastUpdated": "2026-05-10",
+  "description": "다시봄 사용자 등급별 권한·제한 정책. 단일 진실 원본 — BE/FE 모두 이 파일을 참조한다. 변경 시 BE 컨테이너 재시작 + FE 재빌드 필요.",
+  "tiers": {
+    "guest": {
+      "label": "게스트",
+      "summary": "회원가입 없이 체험 가능한 임시 사용자. IP·세션·턴·기간 모두 제한.",
+      "auth": {
+        "tokenExpirationSeconds": 7200,
+        "requiresEmailVerification": false,
+        "requiresOnboarding": false,
+        "canChangePassword": false
+      },
+      "sessions": {
+        "dailyLimit": 3,
+        "dailyLimitScope": "ip",
+        "messageTurnLimit": 3,
+        "duoModeAllowed": false,
+        "canInvitePartner": false,
+        "canResumeOldSession": true
+      },
+      "profile": {
+        "canEditNickname": false,
+        "canEditEmail": false,
+        "canEditCommunicationStyle": false,
+        "canCompleteOnboarding": false,
+        "canSetMbti": false,
+        "canViewHistory": false,
+        "canDeleteAccount": true,
+        "deleteRequiresPassword": false
+      },
+      "data": {
+        "messageContentRetentionDays": 7,
+        "sessionRetentionDays": 30,
+        "reportRetentionDays": 30
+      },
+      "ui": {
+        "showHistoryMenu": false,
+        "showProfileEditing": false,
+        "showConsentReconfirmModal": false,
+        "showUpgradeModalOnLimit": true,
+        "showGuestModeBadge": true,
+        "showBetaBanner": true,
+        "showAdminEntryButton": false,
+        "showLandingChatEntry": true,
+        "showCommunicationStyleSection": false
+      },
+      "mediator": {
+        "styleSource": "per_session",
+        "defaultStyleX": 50,
+        "defaultStyleY": 50
+      },
+      "admin": {
+        "canAccessDashboard": false,
+        "canViewAllUsers": false,
+        "canModifyFeedback": false,
+        "canAnonymizeUser": false,
+        "canViewCrisisMonitor": false,
+        "canViewSystemHealth": false
+      }
+    },
+    "registered": {
+      "label": "회원",
+      "summary": "이메일 인증 또는 OAuth 로그인 회원. 전체 기능·장기 보존·Duo 초대 가능.",
+      "auth": {
+        "tokenExpirationSeconds": 86400,
+        "requiresEmailVerification": true,
+        "requiresOnboarding": true,
+        "canChangePassword": true
+      },
+      "sessions": {
+        "dailyLimit": 5,
+        "dailyLimitScope": "user",
+        "messageTurnLimit": null,
+        "duoModeAllowed": true,
+        "canInvitePartner": true,
+        "canResumeOldSession": true
+      },
+      "profile": {
+        "canEditNickname": true,
+        "canEditEmail": false,
+        "canEditCommunicationStyle": true,
+        "canCompleteOnboarding": true,
+        "canSetMbti": true,
+        "canViewHistory": true,
+        "canDeleteAccount": true,
+        "deleteRequiresPassword": true
+      },
+      "data": {
+        "messageContentRetentionDays": 30,
+        "sessionRetentionDays": 180,
+        "reportRetentionDays": null
+      },
+      "ui": {
+        "showHistoryMenu": true,
+        "showProfileEditing": true,
+        "showConsentReconfirmModal": true,
+        "showUpgradeModalOnLimit": false,
+        "showGuestModeBadge": false,
+        "showBetaBanner": true,
+        "showAdminEntryButton": false,
+        "showLandingChatEntry": true,
+        "showCommunicationStyleSection": true
+      },
+      "mediator": {
+        "styleSource": "profile",
+        "defaultStyleX": 50,
+        "defaultStyleY": 50
+      },
+      "admin": {
+        "canAccessDashboard": false,
+        "canViewAllUsers": false,
+        "canModifyFeedback": false,
+        "canAnonymizeUser": false,
+        "canViewCrisisMonitor": false,
+        "canViewSystemHealth": false
+      }
+    },
+    "admin": {
+      "label": "관리자",
+      "summary": "회원 권한 + 관리자 대시보드/감사 권한. 일반 사용자 흐름(채팅·프로필·온보딩) 모두 가능.",
+      "auth": {
+        "tokenExpirationSeconds": 86400,
+        "requiresEmailVerification": true,
+        "requiresOnboarding": false,
+        "canChangePassword": true
+      },
+      "sessions": {
+        "dailyLimit": 5,
+        "dailyLimitScope": "user",
+        "messageTurnLimit": null,
+        "duoModeAllowed": true,
+        "canInvitePartner": true,
+        "canResumeOldSession": true
+      },
+      "profile": {
+        "canEditNickname": true,
+        "canEditEmail": false,
+        "canEditCommunicationStyle": true,
+        "canCompleteOnboarding": true,
+        "canSetMbti": true,
+        "canViewHistory": true,
+        "canDeleteAccount": true,
+        "deleteRequiresPassword": true
+      },
+      "data": {
+        "messageContentRetentionDays": 30,
+        "sessionRetentionDays": 180,
+        "reportRetentionDays": null
+      },
+      "ui": {
+        "showHistoryMenu": false,
+        "showProfileEditing": true,
+        "showConsentReconfirmModal": true,
+        "showUpgradeModalOnLimit": false,
+        "showGuestModeBadge": false,
+        "showBetaBanner": true,
+        "showAdminEntryButton": true,
+        "showLandingChatEntry": false,
+        "showCommunicationStyleSection": false
+      },
+      "mediator": {
+        "styleSource": "profile",
+        "defaultStyleX": 50,
+        "defaultStyleY": 50
+      },
+      "admin": {
+        "canAccessDashboard": true,
+        "canViewAllUsers": true,
+        "canModifyFeedback": true,
+        "canAnonymizeUser": true,
+        "canViewCrisisMonitor": true,
+        "canViewSystemHealth": true
+      }
+    }
+  },
+  "fieldDefinitions": {
+    "auth.tokenExpirationSeconds": "JWT 액세스 토큰 만료 시간(초)",
+    "auth.requiresEmailVerification": "가입 시 이메일 인증코드 필수 여부",
+    "auth.requiresOnboarding": "세션 생성 전 성격검사(onboarding) 완료 필수 여부",
+    "sessions.dailyLimit": "하루 세션 생성 허용 개수",
+    "sessions.dailyLimitScope": "한도 적용 단위. 'ip'=IP당, 'user'=사용자당",
+    "sessions.messageTurnLimit": "세션당 사용자 발화(turn) 제한. null=무제한",
+    "sessions.duoModeAllowed": "상대 초대 후 Duo 모드 진입 가능 여부",
+    "sessions.canInvitePartner": "초대 토큰 발급/공유 가능 여부",
+    "profile.canEditNickname": "프로필에서 닉네임 변경 가능 여부",
+    "profile.canCompleteOnboarding": "10문항 성격검사 응답 저장 가능 여부",
+    "profile.canSetMbti": "MBTI 입력/검사 가능 여부",
+    "profile.canViewHistory": "지난 세션 이력 조회 가능 여부",
+    "profile.deleteRequiresPassword": "계정 삭제 시 비밀번호 재확인 필수 여부 (OAuth/게스트 false)",
+    "data.messageContentRetentionDays": "사용자 발화 원문 보존 일수. 경과 후 NULL 처리",
+    "data.sessionRetentionDays": "세션 메타데이터 보존 일수",
+    "data.reportRetentionDays": "리포트 보존 일수. null=영구",
+    "ui.showHistoryMenu": "랜딩/대시보드에서 '지난 대화' 메뉴 노출",
+    "ui.showProfileEditing": "프로필 페이지에서 편집 가능한 필드 노출",
+    "ui.showConsentReconfirmModal": "동의 타임스탬프 NULL인 회원에게 재동의 모달 표시",
+    "ui.showUpgradeModalOnLimit": "메시지 한도 도달 시 가입 유도 모달 표시",
+    "ui.showGuestModeBadge": "프로필에 '게스트 모드' 배지 표시",
+    "ui.showAdminEntryButton": "랜딩(/) 페이지에 [관리자모드] 진입 버튼 노출",
+    "ui.showLandingChatEntry": "랜딩 페이지의 일반 사용자 채팅 진입 UI(헤드라인·도구 설명·시작 버튼·이어서 대화하기·온보딩 안내·지난 대화) 노출",
+    "ui.showCommunicationStyleSection": "프로필에 '당신의 대화 스타일' 카드(통신 스타일·MBTI·온보딩 재시도) 노출",
+    "mediator.styleSource": "중재자 성향(공감/팩트 비율) 결정 방법. 'per_session'=세션 생성 시마다 선택(기본 50/50), 'profile'=프로필 기반, 'default'=고정 기본값",
+    "admin.canAccessDashboard": "/admin 페이지 접근 가능 (BE는 SecurityConfig hasRole('ADMIN')로 별도 가드)",
+    "admin.canViewAllUsers": "전체 사용자 목록·검색 조회",
+    "admin.canModifyFeedback": "의견함 상태 변경·관리자 메모",
+    "admin.canAnonymizeUser": "사용자 데이터 익명화 (되돌릴 수 없음)",
+    "admin.canViewCrisisMonitor": "위기 메시지 메타데이터 모니터 (본문은 항상 노출 X)",
+    "admin.canViewSystemHealth": "시스템 헬스 패널·LLM 실패율 차트"
+  }
+}

@@ -12,4 +12,6 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     Page<Feedback> findByCategoryOrderByCreatedAtDesc(String category, Pageable pageable);
 
     Page<Feedback> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
+
+    long countByUserId(String userId);
 }
