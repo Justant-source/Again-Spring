@@ -602,12 +602,12 @@ function EmptyChatPlaceholder() {
         무슨 일이 있으셨어요?
       </div>
       <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-        편한 말로, 카톡처럼 한 줄씩 적어주세요.
+        편한 말로, 한 줄씩 적어주세요.
         <br />
         제가 차분히 들을게요.
         <br /><br />
         <span style={{ fontSize: 12, color: 'var(--P-sub)', opacity: 0.8 }}>
-          AI는 누가 옳은지 판단하지 않아요. 정리가 어색하면 언제든 다시 말씀해 주세요.
+          AI는 누가 옳은지 판단하지 않아요. 편안하게 말씀해 주세요.
         </span>
       </div>
     </div>
