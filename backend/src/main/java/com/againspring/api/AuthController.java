@@ -8,6 +8,7 @@ import com.againspring.api.dto.request.ResetPasswordRequest;
 import com.againspring.api.dto.request.SendVerificationRequest;
 import com.againspring.api.dto.request.SignupRequest;
 import com.againspring.api.dto.response.AuthResponse;
+import com.againspring.security.JwtService;
 import com.againspring.service.AuthService;
 import com.againspring.service.EmailVerificationService;
 import com.againspring.service.LogoutService;
@@ -43,6 +44,7 @@ public class AuthController {
     private final EmailVerificationService emailVerificationService;
     private final PasswordResetService passwordResetService;
     private final LogoutService logoutService;
+    private final JwtService jwtService;
 
     /**
      * Send email verification code.
@@ -71,7 +73,21 @@ public class AuthController {
             content = @Content(schema = @Schema(implementation = AuthResponse.class)))
     @ApiResponse(responseCode = "400", description = "Validation failed")
     @ApiResponse(responseCode = "409", description = "Email already exists")
-    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
+    public ResponseEntity<AuthResponse> signup(
+            @Valid @RequestBody SignupRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        // Authorization 헤더에 게스트 토큰이 있으면 게스트 ID 추출 → request에 설정
+        // (게스트 → 회원 마이그레이션: 온보딩/MBTI/세션 데이터 이전)
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            try {
+                if ("guest".equals(jwtService.getTokenType(token))) {
+                    jwtService.extractUserId(token).ifPresent(request::setMigrateFromGuestId);
+                }
+            } catch (Exception ignored) {
+                // 토큰 파싱 실패는 마이그레이션 없이 신규 가입으로 진행
+            }
+        }
         AuthResponse response = authService.signup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

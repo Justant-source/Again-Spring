@@ -9,6 +9,7 @@ import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.GuestSession;
 import com.againspring.domain.User;
 import com.againspring.repository.GuestSessionRepository;
+import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.security.JwtService;
 import com.againspring.util.GuestNicknameGenerator;
@@ -30,12 +31,14 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final GuestSessionRepository guestSessionRepository;
+    private final SessionRepository sessionRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
     private final AdminRoleAssigner adminRoleAssigner;
     private final Random random = new Random();
 
+    @Transactional
     public AuthResponse signup(SignupRequest request) {
         emailVerificationService.verifyCode(request.getEmail(), request.getVerificationCode());
 
@@ -62,25 +65,113 @@ public class AuthService {
         saved = adminRoleAssigner.ensureAdminIfWhitelisted(saved);
         log.info("User signup successful: {}", saved.getId());
 
+        // 게스트 → 회원 마이그레이션 (요청에 게스트 ID가 있는 경우에만)
+        if (request.getMigrateFromGuestId() != null && !request.getMigrateFromGuestId().isBlank()) {
+            saved = migrateGuestData(request.getMigrateFromGuestId(), saved);
+        }
+
         String token = jwtService.generateAccessToken(saved.getId(), saved.getEmail());
         return buildAuthResponse(saved, token, 86400, false);
     }
 
-    public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException("AUTH_INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않아요.", 401));
-
-        if (user.getDeletedAt() != null) {
-            throw new BusinessException("USER_ALREADY_DELETED", "탈퇴한 계정이에요.");
+    /**
+     * 게스트 user의 온보딩/MBTI/통신스타일을 신규 회원에 복사하고,
+     * 게스트가 만든/초대받은 모든 세션을 신규 회원으로 reassign 후 게스트 user를 soft delete.
+     * 안전성: 대상 user가 isGuest=true 인지 확인, 아니면 무시 (다른 회원 데이터 탈취 차단).
+     */
+    @Transactional
+    protected User migrateGuestData(String guestId, User newMember) {
+        var guestOpt = userRepository.findById(guestId);
+        if (guestOpt.isEmpty()) {
+            log.warn("Guest migration skipped — guest user not found: {}", guestId);
+            return newMember;
         }
+        User guest = guestOpt.get();
+        if (!guest.isGuest()) {
+            log.warn("Guest migration refused — target id is not a guest: {}", guestId);
+            return newMember;
+        }
+        if (guest.getDeletedAt() != null) {
+            log.warn("Guest migration skipped — guest already deleted: {}", guestId);
+            return newMember;
+        }
+
+        // 1) 프로필 복사 (게스트가 채워둔 경우만 — 신규 회원 입력값 덮어쓰기 안 함)
+        if (guest.getCommunicationStyle() != null && newMember.getCommunicationStyle() == null) {
+            newMember.setCommunicationStyle(guest.getCommunicationStyle());
+        }
+        if (guest.getOnboardingAnswers() != null && newMember.getOnboardingAnswers() == null) {
+            newMember.setOnboardingAnswers(guest.getOnboardingAnswers());
+        }
+        if (guest.getMbtiType() != null && newMember.getMbtiType() == null) {
+            newMember.setMbtiType(guest.getMbtiType());
+        }
+        if (guest.getMbtiProfile() != null && newMember.getMbtiProfile() == null) {
+            newMember.setMbtiProfile(guest.getMbtiProfile());
+        }
+        if (guest.getOnboardingCompletedAt() != null && newMember.getOnboardingCompletedAt() == null) {
+            newMember.setOnboardingCompletedAt(guest.getOnboardingCompletedAt());
+        }
+        User savedMember = userRepository.save(newMember);
+
+        // 2) 세션 ownership 이전 (createdByUserId / inviteeUserId 모두)
+        int reassignedCreated = sessionRepository.reassignCreatedBy(guestId, savedMember.getId());
+        int reassignedInvited = sessionRepository.reassignInvitee(guestId, savedMember.getId());
+        log.info("Guest sessions migrated: created={}, invited={} (guest {} → member {})",
+                reassignedCreated, reassignedInvited, guestId, savedMember.getId());
+
+        // 3) 게스트 user soft delete (재인증 시도 차단)
+        guest.setDeletedAt(Instant.now());
+        userRepository.save(guest);
+        log.info("Guest user soft-deleted after migration: {}", guestId);
+
+        return savedMember;
+    }
+
+    public AuthResponse login(LoginRequest request) {
+        // 1) 이메일 등록 여부
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BusinessException(
+                        "EMAIL_NOT_REGISTERED",
+                        "등록되지 않은 이메일이에요. 회원가입이 필요해요.",
+                        404));
+
+        // 2) 탈퇴 계정
+        if (user.getDeletedAt() != null) {
+            throw new BusinessException(
+                    "USER_ALREADY_DELETED",
+                    "탈퇴한 계정이에요. 새 이메일로 가입해주세요.",
+                    410);
+        }
+
+        // 3) OAuth 가입자가 이메일/비밀번호로 로그인 시도
+        if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
+            String providerLabel = providerLabel(user.getProvider());
+            throw new BusinessException(
+                    "OAUTH_LOGIN_REQUIRED",
+                    providerLabel + " 로그인으로 가입된 계정이에요. " + providerLabel + " 로그인을 사용해주세요.",
+                    401);
+        }
+
+        // 4) 비밀번호 검증
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new BusinessException("AUTH_INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않아요.", 401);
+            throw new BusinessException(
+                    "WRONG_PASSWORD",
+                    "비밀번호가 올바르지 않아요. 비밀번호 찾기를 이용해주세요.",
+                    401);
         }
 
         user = adminRoleAssigner.ensureAdminIfWhitelisted(user);
         log.info("User login successful: {}", user.getId());
         String token = jwtService.generateAccessToken(user.getId(), user.getEmail());
         return buildAuthResponse(user, token, 86400, false);
+    }
+
+    private String providerLabel(String provider) {
+        if (provider == null) return "소셜";
+        // 현재 지원: Google만. 그 외는 일반화된 '소셜' 라벨로 노출하지 않음.
+        if ("google".equalsIgnoreCase(provider)) return "Google";
+        return "소셜";
     }
 
     /**
@@ -125,7 +216,8 @@ public class AuthService {
         String guestId;
         String displayNickname = (request.getNickname() != null && !request.getNickname().isBlank())
                 ? request.getNickname()
-                : GuestNicknameGenerator.generate();
+                : GuestNicknameGenerator.generateUnique(
+                        userRepository::existsByNicknameAndDeletedAtIsNull);
 
         if (request.getInviteToken() != null && !request.getInviteToken().isBlank()) {
             guestId = guestSessionRepository.findByInviteToken(request.getInviteToken())

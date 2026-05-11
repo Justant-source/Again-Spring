@@ -16,11 +16,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setErrorCode('');
 
     if (!email || !password) {
       setError('이메일과 비밀번호를 입력해주세요');
@@ -41,6 +43,7 @@ export default function LoginPage() {
       router.push('/');
     } catch (err: any) {
       setError(err.response?.data?.error?.message || '로그인에 실패했어요');
+      setErrorCode(err.response?.data?.error?.code || '');
     } finally {
       setLoading(false);
     }
@@ -105,8 +108,39 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div style={{ fontSize: 13, color: 'var(--L-point)', marginTop: 8 }}>
-                {error}
+              <div
+                style={{
+                  fontSize: 13, marginTop: 8,
+                  padding: '10px 12px',
+                  background: '#fff3f0',
+                  border: '1px solid #f5c0b0',
+                  borderRadius: 8,
+                  color: '#8a2a10',
+                  lineHeight: 1.6,
+                }}
+              >
+                <div>{error}</div>
+                {errorCode === 'EMAIL_NOT_REGISTERED' && (
+                  <Link
+                    href="/signup"
+                    style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: 'var(--L-ink)', textDecoration: 'underline', fontWeight: 600 }}
+                  >
+                    회원가입 하러 가기 →
+                  </Link>
+                )}
+                {errorCode === 'WRONG_PASSWORD' && (
+                  <Link
+                    href="/forgot-password"
+                    style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: 'var(--L-ink)', textDecoration: 'underline', fontWeight: 600 }}
+                  >
+                    비밀번호 찾기 →
+                  </Link>
+                )}
+                {errorCode === 'OAUTH_LOGIN_REQUIRED' && (
+                  <div style={{ marginTop: 6, fontSize: 11, opacity: 0.85 }}>
+                    아래 소셜 로그인 버튼을 사용해주세요.
+                  </div>
+                )}
               </div>
             )}
 

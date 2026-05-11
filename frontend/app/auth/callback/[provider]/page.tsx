@@ -22,7 +22,7 @@ export default function OAuthCallbackPage() {
       return;
     }
 
-    const redirectUri = getRedirectUri(provider as 'google' | 'kakao' | 'naver');
+    const redirectUri = getRedirectUri(provider as 'google');
 
     api
       .post(`/api/auth/oauth2/${provider}`, { code, redirectUri })

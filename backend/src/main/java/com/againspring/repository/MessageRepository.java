@@ -69,4 +69,10 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("SELECT MAX(m.createdAt) FROM Message m WHERE m.sender IN " +
            "(com.againspring.domain.enums.MessageSender.MEDIATOR_TO_A, com.againspring.domain.enums.MessageSender.MEDIATOR_TO_B)")
     Instant findLastMediatorCallAt();
+
+    /** invocation-status 응답용 — 특정 세션·sender의 가장 최근 사용자 메시지 시각 */
+    @Query("SELECT MAX(m.createdAt) FROM Message m WHERE m.sessionId = :sessionId AND m.sender = :sender")
+    Instant findLastMessageAtBySender(
+            @Param("sessionId") String sessionId,
+            @Param("sender") com.againspring.domain.enums.MessageSender sender);
 }

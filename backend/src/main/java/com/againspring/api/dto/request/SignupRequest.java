@@ -43,4 +43,11 @@ public class SignupRequest {
     private boolean disclaimerAgreed;
 
     private boolean marketingAgreed;
+
+    /**
+     * 게스트 → 회원 마이그레이션 ID (선택).
+     * FE가 현재 게스트 user.id를 함께 전송하면 BE가 게스트 데이터(온보딩/MBTI/세션)를
+     * 신규 회원에 이전. AuthController에서 Authorization 헤더의 게스트 토큰과 일치 검증.
+     */
+    private String migrateFromGuestId;
 }

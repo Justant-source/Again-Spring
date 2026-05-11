@@ -157,6 +157,12 @@ public class CancelableChatService {
                 .build());
         incrementUserMessageCount(session, sender);
 
+        // 사용자가 명시적으로 종료 의사를 표현했으면 LLM 응답을 기다리지 않고 즉시 finalize 카드 권유.
+        // 자동 트리거(메시지 수 기반)와 달리 사용자 의지 표현이므로 RESOLVING 게이트 없이 통과.
+        if (session.getFinalizeSuggestedAt() == null && ChatService.detectExitIntent(content)) {
+            triggerFinalizationSuggestion(session, stateMachine.isDuo(session.getStatus()));
+        }
+
         return ChatService.ChatTurnResult.success(userMsg, List.of(), false);
     }
 
@@ -235,6 +241,20 @@ public class CancelableChatService {
     public void cleanupSession(String sessionId) {
         cancelActiveInvocation(sessionId, MessageSender.USER_A, "session_cleanup");
         cancelActiveInvocation(sessionId, MessageSender.USER_B, "session_cleanup");
+    }
+
+    /**
+     * Admin/FE용 — 특정 세션의 sender에 대해 진행 중인 LLM invocation이 있는지 확인.
+     * 새로고침 후 TypingBubble 복원에 사용.
+     */
+    public boolean isInvocationActive(String sessionId, MessageSender sender) {
+        return activeInvocations.containsKey(invocationKey(sessionId, sender));
+    }
+
+    /** 세션의 어떤 sender에든 진행 중 invocation이 있는지 확인 */
+    public boolean isAnyInvocationActive(String sessionId) {
+        return activeInvocations.containsKey(invocationKey(sessionId, MessageSender.USER_A))
+                || activeInvocations.containsKey(invocationKey(sessionId, MessageSender.USER_B));
     }
 
     // --- private helpers ---
@@ -426,13 +446,15 @@ public class CancelableChatService {
         int bCount = session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount();
         boolean isDuo = stateMachine.isDuo(session.getStatus());
 
-        boolean shouldSuggest = isDuo
+        boolean countThreshold = isDuo
                 ? (aCount + bCount) >= ChatService.FINALIZE_SUGGEST_DUO_TOTAL_MIN
                     && aCount >= ChatService.FINALIZE_SUGGEST_DUO_PER_USER_MIN
                     && bCount >= ChatService.FINALIZE_SUGGEST_DUO_PER_USER_MIN
                 : aCount >= ChatService.FINALIZE_SUGGEST_SOLO_MIN;
 
-        if (shouldSuggest) {
+        // 메시지 수만으로는 자동 권유하지 않음 — RESOLVING 상태 도달 신호와 AND 결합.
+        // 명시적 종료 의사는 acceptUserMessage()의 detectExitIntent 경로에서 처리됨.
+        if (countThreshold && ChatService.hasReachedResolvingState(session)) {
             triggerFinalizationSuggestion(session, isDuo);
             return true;
         }

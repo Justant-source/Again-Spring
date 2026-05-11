@@ -28,6 +28,9 @@ public interface UserRepository extends JpaRepository<User, String> {
      */
     boolean existsByEmail(String email);
 
+    /** 게스트 닉네임 중복 차단 (탈퇴 제외) */
+    boolean existsByNicknameAndDeletedAtIsNull(String nickname);
+
     /**
      * OAuth provider + providerId로 사용자 조회
      */

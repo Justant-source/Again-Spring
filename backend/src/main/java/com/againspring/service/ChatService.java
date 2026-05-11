@@ -443,8 +443,14 @@ public class ChatService {
     @Transactional
     public void declineFinalize(String sessionId, MessageSender decliningUser) {
         Session session = sessionRepo.findById(sessionId).orElseThrow();
-        // 상태를 다시 CHATTING_DUO로 (Duo만 권유가 발생하므로)
-        session.setStatus(SessionStatus.CHATTING_DUO);
+        // 원래 모드로 복귀 — Solo면 CHATTING_SOLO, 상대가 합류한 Duo면 CHATTING_DUO.
+        // 이전 버그: 무조건 CHATTING_DUO로 바꿔 Solo 세션이 강제로 Duo UI(SwipeContainer)로 전환되어
+        //          "상대가 초대된 것처럼" 보였음.
+        if (session.getUserBId() != null) {
+            session.setStatus(SessionStatus.CHATTING_DUO);
+        } else {
+            session.setStatus(SessionStatus.CHATTING_SOLO);
+        }
         // 동의 플래그 초기화 (다음 권유 시 새로 받기)
         session.setFinalizeAgreedByA(false);
         session.setFinalizeAgreedByB(false);
@@ -604,12 +610,22 @@ public class ChatService {
         return msgs.size() <= limit ? msgs : msgs.subList(msgs.size() - limit, msgs.size());
     }
 
-    private boolean detectExitIntent(String content) {
+    static boolean detectExitIntent(String content) {
         if (content == null) return false;
         String c = content.replace(" ", "");
         return c.contains("종료") || c.contains("끝내") || c.contains("그만하") ||
                c.contains("마무리") || c.contains("끝낼게") || c.contains("그만해") ||
-               c.contains("대화끝") || c.contains("끝이야");
+               c.contains("대화끝") || c.contains("끝이야") || c.contains("이만하면됐");
+    }
+
+    /** finalize 자동 트리거 게이트 — 사용자가 실제 해소(RESOLVING) 단계에 도달했는지 검사 */
+    static boolean hasReachedResolvingState(Session session) {
+        List<Session.UserStateEntry> hist = session.getUserStateHistory();
+        if (hist == null || hist.isEmpty()) return false;
+        for (Session.UserStateEntry e : hist) {
+            if (e != null && e.state == Session.UserState.RESOLVING) return true;
+        }
+        return false;
     }
 
     private boolean checkAndTriggerFinalizationSuggestion(Session session) {
@@ -619,17 +635,19 @@ public class ChatService {
         int bCount = session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount();
 
         boolean isDuo = stateMachine.isDuo(session.getStatus());
-        boolean shouldSuggest;
+        boolean countThreshold;
 
         if (!isDuo) {
-            shouldSuggest = aCount >= FINALIZE_SUGGEST_SOLO_MIN;
+            countThreshold = aCount >= FINALIZE_SUGGEST_SOLO_MIN;
         } else {
-            shouldSuggest = (aCount + bCount) >= FINALIZE_SUGGEST_DUO_TOTAL_MIN
+            countThreshold = (aCount + bCount) >= FINALIZE_SUGGEST_DUO_TOTAL_MIN
                 && aCount >= FINALIZE_SUGGEST_DUO_PER_USER_MIN
                 && bCount >= FINALIZE_SUGGEST_DUO_PER_USER_MIN;
         }
 
-        if (shouldSuggest) {
+        // 메시지 수만으로는 자동 권유하지 않음 — RESOLVING 상태 도달 신호와 AND 결합.
+        // 명시적 종료 의사는 sendUserMessage()의 detectExitIntent 경로에서 처리됨.
+        if (countThreshold && hasReachedResolvingState(session)) {
             triggerFinalizationSuggestion(session, isDuo);
             return true;
         }

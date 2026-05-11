@@ -33,6 +33,7 @@ public class MessageController {
     private final ChatService chatService;
     private final SessionRoleResolver roleResolver;
     private final SessionService sessionService;
+    private final com.againspring.repository.MessageRepository messageRepository;
 
     @PostMapping("/messages")
     @SecurityRequirement(name = "bearer-jwt")
@@ -90,6 +91,27 @@ public class MessageController {
         var sender = roleResolver.resolveSender(sessionId, userDetails.getUsername());
         var status = chatService.getPartnerStatus(sessionId, sender);
         return ResponseEntity.ok(PartnerStatusResponse.from(status));
+    }
+
+    /**
+     * 새로고침 후 TypingBubble 복원용 — 본인 sender의 LLM invocation이 진행 중인지 조회.
+     * 응답에 lastUserMessageAt 포함: FE가 이 시각 기준으로만 "신규 mediator 응답"을 식별하여
+     * 폴링이 진행 중 typing 상태를 race로 종료시키는 것을 차단.
+     */
+    @GetMapping("/invocation-status")
+    @SecurityRequirement(name = "bearer-jwt")
+    public ResponseEntity<java.util.Map<String, Object>> getInvocationStatus(
+        @PathVariable String sessionId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        var sender = roleResolver.resolveSender(sessionId, userDetails.getUsername());
+        boolean inProgress = cancelableChatService.isInvocationActive(sessionId, sender);
+        Instant lastUserMessageAt = messageRepository.findLastMessageAtBySender(sessionId, sender);
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("inProgress", inProgress);
+        body.put("sender", sender.name());
+        body.put("lastUserMessageAt", lastUserMessageAt);
+        return ResponseEntity.ok(body);
     }
 
     @PostMapping("/finalize")

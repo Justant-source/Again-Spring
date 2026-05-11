@@ -101,4 +101,14 @@ public interface SessionRepository extends JpaRepository<Session, String> {
     /** Admin 사용자 상세용 — 사용자 관여 세션 중 가장 최근 생성 시각 */
     @Query("SELECT MAX(s.createdAt) FROM Session s WHERE s.createdByUserId = :userId OR s.inviteeUserId = :userId")
     Optional<Instant> findLastSessionCreatedAt(@Param("userId") String userId);
+
+    /** 게스트 → 회원 마이그레이션: 게스트가 생성한 세션의 owner를 새 회원으로 이전 */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Session s SET s.createdByUserId = :newId WHERE s.createdByUserId = :oldId")
+    int reassignCreatedBy(@Param("oldId") String oldId, @Param("newId") String newId);
+
+    /** 게스트 → 회원 마이그레이션: 게스트가 초대받은 세션의 invitee를 새 회원으로 이전 */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Session s SET s.inviteeUserId = :newId WHERE s.inviteeUserId = :oldId")
+    int reassignInvitee(@Param("oldId") String oldId, @Param("newId") String newId);
 }

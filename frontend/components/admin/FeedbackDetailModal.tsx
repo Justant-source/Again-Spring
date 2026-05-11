@@ -10,6 +10,9 @@ export interface AdminFeedback {
   content: string;
   status: string;
   adminNote?: string;
+  contactConsent?: boolean;
+  contactEmail?: string;
+  pageUrl?: string;
   createdAt?: string;
 }
 
@@ -114,6 +117,43 @@ export function FeedbackDetailModal({ feedback, onClose, onUpdated }: Props) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', fontSize: 13 }}>
           <Meta label="사용자 ID" value={feedback.userId || '익명'} />
           <Meta label="작성 일시" value={feedback.createdAt ? new Date(feedback.createdAt).toLocaleString('ko-KR') : '-'} />
+
+          {/* 회신 동의 + 이메일 (회신 동의한 경우만 강조 표시) */}
+          {feedback.contactConsent && feedback.contactEmail ? (
+            <div style={{
+              marginTop: 12, marginBottom: 6,
+              padding: '10px 12px',
+              background: '#fff7e6', border: '1px solid #f3d59a', borderRadius: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+            }}>
+              <div>
+                <div style={{ fontSize: 11, color: '#9a6b00', fontWeight: 600, marginBottom: 2 }}>
+                  📧 회신 동의 — 답변 회신 요청
+                </div>
+                <a
+                  href={`mailto:${feedback.contactEmail}?subject=${encodeURIComponent(`[다시봄] 의견 #${feedback.id} 답변`)}`}
+                  style={{ fontSize: 13, color: '#1a3aaa', fontFamily: 'ui-monospace, monospace', textDecoration: 'underline', wordBreak: 'break-all' }}
+                >
+                  {feedback.contactEmail}
+                </a>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (feedback.contactEmail) navigator.clipboard?.writeText(feedback.contactEmail);
+                }}
+                style={{ flexShrink: 0, padding: '5px 10px', background: 'white', border: '1px solid #ddd', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+              >
+                복사
+              </button>
+            </div>
+          ) : feedback.contactConsent ? (
+            <Meta label="회신 동의" value="동의 (이메일 미입력)" />
+          ) : (
+            <Meta label="회신 동의" value="비동의" />
+          )}
+          {feedback.pageUrl && <Meta label="작성 페이지" value={feedback.pageUrl} />}
+
 
           <div style={{ marginTop: 16, marginBottom: 6, fontSize: 12, color: '#888', fontWeight: 600 }}>의견 본문</div>
           <div

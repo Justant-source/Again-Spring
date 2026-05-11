@@ -28,6 +28,7 @@ export function InviteModal({ sessionId, onClose }: Props) {
   const [toneIdx, setToneIdx] = useState(0);
   const [message, setMessage] = useState(TONES[0].message);
   const [copied, setCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   useEffect(() => {
     api
@@ -61,6 +62,17 @@ export function InviteModal({ sessionId, onClose }: Props) {
       await navigator.clipboard.writeText(fullText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopyUrlOnly = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    } catch {
+      // 복사 실패 시 폴백
     }
   };
 
@@ -170,17 +182,49 @@ export function InviteModal({ sessionId, onClose }: Props) {
 
         <div
           style={{
-            padding: '10px 12px',
-            background: 'var(--P-card)',
-            border: '1px solid var(--P-border)',
-            borderRadius: 8,
-            fontSize: 11,
-            color: 'var(--P-sub)',
+            display: 'flex',
+            alignItems: 'stretch',
+            gap: 8,
             marginBottom: 16,
-            wordBreak: 'break-all',
           }}
         >
-          {shareUrl || '링크 생성 중...'}
+          <div
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              background: 'var(--P-card)',
+              border: '1px solid var(--P-border)',
+              borderRadius: 8,
+              fontSize: 11,
+              color: 'var(--P-sub)',
+              wordBreak: 'break-all',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            {shareUrl || '링크 생성 중...'}
+          </div>
+          <button
+            onClick={handleCopyUrlOnly}
+            disabled={!token}
+            aria-label="초대 링크 복사"
+            style={{
+              flexShrink: 0,
+              padding: '0 14px',
+              background: urlCopied ? 'var(--P-ink)' : 'var(--P-card)',
+              color: urlCopied ? 'var(--P-bg)' : 'var(--P-ink)',
+              border: `1px solid ${urlCopied ? 'var(--P-ink)' : 'var(--P-border)'}`,
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: token ? 'pointer' : 'not-allowed',
+              opacity: token ? 1 : 0.4,
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s',
+            }}
+          >
+            {urlCopied ? '복사됨 ✓' : 'URL 복사'}
+          </button>
         </div>
 
         <button
@@ -198,7 +242,7 @@ export function InviteModal({ sessionId, onClose }: Props) {
             opacity: token ? 1 : 0.4,
           }}
         >
-          {copied ? '복사됐어요' : '카톡으로 공유하기'}
+          {copied ? '메시지+링크 복사됐어요' : '카톡으로 공유하기'}
         </button>
 
         <button

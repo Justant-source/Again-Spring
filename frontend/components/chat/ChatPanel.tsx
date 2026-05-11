@@ -72,10 +72,23 @@ export function ChatPanel({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sendingRef = useRef(false);
   const sendStartedAtRef = useRef<number>(0);
+  const sendingShownAtRef = useRef<number>(0);
+  const MIN_TYPING_VISIBLE_MS = 800;
 
   useEffect(() => {
     sendingRef.current = sending;
+    if (sending) sendingShownAtRef.current = Date.now();
   }, [sending]);
+
+  // sending=false를 800ms 최소 노출 보장 후 호출 (인디케이터 깜빡임 방지)
+  const setSendingFalseSafely = () => {
+    const elapsed = Date.now() - sendingShownAtRef.current;
+    if (elapsed >= MIN_TYPING_VISIBLE_MS) {
+      setSending(false);
+    } else {
+      setTimeout(() => setSending(false), MIN_TYPING_VISIBLE_MS - elapsed);
+    }
+  };
 
   const fetchMessages = async () => {
     try {
@@ -93,12 +106,17 @@ export function ChatPanel({
               new Date(m.createdAt).getTime() > sendStartedAtRef.current
           );
           if (hasNewMediator) {
-            setSending(false);
+            setSendingFalseSafely();
           }
         }
-        const merged = mergeMessages(messages, r.data);
-        const processed = processMediatorMessages(merged, setPendingSplits);
-        setMessages(processed);
+        // functional updater 사용 — closure로 잡힌 stale messages 대신 최신 state(prev)와 merge.
+        // 이전 버그: handleSend가 optimistic 추가 후 fetchMessages를 호출하면 stale `messages`
+        // (optimistic 없음)와 merge되어 setMessages(processed)가 optimistic을 덮어써
+        // 메시지가 잠시 화면에서 사라지는 깜빡임 발생.
+        setMessages(prev => {
+          const merged = mergeMessages(prev, r.data);
+          return processMediatorMessages(merged, setPendingSplits);
+        });
         lastFetchRef.current = Date.now();
       }
     } catch (e) {
@@ -108,6 +126,28 @@ export function ChatPanel({
 
   useEffect(() => {
     fetchMessages();
+  }, [sessionId]);
+
+  // 새로고침 후 진행 중 invocation이 있으면 TypingBubble 복원
+  // (mount 시 1회만 호출, 이후 정상 폴링이 mediator 도착 시 sending=false 처리)
+  useEffect(() => {
+    let cancelled = false;
+    api.get(`/api/sessions/${sessionId}/invocation-status`)
+      .then(r => {
+        if (cancelled) return;
+        if (r.data?.inProgress) {
+          // sendStartedAt: BE가 반환한 사용자 최근 메시지 시각 기준 (1초 마진).
+          // 이 시각보다 최근의 mediator 메시지만 "신규 응답"으로 판단되도록 폴링 검사 기준 정렬.
+          // BE가 시각 못 주면 60초 전으로 fallback.
+          const lastAt = r.data?.lastUserMessageAt;
+          sendStartedAtRef.current = lastAt
+            ? new Date(lastAt).getTime() - 1000
+            : Date.now() - 60_000;
+          setSending(true);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [sessionId]);
 
   usePolling(fetchMessages, 3000);
@@ -199,11 +239,12 @@ export function ChatPanel({
       if (r.data.crisisLevel === 1) {
         setMessages(prev => prev.filter(m => m.id !== tempId));
         setCrisisLevel1(true);
-        if (myCount === sendCountRef.current) setSending(false);
+        if (myCount === sendCountRef.current) setSendingFalseSafely();
         return;
       }
-      // optimistic 메시지 제거 (서버 저장된 사용자 메시지가 폴링으로 옴)
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+      // optimistic 메시지는 명시적으로 제거하지 않음 — 폴링이 server user 메시지를
+      // 가져오면 mergeMessages가 자동으로 음수 ID(optimistic)를 cleanup함.
+      // (race condition으로 사용자 메시지가 깜빡 사라지는 이슈 차단)
 
       // V1.5: BE는 즉시 응답하고 중재자 메시지는 폴링으로 도착
       // sending=true 유지 → fetchMessages()가 중재자 메시지 수신 시 false 처리
@@ -222,7 +263,7 @@ export function ChatPanel({
       const safetyTimeoutId = setTimeout(() => {
         clearInterval(fastPollId);
         if (myCount === sendCountRef.current) {
-          setSending(false);
+          setSendingFalseSafely();
         }
       }, 60000);
 
@@ -247,7 +288,7 @@ export function ChatPanel({
       } else {
         console.error('Send failed:', e);
       }
-      if (myCount === sendCountRef.current) setSending(false);
+      if (myCount === sendCountRef.current) setSendingFalseSafely();
     }
   };
 
@@ -435,11 +476,28 @@ function mergeMessages(prev: Message[], incoming: Message[]): Message[] {
   const map = new Map<number, Message>();
   for (const m of prev) map.set(m.id, m);
   for (const m of incoming) map.set(m.id, m); // incoming이 권위 (BE 데이터 우선)
-  return Array.from(map.values()).sort((a, b) => {
-    const ta = new Date(a.createdAt).getTime();
-    const tb = new Date(b.createdAt).getTime();
-    return ta !== tb ? ta - tb : a.id - b.id;
-  });
+
+  const all = Array.from(map.values());
+  // optimistic(음수 ID) 메시지가 server user(양수 ID, 같은 sender·content)와 중복이면 제거
+  // 폴링 응답이 사용자 메시지를 가져오는 즉시 음수 ID 자동 cleanup
+  const optimisticConfirmed = new Set<number>();
+  const positiveBySig = new Set<string>();
+  for (const m of all) {
+    if (m.id >= 0) positiveBySig.add(`${m.sender}::${m.content}`);
+  }
+  for (const m of all) {
+    if (m.id < 0 && positiveBySig.has(`${m.sender}::${m.content}`)) {
+      optimisticConfirmed.add(m.id);
+    }
+  }
+
+  return all
+    .filter(m => !optimisticConfirmed.has(m.id))
+    .sort((a, b) => {
+      const ta = new Date(a.createdAt).getTime();
+      const tb = new Date(b.createdAt).getTime();
+      return ta !== tb ? ta - tb : a.id - b.id;
+    });
 }
 
 /**

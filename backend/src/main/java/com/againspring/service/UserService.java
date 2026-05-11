@@ -262,6 +262,7 @@ public class UserService {
                 .isGuest(user.isGuest())
                 .mustChangePassword(user.isMustChangePassword())
                 .onboardingCompleted(user.getOnboardingCompletedAt() != null)
+                .onboardingCompletedAt(user.getOnboardingCompletedAt())
                 .mbtiType(user.getMbtiType())
                 .mbtiProfile(user.getMbtiProfile())
                 .provider(user.getProvider())

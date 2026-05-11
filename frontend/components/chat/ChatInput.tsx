@@ -42,6 +42,8 @@ export function ChatInput({ onSend, disabled, onCrisis }: Props) {
         value={text}
         onChange={e => setText(e.target.value)}
         onKeyDown={e => {
+          // 한국어 IME composition 중에는 Enter를 무시 (단편 음소 전송 방지)
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return;
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();

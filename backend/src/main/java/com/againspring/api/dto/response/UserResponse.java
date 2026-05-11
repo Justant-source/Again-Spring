@@ -42,6 +42,9 @@ public class UserResponse {
     @JsonProperty("onboardingCompleted")
     private boolean onboardingCompleted;
 
+    @JsonProperty("onboardingCompletedAt")
+    private Instant onboardingCompletedAt;
+
     @JsonProperty("mbtiType")
     private String mbtiType;
 
