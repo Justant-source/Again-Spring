@@ -34,9 +34,6 @@ export function ChatInput({ onSend, disabled, onCrisis }: Props) {
       borderTop: '1px solid var(--P-border)',
       background: 'var(--P-bg)',
     }}>
-      <div style={{ fontSize: 11, color: 'var(--P-sub)', marginBottom: 6, opacity: 0.75 }}>
-        이 글은 AI가 정리해서 전달돼요 — 원문은 전달되지 않아요
-      </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
       <textarea
         value={text}
