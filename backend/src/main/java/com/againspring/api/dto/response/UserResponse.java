@@ -45,6 +45,9 @@ public class UserResponse {
     @JsonProperty("onboardingCompletedAt")
     private Instant onboardingCompletedAt;
 
+    @JsonProperty("mediatorDefaultX")
+    private Integer mediatorDefaultX;
+
     @JsonProperty("mbtiType")
     private String mbtiType;
 

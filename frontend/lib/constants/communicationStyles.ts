@@ -142,3 +142,21 @@ export function defaultMediatorXFor(
   if (!style) return fallback;
   return MEDIATOR_X_BY_STYLE[style] ?? fallback;
 }
+
+/**
+ * X 슬라이더 값(0~100) → 가장 가까운 communicationStyle enum.
+ * 프로필에서 사용자가 슬라이더로 본인 성향을 조정할 때 enum으로 저장하기 위한 매핑.
+ */
+export function closestStyleFor(x: number): CommunicationStyle {
+  const entries = Object.entries(MEDIATOR_X_BY_STYLE) as [CommunicationStyle, number][];
+  let bestStyle: CommunicationStyle = entries[0][0];
+  let bestDist = Math.abs(entries[0][1] - x);
+  for (const [style, val] of entries.slice(1)) {
+    const d = Math.abs(val - x);
+    if (d < bestDist) {
+      bestDist = d;
+      bestStyle = style;
+    }
+  }
+  return bestStyle;
+}

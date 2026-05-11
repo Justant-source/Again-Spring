@@ -21,4 +21,8 @@ public class UpdateUserRequest {
 
     @JsonProperty("communicationStyle")
     private String communicationStyle;
+
+    /** V22: 중재자 톤 기본값 X (0~100). null이면 미변경, 명시적 -1이면 reset(NULL 저장). */
+    @JsonProperty("mediatorDefaultX")
+    private Integer mediatorDefaultX;
 }

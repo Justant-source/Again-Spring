@@ -30,9 +30,12 @@ export default function CategoryPage() {
     minorId: string;
     customText?: string;
   } | null>(null);
-  // 프로필 communicationStyle을 기본값으로 사용. 없으면 정책 default(50).
+  // 1) 사용자가 프로필에서 직접 저장한 mediatorDefaultX 우선
+  // 2) 없으면 communicationStyle 매핑값
+  // 3) 둘 다 없으면 정책 default(50)
   const [styleX, setStyleX] = useState<number>(
-    defaultMediatorXFor(user?.communicationStyle, perms.mediator.defaultStyleX)
+    user?.mediatorDefaultX
+      ?? defaultMediatorXFor(user?.communicationStyle, perms.mediator.defaultStyleX)
   );
   const profileStyleDef = user?.communicationStyle
     ? COMMUNICATION_STYLES[user.communicationStyle]
@@ -185,7 +188,9 @@ export default function CategoryPage() {
             이번 대화의 중재자 톤을 정해주세요.
           </div>
           <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 28, lineHeight: 1.6 }}>
-            {profileStyleDef ? (
+            {user?.mediatorDefaultX != null ? (
+              <>프로필에 저장한 기본값을 불러왔어요. 이번 대화에는 다르게 조정해도 좋아요.</>
+            ) : profileStyleDef ? (
               <>
                 기본값은 프로필 성향{' '}
                 <span style={{ color: 'var(--L-ink)', fontWeight: 500 }}>

@@ -280,6 +280,7 @@ public class AuthService {
                         .provider(user.getProvider())
                         .roles(user.getRoles())
                         .onboardingCompletedAt(user.getOnboardingCompletedAt())
+                        .mediatorDefaultX(user.getMediatorDefaultX())
                         .termsAgreedAt(user.getTermsAgreedAt())
                         .privacyAgreedAt(user.getPrivacyAgreedAt())
                         .disclaimerAgreedAt(user.getDisclaimerAgreedAt())

@@ -73,6 +73,19 @@ public class UserService {
             user.setCommunicationStyle(request.getCommunicationStyle());
         }
 
+        // V22: 중재자 톤 기본값 — null = 미변경, -1 = NULL로 reset, 0~100 = 값 저장
+        if (request.getMediatorDefaultX() != null) {
+            int v = request.getMediatorDefaultX();
+            if (v == -1) {
+                user.setMediatorDefaultX(null);
+            } else if (v >= 0 && v <= 100) {
+                user.setMediatorDefaultX(v);
+            } else {
+                throw new BusinessException("INVALID_MEDIATOR_X",
+                        "중재자 톤 값은 0~100 사이여야 해요.", 400);
+            }
+        }
+
         user.setUpdatedAt(Instant.now());
         User updated = userRepository.save(user);
         log.info("User profile updated: {}", userId);
@@ -263,6 +276,7 @@ public class UserService {
                 .mustChangePassword(user.isMustChangePassword())
                 .onboardingCompleted(user.getOnboardingCompletedAt() != null)
                 .onboardingCompletedAt(user.getOnboardingCompletedAt())
+                .mediatorDefaultX(user.getMediatorDefaultX())
                 .mbtiType(user.getMbtiType())
                 .mbtiProfile(user.getMbtiProfile())
                 .provider(user.getProvider())

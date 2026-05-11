@@ -22,6 +22,7 @@ export interface User {
   communicationStyle?: CommunicationStyle;
   onboardingAnswers?: number[];
   onboardingCompletedAt?: string | null;
+  mediatorDefaultX?: number | null;
   mbtiType?: string;
   mbtiProfile?: MbtiProfile;
   onboardingMethod?: 'test' | 'mbti';

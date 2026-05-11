@@ -65,6 +65,9 @@ public class AuthResponse {
         @JsonProperty("onboardingCompletedAt")
         private Instant onboardingCompletedAt;
 
+        @JsonProperty("mediatorDefaultX")
+        private Integer mediatorDefaultX;
+
         @JsonProperty("termsAgreedAt")
         private Instant termsAgreedAt;
 
