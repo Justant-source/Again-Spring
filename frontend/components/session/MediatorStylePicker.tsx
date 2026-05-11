@@ -13,17 +13,21 @@
 export interface MediatorStylePickerProps {
   value: number; // 0 ~ 100
   onChange: (x: number) => void;
+  /** 슬라이더 위 헤더("이번 대화의 중재자 톤" 라벨) 노출 여부. 기본 true. */
+  showHeader?: boolean;
 }
 
-export function MediatorStylePicker({ value, onChange }: MediatorStylePickerProps) {
+export function MediatorStylePicker({ value, onChange, showHeader = true }: MediatorStylePickerProps) {
   const label = describe(value);
 
   return (
     <div style={{ width: '100%' }}>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 13, color: 'var(--L-sub)', marginBottom: 6 }}>
-          이번 대화의 중재자 톤
-        </div>
+        {showHeader && (
+          <div style={{ fontSize: 13, color: 'var(--L-sub)', marginBottom: 6 }}>
+            이번 대화의 중재자 톤
+          </div>
+        )}
         <div className="serif" style={{ fontSize: 16, color: 'var(--L-ink)' }}>
           {label.title}
         </div>

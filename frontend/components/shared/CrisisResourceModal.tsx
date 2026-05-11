@@ -138,7 +138,7 @@ export function CrisisResourceModal({
           ))}
         </div>
 
-        {/* Buttons */}
+        {/* Buttons — 위기 모달은 dismiss 마찰 유지(절대 규칙)이라 '닫기' 한 개만 둠 */}
         <div
           style={{
             display: 'flex',
@@ -146,36 +146,6 @@ export function CrisisResourceModal({
             gap: '8px',
           }}
         >
-          <button
-            disabled
-            style={{
-              padding: '12px 16px',
-              background: '#E8E6E0',
-              color: '#9B9890',
-              border: 'none',
-              borderRadius: '3px',
-              fontSize: '14px',
-              fontWeight: 500,
-              cursor: 'not-allowed',
-            }}
-          >
-            전화 걸기
-          </button>
-          <button
-            disabled
-            style={{
-              padding: '12px 16px',
-              background: '#E8E6E0',
-              color: '#9B9890',
-              border: 'none',
-              borderRadius: '3px',
-              fontSize: '14px',
-              fontWeight: 500,
-              cursor: 'not-allowed',
-            }}
-          >
-            문자 상담
-          </button>
           <button
             onClick={onClose}
             style={{

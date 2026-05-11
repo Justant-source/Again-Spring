@@ -197,11 +197,6 @@ export default function LandingPage() {
               >
                 {needsOnboarding ? '먼저 10문항을 등록해주세요' : '마음 옮겨 적기 시작'}
               </button>
-              {!user && (
-                <p className="text-center text-[11px]" style={{ color: 'var(--L-sub)' }}>
-                  로그인하시거나 게스트로 시작해주세요
-                </p>
-              )}
               {needsOnboarding && (
                 <Link
                   href="/onboarding/intro?next=/session/new"

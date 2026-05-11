@@ -25,7 +25,6 @@ export default function ProfilePage() {
 
   // 중재자 톤 슬라이더 — 기본값 50, 변경 시 debounce 후 PATCH /api/users/me
   const [mediatorX, setMediatorX] = useState<number>(user?.mediatorDefaultX ?? 50);
-  const [mediatorSaving, setMediatorSaving] = useState(false);
   const mediatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -57,11 +56,9 @@ export default function ProfilePage() {
     if (mediatorTimerRef.current) clearTimeout(mediatorTimerRef.current);
     mediatorTimerRef.current = setTimeout(() => {
       if (x === user.mediatorDefaultX) return;
-      setMediatorSaving(true);
       api.patch<User>('/api/users/me', { mediatorDefaultX: x })
         .then((res) => setUser(res.data))
-        .catch((e) => console.error('Mediator update failed:', e))
-        .finally(() => setMediatorSaving(false));
+        .catch((e) => console.error('Mediator update failed:', e));
     }, 500);
   };
 
@@ -283,18 +280,10 @@ export default function ProfilePage() {
 
         {/* 중재자 대화 스타일 — 새 대화 시작 시 picker 기본값. 매 세션에서 다시 조정 가능. */}
         <div className="letter-card" style={{ padding: '18px 16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: 'var(--L-sub)' }}>
-              중재자 대화 스타일
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>
-              {mediatorSaving ? '저장 중…' : user.mediatorDefaultX != null ? '저장됨' : '기본값 50/50'}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 10 }}>
+            중재자 대화 스타일
           </div>
-          <MediatorStylePicker value={mediatorX} onChange={onMediatorChange} />
-          <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 10, lineHeight: 1.5 }}>
-            새 대화를 시작할 때 이 값을 기본으로 불러와요. 매 대화마다 다시 조정할 수 있어요.
-          </div>
+          <MediatorStylePicker value={mediatorX} onChange={onMediatorChange} showHeader={false} />
         </div>
 
         {/* 비밀번호 변경 (이메일 가입자만) */}
