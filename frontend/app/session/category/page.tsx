@@ -8,6 +8,7 @@ import { useSessionStore } from '@/lib/store/sessionStore';
 import { useUserStore } from '@/lib/store/userStore';
 import { CATEGORIES } from '@/lib/constants/categories';
 import { permissionsFor } from '@/lib/constants/userPermissions';
+import { defaultMediatorXFor, COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
 import { PhoneFrame, PhoneHeader, Dashes } from '@/components/shared';
 import { MediatorStylePicker } from '@/components/session/MediatorStylePicker';
 import { api } from '@/lib/api/client';
@@ -29,7 +30,13 @@ export default function CategoryPage() {
     minorId: string;
     customText?: string;
   } | null>(null);
-  const [styleX, setStyleX] = useState<number>(perms.mediator.defaultStyleX);
+  // 프로필 communicationStyle을 기본값으로 사용. 없으면 정책 default(50).
+  const [styleX, setStyleX] = useState<number>(
+    defaultMediatorXFor(user?.communicationStyle, perms.mediator.defaultStyleX)
+  );
+  const profileStyleDef = user?.communicationStyle
+    ? COMMUNICATION_STYLES[user.communicationStyle]
+    : null;
   const [loading, setLoading] = useState(false);
 
   if (!relationType) {
@@ -178,7 +185,17 @@ export default function CategoryPage() {
             이번 대화의 중재자 톤을 정해주세요.
           </div>
           <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 28, lineHeight: 1.6 }}>
-            매 대화마다 다르게 정할 수 있어요. 프로필의 기본 성향과는 별개로 이번 대화에만 적용돼요.
+            {profileStyleDef ? (
+              <>
+                기본값은 프로필 성향{' '}
+                <span style={{ color: 'var(--L-ink)', fontWeight: 500 }}>
+                  {profileStyleDef.emoji} {profileStyleDef.label}
+                </span>
+                을 반영했어요. 이번 대화 흐름에 맞게 자유롭게 조정해도 좋아요.
+              </>
+            ) : (
+              '매 대화마다 다르게 정할 수 있어요. 이번 대화에만 적용돼요.'
+            )}
           </div>
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

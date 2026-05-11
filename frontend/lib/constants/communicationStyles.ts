@@ -120,3 +120,25 @@ export function getStyleCombinationKey(
 ): string {
   return [a, b].sort().join('-');
 }
+
+/**
+ * communicationStyle → 중재자 톤 X축(0=팩트, 100=공감) 기본값.
+ * 새 세션 진입 시 MediatorStylePicker의 starting value로 사용.
+ * 단계 5 단위로 정렬 (slider step=5).
+ */
+export const MEDIATOR_X_BY_STYLE: Record<CommunicationStyle, number> = {
+  wave: 80,     // 감정 표현 풍부 → 공감 우세
+  mountain: 25, // 차분·거리 두기 → 팩트 우세
+  flame: 20,    // 직설·명확 → 팩트 우세
+  leaf: 85,     // 조화·공감 중시 → 공감 우세
+  moon: 75,     // 분위기·행동 표현 → 공감 우세
+  star: 45,     // 논리·이유 중시 → 약간 팩트
+};
+
+export function defaultMediatorXFor(
+  style: CommunicationStyle | undefined | null,
+  fallback: number = 50,
+): number {
+  if (!style) return fallback;
+  return MEDIATOR_X_BY_STYLE[style] ?? fallback;
+}
