@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
-import { getRedirectUri } from '@/lib/auth/oauth';
+import { getRedirectUri, decodeState } from '@/lib/auth/oauth';
 
 export default function OAuthCallbackPage() {
   const router = useRouter();
@@ -16,6 +16,7 @@ export default function OAuthCallbackPage() {
   useEffect(() => {
     const provider = params.provider as string;
     const code = searchParams.get('code');
+    const nextPath = decodeState(searchParams.get('state')) ?? '/';
 
     if (!code) {
       setError('인증 코드를 받지 못했어요. 다시 시도해주세요.');
@@ -32,7 +33,7 @@ export default function OAuthCallbackPage() {
         if (data.token?.accessToken) {
           localStorage.setItem('again-spring-token', data.token.accessToken);
         }
-        router.replace('/');
+        router.replace(nextPath);
       })
       .catch((err) => {
         const msg = err.response?.data?.error?.message ?? '소셜 로그인에 실패했어요';

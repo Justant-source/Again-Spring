@@ -2,16 +2,26 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
 import { oauthRedirect } from '@/lib/auth/oauth';
 
+// open redirect 방지 — 내부 경로(/로 시작, // 또는 /\는 거부)만 허용
+function safeRedirect(raw: string | null): string {
+  if (!raw) return '/';
+  if (!raw.startsWith('/')) return '/';
+  if (raw.startsWith('//') || raw.startsWith('/\\')) return '/';
+  return raw;
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setUser = useUserStore((s) => s.setUser);
+  const nextPath = safeRedirect(searchParams.get('redirect') || searchParams.get('next'));
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,7 +50,7 @@ export default function LoginPage() {
         localStorage.setItem('again-spring-token', token.accessToken);
       }
       setUser(user);
-      router.push('/');
+      router.push(nextPath);
     } catch (err: any) {
       setError(err.response?.data?.error?.message || '로그인에 실패했어요');
       setErrorCode(err.response?.data?.error?.code || '');
@@ -164,7 +174,7 @@ export default function LoginPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button
-              onClick={() => oauthRedirect('google')}
+              onClick={() => oauthRedirect('google', nextPath)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 0', border: '1px solid var(--L-border)', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#333' }}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">

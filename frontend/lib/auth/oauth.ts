@@ -15,10 +15,35 @@ function redirectUriFor(provider: Provider): string {
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
 
-export function oauthRedirect(provider: Provider) {
+// next 경로를 OAuth state 파라미터로 왕복시키기 위한 URL-safe encoding
+export function encodeState(next: string | null | undefined): string {
+  if (!next || !next.startsWith('/')) return '';
+  try {
+    return btoa(unescape(encodeURIComponent(next)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  } catch {
+    return '';
+  }
+}
+
+export function decodeState(state: string | null | undefined): string | null {
+  if (!state) return null;
+  try {
+    const padded = state.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = decodeURIComponent(escape(atob(padded)));
+    if (!decoded.startsWith('/') || decoded.startsWith('//') || decoded.startsWith('/\\')) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+export function oauthRedirect(provider: Provider, next?: string) {
   const redirectUri = redirectUriFor(provider);
+  const stateParam = encodeState(next);
+  const stateQuery = stateParam ? `&state=${stateParam}` : '';
   if (provider === 'google') {
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20email`;
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20email${stateQuery}`;
     window.location.href = url;
     return;
   }
