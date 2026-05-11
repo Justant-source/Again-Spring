@@ -8,8 +8,7 @@
  * - y는 본 picker에서 노출하지 않으며, 호출 측에서 50 고정으로 전송한다.
  *
  * 사용 등급(user-permissions.json):
- *   - guest.mediator.styleSource = 'per_session' → 본 컴포넌트 사용
- *   - registered.mediator.styleSource = 'profile' → 프로필 값 사용 (본 컴포넌트 미사용)
+ *   - 모든 tier가 styleSource = 'per_session' → 매 세션 진입 시 본 컴포넌트로 다시 선택
  */
 export interface MediatorStylePickerProps {
   value: number; // 0 ~ 100

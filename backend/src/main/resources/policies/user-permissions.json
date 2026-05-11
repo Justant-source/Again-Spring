@@ -105,7 +105,7 @@
         "showCommunicationStyleSection": true
       },
       "mediator": {
-        "styleSource": "profile",
+        "styleSource": "per_session",
         "defaultStyleX": 50,
         "defaultStyleY": 50
       },
@@ -162,7 +162,7 @@
         "showCommunicationStyleSection": false
       },
       "mediator": {
-        "styleSource": "profile",
+        "styleSource": "per_session",
         "defaultStyleX": 50,
         "defaultStyleY": 50
       },

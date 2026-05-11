@@ -170,7 +170,7 @@ export const USER_PERMISSIONS: { guest: TierPermissions; registered: TierPermiss
       showCommunicationStyleSection: true,
     },
     mediator: {
-      styleSource: 'profile',
+      styleSource: 'per_session',
       defaultStyleX: 50,
       defaultStyleY: 50,
     },
@@ -227,7 +227,7 @@ export const USER_PERMISSIONS: { guest: TierPermissions; registered: TierPermiss
       showCommunicationStyleSection: false,
     },
     mediator: {
-      styleSource: 'profile',
+      styleSource: 'per_session',
       defaultStyleX: 50,
       defaultStyleY: 50,
     },

@@ -175,10 +175,10 @@ export default function CategoryPage() {
           </div>
 
           <div className="serif" style={{ fontSize: 18, lineHeight: 1.5, marginBottom: 8 }}>
-            중재자 톤을 정해주세요.
+            이번 대화의 중재자 톤을 정해주세요.
           </div>
           <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 28, lineHeight: 1.6 }}>
-            게스트는 매 대화마다 톤을 다르게 정할 수 있어요. 회원 가입 시에는 프로필에 저장돼요.
+            매 대화마다 다르게 정할 수 있어요. 프로필의 기본 성향과는 별개로 이번 대화에만 적용돼요.
           </div>
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
