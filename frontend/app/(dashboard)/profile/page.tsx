@@ -10,13 +10,10 @@ import { ChangePasswordSection } from '@/components/profile/ChangePasswordSectio
 import { permissionsFor } from '@/lib/constants/userPermissions';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { STYLE_MOTIF } from '@/components/shared/Motif';
-import {
-  COMMUNICATION_STYLES,
-  defaultMediatorXFor,
-  closestStyleFor,
-} from '@/lib/constants/communicationStyles';
+import { COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
+import { MediatorStylePicker } from '@/components/session/MediatorStylePicker';
 import { api } from '@/lib/api/client';
-import type { CommunicationStyle, User } from '@/lib/types';
+import type { User } from '@/lib/types';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -26,23 +23,14 @@ export default function ProfilePage() {
   const hasHydrated = useHasHydrated();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // 슬라이더 로컬 상태 — 사용자 입력 → debounce → PATCH /api/users/me
-  const initialStyleX = user
-    ? defaultMediatorXFor(user.communicationStyle, 50)
-    : 50;
-  const initialMediatorX = user?.mediatorDefaultX ?? initialStyleX;
-  const [styleX, setStyleX] = useState<number>(initialStyleX);
-  const [mediatorX, setMediatorX] = useState<number>(initialMediatorX);
-  const [saving, setSaving] = useState<'style' | 'mediator' | null>(null);
-  const styleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 중재자 톤 슬라이더 — 기본값 50, 변경 시 debounce 후 PATCH /api/users/me
+  const [mediatorX, setMediatorX] = useState<number>(user?.mediatorDefaultX ?? 50);
+  const [mediatorSaving, setMediatorSaving] = useState(false);
   const mediatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // user 변경 시(다른 디바이스 동기화 등) 슬라이더 값 동기화
   useEffect(() => {
-    if (!user) return;
-    setStyleX(defaultMediatorXFor(user.communicationStyle, 50));
-    setMediatorX(user.mediatorDefaultX ?? defaultMediatorXFor(user.communicationStyle, 50));
-  }, [user?.communicationStyle, user?.mediatorDefaultX]);
+    setMediatorX(user?.mediatorDefaultX ?? 50);
+  }, [user?.mediatorDefaultX]);
 
   useEffect(() => {
     if (hasHydrated && !user) {
@@ -56,40 +44,25 @@ export default function ProfilePage() {
 
   const showStyleSection = permissionsFor(user).ui.showCommunicationStyleSection;
 
-  // 슬라이더 값으로부터 enum motif 유도 (사용자가 드래그 중이면 실시간 반영)
-  const effectiveStyle: CommunicationStyle = closestStyleFor(styleX);
-  const style = COMMUNICATION_STYLES[effectiveStyle];
-  const MotifComponent = STYLE_MOTIF[effectiveStyle];
+  const style = user.communicationStyle
+    ? COMMUNICATION_STYLES[user.communicationStyle]
+    : null;
 
-  const persistStyle = (x: number) => {
-    const nextEnum = closestStyleFor(x);
-    if (nextEnum === user.communicationStyle) return;
-    setSaving('style');
-    api.patch<User>('/api/users/me', { communicationStyle: nextEnum })
-      .then((res) => setUser(res.data))
-      .catch((e) => console.error('Style update failed:', e))
-      .finally(() => setSaving(null));
-  };
-
-  const persistMediator = (x: number) => {
-    if (x === user.mediatorDefaultX) return;
-    setSaving('mediator');
-    api.patch<User>('/api/users/me', { mediatorDefaultX: x })
-      .then((res) => setUser(res.data))
-      .catch((e) => console.error('Mediator update failed:', e))
-      .finally(() => setSaving(null));
-  };
-
-  const onStyleChange = (x: number) => {
-    setStyleX(x);
-    if (styleTimerRef.current) clearTimeout(styleTimerRef.current);
-    styleTimerRef.current = setTimeout(() => persistStyle(x), 500);
-  };
+  const MotifComponent = user.communicationStyle
+    ? STYLE_MOTIF[user.communicationStyle]
+    : null;
 
   const onMediatorChange = (x: number) => {
     setMediatorX(x);
     if (mediatorTimerRef.current) clearTimeout(mediatorTimerRef.current);
-    mediatorTimerRef.current = setTimeout(() => persistMediator(x), 500);
+    mediatorTimerRef.current = setTimeout(() => {
+      if (x === user.mediatorDefaultX) return;
+      setMediatorSaving(true);
+      api.patch<User>('/api/users/me', { mediatorDefaultX: x })
+        .then((res) => setUser(res.data))
+        .catch((e) => console.error('Mediator update failed:', e))
+        .finally(() => setMediatorSaving(false));
+    }, 500);
   };
 
   const handleLogout = async () => {
@@ -177,7 +150,7 @@ export default function ProfilePage() {
             당신의 대화 스타일
           </div>
 
-          {user.communicationStyle ? (
+          {style && MotifComponent ? (
             <>
               <div
                 style={{
@@ -215,67 +188,6 @@ export default function ProfilePage() {
                   <div style={{ fontSize: 12, color: 'var(--L-sub)', marginTop: 2 }}>
                     {style.description}
                   </div>
-                </div>
-              </div>
-
-              {/* 슬라이더 1: 나의 대화 성향 — 슬라이더 X → 가장 가까운 enum으로 자동 저장 */}
-              <div style={{ marginBottom: 18 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                  <div style={{ fontSize: 13, color: 'var(--L-ink)', fontWeight: 500 }}>
-                    내 대화 성향 직접 조정
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>
-                    {saving === 'style' ? '저장 중…' : `→ ${style.label}`}
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={styleX}
-                  onChange={(e) => onStyleChange(Number(e.target.value))}
-                  aria-label="나의 대화 성향(0=팩트 중심, 100=공감 중심)"
-                  style={{ width: '100%', accentColor: 'var(--L-ink)' }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--L-sub)', marginTop: 2 }}>
-                  <span>← 팩트 중심</span>
-                  <span style={{ color: 'var(--L-ink)', fontWeight: 500 }}>{styleX}/100</span>
-                  <span>공감 중심 →</span>
-                </div>
-              </div>
-
-              {/* 슬라이더 2: 중재자 톤 기본값 — User.mediator_default_x로 저장 */}
-              <div style={{ marginBottom: 18 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                  <div style={{ fontSize: 13, color: 'var(--L-ink)', fontWeight: 500 }}>
-                    중재자 톤 기본값
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>
-                    {saving === 'mediator'
-                      ? '저장 중…'
-                      : user.mediatorDefaultX != null
-                        ? '맞춤 값 저장됨'
-                        : '프로필 성향 기반'}
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={mediatorX}
-                  onChange={(e) => onMediatorChange(Number(e.target.value))}
-                  aria-label="새 대화 시작 시 중재자 톤 기본값(0=팩트, 100=공감)"
-                  style={{ width: '100%', accentColor: 'var(--L-ink)' }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--L-sub)', marginTop: 2 }}>
-                  <span>← 팩트 중심</span>
-                  <span style={{ color: 'var(--L-ink)', fontWeight: 500 }}>{mediatorX}/100</span>
-                  <span>공감 중심 →</span>
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 6, lineHeight: 1.5 }}>
-                  새 대화 시작 시 중재자 톤 picker의 시작값으로 쓰여요. 매 세션에서 다시 조정 가능.
                 </div>
               </div>
 
@@ -368,6 +280,22 @@ export default function ProfilePage() {
           )}
         </div>
         )}
+
+        {/* 중재자 대화 스타일 — 새 대화 시작 시 picker 기본값. 매 세션에서 다시 조정 가능. */}
+        <div className="letter-card" style={{ padding: '18px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--L-sub)' }}>
+              중재자 대화 스타일
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>
+              {mediatorSaving ? '저장 중…' : user.mediatorDefaultX != null ? '저장됨' : '기본값 50/50'}
+            </div>
+          </div>
+          <MediatorStylePicker value={mediatorX} onChange={onMediatorChange} />
+          <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 10, lineHeight: 1.5 }}>
+            새 대화를 시작할 때 이 값을 기본으로 불러와요. 매 대화마다 다시 조정할 수 있어요.
+          </div>
+        </div>
 
         {/* 비밀번호 변경 (이메일 가입자만) */}
         <ChangePasswordSection />
