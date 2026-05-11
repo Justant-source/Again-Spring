@@ -33,6 +33,7 @@ export default function CategoryPage() {
   const [styleX, setStyleX] = useState<number>(
     user?.mediatorDefaultX ?? perms.mediator.defaultStyleX
   );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   if (!relationType) {
@@ -49,6 +50,7 @@ export default function CategoryPage() {
   const createSession = async (cat: typeof pendingCategory, x: number, y: number) => {
     if (!cat) return;
     setLoading(true);
+    setErrorMessage(null);
     try {
       const response = await api.post('/api/sessions', {
         relationType,
@@ -59,12 +61,17 @@ export default function CategoryPage() {
       const { id } = response.data;
       router.push(`/session/chat/${id}`);
     } catch (error: unknown) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
+      const err = error as {
+        response?: { status?: number; data?: { error?: { message?: string; code?: string } } };
+      };
+      const status = err?.response?.status;
       // 401/403 is handled globally by the API interceptor (redirects to /guest or /login)
-      if (status !== 401 && status !== 403) {
-        console.error('Failed to create session:', error);
-        setLoading(false);
-      }
+      if (status === 401 || status === 403) return;
+
+      console.error('Failed to create session:', error);
+      const beMessage = err?.response?.data?.error?.message;
+      setErrorMessage(beMessage || '대화를 시작할 수 없어요. 잠시 후 다시 시도해 주세요.');
+      setLoading(false);
     }
   };
 
@@ -189,6 +196,41 @@ export default function CategoryPage() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <MediatorStylePicker value={styleX} onChange={setStyleX} />
           </div>
+
+          {errorMessage && (
+            <div
+              role="alert"
+              style={{
+                marginTop: 16,
+                padding: '12px 14px',
+                background: '#FBEAEA',
+                border: '1px solid #E0B4B4',
+                borderRadius: 6,
+                fontSize: 13,
+                color: '#9B2C2C',
+                lineHeight: 1.6,
+              }}
+            >
+              {errorMessage}
+              <button
+                type="button"
+                onClick={() => router.push('/history')}
+                style={{
+                  display: 'block',
+                  marginTop: 8,
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  color: '#9B2C2C',
+                  textDecoration: 'underline',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                지난 대화 정리하러 가기 →
+              </button>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 28 }}>
             <button className="btn-L ghost" style={{ flex: 1 }} onClick={handleBack} disabled={loading}>
