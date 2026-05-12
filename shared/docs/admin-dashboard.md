@@ -333,5 +333,61 @@ env/.env.dev / .env.prod                    # ADMIN_EMAILS 환경변수
 
 ---
 
-**최근 업데이트**: 2026-05-10
+---
+
+## 9. 리포트 Sonnet 생성 모니터링 (V12 추가)
+
+Solo/Duo 리포트는 Claude Sonnet이 생성합니다. 생성 실패는 `report.status=FAILED`로 저장됩니다.
+
+### 9.1 운영자가 확인해야 할 쿼리
+
+```sql
+-- 최근 24시간 리포트 상태 집계
+SELECT status, COUNT(*) as cnt
+FROM reports
+WHERE created_at >= NOW() - INTERVAL 1 DAY
+GROUP BY status;
+
+-- FAILED 리포트 목록 (원인 파악용)
+SELECT id, session_id, llm_provider, created_at
+FROM reports
+WHERE status = 'FAILED'
+ORDER BY created_at DESC
+LIMIT 20;
+
+-- V12 필드 채워짐 비율 (Solo만)
+SELECT
+  COUNT(*) as total,
+  SUM(CASE WHEN core_summary IS NOT NULL THEN 1 ELSE 0 END) as has_summary,
+  SUM(CASE WHEN metaphor_id IS NOT NULL THEN 1 ELSE 0 END) as has_metaphor,
+  SUM(CASE WHEN nvc_observation IS NOT NULL THEN 1 ELSE 0 END) as has_nvc
+FROM reports
+WHERE solo_mode = 1 AND created_at >= NOW() - INTERVAL 7 DAY;
+```
+
+### 9.2 알림 기준
+
+| 상황 | 기준 | 조치 |
+|---|---|---|
+| FAILED 급증 | 1시간 내 FAILED 3건+ | `EmailNotificationService`가 운영팀 자동 알림 발송 |
+| 필드 채워짐 하락 | `has_metaphor / total < 0.9` | 프롬프트 파일 확인, Claude CLI 인증 상태 확인 |
+| 리포트 생성 지연 | finalize 후 3분+ 경과 후도 status=GENERATING | BE 프로세스 풀 포화 여부 확인 (`Semaphore(3)`) |
+
+### 9.3 Claude CLI 인증 확인
+
+```bash
+# 컨테이너 내 Claude 인증 상태
+docker exec againspring-backend-dev claude --version
+docker exec againspring-backend-dev claude --print "test" 2>&1 | head -3
+```
+
+인증 만료 시: 호스트에서 `claude` 명령으로 재로그인 → 컨테이너 재시작 불필요 (볼륨 공유).
+
+### 9.4 프롬프트 핫리로드
+
+`shared/docs/prompts/chat/solo_report.md` / `duo_report.md` 수정 후 BE 재시작 없이 반영됩니다 (파일 경로 직접 읽기).
+
+---
+
+**최근 업데이트**: 2026-05-12
 **관련 정책 문서**: [`policies/user-permissions.md`](./policies/user-permissions.md)

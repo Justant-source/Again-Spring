@@ -4,8 +4,8 @@ import com.againspring.domain.Message;
 import com.againspring.domain.Report;
 import com.againspring.domain.Session;
 import com.againspring.domain.User;
-import com.againspring.domain.enums.ConflictType;
 import com.againspring.domain.enums.MessageSender;
+import com.againspring.domain.enums.ReportStatus;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.MessageRepository;
@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -30,9 +29,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * ReportGenerationService (V1.5 카톡식)
- * Async report generation using Claude Sonnet for duo/solo reports.
- * Calls LLMProvider with custom model selection.
+ * ReportGenerationService (V12)
+ * Async report generation using Claude Sonnet.
+ * V12: Fixed silent schema mismatch, removed _response_instructions.md from report prompts,
+ * added retry logic, added V12 field mapping (coreSummary, fourStageFlow, metaphor,
+ * nvcReflection, recommendedActions, externalResourceGuidance).
  */
 @Slf4j
 @Service
@@ -45,7 +46,6 @@ public class ReportGenerationService {
     private final SessionRepository sessionRepo;
     private final UserRepository userRepo;
     private final ReportResponseParser parser;
-    private final MetaphorSelector metaphorSelector;
     private final RatioEnforcer ratioEnforcer;
     private final PromptLoader promptLoader;
     private final ChatPromptAssembler chatPromptAssembler;
@@ -56,10 +56,6 @@ public class ReportGenerationService {
 
     private final ExecutorService reportExecutor = Executors.newFixedThreadPool(2);
 
-    /**
-     * Solo report: single user perspective only.
-     * Triggered when user completes (≥3 messages).
-     */
     @Async
     public void generateSoloReport(String sessionId) {
         log.info("Generating solo report for session {}", sessionId);
@@ -69,31 +65,37 @@ public class ReportGenerationService {
             Session session = sessionRepo.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Session not found: " + sessionId));
 
-            // Determine perspective (solo could be either A or B)
-            MessageSender perspective = (session.getUserBId() != null) ? MessageSender.USER_B : MessageSender.USER_A;
-
+            MessageSender perspective = (session.getUserBId() != null)
+                ? MessageSender.USER_B : MessageSender.USER_A;
             List<Message> messages = messageRepo.findBySessionIdOrderByCreatedAtAsc(sessionId);
-
-            // Build prompt for solo report
             String prompt = buildSoloReportPrompt(session, messages, perspective);
 
-            // Invoke LLM via ClaudeCodeBridge with Sonnet model
-            String llmResponse;
-            try {
-                llmResponse = invokeWithModel(prompt, reportModel, sessionId);
-            } catch (Exception e) {
-                log.error("LLM call failed for solo report {}", sessionId, e);
-                llmResponse = "{}"; // Fallback empty JSON
+            String llmResponse = invokeWithRetry(prompt, sessionId, "solo");
+            if (llmResponse == null) {
+                saveFailedReport(sessionId, true);
+                return;
             }
 
-            // Parse response
             ReportResponseParser.ParsedReport parsed = parser.parse(llmResponse);
+            if (!parsed.hasV12Content()) {
+                log.error("LLM returned incomplete V12 content for solo report {}", sessionId);
+                // Try once more
+                llmResponse = invokeWithRetry(prompt, sessionId, "solo-v12-retry");
+                if (llmResponse == null) {
+                    saveFailedReport(sessionId, true);
+                    return;
+                }
+                parsed = parser.parse(llmResponse);
+                if (!parsed.hasV12Content()) {
+                    log.error("V12 content still incomplete after retry for solo report {}", sessionId);
+                    saveFailedReport(sessionId, true);
+                    return;
+                }
+            }
 
-            // Build and save report
-            Report report = buildSoloReport(session, parsed, perspective);
+            Report report = buildSoloReport(session, parsed);
             reportRepo.save(report);
 
-            // 세션에 reportId 연결
             sessionRepo.findById(sessionId).ifPresent(s -> {
                 s.setReportId(report.getId());
                 sessionRepo.save(s);
@@ -104,24 +106,10 @@ public class ReportGenerationService {
 
         } catch (Exception e) {
             log.error("Failed to generate solo report for session {}", sessionId, e);
-            try {
-                reportRepo.save(Report.builder()
-                    .id("rep_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20))
-                    .sessionId(sessionId)
-                    .soloMode(true)
-                    .llmProvider("error-fallback")
-                    .createdAt(Instant.now())
-                    .build());
-            } catch (Exception saveFailure) {
-                log.error("Even fallback solo report save failed for session {}", sessionId, saveFailure);
-            }
+            saveFailedReport(sessionId, true);
         }
     }
 
-    /**
-     * Duo report: both perspectives (A and B) analyzed separately then combined.
-     * Triggered when both agree to finalize.
-     */
     @Async
     public void generateDuoReport(String sessionId) {
         log.info("Generating duo report for session {}", sessionId);
@@ -132,48 +120,35 @@ public class ReportGenerationService {
                 .orElseThrow(() -> new IllegalArgumentException("Session not found: " + sessionId));
 
             List<Message> allMessages = messageRepo.findBySessionIdOrderByCreatedAtAsc(sessionId);
-
-            // Build both prompts upfront
             String promptA = buildDuoReportPrompt(session, allMessages, MessageSender.USER_A);
             String promptB = buildDuoReportPrompt(session, allMessages, MessageSender.USER_B);
 
-            // Generate A and B perspective reports in parallel
-            CompletableFuture<String> futureA = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return invokeWithModel(promptA, reportModel, sessionId);
-                } catch (Exception e) {
-                    log.error("LLM call failed for duo report A perspective {}", sessionId, e);
-                    return "{}";
-                }
-            }, reportExecutor);
-            CompletableFuture<String> futureB = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return invokeWithModel(promptB, reportModel, sessionId);
-                } catch (Exception e) {
-                    log.error("LLM call failed for duo report B perspective {}", sessionId, e);
-                    return "{}";
-                }
-            }, reportExecutor);
+            CompletableFuture<String> futureA = CompletableFuture.supplyAsync(() ->
+                invokeWithRetry(promptA, sessionId, "duo-A"), reportExecutor);
+            CompletableFuture<String> futureB = CompletableFuture.supplyAsync(() ->
+                invokeWithRetry(promptB, sessionId, "duo-B"), reportExecutor);
 
             String responseA = futureA.join();
             String responseB = futureB.join();
 
-            // Parse both responses
+            if (responseA == null || responseB == null) {
+                log.error("Duo report LLM failed for session {}", sessionId);
+                saveFailedReport(sessionId, false);
+                return;
+            }
+
             ReportResponseParser.ParsedReport parsedA = parser.parse(responseA);
             ReportResponseParser.ParsedReport parsedB = parser.parse(responseB);
 
-            // Enforce ratio clipping
             RatioEnforcer.Enforced ratio = ratioEnforcer.enforce(
                 parsedA.getContributionRatio() != null ? parsedA.getContributionRatio().a : 50,
                 parsedB.getContributionRatio() != null ? parsedB.getContributionRatio().b : 50,
                 session.getConflictType()
             );
 
-            // Build combined report
             Report report = buildDuoReport(session, parsedA, parsedB, ratio);
             reportRepo.save(report);
 
-            // 세션에 reportId 연결
             sessionRepo.findById(sessionId).ifPresent(s -> {
                 s.setReportId(report.getId());
                 sessionRepo.save(s);
@@ -184,64 +159,35 @@ public class ReportGenerationService {
 
         } catch (Exception e) {
             log.error("Failed to generate duo report for session {}", sessionId, e);
-            try {
-                reportRepo.save(Report.builder()
-                    .id("rep_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20))
-                    .sessionId(sessionId)
-                    .soloMode(false)
-                    .llmProvider("error-fallback")
-                    .createdAt(Instant.now())
-                    .build());
-            } catch (Exception saveFailure) {
-                log.error("Even fallback duo report save failed for session {}", sessionId, saveFailure);
-            }
+            saveFailedReport(sessionId, false);
         }
     }
 
-    /**
-     * Build solo report prompt.
-     */
-    private String buildSoloReportPrompt(Session session, List<Message> messages, MessageSender perspective) throws Exception {
+    private String buildSoloReportPrompt(Session session, List<Message> messages,
+                                          MessageSender perspective) throws Exception {
         StringBuilder sb = new StringBuilder();
-
         sb.append(promptLoader.get("system.md")).append("\n\n");
         sb.append(promptLoader.get("gottman/four_horsemen.md")).append("\n\n");
         sb.append(promptLoader.get("nvc/four_steps.md")).append("\n\n");
-        String userId = (perspective == MessageSender.USER_A) ? session.getUserAId() : session.getUserBId();
+        String userId = (perspective == MessageSender.USER_A)
+            ? session.getUserAId() : session.getUserBId();
         String soloProfile = profileFragment.render(loadUserSafely(userId));
         if (!soloProfile.isEmpty()) {
             sb.append(soloProfile).append("\n");
         }
         sb.append(promptLoader.get("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
         sb.append(promptLoader.get("chat/solo_report.md")).append("\n\n");
-
-        sb.append("<conversation_history>\n");
-        for (var msg : messages) {
-            // Skip system-only notices (join/finalize prompts — not conversation content)
-            if (Boolean.TRUE.equals(msg.getIsPartnerJoinNotice())
-                    || Boolean.TRUE.equals(msg.getIsFinalizeSuggestion())) {
-                continue;
-            }
-            sb.append("[").append(formatSender(msg.getSender())).append("] ")
-              .append(msg.getContent()).append("\n");
-        }
-        sb.append("</conversation_history>\n\n");
-
+        appendConversationHistory(sb, messages, true);
         if (session.getConflictType() != null) {
             sb.append("<conflict_type>").append(session.getConflictType()).append("</conflict_type>\n\n");
         }
-
-        sb.append(promptLoader.get("chat/_response_instructions.md"));
-
+        // NOTE: _response_instructions.md intentionally omitted — it's for chat, not report JSON
         return sb.toString();
     }
 
-    /**
-     * Build duo report prompt (perspective-specific).
-     */
-    private String buildDuoReportPrompt(Session session, List<Message> messages, MessageSender perspective) throws Exception {
+    private String buildDuoReportPrompt(Session session, List<Message> messages,
+                                         MessageSender perspective) throws Exception {
         StringBuilder sb = new StringBuilder();
-
         sb.append(promptLoader.get("system.md")).append("\n\n");
         sb.append(promptLoader.get("gottman/four_horsemen.md")).append("\n\n");
         sb.append(promptLoader.get("nvc/four_steps.md")).append("\n\n");
@@ -252,100 +198,36 @@ public class ReportGenerationService {
         if (!profileA.isEmpty() || !profileB.isEmpty()) sb.append("\n");
         sb.append(promptLoader.get("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
         sb.append(promptLoader.get("chat/duo_report.md")).append("\n\n");
+        appendConversationHistory(sb, messages, false);
+        sb.append("<perspective>").append(perspective == MessageSender.USER_A ? "A" : "B").append("</perspective>\n\n");
+        if (session.getConflictType() != null) {
+            sb.append("<conflict_type>").append(session.getConflictType()).append("</conflict_type>\n\n");
+        }
+        // NOTE: _response_instructions.md intentionally omitted — it's for chat, not report JSON
+        return sb.toString();
+    }
 
+    private void appendConversationHistory(StringBuilder sb, List<Message> messages,
+                                           boolean skipSystemNotices) {
         sb.append("<conversation_history>\n");
         for (var msg : messages) {
+            if (skipSystemNotices && (Boolean.TRUE.equals(msg.getIsPartnerJoinNotice())
+                    || Boolean.TRUE.equals(msg.getIsFinalizeSuggestion()))) {
+                continue;
+            }
             sb.append("[").append(formatSender(msg.getSender())).append("] ")
               .append(msg.getContent()).append("\n");
         }
         sb.append("</conversation_history>\n\n");
-
-        sb.append("<perspective>").append(perspective == MessageSender.USER_A ? "A" : "B").append("</perspective>\n\n");
-
-        if (session.getConflictType() != null) {
-            sb.append("<conflict_type>").append(session.getConflictType()).append("</conflict_type>\n\n");
-        }
-
-        sb.append(promptLoader.get("chat/_response_instructions.md"));
-
-        return sb.toString();
     }
 
-    private User loadUserSafely(String userId) {
-        if (userId == null) return null;
-        try {
-            return userRepo.findByIdAndDeletedAtIsNull(userId).orElse(null);
-        } catch (Exception e) {
-            log.warn("Failed to load user {} for report enrichment: {}", userId, e.getMessage());
-            return null;
-        }
-    }
-
-    private String invokeWithModel(String prompt, String model, String sessionId) throws Exception {
-        try {
-            return llmBridge.invoke(prompt, model);
-        } catch (Exception e) {
-            log.error("LLM invocation failed for session {}: {}", sessionId, e.getMessage());
-            throw e;
-        }
-    }
-
-    /**
-     * Build Report entity for solo mode.
-     */
-    private Report buildSoloReport(Session session, ReportResponseParser.ParsedReport parsed, MessageSender perspective) {
-        String reportId = "rep_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+    private Report buildSoloReport(Session session, ReportResponseParser.ParsedReport parsed) {
+        String reportId = newReportId();
 
         Report.Participant participantA = Report.Participant.builder()
-            .userId(session.getCreatedByUserId())
-            .nicknameSnapshot(null)  // TODO: Fetch from User entity if needed
-            .build();
-
-        Report.Participant participantB = null;
-        if (session.getUserBId() != null) {
-            participantB = Report.Participant.builder()
-                .userId(session.getUserBId())
-                .nicknameSnapshot(null)  // TODO: Fetch from User entity if needed
-                .build();
-        }
-
-        Report.ContributionRatio ratio = null;
-        if (parsed.getContributionRatio() != null) {
-            ratio = Report.ContributionRatio.builder()
-                .a(parsed.getContributionRatio().a)
-                .b(parsed.getContributionRatio().b)
-                .rationale(parsed.getContributionRatio().rationale)
-                .build();
-        }
-
-        Report.NeedsMap needsMap = null;
-        if (parsed.getNeedsMap() != null) {
-            needsMap = Report.NeedsMap.builder()
-                .axisX(parsed.getNeedsMap().axisX)
-                .axisXLabel(parsed.getNeedsMap().axisXLabel)
-                .axisY(parsed.getNeedsMap().axisY)
-                .axisYLabel(parsed.getNeedsMap().axisYLabel)
-                .interpretation(parsed.getNeedsMap().interpretation)
-                .build();
-        }
-
-        Report.FourHorsemenAnalysis horsemen = null;
-        if (parsed.getFourHorsemen() != null) {
-            horsemen = Report.FourHorsemenAnalysis.builder()
-                .criticism(mapHorsemenItem(parsed.getFourHorsemen().criticism))
-                .contempt(mapHorsemenItem(parsed.getFourHorsemen().contempt))
-                .defensiveness(mapHorsemenItem(parsed.getFourHorsemen().defensiveness))
-                .stonewalling(mapHorsemenItem(parsed.getFourHorsemen().stonewalling))
-                .build();
-        }
-
-        Report.NVCScripts nvcScripts = null;
-        if (parsed.getNvcScripts() != null) {
-            nvcScripts = Report.NVCScripts.builder()
-                .aToB(mapNvcScript(parsed.getNvcScripts().aToB))
-                .bToA(mapNvcScript(parsed.getNvcScripts().bToA))
-                .build();
-        }
+            .userId(session.getCreatedByUserId()).build();
+        Report.Participant participantB = session.getUserBId() != null
+            ? Report.Participant.builder().userId(session.getUserBId()).build() : null;
 
         return Report.builder()
             .id(reportId)
@@ -354,110 +236,184 @@ public class ReportGenerationService {
             .participantB(participantB)
             .conflictType(session.getConflictType())
             .soloMode(true)
-            .contributionRatio(ratio)
-            .needsMap(needsMap)
-            .fourHorsemen(horsemen)
-            .nvcScripts(nvcScripts)
-            .repairSuggestions(parsed.getRepairSuggestions())
+            .status(ReportStatus.OK)
             .llmProvider("claude-sonnet")
             .llmCallCount(1)
+            // V12 fields
+            .coreSummary(parsed.getCoreSummary())
+            .fourStageFlow(mapStageFlows(parsed.getFourStageFlow()))
+            .metaphorId(parsed.getMetaphor() != null ? parsed.getMetaphor().id : null)
+            .metaphorDisplayName(parsed.getMetaphor() != null ? parsed.getMetaphor().displayName : null)
+            .metaphorReason(parsed.getMetaphor() != null ? parsed.getMetaphor().reason : null)
+            .nvcObservation(parsed.getNvcReflection() != null ? parsed.getNvcReflection().observation : null)
+            .nvcFeeling(parsed.getNvcReflection() != null ? parsed.getNvcReflection().feeling : null)
+            .nvcNeed(parsed.getNvcReflection() != null ? parsed.getNvcReflection().need : null)
+            .nvcRequest(parsed.getNvcReflection() != null ? parsed.getNvcReflection().request : null)
+            .recommendedActions(mapRecommendedActions(parsed.getRecommendedActions()))
+            .externalResourceGuidance(mapExternalResource(parsed.getExternalResourceGuidance()))
+            // Legacy text fields (kept for compat)
             .aPatternFeedback(parsed.getPatternFeedback())
             .suggestedApproach(parsed.getSuggestedApproach())
-            .inviteAgainCTA(parsed.getInviteAgainCta())
             .createdAt(Instant.now())
             .build();
     }
 
-    /**
-     * Build Report entity for duo mode.
-     */
     private Report buildDuoReport(Session session, ReportResponseParser.ParsedReport parsedA,
-                                  ReportResponseParser.ParsedReport parsedB, RatioEnforcer.Enforced ratio) {
-        String reportId = "rep_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
-
-        Report.Participant participantA = Report.Participant.builder()
-            .userId(session.getCreatedByUserId())
-            .nicknameSnapshot(null)  // TODO: Fetch from User entity if needed
-            .build();
-
-        Report.Participant participantB = Report.Participant.builder()
-            .userId(session.getUserBId())
-            .nicknameSnapshot(null)  // TODO: Fetch from User entity if needed
-            .build();
+                                   ReportResponseParser.ParsedReport parsedB,
+                                   RatioEnforcer.Enforced ratio) {
+        String reportId = newReportId();
 
         Report.ContributionRatio ratioObj = Report.ContributionRatio.builder()
-            .a(ratio.a())
-            .b(ratio.b())
+            .a(ratio.a()).b(ratio.b())
             .clippedFrom(ratio.wasClipped() ? "llm" : null)
             .build();
 
-        // Use A's parsed data as primary (could merge both, but for simplicity use A)
-        Report.NeedsMap needsMap = null;
-        if (parsedA.getNeedsMap() != null) {
-            needsMap = Report.NeedsMap.builder()
-                .axisX(parsedA.getNeedsMap().axisX)
-                .axisXLabel(parsedA.getNeedsMap().axisXLabel)
-                .axisY(parsedA.getNeedsMap().axisY)
-                .axisYLabel(parsedA.getNeedsMap().axisYLabel)
-                .interpretation(parsedA.getNeedsMap().interpretation)
-                .build();
-        }
+        // Map nvcReflection → nvcScripts (aToB from A's nvcReflection, bToA from B's)
+        Report.NVCScripts nvcScripts = buildNvcScriptsFromReflections(parsedA, parsedB);
 
+        // Map fourHorsemenScores → FourHorsemenAnalysis
         Report.FourHorsemenAnalysis horsemen = null;
-        if (parsedA.getFourHorsemen() != null) {
+        if (parsedA.getFourHorsemenScores() != null) {
+            ReportResponseParser.ParsedReport.FourHorsemenScores scores = parsedA.getFourHorsemenScores();
             horsemen = Report.FourHorsemenAnalysis.builder()
-                .criticism(mapHorsemenItem(parsedA.getFourHorsemen().criticism))
-                .contempt(mapHorsemenItem(parsedA.getFourHorsemen().contempt))
-                .defensiveness(mapHorsemenItem(parsedA.getFourHorsemen().defensiveness))
-                .stonewalling(mapHorsemenItem(parsedA.getFourHorsemen().stonewalling))
-                .build();
-        }
-
-        Report.NVCScripts nvcScripts = null;
-        if (parsedA.getNvcScripts() != null) {
-            nvcScripts = Report.NVCScripts.builder()
-                .aToB(mapNvcScript(parsedA.getNvcScripts().aToB))
-                .bToA(mapNvcScript(parsedA.getNvcScripts().bToA))
+                .criticism(horsemenItemFromScore(scores.criticism))
+                .contempt(horsemenItemFromScore(scores.contempt))
+                .defensiveness(horsemenItemFromScore(scores.defensiveness))
+                .stonewalling(horsemenItemFromScore(scores.stonewalling))
                 .build();
         }
 
         return Report.builder()
             .id(reportId)
             .sessionId(session.getId())
-            .participantA(participantA)
-            .participantB(participantB)
+            .participantA(Report.Participant.builder().userId(session.getCreatedByUserId()).build())
+            .participantB(Report.Participant.builder().userId(session.getUserBId()).build())
             .conflictType(session.getConflictType())
             .soloMode(false)
+            .status(ReportStatus.OK)
             .contributionRatio(ratioObj)
-            .needsMap(needsMap)
             .fourHorsemen(horsemen)
             .nvcScripts(nvcScripts)
-            .repairSuggestions(parsedA.getRepairSuggestions())
             .llmProvider("claude-sonnet")
-            .llmCallCount(2)  // A + B perspectives
+            .llmCallCount(2)
+            // V12 fields from A's perspective as primary
+            .coreSummary(parsedA.getCoreSummary())
+            .fourStageFlow(mapStageFlows(parsedA.getFourStageFlow()))
+            .metaphorId(parsedA.getMetaphor() != null ? parsedA.getMetaphor().id : null)
+            .metaphorDisplayName(parsedA.getMetaphor() != null ? parsedA.getMetaphor().displayName : null)
+            .metaphorReason(parsedA.getMetaphor() != null ? parsedA.getMetaphor().reason : null)
+            .nvcObservation(parsedA.getNvcReflection() != null ? parsedA.getNvcReflection().observation : null)
+            .nvcFeeling(parsedA.getNvcReflection() != null ? parsedA.getNvcReflection().feeling : null)
+            .nvcNeed(parsedA.getNvcReflection() != null ? parsedA.getNvcReflection().need : null)
+            .nvcRequest(parsedA.getNvcReflection() != null ? parsedA.getNvcReflection().request : null)
+            .recommendedActions(mapRecommendedActions(parsedA.getRecommendedActions()))
+            .externalResourceGuidance(mapExternalResource(
+                parsedA.getExternalResourceGuidance() != null
+                    ? parsedA.getExternalResourceGuidance()
+                    : parsedB.getExternalResourceGuidance()))
             .aPatternFeedback(parsedA.getPatternFeedback())
             .suggestedApproach(parsedA.getSuggestedApproach())
             .createdAt(Instant.now())
             .build();
     }
 
-    private Report.NVCScripts.NVCScript mapNvcScript(ReportResponseParser.ParsedReport.NVCScript src) {
-        if (src == null) return null;
-        return Report.NVCScripts.NVCScript.builder()
-            .observation(src.observation)
-            .feeling(src.feeling)
-            .need(src.need)
-            .request(src.request)
+    private Report.NVCScripts buildNvcScriptsFromReflections(
+            ReportResponseParser.ParsedReport parsedA,
+            ReportResponseParser.ParsedReport parsedB) {
+        ReportResponseParser.ParsedReport.NVCReflection reflA = parsedA.getNvcReflection();
+        ReportResponseParser.ParsedReport.NVCReflection reflB = parsedB.getNvcReflection();
+        if (reflA == null && reflB == null) return null;
+        return Report.NVCScripts.builder()
+            .aToB(reflA != null ? Report.NVCScripts.NVCScript.builder()
+                .observation(reflA.observation).feeling(reflA.feeling)
+                .need(reflA.need).request(reflA.request).build() : null)
+            .bToA(reflB != null ? Report.NVCScripts.NVCScript.builder()
+                .observation(reflB.observation).feeling(reflB.feeling)
+                .need(reflB.need).request(reflB.request).build() : null)
             .build();
     }
 
-    private Report.FourHorsemenAnalysis.HorsemenItem mapHorsemenItem(ReportResponseParser.ParsedReport.HorsemenItem src) {
+    private List<Report.StageFlow> mapStageFlows(
+            List<ReportResponseParser.ParsedReport.StageFlow> src) {
+        if (src == null || src.isEmpty()) return null;
+        List<Report.StageFlow> result = new ArrayList<>();
+        for (var s : src) {
+            result.add(Report.StageFlow.builder()
+                .stage(s.stage).stageName(s.stageName)
+                .userQuote(s.userQuote).interpretation(s.interpretation)
+                .build());
+        }
+        return result;
+    }
+
+    private List<Report.RecommendedAction> mapRecommendedActions(
+            List<ReportResponseParser.ParsedReport.RecommendedAction> src) {
+        if (src == null || src.isEmpty()) return null;
+        List<Report.RecommendedAction> result = new ArrayList<>();
+        for (var a : src) {
+            result.add(Report.RecommendedAction.builder()
+                .action(a.action).rationale(a.rationale).isUserChosen(a.isUserChosen)
+                .build());
+        }
+        return result;
+    }
+
+    private Report.ExternalResourceGuidance mapExternalResource(
+            ReportResponseParser.ParsedReport.ExternalResourceGuidance src) {
         if (src == null) return null;
-        return Report.FourHorsemenAnalysis.HorsemenItem.builder()
-            .detected(src.detected)
-            .intensity(src.intensity)
-            .examples(src.examples)
+        return Report.ExternalResourceGuidance.builder()
+            .domain(src.domain).resource(src.resource).rationale(src.rationale)
             .build();
+    }
+
+    private Report.FourHorsemenAnalysis.HorsemenItem horsemenItemFromScore(int score) {
+        boolean detected = score > 0;
+        String intensity = score >= 7 ? "high" : score >= 4 ? "medium" : score >= 1 ? "low" : "";
+        return Report.FourHorsemenAnalysis.HorsemenItem.builder()
+            .detected(detected).intensity(intensity).build();
+    }
+
+    private String invokeWithRetry(String prompt, String sessionId, String label) {
+        try {
+            return llmBridge.invoke(prompt, reportModel);
+        } catch (Exception firstEx) {
+            log.warn("LLM first attempt failed for {} report {}: {}", label, sessionId, firstEx.getMessage());
+            try {
+                return llmBridge.invoke(prompt, reportModel);
+            } catch (Exception retryEx) {
+                log.error("LLM retry also failed for {} report {}: {}", label, sessionId, retryEx.getMessage());
+                return null;
+            }
+        }
+    }
+
+    private void saveFailedReport(String sessionId, boolean soloMode) {
+        try {
+            reportRepo.save(Report.builder()
+                .id(newReportId())
+                .sessionId(sessionId)
+                .soloMode(soloMode)
+                .status(ReportStatus.FAILED)
+                .llmProvider("error-failed")
+                .createdAt(Instant.now())
+                .build());
+        } catch (Exception e) {
+            log.error("Even failed report save failed for session {}", sessionId, e);
+        }
+    }
+
+    private User loadUserSafely(String userId) {
+        if (userId == null) return null;
+        try {
+            return userRepo.findByIdAndDeletedAtIsNull(userId).orElse(null);
+        } catch (Exception e) {
+            log.warn("Failed to load user {} for report: {}", userId, e.getMessage());
+            return null;
+        }
+    }
+
+    private String newReportId() {
+        return "rep_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
     }
 
     private String formatSender(MessageSender s) {

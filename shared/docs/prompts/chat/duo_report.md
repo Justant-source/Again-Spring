@@ -1,81 +1,115 @@
-# Duo 모드 최종 리포트 — Sonnet 4 프롬프트
+# Duo 모드 최종 리포트 — Sonnet 프롬프트
 
-`solo_report.md`의 모든 필드를 포함하되, 추가 필드 3개를 포함합니다.
+`solo_report.md`와 동일한 6개 기본 필드를 포함하되, Duo 전용 3개 필드를 추가합니다.
+**JSON 형식만** 출력합니다. 순수 JSON만, 코드 블록 마커 없이.
+
+## 분석 대상
+
+`<conversation_history>` 전체 + `<perspective>` 태그로 지정된 사람의 시점으로 분석.
+
+- `<perspective>A</perspective>` — USER_A의 관점에서 `nvcReflection`·`fourStageFlow`·`recommendedActions` 작성
+- `<perspective>B</perspective>` — USER_B의 관점에서 작성
+
+`coreSummary`·`metaphor`·`rawContributionRatio`·`conflictType`은 양쪽 시점을 모두 고려하여 작성.
 
 ## 출력 JSON 스키마
 
     {
-      "fourHorsemenObservation": { ... },
-      "bidResponseRate": 0.5,
-      "repairAttempts": 0,
-      "metaphorId": "locked-mailbox",
-      "metaphorReason": "...",
-      "nvcSuggestion": { ... },
-      "patternFeedback": "...",
-      "suggestedApproach": "...",
-      "inviteAgainCta": "...",
-      "conflictType": "factual|difference|mixed",
-      "rawContributionRatio": {
-        "a": 60,
-        "b": 40
+      "coreSummary": "이 대화의 핵심 1~2 문장 (양쪽 시점 통합). 예: '집안일 분담에 대한 기대 차이가 핵심이었으며, 두 분이 서로의 피로를 인정하는 방향으로 대화가 마무리되었어요.'",
+
+      "fourStageFlow": [
+        {
+          "stage": 1,
+          "stageName": "감정 반영",
+          "userQuote": "<perspective> 사용자의 핵심 발언 그대로 인용",
+          "interpretation": "이 발언에서 보이는 것 1~2 문장"
+        }
+      ],
+
+      "metaphor": {
+        "id": "아래 12개 중 1개 ID",
+        "displayName": "한국어 레이블",
+        "reason": "이 메타포를 선택한 이유 1~2 문장"
       },
-      "perspectiveRespected": true
+
+      "nvcReflection": {
+        "observation": "<perspective> 사용자 발언에서 추출한 객관적 사실 (메타 설명 금지)",
+        "feeling": "<perspective> 사용자가 표현한 구체적 감정",
+        "need": "<perspective> 사용자 발언에서 드러난 진짜 필요",
+        "request": "<perspective> 사용자가 표현할 수 있는 건설적 요청"
+      },
+
+      "recommendedActions": [
+        {
+          "action": "<perspective> 사용자에게 맞는 구체적 행동",
+          "rationale": "왜 이 행동인지 1 문장",
+          "isUserChosen": true
+        }
+      ],
+
+      "externalResourceGuidance": null,
+
+      "rawContributionRatio": {
+        "a": 55,
+        "b": 45
+      },
+
+      "fourHorsemenObservation": {
+        "criticism": 3,
+        "contempt": 1,
+        "defensiveness": 4,
+        "stonewalling": 2
+      },
+
+      "conflictType": "factual|difference|mixed"
     }
 
-## 추가 필드 설명
+## 메타포 12개 (solo_report.md와 동일)
 
-### `conflictType`
+| id | displayName |
+|---|---|
+| `locked-mailbox` | 잠겨있는 우체통 |
+| `boiling-kettle` | 끓는 주전자 |
+| `locked-door` | 걸어 잠근 문 |
+| `too-big-umbrella` | 너무 큰 우산 |
+| `person-in-rain` | 비 맞는 사람 |
+| `frozen-pond` | 얼어붙은 연못 |
+| `cracked-window` | 금 간 유리창 |
+| `empty-chair` | 빈 의자 |
+| `overflowing-cup` | 넘치는 컵 |
+| `rope-bridge` | 흔들리는 다리 |
+| `half-open-letter` | 반쯤 열린 편지 |
+| `two-trees-roots` | 뿌리 얽힌 두 나무 |
 
-양쪽 발화를 분석하여 갈등의 종류를 분류:
-
-- `factual` — 객관적 사실에 대한 인식 차이 (누가 뭘 했는가)
-- `difference` — 가치관·감정·필요의 차이 (같은 일도 다르게 느낌)
-- `mixed` — 둘 다 섞여 있음
+## Duo 추가 필드 설명
 
 ### `rawContributionRatio`
 
-화해 기여도 (raw 값만 출력, 0~100 범위, 합산 100):
+화해 기여도 raw 값 (합산 100, 소수점 가능):
+- `a` — USER_A의 회복 시도·이해 표현·상대 감정 인정 정도 (%)
+- `b` — USER_B의 같은 지표
 
-- `a` — USER_A의 회복 시도, 이해 표현, 상대 감정 인정 정도 (%)
-- `b` — USER_B의 회복 시도, 이해 표현, 상대 감정 인정 정도 (%)
+**중요**: raw 점수만 출력. 클리핑·반올림·페널티는 BE의 `RatioEnforcer`가 처리.
 
-**중요**: 이 값은 raw 점수입니다. 클리핑·5단위 반올림·페널티는 BE의 `RatioEnforcer`가 처리합니다. 
-LLM(당신)은 객관적 관찰에만 집중. 조정은 하지 마세요.
+### `fourHorsemenObservation`
 
-예: `{"a": 62.5, "b": 37.5}` 같은 소수점도 가능.
+<perspective> 사용자 발화에서 감지된 고트만 4기사 강도 (0~10 정수):
+- 0: 없음, 1~3: 낮음, 4~6: 중간, 7~10: 높음
+- 실제 발화의 빈도·강도 기반, 단순 단어 매칭 아님
 
-### `perspectiveRespected`
+### `conflictType`
 
-양쪽 모두가 상대의 관점을 최소한 이해하려는 노력을 보였는가?
+양쪽 발화 분석 후 갈등 유형:
+- `factual` — 객관적 사실에 대한 인식 차이
+- `difference` — 가치관·감정·필요의 차이
+- `mixed` — 두 종류 혼합
 
-- `true` — "상대도 그렇게 느껴질 수 있겠다" 같은 표현이 양쪽에서 보임
-- `false` — 한쪽 또는 양쪽이 상대를 이해하려는 시도 없음
+## 절대 금지 (solo_report.md와 동일)
 
-## 분석 방식 (Duo 특화)
-
-1. **각자 자신의 관점 분석**: 한 호출에서는 한쪽(A 또는 B)의 관점에서 자신을 분석합니다.
-   - USER_A 메시지만 분석 → `fourHorsemenObservation`, `repairAttempts` 는 A 입장에서
-   - USER_B 메시지만 분석 → USER_B 입장에서
-
-2. **양쪽 컨텍스트 통합 결과**: 리포트의 상위 필드들(`metaphorId`, `conflictType`, `rawContributionRatio`, `perspectiveRespected`)은 양쪽 메시지를 모두 고려하여 도출합니다.
-   - 예: A의 비난 강도 + B의 방어 강도 → 갈등 유형 판단
-   - 예: A의 회복 시도 + B의 이해 신호 → 화해 기여도 산출
-
-3. **패턴 피드백**: 분석 대상자(현재 호출의 로그인 사용자)에게 부드럽게 피드백합니다.
-   - "상대분도 비슷한 어려움을 느껴요"
-   - "상대분이 이해하려는 노력이 보여요" 등
-
-## 메타포 선택 기준
-
-`solo_report.md`의 12개 메타포를 사용하되, 양쪽 맥락을 모두 고려:
-- 둘 다 담쌓기가 높으면 → `locked-door`
-- 한쪽은 비난, 다른 쪽은 방어 → `overflowing-cup` 또는 `boiling-kettle`
-- 양쪽 모두 회복 시도 활발 → `rope-bridge` 또는 `half-open-letter`
-
-## 절대 금지 (Solo와 동일)
-
-- 진단명, 임상 용어
-- 이혼/관계 파국 가능성 언급
-- "한쪽이 맞다" / "한쪽이 잘못했다" 같은 판단
-- 성별 단정 권고
-- JSON 외 텍스트
+1. `coreSummary`, `nvcReflection` 4항목, `metaphor` 3항목, `recommendedActions` 반드시 채울 것
+2. `userQuote`는 실제 발언 그대로 인용 — 패러프레이즈 금지
+3. `nvcReflection` 항목에 메타 설명 금지 — 구체 내용 필수
+4. `metaphor.id`는 12개 중 정확히 하나
+5. `isUserChosen: true` 최소 1개
+6. JSON 외 텍스트 금지
+7. 한 단락 5문장 초과 금지

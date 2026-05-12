@@ -53,6 +53,63 @@ public class ReportResponse {
 
     private Instant createdAt;
 
+    // V12 fields
+    private String status;
+
+    private String coreSummary;
+
+    private List<StageFlowResponse> fourStageFlow;
+
+    private String metaphorId;
+
+    private String metaphorDisplayName;
+
+    private String metaphorReason;
+
+    private String nvcObservation;
+
+    private String nvcFeeling;
+
+    private String nvcNeed;
+
+    private String nvcRequest;
+
+    private List<RecommendedActionResponse> recommendedActions;
+
+    private ExternalResourceResponse externalResourceGuidance;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class StageFlowResponse {
+        private int stage;
+        private String stageName;
+        private String userQuote;
+        private String interpretation;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RecommendedActionResponse {
+        private String action;
+        private String rationale;
+        @com.fasterxml.jackson.annotation.JsonProperty("isUserChosen")
+        private boolean isUserChosen;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExternalResourceResponse {
+        private String domain;
+        private String resource;
+        private String rationale;
+    }
+
     /**
      * Embedded DTO: Participant snapshot from report.
      */

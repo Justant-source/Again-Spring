@@ -1,6 +1,7 @@
 package com.againspring.domain;
 
 import com.againspring.domain.enums.ConflictType;
+import com.againspring.domain.enums.ReportStatus;
 import java.time.Instant;
 import java.util.List;
 import jakarta.persistence.*;
@@ -87,6 +88,90 @@ public class Report {
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
+
+    // V12 — Solo 리포트 컨텍스트 반영 필드
+    @Column(columnDefinition = "LONGTEXT")
+    private String coreSummary;
+
+    @Type(JsonType.class)
+    @Column(columnDefinition = "JSON")
+    private List<StageFlow> fourStageFlow;
+
+    @Column(length = 100)
+    private String metaphorId;
+
+    @Column(length = 100)
+    private String metaphorDisplayName;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String metaphorReason;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String nvcObservation;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String nvcFeeling;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String nvcNeed;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String nvcRequest;
+
+    @Type(JsonType.class)
+    @Column(columnDefinition = "JSON")
+    private List<RecommendedAction> recommendedActions;
+
+    @Type(JsonType.class)
+    @Column(columnDefinition = "JSON")
+    private ExternalResourceGuidance externalResourceGuidance;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ReportStatus status;
+
+    /**
+     * V12 — 4단계 흐름 항목
+     */
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @Getter
+    @Setter
+    public static class StageFlow {
+        public int stage;
+        public String stageName;
+        public String userQuote;
+        public String interpretation;
+    }
+
+    /**
+     * V12 — 추천 다음 행동
+     */
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @Getter
+    @Setter
+    public static class RecommendedAction {
+        public String action;
+        public String rationale;
+        public Boolean isUserChosen;
+    }
+
+    /**
+     * V12 — 외부 자원 안내
+     */
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @Getter
+    @Setter
+    public static class ExternalResourceGuidance {
+        public String domain;
+        public String resource;
+        public String rationale;
+    }
 
     /**
      * 참여자 정보 임베디드

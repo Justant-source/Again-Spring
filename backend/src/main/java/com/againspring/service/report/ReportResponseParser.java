@@ -1,7 +1,6 @@
 package com.againspring.service.report;
 
 import com.againspring.domain.enums.ConflictType;
-import com.againspring.domain.Report;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,9 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Parses LLM responses for report generation.
- * Extracts fields: ratio, horsemen, NVC scripts, needs map, repair suggestions.
- * Tolerant to schema drift with fallback values.
+ * Parses LLM responses for report generation (V12).
+ * Supports new V12 schema: coreSummary, fourStageFlow, metaphor, nvcReflection,
+ * recommendedActions, externalResourceGuidance.
+ * Also handles legacy Duo fields for backward compat.
  */
 @Slf4j
 @Component
@@ -26,15 +26,22 @@ public class ReportResponseParser {
         this.objectMapper = new ObjectMapper();
     }
 
-    /**
-     * Parses raw LLM response into report data.
-     *
-     * @param rawText JSON text from LLM
-     * @return parsed report data
-     */
     public ParsedReport parse(String rawText) {
+        if (rawText == null || rawText.isBlank()) {
+            log.warn("Empty LLM response for report");
+            return ParsedReport.builder().fallback(true).build();
+        }
+        String trimmed = rawText.trim();
+        // Strip markdown code block if present
+        if (trimmed.startsWith("```")) {
+            int firstNewline = trimmed.indexOf('\n');
+            int lastFence = trimmed.lastIndexOf("```");
+            if (firstNewline > 0 && lastFence > firstNewline) {
+                trimmed = trimmed.substring(firstNewline + 1, lastFence).trim();
+            }
+        }
         try {
-            JsonNode root = objectMapper.readTree(rawText);
+            JsonNode root = objectMapper.readTree(trimmed);
             return extractReportData(root);
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse report LLM response as JSON: {}", e.getMessage());
@@ -45,14 +52,32 @@ public class ReportResponseParser {
     private ParsedReport extractReportData(JsonNode root) {
         ParsedReport.ParsedReportBuilder builder = ParsedReport.builder();
 
-        // Extract contribution ratio
-        JsonNode ratioNode = root.get("contributionRatio");
+        // V12 fields
+        builder.coreSummary(getStringField(root, "coreSummary", null));
+        builder.fourStageFlow(extractFourStageFlow(root));
+        builder.metaphor(extractMetaphor(root));
+        builder.nvcReflection(extractNvcReflection(root));
+        builder.recommendedActions(extractRecommendedActions(root));
+        builder.externalResourceGuidance(extractExternalResource(root));
+
+        // Duo-specific: rawContributionRatio (also check legacy key)
+        JsonNode ratioNode = root.get("rawContributionRatio");
+        if (ratioNode == null) ratioNode = root.get("contributionRatio");
         if (ratioNode != null) {
-            ParsedReport.ContributionRatio ratio = extractRatio(ratioNode);
-            builder.contributionRatio(ratio);
+            builder.contributionRatio(extractRatio(ratioNode));
         }
 
-        // Extract conflict type
+        // Duo-specific: fourHorsemenObservation (number scores) + legacy fourHorsemen object
+        JsonNode horsemenScoreNode = root.get("fourHorsemenObservation");
+        if (horsemenScoreNode != null) {
+            builder.fourHorsemenScores(extractHorsemenScores(horsemenScoreNode));
+        }
+        JsonNode horsemenNode = root.get("fourHorsemen");
+        if (horsemenNode != null) {
+            builder.fourHorsemen(extractHorsemen(horsemenNode));
+        }
+
+        // Duo-specific: conflictType
         String conflictTypeStr = getStringField(root, "conflictType", null);
         if (conflictTypeStr != null) {
             try {
@@ -62,32 +87,11 @@ public class ReportResponseParser {
             }
         }
 
-        // Extract NVC scripts
+        // Legacy fields (still used for some Duo paths)
         JsonNode nvcNode = root.get("nvcScripts");
         if (nvcNode != null) {
-            ParsedReport.NVCScripts nvc = extractNVC(nvcNode);
-            builder.nvcScripts(nvc);
+            builder.nvcScripts(extractNVC(nvcNode));
         }
-
-        // Extract four horsemen
-        JsonNode horsemenNode = root.get("fourHorsemen");
-        if (horsemenNode != null) {
-            ParsedReport.FourHorsemen horsemen = extractHorsemen(horsemenNode);
-            builder.fourHorsemen(horsemen);
-        }
-
-        // Extract needs map
-        JsonNode needsNode = root.get("needsMap");
-        if (needsNode != null) {
-            ParsedReport.NeedsMap needsMap = extractNeedsMap(needsNode);
-            builder.needsMap(needsMap);
-        }
-
-        // Extract repair suggestions
-        List<String> suggestions = extractSuggestions(root);
-        builder.repairSuggestions(suggestions);
-
-        // Extract text feedback fields
         builder.patternFeedback(getStringField(root, "patternFeedback", ""));
         builder.suggestedApproach(getStringField(root, "suggestedApproach", ""));
         builder.inviteAgainCta(getStringField(root, "inviteAgainCta", ""));
@@ -95,233 +99,287 @@ public class ReportResponseParser {
         return builder.fallback(false).build();
     }
 
-    private ParsedReport.ContributionRatio extractRatio(JsonNode node) {
-        int a = getIntField(node, "a", 50);
-        int b = getIntField(node, "b", 50);
-        String rationale = getStringField(node, "rationale", "");
-
-        JsonNode labelNode = node.get("label");
-        ParsedReport.RatioLabel label = null;
-        if (labelNode != null) {
-            label = ParsedReport.RatioLabel.builder()
-                    .a(getStringField(labelNode, "a", ""))
-                    .b(getStringField(labelNode, "b", ""))
-                    .build();
+    private List<ParsedReport.StageFlow> extractFourStageFlow(JsonNode root) {
+        List<ParsedReport.StageFlow> result = new ArrayList<>();
+        JsonNode arr = root.get("fourStageFlow");
+        if (arr == null || !arr.isArray()) return result;
+        for (JsonNode item : arr) {
+            int stage = getIntField(item, "stage", 0);
+            String stageName = getStringField(item, "stageName", "");
+            String userQuote = getStringField(item, "userQuote", "");
+            String interpretation = getStringField(item, "interpretation", "");
+            if (!stageName.isBlank() || !userQuote.isBlank()) {
+                result.add(ParsedReport.StageFlow.builder()
+                    .stage(stage).stageName(stageName)
+                    .userQuote(userQuote).interpretation(interpretation)
+                    .build());
+            }
         }
+        return result;
+    }
 
+    private ParsedReport.MetaphorSelection extractMetaphor(JsonNode root) {
+        JsonNode node = root.get("metaphor");
+        if (node == null) return null;
+        String id = getStringField(node, "id", null);
+        String displayName = getStringField(node, "displayName", null);
+        String reason = getStringField(node, "reason", null);
+        if (id == null) return null;
+        return ParsedReport.MetaphorSelection.builder()
+            .id(id).displayName(displayName).reason(reason).build();
+    }
+
+    private ParsedReport.NVCReflection extractNvcReflection(JsonNode root) {
+        JsonNode node = root.get("nvcReflection");
+        if (node == null) return null;
+        String observation = getStringField(node, "observation", null);
+        String feeling = getStringField(node, "feeling", null);
+        String need = getStringField(node, "need", null);
+        String request = getStringField(node, "request", null);
+        return ParsedReport.NVCReflection.builder()
+            .observation(observation).feeling(feeling)
+            .need(need).request(request).build();
+    }
+
+    private List<ParsedReport.RecommendedAction> extractRecommendedActions(JsonNode root) {
+        List<ParsedReport.RecommendedAction> result = new ArrayList<>();
+        JsonNode arr = root.get("recommendedActions");
+        if (arr == null || !arr.isArray()) return result;
+        for (JsonNode item : arr) {
+            String action = getStringField(item, "action", null);
+            String rationale = getStringField(item, "rationale", null);
+            boolean isUserChosen = getBooleanField(item, "isUserChosen", false);
+            if (action != null && !action.isBlank()) {
+                result.add(ParsedReport.RecommendedAction.builder()
+                    .action(action).rationale(rationale).isUserChosen(isUserChosen).build());
+            }
+        }
+        return result;
+    }
+
+    private ParsedReport.ExternalResourceGuidance extractExternalResource(JsonNode root) {
+        JsonNode node = root.get("externalResourceGuidance");
+        if (node == null || node.isNull()) return null;
+        String domain = getStringField(node, "domain", null);
+        String resource = getStringField(node, "resource", null);
+        String rationale = getStringField(node, "rationale", null);
+        if (domain == null) return null;
+        return ParsedReport.ExternalResourceGuidance.builder()
+            .domain(domain).resource(resource).rationale(rationale).build();
+    }
+
+    private ParsedReport.FourHorsemenScores extractHorsemenScores(JsonNode node) {
+        return ParsedReport.FourHorsemenScores.builder()
+            .criticism(getIntField(node, "criticism", 0))
+            .contempt(getIntField(node, "contempt", 0))
+            .defensiveness(getIntField(node, "defensiveness", 0))
+            .stonewalling(getIntField(node, "stonewalling", 0))
+            .build();
+    }
+
+    private ParsedReport.ContributionRatio extractRatio(JsonNode node) {
+        double a = getDoubleField(node, "a", 50.0);
+        double b = getDoubleField(node, "b", 50.0);
+        String rationale = getStringField(node, "rationale", "");
         return ParsedReport.ContributionRatio.builder()
-                .a(a)
-                .b(b)
-                .label(label)
-                .rationale(rationale)
-                .build();
+            .a((int) Math.round(a)).b((int) Math.round(b)).rationale(rationale).build();
     }
 
     private ParsedReport.NVCScripts extractNVC(JsonNode node) {
-        ParsedReport.NVCScript aToB = extractNVCScript(node.get("aToB"));
-        ParsedReport.NVCScript bToA = extractNVCScript(node.get("bToA"));
-
         return ParsedReport.NVCScripts.builder()
-                .aToB(aToB)
-                .bToA(bToA)
-                .build();
+            .aToB(extractNVCScript(node.get("aToB")))
+            .bToA(extractNVCScript(node.get("bToA")))
+            .build();
     }
 
     private ParsedReport.NVCScript extractNVCScript(JsonNode node) {
-        if (node == null) {
-            return null;
-        }
-
+        if (node == null) return null;
         return ParsedReport.NVCScript.builder()
-                .observation(getStringField(node, "observation", ""))
-                .feeling(getStringField(node, "feeling", ""))
-                .need(getStringField(node, "need", ""))
-                .request(getStringField(node, "request", ""))
-                .build();
+            .observation(getStringField(node, "observation", ""))
+            .feeling(getStringField(node, "feeling", ""))
+            .need(getStringField(node, "need", ""))
+            .request(getStringField(node, "request", ""))
+            .build();
     }
 
     private ParsedReport.FourHorsemen extractHorsemen(JsonNode node) {
         return ParsedReport.FourHorsemen.builder()
-                .criticism(extractHorsemenItem(node.get("criticism")))
-                .defensiveness(extractHorsemenItem(node.get("defensiveness")))
-                .contempt(extractHorsemenItem(node.get("contempt")))
-                .stonewalling(extractHorsemenItem(node.get("stonewalling")))
-                .build();
+            .criticism(extractHorsemenItem(node.get("criticism")))
+            .defensiveness(extractHorsemenItem(node.get("defensiveness")))
+            .contempt(extractHorsemenItem(node.get("contempt")))
+            .stonewalling(extractHorsemenItem(node.get("stonewalling")))
+            .build();
     }
 
     private ParsedReport.HorsemenItem extractHorsemenItem(JsonNode node) {
-        if (node == null) {
-            return ParsedReport.HorsemenItem.builder()
-                    .detected(false)
-                    .build();
-        }
-
-        boolean detected = getBooleanField(node, "detected", false);
-        String intensity = getStringField(node, "intensity", "");
-        List<String> examples = extractStringList(node, "examples");
-
+        if (node == null) return ParsedReport.HorsemenItem.builder().detected(false).build();
         return ParsedReport.HorsemenItem.builder()
-                .detected(detected)
-                .intensity(intensity)
-                .examples(examples)
-                .build();
-    }
-
-    private ParsedReport.NeedsMap extractNeedsMap(JsonNode node) {
-        ParsedReport.Position posA = extractPosition(node.get("positionA"));
-        ParsedReport.Position posB = extractPosition(node.get("positionB"));
-
-        return ParsedReport.NeedsMap.builder()
-                .axisX(getStringField(node, "axisX", ""))
-                .axisXLabel(getStringField(node, "axisXLabel", ""))
-                .axisY(getStringField(node, "axisY", ""))
-                .axisYLabel(getStringField(node, "axisYLabel", ""))
-                .positionA(posA)
-                .positionB(posB)
-                .interpretation(getStringField(node, "interpretation", ""))
-                .build();
-    }
-
-    private ParsedReport.Position extractPosition(JsonNode node) {
-        if (node == null) {
-            return null;
-        }
-
-        return ParsedReport.Position.builder()
-                .x(getIntField(node, "x", 0))
-                .y(getIntField(node, "y", 0))
-                .build();
-    }
-
-    private List<String> extractSuggestions(JsonNode root) {
-        List<String> suggestions = new ArrayList<>();
-        JsonNode sugNode = root.get("repairSuggestions");
-
-        if (sugNode != null && sugNode.isArray()) {
-            for (JsonNode item : sugNode) {
-                if (item.isTextual()) {
-                    String text = item.asText();
-                    if (text != null && !text.isBlank()) {
-                        suggestions.add(text);
-                    }
-                }
-            }
-        }
-
-        return suggestions;
+            .detected(getBooleanField(node, "detected", false))
+            .intensity(getStringField(node, "intensity", ""))
+            .examples(extractStringList(node, "examples"))
+            .build();
     }
 
     private List<String> extractStringList(JsonNode node, String fieldName) {
         List<String> result = new ArrayList<>();
-        if (node == null || !node.has(fieldName)) {
-            return result;
-        }
-
+        if (node == null || !node.has(fieldName)) return result;
         JsonNode listNode = node.get(fieldName);
         if (listNode != null && listNode.isArray()) {
             for (JsonNode item : listNode) {
-                if (item.isTextual()) {
-                    String text = item.asText();
-                    if (text != null && !text.isBlank()) {
-                        result.add(text);
-                    }
+                if (item.isTextual() && !item.asText().isBlank()) {
+                    result.add(item.asText());
                 }
             }
         }
-
         return result;
     }
 
     private String getStringField(JsonNode node, String fieldName, String defaultValue) {
-        if (node == null || !node.has(fieldName)) {
-            return defaultValue;
-        }
+        if (node == null || !node.has(fieldName)) return defaultValue;
         JsonNode field = node.get(fieldName);
-        if (field == null || field.isNull()) {
-            return defaultValue;
-        }
+        if (field == null || field.isNull()) return defaultValue;
         return field.asText(defaultValue);
     }
 
     private int getIntField(JsonNode node, String fieldName, int defaultValue) {
-        if (node == null || !node.has(fieldName)) {
-            return defaultValue;
-        }
+        if (node == null || !node.has(fieldName)) return defaultValue;
         JsonNode field = node.get(fieldName);
-        if (field == null || field.isNull() || !field.isIntegralNumber()) {
-            return defaultValue;
-        }
+        if (field == null || field.isNull() || !field.isNumber()) return defaultValue;
         return field.asInt(defaultValue);
     }
 
-    private Double getDoubleField(JsonNode node, String fieldName, Double defaultValue) {
-        if (node == null || !node.has(fieldName)) {
-            return defaultValue;
-        }
+    private double getDoubleField(JsonNode node, String fieldName, double defaultValue) {
+        if (node == null || !node.has(fieldName)) return defaultValue;
         JsonNode field = node.get(fieldName);
-        if (field == null || field.isNull() || !field.isNumber()) {
-            return defaultValue;
-        }
+        if (field == null || field.isNull() || !field.isNumber()) return defaultValue;
         return field.asDouble(defaultValue);
     }
 
     private boolean getBooleanField(JsonNode node, String fieldName, boolean defaultValue) {
-        if (node == null || !node.has(fieldName)) {
-            return defaultValue;
-        }
+        if (node == null || !node.has(fieldName)) return defaultValue;
         JsonNode field = node.get(fieldName);
-        if (field == null || field.isNull()) {
-            return defaultValue;
-        }
+        if (field == null || field.isNull()) return defaultValue;
         return field.asBoolean(defaultValue);
     }
 
-    // Parsed report data classes
+    // ── Parsed data classes ──────────────────────────────────────────────────
+
     public static class ParsedReport {
+        // V12 fields
+        public String coreSummary;
+        public List<StageFlow> fourStageFlow;
+        public MetaphorSelection metaphor;
+        public NVCReflection nvcReflection;
+        public List<RecommendedAction> recommendedActions;
+        public ExternalResourceGuidance externalResourceGuidance;
+
+        // Duo-specific
         public ConflictType conflictType;
         public ContributionRatio contributionRatio;
-        public NVCScripts nvcScripts;
+        public FourHorsemenScores fourHorsemenScores;
         public FourHorsemen fourHorsemen;
-        public NeedsMap needsMap;
-        public List<String> repairSuggestions;
+
+        // Legacy fields (kept for backward compat)
+        public NVCScripts nvcScripts;
         public String patternFeedback;
         public String suggestedApproach;
         public String inviteAgainCta;
         public boolean fallback;
 
         @lombok.Builder
-        public ParsedReport(ConflictType conflictType, ContributionRatio contributionRatio,
-                           NVCScripts nvcScripts, FourHorsemen fourHorsemen, NeedsMap needsMap,
-                           List<String> repairSuggestions, String patternFeedback,
+        public ParsedReport(String coreSummary, List<StageFlow> fourStageFlow,
+                           MetaphorSelection metaphor, NVCReflection nvcReflection,
+                           List<RecommendedAction> recommendedActions,
+                           ExternalResourceGuidance externalResourceGuidance,
+                           ConflictType conflictType, ContributionRatio contributionRatio,
+                           FourHorsemenScores fourHorsemenScores, FourHorsemen fourHorsemen,
+                           NVCScripts nvcScripts, String patternFeedback,
                            String suggestedApproach, String inviteAgainCta, boolean fallback) {
+            this.coreSummary = coreSummary;
+            this.fourStageFlow = fourStageFlow != null ? fourStageFlow : new ArrayList<>();
+            this.metaphor = metaphor;
+            this.nvcReflection = nvcReflection;
+            this.recommendedActions = recommendedActions != null ? recommendedActions : new ArrayList<>();
+            this.externalResourceGuidance = externalResourceGuidance;
             this.conflictType = conflictType;
             this.contributionRatio = contributionRatio;
-            this.nvcScripts = nvcScripts;
+            this.fourHorsemenScores = fourHorsemenScores;
             this.fourHorsemen = fourHorsemen;
-            this.needsMap = needsMap;
-            this.repairSuggestions = repairSuggestions != null ? repairSuggestions : new ArrayList<>();
+            this.nvcScripts = nvcScripts;
             this.patternFeedback = patternFeedback;
             this.suggestedApproach = suggestedApproach;
             this.inviteAgainCta = inviteAgainCta;
             this.fallback = fallback;
         }
 
-        // Getters
+        public String getCoreSummary() { return coreSummary; }
+        public List<StageFlow> getFourStageFlow() { return fourStageFlow; }
+        public MetaphorSelection getMetaphor() { return metaphor; }
+        public NVCReflection getNvcReflection() { return nvcReflection; }
+        public List<RecommendedAction> getRecommendedActions() { return recommendedActions; }
+        public ExternalResourceGuidance getExternalResourceGuidance() { return externalResourceGuidance; }
         public ConflictType getConflictType() { return conflictType; }
         public ContributionRatio getContributionRatio() { return contributionRatio; }
-        public NVCScripts getNvcScripts() { return nvcScripts; }
+        public FourHorsemenScores getFourHorsemenScores() { return fourHorsemenScores; }
         public FourHorsemen getFourHorsemen() { return fourHorsemen; }
-        public NeedsMap getNeedsMap() { return needsMap; }
-        public List<String> getRepairSuggestions() { return repairSuggestions; }
+        public NVCScripts getNvcScripts() { return nvcScripts; }
         public String getPatternFeedback() { return patternFeedback; }
         public String getSuggestedApproach() { return suggestedApproach; }
         public String getInviteAgainCta() { return inviteAgainCta; }
         public boolean isFallback() { return fallback; }
 
-        @lombok.Data
-        @lombok.Builder
-        @lombok.AllArgsConstructor
-        @lombok.NoArgsConstructor
+        public boolean hasV12Content() {
+            return coreSummary != null && !coreSummary.isBlank()
+                && metaphor != null
+                && nvcReflection != null;
+        }
+
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
+        public static class StageFlow {
+            public int stage;
+            public String stageName;
+            public String userQuote;
+            public String interpretation;
+        }
+
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
+        public static class MetaphorSelection {
+            public String id;
+            public String displayName;
+            public String reason;
+        }
+
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
+        public static class NVCReflection {
+            public String observation;
+            public String feeling;
+            public String need;
+            public String request;
+        }
+
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
+        public static class RecommendedAction {
+            public String action;
+            public String rationale;
+            public boolean isUserChosen;
+        }
+
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
+        public static class ExternalResourceGuidance {
+            public String domain;
+            public String resource;
+            public String rationale;
+        }
+
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
+        public static class FourHorsemenScores {
+            public int criticism;
+            public int contempt;
+            public int defensiveness;
+            public int stonewalling;
+        }
+
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
         public static class ContributionRatio {
             public int a;
             public int b;
@@ -329,28 +387,19 @@ public class ReportResponseParser {
             public String rationale;
         }
 
-        @lombok.Data
-        @lombok.Builder
-        @lombok.AllArgsConstructor
-        @lombok.NoArgsConstructor
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
         public static class RatioLabel {
             public String a;
             public String b;
         }
 
-        @lombok.Data
-        @lombok.Builder
-        @lombok.AllArgsConstructor
-        @lombok.NoArgsConstructor
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
         public static class NVCScripts {
             public NVCScript aToB;
             public NVCScript bToA;
         }
 
-        @lombok.Data
-        @lombok.Builder
-        @lombok.AllArgsConstructor
-        @lombok.NoArgsConstructor
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
         public static class NVCScript {
             public String observation;
             public String feeling;
@@ -358,10 +407,7 @@ public class ReportResponseParser {
             public String request;
         }
 
-        @lombok.Data
-        @lombok.Builder
-        @lombok.AllArgsConstructor
-        @lombok.NoArgsConstructor
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
         public static class FourHorsemen {
             public HorsemenItem criticism;
             public HorsemenItem defensiveness;
@@ -369,20 +415,14 @@ public class ReportResponseParser {
             public HorsemenItem stonewalling;
         }
 
-        @lombok.Data
-        @lombok.Builder
-        @lombok.AllArgsConstructor
-        @lombok.NoArgsConstructor
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
         public static class HorsemenItem {
             public boolean detected;
             public String intensity;
             public List<String> examples;
         }
 
-        @lombok.Data
-        @lombok.Builder
-        @lombok.AllArgsConstructor
-        @lombok.NoArgsConstructor
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
         public static class NeedsMap {
             public String axisX;
             public String axisXLabel;
@@ -393,10 +433,7 @@ public class ReportResponseParser {
             public String interpretation;
         }
 
-        @lombok.Data
-        @lombok.Builder
-        @lombok.AllArgsConstructor
-        @lombok.NoArgsConstructor
+        @lombok.Data @lombok.Builder @lombok.AllArgsConstructor @lombok.NoArgsConstructor
         public static class Position {
             public int x;
             public int y;

@@ -125,6 +125,26 @@ export interface MetaphorCard {
   color: 'lavender' | 'green' | 'pink';
 }
 
+// V12 — Solo 리포트 전용 타입
+export interface SoloStageFlow {
+  stage: number;
+  stageName: string;
+  userQuote: string;
+  interpretation: string;
+}
+
+export interface RecommendedAction {
+  action: string;
+  rationale: string;
+  isUserChosen: boolean;
+}
+
+export interface ExternalResourceGuidance {
+  domain: 'crisis' | 'legal' | 'medical' | 'financial';
+  resource: string;
+  rationale: string;
+}
+
 export interface Report {
   id: string;
   sessionId: string;
@@ -142,9 +162,21 @@ export interface Report {
   powerImbalanceDetected?: boolean;
   aPatternFeedback?: string;
   nvcSuggestion?: NvcSuggestion;
-  metaphorId?: string; // V1.5: 12종 메타포 id (locked-mailbox, boiling-kettle, ...)
+  metaphorId?: string;
   suggestedApproach?: string;
   inviteAgainCTA?: string;
   llmProvider?: string;
   createdAt: string;
+  // V12 fields
+  status?: string;
+  coreSummary?: string;
+  fourStageFlow?: SoloStageFlow[];
+  metaphorDisplayName?: string;
+  metaphorReason?: string;
+  nvcObservation?: string;
+  nvcFeeling?: string;
+  nvcNeed?: string;
+  nvcRequest?: string;
+  recommendedActions?: RecommendedAction[];
+  externalResourceGuidance?: ExternalResourceGuidance | null;
 }

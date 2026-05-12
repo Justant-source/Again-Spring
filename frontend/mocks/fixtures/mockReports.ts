@@ -191,32 +191,69 @@ export const mockReports: Record<string, Report> = {
       axisX: '연결 ↔ 자율',
       positionA: { x: -50, y: 0 },
       positionB: null,
-      interpretation: 'B님의 입력이 있어야 완전한 분석이 가능해요.',
+      interpretation: '',
     },
     repairSuggestions: [],
-    metaphorCards: [
+    isSoloMode: true,
+    status: 'OK',
+    coreSummary:
+      '후배가 보고 자리에서 발표를 끊고 직접 진행한 상황이 반복되었고, 그때마다 무시당하는 느낌과 함께 깊은 서운함이 쌓였어요. 상황을 참고 넘겼지만 감정은 해소되지 않은 채 남아 있어요.',
+    fourStageFlow: [
       {
-        color: 'lavender',
-        title: '혼자 품고 있는 마음의 무게',
-        body: '지금 이 순간, 혼자 감당하고 계신 감정들이 있어요. 그 마음은 충분히 이해할 수 있어요. 혼자의 관점에서 보이는 것도 분명히 중요하답니다.',
+        stage: 1,
+        stageName: '촉발',
+        userQuote: '보고 중에 제 말이 채 끝나기도 전에 끊고 자기가 설명을 시작하더라고요.',
+        interpretation: '구체적인 사건이 명확하게 포착되었어요. 무시당했다는 감각이 여기서 시작됐어요.',
       },
       {
-        color: 'green',
-        title: '상대방과 다시 이어지는 작은 문',
-        body: '지금은 한 분의 이야기만 있어요. 상대방의 이야기가 더해지면 더 완전한 그림이 그려져요. 먼저 한 걸음 내딛는 것만으로도 작은 변화가 시작돼요.',
+        stage: 2,
+        stageName: '감정 고조',
+        userQuote: '그게 한두 번이 아니라서요. 그냥 참았는데 계속 쌓이더니 이번엔 참기 어렵더라고요.',
+        interpretation: '단발 사건이 아니라 누적된 패턴에 대한 반응이에요. 참아온 시간이 길수록 감정도 깊어요.',
       },
       {
-        color: 'pink',
-        title: '오늘, 솔직한 한 마디',
-        body: '"요즘 우리 사이가 좀 어색한 것 같아서. 잠깐 얘기할 수 있을까?" 이 한 마디를 오늘 보내보세요.',
+        stage: 3,
+        stageName: '욕구 확인',
+        userQuote: '내가 뭘 잘못한 건지, 아니면 그냥 나를 무시하는 건지 도통 모르겠어요.',
+        interpretation: '인정받고 싶은 욕구와 관계에서의 명확성이 핵심 필요로 드러났어요.',
+      },
+      {
+        stage: 4,
+        stageName: '정리',
+        userQuote: '직접 얘기해야 할 것 같은데 어떻게 꺼내야 할지 막막해요.',
+        interpretation: '대화를 원하고 있어요. 첫 마디를 어떻게 꺼낼지 구체적인 준비가 도움이 될 거예요.',
       },
     ],
-    isSoloMode: true,
-    aPatternFeedback:
-      'A님은 이 상황에서 조금 성급하게 판단하셨을 수 있어요. 먼저 솔직하게 감정을 공유해보시는 건 어떨까요?',
-    suggestedApproach:
-      "다음에 상대를 만나실 때 이렇게 시작해보세요: '요즘 우리 사이 거리감이 생긴 것 같아서 얘기 좀 하고 싶어.'",
-    inviteAgainCTA: '지금이라도 상대를 초대하면 완전한 리포트가 생성돼요.',
+    metaphorId: 'empty-chair',
+    metaphorDisplayName: '빈 의자',
+    metaphorReason:
+      '함께 일하는 공간에 있지만 서로의 마음이 닿지 않는 상태예요. 자리는 옆에 있어도 존재감이 인정받지 못하는 느낌이에요.',
+    nvcObservation:
+      '보고 발표 중 후배가 제 말을 끊고 직접 설명을 이어받는 일이 여러 차례 반복되었어요.',
+    nvcFeeling:
+      '무시당하는 것 같아 서운하고, 그 자리에서 존재가 사라진 것 같아 당황스럽고 속이 쓰렸어요.',
+    nvcNeed:
+      '같은 팀원으로서 존중받고, 내 말이 끝까지 들릴 수 있는 안전한 소통 공간이 필요해요.',
+    nvcRequest:
+      '"발표 중에는 내 차례가 끝나고 나서 추가 설명을 해줬으면 해. 미리 얘기하지 않아서 당황스러웠어."',
+    recommendedActions: [
+      {
+        action: '1:1로 짧게 대화 시간 잡기',
+        rationale: '공개 자리에서 꺼내면 방어적으로 반응할 수 있어요. 단둘이 5분이 더 효과적이에요.',
+        isUserChosen: true,
+      },
+      {
+        action: '위의 NVC 문장을 메모 앱에 저장해두기',
+        rationale: '막상 대화할 때 말이 잘 안 나오는 경우를 대비해요.',
+        isUserChosen: true,
+      },
+      {
+        action: '이번 한 가지 사건만 다루기',
+        rationale: '묵은 감정을 한꺼번에 꺼내면 대화가 산으로 가기 쉬워요.',
+        isUserChosen: false,
+      },
+    ],
+    externalResourceGuidance: null,
     createdAt: new Date().toISOString(),
   },
 

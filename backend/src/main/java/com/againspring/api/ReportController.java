@@ -14,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -160,7 +161,45 @@ public class ReportController {
                 .suggestedApproach(report.getSuggestedApproach())
                 .inviteAgainCTA(report.getInviteAgainCTA())
                 .createdAt(report.getCreatedAt())
+                // V12 fields
+                .status(report.getStatus() != null ? report.getStatus().name() : "OK")
+                .coreSummary(report.getCoreSummary())
+                .fourStageFlow(mapStageFlows(report.getFourStageFlow()))
+                .metaphorId(report.getMetaphorId())
+                .metaphorDisplayName(report.getMetaphorDisplayName())
+                .metaphorReason(report.getMetaphorReason())
+                .nvcObservation(report.getNvcObservation())
+                .nvcFeeling(report.getNvcFeeling())
+                .nvcNeed(report.getNvcNeed())
+                .nvcRequest(report.getNvcRequest())
+                .recommendedActions(mapRecommendedActions(report.getRecommendedActions()))
+                .externalResourceGuidance(mapExternalResource(report.getExternalResourceGuidance()))
                 .build();
+    }
+
+    private List<ReportResponse.StageFlowResponse> mapStageFlows(List<Report.StageFlow> flows) {
+        if (flows == null) return null;
+        return flows.stream().map(f -> ReportResponse.StageFlowResponse.builder()
+            .stage(f.getStage()).stageName(f.getStageName())
+            .userQuote(f.getUserQuote()).interpretation(f.getInterpretation())
+            .build()).toList();
+    }
+
+    private List<ReportResponse.RecommendedActionResponse> mapRecommendedActions(
+            List<Report.RecommendedAction> actions) {
+        if (actions == null) return null;
+        return actions.stream().map(a -> ReportResponse.RecommendedActionResponse.builder()
+            .action(a.getAction()).rationale(a.getRationale())
+            .isUserChosen(Boolean.TRUE.equals(a.getIsUserChosen()))
+            .build()).toList();
+    }
+
+    private ReportResponse.ExternalResourceResponse mapExternalResource(
+            Report.ExternalResourceGuidance src) {
+        if (src == null) return null;
+        return ReportResponse.ExternalResourceResponse.builder()
+            .domain(src.getDomain()).resource(src.getResource()).rationale(src.getRationale())
+            .build();
     }
 
     private ReportResponse.ParticipantSnapshot mapParticipant(Report.Participant participant) {

@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
-import { SoloResult } from '@/components/result/SoloResult';
+import { SoloReport } from '@/components/result/solo/SoloReport';
 import { LegalFooter } from '@/components/shared/LegalFooter';
 import { api } from '@/lib/api/client';
 import type { Report } from '@/lib/types';
@@ -57,7 +57,7 @@ export default function SoloResultPage({ params }: { params: { id: string } }) {
   return (
     <PhoneFrame tone="P">
       <PhoneHeader title="혼자 정리한 이야기" tone="P" onBack={() => router.back()} />
-      <SoloResult report={report} />
+      <SoloReport report={report} sessionId={params.id} />
       <LegalFooter />
     </PhoneFrame>
   );

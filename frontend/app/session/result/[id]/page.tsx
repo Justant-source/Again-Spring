@@ -9,7 +9,7 @@ import { api } from '@/lib/api/client';
 import type { Report, CommunicationStyle } from '@/lib/types';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { ReportLayout } from '@/components/result/ReportLayout';
-import { SoloResult } from '@/components/result/SoloResult';
+import { SoloReport } from '@/components/result/solo/SoloReport';
 import { ShareImage } from '@/components/result/ShareImage';
 
 export default function ResultPage() {
@@ -180,7 +180,7 @@ export default function ResultPage() {
 
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {report.isSoloMode ? (
-          <SoloResult report={report} sessionId={sessionId} />
+          <SoloReport report={report} sessionId={sessionId} />
         ) : (
           <ReportLayout
             report={report}
