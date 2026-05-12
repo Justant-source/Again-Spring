@@ -25,9 +25,12 @@ export default function ResultPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [variant, setVariant] = useState<'card' | 'story'>('card');
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareVariant, setShareVariant] = useState<'b' | 'c' | 'd'>('c');
+  const [soloCapturing, setSoloCapturing] = useState(false);
+  const [soloShareModalOpen, setSoloShareModalOpen] = useState(false);
+  const [soloImageUrl, setSoloImageUrl] = useState<string | null>(null);
+  const [soloImageBlob, setSoloImageBlob] = useState<Blob | null>(null);
 
   // Determine names
   const myRole = sessionStore.role || 'A';
@@ -82,12 +85,111 @@ export default function ResultPage() {
     };
   }, [sessionId, searchParams]);
 
-  const handleShareClick = () => {
-    setShareModalOpen(true);
+  const handleShareClick = async () => {
+    if (report?.isSoloMode) {
+      setSoloCapturing(true);
+      try {
+        const el = document.getElementById('solo-report-shareable');
+        if (!el) { setSoloCapturing(false); return; }
+
+        // 1) Pre-rasterize all <img> in the source DOM to PNG data URLs.
+        //    html2canvas frequently fails to draw SVG <img> directly.
+        const sourceImgs = Array.from(el.querySelectorAll<HTMLImageElement>('img'));
+        const rasterized = new Map<string, string>();
+        await Promise.all(sourceImgs.map(async (img) => {
+          const src = img.src;
+          if (!src || src.startsWith('data:') || rasterized.has(src)) return;
+          try {
+            const w = (img.naturalWidth || img.width || 160);
+            const h = (img.naturalHeight || img.height || 160);
+            const res = await fetch(src);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            try {
+              const tmpImg = new Image();
+              await new Promise<void>((resolve, reject) => {
+                tmpImg.onload = () => resolve();
+                tmpImg.onerror = reject;
+                tmpImg.src = blobUrl;
+              });
+              const scale = 2;
+              const cnv = document.createElement('canvas');
+              cnv.width = w * scale;
+              cnv.height = h * scale;
+              const ctx = cnv.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(tmpImg, 0, 0, w * scale, h * scale);
+                rasterized.set(src, cnv.toDataURL('image/png'));
+              }
+            } finally {
+              URL.revokeObjectURL(blobUrl);
+            }
+          } catch {}
+        }));
+
+        const html2canvas = (await import('html2canvas')).default;
+        const canvas = await html2canvas(el, {
+          useCORS: true,
+          allowTaint: true,
+          scale: 2,
+          backgroundColor: '#FBF3EC',
+          onclone: async (_doc: Document, clonedEl: HTMLElement) => {
+            const imgs = clonedEl.querySelectorAll<HTMLImageElement>('img');
+            await Promise.all(Array.from(imgs).map(async (img) => {
+              const orig = img.src;
+              if (!orig || orig.startsWith('data:')) return;
+              const dataUrl = rasterized.get(orig);
+              if (!dataUrl) return;
+              img.removeAttribute('srcset');
+              img.src = dataUrl;
+              if (!img.complete) {
+                await new Promise<void>((resolve) => {
+                  const done = () => resolve();
+                  img.addEventListener('load', done, { once: true });
+                  img.addEventListener('error', done, { once: true });
+                });
+              }
+            }));
+          },
+        });
+        canvas.toBlob((blob) => {
+          if (blob) {
+            setSoloImageBlob(blob);
+            setSoloImageUrl(URL.createObjectURL(blob));
+            setSoloShareModalOpen(true);
+          }
+          setSoloCapturing(false);
+        }, 'image/png');
+      } catch {
+        setSoloCapturing(false);
+      }
+    } else {
+      setShareModalOpen(true);
+    }
   };
 
   const handleCloseShareModal = () => {
     setShareModalOpen(false);
+  };
+
+  const handleSoloDownload = () => {
+    if (!soloImageUrl) return;
+    const a = document.createElement('a');
+    a.href = soloImageUrl;
+    a.download = '다시봄-리포트.png';
+    a.click();
+  };
+
+  const handleSoloShare = async () => {
+    if (!soloImageBlob) return;
+    const file = new File([soloImageBlob], '다시봄-리포트.png', { type: 'image/png' });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: '다시봄 리포트' });
+      } catch {}
+    } else {
+      handleSoloDownload();
+    }
   };
 
   if (loading || generating) {
@@ -144,38 +246,6 @@ export default function ResultPage() {
         tone="P"
         back={true}
         onBack={() => router.back()}
-        right={
-          <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
-            <button
-              onClick={() => setVariant('card')}
-              style={{
-                background: variant === 'card' ? 'var(--P-ink)' : 'transparent',
-                color: variant === 'card' ? 'var(--P-card)' : 'var(--P-sub)',
-                border: `1px solid ${variant === 'card' ? 'var(--P-ink)' : 'var(--P-border)'}`,
-                borderRadius: 4,
-                padding: '4px 8px',
-                cursor: 'pointer',
-                fontSize: 11,
-              }}
-            >
-              카드
-            </button>
-            <button
-              onClick={() => setVariant('story')}
-              style={{
-                background: variant === 'story' ? 'var(--P-ink)' : 'transparent',
-                color: variant === 'story' ? 'var(--P-card)' : 'var(--P-sub)',
-                border: `1px solid ${variant === 'story' ? 'var(--P-ink)' : 'var(--P-border)'}`,
-                borderRadius: 4,
-                padding: '4px 8px',
-                cursor: 'pointer',
-                fontSize: 11,
-              }}
-            >
-              스토리
-            </button>
-          </div>
-        }
       />
 
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -189,7 +259,7 @@ export default function ResultPage() {
             nameB={nameB}
             styleA={styleA}
             styleB={styleB}
-            variant={variant}
+            variant="card"
           />
         )}
       </div>
@@ -207,14 +277,84 @@ export default function ResultPage() {
         }}
       >
         <div style={{ marginBottom: 12 }}>
-          <button onClick={handleShareClick} className="btn-P" style={{ width: '100%' }}>
-            카톡으로 리포트 공유
+          <button
+            onClick={handleShareClick}
+            className="btn-P"
+            style={{ width: '100%' }}
+            disabled={soloCapturing}
+          >
+            {soloCapturing ? '이미지 생성 중…' : '리포트 공유하기'}
           </button>
         </div>
         <div>본 서비스는 심리 상담이나 법률 자문을 대체하지 않습니다. 위기 상황이라면 전문기관(1393/1366/132)에 연락해주세요.</div>
       </div>
 
-      {/* Share Modal */}
+      {/* Solo Share Modal */}
+      {soloShareModalOpen && soloImageUrl && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            zIndex: 999,
+          }}
+          onClick={() => setSoloShareModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'var(--P-bg)',
+              borderRadius: '20px 20px 0 0',
+              padding: '24px',
+              width: '100%',
+              maxWidth: 480,
+              maxHeight: '80vh',
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--P-ink)', marginBottom: 16 }}>
+              리포트 이미지
+            </div>
+            <div
+              style={{
+                borderRadius: 12,
+                overflow: 'hidden',
+                marginBottom: 20,
+                border: '1px solid var(--P-border)',
+              }}
+            >
+              <img src={soloImageUrl} style={{ width: '100%', display: 'block' }} alt="리포트 캡처" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button className="btn-P" style={{ width: '100%' }} onClick={handleSoloDownload}>
+                이미지 저장
+              </button>
+              <button className="btn-P" style={{ width: '100%' }} onClick={handleSoloShare}>
+                공유하기
+              </button>
+              <button
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: 'transparent',
+                  color: 'var(--P-sub)',
+                  border: 'none',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+                onClick={() => setSoloShareModalOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duo Share Modal */}
       {shareModalOpen && (
         <div
           style={{

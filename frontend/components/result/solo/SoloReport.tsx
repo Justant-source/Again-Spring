@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { getMetaphorById, getMetaphorImagePath } from '@/lib/constants/metaphors';
 import type { Report } from '@/lib/types';
@@ -30,204 +29,236 @@ export function SoloReport({ report, sessionId }: SoloReportProps) {
   const hasActions = report.recommendedActions && report.recommendedActions.length > 0;
 
   return (
-    <div style={{ padding: '8px 22px 36px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-      {/* Core Summary */}
-      {report.coreSummary && (
+    <div>
+      {/* Shareable capture area — all cards, no buttons */}
+      <div
+        id="solo-report-shareable"
+        style={{ padding: '8px 22px 20px', background: 'var(--P-bg)', display: 'flex', flexDirection: 'column', gap: 20 }}
+      >
+        {/* Watermark header */}
         <div
-          className="p-card"
-          style={{ padding: '18px 20px' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: 6,
+            paddingBottom: 14,
+            borderBottom: '1px solid var(--P-border)',
+          }}
         >
-          <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 10 }}>
-            핵심 정리
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span
+              className="serif"
+              style={{ fontSize: 18, fontWeight: 700, color: 'var(--P-ink)', letterSpacing: '-0.01em' }}
+            >
+              다시봄
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--P-sub)', letterSpacing: '0.06em' }}>
+              againspring.net
+            </span>
           </div>
-          <div
-            className="serif"
-            style={{
-              fontSize: 15,
-              lineHeight: 1.8,
-              color: 'var(--P-ink)',
-            }}
-          >
-            {report.coreSummary}
-          </div>
+          <span style={{ fontSize: 11, color: 'var(--P-sub)' }}>마음 정리 리포트</span>
         </div>
-      )}
 
-      {/* 4-Stage Flow */}
-      {report.fourStageFlow && report.fourStageFlow.length > 0 && (
-        <div className="p-card" style={{ padding: '18px 20px' }}>
-          <SoloStageFlowSection stages={report.fourStageFlow} />
-        </div>
-      )}
-
-      {/* Metaphor */}
-      {metaphor && (
-        <div className="p-card" style={{ padding: '18px 20px' }}>
-          <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 14 }}>
-            지금 마음은
-          </div>
+        {/* Core Summary */}
+        {report.coreSummary && (
           <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 14,
-            }}
+            className="p-card"
+            style={{ padding: '18px 20px' }}
           >
-            <Image
-              src={getMetaphorImagePath(metaphor.filename)}
-              alt={metaphor.label}
-              width={160}
-              height={160}
-              style={{ display: 'block' }}
-            />
+            <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 10 }}>
+              핵심 정리
+            </div>
             <div
               className="serif"
-              style={{ fontSize: 18, textAlign: 'center', lineHeight: 1.4, color: 'var(--P-ink)' }}
+              style={{
+                fontSize: 15,
+                lineHeight: 1.8,
+                color: 'var(--P-ink)',
+              }}
             >
-              <strong>{metaphor.label}</strong> 같아요
+              {report.coreSummary}
+            </div>
+          </div>
+        )}
+
+        {/* 4-Stage Flow */}
+        {report.fourStageFlow && report.fourStageFlow.length > 0 && (
+          <div className="p-card" style={{ padding: '18px 20px' }}>
+            <SoloStageFlowSection stages={report.fourStageFlow} />
+          </div>
+        )}
+
+        {/* Metaphor */}
+        {metaphor && (
+          <div className="p-card" style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 14 }}>
+              지금 마음은
             </div>
             <div
               style={{
-                fontSize: 13,
-                color: 'var(--P-sub)',
-                textAlign: 'center',
-                lineHeight: 1.7,
-                maxWidth: 220,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 14,
               }}
             >
-              {report.metaphorReason || metaphor.meaning}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* NVC Reflection */}
-      {hasNvc && (
-        <div className="p-card" style={{ padding: '18px 20px' }}>
-          <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 14 }}>
-            마음의 언어로 정리하면
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-              fontFamily: 'var(--font-serif)',
-              fontSize: 14,
-              lineHeight: 1.85,
-            }}
-          >
-            {report.nvcObservation && (
-              <NvcRow label="관찰" text={report.nvcObservation} />
-            )}
-            {report.nvcFeeling && (
-              <NvcRow label="느낌" text={report.nvcFeeling} />
-            )}
-            {report.nvcNeed && (
-              <NvcRow label="욕구" text={report.nvcNeed} />
-            )}
-            {report.nvcRequest && (
-              <NvcRow label="부탁" text={report.nvcRequest} />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Recommended Actions */}
-      {hasActions && (
-        <div className="p-card" style={{ padding: '18px 20px' }}>
-          <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 14 }}>
-            다음 행동
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {report.recommendedActions!.map((item, i) => (
+              {/* Plain img so html2canvas can capture it reliably */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={getMetaphorImagePath(metaphor.filename)}
+                alt={metaphor.label}
+                width={160}
+                height={160}
+                style={{ display: 'block' }}
+              />
               <div
-                key={i}
+                className="serif"
+                style={{ fontSize: 18, textAlign: 'center', lineHeight: 1.4, color: 'var(--P-ink)' }}
+              >
+                <strong>{metaphor.label}</strong> 같아요
+              </div>
+              <div
                 style={{
-                  display: 'flex',
-                  gap: 10,
-                  alignItems: 'flex-start',
+                  fontSize: 13,
+                  color: 'var(--P-sub)',
+                  textAlign: 'center',
+                  lineHeight: 1.7,
+                  maxWidth: 220,
                 }}
               >
+                {report.metaphorReason || metaphor.meaning}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NVC Reflection */}
+        {hasNvc && (
+          <div className="p-card" style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 14 }}>
+              마음의 언어로 정리하면
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14,
+                fontFamily: 'var(--font-serif)',
+                fontSize: 14,
+                lineHeight: 1.85,
+              }}
+            >
+              {report.nvcObservation && (
+                <NvcRow label="관찰" text={report.nvcObservation} />
+              )}
+              {report.nvcFeeling && (
+                <NvcRow label="느낌" text={report.nvcFeeling} />
+              )}
+              {report.nvcNeed && (
+                <NvcRow label="욕구" text={report.nvcNeed} />
+              )}
+              {report.nvcRequest && (
+                <NvcRow label="부탁" text={report.nvcRequest} />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Recommended Actions */}
+        {hasActions && (
+          <div className="p-card" style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 14 }}>
+              다음 행동
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {report.recommendedActions!.map((item, i) => (
                 <div
+                  key={i}
                   style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 6,
-                    border: item.isUserChosen
-                      ? '2px solid var(--P-ink)'
-                      : '1px solid var(--P-border)',
-                    background: item.isUserChosen ? 'var(--P-ink)' : 'transparent',
-                    flexShrink: 0,
-                    marginTop: 2,
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    gap: 10,
+                    alignItems: 'flex-start',
                   }}
                 >
-                  {item.isUserChosen && (
-                    <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
-                      <path
-                        d="M1 4L4 7.5L10 1"
-                        stroke="var(--P-card)"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                </div>
-                <div>
                   <div
                     style={{
-                      fontSize: 13,
-                      color: 'var(--P-ink)',
-                      lineHeight: 1.6,
-                      fontWeight: item.isUserChosen ? 500 : 400,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 6,
+                      border: item.isUserChosen
+                        ? '2px solid var(--P-ink)'
+                        : '1px solid var(--P-border)',
+                      background: item.isUserChosen ? 'var(--P-ink)' : 'transparent',
+                      flexShrink: 0,
+                      marginTop: 2,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                   >
-                    {item.action}
+                    {item.isUserChosen && (
+                      <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                        <path
+                          d="M1 4L4 7.5L10 1"
+                          stroke="var(--P-card)"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
                   </div>
-                  {item.rationale && (
-                    <div style={{ fontSize: 11, color: 'var(--P-sub)', marginTop: 2, lineHeight: 1.5 }}>
-                      {item.rationale}
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: 'var(--P-ink)',
+                        lineHeight: 1.6,
+                        fontWeight: item.isUserChosen ? 500 : 400,
+                      }}
+                    >
+                      {item.action}
                     </div>
-                  )}
+                    {item.rationale && (
+                      <div style={{ fontSize: 11, color: 'var(--P-sub)', marginTop: 2, lineHeight: 1.5 }}>
+                        {item.rationale}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* External Resource Guidance */}
-      {report.externalResourceGuidance && (
-        <div
-          style={{
-            padding: '14px 16px',
-            background: 'var(--P-card)',
-            border: '1px solid var(--P-border)',
-            borderRadius: 12,
-          }}
-        >
-          <div style={{ fontSize: 11, color: 'var(--P-sub)', marginBottom: 6 }}>
-            전문 도움
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--P-ink)', lineHeight: 1.6 }}>
-            {report.externalResourceGuidance.resource}
-          </div>
-          {report.externalResourceGuidance.rationale && (
-            <div style={{ fontSize: 11, color: 'var(--P-sub)', marginTop: 4, lineHeight: 1.5 }}>
-              {report.externalResourceGuidance.rationale}
+              ))}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Footer: restart */}
-      <div style={{ paddingTop: 8, textAlign: 'center' }}>
+        {/* External Resource Guidance */}
+        {report.externalResourceGuidance && (
+          <div
+            style={{
+              padding: '14px 16px',
+              background: 'var(--P-card)',
+              border: '1px solid var(--P-border)',
+              borderRadius: 12,
+            }}
+          >
+            <div style={{ fontSize: 11, color: 'var(--P-sub)', marginBottom: 6 }}>
+              전문 도움
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--P-ink)', lineHeight: 1.6 }}>
+              {report.externalResourceGuidance.resource}
+            </div>
+            {report.externalResourceGuidance.rationale && (
+              <div style={{ fontSize: 11, color: 'var(--P-sub)', marginTop: 4, lineHeight: 1.5 }}>
+                {report.externalResourceGuidance.rationale}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Footer: restart — outside shareable area */}
+      <div style={{ padding: '8px 22px 36px', textAlign: 'center' }}>
         <button
           onClick={() => router.push('/session/new')}
           style={{

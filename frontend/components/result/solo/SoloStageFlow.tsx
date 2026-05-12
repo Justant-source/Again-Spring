@@ -85,7 +85,6 @@ export function SoloStageFlowSection({ stages }: SoloStageFlowProps) {
                     fontFamily: 'var(--font-serif)',
                     color: 'var(--P-ink)',
                     marginBottom: 8,
-                    borderLeft: '3px solid var(--P-ink)',
                   }}
                 >
                   &ldquo;{stage.userQuote}&rdquo;
