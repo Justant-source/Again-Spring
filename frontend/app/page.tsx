@@ -162,7 +162,7 @@ export default function LandingPage() {
         {/* 일반 사용자 채팅 진입 본문 — admin은 노출 안 함 */}
         {showChatEntry ? (
           <>
-            <div className="flex-1 mt-20">
+            <div className="flex-1 mt-14">
               <div className="text-[13px] mb-3.5" style={{ color: 'var(--L-sub)' }}>
                 중재자와 대화
               </div>
@@ -177,7 +177,7 @@ export default function LandingPage() {
                 5분이면 충분합니다.
               </p>
 
-              <div className="mt-12 letter-card" style={{ padding: 20 }}>
+              <div className="mt-9 letter-card" style={{ padding: 20 }}>
                 <div className="quote-it" style={{ fontSize: 12, marginBottom: 10 }}>
                   다시봄은 이런 도구예요
                 </div>
