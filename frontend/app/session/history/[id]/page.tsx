@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { MessageBubble } from '@/components/chat/MessageBubble';
@@ -26,6 +26,7 @@ export default function SessionHistoryPage() {
   const [myRole, setMyRole] = useState<'USER_A' | 'USER_B'>('USER_A');
   const [sessionTitle, setSessionTitle] = useState('지난 대화');
   const [hasReport, setHasReport] = useState(false);
+  const [reportGenerating, setReportGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -49,7 +50,11 @@ export default function SessionHistoryPage() {
           setSessionTitle(`${session.partnerNickname}분과의 대화`);
         }
 
-        if (session.reportId) setHasReport(true);
+        if (session.reportId) {
+          setHasReport(true);
+        } else if (session.status === 'completed') {
+          setReportGenerating(true);
+        }
 
         setMessages(msgRes.data || []);
       } catch {
@@ -64,6 +69,20 @@ export default function SessionHistoryPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages]);
+
+  useEffect(() => {
+    if (!reportGenerating || hasReport) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get(`/api/sessions/${sessionId}`);
+        if (res.data.reportId) {
+          setHasReport(true);
+          setReportGenerating(false);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [reportGenerating, hasReport, sessionId]);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -164,14 +183,14 @@ export default function SessionHistoryPage() {
         gap: 8,
         alignItems: 'center',
       }}>
-        {hasReport && (
+        {hasReport ? (
           <button
             onClick={() => router.push(`/session/result/${sessionId}`)}
             style={{
               width: '100%',
               padding: '12px',
-              background: 'var(--P-point)',
-              color: '#fff',
+              background: 'var(--P-ink)',
+              color: 'var(--P-card)',
               border: 'none',
               borderRadius: 10,
               fontSize: 14,
@@ -181,7 +200,20 @@ export default function SessionHistoryPage() {
           >
             결과 보기
           </button>
-        )}
+        ) : reportGenerating ? (
+          <div style={{
+            width: '100%',
+            padding: '12px',
+            background: 'var(--P-card)',
+            border: '1px solid var(--P-border)',
+            borderRadius: 10,
+            fontSize: 14,
+            color: 'var(--P-sub)',
+            textAlign: 'center',
+          }}>
+            결과 생성중...
+          </div>
+        ) : null}
         <div style={{ fontSize: 11, color: 'var(--P-sub)' }}>
           지난 대화를 읽기 전용으로 보고 있어요
         </div>

@@ -128,6 +128,10 @@ public class AuthService {
         return savedMember;
     }
 
+    public boolean isNicknameAvailable(String nickname) {
+        return !userRepository.existsByNicknameAndDeletedAtIsNull(nickname);
+    }
+
     public AuthResponse login(LoginRequest request) {
         // 1) 이메일 등록 여부
         User user = userRepository.findByEmail(request.getEmail())

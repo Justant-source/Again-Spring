@@ -268,6 +268,18 @@ export default function HistoryPage() {
                         완료
                       </span>
                     ) : null}
+                    {!active && item.status === 'completed' && !item.reportId && (
+                      <span style={{
+                        fontSize: 10,
+                        padding: '2px 7px',
+                        background: 'color-mix(in srgb, var(--L-sub) 30%, transparent)',
+                        color: 'var(--L-sub)',
+                        borderRadius: 4,
+                        fontWeight: 500,
+                      }}>
+                        결과 생성중
+                      </span>
+                    )}
                     {!active && item.reportId && (
                       <button
                         onClick={e => {

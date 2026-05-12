@@ -83,10 +83,7 @@ export default function GuestPage() {
                 onFocus={(e) => (e.target.style.borderBottomColor = 'var(--L-ink)')}
                 onBlur={(e) => (e.target.style.borderBottomColor = 'var(--L-border)')}
               />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>
-                  비워두면 “{placeholder}”로 설정돼요
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
                 <button
                   type="button"
                   onClick={handleShuffle}

@@ -1,21 +1,24 @@
 // ✅ MOCKUP APPLIED — source: design/handoff/tone-L-screens.jsx (LandingScreen)
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
 import { oauthRedirect } from '@/lib/auth/oauth';
+import { generateGuestNickname } from '@/lib/utils/guestNickname';
 
 export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromGuestSession = searchParams.get('fromGuestSession');
   const setUser = useUserStore((s) => s.setUser);
+  const guestUser = useUserStore((s) => s.user);
 
   const [nickname, setNickname] = useState('');
+  const [nicknameShuffling, setNicknameShuffling] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -30,6 +33,34 @@ export default function SignupPage() {
   const [disclaimerAgreed, setDisclaimerAgreed] = useState(false);
   const [marketingAgreed, setMarketingAgreed] = useState(false);
   const [termsModalUrl, setTermsModalUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (guestUser?.isGuest && guestUser?.nickname) {
+      setNickname(guestUser.nickname);
+    }
+  }, [guestUser]);
+
+  const handleShuffleNickname = async () => {
+    setNicknameShuffling(true);
+    try {
+      for (let i = 0; i < 10; i++) {
+        const candidate = generateGuestNickname();
+        try {
+          const res = await api.get(`/api/auth/check-nickname?nickname=${encodeURIComponent(candidate)}`);
+          if (res.data.available) {
+            setNickname(candidate);
+            return;
+          }
+        } catch {
+          setNickname(candidate);
+          return;
+        }
+      }
+      setNickname(generateGuestNickname());
+    } finally {
+      setNicknameShuffling(false);
+    }
+  };
 
   const inputStyle = {
     width: '100%',
@@ -142,33 +173,27 @@ export default function SignupPage() {
             시작할 이름을<br />알려주세요
           </div>
 
-          <div
-            style={{
-              marginBottom: 20,
-              padding: '12px 14px',
-              background: 'color-mix(in srgb, var(--L-sub) 6%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--L-sub) 15%, transparent)',
-              borderRadius: 8,
-              fontSize: 12,
-              color: 'var(--L-sub)',
-              lineHeight: 1.7,
-            }}
-          >
-            <span style={{ color: 'var(--L-ink)', fontWeight: 500 }}>다시봄은 의료행위 또는 심리치료가 아니에요.</span>{' '}
-            두 분의 이야기를 정리하고 대화를 돕는 도구예요. 분석 결과는 참고용이며, 위기 상황에서는 전문 기관에 도움을 요청해주세요.
-          </div>
-
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
-              <input
-                type="text"
-                placeholder="닉네임"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                style={inputStyle}
-                onFocus={(e) => (e.target.style.borderBottomColor = 'var(--L-ink)')}
-                onBlur={(e) => (e.target.style.borderBottomColor = 'var(--L-border)')}
-              />
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="닉네임"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  style={{ ...inputStyle, flex: 1 }}
+                  onFocus={(e) => (e.target.style.borderBottomColor = 'var(--L-ink)')}
+                  onBlur={(e) => (e.target.style.borderBottomColor = 'var(--L-border)')}
+                />
+                <button
+                  type="button"
+                  onClick={handleShuffleNickname}
+                  disabled={nicknameShuffling}
+                  style={{ background: 'none', border: 'none', color: 'var(--L-ink)', fontSize: 11, textDecoration: 'underline', cursor: 'pointer', padding: '0 0 8px 0', whiteSpace: 'nowrap', opacity: nicknameShuffling ? 0.5 : 1 }}
+                >
+                  {nicknameShuffling ? '...' : '다른 이름'}
+                </button>
+              </div>
               <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 4 }}>3~12자</div>
             </div>
 

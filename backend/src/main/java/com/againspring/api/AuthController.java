@@ -24,10 +24,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import java.util.Map;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -168,6 +171,13 @@ public class AuthController {
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/check-nickname")
+    @Operation(summary = "닉네임 중복 확인", description = "닉네임 사용 가능 여부 반환")
+    @ApiResponse(responseCode = "200", description = "available: true면 사용 가능")
+    public ResponseEntity<Map<String, Boolean>> checkNickname(@RequestParam String nickname) {
+        return ResponseEntity.ok(Map.of("available", authService.isNicknameAvailable(nickname)));
     }
 
     @PostMapping("/agree")
