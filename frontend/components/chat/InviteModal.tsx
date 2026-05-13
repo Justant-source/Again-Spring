@@ -23,23 +23,66 @@ interface Props {
   onClose: () => void;
 }
 
+async function copyToClipboardSafe(text: string): Promise<boolean> {
+  // 1) 표준 API (HTTPS + secureContext + 권한 OK일 때만 동작)
+  if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // fallthrough — 인앱 브라우저(카톡/인스타 등)에서 막힐 수 있음
+    }
+  }
+  // 2) execCommand fallback (구형 브라우저·인앱 브라우저 호환)
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '-9999px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 export function InviteModal({ sessionId, onClose }: Props) {
   const [token, setToken] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
   const [toneIdx, setToneIdx] = useState(0);
   const [message, setMessage] = useState(TONES[0].message);
   const [copied, setCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     api
       .get(`/api/sessions/${sessionId}/invite`)
-      .then(r => setToken(r.data.inviteToken))
+      .then(r => { if (!cancelled) setToken(r.data.inviteToken); })
       .catch(() =>
         api
           .post(`/api/sessions/${sessionId}/invite`)
-          .then(r => setToken(r.data.inviteToken))
-          .catch(e => console.error('Invite failed:', e))
+          .then(r => { if (!cancelled) setToken(r.data.inviteToken); })
+          .catch(e => {
+            console.error('Invite failed:', e);
+            if (!cancelled) {
+              const msg = e?.response?.data?.error?.message
+                || e?.response?.data?.message
+                || '초대 링크를 만들지 못했어요. 잠시 후 다시 시도해 주세요.';
+              setTokenError(msg);
+            }
+          })
       );
+    return () => { cancelled = true; };
   }, [sessionId]);
 
   const baseUrl =
@@ -48,31 +91,42 @@ export function InviteModal({ sessionId, onClose }: Props) {
   const fullText = `${message}\n\n${shareUrl}`;
 
   const handleNativeShare = async () => {
-    if (navigator.share) {
+    setShareError(null);
+    if (!shareUrl) return;
+    // 1) 네이티브 공유 시트 (모바일 Safari/Chrome/카카오)
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
         await navigator.share({
           title: '다시봄',
           text: message,
           url: shareUrl,
         });
-      } catch (e) {
-        // User cancelled or share failed
+        return;
+      } catch (e: any) {
+        // 사용자가 취소한 경우는 무시
+        if (e?.name === 'AbortError') return;
+        // 그 외에는 클립보드 폴백으로
       }
-    } else {
-      await navigator.clipboard.writeText(fullText);
+    }
+    // 2) 클립보드 복사 폴백
+    const ok = await copyToClipboardSafe(fullText);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } else {
+      setShareError('공유가 안 돼요. 아래 URL을 길게 눌러 직접 복사해주세요.');
     }
   };
 
   const handleCopyUrlOnly = async () => {
+    setShareError(null);
     if (!shareUrl) return;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
+    const ok = await copyToClipboardSafe(shareUrl);
+    if (ok) {
       setUrlCopied(true);
       setTimeout(() => setUrlCopied(false), 2000);
-    } catch {
-      // 복사 실패 시 폴백
+    } else {
+      setShareError('복사가 안 돼요. URL을 길게 눌러 직접 복사해주세요.');
     }
   };
 
@@ -189,6 +243,14 @@ export function InviteModal({ sessionId, onClose }: Props) {
           }}
         >
           <div
+            onClick={(e) => {
+              // 사용자가 직접 길게 눌러 복사할 수 있도록 자동 선택
+              const range = document.createRange();
+              range.selectNodeContents(e.currentTarget);
+              const sel = window.getSelection();
+              sel?.removeAllRanges();
+              sel?.addRange(range);
+            }}
             style={{
               flex: 1,
               padding: '10px 12px',
@@ -200,9 +262,12 @@ export function InviteModal({ sessionId, onClose }: Props) {
               wordBreak: 'break-all',
               display: 'flex',
               alignItems: 'center',
+              userSelect: 'all',
+              WebkitUserSelect: 'all',
+              cursor: 'text',
             }}
           >
-            {shareUrl || '링크 생성 중...'}
+            {shareUrl || (tokenError ? '링크 생성 실패' : '링크 생성 중...')}
           </div>
           <button
             onClick={handleCopyUrlOnly}
@@ -238,12 +303,30 @@ export function InviteModal({ sessionId, onClose }: Props) {
             border: 'none',
             borderRadius: 10,
             fontSize: 14,
-            cursor: 'pointer',
+            cursor: token ? 'pointer' : 'not-allowed',
             opacity: token ? 1 : 0.4,
           }}
         >
           {copied ? '메시지+링크 복사됐어요' : '카톡으로 공유하기'}
         </button>
+
+        {/* 토큰 발급 실패 / 공유 실패 안내 */}
+        {(tokenError || shareError) && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: '10px 12px',
+              background: '#FFF3F0',
+              border: '1px solid #F5C0B0',
+              borderRadius: 8,
+              fontSize: 12,
+              color: '#8A2A10',
+              lineHeight: 1.5,
+            }}
+          >
+            {tokenError || shareError}
+          </div>
+        )}
 
         <button
           onClick={onClose}
