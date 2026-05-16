@@ -1,10 +1,15 @@
 package com.againspring.api.admin;
 
 import com.againspring.api.dto.response.AdminUserDetailResponse;
+import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.User;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.admin.AdminUserDetailService;
 import com.againspring.service.retention.UserDeletionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -12,7 +17,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.againspring.common.exception.BusinessException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +25,8 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
+@Tag(name = "Admin — Users", description = "사용자 조회·삭제·역할 관리 (ADMIN 전용)")
+@SecurityRequirement(name = "bearer-jwt")
 public class AdminUserController {
 
     private final UserRepository userRepository;
@@ -28,14 +34,21 @@ public class AdminUserController {
     private final AdminUserDetailService adminUserDetailService;
 
     @GetMapping("/search")
+    @Operation(summary = "사용자 검색", description = "닉네임·이메일 contains 검색 (삭제된 계정 제외)")
+    @ApiResponse(responseCode = "200", description = "검색 결과 목록")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "ADMIN 권한 없음")
     public ResponseEntity<List<User>> search(@RequestParam String q) {
         List<User> users = userRepository
                 .findByNicknameContainingIgnoreCaseOrEmailContainingIgnoreCaseAndDeletedAtIsNull(q, q);
         return ResponseEntity.ok(users);
     }
 
-    /** 전체 사용자 페이지네이션 조회 (admin 대시보드 사용자 관리) */
     @GetMapping
+    @Operation(summary = "사용자 목록 (페이지네이션)", description = "전체 사용자를 페이지 단위로 반환. size는 1~100으로 클램프.")
+    @ApiResponse(responseCode = "200", description = "사용자 페이지")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "ADMIN 권한 없음")
     public ResponseEntity<Page<User>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -49,11 +62,20 @@ public class AdminUserController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "사용자 상세 조회", description = "세션 이력·역할·온보딩 상태 등 상세 정보 반환")
+    @ApiResponse(responseCode = "200", description = "사용자 상세")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "ADMIN 권한 없음")
+    @ApiResponse(responseCode = "404", description = "사용자 없음")
     public ResponseEntity<AdminUserDetailResponse> getDetail(@PathVariable String id) {
         return ResponseEntity.ok(adminUserDetailService.getUserDetail(id));
     }
 
     @DeleteMapping("/{id}/data")
+    @Operation(summary = "사용자 데이터 익명화 예약", description = "PII 삭제를 비동기로 예약한다. 즉시 삭제되지 않음.")
+    @ApiResponse(responseCode = "200", description = "예약 완료 (status=scheduled)")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "ADMIN 권한 없음")
     public ResponseEntity<Map<String, String>> deleteUserData(@PathVariable String id) {
         userDeletionService.scheduleAnonymization(id);
         return ResponseEntity.ok(Map.of("status", "scheduled", "userId", id));
@@ -65,6 +87,12 @@ public class AdminUserController {
      * 허용 역할: USER, TESTER (ADMIN은 AdminRoleAssigner가 관리하므로 여기서 변경 불가).
      */
     @PatchMapping("/{id}/roles")
+    @Operation(summary = "사용자 역할 변경 (V13)", description = "USER·TESTER 역할을 지정한다. ADMIN 역할은 변경 불가(보존됨). 잘못된 역할 지정 시 400 반환.")
+    @ApiResponse(responseCode = "200", description = "변경된 역할 목록 반환")
+    @ApiResponse(responseCode = "400", description = "허용되지 않는 역할 (INVALID_ROLE)")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "ADMIN 권한 없음")
+    @ApiResponse(responseCode = "404", description = "사용자 없음 (USER_NOT_FOUND)")
     public ResponseEntity<Map<String, Object>> updateRoles(
             @PathVariable String id,
             @RequestBody Map<String, List<String>> body) {

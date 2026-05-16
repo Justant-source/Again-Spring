@@ -2,6 +2,7 @@ package com.againspring.service;
 
 import com.againspring.repository.DailyStatsRepository;
 import com.againspring.repository.FeedbackRepository;
+import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.admin.PmfStatsService;
@@ -27,12 +28,13 @@ class PmfStatsServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private FeedbackRepository feedbackRepository;
     @Mock private DailyStatsRepository dailyStatsRepository;
+    @Mock private MessageRepository messageRepository;
 
     private PmfStatsService pmfStatsService;
 
     @BeforeEach
     void setUp() {
-        pmfStatsService = new PmfStatsService(sessionRepository, userRepository, feedbackRepository, dailyStatsRepository);
+        pmfStatsService = new PmfStatsService(sessionRepository, userRepository, feedbackRepository, dailyStatsRepository, messageRepository);
     }
 
     @Test

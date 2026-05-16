@@ -14,6 +14,7 @@ import com.againspring.service.context.IssueContextMerger;
 import com.againspring.service.context.PhaseDMetrics;
 import com.againspring.service.context.QuestionQueueUpdater;
 import com.againspring.service.context.UserStateAppender;
+import com.againspring.config.UserPermissionsConfig;
 import com.againspring.service.crisis.CrisisDetector;
 import com.againspring.service.parser.ChatTurnMetaParser;
 import com.againspring.service.prompt.ChatPromptAssembler;
@@ -52,6 +53,7 @@ class CancelableChatServiceTest {
     @Mock IsolationLintFilter isolationLintFilter;
     @Mock PhaseDMetrics phaseDMetrics;
     @Mock PlatformTransactionManager txManager;
+    @Mock UserPermissionsConfig permissions;
 
     CancelableChatService service;
     Session session;
@@ -67,7 +69,7 @@ class CancelableChatServiceTest {
                 messageRepo, sessionRepo, userRepo, llmBridge,
                 crisisDetector, promptAssembler, stateMachine,
                 turnMetaParser, userStateAppender, issueContextMerger,
-                questionQueueUpdater, isolationLintFilter, phaseDMetrics, txManager);
+                questionQueueUpdater, isolationLintFilter, phaseDMetrics, txManager, permissions);
 
         session = new Session();
         session.setId(SESSION_ID);

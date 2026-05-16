@@ -18,11 +18,17 @@
 - 주요: [psychology-model.md](./policies/psychology-model.md), [forbidden-words.md](./policies/forbidden-words.md), [crisis-detection.md](./policies/crisis-detection.md)
 
 ### [api/](./api/)
-FE↔BE 간의 계약. 변경 시 양쪽 모두 영향.
+FE↔BE 간의 계약 (15개 컨트롤러·57개 엔드포인트). 변경 시 양쪽 모두 영향.
 
-- [api/README.md](./api/README.md) — API 명세 인덱스
-- [rest-spec.md](./api/rest-spec.md) — REST 엔드포인트 전체 명세
-- [database-schema.md](./api/database-schema.md) — MariaDB 11 스키마
+- [api/README.md](./api/README.md) — API 문서 인덱스 (8개 도메인 파일 링크)
+- [api/rest-spec.md](./api/rest-spec.md) — 공통 규약·에러코드·전체 엔드포인트 마스터 표
+- [api/auth.md](./api/auth.md) — 인증 API (AuthController + OAuth2Controller)
+- [api/session-chat.md](./api/session-chat.md) — 세션·채팅 API
+- [api/report.md](./api/report.md) — 리포트 API
+- [api/user.md](./api/user.md) — 사용자 API
+- [api/feedback.md](./api/feedback.md) — 피드백 API
+- [api/admin.md](./api/admin.md) — 관리자 API (17개 엔드포인트)
+- [api/database-schema.md](./api/database-schema.md) — MariaDB 11 스키마 (Flyway V1~V24)
 
 ### [prompts/](./prompts/)
 LLM 프롬프트 레이어 구조 (시스템 / Gottman / NVC / 관계 / 턴).

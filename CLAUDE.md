@@ -60,8 +60,15 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 ### 공통 (BE+FE 모두 참조) — `shared/docs/`
 
 #### API / 스키마
-- `shared/docs/api/rest-spec.md` — REST API 전체 명세
-- `shared/docs/api/database-schema.md` — MariaDB 테이블 설명
+- `shared/docs/api/README.md` — API 문서 인덱스 (도메인별 파일 링크 + 공통 규약)
+- `shared/docs/api/rest-spec.md` — 공통 규약·에러코드·전체 엔드포인트 마스터 표 (15개 컨트롤러·57개)
+- `shared/docs/api/auth.md` — 인증 API (AuthController 9 + OAuth2Controller 1)
+- `shared/docs/api/session-chat.md` — 세션·채팅 API (SessionController 6 + MessageController 11)
+- `shared/docs/api/report.md` — 리포트 API (ReportController 3)
+- `shared/docs/api/user.md` — 사용자 API (UserController 7)
+- `shared/docs/api/feedback.md` — 피드백 API (FeedbackController 1)
+- `shared/docs/api/admin.md` — 관리자 API (admin 7종 컨트롤러·17개 엔드포인트)
+- `shared/docs/api/database-schema.md` — MariaDB 테이블 설명 (Flyway V1~V24)
 - `shared/docs/categories.yml` — 카테고리 catalog (FE/BE 공유 권위본). 변경 시 `frontend/lib/constants/categories.ts` 동기화 필요
 
 #### LLM / 프롬프트
@@ -83,7 +90,7 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 #### 시스템 전체
 - `shared/docs/structure.md` — 모노레포 전체 구조 / 책임 분리
 - `shared/docs/architecture.md` — 시스템 아키텍처 한 장
-- `shared/docs/admin-dashboard.md` — 관리자 대시보드 기능·운영 가이드 (ADMIN 권한·5개 섹션·14개 API)
+- `shared/docs/admin-dashboard.md` — 관리자 대시보드 기능·운영 가이드 (ADMIN 권한·5개 섹션·17개 API)
 
 ### 백엔드 특화 — `backend/docs/`
 - `backend/docs/structure.md` — Spring Boot 패키지 계층
@@ -443,7 +450,7 @@ APP_URL=https://dev.againspring.net
   - ✅ 리포트 생성 (기여도, NVC — 4Horsemen 내부 점수만 보존, UI 노출 없음)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
   - ✅ 데드코드 정리 완료 (V1.5 폐기 코드·관계 그래프·4Horsemen UI)
-  - ✅ OpenAPI / Swagger UI (`/swagger-ui.html`)
+  - ✅ OpenAPI / Swagger UI (`/swagger-ui.html`) — 전체 15개 컨트롤러 `@Tag`·`@Operation`·`bearerAuth` SecurityScheme 완비
   - ✅ CORS 도메인 허용 + GlobalExceptionHandler 표준화
   - ✅ **V10 베타 기능 (2026-05-08~09)**: 피드백 수집(`FeedbackService`, `FeedbackController`) + 관리자 대시보드(AdminFeedbackController, PMF 통계) + 일일 세션 제한(DailyStats, GuestSessionRateLimiter) + 게스트 1세션 제한 + 동의 재확인(ConsentReconfirmModal) + 베타 배너 + Flyway V16~V19
   - ✅ **V10.2 Gmail 발신자 통합 (2026-05-09)**: 단일 발신자 `againspring2026@gmail.com`, `GMAIL_APP_PASSWORD` 환경변수, MimeMessageHelper 표시명("다시봄 운영팀"), 법률 MD 연결(`shared/docs/policies/terms.md`·`privacy.md` → `frontend/public/legal/`)

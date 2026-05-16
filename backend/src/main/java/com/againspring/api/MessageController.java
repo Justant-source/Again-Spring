@@ -8,6 +8,8 @@ import com.againspring.service.CancelableChatService;
 import com.againspring.service.ChatService;
 import com.againspring.service.SessionRoleResolver;
 import com.againspring.service.SessionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.againspring.common.exception.BusinessException;
@@ -28,7 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/sessions/{sessionId}")
 @RequiredArgsConstructor
-@Tag(name = "Chat", description = "Chat messaging endpoints")
+@Tag(name = "Chat", description = "채팅 메시지 송수신·초대·정리 게이트")
 public class MessageController {
 
     private final CancelableChatService cancelableChatService;
@@ -48,6 +50,10 @@ public class MessageController {
 
     @PostMapping("/messages")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "메시지 전송", description = "사용자 메시지를 즉시 저장하고 진행 중 LLM invocation을 취소한 뒤 새 invocation을 비동기로 시작한다. 위기 감지 시 409 반환.")
+    @ApiResponse(responseCode = "200", description = "메시지 저장 완료, LLM 응답은 polling으로 수신")
+    @ApiResponse(responseCode = "409", description = "위기 키워드 감지 — 세션 중단, 위기 모달 표시 필요")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
     public ResponseEntity<ChatTurnResponse> sendMessage(
         @PathVariable String sessionId,
         @Valid @RequestBody SendMessageRequest request,
@@ -71,6 +77,9 @@ public class MessageController {
 
     @GetMapping("/messages")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "메시지 목록 폴링", description = "since(epoch ms) 이후 본인에게 보이는 메시지를 반환한다. since 미전달 시 전체 반환.")
+    @ApiResponse(responseCode = "200", description = "메시지 목록")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
     public ResponseEntity<List<MessageResponse>> getMessages(
         @PathVariable String sessionId,
         @RequestParam(required = false) Long since,
@@ -84,6 +93,9 @@ public class MessageController {
 
     @GetMapping("/partner-messages")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "상대방 메시지 메타데이터 조회", description = "상대방이 메시지를 전송했는지 여부(타임스탬프 등)를 확인한다. 내용은 포함되지 않는다.")
+    @ApiResponse(responseCode = "200", description = "상대방 메시지 메타데이터 목록")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
     public ResponseEntity<List<MessageMetadataResponse>> getPartnerMessages(
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails
@@ -95,6 +107,9 @@ public class MessageController {
 
     @GetMapping("/partner-status")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "상대방 참여 상태 조회", description = "상대방이 세션에 참여 중인지 여부를 반환한다.")
+    @ApiResponse(responseCode = "200", description = "상대방 상태")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
     public ResponseEntity<PartnerStatusResponse> getPartnerStatus(
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails
@@ -111,6 +126,9 @@ public class MessageController {
      */
     @GetMapping("/invocation-status")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "LLM invocation 진행 상태 조회", description = "현재 LLM이 응답을 생성 중인지 여부와 마지막 사용자 메시지 시각을 반환한다. 새로고침 후 TypingBubble 복원에 사용.")
+    @ApiResponse(responseCode = "200", description = "inProgress, sender, lastUserMessageAt 반환")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
     public ResponseEntity<java.util.Map<String, Object>> getInvocationStatus(
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails
@@ -127,6 +145,9 @@ public class MessageController {
 
     @PostMapping("/finalize")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "정리 요청", description = "현재 사용자가 세션 정리(대화 종료)를 요청한다. 5턴 이상 대화가 있어야 요청 가능.")
+    @ApiResponse(responseCode = "200", description = "정리 상태 반환")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
     public ResponseEntity<FinalizationResponse> requestFinalize(
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails
@@ -138,6 +159,9 @@ public class MessageController {
 
     @PostMapping("/finalize/agree")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "정리 동의", description = "상대방의 정리 요청에 동의한다. Duo 세션에서 양쪽 모두 동의하면 세션이 완료 처리된다.")
+    @ApiResponse(responseCode = "200", description = "정리 완료 또는 대기 중 상태 반환")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
     public ResponseEntity<FinalizationResponse> agreeToFinalize(
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails
@@ -149,6 +173,9 @@ public class MessageController {
 
     @PostMapping("/finalize/decline")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "정리 거절", description = "상대방의 정리 요청을 거절하고 대화를 계속한다.")
+    @ApiResponse(responseCode = "200", description = "정리 거절 처리 완료")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
     public ResponseEntity<Void> declineFinalize(
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails
@@ -160,6 +187,10 @@ public class MessageController {
 
     @GetMapping("/invite")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "초대 토큰 조회", description = "세션의 기존 초대 토큰을 조회한다. Duo 모드가 활성화되거나 TESTER 역할이 있어야 접근 가능.")
+    @ApiResponse(responseCode = "200", description = "초대 토큰 반환")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "Duo 모드 비활성 (DUO_MODE_DISABLED)")
     public ResponseEntity<InviteTokenResponse> getInvite(
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails
@@ -175,6 +206,10 @@ public class MessageController {
 
     @PostMapping("/invite")
     @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "초대 토큰 발급", description = "새 초대 토큰을 발급한다. Duo 모드가 활성화되거나 TESTER 역할이 있어야 접근 가능.")
+    @ApiResponse(responseCode = "200", description = "신규 초대 토큰 반환")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "Duo 모드 비활성 (DUO_MODE_DISABLED)")
     public ResponseEntity<InviteTokenResponse> generateInvite(
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails

@@ -5,6 +5,10 @@ import com.againspring.domain.Report;
 import com.againspring.repository.ReportRepository;
 import com.againspring.repository.SessionRepository;
 // import com.againspring.service.ReportService; — REMOVED (V1.5)
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -20,13 +24,14 @@ import java.util.Map;
 /**
  * REST API for report endpoints.
  * - POST /api/sessions/{sessionId}/report — trigger report generation
- * - GET /api/sessions/{sessionId}/report — retrieve report by sessionId (FE 사용)
- * - GET /api/reports/{reportId} — retrieve generated report by reportId
+ * - GET  /api/sessions/{sessionId}/report — retrieve report by sessionId (FE 사용)
+ * - GET  /api/reports/{reportId}          — retrieve generated report by reportId
  */
 @Slf4j
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
+@Tag(name = "Report", description = "갈등 분석 리포트 생성·조회")
 public class ReportController {
 
     // private final ReportService reportService; — REMOVED (V1.5)
@@ -41,6 +46,12 @@ public class ReportController {
      * Response 400: Session not completed or already has report.
      */
     @PostMapping("/sessions/{sessionId}/report")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "리포트 생성 요청", description = "완료된 세션의 리포트를 비동기로 생성 요청한다. 세션 참여자(owner)만 호출 가능. 202 반환 후 GET으로 폴링.")
+    @ApiResponse(responseCode = "202", description = "리포트 생성 시작 (status=generating, estimatedSeconds 포함)")
+    @ApiResponse(responseCode = "400", description = "세션 미완료 또는 이미 리포트 존재")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "세션 참여자 아님")
     public ResponseEntity<Map<String, Object>> triggerReportGeneration(
             @PathVariable String sessionId,
             @AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
@@ -80,6 +91,12 @@ public class ReportController {
      * Response 403: Not a participant.
      */
     @GetMapping("/sessions/{sessionId}/report")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "세션 ID로 리포트 조회", description = "세션에 대한 리포트를 조회한다. 미생성 시 404 — FE는 폴링. 세션 참여자만 접근 가능.")
+    @ApiResponse(responseCode = "200", description = "리포트 상세")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "세션 참여자 아님")
+    @ApiResponse(responseCode = "404", description = "리포트 미생성 (폴링 대기)")
     public ResponseEntity<ReportResponse> getReportBySession(
             @PathVariable String sessionId,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -115,6 +132,12 @@ public class ReportController {
      * Response 404: Report not found.
      */
     @GetMapping("/reports/{reportId}")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "리포트 ID로 직접 조회", description = "reportId로 리포트를 직접 조회한다. 세션 참여자만 접근 가능.")
+    @ApiResponse(responseCode = "200", description = "리포트 상세")
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "세션 참여자 아님")
+    @ApiResponse(responseCode = "404", description = "리포트 없음")
     public ResponseEntity<ReportResponse> getReport(
             @PathVariable String reportId,
             @AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
@@ -274,7 +297,6 @@ public class ReportController {
 
     /**
      * Extract user ID from JWT principal.
-     * TODO Phase 3-5 integration: Adjust based on your actual JWT principal structure.
      */
     private String extractUserIdFromPrincipal(org.springframework.security.core.userdetails.User principal) {
         if (principal == null) {

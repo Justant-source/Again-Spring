@@ -78,7 +78,7 @@ Again-Spring/
 │       │   ├── relations/{couple,family,friend,parent_child}.md
 │       │   └── turns/{solo_mode,turn_1_a,turn_2_b,turn_3_a,turn_4_b,turn_5_a,turn_6_b}.md
 │       ├── policies/               # 서비스 정책
-│       ├── api/                    # API 명세 + DB 스키마
+│       ├── api/                    # API 명세 (도메인별 8파일) + DB 스키마
 │       └── (llm 관련 설계 문서)      # bridge-architecture, system-prompts 등
 │
 └── .gitignore                      # env/.env.{dev,prod} 보호
@@ -111,7 +111,7 @@ Again-Spring/
 
 | 작업 종류 | 작업 위치 | 참고 docs |
 |---|---|---|
-| API 추가/변경 | `backend/src/.../api/`, `frontend/lib/api/` | `shared/docs/api/rest-spec.md` |
+| API 추가/변경 | `backend/src/.../api/`, `frontend/lib/api/` | `shared/docs/api/rest-spec.md` → 해당 도메인 `.md` |
 | DB 스키마 변경 | `backend/src/main/resources/db/migration/V{n+1}__*.sql` | `shared/docs/api/database-schema.md` |
 | 프롬프트 변경 | `shared/docs/prompts/*.md` (런타임 자산) | `shared/docs/prompts/README.md` |
 | LLM 브릿지 코드 | `backend/.../llm/bridge/` | `shared/docs/llm/bridge-architecture.md` |

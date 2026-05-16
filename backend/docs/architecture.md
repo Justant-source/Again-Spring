@@ -9,7 +9,7 @@
 | 빌드 | Gradle Kotlin DSL |
 | DB | MariaDB 11 LTS (utf8mb4, UTC) |
 | ORM | Spring Data JPA (Hibernate) |
-| 마이그레이션 | Flyway 10 (V1~V14) |
+| 마이그레이션 | Flyway 10 (V1~V24) |
 | 인증 | Spring Security + JWT (jjwt 0.12.5) |
 | 메일 | Spring Mail (Gmail SMTP) |
 | API 문서 | springdoc-openapi 2.6 (Swagger UI) |
@@ -24,21 +24,25 @@
 flowchart TB
     Client[Browser/Client]
     subgraph SpringBoot["Spring Boot 3.3"]
-        Filter[JwtAuthFilter]
-        Controller[REST Controller<br/>api/]
-        Service[Service Layer<br/>service/]
-        Domain[JPA Entity<br/>domain/]
-        Repo[JpaRepository<br/>repository/]
-        Bridge[ClaudeCodeBridge<br/>llm/bridge/]
-        Safety[PromptSanitizer<br/>KeywordGuard<br/>CrisisDetector<br/>safety/]
-        Sched[RetentionScheduler]
+        Filter[JwtAuthFilter\nRateLimitFilter]
+        Controller[REST 컨트롤러 15개\napi/ + api/admin/]
+        Service[Service Layer\nservice/ + service/admin/]
+        Context[Phase D 컨텍스트\nservice/context/ + service/prompt/]
+        Domain[JPA Entity\ndomain/]
+        Repo[JpaRepository\nrepository/]
+        Bridge[ClaudeCodeBridge\nllm/bridge/]
+        Safety[PromptSanitizer\nKeywordGuard\nCrisisDetector\nsafety/]
+        Sched[RetentionScheduler\nDailyStatsAggregator\nGuestSessionCleanupScheduler]
+        Notify[FeedbackEmailNotifier\nCrisisFeedbackNotifier\nservice/notify/]
     end
     DB[(MariaDB 11)]
     Claude[Claude CLI]
 
     Client --> Filter --> Controller --> Service
+    Service --> Context
     Service --> Repo --> Domain --> DB
     Service --> Safety --> Bridge --> Claude
+    Service --> Notify
     Sched -.->|cron 03:00 UTC| Repo
 ```
 
@@ -92,32 +96,27 @@ MariaDB (Flyway 관리 스키마)
 `SessionStateMachine`이 `SessionStatus` 전이의 단일 진실. V1.5부터 카톡 메시지 기반 흐름.
 
 ```mermaid
-flowchart TB
-    Start[POST /api/sessions]
-    Solo["CHATTING_SOLO<br/>(Solo 모드)"]
-    Invite[POST /api/sessions/{id}/messages<br/>with invite token]
-    Duo["CHATTING_DUO<br/>(Duo 모드)"]
-    Finalize["AWAITING_FINALIZATION<br/>(종료 권유)"]
-    Completed["COMPLETED<br/>(완료)"]
-    Terminated["TERMINATED<br/>(강제 종료)"]
-    
-    Start -->|세션 생성| Solo
-    Solo -->|상대가 invite로 참여| Duo
-    Solo -->|사용자 결정| Completed
-    Duo -->|/finalize 호출| Finalize
-    Finalize -->|양쪽 agree| Completed
-    Finalize -->|한쪽 decline| Duo
-    Solo -->|crisis detected| Terminated
-    Duo -->|crisis detected| Terminated
+stateDiagram-v2
+    direction LR
+    [*] --> CHATTING_SOLO : POST /api/sessions
+    CHATTING_SOLO --> CHATTING_DUO : POST /sessions/join/{token}\n(Duo게이팅 통과)
+    CHATTING_SOLO --> FINALIZING : POST /finalize\n(5턴 이상)
+    CHATTING_DUO --> FINALIZING : POST /finalize\n(5턴 이상)
+    FINALIZING --> CHATTING_SOLO : POST /finalize/decline
+    FINALIZING --> CHATTING_DUO : POST /finalize/decline (Duo)
+    FINALIZING --> COMPLETED : /finalize/agree\n(양쪽 동의 or Solo)
+    CHATTING_SOLO --> CANCELLED : DELETE /sessions/{id}
+    CHATTING_DUO --> CANCELLED : DELETE /sessions/{id}
+    COMPLETED --> [*]
+    CANCELLED --> [*]
 ```
 
 **상태 전이 규칙**:
-- `CHATTING_SOLO` → `CHATTING_DUO`: 상대가 초대 토큰으로 `/invite` 엔드포인트를 통해 참여
-- `CHATTING_SOLO` → `COMPLETED`: 사용자가 종료 결정 또는 충분히 대화 후 권유 수락
-- `CHATTING_DUO` → `AWAITING_FINALIZATION`: `/finalize` 호출 (종료 권유)
-- `AWAITING_FINALIZATION` → `COMPLETED`: 양쪽이 `/finalize/agree`
-- `AWAITING_FINALIZATION` → `CHATTING_DUO`: 한쪽이 `/finalize/decline`
-- **Any** → `TERMINATED`: CrisisDetector 발동 (위험 키워드)
+- `CHATTING_SOLO` → `CHATTING_DUO`: 상대가 초대 토큰으로 `POST /sessions/join/{token}` 참여 (Duo 게이팅: `app.features.duo-mode=true` 또는 TESTER 역할)
+- `CHATTING_SOLO/DUO` → `FINALIZING`: `POST /finalize` 호출 (5턴 이상 필요)
+- `FINALIZING` → `COMPLETED`: 양쪽이 `/finalize/agree` (Solo는 자동 완료)
+- `FINALIZING` → `CHATTING_SOLO/DUO`: 한쪽이 `/finalize/decline`
+- `CHATTING_SOLO/DUO` → `CANCELLED`: `DELETE /sessions/{id}` (세션 삭제)
 
 **ChatService 처리 순서** (`POST /api/sessions/{id}/messages`):
 1. 현재 상태 확인 (CHATTING_SOLO 또는 CHATTING_DUO만 메시지 허용)
@@ -145,8 +144,10 @@ flowchart TB
 
 | 빈 | cron | 동작 |
 |---|---|---|
-| `RetentionScheduler.purgeExpiredContent` | `0 0 3 * * *` (매일 03:00 UTC) | 30일 경과 세션의 `messages.content` NULL 처리 (V1.5 이후) / `turns.{content, mediator_message}` NULL 처리 (V1.5 이전 레거시 히스토리) |
+| `RetentionScheduler.purgeExpiredContent` | `0 0 3 * * *` (매일 03:00 UTC) | 30일 경과 세션의 `messages.content` NULL 처리 |
 | `RevokedTokenCleanupScheduler.cleanup` | `0 0 4 * * *` (매일 04:00 UTC) | 만료된 `revoked_tokens` 행 삭제 |
+| `DailyStatsAggregator` | `0 0 0 * * *` (자정 UTC) | 전날 세션·사용자 통계 → `daily_stats` 집계 |
+| `GuestSessionCleanupScheduler` | `0 0 2 * * *` (매일 02:00 UTC) | 만료 게스트 세션 정리 |
 
 `SchedulingConfig`의 `@EnableScheduling` 활성. 테스트 프로파일에서는 비활성.
 

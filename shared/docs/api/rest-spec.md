@@ -1,407 +1,222 @@
-# REST API 명세
+# REST API 전체 명세 — 다시봄
+
+> 15개 컨트롤러·약 57개 엔드포인트의 공통 규약, 에러코드, 전체 마스터 표, 인증 매트릭스를 기술합니다.
+> 도메인별 상세(시퀀스 다이어그램·요청/응답 예시)는 각 도메인 문서를 참조하세요.
 
 ## Source of truth
 
-- 컨트롤러: `backend/src/main/java/com/againspring/api/*Controller.java`
-- DTO: `backend/.../api/dto/{request,response}/`
-- Swagger UI: `http://localhost:8080/swagger-ui.html` (dev), `https://dev.againspring.net/swagger-ui/` (서버 dev)
+| 항목 | 위치 |
+|---|---|
+| 컨트롤러 | `backend/src/main/java/com/againspring/api/**/*Controller.java` |
+| DTO | `backend/src/main/java/com/againspring/api/dto/{request,response}/` |
+| 에러 처리 | `backend/src/main/java/com/againspring/common/exception/GlobalExceptionHandler.java` |
+| Swagger UI (dev) | `http://localhost:8080/swagger-ui.html` |
+| Swagger UI (서버 dev) | `https://dev.againspring.net/swagger-ui/` |
+| OpenAPI JSON (dev) | `http://localhost:8080/v3/api-docs` |
 
-코드와 다르면 코드가 옳습니다.
+코드와 문서가 충돌하면 **코드가 옳습니다**. Swagger 자동생성 스펙이 이 문서보다 항상 우선합니다.
 
 ---
 
 ## 공통 규약
 
-- **Base URL**: 클라이언트는 항상 `/api/...`로 호출 (nginx가 backend로 라우팅)
-- **인증**: `Authorization: Bearer {jwt}` (필요한 엔드포인트에 한해)
-- **Content-Type**: `application/json` (요청/응답 모두)
-- **시간**: ISO-8601 UTC (`2026-04-26T10:30:00Z`)
-- **에러 형식**:
-  ```json
-  {
-    "error": {
-      "code": "SESSION_NOT_FOUND",
-      "message": "세션을 찾을 수 없어요",
-      "timestamp": "2026-04-26T10:30:00Z"
-    }
-  }
-  ```
-- **Rate limit**: [policies/auth.md](../policies/auth.md) 참조
+| 항목 | 값 |
+|---|---|
+| Base URL | `/api/...` (nginx → backend 라우팅) |
+| Content-Type | `application/json` |
+| 시간 형식 | ISO-8601 UTC (`2026-04-26T10:30:00Z`) |
+| 인증 헤더 | `Authorization: Bearer {JWT}` |
+| 에러 형식 | `{ "code": "...", "message": "..." }` |
 
-## 에러 코드 (`GlobalExceptionHandler`)
+---
+
+## 에러코드 (`GlobalExceptionHandler`)
 
 | 코드 | HTTP | 설명 |
 |---|---|---|
-| `INVALID_INPUT` | 400 | Bean Validation 실패 |
-| `UNAUTHORIZED` | 401 | 인증 실패 / 토큰 만료 / 토큰 폐기 |
-| `FORBIDDEN` | 403 | 권한 없음 |
+| `VALIDATION_ERROR` | 400 | Bean Validation 실패 (`@Valid`) |
+| `INVALID_ROLE` | 400 | 허용되지 않는 역할 (admin 역할 변경 시도) |
+| `UNAUTHORIZED` | 401 | 인증 실패 / 토큰 만료 / 폐기된 토큰 |
+| `FORBIDDEN` | 403 | 권한 없음 (세션 비참여자, 비ADMIN 등) |
+| `DUO_MODE_DISABLED` | 403 | Duo 모드 미활성 + TESTER 역할 없음 |
 | `NOT_FOUND` | 404 | 리소스 없음 |
+| `EMAIL_ALREADY_EXISTS` | 409 | 이메일 중복 (회원가입) |
+| `CRISIS_DETECTED` | 409 | 채팅 중 위기 키워드 감지 (세션 중단) |
+| `SESSION_ALREADY_HAS_PARTNER` | 409 | 초대 참여 시 이미 참여자 존재 |
 | `INVITE_EXPIRED` | 410 | 초대 토큰 만료 |
-| `CRISIS_DETECTED` | 422 | 위험 키워드 감지 — 세션 중단 |
+| `CRISIS_IN_DESCRIPTION` | 422 | 세션 생성 시 설명에 위기 키워드 |
 | `FORBIDDEN_WORD_DETECTED` | 422 | 금지어 감지 |
-| `LLM_UNAVAILABLE` | 503 | LLM 일시 불가 |
-| `INTERNAL_ERROR` | 500 | 서버 오류 |
+| `USER_NOT_FOUND` | 404 | 사용자 없음 (admin 조회) |
+| `LLM_UNAVAILABLE` | 503 | Claude CLI 불가 (fallback 응답 반환) |
+| `INTERNAL_ERROR` | 500 | 서버 내부 오류 |
 
 ---
 
-## Auth (`AuthController` + `OAuth2Controller`)
+## 인증 · 권한 매트릭스
 
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| POST | `/api/auth/send-verification` | ✗ | 이메일 6자리 코드 발송 (10분 유효) |
-| POST | `/api/auth/signup` | ✗ | 회원가입 (코드 검증 포함) |
-| POST | `/api/auth/login` | ✗ | 로그인 → JWT 발급 |
-| POST | `/api/auth/guest` | ✗ | 게스트 토큰 발급 (1h) |
-| POST | `/api/auth/logout` | ✓ | 토큰 폐기 (revoked_tokens) |
-| POST | `/api/auth/forgot-password` | ✗ | 재설정 토큰 이메일 발송 |
-| POST | `/api/auth/reset-password` | ✗ | 토큰 + 새 비밀번호로 재설정 |
-| POST | `/api/auth/oauth2/{provider}` | ✗ | provider ∈ {google, kakao, naver} |
+```mermaid
+flowchart LR
+    REQ[요청] --> AUTH{JWT 토큰?}
+    AUTH -->|없음| PUBLIC{공개 엔드포인트?}
+    PUBLIC -->|Yes| HANDLE[처리]
+    PUBLIC -->|No| ERR401[401 Unauthorized]
 
-상세 흐름: [policies/auth.md](../policies/auth.md)
+    AUTH -->|있음| VALID{토큰 유효?}
+    VALID -->|폐기/만료| ERR401
+    VALID -->|유효| ROLE{역할 확인}
 
-### `POST /api/auth/login` 예
+    ROLE -->|USER/TESTER/ADMIN| DUOGATE{duo-mode 게이팅?}
+    DUOGATE -->|invite/join 엔드포인트| DUOCHECK{duo=true OR TESTER?}
+    DUOCHECK -->|No| ERR403DUO[403 DUO_MODE_DISABLED]
+    DUOCHECK -->|Yes| HANDLE
 
-```jsonc
-// Request
-{ "email": "user@example.com", "password": "Pass123!" }
+    DUOGATE -->|일반 엔드포인트| ADMINGATE{admin 경로?}
+    ADMINGATE -->|/api/admin/**| ISADMIN{ADMIN 역할?}
+    ISADMIN -->|No| ERR403[403 Forbidden]
+    ISADMIN -->|Yes| ENVGATE{환경 게이팅?}
+    ENVGATE -->|app.admin.enabled=false| NOBEAN[404 Not Found]
+    ENVGATE -->|dev profile 아님| NOBEAN
+    ENVGATE -->|통과| HANDLE
 
-// Response 200
-{
-  "user": {
-    "id": "usr_abc123",
-    "email": "user@example.com",
-    "nickname": "달콩",
-    "isGuest": false,
-    "communicationStyle": "wave",
-    "onboardingCompleted": true
-  },
-  "token": { "accessToken": "eyJhbGc...", "expiresIn": 86400 }
-}
+    ADMINGATE -->|일반 경로| HANDLE
 ```
 
 ---
 
-## User (`UserController`)
+## 전체 엔드포인트 마스터 표
 
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| GET | `/api/users/me` | ✓ | 내 정보 |
-| PATCH | `/api/users/me` | ✓ | 프로필 수정 (닉네임, MBTI 등) |
-| POST | `/api/users/me/onboarding` | ✓ | 온보딩 결과 저장 → 스타일 반환 |
-| POST | `/api/users/me/tutorial/complete` | ✓ | 30초 튜토리얼 완료 기록 (V24) — 204 No Content |
-| GET | `/api/users/me/history` | ✓ | 내 세션 이력 목록 |
-| DELETE | `/api/users/me` | ✓ | 탈퇴 (소프트 삭제 + 원문 즉시 삭제) |
+### 1. Auth / OAuth2
 
-### `POST /api/users/me/onboarding`
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| POST | `/api/auth/send-verification` | 공개 | 200 | [auth.md](auth.md) |
+| POST | `/api/auth/signup` | 공개 | 201 / 400 / 409 | [auth.md](auth.md) |
+| POST | `/api/auth/login` | 공개 | 200 / 401 | [auth.md](auth.md) |
+| POST | `/api/auth/guest` | 공개 | 200 | [auth.md](auth.md) |
+| POST | `/api/auth/logout` | 공개 | 204 | [auth.md](auth.md) |
+| POST | `/api/auth/forgot-password` | 공개 | 200 | [auth.md](auth.md) |
+| POST | `/api/auth/reset-password` | 공개 | 200 / 400 | [auth.md](auth.md) |
+| GET | `/api/auth/check-nickname` | 공개 | 200 | [auth.md](auth.md) |
+| POST | `/api/auth/agree` | **JWT** | 200 / 400 | [auth.md](auth.md) |
+| POST | `/api/auth/oauth2/{provider}` | 공개 | 200 / 400 / 401 | [auth.md](auth.md) |
 
-```jsonc
-// Request
-{ "answers": [4,2,3,5,2,4,3,5,4,3], "mbtiType": "INFP" /* optional */ }
+### 2. Session
 
-// Response 200
-{
-  "communicationStyle": "wave",
-  "styleInfo": {
-    "emoji": "🌊", "label": "파도형",
-    "description": "...", "strengths": [...], "caution": [...]
-  }
-}
-```
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| POST | `/api/sessions` | **JWT** | 201 / 422 | [session-chat.md](session-chat.md) |
+| GET | `/api/sessions/me` | **JWT** | 200 | [session-chat.md](session-chat.md) |
+| GET | `/api/sessions/{id}` | **JWT** | 200 / 403 / 404 | [session-chat.md](session-chat.md) |
+| POST | `/api/sessions/join/{token}` | 공개 | 200 / 403 / 409 / 410 | [session-chat.md](session-chat.md) |
+| GET | `/api/sessions/{id}/status` | 공개 | 200 / 404 | [session-chat.md](session-chat.md) |
+| DELETE | `/api/sessions/{id}` | **JWT** | 204 / 403 / 404 | [session-chat.md](session-chat.md) |
 
-상세: [policies/onboarding.md](../policies/onboarding.md)
+### 3. Chat (Message)
 
----
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| POST | `/api/sessions/{id}/messages` | **JWT** | 200 / 409 | [session-chat.md](session-chat.md) |
+| GET | `/api/sessions/{id}/messages` | **JWT** | 200 | [session-chat.md](session-chat.md) |
+| GET | `/api/sessions/{id}/partner-messages` | **JWT** | 200 | [session-chat.md](session-chat.md) |
+| GET | `/api/sessions/{id}/partner-status` | **JWT** | 200 | [session-chat.md](session-chat.md) |
+| GET | `/api/sessions/{id}/invocation-status` | **JWT** | 200 | [session-chat.md](session-chat.md) |
+| POST | `/api/sessions/{id}/finalize` | **JWT** | 200 | [session-chat.md](session-chat.md) |
+| POST | `/api/sessions/{id}/finalize/agree` | **JWT** | 200 | [session-chat.md](session-chat.md) |
+| POST | `/api/sessions/{id}/finalize/decline` | **JWT** | 200 | [session-chat.md](session-chat.md) |
+| GET | `/api/sessions/{id}/invite` | **JWT** + Duo게이팅 | 200 / 403 | [session-chat.md](session-chat.md) |
+| POST | `/api/sessions/{id}/invite` | **JWT** + Duo게이팅 | 200 / 403 | [session-chat.md](session-chat.md) |
 
-## Session (카톡 채팅 API)
+### 4. Report
 
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| POST | `/api/sessions` | ✓ | Solo 세션 생성 |
-| GET | `/api/sessions/me` | ✓ | 내 세션 목록 |
-| GET | `/api/sessions/{id}` | ✓ | 세션 상세 조회 |
-| GET | `/api/sessions/{id}/status` | ✓ | 세션 상태 폴링 (파트너 합류 감지 용도) |
-| DELETE | `/api/sessions/{id}` | ✓ | 세션 삭제 (종료·방치된 세션 정리) |
-| POST | `/api/sessions/{id}/invite` | ✓ | 초대 토큰 생성 |
-| GET | `/api/sessions/{id}/invite` | ✓ | 초대 토큰 메타 조회 |
-| POST | `/api/sessions/join/{token}` | ✓/✗ | 초대 토큰으로 참여 (B 진입) |
-| POST | `/api/sessions/{id}/messages` | ✓ | 메시지 전송 + AI 응답 |
-| GET | `/api/sessions/{id}/messages` | ✓ | 내 메시지 목록 (since 폴링) |
-| GET | `/api/sessions/{id}/partner-messages` | ✓ | 상대 메시지 메타 (content 없음) |
-| GET | `/api/sessions/{id}/partner-status` | ✓ | 상대 온라인·활동 상태 |
-| POST | `/api/sessions/{id}/finalize` | ✓ | 종료 권유 |
-| POST | `/api/sessions/{id}/finalize/agree` | ✓ | 종료 동의 |
-| POST | `/api/sessions/{id}/finalize/decline` | ✓ | 종료 거절 |
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| POST | `/api/sessions/{id}/report` | **JWT** | 202 / 400 / 403 | [report.md](report.md) |
+| GET | `/api/sessions/{id}/report` | **JWT** | 200 / 403 / 404 | [report.md](report.md) |
+| GET | `/api/reports/{reportId}` | **JWT** | 200 / 403 / 404 | [report.md](report.md) |
 
-### `POST /api/sessions`
+### 5. User
 
-새로운 Solo 세션을 생성합니다.
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| GET | `/api/users/me` | **JWT** | 200 / 404 | [user.md](user.md) |
+| PATCH | `/api/users/me` | **JWT** | 200 | [user.md](user.md) |
+| POST | `/api/users/me/password` | **JWT** | 200 / 401 | [user.md](user.md) |
+| DELETE | `/api/users/me` | **JWT** | 204 / 401 | [user.md](user.md) |
+| POST | `/api/users/me/tutorial/complete` | **JWT** | 204 | [user.md](user.md) |
+| POST | `/api/users/me/onboarding` | **JWT** | 200 | [user.md](user.md) |
+| GET | `/api/users/me/history` | **JWT** | 200 | [user.md](user.md) |
 
-**Request**:
-```json
-{
-  "relationType": "couple",
-  "category": { "major": "...", "middle": "...", "minor": "..." }
-}
-```
+### 6. Feedback
 
-**Response 201**:
-```json
-{
-  "id": "uuid",
-  "status": "chatting_solo",
-  "userAId": "user-id",
-  "userBId": null,
-  "userAMessageCount": 0,
-  "userBMessageCount": 0,
-  "inviteToken": null
-}
-```
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| POST | `/api/feedbacks` | 공개 | 201 / 400 | [feedback.md](feedback.md) |
 
----
+### 7. Health
 
-### `POST /api/sessions/{id}/invite`
+| Method | Path | Auth | 상태코드 | 설명 |
+|---|---|---|---|---|
+| GET | `/api/health` | 공개 | 200 | Liveness probe (status=UP) |
 
-상대를 초대하기 위한 초대 토큰을 생성합니다.
+### 8. Admin — Dashboard
 
-**Response 200**:
-```json
-{
-  "inviteToken": "inv_abc123",
-  "inviteExpiresAt": "2026-04-29T05:00:00Z"
-}
-```
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| GET | `/api/admin/dashboard/summary` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/daily-stats` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/retention` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/crisis-recent` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/llm-failure-rate` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 
----
+### 9. Admin — Users
 
-### `POST /api/sessions/join/{token}`
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| GET | `/api/admin/users/search` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/users` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/users/{id}` | **JWT + ADMIN** | 200 / 404 | [admin.md](admin.md) |
+| DELETE | `/api/admin/users/{id}/data` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| PATCH | `/api/admin/users/{id}/roles` | **JWT + ADMIN** | 200 / 400 / 404 | [admin.md](admin.md) |
 
-초대 토큰을 사용해 세션에 참여합니다 (userB 역할).
+### 10. Admin — Health
 
-**Request**:
-```json
-{ "nickname": "선택" }
-```
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| GET | `/api/admin/health/system` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 
-**Response 200**:
-```json
-{
-  "id": "uuid",
-  "status": "chatting_duo",
-  "userAId": "user-a-id",
-  "userBId": "user-b-id",
-  "userAMessageCount": 5,
-  "userBMessageCount": 0,
-  "inviteToken": null
-}
-```
+### 11. Admin — Feedbacks
 
----
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| GET | `/api/admin/feedbacks` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| PATCH | `/api/admin/feedbacks/{id}` | **JWT + ADMIN** | 200 / 400 / 404 | [admin.md](admin.md) |
 
-### `POST /api/sessions/{id}/messages`
+### 12. Admin — Prompts (app.admin.enabled=true)
 
-사용자 메시지를 입력하고 AI 중재자 응답을 받습니다.
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| POST | `/api/admin/prompts/reload` | **JWT + ADMIN** | 200 / 500 | [admin.md](admin.md) |
 
-**Request**:
-```json
-{ "content": "..." }
-```
+### 13. Admin — Test (@Profile dev only)
 
-**Response 200**:
-```json
-{
-  "userMessage": {
-    "id": 12,
-    "sender": "USER_A",
-    "content": "...",
-    "createdAt": "..."
-  },
-  "mediatorMessage": {
-    "id": 13,
-    "sender": "MEDIATOR_TO_A",
-    "content": "...",
-    "createdAt": "..."
-  },
-  "finalizeSuggested": false,
-  "crisisLevel": null
-}
-```
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| POST | `/api/admin/test/reset` | JWT | 200 | [admin.md](admin.md) |
+| POST | `/api/admin/test/sessions/{id}/terminate` | JWT | 200 | [admin.md](admin.md) |
 
-**Response 409** (위험 키워드 감지):
-```json
-{
-  "crisisLevel": 1
-}
-```
+### 14. Admin — Debug (app.admin.enabled=true)
+
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| GET | `/api/admin/sessions/{id}/context` | **JWT + ADMIN** | 200 / 400 | [admin.md](admin.md) |
 
 ---
 
-### `GET /api/sessions/{id}/messages?since={epoch_ms}`
+## 변경 시 절차
 
-본인이 보낸 메시지와 중재자 응답을 조회합니다.
-
-**Response 200**: 메시지 배열. 본인 메시지 + 본인 중재자 응답만 포함.
-
----
-
-### `GET /api/sessions/{id}/partner-messages`
-
-상대방의 메시지 메타데이터를 조회합니다. **content 필드 절대 없음**.
-
-**Response 200**:
-```json
-[
-  { "id": 7, "sender": "USER_B", "charCount": 142, "createdAt": "..." },
-  { "id": 8, "sender": "MEDIATOR_TO_B", "charCount": 38, "createdAt": "..." }
-]
-```
-
----
-
-### `GET /api/sessions/{id}/partner-status`
-
-상대방의 온라인 상태 및 활동 정보를 조회합니다.
-
-**Response 200**:
-```json
-{
-  "joined": true,
-  "isActive": true,
-  "inviteSent": false,
-  "messageCount": 4,
-  "lastActivityAt": "2026-04-26T05:02:33Z"
-}
-```
-
----
-
-### `POST /api/sessions/{id}/finalize`
-
-종료 권유를 전송합니다.
-
-**Response 200**:
-```json
-{
-  "completed": true|false,
-  "awaitingPartner": true|false
-}
-```
-
----
-
-### `POST /api/sessions/{id}/finalize/agree`
-
-상대방의 종료 권유에 동의합니다.
-
-**Response 200**:
-```json
-{
-  "completed": true|false,
-  "awaitingPartner": true|false
-}
-```
-
----
-
-### `POST /api/sessions/{id}/finalize/decline`
-
-상대방의 종료 권유를 거절합니다.
-
-**Response 204**: No Content
-
----
-
-## Report (`ReportController`)
-
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| POST | `/api/sessions/{sessionId}/report` | ✓ | 리포트 생성 (비동기) |
-| GET | `/api/reports/{reportId}` | ✓ | 리포트 조회 |
-
-### `GET /api/reports/{id}` 응답 (요약 구조)
-
-```jsonc
-{
-  "id": "rep_abc123",
-  "sessionId": "ses_abc123",
-  "conflictType": "difference",
-  "isSoloMode": true,
-  "fourHorsemenObservation": {
-    "criticism": 2,
-    "contempt": 1,
-    "defensiveness": 3,
-    "stonewalling": 0
-  },
-  "bidResponseRate": 0.6,
-  "repairAttempts": 2,
-  "metaphorId": "locked-mailbox",
-  "metaphorReason": "...",
-  "nvcSuggestion": {
-    "observation": "...",
-    "feeling": "...",
-    "need": "...",
-    "request": "...",
-    "fourSentenceDraft": "..."
-  },
-  "patternFeedback": "...",
-  "suggestedApproach": "...",
-  "inviteAgainCta": "...",
-  "rawContributionRatio": {
-    "a": 60,
-    "b": 40
-  },
-  "perspectiveRespected": true,
-  "createdAt": "..."
-}
-```
-
-화해 기여도 알고리즘: [policies/ratio-calculation.md](../policies/ratio-calculation.md)
-
----
-
-## Health (`HealthController`)
-
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| GET | `/api/health` | ✗ | liveness ping |
-| GET | `/actuator/health` | ✗ | Spring Actuator |
-
-prod에서는 `/actuator/health`만 노출 (info, metrics, prometheus 등 비활성).
-
----
-
-## Admin (`AdminPromptsController`, `AdminTestController`, `AdminUserController`)
-
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| POST | `/api/admin/prompts/reload` | ✓ (ADMIN) | `PromptLoader` 캐시 무효화 — 컨테이너 재시작 없이 프롬프트 즉시 반영 |
-| POST | `/api/admin/test/reset` | ✓ (ADMIN) | 테스트 데이터 초기화 (dev only) |
-| POST | `/api/admin/test/sessions/{sessionId}/terminate` | ✓ (ADMIN) | 세션 강제 종료 (dev only) |
-| GET | `/api/admin/users` | ✓ (ADMIN) | 사용자 목록 페이지네이션 (`page`, `size`, `includeGuest`) |
-| GET | `/api/admin/users/search` | ✓ (ADMIN) | 닉네임·이메일 검색 (`q`) |
-| GET | `/api/admin/users/{id}` | ✓ (ADMIN) | 사용자 상세 + 세션 통계 |
-| PATCH | `/api/admin/users/{id}/roles` | ✓ (ADMIN) | **V13**: 역할 변경 — `{"roles":["USER","TESTER"]}`. 허용: `USER`, `TESTER`. `ADMIN`은 자동 보존. |
-| DELETE | `/api/admin/users/{id}/data` | ✓ (ADMIN) | 사용자 데이터 익명화 예약 |
-
-### Duo 진입 제한 (V13)
-
-`app.features.duo-mode=false`(기본값)이고 요청 사용자에게 `TESTER` 역할이 없으면 아래 엔드포인트는 `403 DUO_MODE_DISABLED`를 반환한다:
-
-- `GET /api/sessions/{id}/invite`
-- `POST /api/sessions/{id}/invite`
-- `POST /api/sessions/{id}/join` (invite 토큰으로 참여)
-
-## Debug (`SessionContextDebugController`)
-
-| Method | Path | 인증 | 설명 |
-|---|---|---|---|
-| GET | `/api/sessions/{id}/context` | ✓ | Phase D 컨텍스트 상태 덤프 (dev 전용, prod 비활성) |
-
----
-
-## Swagger UI
-
-- dev (로컬): `http://localhost:8080/swagger-ui.html`
-- dev (서버): `https://dev.againspring.net/swagger-ui/`
-- prod: 비활성 (`application-prod.yml`에서 `springdoc.swagger-ui.enabled: false`)
-
-OpenAPI 정의: `http://localhost:8080/v3/api-docs`. 정적 스냅샷은 `shared/schemas/openapi.yaml`.
+1. 컨트롤러에 엔드포인트 추가/변경
+2. 해당 도메인 `.md` 파일 업데이트 (예: `auth.md`, `session-chat.md`)
+3. 이 문서(rest-spec.md) 마스터 표 및 에러코드 업데이트
+4. `admin.md` 또는 `shared/docs/admin-dashboard.md` (admin 엔드포인트인 경우)
+5. `database-schema.md` (스키마 변경 있는 경우)
+6. Swagger 어노테이션(`@Operation`, `@ApiResponse`) 컨트롤러에 반영

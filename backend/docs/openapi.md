@@ -39,10 +39,33 @@ springdoc:
 `config/OpenApiConfig.java`가 다음을 정의:
 
 - API 정보 (title, version, description)
-- 보안 스키마: `bearerAuth` (HTTP Bearer JWT)
-- 글로벌 보안 적용 (예외 엔드포인트는 컨트롤러에서 `@SecurityRequirement(name = "")`)
+- 보안 스키마: `bearer-jwt` — `SecurityScheme.Type.HTTP` + `scheme("bearer")` + `bearerFormat("JWT")`
+  → Swagger UI 우상단 **Authorize** 버튼에 JWT 입력란 노출
+- 전체 15개 컨트롤러 `@Tag` + `@SecurityRequirement(name = "bearer-jwt")` 적용
+  (공개 엔드포인트는 컨트롤러에서 `@SecurityRequirement` 미적용)
 
 `config/OpenApiExamples.java`는 응답 예시 모음 (Swagger UI에서 사용자가 바로 시도 가능).
+
+## 컨트롤러 어노테이션 현황
+
+| 컨트롤러 | `@Tag` | `@Operation` | `@SecurityRequirement` |
+|---|---|---|---|
+| AuthController | Auth | 9개 | JWT 필요 메서드만 |
+| OAuth2Controller | Auth | 1개 | — (공개) |
+| HealthController | Health | 1개 | — (공개) |
+| SessionController | Session | 6개 | bearer-jwt |
+| MessageController | Chat | 11개 | bearer-jwt |
+| ReportController | Report | 3개 | bearer-jwt |
+| UserController | User | 7개 | bearer-jwt |
+| FeedbackController | Feedback | 1개 | — (공개) |
+| AdminDashboardController | Admin — Dashboard | 5개 | bearer-jwt |
+| AdminUserController | Admin — Users | 5개 | bearer-jwt |
+| AdminHealthController | Admin — Health | 1개 | bearer-jwt |
+| AdminFeedbackController | Admin — Feedbacks | 2개 | bearer-jwt |
+| AdminPromptsController | Admin — Prompts | 1개 | bearer-jwt |
+| AdminTestController | Admin — Test | 2개 | bearer-jwt |
+| SessionContextDebugController | Admin — Debug | 1개 | bearer-jwt |
+| **합계** | **15/15** | **57개** | — |
 
 ## DTO 어노테이션 컨벤션
 
@@ -90,12 +113,11 @@ public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest req
 
 ## 정적 스냅샷 (선택)
 
-`shared/schemas/openapi.yaml`에 정적 스냅샷이 있을 수 있음 (commit 시점 기준). FE 코드 생성 (orval, openapi-typescript)에 활용 가능하지만 현재 FE는 자체 타입 사용.
+`shared/schemas/openapi.json`에 정적 스냅샷이 있을 수 있음 (commit 시점 기준). FE 코드 생성 (orval, openapi-typescript)에 활용 가능하지만 현재 FE는 자체 타입 사용.
 
 스냅샷 갱신:
 ```bash
 cd backend && ./gradlew bootRun &
 sleep 10
 curl http://localhost:8080/v3/api-docs > ../shared/schemas/openapi.json
-# → openapi.yaml 변환 (선택)
 ```

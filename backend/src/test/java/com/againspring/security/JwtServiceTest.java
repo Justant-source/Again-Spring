@@ -1,24 +1,41 @@
 package com.againspring.security;
 
+import com.againspring.config.UserPermissionsConfig;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for JwtService.
  */
+@ExtendWith(MockitoExtension.class)
 class JwtServiceTest {
+
+    @Mock
+    private UserPermissionsConfig permissions;
 
     private JwtService jwtService;
 
     @BeforeEach
     void setUp() {
         String secret = "test-secret-key-this-should-be-at-least-256-bits-long-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-        jwtService = new JwtService(secret, 86400000);
+
+        // generateGuestToken calls permissions.getGuest().getAuth().getTokenExpirationSeconds()
+        UserPermissionsConfig.TierConfig guestTier = mock(UserPermissionsConfig.TierConfig.class);
+        UserPermissionsConfig.Auth guestAuth = mock(UserPermissionsConfig.Auth.class);
+        lenient().when(permissions.getGuest()).thenReturn(guestTier);
+        lenient().when(guestTier.getAuth()).thenReturn(guestAuth);
+        lenient().when(guestAuth.getTokenExpirationSeconds()).thenReturn(7200L);
+
+        jwtService = new JwtService(secret, 86400000L, permissions);
     }
 
     @Test

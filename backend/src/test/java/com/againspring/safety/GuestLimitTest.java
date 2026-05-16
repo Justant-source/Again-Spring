@@ -1,6 +1,7 @@
 package com.againspring.safety;
 
 import com.againspring.common.exception.GuestLimitException;
+import com.againspring.config.UserPermissionsConfig;
 import com.againspring.domain.Session;
 import com.againspring.domain.User;
 import com.againspring.domain.enums.SessionStatus;
@@ -9,19 +10,29 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Guest Limit Tests")
 class GuestLimitTest {
 
+    @Mock
+    private UserPermissionsConfig permissions;
+
     private GuestSessionRateLimiter guestSessionRateLimiter;
 
     @BeforeEach
     void setUp() {
-        guestSessionRateLimiter = new GuestSessionRateLimiter();
+        UserPermissionsConfig.TierConfig guestTier = mock(UserPermissionsConfig.TierConfig.class);
+        UserPermissionsConfig.Sessions guestSessions = mock(UserPermissionsConfig.Sessions.class);
+        lenient().when(permissions.getGuest()).thenReturn(guestTier);
+        lenient().when(guestTier.getSessions()).thenReturn(guestSessions);
+        lenient().when(guestSessions.getDailyLimit()).thenReturn(3);
+        guestSessionRateLimiter = new GuestSessionRateLimiter(permissions);
     }
 
     // ===== GuestSessionRateLimiter 단위 테스트 =====

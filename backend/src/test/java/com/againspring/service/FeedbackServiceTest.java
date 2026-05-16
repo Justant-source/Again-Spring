@@ -3,6 +3,7 @@ package com.againspring.service;
 import com.againspring.domain.Feedback;
 import com.againspring.repository.FeedbackRepository;
 import com.againspring.service.notify.CrisisFeedbackNotifier;
+import com.againspring.service.notify.FeedbackEmailNotifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,11 +25,14 @@ class FeedbackServiceTest {
     @Mock
     private CrisisFeedbackNotifier crisisFeedbackNotifier;
 
+    @Mock
+    private FeedbackEmailNotifier feedbackEmailNotifier;
+
     private FeedbackService feedbackService;
 
     @BeforeEach
     void setUp() {
-        feedbackService = new FeedbackService(feedbackRepository, crisisFeedbackNotifier);
+        feedbackService = new FeedbackService(feedbackRepository, crisisFeedbackNotifier, feedbackEmailNotifier);
     }
 
     @Test

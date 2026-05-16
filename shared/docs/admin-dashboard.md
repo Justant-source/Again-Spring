@@ -192,26 +192,49 @@ API:
 
 ---
 
-## 4. 백엔드 API 엔드포인트 전체 목록
+## 4. 백엔드 API 엔드포인트 전체 목록 (17개)
 
 모두 `/api/admin/**`로 SecurityConfig에서 `hasRole("ADMIN")` 가드.
 
-| Method | Path | 컨트롤러 | 응답 |
-|---|---|---|---|
-| GET | `/api/admin/dashboard/summary` | AdminDashboardController | `Map<String,Object>` (8개 KPI) |
-| GET | `/api/admin/dashboard/daily-stats` | AdminDashboardController | `List<Map>` (최근 30일) |
-| GET | `/api/admin/dashboard/retention` | AdminDashboardController | `List<Map>` (최근 14일) |
-| GET | `/api/admin/dashboard/crisis-recent` | AdminDashboardController | `List<CrisisMessageResponse>` (메타데이터만) |
-| GET | `/api/admin/users` | AdminUserController | `Page<User>` |
-| GET | `/api/admin/users/search?q=` | AdminUserController | `List<User>` |
-| GET | `/api/admin/users/{id}` | AdminUserController | `AdminUserDetailResponse` |
-| DELETE | `/api/admin/users/{id}/data` | AdminUserController | `{ status, userId }` |
-| GET | `/api/admin/feedbacks` | AdminFeedbackController | `Page<Feedback>` |
-| PATCH | `/api/admin/feedbacks/{id}` | AdminFeedbackController | `Feedback` |
-| POST | `/api/admin/test/reset` | AdminTestController | dev 전용 — 테스트 데이터 초기화 |
-| POST | `/api/admin/test/sessions/{id}/terminate` | AdminTestController | dev 전용 — 세션 강제 종료 |
-| POST | `/api/admin/prompts/reload` | AdminPromptsController | dev 전용 — 프롬프트 핫리로드 |
-| GET | `/api/admin/sessions/{id}/context` | SessionContextDebugController | dev 전용 — 세션 컨텍스트 디버깅 |
+### 환경별 활성화 규칙
+
+```mermaid
+flowchart LR
+    REQ[요청] --> SEC{Spring Security\nadmin 경로 인증?}
+    SEC -->|미인증| 401[401 Unauthorized]
+    SEC -->|비ADMIN| 403[403 Forbidden]
+    SEC -->|ADMIN| GATE{컨트롤러 게이팅}
+
+    GATE -->|AdminDashboard / AdminUser\nAdminHealth / AdminFeedback| ALWAYS[항상 활성]
+    GATE -->|AdminPrompts\nSessionContextDebug| PROP{app.admin.enabled=true?}
+    PROP -->|false| 404[404 Not Found\n빈 등록 안 됨]
+    PROP -->|true| ACTIVE[활성]
+    GATE -->|AdminTest| PROFILE{"@Profile('dev')?"}
+    PROFILE -->|prod| 404
+    PROFILE -->|dev| ACTIVE
+```
+
+### 엔드포인트 표
+
+| Method | Path | 컨트롤러 | 응답 | 비고 |
+|---|---|---|---|---|
+| GET | `/api/admin/dashboard/summary` | AdminDashboardController | `Map<String,Object>` (8개 KPI) | 항상 활성 |
+| GET | `/api/admin/dashboard/daily-stats` | AdminDashboardController | `List<Map>` (최근 30일) | 항상 활성 |
+| GET | `/api/admin/dashboard/retention` | AdminDashboardController | `List<Map>` (최근 14일) | 항상 활성 |
+| GET | `/api/admin/dashboard/crisis-recent?limit=20` | AdminDashboardController | `List<CrisisMessageResponse>` | 항상 활성 |
+| GET | `/api/admin/dashboard/llm-failure-rate?days=7` | AdminDashboardController | `List<Map>` (일별 실패율) | 항상 활성 |
+| GET | `/api/admin/health/system` | AdminHealthController | `SystemHealthResponse` | 항상 활성 |
+| GET | `/api/admin/users` | AdminUserController | `Page<User>` | 항상 활성 |
+| GET | `/api/admin/users/search?q=` | AdminUserController | `List<User>` | 항상 활성 |
+| GET | `/api/admin/users/{id}` | AdminUserController | `AdminUserDetailResponse` | 항상 활성 |
+| DELETE | `/api/admin/users/{id}/data` | AdminUserController | `{ status, userId }` | 항상 활성 |
+| PATCH | `/api/admin/users/{id}/roles` | AdminUserController | `{ userId, roles }` | 항상 활성 — USER·TESTER만 변경 가능 |
+| GET | `/api/admin/feedbacks` | AdminFeedbackController | `Page<Feedback>` | 항상 활성 |
+| PATCH | `/api/admin/feedbacks/{id}` | AdminFeedbackController | `Feedback` | 항상 활성 |
+| POST | `/api/admin/test/reset` | AdminTestController | `Map<String,Integer>` | `@Profile("dev")` 전용 |
+| POST | `/api/admin/test/sessions/{id}/terminate` | AdminTestController | 200 | `@Profile("dev")` 전용 |
+| POST | `/api/admin/prompts/reload` | AdminPromptsController | `{ status, message }` | `app.admin.enabled=true` |
+| GET | `/api/admin/sessions/{id}/context` | SessionContextDebugController | `Map<String,Object>` | `app.admin.enabled=true` |
 
 ---
 
@@ -332,11 +355,11 @@ env/.env.dev / .env.prod                    # ADMIN_EMAILS 환경변수
 
 운영 경험 누적 후 검토:
 
-- 사용자 역할 변경 UI (수동 ADMIN 부여/회수)
+- 사용자 역할 변경 UI 고도화 (ADMIN 부여/회수 — 현재는 `PATCH /roles`로 USER·TESTER만 변경)
 - 세션 상세 분석 패널 (관여 사용자, 4호스맨 점수, NVC 스크립트 효과)
 - Admin 감사 로그 (누가 언제 무엇을 변경했는지)
 - 통계 필터 (날짜 범위, 갈등유형, MBTI별 분포)
-- 위기 메시지에 대한 행 클릭 → 세션 컨텍스트 디버깅 모달 (이미 BE에 `/api/admin/sessions/{id}/context` 존재, FE 미연결)
+- 위기 메시지 행 클릭 → 세션 컨텍스트 디버깅 모달 (BE `/api/admin/sessions/{id}/context` 존재, FE 미연결)
 - 의견함 일괄 상태 변경 (체크박스 + 일괄 액션)
 - CSV 내보내기 (의견함, 사용자 목록)
 
@@ -398,5 +421,5 @@ docker exec againspring-backend-dev claude --print "test" 2>&1 | head -3
 
 ---
 
-**최근 업데이트**: 2026-05-12
+**최근 업데이트**: 2026-05-16
 **관련 정책 문서**: [`policies/user-permissions.md`](./policies/user-permissions.md)
