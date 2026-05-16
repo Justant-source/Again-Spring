@@ -3,6 +3,7 @@ import { HISTORY_MESSAGES_MOCK } from './historyMessages';
 
 const messages: Map<string, any[]> = new Map();
 const sessionState: Map<string, any> = new Map();
+const guestTurnCounts: Map<string, number> = new Map();
 
 export const chatHandlers = [
   http.post('/api/sessions/:id/messages', async ({ params, request }) => {
@@ -12,6 +13,19 @@ export const chatHandlers = [
     // 위기 키워드 체크 (간단)
     if (/때리|자살|폭행/.test(body.content)) {
       return HttpResponse.json({ crisisLevel: 1 }, { status: 409 });
+    }
+
+    // 게스트 3턴 제한
+    const authHeader = request.headers.get('Authorization') ?? '';
+    if (authHeader.includes('mock-guest-token')) {
+      const turns = guestTurnCounts.get(id) ?? 0;
+      if (turns >= 3) {
+        return HttpResponse.json(
+          { code: 'GUEST_LIMIT_REACHED', message: '게스트 이용 한도에 도달했어요.' },
+          { status: 402 },
+        );
+      }
+      guestTurnCounts.set(id, turns + 1);
     }
 
     const list = messages.get(id) || [];

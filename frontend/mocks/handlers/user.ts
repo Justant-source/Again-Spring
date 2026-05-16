@@ -144,8 +144,36 @@ export const userHandlers = [
       isGuest: false,
       communicationStyle: 'wave',
       onboardingCompletedAt: '2026-04-01T10:00:00.000Z',
+      // null → ConsentReconfirmModal이 표시되어 dev에서 동의 흐름 테스트 가능
+      termsAgreedAt: null,
+      privacyAgreedAt: null,
+      disclaimerAgreedAt: null,
+      marketingAgreedAt: null,
       createdAt: new Date().toISOString(),
     });
+  }),
+
+  http.post('/api/auth/agree', async ({ request }) => {
+    await delay(300);
+    const body: any = await request.json();
+    const now = new Date().toISOString();
+    return HttpResponse.json({
+      termsAgreedAt: body.termsAgreed ? now : null,
+      privacyAgreedAt: body.privacyAgreed ? now : null,
+      disclaimerAgreedAt: body.disclaimerAgreed ? now : null,
+      marketingAgreedAt: body.marketingAgreed ? now : null,
+    });
+  }),
+
+  http.post('/api/feedbacks', async ({ request }) => {
+    await delay(400);
+    const body: any = await request.json();
+    return HttpResponse.json({
+      id: `feedback_${Date.now().toString(36)}`,
+      category: body.category,
+      status: 'received',
+      createdAt: new Date().toISOString(),
+    }, { status: 201 });
   }),
 
   http.post('/api/users/me/onboarding', async ({ request }) => {
@@ -155,7 +183,6 @@ export const userHandlers = [
     return HttpResponse.json({
       communicationStyle: style,
       styleInfo: {
-        emoji: '🌊',
         label: '파도형',
         description: '감정 표현이 풍부하고 즉각적인 스타일',
         strengths: ['진솔한 감정 표현', '따뜻한 공감 능력'],
