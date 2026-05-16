@@ -44,7 +44,16 @@ ADMIN 역할은 **이메일 화이트리스트 자동 부여** 방식으로 관�
 | **프론트엔드** | `frontend/app/(admin)/admin/page.tsx` (useEffect) | `user.isGuest \|\| !user.roles?.includes('ADMIN')` 시 `/`로 즉시 리다이렉트 |
 | **API 인터셉터** | `frontend/lib/api/client.ts` | 401/403 응답 시 토큰 정리 후 로그인 페이지로 이동 |
 
-### 2.3 ADMIN 사용자의 일반 화면 격리
+### 2.3 TESTER 역할 부여/해제 (V13)
+
+TESTER 역할은 **Duo 모드 베타 테스터** 전용이다. `app.features.duo-mode=false`(기본값) 상태에서도 TESTER 역할 보유자는 Duo invite·join·SwipeContainer에 접근할 수 있다.
+
+- **부여 위치**: 관리자 대시보드 사용자 목록 → 해당 사용자 행의 "TESTER 부여" 버튼 클릭
+- **해제**: 동일 버튼이 "TESTER 해제"로 토글
+- **API**: `PATCH /api/admin/users/{id}/roles` — `{"roles":["USER","TESTER"]}` (허용 값: `USER`, `TESTER`. `ADMIN`은 이 API로 변경 불가)
+- **ADMIN 사용자**: TESTER 역할 없어도 대시보드 접근 가능 / Duo는 TESTER가 있어야 가능
+
+### 2.4 ADMIN 사용자의 일반 화면 격리
 
 ADMIN으로 로그인하면 **랜딩 페이지(`/`) 진입 시 자동으로 `/admin`으로 replace** 되어, "마음 정리하기 / 10문항 등록 / 게스트 모드" 등 일반 사용자 UI는 노출되지 않는다.
 

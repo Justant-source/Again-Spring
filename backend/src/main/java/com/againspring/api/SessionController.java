@@ -17,7 +17,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Optional;
+import com.againspring.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -41,6 +43,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class SessionController {
 
     private final SessionService sessionService;
+
+    @Value("${app.features.duo-mode:false}")
+    private boolean duoModeEnabled;
+
+    private static boolean hasTesterRole(UserDetails ud) {
+        if (ud == null) return false;
+        return ud.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_TESTER".equals(a.getAuthority()));
+    }
 
     /**
      * Create a new session (A initiates).
@@ -134,6 +145,12 @@ public class SessionController {
             @PathVariable("token") String token,
             @RequestBody JoinSessionRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
+        // V13 Phase 2: Duo join은 duoModeEnabled 또는 TESTER 역할 필요
+        if (!duoModeEnabled && !hasTesterRole(userDetails)) {
+            throw new BusinessException("DUO_MODE_DISABLED",
+                    "현재 Duo 모드는 베타 준비 중이에요. 초대 링크를 통한 참여는 잠시 후 가능합니다.", 403);
+        }
+
         Optional<String> userId = Optional.ofNullable(userDetails)
                 .map(UserDetails::getUsername);
 

@@ -88,6 +88,7 @@
 | GET | `/api/users/me` | ✓ | 내 정보 |
 | PATCH | `/api/users/me` | ✓ | 프로필 수정 (닉네임, MBTI 등) |
 | POST | `/api/users/me/onboarding` | ✓ | 온보딩 결과 저장 → 스타일 반환 |
+| POST | `/api/users/me/tutorial/complete` | ✓ | 30초 튜토리얼 완료 기록 (V24) — 204 No Content |
 | GET | `/api/users/me/history` | ✓ | 내 세션 이력 목록 |
 | DELETE | `/api/users/me` | ✓ | 탈퇴 (소프트 삭제 + 원문 즉시 삭제) |
 
@@ -368,13 +369,26 @@ prod에서는 `/actuator/health`만 노출 (info, metrics, prometheus 등 비활
 
 ---
 
-## Admin (`AdminPromptsController`, `AdminTestController`)
+## Admin (`AdminPromptsController`, `AdminTestController`, `AdminUserController`)
 
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
 | POST | `/api/admin/prompts/reload` | ✓ (ADMIN) | `PromptLoader` 캐시 무효화 — 컨테이너 재시작 없이 프롬프트 즉시 반영 |
 | POST | `/api/admin/test/reset` | ✓ (ADMIN) | 테스트 데이터 초기화 (dev only) |
 | POST | `/api/admin/test/sessions/{sessionId}/terminate` | ✓ (ADMIN) | 세션 강제 종료 (dev only) |
+| GET | `/api/admin/users` | ✓ (ADMIN) | 사용자 목록 페이지네이션 (`page`, `size`, `includeGuest`) |
+| GET | `/api/admin/users/search` | ✓ (ADMIN) | 닉네임·이메일 검색 (`q`) |
+| GET | `/api/admin/users/{id}` | ✓ (ADMIN) | 사용자 상세 + 세션 통계 |
+| PATCH | `/api/admin/users/{id}/roles` | ✓ (ADMIN) | **V13**: 역할 변경 — `{"roles":["USER","TESTER"]}`. 허용: `USER`, `TESTER`. `ADMIN`은 자동 보존. |
+| DELETE | `/api/admin/users/{id}/data` | ✓ (ADMIN) | 사용자 데이터 익명화 예약 |
+
+### Duo 진입 제한 (V13)
+
+`app.features.duo-mode=false`(기본값)이고 요청 사용자에게 `TESTER` 역할이 없으면 아래 엔드포인트는 `403 DUO_MODE_DISABLED`를 반환한다:
+
+- `GET /api/sessions/{id}/invite`
+- `POST /api/sessions/{id}/invite`
+- `POST /api/sessions/{id}/join` (invite 토큰으로 참여)
 
 ## Debug (`SessionContextDebugController`)
 

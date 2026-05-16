@@ -79,6 +79,10 @@ app:
   admin-emails: ${ADMIN_EMAILS:againspring2026@gmail.com}
   prompts:
     path: ${PROMPTS_PATH:./shared/docs/prompts}
+  templates:
+    path: ${TEMPLATES_PATH:./shared/docs/templates/first_message}
+  features:
+    duo-mode: ${DUO_MODE_ENABLED:false}
   categories:
     path: ${CATEGORIES_PATH:./shared/docs/categories.yml}
   user-permissions:

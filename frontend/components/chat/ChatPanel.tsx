@@ -65,6 +65,8 @@ export function ChatPanel({
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [pendingSplits, setPendingSplits] = useState<PendingSplit[]>([]);
+  // V13 Phase 1: 세션 진입 시 1초 입력 애니메이션 (mediator 첫마디 자연스러운 노출)
+  const [entryTypingDone, setEntryTypingDone] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastFetchRef = useRef<number>(0);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -127,6 +129,12 @@ export function ChatPanel({
   useEffect(() => {
     fetchMessages();
   }, [sessionId]);
+
+  // V13 Phase 1: 진입 시 1초 후 메시지 표시 (mediator 첫마디 fade-in 효과)
+  useEffect(() => {
+    const timer = setTimeout(() => setEntryTypingDone(true), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // 새로고침 후 진행 중 invocation이 있으면 TypingBubble 복원
   // (mount 시 1회만 호출, 이후 정상 폴링이 mediator 도착 시 sending=false 처리)
@@ -202,7 +210,7 @@ export function ChatPanel({
   }, [messages, secondParts, sending, isTyping]);
 
   const myMessages = messages.filter(m => m.sender === currentUserSender);
-  const canFinalize = myMessages.length >= 3;
+  const canFinalize = myMessages.length >= 5;
 
   const handleSend = async (content: string) => {
     // 진행 중인 요청이 있으면 취소하고 새 메시지로 재시작
@@ -355,7 +363,8 @@ export function ChatPanel({
       <ChatHeader
         isDuo={isDuo}
         canFinalize={canFinalize}
-        canInvite={!isDuo}
+        turnCount={myMessages.length}
+        canInvite={!isDuo && !!onOpenInvite}
         onOpenInvite={onOpenInvite}
         onFinalize={handleFinalize}
         finalizing={finalizing}
@@ -364,8 +373,10 @@ export function ChatPanel({
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
-        {messages.length === 0 && <EmptyChatPlaceholder />}
-        {messages.map(msg => {
+        {/* V13 Phase 1: 1초 진입 애니메이션 — mediator 첫마디 자연스러운 노출 */}
+        {!entryTypingDone && <TypingBubble />}
+        {entryTypingDone && messages.length === 0 && <EmptyChatPlaceholder />}
+        {entryTypingDone && messages.map(msg => {
           if (msg.isPartnerJoinNotice) {
             return (
               <PartnerJoinNoticeCard key={msg.id} message={msg} />
@@ -408,8 +419,8 @@ export function ChatPanel({
             </div>
           );
         })}
-        {sending && <TypingBubble />}
-        {isTyping && <TypingBubble />}
+        {entryTypingDone && sending && <TypingBubble />}
+        {entryTypingDone && isTyping && <TypingBubble />}
         <div ref={messagesEndRef} />
       </div>
 

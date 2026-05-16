@@ -173,7 +173,7 @@ export default function LandingPage() {
                 마음을<br />정리해요.
               </h1>
               <p className="mt-5 text-[14px] leading-[1.7]" style={{ color: 'var(--L-sub)' }}>
-                혼자서도, 함께라도 가능해요.<br />
+                혼자 마음을 정리하는 도구예요.<br />
                 5분이면 충분합니다.
               </p>
 

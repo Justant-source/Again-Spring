@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
 import {
   getAdminSummary, getAdminDailyStats, getAdminRetention,
-  getAdminFeedbacks, searchUsers, listUsers, getCrisisRecent,
+  getAdminFeedbacks, searchUsers, listUsers, getCrisisRecent, updateUserRoles,
   type CrisisMessage, type AdminUserListItem, type PageResponse,
 } from '@/lib/api/admin';
 import {
@@ -58,6 +58,7 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [selectedFeedback, setSelectedFeedback] = useState<AdminFeedback | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [roleUpdating, setRoleUpdating] = useState<string | null>(null); // userId being updated
   const [refreshSignal, setRefreshSignal] = useState(0);
 
   // Client-side ADMIN guard — 비로그인 시 로그인 페이지, 비ADMIN 시 메인으로 강제 이동
@@ -445,12 +446,60 @@ export default function AdminPage() {
                         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                       >
                         <td style={{ padding: '8px 10px' }}>
-                          {u.nickname}
-                          {u.roles?.includes('ADMIN') && (
-                            <span style={{ marginLeft: 6, padding: '1px 6px', background: '#1A1A2E', color: 'white', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>
-                              ADMIN
-                            </span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            {u.nickname}
+                            {u.roles?.includes('ADMIN') && (
+                              <span style={{ padding: '1px 6px', background: '#1A1A2E', color: 'white', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>
+                                ADMIN
+                              </span>
+                            )}
+                            {u.roles?.includes('TESTER') && (
+                              <span style={{ padding: '1px 6px', background: '#5B21B6', color: 'white', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>
+                                TESTER
+                              </span>
+                            )}
+                            {!u.isGuest && !u.roles?.includes('ADMIN') && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  setRoleUpdating(u.id);
+                                  try {
+                                    const isTester = u.roles?.includes('TESTER') ?? false;
+                                    const nextRoles = isTester
+                                      ? (u.roles ?? []).filter((r) => r !== 'TESTER')
+                                      : [...(u.roles ?? ['USER']), 'TESTER'];
+                                    const res = await updateUserRoles(u.id, nextRoles);
+                                    setUserResults((prev) =>
+                                      prev.map((x) => x.id === u.id ? { ...x, roles: res.roles } : x)
+                                    );
+                                    if (userPage) {
+                                      setUserPage((prev) => prev ? {
+                                        ...prev,
+                                        content: prev.content.map((x) => x.id === u.id ? { ...x, roles: res.roles } : x),
+                                      } : prev);
+                                    }
+                                  } catch {
+                                    // ignore — user stays as-is
+                                  } finally {
+                                    setRoleUpdating(null);
+                                  }
+                                }}
+                                disabled={roleUpdating === u.id}
+                                style={{
+                                  padding: '1px 7px',
+                                  fontSize: 10,
+                                  fontWeight: 500,
+                                  border: `1px solid ${u.roles?.includes('TESTER') ? '#5B21B6' : '#aaa'}`,
+                                  borderRadius: 4,
+                                  background: 'transparent',
+                                  color: u.roles?.includes('TESTER') ? '#5B21B6' : '#888',
+                                  cursor: roleUpdating === u.id ? 'wait' : 'pointer',
+                                }}
+                              >
+                                {roleUpdating === u.id ? '…' : u.roles?.includes('TESTER') ? 'TESTER 해제' : 'TESTER 부여'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td style={{ padding: '8px 10px', fontSize: 12 }}>{u.email || '-'}</td>
                         <td style={{ padding: '8px 10px', fontSize: 12 }}>

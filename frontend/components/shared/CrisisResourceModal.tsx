@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { CRISIS_RESOURCES } from '@/lib/constants/crisisResources';
+import { CrisisResources } from '@/components/icons/CrisisResources';
 
 export function CrisisResourceModal({
   open,
@@ -25,7 +26,7 @@ export function CrisisResourceModal({
   if (!open) return null;
 
   const isCritical = severity === 'critical';
-  const title = '🚨 중요한 안내';
+  const title = '중요한 안내';
   const bodyText = isCritical
     ? '말씀해주신 상황은 저희 서비스의 범위를 넘어서는 매우 중요한 문제예요. 지금 바로 전문 기관의 도움을 받아주세요.'
     : '법적 결정은 저희 서비스가 도와드릴 수 없어요. 이 서비스는 관계 회복을 위한 대화 정리를 돕는 것이 목표입니다.';
@@ -66,8 +67,13 @@ export function CrisisResourceModal({
             color: '#1A1A1A',
             marginBottom: '16px',
             textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
           }}
         >
+          <CrisisResources width={20} height={20} color="#C0392B" />
           {title}
         </div>
 

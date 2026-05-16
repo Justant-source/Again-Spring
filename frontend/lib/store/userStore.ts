@@ -15,6 +15,7 @@ interface UserState {
   setMbtiType: (t: string) => void;
   setMbtiProfile: (profile: MbtiProfile) => void;
   setMbtiResult: (t: string, profile?: MbtiProfile) => void;
+  setTutorialCompleted: () => void;
   clear: () => void;
 }
 
@@ -79,6 +80,10 @@ export const useUserStore = create<UserState>()(
                 },
               }
             : prev,
+        ),
+      setTutorialCompleted: () =>
+        set((prev) =>
+          prev.user ? { user: { ...prev.user, tutorialCompleted: true } } : prev,
         ),
       clear: () => {
         if (typeof window !== 'undefined') {

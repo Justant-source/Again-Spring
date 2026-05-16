@@ -1,5 +1,8 @@
 # 관계 가이드 — 부부 (Marriage)
 
+> **V13 힌트 정책**: 아래 내용은 세션 시작 시 LLM에게 전달되는 **참고 맥락**입니다. 사용자가 대화 중 다른 주제로 흘러가도 이 가이드를 기준으로 대화를 제한하지 않습니다.
+
+
 ## 강조 개념
 - Four Horsemen (관계 파괴 4가지 패턴) — 결혼 만족도 60% 설명력 (한국 245쌍 검증)
 - Sound Relationship House (Friendship → Conflict Management → Shared Meaning)

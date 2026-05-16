@@ -3,6 +3,8 @@
 
 import React from 'react';
 import type { Report, CommunicationStyle } from '@/lib/types';
+import { SafeHaven } from '@/components/icons/SafeHaven';
+import { Phone } from '@/components/icons/Phone';
 import { ContributionRatio } from './ContributionRatio';
 import { NVCScript } from './NVCScript';
 import { RepairSuggestions } from './RepairSuggestions';
@@ -173,16 +175,17 @@ export function ReportLayout({
             padding: '18px 16px',
           }}
         >
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#C0392B', marginBottom: 8 }}>
-            ⚠️ 중요한 안내
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#C0392B', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <SafeHaven width={16} height={16} color="#C0392B" />
+            중요한 안내
           </div>
           <div style={{ fontSize: 13, color: '#5A2D2D', lineHeight: 1.75, marginBottom: 12 }}>
             말씀해주신 상황에는 도움이 더 필요해 보여요. AI의 분석보다 전문가의 도움이 훨씬 안전하고 정확해요.
           </div>
-          <div style={{ fontSize: 13, color: '#C0392B', lineHeight: 1.9 }}>
-            📞 여성긴급전화 1366 (24시간)<br />
-            📞 정신건강위기상담 1577-0199<br />
-            📞 자살예방상담전화 1393
+          <div style={{ fontSize: 13, color: '#C0392B', lineHeight: 2.1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Phone width={14} height={14} color="#C0392B" /> 여성긴급전화 1366 (24시간)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Phone width={14} height={14} color="#C0392B" /> 정신건강위기상담 1577-0199</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Phone width={14} height={14} color="#C0392B" /> 자살예방상담전화 1393</div>
           </div>
         </div>
       )}

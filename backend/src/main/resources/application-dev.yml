@@ -25,4 +25,4 @@ app:
   seed:
     enabled: true
   session:
-    min-messages-to-finalize: 1  # 자동화 테스트용 (prod 기본값: 3)
+    min-messages-to-finalize: 5  # V13 Phase 4 (prod 기본값: 5)

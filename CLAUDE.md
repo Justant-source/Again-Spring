@@ -2,8 +2,8 @@
 
 **프로젝트**: 다시봄 · Again Spring
 **도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)
-**진행 상황**: V1.5 카톡식 + 중재 컨텍스트 강화(Phase A/B/C/D) + LLM 호출 취소 메커니즘 구현 완료. dev 배포 및 5종 시나리오 검증 필요.
-**기준일**: 2026-04-30
+**진행 상황**: V13 완료 — 카테고리 힌트화·첫마디 시스템·Duo TESTER 게이팅·SVG 아이콘·30초 온보딩 튜토리얼·5턴 정리 게이트. dev 배포 완료.
+**기준일**: 2026-05-16
 
 ---
 
@@ -430,7 +430,7 @@ APP_URL=https://dev.againspring.net
 - ✅ 프론트엔드 (Next.js 14 — MSW 프로토타입 + 실제 API 연동)
 - ✅ 백엔드 구현 완료
   - ✅ Spring Boot 3.3 + Java 21 + Gradle Kotlin DSL
-  - ✅ MariaDB 11 (JPA + Flyway V1~V10)
+  - ✅ MariaDB 11 (JPA + Flyway V1~V24)
   - ✅ JWT 인증 (회원가입 / 로그인 / 게스트 / Google OAuth)
   - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
   - ✅ V1.5 카톡식 채팅 (ChatService, MessageSender 4종, Solo→Duo 전이)
@@ -447,6 +447,13 @@ APP_URL=https://dev.againspring.net
   - ✅ CORS 도메인 허용 + GlobalExceptionHandler 표준화
   - ✅ **V10 베타 기능 (2026-05-08~09)**: 피드백 수집(`FeedbackService`, `FeedbackController`) + 관리자 대시보드(AdminFeedbackController, PMF 통계) + 일일 세션 제한(DailyStats, GuestSessionRateLimiter) + 게스트 1세션 제한 + 동의 재확인(ConsentReconfirmModal) + 베타 배너 + Flyway V16~V19
   - ✅ **V10.2 Gmail 발신자 통합 (2026-05-09)**: 단일 발신자 `againspring2026@gmail.com`, `GMAIL_APP_PASSWORD` 환경변수, MimeMessageHelper 표시명("다시봄 운영팀"), 법률 MD 연결(`shared/docs/policies/terms.md`·`privacy.md` → `frontend/public/legal/`)
+  - ✅ **V13 베타 출시 전 보강 (2026-05-16)**:
+    - 카테고리 힌트화: `system.md` + `relations/*.md` 7개 톤 완화, 세션 생성 시 mediator 첫마디 자동 저장 (`FirstMessageService`, `FirstMessageTemplateLoader`, 248개 템플릿 JSON)
+    - Duo TESTER 게이팅: `app.features.duo-mode=false` feature flag, SessionController·MessageController invite/join 게이트, `PATCH /api/admin/users/{id}/roles` 신규
+    - 30초 튜토리얼 모달: Flyway V24 (`tutorial_completed_at`), `POST /api/users/me/tutorial/complete`, FE `OnboardingModal.tsx` (3단계 dot indicator)
+    - 5턴 정리 게이트: `MIN_MESSAGES_TO_FINALIZE` 3→5, 진행 인디케이터 dot + 툴팁
+    - SVG 아이콘 5개 (`DasibomLogo`, `Conversation`, `SafeHaven`, `Phone`, `CrisisResources`) + 장식 emoji 7곳 제거
+    - AI emoji 영구 금지 정책 적용 (V13 이후 모든 UI)
 - ✅ Docker 멀티 컨테이너 배포 (MariaDB / Backend / Frontend / Nginx)
 - ✅ Cloudflare Tunnel — `dev.againspring.net`, `againspring.net`
 - ✅ 문서 4-디렉토리 재구성 (shared/docs, backend/docs, frontend/docs, env/docs)
@@ -495,7 +502,7 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-05-09
+**마지막 업데이트**: 2026-05-16
 **담당**: Claude Code (Agent)
 
 > UX 정책 관련 문의: `frontend/docs/ux/principles.md` (4원칙군 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트) 순으로 참조.

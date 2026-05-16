@@ -57,6 +57,8 @@ flowchart LR
 | V12 | `V12__finalize_dismiss_and_invite_index.sql` | messages에 `dismissed_at` TIMESTAMP NULL 추가 + `idx_messages_session_sender_dismissed` 인덱스 |
 | V13 | `V13__add_user_mbti_profile.sql` | users에 `mbti_profile` JSON NULL 추가 (4축 비율) |
 | V14 | `V14__add_mediator_style_to_sessions.sql` | sessions에 `mediator_style_x` TINYINT UNSIGNED DEFAULT 50, `mediator_style_y` TINYINT UNSIGNED DEFAULT 50 추가 |
+| V15~V23 | (상세 생략) | 피드백·동의·일일통계·비밀번호강제변경·리포트v12 컬럼 추가 |
+| V24 | `V24__add_tutorial_completed_at.sql` | **V13**: users에 `tutorial_completed_at` TIMESTAMP NULL 추가 (30초 온보딩 튜토리얼 완료 시각) |
 
 **dev 프로파일은 Flyway disabled** (Hibernate ddl-auto=update 사용). prod 프로파일은 Flyway 적용 + ddl-auto=validate.
 
@@ -109,7 +111,8 @@ erDiagram
 | `onboarding_answers` | JSON | List<Integer> |
 | `mbti_type` | VARCHAR(8) | **V11**: MBTI 16유형 (선택 입력, nullable) |
 | `mbti_profile` | JSON | **V13**: 4축 비율 `{e_i,s_n,t_f,j_p}` 0~100 (nullable) |
-| `roles` | JSON | List<String>, default `["USER"]` |
+| `roles` | JSON | List<String>, default `["USER"]`. 가능 값: `USER`, `TESTER`, `ADMIN` |
+| `tutorial_completed_at` | TIMESTAMP | **V24**: 30초 튜토리얼 완료 시각. NULL이면 미완료 → `tutorialCompleted: false` 반환 |
 | `deleted_at` | TIMESTAMP(3) | 소프트 삭제 |
 | `created_at`, `updated_at` | TIMESTAMP(3) | 필수 |
 

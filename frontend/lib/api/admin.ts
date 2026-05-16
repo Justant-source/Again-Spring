@@ -62,6 +62,11 @@ export async function deleteUserData(id: string) {
   return res.data;
 }
 
+export async function updateUserRoles(id: string, roles: string[]): Promise<{ userId: string; roles: string[] }> {
+  const res = await api.patch(`/api/admin/users/${id}/roles`, { roles });
+  return res.data;
+}
+
 export interface AdminUserDetail {
   id: string;
   email?: string;

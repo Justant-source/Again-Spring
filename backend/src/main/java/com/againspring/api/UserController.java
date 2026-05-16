@@ -86,6 +86,16 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/me/tutorial/complete")
+    @Operation(summary = "Mark tutorial as completed (V24)")
+    @ApiResponse(responseCode = "204", description = "Tutorial marked complete")
+    @SecurityRequirement(name = "bearer-jwt")
+    public ResponseEntity<Void> completeTutorial(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        userService.completeTutorial(userDetails.getUsername());
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/me/onboarding")
     @Operation(summary = "Complete onboarding")
     @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = OnboardingResponse.class)))

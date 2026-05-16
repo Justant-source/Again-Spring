@@ -3,6 +3,7 @@
 'use client';
 
 import type { ContributionRatio as ContributionRatioType } from '@/lib/types';
+import { Conversation } from '@/components/icons/Conversation';
 
 interface ContributionRatioProps {
   ratio: ContributionRatioType | null;
@@ -34,7 +35,9 @@ export function ContributionRatio({
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 24, marginBottom: 8 }}>🤝</div>
+          <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
+            <Conversation width={28} height={28} color="var(--P-sub)" />
+          </div>
           <div style={{ fontSize: 13, color: 'var(--P-ink)', lineHeight: 1.7, marginBottom: 14 }}>
             화해 기여도는 상대방이 함께<br />참여했을 때 안내드릴 수 있어요.
             <br />
@@ -128,8 +131,13 @@ export function ContributionRatio({
         }}
       >
         {extraNote && (
-          <div style={{ marginBottom: 6, color: 'var(--P-ink)', fontWeight: 500 }}>
-            💡 {extraNote}
+          <div style={{ marginBottom: 6, color: 'var(--P-ink)', fontWeight: 500, display: 'flex', alignItems: 'flex-start', gap: 5 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <circle cx="12" cy="15.5" r="0.75" fill="currentColor" stroke="none" />
+            </svg>
+            {extraNote}
           </div>
         )}
         이 수치는 두 분의 회복 시작점을 부드럽게 안내하기 위한 참고용이에요.

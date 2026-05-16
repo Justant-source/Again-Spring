@@ -127,8 +127,12 @@ export function FeedbackDetailModal({ feedback, onClose, onUpdated }: Props) {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
             }}>
               <div>
-                <div style={{ fontSize: 11, color: '#9a6b00', fontWeight: 600, marginBottom: 2 }}>
-                  📧 회신 동의 — 답변 회신 요청
+                <div style={{ fontSize: 11, color: '#9a6b00', fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                    <path d="M2 8 L12 14 L22 8" />
+                  </svg>
+                  회신 동의 — 답변 회신 요청
                 </div>
                 <a
                   href={`mailto:${feedback.contactEmail}?subject=${encodeURIComponent(`[다시봄] 의견 #${feedback.id} 답변`)}`}

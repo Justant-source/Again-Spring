@@ -10,7 +10,9 @@ import com.againspring.service.SessionRoleResolver;
 import com.againspring.service.SessionService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.againspring.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -34,6 +36,15 @@ public class MessageController {
     private final SessionRoleResolver roleResolver;
     private final SessionService sessionService;
     private final com.againspring.repository.MessageRepository messageRepository;
+
+    @Value("${app.features.duo-mode:false}")
+    private boolean duoModeEnabled;
+
+    private static boolean hasTesterRole(UserDetails ud) {
+        if (ud == null) return false;
+        return ud.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_TESTER".equals(a.getAuthority()));
+    }
 
     @PostMapping("/messages")
     @SecurityRequirement(name = "bearer-jwt")
@@ -153,6 +164,11 @@ public class MessageController {
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
+        // V13 Phase 2: invite 조회는 TESTER 또는 duoModeEnabled 필요
+        if (!duoModeEnabled && !hasTesterRole(userDetails)) {
+            throw new BusinessException("DUO_MODE_DISABLED",
+                    "현재 Duo 모드는 베타 준비 중이에요.", 403);
+        }
         var response = sessionService.getInviteForExistingSession(sessionId, userDetails.getUsername());
         return ResponseEntity.ok(response);
     }
@@ -163,6 +179,11 @@ public class MessageController {
         @PathVariable String sessionId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
+        // V13 Phase 2: invite 발급은 TESTER 또는 duoModeEnabled 필요
+        if (!duoModeEnabled && !hasTesterRole(userDetails)) {
+            throw new BusinessException("DUO_MODE_DISABLED",
+                    "현재 Duo 모드는 베타 준비 중이에요.", 403);
+        }
         var response = sessionService.generateInviteForExistingSession(sessionId, userDetails.getUsername());
         return ResponseEntity.ok(response);
     }

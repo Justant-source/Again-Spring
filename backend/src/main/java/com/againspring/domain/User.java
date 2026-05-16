@@ -82,6 +82,10 @@ public class User {
     @Column(name = "onboarding_completed_at")
     private Instant onboardingCompletedAt;
 
+    /** V24: 30초 튜토리얼 완료 시각. NULL이면 미완료. */
+    @Column(name = "tutorial_completed_at")
+    private Instant tutorialCompletedAt;
+
     /** V22: 사용자별 중재자 톤 기본값 X (0=팩트, 100=공감). NULL이면 communicationStyle 매핑 fallback. */
     @Column(name = "mediator_default_x")
     private Integer mediatorDefaultX;

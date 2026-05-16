@@ -99,7 +99,7 @@ public class ChatService {
         this.cancelableChatService = cancelableChatService;
     }
 
-    @Value("${app.session.min-messages-to-finalize:3}")
+    @Value("${app.session.min-messages-to-finalize:5}")
     private int MIN_MESSAGES_TO_FINALIZE;
     public static final int FINALIZE_SUGGEST_SOLO_MIN = 10;
     public static final int FINALIZE_SUGGEST_DUO_TOTAL_MIN = 16;

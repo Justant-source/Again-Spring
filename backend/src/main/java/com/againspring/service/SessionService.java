@@ -12,10 +12,14 @@ import com.againspring.domain.enums.RelationType;
 import com.againspring.domain.enums.SessionStatus;
 import com.againspring.domain.Session;
 import com.againspring.domain.User;
+import com.againspring.domain.Message;
+import com.againspring.domain.enums.MessageSender;
+import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.safety.KeywordGuard;
 import com.againspring.safety.ScanResult;
+import com.againspring.service.context.FirstMessageService;
 import com.againspring.service.event.PartnerJoinedEvent;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -47,6 +51,8 @@ public class SessionService {
     private final ChatService chatService;
     private final ApplicationEventPublisher eventPublisher;
     private final GuestSessionRateLimiter guestSessionRateLimiter;
+    private final FirstMessageService firstMessageService;
+    private final MessageRepository messageRepository;
 
     public SessionService(SessionRepository sessionRepository,
                           UserRepository userRepository,
@@ -54,7 +60,9 @@ public class SessionService {
                           SessionStateMachine stateMachine,
                           @Lazy ChatService chatService,
                           ApplicationEventPublisher eventPublisher,
-                          GuestSessionRateLimiter guestSessionRateLimiter) {
+                          GuestSessionRateLimiter guestSessionRateLimiter,
+                          FirstMessageService firstMessageService,
+                          MessageRepository messageRepository) {
         this.sessionRepository = sessionRepository;
         this.userRepository = userRepository;
         this.keywordGuard = keywordGuard;
@@ -62,6 +70,8 @@ public class SessionService {
         this.chatService = chatService;
         this.eventPublisher = eventPublisher;
         this.guestSessionRateLimiter = guestSessionRateLimiter;
+        this.firstMessageService = firstMessageService;
+        this.messageRepository = messageRepository;
     }
 
     private static final long INVITE_TOKEN_TTL_MS = 86400000; // 24 hours
@@ -179,6 +189,21 @@ public class SessionService {
 
         Session saved = sessionRepository.save(session);
         log.info("Session created: id={}, token={}, creator={}", saved.getId(), inviteToken, createdByUserId);
+
+        // V13 Phase 1: mediator 첫마디를 세션 생성 직후 선제 저장
+        try {
+            String firstMsg = firstMessageService.generateFirstMessage(saved);
+            messageRepository.save(Message.builder()
+                    .sessionId(saved.getId())
+                    .sender(MessageSender.MEDIATOR_TO_A)
+                    .content(firstMsg)
+                    .charCount(firstMsg.length())
+                    .llmModel("template-or-haiku")
+                    .build());
+            log.debug("First message saved for session={}", saved.getId());
+        } catch (Exception e) {
+            log.warn("First message generation failed for session={}: {}", saved.getId(), e.getMessage());
+        }
 
         String inviteUrl = "https://againspring.app/join/" + inviteToken;
 

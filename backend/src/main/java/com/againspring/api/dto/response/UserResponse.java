@@ -45,6 +45,9 @@ public class UserResponse {
     @JsonProperty("onboardingCompletedAt")
     private Instant onboardingCompletedAt;
 
+    @JsonProperty("tutorialCompleted")
+    private boolean tutorialCompleted;
+
     @JsonProperty("mediatorDefaultX")
     private Integer mediatorDefaultX;
 

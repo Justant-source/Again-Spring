@@ -98,7 +98,7 @@ describe('Safety: Crisis Modal Dismiss Friction', () => {
     it('should render when open=true', () => {
       render(<CrisisResourceModal open={true} onClose={() => {}} />)
 
-      expect(screen.getByText('🚨 중요한 안내')).toBeInTheDocument()
+      expect(screen.getByText('중요한 안내')).toBeInTheDocument()
     })
 
     it('should not render when open=false', () => {

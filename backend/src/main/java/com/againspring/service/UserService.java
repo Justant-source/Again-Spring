@@ -266,6 +266,15 @@ public class UserService {
         return mapToUserResponse(saved);
     }
 
+    public void completeTutorial(String userId) {
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요."));
+        if (user.getTutorialCompletedAt() == null) {
+            user.setTutorialCompletedAt(Instant.now());
+            userRepository.save(user);
+        }
+    }
+
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
@@ -276,6 +285,7 @@ public class UserService {
                 .mustChangePassword(user.isMustChangePassword())
                 .onboardingCompleted(user.getOnboardingCompletedAt() != null)
                 .onboardingCompletedAt(user.getOnboardingCompletedAt())
+                .tutorialCompleted(user.getTutorialCompletedAt() != null)
                 .mediatorDefaultX(user.getMediatorDefaultX())
                 .mbtiType(user.getMbtiType())
                 .mbtiProfile(user.getMbtiProfile())
