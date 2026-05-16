@@ -1,10 +1,10 @@
-// ✅ MOCKUP APPLIED — source: design/handoff/tone-P-screens.jsx (ReportCards, ReportStory)
 'use client';
 
 import React from 'react';
 import type { Report, CommunicationStyle } from '@/lib/types';
 import { SafeHaven } from '@/components/icons/SafeHaven';
 import { Phone } from '@/components/icons/Phone';
+import { StatusDot } from '@/components/icons/StatusDot';
 import { ContributionRatio } from './ContributionRatio';
 import { NVCScript } from './NVCScript';
 import { RepairSuggestions } from './RepairSuggestions';
@@ -89,7 +89,7 @@ export function ReportLayout({
           />
           {distanceInfo && (
             <div style={{ textAlign: 'center', marginTop: 18, fontSize: 13, color: 'var(--P-sub)' }}>
-              두 분의 거리: {distanceInfo.emoji} <strong style={{ color: 'var(--P-ink)' }}>{distanceInfo.label}</strong>
+              두 분의 거리: <StatusDot level={distanceInfo.level} /> <strong style={{ color: 'var(--P-ink)' }}>{distanceInfo.label}</strong>
             </div>
           )}
         </div>
@@ -121,7 +121,7 @@ export function ReportLayout({
               color: 'var(--P-sub)',
             }}
           >
-            두 분의 거리: {distanceInfo.emoji}{' '}
+            두 분의 거리: <StatusDot level={distanceInfo.level} />{' '}
             <strong style={{ color: 'var(--P-ink)' }}>{distanceInfo.label}</strong>
           </div>
         )}

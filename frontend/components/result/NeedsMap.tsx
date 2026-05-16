@@ -1,4 +1,3 @@
-// ✅ MOCKUP APPLIED — source: design/handoff/tone-P-screens.jsx (NeedsMap2D, NeedsMapVenn, NeedsMapBars)
 'use client';
 
 import React from 'react';

@@ -1,4 +1,3 @@
-// ✅ MOCKUP APPLIED — source: design/handoff/tone-L-screens.jsx (TreeBig)
 
 'use client';
 

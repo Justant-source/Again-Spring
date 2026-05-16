@@ -2,7 +2,6 @@ import type { CommunicationStyle } from '@/lib/types';
 
 export interface StyleDefinition {
   id: CommunicationStyle;
-  emoji: string;
   label: string;
   motif:
     | 'wave'
@@ -20,7 +19,6 @@ export interface StyleDefinition {
 export const COMMUNICATION_STYLES: Record<CommunicationStyle, StyleDefinition> = {
   wave: {
     id: 'wave',
-    emoji: '🌊',
     label: '파도형',
     motif: 'wave',
     description: '감정 표현이 풍부하고 즉각적인 스타일',
@@ -30,7 +28,6 @@ export const COMMUNICATION_STYLES: Record<CommunicationStyle, StyleDefinition> =
   },
   mountain: {
     id: 'mountain',
-    emoji: '🏔️',
     label: '산형',
     motif: 'mountain',
     description: '차분하고 거리를 두고 생각하는 스타일',
@@ -40,7 +37,6 @@ export const COMMUNICATION_STYLES: Record<CommunicationStyle, StyleDefinition> =
   },
   flame: {
     id: 'flame',
-    emoji: '🔥',
     label: '불꽃형',
     motif: 'flame',
     description: '직설적이고 명확함을 선호하는 스타일',
@@ -50,7 +46,6 @@ export const COMMUNICATION_STYLES: Record<CommunicationStyle, StyleDefinition> =
   },
   leaf: {
     id: 'leaf',
-    emoji: '🌿',
     label: '이파리형',
     motif: 'leaf',
     description: '조화와 공감을 중시하는 스타일',
@@ -60,7 +55,6 @@ export const COMMUNICATION_STYLES: Record<CommunicationStyle, StyleDefinition> =
   },
   moon: {
     id: 'moon',
-    emoji: '🌙',
     label: '달빛형',
     motif: 'moon',
     description: '말보다 분위기·행동으로 표현하는 스타일',
@@ -70,7 +64,6 @@ export const COMMUNICATION_STYLES: Record<CommunicationStyle, StyleDefinition> =
   },
   star: {
     id: 'star',
-    emoji: '⭐',
     label: '별빛형',
     motif: 'star',
     description: '논리와 이유를 중시하는 스타일',

@@ -280,7 +280,7 @@ export default function AdminPage() {
           subtitle="30초마다 자동 갱신 · 본문은 노출하지 않습니다"
         >
           {crisis.length === 0 ? (
-            <p style={{ color: '#888', fontSize: 13, padding: '12px 4px' }}>최근 위기 트리거 없음 ✓</p>
+            <p style={{ color: '#888', fontSize: 13, padding: '12px 4px' }}>최근 위기 트리거 없음</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>

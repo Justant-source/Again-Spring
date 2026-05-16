@@ -1,4 +1,3 @@
-// ✅ MOCKUP APPLIED — source: design/handoff/tone-P-screens.jsx (ReportCards)
 'use client';
 
 import type { NVCScript as NVCScriptType } from '@/lib/types';

@@ -1,4 +1,3 @@
-// ✅ MOCKUP APPLIED — source: design/handoff/tone-P-screens.jsx (ShareImage)
 'use client';
 
 import type { CommunicationStyle } from '@/lib/types';

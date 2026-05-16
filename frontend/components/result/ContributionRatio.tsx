@@ -1,4 +1,3 @@
-// ✅ MOCKUP APPLIED — source: design/handoff/tone-P-screens.jsx (ReportCards)
 // Phase 2 + Phase 7: 법적 안내문구 박스 추가
 'use client';
 

@@ -288,7 +288,7 @@ export function InviteModal({ sessionId, onClose }: Props) {
               transition: 'all 0.15s',
             }}
           >
-            {urlCopied ? '복사됨 ✓' : 'URL 복사'}
+            {urlCopied ? '복사됨' : 'URL 복사'}
           </button>
         </div>
 

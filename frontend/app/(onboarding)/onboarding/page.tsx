@@ -1,4 +1,3 @@
-// ✅ MOCKUP APPLIED — source: design/handoff/tone-L-screens.jsx (OnboardingSlider)
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';

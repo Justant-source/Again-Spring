@@ -144,7 +144,7 @@ export function ChangePasswordSection() {
       </Field>
 
       {error && <p style={{ fontSize: 12, color: '#e55', margin: '4px 0 10px' }}>{error}</p>}
-      {success && <p style={{ fontSize: 12, color: '#0e6e3f', margin: '4px 0 10px' }}>비밀번호가 변경되었어요 ✓</p>}
+      {success && <p style={{ fontSize: 12, color: '#0e6e3f', margin: '4px 0 10px' }}>비밀번호가 변경되었어요</p>}
 
       <button
         onClick={handleSubmit}

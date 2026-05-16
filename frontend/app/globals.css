@@ -6,30 +6,31 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css');
 
 :root {
-  /* Tone L — Letter */
-  --L-bg: #F5EFE6;
-  --L-card: #FBF6EC;
-  --L-ink: #2B2B2B;
-  --L-sub: #6B6050;
-  --L-border: #D9CFBD;
-  --L-point: #8A3A1F;
+  /* Tone L — Letter (SSOT: tailwind.config.ts > colors.tone-l) */
+  --L-bg: theme('colors.tone-l.bg');
+  --L-card: theme('colors.tone-l.card');
+  --L-ink: theme('colors.tone-l.ink');
+  --L-sub: theme('colors.tone-l.sub');
+  --L-border: theme('colors.tone-l.border');
+  --L-point: theme('colors.tone-l.point');
 
-  /* Tone P — Pastel (relationship-tinted, overridden at runtime) */
-  --P-bg: #FBF3EC;
-  --P-card: #FFF8F0;
+  /* Tone P — Pastel (SSOT: tailwind.config.ts > colors.tone-p)
+     --P-a / --P-b: RelationshipColorSync가 관계 유형에 따라 런타임 덮어씀 */
+  --P-bg: theme('colors.tone-p.bg');
+  --P-card: theme('colors.tone-p.card');
   --P-a: #F4A896;
   --P-b: #A8C8B4;
-  --P-ink: #5C4030;
-  --P-sub: #7A6252;
-  --P-border: #EADFD0;
+  --P-ink: theme('colors.tone-p.ink');
+  --P-sub: theme('colors.tone-p.sub');
+  --P-border: theme('colors.tone-p.border');
 
-  /* Tone Q — Quiet */
-  --Q-bg: #FAFAF7;
-  --Q-card: #FFFFFF;
-  --Q-ink: #1A1A1A;
-  --Q-sub: #9B9890;
-  --Q-border: #E8E6E0;
-  --Q-point: #6B7A8F;
+  /* Tone Q — Quiet (SSOT: tailwind.config.ts > colors.tone-q) */
+  --Q-bg: theme('colors.tone-q.bg');
+  --Q-card: theme('colors.tone-q.card');
+  --Q-ink: theme('colors.tone-q.ink');
+  --Q-sub: theme('colors.tone-q.sub');
+  --Q-border: theme('colors.tone-q.border');
+  --Q-point: theme('colors.tone-q.point');
 
   --font-sans: 'Pretendard Variable', Pretendard, -apple-system, system-ui, 'Malgun Gothic', sans-serif;
   --font-serif: 'Noto Serif KR', 'Nanum Myeongjo', serif;

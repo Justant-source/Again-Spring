@@ -1,4 +1,3 @@
-// ⚠️ MOCKUP PENDING — design/mockups/10-profile/ not yet provided; baseline Tone L layout used
 
 'use client';
 

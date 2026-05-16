@@ -20,23 +20,30 @@
    - 페이지 흐름 (신규 사용자 → Solo 모드)
    - 인증 흐름, 환경 변수, 디자인 시스템
 
-### UI & 디자인
+### UX & 디자인 (V14에서 재구성)
 
-3. **[ui/](./ui/)** — 디자인 시스템 및 목업
-   - [design-handoff.md](./ui/design-handoff.md) — 3-Tone 디자인 시스템, 컴포넌트 매핑
-   - [mock-scenarios.md](./ui/mock-scenarios.md) — 5가지 Mock API 시나리오
-   - 색상, 타이포, 간격, 반응형 규칙
+3. **[design/](./design/)** — 디자인 시스템 (Claude Design 협업, V14)
+   - [design/system.md](./design/system.md) — 3-Tone 시스템 (L/P/Q), 절대 금지, 시그니처 요소
+   - [design/components.md](./design/components.md) — 컴포넌트 매핑 + HAX 체크리스트 링크
+   - [design/icons.md](./design/icons.md) — SVG 아이콘 카탈로그 + emoji 금지 정책
+   - [design/visual-reference/](./design/visual-reference/README.md) — 현재 디자인 캡처
+   - [design/specs/](./design/specs/) — 화면별 UX 스펙 (신규 화면 추가 시)
+
+4. **[ux/](./ux/)** — UX 원칙·체크리스트
+   - [ux/principles.md](./ux/principles.md) — 4원칙군 (권위본)
+   - [ux/hax-checklist.md](./ux/hax-checklist.md) — 컴포넌트별 PR 체크리스트
+   - [ux/collaboration.md](./ux/collaboration.md) — Claude Design + Claude Code 협업 흐름 (Phase 5)
 
 ### 정책 및 안전
 
-4. **[policies/](./policies/)** — FE 정책 강제 방법
+5. **[policies/](./policies/)** — FE 정책 강제 방법
    - [forbidden-words-lint.md](./policies/forbidden-words-lint.md) — `npm run lint:words` 사용법, Level 1/2/3 금지어
    - [README.md](./policies/README.md) — 정책 문서 인덱스
    - 위기 감지 모달 구현: [`shared/docs/policies/crisis-detection.md`](../../shared/docs/policies/crisis-detection.md) "FE 구현 가이드" 절
 
 ### 테스트 및 품질
 
-5. **[testing.md](./testing.md)** — 테스트 전략
+6. **[testing.md](./testing.md)** — 테스트 전략 + Mock API 시나리오
    - 린트 검사, 단위 테스트, 통합 테스트, 보안 테스트
    - MSW Mock API 활용
    - 배포 전 체크리스트
@@ -53,11 +60,11 @@ npm run dev           # localhost:3000 (MSW 자동 활성)
 npm run lint:words    # 금지어 검사
 ```
 
-### 목업 기반 구현
+### 디자인 기반 구현
 
-1. 각 Phase 시작 전 `design/mockups/XX-XXX/` 폴더 확인
-2. 목업 있으면 → **ui/design-handoff.md**의 톤(L/P/Q) 선택
-3. 파일 상단에 상태 주석 추가 (`APPLIED`, `PENDING`, `PARTIAL`)
+1. 신규 화면 → **[ux/collaboration.md](./ux/collaboration.md)** 시나리오 A 흐름 따름
+2. 톤(L/P/Q) 선택 → **[design/system.md](./design/system.md)**
+3. 컴포넌트 HAX 체크 → **[ux/hax-checklist.md](./ux/hax-checklist.md)**
 
 ### 금지어 검사
 
@@ -83,7 +90,7 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 - **Tone P** (파스텔): 결과 리포트
 - **Tone Q** (조용함): 고급 화면
 
-절대 섞지 마세요. 자세한 색상·타이포: **[ui/design-handoff.md](./ui/design-handoff.md)**
+절대 섞지 마세요. 자세한 색상·타이포: **[design/system.md](./design/system.md)**
 
 ### 2. 금지어 정책
 
@@ -159,15 +166,15 @@ frontend/
 │   └── fixtures/          # Mock 데이터
 │
 ├── design/                # 디자인 자산 (배포 미포함)
-│   ├── handoff/           # Claude Design 원본
-│   ├── mockups/           # 화면별 목업 폴더
-│   └── tokens/            # 디자인 토큰 JSON
+│   ├── handoff/           # Claude Design 원본 (참조용)
+│   └── mockups/           # Claude Design 결과 캡처 저장
 │
 ├── docs/                  # ← 본 문서
 │   ├── structure.md
 │   ├── architecture.md
-│   ├── testing.md
-│   ├── ui/                # 디자인·목업
+│   ├── testing.md         # 테스트 전략 + Mock API 시나리오
+│   ├── design/            # 디자인 시스템 (V14)
+│   ├── ux/                # UX 원칙·체크리스트
 │   └── policies/          # 금지어, 위기 감지
 │
 ├── scripts/
@@ -201,8 +208,8 @@ frontend/
 |---|---|---|
 | [structure.md](./structure.md) | 모두 | 폴더·파일 위치 |
 | [architecture.md](./architecture.md) | 개발자 | 기술 스택, 데이터 흐름, 라우팅 |
-| [ui/design-handoff.md](./ui/design-handoff.md) | 디자이너·개발자 | 톤(L/P/Q), 색상, 타이포, 컴포넌트 매핑 |
-| [ui/mock-scenarios.md](./ui/mock-scenarios.md) | 개발자 | Mock API 샘플, MSW 구조 |
+| [design/system.md](./design/system.md) | 디자이너·개발자 | 톤(L/P/Q), 절대 금지, 시그니처 요소 |
+| [design/components.md](./design/components.md) | 디자이너·개발자 | 컴포넌트 매핑, HAX 체크리스트 링크 |
 | [policies/forbidden-words-lint.md](./policies/forbidden-words-lint.md) | 개발자 | 금지어 검사 방법, CI/CD 통합 |
 | [testing.md](./testing.md) | QA·개발자 | 테스트 전략, 체크리스트 |
 

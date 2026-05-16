@@ -277,3 +277,54 @@ MSW는 모든 가로챈 요청을 브라우저 콘솔에 로깅합니다:
 
 이들은 프로젝트 성숙도에 따라 향후 추가 권장.
 
+---
+
+## Mock API 시나리오 (구 `ui/mock-scenarios.md`)
+
+`mocks/fixtures/mockReports.ts`에 구현. MSW dev 모드에서 자동 활성.
+
+### 시나리오 강제 선택 (개발 디버깅)
+
+```
+GET /api/mock/report?scenario=factual|difference|mixed
+```
+
+또는 결과 페이지 URL 파라미터:
+```
+/session/result/[id]?mockScenario=factual|difference|mixed|solo
+```
+
+### 시나리오 목록
+
+| # | 이름 | 관계 | 카테고리 | 비고 |
+|---|---|---|---|---|
+| 1 | 사실형 (약속 파기) | 연인 | 약속·신뢰 > 약속 반복 파기 | `conflictType: "factual"` |
+| 2 | 차이형 (연락 빈도) | 연인 | 연락·관심 > 연락 적어서 서운 | `conflictType: "difference"` |
+| 3 | 혼합형 (돈+신뢰) | 부부 | 돈·재정 > 재정 투명성 | `conflictType: "mixed"` |
+| 4 | Solo 모드 | 친구 | 연락 소홀·거리감 | B 미참여, Solo 리포트 |
+| 5 | 심각 갈등 (권태기) | 부부 | 부부 관계 > 권태기 | 전문 상담 안내 CTA |
+
+### MSW Handler 구조
+
+```typescript
+// mocks/handlers/mediation.ts
+export const mediationHandlers = [
+  http.post('/api/sessions/:id/report', async ({ params }) => {
+    await delay(2400);
+    return HttpResponse.json(pickReport(String(params.id)));
+  }),
+  http.get('/api/sessions/:id/report', async ({ params }) => {
+    await delay(200);
+    return HttpResponse.json(pickReport(String(params.id)));
+  }),
+  http.get('/api/mock/report', async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get('scenario') ?? 'difference';
+    await delay(200);
+    return HttpResponse.json(pickReport(`force_${scenario}`));
+  }),
+];
+```
+
+MSW 초기화: `npx msw init ./public` → `public/mockServiceWorker.js` 생성.
+

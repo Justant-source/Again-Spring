@@ -19,3 +19,11 @@
 - [ ] **Survivor**: 학대 상황의 사용자에게 이 기능으로 새로운 위험이 생기는가?
 - [ ] **Roadblock**: 악용을 기능적으로 막거나, 못 막는다면 마찰을 어디에 두는가?
 - [ ] **Exit**: 이 화면에서 위협을 느꼈을 때 1탭으로 빠져나갈 수 있는가?
+
+## 디자인 체크 (V14)
+
+- [ ] `docs/design/system.md` 톤(L/P/Q) 일관성 확인
+- [ ] `npm run lint:emoji` 통과 (emoji 잔존 0)
+- [ ] `npm run lint:words` 통과 (금지어 0)
+- [ ] 토큰 SSOT 유지: `tailwind.config.ts` 외 색상 하드코딩 없음
+- [ ] 신규 아이콘 추가 시 `docs/design/icons.md` 카탈로그 등재
