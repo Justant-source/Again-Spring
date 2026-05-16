@@ -29,10 +29,11 @@
    - [design/visual-reference/](./design/visual-reference/README.md) — 현재 디자인 캡처
    - [design/specs/](./design/specs/) — 화면별 UX 스펙 (신규 화면 추가 시)
 
-4. **[ux/](./ux/)** — UX 원칙·체크리스트
+4. **[ux/](./ux/)** — UX 원칙·체크리스트·흐름
    - [ux/principles.md](./ux/principles.md) — 4원칙군 (권위본)
    - [ux/hax-checklist.md](./ux/hax-checklist.md) — 컴포넌트별 PR 체크리스트
    - [ux/collaboration.md](./ux/collaboration.md) — Claude Design + Claude Code 협업 흐름 (Phase 5)
+   - [ux/flows/](./ux/flows/) — 전체 UX 흐름 as-is (가입~리포트, mermaid 다이어그램)
 
 ### 정책 및 안전
 
@@ -175,6 +176,7 @@ frontend/
 │   ├── testing.md         # 테스트 전략 + Mock API 시나리오
 │   ├── design/            # 디자인 시스템 (V14)
 │   ├── ux/                # UX 원칙·체크리스트
+│   │   └── flows/         # as-is UX 흐름 문서 (9개 주제, mermaid)
 │   └── policies/          # 금지어, 위기 감지
 │
 ├── scripts/
@@ -212,6 +214,7 @@ frontend/
 | [design/components.md](./design/components.md) | 디자이너·개발자 | 컴포넌트 매핑, HAX 체크리스트 링크 |
 | [policies/forbidden-words-lint.md](./policies/forbidden-words-lint.md) | 개발자 | 금지어 검사 방법, CI/CD 통합 |
 | [testing.md](./testing.md) | QA·개발자 | 테스트 전략, 체크리스트 |
+| [ux/flows/](./ux/flows/) | 개발자·디자이너 | as-is UX 흐름 전체 (가입~리포트 mermaid) |
 
 ---
 
