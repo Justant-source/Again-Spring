@@ -16,7 +16,7 @@
 | Rate Limit | bucket4j 7.6 |
 | 직렬화 | Jackson 2.17, SnakeYAML 2.0 |
 | 테스트 | JUnit 5, Mockito, Testcontainers, H2 |
-| LLM | Claude Code CLI (subprocess) |
+| LLM | Claude Code CLI — `againspring-llm` 워커 컨테이너 (`RemoteLlmProvider` HTTP 클라이언트) |
 
 ## 레이어 흐름
 
@@ -30,18 +30,18 @@ flowchart TB
         Context[Phase D 컨텍스트\nservice/context/ + service/prompt/]
         Domain[JPA Entity\ndomain/]
         Repo[JpaRepository\nrepository/]
-        Bridge[ClaudeCodeBridge\nllm/bridge/]
+        Bridge[RemoteLlmProvider\nllm/remote/]
         Safety[PromptSanitizer\nKeywordGuard\nCrisisDetector\nsafety/]
         Sched[RetentionScheduler\nDailyStatsAggregator\nGuestSessionCleanupScheduler]
         Notify[FeedbackEmailNotifier\nCrisisFeedbackNotifier\nservice/notify/]
     end
     DB[(MariaDB 11)]
-    Claude[Claude CLI]
+    LLMWorker[againspring-llm\n워커 컨테이너]
 
     Client --> Filter --> Controller --> Service
     Service --> Context
     Service --> Repo --> Domain --> DB
-    Service --> Safety --> Bridge --> Claude
+    Service --> Safety --> Bridge -->|HTTP /v1/invocations| LLMWorker
     Service --> Notify
     Sched -.->|cron 03:00 UTC| Repo
 ```

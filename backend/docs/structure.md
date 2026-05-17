@@ -40,7 +40,7 @@ flowchart TD
 
     subgraph INF["인프라"]
         direction LR
-        I1[llm/ — ClaudeCodeBridge]
+        I1[llm/remote/ — RemoteLlmProvider<br/>llm/bridge/ — ClaudeCodeBridge fallback]
         I2[safety/ — KeywordGuard·Crisis]
         I3[security/ — JWT·SecurityConfig]
         I4[config/ — OpenAPI·CORS·Async]
@@ -66,7 +66,9 @@ flowchart TD
 | `service/retention/` | 30일 보존 스케줄러 · 일일 통계 집계 |
 | `domain/` | JPA 엔티티 + Enum |
 | `repository/` | Spring Data JPA 인터페이스 |
-| `llm/` | ClaudeCodeBridge + Prompt 어셈블 + 프로세스 풀 + Fallback |
+| `llm/remote/` | `RemoteLlmProvider` (기본) + `RemoteCancelableInvocation` + DTO (llm-worker HTTP 클라이언트) |
+| `llm/bridge/` | `ClaudeCodeBridge` (긴급 fallback, `llm.provider=claude-code`) + `PromptSanitizer` |
+| `llm/` | `LLMProvider` 인터페이스 + Prompt 어셈블 + Fallback + 모니터링 |
 | `safety/` | KeywordGuard · CrisisDetector · RatioEnforcer · SafetyAuditLogger |
 | `security/` | JwtFilter · SecurityConfig · RateLimitFilter · UserDetailsService |
 | `config/` | 빈 설정 (CORS · Async · Scheduling · OpenAPI · AccessLog) |
@@ -254,11 +256,19 @@ com.againspring/
 │   ├── LLMException                    # 추상 예외
 │   ├── LLMProvider                     # 인터페이스
 │   ├── LLMRequest, LLMResponse, PromptLayer
-│   ├── bridge/
-│   │   ├── ClaudeCodeBridge            # Claude CLI 호출 (@ConditionalOnProperty)
-│   │   ├── ClaudeCodeWorkerPool        # Semaphore(3) + ExecutorService
-│   │   ├── MockLLMProvider             # 테스트 프로파일
-│   │   ├── PromptSanitizer             # injection 방지
+│   ├── remote/                         # ← 기본 provider (llm.provider=remote)
+│   │   ├── RemoteLlmProvider           # @ConditionalOnProperty(remote) HTTP 클라이언트
+│   │   ├── RemoteCancelableInvocation  # long-poll + 원격 취소 (extends CancelableInvocation)
+│   │   └── dto/
+│   │       ├── WorkerInvokeRequest/Response
+│   │       ├── WorkerCreateInvocationRequest/Response
+│   │       └── WorkerInvocationResultResponse
+│   ├── bridge/                         # 긴급 fallback (llm.provider=claude-code)
+│   │   ├── CancelableInvocation        # in-process 취소 핸들 (base class)
+│   │   ├── ClaudeCodeBridge            # Claude CLI 직접 호출 (@ConditionalOnProperty)
+│   │   ├── ClaudeCodeWorkerPool        # Semaphore(3) — fallback 전용
+│   │   ├── MockLLMProvider             # 테스트 프로파일 (llm.provider=mock)
+│   │   ├── PromptSanitizer             # injection 방지 (remote/bridge 공통)
 │   │   └── exception/
 │   │       ├── ClaudeCodeException
 │   │       ├── LLMCapacityException
@@ -361,7 +371,8 @@ backend/src/main/resources/
 | 새 OAuth provider | `service/oauth/OAuthProviderService.java` | `shared/docs/policies/auth.md` + `backend/docs/policies/oauth-google.md` |
 | 보안 정책 | `safety/*.java` + `security/*.java` | `shared/docs/policies/{forbidden-words,crisis-detection}.md` |
 | 프롬프트 변경 | `shared/docs/prompts/*.md` (런타임 자산) | `shared/docs/prompts/README.md` |
-| LLM 브릿지 | `llm/bridge/*.java` | `backend/docs/llm-bridge.md` |
+| LLM 브릿지 (remote) | `llm/remote/*.java` | `backend/docs/llm-bridge.md` |
+| LLM 브릿지 (fallback) | `llm/bridge/*.java` | `backend/docs/llm-bridge.md` |
 | Phase D 컨텍스트 | `service/context/` + `service/prompt/` | `shared/docs/policies/context-algorithm.md` |
 | 피드백 시스템 | `service/FeedbackService.java` + `domain/Feedback.java` | `shared/docs/api/feedback.md` |
 | 역할/권한 | `config/UserPermissionsConfig.java` + `service/AdminRoleAssigner.java` | `shared/docs/policies/user-permissions.md` |

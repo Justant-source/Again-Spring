@@ -9,9 +9,12 @@ flowchart TB
         API[REST Controller<br/>/api/sessions/{id}/messages]
         Auth[Security / JWT]
         ChatService[ChatService<br/>Solo/Duo 모드]
-        LLM[ClaudeCodeBridge<br/>Semaphore 3, 60s timeout]
+        LLM[RemoteLlmProvider<br/>HTTP client]
         Safety[PromptSanitizer<br/>KeywordGuard<br/>CrisisDetector]
         Retention[RetentionScheduler<br/>30d cron]
+    end
+    subgraph LLMWorker["llm-worker<br/>Spring Boot"]
+        Pool[LlmWorkerPool<br/>ThreadPoolExecutor 100<br/>+ queue 500]
     end
     DB[(MariaDB 11<br/>V7: messages 테이블)]
     Claude[Claude CLI<br/>Haiku 4.5]
@@ -22,7 +25,8 @@ flowchart TB
     Auth --> ChatService
     ChatService --> Safety
     Safety --> LLM
-    LLM -->|--print --model| Claude
+    LLM -->|POST /v1/invocations| Pool
+    Pool -->|--strict-mcp-config --no-session-persistence| Claude
     LLM -.loads.-> Prompts
     ChatService --> DB
     Retention -.purge expired.-> DB
@@ -46,20 +50,25 @@ flowchart TB
 └──┬──────────────┬───┘
    │              │
    ▼              ▼
-┌────────────┐  ┌──────────────────┐
-│ frontend   │  │  backend         │
-│ Next.js 14 │  │  Spring Boot 3.3 │ ───── ProcessBuilder ─────► claude CLI
-│ :3000      │  │  :8080           │                              (CLI 자체 인증)
-└──────┬─────┘  └─────────┬────────┘                                   │
-       │ axios            │ Spring Data JPA                            ▼
-       │ Bearer JWT       ▼                                  Anthropic Claude API
-       └──────► /api/...  ┌──────────────────┐               (Haiku 4.5 default)
-                          │ MariaDB 11       │
-                          │ Flyway V1~V5     │
-                          │ :3306 (local)    │
-                          │ :3309 (dev)      │
-                          │ internal (prod)  │
-                          └──────────────────┘
+┌────────────┐  ┌──────────────────┐  ┌────────────────────┐
+│ frontend   │  │  backend         │  │  llm-worker        │
+│ Next.js 14 │  │  Spring Boot 3.3 │  │  Spring Boot 3.3   │
+│ :3000      │  │  :8080           │  │  :8090             │
+└──────┬─────┘  └─────────┬────────┘  └────────┬───────────┘
+       │ axios            │ Spring Data JPA    │ HTTP /v1/invoke
+       │ Bearer JWT       │                    │
+       └──────► /api/...  ├─────────────────────┤
+                          │                    ▼
+                          ▼               ProcessBuilder
+                ┌──────────────────┐       │
+                │ MariaDB 11       │       ▼
+                │ Flyway V1~V24    │    claude CLI
+                │ :3306 (local)    │    (--strict-mcp-config
+                │ :3309 (dev)      │     --no-session-persistence)
+                │ internal (prod)  │       │
+                └──────────────────┘       ▼
+                                   Anthropic Claude API
+                                   (Haiku 4.5 default)
 ```
 
 ## 흐름별 설명
@@ -149,15 +158,16 @@ sequenceDiagram
    - `relations/{relationType}.md`
    - `chat/{solo|duo}_chat.md`
 7. `PromptSanitizer` → 사용자 입력에서 prompt-injection 패턴 차단
-8. `ClaudeCodeBridge.invokeCancelable()` → `CancelableInvocation` 래핑
-9. WorkerPool: `Semaphore(3)` 제한으로 동시 3개까지, 60s 타임아웃
-10. `ProcessBuilder("claude", "--print", "--model", model, prompt).start()` → stdout 읽기
-11. 응답을 `TurnResponseParser`로 구조화 → DB 저장
-12. `LLMCallLogger`가 `llm_call_logs`에 기록 (correlation_id, latency, outcome)
-13. 실패 시 `FallbackResponses`의 안전 기본값 반환
+8. `RemoteLlmProvider.invokeCancelable()` → `RemoteCancelableInvocation` 래핑
+9. HTTP POST `/v1/invocations` → llm-worker로 전달
+10. LlmWorkerPool: `ThreadPoolExecutor(100)` + `LinkedBlockingQueue(500)`, 120s 타임아웃
+11. `ClaudeCliInvoker` → `ProcessBuilder("claude", "--strict-mcp-config", "--no-session-persistence", "--print", prompt).start()` → stdout 읽기
+12. 응답을 `TurnResponseParser`로 구조화 → DB 저장
+13. `LLMCallLogger`가 `llm_call_logs`에 기록 (correlation_id, latency, outcome)
+14. 실패 시 `FallbackResponses`의 안전 기본값 반환
 
 **FE 수신 단계**:
-14. `GET /messages?since=` (폴링, 3초 주기) → mediator 응답 수신
+15. `GET /messages?since=` (폴링, 3초 주기) → mediator 응답 수신
 
 상세는 [`backend/docs/llm-bridge.md`](../backend/docs/llm-bridge.md) (취소 메커니즘) 및 [`shared/docs/prompts/README.md`](../shared/docs/prompts/README.md) (레이어 설계) 참조.
 
@@ -174,9 +184,10 @@ sequenceDiagram
 | Cloudflare Tunnel | 외부 도메인 → 호스트 포트 | nginx 8090/8091 |
 | nginx | 경로 분기 + 헤더 주입 | backend, frontend |
 | Next.js (FE) | UI · 라우팅 · 상태 · MSW (개발) | axios → BE |
-| Spring Boot (BE) | API · 도메인 · 보안 · LLM 호출 | MariaDB, claude CLI |
+| Spring Boot (BE) | API · 도메인 · 보안 · 프롬프트 어셈블 · HTTP → llm-worker | MariaDB, llm-worker |
+| llm-worker | LLM CLI 실행 전용 (100풀 + 큐500) | claude CLI |
 | MariaDB | 영속 저장소 (12 테이블) | BE만 |
-| claude CLI | LLM 응답 생성 | BE의 ProcessBuilder |
+| claude CLI | LLM 응답 생성 | llm-worker의 ProcessBuilder |
 
 ## 비기능 요구사항 위치
 
@@ -189,3 +200,7 @@ sequenceDiagram
 | 감사 로그 | `safety/SafetyAuditLogger`, `llm/monitoring/LLMCallLogger`, `service/retention/AccessLogService` |
 | 데이터 만료 | `service/retention/RetentionScheduler` (cron `0 0 3 * * *`) |
 | 토큰 정리 | `RevokedTokenCleanupScheduler` (cron `0 0 4 * * *`) |
+
+---
+
+**마지막 업데이트**: 2026-05-17

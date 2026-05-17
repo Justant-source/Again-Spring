@@ -6,6 +6,7 @@
 - `env/docker-compose.dev.yml`
 - `env/docker-compose.prod.yml`
 - `backend/Dockerfile`
+- `llm-worker/Dockerfile`
 - `frontend/Dockerfile`
 
 ## 3개 스택 개요
@@ -31,11 +32,12 @@ MariaDB 단독. 로컬 머신에서 `./gradlew bootRun` + `npm run dev`로 BE/FE
 | 서비스 | 컨테이너 | 이미지 | 포트 | 의존 |
 |---|---|---|---|---|
 | `mariadb-dev` | `againspring-mariadb-dev` | `mariadb:lts` | `3309:3306` (호스트 접근용) | — |
-| `backend-dev` | `againspring-backend-dev` | `againspring-backend-dev` (build) | internal | `mariadb-dev` (healthy) |
-| `frontend-dev` | `againspring-frontend-dev` | `againspring-frontend-dev` (build) | internal | `backend-dev` |
+| `llm-dev` | `againspring-llm-dev` | build `../llm-worker` | internal (8090) | — |
+| `backend-dev` | `againspring-backend-dev` | build `../backend` | internal | `mariadb-dev` (healthy), `llm-dev` (healthy) |
+| `frontend-dev` | `againspring-frontend-dev` | build `../frontend` | internal | `backend-dev` |
 | `nginx-dev` | `againspring-nginx-dev` | `nginx:alpine` | `8090:80` | `frontend-dev`, `backend-dev` |
 
-backend bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude` (Claude CLI 세션 공유)
+llm-dev bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude` (Claude CLI 세션 공유 — backend가 아닌 llm-worker에 마운트)
 
 `SPRING_PROFILES_ACTIVE=dev` 활성화 → Flyway disabled, ddl-auto=update, Swagger UI on.
 
@@ -50,9 +52,12 @@ backend bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.cla
 | 서비스 | 컨테이너 | 메모리 limit/reservation | 외부 노출 |
 |---|---|---|---|
 | `mariadb-prod` | `againspring-mariadb-prod` | 2G / 1G | 없음 (internal) |
-| `backend-prod` | `againspring-backend-prod` | 1G / 512M | 없음 |
+| `llm-prod` | `againspring-llm-prod` | 4G / 2G | 없음 (internal) |
+| `backend-prod` | `againspring-backend-prod` | 3G / 1G | 없음 |
 | `frontend-prod` | `againspring-frontend-prod` | 512M / 256M | 없음 |
 | `nginx-prod` | `againspring-nginx-prod` | — | `8091:80` |
+
+llm-prod bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/root/.claude}:/root/.claude` (4G 한도: 100 동시 Node CLI 메모리)
 
 `SPRING_PROFILES_ACTIVE=prod` → Flyway 활성, ddl-auto=validate, Swagger 비활성, 모든 env 필수.
 
@@ -74,10 +79,19 @@ backend는 `depends_on.mariadb-*.condition: service_healthy`로 DB 정상화까�
 
 multi-stage:
 1. **build**: `eclipse-temurin:21-jdk-alpine` → `./gradlew bootJar`
-2. **runtime**: `eclipse-temurin:21-jre-alpine` + `nodejs npm` 설치 + `npm install -g @anthropic-ai/claude-code`
+2. **runtime**: `eclipse-temurin:21-jre-alpine` (Node.js / Claude CLI 미포함)
 3. ENTRYPOINT: `java -jar app.jar`
 
-런타임에 Claude CLI가 필요한 이유: `ClaudeCodeBridge`가 ProcessBuilder로 `claude --print --model ... "<prompt>"` 호출.
+Claude CLI는 `llm-worker`로 이동. backend는 `RemoteLlmProvider` HTTP 클라이언트만 실행. 긴급 롤백 시 `LLM_PROVIDER=claude-code`로 전환 + Dockerfile revert.
+
+### llm-worker (`llm-worker/Dockerfile`)
+
+multi-stage:
+1. **build**: `eclipse-temurin:21-jdk-alpine` → `./gradlew bootJar`
+2. **runtime**: `eclipse-temurin:21-jre-alpine` + `nodejs npm` 설치 + `npm install -g @anthropic-ai/claude-code`
+3. EXPOSE 8090, ENTRYPOINT: `java -jar app.jar`
+
+`ClaudeCliInvoker`가 `claude --print --strict-mcp-config --no-session-persistence --model ... --system-prompt ...` ProcessBuilder 호출. `~/.claude` bind mount로 OAuth 인증 공유.
 
 ### frontend (`frontend/Dockerfile`)
 

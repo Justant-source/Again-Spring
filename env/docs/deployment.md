@@ -89,7 +89,7 @@ curl http://localhost:8091/actuator/health
 - [ ] main 브랜치에 push 완료 (CI 미사용 → 수동 확인)
 - [ ] `env/.env.prod` 모든 값 입력 (기본값 없음)
 - [ ] MariaDB 볼륨 백업 (`mariadb-dump`)
-- [ ] 호스트 `~/.claude` 세션 유효 (만료 시 재로그인)
+- [ ] 호스트 `~/.claude` 세션 유효 (만료 시 재로그인 → `docker compose restart againspring-llm-prod`)
 - [ ] Cloudflare Tunnel 가동 중 (`systemctl status cloudflared`)
 
 ## 롤백

@@ -16,8 +16,10 @@ flowchart LR
         Nginx_prod --> BE_prod[backend-prod:8080]
         BE_dev --> DB_dev[(mariadb-dev:3306)]
         BE_prod --> DB_prod[(mariadb-prod:3306)]
-        BE_dev -->|claude CLI| ClaudeMount["~/.claude (host bind-mount)"]
-        BE_prod -->|claude CLI| ClaudeMount
+        BE_dev -->|HTTP /v1/invoke| LLM_dev[llm-dev:8090]
+        BE_prod -->|HTTP /v1/invoke| LLM_prod[llm-prod:8090]
+        LLM_dev -->|claude CLI| ClaudeMount["~/.claude (host bind-mount)"]
+        LLM_prod -->|claude CLI| ClaudeMount
     end
     ClaudeMount -->|Anthropic API| Anthropic[Claude Haiku 4.5]
 ```
@@ -50,18 +52,22 @@ flowchart LR
 │  │ Backend Container    │  │ Frontend Container   │        │
 │  │ (Spring Boot)        │  │ (Next.js)            │        │
 │  │ :8080                │  │ :3000                │        │
-│  └────────┬─────────────┘  └──────────────────────┘        │
-│           │                                                 │
-│           │ JDBC                                           │
-│           ▼                                                 │
-│  ┌──────────────────────┐                                  │
-│  │ MariaDB Container    │                                  │
-│  │ :3306 (internal)     │                                  │
-│  └──────────────────────┘                                  │
-│                                                             │
-│  Claude Code CLI                                          │
-│  └─ ~/.claude (host mount → /root/.claude)               │
-│     (LLM 브릿지 인증, ProcessBuilder로 호출)               │
+│  └────────┬────┬────────┘  └──────────────────────┘        │
+│           │    │                                            │
+│           │ JDBC  HTTP /v1/invoke                          │
+│           ▼    ▼                                            │
+│  ┌──────────┐ ┌────────────────────────────────────────┐   │
+│  │ MariaDB  │ │ LLM Worker Container (Spring Boot)     │   │
+│  │ :3306    │ │ :8090 (internal)                       │   │
+│  └──────────┘ │ ThreadPoolExecutor(100) + Queue(500)   │   │
+│               └───────────────┬────────────────────────┘   │
+│                               │ ProcessBuilder              │
+│                               ▼                             │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │ Claude Code CLI                                    │     │
+│  │ ~/.claude (host mount → /root/.claude)             │     │
+│  │ (llm-worker 컨테이너에 마운트, 인증 공유)             │     │
+│  └────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -107,17 +113,29 @@ flowchart LR
 
 ### Backend (Spring Boot)
 
-- **이미지**: `eclipse-temurin:21-jre-alpine` + Node.js + Claude CLI
+- **이미지**: `eclipse-temurin:21-jre-alpine` (Node.js / Claude CLI 미포함)
 - **포트**: :8080 (내부)
 - **역할**:
   - REST API 라우팅 (`/api/sessions`, `/api/conversations` 등)
   - JWT 인증 · 세션 관리
-  - **LLM 호출** (Claude Haiku 4.5 via `claude` CLI)
+  - **프롬프트 어셈블 + HTTP 클라이언트** (`RemoteLlmProvider` → llm-worker)
   - 금지어 / 위기 감지 (PromptSanitizer, CrisisDetector)
   - 리포트 생성 (기여도, NVC 분석)
   - 이메일 인증 (Spring Mail)
 - **DB 연결**: MariaDB :3306 (내부 네트워크)
-- **Claude 인증**: 호스트 `~/.claude` bind mount → `/root/.claude` (ProcessBuilder 호출 시 자동 사용)
+- **LLM 연결**: `http://againspring-llm-{dev,prod}:8090` (내부 네트워크)
+
+### LLM Worker (Spring Boot)
+
+- **이미지**: `eclipse-temurin:21-jre-alpine` + Node.js + Claude CLI
+- **포트**: :8090 (내부 — host 미노출)
+- **역할**:
+  - `POST /v1/invoke` — 동기 호출 (리포트 Sonnet)
+  - `POST /v1/invocations` — 비동기 취소 가능 호출 (채팅 Haiku)
+  - `GET /v1/invocations/{id}/result` — long-poll 결과 조회
+  - `DELETE /v1/invocations/{id}` — 원격 취소 (`destroyForcibly`)
+  - `ThreadPoolExecutor(100) + LinkedBlockingQueue(500)` — 동시성 제어
+- **Claude 인증**: 호스트 `~/.claude` bind mount → `/root/.claude`
 
 ### MariaDB
 
@@ -155,16 +173,17 @@ flowchart LR
 ### Claude CLI 인증 마운트
 
 ```yaml
-backend-{dev,prod}:
+againspring-llm-{dev,prod}:
   volumes:
-    - ${CLAUDE_HOST_CONFIG_DIR}:/root/.claude:ro  # bind mount (read-only)
+    - ${CLAUDE_HOST_CONFIG_DIR}:/root/.claude  # bind mount
 ```
 
 - **호스트 경로**: `/home/<user>/.claude` (또는 env var `CLAUDE_HOST_CONFIG_DIR`)
-- **컨테이너 경로**: `/root/.claude`
+- **컨테이너 경로**: `/root/.claude` (llm-worker 컨테이너)
 - **용도**: Claude Code CLI 로그인 세션 공유
   - API 키 불필요 — CLI 자체 인증 사용
-  - 백엔드 ProcessBuilder가 `claude --print --model ... "<prompt>"` 호출 시 자동 사용
+  - `ClaudeCliInvoker`가 `claude --print --strict-mcp-config --no-session-persistence ...` 호출 시 자동 사용
+- **backend 컨테이너에는 마운트하지 않음** (backend는 Node.js/Claude CLI 미포함)
 
 **전제 조건**: 호스트에서 미리 `claude` 명령으로 1회 로그인 완료.
 
@@ -192,9 +211,10 @@ backend-{dev,prod}:
    - JWT 검증
    - 세션/대화 데이터 조회 (MariaDB)
    - PromptSanitizer로 사용자 입력 정제
-   - `ProcessBuilder`로 `claude --print ... "<sanitized-prompt>"` 호출
-   - Claude CLI가 호스트의 `~/.claude` 세션 사용 (컨테이너 마운트)
-   - Claude Haiku 4.5 응답 수신
+   - `RemoteLlmProvider`가 `POST http://againspring-llm/v1/invocations` 전송
+   - llm-worker: `ClaudeCliInvoker`가 `claude --print --strict-mcp-config --no-session-persistence ...` 호출
+   - llm-worker 컨테이너의 `~/.claude` 세션 사용
+   - Claude Haiku 4.5 응답 수신 → long-poll로 backend 반환
    - 리포트 생성 (기여도 계산, NVC 재구성)
    - 결과를 MariaDB에 저장
 4. backend → frontend (JSON 응답)

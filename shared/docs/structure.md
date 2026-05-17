@@ -32,15 +32,27 @@ Again-Spring/
 │   ├── cloudflare/                 # Tunnel 자산
 │   └── docs/                       # ← env 관련 모든 문서
 │
-├── backend/                        # Spring Boot 3.3 + Java 21 + MariaDB
+├── llm-worker/                     # LLM 전용 Spring Boot 워커 (Claude CLI 실행)
 │   ├── build.gradle.kts
 │   ├── Dockerfile                  # multi-stage + Claude CLI 설치
+│   └── src/main/java/com/againspring/llmworker/
+│       ├── controller/             # InvocationController (4 endpoints)
+│       ├── pool/                   # LlmWorkerPool (ThreadPoolExecutor 100 + Queue 500)
+│       ├── service/                # ClaudeCliInvoker (ProcessBuilder)
+│       ├── health/                 # ClaudeCliHealthIndicator
+│       ├── dto/                    # 요청/응답 DTO
+│       └── exception/              # LlmException 계층
+│
+├── backend/                        # Spring Boot 3.3 + Java 21 + MariaDB
+│   ├── build.gradle.kts
+│   ├── Dockerfile                  # multi-stage (Node.js/Claude CLI 미포함 — llm-worker로 이동)
 │   ├── src/main/java/com/againspring/
 │   │   ├── api/                    # REST Controllers + DTO
 │   │   ├── service/                # 비즈니스 로직 + State Machine
 │   │   ├── domain/                 # JPA Entity + Enum
 │   │   ├── repository/             # Spring Data JPA
-│   │   ├── llm/                    # ClaudeCodeBridge + Prompt + Safety wrapping
+│   │   ├── llm/remote/             # RemoteLlmProvider + RemoteCancelableInvocation (기본)
+│   │   ├── llm/bridge/             # ClaudeCodeBridge + PromptSanitizer (fallback)
 │   │   ├── safety/                 # KeywordGuard, CrisisDetector, RatioEnforcer
 │   │   ├── security/               # JWT + Spring Security + Rate limit
 │   │   ├── config/                 # OpenAPI, CORS, Async, Scheduling
@@ -91,7 +103,8 @@ Again-Spring/
 | 폴더 | 책임 |
 |---|---|
 | **`env/`** | 컨테이너 정의 + 환경변수 + 도메인 라우팅 — 운영·배포 |
-| **`backend/`** | API + 비즈니스 + DB + LLM 호출 + 보안 — JVM 프로세스 |
+| **`backend/`** | API + 비즈니스 + DB + 프롬프트 어셈블 + 보안 — JVM 프로세스 |
+| **`llm-worker/`** | Claude CLI 실행 전용 워커 — 100풀 + 큐500, HTTP API |
 | **`frontend/`** | UI + 라우팅 + 상태 + axios — Next.js 프로세스 |
 | **`shared/docs/`** | 양쪽이 합의한 정책/명세/아키텍처 — **유일한 공유 문서** |
 | **`shared/docs/prompts/`** | LLM 시스템·턴 프롬프트 — BE가 시작 시 로드 (런타임 자산) |

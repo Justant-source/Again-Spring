@@ -28,17 +28,24 @@
 
 생성 예: `openssl rand -base64 32`
 
-### Claude Code CLI (LLM 브릿지)
+### LLM 워커 (`againspring-llm` 컨테이너)
 
 | 변수 | 사용처 | 기본값 |
 |---|---|---|
-| `LLM_PROVIDER` | `LLMProvider` 빈 선택 | `claude-code` |
-| `CLAUDE_BIN` | CLI 실행 파일명 | `claude` |
-| `CLAUDE_MODEL` | `--model` 인자 | `claude-haiku-4-5-20251001` |
-| `CLAUDE_HOST_CONFIG_DIR` | bind mount 원본 (`→ /root/.claude`) | dev: `/home/justant/.claude` / prod: `/root/.claude` |
+| `LLM_PROVIDER` | `LLMProvider` 빈 선택 (backend) | `remote` |
+| `LLM_WORKER_URL` | backend → llm-worker 접속 URL | `http://againspring-llm-dev:8090` |
+| `CLAUDE_BIN` | llm-worker CLI 실행 파일명 | `claude` |
+| `CLAUDE_MODEL` | llm-worker `--model` 인자 (채팅) | `claude-haiku-4-5-20251001` |
+| `REPORT_LLM_MODEL` | llm-worker 리포트 모델 | `claude-sonnet-4-6` |
+| `CLAUDE_HOST_CONFIG_DIR` | bind mount 원본 (`→ /root/.claude`) — **llm-worker에 마운트** | dev: `/home/justant/.claude` / prod: `/root/.claude` |
+| `LLM_POOL_SIZE` | ThreadPoolExecutor 상한 | `100` |
+| `LLM_QUEUE_CAPACITY` | LinkedBlockingQueue 용량 | `500` |
+| `LLM_QUEUE_WAIT_TIMEOUT_MS` | 큐 대기 최대 시간 (ms) | `30000` |
 | `ANTHROPIC_API_KEY` | claude CLI 인증 fallback (정상 케이스에선 비워둠) | `""` |
 
-API 키 없이 동작 — 호스트의 `~/.claude` 세션을 컨테이너가 공유.
+API 키 없이 동작 — 호스트의 `~/.claude` 세션을 **llm-worker** 컨테이너가 공유. backend 컨테이너에는 마운트 불필요.
+
+긴급 롤백: `LLM_PROVIDER=claude-code`로 변경 → backend에서 in-process 직접 호출 (backend Dockerfile revert 필요).
 
 ### OAuth2
 
@@ -76,7 +83,9 @@ prod는 `application-prod.yml`이 모든 키에 기본값 없이 환경변수를
 - [ ] `JWT_SECRET`
 - [ ] `GOOGLE_*`, `KAKAO_*`, `NAVER_*` (전체 OAuth)
 - [ ] `MAIL_USERNAME` (againspring2026@gmail.com), `GMAIL_APP_PASSWORD`
-- [ ] `CLAUDE_HOST_CONFIG_DIR` 디렉토리가 호스트에 존재 + `claude` 1회 로그인 완료
+- [ ] `CLAUDE_HOST_CONFIG_DIR` 디렉토리가 호스트에 존재 + `claude` 1회 로그인 완료 (llm-worker 컨테이너가 사용)
+- [ ] `LLM_WORKER_URL` (`http://againspring-llm-prod:8090`)
+- [ ] `LLM_POOL_SIZE`, `LLM_QUEUE_CAPACITY`, `LLM_QUEUE_WAIT_TIMEOUT_MS` (기본값 사용 가능)
 
 ## 변경 시 절차
 
