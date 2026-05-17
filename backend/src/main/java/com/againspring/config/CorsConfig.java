@@ -15,8 +15,7 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:3000",
-                "http://localhost:3001",
+                "http://localhost:*",
                 "https://dev.againspring.net",
                 "https://againspring.net",
                 "https://www.againspring.net"

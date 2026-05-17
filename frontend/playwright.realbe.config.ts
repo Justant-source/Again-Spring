@@ -4,9 +4,14 @@ import { defineConfig, devices } from '@playwright/test'
  * 실 BE 대상 FE E2E 설정.
  *
  * 사전 조건:
- *   1. DB (MariaDB): cd env && docker compose up -d
- *   2. BE: cd backend && ./gradlew bootRun  → localhost:8080
- *   3. 이 설정의 webServer가 NEXT_PUBLIC_DISABLE_MSW=true 로 FE를 띄움
+ *   cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d
+ *   → localhost:8090 nginx 응답 확인
+ *
+ * 구조:
+ *   Docker nginx(8090) → /api/* → BE 컨테이너  (CORS: same-origin, MSW: production이므로 비활성)
+ *                      → /*    → FE 컨테이너  (NODE_ENV=production, MSW 비활성)
+ *
+ * webServer 없음 — 이미 실행 중인 Docker 스택 재사용.
  *
  * 실행: npx playwright test --config=playwright.realbe.config.ts
  * 또는: npm run test:e2e:realbe
@@ -20,7 +25,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:8090',
     trace: 'on',
     screenshot: 'on',
     video: 'on-first-retry',
@@ -32,15 +37,5 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-
-  webServer: {
-    command: 'NEXT_PUBLIC_DISABLE_MSW=true npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,  // 이미 띄워진 dev server 재사용
-    timeout: 120000,
-    env: {
-      NEXT_PUBLIC_DISABLE_MSW: 'true',
-      NEXT_PUBLIC_API_BASE_URL: 'http://localhost:8080',
-    },
-  },
+  // webServer 없음 — Docker dev 스택(localhost:8090)을 그대로 사용
 })

@@ -15,13 +15,14 @@ const ONBOARDING_STEPS = 10
 test.describe('게스트 골든패스 (실 BE 연동)', () => {
 
   test('게스트 인증 → 세션 생성 → 채팅 화면 진입 + 첫마디 수신', async ({ page }) => {
-    // 0. BE 헬스 체크 — BE가 응답하지 않으면 명확한 실패 메시지
+    test.setTimeout(120_000) // 온보딩 10문항 + 세션 생성 포함 전체 플로우 여유
+    // 0. BE 헬스 체크 — nginx(8090)를 통해 BE 응답 확인
     let beHealthy = false
     try {
-      const resp = await page.request.get('http://localhost:8080/api/health')
+      const resp = await page.request.get('http://localhost:8090/api/health')
       beHealthy = resp.ok()
     } catch {}
-    expect(beHealthy, 'BE (localhost:8080)가 실행 중이어야 합니다. ./gradlew bootRun 후 재시도').toBe(true)
+    expect(beHealthy, 'BE (localhost:8090/api/health)가 응답하지 않습니다. docker compose dev 환경을 확인하세요.').toBe(true)
 
     // 1. 랜딩 페이지
     await page.goto('/')
@@ -55,32 +56,31 @@ test.describe('게스트 골든패스 (실 BE 연동)', () => {
     // 4. 온보딩 흐름 (FE 전용 — BE API 미호출, 빠르게 통과)
     await page.waitForURL('**/onboarding**', { timeout: 8000 })
 
-    // 온보딩 인트로 → 시작 버튼
-    const introStartBtn = page.getByRole('button', { name: /10문항|시작|다음/ }).first()
-    if (await introStartBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    // 온보딩 인트로 → "10문항 시작하기" 버튼 클릭
+    const introStartBtn = page.getByRole('button', { name: '10문항 시작하기' })
+    if (await introStartBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await introStartBtn.click()
+      await page.waitForURL('**/onboarding', { timeout: 5000 }).catch(() => {})
     }
 
-    // Likert 10문항: 중간값 선택 + 다음
+    // Likert 10문항: 중간값(3) 선택 → 앱이 250ms 후 자동 다음 문항으로 이동
+    // .likert-dot 버튼이 aria-label="n번 선택" 형태이므로 CSS 셀렉터로 선택
     for (let i = 0; i < ONBOARDING_STEPS; i++) {
-      await page.waitForTimeout(200)
-      const buttons = page.getByRole('button', { name: /^[1-5]$/ })
-      const count = await buttons.count()
-      if (count > 0) {
-        await buttons.nth(Math.floor(count / 2)).click()
-      }
-      const nextOrDone = page.getByRole('button', { name: /다음|완료/ })
-      if (await nextOrDone.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await nextOrDone.click()
+      // 현재 문항의 likert 버튼들이 나타날 때까지 대기
+      const likertDots = page.locator('.likert-dot')
+      await likertDots.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+      const count = await likertDots.count()
+      if (count >= 3) {
+        // 중간값(3번째) 선택 — onClick으로 handleSelect 호출 → 250ms 후 자동 다음 문항
+        await likertDots.nth(2).click()
+        // 자동 이동 대기 (마지막 문항은 자동 제출 후 result 페이지로 이동)
+        await page.waitForTimeout(400)
       }
     }
 
-    // 온보딩 결과 → 완료하기
-    await page.waitForTimeout(500)
-    const doneBtn = page.getByRole('button', { name: /완료|다음|시작/ }).first()
-    if (await doneBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await doneBtn.click()
-    }
+    // 온보딩 결과 페이지 → "완료하기" 버튼 클릭 → /session/new 이동
+    await page.waitForURL('**/onboarding/result**', { timeout: 8000 })
+    await page.getByRole('button', { name: '완료하기' }).click({ timeout: 5000 })
 
     // 5. 관계 유형 선택
     await page.waitForURL('**/session/new**', { timeout: 10000 })
@@ -94,35 +94,28 @@ test.describe('게스트 골든패스 (실 BE 연동)', () => {
     await page.waitForURL('**/session/category**', { timeout: 8000 })
     expect(page.url()).toContain('/session/category')
 
+    // Stage 1: 중분류 선택 — PhoneFrame(.tone-L) 내부의 한국어 버튼 중 첫 번째
+    // BetaBanner "의견 보내주세요" 버튼은 fixed+DOM 상위라 .tone-L 밖 → 제외
+    await page.getByText('마음에 걸리시는 일의').waitFor({ timeout: 5000 })
+    await page.locator('.tone-L button').filter({ hasText: /[가-힣]/ }).first().click()
+
+    // Stage 2: 소분류 선택 — PhoneFrame 내부, disabled 아닌 한국어 버튼 중 첫 번째
+    await page.getByText('가장 가까운 상황을').waitFor({ timeout: 8000 })
+    await page.locator('.tone-L button:not([disabled])').filter({ hasText: /[가-힣]/ }).first().click()
+
+    // Stage 3 (게스트): 중재자 성향 → "대화 시작" → POST /api/sessions
     const sessionCreatePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/sessions') && resp.request().method() === 'POST',
       { timeout: 15000 }
     )
-
-    // 첫 번째 중분류 → 첫 번째 소분류 클릭 (또는 직접입력 제외한 첫 항목)
-    const firstMiddleBtn = page.getByRole('button').filter({ hasNot: page.getByText(/직접 입력/) }).nth(1)
-    if (await firstMiddleBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await firstMiddleBtn.click()
-      await page.waitForTimeout(300)
-    }
-    const firstMinorBtn = page.getByRole('button').filter({ hasNot: page.getByText(/직접 입력/) }).nth(1)
-    if (await firstMinorBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await firstMinorBtn.click()
-      await page.waitForTimeout(300)
-    }
-
-    // 세션 생성 확인 버튼이 있으면 클릭
-    const confirmBtn = page.getByRole('button', { name: /시작|확인|대화 시작/ })
-    if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await confirmBtn.click()
-    }
+    await page.getByRole('button', { name: '대화 시작' }).click({ timeout: 5000 })
 
     const sessionResp = await sessionCreatePromise
 
     expect(sessionResp.status(), [
-      `POST /api/sessions가 200이어야 합니다.`,
+      `POST /api/sessions가 201이어야 합니다.`,
       `실제 응답: ${sessionResp.status()} — BE 로그를 확인하세요.`,
-    ].join(' ')).toBe(200)
+    ].join(' ')).toBe(201)
 
     const sessionBody = await sessionResp.json()
     const sessionId = sessionBody.id
@@ -180,7 +173,7 @@ test.describe('게스트 골든패스 (실 BE 연동)', () => {
     // BE가 살아있으면 skip
     let beHealthy = false
     try {
-      const resp = await page.request.get('http://localhost:8080/api/health')
+      const resp = await page.request.get('http://localhost:8090/api/health')
       beHealthy = resp.ok()
     } catch {}
 
