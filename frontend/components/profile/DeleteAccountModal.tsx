@@ -11,7 +11,7 @@ interface Props {
   onDeleted: () => void;
 }
 
-type Step = 'confirm' | 'password';
+type Step = 'confirm' | 'reconfirm' | 'password';
 
 export function DeleteAccountModal({ open, user, onClose, onDeleted }: Props) {
   const [step, setStep] = useState<Step>('confirm');
@@ -104,6 +104,8 @@ export function DeleteAccountModal({ open, user, onClose, onDeleted }: Props) {
               onClick={() => {
                 if (needsPassword) {
                   setStep('password');
+                } else if (!user.isGuest && user.provider) {
+                  setStep('reconfirm');
                 } else {
                   handleDelete();
                 }
@@ -121,6 +123,61 @@ export function DeleteAccountModal({ open, user, onClose, onDeleted }: Props) {
               }}
             >
               계속
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'reconfirm') {
+    return (
+      <div style={overlayStyle} onClick={handleClose}>
+        <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
+          <div className="serif" style={{ fontSize: 17, fontWeight: 600, color: '#B94040' }}>
+            정말 삭제하시겠어요?
+          </div>
+          <div style={{ fontSize: 13, color: '#6B6660', lineHeight: 1.65 }}>
+            Google 계정으로 가입하셨어요.
+            <br />
+            계정을 삭제하면 모든 대화 내역과 리포트를 다시 볼 수 없으며,
+            이 작업은 되돌릴 수 없습니다.
+          </div>
+          {error && (
+            <div style={{ fontSize: 12, color: '#B94040' }}>{error}</div>
+          )}
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button
+              onClick={handleClose}
+              style={{
+                flex: 1,
+                padding: '11px 0',
+                border: '1px solid var(--L-rule)',
+                borderRadius: 6,
+                background: 'transparent',
+                fontSize: 14,
+                color: '#6B6660',
+                cursor: 'pointer',
+              }}
+            >
+              취소
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={loading}
+              style={{
+                flex: 1,
+                padding: '11px 0',
+                border: 'none',
+                borderRadius: 6,
+                background: loading ? '#E8E0E0' : '#B94040',
+                color: loading ? '#9B8888' : '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {loading ? '처리 중...' : '삭제 확인'}
             </button>
           </div>
         </div>

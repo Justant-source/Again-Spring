@@ -32,8 +32,10 @@ export function ChatPanel({
   onOpenInvite,
 }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  // V13 Phase 1: 진입 시 1초 입력 애니메이션
   const [entryTypingDone, setEntryTypingDone] = useState(false);
+  // 신규 세션 첫 메시지: 중재자가 3초간 생각하는 척 후 표시
+  const [firstMessageReady, setFirstMessageReady] = useState(false);
+  const firstMessageTimerStarted = useRef(false);
 
   const { user } = useUserStore();
   const { showGuestLimitModal } = useUiStore();
@@ -57,6 +59,37 @@ export function ChatPanel({
 
   useEffect(() => {
     const t = setTimeout(() => setEntryTypingDone(true), 1000);
+    return () => clearTimeout(t);
+  }, []);
+
+  // 신규 세션(유저 메시지 없음 + 중재자 첫마디 존재): 2초 추가 지연 (진입 1s + 2s = ~3s)
+  // 진행 중 세션(유저 메시지 있음) 또는 빈 세션: 즉시 표시
+  useEffect(() => {
+    if (!entryTypingDone) return;
+    if (firstMessageTimerStarted.current) return;
+
+    const hasMediatorMsg = messages.some(m => m.sender === mediatorSender);
+    const hasUserMsg = messages.some(m => m.sender === currentUserSender);
+
+    if (hasMediatorMsg && !hasUserMsg) {
+      firstMessageTimerStarted.current = true;
+      const t = setTimeout(() => setFirstMessageReady(true), 2000);
+      return () => clearTimeout(t);
+    }
+    if (hasUserMsg || messages.length > 0) {
+      firstMessageTimerStarted.current = true;
+      setFirstMessageReady(true);
+    }
+  }, [entryTypingDone, messages, mediatorSender, currentUserSender]);
+
+  // 안전 장치: 7초 후 무조건 표시 (메시지 로드 지연 또는 빈 세션 대응)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!firstMessageTimerStarted.current) {
+        firstMessageTimerStarted.current = true;
+        setFirstMessageReady(true);
+      }
+    }, 7000);
     return () => clearTimeout(t);
   }, []);
 
@@ -95,9 +128,9 @@ export function ChatPanel({
       />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
-        {!entryTypingDone && <TypingBubble />}
-        {entryTypingDone && messages.length === 0 && <EmptyChatPlaceholder />}
-        {entryTypingDone && messages.map(msg => {
+        {(!entryTypingDone || !firstMessageReady) && <TypingBubble />}
+        {entryTypingDone && firstMessageReady && messages.length === 0 && <EmptyChatPlaceholder />}
+        {entryTypingDone && firstMessageReady && messages.map(msg => {
           if (msg.isPartnerJoinNotice) {
             return <PartnerJoinNoticeCard key={msg.id} message={msg} />;
           }
@@ -126,8 +159,8 @@ export function ChatPanel({
             </div>
           );
         })}
-        {entryTypingDone && sending && <TypingBubble />}
-        {entryTypingDone && isTyping && <TypingBubble />}
+        {entryTypingDone && firstMessageReady && sending && <TypingBubble />}
+        {entryTypingDone && firstMessageReady && isTyping && <TypingBubble />}
         <div ref={messagesEndRef} />
       </div>
 
