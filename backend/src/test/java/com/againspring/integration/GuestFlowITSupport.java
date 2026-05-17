@@ -1,7 +1,7 @@
 package com.againspring.integration;
 
+import com.againspring.llm.LLMProvider;
 import com.againspring.llm.bridge.CancelableInvocation;
-import com.againspring.llm.bridge.ClaudeCodeBridge;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,9 +34,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-// @MockBean ClaudeCodeBridge 이 LLMProvider를 충족.
-// application-test.yml의 llm.provider=mock을 무력화해 MockLLMProvider가 LLMProvider 중복 빈으로 등록되는 걸 방지.
-@TestPropertySource(properties = "llm.provider=claude-code")
+// @MockBean LLMProvider가 CancelableChatService에 주입됨.
+// application-test.yml의 llm.provider=mock → MockLLMProvider 빈 대신 이 mock이 우선 적용.
+@TestPropertySource(properties = "llm.provider=none")
 public abstract class GuestFlowITSupport {
 
     @Autowired
@@ -46,7 +46,7 @@ public abstract class GuestFlowITSupport {
     protected ObjectMapper objectMapper;
 
     @MockBean
-    protected ClaudeCodeBridge mockClaudeCodeBridge;
+    protected LLMProvider mockClaudeCodeBridge;
 
     // CWD = backend/ in Gradle → resolves to backend/src/test/resources/test-templates/...
     @DynamicPropertySource

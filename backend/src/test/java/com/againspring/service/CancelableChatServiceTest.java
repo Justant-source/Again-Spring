@@ -9,14 +9,8 @@ import com.againspring.llm.bridge.ClaudeCodeBridge;
 import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
-import com.againspring.safety.IsolationLintFilter;
-import com.againspring.service.context.IssueContextMerger;
-import com.againspring.service.context.PhaseDMetrics;
-import com.againspring.service.context.QuestionQueueUpdater;
-import com.againspring.service.context.UserStateAppender;
 import com.againspring.config.UserPermissionsConfig;
 import com.againspring.service.crisis.CrisisDetector;
-import com.againspring.service.parser.ChatTurnMetaParser;
 import com.againspring.service.prompt.ChatPromptAssembler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,12 +40,7 @@ class CancelableChatServiceTest {
     @Mock CrisisDetector crisisDetector;
     @Mock ChatPromptAssembler promptAssembler;
     @Mock SessionStateMachine stateMachine;
-    @Mock ChatTurnMetaParser turnMetaParser;
-    @Mock UserStateAppender userStateAppender;
-    @Mock IssueContextMerger issueContextMerger;
-    @Mock QuestionQueueUpdater questionQueueUpdater;
-    @Mock IsolationLintFilter isolationLintFilter;
-    @Mock PhaseDMetrics phaseDMetrics;
+    @Mock ChatTurnProcessor chatTurnProcessor;
     @Mock PlatformTransactionManager txManager;
     @Mock UserPermissionsConfig permissions;
 
@@ -68,8 +57,7 @@ class CancelableChatServiceTest {
         service = new CancelableChatService(
                 messageRepo, sessionRepo, userRepo, llmBridge,
                 crisisDetector, promptAssembler, stateMachine,
-                turnMetaParser, userStateAppender, issueContextMerger,
-                questionQueueUpdater, isolationLintFilter, phaseDMetrics, txManager, permissions);
+                chatTurnProcessor, txManager, permissions);
 
         session = new Session();
         session.setId(SESSION_ID);

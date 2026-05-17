@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { MSWProvider } from '@/components/shared/MSWProvider';
 import { AuthBootstrap } from '@/components/shared/AuthBootstrap';
+import { AuthRedirectGuard } from '@/components/shared/AuthRedirectGuard';
 import { DailyLimitModal } from '@/components/shared/DailyLimitModal';
 import { FeedbackModal } from '@/components/feedback/FeedbackModal';
 import { ConsentReconfirmModal } from '@/components/legal/ConsentReconfirmModal';
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body>
         <MSWProvider>
           <AuthBootstrap />
+          <AuthRedirectGuard />
           <DailyLimitModal />
           <BetaBanner />
           <FeedbackModal />

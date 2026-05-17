@@ -323,7 +323,7 @@ describe('PartnerPanel', () => {
       })
     )
 
-    const consoleDebug = vi.spyOn(console, 'debug').mockImplementation()
+    const consoleDebug = vi.spyOn(console, 'debug').mockImplementation(() => {})
 
     render(<PartnerPanel sessionId="test-session" myRole="USER_A" />)
 

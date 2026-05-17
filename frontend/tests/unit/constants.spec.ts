@@ -21,7 +21,6 @@ describe('Communication Styles Constants', () => {
     it('each style has required fields', () => {
       Object.values(COMMUNICATION_STYLES).forEach((style) => {
         expect(style).toHaveProperty('id')
-        expect(style).toHaveProperty('emoji')
         expect(style).toHaveProperty('label')
         expect(style).toHaveProperty('motif')
         expect(style).toHaveProperty('description')
@@ -40,10 +39,10 @@ describe('Communication Styles Constants', () => {
       })
     })
 
-    it('each style has emoji property', () => {
-      Object.values(COMMUNICATION_STYLES).forEach((style) => {
-        expect(style.emoji).toBeTruthy()
-        expect(typeof style.emoji).toBe('string')
+    it('each style has motif property matching its id', () => {
+      Object.entries(COMMUNICATION_STYLES).forEach(([id, style]) => {
+        expect(style.motif).toBeTruthy()
+        expect(style.motif).toBe(id)
       })
     })
 
@@ -85,42 +84,42 @@ describe('Communication Styles Constants', () => {
     it('wave style is properly defined', () => {
       const wave = COMMUNICATION_STYLES.wave
       expect(wave.id).toBe('wave')
-      expect(wave.emoji).toBe('🌊')
+      expect(wave.motif).toBe('wave')
       expect(wave.label).toBe('파도형')
     })
 
     it('mountain style is properly defined', () => {
       const mountain = COMMUNICATION_STYLES.mountain
       expect(mountain.id).toBe('mountain')
-      expect(mountain.emoji).toBe('🏔️')
+      expect(mountain.motif).toBe('mountain')
       expect(mountain.label).toBe('산형')
     })
 
     it('flame style is properly defined', () => {
       const flame = COMMUNICATION_STYLES.flame
       expect(flame.id).toBe('flame')
-      expect(flame.emoji).toBe('🔥')
+      expect(flame.motif).toBe('flame')
       expect(flame.label).toBe('불꽃형')
     })
 
     it('leaf style is properly defined', () => {
       const leaf = COMMUNICATION_STYLES.leaf
       expect(leaf.id).toBe('leaf')
-      expect(leaf.emoji).toBe('🌿')
+      expect(leaf.motif).toBe('leaf')
       expect(leaf.label).toBe('이파리형')
     })
 
     it('moon style is properly defined', () => {
       const moon = COMMUNICATION_STYLES.moon
       expect(moon.id).toBe('moon')
-      expect(moon.emoji).toBe('🌙')
+      expect(moon.motif).toBe('moon')
       expect(moon.label).toBe('달빛형')
     })
 
     it('star style is properly defined', () => {
       const star = COMMUNICATION_STYLES.star
       expect(star.id).toBe('star')
-      expect(star.emoji).toBe('⭐')
+      expect(star.motif).toBe('star')
       expect(star.label).toBe('별빛형')
     })
   })
@@ -203,7 +202,7 @@ describe('Communication Styles Constants', () => {
 describe('Categories Constants', () => {
   describe('CATEGORIES', () => {
     it('has 6 major categories', () => {
-      expect(CATEGORIES).toHaveLength(6)
+      expect(CATEGORIES).toHaveLength(7)
     })
 
     it('includes all relation types', () => {

@@ -198,7 +198,7 @@ test.describe('Result Report View', () => {
     const hasLoadingOrError = await loadingState.isVisible({ timeout: 2000 }).catch(() => false)
 
     // If no loading, should show content or error
-    const hasContent = await page.locator('body').textContent().then(t => (t?.length || 0) > 50)
+    const hasContent = await page.locator('body').textContent().then((t: string | null) => (t?.length || 0) > 50)
     expect(hasLoadingOrError || hasContent).toBe(true)
   })
 

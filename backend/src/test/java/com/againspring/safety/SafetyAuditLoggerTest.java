@@ -7,10 +7,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
@@ -28,21 +24,17 @@ import org.slf4j.LoggerFactory;
  * - Raw text is NOT logged (only pattern names)
  * - All required fields are present in log
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@TestPropertySource(properties = {
-	"logging.level.com.againspring.safety.audit=WARN"
-})
 @DisplayName("SafetyAuditLogger Tests")
 class SafetyAuditLoggerTest {
 
-	@Autowired
 	private SafetyAuditLogger auditLogger;
 
 	private ListAppender<ILoggingEvent> listAppender;
 
 	@BeforeEach
 	void setUp() {
+		auditLogger = new SafetyAuditLogger();
+
 		// Setup Logback test appender
 		LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
 		Logger logger = loggerContext.getLogger("com.againspring.safety.audit");

@@ -154,7 +154,7 @@ export interface Report {
   metaphorCards?: MetaphorCard[];
   nvcScripts?: {
     aToB: NVCScript;
-    bToA: NVCScript;
+    bToA?: NVCScript;
   };
   horsemenObservation?: HorsemenObservation;
   repairSuggestions: string[];

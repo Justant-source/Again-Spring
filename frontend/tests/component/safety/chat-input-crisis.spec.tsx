@@ -72,14 +72,14 @@ describe('Safety: Chat Input Crisis Keyword Detection', () => {
       expect(onCrisis).toHaveBeenCalledTimes(1)
     })
 
-    it('should block sending when "맞았" is entered', async () => {
+    it('should block sending when "폭행" context is entered', async () => {
       const onSend = vi.fn()
       const onCrisis = vi.fn()
       render(<ChatInput onSend={onSend} onCrisis={onCrisis} />)
       const user = userEvent.setup()
 
       const textarea = screen.getByPlaceholderText('편한 말로 적어주세요')
-      await user.type(textarea, '자기 전에 맞았어')
+      await user.type(textarea, '폭행을 당했어요')
       await user.keyboard('{Enter}')
 
       expect(onSend).not.toHaveBeenCalled()

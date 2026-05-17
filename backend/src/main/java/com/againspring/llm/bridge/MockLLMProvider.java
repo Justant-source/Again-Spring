@@ -83,6 +83,13 @@ public class MockLLMProvider implements LLMProvider {
     }
 
     @Override
+    public CancelableInvocation invokeCancelable(String prompt, String model, String sessionId) {
+        CancelableInvocation ci = new CancelableInvocation(UUID.randomUUID().toString(), sessionId);
+        ci.getResultFuture().complete("[Mock] 두 분의 이야기를 잘 들었어요.");
+        return ci;
+    }
+
+    @Override
     public String getProviderName() {
         return "mock";
     }

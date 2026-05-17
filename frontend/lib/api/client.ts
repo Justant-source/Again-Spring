@@ -22,31 +22,21 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const code = error.response?.data?.error?.code;
 
-    if (status === 401 || status === 403) {
-      if (typeof window !== 'undefined') {
-        const isGuest = (() => {
-          try {
-            const raw = localStorage.getItem('again-spring-user');
-            if (!raw) return false;
-            const parsed = JSON.parse(raw);
-            return parsed?.state?.user?.isGuest === true;
-          } catch { return false; }
-        })();
-        localStorage.removeItem('again-spring-token');
-        window.location.href = isGuest ? '/guest' : '/login';
-      }
-      return Promise.reject(error);
-    }
-
-    if (status === 402 && code === 'GUEST_LIMIT_REACHED') {
+    if (status === 401) {
+      if (typeof window !== 'undefined') localStorage.removeItem('again-spring-token');
+      useUiStore.getState().setAuthError('unauthorized');
+    } else if (status === 403) {
+      if (typeof window !== 'undefined') localStorage.removeItem('again-spring-token');
+      useUiStore.getState().setAuthError('forbidden');
+    } else if (status === 402 && code === 'GUEST_LIMIT_REACHED') {
       const match = typeof window !== 'undefined'
         ? window.location.pathname.match(/\/session\/chat\/([^/]+)/)
         : null;
-      const sessionId = match ? match[1] : null;
-      useUiStore.getState().showGuestLimitModal(sessionId);
+      useUiStore.getState().showGuestLimitModal(match ? match[1] : null);
     } else if (status === 429 && code === 'DAILY_LIMIT_EXCEEDED') {
       useUiStore.getState().showDailyLimitModal();
     }
+
     return Promise.reject(error);
   },
 );

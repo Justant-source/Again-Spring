@@ -7,8 +7,13 @@ import { http, HttpResponse } from 'msw'
 
 describe('InviteModal', () => {
   beforeEach(() => {
-    // Mock the invite token API
+    // Mock the invite token API (component tries GET first, then POST)
     server.use(
+      http.get('/api/sessions/:sessionId/invite', () => {
+        return HttpResponse.json({
+          inviteToken: 'test_invite_token_123',
+        })
+      }),
       http.post('/api/sessions/:sessionId/invite', () => {
         return HttpResponse.json({
           inviteToken: 'test_invite_token_123',
@@ -161,8 +166,9 @@ describe('InviteModal', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
 
-    // Mock navigator.clipboard
-    const clipboardWriteText = vi.fn()
+    // Make clipboard API available (JSDOM isSecureContext may be undefined/false)
+    const clipboardWriteText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('isSecureContext', true)
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText: clipboardWriteText },
       writable: true,
@@ -180,17 +186,20 @@ describe('InviteModal', () => {
     })
     await user.click(shareButton)
 
-    // Since navigator.share is not available in test, clipboard copy should be called
+    // navigator.share not available → clipboard fallback
     await waitFor(() => {
       expect(clipboardWriteText).toHaveBeenCalled()
     })
+
+    vi.unstubAllGlobals()
   })
 
   it('shows copied feedback after sharing', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
 
-    // Mock navigator.clipboard
+    // Make clipboard API available
+    vi.stubGlobal('isSecureContext', true)
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
       writable: true,
@@ -208,10 +217,12 @@ describe('InviteModal', () => {
     })
     await user.click(shareButton)
 
-    // Check for "복사됐어요" message
+    // Button text changes to "메시지+링크 복사됐어요" after successful copy
     await waitFor(() => {
       expect(screen.getByText(/복사됐어요/)).toBeInTheDocument()
     })
+
+    vi.unstubAllGlobals()
   })
 
   it('displays all three tone messages correctly', async () => {
@@ -235,13 +246,16 @@ describe('InviteModal', () => {
 
   it('handles API error gracefully', async () => {
     server.use(
+      http.get('/api/sessions/:sessionId/invite', () => {
+        return HttpResponse.json({ error: 'Failed' }, { status: 500 })
+      }),
       http.post('/api/sessions/:sessionId/invite', () => {
         return HttpResponse.json({ error: 'Failed' }, { status: 500 })
       })
     )
 
     const onClose = vi.fn()
-    const consoleError = vi.spyOn(console, 'error').mockImplementation()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     render(<InviteModal sessionId="test-session" onClose={onClose} />)
 
     await waitFor(() => {

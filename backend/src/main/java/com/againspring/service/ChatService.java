@@ -9,19 +9,12 @@ import com.againspring.llm.LLMProvider;
 import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
-import com.againspring.service.context.IssueContextMerger;
-import com.againspring.service.context.QuestionQueueUpdater;
-import com.againspring.service.context.UserStateAppender;
 import com.againspring.service.context.WelcomeMessageGenerator;
 import com.againspring.service.context.WelcomeQuestionResolver;
-import com.againspring.service.context.PhaseDMetrics;
-import com.againspring.safety.IsolationLintFilter;
 import com.againspring.service.crisis.CrisisDetector;
-import com.againspring.service.parser.ChatTurnMetaParser;
 import com.againspring.service.prompt.ChatPromptAssembler;
 import com.againspring.service.report.ReportGenerationService;
 import com.againspring.service.event.PartnerJoinedEvent;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -51,17 +44,11 @@ public class ChatService {
     private final ChatPromptAssembler promptAssembler;
     private final SessionStateMachine stateMachine;
     private final ReportGenerationService reportService;
-    private final SessionRoleResolver roleResolver;
-    private final ChatTurnMetaParser turnMetaParser;
-    private final UserStateAppender userStateAppender; // Phase D PR-2
-    private final IssueContextMerger issueContextMerger; // Phase D PR-3
-    private final QuestionQueueUpdater questionQueueUpdater; // Phase D PR-4
-    private final IsolationLintFilter isolationLintFilter; // Phase D PR-4
-    private final WelcomeQuestionResolver welcomeQuestionResolver; // Phase D PR-5
-    private final WelcomeMessageGenerator welcomeMessageGenerator; // Phase D PR-5
-    private final PhaseDMetrics phaseDMetrics; // Phase D PR-6
+    private final ChatTurnProcessor chatTurnProcessor;
+    private final WelcomeQuestionResolver welcomeQuestionResolver;
+    private final WelcomeMessageGenerator welcomeMessageGenerator;
 
-    // Bug E: Lazy-injected to avoid circular dependency with CancelableChatService
+    // Lazy-injected to avoid circular dependency with CancelableChatService
     @Lazy
     private CancelableChatService cancelableChatService;
 
@@ -69,15 +56,10 @@ public class ChatService {
                       UserRepository userRepo,
                       LLMProvider llmBridge, CrisisDetector crisisDetector,
                       ChatPromptAssembler promptAssembler, SessionStateMachine stateMachine,
-                      ReportGenerationService reportService, SessionRoleResolver roleResolver,
-                      ChatTurnMetaParser turnMetaParser,
-                      UserStateAppender userStateAppender,
-                      IssueContextMerger issueContextMerger,
-                      QuestionQueueUpdater questionQueueUpdater,
-                      IsolationLintFilter isolationLintFilter,
+                      ReportGenerationService reportService,
+                      ChatTurnProcessor chatTurnProcessor,
                       WelcomeQuestionResolver welcomeQuestionResolver,
                       WelcomeMessageGenerator welcomeMessageGenerator,
-                      PhaseDMetrics phaseDMetrics,
                       @Lazy CancelableChatService cancelableChatService) {
         this.messageRepo = messageRepo;
         this.sessionRepo = sessionRepo;
@@ -87,15 +69,9 @@ public class ChatService {
         this.promptAssembler = promptAssembler;
         this.stateMachine = stateMachine;
         this.reportService = reportService;
-        this.roleResolver = roleResolver;
-        this.turnMetaParser = turnMetaParser;
-        this.userStateAppender = userStateAppender;
-        this.issueContextMerger = issueContextMerger;
-        this.questionQueueUpdater = questionQueueUpdater;
-        this.isolationLintFilter = isolationLintFilter;
+        this.chatTurnProcessor = chatTurnProcessor;
         this.welcomeQuestionResolver = welcomeQuestionResolver;
         this.welcomeMessageGenerator = welcomeMessageGenerator;
-        this.phaseDMetrics = phaseDMetrics;
         this.cancelableChatService = cancelableChatService;
     }
 
@@ -181,73 +157,22 @@ public class ChatService {
         }
         long latency = System.currentTimeMillis() - start;
 
-        int turnIndex = (session.getHorsemenHistory() == null ? 0 : session.getHorsemenHistory().size()) + 1;
-        ChatTurnMetaParser.Result parsed = turnMetaParser.parse(
-            mediatorResponseRaw, turnIndex, userSender.name());
-        String mediatorResponse = parsed.mediatorMessage().isBlank()
-            ? mediatorResponseRaw : parsed.mediatorMessage();
+        ChatTurnProcessor.TurnProcessResult turnResult =
+                chatTurnProcessor.process(session, userSender, mediatorResponseRaw, latency);
 
-        appendPsychologyHistory(session, parsed);
-        userStateAppender.append(session, parsed.userState()); // Phase D PR-2
-        issueContextMerger.merge(session, parsed.issueDelta(), turnIndex); // Phase D PR-3
-        questionQueueUpdater.update(session, parsed.queueDelta(), turnIndex); // Phase D PR-4
-
-        // Phase D PR-6: 메트릭 기록
-        if (parsed.userState() != null) {
-            phaseDMetrics.recordUserState(parsed.userState().state);
-        }
-        if (parsed.userState() != null || parsed.issueDelta() != null) {
-            phaseDMetrics.recordMetaPopulated();
-        }
-        if (parsed.queueDelta() != null && parsed.queueDelta().asked != null) {
-            phaseDMetrics.recordQueueAsked(parsed.queueDelta().asked.size());
-        }
-
-        // '---' 마커로 메시지 분할 저장 (200자 초과 시 자동 분할)
-        String[] rawChunks = mediatorResponse.split("(?m)^---\\s*$");
-        List<String> chunks = new ArrayList<>();
-        for (String c : rawChunks) {
-            String trimmed = c.strip();
-            if (!trimmed.isEmpty()) {
-                chunks.addAll(splitLongChunk(trimmed));
-            }
-        }
-        if (chunks.isEmpty()) {
-            chunks.add(mediatorResponse);
-        }
-
-        List<Message> mediatorMessages = new ArrayList<>();
-        for (int i = 0; i < chunks.size(); i++) {
-            String chunk = chunks.get(i);
-            if (isolationLintFilter.violatesIsolation(chunk)) {
-                log.warn("Isolation violation in chunk {} of session {}", i, sessionId);
-                chunk = "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?";
-            }
-            Message mediatorMsg = messageRepo.save(Message.builder()
-                .sessionId(sessionId)
-                .sender(mediatorSender)
-                .content(chunk)
-                .charCount(chunk.length())
-                .llmModel(MODEL_HAIKU)
-                .llmLatencyMs(i == 0 ? latency : null)
-                .build());
-            mediatorMessages.add(mediatorMsg);
-        }
-
-        // 4. 종료 권유 검토 (카운트 기반) + 명시적 종료 요청 시 재트리거
-        boolean finalizeSuggested = checkAndTriggerFinalizationSuggestion(session);
-
+        // 4. 종료 권유 재트리거 — 사용자가 명시적 종료 의사를 표현했을 때 (count 기반 트리거와 별개)
+        boolean finalizeSuggested = turnResult.finalizeSuggested();
         if (!finalizeSuggested && detectExitIntent(content)) {
             int myCount = userSender == MessageSender.USER_A
                 ? (session.getUserAMessageCount() == null ? 0 : session.getUserAMessageCount())
                 : (session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount());
             if (myCount >= MIN_MESSAGES_TO_FINALIZE) {
-                triggerFinalizationSuggestion(session, isDuo);
+                chatTurnProcessor.triggerFinalizationSuggestion(session, isDuo);
                 finalizeSuggested = true;
             }
         }
 
-        return ChatTurnResult.success(userMsg, mediatorMessages, finalizeSuggested);
+        return ChatTurnResult.success(userMsg, turnResult.mediatorMessages(), finalizeSuggested);
     }
 
     /**
@@ -524,56 +449,6 @@ public class ChatService {
 
     // ==== helpers ====
 
-    private void appendPsychologyHistory(Session session, ChatTurnMetaParser.Result parsed) {
-        if (parsed == null) return;
-        boolean dirty = false;
-        if (parsed.horsemen() != null) {
-            List<Session.HorsemenTurnEntry> hist = session.getHorsemenHistory();
-            if (hist == null) hist = new ArrayList<>();
-            hist.add(parsed.horsemen());
-            session.setHorsemenHistory(hist);
-            updateEmotionIntensity(session, parsed.horsemen());
-            dirty = true;
-        }
-        if (parsed.nvc() != null) {
-            List<Session.NvcTurnEntry> hist = session.getNvcCompletionHistory();
-            if (hist == null) hist = new ArrayList<>();
-            hist.add(parsed.nvc());
-            session.setNvcCompletionHistory(hist);
-            dirty = true;
-        }
-        if (dirty) {
-            sessionRepo.save(session);
-        }
-    }
-
-    private void updateEmotionIntensity(Session session, Session.HorsemenTurnEntry entry) {
-        if (entry == null || entry.sender == null) return;
-        double turnIntensity = avgNonNull(entry.criticism, entry.contempt,
-            entry.defensiveness, entry.stonewalling);
-        boolean isA = MessageSender.USER_A.name().equals(entry.sender);
-        java.math.BigDecimal current = isA
-            ? session.getUserAEmotionIntensity()
-            : session.getUserBEmotionIntensity();
-        Integer count = isA ? session.getUserAMessageCount() : session.getUserBMessageCount();
-        int n = count == null ? 1 : Math.max(1, count);
-        double prevAvg = current == null ? 0.0 : current.doubleValue();
-        double nextAvg = ((prevAvg * (n - 1)) + turnIntensity) / n;
-        java.math.BigDecimal value = java.math.BigDecimal.valueOf(Math.round(nextAvg * 100.0) / 100.0)
-            .setScale(2, java.math.RoundingMode.HALF_UP);
-        if (isA) session.setUserAEmotionIntensity(value);
-        else session.setUserBEmotionIntensity(value);
-    }
-
-    private double avgNonNull(Double... values) {
-        double sum = 0;
-        int n = 0;
-        for (Double v : values) {
-            if (v != null) { sum += v; n++; }
-        }
-        return n == 0 ? 0 : sum / n;
-    }
-
     private User loadUserSafely(String userId) {
         if (userId == null) return null;
         try {
@@ -626,59 +501,6 @@ public class ChatService {
             if (e != null && e.state == Session.UserState.RESOLVING) return true;
         }
         return false;
-    }
-
-    private boolean checkAndTriggerFinalizationSuggestion(Session session) {
-        if (session.getFinalizeSuggestedAt() != null) return false;  // 이미 권유함
-
-        int aCount = session.getUserAMessageCount() == null ? 0 : session.getUserAMessageCount();
-        int bCount = session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount();
-
-        boolean isDuo = stateMachine.isDuo(session.getStatus());
-        boolean countThreshold;
-
-        if (!isDuo) {
-            countThreshold = aCount >= FINALIZE_SUGGEST_SOLO_MIN;
-        } else {
-            countThreshold = (aCount + bCount) >= FINALIZE_SUGGEST_DUO_TOTAL_MIN
-                && aCount >= FINALIZE_SUGGEST_DUO_PER_USER_MIN
-                && bCount >= FINALIZE_SUGGEST_DUO_PER_USER_MIN;
-        }
-
-        // 메시지 수만으로는 자동 권유하지 않음 — RESOLVING 상태 도달 신호와 AND 결합.
-        // 명시적 종료 의사는 sendUserMessage()의 detectExitIntent 경로에서 처리됨.
-        if (countThreshold && hasReachedResolvingState(session)) {
-            triggerFinalizationSuggestion(session, isDuo);
-            return true;
-        }
-        return false;
-    }
-
-    private void triggerFinalizationSuggestion(Session session, boolean isDuo) {
-        String suggestion = "이만큼 이야기 나눠주셔서 고마워요. 지금까지 정리해보면 어떨까요?";
-
-        messageRepo.save(Message.builder()
-            .sessionId(session.getId())
-            .sender(MessageSender.MEDIATOR_TO_A)
-            .content(suggestion)
-            .charCount(suggestion.length())
-            .isFinalizeSuggestion(true)
-            .llmModel(MODEL_HAIKU)
-            .build());
-
-        if (isDuo) {
-            messageRepo.save(Message.builder()
-                .sessionId(session.getId())
-                .sender(MessageSender.MEDIATOR_TO_B)
-                .content(suggestion)
-                .charCount(suggestion.length())
-                .isFinalizeSuggestion(true)
-                .llmModel(MODEL_HAIKU)
-                .build());
-        }
-
-        session.setFinalizeSuggestedAt(Instant.now());
-        sessionRepo.save(session);
     }
 
     /**
@@ -747,27 +569,4 @@ public class ChatService {
         Instant lastActivityAt
     ) {}
 
-    // 200자 초과 청크를 문장 경계에서 자동 분할
-    private static final int MAX_CHUNK_LEN = 200;
-
-    private static List<String> splitLongChunk(String chunk) {
-        if (chunk.length() <= MAX_CHUNK_LEN) return List.of(chunk);
-        List<String> parts = new ArrayList<>();
-        String remaining = chunk;
-        while (remaining.length() > MAX_CHUNK_LEN) {
-            int splitAt = -1;
-            for (int i = Math.min(MAX_CHUNK_LEN, remaining.length()) - 1; i >= MAX_CHUNK_LEN / 2; i--) {
-                char c = remaining.charAt(i);
-                if (c == '.' || c == '?' || c == '!' || c == '~' || c == '\n') {
-                    splitAt = i + 1;
-                    break;
-                }
-            }
-            if (splitAt <= 0) splitAt = MAX_CHUNK_LEN;
-            parts.add(remaining.substring(0, splitAt).trim());
-            remaining = remaining.substring(splitAt).trim();
-        }
-        if (!remaining.isEmpty()) parts.add(remaining);
-        return parts;
-    }
 }

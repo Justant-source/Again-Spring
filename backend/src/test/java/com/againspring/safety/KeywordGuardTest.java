@@ -5,9 +5,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 /**
  * Unit tests for KeywordGuard.
@@ -22,8 +23,8 @@ import org.springframework.test.context.ActiveProfiles;
  * - Korean text handling
  * - Output filter replacements
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@ExtendWith(SpringExtension.class)
+@ContextConfiguration(classes = {KeywordGuard.class})
 @DisplayName("KeywordGuard Tests")
 class KeywordGuardTest {
 
@@ -249,11 +250,13 @@ class KeywordGuardTest {
 	@Test
 	@DisplayName("Korean text handling without normalization issues")
 	void testKoreanTextHandling() {
-		// Various Korean inputs
+		// 폭력 is a crisis keyword
 		ScanResult result1 = keywordGuard.scanUserInput("폭력을 휘둘렀어", "user1");
 		assertTrue(result1.isCrisis());
 
-		ScanResult result2 = keywordGuard.scanUserInput("매일 맞았어", "user1");
+		// 맞고 살 composite is a crisis keyword;
+		// bare 맞았 is deliberately excluded (동음이의: 옳고/옳았)
+		ScanResult result2 = keywordGuard.scanUserInput("맞고 살았어요", "user1");
 		assertTrue(result2.isCrisis());
 	}
 }

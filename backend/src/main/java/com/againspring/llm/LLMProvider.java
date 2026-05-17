@@ -1,5 +1,7 @@
 package com.againspring.llm;
 
+import com.againspring.llm.bridge.CancelableInvocation;
+
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -23,6 +25,12 @@ public interface LLMProvider {
      * Used by ChatService and other services that assemble prompts directly.
      */
     String invoke(String prompt, String model) throws Exception;
+
+    /**
+     * Cancelable invocation — caller can cancel() mid-flight.
+     * Used by CancelableChatService to abort in-progress LLM calls.
+     */
+    CancelableInvocation invokeCancelable(String prompt, String model, String sessionId);
 
     /**
      * Provider identity for logging/monitoring.

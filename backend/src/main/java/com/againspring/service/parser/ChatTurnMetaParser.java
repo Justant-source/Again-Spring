@@ -21,32 +21,31 @@ import org.springframework.stereotype.Component;
 @Component
 public class ChatTurnMetaParser {
 
+    // 패턴은 PromptSchema 상수에서 파생 — 태그명 변경 시 PromptSchema만 수정할 것
     private static final Pattern META_BLOCK = Pattern.compile(
-        "<turn_meta>\\s*(\\{.*?})\\s*</turn_meta>",
+        "<" + PromptSchema.TAG_TURN_META + ">\\s*(\\{.*?})\\s*</" + PromptSchema.TAG_TURN_META + ">",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
-    // LLM이 <turn_meta>를 코드 펜스로 감싸고 </turn_meta>를 생략하는 경우 처리
     private static final Pattern META_BLOCK_CODE_FENCE = Pattern.compile(
-        "```\\w*[\\r\\n]*<turn_meta>[\\r\\n]*(\\{.*?})[\\r\\n]*(?:</turn_meta>[\\r\\n]*)?```",
+        "```\\w*[\\r\\n]*<" + PromptSchema.TAG_TURN_META + ">[\\r\\n]*(\\{.*?})[\\r\\n]*(?:</"
+            + PromptSchema.TAG_TURN_META + ">[\\r\\n]*)?```",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
     private static final Pattern WRAPPER_BLOCK = Pattern.compile(
-        "<mediator_response>\\s*(.*?)\\s*</mediator_response>",
+        "<" + PromptSchema.TAG_MEDIATOR_RESPONSE + ">\\s*(.*?)\\s*</" + PromptSchema.TAG_MEDIATOR_RESPONSE + ">",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
-    // AI가 <turn_meta> 대신 독립 최상위 태그로 출력할 때 스트립 + 파싱
     private static final Pattern ISSUE_DELTA_BLOCK = Pattern.compile(
-        "<issue_delta>\\s*(\\{.*?})\\s*</issue_delta>",
+        "<" + PromptSchema.TAG_ISSUE_DELTA + ">\\s*(\\{.*?})\\s*</" + PromptSchema.TAG_ISSUE_DELTA + ">",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
     private static final Pattern QUEUE_DELTA_BLOCK = Pattern.compile(
-        "<question_queue_delta>\\s*(\\{.*?})\\s*</question_queue_delta>",
+        "<" + PromptSchema.TAG_QUEUE_DELTA + ">\\s*(\\{.*?})\\s*</" + PromptSchema.TAG_QUEUE_DELTA + ">",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
-    // 방어적 마지막 패스: 파싱 후 남은 알려진 구조 태그 잔재 제거
-    // mediator_response는 WRAPPER_BLOCK이 별도 처리하므로 제외
+    // 방어적 마지막 패스: PromptSchema.STRIP_TAG_ALTERNATION 에서 태그 목록 파생
     private static final Pattern UNKNOWN_STRUCTURED_BLOCK = Pattern.compile(
-        "<(turn_meta|issue_delta|question_queue_delta|user_state|horsemen|nvc_completion)[^>]*>.*?</\\1>",
+        "<(" + PromptSchema.STRIP_TAG_ALTERNATION + ")[^>]*>.*?</\\1>",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -77,11 +76,11 @@ public class ChatTurnMetaParser {
         if (metaJson != null) {
             try {
                 JsonNode root = objectMapper.readTree(metaJson);
-                horsemen = readHorsemen(root.get("horsemen"), turn, senderTag);
-                nvc = readNvc(root.get("nvc_completion"), turn, senderTag);
-                userState = readUserState(root.get("user_state"), turn, senderTag);
-                issueDelta = readIssueDelta(root.get("issue_delta"));
-                queueDelta = readQueueDelta(root.get("question_queue_delta"));
+                horsemen = readHorsemen(root.get(PromptSchema.FIELD_HORSEMEN), turn, senderTag);
+                nvc = readNvc(root.get(PromptSchema.FIELD_NVC_COMPLETION), turn, senderTag);
+                userState = readUserState(root.get(PromptSchema.FIELD_USER_STATE), turn, senderTag);
+                issueDelta = readIssueDelta(root.get(PromptSchema.FIELD_ISSUE_DELTA));
+                queueDelta = readQueueDelta(root.get(PromptSchema.FIELD_QUEUE_DELTA));
             } catch (Exception e) {
                 log.warn("turn_meta JSON parse failed (turn={}): {}", turn, e.getMessage());
             }
@@ -130,10 +129,10 @@ public class ChatTurnMetaParser {
         Session.HorsemenTurnEntry e = new Session.HorsemenTurnEntry();
         e.turn = turn;
         e.sender = sender;
-        e.criticism = readDouble(node, "criticism");
-        e.contempt = readDouble(node, "contempt");
-        e.defensiveness = readDouble(node, "defensiveness");
-        e.stonewalling = readDouble(node, "stonewalling");
+        e.criticism    = readDouble(node, PromptSchema.H_CRITICISM);
+        e.contempt     = readDouble(node, PromptSchema.H_CONTEMPT);
+        e.defensiveness = readDouble(node, PromptSchema.H_DEFENSIVENESS);
+        e.stonewalling = readDouble(node, PromptSchema.H_STONEWALLING);
         return e;
     }
 
@@ -142,21 +141,21 @@ public class ChatTurnMetaParser {
         Session.NvcTurnEntry e = new Session.NvcTurnEntry();
         e.turn = turn;
         e.sender = sender;
-        e.observation = readBool(node, "observation");
-        e.feeling = readBool(node, "feeling");
-        e.need = readBool(node, "need");
-        e.request = readBool(node, "request");
+        e.observation = readBool(node, PromptSchema.NVC_OBSERVATION);
+        e.feeling     = readBool(node, PromptSchema.NVC_FEELING);
+        e.need        = readBool(node, PromptSchema.NVC_NEED);
+        e.request     = readBool(node, PromptSchema.NVC_REQUEST);
         return e;
     }
 
     private IssueContextDelta readIssueDelta(JsonNode node) {
         if (node == null || !node.isObject()) return null;
         IssueContextDelta d = new IssueContextDelta();
-        JsonNode hl = node.get("headline");
+        JsonNode hl = node.get(PromptSchema.ID_HEADLINE);
         d.headline = (hl != null && !hl.isNull()) ? trimStr(hl.asText(), 50) : null;
 
         d.factsAdded = new ArrayList<>();
-        JsonNode factsNode = node.get("facts_added");
+        JsonNode factsNode = node.get(PromptSchema.ID_FACTS_ADDED);
         if (factsNode != null && factsNode.isArray()) {
             for (JsonNode fn : factsNode) {
                 Session.IssueFact f = new Session.IssueFact();
@@ -168,7 +167,7 @@ public class ChatTurnMetaParser {
         }
 
         d.factsConfirmed = new ArrayList<>();
-        JsonNode fcNode = node.get("facts_confirmed");
+        JsonNode fcNode = node.get(PromptSchema.ID_FACTS_CONFIRMED);
         if (fcNode != null && fcNode.isArray()) {
             for (JsonNode fc : fcNode) {
                 if (fc.isTextual()) d.factsConfirmed.add(fc.asText());
@@ -176,7 +175,7 @@ public class ChatTurnMetaParser {
         }
 
         d.needsAdded = new ArrayList<>();
-        JsonNode needsNode = node.get("needs_added");
+        JsonNode needsNode = node.get(PromptSchema.ID_NEEDS_ADDED);
         if (needsNode != null && needsNode.isArray()) {
             for (JsonNode nn : needsNode) {
                 Session.NeedSlot n = new Session.NeedSlot();
@@ -188,7 +187,7 @@ public class ChatTurnMetaParser {
         }
 
         d.threadsAdded = new ArrayList<>();
-        JsonNode threadsNode = node.get("threads_added");
+        JsonNode threadsNode = node.get(PromptSchema.ID_THREADS_ADDED);
         if (threadsNode != null && threadsNode.isArray()) {
             for (JsonNode tn : threadsNode) {
                 Session.UnresolvedThread t = new Session.UnresolvedThread();
@@ -199,7 +198,7 @@ public class ChatTurnMetaParser {
         }
 
         d.threadsResolved = new ArrayList<>();
-        JsonNode trNode = node.get("threads_resolved");
+        JsonNode trNode = node.get(PromptSchema.ID_THREADS_RESOLVED);
         if (trNode != null && trNode.isArray()) {
             for (JsonNode tr : trNode) {
                 if (tr.isTextual()) d.threadsResolved.add(tr.asText());
@@ -226,7 +225,7 @@ public class ChatTurnMetaParser {
 
     private Session.UserStateEntry readUserState(JsonNode node, int turn, String sender) {
         if (node == null || !node.isObject()) return null;
-        JsonNode stateNode = node.get("state");
+        JsonNode stateNode = node.get(PromptSchema.US_STATE);
         if (stateNode == null || stateNode.isNull()) return null;
         Session.UserStateEntry e = new Session.UserStateEntry();
         e.turn = turn;
@@ -237,12 +236,12 @@ public class ChatTurnMetaParser {
             log.warn("Unknown UserState '{}' in turn_meta (turn={})", stateNode.asText(), turn);
             return null;
         }
-        JsonNode evNode = node.get("evidence");
+        JsonNode evNode = node.get(PromptSchema.US_EVIDENCE);
         e.evidenceSnippet = (evNode != null && !evNode.isNull()) ? trimStr(evNode.asText(), 30) : null;
-        JsonNode confNode = node.get("confidence");
+        JsonNode confNode = node.get(PromptSchema.US_CONFIDENCE);
         e.confidence = (confNode != null && !confNode.isNull() && confNode.isNumber())
             ? Math.min(1.0, Math.max(0.0, confNode.asDouble())) : null;
-        JsonNode derNode = node.get("derived_from");
+        JsonNode derNode = node.get(PromptSchema.US_DERIVED_FROM);
         e.derivedFrom = (derNode != null && !derNode.isNull()) ? derNode.asText() : null;
         return e;
     }
@@ -275,7 +274,7 @@ public class ChatTurnMetaParser {
         QuestionQueueDelta d = new QuestionQueueDelta();
 
         d.asked = new ArrayList<>();
-        JsonNode askedNode = node.get("asked");
+        JsonNode askedNode = node.get(PromptSchema.QD_ASKED);
         if (askedNode != null && askedNode.isArray()) {
             for (JsonNode a : askedNode) {
                 if (a.isTextual()) d.asked.add(a.asText());
@@ -283,15 +282,15 @@ public class ChatTurnMetaParser {
         }
 
         d.newQuestions = new ArrayList<>();
-        JsonNode newNode = node.get("new");
+        JsonNode newNode = node.get(PromptSchema.QD_NEW);
         if (newNode != null && newNode.isArray()) {
             for (JsonNode qn : newNode) {
                 Session.PendingQuestion q = new Session.PendingQuestion();
-                q.intent = intentOf(qn, "intent");
-                q.target = textOf(qn, "target");
-                q.text = trimStr(textOf(qn, "text"), 80);
-                q.hookFromIssue = textOf(qn, "hookFromIssue");
-                q.antidoteFor = ratioElementOf(qn, "antidoteFor");
+                q.intent = intentOf(qn, PromptSchema.QD_INTENT);
+                q.target = textOf(qn, PromptSchema.QD_TARGET);
+                q.text = trimStr(textOf(qn, PromptSchema.QD_TEXT), 80);
+                q.hookFromIssue = textOf(qn, PromptSchema.QD_HOOK_FROM_ISSUE);
+                q.antidoteFor = ratioElementOf(qn, PromptSchema.QD_ANTIDOTE_FOR);
                 if (q.intent != null && q.target != null) d.newQuestions.add(q);
             }
         }

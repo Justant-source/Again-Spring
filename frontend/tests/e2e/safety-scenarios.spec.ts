@@ -1,9 +1,9 @@
-import { test, expect } from './fixtures'
+import { test, expect, type Page } from '@playwright/test'
 
 test.describe('Safety Scenarios @safety', () => {
   // Helper: navigate to an active chat session
   // sess_active has status: 'chatting_solo' so it won't redirect to result page
-  async function navigateToChatSession(page) {
+  async function navigateToChatSession(page: Page) {
     await page.goto('/session/chat/sess_active')
     await page.waitForTimeout(800)
   }

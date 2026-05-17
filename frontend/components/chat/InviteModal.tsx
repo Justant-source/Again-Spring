@@ -34,8 +34,8 @@ async function copyToClipboardSafe(text: string): Promise<boolean> {
     }
   }
   // 2) execCommand fallback (구형 브라우저·인앱 브라우저 호환)
+  const ta = document.createElement('textarea');
   try {
-    const ta = document.createElement('textarea');
     ta.value = text;
     ta.setAttribute('readonly', '');
     ta.style.position = 'fixed';
@@ -46,11 +46,11 @@ async function copyToClipboardSafe(text: string): Promise<boolean> {
     ta.focus();
     ta.select();
     ta.setSelectionRange(0, text.length);
-    const ok = document.execCommand('copy');
-    document.body.removeChild(ta);
-    return ok;
+    return document.execCommand('copy');
   } catch {
     return false;
+  } finally {
+    if (ta.parentNode) document.body.removeChild(ta);
   }
 }
 

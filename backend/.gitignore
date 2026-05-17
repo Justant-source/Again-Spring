@@ -23,3 +23,10 @@ Thumbs.db
 *.war
 *.ear
 *.log
+/scripts/test-automation/venv/
+/scripts/test-automation/__pycache__/
+/scripts/test-automation/runner/__pycache__/
+/scripts/test-automation/results/
+**/__pycache__/
+*.pyc
+*.pyo

@@ -79,7 +79,7 @@ test.describe('Accessibility (WCAG 2.1)', () => {
       for (const img of images) {
         const alt = await img.getAttribute('alt')
         const ariaLabel = await img.getAttribute('aria-label')
-        const isDecorative = await img.getAttribute('role').then((r) => r === 'presentation')
+        const isDecorative = await img.getAttribute('role').then((r: string | null) => r === 'presentation')
 
         // Decorative images can skip alt text
         if (!isDecorative) {
@@ -159,7 +159,7 @@ test.describe('Accessibility (WCAG 2.1)', () => {
       let lastLevel = 0
 
       for (const heading of headings) {
-        const tagName = await heading.evaluate((el) => el.tagName)
+        const tagName = await heading.evaluate((el: Element) => el.tagName)
         const level = parseInt(tagName.substring(1))
 
         // Level should not jump more than 1

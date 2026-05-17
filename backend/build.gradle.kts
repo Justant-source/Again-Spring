@@ -48,7 +48,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
 
-    val testcontainersVersion = "1.19.7"
+    val testcontainersVersion = "1.20.4"
     testImplementation("org.testcontainers:testcontainers:$testcontainersVersion")
     testImplementation("org.testcontainers:mariadb:$testcontainersVersion")
     testImplementation("org.testcontainers:junit-jupiter:$testcontainersVersion")
@@ -65,6 +65,8 @@ tasks.withType<Test> {
     useJUnitPlatform {
         excludeTags("haiku") // 실 haiku 호출 테스트는 기본 test 태스크에서 제외
     }
+    environment("TESTCONTAINERS_RYUK_DISABLED", "false")
+    jvmArgs("-Dapi.version=1.44")
 }
 
 // 실 Claude CLI haiku 스모크: ./gradlew haikuSmoke (호스트 ~/.claude 로그인 전제)

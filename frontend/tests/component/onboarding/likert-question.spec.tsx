@@ -6,6 +6,7 @@ import { vi } from 'vitest'
 const mockQuestion = {
   id: 'q1',
   text: 'I feel comfortable expressing my emotions in relationships',
+  measures: 'withdrawal' as const,
 }
 
 describe('LikertQuestion', () => {
@@ -271,6 +272,7 @@ describe('LikertQuestion', () => {
     const differentQuestion = {
       id: 'q5',
       text: 'A completely different question about relationships',
+      measures: 'empathy_priority' as const,
     }
 
     render(
@@ -290,6 +292,7 @@ describe('LikertQuestion', () => {
     const longQuestion = {
       id: 'q_long',
       text: 'This is a very long question that spans multiple lines and contains a lot of information about relationships and communication patterns',
+      measures: 'logical_orientation' as const,
     }
 
     render(

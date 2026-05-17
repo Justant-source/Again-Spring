@@ -5,19 +5,13 @@ import com.againspring.domain.Message;
 import com.againspring.domain.Session;
 import com.againspring.domain.User;
 import com.againspring.domain.enums.MessageSender;
+import com.againspring.llm.LLMProvider;
 import com.againspring.llm.bridge.CancelableInvocation;
-import com.againspring.llm.bridge.ClaudeCodeBridge;
 import com.againspring.llm.bridge.exception.InvocationCanceledException;
 import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
-import com.againspring.safety.IsolationLintFilter;
-import com.againspring.service.context.IssueContextMerger;
-import com.againspring.service.context.PhaseDMetrics;
-import com.againspring.service.context.QuestionQueueUpdater;
-import com.againspring.service.context.UserStateAppender;
 import com.againspring.service.crisis.CrisisDetector;
-import com.againspring.service.parser.ChatTurnMetaParser;
 import com.againspring.service.prompt.ChatPromptAssembler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,10 +19,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -44,16 +35,11 @@ public class CancelableChatService {
     private final MessageRepository messageRepo;
     private final SessionRepository sessionRepo;
     private final UserRepository userRepo;
-    private final ClaudeCodeBridge llmBridge;
+    private final LLMProvider llmBridge;
     private final CrisisDetector crisisDetector;
     private final ChatPromptAssembler promptAssembler;
     private final SessionStateMachine stateMachine;
-    private final ChatTurnMetaParser turnMetaParser;
-    private final UserStateAppender userStateAppender;
-    private final IssueContextMerger issueContextMerger;
-    private final QuestionQueueUpdater questionQueueUpdater;
-    private final IsolationLintFilter isolationLintFilter;
-    private final PhaseDMetrics phaseDMetrics;
+    private final ChatTurnProcessor chatTurnProcessor;
     private final TransactionTemplate transactionTemplate;
     private final com.againspring.config.UserPermissionsConfig permissions;
 
@@ -65,16 +51,11 @@ public class CancelableChatService {
             MessageRepository messageRepo,
             SessionRepository sessionRepo,
             UserRepository userRepo,
-            ClaudeCodeBridge llmBridge,
+            LLMProvider llmBridge,
             CrisisDetector crisisDetector,
             ChatPromptAssembler promptAssembler,
             SessionStateMachine stateMachine,
-            ChatTurnMetaParser turnMetaParser,
-            UserStateAppender userStateAppender,
-            IssueContextMerger issueContextMerger,
-            QuestionQueueUpdater questionQueueUpdater,
-            IsolationLintFilter isolationLintFilter,
-            PhaseDMetrics phaseDMetrics,
+            ChatTurnProcessor chatTurnProcessor,
             PlatformTransactionManager txManager,
             com.againspring.config.UserPermissionsConfig permissions) {
         this.messageRepo = messageRepo;
@@ -84,12 +65,7 @@ public class CancelableChatService {
         this.crisisDetector = crisisDetector;
         this.promptAssembler = promptAssembler;
         this.stateMachine = stateMachine;
-        this.turnMetaParser = turnMetaParser;
-        this.userStateAppender = userStateAppender;
-        this.issueContextMerger = issueContextMerger;
-        this.questionQueueUpdater = questionQueueUpdater;
-        this.isolationLintFilter = isolationLintFilter;
-        this.phaseDMetrics = phaseDMetrics;
+        this.chatTurnProcessor = chatTurnProcessor;
         this.transactionTemplate = new TransactionTemplate(txManager);
         this.permissions = permissions;
     }
@@ -157,10 +133,8 @@ public class CancelableChatService {
                 .build());
         incrementUserMessageCount(session, sender);
 
-        // 사용자가 명시적으로 종료 의사를 표현했으면 LLM 응답을 기다리지 않고 즉시 finalize 카드 권유.
-        // 자동 트리거(메시지 수 기반)와 달리 사용자 의지 표현이므로 RESOLVING 게이트 없이 통과.
         if (session.getFinalizeSuggestedAt() == null && ChatService.detectExitIntent(content)) {
-            triggerFinalizationSuggestion(session, stateMachine.isDuo(session.getStatus()));
+            chatTurnProcessor.triggerFinalizationSuggestion(session, stateMachine.isDuo(session.getStatus()));
         }
 
         return ChatService.ChatTurnResult.success(userMsg, List.of(), false);
@@ -280,50 +254,7 @@ public class CancelableChatService {
             Session session = sessionRepo.findById(sessionId).orElse(null);
             if (session == null || !stateMachine.isActive(session.getStatus())) return null;
 
-            MessageSender mediatorSender = sender.mediatorCounterpart();
-            int turnIndex = (session.getHorsemenHistory() == null
-                    ? 0 : session.getHorsemenHistory().size()) + 1;
-
-            ChatTurnMetaParser.Result parsed = turnMetaParser.parse(
-                    rawResponse, turnIndex, sender.name());
-            String mediatorResponse = (parsed.mediatorMessage() == null || parsed.mediatorMessage().isBlank())
-                    ? rawResponse : parsed.mediatorMessage();
-
-            appendPsychologyHistory(session, parsed);
-            userStateAppender.append(session, parsed.userState());
-            issueContextMerger.merge(session, parsed.issueDelta(), turnIndex);
-            questionQueueUpdater.update(session, parsed.queueDelta(), turnIndex);
-
-            if (parsed.userState() != null) phaseDMetrics.recordUserState(parsed.userState().state);
-            if (parsed.userState() != null || parsed.issueDelta() != null) phaseDMetrics.recordMetaPopulated();
-            if (parsed.queueDelta() != null && parsed.queueDelta().asked != null) {
-                phaseDMetrics.recordQueueAsked(parsed.queueDelta().asked.size());
-            }
-
-            String[] rawChunks = mediatorResponse.split("(?m)^---\\s*$");
-            List<String> chunks = new ArrayList<>();
-            for (String c : rawChunks) {
-                String trimmed = c.strip();
-                if (!trimmed.isEmpty()) chunks.addAll(splitLongChunk(trimmed));
-            }
-            if (chunks.isEmpty()) chunks.add(mediatorResponse);
-
-            for (int i = 0; i < chunks.size(); i++) {
-                String chunk = chunks.get(i);
-                if (isolationLintFilter.violatesIsolation(chunk)) {
-                    log.warn("Isolation violation in chunk {} for session {}", i, sessionId);
-                    chunk = "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?";
-                }
-                messageRepo.save(Message.builder()
-                        .sessionId(sessionId)
-                        .sender(mediatorSender)
-                        .content(chunk)
-                        .charCount(chunk.length())
-                        .llmModel(ChatService.MODEL_HAIKU)
-                        .build());
-            }
-
-            checkAndTriggerFinalizationSuggestion(session);
+            chatTurnProcessor.process(session, sender, rawResponse, null);
             return null;
         });
     }
@@ -331,7 +262,7 @@ public class CancelableChatService {
     private void saveFallbackMessage(String sessionId, MessageSender mediatorSender) {
         transactionTemplate.execute(status -> {
             String fallback = "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?";
-            // V11: '-fallback' 접미사로 LLM 호출 실패율 모니터링에서 식별
+            // '-fallback' 접미사로 LLM 호출 실패율 모니터링에서 식별
             messageRepo.save(Message.builder()
                     .sessionId(sessionId)
                     .sender(mediatorSender)
@@ -355,54 +286,6 @@ public class CancelableChatService {
             }
         }
         return "";
-    }
-
-    private void appendPsychologyHistory(Session session, ChatTurnMetaParser.Result parsed) {
-        if (parsed == null) return;
-        boolean dirty = false;
-        if (parsed.horsemen() != null) {
-            List<Session.HorsemenTurnEntry> hist = session.getHorsemenHistory();
-            if (hist == null) hist = new ArrayList<>();
-            hist.add(parsed.horsemen());
-            session.setHorsemenHistory(hist);
-            updateEmotionIntensity(session, parsed.horsemen());
-            dirty = true;
-        }
-        if (parsed.nvc() != null) {
-            List<Session.NvcTurnEntry> hist = session.getNvcCompletionHistory();
-            if (hist == null) hist = new ArrayList<>();
-            hist.add(parsed.nvc());
-            session.setNvcCompletionHistory(hist);
-            dirty = true;
-        }
-        if (dirty) sessionRepo.save(session);
-    }
-
-    private void updateEmotionIntensity(Session session, Session.HorsemenTurnEntry entry) {
-        if (entry == null || entry.sender == null) return;
-        double turnIntensity = avgNonNull(
-                entry.criticism, entry.contempt, entry.defensiveness, entry.stonewalling);
-        boolean isA = MessageSender.USER_A.name().equals(entry.sender);
-        BigDecimal current = isA
-                ? session.getUserAEmotionIntensity() : session.getUserBEmotionIntensity();
-        Integer count = isA
-                ? session.getUserAMessageCount() : session.getUserBMessageCount();
-        int n = count == null ? 1 : Math.max(1, count);
-        double prevAvg = current == null ? 0.0 : current.doubleValue();
-        double nextAvg = ((prevAvg * (n - 1)) + turnIntensity) / n;
-        BigDecimal value = BigDecimal.valueOf(Math.round(nextAvg * 100.0) / 100.0)
-                .setScale(2, RoundingMode.HALF_UP);
-        if (isA) session.setUserAEmotionIntensity(value);
-        else session.setUserBEmotionIntensity(value);
-    }
-
-    private double avgNonNull(Double... values) {
-        double sum = 0;
-        int n = 0;
-        for (Double v : values) {
-            if (v != null) { sum += v; n++; }
-        }
-        return n == 0 ? 0 : sum / n;
     }
 
     private User loadUserSafely(String userId) {
@@ -437,75 +320,5 @@ public class CancelableChatService {
     private List<Message> getRecentMessagesForDuo(String sessionId, int limit) {
         var msgs = messageRepo.findBySessionIdOrderByCreatedAtAsc(sessionId);
         return msgs.size() <= limit ? msgs : msgs.subList(msgs.size() - limit, msgs.size());
-    }
-
-    private boolean checkAndTriggerFinalizationSuggestion(Session session) {
-        if (session.getFinalizeSuggestedAt() != null) return false;
-
-        int aCount = session.getUserAMessageCount() == null ? 0 : session.getUserAMessageCount();
-        int bCount = session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount();
-        boolean isDuo = stateMachine.isDuo(session.getStatus());
-
-        boolean countThreshold = isDuo
-                ? (aCount + bCount) >= ChatService.FINALIZE_SUGGEST_DUO_TOTAL_MIN
-                    && aCount >= ChatService.FINALIZE_SUGGEST_DUO_PER_USER_MIN
-                    && bCount >= ChatService.FINALIZE_SUGGEST_DUO_PER_USER_MIN
-                : aCount >= ChatService.FINALIZE_SUGGEST_SOLO_MIN;
-
-        // 메시지 수만으로는 자동 권유하지 않음 — RESOLVING 상태 도달 신호와 AND 결합.
-        // 명시적 종료 의사는 acceptUserMessage()의 detectExitIntent 경로에서 처리됨.
-        if (countThreshold && ChatService.hasReachedResolvingState(session)) {
-            triggerFinalizationSuggestion(session, isDuo);
-            return true;
-        }
-        return false;
-    }
-
-    private void triggerFinalizationSuggestion(Session session, boolean isDuo) {
-        String suggestion = "이만큼 이야기 나눠주셔서 고마워요. 지금까지 정리해보면 어떨까요?";
-        messageRepo.save(Message.builder()
-                .sessionId(session.getId())
-                .sender(MessageSender.MEDIATOR_TO_A)
-                .content(suggestion)
-                .charCount(suggestion.length())
-                .isFinalizeSuggestion(true)
-                .llmModel(ChatService.MODEL_HAIKU)
-                .build());
-        if (isDuo) {
-            messageRepo.save(Message.builder()
-                    .sessionId(session.getId())
-                    .sender(MessageSender.MEDIATOR_TO_B)
-                    .content(suggestion)
-                    .charCount(suggestion.length())
-                    .isFinalizeSuggestion(true)
-                    .llmModel(ChatService.MODEL_HAIKU)
-                    .build());
-        }
-        session.setFinalizeSuggestedAt(Instant.now());
-        sessionRepo.save(session);
-    }
-
-    // 200자 초과 청크를 문장 경계에서 자동 분할
-    private static final int MAX_CHUNK_LEN = 200;
-
-    private static List<String> splitLongChunk(String chunk) {
-        if (chunk.length() <= MAX_CHUNK_LEN) return List.of(chunk);
-        List<String> parts = new ArrayList<>();
-        String remaining = chunk;
-        while (remaining.length() > MAX_CHUNK_LEN) {
-            int splitAt = -1;
-            for (int i = Math.min(MAX_CHUNK_LEN, remaining.length()) - 1; i >= MAX_CHUNK_LEN / 2; i--) {
-                char c = remaining.charAt(i);
-                if (c == '.' || c == '?' || c == '!' || c == '~' || c == '\n') {
-                    splitAt = i + 1;
-                    break;
-                }
-            }
-            if (splitAt <= 0) splitAt = MAX_CHUNK_LEN;
-            parts.add(remaining.substring(0, splitAt).trim());
-            remaining = remaining.substring(splitAt).trim();
-        }
-        if (!remaining.isEmpty()) parts.add(remaining);
-        return parts;
     }
 }

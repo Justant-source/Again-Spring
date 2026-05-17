@@ -17,6 +17,7 @@ import type { Message } from '@/lib/types'
 describe('Safety: Message Bubble Visual Distinction', () => {
   const baseMessage: Message = {
     id: 1,
+    sender: 'MEDIATOR_TO_A',
     content: 'Test message content',
     charCount: 21,
     isFinalizeSuggestion: false,

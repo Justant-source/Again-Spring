@@ -20,6 +20,9 @@ interface UiState {
   feedbackModal: FeedbackModalState | null;
   showFeedbackModal: (sessionId?: string | null) => void;
   hideFeedbackModal: () => void;
+  authError: 'unauthorized' | 'forbidden' | null;
+  setAuthError: (kind: 'unauthorized' | 'forbidden') => void;
+  clearAuthError: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -32,4 +35,7 @@ export const useUiStore = create<UiState>((set) => ({
   feedbackModal: null,
   showFeedbackModal: (sessionId) => set({ feedbackModal: { sessionId } }),
   hideFeedbackModal: () => set({ feedbackModal: null }),
+  authError: null,
+  setAuthError: (kind) => set({ authError: kind }),
+  clearAuthError: () => set({ authError: null }),
 }));

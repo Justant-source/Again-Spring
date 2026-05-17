@@ -1,0 +1,57 @@
+{
+  "horsemen": {
+    "criticism": 0.4,
+    "contempt": 0.0,
+    "defensiveness": 0.1,
+    "stonewalling": 0.0
+  },
+  "nvc_completion": {
+    "observation": true,
+    "feeling": true,
+    "need": false,
+    "request": false
+  },
+  "user_state": {
+    "state": "VENTING",
+    "evidence": "며칠 전부터 그런 분위기였거든요",
+    "confidence": 0.7,
+    "derived_from": "horsemen.criticism=0.4, nvc.feeling=true"
+  },
+  "issue_delta": {
+    "headline": "최근 며칠간 이어진 무거운 분위기",
+    "facts_added": [
+      {
+        "text": "어제 인사 없이 지나침",
+        "source": "USER_A_T1",
+        "contributesTo": "BOUNDARY"
+      }
+    ],
+    "facts_confirmed": [],
+    "needs_added": [
+      {
+        "text": "관심받고 있다는 느낌이 필요",
+        "owner": "USER_A",
+        "contributesTo": "PERSPECTIVE"
+      }
+    ],
+    "threads_added": [
+      {
+        "text": "며칠 전 분위기가 무거웠던 이유",
+        "origin": "USER_A_T2"
+      }
+    ],
+    "threads_resolved": []
+  },
+  "question_queue_delta": {
+    "asked": ["q-uuid-1"],
+    "new": [
+      {
+        "intent": "SEEK_NEED",
+        "target": "USER_A",
+        "text": "분위기가 무거워졌을 때 가장 원하셨던 건",
+        "hookFromIssue": "며칠 전 분위기가 무거웠던 이유",
+        "antidoteFor": "PERSPECTIVE"
+      }
+    ]
+  }
+}

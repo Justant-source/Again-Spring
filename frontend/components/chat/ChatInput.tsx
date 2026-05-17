@@ -47,6 +47,7 @@ export function ChatInput({ onSend, disabled, onCrisis }: Props) {
           }
         }}
         placeholder="편한 말로 적어주세요"
+        disabled={disabled}
         rows={1}
         style={{
           flex: 1,
@@ -79,6 +80,9 @@ export function ChatInput({ onSend, disabled, onCrisis }: Props) {
       >
         전송
       </button>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--P-sub)', marginTop: 6, textAlign: 'center' }}>
+        이 글은 AI가 정리해서 전달돼요
       </div>
     </div>
   );

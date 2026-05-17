@@ -1,0 +1,58 @@
+package com.againspring.integration;
+
+import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationInfo;
+import org.flywaydb.core.api.MigrationState;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Phase 4: Flyway V1~V24가 실 MariaDB(Testcontainers) 위에서 전부 성공하는지 검증.
+ */
+class FlywayMigrationIT extends MariaDbIntegrationSupport {
+
+    @Autowired
+    private Flyway flyway;
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Test
+    void allMigrationsApplied() {
+        MigrationInfo[] applied = flyway.info().applied();
+        long failedCount = java.util.Arrays.stream(applied)
+                .filter(m -> m.getState() == MigrationState.FAILED)
+                .count();
+        int pendingCount = flyway.info().pending().length;
+
+        assertThat(failedCount).as("실패한 마이그레이션").isZero();
+        assertThat(pendingCount).as("미적용 마이그레이션").isZero();
+        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(24);
+    }
+
+    @Test
+    void v24TutorialColumnExists() throws SQLException {
+        assertThat(columnExists("users", "tutorial_completed_at"))
+                .as("V24: users.tutorial_completed_at 컬럼 존재").isTrue();
+    }
+
+    @Test
+    void v15CrisisLevelColumnExists() throws SQLException {
+        assertThat(columnExists("messages", "crisis_level"))
+                .as("V15: messages.crisis_level 컬럼 존재").isTrue();
+    }
+
+    private boolean columnExists(String table, String column) throws SQLException {
+        try (Connection conn = dataSource.getConnection();
+             ResultSet rs = conn.getMetaData().getColumns(null, null, table, column)) {
+            return rs.next();
+        }
+    }
+}

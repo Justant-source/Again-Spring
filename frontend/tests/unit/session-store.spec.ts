@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { useSessionStore } from '@/lib/store/sessionStore'
-import type { RelationType, SessionStatus, ActiveSessionCategory } from '@/lib/store/sessionStore'
-import type { Message } from '@/lib/types'
+import type { ActiveSessionCategory } from '@/lib/store/sessionStore'
+import type { RelationType, SessionStatus, Message } from '@/lib/types'
 
 describe('useSessionStore (Zustand)', () => {
   beforeEach(() => {

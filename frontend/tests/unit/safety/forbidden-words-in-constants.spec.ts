@@ -78,9 +78,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         }
       })
 
-      expect(violations).toEqual([],
-        `Found forbidden words in metaphor labels: ${JSON.stringify(violations)}`
-      )
+      expect(violations, `Found forbidden words in metaphor labels: ${JSON.stringify(violations)}`).toEqual([])
     })
 
     it('should not contain forbidden words in metaphor meanings', () => {
@@ -97,9 +95,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         }
       })
 
-      expect(violations).toEqual([],
-        `Found forbidden words in metaphor meanings: ${JSON.stringify(violations)}`
-      )
+      expect(violations, `Found forbidden words in metaphor meanings: ${JSON.stringify(violations)}`).toEqual([])
     })
 
     it('should contain safe psychological language in meanings', () => {
@@ -129,9 +125,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         }
       })
 
-      expect(violations).toEqual([],
-        `Found forbidden words in style labels: ${JSON.stringify(violations)}`
-      )
+      expect(violations, `Found forbidden words in style labels: ${JSON.stringify(violations)}`).toEqual([])
     })
 
     it('should not contain forbidden words in style descriptions', () => {
@@ -148,9 +142,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         }
       })
 
-      expect(violations).toEqual([],
-        `Found forbidden words in style descriptions: ${JSON.stringify(violations)}`
-      )
+      expect(violations, `Found forbidden words in style descriptions: ${JSON.stringify(violations)}`).toEqual([])
     })
 
     it('should not contain forbidden words in style strengths', () => {
@@ -169,9 +161,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         })
       })
 
-      expect(violations).toEqual([],
-        `Found forbidden words in style strengths: ${JSON.stringify(violations)}`
-      )
+      expect(violations, `Found forbidden words in style strengths: ${JSON.stringify(violations)}`).toEqual([])
     })
 
     it('should not contain forbidden words in style cautions', () => {
@@ -190,9 +180,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         })
       })
 
-      expect(violations).toEqual([],
-        `Found forbidden words in style cautions: ${JSON.stringify(violations)}`
-      )
+      expect(violations, `Found forbidden words in style cautions: ${JSON.stringify(violations)}`).toEqual([])
     })
 
     it('should not contain forbidden words in style combination insights', () => {
@@ -211,9 +199,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         })
       })
 
-      expect(violations).toEqual([],
-        `Found forbidden words in style combination insights: ${JSON.stringify(violations)}`
-      )
+      expect(violations, `Found forbidden words in style combination insights: ${JSON.stringify(violations)}`).toEqual([])
     })
   })
 
@@ -235,9 +221,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         }
       })
 
-      expect(violations).toEqual([],
-        `Found forbidden words in crisis resource labels: ${JSON.stringify(violations)}`
-      )
+      expect(violations, `Found forbidden words in crisis resource labels: ${JSON.stringify(violations)}`).toEqual([])
     })
 
     it('should not contain forbidden words in resource descriptions (immediate)', () => {
@@ -258,9 +242,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         }
       })
 
-      expect(violations).toEqual([],
-        `Found forbidden words in immediate crisis resource descriptions: ${JSON.stringify(violations)}`
-      )
+      expect(violations, `Found forbidden words in immediate crisis resource descriptions: ${JSON.stringify(violations)}`).toEqual([])
     })
 
     it('legal resources may use legal terminology contextually (이혼, 소송)', () => {
@@ -320,11 +302,10 @@ describe('Safety: Forbidden Words in Constants', () => {
         }
       })
 
-      expect(violations).toEqual([],
-        `Found ${violations.length} forbidden word(s):\n${violations
-          .map(v => `  - [${v.violation.category}] "${v.violation.word}" in ${v.source}`)
-          .join('\n')}`
-      )
+      expect(
+        violations,
+        `Found ${violations.length} forbidden word(s):\n${violations.map(v => `  - [${v.violation.category}] "${v.violation.word}" in ${v.source}`).join('\n')}`
+      ).toEqual([])
     })
 
     it('should not use diagnostic language patterns', () => {
@@ -356,9 +337,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         }
       })
 
-      expect(violations).toEqual([],
-        `Found diagnostic language patterns:\n${violations.join('\n')}`
-      )
+      expect(violations, `Found diagnostic language patterns:\n${violations.join('\n')}`).toEqual([])
     })
 
     it('should not use prescriptive language (telling users to leave/break up)', () => {
@@ -395,9 +374,7 @@ describe('Safety: Forbidden Words in Constants', () => {
         }
       })
 
-      expect(violations).toEqual([],
-        `Found prescriptive language (should describe behaviors, not prescribe outcomes):\n${violations.join('\n')}`
-      )
+      expect(violations, `Found prescriptive language (should describe behaviors, not prescribe outcomes):\n${violations.join('\n')}`).toEqual([])
     })
   })
 

@@ -41,12 +41,12 @@ describe('MbtiAxisSlider', () => {
 
   it('displays percentage for left side', () => {
     render(<MbtiAxisSlider {...defaultProps} value={30} />)
-    expect(screen.getByText('70%')).toBeInTheDocument()
+    expect(screen.getByText(/I 70/)).toBeInTheDocument()
   })
 
   it('displays percentage for right side', () => {
     render(<MbtiAxisSlider {...defaultProps} value={70} />)
-    expect(screen.getByText('70%')).toBeInTheDocument()
+    expect(screen.getByText(/E 70/)).toBeInTheDocument()
   })
 
   it('renders input range slider', () => {
@@ -118,34 +118,32 @@ describe('MbtiAxisSlider', () => {
   it('shows equal percentages at value 50', () => {
     render(<MbtiAxisSlider {...defaultProps} value={50} />)
 
-    // At 50, both sides should show 50%
-    const percentages = screen.getAllByText('50%')
-    expect(percentages.length).toBeGreaterThanOrEqual(2)
+    // At 50, component shows "균형" label
+    expect(screen.getByText('균형')).toBeInTheDocument()
   })
 
   it('calculates left percentage correctly', () => {
     render(<MbtiAxisSlider {...defaultProps} value={30} />)
-    // 100 - 30 = 70 for left
-    expect(screen.getByText('70%')).toBeInTheDocument()
+    // leftPct = 100 - 30 = 70, displayed as "I 70"
+    expect(screen.getByText(/I 70/)).toBeInTheDocument()
   })
 
   it('calculates right percentage correctly', () => {
     render(<MbtiAxisSlider {...defaultProps} value={30} />)
-    // right = 30
-    const percentages = screen.getAllByText(/30%|70%/)
-    expect(percentages.length).toBeGreaterThan(0)
+    // isLeft=true at value 30, displayed as "I 70"
+    expect(screen.getByText(/I 70/)).toBeInTheDocument()
   })
 
   it('handles extreme values (0)', () => {
     render(<MbtiAxisSlider {...defaultProps} value={0} />)
-    expect(screen.getByText('100%')).toBeInTheDocument()
-    expect(screen.getByText('0%')).toBeInTheDocument()
+    // leftPct=100, isLeft=true → "I 100"
+    expect(screen.getByText(/I 100/)).toBeInTheDocument()
   })
 
   it('handles extreme values (100)', () => {
     render(<MbtiAxisSlider {...defaultProps} value={100} />)
-    expect(screen.getByText('0%')).toBeInTheDocument()
-    expect(screen.getByText('100%')).toBeInTheDocument()
+    // rightPct=100, isLeft=false → "E 100"
+    expect(screen.getByText(/E 100/)).toBeInTheDocument()
   })
 
   it('updates when value prop changes', () => {
@@ -153,33 +151,31 @@ describe('MbtiAxisSlider', () => {
       <MbtiAxisSlider {...defaultProps} value={30} />
     )
 
-    expect(screen.getByText('70%')).toBeInTheDocument()
+    expect(screen.getByText(/I 70/)).toBeInTheDocument()
 
     rerender(
       <MbtiAxisSlider {...defaultProps} value={70} />
     )
 
-    expect(screen.getByText('30%')).toBeInTheDocument()
+    expect(screen.getByText(/E 70/)).toBeInTheDocument()
   })
 
   it('determines left bias correctly', () => {
-    const { container } = render(
+    render(
       <MbtiAxisSlider {...defaultProps} value={40} />
     )
 
-    // With value < 50, isLeft should be true
-    const leftPercentage = screen.getByText('60%')
-    expect(leftPercentage).toBeInTheDocument()
+    // With value < 50, isLeft=true → shows "${leftLetter} ${leftPct}" = "I 60"
+    expect(screen.getByText(/I 60/)).toBeInTheDocument()
   })
 
   it('determines right bias correctly', () => {
-    const { container } = render(
+    render(
       <MbtiAxisSlider {...defaultProps} value={60} />
     )
 
-    // With value > 50, isLeft should be false
-    const rightPercentage = screen.getByText('60%')
-    expect(rightPercentage).toBeInTheDocument()
+    // With value > 50, isLeft=false → shows "${rightLetter} ${rightPct}" = "E 60"
+    expect(screen.getByText(/E 60/)).toBeInTheDocument()
   })
 
   it('handles different axis configurations', () => {
@@ -234,7 +230,7 @@ describe('MbtiAxisSlider', () => {
       <MbtiAxisSlider {...defaultProps} value={25} />
     )
 
-    const letters = container.querySelectorAll('span[style*="font-weight: 700"]')
+    const letters = container.querySelectorAll('span[style*="font-weight: 600"]')
     expect(letters.length).toBeGreaterThan(0)
   })
 
@@ -261,30 +257,29 @@ describe('MbtiAxisSlider', () => {
       <MbtiAxisSlider {...defaultProps} value={25} />
     )
 
-    // leftPct = 100 - 25 = 75, rightPct = 25
-    expect(screen.getByText('75%')).toBeInTheDocument()
+    // isLeft=true, leftPct=75 → "I 75"
+    expect(screen.getByText(/I 75/)).toBeInTheDocument()
 
     rerender(
       <MbtiAxisSlider {...defaultProps} value={75} />
     )
 
-    // leftPct = 100 - 75 = 25, rightPct = 75
-    expect(screen.getByText('25%')).toBeInTheDocument()
+    // isLeft=false, rightPct=75 → "E 75"
+    expect(screen.getByText(/E 75/)).toBeInTheDocument()
   })
 
   it('handles rapid value changes', async () => {
-    const user = userEvent.setup()
     const onChange = vi.fn()
 
     const { rerender } = render(
       <MbtiAxisSlider {...defaultProps} value={50} onChange={onChange} />
     )
 
-    // After 80: leftPct = 100 - 80 = 20, rightPct = 80
+    // After 80: isLeft=false, rightPct=80 → "E 80"
     rerender(
       <MbtiAxisSlider {...defaultProps} value={80} onChange={onChange} />
     )
 
-    expect(screen.getByText('20%')).toBeInTheDocument()
+    expect(screen.getByText(/E 80/)).toBeInTheDocument()
   })
 })

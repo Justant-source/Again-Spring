@@ -3,7 +3,13 @@ package com.againspring.service.parser;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.againspring.domain.Session;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ChatTurnMetaParserTest {
 
@@ -166,5 +172,142 @@ class ChatTurnMetaParserTest {
 
         assertEquals("turn_meta 헤드라인", r.issueDelta().headline, "turn_meta 값이 우선돼야 함");
         assertFalse(r.mediatorMessage().contains("issue_delta"));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // P1-2 계약 테스트: 프롬프트 canonical 샘플 → 파서 파싱 검증
+    // shared/docs/prompts/chat/_response_instructions.md 의 예시 JSON을
+    // src/test/resources/parser-contracts/ 에 저장 후 여기서 로드.
+    // 태그명·필드명이 PromptSchema 와 일치해야만 이 테스트가 통과한다.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("P1-2 Prompt ↔ Parser Contract Tests")
+    class ContractTests {
+
+        private String loadContract(String filename) throws Exception {
+            var url = getClass().getClassLoader().getResource("parser-contracts/" + filename);
+            assertNotNull(url, "계약 파일 없음: " + filename);
+            return Files.readString(Path.of(url.toURI()));
+        }
+
+        @Test
+        @DisplayName("full_turn_meta: 모든 필드가 파싱됨 (canonical 샘플)")
+        void fullTurnMeta_allFieldsParsed() throws Exception {
+            String metaJson = loadContract("full_turn_meta.json");
+            String raw = "마음이 많이 힘드셨겠어요.\n<turn_meta>" + metaJson + "</turn_meta>";
+
+            var r = parser.parse(raw, 2, "USER_A");
+
+            // 본문
+            assertEquals("마음이 많이 힘드셨겠어요.", r.mediatorMessage());
+            assertFalse(r.mediatorMessage().contains("<"), "XML 태그 노출 금지");
+
+            // horsemen
+            assertNotNull(r.horsemen());
+            assertEquals(0.4,  r.horsemen().criticism,     0.001);
+            assertEquals(0.0,  r.horsemen().contempt,      0.001);
+            assertEquals(0.1,  r.horsemen().defensiveness, 0.001);
+            assertEquals(0.0,  r.horsemen().stonewalling,  0.001);
+
+            // nvc_completion
+            assertNotNull(r.nvc());
+            assertTrue(r.nvc().observation);
+            assertTrue(r.nvc().feeling);
+            assertFalse(r.nvc().need);
+            assertFalse(r.nvc().request);
+
+            // user_state
+            assertNotNull(r.userState());
+            assertEquals(Session.UserState.VENTING, r.userState().state);
+            assertNotNull(r.userState().evidenceSnippet);
+            assertEquals(0.7, r.userState().confidence, 0.001);
+
+            // issue_delta
+            assertNotNull(r.issueDelta());
+            assertEquals("최근 며칠간 이어진 무거운 분위기", r.issueDelta().headline);
+            assertEquals(1, r.issueDelta().factsAdded.size());
+            assertEquals("어제 인사 없이 지나침", r.issueDelta().factsAdded.get(0).text);
+            assertEquals(1, r.issueDelta().needsAdded.size());
+            assertEquals(1, r.issueDelta().threadsAdded.size());
+            assertEquals(0, r.issueDelta().threadsResolved.size());
+
+            // question_queue_delta
+            assertNotNull(r.queueDelta());
+            assertEquals(1, r.queueDelta().asked.size());
+            assertEquals("q-uuid-1", r.queueDelta().asked.get(0));
+            assertEquals(1, r.queueDelta().newQuestions.size());
+            assertEquals(Session.Intent.SEEK_NEED, r.queueDelta().newQuestions.get(0).intent);
+            assertEquals("USER_A", r.queueDelta().newQuestions.get(0).target);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+            "OPENING", "VENTING", "DEFENSIVE", "BLAMING",
+            "REFLECTING", "NEGOTIATING", "RESOLVING"
+        })
+        @DisplayName("user_state: 7가지 상태 모두 파싱 가능")
+        void userState_allStatesRecognized(String state) {
+            String raw = "응답입니다.\n<turn_meta>{\"horsemen\":{\"criticism\":0,\"contempt\":0,"
+                + "\"defensiveness\":0,\"stonewalling\":0},"
+                + "\"user_state\":{\"state\":\"" + state + "\",\"confidence\":0.5}}"
+                + "</turn_meta>";
+            var r = parser.parse(raw, 1, "USER_A");
+
+            assertNotNull(r.userState(), "user_state 파싱 실패: " + state);
+            assertEquals(state, r.userState().state.name());
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+            "SEEK_FACT", "SEEK_FEELING", "SEEK_NEED",
+            "BRIDGE_PERSPECTIVE", "REFLECT_PATTERN", "INVITE_REPAIR", "WELCOME_PARTNER"
+        })
+        @DisplayName("question_queue_delta: 7가지 Intent 모두 파싱 가능")
+        void queueDelta_allIntentsRecognized(String intent) {
+            String raw = "응답입니다.\n<question_queue_delta>"
+                + "{\"asked\":[],\"new\":[{\"intent\":\"" + intent + "\","
+                + "\"target\":\"USER_A\",\"text\":\"테스트 질문\"}]}"
+                + "</question_queue_delta>";
+            var r = parser.parse(raw, 1, "USER_A");
+
+            assertNotNull(r.queueDelta());
+            assertEquals(1, r.queueDelta().newQuestions.size());
+            assertEquals(intent, r.queueDelta().newQuestions.get(0).intent.name());
+        }
+
+        @Test
+        @DisplayName("PromptSchema 태그명이 파서 패턴과 일치 — TAG_TURN_META")
+        void promptSchema_tagTurnMeta_matchesParser() {
+            // PromptSchema.TAG_TURN_META 를 실제로 사용해 파싱이 되는지 확인
+            String raw = "응답.\n<" + PromptSchema.TAG_TURN_META + ">"
+                + "{\"horsemen\":{\"criticism\":0.5,\"contempt\":0,\"defensiveness\":0,\"stonewalling\":0}}"
+                + "</" + PromptSchema.TAG_TURN_META + ">";
+            var r = parser.parse(raw, 1, "USER_A");
+            assertNotNull(r.horsemen());
+            assertEquals(0.5, r.horsemen().criticism, 0.001);
+        }
+
+        @Test
+        @DisplayName("PromptSchema 태그명이 파서 패턴과 일치 — TAG_ISSUE_DELTA (독립)")
+        void promptSchema_tagIssueDelta_matchesParser() {
+            String raw = "응답.\n<" + PromptSchema.TAG_ISSUE_DELTA + ">"
+                + "{\"headline\":\"계약 테스트 헤드라인\"}"
+                + "</" + PromptSchema.TAG_ISSUE_DELTA + ">";
+            var r = parser.parse(raw, 1, "USER_A");
+            assertNotNull(r.issueDelta());
+            assertEquals("계약 테스트 헤드라인", r.issueDelta().headline);
+        }
+
+        @Test
+        @DisplayName("PromptSchema 태그명이 파서 패턴과 일치 — TAG_QUEUE_DELTA (독립)")
+        void promptSchema_tagQueueDelta_matchesParser() {
+            String raw = "응답.\n<" + PromptSchema.TAG_QUEUE_DELTA + ">"
+                + "{\"asked\":[\"id-001\"],\"new\":[]}"
+                + "</" + PromptSchema.TAG_QUEUE_DELTA + ">";
+            var r = parser.parse(raw, 1, "USER_A");
+            assertNotNull(r.queueDelta());
+            assertEquals("id-001", r.queueDelta().asked.get(0));
+        }
     }
 }
