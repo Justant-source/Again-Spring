@@ -73,8 +73,8 @@ export function ChatPanel({
 
     if (hasMediatorMsg && !hasUserMsg) {
       firstMessageTimerStarted.current = true;
-      const t = setTimeout(() => setFirstMessageReady(true), 2000);
-      return () => clearTimeout(t);
+      setFirstMessageReady(true);
+      return;
     }
     if (hasUserMsg || messages.length > 0) {
       firstMessageTimerStarted.current = true;
