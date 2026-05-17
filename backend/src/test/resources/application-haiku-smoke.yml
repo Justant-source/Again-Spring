@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:haiku_smoke;MODE=MariaDB;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+
+llm:
+  provider: claude-code
+  claude-code:
+    binary-path: claude

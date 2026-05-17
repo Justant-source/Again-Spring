@@ -11,6 +11,8 @@ import { useEffect, type ReactNode } from 'react';
 export function MSWProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return;
+    // NEXT_PUBLIC_DISABLE_MSW=true 시 dev에서도 MSW off → 실 BE 대상 E2E 에서 사용
+    if (process.env.NEXT_PUBLIC_DISABLE_MSW === 'true') return;
     if (typeof window === 'undefined') return;
 
     import('@/mocks/browser').then(async ({ worker }) => {
