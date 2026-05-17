@@ -491,6 +491,13 @@ APP_URL=https://dev.againspring.net
 - [ ] **2순위**: 한 화면에 한 결정만 (GOV.UK one thing per page)
 - [ ] **2순위**: "잠시 멈추기 / 나가기"가 1탭 안에 (HAX G8·G17)
 - [ ] `npm run build` 성공 확인
+- [ ] **e2e 테스트 동기화**: FE 컴포넌트/라우트/셀렉터 변경 시 `tests/e2e-realbe/` spec도 함께 수정
+  - `data-testid` 추가/변경 → `support/selectors.ts` 업데이트
+  - 절대 불변 규칙(위기 모달·Duo 격리·법적박스·Crisis 이중방어) 관련 코드 변경 → `invariants/` spec 검토
+  - 라우트/권한 변경 → `flows/` spec 검토
+- [ ] **pre-commit hook**: `frontend/` 파일 staged 시 자동 실행 (vitest + e2e-realbe 100% 통과 필수)
+  - dev docker 스택이 실행 중이어야 함 (`cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d`)
+  - 우회: `SKIP_TESTS=1 git commit` — 긴급 상황 전용, 절대 불변 규칙 파괴 시 금지
 
 ### 백엔드 수정 시
 

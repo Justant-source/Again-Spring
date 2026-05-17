@@ -112,6 +112,12 @@ test.describe('게스트 골든패스 (실 BE 연동)', () => {
 
     const sessionResp = await sessionCreatePromise
 
+    if (sessionResp.status() === 429) {
+      console.warn('[E2E] 게스트 세션 일일 한도 소진 (GuestSessionRateLimiter 3/24h) — BE 컨테이너 재시작 필요')
+      test.skip(true, '게스트 세션 일일 한도 소진 — 인프라 이슈, 회귀 아님')
+      return
+    }
+
     expect(sessionResp.status(), [
       `POST /api/sessions가 201이어야 합니다.`,
       `실제 응답: ${sessionResp.status()} — BE 로그를 확인하세요.`,

@@ -257,6 +257,25 @@ export function SoloReport({ report, sessionId }: SoloReportProps) {
         )}
       </div>
 
+      {/* 법적 안내 박스 — 절대 불변 규칙 #5: 항상 표시, 숨기거나 조건부 처리 금지 */}
+      <div
+        data-testid="ratio-legal-notice"
+        style={{
+          margin: '0 22px 20px',
+          background: 'color-mix(in srgb, var(--P-sub) 6%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--P-sub) 15%, transparent)',
+          borderRadius: 10,
+          padding: '12px 14px',
+          fontSize: 12,
+          color: 'var(--P-sub)',
+          lineHeight: 1.7,
+        }}
+      >
+        이 리포트는 한 분의 관점을 바탕으로 한 참고용이에요.
+        법적 판단이나 과실 비율과는 무관하며, AI 분석에는 한계가 있어요.
+        깊은 갈등은 전문 상담을 권해드려요.
+      </div>
+
       {/* Footer: restart — outside shareable area */}
       <div style={{ padding: '8px 22px 36px', textAlign: 'center' }}>
         <button

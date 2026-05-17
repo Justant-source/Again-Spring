@@ -1,199 +1,72 @@
 # Frontend Test Infrastructure
 
-Testing infrastructure for the Again Spring frontend using Vitest (unit/component/integration) + Playwright (E2E).
+Testing infrastructure for the Again Spring frontend.
+
+- **Vitest** (unit/component/integration): centralized under `tests/`
+- **Playwright MSW** (`npm run test:e2e`): `tests/e2e/` — a11y-only (axe WCAG checks)
+- **Playwright real-BE** (`npm run test:e2e:realbe`): `tests/e2e-realbe/` — 회귀 방지 메인 무대
 
 ## Directory Structure
 
 ```
 tests/
-├── unit/              # Pure function/utility tests
-├── component/         # React component tests (RTL)
-├── integration/       # API/store integration tests
-├── e2e/              # End-to-end tests (Playwright)
-├── fixtures/         # Test data factories
-├── setup.ts          # Vitest setup (MSW, mocks, polyfills)
-└── README.md         # This file
+├── unit/              # Pure function / utility tests (Vitest)
+├── component/         # React component tests (RTL + Vitest)
+├── integration/       # API/store integration tests (Vitest)
+├── e2e/               # Playwright MSW — a11y only (npm run test:e2e)
+│   ├── a11y.spec.ts
+│   └── fixtures/      # page.route API mock (a11y에서 사용)
+├── e2e-realbe/        # Playwright real-BE 회귀 방지 (npm run test:e2e:realbe)
+│   ├── invariants/    # 절대 불변 규칙 4 spec (최우선)
+│   ├── flows/         # frontend/docs/ux/flows/ 1:1 매핑
+│   ├── fixtures/      # personas, auth-state, cleanup, api-helpers
+│   └── support/       # global-setup, selectors, waits, assertions
+├── fixtures/          # Vitest 데이터 팩토리 (createUser/Session/Message…)
+├── setup.ts           # Vitest setup (MSW server, next mock, DOM polyfill)
+└── README.md
 ```
 
 ## Running Tests
 
 ```bash
-# Run all tests once
+# Vitest (unit/component/integration) — MSW 기반
 npm test
-
-# Watch mode (rerun on file changes)
 npm run test:watch
-
-# Generate coverage report
 npm run test:coverage
 
-# Web dashboard
-npm run test:ui
-
-# E2E tests
+# Playwright — a11y only (MSW dev server 필요: npm run dev)
 npm run test:e2e
-
-# A11y tests only
 npm run test:a11y
+
+# Playwright — real-BE 불변/flow 회귀 검증 (dev Docker 스택 필요)
+# 사전 조건: cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d
+npm run test:e2e:realbe
 ```
+
+## 절대 불변 규칙 (tests/e2e-realbe/invariants/)
+
+아래 4개는 실 BE + 실 브라우저 레벨에서 검증하는 회귀 방지 최우선 spec:
+
+| Spec | 보호 대상 | 권위본 |
+|---|---|---|
+| `crisis-modal-dismiss` | CrisisModal은 ESC·backdrop으로 닫히지 않는다 | `frontend/docs/ux/principles.md`, `08-crisis.md` |
+| `crisis-dual-defense` | FE + BE 이중 차단 (409 메시지 미저장) | `shared/docs/policies/crisis-detection.md` |
+| `duo-message-isolation` | 상대 메시지 원문이 DOM·API에 절대 노출 안 됨 | `frontend/docs/ux/principles.md`, `06-duo.md` |
+| `contribution-ratio-legal-notice` | 법적 안내 박스가 항상 표시·미은닉 | `frontend/README.md` 절대 불변 규칙 |
+
+## Coverage Targets (Vitest)
+
+| 항목 | 목표 |
+|---|---|
+| Lines / Functions / Statements | 80% |
+| Branches | 70% |
 
 ## Writing Tests
 
-### Import Fixtures
+Vitest 테스트 작성법 및 픽스처 사용 예시는 `tests/fixtures/index.ts`의 팩토리 함수 참조.
 
-```typescript
-import {
-  createUser,
-  createSession,
-  createMessage,
-  createSessionWithMessages,
-  createSessionMessages,
-  createMediatorMessage,
-} from '@/tests/fixtures'
-
-// Default user
-const user = createUser()
-
-// Custom user
-const user = createUser({ nickname: 'Alice', isGuest: true })
-
-// Guest user
-const guest = createGuestUser()
-
-// Solo session
-const session = createSession()
-
-// Duo session
-const duoSession = createDuoSession()
-
-// Message from USER_A
-const msg = createMessage({ sender: 'USER_A', content: '...' })
-
-// Mediator message
-const med = createMediatorMessage(undefined, 'MEDIATOR_TO_B')
-
-// Multiple messages
-const messages = createSessionMessages(5, 'USER_A')
-
-// Session with messages
-const { session, messages } = createSessionWithMessages(10)
-
-// User with multiple sessions
-const { user, sessions } = createUserWithSessions(3)
-```
-
-### Component Tests (RTL)
-
-```typescript
-import { render, screen } from '@testing-library/react'
-import { userEvent } from '@testing-library/user-event'
-import { MyComponent } from '@/components/MyComponent'
-import { createUser } from '@/tests/fixtures'
-
-describe('MyComponent', () => {
-  it('displays user name', () => {
-    const user = createUser({ nickname: 'Alice' })
-    render(<MyComponent user={user} />)
-
-    expect(screen.getByText('Alice')).toBeInTheDocument()
-  })
-
-  it('handles click', async () => {
-    const user = userEvent.setup()
-    render(<MyComponent />)
-
-    await user.click(screen.getByRole('button'))
-    expect(screen.getByText('Clicked')).toBeInTheDocument()
-  })
-})
-```
-
-### Integration Tests
-
-```typescript
-import { describe, it, expect } from 'vitest'
-import { createSessionWithMessages } from '@/tests/fixtures'
-
-describe('Message API integration', () => {
-  it('creates a session with messages', () => {
-    const { session, messages } = createSessionWithMessages(5)
-
-    expect(messages).toHaveLength(5)
-    expect(messages[0].sender).toBe('USER_A')
-  })
-})
-```
-
-### E2E Tests (Playwright)
-
-```typescript
-import { test, expect } from '@playwright/test'
-
-test.describe('Chat flow', () => {
-  test('user can send a message', async ({ page }) => {
-    await page.goto('/chat')
-    await page.fill('[data-testid=input]', 'Hello')
-    await page.click('button:has-text("Send")')
-
-    await expect(page.locator('text=Hello')).toBeVisible()
-  })
-})
-```
-
-### A11y Tests
-
-```typescript
-import { test, expect } from '@playwright/test'
-import { injectAxe, checkA11y } from 'axe-playwright'
-
-test('@a11y home page', async ({ page }) => {
-  await page.goto('/')
-  await injectAxe(page)
-  await checkA11y(page)
-})
-```
-
-## Setup & Mocks
-
-`tests/setup.ts` provides:
-
-- **MSW server** — mocked API responses (uses `mocks/handlers`)
-- **RTL cleanup** — after each test
-- **localStorage/sessionStorage** — automatically cleared
-- **Next.js mocks**:
-  - `useRouter()` returns mocked router
-  - `useSearchParams()` returns empty URLSearchParams
-  - `usePathname()` returns `/`
-  - `redirect()`, `notFound()` are vi.fn()
-  - `next/image` → plain `<img>`
-  - `next/link` → plain `<a>`
-- **DOM polyfills**:
-  - `window.matchMedia()`
-  - `IntersectionObserver`
-  - `ResizeObserver`
-
-All setup runs automatically before each test suite.
-
-## Coverage Targets
-
-From `vitest.config.ts`:
-
-- **Lines**: 80% (library code)
-- **Functions**: 80%
-- **Branches**: 70%
-- **Statements**: 80%
-
-Excluded:
-- `mocks/**`
-- `**/*.d.ts`
-- `app/**/page.tsx` (route files)
-- `app/**/layout.tsx` (layout files)
-
-## Tips
-
-1. **Always use fixtures** — they ensure consistency and reduce boilerplate
-2. **Use data-testid** — better than testing implementation details
-3. **Test user interactions** — use `@testing-library/user-event` over fireEvent
-4. **Keep MSW handlers synced** — with `shared/docs/api/rest-spec.md`
-5. **Check HAX compliance** — when testing components, refer to `frontend/docs/ux/hax-checklist.md`
-6. **Run coverage regularly** — `npm run test:coverage` catches regressions
+Playwright real-BE spec 작성 시:
+- `tests/e2e-realbe/fixtures/personas.ts` — 페르소나 10명 참조
+- `tests/e2e-realbe/support/selectors.ts` — data-testid 컨벤션
+- `tests/e2e-realbe/support/waits.ts` — LLM 응답 폴링
+- test.beforeAll에서 `cleanup()` 호출 필수

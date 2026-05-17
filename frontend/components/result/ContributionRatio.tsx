@@ -54,6 +54,24 @@ export function ContributionRatio({
             </button>
           )}
         </div>
+        {/* 법적 안내문구 박스 — Solo 모드에도 항상 표시 (절대 불변 규칙 #5) */}
+        <div
+          data-testid="ratio-legal-notice"
+          style={{
+            marginTop: 14,
+            background: 'color-mix(in srgb, var(--P-sub) 6%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--P-sub) 15%, transparent)',
+            borderRadius: 10,
+            padding: '12px 14px',
+            fontSize: 12,
+            color: 'var(--P-sub)',
+            lineHeight: 1.7,
+          }}
+        >
+          이 수치는 두 분의 회복 시작점을 부드럽게 안내하기 위한 참고용이에요.
+          법적 판단이나 과실 비율과는 무관하며, AI 분析에는 한계가 있어요.
+          깊은 갈등은 전문 상담을 권해드려요.
+        </div>
       </div>
     );
   }
@@ -118,6 +136,7 @@ export function ContributionRatio({
 
       {/* 법적 안내문구 박스 (Phase 7) */}
       <div
+        data-testid="ratio-legal-notice"
         style={{
           marginTop: 14,
           background: 'color-mix(in srgb, var(--P-sub) 6%, transparent)',

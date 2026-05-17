@@ -7,6 +7,7 @@ interface Props {
 export function CrisisModal({ onClose }: Props) {
   return (
     <div
+      data-testid="crisis-modal"
       style={{
         position: 'fixed',
         inset: 0,
@@ -98,6 +99,7 @@ export function CrisisModal({ onClose }: Props) {
           </div>
         </div>
         <button
+          data-testid="crisis-modal-close"
           onClick={onClose}
           style={{
             width: '100%',

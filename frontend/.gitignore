@@ -12,3 +12,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 public/mockServiceWorker.js
+
+# Playwright auth states
+.auth/

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# pre-commit hook: frontend 변경 시 vitest + e2e-realbe 100% 통과 필수
+#
+# 설치: git config core.hooksPath .githooks
+# 우회: 테스트 없이 커밋해야 할 경우 SKIP_TESTS=1 git commit ...
+#       단, CLAUDE.md 절대 규칙(위기 이중 방어 등) 파괴 시 절대 우회 금지.
+
+set -euo pipefail
+
+# ── 우회 옵션 ────────────────────────────────────────────────────────────────
+if [[ "${SKIP_TESTS:-0}" == "1" ]]; then
+  echo "[pre-commit] SKIP_TESTS=1 — 테스트 건너뜀 (긴급 상황 전용)"
+  exit 0
+fi
+
+# ── FE 변경 감지 ─────────────────────────────────────────────────────────────
+STAGED_FE=$(git diff --cached --name-only | grep '^frontend/' | head -1)
+
+if [[ -z "$STAGED_FE" ]]; then
+  exit 0  # FE 파일 없으면 통과
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  [pre-commit] FE 변경 감지 → 테스트 실행"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+FE_DIR="$REPO_ROOT/frontend"
+
+# ── Step 1: vitest (unit/component/integration) ───────────────────────────────
+echo ""
+echo "▶ Step 1/2 — vitest (unit · component · integration)"
+echo ""
+
+cd "$FE_DIR"
+if ! npm test -- --reporter=verbose 2>&1; then
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  [pre-commit] ✗ vitest 실패 — 커밋 중단"
+  echo "  수정 후 다시 커밋하세요."
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  exit 1
+fi
+
+echo ""
+echo "  ✓ vitest 통과"
+
+# ── Step 2: Playwright e2e-realbe ─────────────────────────────────────────────
+echo ""
+echo "▶ Step 2/2 — Playwright e2e-realbe (invariants · flows)"
+echo ""
+
+BE_HEALTH=$(curl -sf "http://localhost:8090/api/health" 2>/dev/null || echo "")
+
+if [[ -z "$BE_HEALTH" ]]; then
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  [pre-commit] ✗ dev 스택 미실행 — 커밋 중단"
+  echo ""
+  echo "  FE 코드를 커밋하려면 dev docker 스택이 실행 중이어야 합니다."
+  echo "  시작 명령:"
+  echo ""
+  echo "    cd $REPO_ROOT/env"
+  echo "    docker compose -f docker-compose.dev.yml --env-file .env.dev up -d"
+  echo ""
+  echo "  스택 시작 후 다시 커밋하세요."
+  echo "  (긴급 상황: SKIP_TESTS=1 git commit ... — 절대 불변 규칙 파괴 시 금지)"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  exit 1
+fi
+
+cd "$FE_DIR"
+if ! npm run test:e2e:realbe 2>&1; then
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  [pre-commit] ✗ e2e-realbe 실패 — 커밋 중단"
+  echo ""
+  echo "  실패한 spec을 먼저 수정하거나,"
+  echo "  FE 변경에 맞게 e2e spec도 함께 업데이트하세요."
+  echo "  리포트: frontend/playwright-report/index.html"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  exit 1
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  [pre-commit] ✓ 모든 테스트 통과 — 커밋 진행"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""

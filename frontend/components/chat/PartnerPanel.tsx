@@ -118,6 +118,7 @@ function BlurredBubble({
 
   return (
     <div
+      data-testid="blurred-bubble"
       style={{
         display: 'flex',
         justifyContent: isPartner ? 'flex-start' : 'flex-end',
