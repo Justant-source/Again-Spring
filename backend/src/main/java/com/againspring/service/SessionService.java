@@ -190,20 +190,8 @@ public class SessionService {
         Session saved = sessionRepository.save(session);
         log.info("Session created: id={}, token={}, creator={}", saved.getId(), inviteToken, createdByUserId);
 
-        // V13 Phase 1: mediator 첫마디를 세션 생성 직후 선제 저장
-        try {
-            String firstMsg = firstMessageService.generateFirstMessage(saved);
-            messageRepository.save(Message.builder()
-                    .sessionId(saved.getId())
-                    .sender(MessageSender.MEDIATOR_TO_A)
-                    .content(firstMsg)
-                    .charCount(firstMsg.length())
-                    .llmModel("template-or-haiku")
-                    .build());
-            log.debug("First message saved for session={}", saved.getId());
-        } catch (Exception e) {
-            log.warn("First message generation failed for session={}: {}", saved.getId(), e.getMessage());
-        }
+        // V13 Phase 1: mediator 첫마디 비동기 저장 (세션 생성 응답 블로킹 제거)
+        firstMessageService.generateAndSaveAsync(saved);
 
         String inviteUrl = "https://againspring.app/join/" + inviteToken;
 

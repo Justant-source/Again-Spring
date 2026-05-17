@@ -1,11 +1,15 @@
 package com.againspring.service.context;
 
+import com.againspring.domain.Message;
 import com.againspring.domain.Session;
+import com.againspring.domain.enums.MessageSender;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.prompt.PromptLoader;
+import com.againspring.repository.MessageRepository;
 import com.againspring.service.category.CategoryCatalog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -33,6 +37,25 @@ public class FirstMessageService {
     private final LLMProvider llmBridge;
     private final PromptLoader promptLoader;
     private final CategoryCatalog catalog;
+    private final MessageRepository messageRepository;
+
+    /** 세션 생성 응답을 블로킹하지 않도록 비동기로 첫마디 생성·저장 */
+    @Async
+    public void generateAndSaveAsync(Session session) {
+        try {
+            String content = generateFirstMessage(session);
+            messageRepository.save(Message.builder()
+                    .sessionId(session.getId())
+                    .sender(MessageSender.MEDIATOR_TO_A)
+                    .content(content)
+                    .charCount(content.length())
+                    .llmModel("template-or-haiku")
+                    .build());
+            log.debug("First message saved async for session={}", session.getId());
+        } catch (Exception e) {
+            log.warn("Async first message generation failed for session={}: {}", session.getId(), e.getMessage());
+        }
+    }
 
     public String generateFirstMessage(Session session) {
         Session.Category cat = session.getCategory();

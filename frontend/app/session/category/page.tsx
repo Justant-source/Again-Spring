@@ -35,31 +35,6 @@ export default function CategoryPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (loading) {
-    return (
-      <div style={{
-        position: 'fixed', inset: 0,
-        background: 'var(--P-bg)',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        gap: 20, zIndex: 100,
-      }}>
-        <div style={{
-          padding: '16px 22px',
-          borderRadius: '4px 14px 14px 14px',
-          background: 'var(--P-card)',
-          border: '1px solid var(--P-border)',
-          display: 'flex', gap: 5, alignItems: 'center',
-        }}>
-          <span className="typing-dot" />
-          <span className="typing-dot" />
-          <span className="typing-dot" />
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--P-sub)' }}>대화를 준비하고 있어요</div>
-      </div>
-    );
-  }
-
   if (!relationType) {
     router.push('/session/new');
     return null;
