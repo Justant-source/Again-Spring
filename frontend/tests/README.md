@@ -4,7 +4,7 @@ Testing infrastructure for the Again Spring frontend.
 
 - **Vitest** (unit/component/integration): centralized under `tests/`
 - **Playwright MSW** (`npm run test:e2e`): `tests/e2e/` — a11y-only (axe WCAG checks)
-- **Playwright real-BE** (`npm run test:e2e:realbe`): `tests/e2e-realbe/` — 회귀 방지 메인 무대
+- **Playwright real-BE** (`npm run test:e2e:realbe`): `tests/e2e-realbe/` — **prod 배포 전 필수 게이트** (커밋 단계 불필요)
 
 ## Directory Structure
 

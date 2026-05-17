@@ -495,8 +495,8 @@ APP_URL=https://dev.againspring.net
   - `data-testid` 추가/변경 → `support/selectors.ts` 업데이트
   - 절대 불변 규칙(위기 모달·Duo 격리·법적박스·Crisis 이중방어) 관련 코드 변경 → `invariants/` spec 검토
   - 라우트/권한 변경 → `flows/` spec 검토
-- [ ] **pre-commit hook**: `frontend/` 파일 staged 시 자동 실행 (vitest + e2e-realbe 100% 통과 필수)
-  - dev docker 스택이 실행 중이어야 함 (`cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d`)
+  - (e2e-realbe 실행은 prod 배포 전 게이트 — 커밋 단계 불필요)
+- [ ] **pre-commit hook**: `frontend/` 파일 staged 시 자동 실행 (vitest 100% 통과 필수)
   - 우회: `SKIP_TESTS=1 git commit` — 긴급 상황 전용, 절대 불변 규칙 파괴 시 금지
 
 ### 백엔드 수정 시
@@ -519,6 +519,10 @@ APP_URL=https://dev.againspring.net
 
 - [ ] dev에서 충분히 검증 완료
 - [ ] main 브랜치에 commit & push 완료
+- [ ] **🚨 e2e-realbe 전체 통과 필수** (`cd frontend && npm run test:e2e:realbe`)
+  - dev docker 스택 실행 중이어야 함 (`cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d`)
+  - 절대 불변 4종(crisis-modal-dismiss · crisis-dual-defense · duo-message-isolation · contribution-ratio-legal-notice) 포함 전부 그린
+  - 실패 시 prod 배포 금지 — 원인 수정 후 재검증
 - [ ] `env/.env.prod` 모든 값 입력 (기본값 없음)
 - [ ] MariaDB 볼륨 백업 (`docker exec againspring-mariadb-prod mariadb-dump ...`)
 - [ ] `docker compose -f docker-compose.prod.yml up -d --build` 성공
