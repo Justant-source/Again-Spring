@@ -257,27 +257,31 @@ curl http://localhost:8080/actuator/health
 
 > 자세한 설계: [`backend/docs/llm-bridge.md`](backend/docs/llm-bridge.md), 프롬프트 구조: [`shared/docs/prompts/README.md`](shared/docs/prompts/README.md)
 
-### ClaudeCodeBridge 설계 원칙
+### 아키텍처 (2-pod 분리)
 
-- **모델**: `claude-haiku-4-5-20251001` (기본). `CLAUDE_MODEL` 환경변수로 변경 가능.
-- **호출**: `claude --print --model <model> "<prompt>"` (프롬프트는 인자, stdin 미사용)
-- **프로세스 풀**: `Semaphore(3)` — 동시 최대 3개 Claude 프로세스
-- **타임아웃**: 60초 (Haiku 평균 응답 ~3초, 안전 마진)
-- **Fallback**: Claude 불가 시 `FallbackResponses` 기본 응답 반환
-- **프롬프트 경로**: `app.prompts.path` (기본 `./shared/docs/prompts`)
+| 컨테이너 | 역할 |
+|---|---|
+| `againspring-backend-dev/prod` | 프롬프트 어셈블 + HTTP 클라이언트 (`RemoteLlmProvider`) |
+| `againspring-llm-dev/prod` | Claude CLI 실행 전용 (`LlmWorkerPool` 100풀 + 큐500) |
+
+- **모델**: `claude-haiku-4-5-20251001` (채팅), `claude-sonnet-4-6` (리포트)
+- **호출 플래그**: `--strict-mcp-config --no-session-persistence --print` (⚠️ `--bare` 금지 — OAuth 파괴)
+- **동시성**: ThreadPoolExecutor 100 + LinkedBlockingQueue 500 (fail-fast 폐기 → 대기 큐)
+- **타임아웃**: 실행 120초 (큐 대기 30초 초과 시 CAPACITY)
+- **Fallback**: `LLM_PROVIDER=claude-code` + backend Dockerfile git revert → in-process 복귀
 
 ### 인증 방식 (API 키 없이)
 
-Claude Code CLI 자체 인증을 활용. 호스트의 `~/.claude` 디렉토리를 컨테이너 `/root/.claude`로 볼륨 마운트하여 호스트 로그인 세션 공유.
+`~/.claude`를 **llm-worker 컨테이너**에 마운트:
 
 ```yaml
-# env/docker-compose.dev.yml / docker-compose.prod.yml
-backend-dev:
+# env/docker-compose.dev.yml
+againspring-llm-dev:
   volumes:
     - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
 ```
 
-호스트에서 최초 1회 `claude` 명령으로 로그인 후, 컨테이너는 동일한 세션을 사용. ANTHROPIC_API_KEY 불필요.
+호스트에서 최초 1회 `claude` 명령으로 로그인. `ANTHROPIC_API_KEY` 불필요. 세션 만료 시 호스트 재로그인 → `docker compose restart againspring-llm-dev`.
 
 ### 보안 규칙
 
@@ -337,6 +341,7 @@ cd frontend && npm run test
 |---|---|---|
 | MariaDB | `againspring-mariadb-dev` | `againspring-mariadb-prod` |
 | Backend | `againspring-backend-dev` | `againspring-backend-prod` |
+| **LLM Worker** | **`againspring-llm-dev`** | **`againspring-llm-prod`** |
 | Frontend | `againspring-frontend-dev` | `againspring-frontend-prod` |
 | Nginx | `againspring-nginx-dev` | `againspring-nginx-prod` |
 
@@ -408,11 +413,16 @@ MARIADB_PASSWORD=...
 # JWT
 JWT_SECRET=...
 
-# Claude Code CLI (API 키 불필요 — 호스트 ~/.claude 마운트)
-LLM_PROVIDER=claude-code
+# LLM 워커 (againspring-llm 컨테이너, API 키 불필요 — 호스트 ~/.claude 마운트)
+LLM_PROVIDER=remote
+LLM_WORKER_URL=http://againspring-llm-dev:8090
+CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude
 CLAUDE_BIN=claude
 CLAUDE_MODEL=claude-haiku-4-5-20251001
-CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude
+REPORT_LLM_MODEL=claude-sonnet-4-6
+LLM_POOL_SIZE=100
+LLM_QUEUE_CAPACITY=500
+LLM_QUEUE_WAIT_TIMEOUT_MS=30000
 PROMPTS_PATH=./shared/docs/prompts   # 기본값
 
 # OAuth2 (Google만 사용 중)
@@ -443,6 +453,7 @@ APP_URL=https://dev.againspring.net
   - ✅ V1.5 카톡식 채팅 (ChatService, MessageSender 4종, Solo→Duo 전이)
   - ✅ **LLM 브릿지 (Claude Haiku 4.5 + 호스트 ~/.claude 마운트, API 키 불필요)**
   - ✅ **LLM 호출 취소 메커니즘 (Phase 1 V1.5)**: POST /messages <500ms 응답 + 새 메시지 도착 시 진행 중 Claude 프로세스 강제 종료 + 누적 메시지 재호출. `CancelableChatService`, `CancelableInvocation`.
+  - ✅ **LLM 워커 분리 (2026-05-17)**: 전용 `againspring-llm-dev/prod` 컨테이너 (`llm-worker/` Spring Boot). `ThreadPoolExecutor(100) + LinkedBlockingQueue(500)` — Semaphore(3) fail-fast 폐기. `RemoteLlmProvider` + `RemoteCancelableInvocation` (long-poll). `--strict-mcp-config --no-session-persistence` CLI 플래그.
   - ✅ **중재 컨텍스트 강화 (Phase A/B/C)**: 사용자 프로필 주입(`UserProfileFragment`) + 턴 간 심리 점수 피드백(`PsychologyFeedbackFormatter`, `ChatTurnMetaParser`) + Duo 균형 추적(`DuoBalanceFormatter`)
   - ✅ **중재 컨텍스트 강화 Phase D**: UserState 7종 + IssueContext 4슬롯 + QuestionQueue (A·B 분리 PQ) + B 진입 시 환영+PQ top1 통합 메시지 + IsolationLintFilter 격리 3중 방어. 권위본: `shared/docs/policies/context-algorithm.md`
   - ✅ **컨텍스트 주입 누락 수정 (2026-04-27)**: 카테고리(대/중/소분류 + 직접 입력) + MBTI + 누락 관계 가이드(marriage, korean_specific) 주입. `CategoryContextFragment`, `categories.yml`, Flyway V11, `UserProfileFragment` MBTI 보강. 권위본: `shared/docs/policies/categories.md`, `shared/docs/policies/onboarding.md`.
@@ -461,7 +472,7 @@ APP_URL=https://dev.againspring.net
     - 5턴 정리 게이트: `MIN_MESSAGES_TO_FINALIZE` 3→5, 진행 인디케이터 dot + 툴팁
     - SVG 아이콘 5개 (`DasibomLogo`, `Conversation`, `SafeHaven`, `Phone`, `CrisisResources`) + 장식 emoji 7곳 제거
     - AI emoji 영구 금지 정책 적용 (V13 이후 모든 UI)
-- ✅ Docker 멀티 컨테이너 배포 (MariaDB / Backend / Frontend / Nginx)
+- ✅ Docker 멀티 컨테이너 배포 (MariaDB / **LLM Worker** / Backend / Frontend / Nginx)
 - ✅ Cloudflare Tunnel — `dev.againspring.net`, `againspring.net`
 - ✅ 문서 4-디렉토리 재구성 (shared/docs, backend/docs, frontend/docs, env/docs)
 - ✅ **FE UX 정책 수립 및 Phase 1+2 적용** (HAX 18 + Designing for Safety — 위기 모달 dismiss 마찰, AI 한계 안내, 나가기 버튼, 데이터 흐름 안내, NeedsMap 근거 아이콘)
@@ -509,7 +520,7 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-05-16
+**마지막 업데이트**: 2026-05-17
 **담당**: Claude Code (Agent)
 
 > UX 정책 관련 문의: `frontend/docs/ux/principles.md` (4원칙군 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트) 순으로 참조.

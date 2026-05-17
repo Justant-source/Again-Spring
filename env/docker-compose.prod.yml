@@ -39,6 +39,38 @@ services:
     networks:
       - againspring-prod
 
+  llm-prod:
+    build:
+      context: ../llm-worker
+      dockerfile: Dockerfile
+    image: againspring-llm-prod
+    container_name: againspring-llm-prod
+    environment:
+      CLAUDE_BIN: ${CLAUDE_BIN:-claude}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5-20251001}
+      REPORT_LLM_MODEL: ${REPORT_LLM_MODEL:-claude-sonnet-4-6}
+      LLM_POOL_SIZE: ${LLM_POOL_SIZE:-100}
+      LLM_QUEUE_CAPACITY: ${LLM_QUEUE_CAPACITY:-500}
+      LLM_QUEUE_WAIT_TIMEOUT_MS: ${LLM_QUEUE_WAIT_TIMEOUT_MS:-30000}
+      LLM_DEFAULT_TIMEOUT_MS: ${LLM_DEFAULT_TIMEOUT_MS:-120000}
+    volumes:
+      - ${CLAUDE_HOST_CONFIG_DIR:-/root/.claude}:/root/.claude
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    networks:
+      - againspring-prod
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8090/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
   backend-prod:
     build:
       context: ../backend
@@ -51,10 +83,8 @@ services:
       DB_USER: ${MARIADB_USER}
       DB_PASSWORD: ${MARIADB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
-      LLM_PROVIDER: ${LLM_PROVIDER:-claude-code}
-      CLAUDE_BIN: ${CLAUDE_BIN:-claude}
-      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5-20251001}
-      CLAUDE_POOL_SIZE: ${CLAUDE_POOL_SIZE:-100}
+      LLM_PROVIDER: ${LLM_PROVIDER:-remote}
+      LLM_WORKER_URL: ${LLM_WORKER_URL:-http://againspring-llm-prod:8090}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
@@ -67,20 +97,21 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-againspring2026@gmail.com}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
     volumes:
-      - ${CLAUDE_HOST_CONFIG_DIR:-/root/.claude}:/root/.claude
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro
       - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro
       - ../shared/docs/policies/user-permissions.json:/app/shared/docs/policies/user-permissions.json:ro
     depends_on:
       mariadb-prod:
         condition: service_healthy
+      llm-prod:
+        condition: service_healthy
     restart: always
     deploy:
       resources:
         limits:
-          memory: 6G
+          memory: 3G
         reservations:
-          memory: 2G
+          memory: 1G
     networks:
       - againspring-prod
 

@@ -13,10 +13,11 @@ RUN chmod +x gradlew && ./gradlew bootJar -x test --no-daemon
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
 
-# Node.js/Claude CLI 제거 — LLM 실행은 againspring-llm 워커 컨테이너가 담당
-# 긴급 rollback: LLM_PROVIDER=claude-code + 이전 git revision으로 backend 재배포
+# Node.js + Claude Code CLI (구독 기반 인증, ~/.claude 마운트 필요)
+RUN apk add --no-cache nodejs npm && \
+    npm install -g @anthropic-ai/claude-code
 
-COPY --from=build /app/build/libs/againspring-*.jar app.jar
+COPY --from=build /app/build/libs/llm-worker-*.jar app.jar
 
-EXPOSE 8080
+EXPOSE 8090
 ENTRYPOINT ["java", "-jar", "app.jar"]
