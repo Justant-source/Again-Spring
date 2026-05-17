@@ -82,14 +82,14 @@ export function ChatPanel({
     }
   }, [entryTypingDone, messages, mediatorSender, currentUserSender]);
 
-  // 안전 장치: 7초 후 무조건 표시 (메시지 로드 지연 또는 빈 세션 대응)
+  // 안전 장치: 30초 후 무조건 표시 (Haiku 커스텀 입력 등 장기 생성 대응)
   useEffect(() => {
     const t = setTimeout(() => {
       if (!firstMessageTimerStarted.current) {
         firstMessageTimerStarted.current = true;
         setFirstMessageReady(true);
       }
-    }, 7000);
+    }, 30000);
     return () => clearTimeout(t);
   }, []);
 
@@ -128,8 +128,7 @@ export function ChatPanel({
       />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
-        {(!entryTypingDone || !firstMessageReady) && <TypingBubble />}
-        {entryTypingDone && firstMessageReady && messages.length === 0 && <EmptyChatPlaceholder />}
+        {(!entryTypingDone || !firstMessageReady || messages.length === 0) && <TypingBubble />}
         {entryTypingDone && firstMessageReady && messages.map(msg => {
           if (msg.isPartnerJoinNotice) {
             return <PartnerJoinNoticeCard key={msg.id} message={msg} />;
