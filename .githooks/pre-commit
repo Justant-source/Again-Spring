@@ -15,7 +15,7 @@ if [[ "${SKIP_TESTS:-0}" == "1" ]]; then
 fi
 
 # ── FE 변경 감지 ─────────────────────────────────────────────────────────────
-STAGED_FE=$(git diff --cached --name-only | grep '^frontend/' | head -1)
+STAGED_FE=$(git diff --cached --name-only | grep '^frontend/' | head -1 || true)
 
 if [[ -z "$STAGED_FE" ]]; then
   exit 0  # FE 파일 없으면 통과
