@@ -34,6 +34,21 @@ public class ChatTurnMetaParser {
         "<mediator_response>\\s*(.*?)\\s*</mediator_response>",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
+    // AI가 <turn_meta> 대신 독립 최상위 태그로 출력할 때 스트립 + 파싱
+    private static final Pattern ISSUE_DELTA_BLOCK = Pattern.compile(
+        "<issue_delta>\\s*(\\{.*?})\\s*</issue_delta>",
+        Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern QUEUE_DELTA_BLOCK = Pattern.compile(
+        "<question_queue_delta>\\s*(\\{.*?})\\s*</question_queue_delta>",
+        Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+
+    // 방어적 마지막 패스: 파싱 후 남은 알려진 구조 태그 잔재 제거
+    // mediator_response는 WRAPPER_BLOCK이 별도 처리하므로 제외
+    private static final Pattern UNKNOWN_STRUCTURED_BLOCK = Pattern.compile(
+        "<(turn_meta|issue_delta|question_queue_delta|user_state|horsemen|nvc_completion)[^>]*>.*?</\\1>",
+        Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Result parse(String rawResponse, int turn, String senderTag) {
@@ -72,10 +87,40 @@ public class ChatTurnMetaParser {
             }
         }
 
+        // AI가 <turn_meta> 대신 독립 최상위 태그로 출력한 경우 스트립 + 파싱
+        // (turn_meta 에서 이미 파싱된 값은 덮어쓰지 않음)
+        Matcher issueMatcher = ISSUE_DELTA_BLOCK.matcher(working);
+        if (issueMatcher.find()) {
+            if (issueDelta == null) {
+                try {
+                    issueDelta = readIssueDelta(objectMapper.readTree(issueMatcher.group(1)));
+                } catch (Exception e) {
+                    log.warn("standalone issue_delta parse failed (turn={}): {}", turn, e.getMessage());
+                }
+            }
+            working = ISSUE_DELTA_BLOCK.matcher(working).replaceAll("").trim();
+        }
+
+        Matcher queueMatcher = QUEUE_DELTA_BLOCK.matcher(working);
+        if (queueMatcher.find()) {
+            if (queueDelta == null) {
+                try {
+                    queueDelta = readQueueDelta(objectMapper.readTree(queueMatcher.group(1)));
+                } catch (Exception e) {
+                    log.warn("standalone question_queue_delta parse failed (turn={}): {}", turn, e.getMessage());
+                }
+            }
+            working = QUEUE_DELTA_BLOCK.matcher(working).replaceAll("").trim();
+        }
+
+        // mediator_response 래퍼가 있으면 내부 텍스트 추출 (UNKNOWN_STRUCTURED_BLOCK 실행 전)
         Matcher wrapper = WRAPPER_BLOCK.matcher(working);
         if (wrapper.find()) {
             working = wrapper.group(1).trim();
         }
+
+        // 방어적 마지막 패스: 파싱 후 남은 알려진 구조 태그 잔재 제거
+        working = UNKNOWN_STRUCTURED_BLOCK.matcher(working).replaceAll("").trim();
 
         return new Result(working.strip(), horsemen, nvc, userState, issueDelta, queueDelta);
     }

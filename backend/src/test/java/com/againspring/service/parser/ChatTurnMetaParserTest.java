@@ -105,4 +105,66 @@ class ChatTurnMetaParserTest {
         assertEquals("그러셨겠어요.", r.mediatorMessage());
         assertNotNull(r.horsemen());
     }
+
+    // ── 실제 버그 재현: AI가 독립 최상위 태그로 출력하는 케이스 ──
+
+    @Test
+    void parse_stripsStandaloneIssueDeltaTag_andParsesIt() {
+        String raw = "아, 그렇군요. 그 시간이 특히 불안했을 것 같아요.\n"
+            + "<issue_delta>\n"
+            + "{\"headline\":\"어제 취침 통보 후 오전 11시까지 연락 공백\","
+            + "\"facts_added\":[{\"text\":\"어제 잔다고 카톡함\",\"contributesTo\":\"PERSPECTIVE\"}]}\n"
+            + "</issue_delta>";
+        var r = parser.parse(raw, 2, "USER_A");
+
+        assertTrue(r.mediatorMessage().contains("아, 그렇군요"));
+        assertFalse(r.mediatorMessage().contains("issue_delta"), "issue_delta 태그가 노출되면 안 됨");
+        assertFalse(r.mediatorMessage().contains("facts_added"), "JSON 내용이 노출되면 안 됨");
+        assertNotNull(r.issueDelta(), "issueDelta 파싱 결과가 있어야 함");
+        assertEquals("어제 취침 통보 후 오전 11시까지 연락 공백", r.issueDelta().headline);
+        assertEquals(1, r.issueDelta().factsAdded.size());
+    }
+
+    @Test
+    void parse_stripsStandaloneQueueDeltaTag_andParsesIt() {
+        String raw = "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?\n"
+            + "<question_queue_delta>\n"
+            + "{\"asked\":[\"8b547c9f-67eb-4ff0-8d1a-f823e1e6cb72\"],"
+            + "\"new\":[{\"intent\":\"SEEK_FEELING\",\"target\":\"USER_A\",\"text\":\"그때 어떤 감정이었나요\"}]}\n"
+            + "</question_queue_delta>";
+        var r = parser.parse(raw, 3, "USER_A");
+
+        assertTrue(r.mediatorMessage().contains("잠깐 정리할 시간이 필요해요"));
+        assertFalse(r.mediatorMessage().contains("question_queue_delta"), "question_queue_delta 태그가 노출되면 안 됨");
+        assertFalse(r.mediatorMessage().contains("SEEK_FEELING"), "JSON 내용이 노출되면 안 됨");
+        assertNotNull(r.queueDelta(), "queueDelta 파싱 결과가 있어야 함");
+        assertEquals(1, r.queueDelta().asked.size());
+        assertEquals(1, r.queueDelta().newQuestions.size());
+    }
+
+    @Test
+    void parse_handlesBothStandaloneTags_togethterWithText() {
+        String raw = "그러셨군요. 마음이 많이 무거우셨겠어요.\n"
+            + "<issue_delta>{\"headline\":\"반복된 무시 패턴\"}</issue_delta>\n"
+            + "<question_queue_delta>{\"asked\":[],\"new\":[]}</question_queue_delta>";
+        var r = parser.parse(raw, 4, "USER_A");
+
+        assertEquals("그러셨군요. 마음이 많이 무거우셨겠어요.", r.mediatorMessage());
+        assertFalse(r.mediatorMessage().contains("<"), "어떤 XML 태그도 노출되면 안 됨");
+        assertNotNull(r.issueDelta());
+        assertEquals("반복된 무시 패턴", r.issueDelta().headline);
+    }
+
+    @Test
+    void parse_standaloneIssueDoesNotOverrideTurnMetaIssueDelta() {
+        // turn_meta 내 issue_delta가 있으면 standalone 태그는 무시
+        String raw = "응답입니다.\n"
+            + "<turn_meta>{\"horsemen\":{\"criticism\":0.2,\"contempt\":0,\"defensiveness\":0,\"stonewalling\":0},"
+            + "\"issue_delta\":{\"headline\":\"turn_meta 헤드라인\"}}</turn_meta>\n"
+            + "<issue_delta>{\"headline\":\"standalone 헤드라인\"}</issue_delta>";
+        var r = parser.parse(raw, 5, "USER_A");
+
+        assertEquals("turn_meta 헤드라인", r.issueDelta().headline, "turn_meta 값이 우선돼야 함");
+        assertFalse(r.mediatorMessage().contains("issue_delta"));
+    }
 }
