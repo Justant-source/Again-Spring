@@ -32,6 +32,7 @@ export default function SignupPage() {
   const [disclaimerAgreed, setDisclaimerAgreed] = useState(false);
   const [marketingAgreed, setMarketingAgreed] = useState(false);
   const [termsModalUrl, setTermsModalUrl] = useState<string | null>(null);
+  const [duplicateEmailModal, setDuplicateEmailModal] = useState(false);
 
   useEffect(() => {
     if (guestUser?.isGuest && guestUser?.nickname) {
@@ -84,7 +85,11 @@ export default function SignupPage() {
       setCodeSent(true);
       setSentToEmail(email);
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || '인증코드 발송에 실패했어요');
+      if (err.response?.data?.error?.code === 'USER_ALREADY_EXISTS') {
+        setDuplicateEmailModal(true);
+      } else {
+        setError(err.response?.data?.error?.message || '인증코드 발송에 실패했어요');
+      }
     } finally {
       setSendingCode(false);
     }
@@ -351,6 +356,51 @@ export default function SignupPage() {
           </Link>
         </div>
       </div>
+
+      {/* 이메일 중복 모달 */}
+      {duplicateEmailModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: 'white', borderRadius: 14, width: '85%', maxWidth: 360,
+              padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 22 }}>이미 가입된 이메일이에요</div>
+            <div style={{ fontSize: 14, color: '#555', lineHeight: 1.7 }}>
+              <strong>{email}</strong>은 이미 가입된 계정이에요.<br />
+              다른 이메일로 인증하거나, 로그인 화면에서 기존 계정으로 입장해 주세요.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+              <button
+                onClick={() => { setDuplicateEmailModal(false); setEmail(''); }}
+                style={{
+                  padding: '12px 0', background: 'var(--L-ink)', color: 'var(--L-bg)',
+                  border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontWeight: 600,
+                }}
+              >
+                다른 이메일로 인증하기
+              </button>
+              <button
+                onClick={() => { setDuplicateEmailModal(false); router.push('/login'); }}
+                style={{
+                  padding: '12px 0', background: 'transparent', color: 'var(--L-ink)',
+                  border: '1px solid var(--L-border)', borderRadius: 8, fontSize: 14, cursor: 'pointer',
+                }}
+              >
+                로그인 화면으로 가기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 약관 전문 보기 모달 */}
       {termsModalUrl && (

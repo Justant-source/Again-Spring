@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { ChatHeader } from './ChatHeader';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
@@ -12,6 +12,8 @@ import { RelationshipColorSync } from '@/components/shared/RelationshipColorSync
 import { useChatSession } from '@/lib/hooks/useChatSession';
 import { useFinalize } from '@/lib/hooks/useFinalize';
 import { useCrisisGuard } from '@/lib/hooks/useCrisisGuard';
+import { useUserStore } from '@/lib/store/userStore';
+import { useUiStore } from '@/lib/store/uiStore';
 import type { ChatMessage, SecondPart } from '@/lib/hooks/useChatSession';
 
 interface Props {
@@ -33,6 +35,8 @@ export function ChatPanel({
   // V13 Phase 1: 진입 시 1초 입력 애니메이션
   const [entryTypingDone, setEntryTypingDone] = useState(false);
 
+  const { user } = useUserStore();
+  const { showGuestLimitModal } = useUiStore();
   const { crisisLevel1, setCrisisLevel1, showCrisisResource, setShowCrisisResource } = useCrisisGuard();
   const { messages, secondParts, sending, isTyping, fetchMessages, handleSend } = useChatSession(
     sessionId,
@@ -44,10 +48,27 @@ export function ChatPanel({
     handleFinalize, handleAgreeFinalize, handleDeclineFinalize,
   } = useFinalize(sessionId, fetchMessages);
 
+  const mediatorSender = currentUserSender === 'USER_A' ? 'MEDIATOR_TO_A' : 'MEDIATOR_TO_B';
+  const mediatorTurnCount = useMemo(
+    () => messages.filter(m => m.sender === mediatorSender).length,
+    [messages, mediatorSender],
+  );
+  const guestLimitTriggeredRef = useRef(false);
+
   useEffect(() => {
     const t = setTimeout(() => setEntryTypingDone(true), 1000);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    if (!user?.isGuest) return;
+    if (guestLimitTriggeredRef.current) return;
+    if (mediatorTurnCount >= 3 && !isTyping && !sending) {
+      guestLimitTriggeredRef.current = true;
+      const t = setTimeout(() => showGuestLimitModal(sessionId), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [user?.isGuest, mediatorTurnCount, isTyping, sending, sessionId, showGuestLimitModal]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
@@ -140,7 +161,11 @@ export function ChatPanel({
         </div>
       )}
 
-      <ChatInput onSend={handleSend} disabled={isFinalized} onCrisis={() => setCrisisLevel1(true)} />
+      <ChatInput
+        onSend={handleSend}
+        disabled={isFinalized || (user?.isGuest === true && mediatorTurnCount >= 3)}
+        onCrisis={() => setCrisisLevel1(true)}
+      />
 
       {crisisLevel1 && <CrisisModal onClose={() => setCrisisLevel1(false)} />}
       <CrisisResourceModal open={showCrisisResource} onClose={() => setShowCrisisResource(false)} />

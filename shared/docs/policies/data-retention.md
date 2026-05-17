@@ -19,7 +19,7 @@ flowchart TD
     C -->|COMPLETED / TERMINATED| D["30일 카운트 시작"]
     D --> E{"content_expires_at\n경과?"}
     E -->|아니오| F["조회 가능\nturns.content 노출"]
-    E -->|예 (RetentionScheduler\n매일 03:00 UTC)| G["원문 NULL 처리\nturns.content / mediator_message\n/ mediator_summary_for_opponent"]
+    E -->|"예 (RetentionScheduler 매일 03:00 UTC)"| G["원문 NULL 처리\nturns.content / mediator_message\n/ mediator_summary_for_opponent"]
     G --> H["이후 조회\n'30일이 지나 원문이\n자동 삭제되었어요' 표시"]
 
     I["사용자 탈퇴\nDELETE /api/users/me"] --> J["즉시 소프트 삭제\nusers.deleted_at = now()"]

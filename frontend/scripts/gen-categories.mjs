@@ -96,7 +96,16 @@ function buildFile(majors) {
 // ─── 실행 ────────────────────────────────────────────────────────────────────
 
 async function run() {
-  const raw = await readFile(yamlPath, 'utf-8');
+  let raw;
+  try {
+    raw = await readFile(yamlPath, 'utf-8');
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      console.log('[gen-categories] categories.yml not found (Docker build) — skipping sync');
+      process.exit(0);
+    }
+    throw e;
+  }
   const doc = jsYaml.load(raw);
   const generated = buildFile(doc.majors);
 

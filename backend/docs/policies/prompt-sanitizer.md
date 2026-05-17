@@ -26,13 +26,13 @@ private static final List<Pattern> INJECTION_PATTERNS = List.of(
 
 ```mermaid
 flowchart TD
-    A["사용자 입력\n(raw)"] --> B{길이 > 5000자?}
+    A["사용자 입력\n(raw)"] --> B{"길이 > 5000자?"}
     B -->|예| C["substring(0, 5000) 잘라냄"]
     B -->|아니오| D
-    C --> D{INJECTION_PATTERNS\n정규식 매치?}
+    C --> D{"INJECTION_PATTERNS\n정규식 매치?"}
     D -->|매치됨| E["WARN 로그\n+ [REDACTED] 치환\ncorrelationId 기록"]
     D -->|매치 없음| F
-    E --> F{특수 구분자\n[INST][/INST] 존재?}
+    E --> F{"특수 구분자\n[INST][/INST] 존재?"}
     F -->|예| G["replaceAll 제거"]
     F -->|아니오| H
     G --> H["정화된 입력\n→ LLM 프롬프트 조립"]

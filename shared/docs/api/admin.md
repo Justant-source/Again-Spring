@@ -26,10 +26,11 @@ flowchart LR
     SEC -->|ADMIN| GATE{컨트롤러 게이팅}
 
     GATE -->|AdminDashboard/User/Health/Feedback| ALWAYS[항상 활성]
-    GATE -->|AdminPrompts/SessionContextDebug| PROP{app.admin.enabled=true?}
-    PROP -->|false| 404[404 Not Found<br/>빈 등록 안 됨]
+    GATE -->|AdminPrompts/SessionContextDebug| PROP{"app.admin.enabled=true?"}
+    PROP -->|false| 404["404 Not Found<br/>빈 등록 안 됨"]
     PROP -->|true| ACTIVE[활성]
-    GATE -->|AdminTest| PROFILE{@Profile("dev")?}
+    GATE -->|AdminTest| PROFILE{"@Profile(dev)?"}
+
     PROFILE -->|prod| 404
     PROFILE -->|dev| ACTIVE
 ```

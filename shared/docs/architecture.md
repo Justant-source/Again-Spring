@@ -102,10 +102,10 @@ FE의 axios 인터셉터(`frontend/lib/api/client.ts`)가 `localStorage.again-sp
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> CHATTING_SOLO : POST /api/sessions
+    [*] --> CHATTING_SOLO : "POST /api/sessions"
     CHATTING_SOLO --> CHATTING_DUO : 상대가 초대 토큰으로 참여
     CHATTING_SOLO --> COMPLETED : 사용자 종료 결정
-    CHATTING_DUO --> AWAITING_FINALIZATION : /finalize 호출
+    CHATTING_DUO --> AWAITING_FINALIZATION : "/finalize 호출"
     AWAITING_FINALIZATION --> COMPLETED : 양쪽 agree
     AWAITING_FINALIZATION --> CHATTING_DUO : 한쪽 decline
     CHATTING_SOLO --> TERMINATED : 위기 키워드 감지
