@@ -62,6 +62,12 @@ export function ChatPanel({
     return () => clearTimeout(t);
   }, []);
 
+  // 진입 애니메이션 완료 직후 즉시 fetch — 템플릿 첫마디는 ~50ms 내 저장되므로 1초 후 바로 표시
+  useEffect(() => {
+    if (!entryTypingDone) return;
+    fetchMessages();
+  }, [entryTypingDone, fetchMessages]);
+
   // 신규 세션(유저 메시지 없음 + 중재자 첫마디 존재): 2초 추가 지연 (진입 1s + 2s = ~3s)
   // 진행 중 세션(유저 메시지 있음) 또는 빈 세션: 즉시 표시
   useEffect(() => {
