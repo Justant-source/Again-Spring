@@ -100,6 +100,7 @@ services:
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro
       - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro
       - ../shared/docs/policies/user-permissions.json:/app/shared/docs/policies/user-permissions.json:ro
+      - ../shared/docs/templates:/app/shared/docs/templates:ro
     depends_on:
       mariadb-prod:
         condition: service_healthy
