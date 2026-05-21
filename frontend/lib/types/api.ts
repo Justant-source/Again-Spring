@@ -882,6 +882,22 @@ export interface paths {
         patch: operations["updateCaption"];
         trace?: never;
     };
+    "/api/admin/survey-deliveries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateSurveyDelivery"];
+        trace?: never;
+    };
     "/api/admin/gacha/deliveries/{drawId}/deliver": {
         parameters: {
             query?: never;
@@ -1682,6 +1698,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/survey-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSurveyDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/stats": {
         parameters: {
             query?: never;
@@ -2188,6 +2220,36 @@ export interface components {
         CaptionUpdateRequest: {
             caption?: string;
         };
+        AdminSurveyDeliveryDto: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            surveyId?: number;
+            surveyTitle?: string;
+            /** Format: int64 */
+            userId?: number;
+            userNickname?: string;
+            userName?: string;
+            /** Format: int64 */
+            optionId?: number;
+            optionText?: string;
+            optionImageUrl?: string;
+            recipientName?: string;
+            recipientPhone?: string;
+            recipientZipcode?: string;
+            recipientAddressMain?: string;
+            recipientAddressDetail?: string;
+            deliveryStatus?: string;
+            deliveryStatusLabel?: string;
+            trackingNumber?: string;
+            /** Format: date-time */
+            deliveredAt?: string;
+            /** Format: int64 */
+            deliveredBy?: number;
+            deliveryMemo?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
         AdminDeliveryDto: {
             /** Format: int64 */
             id?: number;
@@ -2384,6 +2446,10 @@ export interface components {
             earnedDrops?: number;
             /** Format: date */
             birthDate?: string;
+            zipcode?: string;
+            addressMain?: string;
+            addressDetail?: string;
+            phone?: string;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -3134,6 +3200,7 @@ export interface operations {
                 allowOptionAddByUser?: boolean;
                 allowMultiSelect?: boolean;
                 notice?: boolean;
+                requiresShipping?: boolean;
                 options: string;
             };
             header?: never;
@@ -3167,7 +3234,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    [key: string]: number;
+                    [key: string]: Record<string, never>;
                 };
             };
         };
@@ -4432,6 +4499,28 @@ export interface operations {
             };
         };
     };
+    updateSurveyDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminSurveyDeliveryDto"];
+                };
+            };
+        };
+    };
     markDelivered: {
         parameters: {
             query?: never;
@@ -5577,6 +5666,29 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     }[];
+                };
+            };
+        };
+    };
+    listSurveyDeliveries: {
+        parameters: {
+            query?: {
+                surveyId?: number;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminSurveyDeliveryDto"][];
                 };
             };
         };

@@ -8,8 +8,9 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class WorkerInvocationResultResponse {
-    private String status;  // DONE, PENDING, CANCELED, FAILED
+    private String status;  // DONE, STREAMING, PENDING, CANCELED, FAILED
     private String text;
+    private String partial;
     private String error;
     private String errorType;
 }

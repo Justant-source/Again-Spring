@@ -95,9 +95,11 @@ public class InvocationController {
 
     /**
      * GET /v1/invocations/{id}/result?waitMs= — long-poll 결과 조회.
-     * waitMs 동안 resultFuture를 기다려 DONE/CANCELED/FAILED 중 하나를 반환.
-     * 타임아웃 시 PENDING 200 반환 — 클라이언트는 재폴링.
-     * 비동기 ResponseEntity로 HTTP 스레드를 점유하지 않음.
+     * 우선순위:
+     * 1. resultFuture 이미 완료 → DONE/CANCELED/FAILED 즉시 반환
+     * 2. partialContent 있음(스트리밍 진행 중) → STREAMING 즉시 반환
+     * 3. 위 없음 → waitMs 동안 대기, 완료·첫partial·타임아웃 중 선착 반환
+     * STREAMING 수신 클라이언트는 2~3s 후 재폴 — BE 자체 재폴 간격 조절 책임.
      */
     @GetMapping("/invocations/{id}/result")
     public CompletableFuture<ResponseEntity<InvocationResultResponse>> getResult(
@@ -110,31 +112,67 @@ public class InvocationController {
                     ResponseEntity.status(HttpStatus.NOT_FOUND).build());
         }
 
+        // 1. resultFuture 이미 완료
+        if (inv.getResultFuture().isDone()) {
+            return CompletableFuture.completedFuture(buildDoneResponse(inv));
+        }
+
+        // 2. 스트리밍 partial 이미 있음
+        String currentPartial = inv.getPartialContent();
+        if (!currentPartial.isEmpty()) {
+            return CompletableFuture.completedFuture(
+                    ResponseEntity.ok(InvocationResultResponse.streaming(currentPartial)));
+        }
+
+        // 3. 아직 아무것도 없음 — 대기
         long effectiveWait = Math.min(waitMs, 30_000L);
         CompletableFuture<ResponseEntity<InvocationResultResponse>> responseFuture = new CompletableFuture<>();
 
-        // 타임아웃 → PENDING 반환 (원본 resultFuture에 영향 없음)
         pollScheduler.schedule(() -> {
             if (!responseFuture.isDone()) {
                 responseFuture.complete(ResponseEntity.ok(InvocationResultResponse.pending()));
             }
         }, effectiveWait, TimeUnit.MILLISECONDS);
 
-        // resultFuture 완료 시 적절한 응답 반환
         inv.getResultFuture().whenComplete((result, ex) -> {
-            if (responseFuture.isDone()) return;  // 타임아웃이 먼저 완료한 경우
-            if (ex == null) {
-                responseFuture.complete(ResponseEntity.ok(InvocationResultResponse.done(result)));
-            } else if (isCanceled(ex)) {
-                responseFuture.complete(ResponseEntity.ok(InvocationResultResponse.canceled()));
-            } else {
-                String errorType = resolveErrorType(ex);
-                responseFuture.complete(ResponseEntity.ok(
-                        InvocationResultResponse.failed(ex.getMessage(), errorType)));
+            if (!responseFuture.isDone()) {
+                responseFuture.complete(buildDoneResponse(inv));
+            }
+        });
+
+        // 첫 partial 도착 시 즉시 STREAMING 반환 (전체 대기 없이)
+        inv.getPartialReadyFuture().whenComplete((partial, ex) -> {
+            if (!responseFuture.isDone() && partial != null && !partial.isEmpty()) {
+                responseFuture.complete(ResponseEntity.ok(InvocationResultResponse.streaming(partial)));
             }
         });
 
         return responseFuture;
+    }
+
+    private ResponseEntity<InvocationResultResponse> buildDoneResponse(CancelableInvocation inv) {
+        try {
+            String result = inv.getResultFuture().getNow(null);
+            if (result != null) {
+                return ResponseEntity.ok(InvocationResultResponse.done(result));
+            }
+        } catch (Exception ex) {
+            if (isCanceled(ex)) {
+                return ResponseEntity.ok(InvocationResultResponse.canceled());
+            }
+            String errorType = resolveErrorType(ex);
+            return ResponseEntity.ok(InvocationResultResponse.failed(ex.getMessage(), errorType));
+        }
+        // future completed exceptionally — extract cause
+        try {
+            inv.getResultFuture().get();
+            return ResponseEntity.ok(InvocationResultResponse.pending()); // won't reach
+        } catch (Exception ex) {
+            Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+            if (isCanceled(cause)) return ResponseEntity.ok(InvocationResultResponse.canceled());
+            String errorType = resolveErrorType(cause);
+            return ResponseEntity.ok(InvocationResultResponse.failed(cause.getMessage(), errorType));
+        }
     }
 
     /**

@@ -22,6 +22,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 새 메시지 도착 시 진행 중 LLM 호출을 취소하고 재호출.
@@ -152,8 +154,8 @@ public class CancelableChatService {
 
             boolean isDuo = stateMachine.isDuo(session.getStatus());
             List<Message> recentMessages = isDuo
-                    ? getRecentMessagesForDuo(sessionId, 20)
-                    : getRecentMessagesForSolo(sessionId, sender, 10);
+                    ? getRecentMessagesForDuo(sessionId, 12)
+                    : getRecentMessagesForSolo(sessionId, sender, 6);
 
             String lastContent = extractLastUserContent(recentMessages, sender);
             try {
@@ -192,20 +194,54 @@ public class CancelableChatService {
             displaced.cancel();
         }
 
+        // 스트리밍 draft: 첫 partial 도착 시 INSERT, 이후 UPDATE.
+        // DB 쓰기는 최소 500ms 간격으로 throttle.
+        AtomicReference<Long> draftMsgIdRef = new AtomicReference<>(null);
+        AtomicLong lastDbWriteAt = new AtomicLong(0);
+        MessageSender mediatorSender = sender.mediatorCounterpart();
+
+        inv.setPartialHandler(partial -> {
+            long now = System.currentTimeMillis();
+            if (now - lastDbWriteAt.get() < 500) return;  // throttle
+            lastDbWriteAt.set(now);
+            transactionTemplate.execute(txStatus -> {
+                Long draftId = draftMsgIdRef.get();
+                if (draftId == null) {
+                    Message draft = messageRepo.save(Message.builder()
+                            .sessionId(sessionId)
+                            .sender(mediatorSender)
+                            .content(partial)
+                            .charCount(partial.length())
+                            .status("streaming")
+                            .llmModel(ChatService.MODEL_HAIKU)
+                            .build());
+                    draftMsgIdRef.set(draft.getId());
+                } else {
+                    messageRepo.updateStreamingContent(draftId, partial, partial.length());
+                }
+                return null;
+            });
+        });
+
         inv.getResultFuture().whenComplete((result, error) -> {
             if (activeInvocations.get(key) != inv) {
                 log.debug("Invocation {} superseded for session {} sender {}", inv.getInvocationId(), sessionId, sender);
+                cleanupDraft(draftMsgIdRef.get());
                 return;
             }
             try {
                 if (error == null) {
-                    handleSuccessfulResponse(sessionId, sender, result, inv);
+                    handleSuccessfulResponse(sessionId, sender, result, inv, draftMsgIdRef.get());
                 } else if (!isCancellation(error)) {
                     log.error("LLM failed for session {}: {}", sessionId, error.getMessage());
-                    saveFallbackMessage(sessionId, sender.mediatorCounterpart());
+                    cleanupDraft(draftMsgIdRef.get());
+                    saveFallbackMessage(sessionId, mediatorSender);
+                } else {
+                    cleanupDraft(draftMsgIdRef.get());
                 }
             } catch (Exception e) {
                 log.error("Callback error for session {}", sessionId, e);
+                cleanupDraft(draftMsgIdRef.get());
             } finally {
                 activeInvocations.remove(key, inv);
             }
@@ -247,16 +283,30 @@ public class CancelableChatService {
     }
 
     private void handleSuccessfulResponse(
-            String sessionId, MessageSender sender, String rawResponse, CancelableInvocation inv) {
+            String sessionId, MessageSender sender, String rawResponse,
+            CancelableInvocation inv, Long draftMsgId) {
         transactionTemplate.execute(status -> {
             if (inv.isCanceled()) return null;
 
             Session session = sessionRepo.findById(sessionId).orElse(null);
             if (session == null || !stateMachine.isActive(session.getStatus())) return null;
 
+            // 스트리밍 draft 삭제 후 최종 메시지 저장 (같은 트랜잭션)
+            if (draftMsgId != null) {
+                messageRepo.deleteById(draftMsgId);
+            }
             chatTurnProcessor.process(session, sender, rawResponse, null);
             return null;
         });
+    }
+
+    private void cleanupDraft(Long draftMsgId) {
+        if (draftMsgId == null) return;
+        try {
+            transactionTemplate.execute(s -> { messageRepo.deleteById(draftMsgId); return null; });
+        } catch (Exception e) {
+            log.warn("Failed to clean up streaming draft {}: {}", draftMsgId, e.getMessage());
+        }
     }
 
     private void saveFallbackMessage(String sessionId, MessageSender mediatorSender) {

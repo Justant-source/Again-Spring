@@ -210,11 +210,10 @@ public class RemoteLlmProvider implements LLMProvider {
      * resultFuture 완료 시 폴링 중단.
      */
     private void startPolling(RemoteCancelableInvocation inv) {
-        // 0ms 지연으로 첫 폴 즉시 시작
-        scheduleNextPoll(inv);
+        scheduleNextPoll(inv, 0L);
     }
 
-    private void scheduleNextPoll(RemoteCancelableInvocation inv) {
+    private void scheduleNextPoll(RemoteCancelableInvocation inv, long delayMs) {
         if (!inv.isPollingActive()) return;
 
         ScheduledFuture<?> task = poller.schedule(() -> {
@@ -229,18 +228,20 @@ public class RemoteLlmProvider implements LLMProvider {
                 if (result != null) {
                     inv.applyResult(result);
                     if ("PENDING".equals(result.getStatus())) {
-                        scheduleNextPoll(inv);  // 재폴링 (결과 미도착)
+                        scheduleNextPoll(inv, 0L);
+                    } else if ("STREAMING".equals(result.getStatus())) {
+                        scheduleNextPoll(inv, 2000L);
                     }
                 } else {
-                    scheduleNextPoll(inv);
+                    scheduleNextPoll(inv, 0L);
                 }
             } catch (Exception e) {
                 if (inv.isPollingActive()) {
                     log.warn("Poll error for inv={}: {} — retry", inv.getInvocationId(), e.getMessage());
-                    scheduleNextPoll(inv);
+                    scheduleNextPoll(inv, 0L);
                 }
             }
-        }, 0, TimeUnit.MILLISECONDS);
+        }, delayMs, TimeUnit.MILLISECONDS);
 
         inv.setPollTask(task);
     }

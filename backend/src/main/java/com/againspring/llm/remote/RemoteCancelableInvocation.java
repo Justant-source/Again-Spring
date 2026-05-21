@@ -73,12 +73,12 @@ public class RemoteCancelableInvocation extends CancelableInvocation {
 
         switch (result.getStatus()) {
             case "DONE" -> getResultFuture().complete(result.getText());
+            case "STREAMING" -> notifyPartial(result.getPartial());  // 콜백 → DB draft 갱신
             case "CANCELED" -> getResultFuture().completeExceptionally(
                     new InvocationCanceledException("Worker canceled: " + getInvocationId(),
                             getInvocationId()));
             case "FAILED" -> getResultFuture().completeExceptionally(
                     new RuntimeException("[" + result.getErrorType() + "] " + result.getError()));
-            // PENDING → 계속 폴링 (아무것도 안 함)
             default -> { /* PENDING */ }
         }
     }

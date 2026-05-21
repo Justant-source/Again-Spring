@@ -1,5 +1,5 @@
 package com.againspring.llmworker.dto;
 
 public enum InvocationStatus {
-    DONE, PENDING, CANCELED, FAILED
+    DONE, STREAMING, PENDING, CANCELED, FAILED
 }

@@ -8,6 +8,7 @@ interface Message {
   isFinalizeSuggestion: boolean;
   isPartnerJoinNotice: boolean;
   createdAt: string;
+  status?: 'streaming' | 'complete';
 }
 
 interface Props {
@@ -21,6 +22,7 @@ export function MessageBubble({ message, isMine }: Props) {
     minute: '2-digit',
     hour12: false,
   });
+  const isStreaming = message.status === 'streaming';
 
   return (
     <div
@@ -49,6 +51,9 @@ export function MessageBubble({ message, isMine }: Props) {
         }}
       >
         {message.content}
+        {isStreaming && (
+          <span className="streaming-cursor" aria-hidden="true">▍</span>
+        )}
       </div>
       {!isMine && (
         <div style={{ fontSize: 10, color: 'var(--P-sub)' }}>{time}</div>

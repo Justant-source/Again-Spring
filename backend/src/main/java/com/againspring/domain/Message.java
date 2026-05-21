@@ -53,6 +53,11 @@ public class Message {
     @Builder.Default
     private Long llmLatencyMs = 0L;
 
+    /** 스트리밍 draft = "streaming", 최종 저장 = "complete" */
+    @Column(name = "status", nullable = false, length = 16)
+    @Builder.Default
+    private String status = "complete";
+
     @Column(name = "dismissed_at")
     private Instant dismissedAt;
 

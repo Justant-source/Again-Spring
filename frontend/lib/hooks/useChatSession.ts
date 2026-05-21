@@ -13,6 +13,7 @@ export interface ChatMessage {
   isFinalizeSuggestion: boolean;
   isPartnerJoinNotice: boolean;
   createdAt: string;
+  status?: 'streaming' | 'complete';
 }
 
 export interface SecondPart {

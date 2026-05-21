@@ -37,6 +37,11 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("UPDATE Message m SET m.content = NULL WHERE m.sessionId IN :sessionIds")
     int nullifyContentBySessionIds(@Param("sessionIds") List<String> sessionIds);
 
+    /** 스트리밍 draft 갱신 */
+    @Modifying
+    @Query("UPDATE Message m SET m.content = :content, m.charCount = :charCount WHERE m.id = :id AND m.status = 'streaming'")
+    void updateStreamingContent(@Param("id") Long id, @Param("content") String content, @Param("charCount") int charCount);
+
     /** Admin 위기 모니터링용 — 메타데이터만 조회, content 노출 금지 */
     @Query("SELECT m FROM Message m WHERE m.crisisLevel IS NOT NULL AND m.crisisLevel >= 1 " +
            "ORDER BY m.createdAt DESC")

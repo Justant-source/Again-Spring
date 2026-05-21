@@ -26,6 +26,8 @@ public class MessageResponse {
     @JsonProperty("isPartnerJoinNotice")
     private boolean isPartnerJoinNotice;
     private Instant createdAt;
+    /** "streaming" | "complete". FE에서 스트리밍 커서 표시용. */
+    private String status;
 
     public static MessageResponse from(Message msg) {
         return MessageResponse.builder()
@@ -36,6 +38,7 @@ public class MessageResponse {
             .isFinalizeSuggestion(msg.getIsFinalizeSuggestion() != null && msg.getIsFinalizeSuggestion())
             .isPartnerJoinNotice(msg.getIsPartnerJoinNotice() != null && msg.getIsPartnerJoinNotice())
             .createdAt(msg.getCreatedAt())
+            .status(msg.getStatus() != null ? msg.getStatus() : "complete")
             .build();
     }
 }

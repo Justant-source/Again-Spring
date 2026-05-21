@@ -114,6 +114,9 @@ export function ChatPanel({
   }, [messages, secondParts, sending, isTyping]);
 
   const myMessages = messages.filter(m => m.sender === currentUserSender);
+  const hasStreamingMsg = messages.some(
+    m => m.sender === mediatorSender && m.status === 'streaming',
+  );
   const canFinalize = myMessages.length >= 5;
   const myAgreed = currentUserSender === 'USER_A' ? session?.finalizeAgreedByA : session?.finalizeAgreedByB;
   const isFinalized = session?.status === 'awaiting_finalization' && !!myAgreed;
@@ -164,8 +167,8 @@ export function ChatPanel({
             </div>
           );
         })}
-        {entryTypingDone && firstMessageReady && sending && <TypingBubble />}
-        {entryTypingDone && firstMessageReady && isTyping && <TypingBubble />}
+        {entryTypingDone && firstMessageReady && sending && !hasStreamingMsg && <TypingBubble />}
+        {entryTypingDone && firstMessageReady && isTyping && !hasStreamingMsg && <TypingBubble />}
         <div ref={messagesEndRef} />
       </div>
 
