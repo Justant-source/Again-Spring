@@ -91,11 +91,18 @@ public class ClaudeCliInvoker {
     // ── 내부 메서드 ──────────────────────────────────────────────────────────────
 
     /**
-     * stdout을 NDJSON 라인 단위로 읽으며 content_block_delta 이벤트 누적.
-     * inv != null 이면 매 델타마다 updatePartial 호출 (FE 스트리밍 가시화용).
+     * stdout을 NDJSON 라인 단위로 읽으며 Claude CLI stream-json 이벤트 파싱.
+     *
+     * --include-partial-messages 시:
+     *   {"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"..."}}}
+     *   → 토큰 단위 누적, updatePartial 호출
+     *
+     * 최종 이벤트 (공통):
+     *   {"type":"result","result":"최종 전체 텍스트"}
      */
     private String readStreamingOutput(Process process, CancelableInvocation inv) throws Exception {
         StringBuilder accumulated = new StringBuilder();
+        String finalResult = "";
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
@@ -103,24 +110,32 @@ public class ClaudeCliInvoker {
                 if (line.isBlank()) continue;
                 try {
                     JsonNode node = MAPPER.readTree(line);
-                    if ("content_block_delta".equals(node.path("type").asText(""))) {
-                        JsonNode delta = node.path("delta");
-                        if ("text_delta".equals(delta.path("type").asText(""))) {
-                            String chunk = delta.path("text").asText("");
-                            if (!chunk.isEmpty()) {
-                                accumulated.append(chunk);
-                                if (inv != null) {
-                                    inv.updatePartial(accumulated.toString());
+                    String type = node.path("type").asText("");
+                    if ("stream_event".equals(type)) {
+                        // --include-partial-messages: 내부 event 필드에 실제 Anthropic SSE 이벤트 포함
+                        JsonNode event = node.path("event");
+                        if ("content_block_delta".equals(event.path("type").asText(""))) {
+                            JsonNode delta = event.path("delta");
+                            if ("text_delta".equals(delta.path("type").asText(""))) {
+                                String chunk = delta.path("text").asText("");
+                                if (!chunk.isEmpty()) {
+                                    accumulated.append(chunk);
+                                    if (inv != null) inv.updatePartial(accumulated.toString());
                                 }
                             }
                         }
+                    } else if ("result".equals(type)) {
+                        String r = node.path("result").asText("");
+                        if (!r.isBlank()) finalResult = r;
                     }
                 } catch (Exception ignored) {
-                    // 파싱 불가 라인 무시 (로그 스팸 방지)
+                    // 파싱 불가 라인 무시
                 }
             }
         }
-        return accumulated.toString().trim();
+        // result 이벤트 우선 (깔끔한 최종 텍스트), 없으면 누적 partial 사용
+        String answer = finalResult.isBlank() ? accumulated.toString() : finalResult;
+        return answer.trim();
     }
 
     /** stderr를 데몬 스레드로 drain — 파이프 버퍼 포화(데드락) 방지 */
@@ -150,6 +165,8 @@ public class ClaudeCliInvoker {
                 claudeBinaryPath,
                 "--print",
                 "--output-format", "stream-json",
+                "--verbose",
+                "--include-partial-messages",
                 "--model", model,
                 "--strict-mcp-config",
                 "--no-session-persistence",
