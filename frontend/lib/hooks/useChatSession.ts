@@ -88,7 +88,23 @@ export function useChatSession(
         }
         setMessages(prev => {
           const merged = mergeMessages(prev, r.data);
-          return processMediatorMessages(merged, setPendingSplits);
+          // 완성된 mediator 메시지가 새로 도착하면 같은 sender의 stale streaming draft 제거.
+          // (백엔드가 draft delete → 새 ID로 insert하므로 FE merge만으론 draft가 잔류함)
+          const completedSenders = new Set<string>();
+          for (const m of r.data as ChatMessage[]) {
+            if ((m.sender === 'MEDIATOR_TO_A' || m.sender === 'MEDIATOR_TO_B') &&
+                m.status !== 'streaming') {
+              completedSenders.add(m.sender);
+            }
+          }
+          const cleaned = completedSenders.size === 0 ? merged
+            : merged.filter(m => !(m.status === 'streaming' && completedSenders.has(m.sender)));
+          // stale streaming draft의 pendingSplits도 제거
+          if (cleaned.length < merged.length) {
+            const removedIds = new Set(merged.filter(m => !cleaned.includes(m)).map(m => m.id));
+            setPendingSplits(prev => prev.filter(ps => !removedIds.has(ps.messageId)));
+          }
+          return processMediatorMessages(cleaned, setPendingSplits);
         });
         lastFetchRef.current = Date.now();
       }
