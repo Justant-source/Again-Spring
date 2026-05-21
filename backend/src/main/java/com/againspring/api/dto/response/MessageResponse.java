@@ -38,7 +38,7 @@ public class MessageResponse {
             .isFinalizeSuggestion(msg.getIsFinalizeSuggestion() != null && msg.getIsFinalizeSuggestion())
             .isPartnerJoinNotice(msg.getIsPartnerJoinNotice() != null && msg.getIsPartnerJoinNotice())
             .createdAt(msg.getCreatedAt())
-            .status(msg.getStatus() != null ? msg.getStatus() : "complete")
+            .status(msg.getStatus() != null && !msg.getStatus().isEmpty() ? msg.getStatus() : "complete")
             .build();
     }
 }
