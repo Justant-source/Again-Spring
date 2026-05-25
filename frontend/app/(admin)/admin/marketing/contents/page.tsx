@@ -7,6 +7,8 @@ import { AdminTable } from '@/components/admin/AdminTable';
 import { AdminFilters } from '@/components/admin/AdminFilters';
 import { getContents, generateContent, deleteContent, type ContentSummaryResponse } from '@/lib/api/marketing/contentApi';
 import { getSimulations, type SimulationSummaryResponse } from '@/lib/api/marketing/simulationApi';
+import { TemplatePickerModal } from '@/components/admin/marketing/TemplatePickerModal';
+import { RepurposeModal } from '@/components/admin/marketing/RepurposeModal';
 
 const PLATFORM_FILTERS = [
   { value: '', label: '전체' },
@@ -57,6 +59,10 @@ export default function ContentsListPage() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [repurposeContentId, setRepurposeContentId] = useState<number | null>(null);
+  const [repurposeSourcePlatform, setRepurposeSourcePlatform] = useState<string>('');
 
   // Auto-refresh when any content is GENERATING
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -212,6 +218,14 @@ export default function ContentsListPage() {
           >
             상세보기
           </button>
+          {(row.status === 'APPROVED' || row.status === 'EXPORTED') && (
+            <button
+              onClick={() => { setRepurposeContentId(row.id); setRepurposeSourcePlatform(row.platform); }}
+              style={{ padding: '4px 10px', background: '#e6f0ff', color: '#0066cc', border: '1px solid #b3d1ff', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+            >
+              리퍼포징
+            </button>
+          )}
           {row.status !== 'GENERATING' && (
             confirmDeleteId === row.id ? (
               <>
@@ -262,12 +276,20 @@ export default function ContentsListPage() {
             <AdminFilters status={{ value: platformFilter, onChange: setPlatformFilter, options: PLATFORM_FILTERS }} />
             <AdminFilters status={{ value: statusFilter, onChange: setStatusFilter, options: STATUS_FILTERS }} />
           </div>
-          <button
-            onClick={openModal}
-            style={{ padding: '9px 18px', background: '#1A1A2E', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
-          >
-            콘텐츠 생성
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              style={{ padding: '9px 18px', background: 'white', color: '#1A1A2E', border: '1px solid #1A1A2E', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+            >
+              템플릿에서 생성
+            </button>
+            <button
+              onClick={openModal}
+              style={{ padding: '9px 18px', background: '#1A1A2E', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+            >
+              콘텐츠 생성
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -284,6 +306,22 @@ export default function ContentsListPage() {
           rowKey={(row) => row.id}
         />
       </AdminSection>
+
+      {showTemplateModal && (
+        <TemplatePickerModal
+          onClose={() => setShowTemplateModal(false)}
+          onGenerated={() => { setShowTemplateModal(false); setAutoRefresh(true); loadContents(); }}
+        />
+      )}
+
+      {repurposeContentId !== null && (
+        <RepurposeModal
+          sourceId={repurposeContentId}
+          sourcePlatform={repurposeSourcePlatform}
+          onClose={() => { setRepurposeContentId(null); setRepurposeSourcePlatform(''); }}
+          onRepurposed={() => { setRepurposeContentId(null); setRepurposeSourcePlatform(''); loadContents(); }}
+        />
+      )}
 
       {showModal && (
         <div

@@ -27,4 +27,11 @@ public class PlatformContentRouter {
         GenerationContext ctx = GenerationContext.of(simulationSummary, relationType, descriptor);
         return registry.resolve(platform).generate(ctx);
     }
+
+    public String generateWithTemplate(MarketingContent.Platform platform, String simulationSummary,
+            String relationType, String templateBody) throws Exception {
+        PlatformDescriptor descriptor = descriptorLoader.get(platform);
+        GenerationContext ctx = new GenerationContext(simulationSummary, relationType, descriptor, templateBody, null);
+        return registry.resolve(platform).generate(ctx);
+    }
 }

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.againspring.api.dto.request.ContentRequest;
+import com.againspring.api.dto.request.ContentFromTemplateRequest;
 import com.againspring.api.dto.request.PerformanceRequest;
 import com.againspring.api.dto.request.ScheduleRequest;
 import com.againspring.api.dto.request.PublishRequest;
@@ -175,5 +176,14 @@ public class ContentController {
 			@PathVariable Long id,
 			@RequestBody(required = false) PublishRequest request) {
 		return ResponseEntity.ok(contentService.publish(id, request));
+	}
+
+	@PostMapping("/from-template/{templateId}")
+	@Operation(summary = "Generate content from template")
+	public ResponseEntity<ContentResponse> generateFromTemplate(
+			@PathVariable Long templateId,
+			@Valid @RequestBody ContentFromTemplateRequest request) {
+		ContentResponse response = contentService.generateFromTemplate(templateId, request);
+		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 }

@@ -11,11 +11,16 @@ import com.againspring.api.dto.response.ContentResponse;
 import com.againspring.api.dto.response.ContentSummaryResponse;
 import com.againspring.api.dto.request.ScheduleRequest;
 import com.againspring.api.dto.request.PublishRequest;
+import com.againspring.api.dto.request.ContentFromTemplateRequest;
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.domain.marketing.MarketingSimulation;
+import com.againspring.domain.marketing.MarketingContentTemplate;
 import com.againspring.repository.marketing.MarketingContentRepository;
 import com.againspring.repository.marketing.MarketingSimulationRepository;
+import com.againspring.repository.marketing.MarketingContentTemplateRepository;
 import com.againspring.safety.MarketingCopyGuard;
+import com.againspring.service.marketing.content.PlatformContentRouter;
+import com.againspring.service.marketing.content.PlatformDescriptorLoader;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +40,8 @@ public class ContentService {
 	private final MarketingSimulationRepository simRepo;
 	private final MarketingCopyGuard copyGuard;
 	private final ContentGenerationExecutor generationExecutor;
+	private final MarketingContentTemplateRepository templateRepo;
+	private final PlatformContentRouter router;
 
 	/**
 	 * 비동기 콘텐츠 생성 — GENERATING 레코드를 즉시 저장 후 202 반환.
@@ -206,5 +213,59 @@ public class ContentService {
 		MarketingContent updated = contentRepo.save(content);
 		log.info("Published content: id={}, url={}", id, content.getPublishedUrl());
 		return ContentResponse.from(updated);
+	}
+
+	@Transactional
+	public ContentResponse generateFromTemplate(Long templateId, ContentFromTemplateRequest req) {
+		MarketingContentTemplate template = templateRepo.findById(templateId)
+				.orElseThrow(() -> new EntityNotFoundException("Template not found: " + templateId));
+
+		MarketingSimulation simulation = simRepo.findById(req.getSimulationId())
+				.orElseThrow(() -> new EntityNotFoundException("Simulation not found: " + req.getSimulationId()));
+
+		if (simulation.getStatus() != MarketingSimulation.Status.COMPLETED) {
+			throw new IllegalStateException("Simulation is not completed");
+		}
+
+		MarketingContent.Platform platform = req.getPlatform() != null
+				? MarketingContent.Platform.valueOf(req.getPlatform().toUpperCase())
+				: template.getPlatform();
+
+		String instantiatedBody = template.getBodyTemplate();
+		if (req.getVariables() != null) {
+			for (java.util.Map.Entry<String, String> entry : req.getVariables().entrySet()) {
+				instantiatedBody = instantiatedBody.replace("${" + entry.getKey() + "}", entry.getValue());
+			}
+		}
+		if (instantiatedBody.contains("${") || instantiatedBody.contains("{{")) {
+			throw new IllegalStateException("Template has unresolved placeholders. Provide all required variable values.");
+		}
+
+		try {
+			String generated = router.generateWithTemplate(
+					platform,
+					"시뮬레이션 대화 기반 콘텐츠 생성 (템플릿 사용)",
+					"general",
+					instantiatedBody
+			);
+			String sanitized = copyGuard.sanitize(generated);
+
+			MarketingContent content = MarketingContent.builder()
+					.simulationId(req.getSimulationId())
+					.platform(platform)
+					.bodyText(sanitized)
+					.status(copyGuard.hasViolations(generated) ? MarketingContent.Status.REVIEW : MarketingContent.Status.DRAFT)
+					.templateId(templateId)
+					.safetyCheckJson(String.format(
+							"{\"violations_detected\": %b, \"template_id\": %d, \"checked_at\": \"%s\"}",
+							copyGuard.hasViolations(generated), templateId, java.time.Instant.now()))
+					.build();
+
+			MarketingContent saved = contentRepo.save(content);
+			log.info("Generated from template: templateId={}, contentId={}", templateId, saved.getId());
+			return ContentResponse.from(saved);
+		} catch (Exception e) {
+			throw new RuntimeException("Content generation from template failed: " + e.getMessage(), e);
+		}
 	}
 }

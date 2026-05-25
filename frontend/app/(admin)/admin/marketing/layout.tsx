@@ -8,6 +8,8 @@ const MARKETING_TABS = [
   { label: '시뮬레이션', href: '/admin/marketing/simulations' },
   { label: '콘텐츠', href: '/admin/marketing/contents' },
   { label: '캘린더', href: '/admin/marketing/calendar' },
+  { label: '템플릿', href: '/admin/marketing/templates' },
+  { label: '해시태그', href: '/admin/marketing/hashtags' },
   { label: '설정', href: '/admin/marketing/settings' },
 ];
 
