@@ -17,9 +17,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.againspring.api.dto.request.ContentRequest;
+import com.againspring.api.dto.request.PerformanceRequest;
+import com.againspring.api.dto.request.ScheduleRequest;
+import com.againspring.api.dto.request.PublishRequest;
 import com.againspring.api.dto.response.ContentResponse;
 import com.againspring.api.dto.response.ContentSummaryResponse;
 import com.againspring.service.marketing.ContentService;
+import com.againspring.service.marketing.PerformanceService;
+import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -42,6 +47,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ContentController {
 
 	private final ContentService contentService;
+	private final PerformanceService performanceService;
 
 	/**
 	 * Generate marketing content for a completed simulation.
@@ -145,5 +151,29 @@ public class ContentController {
 			@RequestParam(required = false) String reason) {
 		ContentResponse response = contentService.reject(id, reason);
 		return ResponseEntity.ok(response);
+	}
+
+	@PutMapping("/{id}/performance")
+	@Operation(summary = "Record performance metrics")
+	public ResponseEntity<ContentResponse> recordPerformance(
+			@PathVariable Long id,
+			@Valid @RequestBody PerformanceRequest request) {
+		return ResponseEntity.ok(performanceService.recordPerformance(id, request));
+	}
+
+	@PutMapping("/{id}/schedule")
+	@Operation(summary = "Set scheduled publish time")
+	public ResponseEntity<ContentResponse> schedule(
+			@PathVariable Long id,
+			@Valid @RequestBody ScheduleRequest request) {
+		return ResponseEntity.ok(contentService.schedule(id, request));
+	}
+
+	@PutMapping("/{id}/publish")
+	@Operation(summary = "Mark content as published")
+	public ResponseEntity<ContentResponse> publish(
+			@PathVariable Long id,
+			@RequestBody(required = false) PublishRequest request) {
+		return ResponseEntity.ok(contentService.publish(id, request));
 	}
 }

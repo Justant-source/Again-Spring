@@ -10,6 +10,8 @@ import {
   rejectContent,
   type ContentResponse,
 } from '@/lib/api/marketing/contentApi';
+import { PerformanceForm } from '@/components/admin/marketing/PerformanceForm';
+import { scheduleContent, publishContent } from '@/lib/api/marketing/performanceApi';
 
 const STATUS_BADGE_COLORS: Record<string, { bg: string; fg: string }> = {
   DRAFT: { bg: '#f0f0f0', fg: '#666' },
@@ -40,6 +42,12 @@ export default function ContentDetailPage() {
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [scheduledAtInput, setScheduledAtInput] = useState('');
+  const [schedulingErr, setSchedulingErr] = useState('');
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [publishUrl, setPublishUrl] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishErr, setPublishErr] = useState('');
 
   useEffect(() => {
     loadContent();
@@ -111,6 +119,38 @@ export default function ContentDetailPage() {
       console.error(e);
     } finally {
       setIsRejecting(false);
+    }
+  }
+
+  async function handleSchedule() {
+    if (!scheduledAtInput) {
+      setSchedulingErr('날짜를 선택해주세요.');
+      return;
+    }
+    setIsScheduling(true);
+    setSchedulingErr('');
+    try {
+      const updated = await scheduleContent(contentId, new Date(scheduledAtInput).toISOString());
+      setContent(updated);
+    } catch (e: any) {
+      setSchedulingErr('예약 설정에 실패했습니다.');
+      console.error(e);
+    } finally {
+      setIsScheduling(false);
+    }
+  }
+
+  async function handlePublish() {
+    setIsPublishing(true);
+    setPublishErr('');
+    try {
+      const updated = await publishContent(contentId, publishUrl || undefined);
+      setContent(updated);
+    } catch (e: any) {
+      setPublishErr('발행 처리에 실패했습니다.');
+      console.error(e);
+    } finally {
+      setIsPublishing(false);
     }
   }
 
@@ -360,6 +400,126 @@ export default function ContentDetailPage() {
             >
               {JSON.stringify(safetyCheckData, null, 2)}
             </pre>
+          </div>
+        )}
+
+        {/* 발행 예약 */}
+        <div style={{ marginBottom: 24, padding: '16px', background: '#f9f9f9', borderRadius: 8 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', margin: '0 0 12px' }}>
+            발행 예약
+          </h3>
+          {content.scheduledAt && (
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#446620' }}>
+              예약 시각: {new Date(content.scheduledAt).toLocaleString('ko-KR')}
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="datetime-local"
+              value={scheduledAtInput}
+              onChange={(e) => setScheduledAtInput(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                border: '1px solid #ddd',
+                borderRadius: 6,
+                fontSize: 13,
+              }}
+            />
+            <button
+              onClick={handleSchedule}
+              disabled={isScheduling}
+              style={{
+                padding: '7px 14px',
+                background: '#1A1A2E',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                cursor: isScheduling ? 'not-allowed' : 'pointer',
+                fontSize: 13,
+                opacity: isScheduling ? 0.6 : 1,
+              }}
+            >
+              {isScheduling ? '설정 중...' : '예약 설정'}
+            </button>
+          </div>
+          {schedulingErr && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: '#b33333' }}>{schedulingErr}</p>
+          )}
+        </div>
+
+        {/* 발행 처리 */}
+        <div style={{ marginBottom: 24, padding: '16px', background: '#f9f9f9', borderRadius: 8 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', margin: '0 0 12px' }}>
+            발행 처리
+          </h3>
+          {content.publishedAt && (
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#446620' }}>
+              발행 시각: {new Date(content.publishedAt).toLocaleString('ko-KR')}
+              {content.publishedUrl && (
+                <a
+                  href={content.publishedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ marginLeft: 8, color: '#0066cc', fontSize: 12 }}
+                >
+                  링크 확인
+                </a>
+              )}
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="url"
+              placeholder="발행 URL (선택)"
+              value={publishUrl}
+              onChange={(e) => setPublishUrl(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                border: '1px solid #ddd',
+                borderRadius: 6,
+                fontSize: 13,
+                minWidth: 220,
+              }}
+            />
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing || content.status === 'EXPORTED'}
+              style={{
+                padding: '7px 14px',
+                background: content.status === 'EXPORTED' ? '#e7e3d8' : '#446620',
+                color: content.status === 'EXPORTED' ? '#888' : 'white',
+                border: 'none',
+                borderRadius: 6,
+                cursor: (isPublishing || content.status === 'EXPORTED') ? 'not-allowed' : 'pointer',
+                fontSize: 13,
+                opacity: isPublishing ? 0.6 : 1,
+              }}
+            >
+              {isPublishing ? '처리 중...' : content.status === 'EXPORTED' ? '발행 완료' : '발행 완료 처리'}
+            </button>
+          </div>
+          {publishErr && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: '#b33333' }}>{publishErr}</p>
+          )}
+        </div>
+
+        {/* 성과 입력 */}
+        {(content.status === 'APPROVED' || content.status === 'EXPORTED') && (
+          <div style={{ marginBottom: 24, padding: '16px', background: '#f9f9f9', borderRadius: 8 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', margin: '0 0 12px' }}>
+              성과 입력
+            </h3>
+            {content.performanceJson && (() => {
+              try {
+                const perf = JSON.parse(content.performanceJson);
+                return (
+                  <div style={{ marginBottom: 12, fontSize: 12, color: '#666' }}>
+                    최근 기록: {perf.recordedAt ? new Date(perf.recordedAt).toLocaleString('ko-KR') : ''}
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+            <PerformanceForm contentId={contentId} onSaved={loadContent} />
           </div>
         )}
 

@@ -29,7 +29,7 @@ platforms:
     maxUnits: 1
     hashtagCount: 3
     renderType: TEXT
-    enabled: false
+    enabled: true
 
   - code: facebook
     displayName: Facebook
@@ -37,4 +37,4 @@ platforms:
     maxUnits: 1
     hashtagCount: 2
     renderType: TEXT
-    enabled: false
+    enabled: true

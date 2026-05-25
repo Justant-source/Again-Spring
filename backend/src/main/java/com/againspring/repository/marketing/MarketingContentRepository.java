@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,4 +38,19 @@ public interface MarketingContentRepository extends JpaRepository<MarketingConte
      */
     Page<MarketingContent> findByPlatformAndStatus(
             MarketingContent.Platform platform, MarketingContent.Status status, Pageable pageable);
+
+    /**
+     * 특정 기간 내 예약된 콘텐츠 조회
+     */
+    List<MarketingContent> findByScheduledAtBetween(Instant from, Instant to);
+
+    /**
+     * 특정 기간 내 발행된 콘텐츠 조회
+     */
+    List<MarketingContent> findByPublishedAtBetween(Instant from, Instant to);
+
+    /**
+     * 특정 시간 이후의 예약 콘텐츠 조회 (시간순 정렬)
+     */
+    List<MarketingContent> findByScheduledAtAfterOrderByScheduledAtAsc(Instant cutoff);
 }

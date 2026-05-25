@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.againspring.api.dto.response.ContentResponse;
 import com.againspring.api.dto.response.ContentSummaryResponse;
+import com.againspring.api.dto.request.ScheduleRequest;
+import com.againspring.api.dto.request.PublishRequest;
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.domain.marketing.MarketingSimulation;
 import com.againspring.repository.marketing.MarketingContentRepository;
@@ -177,6 +179,32 @@ public class ContentService {
 		MarketingContent updated = contentRepo.save(content);
 		log.info("Rejected marketing content: id={}, reason={}", id, reason);
 
+		return ContentResponse.from(updated);
+	}
+
+	@Transactional
+	public ContentResponse schedule(Long id, ScheduleRequest request) {
+		MarketingContent content = contentRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Content not found: " + id));
+		content.setScheduledAt(request.getScheduledAt());
+		MarketingContent updated = contentRepo.save(content);
+		log.info("Scheduled content: id={}, scheduledAt={}", id, request.getScheduledAt());
+		return ContentResponse.from(updated);
+	}
+
+	@Transactional
+	public ContentResponse publish(Long id, PublishRequest request) {
+		MarketingContent content = contentRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Content not found: " + id));
+		content.setPublishedAt(request != null && request.getPublishedAt() != null
+				? request.getPublishedAt()
+				: java.time.Instant.now());
+		if (request != null && request.getPublishedUrl() != null) {
+			content.setPublishedUrl(request.getPublishedUrl());
+		}
+		content.setStatus(MarketingContent.Status.EXPORTED);
+		MarketingContent updated = contentRepo.save(content);
+		log.info("Published content: id={}, url={}", id, content.getPublishedUrl());
 		return ContentResponse.from(updated);
 	}
 }

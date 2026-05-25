@@ -33,6 +33,11 @@ public class ContentResponse {
 	private Long approvedBy;
 	private Instant createdAt;
 	private Instant updatedAt;
+	private Instant scheduledAt;
+	private Instant publishedAt;
+	private String publishedUrl;
+	private String performanceJson;
+	private String imagePaths;
 
 	/**
 	 * Factory method to create response from entity.
@@ -56,6 +61,11 @@ public class ContentResponse {
 				.approvedBy(content.getApprovedBy())
 				.createdAt(content.getCreatedAt())
 				.updatedAt(content.getUpdatedAt())
+				.scheduledAt(content.getScheduledAt())
+				.publishedAt(content.getPublishedAt())
+				.publishedUrl(content.getPublishedUrl())
+				.performanceJson(content.getPerformanceJson())
+				.imagePaths(content.getImagePaths())
 				.build();
 	}
 }

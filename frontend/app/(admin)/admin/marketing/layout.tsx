@@ -7,6 +7,7 @@ const MARKETING_TABS = [
   { label: '사연', href: '/admin/marketing/stories' },
   { label: '시뮬레이션', href: '/admin/marketing/simulations' },
   { label: '콘텐츠', href: '/admin/marketing/contents' },
+  { label: '캘린더', href: '/admin/marketing/calendar' },
   { label: '설정', href: '/admin/marketing/settings' },
 ];
 

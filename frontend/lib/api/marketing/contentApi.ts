@@ -11,6 +11,11 @@ export interface ContentResponse {
   status: 'GENERATING' | 'DRAFT' | 'REVIEW' | 'APPROVED' | 'EXPORTED' | 'REJECTED';
   safetyCheckJson?: string;
   createdAt: string;
+  scheduledAt?: string;
+  publishedAt?: string;
+  publishedUrl?: string;
+  performanceJson?: string;
+  updatedAt?: string;
 }
 
 export interface ContentSummaryResponse {
@@ -24,7 +29,7 @@ export interface ContentSummaryResponse {
 
 export async function generateContent(
   simulationId: number,
-  platform: 'x' | 'instagram' | 'naver_blog'
+  platform: 'x' | 'instagram' | 'naver_blog' | 'threads' | 'facebook'
 ): Promise<ContentResponse> {
   const res = await api.post<ContentResponse>(
     `/api/admin/marketing/contents/generate?simulationId=${simulationId}&platform=${platform}`

@@ -1,6 +1,7 @@
 package com.againspring.service.marketing;
 
 import com.againspring.repository.marketing.MarketingUsageLogRepository;
+import com.againspring.api.dto.response.WeeklyTrendItem;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -12,7 +13,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -89,5 +93,24 @@ public class CostMonitoringService {
         if (monthlyCost.compareTo(BUDGET_THRESHOLD) >= 0) {
             log.warn("마케팅 월 예산 80% 도달: {}USD", monthlyCost);
         }
+    }
+
+    public List<WeeklyTrendItem> getWeeklyTrend() {
+        List<WeeklyTrendItem> trend = new ArrayList<>();
+        Instant now = Instant.now(java.time.Clock.systemUTC());
+        for (int i = 3; i >= 0; i--) {
+            Instant weekStart = now.minus((i + 1) * 7L, ChronoUnit.DAYS);
+            Instant weekEnd = now.minus(i * 7L, ChronoUnit.DAYS);
+            long count = usageLogRepository.countByCreatedAtBetween(weekStart, weekEnd);
+            BigDecimal cost = usageLogRepository.sumCostByCreatedAtBetween(weekStart, weekEnd);
+            LocalDate labelDate = weekStart.atZone(ZoneOffset.UTC).toLocalDate();
+            String label = labelDate.getMonthValue() + "/" + labelDate.getDayOfMonth();
+            trend.add(WeeklyTrendItem.builder()
+                    .weekLabel(label)
+                    .costUsd(cost)
+                    .count(count)
+                    .build());
+        }
+        return trend;
     }
 }
