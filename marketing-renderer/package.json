@@ -1,0 +1,14 @@
+{
+  "name": "marketing-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node test/render.test.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "playwright": "^1.44.0",
+    "sharp": "^0.33.4"
+  }
+}

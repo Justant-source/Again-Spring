@@ -26,3 +26,6 @@ app:
     enabled: true
   session:
     min-messages-to-finalize: 5  # V13 Phase 4 (prod 기본값: 5)
+  features:
+    marketing:
+      enabled: true              # dev 전용 기능 — prod application-prod.yml에는 포함하지 않음

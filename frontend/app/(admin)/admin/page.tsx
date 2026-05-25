@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
+import Link from 'next/link';
+import { useUserStore } from '@/lib/store/userStore';
 import {
   getAdminSummary, getAdminDailyStats, getAdminRetention,
   getAdminFeedbacks, searchUsers, listUsers, getCrisisRecent, updateUserRoles,
@@ -15,6 +16,11 @@ import { FeedbackDetailModal, CATEGORY_BADGE, type AdminFeedback } from '@/compo
 import { UserDetailModal } from '@/components/admin/UserDetailModal';
 import { SystemHealthPanel } from '@/components/admin/SystemHealthPanel';
 import { LlmFailureRateChart } from '@/components/admin/LlmFailureRateChart';
+import { AdminSection } from '@/components/admin/AdminSection';
+import { AdminStatCard } from '@/components/admin/AdminStatCard';
+import { AdminPagination } from '@/components/admin/AdminPagination';
+import { AdminFilters } from '@/components/admin/AdminFilters';
+import { AdminTable } from '@/components/admin/AdminTable';
 
 const SUMMARY_LABEL: Record<string, string> = {
   todayTotalSessions: '오늘 전체 세션',
@@ -38,7 +44,6 @@ const CRISIS_POLL_MS = 30_000;
 
 export default function AdminPage() {
   const user = useUserStore((s) => s.user);
-  const hasHydrated = useHasHydrated();
   const router = useRouter();
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
   const [dailyStats, setDailyStats] = useState<any[]>([]);
@@ -61,19 +66,9 @@ export default function AdminPage() {
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null); // userId being updated
   const [refreshSignal, setRefreshSignal] = useState(0);
 
-  // Client-side ADMIN guard — 비로그인 시 로그인 페이지, 비ADMIN 시 메인으로 강제 이동
-  useEffect(() => {
-    if (!hasHydrated) return; // localStorage 복원 완료 대기
-    if (!user) {
-      router.replace('/login?next=/admin');
-      return;
-    }
-    if (user.isGuest || !user.roles?.includes('ADMIN')) {
-      router.replace('/');
-    }
-  }, [hasHydrated, user, router]);
 
   // 권한 검증된 ADMIN 사용자만 데이터 로드 (loadAll의 가드)
+  // layout.tsx에서 권한 확인되었으므로 user가 있으면 ADMIN 권한 확보
   const isAuthorizedAdmin = !!user && !user.isGuest && !!user.roles?.includes('ADMIN');
 
   const loadAll = useCallback(async () => {
@@ -175,9 +170,7 @@ export default function AdminPage() {
     : userPage?.content ?? [];
 
   // 권한 미통과 시 콘텐츠 절대 노출 X (BE 가드의 2차 보호)
-  if (!hasHydrated || !isAuthorizedAdmin) {
-    return <div style={{ padding: 40, fontFamily: 'sans-serif', color: '#888' }}>권한 확인 중…</div>;
-  }
+  // layout.tsx에서 권한 확인했으므로 여기선 로딩/에러만 처리
   if (loading) return <div style={{ padding: 40, fontFamily: 'sans-serif' }}>로딩 중...</div>;
   if (error) return <div style={{ padding: 40, color: '#e55', fontFamily: 'sans-serif' }}>{error}</div>;
 
@@ -199,18 +192,26 @@ export default function AdminPage() {
           ← 다시봄 메인
         </button>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E' }}>관리자 대시보드</div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          aria-label="새로고침"
-          style={{
-            background: '#1A1A2E', color: 'white', border: 'none',
-            padding: '6px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-            opacity: refreshing ? 0.6 : 1,
-          }}
-        >
-          {refreshing ? '...' : '↻ 새로고침'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link
+            href="/history"
+            style={{ fontSize: 13, color: '#555', textDecoration: 'none', padding: '6px 4px' }}
+          >
+            지난 대화
+          </Link>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            aria-label="새로고침"
+            style={{
+              background: '#1A1A2E', color: 'white', border: 'none',
+              padding: '6px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+              opacity: refreshing ? 0.6 : 1,
+            }}
+          >
+            {refreshing ? '...' : '↻ 새로고침'}
+          </button>
+        </div>
       </header>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px 60px' }}>
@@ -219,7 +220,7 @@ export default function AdminPage() {
 
         {/* 요약 카드 */}
         {summary && (
-          <Section title="오늘 요약">
+          <AdminSection title="오늘 요약">
             <div
               style={{
                 display: 'grid',
@@ -228,14 +229,14 @@ export default function AdminPage() {
               }}
             >
               {Object.entries(summary).map(([k, v]) => (
-                <StatCard key={k} label={SUMMARY_LABEL[k] || k} value={formatStat(k, v)} />
+                <AdminStatCard key={k} label={SUMMARY_LABEL[k] || k} value={formatStat(k, v)} />
               ))}
             </div>
-          </Section>
+          </AdminSection>
         )}
 
         {/* 추세 차트 */}
-        <Section title="추세 차트">
+        <AdminSection title="추세 차트">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 18 }}>
             <ChartBox title="일별 세션 (최근 30일)">
               {dailyStats.length === 0 ? <EmptyState /> : (
@@ -271,10 +272,10 @@ export default function AdminPage() {
               <LlmFailureRateChart days={7} refreshSignal={refreshSignal} />
             </ChartBox>
           </div>
-        </Section>
+        </AdminSection>
 
         {/* 위기 모니터링 */}
-        <Section
+        <AdminSection
           title="위기 모니터링"
           badge={crisis.length > 0 ? { text: `${crisis.length}건`, color: '#e55' } : undefined}
           subtitle="30초마다 자동 갱신 · 본문은 노출하지 않습니다"
@@ -313,10 +314,10 @@ export default function AdminPage() {
               </table>
             </div>
           )}
-        </Section>
+        </AdminSection>
 
         {/* 의견함 */}
-        <Section title="의견함">
+        <AdminSection title="의견함">
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, color: '#888' }}>상태 필터:</span>
             {STATUS_FILTERS.map((sf) => (
@@ -380,10 +381,10 @@ export default function AdminPage() {
               </table>
             </div>
           )}
-        </Section>
+        </AdminSection>
 
         {/* 사용자 관리 */}
-        <Section
+        <AdminSection
           title="사용자 관리"
           subtitle="가입한 모든 사용자 목록 · 행 클릭 시 상세 보기"
           badge={!searchMode && userPage ? { text: `총 ${userPage.totalElements}명`, color: '#555' } : undefined}
@@ -525,43 +526,16 @@ export default function AdminPage() {
 
               {/* 페이지네이션 (검색 모드 아닐 때만) */}
               {!searchMode && userPage && userPage.totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 16 }}>
-                  <button
-                    onClick={() => loadUsers(0, includeGuest)}
-                    disabled={userPage.first || usersLoading}
-                    style={pagerBtn(userPage.first || usersLoading)}
-                  >
-                    « 처음
-                  </button>
-                  <button
-                    onClick={() => loadUsers(userPageNum - 1, includeGuest)}
-                    disabled={userPage.first || usersLoading}
-                    style={pagerBtn(userPage.first || usersLoading)}
-                  >
-                    ‹ 이전
-                  </button>
-                  <span style={{ fontSize: 12, color: '#555', padding: '0 12px' }}>
-                    {userPageNum + 1} / {userPage.totalPages}
-                  </span>
-                  <button
-                    onClick={() => loadUsers(userPageNum + 1, includeGuest)}
-                    disabled={userPage.last || usersLoading}
-                    style={pagerBtn(userPage.last || usersLoading)}
-                  >
-                    다음 ›
-                  </button>
-                  <button
-                    onClick={() => loadUsers(userPage.totalPages - 1, includeGuest)}
-                    disabled={userPage.last || usersLoading}
-                    style={pagerBtn(userPage.last || usersLoading)}
-                  >
-                    마지막 »
-                  </button>
-                </div>
+                <AdminPagination
+                  page={userPageNum}
+                  totalPages={userPage.totalPages}
+                  onPageChange={(newPage) => loadUsers(newPage, includeGuest)}
+                  loading={usersLoading}
+                />
               )}
             </>
           )}
-        </Section>
+        </AdminSection>
       </div>
 
       {/* 모달 */}
@@ -579,45 +553,6 @@ export default function AdminPage() {
   );
 }
 
-function Section({
-  title, subtitle, badge, children,
-}: {
-  title: string;
-  subtitle?: string;
-  badge?: { text: string; color: string };
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      style={{
-        marginBottom: 22,
-        padding: 20,
-        background: 'white',
-        borderRadius: 12,
-        border: '1px solid #e7e3d8',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: subtitle ? 4 : 14 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, color: '#1A1A2E', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          {title}
-          {badge && (
-            <span
-              style={{
-                background: badge.color, color: 'white',
-                padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-              }}
-            >
-              {badge.text}
-            </span>
-          )}
-        </h2>
-      </div>
-      {subtitle && <p style={{ fontSize: 11, color: '#888', margin: '0 0 14px' }}>{subtitle}</p>}
-      {children}
-    </div>
-  );
-}
-
 function ChartBox({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
@@ -627,33 +562,11 @@ function ChartBox({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{
-      padding: '14px 18px', background: '#fafaf5', borderRadius: 8,
-      border: '1px solid #e7e3d8',
-    }}>
-      <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: '#1A1A2E' }}>{value}</div>
-    </div>
-  );
-}
 
 function EmptyState() {
   return <p style={{ color: '#aaa', fontSize: 13, padding: '12px 4px' }}>데이터 없음</p>;
 }
 
-function pagerBtn(disabled: boolean): React.CSSProperties {
-  return {
-    padding: '6px 10px',
-    fontSize: 12,
-    background: disabled ? '#f5f5f5' : 'white',
-    color: disabled ? '#aaa' : '#333',
-    border: '1px solid #ddd',
-    borderRadius: 4,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-  };
-}
 
 function formatStat(key: string, value: number | string): string {
   if (key === 'finalizeRate') {

@@ -2,8 +2,8 @@
 
 **프로젝트**: 다시봄 · Again Spring
 **도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)
-**진행 상황**: V13 완료 — 카테고리 힌트화·첫마디 시스템·Duo TESTER 게이팅·SVG 아이콘·30초 온보딩 튜토리얼·5턴 정리 게이트. dev 배포 완료.
-**기준일**: 2026-05-16
+**진행 상황**: V13 완료, V15 마케팅 자동화 대시보드 구현 중 (dev 전용) — V15.1~V15.9 진행. 자세한 내용: `shared/docs/v15/marketing-automation.md`
+**기준일**: 2026-05-25
 
 ---
 
@@ -344,6 +344,7 @@ cd frontend && npm run test
 | **LLM Worker** | **`againspring-llm-dev`** | **`againspring-llm-prod`** |
 | Frontend | `againspring-frontend-dev` | `againspring-frontend-prod` |
 | Nginx | `againspring-nginx-dev` | `againspring-nginx-prod` |
+| **Marketing Renderer** | **`againspring-marketing-renderer-dev`** | **없음 (dev 전용)** |
 
 ### 🚀 배포 명령
 
@@ -466,6 +467,9 @@ APP_URL=https://dev.againspring.net
   - ✅ **V10 베타 기능 (2026-05-08~09)**: 피드백 수집(`FeedbackService`, `FeedbackController`) + 관리자 대시보드(AdminFeedbackController, PMF 통계) + 일일 세션 제한(DailyStats, GuestSessionRateLimiter) + 게스트 1세션 제한 + 동의 재확인(ConsentReconfirmModal) + 베타 배너 + Flyway V16~V19
   - ✅ **V10.2 Gmail 발신자 통합 (2026-05-09)**: 단일 발신자 `againspring2026@gmail.com`, `GMAIL_APP_PASSWORD` 환경변수, MimeMessageHelper 표시명("다시봄 운영팀"), 법률 MD 연결(`shared/docs/policies/terms.md`·`privacy.md` → `frontend/public/legal/`)
   - ✅ **V13 베타 출시 전 보강 (2026-05-16)**:
+  - ⏳ **V15 마케팅 자동화 (2026-05-25, dev 전용)**: V15.1~V15.9 구현 완료. 사연관리·시뮬레이션엔진·콘텐츠3채널생성·승인워크플로우·비용모니터링·플랫폼추상화·채팅UI스크린샷. Flyway V28~V39, `marketing-renderer` 사이드카(dev 전용). prod 배포 게이트: Q1/Q2/Q3 답변 + 명시적 지시 필요. 권위본: `shared/docs/v15/`
+    - **V15.8**: 채팅 UI 스크린샷 생성 — `marketing-renderer`에 `/render-chat` 추가. 실제 다시봄 채팅 디자인(배경 #FBF3EC, 사용자A #F4A896)으로 렌더링. `ContentGenerationExecutor` + `ImageRenderClient` + `MarketingImageController` 연동.
+    - **V15.9 (PR1)**: 플랫폼 추상화 — `ContentGenerator` 인터페이스 + `ContentGeneratorRegistry` + `PlatformDescriptorLoader`. `platform-descriptors.yml`로 YAML 구동 메타데이터. Threads/Facebook enum 자리 마련(enabled=false). Flyway V37(contents 7컬럼 확장·enum 확장)/V38(hashtag_library)/V39(content_templates) 적용 완료.
     - 카테고리 힌트화: `system.md` + `relations/*.md` 7개 톤 완화, 세션 생성 시 mediator 첫마디 자동 저장 (`FirstMessageService`, `FirstMessageTemplateLoader`, 248개 템플릿 JSON)
     - Duo TESTER 게이팅: `app.features.duo-mode=false` feature flag, SessionController·MessageController invite/join 게이트, `PATCH /api/admin/users/{id}/roles` 신규
     - 30초 튜토리얼 모달: Flyway V24 (`tutorial_completed_at`), `POST /api/users/me/tutorial/complete`, FE `OnboardingModal.tsx` (3단계 dot indicator)
@@ -531,7 +535,7 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-05-17
+**마지막 업데이트**: 2026-05-25
 **담당**: Claude Code (Agent)
 
 > UX 정책 관련 문의: `frontend/docs/ux/principles.md` (4원칙군 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트) 순으로 참조.

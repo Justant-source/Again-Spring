@@ -1,0 +1,20 @@
+# V15.5 Level B 마케팅 카피 전용 금지어
+# 일반 사용자 채팅에는 적용하지 않음 (shared/docs/policies/marketing-copy.md 참조)
+# MarketingCopyGuard에서만 사용됨
+
+level_b:
+  clinical_terms:
+    - "심리상담"
+    - "심리치료"
+    - "상담사"
+    - "치료사"
+    - "정신과"
+    - "정신건강"
+  absolute_claims:
+    - "확실"
+    - "보장"
+    - "반드시"
+    - "절대"
+    - "100%"
+  substitute_terms:
+    - "해결사"

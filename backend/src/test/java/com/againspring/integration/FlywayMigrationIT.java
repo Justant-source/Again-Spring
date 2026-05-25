@@ -14,7 +14,8 @@ import java.sql.SQLException;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Phase 4: Flyway V1~V24가 실 MariaDB(Testcontainers) 위에서 전부 성공하는지 검증.
+ * Flyway V1~V32이 실 MariaDB(Testcontainers) 위에서 전부 성공하는지 검증.
+ * 새 마이그레이션 추가 시 hasSize 값도 함께 갱신할 것.
  */
 class FlywayMigrationIT extends MariaDbIntegrationSupport {
 
@@ -34,7 +35,7 @@ class FlywayMigrationIT extends MariaDbIntegrationSupport {
 
         assertThat(failedCount).as("실패한 마이그레이션").isZero();
         assertThat(pendingCount).as("미적용 마이그레이션").isZero();
-        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(24);
+        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(33);
     }
 
     @Test

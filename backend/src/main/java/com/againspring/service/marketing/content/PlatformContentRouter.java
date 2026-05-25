@@ -9,7 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Routes content generation requests to the appropriate platform generator.
+ * Routes content generation requests to the appropriate ContentGenerator via registry.
+ * Adding a new platform requires only a new ContentGenerator bean + YAML entry.
  */
 @Component
 @ConditionalOnProperty(name = "app.features.marketing.enabled", havingValue = "true")
@@ -17,29 +18,13 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PlatformContentRouter {
 
-	private final XContentGenerator xGenerator;
-	private final InstagramContentGenerator instagramGenerator;
-	private final NaverBlogContentGenerator naverBlogGenerator;
+    private final ContentGeneratorRegistry registry;
+    private final PlatformDescriptorLoader descriptorLoader;
 
-	/**
-	 * Route content generation to the appropriate platform generator.
-	 *
-	 * @param platform Target platform (X, INSTAGRAM, NAVER_BLOG)
-	 * @param simulationSummary Summary of the simulation
-	 * @param relationType Type of relationship
-	 * @return Generated content as raw LLM text
-	 * @throws Exception if LLM invocation fails or platform is unsupported
-	 */
-	public String generate(MarketingContent.Platform platform, String simulationSummary,
-			String relationType) throws Exception {
-		return switch (platform) {
-		case X -> xGenerator.generate(simulationSummary, relationType);
-		case INSTAGRAM -> instagramGenerator.generate(simulationSummary, relationType);
-		case NAVER_BLOG -> naverBlogGenerator.generate(simulationSummary, relationType);
-		default -> {
-			log.error("Unsupported platform: {}", platform);
-			throw new IllegalArgumentException("Unsupported platform: " + platform);
-		}
-		};
-	}
+    public String generate(MarketingContent.Platform platform, String simulationSummary,
+            String relationType) throws Exception {
+        PlatformDescriptor descriptor = descriptorLoader.get(platform);
+        GenerationContext ctx = GenerationContext.of(simulationSummary, relationType, descriptor);
+        return registry.resolve(platform).generate(ctx);
+    }
 }

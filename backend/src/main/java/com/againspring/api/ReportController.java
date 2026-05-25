@@ -34,9 +34,9 @@ import java.util.Map;
 @Tag(name = "Report", description = "갈등 분석 리포트 생성·조회")
 public class ReportController {
 
-    // private final ReportService reportService; — REMOVED (V1.5)
     private final ReportRepository reportRepository;
     private final SessionRepository sessionRepository;
+    private final com.againspring.service.report.ReportResponseMapper reportMapper;
 
     /**
      * Trigger report generation for a completed session.
@@ -115,7 +115,7 @@ public class ReportController {
             }
 
             return reportRepository.findBySessionId(sessionId)
-                    .map(report -> ResponseEntity.ok(mapToResponse(report)))
+                    .map(report -> ResponseEntity.ok(reportMapper.toResponse(report)))
                     .orElseGet(() -> ResponseEntity.notFound().build());
         } catch (Exception e) {
             log.error("Failed to get report for session {}: {}", sessionId, e.getMessage());
@@ -157,7 +157,7 @@ public class ReportController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
 
-            ReportResponse response = mapToResponse(report);
+            ReportResponse response = reportMapper.toResponse(report);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             log.error("Failed to retrieve report {}: {}", reportId, e.getMessage());
@@ -165,9 +165,6 @@ public class ReportController {
         }
     }
 
-    /**
-     * Map Report entity to ReportResponse DTO.
-     */
     private ReportResponse mapToResponse(Report report) {
         return ReportResponse.builder()
                 .id(report.getId())

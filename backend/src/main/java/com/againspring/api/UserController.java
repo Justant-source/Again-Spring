@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -108,9 +109,10 @@ public class UserController {
     /**
      * 내 세션 목록 조회 (완료 + 진행 중 모두 포함, 최신순).
      * GET /api/users/me/history
+     * ADMIN 사용자는 마케팅 시뮬레이션 세션(testRun=true)도 함께 반환됨.
      */
     @GetMapping("/me/history")
-    @Operation(summary = "Get my session history", description = "Returns all sessions (completed and active) for the current user")
+    @Operation(summary = "Get my session history", description = "Returns all sessions (completed and active) for the current user. ADMIN users also receive marketing simulation sessions.")
     @ApiResponse(responseCode = "200", description = "History retrieved")
     public ResponseEntity<List<SessionHistoryResponse>> getMyHistory(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -119,49 +121,70 @@ public class UserController {
         List<Session> sessions = sessionRepository
                 .findByCreatedByUserIdOrInviteeUserIdOrderByCreatedAtDesc(userId, userId);
 
-        List<SessionHistoryResponse> items = sessions.stream()
-                .map(s -> {
-                    // 상대방 닉네임: 내가 A면 B(초대 수신자), 내가 B면 A(초대 발신자)
-                    String partnerNickname;
-                    if (userId.equals(s.getCreatedByUserId())) {
-                        // 내가 A — 상대는 B
-                        if (s.getInviteeGuestName() != null) {
-                            partnerNickname = s.getInviteeGuestName();
-                        } else if (s.getInviteeUserId() != null) {
-                            partnerNickname = userRepository
-                                    .findByIdAndDeletedAtIsNull(s.getInviteeUserId())
-                                    .map(u -> u.getNickname())
-                                    .orElse("상대방");
-                        } else {
-                            partnerNickname = null;
-                        }
-                    } else {
-                        // 내가 B — 상대는 A(creator)
-                        partnerNickname = userRepository
-                                .findByIdAndDeletedAtIsNull(s.getCreatedByUserId())
-                                .map(u -> u.getNickname())
-                                .orElse("상대방");
-                    }
+        List<SessionHistoryResponse> items = new ArrayList<>(sessions.stream()
+                .map(s -> buildHistoryResponse(s, userId, false))
+                .toList());
 
-                    Session.Category cat = s.getCategory();
-                    return SessionHistoryResponse.builder()
-                            .id(s.getId())
-                            .status(s.getStatus() != null ? s.getStatus().getValue() : "unknown")
-                            .relationType(s.getRelationType() != null ? s.getRelationType().getValue() : null)
-                            .conflictType(s.getConflictType() != null ? s.getConflictType().getValue() : null)
-                            .partnerNickname(partnerNickname)
-                            .soloMode(Boolean.TRUE.equals(s.getSoloMode()))
-                            .completedAt(s.getCompletedAt())
-                            .createdAt(s.getCreatedAt())
-                            .majorCategoryId(cat != null ? cat.majorId : null)
-                            .middleCategoryId(cat != null ? cat.middleId : null)
-                            .minorCategoryId(cat != null ? cat.minorId : null)
-                            .customCategoryText(cat != null ? cat.customText : null)
-                            .reportId(s.getReportId())
-                            .build();
-                })
-                .toList();
+        // ADMIN 사용자: 마케팅 시뮬레이션 세션(testRun=true)도 포함
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isAdmin) {
+            List<Session> testRunSessions = sessionRepository.findAllTestRunSessionsOrderByCreatedAtDesc();
+            testRunSessions.stream()
+                    .map(s -> buildHistoryResponse(s, userId, true))
+                    .forEach(items::add);
+            // 최신순 재정렬
+            items.sort((a, b) -> {
+                java.time.Instant aTime = a.getCreatedAt() != null ? a.getCreatedAt() : java.time.Instant.EPOCH;
+                java.time.Instant bTime = b.getCreatedAt() != null ? b.getCreatedAt() : java.time.Instant.EPOCH;
+                return bTime.compareTo(aTime);
+            });
+        }
 
         return ResponseEntity.ok(items);
+    }
+
+    private SessionHistoryResponse buildHistoryResponse(Session s, String userId, boolean testRun) {
+        String partnerNickname;
+        if (testRun) {
+            // 마케팅 시뮬레이션 세션: 가상 페르소나 대화
+            partnerNickname = null;
+        } else if (userId.equals(s.getCreatedByUserId())) {
+            // 내가 A — 상대는 B
+            if (s.getInviteeGuestName() != null) {
+                partnerNickname = s.getInviteeGuestName();
+            } else if (s.getInviteeUserId() != null) {
+                partnerNickname = userRepository
+                        .findByIdAndDeletedAtIsNull(s.getInviteeUserId())
+                        .map(u -> u.getNickname())
+                        .orElse("상대방");
+            } else {
+                partnerNickname = null;
+            }
+        } else {
+            // 내가 B — 상대는 A(creator)
+            partnerNickname = userRepository
+                    .findByIdAndDeletedAtIsNull(s.getCreatedByUserId())
+                    .map(u -> u.getNickname())
+                    .orElse("상대방");
+        }
+
+        Session.Category cat = s.getCategory();
+        return SessionHistoryResponse.builder()
+                .id(s.getId())
+                .status(s.getStatus() != null ? s.getStatus().getValue() : "unknown")
+                .relationType(s.getRelationType() != null ? s.getRelationType().getValue() : null)
+                .conflictType(s.getConflictType() != null ? s.getConflictType().getValue() : null)
+                .partnerNickname(partnerNickname)
+                .soloMode(Boolean.TRUE.equals(s.getSoloMode()))
+                .completedAt(s.getCompletedAt())
+                .createdAt(s.getCreatedAt())
+                .majorCategoryId(cat != null ? cat.majorId : null)
+                .middleCategoryId(cat != null ? cat.middleId : null)
+                .minorCategoryId(cat != null ? cat.minorId : null)
+                .customCategoryText(cat != null ? cat.customText : null)
+                .reportId(s.getReportId())
+                .testRun(testRun)
+                .build();
     }
 }

@@ -92,6 +92,20 @@ curl http://localhost:8091/actuator/health
 - [ ] 호스트 `~/.claude` 세션 유효 (만료 시 재로그인 → `docker compose restart againspring-llm-prod`)
 - [ ] Cloudflare Tunnel 가동 중 (`systemctl status cloudflared`)
 
+## ⛔ prod 미지원 기능 — 절대 활성화 금지
+
+아래 기능은 **prod에 포함하지 않는다**. Q1/Q2/Q3 답변 완료 + 명시적 prod 배포 지시 전까지 잠금.
+
+| 기능 | 이유 |
+|---|---|
+| **마케팅 자동화 대시보드** (`/admin/marketing`) | 저작권·사이드프로젝트정책·익명운영 미결(Q1~Q3) |
+| `marketing-renderer` 컨테이너 | 마케팅 대시보드 미지원이므로 불필요 |
+| `MARKETING_ENABLED=true` | prod `.env.prod`에 추가 절대 금지 |
+
+prod 배포 시 `docker-compose.prod.yml`에 `marketing-renderer` 서비스가 없으며, BE의 모든 마케팅 빈은 `@ConditionalOnProperty`로 미등록 상태. `/api/admin/marketing/**` 엔드포인트 없음.
+
+상세 정책: `shared/docs/v15/marketing-dev-only-policy.md`
+
 ## 롤백
 
 이전 빌드 이미지로 즉시 복귀:

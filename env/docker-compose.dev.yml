@@ -58,6 +58,30 @@ services:
       retries: 5
       start_period: 60s
 
+  marketing-renderer-dev:
+    build:
+      context: ../marketing-renderer
+      dockerfile: Dockerfile
+    image: againspring-marketing-renderer-dev
+    container_name: againspring-marketing-renderer-dev
+    environment:
+      PORT: 9000
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1500m
+        reservations:
+          memory: 512m
+    networks:
+      - againspring-dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
   backend-dev:
     build:
       context: ../backend
@@ -88,6 +112,7 @@ services:
       - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro
       - ../shared/docs/policies/user-permissions.json:/app/shared/docs/policies/user-permissions.json:ro
       - ../shared/docs/templates:/app/shared/docs/templates:ro
+      - marketing_assets_dev:/var/marketing-assets:rw
     depends_on:
       mariadb-dev:
         condition: service_healthy
@@ -136,3 +161,4 @@ networks:
 
 volumes:
   mariadb_dev_data:
+  marketing_assets_dev:

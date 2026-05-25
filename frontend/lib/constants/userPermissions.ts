@@ -65,6 +65,7 @@ export interface TierPermissions {
     canAnonymizeUser: boolean;
     canViewCrisisMonitor: boolean;
     canViewSystemHealth: boolean;
+    canAccessMarketing: boolean;
   };
 }
 
@@ -124,6 +125,7 @@ export const USER_PERMISSIONS: { guest: TierPermissions; registered: TierPermiss
       canAnonymizeUser: false,
       canViewCrisisMonitor: false,
       canViewSystemHealth: false,
+      canAccessMarketing: false,
     },
   },
   registered: {
@@ -181,6 +183,7 @@ export const USER_PERMISSIONS: { guest: TierPermissions; registered: TierPermiss
       canAnonymizeUser: false,
       canViewCrisisMonitor: false,
       canViewSystemHealth: false,
+      canAccessMarketing: false,
     },
   },
   admin: {
@@ -238,6 +241,7 @@ export const USER_PERMISSIONS: { guest: TierPermissions; registered: TierPermiss
       canAnonymizeUser: true,
       canViewCrisisMonitor: true,
       canViewSystemHealth: true,
+      canAccessMarketing: true,
     },
   },
 };

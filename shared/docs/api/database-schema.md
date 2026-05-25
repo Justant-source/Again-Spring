@@ -54,10 +54,35 @@ flowchart LR
     V23["V23\nreports V12\n필드 11개"] -->
     V24["V24\ntutorial\n_completed_at"]
 
+    V24 -->
+    V25["V25\ncrisis_detections"] -->
+    V26["V26\nrelation_type"] -->
+    V27["V27\nmessage status"]
+
+    V27 -->
+    V28["V28\nmarketing\n_source_stories"] -->
+    V29["V29\nmarketing\n_simulations"] -->
+    V30["V30\nmarketing\n_contents"] -->
+    V31["V31\nis_test_run"] -->
+    V32["V32\nmarketing\n_usage_logs"] -->
+    V33["V33\nmarketing\n_audit_logs"] -->
+    V34["V34\nconversation\n_log"] -->
+    V35["V35\ngenerating\nstatus"] -->
+    V36["V36\nmarketing\n_system user"] -->
+    V37["V37\ncontents+\n7컬럼·enum"] -->
+    V38["V38\nhashtag\n_library"] -->
+    V39["V39\ncontent\n_templates"]
+
     style V7 fill:#e8f4f8
     style V10 fill:#fff3e0
     style V16 fill:#e8ffe8
     style V19 fill:#e8ffe8
+    style V28 fill:#fce4d6
+    style V29 fill:#fce4d6
+    style V30 fill:#fce4d6
+    style V37 fill:#fce4d6
+    style V38 fill:#fce4d6
+    style V39 fill:#fce4d6
 ```
 
 | 버전 | 파일 | 핵심 변경 |
@@ -86,6 +111,21 @@ flowchart LR
 | V22 | `V22__add_user_mediator_default_x.sql` | users에 `mediator_default_x` INT NULL |
 | V23 | `V23__add_report_v12_fields.sql` | reports에 V12 Solo 리포트 필드 11개 추가 |
 | V24 | `V24__add_tutorial_completed_at.sql` | users에 `tutorial_completed_at` TIMESTAMP NULL |
+| V25 | `V25__add_crisis_detections_to_sessions.sql` | sessions에 `crisis_detections` JSON 추가 |
+| V26 | `V26__rename_relationship_type_to_relation_type.sql` | sessions.relationship_type → relation_type 컬럼명 변경 |
+| V27 | `V27__add_message_status.sql` | messages에 `status` VARCHAR(16) 추가 (streaming / complete) |
+| V28 | `V28__add_marketing_source_stories.sql` | **marketing_source_stories 테이블 신규** (사연 수집·승인) |
+| V29 | `V29__add_marketing_simulations.sql` | **marketing_simulations 테이블 신규** (시뮬레이션 실행 기록) |
+| V30 | `V30__add_marketing_contents.sql` | **marketing_contents 테이블 신규** (플랫폼별 콘텐츠 draft→approved) |
+| V31 | `V31__add_is_test_run_to_sessions.sql` | sessions에 `is_test_run` BOOLEAN (마케팅 시뮬레이션 통계 격리) |
+| V32 | `V32__add_marketing_usage_logs.sql` | **marketing_usage_logs 테이블 신규** (LLM 비용 기록) |
+| V33 | `V33__add_marketing_audit_logs.sql` | **marketing_audit_logs 테이블 신규** (콘텐츠 감사 이력) |
+| V34 | `V34__add_conversation_log_to_simulations.sql` | marketing_simulations에 `conversation_log` MEDIUMTEXT 추가 |
+| V35 | `V35__add_generating_status_to_contents.sql` | marketing_contents.status ENUM에 `generating` 추가 |
+| V36 | `V36__seed_marketing_system_user.sql` | `marketing_system` 가상 유저 시드 (마케팅 시뮬레이션 전용 소유자) |
+| V37 | `V37__extend_marketing_contents.sql` | **marketing_contents 확장**: 7컬럼 추가 + ENUM에 threads/facebook |
+| V38 | `V38__add_marketing_hashtag_library.sql` | **marketing_hashtag_library 테이블 신규** (PR3 사전 스키마) |
+| V39 | `V39__add_marketing_content_templates.sql` | **marketing_content_templates 테이블 신규** (PR3 사전 스키마) |
 
 ## 테이블 관계도 (ERD)
 
@@ -105,13 +145,18 @@ erDiagram
     email_verifications }o--|| users : "verifies email"
     password_reset_tokens }o--|| users : "resets password"
     revoked_tokens }o--|| users : "JWT 블랙리스트"
+    marketing_source_stories ||--o{ marketing_simulations : "spawns"
+    marketing_simulations ||--o| sessions : "1:1 (session_id)"
+    marketing_simulations ||--o{ marketing_contents : "generates"
+    marketing_simulations ||--o{ marketing_usage_logs : "logs cost"
+    marketing_contents ||--o{ marketing_audit_logs : "audits"
 ```
 
 | 테이블 | 역할 | PK | Flyway |
 |---|---|---|---|
 | `users` | 회원/게스트 계정 | VARCHAR(32) | V1~V24 |
-| `sessions` | 중재 세션 메타 | VARCHAR(32) | V1~V14 |
-| `messages` | 카톡 메시지 | BIGINT auto | V7,V12,V15 |
+| `sessions` | 중재 세션 메타 | VARCHAR(32) | V1~V31 |
+| `messages` | 카톡 메시지 | BIGINT auto | V7,V12,V15,V27 |
 | `turns` | **[DEPRECATED V1.5]** 구 턴 구조 | BIGINT auto | V1 |
 | `reports` | 분석 리포트 | VARCHAR(32) | V1,V5,V23 |
 | `feedbacks` | 사용자 의견 | BIGINT auto | **V16** |
@@ -123,6 +168,13 @@ erDiagram
 | `email_verifications` | 이메일 인증 코드 | BIGINT auto | V3 |
 | `password_reset_tokens` | 비밀번호 재설정 | BIGINT auto | V4 |
 | `revoked_tokens` | JWT 블랙리스트 | BIGINT auto | V4 |
+| `marketing_source_stories` | 마케팅용 사연 수집·승인 | BIGINT auto | **V28** |
+| `marketing_simulations` | 시뮬레이션 실행 기록 | BIGINT auto | **V29,V34** |
+| `marketing_contents` | 플랫폼별 콘텐츠 (V37 확장) | BIGINT auto | **V30,V35,V37** |
+| `marketing_usage_logs` | LLM 비용 기록 | BIGINT auto | **V32** |
+| `marketing_audit_logs` | 콘텐츠 감사 이력 | BIGINT auto | **V33** |
+| `marketing_hashtag_library` | 해시태그 풀 (PR3 준비) | BIGINT auto | **V38** |
+| `marketing_content_templates` | 카피 템플릿 (PR3 준비) | BIGINT auto | **V39** |
 
 ## 핵심 테이블 상세
 
@@ -296,14 +348,135 @@ V1.5 카톡식 전환 이후 신규 데이터는 `messages` 테이블에 저장�
 
 `user_relationships`·`conflict_history`·`llm_call_logs`·`guest_sessions`·`email_verifications`·`password_reset_tokens`·`revoked_tokens` — 구조는 이전 버전과 동일. 각 테이블 컬럼 상세는 V1~V4 SQL 참조.
 
+---
+
+## V15 마케팅 테이블 상세 (dev 전용)
+
+> 모든 마케팅 테이블은 `app.features.marketing.enabled=true` 환경에서만 사용됩니다.
+
+### `marketing_source_stories` (V28)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `source_platform` | VARCHAR(50) | twitter, reddit, kakao_talk, blog, email 등 |
+| `source_url` | TEXT NULL | 원본 URL |
+| `raw_text` | LONGTEXT | 원본 사연 |
+| `anonymized_text` | LONGTEXT | 익명화 버전 (50%+ 재작성 필수) |
+| `rewrite_ratio` | DECIMAL(5,2) NULL | 재작성 비율 0~100% |
+| `category` | VARCHAR(64) NULL | 관계 카테고리 |
+| `relation_type` | VARCHAR(64) | RelationType enum |
+| `status` | ENUM | pending / approved / rejected / used |
+| `blocked_reason` | VARCHAR(255) NULL | 거부 이유 |
+| `created_by` | VARCHAR(32) | FK → users |
+| `created_at` | TIMESTAMP(3) | |
+
+인덱스: `idx_mss_status`, `idx_mss_created_at`, `idx_mss_source_platform`
+
+### `marketing_simulations` (V29, V34)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `source_story_id` | BIGINT NULL | FK → marketing_source_stories ON DELETE SET NULL |
+| `session_id` | VARCHAR(32) NULL UNIQUE | FK → sessions ON DELETE CASCADE |
+| `persona_a` / `persona_b` | JSON NULL | PersonaProfile 스냅샷 |
+| `turn_count` | INT | 목표 턴 수 (기본 8) |
+| `actual_turn_count` | INT NULL | 실제 완료 턴 수 |
+| `status` | ENUM | queued / running / completed / failed / canceled |
+| `error_message` | TEXT NULL | 실패 원인 |
+| `llm_cost_usd` | DECIMAL(8,4) NULL | 추정 비용 |
+| `conversation_log` | MEDIUMTEXT NULL | **V34** A/B/Mediator 대화 전체 로그 |
+| `started_at` / `finished_at` | TIMESTAMP(3) NULL | |
+| `created_at` | TIMESTAMP(3) | |
+
+인덱스: `idx_ms_status`, `idx_ms_created_at`
+
+### `marketing_contents` (V30, V35, V37)
+
+| 컬럼 | 타입 | Flyway | 비고 |
+|---|---|---|---|
+| `id` | BIGINT auto PK | V30 | |
+| `simulation_id` | BIGINT | V30 | FK → marketing_simulations |
+| `platform` | ENUM | V30/V37 | x / instagram / naver_blog / **threads / facebook** (V37 확장) |
+| `title` | VARCHAR(255) NULL | V30 | |
+| `body_text` | MEDIUMTEXT NULL | V30 | 생성된 카피 |
+| `html_template` | MEDIUMTEXT NULL | V30 | HTML 버전 |
+| `image_paths` | JSON NULL | V30 | `["chat_42.png"]` 채팅 스크린샷 파일명 |
+| `hashtags` | JSON NULL | V30 | `["#다시봄", ...]` |
+| `status` | ENUM | V30/V35 | **generating** / draft / review / approved / exported / rejected |
+| `safety_check_json` | JSON NULL | V30 | MarketingCopyGuard 결과 |
+| `edited_by` / `approved_by` | VARCHAR(32) NULL | V30 | FK → users |
+| `scheduled_at` | TIMESTAMP(3) NULL | **V37** | 예약 발행 시각 (자동 발행 없음, admin 메타데이터만) |
+| `published_at` | TIMESTAMP(3) NULL | **V37** | admin이 수동 기록한 발행 시각 |
+| `published_url` | VARCHAR(500) NULL | **V37** | 발행 후 URL |
+| `performance_json` | JSON NULL | **V37** | 수동 성과 `{impressions, likes, comments, shares, clicks, saves, recordedAt}` |
+| `template_id` | BIGINT NULL | **V37** | 사용된 템플릿 ID (PR3) |
+| `parent_content_id` | BIGINT NULL | **V37** | 리퍼포징 직속 부모 ID (PR3) |
+| `repurpose_source_id` | BIGINT NULL | **V37** | 리퍼포징 최초 원본 ID (PR3) |
+| `created_at` / `updated_at` | TIMESTAMP(3) | V30 | |
+
+인덱스: `uk_mc_sim_platform`, `idx_mc_status_platform`, `idx_mc_created_at`, `idx_mc_scheduled_at`(V37), `idx_mc_published_at`(V37)
+
+### `marketing_usage_logs` (V32)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `simulation_id` | BIGINT NULL | FK → marketing_simulations ON DELETE SET NULL |
+| `model` | VARCHAR(100) | LLM 모델명 |
+| `input_tokens` / `output_tokens` | INT | |
+| `cost_usd` | DECIMAL(8,4) | |
+| `created_at` | TIMESTAMP(3) | |
+
+### `marketing_audit_logs` (V33)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `content_id` | BIGINT NULL | FK → marketing_contents ON DELETE SET NULL |
+| `action` | VARCHAR(50) | APPROVED / REJECTED / EDITED / EXPORTED 등 |
+| `actor_user_id` | VARCHAR(32) | |
+| `payload_json` | JSON NULL | |
+| `created_at` | TIMESTAMP(3) | |
+
+### `marketing_hashtag_library` (V38 — PR3 사전 스키마)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `platform` | ENUM | x/instagram/naver_blog/threads/facebook |
+| `tag` | VARCHAR(100) | `#` 제외 텍스트 |
+| `category` | VARCHAR(50) NULL | |
+| `usage_count` | INT DEFAULT 0 | |
+| `last_used_at` | TIMESTAMP(3) NULL | |
+| `created_at` | TIMESTAMP(3) | |
+
+UNIQUE: `uk_hashtag_platform_tag`
+
+### `marketing_content_templates` (V39 — PR3 사전 스키마)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `platform` | ENUM | x/instagram/naver_blog/threads/facebook |
+| `name` | VARCHAR(120) | |
+| `body_template` | MEDIUMTEXT | `${variable}` 형식 변수 치환 지원 |
+| `variables_json` | JSON NULL | `[{name, description, required}]` |
+| `is_active` | BOOLEAN DEFAULT TRUE | |
+| `created_by` | BIGINT NULL | admin 사용자 ID |
+| `created_at` / `updated_at` | TIMESTAMP(3) | |
+
+---
+
 ## 마이그레이션 추가 절차
 
 ```bash
-# 다음 버전 번호 확인 (현재 V24 → 다음 V25)
+# 다음 버전 번호 확인 (현재 V39 → 다음 V40)
 ls backend/src/main/resources/db/migration/
 
-# V25__<descriptive_name>.sql 작성
-$EDITOR backend/src/main/resources/db/migration/V25__add_xxx.sql
+# V40__<descriptive_name>.sql 작성
+$EDITOR backend/src/main/resources/db/migration/V40__add_xxx.sql
 
 # dev에서 검증
 cd env
@@ -316,6 +489,7 @@ docker logs againspring-backend-dev | grep -i flyway
 - ROLLBACK은 별도 마이그레이션으로 (Flyway Community는 undo 미지원)
 - ALTER TABLE 시 `IF EXISTS` / `IF NOT EXISTS` 또는 idempotent 패턴 사용 (V21·V22 참조)
 - **dev 프로파일은 Flyway 비활성** — dev에서 테이블 확인 후 prod 배포 전 반드시 Flyway 실행 검증
+- 마케팅 테이블 번호: V28~V39 사용 완료. 다음은 V40부터
 
 ## 데이터 보존
 

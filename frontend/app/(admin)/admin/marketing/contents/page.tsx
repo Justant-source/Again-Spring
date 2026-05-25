@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AdminSection } from '@/components/admin/AdminSection';
 import { AdminTable } from '@/components/admin/AdminTable';
 import { AdminFilters } from '@/components/admin/AdminFilters';
-import { getContents, generateContent, type ContentSummaryResponse } from '@/lib/api/marketing/contentApi';
+import { getContents, generateContent, deleteContent, type ContentSummaryResponse } from '@/lib/api/marketing/contentApi';
 import { getSimulations, type SimulationSummaryResponse } from '@/lib/api/marketing/simulationApi';
 
 const PLATFORM_FILTERS = [
@@ -55,6 +55,8 @@ export default function ContentsListPage() {
   const [selectedSimId, setSelectedSimId] = useState<number | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<'x' | 'instagram' | 'naver_blog'>('x');
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // Auto-refresh when any content is GENERATING
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -132,6 +134,20 @@ export default function ContentsListPage() {
     }
   }
 
+  async function handleDeleteContent(id: number) {
+    setDeletingId(id);
+    try {
+      await deleteContent(id);
+      setConfirmDeleteId(null);
+      setError('');
+      await loadContents();
+    } catch (e: any) {
+      setError(`삭제 실패: ${e.response?.data?.message || '알 수 없는 오류'}`);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const filteredContents = contents.filter((c) => {
     if (platformFilter && c.platform.toLowerCase() !== platformFilter.toLowerCase()) return false;
     if (statusFilter && c.status !== statusFilter) return false;
@@ -188,21 +204,41 @@ export default function ContentsListPage() {
       key: 'actions',
       header: '액션',
       render: (row: ContentSummaryResponse) => (
-        <button
-          onClick={() => router.push(`/admin/marketing/contents/${row.id}`)}
-          disabled={row.status === 'GENERATING'}
-          style={{
-            padding: '4px 10px',
-            background: 'white',
-            border: '1px solid #ddd',
-            borderRadius: 4,
-            cursor: row.status === 'GENERATING' ? 'not-allowed' : 'pointer',
-            fontSize: 12,
-            opacity: row.status === 'GENERATING' ? 0.5 : 1,
-          }}
-        >
-          상세보기
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => router.push(`/admin/marketing/contents/${row.id}`)}
+            disabled={row.status === 'GENERATING'}
+            style={{ padding: '4px 10px', background: 'white', border: '1px solid #ddd', borderRadius: 4, cursor: row.status === 'GENERATING' ? 'not-allowed' : 'pointer', fontSize: 12, opacity: row.status === 'GENERATING' ? 0.5 : 1 }}
+          >
+            상세보기
+          </button>
+          {row.status !== 'GENERATING' && (
+            confirmDeleteId === row.id ? (
+              <>
+                <button
+                  onClick={() => handleDeleteContent(row.id)}
+                  disabled={deletingId === row.id}
+                  style={{ padding: '4px 10px', background: '#b33333', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, opacity: deletingId === row.id ? 0.6 : 1 }}
+                >
+                  {deletingId === row.id ? '삭제 중...' : '확인'}
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  style={{ padding: '4px 10px', background: 'white', border: '1px solid #ddd', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                >
+                  취소
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteId(row.id)}
+                style={{ padding: '4px 10px', background: '#ffe6e6', color: '#b33333', border: '1px solid #ffcccc', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+              >
+                삭제
+              </button>
+            )
+          )}
+        </div>
       ),
     },
   ];

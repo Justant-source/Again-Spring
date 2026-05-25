@@ -30,7 +30,7 @@ public class PersonaInferenceService {
      */
     public String inferPersonas(MarketingSourceStory story) {
         try {
-            String prompt = buildPersonaInferencePrompt(story.getAnonymizedText());
+            String prompt = buildPersonaInferencePrompt(story.getRawText());
             String response = llmProvider.invoke(prompt, "claude-haiku-4-5-20251001");
 
             // 응답 검증

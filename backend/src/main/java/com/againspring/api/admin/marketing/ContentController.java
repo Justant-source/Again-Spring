@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -115,6 +116,19 @@ public class ContentController {
 	public ResponseEntity<ContentResponse> approve(@PathVariable Long id) {
 		ContentResponse response = contentService.approve(id);
 		return ResponseEntity.ok(response);
+	}
+
+	/**
+	 * Delete marketing content permanently.
+	 *
+	 * @param id Content ID
+	 * @return 204 No Content
+	 */
+	@DeleteMapping("/{id}")
+	@Operation(summary = "Delete content", description = "Permanently delete marketing content")
+	public ResponseEntity<Void> delete(@PathVariable Long id) {
+		contentService.delete(id);
+		return ResponseEntity.noContent().build();
 	}
 
 	/**

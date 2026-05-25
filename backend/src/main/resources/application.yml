@@ -83,6 +83,9 @@ app:
     path: ${TEMPLATES_PATH:./shared/docs/templates/first_message}
   features:
     duo-mode: ${DUO_MODE_ENABLED:false}
+    marketing:
+      enabled: ${MARKETING_ENABLED:false}        # dev 전용 — prod에서 절대 true 설정 금지
+      renderer-url: ${MARKETING_RENDERER_URL:http://localhost:9000}
   categories:
     path: ${CATEGORIES_PATH:./shared/docs/categories.yml}
   user-permissions:

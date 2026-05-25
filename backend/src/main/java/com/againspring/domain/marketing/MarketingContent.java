@@ -26,7 +26,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 public class MarketingContent {
 
     public enum Platform {
-        X, INSTAGRAM, NAVER_BLOG
+        X, INSTAGRAM, NAVER_BLOG, THREADS, FACEBOOK
     }
 
     public enum Status {
@@ -72,6 +72,27 @@ public class MarketingContent {
 
     @Column(name = "approved_by")
     private Long approvedBy;
+
+    @Column(name = "scheduled_at")
+    private Instant scheduledAt;
+
+    @Column(name = "published_at")
+    private Instant publishedAt;
+
+    @Column(name = "published_url", length = 500)
+    private String publishedUrl;
+
+    @Column(name = "performance_json", columnDefinition = "JSON")
+    private String performanceJson;
+
+    @Column(name = "template_id")
+    private Long templateId;
+
+    @Column(name = "parent_content_id")
+    private Long parentContentId;
+
+    @Column(name = "repurpose_source_id")
+    private Long repurposeSourceId;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

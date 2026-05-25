@@ -3,10 +3,11 @@ import { api } from '../client';
 export interface ContentResponse {
   id: number;
   simulationId: number;
-  platform: 'x' | 'instagram' | 'naver_blog';
+  platform: 'x' | 'instagram' | 'naver_blog' | 'threads' | 'facebook';
   title?: string;
   bodyText: string;
   hashtags?: string[];
+  imagePaths?: string;
   status: 'GENERATING' | 'DRAFT' | 'REVIEW' | 'APPROVED' | 'EXPORTED' | 'REJECTED';
   safetyCheckJson?: string;
   createdAt: string;
@@ -18,6 +19,7 @@ export interface ContentSummaryResponse {
   platform: string;
   status: string;
   createdAt: string;
+  imagePaths?: string;
 }
 
 export async function generateContent(
@@ -55,4 +57,8 @@ export async function rejectContent(id: number, reason: string): Promise<Content
     `/api/admin/marketing/contents/${id}/reject?reason=${encodeURIComponent(reason)}`
   );
   return res.data;
+}
+
+export async function deleteContent(id: number): Promise<void> {
+  await api.delete(`/api/admin/marketing/contents/${id}`);
 }

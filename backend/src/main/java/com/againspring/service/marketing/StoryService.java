@@ -33,7 +33,7 @@ public class StoryService {
             .sourcePlatform(req.getSourcePlatform())
             .sourceUrl(req.getSourceUrl())
             .rawText(req.getRawText())
-            .anonymizedText(req.getRawText())   // 커뮤니티 공개글 — 원문 그대로 사용
+            .anonymizedText(req.getRawText())
             .relationType(req.getRelationType())
             .status(MarketingSourceStory.Status.APPROVED)  // 즉시 시뮬레이션 가능
             .createdBy(adminUserId)

@@ -191,6 +191,7 @@ public class UserPermissionsConfig {
             t.admin.canAnonymizeUser = true;
             t.admin.canViewCrisisMonitor = true;
             t.admin.canViewSystemHealth = true;
+            t.admin.canAccessMarketing = true;
             return t;
         }
     }
@@ -260,5 +261,6 @@ public class UserPermissionsConfig {
         private boolean canAnonymizeUser;
         private boolean canViewCrisisMonitor;
         private boolean canViewSystemHealth;
+        private boolean canAccessMarketing;
     }
 }

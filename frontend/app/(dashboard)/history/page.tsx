@@ -22,6 +22,7 @@ interface HistoryItem {
   minorCategoryId: string | null;
   customCategoryText: string | null;
   reportId: string | null;
+  testRun?: boolean;
 }
 
 const RELATION_TYPE_LABEL: Record<RelationType, string> = {
@@ -218,7 +219,7 @@ export default function HistoryPage() {
 
           const handleClick = () => {
             if (selectMode) {
-              toggleSelect(item.id);
+              if (!item.testRun) toggleSelect(item.id);
               return;
             }
             if (active) {
@@ -247,7 +248,19 @@ export default function HistoryPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>{dateStr}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {active ? (
+                    {item.testRun && (
+                      <span style={{
+                        fontSize: 10,
+                        background: '#7C6A5A',
+                        color: '#fff',
+                        borderRadius: 4,
+                        padding: '2px 7px',
+                        fontWeight: 500,
+                      }}>
+                        시뮬레이션
+                      </span>
+                    )}
+                    {!item.testRun && active ? (
                       <span style={{
                         fontSize: 10,
                         background: 'var(--L-point)',
@@ -257,7 +270,7 @@ export default function HistoryPage() {
                       }}>
                         진행 중
                       </span>
-                    ) : item.completedAt ? (
+                    ) : !item.testRun && item.completedAt ? (
                       <span style={{
                         fontSize: 10,
                         background: 'var(--L-sub)',
@@ -268,7 +281,7 @@ export default function HistoryPage() {
                         완료
                       </span>
                     ) : null}
-                    {!active && item.status === 'completed' && !item.reportId && (
+                    {!item.testRun && !active && item.status === 'completed' && !item.reportId && (
                       <span style={{
                         fontSize: 10,
                         padding: '2px 7px',
@@ -280,7 +293,7 @@ export default function HistoryPage() {
                         결과 생성중
                       </span>
                     )}
-                    {!active && item.reportId && (
+                    {!item.testRun && !active && item.reportId && (
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -303,11 +316,13 @@ export default function HistoryPage() {
                   </div>
                 </div>
                 <div className="serif" style={{ fontSize: 15, color: 'var(--L-ink)', fontWeight: 500, marginBottom: 8 }}>
-                  {item.soloMode
-                    ? '혼자 정리한 이야기'
-                    : item.partnerNickname
-                      ? `${item.partnerNickname}분과의 대화`
-                      : '상대방과의 대화'}
+                  {item.testRun
+                    ? 'AI 시뮬레이션 대화'
+                    : item.soloMode
+                      ? '혼자 정리한 이야기'
+                      : item.partnerNickname
+                        ? `${item.partnerNickname}분과의 대화`
+                        : '상대방과의 대화'}
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   {item.relationType && (
@@ -350,8 +365,8 @@ export default function HistoryPage() {
                 </div>
               </div>
 
-              {/* 체크박스 — 오른쪽 */}
-              {selectMode && (
+              {/* 체크박스 — 시뮬레이션 세션은 삭제 불가 */}
+              {selectMode && !item.testRun && (
                 <div style={{
                   flexShrink: 0,
                   width: 22,

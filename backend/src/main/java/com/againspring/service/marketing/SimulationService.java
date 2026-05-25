@@ -134,4 +134,18 @@ public class SimulationService {
             throw new IllegalStateException("Cannot cancel simulation in status: " + simulation.getStatus());
         }
     }
+
+    @Transactional
+    public void delete(Long id) {
+        MarketingSimulation simulation = simRepo.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Simulation not found: " + id));
+
+        if (simulation.getStatus().equals(MarketingSimulation.Status.QUEUED) ||
+            simulation.getStatus().equals(MarketingSimulation.Status.RUNNING)) {
+            throw new IllegalStateException("Cannot delete simulation in status: " + simulation.getStatus());
+        }
+
+        simRepo.deleteById(id);
+        log.info("Simulation {} deleted", id);
+    }
 }

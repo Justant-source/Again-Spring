@@ -1,4 +1,16 @@
 import { api } from '../client';
+import type { Report } from '@/lib/types';
+
+export interface SimulationMessageResponse {
+  id: number;
+  sender: 'USER_A' | 'USER_B' | 'MEDIATOR_TO_A' | 'MEDIATOR_TO_B';
+  content: string;
+  charCount: number;
+  isFinalizeSuggestion: boolean;
+  isPartnerJoinNotice: boolean;
+  createdAt: string;
+  status: 'streaming' | 'complete';
+}
 
 export interface SimulationResponse {
   id: number;
@@ -46,5 +58,19 @@ export async function getSimulation(id: number): Promise<SimulationResponse> {
 
 export async function cancelSimulation(id: number): Promise<SimulationResponse> {
   const res = await api.post<SimulationResponse>(`/api/admin/marketing/simulations/${id}/cancel`);
+  return res.data;
+}
+
+export async function deleteSimulation(id: number): Promise<void> {
+  await api.delete(`/api/admin/marketing/simulations/${id}`);
+}
+
+export async function getSimulationMessages(id: number): Promise<SimulationMessageResponse[]> {
+  const res = await api.get<SimulationMessageResponse[]>(`/api/admin/marketing/simulations/${id}/messages`);
+  return res.data;
+}
+
+export async function getSimulationReport(id: number): Promise<Report> {
+  const res = await api.get<Report>(`/api/admin/marketing/simulations/${id}/report`);
   return res.data;
 }

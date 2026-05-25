@@ -151,6 +151,18 @@ public class ContentService {
 	}
 
 	/**
+	 * Delete content permanently.
+	 */
+	@Transactional
+	public void delete(Long id) {
+		if (!contentRepo.existsById(id)) {
+			throw new EntityNotFoundException("Content not found: " + id);
+		}
+		contentRepo.deleteById(id);
+		log.info("Deleted marketing content: id={}", id);
+	}
+
+	/**
 	 * Reject content with reason.
 	 */
 	public ContentResponse reject(Long id, String reason) {

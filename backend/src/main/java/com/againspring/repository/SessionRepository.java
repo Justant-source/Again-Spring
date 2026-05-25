@@ -74,32 +74,36 @@ public interface SessionRepository extends JpaRepository<Session, String> {
             @Param("from") Instant from,
             @Param("to") Instant to);
 
-    @Query("SELECT COUNT(s) FROM Session s WHERE s.createdAt >= :from AND s.createdAt < :to")
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.createdAt >= :from AND s.createdAt < :to AND s.testRun = false")
     long countByCreatedAtBetween(@Param("from") Instant from, @Param("to") Instant to);
 
-    @Query("SELECT COUNT(s) FROM Session s WHERE s.status = :status AND s.createdAt >= :from AND s.createdAt < :to")
+    @Query("SELECT COUNT(s) FROM Session s WHERE s.status = :status AND s.createdAt >= :from AND s.createdAt < :to AND s.testRun = false")
     long countByStatusAndCreatedAtBetween(@Param("status") SessionStatus status,
             @Param("from") Instant from, @Param("to") Instant to);
 
     @Query("SELECT COUNT(s) FROM Session s WHERE s.createdByUserId IN " +
-           "(SELECT u.id FROM User u WHERE u.isGuest = true) AND s.createdAt >= :from AND s.createdAt < :to")
+           "(SELECT u.id FROM User u WHERE u.isGuest = true) AND s.createdAt >= :from AND s.createdAt < :to AND s.testRun = false")
     long countGuestSessionsBetween(@Param("from") Instant from, @Param("to") Instant to);
 
     @Query("SELECT COALESCE(AVG(s.userAMessageCount + COALESCE(s.userBMessageCount, 0)), 0) " +
-           "FROM Session s WHERE s.createdAt >= :from AND s.createdAt < :to")
+           "FROM Session s WHERE s.createdAt >= :from AND s.createdAt < :to AND s.testRun = false")
     Double avgTurnsBetween(@Param("from") Instant from, @Param("to") Instant to);
 
-    /** Admin 사용자 상세용 — 사용자가 관여한(생성/초대받은) 모든 세션 카운트 */
-    @Query("SELECT COUNT(s) FROM Session s WHERE s.createdByUserId = :userId OR s.inviteeUserId = :userId")
+    /** ADMIN 지난 대화용 — 마케팅 시뮬레이션 세션 전체 (is_test_run=true), 최신순 */
+    @Query("SELECT s FROM Session s WHERE s.testRun = true ORDER BY s.createdAt DESC")
+    List<Session> findAllTestRunSessionsOrderByCreatedAtDesc();
+
+    /** Admin 사용자 상세용 — 사용자가 관여한(생성/초대받은) 실제 세션 카운트 (마케팅 시뮬레이션 제외) */
+    @Query("SELECT COUNT(s) FROM Session s WHERE (s.createdByUserId = :userId OR s.inviteeUserId = :userId) AND s.testRun = false")
     long countByUserInvolvement(@Param("userId") String userId);
 
-    /** Admin 사용자 상세용 — 사용자 관여 세션 중 완료된 것 카운트 */
+    /** Admin 사용자 상세용 — 사용자 관여 실제 세션 중 완료된 것 카운트 (마케팅 시뮬레이션 제외) */
     @Query("SELECT COUNT(s) FROM Session s WHERE (s.createdByUserId = :userId OR s.inviteeUserId = :userId) " +
-           "AND s.status = com.againspring.domain.enums.SessionStatus.COMPLETED")
+           "AND s.status = com.againspring.domain.enums.SessionStatus.COMPLETED AND s.testRun = false")
     long countCompletedByUserInvolvement(@Param("userId") String userId);
 
-    /** Admin 사용자 상세용 — 사용자 관여 세션 중 가장 최근 생성 시각 */
-    @Query("SELECT MAX(s.createdAt) FROM Session s WHERE s.createdByUserId = :userId OR s.inviteeUserId = :userId")
+    /** Admin 사용자 상세용 — 사용자 관여 실제 세션 중 가장 최근 생성 시각 (마케팅 시뮬레이션 제외) */
+    @Query("SELECT MAX(s.createdAt) FROM Session s WHERE (s.createdByUserId = :userId OR s.inviteeUserId = :userId) AND s.testRun = false")
     Optional<Instant> findLastSessionCreatedAt(@Param("userId") String userId);
 
     /** 게스트 → 회원 마이그레이션: 게스트가 생성한 세션의 owner를 새 회원으로 이전 */

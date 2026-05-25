@@ -78,6 +78,10 @@ public class Session {
     @Builder.Default
     private Boolean soloMode = false;
 
+    @Column(name = "is_test_run")
+    @Builder.Default
+    private Boolean testRun = false;
+
     // ===== V1.5 신규 필드 (카톡식 채팅) =====
 
     @Column(name = "user_a_message_count", nullable = false)

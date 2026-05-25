@@ -10,6 +10,7 @@ import java.time.Instant;
 /**
  * GET /api/users/me/history 응답 DTO.
  * 완료된 세션과 진행 중인 세션을 모두 포함.
+ * ADMIN 사용자는 isTestRun=true인 마케팅 시뮬레이션 세션도 포함됨.
  */
 @Getter
 @Builder
@@ -29,4 +30,5 @@ public class SessionHistoryResponse {
     private String minorCategoryId;
     private String customCategoryText;
     private String reportId;
+    private boolean testRun;
 }

@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -22,12 +23,6 @@ public class ImageRenderClient {
 
     /**
      * Renders HTML to PNG image.
-     *
-     * @param html    HTML content to render
-     * @param width   Viewport width in pixels
-     * @param height  Viewport height in pixels
-     * @return PNG image as byte array
-     * @throws RuntimeException if rendering fails
      */
     public byte[] renderToPng(String html, int width, int height) {
         Map<String, Object> body = Map.of(
@@ -43,6 +38,29 @@ public class ImageRenderClient {
                     .body(byte[].class);
         } catch (Exception e) {
             throw new RuntimeException("이미지 렌더링 실패: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Renders a chat preview screenshot using the Dasibom chat UI design.
+     * messages: list of {sender, content, createdAt} maps.
+     * Returns PNG bytes, or null if renderer is unavailable (non-fatal).
+     */
+    public byte[] renderChatPreview(List<Map<String, Object>> messages, String title, String subtitle) {
+        Map<String, Object> body = Map.of(
+                "messages", messages,
+                "title", title != null ? title : "다시봄",
+                "subtitle", subtitle != null ? subtitle : "AI 갈등 중재",
+                "viewport", Map.of("w", 390, "h", 720)
+        );
+        try {
+            return restClient.post()
+                    .uri("/render-chat")
+                    .body(body)
+                    .retrieve()
+                    .body(byte[].class);
+        } catch (Exception e) {
+            return null;
         }
     }
 }
