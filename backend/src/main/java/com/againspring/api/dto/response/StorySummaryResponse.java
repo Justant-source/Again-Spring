@@ -24,6 +24,9 @@ public class StorySummaryResponse {
     @JsonProperty("id")
     private Long id;
 
+    @JsonProperty("title")
+    private String title;
+
     @JsonProperty("sourcePlatform")
     private String sourcePlatform;
 
@@ -39,6 +42,7 @@ public class StorySummaryResponse {
     public static StorySummaryResponse from(MarketingSourceStory story) {
         return StorySummaryResponse.builder()
             .id(story.getId())
+            .title(story.getTitle())
             .sourcePlatform(story.getSourcePlatform())
             .relationType(story.getRelationType())
             .status(story.getStatus() != null ? story.getStatus().toString() : null)

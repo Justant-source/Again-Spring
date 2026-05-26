@@ -1,6 +1,7 @@
 import { api } from '../client';
 
 export interface StoryRequest {
+  title: string;
   sourcePlatform: string;
   sourceUrl?: string;
   rawText: string;
@@ -9,6 +10,7 @@ export interface StoryRequest {
 
 export interface StoryResponse {
   id: number;
+  title?: string;
   sourcePlatform: string;
   sourceUrl?: string;
   rawText: string;
@@ -22,6 +24,7 @@ export interface StoryResponse {
 
 export interface StorySummaryResponse {
   id: number;
+  title?: string;
   sourcePlatform: string;
   relationType: string;
   status: string;

@@ -416,7 +416,9 @@ export default function SimulationsListPage() {
                       borderLeft: selectedStoryId === s.id ? '3px solid #2d4a7a' : '3px solid transparent',
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E' }}>#{s.id} · {s.sourcePlatform}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E' }}>
+                      {s.title || `#${s.id} · ${s.sourcePlatform}`}
+                    </div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{s.relationType} · {new Date(s.createdAt).toLocaleDateString('ko-KR')}</div>
                   </div>
                 ))}

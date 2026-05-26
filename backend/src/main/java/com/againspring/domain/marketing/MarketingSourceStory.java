@@ -33,6 +33,9 @@ public class MarketingSourceStory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "title", length = 120)
+    private String title;
+
     @Column(name = "source_platform", nullable = false, length = 50)
     private String sourcePlatform;
 

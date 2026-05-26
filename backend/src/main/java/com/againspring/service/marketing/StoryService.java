@@ -30,6 +30,7 @@ public class StoryService {
 
     public StoryResponse create(StoryRequest req, String adminUserId) {
         MarketingSourceStory story = MarketingSourceStory.builder()
+            .title(req.getTitle())
             .sourcePlatform(req.getSourcePlatform())
             .sourceUrl(req.getSourceUrl())
             .rawText(req.getRawText())

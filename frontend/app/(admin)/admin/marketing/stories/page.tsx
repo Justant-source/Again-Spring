@@ -67,6 +67,15 @@ export default function StoriesListPage() {
 
   const columns = [
     {
+      key: 'title',
+      header: '제목',
+      render: (row: StorySummaryResponse) => (
+        <span style={{ fontWeight: 500, color: '#1A1A2E' }}>
+          {row.title || <span style={{ color: '#aaa', fontStyle: 'italic' }}>제목 없음</span>}
+        </span>
+      ),
+    },
+    {
       key: 'sourcePlatform',
       header: '플랫폼',
       render: (row: StorySummaryResponse) => row.sourcePlatform,

@@ -114,6 +114,14 @@ export default function StoryDetailPage() {
         </div>
       )}
 
+      {/* 제목 */}
+      {story.title && (
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 12, color: '#888', margin: '0 0 4px' }}>제목</p>
+          <p style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#1A1A2E' }}>{story.title}</p>
+        </div>
+      )}
+
       {/* 메타데이터 */}
       <div style={{
         display: 'grid',

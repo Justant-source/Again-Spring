@@ -16,6 +16,9 @@ import lombok.Setter;
 @AllArgsConstructor
 public class StoryRequest {
 
+    @NotBlank(message = "Title is required")
+    private String title;
+
     @NotBlank(message = "Source platform is required")
     private String sourcePlatform;
 

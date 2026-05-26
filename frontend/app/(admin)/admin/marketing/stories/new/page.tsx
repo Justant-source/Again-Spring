@@ -19,6 +19,7 @@ export default function NewStoryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState<StoryRequest>({
+    title: '',
     sourcePlatform: '',
     sourceUrl: '',
     rawText: '',
@@ -29,6 +30,10 @@ export default function NewStoryPage() {
     e.preventDefault();
     setError('');
 
+    if (!form.title.trim()) {
+      setError('제목을 입력하세요.');
+      return;
+    }
     if (!form.sourcePlatform.trim()) {
       setError('출처 플랫폼을 입력하세요.');
       return;
@@ -45,6 +50,7 @@ export default function NewStoryPage() {
     setLoading(true);
     try {
       const result = await createStory({
+        title: form.title.trim(),
         sourcePlatform: form.sourcePlatform.trim(),
         sourceUrl: form.sourceUrl?.trim() || undefined,
         rawText: form.rawText.trim(),
@@ -74,6 +80,28 @@ export default function NewStoryPage() {
             {error}
           </div>
         )}
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#1A1A2E' }}>
+            제목 <span style={{ color: '#e55' }}>*</span>
+          </label>
+          <input
+            type="text"
+            placeholder="예: 친구와의 갈등 사연"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            maxLength={120}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              border: '1px solid #ddd',
+              borderRadius: 6,
+              fontSize: 13,
+              fontFamily: 'inherit',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
 
         <div style={{ marginBottom: 18 }}>
           <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#1A1A2E' }}>
