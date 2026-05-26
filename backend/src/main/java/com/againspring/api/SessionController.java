@@ -121,7 +121,10 @@ public class SessionController {
     public ResponseEntity<SessionResponse> getSession(
             @PathVariable("id") String sessionId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        SessionResponse response = sessionService.getSession(sessionId, userDetails.getUsername());
+        String userId = userDetails.getUsername();
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        SessionResponse response = sessionService.getSession(sessionId, userId, isAdmin);
         return ResponseEntity.ok(response);
     }
 

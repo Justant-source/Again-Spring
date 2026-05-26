@@ -216,9 +216,19 @@ public class SessionService {
      */
     @Transactional(readOnly = true)
     public SessionResponse getSession(String sessionId, String userId) {
+        return getSession(sessionId, userId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public SessionResponse getSession(String sessionId, String userId, boolean isAdmin) {
         Session session = sessionRepository
                 .findById(sessionId)
                 .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "세션을 찾을 수 없어요."));
+
+        // ADMIN can view testRun simulation sessions (createdByUserId = "marketing_system")
+        if (isAdmin && Boolean.TRUE.equals(session.getTestRun())) {
+            return mapToSessionResponse(session, session.getCreatedByUserId());
+        }
 
         // Access control: creator or invitee only
         if (!session.getCreatedByUserId().equals(userId)

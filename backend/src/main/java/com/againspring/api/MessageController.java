@@ -4,6 +4,7 @@ import com.againspring.api.dto.request.SendMessageRequest;
 import com.againspring.api.dto.response.*;
 import jakarta.validation.Valid;
 import com.againspring.domain.enums.MessageSender;
+import com.againspring.repository.SessionRepository;
 import com.againspring.service.CancelableChatService;
 import com.againspring.service.ChatService;
 import com.againspring.service.SessionRoleResolver;
@@ -38,6 +39,7 @@ public class MessageController {
     private final SessionRoleResolver roleResolver;
     private final SessionService sessionService;
     private final com.againspring.repository.MessageRepository messageRepository;
+    private final SessionRepository sessionRepository;
 
     @Value("${app.features.duo-mode:false}")
     private boolean duoModeEnabled;
@@ -85,8 +87,25 @@ public class MessageController {
         @RequestParam(required = false) Long since,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        var sender = roleResolver.resolveSender(sessionId, userDetails.getUsername());
         Instant sinceInstant = since != null ? Instant.ofEpochMilli(since) : Instant.EPOCH;
+
+        // ADMIN can view all messages for testRun simulation sessions
+        boolean isAdmin = userDetails.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isAdmin) {
+            var session = sessionRepository.findById(sessionId).orElse(null);
+            if (session != null && Boolean.TRUE.equals(session.getTestRun())) {
+                Instant safeSince = sinceInstant.minusMillis(1);
+                var allMessages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream()
+                    .filter(m -> m.getCreatedAt().isAfter(safeSince))
+                    .filter(m -> m.getDismissedAt() == null)
+                    .map(MessageResponse::from)
+                    .toList();
+                return ResponseEntity.ok(allMessages);
+            }
+        }
+
+        var sender = roleResolver.resolveSender(sessionId, userDetails.getUsername());
         var messages = chatService.getMyMessages(sessionId, sender, sinceInstant);
         return ResponseEntity.ok(messages.stream().map(MessageResponse::from).toList());
     }

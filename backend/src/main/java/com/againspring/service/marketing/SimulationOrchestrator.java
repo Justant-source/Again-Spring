@@ -62,7 +62,7 @@ public class SimulationOrchestrator {
     private static final BigDecimal MONTHLY_BUDGET_USD = BigDecimal.valueOf(20.0);
     private static final String MODEL_HAIKU = "claude-haiku-4-5-20251001";
     private static final int MAX_CRISIS_RETRIES = 2;
-    private static final int REPORT_POLL_MAX_SECONDS = 30;
+    private static final int REPORT_POLL_MAX_SECONDS = 120;
 
     // Haiku 가격 추정 (공식 기준: Input $0.80/1M, Output $4.00/1M tokens)
     private static final BigDecimal HAIKU_INPUT_PRICE = BigDecimal.valueOf(0.80)
