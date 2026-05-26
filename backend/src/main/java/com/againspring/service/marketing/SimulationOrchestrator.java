@@ -62,7 +62,7 @@ public class SimulationOrchestrator {
     private static final BigDecimal MONTHLY_BUDGET_USD = BigDecimal.valueOf(20.0);
     private static final String MODEL_HAIKU = "claude-haiku-4-5-20251001";
     private static final int MAX_CRISIS_RETRIES = 2;
-    private static final int REPORT_POLL_MAX_SECONDS = 120;
+    private static final int REPORT_POLL_MAX_SECONDS = 300;
 
     // Haiku 가격 추정 (공식 기준: Input $0.80/1M, Output $4.00/1M tokens)
     private static final BigDecimal HAIKU_INPUT_PRICE = BigDecimal.valueOf(0.80)
@@ -152,13 +152,16 @@ public class SimulationOrchestrator {
             chatService.requestFinalization(sessionId, MessageSender.USER_A);
             totalCost = totalCost.add(SONNET_REPORT_FLAT_COST);
 
-            // 8. 리포트 완료 대기 (최대 30초)
-            boolean reportReady = pollForReport(sessionId);
+            // 8. 리포트 완료 대기 (최대 REPORT_POLL_MAX_SECONDS)
+            // null=timeout(대화 성공·리포트 백그라운드 진행중), true=OK, false=LLM hard-fail
+            Boolean reportReady = pollForReport(sessionId);
 
             // 9. 시뮬레이션 완료
+            // timeout은 COMPLETED — 대화 자체는 성공했고 리포트는 비동기로 계속 생성됨
             simulation = simRepo.findById(simulationId).orElseThrow();
-            simulation.setStatus(reportReady ? MarketingSimulation.Status.COMPLETED : MarketingSimulation.Status.FAILED);
-            if (!reportReady) simulation.setErrorMessage("report-generation-timeout");
+            boolean hardFail = Boolean.FALSE.equals(reportReady);
+            simulation.setStatus(hardFail ? MarketingSimulation.Status.FAILED : MarketingSimulation.Status.COMPLETED);
+            if (hardFail) simulation.setErrorMessage("report-generation-failed");
             simulation.setActualTurnCount(actualTurns);
             simulation.setLlmCostUsd(totalCost);
             simulation.setFinishedAt(Instant.now());
@@ -224,13 +227,17 @@ public class SimulationOrchestrator {
         return virtualUserGenerator.generateLine(story, personaJson, recentLog, turn);
     }
 
-    private boolean pollForReport(String sessionId) {
+    /**
+     * 리포트 완료 폴링.
+     * @return true=OK, false=LLM hard-fail, null=timeout(대화 성공·리포트 진행 중)
+     */
+    private Boolean pollForReport(String sessionId) {
         for (int i = 0; i < REPORT_POLL_MAX_SECONDS; i++) {
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return false;
+                return null;
             }
             try {
                 java.util.Optional<Report> report = reportRepository.findBySessionId(sessionId);
@@ -238,7 +245,7 @@ public class SimulationOrchestrator {
                     ReportStatus status = report.get().getStatus();
                     if (status == ReportStatus.OK) return true;
                     if (status == ReportStatus.FAILED) {
-                        log.warn("Report generation failed for session {}", sessionId);
+                        log.warn("Report generation hard-failed for session {}", sessionId);
                         return false;
                     }
                 }
@@ -246,8 +253,9 @@ public class SimulationOrchestrator {
                 log.warn("Error polling report for session {}: {}", sessionId, e.getMessage());
             }
         }
-        log.warn("Report poll timeout after {}s for session {}", REPORT_POLL_MAX_SECONDS, sessionId);
-        return false;
+        log.info("Report poll timeout after {}s for session {} — simulation marked COMPLETED, report still generating",
+                REPORT_POLL_MAX_SECONDS, sessionId);
+        return null;
     }
 
     private void checkCostGuards() {
