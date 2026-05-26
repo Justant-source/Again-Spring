@@ -107,6 +107,13 @@ public class ReportController {
             var session = sessionRepository.findById(sessionId)
                     .orElse(null);
             if (session != null && userId != null) {
+                boolean isAdmin = userDetails.getAuthorities().stream()
+                        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+                if (isAdmin && Boolean.TRUE.equals(session.getTestRun())) {
+                    return reportRepository.findBySessionId(sessionId)
+                            .map(report -> ResponseEntity.ok(reportMapper.toResponse(report)))
+                            .orElseGet(() -> ResponseEntity.notFound().build());
+                }
                 boolean isParticipant = userId.equals(session.getCreatedByUserId())
                         || userId.equals(session.getInviteeUserId());
                 if (!isParticipant) {

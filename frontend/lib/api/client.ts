@@ -25,9 +25,6 @@ api.interceptors.response.use(
     if (status === 401) {
       if (typeof window !== 'undefined') localStorage.removeItem('again-spring-token');
       useUiStore.getState().setAuthError('unauthorized');
-    } else if (status === 403) {
-      if (typeof window !== 'undefined') localStorage.removeItem('again-spring-token');
-      useUiStore.getState().setAuthError('forbidden');
     } else if (status === 402 && code === 'GUEST_LIMIT_REACHED') {
       const match = typeof window !== 'undefined'
         ? window.location.pathname.match(/\/session\/chat\/([^/]+)/)
