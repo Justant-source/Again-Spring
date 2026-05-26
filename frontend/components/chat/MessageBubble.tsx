@@ -1,5 +1,15 @@
 'use client';
 
+function renderBold(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*\n]+\*\*)/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={i} style={{ fontWeight: 700 }}>{part.slice(2, -2)}</strong>
+      : part
+  );
+}
+
 interface Message {
   id: number;
   sender: 'USER_A' | 'USER_B' | 'MEDIATOR_TO_A' | 'MEDIATOR_TO_B';
@@ -50,7 +60,7 @@ export function MessageBubble({ message, isMine }: Props) {
           wordBreak: 'break-word',
         }}
       >
-        {message.content}
+        {renderBold(message.content)}
         {isStreaming && (
           <span className="streaming-cursor" aria-hidden="true">▍</span>
         )}
