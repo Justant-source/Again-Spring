@@ -143,6 +143,7 @@ export default function SignupPage() {
         privacyAgreed,
         disclaimerAgreed,
         marketingAgreed,
+        migrateFromGuestId: guestUser?.isGuest ? guestUser.id : undefined,
       });
       const { user, token } = response.data;
       if (token?.accessToken) {
