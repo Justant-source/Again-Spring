@@ -6,6 +6,7 @@ const { buildChatHtml } = require('./templates/chat');
 const renderQuoteRouter = require('./routes/render-quote');
 const renderCardNewsRouter = require('./routes/render-card-news');
 const renderReportSummaryRouter = require('./routes/render-report-summary');
+const renderMetaphorCardRouter = require('./routes/render-metaphor-card');
 
 const app = express();
 app.use(express.json({ limit: '20mb' }));
@@ -31,6 +32,7 @@ app.get('/health', (req, res) => {
 app.use('/render-quote', renderQuoteRouter);
 app.use('/render-card-news', renderCardNewsRouter);
 app.use('/render-report-summary', renderReportSummaryRouter);
+app.use('/render-metaphor-card', renderMetaphorCardRouter);
 
 // Generic HTML → PNG renderer (used for Instagram image cards)
 app.post('/render', async (req, res) => {

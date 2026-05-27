@@ -61,6 +61,19 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
 
         List<RenderedImage> results = new ArrayList<>();
 
+        // ── 최상단: METAPHOR_COVER (hook card PNG) ────────────────────
+        String svgFilename = metaphorSelector.selectFilename(sim, report);
+        String hookText    = metaphorSelector.extractHookText(output, MarketingContent.Platform.NAVER_BLOG);
+        int totalSlots     = imageSlots != null ? imageSlots.size() + 1 : 1;
+        byte[] coverPng    = renderClient.renderMetaphorCard(svgFilename, hookText, contentId, 1, totalSlots);
+        if (coverPng != null && coverPng.length > 0) {
+            String coverFilename = "metaphor_cover_" + contentId + ".png";
+            Files.write(dir.resolve(coverFilename), coverPng);
+            results.add(new RenderedImage(coverFilename, "METAPHOR_COVER", "<!-- IMG:metaphor -->",
+                    hookText, 1));
+            log.info("Naver metaphor cover saved: {}/{}", imageDir, coverFilename);
+        }
+
         if (imageSlots == null || imageSlots.isEmpty()) {
             log.warn("NaverImageStrategy: no imageSlots in payload for contentId={}", contentId);
             return results;
@@ -111,14 +124,10 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
                 default -> filename;
             };
 
-            results.add(new RenderedImage(filename, roleKey, slotMarker, alt, i + 1));
+            // order starts at 2 because metaphor cover is at order 1
+            results.add(new RenderedImage(filename, roleKey, slotMarker, alt, i + 2));
             log.info("Naver image saved: {}/{}", imageDir, filename);
         }
-
-        // Metaphor SVG appended after all rendered images (static asset, no PNG write)
-        String svgFilename = metaphorSelector.selectFilename(sim, report);
-        results.add(new RenderedImage(svgFilename, "METAPHOR", "<!-- IMG:metaphor -->",
-                metaphorSelector.labelFor(svgFilename), results.size() + 1));
 
         return results;
     }

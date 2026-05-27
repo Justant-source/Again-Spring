@@ -19,6 +19,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * Instagram card-news composition:
+ *   slide 1  — METAPHOR_COVER (1080×1080 PNG: metaphor SVG centered + hook text)
+ *   slide 2  — COVER from LLM output (커뮤니티 글 특징 요약)
+ *   slides 3+ — SCENE / FEELING / NVC / CTA / BONUS from LLM output
+ */
+
+/**
  * Image composition strategy for Instagram.
  * Renders 6-7 card-news slides from the slides[] JSON array in structuredPayload.
  */
@@ -55,44 +62,53 @@ public class InstagramImageStrategy implements ImageCompositionStrategy {
             return List.of();
         }
 
-        if (slides.size() < 6 || slides.size() > 7) {
-            log.warn("InstagramImageStrategy: expected 6-7 slides, got {} for contentId={}", slides.size(), contentId);
+        Path dir = Paths.get(imageDir);
+        Files.createDirectories(dir);
+
+        List<RenderedImage> results = new ArrayList<>();
+        // total = metaphor cover (1) + llm slides
+        int total = slides.size() + 1;
+
+        // ── slide 1: METAPHOR_COVER ──────────────────────────────────
+        String svgFilename = metaphorSelector.selectFilename(sim, report);
+        String hookText    = metaphorSelector.extractHookText(output, MarketingContent.Platform.INSTAGRAM);
+        byte[] coverPng    = renderClient.renderMetaphorCard(svgFilename, hookText, contentId, 1, total);
+        if (coverPng != null && coverPng.length > 0) {
+            String coverFilename = "metaphor_cover_" + contentId + ".png";
+            Files.write(dir.resolve(coverFilename), coverPng);
+            results.add(new RenderedImage(coverFilename, "METAPHOR_COVER", "SLIDE_1",
+                    hookText, 1));
+            log.info("Metaphor cover saved: {}/{}", imageDir, coverFilename);
+        } else {
+            log.warn("InstagramImageStrategy: metaphor cover render failed for contentId={}", contentId);
+            total--; // adjust total if metaphor card failed
         }
 
+        // ── slides 2+: LLM card-news (story summary first, then NVC/CTA/…) ──
         List<ImageRenderClient.CardNewsSlide> rendered =
                 renderClient.renderCardNews(slides, "warm", contentId);
 
         if (rendered.isEmpty()) {
             log.warn("InstagramImageStrategy: renderCardNews returned empty for contentId={}", contentId);
-            return List.of();
+            return results; // return whatever we have (at least the metaphor cover)
         }
 
-        Path dir = Paths.get(imageDir);
-        Files.createDirectories(dir);
-
-        List<RenderedImage> results = new ArrayList<>();
         for (int i = 0; i < rendered.size(); i++) {
             ImageRenderClient.CardNewsSlide s = rendered.get(i);
             Files.write(dir.resolve(s.filename()), s.png());
 
             String role = "CARD_SLIDE";
-            String alt = "카드뉴스 슬라이드 " + (i + 1);
+            String alt  = "카드뉴스 슬라이드 " + (i + 2);
             if (i < slides.size()) {
                 Object r = slides.get(i).get("role");
                 if (r != null) role = r.toString();
                 Object t = slides.get(i).get("title");
                 if (t != null) alt = t.toString();
             }
-            results.add(new RenderedImage(s.filename(), role, "SLIDE_" + (i + 1), alt, i + 1));
+            results.add(new RenderedImage(s.filename(), role, "SLIDE_" + (i + 2), alt, i + 2));
         }
 
-        log.info("Instagram card-news saved: {} slides for contentId={}", results.size(), contentId);
-
-        // Metaphor SVG appended as the last entry (static asset, not a rendered PNG)
-        String svgFilename = metaphorSelector.selectFilename(sim, report);
-        results.add(new RenderedImage(svgFilename, "METAPHOR", "METAPHOR",
-                metaphorSelector.labelFor(svgFilename), results.size() + 1));
-
+        log.info("Instagram slides saved: total={} for contentId={}", results.size(), contentId);
         return results;
     }
 }

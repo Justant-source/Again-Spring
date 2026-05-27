@@ -125,6 +125,30 @@ public class ImageRenderClient {
     }
 
     /**
+     * Renders a 1080×1080 metaphor hook card: SVG illustration centered, hook text below.
+     * Returns null on failure (non-fatal).
+     */
+    public byte[] renderMetaphorCard(String svgFilename, String hookText, long contentId,
+                                     int slideNumber, int totalSlides) {
+        Map<String, Object> body = Map.of(
+                "svgFilename", svgFilename != null ? svgFilename : "09-overflowing-cup.svg",
+                "hookText",    hookText    != null ? hookText    : "이런 갈등, 겪어보셨나요?",
+                "contentId",   contentId,
+                "slideNumber", slideNumber,
+                "totalSlides", totalSlides
+        );
+        try {
+            return restClient.post()
+                    .uri("/render-metaphor-card")
+                    .body(body)
+                    .retrieve()
+                    .body(byte[].class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Renders a report summary diagram (NeedsMap / ContributionRatio).
      * mode: "needs" | "ratio" | "combined". Returns null on failure.
      */

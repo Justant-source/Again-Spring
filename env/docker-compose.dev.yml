@@ -66,6 +66,7 @@ services:
     container_name: againspring-marketing-renderer-dev
     environment:
       PORT: 9000
+      FRONTEND_BASE_URL: http://againspring-frontend-dev:3000
     restart: unless-stopped
     deploy:
       resources:

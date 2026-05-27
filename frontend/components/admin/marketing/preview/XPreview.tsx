@@ -10,9 +10,9 @@ interface Props {
 
 export function XPreview({ content }: Props) {
   const images = parseImagePaths(content.imagePaths);
+  const metaphorCover = images.find((img) => img.role === 'METAPHOR_COVER');
   const quoteCard = images.find((img) => img.role === 'QUOTE_CARD');
-  const chatImg = images.find((img) => img.role === 'CHAT');
-  const metaphor = images.find((img) => img.role === 'METAPHOR');
+  const chatImg = images.find((img) => img.role === 'CHAT_PREVIEW');
   const tags = normalizeHashtags(content.hashtags);
 
   const rawTweets = (content.bodyText || '').split(/\n{2,}/).map((t) => t.trim()).filter(Boolean);
@@ -32,7 +32,8 @@ export function XPreview({ content }: Props) {
       {tweets.map((tweet, idx) => {
         const isFirst = idx === 0;
         const isLast = idx === tweets.length - 1;
-        const showQuote = isFirst && quoteCard;
+        const showMetaphorCover = isFirst && metaphorCover;
+        const showQuote = isFirst && !metaphorCover && quoteCard;
         const showChat = isLast && chatImg;
         const showTags = isLast && tags.length > 0;
 
@@ -112,7 +113,26 @@ export function XPreview({ content }: Props) {
                   </p>
                 )}
 
-                {/* quote card image */}
+                {/* metaphor hook card — first tweet's main visual */}
+                {showMetaphorCover && (
+                  <div
+                    style={{
+                      marginBottom: 10,
+                      borderRadius: 16,
+                      overflow: 'hidden',
+                      border: '1px solid #CFD9DE',
+                      maxWidth: 400,
+                    }}
+                  >
+                    <AuthImage
+                      src={imageUrl(metaphorCover.filename)}
+                      alt={metaphorCover.alt || '관계 메타포'}
+                      style={{ display: 'block', width: '100%', aspectRatio: '1/1', objectFit: 'cover' }}
+                    />
+                  </div>
+                )}
+
+                {/* quote card (shown only when no metaphor cover) */}
                 {showQuote && (
                   <div
                     style={{
@@ -164,29 +184,6 @@ export function XPreview({ content }: Props) {
         );
       })}
 
-      {/* Metaphor illustration */}
-      {metaphor && (
-        <div
-          style={{
-            padding: '12px 16px',
-            borderTop: '1px solid #EFF3F4',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            background: '#FAFAFA',
-          }}
-        >
-          <img
-            src={imageUrl(metaphor.filename, 'METAPHOR')}
-            alt={metaphor.alt}
-            style={{ width: 72, height: 72, objectFit: 'contain', flexShrink: 0 }}
-          />
-          <div>
-            <div style={{ fontSize: 11, color: '#536471', marginBottom: 2 }}>관계 메타포</div>
-            <div style={{ fontSize: 13, color: '#0F1419' }}>{metaphor.alt}</div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

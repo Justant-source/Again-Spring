@@ -1,8 +1,10 @@
 package com.againspring.service.marketing.image;
 
 import com.againspring.domain.Report;
+import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.domain.marketing.MarketingSimulation;
 import com.againspring.repository.marketing.MarketingSourceStoryRepository;
+import com.againspring.service.marketing.content.GenerationOutput;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -89,6 +91,54 @@ public class MarketingMetaphorSelector {
             .replace(".svg", "")
             .replace("-", " ");
         return "메타포: " + name;
+    }
+
+    /**
+     * Extracts a short hook text from the LLM output to display on the metaphor card.
+     */
+    @SuppressWarnings("unchecked")
+    public String extractHookText(GenerationOutput output, MarketingContent.Platform platform) {
+        if (output == null || output.structuredPayload() == null) {
+            return "이런 갈등, 겪어보셨나요?";
+        }
+        Map<String, Object> payload = output.structuredPayload();
+
+        try {
+            switch (platform) {
+                case INSTAGRAM -> {
+                    List<Map<String, Object>> slides = (List<Map<String, Object>>) payload.get("slides");
+                    if (slides != null && !slides.isEmpty()) {
+                        Object title = slides.get(0).get("title");
+                        if (title != null && !title.toString().isBlank()) return clamp(title.toString(), 40);
+                    }
+                }
+                case X -> {
+                    Object tweets = payload.get("tweets");
+                    if (tweets instanceof List<?> list && !list.isEmpty()) {
+                        String first = list.get(0).toString().trim();
+                        int dot = first.indexOf('.');
+                        return clamp(dot > 8 && dot < 50 ? first.substring(0, dot + 1) : first, 50);
+                    }
+                }
+                case NAVER_BLOG -> {
+                    String md = (String) payload.get("markdown");
+                    if (md != null) {
+                        for (String line : md.split("\n")) {
+                            String trimmed = line.trim();
+                            if (trimmed.startsWith("# ")) return clamp(trimmed.substring(2).trim(), 40);
+                        }
+                    }
+                }
+                default -> { /* fallthrough */ }
+            }
+        } catch (Exception ignored) { /* safe fallback */ }
+
+        return "이런 갈등, 겪어보셨나요?";
+    }
+
+    private String clamp(String s, int maxLen) {
+        if (s == null) return "";
+        return s.length() <= maxLen ? s : s.substring(0, maxLen - 1) + "…";
     }
 
     private String resolveRelationType(MarketingSimulation sim) {
