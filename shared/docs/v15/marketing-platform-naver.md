@@ -16,15 +16,18 @@
 
 ---
 
-## 2. 콘텐츠 구성 (5-Box)
+## 2. 콘텐츠 구성 (6-Box)
 
-| Box | 제목 예시 | 내용 | 이미지 슬롯 |
+| Box | 이미지 슬롯 | 생성 주체 | 내용 |
 |---|---|---|---|
-| 1. 문제 제시 | "왜 이렇게 말이 안 통할까요?" | 공감 가는 갈등 상황 묘사 + SEO 키워드 삽입 | — |
-| 2. 감정 단어 | "그 순간 어떤 감정이었을까요" | 감정 3~5개 + NVC 관찰 1줄 | — |
-| 3. 사용 장면 | "다시봄 AI와 대화하다" | 채팅 장면 묘사 + 마커 `<!-- IMG:chat-preview -->` | `/render-chat` |
-| 4. 리포트 시각화 | "두 사람의 이야기를 정리하면" | NeedsMap/기여도 설명 + 마커 `<!-- IMG:report-needs-map -->` | `/render-report-summary` |
-| 5. CTA | "지금 시작하는 한 마디" | 인용 카드 + 마커 `<!-- IMG:quote-card -->` + 다시봄 링크 | `/render-quote` |
+| **0. 메타포 훅 카드** | `<!-- IMG:metaphor -->` (자동) | `NaverImageStrategy` | 관계 메타포 SVG 중앙 + 마크다운 제목(훅 텍스트) — **포스트 최상단** |
+| 1. 문제 제시 | — | LLM | 공감 가는 갈등 상황 묘사 + SEO 키워드 삽입 |
+| 2. 감정 단어 | — | LLM | 감정 3~5개 + NVC 관찰 1줄 |
+| 3. 사용 장면 | `<!-- IMG:chat-preview -->` | LLM + renderer | 채팅 장면 묘사 + `/render-chat` |
+| 4. 리포트 시각화 | `<!-- IMG:report-needs-map -->` | LLM + renderer | NeedsMap/기여도 + `/render-report-summary` |
+| 5. CTA | `<!-- IMG:quote-card -->` | LLM + renderer | 인용 카드 + `/render-quote` + 다시봄 링크 |
+
+> **Box 0(METAPHOR_COVER)은 LLM이 생성하지 않는다.** `NaverImageStrategy`가 자동 삽입, `slot="<!-- IMG:metaphor -->"`, `order=1`. 마크다운 body에 해당 슬롯 마커가 없는 경우 프리뷰 컴포넌트(`NaverBlogPreview`)가 포스트 상단에 폴백 표시한다.
 
 ---
 

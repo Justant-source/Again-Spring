@@ -28,12 +28,23 @@
 트윗 5 (CTA) — 다시봄 사용 안내 + 해시태그 + (옵션) 채팅 스크린샷 PNG
 ```
 
+### 스레드 흐름 (이미지 포함)
+
+```
+트윗 1 (훅) — 메타포 훅 카드 PNG 첨부 (METAPHOR_COVER, 1080×1080)
+트윗 2 (공감) — 갈등 상황 메타포 + 감정 인정 + 인용 카드 PNG (QUOTE_CARD)
+트윗 3 (통찰) — NVC 관찰 또는 욕구 한 줄 요약
+트윗 4 (희망) — 화해 가능성 제시 (optional)
+트윗 5 (CTA) — 다시봄 사용 안내 + 해시태그 + 채팅 스크린샷 PNG (optional)
+```
+
 ### 이미지 첨부 규칙
 
-| 슬롯 | 위치 | 렌더러 엔드포인트 | 입력 |
-|---|---|---|---|
-| `QUOTE_CARD` | 트윗 1 | `POST /render-quote` | `line1`=메타포, `line2`=감정 한 줄, `attribution`="다시봄" |
-| `CHAT_PREVIEW` | 트윗 5 (optional) | `POST /render-chat` | 키 모먼트 3개 메시지 (`KeyMomentSelector`) |
+| 슬롯 | Role | 위치 | 렌더러 엔드포인트 | 입력 |
+|---|---|---|---|---|
+| `TWEET_1` | `METAPHOR_COVER` | 트윗 1 (훅 이미지) | `POST /render-metaphor-card` | `svgFilename`, `hookText`=첫 트윗 첫 문장 |
+| `TWEET_2` | `QUOTE_CARD` | 트윗 2 | `POST /render-quote` | `line1`=메타포, `line2`=감정 한 줄 |
+| `TWEET_5` | `CHAT_PREVIEW` | 트윗 5 (optional) | `POST /render-chat` | 키 모먼트 3개 메시지 (`KeyMomentSelector`) |
 
 ---
 
@@ -67,15 +78,17 @@ LLM이 code fence 안에 JSON 반환 시 `extractFirstJsonBlock()` 유틸로 추
 ## 4. 이미지 파일 명명 규칙
 
 ```
-quote_{contentId}.png        → 인용 카드
-chat_{contentId}.png         → 채팅 스크린샷 (optional)
+metaphor_cover_{contentId}.png  → 메타포 훅 카드 (1080×1080, 항상 order=1)
+quote_{contentId}.png           → 인용 카드 (order=2)
+chat_{contentId}.png            → 채팅 스크린샷 (optional, order=3)
 ```
 
 image_paths JSON 메타:
 ```json
 [
-  {"filename":"quote_5.png", "role":"QUOTE_CARD", "slot":"TWEET_1", "alt":"메타포 인용 카드", "order":1},
-  {"filename":"chat_5.png",  "role":"CHAT_PREVIEW","slot":"TWEET_5", "alt":"갈등 대화 미리보기", "order":2}
+  {"filename":"metaphor_cover_5.png","role":"METAPHOR_COVER","slot":"TWEET_1","alt":"훅 텍스트","order":1},
+  {"filename":"quote_5.png",         "role":"QUOTE_CARD",    "slot":"TWEET_2","alt":"메타포 인용 카드","order":2},
+  {"filename":"chat_5.png",          "role":"CHAT_PREVIEW",  "slot":"TWEET_5","alt":"갈등 대화 미리보기","order":3}
 ]
 ```
 

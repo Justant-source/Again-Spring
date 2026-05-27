@@ -20,15 +20,31 @@
 
 ### Role 매핑표
 
-| 순서 | Role | 제목 예시 | 본문 | 시각 힌트 |
+| 순서 | Role | 생성 주체 | 제목/내용 | 렌더러 엔드포인트 |
 |---|---|---|---|---|
-| 1 | `COVER` | 메타포 한 줄 (30자) | 없음 또는 짧은 공감 문장 | 그라데이션 배경 + 큰 타이포 |
-| 2 | `SCENE` | 갈등 장면 인용 | 실제 대화에서 추출한 말 한마디 (따옴표) | 채팅 버블 형태 |
-| 3 | `FEELING` | 그 때의 감정 | 감정 단어 3개 + 설명 1문장 | 색상 팔레트 + 감정 단어 크게 |
-| 4 | `NVC` | 관찰과 욕구 | NVC 관찰 1줄 + 욕구 1줄 | 두 줄 카드, 구분선 |
-| 5 | `RATIO` | 화해 기여도 | 두 사람의 기여 설명 (수치 노출 금지) | 원형 또는 양방향 화살표 |
-| 6 | `CTA` | 다시봄으로 | "지금 대화를 시작해보세요" | 다시봄 로고 + QR 또는 URL |
-| 7 (optional) | `BONUS` | 추가 인사이트 | 리포트에서 추출한 핵심 문장 | 단색 배경 + 인용 형식 |
+| **1** | `METAPHOR_COVER` | `InstagramImageStrategy` (자동) | 관계 메타포 SVG 중앙 + LLM COVER 제목(훅 텍스트) | `POST /render-metaphor-card` |
+| **2** | `COVER` | LLM | 메타포 한 줄 (30자) + 짧은 공감 문장 (커뮤니티 글 특징 요약) | `POST /render-card-news` |
+| 3 | `SCENE` | LLM | 갈등 장면 인용 — 실제 대화 말 한마디 (따옴표) | `POST /render-card-news` |
+| 4 | `FEELING` | LLM | 감정 단어 3개 + 설명 1문장 | `POST /render-card-news` |
+| 5 | `NVC` | LLM | NVC 관찰 1줄 + 욕구 1줄 | `POST /render-card-news` |
+| 6 | `CTA` | LLM | "지금 대화를 시작해보세요" + 다시봄 로고 | `POST /render-card-news` |
+| 7 (optional) | `BONUS` | LLM | 리포트에서 추출한 핵심 문장 | `POST /render-card-news` |
+
+> **슬라이드 1(METAPHOR_COVER)은 LLM이 생성하지 않는다.** `InstagramImageStrategy`가 `MarketingMetaphorSelector`로 메타포 선택 후 `/render-metaphor-card`를 호출해 자동 삽입한다.
+
+### METAPHOR_COVER 레이아웃 (1080×1080 PNG)
+
+```
+┌──────────────────────────────────────────┐
+│  다시봄                        ●●●○○○○  │  ← 상단 바 (브랜드 + 슬라이드 인디케이터)
+│                                          │
+│          [메타포 SVG 일러스트]            │  ← 중앙 55% 영역, SVG 최대 560px
+│                                          │
+│            관계 이야기                   │  ← 라벨 (18px, 서브텍스트)
+│      "커뮤니티 훅 텍스트 문장"            │  ← LLM COVER 제목 (44px, 굵게)
+│            ───────                       │  ← 그라데이션 구분선
+└──────────────────────────────────────────┘
+```
 
 ---
 
@@ -59,18 +75,26 @@
 
 ```
 InstagramImageStrategy.compose()
-  ↓
-ImageRenderClient.renderCardNews(slides, theme="warm", contentId)
-  POST /render-card-news
-  body: { slides: [{role, title, body, visualHint}], theme, contentId }
-  response: { slides: [{filename:"card_{contentId}_{idx:02d}.png", base64:"..."}] }
-  ↓
-각 PNG를 /tmp/marketing-images/ 저장
-  ↓
-image_paths JSON:
+  │
+  ├─ MarketingMetaphorSelector.selectFilename(sim, report)   → "14-melting-candle.svg" 등
+  ├─ MarketingMetaphorSelector.extractHookText(output, INSTAGRAM) → LLM slides[0].title
+  ├─ ImageRenderClient.renderMetaphorCard(svgFilename, hookText, contentId, 1, total)
+  │    POST /render-metaphor-card
+  │    body: { svgFilename, hookText, contentId, slideNumber:1, totalSlides:N+1 }
+  │    ← 1080×1080 PNG bytes
+  │    → 저장: metaphor_cover_{contentId}.png  (role=METAPHOR_COVER, order=1)
+  │
+  └─ ImageRenderClient.renderCardNews(slides, theme="warm", contentId)
+       POST /render-card-news
+       body: { slides: [{role, title, body, visualHint}], theme, contentId }
+       response: { slides: [{filename:"card_{contentId}_{idx:02d}.png", base64:"..."}] }
+       → 저장: card_{contentId}_01.png … (role=COVER/SCENE/…, order=2+)
+
+image_paths JSON (최종):
 [
-  {"filename":"card_5_01.png","role":"COVER","slot":"SLIDE_1","alt":"커버","order":1},
-  {"filename":"card_5_02.png","role":"SCENE","slot":"SLIDE_2","alt":"갈등 장면","order":2},
+  {"filename":"metaphor_cover_35.png","role":"METAPHOR_COVER","slot":"SLIDE_1","alt":"훅 텍스트","order":1},
+  {"filename":"card_35_01.png",       "role":"COVER",         "slot":"SLIDE_2","alt":"커버","order":2},
+  {"filename":"card_35_02.png",       "role":"SCENE",         "slot":"SLIDE_3","alt":"갈등 장면","order":3},
   ...
 ]
 ```
