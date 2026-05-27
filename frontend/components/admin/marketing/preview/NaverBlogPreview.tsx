@@ -11,9 +11,13 @@ interface Props {
 }
 
 const SLOT_PATTERN = /(<!-- IMG:[^>]+-->)/g;
+const METAPHOR_SLOT = '<!-- IMG:metaphor -->';
 
 export function NaverBlogPreview({ content }: Props) {
   const images = parseImagePaths(content.imagePaths);
+  const metaphor = images.find((img) => img.role === 'METAPHOR');
+  // show metaphor at bottom only if its slot marker doesn't appear in the markdown
+  const metaphorInBody = metaphor ? (content.bodyText || '').includes(METAPHOR_SLOT) : false;
   const tags = normalizeHashtags(content.hashtags);
   const markdown = content.bodyText || '';
 
@@ -90,21 +94,36 @@ export function NaverBlogPreview({ content }: Props) {
           if (isMarker) {
             const matched = images.find((img) => img.slot === part.trim());
             if (matched) {
+              const isMetaphor = matched.role === 'METAPHOR';
+              const src = imageUrl(matched.filename, matched.role);
               return (
                 <div
                   key={idx}
                   style={{ margin: '20px 0', textAlign: 'center' }}
                 >
-                  <AuthImage
-                    src={imageUrl(matched.filename)}
-                    alt={matched.alt || matched.role}
-                    style={{
-                      display: 'inline-block',
-                      maxWidth: '100%',
-                      borderRadius: 8,
-                      border: '1px solid #EEEEEE',
-                    }}
-                  />
+                  {isMetaphor ? (
+                    <img
+                      src={src}
+                      alt={matched.alt || matched.role}
+                      style={{
+                        display: 'inline-block',
+                        maxWidth: 240,
+                        borderRadius: 8,
+                        border: '1px solid #EEEEEE',
+                      }}
+                    />
+                  ) : (
+                    <AuthImage
+                      src={src}
+                      alt={matched.alt || matched.role}
+                      style={{
+                        display: 'inline-block',
+                        maxWidth: '100%',
+                        borderRadius: 8,
+                        border: '1px solid #EEEEEE',
+                      }}
+                    />
+                  )}
                   <div style={{ fontSize: 11, color: '#AAA', marginTop: 6 }}>
                     [{matched.role}] {matched.alt}
                   </div>
@@ -187,6 +206,32 @@ export function NaverBlogPreview({ content }: Props) {
             </div>
           );
         })}
+
+        {/* Metaphor fallback — shown at bottom when not embedded via slot in body */}
+        {metaphor && !metaphorInBody && (
+          <div
+            style={{
+              marginTop: 24,
+              padding: 16,
+              background: '#FFF8F0',
+              borderRadius: 8,
+              border: '1px solid #F0E8DF',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+            }}
+          >
+            <img
+              src={imageUrl(metaphor.filename, 'METAPHOR')}
+              alt={metaphor.alt}
+              style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0 }}
+            />
+            <div>
+              <div style={{ fontSize: 11, color: '#A08670', marginBottom: 4 }}>관계 메타포</div>
+              <div style={{ fontSize: 14, color: '#5C4030', fontWeight: 500 }}>{metaphor.alt}</div>
+            </div>
+          </div>
+        )}
 
         {/* hashtags */}
         {tags.length > 0 && (

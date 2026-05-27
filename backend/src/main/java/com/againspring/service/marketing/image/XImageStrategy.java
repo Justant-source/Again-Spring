@@ -33,6 +33,7 @@ public class XImageStrategy implements ImageCompositionStrategy {
     private final ImageRenderClient renderClient;
     private final MessageRepository messageRepository;
     private final KeyMomentSelector keyMomentSelector;
+    private final MarketingMetaphorSelector metaphorSelector;
 
     @Override
     public MarketingContent.Platform supports() {
@@ -100,6 +101,11 @@ public class XImageStrategy implements ImageCompositionStrategy {
                 }
             }
         }
+
+        // 3. Metaphor SVG (served as static asset — not a rendered PNG)
+        String svgFilename = metaphorSelector.selectFilename(sim, report);
+        results.add(new RenderedImage(svgFilename, "METAPHOR", "METAPHOR",
+                metaphorSelector.labelFor(svgFilename), order));
 
         return results;
     }

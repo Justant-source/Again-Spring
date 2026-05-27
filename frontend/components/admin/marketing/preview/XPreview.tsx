@@ -12,6 +12,7 @@ export function XPreview({ content }: Props) {
   const images = parseImagePaths(content.imagePaths);
   const quoteCard = images.find((img) => img.role === 'QUOTE_CARD');
   const chatImg = images.find((img) => img.role === 'CHAT');
+  const metaphor = images.find((img) => img.role === 'METAPHOR');
   const tags = normalizeHashtags(content.hashtags);
 
   const rawTweets = (content.bodyText || '').split(/\n{2,}/).map((t) => t.trim()).filter(Boolean);
@@ -162,6 +163,30 @@ export function XPreview({ content }: Props) {
           </div>
         );
       })}
+
+      {/* Metaphor illustration */}
+      {metaphor && (
+        <div
+          style={{
+            padding: '12px 16px',
+            borderTop: '1px solid #EFF3F4',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            background: '#FAFAFA',
+          }}
+        >
+          <img
+            src={imageUrl(metaphor.filename, 'METAPHOR')}
+            alt={metaphor.alt}
+            style={{ width: 72, height: 72, objectFit: 'contain', flexShrink: 0 }}
+          />
+          <div>
+            <div style={{ fontSize: 11, color: '#536471', marginBottom: 2 }}>관계 메타포</div>
+            <div style={{ fontSize: 13, color: '#0F1419' }}>{metaphor.alt}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

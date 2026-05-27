@@ -29,6 +29,7 @@ import java.util.Map;
 public class InstagramImageStrategy implements ImageCompositionStrategy {
 
     private final ImageRenderClient renderClient;
+    private final MarketingMetaphorSelector metaphorSelector;
 
     @Override
     public MarketingContent.Platform supports() {
@@ -86,6 +87,12 @@ public class InstagramImageStrategy implements ImageCompositionStrategy {
         }
 
         log.info("Instagram card-news saved: {} slides for contentId={}", results.size(), contentId);
+
+        // Metaphor SVG appended as the last entry (static asset, not a rendered PNG)
+        String svgFilename = metaphorSelector.selectFilename(sim, report);
+        results.add(new RenderedImage(svgFilename, "METAPHOR", "METAPHOR",
+                metaphorSelector.labelFor(svgFilename), results.size() + 1));
+
         return results;
     }
 }

@@ -23,7 +23,8 @@ export function parseImagePaths(raw?: string): ImageMeta[] {
   }
 }
 
-export function imageUrl(filename: string): string {
+export function imageUrl(filename: string, role?: string): string {
+  if (role === 'METAPHOR') return `/illustrations/metaphors/${filename}`;
   return `/api/admin/marketing/images/${filename}`;
 }
 

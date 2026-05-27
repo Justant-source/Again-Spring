@@ -35,6 +35,7 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
     private final ImageRenderClient renderClient;
     private final MessageRepository messageRepository;
     private final KeyMomentSelector keyMomentSelector;
+    private final MarketingMetaphorSelector metaphorSelector;
 
     @Override
     public MarketingContent.Platform supports() {
@@ -113,6 +114,11 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
             results.add(new RenderedImage(filename, roleKey, slotMarker, alt, i + 1));
             log.info("Naver image saved: {}/{}", imageDir, filename);
         }
+
+        // Metaphor SVG appended after all rendered images (static asset, no PNG write)
+        String svgFilename = metaphorSelector.selectFilename(sim, report);
+        results.add(new RenderedImage(svgFilename, "METAPHOR", "<!-- IMG:metaphor -->",
+                metaphorSelector.labelFor(svgFilename), results.size() + 1));
 
         return results;
     }

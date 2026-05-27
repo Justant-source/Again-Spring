@@ -16,6 +16,7 @@ export function InstagramPreview({ content }: Props) {
 
   const images = parseImagePaths(content.imagePaths);
   const slides = images.filter((img) => CARD_ROLES.has(img.role));
+  const metaphor = images.find((img) => img.role === 'METAPHOR');
   const tags = normalizeHashtags(content.hashtags);
   const caption = content.bodyText || '';
 
@@ -241,6 +242,32 @@ export function InstagramPreview({ content }: Props) {
           <p style={{ margin: 0, fontSize: 13, color: '#00376B', lineHeight: 1.6 }}>
             {tags.join(' ')}
           </p>
+        )}
+
+        {/* Metaphor illustration */}
+        {metaphor && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: '10px 12px',
+              background: '#FFF8F0',
+              borderRadius: 8,
+              border: '1px solid #F0E8DF',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <img
+              src={imageUrl(metaphor.filename, 'METAPHOR')}
+              alt={metaphor.alt}
+              style={{ width: 64, height: 64, objectFit: 'contain', flexShrink: 0 }}
+            />
+            <div>
+              <div style={{ fontSize: 10, color: '#A08670', marginBottom: 2 }}>관계 메타포</div>
+              <div style={{ fontSize: 12, color: '#5C4030', fontWeight: 500 }}>{metaphor.alt}</div>
+            </div>
+          </div>
         )}
       </div>
     </div>
