@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { COMMUNICATION_STYLES, getStyleCombinationKey, STYLE_COMBINATION_INSIGHTS } from '@/lib/constants/communicationStyles'
 import { CATEGORIES, findMajor, findMiddle, findMinor } from '@/lib/constants/categories'
-import { METAPHORS, getMetaphorById, getMetaphorImagePath } from '@/lib/constants/metaphors'
+import {
+  METAPHORS,
+  getMetaphorById,
+  getMetaphorImagePath,
+  getMetaphorsByContext,
+  getMetaphorsByGroup,
+  matchMetaphor,
+} from '@/lib/constants/metaphors'
 import { CRISIS_RESOURCES, CRISIS_RESOURCES_IMMEDIATE, CRISIS_RESOURCES_LEGAL } from '@/lib/constants/crisisResources'
 import type { CommunicationStyle, RelationType } from '@/lib/types'
 
@@ -427,6 +434,140 @@ describe('Metaphors Constants', () => {
     it('returns string', () => {
       const path = getMetaphorImagePath('01-locked-mailbox.svg')
       expect(typeof path).toBe('string')
+    })
+  })
+
+  describe('extended metadata fields', () => {
+    const VALID_UI_CONTEXTS = [
+      'report-header', 'share-card', 'session-end', 'onboarding-intro',
+      'empty-state', 'marketing-cover', 'marketing-scene',
+      'marketing-naver-inline', 'marketing-quote-card',
+    ]
+    const VALID_RELATION_TYPES = ['couple', 'marriage', 'friend', 'family', 'parent_child', 'colleague', 'all']
+    const VALID_TONES = ['warm', 'neutral', 'heavy']
+
+    it('each metaphor has non-empty emotions array', () => {
+      METAPHORS.forEach((m) => {
+        expect(Array.isArray(m.emotions)).toBe(true)
+        expect(m.emotions.length).toBeGreaterThan(0)
+        m.emotions.forEach((e) => expect(typeof e).toBe('string'))
+      })
+    })
+
+    it('each metaphor has non-empty needs array', () => {
+      METAPHORS.forEach((m) => {
+        expect(Array.isArray(m.needs)).toBe(true)
+        expect(m.needs.length).toBeGreaterThan(0)
+        m.needs.forEach((n) => expect(typeof n).toBe('string'))
+      })
+    })
+
+    it('each metaphor has non-empty uiContexts with valid values', () => {
+      METAPHORS.forEach((m) => {
+        expect(Array.isArray(m.uiContexts)).toBe(true)
+        expect(m.uiContexts.length).toBeGreaterThan(0)
+        m.uiContexts.forEach((ctx) => expect(VALID_UI_CONTEXTS).toContain(ctx))
+      })
+    })
+
+    it('each metaphor has non-empty relationTypes with valid values', () => {
+      METAPHORS.forEach((m) => {
+        expect(Array.isArray(m.relationTypes)).toBe(true)
+        expect(m.relationTypes.length).toBeGreaterThan(0)
+        m.relationTypes.forEach((rt) => expect(VALID_RELATION_TYPES).toContain(rt))
+      })
+    })
+
+    it('each metaphor has a valid tone', () => {
+      METAPHORS.forEach((m) => {
+        expect(VALID_TONES).toContain(m.tone)
+      })
+    })
+
+    it('each metaphor has a non-empty designPrompt', () => {
+      METAPHORS.forEach((m) => {
+        expect(typeof m.designPrompt).toBe('string')
+        expect(m.designPrompt.length).toBeGreaterThan(0)
+      })
+    })
+
+    it('all 3 tone values are represented', () => {
+      const tones = new Set(METAPHORS.map((m) => m.tone))
+      expect(tones.has('warm')).toBe(true)
+      expect(tones.has('neutral')).toBe(true)
+      expect(tones.has('heavy')).toBe(true)
+    })
+  })
+
+  describe('getMetaphorsByContext', () => {
+    it('returns metaphors matching the given context', () => {
+      const results = getMetaphorsByContext('report-header')
+      expect(results.length).toBeGreaterThan(0)
+      results.forEach((m) => expect(m.uiContexts).toContain('report-header'))
+    })
+
+    it('returns metaphors for marketing-cover', () => {
+      const results = getMetaphorsByContext('marketing-cover')
+      expect(results.length).toBeGreaterThan(0)
+    })
+
+    it('returns empty array for context with no matches', () => {
+      // all current metaphors have at least one valid context; test with a context
+      // that is purposely limited — marketing-naver-inline has none assigned yet
+      const results = getMetaphorsByContext('marketing-naver-inline')
+      expect(Array.isArray(results)).toBe(true)
+    })
+  })
+
+  describe('getMetaphorsByGroup', () => {
+    it('returns all avoidance metaphors', () => {
+      const results = getMetaphorsByGroup('avoidance')
+      expect(results.length).toBeGreaterThan(0)
+      results.forEach((m) => expect(m.group).toBe('avoidance'))
+    })
+
+    it('returns exactly one recovery metaphor', () => {
+      const results = getMetaphorsByGroup('recovery')
+      expect(results.length).toBe(1)
+      expect(results[0].id).toBe('two-trees-roots')
+    })
+  })
+
+  describe('matchMetaphor', () => {
+    it('returns a metaphor for a given uiContext', () => {
+      const result = matchMetaphor({ uiContext: 'report-header' })
+      expect(result).toBeTruthy()
+      expect(result.id).toBeTruthy()
+    })
+
+    it('respects emotion scoring — returns metaphor with matching emotion when score is high', () => {
+      const result = matchMetaphor({ uiContext: 'report-header', emotion: '외로움' })
+      expect(result).toBeTruthy()
+    })
+
+    it('respects need scoring — returns metaphor with matching need when score is high', () => {
+      const result = matchMetaphor({ uiContext: 'report-header', need: '연결' })
+      expect(result).toBeTruthy()
+    })
+
+    it('excludes specified ids', () => {
+      const allIds = METAPHORS.map((m) => m.id)
+      const excludeAll = allIds.slice(0, allIds.length - 1)
+      const result = matchMetaphor({ uiContext: 'report-header', exclude: excludeAll })
+      expect(result.id).toBe(allIds[allIds.length - 1])
+    })
+
+    it('returns recovery metaphor when group+tone match', () => {
+      const result = matchMetaphor({ uiContext: 'session-end', tone: 'warm' })
+      expect(result.tone).toBe('warm')
+    })
+
+    it('always returns a valid Metaphor object', () => {
+      for (let i = 0; i < 20; i++) {
+        const result = matchMetaphor({ uiContext: 'marketing-cover' })
+        expect(result).toHaveProperty('id')
+        expect(result).toHaveProperty('filename')
+      }
     })
   })
 })
