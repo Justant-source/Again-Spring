@@ -25,13 +25,13 @@ public class FacebookContentGenerator implements ContentGenerator {
     }
 
     @Override
-    public String generate(GenerationContext ctx) throws Exception {
+    public GenerationOutput generate(GenerationContext ctx) throws Exception {
         String sanitizedSummary = sanitizer.sanitize(ctx.simulationSummary(), "marketing-facebook");
         String prompt = buildPrompt(sanitizedSummary, ctx.relationType(), ctx.templateBody());
         String rawResponse = llmProvider.invoke(prompt, "claude-sonnet-4-6");
         String sanitized = copyGuard.sanitize(rawResponse);
         log.info("Generated Facebook content for relation type: {}", ctx.relationType());
-        return sanitized;
+        return GenerationOutput.textOnly(sanitized);
     }
 
     private String buildPrompt(String simulationSummary, String relationType, String templateBody) {

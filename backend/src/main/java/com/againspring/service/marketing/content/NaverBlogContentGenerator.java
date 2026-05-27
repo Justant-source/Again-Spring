@@ -31,13 +31,13 @@ public class NaverBlogContentGenerator implements ContentGenerator {
     }
 
     @Override
-    public String generate(GenerationContext ctx) throws Exception {
+    public GenerationOutput generate(GenerationContext ctx) throws Exception {
         String sanitizedSummary = sanitizer.sanitize(ctx.simulationSummary(), "marketing-naver");
         String prompt = buildPrompt(sanitizedSummary, ctx.relationType(), ctx.templateBody());
         String rawResponse = llmProvider.invoke(prompt, "claude-sonnet-4-6");
-        String sanitized = copyGuard.sanitize(rawResponse);
+        String sanitizedRaw = copyGuard.sanitize(rawResponse);
         log.info("Generated Naver Blog content for relation type: {}", ctx.relationType());
-        return sanitized;
+        return GenerationOutput.fromLlmJson(sanitizedRaw);
     }
 
     private String buildPrompt(String simulationSummary, String relationType, String templateBody) {
@@ -46,24 +46,30 @@ public class NaverBlogContentGenerator implements ContentGenerator {
                 : "";
         return """
                 You are a marketing copywriter for "다시봄" (Again Spring), an AI conflict mediation tool.
+                Tone: warm, empathetic Korean. No clinical terms (상담, 치료, 정신과).
+                No absolute claims (확실, 보장, 반드시). No emojis. Good for SEO.
 
-                Based on the following conflict simulation summary, generate a Naver Blog post in Korean.
-                The post should be 800-1200 characters with structured headings.
-                Focus on the value of conflict resolution and relationship healing.
-                Reference the tool name: "다시봄 AI 갈등 중재 도구"
+                Based on the conflict simulation summary, respond with ONLY a valid JSON object:
+                {
+                  "markdown": "Naver blog post in Korean markdown (400-600 chars). Include exactly these 3 image slot markers in order: <!-- IMG:chat-preview -->, <!-- IMG:report-needs-map -->, <!-- IMG:quote-card -->. Each marker on its own line with blank lines around it. Structure: 제목(#) → 도입(2-3문장) → <!-- IMG:chat-preview --> → 감정설명(2문장) → <!-- IMG:report-needs-map --> → 다시봄 소개(1문장) → <!-- IMG:quote-card --> → CTA(1문장) → 면책고지(1줄). Keep each section SHORT.",
+                  "imageSlots": [
+                    {"slot": "<!-- IMG:chat-preview -->",     "kind": "chat",         "quoteText": null},
+                    {"slot": "<!-- IMG:report-needs-map -->", "kind": "report-needs", "quoteText": null},
+                    {"slot": "<!-- IMG:quote-card -->",       "kind": "quote",        "quoteText": "핵심 문장 (25자 이내)"}
+                  ],
+                  "hashtags": ["#다시봄", "#갈등해결", "#관계회복", "#AI중재", "#감정정리"]
+                }
+
+                Rules:
+                - Total markdown must be under 600 characters.
+                - No emojis anywhere in the output.
+                - Do not include code fences or any text outside the JSON.
 
                 Simulation Summary:
                 %s
 
                 Relationship Type: %s
                 %s
-                Format:
-                Use markdown with ** ** for bold headings (like **제목** for H2-style).
-                Include line breaks between sections.
-                Structure: Problem → Solution → Benefits → Call to Action
-
-                Do not use clinical terms like 상담, 치료, 정신과, or absolute claims like 확실, 보장, 반드시.
-                Include the disclaimer at the end.
                 """.formatted(simulationSummary, relationType, templateSection);
     }
 }

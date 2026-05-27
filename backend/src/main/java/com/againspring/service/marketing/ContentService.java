@@ -242,23 +242,25 @@ public class ContentService {
 		}
 
 		try {
-			String generated = router.generateWithTemplate(
+			com.againspring.service.marketing.content.GenerationOutput output = router.generateWithTemplate(
 					platform,
 					"시뮬레이션 대화 기반 콘텐츠 생성 (템플릿 사용)",
 					"general",
 					instantiatedBody
 			);
-			String sanitized = copyGuard.sanitize(generated);
+			String bodyText = output.bodyText() != null ? output.bodyText() : "";
+			boolean hasViolations = copyGuard.hasViolations(bodyText);
 
 			MarketingContent content = MarketingContent.builder()
 					.simulationId(req.getSimulationId())
 					.platform(platform)
-					.bodyText(sanitized)
-					.status(copyGuard.hasViolations(generated) ? MarketingContent.Status.REVIEW : MarketingContent.Status.DRAFT)
+					.bodyText(bodyText)
+					.hashtags(output.hashtags())
+					.status(hasViolations ? MarketingContent.Status.REVIEW : MarketingContent.Status.DRAFT)
 					.templateId(templateId)
 					.safetyCheckJson(String.format(
 							"{\"violations_detected\": %b, \"template_id\": %d, \"checked_at\": \"%s\"}",
-							copyGuard.hasViolations(generated), templateId, java.time.Instant.now()))
+							hasViolations, templateId, java.time.Instant.now()))
 					.build();
 
 			MarketingContent saved = contentRepo.save(content);

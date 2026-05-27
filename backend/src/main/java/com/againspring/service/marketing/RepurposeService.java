@@ -59,18 +59,19 @@ public class RepurposeService {
 
         String relationType = resolveRelationType(source);
 
-        String generated = router.generateWithTemplate(
+        com.againspring.service.marketing.content.GenerationOutput output = router.generateWithTemplate(
                 targetPlatform,
                 "리퍼포징 원본 콘텐츠:\n" + source.getBodyText(),
                 relationType,
                 source.getBodyText()
         );
-        String sanitized = copyGuard.sanitize(generated);
+        String bodyText = output.bodyText() != null ? output.bodyText() : "";
 
         MarketingContent repurposed = MarketingContent.builder()
                 .simulationId(source.getSimulationId())
                 .platform(targetPlatform)
-                .bodyText(sanitized)
+                .bodyText(bodyText)
+                .hashtags(output.hashtags())
                 .status(MarketingContent.Status.DRAFT)
                 .parentContentId(source.getId())
                 .repurposeSourceId(source.getId())

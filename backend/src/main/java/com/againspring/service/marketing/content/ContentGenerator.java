@@ -12,10 +12,10 @@ public interface ContentGenerator {
      * Generate marketing copy for the target platform.
      *
      * @param ctx generation context (summary, relation type, descriptor, optional template)
-     * @return generated text (already sanitized by MarketingCopyGuard)
+     * @return structured output (bodyText + hashtags + structuredPayload for image composition)
      * @throws Exception if LLM invocation fails
      */
-    String generate(GenerationContext ctx) throws Exception;
+    GenerationOutput generate(GenerationContext ctx) throws Exception;
 
     /**
      * Returns the Platform this generator handles. Used by ContentGeneratorRegistry.

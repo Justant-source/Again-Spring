@@ -11,6 +11,9 @@ import {
   type ContentResponse,
 } from '@/lib/api/marketing/contentApi';
 import { PerformanceForm } from '@/components/admin/marketing/PerformanceForm';
+import { AuthImage } from '@/components/admin/marketing/AuthImage';
+import { PlatformPreview } from '@/components/admin/marketing/preview/PlatformPreview';
+import { parseImagePaths } from '@/components/admin/marketing/preview/parseImagePaths';
 import { scheduleContent, publishContent } from '@/lib/api/marketing/performanceApi';
 
 const STATUS_BADGE_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -342,41 +345,39 @@ export default function ContentDetailPage() {
           )}
         </div>
 
-        {/* 채팅 UI 스크린샷 */}
-        {content.imagePaths && (() => {
-          let filenames: string[] = [];
-          try { filenames = JSON.parse(content.imagePaths!); } catch { filenames = []; }
-          if (filenames.length === 0) return null;
+        {/* 플랫폼 미리보기 */}
+        <PlatformPreview content={content} />
+
+        {/* 생성된 이미지 자산 */}
+        {(() => {
+          const images = parseImagePaths(content.imagePaths);
+          if (images.length === 0) return null;
           return (
             <div style={{ marginBottom: 24 }}>
               <label style={{ fontSize: 11, color: '#666', fontWeight: 600, display: 'block', marginBottom: 8 }}>
-                앱 UI 스크린샷
+                생성된 이미지 자산 ({images.length}장)
               </label>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {filenames.map((fn: string) => (
-                  <div key={fn} style={{ border: '1px solid #eee', borderRadius: 8, overflow: 'hidden', background: '#f9f9f9' }}>
-                    <img
-                      src={`/api/admin/marketing/images/${fn}`}
-                      alt="채팅 UI 스크린샷"
-                      style={{ display: 'block', width: 195, height: 360, objectFit: 'cover' }}
-                    />
-                    <div style={{ padding: '6px 10px', fontSize: 11, color: '#888', borderTop: '1px solid #eee' }}>
-                      {fn}
-                      <a
-                        href={`/api/admin/marketing/images/${fn}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ marginLeft: 8, color: '#0066cc', textDecoration: 'none', fontSize: 11 }}
-                      >
-                        원본 다운로드
-                      </a>
+                {images.map((img) => {
+                  const isSquare = img.role === 'QUOTE_CARD' || img.role === 'COVER' || img.role === 'SCENE' || img.role === 'FEELING' || img.role === 'NVC' || img.role === 'CTA' || img.role === 'BONUS';
+                  const w = 160;
+                  const h = isSquare ? 160 : 200;
+                  return (
+                    <div key={img.filename} style={{ border: '1px solid #eee', borderRadius: 8, overflow: 'hidden', background: '#f9f9f9', maxWidth: w + 20 }}>
+                      <AuthImage
+                        src={`/api/admin/marketing/images/${img.filename}`}
+                        alt={img.alt || img.role}
+                        style={{ display: 'block', width: w, height: h, objectFit: 'cover' }}
+                      />
+                      <div style={{ padding: '6px 10px', fontSize: 10, color: '#888', borderTop: '1px solid #eee' }}>
+                        <span style={{ fontWeight: 600, color: '#555' }}>{img.role || '이미지'}</span>
+                        <br />
+                        {img.filename}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              <p style={{ margin: '8px 0 0', fontSize: 11, color: '#aaa' }}>
-                시뮬레이션 대화를 실제 다시봄 채팅 UI 스타일로 렌더링한 마케팅 이미지입니다.
-              </p>
             </div>
           );
         })()}

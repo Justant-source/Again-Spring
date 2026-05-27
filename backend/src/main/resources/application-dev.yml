@@ -19,6 +19,11 @@ springdoc:
   swagger-ui:
     enabled: true
 
+llm:
+  remote:
+    read-timeout-ms: 250000
+    default-timeout-ms: 240000
+
 app:
   admin:
     enabled: true
@@ -29,3 +34,5 @@ app:
   features:
     marketing:
       enabled: true              # dev 전용 기능 — prod application-prod.yml에는 포함하지 않음
+      renderer-url: ${MARKETING_RENDERER_URL:http://againspring-marketing-renderer-dev:9000}
+      image-dir: /var/marketing-assets
