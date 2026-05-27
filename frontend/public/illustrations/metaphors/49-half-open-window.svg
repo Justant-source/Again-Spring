@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+
+  
+  <rect x="46" y="36" width="148" height="168" stroke="#5C4030" stroke-width="2" fill="none"></rect>
+  
+  <rect x="40" y="200" width="160" height="10" rx="2" fill="#FFF8F0" stroke="#A08670" stroke-width="1.5"></rect>
+  
+  <line x1="120" y1="36" x2="120" y2="200" stroke="#5C4030" stroke-width="1.6"></line>
+  
+  <line x1="46" y1="118" x2="194" y2="118" stroke="#5C4030" stroke-width="1.6"></line>
+  
+  <rect x="54" y="44" width="62" height="68" fill="#FBF3EC" stroke="#A08670" stroke-width="0.9"></rect>
+  <rect x="54" y="124" width="62" height="72" fill="#FBF3EC" stroke="#A08670" stroke-width="0.9"></rect>
+  
+  
+  <rect x="124" y="44" width="68" height="152" fill="#FFF8F0" opacity="0.9"></rect>
+  
+  <path d="M130 70 Q140 64 150 70 Q158 66 170 72" stroke="#A08670" stroke-width="1" fill="none" opacity="0.5"></path>
+  <path d="M140 90 Q155 86 168 92" stroke="#A08670" stroke-width="1" fill="none" opacity="0.4"></path>
+  
+  <path d="M122 44 L180 30 L180 196 L122 200 Z" fill="#FFF8F0" stroke="#5C4030" stroke-width="1.5" stroke-linejoin="round" opacity="0.9"></path>
+  <line x1="122" y1="116" x2="180" y2="108" stroke="#A08670" stroke-width="1"></line>
+  
+  <circle cx="135" cy="118" r="2.5" fill="#A08670"></circle>
+  
+  <path d="M118 44 Q108 60 116 80 Q124 95 114 110 Q108 125 118 145 Q126 160 116 185" stroke="#F4A896" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.75"></path>
+
+</svg>

@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+
+  
+  <rect x="50" y="46" width="140" height="160" rx="3" fill="#FFF8F0" stroke="#5C4030" stroke-width="2"></rect>
+  
+  <rect x="62" y="58" width="116" height="136" fill="#FBF3EC" stroke="#A08670" stroke-width="1"></rect>
+  
+  <rect x="76" y="74" width="88" height="104" fill="#FFF8F0" stroke="#A08670" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"></rect>
+  
+  <path d="M76 74 L86 78 L82 84 L76 80 Z" fill="#A08670" opacity="0.55"></path>
+  <path d="M164 74 L154 78 L158 84 L164 80 Z" fill="#A08670" opacity="0.55"></path>
+  <path d="M76 178 L86 174 L82 168 L76 172 Z" fill="#A08670" opacity="0.55"></path>
+  <path d="M164 178 L154 174 L158 168 L164 172 Z" fill="#A08670" opacity="0.55"></path>
+  
+  <line x1="80" y1="120" x2="120" y2="120" stroke="#A08670" stroke-width="0.6" opacity="0.3"></line>
+  <line x1="90" y1="135" x2="150" y2="135" stroke="#A08670" stroke-width="0.6" opacity="0.3"></line>
+  
+  <circle cx="120" cy="40" r="2" fill="#5C4030"></circle>
+  
+  <path d="M70 46 Q120 32 170 46" stroke="#A08670" stroke-width="1" fill="none" opacity="0.5"></path>
+
+</svg>

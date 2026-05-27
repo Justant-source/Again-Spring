@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+
+  
+  <path d="M30 90 Q60 80 90 100 Q110 115 100 130" stroke="#A08670" stroke-width="1.6" fill="none" stroke-linecap="round"></path>
+  <path d="M100 130 Q90 145 100 155" stroke="#A08670" stroke-width="1.6" fill="none" stroke-linecap="round"></path>
+  
+  <line x1="100" y1="155" x2="98" y2="165" stroke="#A08670" stroke-width="1.2" stroke-linecap="round"></line>
+  <line x1="100" y1="155" x2="104" y2="167" stroke="#A08670" stroke-width="1.2" stroke-linecap="round"></line>
+  <line x1="100" y1="155" x2="108" y2="163" stroke="#A08670" stroke-width="1.2" stroke-linecap="round"></line>
+  <line x1="100" y1="155" x2="94" y2="163" stroke="#A08670" stroke-width="1" stroke-linecap="round"></line>
+  
+  <line x1="110" y1="170" x2="135" y2="180" stroke="#A08670" stroke-width="1" stroke-dasharray="2 4" opacity="0.35" stroke-linecap="round"></line>
+  
+  <path d="M145 175 Q150 170 142 158" stroke="#A08670" stroke-width="1.6" fill="none" stroke-linecap="round"></path>
+  <path d="M142 158 Q138 140 155 130 Q180 115 210 130" stroke="#A08670" stroke-width="1.6" fill="none" stroke-linecap="round"></path>
+  
+  <line x1="145" y1="175" x2="143" y2="185" stroke="#A08670" stroke-width="1.2" stroke-linecap="round"></line>
+  <line x1="145" y1="175" x2="149" y2="185" stroke="#A08670" stroke-width="1.2" stroke-linecap="round"></line>
+  <line x1="145" y1="175" x2="138" y2="184" stroke="#A08670" stroke-width="1.2" stroke-linecap="round"></line>
+  <line x1="145" y1="175" x2="153" y2="183" stroke="#A08670" stroke-width="1" stroke-linecap="round"></line>
+  
+  <circle cx="120" cy="174" r="3" fill="#F4A896"></circle>
+
+</svg>

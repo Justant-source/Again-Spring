@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+
+  
+  <rect x="0" y="0" width="240" height="240" fill="#FBF3EC" opacity="0"></rect>
+  
+  <rect x="60" y="30" width="120" height="180" stroke="#5C4030" stroke-width="2" fill="none"></rect>
+  
+  <rect x="68" y="38" width="104" height="172" fill="#FFF8F0" stroke="#A08670" stroke-width="1.5"></rect>
+  
+  <rect x="80" y="50" width="80" height="60" stroke="#A08670" stroke-width="1" fill="none"></rect>
+  <rect x="80" y="120" width="80" height="60" stroke="#A08670" stroke-width="1" fill="none"></rect>
+  
+  <circle cx="155" cy="125" r="3" fill="#A08670"></circle>
+  
+  <line x1="20" y1="220" x2="220" y2="220" stroke="#5C4030" stroke-width="1.6"></line>
+  
+  <rect x="68" y="210" width="104" height="3.5" fill="#F4A896"></rect>
+  
+  <path d="M68 213 L40 235 L200 235 L172 213 Z" fill="#F4A896" opacity="0.32"></path>
+  <path d="M80 213 L60 233" stroke="#F4A896" stroke-width="1" opacity="0.55"></path>
+  <path d="M160 213 L180 233" stroke="#F4A896" stroke-width="1" opacity="0.55"></path>
+  
+  <ellipse cx="34" cy="125" rx="6" ry="6" fill="#5C4030" opacity="0.85"></ellipse>
+  <path d="M34 131 L34 180 L28 200" stroke="#5C4030" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.85"></path>
+  <path d="M34 180 L40 200" stroke="#5C4030" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.85"></path>
+  <path d="M34 145 L26 158" stroke="#5C4030" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.85"></path>
+  <path d="M34 145 L42 158" stroke="#5C4030" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.85"></path>
+
+</svg>

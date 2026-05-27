@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+
+  
+  <rect x="55" y="55" width="130" height="170" rx="3" fill="#A08670" opacity="0.25"></rect>
+  
+  <rect x="50" y="50" width="130" height="170" rx="3" fill="#FFF8F0" stroke="#5C4030" stroke-width="1.8"></rect>
+  
+  <line x1="58" y1="50" x2="58" y2="220" stroke="#5C4030" stroke-width="1.4"></line>
+  <line x1="62" y1="50" x2="62" y2="220" stroke="#A08670" stroke-width="1"></line>
+  
+  <rect x="70" y="68" width="100" height="135" rx="2" fill="none" stroke="#A08670" stroke-width="0.9" opacity="0.7"></rect>
+  
+  <path d="M75 78 L82 78 L82 85" stroke="#A08670" stroke-width="1" fill="none"></path>
+  <path d="M165 78 L158 78 L158 85" stroke="#A08670" stroke-width="1" fill="none"></path>
+  <path d="M75 193 L82 193 L82 186" stroke="#A08670" stroke-width="1" fill="none"></path>
+  <path d="M165 193 L158 193 L158 186" stroke="#A08670" stroke-width="1" fill="none"></path>
+  
+  <rect x="92" y="115" width="56" height="42" fill="#FBF3EC" stroke="#A08670" stroke-width="1"></rect>
+  <line x1="100" y1="128" x2="140" y2="128" stroke="#A08670" stroke-width="0.8"></line>
+  <line x1="100" y1="138" x2="140" y2="138" stroke="#A08670" stroke-width="0.8"></line>
+  <line x1="100" y1="148" x2="125" y2="148" stroke="#A08670" stroke-width="0.8"></line>
+  
+  <rect x="174" y="125" width="20" height="28" rx="2" fill="#FFF8F0" stroke="#5C4030" stroke-width="1.5"></rect>
+  
+  <circle cx="184" cy="135" r="3" fill="#5C4030"></circle>
+  <line x1="184" y1="138" x2="184" y2="146" stroke="#5C4030" stroke-width="1.4"></line>
+  
+  <line x1="170" y1="125" x2="174" y2="125" stroke="#A08670" stroke-width="2"></line>
+  <line x1="170" y1="153" x2="174" y2="153" stroke="#A08670" stroke-width="2"></line>
+  
+  <line x1="180" y1="55" x2="180" y2="218" stroke="#A08670" stroke-width="0.6" opacity="0.6"></line>
+  <line x1="178" y1="55" x2="178" y2="218" stroke="#A08670" stroke-width="0.6" opacity="0.4"></line>
+
+</svg>

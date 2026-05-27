@@ -67,52 +67,124 @@ xmlns="http://www.w3.org/2000/svg"
 
 ---
 
-## 5. 현재 일러스트 목록 (12개)
+## 5. 현재 일러스트 목록 (60개, 2026-05-27 완성)
 
-| ID | 파일명 | 그룹 | 톤 | designPrompt |
+### 보편 (01–12)
+
+| ID | 파일명 | 그룹 | 톤 | 의미 |
 |---|---|---|---|---|
-| locked-mailbox | 01-locked-mailbox.svg | avoidance | neutral | 자물쇠가 달린 우체통. 수신함 슬롯·받침대 포함. 닫힌 수직 구조 강조. |
-| boiling-kettle | 02-boiling-kettle.svg | tension | heavy | 여러 줄 수증기가 솟구치는 주전자. 동적인 곡선 수증기 획, 주둥이·몸체·손잡이. |
-| locked-door | 03-locked-door.svg | avoidance | heavy | 자물쇠·문고리 있는 나무 문. 4분할 패널, 견고하고 닫힌 구조감. |
-| too-big-umbrella | 04-too-big-umbrella.svg | protection | neutral | 캐노피가 큰 우산, 아래 작은 원(사람 실루엣). 비대칭 보호·거리감. |
-| person-in-rain | 05-person-in-rain.svg | loneliness | heavy | 빗속 홀로 선 실루엣(원+사각형). 대각선 빗줄기 여러 개, 그림자 타원. |
-| frozen-pond | 06-frozen-pond.svg | avoidance | heavy | 유기적 연못 위 균열 패턴. 물가 식물 2–3개, 균열선이 정적 분위기 강조. |
-| cracked-window | 07-cracked-window.svg | tension | heavy | 창틀 안 방사형 균열. 십자형 프레임, 중심 균열점 원, 정밀한 갈라짐. |
-| empty-chair | 08-empty-chair.svg | avoidance | heavy | 미니멀 의자 실루엣(등받이·좌석·다리). 그림자 타원, 빈 공간이 주인공. |
-| overflowing-cup | 09-overflowing-cup.svg | tension | neutral | 컵에서 흘러넘치는 곡선 액체 2줄기. 잎 장식·물방울, 벅차면서 아름다운 균형. |
-| rope-bridge | 10-rope-bridge.svg | hesitation | neutral | 좌우 절벽 판자 잇는 곡선 밧줄들. 나뭇가지 배경, 불안정하지만 연결된 느낌. |
-| half-open-letter | 11-half-open-letter.svg | hesitation | warm | 반쯤 열린 봉투. 내용 암시선 2–3개, 열린 플랩 곡선, 잎사귀 장식 옵션. |
-| two-trees-roots | 12-two-trees-roots.svg | recovery | warm | 두 나무(구름형 수관), 아래 얽히는 뿌리 곡선들. 희망적이고 연결된 구성. |
+| locked-mailbox | 01-locked-mailbox.svg | avoidance | neutral | 마음을 받았는데 열어보지 않은 채 쌓여있는 상태 |
+| boiling-kettle | 02-boiling-kettle.svg | tension | heavy | 작은 일에도 곧 터질 것 같이 끓고 있는 상태 |
+| locked-door | 03-locked-door.svg | avoidance | heavy | 더 이상 들어올 수 없게 마음의 빗장을 채운 상태 |
+| too-big-umbrella | 04-too-big-umbrella.svg | protection | neutral | 상대를 지키려다 오히려 거리감을 만든 상태 |
+| person-in-rain | 05-person-in-rain.svg | loneliness | heavy | 누군가 알아봐주길 기다리며 그대로 서있는 상태 |
+| frozen-pond | 06-frozen-pond.svg | avoidance | heavy | 흐르지 못하고 멈춰버린 감정 |
+| cracked-window | 07-cracked-window.svg | tension | heavy | 깨지지는 않았지만 작은 충격에도 흔들리는 상태 |
+| empty-chair | 08-empty-chair.svg | avoidance | heavy | 함께 있어도 마음은 없는 자리 |
+| overflowing-cup | 09-overflowing-cup.svg | tension | neutral | 더 이상 받아들일 수 없을 만큼 가득 찬 상태 |
+| rope-bridge | 10-rope-bridge.svg | hesitation | neutral | 건너고 싶지만 무서워서 머뭇거리는 관계 |
+| half-open-letter | 11-half-open-letter.svg | hesitation | warm | 말하고 싶은데 끝까지 못 한 마음 |
+| two-trees-roots | 12-two-trees-roots.svg | recovery | warm | 떨어져 보여도 깊은 곳은 연결되어 있음 |
+
+### 연인·부부 (13–24)
+
+| ID | 파일명 | 그룹 | 톤 | 의미 |
+|---|---|---|---|---|
+| two-compasses-apart | 13-two-compasses-apart.svg | avoidance | neutral | 원하는 미래의 방향이 달라진 상태 |
+| melting-candle | 14-melting-candle.svg | tension | heavy | 열정·온기가 소진되어가는 상태 |
+| parallel-rails | 15-parallel-rails.svg | avoidance | neutral | 같은 방향이지만 영원히 만나지 않는 두 레일 |
+| half-erased-note | 16-half-erased-note.svg | hesitation | neutral | 썼다가 지운 흔적이 남은 메모 — 말하다 멈춘 마음 |
+| tangled-thread | 17-tangled-thread.svg | tension | neutral | 복잡하게 얽힌 관계 |
+| dying-stove | 18-dying-stove.svg | avoidance | heavy | 오래된 관계의 온기가 식어가는 상태 |
+| one-candle-out | 19-one-candle-out.svg | loneliness | heavy | 불균등한 노력 |
+| empty-photo-frame | 20-empty-photo-frame.svg | loneliness | heavy | 함께였던 순간이 지워진 자리 |
+| pendulum | 21-pendulum.svg | tension | neutral | 감정의 극과 극 |
+| back-to-back-umbrellas | 22-back-to-back-umbrellas.svg | avoidance | neutral | 서로 등을 지고 각자 우산을 쓴 상태 |
+| crumbling-sandcastle | 23-crumbling-sandcastle.svg | tension | heavy | 함께 쌓아온 것이 흔들리는 상태 |
+| empty-nest | 24-empty-nest.svg | loneliness | warm | 역할이 끝난 후의 공허함 |
+
+### 친구 (25–32)
+
+| ID | 파일명 | 그룹 | 톤 | 의미 |
+|---|---|---|---|---|
+| dried-bouquet | 25-dried-bouquet.svg | avoidance | neutral | 식어버린 우정 |
+| emptying-hourglass | 26-emptying-hourglass.svg | avoidance | heavy | 서서히 멀어지는 관계 |
+| one-lit-bulb | 27-one-lit-bulb.svg | loneliness | heavy | 일방적인 노력 |
+| broken-thread | 28-broken-thread.svg | avoidance | heavy | 단절된 연결 |
+| wrongly-folded-letter | 29-wrongly-folded-letter.svg | hesitation | neutral | 오해·전달 실패 |
+| string-telephone | 30-string-telephone.svg | hesitation | warm | 거리가 있어도 닿으려는 시도 |
+| inside-out-umbrella | 31-inside-out-umbrella.svg | tension | heavy | 믿었던 것이 배신당한 상태 |
+| one-seedling | 32-one-seedling.svg | loneliness | neutral | 불균형한 투자 |
+
+### 직장 (33–39)
+
+| ID | 파일명 | 그룹 | 톤 | 의미 |
+|---|---|---|---|---|
+| tilted-scale | 33-tilted-scale.svg | tension | heavy | 인정·보상의 불균형 |
+| overflowing-papers | 34-overflowing-papers.svg | tension | heavy | 과도한 요구·소진 |
+| empty-trophy | 35-empty-trophy.svg | loneliness | neutral | 인정받지 못한 노력 |
+| light-under-door | 36-light-under-door.svg | loneliness | heavy | 배제·소외 |
+| chained-anchor | 37-chained-anchor.svg | avoidance | heavy | 벗어나고 싶지만 묶인 상태 |
+| too-many-keys | 38-too-many-keys.svg | tension | neutral | 과중한 책임·역할 |
+| gears-not-meshing | 39-gears-not-meshing.svg | tension | neutral | 팀워크·협력 단절 |
+
+### 가족 (40–47)
+
+| ID | 파일명 | 그룹 | 톤 | 의미 |
+|---|---|---|---|---|
+| small-birdcage | 40-small-birdcage.svg | tension | heavy | 통제·과잉보호로 숨막히는 상태 |
+| tall-fence | 41-tall-fence.svg | protection | heavy | 보호가 감금으로 변한 상태 |
+| trees-growing-apart | 42-trees-growing-apart.svg | avoidance | neutral | 같은 뿌리에서 서로 다른 방향으로 자란 |
+| cracked-bowl | 43-cracked-bowl.svg | tension | heavy | 상처난 관계 |
+| empty-dining-table | 44-empty-dining-table.svg | loneliness | heavy | 함께하지 못하는 시간 |
+| wilting-plant | 45-wilting-plant.svg | avoidance | neutral | 방치된 관계 |
+| closed-diary | 46-closed-diary.svg | hesitation | neutral | 세대 간 말하지 못하는 속마음 |
+| long-shadow | 47-long-shadow.svg | protection | heavy | 부모의 영향력 아래 |
+
+### 지인 (48–52)
+
+| ID | 파일명 | 그룹 | 톤 | 의미 |
+|---|---|---|---|---|
+| foggy-path | 48-foggy-path.svg | hesitation | neutral | 관계의 모호함 |
+| half-open-window | 49-half-open-window.svg | hesitation | warm | 조심스럽게 열어두는 마음 |
+| oil-on-water | 50-oil-on-water.svg | avoidance | neutral | 섞이지 않는 관계 |
+| crossing-paths | 51-crossing-paths.svg | hesitation | neutral | 스쳐 지나가는 관계 |
+| shallow-well | 52-shallow-well.svg | loneliness | neutral | 깊어지지 않는 관계 |
+
+### 회복·전환 (53–60)
+
+| ID | 파일명 | 그룹 | 톤 | 의미 |
+|---|---|---|---|---|
+| first-footstep | 53-first-footstep.svg | recovery | warm | 용기 내어 내딛은 시작 |
+| seed-in-palm | 54-seed-in-palm.svg | recovery | warm | 새 관계의 가능성 |
+| open-window | 55-open-window.svg | recovery | warm | 마음을 열어두는 상태 |
+| cups-finally-touching | 56-cups-finally-touching.svg | recovery | warm | 화해의 첫 접촉 |
+| melting-ice | 57-melting-ice.svg | recovery | neutral | 차가움이 녹는 과정 |
+| crack-with-light | 58-crack-with-light.svg | recovery | warm | 상처가 빛의 통로 |
+| two-compasses-aligned | 59-two-compasses-aligned.svg | recovery | warm | 같은 미래를 바라보는 마음 |
+| raft-together | 60-raft-together.svg | recovery | neutral | 어려움 속 동행 |
 
 ---
 
-## 6. 갭 분석 (신규 일러스트가 필요한 자리)
+## 6. 그룹·톤 분포 (60종)
 
-현재 부족한 영역:
-
-| 그룹 | 현재 수 | 부족한 감정/상황 |
-|---|---|---|
-| recovery | 1개 | 화해·대화 시작·첫 걸음 |
-| protection | 1개 | 과잉 통제·감시·집착 |
-| hesitation | 2개 | 용기·작은 시도·반쯤 열린 마음 (행동판) |
-| loneliness | 1개 | 군중 속 외로움·존재감 없음 |
-
-**우선 추천 신규 주제** (번호는 파일명 번호 기준):
-- `13-first-step.svg` — recovery: 첫 발자국 하나 (용기 내어 내딛은 첫 걸음)
-- `14-glass-wall.svg` — avoidance: 유리벽 사이 두 사람 (눈은 마주치지만 닿지 않는)
-- `15-empty-table.svg` — loneliness: 두 자리 중 하나만 채워진 식탁
-- `16-seed-in-hand.svg` — recovery: 손바닥 위 씨앗 (새로운 시작)
-- `17-open-window.svg` — recovery: 활짝 열린 창문 (통함·환기)
+| 그룹 | 수 | | 톤 | 수 |
+|---|---|---|---|---|
+| avoidance | 13 | | heavy | 23 |
+| tension | 13 | | neutral | 23 |
+| loneliness | 9 | | warm | 14 |
+| hesitation | 8 | | | |
+| recovery | 9 | | | |
+| protection | 3 | | | |
+| 합 | 60 | | 합 | 60 |
 
 ---
 
-## 7. Claude Design 요청 템플릿
+## 7. 추가 일러스트 요청 방법 (Claude Design)
 
-아래 3-Block을 복사해 Claude Design 채팅에 붙여넣으세요.
+기존 60종으로 충분하지 않은 경우 아래 3-Block 형식으로 Claude Design에 요청하세요.
 
----
-
-### Block 1 — 공통 컨텍스트 (매번 필수 포함)
+### Block 1 — 공통 컨텍스트 (매번 필수)
 
 ```
 다시봄 앱의 SVG 메타포 일러스트를 만들어줘.
@@ -136,31 +208,30 @@ xmlns="http://www.w3.org/2000/svg"
 - 분위기: 따뜻하고 차분하며, 무겁지 않게
 ```
 
-### Block 2 — 스타일 레퍼런스 (기존 SVG 코드 1개 붙여넣기)
+### Block 2 — 스타일 레퍼런스
 
 ```
 기존 일러스트 코드를 참고해서 같은 스타일로 만들어줘:
-
-[11-half-open-letter.svg 코드 전체 붙여넣기]
+[유사한 톤의 기존 SVG 코드 1개 붙여넣기]
 ```
 
 ### Block 3 — 이번 요청 명세
 
 ```
 새로 만들어줄 일러스트:
-- 파일명: 13-first-step.svg
-- 주제: 용기 내어 내딛은 첫 발자국
-- group: recovery
-- 표현하고 싶은 감정: 조심스러운 용기, 작은 희망
-- 관련 욕구: 연결, 성장, 시작
-- 톤: warm (포근하게, 무겁지 않게)
-- 색: #FFF8F0 + #A08670 + #A8C8B4 (세이지 그린, 희망)
-- 특이사항: 발자국은 하나만, 너무 귀엽지 않게
+- 파일명: 61-xxx.svg
+- 주제: ...
+- group: recovery / avoidance / tension / hesitation / loneliness / protection
+- 표현하고 싶은 감정: ...
+- 관련 욕구: ...
+- 톤: warm / neutral / heavy
+- 색: #FFF8F0 + #A08670 + [포인트 1색]
+- 특이사항: ...
 ```
 
 ---
 
-## 8. 검수 체크리스트 (Claude Design 결과물 받은 후)
+## 8. 등록 체크리스트 (신규 SVG 수령 후)
 
 - [ ] viewBox="0 0 240 240" 확인
 - [ ] 색이 3색 이하이며 팔레트 값 정확한지 확인
@@ -168,6 +239,6 @@ xmlns="http://www.w3.org/2000/svg"
 - [ ] 중심 오브젝트가 너무 작지 않은지 (40% 이상)
 - [ ] `frontend/public/illustrations/metaphors/` 에 저장
 - [ ] `frontend/lib/constants/metaphors.ts` METAPHORS 배열에 등록 (모든 필드 필수)
-- [ ] `frontend/docs/design/specs/metaphor-illustration-system.md` 현재 목록 테이블 업데이트
+- [ ] 이 문서 §5 목록 테이블 업데이트
 - [ ] `npm run build` 통과
 - [ ] `npm run lint:emoji` 통과

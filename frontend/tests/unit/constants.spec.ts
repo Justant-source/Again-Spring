@@ -351,8 +351,8 @@ describe('Categories Constants', () => {
 
 describe('Metaphors Constants', () => {
   describe('METAPHORS', () => {
-    it('has 12 metaphor definitions', () => {
-      expect(METAPHORS).toHaveLength(12)
+    it('has 60 metaphor definitions', () => {
+      expect(METAPHORS).toHaveLength(60)
     })
 
     it('each metaphor has required fields', () => {
@@ -526,10 +526,11 @@ describe('Metaphors Constants', () => {
       results.forEach((m) => expect(m.group).toBe('avoidance'))
     })
 
-    it('returns exactly one recovery metaphor', () => {
+    it('returns all recovery metaphors (9 total)', () => {
       const results = getMetaphorsByGroup('recovery')
-      expect(results.length).toBe(1)
-      expect(results[0].id).toBe('two-trees-roots')
+      expect(results.length).toBe(9)
+      results.forEach((m) => expect(m.group).toBe('recovery'))
+      expect(results.some((m) => m.id === 'two-trees-roots')).toBe(true)
     })
   })
 

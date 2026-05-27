@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+
+  
+  <ellipse cx="120" cy="210" rx="48" ry="5" fill="#FFF8F0" stroke="#A08670" stroke-width="1.2"></ellipse>
+  
+  <path d="M80 150 L82 200 Q83 210 92 210 L148 210 Q157 210 158 200 L160 150 Z" fill="#FFF8F0" stroke="#A08670" stroke-width="1.5" stroke-linejoin="round"></path>
+  
+  <ellipse cx="120" cy="150" rx="40" ry="6" fill="#FFF8F0" stroke="#A08670" stroke-width="1.5"></ellipse>
+  
+  <ellipse cx="120" cy="150" rx="34" ry="4" fill="#A08670" opacity="0.35"></ellipse>
+  
+  <path d="M120 150 Q120 110 95 100" stroke="#A08670" stroke-width="1.5" fill="none" stroke-linecap="round"></path>
+  <path d="M120 150 Q125 110 150 110 Q165 110 165 130" stroke="#A08670" stroke-width="1.5" fill="none" stroke-linecap="round"></path>
+  <path d="M120 150 Q108 120 85 130" stroke="#A08670" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.85"></path>
+  
+  <path d="M95 100 Q80 100 75 115 Q88 115 95 100 Z" fill="#A8C8B4" stroke="#A08670" stroke-width="1.2" stroke-linejoin="round" opacity="0.7"></path>
+  <path d="M165 130 Q170 145 158 152 Q156 140 165 130 Z" fill="#A8C8B4" stroke="#A08670" stroke-width="1.2" stroke-linejoin="round" opacity="0.7"></path>
+  <path d="M85 130 Q70 132 65 145 Q78 145 85 130 Z" fill="#A8C8B4" stroke="#A08670" stroke-width="1.2" stroke-linejoin="round" opacity="0.6"></path>
+  
+  <path d="M120 150 Q120 120 130 105 Q140 95 145 80" stroke="#A08670" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.85"></path>
+  <path d="M145 80 Q138 70 130 75 Q138 88 145 80 Z" fill="#A8C8B4" stroke="#A08670" stroke-width="1.2" stroke-linejoin="round" opacity="0.7"></path>
+  
+  <path d="M65 215 Q72 210 78 215 Q72 220 65 215 Z" fill="#A8C8B4" stroke="#A08670" stroke-width="1" opacity="0.7"></path>
+  <path d="M170 218 Q176 213 182 218 Q176 223 170 218 Z" fill="#A8C8B4" stroke="#A08670" stroke-width="1" opacity="0.7"></path>
+  <path d="M155 222 Q160 218 165 222 Q160 226 155 222 Z" fill="#A8C8B4" stroke="#A08670" stroke-width="1" opacity="0.55"></path>
+
+</svg>

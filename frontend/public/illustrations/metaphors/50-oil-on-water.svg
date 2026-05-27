@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+
+  
+  <path d="M70 60 L80 200 Q82 210 92 210 L148 210 Q158 210 160 200 L170 60 Z" fill="#FFF8F0" stroke="#5C4030" stroke-width="1.8" stroke-linejoin="round"></path>
+  
+  <ellipse cx="120" cy="60" rx="50" ry="8" fill="#FFF8F0" stroke="#5C4030" stroke-width="1.8"></ellipse>
+  
+  <path d="M76 100 L77 200 Q79 207 88 207 L152 207 Q161 207 163 200 L164 100 Z" fill="#FBF3EC" opacity="0.85"></path>
+  
+  <ellipse cx="120" cy="100" rx="46" ry="6" fill="#FBF3EC" stroke="#A08670" stroke-width="1.3"></ellipse>
+  
+  <path d="M74 75 L75 100 L164 100 L166 75 Z" fill="#F4A896" opacity="0.55"></path>
+  
+  <ellipse cx="100" cy="135" rx="8" ry="6" fill="#F4A896" opacity="0.7"></ellipse>
+  <ellipse cx="135" cy="160" rx="10" ry="7" fill="#F4A896" opacity="0.7"></ellipse>
+  <ellipse cx="115" cy="180" rx="6" ry="4.5" fill="#F4A896" opacity="0.7"></ellipse>
+  
+  <line x1="83" y1="75" x2="100" y2="78" stroke="#FFF8F0" stroke-width="1.4"></line>
+  <line x1="135" y1="80" x2="150" y2="78" stroke="#FFF8F0" stroke-width="1.2"></line>
+  
+  <line x1="85" y1="115" x2="100" y2="115" stroke="#A08670" stroke-width="0.8" opacity="0.5"></line>
+  <line x1="125" y1="125" x2="150" y2="125" stroke="#A08670" stroke-width="0.8" opacity="0.5"></line>
+
+</svg>

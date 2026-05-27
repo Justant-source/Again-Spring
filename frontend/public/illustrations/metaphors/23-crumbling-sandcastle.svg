@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+
+  
+  <path d="M0 200 Q60 195 120 200 Q180 205 240 200 L240 240 L0 240 Z" fill="#FFF8F0" stroke="#A08670" stroke-width="1"></path>
+  
+  <rect x="58" y="120" width="30" height="80" fill="#FFF8F0" stroke="#A08670" stroke-width="1.5"></rect>
+  <path d="M58 120 L58 108 L62 112 L66 108 L70 112 L74 108 L78 112 L82 108 L88 120" stroke="#A08670" stroke-width="1.5" fill="#FFF8F0" stroke-linejoin="round"></path>
+  <rect x="88" y="160" width="50" height="40" fill="#FFF8F0" stroke="#A08670" stroke-width="1.5"></rect>
+  
+  <path d="M138 160 L138 200 L168 200 L172 178 L160 168 L155 175 L148 165 Z" fill="#FFF8F0" stroke="#A08670" stroke-width="1.5" stroke-linejoin="round"></path>
+  
+  <path d="M105 200 L105 180 Q105 170 115 170 Q125 170 125 180 L125 200" stroke="#5C4030" stroke-width="1.4" fill="none"></path>
+  
+  <circle cx="180" cy="198" r="3" fill="#A08670" opacity="0.7"></circle>
+  <circle cx="190" cy="200" r="2.5" fill="#A08670" opacity="0.7"></circle>
+  <circle cx="175" cy="202" r="2" fill="#A08670" opacity="0.7"></circle>
+  
+  <path d="M165 195 Q185 185 200 192 Q215 198 232 188" stroke="#F4A896" stroke-width="2" fill="none" stroke-linecap="round"></path>
+  <path d="M180 200 Q195 192 210 198 Q220 202 232 196" stroke="#F4A896" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.7"></path>
+
+</svg>
