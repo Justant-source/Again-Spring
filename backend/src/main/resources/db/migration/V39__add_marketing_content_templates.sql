@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS marketing_content_templates (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     platform        ENUM('x','instagram','naver_blog','threads','facebook') NOT NULL COMMENT '적용 플랫폼',
     name            VARCHAR(120) NOT NULL COMMENT '템플릿 이름',
-    body_template   MEDIUMTEXT   NOT NULL COMMENT '카피 템플릿 (${variable} 형식 변수 치환 지원)',
+    body_template   MEDIUMTEXT   NOT NULL COMMENT '카피 템플릿 ($${variable} 형식 변수 치환 지원)',
     variables_json  JSON         NULL     COMMENT '변수 목록 및 설명 [{name, description, required}]',
     is_active       BOOLEAN      NOT NULL DEFAULT TRUE COMMENT '활성 상태 (false면 목록 노출 안 함)',
     created_by      BIGINT       NULL     COMMENT 'admin 사용자 ID',
