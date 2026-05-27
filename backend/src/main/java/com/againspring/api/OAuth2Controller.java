@@ -46,7 +46,8 @@ public class OAuth2Controller {
                 provider, request.getCode(), request.getRedirectUri());
 
         AuthResponse response = authService.oauthSignIn(
-                provider, userInfo.getProviderId(), userInfo.getEmail(), userInfo.getNickname());
+                provider, userInfo.getProviderId(), userInfo.getEmail(), userInfo.getNickname(),
+                request.getGuestToken());
 
         return ResponseEntity.ok(response);
     }

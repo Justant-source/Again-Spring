@@ -24,9 +24,10 @@ export default function OAuthCallbackPage() {
     }
 
     const redirectUri = getRedirectUri(provider as 'google');
+    const guestToken = localStorage.getItem('again-spring-token') ?? undefined;
 
     api
-      .post(`/api/auth/oauth2/${provider}`, { code, redirectUri })
+      .post(`/api/auth/oauth2/${provider}`, { code, redirectUri, guestToken })
       .then((res) => {
         const data = res.data;
         setUser(data.user);

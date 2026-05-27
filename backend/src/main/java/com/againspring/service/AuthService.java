@@ -183,7 +183,9 @@ public class AuthService {
      * code 교환 및 프로필 조회는 OAuth2Service(per-provider)에서 처리 후 이 메서드를 호출.
      */
     @Transactional
-    public AuthResponse oauthSignIn(String provider, String providerId, String email, String nickname) {
+    public AuthResponse oauthSignIn(String provider, String providerId, String email, String nickname,
+                                    String guestToken) {
+        final boolean[] isNewUser = {false};
         User user = userRepository.findByProviderAndProviderId(provider, providerId)
                 .orElseGet(() -> {
                     User newUser = User.builder()
@@ -197,12 +199,22 @@ public class AuthService {
                             .build();
                     newUser.getRoles().add("USER");
                     User saved = userRepository.save(newUser);
+                    isNewUser[0] = true;
                     log.info("OAuth user created: {} via {}", saved.getId(), provider);
                     return saved;
                 });
 
         if (user.getDeletedAt() != null) {
             throw new BusinessException("USER_ALREADY_DELETED", "탈퇴한 계정이에요.");
+        }
+
+        // 신규 가입이고 게스트 토큰이 있으면 게스트 데이터(온보딩/스타일) 이전
+        if (isNewUser[0] && guestToken != null && !guestToken.isBlank()) {
+            final User newlyCreated = user;
+            jwtService.extractUserId(guestToken).ifPresent(guestId -> {
+                log.info("Migrating guest data: guestId={} → userId={}", guestId, newlyCreated.getId());
+                migrateGuestData(guestId, newlyCreated);
+            });
         }
 
         user = adminRoleAssigner.ensureAdminIfWhitelisted(user);

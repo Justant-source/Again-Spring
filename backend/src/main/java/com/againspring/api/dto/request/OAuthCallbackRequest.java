@@ -15,4 +15,6 @@ public class OAuthCallbackRequest {
 
     @NotBlank
     private String redirectUri;
+
+    private String guestToken;
 }
