@@ -4,6 +4,8 @@ import com.againspring.llm.LLMException;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.LLMRequest;
 import com.againspring.llm.LLMResponse;
+import com.againspring.llm.prompt.CacheTier;
+import com.againspring.llm.prompt.PromptSegment;
 import com.againspring.llm.prompt.StructuredPrompt;
 import com.againspring.llm.bridge.CancelableInvocation;
 import com.againspring.llm.bridge.exception.InvocationCanceledException;
@@ -125,10 +127,97 @@ public class ClaudeApiProvider implements LLMProvider {
         });
     }
 
+    /**
+     * 구조화 프롬프트 취소 가능 호출 — cache_control breakpoint 3개 적용.
+     *
+     * 매핑 전략 (HISTORY가 단일 텍스트 블록이므로 system[]에 배치):
+     *   system[0] GLOBAL_STATIC  → bp1 (세션 간 재사용)
+     *   system[1] SESSION_STATIC → bp2 (세션 내 고정)
+     *   system[2] HISTORY        → bp3 (매 턴 증분 캐싱)
+     *   messages[0] DYNAMIC      → user 메시지 (캐시 없음, 매 턴 변동)
+     */
     @Override
-    public CancelableInvocation invokeCancelable(com.againspring.llm.prompt.StructuredPrompt prompt, String model, String sessionId) {
-        // Delegate to String version via flatten()
-        return invokeCancelable(prompt.flatten(), model, sessionId);
+    public CancelableInvocation invokeCancelable(StructuredPrompt prompt, String model, String sessionId) {
+        String invocationId = UUID.randomUUID().toString();
+        CancelableInvocation invocation = new CancelableInvocation(invocationId, sessionId);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                if (!semaphore.tryAcquire(5, TimeUnit.SECONDS)) {
+                    invocation.getResultFuture().completeExceptionally(
+                        new LLMCapacityException("claude-api concurrency limit reached", invocationId));
+                    return;
+                }
+                try {
+                    if (invocation.isCanceled()) {
+                        invocation.getResultFuture().completeExceptionally(
+                            new InvocationCanceledException("Invocation canceled", invocationId));
+                        return;
+                    }
+
+                    AnthropicRequest request = buildStructuredRequest(prompt, model);
+                    AnthropicResponse response = callWithRetry(request);
+
+                    if (invocation.isCanceled()) {
+                        invocation.getResultFuture().completeExceptionally(
+                            new InvocationCanceledException("Invocation canceled", invocationId));
+                        return;
+                    }
+
+                    invocation.getResultFuture().complete(response.text());
+                    log.debug("ClaudeApi structured: id={} cacheRead={} cacheCreate={}",
+                        invocationId, response.cacheReadInputTokens(), response.cacheCreationInputTokens());
+
+                } finally {
+                    semaphore.release();
+                }
+            } catch (InvocationCanceledException e) {
+                invocation.getResultFuture().completeExceptionally(e);
+            } catch (Exception e) {
+                log.error("[ClaudeApi] structured invocation failed: {}", e.getMessage());
+                invocation.getResultFuture().complete("처리 중에 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+            }
+        });
+
+        return invocation;
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * StructuredPrompt → Anthropic Messages API 구조로 매핑.
+     * GLOBAL_STATIC + SESSION_STATIC + HISTORY = system[] (breakpoint 각 tier 끝에)
+     * DYNAMIC = 단일 user messages[0]
+     */
+    private AnthropicRequest buildStructuredRequest(StructuredPrompt prompt, String model) {
+        List<AnthropicTextBlock> systemBlocks = new ArrayList<>();
+
+        appendTierWithBreakpoint(systemBlocks, prompt.getSegmentsByTier(CacheTier.GLOBAL_STATIC));
+        appendTierWithBreakpoint(systemBlocks, prompt.getSegmentsByTier(CacheTier.SESSION_STATIC));
+        appendTierWithBreakpoint(systemBlocks, prompt.getSegmentsByTier(CacheTier.HISTORY));
+
+        String dynamicText = prompt.getSegmentsByTier(CacheTier.DYNAMIC).stream()
+            .map(PromptSegment::getText)
+            .collect(Collectors.joining());
+
+        return AnthropicRequest.builder()
+            .model(model)
+            .maxTokens(MAX_TOKENS)
+            .system(systemBlocks.isEmpty() ? null : systemBlocks)
+            .messages(List.of(AnthropicMessage.user(dynamicText.isBlank() ? "." : dynamicText)))
+            .build();
+    }
+
+    /** tier 세그먼트들을 systemBlocks에 추가; 마지막 세그먼트에 cache_control 부착 */
+    private void appendTierWithBreakpoint(List<AnthropicTextBlock> target, List<PromptSegment> segments) {
+        if (segments.isEmpty()) return;
+        for (int i = 0; i < segments.size(); i++) {
+            boolean isLast = (i == segments.size() - 1);
+            String text = segments.get(i).getText();
+            target.add(isLast && cacheEnabled
+                ? AnthropicTextBlock.cached(text)
+                : AnthropicTextBlock.text(text));
+        }
     }
 
     @Override
