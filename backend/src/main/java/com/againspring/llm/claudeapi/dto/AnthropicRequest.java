@@ -30,12 +30,17 @@ public class AnthropicRequest {
 
     private List<AnthropicMessage> messages;
 
-    /** Create a minimal request for simple string invocation (no system, no caching). */
+    /**
+     * SSE 스트리밍 활성화. null = false (필드 직렬화 생략).
+     * true 설정 시 Anthropic이 text/event-stream으로 응답.
+     */
+    private Boolean stream;
+
+    /** 단순 문자열 호출용 — 캐싱·스트리밍 없음 */
     public static AnthropicRequest simple(String model, int maxTokens, String userPrompt) {
         return AnthropicRequest.builder()
             .model(model)
             .maxTokens(maxTokens)
-            // system intentionally omitted → Anthropic treats as no system prompt
             .messages(List.of(AnthropicMessage.user(userPrompt)))
             .build();
     }
