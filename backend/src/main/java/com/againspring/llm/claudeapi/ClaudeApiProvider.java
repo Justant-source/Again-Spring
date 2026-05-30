@@ -26,6 +26,7 @@ import org.springframework.web.client.RestClient;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
@@ -49,7 +50,8 @@ public class ClaudeApiProvider implements LLMProvider {
     private static final String API_URL = "https://api.anthropic.com/v1/messages";
     private static final String ANTHROPIC_VERSION = "2023-06-01";
     private static final String ANTHROPIC_BETA = "prompt-caching-2024-07-31";
-    private static final int MAX_TOKENS = 1024;
+    /** 한국어 1~3문장 응답 기준 최대 256토큰으로 충분. 출력 토큰은 캐싱 불가이므로 축소가 직접 비용 절감. */
+    private static final int MAX_TOKENS = 256;
     private static final int DEFAULT_TIMEOUT_SECONDS = 30;
 
     @Value("${llm.claude-api.key:}")
@@ -155,8 +157,10 @@ public class ClaudeApiProvider implements LLMProvider {
                         return;
                     }
 
+                    long callStart = System.currentTimeMillis();
                     AnthropicRequest request = buildStructuredRequest(prompt, model);
                     AnthropicResponse response = callWithRetry(request);
+                    long latencyMs = System.currentTimeMillis() - callStart;
 
                     if (invocation.isCanceled()) {
                         invocation.getResultFuture().completeExceptionally(
@@ -164,9 +168,43 @@ public class ClaudeApiProvider implements LLMProvider {
                         return;
                     }
 
-                    invocation.getResultFuture().complete(response.text());
-                    log.debug("ClaudeApi structured: id={} cacheRead={} cacheCreate={}",
-                        invocationId, response.cacheReadInputTokens(), response.cacheCreationInputTokens());
+                    String text = response.text();
+                    invocation.getResultFuture().complete(text);
+
+                    // DB 로깅 — cache_read/creation 토큰 포함
+                    int cacheRead    = response.cacheReadInputTokens();
+                    int cacheCreate  = response.cacheCreationInputTokens();
+                    int inputTok     = response.usage() != null ? response.usage().inputTokens() : 0;
+                    int outputTok    = response.usage() != null ? response.usage().outputTokens() : 0;
+                    // 1h TTL 캐시 생성량 (신규 중첩 포맷)
+                    int create1h = (response.usage() != null
+                            && response.usage().cacheCreation() != null
+                            && response.usage().cacheCreation().ephemeral1h() != null)
+                        ? response.usage().cacheCreation().ephemeral1h() : 0;
+                    log.info("LLM_CALL provider=claude-api correlationId={} latencyMs={} " +
+                             "inputTokens={} outputTokens={} cacheRead={} cacheCreate5m={} cacheCreate1h={} sessionId={}",
+                             invocationId, latencyMs, inputTok, outputTok,
+                             cacheRead, (cacheCreate - create1h), create1h, sessionId);
+
+                    LLMRequest llmReq = LLMRequest.builder()
+                        .correlationId(invocationId)
+                        .userInput("")          // 프롬프트 내용 비기록 정책
+                        .metadata(Map.of("sessionId", sessionId != null ? sessionId : "",
+                                         "provider", "claude-api"))
+                        .build();
+                    LLMResponse llmRes = LLMResponse.builder()
+                        .rawText(text)
+                        .provider("claude-api")
+                        .correlationId(invocationId)
+                        .latencyMs(latencyMs)
+                        .tokensUsed(inputTok + outputTok)
+                        .inputTokens(inputTok)
+                        .outputTokens(outputTok)
+                        .cacheReadTokens(cacheRead > 0 ? cacheRead : null)
+                        .cacheCreationTokens(cacheCreate > 0 ? cacheCreate : null)
+                        .isFallback(false)
+                        .build();
+                    llmCallLogger.logCall(llmReq, llmRes, null);
 
                 } finally {
                     semaphore.release();
@@ -192,9 +230,12 @@ public class ClaudeApiProvider implements LLMProvider {
     private AnthropicRequest buildStructuredRequest(StructuredPrompt prompt, String model) {
         List<AnthropicTextBlock> systemBlocks = new ArrayList<>();
 
-        appendTierWithBreakpoint(systemBlocks, prompt.getSegmentsByTier(CacheTier.GLOBAL_STATIC));
-        appendTierWithBreakpoint(systemBlocks, prompt.getSegmentsByTier(CacheTier.SESSION_STATIC));
-        appendTierWithBreakpoint(systemBlocks, prompt.getSegmentsByTier(CacheTier.HISTORY));
+        // bp1: GLOBAL_STATIC → 1h TTL (system.md, gottman, nvc, chat_mode — 배포 단위로만 변경)
+        appendTierWithBreakpoint(systemBlocks, prompt.getSegmentsByTier(CacheTier.GLOBAL_STATIC), true);
+        // bp2: SESSION_STATIC → 5m TTL (mediator_style, relations, user_profile — 세션별 변동)
+        appendTierWithBreakpoint(systemBlocks, prompt.getSegmentsByTier(CacheTier.SESSION_STATIC), false);
+        // bp3: HISTORY → 5m TTL (대화 기록 — 매 턴 증분)
+        appendTierWithBreakpoint(systemBlocks, prompt.getSegmentsByTier(CacheTier.HISTORY), false);
 
         String dynamicText = prompt.getSegmentsByTier(CacheTier.DYNAMIC).stream()
             .map(PromptSegment::getText)
@@ -208,15 +249,24 @@ public class ClaudeApiProvider implements LLMProvider {
             .build();
     }
 
-    /** tier 세그먼트들을 systemBlocks에 추가; 마지막 세그먼트에 cache_control 부착 */
-    private void appendTierWithBreakpoint(List<AnthropicTextBlock> target, List<PromptSegment> segments) {
+    /**
+     * tier 세그먼트들을 systemBlocks에 추가; 마지막 세그먼트에 cache_control 부착.
+     * @param useLongTtl true → 1h TTL (GLOBAL_STATIC), false → 5m TTL (SESSION/HISTORY)
+     */
+    private void appendTierWithBreakpoint(List<AnthropicTextBlock> target,
+                                          List<PromptSegment> segments,
+                                          boolean useLongTtl) {
         if (segments.isEmpty()) return;
         for (int i = 0; i < segments.size(); i++) {
             boolean isLast = (i == segments.size() - 1);
             String text = segments.get(i).getText();
-            target.add(isLast && cacheEnabled
-                ? AnthropicTextBlock.cached(text)
-                : AnthropicTextBlock.text(text));
+            if (isLast && cacheEnabled) {
+                target.add(useLongTtl
+                    ? AnthropicTextBlock.cachedLong(text)   // 1h TTL
+                    : AnthropicTextBlock.cached(text));      // 5m TTL
+            } else {
+                target.add(AnthropicTextBlock.text(text));
+            }
         }
     }
 

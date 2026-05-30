@@ -21,14 +21,23 @@ public record AnthropicResponse(
 ) {
     /**
      * Usage statistics including cache read/creation tokens.
+     * API 2025 기준 신규 중첩 포맷 (ephemeral_5m / ephemeral_1h) 병행 지원.
      */
     @Builder
     public record UsageBlock(
         @JsonProperty("input_tokens") int inputTokens,
         @JsonProperty("output_tokens") int outputTokens,
         @JsonProperty("cache_read_input_tokens") Integer cacheReadInputTokens,
-        @JsonProperty("cache_creation_input_tokens") Integer cacheCreationInputTokens
-    ) {}
+        @JsonProperty("cache_creation_input_tokens") Integer cacheCreationInputTokens,
+        /** 신규 중첩 포맷 — TTL별 캐시 생성량 */
+        @JsonProperty("cache_creation") CacheCreationDetail cacheCreation
+    ) {
+        @Builder
+        public record CacheCreationDetail(
+            @JsonProperty("ephemeral_5m_input_tokens") Integer ephemeral5m,
+            @JsonProperty("ephemeral_1h_input_tokens") Integer ephemeral1h
+        ) {}
+    }
 
     /**
      * Extract all text content from response blocks.
