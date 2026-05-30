@@ -150,9 +150,9 @@ export default function SignupPage() {
         localStorage.setItem('again-spring-token', token.accessToken);
       }
       setUser(user);
-      // 게스트 세션에서 업그레이드된 경우 새 세션 시작 안내 페이지로
+      // 게스트 세션에서 업그레이드된 경우 원래 세션으로 복귀
       if (fromGuestSession) {
-        router.push(`/?upgraded=true`);
+        router.push(`/session/chat/${fromGuestSession}`);
       } else {
         router.push('/');
       }
