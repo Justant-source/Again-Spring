@@ -120,6 +120,7 @@ export function ChatPanel({
   const canFinalize = myMessages.length >= 5;
   const myAgreed = currentUserSender === 'USER_A' ? session?.finalizeAgreedByA : session?.finalizeAgreedByB;
   const isFinalized = session?.status === 'awaiting_finalization' && !!myAgreed;
+  const isGuestLimited = user?.isGuest === true && mediatorTurnCount >= 3;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--P-bg)' }}>
@@ -204,8 +205,9 @@ export function ChatPanel({
 
       <ChatInput
         onSend={handleSend}
-        disabled={isFinalized || (user?.isGuest === true && mediatorTurnCount >= 3)}
+        disabled={isFinalized || isGuestLimited}
         onCrisis={() => setCrisisLevel1(true)}
+        onDisabledClick={isGuestLimited ? () => showGuestLimitModal(sessionId) : undefined}
       />
 
       {crisisLevel1 && <CrisisModal onClose={() => setCrisisLevel1(false)} />}

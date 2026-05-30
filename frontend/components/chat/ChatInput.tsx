@@ -7,9 +7,10 @@ interface Props {
   onSend: (content: string) => void;
   disabled?: boolean;
   onCrisis?: () => void;
+  onDisabledClick?: () => void;
 }
 
-export function ChatInput({ onSend, disabled, onCrisis }: Props) {
+export function ChatInput({ onSend, disabled, onCrisis, onDisabledClick }: Props) {
   const [text, setText] = useState('');
 
   const handleSend = () => {
@@ -33,6 +34,7 @@ export function ChatInput({ onSend, disabled, onCrisis }: Props) {
       padding: '8px 14px 12px',
       borderTop: '1px solid var(--P-border)',
       background: 'var(--P-bg)',
+      position: 'relative',
     }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
       <textarea
@@ -84,6 +86,13 @@ export function ChatInput({ onSend, disabled, onCrisis }: Props) {
       <div style={{ fontSize: 11, color: 'var(--P-sub)', marginTop: 6, textAlign: 'center' }}>
         이 글은 AI가 정리해서 전달돼요
       </div>
+      {disabled && onDisabledClick && (
+        <div
+          onClick={onDisabledClick}
+          style={{ position: 'absolute', inset: 0, cursor: 'pointer', zIndex: 1 }}
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 }
