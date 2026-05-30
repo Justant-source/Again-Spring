@@ -38,6 +38,15 @@ env/.env.prod
 *.p12
 *.keystore
 
+# ===== Test reports & coverage =====
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+# ===== DB backups =====
+.backup/
+backup_*.sql
+
 # ===== Tool / OS =====
 .DS_Store
 Thumbs.db
