@@ -35,7 +35,7 @@ class FlywayMigrationIT extends MariaDbIntegrationSupport {
 
         assertThat(failedCount).as("실패한 마이그레이션").isZero();
         assertThat(pendingCount).as("미적용 마이그레이션").isZero();
-        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(33);
+        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(42);
     }
 
     @Test

@@ -50,6 +50,7 @@ public class ReportGenerationService {
     private final PromptLoader promptLoader;
     private final ChatPromptAssembler chatPromptAssembler;
     private final UserProfileFragment profileFragment;
+    private final ReportContextAssembler reportContextAssembler;
 
     @Value("${llm.claude-code.report-model:claude-sonnet-4-6}")
     private String reportModel;
@@ -177,6 +178,8 @@ public class ReportGenerationService {
         }
         sb.append(promptLoader.get("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
         sb.append(promptLoader.get("chat/solo_report.md")).append("\n\n");
+        String soloCtx = reportContextAssembler.assemble(session);
+        if (!soloCtx.isEmpty()) sb.append(soloCtx).append("\n\n");
         appendConversationHistory(sb, messages, true);
         if (session.getConflictType() != null) {
             sb.append("<conflict_type>").append(session.getConflictType()).append("</conflict_type>\n\n");
@@ -198,6 +201,8 @@ public class ReportGenerationService {
         if (!profileA.isEmpty() || !profileB.isEmpty()) sb.append("\n");
         sb.append(promptLoader.get("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
         sb.append(promptLoader.get("chat/duo_report.md")).append("\n\n");
+        String duoCtx = reportContextAssembler.assemble(session);
+        if (!duoCtx.isEmpty()) sb.append(duoCtx).append("\n\n");
         appendConversationHistory(sb, messages, false);
         sb.append("<perspective>").append(perspective == MessageSender.USER_A ? "A" : "B").append("</perspective>\n\n");
         if (session.getConflictType() != null) {

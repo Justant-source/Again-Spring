@@ -7,7 +7,6 @@ import com.againspring.llm.bridge.exception.LLMCapacityException;
 import com.againspring.llm.monitoring.LLMCallLogger;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -22,8 +21,7 @@ import java.util.concurrent.CompletionException;
  * Delegates to ClaudeCodeWorkerPool for concurrency management and timeout enforcement.
  */
 @Slf4j
-@Component
-@ConditionalOnProperty(name = "llm.provider", havingValue = "claude-code", matchIfMissing = true)
+@Component("claudeCodeBridge")
 public class ClaudeCodeBridge implements LLMProvider {
 
     // Claude Code CLI의 기본 SW엔지니어링 시스템 프롬프트를 교체해 캐릭터 이탈 방지
@@ -196,6 +194,12 @@ public class ClaudeCodeBridge implements LLMProvider {
         });
 
         return inv;
+    }
+
+    @Override
+    public CancelableInvocation invokeCancelable(com.againspring.llm.prompt.StructuredPrompt prompt, String model, String sessionId) {
+        // Delegate to String version via flatten()
+        return invokeCancelable(prompt.flatten(), model, sessionId);
     }
 
     private String runClaudeCommandWithInvocation(

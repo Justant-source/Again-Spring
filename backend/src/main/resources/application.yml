@@ -101,7 +101,11 @@ app:
     support-email: againspring2026@gmail.com
 
 llm:
-  provider: ${LLM_PROVIDER:claude-code}
+  provider: ${LLM_PROVIDER:claude-code}   # deprecated: llm.chat.provider / llm.report.provider 사용
+  chat:
+    provider: ${LLM_CHAT_PROVIDER:claude-code}     # dev:remote  prod:claude-api  test:mock
+  report:
+    provider: ${LLM_REPORT_PROVIDER:claude-code}   # dev:remote  prod:remote      test:mock
   remote:
     base-url: ${LLM_WORKER_URL:http://againspring-llm-dev:8090}
     connect-timeout-ms: ${LLM_REMOTE_CONNECT_TIMEOUT_MS:5000}
@@ -116,7 +120,11 @@ llm:
     default-timeout-ms: 120000
   claude-api:
     key: ${ANTHROPIC_API_KEY:}
-    model: ${CLAUDE_MODEL:claude-sonnet-4-5}
+    model: ${LLM_API_CHAT_MODEL:claude-haiku-4-5-20251001}
+    max-concurrency: ${LLM_API_MAX_CONCURRENCY:8}
+    cache:
+      enabled: ${LLM_API_CACHE_ENABLED:true}
+      ttl: ${LLM_API_CACHE_TTL:5m}
 
 logging:
   level:

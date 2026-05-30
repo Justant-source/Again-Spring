@@ -2,7 +2,6 @@ package com.againspring.llm.bridge;
 
 import com.againspring.llm.*;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -16,8 +15,7 @@ import java.util.concurrent.CompletionException;
  * Returns scripted responses based on request metadata (turnNumber, etc).
  */
 @Slf4j
-@Component
-@ConditionalOnProperty(name = "llm.provider", havingValue = "mock")
+@Component("mockLlmProvider")
 public class MockLLMProvider implements LLMProvider {
 
     private static final Map<String, String> MOCK_RESPONSES = new HashMap<>();
@@ -87,6 +85,12 @@ public class MockLLMProvider implements LLMProvider {
         CancelableInvocation ci = new CancelableInvocation(UUID.randomUUID().toString(), sessionId);
         ci.getResultFuture().complete("[Mock] 두 분의 이야기를 잘 들었어요.");
         return ci;
+    }
+
+    @Override
+    public CancelableInvocation invokeCancelable(com.againspring.llm.prompt.StructuredPrompt prompt, String model, String sessionId) {
+        // Delegate to String version via flatten()
+        return invokeCancelable(prompt.flatten(), model, sessionId);
     }
 
     @Override

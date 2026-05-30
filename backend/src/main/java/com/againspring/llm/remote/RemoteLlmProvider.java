@@ -9,7 +9,6 @@ import com.againspring.llm.bridge.exception.LLMTimeoutException;
 import com.againspring.llm.remote.dto.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -25,8 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * PromptSanitizer + 프롬프트 어셈블은 backend에서 수행, 워커는 완성 프롬프트만 수신.
  */
 @Slf4j
-@Component
-@ConditionalOnProperty(name = "llm.provider", havingValue = "remote")
+@Component("remoteLlmProvider")
 public class RemoteLlmProvider implements LLMProvider {
 
     private final PromptSanitizer sanitizer;

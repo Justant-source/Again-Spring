@@ -6,6 +6,7 @@ import com.againspring.domain.enums.MessageSender;
 import com.againspring.domain.enums.SessionStatus;
 import com.againspring.llm.bridge.CancelableInvocation;
 import com.againspring.llm.bridge.ClaudeCodeBridge;
+import com.againspring.llm.prompt.StructuredPrompt;
 import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class CancelableChatServiceTest {
@@ -87,9 +89,9 @@ class CancelableChatServiceTest {
 
     @Test
     void testNewMessageCancelsActiveInvocation() throws Exception {
-        doReturn("prompt").when(promptAssembler).assembleSoloTurn(any(), any(), any(), any());
+        doReturn(new StructuredPrompt()).when(promptAssembler).assembleSoloTurnStructured(any(), any(), anyString(), any());
         CancelableInvocation inv1 = new CancelableInvocation("inv-1", SESSION_ID);
-        when(llmBridge.invokeCancelable(any(), any(), eq(SESSION_ID))).thenReturn(inv1);
+        when(llmBridge.invokeCancelable(any(StructuredPrompt.class), anyString(), anyString())).thenReturn(inv1);
 
         service.acceptUserMessage(SESSION_ID, MessageSender.USER_A, "첫 메시지");
         service.beginInvocation(SESSION_ID, MessageSender.USER_A);
@@ -98,7 +100,7 @@ class CancelableChatServiceTest {
 
         // Second message arrives — should cancel inv1
         CancelableInvocation inv2 = new CancelableInvocation("inv-2", SESSION_ID);
-        doReturn(inv2).when(llmBridge).invokeCancelable(any(), any(), eq(SESSION_ID));
+        doReturn(inv2).when(llmBridge).invokeCancelable(any(StructuredPrompt.class), anyString(), anyString());
 
         service.acceptUserMessage(SESSION_ID, MessageSender.USER_A, "두 번째 메시지");
 
@@ -112,10 +114,10 @@ class CancelableChatServiceTest {
 
     @Test
     void testTwoQuickMessagesOnlySecondInvocationSurvives() throws Exception {
-        doReturn("prompt").when(promptAssembler).assembleSoloTurn(any(), any(), any(), any());
+        doReturn(new StructuredPrompt()).when(promptAssembler).assembleSoloTurnStructured(any(), any(), anyString(), any());
 
         List<CancelableInvocation> created = new ArrayList<>();
-        when(llmBridge.invokeCancelable(any(), any(), any())).thenAnswer(inv -> {
+        when(llmBridge.invokeCancelable(any(StructuredPrompt.class), anyString(), anyString())).thenAnswer(inv -> {
             CancelableInvocation ci = new CancelableInvocation("inv-" + created.size(), SESSION_ID);
             created.add(ci);
             return ci;
@@ -133,10 +135,10 @@ class CancelableChatServiceTest {
 
     @Test
     void testFiveQuickMessagesOnlyLastInvocationSurvives() throws Exception {
-        doReturn("prompt").when(promptAssembler).assembleSoloTurn(any(), any(), any(), any());
+        doReturn(new StructuredPrompt()).when(promptAssembler).assembleSoloTurnStructured(any(), any(), anyString(), any());
 
         List<CancelableInvocation> created = new ArrayList<>();
-        when(llmBridge.invokeCancelable(any(), any(), any())).thenAnswer(inv -> {
+        when(llmBridge.invokeCancelable(any(StructuredPrompt.class), anyString(), anyString())).thenAnswer(inv -> {
             CancelableInvocation ci = new CancelableInvocation("inv-" + created.size(), SESSION_ID);
             created.add(ci);
             return ci;
@@ -157,9 +159,9 @@ class CancelableChatServiceTest {
 
     @Test
     void testCanceledInvocationDoesNotSaveMediatorMessage() throws Exception {
-        doReturn("prompt").when(promptAssembler).assembleSoloTurn(any(), any(), any(), any());
+        doReturn(new StructuredPrompt()).when(promptAssembler).assembleSoloTurnStructured(any(), any(), anyString(), any());
         CancelableInvocation inv = new CancelableInvocation("inv-1", SESSION_ID);
-        when(llmBridge.invokeCancelable(any(), any(), any())).thenReturn(inv);
+        when(llmBridge.invokeCancelable(any(StructuredPrompt.class), anyString(), anyString())).thenReturn(inv);
 
         service.acceptUserMessage(SESSION_ID, MessageSender.USER_A, "msg");
         service.beginInvocation(SESSION_ID, MessageSender.USER_A);
@@ -173,9 +175,9 @@ class CancelableChatServiceTest {
 
     @Test
     void testCrisisLevel1DoesNotCancelActiveInvocation() throws Exception {
-        doReturn("prompt").when(promptAssembler).assembleSoloTurn(any(), any(), any(), any());
+        doReturn(new StructuredPrompt()).when(promptAssembler).assembleSoloTurnStructured(any(), any(), anyString(), any());
         CancelableInvocation activeInv = new CancelableInvocation("inv-active", SESSION_ID);
-        when(llmBridge.invokeCancelable(any(), any(), any())).thenReturn(activeInv);
+        when(llmBridge.invokeCancelable(any(StructuredPrompt.class), anyString(), anyString())).thenReturn(activeInv);
 
         service.acceptUserMessage(SESSION_ID, MessageSender.USER_A, "정상 메시지");
         service.beginInvocation(SESSION_ID, MessageSender.USER_A);
@@ -191,9 +193,9 @@ class CancelableChatServiceTest {
 
     @Test
     void testSessionCleanupCancelsActiveInvocation() throws Exception {
-        doReturn("prompt").when(promptAssembler).assembleSoloTurn(any(), any(), any(), any());
+        doReturn(new StructuredPrompt()).when(promptAssembler).assembleSoloTurnStructured(any(), any(), anyString(), any());
         CancelableInvocation inv = new CancelableInvocation("inv-1", SESSION_ID);
-        when(llmBridge.invokeCancelable(any(), any(), any())).thenReturn(inv);
+        when(llmBridge.invokeCancelable(any(StructuredPrompt.class), anyString(), anyString())).thenReturn(inv);
 
         service.acceptUserMessage(SESSION_ID, MessageSender.USER_A, "msg");
         service.beginInvocation(SESSION_ID, MessageSender.USER_A);

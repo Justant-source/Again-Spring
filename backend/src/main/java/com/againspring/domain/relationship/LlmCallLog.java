@@ -61,6 +61,22 @@ public class LlmCallLog {
     @Column(length = 64, name = "error_code")
     private String errorCode;
 
+    /** 캐시에서 읽은 입력 토큰 수 — claude-api 경로에서만 채워짐, CLI 경로는 NULL */
+    @Column(name = "cache_read_tokens")
+    private Integer cacheReadTokens;
+
+    /** 캐시에 새로 쓴 입력 토큰 수 — claude-api 경로에서만 채워짐 */
+    @Column(name = "cache_creation_tokens")
+    private Integer cacheCreationTokens;
+
+    /** 실제 입력 토큰 수 — claude-api 경로에서만 채워짐 */
+    @Column(name = "input_tokens")
+    private Integer inputTokens;
+
+    /** 실제 출력 토큰 수 — claude-api 경로에서만 채워짐 */
+    @Column(name = "output_tokens")
+    private Integer outputTokens;
+
     @Column(nullable = false, updatable = false, name = "created_at")
     private Instant createdAt;
 

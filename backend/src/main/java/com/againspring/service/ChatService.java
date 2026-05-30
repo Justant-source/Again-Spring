@@ -16,6 +16,7 @@ import com.againspring.service.prompt.ChatPromptAssembler;
 import com.againspring.service.report.ReportGenerationService;
 import com.againspring.service.event.PartnerJoinedEvent;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -54,7 +55,7 @@ public class ChatService {
 
     public ChatService(MessageRepository messageRepo, SessionRepository sessionRepo,
                       UserRepository userRepo,
-                      LLMProvider llmBridge, CrisisDetector crisisDetector,
+                      @Qualifier("chatLlmProvider") LLMProvider llmBridge, CrisisDetector crisisDetector,
                       ChatPromptAssembler promptAssembler, SessionStateMachine stateMachine,
                       ReportGenerationService reportService,
                       ChatTurnProcessor chatTurnProcessor,

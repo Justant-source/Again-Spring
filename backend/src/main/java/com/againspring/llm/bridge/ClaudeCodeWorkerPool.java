@@ -6,7 +6,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -21,7 +20,6 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "llm.provider", havingValue = "claude-code", matchIfMissing = true)
 public class ClaudeCodeWorkerPool {
 
     /**

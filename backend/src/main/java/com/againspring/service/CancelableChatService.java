@@ -8,12 +8,14 @@ import com.againspring.domain.enums.MessageSender;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.bridge.CancelableInvocation;
 import com.againspring.llm.bridge.exception.InvocationCanceledException;
+import com.againspring.llm.prompt.StructuredPrompt;
 import com.againspring.repository.MessageRepository;
 import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.crisis.CrisisDetector;
 import com.againspring.service.prompt.ChatPromptAssembler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +55,7 @@ public class CancelableChatService {
             MessageRepository messageRepo,
             SessionRepository sessionRepo,
             UserRepository userRepo,
-            LLMProvider llmBridge,
+            @Qualifier("chatLlmProvider") LLMProvider llmBridge,
             CrisisDetector crisisDetector,
             ChatPromptAssembler promptAssembler,
             SessionStateMachine stateMachine,
@@ -145,9 +147,10 @@ public class CancelableChatService {
     /**
      * 새 LLM invocation 시작 (비동기).
      * acceptUserMessage 트랜잭션이 커밋된 후 컨트롤러에서 호출해야 함.
+     * 구조화 프롬프트 사용 — StructuredPrompt로 빌드 후 invokeCancelable(StructuredPrompt, ...) 호출.
      */
     public void beginInvocation(String sessionId, MessageSender sender) {
-        final String[] promptHolder = new String[1];
+        final StructuredPrompt[] promptHolder = new StructuredPrompt[1];
         transactionTemplate.execute(status -> {
             Session session = sessionRepo.findById(sessionId).orElse(null);
             if (session == null || !stateMachine.isActive(session.getStatus())) return null;
@@ -162,23 +165,23 @@ public class CancelableChatService {
                 if (isDuo) {
                     User userA = loadUserSafely(session.getUserAId());
                     User userB = loadUserSafely(session.getUserBId());
-                    promptHolder[0] = promptAssembler.assembleDuoTurn(
+                    promptHolder[0] = promptAssembler.assembleDuoTurnStructured(
                             session, userA, userB, sender, lastContent, recentMessages);
                 } else {
                     String uid = sender == MessageSender.USER_A
                             ? session.getUserAId() : session.getUserBId();
                     User soloUser = loadUserSafely(uid);
-                    promptHolder[0] = promptAssembler.assembleSoloTurn(
+                    promptHolder[0] = promptAssembler.assembleSoloTurnStructured(
                             session, soloUser, lastContent, recentMessages);
                 }
             } catch (Exception e) {
                 log.error("Prompt assembly failed for session {}", sessionId, e);
-                promptHolder[0] = "";
+                promptHolder[0] = StructuredPrompt.empty();
             }
             return null;
         });
 
-        String prompt = promptHolder[0];
+        StructuredPrompt prompt = promptHolder[0];
         if (prompt == null) {
             log.warn("Session {} not found or inactive — skipping invocation", sessionId);
             return;

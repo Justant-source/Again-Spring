@@ -23,6 +23,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -66,7 +67,7 @@ public abstract class GuestFlowITSupport {
             ci.getResultFuture().complete("[통합테스트] 두 분의 이야기를 잘 들었어요.");
             return ci;
         };
-        when(mockClaudeCodeBridge.invokeCancelable(any(), any(), any()))
+        when(mockClaudeCodeBridge.invokeCancelable(anyString(), anyString(), anyString()))
                 .thenAnswer(deterministicAnswer);
     }
 

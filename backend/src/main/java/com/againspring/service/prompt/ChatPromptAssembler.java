@@ -4,10 +4,15 @@ import com.againspring.domain.Message;
 import com.againspring.domain.Session;
 import com.againspring.domain.User;
 import com.againspring.domain.enums.MessageSender;
+import com.againspring.llm.prompt.CacheTier;
 import com.againspring.llm.prompt.PromptLoader;
+import com.againspring.llm.prompt.PromptSegment;
+import com.againspring.llm.prompt.SegmentRole;
+import com.againspring.llm.prompt.StructuredPrompt;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -169,6 +174,218 @@ public class ChatPromptAssembler {
         sb.append("</solo_conversation_history>\n");
 
         return sb.toString();
+    }
+
+    /**
+     * Solo 모드 구조화 프롬프트 — 본인 컨텍스트만 사용.
+     *
+     * Legacy order (§7.2):
+     *   1. system.md [GLOBAL_STATIC]
+     *   2. <mediator_style> [SESSION_STATIC]
+     *   3. gottman/four_horsemen.md [GLOBAL_STATIC]
+     *   4. nvc/four_steps.md [GLOBAL_STATIC]
+     *   5. <user_profile> [SESSION_STATIC]
+     *   6. <psychology_feedback> [DYNAMIC]
+     *   7. Phase-D fragments: issue, state, queue [DYNAMIC]
+     *   8. relations/<type>.md [SESSION_STATIC]
+     *   9. <category_context> [DYNAMIC]
+     *  10. solo_chat.md [GLOBAL_STATIC]
+     *  11. <conversation_history> [HISTORY]
+     *  12. <current_user_message> [DYNAMIC]
+     *  13. _response_instructions.md [DYNAMIC]
+     *
+     * flatten() guarantees byte-for-byte equivalence with legacy assembleSoloTurn().
+     * Segments are added in legacy order, with tiers reflecting prompt caching tier.
+     */
+    public StructuredPrompt assembleSoloTurnStructured(Session session, User user, String currentMessage, List<Message> recentMessages) throws Exception {
+        StructuredPrompt prompt = new StructuredPrompt();
+
+        // 1. system.md
+        prompt.add(CacheTier.GLOBAL_STATIC, safeLoad("system.md") + "\n\n", SegmentRole.SYSTEM);
+
+        // 2. <mediator_style>
+        String mediatorStyle = buildMediatorStyleFragment(session.getMediatorStyleX(), session.getMediatorStyleY());
+        prompt.add(CacheTier.SESSION_STATIC, mediatorStyle + "\n\n", SegmentRole.USER_CONTEXT);
+
+        // 3-4. gottman/four_horsemen.md + nvc/four_steps.md
+        prompt.add(CacheTier.GLOBAL_STATIC, safeLoad("gottman/four_horsemen.md") + "\n\n", SegmentRole.FRAMEWORK);
+        prompt.add(CacheTier.GLOBAL_STATIC, safeLoad("nvc/four_steps.md") + "\n\n", SegmentRole.FRAMEWORK);
+
+        // 5. <user_profile> (conditional)
+        String profile = profileFragment.render(user);
+        if (!profile.isEmpty()) {
+            prompt.add(CacheTier.SESSION_STATIC, profile + "\n", SegmentRole.USER_CONTEXT);
+        }
+
+        // 6. <psychology_feedback> (conditional)
+        String feedback = psychologyFeedback.render(session);
+        if (!feedback.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, feedback + "\n", SegmentRole.USER_CONTEXT);
+        }
+
+        // 7. Phase D fragments (conditional)
+        String issue = issueContextFragment.render(session);
+        if (!issue.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, issue + "\n", SegmentRole.USER_CONTEXT);
+        }
+        String state = userStateFragment.render(session, false);
+        if (!state.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, state + "\n", SegmentRole.USER_CONTEXT);
+        }
+        String queue = questionQueueFragment.render(session, MessageSender.USER_A);
+        if (!queue.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, queue + "\n", SegmentRole.USER_CONTEXT);
+        }
+
+        // 8. relations/<type>.md
+        prompt.add(CacheTier.SESSION_STATIC, safeLoad("relations/" + session.getRelationType().getValue() + ".md") + "\n\n", SegmentRole.USER_CONTEXT);
+
+        // 9. <category_context> (conditional)
+        String categoryContext = categoryContextFragment.render(session);
+        if (!categoryContext.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, categoryContext + "\n", SegmentRole.USER_CONTEXT);
+        }
+
+        // 10. solo_chat.md
+        prompt.add(CacheTier.GLOBAL_STATIC, safeLoad("chat/solo_chat.md") + "\n\n", SegmentRole.FRAMEWORK);
+
+        // 11. <conversation_history> — split into segments
+        prompt.add(CacheTier.HISTORY, "<conversation_history>\n", SegmentRole.CONVERSATION_HISTORY);
+        for (var msg : recentMessages) {
+            prompt.add(CacheTier.HISTORY, "[" + formatSender(msg.getSender()) + "] " + msg.getContent() + "\n", SegmentRole.CONVERSATION_HISTORY);
+        }
+        prompt.add(CacheTier.HISTORY, "</conversation_history>\n\n", SegmentRole.CONVERSATION_HISTORY);
+
+        // 12. <current_user_message>
+        prompt.add(CacheTier.DYNAMIC, "<current_user_message>\n" + currentMessage + "\n</current_user_message>\n\n", SegmentRole.CURRENT_INPUT);
+
+        // 13. _response_instructions.md
+        prompt.add(CacheTier.DYNAMIC, safeLoad("chat/_response_instructions.md"), SegmentRole.INSTRUCTIONS);
+
+        return prompt;
+    }
+
+    /**
+     * Duo 모드 구조화 프롬프트 — 양쪽 컨텍스트 모두 사용. 단, 응답은 currentUserSender에게만 보내짐.
+     *
+     * Legacy order (§7.2):
+     *   1. system.md [GLOBAL_STATIC]
+     *   2. <mediator_style> [SESSION_STATIC]
+     *   3. gottman/four_horsemen.md [GLOBAL_STATIC]
+     *   4. nvc/four_steps.md [GLOBAL_STATIC]
+     *   5. <user_profile>(들) [SESSION_STATIC]
+     *   6. <psychology_feedback> [DYNAMIC]
+     *   7. Phase-D fragments: issue, state, queue [DYNAMIC]
+     *   8. relations/<type>.md [SESSION_STATIC]
+     *   9. <category_context> [DYNAMIC]
+     *  10. duo_chat.md [GLOBAL_STATIC]
+     *  11. <conversation_history> [HISTORY]
+     *  12. <current_user_message> [DYNAMIC]
+     *  13. _response_instructions.md [DYNAMIC]
+     *  14. <partner_onboarding> (B early, conditional) [DYNAMIC]
+     *  15. <duo_specific_rules> [DYNAMIC]
+     *  16. <duo_balance> (conditional) [DYNAMIC]
+     *
+     * flatten() guarantees byte-for-byte equivalence with legacy assembleDuoTurn().
+     */
+    public StructuredPrompt assembleDuoTurnStructured(Session session, User userA, User userB, MessageSender currentUserSender,
+                                                      String currentMessage, List<Message> allRecentMessages) throws Exception {
+        StructuredPrompt prompt = new StructuredPrompt();
+
+        // 1. system.md
+        prompt.add(CacheTier.GLOBAL_STATIC, safeLoad("system.md") + "\n\n", SegmentRole.SYSTEM);
+
+        // 2. <mediator_style>
+        String mediatorStyle = buildMediatorStyleFragment(session.getMediatorStyleX(), session.getMediatorStyleY());
+        prompt.add(CacheTier.SESSION_STATIC, mediatorStyle + "\n\n", SegmentRole.USER_CONTEXT);
+
+        // 3-4. gottman/four_horsemen.md + nvc/four_steps.md
+        prompt.add(CacheTier.GLOBAL_STATIC, safeLoad("gottman/four_horsemen.md") + "\n\n", SegmentRole.FRAMEWORK);
+        prompt.add(CacheTier.GLOBAL_STATIC, safeLoad("nvc/four_steps.md") + "\n\n", SegmentRole.FRAMEWORK);
+
+        // 5. <user_profile>(들) (conditional)
+        String profileA = profileFragment.render(userA, MessageSender.USER_A);
+        String profileB = profileFragment.render(userB, MessageSender.USER_B);
+        if (!profileA.isEmpty()) prompt.add(CacheTier.SESSION_STATIC, profileA, SegmentRole.USER_CONTEXT);
+        if (!profileB.isEmpty()) prompt.add(CacheTier.SESSION_STATIC, profileB, SegmentRole.USER_CONTEXT);
+        if (!profileA.isEmpty() || !profileB.isEmpty()) prompt.add(CacheTier.SESSION_STATIC, "\n", SegmentRole.USER_CONTEXT);
+
+        // 6. <psychology_feedback> (conditional)
+        String feedback = psychologyFeedback.render(session);
+        if (!feedback.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, feedback + "\n", SegmentRole.USER_CONTEXT);
+        }
+
+        // 7. Phase D fragments (conditional)
+        String issue = issueContextFragment.render(session);
+        if (!issue.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, issue + "\n", SegmentRole.USER_CONTEXT);
+        }
+        String state = userStateFragment.render(session, true);
+        if (!state.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, state + "\n", SegmentRole.USER_CONTEXT);
+        }
+        String queue = questionQueueFragment.render(session, currentUserSender);
+        if (!queue.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, queue + "\n", SegmentRole.USER_CONTEXT);
+        }
+
+        // 8. relations/<type>.md
+        prompt.add(CacheTier.SESSION_STATIC, safeLoad("relations/" + session.getRelationType().getValue() + ".md") + "\n\n", SegmentRole.USER_CONTEXT);
+
+        // 9. <category_context> (conditional)
+        String categoryContextDuo = categoryContextFragment.render(session);
+        if (!categoryContextDuo.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, categoryContextDuo + "\n", SegmentRole.USER_CONTEXT);
+        }
+
+        // 10. duo_chat.md
+        prompt.add(CacheTier.GLOBAL_STATIC, safeLoad("chat/duo_chat.md") + "\n\n", SegmentRole.FRAMEWORK);
+
+        // 11. <conversation_history> — split into segments
+        prompt.add(CacheTier.HISTORY, "<conversation_history note=\"두 사람 모두의 대화. 응답할 때는 " + formatSender(currentUserSender) + "에게만 답하세요.\">\n", SegmentRole.CONVERSATION_HISTORY);
+        for (var msg : allRecentMessages) {
+            prompt.add(CacheTier.HISTORY, "[" + formatSender(msg.getSender()) + "] " + msg.getContent() + "\n", SegmentRole.CONVERSATION_HISTORY);
+        }
+        prompt.add(CacheTier.HISTORY, "</conversation_history>\n\n", SegmentRole.CONVERSATION_HISTORY);
+
+        // 12. <current_user_message>
+        prompt.add(CacheTier.DYNAMIC, "<current_user_message sender=\"" + formatSender(currentUserSender) + "\">\n" + currentMessage + "\n</current_user_message>\n\n", SegmentRole.CURRENT_INPUT);
+
+        // 13. _response_instructions.md
+        prompt.add(CacheTier.DYNAMIC, safeLoad("chat/_response_instructions.md") + "\n\n", SegmentRole.INSTRUCTIONS);
+
+        // 14. <partner_onboarding> (B early, conditional)
+        if (currentUserSender == MessageSender.USER_B) {
+            int bCount = session.getUserBMessageCount() == null ? 0 : session.getUserBMessageCount();
+            if (bCount <= 2) {
+                String partnerOnboarding = "<partner_onboarding>\n" +
+                        "사용자 B가 막 진입했습니다. 위의 대화 이력에서 A가 공유한 상황의 핵심 맥락을 파악하고, " +
+                        "B에게 왜 이 자리에 초대됐는지 구체적으로 안내하세요. " +
+                        "A의 발화를 직접 인용하지 않되, 두 사람 사이의 상황 유형(예: '약속 관련 일', '갈등 상황')은 언급 가능합니다. " +
+                        "B가 거칠게 반응해도 대화를 포기하지 않습니다. " +
+                        "'여기 있을 필요 없어요' 같은 포기성 발화는 절대 하지 않습니다.\n" +
+                        "</partner_onboarding>\n\n";
+                prompt.add(CacheTier.DYNAMIC, partnerOnboarding, SegmentRole.INSTRUCTIONS);
+            }
+        }
+
+        // 15. <duo_specific_rules>
+        String duoRules = "<duo_specific_rules>\n" +
+                "- 응답은 오직 " + formatSender(currentUserSender) + "에게만.\n" +
+                "- 상대방의 발화 내용을 인용하거나 누설 금지.\n" +
+                "- 단, 양쪽 컨텍스트를 종합한 통찰은 가설형으로 가능: \"혹시 상대분도 ~~로 느끼셨을 수 있어요\"\n" +
+                "- 한쪽 편들지 않음. 균형 유지.\n" +
+                "</duo_specific_rules>";
+        prompt.add(CacheTier.DYNAMIC, duoRules, SegmentRole.INSTRUCTIONS);
+
+        // 16. <duo_balance> (conditional)
+        String balance = duoBalance.render(session);
+        if (!balance.isEmpty()) {
+            prompt.add(CacheTier.DYNAMIC, "\n\n" + balance, SegmentRole.USER_CONTEXT);
+        }
+
+        return prompt;
     }
 
     private String buildMediatorStyleFragment(int styleX, int styleY) {
