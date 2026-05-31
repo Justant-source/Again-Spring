@@ -79,13 +79,13 @@ export function ChatLayout({ sessionId, session: initialSession }: Props) {
 
         <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
           {!isDuo ? (
-            // Solo: 단일 패널 (V13: canInvite는 TESTER만)
+            // Solo: 단일 패널 (V17: 초대 버튼은 모든 사용자에게 노출)
             <ChatPanel
               sessionId={sessionId}
               session={session}
               currentUserSender={myRole}
               isDuo={false}
-              onOpenInvite={isTester ? () => setShowInviteModal(true) : undefined}
+              onOpenInvite={() => setShowInviteModal(true)}
             />
           ) : isTester ? (
             // Duo: 스와이프 분할 (TESTER만)
@@ -110,8 +110,8 @@ export function ChatLayout({ sessionId, session: initialSession }: Props) {
         </div>
       </div>
 
-      {/* 초대 모달 — TESTER만 */}
-      {isTester && showInviteModal && (
+      {/* 초대 모달 — V17: 모든 사용자 (TESTER 게이트 해제) */}
+      {showInviteModal && (
         <InviteModal
           sessionId={sessionId}
           onClose={() => setShowInviteModal(false)}

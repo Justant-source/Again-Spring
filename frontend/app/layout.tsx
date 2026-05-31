@@ -10,6 +10,7 @@ import { ForcePasswordChangeModal } from '@/components/auth/ForcePasswordChangeM
 import { BetaBanner } from '@/components/shared/BetaBanner';
 import { LegalFooter } from '@/components/shared/LegalFooter';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
+import { BottomNav } from '@/components/shared/BottomNav';
 
 export const metadata: Metadata = {
   title: '다시봄 · Again Spring',
@@ -48,7 +49,8 @@ export default function RootLayout({
           <ForcePasswordChangeModal />
           <OnboardingModal />
           <LegalFooter />
-          <div style={{ paddingTop: '30px', paddingBottom: '44px' }}>{children}</div>
+          <BottomNav />
+          <div style={{ paddingTop: '30px', paddingBottom: '76px' }}>{children}</div>
         </MSWProvider>
       </body>
     </html>

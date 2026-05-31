@@ -22,8 +22,15 @@ export default function CommunityNewPage() {
   const [crisisOpen, setCrisisOpen] = useState(false);
   const [generatedPost, setGeneratedPost] = useState<{ id: string; title: string; bodyPublished: string } | null>(null);
 
-  // 세션스토리지에서 복원
+  // 세션스토리지에서 복원 (결과화면 "다음 단계 선택"에서 올 때)
   useEffect(() => {
+    // 결과화면에서 선택한 visibility 읽기 (버튼 클릭 시 저장)
+    const presetVisibility = sessionStorage.getItem('community-draft-visibility') as 'PUBLIC' | 'PRIVATE' | null;
+    if (presetVisibility) {
+      setVisibility(presetVisibility);
+      sessionStorage.removeItem('community-draft-visibility');
+    }
+
     if (searchParams.get('from') === 'session') {
       try {
         const stored = sessionStorage.getItem('community-draft');
@@ -31,7 +38,10 @@ export default function CommunityNewPage() {
           const draft = JSON.parse(stored);
           setBodyRaw(draft.bodyRaw || '');
           setCategory(draft.category || CATEGORIES[0]?.id || '');
-          setVisibility(draft.visibility || 'PRIVATE');
+          // visibility는 위에서 이미 설정했으므로 draft 값은 fallback으로만 사용
+          if (!presetVisibility) {
+            setVisibility(draft.visibility || 'PRIVATE');
+          }
           sessionStorage.removeItem('community-draft');
         }
       } catch (err) {

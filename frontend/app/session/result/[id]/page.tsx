@@ -276,6 +276,7 @@ export default function ResultPage() {
             variant="card"
             sessionId={sessionId}
             onConvertToCommunity={handleConvertToCommunity}
+            onInvite={() => router.push(`/session/chat/${sessionId}?invite=1`)}
           />
         )}
       </div>

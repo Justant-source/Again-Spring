@@ -186,7 +186,41 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 pb-2" style={{ paddingTop: 50 }}>
+            {/* 커뮤니티 진입 카드 */}
+            <div
+              style={{ marginTop: 20, borderRadius: 10, border: '1px solid var(--L-border)', overflow: 'hidden' }}
+            >
+              <Link
+                href="/community"
+                style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--P-bg, #FBF3EC)' }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--P-ink, #5C4030)' }}>
+                    커뮤니티 사연 보기
+                  </div>
+                  <div style={{ fontSize: 11, marginTop: 3, color: 'var(--P-sub, #A08670)' }}>
+                    다른 사람들의 갈등 사연 · 투표 · AI 배심원
+                  </div>
+                </div>
+                <span style={{ color: 'var(--P-sub)', fontSize: 16 }}>›</span>
+              </Link>
+              <Link
+                href="/three-way/new"
+                style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'white', borderTop: '1px solid var(--L-border)' }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--L-ink, #2B2B2B)' }}>
+                    상대방과 함께 대화하기
+                  </div>
+                  <div style={{ fontSize: 11, marginTop: 3, color: 'var(--L-sub, #8A7F6B)' }}>
+                    3자 대화 · AI 중재자 · 초대 링크 공유
+                  </div>
+                </div>
+                <span style={{ color: 'var(--L-sub)', fontSize: 16 }}>›</span>
+              </Link>
+            </div>
+
+            <div className="flex flex-col gap-2 pb-2" style={{ paddingTop: 24 }}>
               <button
                 onClick={handleStartSession}
                 disabled={!user}

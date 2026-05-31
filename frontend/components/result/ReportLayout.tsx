@@ -25,6 +25,23 @@ interface ReportLayoutProps {
   onConvertToCommunity?: (draft: any) => void;
 }
 
+function nextStepBtn(bg: string, color: string, border: string): React.CSSProperties {
+  return {
+    width: '100%',
+    padding: '14px 16px',
+    background: bg,
+    color,
+    border: `1px solid ${border}`,
+    borderRadius: 10,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    textAlign: 'center',
+    cursor: 'pointer',
+    transition: 'opacity 0.15s',
+  };
+}
+
 export function ReportLayout({
   report,
   myRole,
@@ -217,29 +234,64 @@ export function ReportLayout({
         </div>
       )}
 
-      {/* Phase 5: Convert to Community Button */}
+      {/* 다음 단계 선택 — 커뮤니티 / 배심원 / 상대방 초대 */}
       {sessionId && onConvertToCommunity && (
-        <button
-          data-testid="convert-to-community-btn"
-          onClick={() => onConvertToCommunity(sessionId)}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            marginTop: 8,
-            background: 'var(--P-point, #D4A5A5)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: 'pointer',
-            transition: 'opacity 0.2s',
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.9'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
-        >
-          이 대화를 사연으로 정리하기
-        </button>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 10, fontWeight: 600, letterSpacing: 0.5 }}>
+            다음 단계를 선택하세요
+          </div>
+
+          {/* 비공개 AI 배심원 */}
+          <button
+            data-testid="convert-to-community-btn"
+            onClick={() => {
+              sessionStorage.setItem('community-draft-visibility', 'PRIVATE');
+              onConvertToCommunity(sessionId);
+            }}
+            style={nextStepBtn('#FBF3EC', 'var(--P-ink, #5C4030)', 'var(--P-border, #EADFD0)')}
+          >
+            <div style={{ fontSize: 22, marginBottom: 4 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/>
+              </svg>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>AI 배심원에게 물어보기</div>
+            <div style={{ fontSize: 11, marginTop: 3, opacity: 0.7 }}>비공개 · 9인 다관점 의견 · 약 3분</div>
+          </button>
+
+          {/* 공개 투표 */}
+          <button
+            onClick={() => {
+              sessionStorage.setItem('community-draft-visibility', 'PUBLIC');
+              onConvertToCommunity(sessionId);
+            }}
+            style={{ ...nextStepBtn('white', 'var(--L-ink, #2B2B2B)', '#e7e3d8'), marginTop: 8 }}
+          >
+            <div style={{ fontSize: 22, marginBottom: 4 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>커뮤니티에 공개하기</div>
+            <div style={{ fontSize: 11, marginTop: 3, opacity: 0.6 }}>공개 투표 · 실제 사람들의 반응</div>
+          </button>
+
+          {/* 상대방 초대 (Duo) */}
+          {onInvite && (
+            <button
+              onClick={onInvite}
+              style={{ ...nextStepBtn('var(--L-card, #FBF6EC)', 'var(--L-ink, #2B2B2B)', 'var(--L-border, #D9CFBD)'), marginTop: 8 }}
+            >
+              <div style={{ fontSize: 22, marginBottom: 4 }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>상대방과 직접 대화하기</div>
+              <div style={{ fontSize: 11, marginTop: 3, opacity: 0.6 }}>초대 링크 · AI 중재자 참여 · Duo 모드</div>
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
