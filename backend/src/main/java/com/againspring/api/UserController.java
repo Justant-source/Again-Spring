@@ -66,6 +66,26 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUserProfile(userDetails.getUsername(), request));
     }
 
+    /**
+     * V47: 중재자 성향 기본값 설정 (회원 프로필 저장).
+     * 세션 생성 시 mediatorStyleX/Y 미입력이면 이 값으로 프리필.
+     */
+    @PatchMapping("/me/mediator-style")
+    @Operation(summary = "Set default mediator style", description = "회원 프로필에 중재자 성향 기본값(X/Y 0~100) 저장")
+    @ApiResponse(responseCode = "204", description = "Saved")
+    @ApiResponse(responseCode = "400", description = "Invalid range")
+    public ResponseEntity<Void> updateMediatorStyle(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody java.util.Map<String, Integer> body) {
+        Integer x = body.get("mediatorStyleX");
+        Integer y = body.get("mediatorStyleY");
+        if ((x != null && (x < 0 || x > 100)) || (y != null && (y < 0 || y > 100))) {
+            return ResponseEntity.badRequest().build();
+        }
+        userService.updateMediatorStyle(userDetails.getUsername(), x, y);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/me/password")
     @Operation(summary = "Change password (current → new). For temp password first change, currentPassword is the temp.")
     @ApiResponse(responseCode = "200", description = "Password changed")
@@ -180,9 +200,12 @@ public class UserController {
                 .completedAt(s.getCompletedAt())
                 .createdAt(s.getCreatedAt())
                 .majorCategoryId(cat != null ? cat.majorId : null)
-                .middleCategoryId(cat != null ? cat.middleId : null)
-                .minorCategoryId(cat != null ? cat.minorId : null)
+                // middleId, minorId 제거 (V47 — 자동 추론 전환)
                 .customCategoryText(cat != null ? cat.customText : null)
+                // V47 신규: 추론 메타
+                .title(s.getTitle())
+                .keywords(s.getKeywords())
+                .koreanTag(s.getKoreanTag())
                 .reportId(s.getReportId())
                 .testRun(testRun)
                 .build();

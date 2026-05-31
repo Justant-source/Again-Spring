@@ -50,13 +50,13 @@ export interface PartnerStatus {
 export interface Session {
   id: string;
   status: SessionStatus;
-  relationType: RelationType;
+  /** V47~: LLM 추론값. 세션 생성 직후 null일 수 있음 (비동기 추론). */
+  relationType: RelationType | null;
+  /** V47~: majorId만 잔존 (중·소분류 제거). */
   category: {
-    majorId: string;
-    middleId: string;
-    minorId: string;
+    majorId: string | null;
     customText?: string;
-  };
+  } | null;
   createdByUserId: string;
   inviteeUserId: string | null;
   inviteToken: string | null;
@@ -71,6 +71,12 @@ export interface Session {
   createdAt: string;
   completedAt?: string;
   reportId?: string;
+  /** V47 신규: 자동 생성 제목 (사용자 수정 가능). */
+  title?: string | null;
+  /** V47 신규: 추론 핵심 키워드 최대 2개. */
+  keywords?: string[] | null;
+  /** V47 신규: 한국 특화 태그 (in_law|face|lingered|generation|null). */
+  koreanTag?: string | null;
 }
 
 export interface NVCScript {

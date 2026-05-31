@@ -26,9 +26,14 @@ public class SessionHistoryResponse {
     private Instant completedAt;
     private Instant createdAt;
     private String majorCategoryId;
-    private String middleCategoryId;
-    private String minorCategoryId;
+    // middleCategoryId, minorCategoryId 제거 (V47 — 자동 추론 전환)
     private String customCategoryText;
+    /** V47 신규: LLM 자동 생성 제목. */
+    private String title;
+    /** V47 신규: 추론 핵심 키워드 최대 2개. */
+    private java.util.List<String> keywords;
+    /** V47 신규: 한국 특화 태그 (in_law|face|lingered|generation|null). */
+    private String koreanTag;
     private String reportId;
     private boolean testRun;
 }

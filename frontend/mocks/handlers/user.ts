@@ -4,13 +4,16 @@ import { generateGuestNickname } from '@/lib/utils/guestNickname';
 const USERS = new Map<string, any>();
 const GUEST_SESSIONS = new Map<string, string>(); // inviteToken → guestId
 
+// V47~: title/keywords/koreanTag 추가, middleId/minorId 제거
 const SESSION_HISTORY: any[] = [
   {
     id: 'sess_history_1',
     status: 'completed',
     partnerNickname: '준호',
     relationType: 'marriage',
-    conflictType: 'difference',
+    title: '가사 분담 갈등',
+    keywords: ['가사 분담', '누적 불만'],
+    koreanTag: null,
     soloMode: false,
     completedAt: '2026-04-12T09:21:00.000Z',
     createdAt: '2026-04-12T08:00:00.000Z',
@@ -20,7 +23,9 @@ const SESSION_HISTORY: any[] = [
     status: 'completed',
     partnerNickname: '지민',
     relationType: 'friend',
-    conflictType: 'factual',
+    title: '약속 취소 반복',
+    keywords: ['약속 취소', '서운함'],
+    koreanTag: null,
     soloMode: false,
     completedAt: '2026-03-02T12:05:00.000Z',
     createdAt: '2026-03-02T11:00:00.000Z',
@@ -30,7 +35,9 @@ const SESSION_HISTORY: any[] = [
     status: 'completed',
     partnerNickname: '엄마',
     relationType: 'parent_child',
-    conflictType: 'mixed',
+    title: '진로 결정 갈등',
+    keywords: ['진로 결정', '선택 존중'],
+    koreanTag: null,
     soloMode: false,
     completedAt: '2026-02-17T18:40:00.000Z',
     createdAt: '2026-02-17T17:30:00.000Z',
@@ -189,5 +196,11 @@ export const userHandlers = [
         caution: ['감정 격앙 시 휴식 필요'],
       },
     });
+  }),
+
+  // V47 신규: 중재자 성향 기본값 저장
+  http.patch('/api/users/me/mediator-style', async ({ request }) => {
+    await delay(200);
+    return new HttpResponse(null, { status: 204 });
   }),
 ];

@@ -137,9 +137,8 @@ class QuestionQueueUpdaterTest {
     @Test
     void lingered_seekFact_rejectedByRuleEnforcer() {
         Session session = new Session();
-        Session.Category cat = new Session.Category();
-        cat.minorId = "lingered";
-        session.setCategory(cat);
+        // V47~: koreanTag 방식 (minorId/category 불필요)
+        session.setKoreanTag("lingered");
 
         updater.update(session, deltaWithNew(Session.Intent.SEEK_FACT, "USER_A", null), 1);
 

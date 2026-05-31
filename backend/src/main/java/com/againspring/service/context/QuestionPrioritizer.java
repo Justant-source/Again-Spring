@@ -27,7 +27,8 @@ public class QuestionPrioritizer {
 
         Session.UserState currentState = currentStateFor(session, target);
         Set<String> unresolvedThreadTexts = collectUnresolvedThreadTexts(session);
-        String categoryMinor = session.getCategory() != null ? session.getCategory().minorId : null;
+        // V47~: koreanTag 기반 보정 (minorId 제거)
+        String categoryMinor = session.getKoreanTag();
 
         for (Session.PendingQuestion q : queue) {
             if (Boolean.TRUE.equals(q.asked)) {

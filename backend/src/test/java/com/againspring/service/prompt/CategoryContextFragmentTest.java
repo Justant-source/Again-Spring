@@ -8,6 +8,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
 
+/**
+ * V47~: 중·소분류 제거 후 CategoryContextFragment 테스트.
+ * majorId + customText만 잔존.
+ */
 class CategoryContextFragmentTest {
 
     private CategoryContextFragment fragment;
@@ -41,13 +45,13 @@ class CategoryContextFragmentTest {
 
     @Test
     void render_returnsEmpty_whenMajorNotInCatalog() {
-        Session s = sessionWithCategory("nonexistent", null, null, null);
+        Session s = sessionWithMajor("nonexistent", null);
         assertEquals("", fragment.render(s));
     }
 
     @Test
-    void render_includesMajorLabel_withoutMiddle() {
-        Session s = sessionWithCategory("couple", null, null, null);
+    void render_includesMajorLabel() {
+        Session s = sessionWithMajor("couple", null);
         String result = fragment.render(s);
         assertTrue(result.contains("관계 유형: 연인 · 썸"));
         assertTrue(result.contains("<conflict_category"));
@@ -55,58 +59,32 @@ class CategoryContextFragmentTest {
     }
 
     @Test
-    void render_includesMiddleLabel_whenPresent() {
-        Session s = sessionWithCategory("couple", "couple_contact", null, null);
+    void render_includesCustomText_whenPresent() {
+        Session s = sessionWithMajor("couple", "답장이 너무 짧아요");
         String result = fragment.render(s);
-        assertTrue(result.contains("갈등 카테고리: 연락 · 관심"));
-        assertFalse(result.contains("연락 · 관심 >"), "minor 없으면 > 구분자 없음");
-    }
-
-    @Test
-    void render_includesAllThreeLevels() {
-        Session s = sessionWithCategory("marriage", "marriage_inlaws", "visit_freq", null);
-        String result = fragment.render(s);
-        assertTrue(result.contains("관계 유형: 부부"));
-        assertTrue(result.contains("갈등 카테고리: 시가 · 처가 > 시가/처가 방문 빈도"));
-    }
-
-    @Test
-    void render_omitsCustomMinorLabel_butIncludesCustomText() {
-        Session s = sessionWithCategory("couple", "couple_contact", "custom", "답장이 너무 짧아요");
-        String result = fragment.render(s);
-        assertFalse(result.contains("직접 입력"), "custom minor 라벨은 노출하지 않음");
         assertTrue(result.contains("사용자 추가 설명: 답장이 너무 짧아요"));
     }
 
     @Test
-    void render_includesCustomText_evenWithoutMinor() {
-        Session s = sessionWithCategory("couple", "couple_contact", null, "내가 원하는 건 따뜻한 답장");
-        String result = fragment.render(s);
-        assertTrue(result.contains("사용자 추가 설명: 내가 원하는 건 따뜻한 답장"));
-    }
-
-    @Test
-    void render_noCustomText_whenBlank() {
-        Session s = sessionWithCategory("couple", "couple_contact", "contact_too_little", "   ");
+    void render_omitsCustomText_whenBlank() {
+        Session s = sessionWithMajor("couple", "   ");
         String result = fragment.render(s);
         assertFalse(result.contains("사용자 추가 설명"));
     }
 
     @Test
     void render_noteLabelDirectCitationWarning() {
-        Session s = sessionWithCategory("couple", "couple_contact", "contact_too_little", null);
+        Session s = sessionWithMajor("couple", null);
         String result = fragment.render(s);
         assertTrue(result.contains("라벨을 직접 인용하지는 않습니다"));
     }
 
     // ── helpers ──────────────────────────────────────────────────
 
-    private Session sessionWithCategory(String majorId, String middleId, String minorId, String customText) {
+    private Session sessionWithMajor(String majorId, String customText) {
         Session s = new Session();
         Session.Category c = new Session.Category();
         c.majorId = majorId;
-        c.middleId = middleId;
-        c.minorId = minorId;
         c.customText = customText;
         s.setCategory(c);
         return s;

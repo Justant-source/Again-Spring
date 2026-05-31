@@ -6,21 +6,22 @@ import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { api } from '@/lib/api/client';
 import type { RelationType } from '@/lib/types';
-import { CATEGORIES } from '@/lib/constants/categories';
+// V47~: CATEGORIES import 제거 (중·소분류 칩 렌더링 삭제됨)
 
 interface HistoryItem {
   id: string;
   status: string;
   partnerNickname: string | null;
   relationType: RelationType | null;
-  conflictType: string | null;
   soloMode: boolean;
   completedAt: string | null;
   createdAt: string;
-  majorCategoryId: string | null;
-  middleCategoryId: string | null;
-  minorCategoryId: string | null;
-  customCategoryText: string | null;
+  /** V47 신규: 자동 생성 제목 (사용자 수정 가능). */
+  title?: string | null;
+  /** V47 신규: 추론 핵심 키워드 최대 2개. */
+  keywords?: string[] | null;
+  /** V47 신규: 한국 특화 태그. */
+  koreanTag?: string | null;
   reportId: string | null;
   testRun?: boolean;
 }
@@ -35,27 +36,7 @@ const RELATION_TYPE_LABEL: Record<RelationType, string> = {
   work: '직장',
 };
 
-function getMiddleLabel(majorId: string | null, middleId: string | null): string | null {
-  if (!majorId || !middleId) return null;
-  const major = CATEGORIES.find(c => c.id === majorId);
-  if (!major) return null;
-  const middle = major.middles.find(m => m.id === middleId);
-  return middle?.label ?? null;
-}
-
-function getMinorLabel(majorId: string | null, middleId: string | null, minorId: string | null, customText: string | null): string | null {
-  if (!majorId || !middleId || !minorId) return null;
-  if (minorId === 'custom') {
-    const text = customText?.trim();
-    return text ? `직접: ${text}` : '직접 입력';
-  }
-  const major = CATEGORIES.find(c => c.id === majorId);
-  if (!major) return null;
-  const middle = major.middles.find(m => m.id === middleId);
-  if (!middle) return null;
-  const minor = middle.minors.find(n => n.id === minorId);
-  return minor?.label ?? null;
-}
+// V47~: 중·소분류 제거 — 키워드 칩은 item.keywords 배열에서 직접 렌더링
 
 const ACTIVE_STATUSES = new Set(['chatting_solo', 'chatting_duo', 'awaiting_finalization', 'waiting_b']);
 const isActive = (status: string) => ACTIVE_STATUSES.has(status);
@@ -315,15 +296,19 @@ export default function HistoryPage() {
                     )}
                   </div>
                 </div>
+                {/* V47~: 제목 — item.title 우선, 없으면 관계 기반 fallback */}
                 <div className="serif" style={{ fontSize: 15, color: 'var(--L-ink)', fontWeight: 500, marginBottom: 8 }}>
                   {item.testRun
                     ? 'AI 시뮬레이션 대화'
-                    : item.soloMode
-                      ? '혼자 정리한 이야기'
-                      : item.partnerNickname
-                        ? `${item.partnerNickname}분과의 대화`
-                        : '상대방과의 대화'}
+                    : item.title
+                      ? item.title
+                      : item.soloMode
+                        ? '혼자 정리한 이야기'
+                        : item.partnerNickname
+                          ? `${item.partnerNickname}분과의 대화`
+                          : '상대방과의 대화'}
                 </div>
+                {/* V47~: [대분류] · 키워드1 · 키워드2 */}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   {item.relationType && (
                     <span style={{
@@ -337,31 +322,20 @@ export default function HistoryPage() {
                       {RELATION_TYPE_LABEL[item.relationType] ?? item.relationType}
                     </span>
                   )}
-                  {(() => {
-                    const midLabel = getMiddleLabel(item.majorCategoryId, item.middleCategoryId);
-                    const minLabel = getMinorLabel(item.majorCategoryId, item.middleCategoryId, item.minorCategoryId, item.customCategoryText);
-                    const chipStyle: React.CSSProperties = {
-                      fontSize: '11px',
-                      background: 'var(--L-card)',
-                      border: '1px solid var(--L-border)',
-                      borderRadius: '3px',
-                      padding: '4px 8px',
-                      color: 'var(--L-sub)',
-                    };
-                    if (!midLabel && !minLabel && item.majorCategoryId) {
-                      return (
-                        <span style={{ ...chipStyle, opacity: 0.55, fontStyle: 'italic' }}>
-                          세부 분류 없음
+                  {item.keywords && item.keywords.length > 0
+                    ? item.keywords.map((kw, idx) => (
+                        <span key={idx} style={{
+                          fontSize: '11px',
+                          background: 'var(--L-card)',
+                          border: '1px solid var(--L-border)',
+                          borderRadius: '3px',
+                          padding: '4px 8px',
+                          color: 'var(--L-sub)',
+                        }}>
+                          {kw}
                         </span>
-                      );
-                    }
-                    return (
-                      <>
-                        {midLabel && <span style={chipStyle}>{midLabel}</span>}
-                        {minLabel && <span style={chipStyle}>{minLabel}</span>}
-                      </>
-                    );
-                  })()}
+                      ))
+                    : null}
                 </div>
               </div>
 

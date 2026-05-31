@@ -22,7 +22,8 @@ export default function ProfilePage() {
   const hasHydrated = useHasHydrated();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // 중재자 톤 슬라이더 — 기본값 50, 변경 시 debounce 후 PATCH /api/users/me
+  // V47~: 중재자 톤 슬라이더 — X축(팩트↔공감), Y축은 기본값 50 유지.
+  // 변경 시 debounce 후 PATCH /api/users/me/mediator-style 로 저장.
   const [mediatorX, setMediatorX] = useState<number>(user?.mediatorDefaultX ?? 50);
   const mediatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -55,8 +56,11 @@ export default function ProfilePage() {
     if (mediatorTimerRef.current) clearTimeout(mediatorTimerRef.current);
     mediatorTimerRef.current = setTimeout(() => {
       if (x === user.mediatorDefaultX) return;
-      api.patch<User>('/api/users/me', { mediatorDefaultX: x })
-        .then((res) => setUser(res.data))
+      // V47~: 새 전용 엔드포인트 사용
+      api.patch('/api/users/me/mediator-style', { mediatorStyleX: x })
+        .then(() => {
+          setUser({ ...user, mediatorDefaultX: x });
+        })
         .catch((e) => console.error('Mediator update failed:', e));
     }, 500);
   };

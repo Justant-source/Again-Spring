@@ -80,9 +80,8 @@ class QuestionPrioritizerTest {
     @Test
     void lingered_seekFact_priorityIsZero() {
         Session session = new Session();
-        Session.Category cat = new Session.Category();
-        cat.minorId = "lingered";
-        session.setCategory(cat);
+        // V47~: koreanTag 방식 (minorId/category 불필요)
+        session.setKoreanTag("lingered");
 
         Session.PendingQuestion seekFact = q(Session.Intent.SEEK_FACT, 0);
         prioritizer.rescore(new ArrayList<>(List.of(seekFact)), session, MessageSender.USER_A);
@@ -93,9 +92,8 @@ class QuestionPrioritizerTest {
     @Test
     void inLaw_bridgePerspective_higherThanDefault() {
         Session session = new Session();
-        Session.Category cat = new Session.Category();
-        cat.minorId = "in_law";
-        session.setCategory(cat);
+        // V47~: koreanTag 방식 (minorId/category 불필요)
+        session.setKoreanTag("in_law");
 
         Session.PendingQuestion bridge = q(Session.Intent.BRIDGE_PERSPECTIVE, 0);
         Session.PendingQuestion seekFact = q(Session.Intent.SEEK_FACT, 0);

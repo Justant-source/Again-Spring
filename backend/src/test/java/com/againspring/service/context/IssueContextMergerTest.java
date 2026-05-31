@@ -65,9 +65,8 @@ class IssueContextMergerTest {
     @Test
     void merge_rejectsFact_whenCategoryRuleViolated() {
         Session session = new Session();
-        Session.Category cat = new Session.Category();
-        cat.minorId = "in_law";
-        session.setCategory(cat);
+        // V47~: koreanTag 방식 (minorId/category 불필요)
+        session.setKoreanTag("in_law");
 
         merger.merge(session, deltaWithFact("시어머니가 차별했다"), 1);
 
@@ -80,9 +79,8 @@ class IssueContextMergerTest {
     @Test
     void merge_allowsFact_forNeutralInLawText() {
         Session session = new Session();
-        Session.Category cat = new Session.Category();
-        cat.minorId = "in_law";
-        session.setCategory(cat);
+        // V47~: koreanTag 방식 (minorId/category 불필요)
+        session.setKoreanTag("in_law");
 
         merger.merge(session, deltaWithFact("시어머니 댁에 방문했다"), 1);
 

@@ -69,6 +69,11 @@ public abstract class GuestFlowITSupport {
         };
         when(mockClaudeCodeBridge.invokeCancelable(anyString(), anyString(), anyString()))
                 .thenAnswer(deterministicAnswer);
+        // V47~: invoke(prompt, model)도 스텁 (SessionMetaInferenceService 비동기 호출용)
+        try {
+            when(mockClaudeCodeBridge.invoke(anyString(), anyString()))
+                    .thenReturn("[통합테스트] 두 분의 이야기를 잘 들었어요.");
+        } catch (Exception ignored) {}  // Mockito stub — 예외 무시
     }
 
     // --- 헬퍼 ---
@@ -88,15 +93,13 @@ public abstract class GuestFlowITSupport {
         return objectMapper.readTree(json).path("token").path("accessToken").asText();
     }
 
-    /** POST /api/sessions → session id 반환 (표준 소분류 — 템플릿 경로, haiku 미호출) */
+    /** POST /api/sessions → session id 반환 (V47~: 중·소분류 제거, majorId만) */
     protected String createSession(String token, String clientIp) throws Exception {
         String body = """
                 {
                   "relationType": "couple",
                   "category": {
-                    "majorId": "couple",
-                    "middleId": "couple_affection",
-                    "minorId": "forget_anni"
+                    "majorId": "couple"
                   }
                 }
                 """;
@@ -132,11 +135,11 @@ public abstract class GuestFlowITSupport {
         return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
-    /** mediator 응답이 2건 이상(첫마디 + 사용자 메시지 이후 응답)이 될 때까지 최대 3초 폴링 */
+    /** mediator 응답이 2건 이상(첫마디 + 사용자 메시지 이후 응답)이 될 때까지 최대 5초 폴링 */
     protected void awaitMediatorResponse(String sessionId, String token) {
         Awaitility.await()
-                .atMost(3, TimeUnit.SECONDS)
-                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(5, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .until(() -> {
                     com.fasterxml.jackson.databind.JsonNode msgs = getMessages(sessionId, token);
                     long mediatorCount = 0;

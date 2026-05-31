@@ -93,10 +93,9 @@ public class SeedScenarioBuilder {
         Instant now = Instant.now();
         Instant sessionCreatedAt = now.minus(Duration.ofMinutes(sc.sessionCreatedMinutesAgo()));
 
+        // V47~: 중·소분류 제거 — majorId만 잔존
         Session.Category category = new Session.Category();
         category.majorId = sc.categoryMajor();
-        category.middleId = sc.categoryMiddle();
-        category.minorId = sc.categoryMinor();
         category.customText = null;
 
         Session session = Session.builder()

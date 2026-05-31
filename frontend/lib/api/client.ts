@@ -38,10 +38,12 @@ api.interceptors.response.use(
   },
 );
 
+// V47~: 중·소분류 제거. category 미전송, relationType + mediatorStyle만 필수.
 export interface CreateSessionPayload {
   relationType: string;
-  category: { majorId: string; middleId: string; minorId: string; customText?: string };
-  description: string;
+  mediatorStyleX?: number;
+  mediatorStyleY?: number;
+  soloMode?: boolean;
 }
 
 export interface TurnRequest {

@@ -7,10 +7,10 @@ import type {
   SessionStatus,
 } from '@/lib/types';
 
+// V47~: 중·소분류 제거 — majorId만 잔존 (하위 호환 타입 보존)
 export interface ActiveSessionCategory {
   majorId: string;
-  middleId: string;
-  minorId: string;
+  // middleId, minorId 제거 (V47)
   customText?: string;
 }
 

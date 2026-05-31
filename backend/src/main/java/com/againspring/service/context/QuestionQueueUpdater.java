@@ -39,8 +39,8 @@ public class QuestionQueueUpdater {
         ageNonAsked(session.getQuestionQueueB());
 
         // 3. new 추가
-        String categoryMinor = session.getCategory() != null
-            ? session.getCategory().minorId : null;
+        // V47~: koreanTag 기반 보정 (minorId 제거)
+        String categoryMinor = session.getKoreanTag();
         if (delta != null && delta.newQuestions != null) {
             for (Session.PendingQuestion nq : delta.newQuestions) {
                 if (!ruleEnforcer.isIntentAllowed(nq.intent, categoryMinor)) continue;

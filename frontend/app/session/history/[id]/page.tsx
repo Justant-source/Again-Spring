@@ -44,7 +44,10 @@ export default function SessionHistoryPage() {
         const r = session.myRole;
         if (r === 'B' || r === 'USER_B') setMyRole('USER_B');
 
-        if (session.soloMode) {
+        // V47~: 서버 title 우선, 없으면 기존 fallback
+        if (session.title) {
+          setSessionTitle(session.title);
+        } else if (session.soloMode) {
           setSessionTitle('혼자 정리한 이야기');
         } else if (session.partnerNickname) {
           setSessionTitle(`${session.partnerNickname}분과의 대화`);

@@ -26,6 +26,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -196,6 +197,29 @@ public class SessionController {
             @PathVariable("id") String sessionId,
             @AuthenticationPrincipal UserDetails userDetails) {
         sessionService.deleteSession(sessionId, userDetails.getUsername());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * V47: 세션 제목 수정 (사용자 직접 편집).
+     * titleEditedByUser=true 로 설정해 이후 자동 덮어쓰기를 차단.
+     */
+    @PatchMapping("/{id}/title")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "Update session title", description = "사용자가 세션 제목을 직접 편집. 이후 LLM 자동 덮어쓰기 차단.")
+    @ApiResponse(responseCode = "204", description = "Title updated")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @ApiResponse(responseCode = "403", description = "Forbidden")
+    @ApiResponse(responseCode = "404", description = "Session not found")
+    public ResponseEntity<Void> updateSessionTitle(
+            @PathVariable("id") String sessionId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody java.util.Map<String, String> body) {
+        String newTitle = body.get("title");
+        if (newTitle == null || newTitle.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        sessionService.updateTitle(sessionId, userDetails.getUsername(), newTitle.strip());
         return ResponseEntity.noContent().build();
     }
 }

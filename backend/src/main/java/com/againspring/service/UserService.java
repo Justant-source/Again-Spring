@@ -94,6 +94,20 @@ public class UserService {
     }
 
     /**
+     * V47: 중재자 성향 기본값 저장 (X/Y 독립 저장, null이면 해당 축 미변경).
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void updateMediatorStyle(String userId, Integer x, Integer y) {
+        User user = userRepository
+                .findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요."));
+        if (x != null) user.setMediatorDefaultX(x);
+        if (y != null) user.setMediatorDefaultY(y);
+        user.setUpdatedAt(java.time.Instant.now());
+        userRepository.save(user);
+    }
+
+    /**
      * Complete onboarding: save 10 answers and calculate communication style.
      *
      * @param userId the user ID

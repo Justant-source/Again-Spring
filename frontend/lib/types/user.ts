@@ -24,6 +24,7 @@ export interface User {
   onboardingCompletedAt?: string | null;
   tutorialCompleted?: boolean;
   mediatorDefaultX?: number | null;
+  mediatorDefaultY?: number | null; // V47: Y축 기본값 (0=경청, 100=능동)
   mbtiType?: string;
   mbtiProfile?: MbtiProfile;
   onboardingMethod?: 'test' | 'mbti';

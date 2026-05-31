@@ -78,6 +78,21 @@ intent: `SEEK_FACT|SEEK_FEELING|SEEK_NEED|BRIDGE_PERSPECTIVE|REFLECT_PATTERN|INV
 **금지**: pending_questions text 그대로 옮기기, 한 응답에 질문 여러 개, `INVITE_REPAIR` 세션당 2회 이상.  
 모르면 통째로 생략.
 
+## `inferred_keywords`, `inferred_title`, `inferred_korean_tag` (처음 5턴 이내 — 조건부)
+
+대화가 아직 초반(누적 메시지 ≤5)이면, 지금까지 나온 내용을 바탕으로 세션 메타를 추론해 아래 필드를 한 번만 포함하세요. 이미 `<session_meta>`에 제목·키워드가 있으면 생략해도 됩니다.
+
+```json
+"inferred_keywords": ["키워드1", "키워드2"],
+"inferred_title": "세션 제목 15자 이하",
+"inferred_korean_tag": "in_law | face | lingered | generation | null"
+```
+
+- `inferred_keywords`: 핵심 갈등 키워드 정확히 2개 (각 10자 이하 한국어)
+- `inferred_title`: 갈등의 핵심을 담은 15자 이하 제목
+- `inferred_korean_tag`: 한국 특화 4종에 해당하면 태그, 아니면 `null` 또는 필드 생략
+- **6턴 이후에는 이 필드들을 출력하지 않습니다.**
+
 ---
 
 **[응답 시작 지시 — 최우선]**

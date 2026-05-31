@@ -61,7 +61,7 @@ public class ChatPromptAssembler {
         if (!state.isEmpty()) sb.append(state).append("\n");
         String queue = questionQueueFragment.render(session, MessageSender.USER_A);
         if (!queue.isEmpty()) sb.append(queue).append("\n");
-        sb.append(safeLoad("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
+        sb.append(safeLoadRelations(session)).append("\n\n");
         String categoryContext = categoryContextFragment.render(session);
         if (!categoryContext.isEmpty()) sb.append(categoryContext).append("\n");
         sb.append(safeLoad("chat/solo_chat.md")).append("\n\n");
@@ -109,7 +109,7 @@ public class ChatPromptAssembler {
         if (!state.isEmpty()) sb.append(state).append("\n");
         String queue = questionQueueFragment.render(session, currentUserSender);
         if (!queue.isEmpty()) sb.append(queue).append("\n");
-        sb.append(safeLoad("relations/" + session.getRelationType().getValue() + ".md")).append("\n\n");
+        sb.append(safeLoadRelations(session)).append("\n\n");
         String categoryContextDuo = categoryContextFragment.render(session);
         if (!categoryContextDuo.isEmpty()) sb.append(categoryContextDuo).append("\n");
         sb.append(safeLoad("chat/duo_chat.md")).append("\n\n");
@@ -238,7 +238,7 @@ public class ChatPromptAssembler {
         }
 
         // 8. relations/<type>.md
-        prompt.add(CacheTier.SESSION_STATIC, safeLoad("relations/" + session.getRelationType().getValue() + ".md") + "\n\n", SegmentRole.USER_CONTEXT);
+        prompt.add(CacheTier.SESSION_STATIC, safeLoadRelations(session) + "\n\n", SegmentRole.USER_CONTEXT);
 
         // 9. <category_context> (conditional)
         String categoryContext = categoryContextFragment.render(session);
@@ -331,7 +331,7 @@ public class ChatPromptAssembler {
         }
 
         // 8. relations/<type>.md
-        prompt.add(CacheTier.SESSION_STATIC, safeLoad("relations/" + session.getRelationType().getValue() + ".md") + "\n\n", SegmentRole.USER_CONTEXT);
+        prompt.add(CacheTier.SESSION_STATIC, safeLoadRelations(session) + "\n\n", SegmentRole.USER_CONTEXT);
 
         // 9. <category_context> (conditional)
         String categoryContextDuo = categoryContextFragment.render(session);
@@ -412,8 +412,17 @@ public class ChatPromptAssembler {
             return loader.get(path);
         } catch (Exception e) {
             // 프롬프트 파일이 없으면 기본값 반환
-            return ""; // 또는 기본 프롬프트 텍스트
+            return "";
         }
+    }
+
+    /**
+     * V47 null 가드: relationType이 아직 추론 중(null)이면 빈 문자열 반환.
+     * 추론이 완료되면 다음 턴부터 relations/{type}.md가 정상 적용된다.
+     */
+    private String safeLoadRelations(Session session) {
+        if (session.getRelationType() == null) return "";
+        return safeLoad("relations/" + session.getRelationType().getValue() + ".md");
     }
 
     private String formatSender(MessageSender s) {

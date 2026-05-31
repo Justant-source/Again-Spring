@@ -268,14 +268,13 @@ class GuestConversationFlowIT extends GuestFlowITSupport {
 
     // --- helpers ---
 
+    // V47~: 중·소분류 제거, majorId만
     private static String sessionBody() {
         return """
                 {
                   "relationType": "couple",
                   "category": {
-                    "majorId": "couple",
-                    "middleId": "couple_affection",
-                    "minorId": "forget_anni"
+                    "majorId": "couple"
                   }
                 }
                 """;

@@ -75,6 +75,20 @@ public final class PromptSchema {
     public static final String QD_HOOK_FROM_ISSUE  = "hookFromIssue";
     public static final String QD_ANTIDOTE_FOR     = "antidoteFor";
 
+    // ── V47 신규 세션 메타 추론 필드 (turn_meta 내부) ───────────────────────
+
+    /** 대화 내용 기반 핵심 키워드 2개 (배열). 초반 5턴 이내에 한 번만 추론. */
+    public static final String FIELD_INFERRED_KEYWORDS = "inferred_keywords";
+
+    /** 대화 내용 기반 자동 생성 제목 (15자 이하). 초반 5턴 이내에 한 번만 추론. */
+    public static final String FIELD_INFERRED_TITLE = "inferred_title";
+
+    /**
+     * 한국 특화 태그 추론 (in_law / face / lingered / generation / null).
+     * 초반 3턴 이내에 한 번만 추론 — 이미 세션에 저장된 경우 덮어쓰지 않음.
+     */
+    public static final String FIELD_INFERRED_KOREAN_TAG = "inferred_korean_tag";
+
     // ── 방어적 스트립 대상 태그 목록 (파서 마지막 패스용) ─────────────────────
 
     /** UNKNOWN_STRUCTURED_BLOCK 정규식에서 사용하는 태그 목록 (| 구분). */

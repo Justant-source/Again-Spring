@@ -90,6 +90,10 @@ public class User {
     @Column(name = "mediator_default_x")
     private Integer mediatorDefaultX;
 
+    /** V47: 사용자별 중재자 톤 기본값 Y (0=경청, 100=능동). NULL이면 50 fallback. */
+    @Column(name = "mediator_default_y")
+    private Integer mediatorDefaultY;
+
     @Column(name = "terms_agreed_at")
     private Instant termsAgreedAt;
 

@@ -52,7 +52,7 @@ public class ChatTurnMetaParser {
 
     public Result parse(String rawResponse, int turn, String senderTag) {
         if (rawResponse == null || rawResponse.isBlank()) {
-            return new Result("", null, null, null, null, null);
+            return new Result("", null, null, null, null, null, null, null, null);
         }
 
         String working = rawResponse;
@@ -62,6 +62,10 @@ public class ChatTurnMetaParser {
         Session.UserStateEntry userState = null;
         IssueContextDelta issueDelta = null;
         QuestionQueueDelta queueDelta = null;
+        // V47 신규
+        List<String> inferredKeywords = null;
+        String inferredTitle = null;
+        String inferredKoreanTag = null;
 
         Matcher codeFenceMeta = META_BLOCK_CODE_FENCE.matcher(working);
         Matcher meta = META_BLOCK.matcher(working);
@@ -81,6 +85,10 @@ public class ChatTurnMetaParser {
                 userState = readUserState(root.get(PromptSchema.FIELD_USER_STATE), turn, senderTag);
                 issueDelta = readIssueDelta(root.get(PromptSchema.FIELD_ISSUE_DELTA));
                 queueDelta = readQueueDelta(root.get(PromptSchema.FIELD_QUEUE_DELTA));
+                // V47 신규 필드
+                inferredKeywords = readStringList(root.get(PromptSchema.FIELD_INFERRED_KEYWORDS), 2);
+                inferredTitle = readStringField(root, PromptSchema.FIELD_INFERRED_TITLE, 30);
+                inferredKoreanTag = readStringField(root, PromptSchema.FIELD_INFERRED_KOREAN_TAG, 20);
             } catch (Exception e) {
                 log.warn("turn_meta JSON parse failed (turn={}): {}", turn, e.getMessage());
             }
@@ -121,7 +129,8 @@ public class ChatTurnMetaParser {
         // 방어적 마지막 패스: 파싱 후 남은 알려진 구조 태그 잔재 제거
         working = UNKNOWN_STRUCTURED_BLOCK.matcher(working).replaceAll("").trim();
 
-        return new Result(working.strip(), horsemen, nvc, userState, issueDelta, queueDelta);
+        return new Result(working.strip(), horsemen, nvc, userState, issueDelta, queueDelta,
+                inferredKeywords, inferredTitle, inferredKoreanTag);
     }
 
     private Session.HorsemenTurnEntry readHorsemen(JsonNode node, int turn, String sender) {
@@ -308,11 +317,36 @@ public class ChatTurnMetaParser {
         }
     }
 
+    // ── V47 신규 헬퍼 ────────────────────────────────────────────────────────
+
+    private List<String> readStringList(JsonNode node, int maxItems) {
+        if (node == null || !node.isArray()) return null;
+        List<String> result = new java.util.ArrayList<>();
+        for (JsonNode item : node) {
+            if (item.isTextual() && !item.asText().isBlank()) {
+                result.add(trimStr(item.asText(), 20));
+                if (result.size() >= maxItems) break;
+            }
+        }
+        return result.isEmpty() ? null : result;
+    }
+
+    private String readStringField(JsonNode root, String field, int maxLen) {
+        JsonNode node = root.get(field);
+        if (node == null || node.isNull() || !node.isTextual()) return null;
+        String val = node.asText().strip();
+        return val.isBlank() ? null : trimStr(val, maxLen);
+    }
+
     public record Result(
         String mediatorMessage,
         Session.HorsemenTurnEntry horsemen,
         Session.NvcTurnEntry nvc,
         Session.UserStateEntry userState,
         IssueContextDelta issueDelta,
-        QuestionQueueDelta queueDelta) {}
+        QuestionQueueDelta queueDelta,
+        // V47 신규
+        List<String> inferredKeywords,
+        String inferredTitle,
+        String inferredKoreanTag) {}
 }

@@ -49,10 +49,9 @@ export function createSession(overrides?: Partial<Session>): Session {
     id: '660e8400-e29b-41d4-a716-446655440000',
     status: 'chatting_solo' as SessionStatus,
     relationType: 'couple' as RelationType,
+    // V47~: 중·소분류 제거
     category: {
       majorId: 'major-1',
-      middleId: 'middle-1',
-      minorId: 'minor-1',
       customText: 'Custom conflict text',
     },
     createdByUserId: '550e8400-e29b-41d4-a716-446655440000',

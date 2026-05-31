@@ -81,8 +81,9 @@ class WelcomeMessageGeneratorTest {
         Session session = new Session();
         Session.Category cat = new Session.Category();
         cat.majorId = "couple";
-        cat.minorId = "in_law";
         session.setCategory(cat);
+        // V47~: koreanTag 방식 (minorId 제거)
+        session.setKoreanTag("in_law");
 
         generator.generate(session, welcomeQ());
 

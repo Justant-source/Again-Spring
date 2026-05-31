@@ -66,6 +66,8 @@ public class ChatTurnProcessor {
         userStateAppender.append(session, parsed.userState());
         issueContextMerger.merge(session, parsed.issueDelta(), turnIndex);
         questionQueueUpdater.update(session, parsed.queueDelta(), turnIndex);
+        // V47 신규: 키워드·제목·koreanTag 추론값 세션에 반영
+        applyInferredMeta(session, parsed);
 
         if (parsed.userState() != null) phaseDMetrics.recordUserState(parsed.userState().state);
         if (parsed.userState() != null || parsed.issueDelta() != null) phaseDMetrics.recordMetaPopulated();
@@ -148,6 +150,37 @@ public class ChatTurnProcessor {
     }
 
     // ── private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * V47: turn_meta에서 추론된 키워드·제목·koreanTag를 세션에 반영.
+     * - keywords: 아직 없을 때만 저장 (초반 5턴 이내 LLM이 추론)
+     * - title: 사용자가 직접 편집하지 않았을 때만 저장
+     * - koreanTag: 아직 없을 때만 저장
+     */
+    private void applyInferredMeta(Session session, ChatTurnMetaParser.Result parsed) {
+        boolean dirty = false;
+
+        if (parsed.inferredKeywords() != null && !parsed.inferredKeywords().isEmpty()
+                && (session.getKeywords() == null || session.getKeywords().isEmpty())) {
+            session.setKeywords(parsed.inferredKeywords());
+            dirty = true;
+        }
+
+        if (parsed.inferredTitle() != null && !parsed.inferredTitle().isBlank()
+                && !Boolean.TRUE.equals(session.getTitleEditedByUser())
+                && (session.getTitle() == null || session.getTitle().isBlank())) {
+            session.setTitle(parsed.inferredTitle());
+            dirty = true;
+        }
+
+        if (parsed.inferredKoreanTag() != null && !parsed.inferredKoreanTag().isBlank()
+                && session.getKoreanTag() == null) {
+            session.setKoreanTag(parsed.inferredKoreanTag());
+            dirty = true;
+        }
+
+        if (dirty) sessionRepo.save(session);
+    }
 
     private void appendPsychologyHistory(Session session, ChatTurnMetaParser.Result parsed) {
         if (parsed == null) return;

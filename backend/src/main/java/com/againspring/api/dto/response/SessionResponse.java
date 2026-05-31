@@ -62,18 +62,13 @@ public class SessionResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    // V47~: 중·소분류 제거 — 자동 추론 전환.
     public static class CategoryInfo {
         @JsonProperty("major")
         private String major;
-
-        @JsonProperty("middle")
-        private String middle;
-
-        @JsonProperty("minor")
-        private String minor;
-
-        @JsonProperty("customMinor")
-        private String customMinor;
+        // middle, minor 제거 (V47 — 자동 추론 전환)
+        @JsonProperty("customText")
+        private String customText;
     }
 
     @Getter

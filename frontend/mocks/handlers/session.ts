@@ -43,11 +43,11 @@ const HISTORY_SESSIONS: Record<string, any> = {
     id: 'sess_active',
     status: 'chatting_solo',
     relationType: 'couple',
-    category: {
-      majorId: 'couple',
-      middleId: 'couple_communication',
-      minorId: 'contact_too_little',
-    },
+    // V47~: category는 majorId만 잔존 (중·소분류 제거)
+    category: { majorId: 'couple' },
+    title: '연락 빈도 갈등',
+    keywords: ['연락 빈도', '서운함'],
+    koreanTag: null,
     partnerNickname: '준호',
     soloMode: true,
     myRole: 'A',
@@ -89,14 +89,30 @@ export const sessionHandlers = [
     const session = {
       id,
       inviteToken: token,
-      status: 'waiting_b',
-      currentTurn: 1,
+      status: 'chatting_solo',
+      currentTurn: 0,
       turns: [],
+      // V47: title/keywords는 비동기 추론 — 초기엔 null
+      title: null,
+      keywords: null,
+      koreanTag: null,
       createdAt: new Date().toISOString(),
       ...body,
     };
     SESSIONS.set(id, session);
     return HttpResponse.json(session);
+  }),
+
+  // V47 신규: 세션 제목 수정
+  http.patch('/api/sessions/:id/title', async ({ params, request }) => {
+    await delay(200);
+    const id = String(params.id);
+    const body: any = await request.json();
+    const s = SESSIONS.get(id) ?? HISTORY_SESSIONS[id];
+    if (!s) return HttpResponse.json({ error: 'not_found' }, { status: 404 });
+    s.title = body.title;
+    s.titleEditedByUser = true;
+    return new HttpResponse(null, { status: 204 });
   }),
 
   http.get('/api/sessions/:id', async ({ params }) => {

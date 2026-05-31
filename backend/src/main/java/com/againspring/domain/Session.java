@@ -159,6 +159,30 @@ public class Session {
     @Column(name = "question_queue_b", columnDefinition = "JSON")
     private List<PendingQuestion> questionQueueB;
 
+    // ===== V47: 자동 추론 메타 필드 =====
+    // 자유 서술 → SessionMetaInferenceService → LLM 추론 결과
+
+    /** 세션 제목 (LLM 자동 생성, 사용자 수정 가능). */
+    @Column(length = 255)
+    private String title;
+
+    /** 핵심 키워드 최대 2개 (JSON 배열). */
+    @Type(JsonType.class)
+    @Column(columnDefinition = "JSON")
+    private List<String> keywords;
+
+    /** 사용자가 제목을 직접 수정한 경우 true — 자동 덮어쓰기 중단. */
+    @Column(name = "title_edited_by_user", nullable = false)
+    @Builder.Default
+    private Boolean titleEditedByUser = false;
+
+    /**
+     * 한국 특화 4종 추론 태그 (in_law / face / lingered / generation / null).
+     * CategoryRuleEnforcer 트리거 기준 — 분류 화면 제거 후 LLM 추론값으로 대체.
+     */
+    @Column(name = "korean_tag", length = 32)
+    private String koreanTag;
+
     // ===== 기존 필드 유지 =====
 
     @Column(length = 32, name = "report_id")
@@ -236,30 +260,18 @@ public class Session {
     }
 
     /**
-     * 카테고리 임베디드 (JSON 저장)
+     * 카테고리 임베디드 (JSON 저장).
+     * V47~: 중·소분류 제거 — 자유 서술 기반 자동 추론으로 전환.
+     * majorId만 잔존 (기존 데이터 호환용, 신규 세션은 null).
      */
     public static class Category {
         public String majorId;
-        public String middleId;
-        public String minorId;
+        // middleId, minorId 제거 (V47 — 자동 추론 전환)
         public String customText;
 
         @Override
         public String toString() {
-            return "Category{"
-                    + "majorId='"
-                    + majorId
-                    + '\''
-                    + ", middleId='"
-                    + middleId
-                    + '\''
-                    + ", minorId='"
-                    + minorId
-                    + '\''
-                    + ", customText='"
-                    + customText
-                    + '\''
-                    + '}';
+            return "Category{majorId='" + majorId + "', customText='" + customText + "'}";
         }
     }
 

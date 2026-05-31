@@ -36,7 +36,8 @@ public class IssueContextMerger {
             ctx.revision = 0;
         }
 
-        String categoryMinor = (session.getCategory() != null) ? session.getCategory().minorId : null;
+        // V47~: koreanTag는 LLM 추론값 (session.koreanTag), categoryMinorId 대신 사용
+        String categoryMinor = session.getKoreanTag();
 
         // headline — currentFocus와 동기화 (호환 레이어)
         if (delta.headline != null && !delta.headline.isBlank()) {

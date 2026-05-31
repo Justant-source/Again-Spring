@@ -33,7 +33,7 @@ export default function NewSessionPage() {
       <PhoneHeader title="어떤 관계인가요" onBack={() => router.push('/')} />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ marginBottom: 28 }}>
-          <Dashes n={4} done={1} />
+          <Dashes n={2} done={1} />
         </div>
 
         <div className="serif" style={{ fontSize: 22, lineHeight: 1.5, marginBottom: 28 }}>
