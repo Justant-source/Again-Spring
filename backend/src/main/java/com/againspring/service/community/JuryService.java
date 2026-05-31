@@ -114,7 +114,7 @@ public class JuryService {
                             .build();
 
                     jurorRepository.save(juror);
-                    log.error("[JuryService] Juror saved (prod diagnostics): post={}, {}:{}", post.getId(), persona.getAgeGroup(), persona.getGender());
+                    log.info("Juror saved for post {}, persona: {} / {}", post.getId(), persona.getAgeGroup(), persona.getGender());
 
                 } catch (Exception e) {
                     log.warn("Failed to generate juror for post {} with persona {} / {}: {}",
