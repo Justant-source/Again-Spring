@@ -161,8 +161,8 @@ export default function LandingPage() {
         {/* 일반 사용자 채팅 진입 본문 — admin은 노출 안 함 */}
         {showChatEntry ? (
           <>
-            <div className="flex-1 mt-14">
-              <div className="text-[13px] mb-3.5" style={{ color: 'var(--L-sub)' }}>
+            <div className="mt-6">
+              <div className="text-[13px] mb-2.5" style={{ color: 'var(--L-sub)' }}>
                 중재자와 대화
               </div>
               <h1
@@ -171,22 +171,22 @@ export default function LandingPage() {
               >
                 마음을<br />정리해요.
               </h1>
-              <p className="mt-5 text-[14px] leading-[1.7]" style={{ color: 'var(--L-sub)' }}>
+              <p className="mt-3 text-[14px] leading-[1.7]" style={{ color: 'var(--L-sub)' }}>
                 5분이면 충분합니다.
               </p>
 
-              <div className="mt-9 letter-card" style={{ padding: 20 }}>
-                <div className="quote-it" style={{ fontSize: 12, marginBottom: 10 }}>
+              <div className="mt-5 letter-card" style={{ padding: 16 }}>
+                <div className="quote-it" style={{ fontSize: 12, marginBottom: 8 }}>
                   다시봄은 이런 도구예요
                 </div>
-                <ul className="serif" style={{ fontSize: 13, lineHeight: 1.9 }}>
+                <ul className="serif" style={{ fontSize: 13, lineHeight: 1.8 }}>
                   <li>· 대화로 같이 마음을 정리해요</li>
                   <li>· 옳고 그름이 아니라 서로의 마음을 봐요</li>
                 </ul>
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 pb-2 pt-4">
+            <div className="flex flex-col gap-2 pb-2 pt-5">
               <button
                 onClick={handleStartSession}
                 disabled={!user}
@@ -195,7 +195,7 @@ export default function LandingPage() {
                 대화 시작
               </button>
               {!user && (
-                <Link href="/guest" className="text-center text-[12px] mt-1" style={{ color: 'var(--L-sub)' }}>
+                <Link href="/guest" className="btn-L ghost" style={{ textAlign: 'center', textDecoration: 'none', display: 'block' }}>
                   게스트로 둘러보기
                 </Link>
               )}

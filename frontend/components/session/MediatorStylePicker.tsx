@@ -23,11 +23,6 @@ export function MediatorStylePicker({ value, onChange, showHeader = true }: Medi
   return (
     <div style={{ width: '100%' }}>
       <div style={{ marginBottom: 14 }}>
-        {showHeader && (
-          <div style={{ fontSize: 13, color: 'var(--L-sub)', marginBottom: 6 }}>
-            이번 대화의 중재자 톤
-          </div>
-        )}
         <div className="serif" style={{ fontSize: 16, color: 'var(--L-ink)' }}>
           {label.title}
         </div>

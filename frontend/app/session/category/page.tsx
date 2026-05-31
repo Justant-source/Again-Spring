@@ -83,8 +83,8 @@ export default function CategoryPage() {
         </div>
         <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 28, lineHeight: 1.6 }}>
           {hasProfileDefault
-            ? '프로필에 저장한 기본값을 불러왔어요. 이번 대화에만 다르게 조정해도 좋아요.'
-            : '매 대화마다 다르게 정할 수 있어요. 프로필에서 기본값을 저장할 수도 있어요.'}
+            ? '프로필에 저장한 기본값을 불러왔어요.'
+            : '프로필에서 기본값을 저장할 수도 있어요.'}
         </div>
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
