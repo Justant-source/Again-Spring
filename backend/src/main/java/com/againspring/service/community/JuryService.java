@@ -30,7 +30,6 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class JuryService {
 
     private final JurorRepository jurorRepository;
@@ -106,17 +105,16 @@ public class JuryService {
                             .findFirst()
                             .orElse(null);
 
-                    // 배심원 저장
+                    // 배심원 저장 (독립 트랜잭션 — @Async 내 save는 트랜잭션 없이 직접 호출)
                     Juror juror = Juror.builder()
                             .postId(post.getId())
                             .persona(persona)
                             .chosenOptionId(chosenOptionId)
                             .empathyComment(empathyComment)
-                            .createdAt(Instant.now())
                             .build();
 
                     jurorRepository.save(juror);
-                    log.info("Juror saved for post {}, persona: {} / {}", post.getId(), persona.getAgeGroup(), persona.getGender());
+                    log.error("[JuryService] Juror saved (prod diagnostics): post={}, {}:{}", post.getId(), persona.getAgeGroup(), persona.getGender());
 
                 } catch (Exception e) {
                     log.warn("Failed to generate juror for post {} with persona {} / {}: {}",
