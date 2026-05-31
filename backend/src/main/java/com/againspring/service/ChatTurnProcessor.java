@@ -66,8 +66,12 @@ public class ChatTurnProcessor {
         userStateAppender.append(session, parsed.userState());
         issueContextMerger.merge(session, parsed.issueDelta(), turnIndex);
         questionQueueUpdater.update(session, parsed.queueDelta(), turnIndex);
-        // V47 신규: 키워드·제목·koreanTag 추론값 세션에 반영
-        applyInferredMeta(session, parsed);
+        // V47 신규: 키워드·제목·koreanTag 추론값 세션에 반영 (예외가 채팅 플로우를 차단하지 않도록 보호)
+        try {
+            applyInferredMeta(session, parsed);
+        } catch (Exception e) {
+            log.warn("applyInferredMeta failed for session {}: {}", sessionId, e.getMessage());
+        }
 
         if (parsed.userState() != null) phaseDMetrics.recordUserState(parsed.userState().state);
         if (parsed.userState() != null || parsed.issueDelta() != null) phaseDMetrics.recordMetaPopulated();

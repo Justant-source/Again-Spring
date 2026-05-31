@@ -2,7 +2,7 @@
 
 **프로젝트**: 다시봄 · Again Spring
 **도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)
-**진행 상황**: V13 완료, V15 마케팅 자동화 대시보드 구현 중 (dev 전용) — V15.1~V15.9 + 소셜 포스터 봇 우회 완료. 자세한 내용: `shared/docs/v15/marketing-automation.md`
+**진행 상황**: V13 완료, V15 마케팅 자동화 대시보드 구현 중 (dev 전용) — V15.1~V15.9 + 소셜 포스터 봇 우회 완료. **V16 카테고리 UX 개선**: 중·소분류 제거, 대분류만 유지, 대분류별 predefined 첫마디(7×5=35개), turn_meta 키워드·제목·koreanTag 추론 완료. 자세한 내용: `shared/docs/v15/marketing-automation.md`
 **기준일**: 2026-05-31
 
 ---

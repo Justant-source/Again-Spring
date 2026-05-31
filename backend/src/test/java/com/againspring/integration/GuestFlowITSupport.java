@@ -49,6 +49,14 @@ public abstract class GuestFlowITSupport {
     @MockBean
     protected LLMProvider mockClaudeCodeBridge;
 
+    /**
+     * V47 수정: @MockBean LLMProvider는 qualifier 없는 빈만 대체한다.
+     * CancelableChatService가 @Qualifier("chatLlmProvider")로 주입받는 빈을 직접 대체하기 위해
+     * 이름으로 명시적으로 mock 등록.
+     */
+    @org.springframework.boot.test.mock.mockito.MockBean(name = "chatLlmProvider")
+    protected LLMProvider mockChatLlmProvider;
+
     // CWD = backend/ in Gradle → resolves to backend/src/test/resources/test-templates/...
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -63,17 +71,22 @@ public abstract class GuestFlowITSupport {
             String sessionId = invoc.getArgument(2);
             CancelableInvocation ci = new CancelableInvocation(
                     UUID.randomUUID().toString(), sessionId);
-            // resultFuture 즉시 완료 → whenComplete 콜백이 동기로 실행됨
             ci.getResultFuture().complete("[통합테스트] 두 분의 이야기를 잘 들었어요.");
             return ci;
         };
+        // mockClaudeCodeBridge (unnamed bean) 스텁
         when(mockClaudeCodeBridge.invokeCancelable(anyString(), anyString(), anyString()))
                 .thenAnswer(deterministicAnswer);
-        // V47~: invoke(prompt, model)도 스텁 (SessionMetaInferenceService 비동기 호출용)
+        // chatLlmProvider (named bean: CancelableChatService, SessionMetaInferenceService가 주입받는 빈) 스텁
+        when(mockChatLlmProvider.invokeCancelable(anyString(), anyString(), anyString()))
+                .thenAnswer(deterministicAnswer);
+        // V47~: CancelableChatService.beginInvocation에서 prompt.flatten()을 명시 호출하므로
+        //       String 오버로드 스텁 하나만으로 커버됨. StructuredPrompt 오버로드는 불필요.
+        // V47~: invoke(prompt, model)도 스텁
         try {
             when(mockClaudeCodeBridge.invoke(anyString(), anyString()))
                     .thenReturn("[통합테스트] 두 분의 이야기를 잘 들었어요.");
-        } catch (Exception ignored) {}  // Mockito stub — 예외 무시
+        } catch (Exception ignored) {}
     }
 
     // --- 헬퍼 ---
@@ -135,11 +148,11 @@ public abstract class GuestFlowITSupport {
         return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
-    /** mediator 응답이 2건 이상(첫마디 + 사용자 메시지 이후 응답)이 될 때까지 최대 5초 폴링 */
+    /** mediator 응답이 2건 이상(첫마디 + 사용자 메시지 이후 응답)이 될 때까지 최대 3초 폴링 */
     protected void awaitMediatorResponse(String sessionId, String token) {
         Awaitility.await()
-                .atMost(5, TimeUnit.SECONDS)
-                .pollInterval(200, TimeUnit.MILLISECONDS)
+                .atMost(3, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(() -> {
                     com.fasterxml.jackson.databind.JsonNode msgs = getMessages(sessionId, token);
                     long mediatorCount = 0;

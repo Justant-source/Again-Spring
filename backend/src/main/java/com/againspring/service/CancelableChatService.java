@@ -187,8 +187,11 @@ public class CancelableChatService {
             return;
         }
 
+        // StructuredPrompt 기본 오버로드 대신 flatten() 후 String 오버로드 직접 호출.
+        // 이유: 일부 환경(Mockito 테스트)에서 default method delegate가 올바르게 동작하지 않을 수 있어,
+        //       String 오버로드를 명시적으로 호출해 스텁이 항상 매칭되도록 한다.
         CancelableInvocation inv = llmBridge.invokeCancelable(
-                prompt, ChatService.MODEL_HAIKU, sessionId);
+                prompt.flatten(), ChatService.MODEL_HAIKU, sessionId);
 
         String key = invocationKey(sessionId, sender);
         CancelableInvocation displaced = activeInvocations.put(key, inv);
