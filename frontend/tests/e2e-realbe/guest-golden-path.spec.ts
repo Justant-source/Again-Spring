@@ -51,35 +51,30 @@ test.describe('게스트 골든패스 (실 BE 연동)', () => {
     expect(authBody.token?.accessToken, 'accessToken이 발급돼야 합니다').toBeTruthy()
     expect(authBody.user?.isGuest, '게스트 유저여야 합니다').toBe(true)
 
-    // 4. 온보딩 강제 폐지(2026-05-31) — 게스트는 바로 홈으로 진입
-    await page.waitForURL((url) => !url.pathname.includes('/guest'), { timeout: 8000 })
-    expect(page.url()).not.toContain('/onboarding')
-
-    // 5. 홈에서 "대화 시작" → 관계 유형 선택 (카피 수정: 70373e3)
-    const startBtn = page.getByRole('button', { name: '대화 시작' })
-    await expect(startBtn).toBeVisible({ timeout: 8000 })
-    await startBtn.click()
+    // 4. 게스트 인증 성공 후 /session/new로 자동 리다이렉트
+    // (app/(auth)/guest/page.tsx:42 router.push('/session/new'))
     await page.waitForURL('**/session/new**', { timeout: 10000 })
     expect(page.url()).toContain('/session/new')
 
+    // 5. 대분류 선택 (예: 친구)
     const friendBtn = page.getByRole('button', { name: /친구/ })
     await expect(friendBtn).toBeVisible({ timeout: 5000 })
     await friendBtn.click()
 
-    // 6. 카테고리 선택 → POST /api/sessions 실 BE 호출
+    // 6. 카테고리 화면 진입 → POST /api/sessions 실 BE 호출
     await page.waitForURL('**/session/category**', { timeout: 8000 })
     expect(page.url()).toContain('/session/category')
 
-    // Stage 1: 중분류 선택 — PhoneFrame(.tone-L) 내부의 한국어 버튼 중 첫 번째
+    // 7. 중분류 선택 — PhoneFrame(.tone-L) 내부의 한국어 버튼 중 첫 번째
     // BetaBanner "의견 보내주세요" 버튼은 fixed+DOM 상위라 .tone-L 밖 → 제외
     await page.getByText('마음에 걸리시는 일의').waitFor({ timeout: 5000 })
     await page.locator('.tone-L button').filter({ hasText: /[가-힣]/ }).first().click()
 
-    // Stage 2: 소분류 선택 — PhoneFrame 내부, disabled 아닌 한국어 버튼 중 첫 번째
+    // 8. 소분류 선택 — PhoneFrame 내부, disabled 아닌 한국어 버튼 중 첫 번째
     await page.getByText('가장 가까운 상황을').waitFor({ timeout: 8000 })
     await page.locator('.tone-L button:not([disabled])').filter({ hasText: /[가-힣]/ }).first().click()
 
-    // Stage 3 (게스트): 중재자 성향 → "대화 시작" → POST /api/sessions
+    // 9. 중재자 성향 슬라이더 설정 → "대화 시작" → POST /api/sessions
     const sessionCreatePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/sessions') && resp.request().method() === 'POST',
       { timeout: 15000 }
