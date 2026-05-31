@@ -61,20 +61,12 @@ test.describe('게스트 골든패스 (실 BE 연동)', () => {
     await expect(friendBtn).toBeVisible({ timeout: 5000 })
     await friendBtn.click()
 
-    // 6. 카테고리 화면 진입 → POST /api/sessions 실 BE 호출
+    // 6. /session/category로 이동 (V16~: 중·소분류 제거, 중재자 성향 슬라이더 단일 화면)
     await page.waitForURL('**/session/category**', { timeout: 8000 })
     expect(page.url()).toContain('/session/category')
+    await page.getByText('이번 대화의 중재자 톤을').waitFor({ timeout: 5000 })
 
-    // 7. 중분류 선택 — PhoneFrame(.tone-L) 내부의 한국어 버튼 중 첫 번째
-    // BetaBanner "의견 보내주세요" 버튼은 fixed+DOM 상위라 .tone-L 밖 → 제외
-    await page.getByText('마음에 걸리시는 일의').waitFor({ timeout: 5000 })
-    await page.locator('.tone-L button').filter({ hasText: /[가-힣]/ }).first().click()
-
-    // 8. 소분류 선택 — PhoneFrame 내부, disabled 아닌 한국어 버튼 중 첫 번째
-    await page.getByText('가장 가까운 상황을').waitFor({ timeout: 8000 })
-    await page.locator('.tone-L button:not([disabled])').filter({ hasText: /[가-힣]/ }).first().click()
-
-    // 9. 중재자 성향 슬라이더 설정 → "대화 시작" → POST /api/sessions
+    // 7. 중재자 성향 설정 → "대화 시작" → POST /api/sessions
     const sessionCreatePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/sessions') && resp.request().method() === 'POST',
       { timeout: 15000 }
