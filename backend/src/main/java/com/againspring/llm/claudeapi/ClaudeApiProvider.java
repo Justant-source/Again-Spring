@@ -57,8 +57,13 @@ public class ClaudeApiProvider implements LLMProvider {
     private static final String API_URL = "https://api.anthropic.com/v1/messages";
     private static final String ANTHROPIC_VERSION = "2023-06-01";
     private static final String ANTHROPIC_BETA = "prompt-caching-2024-07-31";
-    /** 한국어 1~3문장 = 최대 ~150 토큰. 출력 토큰은 캐싱 불가이므로 작을수록 직접 절감. */
-    private static final int MAX_TOKENS = 256;
+    /**
+     * 본문(한국어 1~3문장 ~150토큰) + &lt;turn_meta&gt; JSON(horsemen·nvc·user_state·issue/queue delta·inferred_*)
+     * 을 모두 수용해야 한다. 256은 turn_meta를 담지 못해 응답이 &lt;/turn_meta&gt; 전에 잘리고,
+     * 닫는 태그 누락으로 파서가 본문을 분리하지 못해 사용자에게 JSON이 노출되는 버그를 유발했다.
+     * maxTokens는 상한일 뿐이라 실제 출력 길이만큼만 과금된다(출력은 캐싱 불가).
+     */
+    private static final int MAX_TOKENS = 1024;
 
     @Value("${llm.claude-api.key:}")
     private String apiKey;

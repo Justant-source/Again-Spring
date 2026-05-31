@@ -48,6 +48,13 @@ public class ChatTurnMetaParser {
         "<(" + PromptSchema.STRIP_TAG_ALTERNATION + ")[^>]*>.*?</\\1>",
         Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
+    // 닫는 태그 없이 잘린 구조 블록 방어: MAX_TOKENS 초과로 </turn_meta> 등이 누락되면
+    // 위 패턴들이 못 잡는다. 여는 태그만 매칭해 그 지점부터 끝까지 제거 → JSON/메타 노출 차단.
+    // (본문은 turn_meta 앞에 위치하므로 보존된다)
+    private static final Pattern DANGLING_OPEN_TAG = Pattern.compile(
+        "<(" + PromptSchema.STRIP_TAG_ALTERNATION + ")[^>]*>",
+        Pattern.CASE_INSENSITIVE);
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Result parse(String rawResponse, int turn, String senderTag) {
@@ -128,6 +135,12 @@ public class ChatTurnMetaParser {
 
         // 방어적 마지막 패스: 파싱 후 남은 알려진 구조 태그 잔재 제거
         working = UNKNOWN_STRUCTURED_BLOCK.matcher(working).replaceAll("").trim();
+
+        // 닫는 태그 없이 잘린 구조 블록 — 여는 태그부터 끝까지 잘라낸다 (응답이 MAX_TOKENS에서 잘린 경우).
+        Matcher dangling = DANGLING_OPEN_TAG.matcher(working);
+        if (dangling.find()) {
+            working = working.substring(0, dangling.start()).strip();
+        }
 
         return new Result(working.strip(), horsemen, nvc, userState, issueDelta, queueDelta,
                 inferredKeywords, inferredTitle, inferredKoreanTag);

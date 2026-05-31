@@ -59,8 +59,11 @@ public class ChatTurnProcessor {
                 ? 0 : session.getHorsemenHistory().size()) + 1;
 
         ChatTurnMetaParser.Result parsed = turnMetaParser.parse(rawLlmResponse, turnIndex, sender.name());
+        // parser가 본문을 분리하지 못한 경우(본문 없이 메타만 온 비정상 응답 등) raw를 그대로 쓰면
+        // turn_meta JSON이 사용자에게 노출된다. raw 대신 안전한 fallback 문구를 사용한다.
         String mediatorResponse = (parsed.mediatorMessage() == null || parsed.mediatorMessage().isBlank())
-                ? rawLlmResponse : parsed.mediatorMessage();
+                ? "잠깐 정리할 시간이 필요해요. 다시 들려주실 수 있을까요?"
+                : parsed.mediatorMessage();
 
         appendPsychologyHistory(session, parsed);
         userStateAppender.append(session, parsed.userState());

@@ -45,6 +45,32 @@ class ChatTurnMetaParserTest {
     }
 
     @Test
+    @DisplayName("MAX_TOKENS 잘림으로 </turn_meta>가 없어도 본문만 추출하고 JSON을 노출하지 않는다")
+    void parse_stripsTruncatedTurnMeta_withoutClosingTag() {
+        // prod 실제 케이스: 응답이 MAX_TOKENS에서 잘려 </turn_meta>가 누락됨
+        String raw = "맨날 싸우니까 정말 지치고 힘들겠어요. 어떤 주제로 싸우는 게 제일 많아요?\n\n"
+            + "<turn_meta>\n{\n  \"horsemen\": {\n    \"criticism\": 0.0,\n    \"contempt\": 0.0\n  },\n"
+            + "  \"user_state\": {\n    \"state\": \"VENTING\",\n    \"evidence\": \"남편이랑 맨날싸워\"\n"
+            + "  },\n  \"inferred_keywords\": [\"부부갈등\"";  // 닫는 }·</turn_meta> 없이 잘림
+        var r = parser.parse(raw, 1, "USER_A");
+
+        assertTrue(r.mediatorMessage().contains("맨날 싸우니까"), "본문은 보존돼야 함");
+        assertFalse(r.mediatorMessage().contains("turn_meta"), "여는 태그 노출 금지");
+        assertFalse(r.mediatorMessage().contains("horsemen"), "JSON 내용 노출 금지");
+        assertFalse(r.mediatorMessage().contains("{"), "JSON 중괄호 노출 금지");
+        assertFalse(r.mediatorMessage().contains("VENTING"), "내부 라벨 노출 금지");
+    }
+
+    @Test
+    @DisplayName("본문 없이 turn_meta로 시작해 잘린 경우에도 JSON을 노출하지 않는다")
+    void parse_noBodyTruncatedMeta_doesNotLeakJson() {
+        String raw = "<turn_meta>\n{\n  \"horsemen\": {\"criticism\": 0.5";  // 본문 없이 잘림
+        var r = parser.parse(raw, 1, "USER_A");
+        assertFalse(r.mediatorMessage().contains("turn_meta"));
+        assertFalse(r.mediatorMessage().contains("horsemen"));
+    }
+
+    @Test
     void parse_clampsOutOfRangeIntensities() {
         String raw = "응답.\n<turn_meta>{\"horsemen\":{\"criticism\":1.7,\"contempt\":-0.2}}</turn_meta>";
         Session.HorsemenTurnEntry h = parser.parse(raw, 1, "USER_A").horsemen();
