@@ -10,15 +10,38 @@ const { applyStorageState, dumpStorageState } = require('../lib/session');
 const { generateTotp } = require('../lib/totp');
 const IG = require('../lib/ig-selectors');
 const { jitter, warmup } = require('../lib/anti-bot');
+const { captureFailure } = require('../lib/debug');
 
 async function humanDelay(page, minMs = 1200, maxMs = 3000) {
   await page.waitForTimeout(jitter((minMs + maxMs) / 2, 0.35));
 }
 
 async function isLoggedIn(page) {
+  // Instagram 은 로그아웃 시에도 루트 URL(/)에서 로그인 폼을 그대로 보여줌
+  // → URL 체크는 신뢰 불가. DOM 요소로 직접 판단한다.
   try {
     await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 15000 });
-    return !page.url().includes('/accounts/login') && !page.url().includes('/challenge');
+    await page.waitForTimeout(2500); // SPA 렌더링 대기
+
+    const url = page.url();
+    if (url.includes('/accounts/login') || url.includes('/challenge')) return false;
+
+    // 긍정 신호: 로그인 상태에서만 보이는 네비게이션 요소 (최대 5초 대기)
+    const loggedInSelector =
+      'svg[aria-label="홈"], svg[aria-label="Home"], ' +
+      'svg[aria-label="새 게시물"], svg[aria-label="New post"], ' +
+      'a[href="/explore/"], a[href^="/direct/"]';
+    try {
+      await page.waitForSelector(loggedInSelector, { timeout: 5000 });
+      return true;
+    } catch (e) { /* 아래 부정 신호 확인 */ }
+
+    // 부정 신호: 로그인 폼 입력칸이 보이면 로그아웃 상태
+    const loginForm = await page.$('input[name="username"], input[name="pass"], input[name="password"]');
+    if (loginForm) return false;
+
+    // 불명확 — 안전하게 로그아웃으로 간주(재로그인/재시드 유도)
+    return false;
   } catch (e) {
     return false;
   }
@@ -68,10 +91,14 @@ async function attemptRelogin(page, credentials) {
 
 router.post('/', async (req, res) => {
   const { storageState, credentials = {}, content = {} } = req.body;
-  const { caption = '', imageBase64, imageFilename = 'post.png' } = content;
+  const { caption = '', imageBase64, imageFilename = 'post.png', images = [] } = content;
 
-  // Validate required image
-  if (!imageBase64) {
+  // 업로드할 이미지 목록 결정: images[] 우선, 없으면 imageBase64 단건
+  const imageList = images && images.length > 0
+    ? images
+    : (imageBase64 ? [{ base64: imageBase64, filename: imageFilename }] : []);
+
+  if (imageList.length === 0) {
     return res.status(400).json({
       ok: false,
       error: 'IMAGE_REQUIRED',
@@ -91,10 +118,16 @@ router.post('/', async (req, res) => {
     });
   }
 
-  // Write image to temp file
-  const tmpPath = path.join('/tmp', 'ig-upload-' + Date.now() + '-' + imageFilename);
+  // 모든 이미지를 temp 파일로 저장
+  const ts = Date.now();
+  const tmpPaths = [];
   try {
-    fs.writeFileSync(tmpPath, Buffer.from(imageBase64, 'base64'));
+    for (let i = 0; i < imageList.length; i++) {
+      const img = imageList[i];
+      const tmpPath = path.join('/tmp', `ig-upload-${ts}-${i}-${img.filename || 'slide.png'}`);
+      fs.writeFileSync(tmpPath, Buffer.from(img.base64, 'base64'));
+      tmpPaths.push(tmpPath);
+    }
   } catch (e) {
     return res.json({
       ok: false,
@@ -114,12 +147,13 @@ router.post('/', async (req, res) => {
 
     let loggedIn = await isLoggedIn(page);
     if (!loggedIn) {
+      await captureFailure(page, 'ig-not-logged-in'); // 세션 상태 진단
       const loginResult = await attemptRelogin(page, credentials);
 
       if (loginResult === 'challenge') {
         const updatedState = await dumpStorageState(context);
         await context.close();
-        fs.unlinkSync(tmpPath);
+        for (const p of tmpPaths) { try { fs.unlinkSync(p); } catch (e) { /* ignore */ } }
         return res.json({
           ok: false,
           error: 'CHALLENGE',
@@ -132,7 +166,7 @@ router.post('/', async (req, res) => {
       if (loginResult === 'failed') {
         const updatedState = await dumpStorageState(context);
         await context.close();
-        fs.unlinkSync(tmpPath);
+        for (const p of tmpPaths) { try { fs.unlinkSync(p); } catch (e) { /* ignore */ } }
         return res.json({
           ok: false,
           error: 'LOGIN_FAILED',
@@ -150,7 +184,8 @@ router.post('/', async (req, res) => {
     // 피드 워밍업 — 즉시 업로드 패턴 방지
     await warmup(page, 'INSTAGRAM');
 
-    // Try to click "New Post" button (try multiple selectors)
+    // "새로운 게시물" 버튼 클릭 → create 모달 오픈
+    // ⚠️ /create/select/ 직접 URL 은 "페이지 사용 불가"로 죽었으므로 반드시 버튼 클릭으로 진입
     let newPostClicked = false;
     for (const sel of IG.NEW_POST_NAV_BUTTON.split(',')) {
       const el = await page.$(sel.trim());
@@ -162,18 +197,39 @@ router.post('/', async (req, res) => {
     }
 
     if (!newPostClicked) {
-      // Try navigating directly to create page
-      await page.goto('https://www.instagram.com/create/select/', { waitUntil: 'domcontentloaded', timeout: 10000 });
+      // 버튼을 못 찾음 → 로그인 안 됐거나 UI 변경. 진단 후 명확히 실패 처리
+      await captureFailure(page, 'ig-no-newpost-button');
+      const loginWall = await page.$('input[name="username"], input[name="pass"], input[name="password"]');
+      if (loginWall) {
+        const e = new Error('SESSION_EXPIRED: Instagram 새 게시물 버튼 대신 로그인 화면 감지. 세션 재시드 필요.');
+        e.needsReseed = true;
+        throw e;
+      }
+      throw new Error('Instagram "새로운 게시물" 버튼을 찾지 못함 — UI 변경 가능 (debug 스크린샷 확인)');
     }
-    await humanDelay(page, 1000, 2000);
+    await humanDelay(page, 1500, 2500);
 
-    // Upload file — try setInputFiles approach
-    const fileInput = await page.$(IG.FILE_INPUT);
+    // 파일 업로드 — 단건 또는 카드뉴스 다중 이미지
+    // create 다이얼로그가 뜰 때까지 잠시 대기 (file input 은 보통 hidden)
+    let fileInput = await page.$(IG.FILE_INPUT);
     if (!fileInput) {
-      throw new Error('FILE_INPUT not found — Instagram UI may have changed');
+      // 한 번 더 대기 후 재시도 (다이얼로그 렌더링 지연 대응)
+      await page.waitForTimeout(2500);
+      fileInput = await page.$(IG.FILE_INPUT);
+    }
+    if (!fileInput) {
+      // 진단 캡처 — 로그인월/UI변경 구분
+      await captureFailure(page, 'ig-no-fileinput');
+      const loginWall = await page.$('input[name="username"], input[name="pass"], input[name="password"]');
+      if (loginWall) {
+        const e = new Error('SESSION_EXPIRED: Instagram 업로드 화면 대신 로그인 화면이 감지됨. Instagram 세션 재시드 필요.');
+        e.needsReseed = true;
+        throw e;
+      }
+      throw new Error('FILE_INPUT not found — Instagram 업로드 다이얼로그가 열리지 않았거나 UI가 변경됨 (debug 스크린샷 확인)');
     }
 
-    await page.setInputFiles(IG.FILE_INPUT, tmpPath);
+    await page.setInputFiles(IG.FILE_INPUT, tmpPaths);
     await humanDelay(page, 2000, 3000);
 
     // Click Next (crop step)
@@ -224,7 +280,7 @@ router.post('/', async (req, res) => {
 
     const updatedStorageState = await dumpStorageState(context);
     await context.close();
-    fs.unlinkSync(tmpPath);
+    for (const p of tmpPaths) { try { fs.unlinkSync(p); } catch (e) { /* ignore */ } }
 
     return res.json({
       ok: true,
@@ -241,17 +297,13 @@ router.post('/', async (req, res) => {
         // Ignore cleanup errors
       }
     }
-    try {
-      fs.unlinkSync(tmpPath);
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+    for (const p of tmpPaths) { try { fs.unlinkSync(p); } catch (e) { /* ignore */ } }
 
     return res.json({
       ok: false,
       url: null,
       error: err.message,
-      needsReseed: false,
+      needsReseed: err.needsReseed === true,
       updatedStorageState: null,
     });
   }

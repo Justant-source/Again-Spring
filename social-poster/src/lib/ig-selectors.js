@@ -16,14 +16,15 @@ module.exports = {
   CHALLENGE_INDICATOR: 'h2:has-text("인증"), h2:has-text("Verify"), form input[name="email"], form input[name="phoneNumber"]',
 
   // New post creation flow
-  // The "+" or "new post" button in the nav
-  NEW_POST_NAV_BUTTON: 'svg[aria-label="새 게시물"], svg[aria-label="New post"], [aria-label="새로운 게시물 만들기"]',
+  // 좌측 네비게이션의 "새로운 게시물" 버튼 (2025 UI: svg aria-label="새로운 게시물")
+  // ⚠️ "새 게시물"(X) 아님 — 실제 라벨은 "새로운 게시물"
+  NEW_POST_NAV_BUTTON: 'svg[aria-label="새로운 게시물"], svg[aria-label="New post"], svg[aria-label="새 게시물"], [aria-label="새로운 게시물 만들기"]',
 
-  // Or try the "Create" in the menu
-  NEW_POST_CREATE_LINK: 'a[href="/create/select/"]',
+  // ⚠️ /create/select/ 직접 URL 은 "페이지 사용 불가"로 죽음 — 사용 금지.
+  //    반드시 위 NEW_POST_NAV_BUTTON 클릭으로 모달을 띄울 것.
 
-  // File input for image upload
-  FILE_INPUT: 'input[type="file"][accept]',
+  // File input for image upload (create 모달 내부, accept 속성 없을 수도 있음)
+  FILE_INPUT: 'input[type="file"][accept], input[type="file"]',
 
   // Step navigation buttons
   NEXT_BUTTON: 'button:has-text("다음"), button:has-text("Next")',

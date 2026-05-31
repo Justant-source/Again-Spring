@@ -10,6 +10,7 @@ import com.againspring.service.marketing.social.DuplicatePublishException;
 import com.againspring.service.marketing.social.SocialCredentialService;
 import com.againspring.service.marketing.social.SocialPosterClient;
 import com.againspring.service.marketing.social.SocialPublishService;
+import com.againspring.service.marketing.social.SocialSessionNormalizer;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,6 +49,7 @@ public class SocialPublishController {
     private final SocialPublishResultRepository resultRepository;
     private final SocialCryptoService cryptoService;
     private final MarketingContentRepository contentRepository;
+    private final SocialSessionNormalizer sessionNormalizer;
 
     /**
      * 콘텐츠 발행 시작
@@ -173,7 +175,11 @@ public class SocialPublishController {
     public ResponseEntity<?> seedSession(@RequestBody Map<String, Object> request) {
         try {
             String platform = (String) request.get("platform");
-            String storageState = (String) request.get("storageState");
+            String rawStorageState = (String) request.get("storageState");
+
+            // 정규화(Cookie-Editor export 변환 포함) + 필수 인증 쿠키 검증 (fail-fast)
+            // → httpOnly 누락으로 로그아웃 상태 세션이 저장되는 문제 차단
+            String storageState = sessionNormalizer.normalizeAndValidate(platform, rawStorageState);
 
             var session = sessionRepository.findByPlatform(platform)
                     .orElse(new com.againspring.domain.marketing.SocialSession());
@@ -189,6 +195,10 @@ public class SocialPublishController {
                     "platform", platform,
                     "status", "SEEDED"
             ));
+        } catch (IllegalArgumentException e) {
+            // 형식 오류 또는 필수 인증 쿠키 누락 — 운영자에게 명확한 안내 반환
+            log.warn("[SOCIAL_SESSION] Seed rejected: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (java.security.GeneralSecurityException e) {
             log.error("[SOCIAL_SESSION] Encryption failed: {}", e.getMessage());
             return ResponseEntity.status(500).body(Map.of("error", "Encryption failed: " + e.getMessage()));

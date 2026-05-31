@@ -325,8 +325,13 @@ export default function MarketingSettingsPage() {
                '미시딩'}
             </span>
           </div>
+          <p style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, margin: '0 0 8px', background: '#fffbe6', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 10px' }}>
+            ⚠️ 브라우저 콘솔(document.cookie) 방식은 <b>auth_token</b>(httpOnly 로그인 쿠키)을 읽지 못해 발행이 실패합니다.<br />
+            ✅ 권장: <b>Cookie-Editor</b> 확장 설치 → x.com 로그인 상태에서 Export → <b>Export as JSON</b> → 아래에 붙여넣기 (httpOnly 포함 캡처).<br />
+            또는 로컬에서 <code>node seed-cli.js --platform x</code> 실행.
+          </p>
           <textarea
-            placeholder="로컬에서 node seed-cli.js --platform x 실행 후 출력된 JSON을 붙여넣으세요"
+            placeholder="Cookie-Editor 'Export as JSON' 결과 또는 seed-cli.js storageState JSON 붙여넣기"
             value={xStorageState}
             onChange={(e) => setXStorageState(e.target.value)}
             style={{
@@ -489,8 +494,13 @@ export default function MarketingSettingsPage() {
                '미시딩'}
             </span>
           </div>
+          <p style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, margin: '0 0 8px', background: '#fffbe6', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 10px' }}>
+            ⚠️ 브라우저 콘솔(document.cookie) 방식은 <b>sessionid</b>(httpOnly 로그인 쿠키)를 읽지 못해 발행이 실패합니다.<br />
+            ✅ 권장: <b>Cookie-Editor</b> 확장 설치 → instagram.com 로그인 상태에서 Export → <b>Export as JSON</b> → 아래에 붙여넣기 (httpOnly 포함 캡처).<br />
+            또는 로컬에서 <code>node seed-cli.js --platform instagram</code> 실행.
+          </p>
           <textarea
-            placeholder="로컬에서 node seed-cli.js --platform instagram 실행 후 출력된 JSON을 붙여넣으세요"
+            placeholder="Cookie-Editor 'Export as JSON' 결과 또는 seed-cli.js storageState JSON 붙여넣기"
             value={igStorageState}
             onChange={(e) => setIgStorageState(e.target.value)}
             style={{

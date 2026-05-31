@@ -15,6 +15,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import org.springframework.beans.factory.annotation.Value;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,6 +45,9 @@ public class SocialPublishExecutor {
     private final SocialCryptoService cryptoService;
     private final SocialOperatorNotifier notifier;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${app.features.marketing.image-dir:/tmp/marketing-images}")
+    private String imageDir;
 
     @Async("socialExecutor")
     public void executePublish(Long contentId, List<String> targetPlatforms, String linkMode) {
@@ -170,6 +175,16 @@ public class SocialPublishExecutor {
             contentMap.put("linkUrl", "https://againspring.net");
             contentMap.put("linkMode", linkMode != null ? linkMode : "last_tweet");
 
+            // 첫 번째 이미지 (TWEET_1 슬롯 우선, 없으면 첫 이미지)
+            String coverBase64 = extractImageBase64BySlot(content, "TWEET_1");
+            if (coverBase64 == null) {
+                coverBase64 = extractFirstImageBase64(content);
+            }
+            if (coverBase64 != null) {
+                contentMap.put("imageBase64", coverBase64);
+                contentMap.put("imageFilename", "cover.png");
+            }
+
             Map<String, Object> request = new HashMap<>();
             request.put("storageState", storageStateJson);
             request.put("credentials", credentials);
@@ -177,17 +192,18 @@ public class SocialPublishExecutor {
             return request;
 
         } else {
-            // INSTAGRAM
+            // INSTAGRAM — 카드뉴스 슬라이드 전체 전달
             String caption = content.getBodyText();
             if (content.getHashtags() != null && !content.getHashtags().isBlank()) {
                 caption = caption + "\n\n" + content.getHashtags();
             }
 
-            String imageBase64 = extractFirstImageBase64(content);
+            List<Map<String, Object>> images = extractAllImagesAsBase64List(content);
             Map<String, Object> contentMap = new HashMap<>();
             contentMap.put("caption", caption);
-            contentMap.put("imageBase64", imageBase64);
-            contentMap.put("imageFilename", "post.png");
+            if (!images.isEmpty()) {
+                contentMap.put("images", images);
+            }
 
             Map<String, Object> request = new HashMap<>();
             request.put("storageState", storageStateJson);
@@ -232,36 +248,101 @@ public class SocialPublishExecutor {
     }
 
     /**
-     * imagePaths에서 첫 번째 이미지 Base64 추출
+     * imagePaths에서 첫 번째 이미지 Base64 추출.
+     * JSON 객체 배열 형식([{"filename":..., "role":..., "slot":...}])과 문자열 배열 형식 모두 지원.
      */
     private String extractFirstImageBase64(MarketingContent content) {
         if (content.getImagePaths() == null || content.getImagePaths().isBlank()) {
             return null;
         }
-
         try {
             String paths = content.getImagePaths().trim();
-            String firstPath;
-
             if (paths.startsWith("[")) {
-                // JSON 배열 파싱
                 List<?> pathList = objectMapper.readValue(paths, List.class);
-                firstPath = pathList.isEmpty() ? null : (String) pathList.get(0);
+                if (pathList.isEmpty()) return null;
+                return readImageFromListItem(pathList.get(0));
             } else {
-                // 쉼표 구분
-                firstPath = paths.split(",")[0].trim();
+                // 쉼표 구분 레거시 형식
+                String firstPath = paths.split(",")[0].trim();
+                return readFileAsBase64(Path.of(firstPath));
             }
-
-            if (firstPath == null || firstPath.isBlank()) {
-                return null;
-            }
-
-            byte[] bytes = Files.readAllBytes(Path.of(firstPath));
-            return java.util.Base64.getEncoder().encodeToString(bytes);
-
-        } catch (IOException e) {
-            log.warn("[SOCIAL_PUBLISH] Could not read image: {}", e.getMessage());
+        } catch (Exception e) {
+            log.warn("[SOCIAL_PUBLISH] Could not read first image: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 특정 slot의 이미지 Base64 추출 (예: "TWEET_1", "SLIDE_1")
+     */
+    private String extractImageBase64BySlot(MarketingContent content, String targetSlot) {
+        if (content.getImagePaths() == null || content.getImagePaths().isBlank()) return null;
+        try {
+            String paths = content.getImagePaths().trim();
+            if (!paths.startsWith("[")) return null;
+            List<?> pathList = objectMapper.readValue(paths, List.class);
+            for (Object item : pathList) {
+                if (item instanceof Map<?, ?> map) {
+                    Object slot = map.get("slot");
+                    if (targetSlot.equals(slot != null ? slot.toString() : null)) {
+                        return readImageFromListItem(item);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[SOCIAL_PUBLISH] Could not read image by slot={}: {}", targetSlot, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * 모든 이미지를 Base64 리스트로 추출 (인스타 카드뉴스용)
+     */
+    private List<Map<String, Object>> extractAllImagesAsBase64List(MarketingContent content) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (content.getImagePaths() == null || content.getImagePaths().isBlank()) return result;
+        try {
+            String paths = content.getImagePaths().trim();
+            if (!paths.startsWith("[")) return result;
+            List<?> pathList = objectMapper.readValue(paths, List.class);
+            for (Object item : pathList) {
+                if (item instanceof Map<?, ?> map) {
+                    Object fn = map.get("filename");
+                    if (fn == null) continue;
+                    try {
+                        byte[] bytes = Files.readAllBytes(Path.of(imageDir, fn.toString()));
+                        Object slotObj = map.get("slot");
+                        result.add(Map.of(
+                                "base64", java.util.Base64.getEncoder().encodeToString(bytes),
+                                "filename", fn.toString(),
+                                "slot", slotObj != null ? slotObj.toString() : ""
+                        ));
+                    } catch (IOException e) {
+                        log.warn("[SOCIAL_PUBLISH] Could not read image {}: {}", fn, e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[SOCIAL_PUBLISH] Could not parse imagePaths for all images: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    private String readImageFromListItem(Object item) throws IOException {
+        if (item instanceof String s) {
+            // 레거시: 이미 전체 경로 문자열
+            return readFileAsBase64(Path.of(s));
+        } else if (item instanceof Map<?, ?> map) {
+            // 신규: {filename, role, slot, alt, order}
+            Object fn = map.get("filename");
+            if (fn == null) return null;
+            return readFileAsBase64(Path.of(imageDir, fn.toString()));
+        }
+        return null;
+    }
+
+    private String readFileAsBase64(Path path) throws IOException {
+        byte[] bytes = Files.readAllBytes(path);
+        return java.util.Base64.getEncoder().encodeToString(bytes);
     }
 }

@@ -59,7 +59,7 @@ export default function ContentDetailPage() {
   const [publishUrl, setPublishUrl] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishErr, setPublishErr] = useState('');
-  const [socialTargets, setSocialTargets] = useState<SocialPlatform[]>(['X', 'INSTAGRAM']);
+  const [socialTargets, setSocialTargets] = useState<SocialPlatform[]>([]);
   const [linkMode, setLinkMode] = useState<'last_tweet' | 'first_reply'>('last_tweet');
   const [socialPublishResults, setSocialPublishResults] = useState<SocialPublishResult[]>([]);
   const [isAutoPublishing, setIsAutoPublishing] = useState(false);
@@ -69,6 +69,15 @@ export default function ContentDetailPage() {
   useEffect(() => {
     loadContent();
   }, [contentId]);
+
+  // content.platform 기반으로 발행 대상 자동 설정
+  useEffect(() => {
+    if (!content) return;
+    const p = content.platform?.toUpperCase();
+    if (p === 'X' || p === 'INSTAGRAM') {
+      setSocialTargets([p as SocialPlatform]);
+    }
+  }, [content?.platform]);
 
   async function loadContent() {
     try {
@@ -498,29 +507,30 @@ export default function ContentDetailPage() {
         {(content.status === 'APPROVED' || content.status === 'PUBLISHING' || content.status === 'PARTIAL' || content.status === 'PUBLISHED' || content.status === 'FAILED') && (
           <div style={{ marginBottom: 24, padding: '16px', background: '#f9f9f9', borderRadius: 8 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', margin: '0 0 12px' }}>소셜 자동 발행</h3>
-            {/* Target platform toggles */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              {(['X', 'INSTAGRAM'] as SocialPlatform[]).map(p => (
-                <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={socialTargets.includes(p)}
-                    disabled={socialPublishResults.some(r => r.platform === p && r.state === 'SUCCEEDED')}
-                    onChange={e => setSocialTargets(prev =>
-                      e.target.checked ? (prev.includes(p) ? prev : [...prev, p]) : prev.filter(x => x !== p)
-                    )}
-                  />
-                  {p}
-                  {socialPublishResults.some(r => r.platform === p && r.state === 'SUCCEEDED') && (
-                    <span style={{ fontSize: 11, color: '#065f46', background: '#d1fae5', borderRadius: 4, padding: '1px 5px' }}>발행완료</span>
-                  )}
-                  {socialPublishResults.some(r => r.platform === p && r.state === 'FAILED') && (
-                    <span style={{ fontSize: 11, color: '#991b1b', background: '#fee2e2', borderRadius: 4, padding: '1px 5px' }}>실패</span>
-                  )}
-                </label>
-              ))}
+            {/* Target platform — content.platform 에 맞는 플랫폼만 표시 */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              {content && (() => {
+                const p = content.platform?.toUpperCase() as SocialPlatform;
+                if (p !== 'X' && p !== 'INSTAGRAM') return null;
+                const succeeded = socialPublishResults.some(r => r.platform === p && r.state === 'SUCCEEDED');
+                const failed = socialPublishResults.some(r => r.platform === p && r.state === 'FAILED');
+                return (
+                  <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={socialTargets.includes(p)}
+                      disabled={succeeded}
+                      onChange={e => setSocialTargets(e.target.checked ? [p] : [])}
+                    />
+                    {p}
+                    {succeeded && <span style={{ fontSize: 11, color: '#065f46', background: '#d1fae5', borderRadius: 4, padding: '1px 5px' }}>발행완료</span>}
+                    {failed && <span style={{ fontSize: 11, color: '#991b1b', background: '#fee2e2', borderRadius: 4, padding: '1px 5px' }}>실패</span>}
+                  </label>
+                );
+              })()}
             </div>
-            {/* Link mode */}
+            {/* Link mode — X 콘텐츠 전용 */}
+            {content?.platform?.toUpperCase() === 'X' && (
             <div style={{ marginBottom: 12, display: 'flex', gap: 12, fontSize: 13 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <input type="radio" name="linkMode" value="last_tweet" checked={linkMode === 'last_tweet'} onChange={() => setLinkMode('last_tweet')} />
@@ -531,6 +541,7 @@ export default function ContentDetailPage() {
                 첫 댓글에 링크
               </label>
             </div>
+            )}
             {/* Publish button */}
             <button
               onClick={handleAutoPublish}
@@ -547,10 +558,12 @@ export default function ContentDetailPage() {
             >
               {publishPolling ? '발행 중...' : isAutoPublishing ? '요청 중...' : '발행'}
             </button>
-            {/* Per-platform results */}
+            {/* Per-platform results — content.platform 에 해당하는 플랫폼만 표시 */}
             {socialPublishResults.length > 0 && (
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {socialPublishResults.map(r => (
+                {socialPublishResults.filter(r =>
+                  r.platform === content?.platform?.toUpperCase()
+                ).map(r => (
                   <div key={r.platform} style={{ fontSize: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 600, minWidth: 80 }}>{r.platform}</span>
                     <span style={{

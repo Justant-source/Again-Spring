@@ -22,11 +22,13 @@
  */
 
 const express = require('express');
+const fs = require('fs');
 const router = express.Router();
 const { applyStorageState, dumpStorageState } = require('../lib/session');
 const { generateTotp } = require('../lib/totp');
 const X = require('../lib/x-selectors');
 const { jitter, warmup } = require('../lib/anti-bot');
+const { captureFailure } = require('../lib/debug');
 
 /**
  * jitter 기반 지연 — 동일 타이밍 패턴 방지
@@ -36,7 +38,9 @@ async function humanDelay(page, minMs = 1200, maxMs = 3000) {
 }
 
 /**
- * Check if currently logged in by navigating to home
+ * Check if currently logged in.
+ * URL 만으로는 신뢰할 수 없음(로그아웃 시 x.com 루트로 리다이렉트되어 /login 미포함).
+ * → 로그인 상태에서만 존재하는 DOM 요소를 직접 확인한다.
  */
 async function isLoggedIn(page) {
   try {
@@ -44,8 +48,32 @@ async function isLoggedIn(page) {
       waitUntil: 'domcontentloaded',
       timeout: 15000,
     });
-    // If we're on login or flow pages, we're not logged in
-    return !page.url().includes('/login') && !page.url().includes('/i/flow');
+    await page.waitForTimeout(2000); // SPA 렌더링 대기
+
+    const url = page.url();
+    if (url.includes('/login') || url.includes('/i/flow') || url.includes('/account/access')) {
+      return false;
+    }
+
+    // 긍정 신호: 로그인 상태에서만 보이는 요소 (최대 5초 대기)
+    const loggedInSelector =
+      '[data-testid="SideNav_NewTweet_Button"], [data-testid="AppTabBar_Home_Link"], ' +
+      '[data-testid="SideNav_AccountSwitcher_Button"], [aria-label="Home timeline"], ' +
+      '[data-testid="primaryColumn"]';
+    try {
+      await page.waitForSelector(loggedInSelector, { timeout: 5000 });
+      return true;
+    } catch (e) { /* 아래 부정 신호 확인 */ }
+
+    // 부정 신호: 로그인 폼/버튼이 보이면 로그아웃 상태
+    const loggedOutEl = await page.$(
+      'input[autocomplete="username"], a[href="/login"], a[data-testid="loginButton"], ' +
+      '[data-testid="login"]'
+    );
+    if (loggedOutEl) return false;
+
+    // 둘 다 불명확 — 안전하게 로그아웃으로 간주(재로그인/재시드 유도)
+    return false;
   } catch (e) {
     return false;
   }
@@ -192,7 +220,7 @@ async function extractPostedTweetUrl(page) {
 
 router.post('/', async (req, res) => {
   const { storageState, credentials = {}, content = {} } = req.body;
-  const { tweets = [], linkUrl = '', linkMode = 'last_tweet' } = content;
+  const { tweets = [], linkUrl = '', linkMode = 'last_tweet', imageBase64 = null, imageFilename = 'cover.png' } = content;
 
   // Validate inputs
   if (!storageState) {
@@ -237,6 +265,7 @@ router.post('/', async (req, res) => {
   }
 
   let browser, context, page;
+  let tmpImgPath = null; // try/catch 양쪽에서 접근하려면 블록 바깥에 선언
 
   try {
     browser = await getBrowser();
@@ -257,6 +286,9 @@ router.post('/', async (req, res) => {
 
     // Check if logged in; if not, try to re-login
     let loggedIn = await isLoggedIn(page);
+    if (!loggedIn) {
+      await captureFailure(page, 'x-not-logged-in'); // 세션 상태 진단
+    }
     if (!loggedIn && credentials.email && credentials.password) {
       const loginResult = await attemptRelogin(page, credentials);
       if (loginResult === 'challenge') {
@@ -306,22 +338,66 @@ router.post('/', async (req, res) => {
     // 피드 워밍업 — 즉시 compose 클릭 패턴 방지
     await warmup(page, 'X');
 
-    // Click compose button
+    // Compose 버튼 대기 후 클릭 (UI 변경 대응)
     const composeBtnSelectors = X.COMPOSE_TWEET_BUTTON.split(',').map(s => s.trim());
     let clicked = false;
-    for (const sel of composeBtnSelectors) {
-      const btn = await page.$(sel);
-      if (btn) {
-        await btn.click();
-        clicked = true;
-        break;
+    try {
+      await page.waitForSelector(composeBtnSelectors.join(', '), { timeout: 8000 });
+      for (const sel of composeBtnSelectors) {
+        const btn = await page.$(sel);
+        if (btn) { await btn.click(); clicked = true; break; }
       }
+    } catch (e) {
+      // 셀렉터 실패 → URL 직접 이동으로 fallback
     }
-    if (!clicked) throw new Error('Could not find compose button');
+    if (!clicked) {
+      // X compose 직접 URL fallback
+      await page.goto('https://x.com/compose/tweet', {
+        waitUntil: 'domcontentloaded',
+        timeout: 15000,
+      });
+    }
 
     // Wait for tweet textarea to appear
-    await page.waitForSelector(X.TWEET_TEXT_AREA_0, { timeout: 10000 });
+    try {
+      await page.waitForSelector(X.TWEET_TEXT_AREA_0, { timeout: 12000 });
+    } catch (waitErr) {
+      // 진단 캡처 — 로그인월/UI변경 구분
+      await captureFailure(page, 'x-no-textarea');
+      const loginWall = await page.$(
+        'input[autocomplete="username"], input[name="text"], a[href="/login"], [data-testid="login"]'
+      );
+      if (loginWall) {
+        const e = new Error('SESSION_EXPIRED: X compose에 트윗 입력창이 없고 로그인 화면이 감지됨. X 세션 재시드 필요.');
+        e.needsReseed = true;
+        throw e;
+      }
+      throw new Error('Tweet textarea not found — X compose가 열리지 않았거나 UI가 변경됨 (debug 스크린샷 확인)');
+    }
     await humanDelay(page, 800, 1500);
+
+    // 이미지 첨부 (imageBase64 전달된 경우)
+    if (imageBase64) {
+      tmpImgPath = `/tmp/x-img-${Date.now()}.png`;
+      try {
+        fs.writeFileSync(tmpImgPath, Buffer.from(imageBase64, 'base64'));
+        const mediaInputSels = X.MEDIA_INPUT.split(',').map(s => s.trim());
+        let mediaInputFound = false;
+        for (const sel of mediaInputSels) {
+          const el = await page.$(sel);
+          if (el) {
+            await page.setInputFiles(sel, tmpImgPath);
+            mediaInputFound = true;
+            break;
+          }
+        }
+        if (mediaInputFound) {
+          await humanDelay(page, 2000, 3500); // 업로드 대기
+        }
+      } catch (imgErr) {
+        console.warn('[X] Image upload failed (non-fatal):', imgErr.message);
+      }
+    }
 
     // Type each tweet
     for (let i = 0; i < tweets.length; i++) {
@@ -403,6 +479,11 @@ router.post('/', async (req, res) => {
     const updatedStorageState = await dumpStorageState(context);
     await context.close();
 
+    // 임시 이미지 파일 정리
+    if (tmpImgPath) {
+      try { fs.unlinkSync(tmpImgPath); } catch (e) { /* ignore */ }
+    }
+
     return res.json({
       ok: true,
       url: postUrl,
@@ -419,11 +500,14 @@ router.post('/', async (req, res) => {
         // ignore
       }
     }
+    if (tmpImgPath) {
+      try { fs.unlinkSync(tmpImgPath); } catch (e) { /* ignore */ }
+    }
     return res.json({
       ok: false,
       url: null,
       error: err.message,
-      needsReseed: false,
+      needsReseed: err.needsReseed === true,
       updatedStorageState: null,
     });
   }

@@ -25,8 +25,11 @@ module.exports = {
     '[data-testid="challenge"], h1:has-text("인증"), h1:has-text("Verify"), h1:has-text("확인해")',
 
   // ===== Compose =====
+  // X UI는 자주 바뀌므로 여러 셀렉터를 우선순위 순으로 나열
   COMPOSE_TWEET_BUTTON:
-    '[data-testid="SideNav_NewTweet_Button"], [aria-label="게시하기"], [aria-label="Post"]',
+    '[data-testid="SideNav_NewTweet_Button"], a[href="/compose/tweet"], [aria-label="게시하기"], [aria-label="Post"], [aria-label="Tweet"], [data-testid="FloatingActionButton_Tweet_Button"]',
+  // 미디어(이미지) 첨부 파일 input
+  MEDIA_INPUT: 'input[data-testid="fileInput"], input[type="file"][accept*="image"]',
   TWEET_TEXT_AREA_0: '[data-testid="tweetTextarea_0"]',
   TWEET_TEXT_AREA_N: (n) => `[data-testid="tweetTextarea_${n}"]`,
   ADD_TWEET_BUTTON: '[data-testid="addButton"]',

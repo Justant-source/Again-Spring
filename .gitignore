@@ -62,3 +62,6 @@ nbproject/
 *.swp
 *.swo
 backend/scripts/test-automation/results/
+
+# 절대 커밋 금지 — 소셜 쿠키/세션 원본
+.temp/

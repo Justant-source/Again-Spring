@@ -1,2 +1,5 @@
 node_modules/
 *.log
+
+# 발행 실패 진단 스크린샷
+src/debug/
