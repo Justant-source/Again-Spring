@@ -187,11 +187,13 @@ public class CancelableChatService {
             return;
         }
 
-        // StructuredPrompt 기본 오버로드 대신 flatten() 후 String 오버로드 직접 호출.
-        // 이유: 일부 환경(Mockito 테스트)에서 default method delegate가 올바르게 동작하지 않을 수 있어,
-        //       String 오버로드를 명시적으로 호출해 스텁이 항상 매칭되도록 한다.
+        // StructuredPrompt 오버로드를 직접 호출 — provider가 캐싱을 지원하면(ClaudeApiProvider)
+        // cache_control breakpoint(GLOBAL_STATIC 1h + SESSION_STATIC/HISTORY 5m)를 적용해
+        // 매 턴 반복되는 system/framework/profile/history 토큰을 캐시 히트로 절감한다.
+        // 캐싱 미지원 provider(RemoteLlmProvider/ClaudeCodeBridge)는 default 메서드가 flatten()으로 위임.
+        // (테스트 mock은 default 위임을 실행하지 않으므로 StructuredPrompt 오버로드를 직접 스텁해야 함)
         CancelableInvocation inv = llmBridge.invokeCancelable(
-                prompt.flatten(), ChatService.MODEL_HAIKU, sessionId);
+                prompt, ChatService.MODEL_HAIKU, sessionId);
 
         String key = invocationKey(sessionId, sender);
         CancelableInvocation displaced = activeInvocations.put(key, inv);

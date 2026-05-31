@@ -2,6 +2,7 @@ package com.againspring.integration;
 
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.bridge.CancelableInvocation;
+import com.againspring.llm.prompt.StructuredPrompt;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,15 +75,19 @@ public abstract class GuestFlowITSupport {
             ci.getResultFuture().complete("[통합테스트] 두 분의 이야기를 잘 들었어요.");
             return ci;
         };
-        // mockClaudeCodeBridge (unnamed bean) 스텁
+        // mockClaudeCodeBridge (unnamed bean) 스텁 — String + StructuredPrompt 양쪽
         when(mockClaudeCodeBridge.invokeCancelable(anyString(), anyString(), anyString()))
+                .thenAnswer(deterministicAnswer);
+        when(mockClaudeCodeBridge.invokeCancelable(any(StructuredPrompt.class), anyString(), anyString()))
                 .thenAnswer(deterministicAnswer);
         // chatLlmProvider (named bean: CancelableChatService, SessionMetaInferenceService가 주입받는 빈) 스텁
         when(mockChatLlmProvider.invokeCancelable(anyString(), anyString(), anyString()))
                 .thenAnswer(deterministicAnswer);
-        // V47~: CancelableChatService.beginInvocation에서 prompt.flatten()을 명시 호출하므로
-        //       String 오버로드 스텁 하나만으로 커버됨. StructuredPrompt 오버로드는 불필요.
-        // V47~: invoke(prompt, model)도 스텁
+        // CancelableChatService.beginInvocation이 StructuredPrompt 오버로드를 직접 호출(캐싱 활성화)하므로
+        // StructuredPrompt 오버로드 스텁이 필수 — mock은 default 메서드의 flatten() 위임을 실행하지 않는다.
+        when(mockChatLlmProvider.invokeCancelable(any(StructuredPrompt.class), anyString(), anyString()))
+                .thenAnswer(deterministicAnswer);
+        // invoke(prompt, model)도 스텁
         try {
             when(mockClaudeCodeBridge.invoke(anyString(), anyString()))
                     .thenReturn("[통합테스트] 두 분의 이야기를 잘 들었어요.");
