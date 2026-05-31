@@ -30,6 +30,7 @@ export default function ResultPage() {
   const [soloShareModalOpen, setSoloShareModalOpen] = useState(false);
   const [soloImageUrl, setSoloImageUrl] = useState<string | null>(null);
   const [soloImageBlob, setSoloImageBlob] = useState<Blob | null>(null);
+  const [convertLoading, setConvertLoading] = useState(false);
 
   // Determine names
   const myRole = sessionStore.role || 'A';
@@ -191,6 +192,20 @@ export default function ResultPage() {
     }
   };
 
+  const handleConvertToCommunity = async (sId: string) => {
+    setConvertLoading(true);
+    try {
+      const res = await api.get(`/api/sessions/${sId}/draft-for-community`);
+      const draft = res.data;
+      sessionStorage.setItem('community-draft', JSON.stringify(draft));
+      router.push('/community/new?from=session');
+    } catch (err) {
+      console.error('Failed to load draft:', err);
+      alert('사연 변환 초안을 불러오지 못했어요. 다시 시도해주세요.');
+      setConvertLoading(false);
+    }
+  };
+
   if (loading || generating) {
     return (
       <PhoneFrame tone="P">
@@ -259,6 +274,8 @@ export default function ResultPage() {
             styleA={styleA}
             styleB={styleB}
             variant="card"
+            sessionId={sessionId}
+            onConvertToCommunity={handleConvertToCommunity}
           />
         )}
       </div>

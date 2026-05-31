@@ -38,3 +38,15 @@ export const EMAIL_INPUT_PLACEHOLDER = '이메일'
 export const PASSWORD_INPUT_PLACEHOLDER = '비밀번호'
 export const LOGIN_BUTTON = { name: '로그인' } as const
 export const GUEST_START_BUTTON = { name: '시작하기' } as const
+
+// ── V17 커뮤니티 (Phase 3에서 추가) ────────────────────────────
+export const POST_BODY_INPUT = '[data-testid="post-body-input"]'
+export const POST_COMPOSE_PREVIEW = '[data-testid="post-compose-preview"]'
+export const VOTE_DISTRIBUTION = '[data-testid="vote-distribution"]'
+export const JURY_DISTRIBUTION = '[data-testid="jury-distribution"]'
+export const COMMENT_LIKE_BTN = '[data-testid="comment-like-btn"]'
+export const COMMUNITY_LEGAL_NOTICE = '[data-testid="ratio-legal-notice"]'
+
+// ── V17 3자 대화 (Phase 6에서 추가) ──────────────────────────────
+export const THREE_WAY_MEDIATOR_MSG = '[data-testid="three-way-mediator-msg"]'
+export const THREE_WAY_MEDIATOR_LABEL = '[data-testid="three-way-mediator-label"]'

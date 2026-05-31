@@ -109,6 +109,11 @@ llm:
     provider: ${LLM_CHAT_PROVIDER:claude-code}     # dev:remote  prod:claude-api  test:mock
   report:
     provider: ${LLM_REPORT_PROVIDER:claude-code}   # dev:remote  prod:remote      test:mock
+  jury:
+    provider: ${LLM_JURY_PROVIDER:claude-code}
+    model: ${JURY_LLM_MODEL:claude-haiku-4-5-20251001}
+  compose:
+    model: ${COMPOSE_LLM_MODEL:claude-haiku-4-5-20251001}
   remote:
     base-url: ${LLM_WORKER_URL:http://againspring-llm-dev:8090}
     connect-timeout-ms: ${LLM_REMOTE_CONNECT_TIMEOUT_MS:5000}

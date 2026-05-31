@@ -29,6 +29,9 @@ public class LlmProviderConfig {
     @Value("${llm.report.provider:claude-code}")
     private String reportProvider;
 
+    @Value("${llm.jury.provider:claude-code}")
+    private String juryProvider;
+
     /**
      * 대화(chat) 전용 provider.
      * Qualifer: "chatLlmProvider"
@@ -96,6 +99,36 @@ public class LlmProviderConfig {
             }
             default -> {
                 log.info("Report LLM provider: claude-code (default)");
+                yield claudeCode;
+            }
+        };
+
+        return selected;
+    }
+
+    /**
+     * 배심원(jury) 전용 provider.
+     * Qualifier: "juryLlmProvider"
+     * 기본값: claude-code
+     */
+    @Bean
+    @Qualifier("juryLlmProvider")
+    public LLMProvider juryLlmProvider(
+            @Qualifier("remoteLlmProvider") LLMProvider remote,
+            @Qualifier("claudeCodeBridge") LLMProvider claudeCode,
+            @Qualifier("mockLlmProvider") LLMProvider mock) {
+
+        LLMProvider selected = switch (juryProvider) {
+            case "remote" -> {
+                log.info("Jury LLM provider: remote");
+                yield remote;
+            }
+            case "mock" -> {
+                log.info("Jury LLM provider: mock");
+                yield mock;
+            }
+            default -> {
+                log.info("Jury LLM provider: claude-code (default)");
                 yield claudeCode;
             }
         };

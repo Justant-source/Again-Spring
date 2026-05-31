@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS posts (
+    id VARCHAR(32) NOT NULL,
+    author_id VARCHAR(32) NOT NULL,
+    session_id VARCHAR(36),
+    title VARCHAR(200),
+    body_raw LONGTEXT,
+    body_published LONGTEXT,
+    category VARCHAR(50),
+    visibility VARCHAR(20) NOT NULL DEFAULT 'PRIVATE',
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+    neutralization_passed BOOLEAN NOT NULL DEFAULT FALSE,
+    vote_close_at TIMESTAMP(6),
+    created_at TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    INDEX idx_posts_author (author_id),
+    INDEX idx_posts_visibility_status (visibility, status),
+    INDEX idx_posts_category (category),
+    INDEX idx_posts_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

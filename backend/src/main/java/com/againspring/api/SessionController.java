@@ -3,10 +3,12 @@ package com.againspring.api;
 import com.againspring.api.dto.request.CreateSessionRequest;
 import com.againspring.api.dto.request.JoinSessionRequest;
 import com.againspring.api.dto.response.CreateSessionResponse;
+import com.againspring.api.dto.response.SessionDraftDto;
 import com.againspring.api.dto.response.SessionListItemResponse;
 import com.againspring.api.dto.response.SessionResponse;
 import com.againspring.api.dto.response.SessionStatusResponse;
 import com.againspring.service.SessionService;
+import com.againspring.service.community.SessionToPostService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -44,6 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SessionController {
 
     private final SessionService sessionService;
+    private final SessionToPostService sessionToPostService;
 
     @Value("${app.features.duo-mode:false}")
     private boolean duoModeEnabled;
@@ -221,5 +224,29 @@ public class SessionController {
         }
         sessionService.updateTitle(sessionId, userDetails.getUsername(), newTitle.strip());
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Phase 5: GET /api/sessions/{id}/draft-for-community
+     * 세션을 커뮤니티 사연으로 변환하기 위한 초안 추출
+     * - 참여자만 접근 가능
+     * - IssueContext를 익명화된 본문으로 변환
+     * - 제목, 카테고리, 본문 포함
+     */
+    @GetMapping("/{id}/draft-for-community")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(
+        summary = "세션 → 커뮤니티 초안 추출",
+        description = "완료된 세션을 익명화하여 커뮤니티 포스트 작성용 초안으로 변환 (Phase 5)"
+    )
+    @ApiResponse(responseCode = "200", description = "초안 추출 성공", content = @Content(schema = @Schema(implementation = SessionDraftDto.class)))
+    @ApiResponse(responseCode = "401", description = "인증 필요")
+    @ApiResponse(responseCode = "403", description = "참여자 아님")
+    @ApiResponse(responseCode = "404", description = "세션 없음")
+    public ResponseEntity<SessionDraftDto> getDraftForCommunity(
+            @PathVariable("id") String sessionId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        SessionDraftDto draft = sessionToPostService.extractDraft(sessionId, userDetails.getUsername());
+        return ResponseEntity.ok(draft);
     }
 }

@@ -42,6 +42,8 @@ public class KeywordGuard {
 	private List<KeywordPattern> level3Keywords = new ArrayList<>();
 	private List<KeywordPattern> level4Keywords = new ArrayList<>();
 	private List<OutputFilter> outputFilters = new ArrayList<>();
+	private List<OutputFilter> communityPublicReframeEntries = new ArrayList<>();
+	private List<KeywordPattern> juryOutputBannedEntries = new ArrayList<>();
 
 	@PostConstruct
 	public void loadKeywords() {
@@ -133,9 +135,26 @@ public class KeywordGuard {
 				}
 			}
 
-			log.info("Safety keywords loaded: crisis={}, level1={}, level2={}, level3={}, level4={}, filters={}",
+			// Parse community_public_reframe
+			List<Map<String, Object>> communityReframe = (List<Map<String, Object>>) config.getOrDefault("community_public_reframe", new ArrayList<>());
+			for (Map<String, Object> entry : communityReframe) {
+				String term = (String) entry.get("term");
+				String replacement = (String) entry.getOrDefault("replacement", "");
+				if (term != null) communityPublicReframeEntries.add(new OutputFilter(term, replacement));
+			}
+
+			// Parse jury_output_banned
+			List<Map<String, Object>> juryBanned = (List<Map<String, Object>>) config.getOrDefault("jury_output_banned", new ArrayList<>());
+			for (Map<String, Object> entry : juryBanned) {
+				String pattern = (String) entry.get("pattern");
+				boolean crisis = Boolean.TRUE.equals(entry.get("crisis"));
+				if (pattern != null) juryOutputBannedEntries.add(new KeywordPattern(pattern, Level.LEVEL2, "JURY_BANNED", crisis));
+			}
+
+			log.info("Safety keywords loaded: crisis={}, level1={}, level2={}, level3={}, level4={}, filters={}, community_reframe={}, jury_banned={}",
 				crisisKeywords.size(), level1Keywords.size(), level2Keywords.size(),
-				level3Keywords.size(), level4Keywords.size(), outputFilters.size());
+				level3Keywords.size(), level4Keywords.size(), outputFilters.size(),
+				communityPublicReframeEntries.size(), juryOutputBannedEntries.size());
 
 		} catch (Exception e) {
 			log.error("Failed to load safety keywords configuration", e);
@@ -283,6 +302,68 @@ public class KeywordGuard {
 		}
 
 		return result;
+	}
+
+	/**
+	 * Applies community public reframe replacements to text.
+	 * Replaces legal terms, judgment language for public-facing posts.
+	 *
+	 * @param text Input text
+	 * @return Text with community reframe applied
+	 */
+	public String applyCommunityPublicReframe(String text) {
+		if (text == null || text.isEmpty()) {
+			return text;
+		}
+
+		String result = text;
+		for (OutputFilter filter : communityPublicReframeEntries) {
+			result = replaceCaseInsensitive(result, filter.term, filter.replacement);
+		}
+
+		return result;
+	}
+
+	/**
+	 * Scans jury output for banned terms specific to jury generation.
+	 * Returns ScanResult with matches if any jury-specific banned terms are found.
+	 *
+	 * @param text Jury output text
+	 * @return ScanResult with jury-specific matches
+	 */
+	public ScanResult scanJuryOutput(String text) {
+		if (text == null || text.isEmpty()) {
+			return ScanResult.empty();
+		}
+
+		// First check for general crisis keywords
+		ScanResult crisisCheck = scanUserInput(text, null);
+		if (crisisCheck.isCrisis()) {
+			return crisisCheck;
+		}
+
+		String lowerText = text.toLowerCase();
+		List<ScanResult.Match> matches = new ArrayList<>();
+
+		// Check jury-specific banned terms
+		for (KeywordPattern entry : juryOutputBannedEntries) {
+			int pos = findCaseInsensitivePosition(lowerText, entry.pattern.toLowerCase());
+			if (pos >= 0) {
+				matches.add(new ScanResult.Match(
+					entry.pattern,
+					entry.level,
+					entry.category,
+					entry.crisis,
+					pos
+				));
+			}
+		}
+
+		if (!matches.isEmpty()) {
+			return ScanResult.warningResult(Level.LEVEL2, matches);
+		}
+
+		return ScanResult.empty();
 	}
 
 	/**

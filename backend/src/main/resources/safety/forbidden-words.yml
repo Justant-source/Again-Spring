@@ -258,3 +258,37 @@ output_filter:
     replacement: "[제거]"
   - term: "오답"
     replacement: "[제거]"
+
+community_public_reframe:
+  - term: "과실비율"
+    replacement: "공감 분포"
+  - term: "판정"
+    replacement: "공감"
+  - term: "판결"
+    replacement: "결과"
+  - term: "가해자"
+    replacement: "A님"
+  - term: "피해자"
+    replacement: "B님"
+  - term: "승자"
+    replacement: "[제거]"
+  - term: "패자"
+    replacement: "[제거]"
+  - term: "이겼다"
+    replacement: "[제거]"
+  - term: "졌다"
+    replacement: "[제거]"
+  - term: "틀렸"
+    replacement: "다른 입장"
+  - term: "맞다"
+    replacement: "이해된다"
+
+jury_output_banned:
+  - pattern: "판결한다"
+    crisis: false
+  - pattern: "유죄"
+    crisis: false
+  - pattern: "무죄"
+    crisis: false
+  - pattern: "고소하"
+    crisis: false

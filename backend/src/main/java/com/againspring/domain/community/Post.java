@@ -1,0 +1,73 @@
+package com.againspring.domain.community;
+
+import com.againspring.domain.enums.PostStatus;
+import com.againspring.domain.enums.PostVisibility;
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.Instant;
+
+/**
+ * 커뮤니티 포스트 (V17 커뮤니티)
+ * 사용자가 공개한 관계 이야기
+ */
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "posts")
+@EntityListeners(AuditingEntityListener.class)
+public class Post {
+
+    @Id
+    @Column(length = 32)
+    private String id;
+
+    @Column(nullable = false, length = 32)
+    private String authorId;
+
+    @Column(length = 36)
+    private String sessionId;
+
+    @Column(length = 200)
+    private String title;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String bodyRaw;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String bodyPublished;
+
+    @Column(length = 50)
+    private String category;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private PostVisibility visibility = PostVisibility.PRIVATE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private PostStatus status = PostStatus.DRAFT;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean neutralizationPassed = false;
+
+    @Column(name = "vote_close_at")
+    private Instant voteCloseAt;
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @LastModifiedDate
+    @Column(nullable = false)
+    private Instant updatedAt;
+}
