@@ -20,6 +20,9 @@ server:
 logging:
   level:
     com.againspring: WARN
+    # 메일 발송 성공/실패는 prod에서도 보이도록 (진단성)
+    com.againspring.service.EmailVerificationService: INFO
+    com.againspring.service.PasswordResetService: INFO
     org.springframework: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
