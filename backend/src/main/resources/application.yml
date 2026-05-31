@@ -110,7 +110,7 @@ llm:
   report:
     provider: ${LLM_REPORT_PROVIDER:claude-code}   # dev:remote  prod:remote      test:mock
   jury:
-    provider: ${LLM_JURY_PROVIDER:claude-code}
+    provider: ${LLM_JURY_PROVIDER:remote}     # dev/prod 모두 llm-worker(remote) 사용
     model: ${JURY_LLM_MODEL:claude-haiku-4-5-20251001}
   compose:
     model: ${COMPOSE_LLM_MODEL:claude-haiku-4-5-20251001}
