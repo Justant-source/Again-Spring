@@ -55,8 +55,8 @@ test.describe('게스트 골든패스 (실 BE 연동)', () => {
     await page.waitForURL((url) => !url.pathname.includes('/guest'), { timeout: 8000 })
     expect(page.url()).not.toContain('/onboarding')
 
-    // 5. 홈에서 "마음 옮겨 적기 시작" → 관계 유형 선택
-    const startBtn = page.getByRole('button', { name: '마음 옮겨 적기 시작' })
+    // 5. 홈에서 "대화 시작" → 관계 유형 선택 (카피 수정: 70373e3)
+    const startBtn = page.getByRole('button', { name: '대화 시작' })
     await expect(startBtn).toBeVisible({ timeout: 8000 })
     await startBtn.click()
     await page.waitForURL('**/session/new**', { timeout: 10000 })
