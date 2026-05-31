@@ -1,25 +1,24 @@
-# 다시봄 마케팅 문서 폴더
+# 마케팅 자동화 (Marketing) — dev 전용
 
-이 폴더는 다시봄의 포지셔닝, 페르소나, 로드맵, 바이럴 메커니즘, 콘텐츠 캘린더를 한곳에 모은 마케팅 single source of truth입니다.
+다시봄 마케팅 관련 자원을 한곳에 모은 통합 디렉토리입니다. **모두 dev 환경 전용**이며 prod compose에는 포함되지 않습니다.
 
-## 문서 목록
+## 구성
 
-| 파일 | 내용 | 업데이트 주기 |
+| 하위 디렉토리 | 내용 | 컨테이너 / 포트 |
 |---|---|---|
-| `01-positioning.md` | "감정을 정리하는 도구" 포지셔닝, 톤 가이드, 카피 라이브러리 | 분기 |
-| `02-personas.md` | 1차/2차/3차 페르소나, 사용 시나리오 | 분기 |
-| `03-roadmap-day-1-90.md` | Day 1~30 PMF, 31~60 인플루언서, 61~90 SEO | 마일스톤별 |
-| `04-viral-mechanics.md` | 5종 공유 카드 사용 시나리오, 12종 메타포 매핑 | 마일스톤별 |
-| `05-content-calendar.md` | 블로그 글 10편 outline + 포스팅 일정 | 월간 |
+| [`docs/`](docs/README.md) | 마케팅 전략 문서 (포지셔닝·페르소나·로드맵·바이럴 메커니즘·콘텐츠 캘린더) | — (문서) |
+| `renderer/` | 이미지 렌더링 사이드카 (Node.js + Playwright + Sharp) — 카드뉴스·인용·채팅 스크린샷 PNG 생성 | `againspring-marketing-renderer-dev` / 9000 |
+| `social-poster/` | 소셜 자동 포스팅 사이드카 (Playwright) — X·Instagram 세션 재사용 발행 | `againspring-social-poster-dev` / 9100 |
 
-## 사용 방법
+## 운영 / 배포
 
-- 신규 마케팅 액션을 만들 때 본 문서들을 먼저 확인 (톤 일치)
-- 외부 협력사·인플루언서에게 톤 가이드 공유 시 본 문서 발췌 사용
-- 모든 카피/슬로건 변경은 `01-positioning.md`에서 시작
+- **dev 전용**: `env/docker-compose.dev.yml`의 `marketing-renderer-dev` / `social-poster-dev` 서비스. prod compose에는 추가하지 않음.
+- 빌드 컨텍스트: `renderer/` → `../marketing/renderer`, `social-poster/` → `../marketing/social-poster`
+- 핫리로드: `social-poster/src`는 호스트 bind mount + nodemon → `docker compose restart againspring-social-poster-dev`만으로 반영
 
-## 변경 이력
+## 관련 문서 (권위본)
 
-| 일자 | 변경 |
-|---|---|
-| 2026-04-26 | V1.5 Solo-First 전환과 함께 최초 작성 |
+- 마케팅 자동화 전체: [`shared/docs/v15/marketing-automation.md`](../shared/docs/v15/marketing-automation.md)
+- dev 전용 정책 / prod 게이트: [`shared/docs/v15/marketing-dev-only-policy.md`](../shared/docs/v15/marketing-dev-only-policy.md)
+- 소셜 자동 포스팅 runbook: [`shared/docs/v15/social-auto-posting-runbook.md`](../shared/docs/v15/social-auto-posting-runbook.md)
+- 소셜 포스터 장애 대응: [`shared/docs/v15/social-poster-troubleshooting.md`](../shared/docs/v15/social-poster-troubleshooting.md)

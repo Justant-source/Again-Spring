@@ -60,7 +60,7 @@ services:
 
   marketing-renderer-dev:
     build:
-      context: ../marketing-renderer
+      context: ../marketing/renderer
       dockerfile: Dockerfile
     image: againspring-marketing-renderer-dev
     container_name: againspring-marketing-renderer-dev
@@ -85,7 +85,7 @@ services:
 
   social-poster-dev:
     build:
-      context: ../social-poster
+      context: ../marketing/social-poster
       dockerfile: Dockerfile
     image: againspring-social-poster-dev
     container_name: againspring-social-poster-dev
@@ -94,7 +94,7 @@ services:
     # 핫리로드: src/ 디렉토리를 호스트에서 마운트 — JS 파일 수정 후 restart만으로 반영
     # 재빌드 불필요 (셀렉터 깨짐, 로그인 플로우 변경 등 긴급 대응 시 사용)
     volumes:
-      - ../social-poster/src:/app/src
+      - ../marketing/social-poster/src:/app/src
     command: ["nodemon", "--watch", "src", "src/server.js"]
     restart: unless-stopped
     deploy:

@@ -138,7 +138,7 @@ https://dev.againspring.net/admin/marketing/settings
 **환경**: Windows 11 + Chrome, Linux + Chrome 등 일반 사용자 환경
 
 ```bash
-# social-poster/src 디렉토리에서 extract-session.js 파일 확인
+# marketing/social-poster/ 디렉토리에서 extract-session.js 파일 확인
 # (파일명: extract-session.js)
 
 # 방법: x.com 또는 instagram.com에 로그인 후 브라우저 콘솔에서 실행
@@ -172,7 +172,7 @@ extractSession().then(s => console.log(JSON.stringify(s)));
 **환경**: Linux 서버, CI/CD, 운영 자동화
 
 ```bash
-cd /path/to/social-poster
+cd /path/to/marketing/social-poster
 npm install
 
 # 대화형 프롬프트로 실행 (이메일/비밀번호/2FA 입력)
@@ -194,7 +194,7 @@ node src/seed-server.js --platform x
 
 ```bash
 # docker 컨테이너 X, 호스트 머신에서 실행
-cd /path/to/social-poster
+cd /path/to/marketing/social-poster
 npm install
 
 node src/seed-cli.js --platform x
@@ -523,8 +523,8 @@ X·Instagram의 UI는 빈번하게 변경됩니다. 자동 발행이 실패하�
 ### 셀렉터 위치
 
 ```
-social-poster/src/lib/x-selectors.js          (X 로그인, 트윗 발행)
-social-poster/src/lib/ig-selectors.js         (Instagram 로그인, 게시물 발행)
+marketing/social-poster/src/lib/x-selectors.js   (X 로그인, 트윗 발행)
+marketing/social-poster/src/lib/ig-selectors.js  (Instagram 로그인, 게시물 발행)
 ```
 
 ### 수정 후 배포

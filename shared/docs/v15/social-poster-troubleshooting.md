@@ -9,7 +9,7 @@
 ## 핵심 파일 구조 (치트시트)
 
 ```
-social-poster/src/
+marketing/social-poster/src/
 ├── server.js                  ← Express 앱 진입점, 라우터 등록
 ├── lib/
 │   ├── anti-bot.js            ← 핑거프린트, warmup, jitter (봇탐지 우회)
@@ -37,8 +37,8 @@ social-poster/src/
 
 ```bash
 # 1. 셀렉터 파일 수정 (로컬 에디터에서)
-#    X:         social-poster/src/lib/x-selectors.js
-#    Instagram: social-poster/src/lib/ig-selectors.js
+#    X:         marketing/social-poster/src/lib/x-selectors.js
+#    Instagram: marketing/social-poster/src/lib/ig-selectors.js
 
 # 2. 컨테이너 재시작 (3~5초, 재빌드 없음)
 cd /home/justant/Data/Again-Spring/env

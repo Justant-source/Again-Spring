@@ -103,7 +103,7 @@ image_paths JSON (최종):
 
 ## 5. 디자인 토큰 (슬라이드 공통)
 
-`marketing-renderer/src/styles/tokens.js` 단일 출처 참조.
+`marketing/renderer/src/styles/tokens.js` 단일 출처 참조.
 
 | 토큰 | 값 |
 |---|---|

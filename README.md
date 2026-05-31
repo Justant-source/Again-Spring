@@ -43,17 +43,19 @@ Again-Spring/
 │   ├── cloudflare/
 │   └── docs/                 # 환경 문서 (docker, env-vars, local-dev, deployment, cloudflare)
 │
-└── social-poster/            # 소셜 자동 포스팅 사이드카 (Playwright, dev 전용)
-    ├── src/
-    │   ├── lib/anti-bot.js   # 봇 탐지 우회 (핑거프린트, warmup, jitter)
-    │   ├── lib/session.js    # storageState 관리
-    │   ├── lib/x-selectors.js, ig-selectors.js
-    │   └── routes/           # publish-x, publish-instagram, session-health, test-login
-    ├── extract-session.js    # 브라우저 콘솔에서 세션 추출 스크립트
-    └── src/seed-server.js    # 서버 headless 세션 시딩 CLI
+└── marketing/                # 마케팅 자동화 통합 (dev 전용)
+    ├── README.md             # 마케팅 디렉토리 진입 가이드
+    ├── docs/                 # 마케팅 전략 문서 (포지셔닝·페르소나·로드맵·바이럴·콘텐츠 캘린더)
+    ├── renderer/             # 이미지 렌더링 사이드카 (Playwright + Sharp, 포트 9000)
+    │   └── src/              # routes/(render-chat·quote·card-news), templates/, styles/tokens.js
+    └── social-poster/        # 소셜 자동 포스팅 사이드카 (Playwright, 포트 9100)
+        ├── src/lib/          # anti-bot(봇 탐지 우회), session(storageState), x·ig-selectors
+        ├── src/routes/       # publish-x, publish-instagram, session-health, test-login
+        ├── extract-session.js # 브라우저 콘솔에서 세션 추출 스크립트
+        └── src/seed-server.js # 서버 headless 세션 시딩 CLI
 ```
 
-> **문서 위치 규칙**: 모든 .md 문서는 위 4개 docs 디렉토리(`shared/docs/`, `backend/docs/`, `frontend/docs/`, `env/docs/`)에만 둡니다. 루트는 `README.md`와 `CLAUDE.md`만 허용. 모듈 루트의 `README.md`는 짧은 진입 가이드 역할만 합니다.
+> **문서 위치 규칙**: 모든 .md 문서는 위 4개 docs 디렉토리(`shared/docs/`, `backend/docs/`, `frontend/docs/`, `env/docs/`)에만 둡니다. 루트는 `README.md`와 `CLAUDE.md`만 허용. 모듈 루트의 `README.md`는 짧은 진입 가이드 역할만 합니다. (예외: dev 전용 `marketing/docs/`는 마케팅 전략 문서 전용)
 
 ---
 

@@ -25,6 +25,7 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 | **LLM 브릿지** | `backend/src/main/java/.../llm/` | `backend/docs/llm-bridge.md` |
 | **공유 타입/스키마/프롬프트** | `shared/` | `shared/docs/README.md` |
 | **환경/인프라/배포** | `env/` | `env/docs/README.md` |
+| **마케팅 자동화** (dev 전용) | `marketing/` | `marketing/README.md` |
 
 ### 절대 규칙
 
@@ -51,6 +52,7 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
    → `shared/docs/` (공통), `backend/docs/` (BE 특화), `frontend/docs/` (FE 특화), `env/docs/` (환경/배포)
    → 루트는 `README.md`와 `CLAUDE.md`만 허용
    → 모듈 루트의 `README.md`는 짧은 진입 가이드만 (~20줄)
+   → 예외: dev 전용 `marketing/` 모듈은 `marketing/docs/`(마케팅 전략 문서)를 모듈 로컬로 보유 — 공통 docs 아님
    → **권위본은 `shared/docs/policies/`** — backend/frontend 의 `policies/` 는 각 모듈의 구현 방법만 설명
 
 ---

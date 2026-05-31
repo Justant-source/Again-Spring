@@ -80,7 +80,7 @@ app:
 services:
   marketing-renderer-dev:
     build:
-      context: ../marketing-renderer
+      context: ../marketing/renderer
       dockerfile: Dockerfile
     container_name: againspring-marketing-renderer-dev
     environment:

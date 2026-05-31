@@ -35,8 +35,8 @@ MariaDB 단독. 로컬 머신에서 `./gradlew bootRun` + `npm run dev`로 BE/FE
 | `llm-dev` | `againspring-llm-dev` | build `../llm-worker` | internal (8090) | — |
 | `backend-dev` | `againspring-backend-dev` | build `../backend` | internal | `mariadb-dev` (healthy), `llm-dev` (healthy) |
 | `frontend-dev` | `againspring-frontend-dev` | build `../frontend` | internal | `backend-dev` |
-| `marketing-renderer-dev` | `againspring-marketing-renderer-dev` | build `../marketing-renderer` | internal (9000) | `backend-dev` |
-| `social-poster-dev` | `againspring-social-poster-dev` | build `../social-poster` | internal (9100) | `backend-dev` |
+| `marketing-renderer-dev` | `againspring-marketing-renderer-dev` | build `../marketing/renderer` | internal (9000) | `backend-dev` |
+| `social-poster-dev` | `againspring-social-poster-dev` | build `../marketing/social-poster` | internal (9100) | `backend-dev` |
 | `nginx-dev` | `againspring-nginx-dev` | `nginx:alpine` | `8090:80` | `frontend-dev`, `backend-dev` |
 
 llm-dev bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude` (Claude CLI 세션 공유 — backend가 아닌 llm-worker에 마운트)
