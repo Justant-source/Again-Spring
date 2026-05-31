@@ -41,7 +41,7 @@ async function getOrCreateGuestId(
   return { guestId, token: jwtToken };
 }
 
-type Step = 'landing' | 'choose-mode' | 'guest-onboarding-prompt' | 'login-onboarding-prompt' | 'nickname-input';
+type Step = 'landing' | 'choose-mode' | 'nickname-input';
 
 export default function JoinPage({ params }: { params: { token: string } }) {
   const router = useRouter();
@@ -75,15 +75,8 @@ export default function JoinPage({ params }: { params: { token: string } }) {
       })
       .finally(() => {
         setIsLoading(false);
-        // 로그인 사용자: 스타일 등록 여부에 따라 분기
-        if (user && !user.isGuest) {
-          setStep(
-            user.onboardingCompletedAt && user.communicationStyle
-              ? 'nickname-input'
-              : 'login-onboarding-prompt',
-          );
-        } else if (user?.isGuest && user.communicationStyle) {
-          // 게스트가 이미 성격검사를 마친 경우(예: 온보딩 후 복귀) → 바로 참여 단계로
+        // 온보딩은 선택 사항 — 로그인/게스트 사용자는 바로 참여 단계로
+        if (user) {
           setStep('nickname-input');
         } else {
           setStep('choose-mode');
@@ -97,40 +90,7 @@ export default function JoinPage({ params }: { params: { token: string } }) {
   };
 
   const handleGuestMode = () => {
-    setStep('guest-onboarding-prompt');
-  };
-
-  const handleGuestSkipOnboarding = () => {
     setStep('nickname-input');
-  };
-
-  const handleGuestDoOnboarding = async () => {
-    // 온보딩 결과(communicationStyle)가 user 객체에 저장되도록 게스트를 먼저 생성한다.
-    // 생성 실패해도 온보딩 자체는 진행 (handleJoin 시점에 다시 시도됨)
-    if (!user) {
-      try {
-        const tempName = generateGuestNickname();
-        const { guestId, token: guestJwt } = await getOrCreateGuestId(token, tempName);
-        localStorage.setItem('again-spring-token', guestJwt);
-        setUser({
-          id: guestId,
-          nickname: tempName,
-          isGuest: true,
-          createdAt: new Date().toISOString(),
-        });
-      } catch {
-        // 무시 — 온보딩 후 닉네임 입력 단계에서 다시 시도된다
-      }
-    }
-    router.push(`/onboarding/intro?next=/session/join/${token}`);
-  };
-
-  const handleLoginSkipOnboarding = () => {
-    setStep('nickname-input');
-  };
-
-  const handleLoginDoOnboarding = () => {
-    router.push(`/onboarding/intro?next=/session/join/${token}`);
   };
 
   const handleJoin = async () => {
@@ -215,69 +175,6 @@ export default function JoinPage({ params }: { params: { token: string } }) {
             </button>
             <button className="btn-L ghost" onClick={handleGuestMode} style={{ width: '100%' }}>
               게스트로 참여하기
-            </button>
-          </div>
-        </div>
-      </PhoneFrame>
-    );
-  }
-
-  // ── Step: guest-onboarding-prompt ──
-  if (step === 'guest-onboarding-prompt') {
-    return (
-      <PhoneFrame tone="L">
-        <PhoneHeader title="성격검사 안내" onBack={() => setStep('choose-mode')} />
-        <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div className="letter-card" style={{ padding: 24, marginBottom: 24 }}>
-            <div className="quote-it" style={{ fontSize: 12, marginBottom: 12 }}>
-              선택 사항이에요
-            </div>
-            <div className="serif" style={{ fontSize: 16, lineHeight: 1.7, marginBottom: 12 }}>
-              10가지 질문에 답하면<br />더 정확한 중재를 받을 수 있어요.
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--L-sub)', lineHeight: 1.6 }}>
-              성격검사는 약 2분이 걸려요.<br />
-              검사 없이도 바로 참여하실 수 있어요.
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button className="btn-L" onClick={handleGuestDoOnboarding} style={{ width: '100%' }}>
-              검사하고 더 정확하게
-            </button>
-            <button className="btn-L ghost" onClick={handleGuestSkipOnboarding} style={{ width: '100%' }}>
-              건너뛰고 바로 참여하기
-            </button>
-          </div>
-        </div>
-      </PhoneFrame>
-    );
-  }
-
-  // ── Step: login-onboarding-prompt ──
-  if (step === 'login-onboarding-prompt') {
-    return (
-      <PhoneFrame tone="L">
-        <PhoneHeader title="성격검사 안내" />
-        <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div className="letter-card" style={{ padding: 24, marginBottom: 24 }}>
-            <div className="quote-it" style={{ fontSize: 12, marginBottom: 12 }}>
-              아직 성격검사를 하지 않으셨어요
-            </div>
-            <div className="serif" style={{ fontSize: 16, lineHeight: 1.7, marginBottom: 12 }}>
-              10가지 질문에 답하면<br />중재 결과가 더 정확해져요.
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--L-sub)', lineHeight: 1.6 }}>
-              검사 없이도 바로 참여하실 수 있어요.
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button className="btn-L" onClick={handleLoginDoOnboarding} style={{ width: '100%' }}>
-              검사하고 더 정확하게
-            </button>
-            <button className="btn-L ghost" onClick={handleLoginSkipOnboarding} style={{ width: '100%' }}>
-              건너뛰고 바로 참여하기
             </button>
           </div>
         </div>

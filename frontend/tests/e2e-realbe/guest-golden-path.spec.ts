@@ -10,12 +10,10 @@ import { test, expect } from '@playwright/test'
  * 검증 목표: 게스트가 랜딩→대화 생성→채팅 화면까지 실 BE와 연동해 성공하는지.
  */
 
-const ONBOARDING_STEPS = 10
-
 test.describe('게스트 골든패스 (실 BE 연동)', () => {
 
   test('게스트 인증 → 세션 생성 → 채팅 화면 진입 + 첫마디 수신', async ({ page }) => {
-    test.setTimeout(120_000) // 온보딩 10문항 + 세션 생성 포함 전체 플로우 여유
+    test.setTimeout(120_000) // 세션 생성 + 채팅 + mediator 응답 포함 전체 플로우 여유
     // 0. BE 헬스 체크 — nginx(8090)를 통해 BE 응답 확인
     let beHealthy = false
     try {
@@ -53,36 +51,14 @@ test.describe('게스트 골든패스 (실 BE 연동)', () => {
     expect(authBody.token?.accessToken, 'accessToken이 발급돼야 합니다').toBeTruthy()
     expect(authBody.user?.isGuest, '게스트 유저여야 합니다').toBe(true)
 
-    // 4. 온보딩 흐름 (FE 전용 — BE API 미호출, 빠르게 통과)
-    await page.waitForURL('**/onboarding**', { timeout: 8000 })
+    // 4. 온보딩 강제 폐지(2026-05-31) — 게스트는 바로 홈으로 진입
+    await page.waitForURL((url) => !url.pathname.includes('/guest'), { timeout: 8000 })
+    expect(page.url()).not.toContain('/onboarding')
 
-    // 온보딩 인트로 → "10문항 시작하기" 버튼 클릭
-    const introStartBtn = page.getByRole('button', { name: '10문항 시작하기' })
-    if (await introStartBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await introStartBtn.click()
-      await page.waitForURL('**/onboarding', { timeout: 5000 }).catch(() => {})
-    }
-
-    // Likert 10문항: 중간값(3) 선택 → 앱이 250ms 후 자동 다음 문항으로 이동
-    // .likert-dot 버튼이 aria-label="n번 선택" 형태이므로 CSS 셀렉터로 선택
-    for (let i = 0; i < ONBOARDING_STEPS; i++) {
-      // 현재 문항의 likert 버튼들이 나타날 때까지 대기
-      const likertDots = page.locator('.likert-dot')
-      await likertDots.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
-      const count = await likertDots.count()
-      if (count >= 3) {
-        // 중간값(3번째) 선택 — onClick으로 handleSelect 호출 → 250ms 후 자동 다음 문항
-        await likertDots.nth(2).click()
-        // 자동 이동 대기 (마지막 문항은 자동 제출 후 result 페이지로 이동)
-        await page.waitForTimeout(400)
-      }
-    }
-
-    // 온보딩 결과 페이지 → "완료하기" 버튼 클릭 → /session/new 이동
-    await page.waitForURL('**/onboarding/result**', { timeout: 8000 })
-    await page.getByRole('button', { name: '완료하기' }).click({ timeout: 5000 })
-
-    // 5. 관계 유형 선택
+    // 5. 홈에서 "마음 옮겨 적기 시작" → 관계 유형 선택
+    const startBtn = page.getByRole('button', { name: '마음 옮겨 적기 시작' })
+    await expect(startBtn).toBeVisible({ timeout: 8000 })
+    await startBtn.click()
     await page.waitForURL('**/session/new**', { timeout: 10000 })
     expect(page.url()).toContain('/session/new')
 

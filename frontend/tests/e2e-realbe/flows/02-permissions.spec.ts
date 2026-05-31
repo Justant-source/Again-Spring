@@ -44,7 +44,8 @@ test.describe('Flow 02: 권한 및 라우트 가드', () => {
     await input.waitFor({ state: 'visible', timeout: 8_000 })
     await input.fill('게스트권한테스트')
     await page.getByRole('button', { name: '시작하기' }).click()
-    await page.waitForURL(/\/onboarding/, { timeout: 10_000 })
+    // 온보딩 강제 폐지 — 게스트는 닉네임 설정 즉시 /session/new로 이동
+    await page.waitForURL(/\/session\/new/, { timeout: 10_000 })
 
     // /history 접근
     await page.goto(`${BASE}/history`)

@@ -3,7 +3,7 @@
  *
  * 권위본: frontend/docs/ux/flows/01-auth.md (as-is 코드 기준)
  * 토큰 키: again-spring-token (localStorage)
- * 게스트 → /onboarding/intro 강제 이동 (코드 기준; next 파라미터 없음)
+ * 게스트 → 바로 홈('/') 진입 (온보딩 강제 폐지 2026-05-31)
  */
 import { test, expect } from '@playwright/test'
 import { authStatePath } from '../fixtures/auth-state'
@@ -38,7 +38,7 @@ test.describe('Flow 01: 인증', () => {
     expect(token).toBeTruthy()
   })
 
-  test('게스트 진입 → /onboarding/intro 강제 이동', async ({ page }) => {
+  test('게스트 진입 → 바로 세션 생성 화면 진입 (온보딩 강제 없음)', async ({ page }) => {
     await page.goto(`${BASE}/guest`)
 
     // 닉네임 입력 (dynamic placeholder는 useEffect, role/position으로 접근)
@@ -48,8 +48,9 @@ test.describe('Flow 01: 인증', () => {
 
     await page.getByRole('button', GUEST_START_BUTTON).click()
 
-    // 게스트 → /onboarding/intro 강제 (플로우 문서 기준)
-    await page.waitForURL(/\/onboarding\/intro|\/onboarding/, { timeout: 10_000 })
+    // 온보딩 강제 폐지(2026-05-31) — 게스트는 닉네임 설정 즉시 /session/new로 이동
+    await page.waitForURL(/\/session\/new/, { timeout: 10_000 })
+    expect(page.url()).toContain('/session/new')
 
     const token = await page.evaluate((key: string) => localStorage.getItem(key), TOKEN_KEY)
     expect(token).toBeTruthy()

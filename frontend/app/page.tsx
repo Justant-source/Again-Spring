@@ -38,10 +38,6 @@ export default function LandingPage() {
       router.push('/login?next=/session/new');
       return;
     }
-    if (!user.onboardingCompletedAt || !user.communicationStyle) {
-      router.push('/onboarding/intro?next=/session/new');
-      return;
-    }
     router.push('/session/new');
   };
 
@@ -50,9 +46,6 @@ export default function LandingPage() {
   const showMarketingEntry = perms.admin.canAccessMarketing;
   const showChatEntry = perms.ui.showLandingChatEntry;
   const showHistoryMenu = perms.ui.showHistoryMenu;
-  const needsOnboarding =
-    !!user && showChatEntry &&
-    (!user.onboardingCompletedAt || !user.communicationStyle);
 
   return (
     <PhoneFrame tone="L">
@@ -140,7 +133,7 @@ export default function LandingPage() {
         )}
 
         {/* 이어서 대화하기 배너 (활성 세션 있을 때, 채팅 진입 가능 등급만) */}
-        {showChatEntry && activeSessionId && !needsOnboarding && (
+        {showChatEntry && activeSessionId && (
           <button
             onClick={() => router.push(`/session/chat/${activeSessionId}`)}
             style={{
@@ -163,31 +156,6 @@ export default function LandingPage() {
             </div>
             <span style={{ color: 'var(--L-sub)', fontSize: 18 }}>›</span>
           </button>
-        )}
-
-        {/* 온보딩 안내 배너 (로그인 사용자, 미완료 시, 채팅 진입 가능 등급만) */}
-        {showChatEntry && needsOnboarding && (
-          <div
-            style={{
-              marginTop: 16,
-              padding: '12px 16px',
-              background: 'var(--L-card)',
-              border: '1px solid var(--L-border)',
-              borderRadius: 8,
-              fontSize: 12,
-              color: 'var(--L-sub)',
-              lineHeight: 1.6,
-            }}
-          >
-            <span style={{ color: 'var(--L-ink)', fontWeight: 500 }}>성격검사를 완료하면 더 정확한 중재를 받을 수 있어요.</span>
-            {' '}
-            <Link
-              href="/onboarding/intro"
-              style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}
-            >
-              지금 검사하기
-            </Link>
-          </div>
         )}
 
         {/* 일반 사용자 채팅 진입 본문 — admin은 노출 안 함 */}
@@ -223,20 +191,11 @@ export default function LandingPage() {
             <div className="flex flex-col gap-2 pb-2 pt-4">
               <button
                 onClick={handleStartSession}
-                disabled={!user || needsOnboarding}
+                disabled={!user}
                 className="btn-L text-center"
               >
-                {needsOnboarding ? '먼저 10문항을 등록해주세요' : '마음 옮겨 적기 시작'}
+                마음 옮겨 적기 시작
               </button>
-              {needsOnboarding && (
-                <Link
-                  href="/onboarding/intro?next=/session/new"
-                  className="text-center text-[12px] mt-1"
-                  style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}
-                >
-                  10문항 시작하기
-                </Link>
-              )}
               {!user && (
                 <Link href="/guest" className="text-center text-[12px] mt-1" style={{ color: 'var(--L-sub)' }}>
                   게스트로 둘러보기

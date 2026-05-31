@@ -16,7 +16,7 @@ function OnboardingResultContent() {
   const [mounted, setMounted] = useState(false);
   const [showMbtiOptions, setShowMbtiOptions] = useState(false);
 
-  const nextPath = searchParams.get('next') ?? '/session/new';
+  const nextPath = searchParams.get('next') ?? '/';
 
   useEffect(() => {
     setMounted(true);

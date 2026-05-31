@@ -37,6 +37,7 @@ LLM의 역할·말투·금기를 정의. 모든 호출에 포함.
 - `<user_profile>` 블록은 `UserProfileFragment.render(User)`가 코드로 빌드해 주입.
 - 6스타일(wave/mountain/flame/leaf/moon/star) label/emoji/strengths/caution은 `StyleCalculator.CommunicationStyle` enum이 권위본.
 - Solo는 본인 1블록, Duo는 `sender="USER_A"` / `sender="USER_B"` 두 블록 연속. 온보딩 미완료 사용자에게는 출력 생략.
+- (2026-05-31) 온보딩 선택화 이후 대부분 사용자는 스타일 미설정이 기본값 — `<user_profile>`는 자동 생략되고 중재는 Phase D 동적 컨텍스트가 주 경로. 스타일이 설정된 경우에만 톤 힌트로 보강.
 
 ### Layer 3.6 — 누적 심리 피드백 (`<psychology_feedback>`, 동적 주입)
 - 코드 빌더: `PsychologyFeedbackFormatter.render(Session)`

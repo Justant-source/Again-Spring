@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
 import { DasibomLogo } from '@/components/icons/DasibomLogo';
@@ -25,7 +26,11 @@ const STEPS = [
   },
 ] as const;
 
+// 설명 카드 3개 + 마지막에 '대화 스타일 설정(선택)' 안내 1개 = 가입 직후 1회만 노출
+const TOTAL = STEPS.length + 1;
+
 export function OnboardingModal() {
+  const router = useRouter();
   const user = useUserStore((s) => s.user);
   const setTutorialCompleted = useUserStore((s) => s.setTutorialCompleted);
   const [step, setStep] = useState(0);
@@ -36,27 +41,35 @@ export function OnboardingModal() {
 
   if (!shouldShow) return null;
 
-  const current = STEPS[step];
-  const isLast = step === STEPS.length - 1;
+  const isStyleStep = step === STEPS.length; // 마지막 단계 = 스타일 설정 안내(선택)
+  const current = isStyleStep ? null : STEPS[step];
 
-  const handleNext = () => {
-    if (isLast) {
-      handleComplete();
-    } else {
-      setStep((s) => s + 1);
-    }
-  };
-
-  const handleComplete = async () => {
-    setCompleting(true);
+  // 튜토리얼 완료 마킹 — tutorial_completed_at 으로 재노출 방지
+  const markTutorialDone = async () => {
     try {
       await api.post('/api/users/me/tutorial/complete');
     } catch {
       // 실패해도 로컬 상태는 완료로 처리 (재노출 방지)
     } finally {
       setTutorialCompleted();
-      setCompleting(false);
     }
+  };
+
+  const handleNext = () => setStep((s) => s + 1);
+
+  // [지금 설정하기] — 완료 마킹 후 선택 온보딩(10문항/MBTI)으로 이동
+  const handleSetupStyle = async () => {
+    setCompleting(true);
+    await markTutorialDone();
+    setCompleting(false);
+    router.push('/onboarding/intro?next=/session/new');
+  };
+
+  // [건너뛰고 시작하기] — 완료 마킹 후 모달만 닫힘(홈 유지, 바로 대화 시작 가능)
+  const handleSkip = async () => {
+    setCompleting(true);
+    await markTutorialDone();
+    setCompleting(false);
   };
 
   return (
@@ -84,7 +97,11 @@ export function OnboardingModal() {
       >
         {/* 아이콘 */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-          {current.icon}
+          {isStyleStep ? (
+            <Conversation width={40} height={40} color="var(--L-point)" />
+          ) : (
+            current?.icon
+          )}
         </div>
 
         {/* 제목 */}
@@ -99,7 +116,7 @@ export function OnboardingModal() {
             lineHeight: 1.4,
           }}
         >
-          {current.title}
+          {isStyleStep ? '대화 스타일을 설정해볼까요?' : current?.title}
         </div>
 
         {/* 본문 */}
@@ -112,7 +129,9 @@ export function OnboardingModal() {
             marginBottom: 28,
           }}
         >
-          {current.body}
+          {isStyleStep
+            ? '약 1~2분이면 끝나요. 지금 건너뛰고 바로 시작해도 좋아요. 나중에 프로필에서 언제든 설정할 수 있어요.'
+            : current?.body}
         </div>
 
         {/* Dot indicator */}
@@ -124,7 +143,7 @@ export function OnboardingModal() {
             marginBottom: 24,
           }}
         >
-          {STEPS.map((_, i) => (
+          {Array.from({ length: TOTAL }).map((_, i) => (
             <div
               key={i}
               style={{
@@ -139,14 +158,35 @@ export function OnboardingModal() {
         </div>
 
         {/* 버튼 */}
-        <button
-          onClick={handleNext}
-          disabled={completing}
-          className="btn-L"
-          style={{ width: '100%', textAlign: 'center' }}
-        >
-          {isLast ? (completing ? '…' : '시작하기') : '다음'}
-        </button>
+        {isStyleStep ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button
+              onClick={handleSetupStyle}
+              disabled={completing}
+              className="btn-L"
+              style={{ width: '100%', textAlign: 'center' }}
+            >
+              {completing ? '…' : '지금 설정하기'}
+            </button>
+            <button
+              onClick={handleSkip}
+              disabled={completing}
+              className="btn-L ghost"
+              style={{ width: '100%', textAlign: 'center' }}
+            >
+              건너뛰고 시작하기
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleNext}
+            disabled={completing}
+            className="btn-L"
+            style={{ width: '100%', textAlign: 'center' }}
+          >
+            다음
+          </button>
+        )}
       </div>
     </div>
   );

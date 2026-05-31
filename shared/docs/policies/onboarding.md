@@ -2,6 +2,15 @@
 
 신규 사용자의 커뮤니케이션 스타일을 추정하여 이후 LLM 응답 톤·관계 분석 컨텍스트로 활용.
 
+> **2026-05-31 변경 — 온보딩 선택화(강제 폐지)**
+> 가입 직후 10문항/MBTI 강제 게이트를 제거했다. 가입하면 바로 세션/대화로 진입하며,
+> 검사는 **프로필에서 선택**으로 언제든 가능하다. 가입 직후 1회만 비강제 안내(튜토리얼 모달 CTA).
+> 근거: 6-렌즈 타당성 검토 — 사전 검사는 중재 필수 context가 아니며(`<user_profile>`는 "톤 미세조정만"),
+> 실제 중재는 Gottman 4 Horsemen + NVC + Phase D 동적 컨텍스트로 동작. q8·q9는 스타일 산출에 미사용.
+> **데이터 모델·주입 배관(`User.communicationStyle/mbtiType/mbtiProfile`, `StyleCalculator`, `UserProfileFragment`,
+> `POST /api/users/me/onboarding`)은 전부 보존** — 추후 relation 강화 시 중재자 temperature/파라미터 확장점.
+> BE 강제 해제: `SessionService.createSession`의 `ONBOARDING_REQUIRED` 게이트 제거.
+
 ## Source of truth
 
 - 문항: `frontend/lib/constants/onboardingQuestions.ts`
@@ -15,7 +24,7 @@
 
 ```mermaid
 flowchart TD
-    A["/ 랜딩"] -->|시작하기| B["/onboarding\n10문항 필수"]
+    A["프로필 / 가입직후 1회 안내"] -->|선택| B["/onboarding\n10문항 (선택)"]
     B -->|완료| C["/onboarding/result\n스타일 카드"]
     C --> D{MBTI 추가 선택}
     D -->|미니 테스트| E["/onboarding/mbti-test\n4문항 EI·SN·TF·JP"]
@@ -25,7 +34,7 @@ flowchart TD
     F --> G
 ```
 
-10문항은 **필수**, MBTI는 결과 화면 이후 **선택 추가** (commit 68b19d5에서 변경).
+10문항·MBTI 모두 **선택**. 가입 직후 강제하지 않으며(2026-05-31 변경), 프로필 또는 가입 직후 1회 안내에서 진입한다. 온보딩 페이지·계산 로직은 옵션 흐름으로 존속.
 
 ## 10문항 (5점 리커트)
 

@@ -19,7 +19,6 @@ import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.safety.KeywordGuard;
 import com.againspring.safety.ScanResult;
-import com.againspring.service.context.FirstMessageService;
 import com.againspring.service.event.PartnerJoinedEvent;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -51,8 +50,8 @@ public class SessionService {
     private final ChatService chatService;
     private final ApplicationEventPublisher eventPublisher;
     private final GuestSessionRateLimiter guestSessionRateLimiter;
-    private final FirstMessageService firstMessageService;
     private final MessageRepository messageRepository;
+    private final com.againspring.service.context.FirstMessageTemplateService firstMessageTemplateService;
 
     public SessionService(SessionRepository sessionRepository,
                           UserRepository userRepository,
@@ -61,8 +60,8 @@ public class SessionService {
                           @Lazy ChatService chatService,
                           ApplicationEventPublisher eventPublisher,
                           GuestSessionRateLimiter guestSessionRateLimiter,
-                          FirstMessageService firstMessageService,
-                          MessageRepository messageRepository) {
+                          MessageRepository messageRepository,
+                          com.againspring.service.context.FirstMessageTemplateService firstMessageTemplateService) {
         this.sessionRepository = sessionRepository;
         this.userRepository = userRepository;
         this.keywordGuard = keywordGuard;
@@ -70,8 +69,8 @@ public class SessionService {
         this.chatService = chatService;
         this.eventPublisher = eventPublisher;
         this.guestSessionRateLimiter = guestSessionRateLimiter;
-        this.firstMessageService = firstMessageService;
         this.messageRepository = messageRepository;
+        this.firstMessageTemplateService = firstMessageTemplateService;
     }
 
     private static final long INVITE_TOKEN_TTL_MS = 86400000; // 24 hours
@@ -91,10 +90,10 @@ public class SessionService {
     public CreateSessionResponse createSession(String createdByUserId, CreateSessionRequest request, String clientIp) {
         User creator = userRepository.findByIdAndDeletedAtIsNull(createdByUserId)
                 .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다"));
-        // 게스트는 온보딩 완료 여부 체크 없이 세션 생성 허용 (앱 내 10문항 흐름 병행)
-        if (!creator.isGuest() && creator.getOnboardingCompletedAt() == null) {
-            throw new BusinessException("ONBOARDING_REQUIRED", "성격검사를 먼저 완료해주세요", 403);
-        }
+        // 온보딩(성격검사)은 선택 사항 — 가입 직후 강제하지 않음.
+        // communicationStyle이 없으면 UserProfileFragment가 프롬프트에서 자동 생략되며,
+        // 중재는 Phase D 동적 컨텍스트(대화 기반)로 정상 동작한다.
+        // 스타일/MBTI는 프로필에서 옵션으로 설정 가능(추후 중재자 파라미터 확장점).
 
         // 게스트 제한: IP당 24시간 3세션
         if (creator.isGuest() && clientIp != null) {
@@ -127,7 +126,7 @@ public class SessionService {
                     "동시에 진행 중인 대화가 너무 많아요. 기존 대화를 먼저 마무리해 주세요.", 429);
         }
 
-        // Validate relation type
+        // 대분류(relationType)는 사용자가 선택 — 필수 검증 (V47~: 중·소분류만 제거)
         try {
             RelationType.fromValue(request.getRelationType());
         } catch (IllegalArgumentException e) {
@@ -152,23 +151,30 @@ public class SessionService {
         Instant now = Instant.now();
         Instant expiresAt = now.plusMillis(INVITE_TOKEN_TTL_MS);
 
-        // Build category
+        // V47~: 카테고리 선택 제거. majorId는 기존 API 호환용으로 수신할 수 있으나
+        // 중·소분류는 무시. relationType 및 koreanTag는 SessionMetaInferenceService가 추론.
         Session.Category category = null;
-        if (request.getCategory() != null) {
+        if (request.getCategory() != null && request.getCategory().getMajorId() != null) {
             category = new Session.Category();
             category.majorId = request.getCategory().getMajorId();
-            category.middleId = request.getCategory().getMiddleId();
-            category.minorId = request.getCategory().getMinorId();
             category.customText = request.getCategory().getCustomText();
         }
 
         // V1.5: 모든 세션은 CHATTING_SOLO로 시작 (초대 여부 무관)
         // 상대 join은 별도 메서드로 처리 (generateInviteForExistingSession)
+        // User의 mediator 기본값 프리필 (X축은 V22부터 존재, Y축은 V47 신규)
+        int styleX = request.getMediatorStyleX() != null ? request.getMediatorStyleX()
+                : (creator.getMediatorDefaultX() != null ? creator.getMediatorDefaultX() : 50);
+        int styleY = request.getMediatorStyleY() != null ? request.getMediatorStyleY()
+                : (creator.getMediatorDefaultY() != null ? creator.getMediatorDefaultY() : 50);
+
+        RelationType relationType = RelationType.fromValue(request.getRelationType());
+
         String sessionId = "ses_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
         Session session = Session.builder()
                 .id(sessionId)
                 .createdByUserId(createdByUserId)
-                .relationType(RelationType.fromValue(request.getRelationType()))
+                .relationType(relationType)
                 .category(category)
                 .status(SessionStatus.CHATTING_SOLO)  // V1.5: 항상 SOLO로 시작
                 .soloMode(true)                         // V1.5: default true
@@ -176,8 +182,8 @@ public class SessionService {
                 .userBMessageCount(0)
                 .finalizeAgreedByA(false)
                 .finalizeAgreedByB(false)
-                .mediatorStyleX(request.getMediatorStyleX() != null ? request.getMediatorStyleX() : 50)
-                .mediatorStyleY(request.getMediatorStyleY() != null ? request.getMediatorStyleY() : 50)
+                .mediatorStyleX(styleX)
+                .mediatorStyleY(styleY)
                 .crisisDetections(new ArrayList<>())
                 .createdAt(now)
                 .updatedAt(now)
@@ -190,8 +196,8 @@ public class SessionService {
         Session saved = sessionRepository.save(session);
         log.info("Session created: id={}, token={}, creator={}", saved.getId(), inviteToken, createdByUserId);
 
-        // V13 Phase 1: mediator 첫마디 비동기 저장 (세션 생성 응답 블로킹 제거)
-        firstMessageService.generateAndSaveAsync(saved);
+        // V47: 대분류별 predefined 첫마디 비동기 저장 (세션 생성 응답 블로킹 제거)
+        firstMessageTemplateService.generateAndSaveAsync(saved);
 
         String inviteUrl = "https://againspring.app/join/" + inviteToken;
 
@@ -440,6 +446,22 @@ public class SessionService {
      * @param userId the requesting user ID
      * @throws BusinessException if session not found or access denied
      */
+    /**
+     * V47: 세션 제목을 사용자가 직접 수정. titleEditedByUser=true 로 이후 자동 덮어쓰기 차단.
+     */
+    @Transactional
+    public void updateTitle(String sessionId, String userId, String newTitle) {
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "세션을 찾을 수 없어요."));
+        if (!session.getCreatedByUserId().equals(userId)
+                && !(session.getInviteeUserId() != null && session.getInviteeUserId().equals(userId))) {
+            throw new BusinessException("SESSION_FORBIDDEN", "이 세션에 접근할 권한이 없어요.");
+        }
+        session.setTitle(newTitle);
+        session.setTitleEditedByUser(true);
+        sessionRepository.save(session);
+    }
+
     public void deleteSession(String sessionId, String userId) {
         Session session = sessionRepository
                 .findById(sessionId)
@@ -458,13 +480,11 @@ public class SessionService {
     private SessionResponse mapToSessionResponse(Session session, String userId) {
         return SessionResponse.builder()
                 .id(session.getId())
-                .relationType(session.getRelationType().getValue())
+                .relationType(session.getRelationType() != null ? session.getRelationType().getValue() : null)
                 .category(session.getCategory() != null
                         ? SessionResponse.CategoryInfo.builder()
                                 .major(session.getCategory().majorId)
-                                .middle(session.getCategory().middleId)
-                                .minor(session.getCategory().minorId)
-                                .customMinor(session.getCategory().customText)
+                                .customText(session.getCategory().customText)
                                 .build()
                         : null)
                 .status(session.getStatus().getValue())
@@ -498,7 +518,7 @@ public class SessionService {
 
         return SessionListItemResponse.builder()
                 .id(session.getId())
-                .relationType(session.getRelationType().getValue())
+                .relationType(session.getRelationType() != null ? session.getRelationType().getValue() : null)
                 .partnerName(partnerName)
                 .status(session.getStatus().getValue())
                 .createdAt(session.getCreatedAt())
