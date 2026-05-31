@@ -186,7 +186,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 pb-2 pt-5">
+            <div className="flex flex-col gap-2 pb-2" style={{ paddingTop: 50 }}>
               <button
                 onClick={handleStartSession}
                 disabled={!user}
