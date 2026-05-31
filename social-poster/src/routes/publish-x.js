@@ -28,7 +28,7 @@ const { applyStorageState, dumpStorageState } = require('../lib/session');
 const { generateTotp } = require('../lib/totp');
 const X = require('../lib/x-selectors');
 const { jitter, warmup } = require('../lib/anti-bot');
-const { captureFailure } = require('../lib/debug');
+const { captureFailure, shortError } = require('../lib/debug');
 
 /**
  * jitter 기반 지연 — 동일 타이밍 패턴 방지
@@ -400,6 +400,8 @@ router.post('/', async (req, res) => {
     }
 
     // Type each tweet
+    // ⚠️ X 입력창은 Draft.js contenteditable — page.fill()은 React 상태를 갱신하지 못해
+    //    Post 버튼이 비활성 유지됨. 반드시 click + keyboard.type 로 실제 키 입력 이벤트 발생.
     for (let i = 0; i < tweets.length; i++) {
       let text = tweets[i];
 
@@ -413,7 +415,11 @@ router.post('/', async (req, res) => {
         ? X.TWEET_TEXT_AREA_N(i)
         : X.TWEET_TEXT_AREA_0;
 
-      await page.fill(textareaSelector, text);
+      const ta = await page.$(textareaSelector);
+      if (!ta) throw new Error(`tweet 입력창(${i})을 찾지 못함`);
+      await ta.click();
+      await page.waitForTimeout(300);
+      await page.keyboard.type(text, { delay: 12 });
       await humanDelay(page, 800, 1500);
 
       // If not the last tweet, click "Add another Tweet" button
@@ -425,18 +431,34 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Submit tweet(s)
-    const submitBtnSelectors = X.TWEET_SUBMIT_BUTTON.split(',').map(s => s.trim());
+    // Submit tweet(s) — 여러 Post 버튼 셀렉터 중 "활성화된" 것을 찾아 클릭
+    // (full compose 모달은 tweetButton, 인라인은 tweetButtonInline — 상황에 따라 활성 버튼이 다름)
+    await page.waitForTimeout(800);
     clicked = false;
-    for (const sel of submitBtnSelectors) {
-      const btn = await page.$(sel);
-      if (btn) {
-        await btn.click();
-        clicked = true;
-        break;
+    const submitBtnSelectors = X.TWEET_SUBMIT_BUTTON.split(',').map(s => s.trim());
+    for (let t = 0; t < 16 && !clicked; t++) { // 최대 8초, 활성 버튼 폴링
+      for (const sel of submitBtnSelectors) {
+        const btn = await page.$(sel);
+        if (btn && await btn.isEnabled().catch(() => false)) {
+          await btn.click({ timeout: 5000 }).catch(() => {});
+          clicked = true;
+          break;
+        }
+      }
+      if (!clicked) await page.waitForTimeout(500);
+    }
+    if (!clicked) {
+      // fallback: 키보드 단축키(Ctrl+Enter)로 게시 시도
+      console.warn('[X] Post 버튼 비활성/미발견 — Ctrl+Enter fallback');
+      await page.keyboard.press('Control+Enter');
+      await page.waitForTimeout(1000);
+      // 여전히 compose 가 열려 있으면 텍스트 미입력 등으로 실패
+      const stillComposing = await page.$(X.TWEET_TEXT_AREA_0);
+      if (stillComposing) {
+        await captureFailure(page, 'x-submit-disabled');
+        throw new Error('게시 실패: Post 버튼이 활성화되지 않음 (트윗 본문 입력 실패 가능 — debug 스크린샷 확인)');
       }
     }
-    if (!clicked) throw new Error('Could not find submit button');
 
     // Wait for submission to complete
     await page.waitForTimeout(4000);
@@ -506,7 +528,7 @@ router.post('/', async (req, res) => {
     return res.json({
       ok: false,
       url: null,
-      error: err.message,
+      error: shortError(err),
       needsReseed: err.needsReseed === true,
       updatedStorageState: null,
     });

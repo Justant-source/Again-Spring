@@ -48,4 +48,20 @@ async function captureFailure(page, label) {
   }
 }
 
-module.exports = { captureFailure, DEBUG_DIR };
+/**
+ * Playwright 에러 메시지를 화면 표시용 간결한 한 줄로 축약.
+ * (timeout 재시도 로그 등 수백 줄 → 핵심 1줄 + 분류 힌트)
+ */
+function shortError(err) {
+  const msg = (err && err.message ? err.message : String(err)) || 'unknown error';
+  const firstLine = msg.split('\n')[0].trim();
+  let hint = '';
+  if (/Timeout .*exceeded/i.test(msg)) {
+    if (/intercepts pointer events/i.test(msg)) hint = ' (요소가 다른 레이어에 가려져 클릭 불가)';
+    else if (/element is not enabled/i.test(msg)) hint = ' (버튼 비활성 — 입력 누락 가능)';
+    else if (/waiting for/i.test(msg)) hint = ' (요소를 찾지 못함/표시 안 됨)';
+  }
+  return (firstLine + hint).slice(0, 280);
+}
+
+module.exports = { captureFailure, shortError, DEBUG_DIR };

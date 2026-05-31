@@ -10,7 +10,7 @@ const { applyStorageState, dumpStorageState } = require('../lib/session');
 const { generateTotp } = require('../lib/totp');
 const IG = require('../lib/ig-selectors');
 const { jitter, warmup } = require('../lib/anti-bot');
-const { captureFailure } = require('../lib/debug');
+const { captureFailure, shortError } = require('../lib/debug');
 
 async function humanDelay(page, minMs = 1200, maxMs = 3000) {
   await page.waitForTimeout(jitter((minMs + maxMs) / 2, 0.35));
@@ -230,43 +230,50 @@ router.post('/', async (req, res) => {
     }
 
     await page.setInputFiles(IG.FILE_INPUT, tmpPaths);
-    await humanDelay(page, 2000, 3000);
+    await humanDelay(page, 2500, 3500);
 
-    // Click Next (crop step)
-    const nextBtn1 = await page.$(IG.NEXT_BUTTON.split(',')[0].trim());
-    if (nextBtn1) {
-      await nextBtn1.click();
-      await humanDelay(page);
+    // 다이얼로그 내 버튼은 locator 로 클릭 — 자동 대기 + 전환 오버레이(pointer intercept) 대응
+    // (elementHandle.click() 은 모달 전환 중 div 오버레이에 가로막혀 타임아웃됨)
+    const clickDialogBtn = async (text, { timeout = 12000, force = false } = {}) => {
+      const loc = page.locator(
+        `div[role="dialog"] button:has-text("${text}"), div[role="dialog"] div[role="button"]:has-text("${text}")`
+      ).last();
+      await loc.waitFor({ state: 'visible', timeout });
+      try {
+        await loc.click({ timeout: 5000 });
+      } catch (e) {
+        // 오버레이가 잠깐 가로막는 경우 사라질 때까지 잠시 후 force 클릭
+        await page.waitForTimeout(1200);
+        await loc.click({ force: true, timeout: 5000 });
+      }
+    };
+
+    // 1차 "다음" (자르기 단계)
+    await clickDialogBtn('다음');
+    await humanDelay(page, 1500, 2500);
+
+    // 2차 "다음" (필터/편집 단계)
+    await clickDialogBtn('다음');
+    await humanDelay(page, 1500, 2500);
+
+    // 캡션 입력 (contenteditable)
+    if (caption) {
+      const captionLoc = page.locator(
+        'div[aria-label="문구를 입력하세요..."], div[aria-label="Write a caption..."], div[role="dialog"] div[contenteditable="true"][role="textbox"]'
+      ).first();
+      try {
+        await captionLoc.waitFor({ state: 'visible', timeout: 8000 });
+        await captionLoc.click();
+        await humanDelay(page, 400, 900);
+        await page.keyboard.type(caption, { delay: 12 });
+        await humanDelay(page, 800, 1500);
+      } catch (e) {
+        console.warn('[IG] 캡션 입력칸을 찾지 못함 (캡션 없이 진행):', e.message);
+      }
     }
 
-    // Click Next again (filter/edit step)
-    const nextBtn2 = await page.$(IG.NEXT_BUTTON.split(',')[0].trim());
-    if (nextBtn2) {
-      await nextBtn2.click();
-      await humanDelay(page);
-    }
-
-    // Fill caption
-    const captionEl =
-      (await page.$(IG.CAPTION_INPUT.split(',')[0].trim())) ||
-      (await page.$(IG.CAPTION_INPUT.split(',')[1]?.trim())) ||
-      (await page.$(IG.CAPTION_INPUT.split(',')[2]?.trim()));
-
-    if (captionEl && caption) {
-      await captionEl.click();
-      await humanDelay(page, 500, 1000);
-      await page.keyboard.type(caption, { delay: 30 });
-      await humanDelay(page);
-    }
-
-    // Share
-    const shareBtn =
-      (await page.$(IG.SHARE_BUTTON.split(',')[0].trim())) ||
-      (await page.$(IG.SHARE_BUTTON.split(',')[1]?.trim()));
-
-    if (!shareBtn) throw new Error('SHARE_BUTTON not found');
-
-    await shareBtn.click();
+    // "공유하기"
+    await clickDialogBtn('공유');
 
     // Wait for confirmation (up to 30 seconds)
     let postUrl = null;
@@ -302,7 +309,7 @@ router.post('/', async (req, res) => {
     return res.json({
       ok: false,
       url: null,
-      error: err.message,
+      error: shortError(err),
       needsReseed: err.needsReseed === true,
       updatedStorageState: null,
     });

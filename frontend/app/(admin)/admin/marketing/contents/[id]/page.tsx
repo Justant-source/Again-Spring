@@ -68,6 +68,7 @@ export default function ContentDetailPage() {
 
   useEffect(() => {
     loadContent();
+    loadPublishStatus(); // 페이지 진입 시 기존 발행 결과(실패 사유 포함) 표시
   }, [contentId]);
 
   // content.platform 기반으로 발행 대상 자동 설정
@@ -78,6 +79,16 @@ export default function ContentDetailPage() {
       setSocialTargets([p as SocialPlatform]);
     }
   }, [content?.platform]);
+
+  // 발행 결과 조회 (마운트 시 + 폴링 종료 시)
+  async function loadPublishStatus() {
+    try {
+      const status = await getPublishStatus(contentId);
+      setSocialPublishResults(status.results);
+    } catch (e) {
+      // 결과 없으면 무시 (최초 발행 전)
+    }
+  }
 
   async function loadContent() {
     try {
@@ -188,20 +199,30 @@ export default function ContentDetailPage() {
       await publishSocial(contentId, socialTargets, linkMode);
       setPublishPolling(true);
       let attempts = 0;
+      // X/IG 발행 실패는 셀렉터 타임아웃 등으로 90초 이상 걸릴 수 있어 넉넉히 폴링
+      const MAX_ATTEMPTS = 50; // 50 × 3s = 150초
       const pollInterval = setInterval(async () => {
         attempts++;
         try {
           const status = await getPublishStatus(contentId);
           setSocialPublishResults(status.results);
-          const allDone = status.results.every(r => r.state === 'SUCCEEDED' || r.state === 'FAILED');
-          if (allDone || attempts >= 20) {
+          const allDone = status.results.length > 0 &&
+            status.results.every(r => r.state === 'SUCCEEDED' || r.state === 'FAILED');
+          if (allDone || attempts >= MAX_ATTEMPTS) {
             clearInterval(pollInterval);
             setPublishPolling(false);
+            if (!allDone) {
+              setAutoPublishErr('발행이 오래 걸려 자동 갱신을 멈췄어요. "상태 새로고침"으로 결과를 확인하세요.');
+            }
             await loadContent();
+            await loadPublishStatus(); // 최종 결과(실패 사유) 재조회
           }
         } catch (e) {
-          clearInterval(pollInterval);
-          setPublishPolling(false);
+          // 일시적 오류는 무시하고 계속 폴링 (네트워크 흔들림 대응)
+          if (attempts >= MAX_ATTEMPTS) {
+            clearInterval(pollInterval);
+            setPublishPolling(false);
+          }
         }
       }, 3000);
     } catch (e: any) {
@@ -542,42 +563,61 @@ export default function ContentDetailPage() {
               </label>
             </div>
             )}
-            {/* Publish button */}
-            <button
-              onClick={handleAutoPublish}
-              disabled={isAutoPublishing || publishPolling}
-              style={{
-                padding: '7px 16px',
-                background: (isAutoPublishing || publishPolling) ? '#ccc' : '#1A1A2E',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                cursor: (isAutoPublishing || publishPolling) ? 'not-allowed' : 'pointer',
-                fontSize: 13,
-              }}
-            >
-              {publishPolling ? '발행 중...' : isAutoPublishing ? '요청 중...' : '발행'}
-            </button>
+            {/* Publish button + 상태 새로고침 */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                onClick={handleAutoPublish}
+                disabled={isAutoPublishing || publishPolling}
+                style={{
+                  padding: '7px 16px',
+                  background: (isAutoPublishing || publishPolling) ? '#ccc' : '#1A1A2E',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: (isAutoPublishing || publishPolling) ? 'not-allowed' : 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                {publishPolling ? '발행 중...' : isAutoPublishing ? '요청 중...' : '발행'}
+              </button>
+              <button
+                onClick={loadPublishStatus}
+                style={{
+                  padding: '7px 12px', background: '#fff', color: '#446620',
+                  border: '1px solid #446620', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                }}
+              >
+                상태 새로고침
+              </button>
+            </div>
             {/* Per-platform results — content.platform 에 해당하는 플랫폼만 표시 */}
-            {socialPublishResults.length > 0 && (
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {socialPublishResults.filter(r => r.platform === content?.platform?.toUpperCase()).length > 0 && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {socialPublishResults.filter(r =>
                   r.platform === content?.platform?.toUpperCase()
                 ).map(r => (
-                  <div key={r.platform} style={{ fontSize: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 600, minWidth: 80 }}>{r.platform}</span>
-                    <span style={{
-                      padding: '2px 6px', borderRadius: 4,
-                      background: r.state === 'SUCCEEDED' ? '#d1fae5' : r.state === 'FAILED' ? '#fee2e2' : '#fff3cd',
-                      color: r.state === 'SUCCEEDED' ? '#065f46' : r.state === 'FAILED' ? '#991b1b' : '#856404',
-                    }}>
-                      {r.state === 'SUCCEEDED' ? '성공' : r.state === 'FAILED' ? '실패' : '진행 중'}
-                    </span>
-                    {r.publishedUrl && (
-                      <a href={r.publishedUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc', fontSize: 11 }}>게시물 보기</a>
-                    )}
+                  <div key={r.platform} style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: '#fff', border: '1px solid #eee', borderRadius: 6 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, minWidth: 80 }}>{r.platform}</span>
+                      <span style={{
+                        padding: '2px 6px', borderRadius: 4,
+                        background: r.state === 'SUCCEEDED' ? '#d1fae5' : r.state === 'FAILED' ? '#fee2e2' : '#fff3cd',
+                        color: r.state === 'SUCCEEDED' ? '#065f46' : r.state === 'FAILED' ? '#991b1b' : '#856404',
+                      }}>
+                        {r.state === 'SUCCEEDED' ? '성공' : r.state === 'FAILED' ? '실패' : '진행 중'}
+                      </span>
+                      {r.publishedUrl && (
+                        <a href={r.publishedUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc', fontSize: 11 }}>게시물 보기</a>
+                      )}
+                    </div>
                     {r.errorReason && (
-                      <span style={{ color: '#991b1b', fontSize: 11 }}>{r.errorReason}</span>
+                      <div style={{
+                        color: '#991b1b', fontSize: 11, lineHeight: 1.5, whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word', maxHeight: 120, overflowY: 'auto',
+                        background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 4, padding: '6px 8px',
+                      }}>
+                        <b>실패 사유:</b> {r.errorReason}
+                      </div>
                     )}
                   </div>
                 ))}
