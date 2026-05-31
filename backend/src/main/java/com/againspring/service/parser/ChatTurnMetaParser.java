@@ -146,6 +146,27 @@ public class ChatTurnMetaParser {
                 inferredKeywords, inferredTitle, inferredKoreanTag);
     }
 
+    /**
+     * 스트리밍 partial 정제 — turn_meta 등 구조 태그가 시작된 지점과 끝의 미완성 태그('<...')를
+     * 제거해, 스트리밍 중 JSON이 사용자에게 잠깐 노출되는 것을 막는다. 본문은 구조 태그 앞에
+     * 위치하므로 보존된다. (CancelableChatService 스트리밍 draft 저장 경로에서 사용)
+     */
+    public static String stripStructuredTagsForStreaming(String partial) {
+        if (partial == null || partial.isEmpty()) return "";
+        String s = partial;
+        // 1. 완성된 구조 여는 태그(<turn_meta> 등) 이후 전부 제거
+        Matcher m = DANGLING_OPEN_TAG.matcher(s);
+        if (m.find()) {
+            s = s.substring(0, m.start());
+        }
+        // 2. 끝에 닫히지 않은 '<' (태그를 생성하는 중)이 남아있으면 제거
+        int lastLt = s.lastIndexOf('<');
+        if (lastLt >= 0 && s.indexOf('>', lastLt) < 0) {
+            s = s.substring(0, lastLt);
+        }
+        return s.strip();
+    }
+
     private Session.HorsemenTurnEntry readHorsemen(JsonNode node, int turn, String sender) {
         if (node == null || !node.isObject()) return null;
         Session.HorsemenTurnEntry e = new Session.HorsemenTurnEntry();

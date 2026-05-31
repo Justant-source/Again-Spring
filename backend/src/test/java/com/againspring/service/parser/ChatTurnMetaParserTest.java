@@ -70,6 +70,36 @@ class ChatTurnMetaParserTest {
         assertFalse(r.mediatorMessage().contains("horsemen"));
     }
 
+    // ── 스트리밍 partial 정제 (draft 표시 중 JSON 잠깐 노출 방지) ──
+
+    @Test
+    @DisplayName("스트리밍 정제: turn_meta 시작 부분을 제거하고 본문만 남긴다")
+    void stripStreaming_removesTurnMetaStart() {
+        String partial = "맨날 싸우니까 정말 지치겠어요. 어떤 일이 있었나요?\n\n<turn_meta>\n{\n  \"horsemen\": {\"criticism\": 0.3";
+        String s = ChatTurnMetaParser.stripStructuredTagsForStreaming(partial);
+        assertTrue(s.contains("어떤 일이 있었나요?"), "본문 보존");
+        assertFalse(s.contains("turn_meta"));
+        assertFalse(s.contains("horsemen"));
+        assertFalse(s.contains("<"));
+    }
+
+    @Test
+    @DisplayName("스트리밍 정제: 미완성 태그 시작('<tur')도 제거한다")
+    void stripStreaming_removesIncompleteTag() {
+        String partial = "그러셨군요. 마음이 무거우셨겠어요.\n\n<tur";
+        String s = ChatTurnMetaParser.stripStructuredTagsForStreaming(partial);
+        assertEquals("그러셨군요. 마음이 무거우셨겠어요.", s);
+        assertFalse(s.contains("<"));
+    }
+
+    @Test
+    @DisplayName("스트리밍 정제: 태그 없는 순수 본문은 그대로 둔다")
+    void stripStreaming_keepsPlainText() {
+        String partial = "어떤 점이 가장 힘드셨어요?";
+        assertEquals("어떤 점이 가장 힘드셨어요?",
+            ChatTurnMetaParser.stripStructuredTagsForStreaming(partial));
+    }
+
     @Test
     void parse_clampsOutOfRangeIntensities() {
         String raw = "응답.\n<turn_meta>{\"horsemen\":{\"criticism\":1.7,\"contempt\":-0.2}}</turn_meta>";

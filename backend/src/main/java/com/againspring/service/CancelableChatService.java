@@ -211,21 +211,26 @@ public class CancelableChatService {
         inv.setPartialHandler(partial -> {
             long now = System.currentTimeMillis();
             if (now - lastDbWriteAt.get() < 500) return;  // throttle
+            // 스트리밍 중 turn_meta 등 구조 태그/미완성 태그를 제거 — JSON이 잠깐 노출되는 것을 방지.
+            String safePartial = com.againspring.service.parser.ChatTurnMetaParser
+                    .stripStructuredTagsForStreaming(partial);
+            if (safePartial.isEmpty()) return;  // 표시할 본문이 아직 없음 (throttle 유지)
             lastDbWriteAt.set(now);
+            final String draftContent = safePartial;
             transactionTemplate.execute(txStatus -> {
                 Long draftId = draftMsgIdRef.get();
                 if (draftId == null) {
                     Message draft = messageRepo.save(Message.builder()
                             .sessionId(sessionId)
                             .sender(mediatorSender)
-                            .content(partial)
-                            .charCount(partial.length())
+                            .content(draftContent)
+                            .charCount(draftContent.length())
                             .status("streaming")
                             .llmModel(ChatService.MODEL_HAIKU)
                             .build());
                     draftMsgIdRef.set(draft.getId());
                 } else {
-                    messageRepo.updateStreamingContent(draftId, partial, partial.length());
+                    messageRepo.updateStreamingContent(draftId, draftContent, draftContent.length());
                 }
                 return null;
             });
