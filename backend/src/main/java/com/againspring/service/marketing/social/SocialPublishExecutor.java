@@ -169,7 +169,8 @@ public class SocialPublishExecutor {
             Map<String, Object> credentials) {
 
         if ("X".equals(platform)) {
-            List<String> tweets = splitIntoTweets(content.getBodyText(), 270);
+            // 250(가중치) — X 280 한도에서 링크(~24)·여유 확보. CJK는 2로 계산됨.
+            List<String> tweets = splitIntoTweets(content.getBodyText(), 250);
             Map<String, Object> contentMap = new HashMap<>();
             contentMap.put("tweets", tweets);
             contentMap.put("linkUrl", "https://againspring.net");
@@ -214,37 +215,88 @@ public class SocialPublishExecutor {
     }
 
     /**
-     * 텍스트를 최대 길이 기반 트윗으로 분할
+     * 텍스트를 트윗으로 분할.
+     * ⚠️ X는 한글·한자·가나 등 CJK 문자를 2글자로 계산(280 한도). JS/Java .length(CJK=1)로
+     *    세면 한글 트윗이 한도를 초과해 Post 버튼이 비활성화됨. → 가중치 기반으로 분할.
+     *
+     * @param maxLen 가중치 기준 최대 길이(280 미만 권장, 링크 여유 포함 ~250)
      */
     private List<String> splitIntoTweets(String text, int maxLen) {
         if (text == null || text.isBlank()) {
             return List.of("");
         }
 
-        if (text.length() <= maxLen) {
+        if (weightedLength(text) <= maxLen) {
             return List.of(text);
         }
 
         List<String> tweets = new ArrayList<>();
+        // 문장 우선 분할, 한 문장이 너무 길면 가중치 기준으로 강제 분할
         String[] sentences = text.split("(?<=[.!?。]\\s)");
 
         StringBuilder current = new StringBuilder();
         for (String sentence : sentences) {
-            if (current.length() + sentence.length() > maxLen && !current.isEmpty()) {
-                tweets.add(current.toString().trim());
-                current = new StringBuilder(sentence);
-            } else {
-                current.append(sentence);
+            for (String chunk : splitByWeight(sentence, maxLen)) {
+                if (weightedLength(current.toString()) + weightedLength(chunk) > maxLen
+                        && current.length() > 0) {
+                    tweets.add(current.toString().trim());
+                    current = new StringBuilder(chunk);
+                } else {
+                    current.append(chunk);
+                }
             }
         }
 
-        if (!current.isEmpty()) {
+        if (current.length() > 0) {
             tweets.add(current.toString().trim());
         }
 
-        return tweets.isEmpty()
-                ? List.of(text.substring(0, Math.min(text.length(), maxLen)))
-                : tweets;
+        return tweets.isEmpty() ? List.of(text) : tweets;
+    }
+
+    /** X 가중치 길이: CJK 문자 = 2, 그 외 = 1 */
+    private int weightedLength(String s) {
+        int w = 0;
+        for (int i = 0; i < s.length(); ) {
+            int cp = s.codePointAt(i);
+            i += Character.charCount(cp);
+            w += isCjk(cp) ? 2 : 1;
+        }
+        return w;
+    }
+
+    private boolean isCjk(int cp) {
+        return (cp >= 0xAC00 && cp <= 0xD7A3)   // 한글 음절
+                || (cp >= 0x1100 && cp <= 0x11FF)   // 한글 자모
+                || (cp >= 0x3130 && cp <= 0x318F)   // 한글 호환 자모
+                || (cp >= 0x4E00 && cp <= 0x9FFF)   // CJK 한자
+                || (cp >= 0x3040 && cp <= 0x30FF)   // 히라가나+가타카나
+                || (cp >= 0xFF00 && cp <= 0xFFEF);  // 전각 문자
+    }
+
+    /** 문장 하나가 maxLen(가중치)을 넘으면 공백/문자 경계로 강제 분할 */
+    private List<String> splitByWeight(String sentence, int maxLen) {
+        if (weightedLength(sentence) <= maxLen) {
+            return List.of(sentence);
+        }
+        List<String> chunks = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        for (String word : sentence.split("(?<= )")) { // 공백 뒤에서 분할(공백 유지)
+            if (weightedLength(cur.toString()) + weightedLength(word) > maxLen && cur.length() > 0) {
+                chunks.add(cur.toString());
+                cur = new StringBuilder(word);
+            } else {
+                cur.append(word);
+            }
+            // 단어 자체가 maxLen 초과(긴 URL 등)면 문자 단위로 자름
+            while (weightedLength(cur.toString()) > maxLen) {
+                int cut = cur.length() / 2;
+                chunks.add(cur.substring(0, cut));
+                cur = new StringBuilder(cur.substring(cut));
+            }
+        }
+        if (cur.length() > 0) chunks.add(cur.toString());
+        return chunks;
     }
 
     /**

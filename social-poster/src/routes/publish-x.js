@@ -335,28 +335,17 @@ router.post('/', async (req, res) => {
     });
     await humanDelay(page, 1000, 2000);
 
-    // 피드 워밍업 — 즉시 compose 클릭 패턴 방지
+    // 피드 워밍업 — 즉시 compose 패턴 방지
     await warmup(page, 'X');
 
-    // Compose 버튼 대기 후 클릭 (UI 변경 대응)
-    const composeBtnSelectors = X.COMPOSE_TWEET_BUTTON.split(',').map(s => s.trim());
-    let clicked = false;
-    try {
-      await page.waitForSelector(composeBtnSelectors.join(', '), { timeout: 8000 });
-      for (const sel of composeBtnSelectors) {
-        const btn = await page.$(sel);
-        if (btn) { await btn.click(); clicked = true; break; }
-      }
-    } catch (e) {
-      // 셀렉터 실패 → URL 직접 이동으로 fallback
-    }
-    if (!clicked) {
-      // X compose 직접 URL fallback
-      await page.goto('https://x.com/compose/tweet', {
-        waitUntil: 'domcontentloaded',
-        timeout: 15000,
-      });
-    }
+    // ⚠️ 모달 compose(SideNav 클릭)는 홈 인라인 컴포저가 뒤에 남아 포커스/에디터 상태가
+    //    충돌 → 본문을 입력해도 Post 버튼이 활성화되지 않음. 전체 페이지 /compose/tweet 로
+    //    이동하면 단일 컴포저라 정상 동작(검증 완료).
+    await page.goto('https://x.com/compose/tweet', {
+      waitUntil: 'domcontentloaded',
+      timeout: 15000,
+    });
+    let clicked = false; // (아래 submit 로직 호환용)
 
     // Wait for tweet textarea to appear
     try {
@@ -406,9 +395,13 @@ router.post('/', async (req, res) => {
       let text = tweets[i];
 
       // Append link to last tweet if linkMode is last_tweet
+      // ⚠️ 개행(\n) 대신 공백 — keyboard.type 의 '\n'은 Enter 입력으로 처리되어
+      //    X 스레드 컴포저에서 "새 트윗"을 생성함(빈 트윗 → Post 버튼 비활성).
       if (i === tweets.length - 1 && linkMode === 'last_tweet' && linkUrl) {
-        text = text + '\n' + linkUrl;
+        text = text + ' ' + linkUrl;
       }
+      // 본문 내부 개행도 모두 공백으로 — 동일 이유(개행 입력 시 새 트윗 생성)
+      text = text.replace(/\s*\n\s*/g, ' ').trim();
 
       // Get textarea selector for this tweet
       const textareaSelector = typeof X.TWEET_TEXT_AREA_N === 'function'
@@ -431,28 +424,27 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Submit tweet(s) — 여러 Post 버튼 셀렉터 중 "활성화된" 것을 찾아 클릭
-    // (full compose 모달은 tweetButton, 인라인은 tweetButtonInline — 상황에 따라 활성 버튼이 다름)
-    await page.waitForTimeout(800);
+    // Submit tweet(s)
+    // 모달 스레드: tweetButton="Post all"(활성), tweetButtonInline=비활성.
+    // URL 입력 시 링크 카드 생성으로 버튼 활성화가 지연될 수 있어 locator 자동 대기로 클릭.
+    await page.waitForTimeout(1500); // 링크 카드 생성 등 안정화 대기
     clicked = false;
-    const submitBtnSelectors = X.TWEET_SUBMIT_BUTTON.split(',').map(s => s.trim());
-    for (let t = 0; t < 16 && !clicked; t++) { // 최대 8초, 활성 버튼 폴링
-      for (const sel of submitBtnSelectors) {
-        const btn = await page.$(sel);
-        if (btn && await btn.isEnabled().catch(() => false)) {
-          await btn.click({ timeout: 5000 }).catch(() => {});
-          clicked = true;
-          break;
-        }
+    for (const sel of ['[data-testid="tweetButton"]', '[data-testid="tweetButtonInline"]']) {
+      try {
+        const loc = page.locator(sel).last();
+        await loc.waitFor({ state: 'visible', timeout: 3000 });
+        await loc.click({ timeout: 15000 }); // 활성화(enabled)될 때까지 자동 대기 후 클릭
+        clicked = true;
+        break;
+      } catch (e) {
+        // 다음 셀렉터 시도
       }
-      if (!clicked) await page.waitForTimeout(500);
     }
     if (!clicked) {
       // fallback: 키보드 단축키(Ctrl+Enter)로 게시 시도
-      console.warn('[X] Post 버튼 비활성/미발견 — Ctrl+Enter fallback');
+      console.warn('[X] Post 버튼 클릭 실패 — Ctrl+Enter fallback');
       await page.keyboard.press('Control+Enter');
-      await page.waitForTimeout(1000);
-      // 여전히 compose 가 열려 있으면 텍스트 미입력 등으로 실패
+      await page.waitForTimeout(1500);
       const stillComposing = await page.$(X.TWEET_TEXT_AREA_0);
       if (stillComposing) {
         await captureFailure(page, 'x-submit-disabled');
