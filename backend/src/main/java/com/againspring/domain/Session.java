@@ -263,7 +263,10 @@ public class Session {
      * 카테고리 임베디드 (JSON 저장).
      * V47~: 중·소분류 제거 — 자유 서술 기반 자동 추론으로 전환.
      * majorId만 잔존 (기존 데이터 호환용, 신규 세션은 null).
+     * ignoreUnknown: V47 이전 데이터에 남은 middleId/minorId가 DB JSON에 있어도 역직렬화 시 무시.
+     *   (없으면 옛 세션 로드 시 UnrecognizedPropertyException → 계정 삭제·세션 조회 등 실패)
      */
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public static class Category {
         public String majorId;
         // middleId, minorId 제거 (V47 — 자동 추론 전환)
