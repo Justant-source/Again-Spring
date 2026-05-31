@@ -28,7 +28,7 @@ export default function LandingPage() {
     api.get('/api/users/me/history').then(r => {
       const active = (r.data as any[]).find(s => ACTIVE_STATUSES.has(s.status));
       setActiveSessionId(active?.id ?? null);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [user]);
 
   if (!mounted) return null;
@@ -172,7 +172,7 @@ export default function LandingPage() {
                 마음을<br />정리해요.
               </h1>
               <p className="mt-5 text-[14px] leading-[1.7]" style={{ color: 'var(--L-sub)' }}>
-                마음을 정리하기까지 5분이면 충분합니다.
+                5분이면 충분합니다.
               </p>
 
               <div className="mt-9 letter-card" style={{ padding: 20 }}>
