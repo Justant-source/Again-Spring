@@ -30,7 +30,7 @@ public class MarketingContent {
     }
 
     public enum Status {
-        GENERATING, DRAFT, REVIEW, APPROVED, EXPORTED, REJECTED
+        GENERATING, DRAFT, REVIEW, APPROVED, EXPORTED, REJECTED, PUBLISHING, PARTIAL, PUBLISHED, FAILED
     }
 
     @Id

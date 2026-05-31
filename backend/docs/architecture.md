@@ -6,17 +6,18 @@
 |---|---|
 | 언어 | Java 21 (Eclipse Temurin) |
 | 프레임워크 | Spring Boot 3.3 |
-| 빌드 | Gradle Kotlin DSL |
+| 빌드 | Gradle 8.5 (Kotlin DSL) |
 | DB | MariaDB 11 LTS (utf8mb4, UTC) |
 | ORM | Spring Data JPA (Hibernate) |
-| 마이그레이션 | Flyway 10 (V1~V24) |
+| 마이그레이션 | Flyway 10 (V1~V42) |
 | 인증 | Spring Security + JWT (jjwt 0.12.5) |
 | 메일 | Spring Mail (Gmail SMTP) |
 | API 문서 | springdoc-openapi 2.6 (Swagger UI) |
 | Rate Limit | bucket4j 7.6 |
 | 직렬화 | Jackson 2.17, SnakeYAML 2.0 |
 | 테스트 | JUnit 5, Mockito, Testcontainers, H2 |
-| LLM | Claude Code CLI — `againspring-llm` 워커 컨테이너 (`RemoteLlmProvider` HTTP 클라이언트) |
+| LLM | Task별 분리: 대화(dev: CLI 워커, prod: Anthropic API), 리포트(모두: CLI 워커) |
+| LLM HTTP | RestClient (Anthropic API) + `againspring-llm` 워커 (Claude Code CLI) |
 
 ## 레이어 흐름
 
@@ -30,18 +31,26 @@ flowchart TB
         Context[Phase D 컨텍스트\nservice/context/ + service/prompt/]
         Domain[JPA Entity\ndomain/]
         Repo[JpaRepository\nrepository/]
-        Bridge[RemoteLlmProvider\nllm/remote/]
+        LLMRouter["LlmProviderConfig\nTask 라우팅"]
+        ChatProvider["ChatLLM Provider<br/>(dev: Remote<br/>prod: ClaudeApi)"]
+        ReportProvider["ReportLLM Provider<br/>(all: Remote)"]
         Safety[PromptSanitizer\nKeywordGuard\nCrisisDetector\nsafety/]
         Sched[RetentionScheduler\nDailyStatsAggregator\nGuestSessionCleanupScheduler]
         Notify[FeedbackEmailNotifier\nCrisisFeedbackNotifier\nservice/notify/]
     end
-    DB[(MariaDB 11)]
+    DB[(MariaDB 11\n+ llm_call_logs)]
     LLMWorker[againspring-llm\n워커 컨테이너]
+    AnthropicAPI["Anthropic API<br/>(prod)"]
 
     Client --> Filter --> Controller --> Service
     Service --> Context
     Service --> Repo --> Domain --> DB
-    Service --> Safety --> Bridge -->|HTTP /v1/invocations| LLMWorker
+    Service --> Safety --> LLMRouter
+    LLMRouter --> ChatProvider
+    LLMRouter --> ReportProvider
+    ChatProvider -->|dev: HTTP /v1/invocations| LLMWorker
+    ChatProvider -->|prod: REST| AnthropicAPI
+    ReportProvider -->|HTTP /v1/invoke| LLMWorker
     Service --> Notify
     Sched -.->|cron 03:00 UTC| Repo
 ```
@@ -60,8 +69,12 @@ HTTP Request
    │
    │  비즈니스 로직 + @Transactional 경계
    │  ├── safety/* (KeywordGuard, CrisisDetector)
-   │  ├── llm/* (ClaudeCodeBridge → claude CLI) — 자세한 설명은 llm-bridge.md 참조
+   │  ├── llm/* (LlmProviderConfig 라우팅)
+   │  │   ├── claudeapi/* (Anthropic API, prod 대화)
+   │  │   └── remote/* (CLI 워커, 모든 리포트 + dev 대화)
    │  └── parser/* (LLM 응답 → 도메인 객체)
+   │
+   │  자세한 설명: llm-bridge.md 참조
    ▼
 @Repository (Spring Data JPA)
    │
@@ -148,6 +161,7 @@ stateDiagram-v2
 | `RevokedTokenCleanupScheduler.cleanup` | `0 0 4 * * *` (매일 04:00 UTC) | 만료된 `revoked_tokens` 행 삭제 |
 | `DailyStatsAggregator` | `0 0 0 * * *` (자정 UTC) | 전날 세션·사용자 통계 → `daily_stats` 집계 |
 | `GuestSessionCleanupScheduler` | `0 0 2 * * *` (매일 02:00 UTC) | 만료 게스트 세션 정리 |
+| `SessionHealthCheckJob` *(dev, marketing.enabled)* | `0 0 3 * * *` (매일 03:00) | X·Instagram 세션 유효성 확인 + 피드 방문으로 쿠키 갱신 → DB 저장 |
 
 `SchedulingConfig`의 `@EnableScheduling` 활성. 테스트 프로파일에서는 비활성.
 
@@ -160,8 +174,10 @@ stateDiagram-v2
 | `springdoc.swagger-ui.enabled` | `true` | `false` | (N/A) |
 | `management.endpoints.web.exposure.include` | `health,info,metrics` | `health` only | (N/A) |
 | `logging.level.com.againspring` | `DEBUG` | `WARN` | `DEBUG` |
-| `llm.provider` | `claude-code` | `claude-code` | `mock` |
+| `llm.chat.provider` | `remote` (CLI) | `claude-api` (Anthropic) | `mock` |
+| `llm.report.provider` | `remote` (CLI) | `remote` (CLI) | `mock` |
 | DB | MariaDB 3306 (host) / 컨테이너 | MariaDB internal | H2 in-memory (MariaDB mode) |
+| Anthropic API Key | (N/A) | `${ANTHROPIC_API_KEY}` | (N/A) |
 
 ## DTO 컨벤션
 
@@ -263,3 +279,7 @@ flowchart LR
 | Rate limit | RateLimitFilter (bucket4j) |
 | 로깅 | logback-spring.xml + Lombok @Slf4j |
 | 트레이싱 | `correlationId` (UUID, X-Request-ID 헤더) — `LLMCallLogger` 등에 전파 |
+
+---
+
+**마지막 업데이트**: 2026-05-30

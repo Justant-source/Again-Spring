@@ -10,6 +10,10 @@ import {
   rejectContent,
   type ContentResponse,
 } from '@/lib/api/marketing/contentApi';
+import {
+  publishSocial, getPublishStatus,
+  type SocialPlatform, type SocialPublishResult,
+} from '@/lib/api/marketing/socialApi';
 import { PerformanceForm } from '@/components/admin/marketing/PerformanceForm';
 import { AuthImage } from '@/components/admin/marketing/AuthImage';
 import { PlatformPreview } from '@/components/admin/marketing/preview/PlatformPreview';
@@ -22,6 +26,10 @@ const STATUS_BADGE_COLORS: Record<string, { bg: string; fg: string }> = {
   APPROVED: { bg: '#e6f7e6', fg: '#2d7a2d' },
   EXPORTED: { bg: '#f0e6ff', fg: '#7a2d7a' },
   REJECTED: { bg: '#ffe6e6', fg: '#b33333' },
+  PUBLISHING: { bg: '#fff3cd', fg: '#856404' },
+  PARTIAL: { bg: '#ffd6a5', fg: '#7a3000' },
+  PUBLISHED: { bg: '#d1fae5', fg: '#065f46' },
+  FAILED: { bg: '#fee2e2', fg: '#991b1b' },
 };
 
 const PLATFORM_BADGE_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -51,6 +59,12 @@ export default function ContentDetailPage() {
   const [publishUrl, setPublishUrl] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishErr, setPublishErr] = useState('');
+  const [socialTargets, setSocialTargets] = useState<SocialPlatform[]>(['X', 'INSTAGRAM']);
+  const [linkMode, setLinkMode] = useState<'last_tweet' | 'first_reply'>('last_tweet');
+  const [socialPublishResults, setSocialPublishResults] = useState<SocialPublishResult[]>([]);
+  const [isAutoPublishing, setIsAutoPublishing] = useState(false);
+  const [autoPublishErr, setAutoPublishErr] = useState('');
+  const [publishPolling, setPublishPolling] = useState(false);
 
   useEffect(() => {
     loadContent();
@@ -154,6 +168,38 @@ export default function ContentDetailPage() {
       console.error(e);
     } finally {
       setIsPublishing(false);
+    }
+  }
+
+  async function handleAutoPublish() {
+    if (socialTargets.length === 0) { setAutoPublishErr('발행 대상을 선택해주세요'); return; }
+    setIsAutoPublishing(true);
+    setAutoPublishErr('');
+    try {
+      await publishSocial(contentId, socialTargets, linkMode);
+      setPublishPolling(true);
+      let attempts = 0;
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        try {
+          const status = await getPublishStatus(contentId);
+          setSocialPublishResults(status.results);
+          const allDone = status.results.every(r => r.state === 'SUCCEEDED' || r.state === 'FAILED');
+          if (allDone || attempts >= 20) {
+            clearInterval(pollInterval);
+            setPublishPolling(false);
+            await loadContent();
+          }
+        } catch (e) {
+          clearInterval(pollInterval);
+          setPublishPolling(false);
+        }
+      }, 3000);
+    } catch (e: any) {
+      if (e.response?.status === 409) setAutoPublishErr('이미 발행된 플랫폼입니다 (재발행 불가)');
+      else setAutoPublishErr(e.response?.data?.error || '발행 요청 실패');
+    } finally {
+      setIsAutoPublishing(false);
     }
   }
 
@@ -448,61 +494,106 @@ export default function ContentDetailPage() {
           )}
         </div>
 
-        {/* 발행 처리 */}
-        <div style={{ marginBottom: 24, padding: '16px', background: '#f9f9f9', borderRadius: 8 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', margin: '0 0 12px' }}>
-            발행 처리
-          </h3>
-          {content.publishedAt && (
-            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#446620' }}>
-              발행 시각: {new Date(content.publishedAt).toLocaleString('ko-KR')}
-              {content.publishedUrl && (
-                <a
-                  href={content.publishedUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ marginLeft: 8, color: '#0066cc', fontSize: 12 }}
-                >
-                  링크 확인
-                </a>
-              )}
-            </p>
-          )}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input
-              type="url"
-              placeholder="발행 URL (선택)"
-              value={publishUrl}
-              onChange={(e) => setPublishUrl(e.target.value)}
-              style={{
-                padding: '6px 10px',
-                border: '1px solid #ddd',
-                borderRadius: 6,
-                fontSize: 13,
-                minWidth: 220,
-              }}
-            />
+        {/* 소셜 자동 발행 */}
+        {(content.status === 'APPROVED' || content.status === 'PUBLISHING' || content.status === 'PARTIAL' || content.status === 'PUBLISHED' || content.status === 'FAILED') && (
+          <div style={{ marginBottom: 24, padding: '16px', background: '#f9f9f9', borderRadius: 8 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', margin: '0 0 12px' }}>소셜 자동 발행</h3>
+            {/* Target platform toggles */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              {(['X', 'INSTAGRAM'] as SocialPlatform[]).map(p => (
+                <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={socialTargets.includes(p)}
+                    disabled={socialPublishResults.some(r => r.platform === p && r.state === 'SUCCEEDED')}
+                    onChange={e => setSocialTargets(prev =>
+                      e.target.checked ? (prev.includes(p) ? prev : [...prev, p]) : prev.filter(x => x !== p)
+                    )}
+                  />
+                  {p}
+                  {socialPublishResults.some(r => r.platform === p && r.state === 'SUCCEEDED') && (
+                    <span style={{ fontSize: 11, color: '#065f46', background: '#d1fae5', borderRadius: 4, padding: '1px 5px' }}>발행완료</span>
+                  )}
+                  {socialPublishResults.some(r => r.platform === p && r.state === 'FAILED') && (
+                    <span style={{ fontSize: 11, color: '#991b1b', background: '#fee2e2', borderRadius: 4, padding: '1px 5px' }}>실패</span>
+                  )}
+                </label>
+              ))}
+            </div>
+            {/* Link mode */}
+            <div style={{ marginBottom: 12, display: 'flex', gap: 12, fontSize: 13 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <input type="radio" name="linkMode" value="last_tweet" checked={linkMode === 'last_tweet'} onChange={() => setLinkMode('last_tweet')} />
+                마지막 트윗에 링크
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <input type="radio" name="linkMode" value="first_reply" checked={linkMode === 'first_reply'} onChange={() => setLinkMode('first_reply')} />
+                첫 댓글에 링크
+              </label>
+            </div>
+            {/* Publish button */}
             <button
-              onClick={handlePublish}
-              disabled={isPublishing || content.status === 'EXPORTED'}
+              onClick={handleAutoPublish}
+              disabled={isAutoPublishing || publishPolling}
               style={{
-                padding: '7px 14px',
-                background: content.status === 'EXPORTED' ? '#e7e3d8' : '#446620',
-                color: content.status === 'EXPORTED' ? '#888' : 'white',
+                padding: '7px 16px',
+                background: (isAutoPublishing || publishPolling) ? '#ccc' : '#1A1A2E',
+                color: 'white',
                 border: 'none',
                 borderRadius: 6,
-                cursor: (isPublishing || content.status === 'EXPORTED') ? 'not-allowed' : 'pointer',
+                cursor: (isAutoPublishing || publishPolling) ? 'not-allowed' : 'pointer',
                 fontSize: 13,
-                opacity: isPublishing ? 0.6 : 1,
               }}
             >
-              {isPublishing ? '처리 중...' : content.status === 'EXPORTED' ? '발행 완료' : '발행 완료 처리'}
+              {publishPolling ? '발행 중...' : isAutoPublishing ? '요청 중...' : '발행'}
             </button>
+            {/* Per-platform results */}
+            {socialPublishResults.length > 0 && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {socialPublishResults.map(r => (
+                  <div key={r.platform} style={{ fontSize: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600, minWidth: 80 }}>{r.platform}</span>
+                    <span style={{
+                      padding: '2px 6px', borderRadius: 4,
+                      background: r.state === 'SUCCEEDED' ? '#d1fae5' : r.state === 'FAILED' ? '#fee2e2' : '#fff3cd',
+                      color: r.state === 'SUCCEEDED' ? '#065f46' : r.state === 'FAILED' ? '#991b1b' : '#856404',
+                    }}>
+                      {r.state === 'SUCCEEDED' ? '성공' : r.state === 'FAILED' ? '실패' : '진행 중'}
+                    </span>
+                    {r.publishedUrl && (
+                      <a href={r.publishedUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc', fontSize: 11 }}>게시물 보기</a>
+                    )}
+                    {r.errorReason && (
+                      <span style={{ color: '#991b1b', fontSize: 11 }}>{r.errorReason}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {autoPublishErr && <p style={{ margin: '8px 0 0', fontSize: 12, color: '#b33333' }}>{autoPublishErr}</p>}
+            {/* Legacy manual record */}
+            <details style={{ marginTop: 16 }}>
+              <summary style={{ fontSize: 12, color: '#888', cursor: 'pointer' }}>수동 기록 (레거시)</summary>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="url"
+                  placeholder="발행 URL (선택)"
+                  value={publishUrl}
+                  onChange={(e) => setPublishUrl(e.target.value)}
+                  style={{ padding: '6px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13, minWidth: 220 }}
+                />
+                <button
+                  onClick={handlePublish}
+                  disabled={isPublishing}
+                  style={{ padding: '7px 14px', background: '#446620', color: 'white', border: 'none', borderRadius: 6, cursor: isPublishing ? 'not-allowed' : 'pointer', fontSize: 13 }}
+                >
+                  {isPublishing ? '처리 중...' : '수동 발행 완료'}
+                </button>
+              </div>
+              {publishErr && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#b33333' }}>{publishErr}</p>}
+            </details>
           </div>
-          {publishErr && (
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: '#b33333' }}>{publishErr}</p>
-          )}
-        </div>
+        )}
 
         {/* 성과 입력 */}
         {(content.status === 'APPROVED' || content.status === 'EXPORTED') && (

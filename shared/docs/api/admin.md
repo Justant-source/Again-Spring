@@ -157,18 +157,67 @@ flowchart LR
 }
 ```
 
+## Social Publishing API — X·Instagram 자동 포스팅 (dev 전용)
+
+**Base path:** `/api/admin/marketing/social` — 인증: JWT + ADMIN  
+**활성 조건:** `app.features.marketing.enabled=true` (dev 전용)  
+**컨트롤러:** `SocialPublishController.java`
+
+| Method | Path | 설명 | 요청 | 응답 |
+|---|---|---|---|---|
+| `POST` | `/credentials` | 플랫폼 자격증명 저장 (이메일+비밀번호 AES-256-GCM 암호화) | `{ platform, email, password }` | `{ platform, configured: true }` |
+| `GET` | `/credentials/status` | 플랫폼별 자격증명 등록 여부 확인 | — | `[{ platform, configured }]` |
+| `POST` | `/test-login/{platform}` | 저장된 자격증명으로 실제 로그인 테스트 (Playwright headless) | — | `{ ok, error }` |
+| `POST` | `/sessions` | 브라우저 세션 시드 (Playwright storageState JSON 저장) | `{ platform, storageState }` | `{ platform, status: "SEEDED" }` |
+| `GET` | `/sessions/status` | 플랫폼별 세션 상태 및 마지막 사용 시각 | — | `[{ platform, status, lastUsedAt }]` |
+| `POST` | `/publish/{contentId}` | 승인된 콘텐츠를 선택 플랫폼에 자동 발행 | `{ targets: ["X","INSTAGRAM"], linkMode }` | `{ contentId, results: [{ platform, state }] }` |
+| `GET` | `/publish/{contentId}/status` | 콘텐츠 발행 상태 조회 | — | `{ contentId, contentStatus, results: [...] }` |
+
+```json
+// POST /credentials 요청
+{ "platform": "X", "email": "user@example.com", "password": "••••••" }
+
+// POST /test-login/X 응답 (성공)
+{ "ok": true, "error": null }
+
+// POST /test-login/INSTAGRAM 응답 (챌린지 필요)
+{ "ok": false, "error": "CHALLENGE_REQUIRED" }
+
+// POST /publish/123 요청
+{ "targets": ["X", "INSTAGRAM"], "linkMode": "last_tweet" }
+
+// GET /publish/123/status 응답
+{
+  "contentId": 123,
+  "contentStatus": "PUBLISHED",
+  "results": [
+    { "platform": "X", "state": "SUCCEEDED", "publishedUrl": "https://x.com/...", "attemptedAt": "..." },
+    { "platform": "INSTAGRAM", "state": "FAILED", "errorReason": "SESSION_EXPIRED" }
+  ]
+}
+```
+
+**세션 상태값:** `SEEDED` | `EXPIRED` | `NOT_SEEDED`  
+**발행 상태값:** `PENDING` | `SUCCEEDED` | `FAILED`  
+**플랫폼값:** `X` | `INSTAGRAM`
+
+> 자격증명은 `SOCIAL_MASTER_KEY`(AES-256-GCM)로 암호화 저장. 복호화는 BE 내부에서만 수행.  
+> 세션 시딩 방법: Windows PC 브라우저 콘솔에서 `extract-session.js` 실행 또는 서버에서 `seed-server.js` 실행.  
+> 장애 대응: `shared/docs/v15/social-poster-troubleshooting.md`
+
 ## 전체 Admin 엔드포인트 수
 
-| 컨트롤러 | 엔드포인트 수 |
-|---|---|
-| AdminDashboardController | 5 |
-| AdminUserController | 5 |
-| AdminHealthController | 1 |
-| AdminFeedbackController | 2 |
-| AdminPromptsController | 1 (app.admin.enabled) |
-| AdminTestController | 2 (dev only) |
-| SessionContextDebugController | 1 (app.admin.enabled) |
-| **합계** | **17** |
+| 컨트롤러 | 엔드포인트 수 | 활성 조건 |
+|---|---|---|
+| AdminDashboardController | 5 | 항상 |
+| AdminUserController | 5 | 항상 |
+| AdminHealthController | 1 | 항상 |
+| AdminFeedbackController | 2 | 항상 |
+| AdminPromptsController | 1 | `app.admin.enabled=true` |
+| AdminTestController | 2 | `@Profile("dev")` |
+| SessionContextDebugController | 1 | `app.admin.enabled=true` |
+| SocialPublishController | 7 | `app.features.marketing.enabled=true` (dev) |
+| **합계** | **24** | |
 
 ## 변경 시 절차
 

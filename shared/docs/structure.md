@@ -43,6 +43,22 @@ Again-Spring/
 │       ├── dto/                    # 요청/응답 DTO
 │       └── exception/              # LlmException 계층
 │
+├── social-poster/                  # 소셜 자동 포스팅 사이드카 (dev 전용, Playwright 기반)
+│   ├── Dockerfile                  # Playwright + nodemon (dev 핫리로드)
+│   ├── extract-session.js          # 브라우저 콘솔 세션 추출 스크립트 (Windows PC용)
+│   ├── src/server.js               # Express 앱, 라우터 등록, 포트 9100
+│   ├── src/seed-server.js          # 서버 headless 세션 시딩 CLI
+│   ├── src/lib/
+│   │   ├── anti-bot.js             # 봇 탐지 우회 (핑거프린트, jitter, warmup, webdriver 마스킹)
+│   │   ├── session.js              # storageState 로드/저장 (anti-bot context 적용)
+│   │   ├── x-selectors.js          # X CSS 셀렉터 (UI 변경 시 여기만 수정 → restart)
+│   │   └── ig-selectors.js         # Instagram CSS 셀렉터
+│   └── src/routes/
+│       ├── publish-x.js            # X 트윗 스레드 발행
+│       ├── publish-instagram.js    # Instagram 이미지+캡션 발행
+│       ├── session-health.js       # 세션 유효성 확인 + 쿠키 워밍업 갱신
+│       └── test-login.js           # Admin UI 로그인 테스트 엔드포인트
+│
 ├── backend/                        # Spring Boot 3.3 + Java 21 + MariaDB
 │   ├── build.gradle.kts
 │   ├── Dockerfile                  # multi-stage (Node.js/Claude CLI 미포함 — llm-worker로 이동)
@@ -106,6 +122,7 @@ Again-Spring/
 | **`backend/`** | API + 비즈니스 + DB + 프롬프트 어셈블 + 보안 — JVM 프로세스 |
 | **`llm-worker/`** | Claude CLI 실행 전용 워커 — 100풀 + 큐500, HTTP API |
 | **`frontend/`** | UI + 라우팅 + 상태 + axios — Next.js 프로세스 |
+| **`social-poster/`** | 소셜 자동 포스팅 사이드카 — Playwright 세션 재사용, X·Instagram 발행, dev 전용 |
 | **`shared/docs/`** | 양쪽이 합의한 정책/명세/아키텍처 — **유일한 공유 문서** |
 | **`shared/docs/prompts/`** | LLM 시스템·턴 프롬프트 — BE가 시작 시 로드 (런타임 자산) |
 
@@ -129,4 +146,5 @@ Again-Spring/
 | 프롬프트 변경 | `shared/docs/prompts/*.md` (런타임 자산) | `shared/docs/prompts/README.md` |
 | LLM 브릿지 코드 | `backend/.../llm/bridge/` | `shared/docs/llm/bridge-architecture.md` |
 | 정책 검증 (금지어/위험) | `frontend/lib/constants/`, `backend/.../safety/` | `shared/docs/policies/forbidden-words.md` |
+| 소셜 포스터 셀렉터/로직 수정 | `social-poster/src/lib/`, `social-poster/src/routes/` | `shared/docs/v15/social-poster-troubleshooting.md` |
 | 도커 / nginx / 배포 | `env/` | `env/docs/` |

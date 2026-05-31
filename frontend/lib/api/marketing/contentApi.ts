@@ -8,7 +8,7 @@ export interface ContentResponse {
   bodyText: string;
   hashtags?: string[];
   imagePaths?: string;
-  status: 'GENERATING' | 'DRAFT' | 'REVIEW' | 'APPROVED' | 'EXPORTED' | 'REJECTED';
+  status: 'GENERATING' | 'DRAFT' | 'REVIEW' | 'APPROVED' | 'EXPORTED' | 'REJECTED' | 'PUBLISHING' | 'PARTIAL' | 'PUBLISHED' | 'FAILED';
   safetyCheckJson?: string;
   createdAt: string;
   scheduledAt?: string;

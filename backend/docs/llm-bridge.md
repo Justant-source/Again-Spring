@@ -1,16 +1,24 @@
 # LLM 브릿지 — BE 구현 가이드
 
-다시봄은 LLM 호출을 전용 `againspring-llm` 워커 컨테이너로 분리. backend는 프롬프트를 어셈블해 HTTP로 전송, 워커가 Claude CLI를 spawn.
+다시봄은 **task별 LLM 제공자 분리**:
+- **대화(chat)**: prod 환경에서 Anthropic API (`ClaudeApiProvider` — 프롬프트 캐싱 3-breakpoint 활용, Haiku 4.5)
+- **리포트(report)**: 모든 환경에서 CLI 워커 (`RemoteLlmProvider` — `againspring-llm` 컨테이너, Sonnet 4.6)
+
+dev 환경에서는 양쪽 모두 CLI 워커 사용. backend는 프롬프트를 어셈블해 HTTP로 전송하거나 REST API로 호출.
 
 ## 소스 코드 위치
 
-### backend (프롬프트 어셈블 + HTTP 클라이언트)
-- `backend/.../llm/remote/RemoteLlmProvider.java` — LLMProvider 구현 (`llm.provider=remote`, 기본값)
+### backend (프롬프트 어셈블 + 제공자 라우팅)
+- `backend/.../llm/provider/LlmProviderConfig.java` — @Qualifier("chatLlmProvider") / @Qualifier("reportLlmProvider") 라우팅
+- `backend/.../llm/claudeapi/ClaudeApiProvider.java` — Anthropic REST API 직접 호출 (prod 대화 전용)
+- `backend/.../llm/claudeapi/ClaudeApiService.java` — /v1/messages 엔드포인트
+- `backend/.../llm/prompt/StructuredPrompt.java` — 4계층 캐시 제어 (GLOBAL_STATIC / SESSION_STATIC / HISTORY / DYNAMIC)
+- `backend/.../llm/remote/RemoteLlmProvider.java` — CLI 워커 HTTP 클라이언트 (모든 리포트 + dev 대화)
 - `backend/.../llm/remote/RemoteCancelableInvocation.java` — 원격 취소 프록시 (long-poll 포함)
 - `backend/.../llm/bridge/PromptSanitizer.java` — 사용자 입력 검증 (backend 유지)
 - `backend/.../llm/bridge/ClaudeCodeBridge.java` — in-process fallback (`llm.provider=claude-code`)
 - `backend/.../llm/bridge/ClaudeCodeWorkerPool.java` — Semaphore 풀 (fallback용)
-- `backend/.../llm/monitoring/LLMCallLogger.java` — 호출 감사 로깅
+- `backend/.../llm/monitoring/LLMCallLogger.java` — 호출 감사 로깅 (DB 저장, cache tokens 포함)
 - `backend/.../llm/fallback/FallbackResponses.java` — 실패 시 안전 응답
 
 ### llm-worker (Claude CLI 실행 전용 — `againspring-llm-dev/prod` 컨테이너)
@@ -78,11 +86,41 @@ public interface LLMProvider {
 }
 ```
 
-### `RemoteLlmProvider` (기본값 — `llm.provider=remote`)
+### `ClaudeApiProvider` (prod 대화 전용 — `llm.chat.provider=claude-api`)
 
 ```java
 @Component
-@ConditionalOnProperty(name = "llm.provider", havingValue = "remote")
+@ConditionalOnProperty(name = "llm.chat.provider", havingValue = "claude-api")
+public class ClaudeApiProvider implements LLMProvider { ... }
+```
+
+- Anthropic SDK 대신 **RestClient 직접 호출** → `/v1/messages`
+- **SSE 스트리밍 지원**: `buildStreamingRequest()` → `stream=true` → `doStream()`이 SSE 이벤트 파싱
+  - `content_block_delta` → 텍스트 누적 + `notifyPartial()` (500ms throttle DB draft 저장)
+  - `message_start` / `message_delta` → 캐시·토큰 통계 수집
+  - 취소 확인: `invocation.isCanceled()` 매 SSE 라인마다 체크
+  - FE 폴링이 첫 토큰부터 순차 표시 가능 (체감 응답속도 개선)
+  - RestClient 타임아웃: connect 10s, read 120s
+- **프롬프트 캐싱**: `StructuredPrompt`를 `cache_control` 3-breakpoint로 변환
+
+  | 계층 | 내용 | TTL |
+  |---|---|---|
+  | `GLOBAL_STATIC` (bp1) | system.md + gottman + nvc + chat_mode | **1시간** (배포 단위 변경) |
+  | `SESSION_STATIC` (bp2) | 사용자 프로필, 카테고리 | 5분 |
+  | `HISTORY` (bp3) | 누적 메시지 | 5분 |
+  | `DYNAMIC` | 현재 턴 | 캐시 제어 없음 |
+
+  GLOBAL_STATIC에 `CacheControl.cachedLong()` (ttl="1h") 적용, 나머지는 `CacheControl.cached()` (5분 기본).
+- **max_tokens**: 256 (한국어 1~3문장 기준, 출력 토큰 절감)
+- **동시성**: Semaphore(`llm.claude-api.max-concurrent`, 기본값 10)로 제한
+- **재시도**: 지수 백오프 (처음 3s, 최대 60s, 429 포함)
+- 응답 토큰 (`cache_read_tokens`, `cache_creation_tokens`, `cache_create_1h`, `input_tokens`, `output_tokens`) → `LLMCallLogger`로 DB 저장
+
+### `RemoteLlmProvider` (CLI 워커 — 모든 리포트 + dev 대화)
+
+```java
+@Component
+@ConditionalOnProperty(name = "llm.report.provider", havingValue = "remote")
 public class RemoteLlmProvider implements LLMProvider { ... }
 ```
 
@@ -189,16 +227,53 @@ app:
     path: ${PROMPTS_PATH:./shared/docs/prompts}
 
 llm:
-  provider: ${LLM_PROVIDER:remote}           # 'remote' (기본) | 'claude-code' (긴급 롤백) | 'mock' (테스트)
+  # Task별 제공자 라우팅 (application-dev.yml / application-prod.yml에서 설정)
+  chat:
+    provider: ${LLM_CHAT_PROVIDER:remote}    # 'remote' (dev) | 'claude-api' (prod)
+  report:
+    provider: ${LLM_REPORT_PROVIDER:remote}  # 'remote' (모든 환경)
+  
+  # Claude API (prod 대화 전용)
+  claude-api:
+    api-key: ${ANTHROPIC_API_KEY:}
+    base-url: https://api.anthropic.com
+    model: ${CLAUDE_API_CHAT_MODEL:claude-haiku-4-5-20251001}
+    timeout-ms: 30000
+    max-concurrent: 10
+    cache:
+      ttl: 3600  # 1시간
+  
+  # CLI 워커 (모든 리포트 + dev 대화)
   remote:
     base-url: ${LLM_WORKER_URL:http://againspring-llm-dev:8090}
     connect-timeout-ms: 5000
     read-timeout-ms: 130000                  # 워커 exec timeout(120s) 초과
     default-timeout-ms: 120000
     poll-wait-ms: 25000                      # long-poll 단위
+  
   claude-code:                               # 긴급 롤백 전용 (미선택 시 빈으로 등록 안됨)
     binary-path: ${CLAUDE_BIN:claude}
     model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
+```
+
+### environment별 설정
+
+**application-dev.yml**:
+```yaml
+llm:
+  chat:
+    provider: remote      # dev는 모두 CLI 워커
+  report:
+    provider: remote
+```
+
+**application-prod.yml**:
+```yaml
+llm:
+  chat:
+    provider: claude-api  # prod 대화는 API (캐싱)
+  report:
+    provider: remote      # 모든 리포트는 CLI 워커
 ```
 
 ### llm-worker `application.yml`
@@ -219,13 +294,14 @@ llm:
 
 ---
 
-## 인증 (호스트 ~/.claude 마운트)
+## 인증
 
-API 키 미사용. `~/.claude` 볼륨은 **backend가 아닌 llm-worker 컨테이너**에 마운트:
+### CLI 워커 (RemoteLlmProvider)
+`~/.claude` 볼륨을 **llm-worker 컨테이너**에 마운트 (API 키 미사용):
 
 ```yaml
-# docker-compose.dev.yml
-againspring-llm-dev:
+# docker-compose.dev.yml / docker-compose.prod.yml
+againspring-llm-dev/prod:
   volumes:
     - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
 ```
@@ -239,23 +315,38 @@ againspring-llm-dev:
 - 호스트에서 `claude` 재로그인
 - `docker compose restart againspring-llm-dev` (또는 prod)
 
+### Anthropic API (ClaudeApiProvider)
+prod 환경에서만 사용. `ANTHROPIC_API_KEY` 환경변수로 설정:
+
+```yaml
+# env/.env.prod
+ANTHROPIC_API_KEY=sk-ant-...
+CLAUDE_API_CHAT_MODEL=claude-haiku-4-5-20251001
+```
+
+backend 컨테이너가 직접 API 호출.
+
 ---
 
 ## 모니터링
 
-`LLMCallLogger.logCall`이 `llm_call_logs` 테이블에 다음 기록:
+`LLMCallLogger.logCall`이 `llm_call_logs` 테이블에 다음 기록 (V42 마이그레이션):
 
 | 필드 | 설명 |
 |---|---|
 | `correlation_id` | 호출 추적 (요청 헤더 X-Request-ID와 연동) |
-| `provider` | `remote` |
+| `provider` | `remote` 또는 `claude-api` |
 | `session_id`, `turn_number` | 세션 컨텍스트 |
-| `tokens_used` | Bridge가 추정 (`length / 4`) |
+| `model` | 모델명 (haiku-4-5, sonnet-4-6 등) |
+| `input_tokens` | 입력 토큰 (API) 또는 추정값 (CLI) |
+| `output_tokens` | 출력 토큰 |
+| `cache_read_tokens` | 캐시에서 읽은 토큰 (API만) |
+| `cache_creation_tokens` | 캐시 쓰기에 소비한 토큰 (API만) |
 | `latency_ms` | invoke 시작 → 응답까지 경과 시간 |
 | `outcome` | `success` / `fallback` / `timeout` / `error` |
 | `error_code` | `LLMTimeoutException` / `LLMCapacityException` / 기타 |
 
-**참고**: 프롬프트/응답 본문은 저장하지 않음 — 분량과 결과만 기록.
+**참고**: 프롬프트/응답 본문은 저장하지 않음 — 토큰·성능·비용만 기록.
 
 ---
 
@@ -291,20 +382,30 @@ againspring-llm-dev:
 
 ---
 
-## 향후 API 전환 계획
+## StructuredPrompt (프롬프트 캐싱 전용)
 
-API 키 기반 전환 시:
+캐시 계층을 명시적으로 추적해 API 비용과 응답 속도 최적화:
 
 ```java
-@Component
-@ConditionalOnProperty(name = "llm.provider", havingValue = "claude-api")
-public class ClaudeAPIProvider implements LLMProvider {
-  @Value("${llm.claude-api.key}") private String apiKey;
-  // Anthropic SDK 사용
+public class StructuredPrompt {
+  private List<PromptSegment> segments;  // 계층별 분리
+  
+  public List<ChatMessage> flatten() {
+    // 4계층을 순차 병합 → API 호출용 flat 구조로 변환
+  }
+}
+
+enum CacheTier {
+  GLOBAL_STATIC,      // system.md (한번 만들어지면 영구)
+  SESSION_STATIC,     // 사용자 프로필, 카테고리 (세션당 1회)
+  HISTORY,            // 누적 메시지 (매 턴 증가, cache hit 가능)
+  DYNAMIC             // 현재 턴 (캐시 제어 없음)
 }
 ```
 
-환경변수 변경만으로 전환 — 비즈니스 로직 코드 무수정.
+- **flatten()**: 재귀 금지, CLI/API 양쪽 호환
+- **API 호출 시**: 각 계층에 `"cache_control": {"type": "ephemeral"}` 마킹
+- **CLI 호출 시**: 캐시 제어 마킹 무시 (CLI는 자체 세션 관리)
 
 ---
 
@@ -373,4 +474,42 @@ V1.5 카톡식 응답은 본문 + 메타 블록의 두 파트로 구성:
 
 ---
 
-**마지막 업데이트**: 2026-05-17
+---
+
+## ReportContextAssembler (리포트 생성 전용)
+
+리포트 턴에서 누적된 세션 정보를 `<session_context>` 블록으로 조립:
+
+```java
+public class ReportContextAssembler {
+  public String assembleContext(Session session, List<Turn> turns) {
+    return """
+      <session_context>
+      <cumulative_issue_context>
+        ... issue_context JSON
+      </cumulative_issue_context>
+      <cumulative_horsemen>
+        ... horsemen_history
+      </cumulative_horsemen>
+      <cumulative_nvc>
+        ... nvc_completion_history
+      </cumulative_nvc>
+      <cumulative_user_states>
+        ... user_state_history
+      </cumulative_user_states>
+      <question_queue>
+        ... question_queue_a / question_queue_b
+      </question_queue>
+      </session_context>
+      """;
+  }
+}
+```
+
+- `conversation_history` 앞에 주입
+- **모델**: ReportGenerationService에서 `reportLlmProvider` (항상 RemoteLlmProvider, Sonnet 4.6)
+- **캐싱**: 리포트 생성은 API 캐싱 미적용 (일회성, 컨텍스트 재사용 안함)
+
+---
+
+**마지막 업데이트**: 2026-05-31

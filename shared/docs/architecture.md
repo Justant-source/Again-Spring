@@ -9,25 +9,34 @@ flowchart TB
         API[REST Controller<br/>/api/sessions/{id}/messages]
         Auth[Security / JWT]
         ChatService[ChatService<br/>Solo/Duo 모드]
-        LLM[RemoteLlmProvider<br/>HTTP client]
+        LLMRouter["LlmProviderConfig<br/>Task 라우팅"]
+        ChatLLM["ChatLLM Provider<br/>(dev: Remote CLI<br/>prod: ClaudeApiProvider)"]
+        ReportLLM["ReportLLM Provider<br/>(all: Remote CLI)"]
         Safety[PromptSanitizer<br/>KeywordGuard<br/>CrisisDetector]
         Retention[RetentionScheduler<br/>30d cron]
     end
-    subgraph LLMWorker["llm-worker<br/>Spring Boot"]
+    subgraph LLMWorker["llm-worker<br/>Spring Boot<br/>(dev+prod)"]
         Pool[LlmWorkerPool<br/>ThreadPoolExecutor 100<br/>+ queue 500]
     end
-    DB[(MariaDB 11<br/>V7: messages 테이블)]
-    Claude[Claude CLI<br/>Haiku 4.5]
-    Prompts["shared/docs/prompts/<br/>system + gottman + nvc + relations<br/>+ chat/(solo|duo)_chat.md"]
+    subgraph AnthropicAPI["Anthropic API<br/>(prod only)"]
+        APIClient["/v1/messages<br/>Haiku 4.5<br/>cache_control 3-tier"]
+    end
+    DB[(MariaDB 11<br/>+ llm_call_logs)]
+    Claude[Claude CLI<br/>Haiku/Sonnet]
+    Prompts["shared/docs/prompts/<br/>system + gottman + nvc + relations<br/>+ StructuredPrompt (캐시 4계층)"]
 
     Browser -->|HTTPS + JWT| API
     API --> Auth
     Auth --> ChatService
     ChatService --> Safety
-    Safety --> LLM
-    LLM -->|POST /v1/invocations| Pool
+    Safety --> LLMRouter
+    LLMRouter --> ChatLLM
+    LLMRouter --> ReportLLM
+    ChatLLM -->|dev: POST /v1/invocations| Pool
+    ChatLLM -->|prod: REST| APIClient
+    ReportLLM -->|POST /v1/invoke| Pool
     Pool -->|--strict-mcp-config --no-session-persistence| Claude
-    LLM -.loads.-> Prompts
+    LLMRouter -.loads.-> Prompts
     ChatService --> DB
     Retention -.purge expired.-> DB
 ```
@@ -73,7 +82,7 @@ flowchart TB
 
 ## 흐름별 설명
 
-### 1) HTTP 요청 흐름
+### 1) HTTP 요청 흐름 (dev 기준, prod는 ClaudeApiProvider 사용)
 
 1. 브라우저 → `https://dev.againspring.net/api/sessions/{id}/messages`
 2. Cloudflare Tunnel → 호스트 `localhost:8090`
@@ -81,8 +90,12 @@ flowchart TB
    - `/api/` 매치 → `http://againspring-backend-dev:8080`
    - 타임아웃 60s, `X-Forwarded-*` 헤더 주입
 4. `MessageController.sendMessage(...)` 진입
-5. `ChatService` → `ClaudeCodeBridge.invoke(...)` → `claude --print --model claude-haiku-4-5-20251001 "..."`
-6. 응답 직렬화 후 nginx 통해 브라우저 반환
+5. `ChatService` → `LlmProviderConfig`가 task별 제공자 선택
+   - dev: `@Qualifier("chatLlmProvider")` = `RemoteLlmProvider`
+   - prod: `@Qualifier("chatLlmProvider")` = `ClaudeApiProvider`
+6. **dev**: RemoteLlmProvider → `POST http://againspring-llm-dev:8090/v1/invocations` → 워커가 CLI spawn
+   **prod**: ClaudeApiProvider → POST `https://api.anthropic.com/v1/messages` (캐시 3-breakpoint)
+7. 응답 직렬화 + `LLMCallLogger`로 DB 저장 후 nginx 통해 브라우저 반환
 
 ### 2) 인증 흐름
 
@@ -184,10 +197,13 @@ sequenceDiagram
 | Cloudflare Tunnel | 외부 도메인 → 호스트 포트 | nginx 8090/8091 |
 | nginx | 경로 분기 + 헤더 주입 | backend, frontend |
 | Next.js (FE) | UI · 라우팅 · 상태 · MSW (개발) | axios → BE |
-| Spring Boot (BE) | API · 도메인 · 보안 · 프롬프트 어셈블 · HTTP → llm-worker | MariaDB, llm-worker |
+| Spring Boot (BE) | API · 도메인 · 보안 · 프롬프트 어셈블 · Task별 제공자 라우팅 | MariaDB, llm-worker, Anthropic API |
+| ClaudeApiProvider (BE) | Anthropic REST API 호출 (prod 대화) | /v1/messages (캐시 3-tier) |
+| RemoteLlmProvider (BE) | CLI 워커 HTTP 호출 (모든 리포트 + dev 대화) | llm-worker |
 | llm-worker | LLM CLI 실행 전용 (100풀 + 큐500) | claude CLI |
-| MariaDB | 영속 저장소 (12 테이블) | BE만 |
-| claude CLI | LLM 응답 생성 | llm-worker의 ProcessBuilder |
+| MariaDB | 영속 저장소 (13 테이블 + llm_call_logs) | BE만 |
+| Anthropic API | 대화 LLM (prod, Haiku 4.5, 캐싱) | ClaudeApiProvider |
+| claude CLI | 대화/리포트 LLM (dev + 모든 리포트, Sonnet 4.6) | llm-worker의 ProcessBuilder |
 
 ## 비기능 요구사항 위치
 
@@ -203,4 +219,4 @@ sequenceDiagram
 
 ---
 
-**마지막 업데이트**: 2026-05-17
+**마지막 업데이트**: 2026-05-30

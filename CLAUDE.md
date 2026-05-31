@@ -2,8 +2,8 @@
 
 **프로젝트**: 다시봄 · Again Spring
 **도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)
-**진행 상황**: V13 완료, V15 마케팅 자동화 대시보드 구현 중 (dev 전용) — V15.1~V15.9 진행. 자세한 내용: `shared/docs/v15/marketing-automation.md`
-**기준일**: 2026-05-25
+**진행 상황**: V13 완료, V15 마케팅 자동화 대시보드 구현 중 (dev 전용) — V15.1~V15.9 + 소셜 포스터 봇 우회 완료. 자세한 내용: `shared/docs/v15/marketing-automation.md`
+**기준일**: 2026-05-31
 
 ---
 
@@ -67,7 +67,7 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 - `shared/docs/api/report.md` — 리포트 API (ReportController 3)
 - `shared/docs/api/user.md` — 사용자 API (UserController 7)
 - `shared/docs/api/feedback.md` — 피드백 API (FeedbackController 1)
-- `shared/docs/api/admin.md` — 관리자 API (admin 7종 컨트롤러·17개 엔드포인트)
+- `shared/docs/api/admin.md` — 관리자 API (admin 8종 컨트롤러·24개 엔드포인트, SocialPublishController 포함)
 - `shared/docs/api/database-schema.md` — MariaDB 테이블 설명 (Flyway V1~V24)
 - `shared/docs/categories.yml` — 카테고리 catalog (FE/BE 공유 권위본). 변경 시 `frontend/lib/constants/categories.ts` 동기화 필요
 
@@ -345,6 +345,7 @@ cd frontend && npm run test
 | Frontend | `againspring-frontend-dev` | `againspring-frontend-prod` |
 | Nginx | `againspring-nginx-dev` | `againspring-nginx-prod` |
 | **Marketing Renderer** | **`againspring-marketing-renderer-dev`** | **없음 (dev 전용)** |
+| **Social Poster** | **`againspring-social-poster-dev`** | **없음 (dev 전용)** |
 
 ### 🚀 배포 명령
 
@@ -455,6 +456,7 @@ APP_URL=https://dev.againspring.net
   - ✅ **LLM 브릿지 (Claude Haiku 4.5 + 호스트 ~/.claude 마운트, API 키 불필요)**
   - ✅ **LLM 호출 취소 메커니즘 (Phase 1 V1.5)**: POST /messages <500ms 응답 + 새 메시지 도착 시 진행 중 Claude 프로세스 강제 종료 + 누적 메시지 재호출. `CancelableChatService`, `CancelableInvocation`.
   - ✅ **LLM 워커 분리 (2026-05-17)**: 전용 `againspring-llm-dev/prod` 컨테이너 (`llm-worker/` Spring Boot). `ThreadPoolExecutor(100) + LinkedBlockingQueue(500)` — Semaphore(3) fail-fast 폐기. `RemoteLlmProvider` + `RemoteCancelableInvocation` (long-poll). `--strict-mcp-config --no-session-persistence` CLI 플래그.
+  - ✅ **prod LLM 분리 + 프롬프트 캐싱 (2026-05-30)**: `LlmProviderConfig` + per-task 라우팅 (chat=`ClaudeApiProvider` / report=`RemoteLlmProvider`). `ClaudeApiProvider`: RestClient로 Anthropic API 직접 호출, `cache_control` 3-breakpoint (GLOBAL_STATIC / SESSION_STATIC / HISTORY), Semaphore 동시성, 지수 백오프. `StructuredPrompt`: 4계층 캐시 + flatten(). `ReportContextAssembler` + `llm_call_logs` DB 저장 (cacheReadTokens, cacheCreationTokens).
   - ✅ **중재 컨텍스트 강화 (Phase A/B/C)**: 사용자 프로필 주입(`UserProfileFragment`) + 턴 간 심리 점수 피드백(`PsychologyFeedbackFormatter`, `ChatTurnMetaParser`) + Duo 균형 추적(`DuoBalanceFormatter`)
   - ✅ **중재 컨텍스트 강화 Phase D**: UserState 7종 + IssueContext 4슬롯 + QuestionQueue (A·B 분리 PQ) + B 진입 시 환영+PQ top1 통합 메시지 + IsolationLintFilter 격리 3중 방어. 권위본: `shared/docs/policies/context-algorithm.md`
   - ✅ **컨텍스트 주입 누락 수정 (2026-04-27)**: 카테고리(대/중/소분류 + 직접 입력) + MBTI + 누락 관계 가이드(marriage, korean_specific) 주입. `CategoryContextFragment`, `categories.yml`, Flyway V11, `UserProfileFragment` MBTI 보강. 권위본: `shared/docs/policies/categories.md`, `shared/docs/policies/onboarding.md`.
@@ -467,7 +469,7 @@ APP_URL=https://dev.againspring.net
   - ✅ **V10 베타 기능 (2026-05-08~09)**: 피드백 수집(`FeedbackService`, `FeedbackController`) + 관리자 대시보드(AdminFeedbackController, PMF 통계) + 일일 세션 제한(DailyStats, GuestSessionRateLimiter) + 게스트 1세션 제한 + 동의 재확인(ConsentReconfirmModal) + 베타 배너 + Flyway V16~V19
   - ✅ **V10.2 Gmail 발신자 통합 (2026-05-09)**: 단일 발신자 `againspring2026@gmail.com`, `GMAIL_APP_PASSWORD` 환경변수, MimeMessageHelper 표시명("다시봄 운영팀"), 법률 MD 연결(`shared/docs/policies/terms.md`·`privacy.md` → `frontend/public/legal/`)
   - ✅ **V13 베타 출시 전 보강 (2026-05-16)**:
-  - ⏳ **V15 마케팅 자동화 (2026-05-25, dev 전용)**: V15.1~V15.9 구현 완료. 사연관리·시뮬레이션엔진·콘텐츠3채널생성·승인워크플로우·비용모니터링·플랫폼추상화·채팅UI스크린샷. Flyway V28~V39, `marketing-renderer` 사이드카(dev 전용). prod 배포 게이트: Q1/Q2/Q3 답변 + 명시적 지시 필요. 권위본: `shared/docs/v15/`
+  - ⏳ **V15 마케팅 자동화 (2026-05-31, dev 전용)**: V15.1~V15.9 + 소셜 포스터 봇 우회 구현 완료. 사연관리·시뮬레이션엔진·콘텐츠3채널생성·승인워크플로우·비용모니터링·플랫폼추상화·채팅UI스크린샷. Flyway V28~V39, `marketing-renderer` 사이드카(dev 전용). prod 배포 게이트: Q1/Q2/Q3 답변 + 명시적 지시 필요. 권위본: `shared/docs/v15/`
     - **V15.8**: 채팅 UI 스크린샷 생성 — `marketing-renderer`에 `/render-chat` 추가. 실제 다시봄 채팅 디자인(배경 #FBF3EC, 사용자A #F4A896)으로 렌더링. `ContentGenerationExecutor` + `ImageRenderClient` + `MarketingImageController` 연동.
     - **V15.9 (PR1)**: 플랫폼 추상화 — `ContentGenerator` 인터페이스 + `ContentGeneratorRegistry` + `PlatformDescriptorLoader`. `platform-descriptors.yml`로 YAML 구동 메타데이터. Threads/Facebook enum 자리 마련(enabled=false). Flyway V37(contents 7컬럼 확장·enum 확장)/V38(hashtag_library)/V39(content_templates) 적용 완료.
     - 카테고리 힌트화: `system.md` + `relations/*.md` 7개 톤 완화, 세션 생성 시 mediator 첫마디 자동 저장 (`FirstMessageService`, `FirstMessageTemplateLoader`, 248개 템플릿 JSON)
@@ -476,6 +478,12 @@ APP_URL=https://dev.againspring.net
     - 5턴 정리 게이트: `MIN_MESSAGES_TO_FINALIZE` 3→5, 진행 인디케이터 dot + 툴팁
     - SVG 아이콘 5개 (`DasibomLogo`, `Conversation`, `SafeHaven`, `Phone`, `CrisisResources`) + 장식 emoji 7곳 제거
     - AI emoji 영구 금지 정책 적용 (V13 이후 모든 UI)
+    - **소셜 자격증명 개편 (2026-05-31)**: TOTP 제거, username → email 전환. DB: `social_credentials.email_enc` (V46 마이그레이션). Admin UI 설정 페이지에서 이메일+비밀번호만 입력.
+    - **소셜 포스터 봇 차단 우회 (2026-05-31)**: `anti-bot.js` — Windows 11 Chrome 120 핑거프린트, `navigator.webdriver` 마스킹, ±35% jitter, 포스팅 전 피드 워밍업. `session.js` + 모든 라우트에 자동 적용.
+    - **세션 자동 갱신 (2026-05-31)**: `SessionHealthCheckJob` 매일 03:00 피드 방문 → 갱신된 `updatedStorageState` DB 저장. `session-health.js` warmup 스크롤 추가.
+    - **Playwright 핫리로드 (2026-05-31)**: `social-poster-dev` 서비스에 `src/` volume mount + nodemon. 셀렉터·발행 코드 수정 → `docker compose restart`만으로 즉시 반영.
+    - **세션 시딩 개선 (2026-05-31)**: `extract-session.js` (Windows PC 브라우저 콘솔 실행), `seed-server.js` (서버 headless CLI, 이메일/비밀번호 프롬프트 + 2FA 코드 입력).
+    - **소셜 포스터 장애 대응 runbook (2026-05-31)**: `shared/docs/v15/social-poster-troubleshooting.md` 신규 작성. 셀렉터 깨짐·로그인 플로우 변경·세션 만료·봇 탐지 대응 절차.
 - ✅ Docker 멀티 컨테이너 배포 (MariaDB / **LLM Worker** / Backend / Frontend / Nginx)
 - ✅ Cloudflare Tunnel — `dev.againspring.net`, `againspring.net`
 - ✅ 문서 4-디렉토리 재구성 (shared/docs, backend/docs, frontend/docs, env/docs)
@@ -535,7 +543,7 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-05-25
+**마지막 업데이트**: 2026-05-31
 **담당**: Claude Code (Agent)
 
 > UX 정책 관련 문의: `frontend/docs/ux/principles.md` (4원칙군 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트) 순으로 참조.

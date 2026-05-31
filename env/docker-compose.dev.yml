@@ -83,6 +83,35 @@ services:
       retries: 5
       start_period: 90s
 
+  social-poster-dev:
+    build:
+      context: ../social-poster
+      dockerfile: Dockerfile
+    image: againspring-social-poster-dev
+    container_name: againspring-social-poster-dev
+    environment:
+      PORT: 9100
+    # 핫리로드: src/ 디렉토리를 호스트에서 마운트 — JS 파일 수정 후 restart만으로 반영
+    # 재빌드 불필요 (셀렉터 깨짐, 로그인 플로우 변경 등 긴급 대응 시 사용)
+    volumes:
+      - ../social-poster/src:/app/src
+    command: ["nodemon", "--watch", "src", "src/server.js"]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1500m
+        reservations:
+          memory: 512m
+    networks:
+      - againspring-dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9100/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
   backend-dev:
     build:
       context: ../backend
@@ -114,6 +143,11 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-againspring2026@gmail.com}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
+      SOCIAL_MASTER_KEY: ${SOCIAL_MASTER_KEY:-}
+      SOCIAL_POSTER_URL: ${SOCIAL_POSTER_URL:-http://againspring-social-poster-dev:9100}
+      SOCIAL_PUBLISHING_ENABLED: ${SOCIAL_PUBLISHING_ENABLED:-true}
+      SOCIAL_WEBHOOK_URL: ${SOCIAL_WEBHOOK_URL:-}
+      SOCIAL_EMAIL: ${SOCIAL_EMAIL:-}
     volumes:
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro
       - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro

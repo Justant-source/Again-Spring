@@ -25,7 +25,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * V15.1 — is_test_run=true 세션이 통계 쿼리에서 완전히 제외됨을 검증.
  * 10개 testRun 세션 + 10개 일반 세션 생성 후, 통계 쿼리는 일반 10개만 반환해야 한다.
  */
-@TestPropertySource(properties = "app.features.marketing.enabled=true")
+@TestPropertySource(properties = {
+    "app.features.marketing.enabled=true",
+    "app.social.master-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+})
 class SessionTestRunIsolationTest extends MariaDbIntegrationSupport {
 
     @Autowired

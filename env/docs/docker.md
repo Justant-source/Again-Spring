@@ -35,11 +35,17 @@ MariaDB 단독. 로컬 머신에서 `./gradlew bootRun` + `npm run dev`로 BE/FE
 | `llm-dev` | `againspring-llm-dev` | build `../llm-worker` | internal (8090) | — |
 | `backend-dev` | `againspring-backend-dev` | build `../backend` | internal | `mariadb-dev` (healthy), `llm-dev` (healthy) |
 | `frontend-dev` | `againspring-frontend-dev` | build `../frontend` | internal | `backend-dev` |
+| `marketing-renderer-dev` | `againspring-marketing-renderer-dev` | build `../marketing-renderer` | internal (9000) | `backend-dev` |
+| `social-poster-dev` | `againspring-social-poster-dev` | build `../social-poster` | internal (9100) | `backend-dev` |
 | `nginx-dev` | `againspring-nginx-dev` | `nginx:alpine` | `8090:80` | `frontend-dev`, `backend-dev` |
 
 llm-dev bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude` (Claude CLI 세션 공유 — backend가 아닌 llm-worker에 마운트)
 
 `SPRING_PROFILES_ACTIVE=dev` 활성화 → Flyway disabled, ddl-auto=update, Swagger UI on.
+
+**dev 전용 추가 서비스:**
+- `marketing-renderer-dev` (포트 9000 내부): Node.js + Playwright + Sharp. 마케팅 콘텐츠용 PNG 렌더링. `/render`, `/render-chat`, `/render-quote`, `/render-card-news` 엔드포인트.
+- `social-poster-dev` (포트 9100 내부): Node.js + Playwright. X·Instagram 자동 포스팅. `src/` 디렉토리가 호스트에서 bind mount되어 nodemon으로 핫리로드. 셀렉터 파일 수정 → `docker compose restart`만으로 반영.
 
 ### 3. prod (`docker-compose.prod.yml`)
 

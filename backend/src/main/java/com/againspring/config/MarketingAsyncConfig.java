@@ -4,6 +4,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
@@ -14,6 +15,7 @@ import java.util.concurrent.Executor;
  */
 @Configuration
 @EnableAsync
+@EnableScheduling
 @ConditionalOnProperty(name = "app.features.marketing.enabled", havingValue = "true")
 public class MarketingAsyncConfig {
 
@@ -24,6 +26,17 @@ public class MarketingAsyncConfig {
         executor.setMaxPoolSize(1);
         executor.setQueueCapacity(10);
         executor.setThreadNamePrefix("marketing-sim-");
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean("socialExecutor")
+    public Executor socialExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(20);
+        executor.setThreadNamePrefix("social-publish-");
         executor.initialize();
         return executor;
     }
