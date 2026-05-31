@@ -32,6 +32,9 @@ public class SimulationTurnPlanner {
     }
 
     private boolean containsWrapUpSignal(String content) {
-        return content.contains("정리") || content.contains("마무리") || content.contains("마치");
+        return content.contains("정리하기 버튼") ||
+               content.contains("오늘 대화를 마무리") ||
+               content.contains("대화를 마치") ||
+               content.contains("정리해보면 어떨까요");
     }
 }
