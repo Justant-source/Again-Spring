@@ -21,6 +21,8 @@ interface ReportLayoutProps {
   styleB?: CommunicationStyle;
   variant: 'card' | 'story';
   onInvite?: () => void;
+  sessionId?: string;
+  onConvertToCommunity?: (draft: any) => void;
 }
 
 export function ReportLayout({
@@ -32,6 +34,8 @@ export function ReportLayout({
   styleB,
   variant,
   onInvite,
+  sessionId,
+  onConvertToCommunity,
 }: ReportLayoutProps) {
   const myName = myRole === 'A' ? nameA : nameB;
   const partnerName = myRole === 'A' ? nameB : nameA;
@@ -211,6 +215,31 @@ export function ReportLayout({
         <div className="p-card">
           <RepairSuggestions suggestions={report.repairSuggestions} />
         </div>
+      )}
+
+      {/* Phase 5: Convert to Community Button */}
+      {sessionId && onConvertToCommunity && (
+        <button
+          data-testid="convert-to-community-btn"
+          onClick={() => onConvertToCommunity(sessionId)}
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            marginTop: 8,
+            background: 'var(--P-point, #D4A5A5)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'opacity 0.2s',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.9'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+        >
+          이 대화를 사연으로 정리하기
+        </button>
       )}
     </div>
   );
