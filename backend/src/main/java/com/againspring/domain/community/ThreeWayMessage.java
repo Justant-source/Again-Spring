@@ -29,7 +29,7 @@ public class ThreeWayMessage {
     private String twsId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "author_role", nullable = false, length = 20)
     private ThreeWayRole authorRole;
 
     @Column(columnDefinition = "TEXT")
@@ -39,7 +39,7 @@ public class ThreeWayMessage {
     @Builder.Default
     private String status = "complete";
 
-    @Column(length = 80)
+    @Column(name = "llm_model", length = 80)
     private String llmModel;
 
     @CreatedDate

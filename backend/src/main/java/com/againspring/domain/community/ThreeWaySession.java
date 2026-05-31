@@ -27,10 +27,10 @@ public class ThreeWaySession {
     @Column(length = 32)
     private String id;
 
-    @Column(nullable = false, length = 32)
+    @Column(name = "party_a_user_id", nullable = false, length = 32)
     private String partyAUserId;
 
-    @Column(length = 32)
+    @Column(name = "party_b_user_id", length = 32)
     private String partyBUserId;
 
     @Enumerated(EnumType.STRING)
