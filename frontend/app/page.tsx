@@ -172,8 +172,7 @@ export default function LandingPage() {
                 마음을<br />정리해요.
               </h1>
               <p className="mt-5 text-[14px] leading-[1.7]" style={{ color: 'var(--L-sub)' }}>
-                혼자 마음을 정리하는 도구예요.<br />
-                5분이면 충분합니다.
+                마음을 정리하기까지 5분이면 충분합니다.
               </p>
 
               <div className="mt-9 letter-card" style={{ padding: 20 }}>
@@ -181,9 +180,8 @@ export default function LandingPage() {
                   다시봄은 이런 도구예요
                 </div>
                 <ul className="serif" style={{ fontSize: 13, lineHeight: 1.9 }}>
-                  <li>· 중재자와 대화로 마음을 정리해요</li>
+                  <li>· 대화로 같이 마음을 정리해요</li>
                   <li>· 옳고 그름이 아니라 서로의 마음을 봐요</li>
-                  <li>· 이야기는 30일 후 자동으로 사라져요</li>
                 </ul>
               </div>
             </div>
@@ -194,7 +192,7 @@ export default function LandingPage() {
                 disabled={!user}
                 className="btn-L text-center"
               >
-                마음 옮겨 적기 시작
+                대화 시작
               </button>
               {!user && (
                 <Link href="/guest" className="text-center text-[12px] mt-1" style={{ color: 'var(--L-sub)' }}>

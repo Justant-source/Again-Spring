@@ -12,7 +12,7 @@ export function Footer() {
       }}
     >
       <div style={{ fontSize: 10, color: 'var(--L-sub)' }}>
-        다시봄은 의료행위·심리치료가 아닌 AI와 함께 감정을 정리하는 도구예요.
+        다시봄은 의료행위·심리치료가 아닙니다.
       </div>
     </footer>
   );

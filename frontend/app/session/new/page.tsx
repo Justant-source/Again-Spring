@@ -37,7 +37,7 @@ export default function NewSessionPage() {
         </div>
 
         <div className="serif" style={{ fontSize: 22, lineHeight: 1.5, marginBottom: 28 }}>
-          지금 이야기하실 분과의<br />관계를 알려주세요.
+          어떤 분과의 이야기인가요?
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
