@@ -365,7 +365,7 @@ export default function HistoryPage() {
         })}
       </div>
 
-      {/* 하단 선택 모드 액션바 */}
+      {/* 하단 선택 모드 액션바 — zIndex: 210으로 BottomNav(200) 위에 표시 */}
       {selectMode && (
         <div style={{
           position: 'fixed',
@@ -374,12 +374,12 @@ export default function HistoryPage() {
           transform: 'translateX(-50%)',
           width: '100%',
           maxWidth: 420,
-          padding: '12px 24px 20px',
+          padding: '12px 24px max(20px, env(safe-area-inset-bottom, 20px))',
           background: 'var(--L-bg)',
           borderTop: '1px solid var(--L-border)',
           display: 'flex',
           gap: 10,
-          zIndex: 100,
+          zIndex: 210,
         }}>
           <button
             onClick={() => {

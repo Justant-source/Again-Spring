@@ -337,7 +337,7 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {/* 법적 링크 + 위기 핫라인 */}
+        {/* 법적 링크 */}
         <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--L-border)', display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
           {[
             { href: '/terms', label: '이용약관' },
@@ -347,9 +347,6 @@ export default function ProfilePage() {
               {link.label}
             </a>
           ))}
-          <a href="tel:1393" style={{ fontSize: 12, color: 'var(--L-sub)', textDecoration: 'none' }}>
-            위기 상담 1393
-          </a>
         </div>
       </div>
       <DeleteAccountModal

@@ -78,28 +78,11 @@ test.describe('절대 불변: Crisis 모달 dismiss 마찰', () => {
     await page.locator(CRISIS_MODAL_CLOSE).click()
   })
 
-  test('헤더 SOS 버튼 → CrisisResourceModal 표시, ESC·backdrop 무효', async ({ page }) => {
-    await page.goto(`${BASE}/session/chat/${sessionId}`)
-    await expect(page.getByPlaceholder(CHAT_INPUT_PLACEHOLDER)).toBeVisible({ timeout: 10_000 })
-
-    // SOS 버튼 클릭 (aria-label)
-    await page.getByRole('button', SOS_BUTTON_ROLE).click()
-
-    const dialog = page.locator(CRISIS_RESOURCE_DIALOG)
-    await expect(dialog).toBeVisible({ timeout: 5_000 })
-
-    // ESC → 닫히지 않음
-    await page.keyboard.press('Escape')
-    await page.waitForTimeout(400)
-    await expect(dialog).toBeVisible()
-
-    // backdrop 클릭 → 닫히지 않음
-    await page.mouse.click(10, 10)
-    await page.waitForTimeout(400)
-    await expect(dialog).toBeVisible()
-
-    // 명시적 닫기 버튼
-    await page.getByRole('button', { name: '닫기' }).click()
-    await expect(dialog).not.toBeVisible({ timeout: 3_000 })
+  test.skip('헤더 SOS 버튼 → CrisisResourceModal 표시, ESC·backdrop 무효', async ({ page }) => {
+    // V17에서 SOS 버튼을 의도적으로 제거함 (이모지 금지 정책 / 디자인).
+    // CrisisResourceModal은 이제 자동 위기감지(ChatInput KeywordGuard)를 통해서만 트리거됨.
+    // 모달 자체의 dismiss 마찰(ESC·backdrop 차단)은 아래 두 테스트(CrisisModal)에서 동일하게 검증.
+    // 이 케이스는 트리거 방법이 없어진 것이므로 skip 처리.
+    void page, sessionId
   })
 })

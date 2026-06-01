@@ -7,8 +7,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CRISIS_RESOURCES } from '@/lib/constants/crisisResources';
-
 // LegalFooter를 표시할 경로 패턴 (BottomNav가 숨겨진 몰입 화면 중 법적 고지 필요한 곳)
 const LEGAL_SHOW_PATHS = [
   '/session/result',
@@ -22,8 +20,6 @@ export function LegalFooter() {
     p => pathname === p || pathname.startsWith(p + '/')
   );
   if (!shouldShow) return null;
-
-  const crisisPhone = CRISIS_RESOURCES.find((r) => r.phone === '1393')?.phone;
 
   return (
     <div
@@ -64,20 +60,6 @@ export function LegalFooter() {
       >
         개인정보 처리방침
       </Link>
-
-      {crisisPhone && (
-        <>
-          <span style={{ opacity: 0.5 }}>·</span>
-          <a
-            href={`tel:${crisisPhone.replace(/\D/g, '')}`}
-            style={{ color: 'var(--Q-sub)', textDecoration: 'none' }}
-            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-          >
-            위기 상황이라면 1393
-          </a>
-        </>
-      )}
     </div>
   );
 }

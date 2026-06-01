@@ -303,7 +303,6 @@ export default function ResultPage() {
             {soloCapturing ? '이미지 생성 중…' : '리포트 공유하기'}
           </button>
         </div>
-        <div>본 서비스는 심리 상담이나 법률 자문을 대체하지 않습니다. 위기 상황이라면 전문기관(1393/1366/132)에 연락해주세요.</div>
       </div>
 
       {/* Solo Share Modal */}

@@ -26,10 +26,10 @@ test.describe('게스트 골든패스 (실 BE 연동)', () => {
     await page.goto('/')
     await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 10000 })
 
-    // 2. 게스트 진입
-    const guestLink = page.getByRole('link', { name: /게스트로/ })
-    await expect(guestLink).toBeVisible({ timeout: 5000 })
-    await guestLink.click()
+    // 2. 게스트 진입 — V17부터 랜딩의 "게스트로 둘러보기" 링크 제거됨.
+    //    하단 CTA(대화 시작)이 비로그인 → /guest?next=/session/new 으로 라우팅하거나
+    //    URL 직접 진입으로 동일 흐름 테스트.
+    await page.goto('/guest')
     await page.waitForURL('**/guest', { timeout: 8000 })
     expect(page.url()).toContain('/guest')
 
