@@ -1,16 +1,28 @@
 'use client';
 
-// Legal footer with links to terms, privacy, crisis hotline, and feedback.
-// Place manually at end of result pages. Tone Q styling.
+// Legal footer with links to terms, privacy, and crisis hotline.
+// 결과 화면·과거 대화 상세에서만 노출.
+// BottomNav가 표시되는 모든 화면(홈·커뮤니티·대화기록·내정보 등)에서는 숨겨
+// 두 막대가 겹치지 않도록 한다.
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { CRISIS_RESOURCES } from '@/lib/constants/crisisResources';
+
+// LegalFooter를 표시할 경로 패턴 (BottomNav가 숨겨진 몰입 화면 중 법적 고지 필요한 곳)
+const LEGAL_SHOW_PATHS = [
+  '/session/result',
+  '/session/history',
+];
+
 export function LegalFooter() {
   const pathname = usePathname();
-  if (pathname?.startsWith('/session/chat')) return null;
-  if (pathname?.startsWith('/admin')) return null;
-  // Find 1393 (자살예방상담) in crisis resources
+
+  const shouldShow = LEGAL_SHOW_PATHS.some(
+    p => pathname === p || pathname.startsWith(p + '/')
+  );
+  if (!shouldShow) return null;
+
   const crisisPhone = CRISIS_RESOURCES.find((r) => r.phone === '1393')?.phone;
 
   return (
@@ -30,14 +42,12 @@ export function LegalFooter() {
         justifyContent: 'center',
         gap: '16px',
         flexWrap: 'wrap',
+        zIndex: 150, // BottomNav(200)보다 낮고 위기모달(999)보다 낮음
       }}
     >
       <Link
         href="/terms"
-        style={{
-          color: 'var(--Q-sub)',
-          textDecoration: 'none',
-        }}
+        style={{ color: 'var(--Q-sub)', textDecoration: 'none' }}
         onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
         onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
       >
@@ -48,32 +58,26 @@ export function LegalFooter() {
 
       <Link
         href="/privacy"
-        style={{
-          color: 'var(--Q-sub)',
-          textDecoration: 'none',
-        }}
+        style={{ color: 'var(--Q-sub)', textDecoration: 'none' }}
         onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
         onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
       >
         개인정보 처리방침
       </Link>
 
-      <span style={{ opacity: 0.5 }}>·</span>
-
       {crisisPhone && (
-        <a
-          href={`tel:${crisisPhone.replace(/\D/g, '')}`}
-          style={{
-            color: 'var(--Q-sub)',
-            textDecoration: 'none',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-        >
-          위기 상황이라면 1393
-        </a>
+        <>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <a
+            href={`tel:${crisisPhone.replace(/\D/g, '')}`}
+            style={{ color: 'var(--Q-sub)', textDecoration: 'none' }}
+            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+          >
+            위기 상황이라면 1393
+          </a>
+        </>
       )}
-
     </div>
   );
 }

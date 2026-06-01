@@ -26,7 +26,7 @@ const config: Config = {
           bg: '#F5EFE6',
           card: '#FBF6EC',
           ink: '#2B2B2B',
-          sub: '#8A7F6B',
+          sub: '#6E6151', // 가독성 개선: 구 #8A7F6B → AA WCAG 기준 L-bg 위 ≥4.5:1
           border: '#D9CFBD',
           point: '#8A3A1F',
         },
@@ -35,7 +35,7 @@ const config: Config = {
           bg: '#FBF3EC',
           card: '#FFF8F0',
           ink: '#5C4030',
-          sub: '#A08670',
+          sub: '#876B54', // 가독성 개선: 구 #A08670 → AA WCAG 기준 P-bg 위 ≥4.5:1
           border: '#EADFD0',
           a: '#F4A896',
           b: '#A8C8B4',

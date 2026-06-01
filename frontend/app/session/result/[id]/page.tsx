@@ -243,7 +243,7 @@ export default function ResultPage() {
               : error || '리포트를 찾지 못했어요'}
           </div>
           <button onClick={() => router.push('/history')} className="btn-P" style={{ width: '100%' }}>
-            지난 대화 보기
+            대화기록 보기
           </button>
           <button onClick={() => router.push('/')} className="btn-P ghost" style={{ width: '100%' }}>
             홈으로 돌아가기

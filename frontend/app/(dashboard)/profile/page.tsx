@@ -72,7 +72,7 @@ export default function ProfilePage() {
 
   return (
     <PhoneFrame tone="L">
-      <PhoneHeader title={showStyleSection ? '내 대화 성향' : '프로필'} tone="L" onBack={() => router.back()} />
+      <PhoneHeader title="내정보" tone="L" back={false} />
       <div
         style={{
           padding: '8px 28px 40px',
@@ -292,6 +292,28 @@ export default function ProfilePage() {
         {/* 비밀번호 변경 (이메일 가입자만) */}
         <ChangePasswordSection />
 
+        {/* 관리자 진입 카드 — showAdminEntryButton 조건 */}
+        {permissionsFor(user).ui.showAdminEntryButton && (
+          <div className="letter-card" style={{ padding: '4px 0' }}>
+            <button
+              onClick={() => router.push('/admin')}
+              style={{ width: '100%', background: 'none', border: 'none', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <div style={{ fontSize: 14, color: 'var(--L-ink)', fontWeight: 500 }}>관리자 대시보드</div>
+              <span style={{ color: 'var(--L-sub)', fontSize: 16 }}>›</span>
+            </button>
+            {permissionsFor(user).admin.canAccessMarketing && (
+              <button
+                onClick={() => router.push('/admin/marketing')}
+                style={{ width: '100%', background: 'none', border: 'none', borderTop: '1px solid var(--L-border)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ fontSize: 14, color: 'var(--L-ink)', fontWeight: 500 }}>마케팅 관리</div>
+                <span style={{ color: 'var(--L-sub)', fontSize: 16 }}>›</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
           <button onClick={handleLogout} className="btn-L" style={{ width: '100%' }}>
@@ -313,6 +335,21 @@ export default function ProfilePage() {
           >
             계정 삭제
           </button>
+        </div>
+
+        {/* 법적 링크 + 위기 핫라인 */}
+        <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--L-border)', display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
+          {[
+            { href: '/terms', label: '이용약관' },
+            { href: '/privacy', label: '개인정보처리방침' },
+          ].map((link) => (
+            <a key={link.href} href={link.href} style={{ fontSize: 12, color: 'var(--L-sub)', textDecoration: 'none' }}>
+              {link.label}
+            </a>
+          ))}
+          <a href="tel:1393" style={{ fontSize: 12, color: 'var(--L-sub)', textDecoration: 'none' }}>
+            위기 상담 1393
+          </a>
         </div>
       </div>
       <DeleteAccountModal

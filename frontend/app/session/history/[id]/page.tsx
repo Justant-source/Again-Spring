@@ -24,7 +24,7 @@ export default function SessionHistoryPage() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [myRole, setMyRole] = useState<'USER_A' | 'USER_B'>('USER_A');
-  const [sessionTitle, setSessionTitle] = useState('지난 대화');
+  const [sessionTitle, setSessionTitle] = useState('대화 다시보기');
   const [hasReport, setHasReport] = useState(false);
   const [reportGenerating, setReportGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -101,7 +101,7 @@ export default function SessionHistoryPage() {
   if (loading) {
     return (
       <PhoneFrame tone="P">
-        <PhoneHeader title="지난 대화" tone="P" back onBack={() => router.push('/history')} />
+        <PhoneHeader title="대화 다시보기" tone="P" back onBack={() => router.push('/history')} />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--P-sub)', fontSize: 14 }}>
           불러오는 중...
         </div>

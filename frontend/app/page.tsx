@@ -22,9 +22,9 @@ export default function LandingPage() {
     setMounted(true);
   }, []);
 
-  // 활성 세션 폴링 — 게스트 외 모든 등급 (ADMIN도 일반 사용자처럼 동작)
+  // 활성 세션 폴링 — 로그인 사용자 전체 (게스트도 canResumeOldSession:true 정책 준수)
   useEffect(() => {
-    if (!user || user.isGuest) return;
+    if (!user) return;
     api.get('/api/users/me/history').then(r => {
       const active = (r.data as any[]).find(s => ACTIVE_STATUSES.has(s.status));
       setActiveSessionId(active?.id ?? null);
@@ -34,8 +34,14 @@ export default function LandingPage() {
   if (!mounted) return null;
 
   const handleStartSession = () => {
+    // 활성 세션이 있으면 바로 이어서 대화 (회원·게스트 공통)
+    if (activeSessionId) {
+      router.push(`/session/chat/${activeSessionId}`);
+      return;
+    }
+    // 비로그인: 게스트로 바로 진입 (로그인 강제 제거)
     if (!user) {
-      router.push('/login?next=/session/new');
+      router.push('/guest?next=/session/new');
       return;
     }
     router.push('/session/new');
@@ -45,29 +51,13 @@ export default function LandingPage() {
   const showAdminEntry = perms.ui.showAdminEntryButton;
   const showMarketingEntry = perms.admin.canAccessMarketing;
   const showChatEntry = perms.ui.showLandingChatEntry;
-  const showHistoryMenu = perms.ui.showHistoryMenu;
 
   return (
     <PhoneFrame tone="L">
       <div className="flex flex-col flex-1 px-7 pt-6 pb-5">
-        <div className="flex items-center justify-between">
+        {/* 헤더: 로고만 — 내비·프로필은 하단 5탭으로 */}
+        <div className="flex items-center">
           <Logo />
-          {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              {showHistoryMenu && (
-                <Link href="/history" className="text-[12px]" style={{ color: 'var(--L-sub)' }}>
-                  지난 대화
-                </Link>
-              )}
-              <Link href="/profile" className="text-[12px]" style={{ color: 'var(--L-sub)' }}>
-                {user.nickname}
-              </Link>
-            </div>
-          ) : (
-            <Link href="/login" className="text-[12px]" style={{ color: 'var(--L-sub)' }}>
-              로그인
-            </Link>
-          )}
         </div>
 
         {/* 관리자 모드 진입 카드 — user-permissions.json의 ui.showAdminEntryButton */}
@@ -180,7 +170,7 @@ export default function LandingPage() {
                   다시봄은 이런 도구예요
                 </div>
                 <ul className="serif" style={{ fontSize: 13, lineHeight: 1.8 }}>
-                  <li>· 대화로 같이 마음을 정리해요</li>
+                  <li>· 상대와 직접 말하지 않고, 각자 중재자와 대화해요</li>
                   <li>· 옳고 그름이 아니라 서로의 마음을 봐요</li>
                 </ul>
               </div>
@@ -223,16 +213,10 @@ export default function LandingPage() {
             <div className="flex flex-col gap-2 pb-2" style={{ paddingTop: 24 }}>
               <button
                 onClick={handleStartSession}
-                disabled={!user}
                 className="btn-L text-center"
               >
                 대화 시작
               </button>
-              {!user && (
-                <Link href="/guest" className="btn-L ghost" style={{ textAlign: 'center', textDecoration: 'none', display: 'block' }}>
-                  게스트로 둘러보기
-                </Link>
-              )}
             </div>
           </>
         ) : (

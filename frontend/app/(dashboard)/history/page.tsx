@@ -110,7 +110,7 @@ export default function HistoryPage() {
   if (loading) {
     return (
       <PhoneFrame tone="L">
-        <PhoneHeader title="지나온 이야기" tone="L" onBack={() => router.push('/')} />
+        <PhoneHeader title="대화기록" tone="L" onBack={() => router.push('/')} />
         <div style={{ padding: '28px', textAlign: 'center', color: 'var(--L-sub)' }}>
           로딩 중...
         </div>
@@ -121,7 +121,7 @@ export default function HistoryPage() {
   if (user.isGuest) {
     return (
       <PhoneFrame tone="L">
-        <PhoneHeader title="지나온 이야기" tone="L" onBack={() => router.push('/')} />
+        <PhoneHeader title="대화기록" tone="L" onBack={() => router.push('/')} />
         <div style={{ padding: '28px 28px 40px', display: 'flex', flexDirection: 'column', gap: 24 }}>
           <div style={{ textAlign: 'center', marginTop: 40 }}>
             <div className="serif" style={{ fontSize: 20, lineHeight: 1.5, marginBottom: 16 }}>
@@ -142,7 +142,7 @@ export default function HistoryPage() {
   if (history.length === 0) {
     return (
       <PhoneFrame tone="L">
-        <PhoneHeader title="지나온 이야기" tone="L" onBack={() => router.push('/')} />
+        <PhoneHeader title="대화기록" tone="L" onBack={() => router.push('/')} />
         <div style={{ padding: '28px 28px 40px', display: 'flex', flexDirection: 'column', gap: 24 }}>
           <div style={{ textAlign: 'center', marginTop: 40 }}>
             <div className="serif" style={{ fontSize: 20, lineHeight: 1.5, marginBottom: 16 }}>
@@ -163,7 +163,7 @@ export default function HistoryPage() {
   return (
     <PhoneFrame tone="L">
       <PhoneHeader
-        title={selectMode ? `${selected.size}개 선택됨` : '지나온 이야기'}
+        title={selectMode ? `${selected.size}개 선택됨` : '대화기록'}
         tone="L"
         back={!selectMode}
         onBack={selectMode ? undefined : () => router.push('/')}

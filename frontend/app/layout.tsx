@@ -50,7 +50,7 @@ export default function RootLayout({
           <OnboardingModal />
           <LegalFooter />
           <BottomNav />
-          <div style={{ paddingTop: '30px', paddingBottom: '76px' }}>{children}</div>
+          <div style={{ paddingTop: '30px', paddingBottom: '82px' }}>{children}</div>
         </MSWProvider>
       </body>
     </html>

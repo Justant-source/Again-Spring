@@ -70,7 +70,7 @@ export function PhoneHeader({
         ‹
       </button>
       <div
-        className="text-[13px] font-medium truncate"
+        className="text-[15px] font-medium truncate"
         style={{ color: ink }}
       >
         {title}

@@ -63,32 +63,44 @@ export default function CommunityFeedPage() {
 
   return (
     <div>
-      {/* 카테고리 필터 */}
-      <div style={{ marginBottom: 20 }}>
-        <label style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 8, display: 'block' }}>
-          카테고리
-        </label>
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
+      {/* 카테고리 필터 — 가로 스크롤 칩 */}
+      <div style={{ marginBottom: 20, overflow: 'hidden' }}>
+        <div
           style={{
-            width: '100%',
-            padding: '10px 12px',
-            border: '1px solid var(--P-border)',
-            borderRadius: 8,
-            fontSize: 13,
-            background: 'white',
-            color: 'var(--P-ink)',
-            outline: 'none',
-            cursor: 'pointer',
+            display: 'flex',
+            gap: 8,
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: 4,
           }}
         >
-          {categoryOptions.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          {categoryOptions.map((opt) => {
+            const isSelected = selectedCategory === opt.id;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => setSelectedCategory(opt.id)}
+                style={{
+                  flexShrink: 0,
+                  padding: '8px 14px',
+                  borderRadius: 999,
+                  border: `1.5px solid ${isSelected ? 'var(--P-ink)' : 'var(--P-border)'}`,
+                  background: isSelected ? 'var(--P-ink)' : 'white',
+                  color: isSelected ? 'white' : 'var(--P-ink)',
+                  fontSize: 13,
+                  fontWeight: isSelected ? 600 : 400,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  letterSpacing: '-0.2px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 로딩 상태 */}
@@ -140,16 +152,29 @@ export default function CommunityFeedPage() {
               }}
             >
               <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--P-ink)', marginBottom: 4 }}>
+                <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--P-ink)', marginBottom: 6, lineHeight: 1.4 }}>
                   {post.title}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--P-sub)', display: 'flex', gap: 8 }}>
-                  <span>{getCategoryLabel(post.category)}</span>
-                  <span>·</span>
-                  <span>{post.visibility === 'PUBLIC' ? '투표 ' : '배심원 '}{post.voteCount}명</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: 'var(--P-sub)' }}>
+                    {getCategoryLabel(post.category)}
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--P-sub)', opacity: 0.5 }}>·</span>
+                  {/* 공개/비공개 뱃지 */}
+                  <span style={{
+                    fontSize: 11,
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                    background: post.visibility === 'PUBLIC' ? 'var(--P-border)' : '#F0EBE5',
+                    color: 'var(--P-ink)',
+                    fontWeight: 500,
+                  }}>
+                    {post.visibility === 'PUBLIC' ? '투표' : 'AI 배심원'}
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--P-sub)' }}>{post.voteCount}명</span>
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--P-sub)' }}>
+              <div style={{ fontSize: 12, color: 'var(--P-sub)' }}>
                 {formatDate(post.createdAt)}
               </div>
             </Link>
