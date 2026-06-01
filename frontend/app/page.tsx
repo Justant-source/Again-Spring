@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { PhoneFrame } from '@/components/shared/PhoneFrame';
@@ -32,20 +31,6 @@ export default function LandingPage() {
   }, [user]);
 
   if (!mounted) return null;
-
-  const handleStartSession = () => {
-    // 활성 세션이 있으면 바로 이어서 대화 (회원·게스트 공통)
-    if (activeSessionId) {
-      router.push(`/session/chat/${activeSessionId}`);
-      return;
-    }
-    // 비로그인: 게스트로 바로 진입 (로그인 강제 제거)
-    if (!user) {
-      router.push('/guest?next=/session/new');
-      return;
-    }
-    router.push('/session/new');
-  };
 
   const perms = permissionsFor(user);
   const showAdminEntry = perms.ui.showAdminEntryButton;
@@ -176,48 +161,6 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* 커뮤니티 진입 카드 */}
-            <div
-              style={{ marginTop: 20, borderRadius: 10, border: '1px solid var(--L-border)', overflow: 'hidden' }}
-            >
-              <Link
-                href="/community"
-                style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--P-bg, #FBF3EC)' }}
-              >
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--P-ink, #5C4030)' }}>
-                    커뮤니티 사연 보기
-                  </div>
-                  <div style={{ fontSize: 11, marginTop: 3, color: 'var(--P-sub, #A08670)' }}>
-                    다른 사람들의 갈등 사연 · 투표 · AI 배심원
-                  </div>
-                </div>
-                <span style={{ color: 'var(--P-sub)', fontSize: 16 }}>›</span>
-              </Link>
-              <Link
-                href="/three-way/new"
-                style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'white', borderTop: '1px solid var(--L-border)' }}
-              >
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--L-ink, #2B2B2B)' }}>
-                    상대방과 함께 대화하기
-                  </div>
-                  <div style={{ fontSize: 11, marginTop: 3, color: 'var(--L-sub, #8A7F6B)' }}>
-                    3자 대화 · AI 중재자 · 초대 링크 공유
-                  </div>
-                </div>
-                <span style={{ color: 'var(--L-sub)', fontSize: 16 }}>›</span>
-              </Link>
-            </div>
-
-            <div className="flex flex-col gap-2 pb-2" style={{ paddingTop: 24 }}>
-              <button
-                onClick={handleStartSession}
-                className="btn-L text-center"
-              >
-                대화 시작
-              </button>
-            </div>
           </>
         ) : (
           // admin 등 채팅 진입 비대상 — 빈 영역으로 [관리자 모드] 카드만 부각
