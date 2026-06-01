@@ -59,6 +59,7 @@ public class AuthController {
     @Operation(summary = "Send email verification code", description = "Send a 6-digit code to the email address")
     @ApiResponse(responseCode = "200", description = "Code sent")
     @ApiResponse(responseCode = "400", description = "Invalid email")
+    @ApiResponse(responseCode = "409", description = "Email already registered")
     public ResponseEntity<Void> sendVerification(@Valid @RequestBody SendVerificationRequest request) {
         emailVerificationService.sendCode(request.getEmail());
         return ResponseEntity.ok().build();

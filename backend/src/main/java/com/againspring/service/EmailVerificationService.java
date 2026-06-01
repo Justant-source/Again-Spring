@@ -3,6 +3,7 @@ package com.againspring.service;
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.EmailVerification;
 import com.againspring.repository.EmailVerificationRepository;
+import com.againspring.repository.UserRepository;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import java.security.SecureRandom;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmailVerificationService {
 
     private final EmailVerificationRepository repository;
+    private final UserRepository userRepository;
     private final JavaMailSender mailSender;
     private final Environment environment;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -34,6 +36,10 @@ public class EmailVerificationService {
 
     @Transactional
     public void sendCode(String email) {
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new BusinessException("USER_ALREADY_EXISTS", "이미 가입된 이메일이에요. 다른 이메일로 인증해 주세요.", 409);
+        }
+
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));
 
         EmailVerification ev = EmailVerification.builder()

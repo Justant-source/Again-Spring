@@ -1,6 +1,7 @@
 package com.againspring.service;
 
 import com.againspring.repository.EmailVerificationRepository;
+import com.againspring.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,12 +20,13 @@ class EmailServiceSenderTest {
 
     @Mock JavaMailSender mailSender;
     @Mock EmailVerificationRepository verificationRepository;
+    @Mock UserRepository userRepository;
     @Mock Environment environment;
 
     @Test
     @DisplayName("EmailVerificationService mailFrom 기본값이 againspring2026@gmail.com")
     void verificationServiceMailFromDefault() {
-        EmailVerificationService svc = new EmailVerificationService(verificationRepository, mailSender, environment);
+        EmailVerificationService svc = new EmailVerificationService(verificationRepository, userRepository, mailSender, environment);
         ReflectionTestUtils.setField(svc, "mailFrom", "againspring2026@gmail.com");
 
         String mailFrom = (String) ReflectionTestUtils.getField(svc, "mailFrom");
@@ -35,7 +37,7 @@ class EmailServiceSenderTest {
     @Test
     @DisplayName("EmailVerificationService fromName이 '다시봄 운영팀'")
     void verificationServiceFromName() {
-        EmailVerificationService svc = new EmailVerificationService(verificationRepository, mailSender, environment);
+        EmailVerificationService svc = new EmailVerificationService(verificationRepository, userRepository, mailSender, environment);
         ReflectionTestUtils.setField(svc, "fromName", "다시봄 운영팀");
 
         String fromName = (String) ReflectionTestUtils.getField(svc, "fromName");
