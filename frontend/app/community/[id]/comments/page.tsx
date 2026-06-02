@@ -8,7 +8,6 @@ import { CommunityComment } from '@/components/community/c3/CommunityComment';
 import { CommentBar } from '@/components/community/c3/CommentBar';
 import { ReportModal } from '@/components/community/ReportModal';
 import { checkKeywords } from '@/lib/utils/keywordGuard';
-import { CrisisResourceModal } from '@/components/shared/CrisisResourceModal';
 
 interface PageProps {
   params: { id: string };
@@ -37,9 +36,9 @@ export default function PostCommentsPage({ params }: PageProps) {
   const router = useRouter();
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState('');
+  const [replyToNick, setReplyToNick] = useState<string | undefined>(undefined);
   const [parentCommentId, setParentCommentId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [crisisOpen, setCrisisOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ commentId?: number; authorId?: string } | null>(null);
 
@@ -57,30 +56,42 @@ export default function PostCommentsPage({ params }: PageProps) {
     loadComments();
   }, [params.id]);
 
-  const handleCommentSubmit = async (text: string, inputRef: HTMLInputElement | null) => {
-    if (!text.trim()) return;
+  const handleCommentSubmit = async () => {
+    if (!commentText.trim()) return;
 
-    const keywordCheck = checkKeywords(text);
+    const keywordCheck = checkKeywords(commentText);
     if (keywordCheck.level === 1) {
-      setCrisisOpen(true);
+      // Crisis keywords detected - handled by KeywordGuard on BE
       return;
     }
 
     try {
-      const newComment = await commentApi.add(params.id, text.trim(), parentCommentId || undefined);
-      setComments([...comments, newComment]);
+      await commentApi.add(params.id, commentText.trim(), parentCommentId || undefined);
       setCommentText('');
       setParentCommentId(null);
-      if (inputRef) {
-        inputRef.value = '';
-      }
+      setReplyToNick(undefined);
+      // Reload comments
+      const updatedComments = await commentApi.list(params.id);
+      setComments(updatedComments);
     } catch (err) {
       console.error('Failed to add comment:', err);
     }
   };
 
-  const handleReplyClick = (commentId: number) => {
+  const handleReplyClick = (commentId: number, authorNick: string) => {
     setParentCommentId(commentId);
+    setReplyToNick(authorNick);
+  };
+
+  const handleLike = async (commentId: number) => {
+    try {
+      await commentApi.toggleLike(params.id, commentId);
+      // Reload comments
+      const updatedComments = await commentApi.list(params.id);
+      setComments(updatedComments);
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+    }
   };
 
   const handleReportClick = (commentId: number, authorId: string) => {
@@ -88,9 +99,9 @@ export default function PostCommentsPage({ params }: PageProps) {
     setReportOpen(true);
   };
 
-  const renderComment = (comment: Comment, isReply = false) => {
-    const isAuthor = false; // TODO: Get from context
-    const isPartner = false; // TODO: Get from context
+  const renderComment = (comment: any, isReply = false) => {
+    const isAuthor = comment.isAuthor ?? false;
+    const isPartner = comment.isPartner ?? false;
 
     return (
       <div key={comment.id}>
@@ -120,10 +131,27 @@ export default function PostCommentsPage({ params }: PageProps) {
           </button>
         </div>
 
+        {/* 좋아요 버튼 */}
+        <button
+          onClick={() => handleLike(comment.id)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--L-sub)',
+            cursor: 'pointer',
+            fontSize: 11,
+            paddingLeft: 0,
+            marginRight: 12,
+            textDecoration: 'underline',
+          }}
+        >
+          공감 {comment.likeCount}
+        </button>
+
         {/* 댓글 버튼 */}
         {!isReply && (
           <button
-            onClick={() => handleReplyClick(comment.id)}
+            onClick={() => handleReplyClick(comment.id, comment.authorId)}
             style={{
               background: 'none',
               border: 'none',
@@ -142,7 +170,7 @@ export default function PostCommentsPage({ params }: PageProps) {
         {/* 대댓글 렌더링 */}
         {comment.replies && comment.replies.length > 0 && (
           <div style={{ marginLeft: 0 }}>
-            {comment.replies.map((reply) => renderComment(reply, true))}
+            {comment.replies.map((reply: Comment) => renderComment(reply, true))}
           </div>
         )}
       </div>
@@ -192,16 +220,10 @@ export default function PostCommentsPage({ params }: PageProps) {
 
       {/* 댓글 입력 바 (고정) */}
       <CommentBar
-        onFocus={() => {
-          // Handled by form submission
-        }}
-      />
-
-      {/* 위기 자원 모달 */}
-      <CrisisResourceModal
-        open={crisisOpen}
-        onClose={() => setCrisisOpen(false)}
-        severity="advisory"
+        value={commentText}
+        onChange={setCommentText}
+        onSubmit={handleCommentSubmit}
+        replyTo={replyToNick}
       />
 
       {/* 신고 모달 */}

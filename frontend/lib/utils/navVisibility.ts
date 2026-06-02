@@ -4,7 +4,7 @@
  */
 
 /** 바텀 내비 시각적 높이 (safe-area 제외). layout.tsx paddingBottom 계산에 사용. */
-export const BOTTOM_NAV_HEIGHT = 74;
+export const BOTTOM_NAV_HEIGHT = 0;
 
 /**
  * 바텀 내비를 숨길 경로 패턴.

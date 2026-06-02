@@ -5,7 +5,7 @@ interface FeedCardProps {
   title: string;
   authorPct: number;
   voteCount: number;
-  commentCount: number;
+  commentCount?: number;
   paired: boolean;
   href: string;
 }
@@ -123,7 +123,7 @@ export function FeedCard({
             color: 'var(--P-sub)',
           }}
         >
-          {voteCount}표 · 댓글 {commentCount}
+          {voteCount}표{commentCount !== undefined ? ` · 댓글 ${commentCount}` : ''}
         </div>
       </div>
     </a>

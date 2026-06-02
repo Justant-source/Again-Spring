@@ -4,12 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { postApi, PostDetail, JuryResult, VoteResult } from '@/lib/api/community/postApi';
-import { commentApi, Comment, CommentResponse } from '@/lib/api/community/commentApi';
-import { checkKeywords } from '@/lib/utils/keywordGuard';
-import { CrisisResourceModal } from '@/components/shared/CrisisResourceModal';
+import { commentApi, Comment } from '@/lib/api/community/commentApi';
 import { VoteBar, SideStory, JurorCard } from '@/components/community/c3';
-import LegalNoticeBox from '@/components/shared/LegalNoticeBox';
-import { GRN, GRN_DK, RED, RED_DK, GRN_BG, RED_BG } from '@/lib/constants/factionColors';
+import { GRN, RED, GRN_BG, RED_BG } from '@/lib/constants/factionColors';
 
 interface PageProps {
   params: { id: string };
@@ -501,28 +498,24 @@ function C3Closed({
 
       {/* 2칸 그리드 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-        <div
-          style={{
-            background: GRN_BG,
-            borderRadius: 12,
-            padding: '12px',
-            fontSize: 12,
-            color: 'var(--P-ink)',
-          }}
-        >
-          작성자 입장
-        </div>
-        <div
-          style={{
-            background: RED_BG,
-            borderRadius: 12,
-            padding: '12px',
-            fontSize: 12,
-            color: 'var(--P-ink)',
-          }}
-        >
-          상대방 입장
-        </div>
+        <SideStory
+          side="g"
+          label="작성자"
+          body={post.bodyPublished || ''}
+          clamp={false}
+          selected={false}
+          onSelect={() => {}}
+          onMore={() => {}}
+        />
+        <SideStory
+          side="r"
+          label="상대방"
+          body={post.partnerBodyPublished || ''}
+          clamp={false}
+          selected={false}
+          onSelect={() => {}}
+          onMore={() => {}}
+        />
       </div>
 
       {/* VoteBar */}
@@ -570,9 +563,9 @@ function C3Closed({
 export default function CommunityPostPage({ params }: PageProps) {
   const [post, setPost] = useState<PostDetail | null>(null);
   const [voteResult, setVoteResult] = useState<VoteResult | null>(null);
+  const [juryResult, setJuryResult] = useState<JuryResult | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [crisisOpen, setCrisisOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isVoting, setIsVoting] = useState(false);
 
@@ -583,11 +576,11 @@ export default function CommunityPostPage({ params }: PageProps) {
         const postData = await postApi.get(params.id);
         setPost(postData);
 
-        const voteData = await postApi.vote(params.id, postData.voteOptions[0]?.id || 1);
-        setVoteResult(voteData);
-
         const commentsData = await commentApi.list(params.id);
         setComments(commentsData);
+
+        // Get jury result (ignore errors)
+        postApi.getJury(params.id).then(setJuryResult).catch(() => {});
       } catch (err) {
         console.error('Failed to load post:', err);
         setError('사연을 불러올 수 없습니다');

@@ -6,9 +6,10 @@ interface GuestNoticeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSignup: () => void;
+  onContinueAsGuest?: () => void;
 }
 
-export function GuestNoticeModal({ isOpen, onClose, onSignup }: GuestNoticeModalProps) {
+export function GuestNoticeModal({ isOpen, onClose, onSignup, onContinueAsGuest }: GuestNoticeModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -117,7 +118,7 @@ export function GuestNoticeModal({ isOpen, onClose, onSignup }: GuestNoticeModal
             가입하고 올리기
           </button>
           <button
-            onClick={onClose}
+            onClick={onContinueAsGuest || onClose}
             style={{
               padding: '14px',
               background: 'transparent',

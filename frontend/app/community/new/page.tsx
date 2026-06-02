@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { postApi, PostCreateRequest } from '@/lib/api/community/postApi';
 import { CATEGORIES } from '@/lib/constants/categories';
-import { checkKeywords } from '@/lib/utils/keywordGuard';
-import { CrisisResourceModal } from '@/components/shared/CrisisResourceModal';
+import { GuestNoticeModal } from '@/components/auth/GuestNoticeModal';
 import { JurorPicker } from '@/components/community/c3/JurorPicker';
 import { useUserStore } from '@/lib/store/userStore';
 import { GRN, GRN_BG, RED, RED_BG } from '@/lib/constants/factionColors';
@@ -24,22 +23,13 @@ export default function CommunityNewPage() {
   const [jurorCount, setJurorCount] = useState(3);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [crisisOpen, setCrisisOpen] = useState(false);
+  const [showGuestNotice, setShowGuestNotice] = useState(false);
   const [generatedPost, setGeneratedPost] = useState<{
     id: string;
     title: string;
     bodyPublished: string;
   } | null>(null);
 
-  const handleInputChange = (value: string) => {
-    setBodyRaw(value);
-    setError(null);
-    // 위기감지 이중방어
-    const kw = checkKeywords(value);
-    if (kw.level === 1) {
-      setCrisisOpen(true);
-    }
-  };
 
   const handleComposeSubmit = async () => {
     if (!title.trim()) {
@@ -59,7 +49,11 @@ export default function CommunityNewPage() {
       return;
     }
 
-    setStep('mode');
+    if (isGuest) {
+      setShowGuestNotice(true);
+    } else {
+      setStep('mode');
+    }
   };
 
   const handleModeSelect = async (visibility: 'PUBLIC' | 'PRIVATE') => {
@@ -230,14 +224,17 @@ export default function CommunityNewPage() {
             </label>
             <textarea
               value={bodyRaw}
-              onChange={(e) => handleInputChange(e.target.value)}
+              onChange={(e) => {
+                setBodyRaw(e.target.value);
+                setError(null);
+              }}
               placeholder="갈등 상황을 적어주세요"
               style={{
                 width: '100%',
                 minHeight: 160,
                 padding: '12px 14px',
-                border: `6px solid var(--L-border)`,
-                borderRadius: 10,
+                border: '1px solid var(--L-border)',
+                borderRadius: 6,
                 fontSize: 14,
                 fontFamily: 'var(--font-serif)',
                 lineHeight: 1.6,
@@ -300,10 +297,14 @@ export default function CommunityNewPage() {
           </button>
         </div>
 
-        <CrisisResourceModal
-          open={crisisOpen}
-          onClose={() => setCrisisOpen(false)}
-          severity="advisory"
+        <GuestNoticeModal
+          isOpen={showGuestNotice}
+          onClose={() => setShowGuestNotice(false)}
+          onSignup={() => router.push('/signup')}
+          onContinueAsGuest={() => {
+            setShowGuestNotice(false);
+            setStep('mode');
+          }}
         />
       </div>
     );

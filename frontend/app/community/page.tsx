@@ -3,13 +3,21 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { postApi, PostSummary } from '@/lib/api/community/postApi';
-import { CATEGORIES } from '@/lib/constants/categories';
+import { FeedCard } from '@/components/community/c3';
+
+const C3_CATS = ['연인', '부부', '친구', '가족', '직장', '기타'];
 
 function getCategoryLabel(categoryId: string): string {
-  for (const major of CATEGORIES) {
-    if (major.id === categoryId) return major.label;
-  }
-  return categoryId;
+  const categoryMap: { [key: string]: string } = {
+    couple: '연인',
+    marriage: '부부',
+    friend: '친구',
+    family: '가족',
+    parent_child: '가족',
+    work: '직장',
+    korean_specific: '기타',
+  };
+  return categoryMap[categoryId] || '기타';
 }
 
 export default function CommunityFeedPage() {
@@ -21,7 +29,7 @@ export default function CommunityFeedPage() {
 
   const categoryOptions = [
     { id: '', label: '전체' },
-    ...CATEGORIES.map(cat => ({ id: cat.id, label: cat.label })),
+    ...C3_CATS.map(cat => ({ id: cat, label: cat })),
   ];
 
   useEffect(() => {
@@ -204,60 +212,15 @@ export default function CommunityFeedPage() {
           paddingRight: 20,
         }}>
           {posts.map((post) => (
-            <Link
+            <FeedCard
               key={post.id}
               href={`/community/${post.id}`}
-              data-testid="community-post-link"
-              style={{
-                padding: '16px',
-                background: 'var(--L-card)',
-                border: '1px solid var(--L-border)',
-                borderRadius: 10,
-                textDecoration: 'none',
-                color: 'inherit',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'color-mix(in srgb, var(--L-sub) 3%, var(--L-card))';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--L-card)';
-              }}
-            >
-              <div style={{ marginBottom: 8 }}>
-                <div style={{
-                  fontSize: 16,
-                  fontWeight: 500,
-                  color: 'var(--L-ink)',
-                  marginBottom: 6,
-                  lineHeight: 1.4,
-                }}>
-                  {post.title}
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  flexWrap: 'wrap',
-                }}>
-                  <span style={{ fontSize: 12, color: 'var(--L-sub)' }}>
-                    {getCategoryLabel(post.category)}
-                  </span>
-                  <span style={{ fontSize: 12, color: 'var(--L-sub)', opacity: 0.5 }}>·</span>
-                  <span style={{
-                    fontSize: 11,
-                    padding: '2px 7px',
-                    borderRadius: 999,
-                    background: post.visibility === 'PUBLIC' ? 'var(--L-border)' : '#F0EBE5',
-                    color: 'var(--L-ink)',
-                    fontWeight: 500,
-                  }}>
-                    {post.visibility === 'PUBLIC' ? '투표' : 'AI 배심원'}
-                  </span>
-                  <span style={{ fontSize: 12, color: 'var(--L-sub)' }}>{post.voteCount}명</span>
-                </div>
-              </div>
-            </Link>
+              cat={getCategoryLabel(post.category)}
+              title={post.title}
+              authorPct={post.authorPct || 50}
+              voteCount={post.voteCount || 0}
+              paired={post.paired || false}
+            />
           ))}
         </div>
       )}
@@ -290,7 +253,7 @@ export default function CommunityFeedPage() {
       {/* 고정 하단 버튼 */}
       <div style={{
         position: 'fixed',
-        bottom: 100,
+        bottom: 20,
         left: 0,
         right: 0,
         padding: '16px 20px',
