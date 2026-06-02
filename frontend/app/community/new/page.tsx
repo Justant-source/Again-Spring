@@ -1,13 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { postApi, PostCreateRequest } from '@/lib/api/community/postApi';
-import { CATEGORIES } from '@/lib/constants/categories';
 import { GuestNoticeModal } from '@/components/auth/GuestNoticeModal';
 import { JurorPicker } from '@/components/community/c3/JurorPicker';
 import { useUserStore } from '@/lib/store/userStore';
-import { GRN, GRN_BG, RED, RED_BG } from '@/lib/constants/factionColors';
+import { GRN, GRN_BG } from '@/lib/constants/factionColors';
+
+// C3 대분류 카테고리 — id는 BE PostCategory enum 이름과 1:1 매핑
+const C3_CATEGORIES = [
+  { id: 'COUPLE',  label: '연인' },
+  { id: 'MARRIED', label: '부부' },
+  { id: 'FRIEND',  label: '친구' },
+  { id: 'FAMILY',  label: '가족' },
+  { id: 'WORK',    label: '직장' },
+  { id: 'OTHER',   label: '기타' },
+];
 
 type Step = 'compose' | 'mode' | 'analyzing';
 
@@ -19,7 +28,7 @@ export default function CommunityNewPage() {
   const [step, setStep] = useState<Step>('compose');
   const [title, setTitle] = useState('');
   const [bodyRaw, setBodyRaw] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[0]?.id || '');
+  const [category, setCategory] = useState(C3_CATEGORIES[0].id);
   const [jurorCount, setJurorCount] = useState(3);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +156,7 @@ export default function CommunityNewPage() {
               scrollbarWidth: 'none',
               paddingBottom: 4,
             }}>
-              {CATEGORIES.map((cat) => {
+              {C3_CATEGORIES.map((cat) => {
                 const isSelected = category === cat.id;
                 return (
                   <button
@@ -159,9 +168,9 @@ export default function CommunityNewPage() {
                       borderRadius: 999,
                       border: `1.5px solid ${isSelected ? 'var(--L-ink)' : 'var(--L-border)'}`,
                       background: isSelected ? 'var(--L-ink)' : 'transparent',
-                      color: isSelected ? 'white' : 'var(--L-ink)',
+                      color: isSelected ? 'var(--L-bg)' : 'var(--L-ink)',
                       fontSize: 13,
-                      fontWeight: isSelected ? 600 : 400,
+                      fontWeight: isSelected ? 500 : 400,
                       cursor: 'pointer',
                       transition: 'all 0.15s',
                       whiteSpace: 'nowrap',

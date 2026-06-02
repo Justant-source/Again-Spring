@@ -74,9 +74,12 @@ export const postApi = {
   create: (req: PostCreateRequest) =>
     api.post<PostDetail>('/api/community/posts', req).then(r => r.data),
 
-  list: (params?: { category?: string; page?: number; size?: number; sort?: 'latest' | 'recommended' }) =>
-    api.get<{ content: PostSummary[]; totalElements: number; totalPages: number }>(
-      '/api/community/posts', { params }).then(r => r.data),
+  list: (params?: { category?: string; page?: number; size?: number; sort?: 'latest' | 'recommended' }) => {
+    const { sort, ...rest } = params || {};
+    const queryParams = { ...rest, ...(sort ? { sortBy: sort } : {}) };
+    return api.get<{ content: PostSummary[]; totalElements: number; totalPages: number }>(
+      '/api/community/posts', { params: queryParams }).then(r => r.data);
+  },
 
   get: (id: string) =>
     api.get<PostDetail>(`/api/community/posts/${id}`).then(r => r.data),

@@ -20,7 +20,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -88,9 +90,12 @@ public class CommunityPostController {
     @Operation(summary = "공개 포스트 목록")
     public ResponseEntity<Page<PostResponse>> listPosts(
             @RequestParam(required = false) String category,
-            @RequestParam(defaultValue = "latest") String sort,
-            Pageable pageable) {
+            @RequestParam(name = "sortBy", defaultValue = "latest") String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
+        // Pageable을 수동 생성 — Spring Data의 sort 파라미터와 이름 충돌 방지
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Post> posts = postService.listPublicPosts(category, sort, pageable);
         Page<PostResponse> responses = posts.map(post -> {
             List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
