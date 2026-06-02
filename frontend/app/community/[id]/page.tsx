@@ -579,8 +579,10 @@ export default function CommunityPostPage({ params }: PageProps) {
         const commentsData = await commentApi.list(params.id);
         setComments(commentsData);
 
-        // Get jury result (ignore errors)
-        postApi.getJury(params.id).then(setJuryResult).catch(() => {});
+        // Get jury result — author only (BE는 401 반환, 비로그인 시 전역 auth 에러 유발 방지)
+        if (postData.isAuthor) {
+          postApi.getJury(params.id).then(setJuryResult).catch(() => {});
+        }
       } catch (err) {
         console.error('Failed to load post:', err);
         setError('사연을 불러올 수 없습니다');
