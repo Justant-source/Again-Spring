@@ -9,7 +9,6 @@ import { ConsentReconfirmModal } from '@/components/legal/ConsentReconfirmModal'
 import { ForcePasswordChangeModal } from '@/components/auth/ForcePasswordChangeModal';
 import { BetaBanner } from '@/components/shared/BetaBanner';
 import { LegalFooter } from '@/components/shared/LegalFooter';
-import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 
 export const metadata: Metadata = {
   title: '다시봄 · Again Spring',
@@ -46,7 +45,6 @@ export default function RootLayout({
           <FeedbackModal />
           <ConsentReconfirmModal />
           <ForcePasswordChangeModal />
-          <OnboardingModal />
           <LegalFooter />
           <div style={{ paddingTop: '30px', paddingBottom: '0px' }}>{children}</div>
         </MSWProvider>

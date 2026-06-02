@@ -4,7 +4,6 @@ import com.againspring.domain.community.Juror;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.VoteOption;
 import com.againspring.llm.LLMProvider;
-import com.againspring.llm.bridge.PromptSanitizer;
 import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.VoteOptionRepository;
@@ -35,7 +34,7 @@ public class JuryService {
     private final JurorRepository jurorRepository;
     private final VoteOptionRepository voteOptionRepository;
     private final PromptLoader promptLoader;
-    private final PromptSanitizer promptSanitizer;
+    // private final PromptSanitizer promptSanitizer; (removed)
     private final KeywordGuard keywordGuard;
     private final ObjectMapper objectMapper;
 

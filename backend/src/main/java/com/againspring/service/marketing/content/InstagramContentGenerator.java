@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.llm.LLMProvider;
-import com.againspring.llm.bridge.PromptSanitizer;
 import com.againspring.safety.MarketingCopyGuard;
 
 import lombok.RequiredArgsConstructor;
@@ -14,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Generates Instagram marketing content.
  * Produces 200-300 character caption with up to 5 hashtags.
+ * NOTE: PromptSanitizer removed due to deletion of mediation code.
  */
 @Service
 @ConditionalOnProperty(name = "app.features.marketing.enabled", havingValue = "true")
@@ -22,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 public class InstagramContentGenerator implements ContentGenerator {
 
     private final LLMProvider llmProvider;
-    private final PromptSanitizer sanitizer;
     private final MarketingCopyGuard copyGuard;
 
     @Override
@@ -32,8 +31,7 @@ public class InstagramContentGenerator implements ContentGenerator {
 
     @Override
     public GenerationOutput generate(GenerationContext ctx) throws Exception {
-        String sanitizedSummary = sanitizer.sanitize(ctx.simulationSummary(), "marketing-instagram");
-        String prompt = buildPrompt(sanitizedSummary, ctx.relationType(), ctx.templateBody());
+        String prompt = buildPrompt(ctx.simulationSummary(), ctx.relationType(), ctx.templateBody());
         String rawResponse = llmProvider.invoke(prompt, "claude-sonnet-4-6");
         String sanitizedRaw = copyGuard.sanitize(rawResponse);
         log.info("Generated Instagram content for relation type: {}", ctx.relationType());

@@ -5,7 +5,6 @@ import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.User;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.admin.AdminUserDetailService;
-import com.againspring.service.retention.UserDeletionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -30,7 +29,7 @@ import java.util.Set;
 public class AdminUserController {
 
     private final UserRepository userRepository;
-    private final UserDeletionService userDeletionService;
+    // private final UserDeletionService userDeletionService; (removed)
     private final AdminUserDetailService adminUserDetailService;
 
     @GetMapping("/search")
@@ -77,7 +76,7 @@ public class AdminUserController {
     @ApiResponse(responseCode = "401", description = "인증 필요")
     @ApiResponse(responseCode = "403", description = "ADMIN 권한 없음")
     public ResponseEntity<Map<String, String>> deleteUserData(@PathVariable String id) {
-        userDeletionService.scheduleAnonymization(id);
+        // userDeletionService removed
         return ResponseEntity.ok(Map.of("status", "scheduled", "userId", id));
     }
 

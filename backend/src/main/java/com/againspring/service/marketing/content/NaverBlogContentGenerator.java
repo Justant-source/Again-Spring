@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.llm.LLMProvider;
-import com.againspring.llm.bridge.PromptSanitizer;
 import com.againspring.safety.MarketingCopyGuard;
 
 import lombok.RequiredArgsConstructor;
@@ -14,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Generates Naver Blog marketing content.
  * Produces 800-1200 character blog post with structured headings.
+ * NOTE: PromptSanitizer removed due to deletion of mediation code.
  */
 @Service
 @ConditionalOnProperty(name = "app.features.marketing.enabled", havingValue = "true")
@@ -22,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 public class NaverBlogContentGenerator implements ContentGenerator {
 
     private final LLMProvider llmProvider;
-    private final PromptSanitizer sanitizer;
     private final MarketingCopyGuard copyGuard;
 
     @Override
@@ -32,8 +31,7 @@ public class NaverBlogContentGenerator implements ContentGenerator {
 
     @Override
     public GenerationOutput generate(GenerationContext ctx) throws Exception {
-        String sanitizedSummary = sanitizer.sanitize(ctx.simulationSummary(), "marketing-naver");
-        String prompt = buildPrompt(sanitizedSummary, ctx.relationType(), ctx.templateBody());
+        String prompt = buildPrompt(ctx.simulationSummary(), ctx.relationType(), ctx.templateBody());
         String rawResponse = llmProvider.invoke(prompt, "claude-sonnet-4-6");
         String sanitizedRaw = copyGuard.sanitize(rawResponse);
         log.info("Generated Naver Blog content for relation type: {}", ctx.relationType());

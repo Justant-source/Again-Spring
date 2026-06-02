@@ -1,6 +1,5 @@
 package com.againspring.service.marketing.image;
 
-import com.againspring.domain.Report;
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.domain.marketing.MarketingSimulation;
 import com.againspring.service.marketing.ImageRenderClient;
@@ -48,7 +47,7 @@ public class InstagramImageStrategy implements ImageCompositionStrategy {
     public List<RenderedImage> compose(
             GenerationOutput output,
             MarketingSimulation sim,
-            Report report,
+            Object report,  // Stub: was Report report
             Long contentId,
             String imageDir
     ) throws IOException {

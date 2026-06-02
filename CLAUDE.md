@@ -65,7 +65,6 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 - `shared/docs/api/README.md` — API 문서 인덱스 (도메인별 파일 링크 + 공통 규약)
 - `shared/docs/api/rest-spec.md` — 공통 규약·에러코드·전체 엔드포인트 마스터 표 (15개 컨트롤러·57개)
 - `shared/docs/api/auth.md` — 인증 API (AuthController 9 + OAuth2Controller 1)
-- `shared/docs/api/session-chat.md` — 세션·채팅 API (SessionController 6 + MessageController 11)
 - `shared/docs/api/report.md` — 리포트 API (ReportController 3)
 - `shared/docs/api/user.md` — 사용자 API (UserController 7)
 - `shared/docs/api/feedback.md` — 피드백 API (FeedbackController 1)
@@ -238,13 +237,13 @@ curl http://localhost:8080/actuator/health
 | 컨테이너 | 역할 |
 |---|---|
 | `againspring-backend-dev/prod` | 프롬프트 어셈블 + HTTP 클라이언트 (`RemoteLlmProvider`) |
-| `againspring-llm-dev/prod` | Claude CLI 실행 전용 (`LlmWorkerPool` 100풀 + 큐500) |
+| `againspring-llm-dev/prod` | Claude CLI 실행 전용 (LLM 작업 전담) |
 
-- **모델**: `claude-haiku-4-5-20251001` (채팅·배심원), `claude-sonnet-4-6` (리포트)
+- **모델**: `claude-haiku-4-5-20251001` (배심원/중재 메시지), `claude-sonnet-4-6` (리포트 생성)
 - **호출 플래그**: `--strict-mcp-config --no-session-persistence --print` (⚠️ `--bare` 금지 — OAuth 파괴)
 - **동시성**: ThreadPoolExecutor 100 + LinkedBlockingQueue 500 (fail-fast 폐기 → 대기 큐)
 - **타임아웃**: 실행 120초 (큐 대기 30초 초과 시 CAPACITY)
-- **dev/prod 동일**: 실시간 응답 불필요 → **두 환경 모두 `remote`(CLI 브릿지) 사용**. `ANTHROPIC_API_KEY` 불필요.
+- **환경 동일**: **dev/prod 모두 원격 CLI 브릿지 사용**. `ANTHROPIC_API_KEY` 불필요.
 
 ### 인증 방식 (API 키 없이 — dev/prod 동일)
 
@@ -392,16 +391,11 @@ MARIADB_PASSWORD=...
 JWT_SECRET=...
 
 # LLM 워커 (againspring-llm 컨테이너, API 키 불필요 — 호스트 ~/.claude 마운트)
-LLM_PROVIDER=remote
 LLM_WORKER_URL=http://againspring-llm-dev:8090
 CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude
-CLAUDE_BIN=claude
-CLAUDE_MODEL=claude-haiku-4-5-20251001
-REPORT_LLM_MODEL=claude-sonnet-4-6
-LLM_POOL_SIZE=100
-LLM_QUEUE_CAPACITY=500
-LLM_QUEUE_WAIT_TIMEOUT_MS=30000
-PROMPTS_PATH=./shared/docs/prompts   # 기본값
+LLM_JURY_PROVIDER=remote
+JURY_LLM_MODEL=claude-haiku-4-5-20251001
+COMPOSE_LLM_MODEL=claude-haiku-4-5-20251001
 
 # OAuth2 (Google만 사용 중)
 GOOGLE_CLIENT_ID=...
@@ -415,6 +409,10 @@ GMAIL_APP_PASSWORD=...   # againspring2026 Gmail 2단계인증 앱 비밀번호 
 
 # App URL (소셜 로그인 redirect_uri 기준)
 APP_URL=https://dev.againspring.net
+
+# Prompts & Categories
+PROMPTS_PATH=./shared/docs/prompts
+CATEGORIES_PATH=./shared/docs/categories.yml
 ```
 
 ---

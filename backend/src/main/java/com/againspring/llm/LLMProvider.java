@@ -1,54 +1,23 @@
 package com.againspring.llm;
 
-import com.againspring.llm.bridge.CancelableInvocation;
-import com.againspring.llm.prompt.StructuredPrompt;
-
-import java.util.concurrent.CompletableFuture;
-
 /**
- * LLM Provider interface for abstract LLM interactions.
- * Implementations: ClaudeCodeBridge, ClaudeAPIProvider (future), MockLLMProvider
+ * LLM Provider interface — Community (jury, neutralize) 전용.
+ * 구현체: RemoteLlmProvider (llm-worker HTTP 브릿지), MockLLMProvider (테스트)
  */
 public interface LLMProvider {
 
     /**
-     * Synchronous completion: invoke LLM and return response.
-     */
-    LLMResponse invoke(LLMRequest request) throws LLMException;
-
-    /**
-     * Asynchronous completion: non-blocking variant.
-     */
-    CompletableFuture<LLMResponse> invokeAsync(LLMRequest request);
-
-    /**
-     * Raw string invocation with explicit model selection.
-     * Used by ChatService and other services that assemble prompts directly.
+     * 동기 텍스트 호출 — 프롬프트와 모델을 받아 완성 문자열 반환.
      */
     String invoke(String prompt, String model) throws Exception;
 
     /**
-     * Cancelable invocation — caller can cancel() mid-flight.
-     * Used by CancelableChatService to abort in-progress LLM calls.
-     */
-    CancelableInvocation invokeCancelable(String prompt, String model, String sessionId);
-
-    /**
-     * Cancelable invocation with structured prompt.
-     * Default implementation delegates to invokeCancelable(String, String, String) via flatten().
-     * Implementations can override for prompt caching optimization.
-     */
-    default CancelableInvocation invokeCancelable(StructuredPrompt prompt, String model, String sessionId) {
-        return invokeCancelable(prompt.flatten(), model, sessionId);
-    }
-
-    /**
-     * Provider identity for logging/monitoring.
+     * Provider 식별자 (로깅용).
      */
     String getProviderName();
 
     /**
-     * Health check: confirm provider is accessible.
+     * 헬스 체크.
      */
     boolean isHealthy();
 }

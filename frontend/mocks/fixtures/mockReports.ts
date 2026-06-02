@@ -1,7 +1,5 @@
-import type { Report } from '@/lib/types';
-
 /** Curated reports keyed by scenario name (docs/MOCK_SCENARIOS.md). */
-export const mockReports: Record<string, Report> = {
+export const mockReports: Record<string, any> = {
   factual: {
     id: 'rep_factual',
     sessionId: 'sess_factual',

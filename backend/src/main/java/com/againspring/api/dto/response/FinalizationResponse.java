@@ -1,6 +1,5 @@
 package com.againspring.api.dto.response;
 
-import com.againspring.service.ChatService;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,10 +17,8 @@ public class FinalizationResponse {
     @JsonProperty("awaitingPartner")
     private boolean awaitingPartner;
 
-    public static FinalizationResponse from(ChatService.FinalizationResult result) {
-        return FinalizationResponse.builder()
-            .completed(result.completed())
-            .awaitingPartner(result.awaitingPartner())
-            .build();
+    public static FinalizationResponse from(Object result) {
+        // Stub: ChatService.FinalizationResult class removed
+        return FinalizationResponse.builder().build();
     }
 }

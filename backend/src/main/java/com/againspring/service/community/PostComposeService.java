@@ -1,4 +1,5 @@
 package com.againspring.service.community;
+import com.againspring.llm.PromptSanitizer;
 
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.VoteOption;
@@ -6,7 +7,6 @@ import com.againspring.domain.enums.PostCategory;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.llm.LLMProvider;
-import com.againspring.llm.bridge.PromptSanitizer;
 import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;

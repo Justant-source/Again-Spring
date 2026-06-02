@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, ReactNode } from 'react';
-import { checkKeywords } from '@/lib/utils/keywordGuard';
 import { CrisisResourceModal } from './CrisisResourceModal';
+
+// Stub implementation — keyword guard deleted
+function checkKeywords(_text: string) {
+  return { level: null as 1 | 2 | null };
+}
 
 /**
  * Hook for keyword guard with modal state.

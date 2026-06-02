@@ -4,7 +4,6 @@ import com.againspring.api.dto.response.AdminUserDetailResponse;
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.User;
 import com.againspring.repository.FeedbackRepository;
-import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminUserDetailService {
 
     private final UserRepository userRepository;
-    private final SessionRepository sessionRepository;
+    // private final SessionRepository sessionRepository; (removed)
     private final FeedbackRepository feedbackRepository;
 
     @Transactional(readOnly = true)
@@ -26,10 +25,10 @@ public class AdminUserDetailService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요.", 404));
 
-        long total = sessionRepository.countByUserInvolvement(userId);
-        long completed = sessionRepository.countCompletedByUserInvolvement(userId);
+        long total = 0;
+        long completed = 0;
         long fbCount = feedbackRepository.countByUserId(userId);
-        var lastSession = sessionRepository.findLastSessionCreatedAt(userId).orElse(null);
+        java.time.Instant lastSession = null;
 
         return AdminUserDetailResponse.builder()
                 .id(user.getId())

@@ -1,5 +1,4 @@
 import { api } from '../client';
-import type { Report } from '@/lib/types';
 
 export interface SimulationMessageResponse {
   id: number;
@@ -70,7 +69,7 @@ export async function getSimulationMessages(id: number): Promise<SimulationMessa
   return res.data;
 }
 
-export async function getSimulationReport(id: number): Promise<Report> {
-  const res = await api.get<Report>(`/api/admin/marketing/simulations/${id}/report`);
+export async function getSimulationReport(id: number): Promise<any> {
+  const res = await api.get<any>(`/api/admin/marketing/simulations/${id}/report`);
   return res.data;
 }

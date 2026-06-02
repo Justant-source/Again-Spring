@@ -1,6 +1,5 @@
 package com.againspring.api.dto.response;
 
-import com.againspring.service.ChatService;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,13 +20,8 @@ public class PartnerStatusResponse {
     private int messageCount;
     private Instant lastActivityAt;
 
-    public static PartnerStatusResponse from(ChatService.PartnerStatus status) {
-        return PartnerStatusResponse.builder()
-            .joined(status.joined())
-            .isActive(status.isActive())
-            .inviteSent(status.inviteSent())
-            .messageCount(status.messageCount())
-            .lastActivityAt(status.lastActivityAt())
-            .build();
+    public static PartnerStatusResponse from(Object status) {
+        // Stub: ChatService.PartnerStatus class removed
+        return PartnerStatusResponse.builder().build();
     }
 }

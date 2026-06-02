@@ -1,6 +1,5 @@
 package com.againspring.service.marketing.image;
 
-import com.againspring.domain.Report;
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.domain.marketing.MarketingSimulation;
 import com.againspring.repository.marketing.MarketingSourceStoryRepository;
@@ -14,8 +13,7 @@ import java.util.Map;
 
 /**
  * Selects the most contextually appropriate metaphor SVG for a marketing content piece.
- * Returns the raw SVG filename (e.g. "05-person-in-rain.svg") — served as static assets by the FE,
- * not as rendered PNGs — so no imageDir write is needed.
+ * NOTE: Report class removed due to deletion of mediation code. Stub implementation.
  */
 @Component
 @RequiredArgsConstructor
@@ -51,56 +49,12 @@ public class MarketingMetaphorSelector {
         "08-empty-chair.svg",     "02-boiling-kettle.svg", "11-half-open-letter.svg"
     );
 
-    // report.metaphorId → SVG filename (최우선 — 리포트가 선택한 메타포를 그대로 사용)
-    private static final Map<String, String> METAPHOR_ID_TO_SVG = Map.ofEntries(
-        Map.entry("locked-mailbox",   "01-locked-mailbox.svg"),
-        Map.entry("boiling-kettle",   "02-boiling-kettle.svg"),
-        Map.entry("locked-door",      "03-locked-door.svg"),
-        Map.entry("too-big-umbrella", "04-too-big-umbrella.svg"),
-        Map.entry("person-in-rain",   "05-person-in-rain.svg"),
-        Map.entry("frozen-pond",      "06-frozen-pond.svg"),
-        Map.entry("cracked-window",   "07-cracked-window.svg"),
-        Map.entry("empty-chair",      "08-empty-chair.svg"),
-        Map.entry("overflowing-cup",  "09-overflowing-cup.svg"),
-        Map.entry("rope-bridge",      "10-rope-bridge.svg"),
-        Map.entry("half-open-letter", "11-half-open-letter.svg"),
-        Map.entry("two-trees-roots",  "12-two-trees-roots.svg")
-    );
-
-    // NVC need keyword → preferred SVG (relationType 이전 보조 fallback)
-    private static final Map<String, String> NEED_TO_SVG = Map.ofEntries(
-        Map.entry("연결",   "30-string-telephone.svg"),
-        Map.entry("소통",   "11-half-open-letter.svg"),
-        Map.entry("인정",   "35-empty-trophy.svg"),
-        Map.entry("자율성", "37-chained-anchor.svg"),
-        Map.entry("안전",   "04-too-big-umbrella.svg"),
-        Map.entry("이해",   "29-wrongly-folded-letter.svg"),
-        Map.entry("회복",   "58-crack-with-light.svg"),
-        Map.entry("신뢰",   "31-inside-out-umbrella.svg"),
-        Map.entry("돌봄",   "55-open-window.svg"),
-        Map.entry("존중",   "56-cups-finally-touching.svg")
-    );
-
     /**
      * Selects an SVG filename appropriate for the given simulation and report context.
+     * Stub: returns relationType-based SVG.
      */
-    public String selectFilename(MarketingSimulation sim, Report report) {
-        // 1. report.metaphorId 최우선 — 리포트가 선택한 메타포와 일러스트를 일치시킴
-        if (report != null && report.getMetaphorId() != null) {
-            String svg = METAPHOR_ID_TO_SVG.get(report.getMetaphorId());
-            if (svg != null) return svg;
-        }
-
-        // 2. NVC need keyword (metaphorId 없을 때 보조)
-        if (report != null && report.getNvcNeed() != null) {
-            for (Map.Entry<String, String> e : NEED_TO_SVG.entrySet()) {
-                if (report.getNvcNeed().contains(e.getKey())) {
-                    return e.getValue();
-                }
-            }
-        }
-
-        // 3. relationType-based candidate list
+    public String selectFilename(MarketingSimulation sim, Object report) {
+        // Stub: skip report (was Report report)
         String relationType = resolveRelationType(sim);
         List<String> candidates = BY_RELATION.getOrDefault(relationType, GENERAL_FALLBACK);
         return candidates.get(0);

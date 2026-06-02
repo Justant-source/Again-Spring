@@ -1,13 +1,15 @@
 import type {
   User,
-  Message,
-  Session,
-  Report,
   CommunicationStyle,
-  RelationType,
-  MessageSender,
-  SessionStatus,
 } from '@/lib/types'
+
+// Legacy types removed — use any for fixtures
+type Message = any;
+type Session = any;
+type Report = any;
+type RelationType = string;
+type MessageSender = string;
+type SessionStatus = string;
 
 // ============================================================================
 // User Fixtures

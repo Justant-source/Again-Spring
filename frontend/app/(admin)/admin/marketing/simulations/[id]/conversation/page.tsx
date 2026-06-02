@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { MessageBubble } from '@/components/chat/MessageBubble';
-import { SoloReport } from '@/components/result/solo/SoloReport';
 import {
   getSimulation,
   getSimulationMessages,
@@ -11,7 +9,6 @@ import {
   type SimulationMessageResponse,
   type SimulationResponse,
 } from '@/lib/api/marketing/simulationApi';
-import type { Report } from '@/lib/types';
 
 export default function SimulationConversationPage() {
   const router = useRouter();
@@ -20,7 +17,7 @@ export default function SimulationConversationPage() {
 
   const [simulation, setSimulation] = useState<SimulationResponse | null>(null);
   const [messages, setMessages] = useState<SimulationMessageResponse[]>([]);
-  const [report, setReport] = useState<Report | null>(null);
+  const [report, setReport] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [reportOpen, setReportOpen] = useState(true);
   const [error, setError] = useState('');
@@ -170,20 +167,24 @@ export default function SimulationConversationPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {messages.map((msg) => (
-              <MessageBubble
+              <div
                 key={msg.id}
-                message={{
-                  id: msg.id,
-                  sender: msg.sender,
-                  content: msg.content,
-                  charCount: msg.charCount,
-                  isFinalizeSuggestion: msg.isFinalizeSuggestion,
-                  isPartnerJoinNotice: msg.isPartnerJoinNotice,
-                  createdAt: msg.createdAt,
-                  status: msg.status,
+                style={{
+                  padding: '10px 12px',
+                  marginBottom: '8px',
+                  borderRadius: '8px',
+                  background: msg.sender === 'USER_A' ? '#f0f0f0' : '#e8e8e8',
+                  textAlign: msg.sender === 'USER_A' ? 'left' : 'left',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                  color: '#333',
                 }}
-                isMine={msg.sender === 'USER_A'}
-              />
+              >
+                <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                  {msg.sender} • {msg.status}
+                </div>
+                <div>{msg.content}</div>
+              </div>
             ))}
             <div ref={chatEndRef} />
           </div>
@@ -223,9 +224,13 @@ export default function SimulationConversationPage() {
         </button>
 
         {reportOpen && (
-          <div>
+          <div style={{ padding: '20px' }}>
             {report ? (
-              <SoloReport report={report} sessionId={report.sessionId} />
+              <div style={{ fontSize: '13px', color: '#333', lineHeight: '1.6' }}>
+                <pre style={{ background: '#f5f5f5', padding: '12px', borderRadius: '4px', overflow: 'auto', fontSize: '11px' }}>
+                  {JSON.stringify(report, null, 2)}
+                </pre>
+              </div>
             ) : (
               <div
                 style={{

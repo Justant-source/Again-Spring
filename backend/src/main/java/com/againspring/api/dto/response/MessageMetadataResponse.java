@@ -1,7 +1,5 @@
 package com.againspring.api.dto.response;
 
-import com.againspring.domain.enums.MessageSender;
-import com.againspring.service.ChatService;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,16 +15,12 @@ import java.time.Instant;
 @NoArgsConstructor @AllArgsConstructor
 public class MessageMetadataResponse {
     private Long id;
-    private MessageSender sender;
+    private String sender;
     private int charCount;
     private Instant createdAt;
 
-    public static MessageMetadataResponse from(ChatService.MessageMetadata meta) {
-        return MessageMetadataResponse.builder()
-            .id(meta.id())
-            .sender(meta.sender())
-            .charCount(meta.charCount())
-            .createdAt(meta.createdAt())
-            .build();
+    public static MessageMetadataResponse from(Object meta) {
+        // Stub: ChatService.MessageMetadata class removed
+        return MessageMetadataResponse.builder().build();
     }
 }

@@ -6,12 +6,8 @@ import com.againspring.api.dto.request.UpdateUserRequest;
 import com.againspring.api.dto.response.OnboardingResponse;
 import com.againspring.api.dto.response.UserResponse;
 import com.againspring.common.exception.BusinessException;
-import com.againspring.domain.Session;
 import com.againspring.domain.User;
-import com.againspring.domain.enums.SessionStatus;
 import com.againspring.repository.EmailVerificationRepository;
-import com.againspring.repository.GuestSessionRepository;
-import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.StyleCalculator.CommunicationStyle;
 import java.time.Instant;
@@ -33,9 +29,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final StyleCalculator styleCalculator;
     private final PasswordEncoder passwordEncoder;
-    private final SessionRepository sessionRepository;
     private final EmailVerificationRepository emailVerificationRepository;
-    private final GuestSessionRepository guestSessionRepository;
 
     /**
      * Get user profile.
@@ -207,15 +201,8 @@ public class UserService {
         Instant now = Instant.now();
         String originalEmail = user.getEmail();
 
-        // Cancel active sessions so the partner is not left waiting
-        List<SessionStatus> activeStatuses = List.of(
-                SessionStatus.CHATTING_SOLO, SessionStatus.CHATTING_DUO,
-                SessionStatus.AWAITING_FINALIZATION, SessionStatus.WAITING_B,
-                SessionStatus.B_JOINED, SessionStatus.IN_MEDIATION, SessionStatus.SOLO_MODE);
-        sessionRepository.findByCreatedByUserIdAndStatusIn(userId, activeStatuses)
-                .forEach(s -> { s.setStatus(SessionStatus.TERMINATED); s.setCompletedAt(now); });
-        sessionRepository.findByInviteeUserIdAndStatusIn(userId, activeStatuses)
-                .forEach(s -> { s.setStatus(SessionStatus.TERMINATED); s.setCompletedAt(now); });
+        // NOTE: Session cancellation removed due to deletion of Session/ChatService classes
+        // TODO: Implement session cleanup for deleted users
 
         // Anonymize PII — keep the row for statistics/audit
         String shortId = userId.length() >= 8 ? userId.substring(0, 8) : userId;
@@ -238,8 +225,8 @@ public class UserService {
             emailVerificationRepository.deleteByEmail(originalEmail);
         }
 
-        // Remove guest session mapping (guest users only; noop for regular users)
-        guestSessionRepository.deleteByGuestId(userId);
+        // NOTE: Guest session mapping removal removed due to deletion of GuestSession class
+        // TODO: Implement guest session cleanup for deleted users
 
         log.info("User account anonymized: {}", userId);
     }

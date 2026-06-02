@@ -6,10 +6,7 @@ import com.againspring.api.dto.request.LoginRequest;
 import com.againspring.api.dto.request.SignupRequest;
 import com.againspring.api.dto.response.AuthResponse;
 import com.againspring.common.exception.BusinessException;
-import com.againspring.domain.GuestSession;
 import com.againspring.domain.User;
-import com.againspring.repository.GuestSessionRepository;
-import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.security.JwtService;
 import com.againspring.util.GuestNicknameGenerator;
@@ -30,8 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final GuestSessionRepository guestSessionRepository;
-    private final SessionRepository sessionRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
@@ -114,13 +109,7 @@ public class AuthService {
         }
         User savedMember = userRepository.save(newMember);
 
-        // 2) 세션 ownership 이전 (createdByUserId / inviteeUserId 모두)
-        int reassignedCreated = sessionRepository.reassignCreatedBy(guestId, savedMember.getId());
-        int reassignedInvited = sessionRepository.reassignInvitee(guestId, savedMember.getId());
-        log.info("Guest sessions migrated: created={}, invited={} (guest {} → member {})",
-                reassignedCreated, reassignedInvited, guestId, savedMember.getId());
-
-        // 3) 게스트 user soft delete (재인증 시도 차단)
+        // 2) 게스트 user soft delete (재인증 시도 차단)
         guest.setDeletedAt(Instant.now());
         userRepository.save(guest);
         log.info("Guest user soft-deleted after migration: {}", guestId);
@@ -225,35 +214,16 @@ public class AuthService {
 
     /**
      * 게스트 토큰 발급.
-     * inviteToken이 있으면 같은 URL 재방문 시 동일 Guest ID를 반환한다.
      */
     @Transactional
     public AuthResponse guest(GuestRequest request) {
-        String guestId;
+        String guestId = generateGuestId();
         String displayNickname = (request.getNickname() != null && !request.getNickname().isBlank())
                 ? request.getNickname()
                 : GuestNicknameGenerator.generateUnique(
                         userRepository::existsByNicknameAndDeletedAtIsNull);
 
-        if (request.getInviteToken() != null && !request.getInviteToken().isBlank()) {
-            guestId = guestSessionRepository.findByInviteToken(request.getInviteToken())
-                    .map(GuestSession::getGuestId)
-                    .orElseGet(() -> {
-                        String newId = generateGuestId();
-                        GuestSession gs = GuestSession.builder()
-                                .inviteToken(request.getInviteToken())
-                                .guestId(newId)
-                                .guestNickname(displayNickname)
-                                .expiresAt(Instant.now().plusSeconds(86400 * 30)) // 30일
-                                .build();
-                        guestSessionRepository.save(gs);
-                        log.info("Guest session created: {} for token {}", newId, request.getInviteToken());
-                        return newId;
-                    });
-        } else {
-            guestId = generateGuestId();
-            log.info("Guest token issued (no invite): {}", guestId);
-        }
+        log.info("Guest token issued: {}", guestId);
 
         // 게스트 유저를 users 테이블에 저장 (없을 때만) — UserDetailsService/SessionService 인증 경로 공유
         if (!userRepository.existsById(guestId)) {

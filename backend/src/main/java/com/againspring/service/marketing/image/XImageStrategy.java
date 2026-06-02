@@ -1,10 +1,7 @@
 package com.againspring.service.marketing.image;
 
-import com.againspring.domain.Message;
-import com.againspring.domain.Report;
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.domain.marketing.MarketingSimulation;
-import com.againspring.repository.MessageRepository;
 import com.againspring.service.marketing.ImageRenderClient;
 import com.againspring.service.marketing.content.GenerationOutput;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +28,6 @@ import java.util.Map;
 public class XImageStrategy implements ImageCompositionStrategy {
 
     private final ImageRenderClient renderClient;
-    private final MessageRepository messageRepository;
     private final KeyMomentSelector keyMomentSelector;
     private final MarketingMetaphorSelector metaphorSelector;
 
@@ -45,7 +41,7 @@ public class XImageStrategy implements ImageCompositionStrategy {
     public List<RenderedImage> compose(
             GenerationOutput output,
             MarketingSimulation sim,
-            Report report,
+            Object report,  // Stub: was Report report
             Long contentId,
             String imageDir
     ) throws IOException {
@@ -82,34 +78,21 @@ public class XImageStrategy implements ImageCompositionStrategy {
                 results.add(new RenderedImage(filename, "QUOTE_CARD", "TWEET_2", line1, order++));
                 log.info("Quote card saved: {}/{}", imageDir, filename);
             }
-        } else if (report != null && report.getMetaphorDisplayName() != null) {
+        } else if (report != null && "" != null) {
             byte[] png = renderClient.renderQuote(
-                    report.getMetaphorDisplayName(),
-                    report.getNvcNeed() != null ? report.getNvcNeed() : "",
+                    "",
+                    "",
                     "다시봄", "warm");
             if (png != null && png.length > 0) {
                 String filename = "quote_" + contentId + ".png";
                 Files.write(dir.resolve(filename), png);
                 results.add(new RenderedImage(filename, "QUOTE_CARD", "TWEET_2",
-                        report.getMetaphorDisplayName(), order++));
+                        "", order++));
             }
         }
 
         // 3. Optional chat key-moment screenshot (last tweet)
-        if (sim.getSessionId() != null) {
-            List<Message> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sim.getSessionId());
-            if (!messages.isEmpty()) {
-                List<Message> keyMoments = keyMomentSelector.select(messages);
-                List<Map<String, Object>> msgData = keyMomentSelector.toRendererPayload(keyMoments);
-                byte[] png = renderClient.renderChatPreview(msgData, "다시봄", "AI 갈등 중재", 0);
-                if (png != null && png.length > 0) {
-                    String filename = "chat_" + contentId + ".png";
-                    Files.write(dir.resolve(filename), png);
-                    results.add(new RenderedImage(filename, "CHAT_PREVIEW", "TWEET_5",
-                            "갈등 대화 미리보기", order++));
-                }
-            }
-        }
+        // TODO: Implement chat preview rendering for marketing simulation
 
         return results;
     }

@@ -1,10 +1,7 @@
 package com.againspring.service.marketing.image;
 
-import com.againspring.domain.Message;
-import com.againspring.domain.Report;
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.domain.marketing.MarketingSimulation;
-import com.againspring.repository.MessageRepository;
 import com.againspring.service.marketing.ImageRenderClient;
 import com.againspring.service.marketing.content.GenerationOutput;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +30,6 @@ import java.util.Map;
 public class NaverImageStrategy implements ImageCompositionStrategy {
 
     private final ImageRenderClient renderClient;
-    private final MessageRepository messageRepository;
     private final KeyMomentSelector keyMomentSelector;
     private final MarketingMetaphorSelector metaphorSelector;
 
@@ -47,7 +43,7 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
     public List<RenderedImage> compose(
             GenerationOutput output,
             MarketingSimulation sim,
-            Report report,
+            Object report,  // Stub: was Report report
             Long contentId,
             String imageDir
     ) throws IOException {
@@ -87,13 +83,11 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
 
             byte[] png = switch (kind) {
                 case "chat" -> renderChatImage(sim, contentId);
-                case "report-needs" -> renderReportImage(report, "needs");
-                case "report-ratio" -> renderReportImage(report, "ratio");
-                case "report-combined" -> renderReportImage(report, "combined");
+                case "report-needs", "report-ratio", "report-combined" -> null;
                 case "quote" -> {
                     String quoteText = (String) slot.get("quoteText");
-                    if (quoteText == null && report != null)
-                        quoteText = report.getMetaphorDisplayName();
+                    if (quoteText == null)
+                        quoteText = "";
                     yield renderClient.renderQuote(quoteText, "", "다시봄", "warm");
                 }
                 default -> null;
@@ -134,40 +128,20 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
 
     private byte[] renderChatImage(MarketingSimulation sim, Long contentId) {
         if (sim.getSessionId() == null) return null;
-        List<Message> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sim.getSessionId());
-        if (messages.isEmpty()) return null;
-        List<Message> keyMoments = keyMomentSelector.select(messages);
-        return renderClient.renderChatPreview(
-                keyMomentSelector.toRendererPayload(keyMoments), "다시봄", "AI 갈등 중재", 0);
+        // TODO: Implement chat image rendering for marketing simulation
+        log.warn("Chat image rendering not yet implemented for marketing simulation {}", sim.getId());
+        return null;
     }
 
-    private byte[] renderReportImage(Report report, String mode) {
+    private byte[] renderReportImage(Object report, String mode) {
         if (report == null) return null;
         Map<String, Object> reportData = buildReportData(report);
         return renderClient.renderReportSummary(reportData, mode);
     }
 
-    private Map<String, Object> buildReportData(Report report) {
-        Map<String, Object> data = new HashMap<>();
-
-        if (report.getNeedsMap() != null) {
-            Map<String, Object> nm = new HashMap<>();
-            // NeedsMap inner fields depend on Report.NeedsMap inner record
-            nm.put("labelA", "A님");
-            nm.put("labelB", "B님");
-            data.put("needsMap", nm);
-        }
-
-        if (report.getContributionRatio() != null) {
-            Map<String, Object> cr = new HashMap<>();
-            // ContributionRatio inner fields accessed via reflection-safe toString
-            data.put("contributionRatio", cr);
-        }
-
-        if (report.getMetaphorDisplayName() != null) {
-            data.put("metaphor", report.getMetaphorDisplayName());
-        }
-
-        return data;
+    private Map<String, Object> buildReportData(Object report) {
+        // Stub: Report class removed
+        log.warn("renderReportImage not yet implemented for refactored architecture");
+        return new HashMap<>();
     }
 }

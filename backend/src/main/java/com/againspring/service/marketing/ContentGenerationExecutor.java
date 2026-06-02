@@ -1,10 +1,8 @@
 package com.againspring.service.marketing;
 
-import com.againspring.domain.Report;
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.domain.marketing.MarketingSimulation;
 import com.againspring.domain.marketing.MarketingSourceStory;
-import com.againspring.repository.ReportRepository;
 import com.againspring.repository.marketing.MarketingContentRepository;
 import com.againspring.repository.marketing.MarketingSourceStoryRepository;
 import com.againspring.safety.MarketingCopyGuard;
@@ -25,6 +23,7 @@ import java.util.List;
 
 /**
  * 콘텐츠 비동기 생성 실행 빈.
+ * NOTE: Report 클래스 삭제 후 스텁으로 변경됨.
  * ContentService와 분리된 빈으로 @Async 프록시가 올바르게 적용되도록 함.
  */
 @Slf4j
@@ -35,7 +34,6 @@ public class ContentGenerationExecutor {
 
     private final MarketingContentRepository contentRepo;
     private final MarketingSourceStoryRepository storyRepo;
-    private final ReportRepository reportRepository;
     private final PlatformContentRouter router;
     private final MarketingCopyGuard copyGuard;
     private final ImageCompositionStrategyRegistry imageStrategyRegistry;
@@ -61,12 +59,8 @@ public class ContentGenerationExecutor {
 
             boolean hasViolations = output.bodyText() != null && copyGuard.hasViolations(output.bodyText());
 
-            // Image composition per platform strategy
-            Report report = simulation.getSessionId() != null
-                    ? reportRepository.findBySessionId(simulation.getSessionId()).orElse(null)
-                    : null;
-
-            String finalImagePaths = composeAndSaveImages(platform, output, simulation, report, contentId);
+            // Image composition per platform strategy (Report stub: null)
+            String finalImagePaths = composeAndSaveImages(platform, output, simulation, null, contentId);
 
             MarketingContent content = contentRepo.findById(contentId).orElseThrow();
             content.setBodyText(output.bodyText());
@@ -95,12 +89,12 @@ public class ContentGenerationExecutor {
             MarketingContent.Platform platform,
             GenerationOutput output,
             MarketingSimulation simulation,
-            Report report,
+            Object report,  // Stub: was Report report
             Long contentId
     ) {
         return imageStrategyRegistry.find(platform).map(strategy -> {
             try {
-                List<RenderedImage> images = strategy.compose(output, simulation, report, contentId, imageDir);
+                List<RenderedImage> images = strategy.compose(output, simulation, null, contentId, imageDir);
                 if (images.isEmpty()) return null;
                 return objectMapper.writeValueAsString(images.stream()
                         .map(img -> java.util.Map.of(
@@ -118,12 +112,6 @@ public class ContentGenerationExecutor {
     }
 
     private String buildSummary(MarketingSimulation simulation) {
-        if (simulation.getSessionId() != null) {
-            Report report = reportRepository.findBySessionId(simulation.getSessionId()).orElse(null);
-            if (report != null && report.getCoreSummary() != null) {
-                return buildSummaryFromReport(report, simulation);
-            }
-        }
         if (simulation.getConversationLog() != null && !simulation.getConversationLog().isBlank()) {
             return String.format("대화 기록:\n%s\n\n턴 수: %d",
                     simulation.getConversationLog(),
@@ -132,16 +120,6 @@ public class ContentGenerationExecutor {
         return String.format("Persona A: %s\nTurns: %d",
                 simulation.getPersonaA() != null ? simulation.getPersonaA() : "Unknown",
                 simulation.getActualTurnCount() != null ? simulation.getActualTurnCount() : 0);
-    }
-
-    private String buildSummaryFromReport(Report report, MarketingSimulation simulation) {
-        StringBuilder sb = new StringBuilder();
-        if (report.getCoreSummary() != null) sb.append("핵심 요약: ").append(report.getCoreSummary()).append("\n");
-        if (report.getNvcObservation() != null) sb.append("NVC 관찰: ").append(report.getNvcObservation()).append("\n");
-        if (report.getNvcNeed() != null) sb.append("NVC 욕구: ").append(report.getNvcNeed()).append("\n");
-        if (report.getMetaphorDisplayName() != null) sb.append("관계 메타포: ").append(report.getMetaphorDisplayName()).append("\n");
-        sb.append("턴 수: ").append(simulation.getActualTurnCount() != null ? simulation.getActualTurnCount() : 0);
-        return sb.toString();
     }
 
     private String buildSafetyJson(boolean hasViolations) {

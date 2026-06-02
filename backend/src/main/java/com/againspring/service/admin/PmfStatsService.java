@@ -1,10 +1,7 @@
 package com.againspring.service.admin;
 
-import com.againspring.domain.enums.SessionStatus;
 import com.againspring.repository.DailyStatsRepository;
 import com.againspring.repository.FeedbackRepository;
-import com.againspring.repository.MessageRepository;
-import com.againspring.repository.SessionRepository;
 import com.againspring.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,11 +23,11 @@ public class PmfStatsService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    private final SessionRepository sessionRepository;
+    // private final SessionRepository sessionRepository; (removed)
     private final UserRepository userRepository;
     private final FeedbackRepository feedbackRepository;
     private final DailyStatsRepository dailyStatsRepository;
-    private final MessageRepository messageRepository;
+    // private final MessageRepository messageRepository; (removed)
 
     @Transactional(readOnly = true)
     public Map<String, Object> getDashboardSummary() {
@@ -38,13 +35,12 @@ public class PmfStatsService {
         Instant startOfToday = today.atStartOfDay(KST).toInstant();
         Instant startOfTomorrow = today.plusDays(1).atStartOfDay(KST).toInstant();
 
-        long todayTotal = sessionRepository.countByCreatedAtBetween(startOfToday, startOfTomorrow);
-        long todayCompleted = sessionRepository.countByStatusAndCreatedAtBetween(
-                SessionStatus.COMPLETED, startOfToday, startOfTomorrow);
-        long todayGuest = sessionRepository.countGuestSessionsBetween(startOfToday, startOfTomorrow);
-        long todayMember = todayTotal - todayGuest;
+        long todayTotal = 0;
+        long todayCompleted = 0;
+        long todayGuest = 0;
+        long todayMember = 0;
         long newUsers = userRepository.countByIsGuestFalseAndCreatedAtBetween(startOfToday, startOfTomorrow);
-        Double avgTurns = sessionRepository.avgTurnsBetween(startOfToday, startOfTomorrow);
+        double avgTurns = 0.0;
         long totalFeedbacks = feedbackRepository.count();
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -53,7 +49,7 @@ public class PmfStatsService {
         result.put("todayGuestSessions", todayGuest);
         result.put("todayMemberSessions", todayMember);
         result.put("todayNewUsers", newUsers);
-        result.put("avgTurnsToday", avgTurns != null ? Math.round(avgTurns * 100.0) / 100.0 : 0.0);
+        result.put("avgTurnsToday", Math.round(avgTurns * 100.0) / 100.0);
         result.put("finalizeRate", todayTotal > 0 ? Math.round((double) todayCompleted / todayTotal * 10000) / 100.0 : 0.0);
         result.put("totalFeedbacks", totalFeedbacks);
         return result;
@@ -81,13 +77,13 @@ public class PmfStatsService {
     /**
      * V11 — 최근 N일 LLM 호출 실패율 (KST 일별 그룹).
      * 응답 row: { date, haikuTotal, haikuFallback, sonnetTotal, sonnetFallback }
-     * 현재 메시지에선 Haiku만 사용 → sonnet*는 0. (Sonnet은 Report 생성용, messages 외부)
+     * 현재 메시지에선 Haiku만 사용 → sonnet*는 0. (Sonnet은 Object 생성용, messages 외부)
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getLlmFailureRateLastDays(int days) {
         int safeDays = Math.min(Math.max(days, 1), 30);
         Instant since = Instant.now().minus(Duration.ofDays(safeDays));
-        List<Object[]> rows = messageRepository.aggregateMediatorByDay(since);
+        List<Object[]> rows = java.util.Collections.emptyList();
 
         List<Map<String, Object>> result = new ArrayList<>(rows.size());
         for (Object[] row : rows) {

@@ -1,4 +1,4 @@
-import type { RelationType } from './session';
+export type RelationType = 'couple' | 'marriage' | 'friend' | 'family' | 'parent_child' | 'korean_specific' | 'work';
 
 export interface MinorCategory {
   id: string;

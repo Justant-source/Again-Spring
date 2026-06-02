@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
 import { DeleteAccountModal } from '@/components/profile/DeleteAccountModal';
@@ -9,8 +9,6 @@ import { ChangePasswordSection } from '@/components/profile/ChangePasswordSectio
 import { permissionsFor } from '@/lib/constants/userPermissions';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { STYLE_MOTIF } from '@/components/shared/Motif';
-import { COMMUNICATION_STYLES } from '@/lib/constants/communicationStyles';
-import { MediatorStylePicker } from '@/components/session/MediatorStylePicker';
 import { api } from '@/lib/api/client';
 import type { User } from '@/lib/types';
 
@@ -36,15 +34,6 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'myPosts' | 'voted' | 'saved'>('myPosts');
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
-
-  // V47~: 중재자 톤 슬라이더 — X축(팩트↔공감), Y축은 기본값 50 유지.
-  // 변경 시 debounce 후 PATCH /api/users/me/mediator-style 로 저장.
-  const [mediatorX, setMediatorX] = useState<number>(user?.mediatorDefaultX ?? 50);
-  const mediatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    setMediatorX(user?.mediatorDefaultX ?? 50);
-  }, [user?.mediatorDefaultX]);
 
   useEffect(() => {
     if (hasHydrated && !user) {
@@ -77,27 +66,9 @@ export default function ProfilePage() {
 
   const showStyleSection = permissionsFor(user).ui.showCommunicationStyleSection;
 
-  const style = user.communicationStyle
-    ? COMMUNICATION_STYLES[user.communicationStyle]
-    : null;
-
   const MotifComponent = user.communicationStyle
     ? STYLE_MOTIF[user.communicationStyle]
     : null;
-
-  const onMediatorChange = (x: number) => {
-    setMediatorX(x);
-    if (mediatorTimerRef.current) clearTimeout(mediatorTimerRef.current);
-    mediatorTimerRef.current = setTimeout(() => {
-      if (x === user.mediatorDefaultX) return;
-      // V47~: 새 전용 엔드포인트 사용
-      api.patch('/api/users/me/mediator-style', { mediatorStyleX: x })
-        .then(() => {
-          setUser({ ...user, mediatorDefaultX: x });
-        })
-        .catch((e) => console.error('Mediator update failed:', e));
-    }, 500);
-  };
 
   const handleLogout = async () => {
     clearUser();
@@ -388,7 +359,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Communication style card — admin은 정책으로 노출 안 함 */}
-            {showStyleSection && (
+            {showStyleSection && MotifComponent && (
               <div
                 className="letter-card"
                 style={{
@@ -400,7 +371,7 @@ export default function ProfilePage() {
                   당신의 대화 스타일
                 </div>
 
-                {style && MotifComponent ? (
+                {MotifComponent ? (
                   <>
                     <div
                       style={{
@@ -415,7 +386,7 @@ export default function ProfilePage() {
                           width: 56,
                           height: 56,
                           borderRadius: '50%',
-                          background: style.color,
+                          background: 'var(--P-a)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -433,28 +404,9 @@ export default function ProfilePage() {
                             fontWeight: 500,
                           }}
                         >
-                          {style.label}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--L-sub)', marginTop: 2 }}>
-                          {style.description}
+                          {user.communicationStyle}
                         </div>
                       </div>
-                    </div>
-
-                    <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--L-sub)', marginBottom: 16 }}>
-                      <div style={{ fontWeight: 500, marginBottom: 8 }}>강점</div>
-                      <ul style={{ paddingLeft: '16px', marginBottom: 12 }}>
-                        {style.strengths.map((s: string, i: number) => (
-                          <li key={i}>{s}</li>
-                        ))}
-                      </ul>
-
-                      <div style={{ fontWeight: 500, marginBottom: 8 }}>유의할 점</div>
-                      <ul style={{ paddingLeft: '16px' }}>
-                        {style.caution.map((c: string, i: number) => (
-                          <li key={i}>{c}</li>
-                        ))}
-                      </ul>
                     </div>
 
                     <div
@@ -530,14 +482,6 @@ export default function ProfilePage() {
                 )}
               </div>
             )}
-
-            {/* 중재자 대화 스타일 — 새 대화 시작 시 picker 기본값. 매 세션에서 다시 조정 가능. */}
-            <div className="letter-card" style={{ padding: '18px 16px', marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 10 }}>
-                중재자 대화 스타일
-              </div>
-              <MediatorStylePicker value={mediatorX} onChange={onMediatorChange} showHeader={false} />
-            </div>
 
             {/* 비밀번호 변경 (이메일 가입자만) */}
             <div style={{ marginBottom: 16 }}>

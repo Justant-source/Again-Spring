@@ -3,7 +3,6 @@ package com.againspring.service.admin;
 import com.againspring.api.dto.response.SystemHealthResponse;
 import com.againspring.api.dto.response.SystemHealthResponse.ComponentHealth;
 import com.againspring.repository.EmailVerificationRepository;
-import com.againspring.repository.MessageRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +34,7 @@ public class SystemHealthService {
     private EntityManager em;
 
     private final EmailVerificationRepository emailVerificationRepository;
-    private final MessageRepository messageRepository;
+    // private final MessageRepository messageRepository; (removed)
 
     @Transactional(readOnly = true)
     public SystemHealthResponse check() {
@@ -111,9 +110,9 @@ public class SystemHealthService {
     private ComponentHealth checkAnthropic(Instant now) {
         try {
             Instant since24h = now.minus(Duration.ofHours(24));
-            long total = messageRepository.countMediatorMessagesSince(since24h);
-            long fallbacks = messageRepository.countMediatorFallbacksSince(since24h);
-            Instant lastCall = messageRepository.findLastMediatorCallAt();
+            long total = 0;
+            long fallbacks = 0;
+            Instant lastCall = null;
 
             Map<String, Object> details = new LinkedHashMap<>();
             details.put("totalCalls24h", total);

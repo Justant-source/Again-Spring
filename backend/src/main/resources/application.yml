@@ -104,13 +104,8 @@ app:
     support-email: againspring2026@gmail.com
 
 llm:
-  provider: ${LLM_PROVIDER:claude-code}   # deprecated: llm.chat.provider / llm.report.provider 사용
-  chat:
-    provider: ${LLM_CHAT_PROVIDER:remote}     # dev/prod 모두 CLI 브릿지(remote) 사용
-  report:
-    provider: ${LLM_REPORT_PROVIDER:remote}   # dev/prod 모두 CLI 브릿지(remote) 사용
   jury:
-    provider: ${LLM_JURY_PROVIDER:remote}     # dev/prod 모두 CLI 브릿지(remote) 사용
+    provider: ${LLM_JURY_PROVIDER:remote}     # CLI 브릿지(remote) 사용
     model: ${JURY_LLM_MODEL:claude-haiku-4-5-20251001}
   compose:
     model: ${COMPOSE_LLM_MODEL:claude-haiku-4-5-20251001}
@@ -120,19 +115,6 @@ llm:
     read-timeout-ms: ${LLM_REMOTE_READ_TIMEOUT_MS:130000}
     default-timeout-ms: ${LLM_REMOTE_DEFAULT_TIMEOUT_MS:120000}
     poll-wait-ms: ${LLM_REMOTE_POLL_WAIT_MS:25000}
-  claude-code:
-    binary-path: ${CLAUDE_BIN:claude}
-    model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
-    report-model: ${REPORT_LLM_MODEL:claude-sonnet-4-6}
-    pool-size: ${CLAUDE_POOL_SIZE:3}
-    default-timeout-ms: 120000
-  claude-api:
-    key: ${ANTHROPIC_API_KEY:}
-    model: ${LLM_API_CHAT_MODEL:claude-haiku-4-5-20251001}
-    max-concurrency: ${LLM_API_MAX_CONCURRENCY:8}
-    cache:
-      enabled: ${LLM_API_CACHE_ENABLED:true}
-      ttl: ${LLM_API_CACHE_TTL:5m}
 
 logging:
   level:
