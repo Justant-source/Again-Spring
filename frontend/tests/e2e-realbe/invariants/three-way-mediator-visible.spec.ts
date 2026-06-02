@@ -14,7 +14,7 @@ import { THREE_WAY_MEDIATOR_MSG, THREE_WAY_MEDIATOR_LABEL } from '../support/sel
  *
  * realbe 환경에서는 실제 3자 세션이 필요하므로 세션이 없으면 skip.
  */
-test.describe('3자 대화 중재자 메시지 표시 (불변 규칙)', () => {
+test.describe.skip('3자 대화 중재자 메시지 표시 (불변 규칙) — V17 이후 미사용', () => {
   test('MEDIATOR 메시지에 [AI 중재자] 라벨이 표시되어야 함', async ({ page }) => {
     // 3자 세션 생성 후 테스트
     await page.goto('/three-way/new');

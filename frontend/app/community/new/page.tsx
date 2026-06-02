@@ -1,255 +1,304 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { postApi } from '@/lib/api/community/postApi';
+import { useRouter } from 'next/navigation';
+import { postApi, PostCreateRequest } from '@/lib/api/community/postApi';
 import { CATEGORIES } from '@/lib/constants/categories';
 import { checkKeywords } from '@/lib/utils/keywordGuard';
 import { CrisisResourceModal } from '@/components/shared/CrisisResourceModal';
-import LegalNoticeBox from '@/components/shared/LegalNoticeBox';
+import { JurorPicker } from '@/components/community/c3/JurorPicker';
+import { useUserStore } from '@/lib/store/userStore';
+import { GRN, GRN_BG, RED, RED_BG } from '@/lib/constants/factionColors';
 
-type Step = 1 | 2 | 3;
+type Step = 'compose' | 'mode' | 'analyzing';
 
 export default function CommunityNewPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [step, setStep] = useState<Step>(1);
+  const user = useUserStore((s) => s.user);
+  const isGuest = user?.isGuest ?? true;
+
+  const [step, setStep] = useState<Step>('compose');
+  const [title, setTitle] = useState('');
   const [bodyRaw, setBodyRaw] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0]?.id || '');
-  const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PRIVATE');
+  const [jurorCount, setJurorCount] = useState(3);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [crisisOpen, setCrisisOpen] = useState(false);
-  const [generatedPost, setGeneratedPost] = useState<{ id: string; title: string; bodyPublished: string } | null>(null);
-
-  // 세션스토리지에서 복원 (결과화면 "다음 단계 선택"에서 올 때)
-  useEffect(() => {
-    // 결과화면에서 선택한 visibility 읽기 (버튼 클릭 시 저장)
-    const presetVisibility = sessionStorage.getItem('community-draft-visibility') as 'PUBLIC' | 'PRIVATE' | null;
-    if (presetVisibility) {
-      setVisibility(presetVisibility);
-      sessionStorage.removeItem('community-draft-visibility');
-    }
-
-    if (searchParams.get('from') === 'session') {
-      try {
-        const stored = sessionStorage.getItem('community-draft');
-        if (stored) {
-          const draft = JSON.parse(stored);
-          setBodyRaw(draft.bodyRaw || '');
-          setCategory(draft.category || CATEGORIES[0]?.id || '');
-          // visibility는 위에서 이미 설정했으므로 draft 값은 fallback으로만 사용
-          if (!presetVisibility) {
-            setVisibility(draft.visibility || 'PRIVATE');
-          }
-          sessionStorage.removeItem('community-draft');
-        }
-      } catch (err) {
-        console.error('Failed to restore draft:', err);
-      }
-    }
-  }, [searchParams]);
-
-  const handleCreatePost = async () => {
-    if (!bodyRaw.trim()) {
-      setError('사연을 입력해주세요');
-      return;
-    }
-
-    if (!category) {
-      setError('카테고리를 선택해주세요');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const result = await postApi.create({
-        bodyRaw: bodyRaw.trim(),
-        category,
-        visibility,
-      });
-
-      setGeneratedPost({
-        id: result.id,
-        title: result.title,
-        bodyPublished: result.bodyPublished,
-      });
-      setStep(2);
-    } catch (err) {
-      console.error('Failed to create post:', err);
-      setError('사연을 생성할 수 없습니다. 다시 시도해주세요.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePublish = async () => {
-    if (!generatedPost) return;
-    try {
-      setLoading(true);
-      setError(null);
-      setStep(3);
-      setTimeout(() => {
-        router.push(`/community/${generatedPost.id}`);
-      }, 500);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCrisisCheck = () => {
-    const result = checkKeywords(bodyRaw);
-    if (result.level === 1) {
-      setCrisisOpen(true);
-      return true;
-    }
-    return false;
-  };
+  const [generatedPost, setGeneratedPost] = useState<{
+    id: string;
+    title: string;
+    bodyPublished: string;
+  } | null>(null);
 
   const handleInputChange = (value: string) => {
     setBodyRaw(value);
     setError(null);
-    // 위기감지 이중방어 — FE 즉시 차단 (BE도 재검사)
+    // 위기감지 이중방어
     const kw = checkKeywords(value);
     if (kw.level === 1) {
       setCrisisOpen(true);
     }
   };
 
-  if (step === 1) {
+  const handleComposeSubmit = async () => {
+    if (!title.trim()) {
+      setError('제목을 입력해주세요');
+      return;
+    }
+    if (!bodyRaw.trim()) {
+      setError('본문을 입력해주세요');
+      return;
+    }
+    if (bodyRaw.trim().length > 600) {
+      setError('본문은 600자 이내여야 합니다');
+      return;
+    }
+    if (!category) {
+      setError('카테고리를 선택해주세요');
+      return;
+    }
+
+    setStep('mode');
+  };
+
+  const handleModeSelect = async (visibility: 'PUBLIC' | 'PRIVATE') => {
+    try {
+      setLoading(true);
+      setError(null);
+      setStep('analyzing');
+
+      const request: PostCreateRequest = {
+        bodyRaw: bodyRaw.trim(),
+        category,
+        visibility,
+        userTitle: title.trim(),
+        jurorCount,
+      };
+
+      const result = await postApi.create(request);
+      setGeneratedPost({
+        id: result.id,
+        title: result.title,
+        bodyPublished: result.bodyPublished,
+      });
+
+      // 약간의 지연 후 상세 페이지로 이동
+      setTimeout(() => {
+        router.push(`/community/${result.id}`);
+      }, 800);
+    } catch (err) {
+      console.error('Failed to create post:', err);
+      setError('사연 생성에 실패했습니다. 다시 시도해주세요.');
+      setStep('mode');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 1: 사연 작성
+  if (step === 'compose') {
     return (
-      <div>
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 8, display: 'block' }}>
-            카테고리
-          </label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+      <div style={{ background: 'var(--L-bg)', minHeight: '100vh' }}>
+        {/* 헤더 바 */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 20px',
+          borderBottom: '1px solid var(--L-border)',
+          background: 'white',
+        }}>
+          <button
+            onClick={() => router.back()}
             style={{
-              width: '100%',
-              padding: '10px 12px',
-              border: '1px solid var(--P-border)',
-              borderRadius: 8,
-              fontSize: 13,
-              background: 'white',
-              color: 'var(--P-ink)',
-              outline: 'none',
+              background: 'none',
+              border: 'none',
+              fontSize: 18,
               cursor: 'pointer',
-              marginBottom: 16,
+              color: 'var(--L-ink)',
             }}
           >
-            {CATEGORIES.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.label}
-              </option>
-            ))}
-          </select>
+            ✕
+          </button>
+          <h2 style={{
+            fontSize: 16,
+            fontWeight: 600,
+            color: 'var(--L-ink)',
+            margin: 0,
+          }}>
+            사연 올리기
+          </h2>
+          <div style={{ width: 28 }} />
         </div>
 
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 8, display: 'block' }}>
-            공개 범위
-          </label>
-          <div style={{ display: 'flex', gap: 16 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="visibility"
-                value="PUBLIC"
-                checked={visibility === 'PUBLIC'}
-                onChange={(e) => setVisibility(e.target.value as 'PUBLIC' | 'PRIVATE')}
-                style={{ cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: 13 }}>공개 (투표)</span>
+        <div style={{ padding: '20px', paddingBottom: 120 }}>
+          {/* 카테고리 칩 */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{
+              fontSize: 11,
+              color: 'var(--L-sub)',
+              marginBottom: 8,
+              display: 'block',
+              letterSpacing: '0.5px',
+              fontWeight: 500,
+            }}>
+              카테고리
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="visibility"
-                value="PRIVATE"
-                checked={visibility === 'PRIVATE'}
-                onChange={(e) => setVisibility(e.target.value as 'PUBLIC' | 'PRIVATE')}
-                style={{ cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: 13 }}>비공개 (배심원)</span>
-            </label>
+            <div style={{
+              display: 'flex',
+              gap: 8,
+              overflowX: 'auto',
+              scrollbarWidth: 'none',
+              paddingBottom: 4,
+            }}>
+              {CATEGORIES.map((cat) => {
+                const isSelected = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setCategory(cat.id)}
+                    style={{
+                      flexShrink: 0,
+                      padding: '8px 14px',
+                      borderRadius: 999,
+                      border: `1.5px solid ${isSelected ? 'var(--L-ink)' : 'var(--L-border)'}`,
+                      background: isSelected ? 'var(--L-ink)' : 'transparent',
+                      color: isSelected ? 'white' : 'var(--L-ink)',
+                      fontSize: 13,
+                      fontWeight: isSelected ? 600 : 400,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 8, display: 'block' }}>
-            사연
-          </label>
-          <textarea
-            data-testid="post-body-input"
-            value={bodyRaw}
-            onChange={(e) => handleInputChange(e.target.value)}
-            placeholder="갈등 상황을 적어주세요"
+          {/* 제목 입력 */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{
+              fontSize: 11,
+              color: 'var(--L-sub)',
+              marginBottom: 8,
+              display: 'block',
+              letterSpacing: '0.5px',
+              fontWeight: 500,
+            }}>
+              제목
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setError(null);
+              }}
+              placeholder="제목을 입력하세요"
+              style={{
+                width: '100%',
+                padding: '12px 0',
+                borderBottom: '1px solid var(--L-ink)',
+                background: 'transparent',
+                fontSize: 18,
+                fontFamily: 'var(--font-serif)',
+                color: 'var(--L-ink)',
+                outline: 'none',
+                border: 'none',
+                borderBottomWidth: 1,
+                borderBottomStyle: 'solid',
+                borderBottomColor: 'var(--L-ink)',
+              }}
+            />
+          </div>
+
+          {/* 본문 입력 */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{
+              fontSize: 11,
+              color: 'var(--L-sub)',
+              marginBottom: 8,
+              display: 'block',
+              letterSpacing: '0.5px',
+              fontWeight: 500,
+            }}>
+              본문
+            </label>
+            <textarea
+              value={bodyRaw}
+              onChange={(e) => handleInputChange(e.target.value)}
+              placeholder="갈등 상황을 적어주세요"
+              style={{
+                width: '100%',
+                minHeight: 160,
+                padding: '12px 14px',
+                border: `6px solid var(--L-border)`,
+                borderRadius: 10,
+                fontSize: 14,
+                fontFamily: 'var(--font-serif)',
+                lineHeight: 1.6,
+                outline: 'none',
+                resize: 'vertical',
+                color: 'var(--L-ink)',
+                background: 'var(--L-card)',
+              }}
+            />
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: 8,
+            }}>
+              <span style={{ fontSize: 12, color: 'var(--L-sub)' }}>
+                익명
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--L-sub)' }}>
+                {bodyRaw.length} / 600
+              </span>
+            </div>
+          </div>
+
+          {error && (
+            <div
+              style={{
+                padding: '12px 14px',
+                background: '#FEE',
+                border: '1px solid #F99',
+                borderRadius: 8,
+                fontSize: 12,
+                color: '#C33',
+                marginBottom: 20,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* 올리기 버튼 */}
+          <button
+            onClick={handleComposeSubmit}
+            disabled={loading}
             style={{
               width: '100%',
-              minHeight: 200,
-              padding: '12px 14px',
-              border: '1px solid var(--P-border)',
+              padding: '14px 16px',
+              background: 'var(--L-ink)',
+              color: 'white',
+              border: 'none',
               borderRadius: 8,
-              fontSize: 13,
-              fontFamily: 'inherit',
-              lineHeight: 1.6,
-              outline: 'none',
-              resize: 'vertical',
-              color: 'var(--P-ink)',
-              background: 'white',
-            }}
-          />
-        </div>
-
-        {error && (
-          <div
-            style={{
-              padding: '12px 14px',
-              background: '#FEE',
-              border: '1px solid #F99',
-              borderRadius: 8,
-              fontSize: 12,
-              color: '#C33',
-              marginBottom: 20,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+              opacity: loading ? 0.6 : 1,
+              transition: 'all 0.2s',
             }}
           >
-            {error}
-          </div>
-        )}
-
-        <button
-          onClick={handleCreatePost}
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: '14px 16px',
-            background: 'var(--P-ink)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: 'pointer',
-            opacity: loading ? 0.6 : 1,
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            if (!loading) {
-              e.currentTarget.style.opacity = '0.85';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!loading) {
-              e.currentTarget.style.opacity = '1';
-            }
-          }}
-        >
-          {loading ? '생성 중...' : 'AI가 중립화해줘요'}
-        </button>
+            올리기
+          </button>
+        </div>
 
         <CrisisResourceModal
           open={crisisOpen}
@@ -260,98 +309,206 @@ export default function CommunityNewPage() {
     );
   }
 
-  if (step === 2) {
+  // Step 2: 모드 선택 (공개 vs 비공개)
+  if (step === 'mode') {
     return (
-      <div data-testid="post-compose-preview">
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--P-ink)', marginBottom: 12 }}>
-            {generatedPost?.title}
+      <div style={{ background: 'var(--L-bg)', minHeight: '100vh', padding: '20px' }}>
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 32,
+          marginTop: 24,
+        }}>
+          <h2 style={{
+            fontSize: 18,
+            fontWeight: 600,
+            fontFamily: 'var(--font-serif)',
+            color: 'var(--L-ink)',
+          }}>
+            이 사연, 어떻게 올릴까요?
           </h2>
-          <div
-            style={{
-              padding: '16px',
-              background: 'var(--P-card)',
-              border: '1px solid var(--P-border)',
-              borderRadius: 8,
-              fontSize: 13,
-              lineHeight: 1.8,
-              color: 'var(--P-ink)',
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {generatedPost?.bodyPublished}
+        </div>
+
+        {/* 옵션 1: 바로 광장에 올리기 */}
+        <button
+          onClick={() => handleModeSelect('PUBLIC')}
+          disabled={loading}
+          style={{
+            width: '100%',
+            marginBottom: 12,
+            padding: '16px',
+            border: `2px solid ${GRN}`,
+            background: GRN_BG,
+            borderRadius: 10,
+            cursor: 'pointer',
+            opacity: loading ? 0.6 : 1,
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            if (!loading) {
+              (e.currentTarget as HTMLElement).style.background =
+                'color-mix(in srgb, ' + GRN + ' 10%, ' + GRN_BG + ')';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!loading) {
+              (e.currentTarget as HTMLElement).style.background = GRN_BG;
+            }
+          }}
+        >
+          <div style={{
+            textAlign: 'left',
+          }}>
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: GRN,
+              marginBottom: 4,
+            }}>
+              바로 광장에 올리기
+            </div>
+            <div style={{
+              fontSize: 12,
+              color: 'color-mix(in srgb, ' + GRN + ' 80%, black)',
+            }}>
+              익명 투표
+            </div>
           </div>
+        </button>
+
+        {/* 옵션 2: 상대를 초대하기 */}
+        <button
+          onClick={() => handleModeSelect('PRIVATE')}
+          disabled={loading || isGuest}
+          style={{
+            width: '100%',
+            marginBottom: 24,
+            padding: '16px',
+            border: `2px solid var(--L-border)`,
+            background: isGuest ? 'color-mix(in srgb, var(--L-sub) 5%, white)' : 'white',
+            borderRadius: 10,
+            cursor: isGuest ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : isGuest ? 0.5 : 1,
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            if (!loading && !isGuest) {
+              (e.currentTarget as HTMLElement).style.background =
+                'color-mix(in srgb, var(--L-sub) 3%, white)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!loading && !isGuest) {
+              (e.currentTarget as HTMLElement).style.background = 'white';
+            }
+          }}
+        >
+          <div style={{
+            textAlign: 'left',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            {isGuest && (
+              <span style={{ fontSize: 16 }}>
+                🔒
+              </span>
+            )}
+            <div>
+              <div style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--L-ink)',
+                marginBottom: 4,
+              }}>
+                상대를 초대하기
+              </div>
+              <div style={{
+                fontSize: 12,
+                color: 'var(--L-sub)',
+              }}>
+                두 입장을 나란히
+              </div>
+            </div>
+          </div>
+        </button>
+
+        {/* JurorPicker */}
+        <div style={{
+          padding: '16px',
+          background: 'white',
+          borderRadius: 10,
+          border: '1px solid var(--L-border)',
+          marginBottom: 20,
+        }}>
+          <JurorPicker
+            defaultValue={jurorCount}
+            onChange={setJurorCount}
+          />
         </div>
 
-        <LegalNoticeBox data-testid="ratio-legal-notice" />
-
-        <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-          <button
-            onClick={() => setStep(1)}
-            style={{
-              flex: 1,
-              padding: '14px 16px',
-              background: 'var(--P-card)',
-              border: '1px solid var(--P-border)',
-              color: 'var(--P-ink)',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'color-mix(in srgb, var(--P-sub) 6%, var(--P-card))';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--P-card)';
-            }}
-          >
-            다시 쓰기
-          </button>
-          <button
-            onClick={handlePublish}
-            disabled={loading}
-            style={{
-              flex: 1,
-              padding: '14px 16px',
-              background: 'var(--P-ink)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: 'pointer',
-              opacity: loading ? 0.6 : 1,
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.currentTarget.style.opacity = '0.85';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!loading) {
-                e.currentTarget.style.opacity = '1';
-              }
-            }}
-          >
-            게시하기
-          </button>
-        </div>
+        {/* 게스트 안내 */}
+        {isGuest && (
+          <div style={{
+            padding: '12px 14px',
+            background: '#F0F0F0',
+            borderRadius: 8,
+            fontSize: 12,
+            color: 'var(--L-sub)',
+            textAlign: 'center',
+          }}>
+            회원가입 후 상대를 초대할 수 있어요{' '}
+            <a
+              href="/auth/register"
+              style={{
+                color: 'var(--L-ink)',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              가입하기
+            </a>
+          </div>
+        )}
       </div>
     );
   }
 
-  if (step === 3) {
+  // Step 3: 분석 중
+  if (step === 'analyzing') {
     return (
-      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--P-ink)', marginBottom: 12 }}>
-          게시됐습니다
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        padding: '20px',
+      }}>
+        <div style={{
+          width: 50,
+          height: 50,
+          borderTop: '3px solid var(--L-ink)',
+          borderRight: '3px solid transparent',
+          borderBottom: '3px solid transparent',
+          borderLeft: '3px solid transparent',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          marginBottom: 20,
+        }} />
+        <div style={{
+          fontSize: 16,
+          fontWeight: 500,
+          fontFamily: 'var(--font-serif)',
+          color: 'var(--L-ink)',
+          textAlign: 'center',
+        }}>
+          시선을 모으고 있어요
         </div>
-        <div style={{ fontSize: 13, color: 'var(--P-sub)' }}>
-          잠시 후 사연 상세 페이지로 이동합니다
-        </div>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     );
   }

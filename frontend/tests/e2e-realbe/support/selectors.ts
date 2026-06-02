@@ -47,6 +47,19 @@ export const JURY_DISTRIBUTION = '[data-testid="jury-distribution"]'
 export const COMMENT_LIKE_BTN = '[data-testid="comment-like-btn"]'
 export const COMMUNITY_LEGAL_NOTICE = '[data-testid="ratio-legal-notice"]'
 
-// ── V17 3자 대화 (Phase 6에서 추가) ──────────────────────────────
-export const THREE_WAY_MEDIATOR_MSG = '[data-testid="three-way-mediator-msg"]'
-export const THREE_WAY_MEDIATOR_LABEL = '[data-testid="three-way-mediator-label"]'
+// ── V17 3자 대화 (Phase 6에서 추가, V17 이후 미사용) ──────────────────
+// 참고: V17 이후 3자 대화(THREE_WAY) FE 은퇴됨
+// export const THREE_WAY_MEDIATOR_MSG = '[data-testid="three-way-mediator-msg"]'
+// export const THREE_WAY_MEDIATOR_LABEL = '[data-testid="three-way-mediator-label"]'
+
+// ── V17 커뮤니티 피드 (C3 광장형) ──────────────────────────────────
+export const FEED_SORT_LATEST = '[data-testid="feed-sort-latest"]'
+export const FEED_SORT_RECOMMENDED = '[data-testid="feed-sort-recommended"]'
+export const COMPOSE_TITLE = '[data-testid="compose-title"]'
+export const COMPOSE_BODY = '[data-testid="compose-body"]'
+export const COMPOSE_CHAR_COUNT = '[data-testid="compose-char-count"]'
+export const STORY_AUTHOR_BOX = '[data-testid="story-author-box"]'
+export const STORY_PARTNER_BOX = '[data-testid="story-partner-box"]'
+export const VOTE_COMPLETE_BTN = '[data-testid="vote-complete-btn"]'
+export const VOTE_STAMP = '[data-testid="vote-stamp"]'
+export const NOTIFICATION_LIST = '[data-testid="notification-list"]'

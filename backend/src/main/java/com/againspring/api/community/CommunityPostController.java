@@ -63,17 +63,19 @@ public class CommunityPostController {
         String userId = userDetails.getUsername();
         Post post = composeService.composeAndNeutralize(
                 userId,
+                request.getUserTitle(),
                 request.getBodyRaw(),
                 request.getCategory(),
                 request.getVisibility(),
+                request.getJurorCount(),
                 request.getSessionId()
         );
 
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
 
-        // 비공개 포스트: 배심원 비동기 생성
-        if (PostVisibility.PRIVATE.equals(post.getVisibility()) && !options.isEmpty()) {
-            juryService.generateJuryAsync(post, options);
+        // 비공개 포스트 + jurorCount > 0: 배심원 비동기 생성
+        if (PostVisibility.PRIVATE.equals(post.getVisibility()) && request.getJurorCount() > 0 && !options.isEmpty()) {
+            juryService.generateJuryAsync(post, options, request.getJurorCount());
         }
 
         return ResponseEntity.ok(PostResponse.from(post, options));
@@ -86,9 +88,10 @@ public class CommunityPostController {
     @Operation(summary = "공개 포스트 목록")
     public ResponseEntity<Page<PostResponse>> listPosts(
             @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "latest") String sort,
             Pageable pageable) {
 
-        Page<Post> posts = postService.listPublicPosts(category, pageable);
+        Page<Post> posts = postService.listPublicPosts(category, sort, pageable);
         Page<PostResponse> responses = posts.map(post -> {
             List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
             return PostResponse.from(post, options);

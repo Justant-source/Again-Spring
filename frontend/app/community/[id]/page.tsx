@@ -1,11 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { postApi, PostDetail, JuryResult, VoteResult } from '@/lib/api/community/postApi';
-import { commentApi, Comment } from '@/lib/api/community/commentApi';
+import { commentApi, Comment, CommentResponse } from '@/lib/api/community/commentApi';
 import { checkKeywords } from '@/lib/utils/keywordGuard';
 import { CrisisResourceModal } from '@/components/shared/CrisisResourceModal';
+import { VoteBar, SideStory, JurorCard } from '@/components/community/c3';
 import LegalNoticeBox from '@/components/shared/LegalNoticeBox';
+import { GRN, GRN_DK, RED, RED_DK, GRN_BG, RED_BG } from '@/lib/constants/factionColors';
 
 interface PageProps {
   params: { id: string };
@@ -30,16 +34,547 @@ function formatDate(dateStr: string) {
   return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
 }
 
+// View A: 관람자 — C3_StoryDetail (Tone L)
+function C3StoryDetail({
+  post,
+  voteResult,
+  comments,
+  onVote,
+  isVoting,
+}: {
+  post: PostDetail;
+  voteResult: VoteResult | null;
+  comments: Comment[];
+  onVote: (optionId: number) => Promise<void>;
+  isVoting: boolean;
+}) {
+  const [pick, setPick] = useState<'g' | 'r' | null>(post.myVoteSide || null);
+  const [voted, setVoted] = useState(post.hasVoted || false);
+  const router = useRouter();
+
+  const handlePick = (side: 'g' | 'r') => {
+    setPick(side);
+  };
+
+  const handleVote = async () => {
+    if (!pick) return;
+    const optionId = pick === 'g' ? post.voteOptions[0]?.id : post.voteOptions[1]?.id;
+    if (!optionId) return;
+
+    try {
+      await onVote(optionId);
+      setVoted(true);
+    } catch (err) {
+      console.error('Vote failed:', err);
+    }
+  };
+
+  const authorPct = pick === 'g' ? 62 : pick === 'r' ? 46 : (post.authorPct || 50);
+
+  return (
+    <div style={{ background: 'var(--L-bg)', minHeight: '100vh', padding: '16px' }}>
+      {/* 상단 네비 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <Link
+          href="/community"
+          style={{
+            fontSize: 14,
+            fontWeight: 500,
+            color: 'var(--L-ink)',
+            textDecoration: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          ‹ 광장
+        </Link>
+        {voted && (
+          <div style={{ fontSize: 11, color: GRN, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span>卜</span> 투표 완료
+          </div>
+        )}
+      </div>
+
+      {/* 메타 정보: 카테고리 칩 + 제목 + 작성자 */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              background: 'var(--L-card)',
+              color: 'var(--L-ink)',
+              padding: '4px 10px',
+              borderRadius: 20,
+            }}
+          >
+            {post.category}
+          </span>
+          {post.paired && (
+            <>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: GRN }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: RED }} />
+            </>
+          )}
+        </div>
+        <h1
+          style={{
+            fontSize: 18,
+            fontWeight: 600,
+            fontFamily: 'var(--font-serif)',
+            color: 'var(--L-ink)',
+            margin: 0,
+            marginBottom: 8,
+          }}
+        >
+          {post.title}
+        </h1>
+        <div style={{ fontSize: 12, color: 'var(--L-sub)' }}>
+          익명 · {formatDate(post.createdAt)}
+        </div>
+      </div>
+
+      {/* SideStory 2개 (clamp=true) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+        <SideStory
+          side="g"
+          label="작성자"
+          body={post.bodyPublished}
+          clamp={true}
+          selected={pick === 'g'}
+          onSelect={() => handlePick('g')}
+          onMore={() => router.push(`/community/${post.id}/read?side=g`)}
+        />
+        <SideStory
+          side="r"
+          label={post.paired ? '상대방' : '상대 입장 · AI'}
+          body={post.partnerBodyPublished || '상대방의 이야기를 기다리는 중입니다.'}
+          clamp={true}
+          selected={pick === 'r'}
+          onSelect={() => handlePick('r')}
+          onMore={() => router.push(`/community/${post.id}/read?side=r`)}
+        />
+      </div>
+
+      {/* 비율 막대 */}
+      <div style={{ marginBottom: 20 }}>
+        <VoteBar authorPct={Math.round(authorPct)} big={false} />
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--L-sub)',
+            marginTop: 8,
+            textAlign: 'center',
+          }}
+        >
+          작성자 {Math.round(authorPct)}% / 상대방 {Math.round(100 - authorPct)}%
+        </div>
+      </div>
+
+      {/* 댓글 미리보기 */}
+      {comments.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--L-ink)', marginBottom: 8 }}>
+            댓글 {comments.length}
+          </div>
+          {comments.slice(0, 2).map((comment) => (
+            <div
+              key={comment.id}
+              style={{
+                fontSize: 12,
+                color: 'var(--L-ink)',
+                padding: '8px 0',
+                borderBottom: '1px solid var(--L-border)',
+                lineHeight: 1.5,
+              }}
+            >
+              <div style={{ fontSize: 11, color: 'var(--L-sub)', marginBottom: 4 }}>
+                {formatDate(comment.createdAt)}
+              </div>
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {comment.body}
+              </div>
+            </div>
+          ))}
+          <Link
+            href={`/community/${post.id}/comments`}
+            style={{
+              fontSize: 12,
+              color: 'var(--L-sub)',
+              textDecoration: 'none',
+              marginTop: 8,
+              display: 'block',
+            }}
+          >
+            댓글 보기 ›
+          </Link>
+        </div>
+      )}
+
+      {/* 하단 고정 버튼 */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '12px 16px',
+          background: 'white',
+          borderTop: '1px solid var(--L-border)',
+        }}
+      >
+        <button
+          onClick={handleVote}
+          disabled={!pick || voted || isVoting}
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            background: voted ? 'var(--L-border)' : 'var(--L-ink)',
+            color: voted ? 'var(--L-sub)' : 'white',
+            border: 'none',
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: voted || !pick || isVoting ? 'default' : 'pointer',
+            opacity: voted || !pick || isVoting ? 0.5 : 1,
+          }}
+        >
+          {voted ? '다시 선택하려면 탭하세요' : pick ? '투표 완료하기' : '작성자 · 상대방을 선택하세요'}
+        </button>
+      </div>
+      <div style={{ height: 80 }} />
+    </div>
+  );
+}
+
+// View B: 작성자 + VOTING + partner 없음 — C3_ResultSolo (Tone P)
+function C3ResultSolo({
+  post,
+  voteResult,
+  comments,
+}: {
+  post: PostDetail;
+  voteResult: VoteResult | null;
+  comments: Comment[];
+}) {
+  const router = useRouter();
+
+  return (
+    <div style={{ background: 'var(--P-bg)', minHeight: '100vh', padding: '16px' }}>
+      {/* 상단 메타 */}
+      <div
+        style={{
+          fontSize: 12,
+          color: 'var(--P-sub)',
+          marginBottom: 20,
+          display: 'flex',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span>{post.category}</span>
+        <span>{voteResult?.totalVotes || 0}표 · 댓글 {comments.length}</span>
+      </div>
+
+      {/* 제목 */}
+      <h1
+        style={{
+          fontSize: 18,
+          fontWeight: 600,
+          fontFamily: 'var(--font-serif)',
+          color: 'var(--P-ink)',
+          margin: 0,
+          marginBottom: 20,
+        }}
+      >
+        {post.title}
+      </h1>
+
+      {/* 2칸 그리드: SideStory */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+        <SideStory
+          side="g"
+          label="작성자"
+          body={post.bodyPublished}
+          clamp={false}
+          selected={false}
+          onSelect={() => {}}
+          onMore={() => router.push(`/community/${post.id}/read?side=g`)}
+        />
+        <SideStory
+          side="r"
+          label="상대 입장 · AI"
+          body={post.partnerBodyPublished || ''}
+          clamp={false}
+          selected={false}
+          onSelect={() => {}}
+          onMore={() => router.push(`/community/${post.id}/read?side=r`)}
+        />
+      </div>
+
+      {/* VoteBar */}
+      {voteResult && (
+        <div style={{ marginBottom: 20 }}>
+          <VoteBar authorPct={Math.round(post.authorPct || 50)} big={true} />
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--P-sub)',
+              marginTop: 8,
+              textAlign: 'center',
+            }}
+          >
+            작성자 / 상대방
+          </div>
+        </div>
+      )}
+
+      {/* 배심원 카드 (summaryLine 있으면) */}
+      {post.partnerBodyPublished && (
+        <div style={{ marginBottom: 20 }}>
+          <JurorCard
+            name="배심원"
+            lens="종합"
+            text="양쪽 이야기를 들었을 때 각자의 노력이 보입니다."
+            accent={GRN}
+          />
+        </div>
+      )}
+
+      {/* 액션 버튼들 */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        <button
+          onClick={() => router.push(`/community/${post.id}/invite`)}
+          style={{
+            flex: 1,
+            padding: '12px 16px',
+            background: 'var(--P-ink)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          상대 초대하기
+        </button>
+        <button
+          onClick={() => router.push(`/community/${post.id}/comments`)}
+          style={{
+            flex: 1,
+            padding: '12px 16px',
+            background: 'transparent',
+            color: 'var(--P-ink)',
+            border: `1px solid var(--P-border)`,
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          댓글 보기
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// View C: 작성자 + VOTING + partner 있음 — C3_ResultPair (Tone P)
+function C3ResultPair({
+  post,
+  voteResult,
+  comments,
+}: {
+  post: PostDetail;
+  voteResult: VoteResult | null;
+  comments: Comment[];
+}) {
+  const router = useRouter();
+
+  return (
+    <div style={{ background: 'var(--P-bg)', minHeight: '100vh', padding: '16px' }}>
+      {/* 상단 메타 */}
+      <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 20 }}>
+        {post.category} · 양쪽 도착
+      </div>
+
+      {/* 2칙 그리드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+        <SideStory
+          side="g"
+          label="작성자"
+          body={post.bodyPublished}
+          clamp={false}
+          selected={false}
+          onSelect={() => {}}
+          onMore={() => {}}
+        />
+        <SideStory
+          side="r"
+          label="상대방"
+          body={post.partnerBodyPublished || ''}
+          clamp={false}
+          selected={false}
+          onSelect={() => {}}
+          onMore={() => {}}
+        />
+      </div>
+
+      {/* VoteBar */}
+      {voteResult && (
+        <div style={{ marginBottom: 20 }}>
+          <VoteBar authorPct={Math.round(post.authorPct || 50)} big={true} />
+        </div>
+      )}
+
+      {/* AI 배심원 종합 */}
+      <div style={{ marginBottom: 20 }}>
+        <JurorCard
+          name="AI 배심원"
+          lens="종합"
+          text="양쪽 모두 대화를 통해 더 깊이 이해할 수 있었어요."
+          accent={GRN}
+        />
+      </div>
+
+      {/* 결과 공유 버튼 */}
+      <button
+        style={{
+          width: '100%',
+          padding: '12px 16px',
+          background: 'var(--P-ink)',
+          color: 'white',
+          border: 'none',
+          borderRadius: 8,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}
+      >
+        결과 공유
+      </button>
+    </div>
+  );
+}
+
+// View D: status=CLOSED — C3_Closed (Tone P)
+function C3Closed({
+  post,
+  voteResult,
+}: {
+  post: PostDetail;
+  voteResult: VoteResult | null;
+}) {
+  return (
+    <div style={{ background: 'var(--P-bg)', minHeight: '100vh', padding: '16px' }}>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          background: '#F0E8E0',
+          color: '#8A7F6B',
+          padding: '6px 12px',
+          borderRadius: 16,
+          display: 'inline-block',
+          marginBottom: 20,
+        }}
+      >
+        마감됨
+      </div>
+
+      <h1
+        style={{
+          fontSize: 18,
+          fontWeight: 600,
+          fontFamily: 'var(--font-serif)',
+          color: 'var(--P-ink)',
+          margin: 0,
+          marginBottom: 20,
+        }}
+      >
+        {post.title}
+      </h1>
+
+      {/* 투표 수 */}
+      <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 20 }}>
+        최종 {voteResult?.totalVotes || 0}표
+      </div>
+
+      {/* 2칸 그리드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+        <div
+          style={{
+            background: GRN_BG,
+            borderRadius: 12,
+            padding: '12px',
+            fontSize: 12,
+            color: 'var(--P-ink)',
+          }}
+        >
+          작성자 입장
+        </div>
+        <div
+          style={{
+            background: RED_BG,
+            borderRadius: 12,
+            padding: '12px',
+            fontSize: 12,
+            color: 'var(--P-ink)',
+          }}
+        >
+          상대방 입장
+        </div>
+      </div>
+
+      {/* VoteBar */}
+      {voteResult && (
+        <div style={{ marginBottom: 20 }}>
+          <VoteBar authorPct={Math.round(post.authorPct || 50)} big={true} />
+        </div>
+      )}
+
+      {/* 안내 메시지 */}
+      <div
+        style={{
+          fontSize: 12,
+          color: 'var(--P-sub)',
+          background: 'var(--P-card)',
+          padding: '12px',
+          borderRadius: 8,
+          textAlign: 'center',
+        }}
+      >
+        투표가 마감되어 결과가 고정됐어요
+      </div>
+
+      {/* 결과 공유 버튼 */}
+      <button
+        style={{
+          width: '100%',
+          padding: '12px 16px',
+          background: 'var(--P-ink)',
+          color: 'white',
+          border: 'none',
+          borderRadius: 8,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: 'pointer',
+          marginTop: 20,
+        }}
+      >
+        결과 공유
+      </button>
+    </div>
+  );
+}
+
 export default function CommunityPostPage({ params }: PageProps) {
   const [post, setPost] = useState<PostDetail | null>(null);
   const [voteResult, setVoteResult] = useState<VoteResult | null>(null);
-  const [juryResult, setJuryResult] = useState<JuryResult | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [commentText, setCommentText] = useState('');
   const [loading, setLoading] = useState(true);
   const [crisisOpen, setCrisisOpen] = useState(false);
-  const [expandedJurors, setExpandedJurors] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [isVoting, setIsVoting] = useState(false);
 
   useEffect(() => {
     const loadPost = async () => {
@@ -48,13 +583,8 @@ export default function CommunityPostPage({ params }: PageProps) {
         const postData = await postApi.get(params.id);
         setPost(postData);
 
-        if (postData.visibility === 'PUBLIC') {
-          const votesData = await postApi.vote(params.id, postData.voteOptions[0]?.id || 1);
-          setVoteResult(votesData);
-        } else {
-          const juryData = await postApi.getJury(params.id);
-          setJuryResult(juryData);
-        }
+        const voteData = await postApi.vote(params.id, postData.voteOptions[0]?.id || 1);
+        setVoteResult(voteData);
 
         const commentsData = await commentApi.list(params.id);
         setComments(commentsData);
@@ -69,21 +599,16 @@ export default function CommunityPostPage({ params }: PageProps) {
     loadPost();
   }, [params.id]);
 
-  const handleCommentSubmit = async () => {
-    if (!commentText.trim()) return;
-
-    const keywordCheck = checkKeywords(commentText);
-    if (keywordCheck.level === 1) {
-      setCrisisOpen(true);
-      return;
-    }
-
+  const handleVote = async (optionId: number) => {
+    setIsVoting(true);
     try {
-      const newComment = await commentApi.add(params.id, commentText.trim());
-      setComments([...comments, newComment]);
-      setCommentText('');
+      const result = await postApi.vote(params.id, optionId);
+      setVoteResult(result);
+      setPost((prev) => prev ? { ...prev, hasVoted: true, myVoteSide: optionId === prev.voteOptions[0]?.id ? 'g' : 'r' } : null);
     } catch (err) {
-      console.error('Failed to add comment:', err);
+      console.error('Vote failed:', err);
+    } finally {
+      setIsVoting(false);
     }
   };
 
@@ -113,308 +638,18 @@ export default function CommunityPostPage({ params }: PageProps) {
     );
   }
 
-  return (
-    <div>
-      {/* 제목 및 본문 */}
-      <h1 style={{ fontSize: 18, fontWeight: 600, color: 'var(--P-ink)', marginBottom: 12 }}>
-        {post.title}
-      </h1>
-
-      <div
-        style={{
-          padding: '16px',
-          background: 'var(--P-card)',
-          border: '1px solid var(--P-border)',
-          borderRadius: 8,
-          fontSize: 13,
-          lineHeight: 1.8,
-          color: 'var(--P-ink)',
-          whiteSpace: 'pre-wrap',
-          marginBottom: 20,
-        }}
-      >
-        {post.bodyPublished}
-      </div>
-
-      <LegalNoticeBox data-testid="ratio-legal-notice" />
-
-      {/* 투표 섹션 (PUBLIC) */}
-      {post.visibility === 'PUBLIC' && voteResult && (
-        <div style={{ marginTop: 20, marginBottom: 20 }}>
-          <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 12 }}>투표</div>
-          <div data-testid="vote-distribution" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {voteResult.options.map((option) => {
-              const barWidth = Math.max((option.percentage || 0), 3);
-              return (
-                <div key={option.id}>
-                  <div style={{ fontSize: 12, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{option.label}</span>
-                    <span style={{ color: 'var(--P-sub)' }}>{option.percentage}% ({option.count}명)</span>
-                  </div>
-                  <div
-                    style={{
-                      width: '100%',
-                      height: 24,
-                      background: '#E8E6E0',
-                      borderRadius: 6,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${barWidth}%`,
-                        background: 'var(--P-a)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 11,
-                        fontWeight: 500,
-                        color: option.percentage > 10 ? '#5C4030' : 'transparent',
-                        transition: 'all 0.3s',
-                      }}
-                    >
-                      {option.percentage > 10 && `${option.percentage}%`}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--P-sub)', marginTop: 12 }}>
-            총 {voteResult.totalVotes}명 투표
-          </div>
-        </div>
-      )}
-
-      {/* 배심원 섹션 (PRIVATE) */}
-      {post.visibility === 'PRIVATE' && juryResult && (
-        <div style={{ marginTop: 20, marginBottom: 20 }}>
-          <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 12 }}>배심원 결과</div>
-          <div data-testid="jury-distribution" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {juryResult.distribution.map((option, idx) => {
-              const barWidth = Math.max((option.percentage || 0), 3);
-              return (
-                <div key={idx}>
-                  <div style={{ fontSize: 12, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{option.label}</span>
-                    <span style={{ color: 'var(--P-sub)' }}>{option.percentage}% ({option.count}명)</span>
-                  </div>
-                  <div
-                    style={{
-                      width: '100%',
-                      height: 24,
-                      background: '#E8E6E0',
-                      borderRadius: 6,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${barWidth}%`,
-                        background: 'var(--P-a)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 11,
-                        fontWeight: 500,
-                        color: option.percentage > 10 ? '#5C4030' : 'transparent',
-                        transition: 'all 0.3s',
-                      }}
-                    >
-                      {option.percentage > 10 && `${option.percentage}%`}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 배심원 개별 의견 아코디언 */}
-          <div style={{ marginTop: 16 }}>
-            {juryResult.jurors.map((juror, idx) => {
-              const isExpanded = expandedJurors.has(idx);
-              return (
-                <div
-                  key={idx}
-                  style={{
-                    marginBottom: 8,
-                    border: '1px solid var(--P-border)',
-                    borderRadius: 6,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <button
-                    onClick={() => {
-                      const newSet = new Set(expandedJurors);
-                      if (newSet.has(idx)) {
-                        newSet.delete(idx);
-                      } else {
-                        newSet.add(idx);
-                      }
-                      setExpandedJurors(newSet);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      background: 'var(--P-card)',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      color: 'var(--P-ink)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span>
-                      {juror.gender} {juror.ageGroup}
-                    </span>
-                    <span style={{ color: 'var(--P-sub)' }}>{isExpanded ? '▲' : '▼'}</span>
-                  </button>
-                  {isExpanded && (
-                    <div style={{ padding: '12px 14px', borderTop: '1px solid var(--P-border)', fontSize: 12, lineHeight: 1.6 }}>
-                      <div style={{ marginBottom: 8, color: 'var(--P-ink)', fontWeight: 500 }}>
-                        {juror.chosenOptionLabel}
-                      </div>
-                      <div style={{ color: 'var(--P-sub)' }}>
-                        {juror.empathyComment}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ fontSize: 11, color: 'var(--P-sub)', marginTop: 12, padding: '12px', background: 'var(--P-card)', borderRadius: 6 }}>
-            {juryResult.legalNotice}
-          </div>
-        </div>
-      )}
-
-      {/* 댓글 섹션 */}
-      <div style={{ marginTop: 30, borderTop: '1px solid var(--P-border)', paddingTop: 20 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--P-ink)', marginBottom: 16 }}>
-          댓글 {comments.length}
-        </h2>
-
-        {/* 댓글 입력 */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <textarea
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="댓글을 입력하세요"
-              rows={2}
-              style={{
-                flex: 1,
-                padding: '10px 12px',
-                border: '1px solid var(--P-border)',
-                borderRadius: 6,
-                fontSize: 12,
-                fontFamily: 'inherit',
-                lineHeight: 1.5,
-                outline: 'none',
-                resize: 'none',
-                color: 'var(--P-ink)',
-                background: 'white',
-              }}
-            />
-            <button
-              onClick={handleCommentSubmit}
-              disabled={!commentText.trim()}
-              style={{
-                padding: '10px 14px',
-                background: 'var(--P-ink)',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                fontSize: 12,
-                cursor: 'pointer',
-                fontWeight: 500,
-                opacity: commentText.trim() ? 1 : 0.5,
-                transition: 'all 0.2s',
-                alignSelf: 'flex-start',
-              }}
-              onMouseEnter={(e) => {
-                if (commentText.trim()) {
-                  e.currentTarget.style.opacity = '0.85';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (commentText.trim()) {
-                  e.currentTarget.style.opacity = '1';
-                }
-              }}
-            >
-              등록
-            </button>
-          </div>
-        </div>
-
-        {/* 댓글 목록 */}
-        {comments.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {comments.map((comment) => (
-              <div
-                key={comment.id}
-                style={{
-                  padding: '12px 14px',
-                  background: 'var(--P-card)',
-                  border: '1px solid var(--P-border)',
-                  borderRadius: 6,
-                }}
-              >
-                <div style={{ fontSize: 11, color: 'var(--P-sub)', marginBottom: 6 }}>
-                  {comment.authorId} · {formatDate(comment.createdAt)}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--P-ink)', lineHeight: 1.6, marginBottom: 8 }}>
-                  {comment.body}
-                </div>
-                <button
-                  data-testid="comment-like-btn"
-                  onClick={() => {
-                    commentApi.toggleLike(params.id, comment.id);
-                  }}
-                  style={{
-                    padding: '4px 8px',
-                    background: 'transparent',
-                    border: '1px solid var(--P-border)',
-                    borderRadius: 4,
-                    fontSize: 11,
-                    color: 'var(--P-sub)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--P-ink)';
-                    e.currentTarget.style.color = 'var(--P-ink)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--P-border)';
-                    e.currentTarget.style.color = 'var(--P-sub)';
-                  }}
-                >
-                  공감 {comment.likeCount}
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '20px', fontSize: 12, color: 'var(--P-sub)' }}>
-            아직 댓글이 없습니다
-          </div>
-        )}
-      </div>
-
-      <CrisisResourceModal
-        open={crisisOpen}
-        onClose={() => setCrisisOpen(false)}
-        severity="advisory"
-      />
-    </div>
-  );
+  // Render logic
+  if (!post.isAuthor) {
+    // View A: 관람자
+    return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} isVoting={isVoting} />;
+  } else if (post.status === 'VOTING' && !post.paired) {
+    // View B: 작성자 + VOTING + partner 없음
+    return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} />;
+  } else if (post.status === 'VOTING' && post.paired) {
+    // View C: 작성자 + VOTING + partner 있음
+    return <C3ResultPair post={post} voteResult={voteResult} comments={comments} />;
+  } else {
+    // View D: status=CLOSED
+    return <C3Closed post={post} voteResult={voteResult} />;
+  }
 }

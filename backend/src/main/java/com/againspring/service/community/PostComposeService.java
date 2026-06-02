@@ -2,6 +2,7 @@ package com.againspring.service.community;
 
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.VoteOption;
+import com.againspring.domain.enums.PostCategory;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.llm.LLMProvider;
@@ -53,13 +54,15 @@ public class PostComposeService {
      * 위기 감지 시 IllegalArgumentException 발생
      *
      * @param authorId 작성자 ID
+     * @param userTitle 사용자가 입력한 제목
      * @param bodyRaw 원본 사연 텍스트
      * @param category 관계 카테고리
      * @param visibility 공개/비공개 설정
+     * @param jurorCount AI 배심원 인원 (0-9)
      * @param sessionId 관련 세션 ID (nullable)
-     * @return 중립화된 Post 객체 (status=VOTING, VoteOption 3개 포함)
+     * @return 중립화된 Post 객체 (status=VOTING)
      */
-    public Post composeAndNeutralize(String authorId, String bodyRaw, String category, String visibility, String sessionId) {
+    public Post composeAndNeutralize(String authorId, String userTitle, String bodyRaw, PostCategory category, String visibility, int jurorCount, String sessionId) {
         log.info("Starting compose for author {} with category {}", authorId, category);
 
         // 1) 위기 감지 (이중방어 — FE에서도 감지)
@@ -75,6 +78,7 @@ public class PostComposeService {
                 .authorId(authorId)
                 .sessionId(sessionId)
                 .bodyRaw(bodyRaw)
+                .userTitle(userTitle)
                 .category(category)
                 .visibility(PostVisibility.valueOf(visibility.toUpperCase()))
                 .status(PostStatus.NEUTRALIZING)
@@ -109,21 +113,22 @@ public class PostComposeService {
             post.setVoteCloseAt(Instant.now().plusSeconds(7 * 24 * 3600)); // 7일
             postRepository.save(post);
 
-            // 6) VoteOption 저장
-            JsonNode voteOptions = responseJson.get("voteOptions");
-            if (voteOptions != null && voteOptions.isArray()) {
-                List<VoteOption> options = new ArrayList<>();
-                for (JsonNode optNode : voteOptions) {
-                    VoteOption opt = VoteOption.builder()
-                            .postId(postId)
-                            .label(optNode.get("label").asText())
-                            .orderIdx(optNode.has("orderIdx") ? optNode.get("orderIdx").asInt() : 0)
-                            .build();
-                    options.add(opt);
-                }
-                voteOptionRepository.saveAll(options);
-                log.info("VoteOptions saved: {} for post {}", options.size(), postId);
-            }
+            // 6) VoteOption 저장 — 정확히 2개 고정: "작성자" (0) vs "상대방" (1)
+            List<VoteOption> options = new ArrayList<>();
+            VoteOption opt1 = VoteOption.builder()
+                    .postId(postId)
+                    .label("작성자")
+                    .orderIdx(0)
+                    .build();
+            VoteOption opt2 = VoteOption.builder()
+                    .postId(postId)
+                    .label("상대방")
+                    .orderIdx(1)
+                    .build();
+            options.add(opt1);
+            options.add(opt2);
+            voteOptionRepository.saveAll(options);
+            log.info("VoteOptions saved: 2 fixed options for post {}", postId);
 
             return post;
 

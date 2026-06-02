@@ -35,8 +35,8 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 2. **BE만 Claude Code를 수행**
    → ClaudeCodeBridge: `backend/src/main/java/.../llm/bridge/ClaudeCodeBridge.java`
 
-3. **금지어/위기 키워드 확인 필수**
-   → 코드/프롬프트 수정 시 `shared/docs/policies/forbidden-words.md`, `shared/docs/policies/crisis-detection.md` 참조
+3. **AI 출력 품질 금지어 확인**
+   → LLM 프롬프트/출력 수정 시 `shared/docs/policies/forbidden-words.md` 참조 (AI 출력 품질 기준, 사용자 입력에는 미적용)
 
 4. **🚨 PROD 배포 절대 규칙 — 위반 금지**
    → 명시적으로 "prod에 배포해줘" 지시가 없는 한 prod 환경에 절대 배포하지 않음
@@ -125,84 +125,58 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 ## 🎨 FE UX 정책 (프론트엔드 작업 시 항상 준수)
 
 > 권위본: [`frontend/docs/ux/principles.md`](frontend/docs/ux/principles.md) · 컴포넌트 체크리스트: [`frontend/docs/ux/hax-checklist.md`](frontend/docs/ux/hax-checklist.md)
->
-> 다시봄의 사용자는 **갈등 한복판에 있는 두 사람**입니다. "선의의 디자인"으로는 부족하며, **악용 시나리오를 명시적으로 차단하는 디자인**이 필요합니다.
 
-### 4원칙군 우선순위
+### 핵심 원칙
 
-| 순위 | 원칙군 | 기준 문헌 | 적용 시점 |
-|---|---|---|---|
-| **1순위 (즉시)** | AI 중재자 신뢰성 | Microsoft HAX 18 가이드라인 | 모든 FE 변경 시 |
-| **1순위 (즉시)** | 위기 사용자 보호 | Designing for Safety (PenzeyMoog) | 모든 FE 변경 시 |
-| **2순위 (플로우)** | 인지 부하 최소화 | GOV.UK Service Manual (question page / task list) | 화면 신규 추가 시 |
-| **3순위 (디테일)** | 카피·인터랙션 | NN/g wizard, SAMHSA 6원칙, Trauma-Informed | 카피·인터랙션 수정 시 |
-| **4순위 (장기)** | 결과 해석 안전성 | WCAG 2.2 cognitive, Do No Harm Guide | 결과 리포트 수정 시 |
+| 순위 | 원칙군 | 적용 시점 |
+|---|---|---|
+| **1순위** | AI 신뢰성 (배심원·요약은 AI임을 명확히) | 모든 FE 변경 시 |
+| **2순위** | 인지 부하 최소화 (한 화면 한 결정) | 화면 신규 추가 시 |
+| **3순위** | 카피·인터랙션 (간결, 판결 표현 금지) | 카피·인터랙션 수정 시 |
 
-### 절대 불변 규칙 (코드에서 절대 되돌리지 않음)
+### 서비스 책임 정책 (2026-06-02 개정)
 
-1. **위기 모달(CrisisModal, CrisisResourceModal)은 ESC·바깥 클릭으로 닫히지 않는다.**  
-   `onClick={onClose}` on backdrop, ESC keydown handler → 절대 추가 금지.
+> **사용자가 직접 입력하는 콘텐츠에 대한 책임은 사용자에게 있다.**
+> 플랫폼은 AI 출력 품질을 관리하되, 사용자 입력을 강제로 차단하거나 개입하지 않는다.
 
-2. **위기 감지는 FE(ChatInput)와 BE(KeywordGuard) 이중 구현을 유지한다.**  
-   클라이언트 우회 가능성을 가정. 어느 한쪽 제거 금지.
+- **위기 감지 개입 없음**: 사연·댓글 작성 시 키워드로 세션을 중단하거나 모달을 띄우지 않는다.
+- **법률·임상 용어 사용자 입력 허용**: 사용자가 직접 작성하는 텍스트에 금지어 필터 미적용.
+- **AI 출력만 품질 관리**: AI 배심원·요약이 법률 용어·판결 표현·처방을 출력하지 않도록 프롬프트/`PromptSanitizer`로 제어.
+- **결과 리포트에 처방(prescription) 금지**: "N%이니 A님이 더 노력해야 합니다" 수치→처방 패턴은 AI 출력에서 금지.
 
-3. **AI 메시지와 사용자 메시지는 시각적으로 명확히 구분된다.**  
-   `MEDIATOR_TO_A/B` sender를 사용자 메시지와 동일하게 표시 금지.
+### 광장형 UX 고정 원칙
 
-4. **결과 리포트에 처방(prescription)을 쓰지 않는다.**  
-   "55:45이니 A님이 더 노력하셔야 합니다" 같은 수치→처방 패턴 금지.
-
-5. **`ContributionRatio` 법적 안내 박스는 항상 표시한다.**  
-   "과실비율과 무관합니다" 박스를 숨기거나 조건부로 만드는 것 금지.
-
-### 신규 화면/입력/공유 기능 추가 시 — Safety Check 4문
-
-PR 병합 전 필수 답변 (`.github/PULL_REQUEST_TEMPLATE.md`에 포함):
-
-- **Abuser**: 가해자가 이 기능을 무기로 쓸 수 있는가?
-- **Survivor**: 학대 상황의 사용자에게 새로운 위험이 생기는가?
-- **Roadblock**: 악용을 막거나 마찰을 어디에 두는가?
-- **Exit**: 이 화면에서 1탭으로 빠져나갈 수 있는가?
+1. **AI 메시지와 사용자 메시지 시각 구분**: AI 배심원 카드는 사용자 글과 구별 표시.
+2. **작성자=초록, 상대방=붉은** 색 식별 규칙은 앱 전체에서 일관 유지.
+3. **판결/승패 표현 금지** (AI 출력): "누가 이겼다", "잘못했다" → 대체: 공감/관점.
 
 ---
 
-## ⚠️ 금지어 및 법적 리스크 (필수 숙지)
+## ⚠️ AI 출력 품질 기준 (AI 배심원·요약에만 적용)
 
-> 권위본: [`shared/docs/policies/forbidden-words.md`](shared/docs/policies/forbidden-words.md), [`shared/docs/policies/crisis-detection.md`](shared/docs/policies/crisis-detection.md)
+> **사용자 입력에는 미적용** — 사용자가 작성하는 사연·댓글의 책임은 사용자에게 있음.
+> AI가 생성하는 텍스트(배심원 의견, 중립화 요약, 제목)에만 아래 기준 적용.
+> 권위본: [`shared/docs/policies/forbidden-words.md`](shared/docs/policies/forbidden-words.md)
 
-### 절대 금지어 (UI 전면 차단)
+### AI 출력 금지 표현
 
-**Level 1 법률 용어** (변호사법 저촉):
-- "과실비율" → 대체: "화해 기여도"
-- "판결", "판사", "심판" → 대체: "결과", "중재자"
-- "유죄", "무죄", "증거", "판단" → 사용 금지
-- "가해자", "피해자" → 사용 금지 (낙인)
-- "고소", "소송" → 사용 금지
+**법률·심판 표현** (AI가 쓰지 말아야 할 것):
+- "과실비율", "판결", "유죄/무죄", "가해자/피해자" → AI 출력 금지
+- 대체: "공감 비율", "결과", "작성자/상대방"
 
-**Level 2 진단명/임상 용어** (악용 가능):
-- "나르시시스트", "소시오패스", "가스라이팅", "PTSD", "트라우마" → 사용 금지
-- 대체: 구체적 행동 기술 ("대화 중 거리를 두고 싶어하시는 편" 등)
+**처방·판결 표현** (관계 파국 방지):
+- "이겼다/졌다", "맞다/틀렸다", "승자/패자" → AI 출력 금지
+- 권고성 처방 ("헤어지세요", "절교") → AI 출력 금지
 
-**Level 3 판결/승패** (관계 파국):
-- "이겼다/졌다", "맞다/틀렸다", "승자/패자" → 사용 금지
-- "헤어지세요", "절교", "손절" → 사용 금지
-
-### 위험 키워드 (세션 즉시 중단)
-
-- **폭력**: "때리", "폭행", "폭력", "구타"
-- **성폭력**: "강간", "성폭행"
-- **자해**: "죽고 싶", "자살", "자해", "목 매"
-- **아동학대**: "아이를 때", "아동학대"
-
-감지 시 → Crisis Resource 모달 표시 (1366, 1393, 132 등 핫라인)
+**진단명** (AI 출력 자제):
+- "나르시시스트", "소시오패스", "가스라이팅" → AI 출력 자제, 행동 기술로 대체
 
 ### 검증 방법
 
 ```bash
-cd frontend
-npm run lint:words    # 금지어 자동 스캔
-
-# BE: PromptSanitizer + KeywordGuard (safety/) 자동 적용
+# BE: PromptSanitizer (AI 출력 후처리) 자동 적용
+# FE: lint:words 는 코드베이스 내 하드코딩 카피 검사용 (사용자 입력 런타임 검사 아님)
+cd frontend && npm run lint:words
 ```
 
 ---
@@ -498,20 +472,17 @@ APP_URL=https://dev.againspring.net
 
 ### 프론트엔드 수정 시
 
-- [ ] 변경된 컴포넌트의 `frontend/docs/ux/hax-checklist.md` 해당 섹션을 읽고 체크
-- [ ] `shared/docs/policies/forbidden-words.md` 금지어 없는지 확인 (`npm run lint:words`)
-- [ ] **1순위**: 위기 모달 dismiss 마찰 유지, AI 능력/한계 안내 존재 여부 확인 (HAX G1·G2)
-- [ ] **1순위**: 새 화면/입력/공유 기능이면 Safety Check 4문 답변 (PR 템플릿)
-- [ ] **2순위**: 한 화면에 한 결정만 (GOV.UK one thing per page)
-- [ ] **2순위**: "잠시 멈추기 / 나가기"가 1탭 안에 (HAX G8·G17)
+- [ ] **AI 배심원·요약 출력**: `PromptSanitizer` 경유 확인, 판결/처방 표현 없는지 확인
+- [ ] `npm run lint:words` — 코드베이스 하드코딩 카피 검사 (사용자 입력 런타임 차단 아님)
+- [ ] 한 화면에 한 결정만 (인지 부하 최소화)
+- [ ] AI 배심원 카드는 사용자 글과 시각적으로 구분
 - [ ] `npm run build` 성공 확인
 - [ ] **e2e 테스트 동기화**: FE 컴포넌트/라우트/셀렉터 변경 시 `tests/e2e-realbe/` spec도 함께 수정
   - `data-testid` 추가/변경 → `support/selectors.ts` 업데이트
-  - 절대 불변 규칙(위기 모달·Duo 격리·법적박스·Crisis 이중방어) 관련 코드 변경 → `invariants/` spec 검토
   - 라우트/권한 변경 → `flows/` spec 검토
   - (e2e-realbe 실행은 prod 배포 전 게이트 — 커밋 단계 불필요)
 - [ ] **pre-commit hook**: `frontend/` 파일 staged 시 자동 실행 (vitest 100% 통과 필수)
-  - 우회: `SKIP_TESTS=1 git commit` — 긴급 상황 전용, 절대 불변 규칙 파괴 시 금지
+  - 우회: `SKIP_TESTS=1 git commit` — 긴급 상황 전용
 
 ### 백엔드 수정 시
 
@@ -535,7 +506,6 @@ APP_URL=https://dev.againspring.net
 - [ ] main 브랜치에 commit & push 완료
 - [ ] **🚨 e2e-realbe 전체 통과 필수** (`cd frontend && npm run test:e2e:realbe`)
   - dev docker 스택 실행 중이어야 함 (`cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d`)
-  - 절대 불변 4종(crisis-modal-dismiss · crisis-dual-defense · duo-message-isolation · contribution-ratio-legal-notice) 포함 전부 그린
   - 실패 시 prod 배포 금지 — 원인 수정 후 재검증
 - [ ] `env/.env.prod` 모든 값 입력 (기본값 없음)
 - [ ] MariaDB 볼륨 백업 (`docker exec againspring-mariadb-prod mariadb-dump ...`)
@@ -545,7 +515,8 @@ APP_URL=https://dev.againspring.net
 
 ---
 
-**마지막 업데이트**: 2026-05-31
+**마지막 업데이트**: 2026-06-02
 **담당**: Claude Code (Agent)
 
-> UX 정책 관련 문의: `frontend/docs/ux/principles.md` (4원칙군 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트) 순으로 참조.
+> UX 정책: `frontend/docs/ux/principles.md` (원칙 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트).
+> **2026-06-02 정책 변경**: 위기 감지·법률 규제 제거. 사용자 입력 책임은 사용자에게 있음. AI 출력 품질(금지 표현)만 제어. 광장형(C3) UX 전면 전환 진행 중.

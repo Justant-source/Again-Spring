@@ -59,15 +59,23 @@ public class JuryService {
     );
 
     /**
-     * 포스트에 대해 9인 배심원이 투표하도록 비동기 생성
+     * 포스트에 대해 지정된 수의 배심원이 투표하도록 비동기 생성
      * 각 배심원이 독립적으로 생성되며, 실패해도 전체 실패로 이어지지 않음
+     * jurorCount=0이면 즉시 반환 (배심원 생성 스킵)
      *
      * @param post 대상 포스트
      * @param options 투표 선택지 목록
+     * @param jurorCount 생성할 배심원 수 (0-9, 0이면 스킵)
      */
     @Async
-    public void generateJuryAsync(Post post, List<VoteOption> options) {
-        log.info("Starting jury generation for post {}", post.getId());
+    public void generateJuryAsync(Post post, List<VoteOption> options, int jurorCount) {
+        log.info("Starting jury generation for post {} with jurorCount={}", post.getId(), jurorCount);
+
+        // jurorCount=0이면 스킵
+        if (jurorCount <= 0) {
+            log.info("Jury generation skipped for post {} (jurorCount=0)", post.getId());
+            return;
+        }
 
         try {
             String juryPersonaPrompt = promptLoader.get("community/jury_persona.md");
@@ -78,8 +86,9 @@ public class JuryService {
                 optionsText.append(String.format("- %s\n", opt.getLabel()));
             }
 
-            // 9인 배심원 루프
-            for (Juror.JurorPersona persona : PERSONAS) {
+            // 지정된 jurorCount만큼만 배심원 생성 (PERSONAS를 부분 취하기)
+            List<Juror.JurorPersona> selectedPersonas = PERSONAS.subList(0, Math.min(jurorCount, PERSONAS.size()));
+            for (Juror.JurorPersona persona : selectedPersonas) {
                 try {
                     // 페르소나 블록 생성
                     String personaBlock = buildPersonaBlock(persona);

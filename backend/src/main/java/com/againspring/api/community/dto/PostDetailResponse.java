@@ -83,7 +83,7 @@ public class PostDetailResponse {
                 .id(post.getId())
                 .title(post.getTitle())
                 .bodyPublished(post.getBodyPublished())
-                .category(post.getCategory())
+                .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())
                 .status(post.getStatus().name())
                 .voteOptions(voteDtos)

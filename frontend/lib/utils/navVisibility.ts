@@ -10,15 +10,9 @@ export const BOTTOM_NAV_HEIGHT = 74;
  * 바텀 내비를 숨길 경로 패턴.
  * 안전 불변: 채팅·결과·온보딩·인증 플로우에서는 항상 숨김.
  * '/community/new'는 글쓰기 몰입 화면 — 피드·상세는 표시.
+ * '/s/' (파트너 작성 화면) 숨김.
  */
 export const NAV_HIDE_PATHS = [
-  '/session/chat',
-  '/session/result',
-  '/session/new',
-  '/session/join',
-  '/session/history',
-  '/session/category',
-  '/three-way',
   '/onboarding',
   '/login',
   '/signup',
@@ -28,6 +22,7 @@ export const NAV_HIDE_PATHS = [
   '/auth/callback',
   '/admin',
   '/community/new',
+  '/s/',
 ];
 
 /** 경로가 숨김 패턴에 해당하는지 정확히 매칭. */

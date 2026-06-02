@@ -4,6 +4,7 @@ import { userHandlers } from './user';
 import { chatHandlers } from './chat';
 import { communityHandlers } from './community';
 import { threeWayHandlers } from './threeWay';
+import { notificationHandlers } from './notifications';
 
 export const handlers = [
   ...sessionHandlers,
@@ -12,4 +13,5 @@ export const handlers = [
   ...userHandlers,
   ...communityHandlers,
   ...threeWayHandlers,
+  ...notificationHandlers,
 ];

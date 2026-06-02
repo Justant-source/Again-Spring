@@ -2,6 +2,8 @@ package com.againspring.domain.community;
 
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
+import com.againspring.domain.enums.PostCategory;
+import com.againspring.domain.enums.PublishMode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -37,14 +39,43 @@ public class Post {
     @Column(length = 200)
     private String title;
 
+    @Column(length = 200)
+    private String userTitle;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer jurorCount = 3;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    private PostCategory category;
+
     @Column(columnDefinition = "LONGTEXT")
     private String bodyRaw;
 
     @Column(columnDefinition = "LONGTEXT")
     private String bodyPublished;
 
-    @Column(length = 50)
-    private String category;
+    @Column(unique = true, length = 64)
+    private String inviteToken;
+
+    @Column(length = 32)
+    private String partnerUserId;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String partnerBodyRaw;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String partnerBodyPublished;
+
+    private Instant partnerAnsweredAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    @Builder.Default
+    private PublishMode publishMode = PublishMode.PUBLISH_NOW;
+
+    private Integer voteDurationHours;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

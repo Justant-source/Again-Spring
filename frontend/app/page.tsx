@@ -7,42 +7,42 @@ import { Logo } from '@/components/shared/Logo';
 import { Footer } from '@/components/shared/Footer';
 import { useUserStore } from '@/lib/store/userStore';
 import { permissionsFor } from '@/lib/constants/userPermissions';
-import { api } from '@/lib/api/client';
-
-const ACTIVE_STATUSES = new Set(['chatting_solo', 'chatting_duo', 'awaiting_finalization']);
 
 export default function LandingPage() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
   const [mounted, setMounted] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  // 활성 세션 폴링 — 로그인 사용자 전체 (게스트도 canResumeOldSession:true 정책 준수)
-  useEffect(() => {
-    if (!user) return;
-    api.get('/api/users/me/history').then(r => {
-      const active = (r.data as any[]).find(s => ACTIVE_STATUSES.has(s.status));
-      setActiveSessionId(active?.id ?? null);
-    }).catch(() => { });
-  }, [user]);
 
   if (!mounted) return null;
 
   const perms = permissionsFor(user);
   const showAdminEntry = perms.ui.showAdminEntryButton;
   const showMarketingEntry = perms.admin.canAccessMarketing;
-  const showChatEntry = perms.ui.showLandingChatEntry;
 
   return (
     <PhoneFrame tone="L">
       <div className="flex flex-col flex-1 px-7 pt-6 pb-5">
-        {/* 헤더: 로고만 — 내비·프로필은 하단 5탭으로 */}
-        <div className="flex items-center">
+        {/* 헤더: 로고 + 우측 로그인 링크 */}
+        <div className="flex items-center justify-between">
           <Logo />
+          <button
+            onClick={() => router.push('/login')}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 14,
+              color: 'var(--L-sub)',
+              textDecoration: 'none',
+              padding: 0,
+            }}
+          >
+            로그인
+          </button>
         </div>
 
         {/* 관리자 모드 진입 카드 — user-permissions.json의 ui.showAdminEntryButton */}
@@ -107,65 +107,87 @@ export default function LandingPage() {
           </button>
         )}
 
-        {/* 이어서 대화하기 배너 (활성 세션 있을 때, 채팅 진입 가능 등급만) */}
-        {showChatEntry && activeSessionId && (
-          <button
-            onClick={() => router.push(`/session/chat/${activeSessionId}`)}
+        {/* C3 광장형 랜딩 본문 */}
+        <div className="mt-8 flex flex-col flex-1">
+          <div className="text-[12px] mb-2.5" style={{ color: 'var(--L-sub)' }}>
+            혼자 끙끙 앓지 마세요
+          </div>
+          <h1
+            className="serif"
             style={{
-              marginTop: 16,
-              width: '100%',
-              padding: '12px 16px',
-              background: 'var(--L-card)',
-              border: '1px solid var(--L-rule)',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              textAlign: 'left',
+              fontSize: 30,
+              lineHeight: 1.35,
+              letterSpacing: '-0.01em',
+              marginBottom: 16,
             }}
           >
-            <div>
-              <div style={{ fontSize: 13, color: 'var(--L-ink)', fontWeight: 500 }}>이어서 대화하기</div>
-              <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 2 }}>진행 중인 대화가 있어요</div>
-            </div>
-            <span style={{ color: 'var(--L-sub)', fontSize: 18 }}>›</span>
-          </button>
-        )}
+            내 갈등,<br />혼자 판단하기<br />어려울 때.
+          </h1>
+          <p
+            className="text-[14px]"
+            style={{
+              color: 'var(--L-sub)',
+              lineHeight: 1.75,
+              marginBottom: 24,
+            }}
+          >
+            AI 배심원단과 익명의 여론이 여러 시선을 빌려드려요.
+            <br />
+            혼자, 또는 상대와 함께 풀어가요.
+          </p>
 
-        {/* 일반 사용자 채팅 진입 본문 — admin은 노출 안 함 */}
-        {showChatEntry ? (
-          <>
-            <div className="mt-6">
-              <div className="text-[13px] mb-2.5" style={{ color: 'var(--L-sub)' }}>
-                중재자와 대화
+          {/* 통계 블록 */}
+          <div
+            className="flex items-center justify-center gap-4 mb-8"
+            style={{ padding: '12px 0' }}
+          >
+            <div style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--L-ink)' }}>
+                12,840
               </div>
-              <h1
-                className="serif"
-                style={{ fontSize: 32, lineHeight: 1.35, letterSpacing: '-0.01em' }}
-              >
-                마음을<br />정리해요.
-              </h1>
-              <p className="mt-3 text-[14px] leading-[1.7]" style={{ color: 'var(--L-sub)' }}>
-                5분이면 충분합니다.
-              </p>
-
-              <div className="mt-5 letter-card" style={{ padding: 16 }}>
-                <div className="quote-it" style={{ fontSize: 12, marginBottom: 8 }}>
-                  다시봄은 이런 도구예요
-                </div>
-                <ul className="serif" style={{ fontSize: 13, lineHeight: 1.8 }}>
-                  <li>· 상대와 직접 말하지 않고, 각자 중재자와 대화해요</li>
-                  <li>· 옳고 그름이 아니라 서로의 마음을 봐요</li>
-                </ul>
+              <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 2 }}>
+                오늘 모인 시선
               </div>
             </div>
+            <div
+              style={{
+                width: 1,
+                height: 24,
+                backgroundColor: 'var(--L-sub)',
+                opacity: 0.2,
+              }}
+            />
+            <div style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--L-ink)' }}>
+                3분
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 2 }}>
+                평균 소요
+              </div>
+            </div>
+          </div>
 
-          </>
-        ) : (
-          // admin 등 채팅 진입 비대상 — 빈 영역으로 [관리자 모드] 카드만 부각
+          {/* 스페이서 */}
           <div className="flex-1" />
-        )}
+
+          {/* 하단 버튼 */}
+          <button
+            onClick={() => router.push('/community')}
+            style={{
+              width: '100%',
+              padding: '12px 0',
+              background: 'var(--L-ink)',
+              color: 'var(--L-card)',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            다시봄 광장
+          </button>
+        </div>
       </div>
       <Footer />
     </PhoneFrame>

@@ -1,7 +1,10 @@
 import { http, HttpResponse } from 'msw';
 
 export const communityHandlers = [
-  http.get('/api/community/posts', () => {
+  http.get('/api/community/posts', ({ request }) => {
+    const url = new URL(request.url);
+    const sort = url.searchParams.get('sort') || 'latest';
+
     return HttpResponse.json({
       content: [
         {
@@ -12,6 +15,10 @@ export const communityHandlers = [
           status: 'VOTING',
           voteCount: 15,
           createdAt: new Date().toISOString(),
+          userTitle: '외갓집 가느냐 마느냐',
+          authorPct: 70,
+          partnerPct: 30,
+          paired: true,
         },
       ],
       totalElements: 1,
@@ -34,6 +41,13 @@ export const communityHandlers = [
       ],
       createdAt: new Date().toISOString(),
       isVoted: false,
+      userTitle: '외갓집 가느냐 마느냐',
+      authorPct: 70,
+      partnerPct: 30,
+      paired: true,
+      isAuthor: false,
+      hasVoted: false,
+      jurorCount: 3,
     });
   }),
 
@@ -68,19 +82,47 @@ export const communityHandlers = [
 
   http.get('/api/community/posts/:id/jury', () => {
     return HttpResponse.json({
-      jurors: Array.from({ length: 9 }, (_, i) => ({
-        ageGroup: i < 3 ? '20대' : i < 6 ? '30대' : '40대',
+      jurors: Array.from({ length: 3 }, (_, i) => ({
+        ageGroup: i < 1 ? '20대' : i < 2 ? '30대' : '40대',
         gender: i % 2 === 0 ? '여성' : '남성',
         chosenOptionLabel: 'A님 입장이 더 이해됩니다',
         empathyComment: 'A님 상황에 더 공감이 갑니다. 다만 B님도 자신의 감정을 표현한 것이므로 이해할 수 있습니다.',
       })),
       distribution: [
-        { label: 'A님 입장이 더 이해됩니다', count: 6, percentage: 67 },
-        { label: 'B님 입장이 더 이해됩니다', count: 2, percentage: 22 },
-        { label: '서로 오해가 있어 보입니다', count: 1, percentage: 11 },
+        { label: 'A님 입장이 더 이해됩니다', count: 2, percentage: 67 },
+        { label: 'B님 입장이 더 이해됩니다', count: 1, percentage: 33 },
       ],
       legalNotice: '이 결과는 공감 분포일 뿐 법적 책임이나 과실 비율과 무관합니다.',
+      summaryLine: 'AI 배심원 3인 중 2인이 작성자에 공감했어요',
     });
+  }),
+
+  http.post('/api/community/posts/:id/invite', ({ params }) => {
+    return HttpResponse.json({
+      inviteToken: 'tok_' + Math.random().toString(36).substr(2, 9),
+      inviteUrl: 'https://example.com/s/tok_' + Math.random().toString(36).substr(2, 9),
+    });
+  }),
+
+  http.get('/api/s/:token', ({ params }) => {
+    return HttpResponse.json({
+      postId: 'post_test001',
+      userTitle: '외갓집 가느냐 마느냐',
+      authorBodyPublished: 'A님의 입장 설명입니다.',
+      category: 'couple',
+    });
+  }),
+
+  http.post('/api/s/:token/answer', () => {
+    return HttpResponse.json({ success: true });
+  }),
+
+  http.patch('/api/community/posts/:id/publish-mode', () => {
+    return HttpResponse.json({ success: true });
+  }),
+
+  http.post('/api/community/posts/:id/publish-now', () => {
+    return HttpResponse.json({ success: true });
   }),
 
   http.get('/api/community/posts/:id/comments', () => {

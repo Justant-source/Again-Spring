@@ -7,8 +7,10 @@ import com.againspring.domain.community.VoteOption;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.community.VoteRepository;
+import com.againspring.service.notification.event.NewVoteEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,10 +31,11 @@ public class VoteService {
     private final VoteRepository voteRepository;
     private final PostRepository postRepository;
     private final VoteOptionRepository voteOptionRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 투표 수행 및 현재 투표 결과 반환
-     * 이미 투표했으면 기존 투표를 반환
+     * 이미 투표했으면 optionId 업데이트 (투표 변경 허용)
      *
      * @param postId 포스트 ID
      * @param optionId 선택지 ID
@@ -57,7 +60,14 @@ public class VoteService {
         // 이미 투표했는지 확인
         Optional<Vote> existingVote = voteRepository.findByPostIdAndVoterUserId(postId, userId);
 
-        if (existingVote.isEmpty()) {
+        if (existingVote.isPresent()) {
+            // 기존 투표 업데이트 (투표 변경 허용)
+            Vote vote = existingVote.get();
+            vote.setOptionId(optionId);
+            voteRepository.save(vote);
+            log.info("Vote updated for post {} by user {}: option {} -> {}", postId, userId,
+                    existingVote.get().getOptionId(), optionId);
+        } else {
             // 새 투표 생성
             Vote vote = Vote.builder()
                     .postId(postId)
@@ -67,8 +77,14 @@ public class VoteService {
                     .build();
             voteRepository.save(vote);
             log.info("Vote cast for post {} by user {}: option {}", postId, userId, optionId);
-        } else {
-            log.info("User {} already voted for post {}", userId, postId);
+
+            // C3 알림: 사연 작성자에게 새 투표 알림 발행
+            eventPublisher.publishEvent(new NewVoteEvent(
+                this,
+                post.getAuthorId(),
+                postId,
+                userId + "님이 투표했어요"
+            ));
         }
 
         return getVoteResult(postId);

@@ -1,5 +1,6 @@
 package com.againspring.domain.community;
 
+import com.againspring.domain.enums.CommentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -37,6 +38,11 @@ public class PostComment {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String body;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private CommentStatus status = CommentStatus.ACTIVE;
 
     @Column(nullable = false)
     @Builder.Default

@@ -4,6 +4,8 @@ export interface PostCreateRequest {
   bodyRaw: string;
   category: string;
   visibility: 'PUBLIC' | 'PRIVATE';
+  userTitle?: string;
+  jurorCount?: number;
   sessionId?: string;
 }
 
@@ -24,6 +26,16 @@ export interface PostDetail {
   createdAt: string;
   isVoted?: boolean;
   voteResult?: VoteResult;
+  userTitle?: string;
+  jurorCount?: number;
+  authorPct?: number;
+  partnerPct?: number;
+  paired?: boolean;
+  inviteToken?: string;
+  partnerBodyPublished?: string;
+  isAuthor?: boolean;
+  hasVoted?: boolean;
+  myVoteSide?: 'g' | 'r' | null;
 }
 
 export interface PostSummary {
@@ -34,6 +46,10 @@ export interface PostSummary {
   status: string;
   voteCount: number;
   createdAt: string;
+  userTitle?: string;
+  authorPct?: number;
+  partnerPct?: number;
+  paired?: boolean;
 }
 
 export interface VoteResult {
@@ -51,13 +67,14 @@ export interface JuryResult {
   }>;
   distribution: Array<{ label: string; count: number; percentage: number }>;
   legalNotice: string;
+  summaryLine?: string;
 }
 
 export const postApi = {
   create: (req: PostCreateRequest) =>
     api.post<PostDetail>('/api/community/posts', req).then(r => r.data),
 
-  list: (params?: { category?: string; page?: number; size?: number }) =>
+  list: (params?: { category?: string; page?: number; size?: number; sort?: 'latest' | 'recommended' }) =>
     api.get<{ content: PostSummary[]; totalElements: number; totalPages: number }>(
       '/api/community/posts', { params }).then(r => r.data),
 

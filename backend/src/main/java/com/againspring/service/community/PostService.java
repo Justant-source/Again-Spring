@@ -30,21 +30,44 @@ public class PostService {
      * 공개 포스트 목록 조회 (공개된 VOTING/CLOSED 상태만)
      *
      * @param category 카테고리 필터 (nullable)
+     * @param sort 정렬 순서 ("latest" | "recommended", 기본값 "latest")
      * @param pageable 페이징 정보
      * @return 공개 포스트 페이지
      */
-    public Page<Post> listPublicPosts(String category, Pageable pageable) {
-        // 현재 리포지토리에는 category 필터 기능 없음
-        // 간단한 구현: 공개 포스트만 조회
-        List<Post> posts = postRepository.findByVisibilityAndStatusOrderByCreatedAtDesc(
-                PostVisibility.PUBLIC,
-                PostStatus.VOTING,
-                pageable
-        );
+    public Page<Post> listPublicPosts(String category, String sort, Pageable pageable) {
+        // 카테고리 필터링
+        List<Post> posts;
+        if (category != null && !category.isEmpty()) {
+            try {
+                com.againspring.domain.enums.PostCategory cat =
+                        com.againspring.domain.enums.PostCategory.valueOf(category.toUpperCase());
+                posts = postRepository.findByVisibilityAndStatusAndCategoryOrderByCreatedAtDesc(
+                        PostVisibility.PUBLIC,
+                        PostStatus.VOTING,
+                        cat,
+                        pageable
+                );
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid category: {}", category);
+                posts = postRepository.findByVisibilityAndStatusOrderByCreatedAtDesc(
+                        PostVisibility.PUBLIC,
+                        PostStatus.VOTING,
+                        pageable
+                );
+            }
+        } else {
+            posts = postRepository.findByVisibilityAndStatusOrderByCreatedAtDesc(
+                    PostVisibility.PUBLIC,
+                    PostStatus.VOTING,
+                    pageable
+            );
+        }
 
-        // TODO: category 필터링이 필요하면 리포지토리에 메서드 추가 필요
+        // "recommended" 정렬은 추후 추천도(voteCount) 컬럼 추가 예정
+        // 현재는 "latest"만 작동 (createdAt desc는 이미 적용됨)
+
         long total = posts.size();
-        log.info("Listed {} public posts", total);
+        log.info("Listed {} public posts (category={}, sort={})", total, category, sort);
         return new PageImpl<>(posts, pageable, total);
     }
 

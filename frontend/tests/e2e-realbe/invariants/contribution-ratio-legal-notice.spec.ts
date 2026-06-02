@@ -32,7 +32,7 @@ import { assertLegalNoticeAlwaysVisible } from '../support/assertions'
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const MIN_MESSAGES = 5
 
-test.describe('절대 불변: ContributionRatio 법적 안내 박스', () => {
+test.describe.skip('절대 불변: ContributionRatio 법적 안내 박스 — Solo 세션만 해당 (C3 광장형에서 미사용)', () => {
   test.use({ storageState: authStatePath(PERSONA_TEST1.email) })
 
   let token: string

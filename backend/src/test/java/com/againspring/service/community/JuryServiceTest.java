@@ -101,7 +101,7 @@ class JuryServiceTest {
         when(jurorRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        service.generateJuryAsync(post, options);
+        service.generateJuryAsync(post, options, 9);
 
         // Then
         // 비동기 실행이므로 검증은 제한적
@@ -129,7 +129,7 @@ class JuryServiceTest {
         when(promptLoader.get("community/jury_persona.md")).thenThrow(new RuntimeException("File not found"));
 
         // When
-        service.generateJuryAsync(post, options);
+        service.generateJuryAsync(post, options, 9);
 
         // Then - 비동기 실행이므로 예외를 발생하지 않음
         verify(promptLoader, times(1)).get("community/jury_persona.md");

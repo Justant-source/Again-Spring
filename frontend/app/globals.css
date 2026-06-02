@@ -32,6 +32,14 @@
   --Q-border: theme('colors.tone-q.border');
   --Q-point: theme('colors.tone-q.point');
 
+  /* Faction colors — 작성자(초록) vs 상대방(붉은) 진영 구분 */
+  --grn: #5E9B77;
+  --grn-bg: #E5F0E9;
+  --grn-dk: #3C7A55;
+  --red: #CC6B57;
+  --red-bg: #F7E3DB;
+  --red-dk: #A8472F;
+
   --font-sans: 'Pretendard Variable', Pretendard, -apple-system, system-ui, 'Malgun Gothic', sans-serif;
   --font-serif: 'Noto Serif KR', 'Nanum Myeongjo', serif;
 

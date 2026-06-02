@@ -2,6 +2,7 @@ package com.againspring.service.community;
 
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.VoteOption;
+import com.againspring.domain.enums.PostCategory;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.llm.LLMProvider;
@@ -96,7 +97,7 @@ class PostComposeServiceTest {
         when(voteOptionRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        Post result = service.composeAndNeutralize(authorId, bodyRaw, category, visibility, sessionId);
+        Post result = service.composeAndNeutralize(authorId, null, bodyRaw, PostCategory.MARRIED, visibility, 9, sessionId);
 
         // Then
         assertNotNull(result);
@@ -146,7 +147,7 @@ class PostComposeServiceTest {
 
         // When & Then
         assertThrows(IllegalArgumentException.class, () ->
-                service.composeAndNeutralize(authorId, bodyRaw, category, visibility, null)
+                service.composeAndNeutralize(authorId, null, bodyRaw, PostCategory.MARRIED, visibility, 9, null)
         );
 
         verify(postRepository, times(2)).save(any());

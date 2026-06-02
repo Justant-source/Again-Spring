@@ -1,9 +1,11 @@
 package com.againspring.repository.community;
 
 import com.againspring.domain.community.Post;
+import com.againspring.domain.enums.PostCategory;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -21,7 +23,18 @@ public interface PostRepository extends JpaRepository<Post, String> {
             PostVisibility visibility, PostStatus status, Pageable pageable);
 
     /**
+     * 공개 여부, 상태, 카테고리로 포스트 조회 (생성순 역순)
+     */
+    List<Post> findByVisibilityAndStatusAndCategoryOrderByCreatedAtDesc(
+            PostVisibility visibility, PostStatus status, PostCategory category, Pageable pageable);
+
+    /**
      * 작성자별 포스트 조회 (생성순 역순)
      */
     List<Post> findByAuthorIdOrderByCreatedAtDesc(String authorId);
+
+    /**
+     * 초대 토큰으로 포스트 조회 (C3 파트너 초대)
+     */
+    Optional<Post> findByInviteToken(String inviteToken);
 }

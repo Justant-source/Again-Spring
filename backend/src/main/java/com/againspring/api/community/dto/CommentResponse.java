@@ -31,6 +31,10 @@ public class CommentResponse {
 
     private Instant createdAt;
 
+    private Boolean isAuthor;
+
+    private Boolean isPartner;
+
     /**
      * PostComment로부터 CommentResponse 생성
      */
@@ -42,6 +46,22 @@ public class CommentResponse {
                 .likeCount((long) comment.getLikeCount())
                 .isLiked(isLiked)
                 .createdAt(comment.getCreatedAt())
+                .build();
+    }
+
+    /**
+     * PostComment로부터 CommentResponse 생성 (isAuthor, isPartner 포함)
+     */
+    public static CommentResponse from(PostComment comment, boolean isLiked, boolean isAuthor, boolean isPartner) {
+        return CommentResponse.builder()
+                .id(comment.getId())
+                .authorId(comment.getAuthorId())
+                .body(comment.getBody())
+                .likeCount((long) comment.getLikeCount())
+                .isLiked(isLiked)
+                .createdAt(comment.getCreatedAt())
+                .isAuthor(isAuthor)
+                .isPartner(isPartner)
                 .build();
     }
 }

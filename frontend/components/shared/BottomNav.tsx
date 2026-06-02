@@ -32,12 +32,12 @@ function CommunityIcon({ active }: { active: boolean }) {
   );
 }
 
-function HistoryIcon({ active }: { active: boolean }) {
+function NotificationsIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <polyline points="12 7 12 12 15 15" />
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
   );
 }
@@ -72,9 +72,8 @@ export function BottomNav() {
   // 몰입 화면에서는 숨김 — 안전 불변: 채팅/결과/온보딩/인증 항상 숨김
   if (isNavHidden(pathname)) return null;
 
-  const showHistory = perms.ui.showHistoryMenu;       // 게스트·관리자: false
-  const showChatCta = perms.ui.showLandingChatEntry;  // 관리자: false
-  const showAdmin   = perms.ui.showAdminEntryButton;  // 관리자만: true
+  const showAdmin = perms.ui.showAdminEntryButton;        // 관리자만: true
+  const showNotifications = !user?.isGuest && !showAdmin; // 회원만 (관리자 제외)
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : (pathname === href || pathname.startsWith(href + '/'));
@@ -99,8 +98,8 @@ export function BottomNav() {
     whiteSpace: 'nowrap',
   });
 
-  // 가운데 CTA 클릭 핸들러 — 게스트 우선, 활성 세션 resume은 BottomCtaHandler가 담당 (E 워크스트림)
-  const handleCta = () => router.push('/session/new');
+  // 가운데 CTA 클릭 핸들러 — 사연 올리기
+  const handleCta = () => router.push('/community/new');
 
   return (
     <nav
@@ -139,13 +138,13 @@ export function BottomNav() {
         <span style={lbl(isActive('/community'))}>커뮤니티</span>
       </Link>
 
-      {/* ── 가운데 강조 CTA (회원·게스트) / 관리 탭 (관리자) ── */}
-      {showChatCta ? (
+      {/* ── 가운데 강조 CTA: 사연 올리기 / 관리 탭 (관리자) ── */}
+      {!showAdmin ? (
         <button
           type="button"
           onClick={handleCta}
-          aria-label="대화 시작"
-          data-testid="nav-start-chat"
+          aria-label="사연 올리기"
+          data-testid="nav-write-post"
           style={{
             flex: 1.4,
             display: 'flex',
@@ -174,7 +173,7 @@ export function BottomNav() {
             boxShadow: '0 -2px 12px rgba(60,40,20,0.10), 0 6px 24px rgba(60,40,20,0.20)',
             transition: 'box-shadow 0.15s, transform 0.15s',
           }}>
-            <Conversation color="white" width={22} height={22} />
+            <span style={{ color: 'white', fontSize: 20 }}>✎</span>
           </div>
           <span style={{
             fontSize: 12,
@@ -184,11 +183,11 @@ export function BottomNav() {
             color: 'var(--P-ink)',
             whiteSpace: 'nowrap',
           }}>
-            대화 시작
+            사연 올리기
           </span>
         </button>
-      ) : showAdmin ? (
-        /* 관리자: 대화 시작 대신 관리 탭 */
+      ) : (
+        /* 관리자: 사연 올리기 대신 관리 탭 */
         <Link
           href="/admin"
           data-testid="nav-admin"
@@ -197,23 +196,20 @@ export function BottomNav() {
           <AdminIcon active={isActive('/admin')} />
           <span style={lbl(isActive('/admin'))}>관리</span>
         </Link>
-      ) : (
-        /* 아무것도 없을 경우 빈 스페이서 */
-        <div style={{ flex: 1.4 }} aria-hidden="true" />
       )}
 
-      {/* ── 대화기록 (회원만 / 게스트·관리자 숨김) ── */}
-      {showHistory ? (
+      {/* ── 알림 (회원만 / 게스트·관리자 숨김) ── */}
+      {showNotifications ? (
         <Link
-          href="/history"
-          data-testid="nav-history"
-          style={{ ...baseTab, color: isActive('/history') ? 'var(--P-ink)' : 'var(--P-sub)' }}
+          href="/notifications"
+          data-testid="nav-notifications"
+          style={{ ...baseTab, color: isActive('/notifications') ? 'var(--P-ink)' : 'var(--P-sub)' }}
         >
-          <HistoryIcon active={isActive('/history')} />
-          <span style={lbl(isActive('/history'))}>대화기록</span>
+          <NotificationsIcon active={isActive('/notifications')} />
+          <span style={lbl(isActive('/notifications'))}>알림</span>
         </Link>
       ) : (
-        /* 게스트·관리자: 대화기록 자리를 스페이서로 채워 균형 유지 */
+        /* 게스트·관리자: 알림 자리를 스페이서로 채워 균형 유지 */
         <div style={{ flex: 1 }} aria-hidden="true" />
       )}
 

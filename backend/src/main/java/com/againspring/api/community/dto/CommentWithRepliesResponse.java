@@ -32,4 +32,8 @@ public class CommentWithRepliesResponse {
     private Instant createdAt;
 
     private List<CommentResponse> replies;
+
+    private Boolean isAuthor;
+
+    private Boolean isPartner;
 }
