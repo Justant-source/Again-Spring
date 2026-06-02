@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { postApi, PostDetail, JuryResult, VoteResult } from '@/lib/api/community/postApi';
 import { commentApi, Comment } from '@/lib/api/community/commentApi';
 import { VoteBar, SideStory, JurorCard } from '@/components/community/c3';
 import { GRN, RED, GRN_BG, RED_BG } from '@/lib/constants/factionColors';
+
+const COMMENT_PAGE_SIZE = 10;
 
 interface PageProps {
   params: { id: string };
@@ -38,12 +40,18 @@ function C3StoryDetail({
   comments,
   onVote,
   isVoting,
+  hasMoreComments,
+  loadingMoreComments,
+  commentBottomRef,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
   comments: Comment[];
   onVote: (optionId: number) => Promise<void>;
   isVoting: boolean;
+  hasMoreComments: boolean;
+  loadingMoreComments: boolean;
+  commentBottomRef: React.RefObject<HTMLDivElement>;
 }) {
   const [pick, setPick] = useState<'g' | 'r' | null>(post.myVoteSide || null);
   const [voted, setVoted] = useState(post.hasVoted || false);
@@ -147,7 +155,7 @@ function C3StoryDetail({
           body={post.partnerBodyPublished || '상대방의 이야기를 기다리는 중입니다.'}
           clamp={true}
           selected={pick === 'r'}
-          onSelect={post.partnerBodyPublished ? () => handlePick('r') : undefined}
+          onSelect={() => handlePick('r')}
           onMore={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
         />
       </div>
@@ -167,45 +175,50 @@ function C3StoryDetail({
         </div>
       </div>
 
-      {/* 댓글 미리보기 */}
-      {comments.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--L-ink)', marginBottom: 8 }}>
-            댓글 {comments.length}
-          </div>
-          {comments.slice(0, 2).map((comment) => (
-            <div
-              key={comment.id}
-              style={{
-                fontSize: 12,
-                color: 'var(--L-ink)',
-                padding: '8px 0',
-                borderBottom: '1px solid var(--L-border)',
-                lineHeight: 1.5,
-              }}
-            >
-              <div style={{ fontSize: 11, color: 'var(--L-sub)', marginBottom: 4 }}>
-                {formatDate(comment.createdAt)}
-              </div>
-              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {comment.body}
-              </div>
-            </div>
-          ))}
-          <Link
-            href={`/community/${post.id}/comments`}
-            style={{
-              fontSize: 12,
-              color: 'var(--L-sub)',
-              textDecoration: 'none',
-              marginTop: 8,
-              display: 'block',
-            }}
-          >
-            댓글 보기 ›
-          </Link>
+      {/* 댓글 인라인 목록 (10개씩 무한스크롤) */}
+      <div style={{ marginBottom: 80 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--L-ink)', marginBottom: 12 }}>
+          댓글 {comments.length}{hasMoreComments ? '+' : ''}
         </div>
-      )}
+        {comments.length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--L-sub)', padding: '16px 0', textAlign: 'center' }}>
+            아직 댓글이 없습니다
+          </div>
+        )}
+        {comments.map((comment) => (
+          <div key={comment.id}>
+            <div style={{ padding: '10px 0', borderBottom: '1px solid var(--L-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{
+                  fontSize: 12.5, fontWeight: 500,
+                  color: (comment as any).isAuthor ? GRN : (comment as any).isPartner ? RED : 'var(--L-ink)',
+                }}>
+                  {((comment as any).isAuthor || (comment as any).isPartner) ? '* ' : ''}{comment.authorId}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--L-sub)' }}>{formatDate(comment.createdAt)}</span>
+              </div>
+              <div style={{ fontSize: 13.5, color: 'var(--L-ink)', lineHeight: 1.6 }}>{comment.body}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--L-sub)', marginTop: 6 }}>공감 {comment.likeCount}</div>
+            </div>
+            {/* 대댓글 */}
+            {comment.replies?.map((reply) => (
+              <div key={reply.id} style={{ paddingLeft: 20, padding: '8px 0 8px 20px', borderBottom: '1px solid var(--L-border)' }}>
+                <span style={{ color: 'var(--L-sub)', fontSize: 13, marginRight: 6 }}>↳</span>
+                <span style={{ fontSize: 12.5, fontWeight: 500, color: (reply as any).isAuthor ? GRN : (reply as any).isPartner ? RED : 'var(--L-ink)' }}>
+                  {((reply as any).isAuthor || (reply as any).isPartner) ? '* ' : ''}{reply.authorId}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--L-sub)', marginLeft: 6 }}>{formatDate(reply.createdAt)}</span>
+                <div style={{ fontSize: 13.5, color: 'var(--L-ink)', lineHeight: 1.6, marginTop: 4, paddingLeft: 20 }}>{reply.body}</div>
+              </div>
+            ))}
+          </div>
+        ))}
+        {/* 무한스크롤 트리거 */}
+        <div ref={commentBottomRef} style={{ height: 16 }} />
+        {loadingMoreComments && (
+          <div style={{ textAlign: 'center', padding: '8px', color: 'var(--L-sub)', fontSize: 12 }}>불러오는 중...</div>
+        )}
+      </div>
 
       {/* 하단 고정 버튼 */}
       <div
@@ -565,9 +578,13 @@ export default function CommunityPostPage({ params }: PageProps) {
   const [voteResult, setVoteResult] = useState<VoteResult | null>(null);
   const [juryResult, setJuryResult] = useState<JuryResult | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [commentPage, setCommentPage] = useState(0);
+  const [hasMoreComments, setHasMoreComments] = useState(true);
+  const [loadingMoreComments, setLoadingMoreComments] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isVoting, setIsVoting] = useState(false);
+  const commentBottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadPost = async () => {
@@ -576,8 +593,11 @@ export default function CommunityPostPage({ params }: PageProps) {
         const postData = await postApi.get(params.id);
         setPost(postData);
 
-        const commentsData = await commentApi.list(params.id);
+        // 댓글 첫 페이지 (10개)
+        const commentsData = await commentApi.list(params.id, 0, COMMENT_PAGE_SIZE);
         setComments(commentsData);
+        setHasMoreComments(commentsData.length === COMMENT_PAGE_SIZE);
+        setCommentPage(1);
 
         // Get jury result — author only (BE는 401 반환, 비로그인 시 전역 auth 에러 유발 방지)
         if (postData.isAuthor) {
@@ -593,6 +613,33 @@ export default function CommunityPostPage({ params }: PageProps) {
 
     loadPost();
   }, [params.id]);
+
+  // 댓글 추가 로드 (무한스크롤)
+  const loadMoreComments = useCallback(async () => {
+    if (loadingMoreComments || !hasMoreComments || !post) return;
+    setLoadingMoreComments(true);
+    try {
+      const data = await commentApi.list(post.id, commentPage, COMMENT_PAGE_SIZE);
+      if (data.length < COMMENT_PAGE_SIZE) setHasMoreComments(false);
+      setComments(prev => [...prev, ...data]);
+      setCommentPage(p => p + 1);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingMoreComments(false);
+    }
+  }, [post, commentPage, loadingMoreComments, hasMoreComments]);
+
+  useEffect(() => {
+    const el = commentBottomRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMoreComments(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMoreComments]);
 
   const handleVote = async (optionId: number) => {
     // 이미 투표했으면 재투표 불가
@@ -639,7 +686,7 @@ export default function CommunityPostPage({ params }: PageProps) {
   // Render logic
   if (!post.isAuthor) {
     // View A: 관람자
-    return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} isVoting={isVoting} />;
+    return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} isVoting={isVoting} hasMoreComments={hasMoreComments} loadingMoreComments={loadingMoreComments} commentBottomRef={commentBottomRef} />;
   } else if (post.status === 'VOTING' && !post.paired) {
     // View B: 작성자 + VOTING + partner 없음
     return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} />;
