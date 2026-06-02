@@ -66,7 +66,7 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     // testid로 버튼 클릭 (event.stopPropagation 적용됨)
     await page.locator('[data-testid="guest-notice-continue"]').click()
     // 모드 선택 단계 진입
-    await expect(page.getByText('이 사연, 어떻게 올릴까요?')).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 5_000 })
   })
 
   test('게스트 — 모드 선택: 상대 초대 카드 비활성, PUBLIC 선택 → 버튼 활성', async ({ page }) => {
@@ -75,7 +75,7 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     await page.locator('[data-testid="compose-body"]').fill('게스트 모드 카드 활성화 테스트 본문.')
     await page.getByRole('button', { name: '올리기' }).click()
     await page.locator('[data-testid="guest-notice-continue"]').click()
-    await expect(page.getByText('이 사연, 어떻게 올릴까요?')).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 5_000 })
 
     // 제출 버튼 초기 비활성
     const submitBtn = page.locator('[data-testid="mode-submit-btn"]')
@@ -117,7 +117,7 @@ test.describe('Flow 04-B: 광장 플로우 (회원)', () => {
     await page.getByRole('button', { name: '올리기' }).click()
 
     // mode 단계 (회원이므로 GuestNoticeModal 없음)
-    await expect(page.getByText('이 사연, 어떻게 올릴까요?')).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 8_000 })
 
     // PUBLIC 선택
     await page.locator('[data-testid="mode-public-card"]').click()
@@ -139,7 +139,7 @@ test.describe('Flow 04-B: 광장 플로우 (회원)', () => {
     await page.locator('[data-testid="compose-body"]').fill('상대 초대 기능 e2e 테스트 본문입니다.')
     await page.getByRole('button', { name: '올리기' }).click()
 
-    await expect(page.getByText('이 사연, 어떻게 올릴까요?')).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 8_000 })
 
     // 회원이면 상대 초대 카드 클릭 가능
     await page.locator('[data-testid="mode-private-card"]').click()

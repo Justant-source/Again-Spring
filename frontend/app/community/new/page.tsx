@@ -330,7 +330,7 @@ export default function CommunityNewPage() {
       <div style={{ background: 'var(--L-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, padding: '24px 26px 120px' }}>
           {/* 제목 */}
-          <h2 className="serif" style={{ fontSize: 22, lineHeight: 1.45, marginBottom: 24, color: 'var(--L-ink)', fontWeight: 500 }}>
+          <h2 data-testid="mode-step-heading" className="serif" style={{ fontSize: 22, lineHeight: 1.45, marginBottom: 24, color: 'var(--L-ink)', fontWeight: 500 }}>
             이 사연,<br />어떻게 올릴까요?
           </h2>
 
