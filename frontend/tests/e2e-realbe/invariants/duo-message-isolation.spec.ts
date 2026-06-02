@@ -1,4 +1,7 @@
 /**
+ * V18 이후 미사용 — Duo 1:1 중재 채팅 기능 FE 은퇴
+ * 백엔드 API는 유지되나 FE 내비에서 제거됨 (2026-06-02)
+ *
  * 절대 불변 규칙: Duo 모드에서 상대방 메시지 원문은 DOM·API에 노출되지 않는다.
  *
  * 권위본:
@@ -26,7 +29,7 @@ import { BLURRED_BUBBLE } from '../support/selectors'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 
-test.describe('절대 불변: Duo 메시지 격리', () => {
+test.describe.skip('절대 불변: Duo 메시지 격리 — V18 FE 은퇴로 스킵', () => {
   let tokenA: string
   let tokenB: string
   let sessionId: string
