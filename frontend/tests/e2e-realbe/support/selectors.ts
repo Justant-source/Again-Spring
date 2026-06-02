@@ -65,6 +65,8 @@ export const COMPOSE_CHAR_COUNT = '[data-testid="compose-char-count"]'
 export const MODE_PUBLIC_CARD = '[data-testid="mode-public-card"]'
 export const MODE_PRIVATE_CARD = '[data-testid="mode-private-card"]'
 export const MODE_SUBMIT_BTN = '[data-testid="mode-submit-btn"]'
+// Guest 모달
+export const GUEST_NOTICE_CONTINUE = '[data-testid="guest-notice-continue"]'
 // Story detail
 export const STORY_AUTHOR_BOX = '[data-testid="story-author-box"]'
 export const STORY_PARTNER_BOX = '[data-testid="story-partner-box"]'

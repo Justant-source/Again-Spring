@@ -118,7 +118,8 @@ export function GuestNoticeModal({ isOpen, onClose, onSignup, onContinueAsGuest 
             가입하고 올리기
           </button>
           <button
-            onClick={onContinueAsGuest || onClose}
+            data-testid="guest-notice-continue"
+            onClick={(e) => { e.stopPropagation(); (onContinueAsGuest || onClose)(); }}
             style={{
               padding: '14px',
               background: 'transparent',
