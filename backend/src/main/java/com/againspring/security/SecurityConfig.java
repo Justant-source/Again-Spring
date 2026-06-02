@@ -64,6 +64,8 @@ public class SecurityConfig {
                         .requestMatchers("POST", "/api/feedbacks").permitAll()
                         .requestMatchers("GET", "/api/community/posts").permitAll()
                         .requestMatchers("GET", "/api/community/posts/*").permitAll()
+                        .requestMatchers("GET", "/api/community/posts/*/comments").permitAll()
+                        .requestMatchers("GET", "/api/s/*").permitAll()
                         .requestMatchers("POST", "/api/community/**").authenticated()
                         .requestMatchers("DELETE", "/api/community/**").authenticated()
                         .requestMatchers("/api/three-way/**").authenticated()
