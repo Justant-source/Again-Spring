@@ -240,24 +240,24 @@ curl http://localhost:8080/actuator/health
 | `againspring-backend-dev/prod` | 프롬프트 어셈블 + HTTP 클라이언트 (`RemoteLlmProvider`) |
 | `againspring-llm-dev/prod` | Claude CLI 실행 전용 (`LlmWorkerPool` 100풀 + 큐500) |
 
-- **모델**: `claude-haiku-4-5-20251001` (채팅), `claude-sonnet-4-6` (리포트)
+- **모델**: `claude-haiku-4-5-20251001` (채팅·배심원), `claude-sonnet-4-6` (리포트)
 - **호출 플래그**: `--strict-mcp-config --no-session-persistence --print` (⚠️ `--bare` 금지 — OAuth 파괴)
 - **동시성**: ThreadPoolExecutor 100 + LinkedBlockingQueue 500 (fail-fast 폐기 → 대기 큐)
 - **타임아웃**: 실행 120초 (큐 대기 30초 초과 시 CAPACITY)
-- **Fallback**: `LLM_PROVIDER=claude-code` + backend Dockerfile git revert → in-process 복귀
+- **dev/prod 동일**: 실시간 응답 불필요 → **두 환경 모두 `remote`(CLI 브릿지) 사용**. `ANTHROPIC_API_KEY` 불필요.
 
-### 인증 방식 (API 키 없이)
+### 인증 방식 (API 키 없이 — dev/prod 동일)
 
 `~/.claude`를 **llm-worker 컨테이너**에 마운트:
 
 ```yaml
-# env/docker-compose.dev.yml
-againspring-llm-dev:
+# env/docker-compose.{dev,prod}.yml
+againspring-llm-{dev,prod}:
   volumes:
     - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
 ```
 
-호스트에서 최초 1회 `claude` 명령으로 로그인. `ANTHROPIC_API_KEY` 불필요. 세션 만료 시 호스트 재로그인 → `docker compose restart againspring-llm-dev`.
+호스트에서 최초 1회 `claude` 명령으로 로그인. `ANTHROPIC_API_KEY` 불필요. 세션 만료 시 호스트 재로그인 → `docker compose restart againspring-llm-{dev,prod}`.
 
 ### 보안 규칙
 

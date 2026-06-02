@@ -106,11 +106,11 @@ app:
 llm:
   provider: ${LLM_PROVIDER:claude-code}   # deprecated: llm.chat.provider / llm.report.provider 사용
   chat:
-    provider: ${LLM_CHAT_PROVIDER:claude-code}     # dev:remote  prod:claude-api  test:mock
+    provider: ${LLM_CHAT_PROVIDER:remote}     # dev/prod 모두 CLI 브릿지(remote) 사용
   report:
-    provider: ${LLM_REPORT_PROVIDER:claude-code}   # dev:remote  prod:remote      test:mock
+    provider: ${LLM_REPORT_PROVIDER:remote}   # dev/prod 모두 CLI 브릿지(remote) 사용
   jury:
-    provider: ${LLM_JURY_PROVIDER:remote}     # dev/prod 모두 llm-worker(remote) 사용
+    provider: ${LLM_JURY_PROVIDER:remote}     # dev/prod 모두 CLI 브릿지(remote) 사용
     model: ${JURY_LLM_MODEL:claude-haiku-4-5-20251001}
   compose:
     model: ${COMPOSE_LLM_MODEL:claude-haiku-4-5-20251001}
