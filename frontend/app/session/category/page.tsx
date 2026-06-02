@@ -9,6 +9,8 @@
  * 흐름: /session/new(대분류 선택, step 1) → /session/category(중재자 성향, step 2) → 세션 생성
  */
 
+export const dynamic = 'force-dynamic';
+
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useSessionStore } from '@/lib/store/sessionStore';
