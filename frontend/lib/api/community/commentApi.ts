@@ -16,8 +16,8 @@ export interface CommentResponse extends Comment {
 }
 
 export const commentApi = {
-  list: (postId: string) =>
-    api.get<Comment[]>(`/api/community/posts/${postId}/comments`).then(r => r.data),
+  list: (postId: string, page = 0, size = 10) =>
+    api.get<Comment[]>(`/api/community/posts/${postId}/comments`, { params: { page, size } }).then(r => r.data),
 
   add: (postId: string, body: string, parentCommentId?: number) =>
     api.post<Comment>(`/api/community/posts/${postId}/comments`, { body, parentCommentId }).then(r => r.data),

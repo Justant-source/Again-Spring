@@ -39,9 +39,11 @@ public class CommunityCommentController {
      * GET /api/community/posts/{postId}/comments
      */
     @GetMapping
-    @Operation(summary = "댓글 목록 조회", description = "최상위 댓글과 각 대댓글 포함")
+    @Operation(summary = "댓글 목록 조회", description = "최상위 댓글과 각 대댓글 포함 (페이지네이션)")
     public ResponseEntity<List<CommentWithRepliesResponse>> getComments(
             @PathVariable String postId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         String userId = userDetails != null ? userDetails.getUsername() : null;
@@ -51,7 +53,13 @@ public class CommunityCommentController {
         String postAuthorId = post != null ? post.getAuthorId() : null;
         String postPartnerUserId = post != null ? post.getPartnerUserId() : null;
 
-        List<PostComment> topLevelComments = commentService.getTopLevelComments(postId);
+        List<PostComment> allTopLevel = commentService.getTopLevelComments(postId);
+        // 페이지네이션 (Java-side, 댓글 수가 많지 않으므로 DB 쿼리 추가 없이 처리)
+        int fromIndex = page * size;
+        int toIndex = Math.min(fromIndex + size, allTopLevel.size());
+        List<PostComment> topLevelComments = fromIndex >= allTopLevel.size()
+                ? java.util.Collections.emptyList()
+                : allTopLevel.subList(fromIndex, toIndex);
 
         List<CommentWithRepliesResponse> responses = topLevelComments.stream()
                 .map(comment -> {

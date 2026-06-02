@@ -61,12 +61,9 @@ public class VoteService {
         Optional<Vote> existingVote = voteRepository.findByPostIdAndVoterUserId(postId, userId);
 
         if (existingVote.isPresent()) {
-            // 기존 투표 업데이트 (투표 변경 허용)
-            Vote vote = existingVote.get();
-            vote.setOptionId(optionId);
-            voteRepository.save(vote);
-            log.info("Vote updated for post {} by user {}: option {} -> {}", postId, userId,
-                    existingVote.get().getOptionId(), optionId);
+            // 재투표 금지 — 이미 투표한 경우 409 반환
+            throw new com.againspring.common.exception.BusinessException(
+                "ALREADY_VOTED", "이미 투표하셨습니다", 409);
         } else {
             // 새 투표 생성
             Vote vote = Vote.builder()

@@ -2,25 +2,29 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { postApi, PostSummary } from '@/lib/api/community/postApi';
 import { FeedCard } from '@/components/community/c3';
+import { useUserStore } from '@/lib/store/userStore';
 
-const C3_CATS = ['연인', '부부', '친구', '가족', '직장', '기타'];
+// id = BE PostCategory enum, label = 표시 한글
+const C3_CATS = [
+  { id: 'COUPLE',  label: '연인' },
+  { id: 'MARRIED', label: '부부' },
+  { id: 'FRIEND',  label: '친구' },
+  { id: 'FAMILY',  label: '가족' },
+  { id: 'WORK',    label: '직장' },
+  { id: 'OTHER',   label: '기타' },
+];
 
 function getCategoryLabel(categoryId: string): string {
-  const categoryMap: { [key: string]: string } = {
-    couple: '연인',
-    marriage: '부부',
-    friend: '친구',
-    family: '가족',
-    parent_child: '가족',
-    work: '직장',
-    korean_specific: '기타',
-  };
-  return categoryMap[categoryId] || '기타';
+  const found = C3_CATS.find(c => c.id === (categoryId || '').toUpperCase());
+  return found?.label || '기타';
 }
 
 export default function CommunityFeedPage() {
+  const router = useRouter();
+  const user = useUserStore((s) => s.user);
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [sort, setSort] = useState<'latest' | 'recommended'>('latest');
@@ -29,7 +33,7 @@ export default function CommunityFeedPage() {
 
   const categoryOptions = [
     { id: '', label: '전체' },
-    ...C3_CATS.map(cat => ({ id: cat, label: cat })),
+    ...C3_CATS,
   ];
 
   useEffect(() => {
@@ -74,6 +78,23 @@ export default function CommunityFeedPage() {
         }}>
           다시봄 광장
         </h1>
+        {/* 우상단 로그인/닉네임 */}
+        <button
+          onClick={() => router.push(user ? '/profile' : '/login')}
+          style={{
+            background: 'none',
+            border: '1px solid var(--L-border)',
+            borderRadius: 999,
+            padding: '6px 12px',
+            fontSize: 13,
+            color: user ? 'var(--L-ink)' : 'var(--L-sub)',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {user ? (user.nickname || '내 정보') : '로그인'}
+        </button>
       </div>
 
       {/* 카테고리 필터 — 가로 스크롤 칩 */}

@@ -30,18 +30,19 @@ export default function LandingPage() {
         <div className="flex items-center justify-between">
           <Logo />
           <button
-            onClick={() => router.push('/login')}
+            onClick={() => router.push(user ? '/profile' : '/login')}
             style={{
               background: 'none',
-              border: 'none',
+              border: '1px solid var(--L-border)',
+              borderRadius: 999,
+              padding: '5px 12px',
               cursor: 'pointer',
-              fontSize: 14,
-              color: 'var(--L-sub)',
-              textDecoration: 'none',
-              padding: 0,
+              fontSize: 13,
+              color: user ? 'var(--L-ink)' : 'var(--L-sub)',
+              fontFamily: 'var(--font-sans)',
             }}
           >
-            로그인
+            {user ? (user.nickname || '내 정보') : '로그인'}
           </button>
         </div>
 

@@ -39,7 +39,7 @@ export default function GuestPage() {
         localStorage.setItem('again-spring-token', token.accessToken);
       }
       setUser(user);
-      router.push('/session/new');
+      router.push('/community');
     } catch (err: any) {
       setError(err.response?.data?.error?.message || '게스트 입장에 실패했어요');
     } finally {

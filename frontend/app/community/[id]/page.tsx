@@ -143,12 +143,12 @@ function C3StoryDetail({
         />
         <SideStory
           side="r"
-          label={post.paired ? '상대방' : '상대 입장 · AI'}
+          label="상대방"
           body={post.partnerBodyPublished || '상대방의 이야기를 기다리는 중입니다.'}
           clamp={true}
           selected={pick === 'r'}
-          onSelect={() => handlePick('r')}
-          onMore={() => router.push(`/community/${post.id}/read?side=r`)}
+          onSelect={post.partnerBodyPublished ? () => handlePick('r') : undefined}
+          onMore={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
         />
       </div>
 
@@ -298,12 +298,12 @@ function C3ResultSolo({
         />
         <SideStory
           side="r"
-          label="상대 입장 · AI"
+          label="상대방"
           body={post.partnerBodyPublished || ''}
           clamp={false}
           selected={false}
-          onSelect={() => {}}
-          onMore={() => router.push(`/community/${post.id}/read?side=r`)}
+          onSelect={undefined}
+          onMore={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
         />
       </div>
 
@@ -595,13 +595,16 @@ export default function CommunityPostPage({ params }: PageProps) {
   }, [params.id]);
 
   const handleVote = async (optionId: number) => {
+    // 이미 투표했으면 재투표 불가
+    if (post?.hasVoted) return;
     setIsVoting(true);
     try {
       const result = await postApi.vote(params.id, optionId);
       setVoteResult(result);
-      setPost((prev) => prev ? { ...prev, hasVoted: true, myVoteSide: optionId === prev.voteOptions[0]?.id ? 'g' : 'r' } : null);
-    } catch (err) {
-      console.error('Vote failed:', err);
+      setPost((prev) => prev ? { ...prev, hasVoted: true, myVoteSide: optionId === prev.voteOptions?.[0]?.id ? 'g' : 'r' } : null);
+    } catch (err: any) {
+      // 409 ALREADY_VOTED는 조용히 처리 (UI는 이미 잠금 상태)
+      if (err?.response?.status !== 409) console.error('Vote failed:', err);
     } finally {
       setIsVoting(false);
     }

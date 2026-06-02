@@ -6,8 +6,8 @@ interface SideStoryProps {
   body: string;
   clamp?: boolean;
   selected?: boolean;
-  onSelect: () => void;
-  onMore: () => void;
+  onSelect?: () => void;
+  onMore?: () => void;
 }
 
 export function SideStory({
@@ -82,7 +82,7 @@ export function SideStory({
         >
           {body}
         </p>
-        {clamp && (
+        {clamp && onMore && (
           <button
             onClick={(e) => {
               e.stopPropagation();
