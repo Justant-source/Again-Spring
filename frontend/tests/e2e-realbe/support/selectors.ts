@@ -52,12 +52,20 @@ export const COMMUNITY_LEGAL_NOTICE = '[data-testid="ratio-legal-notice"]'
 // export const THREE_WAY_MEDIATOR_MSG = '[data-testid="three-way-mediator-msg"]'
 // export const THREE_WAY_MEDIATOR_LABEL = '[data-testid="three-way-mediator-label"]'
 
-// ── V17 커뮤니티 피드 (C3 광장형) ──────────────────────────────────
+// ── V18 커뮤니티 피드 (C3 광장형) ──────────────────────────────────
+// Feed
+export const FEED_POST_LIST = '[data-testid="feed-post-list"]'
 export const FEED_SORT_LATEST = '[data-testid="feed-sort-latest"]'
 export const FEED_SORT_RECOMMENDED = '[data-testid="feed-sort-recommended"]'
+// Compose
 export const COMPOSE_TITLE = '[data-testid="compose-title"]'
 export const COMPOSE_BODY = '[data-testid="compose-body"]'
 export const COMPOSE_CHAR_COUNT = '[data-testid="compose-char-count"]'
+// Mode 선택
+export const MODE_PUBLIC_CARD = '[data-testid="mode-public-card"]'
+export const MODE_PRIVATE_CARD = '[data-testid="mode-private-card"]'
+export const MODE_SUBMIT_BTN = '[data-testid="mode-submit-btn"]'
+// Story detail
 export const STORY_AUTHOR_BOX = '[data-testid="story-author-box"]'
 export const STORY_PARTNER_BOX = '[data-testid="story-partner-box"]'
 export const VOTE_COMPLETE_BTN = '[data-testid="vote-complete-btn"]'

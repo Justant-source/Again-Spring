@@ -196,6 +196,7 @@ export default function CommunityNewPage() {
               제목
             </label>
             <input
+              data-testid="compose-title"
               type="text"
               value={title}
               onChange={(e) => {
@@ -233,6 +234,7 @@ export default function CommunityNewPage() {
               본문
             </label>
             <textarea
+              data-testid="compose-body"
               value={bodyRaw}
               onChange={(e) => {
                 setBodyRaw(e.target.value);
@@ -263,7 +265,7 @@ export default function CommunityNewPage() {
               <span style={{ fontSize: 12, color: 'var(--L-sub)' }}>
                 익명
               </span>
-              <span style={{ fontSize: 12, color: 'var(--L-sub)' }}>
+              <span data-testid="compose-char-count" style={{ fontSize: 12, color: 'var(--L-sub)' }}>
                 {bodyRaw.length} / 600
               </span>
             </div>
@@ -334,6 +336,7 @@ export default function CommunityNewPage() {
 
           {/* 옵션 1: 바로 광장에 올리기 */}
           <div
+            data-testid="mode-public-card"
             onClick={() => setSelectedMode('PUBLIC')}
             style={{
               padding: '20px 18px',
@@ -351,6 +354,7 @@ export default function CommunityNewPage() {
 
           {/* 옵션 2: 상대를 초대하기 */}
           <div
+            data-testid="mode-private-card"
             onClick={() => { if (!isGuest) setSelectedMode('PRIVATE'); }}
             style={{
               padding: '20px 18px',
@@ -403,6 +407,7 @@ export default function CommunityNewPage() {
               if (!selectedMode) return;
               handleModeSelect(selectedMode);
             }}
+            data-testid="mode-submit-btn"
             disabled={!selectedMode || loading}
             style={{
               width: '100%',

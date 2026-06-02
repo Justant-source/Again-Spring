@@ -192,7 +192,7 @@ export default function CommunityFeedPage() {
 
       {/* 사연 목록 */}
       {!loading && posts.length > 0 && (
-        <div style={{
+        <div data-testid="feed-post-list" style={{
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
