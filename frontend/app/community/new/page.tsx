@@ -24,6 +24,7 @@ export default function CommunityNewPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showGuestNotice, setShowGuestNotice] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<'PUBLIC' | 'PRIVATE' | null>(null);
   const [generatedPost, setGeneratedPost] = useState<{
     id: string;
     title: string;
@@ -101,7 +102,7 @@ export default function CommunityNewPage() {
           justifyContent: 'space-between',
           padding: '12px 20px',
           borderBottom: '1px solid var(--L-border)',
-          background: 'white',
+          background: 'var(--L-bg)',
         }}>
           <button
             onClick={() => router.back()}
@@ -310,166 +311,107 @@ export default function CommunityNewPage() {
     );
   }
 
-  // Step 2: 모드 선택 (공개 vs 비공개)
+  // Step 2: 모드 선택 — 카드를 눌러 선택, 하단 버튼으로 진행
   if (step === 'mode') {
+    const isPub = selectedMode === 'PUBLIC';
+    const isPrv = selectedMode === 'PRIVATE';
     return (
-      <div style={{ background: 'var(--L-bg)', minHeight: '100vh', padding: '20px' }}>
-        <div style={{
-          textAlign: 'center',
-          marginBottom: 32,
-          marginTop: 24,
-        }}>
-          <h2 style={{
-            fontSize: 18,
-            fontWeight: 600,
-            fontFamily: 'var(--font-serif)',
-            color: 'var(--L-ink)',
-          }}>
-            이 사연, 어떻게 올릴까요?
+      <div style={{ background: 'var(--L-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, padding: '24px 26px 120px' }}>
+          {/* 제목 */}
+          <h2 className="serif" style={{ fontSize: 22, lineHeight: 1.45, marginBottom: 24, color: 'var(--L-ink)', fontWeight: 500 }}>
+            이 사연,<br />어떻게 올릴까요?
           </h2>
-        </div>
 
-        {/* 옵션 1: 바로 광장에 올리기 */}
-        <button
-          onClick={() => handleModeSelect('PUBLIC')}
-          disabled={loading}
-          style={{
-            width: '100%',
-            marginBottom: 12,
-            padding: '16px',
-            border: `2px solid ${GRN}`,
-            background: GRN_BG,
-            borderRadius: 10,
-            cursor: 'pointer',
-            opacity: loading ? 0.6 : 1,
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            if (!loading) {
-              (e.currentTarget as HTMLElement).style.background =
-                'color-mix(in srgb, ' + GRN + ' 10%, ' + GRN_BG + ')';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!loading) {
-              (e.currentTarget as HTMLElement).style.background = GRN_BG;
-            }
-          }}
-        >
-          <div style={{
-            textAlign: 'left',
-          }}>
-            <div style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: GRN,
-              marginBottom: 4,
-            }}>
-              바로 광장에 올리기
-            </div>
-            <div style={{
-              fontSize: 12,
-              color: 'color-mix(in srgb, ' + GRN + ' 80%, black)',
-            }}>
-              익명 투표
+          {/* 옵션 1: 바로 광장에 올리기 */}
+          <div
+            onClick={() => setSelectedMode('PUBLIC')}
+            style={{
+              padding: '20px 18px',
+              border: `2px solid ${isPub ? GRN : 'var(--L-border)'}`,
+              background: isPub ? GRN_BG : 'transparent',
+              borderRadius: 12,
+              cursor: 'pointer',
+              marginBottom: 11,
+              transition: 'all .15s',
+            }}
+          >
+            <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--L-ink)', marginBottom: 4 }}>바로 광장에 올리기</div>
+            <div style={{ fontSize: 12.5, color: 'var(--L-sub)' }}>익명 투표</div>
+          </div>
+
+          {/* 옵션 2: 상대를 초대하기 */}
+          <div
+            onClick={() => { if (!isGuest) setSelectedMode('PRIVATE'); }}
+            style={{
+              padding: '20px 18px',
+              border: `2px solid ${isPrv ? 'var(--L-ink)' : 'var(--L-border)'}`,
+              background: isPrv ? 'var(--L-card)' : 'transparent',
+              borderRadius: 12,
+              cursor: isGuest ? 'not-allowed' : 'pointer',
+              opacity: isGuest ? 0.55 : 1,
+              marginBottom: 11,
+              transition: 'all .15s',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              {isGuest && <span style={{ fontSize: 14 }}>🔒</span>}
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 500, color: isGuest ? 'var(--L-sub)' : 'var(--L-ink)', marginBottom: 4 }}>상대를 초대하기</div>
+                <div style={{ fontSize: 12.5, color: 'var(--L-sub)' }}>두 입장을 나란히</div>
+              </div>
             </div>
           </div>
-        </button>
 
-        {/* 옵션 2: 상대를 초대하기 */}
-        <button
-          onClick={() => handleModeSelect('PRIVATE')}
-          disabled={loading || isGuest}
-          style={{
-            width: '100%',
-            marginBottom: 24,
-            padding: '16px',
-            border: `2px solid var(--L-border)`,
-            background: isGuest ? 'color-mix(in srgb, var(--L-sub) 5%, white)' : 'white',
-            borderRadius: 10,
-            cursor: isGuest ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.6 : isGuest ? 0.5 : 1,
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            if (!loading && !isGuest) {
-              (e.currentTarget as HTMLElement).style.background =
-                'color-mix(in srgb, var(--L-sub) 3%, white)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!loading && !isGuest) {
-              (e.currentTarget as HTMLElement).style.background = 'white';
-            }
-          }}
-        >
-          <div style={{
-            textAlign: 'left',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}>
-            {isGuest && (
-              <span style={{ fontSize: 16 }}>
-                🔒
+          {/* JurorPicker — 두 옵션 아래 공통 */}
+          <div style={{ padding: '14px 16px', border: '1px solid var(--L-border)', borderRadius: 12, background: 'var(--L-card)', marginBottom: 11 }}>
+            <JurorPicker defaultValue={jurorCount} onChange={setJurorCount} />
+          </div>
+
+          {/* 게스트 안내 */}
+          {isGuest && (
+            <div style={{ padding: '13px 15px', border: '1px solid var(--L-border)', borderRadius: 10, background: 'var(--L-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ fontSize: 12.5, color: 'var(--L-ink)', lineHeight: 1.5 }}>회원가입 후 상대를 초대할 수 있어요</span>
+              <span
+                onClick={() => router.push('/signup')}
+                style={{ fontSize: 12.5, color: 'var(--L-point)', fontWeight: 500, whiteSpace: 'nowrap', cursor: 'pointer' }}
+              >
+                가입하기
               </span>
-            )}
-            <div>
-              <div style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: 'var(--L-ink)',
-                marginBottom: 4,
-              }}>
-                상대를 초대하기
-              </div>
-              <div style={{
-                fontSize: 12,
-                color: 'var(--L-sub)',
-              }}>
-                두 입장을 나란히
-              </div>
             </div>
-          </div>
-        </button>
-
-        {/* JurorPicker */}
-        <div style={{
-          padding: '16px',
-          background: 'white',
-          borderRadius: 10,
-          border: '1px solid var(--L-border)',
-          marginBottom: 20,
-        }}>
-          <JurorPicker
-            defaultValue={jurorCount}
-            onChange={setJurorCount}
-          />
+          )}
         </div>
 
-        {/* 게스트 안내 */}
-        {isGuest && (
-          <div style={{
-            padding: '12px 14px',
-            background: '#F0F0F0',
-            borderRadius: 8,
-            fontSize: 12,
-            color: 'var(--L-sub)',
-            textAlign: 'center',
-          }}>
-            회원가입 후 상대를 초대할 수 있어요{' '}
-            <a
-              href="/auth/register"
-              style={{
-                color: 'var(--L-ink)',
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              가입하기
-            </a>
-          </div>
-        )}
+        {/* 하단 고정 버튼 */}
+        <div style={{
+          position: 'fixed',
+          left: 0, right: 0, bottom: 0,
+          padding: '24px 26px 24px',
+          background: `linear-gradient(transparent, var(--L-bg) 30%)`,
+        }}>
+          <button
+            onClick={() => {
+              if (!selectedMode) return;
+              handleModeSelect(selectedMode);
+            }}
+            disabled={!selectedMode || loading}
+            style={{
+              width: '100%',
+              padding: '15px 0',
+              borderRadius: 4,
+              border: 'none',
+              background: selectedMode && !loading ? 'var(--L-ink)' : 'var(--L-border)',
+              color: selectedMode && !loading ? 'var(--L-bg)' : 'var(--L-sub)',
+              fontSize: 15,
+              fontWeight: 500,
+              fontFamily: 'var(--font-sans)',
+              cursor: selectedMode && !loading ? 'pointer' : 'default',
+              transition: 'all .15s',
+            }}
+          >
+            {loading ? '올리는 중...' : selectedMode === 'PRIVATE' ? '상대 초대하기' : '바로 올리기'}
+          </button>
+        </div>
       </div>
     );
   }

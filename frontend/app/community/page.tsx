@@ -69,23 +69,11 @@ export default function CommunityFeedPage() {
           fontSize: 28,
           fontFamily: 'var(--font-serif)',
           color: 'var(--L-ink)',
-          fontWeight: 600,
+          fontWeight: 500,
           margin: 0,
         }}>
           다시봄 광장
         </h1>
-        <button
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: 20,
-            cursor: 'pointer',
-            color: 'var(--L-ink)',
-          }}
-          title="메뉴"
-        >
-          ☰
-        </button>
       </div>
 
       {/* 카테고리 필터 — 가로 스크롤 칩 */}
@@ -253,12 +241,11 @@ export default function CommunityFeedPage() {
       {/* 고정 하단 버튼 */}
       <div style={{
         position: 'fixed',
-        bottom: 20,
+        bottom: 0,
         left: 0,
         right: 0,
-        padding: '16px 20px',
-        background: 'white',
-        borderTop: '1px solid var(--L-border)',
+        padding: '16px 20px 24px',
+        background: 'linear-gradient(transparent, var(--L-bg) 30%)',
         zIndex: 10,
       }}>
         <Link
