@@ -3,17 +3,17 @@ import { api } from '../client';
 export interface Comment {
   id: number;
   authorId: string;
+  authorNickname?: string;
   body: string;
   likeCount: number;
   isLiked: boolean;
   createdAt: string;
   replies?: Comment[];
-}
-
-export interface CommentResponse extends Comment {
   isAuthor?: boolean;
   isPartner?: boolean;
 }
+
+export type CommentResponse = Comment;
 
 export const commentApi = {
   list: (postId: string, page = 0, size = 10) =>

@@ -23,6 +23,8 @@ public class CommentWithRepliesResponse {
 
     private String authorId;
 
+    private String authorNickname;
+
     private String body;
 
     private Long likeCount;

@@ -74,7 +74,10 @@ function C3StoryDetail({
     }
   };
 
-  const authorPct = pick === 'g' ? 62 : pick === 'r' ? 46 : (post.authorPct || 50);
+  // 투표 완료 후 실제 BE 비율 사용, 아직 투표 전이면 pick에 따라 시각 피드백
+  const authorPct = voteResult
+    ? Math.round((voteResult.options?.[0]?.percentage ?? post.authorPct ?? 50))
+    : (pick === 'g' ? 62 : pick === 'r' ? 46 : (post.authorPct || 50));
 
   return (
     <div style={{ background: 'var(--L-bg)', minHeight: '100vh', padding: '16px' }}>
@@ -193,7 +196,7 @@ function C3StoryDetail({
                   fontSize: 12.5, fontWeight: 500,
                   color: (comment as any).isAuthor ? GRN : (comment as any).isPartner ? RED : 'var(--L-ink)',
                 }}>
-                  {((comment as any).isAuthor || (comment as any).isPartner) ? '* ' : ''}{comment.authorId}
+                  {(comment.isAuthor || comment.isPartner) ? '* ' : ''}{comment.authorNickname || comment.authorId}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--L-sub)' }}>{formatDate(comment.createdAt)}</span>
               </div>
@@ -205,7 +208,7 @@ function C3StoryDetail({
               <div key={reply.id} style={{ paddingLeft: 20, padding: '8px 0 8px 20px', borderBottom: '1px solid var(--L-border)' }}>
                 <span style={{ color: 'var(--L-sub)', fontSize: 13, marginRight: 6 }}>↳</span>
                 <span style={{ fontSize: 12.5, fontWeight: 500, color: (reply as any).isAuthor ? GRN : (reply as any).isPartner ? RED : 'var(--L-ink)' }}>
-                  {((reply as any).isAuthor || (reply as any).isPartner) ? '* ' : ''}{reply.authorId}
+                  {(reply.isAuthor || reply.isPartner) ? '* ' : ''}{reply.authorNickname || reply.authorId}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--L-sub)', marginLeft: 6 }}>{formatDate(reply.createdAt)}</span>
                 <div style={{ fontSize: 13.5, color: 'var(--L-ink)', lineHeight: 1.6, marginTop: 4, paddingLeft: 20 }}>{reply.body}</div>

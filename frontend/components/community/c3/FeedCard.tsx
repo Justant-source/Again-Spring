@@ -26,105 +26,52 @@ export function FeedCard({
       href={href}
       style={{
         display: 'block',
-        padding: '14px 16px',
-        background: 'var(--P-card)',
-        border: '1px solid var(--P-border)',
-        borderRadius: 12,
+        padding: '12px 14px',
+        background: 'var(--L-card)',
+        border: '1px solid var(--L-border)',
+        borderRadius: 8,
         textDecoration: 'none',
-        transition: 'background 0.15s, border-color 0.15s',
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.background = 'rgba(100, 100, 100, 0.02)';
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.background = 'var(--P-card)';
       }}
     >
-      {/* 카테고리 칩 + paired 표시 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '4px 10px',
+      {/* 상단: 카테고리 + paired 점 + 오른쪽 통계 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{
+            padding: '2px 9px',
             background: 'var(--L-ink)',
-            color: 'white',
+            color: 'var(--L-bg)',
             borderRadius: 999,
             fontSize: 11,
-            fontWeight: 500,
-          }}
-        >
-          {cat}
+          }}>{cat}</span>
+          {paired && (
+            <div style={{ display: 'flex', gap: 3 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--grn)', display: 'inline-block' }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', display: 'inline-block' }} />
+            </div>
+          )}
         </div>
-        {paired && (
-          <div style={{ display: 'flex', gap: 4 }}>
-            <div
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: 'var(--grn)',
-              }}
-            />
-            <div
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: 'var(--red)',
-              }}
-            />
-          </div>
-        )}
+        {/* 오른쪽 상단: 투표수 + 댓글수 */}
+        <span style={{ fontSize: 11, color: 'var(--L-sub)', whiteSpace: 'nowrap' }}>
+          {voteCount}표{commentCount !== undefined ? ` · 댓글 ${commentCount}` : ''}
+        </span>
       </div>
 
       {/* 제목 */}
-      <h3
-        style={{
-          margin: '0 0 10px 0',
-          fontSize: 14,
-          fontWeight: 600,
-          fontFamily: 'var(--font-serif)',
-          color: 'var(--P-ink)',
-          lineHeight: 1.5,
-        }}
-      >
+      <div style={{
+        fontSize: 15,
+        fontWeight: 500,
+        fontFamily: 'var(--font-serif)',
+        color: 'var(--L-ink)',
+        lineHeight: 1.45,
+        marginBottom: 10,
+      }}>
         {title}
-      </h3>
+      </div>
 
-      {/* 하단: 미니 막대 + 통계 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div
-          style={{
-            display: 'flex',
-            height: 20,
-            borderRadius: 4,
-            overflow: 'hidden',
-            border: '1px solid var(--P-border)',
-          }}
-        >
-          <div
-            style={{
-              flex: authorPct,
-              background: 'var(--grn)',
-            }}
-          />
-          <div
-            style={{
-              flex: partnerPct,
-              background: 'var(--red)',
-            }}
-          />
-        </div>
-        <div
-          style={{
-            fontSize: 11,
-            color: 'var(--P-sub)',
-          }}
-        >
-          {voteCount}표{commentCount !== undefined ? ` · 댓글 ${commentCount}` : ''}
-        </div>
+      {/* 하단: 미니 투표 막대 */}
+      <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ width: authorPct + '%', background: 'var(--grn)' }} />
+        <div style={{ flex: 1, background: 'var(--red)' }} />
       </div>
     </a>
   );

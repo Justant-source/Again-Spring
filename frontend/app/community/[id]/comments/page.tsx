@@ -127,7 +127,7 @@ export default function PostCommentsPage({ params }: PageProps) {
     <div key={comment.id}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <CommunityComment
-          nick={comment.authorId}
+          nick={comment.authorNickname || comment.authorId}
           isAuthor={comment.isAuthor ?? false}
           isPartner={comment.isPartner ?? false}
           time={formatDate(comment.createdAt)}
@@ -147,7 +147,7 @@ export default function PostCommentsPage({ params }: PageProps) {
         >공감 {comment.likeCount}</button>
         {!isReply && (
           <button
-            onClick={() => { setParentCommentId(comment.id); setReplyToNick(comment.authorId); }}
+            onClick={() => { setParentCommentId(comment.id); setReplyToNick(comment.authorNickname || comment.authorId); }}
             style={{ background: 'none', border: 'none', color: 'var(--L-sub)', cursor: 'pointer', fontSize: 11, padding: 0 }}
           >답글</button>
         )}

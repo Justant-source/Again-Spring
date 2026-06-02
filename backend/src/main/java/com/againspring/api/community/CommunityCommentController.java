@@ -6,6 +6,7 @@ import com.againspring.domain.community.CommunityReport;
 import com.againspring.domain.community.Post;
 import com.againspring.repository.community.CommunityReportRepository;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.repository.UserRepository;
 import com.againspring.service.community.CommentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -33,6 +34,7 @@ public class CommunityCommentController {
     private final CommentService commentService;
     private final CommunityReportRepository communityReportRepository;
     private final PostRepository postRepository;
+    private final UserRepository userRepository;
 
     /**
      * 댓글 목록 조회
@@ -69,12 +71,15 @@ public class CommunityCommentController {
                     boolean isAuthor = postAuthorId != null && postAuthorId.equals(comment.getAuthorId());
                     boolean isPartner = postPartnerUserId != null && postPartnerUserId.equals(comment.getAuthorId());
 
+                    String authorNickname = resolveNickname(comment.getAuthorId());
+
                     List<CommentResponse> replyResponses = replies.stream()
                             .map(reply -> {
                                 boolean replyIsAuthor = postAuthorId != null && postAuthorId.equals(reply.getAuthorId());
                                 boolean replyIsPartner = postPartnerUserId != null && postPartnerUserId.equals(reply.getAuthorId());
+                                String replyNickname = resolveNickname(reply.getAuthorId());
                                 // TODO: isLiked 조회
-                                return CommentResponse.from(reply, false, replyIsAuthor, replyIsPartner);
+                                return CommentResponse.from(reply, false, replyIsAuthor, replyIsPartner, replyNickname);
                             })
                             .toList();
 
@@ -82,6 +87,7 @@ public class CommunityCommentController {
                     return CommentWithRepliesResponse.builder()
                             .id(comment.getId())
                             .authorId(comment.getAuthorId())
+                            .authorNickname(authorNickname)
                             .body(comment.getBody())
                             .likeCount((long) comment.getLikeCount())
                             .isLiked(false)
@@ -94,6 +100,14 @@ public class CommunityCommentController {
                 .toList();
 
         return ResponseEntity.ok(responses);
+    }
+
+    /** 사용자 ID → 닉네임 변환 (없으면 익명 반환) */
+    private String resolveNickname(String userId) {
+        if (userId == null) return "익명";
+        return userRepository.findById(userId)
+                .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                .orElse("익명");
     }
 
     /**
