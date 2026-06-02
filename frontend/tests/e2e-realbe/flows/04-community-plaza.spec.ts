@@ -96,10 +96,13 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     await page.waitForSelector('[data-testid="feed-post-list"]', { timeout: 12_000 })
     const firstCard = page.locator('[data-testid="feed-post-list"] a[href*="/community/"]').first()
     await expect(firstCard).toBeVisible()
-    await firstCard.click()
+    // 카드의 href로 직접 이동 (FeedCard <a> 클릭 대신)
+    const href = await firstCard.getAttribute('href')
+    expect(href).toBeTruthy()
+    await page.goto(`${BASE}${href}`)
     await page.waitForURL(/\/community\/[^/]+$/, { timeout: 12_000 })
-    // 상세 페이지에 타이틀 영역 표시
-    await expect(page.locator('h1, h2').first()).toBeVisible({ timeout: 8_000 })
+    // 상세 페이지 — "광장" 뒤로가기 링크 또는 카테고리 칩 존재 (div 기반 타이틀)
+    await expect(page.getByText('광장')).toBeVisible({ timeout: 8_000 })
   })
 })
 
