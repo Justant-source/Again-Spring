@@ -24,12 +24,12 @@
 ```json
 // 요청 (SubmitFeedbackRequest)
 {
-  "sessionId": "ses_xxxxx",          // nullable — 세션 연동 시
+  "postId": "123",                   // nullable — 게시글 연동 시
   "category": "praise",              // praise | bug | suggestion | other | crisis
-  "content": "서비스가 정말 도움이 됐어요.",  // 최소 10자
+  "content": "배심원 의견이 도움이 됐어요.",  // 최소 10자
   "contactConsent": true,            // 연락 동의 여부
   "contactEmail": "user@example.com",// contactConsent=true 일 때만 저장
-  "pageUrl": "/chat/ses_xxxxx",      // nullable
+  "pageUrl": "/community/posts/123",      // nullable
   "userAgent": "Mozilla/5.0 ..."     // nullable
 }
 

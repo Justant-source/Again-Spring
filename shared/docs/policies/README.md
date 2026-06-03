@@ -6,14 +6,12 @@
 
 | 파일 | 설명 |
 |---|---|
-| `psychology-model.md` | Gottman + NVC 모델 채택 근거 및 검증 |
-| `auth.md` | 인증·인가 정책 (회원가입, OAuth, 게스트) |
-| `onboarding.md` | 온보딩 Q&A → 소통 스타일 매핑 |
-| `categories.md` | 갈등·관계 카테고리 정의 |
-| `forbidden-words.md` | 금지어·위기 키워드 및 검증 방법 |
-| `crisis-detection.md` | 위기 감지 기준 및 리소스 안내 |
-| `ratio-calculation.md` | 화해 기여도 계산 규칙 |
-| `data-retention.md` | 데이터 보존 및 만료 정책 |
+| `psychology-model.md` | Gottman + NVC 모델 배심원 페르소나 근거 |
+| `auth.md` | 인증·인가 정책 (회원가입, OAuth, 게스트, JWT) |
+| `categories.md` | 갈등·관계 카테고리 정의 (6개 메이저) |
+| `forbidden-words.md` | AI 출력 금지어·규칙 및 검증 방법 |
+| `data-retention.md` | 데이터 보존 및 자동 삭제 정책 (30일/60일) |
+| `user-permissions.md` | 게스트·회원 등급별 권한 정책 |
 | `terms-of-service.md` | 내부 운용 정책 (운영자용) |
-| `terms.md` | **이용약관 — 사용자 표시 본문** (베타 v1.0, 법무 검토 예정) |
-| `privacy.md` | **개인정보처리방침 — 사용자 표시 본문** (베타 v1.0) |
+| `terms.md` | **이용약관 — 사용자 표시 본문** |
+| `privacy.md` | **개인정보처리방침 — 사용자 표시 본문** |

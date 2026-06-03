@@ -33,7 +33,9 @@
 | 변수 | 사용처 | 기본값 |
 |---|---|---|
 | `LLM_PROVIDER` | `LLMProvider` 빈 선택 (backend) | `remote` |
+| `LLM_JURY_PROVIDER` | 배심원 생성 provider (`remote` \| `mock`) | `remote` (dev) |
 | `LLM_WORKER_URL` | backend → llm-worker 접속 URL | `http://againspring-llm-dev:8090` |
+| `LLM_DEFAULT_TIMEOUT_MS` | LLM 호출 타임아웃 (ms) | `120000` |
 | `CLAUDE_BIN` | llm-worker CLI 실행 파일명 | `claude` |
 | `CLAUDE_MODEL` | llm-worker `--model` 인자 (채팅) | `claude-haiku-4-5-20251001` |
 | `REPORT_LLM_MODEL` | llm-worker 리포트 모델 | `claude-sonnet-4-6` |
@@ -75,15 +77,29 @@ frontend도 build-time ARG로 `NEXT_PUBLIC_{GOOGLE,KAKAO,NAVER}_CLIENT_ID`를 �
 `GMAIL_APP_PASSWORD`: againspring2026@gmail.com → Google 계정 → 2단계 인증 → 앱 비밀번호 발급.
 이메일 인증·비밀번호 재설정 모두 단일 발신자. SMTP 미설정 시 dev에서는 로그로 코드 출력.
 
+### 마케팅 렌더러 (dev 전용)
+
+| 변수 | 사용처 | dev | prod |
+|---|---|---|---|
+| `MARKETING_ENABLED` | 마케팅 기능 전체 활성화 (`app.features.marketing.enabled`) | `true` | `false` (기본값, 변경 금지) |
+| `MARKETING_RENDERER_URL` | backend → marketing-renderer HTTP 주소 | `http://marketing-renderer-dev:9000` | 불필요 |
+
 ### 소셜 자동 포스팅 (dev 전용)
 
 | 변수 | 사용처 | dev | prod |
 |---|---|---|---|
 | `SOCIAL_MASTER_KEY` | AES-256-GCM 마스터 키 — social_credentials·sessions 암호화 | **필수** (32바이트 base64) | 불필요 (기능 없음) |
-| `MARKETING_ENABLED` | 마케팅 기능 전체 활성화 (`app.features.marketing.enabled`) | `true` | `false` (기본값, 변경 금지) |
 | `SOCIAL_PUBLISHING_ENABLED` | 소셜 발행만 개별 킬스위치 | `true` | 불필요 |
-| `APP_SOCIAL_WEBHOOK_URL` | 세션 만료·발행 실패 시 Slack 알림 URL | 선택 | 불필요 |
+| `SOCIAL_WEBHOOK_URL` | 세션 만료·발행 실패 시 Slack 알림 URL | 선택 | 불필요 |
+| `SOCIAL_EMAIL` | 소셜 계정 이메일 | 선택 | 불필요 |
 | `SOCIAL_POSTER_URL` | backend → social-poster HTTP 주소 | `http://againspring-social-poster-dev:9100` | 불필요 |
+
+### 위기 알림 (선택사항)
+
+| 변수 | 사용처 | dev | prod |
+|---|---|---|---|
+| `CRISIS_WEBHOOK_URL` | 위기 신호 감지 시 webhook URL | 선택 | 선택 |
+| `CRISIS_EMAIL` | 위기 알림 이메일 | 선택 | 선택 |
 
 마스터 키 생성: `openssl rand -base64 32`
 

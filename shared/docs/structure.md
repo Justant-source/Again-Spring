@@ -9,7 +9,7 @@ flowchart LR
     Root --> Env[env/<br/>인프라/배포]
 
     FE --> FE_docs[docs/<br/>structure, architecture,<br/>policies, ui, testing]
-    BE --> BE_docs[docs/<br/>structure, architecture,<br/>policies, llm-bridge, testing, openapi]
+    BE --> BE_docs[docs/<br/>structure, architecture,<br/>api, policies, llm-bridge, testing]
     Shared --> S_docs[docs/<br/>structure, architecture,<br/>policies, api, prompts]
     Shared --> S_types[types/, schemas/]
     Env --> E_docs[docs/<br/>structure, architecture,<br/>docker, env-vars, local-dev,<br/>deployment, cloudflare]
@@ -68,27 +68,30 @@ Again-Spring/
 │   ├── build.gradle.kts
 │   ├── Dockerfile                  # multi-stage (Node.js/Claude CLI 미포함 — llm-worker로 이동)
 │   ├── src/main/java/com/againspring/
-│   │   ├── api/                    # REST Controllers + DTO
-│   │   ├── service/                # 비즈니스 로직 + State Machine
-│   │   ├── domain/                 # JPA Entity + Enum
-│   │   ├── repository/             # Spring Data JPA
-│   │   ├── llm/remote/             # RemoteLlmProvider + RemoteCancelableInvocation (기본)
-│   │   ├── llm/bridge/             # ClaudeCodeBridge + PromptSanitizer (fallback)
+│   │   ├── api/                    # REST Controllers + DTO (community, admin, marketing)
+│   │   ├── service/                # 비즈니스 로직 (community, marketing, crisis, retention 등)
+│   │   ├── domain/                 # JPA Entity + Enum (community, marketing, notification 등)
+│   │   ├── repository/             # Spring Data JPA (community, marketing, notification)
+│   │   ├── llm/remote/             # RemoteLlmProvider (HTTP → llm-worker)
+│   │   ├── llm/fallback/           # 로컬 fallback (개발 전용)
+│   │   ├── llm/monitoring/         # LLM 호출 지표
+│   │   ├── llm/prompt/             # PromptLoader
+│   │   ├── llm/PromptSanitizer.java# 사용자 입력 검증 + <user_input> 태그
 │   │   ├── safety/                 # KeywordGuard, CrisisDetector, RatioEnforcer
 │   │   ├── security/               # JWT + Spring Security + Rate limit
 │   │   ├── config/                 # OpenAPI, CORS, Async, Scheduling
 │   │   └── common/                 # 예외 + 공통 DTO
 │   ├── src/main/resources/
 │   │   ├── application{,-dev,-prod,-test}.yml
-│   │   ├── db/migration/V1~V5.sql  # Flyway
 │   │   └── safety/                 # 금지어/위험 키워드 yml
-│   └── docs/                       # ← BE 특화 문서
+│   ├── docs/                       # ← BE 특화 문서
+│   └── src/main/resources/db/migration/V*.sql  # Flyway V1~V56 (마이그레이션 권위본)
 │
 ├── frontend/                       # Next.js 14 + React 18 + Tailwind
 │   ├── package.json                # scripts: dev, build, lint, lint:words
 │   ├── Dockerfile                  # multi-stage, non-root, NEXT_PUBLIC_* ARG
-│   ├── app/                        # App Router (auth, onboarding, session, dashboard)
-│   ├── components/                 # shared, mediation, onboarding, result
+│   ├── app/                        # App Router (auth, community, dashboard)
+│   ├── components/                 # community/c3, auth, shared
 │   ├── lib/
 │   │   ├── api/                    # axios + Bearer interceptor
 │   │   ├── auth/                   # OAuth helper
@@ -105,14 +108,10 @@ Again-Spring/
 │   ├── types/                      # TS 공통 타입 (common, user, session, report)
 │   └── docs/                       # ← FE+BE 공통 문서
 │       ├── prompts/                # ← BE PromptLoader 런타임 로딩 (NOT docs)
-│       │   ├── system.md
-│       │   ├── gottman/{four_horsemen,sound_relationship_house,bids_and_repair}.md
-│       │   ├── nvc/four_steps.md
-│       │   ├── relations/{couple,family,friend,parent_child}.md
-│       │   └── turns/{solo_mode,turn_1_a,turn_2_b,turn_3_a,turn_4_b,turn_5_a,turn_6_b}.md
-│       ├── policies/               # 서비스 정책
-│       ├── api/                    # API 명세 (도메인별 8파일) + DB 스키마
-│       └── (llm 관련 설계 문서)      # bridge-architecture, system-prompts 등
+│       │   └── community/{jury_persona.md, neutralize.md}
+│       ├── policies/               # 서비스 정책 (금지어, 보존, 권한 등)
+│       ├── api/                    # API 명세 (auth, user, feedback, admin, 스키마)
+│       └── ADR/                    # 아키텍처 결정 기록 (7개)
 │
 └── .gitignore                      # env/.env.{dev,prod} 보호
 ```
@@ -150,7 +149,7 @@ Again-Spring/
 | API 추가/변경 | `backend/src/.../api/`, `frontend/lib/api/` | `shared/docs/api/rest-spec.md` → 해당 도메인 `.md` |
 | DB 스키마 변경 | `backend/src/main/resources/db/migration/V{n+1}__*.sql` | `shared/docs/api/database-schema.md` |
 | 프롬프트 변경 | `shared/docs/prompts/*.md` (런타임 자산) | `shared/docs/prompts/README.md` |
-| LLM 브릿지 코드 | `backend/.../llm/bridge/` | `shared/docs/llm/bridge-architecture.md` |
+| LLM 브릿지 코드 | `backend/.../llm/remote/`, `llm/PromptSanitizer.java` | [`backend/docs/llm-bridge.md`](../backend/docs/llm-bridge.md) |
 | 정책 검증 (금지어/위험) | `frontend/lib/constants/`, `backend/.../safety/` | `shared/docs/policies/forbidden-words.md` |
 | 소셜 포스터 셀렉터/로직 수정 | `marketing/social-poster/src/lib/`, `marketing/social-poster/src/routes/` | `shared/docs/v15/social-poster-troubleshooting.md` |
 | 도커 / nginx / 배포 | `env/` | `env/docs/` |

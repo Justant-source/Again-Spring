@@ -54,8 +54,8 @@ flowchart TD
 |---|---|
 | 알고리즘 | HS256 |
 | 비밀 | `JWT_SECRET` (≥256bit) |
-| 유효기간 (회원) | 24시간 (`86400000`ms) |
-| 유효기간 (게스트) | 1시간 (3600s) |
+| 유효기간 (회원) | 24시간 |
+| 유효기간 (게스트) | 1시간 |
 | 발급자 | `AuthService` |
 | 검증 | `JwtAuthFilter` (모든 요청 1회) |
 | 로그아웃 처리 | `LogoutService` → `revoked_tokens.jti` 추가 → `JwtAuthFilter`가 검사 |

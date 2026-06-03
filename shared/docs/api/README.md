@@ -17,14 +17,12 @@
 
 | 파일 | 범위 | 컨트롤러 |
 |---|---|---|
-| [`rest-spec.md`](rest-spec.md) | 공통 규약·에러코드·전체 엔드포인트 마스터 표·인증 매트릭스 | 전체 15개 |
+| [`rest-spec.md`](rest-spec.md) | 공통 규약·에러코드·전체 엔드포인트 마스터 표·인증 매트릭스 | 전체 |
 | [`auth.md`](auth.md) | 인증·소셜 로그인 | `AuthController`, `OAuth2Controller` |
-| [`session-chat.md`](session-chat.md) | 세션 생성·채팅·초대·정리 | `SessionController`, `MessageController` |
-| [`report.md`](report.md) | 갈등 분석 리포트 | `ReportController` |
-| [`user.md`](user.md) | 사용자 프로필·온보딩·탈퇴 | `UserController` |
+| [`user.md`](user.md) | 사용자 프로필·비밀번호·탈퇴 | `UserController` |
 | [`feedback.md`](feedback.md) | 피드백 제출 | `FeedbackController` |
-| [`admin.md`](admin.md) | 관리자 전용 API | `AdminDashboard/User/Health/Feedback/Prompts/Test/DebugController` |
-| [`database-schema.md`](database-schema.md) | MariaDB 테이블 스키마 · Flyway 마이그레이션 | — |
+| [`admin.md`](admin.md) | 관리자 전용 API | `AdminDashboardController`, `AdminUserController`, `AdminHealthController`, `AdminFeedbackController`, `AdminPromptsController` + 마케팅 (Story/Simulation/Content/Template/Hashtag/Calendar 등) |
+| [`database-schema.md`](database-schema.md) | MariaDB 테이블 스키마 · Flyway 마이그레이션 (V1~V56) | — |
 
 ## 공통 규약
 

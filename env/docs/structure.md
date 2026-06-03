@@ -27,10 +27,14 @@ env/
 | compose 파일 | project name | container_name(s) |
 |---|---|---|
 | `docker-compose.yml` | `againspring` | `againspring-mariadb` |
-| `docker-compose.dev.yml` | `againspring-dev` | `againspring-{mariadb,backend,frontend,nginx}-dev` |
-| `docker-compose.prod.yml` | `againspring-prod` | `againspring-{mariadb,backend,frontend,nginx}-prod` |
+| `docker-compose.dev.yml` | `againspring-dev` | `againspring-{mariadb,llm,marketing-renderer,social-poster,backend,frontend,nginx}-dev` |
+| `docker-compose.prod.yml` | `againspring-prod` | `againspring-{mariadb,llm,backend,frontend,nginx}-prod` |
 
 `name:` 필드는 각 compose 파일 상단에 명시 — 디렉토리명에 의존하지 않음.
+
+**llm-worker 컨테이너명**: 
+- dev: `againspring-llm-dev`
+- prod: `againspring-llm-prod`
 
 ## 호스트 포트 점유
 
@@ -40,8 +44,10 @@ env/
 | 3309 | dev | `againspring-mariadb-dev` |
 | 8090 | dev | `againspring-nginx-dev` (Cloudflare Tunnel target) |
 | 8091 | prod | `againspring-nginx-prod` (Cloudflare Tunnel target) |
+| 9000 | dev (internal) | `againspring-marketing-renderer-dev` (Playwright 렌더러) |
+| 9100 | dev (internal) | `againspring-social-poster-dev` (소셜 포스팅) |
 
-prod MariaDB는 외부 포트 노출 없음 (internal only).
+prod MariaDB는 외부 포트 노출 없음 (internal only). dev의 9000, 9100도 내부 네트워크에서만 접근.
 
 ## 빌드 컨텍스트
 
@@ -53,10 +59,15 @@ dev/prod compose 모두:
 
 ## 볼륨
 
-| compose | volume |
-|---|---|
-| local | `mariadb_data` (실제 이름: `againspring_mariadb_data`) |
-| dev | `mariadb_dev_data` (실제 이름: `againspring-dev_mariadb_dev_data`) |
-| prod | `mariadb_prod_data` (실제 이름: `againspring-prod_mariadb_prod_data`) |
+| compose | volume | 목적 |
+|---|---|---|
+| local | `mariadb_data` (실제 이름: `againspring_mariadb_data`) | 로컬 DB 영속성 |
+| dev | `mariadb_dev_data` (실제 이름: `againspring-dev_mariadb_dev_data`) | dev DB 영속성 |
+| dev | `marketing_assets_dev` | 마케팅 렌더링 결과물 임시 저장 |
+| prod | `mariadb_prod_data` (실제 이름: `againspring-prod_mariadb_prod_data`) | prod DB 영속성 |
 
-backend 컨테이너는 호스트의 `~/.claude` 디렉토리를 `/root/.claude`로 bind mount (`CLAUDE_HOST_CONFIG_DIR` 환경변수). LLM CLI 인증 공유 목적.
+**bind mount** (named volume 아님):
+- **llm-worker 컨테이너** (llm-dev / llm-prod): 호스트의 `${CLAUDE_HOST_CONFIG_DIR}`을 `/root/.claude`로 마운트. Claude CLI 인증 세션 공유 목적.
+  - dev: 기본값 `/home/justant/.claude`
+  - prod: 기본값 `/root/.claude`
+- **social-poster-dev**: 호스트의 `../marketing/social-poster/src`을 `/app/src`로 마운트. 핫리로드용.

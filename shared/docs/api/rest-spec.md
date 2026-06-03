@@ -39,15 +39,10 @@
 | `VALIDATION_ERROR` | 400 | Bean Validation 실패 (`@Valid`) |
 | `INVALID_ROLE` | 400 | 허용되지 않는 역할 (admin 역할 변경 시도) |
 | `UNAUTHORIZED` | 401 | 인증 실패 / 토큰 만료 / 폐기된 토큰 |
-| `FORBIDDEN` | 403 | 권한 없음 (세션 비참여자, 비ADMIN 등) |
-| `DUO_MODE_DISABLED` | 403 | Duo 모드 미활성 + TESTER 역할 없음 |
+| `FORBIDDEN` | 403 | 권한 없음 (비ADMIN 등) |
 | `NOT_FOUND` | 404 | 리소스 없음 |
 | `EMAIL_ALREADY_EXISTS` | 409 | 이메일 중복 (회원가입) |
-| `CRISIS_DETECTED` | 409 | 채팅 중 위기 키워드 감지 (세션 중단) |
-| `SESSION_ALREADY_HAS_PARTNER` | 409 | 초대 참여 시 이미 참여자 존재 |
-| `INVITE_EXPIRED` | 410 | 초대 토큰 만료 |
-| `CRISIS_IN_DESCRIPTION` | 422 | 세션 생성 시 설명에 위기 키워드 |
-| `FORBIDDEN_WORD_DETECTED` | 422 | 금지어 감지 |
+| `FORBIDDEN_WORD_DETECTED` | 422 | 금지어 감지 (게시글/댓글 작성) |
 | `USER_NOT_FOUND` | 404 | 사용자 없음 (admin 조회) |
 | `LLM_UNAVAILABLE` | 503 | Claude CLI 불가 (fallback 응답 반환) |
 | `INTERNAL_ERROR` | 500 | 서버 내부 오류 |
@@ -102,43 +97,26 @@ flowchart LR
 | POST | `/api/auth/agree` | **JWT** | 200 / 400 | [auth.md](auth.md) |
 | POST | `/api/auth/oauth2/{provider}` | 공개 | 200 / 400 / 401 | [auth.md](auth.md) |
 
-### 2. Community — Posts
+### 2. Community — Posts · Comments · Voting · Jury
 
-| Method | Path | Auth | 상태코드 | 상세 문서 |
+| Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
-| POST | `/api/community/posts` | **JWT** | 201 / 422 | [community.md](community.md) |
-| GET | `/api/community/posts` | 공개 | 200 | [community.md](community.md) |
-| GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | [community.md](community.md) |
-| PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | [community.md](community.md) |
-| DELETE | `/api/community/posts/{id}` | **JWT** | 204 / 403 / 404 | [community.md](community.md) |
+| POST | `/api/community/posts` | **JWT** | 201 / 422 | 게시글 작성 |
+| GET | `/api/community/posts` | 공개 | 200 | 게시글 목록 |
+| GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | 게시글 상세 |
+| PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만) |
+| DELETE | `/api/community/posts/{id}` | **JWT** | 204 / 403 / 404 | 게시글 삭제 (작성자만) |
+| POST | `/api/community/posts/{id}/comments` | **JWT** | 201 / 422 | 댓글 작성 |
+| GET | `/api/community/posts/{id}/comments` | 공개 | 200 | 댓글 목록 |
+| PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | 댓글 수정 (작성자만) |
+| DELETE | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 204 / 403 / 404 | 댓글 삭제 (작성자만) |
+| GET | `/api/community/posts/{id}/jury` | 공개 | 200 / 404 | AI 배심원 조회 |
+| POST | `/api/community/posts/{id}/votes` | **JWT** | 201 / 422 | 투표 생성 |
+| POST | `/api/community/posts/{postId}/comments/{id}/like` | **JWT** | 201 / 204 | 댓글 좋아요 |
+| POST | `/api/community/posts/{id}/like` | **JWT** | 201 / 204 | 게시글 좋아요 |
+| POST | `/api/community/posts/{postId}/comments/{id}/report` | **JWT** | 202 | 댓글 신고 |
 
-### 3. Community — Comments
-
-| Method | Path | Auth | 상태코드 | 상세 문서 |
-|---|---|---|---|---|
-| POST | `/api/community/posts/{id}/comments` | **JWT** | 201 / 422 | [community.md](community.md) |
-| GET | `/api/community/posts/{id}/comments` | 공개 | 200 | [community.md](community.md) |
-| PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | [community.md](community.md) |
-| DELETE | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 204 / 403 / 404 | [community.md](community.md) |
-
-### 4. Community — Jury & Votes
-
-| Method | Path | Auth | 상태코드 | 상세 문서 |
-|---|---|---|---|---|
-| GET | `/api/community/posts/{id}/jury` | 공개 | 200 / 404 | [community.md](community.md) |
-| POST | `/api/community/posts/{id}/jury/regenerate` | **JWT+ADMIN** | 202 / 404 | [community.md](community.md) |
-| POST | `/api/community/posts/{id}/votes` | **JWT** | 201 / 422 | [community.md](community.md) |
-| GET | `/api/community/posts/{id}/votes` | 공개 | 200 | [community.md](community.md) |
-| GET | `/api/community/votes/{voteId}` | 공개 | 200 / 404 | [community.md](community.md) |
-
-### 5. Report (선택, 향후)
-
-| Method | Path | Auth | 상태코드 | 상세 문서 |
-|---|---|---|---|---|
-| POST | `/api/community/posts/{id}/report` | **JWT** | 202 | [report.md](report.md) |
-| GET | `/api/reports/{reportId}` | **JWT** | 200 / 404 | [report.md](report.md) |
-
-### 6. User
+### 3. User
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
@@ -148,19 +126,19 @@ flowchart LR
 | DELETE | `/api/users/me` | **JWT** | 204 / 401 | [user.md](user.md) |
 | POST | `/api/users/me/tutorial/complete` | **JWT** | 204 | [user.md](user.md) |
 
-### 7. Feedback
+### 4. Feedback
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | POST | `/api/feedbacks` | 공개 | 201 / 400 | [feedback.md](feedback.md) |
 
-### 8. Health
+### 5. Health
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | GET | `/api/health` | 공개 | 200 | Liveness probe (status=UP) |
 
-### 9. Admin — Dashboard
+### 6. Admin — Dashboard
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
@@ -170,7 +148,7 @@ flowchart LR
 | GET | `/api/admin/dashboard/crisis-recent` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | GET | `/api/admin/dashboard/llm-failure-rate` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 
-### 10. Admin — Users
+### 7. Admin — Users
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
@@ -180,24 +158,30 @@ flowchart LR
 | DELETE | `/api/admin/users/{id}/data` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | PATCH | `/api/admin/users/{id}/roles` | **JWT + ADMIN** | 200 / 400 / 404 | [admin.md](admin.md) |
 
-### 11. Admin — Health
+### 8. Admin — Health
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | GET | `/api/admin/health/system` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 
-### 12. Admin — Feedbacks
+### 9. Admin — Feedbacks
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | GET | `/api/admin/feedbacks` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | PATCH | `/api/admin/feedbacks/{id}` | **JWT + ADMIN** | 200 / 400 / 404 | [admin.md](admin.md) |
 
-### 13. Admin — Prompts (app.admin.enabled=true)
+### 10. Admin — Prompts (app.admin.enabled=true)
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | POST | `/api/admin/prompts/reload` | **JWT + ADMIN** | 200 / 500 | [admin.md](admin.md) |
+
+### 11. Admin — Marketing (dev 전용)
+
+| Method | Path | Auth | 상태코드 | 설명 |
+|---|---|---|---|---|
+| 다수 | `/api/admin/marketing/**` | **JWT + ADMIN** | 200~500 | Story, Simulation, Content, Template, Hashtag, Calendar, Cost, SocialPublish, MarketingImage, Repurpose, Dashboard |
 
 ### 14. Admin — Test (@Profile dev only)
 

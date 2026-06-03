@@ -1,501 +1,176 @@
 # CLAUDE.md — 다시봄 프로젝트 개발 가이드
 
-**프로젝트**: 다시봄 · Again Spring
-**도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)
-**진행 상황**: **2026-06-02 피벗 완료**: 1:1 AI 중재 → **커뮤니티 광장 + AI 배심원** 모델 전환. Post/Juror/Vote 엔티티 + 광장형 UX (C3) 구현 완료. 구 Session/Message/Report 코드 삭제됨 (commit defc742).
+> ⚠️ **이 파일은 250줄 미만으로 유지한다.** 상세 내용은 4개 docs 디렉토리에 위임.
+
+**프로젝트**: 다시봄 · Again Spring  
+**도메인**: `dev.againspring.net` (dev) / `againspring.net` (prod)  
+**상태**: 커뮤니티 광장 + AI 배심원 모델 (2026-06-02 피벗 완료, commit defc742)  
 **기준일**: 2026-06-03
 
 ---
 
 ## 🎯 프로젝트 한 줄 요약
 
-갈등 커뮤니티 플랫폼. 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공하는 웹앱.
-FE는 Next.js 14, BE는 Spring Boot 3.3 + **MariaDB 11** + Claude Code LLM 브릿지 (remote CLI only).
+갈등 커뮤니티 플랫폼. 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공하는 웹앱.  
+FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (remote CLI only).
 
 ---
 
-## 🏗️ 작업 범위 분리 원칙
+## 🏗️ 작업 범위 분리
 
-### 작업 위치 규칙
-
-| 작업 범위 | 코드 디렉토리 | 진입 문서 |
+| 작업 범위 | 디렉토리 | 진입 문서 |
 |---|---|---|
-| **FE 기능/UI** | `frontend/` | `frontend/docs/README.md` |
-| **BE 기능/API** | `backend/` | `backend/docs/README.md` |
-| **LLM 브릿지** | `backend/src/main/java/.../llm/` | `backend/docs/llm-bridge.md` |
-| **공유 타입/스키마/프롬프트** | `shared/` | `shared/docs/README.md` |
-| **환경/인프라/배포** | `env/` | `env/docs/README.md` |
-| **마케팅 자동화** (dev 전용) | `marketing/` | `marketing/README.md` |
+| FE 기능/UI | `frontend/` | `frontend/docs/README.md` |
+| BE 기능/API | `backend/` | `backend/docs/README.md` |
+| LLM 브릿지 | `backend/src/main/java/.../llm/` | `backend/docs/llm-bridge.md` |
+| 공유 타입/스키마/프롬프트 | `shared/` | `shared/docs/README.md` |
+| 환경/인프라/배포 | `env/` | `env/docs/README.md` |
+| 마케팅 자동화 (dev 전용) | `marketing/` | `marketing/README.md` |
 
 ### 절대 규칙
 
-1. **FE는 Claude Code를 직접 호출하지 않음**
-   → 모든 LLM 요청은 BE 경유 (REST API)
-
-2. **BE는 RemoteLlmProvider만 사용 (againspring-llm 워커 CLI)**
-   → 모든 LLM 호출: HTTP POST → `/v1/invoke` (CLI 브릿지)
-   → 구 ClaudeCodeBridge/ClaudeApiProvider 제거됨
-
-3. **AI 출력 품질 금지어 확인**
-   → LLM 프롬프트/출력 수정 시 `shared/docs/policies/forbidden-words.md` 참조 (AI 출력 품질 기준, 사용자 입력에는 미적용)
-
-4. **🚨 PROD 배포 절대 규칙 — 위반 금지**
-   → 명시적으로 "prod에 배포해줘" 지시가 없는 한 prod 환경에 절대 배포하지 않음
-   → 배포 순서: **dev 배포 → commit & push (main 브랜치) → prod 배포**
-   → prod에는 반드시 main 브랜치 기준으로만 배포
-
-5. **환경별 격리**
-   → dev: `env/docker-compose.dev.yml` + `env/.env.dev`
-   → prod: `env/docker-compose.prod.yml` + `env/.env.prod`
-   → `.env.prod`는 절대 git에 커밋 금지
-
-6. **문서 위치 규칙 — 4개 docs 디렉토리만 사용**
-   → `shared/docs/` (공통), `backend/docs/` (BE 특화), `frontend/docs/` (FE 특화), `env/docs/` (환경/배포)
-   → 루트는 `README.md`와 `CLAUDE.md`만 허용
-   → 모듈 루트의 `README.md`는 짧은 진입 가이드만 (~20줄)
-   → 예외: dev 전용 `marketing/` 모듈은 `marketing/docs/`(마케팅 전략 문서)를 모듈 로컬로 보유 — 공통 docs 아님
-   → **권위본은 `shared/docs/policies/`** — backend/frontend 의 `policies/` 는 각 모듈의 구현 방법만 설명
+1. **FE는 Claude Code 직접 호출 금지** — 모든 LLM 요청은 BE 경유 (REST API)
+2. **BE는 RemoteLlmProvider만 사용** — HTTP POST → `againspring-llm-{dev,prod}:/v1/invoke`
+3. **LLM 프롬프트/출력 수정 시** `shared/docs/policies/forbidden-words.md` 반드시 확인
+4. **🚨 prod 배포 절대 규칙** — 명시적 "prod에 배포해줘" 지시 없으면 배포 금지. 순서: dev 배포 → commit & push (main) → prod 배포
+5. **`.env.prod` git 커밋 절대 금지**
+6. **문서 위치** — 루트는 `README.md`, `CLAUDE.md`만. 상세 문서는 4개 docs 디렉토리만 허용.
 
 ---
 
-## 📋 문서 위치 맵
+## 📋 핵심 문서 위치
 
-### 공통 (BE+FE 모두 참조) — `shared/docs/`
-
-#### API / 스키마
-- `shared/docs/api/README.md` — API 문서 인덱스 (도메인별 파일 링크 + 공통 규약)
-- `shared/docs/api/rest-spec.md` — 공통 규약·에러코드·전체 엔드포인트 마스터 표
-- `shared/docs/api/auth.md` — 인증 API (AuthController, OAuth2Controller)
-- `shared/docs/api/community.md` — 광장 API (CommunityPostController, CommunityCommentController)
-- `shared/docs/api/user.md` — 사용자 API (UserController)
-- `shared/docs/api/feedback.md` — 피드백 API (FeedbackController)
-- `shared/docs/api/admin.md` — 관리자 API
-- `shared/docs/api/database-schema.md` — MariaDB 테이블 설명 (Flyway V1~V56+)
-- `shared/docs/categories.yml` — 카테고리 catalog (FE/BE 공유 권위본). 변경 시 `frontend/lib/constants/categories.ts` 동기화 필요
-
-#### LLM / 프롬프트
-- `shared/docs/prompts/README.md` — 프롬프트 레이어링(시스템/Gottman/NVC/관계/턴) + 핫리로드
-- `shared/docs/prompts/system.md` — 시스템 프롬프트 (BE 런타임 로드)
-- `shared/docs/prompts/{gottman,nvc,relations,turns}/*.md` — 도메인별 프롬프트 파편
-
-#### 정책 (서비스 컨텐츠 룰 — **권위본**)
-- `shared/docs/policies/psychology-model.md` — 심리학 모델 (Gottman + NVC) 채택 근거
-- `shared/docs/policies/auth.md` — 이메일/게스트/OAuth 인증 정책
-- `shared/docs/policies/onboarding.md` — 온보딩 Q&A → 6스타일 매핑
-- `shared/docs/policies/categories.md` — 갈등 카테고리
-- `shared/docs/policies/forbidden-words.md` — AI 출력 금지어 (필수!)
-- `shared/docs/policies/data-retention.md` — 30일 보존 정책
-- `shared/docs/policies/terms-of-service.md` — 서비스 이용약관
-- `shared/docs/ADR/` — 아키텍처 결정 기록 (2026-06-02 피벗 등)
-
-#### 시스템 전체
-- `shared/docs/structure.md` — 모노레포 전체 구조 / 책임 분리
-- `shared/docs/architecture.md` — 시스템 아키텍처 한 장
-- `shared/docs/admin-dashboard.md` — 관리자 대시보드 기능·운영 가이드 (ADMIN 권한·5개 섹션·17개 API)
-
-### 백엔드 특화 — `backend/docs/`
-- `backend/docs/structure.md` — Spring Boot 패키지 계층 (community/ 추가)
-- `backend/docs/architecture.md` — Layer / JPA / Flyway / 커뮤니티 광장 흐름 / 이벤트
-- `backend/docs/policies/{auth-jwt,oauth-google,keyword-guard,prompt-sanitizer}.md` — BE 구현 정책
-- `backend/docs/testing.md` — 테스트 전략 + 커버리지
-- `backend/docs/openapi.md` — Swagger UI + DTO 컨벤션
-
-### 프론트엔드 특화 — `frontend/docs/`
-- `frontend/docs/structure.md` — Next.js 14 App Router 레이아웃
-- `frontend/docs/architecture.md` — 상태/API 클라이언트/MSW
-- `frontend/docs/policies/forbidden-words-lint.md` — FE 금지어 린트 구현
-- `frontend/docs/ui/{design-handoff,mock-scenarios}.md` — 디자인 핸드오프 + MSW 시나리오
-- `frontend/docs/testing.md` — FE 테스트 전략
-- **`frontend/docs/ux/principles.md`** — **FE UX 권위본** (4원칙군, 우선순위, 로드맵)
-- **`frontend/docs/ux/hax-checklist.md`** — **컴포넌트별 PR 체크리스트** (HAX 18 × 23개 컴포넌트)
-
-### 환경 / 배포 — `env/docs/`
-- `env/docs/structure.md` — env/ 디렉토리 레이아웃
-- `env/docs/architecture.md` — 배포 토폴로지 (Tunnel→nginx→FE/BE→DB)
-- `env/docs/docker.md` — compose 3-variant
-- `env/docs/environment-variables.md` — `.env.*` 변수 사전
-- `env/docs/local-dev.md` — 로컬 개발 실행법
-- `env/docs/deployment.md` — dev → main → prod 파이프라인
-- `env/docs/cloudflare.md` — Tunnel 라우팅 + 설치
+| 영역 | 권위본 |
+|---|---|
+| API 명세 + DB 스키마 | `shared/docs/api/` |
+| AI 출력 금지어 정책 | `shared/docs/policies/forbidden-words.md` |
+| 서비스 정책 (인증·온보딩·약관) | `shared/docs/policies/` |
+| LLM 프롬프트 | `shared/docs/prompts/` |
+| FE UX 원칙 | `frontend/docs/ux/principles.md` |
+| FE 컴포넌트 PR 체크리스트 | `frontend/docs/ux/hax-checklist.md` |
+| 배포 절차 | `env/docs/deployment.md` |
+| 환경 변수 사전 | `env/docs/environment-variables.md` |
 
 ---
 
-## 🎨 FE UX 정책 (프론트엔드 작업 시 항상 준수)
+## 🎨 FE UX 핵심 규칙
 
-> 권위본: [`frontend/docs/ux/principles.md`](frontend/docs/ux/principles.md) · 컴포넌트 체크리스트: [`frontend/docs/ux/hax-checklist.md`](frontend/docs/ux/hax-checklist.md)
+> 권위본: [`frontend/docs/ux/principles.md`](frontend/docs/ux/principles.md) · 체크리스트: [`frontend/docs/ux/hax-checklist.md`](frontend/docs/ux/hax-checklist.md)
 
-### 핵심 원칙
-
-| 순위 | 원칙군 | 적용 시점 |
-|---|---|---|
-| **1순위** | AI 신뢰성 (배심원·요약은 AI임을 명확히) | 모든 FE 변경 시 |
-| **2순위** | 인지 부하 최소화 (한 화면 한 결정) | 화면 신규 추가 시 |
-| **3순위** | 카피·인터랙션 (간결, 판결 표현 금지) | 카피·인터랙션 수정 시 |
-
-### 서비스 책임 정책 (2026-06-02 개정)
-
-> **사용자가 직접 입력하는 콘텐츠에 대한 책임은 사용자에게 있다.**
-> 플랫폼은 AI 출력 품질을 관리하되, 사용자 입력을 강제로 차단하거나 개입하지 않는다.
-
-- **위기 감지 개입 없음**: 사연·댓글 작성 시 키워드로 세션을 중단하거나 모달을 띄우지 않는다.
-- **법률·임상 용어 사용자 입력 허용**: 사용자가 직접 작성하는 텍스트에 금지어 필터 미적용.
-- **AI 출력만 품질 관리**: AI 배심원·요약이 법률 용어·판결 표현·처방을 출력하지 않도록 프롬프트/`PromptSanitizer`로 제어.
-- **결과 리포트에 처방(prescription) 금지**: "N%이니 A님이 더 노력해야 합니다" 수치→처방 패턴은 AI 출력에서 금지.
-
-### 광장형 UX 고정 원칙
-
-1. **AI 메시지와 사용자 메시지 시각 구분**: AI 배심원 카드는 사용자 글과 구별 표시.
-2. **작성자=초록, 상대방=붉은** 색 식별 규칙은 앱 전체에서 일관 유지.
-3. **판결/승패 표현 금지** (AI 출력): "누가 이겼다", "잘못했다" → 대체: 공감/관점.
+- **AI 신뢰성 최우선**: 배심원·요약은 AI임을 명확히 표시, 사용자 글과 시각 구분
+- **작성자=초록, 상대방=붉은** — 앱 전체 일관 유지
+- **판결/처방/승패 표현 금지** (AI 출력만) — 대체: "공감", "관점", "작성자/상대방"
+- **사용자 입력에 금지어 필터 미적용** — 사용자가 쓴 텍스트의 책임은 사용자에게 있음
 
 ---
 
 ## ⚠️ AI 출력 품질 기준 (AI 배심원·요약에만 적용)
 
-> **사용자 입력에는 미적용** — 사용자가 작성하는 사연·댓글의 책임은 사용자에게 있음.
-> AI가 생성하는 텍스트(배심원 의견, 중립화 요약, 제목)에만 아래 기준 적용.
-> 권위본: [`shared/docs/policies/forbidden-words.md`](shared/docs/policies/forbidden-words.md)
+> 권위본: [`shared/docs/policies/forbidden-words.md`](shared/docs/policies/forbidden-words.md)  
+> **사용자 입력에는 미적용** — AI 생성 텍스트(배심원 의견, 중립화 요약, 제목)에만 적용
 
-### AI 출력 금지 표현
-
-**법률·심판 표현** (AI가 쓰지 말아야 할 것):
-- "과실비율", "판결", "유죄/무죄", "가해자/피해자" → AI 출력 금지
-- 대체: "공감 비율", "결과", "작성자/상대방"
-
-**처방·판결 표현** (관계 파국 방지):
-- "이겼다/졌다", "맞다/틀렸다", "승자/패자" → AI 출력 금지
-- 권고성 처방 ("헤어지세요", "절교") → AI 출력 금지
-
-**진단명** (AI 출력 자제):
-- "나르시시스트", "소시오패스", "가스라이팅" → AI 출력 자제, 행동 기술로 대체
-
-### 검증 방법
+- 금지: `과실비율 / 판결 / 유죄 / 가해자` → 대체: `공감 비율 / 결과 / 작성자`
+- 금지: `이겼다 / 졌다 / 맞다 / 틀렸다 / 처방 (헤어지세요 등)`
+- 자제: `나르시시스트 / 가스라이팅` → 행동 기술로 대체
 
 ```bash
-# BE: PromptSanitizer (AI 출력 후처리) 자동 적용
-# FE: lint:words 는 코드베이스 내 하드코딩 카피 검사용 (사용자 입력 런타임 검사 아님)
-cd frontend && npm run lint:words
+cd frontend && npm run lint:words   # 코드베이스 하드코딩 카피 검사
 ```
 
 ---
 
 ## 🔌 로컬 개발 명령
 
-### 인프라 (DB)
-
 ```bash
-cd /home/justant/Data/Again-Spring/env
-docker compose up -d      # MariaDB 11 시작 (localhost:3306)
-docker compose logs -f    # 로그 확인
-docker compose down       # 종료
-```
+# DB
+cd /home/justant/Data/Again-Spring/env && docker compose up -d   # MariaDB localhost:3306
 
-### BE 개발
+# BE
+cd /home/justant/Data/Again-Spring/backend && ./gradlew bootRun  # localhost:8080
 
-```bash
-cd /home/justant/Data/Again-Spring/backend
-./gradlew bootRun         # localhost:8080
-```
+# FE
+cd /home/justant/Data/Again-Spring/frontend && npm install && npm run dev  # localhost:3000
 
-환경변수 (dev 프로파일 기본값 자동 적용):
-
-```bash
-DB_URL=jdbc:mariadb://localhost:3306/againspring?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-DB_USER=againspring
-DB_PASSWORD=changeme
-JWT_SECRET=dev_secret_key_change_in_prod
-CLAUDE_BIN=/path/to/claude
-PROMPTS_PATH=./shared/docs/prompts   # 기본값
-```
-
-### FE 개발
-
-```bash
-cd /home/justant/Data/Again-Spring/frontend
-npm install
-npm run dev          # localhost:3000 (MSW 자동 활성화)
-npm run lint:words   # 금지어 검사
-npm run build        # 프로덕션 빌드
-```
-
-### 헬스 체크
-
-```bash
+# 헬스 체크
 curl http://localhost:8080/api/health
-curl http://localhost:8080/actuator/health
 ```
 
 ---
 
-## 🧠 LLM 브릿지 운영 주의사항
+## 🧠 LLM 브릿지 핵심
 
-> 프롬프트 구조: [`shared/docs/prompts/README.md`](shared/docs/prompts/README.md)
+- **구조**: `againspring-backend` → HTTP → `againspring-llm` (`/v1/invoke`)
+- **모델**: `claude-haiku-4-5-20251001` · **인증**: 호스트 `~/.claude` 마운트 (API 키 불필요)
+- **플래그**: `--strict-mcp-config --no-session-persistence --print`
+- **동시성**: ThreadPoolExecutor 100 + LinkedBlockingQueue 500 · 타임아웃 120초
 
-### 아키텍처 (원격 CLI 통합)
+**보안**: 사용자 입력은 반드시 `PromptSanitizer` 경유 후 `<user_input>` 태그로 삽입.
 
-모든 LLM 호출은 `againspring-llm-dev/prod` 워커 컨테이너를 통함 (RemoteLlmProvider HTTP 클라이언트):
-
-| 컨테이너 | 역할 |
-|---|---|
-| `againspring-backend-dev/prod` | 프롬프트 어셈블 + HTTP 클라이언트 (RemoteLlmProvider) |
-| `againspring-llm-dev/prod` | Claude Code CLI 실행 전용 (`/v1/invoke` endpoint) |
-
-- **모델**: `claude-haiku-4-5-20251001` (배심원 의견), 커뮤니티 광장 전용
-- **호출 플래그**: `--strict-mcp-config --no-session-persistence --print`
-- **동시성**: ThreadPoolExecutor 100 + LinkedBlockingQueue 500
-- **타임아웃**: 실행 120초
-- **환경 동일**: **dev/prod 모두 동일 경로**. `ANTHROPIC_API_KEY` 불필요.
-
-### 인증 방식 (API 키 없이 — dev/prod 동일)
-
-`~/.claude`를 **llm-worker 컨테이너**에 마운트:
-
-```yaml
-# env/docker-compose.{dev,prod}.yml
-againspring-llm-{dev,prod}:
-  volumes:
-    - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
-```
-
-호스트에서 최초 1회 `claude` 명령으로 로그인. `ANTHROPIC_API_KEY` 불필요. 세션 만료 시 호스트 재로그인 → `docker compose restart againspring-llm-{dev,prod}`.
-
-### 보안 규칙
-
-```
-❌ 위험: 사용자 입력을 프롬프트에 직접 삽입
-  claude --print "사용자의 말: ${userInput}"
-
-✅ 안전: PromptSanitizer → 구조화된 형태로 삽입
-  sanitized = sanitizer.sanitize(userInput);
-  prompt = systemPrompt + "\n<user_input>\n" + sanitized + "\n</user_input>";
-```
-
-### 프롬프트 프레이밍 주의
-
-Claude Code CLI는 SW 엔지니어링 작업에 최적화돼 있어 비기술 조언을 거부할 수 있음. 다시봄의 system prompt(`shared/docs/prompts/system.md`)는 NVC 재구성/구조화 출력 형태로 프레임돼 있어 정상 동작.
+세션 만료 시: 호스트 `claude` 재로그인 → `docker compose restart againspring-llm-{dev,prod}`
 
 ---
 
 ## 🧪 테스트 정책
 
-| 계층 | 대상 | 목표 커버리지 | 비고 |
-|---|---|---|---|
-| **Unit** | Service | 80% | 비즈니스 로직 |
-| | Controller | 70% | 라우팅, 입력 검증 |
-| | LLM Bridge | 90% | 에러 처리 중점 |
-| **Integration** | API | 80% | FE/BE 연동 |
-| **Security** | Sanitizer | 100% | 금지어, 프롬프트 주입 |
-| | Crisis Guard | 100% | 위험 키워드 감지 |
+| 계층 | 목표 커버리지 |
+|---|---|
+| Unit — Service | 80% |
+| Unit — Controller | 70% |
+| LLM Bridge | 90% |
+| Integration (API) | 80% |
+| Security (Sanitizer + Crisis Guard) | 100% |
 
 ```bash
-# BE
 cd backend && ./gradlew test
-
-# FE
 cd frontend && npm run test
 ```
 
-자세한 전략: [`backend/docs/testing.md`](backend/docs/testing.md), [`frontend/docs/testing.md`](frontend/docs/testing.md)
-
 ---
 
-## 🌐 배포 / 환경 변수
+## 🚀 배포 핵심
 
-> 자세한 절차: [`env/docs/deployment.md`](env/docs/deployment.md), [`env/docs/environment-variables.md`](env/docs/environment-variables.md)
+> 자세한 절차: [`env/docs/deployment.md`](env/docs/deployment.md)
 
-### 환경 구분
-
-| 환경 | 도메인 | compose 파일 | env 파일 | nginx 포트 |
-|---|---|---|---|---|
-| **로컬 개발** | localhost | `env/docker-compose.yml` | — | — |
-| **서버 dev** | `dev.againspring.net` | `env/docker-compose.dev.yml` | `env/.env.dev` | 8090 |
-| **서버 prod** | `againspring.net` | `env/docker-compose.prod.yml` | `env/.env.prod` | 8091 |
-
-### 컨테이너 명명 규칙
-
-| 컨테이너 | dev | prod |
-|---|---|---|
-| MariaDB | `againspring-mariadb-dev` | `againspring-mariadb-prod` |
-| Backend | `againspring-backend-dev` | `againspring-backend-prod` |
-| **LLM Worker** | **`againspring-llm-dev`** | **`againspring-llm-prod`** |
-| Frontend | `againspring-frontend-dev` | `againspring-frontend-prod` |
-| Nginx | `againspring-nginx-dev` | `againspring-nginx-prod` |
-| **Marketing Renderer** | **`againspring-marketing-renderer-dev`** | **없음 (dev 전용)** |
-| **Social Poster** | **`againspring-social-poster-dev`** | **없음 (dev 전용)** |
-
-### 🚀 배포 명령
-
-#### 1단계: dev 배포 (항상 먼저)
+| 환경 | 도메인 | compose 파일 | nginx 포트 |
+|---|---|---|---|
+| dev | `dev.againspring.net` | `docker-compose.dev.yml` + `.env.dev` | 8090 |
+| prod | `againspring.net` | `docker-compose.prod.yml` + `.env.prod` | 8091 |
 
 ```bash
+# dev 배포
 cd /home/justant/Data/Again-Spring/env
-
-# env 파일 준비 (최초 1회)
-cp .env.dev.example .env.dev
-vi .env.dev  # 실제 값 입력
-
-# 빌드 & 실행
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
-
-# 확인
-docker compose -f docker-compose.dev.yml ps
 curl http://localhost:8090/api/health
-```
 
-#### 2단계: commit & push to main
-
-```bash
-git add -A
-git commit -m "feat: 변경 내용 요약"
-git push origin main
-```
-
-#### 3단계: prod 배포 (명시적 지시 시에만)
-
-```bash
-cd /home/justant/Data/Again-Spring/env
-
-# env 파일 준비 (최초 1회)
-cp .env.prod.example .env.prod
-vi .env.prod  # 실제 값 입력 (기본값 없음, 전부 필수)
-
-# 빌드 & 실행
+# prod 배포 (명시적 지시 시에만 — main 브랜치 기준)
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-
-# 확인
-docker compose -f docker-compose.prod.yml ps
 curl http://localhost:8091/api/health
 ```
 
-### Cloudflare Tunnel 라우팅
-
-```
-dev.againspring.net  →  localhost:8090
-againspring.net      →  localhost:8091
-www.againspring.net  →  localhost:8091
-```
-
-상세 설정: [`env/docs/cloudflare.md`](env/docs/cloudflare.md)
-
-### 환경 변수 (`.env.dev` / `.env.prod`)
-
-전체 항목은 `env/.env.dev.example` / `env/.env.prod.example` 참조. 주요 항목:
-
-```bash
-# DB
-MARIADB_ROOT_PASSWORD=...
-MARIADB_DATABASE=againspring_dev
-MARIADB_USER=againspring
-MARIADB_PASSWORD=...
-
-# JWT
-JWT_SECRET=...
-
-# LLM 워커 (againspring-llm 컨테이너, API 키 불필요 — 호스트 ~/.claude 마운트)
-LLM_WORKER_URL=http://againspring-llm-dev:8090
-CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude
-LLM_JURY_PROVIDER=remote
-JURY_LLM_MODEL=claude-haiku-4-5-20251001
-COMPOSE_LLM_MODEL=claude-haiku-4-5-20251001
-
-# OAuth2 (Google만 사용 중)
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-
-# Email — 모든 발송 againspring2026@gmail.com 단일 발신자
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=againspring2026@gmail.com
-GMAIL_APP_PASSWORD=...   # againspring2026 Gmail 2단계인증 앱 비밀번호 16자
-
-# App URL (소셜 로그인 redirect_uri 기준)
-APP_URL=https://dev.againspring.net
-
-# Prompts & Categories
-PROMPTS_PATH=./shared/docs/prompts
-CATEGORIES_PATH=./shared/docs/categories.yml
-```
-
----
-
-## 📊 현재 진행 상황
-
-- ✅ 모노레포 구조 (frontend/, backend/, shared/, env/)
-- ✅ 프론트엔드 (Next.js 14 + 광장형 UX)
-- ✅ 백엔드 구현 완료
-  - ✅ Spring Boot 3.3 + Java 21 + Gradle Kotlin DSL
-  - ✅ MariaDB 11 (JPA + Flyway V1~V56+)
-  - ✅ JWT 인증 (회원가입 / 로그인 / 게스트 / Google OAuth)
-  - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
-  - ✅ **커뮤니티 광장 (Post/Juror/Vote/PostComment)**
-    - ✅ CommunityPostController — 게시글 작성/조회/삭제
-    - ✅ CommunityCommentController — 댓글 무한스크롤
-    - ✅ JuryService — LLM 배심원 의견 생성 (비동기)
-    - ✅ VoteRepository — 배심원 의견에 투표
-  - ✅ **LLM 브릿지**: RemoteLlmProvider (againspring-llm 워커 CLI only)
-  - ✅ 금지어 가드 (KeywordGuard, PromptSanitizer)
-  - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
-  - ✅ OpenAPI / Swagger UI
-  - ✅ 피드백 수집 + 관리자 대시보드
-  - ✅ CORS 도메인 허용 + GlobalExceptionHandler 표준화
-- ✅ Docker 멀티 컨테이너 배포 (MariaDB / LLM Worker / Backend / Frontend / Nginx)
-- ✅ Cloudflare Tunnel — `dev.againspring.net`, `againspring.net`
-- ✅ 문서 4-디렉토리 재구성 (shared/docs, backend/docs, frontend/docs, env/docs)
-- ✅ **2026-06-02 피벗 완료**: 커뮤니티 광장 + AI 배심원 모델 (구 Session/Message/Report 코드 삭제)
-- ⏳ prod 배포 (명시적 지시 시에만)
+Cloudflare Tunnel: `dev.againspring.net → :8090` · `againspring.net → :8091`
 
 ---
 
 ## 💡 개발 체크리스트
 
-### 프론트엔드 수정 시
+### FE 수정 시
+- [ ] AI 배심원·요약 출력에 판결/처방 표현 없는지 확인
+- [ ] `npm run lint:words` 통과
+- [ ] `npm run build` 성공
+- [ ] `data-testid` 변경 시 `tests/e2e-realbe/support/selectors.ts` 동기화
+- [ ] pre-commit hook (vitest) 통과 (긴급 우회: `SKIP_TESTS=1 git commit`)
 
-- [ ] **AI 배심원·요약 출력**: `PromptSanitizer` 경유 확인, 판결/처방 표현 없는지 확인
-- [ ] `npm run lint:words` — 코드베이스 하드코딩 카피 검사 (사용자 입력 런타임 차단 아님)
-- [ ] 한 화면에 한 결정만 (인지 부하 최소화)
-- [ ] AI 배심원 카드는 사용자 글과 시각적으로 구분
-- [ ] `npm run build` 성공 확인
-- [ ] **e2e 테스트 동기화**: FE 컴포넌트/라우트/셀렉터 변경 시 `tests/e2e-realbe/` spec도 함께 수정
-  - `data-testid` 추가/변경 → `support/selectors.ts` 업데이트
-  - 라우트/권한 변경 → `flows/` spec 검토
-  - (e2e-realbe 실행은 prod 배포 전 게이트 — 커밋 단계 불필요)
-- [ ] **pre-commit hook**: `frontend/` 파일 staged 시 자동 실행 (vitest 100% 통과 필수)
-  - 우회: `SKIP_TESTS=1 git commit` — 긴급 상황 전용
+### BE 수정 시
+- [ ] `shared/docs/api/rest-spec.md` 명세 일치 확인
+- [ ] LLM 호출 시 `PromptSanitizer` 경유 확인
+- [ ] 테스트 커버리지 80% 이상
 
-### 백엔드 수정 시
-
-- [ ] `shared/docs/api/rest-spec.md` 명세와 일치하는지 확인
-- [ ] `shared/docs/policies/forbidden-words.md` 금지어 없는지 확인
-- [ ] LLM 호출 시 PromptSanitizer 경유 여부 확인
-- [ ] `shared/docs/api/database-schema.md` 스키마 준수
-- [ ] 테스트 커버리지 80% 이상 유지
-
-### dev 배포 전
-
-- [ ] `./gradlew test` 통과
-- [ ] 금지어/위험 키워드 검사 (`npm run lint:words`)
-- [ ] `env/.env.dev` 값 확인
-- [ ] `docker compose -f docker-compose.dev.yml up -d --build` 성공
-- [ ] `curl http://localhost:8090/api/health` 응답 확인
-
-### prod 배포 전 (명시적 지시 시에만 수행)
-
-- [ ] dev에서 충분히 검증 완료
-- [ ] main 브랜치에 commit & push 완료
-- [ ] **🚨 e2e-realbe 전체 통과 필수** (`cd frontend && npm run test:e2e:realbe`)
-  - dev docker 스택 실행 중이어야 함 (`cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d`)
-  - 실패 시 prod 배포 금지 — 원인 수정 후 재검증
+### prod 배포 전 (명시적 지시 시에만)
+- [ ] dev 검증 완료 + main 브랜치 commit & push 완료
+- [ ] **🚨 e2e-realbe 전체 통과 필수** — `cd frontend && npm run test:e2e:realbe`
 - [ ] `env/.env.prod` 모든 값 입력 (기본값 없음)
-- [ ] MariaDB 볼륨 백업 (`docker exec againspring-mariadb-prod mariadb-dump ...`)
-- [ ] `docker compose -f docker-compose.prod.yml up -d --build` 성공
-- [ ] `curl http://localhost:8091/api/health` 응답 확인
-- [ ] Cloudflare Tunnel 라우팅 정상 확인
+- [ ] MariaDB 볼륨 백업 후 배포
 
 ---
 
-**마지막 업데이트**: 2026-06-03
-**담당**: Claude Code (Agent)
-
-> **2026-06-02 피벗 완료**: 1:1 AI 중재 → 커뮤니티 광장 + AI 배심원 모델. 
-> UX 정책: `frontend/docs/ux/principles.md` (원칙 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트).
-> **서비스 책임**: 사용자 입력에 대한 책임은 사용자에게, AI 출력 품질만 제어. 광장형(C3) UX 완전 전환.
+**마지막 업데이트**: 2026-06-03 | **담당**: Claude Code (Agent)

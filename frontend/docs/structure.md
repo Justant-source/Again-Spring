@@ -2,13 +2,15 @@
 
 ```
 frontend/
-├── package.json                # next 14.2.15, react 18.3.1, zustand 5, axios 1.7, msw 2.6
-├── next.config.mjs             # ESLint dirs, strict mode
-├── tailwind.config.ts          # 디자인 토큰: tone-l/p/q, canvas, Pretendard, blink·fade-in-up
+├── package.json                # next 14, react 18, zustand, axios, msw
+├── next.config.mjs
+├── tailwind.config.ts
 ├── tsconfig.json               # ES2022, strict, path alias @/*
+├── vitest.config.ts            # Vitest 설정
+├── playwright.config.ts        # Playwright e2e (a11y)
+├── playwright.realbe.config.ts # Playwright e2e (실서버)
 ├── postcss.config.mjs
 ├── Dockerfile                  # multi-stage, non-root
-├── capacitor.config.ts         # (모바일 앱 래퍼 향후)
 │
 ├── app/                        # Next.js App Router
 │   ├── layout.tsx              # 루트 레이아웃 (MSWProvider 등록)
@@ -19,160 +21,199 @@ frontend/
 │   ├── privacy/page.tsx
 │   ├── terms/page.tsx
 │   │
-│   ├── auth/                   # 비로그인 라우트
-│   │   ├── login/page.tsx
-│   │   ├── signup/page.tsx
-│   │   ├── guest/page.tsx
+│   ├── (admin)/
+│   │   └── admin/
+│   │       ├── community/      # 광장 관리
+│   │       └── marketing/      # 마케팅 대시보드
+│   │           ├── calendar/, contents/, costs/, hashtags/, settings/
+│   │           ├── simulations/, stories/, templates/
+│   │
+│   ├── (auth)/                 # 라우트 그룹 (인증 관련)
 │   │   ├── forgot-password/page.tsx
-│   │   └── callback/[provider]/page.tsx     # OAuth callback
+│   │   ├── guest/page.tsx
+│   │   ├── login/page.tsx
+│   │   ├── reset-password/[token]/page.tsx
+│   │   └── signup/page.tsx
 │   │
-│   ├── (auth)/                 # 라우트 그룹 — 사일런트
-│   │   └── reset-password/[token]/page.tsx
-│   │
-│   ├── (onboarding)/           # 라우트 그룹
-│   │   └── onboarding/
-│   │       ├── page.tsx                      # 10문항
-│   │       ├── intro/page.tsx
-│   │       ├── result/page.tsx               # 스타일 카드
-│   │       ├── mbti-test/page.tsx            # 선택
-│   │       └── mbti-input/page.tsx           # 선택
+│   ├── auth/
+│   │   └── callback/[provider]/page.tsx     # OAuth 콜백
 │   │
 │   ├── (dashboard)/            # 인증 필요
-│   │   ├── profile/page.tsx
-│   │   └── history/page.tsx
+│   │   └── profile/page.tsx
 │   │
-│   └── community/              # 광장형 흐름
-│       ├── page.tsx                          # 피드 (무한스크롤)
-│       ├── [id]/page.tsx                     # 게시글 상세 + 배심원 + 투표 + 댓글
-│       ├── [id]/comments/page.tsx            # 댓글 리스트 (무한스크롤)
-│       └── new/page.tsx                      # 게시글 작성
+│   ├── community/              # 광장형 메인 흐름
+│   │   ├── page.tsx            # 피드 (무한스크롤)
+│   │   ├── [id]/page.tsx       # 게시글 상세 + 배심원 + 투표 + 댓글
+│   │   ├── [id]/comments/page.tsx
+│   │   ├── [id]/invite/page.tsx
+│   │   ├── [id]/read/page.tsx
+│   │   └── new/page.tsx        # 게시글 작성
+│   │
+│   ├── notifications/page.tsx  # 알림
+│   │
+│   └── s/[token]/page.tsx      # 초대 토큰 진입점
 │
 ├── components/
-│   ├── shared/
-│   │   ├── MSWProvider.tsx                   # 클라이언트 사이드 MSW worker 등록
+│   ├── admin/
+│   │   └── marketing/
+│   │       └── preview/
+│   │
+│   ├── auth/                   # 인증 컴포넌트
+│   │
+│   ├── community/
+│   │   └── c3/                 # 광장 핵심 컴포넌트
+│   │       ├── FeedCard.tsx
+│   │       ├── JurorCard.tsx
+│   │       ├── JurorPicker.tsx
+│   │       ├── VoteBar.tsx
+│   │       ├── CommentBar.tsx
+│   │       ├── CommentComposeSheet.tsx
+│   │       ├── CommunityComment.tsx
+│   │       ├── UserChip.tsx
+│   │       ├── BrandBar.tsx
+│   │       ├── SideStory.tsx
+│   │       └── index.ts
+│   │
+│   ├── feedback/
+│   ├── icons/                  # DasibomLogo, Phone, CrisisResources, etc.
+│   ├── legal/
+│   ├── profile/
+│   ├── shared/                 # 공유 컴포넌트
+│   │   ├── MSWProvider.tsx
 │   │   ├── Logo.tsx
-│   │   ├── Dashes.tsx
-│   │   ├── PhoneFrame.tsx
-│   │   ├── Motif.tsx
-│   │   ├── LegalFooter.tsx                   # 모든 결과 화면 푸터
-│   │   ├── RelationshipColorSync.tsx
-│   │   ├── CrisisResourceModal.tsx           # 위기 감지 모달
-│   │   └── KeywordGuard.tsx                  # 입력 필드용 인라인 가드
+│   │   ├── CrisisResourceModal.tsx   # 위기 모달
+│   │   ├── LegalFooter.tsx
+│   │   └── ...
 │   │
-│   ├── onboarding/
-│   │   ├── LikertQuestion.tsx                # 5점 리커트
-│   │   └── MbtiAxisSlider.tsx                # MBTI 4축
-│   │
-│   ├── community/c3/
-│   │   ├── FeedCard.tsx                      # 게시글 카드 (배심원 포함)
-│   │   ├── JurorCard.tsx                     # AI 배심원 의견 카드
-│   │   ├── VoteBar.tsx                       # 투표 버튼 (도움됨/안 됨)
-│   │   ├── CommentBar.tsx                    # 댓글 무한스크롤 + 입력
-│   │   ├── CommentComposeSheet.tsx           # 댓글 작성 시트
-│   │   ├── UserChip.tsx                      # 사용자 칩 (닉네임 + 프로필)
-│   │   ├── BrandBar.tsx                      # 브랜드 바
-│   │   ├── SideStory.tsx                     # 사이드 스토리 (배경)
-│   │   └── index.ts                          # 내보내기
-│   │
-│   ├── result/
-│   │   ├── ReportLayout.tsx                  # 결과 카드 레이아웃
-│   │   ├── StyleCombination.tsx              # 6×6 조합 해석
-│   │   ├── ContributionRatio.tsx             # 화해 기여도 도넛
-│   │   ├── SoloResult.tsx                    # Solo 모드 결과
-│   │   ├── NeedsMap.tsx                      # 욕구 차이 지도
-│   │   ├── NVCScript.tsx                     # NVC 4단계 카드
-│   │   ├── MetaphorCards.tsx                 # 은유 카드
-│   │   ├── RepairSuggestions.tsx             # 관계 회복 제안
-│   │   ├── ShareImage.tsx                    # 공유용 추상화 이미지
-│   │   ├── ShareCardRatio.tsx                # 공유 카드 (기여도)
-│   │   ├── ShareCardBlurredLetter.tsx        # 공유 카드 (편지형)
-│   │   └── ShareCardMetaphor.tsx             # 공유 카드 (은유형)
-│   │
-│   └── ui/                                    # 기본 UI 컴포넌트 (shadcn-ish)
+│   └── ui/                     # 기본 UI 컴포넌트 (shadcn-ish)
 │
 ├── lib/
 │   ├── api/
-│   │   └── client.ts                          # axios 인스턴스 + Bearer 인터셉터
-│   ├── auth/
-│   │   └── oauth.ts                           # OAuth provider redirect 헬퍼
-│   ├── store/
-│   │   ├── userStore.ts                       # Zustand + persist (again-spring-user)
-│   │   └── sessionStore.ts                    # Zustand + persist (again-spring-session)
+│   │   ├── community.ts        # /api/communities/* + /api/posts/*
+│   │   ├── user.ts             # /api/users/*
+│   │   └── client.ts           # axios 인스턴스 + Bearer 인터셉터
+│   │
 │   ├── constants/
-│   │   ├── onboardingQuestions.ts             # 10문항 (상세: ../../shared/docs/policies/onboarding-mapping.md)
-│   │   ├── communicationStyles.ts             # 6스타일 + 36조합
-│   │   ├── mbtiMapping.ts                     # MBTI 16유형
-│   │   ├── crisisResources.ts                 # 핫라인 카드 (상세: shared/docs/policies/crisis-detection.md)
-│   │   ├── categories.ts                      # 카테고리 (상세: ../../shared/docs/policies/categories.md)
-│   │   └── forbiddenWords.ts                  # 금지어 (상세: docs/policies/forbidden-words-lint.md)
-│   ├── types/
-│   │   ├── index.ts
-│   │   ├── user.ts
-│   │   ├── session.ts
-│   │   └── category.ts
+│   │   ├── forbiddenWords.ts   # CRISIS_KEYWORDS, WARNING_KEYWORDS, FORBIDDEN_UI_WORDS
+│   │   ├── userPermissions.ts  # permissionsFor() 함수, 3-tier 권한
+│   │   └── ...
+│   │
+│   ├── store/
+│   │   └── uiStore.ts          # Zustand + persist
+│   │
 │   └── utils/
-│       ├── keywordGuard.ts                    # 클라 사이드 검사
-│       ├── styleCalculator.ts                 # 답변 → 스타일
-│       ├── ratio.ts                           # 화해 기여도 표시 헬퍼
-│       ├── needsMapDistance.ts
-│       ├── describePlaceholder.ts
-│       ├── guestNickname.ts
-│       ├── cn.ts                              # clsx + tailwind-merge
-│       └── index.ts
+│       ├── styleCalculator.ts  # 유틸 함수
+│       ├── cn.ts               # clsx + tailwind-merge
+│       └── ...
 │
-├── mocks/                                     # MSW
-│   ├── browser.ts                             # setupWorker
-│   ├── handlers/
-│   │   ├── index.ts                           # 핸들러 통합
-│   │   ├── user.ts                            # /api/users/*
-│   │   ├── session.ts                         # /api/sessions/*
-│   │   ├── chat.ts                            # /api/sessions/{id}/messages/*
-│   │   ├── historyMessages.ts                 # /api/sessions/{id}/messages/history
-│   │   └── mediation.ts                       # /api/sessions/{id}/report
-│   └── fixtures/
-│       └── mockReports.ts                     # 시나리오별 리포트
+├── mocks/                      # MSW
+│   ├── browser.ts              # setupWorker
+│   └── handlers/
+│       ├── index.ts
+│       ├── community.ts        # /api/communities, /api/posts
+│       ├── notifications.ts    # /api/notifications
+│       └── user.ts             # /api/users
 │
 ├── scripts/
-│   └── check-forbidden-words.js               # npm run lint:words
+│   ├── lint:words              # 금지어 검사
+│   ├── lint:emoji              # 이모지 검사
+│   └── test:e2e:realbe         # 실서버 e2e
 │
 ├── public/
-│   └── mockServiceWorker.js                   # MSW가 자동 생성 (gitignored)
+│   └── mockServiceWorker.js    # MSW 자동 생성 (gitignored)
 │
-├── design/                                    # 디자인 핸드오프 자산 (배포 미포함)
-│   ├── handoff/                              # Claude Design 원본 (참조용)
-│   ├── mockups/                              # 화면별 목업 폴더 (자세한 구조: docs/ui/design-handoff.md)
-│   └── tokens/                               # 디자인 토큰 JSON
+├── tests/
+│   ├── e2e/                    # Playwright (a11y)
+│   ├── e2e-realbe/             # Playwright (실서버)
+│   │   ├── flows/
+│   │   │   ├── 01-auth/
+│   │   │   ├── 02-permissions/
+│   │   │   ├── 03-email-verification/
+│   │   │   └── 04-community-plaza/
+│   │   ├── invariants/
+│   │   │   └── community-legal-notice.spec.ts
+│   │   └── support/
+│   │       └── selectors.ts    # data-testid 관리
+│   │
+│   └── unit/                   # Vitest
 │
-└── docs/                                      # 개발 문서
-│   ├── README.md                              # ← 문서 인덱스 (여기서 시작)
-│   ├── structure.md                           # 폴더 구조 (본 파일)
-│   ├── architecture.md                        # 기술 스택 및 데이터 흐름
-│   ├── testing.md                             # 테스트 전략
-│   ├── ui/                                    # 디자인 및 목업 (자세한 내용)
-│   │   ├── README.md
-│   │   ├── design-handoff.md
-│   │   └── mock-scenarios.md
-│   └── policies/                              # FE 정책 구현 가이드
-│       ├── README.md
-│       └── forbidden-words-lint.md
+└── docs/                       # 개발 문서
+    ├── README.md               # 문서 인덱스
+    ├── structure.md            # 폴더 구조 (본 파일)
+    ├── architecture.md         # 기술 스택 및 데이터 흐름
+    ├── testing.md              # 테스트 전략
+    ├── ux/
+    │   ├── principles.md       # FE UX 권위본
+    │   ├── hax-checklist.md    # 컴포넌트 체크리스트
+    │   ├── collaboration.md    # 협업 프로세스
+    │   └── flows/
+    │       ├── 01-auth.md
+    │       ├── 02-permissions.md
+    │       ├── 08-crisis.md
+    │       └── 09-admin.md
+    ├── design/
+    │   ├── README.md
+    │   ├── components.md
+    │   ├── system.md
+    │   ├── icons.md
+    │   ├── visual-reference/
+    │   │   └── README.md
+    │   └── specs/
+    │       └── metaphor-illustration-system.md
+    └── policies/
+        ├── README.md
+        ├── forbidden-words-lint.md
+        └── (기타 정책 문서)
 ```
 
-## App Router 라우팅 정리
+---
 
-### 라우트 그룹 vs 일반 폴더
+## App Router 라우팅
 
-- `(auth)`, `(onboarding)`, `(dashboard)` — **라우트 그룹** (URL에 미반영, 레이아웃/조직화)
-- `auth/`, `session/`, `privacy/`, `terms/` — 일반 폴더 (URL 반영)
+### 라우트 그룹 (URL 미반영)
+- `(admin)` — `/admin/*`의 레이아웃 그룹화
+- `(auth)` — 인증 플로우 관련
+- `(dashboard)` — 인증 필요 페이지 그룹화
+
+### 일반 폴더 (URL 반영)
+- `auth/` — OAuth 콜백
+- `community/` — 광장 메인
+- `notifications/` — 알림
+- `s/` — 초대 토큰 진입
 
 ### 동적 라우트
+- `[provider]` → `/auth/callback/google`, `/auth/callback/kakao`
+- `[token]` → `/s/{token}`, `/reset-password/{token}`
+- `[id]` → `/community/{id}`, `/community/{id}/comments`
 
-- `[provider]` — `/auth/callback/google`, `/auth/callback/kakao`
-- `[token]` — `/auth/reset-password/abc123`, `/session/join/inv_xyz`
-- `[id]` — `/session/result/ses_abc`
+---
 
-### 보호 정책
+## 실제 구조 vs 부재 경로
 
-현재 라우트 보호는 페이지 레벨 (`useUserStore` 검사 후 redirect). 미들웨어 미사용. 향후 `middleware.ts`로 통합 검토 가능.
+### 실재 하는 것
+- `app/community/**` — 광장 피드·상세·작성
+- `app/(admin)/admin/community/` — 광장 관리
+- `app/(admin)/admin/marketing/**` — 마케팅 대시보드
+- `components/community/c3/` — FeedCard, JurorCard 등 9개 컴포넌트
+- `lib/api/community.ts` + `lib/api/user.ts` — API 클라이언트
+- `lib/constants/forbiddenWords.ts` — 3-tier 금지어
+- `lib/constants/userPermissions.ts` — 3-tier 권한
+- `lib/store/uiStore.ts` — 상태 관리
+- `mocks/handlers/community.ts`, `notifications.ts`, `user.ts`
+- `tests/e2e-realbe/flows/{01,02,03,04}/`, `invariants/community-legal-notice.spec.ts`
+
+### 부재하는 것 (삭제됨)
+- `app/(onboarding)/**` — 온보딩 페이지 (광장형 모델로 변경)
+- `app/(dashboard)/history/` — 기존 세션 이력 (광장형에서 비관련)
+- `components/chat/`, `components/result/` — 구 카톡 채팅/결과 (광장형 전환)
+- `components/onboarding/` — 온보딩 컴포넌트
+- `lib/constants/onboardingQuestions.ts`, `communicationStyles.ts`, `mbtiMapping.ts`
+- `lib/utils/keywordGuard.ts` — 클라이언트 사이드 검사 (서버만 사용)
+- `lib/store/sessionStore.ts`, `communityStore.ts` — 삭제됨 (uiStore로 통합)
+- `mocks/handlers/session.ts`, `chat.ts`, `mediation.ts`
+- `mocks/fixtures/mockReports.ts`
+
+---
 
 ## 코드 위치 → 책임
 
@@ -180,9 +221,13 @@ frontend/
 |---|---|
 | 새 페이지 | `app/<path>/page.tsx` |
 | 재사용 컴포넌트 | `components/<domain>/` |
-| API 호출 | `lib/api/client.ts` (인터셉터 추가) + 각 페이지에서 axios 사용 |
-| 클라이언트 상태 | `lib/store/<store>.ts` |
-| 타입 | `lib/types/<domain>.ts` |
-| 유틸 함수 | `lib/utils/<feature>.ts` |
-| 상수 | `lib/constants/<feature>.ts` |
-| MSW 핸들러 | `mocks/handlers/<domain>.ts` + `mocks/fixtures/` |
+| API 호출 | `lib/api/{community,user}.ts` |
+| 클라이언트 상태 | `lib/store/uiStore.ts` |
+| 타입 | `lib/types/` |
+| 유틸 함수 | `lib/utils/` |
+| 상수 | `lib/constants/` |
+| MSW 핸들러 | `mocks/handlers/{community,notifications,user}.ts` |
+| e2e 테스트 | `tests/e2e-realbe/` |
+| 테스트 ID 관리 | `tests/e2e-realbe/support/selectors.ts` |
+
+**마지막 업데이트**: 2026-06-03

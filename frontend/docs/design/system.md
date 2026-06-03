@@ -12,7 +12,7 @@
 
 ### Tone L — 편지지 (Letter)
 
-**용도**: 온보딩, 입력 플로우, 카톡식 채팅 세션, 이력/프로필
+**용도**: 인증 플로우, 사연 작성, 커뮤니티 피드, 프로필
 
 **토큰** (`tailwind.config.ts > colors.tone-l`):
 
@@ -32,13 +32,13 @@
 - 여백: 40px padding, 넉넉하게
 - 느낌: "잘 정돈된 편지지"
 
-**관련 UX 원칙**: [principles.md §3 — 인지 부하 최소화](../ux/principles.md), [principles.md §1 — AI 중재자 신뢰성](../ux/principles.md)
+**관련 UX 원칙**: [principles.md](../ux/principles.md)
 
 ---
 
 ### Tone P — 파스텔 (Pastel)
 
-**용도**: 결과 리포트, 카톡 공유 이미지, 관계 온도, 욕구 차이 지도
+**용도**: 배심원 카드, 공감 비율 공유 이미지, 마케팅 카드
 
 **토큰** (`tailwind.config.ts > colors.tone-p`):
 
@@ -46,8 +46,8 @@
 |---|---|---|---|
 | 배경 | `tone-p.bg` | `var(--P-bg)` | |
 | 카드 | `tone-p.card` | `var(--P-card)` | |
-| A 포인트 | `tone-p.a` | `var(--P-a)` | RelationshipColorSync 런타임 덮어씀 |
-| B 포인트 | `tone-p.b` | `var(--P-b)` | RelationshipColorSync 런타임 덮어씀 |
+| A 포인트 (작성자) | `tone-p.a` | `var(--P-a)` | 초록 계열 (A측 공감) |
+| B 포인트 (상대방) | `tone-p.b` | `var(--P-b)` | 붉은 계열 (B측 공감) |
 | 텍스트 | `tone-p.ink` | `var(--P-ink)` | |
 | 보조 | `tone-p.sub` | `var(--P-sub)` | |
 | 보더 | `tone-p.border` | `var(--P-border)` | |
@@ -55,15 +55,15 @@
 **특징**:
 - 라운드: `rounded-pastel` (14px) / `rounded-card-p` (18px) — 크게
 - 타이포: Pretendard 전용, 제목만 font-weight 500
-- 느낌: "따뜻한 MBTI 결과지"
+- 느낌: "배심원 카드·공감 비율 카드"
 
-**관련 UX 원칙**: [principles.md §4 — 결과 해석 안전성](../ux/principles.md)
+**관련 UX 원칙**: [principles.md](../ux/principles.md)
 
 ---
 
 ### Tone Q — 조용한 고급감 (Quiet)
 
-**용도**: PDF 리포트, Premium 결제 화면, 상담사 연결 화면 (향후)
+**용도**: 어드민 대시보드, 설정 화면, 향후 프리미엄 기능
 
 **토큰** (`tailwind.config.ts > colors.tone-q`):
 
@@ -86,7 +86,8 @@
 
 - 하트, 손잡는 일러스트, 무지개 그라데이션
 - Duolingo식 마스코트 캐릭터
-- "과실비율", "판결", "가해자/피해자" 등 판결/병리 용어 ([forbidden-words-lint.md](../policies/forbidden-words-lint.md) 참조)
+- "과실비율", "유죄/무죄", "가해자/피해자", "이겼다/졌다" 등 법적 결론·낙인 표현 ([forbidden-words.md](../../shared/docs/policies/forbidden-words.md) 참조)
+  - **참고**: "배심원"은 제품 메타포로 허용. 금지 대상은 배심원이 내리는 법적 *결론* 표현임
 - 다크모드 기본값
 - 3D 글래스모피즘, 네온, 그라데이션 효과
 - `font-weight: 700` (bold) 혼용 → 500만 사용
@@ -113,20 +114,19 @@
 
 이 요소들은 다시봄 전체에서 일관되게 유지합니다.
 
-### 욕구 차이 지도
-- 2D 차트, A는 피치 원, B는 세이지 원
-- 축 레이블은 세리프 이탤릭
+### 공감 비율 바
+- A측(작성자)=초록 / B측(상대방)=붉은 일관 유지
+- `X% : Y%` 형식으로 표시 (실제 집계값)
+- AI 분석 레이블 (`"AI 배심원 분석"`) 항상 동반
 
-### 관계 온도
-- `36.2°C` 형식 (소수점 1자리 고정)
+### 배심원 카드
+- 페르소나명 + 편향(A측/B측/중립) 표시
+- "AI 배심원" 레이블 필수
+- 배경색: A편향=연초록, B편향=연붉은, 중립=연회색
 
-### 화해 기여도
-- `55 : 45` 또는 `55 · 45` 형식 (5 단위 반올림)
-- 법적 안내 박스 항상 표시 ("과실비율과 무관합니다")
-
-### 커뮤니케이션 스타일
-- 자연물 은유 — `Motif.tsx` SVG variant 사용 (emoji 금지)
-- 파도형 · 산형 · 불꽃형 · 이파리형 · 달빛형 · 별빛형
+### 메타포 일러스트 — `design/specs/metaphor-illustration-system.md`
+- 갈등·공감 테마 SVG 일러스트 (emoji 금지)
+- 공유 이미지 카드 생성 시 사용
 
 ---
 

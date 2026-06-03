@@ -1,57 +1,71 @@
-# UX 흐름 인덱스
+# UX 흐름 인덱스 — 광장형
 
 **위치**: `frontend/docs/ux/flows/README.md`  
 **자매 문서**: [../principles.md](../principles.md) · [../../architecture.md](../../architecture.md)  
-**기준일**: 2026-05-16  
-**성격**: as-is 현행 기준 — 실제 코드 동작 기준으로 서술. 개선 제안 없음.
+**기준일**: 2026-06-03  
+**성격**: as-is 현행 기준 — 광장형 모델 기준으로 서술.
 
 ---
 
-## 파일 목록
+## 문서 현황
 
-| 파일 | 주제 |
+### 현존하는 문서 (광장형 기준)
+
+| 파일 | 주제 | 상태 |
+|---|---|---|
+| [01-auth.md](./01-auth.md) | 가입·로그인·게스트·OAuth | ✅ 유지 |
+| [02-permissions.md](./02-permissions.md) | 권한 시스템 (3-tier, TESTER role) | ✅ 유지 |
+| [08-crisis.md](./08-crisis.md) | 위기 감지·CrisisResourceModal | 🔄 전면 재작성 필요 |
+| [09-admin.md](./09-admin.md) | 관리자 대시보드 | 🔄 전면 재작성 필요 |
+
+### 삭제된 문서 (구 모델)
+
+| 파일 | 이유 |
 |---|---|
-| [01-auth.md](./01-auth.md) | 가입·로그인·게스트 진입·OAuth·비밀번호 |
-| [02-permissions.md](./02-permissions.md) | guest/registered/admin 권한 + TESTER role + 라우트 가드 |
-| [03-onboarding.md](./03-onboarding.md) | 10문항 Likert + 6스타일 매핑 + 30초 튜토리얼 모달 |
-| [04-mbti.md](./04-mbti.md) | MBTI 수동 슬라이더 + 60문항 검사 + 진입 경로 |
-| [05-session-chat.md](./05-session-chat.md) | 세션 생성·카테고리 선택·Solo 대화·5턴 게이트 |
-| [06-duo.md](./06-duo.md) | 초대·참여·TESTER 게이팅·Solo→Duo 전이 |
-| [07-report.md](./07-report.md) | finalize·Solo/Duo 리포트 구성·공유 캡처 |
-| [08-crisis.md](./08-crisis.md) | 입력 키워드 감지·헤더 SOS·리포트 위기 박스 |
-| [09-admin.md](./09-admin.md) | ADMIN 3중 가드·대시보드 5섹션 |
+| `03-onboarding.md` | 온보딩 페이지 삭제됨 (광장형 모델) |
+| `04-mbti.md` | MBTI 테스트 삭제됨 |
+| `05-session-chat.md` | 세션 기반 채팅 삭제됨 |
+| `06-duo.md` | Duo 모드 (파트너 초대) 삭제됨 |
+| `07-report.md` | Solo/Duo 리포트 삭제됨 |
 
 ---
 
-## 전체 진입 지도
+## 전체 진입 지도 (광장형)
 
 ```mermaid
 flowchart TD
     Root(["/ 랜딩"])
 
-    Root -->|"user 없음"| NoUser["로그인 버튼\n게스트로 둘러보기"]
-    Root -->|"admin tier"| AdminEntry["관리자 모드 카드\n→ /admin"]
-    Root -->|"guest/registered\n온보딩 미완"| OnboardGate["온보딩 배너\n→ /onboarding/intro"]
-    Root -->|"guest/registered\n온보딩 완료"| ChatEntry["마음 옮겨 적기 시작\n→ /session/new"]
+    Root -->|"로그인 필요 없음"| Feed["/community\n광장 피드\n게시글 목록"]
+    Root -->|"비로그인"| Feed
+    Root -->|"로그인"| Feed
 
-    NoUser -->|"게스트 클릭"| Guest["/guest\n닉네임 입력"]
-    NoUser -->|"로그인 클릭"| Login["/login"]
-    NoUser -->|"가입"| Signup["/signup"]
+    Feed -->|"카드 클릭"| Detail["/community/[id]\n게시글 상세\n배심원 의견\n투표\n댓글"]
 
-    Guest -->|"자동"| OnboardIntro["/onboarding/intro"]
-    Login -->|"성공"| Root
-    Signup -->|"완료"| Root
+    Feed -->|"+ 버튼"| AuthGate{"로그인\n확인"}
+    AuthGate -->|"미로그인"| Login["/login"]
+    AuthGate -->|"로그인"| NewPost["/community/new\n게시글 작성\nA입장·B입장 작성"]
+    Login -->|"완료"| NewPost
 
-    OnboardIntro --> Onboard["/onboarding\n10문항"]
-    Onboard --> OnboardResult["/onboarding/result\n스타일 카드"]
-    OnboardResult -->|"next param"| ChatEntry
+    NewPost -->|"발행"| Detail
 
-    ChatEntry --> SessionNew["/session/new\n관계 유형 선택"]
-    SessionNew --> Category["/session/category\n3단계 선택"]
-    Category -->|"POST /api/sessions"| Chat["/session/chat/{id}\n대화"]
-    Chat -->|"finalize"| Report["/session/result/{id}\n리포트"]
+    Detail -->|"배심원 카드\n클릭"| JurorDetail["배심원 의견 상세\n(상세 페이지 내 펼침)"]
 
-    AdminEntry --> Admin["/admin\n대시보드"]
+    Detail -->|"투표"| AuthGate2{"로그인\n확인"}
+    AuthGate2 -->|"미로그인"| Login
+    AuthGate2 -->|"로그인"| Vote["A측/B측 투표\n투표 완료 후 비율 표시"]
+
+    Detail -->|"댓글"| AuthGate3{"로그인\n확인"}
+    AuthGate3 -->|"미로그인"| Login
+    AuthGate3 -->|"로그인"| Comment["댓글 작성\n무한스크롤 목록"]
+
+    Root -->|"로그인"| Profile["/profile\n프로필"]
+    Root -->|"로그인"| Notif["/notifications\n알림\n배심원 분석 완료\n댓글, 좋아요"]
+
+    Root -->|"관리자"| Admin["/admin\n관리자 대시보드\ncommunity/\nmarketing/"]
+
+    Feed -.->|"비공개 링크\n/s/[token]"| Invite["초대 토큰\n상대방 진입"]
+    Invite --> Detail
 ```
 
 ---
@@ -60,40 +74,93 @@ flowchart TD
 
 출처: `lib/constants/userPermissions.ts`
 
-| 항목 | guest | registered | admin |
-|---|---|---|---|
-| **토큰 만료** | 2시간 | 24시간 | 24시간 |
-| **이메일 인증 필요** | X | O | O |
-| **온보딩 필수** | X | O | X |
-| **일일 세션 한도** | 3 (IP 기준) | 5 (계정 기준) | 5 (계정 기준) |
-| **메시지 턴 제한** | 3턴 | 없음 | 없음 |
-| **Duo 모드 허용** | X | O | O |
-| **파트너 초대** | X | O | O |
-| **대화 이력 조회** | X | O | O |
-| **메시지 보존** | 7일 | 30일 | 30일 |
-| **세션 보존** | 30일 | 180일 | 180일 |
-| **게스트 배지** | O | X | X |
-| **한도 도달 업그레이드 모달** | O | X | X |
-| **관리자 진입 버튼** | X | X | O |
-| **랜딩 채팅 진입 버튼** | O | O | X |
-| **이력 메뉴** | X | O | X |
-| **동의 재확인 모달** | X | O | O |
-| **중재자 톤 설정** | per_session | per_session | per_session |
-| **관리자 대시보드** | X | X | O |
+| 권한 | Guest | User | TESTER | Admin |
+|---|---|---|---|---|
+| **피드 열람** | ✅ | ✅ | ✅ | ✅ |
+| **게시글 작성** | ❌ | ✅ | ✅ | ✅ |
+| **투표** | ❌ | ✅ | ✅ | ✅ |
+| **댓글** | ❌ | ✅ | ✅ | ✅ |
+| **프로필** | ❌ | ✅ | ✅ | ✅ |
+| **알림** | ❌ | ✅ | ✅ | ✅ |
+| **커뮤니티 관리** | ❌ | ❌ | ❌ | ✅ |
+| **마케팅 대시보드** | ❌ | ❌ | ❌ | ✅ |
+| **관리자 액세스** | ❌ | ❌ | (조회 전용) | ✅ |
 
-**TESTER role**: tier가 아님. `user.roles` 배열 값. `permissionsFor()`로 판단되는 tier와 독립적.  
-사용처: ChatLayout.tsx (Duo UI 게이팅) · admin 사용자 관리 토글.  
-TESTER를 가진 registered 사용자는 registered 권한이지만 Duo 초대·SwipeContainer UI를 사용할 수 있음.
+**TESTER role**: `user.roles[]` 배열의 값. 관리자에게 테스트 기능 노출용.
 
 ---
 
-## 알려진 불일치
+## 페이지별 흐름
 
-아래 4건은 기존 정책 문서와 실제 코드가 다른 지점이다. 본 flows/ 문서는 **실제 코드 기준**으로 서술하며, 기존 정책 문서(`shared/docs/policies/` 등)는 변경하지 않는다.
+### 1. 피드 (`/community`)
+1. 로그인 여부 무관 열람 가능
+2. 무한스크롤 또는 페이지네이션
+3. 카테고리 필터 (선택 안 함도 가능)
 
-| # | 항목 | 기존 문서 | 실제 코드 | 본 문서 기준 |
-|---|---|---|---|---|
-| 1 | MBTI 문항 수 | `shared/docs/policies/onboarding.md` — 4문항 | `lib/constants/mbtiMapping.ts` — 60문항 (15×4축) | **60문항** |
-| 2 | 스타일 조합 인사이트 | 36조합 (6×6) 가정 | `lib/constants/communicationStyles.ts` — 5개 키 (STYLE_COMBINATION_INSIGHTS) | **5개 조합** |
-| 3 | V13 카테고리 힌트화 | 카테고리별 hint 메타데이터 존재 가정 | `lib/constants/categories.ts` — hint 필드 없음, label 직접 노출 | **hint 메타 없음** |
-| 4 | Duo 게이팅 방식 | `app.features.duo-mode` flag | FE에 feature flag 없음. `user.roles.includes('TESTER')` 단독 판별 | **TESTER role** |
+### 2. 게시글 작성 (`/community/new`)
+1. 로그인 필수 (미로그인 → 로그인 모달)
+2. A입장·B입장 작성
+3. partner_token 발행 (초대 링크)
+4. publish 선택: 상대방 미작성 시에도 혼자 게시 가능
+
+### 3. 게시글 상세 (`/community/[id]`)
+1. 배심원 의견 조회 (AI 레이블 표시)
+2. 투표 버튼 (A측/B측, 로그인 필요)
+3. 댓글 무한스크롤 (로그인 필요)
+4. 위기 컨텐츠: CrisisResourceModal 표시
+
+### 4. 알림 (`/notifications`)
+- 배심원 분석 완료 알림
+- 댓글, 좋아요 알림
+- 읽음 처리 후 30일 자동 삭제
+
+---
+
+## 현존하는 흐름 문서
+
+### [01-auth.md](./01-auth.md)
+- 게스트 진입 (`/guest`)
+- 일반 로그인 (`/login`)
+- 가입 (`/signup`)
+- OAuth 콜백 (`/auth/callback/[provider]`)
+- 비밀번호 재설정
+
+**광장형 영향**: 정책 유지 (온보딩 게이트 제거 가능)
+
+### [02-permissions.md](./02-permissions.md)
+- guest/registered/admin 3-tier
+- TESTER role
+- 라우트 게이트
+- 401/403/402/429 에러 처리
+
+**광장형 영향**: 게시글 작성 권한 추가 (registered+)
+
+### [08-crisis.md](./08-crisis.md) — 전면 재작성 필요
+**구 모델**: 입력 차단 → 세션 즉시 중단  
+**신 모델**: 사용자 입력 필터 미적용 → 관리자 위기 마크 설정  
+재작성 예정 사항:
+- CrisisResourceModal (ESC/바깥클릭 차단 불변)
+- 관리자 admin crisis flag
+- 상시 핫라인 리소스
+
+### [09-admin.md](./09-admin.md) — 전면 재작성 필요
+**신 콘텐츠**: 
+- `(admin)/admin/community/` — 광장 관리 (게시글, 댓글, 위기 마크)
+- `(admin)/admin/marketing/**` — 마케팅 대시보드 (5섹션)
+
+---
+
+## 기술 변경 사항
+
+| 항목 | 구 모델 | 신 모델 |
+|---|---|---|
+| **라우트 구조** | `session/` 중심 | `community/` 중심 |
+| **상태 관리** | sessionStore, communityStore | uiStore (통합) |
+| **중재 방식** | 6턴 chat | 배심원 9인 병렬 분석 |
+| **API 엔드포인트** | `/api/sessions/*` | `/api/posts/**` (community) |
+| **결과 페이지** | `/session/result/[id]` | 게시글 상세에 통합 |
+| **온보딩** | 10문항 + 선택 | 제거됨 |
+
+---
+
+**마지막 업데이트**: 2026-06-03

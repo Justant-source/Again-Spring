@@ -8,11 +8,7 @@
 
 - [structure.md](./structure.md) — `com.againspring.*` 패키지 구조 + 각 패키지 책임
 - [architecture.md](./architecture.md) — 레이어 흐름, JPA, Flyway, 커뮤니티 서비스, 도메인 이벤트
-- [policies/](./policies/) — BE 구현 정책
-  - [auth-jwt.md](./policies/auth-jwt.md) — JWT 토큰 생성/검증
-  - [oauth-google.md](./policies/oauth-google.md) — Google OAuth2 콜백
-  - [keyword-guard.md](./policies/keyword-guard.md) — 금지어 검사 (4 레벨)
-  - [prompt-sanitizer.md](./policies/prompt-sanitizer.md) — 입력 정제 & injection 차단
+- [llm-bridge.md](./llm-bridge.md) — LLM 브릿지 구조, RemoteLlmProvider, PromptSanitizer
 - [testing.md](./testing.md) — 테스트 전략, 커버리지 정책, `./gradlew test`
 - [openapi.md](./openapi.md) — Swagger UI, DTO 컨벤션, API 문서화
 

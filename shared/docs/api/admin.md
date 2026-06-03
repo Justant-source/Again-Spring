@@ -124,39 +124,6 @@ flowchart LR
 > 프롬프트 파일 변경 후 재배포 없이 즉시 적용하려면 이 API 호출.
 > `shared/docs/prompts/` 경로의 `.md` 파일을 모두 재로드.
 
-## Test API — 테스트 데이터 조작
-
-**Base path:** `/api/admin/test` — 인증: JWT
-**활성 조건:** `@Profile("dev")` — dev 프로파일 전용 (prod 미존재)
-
-| Method | Path | 설명 | 응답 |
-|---|---|---|---|
-| `POST` | `/reset` | 테스트 사용자 데이터 전체 삭제 | `Map<String, Integer>` (삭제 건수) |
-| `POST` | `/sessions/{sessionId}/terminate` | 특정 세션 강제 종료 | — (200) |
-
-## Debug API — 세션 Phase D 컨텍스트
-
-**Base path:** `/api/admin/sessions` — 인증: JWT + ADMIN + `@PreAuthorize("hasRole('ADMIN')")`
-**활성 조건:** `app.admin.enabled=true`
-
-| Method | Path | 설명 | 응답 |
-|---|---|---|---|
-| `GET` | `/{id}/context` | Phase D 컨텍스트 전체 덤프 | `Map<String, Object>` |
-
-```json
-// GET /{id}/context 응답
-{
-  "sessionId": "ses_xxxxx",
-  "status": "CHATTING_DUO",
-  "issueContext": { ... },
-  "userStateHistory": [ ... ],
-  "questionQueueA": [ ... ],
-  "questionQueueB": [ ... ],
-  "horsemenHistory": [ ... ],
-  "currentFocus": "..."
-}
-```
-
 ## Social Publishing API — X·Instagram 자동 포스팅 (dev 전용)
 
 **Base path:** `/api/admin/marketing/social` — 인증: JWT + ADMIN  
@@ -222,5 +189,5 @@ flowchart LR
 ## 변경 시 절차
 
 - 신규 admin 엔드포인트 추가: 이 문서 + `shared/docs/admin-dashboard.md` 동시 갱신
-- Duo 모드 테스터 지정: `PATCH /api/admin/users/{id}/roles { "roles": ["USER", "TESTER"] }`
+- TESTER role 지정: `PATCH /api/admin/users/{id}/roles { "roles": ["USER", "TESTER"] }`
 - 역할 체계 변경: `shared/docs/policies/user-permissions.md` 권위본 + `AdminRoleAssigner.java`

@@ -28,7 +28,7 @@ cd backend
 | JUnit 5 | 단위/통합 테스트 |
 | Mockito | mock |
 | AssertJ | fluent assertion |
-| Testcontainers 1.19.7 | 실 DB 통합 테스트 (선택) |
+| Testcontainers 1.20.4 | 실 DB 통합 테스트 (선택) |
 | Spring Boot Test | `@SpringBootTest`, `@WebMvcTest`, `@DataJpaTest` |
 | MockMvc | Controller 테스트 |
 
@@ -43,15 +43,15 @@ flowchart TD
         S4["PromptSanitizer\nInjection 패턴 + 길이 제한"]
     end
     subgraph LLM["LLM Bridge — 90%"]
-        L1["ClaudeCodeBridge\n타임아웃·취소·fallback"]
-        L2["CancelableChatService\n<500ms + destroyForcibly"]
+        L1["RemoteLlmProvider\n타임아웃·에러 처리"]
+        L2["PromptSanitizer\nInjection 방지"]
     end
     subgraph SVC["Service — 80%"]
-        V1["ChatService\nChatTurnMetaParser"]
-        V2["Phase D 컴포넌트\nIssueContextMerger\nQuestionPrioritizer"]
+        V1["JuryService\nPostComposeService"]
+        V2["CommunityPostService\nCommunityCommentService"]
     end
     subgraph CTRL["Controller — 70%"]
-        C1["SessionController\nMessageController"]
+        C1["CommunityPostController\nCommunityCommentController"]
         C2["UserController\nAuthController"]
     end
     subgraph INT["통합 (SpringBootTest) — 80%"]
@@ -90,9 +90,9 @@ class StyleCalculatorTest {
 Controller만 띄우고 Service mock. MockMvc로 HTTP 검증.
 
 ```java
-@WebMvcTest(SessionController.class)
-class SessionControllerTest {
-    @MockBean SessionService sessionService;
+@WebMvcTest(CommunityPostController.class)
+class CommunityPostControllerTest {
+    @MockBean CommunityPostService communityPostService;
     @Autowired MockMvc mockMvc;
 }
 ```
@@ -131,7 +131,7 @@ CI에서는 환경변수 없으면 자동 skip.
 - `safety/KeywordGuard` — 모든 단어 카테고리 + 응답 후처리
 - `safety/CrisisDetector` — Level 1 4 카테고리 + Level 2
 - `safety/RatioEnforcer` — factual/difference/mixed 클리핑 + 엣지 케이스
-- `llm/bridge/PromptSanitizer` — INJECTION_PATTERNS 전부 + 길이 제한
+- `llm/PromptSanitizer` — INJECTION_PATTERNS 전부 + 길이 제한
 - `security/JwtService` — 토큰 발급/검증/폐기 확인
 - `security/JwtAuthFilter` — 인증 헤더 누락/유효/만료/폐기 시나리오
 

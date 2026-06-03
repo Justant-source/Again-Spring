@@ -32,7 +32,7 @@
 | `Phone` | 전화 수화기 | 핫라인 번호 옆 |
 | `CrisisResources` | 위기 자원 진입 | 위기 메뉴 |
 | `IconCheck` | 완료·성공 체크 | 성공 메시지 |
-| `StatusDot` | 거리 수준 컬러 점 | NeedsMap 거리 표시 (level 1–5) |
+| `StatusDot` | 상태 컬러 점 | 배심원 분석 상태 표시 (pending/done/error) |
 
 ### 커뮤니케이션 스타일 — `components/shared/Motif.tsx`
 

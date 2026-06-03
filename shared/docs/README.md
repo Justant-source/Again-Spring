@@ -21,13 +21,12 @@
 - [architecture.md](./architecture.md) — 시스템 전체 아키텍처 (브라우저↔Tunnel↔Nginx↔FE↔BE↔DB↔LLM, 커뮤니티 광장 기준)
 
 ### 운영
-- [admin-dashboard.md](./admin-dashboard.md) — 관리자 대시보드 기능·운영 가이드 (KPI·의견함·사용자·위기 모니터링)
 
 ### [policies/](./policies/)
 서비스의 행동 규칙. 코드 변경 전에 읽어야 함.
 
 - [policies/README.md](./policies/README.md) — 정책 문서 인덱스
-- 주요: [psychology-model.md](./policies/psychology-model.md), [forbidden-words.md](./policies/forbidden-words.md), [crisis-detection.md](./policies/crisis-detection.md)
+- 주요: [psychology-model.md](./policies/psychology-model.md), [forbidden-words.md](./policies/forbidden-words.md)
 
 ### [api/](./api/)
 FE↔BE 간의 계약 (커뮤니티 광장 기준). 변경 시 양쪽 모두 영향.
@@ -35,18 +34,14 @@ FE↔BE 간의 계약 (커뮤니티 광장 기준). 변경 시 양쪽 모두 영
 - [api/README.md](./api/README.md) — API 문서 인덱스 (도메인별 파일 링크)
 - [api/rest-spec.md](./api/rest-spec.md) — 공통 규약·에러코드·전체 엔드포인트 마스터 표
 - [api/auth.md](./api/auth.md) — 인증 API (AuthController + OAuth2Controller)
-- [api/community.md](./api/community.md) — 커뮤니티 광장 API (PostController, JuryController, VoteController)
-- [api/report.md](./api/report.md) — 리포트 API (선택사항, 향후)
-- [api/user.md](./api/user.md) — 사용자 API
+- [api/user.md](./api/user.md) — 사용자 API (프로필·비밀번호·탈퇴)
 - [api/feedback.md](./api/feedback.md) — 피드백 API
-- [api/admin.md](./api/admin.md) — 관리자 API (대시보드, 모니터링)
-- [api/database-schema.md](./api/database-schema.md) — MariaDB 11 스키마 (Flyway V57+, V56 DROP 기록)
+- [api/admin.md](./api/admin.md) — 관리자 API (대시보드, 모니터링, 마케팅)
+- [api/database-schema.md](./api/database-schema.md) — MariaDB 11 스키마 (Flyway V1~V56)
 
 ### [prompts/](./prompts/)
-LLM 프롬프트 레이어 구조 (시스템 / 커뮤니티 배심원).
+LLM 배심원 프롬프트 (커뮤니티 광장).
 
-- [prompts/README.md](./prompts/README.md) — 프롬프트 아키텍처 개요
-- [prompts/system.md](./prompts/system.md) — 모든 AI 출력 기본 (안내·제약)
 - [prompts/community/](./prompts/community/) — **배심원 페르소나** (jury_persona.md), **중립화** (neutralize.md)
 
 ## 다른 docs와의 관계
@@ -55,8 +50,8 @@ LLM 프롬프트 레이어 구조 (시스템 / 커뮤니티 배심원).
 |---|---|
 | **`shared/docs/`** (여기) | FE+BE 공통 (정책 · API · 프롬프트 · 아키텍처) — **유일한 공유 문서 위치** |
 | `env/docs/` | 환경 · 도커 · Cloudflare · 배포 · env vars · 로컬 실행 |
-| `backend/docs/` | BE 내부 (패키지, JPA, 보안 컴포넌트, 테스트) |
-| `frontend/docs/` | FE 내부 (App Router, Zustand, MSW, 디자인 핸드오프) |
+| `backend/docs/` | BE 내부 (패키지, JPA, LLM 브릿지, 보안 컴포넌트, 테스트) |
+| `frontend/docs/` | FE 내부 (App Router, Zustand, MSW, UX 원칙, 디자인 핸드오프) |
 
 ## Source of truth
 
@@ -64,6 +59,6 @@ LLM 프롬프트 레이어 구조 (시스템 / 커뮤니티 배심원).
 
 - API 실제: `backend/src/main/java/com/againspring/api/*Controller.java`
 - DB 실제: `backend/src/main/resources/db/migration/V*.sql`
-- LLM 실제: `backend/src/main/java/com/againspring/llm/bridge/ClaudeCodeBridge.java`
-- 프롬프트 실제: `shared/docs/prompts/**.md` (런타임 로딩 자산, 문서 아님)
+- LLM 실제: `backend/src/main/java/com/againspring/llm/remote/RemoteLlmProvider.java` (HTTP → `againspring-llm-{dev,prod}:8090/v1/invoke`)
+- 프롬프트 실제: `shared/docs/prompts/community/**.md` (BE 런타임 로딩 자산)
 - 금지어 실제: `frontend/lib/constants/forbiddenWords.ts`, `backend/.../safety/KeywordGuard.java`

@@ -39,15 +39,16 @@ flowchart TD
 | 온보딩 필수 | X | O | X |
 | 비밀번호 변경 | X | O | O |
 
-### sessions
+### community
 
 | 항목 | guest | registered | admin |
 |---|---|---|---|
-| 일일 한도 | 3 (IP) | 5 (user) | 5 (user) |
-| 메시지 턴 제한 | 3 | null (무제한) | null (무제한) |
-| Duo 모드 허용 | X | O | O |
+| 피드 열람 | O | O | O |
+| 사연 게시 | X | O | O |
+| 투표 | X | O | O |
+| 댓글 작성 | X | O | O |
 | 파트너 초대 | X | O | O |
-| 이전 세션 재개 | O | O | O |
+| 신고 | X | O | O |
 
 ### profile
 

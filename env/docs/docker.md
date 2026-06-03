@@ -44,7 +44,7 @@ llm-dev bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.cla
 `SPRING_PROFILES_ACTIVE=dev` 활성화 → Flyway disabled, ddl-auto=update, Swagger UI on.
 
 **dev 전용 추가 서비스:**
-- `marketing-renderer-dev` (포트 9000 내부): Node.js + Playwright + Sharp. 마케팅 콘텐츠용 PNG 렌더링. `/render`, `/render-chat`, `/render-quote`, `/render-card-news` 엔드포인트.
+- `marketing-renderer-dev` (포트 9000 내부): Node.js + Playwright + Sharp. 마케팅 콘텐츠용 PNG 렌더링. 엔드포인트: `/render`, `/render-chat`, `/render-quote`, `/render-card-news`, `/render-report-summary`, `/render-metaphor-card`.
 - `social-poster-dev` (포트 9100 내부): Node.js + Playwright. X·Instagram 자동 포스팅. `src/` 디렉토리가 호스트에서 bind mount되어 nodemon으로 핫리로드. 셀렉터 파일 수정 → `docker compose restart`만으로 반영.
 
 ### 3. prod (`docker-compose.prod.yml`)

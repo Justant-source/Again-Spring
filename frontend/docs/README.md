@@ -17,7 +17,7 @@
 
 2. **[architecture.md](./architecture.md)** — 기술 스택 및 데이터 흐름
    - Next.js 14, React 18, TypeScript, Tailwind, Zustand, axios, MSW
-   - 페이지 흐름 (신규 사용자 → Solo 모드)
+   - 페이지 흐름 (신규 사용자 → 커뮤니티 광장 진입)
    - 인증 흐름, 환경 변수, 디자인 시스템
 
 ### UX & 디자인 (V14에서 재구성)
@@ -40,7 +40,7 @@
 5. **[policies/](./policies/)** — FE 정책 강제 방법
    - [forbidden-words-lint.md](./policies/forbidden-words-lint.md) — `npm run lint:words` 사용법, Level 1/2/3 금지어
    - [README.md](./policies/README.md) — 정책 문서 인덱스
-   - 위기 감지 모달 구현: [`shared/docs/policies/crisis-detection.md`](../../shared/docs/policies/crisis-detection.md) "FE 구현 가이드" 절
+   - 위기 처리 흐름: [`ux/flows/08-crisis.md`](./ux/flows/08-crisis.md)
 
 ### 테스트 및 품질
 
@@ -59,13 +59,16 @@
 npm install
 npm run dev           # localhost:3000 (MSW 자동 활성)
 npm run lint:words    # 금지어 검사
+npm run lint:emoji    # 이모지 금지 검사
+npm run test          # Vitest 유닛 테스트
 ```
 
-### 디자인 기반 구현
+### 신규 컴포넌트 작성 시
 
-1. 신규 화면 → **[ux/collaboration.md](./ux/collaboration.md)** 시나리오 A 흐름 따름
-2. 톤(L/P/Q) 선택 → **[design/system.md](./design/system.md)**
-3. 컴포넌트 HAX 체크 → **[ux/hax-checklist.md](./ux/hax-checklist.md)**
+1. 실제 경로 확인 → **[structure.md](./structure.md)**
+2. UX 원칙 적용 → **[ux/principles.md](./ux/principles.md)**
+3. HAX 체크리스트 → **[ux/hax-checklist.md](./ux/hax-checklist.md)**
+4. 금지어 검사 → **[policies/forbidden-words-lint.md](./policies/forbidden-words-lint.md)**
 
 ### 금지어 검사
 
@@ -77,9 +80,12 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 
 ### 위기 감지
 
-입력 필드에서 "때리", "자살" 등 감지 시 → `CrisisResourceModal` 자동 표시
+광장형에서는 사용자 입력에 필터를 적용하지 않습니다. 위기 키워드가 포함된 경우:
+- **관리자 위기 마크** (admin crisis flag) 설정 가능
+- **상시 핫라인 리소스** 노출 (CrisisResourceModal)
+- 입력 차단이나 세션 중단 없음
 
-정책 상세: **[shared/docs/policies/crisis-detection.md](../../shared/docs/policies/crisis-detection.md)**
+정책 상세: **[shared/docs/policies/forbidden-words.md](../../shared/docs/policies/forbidden-words.md)**
 
 ---
 
@@ -93,15 +99,19 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 
 절대 섞지 마세요. 자세한 색상·타이포: **[design/system.md](./design/system.md)**
 
-### 2. 금지어 정책
+### 2. 금지어 정책 (AI 출력에만 적용)
 
-- **Level 1** (법률): "과실비율" → "화해 기여도", "판결" → "결과"
+- **Level 1** (법률): "과실비율" → "공감 비율", "판결" → "결과", "처방" 금지
 - **Level 2** (진단명): "나르시시스트" → 구체적 행동 기술
-- **Level 3** (판결): "이겼다/졌다" 금지
+- **Level 3** (판결): "이겼다/졌다/맞다/틀렸다" 금지
+- **사용자 입력**: 필터 미적용 (사용자 책임)
 
-### 3. 위기 감지
+### 3. 광장형 모델의 위기 처리
 
-게시글/댓글 작성 시 위기 키워드는 사용자에게 자동으로 감지되지 않습니다. 커뮤니티 플랫폼이므로 사용자 책임입니다. 관리자는 기술적으로 위기 마크 기능으로 제한합니다.
+- 입력 필드의 자동 필터링 없음
+- 관리자가 게시글에 `crisis flag` 설정 가능
+- CrisisResourceModal은 상시 노출 (필요 시 강조)
+- 사용자가 쓴 텍스트의 책임은 사용자에게
 
 ### 4. 대기관 정책
 
@@ -223,8 +233,7 @@ frontend/
 ../../shared/docs/
 ├── policies/
 │   ├── forbidden-words.md          # 금지어 정의 (권위본)
-│   ├── crisis-detection.md         # 위기 감지 정책 (권위본) + FE 구현 가이드
-│   ├── onboarding.md               # 온보딩 Q&A → 스타일 매핑
+│   ├── categories.md               # 갈등 카테고리 (권위본 — 아래와 중복 제거)
 │   ├── categories.md               # 갈등 카테고리 (권위본)
 │   └── ratio-calculation.md        # 화해 기여도 계산
 ├── api/

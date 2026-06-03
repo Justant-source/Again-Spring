@@ -9,13 +9,13 @@
 | 빌드 | Gradle 8.5 (Kotlin DSL) |
 | DB | MariaDB 11 LTS (utf8mb4, UTC) |
 | ORM | Spring Data JPA (Hibernate) |
-| 마이그레이션 | Flyway 10 (V1~V42) |
+| 마이그레이션 | Flyway 10 (V1~V56) |
 | 인증 | Spring Security + JWT (jjwt 0.12.5) |
 | 메일 | Spring Mail (Gmail SMTP) |
 | API 문서 | springdoc-openapi 2.6 (Swagger UI) |
 | Rate Limit | bucket4j 7.6 |
 | 직렬화 | Jackson 2.17, SnakeYAML 2.0 |
-| 테스트 | JUnit 5, Mockito, Testcontainers, H2 |
+| 테스트 | JUnit 5, Mockito, Testcontainers 1.20.4, H2 |
 | LLM | 모든 호출: `againspring-llm` 워커 (Claude Code CLI remote) |
 | LLM HTTP | RestClient → `againspring-llm` 워커 `/v1/invoke` endpoint |
 
@@ -26,65 +26,47 @@ flowchart TB
     Client[Browser/Client]
     subgraph SpringBoot["Spring Boot 3.3"]
         Filter[JwtAuthFilter\nRateLimitFilter]
-        Controller[REST 컨트롤러 15개\napi/ + api/admin/]
-        Service[Service Layer\nservice/ + service/admin/]
-        Context[Phase D 컨텍스트\nservice/context/ + service/prompt/]
-        Domain[JPA Entity\ndomain/]
+        Controller["REST 컨트롤러\napi/community/* + api/admin/* + marketing"]
+        Service["Service Layer\nservice/community/* + service/marketing/*"]
+        Domain["JPA Entity\ndomain/community/* + notification + marketing"]
         Repo[JpaRepository\nrepository/]
-        LLMRouter["LlmProviderConfig\nTask 라우팅"]
-        ChatProvider["ChatLLM Provider<br/>(dev: Remote<br/>prod: ClaudeApi)"]
-        ReportProvider["ReportLLM Provider<br/>(all: Remote)"]
-        Safety[PromptSanitizer\nKeywordGuard\nCrisisDetector\nsafety/]
-        Sched[RetentionScheduler\nDailyStatsAggregator\nGuestSessionCleanupScheduler]
-        Notify[FeedbackEmailNotifier\nCrisisFeedbackNotifier\nservice/notify/]
+        LLM["RemoteLlmProvider\nllm/remote/"]
+        Safety["PromptSanitizer\nKeywordGuard\nCrisisDetector\nsafety/"]
+        Sched["RetentionScheduler\nservice/retention/"]
+        Notify["service/notify/\nservice/notification/"]
     end
-    DB[(MariaDB 11\n+ llm_call_logs)]
-    LLMWorker[againspring-llm\n워커 컨테이너]
-    AnthropicAPI["Anthropic API<br/>(prod)"]
+    DB[(MariaDB 11\nFlyway V1~V56)]
+    LLMWorker["againspring-llm-dev/prod\n워커 컨테이너\nClaude CLI"]
 
     Client --> Filter --> Controller --> Service
-    Service --> Context
     Service --> Repo --> Domain --> DB
-    Service --> Safety --> LLMRouter
-    LLMRouter --> ChatProvider
-    LLMRouter --> ReportProvider
-    ChatProvider -->|dev: HTTP /v1/invocations| LLMWorker
-    ChatProvider -->|prod: REST| AnthropicAPI
-    ReportProvider -->|HTTP /v1/invoke| LLMWorker
+    Service --> Safety
+    Safety --> LLM
+    LLM -->|HTTP POST /v1/invoke| LLMWorker
     Service --> Notify
     Sched -.->|cron 03:00 UTC| Repo
 ```
-
-### 구성 요소:
 
 ```
 HTTP Request
    │
    ▼  Spring Security (JwtAuthFilter, RateLimitFilter)
-@RestController (api/*Controller)
+@RestController (api/community/*, api/admin/*, marketing/*)
    │
    │  request DTO 검증 (Bean Validation)
    ▼
-@Service (service/*)
+@Service (service/community/*, service/marketing/*)
    │
    │  비즈니스 로직 + @Transactional 경계
-   │  ├── safety/* (KeywordGuard, CrisisDetector)
-   │  ├── llm/* (LlmProviderConfig 라우팅)
-   │  │   ├── claudeapi/* (Anthropic API, prod 대화)
-   │  │   └── remote/* (CLI 워커, 모든 리포트 + dev 대화)
-   │  └── parser/* (LLM 응답 → 도메인 객체)
+   │  ├── safety/* (KeywordGuard, PromptSanitizer, CrisisDetector)
+   │  └── llm/remote/* (RemoteLlmProvider → llm-worker HTTP)
    │
    │  자세한 설명: llm-bridge.md 참조
    ▼
 @Repository (Spring Data JPA)
    │
    ▼
-MariaDB (Flyway 관리 스키마)
-
-   ◄── domain Event 발행 ──◄
-       TurnCompletedEvent
-       SafetyTriggerEvent → SafetyAuditLogger
-       CrisisDetectedEvent → SessionService (TERMINATED 전이)
+MariaDB (Flyway V1~V56 관리 스키마)
 ```
 
 ## 트랜잭션 정책
@@ -95,13 +77,13 @@ MariaDB (Flyway 관리 스키마)
 - 패턴:
   ```java
   @Transactional
-  public Turn saveUserInput(...) { /* DB 저장 */ }
+  public Post savePost(...) { /* DB 저장 */ }
   
-  // 트랜잭션 밖에서 LLM 호출
-  LLMResponse response = llmProvider.invoke(request);
+  // 트랜잭션 밖에서 LLM 호출 (RemoteLlmProvider)
+  LLMResponse response = remoteLlmProvider.invoke(request);
   
   @Transactional
-  public Turn saveMediatorResponse(...) { /* 결과 저장 */ }
+  public Juror saveJuryOpinion(...) { /* 결과 저장 */ }
   ```
 
 ## 커뮤니티 광장 흐름
@@ -170,10 +152,10 @@ flowchart LR
 | `springdoc.swagger-ui.enabled` | `true` | `false` | (N/A) |
 | `management.endpoints.web.exposure.include` | `health,info,metrics` | `health` only | (N/A) |
 | `logging.level.com.againspring` | `DEBUG` | `WARN` | `DEBUG` |
-| `llm.chat.provider` | `remote` (CLI) | `claude-api` (Anthropic) | `mock` |
-| `llm.report.provider` | `remote` (CLI) | `remote` (CLI) | `mock` |
+| `llm.jury.provider` | `remote` (CLI) | `remote` (CLI) | `mock` |
+| `llm.compose.provider` | `remote` (CLI) | `remote` (CLI) | `mock` |
+| `llm.remote.base-url` | `http://againspring-llm-dev:8090` | `http://againspring-llm-prod:8090` | (N/A) |
 | DB | MariaDB 3306 (host) / 컨테이너 | MariaDB internal | H2 in-memory (MariaDB mode) |
-| Anthropic API Key | (N/A) | `${ANTHROPIC_API_KEY}` | (N/A) |
 
 ## DTO 컨벤션
 
@@ -189,57 +171,10 @@ flowchart LR
 | `JwtAuthFilter` | 모든 요청에서 토큰 검증 + 폐기 확인 | [policies/auth-jwt.md](./policies/auth-jwt.md) |
 | `RateLimitFilter` | bucket4j 기반 IP/유저별 제한 | `shared/docs/policies/auth.md` |
 | `KeywordGuard` | 금지어 검사 (입력+응답 양방향) | [policies/keyword-guard.md](./policies/keyword-guard.md) |
-| `CrisisDetector` | 위기 키워드 → 세션 강제 종료 | `shared/docs/policies/crisis-detection.md` |
-| `PromptSanitizer` | LLM 입력 inject 방지 | [policies/prompt-sanitizer.md](./policies/prompt-sanitizer.md) |
-| `RatioEnforcer` | 화해 기여도 클리핑 강제 | `shared/docs/policies/ratio-calculation.md` |
+| `CrisisDetector` | 위기 키워드 감지 → 관리자 알림 | `shared/docs/policies/forbidden-words.md` |
+| `PromptSanitizer` | LLM 입력 inject 방지 | `backend/docs/llm-bridge.md` |
+| `RatioEnforcer` | 공감 비율 범위 강제 (0~100%) | `shared/docs/policies/forbidden-words.md` |
 | `SafetyAuditLogger` | 모든 safety 이벤트 마스킹 후 DB | — |
-
-## Phase D 컨텍스트 추적
-
-권위본: [`shared/docs/policies/context-algorithm.md`](../../shared/docs/policies/context-algorithm.md)
-
-세션별로 사용자의 심리 상태를 추적하고 질문 큐를 관리해 매 턴 컨텍스트를 풍부하게 한다.
-
-```mermaid
-flowchart LR
-    MSG["사용자 메시지"] --> PARSER["ChatTurnMetaParser\n<turn_meta> JSON 파싱"]
-    PARSER --> US["UserStateAppender\nPhase D user_state"]
-    PARSER --> IC["IssueContextMerger\nPhase D issue_delta"]
-    PARSER --> QQ["QuestionQueueUpdater\nPhase D queue_delta"]
-    IC --> CRE["CategoryRuleEnforcer\nin_law/lingered/face/generation 검증"]
-    IC --> RET["RatioElementTagger\nfacts→RatioElement 매핑"]
-    QQ --> PRI["QuestionPrioritizer\npriority 재계산 (매 턴)"]
-    QQ --> EVT["evict: 큐 크기 5 제한\nageInTurns ≥ 8 + priority < 0.2 → 제거"]
-
-    US --> DB[("Sessions\nuser_state_history JSON\nissue_context JSON\nquestion_queue_a JSON\nquestion_queue_b JSON")]
-    IC --> DB
-    QQ --> DB
-
-    DB --> FRAG["Fragment 렌더링\nUserStateFragment\nIssueContextFragment\nQuestionQueueFragment"]
-    FRAG --> NEXT["다음 턴 프롬프트"]
-```
-
-| 컴포넌트 | 역할 |
-|---|---|
-| `UserState` (enum 7종) | `OPENING` → `VENTING` → `DEFENSIVE` → `BLAMING` → `REFLECTING` → `NEGOTIATING` → `RESOLVING` |
-| `IssueContext` (4슬롯) | headline · facts · namedNeeds · threads |
-| `QuestionQueue` (A·B 분리 PQ) | 사용자별 우선순위 질문 큐 — 중재자가 적시에 명확화 질문 삽입 |
-
-세션 컬럼(V10): `user_state_history` JSON, `issue_context` JSON, `question_queue_a` JSON, `question_queue_b` JSON
-
-## 중재 컨텍스트 강화 컴포넌트 (Phase A/B/C)
-
-| 컴포넌트 | 역할 | 위치 |
-|---|---|---|
-| `UserProfileFragment` | User → `<user_profile>` 자연어 블록 (Phase A) | `service/prompt/UserProfileFragment.java` |
-| `PsychologyFeedbackFormatter` | 누적 4 Horsemen·NVC 점수 → `<psychology_feedback>` 자연어 지시 (Phase B) | `service/prompt/PsychologyFeedbackFormatter.java` |
-| `DuoBalanceFormatter` | A·B 발화량/감정 강도 불균형 시 `<duo_balance>` 관심 분배 지시 (Phase C) | `service/prompt/DuoBalanceFormatter.java` |
-| `ChatTurnMetaParser` | LLM 응답 본문/`<turn_meta>` JSON 분리 + 누적 점수 추출 (Phase B) | `service/parser/ChatTurnMetaParser.java` |
-
-세션 누적 데이터:
-- `sessions.horsemen_history` (V8) — 턴별 4 Horsemen 강도 배열
-- `sessions.nvc_completion_history` (V8) — 턴별 NVC 4단계 완성 여부
-- `sessions.user_{a,b}_emotion_intensity` (V9) — A·B 누적 감정 강도 0.00–1.00
 
 ## 예외 처리
 

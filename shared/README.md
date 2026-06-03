@@ -7,8 +7,8 @@
 - **`docs/`** — FE와 BE가 함께 참고하는 정책·API·아키텍처 문서
   - `docs/README.md` 참고: 정책(policies/), API(api/), 프롬프트(prompts/), 구조(structure.md), 아키텍처(architecture.md)
   
-- **`docs/prompts/`** — LLM 중재자 프롬프트 (BE 런타임 로딩)
-  - system.md, gottman/, nvc/, relations/, turns/
+- **`docs/prompts/`** — LLM 배심원 프롬프트 (BE 런타임 로딩)
+  - community/jury_persona.md, community/neutralize.md
 
 - **`types/`** — TypeScript 공유 타입 (Session, User, Report 등)
 

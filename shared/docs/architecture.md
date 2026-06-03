@@ -67,27 +67,27 @@ flowchart TB
                           ▼               ProcessBuilder
                 ┌──────────────────┐       │
                 │ MariaDB 11       │       ▼
-                │ Flyway V1~V24    │    claude CLI
+                │ Flyway V1~V56    │    claude CLI
                 │ :3306 (local)    │    (--strict-mcp-config
                 │ :3309 (dev)      │     --no-session-persistence)
                 │ internal (prod)  │       │
                 └──────────────────┘       ▼
                                    Anthropic Claude API
-                                   (Haiku 4.5 default)
+                                   (Haiku 4.5, 2024-10-01)
 ```
 
 ## 흐름별 설명
 
 ### 1) HTTP 요청 흐름 (커뮤니티 광장)
 
-1. 브라우저 → `https://dev.againspring.net/api/community/posts` 또는 `/jury`
+1. 브라우저 → `https://dev.againspring.net/api/community/posts` 또는 `/comments`
 2. Cloudflare Tunnel → 호스트 `localhost:8090` (dev) / `8091` (prod)
 3. `againspring-nginx-{dev,prod}` (`env/nginx/`):
    - `/api/` 매치 → `http://againspring-backend-{dev,prod}:8080`
    - 타임아웃 60s, `X-Forwarded-*` 헤더 주입
-4. `CommunityPostController.createPost(...)` 또는 `JuryController.generateJury(...)` 진입
+4. `CommunityPostController` / `CommunityCommentController` / `NotificationController` 진입
 5. `PostComposeService` / `JuryService` → `RemoteLlmProvider` (ADR-0003: CLI 단일 경로)
-6. RemoteLlmProvider → `POST http://againspring-llm-{dev,prod}:8090/v1/invocations` → 워커가 Claude Code CLI spawn
+6. RemoteLlmProvider → `POST http://againspring-llm-{dev,prod}:8090/v1/invoke` → 워커가 Claude Code CLI spawn
 7. 응답 직렬화 + `LLMCallLogger`로 DB 저장 후 nginx 통해 브라우저 반환
 
 ### 2) 인증 흐름
@@ -158,11 +158,10 @@ sequenceDiagram
 ```
 
 **프롬프트 구조** (`shared/docs/prompts/community/`):
-- `system.md`: AI 역할 정의 (배심원), 금기사항
 - `jury_persona.md`: 9개 페르소나 정의 (심리상담사, 경계 전문가 등)
 - `neutralize.md`: NVC 중립화 규칙
 
-상세는 [`shared/docs/prompts/README.md`](../shared/docs/prompts/README.md) (프롬프트 아키텍처) 및 [`backend/docs/llm-bridge.md`](../backend/docs/llm-bridge.md) (LLM 워커) 참조.
+상세는 [`backend/docs/llm-bridge.md`](../backend/docs/llm-bridge.md) (LLM 워커) 참조.
 
 ### 5) 데이터 보존
 
@@ -188,7 +187,7 @@ sequenceDiagram
 
 | 요구사항 | 구현 위치 |
 |---|---|
-| 입력 보안 | `safety/KeywordGuard`, `llm/bridge/PromptSanitizer` |
+| 입력 보안 | `safety/KeywordGuard`, `llm/PromptSanitizer` |
 | 위기 대응 | `safety/CrisisDetector` → `CrisisDetectedEvent` |
 | 비율 균형 | `safety/RatioEnforcer` |
 | Rate limiting | `security/RateLimitFilter` (bucket4j) |

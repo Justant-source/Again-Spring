@@ -48,24 +48,36 @@ springdoc:
 
 ## 컨트롤러 어노테이션 현황
 
-| 컨트롤러 | `@Tag` | `@Operation` | `@SecurityRequirement` |
-|---|---|---|---|
-| AuthController | Auth | 9개 | JWT 필요 메서드만 |
-| OAuth2Controller | Auth | 1개 | — (공개) |
-| HealthController | Health | 1개 | — (공개) |
-| SessionController | Session | 6개 | bearer-jwt |
-| MessageController | Chat | 11개 | bearer-jwt |
-| ReportController | Report | 3개 | bearer-jwt |
-| UserController | User | 7개 | bearer-jwt |
-| FeedbackController | Feedback | 1개 | — (공개) |
-| AdminDashboardController | Admin — Dashboard | 5개 | bearer-jwt |
-| AdminUserController | Admin — Users | 5개 | bearer-jwt |
-| AdminHealthController | Admin — Health | 1개 | bearer-jwt |
-| AdminFeedbackController | Admin — Feedbacks | 2개 | bearer-jwt |
-| AdminPromptsController | Admin — Prompts | 1개 | bearer-jwt |
-| AdminTestController | Admin — Test | 2개 | bearer-jwt |
-| SessionContextDebugController | Admin — Debug | 1개 | bearer-jwt |
-| **합계** | **15/15** | **57개** | — |
+| 컨트롤러 | `@Tag` | `@SecurityRequirement` |
+|---|---|---|
+| AuthController | Auth | JWT 필요 메서드만 |
+| OAuth2Controller | Auth | — (공개) |
+| HealthController | Health | — (공개) |
+| CommunityPostController | Community — Posts | bearer-jwt |
+| CommunityCommentController | Community — Comments | bearer-jwt |
+| PostInviteController | Community — Invites | bearer-jwt |
+| NotificationController | Notifications | bearer-jwt |
+| UserController | User | bearer-jwt |
+| FeedbackController | Feedback | — (공개) |
+| AdminDashboardController | Admin — Dashboard | bearer-jwt |
+| AdminUserController | Admin — Users | bearer-jwt |
+| AdminHealthController | Admin — Health | bearer-jwt |
+| AdminCommunityController | Admin — Community | bearer-jwt |
+| AdminFeedbackController | Admin — Feedbacks | bearer-jwt |
+| AdminPromptsController | Admin — Prompts | bearer-jwt |
+| CalendarController | Marketing — Calendar | bearer-jwt |
+| ContentController | Marketing — Content | bearer-jwt |
+| CostController | Marketing — Cost | bearer-jwt |
+| DashboardController | Marketing — Dashboard | bearer-jwt |
+| HashtagController | Marketing — Hashtags | bearer-jwt |
+| MarketingImageController | Marketing — Images | bearer-jwt |
+| MarketingModuleController | Marketing — Modules | bearer-jwt |
+| RepurposeController | Marketing — Repurpose | bearer-jwt |
+| SimulationController | Marketing — Simulation | bearer-jwt |
+| SocialPublishController | Marketing — Social | bearer-jwt |
+| StoryController | Marketing — Stories | bearer-jwt |
+| TemplateController | Marketing — Templates | bearer-jwt |
+| **합계** | **27개** | — |
 
 ## DTO 어노테이션 컨벤션
 

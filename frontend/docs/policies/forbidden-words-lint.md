@@ -42,6 +42,10 @@ frontend/
 - `public/`
 - `.next/` 빌드 결과
 - `design/` (비코드 자산)
+- `tests/` (테스트 시나리오, 필요시만 검사)
+
+**적용 범위**: AI 생성 텍스트 (배심원 의견, 요약, 제목) 중심  
+**미적용**: 사용자 입력 (게시글, 댓글) — 사용자 책임
 
 ---
 
@@ -93,7 +97,7 @@ frontend/
 아동학대: "아이를 때", "아동학대"
 ```
 
-감지 시 → `CrisisResourceModal` 즉시 표시. 자세한 내용: `shared/docs/policies/crisis-detection.md` "FE 구현 가이드" 절
+감지 시 → `CrisisResourceModal` 즉시 표시. 위기 처리 흐름: `frontend/docs/ux/flows/08-crisis.md`
 
 ---
 

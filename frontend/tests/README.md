@@ -50,9 +50,7 @@ npm run test:e2e:realbe
 | Spec | 보호 대상 | 권위본 |
 |---|---|---|
 | `crisis-modal-dismiss` | CrisisModal은 ESC·backdrop으로 닫히지 않는다 | `frontend/docs/ux/principles.md`, `08-crisis.md` |
-| `crisis-dual-defense` | FE + BE 이중 차단 (409 메시지 미저장) | `shared/docs/policies/crisis-detection.md` |
-| `duo-message-isolation` | 상대 메시지 원문이 DOM·API에 절대 노출 안 됨 | `frontend/docs/ux/principles.md`, `06-duo.md` |
-| `contribution-ratio-legal-notice` | 법적 안내 박스가 항상 표시·미은닉 | `frontend/README.md` 절대 불변 규칙 |
+| `crisis-modal-no-dismiss` | CrisisResourceModal은 ESC·backdrop으로 닫히지 않는다 | `frontend/docs/ux/flows/08-crisis.md` |
 
 ## Coverage Targets (Vitest)
 

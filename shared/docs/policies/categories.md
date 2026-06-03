@@ -1,6 +1,6 @@
 # 갈등 카테고리
 
-세션 생성 시 사용자가 선택하는 대/중/소 분류. LLM 프롬프트 컨텍스트로 주입되어 카테고리 특화 질문 생성.
+게시글 작성 시 사용자가 선택하는 대/중/소 분류. LLM 배심원 프롬프트 컨텍스트로 주입되어 카테고리 특화 배심원 의견 생성.
 
 ## Source of truth
 
@@ -132,4 +132,4 @@ Gottman 모델로 잡히지 않는 한국 관계 패턴. 학술 근거는 [psych
 1. `frontend/lib/constants/categories.ts` 갱신
 2. 신규 `relationType` 추가 시 `backend/.../domain/enums/RelationType.java`도 추가
 3. 본 문서 갱신
-4. 관련 프롬프트 (`shared/prompts/relations/*.md`)에 카테고리 인지 안내 보강 검토
+4. 관련 프롬프트 (`shared/docs/prompts/community/jury_persona.md`)에 카테고리 인지 안내 보강 검토

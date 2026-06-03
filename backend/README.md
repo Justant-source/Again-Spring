@@ -1,44 +1,74 @@
-# Backend — 다시봄 AI 중재 서비스
+# 다시봄 — Backend
 
-**Stack**: Java 21, Spring Boot 3.3, Gradle, MariaDB 11, Claude Code CLI
-
-## Quick Start
-
-```bash
-# 1. DB 시작 (호스트에서)
-cd ../infra && docker compose up -d
-
-# 2. 백엔드 실행 (dev 프로파일 자동 적용)
-./gradlew bootRun          # localhost:8080
-
-# 3. 테스트
-./gradlew test
-
-# 4. 확인
-curl http://localhost:8080/api/health
-```
-
-## 전체 문서
-
-자세한 아키텍처, 구조, 정책은 [`docs/README.md`](./docs/README.md) 참조.
-
-## BE 특화 정책
-
-- 구현 정책 (JWT, OAuth, 금지어 검사, 입력 정제): [`docs/policies/`](./docs/policies/)
-- 서비스 전체 정책 (심리학 모델, 온보딩, 위기 감지): `../../shared/docs/policies/`
-
-## 환경 설정
-
-MariaDB 필수. `application.yml`에서 프로파일별 자동 설정:
-
-```bash
-# dev: localhost MariaDB (docker-compose)
-# prod: 환경변수 기반 (DB_URL, JWT_SECRET 등)
-# test: H2 in-memory
-```
-
-자세한 환경 변수: `docs/README.md`
+> Spring Boot 3.3 기반 갈등 커뮤니티 + AI 배심원 플랫폼 백엔드.  
+> 사용자가 사연(갈등 게시글)을 올리면 AI 배심원 9인이 공감 비율을 분석하고, 커뮤니티 투표/댓글로 의견을 모읍니다.
 
 ---
 
-**마지막 업데이트**: 2026-04-26
+## 기술 스택
+
+| 항목 | 버전 |
+|---|---|
+| Java | 21 |
+| Spring Boot | 3.3 |
+| 빌드 | Gradle (Kotlin DSL) |
+| DB | MariaDB 11 LTS + Flyway |
+| ORM | Spring Data JPA |
+| 인증 | Spring Security + JWT + Google OAuth2 |
+| 이메일 | Spring Mail (Gmail SMTP) |
+| 테스트 | JUnit 5 + Testcontainers 1.20.4 |
+
+---
+
+## 빠른 시작 (로컬 개발)
+
+```bash
+# 1. DB 시작
+cd /home/justant/Data/Again-Spring/env && docker compose up -d   # MariaDB localhost:3306
+
+# 2. 백엔드 실행
+cd /home/justant/Data/Again-Spring/backend && ./gradlew bootRun  # localhost:8080
+
+# 3. 헬스 체크
+curl http://localhost:8080/api/health
+```
+
+> 자세한 환경 설정: [`env/docs/local-dev.md`](../env/docs/local-dev.md)
+
+---
+
+## 디렉토리 구조
+
+```
+backend/
+├── src/main/java/com/againspring/
+│   ├── api/                    # 컨트롤러 (community, admin, marketing 등)
+│   ├── domain/                 # 도메인 엔티티 (community, marketing, notification 등)
+│   ├── service/                # 비즈니스 로직
+│   ├── llm/                    # LLM 브릿지 (RemoteLlmProvider, PromptSanitizer)
+│   ├── safety/                 # 위기 감지, 콘텐츠 안전
+│   ├── seed/                   # 시드 데이터
+│   └── config/, security/, repository/, common/
+├── src/main/resources/
+│   └── db/migration/           # Flyway V1~V56
+├── docs/                       # 개발 문서
+└── build.gradle.kts
+```
+
+---
+
+## 문서 진입점
+
+| 영역 | 문서 |
+|---|---|
+| 패키지 구조 | [`docs/structure.md`](docs/structure.md) |
+| 아키텍처·흐름 | [`docs/architecture.md`](docs/architecture.md) |
+| LLM 브릿지 | [`docs/llm-bridge.md`](docs/llm-bridge.md) |
+| OpenAPI·컨트롤러 | [`docs/openapi.md`](docs/openapi.md) |
+| 테스트 정책 | [`docs/testing.md`](docs/testing.md) |
+| API 명세 | [`../shared/docs/api/`](../shared/docs/api/) |
+| 서비스 정책 | [`../shared/docs/policies/`](../shared/docs/policies/) |
+
+---
+
+**마지막 업데이트**: 2026-06-03

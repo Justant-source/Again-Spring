@@ -19,28 +19,24 @@
 
 | 카테고리 | 항목 | 게스트 | 회원 |
 |---|---|---|---|
-| **인증** | JWT 만료 | 2시간 | 24시간 |
+| **인증** | JWT 만료 | 1시간 | 24시간 |
 | | 이메일 인증 | 불필요 | 필수 |
-| | 온보딩 강제 | 아님 | 세션 생성 전 필수 |
-| **세션** | 하루 한도 | **3개 / IP** | 5개 / 사용자 |
-| | 발화(턴) 제한 | **3턴** | 무제한 |
-| | Duo 초대 | ❌ Solo 전용 | ✅ |
-| | 이전 세션 재진입 | ✅ | ✅ |
+| **게시글** | 게시글 작성 | ✅ | ✅ |
+| | 게시글 수정/삭제 | ✅ (본인만) | ✅ (본인만) |
+| | 댓글 작성 | ✅ | ✅ |
+| | 댓글 수정/삭제 | ✅ (본인만) | ✅ (본인만) |
+| | 좋아요 | ✅ | ✅ |
+| | 투표 (배심원) | ✅ | ✅ |
 | **프로필** | 닉네임 편집 | ❌ | ✅ |
 | | 통신 스타일 편집 | ❌ | ✅ |
-| | 온보딩 응답 저장 | ❌ | ✅ |
 | | MBTI 등록 | ❌ | ✅ |
-| | 지난 대화 조회 | ❌ | ✅ |
+| | 프로필 이미지 | ❌ | ✅ |
 | | 계정 삭제 | ✅ (비번 X) | ✅ (OAuth 외 비번 필수) |
-| **데이터** | 메시지 원문 보존 | **7일** | 30일 |
-| | 세션 메타 보존 | 30일 | 180일 |
-| | 리포트 보존 | 30일 | 영구 |
-| **UI** | "지난 대화" 메뉴 | 숨김 | 표시 |
-| | 프로필 편집 영역 | 숨김 | 표시 |
-| | 동의 재확인 모달 | 표시 안 함 | 필수 동의 미수집 시 표시 |
-| | 한도 도달 시 가입 유도 | 표시 | 표시 안 함 |
+| **데이터** | 게시글 원문 보존 | 30일 | 30일 |
+| | 댓글 원문 보존 | 30일 | 30일 |
+| | 배심원 보존 | 60일 | 60일 |
+| **UI** | 프로필 편집 영역 | 숨김 | 표시 |
 | | "게스트 모드" 배지 | 표시 | 표시 안 함 |
-| **중재자** | 성향 결정 | 고정 50/50 | 프로필 기반 (TODO) |
 
 ---
 
@@ -61,10 +57,7 @@
 | 파일 | 사용 필드 |
 |---|---|
 | `security/JwtService.java` | `tiers.guest.auth.tokenExpirationSeconds` |
-| `service/GuestSessionRateLimiter.java` | `tiers.guest.sessions.dailyLimit` |
-| `service/CancelableChatService.java` | `tiers.guest.sessions.messageTurnLimit` |
-| `service/retention/GuestSessionCleanupScheduler.java` | `tiers.guest.data.messageContentRetentionDays` |
-| `service/SessionService.java` | `tiers.guest.sessions.duoModeAllowed`, `tiers.registered.auth.requiresOnboarding` |
+| `service/retention/RetentionScheduler.java` | `tiers.*.data.contentRetentionDays` |
 
 ### Frontend (TypeScript)
 
@@ -74,11 +67,9 @@
 
 | 파일 | 사용 필드 |
 |---|---|
-| `app/(dashboard)/history/page.tsx` | `tiers.guest.profile.canViewHistory` |
 | `app/(dashboard)/profile/page.tsx` | `tiers.guest.ui.showProfileEditing`, `showGuestModeBadge` |
-| `components/legal/ConsentReconfirmModal.tsx` | `tiers.guest.ui.showConsentReconfirmModal` |
-| `components/auth/GuestUpgradeModal.tsx` | `tiers.guest.sessions.messageTurnLimit` |
 | `components/profile/DeleteAccountModal.tsx` | `tiers.guest.profile.deleteRequiresPassword` |
+| `lib/constants/userPermissions.ts` | 전체 권한 매트릭스 (FE 미러) |
 
 ---
 
@@ -94,7 +85,7 @@
 
 JSON 한 줄을 바꾸면 다음을 함께 확인:
 
-- [ ] BE 의존 파일에 영향 없는지 (예: `messageTurnLimit`을 5로 늘리면 `CancelableChatService` 동작 확인)
+- [ ] BE 의존 파일에 영향 없는지 (예: `dailyPostLimit`을 늘리면 `CommunityPostService` 동작 확인)
 - [ ] FE 미러본 `userPermissions.ts` 동일하게 수정
 - [ ] 정책 문서 본 파일(MD)의 표 갱신
 - [ ] Dev에서 게스트/회원 양쪽 시나리오 모두 검증 후 prod 배포

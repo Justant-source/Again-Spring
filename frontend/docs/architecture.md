@@ -4,260 +4,322 @@
 
 | 영역 | 기술 |
 |---|---|
-| 프레임워크 | Next.js 14.2.15 (App Router) |
-| 언어 | TypeScript 5.6 (strict) |
-| 런타임 | React 18.3 |
-| 상태 | Zustand 5.0 + persist 미들웨어 |
-| HTTP | axios 1.7 + Bearer 인터셉터 |
-| 스타일 | Tailwind CSS 3.4 + Radix UI |
-| 폼 | react-hook-form 7.53 + zod 3.23 |
-| 차트 | Recharts 2.13 |
-| 애니메이션 | framer-motion 11.11 |
-| 아이콘 | lucide-react 0.454 |
-| Mock | MSW 2.6 |
+| 프레임워크 | Next.js 14 (App Router) |
+| 언어 | TypeScript 5+ (strict) |
+| 런타임 | React 18+ |
+| 상태 관리 | Zustand + persist |
+| HTTP | axios + Bearer 인터셉터 |
+| 스타일 | Tailwind CSS 3+ |
+| 테스트 | Vitest, Playwright |
+| Mock | MSW 2+ (개발 전용) |
+
+---
 
 ## 데이터 흐름
 
-```mermaid
-flowchart LR
-    User[사용자]
-    subgraph NextApp["Next.js 14 App Router"]
-        Page[page.tsx<br/>RSC]
-        Client[Client Component]
-        Hook[useXxx hooks]
-        Store[Zustand Store]
-        ApiClient[api/client.ts<br/>fetch wrapper]
-        MSW[MSW handlers<br/>dev only]
-    end
-    BE[(Backend REST<br/>:8080)]
+### 광장형 사연 발행 흐름
 
-    User --> Page --> Client --> Hook
-    Hook --> Store
-    Hook --> ApiClient
-    ApiClient -->|prod| BE
-    ApiClient -.dev.-> MSW
+```
+[사용자] → /community/new (작성) → POST /api/posts
+  ↓
+[Backend] → LLM Worker 호출 (Claude Haiku)
+  ↓
+배심원 9명 의견 생성 (각 페르소나별 공감 비율 분석)
+  ↓
+[Frontend] 게시글 상세 페이지 진입
+  ├─ FeedCard: 배심원 의견 미리보기
+  ├─ JurorCard: 각 배심원 상세 의견 (AI 레이블 명시)
+  ├─ VoteBar: 커뮤니티 투표 (도움됨/안 됨)
+  └─ CommentBar: 댓글 무한스크롤
 ```
 
-**광장형 흐름**:
-1. 사용자가 갈등 게시글 작성 → `POST /api/posts`
-2. FeedCard에서 배심원 의견 표시 (LLM 생성)
-3. VoteBar에서 "도움됨/안 됨" 투표
-4. CommentBar에서 댓글 작성 및 무한스크롤
-
-### 텍스트 버전:
+### HTTP 요청 흐름
 
 ```
 [페이지/컴포넌트]
-     │
-     │ ① api.get/post/...
-     ▼
+  ↓
 [lib/api/client.ts] axios instance
-     │ ② request interceptor:
-     │    Authorization: Bearer ${localStorage.again-spring-token}
-     ▼
-[브라우저 fetch]
-     │
-     ├── (개발: MSW worker 활성)
-     │      ↓
-     │   mocks/handlers/* 가 가로채서 응답
-     │
-     └── (프로덕션 또는 MSW miss)
-            ↓
-         BE API (`/api/...`)
-     │
-     ▼
+  ├─ Request Interceptor: Authorization Bearer 헤더 추가
+  └─ Response Interceptor: 401/403/402/429 에러 처리
+  ↓
+[브라우저]
+  ├─ 개발 모드: MSW Worker (mocks/handlers/*)로 가로챔
+  └─ 프로덕션: 실제 Backend (:8080)로 전송
+  ↓
 [응답]
-     │ ③ 페이지/컴포넌트에서 useState 또는 store에 반영
-     ▼
-[Zustand store]
-     │ persist 미들웨어 → localStorage 동기화
+  ↓
+[React State / Zustand Store]
+  ├─ uiStore: 화면 상태 (모달, 필터 등)
+  └─ persist: localStorage 동기화 (단, 민감정보 제외)
 ```
 
-## 핵심 컴포넌트
+---
 
-### `lib/api/client.ts`
+## 상태 관리 (Zustand)
+
+### uiStore
 
 ```typescript
-import axios from 'axios';
-
-export const api = axios.create({
-  baseURL: '',                              // 상대 경로 — nginx가 BE로 라우팅
-  headers: { 'Content-Type': 'application/json' },
-});
-
-api.interceptors.request.use((config) => {
-  const token = typeof window !== 'undefined'
-    ? localStorage.getItem('again-spring-token')
-    : null;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-export interface CreateSessionPayload { ... }
-export interface TurnRequest { ... }
-```
-
-axios 인스턴스를 모든 곳에서 import — 토큰 주입 일관성. SSR에서는 `typeof window` 가드.
-
-### `lib/store/userStore.ts` (Zustand)
-
-```typescript
-interface UserState {
-  user: User | null;
-  setUser: (u: User | null) => void;
-  setStyle: (style: CommunicationStyle) => void;
-  setOnboardingAnswers: (answers: number[]) => void;
-  setOnboardingCompleted: (b: boolean) => void;
-  setMbtiType: (mbti: string | null) => void;
-  clear: () => void;            // 로그아웃 시 — token도 함께 제거
-}
-const useUserStore = create<UserState>()(
-  persist(/* ... */, { name: 'again-spring-user' })
-);
-```
-
-`clear()`는 store + `localStorage.again-spring-token` 둘 다 정리.
-
-### `lib/store/communityStore.ts`
-
-광장 피드 상태 (posts 배열, currentPost, comments, votes 등). 필터/정렬 상태 포함.
-
-### MSW (`mocks/`)
-
-`mocks/browser.ts`:
-```typescript
-import { setupWorker } from 'msw/browser';
-import { handlers } from './handlers';
-export const worker = setupWorker(...handlers);
-```
-
-`components/shared/MSWProvider.tsx`가 클라이언트에서 worker 시작:
-```typescript
-'use client';
-useEffect(() => {
-  if (process.env.NODE_ENV === 'development') {
-    import('@/mocks/browser').then(({ worker }) => {
-      worker.start({ onUnhandledRequest: 'bypass' });
-    });
-  }
-}, []);
-```
-
-`onUnhandledRequest: 'bypass'` — MSW에 핸들러 없는 경로는 실 BE로 통과. → 일부 API만 mock + 일부는 BE 직접 호출 가능.
-
-`public/mockServiceWorker.js`는 MSW가 자동 생성 (`.gitignored`).
-
-### `components/community/c3/FeedCard.tsx`
-
-갈등 게시글 카드. 배심원 의견(AI 생성) + 투표/댓글 버튼 포함.
-
-### `components/community/c3/JurorCard.tsx`
-
-AI 배심원 의견 카드. 중립화된 요약 + 배심원 분석 표시.
-
-### `components/community/c3/VoteBar.tsx`
-
-투표 버튼 (도움됨/안 됨). 클릭하면 `POST /api/posts/{id}/votes` 호출.
-
-### `components/community/c3/CommentBar.tsx`
-
-댓글 무한스크롤 리스트 + 댓글 입력 폼. 무한스크롤 구현.
-
-## 페이지 흐름
-
-### 1) 신규 사용자
-
-```mermaid
-flowchart TD
-    Land["/ 랜딩"] -->|시작하기| Onboard["/onboarding\n10문항"]
-    Onboard -->|완료| Result["/onboarding/result\n스타일 카드"]
-    Result -->|회원가입| Signup["/auth/signup\n이메일 + 코드"]
-    Signup -->|가입 완료| Plaza["/community\n광장 피드"]
-    Plaza -->|게시하기| NewPost["/community/new\n갈등 사연 작성"]
-    NewPost -->|게시 완료| PostDetail["/community/{id}\n배심원 + 투표 + 댓글"]
-```
-
-### 2) 기존 사용자
-
-```mermaid
-flowchart TD
-    Login["/auth/login"] --> Plaza["/community\n광장 피드"]
-    Plaza -->|게시글 선택| Detail["/community/{id}\n배심원 + 투표"]
-    Detail -->|댓글 작성| Comment["POST /api/posts/{id}/comments"]
-    Detail -->|투표| Vote["POST /api/posts/{id}/votes"]
-```
-
-### 3) 게스트
-
-```mermaid
-flowchart TD
-    Land["/ 랜딩"] --> Guest["게스트 JWT 발급"]
-    Guest --> Plaza["/community\n광장 피드 (읽기만)"]
-```
-
-## 인증 흐름
-
-| 시나리오 | 처리 |
-|---|---|
-| 로그인 후 보호 페이지 진입 | `useUserStore.user`가 null이면 `router.push('/auth/login')` |
-| 토큰 만료 (401 응답) | axios 응답 인터셉터에서 catch — 현재 미구현, 향후 추가 검토 |
-| OAuth callback | `app/auth/callback/[provider]/page.tsx`에서 code 추출 → `POST /api/auth/oauth2/{provider}` → 응답으로 token 저장 + `setUser` |
-
-## 환경 변수 (build-time)
-
-`NEXT_PUBLIC_*` prefix만 클라이언트 노출. `frontend/Dockerfile` 빌드 단계 ARG:
-
-| 변수 | 사용처 |
-|---|---|
-| `NEXT_PUBLIC_APP_URL` | OAuth `redirect_uri` 베이스 |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google 로그인 버튼 |
-| `NEXT_PUBLIC_KAKAO_CLIENT_ID` | Kakao 로그인 버튼 |
-| `NEXT_PUBLIC_NAVER_CLIENT_ID` | Naver 로그인 버튼 |
-
-빌드 시 정적 인라인 — runtime 변경 불가. 환경별 별도 빌드 필요.
-
-## 디자인 시스템
-
-`tailwind.config.ts`:
-
-```typescript
+// lib/store/uiStore.ts
 {
-  fontFamily: {
-    sans: ['Pretendard', 'sans-serif'],
-    serif: ['Noto Serif KR', 'serif'],
-  },
-  colors: {
-    'tone-l': { ... },     // letter (글자 톤)
-    'tone-p': { ... },     // pastel (배경 톤)
-    'tone-q': { ... },     // quiet (강조 톤)
-    canvas: '...',          // 베이스 배경
-  },
-  borderRadius: { letter, pastel, 'card-p' },
-  boxShadow: { phone: '...' },
-  animation: { blink, 'fade-in-up' },
+  // 모달 상태
+  isCrisisModalOpen: boolean
+  showCommunityFeedFilter: boolean
+  
+  // 사용자 인증 상태는 userStore에서 (BE 동기화)
+  
+  // 임시 입력값
+  draftPostTitle: string
+  draftPostBody: string
+  
+  // persist: localStorage에 저장
+  // → 새로고침 후 상태 복구
 }
 ```
 
-`PhoneFrame` 컴포넌트로 모바일 우선 레이아웃 + 데스크톱에서 폰 프레임 안에 렌더 (디자인 컨셉).
+**세션 상태는 없음** (광장형) — 모든 상태는 서버 동기화 또는 일시적 UI 상태.
 
-## 빌드/실행
+---
 
-```bash
-npm run dev         # next dev (localhost:3000, MSW 자동 활성)
-npm run build       # 프로덕션 빌드 (.next/)
-npm start           # 빌드 결과 실행
-npm run lint        # ESLint
-npm run lint:words  # 금지어 스캔 (docs/policies/forbidden-words-lint.md)
+## API 클라이언트 구조
+
+### lib/api/community.ts
+
+```typescript
+// 게시글 관련 API
+export const communityApi = {
+  getPosts(filters?: { category?: string }),
+  getPost(postId: string),
+  createPost(body: { ... }),
+  getJuryOpinions(postId: string),
+  voteCommunity(postId: string, vote: 'A' | 'B'),
+}
 ```
 
-`next.config.mjs`에서 `eslint.dirs: ['app','components','lib','mocks']` — build 시 자동 검사.
+### lib/api/user.ts
 
-## 주의사항
+```typescript
+// 사용자 관련 API
+export const userApi = {
+  getCurrentUser(),
+  login(email, password),
+  loginWithOAuth(provider, code),
+  logout(),
+  getPermissions(),
+}
+```
 
-- **Server Component 기본** — 'use client' 명시한 컴포넌트만 클라이언트 렌더 (Zustand, 폼, 애니메이션 사용 시 필요)
-- **`localStorage` 접근**은 항상 `typeof window !== 'undefined'` 가드
-- **MSW는 dev 전용** — production 빌드는 MSWProvider가 worker 시작 안 함
-- **금지어** — `forbiddenWords.ts`의 단어를 카피로 직접 사용 금지 (`lint:words`가 차단)
-- **광장형 UX** — AI 배심원과 사용자 게시글 시각적 구분 필수 (배심원은 카드, 사용자는 텍스트)
+### 요청/응답 인터셉터
+
+```typescript
+// lib/api/client.ts
+const client = axios.create({ baseURL: process.env.NEXT_PUBLIC_API_URL })
+
+// Request: Bearer 토큰 추가
+client.interceptors.request.use((config) => {
+  const token = localStorage.getItem('again-spring-token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+// Response: 에러 처리
+client.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response.status === 401) redirect('/login')
+    if (err.response.status === 403) redirect('/unauthorized')
+    if (err.response.status === 429) showRateLimitModal()
+    // ...
+  }
+)
+```
+
+---
+
+## 권한 시스템 (3-tier)
+
+```typescript
+// lib/constants/userPermissions.ts
+
+enum UserRole {
+  GUEST = 'GUEST',           // 비로그인
+  USER = 'USER',             // 일반 사용자
+  TESTER = 'TESTER',         // QA/테스터
+  ADMIN = 'ADMIN',           // 관리자
+}
+
+function permissionsFor(role: UserRole) {
+  return {
+    canReadFeed: true,                  // 모두
+    canCreatePost: role !== 'GUEST',    // 로그인 필수
+    canVote: role !== 'GUEST',          // 로그인 필수
+    canComment: role !== 'GUEST',       // 로그인 필수
+    canManageCommunity: role === 'ADMIN',
+    canViewAdminDashboard: role === 'ADMIN' || role === 'TESTER',
+  }
+}
+```
+
+---
+
+## MSW (Mock Service Worker)
+
+### 개발 모드에서의 목업
+
+```typescript
+// mocks/browser.ts
+export const worker = setupWorker(...handlers)
+
+// pages/layout.tsx에서
+<MSWProvider>
+  <App />
+</MSWProvider>
+```
+
+### 핸들러 구조
+
+```typescript
+// mocks/handlers/community.ts
+export const communityHandlers = [
+  http.get('/api/posts', () => json([...])),
+  http.get('/api/posts/:id', () => json({...})),
+  http.post('/api/posts', () => json({...})),
+  http.get('/api/posts/:id/jury-opinions', () => json([...])),
+]
+
+// mocks/handlers/notifications.ts
+// mocks/handlers/user.ts
+```
+
+**중요**: MSW는 dev 전용. prod에서는 무시되고 실제 Backend로 요청.
+
+---
+
+## 파일 조직 원칙
+
+### 페이지 컴포넌트 (`app/**`)
+- Server Component 기본 (데이터 페칭)
+- 필요시 `'use client'` 선언
+- 레이아웃 리소스 활용 (인증 게이트, 헤더 등)
+
+### 재사용 컴포넌트 (`components/**`)
+- 도메인별 폴더 (`community/c3/`, `admin/`, `auth/` 등)
+- 큰 컴포넌트: 폴더 + index.ts
+- 작은 컴포넌트: 단일 파일
+
+### 호출 패턴
+
+```
+app/community/page.tsx (Server RSC)
+  ↓
+  ├─ components/community/c3/FeedCard.tsx (Client)
+  │   ├─ hooks: useFeed(), useLike()
+  │   └─ lib/api/community.ts
+  │
+  ├─ components/community/c3/VoteBar.tsx (Client)
+  │   └─ lib/api/community.ts
+```
+
+---
+
+## 주요 기능별 데이터 흐름
+
+### 1. 피드 열람 (`/community`)
+
+```
+Page → api.getPosts()
+  ↓
+[무한스크롤] Intersection Observer
+  ↓
+각 카드 → api.getPost(id) & api.getJuryOpinions(id)
+  ↓
+FeedCard 렌더링
+```
+
+### 2. 게시글 작성 (`/community/new`)
+
+```
+Form → [제목, A입장, B입장 입력]
+  ↓
+POST /api/posts { title, categoryId, positionA, positionB }
+  ↓
+[Backend] LLM Worker 호출
+  ├─ 각 배심원 페르소나별 공감 분석
+  ├─ 투표 리소스 생성
+  └─ 댓글 초기화
+  ↓
+[Frontend] 상세 페이지 자동 진입
+```
+
+### 3. 배심원 의견 조회
+
+```
+GET /api/posts/{id}/jury-opinions
+  ↓
+[응답]
+{
+  juryOpinions: [
+    {
+      jurorId: "jur_001",
+      jurorName: "심리상담사 이소윤",
+      bias: "A" | "B" | "NEUTRAL",
+      empathyRatio: 0.65,
+      opinion: "..."
+    },
+    ...
+  ]
+}
+  ↓
+JurorCard 렌더링
+```
+
+### 4. 투표 (`/community/[id]`)
+
+```
+VoteBar [버튼 A측/B측]
+  ↓
+POST /api/posts/{id}/votes { vote: "A" | "B" }
+  ↓
+[응답] { updatedRatio: { A: 0.55, B: 0.45 } }
+  ↓
+VoteBar UI 업데이트
+```
+
+### 5. 댓글 (`CommentBar`)
+
+```
+CommentComposeSheet [로그인 필수]
+  ↓
+POST /api/posts/{id}/comments { content: "..." }
+  ↓
+[응답] { commentId, author, createdAt, ... }
+  ↓
+CommentBar 무한스크롤 목록 prepend
+```
+
+---
+
+## 부재 기능
+
+> 광장형 피벗으로 인해 제거됨
+
+- **온보딩 (MBTI 테스트)** — 더 이상 필요 없음
+- **세션 기반 상태** — 광장형에서 중앙화된 피드로 변경
+- **서로 다른 페르소나 간 컨텍스트** — 9인 배심원 중 병렬 분석으로 변경
+- **클라이언트 사이드 키워드 필터** — 서버에서만 검사 (위기 감지)
+
+---
+
+## 마이그레이션 참고
+
+| 구 모델 (V1.5) | 신 모델 (광장형) | 상태 |
+|---|---|---|
+| 세션 기반 채팅 | 광장 피드 기반 | ✅ 완료 |
+| 6턴 중재 | 배심원 9인 병렬 분석 | ✅ 완료 |
+| Solo/Duo 모드 | 단일 광장 (비공개/공개) | ✅ 완료 |
+| MediatorMessage | JuryOpinion | ✅ 완료 |
+| ContributionRatio | EmpathyRatio | ✅ 완료 |
+
+---
+
+**마지막 업데이트**: 2026-06-03

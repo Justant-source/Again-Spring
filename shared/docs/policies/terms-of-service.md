@@ -7,7 +7,7 @@
 - **사용자 표시 본문(권위본)**: [`terms.md`](./terms.md) — 베타 v1.0 법률 약관 전문
 - 사용자 표시 페이지: `frontend/app/terms/page.tsx` (terms.md를 fetch·렌더링)
 - 푸터 컴포넌트: `frontend/components/shared/LegalFooter.tsx`
-- 관련 정책: [psychology-model.md](./psychology-model.md), [crisis-detection.md](./crisis-detection.md), [data-retention.md](./data-retention.md), [forbidden-words.md](./forbidden-words.md)
+- 관련 정책: [psychology-model.md](./psychology-model.md), [data-retention.md](./data-retention.md), [forbidden-words.md](./forbidden-words.md)
 
 > 이 파일(`terms-of-service.md`)은 내부 운용 정책·설계 근거 문서입니다. 실제 사용자에게 표시되는 약관 본문은 `terms.md`를 참조하세요.
 
@@ -57,7 +57,7 @@
 | **1388** | 청소년 상담 — 24시간 |
 | **132** | 대한법률구조공단 |
 
-상세는 [crisis-detection.md](./crisis-detection.md).
+상세는 `lib/constants/crisisResources.ts` 참조.
 
 ## 제5조 (V1.5 무료 운영 정책)
 
@@ -91,7 +91,7 @@
 
 ## 제7조 (콘텐츠 공유)
 
-1. 이용자는 결과 리포트의 **추상화된 시각 자료**(욕구 차이 지도 등)를 제3자와 공유할 수 있다.
+1. 이용자는 배심원 분석 결과(공감 비율, 배심원 의견 등)를 제3자와 공유할 수 있다.
 
 2. 갈등의 구체적 내용이 포함된 정보는 이용자 본인의 판단과 책임 하에 공유하며, 서비스는 이로 인한 분쟁에 책임지지 않는다.
 
@@ -164,5 +164,5 @@
 ## 변경 시 절차
 
 1. 약관 본문 변경 → `frontend/app/terms/page.tsx` 갱신 + 본 문서 갱신
-2. 핫라인 변경 → [crisis-detection.md](./crisis-detection.md) + `frontend/lib/constants/crisisResources.ts` + 본 문서 동시 갱신
+2. 핫라인 변경 → `frontend/lib/constants/crisisResources.ts` + 본 문서 동시 갱신
 3. 보존 기간 변경 → [data-retention.md](./data-retention.md) + 본 문서 제6조 동시 갱신

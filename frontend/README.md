@@ -1,47 +1,115 @@
-# 다시봄 · Again Spring — 프론트엔드
+# 다시봄 — Frontend
 
-> **"다시 봄. 다시 바라봄."**
->
-> 싸운 두 사람 사이에서 AI 중재자가 양쪽 이야기를 중립적으로 정리해, 관계 회복을 돕는 웹앱의 프론트엔드.
+> Next.js 14 (App Router) 기반 갈등 커뮤니티 + AI 배심원 플랫폼 프론트엔드.  
+> 사용자가 사연(갈등 게시글)을 올리면 AI 배심원 9인이 공감 비율을 분석하고, 커뮤니티 투표/댓글로 의견을 모읍니다.
+
+---
+
+## 기술 스택
+
+| 항목 | 버전 |
+|---|---|
+| Next.js (App Router) | 14 |
+| TypeScript | 5+ |
+| Tailwind CSS | 3+ |
+| Zustand | — |
+| MSW (Mock Service Worker) | — |
+| Vitest | — |
+| Playwright | — |
 
 ---
 
 ## 빠른 시작
 
 ```bash
+cd /home/justant/Data/Again-Spring/frontend
 npm install
-npm run dev          # localhost:3000 (MSW 자동 활성)
-npm run lint:words   # 금지어 검사 (배포 전 필수)
-npm run build        # 프로덕션 빌드
+npm run dev    # localhost:3000
+```
+
+> MSW는 로컬 개발 시 자동 활성화됩니다.
+
+---
+
+## 디렉토리 구조
+
+```
+frontend/
+├── app/                          # Next.js App Router 페이지
+│   ├── (admin)/admin/            # 관리자 대시보드 (community, marketing)
+│   ├── (auth)/                   # 인증 (login, signup, guest, forgot-password, reset-password)
+│   ├── auth/callback/[provider]/ # OAuth 콜백
+│   ├── (dashboard)/profile/      # 사용자 프로필
+│   ├── community/                # 광장 피드 + 사연 상세/작성
+│   │   ├── [id]/{comments,invite,read}/
+│   │   └── new/
+│   ├── notifications/
+│   ├── s/[token]/                # 초대 토큰 진입
+│   └── {privacy,terms}/
+├── components/
+│   ├── community/c3/             # 광장 핵심 컴포넌트
+│   │   └── FeedCard, JurorCard, JurorPicker, VoteBar, CommentBar, 
+│   │       CommentComposeSheet, CommunityComment, UserChip, BrandBar, SideStory
+│   ├── admin/, auth/, feedback/, icons/, legal/, profile/, shared/, ui/
+├── lib/
+│   ├── api/                      # API 클라이언트 (community, user 등)
+│   ├── constants/                # userPermissions, forbiddenWords 등
+│   └── store/                    # uiStore (Zustand)
+├── mocks/
+│   └── handlers/                 # MSW 핸들러 (community, notifications, user)
+├── tests/
+│   ├── e2e/                      # Playwright a11y
+│   ├── e2e-realbe/               # Playwright 실서버 e2e
+│   │   ├── flows/                # 01-auth, 02-permissions, 03-email-verification, 04-community-plaza
+│   │   └── invariants/           # community-legal-notice
+│   └── unit/                     # Vitest 유닛 테스트
+└── docs/                         # FE 특화 문서
 ```
 
 ---
 
-## 🎨 UX 정책 — 4원칙군 (모든 FE 작업의 기준)
+## 문서 진입점
 
-다시봄의 사용자는 갈등 한복판에 있습니다. 일반 SaaS 디자인 원칙으로는 부족하며, **악용 시나리오를 명시적으로 차단하는 설계**가 필요합니다.
+| 영역 | 문서 |
+|---|---|
+| 패키지 구조 | [`docs/structure.md`](docs/structure.md) |
+| 아키텍처·데이터 흐름 | [`docs/architecture.md`](docs/architecture.md) |
+| 테스트 정책 | [`docs/testing.md`](docs/testing.md) |
+| **UX 원칙 (권위본)** | [`docs/ux/principles.md`](docs/ux/principles.md) |
+| HAX 컴포넌트 체크리스트 | [`docs/ux/hax-checklist.md`](docs/ux/hax-checklist.md) |
+| 디자인 시스템 | [`docs/design/README.md`](docs/design/README.md) |
+| 금지어 린트 | [`docs/policies/forbidden-words-lint.md`](docs/policies/forbidden-words-lint.md) |
 
-| 순위 | 원칙군 | 권위 문헌 | 언제 확인 |
-|---|---|---|---|
-| **1순위** | AI 중재자 신뢰성 | Microsoft HAX 18 가이드라인 | 모든 컴포넌트 수정 시 |
-| **1순위** | 위기 사용자 보호 | Designing for Safety (PenzeyMoog) | 모든 컴포넌트 수정 시 |
-| **2순위** | 인지 부하 최소화 | GOV.UK Service Manual | 화면 신규 추가 시 |
-| **3순위** | 카피·인터랙션 | NN/g wizard, SAMHSA 6원칙 | 카피·인터랙션 수정 시 |
-| **4순위** | 결과 해석 안전성 | WCAG 2.2 cognitive, Do No Harm Guide | 결과 리포트 수정 시 |
+---
 
-**권위본**: [`docs/ux/principles.md`](./docs/ux/principles.md)  
-**컴포넌트 체크리스트**: [`docs/ux/hax-checklist.md`](./docs/ux/hax-checklist.md)
+## 주요 스크립트
 
-### 절대 불변 규칙
+```bash
+npm run dev          # 개발 서버 (localhost:3000)
+npm run build        # 프로덕션 빌드
+npm run lint:words   # 금지어 하드코딩 검사
+npm run lint:emoji   # 이모지 금지 검사
+npm run test         # Vitest 유닛 테스트
+npm run test:e2e:realbe  # 실서버 e2e (Playwright)
+```
 
-- **위기 모달은 ESC·바깥 클릭으로 닫히지 않는다** — 명시적 버튼으로만 닫힘
-- **위기 감지는 FE+BE 이중 구현** — 어느 한쪽 제거 금지
-- **결과 리포트에 처방(prescription) 금지** — "이니 더 노력하셔야 합니다" 패턴 금지
-- **`ContributionRatio` 법적 안내 박스는 항상 표시** — 조건부로 만들지 않음
+---
 
-### 신규 화면·입력·공유 기능 PR 시 — Safety Check 4문
+## 핵심 UX 원칙
 
-PR 템플릿(`.github/PULL_REQUEST_TEMPLATE.md`)에 포함:
+> 권위본: [`docs/ux/principles.md`](docs/ux/principles.md)
+
+- **AI 신뢰성 최우선**: 배심원·요약은 AI임을 명확히 표시, 사용자 글과 시각 구분
+- **작성자=초록, 상대방=붉은** — 앱 전체 일관 유지
+- **판결/처방 표현 금지** (AI 출력만) — 대체: "공감", "관점", "작성자/상대방"
+- **사용자 입력에 금지어 필터 미적용** — 사용자가 쓴 텍스트의 책임은 사용자에게 있음
+- **위기 모달**: ESC·바깥클릭 차단 (명시적 버튼으로만 닫힘)
+
+---
+
+## 신규 기능 추가 시 안전성 체크
+
+모든 새 화면·입력·공유 기능 PR은 다음 4개 질문에 답해야 합니다:
 
 1. **Abuser**: 가해자가 이 기능을 무기로 쓸 수 있는가?
 2. **Survivor**: 학대 상황의 사용자에게 새로운 위험이 생기는가?
@@ -50,34 +118,15 @@ PR 템플릿(`.github/PULL_REQUEST_TEMPLATE.md`)에 포함:
 
 ---
 
-## 핵심 정책
-
-- **금지어 차단**: `npm run lint:words` — Level 1(법률), Level 2(진단명), Level 3(승패) 자동 스캔
-- **위기 감지**: 클라이언트 사이드 `checkKeywords()` + 서버 사이드 `KeywordGuard` 이중화
-- **디자인 톤**: Tone L (입력/채팅), Tone P (결과), Tone Q (고급) — 절대 섞지 않기
-- **데이터 격리**: Duo 모드에서 상대방 메시지 원문 절대 노출 금지 (`BlurredBubble`)
-
----
-
-## 배포 전 체크리스트
+## PR 병합 전 체크리스트
 
 - [ ] `npm run lint:words` 통과
-- [ ] 수정한 컴포넌트의 `docs/ux/hax-checklist.md` 해당 섹션 확인
-- [ ] 위기 모달 dismiss 마찰 여전히 유지되는지 확인
+- [ ] 변경된 컴포넌트의 `docs/ux/hax-checklist.md` 항목 확인
 - [ ] `npm run build` 성공
-- [ ] 전체 플로우 수동 테스트 (온보딩 → 세션 → 채팅 → 결과)
+- [ ] 해당하면 `data-testid` 변경 + `tests/e2e-realbe/support/selectors.ts` 동기화
+- [ ] 색상 일관성 (초록=A, 붉은=B, 회색=중립)
 - [ ] 모바일 반응형 확인
 
 ---
 
-## 문서
-
-| 문서 | 내용 |
-|---|---|
-| [`docs/ux/principles.md`](./docs/ux/principles.md) | **FE UX 권위본** — 4원칙군, 우선순위, 로드맵 |
-| [`docs/ux/hax-checklist.md`](./docs/ux/hax-checklist.md) | 컴포넌트별 PR 체크리스트 (HAX 18) |
-| [`docs/ui/design-handoff.md`](./docs/ui/design-handoff.md) | 3-Tone 디자인 시스템, 목업 |
-| [`docs/architecture.md`](./docs/architecture.md) | 기술 스택, 상태 관리, API 클라이언트 |
-| [`docs/structure.md`](./docs/structure.md) | 폴더 구조 |
-| [`docs/policies/crisis-modal.md`](./docs/policies/crisis-modal.md) | 위기 모달 정책 (위기 모달 수정 시 필독) |
-| [`docs/policies/forbidden-words-lint.md`](./docs/policies/forbidden-words-lint.md) | 금지어 린트 구현 |
+**마지막 업데이트**: 2026-06-03
