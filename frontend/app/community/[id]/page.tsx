@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { postApi, PostDetail, JuryResult, VoteResult } from '@/lib/api/community/postApi';
 import { commentApi, Comment } from '@/lib/api/community/commentApi';
 import { getOrCreateDeviceId } from '@/lib/utils/deviceId';
-import { VoteBar, SideStory, JurorCard, CommunityComment } from '@/components/community/c3';
+import { VoteBar, SideStory, JurySection, CommunityComment } from '@/components/community/c3';
 import { AUTHOR, PARTNER, AUTHOR_BG, PARTNER_BG } from '@/lib/constants/factionColors';
 import { timeAgo } from '@/lib/utils/timeAgo';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
@@ -285,10 +285,12 @@ function C3ResultSolo({
   post,
   voteResult,
   comments,
+  jury,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
   comments: Comment[];
+  jury: JuryResult | null;
 }) {
   const router = useRouter();
 
@@ -361,17 +363,10 @@ function C3ResultSolo({
         </div>
       )}
 
-      {/* 배심원 카드 (summaryLine 있으면) */}
-      {post.partnerBodyPublished && (
-        <div style={{ marginBottom: 20 }}>
-          <JurorCard
-            name="배심원"
-            lens="종합"
-            text="양쪽 이야기를 들었을 때 각자의 노력이 보입니다."
-            accent={AUTHOR}
-          />
-        </div>
-      )}
+      {/* AI 배심원 섹션 */}
+      <div style={{ marginBottom: 20 }}>
+        <JurySection jury={jury} jurorCount={post.jurorCount ?? 0} />
+      </div>
 
       {/* 액션 버튼들 */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
@@ -417,10 +412,12 @@ function C3ResultPair({
   post,
   voteResult,
   comments,
+  jury,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
   comments: Comment[];
+  jury: JuryResult | null;
 }) {
   const router = useRouter();
 
@@ -460,14 +457,9 @@ function C3ResultPair({
         </div>
       )}
 
-      {/* AI 배심원 종합 */}
+      {/* AI 배심원 섹션 */}
       <div style={{ marginBottom: 20 }}>
-        <JurorCard
-          name="AI 배심원"
-          lens="종합"
-          text="양쪽 모두 대화를 통해 더 깊이 이해할 수 있었어요."
-          accent={AUTHOR}
-        />
+        <JurySection jury={jury} jurorCount={post.jurorCount ?? 0} />
       </div>
 
       {/* 결과 공유 버튼 */}
@@ -494,9 +486,11 @@ function C3ResultPair({
 function C3Closed({
   post,
   voteResult,
+  jury,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
+  jury: JuryResult | null;
 }) {
   return (
     <div style={{ background: 'var(--P-bg)', minHeight: '100vh', padding: '16px' }}>
@@ -561,6 +555,11 @@ function C3Closed({
           <VoteBar authorPct={Math.round(post.authorPct || 50)} big={true} />
         </div>
       )}
+
+      {/* AI 배심원 섹션 */}
+      <div style={{ marginBottom: 20 }}>
+        <JurySection jury={jury} jurorCount={post.jurorCount ?? 0} />
+      </div>
 
       {/* 안내 메시지 */}
       <div
@@ -641,6 +640,32 @@ export default function CommunityPostPage({ params }: PageProps) {
 
     loadPost();
   }, [params.id]);
+
+  // AI 배심원 폴링 — 작성자이고 배심원이 아직 도착 중일 때 3초마다 재조회
+  // ⚠️ deps에 juryResult 포함 금지 (setJuryResult마다 interval 재구독 → 폴링 폭주)
+  useEffect(() => {
+    if (!post?.isAuthor) return;
+    const target = post.jurorCount ?? 0;
+    if (target === 0) return;
+    // 이미 완료된 경우 구독 즉시 종료
+    if (juryResult && juryResult.jurors.length >= target) return;
+
+    let attempts = 0;
+    const MAX = 20; // 최대 ~60초
+    const timer = setInterval(async () => {
+      attempts += 1;
+      try {
+        const data = await postApi.getJury(params.id);
+        setJuryResult(data);
+        if (data.jurors.length >= target || attempts >= MAX) {
+          clearInterval(timer);
+        }
+      } catch {
+        if (attempts >= MAX) clearInterval(timer);
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [post?.isAuthor, post?.jurorCount, params.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 댓글 페이지에서 돌아올 때 commentCount 갱신
   useEffect(() => {
@@ -747,12 +772,12 @@ export default function CommunityPostPage({ params }: PageProps) {
     return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} onLike={handleLike} isVoting={isVoting} hasMoreComments={hasMoreComments} loadingMoreComments={loadingMoreComments} commentBottomRef={commentBottomRef} />;
   } else if (post.status === 'VOTING' && !post.paired) {
     // View B: 작성자 + VOTING + partner 없음
-    return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} />;
+    return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} jury={juryResult} />;
   } else if (post.status === 'VOTING' && post.paired) {
     // View C: 작성자 + VOTING + partner 있음
-    return <C3ResultPair post={post} voteResult={voteResult} comments={comments} />;
+    return <C3ResultPair post={post} voteResult={voteResult} comments={comments} jury={juryResult} />;
   } else {
     // View D: status=CLOSED
-    return <C3Closed post={post} voteResult={voteResult} />;
+    return <C3Closed post={post} voteResult={voteResult} jury={juryResult} />;
   }
 }

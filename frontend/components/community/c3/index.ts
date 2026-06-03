@@ -4,6 +4,7 @@ export { FeedCard } from './FeedCard';
 export { CommunityComment } from './CommunityComment';
 export { JurorPicker } from './JurorPicker';
 export { JurorCard } from './JurorCard';
+export { JurySection } from './JurySection';
 export { CommentBar } from './CommentBar';
 export { CommentComposeSheet } from './CommentComposeSheet';
 export { UserChip } from './UserChip';

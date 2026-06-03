@@ -5,6 +5,7 @@ interface JurorCardProps {
   lens: string;
   text: string;
   accent?: string;
+  testId?: string;
 }
 
 export function JurorCard({
@@ -12,9 +13,11 @@ export function JurorCard({
   lens,
   text,
   accent = 'var(--P-sub)',
+  testId = 'juror-card',
 }: JurorCardProps) {
   return (
     <div
+      data-testid={testId}
       style={{
         background: 'var(--P-card)',
         border: '1px solid var(--P-border)',

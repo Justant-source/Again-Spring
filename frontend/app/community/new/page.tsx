@@ -87,11 +87,11 @@ export default function CommunityNewPage() {
         new Promise(r => setTimeout(r, 1000)),
       ]);
 
-      // PRIVATE: 초대 화면으로 이동, PUBLIC: 피드로 이동
+      // PRIVATE: 초대 화면으로 이동, PUBLIC: 내 결과 화면으로 이동 (배심원 의견 폴링)
       if (visibility === 'PRIVATE') {
         router.push(`/community/${result.id}/invite`);
       } else {
-        router.push('/community');
+        router.push(`/community/${result.id}`);
       }
     } catch (err: unknown) {
       console.error('Failed to create post:', err);

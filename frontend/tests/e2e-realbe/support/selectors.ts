@@ -44,3 +44,13 @@ export const INVITE = {
   linkGenBtn: '[data-testid="invite-link-gen-btn"]',     // 링크 생성 버튼
   arrivedResultBtn: '[data-testid="arrived-result-btn"]', // 답변 도착 후 결과 보기 버튼
 } as const
+
+// ── AI 배심원 (Jury) ──────────────────────────────────────────────
+export const JURY = {
+  section:         '[data-testid="jury-section"]',          // 전체 섹션 컨테이너
+  pending:         '[data-testid="jury-pending"]',          // 대기 중 스피너 블록
+  distributionBar: '[data-testid="jury-distribution-bar"]', // 공감 분포 바 래퍼
+  summary:         '[data-testid="jury-summary"]',          // 요약 줄 ("N인 중 M인이...")
+  jurorCard:       '[data-testid="juror-card"]',            // 배심원 카드 (복수)
+  legalNotice:     '[data-testid="jury-legal-notice"]',     // 법적 고지
+} as const
