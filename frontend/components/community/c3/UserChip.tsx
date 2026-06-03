@@ -124,9 +124,9 @@ export function UserChip({ user }: UserChipProps) {
       >
         <span style={{
           width: 22, height: 22, borderRadius: '50%',
-          background: isGuest ? 'transparent' : 'var(--L-ink)',
+          background: isGuest ? 'transparent' : 'var(--P-a)',
           border: isGuest ? '1.5px dashed var(--L-sub)' : 'none',
-          color: isGuest ? 'var(--L-sub)' : 'var(--L-bg)',
+          color: isGuest ? 'var(--L-sub)' : 'white',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, fontWeight: 500, flexShrink: 0,
         }}>
