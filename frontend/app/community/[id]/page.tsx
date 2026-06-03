@@ -233,7 +233,7 @@ function C3StoryDetail({
       </div>
 
       {/* 하단 고정 영역: 댓글바 + 투표 버튼 */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--L-bg)' }}>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto', background: 'var(--L-bg)' }}>
         {/* 댓글 입력바 — 탭하면 댓글 페이지로 */}
         <div
           role="button"

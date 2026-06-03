@@ -28,7 +28,7 @@ function GuestInfoSheet({ user, onClose }: { user: User; onClose: () => void }) 
       <div
         data-testid="guest-info-sheet"
         style={{
-          position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 401,
+          position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 401, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto',
           background: 'var(--L-bg)',
           borderRadius: '20px 20px 0 0',
           boxShadow: '0 -8px 30px rgba(60,40,20,.12)',
