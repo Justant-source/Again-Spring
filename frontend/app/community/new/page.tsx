@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { postApi, PostCreateRequest } from '@/lib/api/community/postApi';
 import { GuestNoticeModal } from '@/components/auth/GuestNoticeModal';
-import { JurorPicker, UserChip } from '@/components/community/c3';
+import { UserChip } from '@/components/community/c3';
 import { useUserStore } from '@/lib/store/userStore';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { AUTHOR, AUTHOR_BG } from '@/lib/constants/factionColors';
@@ -31,7 +31,7 @@ export default function CommunityNewPage() {
   const [title, setTitle] = useState('');
   const [bodyRaw, setBodyRaw] = useState('');
   const [category, setCategory] = useState(C3_CATEGORIES[0].id);
-  const [jurorCount, setJurorCount] = useState(3);
+  const jurorCount = 0; // AI 중재자 모드 숨김 처리 중
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showGuestNotice, setShowGuestNotice] = useState(false);
@@ -47,8 +47,8 @@ export default function CommunityNewPage() {
       setError('본문을 입력해주세요');
       return;
     }
-    if (bodyRaw.trim().length > 600) {
-      setError('본문은 600자 이내여야 합니다');
+    if (bodyRaw.trim().length > 1000) {
+      setError('본문은 1000자 이내여야 합니다');
       return;
     }
     if (!category) {
@@ -265,7 +265,7 @@ export default function CommunityNewPage() {
                 익명
               </span>
               <span data-testid="compose-char-count" style={{ fontSize: 12, color: 'var(--L-sub)' }}>
-                {bodyRaw.length} / 600
+                {bodyRaw.length} / 1000
               </span>
             </div>
           </div>
@@ -390,8 +390,7 @@ export default function CommunityNewPage() {
             </div>
           )}
 
-          {/* AI 배심원 선택기 */}
-          <JurorPicker defaultValue={jurorCount} onChange={setJurorCount} />
+          {/* AI 중재자 모드 숨김 처리 중 */}
         </div>
 
         {/* 하단 고정 버튼 */}
