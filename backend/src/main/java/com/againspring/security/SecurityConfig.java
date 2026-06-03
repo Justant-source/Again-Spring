@@ -63,6 +63,7 @@ public class SecurityConfig {
                         .requestMatchers("GET", "/api/community/posts/*").permitAll()
                         .requestMatchers("GET", "/api/community/posts/*/comments").permitAll()
                         .requestMatchers("GET", "/api/s/*").permitAll()
+                        .requestMatchers("POST", "/api/s/*/answer").permitAll()
                         // 댓글·투표·좋아요는 게스트 토큰도 허용 — 컨트롤러에서 익명(토큰 없음) 차단
                         .requestMatchers("POST", "/api/community/posts/*/comments").permitAll()
                         .requestMatchers("POST", "/api/community/posts/*/comments/*/like").permitAll()
