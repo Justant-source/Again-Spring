@@ -207,23 +207,6 @@ export default function C3StoryRead({ params }: PageProps) {
         </button>
       </div>
 
-      {/* 반대 진영 전환 */}
-      <button
-        onClick={() => setSide(side === 'g' ? 'r' : 'g')}
-        style={{
-          width: '100%',
-          padding: '12px 16px',
-          background: 'var(--P-card)',
-          border: '1px solid var(--P-border)',
-          borderRadius: 8,
-          fontSize: 12,
-          fontWeight: 600,
-          color: 'var(--P-ink)',
-          cursor: 'pointer',
-        }}
-      >
-        {side === 'g' ? '상대방' : '작성자'} 이야기 읽기 ›
-      </button>
     </div>
   );
 }
