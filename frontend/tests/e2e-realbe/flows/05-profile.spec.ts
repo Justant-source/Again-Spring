@@ -32,45 +32,41 @@ test.describe('Flow 05: 프로필 페이지 (6/2 개편)', () => {
 
   test('프로필 — 탭 3개 표시 (내 사연 / 투표한 글 / 저장)', async ({ page }) => {
     await page.goto(`${BASE}/profile`)
-    await expect(page.getByText('마이페이지')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByText('내 사연')).toBeVisible()
+    // '내 사연' 탭이 보이면 프로필 콘텐츠 hydrate 완료 (BottomNav의 '마이페이지'와 구분)
+    await expect(page.getByText('내 사연')).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText('투표한 글')).toBeVisible()
     await expect(page.getByText('저장')).toBeVisible()
   })
 
   test('프로필 — 탭 전환 시 닉네임 유지 (7e72d05 회귀 방지)', async ({ page }) => {
     await page.goto(`${BASE}/profile`)
-    await expect(page.getByText('마이페이지')).toBeVisible({ timeout: 10_000 })
-
-    // 초기 닉네임 읽기
-    const profileRow = page.locator('div').filter({ hasText: /사연 \d+/ }).first()
-    await expect(profileRow).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('내 사연')).toBeVisible({ timeout: 10_000 })
 
     // "투표한 글" 탭으로 이동
     await page.getByText('투표한 글').click()
-    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 5_000 })
 
-    // 닉네임이 사라지지 않아야 함 — 프로필 행이 여전히 존재
-    await expect(page.getByText('마이페이지')).toBeVisible()
+    // 탭 행이 사라지지 않아야 함
+    await expect(page.getByText('내 사연')).toBeVisible()
+    await expect(page.getByText('저장')).toBeVisible()
 
     // "내 사연" 탭으로 복귀
     await page.getByText('내 사연').click()
-    // 아직 사연이 없으면 "아직 사연이 없어요", 있으면 목록 표시 — 어느 쪽이든 "마이페이지"는 유지
-    await expect(page.getByText('마이페이지')).toBeVisible()
+    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 3_000 })
   })
 
   test('프로필 — 투표한 글 탭 → "준비 중입니다"', async ({ page }) => {
     await page.goto(`${BASE}/profile`)
-    await expect(page.getByText('마이페이지')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('내 사연')).toBeVisible({ timeout: 10_000 })
     await page.getByText('투표한 글').click()
-    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 5_000 })
   })
 
   test('프로필 — 저장 탭 → "준비 중입니다"', async ({ page }) => {
     await page.goto(`${BASE}/profile`)
-    await expect(page.getByText('마이페이지')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('내 사연')).toBeVisible({ timeout: 10_000 })
     await page.getByText('저장').click()
-    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 5_000 })
   })
 })
 

@@ -25,12 +25,25 @@ export async function saveAuthState(
   if (!resp.ok()) {
     throw new Error(`Login failed for ${persona.email}: ${resp.status()} ${await resp.text()}`)
   }
-  const { token } = await resp.json()
-  const accessToken: string = token?.accessToken
+  const loginData = await resp.json()
+  const accessToken: string = loginData.token?.accessToken
+  const user = loginData.user ?? null
 
   const page = await context.newPage()
   await page.goto(baseURL)
-  await page.evaluate((t: string) => localStorage.setItem('again-spring-token', t), accessToken)
+  await page.evaluate(
+    ({ t, u }: { t: string; u: unknown }) => {
+      localStorage.setItem('again-spring-token', t)
+      // Zustand persist 스토어에 user 데이터 주입 — user=null이면 프로필 페이지가 login으로 redirect됨
+      if (u) {
+        localStorage.setItem(
+          'again-spring-user',
+          JSON.stringify({ state: { user: u, _hasHydrated: true }, version: 0 }),
+        )
+      }
+    },
+    { t: accessToken, u: user },
+  )
   await page.close()
 
   if (!fs.existsSync(AUTH_STATE_DIR)) fs.mkdirSync(AUTH_STATE_DIR, { recursive: true })
