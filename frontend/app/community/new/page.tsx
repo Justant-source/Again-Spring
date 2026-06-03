@@ -7,7 +7,7 @@ import { GuestNoticeModal } from '@/components/auth/GuestNoticeModal';
 import { JurorPicker, UserChip } from '@/components/community/c3';
 import { useUserStore } from '@/lib/store/userStore';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
-import { GRN, GRN_BG } from '@/lib/constants/factionColors';
+import { AUTHOR, AUTHOR_BG } from '@/lib/constants/factionColors';
 
 // C3 대분류 카테고리 — id는 BE PostCategory enum 이름과 1:1 매핑
 const C3_CATEGORIES = [

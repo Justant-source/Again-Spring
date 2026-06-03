@@ -65,9 +65,9 @@ export default function NotificationsPage() {
   const getNotificationDot = (type: string) => {
     switch (type) {
       case 'PARTNER_ANSWERED':
-        return 'var(--L-point)'; // RED
+        return 'var(--L-point)'; // 알림 강조색
       case 'NEW_VOTE':
-        return '#4caf50'; // GREEN
+        return 'var(--faction-author)'; // 투표 알림 — 작성자(피치)
       default:
         return 'var(--L-sub)';
     }

@@ -107,7 +107,7 @@ export function CommentComposeSheet({
 
         {/* 에러 메시지 */}
         {error && (
-          <div style={{ padding: '0 20px 8px', fontSize: 12, color: 'var(--red)' }}>{error}</div>
+          <div style={{ padding: '0 20px 8px', fontSize: 12, color: 'var(--faction-partner)' }}>{error}</div>
         )}
 
         {/* 등록 버튼 */}

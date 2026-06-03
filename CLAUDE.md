@@ -2,16 +2,16 @@
 
 > ⚠️ **이 파일은 250줄 미만으로 유지한다.** 상세 내용은 4개 docs 디렉토리에 위임.
 
-**프로젝트**: 다시봄 · Again Spring  
-**도메인**: `dev.againspring.net` (dev) / `againspring.net` (prod)  
-**상태**: 커뮤니티 광장 + AI 배심원 모델 (2026-06-02 피벗 완료, commit defc742)  
+**프로젝트**: 다시봄 · Again Spring
+**도메인**: `dev.againspring.net` (dev) / `againspring.net` (prod)
+**상태**: 커뮤니티 광장 + AI 배심원 모델 (2026-06-02 피벗 완료, commit defc742)
 **기준일**: 2026-06-03
 
 ---
 
 ## 🎯 프로젝트 한 줄 요약
 
-갈등 커뮤니티 플랫폼. 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공하는 웹앱.  
+갈등 커뮤니티 플랫폼. 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공하는 웹앱.
 FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (remote CLI only).
 
 ---
@@ -46,6 +46,7 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
 | AI 출력 금지어 정책 | `shared/docs/policies/forbidden-words.md` |
 | 서비스 정책 (인증·온보딩·약관) | `shared/docs/policies/` |
 | LLM 프롬프트 | `shared/docs/prompts/` |
+| FE 디자인 시스템 (톤·색·타이포·시그니처) | `frontend/docs/design/system.md` |
 | FE UX 원칙 | `frontend/docs/ux/principles.md` |
 | FE 컴포넌트 PR 체크리스트 | `frontend/docs/ux/hax-checklist.md` |
 | 배포 절차 | `env/docs/deployment.md` |
@@ -58,7 +59,7 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
 > 권위본: [`frontend/docs/ux/principles.md`](frontend/docs/ux/principles.md) · 체크리스트: [`frontend/docs/ux/hax-checklist.md`](frontend/docs/ux/hax-checklist.md)
 
 - **AI 신뢰성 최우선**: 배심원·요약은 AI임을 명확히 표시, 사용자 글과 시각 구분
-- **작성자=초록, 상대방=붉은** — 앱 전체 일관 유지
+- **작성자=피치(peach #C9785A), 상대방=세이지(sage #5F8F76)** — 앱 전체 일관 유지
 - **판결/처방/승패 표현 금지** (AI 출력만) — 대체: "공감", "관점", "작성자/상대방"
 - **사용자 입력에 금지어 필터 미적용** — 사용자가 쓴 텍스트의 책임은 사용자에게 있음
 
@@ -66,12 +67,7 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
 
 ## ⚠️ AI 출력 품질 기준 (AI 배심원·요약에만 적용)
 
-> 권위본: [`shared/docs/policies/forbidden-words.md`](shared/docs/policies/forbidden-words.md)  
-> **사용자 입력에는 미적용** — AI 생성 텍스트(배심원 의견, 중립화 요약, 제목)에만 적용
-
-- 금지: `과실비율 / 판결 / 유죄 / 가해자` → 대체: `공감 비율 / 결과 / 작성자`
-- 금지: `이겼다 / 졌다 / 맞다 / 틀렸다 / 처방 (헤어지세요 등)`
-- 자제: `나르시시스트 / 가스라이팅` → 행동 기술로 대체
+> 권위본: [`shared/docs/policies/forbidden-words.md`](shared/docs/policies/forbidden-words.md)
 
 ```bash
 cd frontend && npm run lint:words   # 코드베이스 하드코딩 카피 검사

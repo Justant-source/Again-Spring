@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { postApi, PostDetail, JuryResult, VoteResult } from '@/lib/api/community/postApi';
 import { commentApi, Comment } from '@/lib/api/community/commentApi';
 import { VoteBar, SideStory, JurorCard, CommunityComment } from '@/components/community/c3';
-import { GRN, RED, GRN_BG, RED_BG } from '@/lib/constants/factionColors';
+import { AUTHOR, PARTNER, AUTHOR_BG, PARTNER_BG } from '@/lib/constants/factionColors';
 import { timeAgo } from '@/lib/utils/timeAgo';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 
@@ -111,8 +111,8 @@ function C3StoryDetail({
           </Link>
           {voted && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${GRN}`, color: GRN, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>卜</span>
-              <span style={{ fontSize: 11.5, color: GRN, fontWeight: 500 }}>투표 완료</span>
+              <span style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${AUTHOR}`, color: AUTHOR, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>卜</span>
+              <span style={{ fontSize: 11.5, color: AUTHOR, fontWeight: 500 }}>투표 완료</span>
             </div>
           )}
         </div>
@@ -124,8 +124,8 @@ function C3StoryDetail({
           </span>
           {post.paired && (
             <>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: GRN }} />
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: RED, marginLeft: -3 }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: AUTHOR }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: PARTNER, marginLeft: -3 }} />
             </>
           )}
         </div>
@@ -163,8 +163,8 @@ function C3StoryDetail({
         {/* 라이브 비율 막대 (얇은 8px + 좌우 라벨) */}
         <div style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{ width: `${authorPct}%`, background: GRN, transition: 'width .25s' }} />
-            <div style={{ flex: 1, background: RED }} />
+            <div style={{ width: `${authorPct}%`, background: AUTHOR, transition: 'width .25s' }} />
+            <div style={{ flex: 1, background: PARTNER }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--L-sub)', marginTop: 7 }}>
             <span>작성자 {authorPct}%</span>
@@ -363,7 +363,7 @@ function C3ResultSolo({
             name="배심원"
             lens="종합"
             text="양쪽 이야기를 들었을 때 각자의 노력이 보입니다."
-            accent={GRN}
+            accent={AUTHOR}
           />
         </div>
       )}
@@ -461,7 +461,7 @@ function C3ResultPair({
           name="AI 배심원"
           lens="종합"
           text="양쪽 모두 대화를 통해 더 깊이 이해할 수 있었어요."
-          accent={GRN}
+          accent={AUTHOR}
         />
       </div>
 

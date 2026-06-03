@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { postApi, PostDetail } from '@/lib/api/community/postApi';
-import { GRN, RED, GRN_BG, RED_BG } from '@/lib/constants/factionColors';
+import { AUTHOR, PARTNER, AUTHOR_BG, PARTNER_BG } from '@/lib/constants/factionColors';
 
 interface PageProps {
   params: { id: string };
@@ -63,8 +63,8 @@ export default function C3StoryRead({ params }: PageProps) {
     );
   }
 
-  const bgColor = side === 'g' ? GRN_BG : RED_BG;
-  const textColor = side === 'g' ? GRN : RED;
+  const bgColor = side === 'g' ? AUTHOR_BG : PARTNER_BG;
+  const textColor = side === 'g' ? AUTHOR : PARTNER;
   const body = side === 'g' ? post.bodyPublished : post.partnerBodyPublished;
 
   return (
@@ -113,11 +113,11 @@ export default function C3StoryRead({ params }: PageProps) {
             flex: 1,
             padding: '10px 12px',
             background: side === 'g' ? 'transparent' : 'var(--P-card)',
-            border: side === 'g' ? `2px solid ${GRN}` : '1px solid var(--P-border)',
+            border: side === 'g' ? `2px solid ${AUTHOR}` : '1px solid var(--P-border)',
             borderRadius: 8,
             fontSize: 12,
             fontWeight: 600,
-            color: side === 'g' ? GRN : 'var(--P-ink)',
+            color: side === 'g' ? AUTHOR : 'var(--P-ink)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -125,7 +125,7 @@ export default function C3StoryRead({ params }: PageProps) {
             justifyContent: 'center',
           }}
         >
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: GRN }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: AUTHOR }} />
           작성자의 이야기
         </button>
         <button
@@ -134,11 +134,11 @@ export default function C3StoryRead({ params }: PageProps) {
             flex: 1,
             padding: '10px 12px',
             background: side === 'r' ? 'transparent' : 'var(--P-card)',
-            border: side === 'r' ? `2px solid ${RED}` : '1px solid var(--P-border)',
+            border: side === 'r' ? `2px solid ${PARTNER}` : '1px solid var(--P-border)',
             borderRadius: 8,
             fontSize: 12,
             fontWeight: 600,
-            color: side === 'r' ? RED : 'var(--P-ink)',
+            color: side === 'r' ? PARTNER : 'var(--P-ink)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -146,7 +146,7 @@ export default function C3StoryRead({ params }: PageProps) {
             justifyContent: 'center',
           }}
         >
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: RED }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: PARTNER }} />
           상대방의 이야기
         </button>
       </div>

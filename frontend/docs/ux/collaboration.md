@@ -113,7 +113,7 @@ dev에서 시각 확인 + UX 원칙 통과 확인.
         ↓ + visual-reference/ 캡처 업데이트 (필요시)
 ```
 
-**핵심**: 토큰 변경은 `tailwind.config.ts` **한 곳만**. `globals.css`는 `theme()` 참조이므로 자동 반영.
+**핵심**: 토큰 변경은 `tailwind.config.ts` + `globals.css`에서 수정. CSS 변수는 `globals.css`에서 정의, tailwind 토큰 참조는 `tailwind.config.ts`에서 설정.
 
 ---
 

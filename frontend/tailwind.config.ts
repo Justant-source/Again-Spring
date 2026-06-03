@@ -21,25 +21,28 @@ const config: Config = {
         serif: ['Noto Serif KR', 'Nanum Myeongjo', 'serif'],
       },
       colors: {
-        // Tone L — Letter (편지지)
+        // Tone L — Letter (편지지 · 미스트 세이지)
         'tone-l': {
-          bg: '#F5EFE6',
-          card: '#FBF6EC',
-          ink: '#2B2B2B',
-          sub: '#6E6151', // 가독성 개선: 구 #8A7F6B → AA WCAG 기준 L-bg 위 ≥4.5:1
-          border: '#D9CFBD',
+          bg: '#EDF1E8',
+          card: '#F7F9F2',
+          ink: '#2E3A2E',
+          sub: '#7C8A77',
+          border: '#D3DCC9',
           point: '#8A3A1F',
         },
-        // Tone P — Pastel (결과·공유)
+        // Tone P — Pastel (결과·공유 · 미스트 세이지)
         'tone-p': {
-          bg: '#FBF3EC',
-          card: '#FFF8F0',
-          ink: '#5C4030',
-          sub: '#876B54', // 가독성 개선: 구 #A08670 → AA WCAG 기준 P-bg 위 ≥4.5:1
-          border: '#EADFD0',
-          a: '#F4A896',
-          b: '#A8C8B4',
+          bg: '#EFF4EA',
+          card: '#F7FAF2',
+          ink: '#2E3A2E',
+          sub: '#7C8A77',
+          border: '#D3DCC9',
+          a: '#C9785A', // 작성자(피치)
+          b: '#5F8F76', // 상대방(세이지)
         },
+        // 진영색 — 작성자(피치) vs 상대방(세이지) · 중립 식별색
+        author: { DEFAULT: '#C9785A', bg: '#F6E6DD', dk: '#A55C3E' },
+        partner: { DEFAULT: '#5F8F76', bg: '#E6EFE8', dk: '#487961' },
         // Tone Q — Quiet (PDF·Premium)
         'tone-q': {
           bg: '#FAFAF7',

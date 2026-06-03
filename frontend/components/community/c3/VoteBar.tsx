@@ -19,11 +19,11 @@ export function VoteBar({ authorPct, big = false }: VoteBarProps) {
         overflow: 'hidden',
       }}
     >
-      {/* 작성자(초록) */}
+      {/* 작성자(피치) */}
       <div
         style={{
           flex: authorPct,
-          background: 'var(--grn)',
+          background: 'var(--faction-author)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -36,11 +36,11 @@ export function VoteBar({ authorPct, big = false }: VoteBarProps) {
         {authorPct > 10 && `${authorPct}%`}
       </div>
 
-      {/* 상대방(붉은) */}
+      {/* 상대방(세이지) */}
       <div
         style={{
           flex: partnerPct,
-          background: 'var(--red)',
+          background: 'var(--faction-partner)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

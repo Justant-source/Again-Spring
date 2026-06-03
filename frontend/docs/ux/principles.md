@@ -28,11 +28,11 @@
 ### 1-2. 양측 색상 시스템 — 앱 전체 일관 적용
 | 대상 | 색상 | 용도 |
 |---|---|---|
-| 작성자(A측) | 초록 계열 | FeedCard A측, JurorCard A편향, VoteBar A |
-| 상대방(B측) | 붉은 계열 | FeedCard B측, JurorCard B편향, VoteBar B |
+| 작성자(A측) | 피치(#C9785A) | FeedCard A측, JurorCard A편향, VoteBar A |
+| 상대방(B측) | 세이지(#5F8F76) | FeedCard B측, JurorCard B편향, VoteBar B |
 | 중립 | 회색 계열 | 커뮤니티 댓글, 중립 배심원 |
 
-**규칙**: 초록/붉은 색상을 A/B 이외의 의미로 사용 금지.
+**규칙**: 피치/세이지 색상을 A/B 이외의 의미로 사용 금지.
 
 ### 1-3. 판결·처방 표현 금지 (AI 출력에만 적용)
 **금지 표현** (AI 생성 텍스트에서):
@@ -68,7 +68,7 @@
 
 ### 2-3. VoteBar (`components/community/c3/VoteBar`)
 - 투표 비율: 실제 집계값 (%) 표시 — 임의값 금지
-- A측=초록, B측=붉은 일관 유지
+- A측=피치(#C9785A), B측=세이지(#5F8F76) 일관 유지
 - 투표 전/후 상태 구분 (완료 시 비율 표시, 재투표 금지)
 
 ### 2-4. CommentBar / CommentComposeSheet

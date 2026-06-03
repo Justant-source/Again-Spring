@@ -10,7 +10,7 @@ interface FeedCardProps {
   title: string;
   /** 본문 미리보기 (2줄 clamp) */
   body?: string;
-  /** 작성자(초록) 공감 비율 0~100 */
+  /** 작성자(피치) 공감 비율 0~100 */
   g: number;
   /** 투표 수 (0이면 '투표' 라벨) */
   votes?: number;
@@ -78,8 +78,8 @@ export function FeedCard({ cat, id, time, title, body, g, votes, c, views, href 
 
       {/* 투표 현황 — 카드 하단에 꽉 차게 (비율 숫자 없음) */}
       <div style={{ display: 'flex', height: 7 }}>
-        <div style={{ width: g + '%', background: 'var(--grn)' }} />
-        <div style={{ flex: 1, background: 'var(--red)' }} />
+        <div style={{ width: g + '%', background: 'var(--faction-author)' }} />
+        <div style={{ flex: 1, background: 'var(--faction-partner)' }} />
       </div>
     </a>
   );

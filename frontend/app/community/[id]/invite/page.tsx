@@ -141,7 +141,7 @@ export default function PostInvitePage() {
   if (!post) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--P-bg)', padding: '20px' }}>
-        <div style={{ fontSize: 14, color: 'var(--P-red)' }}>{error || '포스트를 찾을 수 없습니다'}</div>
+        <div style={{ fontSize: 14, color: 'var(--faction-partner)' }}>{error || '포스트를 찾을 수 없습니다'}</div>
       </div>
     );
   }
@@ -539,9 +539,9 @@ export default function PostInvitePage() {
             style={{
               minHeight: 200,
               padding: '13px 14px',
-              border: '2.5px dashed var(--red)',
+              border: '2.5px dashed var(--faction-partner)',
               borderRadius: 12,
-              background: 'var(--red-bg)',
+              background: 'var(--faction-partner-bg)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -554,7 +554,7 @@ export default function PostInvitePage() {
                   width: 8,
                   height: 8,
                   borderRadius: '50%',
-                  background: 'var(--red)',
+                  background: 'var(--faction-partner)',
                   margin: '0 auto 8px',
                 }}
               />

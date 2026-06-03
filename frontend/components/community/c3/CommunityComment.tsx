@@ -49,9 +49,9 @@ export function CommunityComment({
 
   const sub = 'var(--L-sub)';
   const ink = 'var(--L-ink)';
-  const nickColor = isAuthor ? 'var(--grn)' : isPartner ? 'var(--red)' : sub;
+  const nickColor = isAuthor ? 'var(--faction-author)' : isPartner ? 'var(--faction-partner)' : sub;
   const hasStar = isAuthor || isPartner;
-  const likeColor = isLiked ? 'var(--grn)' : sub;
+  const likeColor = isLiked ? 'var(--faction-author)' : sub;
 
   return (
     <div
@@ -172,7 +172,7 @@ export function CommunityComment({
                 border: 'none',
                 textAlign: 'left',
                 fontSize: 13,
-                color: 'var(--red)',
+                color: 'var(--faction-partner)',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
               }}

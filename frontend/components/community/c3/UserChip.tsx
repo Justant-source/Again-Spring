@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@/lib/types/user';
 
-const RED = '#CC6B57';
+const PARTNER_COLOR = '#5F8F76';
 
 interface UserChipProps {
   user?: User | null;
@@ -56,7 +56,7 @@ function GuestInfoSheet({ user, onClose }: { user: User; onClose: () => void }) 
             '상대 초대·결과 알림을 받을 수 없어요',
           ].map((text) => (
             <div key={text} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ color: RED, fontSize: 14, marginTop: 1, flexShrink: 0 }}>✕</span>
+              <span style={{ color: PARTNER_COLOR, fontSize: 14, marginTop: 1, flexShrink: 0 }}>✕</span>
               <span style={{ fontSize: 13.5, color: 'var(--L-ink)', lineHeight: 1.5 }}>{text}</span>
             </div>
           ))}

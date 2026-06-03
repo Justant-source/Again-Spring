@@ -82,7 +82,7 @@ export default function PartnerAnswerPage() {
   if (!post) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--P-bg)', padding: '20px' }}>
-        <div style={{ fontSize: 14, color: 'var(--P-red)' }}>{error || '초대 링크를 찾을 수 없습니다'}</div>
+        <div style={{ fontSize: 14, color: 'var(--faction-partner)' }}>{error || '초대 링크를 찾을 수 없습니다'}</div>
       </div>
     );
   }
@@ -115,7 +115,7 @@ export default function PartnerAnswerPage() {
           style={{
             fontSize: 14,
             fontWeight: 600,
-            color: 'var(--red)',
+            color: 'var(--faction-partner)',
             margin: 0,
             flex: 1,
             textAlign: 'center',
@@ -178,9 +178,9 @@ export default function PartnerAnswerPage() {
             width: '100%',
             minHeight: 200,
             padding: '12px 14px',
-            border: '1px solid var(--red)',
+            border: '1px solid var(--faction-partner)',
             borderRadius: 8,
-            background: 'var(--red-bg)',
+            background: 'var(--faction-partner-bg)',
             fontSize: 13,
             fontFamily: 'var(--font-serif)',
             lineHeight: 1.6,

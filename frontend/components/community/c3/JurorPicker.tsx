@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-const GRN = '#5E9B77';
+const AUTHOR_COLOR = '#C9785A';
 
 interface JurorPickerProps {
   onChange: (value: number) => void;
@@ -46,7 +46,7 @@ export function JurorPicker({ onChange, defaultValue = 3 }: JurorPickerProps) {
           onClick={handleDec}
           style={{
             width: 26, height: 26, borderRadius: '50%',
-            border: `1px solid ${GRN}`, color: GRN,
+            border: `1px solid ${AUTHOR_COLOR}`, color: AUTHOR_COLOR,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 16, cursor: 'pointer', background: '#fff',
             opacity: count === 0 ? 0.4 : 1,
@@ -63,7 +63,7 @@ export function JurorPicker({ onChange, defaultValue = 3 }: JurorPickerProps) {
           onClick={handleInc}
           style={{
             width: 26, height: 26, borderRadius: '50%',
-            border: `1px solid ${GRN}`, color: GRN,
+            border: `1px solid ${AUTHOR_COLOR}`, color: AUTHOR_COLOR,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 16, cursor: 'pointer', background: '#fff',
             opacity: count === 9 ? 0.4 : 1,

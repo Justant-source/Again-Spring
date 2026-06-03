@@ -19,9 +19,9 @@ export function SideStory({
   onSelect,
   onMore,
 }: SideStoryProps) {
-  const c = side === 'g' ? 'var(--grn)' : 'var(--red)';
-  const cDk = side === 'g' ? 'var(--grn-dk)' : 'var(--red-dk)';
-  const bg = side === 'g' ? 'var(--grn-bg)' : 'var(--red-bg)';
+  const c = side === 'g' ? 'var(--faction-author)' : 'var(--faction-partner)';
+  const cDk = side === 'g' ? 'var(--faction-author-dk)' : 'var(--faction-partner-dk)';
+  const bg = side === 'g' ? 'var(--faction-author-bg)' : 'var(--faction-partner-bg)';
 
   return (
     <div

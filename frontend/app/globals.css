@@ -14,12 +14,11 @@
   --L-border: theme('colors.tone-l.border');
   --L-point: theme('colors.tone-l.point');
 
-  /* Tone P — Pastel (SSOT: tailwind.config.ts > colors.tone-p)
-     --P-a / --P-b: RelationshipColorSync가 관계 유형에 따라 런타임 덮어씀 */
+  /* Tone P — Pastel (SSOT: tailwind.config.ts > colors.tone-p) */
   --P-bg: theme('colors.tone-p.bg');
   --P-card: theme('colors.tone-p.card');
-  --P-a: #F4A896;
-  --P-b: #A8C8B4;
+  --P-a: #C9785A;
+  --P-b: #5F8F76;
   --P-ink: theme('colors.tone-p.ink');
   --P-sub: theme('colors.tone-p.sub');
   --P-border: theme('colors.tone-p.border');
@@ -32,13 +31,13 @@
   --Q-border: theme('colors.tone-q.border');
   --Q-point: theme('colors.tone-q.point');
 
-  /* Faction colors — 작성자(초록) vs 상대방(붉은) 진영 구분 */
-  --grn: #5E9B77;
-  --grn-bg: #E5F0E9;
-  --grn-dk: #3C7A55;
-  --red: #CC6B57;
-  --red-bg: #F7E3DB;
-  --red-dk: #A8472F;
+  /* 진영색 — 작성자(피치) vs 상대방(세이지) · 중립 식별색(좌=작성자/우=상대방) */
+  --faction-author: #C9785A;
+  --faction-author-bg: #F6E6DD;
+  --faction-author-dk: #A55C3E;
+  --faction-partner: #5F8F76;
+  --faction-partner-bg: #E6EFE8;
+  --faction-partner-dk: #487961;
 
   --font-sans: 'Pretendard Variable', Pretendard, -apple-system, system-ui, 'Malgun Gothic', sans-serif;
   --font-serif: 'Noto Serif KR', 'Nanum Myeongjo', serif;

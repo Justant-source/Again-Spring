@@ -119,6 +119,9 @@ frontend/
 │   ├── lint:emoji              # 이모지 검사
 │   └── test:e2e:realbe         # 실서버 e2e
 │
+├── design/                     # 디자인 자산 (배포 미포함)
+│   └── 다시봄 광장형 UX (standalone).html  # 28화면 시각 정본
+│
 ├── public/
 │   └── mockServiceWorker.js    # MSW 자동 생성 (gitignored)
 │
@@ -152,14 +155,14 @@ frontend/
     │       ├── 08-crisis.md
     │       └── 09-admin.md
     ├── design/
-    │   ├── README.md
-    │   ├── components.md
-    │   ├── system.md
-    │   ├── icons.md
+    │   ├── README.md           # 디자인 문서 인덱스
+    │   ├── system.md           # 디자인 시스템 SSOT (색·타이포·시그니처·금지사항)
+    │   ├── components.md       # 컴포넌트 인벤토리 + 28화면 인덱스 + 인터랙션 규칙
+    │   ├── icons.md            # SVG 아이콘 카탈로그 + emoji 금지 정책
     │   ├── visual-reference/
-    │   │   └── README.md
+    │   │   └── README.md       # 시각 정본 HTML 포인터
     │   └── specs/
-    │       └── metaphor-illustration-system.md
+    │       └── metaphor-illustration-system.md  # 메타포 일러스트 60종 레지스트리
     └── policies/
         ├── README.md
         ├── forbidden-words-lint.md
