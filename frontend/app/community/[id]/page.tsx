@@ -286,11 +286,15 @@ function C3ResultSolo({
   voteResult,
   comments,
   jury,
+  juryExhausted,
+  onRetryJury,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
   comments: Comment[];
   jury: JuryResult | null;
+  juryExhausted?: boolean;
+  onRetryJury?: () => void;
 }) {
   const router = useRouter();
 
@@ -365,7 +369,7 @@ function C3ResultSolo({
 
       {/* AI 배심원 섹션 */}
       <div style={{ marginBottom: 20 }}>
-        <JurySection jury={jury} jurorCount={post.jurorCount ?? 0} />
+        <JurySection jury={jury} jurorCount={post.jurorCount ?? 0} exhausted={juryExhausted} onRetry={onRetryJury} />
       </div>
 
       {/* 액션 버튼들 */}
@@ -413,13 +417,28 @@ function C3ResultPair({
   voteResult,
   comments,
   jury,
+  juryExhausted,
+  onRetryJury,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
   comments: Comment[];
   jury: JuryResult | null;
+  juryExhausted?: boolean;
+  onRetryJury?: () => void;
 }) {
   const router = useRouter();
+
+  const handleShare = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: post.title, url });
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch { /* 사용자 취소 등 — 무시 */ }
+  };
 
   return (
     <div style={{ background: 'var(--P-bg)', minHeight: '100vh', padding: '16px' }}>
@@ -459,11 +478,12 @@ function C3ResultPair({
 
       {/* AI 배심원 섹션 */}
       <div style={{ marginBottom: 20 }}>
-        <JurySection jury={jury} jurorCount={post.jurorCount ?? 0} />
+        <JurySection jury={jury} jurorCount={post.jurorCount ?? 0} exhausted={juryExhausted} onRetry={onRetryJury} />
       </div>
 
       {/* 결과 공유 버튼 */}
       <button
+        onClick={handleShare}
         style={{
           width: '100%',
           padding: '12px 16px',
@@ -487,11 +507,26 @@ function C3Closed({
   post,
   voteResult,
   jury,
+  juryExhausted,
+  onRetryJury,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
   jury: JuryResult | null;
+  juryExhausted?: boolean;
+  onRetryJury?: () => void;
 }) {
+  const handleShare = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: post.title, url });
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch { /* 사용자 취소 등 — 무시 */ }
+  };
+
   return (
     <div style={{ background: 'var(--P-bg)', minHeight: '100vh', padding: '16px' }}>
       <div
@@ -558,7 +593,7 @@ function C3Closed({
 
       {/* AI 배심원 섹션 */}
       <div style={{ marginBottom: 20 }}>
-        <JurySection jury={jury} jurorCount={post.jurorCount ?? 0} />
+        <JurySection jury={jury} jurorCount={post.jurorCount ?? 0} exhausted={juryExhausted} onRetry={onRetryJury} />
       </div>
 
       {/* 안내 메시지 */}
@@ -577,6 +612,7 @@ function C3Closed({
 
       {/* 결과 공유 버튼 */}
       <button
+        onClick={handleShare}
         style={{
           width: '100%',
           padding: '12px 16px',
@@ -601,6 +637,8 @@ export default function CommunityPostPage({ params }: PageProps) {
   const [post, setPost] = useState<PostDetail | null>(null);
   const [voteResult, setVoteResult] = useState<VoteResult | null>(null);
   const [juryResult, setJuryResult] = useState<JuryResult | null>(null);
+  const [juryPollingExhausted, setJuryPollingExhausted] = useState(false);
+  const [juryRetryKey, setJuryRetryKey] = useState(0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentPage, setCommentPage] = useState(0);
   const [hasMoreComments, setHasMoreComments] = useState(true);
@@ -650,8 +688,10 @@ export default function CommunityPostPage({ params }: PageProps) {
     // 이미 완료된 경우 구독 즉시 종료
     if (juryResult && juryResult.jurors.length >= target) return;
 
+    setJuryPollingExhausted(false);
     let attempts = 0;
-    const MAX = 20; // 최대 ~60초
+    // 배심원 1인당 ~25초 × 2배 여유 = 50초 → 50/3 ≈ 17폴. 최소 60(3분)
+    const MAX = Math.max(60, target * 17);
     const timer = setInterval(async () => {
       attempts += 1;
       try {
@@ -659,13 +699,29 @@ export default function CommunityPostPage({ params }: PageProps) {
         setJuryResult(data);
         if (data.jurors.length >= target || attempts >= MAX) {
           clearInterval(timer);
+          if (data.jurors.length < target) setJuryPollingExhausted(true);
         }
       } catch {
-        if (attempts >= MAX) clearInterval(timer);
+        if (attempts >= MAX) {
+          clearInterval(timer);
+          setJuryPollingExhausted(true);
+        }
       }
     }, 3000);
     return () => clearInterval(timer);
-  }, [post?.isAuthor, post?.jurorCount, params.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [post?.isAuthor, post?.jurorCount, params.id, juryRetryKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleRetryJury = useCallback(async () => {
+    if (!post) return;
+    try {
+      await postApi.retryJury(post.id);
+      setJuryPollingExhausted(false);
+      setJuryRetryKey(k => k + 1);
+    } catch {
+      // retry 409이면 이미 완료 — 재조회
+      postApi.getJury(post.id).then(setJuryResult).catch(() => {});
+    }
+  }, [post]);
 
   // 댓글 페이지에서 돌아올 때 commentCount 갱신
   useEffect(() => {
@@ -772,12 +828,12 @@ export default function CommunityPostPage({ params }: PageProps) {
     return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} onLike={handleLike} isVoting={isVoting} hasMoreComments={hasMoreComments} loadingMoreComments={loadingMoreComments} commentBottomRef={commentBottomRef} />;
   } else if (post.status === 'VOTING' && !post.paired) {
     // View B: 작성자 + VOTING + partner 없음
-    return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} jury={juryResult} />;
+    return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} jury={juryResult} juryExhausted={juryPollingExhausted} onRetryJury={handleRetryJury} />;
   } else if (post.status === 'VOTING' && post.paired) {
     // View C: 작성자 + VOTING + partner 있음
-    return <C3ResultPair post={post} voteResult={voteResult} comments={comments} jury={juryResult} />;
+    return <C3ResultPair post={post} voteResult={voteResult} comments={comments} jury={juryResult} juryExhausted={juryPollingExhausted} onRetryJury={handleRetryJury} />;
   } else {
     // View D: status=CLOSED
-    return <C3Closed post={post} voteResult={voteResult} jury={juryResult} />;
+    return <C3Closed post={post} voteResult={voteResult} jury={juryResult} juryExhausted={juryPollingExhausted} onRetryJury={handleRetryJury} />;
   }
 }
