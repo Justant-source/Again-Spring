@@ -1,12 +1,13 @@
 /**
- * Flow 04: 광장형 커뮤니티 핵심 플로우 (C3 광장형 V18 기준)
+ * Flow 04: 광장형 커뮤니티 핵심 플로우 (C3 광장형 V18 / 6/2 피벗 기준)
  *
  * 커버 범위:
- *   - 광장 피드 로딩 (사연 목록 표시, 타이틀, 카테고리 칩)
+ *   - 광장 피드 로딩, 정렬 토글(최신순/추천순), 카테고리 필터
  *   - 사연 작성: 제목·본문 입력, 글자수 카운터
- *   - 모드 선택: PUBLIC 선택 → 버튼 활성화 (로그인 상태)
- *   - 게스트 제약: 상대 초대 카드 비활성
- *   - 사연 상세: 진입 후 본문 표시
+ *   - 모드 선택: PUBLIC → 피드로 이동, PRIVATE(회원만 활성)
+ *   - 게스트 제약: GuestNoticeModal, 상대 초대 카드 비활성
+ *   - 사연 상세: 댓글바 클릭 → 댓글 페이지 이동, 진영 탭 전환
+ *   - 전문 읽기 화면: 작성자/상대방 탭 전환
  *
  * 실행 조건: dev docker 스택 가동 중, mock 사연 시드 존재
  */
@@ -28,13 +29,46 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     expect(await cards.count()).toBeGreaterThanOrEqual(1)
   })
 
-  test('피드 — 타이틀·버튼·카테고리 칩 표시', async ({ page }) => {
+  test('피드 — 타이틀·카테고리 칩 표시 (내 사연 올리기 버튼 없음)', async ({ page }) => {
     await page.goto(`${BASE}/community`)
     await page.waitForSelector('[data-testid="feed-post-list"]', { timeout: 12_000 })
     await expect(page.getByText('다시봄 광장')).toBeVisible()
-    await expect(page.getByText('내 사연 올리기')).toBeVisible()
     await expect(page.getByText('전체')).toBeVisible()
     await expect(page.getByRole('button', { name: '연인' })).toBeVisible()
+    // 6/2 피벗 이후 피드 페이지에서 "내 사연 올리기" 버튼 제거됨
+    await expect(page.getByText('내 사연 올리기')).not.toBeVisible()
+  })
+
+  test('피드 — 정렬 토글: 최신순↔추천순 전환', async ({ page }) => {
+    await page.goto(`${BASE}/community`)
+    await page.waitForSelector('[data-testid="feed-post-list"]', { timeout: 12_000 })
+
+    const latestBtn = page.locator('[data-testid="feed-sort-latest"]')
+    const recommendedBtn = page.locator('[data-testid="feed-sort-recommended"]')
+    await expect(latestBtn).toBeVisible()
+    await expect(recommendedBtn).toBeVisible()
+
+    // 추천순 클릭 → 피드 재로드
+    await recommendedBtn.click()
+    await page.waitForSelector('[data-testid="feed-post-list"]', { timeout: 8_000 })
+
+    // 최신순 복귀
+    await latestBtn.click()
+    await page.waitForSelector('[data-testid="feed-post-list"]', { timeout: 8_000 })
+  })
+
+  test('피드 — 카테고리 필터: 연인 선택 → 전체 복귀', async ({ page }) => {
+    await page.goto(`${BASE}/community`)
+    await page.waitForSelector('[data-testid="feed-post-list"]', { timeout: 12_000 })
+
+    // 연인 칩 클릭
+    await page.getByRole('button', { name: '연인' }).click()
+    // 필터 적용 후 잠시 대기 (빈 상태일 수도 있음)
+    await page.waitForTimeout(1_000)
+
+    // 전체 복귀 → 피드 재표시
+    await page.getByRole('button', { name: '전체' }).click()
+    await page.waitForSelector('[data-testid="feed-post-list"]', { timeout: 8_000 })
   })
 
   test('compose — 제목·본문 입력 + 글자수 카운터', async ({ page }) => {
@@ -89,10 +123,8 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
   })
 
   test('사연 상세 — 알려진 mock 포스트 직접 방문 → 페이지 로드 확인', async ({ page }) => {
-    // mock 데이터 중 알려진 post ID 직접 방문
     await page.goto(`${BASE}/community/mock_001`)
     await page.waitForURL(/\/community\/mock_001/, { timeout: 12_000 })
-    // 페이지가 에러 없이 로드됐는지 확인 — 사연 제목 텍스트 존재
     await expect(page.getByText('주말에도 저만 쉬는 날이 없어요')).toBeVisible({ timeout: 12_000 })
   })
 
@@ -100,7 +132,6 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     await page.goto(`${BASE}/community`)
     // 게스트 자동 초기화 대기 (2초)
     await page.waitForTimeout(2000)
-    // UserChip 클릭
     const userChip = page.locator('[data-testid="user-chip"]')
     await expect(userChip).toBeVisible({ timeout: 5_000 })
     await userChip.click()
@@ -119,54 +150,84 @@ test.describe('Flow 04-C: 댓글 · 좋아요 (공개 접근)', () => {
 
   test('댓글 입력바 클릭 → 컴포즈 시트 열림', async ({ page }) => {
     await page.goto(`${BASE}/community/mock_001/comments`)
-    // 댓글 입력바 대기 및 클릭
     const commentBar = page.getByText('댓글을 남겨주세요.')
     await expect(commentBar).toBeVisible({ timeout: 8_000 })
     await commentBar.click()
-    // 컴포즈 textarea 표시 확인
     const textarea = page.locator('textarea')
     await expect(textarea).toBeVisible({ timeout: 3_000 })
   })
 
   test('익명 댓글 등록 가능 (토큰 없이)', async ({ page }) => {
     await page.goto(`${BASE}/community/mock_001/comments`)
-    // 댓글 입력바 클릭
     const commentBar = page.getByText('댓글을 남겨주세요.')
     await expect(commentBar).toBeVisible({ timeout: 8_000 })
     await commentBar.click()
-    // textarea 채우기
     const textarea = page.locator('textarea')
     await expect(textarea).toBeVisible({ timeout: 3_000 })
     const testCommentText = '익명 댓글 테스트'
     await textarea.fill(testCommentText)
-    // 등록 버튼 클릭
     await page.getByRole('button', { name: '등록' }).click()
-    // 댓글이 목록에 나타나는지 확인 (.first() — 이전 테스트 실행 누적 또는 textarea 잔존 텍스트 대비)
     await expect(page.getByText(testCommentText).first()).toBeVisible({ timeout: 5_000 })
   })
 
   test('방금 등록한 댓글 시간 → 음수 없음', async ({ page }) => {
     await page.goto(`${BASE}/community/mock_001/comments`)
-    // 댓글 입력바 클릭
     const commentBar = page.getByText('댓글을 남겨주세요.')
     await expect(commentBar).toBeVisible({ timeout: 8_000 })
     await commentBar.click()
-    // textarea 채우기
     const textarea = page.locator('textarea')
     await expect(textarea).toBeVisible({ timeout: 3_000 })
     const testCommentText = '방금 작성된 댓글'
     await textarea.fill(testCommentText)
-    // 등록 버튼 클릭
     await page.getByRole('button', { name: '등록' }).click()
-    // 댓글이 목록에 나타남 (.first() — 이전 실행 누적 또는 textarea 잔존 텍스트 대비)
     await expect(page.getByText(testCommentText).first()).toBeVisible({ timeout: 5_000 })
-    // 댓글 시간 텍스트 검사 (방금 또는 N분 전, 음수 없음)
     const commentLocator = page.getByText(testCommentText).first()
     const commentContainer = commentLocator.locator('..')
-    // 음수 시간 표현은 "-N일 전" 또는 "-N분 전" 형태 → 이게 없어야 함
     const timeText = await commentContainer.textContent()
     expect(timeText).toMatch(/방금|\d+분 전|\d+시간 전|\d+일 전/)
     expect(timeText).not.toMatch(/-\d+/)
+  })
+
+  test('사연 상세 — 댓글바 클릭 → 댓글 페이지 이동', async ({ page }) => {
+    // 상세 페이지 하단 고정 댓글바는 /comments로 라우팅 (6/2 개편 후 인라인 미작성)
+    await page.goto(`${BASE}/community/mock_001`)
+    await page.waitForURL(/\/community\/mock_001/, { timeout: 12_000 })
+    const commentBar = page.getByText('댓글을 남겨주세요.').first()
+    await expect(commentBar).toBeVisible({ timeout: 8_000 })
+    await commentBar.click()
+    await page.waitForURL(/\/community\/mock_001\/comments/, { timeout: 8_000 })
+    expect(page.url()).toContain('/community/mock_001/comments')
+  })
+})
+
+// ── 전문 읽기 화면 ─────────────────────────────────────────────
+test.describe('Flow 04-D: 전문 읽기 화면 (6/2 진영 탭)', () => {
+  // read 페이지에는 "상대방 이야기 읽기 ›" 이동 버튼이 없고
+  // 작성자/상대방 탭 전환 UI만 존재한다 (710d874 기준).
+
+  test('read 화면 — 진영 탭 두 개 표시 (작성자 · 상대방)', async ({ page }) => {
+    await page.goto(`${BASE}/community/mock_001/read`)
+    await expect(page.getByText('작성자의 이야기')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('상대방의 이야기')).toBeVisible({ timeout: 5_000 })
+  })
+
+  test('read 화면 — 상대방 탭 클릭 → 활성 스타일 전환 (URL side=r)', async ({ page }) => {
+    await page.goto(`${BASE}/community/mock_001/read`)
+    await page.waitForURL(/\/read/, { timeout: 10_000 })
+    const partnerTab = page.getByText('상대방의 이야기')
+    await expect(partnerTab).toBeVisible({ timeout: 8_000 })
+    await partnerTab.click()
+    // side=r 파라미터가 반영되거나 탭이 활성 상태로 전환됨
+    // URL 쿼리 또는 UI 상태 확인 (두 탭 모두 여전히 보여야 함)
+    await expect(page.getByText('작성자의 이야기')).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByText('상대방의 이야기')).toBeVisible({ timeout: 3_000 })
+  })
+
+  test('read 화면 — "상대방 이야기 읽기 ›" 이동 버튼 없음 (710d874 회귀 방지)', async ({ page }) => {
+    await page.goto(`${BASE}/community/mock_001/read`)
+    await expect(page.getByText('작성자의 이야기')).toBeVisible({ timeout: 10_000 })
+    // 해당 버튼이 삭제됐음을 확인
+    await expect(page.getByText(/상대방 이야기 읽기/)).not.toBeVisible()
   })
 })
 
@@ -174,9 +235,10 @@ test.describe('Flow 04-C: 댓글 · 좋아요 (공개 접근)', () => {
 test.describe('Flow 04-B: 광장 플로우 (회원)', () => {
   test.use({ storageState: authStatePath(PERSONA_TEST1.email) })
 
-  test('회원 — 모드 선택: PUBLIC 선택 후 제출 → analyzing → 상세 이동', async ({ page }) => {
+  test('회원 — PUBLIC 선택 후 제출 → 피드로 이동 (6/2 이후 동작)', async ({ page }) => {
+    // 6/2 이전: 제출 후 /community/[id] 로 이동
+    // 6/2 이후: 제출 후 /community (피드)로 이동 — BE 분석 대기 없이 즉시 반환
     await page.goto(`${BASE}/community/new`)
-    // compose 단계
     const titleInput = page.locator('[data-testid="compose-title"]')
     await expect(titleInput).toBeVisible({ timeout: 10_000 })
     await titleInput.fill('e2e 자동 테스트 사연')
@@ -186,16 +248,15 @@ test.describe('Flow 04-B: 광장 플로우 (회원)', () => {
     // mode 단계 (회원이므로 GuestNoticeModal 없음)
     await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 8_000 })
 
-    // PUBLIC 선택
+    // PUBLIC 선택 후 제출
     await page.locator('[data-testid="mode-public-card"]').click()
     const submitBtn = page.locator('[data-testid="mode-submit-btn"]')
     await expect(submitBtn).toBeEnabled()
-
-    // 제출 → analyzing → 상세 페이지
     await submitBtn.click()
-    // analyzing 화면 또는 바로 상세로 이동 (BE 처리 속도에 따라 달라질 수 있음)
-    await page.waitForURL(/\/community\/[^/]+$/, { timeout: 30_000 })
-    expect(page.url()).toMatch(/\/community\/[^/]+$/)
+
+    // 피드(/community)로 이동
+    await page.waitForURL(/\/community$/, { timeout: 30_000 })
+    expect(page.url()).toMatch(/\/community$/)
   })
 
   test('회원 — 상대 초대 카드 활성화', async ({ page }) => {

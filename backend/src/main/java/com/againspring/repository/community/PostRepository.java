@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -37,4 +40,8 @@ public interface PostRepository extends JpaRepository<Post, String> {
      * 초대 토큰으로 포스트 조회 (C3 파트너 초대)
      */
     Optional<Post> findByInviteToken(String inviteToken);
+
+    @Modifying
+    @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :postId")
+    void incrementViewCount(@Param("postId") String postId);
 }

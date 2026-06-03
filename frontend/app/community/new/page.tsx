@@ -67,7 +67,11 @@ export default function CommunityNewPage() {
     try {
       setLoading(true);
       setError(null);
-      setStep('analyzing');
+
+      // PUBLIC인 경우만 분석 화면 표시
+      if (visibility === 'PUBLIC') {
+        setStep('analyzing');
+      }
 
       const request: PostCreateRequest = {
         bodyRaw: bodyRaw.trim(),
@@ -78,13 +82,17 @@ export default function CommunityNewPage() {
       };
 
       // 등록 요청과 최소 1초 대기를 병렬 실행
-      const [_result] = await Promise.all([
+      const [result] = await Promise.all([
         postApi.create(request),
         new Promise(r => setTimeout(r, 1000)),
       ]);
 
-      // 등록 완료 — 피드로 이동 (내 글이 바로 보임)
-      router.push('/community');
+      // PRIVATE: 초대 화면으로 이동, PUBLIC: 피드로 이동
+      if (visibility === 'PRIVATE') {
+        router.push(`/community/${result.id}/invite`);
+      } else {
+        router.push('/community');
+      }
     } catch (err: unknown) {
       console.error('Failed to create post:', err);
       const msg = err instanceof Error ? err.message : '';

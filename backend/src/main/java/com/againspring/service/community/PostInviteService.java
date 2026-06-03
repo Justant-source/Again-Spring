@@ -3,6 +3,7 @@ package com.againspring.service.community;
 import com.againspring.api.community.dto.PostInviteDto;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.enums.PostStatus;
+import com.againspring.domain.enums.PostVisibility;
 import com.againspring.domain.enums.PublishMode;
 import com.againspring.repository.community.PostRepository;
 import lombok.RequiredArgsConstructor;
@@ -103,7 +104,15 @@ public class PostInviteService {
 
         post.setPartnerUserId(partnerUserId);
         post.setPartnerBodyRaw(bodyRaw);
+        post.setPartnerBodyPublished(bodyRaw);
         post.setPartnerAnsweredAt(Instant.now());
+
+        // WAIT_FOR_PARTNER 모드일 때 공개 및 투표 마감시간 설정
+        if (PublishMode.WAIT_FOR_PARTNER.equals(post.getPublishMode())) {
+            post.setVisibility(PostVisibility.PUBLIC);
+            int hours = (post.getVoteDurationHours() != null) ? post.getVoteDurationHours() : 72;
+            post.setVoteCloseAt(post.getPartnerAnsweredAt().plusSeconds((long) hours * 3600));
+        }
 
         // userTitle이 제공되면 업데이트 (선택사항)
         if (userTitle != null && !userTitle.isBlank()) {
@@ -155,11 +164,12 @@ public class PostInviteService {
             throw new IllegalArgumentException("UNAUTHORIZED");
         }
 
-        // 상태를 VOTING으로 전환 (이미 VOTING이면 유지)
-        if (PostStatus.DRAFT.equals(post.getStatus())) {
-            post.setStatus(PostStatus.VOTING);
-            postRepository.save(post);
-            log.info("Published post {} immediately", postId);
+        post.setVisibility(PostVisibility.PUBLIC);
+        if (post.getVoteCloseAt() == null) {
+            int hours = (post.getVoteDurationHours() != null) ? post.getVoteDurationHours() : 72;
+            post.setVoteCloseAt(Instant.now().plusSeconds((long) hours * 3600));
         }
+        postRepository.save(post);
+        log.info("Published post {} immediately", postId);
     }
 }

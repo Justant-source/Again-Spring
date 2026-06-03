@@ -6,13 +6,14 @@ import { postApi } from '@/lib/api/community/postApi';
 import { postInviteApi } from '@/lib/api/community/postInviteApi';
 import { SideStory } from '@/components/community/c3/SideStory';
 
-type Step = 'invite' | 'choice' | 'closing' | 'waiting';
+type Step = 'invite' | 'choice' | 'closing' | 'waiting' | 'arrived';
 
 interface PostData {
   id: string;
   userTitle: string;
   bodyPublished: string;
   category: string;
+  partnerBodyPublished?: string;
 }
 
 export default function PostInvitePage() {
@@ -31,6 +32,9 @@ export default function PostInvitePage() {
 
   // "closing" 단계 상태
   const [voteDuration, setVoteDuration] = useState<24 | 72 | 168 | null>(72);
+
+  // "waiting" 단계 상태
+  const [partnerArrived, setPartnerArrived] = useState(false);
 
   // 페이지 로드: 포스트 정보 가져오기
   useEffect(() => {
@@ -57,6 +61,22 @@ export default function PostInvitePage() {
     loadPost();
   }, [postId]);
 
+  // Polling for partner arrival
+  useEffect(() => {
+    if (step !== 'waiting') return;
+    const timer = setInterval(async () => {
+      try {
+        const data = await postApi.get(postId);
+        if (data.paired || data.partnerBodyPublished) {
+          clearInterval(timer);
+          setPost(prev => prev ? { ...prev, bodyPublished: data.bodyPublished, partnerBodyPublished: data.partnerBodyPublished } : prev);
+          setStep('arrived');
+        }
+      } catch {}
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [step, postId]);
+
   const handleCreateInvite = async () => {
     if (!postId) return;
     try {
@@ -73,10 +93,18 @@ export default function PostInvitePage() {
     }
   };
 
-  const handleChoiceNext = () => {
+  const handleChoiceNext = async () => {
     if (publishChoice === 'now') {
       setStep('closing');
     } else {
+      try {
+        setLoading(true);
+        await postInviteApi.setPublishMode(postId, 'WAIT_FOR_PARTNER', 72);
+      } catch (err) {
+        console.error('Failed to set publish mode:', err);
+      } finally {
+        setLoading(false);
+      }
       setStep('waiting');
     }
   };
@@ -645,6 +673,68 @@ export default function PostInvitePage() {
             링크 다시 보내기
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // Step 4.5: Arrived
+  if (step === 'arrived') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--L-bg)', padding: '20px' }}>
+        <div
+          style={{
+            fontSize: 18,
+            fontFamily: 'var(--font-serif)',
+            fontWeight: 600,
+            color: 'var(--L-ink)',
+            marginBottom: 8,
+          }}
+        >
+          답변이 도착했어요
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--L-sub)', marginBottom: 28 }}>
+          상대방의 이야기가 붙었습니다
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 32 }}>
+          <SideStory
+            side="g"
+            label="내 이야기"
+            body={post.bodyPublished}
+            clamp={false}
+            selected={false}
+            onSelect={() => {}}
+            onMore={() => {}}
+          />
+          <SideStory
+            side="r"
+            label="상대방 이야기"
+            body={post.partnerBodyPublished || ''}
+            clamp={false}
+            selected={false}
+            onSelect={() => {}}
+            onMore={() => {}}
+          />
+        </div>
+
+        <button
+          data-testid="arrived-result-btn"
+          onClick={() => router.push(`/community/${postId}`)}
+          style={{
+            width: '100%',
+            padding: '15px 0',
+            borderRadius: 4,
+            border: 'none',
+            background: 'var(--L-ink)',
+            color: 'var(--L-bg)',
+            fontSize: 15,
+            fontWeight: 500,
+            fontFamily: 'var(--font-sans)',
+            cursor: 'pointer',
+          }}
+        >
+          함께 결과 보기
+        </button>
       </div>
     );
   }

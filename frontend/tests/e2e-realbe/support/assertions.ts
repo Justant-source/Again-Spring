@@ -1,14 +1,5 @@
-import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { RATIO_LEGAL_NOTICE } from './selectors'
 
-/**
- * ContributionRatio 법적 안내 박스가 표시되고 숨겨지지 않음을 단언.
- * 3회 재확인으로 동적으로 제거되지 않는다는 것까지 검증.
- */
-export async function assertLegalNoticeAlwaysVisible(page: Page): Promise<void> {
-  for (let i = 0; i < 3; i++) {
-    await expect(page.locator(RATIO_LEGAL_NOTICE)).toBeVisible()
-    if (i < 2) await page.waitForTimeout(500)
-  }
-}
+// 향후 공통 assertion 헬퍼를 여기에 추가한다.
+// (assertLegalNoticeAlwaysVisible: community 페이지에서 LegalNoticeBox 미사용으로 삭제)
+export type { Page }

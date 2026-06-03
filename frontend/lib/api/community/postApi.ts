@@ -26,12 +26,14 @@ export interface PostDetail {
   createdAt: string;
   isVoted?: boolean;
   commentCount?: number;
+  viewCount?: number;
   voteResult?: VoteResult;
   userTitle?: string;
   jurorCount?: number;
   authorPct?: number;
   partnerPct?: number;
   paired?: boolean;
+  partnerAnsweredAt?: string;
   inviteToken?: string;
   partnerBodyPublished?: string;
   isAuthor?: boolean;
@@ -48,12 +50,13 @@ export interface PostSummary {
   status: string;
   voteCount: number;
   commentCount?: number;
+  viewCount?: number;
   createdAt: string;
   authorPct?: number;
   partnerPct?: number;
   paired?: boolean;
-  bodyPublished?: string;      // 본문 preview용
-  authorNickname?: string;     // 작성자 닉네임
+  bodyPublished?: string;
+  authorNickname?: string;
 }
 
 export interface VoteResult {
@@ -102,4 +105,7 @@ export const postApi = {
 
   toggleLike: (postId: string) =>
     api.post<{ liked: boolean; count: number }>(`/api/community/posts/${postId}/like`).then(r => r.data),
+
+  recordView: (postId: string, deviceId: string) =>
+    api.post<{ viewCount: number }>(`/api/community/posts/${postId}/view`, { deviceId }).then(r => r.data),
 };

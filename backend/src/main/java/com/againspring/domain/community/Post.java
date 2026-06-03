@@ -91,6 +91,10 @@ public class Post {
     @Builder.Default
     private Boolean neutralizationPassed = false;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer viewCount = 0;
+
     @Column(name = "vote_close_at")
     private Instant voteCloseAt;
 

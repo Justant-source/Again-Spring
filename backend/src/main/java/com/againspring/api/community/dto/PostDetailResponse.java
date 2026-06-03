@@ -47,8 +47,16 @@ public class PostDetailResponse {
 
     private Long commentCount;
 
+    private Long viewCount;
+
     /** FE 배심원 폴링 종료 조건: 기대 배심원 수 */
     private Integer jurorCount;
+
+    private Boolean paired;
+
+    private String partnerBodyPublished;
+
+    private String inviteToken;
 
     /**
      * Post + VoteOption + 투표 결과로부터 PostDetailResponse 생성
@@ -98,7 +106,11 @@ public class PostDetailResponse {
                 .voteResult(voteResultResponse)
                 .createdAt(post.getCreatedAt())
                 .commentCount(commentCount)
+                .viewCount(post.getViewCount() != null ? post.getViewCount().longValue() : 0L)
                 .jurorCount(post.getJurorCount())
+                .paired(post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null)
+                .partnerBodyPublished(post.getPartnerBodyPublished())
+                .inviteToken(post.getInviteToken())
                 .build();
     }
 }

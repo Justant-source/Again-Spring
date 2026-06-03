@@ -154,6 +154,8 @@ export default function CommunityFeedPage() {
                 g={post.authorPct ?? 50}
                 votes={post.voteCount || 0}
                 c={post.commentCount || 0}
+                views={post.viewCount || 0}
+                paired={post.paired}
               />
             ))}
           </div>

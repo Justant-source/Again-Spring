@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { postApi, PostDetail, JuryResult, VoteResult } from '@/lib/api/community/postApi';
 import { commentApi, Comment } from '@/lib/api/community/commentApi';
+import { getOrCreateDeviceId } from '@/lib/utils/deviceId';
 import { VoteBar, SideStory, JurorCard, CommunityComment } from '@/components/community/c3';
 import { AUTHOR, PARTNER, AUTHOR_BG, PARTNER_BG } from '@/lib/constants/factionColors';
 import { timeAgo } from '@/lib/utils/timeAgo';
@@ -622,6 +623,9 @@ export default function CommunityPostPage({ params }: PageProps) {
         setComments(commentsData);
         setHasMoreComments(commentsData.length === COMMENT_PAGE_SIZE);
         setCommentPage(1);
+
+        // 조회수 기록 (fire & forget) — 디바이스 기준 중복 방지
+        postApi.recordView(params.id, getOrCreateDeviceId()).catch(() => {});
 
         // Get jury result — author only (BE는 401 반환, 비로그인 시 전역 auth 에러 유발 방지)
         if (postData.isAuthor) {

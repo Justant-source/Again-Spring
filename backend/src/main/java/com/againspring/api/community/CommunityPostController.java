@@ -12,6 +12,7 @@ import com.againspring.service.community.CommentService;
 import com.againspring.service.community.JuryService;
 import com.againspring.service.community.PostComposeService;
 import com.againspring.service.community.PostService;
+import com.againspring.service.community.ViewService;
 import com.againspring.service.community.VoteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -49,6 +50,7 @@ public class CommunityPostController {
     private final PostService postService;
     private final VoteService voteService;
     private final JuryService juryService;
+    private final ViewService viewService;
     private final VoteOptionRepository voteOptionRepository;
     private final JurorRepository jurorRepository;
     private final CommunityReportRepository communityReportRepository;
@@ -132,6 +134,24 @@ public class CommunityPostController {
         long commentCount = postCommentRepository.countByPostId(id);
 
         return ResponseEntity.ok(PostDetailResponse.from(post, options, voteResult, myVote, commentCount));
+    }
+
+    /**
+     * 조회수 기록 — device_id 기준 중복 카운트 방지
+     * 공개 엔드포인트 (인증 불필요)
+     */
+    @PostMapping("/{id}/view")
+    @Operation(summary = "조회수 기록")
+    public ResponseEntity<Map<String, Long>> recordView(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+
+        String deviceId = body.get("deviceId");
+        if (deviceId == null || deviceId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        long viewCount = viewService.recordViewAndGetCount(id, deviceId);
+        return ResponseEntity.ok(Map.of("viewCount", viewCount));
     }
 
     /**

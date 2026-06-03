@@ -19,6 +19,8 @@ interface FeedCardProps {
   /** 조회 수 (없으면 '조회' 라벨) */
   views?: number | string;
   href: string;
+  /** 양쪽 이야기가 모두 있으면 true — 피치+세이지 점 표시 */
+  paired?: boolean;
 }
 
 const STAT_COL: React.CSSProperties = {
@@ -29,7 +31,7 @@ const STAT_COL: React.CSSProperties = {
   gap: 5,
 };
 
-export function FeedCard({ cat, id, time, title, body, g, votes, c, views, href }: FeedCardProps) {
+export function FeedCard({ cat, id, time, title, body, g, votes, c, views, href, paired }: FeedCardProps) {
   return (
     <a
       href={href}
@@ -41,8 +43,17 @@ export function FeedCard({ cat, id, time, title, body, g, votes, c, views, href 
         overflow: 'hidden',
         textDecoration: 'none',
         color: 'inherit',
+        position: 'relative',
       }}
     >
+      {/* paired 점 — 우상단 */}
+      {paired && (
+        <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', alignItems: 'center' }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--faction-author)', display: 'inline-block' }} />
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--faction-partner)', display: 'inline-block', marginLeft: -3 }} />
+        </div>
+      )}
+
       <div style={{ padding: '15px 16px' }}>
         {/* 상단: 대분류 · 아이디 · 시간 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
