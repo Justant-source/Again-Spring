@@ -35,9 +35,9 @@ class FlywayMigrationIT extends MariaDbIntegrationSupport {
 
         assertThat(failedCount).as("실패한 마이그레이션").isZero();
         assertThat(pendingCount).as("미적용 마이그레이션").isZero();
-        // V55 추가됨 — V1~V47(기존) + V48~V55(V17 커뮤니티) = 총 55개
+        // V57 추가됨 — V1~V47(기존) + V48~V57(V17 커뮤니티) = 총 57개
         // 주의: 마이그레이션 추가 시 이 숫자도 함께 갱신할 것
-        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(55);
+        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(57);
     }
 
     @Test
@@ -47,9 +47,11 @@ class FlywayMigrationIT extends MariaDbIntegrationSupport {
     }
 
     @Test
-    void v15CrisisLevelColumnExists() throws SQLException {
-        assertThat(columnExists("messages", "crisis_level"))
-                .as("V15: messages.crisis_level 컬럼 존재").isTrue();
+    void v24TutorialColumnExistsOnUsers() throws SQLException {
+        // V56에서 legacy mediation tables(messages 등) 삭제 — messages 컬럼 검사는 제거됨
+        // V24: users.tutorial_completed_at 은 users 테이블에 있으므로 유효
+        assertThat(columnExists("users", "tutorial_completed_at"))
+                .as("V24: users.tutorial_completed_at 컬럼 존재").isTrue();
     }
 
     private boolean columnExists(String table, String column) throws SQLException {

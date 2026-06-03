@@ -25,6 +25,7 @@ export interface PostDetail {
   voteOptions: VoteOption[];
   createdAt: string;
   isVoted?: boolean;
+  commentCount?: number;
   voteResult?: VoteResult;
   userTitle?: string;
   jurorCount?: number;

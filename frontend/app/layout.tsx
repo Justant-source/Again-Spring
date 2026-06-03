@@ -8,6 +8,7 @@ import { FeedbackModal } from '@/components/feedback/FeedbackModal';
 import { ForcePasswordChangeModal } from '@/components/auth/ForcePasswordChangeModal';
 import { BetaBanner } from '@/components/shared/BetaBanner';
 import { LegalFooter } from '@/components/shared/LegalFooter';
+import { BottomNav } from '@/components/shared/BottomNav';
 
 export const metadata: Metadata = {
   title: '다시봄 · Again Spring',
@@ -44,6 +45,7 @@ export default function RootLayout({
           <FeedbackModal />
           <ForcePasswordChangeModal />
           <LegalFooter />
+          <BottomNav />
           <div style={{ paddingTop: '30px', paddingBottom: '0px' }}>{children}</div>
         </MSWProvider>
       </body>

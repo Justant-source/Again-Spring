@@ -5,6 +5,7 @@ import com.againspring.llm.remote.dto.WorkerInvokeRequest;
 import com.againspring.llm.remote.dto.WorkerInvokeResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -15,6 +16,7 @@ import java.util.UUID;
  * 커뮤니티 배심원(JuryService) + 사연 중립화(PostComposeService) 전용.
  */
 @Slf4j
+@Primary
 @Component("remoteLlmProvider")
 public class RemoteLlmProvider implements LLMProvider {
 

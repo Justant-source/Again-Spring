@@ -45,11 +45,17 @@ public class PostDetailResponse {
 
     private Instant createdAt;
 
+    private Long commentCount;
+
+    /** FE 배심원 폴링 종료 조건: 기대 배심원 수 */
+    private Integer jurorCount;
+
     /**
      * Post + VoteOption + 투표 결과로부터 PostDetailResponse 생성
      */
     public static PostDetailResponse from(Post post, List<VoteOption> options,
-                                         Map<Long, Long> voteResult, Optional<Long> myVote) {
+                                         Map<Long, Long> voteResult, Optional<Long> myVote,
+                                         long commentCount) {
         List<VoteOptionDto> voteDtos = options.stream()
                 .map(opt -> VoteOptionDto.builder()
                         .id(opt.getId())
@@ -91,6 +97,8 @@ public class PostDetailResponse {
                 .myVotedOptionId(myVote.orElse(null))
                 .voteResult(voteResultResponse)
                 .createdAt(post.getCreatedAt())
+                .commentCount(commentCount)
+                .jurorCount(post.getJurorCount())
                 .build();
     }
 }

@@ -108,7 +108,7 @@ export function UserChip({ user }: UserChipProps) {
     if (isGuest && user) {
       setSheetOpen(true);
     } else if (!isGuest) {
-      router.push('/profile');
+      router.push('/profile/info');
     }
   };
 

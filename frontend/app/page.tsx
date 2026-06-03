@@ -2,8 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { PhoneFrame } from '@/components/shared/PhoneFrame';
-import { Logo } from '@/components/shared/Logo';
 import { Footer } from '@/components/shared/Footer';
 import { BrandBar } from '@/components/community/c3';
 import { useUserStore } from '@/lib/store/userStore';
@@ -27,8 +25,8 @@ export default function LandingPage() {
   const showMarketingEntry = perms.admin.canAccessMarketing;
 
   return (
-    <PhoneFrame tone="L">
-      <div className="flex flex-col flex-1 px-7 pt-6 pb-5">
+    <div style={{ background: 'var(--L-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="flex flex-col flex-1 px-7 pt-6 pb-5" style={{ maxWidth: 640, margin: '0 auto', width: '100%' }}>
         {/* 헤더: 다시봄 + 우측 유저 칩 */}
         <BrandBar title="다시봄" user={user} />
 
@@ -177,6 +175,6 @@ export default function LandingPage() {
         </div>
       </div>
       <Footer />
-    </PhoneFrame>
+    </div>
   );
 }

@@ -38,7 +38,7 @@ public class JuryService {
     private final KeywordGuard keywordGuard;
     private final ObjectMapper objectMapper;
 
-    @Qualifier("juryLlmProvider")
+    @Qualifier("remoteLlmProvider")
     private final LLMProvider juryLlmProvider;
 
     @Value("${llm.jury.model:claude-haiku-4-5-20251001}")
@@ -94,7 +94,7 @@ public class JuryService {
                     String prompt = juryPersonaPrompt.replace("{{PERSONA_BLOCK}}", personaBlock);
 
                     // 포스트 본문 및 선택지 추가
-                    prompt += "\n\n중립화된 사연:\n" + post.getBodyPublished();
+                    prompt += "\n\n사연:\n" + post.getBodyPublished();
                     prompt += "\n\n" + optionsText.toString();
 
                     // LLM 호출

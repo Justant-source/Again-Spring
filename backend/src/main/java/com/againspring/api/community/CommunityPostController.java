@@ -58,7 +58,7 @@ public class CommunityPostController {
     private final com.againspring.repository.community.VoteRepository voteRepository;
 
     /**
-     * 포스트 생성 — AI 중립화 + VoteOption 저장 + 비공개 시 배심원 비동기 생성
+     * 포스트 생성 — 원문 즉시 등록 + VoteOption 저장 + jurorCount > 0이면 배심원 비동기 생성
      */
     @PostMapping
     @SecurityRequirement(name = "bearer-jwt")
@@ -68,7 +68,7 @@ public class CommunityPostController {
             @AuthenticationPrincipal UserDetails userDetails) {
 
         String userId = userDetails.getUsername();
-        Post post = composeService.composeAndNeutralize(
+        Post post = composeService.composeAndPublish(
                 userId,
                 request.getUserTitle(),
                 request.getBodyRaw(),
@@ -80,8 +80,8 @@ public class CommunityPostController {
 
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
 
-        // 비공개 포스트 + jurorCount > 0: 배심원 비동기 생성
-        if (PostVisibility.PRIVATE.equals(post.getVisibility()) && request.getJurorCount() > 0 && !options.isEmpty()) {
+        // jurorCount > 0이면 visibility 무관하게 배심원 비동기 생성
+        if (request.getJurorCount() > 0 && !options.isEmpty()) {
             juryService.generateJuryAsync(post, options, request.getJurorCount());
         }
 
@@ -129,8 +129,9 @@ public class CommunityPostController {
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
         Map<Long, Long> voteResult = voteService.getVoteResult(id);
         Optional<Long> myVote = userId != null ? voteService.getMyVote(id, userId) : Optional.empty();
+        long commentCount = postCommentRepository.countByPostId(id);
 
-        return ResponseEntity.ok(PostDetailResponse.from(post, options, voteResult, myVote));
+        return ResponseEntity.ok(PostDetailResponse.from(post, options, voteResult, myVote, commentCount));
     }
 
     /**

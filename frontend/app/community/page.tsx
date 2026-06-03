@@ -181,38 +181,6 @@ export default function CommunityFeedPage() {
         )}
       </div>
 
-      {/* 고정 하단 버튼 */}
-      <div style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        maxWidth: 640,
-        marginLeft: 'auto',
-        marginRight: 'auto',
-        padding: '24px 22px',
-        background: 'linear-gradient(transparent, var(--L-bg) 30%)',
-        zIndex: 10,
-      }}>
-        <Link
-          href="/community/new"
-          style={{
-            display: 'block',
-            width: '100%',
-            padding: '15px 0',
-            background: 'var(--L-ink)',
-            color: 'var(--L-bg)',
-            textAlign: 'center',
-            borderRadius: 4,
-            fontSize: 15,
-            fontWeight: 500,
-            textDecoration: 'none',
-            transition: 'opacity 0.15s',
-          }}
-        >
-          내 사연 올리기
-        </Link>
-      </div>
     </div>
   );
 }

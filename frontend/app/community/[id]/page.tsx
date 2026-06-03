@@ -56,8 +56,12 @@ function C3StoryDetail({
   loadingMoreComments: boolean;
   commentBottomRef: React.RefObject<HTMLDivElement>;
 }) {
-  const [pick, setPick] = useState<'g' | 'r' | null>(post.myVoteSide || null);
-  const [voted, setVoted] = useState(post.hasVoted || false);
+  const myVotedId = post.voteResult?.myVotedOptionId;
+  const derivedSide: 'g' | 'r' | null = myVotedId != null
+    ? (myVotedId === post.voteOptions?.[0]?.id ? 'g' : 'r')
+    : (post.myVoteSide ?? null);
+  const [pick, setPick] = useState<'g' | 'r' | null>(derivedSide);
+  const [voted, setVoted] = useState(post.isVoted || post.hasVoted || false);
   const router = useRouter();
 
   const handlePick = (side: 'g' | 'r') => {
@@ -180,7 +184,7 @@ function C3StoryDetail({
           </span>
           <span style={ACTION_COL}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 15a2 2 0 01-2 2H8l-4 4V5a2 2 0 012-2h13a2 2 0 012 2z" strokeLinejoin="round" /></svg>
-            {comments.length}
+            {post.commentCount ?? comments.length}
           </span>
           <button onClick={handleShare} style={{ ...ACTION_COL, background: 'none', border: 'none', color: 'var(--L-sub)', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 3v13M12 3L8 7M12 3l4 4M5 14v5a2 2 0 002 2h10a2 2 0 002-2v-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -634,6 +638,19 @@ export default function CommunityPostPage({ params }: PageProps) {
     loadPost();
   }, [params.id]);
 
+  // 댓글 페이지에서 돌아올 때 commentCount 갱신
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        postApi.get(params.id).then((data) => {
+          setPost((prev) => prev ? { ...prev, commentCount: data.commentCount } : prev);
+        }).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', refresh);
+    return () => document.removeEventListener('visibilitychange', refresh);
+  }, [params.id]);
+
   // 댓글 추가 로드 (무한스크롤)
   const loadMoreComments = useCallback(async () => {
     if (loadingMoreComments || !hasMoreComments || !post) return;
@@ -680,12 +697,12 @@ export default function CommunityPostPage({ params }: PageProps) {
 
   const handleVote = async (optionId: number) => {
     // 이미 투표했으면 재투표 불가
-    if (post?.hasVoted) return;
+    if (post?.isVoted || post?.hasVoted) return;
     setIsVoting(true);
     try {
       const result = await postApi.vote(params.id, optionId);
       setVoteResult(result);
-      setPost((prev) => prev ? { ...prev, hasVoted: true, myVoteSide: optionId === prev.voteOptions?.[0]?.id ? 'g' : 'r' } : null);
+      setPost((prev) => prev ? { ...prev, isVoted: true, hasVoted: true, myVoteSide: optionId === prev.voteOptions?.[0]?.id ? 'g' : 'r' } : null);
     } catch (err: any) {
       // 409 ALREADY_VOTED는 조용히 처리 (UI는 이미 잠금 상태)
       if (err?.response?.status !== 409) console.error('Vote failed:', err);

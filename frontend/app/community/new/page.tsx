@@ -36,11 +36,6 @@ export default function CommunityNewPage() {
   const [error, setError] = useState<string | null>(null);
   const [showGuestNotice, setShowGuestNotice] = useState(false);
   const [selectedMode, setSelectedMode] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
-  const [generatedPost, setGeneratedPost] = useState<{
-    id: string;
-    title: string;
-    bodyPublished: string;
-  } | null>(null);
 
 
   const handleComposeSubmit = async () => {
@@ -82,20 +77,22 @@ export default function CommunityNewPage() {
         jurorCount,
       };
 
-      const result = await postApi.create(request);
-      setGeneratedPost({
-        id: result.id,
-        title: result.title,
-        bodyPublished: result.bodyPublished,
-      });
+      // 등록 요청과 최소 1초 대기를 병렬 실행
+      const [_result] = await Promise.all([
+        postApi.create(request),
+        new Promise(r => setTimeout(r, 1000)),
+      ]);
 
-      // 약간의 지연 후 상세 페이지로 이동
-      setTimeout(() => {
-        router.push(`/community/${result.id}`);
-      }, 800);
-    } catch (err) {
+      // 등록 완료 — 피드로 이동 (내 글이 바로 보임)
+      router.push('/community');
+    } catch (err: unknown) {
       console.error('Failed to create post:', err);
-      setError('사연 생성에 실패했습니다. 다시 시도해주세요.');
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('CRISIS_DETECTED')) {
+        setError('작성하신 내용이 정책에 위배됩니다. 다시 시도해주세요.');
+      } else {
+        setError('사연 등록에 실패했습니다. 다시 시도해주세요.');
+      }
       setStep('mode');
     } finally {
       setLoading(false);
@@ -394,6 +391,7 @@ export default function CommunityNewPage() {
           position: 'fixed',
           left: 0, right: 0, bottom: 0,
           padding: '24px 26px',
+          maxWidth: 640, margin: '0 auto',
           background: 'linear-gradient(transparent, var(--L-bg) 30%)',
         }}>
           <button
