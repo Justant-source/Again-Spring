@@ -5,3 +5,6 @@ export { CommunityComment } from './CommunityComment';
 export { JurorPicker } from './JurorPicker';
 export { JurorCard } from './JurorCard';
 export { CommentBar } from './CommentBar';
+export { CommentComposeSheet } from './CommentComposeSheet';
+export { UserChip } from './UserChip';
+export { BrandBar } from './BrandBar';

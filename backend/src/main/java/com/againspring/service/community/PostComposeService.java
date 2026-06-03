@@ -43,7 +43,7 @@ public class PostComposeService {
     private final KeywordGuard keywordGuard;
     private final ObjectMapper objectMapper;
 
-    @Qualifier("chatLlmProvider")
+    @Qualifier("composeLlmProvider")
     private final LLMProvider composeLlmProvider;
 
     @Value("${llm.compose.model:claude-haiku-4-5-20251001}")

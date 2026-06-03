@@ -1,17 +1,14 @@
 'use client';
 
 // Legal footer with links to terms, privacy, and crisis hotline.
-// 결과 화면·과거 대화 상세에서만 노출.
-// BottomNav가 표시되는 모든 화면(홈·커뮤니티·대화기록·내정보 등)에서는 숨겨
-// 두 막대가 겹치지 않도록 한다.
+// V18 이후 더 이상 사용되지 않음 (1:1 세션 모델 폐기)
+// 레거시 호환성을 위해 유지
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 // LegalFooter를 표시할 경로 패턴 (BottomNav가 숨겨진 몰입 화면 중 법적 고지 필요한 곳)
-const LEGAL_SHOW_PATHS = [
-  '/session/result',
-  '/session/history',
-];
+// V18 이후: 1:1 세션 모델 폐기, 더 이상 노출되지 않음
+const LEGAL_SHOW_PATHS: string[] = [];
 
 export function LegalFooter() {
   const pathname = usePathname();

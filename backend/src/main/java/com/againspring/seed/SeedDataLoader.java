@@ -30,7 +30,6 @@ public class SeedDataLoader implements CommandLineRunner {
     private String activeProfiles;
 
     private final UserRepository userRepository;
-    private final SeedScenarioBuilder scenarioBuilder;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -60,15 +59,8 @@ public class SeedDataLoader implements CommandLineRunner {
         users.forEach(userRepository::save);
         log.info("✓ Seeded {} personas", users.size());
 
-        // Step 2: 시나리오 빌드 (현재는 비어있음 — Agent-B/C/D 후 채워짐)
-        List<com.againspring.seed.dto.SeedScenario> scenarios = SeedScenarios.all();
-        if (scenarios.isEmpty()) {
-            log.info("No scenarios to build. Awaiting Agent-B/C/D scenario definitions.");
-        } else {
-            int[] counts = scenarioBuilder.buildAll(scenarios, users);
-            log.info("✓ Seeded {} scenarios + {} messages + {} reports",
-                    counts[0], counts[1], counts[2]);
-        }
+        // Step 2: 시나리오 빌드는 제거됨 (SeedScenarios, SeedScenarioBuilder 삭제)
+        log.info("Scenario seeding disabled (legacy code removed).");
 
         log.info("=== Dev seed data load complete ===");
     }

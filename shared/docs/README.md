@@ -2,11 +2,23 @@
 
 다시봄(Again Spring) 프로젝트의 FE와 BE가 공유해야 하는 명세, 정책, 아키텍처 문서.
 
+## 📋 아키텍처 결정 기록 (ADR)
+
+2026-06-02 커뮤니티 광장 피벗 관련 주요 결정사항:
+
+- [**ADR/README.md**](./ADR/README.md) — ADR 인덱스 및 작성법
+- [**ADR-0001**](./ADR/0001-pivot-to-community-plaza.md) — 🟥 **커뮤니티 광장 피벗** (1:1 중재 채팅 → 공개 게시글 + AI 배심원)
+- [ADR-0002](./ADR/0002-psychology-model-repurposed-for-jurors.md) — 심리학 모델 배심원 페르소나화 (Gottman/NVC/EFT)
+- [ADR-0003](./ADR/0003-llm-consolidated-to-claude-code-cli.md) — LLM 통합 (Claude Code CLI 단일 경로)
+- [ADR-0004](./ADR/0004-onboarding-mbti-hidden-not-removed.md) — 온보딩/MBTI 숨김 (삭제 아님)
+- [ADR-0005](./ADR/0005-marketing-automation-retained-unchanged.md) — V15 마케팅 자동화 유지 (격리됨)
+- [ADR-0006](./ADR/0006-legacy-deletion-and-git-recovery.md) — 🔴 **삭제 원장 및 복구 경로** (60+ 파일, 8 테이블)
+
 ## 문서 인덱스
 
 ### 입문
 - [structure.md](./structure.md) — 모노레포 4-분할 구조 (env/ backend/ frontend/ shared/)
-- [architecture.md](./architecture.md) — 시스템 전체 아키텍처 (브라우저↔Tunnel↔Nginx↔FE↔BE↔DB↔LLM)
+- [architecture.md](./architecture.md) — 시스템 전체 아키텍처 (브라우저↔Tunnel↔Nginx↔FE↔BE↔DB↔LLM, 커뮤니티 광장 기준)
 
 ### 운영
 - [admin-dashboard.md](./admin-dashboard.md) — 관리자 대시보드 기능·운영 가이드 (KPI·의견함·사용자·위기 모니터링)
@@ -18,23 +30,24 @@
 - 주요: [psychology-model.md](./policies/psychology-model.md), [forbidden-words.md](./policies/forbidden-words.md), [crisis-detection.md](./policies/crisis-detection.md)
 
 ### [api/](./api/)
-FE↔BE 간의 계약 (15개 컨트롤러·57개 엔드포인트). 변경 시 양쪽 모두 영향.
+FE↔BE 간의 계약 (커뮤니티 광장 기준). 변경 시 양쪽 모두 영향.
 
-- [api/README.md](./api/README.md) — API 문서 인덱스 (8개 도메인 파일 링크)
+- [api/README.md](./api/README.md) — API 문서 인덱스 (도메인별 파일 링크)
 - [api/rest-spec.md](./api/rest-spec.md) — 공통 규약·에러코드·전체 엔드포인트 마스터 표
 - [api/auth.md](./api/auth.md) — 인증 API (AuthController + OAuth2Controller)
-- [api/session-chat.md](./api/session-chat.md) — 세션·채팅 API
-- [api/report.md](./api/report.md) — 리포트 API
+- [api/community.md](./api/community.md) — 커뮤니티 광장 API (PostController, JuryController, VoteController)
+- [api/report.md](./api/report.md) — 리포트 API (선택사항, 향후)
 - [api/user.md](./api/user.md) — 사용자 API
 - [api/feedback.md](./api/feedback.md) — 피드백 API
-- [api/admin.md](./api/admin.md) — 관리자 API (17개 엔드포인트)
-- [api/database-schema.md](./api/database-schema.md) — MariaDB 11 스키마 (Flyway V1~V24)
+- [api/admin.md](./api/admin.md) — 관리자 API (대시보드, 모니터링)
+- [api/database-schema.md](./api/database-schema.md) — MariaDB 11 스키마 (Flyway V57+, V56 DROP 기록)
 
 ### [prompts/](./prompts/)
-LLM 프롬프트 레이어 구조 (시스템 / Gottman / NVC / 관계 / 턴).
+LLM 프롬프트 레이어 구조 (시스템 / 커뮤니티 배심원).
 
 - [prompts/README.md](./prompts/README.md) — 프롬프트 아키텍처 개요
-- `prompts/system.md`, `prompts/gottman/`, `prompts/nvc/`, `prompts/relations/`, `prompts/turns/`
+- [prompts/system.md](./prompts/system.md) — 모든 AI 출력 기본 (안내·제약)
+- [prompts/community/](./prompts/community/) — **배심원 페르소나** (jury_persona.md), **중립화** (neutralize.md)
 
 ## 다른 docs와의 관계
 

@@ -87,19 +87,6 @@ public class UserService {
         return mapToUserResponse(updated);
     }
 
-    /**
-     * V47: 중재자 성향 기본값 저장 (X/Y 독립 저장, null이면 해당 축 미변경).
-     */
-    @org.springframework.transaction.annotation.Transactional
-    public void updateMediatorStyle(String userId, Integer x, Integer y) {
-        User user = userRepository
-                .findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요."));
-        if (x != null) user.setMediatorDefaultX(x);
-        if (y != null) user.setMediatorDefaultY(y);
-        user.setUpdatedAt(java.time.Instant.now());
-        userRepository.save(user);
-    }
 
     /**
      * Complete onboarding: save 10 answers and calculate communication style.
@@ -201,9 +188,6 @@ public class UserService {
         Instant now = Instant.now();
         String originalEmail = user.getEmail();
 
-        // NOTE: Session cancellation removed due to deletion of Session/ChatService classes
-        // TODO: Implement session cleanup for deleted users
-
         // Anonymize PII — keep the row for statistics/audit
         String shortId = userId.length() >= 8 ? userId.substring(0, 8) : userId;
         user.setEmail("deleted-" + shortId + "@deleted.local");
@@ -224,9 +208,6 @@ public class UserService {
         if (originalEmail != null) {
             emailVerificationRepository.deleteByEmail(originalEmail);
         }
-
-        // NOTE: Guest session mapping removal removed due to deletion of GuestSession class
-        // TODO: Implement guest session cleanup for deleted users
 
         log.info("User account anonymized: {}", userId);
     }

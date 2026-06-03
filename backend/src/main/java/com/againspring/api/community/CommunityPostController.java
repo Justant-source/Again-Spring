@@ -23,7 +23,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -51,6 +53,9 @@ public class CommunityPostController {
     private final JurorRepository jurorRepository;
     private final CommunityReportRepository communityReportRepository;
     private final CommentService commentService;
+    private final com.againspring.repository.UserRepository userRepository;
+    private final com.againspring.repository.community.PostCommentRepository postCommentRepository;
+    private final com.againspring.repository.community.VoteRepository voteRepository;
 
     /**
      * 포스트 생성 — AI 중립화 + VoteOption 저장 + 비공개 시 배심원 비동기 생성
@@ -99,7 +104,12 @@ public class CommunityPostController {
         Page<Post> posts = postService.listPublicPosts(category, sort, pageable);
         Page<PostResponse> responses = posts.map(post -> {
             List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
-            return PostResponse.from(post, options);
+            long voteCount = voteRepository.countByPostId(post.getId());
+            long commentCount = postCommentRepository.countByPostId(post.getId());
+            String authorNickname = userRepository.findById(post.getAuthorId())
+                    .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                    .orElse("익명");
+            return PostResponse.from(post, options, voteCount, commentCount, authorNickname);
         });
         return ResponseEntity.ok(responses);
     }
@@ -146,9 +156,12 @@ public class CommunityPostController {
     public ResponseEntity<VoteResultResponse> castVote(
             @PathVariable String id,
             @Valid @RequestBody VoteRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            Authentication authentication) {
 
-        Map<Long, Long> result = voteService.castVoteAndGetResult(id, request.getOptionId(), userDetails.getUsername());
+        String userId = resolveUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        Map<Long, Long> result = voteService.castVoteAndGetResult(id, request.getOptionId(), userId);
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
         long totalVotes = result.values().stream().mapToLong(Long::longValue).sum();
 
@@ -268,10 +281,19 @@ public class CommunityPostController {
     @Operation(summary = "포스트 좋아요 토글")
     public ResponseEntity<LikeResponse> toggleLike(
             @PathVariable String id,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            Authentication authentication) {
 
-        boolean liked = commentService.togglePostLike(id, userDetails.getUsername());
+        String userId = resolveUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        boolean liked = commentService.togglePostLike(id, userId);
         long count = commentService.getPostLikeCount(id);
         return ResponseEntity.ok(LikeResponse.builder().liked(liked).count(count).build());
+    }
+
+    private String resolveUserId(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) return null;
+        String name = authentication.getName();
+        return "anonymousUser".equals(name) ? null : name;
     }
 }

@@ -163,7 +163,7 @@ export const USER_PERMISSIONS: { guest: TierPermissions; registered: TierPermiss
     ui: {
       showHistoryMenu: true,
       showProfileEditing: true,
-      showConsentReconfirmModal: true,
+      showConsentReconfirmModal: false,
       showUpgradeModalOnLimit: false,
       showGuestModeBadge: false,
       showBetaBanner: true,
@@ -221,7 +221,7 @@ export const USER_PERMISSIONS: { guest: TierPermissions; registered: TierPermiss
     ui: {
       showHistoryMenu: false,
       showProfileEditing: true,
-      showConsentReconfirmModal: true,
+      showConsentReconfirmModal: false,
       showUpgradeModalOnLimit: false,
       showGuestModeBadge: false,
       showBetaBanner: true,

@@ -11,9 +11,6 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * 포스트 응답 DTO
- */
 @Getter
 @Builder
 @NoArgsConstructor
@@ -22,25 +19,23 @@ import java.util.List;
 public class PostResponse {
 
     private String id;
-
     private String title;
-
+    private String userTitle;
     private String bodyPublished;
-
     private String category;
-
     private String visibility;
-
     private String status;
-
     private List<VoteOptionDto> voteOptions;
-
     private Instant createdAt;
+    private Long voteCount;
+    private Long commentCount;
+    private String authorNickname;
 
-    /**
-     * Post + VoteOption 목록으로부터 PostResponse 생성
-     */
     public static PostResponse from(Post post, List<VoteOption> options) {
+        return from(post, options, 0L, 0L, null);
+    }
+
+    public static PostResponse from(Post post, List<VoteOption> options, Long voteCount, Long commentCount, String authorNickname) {
         List<VoteOptionDto> voteDtos = options.stream()
                 .map(opt -> VoteOptionDto.builder()
                         .id(opt.getId())
@@ -52,12 +47,16 @@ public class PostResponse {
         return PostResponse.builder()
                 .id(post.getId())
                 .title(post.getTitle())
+                .userTitle(post.getUserTitle())
                 .bodyPublished(post.getBodyPublished())
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())
                 .status(post.getStatus().name())
                 .voteOptions(voteDtos)
                 .createdAt(post.getCreatedAt())
+                .voteCount(voteCount)
+                .commentCount(commentCount)
+                .authorNickname(authorNickname)
                 .build();
     }
 }

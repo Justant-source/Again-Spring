@@ -31,12 +31,6 @@ springdoc:
   swagger-ui:
     enabled: false
 
-llm:
-  chat:
-    provider: ${LLM_CHAT_PROVIDER:claude-api}    # prod 기본: claude-api (Haiku + 캐싱)
-  report:
-    provider: ${LLM_REPORT_PROVIDER:remote}      # prod 기본: CLI Sonnet 유지
-
 management:
   endpoints:
     web:

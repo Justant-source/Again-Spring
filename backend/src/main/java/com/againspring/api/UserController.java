@@ -62,25 +62,6 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUserProfile(userDetails.getUsername(), request));
     }
 
-    /**
-     * V47: 중재자 성향 기본값 설정 (회원 프로필 저장).
-     * 세션 생성 시 mediatorStyleX/Y 미입력이면 이 값으로 프리필.
-     */
-    @PatchMapping("/me/mediator-style")
-    @Operation(summary = "Set default mediator style", description = "회원 프로필에 중재자 성향 기본값(X/Y 0~100) 저장")
-    @ApiResponse(responseCode = "204", description = "Saved")
-    @ApiResponse(responseCode = "400", description = "Invalid range")
-    public ResponseEntity<Void> updateMediatorStyle(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody java.util.Map<String, Integer> body) {
-        Integer x = body.get("mediatorStyleX");
-        Integer y = body.get("mediatorStyleY");
-        if ((x != null && (x < 0 || x > 100)) || (y != null && (y < 0 || y > 100))) {
-            return ResponseEntity.badRequest().build();
-        }
-        userService.updateMediatorStyle(userDetails.getUsername(), x, y);
-        return ResponseEntity.noContent().build();
-    }
 
     @PostMapping("/me/password")
     @Operation(summary = "Change password (current → new). For temp password first change, currentPassword is the temp.")
@@ -103,31 +84,6 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/me/tutorial/complete")
-    @Operation(summary = "Mark tutorial as completed (V24)")
-    @ApiResponse(responseCode = "204", description = "Tutorial marked complete")
-    @SecurityRequirement(name = "bearer-jwt")
-    public ResponseEntity<Void> completeTutorial(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        userService.completeTutorial(userDetails.getUsername());
-        return ResponseEntity.noContent().build();
-    }
 
-    @PostMapping("/me/onboarding")
-    @Operation(summary = "Complete onboarding")
-    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = OnboardingResponse.class)))
-    public ResponseEntity<OnboardingResponse> completeOnboarding(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody OnboardingRequest request) {
-        return ResponseEntity.ok(userService.completeOnboarding(userDetails.getUsername(), request));
-    }
 
-    /** @deprecated 세션 히스토리 — V18에서 제거됨 (광장형으로 전환). 빈 응답 반환. */
-    @GetMapping("/me/history")
-    @Operation(summary = "내 세션 히스토리 (V18 이후 비사용)")
-    @ApiResponse(responseCode = "200", description = "빈 목록 반환")
-    public ResponseEntity<List<Object>> getMyHistory(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(java.util.Collections.emptyList());
-    }
 }

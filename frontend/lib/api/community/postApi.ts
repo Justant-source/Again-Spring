@@ -41,15 +41,18 @@ export interface PostDetail {
 export interface PostSummary {
   id: string;
   title: string;
+  userTitle?: string;
   category: string;
   visibility: 'PUBLIC' | 'PRIVATE';
   status: string;
   voteCount: number;
+  commentCount?: number;
   createdAt: string;
-  userTitle?: string;
   authorPct?: number;
   partnerPct?: number;
   paired?: boolean;
+  bodyPublished?: string;      // 본문 preview용
+  authorNickname?: string;     // 작성자 닉네임
 }
 
 export interface VoteResult {

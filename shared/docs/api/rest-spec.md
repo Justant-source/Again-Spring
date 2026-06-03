@@ -1,7 +1,9 @@
 # REST API 전체 명세 — 다시봄
 
-> 15개 컨트롤러·약 57개 엔드포인트의 공통 규약, 에러코드, 전체 마스터 표, 인증 매트릭스를 기술합니다.
+> 공통 규약, 에러코드, 전체 마스터 표, 인증 매트릭스를 기술합니다.
 > 도메인별 상세(시퀀스 다이어그램·요청/응답 예시)는 각 도메인 문서를 참조하세요.
+> 
+> **주의**: 2026-06-02 커뮤니티 광장 피벗. 구 Session/Turn/Message 모델 삭제 (ADR-0001 참조).
 
 ## Source of truth
 
@@ -100,41 +102,43 @@ flowchart LR
 | POST | `/api/auth/agree` | **JWT** | 200 / 400 | [auth.md](auth.md) |
 | POST | `/api/auth/oauth2/{provider}` | 공개 | 200 / 400 / 401 | [auth.md](auth.md) |
 
-### 2. Session
+### 2. Community — Posts
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
-| POST | `/api/sessions` | **JWT** | 201 / 422 | [session-chat.md](session-chat.md) |
-| GET | `/api/sessions/me` | **JWT** | 200 | [session-chat.md](session-chat.md) |
-| GET | `/api/sessions/{id}` | **JWT** | 200 / 403 / 404 | [session-chat.md](session-chat.md) |
-| POST | `/api/sessions/join/{token}` | 공개 | 200 / 403 / 409 / 410 | [session-chat.md](session-chat.md) |
-| GET | `/api/sessions/{id}/status` | 공개 | 200 / 404 | [session-chat.md](session-chat.md) |
-| DELETE | `/api/sessions/{id}` | **JWT** | 204 / 403 / 404 | [session-chat.md](session-chat.md) |
+| POST | `/api/community/posts` | **JWT** | 201 / 422 | [community.md](community.md) |
+| GET | `/api/community/posts` | 공개 | 200 | [community.md](community.md) |
+| GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | [community.md](community.md) |
+| PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | [community.md](community.md) |
+| DELETE | `/api/community/posts/{id}` | **JWT** | 204 / 403 / 404 | [community.md](community.md) |
 
-### 3. Chat (Message)
-
-| Method | Path | Auth | 상태코드 | 상세 문서 |
-|---|---|---|---|---|
-| POST | `/api/sessions/{id}/messages` | **JWT** | 200 / 409 | [session-chat.md](session-chat.md) |
-| GET | `/api/sessions/{id}/messages` | **JWT** | 200 | [session-chat.md](session-chat.md) |
-| GET | `/api/sessions/{id}/partner-messages` | **JWT** | 200 | [session-chat.md](session-chat.md) |
-| GET | `/api/sessions/{id}/partner-status` | **JWT** | 200 | [session-chat.md](session-chat.md) |
-| GET | `/api/sessions/{id}/invocation-status` | **JWT** | 200 | [session-chat.md](session-chat.md) |
-| POST | `/api/sessions/{id}/finalize` | **JWT** | 200 | [session-chat.md](session-chat.md) |
-| POST | `/api/sessions/{id}/finalize/agree` | **JWT** | 200 | [session-chat.md](session-chat.md) |
-| POST | `/api/sessions/{id}/finalize/decline` | **JWT** | 200 | [session-chat.md](session-chat.md) |
-| GET | `/api/sessions/{id}/invite` | **JWT** + Duo게이팅 | 200 / 403 | [session-chat.md](session-chat.md) |
-| POST | `/api/sessions/{id}/invite` | **JWT** + Duo게이팅 | 200 / 403 | [session-chat.md](session-chat.md) |
-
-### 4. Report
+### 3. Community — Comments
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
-| POST | `/api/sessions/{id}/report` | **JWT** | 202 / 400 / 403 | [report.md](report.md) |
-| GET | `/api/sessions/{id}/report` | **JWT** | 200 / 403 / 404 | [report.md](report.md) |
-| GET | `/api/reports/{reportId}` | **JWT** | 200 / 403 / 404 | [report.md](report.md) |
+| POST | `/api/community/posts/{id}/comments` | **JWT** | 201 / 422 | [community.md](community.md) |
+| GET | `/api/community/posts/{id}/comments` | 공개 | 200 | [community.md](community.md) |
+| PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | [community.md](community.md) |
+| DELETE | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 204 / 403 / 404 | [community.md](community.md) |
 
-### 5. User
+### 4. Community — Jury & Votes
+
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| GET | `/api/community/posts/{id}/jury` | 공개 | 200 / 404 | [community.md](community.md) |
+| POST | `/api/community/posts/{id}/jury/regenerate` | **JWT+ADMIN** | 202 / 404 | [community.md](community.md) |
+| POST | `/api/community/posts/{id}/votes` | **JWT** | 201 / 422 | [community.md](community.md) |
+| GET | `/api/community/posts/{id}/votes` | 공개 | 200 | [community.md](community.md) |
+| GET | `/api/community/votes/{voteId}` | 공개 | 200 / 404 | [community.md](community.md) |
+
+### 5. Report (선택, 향후)
+
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| POST | `/api/community/posts/{id}/report` | **JWT** | 202 | [report.md](report.md) |
+| GET | `/api/reports/{reportId}` | **JWT** | 200 / 404 | [report.md](report.md) |
+
+### 6. User
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
@@ -143,22 +147,20 @@ flowchart LR
 | POST | `/api/users/me/password` | **JWT** | 200 / 401 | [user.md](user.md) |
 | DELETE | `/api/users/me` | **JWT** | 204 / 401 | [user.md](user.md) |
 | POST | `/api/users/me/tutorial/complete` | **JWT** | 204 | [user.md](user.md) |
-| POST | `/api/users/me/onboarding` | **JWT** | 200 | [user.md](user.md) |
-| GET | `/api/users/me/history` | **JWT** | 200 | [user.md](user.md) |
 
-### 6. Feedback
+### 7. Feedback
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | POST | `/api/feedbacks` | 공개 | 201 / 400 | [feedback.md](feedback.md) |
 
-### 7. Health
+### 8. Health
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | GET | `/api/health` | 공개 | 200 | Liveness probe (status=UP) |
 
-### 8. Admin — Dashboard
+### 9. Admin — Dashboard
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
@@ -168,7 +170,7 @@ flowchart LR
 | GET | `/api/admin/dashboard/crisis-recent` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | GET | `/api/admin/dashboard/llm-failure-rate` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 
-### 9. Admin — Users
+### 10. Admin — Users
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
@@ -178,39 +180,32 @@ flowchart LR
 | DELETE | `/api/admin/users/{id}/data` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | PATCH | `/api/admin/users/{id}/roles` | **JWT + ADMIN** | 200 / 400 / 404 | [admin.md](admin.md) |
 
-### 10. Admin — Health
+### 11. Admin — Health
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | GET | `/api/admin/health/system` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 
-### 11. Admin — Feedbacks
+### 12. Admin — Feedbacks
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | GET | `/api/admin/feedbacks` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | PATCH | `/api/admin/feedbacks/{id}` | **JWT + ADMIN** | 200 / 400 / 404 | [admin.md](admin.md) |
 
-### 12. Admin — Prompts (app.admin.enabled=true)
+### 13. Admin — Prompts (app.admin.enabled=true)
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | POST | `/api/admin/prompts/reload` | **JWT + ADMIN** | 200 / 500 | [admin.md](admin.md) |
 
-### 13. Admin — Test (@Profile dev only)
+### 14. Admin — Test (@Profile dev only)
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | POST | `/api/admin/test/reset` | JWT | 200 | [admin.md](admin.md) |
-| POST | `/api/admin/test/sessions/{id}/terminate` | JWT | 200 | [admin.md](admin.md) |
 
-### 14. Admin — Debug (app.admin.enabled=true)
-
-| Method | Path | Auth | 상태코드 | 상세 문서 |
-|---|---|---|---|---|
-| GET | `/api/admin/sessions/{id}/context` | **JWT + ADMIN** | 200 / 400 | [admin.md](admin.md) |
-
-### 15. Admin — Marketing: Source Stories (app.features.marketing.enabled=true)
+### 15. Admin — Marketing: Source Stories (app.features.marketing.enabled=true, dev-only)
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
@@ -221,7 +216,7 @@ flowchart LR
 | POST | `/api/admin/marketing/source-stories/{id}/approve` | **JWT + ADMIN** | 200 / 404 | 승인 |
 | POST | `/api/admin/marketing/source-stories/{id}/reject` | **JWT + ADMIN** | 200 / 404 | 거부 (이유 포함) |
 
-### 16. Admin — Marketing: Simulations (app.features.marketing.enabled=true)
+### 16. Admin — Marketing: Simulations (app.features.marketing.enabled=true, dev-only)
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
@@ -231,7 +226,7 @@ flowchart LR
 | DELETE | `/api/admin/marketing/simulations/{id}` | **JWT + ADMIN** | 204 / 404 | 삭제 |
 | GET | `/api/admin/marketing/simulations/{id}/cost` | **JWT + ADMIN** | 200 | 비용 상세 |
 
-### 17. Admin — Marketing: Contents (app.features.marketing.enabled=true)
+### 17. Admin — Marketing: Contents (app.features.marketing.enabled=true, dev-only)
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
@@ -243,13 +238,13 @@ flowchart LR
 | POST | `/api/admin/marketing/contents/{id}/approve` | **JWT + ADMIN** | 200 / 404 | 승인 (APPROVED) |
 | POST | `/api/admin/marketing/contents/{id}/reject` | **JWT + ADMIN** | 200 / 404 | 거부 (`?reason=`, REJECTED) |
 
-### 18. Admin — Marketing: Images (app.features.marketing.enabled=true)
+### 18. Admin — Marketing: Images (app.features.marketing.enabled=true, dev-only)
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | GET | `/api/admin/marketing/images/{filename}` | **JWT + ADMIN** | 200 / 400 / 404 | 채팅 스크린샷 PNG 서빙. `..` / `/` 포함 파일명 400 |
 
-### 19. Admin — Marketing: Cost (app.features.marketing.enabled=true)
+### 19. Admin — Marketing: Cost (app.features.marketing.enabled=true, dev-only)
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|

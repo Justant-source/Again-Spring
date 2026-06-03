@@ -141,7 +141,7 @@ public class UserPermissionsConfig {
         static TierConfig guestDefaults() {
             TierConfig t = new TierConfig();
             t.label = "게스트"; t.summary = "fallback";
-            t.auth = new Auth(); t.auth.tokenExpirationSeconds = 7200;
+            t.auth = new Auth(); t.auth.tokenExpirationSeconds = 2592000; // 30일 — 디바이스 게스트 지속성
             t.sessions = new Sessions(); t.sessions.dailyLimit = 3;
             t.sessions.dailyLimitScope = "ip"; t.sessions.messageTurnLimit = 3;
             t.sessions.duoModeAllowed = false; t.sessions.canInvitePartner = false;

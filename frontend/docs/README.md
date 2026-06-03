@@ -1,7 +1,7 @@
 # 다시봄 (Again Spring) 프론트엔드 문서
 
 > **"다시 봄. 다시 바라봄."**  
-> 싸운 두 사람 사이에서 AI 중재자가 양쪽의 입력을 중립적으로 처리해 관계 회복을 돕는 웹앱입니다.
+> 갈등 커뮤니티 플랫폼. 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공하는 웹앱입니다.
 
 본 디렉토리는 Next.js 14 기반의 **프로토타입** 프론트엔드 개발 문서입니다.
 
@@ -87,9 +87,9 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 
 ### 1. 디자인 시스템
 
-- **Tone L** (편지지): 온보딩, 입력, 채팅
-- **Tone P** (파스텔): 결과 리포트
-- **Tone Q** (조용함): 고급 화면
+- **Tone L** (편지지): 온보딩, 게시글 작성
+- **Tone P** (파스텔): 배심원 카드, 투표 결과
+- **Tone Q** (조용함): 댓글, 고급 화면
 
 절대 섞지 마세요. 자세한 색상·타이포: **[design/system.md](./design/system.md)**
 
@@ -101,8 +101,7 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 
 ### 3. 위기 감지
 
-- **즉시 감지**: "때리", "폭행", "자살", "강간" → 세션 중단 + 모달
-- **핫라인**: 1366(여성긴급), 1393(생명), 132(경찰), 112(신고), 1388(청소년), 1577-0199(학교폭력)
+게시글/댓글 작성 시 위기 키워드는 사용자에게 자동으로 감지되지 않습니다. 커뮤니티 플랫폼이므로 사용자 책임입니다. 관리자는 기술적으로 위기 마크 기능으로 제한합니다.
 
 ### 4. 대기관 정책
 
@@ -126,9 +125,9 @@ FE는 이들을 **참조하고 구현**할 뿐, 독립적으로 정의하지 않
 
 - [ ] `npm run build` 성공 (no errors)
 - [ ] `npm run lint:words` 최종 확인
-- [ ] 전체 플로우 (온보딩 → 세션 → 채팅 → 결과) 수동 테스트
+- [ ] 전체 플로우 (온보딩 → 광장 게시 → 배심원 → 투표/댓글) 수동 테스트
 - [ ] 모바일 반응형 (PhoneFrame) 확인
-- [ ] 위기 모달 팝업 테스트
+- [ ] 댓글 무한스크롤 테스트
 
 ---
 
@@ -144,15 +143,14 @@ frontend/
 │   ├── page.tsx           # / (랜딩)
 │   ├── auth/              # 가입/로그인
 │   ├── (onboarding)/      # 온보딩 플로우
-│   ├── session/           # 세션 시작·중재·결과
+│   ├── community/         # 광장 피드·게시·댓글
 │   ├── (dashboard)/       # 이력·프로필
 │   └── globals.css        # 공통 스타일
 │
 ├── components/            # React 컴포넌트
-│   ├── shared/            # Logo, PhoneFrame, CrisisResourceModal
+│   ├── shared/            # Logo, PhoneFrame
 │   ├── onboarding/        # LikertQuestion
-│   ├── chat/              # ChatPanel, ChatInput, MessageBubble
-│   ├── result/            # NeedsMap, ContributionRatio, NVCScript
+│   ├── community/c3/      # 광장 컴포넌트 (FeedCard, JurorCard, VoteBar, CommentBar)
 │   └── ui/                # 기본 UI (Radix)
 │
 ├── lib/
@@ -193,14 +191,13 @@ frontend/
 ### 프로토타입 완성도
 
 - ✅ Next.js 14 + TypeScript + Tailwind
-- ✅ MSW Mock API (5개 시나리오)
-- ✅ 전체 플로우 (가입 → 세션 → 중재 → 결과)
-- ✅ 금지어 및 위기 감지
+- ✅ MSW Mock API
+- ✅ 광장형 UX (게시 → 배심원 → 투표/댓글)
+- ✅ 금지어 검사
 - ✅ 3-Tone 디자인 시스템
+- ✅ 댓글 무한스크롤
 - ⏳ Jest/Vitest 단위 테스트 (향후)
 - ⏳ Playwright E2E 테스트 (향후)
-- ⏳ 실제 백엔드 연동 (다음 단계)
-- ⏳ 실제 LLM 연동 (다음 단계)
 
 ---
 

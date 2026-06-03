@@ -37,25 +37,21 @@ test.describe('Flow 02: 권한 및 라우트 가드', () => {
     expect(page.url()).toMatch(/next=%2Fadmin|next=\/admin/)
   })
 
-  test('게스트 사용자가 /history 접근 → 인페이지 업셀(리다이렉트 아님)', async ({ page }) => {
+  test('게스트 사용자가 /profile 접근 → /login으로 리다이렉트', async ({ page }) => {
     // 게스트로 입장
     await page.goto(`${BASE}/guest`)
     const input = page.locator('input[type="text"]').first()
     await input.waitFor({ state: 'visible', timeout: 8_000 })
     await input.fill('게스트권한테스트')
     await page.getByRole('button', { name: '시작하기' }).click()
-    // 온보딩 강제 폐지 — 게스트는 닉네임 설정 즉시 /session/new로 이동
-    await page.waitForURL(/\/session\/new/, { timeout: 10_000 })
+    // V18 이후 게스트는 커뮤니티로 이동
+    await page.waitForURL(/\/community/, { timeout: 10_000 })
 
-    // /history 접근
-    await page.goto(`${BASE}/history`)
-    await page.waitForTimeout(2_000)
-
-    // URL은 /history 그대로 (리다이렉트 아님 — flows/02 기준)
-    expect(page.url()).toContain('/history')
-    // 업셀 텍스트 표시 (flows/02: "게스트 모드에서는 이력이 저장되지 않아요.")
-    const bodyText = await page.locator('body').textContent()
-    expect(bodyText).toMatch(/게스트|이력|저장되지/)
+    // /profile 접근 (회원 전용)
+    await page.goto(`${BASE}/profile`)
+    // 게스트는 /login으로 리다이렉트됨
+    await page.waitForURL(/\/login/, { timeout: 10_000 })
+    expect(page.url()).toContain('/login')
   })
 
   test('registered 사용자가 /admin 접근 → / 리다이렉트', async ({ page, browser }) => {

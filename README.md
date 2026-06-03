@@ -1,9 +1,9 @@
 # 다시봄 · Again Spring
 
 > **"다시 봄. 다시 바라봄."**
-> 싸운 두 사람 사이에서 AI 중재자가 양쪽 이야기를 중립적으로 정리해, 관계 회복을 돕는 웹앱.
+> 갈등 커뮤니티 플랫폼. 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공하는 웹앱.
 
-본 레포는 **모노레포 구조**로 프론트엔드, 백엔드, 공유 리소스, 환경 설정을 한곳에 관리합니다.
+본 레포는 **모노레포 구조**로 프론트엔드, 백엔드, 공유 리소스, 환경 설정을 한곳에 관리합니다. **2026-06-02 피벗**: 1:1 AI 중재 → 커뮤니티 광장 + AI 배심원 모델.
 
 ---
 
@@ -127,8 +127,7 @@ curl http://localhost:8090/api/health     # nginx 경유
 | | Spring Data JPA + Hibernate | — |
 | **Database** | MariaDB | 11 LTS |
 | | Flyway (마이그레이션) | — |
-| **LLM (대화 prod)** | ClaudeApiProvider (Anthropic REST API) | Haiku 4.5, 프롬프트 캐싱 3-tier |
-| **LLM (대화 dev + 리포트)** | llm-worker (Claude CLI) | API 키 불필요, ~/.claude 마운트 |
+| **LLM** | llm-worker (Claude CLI, dev/prod 동일) | Haiku 4.5, API 키 불필요 (~/.claude) |
 | **Email** | Spring Mail (Gmail SMTP) | App Password 인증 |
 | **OAuth** | Google OAuth 2.0 | FE-driven code exchange |
 | **Infrastructure** | Docker Compose (멀티 컨테이너) | v2+ |
@@ -139,20 +138,17 @@ curl http://localhost:8090/api/health     # nginx 경유
 ## 📊 진행 상황
 
 - ✅ 모노레포 구조 (frontend/, backend/, shared/, env/)
-- ✅ 프론트엔드 (Next.js 14, MSW + 실제 API 연동)
+- ✅ 프론트엔드 (Next.js 14 + 광장형 UX)
 - ✅ 백엔드 전체 구현 (Spring Boot 3.3 + MariaDB)
-  - ✅ JWT 인증 (직접 회원가입 / 로그인 / 게스트 / Google OAuth)
+  - ✅ JWT 인증 (회원가입 / 로그인 / 게스트 / Google OAuth)
   - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
-  - ✅ 게스트 세션 지속성 (초대 URL별 동일 Guest-XXXXXX ID)
-  - ✅ 세션 관리 + 중재 흐름 (State Machine)
-  - ✅ **LLM 워커 분리** — 전용 llm-worker 컨테이너 (ThreadPoolExecutor 100 + Queue 500)
-  - ✅ **prod LLM 분리 + 프롬프트 캐싱** — ClaudeApiProvider (Anthropic REST API, cache_control 3-tier)
-  - ✅ 위기 감지 + 금지어 가드
-  - ✅ 리포트 생성 (기여도, NVC — 4Horsemen 내부 점수만 보존)
+  - ✅ **커뮤니티 광장** (Post / PostComment / Vote / Juror 엔티티)
+  - ✅ **LLM 배심원** — RemoteLlmProvider (againspring-llm 워커)
+  - ✅ 댓글 무한스크롤
+  - ✅ 금지어 가드 + PromptSanitizer (AI 출력 품질)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
-  - ✅ 데드코드 정리 완료 (V1.5 폐기 코드·관계 그래프·4Horsemen UI)
-  - ✅ **V15 마케팅 자동화** (dev 전용) — 사연→시뮬레이션→콘텐츠→이미지→승인 자동화
-  - ✅ **소셜 자동 포스팅** — X·Instagram Playwright 자동화, 봇 차단 우회(anti-bot.js), 세션 자동 갱신
-- ✅ Docker 멀티 컨테이너 배포 (MariaDB / llm-worker / Backend / Frontend / Nginx / social-poster(dev) / marketing-renderer(dev))
+  - ✅ 피드백 수집 + 관리자 대시보드
+- ✅ Docker 멀티 컨테이너 배포 (MariaDB / llm-worker / Backend / Frontend / Nginx)
 - ✅ Cloudflare Tunnel (dev/prod 도메인 라우팅)
+- ✅ **2026-06-02 피벗 완료**: 커뮤니티 광장 + AI 배심원 모델 (구 Session/Message/Report 코드 삭제)
 - ⏳ Prod 배포 (명시적 지시 시에만)

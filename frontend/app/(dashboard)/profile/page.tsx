@@ -8,8 +8,8 @@ import { DeleteAccountModal } from '@/components/profile/DeleteAccountModal';
 import { ChangePasswordSection } from '@/components/profile/ChangePasswordSection';
 import { permissionsFor } from '@/lib/constants/userPermissions';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
-import { STYLE_MOTIF } from '@/components/shared/Motif';
 import { api } from '@/lib/api/client';
+import { generateGuestNickname } from '@/lib/utils/guestNickname';
 import type { User } from '@/lib/types';
 
 interface Post {
@@ -30,18 +30,23 @@ export default function ProfilePage() {
   const clearUser = useUserStore((s) => s.clear);
   const hasHydrated = useHasHydrated();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<'myPosts' | 'voted' | 'saved'>('myPosts');
+  const [activeTab, setActiveTab] = useState<'myPosts' | 'voted' | 'saved' | 'myInfo'>('myPosts');
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
 
+  // 닉네임 변경
+  const [newNickname, setNewNickname] = useState('');
+  const [nickShuffling, setNickShuffling] = useState(false);
+  const [nickError, setNickError] = useState('');
+  const [nickSaving, setNickSaving] = useState(false);
+  const [nickSuccess, setNickSuccess] = useState(false);
+
   useEffect(() => {
-    if (hasHydrated && !user) {
+    if (hasHydrated && (!user || user.isGuest)) {
       router.push('/login');
     }
   }, [hasHydrated, user, router]);
 
-  // Fetch my posts
   useEffect(() => {
     if (activeTab === 'myPosts' && hasHydrated && user && !user.isGuest) {
       const fetchMyPosts = async () => {
@@ -60,15 +65,17 @@ export default function ProfilePage() {
     }
   }, [activeTab, hasHydrated, user]);
 
+  useEffect(() => {
+    if (activeTab === 'myInfo' && user) {
+      setNewNickname(user.nickname || '');
+      setNickError('');
+      setNickSuccess(false);
+    }
+  }, [activeTab, user]);
+
   if (!hasHydrated || !user) {
     return null;
   }
-
-  const showStyleSection = permissionsFor(user).ui.showCommunicationStyleSection;
-
-  const MotifComponent = user.communicationStyle
-    ? STYLE_MOTIF[user.communicationStyle]
-    : null;
 
   const handleLogout = async () => {
     clearUser();
@@ -99,396 +106,325 @@ export default function ProfilePage() {
     return null;
   };
 
+  const handleShuffleNickname = async () => {
+    setNickShuffling(true);
+    setNickError('');
+    try {
+      for (let i = 0; i < 10; i++) {
+        const candidate = generateGuestNickname();
+        try {
+          const res = await api.get(`/api/auth/check-nickname?nickname=${encodeURIComponent(candidate)}`);
+          if (res.data.available) {
+            setNewNickname(candidate);
+            return;
+          }
+        } catch {
+          setNewNickname(candidate);
+          return;
+        }
+      }
+      setNewNickname(generateGuestNickname());
+    } finally {
+      setNickShuffling(false);
+    }
+  };
+
+  const handleSaveNickname = async () => {
+    const trimmed = newNickname.trim();
+    if (!trimmed) {
+      setNickError('닉네임을 입력해주세요');
+      return;
+    }
+    if (trimmed.length < 3 || trimmed.length > 12) {
+      setNickError('닉네임은 3~12자여야 해요');
+      return;
+    }
+    if (trimmed === user.nickname) {
+      setNickError('현재와 동일한 닉네임이에요');
+      return;
+    }
+    setNickSaving(true);
+    setNickError('');
+    try {
+      const checkRes = await api.get(`/api/auth/check-nickname?nickname=${encodeURIComponent(trimmed)}`);
+      if (!checkRes.data.available) {
+        setNickError('이미 사용 중인 닉네임이에요');
+        return;
+      }
+      const res = await api.patch('/api/users/me', { nickname: trimmed });
+      setUser({ ...user, nickname: res.data.nickname || trimmed });
+      setNickSuccess(true);
+    } catch {
+      setNickError('닉네임 변경에 실패했어요');
+    } finally {
+      setNickSaving(false);
+    }
+  };
+
+  const TABS = [
+    { key: 'myPosts', label: '내 사연' },
+    { key: 'voted',   label: '투표한 글' },
+    { key: 'saved',   label: '저장' },
+    { key: 'myInfo',  label: '내 정보' },
+  ] as const;
+
   return (
     <PhoneFrame tone="L">
       <PhoneHeader
         title="내정보"
         tone="L"
         back={false}
-        right={
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: 18,
-              cursor: 'pointer',
-              color: 'var(--L-ink)',
-              padding: 0,
-            }}
-          >
-            ⚙️
-          </button>
-        }
       />
 
       <div style={{ padding: '8px 28px 40px', display: 'flex', flexDirection: 'column' }}>
-        {/* Profile Section */}
-        {!showSettings && (
-          <>
-            <div style={{ marginTop: 12, marginBottom: 24, textAlign: 'center' }}>
-              {/* Avatar */}
-              <div
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: '50%',
-                  background: 'var(--P-a)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontSize: 18,
-                  fontWeight: 600,
-                  margin: '0 auto 12px',
-                }}
-              >
-                {getInitials(user.nickname)}
-              </div>
-
-              {/* Nickname */}
-              <div
-                className="serif"
-                style={{
-                  fontSize: 15,
-                  fontWeight: 500,
-                  color: 'var(--L-ink)',
-                  marginBottom: 8,
-                }}
-              >
-                {user.nickname}
-              </div>
-
-              {/* Meta */}
-              <div style={{ fontSize: 12, color: 'var(--L-sub)' }}>
-                사연 {myPosts.length} · 투표 0 · 댓글 0
-              </div>
-            </div>
-
-            {/* Tabs */}
+        {/* Avatar + Nickname */}
+        {activeTab !== 'myInfo' && (
+          <div style={{ marginTop: 12, marginBottom: 24, textAlign: 'center' }}>
             <div
               style={{
+                width: 46,
+                height: 46,
+                borderRadius: '50%',
+                background: 'var(--P-a)',
                 display: 'flex',
-                gap: 24,
-                marginBottom: 16,
-                borderBottom: '1px solid var(--L-border)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: 18,
+                fontWeight: 600,
+                margin: '0 auto 12px',
               }}
             >
-              {['myPosts', 'voted', 'saved'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab as typeof activeTab)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: '0 0 12px',
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: activeTab === tab ? 'var(--L-ink)' : 'var(--L-sub)',
-                    cursor: 'pointer',
-                    borderBottom: activeTab === tab ? '2px solid var(--L-ink)' : 'none',
-                  }}
-                >
-                  {tab === 'myPosts' ? '내 사연' : tab === 'voted' ? '투표한 글' : '저장'}
-                </button>
-              ))}
+              {getInitials(user.nickname)}
             </div>
-
-            {/* Tab Content */}
-            {activeTab === 'myPosts' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {postsLoading ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0', fontSize: 13, color: 'var(--L-sub)' }}>
-                    로딩 중...
-                  </div>
-                ) : myPosts.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0', fontSize: 13, color: 'var(--L-sub)' }}>
-                    아직 사연이 없어요
-                  </div>
-                ) : (
-                  myPosts.map((post) => {
-                    const status = getPostStatus(post);
-                    return (
-                      <div
-                        key={post.id}
-                        style={{
-                          padding: '14px 15px',
-                          background: 'var(--L-card)',
-                          border: '1px solid var(--L-border)',
-                          borderRadius: 8,
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => router.push(`/community/${post.id}`)}
-                      >
-                        {/* Category & Status */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            marginBottom: 8,
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'inline-block',
-                              padding: '3px 8px',
-                              background: 'var(--L-ink)',
-                              color: 'var(--L-bg)',
-                              borderRadius: 3,
-                              fontSize: 11,
-                              fontWeight: 500,
-                            }}
-                          >
-                            {post.categoryName}
-                          </div>
-                          {status && (
-                            <div
-                              style={{
-                                display: 'inline-block',
-                                padding: '2px 6px',
-                                background: status.color,
-                                color: 'white',
-                                borderRadius: 2,
-                                fontSize: 10,
-                                fontWeight: 500,
-                              }}
-                            >
-                              {status.text}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Title */}
-                        <div
-                          className="serif"
-                          style={{
-                            fontSize: 14.5,
-                            fontWeight: 500,
-                            color: 'var(--L-ink)',
-                            marginBottom: 8,
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {post.title}
-                        </div>
-
-                        {/* Meta */}
-                        <div style={{ fontSize: 11.5, color: 'var(--L-sub)' }}>
-                          투표 {post.voteCount || 0} · 댓글 0
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-
-            {activeTab === 'voted' && (
-              <div style={{ textAlign: 'center', padding: '20px 0', fontSize: 13, color: 'var(--L-sub)' }}>
-                준비 중입니다
-              </div>
-            )}
-
-            {activeTab === 'saved' && (
-              <div style={{ textAlign: 'center', padding: '20px 0', fontSize: 13, color: 'var(--L-sub)' }}>
-                준비 중입니다
-              </div>
-            )}
-          </>
+            <div
+              className="serif"
+              style={{ fontSize: 15, fontWeight: 500, color: 'var(--L-ink)', marginBottom: 8 }}
+            >
+              {user.nickname}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--L-sub)' }}>
+              사연 {myPosts.length} · 투표 0 · 댓글 0
+            </div>
+          </div>
         )}
 
-        {/* Settings Section */}
-        {showSettings && (
-          <>
-            {/* User Info */}
-            <div
-              className="letter-card"
+        {/* Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 24,
+            marginBottom: 16,
+            borderBottom: '1px solid var(--L-border)',
+          }}
+        >
+          {TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
               style={{
-                padding: '18px 16px',
-                marginBottom: 16,
+                background: 'none',
+                border: 'none',
+                padding: '0 0 12px',
+                fontSize: 13,
+                fontWeight: 500,
+                color: activeTab === key ? 'var(--L-ink)' : 'var(--L-sub)',
+                cursor: 'pointer',
+                borderBottom: activeTab === key ? '2px solid var(--L-ink)' : 'none',
+                whiteSpace: 'nowrap',
               }}
             >
-              <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 4 }}>
-                닉네임
-              </div>
-              <div
-                className="serif"
-                style={{
-                  fontSize: 16,
-                  color: 'var(--L-ink)',
-                  fontWeight: 500,
-                  marginBottom: 12,
-                }}
-              >
-                {user.nickname}
-              </div>
+              {label}
+            </button>
+          ))}
+        </div>
 
-              {user.email && (
-                <>
-                  <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 4 }}>
-                    이메일
-                  </div>
+        {/* 내 사연 */}
+        {activeTab === 'myPosts' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {postsLoading ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', fontSize: 13, color: 'var(--L-sub)' }}>
+                로딩 중...
+              </div>
+            ) : myPosts.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', fontSize: 13, color: 'var(--L-sub)' }}>
+                아직 사연이 없어요
+              </div>
+            ) : (
+              myPosts.map((post) => {
+                const status = getPostStatus(post);
+                return (
                   <div
+                    key={post.id}
                     style={{
-                      fontSize: 13,
-                      color: 'var(--L-ink)',
-                      marginBottom: 12,
-                      wordBreak: 'break-all',
+                      padding: '14px 15px',
+                      background: 'var(--L-card)',
+                      border: '1px solid var(--L-border)',
+                      borderRadius: 8,
+                      cursor: 'pointer',
                     }}
+                    onClick={() => router.push(`/community/${post.id}`)}
                   >
-                    {user.email}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <div
+                        style={{
+                          display: 'inline-block',
+                          padding: '3px 8px',
+                          background: 'var(--L-ink)',
+                          color: 'var(--L-bg)',
+                          borderRadius: 3,
+                          fontSize: 11,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {post.categoryName}
+                      </div>
+                      {status && (
+                        <div
+                          style={{
+                            display: 'inline-block',
+                            padding: '2px 6px',
+                            background: status.color,
+                            color: 'white',
+                            borderRadius: 2,
+                            fontSize: 10,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {status.text}
+                        </div>
+                      )}
+                    </div>
+                    <div
+                      className="serif"
+                      style={{
+                        fontSize: 14.5,
+                        fontWeight: 500,
+                        color: 'var(--L-ink)',
+                        marginBottom: 8,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {post.title}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--L-sub)' }}>
+                      투표 {post.voteCount || 0} · 댓글 0
+                    </div>
                   </div>
-                </>
-              )}
+                );
+              })
+            )}
+          </div>
+        )}
 
-              {user.isGuest && (
-                <div
+        {/* 투표한 글 */}
+        {activeTab === 'voted' && (
+          <div style={{ textAlign: 'center', padding: '20px 0', fontSize: 13, color: 'var(--L-sub)' }}>
+            준비 중입니다
+          </div>
+        )}
+
+        {/* 저장 */}
+        {activeTab === 'saved' && (
+          <div style={{ textAlign: 'center', padding: '20px 0', fontSize: 13, color: 'var(--L-sub)' }}>
+            준비 중입니다
+          </div>
+        )}
+
+        {/* 내 정보 */}
+        {activeTab === 'myInfo' && (
+          <>
+            {/* 닉네임 변경 */}
+            <div className="letter-card" style={{ padding: '18px 16px', marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 10 }}>닉네임 변경</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                <input
+                  value={newNickname}
+                  onChange={(e) => { setNewNickname(e.target.value); setNickError(''); setNickSuccess(false); }}
+                  placeholder="닉네임"
+                  maxLength={12}
                   style={{
-                    padding: '10px 12px',
-                    background: 'var(--L-bg)',
+                    flex: 1,
+                    border: 'none',
+                    borderBottom: '1px solid var(--L-border)',
+                    background: 'transparent',
+                    fontSize: 15,
+                    color: 'var(--L-ink)',
+                    padding: '4px 0 8px',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={handleShuffleNickname}
+                  disabled={nickShuffling}
+                  style={{
+                    background: 'none',
                     border: '1px solid var(--L-border)',
-                    borderRadius: '3px',
-                    fontSize: '12px',
+                    borderRadius: 3,
+                    padding: '6px 10px',
+                    fontSize: 12,
                     color: 'var(--L-sub)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                   }}
                 >
-                  게스트 모드
-                </div>
+                  {nickShuffling ? '...' : '다른 이름'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--L-sub)', marginBottom: 14 }}>
+                3~12자 · 현재: {user.nickname}
+              </div>
+              {nickError && (
+                <div style={{ fontSize: 12, color: 'var(--L-point)', marginBottom: 10 }}>{nickError}</div>
               )}
+              {nickSuccess && (
+                <div style={{ fontSize: 12, color: '#27AE60', marginBottom: 10 }}>닉네임이 변경됐어요</div>
+              )}
+              <button
+                onClick={handleSaveNickname}
+                disabled={nickSaving}
+                className="btn-L"
+                style={{ width: '100%' }}
+              >
+                {nickSaving ? '저장 중...' : '저장'}
+              </button>
             </div>
 
-            {/* Communication style card — admin은 정책으로 노출 안 함 */}
-            {showStyleSection && MotifComponent && (
+            {/* 이메일 */}
+            {user.email && (
+              <div className="letter-card" style={{ padding: '18px 16px', marginBottom: 16 }}>
+                <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 4 }}>이메일</div>
+                <div style={{ fontSize: 13, color: 'var(--L-ink)', wordBreak: 'break-all' }}>
+                  {user.email}
+                </div>
+              </div>
+            )}
+
+            {/* 게스트 모드 표시 */}
+            {user.isGuest && (
               <div
-                className="letter-card"
                 style={{
-                  padding: '18px 16px',
+                  padding: '10px 12px',
+                  background: 'var(--L-bg)',
+                  border: '1px solid var(--L-border)',
+                  borderRadius: 3,
+                  fontSize: 12,
+                  color: 'var(--L-sub)',
                   marginBottom: 16,
                 }}
               >
-                <div style={{ fontSize: 12, color: 'var(--L-sub)', marginBottom: 10 }}>
-                  당신의 대화 스타일
-                </div>
-
-                {MotifComponent ? (
-                  <>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        marginBottom: 14,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: '50%',
-                          background: 'var(--P-a)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                        }}
-                      >
-                        <MotifComponent size={28} color="white" />
-                      </div>
-                      <div>
-                        <div
-                          className="serif"
-                          style={{
-                            fontSize: 16,
-                            color: 'var(--L-ink)',
-                            fontWeight: 500,
-                          }}
-                        >
-                          {user.communicationStyle}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        border: '1px solid var(--L-rule)',
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <div
-                        style={{
-                          padding: '10px 14px 8px',
-                          fontSize: 11,
-                          color: 'var(--L-sub)',
-                          borderBottom: '1px solid var(--L-rule)',
-                        }}
-                      >
-                        스타일 다시 등록하기
-                      </div>
-                      {[
-                        {
-                          label: '10문항 다시 하기',
-                          desc: '갈등 상황 기반 검사 · 약 2분',
-                          href: '/onboarding?next=/profile',
-                        },
-                        {
-                          label: 'MBTI 수정하기',
-                          desc: '직접 입력으로 변경',
-                          href: '/onboarding/mbti-input?next=/profile',
-                        },
-                      ].map((opt, i) => (
-                        <button
-                          key={opt.label}
-                          onClick={() => router.push(opt.href)}
-                          style={{
-                            width: '100%',
-                            background: 'transparent',
-                            border: 'none',
-                            borderTop: i === 0 ? 'none' : '1px solid var(--L-rule)',
-                            padding: '12px 14px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontSize: 13, color: 'var(--L-ink)', marginBottom: 2 }}>
-                              {opt.label}
-                            </div>
-                            <div style={{ fontSize: 11, color: 'var(--L-sub)' }}>{opt.desc}</div>
-                          </div>
-                          <span style={{ color: 'var(--L-sub)', fontSize: 16, marginLeft: 12, flexShrink: 0 }}>›</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 13, color: 'var(--L-sub)', lineHeight: 1.6, marginBottom: 14 }}>
-                      아직 대화 스타일이 등록되지 않았어요.
-                      <br />10문항으로 내 스타일을 파악해보세요.
-                    </div>
-                    <button
-                      className="btn-L"
-                      style={{ width: '100%' }}
-                      onClick={() => router.push('/onboarding/intro?next=/profile')}
-                    >
-                      10문항 시작하기
-                    </button>
-                  </>
-                )}
+                게스트 모드
               </div>
             )}
 
-            {/* 비밀번호 변경 (이메일 가입자만) */}
+
+            {/* 비밀번호 변경 */}
             <div style={{ marginBottom: 16 }}>
               <ChangePasswordSection />
             </div>
 
-            {/* 관리자 진입 카드 — showAdminEntryButton 조건 */}
+            {/* 관리자 진입 카드 */}
             {permissionsFor(user).ui.showAdminEntryButton && (
               <div className="letter-card" style={{ padding: '4px 0', marginBottom: 16 }}>
                 <button
@@ -510,7 +446,7 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Actions */}
+            {/* 로그아웃 / 계정 삭제 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
               <button onClick={handleLogout} className="btn-L" style={{ width: '100%' }}>
                 로그아웃
@@ -523,26 +459,14 @@ export default function ProfilePage() {
                   background: 'transparent',
                   color: '#B94040',
                   border: '1px solid #B94040',
-                  borderRadius: '3px',
-                  fontSize: '14px',
+                  borderRadius: 3,
+                  fontSize: 14,
                   fontWeight: 500,
                   cursor: 'pointer',
                 }}
               >
                 계정 삭제
               </button>
-            </div>
-
-            {/* 법적 링크 */}
-            <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--L-border)', display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
-              {[
-                { href: '/terms', label: '이용약관' },
-                { href: '/privacy', label: '개인정보처리방침' },
-              ].map((link) => (
-                <a key={link.href} href={link.href} style={{ fontSize: 12, color: 'var(--L-sub)', textDecoration: 'none' }}>
-                  {link.label}
-                </a>
-              ))}
             </div>
           </>
         )}

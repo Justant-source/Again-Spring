@@ -39,9 +39,7 @@ export function GuestUpgradeModal() {
 
   const handleSignup = () => {
     hideGuestLimitModal();
-    const sessionId = guestLimitModal?.sessionId;
-    const query = sessionId ? `?fromGuestSession=${sessionId}` : '';
-    router.push(`/signup${query}`);
+    router.push('/signup');
   };
 
   const handleBack = () => {

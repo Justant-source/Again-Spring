@@ -38,7 +38,7 @@ test.describe('Flow 01: 인증', () => {
     expect(token).toBeTruthy()
   })
 
-  test('게스트 진입 → 바로 세션 생성 화면 진입 (온보딩 강제 없음)', async ({ page }) => {
+  test('게스트 진입 → 커뮤니티 광장 이동', async ({ page }) => {
     await page.goto(`${BASE}/guest`)
 
     // 닉네임 입력 (dynamic placeholder는 useEffect, role/position으로 접근)
@@ -48,9 +48,9 @@ test.describe('Flow 01: 인증', () => {
 
     await page.getByRole('button', GUEST_START_BUTTON).click()
 
-    // 온보딩 강제 폐지(2026-05-31) — 게스트는 닉네임 설정 즉시 /session/new로 이동
-    await page.waitForURL(/\/session\/new/, { timeout: 10_000 })
-    expect(page.url()).toContain('/session/new')
+    // V18 이후 게스트도 커뮤니티 광장으로 이동
+    await page.waitForURL(/\/community/, { timeout: 10_000 })
+    expect(page.url()).toContain('/community')
 
     const token = await page.evaluate((key: string) => localStorage.getItem(key), TOKEN_KEY)
     expect(token).toBeTruthy()

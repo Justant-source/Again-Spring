@@ -5,6 +5,7 @@ import com.againspring.domain.community.PostComment;
 import com.againspring.domain.community.CommunityReport;
 import com.againspring.domain.community.Post;
 import com.againspring.repository.community.CommunityReportRepository;
+import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.community.CommentService;
@@ -14,7 +15,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -35,6 +38,7 @@ public class CommunityCommentController {
     private final CommunityReportRepository communityReportRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final PostLikeRepository postLikeRepository;
 
     /**
      * 댓글 목록 조회
@@ -67,30 +71,28 @@ public class CommunityCommentController {
                 .map(comment -> {
                     List<PostComment> replies = commentService.getReplies(comment.getId());
 
-                    // 댓글 작성자가 포스트 작성자인지, 파트너인지 확인
                     boolean isAuthor = postAuthorId != null && postAuthorId.equals(comment.getAuthorId());
                     boolean isPartner = postPartnerUserId != null && postPartnerUserId.equals(comment.getAuthorId());
-
                     String authorNickname = resolveNickname(comment.getAuthorId());
+                    boolean isLiked = userId != null && postLikeRepository.existsByCommentIdAndUserId(comment.getId(), userId);
 
                     List<CommentResponse> replyResponses = replies.stream()
                             .map(reply -> {
                                 boolean replyIsAuthor = postAuthorId != null && postAuthorId.equals(reply.getAuthorId());
                                 boolean replyIsPartner = postPartnerUserId != null && postPartnerUserId.equals(reply.getAuthorId());
                                 String replyNickname = resolveNickname(reply.getAuthorId());
-                                // TODO: isLiked 조회
-                                return CommentResponse.from(reply, false, replyIsAuthor, replyIsPartner, replyNickname);
+                                boolean replyIsLiked = userId != null && postLikeRepository.existsByCommentIdAndUserId(reply.getId(), userId);
+                                return CommentResponse.from(reply, replyIsLiked, replyIsAuthor, replyIsPartner, replyNickname);
                             })
                             .toList();
 
-                    // TODO: isLiked 조회
                     return CommentWithRepliesResponse.builder()
                             .id(comment.getId())
                             .authorId(comment.getAuthorId())
                             .authorNickname(authorNickname)
                             .body(comment.getBody())
                             .likeCount((long) comment.getLikeCount())
-                            .isLiked(false)
+                            .isLiked(isLiked)
                             .createdAt(comment.getCreatedAt())
                             .isAuthor(isAuthor)
                             .isPartner(isPartner)
@@ -102,9 +104,16 @@ public class CommunityCommentController {
         return ResponseEntity.ok(responses);
     }
 
+    /** Authentication → userId (null이면 미인증) */
+    private String resolveUserId(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) return null;
+        String name = authentication.getName();
+        return "anonymousUser".equals(name) ? null : name;
+    }
+
     /** 사용자 ID → 닉네임 변환 (없으면 익명 반환) */
     private String resolveNickname(String userId) {
-        if (userId == null) return "익명";
+        if (userId == null || userId.startsWith("anon_")) return "익명";
         return userRepository.findById(userId)
                 .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
                 .orElse("익명");
@@ -120,12 +129,18 @@ public class CommunityCommentController {
     public ResponseEntity<CommentResponse> addComment(
             @PathVariable String postId,
             @Valid @RequestBody CommentRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            Authentication authentication) {
+
+        String userId = resolveUserId(authentication);
+        // 미인증 사용자도 익명으로 댓글 가능
+        if (userId == null) {
+            userId = "anon_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        }
 
         PostComment comment = commentService.addComment(
                 postId,
                 request.getParentCommentId(),
-                userDetails.getUsername(),
+                userId,
                 request.getBody()
         );
 
@@ -143,9 +158,12 @@ public class CommunityCommentController {
     public ResponseEntity<LikeResponse> toggleCommentLike(
             @PathVariable String postId,
             @PathVariable Long commentId,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            Authentication authentication) {
 
-        boolean liked = commentService.toggleCommentLike(commentId, userDetails.getUsername());
+        String userId = resolveUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        boolean liked = commentService.toggleCommentLike(commentId, userId);
         long count = commentService.getCommentLikeCount(commentId);
 
         LikeResponse response = LikeResponse.builder()
@@ -167,18 +185,21 @@ public class CommunityCommentController {
             @PathVariable String postId,
             @PathVariable Long commentId,
             @Valid @RequestBody ReportRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            Authentication authentication) {
+
+        String userId = resolveUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         CommunityReport report = CommunityReport.builder()
                 .targetType("COMMENT")
                 .targetId(String.valueOf(commentId))
-                .reporterUserId(userDetails.getUsername())
+                .reporterUserId(userId)
                 .reason(request.getReason())
                 .status("PENDING")
                 .build();
 
         communityReportRepository.save(report);
-        log.info("Comment reported: {} by user {}, reason: {}", commentId, userDetails.getUsername(), request.getReason());
+        log.info("Comment reported: {} by user {}, reason: {}", commentId, userId, request.getReason());
 
         return ResponseEntity.ok(com.againspring.api.community.dto.ReportResponse.builder()
                 .reported(true)

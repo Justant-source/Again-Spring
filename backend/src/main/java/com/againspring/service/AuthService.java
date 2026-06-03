@@ -217,16 +217,21 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse guest(GuestRequest request) {
-        String guestId = generateGuestId();
+        // deviceId가 있으면 동일 기기 = 동일 guestId (재방문 시 동일 계정 재사용)
+        String guestId = deviceToGuestId(request.getDeviceId());
+
+        // 닉네임: 요청에 있으면 사용, 없으면 자동 생성
         String displayNickname = (request.getNickname() != null && !request.getNickname().isBlank())
                 ? request.getNickname()
                 : GuestNicknameGenerator.generateUnique(
                         userRepository::existsByNicknameAndDeletedAtIsNull);
 
-        log.info("Guest token issued: {}", guestId);
-
-        // 게스트 유저를 users 테이블에 저장 (없을 때만) — UserDetailsService/SessionService 인증 경로 공유
-        if (!userRepository.existsById(guestId)) {
+        // 기존 게스트 유저가 있으면 닉네임 유지
+        var existingUser = userRepository.findById(guestId).orElse(null);
+        if (existingUser != null && existingUser.getNickname() != null) {
+            displayNickname = existingUser.getNickname();
+            log.info("Guest returning: {}, nickname={}", guestId, displayNickname);
+        } else {
             User guestUser = User.builder()
                     .id(guestId)
                     .nickname(displayNickname)
@@ -247,9 +252,18 @@ public class AuthService {
                         .build())
                 .token(AuthResponse.TokenInfo.builder()
                         .accessToken(token)
-                        .expiresIn(7200)
+                        .expiresIn(2592000)
                         .build())
                 .build();
+    }
+
+    /** deviceId → 결정론적 guestId (없으면 랜덤 생성) */
+    private String deviceToGuestId(String deviceId) {
+        if (deviceId == null || deviceId.isBlank()) return generateGuestId();
+        // UUID 하이픈 제거 후 앞 14자 사용 → "d-" 접두어
+        String clean = deviceId.replaceAll("[^a-zA-Z0-9]", "");
+        String suffix = clean.length() >= 14 ? clean.substring(0, 14) : clean;
+        return "d-" + suffix;
     }
 
     private AuthResponse buildAuthResponse(User user, String token, int expiresIn, boolean isGuest) {

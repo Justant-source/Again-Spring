@@ -16,8 +16,8 @@
 | Rate Limit | bucket4j 7.6 |
 | 직렬화 | Jackson 2.17, SnakeYAML 2.0 |
 | 테스트 | JUnit 5, Mockito, Testcontainers, H2 |
-| LLM | Task별 분리: 대화(dev: CLI 워커, prod: Anthropic API), 리포트(모두: CLI 워커) |
-| LLM HTTP | RestClient (Anthropic API) + `againspring-llm` 워커 (Claude Code CLI) |
+| LLM | 모든 호출: `againspring-llm` 워커 (Claude Code CLI remote) |
+| LLM HTTP | RestClient → `againspring-llm` 워커 `/v1/invoke` endpoint |
 
 ## 레이어 흐름
 
@@ -104,52 +104,48 @@ MariaDB (Flyway 관리 스키마)
   public Turn saveMediatorResponse(...) { /* 결과 저장 */ }
   ```
 
-## Mediation State Machine (V1.5 카톡식)
+## 커뮤니티 광장 흐름
 
-`SessionStateMachine`이 `SessionStatus` 전이의 단일 진실. V1.5부터 카톡 메시지 기반 흐름.
+`CommunityPostController`와 `JuryService`가 핵심. 광장형 UX로 피벗(2026-06-02).
 
 ```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> CHATTING_SOLO : POST /api/sessions
-    CHATTING_SOLO --> CHATTING_DUO : POST /sessions/join/{token}\n(Duo게이팅 통과)
-    CHATTING_SOLO --> FINALIZING : POST /finalize\n(5턴 이상)
-    CHATTING_DUO --> FINALIZING : POST /finalize\n(5턴 이상)
-    FINALIZING --> CHATTING_SOLO : POST /finalize/decline
-    FINALIZING --> CHATTING_DUO : POST /finalize/decline (Duo)
-    FINALIZING --> COMPLETED : /finalize/agree\n(양쪽 동의 or Solo)
-    CHATTING_SOLO --> CANCELLED : DELETE /sessions/{id}
-    CHATTING_DUO --> CANCELLED : DELETE /sessions/{id}
-    COMPLETED --> [*]
-    CANCELLED --> [*]
+flowchart LR
+    Client["사용자"]
+    Post["POST /api/posts<br/>(게시글 작성)"]
+    Save["PostService<br/>(DB 저장)"]
+    LLM["JuryService<br/>(LLM 배심원 호출)"]
+    Jury["POST /api/posts/{id}/jury<br/>(배심원 의견 저장)"]
+    Vote["POST /api/posts/{id}/votes<br/>(투표)"]
+    Comment["POST /api/posts/{id}/comments<br/>(댓글)"]
+    
+    Client --> Post --> Save
+    Save --> LLM
+    LLM --> Jury
+    Client --> Vote
+    Client --> Comment
 ```
 
-**상태 전이 규칙**:
-- `CHATTING_SOLO` → `CHATTING_DUO`: 상대가 초대 토큰으로 `POST /sessions/join/{token}` 참여 (Duo 게이팅: `app.features.duo-mode=true` 또는 TESTER 역할)
-- `CHATTING_SOLO/DUO` → `FINALIZING`: `POST /finalize` 호출 (5턴 이상 필요)
-- `FINALIZING` → `COMPLETED`: 양쪽이 `/finalize/agree` (Solo는 자동 완료)
-- `FINALIZING` → `CHATTING_SOLO/DUO`: 한쪽이 `/finalize/decline`
-- `CHATTING_SOLO/DUO` → `CANCELLED`: `DELETE /sessions/{id}` (세션 삭제)
+**핵심 엔티티**:
+- `Post` — 사연 게시글 (title, content, category, author)
+- `PostComment` — 댓글 (post_id, author, content)
+- `Vote` — 배심원 의견에 대한 투표 (helpful/unhelpful)
+- `Juror` — AI 배심원 (post_id, jury_opinion, neutral_summary)
 
-**ChatService 처리 순서** (`POST /api/sessions/{id}/messages`):
-1. 현재 상태 확인 (CHATTING_SOLO 또는 CHATTING_DUO만 메시지 허용)
-2. CrisisDetector 실행 (위험 키워드) → level 1 시 즉시 차단, level 2는 메타 부착
-3. 사용자 메시지 저장 (`messages` 테이블) + 카운트 증가
-4. **사용자 프로필 로드** (`UserRepository.findByIdAndDeletedAtIsNull`) — Solo 1명 / Duo 2명
-5. **ChatPromptAssembler 호출** — system + gottman + nvc + `<user_profile>` + `<psychology_feedback>` + relations + chat/{solo,duo}_chat + history + current + `<duo_balance>` + 응답 형식 지시
-6. LLM 호출 (Haiku, 트랜잭션 밖, 60s timeout)
-7. **`ChatTurnMetaParser.parse()`** — 응답을 본문 + `<turn_meta>` JSON으로 분리
-8. 중재자 본문 저장 (`messages` 테이블) — meta 블록은 사용자에 노출되지 않음
-9. **세션 누적 갱신**: `horsemen_history`, `nvc_completion_history` append + Duo면 발신자별 `user_{a,b}_emotion_intensity` 누적 평균
-10. 필요시 `finalize_suggested_at` 설정 (AI가 종료 권유)
+**흐름**:
+1. 사용자가 갈등 사연 작성 → `POST /api/posts`
+2. PostService가 DB에 저장
+3. JuryService가 비동기로 LLM 호출 (Claude Haiku 4.5)
+   - 중립화된 요약 + AI 배심원 의견 생성
+   - `RemoteLlmProvider` (againspring-llm 워커 CLI)
+4. 배심원 결과 DB 저장 → `POST /api/posts/{id}/jury`
+5. 커뮤니티가 투표/댓글 → `POST /api/posts/{id}/votes`, `POST /api/posts/{id}/comments`
 
 ## 이벤트 흐름
 
 | 이벤트 | 발행 | 리스너 | 효과 |
 |---|---|---|---|
-| `TurnCompletedEvent` | 매 턴 완료 시 | (현재 미사용 — 모니터링용 예약) | — |
-| `SafetyTriggerEvent` | KeywordGuard / RatioEnforcer 위반 시 | `SafetyAuditLogger` | safety 감사 로그 (마스킹) |
-| `CrisisDetectedEvent` | CrisisDetector 발동 시 | `SessionService.terminateForCrisis` | `SessionStatus.TERMINATED` 전이 |
+| `SafetyTriggerEvent` | KeywordGuard 위반 시 | `SafetyAuditLogger` | safety 감사 로그 (마스킹) |
+| `CrisisDetectedEvent` | CrisisDetector 발동 시 (게시글/댓글) | 관리자 알림 | crisis_alerts 로깅 |
 
 `AsyncConfig`로 일부 리스너는 비동기 처리 — main thread 막지 않음.
 

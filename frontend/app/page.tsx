@@ -5,13 +5,16 @@ import { useEffect, useState } from 'react';
 import { PhoneFrame } from '@/components/shared/PhoneFrame';
 import { Logo } from '@/components/shared/Logo';
 import { Footer } from '@/components/shared/Footer';
+import { BrandBar } from '@/components/community/c3';
 import { useUserStore } from '@/lib/store/userStore';
+import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { permissionsFor } from '@/lib/constants/userPermissions';
 
 export default function LandingPage() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
   const [mounted, setMounted] = useState(false);
+  useGuestInit();
 
   useEffect(() => {
     setMounted(true);
@@ -26,25 +29,8 @@ export default function LandingPage() {
   return (
     <PhoneFrame tone="L">
       <div className="flex flex-col flex-1 px-7 pt-6 pb-5">
-        {/* 헤더: 로고 + 우측 로그인 링크 */}
-        <div className="flex items-center justify-between">
-          <Logo />
-          <button
-            onClick={() => router.push(user ? '/profile' : '/login')}
-            style={{
-              background: 'none',
-              border: '1px solid var(--L-border)',
-              borderRadius: 999,
-              padding: '5px 12px',
-              cursor: 'pointer',
-              fontSize: 13,
-              color: user ? 'var(--L-ink)' : 'var(--L-sub)',
-              fontFamily: 'var(--font-sans)',
-            }}
-          >
-            {user ? (user.nickname || '내 정보') : '로그인'}
-          </button>
-        </div>
+        {/* 헤더: 다시봄 + 우측 유저 칩 */}
+        <BrandBar title="다시봄" user={user} />
 
         {/* 관리자 모드 진입 카드 — user-permissions.json의 ui.showAdminEntryButton */}
         {showAdminEntry && (
@@ -122,7 +108,7 @@ export default function LandingPage() {
               marginBottom: 16,
             }}
           >
-            내 갈등,<br />혼자 판단하기<br />어려울 때.
+            나의 갈등,<br />혼자 판단하기<br />어려울 때.
           </h1>
           <p
             className="text-[14px]"
@@ -132,7 +118,7 @@ export default function LandingPage() {
               marginBottom: 24,
             }}
           >
-            AI 배심원단과 익명의 여론이 여러 시선을 빌려드려요.
+            익명의 여론이 여러 시선을 빌려드려요.
             <br />
             혼자, 또는 상대와 함께 풀어가요.
           </p>

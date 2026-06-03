@@ -19,89 +19,58 @@ export function SideStory({
   onSelect,
   onMore,
 }: SideStoryProps) {
-  const bgColor = side === 'g' ? 'var(--grn-bg)' : 'var(--red-bg)';
-  const borderColor = selected
-    ? (side === 'g' ? 'var(--grn-dk)' : 'var(--red-dk)')
-    : 'transparent';
+  const c = side === 'g' ? 'var(--grn)' : 'var(--red)';
+  const cDk = side === 'g' ? 'var(--grn-dk)' : 'var(--red-dk)';
+  const bg = side === 'g' ? 'var(--grn-bg)' : 'var(--red-bg)';
 
   return (
     <div
       onClick={onSelect}
       style={{
-        background: bgColor,
+        background: bg,
         borderRadius: 12,
         padding: '13px 14px',
-        border: `2.5px solid ${borderColor}`,
-        cursor: 'pointer',
-        transition: 'border-color 0.2s',
+        border: `2.5px solid ${selected ? cDk : 'transparent'}`,
+        cursor: onSelect ? 'pointer' : clamp ? 'pointer' : 'default',
+        transition: 'border-color 0.15s',
       }}
     >
-      {/* 상단: 색점 + 라벨 + selected 표시 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <div
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: side === 'g' ? 'var(--grn)' : 'var(--red)',
-            flexShrink: 0,
-          }}
-        />
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--P-ink)', flex: 1 }}>
-          {label}
-        </span>
-        {selected && (
-          <span style={{ fontSize: 11, color: 'var(--P-sub)' }}>· 선택됨</span>
+      {/* 상단: 색점 + 라벨 + 선택됨 / 더 보기 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
+          <span style={{ fontSize: 11, color: c, fontWeight: 500 }}>{label}</span>
+          {selected && <span style={{ fontSize: 11, color: cDk, fontWeight: 500 }}>· 선택됨</span>}
+        </div>
+        {clamp && onMore && (
+          <span
+            onClick={(e) => {
+              e.stopPropagation();
+              onMore();
+            }}
+            style={{ fontSize: 11, color: c, cursor: 'pointer' }}
+          >
+            더 보기 ›
+          </span>
         )}
       </div>
 
       {/* 본문 */}
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end',
-          gap: 8,
+          fontSize: 12.5,
+          color: 'var(--P-ink)',
+          lineHeight: 1.65,
+          fontFamily: 'var(--font-serif)',
+          ...(clamp && {
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }),
         }}
       >
-        <p
-          style={{
-            margin: 0,
-            fontSize: 12.5,
-            fontFamily: 'var(--font-serif)',
-            lineHeight: 1.6,
-            color: 'var(--P-ink)',
-            flex: 1,
-            ...(clamp && {
-              display: '-webkit-box',
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }),
-          }}
-        >
-          {body}
-        </p>
-        {clamp && onMore && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onMore();
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: 12,
-              color: 'var(--P-sub)',
-              cursor: 'pointer',
-              padding: 0,
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            더 보기 ›
-          </button>
-        )}
+        {body}
       </div>
     </div>
   );

@@ -11,8 +11,6 @@ import { generateGuestNickname } from '@/lib/utils/guestNickname';
 
 export default function SignupPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const fromGuestSession = searchParams.get('fromGuestSession');
   const setUser = useUserStore((s) => s.setUser);
   const guestUser = useUserStore((s) => s.user);
 
@@ -27,10 +25,10 @@ export default function SignupPage() {
   const [sendingCode, setSendingCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [sentToEmail, setSentToEmail] = useState('');
-  const [termsAgreed, setTermsAgreed] = useState(false);
-  const [privacyAgreed, setPrivacyAgreed] = useState(false);
-  const [disclaimerAgreed, setDisclaimerAgreed] = useState(false);
-  const [marketingAgreed, setMarketingAgreed] = useState(false);
+  const [termsAgreed] = useState(true);
+  const [privacyAgreed] = useState(true);
+  const [disclaimerAgreed] = useState(true);
+  const [marketingAgreed] = useState(false);
   const [termsModalUrl, setTermsModalUrl] = useState<string | null>(null);
   const [duplicateEmailModal, setDuplicateEmailModal] = useState(false);
 
@@ -127,10 +125,7 @@ export default function SignupPage() {
       setError('비밀번호가 일치하지 않아요');
       return;
     }
-    if (!termsAgreed || !privacyAgreed || !disclaimerAgreed) {
-      setError('필수 동의 항목을 모두 체크해주세요');
-      return;
-    }
+
 
     setLoading(true);
     try {
@@ -150,12 +145,7 @@ export default function SignupPage() {
         localStorage.setItem('again-spring-token', token.accessToken);
       }
       setUser(user);
-      // 게스트 세션에서 업그레이드된 경우 원래 세션으로 복귀
-      if (fromGuestSession) {
-        router.push(`/session/chat/${fromGuestSession}`);
-      } else {
-        router.push('/');
-      }
+      router.push('/');
     } catch (err: any) {
       setError(err.response?.data?.error?.message || '회원가입에 실패했어요');
     } finally {
@@ -280,35 +270,6 @@ export default function SignupPage() {
               />
             </div>
 
-            {/* 동의 체크박스 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 0', borderTop: '1px solid var(--L-border)' }}>
-              <ConsentRow
-                checked={termsAgreed}
-                onChange={setTermsAgreed}
-                label="이용약관"
-                required
-                onViewClick={() => setTermsModalUrl('/terms')}
-              />
-              <ConsentRow
-                checked={privacyAgreed}
-                onChange={setPrivacyAgreed}
-                label="개인정보 처리방침"
-                required
-                onViewClick={() => setTermsModalUrl('/privacy')}
-              />
-              <ConsentRow
-                checked={disclaimerAgreed}
-                onChange={setDisclaimerAgreed}
-                label="전문 상담·치료를 대체하지 않음을 이해합니다"
-                required
-              />
-              <ConsentRow
-                checked={marketingAgreed}
-                onChange={setMarketingAgreed}
-                label="마케팅 정보 수신 동의"
-                required={false}
-              />
-            </div>
 
             {error && (
               <div style={{ fontSize: 13, color: 'var(--L-point)' }}>{error}</div>

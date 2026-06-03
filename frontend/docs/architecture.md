@@ -38,6 +38,12 @@ flowchart LR
     ApiClient -.dev.-> MSW
 ```
 
+**광장형 흐름**:
+1. 사용자가 갈등 게시글 작성 → `POST /api/posts`
+2. FeedCard에서 배심원 의견 표시 (LLM 생성)
+3. VoteBar에서 "도움됨/안 됨" 투표
+4. CommentBar에서 댓글 작성 및 무한스크롤
+
 ### 텍스트 버전:
 
 ```
@@ -114,9 +120,9 @@ const useUserStore = create<UserState>()(
 
 `clear()`는 store + `localStorage.again-spring-token` 둘 다 정리.
 
-### `lib/store/sessionStore.ts`
+### `lib/store/communityStore.ts`
 
-세션 진행 중인 플로우 상태 (relationType, category, description, currentTurn, turns, partnerNickname 등). 새 세션 시작 시 `reset()`.
+광장 피드 상태 (posts 배열, currentPost, comments, votes 등). 필터/정렬 상태 포함.
 
 ### MSW (`mocks/`)
 
@@ -143,17 +149,21 @@ useEffect(() => {
 
 `public/mockServiceWorker.js`는 MSW가 자동 생성 (`.gitignored`).
 
-### `components/shared/CrisisResourceModal.tsx`
+### `components/community/c3/FeedCard.tsx`
 
-위기 키워드 감지 시 풀스크린 모달. `lib/constants/crisisResources.ts`의 핫라인 카드 표시. `tel:` 링크로 즉시 전화 연결 + `sms:`로 문자 상담.
+갈등 게시글 카드. 배심원 의견(AI 생성) + 투표/댓글 버튼 포함.
 
-### `components/shared/KeywordGuard.tsx`
+### `components/community/c3/JurorCard.tsx`
 
-입력 필드(`<textarea>`) 옆에 인라인 경고. `lib/utils/keywordGuard.ts`의 `checkKeywords(text)` 결과에 따라:
-- Level 1: 모달 띄우고 입력 차단
-- Level 2: 인라인 배너 + 입력 허용
+AI 배심원 의견 카드. 중립화된 요약 + 배심원 분석 표시.
 
-상세 정책: [docs/policies/forbidden-words-lint.md](./policies/forbidden-words-lint.md)
+### `components/community/c3/VoteBar.tsx`
+
+투표 버튼 (도움됨/안 됨). 클릭하면 `POST /api/posts/{id}/votes` 호출.
+
+### `components/community/c3/CommentBar.tsx`
+
+댓글 무한스크롤 리스트 + 댓글 입력 폼. 무한스크롤 구현.
 
 ## 페이지 흐름
 
@@ -164,32 +174,27 @@ flowchart TD
     Land["/ 랜딩"] -->|시작하기| Onboard["/onboarding\n10문항"]
     Onboard -->|완료| Result["/onboarding/result\n스타일 카드"]
     Result -->|회원가입| Signup["/auth/signup\n이메일 + 코드"]
-    Signup -->|가입 완료| New["/session/new\n관계 유형 선택"]
-    New --> Category["/session/category\n갈등 유형"]
-    Category --> Describe["/session/describe\nKeywordGuard"]
-    Describe --> Invite["/session/invite\n초대 링크 공유"]
-    Invite -->|링크 공유 후 대기| Wait["/session/wait\nB 참여 대기"]
-    Wait -->|B 참여| Chat["/session/chat/{id}\n카톡식 채팅"]
-    Chat -->|완료| Report["/session/result/{id}\n리포트"]
+    Signup -->|가입 완료| Plaza["/community\n광장 피드"]
+    Plaza -->|게시하기| NewPost["/community/new\n갈등 사연 작성"]
+    NewPost -->|게시 완료| PostDetail["/community/{id}\n배심원 + 투표 + 댓글"]
 ```
 
-### 2) B (초대받은 쪽) 진입
+### 2) 기존 사용자
 
 ```mermaid
 flowchart TD
-    Link([초대 링크 클릭]) --> Join["/session/join/{token}\nB 닉네임 입력"]
-    Join -->|회원 로그인| Login["/auth/login"]
-    Join -->|게스트로 참여| Guest["게스트 JWT 발급"]
-    Login --> Chat
-    Guest --> Chat["/session/chat/{id}\nB 입장"]
+    Login["/auth/login"] --> Plaza["/community\n광장 피드"]
+    Plaza -->|게시글 선택| Detail["/community/{id}\n배심원 + 투표"]
+    Detail -->|댓글 작성| Comment["POST /api/posts/{id}/comments"]
+    Detail -->|투표| Vote["POST /api/posts/{id}/votes"]
 ```
 
-### 3) Solo 모드
+### 3) 게스트
 
 ```mermaid
 flowchart TD
-    Wait["B가 24h 내 미참여"] -->|혼자 진행하기| Solo["/session/result/{id}\nSolo 분석 리포트"]
-    Solo -->|초대 링크 다시 보내기| Invite["POST /api/sessions/{id}/invite\n링크 클립보드 복사"]
+    Land["/ 랜딩"] --> Guest["게스트 JWT 발급"]
+    Guest --> Plaza["/community\n광장 피드 (읽기만)"]
 ```
 
 ## 인증 흐름
@@ -255,3 +260,4 @@ npm run lint:words  # 금지어 스캔 (docs/policies/forbidden-words-lint.md)
 - **`localStorage` 접근**은 항상 `typeof window !== 'undefined'` 가드
 - **MSW는 dev 전용** — production 빌드는 MSWProvider가 worker 시작 안 함
 - **금지어** — `forbiddenWords.ts`의 단어를 카피로 직접 사용 금지 (`lint:words`가 차단)
+- **광장형 UX** — AI 배심원과 사용자 게시글 시각적 구분 필수 (배심원은 카드, 사용자는 텍스트)

@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { permissionsFor } from '@/lib/constants/userPermissions';
-import { Conversation } from '@/components/icons/Conversation';
 import { isNavHidden } from '@/lib/utils/navVisibility';
 
 // ─── SVG 탭 아이콘 ────────────────────────────────────────────────────

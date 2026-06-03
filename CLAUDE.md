@@ -2,15 +2,15 @@
 
 **프로젝트**: 다시봄 · Again Spring
 **도메인**: `dev.againspring.net` (dev) / `againspring.net`, `www.againspring.net` (prod)
-**진행 상황**: V13 완료, V15 마케팅 자동화 대시보드 구현 중 (dev 전용) — V15.1~V15.9 + 소셜 포스터 봇 우회 완료. **V16 카테고리 UX 개선**: 중·소분류 제거, 대분류만 유지, 대분류별 predefined 첫마디(7×5=35개), turn_meta 키워드·제목·koreanTag 추론 완료. 자세한 내용: `shared/docs/v15/marketing-automation.md`
-**기준일**: 2026-05-31
+**진행 상황**: **2026-06-02 피벗 완료**: 1:1 AI 중재 → **커뮤니티 광장 + AI 배심원** 모델 전환. Post/Juror/Vote 엔티티 + 광장형 UX (C3) 구현 완료. 구 Session/Message/Report 코드 삭제됨 (commit defc742).
+**기준일**: 2026-06-03
 
 ---
 
 ## 🎯 프로젝트 한 줄 요약
 
-싸운 두 사람 사이에서 AI가 양쪽 이야기를 중립적으로 정리해 관계 회복을 돕는 웹앱.
-FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + Claude Code LLM 브릿지.
+갈등 커뮤니티 플랫폼. 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공하는 웹앱.
+FE는 Next.js 14, BE는 Spring Boot 3.3 + **MariaDB 11** + Claude Code LLM 브릿지 (remote CLI only).
 
 ---
 
@@ -32,8 +32,9 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 1. **FE는 Claude Code를 직접 호출하지 않음**
    → 모든 LLM 요청은 BE 경유 (REST API)
 
-2. **BE만 Claude Code를 수행**
-   → ClaudeCodeBridge: `backend/src/main/java/.../llm/bridge/ClaudeCodeBridge.java`
+2. **BE는 RemoteLlmProvider만 사용 (againspring-llm 워커 CLI)**
+   → 모든 LLM 호출: HTTP POST → `/v1/invoke` (CLI 브릿지)
+   → 구 ClaudeCodeBridge/ClaudeApiProvider 제거됨
 
 3. **AI 출력 품질 금지어 확인**
    → LLM 프롬프트/출력 수정 시 `shared/docs/policies/forbidden-words.md` 참조 (AI 출력 품질 기준, 사용자 입력에는 미적용)
@@ -63,13 +64,13 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 
 #### API / 스키마
 - `shared/docs/api/README.md` — API 문서 인덱스 (도메인별 파일 링크 + 공통 규약)
-- `shared/docs/api/rest-spec.md` — 공통 규약·에러코드·전체 엔드포인트 마스터 표 (15개 컨트롤러·57개)
-- `shared/docs/api/auth.md` — 인증 API (AuthController 9 + OAuth2Controller 1)
-- `shared/docs/api/report.md` — 리포트 API (ReportController 3)
-- `shared/docs/api/user.md` — 사용자 API (UserController 7)
-- `shared/docs/api/feedback.md` — 피드백 API (FeedbackController 1)
-- `shared/docs/api/admin.md` — 관리자 API (admin 8종 컨트롤러·24개 엔드포인트, SocialPublishController 포함)
-- `shared/docs/api/database-schema.md` — MariaDB 테이블 설명 (Flyway V1~V24)
+- `shared/docs/api/rest-spec.md` — 공통 규약·에러코드·전체 엔드포인트 마스터 표
+- `shared/docs/api/auth.md` — 인증 API (AuthController, OAuth2Controller)
+- `shared/docs/api/community.md` — 광장 API (CommunityPostController, CommunityCommentController)
+- `shared/docs/api/user.md` — 사용자 API (UserController)
+- `shared/docs/api/feedback.md` — 피드백 API (FeedbackController)
+- `shared/docs/api/admin.md` — 관리자 API
+- `shared/docs/api/database-schema.md` — MariaDB 테이블 설명 (Flyway V1~V56+)
 - `shared/docs/categories.yml` — 카테고리 catalog (FE/BE 공유 권위본). 변경 시 `frontend/lib/constants/categories.ts` 동기화 필요
 
 #### LLM / 프롬프트
@@ -78,15 +79,14 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 - `shared/docs/prompts/{gottman,nvc,relations,turns}/*.md` — 도메인별 프롬프트 파편
 
 #### 정책 (서비스 컨텐츠 룰 — **권위본**)
-- `shared/docs/policies/psychology-model.md` — 심리학 모델 (Gottman + NVC + EFT) 채택 근거
+- `shared/docs/policies/psychology-model.md` — 심리학 모델 (Gottman + NVC) 채택 근거
 - `shared/docs/policies/auth.md` — 이메일/게스트/OAuth 인증 정책
 - `shared/docs/policies/onboarding.md` — 온보딩 Q&A → 6스타일 매핑
-- `shared/docs/policies/categories.md` — 5+1 관계 카테고리
-- `shared/docs/policies/forbidden-words.md` — 4-tier 금지어 (필수!)
-- `shared/docs/policies/crisis-detection.md` — 위기 키워드 + 핫라인
-- `shared/docs/policies/ratio-calculation.md` — 화해 기여도 산식
+- `shared/docs/policies/categories.md` — 갈등 카테고리
+- `shared/docs/policies/forbidden-words.md` — AI 출력 금지어 (필수!)
 - `shared/docs/policies/data-retention.md` — 30일 보존 정책
 - `shared/docs/policies/terms-of-service.md` — 서비스 이용약관
+- `shared/docs/ADR/` — 아키텍처 결정 기록 (2026-06-02 피벗 등)
 
 #### 시스템 전체
 - `shared/docs/structure.md` — 모노레포 전체 구조 / 책임 분리
@@ -94,9 +94,8 @@ FE는 Next.js 14 MSW 프로토타입, BE는 Spring Boot 3.3 + **MariaDB 11** + C
 - `shared/docs/admin-dashboard.md` — 관리자 대시보드 기능·운영 가이드 (ADMIN 권한·5개 섹션·17개 API)
 
 ### 백엔드 특화 — `backend/docs/`
-- `backend/docs/structure.md` — Spring Boot 패키지 계층
-- `backend/docs/architecture.md` — Layer / JPA / Flyway / State Machine / 이벤트
-- `backend/docs/llm-bridge.md` — Claude Code CLI 통합 (프로세스 풀, 타임아웃, fallback)
+- `backend/docs/structure.md` — Spring Boot 패키지 계층 (community/ 추가)
+- `backend/docs/architecture.md` — Layer / JPA / Flyway / 커뮤니티 광장 흐름 / 이벤트
 - `backend/docs/policies/{auth-jwt,oauth-google,keyword-guard,prompt-sanitizer}.md` — BE 구현 정책
 - `backend/docs/testing.md` — 테스트 전략 + 커버리지
 - `backend/docs/openapi.md` — Swagger UI + DTO 컨벤션
@@ -230,20 +229,22 @@ curl http://localhost:8080/actuator/health
 
 ## 🧠 LLM 브릿지 운영 주의사항
 
-> 자세한 설계: [`backend/docs/llm-bridge.md`](backend/docs/llm-bridge.md), 프롬프트 구조: [`shared/docs/prompts/README.md`](shared/docs/prompts/README.md)
+> 프롬프트 구조: [`shared/docs/prompts/README.md`](shared/docs/prompts/README.md)
 
-### 아키텍처 (2-pod 분리)
+### 아키텍처 (원격 CLI 통합)
+
+모든 LLM 호출은 `againspring-llm-dev/prod` 워커 컨테이너를 통함 (RemoteLlmProvider HTTP 클라이언트):
 
 | 컨테이너 | 역할 |
 |---|---|
-| `againspring-backend-dev/prod` | 프롬프트 어셈블 + HTTP 클라이언트 (`RemoteLlmProvider`) |
-| `againspring-llm-dev/prod` | Claude CLI 실행 전용 (LLM 작업 전담) |
+| `againspring-backend-dev/prod` | 프롬프트 어셈블 + HTTP 클라이언트 (RemoteLlmProvider) |
+| `againspring-llm-dev/prod` | Claude Code CLI 실행 전용 (`/v1/invoke` endpoint) |
 
-- **모델**: `claude-haiku-4-5-20251001` (배심원/중재 메시지), `claude-sonnet-4-6` (리포트 생성)
-- **호출 플래그**: `--strict-mcp-config --no-session-persistence --print` (⚠️ `--bare` 금지 — OAuth 파괴)
-- **동시성**: ThreadPoolExecutor 100 + LinkedBlockingQueue 500 (fail-fast 폐기 → 대기 큐)
-- **타임아웃**: 실행 120초 (큐 대기 30초 초과 시 CAPACITY)
-- **환경 동일**: **dev/prod 모두 원격 CLI 브릿지 사용**. `ANTHROPIC_API_KEY` 불필요.
+- **모델**: `claude-haiku-4-5-20251001` (배심원 의견), 커뮤니티 광장 전용
+- **호출 플래그**: `--strict-mcp-config --no-session-persistence --print`
+- **동시성**: ThreadPoolExecutor 100 + LinkedBlockingQueue 500
+- **타임아웃**: 실행 120초
+- **환경 동일**: **dev/prod 모두 동일 경로**. `ANTHROPIC_API_KEY` 불필요.
 
 ### 인증 방식 (API 키 없이 — dev/prod 동일)
 
@@ -420,48 +421,27 @@ CATEGORIES_PATH=./shared/docs/categories.yml
 ## 📊 현재 진행 상황
 
 - ✅ 모노레포 구조 (frontend/, backend/, shared/, env/)
-- ✅ 프론트엔드 (Next.js 14 — MSW 프로토타입 + 실제 API 연동)
+- ✅ 프론트엔드 (Next.js 14 + 광장형 UX)
 - ✅ 백엔드 구현 완료
   - ✅ Spring Boot 3.3 + Java 21 + Gradle Kotlin DSL
-  - ✅ MariaDB 11 (JPA + Flyway V1~V24)
+  - ✅ MariaDB 11 (JPA + Flyway V1~V56+)
   - ✅ JWT 인증 (회원가입 / 로그인 / 게스트 / Google OAuth)
   - ✅ 이메일 인증코드 (Spring Mail + Gmail SMTP)
-  - ✅ V1.5 카톡식 채팅 (ChatService, MessageSender 4종, Solo→Duo 전이)
-  - ✅ **LLM 브릿지 (Claude Haiku 4.5 + 호스트 ~/.claude 마운트, API 키 불필요)**
-  - ✅ **LLM 호출 취소 메커니즘 (Phase 1 V1.5)**: POST /messages <500ms 응답 + 새 메시지 도착 시 진행 중 Claude 프로세스 강제 종료 + 누적 메시지 재호출. `CancelableChatService`, `CancelableInvocation`.
-  - ✅ **LLM 워커 분리 (2026-05-17)**: 전용 `againspring-llm-dev/prod` 컨테이너 (`llm-worker/` Spring Boot). `ThreadPoolExecutor(100) + LinkedBlockingQueue(500)` — Semaphore(3) fail-fast 폐기. `RemoteLlmProvider` + `RemoteCancelableInvocation` (long-poll). `--strict-mcp-config --no-session-persistence` CLI 플래그.
-  - ✅ **prod LLM 분리 + 프롬프트 캐싱 (2026-05-30)**: `LlmProviderConfig` + per-task 라우팅 (chat=`ClaudeApiProvider` / report=`RemoteLlmProvider`). `ClaudeApiProvider`: RestClient로 Anthropic API 직접 호출, `cache_control` 3-breakpoint (GLOBAL_STATIC / SESSION_STATIC / HISTORY), Semaphore 동시성, 지수 백오프. `StructuredPrompt`: 4계층 캐시 + flatten(). `ReportContextAssembler` + `llm_call_logs` DB 저장 (cacheReadTokens, cacheCreationTokens).
-  - ✅ **중재 컨텍스트 강화 (Phase A/B/C)**: 사용자 프로필 주입(`UserProfileFragment`) + 턴 간 심리 점수 피드백(`PsychologyFeedbackFormatter`, `ChatTurnMetaParser`) + Duo 균형 추적(`DuoBalanceFormatter`)
-  - ✅ **중재 컨텍스트 강화 Phase D**: UserState 7종 + IssueContext 4슬롯 + QuestionQueue (A·B 분리 PQ) + B 진입 시 환영+PQ top1 통합 메시지 + IsolationLintFilter 격리 3중 방어. 권위본: `shared/docs/policies/context-algorithm.md`
-  - ✅ **컨텍스트 주입 누락 수정 (2026-04-27)**: 카테고리(대/중/소분류 + 직접 입력) + MBTI + 누락 관계 가이드(marriage, korean_specific) 주입. `CategoryContextFragment`, `categories.yml`, Flyway V11, `UserProfileFragment` MBTI 보강. 권위본: `shared/docs/policies/categories.md`, `shared/docs/policies/onboarding.md`.
-  - ✅ 위기 감지 (CrisisDetector) + 금지어 가드 (KeywordGuard)
-  - ✅ 리포트 생성 (기여도, NVC — 4Horsemen 내부 점수만 보존, UI 노출 없음)
+  - ✅ **커뮤니티 광장 (Post/Juror/Vote/PostComment)**
+    - ✅ CommunityPostController — 게시글 작성/조회/삭제
+    - ✅ CommunityCommentController — 댓글 무한스크롤
+    - ✅ JuryService — LLM 배심원 의견 생성 (비동기)
+    - ✅ VoteRepository — 배심원 의견에 투표
+  - ✅ **LLM 브릿지**: RemoteLlmProvider (againspring-llm 워커 CLI only)
+  - ✅ 금지어 가드 (KeywordGuard, PromptSanitizer)
   - ✅ 데이터 보존 정책 (30일 만료, 스케줄러)
-  - ✅ 데드코드 정리 완료 (V1.5 폐기 코드·관계 그래프·4Horsemen UI)
-  - ✅ OpenAPI / Swagger UI (`/swagger-ui.html`) — 전체 15개 컨트롤러 `@Tag`·`@Operation`·`bearerAuth` SecurityScheme 완비
+  - ✅ OpenAPI / Swagger UI
+  - ✅ 피드백 수집 + 관리자 대시보드
   - ✅ CORS 도메인 허용 + GlobalExceptionHandler 표준화
-  - ✅ **V10 베타 기능 (2026-05-08~09)**: 피드백 수집(`FeedbackService`, `FeedbackController`) + 관리자 대시보드(AdminFeedbackController, PMF 통계) + 일일 세션 제한(DailyStats, GuestSessionRateLimiter) + 게스트 1세션 제한 + 동의 재확인(ConsentReconfirmModal) + 베타 배너 + Flyway V16~V19
-  - ✅ **V10.2 Gmail 발신자 통합 (2026-05-09)**: 단일 발신자 `againspring2026@gmail.com`, `GMAIL_APP_PASSWORD` 환경변수, MimeMessageHelper 표시명("다시봄 운영팀"), 법률 MD 연결(`shared/docs/policies/terms.md`·`privacy.md` → `frontend/public/legal/`)
-  - ✅ **V13 베타 출시 전 보강 (2026-05-16)**:
-  - ⏳ **V15 마케팅 자동화 (2026-05-31, dev 전용)**: V15.1~V15.9 + 소셜 포스터 봇 우회 구현 완료. 사연관리·시뮬레이션엔진·콘텐츠3채널생성·승인워크플로우·비용모니터링·플랫폼추상화·채팅UI스크린샷. Flyway V28~V39, `marketing-renderer` 사이드카(dev 전용). prod 배포 게이트: Q1/Q2/Q3 답변 + 명시적 지시 필요. 권위본: `shared/docs/v15/`
-    - **V15.8**: 채팅 UI 스크린샷 생성 — `marketing-renderer`에 `/render-chat` 추가. 실제 다시봄 채팅 디자인(배경 #FBF3EC, 사용자A #F4A896)으로 렌더링. `ContentGenerationExecutor` + `ImageRenderClient` + `MarketingImageController` 연동.
-    - **V15.9 (PR1)**: 플랫폼 추상화 — `ContentGenerator` 인터페이스 + `ContentGeneratorRegistry` + `PlatformDescriptorLoader`. `platform-descriptors.yml`로 YAML 구동 메타데이터. Threads/Facebook enum 자리 마련(enabled=false). Flyway V37(contents 7컬럼 확장·enum 확장)/V38(hashtag_library)/V39(content_templates) 적용 완료.
-    - 카테고리 힌트화: `system.md` + `relations/*.md` 7개 톤 완화, 세션 생성 시 mediator 첫마디 자동 저장 (`FirstMessageService`, `FirstMessageTemplateLoader`, 248개 템플릿 JSON)
-    - Duo TESTER 게이팅: `app.features.duo-mode=false` feature flag, SessionController·MessageController invite/join 게이트, `PATCH /api/admin/users/{id}/roles` 신규
-    - 30초 튜토리얼 모달: Flyway V24 (`tutorial_completed_at`), `POST /api/users/me/tutorial/complete`, FE `OnboardingModal.tsx` (3단계 dot indicator)
-    - 5턴 정리 게이트: `MIN_MESSAGES_TO_FINALIZE` 3→5, 진행 인디케이터 dot + 툴팁
-    - SVG 아이콘 5개 (`DasibomLogo`, `Conversation`, `SafeHaven`, `Phone`, `CrisisResources`) + 장식 emoji 7곳 제거
-    - AI emoji 영구 금지 정책 적용 (V13 이후 모든 UI)
-    - **소셜 자격증명 개편 (2026-05-31)**: TOTP 제거, username → email 전환. DB: `social_credentials.email_enc` (V46 마이그레이션). Admin UI 설정 페이지에서 이메일+비밀번호만 입력.
-    - **소셜 포스터 봇 차단 우회 (2026-05-31)**: `anti-bot.js` — Windows 11 Chrome 120 핑거프린트, `navigator.webdriver` 마스킹, ±35% jitter, 포스팅 전 피드 워밍업. `session.js` + 모든 라우트에 자동 적용.
-    - **세션 자동 갱신 (2026-05-31)**: `SessionHealthCheckJob` 매일 03:00 피드 방문 → 갱신된 `updatedStorageState` DB 저장. `session-health.js` warmup 스크롤 추가.
-    - **Playwright 핫리로드 (2026-05-31)**: `social-poster-dev` 서비스에 `src/` volume mount + nodemon. 셀렉터·발행 코드 수정 → `docker compose restart`만으로 즉시 반영.
-    - **세션 시딩 개선 (2026-05-31)**: `extract-session.js` (Windows PC 브라우저 콘솔 실행), `seed-server.js` (서버 headless CLI, 이메일/비밀번호 프롬프트 + 2FA 코드 입력).
-    - **소셜 포스터 장애 대응 runbook (2026-05-31)**: `shared/docs/v15/social-poster-troubleshooting.md` 신규 작성. 셀렉터 깨짐·로그인 플로우 변경·세션 만료·봇 탐지 대응 절차.
-- ✅ Docker 멀티 컨테이너 배포 (MariaDB / **LLM Worker** / Backend / Frontend / Nginx)
+- ✅ Docker 멀티 컨테이너 배포 (MariaDB / LLM Worker / Backend / Frontend / Nginx)
 - ✅ Cloudflare Tunnel — `dev.againspring.net`, `againspring.net`
 - ✅ 문서 4-디렉토리 재구성 (shared/docs, backend/docs, frontend/docs, env/docs)
-- ✅ **FE UX 정책 수립 및 Phase 1+2 적용** (HAX 18 + Designing for Safety — 위기 모달 dismiss 마찰, AI 한계 안내, 나가기 버튼, 데이터 흐름 안내, NeedsMap 근거 아이콘)
+- ✅ **2026-06-02 피벗 완료**: 커뮤니티 광장 + AI 배심원 모델 (구 Session/Message/Report 코드 삭제)
 - ⏳ prod 배포 (명시적 지시 시에만)
 
 ---
@@ -513,8 +493,9 @@ CATEGORIES_PATH=./shared/docs/categories.yml
 
 ---
 
-**마지막 업데이트**: 2026-06-02
+**마지막 업데이트**: 2026-06-03
 **담당**: Claude Code (Agent)
 
+> **2026-06-02 피벗 완료**: 1:1 AI 중재 → 커뮤니티 광장 + AI 배심원 모델. 
 > UX 정책: `frontend/docs/ux/principles.md` (원칙 권위본) → `frontend/docs/ux/hax-checklist.md` (컴포넌트 체크리스트).
-> **2026-06-02 정책 변경**: 위기 감지·법률 규제 제거. 사용자 입력 책임은 사용자에게 있음. AI 출력 품질(금지 표현)만 제어. 광장형(C3) UX 전면 전환 진행 중.
+> **서비스 책임**: 사용자 입력에 대한 책임은 사용자에게, AI 출력 품질만 제어. 광장형(C3) UX 완전 전환.

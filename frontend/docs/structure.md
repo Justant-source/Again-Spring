@@ -41,19 +41,11 @@ frontend/
 │   │   ├── profile/page.tsx
 │   │   └── history/page.tsx
 │   │
-│   └── session/                # 세션 흐름
-│       ├── new/page.tsx
-│       ├── wait/page.tsx
-│       ├── category/page.tsx
-│       ├── describe/page.tsx                # KeywordGuard 적용
-│       ├── invite/page.tsx
-│       ├── [sessionId]/
-│       │   ├── page.tsx                      # 채팅 메인 (ChatLayout)
-│       │   └── loading.tsx
-│       ├── join/[token]/page.tsx             # B 진입
-│       └── result/
-│           ├── [id]/page.tsx                 # 결과 리포트
-│           └── [id]/solo/page.tsx
+│   └── community/              # 광장형 흐름
+│       ├── page.tsx                          # 피드 (무한스크롤)
+│       ├── [id]/page.tsx                     # 게시글 상세 + 배심원 + 투표 + 댓글
+│       ├── [id]/comments/page.tsx            # 댓글 리스트 (무한스크롤)
+│       └── new/page.tsx                      # 게시글 작성
 │
 ├── components/
 │   ├── shared/
@@ -71,20 +63,16 @@ frontend/
 │   │   ├── LikertQuestion.tsx                # 5점 리커트
 │   │   └── MbtiAxisSlider.tsx                # MBTI 4축
 │   │
-│   ├── chat/
-│   │   ├── ChatLayout.tsx                    # 채팅 컨테이너 레이아웃
-│   │   ├── ChatPanel.tsx                     # A/B 채팅 패널
-│   │   ├── ChatHeader.tsx                    # 세션 정보 헤더
-│   │   ├── ChatInput.tsx                     # 입력 필드 + KeywordGuard
-│   │   ├── MessageBubble.tsx                 # 메시지 버블
-│   │   ├── PartnerPanel.tsx                  # B 참여 대기/진행 상태 패널
-│   │   ├── PartnerStatusBar.tsx              # B 온라인 상태 바
-│   │   ├── SwipeContainer.tsx                # 모바일 좌우 스와이프
-│   │   ├── CrisisModal.tsx                   # 위기 감지 모달 (채팅용)
-│   │   ├── InviteModal.tsx                   # 초대 링크 공유 모달
-│   │   ├── FinalizeSuggestionCard.tsx        # 세션 종료 제안
-│   │   ├── PartnerJoinedToast.tsx            # B 참여 알림
-│   │   └── PartnerJoinNoticeCard.tsx         # B 참여 공지 카드
+│   ├── community/c3/
+│   │   ├── FeedCard.tsx                      # 게시글 카드 (배심원 포함)
+│   │   ├── JurorCard.tsx                     # AI 배심원 의견 카드
+│   │   ├── VoteBar.tsx                       # 투표 버튼 (도움됨/안 됨)
+│   │   ├── CommentBar.tsx                    # 댓글 무한스크롤 + 입력
+│   │   ├── CommentComposeSheet.tsx           # 댓글 작성 시트
+│   │   ├── UserChip.tsx                      # 사용자 칩 (닉네임 + 프로필)
+│   │   ├── BrandBar.tsx                      # 브랜드 바
+│   │   ├── SideStory.tsx                     # 사이드 스토리 (배경)
+│   │   └── index.ts                          # 내보내기
 │   │
 │   ├── result/
 │   │   ├── ReportLayout.tsx                  # 결과 카드 레이아웃

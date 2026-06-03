@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { postApi, PostDetail, JuryResult, VoteResult } from '@/lib/api/community/postApi';
 import { commentApi, Comment } from '@/lib/api/community/commentApi';
-import { VoteBar, SideStory, JurorCard } from '@/components/community/c3';
+import { VoteBar, SideStory, JurorCard, CommunityComment } from '@/components/community/c3';
 import { GRN, RED, GRN_BG, RED_BG } from '@/lib/constants/factionColors';
+import { timeAgo } from '@/lib/utils/timeAgo';
+import { useGuestInit } from '@/lib/hooks/useGuestInit';
 
 const COMMENT_PAGE_SIZE = 10;
 
@@ -14,24 +16,24 @@ interface PageProps {
   params: { id: string };
 }
 
-function formatDate(dateStr: string) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) {
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffHours === 0) {
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      return diffMins > 0 ? `${diffMins}분 전` : '방금';
-    }
-    return `${diffHours}시간 전`;
-  }
-  if (diffDays === 1) return '어제';
-  if (diffDays < 7) return `${diffDays}일 전`;
-  return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+// 카테고리 enum → 표시 한글 (피드와 동일)
+const CAT_LABELS: Record<string, string> = {
+  COUPLE: '연인', MARRIED: '부부', FRIEND: '친구', FAMILY: '가족', WORK: '직장', OTHER: '기타',
+};
+function catLabel(c: string): string {
+  return CAT_LABELS[(c || '').toUpperCase()] || '기타';
 }
+
+// 액션 행 컬럼 (투표수 · 댓글수 · 공유) 공통 스타일
+const ACTION_COL: React.CSSProperties = {
+  flex: 1,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
+  fontSize: 14,
+};
 
 // View A: 관람자 — C3_StoryDetail (Tone L)
 function C3StoryDetail({
@@ -39,8 +41,8 @@ function C3StoryDetail({
   voteResult,
   comments,
   onVote,
+  onLike,
   isVoting,
-  hasMoreComments,
   loadingMoreComments,
   commentBottomRef,
 }: {
@@ -48,6 +50,7 @@ function C3StoryDetail({
   voteResult: VoteResult | null;
   comments: Comment[];
   onVote: (optionId: number) => Promise<void>;
+  onLike: (commentId: number) => void;
   isVoting: boolean;
   hasMoreComments: boolean;
   loadingMoreComments: boolean;
@@ -58,11 +61,13 @@ function C3StoryDetail({
   const router = useRouter();
 
   const handlePick = (side: 'g' | 'r') => {
+    // 재투표 금지 — 이미 투표했으면 선택 변경 불가
+    if (voted) return;
     setPick(side);
   };
 
   const handleVote = async () => {
-    if (!pick) return;
+    if (!pick || voted) return;
     const optionId = pick === 'g' ? post.voteOptions[0]?.id : post.voteOptions[1]?.id;
     if (!optionId) return;
 
@@ -74,187 +79,198 @@ function C3StoryDetail({
     }
   };
 
-  // 투표 완료 후 실제 BE 비율 사용, 아직 투표 전이면 pick에 따라 시각 피드백
+  const handleShare = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: post.title, url });
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {
+      /* 사용자 취소 등 — 무시 */
+    }
+  };
+
+  // 투표 완료 후 실제 BE 비율 사용, 아직 투표 전이면 pick에 따라 시각 피드백 (라이브 집계 시뮬레이션)
   const authorPct = voteResult
-    ? Math.round((voteResult.options?.[0]?.percentage ?? post.authorPct ?? 50))
-    : (pick === 'g' ? 62 : pick === 'r' ? 46 : (post.authorPct || 50));
+    ? Math.round(voteResult.options?.[0]?.percentage ?? post.authorPct ?? 50)
+    : pick === 'g' ? 62 : pick === 'r' ? 54 : (post.authorPct ?? 58);
+  const partnerPct = 100 - authorPct;
+
+  const voteCount = voteResult?.totalVotes ?? post.voteResult?.totalVotes ?? 0;
 
   return (
-    <div style={{ background: 'var(--L-bg)', minHeight: '100vh', padding: '16px' }}>
-      {/* 상단 네비 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Link
-          href="/community"
-          style={{
-            fontSize: 14,
-            fontWeight: 500,
-            color: 'var(--L-ink)',
-            textDecoration: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          ‹ 광장
-        </Link>
-        {voted && (
-          <div style={{ fontSize: 11, color: GRN, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span>卜</span> 투표 완료
-          </div>
-        )}
-      </div>
+    <div style={{ background: 'var(--L-bg)', minHeight: '100vh' }}>
+      <div style={{ padding: '14px 20px 160px' }}>
+        {/* 상단: ‹ 광장 + 투표 완료 도장 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Link href="/community" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+            <span style={{ fontSize: 17, color: 'var(--L-sub)' }}>‹</span>
+            <span style={{ fontSize: 13, color: 'var(--L-sub)' }}>광장</span>
+          </Link>
+          {voted && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${GRN}`, color: GRN, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>卜</span>
+              <span style={{ fontSize: 11.5, color: GRN, fontWeight: 500 }}>투표 완료</span>
+            </div>
+          )}
+        </div>
 
-      {/* 메타 정보: 카테고리 칩 + 제목 + 작성자 */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              background: 'var(--L-card)',
-              color: 'var(--L-ink)',
-              padding: '4px 10px',
-              borderRadius: 20,
-            }}
-          >
-            {post.category}
+        {/* 카테고리 + paired 점 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 14 }}>
+          <span style={{ fontSize: 11, color: 'var(--L-bg)', background: 'var(--L-ink)', borderRadius: 999, padding: '2px 9px' }}>
+            {catLabel(post.category)}
           </span>
           {post.paired && (
             <>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: GRN }} />
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: RED }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: GRN }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: RED, marginLeft: -3 }} />
             </>
           )}
         </div>
-        <h1
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            fontFamily: 'var(--font-serif)',
-            color: 'var(--L-ink)',
-            margin: 0,
-            marginBottom: 8,
-          }}
-        >
+
+        {/* 제목 + 메타 */}
+        <h1 style={{ fontSize: 20, color: 'var(--L-ink)', fontWeight: 500, fontFamily: 'var(--font-serif)', margin: 0, marginTop: 10, lineHeight: 1.4 }}>
           {post.title}
         </h1>
-        <div style={{ fontSize: 12, color: 'var(--L-sub)' }}>
-          익명 · {formatDate(post.createdAt)}
+        <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 6 }}>
+          익명 · {timeAgo(post.createdAt)}
         </div>
-      </div>
 
-      {/* SideStory 2개 (clamp=true) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-        <SideStory
-          side="g"
-          label="작성자"
-          body={post.bodyPublished}
-          clamp={true}
-          selected={pick === 'g'}
-          onSelect={() => handlePick('g')}
-          onMore={() => router.push(`/community/${post.id}/read?side=g`)}
-        />
-        <SideStory
-          side="r"
-          label="상대방"
-          body={post.partnerBodyPublished || '상대방의 이야기를 기다리는 중입니다.'}
-          clamp={true}
-          selected={pick === 'r'}
-          onSelect={() => handlePick('r')}
-          onMore={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
-        />
-      </div>
-
-      {/* 비율 막대 */}
-      <div style={{ marginBottom: 20 }}>
-        <VoteBar authorPct={Math.round(authorPct)} big={false} />
-        <div
-          style={{
-            fontSize: 12,
-            color: 'var(--L-sub)',
-            marginTop: 8,
-            textAlign: 'center',
-          }}
-        >
-          작성자 {Math.round(authorPct)}% / 상대방 {Math.round(100 - authorPct)}%
+        {/* 양쪽 사연 (clamp=true) */}
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 9 }}>
+          <SideStory
+            side="g"
+            label="작성자"
+            body={post.bodyPublished}
+            clamp
+            selected={pick === 'g'}
+            onSelect={() => handlePick('g')}
+            onMore={() => router.push(`/community/${post.id}/read?side=g`)}
+          />
+          <SideStory
+            side="r"
+            label="상대방"
+            body={post.partnerBodyPublished || '상대방의 이야기를 기다리는 중입니다.'}
+            clamp
+            selected={pick === 'r'}
+            onSelect={() => handlePick('r')}
+            onMore={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
+          />
         </div>
-      </div>
 
-      {/* 댓글 인라인 목록 (10개씩 무한스크롤) */}
-      <div style={{ marginBottom: 80 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--L-ink)', marginBottom: 12 }}>
-          댓글 {comments.length}{hasMoreComments ? '+' : ''}
-        </div>
-        {comments.length === 0 && (
-          <div style={{ fontSize: 12, color: 'var(--L-sub)', padding: '16px 0', textAlign: 'center' }}>
-            아직 댓글이 없습니다
+        {/* 라이브 비율 막대 (얇은 8px + 좌우 라벨) */}
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ width: `${authorPct}%`, background: GRN, transition: 'width .25s' }} />
+            <div style={{ flex: 1, background: RED }} />
           </div>
-        )}
-        {comments.map((comment) => (
-          <div key={comment.id}>
-            <div style={{ padding: '10px 0', borderBottom: '1px solid var(--L-border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{
-                  fontSize: 12.5, fontWeight: 500,
-                  color: (comment as any).isAuthor ? GRN : (comment as any).isPartner ? RED : 'var(--L-ink)',
-                }}>
-                  {(comment.isAuthor || comment.isPartner) ? '* ' : ''}{comment.authorNickname || comment.authorId}
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--L-sub)' }}>{formatDate(comment.createdAt)}</span>
-              </div>
-              <div style={{ fontSize: 13.5, color: 'var(--L-ink)', lineHeight: 1.6 }}>{comment.body}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--L-sub)', marginTop: 6 }}>공감 {comment.likeCount}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--L-sub)', marginTop: 7 }}>
+            <span>작성자 {authorPct}%</span>
+            <span>상대방 {partnerPct}%</span>
+          </div>
+        </div>
+
+        {/* 액션 행 — 투표수 · 댓글수 · 공유하기 */}
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: 16, paddingTop: 14, paddingBottom: 4, borderTop: '1px solid var(--L-border)', color: 'var(--L-sub)' }}>
+          <span style={ACTION_COL}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M9 11l3-8 3 8M5 11h14v8a2 2 0 01-2 2H7a2 2 0 01-2-2z" strokeLinejoin="round" /></svg>
+            {voteCount}
+          </span>
+          <span style={ACTION_COL}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 15a2 2 0 01-2 2H8l-4 4V5a2 2 0 012-2h13a2 2 0 012 2z" strokeLinejoin="round" /></svg>
+            {comments.length}
+          </span>
+          <button onClick={handleShare} style={{ ...ACTION_COL, background: 'none', border: 'none', color: 'var(--L-sub)', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 3v13M12 3L8 7M12 3l4 4M5 14v5a2 2 0 002 2h10a2 2 0 002-2v-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            공유하기
+          </button>
+        </div>
+
+        {/* 댓글 인라인 목록 — 블라인드 방식 (무한스크롤) */}
+        <div style={{ marginTop: 4, marginBottom: 80 }}>
+          {comments.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--L-sub)', padding: '16px 0', textAlign: 'center' }}>
+              아직 댓글이 없습니다
             </div>
-            {/* 대댓글 */}
-            {comment.replies?.map((reply) => (
-              <div key={reply.id} style={{ paddingLeft: 20, padding: '8px 0 8px 20px', borderBottom: '1px solid var(--L-border)' }}>
-                <span style={{ color: 'var(--L-sub)', fontSize: 13, marginRight: 6 }}>↳</span>
-                <span style={{ fontSize: 12.5, fontWeight: 500, color: (reply as any).isAuthor ? GRN : (reply as any).isPartner ? RED : 'var(--L-ink)' }}>
-                  {(reply.isAuthor || reply.isPartner) ? '* ' : ''}{reply.authorNickname || reply.authorId}
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--L-sub)', marginLeft: 6 }}>{formatDate(reply.createdAt)}</span>
-                <div style={{ fontSize: 13.5, color: 'var(--L-ink)', lineHeight: 1.6, marginTop: 4, paddingLeft: 20 }}>{reply.body}</div>
-              </div>
-            ))}
-          </div>
-        ))}
-        {/* 무한스크롤 트리거 */}
-        <div ref={commentBottomRef} style={{ height: 16 }} />
-        {loadingMoreComments && (
-          <div style={{ textAlign: 'center', padding: '8px', color: 'var(--L-sub)', fontSize: 12 }}>불러오는 중...</div>
-        )}
+          )}
+          {comments.map((comment) => (
+            <div key={comment.id}>
+              <CommunityComment
+                nick={comment.authorNickname || comment.authorId}
+                isAuthor={comment.isAuthor ?? false}
+                isPartner={comment.isPartner ?? false}
+                time={timeAgo(comment.createdAt)}
+                text={comment.body}
+                likeCount={comment.likeCount}
+                isLiked={comment.isLiked}
+                onLike={() => onLike(comment.id)}
+                onReply={() => router.push(`/community/${post.id}/comments`)}
+              />
+              {comment.replies?.map((reply) => (
+                <CommunityComment
+                  key={reply.id}
+                  nick={reply.authorNickname || reply.authorId}
+                  isAuthor={reply.isAuthor ?? false}
+                  isPartner={reply.isPartner ?? false}
+                  time={timeAgo(reply.createdAt)}
+                  text={reply.body}
+                  likeCount={reply.likeCount}
+                  isLiked={reply.isLiked}
+                  isReply
+                  onLike={() => onLike(reply.id)}
+                />
+              ))}
+            </div>
+          ))}
+          {/* 무한스크롤 트리거 */}
+          <div ref={commentBottomRef} style={{ height: 16 }} />
+          {loadingMoreComments && (
+            <div style={{ textAlign: 'center', padding: '8px 0', color: 'var(--L-sub)', fontSize: 12 }}>불러오는 중...</div>
+          )}
+        </div>
       </div>
 
-      {/* 하단 고정 버튼 */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: '12px 16px',
-          background: 'white',
-          borderTop: '1px solid var(--L-border)',
-        }}
-      >
-        <button
-          onClick={handleVote}
-          disabled={!pick || voted || isVoting}
+      {/* 하단 고정 영역: 댓글바 + 투표 버튼 */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--L-bg)' }}>
+        {/* 댓글 입력바 — 탭하면 댓글 페이지로 */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => router.push(`/community/${post.id}/comments`)}
+          onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/community/${post.id}/comments`); }}
           style={{
-            width: '100%',
-            padding: '12px 16px',
-            background: voted ? 'var(--L-border)' : 'var(--L-ink)',
-            color: voted ? 'var(--L-sub)' : 'white',
-            border: 'none',
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: voted || !pick || isVoting ? 'default' : 'pointer',
-            opacity: voted || !pick || isVoting ? 0.5 : 1,
+            borderTop: '1px solid var(--L-border)',
+            padding: '12px 20px',
+            cursor: 'text',
           }}
         >
-          {voted ? '다시 선택하려면 탭하세요' : pick ? '투표 완료하기' : '작성자 · 상대방을 선택하세요'}
-        </button>
+          <span style={{ fontSize: 14.5, color: 'var(--L-sub)' }}>댓글을 남겨주세요.</span>
+        </div>
+        {/* 투표 버튼 */}
+        <div style={{ padding: '8px 20px 20px', background: 'var(--L-bg)' }}>
+          <button
+            onClick={handleVote}
+            disabled={!pick || voted || isVoting}
+            style={{
+              width: '100%',
+              padding: '13px 0',
+              background: voted ? 'var(--L-border)' : 'var(--L-ink)',
+              color: voted ? 'var(--L-sub)' : 'var(--L-bg)',
+              border: 'none',
+              borderRadius: 4,
+              fontSize: 15,
+              fontWeight: 500,
+              cursor: voted || !pick || isVoting ? 'default' : 'pointer',
+              opacity: !pick && !voted ? 0.6 : 1,
+              fontFamily: 'inherit',
+            }}
+          >
+            {voted ? '투표 완료' : isVoting ? '처리 중...' : pick ? '투표 완료하기' : '작성자 · 상대방을 선택하세요'}
+          </button>
+        </div>
       </div>
-      <div style={{ height: 80 }} />
     </div>
   );
 }
@@ -577,6 +593,7 @@ function C3Closed({
 }
 
 export default function CommunityPostPage({ params }: PageProps) {
+  useGuestInit();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [voteResult, setVoteResult] = useState<VoteResult | null>(null);
   const [juryResult, setJuryResult] = useState<JuryResult | null>(null);
@@ -644,6 +661,23 @@ export default function CommunityPostPage({ params }: PageProps) {
     return () => observer.disconnect();
   }, [loadMoreComments]);
 
+  const handleLike = async (commentId: number) => {
+    try {
+      const result = await commentApi.toggleLike(params.id, commentId);
+      setComments((prev) =>
+        prev.map((c) => {
+          if (c.id === commentId) return { ...c, likeCount: result.count, isLiked: result.liked };
+          const updatedReplies = c.replies?.map((r) =>
+            r.id === commentId ? { ...r, likeCount: result.count, isLiked: result.liked } : r
+          );
+          return c.replies ? { ...c, replies: updatedReplies } : c;
+        })
+      );
+    } catch {
+      // 401 등 — axios interceptor가 처리
+    }
+  };
+
   const handleVote = async (optionId: number) => {
     // 이미 투표했으면 재투표 불가
     if (post?.hasVoted) return;
@@ -689,7 +723,7 @@ export default function CommunityPostPage({ params }: PageProps) {
   // Render logic
   if (!post.isAuthor) {
     // View A: 관람자
-    return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} isVoting={isVoting} hasMoreComments={hasMoreComments} loadingMoreComments={loadingMoreComments} commentBottomRef={commentBottomRef} />;
+    return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} onLike={handleLike} isVoting={isVoting} hasMoreComments={hasMoreComments} loadingMoreComments={loadingMoreComments} commentBottomRef={commentBottomRef} />;
   } else if (post.status === 'VOTING' && !post.paired) {
     // View B: 작성자 + VOTING + partner 없음
     return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} />;

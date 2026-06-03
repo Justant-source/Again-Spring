@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { postApi, PostCreateRequest } from '@/lib/api/community/postApi';
 import { GuestNoticeModal } from '@/components/auth/GuestNoticeModal';
-import { JurorPicker } from '@/components/community/c3/JurorPicker';
+import { JurorPicker, UserChip } from '@/components/community/c3';
 import { useUserStore } from '@/lib/store/userStore';
+import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { GRN, GRN_BG } from '@/lib/constants/factionColors';
 
 // C3 대분류 카테고리 — id는 BE PostCategory enum 이름과 1:1 매핑
@@ -23,6 +24,7 @@ type Step = 'compose' | 'mode' | 'analyzing';
 export default function CommunityNewPage() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
+  useGuestInit();
   const isGuest = user?.isGuest ?? true;
 
   const [step, setStep] = useState<Step>('compose');
@@ -33,7 +35,7 @@ export default function CommunityNewPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showGuestNotice, setShowGuestNotice] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<'PUBLIC' | 'PRIVATE' | null>(null);
+  const [selectedMode, setSelectedMode] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
   const [generatedPost, setGeneratedPost] = useState<{
     id: string;
     title: string;
@@ -104,36 +106,28 @@ export default function CommunityNewPage() {
   if (step === 'compose') {
     return (
       <div style={{ background: 'var(--L-bg)', minHeight: '100vh' }}>
-        {/* 헤더 바 */}
+        {/* 헤더 바 — 3-part layout: ✕ (left) + "사연 올리기" (center) + UserChip (right) */}
         <div style={{
+          padding: '14px 20px 0',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 20px',
-          borderBottom: '1px solid var(--L-border)',
-          background: 'var(--L-bg)',
         }}>
           <button
             onClick={() => router.back()}
             style={{
               background: 'none',
               border: 'none',
-              fontSize: 18,
+              fontSize: 17,
+              color: 'var(--L-sub)',
               cursor: 'pointer',
-              color: 'var(--L-ink)',
+              padding: 0,
             }}
           >
             ✕
           </button>
-          <h2 style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: 'var(--L-ink)',
-            margin: 0,
-          }}>
-            사연 올리기
-          </h2>
-          <div style={{ width: 28 }} />
+          <span style={{ fontSize: 13, fontWeight: 500 }}>사연 올리기</span>
+          <UserChip user={user} />
         </div>
 
         <div style={{ padding: '20px', paddingBottom: 120 }}>
@@ -322,34 +316,42 @@ export default function CommunityNewPage() {
     );
   }
 
-  // Step 2: 모드 선택 — 카드를 눌러 선택, 하단 버튼으로 진행
+  // Step 2: 모드 선택 — 디자인 C3_Mode / C3_ModeGuest 그대로
   if (step === 'mode') {
-    const isPub = selectedMode === 'PUBLIC';
-    const isPrv = selectedMode === 'PRIVATE';
-    return (
-      <div style={{ background: 'var(--L-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1, padding: '24px 26px 120px' }}>
-          {/* 제목 */}
-          <h2 data-testid="mode-step-heading" className="serif" style={{ fontSize: 22, lineHeight: 1.45, marginBottom: 24, color: 'var(--L-ink)', fontWeight: 500 }}>
-            이 사연,<br />어떻게 올릴까요?
-          </h2>
+    const sel = selectedMode ?? 'PUBLIC';
+    const cardStyle = (on: boolean): React.CSSProperties => ({
+      padding: '20px 18px',
+      borderRadius: 12,
+      cursor: 'pointer',
+      border: `2px solid ${on ? 'var(--L-ink)' : 'var(--L-border)'}`,
+      background: on ? 'var(--L-card)' : 'transparent',
+      transition: 'border-color .15s, background .15s',
+    });
 
+    return (
+      <div style={{ background: 'var(--L-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 26px' }}>
+
+        {/* 게스트 칩 */}
+        {isGuest && (
+          <div style={{ marginBottom: 18 }}>
+            <span style={{ fontSize: 11, color: 'var(--L-sub)', border: '1px solid var(--L-border)', borderRadius: 999, padding: '3px 10px' }}>게스트</span>
+          </div>
+        )}
+
+        {/* 제목 */}
+        <div data-testid="mode-step-heading" className="serif" style={{ fontSize: 22, lineHeight: 1.45, marginBottom: 24, color: 'var(--L-ink)', fontWeight: 500 }}>
+          이 사연,<br />어떻게 올릴까요?
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           {/* 옵션 1: 바로 광장에 올리기 */}
           <div
             data-testid="mode-public-card"
             onClick={() => setSelectedMode('PUBLIC')}
-            style={{
-              padding: '20px 18px',
-              border: `2px solid ${isPub ? GRN : 'var(--L-border)'}`,
-              background: isPub ? GRN_BG : 'transparent',
-              borderRadius: 12,
-              cursor: 'pointer',
-              marginBottom: 11,
-              transition: 'all .15s',
-            }}
+            style={cardStyle(sel === 'PUBLIC')}
           >
-            <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--L-ink)', marginBottom: 4 }}>바로 광장에 올리기</div>
-            <div style={{ fontSize: 12.5, color: 'var(--L-sub)' }}>익명 투표</div>
+            <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--L-ink)' }}>바로 광장에 올리기</div>
+            <div style={{ fontSize: 12.5, color: 'var(--L-sub)', marginTop: 4 }}>익명 투표</div>
           </div>
 
           {/* 옵션 2: 상대를 초대하기 */}
@@ -357,73 +359,56 @@ export default function CommunityNewPage() {
             data-testid="mode-private-card"
             onClick={() => { if (!isGuest) setSelectedMode('PRIVATE'); }}
             style={{
-              padding: '20px 18px',
-              border: `2px solid ${isPrv ? 'var(--L-ink)' : 'var(--L-border)'}`,
-              background: isPrv ? 'var(--L-card)' : 'transparent',
-              borderRadius: 12,
-              cursor: isGuest ? 'not-allowed' : 'pointer',
+              ...cardStyle(!isGuest && sel === 'PRIVATE'),
               opacity: isGuest ? 0.55 : 1,
-              marginBottom: 11,
-              transition: 'all .15s',
+              cursor: isGuest ? 'default' : 'pointer',
+              border: isGuest ? '1px solid var(--L-border)' : cardStyle(sel === 'PRIVATE').border,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              {isGuest && <span style={{ fontSize: 14 }}>🔒</span>}
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 500, color: isGuest ? 'var(--L-sub)' : 'var(--L-ink)', marginBottom: 4 }}>상대를 초대하기</div>
-                <div style={{ fontSize: 12.5, color: 'var(--L-sub)' }}>두 입장을 나란히</div>
-              </div>
+              {isGuest && <span style={{ fontSize: 13, color: 'var(--L-sub)' }}>🔒</span>}
+              <span style={{ fontSize: 17, fontWeight: 500, color: isGuest ? 'var(--L-sub)' : 'var(--L-ink)' }}>상대를 초대하기</span>
             </div>
+            <div style={{ fontSize: 12.5, color: 'var(--L-sub)', marginTop: 4 }}>두 입장을 나란히</div>
           </div>
 
-          {/* JurorPicker — 두 옵션 아래 공통 */}
-          <div style={{ padding: '14px 16px', border: '1px solid var(--L-border)', borderRadius: 12, background: 'var(--L-card)', marginBottom: 11 }}>
-            <JurorPicker defaultValue={jurorCount} onChange={setJurorCount} />
-          </div>
-
-          {/* 게스트 안내 */}
+          {/* 게스트 인라인 안내 — disabled 카드 바로 아래 */}
           {isGuest && (
-            <div style={{ padding: '13px 15px', border: '1px solid var(--L-border)', borderRadius: 10, background: 'var(--L-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <span style={{ fontSize: 12.5, color: 'var(--L-ink)', lineHeight: 1.5 }}>회원가입 후 상대를 초대할 수 있어요</span>
+            <div style={{ marginTop: -4, fontSize: 12.5, color: 'var(--L-sub)', lineHeight: 1.5, paddingLeft: 2 }}>
+              회원가입 후 상대를 초대할 수 있습니다{' '}
               <span
                 onClick={() => router.push('/signup')}
-                style={{ fontSize: 12.5, color: 'var(--L-point)', fontWeight: 500, whiteSpace: 'nowrap', cursor: 'pointer' }}
+                style={{ color: 'var(--L-point)', fontWeight: 500, textDecoration: 'underline', textUnderlineOffset: 2, cursor: 'pointer' }}
               >
                 가입하기
               </span>
             </div>
           )}
+
+          {/* AI 배심원 선택기 */}
+          <JurorPicker defaultValue={jurorCount} onChange={setJurorCount} />
         </div>
 
         {/* 하단 고정 버튼 */}
         <div style={{
           position: 'fixed',
           left: 0, right: 0, bottom: 0,
-          padding: '24px 26px 24px',
-          background: `linear-gradient(transparent, var(--L-bg) 30%)`,
+          padding: '24px 26px',
+          background: 'linear-gradient(transparent, var(--L-bg) 30%)',
         }}>
           <button
-            onClick={() => {
-              if (!selectedMode) return;
-              handleModeSelect(selectedMode);
-            }}
             data-testid="mode-submit-btn"
-            disabled={!selectedMode || loading}
+            onClick={() => handleModeSelect(sel as 'PUBLIC' | 'PRIVATE')}
+            disabled={loading}
             style={{
-              width: '100%',
-              padding: '15px 0',
-              borderRadius: 4,
-              border: 'none',
-              background: selectedMode && !loading ? 'var(--L-ink)' : 'var(--L-border)',
-              color: selectedMode && !loading ? 'var(--L-bg)' : 'var(--L-sub)',
-              fontSize: 15,
-              fontWeight: 500,
-              fontFamily: 'var(--font-sans)',
-              cursor: selectedMode && !loading ? 'pointer' : 'default',
-              transition: 'all .15s',
+              width: '100%', padding: '15px 0', borderRadius: 4, border: 'none',
+              background: loading ? 'var(--L-border)' : 'var(--L-ink)',
+              color: loading ? 'var(--L-sub)' : 'var(--L-bg)',
+              fontSize: 15, fontWeight: 500, fontFamily: 'var(--font-sans)',
+              cursor: loading ? 'default' : 'pointer', transition: 'all .15s',
             }}
           >
-            {loading ? '올리는 중...' : selectedMode === 'PRIVATE' ? '상대 초대하기' : '바로 올리기'}
+            {loading ? '올리는 중...' : sel === 'PRIVATE' ? '상대 초대하기' : '바로 올리기'}
           </button>
         </div>
       </div>

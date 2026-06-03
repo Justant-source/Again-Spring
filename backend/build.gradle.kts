@@ -62,19 +62,7 @@ java {
 }
 
 tasks.withType<Test> {
-    useJUnitPlatform {
-        excludeTags("haiku") // 실 haiku 호출 테스트는 기본 test 태스크에서 제외
-    }
+    useJUnitPlatform()
     environment("TESTCONTAINERS_RYUK_DISABLED", "false")
     jvmArgs("-Dapi.version=1.44")
-}
-
-// 실 Claude CLI haiku 스모크: ./gradlew haikuSmoke (호스트 ~/.claude 로그인 전제)
-tasks.register<Test>("haikuSmoke") {
-    group = "verification"
-    description = "ClaudeCodeBridge 실제 haiku 호출 스모크 (llm.provider=claude-code)"
-    useJUnitPlatform {
-        includeTags("haiku")
-    }
-    systemProperty("spring.profiles.active", "haiku-smoke")
 }

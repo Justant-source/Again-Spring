@@ -23,8 +23,12 @@ api.interceptors.response.use(
     const code = error.response?.data?.error?.code;
 
     if (status === 401) {
-      if (typeof window !== 'undefined') localStorage.removeItem('again-spring-token');
-      useUiStore.getState().setAuthError('unauthorized');
+      const url = error.config?.url || '';
+      // community 엔드포인트의 401은 토큰 삭제하지 않음 (게스트 처리용)
+      if (!url.includes('/api/community/')) {
+        if (typeof window !== 'undefined') localStorage.removeItem('again-spring-token');
+        useUiStore.getState().setAuthError('unauthorized');
+      }
     } else if (status === 402 && code === 'GUEST_LIMIT_REACHED') {
       const match = typeof window !== 'undefined'
         ? window.location.pathname.match(/\/session\/chat\/([^/]+)/)
@@ -37,14 +41,6 @@ api.interceptors.response.use(
     return Promise.reject(error);
   },
 );
-
-// V47~: 중·소분류 제거. category 미전송, relationType + mediatorStyle만 필수.
-export interface CreateSessionPayload {
-  relationType: string;
-  mediatorStyleX?: number;
-  mediatorStyleY?: number;
-  soloMode?: boolean;
-}
 
 export interface TurnRequest {
   sessionId: string;

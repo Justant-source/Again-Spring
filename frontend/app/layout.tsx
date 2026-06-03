@@ -5,7 +5,6 @@ import { AuthBootstrap } from '@/components/shared/AuthBootstrap';
 import { AuthRedirectGuard } from '@/components/shared/AuthRedirectGuard';
 import { DailyLimitModal } from '@/components/shared/DailyLimitModal';
 import { FeedbackModal } from '@/components/feedback/FeedbackModal';
-import { ConsentReconfirmModal } from '@/components/legal/ConsentReconfirmModal';
 import { ForcePasswordChangeModal } from '@/components/auth/ForcePasswordChangeModal';
 import { BetaBanner } from '@/components/shared/BetaBanner';
 import { LegalFooter } from '@/components/shared/LegalFooter';
@@ -43,7 +42,6 @@ export default function RootLayout({
           <DailyLimitModal />
           <BetaBanner />
           <FeedbackModal />
-          <ConsentReconfirmModal />
           <ForcePasswordChangeModal />
           <LegalFooter />
           <div style={{ paddingTop: '30px', paddingBottom: '0px' }}>{children}</div>

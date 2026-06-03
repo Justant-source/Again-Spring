@@ -7,8 +7,7 @@
 ## 문서 인덱스
 
 - [structure.md](./structure.md) — `com.againspring.*` 패키지 구조 + 각 패키지 책임
-- [architecture.md](./architecture.md) — 레이어 흐름, JPA, Flyway, State Machine, 도메인 이벤트
-- [llm-bridge.md](./llm-bridge.md) — Claude Code CLI 호출, ProcessBuilder, Semaphore(3), 프롬프트 로더, 모니터링
+- [architecture.md](./architecture.md) — 레이어 흐름, JPA, Flyway, 커뮤니티 서비스, 도메인 이벤트
 - [policies/](./policies/) — BE 구현 정책
   - [auth-jwt.md](./policies/auth-jwt.md) — JWT 토큰 생성/검증
   - [oauth-google.md](./policies/oauth-google.md) — Google OAuth2 콜백

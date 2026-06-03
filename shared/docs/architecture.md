@@ -1,47 +1,43 @@
 # 시스템 아키텍처
 
+**주의**: 2026-06-02 커뮤니티 광장 피벗 완료. 구 Session/Turn/ChatMessage 모델은 삭제됨 (ADR-0001 참조).
+
 ## 한 장 다이어그램
 
 ```mermaid
 flowchart TB
     Browser[Browser SPA<br/>Next.js 14]
     subgraph Backend["Spring Boot 3.3"]
-        API[REST Controller<br/>/api/sessions/{id}/messages]
+        API[REST Controller<br/>/api/community/{posts,votes,jury}]
         Auth[Security / JWT]
-        ChatService[ChatService<br/>Solo/Duo 모드]
-        LLMRouter["LlmProviderConfig<br/>Task 라우팅"]
-        ChatLLM["ChatLLM Provider<br/>(dev: Remote CLI<br/>prod: ClaudeApiProvider)"]
-        ReportLLM["ReportLLM Provider<br/>(all: Remote CLI)"]
+        PostService[PostComposeService<br/>게시글 처리]
+        JuryService[JuryService<br/>배심원 생성]
+        LLMProvider["RemoteLlmProvider<br/>(CLI 단일 경로)<br/>ADR-0003"]
         Safety[PromptSanitizer<br/>KeywordGuard<br/>CrisisDetector]
         Retention[RetentionScheduler<br/>30d cron]
     end
     subgraph LLMWorker["llm-worker<br/>Spring Boot<br/>(dev+prod)"]
         Pool[LlmWorkerPool<br/>ThreadPoolExecutor 100<br/>+ queue 500]
     end
-    subgraph AnthropicAPI["Anthropic API<br/>(prod only)"]
-        APIClient["/v1/messages<br/>Haiku 4.5<br/>cache_control 3-tier"]
-    end
-    DB[(MariaDB 11<br/>+ llm_call_logs)]
-    Claude[Claude CLI<br/>Haiku/Sonnet]
-    Prompts["shared/docs/prompts/<br/>system + gottman + nvc + relations<br/>+ StructuredPrompt (캐시 4계층)"]
+    DB[(MariaDB 11<br/>posts, post_comments<br/>votes, jurors<br/>+ llm_call_logs)]
+    Claude[Claude CLI<br/>Haiku 4.5]
+    Prompts["shared/docs/prompts/<br/>system.md<br/>+ community/<br/>{jury_persona.md<br/>neutralize.md}"]
 
     Browser -->|HTTPS + JWT| API
     API --> Auth
-    Auth --> ChatService
-    ChatService --> Safety
-    Safety --> LLMRouter
-    LLMRouter --> ChatLLM
-    LLMRouter --> ReportLLM
-    ChatLLM -->|dev: POST /v1/invocations| Pool
-    ChatLLM -->|prod: REST| APIClient
-    ReportLLM -->|POST /v1/invoke| Pool
-    Pool -->|--strict-mcp-config --no-session-persistence| Claude
-    LLMRouter -.loads.-> Prompts
-    ChatService --> DB
+    Auth --> PostService
+    PostService --> JuryService
+    JuryService --> Safety
+    Safety --> LLMProvider
+    LLMProvider -->|POST /v1/invocations| Pool
+    Pool -->|--strict-mcp-config<br/>--no-session-persistence| Claude
+    LLMProvider -.loads.-> Prompts
+    PostService --> DB
+    JuryService --> DB
     Retention -.purge expired.-> DB
 ```
 
-### 이전 ASCII 버전 참조:
+### 배포 토폴로지:
 
 ```
 사용자 브라우저
@@ -82,19 +78,16 @@ flowchart TB
 
 ## 흐름별 설명
 
-### 1) HTTP 요청 흐름 (dev 기준, prod는 ClaudeApiProvider 사용)
+### 1) HTTP 요청 흐름 (커뮤니티 광장)
 
-1. 브라우저 → `https://dev.againspring.net/api/sessions/{id}/messages`
-2. Cloudflare Tunnel → 호스트 `localhost:8090`
-3. `againspring-nginx-dev` (`env/nginx/dev.conf`):
-   - `/api/` 매치 → `http://againspring-backend-dev:8080`
+1. 브라우저 → `https://dev.againspring.net/api/community/posts` 또는 `/jury`
+2. Cloudflare Tunnel → 호스트 `localhost:8090` (dev) / `8091` (prod)
+3. `againspring-nginx-{dev,prod}` (`env/nginx/`):
+   - `/api/` 매치 → `http://againspring-backend-{dev,prod}:8080`
    - 타임아웃 60s, `X-Forwarded-*` 헤더 주입
-4. `MessageController.sendMessage(...)` 진입
-5. `ChatService` → `LlmProviderConfig`가 task별 제공자 선택
-   - dev: `@Qualifier("chatLlmProvider")` = `RemoteLlmProvider`
-   - prod: `@Qualifier("chatLlmProvider")` = `ClaudeApiProvider`
-6. **dev**: RemoteLlmProvider → `POST http://againspring-llm-dev:8090/v1/invocations` → 워커가 CLI spawn
-   **prod**: ClaudeApiProvider → POST `https://api.anthropic.com/v1/messages` (캐시 3-breakpoint)
+4. `CommunityPostController.createPost(...)` 또는 `JuryController.generateJury(...)` 진입
+5. `PostComposeService` / `JuryService` → `RemoteLlmProvider` (ADR-0003: CLI 단일 경로)
+6. RemoteLlmProvider → `POST http://againspring-llm-{dev,prod}:8090/v1/invocations` → 워커가 Claude Code CLI spawn
 7. 응답 직렬화 + `LLMCallLogger`로 DB 저장 후 nginx 통해 브라우저 반환
 
 ### 2) 인증 흐름
@@ -110,84 +103,72 @@ flowchart TB
 
 FE의 axios 인터셉터(`frontend/lib/api/client.ts`)가 `localStorage.again-spring-token`을 `Authorization: Bearer ...` 헤더로 자동 주입.
 
-### 3) 세션 진행 (State Machine)
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> CHATTING_SOLO : "POST /api/sessions"
-    CHATTING_SOLO --> CHATTING_DUO : 상대가 초대 토큰으로 참여
-    CHATTING_SOLO --> COMPLETED : 사용자 종료 결정
-    CHATTING_DUO --> AWAITING_FINALIZATION : "/finalize 호출"
-    AWAITING_FINALIZATION --> COMPLETED : 양쪽 agree
-    AWAITING_FINALIZATION --> CHATTING_DUO : 한쪽 decline
-    CHATTING_SOLO --> TERMINATED : 위기 키워드 감지
-    CHATTING_DUO --> TERMINATED : 위기 키워드 감지
-    AWAITING_FINALIZATION --> TERMINATED : 위기 키워드 감지
-    COMPLETED --> [*]
-    TERMINATED --> [*]
-```
-
-전이는 `service/SessionStateMachine`이 단일 진실로 강제. 위험 키워드 감지 시 `CrisisDetector` 발동 → `CrisisDetectedEvent` → `SessionStatus.TERMINATED`.
-
-### 4) LLM 호출 흐름 (Phase 1 V1.5: 비동기 + 취소)
+### 3) 게시글 & 배심원 흐름
 
 ```mermaid
 sequenceDiagram
-    participant FE as 브라우저 (FE)
-    participant Ctrl as MessageController
-    participant Svc as CancelableChatService
-    participant Map as activeInvocations
-    participant LLM as Claude CLI
+    participant User as 사용자 (FE)
+    participant Ctrl as CommunityPostController
+    participant Svc as JuryService
+    participant LLM as Claude CLI (llm-worker)
+    participant DB as MariaDB
 
-    FE->>Ctrl: POST /api/sessions/{id}/messages
-    Ctrl->>Svc: acceptUserMessage()
-    Svc->>Map: cancel(sessionId) — 진행 중 LLM 강제 종료
-    Svc-->>Ctrl: userMessage 저장 완료
-    Ctrl-->>FE: HTTP 200 (< 500ms)
-    Svc->>LLM: beginInvocation() 비동기 시작
-
-    loop FE 3초 폴링
-        FE->>Ctrl: GET /messages?since=...
-    end
-
-    LLM-->>Svc: stdout 응답 수신
-    Svc->>Svc: DB 저장 (mediator messages)
-    Ctrl-->>FE: 폴링 응답에 mediator 메시지 포함
+    User->>Ctrl: POST /api/community/posts (제목, 내용, 카테고리)
+    Ctrl->>DB: Post 엔티티 생성
+    Ctrl-->>User: 201 (postId)
+    
+    Svc->>LLM: 배심원 생성 (N=9, 페르소나별)
+    LLM-->>Svc: 배심원 9명의 관점
+    Svc->>DB: Juror 엔티티 저장 (persona, perspective, key_insight)
+    Svc->>Svc: PromptSanitizer → 금지 표현 제거
+    
+    User->>Ctrl: GET /api/community/posts/{postId}/jury
+    Ctrl-->>User: 배심원 9명 리스트
+    
+    User->>Ctrl: POST /api/community/posts/{postId}/vote
+    Ctrl->>DB: Vote 엔티티 (jurorId, voteOption=empathy)
 ```
 
-**HTTP 응답 단계** (동기, <500ms):
-1. `POST /messages` → `MessageController.sendMessage()`
-2. `CancelableChatService.acceptUserMessage()` → 사용자 메시지만 DB 저장
-3. HTTP 응답 반환 (mediatorMessages 필드 없음)
+게시글 생성 시 배심원 생성은 **비동기** (큐 기반, 보통 30초~1분). 사용자는 즉시 게시글을 볼 수 있으며, 배심원은 준비되면 폴링으로 수신.
 
-**LLM 실행 단계** (비동기, 응답 후):
-4. `CancelableChatService.beginInvocation()` 시작 (백그라운드)
-5. 진행 중 LLM이 있으면 `activeInvocations` 맵에서 `cancel()` → `destroyForcibly()`
-6. `PromptAssembler`가 누적 메시지(A+B) 기반으로 레이어 조립 (`shared/docs/prompts/`):
-   - `system.md` (정체성/금기/말투)
-   - `gottman/*.md` (관련 컨텍스트만)
-   - `nvc/four_steps.md`
-   - `relations/{relationType}.md`
-   - `chat/{solo|duo}_chat.md`
-7. `PromptSanitizer` → 사용자 입력에서 prompt-injection 패턴 차단
-8. `RemoteLlmProvider.invokeCancelable()` → `RemoteCancelableInvocation` 래핑
-9. HTTP POST `/v1/invocations` → llm-worker로 전달
-10. LlmWorkerPool: `ThreadPoolExecutor(100)` + `LinkedBlockingQueue(500)`, 120s 타임아웃
-11. `ClaudeCliInvoker` → `ProcessBuilder("claude", "--strict-mcp-config", "--no-session-persistence", "--print", prompt).start()` → stdout 읽기
-12. 응답을 `TurnResponseParser`로 구조화 → DB 저장
-13. `LLMCallLogger`가 `llm_call_logs`에 기록 (correlation_id, latency, outcome)
-14. 실패 시 `FallbackResponses`의 안전 기본값 반환
+### 4) LLM 호출 흐름 (배심원 생성)
 
-**FE 수신 단계**:
-15. `GET /messages?since=` (폴링, 3초 주기) → mediator 응답 수신
+```mermaid
+sequenceDiagram
+    participant Svc as JuryService
+    participant Prom as PromptAssembler
+    participant Prov as RemoteLlmProvider
+    participant Pool as LlmWorkerPool
+    participant CLI as Claude CLI
+    participant DB as MariaDB
 
-상세는 [`backend/docs/llm-bridge.md`](../backend/docs/llm-bridge.md) (취소 메커니즘) 및 [`shared/docs/prompts/README.md`](../shared/docs/prompts/README.md) (레이어 설계) 참조.
+    Svc->>Prom: 포스트 콘텍스트 조립
+    Prom->>Prom: system.md + prompts/community/*.md 병합
+    Prom->>Svc: StructuredPrompt (4계층 캐시)
+    
+    Svc->>Prov: juryLlmProvider.invoke(prompt)
+    Prov->>Pool: POST /v1/invocations
+    Pool->>CLI: ProcessBuilder spawn (--strict-mcp-config --no-session-persistence)
+    CLI-->>Pool: stdout: {persona_name, key_insight, perspective}
+    Pool-->>Prov: 응답 파싱
+    
+    Prov->>Svc: JurorResponse[]
+    Svc->>Svc: PromptSanitizer → 금지 표현 제거
+    Svc->>DB: Juror 엔티티 저장
+```
+
+**프롬프트 구조** (`shared/docs/prompts/community/`):
+- `system.md`: AI 역할 정의 (배심원), 금기사항
+- `jury_persona.md`: 9개 페르소나 정의 (심리상담사, 경계 전문가 등)
+- `neutralize.md`: NVC 중립화 규칙
+
+상세는 [`shared/docs/prompts/README.md`](../shared/docs/prompts/README.md) (프롬프트 아키텍처) 및 [`backend/docs/llm-bridge.md`](../backend/docs/llm-bridge.md) (LLM 워커) 참조.
 
 ### 5) 데이터 보존
 
-- 사용자 입력 원문(`turns.content`, `mediator_message`, `mediator_summary_for_opponent`) → 30일 후 `RetentionScheduler`(매일 03:00 UTC)가 NULL 처리
-- 리포트(`reports`) → 영구 보관 (요약·기여도·NVC만 남김, 원문 없음)
+- 게시글 원문(`posts.content`, `posts.title`) → 30일 후 `RetentionScheduler`(매일 03:00 UTC)가 NULL 처리
+- 댓글(`post_comments`) → 30일 후 NULL 처리
+- 배심원(`jurors`) → 60일 후 삭제 (논란 최소화)
 - 자세한 정책: [policies/data-retention.md](./policies/data-retention.md)
 
 ## 컴포넌트 책임 요약
@@ -197,13 +178,11 @@ sequenceDiagram
 | Cloudflare Tunnel | 외부 도메인 → 호스트 포트 | nginx 8090/8091 |
 | nginx | 경로 분기 + 헤더 주입 | backend, frontend |
 | Next.js (FE) | UI · 라우팅 · 상태 · MSW (개발) | axios → BE |
-| Spring Boot (BE) | API · 도메인 · 보안 · 프롬프트 어셈블 · Task별 제공자 라우팅 | MariaDB, llm-worker, Anthropic API |
-| ClaudeApiProvider (BE) | Anthropic REST API 호출 (prod 대화) | /v1/messages (캐시 3-tier) |
-| RemoteLlmProvider (BE) | CLI 워커 HTTP 호출 (모든 리포트 + dev 대화) | llm-worker |
-| llm-worker | LLM CLI 실행 전용 (100풀 + 큐500) | claude CLI |
-| MariaDB | 영속 저장소 (13 테이블 + llm_call_logs) | BE만 |
-| Anthropic API | 대화 LLM (prod, Haiku 4.5, 캐싱) | ClaudeApiProvider |
-| claude CLI | 대화/리포트 LLM (dev + 모든 리포트, Sonnet 4.6) | llm-worker의 ProcessBuilder |
+| Spring Boot (BE) | API · 도메인 · 보안 · 프롬프트 어셈블 · 배심원 생성 | MariaDB, llm-worker |
+| RemoteLlmProvider (BE) | Claude Code CLI 호출 (배심원 + 미래 리포트) | llm-worker |
+| llm-worker | LLM CLI 실행 전용 (ThreadPoolExecutor 100 + queue 500, 120s 타임아웃) | Claude Code CLI |
+| MariaDB | 영속 저장소 (posts, post_comments, votes, jurors + llm_call_logs) | BE만 |
+| Claude Code CLI | 배심원 생성 (Haiku 4.5), 프롬프트 로드 | llm-worker의 ProcessBuilder |
 
 ## 비기능 요구사항 위치
 
@@ -219,4 +198,5 @@ sequenceDiagram
 
 ---
 
-**마지막 업데이트**: 2026-05-30
+**마지막 업데이트**: 2026-06-03 (커뮤니티 광장 피벗)
+**관련 ADR**: [ADR-0001](./ADR/0001-pivot-to-community-plaza.md) (피벗), [ADR-0003](./ADR/0003-llm-consolidated-to-claude-code-cli.md) (LLM 통합)

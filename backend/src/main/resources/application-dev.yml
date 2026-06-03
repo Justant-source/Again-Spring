@@ -20,10 +20,6 @@ springdoc:
     enabled: true
 
 llm:
-  chat:
-    provider: remote    # dev는 CLI 워커(remote) 사용 — API 스모크 시 LLM_CHAT_PROVIDER=claude-api 임시 설정
-  report:
-    provider: remote
   remote:
     read-timeout-ms: 250000
     default-timeout-ms: 240000

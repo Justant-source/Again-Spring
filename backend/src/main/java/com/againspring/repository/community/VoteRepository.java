@@ -16,6 +16,8 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
      */
     Long countByPostIdAndOptionId(String postId, Long optionId);
 
+    Long countByPostId(String postId);
+
     /**
      * 포스트 및 투표자별 투표 조회
      */

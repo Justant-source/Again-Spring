@@ -14,4 +14,7 @@ public class GuestRequest {
 
     /** 게스트 닉네임 (선택) */
     private String nickname;
+
+    /** 브라우저 기기 식별자 — 동일 기기 재접속 시 동일 Guest ID 재발급 */
+    private String deviceId;
 }

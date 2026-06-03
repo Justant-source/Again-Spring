@@ -34,7 +34,7 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     await expect(page.getByText('다시봄 광장')).toBeVisible()
     await expect(page.getByText('내 사연 올리기')).toBeVisible()
     await expect(page.getByText('전체')).toBeVisible()
-    await expect(page.getByText('연인')).toBeVisible()
+    await expect(page.getByRole('button', { name: '연인' })).toBeVisible()
   })
 
   test('compose — 제목·본문 입력 + 글자수 카운터', async ({ page }) => {
@@ -77,16 +77,13 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     await page.locator('[data-testid="guest-notice-continue"]').click()
     await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 5_000 })
 
-    // 제출 버튼 초기 비활성
+    // 제출 버튼 초기 활성 (PUBLIC이 기본값)
     const submitBtn = page.locator('[data-testid="mode-submit-btn"]')
-    await expect(submitBtn).toBeDisabled()
+    await expect(submitBtn).toBeEnabled()
+    await expect(submitBtn).toContainText('바로 올리기')
 
-    // 상대 초대 클릭해도 여전히 비활성 (게스트 차단)
+    // 상대 초대 카드 클릭해도 PUBLIC이 선택된 상태 유지 → 버튼은 계속 활성
     await page.locator('[data-testid="mode-private-card"]').click({ force: true })
-    await expect(submitBtn).toBeDisabled()
-
-    // 바로 광장에 올리기 선택 → 버튼 활성화
-    await page.locator('[data-testid="mode-public-card"]').click()
     await expect(submitBtn).toBeEnabled()
     await expect(submitBtn).toContainText('바로 올리기')
   })
@@ -97,6 +94,79 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     await page.waitForURL(/\/community\/mock_001/, { timeout: 12_000 })
     // 페이지가 에러 없이 로드됐는지 확인 — 사연 제목 텍스트 존재
     await expect(page.getByText('주말에도 저만 쉬는 날이 없어요')).toBeVisible({ timeout: 12_000 })
+  })
+
+  test('UserChip 클릭 → 게스트 정보 시트 표시 → 회원가입 버튼 존재', async ({ page }) => {
+    await page.goto(`${BASE}/community`)
+    // 게스트 자동 초기화 대기 (2초)
+    await page.waitForTimeout(2000)
+    // UserChip 클릭
+    const userChip = page.locator('[data-testid="user-chip"]')
+    await expect(userChip).toBeVisible({ timeout: 5_000 })
+    await userChip.click()
+    // 게스트 정보 시트 표시
+    await expect(page.getByText('게스트로는')).toBeVisible({ timeout: 5_000 })
+    // 회원가입하기 버튼 존재 확인
+    await expect(page.getByRole('button', { name: '회원가입하기' })).toBeVisible()
+    // 게스트로 계속하기 버튼으로 시트 닫기
+    await page.getByRole('button', { name: '게스트로 계속하기' }).click()
+    await expect(page.getByText('게스트로는')).not.toBeVisible({ timeout: 2_000 })
+  })
+})
+
+// ── 댓글 및 좋아요 (공개 접근) ──────────────────────────────────
+test.describe('Flow 04-C: 댓글 · 좋아요 (공개 접근)', () => {
+
+  test('댓글 입력바 클릭 → 컴포즈 시트 열림', async ({ page }) => {
+    await page.goto(`${BASE}/community/mock_001/comments`)
+    // 댓글 입력바 대기 및 클릭
+    const commentBar = page.getByText('댓글을 남겨주세요.')
+    await expect(commentBar).toBeVisible({ timeout: 8_000 })
+    await commentBar.click()
+    // 컴포즈 textarea 표시 확인
+    const textarea = page.locator('textarea')
+    await expect(textarea).toBeVisible({ timeout: 3_000 })
+  })
+
+  test('익명 댓글 등록 가능 (토큰 없이)', async ({ page }) => {
+    await page.goto(`${BASE}/community/mock_001/comments`)
+    // 댓글 입력바 클릭
+    const commentBar = page.getByText('댓글을 남겨주세요.')
+    await expect(commentBar).toBeVisible({ timeout: 8_000 })
+    await commentBar.click()
+    // textarea 채우기
+    const textarea = page.locator('textarea')
+    await expect(textarea).toBeVisible({ timeout: 3_000 })
+    const testCommentText = '익명 댓글 테스트'
+    await textarea.fill(testCommentText)
+    // 등록 버튼 클릭
+    await page.getByRole('button', { name: '등록' }).click()
+    // 댓글이 목록에 나타나는지 확인 (.first() — 이전 테스트 실행 누적 또는 textarea 잔존 텍스트 대비)
+    await expect(page.getByText(testCommentText).first()).toBeVisible({ timeout: 5_000 })
+  })
+
+  test('방금 등록한 댓글 시간 → 음수 없음', async ({ page }) => {
+    await page.goto(`${BASE}/community/mock_001/comments`)
+    // 댓글 입력바 클릭
+    const commentBar = page.getByText('댓글을 남겨주세요.')
+    await expect(commentBar).toBeVisible({ timeout: 8_000 })
+    await commentBar.click()
+    // textarea 채우기
+    const textarea = page.locator('textarea')
+    await expect(textarea).toBeVisible({ timeout: 3_000 })
+    const testCommentText = '방금 작성된 댓글'
+    await textarea.fill(testCommentText)
+    // 등록 버튼 클릭
+    await page.getByRole('button', { name: '등록' }).click()
+    // 댓글이 목록에 나타남 (.first() — 이전 실행 누적 또는 textarea 잔존 텍스트 대비)
+    await expect(page.getByText(testCommentText).first()).toBeVisible({ timeout: 5_000 })
+    // 댓글 시간 텍스트 검사 (방금 또는 N분 전, 음수 없음)
+    const commentLocator = page.getByText(testCommentText).first()
+    const commentContainer = commentLocator.locator('..')
+    // 음수 시간 표현은 "-N일 전" 또는 "-N분 전" 형태 → 이게 없어야 함
+    const timeText = await commentContainer.textContent()
+    expect(timeText).toMatch(/방금|\d+분 전|\d+시간 전|\d+일 전/)
+    expect(timeText).not.toMatch(/-\d+/)
   })
 })
 

@@ -15,26 +15,25 @@
 
 ```flowchart
 flowchart TD
-    subgraph API["api/ — REST 15개 컨트롤러"]
+    subgraph API["api/ — REST 컨트롤러"]
         direction LR
         C1[AuthController\nOAuth2Controller\nHealthController]
-        C2[SessionController\nMessageController\nReportController]
-        C3[UserController\nFeedbackController]
-        C4[admin/\nAdminDashboardController\nAdminUserController\nAdminHealthController]
-        C5[AdminFeedbackController\nAdminPromptsController\nAdminTestController\nSessionContextDebugController]
+        C2[CommunityPostController\nCommunityCommentController\nUserController\nFeedbackController]
+        C3[admin/\nAdminDashboardController\nAdminUserController\nAdminHealthController]
+        C4[AdminFeedbackController\nAdminPromptsController\nAdminTestController]
     end
 
     subgraph SVC["service/ — 비즈니스 로직"]
         direction LR
-        S1[CancelableChatService\nSessionService\nSessionStateMachine]
+        S1[CommunityPostService\nJuryService\nPostCommentService]
         S2[AuthService\nUserService\nFeedbackService]
-        S3[admin/\nprompt/\ncontext/\nreport/]
-        S4[retention/\nnotify/\nparser/\noauth/]
+        S3[admin/\nsafety/\nretention/]
+        S4[notify/\noauth/\ncategory/]
     end
 
     subgraph DOM["domain/ — JPA 엔티티"]
         direction LR
-        D1[User · Session · Message\nReport · Feedback · DailyStats]
+        D1[User · Post · PostComment\nVote · Juror · Feedback]
         D2[GuestSession · RevokedToken\nEmailVerification · PasswordResetToken]
     end
 
@@ -55,23 +54,22 @@ flowchart TD
 
 | 패키지 | 책임 |
 |---|---|
-| `api/` | REST 컨트롤러 **15개** + DTO (request 18개, response 19개) |
-| `api/admin/` | 관리자 컨트롤러 3개 (Dashboard · User · Health) |
-| `service/` | 비즈니스 로직, 트랜잭션 경계, State Machine |
-| `service/admin/` | PMF 통계 · 리텐션 코호트 · 사용자 상세 · 위기 모니터링 · 시스템 헬스 |
-| `service/context/` | Phase D: FirstMessage · IssueContext 병합 · QuestionQueue · WelcomeMessage |
-| `service/prompt/` | 프롬프트 Fragment 조립 (카테고리·프로필·심리·Duo균형·Phase D) |
+| `api/` | REST 컨트롤러 + DTO (community, auth, user, feedback) |
+| `api/admin/` | 관리자 컨트롤러 (Dashboard · User · Health) |
+| `service/` | 비즈니스 로직, 트랜잭션 경계 |
+| `service/admin/` | 관리자 기능 (통계 · 사용자 · 모니터링) |
+| `service/community/` | 광장 서비스 (Post · Comment · Vote · Jury) |
 | `service/notify/` | 위기 알림 이메일 · 피드백 이메일 발신 |
-| `service/report/` | 리포트 생성 (NVC · Metaphor · RatioEnforcer) |
 | `service/retention/` | 30일 보존 스케줄러 · 일일 통계 집계 |
 | `domain/` | JPA 엔티티 + Enum |
+| `domain/community/` | Post · PostComment · Vote · Juror |
 | `repository/` | Spring Data JPA 인터페이스 |
-| `llm/remote/` | `RemoteLlmProvider` (기본) + `RemoteCancelableInvocation` + DTO (llm-worker HTTP 클라이언트) |
-| `llm/bridge/` | `ClaudeCodeBridge` (긴급 fallback, `llm.provider=claude-code`) + `PromptSanitizer` |
-| `llm/` | `LLMProvider` 인터페이스 + Prompt 어셈블 + Fallback + 모니터링 |
-| `safety/` | KeywordGuard · CrisisDetector · RatioEnforcer · SafetyAuditLogger |
+| `repository/community/` | PostRepository · PostCommentRepository · VoteRepository · JurorRepository |
+| `llm/remote/` | `RemoteLlmProvider` (기본) + HTTP 클라이언트 (againspring-llm 워커) |
+| `llm/` | `LLMProvider` 인터페이스 + Prompt 어셈블 + 모니터링 |
+| `safety/` | KeywordGuard · CrisisDetector · SafetyAuditLogger |
 | `security/` | JwtFilter · SecurityConfig · RateLimitFilter · UserDetailsService |
-| `config/` | 빈 설정 (CORS · Async · Scheduling · OpenAPI · AccessLog) |
+| `config/` | 빈 설정 (CORS · Async · Scheduling · OpenAPI) |
 | `common/` | 공통 예외 (BusinessException · GlobalExceptionHandler) |
 
 ## 트리

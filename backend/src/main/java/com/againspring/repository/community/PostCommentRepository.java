@@ -20,4 +20,9 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
      * 댓글의 답글 조회 (생성순)
      */
     List<PostComment> findByParentCommentIdOrderByCreatedAtAsc(Long parentCommentId);
+
+    /**
+     * 포스트의 전체 댓글 수 (최상위 + 대댓글)
+     */
+    long countByPostId(String postId);
 }

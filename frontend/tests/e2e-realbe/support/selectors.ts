@@ -7,11 +7,6 @@
  *   2. getByTestId (data-testid 박힌 경우)
  *   3. getByText  (한국어 리터럴 — i18n 위험, 최후 수단)
  *
- * 단계 3에서 추가한 data-testid:
- *   - crisis-modal            CrisisModal.tsx 루트 div
- *   - crisis-modal-close      CrisisModal 닫기 버튼
- *   - ratio-legal-notice      ContributionRatio.tsx 법적 안내 박스
- *   - blurred-bubble          PartnerPanel.tsx BlurredBubble 래퍼
  */
 
 // ── 위기 모달 ──────────────────────────────────────────────────
@@ -26,13 +21,6 @@ export const SOS_BUTTON_ROLE = { name: '위기 지원 연락처 보기' } as con
 // 주의: 컴포넌트에 CJK 오타(분析) 존재 → testid 사용 필수
 export const RATIO_LEGAL_NOTICE = '[data-testid="ratio-legal-notice"]'
 
-// ── Duo 격리 ───────────────────────────────────────────────────
-export const BLURRED_BUBBLE = '[data-testid="blurred-bubble"]'
-
-// ── 채팅 입력 ─────────────────────────────────────────────────
-export const CHAT_INPUT_PLACEHOLDER = '편한 말로 적어주세요'
-export const SEND_BUTTON = { name: '전송' } as const
-
 // ── 인증 ──────────────────────────────────────────────────────
 export const EMAIL_INPUT_PLACEHOLDER = '이메일'
 export const PASSWORD_INPUT_PLACEHOLDER = '비밀번호'
@@ -46,11 +34,6 @@ export const VOTE_DISTRIBUTION = '[data-testid="vote-distribution"]'
 export const JURY_DISTRIBUTION = '[data-testid="jury-distribution"]'
 export const COMMENT_LIKE_BTN = '[data-testid="comment-like-btn"]'
 export const COMMUNITY_LEGAL_NOTICE = '[data-testid="ratio-legal-notice"]'
-
-// ── V17 3자 대화 (Phase 6에서 추가, V17 이후 미사용) ──────────────────
-// 참고: V17 이후 3자 대화(THREE_WAY) FE 은퇴됨
-// export const THREE_WAY_MEDIATOR_MSG = '[data-testid="three-way-mediator-msg"]'
-// export const THREE_WAY_MEDIATOR_LABEL = '[data-testid="three-way-mediator-label"]'
 
 // ── V18 커뮤니티 피드 (C3 광장형) ──────────────────────────────────
 // Feed
@@ -73,3 +56,9 @@ export const STORY_PARTNER_BOX = '[data-testid="story-partner-box"]'
 export const VOTE_COMPLETE_BTN = '[data-testid="vote-complete-btn"]'
 export const VOTE_STAMP = '[data-testid="vote-stamp"]'
 export const NOTIFICATION_LIST = '[data-testid="notification-list"]'
+// 댓글 및 UserChip
+export const USER_CHIP = '[data-testid="user-chip"]'
+export const GUEST_INFO_SHEET = '[data-testid="guest-info-sheet"]'
+export const COMMENT_BAR_PLACEHOLDER = '댓글을 남겨주세요.'
+export const COMMENT_COMPOSE_TEXTAREA = 'textarea'
+export const COMMENT_SUBMIT_BTN = { name: '등록' } as const

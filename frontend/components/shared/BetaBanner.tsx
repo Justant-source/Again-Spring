@@ -7,7 +7,6 @@ export function BetaBanner() {
   const pathname = usePathname();
   const { showFeedbackModal } = useUiStore();
 
-  if (pathname?.startsWith('/session/chat')) return null;
   if (pathname?.startsWith('/admin')) return null;
 
   return (
