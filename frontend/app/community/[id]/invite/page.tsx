@@ -277,39 +277,6 @@ export default function PostInvitePage() {
           </div>
         ) : null}
 
-        {/* Share buttons */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
-          <button
-            style={{
-              flex: 1,
-              padding: '12px 14px',
-              background: '#FEE500',
-              color: '#333',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            카카오톡
-          </button>
-          <button
-            style={{
-              flex: 1,
-              padding: '12px 14px',
-              background: 'var(--P-card)',
-              color: 'var(--P-ink)',
-              border: '1px solid var(--P-border)',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            문자 · 더보기
-          </button>
-        </div>
 
         {error && (
           <div
@@ -670,7 +637,7 @@ export default function PostInvitePage() {
               cursor: 'pointer',
             }}
           >
-            링크 다시 보내기
+            링크 보내기
           </button>
         </div>
       </div>
