@@ -32,7 +32,9 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
 1. **FE는 Claude Code 직접 호출 금지** — 모든 LLM 요청은 BE 경유 (REST API)
 2. **BE는 RemoteLlmProvider만 사용** — HTTP POST → `againspring-llm-{dev,prod}:/v1/invoke`
 3. **LLM 프롬프트/출력 수정 시** `shared/docs/policies/forbidden-words.md` 반드시 확인
-4. **🚨 prod 배포 절대 규칙** — 명시적 "prod에 배포해줘" 지시 없으면 배포 금지. 순서: dev 배포 → commit & push (main) → prod 배포
+4. **🚨 prod 배포 절대 규칙** — 명시적 "prod에 배포해줘" 지시 없으면 배포 금지.
+   **필수 순서**: ① dev 배포 → ② **e2e 테스트 (dev 대상, 전체 통과)** → ③ commit & push (main) → ④ prod 배포
+   e2e-realbe는 **반드시 dev(localhost:8090)에서만** 실행한다. prod 대상 실행 금지.
 5. **`.env.prod` git 커밋 절대 금지**
 6. **문서 위치** — 루트는 `README.md`, `CLAUDE.md`만. 상세 문서는 4개 docs 디렉토리만 허용.
 
@@ -161,11 +163,13 @@ Cloudflare Tunnel: `dev.againspring.net → :8090` · `againspring.net → :8091
 - [ ] LLM 호출 시 `PromptSanitizer` 경유 확인
 - [ ] 테스트 커버리지 80% 이상
 
-### prod 배포 전 (명시적 지시 시에만)
-- [ ] dev 검증 완료 + main 브랜치 commit & push 완료
-- [ ] **🚨 e2e-realbe 전체 통과 필수** — `cd frontend && npm run test:e2e:realbe`
-- [ ] `env/.env.prod` 모든 값 입력 (기본값 없음)
-- [ ] MariaDB 볼륨 백업 후 배포
+### prod 배포 전 (명시적 지시 시에만) — 순서 엄수
+- [ ] ① dev 빌드·배포 완료 (`docker-compose.dev.yml`)
+- [ ] ② **🚨 e2e-realbe 전체 통과** — `E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe`
+      → **dev(8090) 대상으로만 실행. prod(8091) 대상 실행 절대 금지**
+- [ ] ③ main 브랜치 commit & push 완료
+- [ ] ④ `env/.env.prod` 모든 값 입력 (기본값 없음)
+- [ ] ⑤ MariaDB 볼륨 백업 후 prod 배포
 
 ---
 
