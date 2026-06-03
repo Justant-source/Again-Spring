@@ -39,6 +39,16 @@ function ActivityIcon({ active }: { active: boolean }) {
   );
 }
 
+function WriteIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={active ? 2 : 1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+    </svg>
+  );
+}
+
 function AdminIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -106,7 +116,7 @@ export function BottomNav() {
         maxWidth: 640,
         margin: '0 auto',
         display: 'flex',
-        alignItems: 'flex-end',
+        alignItems: 'stretch',
         overflow: 'visible',
       }}>
         {/* ── 광장 ── */}
@@ -133,7 +143,7 @@ export function BottomNav() {
           <div style={{ flex: 1 }} aria-hidden="true" />
         )}
 
-        {/* ── 가운데 강조 CTA: 글쓰기 / 관리 탭 (관리자) ── */}
+        {/* ── 글쓰기 / 관리 탭 (관리자) ── */}
         {!showAdmin ? (
           <button
             type="button"
@@ -141,48 +151,16 @@ export function BottomNav() {
             aria-label="글쓰기"
             data-testid="nav-write-post"
             style={{
-              flex: 1.4,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 4,
-              padding: '0 4px 6px',
+              ...baseTab,
+              flex: 1,
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              minWidth: 0,
+              color: isActive('/community/new') ? 'var(--P-ink)' : 'var(--P-sub)',
             }}
           >
-            {/* 원형 — 바 위로 20px 돌출 */}
-            <div style={{
-              width: 50,
-              height: 50,
-              borderRadius: '50%',
-              background: 'var(--P-ink)',
-              color: 'var(--P-bg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: -20,
-              flexShrink: 0,
-              boxShadow: '0 4px 14px rgba(43,43,43,0.28)',
-              transition: 'box-shadow 0.15s, transform 0.15s',
-            }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </div>
-            <span style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '-0.3px',
-              lineHeight: 1,
-              color: 'var(--P-sub)',
-              whiteSpace: 'nowrap',
-            }}>
-              글쓰기
-            </span>
+            <WriteIcon active={isActive('/community/new')} />
+            <span style={lbl(isActive('/community/new'))}>글쓰기</span>
           </button>
         ) : (
           <Link
