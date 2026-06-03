@@ -178,8 +178,7 @@ export default function ProfilePage() {
 
       <div style={{ padding: '8px 28px 40px', display: 'flex', flexDirection: 'column' }}>
         {/* Avatar + Nickname */}
-        {activeTab !== 'myInfo' && (
-          <div style={{ marginTop: 12, marginBottom: 24, textAlign: 'center' }}>
+        <div style={{ marginTop: 12, marginBottom: 24, textAlign: 'center' }}>
             <div
               style={{
                 width: 46,
@@ -207,7 +206,6 @@ export default function ProfilePage() {
               사연 {myPosts.length} · 투표 0 · 댓글 0
             </div>
           </div>
-        )}
 
         {/* Tabs */}
         <div

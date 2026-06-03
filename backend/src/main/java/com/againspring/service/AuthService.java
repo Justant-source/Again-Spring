@@ -160,6 +160,20 @@ public class AuthService {
         return buildAuthResponse(user, token, 86400, false);
     }
 
+    private String resolveOAuthNickname(String base) {
+        if (!userRepository.existsByNicknameAndDeletedAtIsNull(base)) {
+            return base;
+        }
+        Random rng = new Random();
+        for (int i = 0; i < 256; i++) {
+            String candidate = base + String.format("%02x", rng.nextInt(256));
+            if (!userRepository.existsByNicknameAndDeletedAtIsNull(candidate)) {
+                return candidate;
+            }
+        }
+        return base + String.format("%02x", rng.nextInt(256));
+    }
+
     private String providerLabel(String provider) {
         if (provider == null) return "소셜";
         // 현재 지원: Google만. 그 외는 일반화된 '소셜' 라벨로 노출하지 않음.
@@ -177,10 +191,11 @@ public class AuthService {
         final boolean[] isNewUser = {false};
         User user = userRepository.findByProviderAndProviderId(provider, providerId)
                 .orElseGet(() -> {
+                    String resolvedNickname = resolveOAuthNickname(nickname != null ? nickname : "사용자");
                     User newUser = User.builder()
                             .id(generateUserId())
                             .email(email)
-                            .nickname(nickname != null ? nickname : "사용자")
+                            .nickname(resolvedNickname)
                             .provider(provider)
                             .providerId(providerId)
                             .isGuest(false)
