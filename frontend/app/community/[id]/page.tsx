@@ -97,10 +97,16 @@ function C3StoryDetail({
     }
   };
 
-  // 투표 완료 후 실제 BE 비율 사용, 아직 투표 전이면 pick에 따라 시각 피드백 (라이브 집계 시뮬레이션)
+  // 투표 완료 후 실제 BE 비율 사용, 투표 전 선택 시 내 한 표를 더한 예상 비율로 미리보기
+  const existingTotal = post.voteResult?.totalVotes ?? 0;
+  const existingAuthorCount = post.voteResult?.options?.[0]?.count ?? 0;
   const authorPct = voteResult
     ? Math.round(voteResult.options?.[0]?.percentage ?? post.authorPct ?? 50)
-    : pick === 'g' ? 62 : pick === 'r' ? 54 : (post.authorPct ?? 58);
+    : pick === 'g'
+      ? Math.round((existingAuthorCount + 1) / (existingTotal + 1) * 100)
+      : pick === 'r'
+      ? Math.round(existingAuthorCount / (existingTotal + 1) * 100)
+      : Math.round(post.authorPct ?? 50);
   const partnerPct = 100 - authorPct;
 
   const voteCount = voteResult?.totalVotes ?? post.voteResult?.totalVotes ?? 0;
@@ -157,7 +163,7 @@ function C3StoryDetail({
           <SideStory
             side="r"
             label="상대방"
-            body={post.partnerBodyPublished || '상대방의 이야기를 기다리는 중입니다.'}
+            body={post.partnerBodyPublished || ''}
             clamp
             selected={pick === 'r'}
             onSelect={() => handlePick('r')}
