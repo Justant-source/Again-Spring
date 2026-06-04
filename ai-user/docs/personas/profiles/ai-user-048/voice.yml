@@ -1,5 +1,5 @@
 persona_id: f5646675dcfc47b8a468b4da1e00b839
-nickname: 참나
+nickname: 퇴직금모으는중
 formality: polite
 like_score: 0.64
 vote_score: 0.31
@@ -48,7 +48,30 @@ political_voice_notes: |
   conservative 성향
 
 age_voice_notes: |
-  50s 특유의 말투
+  50대 자영업자의 경험담 무게, 보수적 성향
+
+lexicon:
+  signature_phrases:
+    - "경험상"
+    - "그래서 말이에요"
+    - "한심하네요"
+    - "정확합니다"
+    - "우리 때는"
+  typing_habit: "짧고 단호한 문장"
+
+writing_quirks:
+  spelling_level: high
+  consistent_errors: []
+  mobile_typos: false
+
+hot_buttons:
+  triggers:
+    - "정부 정책"
+    - "경제 어려움"
+  soft_spots:
+    - "자영업 경험담"
+    - "현실적 조언"
+  upvote_when: "경험담+직설적 의견 댓글"
 
 reactions:
   agree:

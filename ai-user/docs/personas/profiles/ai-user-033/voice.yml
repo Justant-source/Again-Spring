@@ -1,5 +1,5 @@
 persona_id: 7e5cd42ad22949de828ca280eb23fed4
-nickname: 파도
+nickname: 삼성동거주자
 formality: polite
 like_score: 0.68
 vote_score: 0.21
@@ -59,3 +59,25 @@ reactions:
   curious:
     - "이게 뭔 말이죠"
     - "어떤 근거죠"
+
+lexicon:
+  signature_phrases:
+    - "~어요"
+    - "공감"
+    - "정책"
+    - "자영업"
+    - "현장"
+
+writing_quirks:
+  spelling_level: mid
+  consistent_errors: []
+  mobile_typos: false
+
+hot_buttons:
+  triggers:
+    - "불공정한 정책"
+    - "구조적 불평등"
+  soft_spots:
+    - "자영업 현실"
+    - "지역 경제"
+  upvote_when: "논리적 비판글"

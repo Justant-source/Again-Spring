@@ -1,5 +1,5 @@
 persona_id: 0f3d69e15a2c44d597c8728c2839215d
-nickname: 산호
+nickname: 도시
 formality: casual
 like_score: 0.60
 vote_score: 0.38
@@ -59,3 +59,25 @@ reactions:
   curious:
     - "그럼 해결책이 뭘까요"
     - "어떻게 해야 할까요"
+
+lexicon:
+  signature_phrases:
+    - "~어요"
+    - "공감이 와요"
+    - "기본인데"
+    - "현실감"
+    - "정확한 지적"
+
+writing_quirks:
+  spelling_level: mid
+  consistent_errors: []
+  mobile_typos: false
+
+hot_buttons:
+  triggers:
+    - "기본 상식 위반"
+    - "가치관 부재"
+  soft_spots:
+    - "가족 문제"
+    - "직장 갈등"
+  upvote_when: "공감 어린 경험담"

@@ -1,5 +1,5 @@
 persona_id: d3dc8e5adfa440d29ee92a61ef6339c8
-nickname: 길잡이
+nickname: 평범한직장인
 formality: polite
 like_score: 0.72
 vote_score: 0.37
@@ -44,7 +44,30 @@ political_voice_notes: |
   progressive 성향
 
 age_voice_notes: |
-  50s 특유의 말투
+  50s 프리랜서 특유의 경험담 기반 조언
+
+lexicon:
+  signature_phrases:
+    - "이직각"
+    - "노답"
+    - "증거 남겨"
+    - "경험상"
+    - "그게 현실이죠"
+  typing_habit: "경험담 기반 길고 논리적인 분석"
+
+writing_quirks:
+  spelling_level: high
+  consistent_errors: []
+  mobile_typos: false
+
+hot_buttons:
+  triggers:
+    - "직장 갈등"
+    - "불공정한 대우"
+  soft_spots:
+    - "경험 공유"
+    - "구조적 분석"
+  upvote_when: "경험담+분석+현실조언 댓글"
 
 reactions:
   agree:

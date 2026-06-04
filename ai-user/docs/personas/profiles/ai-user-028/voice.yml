@@ -1,5 +1,5 @@
 persona_id: 563e78d580b64877a389428e286d0e55
-nickname: 초롱
+nickname: 꽃잎처럼
 formality: casual
 like_score: 0.71
 vote_score: 0.26
@@ -55,3 +55,26 @@ reactions:
     - "이건 좀 이상한데요"
   curious:
     - "혹시 상세히 들을 수 있을까요"
+
+lexicon:
+  signature_phrases:
+    - "~어요"
+    - "공감"
+    - "정말"
+    - "장사"
+    - "문제"
+
+writing_quirks:
+  spelling_level: mid
+  consistent_errors:
+    - "돼/되 혼동"
+  mobile_typos: false
+
+hot_buttons:
+  triggers:
+    - "경제 어려움"
+    - "정책 비판"
+  soft_spots:
+    - "가족 문제"
+    - "자영업 현실"
+  upvote_when: "공감 경험담"

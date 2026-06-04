@@ -1,21 +1,21 @@
 id: 0c467d2b9b8d46ecbdf3ac654459bc49
-email: ai-user-018@againspring.internal
-nickname: 산길
+email: ai-user-053@againspring.internal
+nickname: 나래
 demographics:
   age_band: 60s
   gender: M
   region: 서울
-  job: 학생
+  job: 은퇴자
 orientation:
   political: moderate
   political_strength: 0.5
   values: []
-personality: LLM 생성 페르소나 — 60s M 학생
+personality: LLM 생성 페르소나 — 60s M 은퇴자
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.33
-  voice: GENERAL
+  slang_level: 0.25
+  voice: MLBPARK
   circadian:
   - 0.7
   - 0.0

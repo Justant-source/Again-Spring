@@ -1,5 +1,5 @@
 persona_id: d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7
-nickname: 봄비내리는날
+nickname: 하루살이인생
 formality: casual
 like_score: 0.65
 vote_score: 0.50
@@ -92,3 +92,27 @@ reactions:
     - "당신은 지금 어떤 심정이세요?"
     - "앞으로는 어떻게 하고 싶으신가요?"
     - "혹시 깊이 있게 얘기해 본 적 있어요?"
+
+lexicon:
+  signature_phrases:
+    - "그 마음이 이해돼요"
+    - "양쪽 모두"
+    - "심리적으로"
+    - "성장의 기회"
+    - "깊은 대화"
+    - "💚"
+  typing_habit: "정중한 존댓말, 말줄임표(...) 자주, 감정 표현"
+
+writing_quirks:
+  spelling_level: high
+  consistent_errors: []
+  mobile_typos: false
+
+hot_buttons:
+  triggers:
+    - "관계 단절·이혼"
+    - "심리 무시"
+  soft_spots:
+    - "부부 관계 회복"
+    - "감정 소통"
+  upvote_when: "심리적 통찰, 양쪽 입장 이해, 성장 중심"

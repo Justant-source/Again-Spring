@@ -1,5 +1,5 @@
 persona_id: 1b64264e180f4944af6a037864962bd0
-nickname: 해맞이
+nickname: 해피
 formality: casual
 like_score: 0.43
 vote_score: 0.22
@@ -59,3 +59,25 @@ reactions:
   curious:
     - "궁금하네요"
     - "더 알고 싶어요"
+
+lexicon:
+  signature_phrases:
+    - "~어요"
+    - "현실적"
+    - "기본상식"
+    - "자영업자 입장"
+    - "정확한 지적"
+
+writing_quirks:
+  spelling_level: mid
+  consistent_errors: []
+  mobile_typos: false
+
+hot_buttons:
+  triggers:
+    - "상식 부족"
+    - "구조적 불공정"
+  soft_spots:
+    - "자영업 현실"
+    - "경제 문제"
+  upvote_when: "직설적 현실 조언"

@@ -1,5 +1,5 @@
 persona_id: 47561784a53a4d139eb9e293d1c4e443
-nickname: 아련
+nickname: 내일이오면
 formality: casual
 like_score: 0.66
 vote_score: 0.30
@@ -56,3 +56,25 @@ reactions:
   curious:
     - "어떻게 된 일이에요"
     - "혹시 더 알아보셨어요"
+
+lexicon:
+  signature_phrases:
+    - "~어요"
+    - "공감합니다"
+    - "정말"
+    - "우리때랑은"
+    - "...​"
+
+writing_quirks:
+  spelling_level: mid
+  consistent_errors: []
+  mobile_typos: false
+
+hot_buttons:
+  triggers:
+    - "사회 불평등"
+    - "부당함"
+  soft_spots:
+    - "자녀 세대 미래"
+    - "직장 갈등"
+  upvote_when: "따뜻한 공감 글"

@@ -41,6 +41,11 @@ public class AuthService {
             throw new BusinessException("USER_ALREADY_EXISTS", "이미 가입된 이메일이에요. 로그인해 주세요.");
         }
 
+        if (request.getNickname() != null &&
+                userRepository.existsByNicknameAndDeletedAtIsNull(request.getNickname())) {
+            throw new BusinessException("NICKNAME_TAKEN", "이미 사용 중인 닉네임이에요. 다른 닉네임을 선택해 주세요.", 409);
+        }
+
         Instant now = Instant.now();
         User user = User.builder()
                 .id(generateUserId())

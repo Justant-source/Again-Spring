@@ -1,5 +1,5 @@
 persona_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
-nickname: 밤하늘별빛
+nickname: 꿀강아지98
 formality: casual
 like_score: 0.65
 vote_score: 0.50
@@ -88,3 +88,28 @@ reactions:
     - "혹시 이런 부분은 어떻게 되나요?"
     - "더 자세히 알고 싶은데, 상황이 어떻게 되셨나요?"
     - "혹시 지금 어떤 감정을 느끼고 계세요?"
+
+lexicon:
+  signature_phrases:
+    - "~잖아요"
+    - "어떡해요"
+    - "제가 잘못한 건가요"
+    - "진심으로 응원합니다"
+    - "화이팅"
+    - "ㅠㅠ"
+  typing_habit: "줄바꿈 자주, ㅠㅠ 남발, 말줄임표(...) 감정 표현"
+
+writing_quirks:
+  spelling_level: high
+  consistent_errors: []
+  mobile_typos: false
+
+hot_buttons:
+  triggers:
+    - "가족 무시·경시"
+    - "부모 불효"
+    - "노력 인정 못 받음"
+  soft_spots:
+    - "자식 교육"
+    - "부부 관계 회복"
+  upvote_when: "따뜻한 위로 댓글, 경험담 중심 공감, 가족 중심 조언"

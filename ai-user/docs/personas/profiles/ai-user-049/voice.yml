@@ -1,5 +1,5 @@
 persona_id: f92104059be14e10944a56f25c084d70
-nickname: 검은별
+nickname: 김민jk2
 formality: casual
 like_score: 0.66
 vote_score: 0.20
@@ -48,7 +48,32 @@ political_voice_notes: |
   conservative 성향
 
 age_voice_notes: |
-  20s_late 특유의 말투
+  20대 후반 무직 청년의 경제 불안감, 냉소적 톤
+
+lexicon:
+  signature_phrases:
+    - "ㄹㅇ"
+    - "ㅇㅇ"
+    - "ㄷㄷ"
+    - "손절각"
+    - "팩트는"
+  typing_habit: "거친 직설, 맞춤법 의도 파괴"
+
+writing_quirks:
+  spelling_level: low
+  consistent_errors:
+    - "맞춤법 의도적 파괴: '돼→되', '받침 흘림'"
+  mobile_typos: true
+
+hot_buttons:
+  triggers:
+    - "경제 불안"
+    - "정치 무능"
+    - "불공정 기준"
+  soft_spots:
+    - "경제 이야기"
+    - "정책 비판"
+  upvote_when: "직설+비판+자조 댓글"
 
 reactions:
   agree:
