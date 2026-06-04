@@ -148,7 +148,7 @@ FE는 이들을 **참조하고 구현**할 뿐, 독립적으로 정의하지 않
 frontend/
 ├── README.md              # 메인 엔트리 (간단한 가이드)
 ├── package.json           # next 14, react 18, msw 2.6, ...
-├── tailwind.config.ts     # 3-Tone 토큰, Pretendard, 애니메이션
+├── tailwind.config.ts     # 3-Tone 토큰, Noto Sans KR, 애니메이션
 │
 ├── app/                   # Next.js App Router 페이지
 │   ├── page.tsx           # / (랜딩)

@@ -10,7 +10,8 @@
  *   - 회원: 마이페이지 헤더 + 아바타 + 닉네임 표시
  *   - 3탭 노출: 내 사연 / 투표한 글 / 저장
  *   - 탭 전환 시 닉네임 유지 (7e72d05 회귀 방지)
- *   - 투표한 글 / 저장 탭 → "준비 중입니다" 표시
+ *   - 투표한 글 탭 → 빈 상태 메시지 ("아직 투표한 글이 없습니다")
+ *   - 저장 탭 → "준비 중입니다" (미구현)
  */
 import { test, expect } from '@playwright/test'
 import { PERSONA_TEST1 } from '../fixtures/personas'
@@ -44,22 +45,23 @@ test.describe('Flow 05: 프로필 페이지 (6/2 개편)', () => {
 
     // "투표한 글" 탭으로 이동
     await page.getByText('투표한 글').click()
-    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('아직 투표한 글이 없습니다')).toBeVisible({ timeout: 5_000 })
 
     // 탭 행이 사라지지 않아야 함
     await expect(page.getByText('내 사연')).toBeVisible()
     await expect(page.getByText('저장')).toBeVisible()
 
-    // "내 사연" 탭으로 복귀
+    // "내 사연" 탭으로 복귀 — 탭 행이 유지되어야 함 (닉네임 유지 핵심 검증)
     await page.getByText('내 사연').click()
-    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByText('투표한 글')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('저장')).toBeVisible()
   })
 
-  test('프로필 — 투표한 글 탭 → "준비 중입니다"', async ({ page }) => {
+  test('프로필 — 투표한 글 탭 → 빈 상태 메시지 표시', async ({ page }) => {
     await page.goto(`${BASE}/profile`)
     await expect(page.getByText('내 사연')).toBeVisible({ timeout: 10_000 })
     await page.getByText('투표한 글').click()
-    await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('아직 투표한 글이 없습니다')).toBeVisible({ timeout: 5_000 })
   })
 
   test('프로필 — 저장 탭 → "준비 중입니다"', async ({ page }) => {

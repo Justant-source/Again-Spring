@@ -26,7 +26,7 @@ public class PostCreateRequest {
     private String userTitle;
 
     @NotBlank(message = "사연 내용은 필수입니다")
-    @Size(max = 600, message = "사연 내용은 600자 이하여야 합니다")
+    @Size(max = 1000, message = "사연 내용은 1000자 이하여야 합니다")
     private String bodyRaw;
 
     @NotNull(message = "카테고리는 필수입니다")

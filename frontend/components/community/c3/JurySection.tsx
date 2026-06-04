@@ -10,9 +10,13 @@ interface JurySectionProps {
   jury: JuryResult | null;
   /** post.jurorCount ?? 0 — 0이면 섹션 전체 숨김 */
   jurorCount: number;
+  /** 폴링이 소진되어 재시도 필요 */
+  exhausted?: boolean;
+  /** 재시도 버튼 클릭 핸들러 */
+  onRetry?: () => void;
 }
 
-export function JurySection({ jury, jurorCount }: JurySectionProps) {
+export function JurySection({ jury, jurorCount, exhausted, onRetry }: JurySectionProps) {
   // 배심원 없이 올린 글이면 아무것도 렌더 안 함
   if (jurorCount === 0) return null;
 
@@ -20,6 +24,47 @@ export function JurySection({ jury, jurorCount }: JurySectionProps) {
   const isComplete = jury !== null && jury.jurors.length >= jurorCount;
 
   if (!isComplete) {
+    if (exhausted) {
+      return (
+        <div data-testid="jury-section">
+          <div
+            data-testid="jury-exhausted"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 10,
+              padding: '16px',
+              background: 'var(--P-card)',
+              border: '1px solid var(--P-border)',
+              borderRadius: 14,
+              textAlign: 'center',
+            }}
+          >
+            <span style={{ fontSize: 13, color: 'var(--P-sub)', fontFamily: 'var(--font-serif)' }}>
+              AI 배심원 의견을 받아오지 못했어요
+            </span>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                style={{
+                  fontSize: 12,
+                  color: 'var(--faction-author)',
+                  background: 'none',
+                  border: `1px solid var(--faction-author)`,
+                  borderRadius: 8,
+                  padding: '5px 14px',
+                  cursor: 'pointer',
+                }}
+              >
+                다시 요청하기
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div data-testid="jury-section">
         <div

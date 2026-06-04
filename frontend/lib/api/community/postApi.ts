@@ -108,4 +108,13 @@ export const postApi = {
 
   recordView: (postId: string, deviceId: string) =>
     api.post<{ viewCount: number }>(`/api/community/posts/${postId}/view`, { deviceId }).then(r => r.data),
+
+  mine: () =>
+    api.get<PostSummary[]>('/api/community/posts/mine').then(r => r.data),
+
+  voted: () =>
+    api.get<PostSummary[]>('/api/community/posts/voted').then(r => r.data),
+
+  retryJury: (postId: string) =>
+    api.post(`/api/community/posts/${postId}/jury/retry`),
 };

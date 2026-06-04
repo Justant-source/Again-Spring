@@ -44,4 +44,14 @@ public interface PostRepository extends JpaRepository<Post, String> {
     @Modifying
     @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :postId")
     void incrementViewCount(@Param("postId") String postId);
+
+    /** 배심원이 부족한 포스트 ID 목록 (startup 복구용, native 쿼리로 enum 변환 오류 회피) */
+    @Query(value = """
+            SELECT p.id FROM posts p
+            LEFT JOIN jurors j ON p.id = j.post_id
+            WHERE p.juror_count > 0
+            GROUP BY p.id, p.juror_count
+            HAVING COUNT(j.id) < p.juror_count
+            """, nativeQuery = true)
+    List<String> findPostIdsNeedingJury();
 }

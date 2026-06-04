@@ -57,7 +57,7 @@ export function CommunityComment({
     <div
       style={{
         position: 'relative',
-        background: isReply ? '#EDE6D8' : 'transparent',
+        background: isReply ? 'var(--L-card)' : 'transparent',
         borderTop: isReply ? 'none' : '1px solid var(--L-border)',
         padding: isReply ? '12px 20px 12px 36px' : '13px 20px',
         marginLeft: -20,

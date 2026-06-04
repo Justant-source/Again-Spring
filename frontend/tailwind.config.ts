@@ -11,14 +11,13 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: [
-          'Pretendard Variable',
-          'Pretendard',
+          'Noto Sans KR',
           '-apple-system',
           'system-ui',
           'Malgun Gothic',
           'sans-serif',
         ],
-        serif: ['Noto Serif KR', 'Nanum Myeongjo', 'serif'],
+        serif: ['Noto Sans KR', '-apple-system', 'system-ui', 'Malgun Gothic', 'sans-serif'],
       },
       colors: {
         // Tone L — Letter (편지지 · 미스트 세이지)

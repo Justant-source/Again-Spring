@@ -70,7 +70,7 @@ export function BottomNav() {
   if (!isNavVisible(pathname)) return null;
 
   const showAdmin = perms.ui.showAdminEntryButton;
-  const showNotifications = !user?.isGuest && !showAdmin;
+  const showNotifications = !user?.isGuest; // admin도 알림 표시
 
   // /profile/info 등 서브경로에서 탭이 활성화되지 않도록 정확한 경로만 매칭
   const isActive = (href: string) => pathname === href;

@@ -2,15 +2,20 @@ package com.againspring.service.community;
 
 import com.againspring.api.community.dto.PostInviteDto;
 import com.againspring.domain.community.Post;
+import com.againspring.domain.community.VoteOption;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.domain.enums.PublishMode;
+import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.repository.community.VoteOptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -26,6 +31,9 @@ import java.util.UUID;
 public class PostInviteService {
 
     private final PostRepository postRepository;
+    private final JurorRepository jurorRepository;
+    private final VoteOptionRepository voteOptionRepository;
+    private final JuryService juryService;
 
     @Value("${app.url:https://againspring.net}")
     private String appUrl;
@@ -121,6 +129,17 @@ public class PostInviteService {
 
         postRepository.save(post);
         log.info("Partner {} submitted answer to invite {}", partnerUserId, token);
+
+        // 파트너 답변 후 배심원 재평가 — 기존 배심원 삭제 후 양측 사연을 모두 반영해 재생성
+        int jurorCount = post.getJurorCount();
+        if (jurorCount > 0) {
+            jurorRepository.deleteByPostId(post.getId());
+            List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
+            if (!options.isEmpty()) {
+                juryService.generateJuryAsync(post, options, jurorCount);
+                log.info("Re-triggered jury generation for post {} after partner answer", post.getId());
+            }
+        }
     }
 
     /**

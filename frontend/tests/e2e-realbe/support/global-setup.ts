@@ -112,6 +112,30 @@ export default async function globalSetup(): Promise<void> {
   // 3. SQL 부트스트랩 (test1 비밀번호 리셋 + ADMIN, test2·test3 TESTER)
   bootstrapViaSql()
 
+  // 3-1. mock_001 seed 포스트 보장 — 사연 상세/댓글/read 화면 테스트가 의존
+  try {
+    const pass = readEnvVar('MARIADB_PASSWORD')
+    const db = readEnvVar('MARIADB_DATABASE') || 'againspring_dev'
+    const user = readEnvVar('MARIADB_USER') || 'againspring'
+    if (pass) {
+      const seedMock = `
+        INSERT IGNORE INTO posts (id, author_id, body_published, body_raw, category, created_at, neutralization_passed, status, title, updated_at, visibility, juror_count, publish_mode, user_title, view_count)
+        SELECT 'mock_001', id, '저는 직장인인데 주말에도 집안일을 다 도맡아 하고 있어요. 상대방은 이게 당연하다고 생각하는 것 같아요. 저만 쉬는 날이 없는 것 같아서 힘드네요.',
+               '저는 직장인인데 주말에도 집안일을 다 도맡아 하고 있어요.', 'WORK', NOW(), 0, 'VOTING', '주말에도 저만 쉬는 날이 없어요', NOW(), 'PUBLIC', 0, 'PUBLISH_NOW', '주말에도 저만 쉬는 날이 없어요', 0
+        FROM users WHERE email='test1@again.com';
+        INSERT IGNORE INTO vote_options (post_id, label, order_idx) VALUES ('mock_001', '작성자', 0), ('mock_001', '상대방', 1);
+      `
+      spawnSync(
+        'docker',
+        ['exec', '-i', `againspring-mariadb-dev`, 'mariadb', '-u', user, `-p${pass}`, db],
+        { input: seedMock, encoding: 'utf-8' },
+      )
+      console.log('[global-setup] mock_001 seed 포스트 보장 완료')
+    }
+  } catch (e) {
+    console.warn('[global-setup] mock_001 seed 건너뜀:', (e as Error).message)
+  }
+
   // 4. 페르소나 prelogin — storageState 저장 (.auth/<email>.json)
   //    Rate Limit: /api/auth/login 5회/분 → 페르소나당 13초 간격
   if (!fs.existsSync(AUTH_STATE_DIR)) fs.mkdirSync(AUTH_STATE_DIR, { recursive: true })

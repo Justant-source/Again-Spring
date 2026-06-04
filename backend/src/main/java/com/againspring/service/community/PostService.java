@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * PostService - 커뮤니티 포스트 관리 서비스
@@ -81,6 +82,10 @@ public class PostService {
         List<Post> posts = postRepository.findByAuthorIdOrderByCreatedAtDesc(userId);
         log.info("Listed {} posts for author {}", posts.size(), userId);
         return posts;
+    }
+
+    public Optional<Post> findById(String postId) {
+        return postRepository.findById(postId);
     }
 
     /**

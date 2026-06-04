@@ -117,6 +117,60 @@ public class CommunityPostController {
     }
 
     /**
+     * 투표한 글 목록 — 본인이 투표한 PUBLIC 포스트 최신순
+     */
+    @GetMapping("/voted")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "투표한 글 목록")
+    public ResponseEntity<List<PostResponse>> listVotedPosts(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String userId = userDetails.getUsername();
+        List<com.againspring.domain.community.Vote> votes =
+                voteRepository.findByVoterUserIdOrderByCreatedAtDesc(userId);
+
+        List<PostResponse> responses = votes.stream()
+                .map(v -> postService.findById(v.getPostId()))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .map(post -> {
+                    List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
+                    long voteCount = voteRepository.countByPostId(post.getId());
+                    long commentCount = postCommentRepository.countByPostId(post.getId());
+                    String authorNickname = userRepository.findById(post.getAuthorId())
+                            .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                            .orElse("익명");
+                    return PostResponse.from(post, options, voteCount, commentCount, authorNickname);
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 내 사연 목록 — 본인이 작성한 모든 포스트 (PUBLIC + PRIVATE 포함)
+     */
+    @GetMapping("/mine")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "내 사연 목록")
+    public ResponseEntity<List<PostResponse>> listMyPosts(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String userId = userDetails.getUsername();
+        List<Post> posts = postService.listMyPosts(userId);
+        List<PostResponse> responses = posts.stream().map(post -> {
+            List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
+            long voteCount = voteRepository.countByPostId(post.getId());
+            long commentCount = postCommentRepository.countByPostId(post.getId());
+            String authorNickname = userRepository.findById(post.getAuthorId())
+                    .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                    .orElse("익명");
+            return PostResponse.from(post, options, voteCount, commentCount, authorNickname);
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
      * 포스트 상세 조회
      */
     @GetMapping("/{id}")
@@ -133,7 +187,7 @@ public class CommunityPostController {
         Optional<Long> myVote = userId != null ? voteService.getMyVote(id, userId) : Optional.empty();
         long commentCount = postCommentRepository.countByPostId(id);
 
-        return ResponseEntity.ok(PostDetailResponse.from(post, options, voteResult, myVote, commentCount));
+        return ResponseEntity.ok(PostDetailResponse.from(post, options, voteResult, myVote, commentCount, userId));
     }
 
     /**
@@ -269,6 +323,37 @@ public class CommunityPostController {
                 .distribution(distribution)
                 .legalNotice("이 결과는 공감 분포일 뿐 법적 책임이나 과실 비율과 무관합니다.")
                 .build());
+    }
+
+    /**
+     * 배심원 생성 재시도 — 작성자 전용, jurors < jurorCount일 때만 허용
+     */
+    @PostMapping("/{id}/jury/retry")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "배심원 생성 재시도")
+    public ResponseEntity<Void> retryJury(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String userId = userDetails.getUsername();
+        Post post = postService.getPost(id, userId);
+        if (!userId.equals(post.getAuthorId())) {
+            throw new com.againspring.common.exception.BusinessException("ACCESS_DENIED", "작성자만 재시도할 수 있습니다.", 403);
+        }
+
+        int target = post.getJurorCount() != null ? post.getJurorCount() : 0;
+        long existing = jurorRepository.countByPostId(id);
+
+        if (existing >= target) {
+            throw new com.againspring.common.exception.BusinessException("JURY_COMPLETE", "배심원이 이미 완료되었습니다.", 409);
+        }
+
+        List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
+        if (!options.isEmpty() && target > 0) {
+            juryService.generateJuryAsync(post, options, target);
+        }
+
+        return ResponseEntity.accepted().build();
     }
 
     /**
