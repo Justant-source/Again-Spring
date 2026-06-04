@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: llm-ai-user
+
+server:
+  port: 8092
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+llm:
+  worker:
+    pool-size: ${LLM_POOL_SIZE:20}
+    queue-capacity: ${LLM_QUEUE_CAPACITY:100}
+    queue-wait-timeout-ms: ${LLM_QUEUE_WAIT_TIMEOUT_MS:30000}
+    default-timeout-ms: ${LLM_DEFAULT_TIMEOUT_MS:120000}
+    claude-binary-path: ${CLAUDE_BIN:claude}
+    claude-model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
+
+logging:
+  level:
+    root: INFO
+    com.againspring.aiuser.llm: DEBUG

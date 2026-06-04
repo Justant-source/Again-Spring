@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: ai-user-orchestrator
+  datasource:
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/againspring_dev?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
+    username: ${DB_USER:againspring}
+    password: ${DB_PASSWORD:changeme}
+    driver-class-name: org.mariadb.jdbc.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 10000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MariaDBDialect
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    table: flyway_schema_history_aiuser   # CRITICAL: separate history from backend
+
+server:
+  port: 8096
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+ai-user:
+  enabled: ${AI_USER_ENABLED:false}
+  seed:
+    enabled: ${AI_USER_SEED_ENABLED:true}
+  tick-cron: ${AI_USER_TICK_CRON:"0 */10 * * * *"}
+  daily-global-cap: ${AI_USER_DAILY_GLOBAL_CAP:200}
+  bot-password: ${AI_USER_BOT_PASSWORD:ai-user-dev-pw-2026}
+  backend-base-url: ${BACKEND_BASE_URL:http://againspring-backend-dev:8080}
+  llm-ai-user-url: ${LLM_AI_USER_URL:http://againspring-llm-ai-user-dev:8092}
+  history-dir: ${AI_USER_HISTORY_DIR:/app/persona-history}
+
+logging:
+  level:
+    root: INFO
+    com.againspring.aiuser.orchestrator: DEBUG

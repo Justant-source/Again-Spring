@@ -44,6 +44,8 @@ env/
 | 3309 | dev | `againspring-mariadb-dev` |
 | 8090 | dev | `againspring-nginx-dev` (Cloudflare Tunnel target) |
 | 8091 | prod | `againspring-nginx-prod` (Cloudflare Tunnel target) |
+| 8092 | dev (internal) | `againspring-llm-ai-user-dev` (Haiku 본문 생성 워커) |
+| 8096 | dev (internal) | `againspring-ai-user-orchestrator-dev` (AI 유저 오케스트레이터) |
 | 9000 | dev (internal) | `againspring-marketing-renderer-dev` (Playwright 렌더러) |
 | 9100 | dev (internal) | `againspring-social-poster-dev` (소셜 포스팅) |
 

@@ -58,6 +58,69 @@ services:
       retries: 5
       start_period: 60s
 
+  llm-ai-user-dev:
+    build:
+      context: ../llm-ai-user
+      dockerfile: Dockerfile
+    image: againspring-llm-ai-user-dev
+    container_name: againspring-llm-ai-user-dev
+    environment:
+      CLAUDE_BIN: ${CLAUDE_BIN:-claude}
+      CLAUDE_MODEL: ${AI_USER_LLM_MODEL:-claude-haiku-4-5-20251001}
+      LLM_POOL_SIZE: ${AI_USER_LLM_POOL_SIZE:-20}
+      LLM_QUEUE_CAPACITY: ${AI_USER_LLM_QUEUE_CAPACITY:-100}
+      LLM_QUEUE_WAIT_TIMEOUT_MS: ${AI_USER_LLM_QUEUE_WAIT_TIMEOUT_MS:-30000}
+      LLM_DEFAULT_TIMEOUT_MS: ${AI_USER_LLM_DEFAULT_TIMEOUT_MS:-120000}
+    volumes:
+      - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
+    restart: unless-stopped
+    networks:
+      - againspring-dev
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8092/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  ai-user-orchestrator-dev:
+    build:
+      context: ../ai-user-orchestrator
+      dockerfile: Dockerfile
+    image: againspring-ai-user-orchestrator-dev
+    container_name: againspring-ai-user-orchestrator-dev
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${MARIADB_DATABASE:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      DB_USER: ${MARIADB_USER:-againspring}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
+      BACKEND_BASE_URL: ${AI_USER_BACKEND_URL:-http://againspring-backend-dev:8080}
+      LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user-dev:8092}
+      AI_USER_ENABLED: ${AI_USER_ENABLED:-false}
+      AI_USER_TICK_CRON: ${AI_USER_TICK_CRON:-0 */10 * * * *}
+      AI_USER_DAILY_GLOBAL_CAP: ${AI_USER_DAILY_GLOBAL_CAP:-200}
+      AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-dev-pw-2026}
+      AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
+      AI_USER_HISTORY_DIR: ${AI_USER_HISTORY_DIR:-/app/persona-history}
+    volumes:
+      - ../persona-history:/app/persona-history:rw
+    depends_on:
+      mariadb-dev:
+        condition: service_healthy
+      llm-ai-user-dev:
+        condition: service_healthy
+      backend-dev:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - againspring-dev
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8096/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
   marketing-renderer-dev:
     build:
       context: ../marketing/renderer

@@ -79,6 +79,8 @@ Again-Spring/
 | MariaDB | prod | 3309 |
 | nginx (외부 노출) | dev | 8090 |
 | nginx (외부 노출) | prod | 8091 |
+| llm-ai-user | dev 컨테이너 (내부) | 8092 |
+| ai-user-orchestrator | dev 컨테이너 (내부) | 8096 |
 | marketing-renderer | dev 컨테이너 | 9000 |
 | social-poster | dev 컨테이너 | 9100 |
 | BE | 로컬 개발 | 8080 |

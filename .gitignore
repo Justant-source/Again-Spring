@@ -65,3 +65,6 @@ backend/scripts/test-automation/results/
 
 # 절대 커밋 금지 — 소셜 쿠키/세션 원본
 .temp/
+
+# AI 유저 활동 히스토리 (선택적 추적 — 기본 gitignore)
+persona-history/
