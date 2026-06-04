@@ -72,13 +72,16 @@ public class BehaviorEngine {
 
         // 4. Volume quota for this tick
         int currentHour = LocalTime.now(ZoneId.of("Asia/Seoul")).getHour();
-        double hourWeight = quotaCalc.circadianWeight(currentHour, null); // global curve
+        double hourWeight = props.isForceActive() ? 1.0
+            : quotaCalc.circadianWeight(currentHour, null);
         int ticksPerDay = quotaCalc.estimateTicksPerDay(props.getTickCron());
         int remaining = rt.getDailyGlobalCap() - rt.getActionsToday();
-        int budget = quotaCalc.calculate(rt.getDailyGlobalCap(), ticksPerDay, hourWeight, remaining);
+        int budget = props.isForceActive()
+            ? Math.max(3, quotaCalc.calculate(rt.getDailyGlobalCap(), ticksPerDay, hourWeight, remaining))
+            : quotaCalc.calculate(rt.getDailyGlobalCap(), ticksPerDay, hourWeight, remaining);
 
-        log.debug("Tick: hour={} hourWeight={} budget={} remaining={}",
-            currentHour, String.format("%.2f", hourWeight), budget, remaining);
+        log.debug("Tick: hour={} hourWeight={} budget={} remaining={} forceActive={}",
+            currentHour, String.format("%.2f", hourWeight), budget, remaining, props.isForceActive());
 
         if (budget <= 0) {
             log.debug("Zero budget for this tick. Skipping.");

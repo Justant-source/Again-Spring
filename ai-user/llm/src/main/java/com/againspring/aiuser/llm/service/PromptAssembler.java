@@ -20,9 +20,10 @@ public class PromptAssembler {
 
     @PostConstruct
     public void loadGuides() {
-        postGuide = loadResource("voice/post.md");
-        commentGuide = loadResource("voice/comment.md");
-        replyGuide = loadResource("voice/reply.md");
+        // % 문자를 %% 로 이스케이프 — buildSystem()에서 String.formatted()에 넘기기 때문
+        postGuide = loadResource("voice/post.md").replace("%", "%%");
+        commentGuide = loadResource("voice/comment.md").replace("%", "%%");
+        replyGuide = loadResource("voice/reply.md").replace("%", "%%");
         log.info("Voice guides loaded: post={}c comment={}c reply={}c",
             postGuide.length(), commentGuide.length(), replyGuide.length());
     }
@@ -80,10 +81,10 @@ public class PromptAssembler {
             - 실제 사건 원문 복제 금지 (완전 창작)
             - 판결·처방·승패 표현 금지
             %s%s""".formatted(
-                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + req.getDemographic() + "\n" : "",
+                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
                 req.getCategory() != null ? req.getCategory() : "OTHER",
                 req.getArchetype() != null ? req.getArchetype() : "일반갈등",
-                req.getTopicSeed() != null ? "상황: " + req.getTopicSeed() : "",
+                req.getTopicSeed() != null ? "상황: " + safe(req.getTopicSeed()) : "",
                 lengthInstruction(req.getLengthTier()),
                 dynamicExamplesBlock(req.getDynamicExamples()),
                 politeSuffix,
@@ -108,12 +109,12 @@ public class PromptAssembler {
             - 50~150자 내외
             %s
             """.formatted(
-                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + req.getDemographic() + "\n" : "",
-                req.getPostTitle() != null ? req.getPostTitle() : "",
-                req.getPostBodyExcerpt() != null ? req.getPostBodyExcerpt() : "",
+                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
+                safe(req.getPostTitle() != null ? req.getPostTitle() : ""),
+                safe(req.getPostBodyExcerpt() != null ? req.getPostBodyExcerpt() : ""),
                 req.getStance() != null ? req.getStance() : "NEUTRAL",
-                req.getArchetypeCommentSamples() != null && !req.getArchetypeCommentSamples().isBlank() ? "이 글에 자주 달리는 댓글 패턴 (참고용):\n" + req.getArchetypeCommentSamples() : "",
-                req.getExistingComments() != null && !req.getExistingComments().isBlank() ? "이미 달린 댓글들 (중복 피하고 다른 관점으로):\n" + req.getExistingComments() : "",
+                req.getArchetypeCommentSamples() != null && !req.getArchetypeCommentSamples().isBlank() ? "이 글에 자주 달리는 댓글 패턴 (참고용):\n" + safe(req.getArchetypeCommentSamples()) : "",
+                req.getExistingComments() != null && !req.getExistingComments().isBlank() ? "이미 달린 댓글들 (중복 피하고 다른 관점으로):\n" + safe(req.getExistingComments()) : "",
                 dynamicExamplesBlock(req.getDynamicExamples()),
                 toneNote);
         return system + "\n" + SEP + "\n" + user;
@@ -137,11 +138,11 @@ public class PromptAssembler {
             - ㅠㅠ, ㅋ, 💚 같은 이모지 자연스럽게 포함
             %s
             """.formatted(
-                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + req.getDemographic() + "\n" : "",
-                req.getPostBodyExcerpt() != null && !req.getPostBodyExcerpt().isBlank() ? "원글 맥락: " + req.getPostBodyExcerpt() + "\n" : "",
-                req.getSiblingComments() != null && !req.getSiblingComments().isBlank() ? "다른 댓글들:\n" + req.getSiblingComments() + "\n" : "",
-                req.getParentCommentExcerpt() != null ? req.getParentCommentExcerpt() : "",
-                req.getThreadContext() != null ? req.getThreadContext() : "",
+                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
+                req.getPostBodyExcerpt() != null && !req.getPostBodyExcerpt().isBlank() ? "원글 맥락: " + safe(req.getPostBodyExcerpt()) + "\n" : "",
+                req.getSiblingComments() != null && !req.getSiblingComments().isBlank() ? "다른 댓글들:\n" + safe(req.getSiblingComments()) + "\n" : "",
+                safe(req.getParentCommentExcerpt() != null ? req.getParentCommentExcerpt() : ""),
+                safe(req.getThreadContext() != null ? req.getThreadContext() : ""),
                 req.getStance() != null ? req.getStance() : "CURIOUS",
                 toneNote);
         return system + "\n" + SEP + "\n" + user;
@@ -156,9 +157,14 @@ public class PromptAssembler {
         return req.getPrompt() != null ? req.getPrompt() : "";
     }
 
+    /** String.formatted()에 넘기기 전 % 이스케이프 */
+    private String safe(String s) {
+        return s != null ? s.replace("%", "%%") : "";
+    }
+
     private String dynamicExamplesBlock(String examples) {
         if (examples == null || examples.isBlank()) return "";
-        return "\n[실제 커뮤니티 유사 예시 — 말투·구조만 참고, 내용은 완전 창작]\n" + examples.trim() + "\n";
+        return "\n[실제 커뮤니티 유사 예시 — 말투·구조만 참고, 내용은 완전 창작]\n" + safe(examples.trim()) + "\n";
     }
 
     private boolean isPolite(String formality) {
@@ -167,6 +173,9 @@ public class PromptAssembler {
 
     private String buildSystem(String voiceProfile, double slangLevel, String guide, String formality) {
         boolean polite = isPolite(formality);
+        // % 문자가 String.formatted()의 포맷 지시자로 오해받지 않도록 이스케이프
+        String safeVoice = voiceProfile != null ? voiceProfile.replace("%", "%%") : "일반 커뮤니티 사용자";
+        String safeGuide = guide != null ? guide.replace("%", "%%") : "";
 
         String speechRules = polite ? """
             **존댓말 사용** — 자연스러운 구어 존댓말:
@@ -191,7 +200,7 @@ public class PromptAssembler {
 
 ## 핵심 3가지 (2026-06-04 개정 — 가장 중요)
 
-### 1. 배경 50% 축소 → 본 이야기로 빠르게 진입
+### 1. 배경 50%% 축소 → 본 이야기로 빠르게 진입
 - ❌ "5년을 사귀고 있는데, 만난 지 첫 6개월에는 좋았지만, 지금은 점점..."
 - ✅ "남친이 전여친 얘기를 자꾸 꺼냄. 나는 진짜 못 듣겠음."
 - 배경은 **최대 1~2줄**, 나머지는 갈등 상황 + 감정에 할애
@@ -242,7 +251,7 @@ public class PromptAssembler {
             speechRules,
             slangLevel,
             slangGuide,
-            voiceProfile != null ? voiceProfile : "일반 커뮤니티 사용자",
-            guide);
+            safeVoice,
+            safeGuide);
     }
 }

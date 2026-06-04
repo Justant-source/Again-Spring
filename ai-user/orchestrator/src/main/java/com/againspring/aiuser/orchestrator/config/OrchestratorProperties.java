@@ -18,4 +18,5 @@ public class OrchestratorProperties {
     private String llmAiUserUrl = "http://againspring-llm-ai-user-dev:8092";
     private int personaTarget = 50;
     private String personasDir = "/app/personas";
+    private boolean forceActive = false;  // 시간대 무관 강제 활성 (dev 테스트용)
 }
