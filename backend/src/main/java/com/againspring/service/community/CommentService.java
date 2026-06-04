@@ -8,8 +8,11 @@ import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.safety.KeywordGuard;
+import com.againspring.service.notification.event.NewCommentEvent;
+import com.againspring.service.notification.event.NewReplyEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,7 @@ public class CommentService {
     private final PostRepository postRepository;
     private final PostLikeRepository postLikeRepository;
     private final KeywordGuard keywordGuard;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 댓글 작성
@@ -49,8 +53,9 @@ public class CommentService {
         keywordGuard.scanUserInput(body, authorId);
 
         // 부모 댓글 존재 확인 (nullable)
+        PostComment parent = null;
         if (parentCommentId != null) {
-            PostComment parent = commentRepository.findById(parentCommentId)
+            parent = commentRepository.findById(parentCommentId)
                     .orElseThrow(() -> new BusinessException("COMMENT_NOT_FOUND", "Parent comment not found: " + parentCommentId, 404));
 
             if (!parent.getPostId().equals(postId)) {
@@ -70,6 +75,19 @@ public class CommentService {
 
         PostComment saved = commentRepository.save(comment);
         log.info("Comment added for post {}: comment {}", postId, saved.getId());
+
+        if (parent == null) {
+            // 최상위 댓글: 글 작성자에게 알림 (자기 자신 제외) — refCommentId = 새 댓글 ID
+            if (!authorId.equals(post.getAuthorId())) {
+                eventPublisher.publishEvent(new NewCommentEvent(this, post.getAuthorId(), postId, saved.getId(), "새 댓글이 달렸어요"));
+            }
+        } else {
+            // 대댓글: 부모 댓글 작성자에게 알림 (자기 자신 제외) — refCommentId = 부모 댓글 ID
+            if (!authorId.equals(parent.getAuthorId())) {
+                eventPublisher.publishEvent(new NewReplyEvent(this, parent.getAuthorId(), postId, parent.getId(), "내 댓글에 답글이 달렸어요"));
+            }
+        }
+
         return saved;
     }
 

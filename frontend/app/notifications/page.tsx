@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
 import { notificationApi, NotificationItem } from '@/lib/api/community/notificationApi';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
-import { GuestConvertModal } from '@/components/auth/GuestConvertModal';
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -13,19 +12,12 @@ export default function NotificationsPage() {
   const hasHydrated = useHasHydrated();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showGuestConvert, setShowGuestConvert] = useState(false);
 
   useEffect(() => {
     if (hasHydrated && !user) {
       router.push('/login');
     }
   }, [hasHydrated, user, router]);
-
-  useEffect(() => {
-    if (hasHydrated && user?.isGuest) {
-      setShowGuestConvert(true);
-    }
-  }, [hasHydrated, user?.isGuest]);
 
   useEffect(() => {
     if (!hasHydrated || !user) return;
@@ -57,9 +49,12 @@ export default function NotificationsPage() {
   };
 
   const handleNotificationClick = (notification: NotificationItem) => {
-    if (notification.refPostId) {
-      router.push(`/community/${notification.refPostId}`);
-    }
+    if (!notification.refPostId) return;
+    const base = `/community/${notification.refPostId}/comments`;
+    const target = notification.refCommentId != null
+      ? `${base}?highlight=${notification.refCommentId}`
+      : base;
+    router.push(target);
   };
 
   const getNotificationDot = (type: string) => {
@@ -178,16 +173,6 @@ export default function NotificationsPage() {
           )}
         </div>
       </PhoneFrame>
-
-      {/* Guest Convert Modal */}
-      <GuestConvertModal
-        isOpen={showGuestConvert}
-        onClose={() => setShowGuestConvert(false)}
-        onSignup={() => {
-          setShowGuestConvert(false);
-          router.push('/signup');
-        }}
-      />
     </>
   );
 }

@@ -23,6 +23,7 @@ public class NotificationDto {
     private String title;
     private String subtitle;
     private String refPostId;
+    private Long refCommentId;
     private Boolean isRead;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
@@ -35,6 +36,7 @@ public class NotificationDto {
             .title(notification.getTitle())
             .subtitle(notification.getSubtitle())
             .refPostId(notification.getRefPostId())
+            .refCommentId(notification.getRefCommentId())
             .isRead(notification.getIsRead())
             .createdAt(notification.getCreatedAt())
             .build();

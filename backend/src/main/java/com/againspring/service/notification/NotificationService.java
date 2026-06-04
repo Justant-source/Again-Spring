@@ -42,13 +42,14 @@ public class NotificationService {
      * 새 알림 생성
      */
     @Transactional
-    public void createNotification(String userId, NotificationType type, String title, String subtitle, String refPostId) {
+    public void createNotification(String userId, NotificationType type, String title, String subtitle, String refPostId, Long refCommentId) {
         Notification notification = Notification.builder()
             .userId(userId)
             .type(type)
             .title(title)
             .subtitle(subtitle)
             .refPostId(refPostId)
+            .refCommentId(refCommentId)
             .isRead(false)
             .build();
 

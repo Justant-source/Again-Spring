@@ -6,6 +6,7 @@ export interface NotificationItem {
   title: string;
   subtitle?: string;
   refPostId?: string;
+  refCommentId?: number;
   isRead: boolean;
   createdAt: string;
 }

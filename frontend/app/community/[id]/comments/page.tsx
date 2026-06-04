@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { commentApi, Comment } from '@/lib/api/community/commentApi';
 import { CommunityComment } from '@/components/community/c3/CommunityComment';
 import { CommentBar } from '@/components/community/c3/CommentBar';
@@ -19,6 +19,10 @@ const PAGE_SIZE = 10;
 export default function PostCommentsPage({ params }: PageProps) {
   useGuestInit();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get('highlight') ? Number(searchParams.get('highlight')) : null;
+  const scrolledRef = useRef(false);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -69,6 +73,23 @@ export default function PostCommentsPage({ params }: PageProps) {
       setLoadingMore(false);
     }
   }, [params.id, page, loadingMore, hasMore]);
+
+  // 알림 클릭 시 highlight 댓글로 스크롤 (loadMore 선언 이후)
+  useEffect(() => {
+    if (!highlightId || scrolledRef.current || initialLoading) return;
+    const el = document.getElementById(`comment-${highlightId}`);
+    if (el) {
+      scrolledRef.current = true;
+      setHighlightedId(highlightId);
+      setTimeout(() => {
+        const top = el.getBoundingClientRect().top + window.scrollY - 60;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }, 50);
+      setTimeout(() => setHighlightedId(null), 2000);
+    } else if (!loadingMore && hasMore) {
+      loadMore();
+    }
+  }, [highlightId, comments, initialLoading, loadingMore, hasMore, loadMore]);
 
   // 무한스크롤 — 하단 도달 시 추가 로드
   useEffect(() => {
@@ -133,7 +154,15 @@ export default function PostCommentsPage({ params }: PageProps) {
   const totalCount = comments.reduce((sum, c) => sum + 1 + (c.replies?.length ?? 0), 0);
 
   const renderComment = (comment: Comment, isReply = false) => (
-    <div key={comment.id}>
+    <div
+      key={comment.id}
+      id={`comment-${comment.id}`}
+      style={comment.id === highlightedId ? {
+        borderRadius: 8,
+        outline: '2px solid var(--L-point)',
+        transition: 'outline 0.5s ease',
+      } : undefined}
+    >
       <CommunityComment
         nick={comment.authorNickname || comment.authorId}
         isAuthor={comment.isAuthor ?? false}

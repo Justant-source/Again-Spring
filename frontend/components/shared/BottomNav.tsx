@@ -70,7 +70,7 @@ export function BottomNav() {
   if (!isNavVisible(pathname)) return null;
 
   const showAdmin = perms.ui.showAdminEntryButton;
-  const showNotifications = !user?.isGuest; // admin도 알림 표시
+  // 알림은 게스트·회원·admin 모두에게 표시 (백엔드가 게스트에게도 알림 생성)
 
   // /profile/info 등 서브경로에서 탭이 활성화되지 않도록 정확한 경로만 매칭
   const isActive = (href: string) => pathname === href;
@@ -129,19 +129,15 @@ export function BottomNav() {
           <span style={lbl(isActive('/community'))}>광장</span>
         </Link>
 
-        {/* ── 알림 (회원만 / 게스트·관리자 숨김) ── */}
-        {showNotifications ? (
-          <Link
-            href="/notifications"
-            data-testid="nav-notifications"
-            style={{ ...baseTab, color: isActive('/notifications') ? 'var(--P-ink)' : 'var(--P-sub)' }}
-          >
-            <NotificationsIcon active={isActive('/notifications')} />
-            <span style={lbl(isActive('/notifications'))}>알림</span>
-          </Link>
-        ) : (
-          <div style={{ flex: 1 }} aria-hidden="true" />
-        )}
+        {/* ── 알림 (게스트·회원·관리자 모두 표시) ── */}
+        <Link
+          href="/notifications"
+          data-testid="nav-notifications"
+          style={{ ...baseTab, color: isActive('/notifications') ? 'var(--P-ink)' : 'var(--P-sub)' }}
+        >
+          <NotificationsIcon active={isActive('/notifications')} />
+          <span style={lbl(isActive('/notifications'))}>알림</span>
+        </Link>
 
         {/* ── 글쓰기 / 관리 탭 (관리자) ── */}
         {!showAdmin ? (

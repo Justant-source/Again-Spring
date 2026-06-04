@@ -43,6 +43,9 @@ public class Notification {
     @Column(length = 32)
     private String refPostId;
 
+    @Column
+    private Long refCommentId;
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean isRead = false;
