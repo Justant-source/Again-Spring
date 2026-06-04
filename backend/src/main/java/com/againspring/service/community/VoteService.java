@@ -122,6 +122,22 @@ public class VoteService {
     }
 
     /**
+     * 투표 취소 — 본인 투표를 삭제하고 갱신된 결과 반환
+     * 투표 기록이 없으면 NO_VOTE_TO_CANCEL(404) 반환
+     */
+    @Transactional
+    public Map<Long, Long> cancelVoteAndGetResult(String postId, String userId) {
+        postRepository.findById(postId)
+                .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
+        if (!voteRepository.existsByPostIdAndVoterUserId(postId, userId)) {
+            throw new BusinessException("NO_VOTE_TO_CANCEL", "취소할 투표가 없습니다", 404);
+        }
+        voteRepository.deleteByPostIdAndVoterUserId(postId, userId);
+        log.info("Vote cancelled for post {} by user {}", postId, userId);
+        return getVoteResult(postId);
+    }
+
+    /**
      * 배심원 투표 결과 조회 (포스트 작성자만)
      *
      * @param postId 포스트 ID

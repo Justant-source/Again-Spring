@@ -42,6 +42,7 @@ function C3StoryDetail({
   voteResult,
   comments,
   onVote,
+  onCancelVote,
   onLike,
   isVoting,
   loadingMoreComments,
@@ -51,6 +52,7 @@ function C3StoryDetail({
   voteResult: VoteResult | null;
   comments: Comment[];
   onVote: (optionId: number) => Promise<void>;
+  onCancelVote: () => Promise<void>;
   onLike: (commentId: number) => void;
   isVoting: boolean;
   hasMoreComments: boolean;
@@ -65,17 +67,24 @@ function C3StoryDetail({
   const [voted, setVoted] = useState(post.isVoted || post.hasVoted || false);
   const router = useRouter();
 
-  const handlePick = (side: 'g' | 'r') => {
-    // 재투표 금지 — 이미 투표했으면 선택 변경 불가
-    if (voted) return;
-    setPick(side);
-  };
-
-  const handleVote = async () => {
-    if (!pick || voted) return;
-    const optionId = pick === 'g' ? post.voteOptions[0]?.id : post.voteOptions[1]?.id;
+  // 우측 끝 투표 버튼 — 해당 쪽 투표 / 이미 이 쪽에 투표했으면 취소
+  const handleVoteSide = async (side: 'g' | 'r') => {
+    if (isVoting) return;
+    if (voted && pick === side) {
+      // 취소
+      try {
+        await onCancelVote();
+        setPick(null);
+        setVoted(false);
+      } catch (err) {
+        console.error('Cancel vote failed:', err);
+      }
+      return;
+    }
+    if (voted) return; // 다른 쪽에 이미 투표함 — 변경 불가
+    const optionId = side === 'g' ? post.voteOptions[0]?.id : post.voteOptions[1]?.id;
     if (!optionId) return;
-
+    setPick(side);
     try {
       await onVote(optionId);
       setVoted(true);
@@ -149,7 +158,7 @@ function C3StoryDetail({
           익명 · {timeAgo(post.createdAt)}
         </div>
 
-        {/* 양쪽 사연 (clamp=true) */}
+        {/* 양쪽 사연 (clamp=true) — 박스 클릭=전문 보기, 우측 끝 버튼=투표 */}
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 9 }}>
           <SideStory
             side="g"
@@ -157,8 +166,10 @@ function C3StoryDetail({
             body={post.bodyPublished}
             clamp
             selected={pick === 'g'}
-            onSelect={() => handlePick('g')}
-            onMore={() => router.push(`/community/${post.id}/read?side=g`)}
+            voted={voted && pick === 'g'}
+            voteDisabled={isVoting || (voted && pick !== 'g')}
+            onSelect={() => router.push(`/community/${post.id}/read?side=g`)}
+            onVote={() => handleVoteSide('g')}
           />
           <SideStory
             side="r"
@@ -166,8 +177,10 @@ function C3StoryDetail({
             body={post.partnerBodyPublished || ''}
             clamp
             selected={pick === 'r'}
-            onSelect={() => handlePick('r')}
-            onMore={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
+            voted={voted && pick === 'r'}
+            voteDisabled={isVoting || (voted && pick !== 'r')}
+            onSelect={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
+            onVote={() => handleVoteSide('r')}
           />
         </div>
 
@@ -243,7 +256,7 @@ function C3StoryDetail({
         </div>
       </div>
 
-      {/* 하단 고정 영역: 댓글바 + 투표 버튼 */}
+      {/* 하단 고정 영역: 댓글 입력바 (투표는 각 사연 우측 끝 버튼으로) */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto', background: 'var(--L-bg)' }}>
         {/* 댓글 입력바 — 탭하면 댓글 페이지로 */}
         <div
@@ -253,33 +266,11 @@ function C3StoryDetail({
           onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/community/${post.id}/comments`); }}
           style={{
             borderTop: '1px solid var(--L-border)',
-            padding: '12px 20px',
+            padding: '14px 20px calc(14px + env(safe-area-inset-bottom))',
             cursor: 'text',
           }}
         >
           <span style={{ fontSize: 14.5, color: 'var(--L-sub)' }}>댓글을 남겨주세요.</span>
-        </div>
-        {/* 투표 버튼 */}
-        <div style={{ padding: '8px 20px 20px', background: 'var(--L-bg)' }}>
-          <button
-            onClick={handleVote}
-            disabled={!pick || voted || isVoting}
-            style={{
-              width: '100%',
-              padding: '13px 0',
-              background: voted ? 'var(--L-border)' : 'var(--L-ink)',
-              color: voted ? 'var(--L-sub)' : 'var(--L-bg)',
-              border: 'none',
-              borderRadius: 4,
-              fontSize: 15,
-              fontWeight: 500,
-              cursor: voted || !pick || isVoting ? 'default' : 'pointer',
-              opacity: !pick && !voted ? 0.6 : 1,
-              fontFamily: 'inherit',
-            }}
-          >
-            {voted ? '투표 완료' : isVoting ? '처리 중...' : pick ? '투표 완료하기' : '작성자 · 상대방을 선택하세요'}
-          </button>
         </div>
       </div>
     </div>
@@ -786,6 +777,16 @@ export default function CommunityPostPage({ params }: PageProps) {
     }
   };
 
+  const handleCancelVote = async () => {
+    try {
+      const result = await postApi.cancelVote(params.id);
+      setVoteResult(result);
+      setPost(prev => prev ? { ...prev, isVoted: false, hasVoted: false, myVoteSide: null } : null);
+    } catch (err: any) {
+      if (err?.response?.status !== 404) console.error('Cancel vote failed:', err);
+    }
+  };
+
   const handleVote = async (optionId: number) => {
     // 이미 투표했으면 재투표 불가
     if (post?.isVoted || post?.hasVoted) return;
@@ -831,7 +832,7 @@ export default function CommunityPostPage({ params }: PageProps) {
   // Render logic
   if (!post.isAuthor) {
     // View A: 관람자
-    return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} onLike={handleLike} isVoting={isVoting} hasMoreComments={hasMoreComments} loadingMoreComments={loadingMoreComments} commentBottomRef={commentBottomRef} />;
+    return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} onCancelVote={handleCancelVote} onLike={handleLike} isVoting={isVoting} hasMoreComments={hasMoreComments} loadingMoreComments={loadingMoreComments} commentBottomRef={commentBottomRef} />;
   } else if (post.status === 'VOTING' && !post.paired) {
     // View B: 작성자 + VOTING + partner 없음
     return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} jury={juryResult} juryExhausted={juryPollingExhausted} onRetryJury={handleRetryJury} />;

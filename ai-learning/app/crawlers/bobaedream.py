@@ -1,125 +1,86 @@
 """
-Bobaedream Free Board Crawler
-Fetches posts and comments from Bobaedream free board.
-Uses Playwright with anti-bot measures.
+보배드림 크롤러 v2 — requests + BeautifulSoup, URL 패턴 필터링
 """
 import asyncio
 import logging
 import random
+import re
 from typing import List, Dict
-from playwright.async_api import async_playwright
+
+import requests
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-BOARD_URL = "https://www.bobaedream.co.kr/board/list/freeb?sort=recommend"
-
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
-HIDE_WEBDRIVER_SCRIPT = """
-    Object.defineProperty(navigator, 'webdriver', {
-        get: () => undefined,
-    });
-"""
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+]
 
 
-async def crawl(daily_limit: int = 100) -> List[Dict]:
-    """
-    Crawl Bobaedream free board.
-
-    Args:
-        daily_limit: Maximum number of posts to fetch (max 10 posts)
-
-    Returns:
-        List of post/comment dicts with keys: content, content_type, source, category
-    """
+async def crawl(daily_limit: int = 300) -> List[Dict]:
+    """보배드림 자유게시판 크롤링"""
     results = []
-    logger.info("Bobaedream crawl started")
+    session = requests.Session()
+    session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+    board_url = "https://www.bobaedream.co.kr/board/list/freeb?sort=recommend"
 
-        context = await browser.new_context(
-            user_agent=USER_AGENT,
-            viewport={"width": 1280, "height": 720},
-        )
+    try:
+        resp = session.get(board_url, timeout=15)
+        resp.raise_for_status()
+        await asyncio.sleep(random.uniform(2, 3))
 
-        page = await context.new_page()
+        soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Hide webdriver
-        await page.add_init_script(HIDE_WEBDRIVER_SCRIPT)
+        # 모든 <a> 태그에서 게시글 링크 찾기 (URL 패턴 필터)
+        posts_found = 0
+        for link in soup.find_all("a"):
+            if len(results) >= daily_limit:
+                break
 
-        try:
-            await page.goto(BOARD_URL, wait_until="domcontentloaded", timeout=10000)
-            await asyncio.sleep(random.uniform(2, 5))
+            href = link.get("href", "")
+            # 보배드림 게시글 URL 패턴: /board/view.php?... 또는 /board/?...
+            if not href or "/view" not in href or "board" not in href:
+                continue
 
-            # Extract post links
-            post_links = await page.locator("ul.basicList li a.bsubject").all()
-            logger.info(f"Found {len(post_links)} posts")
+            post_url = href if href.startswith("http") else f"https://www.bobaedream.co.kr{href}"
 
-            for idx, link in enumerate(post_links[:10]):  # max 10 posts
-                if idx >= 10:
-                    break
+            try:
+                post_resp = session.get(post_url, timeout=10)
+                post_resp.raise_for_status()
+                await asyncio.sleep(random.uniform(1, 2))
 
-                try:
-                    post_url = await link.get_attribute("href")
-                    if not post_url:
-                        continue
+                post_soup = BeautifulSoup(post_resp.text, "html.parser")
 
-                    # Make absolute URL if needed
-                    if not post_url.startswith("http"):
-                        post_url = "https://www.bobaedream.co.kr" + post_url
+                # 원글 내용 추출 (다양한 셀렉터 시도)
+                content = (
+                    post_soup.select_one("div.article_content") or
+                    post_soup.select_one("div[class*='content']") or
+                    post_soup.select_one("article") or
+                    post_soup.select_one("div.bbs_content")
+                )
 
-                    await page.goto(post_url, wait_until="domcontentloaded", timeout=10000)
-                    await asyncio.sleep(random.uniform(2, 5))
-
-                    # Extract post body
-                    body_elem = await page.locator("div.bodyCont").first.text_content()
-                    if body_elem and body_elem.strip():
+                if content:
+                    post_text = content.get_text(strip=True)
+                    if post_text and len(post_text) > 10:
                         results.append({
-                            "content": body_elem.strip(),
+                            "content": post_text[:1500],
                             "content_type": "POST",
                             "source": "bobaedream",
-                            "category": "freeboard",
+                            "category": "freeb",
                         })
+                        logger.debug(f"Bobaedream post: saved")
+                        posts_found += 1
 
-                    # Extract comments
-                    comment_elems = await page.locator("ul#repList li p.con").all()
-                    for comment_elem in comment_elems:
-                        comment_text = await comment_elem.text_content()
-                        if comment_text and comment_text.strip():
-                            results.append({
-                                "content": comment_text.strip(),
-                                "content_type": "COMMENT",
-                                "source": "bobaedream",
-                                "category": "freeboard",
-                            })
+            except Exception as e:
+                logger.debug(f"Failed to fetch bobaedream post: {e}")
+                continue
 
-                    if len(results) >= daily_limit:
-                        break
+        logger.info(f"Bobaedream: {posts_found} posts fetched")
 
-                except Exception as e:
-                    logger.warning(f"Failed to process post {idx}: {e}")
-                    continue
+    except Exception as e:
+        logger.warning(f"Failed to fetch Bobaedream: {e}")
 
-        except Exception as e:
-            logger.error(f"Failed to load Bobaedream page: {e}")
-
-        finally:
-            await context.close()
-            await browser.close()
-
-        logger.info(f"Bobaedream crawl completed: {len(results)} items collected")
-
+    logger.info(f"Bobaedream crawl completed: {len(results)} items")
     return results
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-
-    result = asyncio.run(crawl(daily_limit=100))
-    print(f"Total results: {len(result)}")
-    for r in result[:3]:
-        print(r)

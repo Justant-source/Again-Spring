@@ -261,6 +261,43 @@ public class CommunityPostController {
     }
 
     /**
+     * 투표 취소
+     */
+    @DeleteMapping("/{id}/vote")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "투표 취소")
+    public ResponseEntity<VoteResultResponse> cancelVote(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        String userId = resolveUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        Map<Long, Long> result = voteService.cancelVoteAndGetResult(id, userId);
+        List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
+        long totalVotes = result.values().stream().mapToLong(Long::longValue).sum();
+
+        List<VoteOptionResultDto> resultDtos = options.stream()
+                .map(opt -> {
+                    long count = result.getOrDefault(opt.getId(), 0L);
+                    double percentage = totalVotes > 0 ? (count * 100.0) / totalVotes : 0.0;
+                    return VoteOptionResultDto.builder()
+                            .id(opt.getId())
+                            .label(opt.getLabel())
+                            .count(count)
+                            .percentage(percentage)
+                            .build();
+                })
+                .toList();
+
+        return ResponseEntity.ok(VoteResultResponse.builder()
+                .options(resultDtos)
+                .totalVotes(totalVotes)
+                .myVotedOptionId(null)
+                .build());
+    }
+
+    /**
      * 배심원 결과 조회 (작성자만)
      */
     @GetMapping("/{id}/jury")

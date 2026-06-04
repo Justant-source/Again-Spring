@@ -36,6 +36,11 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
     List<Vote> findByVoterUserIdOrderByCreatedAtDesc(String voterUserId);
 
     /**
+     * 투표 취소 — 포스트+투표자 기준 삭제
+     */
+    void deleteByPostIdAndVoterUserId(String postId, String voterUserId);
+
+    /**
      * 특정 시간 범위의 투표 수 (일별 집계용)
      */
     long countByCreatedAtBetween(Instant from, Instant to);

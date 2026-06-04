@@ -6,8 +6,16 @@ interface SideStoryProps {
   body: string;
   clamp?: boolean;
   selected?: boolean;
+  /** 박스(본문) 클릭 — 사연 전문 보기로 이동 */
   onSelect?: () => void;
+  /** (legacy) clamp 시 우상단 "더 보기 ›" 링크 */
   onMore?: () => void;
+  /** 우측 끝 투표 버튼 — 이 쪽에 투표 */
+  onVote?: () => void;
+  /** 이 쪽에 투표 완료됨 (버튼 라벨/색 반전) */
+  voted?: boolean;
+  /** 투표가 이미 끝나 버튼 비활성 */
+  voteDisabled?: boolean;
 }
 
 export function SideStory({
@@ -18,6 +26,9 @@ export function SideStory({
   selected = false,
   onSelect,
   onMore,
+  onVote,
+  voted = false,
+  voteDisabled = false,
 }: SideStoryProps) {
   const c = side === 'g' ? 'var(--faction-author)' : 'var(--faction-partner)';
   const cDk = side === 'g' ? 'var(--faction-author-dk)' : 'var(--faction-partner-dk)';
@@ -35,14 +46,42 @@ export function SideStory({
         transition: 'border-color 0.15s',
       }}
     >
-      {/* 상단: 색점 + 라벨 + 선택됨 / 더 보기 */}
+      {/* 상단: 색점 + 라벨 + (투표함) / 우측 끝 투표 버튼 또는 더 보기 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
           <span style={{ fontSize: 11, color: c, fontWeight: 500 }}>{label}</span>
-          {selected && <span style={{ fontSize: 11, color: cDk, fontWeight: 500 }}>· 선택됨</span>}
         </div>
-        {clamp && onMore && (
+        {onVote ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!voteDisabled) onVote();
+            }}
+            disabled={voteDisabled}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 11.5,
+              fontWeight: 500,
+              padding: '5px 11px',
+              borderRadius: 999,
+              cursor: voteDisabled ? 'default' : 'pointer',
+              background: voted ? c : 'transparent',
+              color: voted ? '#fff' : c,
+              border: `1px solid ${c}`,
+              opacity: voteDisabled && !voted ? 0.45 : 1,
+              fontFamily: 'inherit',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+              <path d="M9 11l3-8 3 8M5 11h14v8a2 2 0 01-2 2H7a2 2 0 01-2-2z" strokeLinejoin="round" />
+            </svg>
+            {voted ? '투표함' : '투표'}
+          </button>
+        ) : clamp && onMore ? (
           <span
             onClick={(e) => {
               e.stopPropagation();
@@ -52,7 +91,7 @@ export function SideStory({
           >
             더 보기 ›
           </span>
-        )}
+        ) : null}
       </div>
 
       {/* 본문 */}

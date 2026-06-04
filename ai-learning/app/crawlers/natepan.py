@@ -1,125 +1,109 @@
 """
-Nate Pan Crawler
-Fetches posts and comments from Nate Pann talk board.
-Uses Playwright with anti-bot measures.
+네이트판 크롤러 — WaggleBot 코드 기반
 """
 import asyncio
 import logging
-import random
+import re
 from typing import List, Dict
-from playwright.async_api import async_playwright
+
+import requests
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-PANN_URL = "https://pann.nate.com/talk/board/g?order=best"
+POST_BASE = "https://pann.nate.com/talk/"
 
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+SECTIONS = [
+    {"name": "톡톡 베스트", "url": "https://pann.nate.com/talk/ranking"},
+    {"name": "톡커들의 선택", "url": "https://pann.nate.com/talk/ranking/best"},
+]
 
-HIDE_WEBDRIVER_SCRIPT = """
-    Object.defineProperty(navigator, 'webdriver', {
-        get: () => undefined,
-    });
-"""
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+]
 
 
-async def crawl(daily_limit: int = 50) -> List[Dict]:
-    """
-    Crawl Nate Pann talk board.
-
-    Args:
-        daily_limit: Maximum number of posts to fetch (max 8 posts)
-
-    Returns:
-        List of post/comment dicts with keys: content, content_type, source, category
-    """
+async def crawl(daily_limit: int = 400) -> List[Dict]:
+    """네이트판 크롤링 — WaggleBot 포팅"""
     results = []
-    logger.info("Nate Pann crawl started")
+    session = requests.Session()
+    session.headers.update({"User-Agent": USER_AGENTS[0]})
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+    posts = []
+    seen = set()
 
-        context = await browser.new_context(
-            user_agent=USER_AGENT,
-            viewport={"width": 1280, "height": 720},
-        )
-
-        page = await context.new_page()
-
-        # Hide webdriver
-        await page.add_init_script(HIDE_WEBDRIVER_SCRIPT)
-
+    # Step 1: 목록에서 게시글 링크 수집
+    for section in SECTIONS:
         try:
-            await page.goto(PANN_URL, wait_until="domcontentloaded", timeout=10000)
-            await asyncio.sleep(random.uniform(2.5, 5.5))
+            resp = session.get(section["url"], timeout=10)
+            resp.raise_for_status()
+            await asyncio.sleep(0.5)
 
-            # Extract post links
-            post_links = await page.locator("ul.talk-list li a.subject").all()
-            logger.info(f"Found {len(post_links)} posts")
+            soup = BeautifulSoup(resp.text, "html.parser")
 
-            for idx, link in enumerate(post_links[:8]):  # max 8 posts
-                if idx >= 8:
-                    break
-
-                try:
-                    post_url = await link.get_attribute("href")
-                    if not post_url:
-                        continue
-
-                    # Make absolute URL if needed
-                    if not post_url.startswith("http"):
-                        post_url = "https://pann.nate.com" + post_url
-
-                    await page.goto(post_url, wait_until="domcontentloaded", timeout=10000)
-                    await asyncio.sleep(random.uniform(2.5, 5.5))
-
-                    # Extract post body
-                    body_elem = await page.locator("div.talk-content div.text").first.text_content()
-                    if body_elem and body_elem.strip():
-                        results.append({
-                            "content": body_elem.strip(),
-                            "content_type": "POST",
-                            "source": "natepan",
-                            "category": "talk",
-                        })
-
-                    # Extract comments
-                    comment_elems = await page.locator("ul.reply-list li div.reply-text span").all()
-                    for comment_elem in comment_elems:
-                        comment_text = await comment_elem.text_content()
-                        if comment_text and comment_text.strip():
-                            results.append({
-                                "content": comment_text.strip(),
-                                "content_type": "COMMENT",
-                                "source": "natepan",
-                                "category": "talk",
-                            })
-
-                    if len(results) >= daily_limit:
-                        break
-
-                except Exception as e:
-                    logger.warning(f"Failed to process post {idx}: {e}")
+            # WaggleBot: "div.cntList ul.post_wrap li" → "dl dt h2 a"
+            for li in soup.select("div.cntList ul.post_wrap li"):
+                link = li.select_one("dl dt h2 a")
+                if not link:
                     continue
 
+                href = link.get("href", "")
+                match = re.search(r"/talk/(\d+)", href)
+                if not match:
+                    continue
+
+                origin_id = match.group(1)
+                if origin_id in seen:
+                    continue
+                seen.add(origin_id)
+
+                title = link.get("title") or link.get_text(strip=True)
+                if not title:
+                    continue
+
+                posts.append({
+                    "origin_id": origin_id,
+                    "title": title,
+                    "url": POST_BASE + origin_id,
+                })
+
+            logger.info(f"Section '{section['name']}': {len(posts)} posts")
+
         except Exception as e:
-            logger.error(f"Failed to load Pann page: {e}")
+            logger.warning(f"Failed to fetch section: {e}")
+            continue
 
-        finally:
-            await context.close()
-            await browser.close()
+    logger.info(f"Total posts found: {len(posts)}")
 
-        logger.info(f"Nate Pann crawl completed: {len(results)} items collected")
+    # Step 2: 각 게시글 상세 페이지에서 내용 추출
+    for post in posts:
+        if len(results) >= daily_limit:
+            break
 
+        try:
+            resp = session.get(post["url"], timeout=10)
+            resp.raise_for_status()
+            await asyncio.sleep(0.5)
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # WaggleBot: contentArea에서 본문 추출
+            content_area = soup.select_one("div#contentArea")
+            if content_area:
+                content = content_area.get_text("\n", strip=True)
+
+                if content and len(content) > 10:
+                    results.append({
+                        "content": content[:2000],
+                        "content_type": "POST",
+                        "source": "natepan",
+                        "category": "talk",
+                    })
+                    logger.debug(f"Post {post['origin_id']}: saved {len(content)} chars")
+
+        except Exception as e:
+            logger.debug(f"Failed to parse post {post['url']}: {e}")
+            continue
+
+    logger.info(f"Nate Pann crawl completed: {len(results)} items")
     return results
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-
-    result = asyncio.run(crawl(daily_limit=50))
-    print(f"Total results: {len(result)}")
-    for r in result[:3]:
-        print(r)

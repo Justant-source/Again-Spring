@@ -1,135 +1,162 @@
 """
-DCInside Gallery Crawler
-Fetches posts and comments from DCInside galleries (Life, Love, Marriage).
-Uses Playwright with anti-bot measures.
+DCInside 크롤러 — WaggleBot 코드 기반 (직접 포팅)
+가장 신뢰할 수 있는 크롤러
 """
 import asyncio
 import logging
-import random
 import re
 from typing import List, Dict
-from playwright.async_api import async_playwright
+
+import requests
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-GALLERIES = [
-    ("life_incident", "https://gall.dcinside.com/mgallery/board/lists/?id=life_incident&sort_type=recomm"),
-    ("love", "https://gall.dcinside.com/mgallery/board/lists/?id=love&sort_type=recomm"),
-    ("marriage", "https://gall.dcinside.com/board/lists/?id=marriage&sort_type=recomm"),
+BASE_URL = "https://gall.dcinside.com"
+COMMENT_API_URL = "https://m.dcinside.com/ajax/response-comment"
+
+# WaggleBot과 동일한 섹션
+SECTIONS = [
+    {"name": "실시간 베스트 (실베)", "url": "https://gall.dcinside.com/board/lists/?id=dcbest"},
+    {"name": "HIT 갤러리 (힛갤)", "url": "https://gall.dcinside.com/board/lists/?id=hit"},
 ]
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
 ]
 
-HIDE_WEBDRIVER_SCRIPT = """
-    Object.defineProperty(navigator, 'webdriver', {
-        get: () => undefined,
-    });
-"""
+
+def parse_board_href(href: str) -> tuple:
+    """WaggleBot: href에서 (id, no) 추출"""
+    id_m = re.search(r"[?&]id=([^&#]+)", href)
+    no_m = re.search(r"[?&]no=(\d+)", href)
+    if id_m and no_m:
+        return id_m.group(1), no_m.group(1)
+    return "", ""
 
 
-async def crawl(daily_limit: int = 100) -> List[Dict]:
-    """
-    Crawl DCInside galleries.
+def clean_listing_title(raw: str) -> str:
+    """WaggleBot: 갤러리 접두어·아이콘 제거"""
+    text = re.sub(r"^\[[^\]]{1,20}\]\s*", "", raw.strip())
+    return text.strip()
 
-    Args:
-        daily_limit: Maximum number of posts to fetch (max 10 posts per gallery)
 
-    Returns:
-        List of post/comment dicts with keys: content, content_type, source, category
-    """
-    results = []
-    gallery_name, gallery_url = random.choice(GALLERIES)
-    logger.info(f"DCInside crawl started - gallery: {gallery_name}")
+def iter_post_rows(soup: BeautifulSoup):
+    """WaggleBot: 테이블·리스트 양쪽 레이아웃 처리"""
+    # 테이블 기반 레이아웃
+    rows = soup.select("table.gall_list tbody tr.us-post")
+    if not rows:
+        rows = soup.select("tr.ub-content")
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-
-        context = await browser.new_context(
-            user_agent=random.choice(USER_AGENTS),
-            viewport={"width": 1280, "height": 720},
+    if rows:
+        return (
+            r for r in rows
+            if "notice" not in " ".join(r.get("class", []))
+            and "ad" not in " ".join(r.get("class", []))
         )
 
-        page = await context.new_page()
+    # 리스트 기반 레이아웃
+    all_li = soup.select("ul.gall-list li") or soup.select("ul li")
+    return (li for li in all_li if li.find("a", href=re.compile(r"/board/view/")))
 
-        # Hide webdriver
-        await page.add_init_script(HIDE_WEBDRIVER_SCRIPT)
 
+async def crawl(daily_limit: int = 450) -> List[Dict]:
+    """DCInside 크롤링 — WaggleBot 포팅"""
+    results = []
+    session = requests.Session()
+    session.headers.update({
+        "Referer": "https://www.dcinside.com/",
+        "User-Agent": USER_AGENTS[0],
+    })
+
+    posts = []
+    seen = set()
+
+    # Step 1: 목록에서 게시글 링크 수집
+    for section in SECTIONS:
         try:
-            await page.goto(gallery_url, wait_until="domcontentloaded", timeout=10000)
-            await asyncio.sleep(random.uniform(2.5, 4))
+            resp = session.get(section["url"], timeout=10)
+            resp.raise_for_status()
+            await asyncio.sleep(0.5)
 
-            # Extract post links
-            post_links = await page.locator("tr.ub-content td.gall_tit a[href*='/board/view/']").all()
-            logger.info(f"Found {len(post_links)} posts")
+            soup = BeautifulSoup(resp.text, "html.parser")
+            section_count = 0
 
-            for idx, link in enumerate(post_links[:10]):
-                if idx >= 10:  # max 10 posts per gallery
-                    break
+            for row in iter_post_rows(soup):
+                # WaggleBot: 3가지 폴백 셀렉터
+                link = (
+                    row.select_one("td.gall_tit a:first-child")
+                    or row.select_one("a.newtxt")
+                    or row.select_one("a[href*='/board/view/']")
+                )
 
-                try:
-                    post_url = await link.get_attribute("href")
-                    if not post_url:
-                        continue
-
-                    # Make absolute URL if needed
-                    if not post_url.startswith("http"):
-                        post_url = "https://gall.dcinside.com" + post_url
-
-                    await page.goto(post_url, wait_until="domcontentloaded", timeout=10000)
-                    await asyncio.sleep(random.uniform(2.5, 6))
-
-                    # Extract post body
-                    body_elem = await page.locator(".write_div").first.text_content()
-                    if body_elem and body_elem.strip():
-                        results.append({
-                            "content": body_elem.strip(),
-                            "content_type": "POST",
-                            "source": "dcinside",
-                            "category": gallery_name,
-                        })
-
-                    # Extract comments
-                    comment_elems = await page.locator(".cmt_txtbox p.usertxt").all()
-                    for comment_elem in comment_elems:
-                        comment_text = await comment_elem.text_content()
-                        if comment_text and comment_text.strip():
-                            results.append({
-                                "content": comment_text.strip(),
-                                "content_type": "COMMENT",
-                                "source": "dcinside",
-                                "category": gallery_name,
-                            })
-
-                    if len(results) >= daily_limit:
-                        break
-
-                except Exception as e:
-                    logger.warning(f"Failed to process post {idx}: {e}")
+                if not link:
                     continue
 
+                href = link.get("href", "")
+                gall_id, post_no = parse_board_href(href)
+                if not gall_id or not post_no:
+                    continue
+
+                origin_id = f"{gall_id}_{post_no}"
+                if origin_id in seen:
+                    continue
+                seen.add(origin_id)
+
+                title = clean_listing_title(link.get_text(strip=True))
+                if not title:
+                    continue
+
+                url = BASE_URL + href if href.startswith("/") else href
+                posts.append({
+                    "origin_id": origin_id,
+                    "title": title,
+                    "url": url,
+                    "gall_id": gall_id,
+                    "post_no": post_no,
+                })
+                section_count += 1
+
+            logger.info(f"Section '{section['name']}': {section_count} posts")
+
         except Exception as e:
-            logger.error(f"Failed to load gallery page: {e}")
+            logger.warning(f"Failed to fetch section: {e}")
+            continue
 
-        finally:
-            await context.close()
-            await browser.close()
+    logger.info(f"Total posts found: {len(posts)}")
 
-        logger.info(f"DCInside crawl completed: {len(results)} items collected")
+    # Step 2: 각 게시글 상세 페이지에서 내용 추출
+    for post in posts:
+        if len(results) >= daily_limit:
+            break
 
+        try:
+            resp = session.get(post["url"], timeout=10)
+            resp.raise_for_status()
+            await asyncio.sleep(0.5)
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # 본문 추출
+            body_el = soup.select_one("div.writing_view_box")
+            if body_el:
+                content = body_el.get_text("\n", strip=True)
+                # 출처 표기 제거
+                content = re.sub(r"출처\s*:.*?(?:\[원본\s*보기\])?$", "", content, flags=re.MULTILINE).strip()
+
+                if content and len(content) > 10:
+                    results.append({
+                        "content": content[:2000],
+                        "content_type": "POST",
+                        "source": "dcinside",
+                        "category": post["gall_id"],
+                    })
+                    logger.debug(f"Post {post['post_no']}: saved {len(content)} chars")
+
+        except Exception as e:
+            logger.debug(f"Failed to parse post {post['url']}: {e}")
+            continue
+
+    logger.info(f"DCInside crawl completed: {len(results)} items")
     return results
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-
-    result = asyncio.run(crawl(daily_limit=100))
-    print(f"Total results: {len(result)}")
-    for r in result[:3]:
-        print(r)

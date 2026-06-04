@@ -47,8 +47,8 @@ export default function CommunityNewPage() {
       setError('본문을 입력해주세요');
       return;
     }
-    if (bodyRaw.trim().length > 1000) {
-      setError('본문은 1000자 이내여야 합니다');
+    if (bodyRaw.trim().length > 2000) {
+      setError('본문은 2000자 이내여야 합니다');
       return;
     }
     if (!category) {
@@ -265,7 +265,7 @@ export default function CommunityNewPage() {
                 익명
               </span>
               <span data-testid="compose-char-count" style={{ fontSize: 12, color: 'var(--L-sub)' }}>
-                {bodyRaw.length} / 1000
+                {bodyRaw.length} / 2000
               </span>
             </div>
           </div>

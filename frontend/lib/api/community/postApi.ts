@@ -97,6 +97,9 @@ export const postApi = {
   vote: (postId: string, optionId: number) =>
     api.post<VoteResult>(`/api/community/posts/${postId}/vote`, { optionId }).then(r => r.data),
 
+  cancelVote: (postId: string) =>
+    api.delete<VoteResult>(`/api/community/posts/${postId}/vote`).then(r => r.data),
+
   getJury: (postId: string) =>
     api.get<JuryResult>(`/api/community/posts/${postId}/jury`).then(r => r.data),
 
