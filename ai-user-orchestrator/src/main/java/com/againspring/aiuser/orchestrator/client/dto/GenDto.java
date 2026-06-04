@@ -23,6 +23,7 @@ public class GenDto {
         private String topicSeed;
         private String formality;
         private String demographic;
+        private String lengthTier;   // "SHORT"|"MEDIUM"|"LONG"|"VERYLONG"
         private String correlationId;
         @Builder.Default
         private long timeoutMs = 120000L;

@@ -193,6 +193,9 @@ public class ActionExecutor {
         // Phase 2c: archetype 기반 topic seed (hot_button_phrases, emotional_beats)
         String topicSeed = buildTopicSeed(persona);
 
+        // 글 길이 다양화 — 페르소나 tier 기반 가중 랜덤
+        String lengthTier = pickLengthTier(persona);
+
         java.util.Optional<String> bodyOpt = llmClient.generatePost(GenDto.PostRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForPost(persona))
@@ -203,6 +206,7 @@ public class ActionExecutor {
             .topicSeed(topicSeed)
             .formality(voiceFormality(persona))
             .demographic(demographicStr(persona))
+            .lengthTier(lengthTier)
             .correlationId(corrId)
             .build());
 
@@ -325,6 +329,22 @@ public class ActionExecutor {
     private void appendStr(StringBuilder sb, Map<String, Object> vp, String key, String prefix) {
         Object v = vp.get(key);
         if (v != null && !v.toString().isBlank()) sb.append(prefix).append(v.toString().trim());
+    }
+
+    // ── 글 길이 다양화 ────────────────────────────────────────────────────────
+
+    /**
+     * 페르소나 tier에 따른 가중 랜덤 길이 티어 선택.
+     * SHORT=25%, MEDIUM=35%, LONG=25%, VERYLONG=15%
+     * HEAVY 페르소나는 LONG+VERYLONG 비중 2배
+     */
+    private String pickLengthTier(Persona persona) {
+        double r = RNG.nextDouble();
+        boolean heavy = "HEAVY".equals(persona.getTier());
+        if (r < 0.25) return "SHORT";
+        if (r < 0.60) return "MEDIUM";
+        if (r < (heavy ? 0.85 : 0.80)) return "LONG";
+        return "VERYLONG";
     }
 
     // ── Phase 2c: ArchetypeCatalog topicSeed ─────────────────────────────────

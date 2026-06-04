@@ -17,6 +17,7 @@ public class PostGenRequest {
     private String topicSeed;        // optional hint
     private String formality;        // "casual" (반말) | "polite" (존댓말)
     private String demographic;
+    private String lengthTier;       // "SHORT"|"MEDIUM"|"LONG"|"VERYLONG"
     private String correlationId;
     private long timeoutMs;
 }

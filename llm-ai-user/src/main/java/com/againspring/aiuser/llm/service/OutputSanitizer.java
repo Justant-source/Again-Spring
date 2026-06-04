@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 @Service
 public class OutputSanitizer {
-    private static final int MAX_POST = 800;
+    private static final int MAX_POST = 2000;
     private static final int MAX_COMMENT = 300;
 
     // LLM이 여러 옵션을 제시할 때 첫 번째 옵션만 추출

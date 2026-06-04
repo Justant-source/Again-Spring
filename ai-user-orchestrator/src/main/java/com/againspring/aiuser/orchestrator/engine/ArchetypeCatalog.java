@@ -89,25 +89,34 @@ public class ArchetypeCatalog {
         return id != null && catalog.containsKey(id);
     }
 
-    /** Build a topic seed string for post generation */
+    /**
+     * 글 생성용 topicSeed 조립 — 분석 라벨 대신 자연어 장면 1~2문장.
+     * "감정: X" / "핵심 표현: Y" 라벨 제거 → show-not-tell 유도.
+     */
     public String buildTopicSeed(Archetype a, Random rng) {
-        StringBuilder sb = new StringBuilder();
-        if (a.scenarioSkeleton() != null && !a.scenarioSkeleton().isBlank()) {
-            sb.append("시나리오: ").append(a.scenarioSkeleton()).append("\n");
-        }
-        List<String> beats = a.emotionalBeats();
-        if (beats != null && !beats.isEmpty()) {
-            int n = Math.min(2, beats.size());
-            List<String> shuffled = new ArrayList<>(beats);
-            Collections.shuffle(shuffled, rng);
-            sb.append("감정: ").append(String.join(", ", shuffled.subList(0, n))).append("\n");
-        }
+        // 1. commonDetails에서 구체 장면 1개 선택
+        List<String> details = a.commonDetails();
+        String detail = (details != null && !details.isEmpty())
+            ? details.get(rng.nextInt(details.size())) : null;
+
+        // 2. hot_button_phrases에서 1개 선택 (직접 발화로 느끼게)
         List<String> hotButtons = a.hotButtonPhrases();
-        if (hotButtons != null && !hotButtons.isEmpty()) {
-            int n = Math.min(2, hotButtons.size());
-            List<String> shuffled = new ArrayList<>(hotButtons);
-            Collections.shuffle(shuffled, rng);
-            sb.append("핵심 표현: ").append(String.join(" / ", shuffled.subList(0, n)));
+        String hotButton = (hotButtons != null && !hotButtons.isEmpty())
+            ? hotButtons.get(rng.nextInt(hotButtons.size())) : null;
+
+        // 3. scenario_skeleton 핵심만 (라벨 없이)
+        String scenario = a.scenarioSkeleton();
+
+        StringBuilder sb = new StringBuilder();
+        if (scenario != null && !scenario.isBlank()) {
+            // 시나리오를 라벨 없이 자연어로
+            sb.append(scenario.trim());
+        }
+        if (detail != null) {
+            sb.append(sb.length() > 0 ? " — " : "").append(detail);
+        }
+        if (hotButton != null) {
+            sb.append(sb.length() > 0 ? "\n" : "").append(hotButton);
         }
         return sb.toString().trim();
     }
