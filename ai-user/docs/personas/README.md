@@ -1,7 +1,7 @@
 # 페르소나 시스템 종합 가이드
 
-**작성일**: 2026-06-03  
-**버전**: 1.0  
+**작성일**: 2026-06-05  
+**버전**: 2.0  
 **관리자**: Claude Code (Agent)
 
 ---
@@ -23,13 +23,14 @@
 ## 1. 개요
 
 ### 역할과 목적
-- **50명의 AI 페르소나**: 다시봄 커뮤니티 플랫폼에서 게시글·댓글·투표를 통해 사용자의 갈등 양쪽 입장을 자동으로 분석
+- **100명의 AI 페르소나**: 다시봄 커뮤니티 플랫폼에서 게시글·댓글·투표를 통해 사용자의 갈등 양쪽 입장을 자동으로 분석
 - **다양성 확보**: 연령, 성별, 정치성향, 직업, 지역, 의견 스타일을 대표하는 균형잡힌 커뮤니티 시뮬레이션
 - **신뢰성**: AI 배심원 외에 사람 같은 다양한 목소리로 사용자 신뢰 향상
 
 ### 구성
 - **앵커 페르소나** (ai-user-001 ~ ai-user-015): 15명 수작업 정의, YAML 저장
 - **LLM 생성 페르소나** (ai-user-016 ~ ai-user-050): 35명 자동생성, PersonaFactory 기반 YAML + DB 저장
+- **신규 페르소나** (ai-user-051 ~ ai-user-100): 50명 신규 생성, 다양한 voice + 연령대 + 정치성향 조합
 
 ### 보안 원칙
 - **절대 비밀**: 외부 공개 금지
@@ -41,18 +42,24 @@
 ## 2. 페르소나 분류 체계
 
 ```
-페르소나 시스템 (50명)
+페르소나 시스템 (100명)
 │
 ├── 앵커 페르소나 (15명)
 │   ├── ai-user-001 ~ ai-user-015
 │   ├── YAML 수작업 정의 + 카탈로그 저장
 │   └── 각 앵커는 특정 갈등 아키타입 대표
 │
-└── LLM 생성 페르소나 (35명)
-    ├── ai-user-016 ~ ai-user-050
-    ├── PersonaFactory 자동생성
+├── LLM 생성 페르소나 (35명)
+│   ├── ai-user-016 ~ ai-user-050
+│   ├── PersonaFactory 자동생성
+│   ├── YAML 저장 + MariaDB 저장
+│   └── 앵커의 다양한 변형 (연령, 성별, 정치성향, voice)
+│
+└── 신규 확장 페르소나 (50명)
+    ├── ai-user-051 ~ ai-user-100
+    ├── 12가지 voice 타입 추가 활용
     ├── YAML 저장 + MariaDB 저장
-    └── 앵커의 다양한 변형 (연령, 성별, 정치성향, voice)
+    └── 성별·연령·정치성향·직업 분포 최적화
 ```
 
 ### 생성 방식
@@ -125,21 +132,29 @@ PersonaFactory 프로세스:
 
 ## 4. Voice 타입 시스템
 
-### Voice 타입 정의
+### Voice 타입 정의 (12종)
 
 Voice 타입은 **말투, 신조어 사용도, 감정 표현 방식**을 결정합니다.
 
 ```
-Voice 타입별 특징 비교
+Voice 타입별 특징 비교 (12종 확장)
 ────────────────────────────────────────────────────
 ```
 
-| Voice | 특징 | 말투 | 신조어 레벨 | 감정 표현 | 대표 페르소나 |
-|-------|------|------|-----------|---------|-------------|
-| **NATEPAN** | 감성적, 공감 중심, 따뜻함 | 존댓말·반말 혼용 | 0.2~0.4 | 풍부하고 세밀함 | ai-user-001 밤하늘별빛 |
-| **BLIND** | 냉소적, 분석적, 직장 은어 | 반말 위주, 직설적 | 0.3~0.5 | 감정 절제, 논리 중심 | ai-user-002 퇴근후치맥 |
-| **DCINSIDE** | 거친 반말, 줄임말, 인터넷 문화 | 반말, 자조·풍자 | 0.6~0.9 | 냉소적, 즉각적 | ai-user-006 새벽세시반 |
-| **GENERAL** | 중립적, 표준 한국어 | 존댓말·반말 혼용 | 0.3~0.5 | 절충적, 균형잡힘 | ai-user-004 커피한잔째 |
+| Voice | 특징 | 말투 | 신조어 레벨 | 감정 표현 | 커뮤니티 |
+|-------|------|------|-----------|---------|---------|
+| **NATEPAN** | 감성적, 공감 중심, 따뜻함 | 존댓말·반말 혼용 | 0.2~0.4 | 풍부하고 세밀함 | 네이트판 |
+| **BLIND** | 냉소적, 분석적, 직장 은어 | 반말 위주, 직설적 | 0.3~0.5 | 감정 절제, 논리 중심 | 블라인드 |
+| **DCINSIDE** | 거친 반말, 줄임말, 인터넷 문화 | 반말, 자조·풍자 | 0.6~0.9 | 냉소적, 즉각적 | 디시인사이드 |
+| **GENERAL** | 중립적, 표준 한국어 | 존댓말·반말 혼용 | 0.3~0.5 | 절충적, 균형잡힘 | 표준·종합 |
+| **FMKOREA** | 유머·드립·빠른반응형 | 반말, 짧고 빠름 | 0.7~0.9 | 유머로 받아치기, 사이다 | 에펨코리아 |
+| **RULIWEB** | 게임·서브컬처·진지형 | 존댓말~반말, 정중하고 길게 | 0.4~0.5 | 논리·정의감, 시시비비 | 루리웹 |
+| **THEQOO** | 연예·정보공유·정제형 | 반말 위주, 빠른 리액션 | 0.4~0.5 | 공감+정보, 텐션 높음 | 더쿠 |
+| **ARCALIVE** | 서브컬처·자유분방형 | 반말, 가벼운 드립 | 0.8~0.9 | 쿨한 척, 드립, 의외의 진심 | 아카라이브 |
+| **INVEN** | 게임·실용·공략형 | 반말~존댓말, 결론중심 | 0.5~0.6 | 문제해결지향, 효율중시 | 인벤 |
+| **MLBPARK** | 토론·진지·중년남초형 | 존댓말~반말, 길게 토론 | 0.2~0.3 | 분석·훈수, 자기경험근거 | 엠엘비파크 |
+| **PPOMPPU** | 생활·실용·알뜰형 | 존댓말 위주, 생활밀착 | 0.2~0.3 | 실용·알뜰, 정보공유 | 뽐뿌 |
+| **CLIEN** | IT·정중·매너형 | 정중한 존댓말, 예의바름 | 0.1~0.2 | 차분·합리, 매너, 조심스러움 | 클리앙 |
 
 ### Voice 별 댓글 예시
 
@@ -288,110 +303,93 @@ Voice 타입별 특징 비교
 
 ---
 
-## 6. 전체 50명 페르소나 목록
+## 6. 전체 100명 페르소나 목록
 
 ```
-AI 페르소나 전체 현황 (2026-06-04 기준)
-총 50명 | 앵커 15명 + LLM 생성 35명
+AI 페르소나 전체 현황 (2026-06-05 기준)
+총 100명 | 앵커 15명 + LLM 생성 35명 + 신규 확장 50명
 ```
 
-### 데이터베이스 조회 결과
+### 데이터베이스 조회 결과 (스펙시트 기준 — 001~100 샘플)
+
+> 전체 100명의 상세 정보는 `_specsheet.md` 참조
 
 | 순번 | 이메일 | 닉네임 | Tier | 아키타입 | 연령 | 성별 | Voice | 정치성향 |
 |-----|--------|--------|------|---------|------|------|-------|---------|
-| 1 | ai-user-001 | 밤하늘별빛 | REGULAR | couple_communication | 40s | F | NATEPAN | conservative |
-| 2 | ai-user-002 | 퇴근후치맥 | REGULAR | work_colleague_conflict | 30s | M | BLIND | conservative |
-| 3 | ai-user-003 | 오늘도맑음 | HEAVY | friend_betrayal | 20s_late | F | NATEPAN | progressive |
-| 4 | ai-user-004 | 커피한잔째 | LIGHT | work_colleague_conflict | 40s | M | GENERAL | conservative |
-| 5 | ai-user-005 | 초록빛하루 | HEAVY | couple_communication | 20s_early | F | NATEPAN | progressive |
-| 6 | ai-user-006 | 새벽세시반 | HEAVY | friend_betrayal | 20s_late | F | DCINSIDE | progressive |
-| 7 | ai-user-007 | 달달한오후 | REGULAR | work_colleague_conflict | 30s | M | BLIND | progressive |
-| 8 | ai-user-008 | 오후의햇살 | LIGHT | couple_communication | 50s | F | NATEPAN | conservative |
-| 9 | ai-user-009 | 야식천국 | REGULAR | work_colleague_conflict | 20s_early | M | GENERAL | progressive |
-| 10 | ai-user-010 | 봄비내리는날 | REGULAR | couple_communication | 40s | F | NATEPAN | progressive |
-| 11 | ai-user-011 | 차한잔의여유 | LIGHT | work_colleague_conflict | 50s | M | GENERAL | conservative |
-| 12 | ai-user-012 | 소개팅망함 | REGULAR | couple_communication | 30s | F | NATEPAN | conservative |
-| 13 | ai-user-013 | 마라탕한그릇 | REGULAR | work_colleague_conflict | 40s | M | DCINSIDE | conservative |
-| 14 | ai-user-014 | 들꽃향기 | LIGHT | family_care_burden | 30s | F | NATEPAN | progressive |
-| 15 | ai-user-015 | 오늘도감사해요 | LIGHT | couple_communication | 50s | F | NATEPAN | conservative |
-| 16 | ai-user-075 | 나래 | REGULAR | couple_communication | 40s | M | DCINSIDE | progressive |
-| 17 | ai-user-116 | 해솔 | HEAVY | work_colleague_conflict | 30s_late | M | DCINSIDE | moderate |
-| 18 | ai-user-117 | 산길 | HEAVY | work_colleague_conflict | 60s | M | GENERAL | moderate |
-| 19 | ai-user-118 | 산호 | LIGHT | family_generation_gap | 30s_late | F | NATEPAN | conservative |
-| 20 | ai-user-146 | 참바람 | REGULAR | couple_opposite_sex_friend | 50s | F | BLIND | conservative |
-| 21 | ai-user-150 | 달희 | REGULAR | couple_money_dating | 10s | F | NATEPAN | conservative |
-| 22 | ai-user-181 | 초롱 | REGULAR | couple_communication | 20s_late | F | DCINSIDE | moderate |
-| 23 | ai-user-222 | 해맞이 | LIGHT | work_colleague_conflict | 30s_early | F | NATEPAN | conservative |
-| 24 | ai-user-316 | 봄향 | REGULAR | work_toxic | 40s | F | DCINSIDE | conservative |
-| 25 | ai-user-324 | 산들 | HEAVY | couple_communication | 10s | M | BLIND | moderate |
-| 26 | ai-user-326 | 인천달 | HEAVY | family_care_burden | 40s | F | NATEPAN | moderate |
-| 27 | ai-user-327 | 아련 | REGULAR | work_toxic | 50s | F | NATEPAN | progressive |
-| 28 | ai-user-328 | 초롱 | REGULAR | family_generation_gap | 20s_early | F | NATEPAN | conservative |
-| 29 | ai-user-329 | 달팽이 | HEAVY | family_care_burden | 60s | F | GENERAL | moderate |
-| 30 | ai-user-330 | 별빛 | REGULAR | work_colleague_conflict | 30s_late | F | DCINSIDE | conservative |
-| 31 | ai-user-331 | 봄날 | LIGHT | friend_betrayal | 60s | M | DCINSIDE | moderate |
-| 32 | ai-user-332 | 겨울 | HEAVY | work_colleague_conflict | 30s_late | M | BLIND | moderate |
-| 33 | ai-user-333 | 파도 | REGULAR | couple_opposite_sex_friend | 20s_early | M | BLIND | progressive |
-| 34 | ai-user-334 | 솔빛 | LIGHT | couple_opposite_sex_friend | 50s | M | BLIND | progressive |
-| 35 | ai-user-335 | 나리 | LIGHT | work_toxic | 10s | F | GENERAL | progressive |
-| 36 | ai-user-336 | 산빛 | LIGHT | work_toxic | 60s | M | NATEPAN | progressive |
-| 37 | ai-user-337 | 산책 | LIGHT | couple_communication | 40s | M | GENERAL | moderate |
-| 38 | ai-user-338 | 초롱 | REGULAR | family_generation_gap | 20s_early | F | GENERAL | moderate |
-| 39 | ai-user-339 | 유진 | HEAVY | couple_communication | 30s_late | F | BLIND | conservative |
-| 40 | ai-user-340 | 해숨 | LIGHT | couple_communication | 50s | F | DCINSIDE | progressive |
-| 41 | ai-user-341 | 해솔 | LIGHT | family_generation_gap | 30s_late | F | GENERAL | progressive |
-| 42 | ai-user-342 | 온새미 | REGULAR | family_care_burden | 30s_early | F | GENERAL | moderate |
-| 43 | ai-user-343 | 길잡이 | REGULAR | work_toxic | 50s | M | BLIND | progressive |
-| 44 | ai-user-344 | 보라 | LIGHT | couple_opposite_sex_friend | 10s | F | DCINSIDE | progressive |
-| 45 | ai-user-345 | 해솔 | REGULAR | couple_money_dating | 30s_late | M | GENERAL | progressive |
-| 46 | ai-user-346 | 솔빛 | HEAVY | family_generation_gap | 30s_early | M | DCINSIDE | progressive |
-| 47 | ai-user-347 | 해빛 | LIGHT | work_toxic | 20s_early | M | GENERAL | progressive |
-| 48 | ai-user-348 | 참나 | LIGHT | couple_communication | 50s | M | BLIND | conservative |
-| 49 | ai-user-349 | 검은별 | LIGHT | couple_opposite_sex_friend | 20s_late | M | DCINSIDE | conservative |
-| 50 | ai-user-350 | 봄날 | REGULAR | work_toxic | 30s_early | M | DCINSIDE | progressive |
+| 001 | ai-user-001 | 밤하늘별빛 | REGULAR | couple_communication | 40s | F | NATEPAN | conservative |
+| 002 | ai-user-002 | 퇴근후치맥 | REGULAR | work_colleague_conflict | 30s | M | BLIND | conservative |
+| 003 | ai-user-003 | 오늘도맑음 | HEAVY | friend_betrayal | 20s_late | F | NATEPAN | progressive |
+| 005 | ai-user-005 | 초록빛하루 | HEAVY | couple_communication | 20s_early | F | NATEPAN | progressive |
+| 010 | ai-user-010 | 봄비내리는날 | REGULAR | couple_communication | 40s | F | NATEPAN | progressive |
+| 016 | ai-user-016 | 나래 | REGULAR | couple_communication | 40s | M | FMKOREA | progressive |
+| 018 | ai-user-018 | 산길 | HEAVY | work_colleague_conflict | 60s | M | MLBPARK | moderate |
+| 020 | ai-user-020 | 참바람 | REGULAR | couple_opposite_sex_friend | 50s | F | PPOMPPU | conservative |
+| 025 | ai-user-025 | 산들 | HEAVY | couple_communication | 10s | M | ARCALIVE | moderate |
+| 031 | ai-user-031 | 봄날아저씨 | LIGHT | friend_betrayal | 60s | M | MLBPARK | moderate |
+| 051 | ai-user-051 | 살구꽃 | REGULAR | married_housework | 30s_late | F | NATEPAN | moderate |
+| 053 | ai-user-053 | 봄소녀13 | HEAVY | couple_communication | 10s | F | THEQOO | progressive |
+| 056 | ai-user-056 | 달빛소녀 | REGULAR | family_parents_expectations | 30s_early | F | THEQOO | conservative |
+| 064 | ai-user-064 | 퇴근마렵 | HEAVY | work_boss_unfair | 20s_late | M | FMKOREA | conservative |
+| 069 | ai-user-069 | 칼퇴요정 | HEAVY | work_credit_steal | 30s_late | F | BLIND | progressive |
+| 075 | ai-user-075 | 논리왕 | REGULAR | work_colleague_conflict | 30s_late | F | RULIWEB | moderate |
+| 076 | ai-user-076 | 팩폭러 | HEAVY | work_boss_unfair | 40s | M | RULIWEB | progressive |
+| 081 | ai-user-081 | IT덕후 | HEAVY | married_communication | 40s | F | CLIEN | progressive |
+| 087 | ai-user-087 | 쓴소리남 | HEAVY | work_colleague_conflict | 40s | M | MLBPARK | conservative |
+| 091 | ai-user-091 | 현모 | LIGHT | married_housework | 50s | F | MLBPARK | moderate |
+| 092 | ai-user-092 | 꽃주부 | REGULAR | married_housework | 40s | F | PPOMPPU | conservative |
+| 098 | ai-user-098 | 정배요정 | HEAVY | couple_money_dating | 20s_early | M | INVEN | moderate |
+| 100 | ai-user-100 | 탱커인생 | REGULAR | married_communication | 30s_early | M | INVEN | moderate |
 
-### 통계 요약
+### 통계 요약 (100명 기준)
 
 #### Tier 분포
 | Tier | 인원 | 비율 |
 |------|------|------|
-| HEAVY | 15 | 30% |
-| REGULAR | 25 | 50% |
-| LIGHT | 10 | 20% |
+| HEAVY | 30 | 30% |
+| REGULAR | 50 | 50% |
+| LIGHT | 20 | 20% |
 
 #### 성별 분포
 | 성별 | 인원 | 비율 |
 |------|------|------|
-| F (여) | 26 | 52% |
-| M (남) | 24 | 48% |
+| F (여) | 50 | 50% |
+| M (남) | 50 | 50% |
 
 #### 정치성향 분포
 | 성향 | 인원 | 비율 |
 |------|------|------|
-| conservative | 16 | 32% |
-| progressive | 18 | 36% |
-| moderate | 16 | 32% |
+| conservative | 33 | 33% |
+| progressive | 33 | 33% |
+| moderate | 34 | 34% |
 
-#### Voice 타입 분포
+#### Voice 타입 분포 (12종)
 | Voice | 인원 | 비율 |
 |------|------|------|
-| NATEPAN | 18 | 36% |
-| DCINSIDE | 13 | 26% |
-| GENERAL | 10 | 20% |
-| BLIND | 9 | 18% |
+| NATEPAN | 16 | 16% |
+| DCINSIDE | 10 | 10% |
+| GENERAL | 9 | 9% |
+| BLIND | 8 | 8% |
+| FMKOREA | 9 | 9% |
+| THEQOO | 10 | 10% |
+| ARCALIVE | 7 | 7% |
+| RULIWEB | 7 | 7% |
+| CLIEN | 7 | 7% |
+| MLBPARK | 7 | 7% |
+| PPOMPPU | 7 | 7% |
+| INVEN | 3 | 3% |
 
 #### 연령대 분포
 | 연령 | 인원 |
 |------|------|
-| 10s | 3 |
-| 20s_early | 3 |
-| 20s_late | 4 |
+| 10s | 6 |
+| 20s_early | 6 |
+| 20s_late | 8 |
 | 30s | 6 |
-| 30s_early | 2 |
-| 30s_late | 5 |
-| 40s | 9 |
-| 50s | 10 |
-| 60s | 3 |
+| 30s_early | 10 |
+| 30s_late | 12 |
+| 40s | 20 |
+| 50s | 20 |
+| 60s | 6 |
 
 ---
 
@@ -902,11 +900,12 @@ VALUES ('{new_id}', '{existing_id}', 'ACQUAINTANCE', 0.3);
 - 한국 온라인 커뮤니티 패턴 분석 기반
 - 다양성만 고려하여 생성된 인공 프로필
 
-### Q. 왜 50명인가?
-**A.** 2026년 2분기 커뮤니티 규모 기준 타당한 숫자입니다.
-- 15명 앵커 = 핵심 아키타입 + 정치성향 + voice 조합
-- 35명 LLM 생성 = 앵커 다양화 + 데이터셋 풍부화
-- 500명 사용자 대비 10% 봇 비율로 신뢰성 유지
+### Q. 왜 100명인가?
+**A.** Phase C 확장으로 voice 다양성 + 네트워크 밀도 향상을 위함입니다.
+- 15명 앵커 = 핵심 아키타입 + 정치성향 + voice 조합 (4종)
+- 35명 LLM 생성 = 앵커 다양화 + 데이터셋 풍부화 (5종 추가)
+- 50명 신규 확장 = voice 12종 풀 활용 + 관계 네트워크 고도화
+- 1000명 사용자 대비 10% 봇 비율로 신뢰성 유지
 
 ### Q. 페르소나가 실제로 댓글을 쓰는가?
 **A.** 현재는 수동 테스트 + PersonaFactory 시뮬레이션입니다.
@@ -921,6 +920,7 @@ VALUES ('{new_id}', '{existing_id}', 'ACQUAINTANCE', 0.3);
 
 ---
 
-**마지막 업데이트**: 2026-06-04  
+**마지막 업데이트**: 2026-06-05  
+**버전**: 2.0 (100명 확장)  
 **담당**: Claude Code (Agent)  
 **검토 대상**: Product, Engineering
