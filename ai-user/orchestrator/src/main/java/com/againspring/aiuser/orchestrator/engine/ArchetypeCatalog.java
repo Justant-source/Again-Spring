@@ -1,12 +1,14 @@
 package com.againspring.aiuser.orchestrator.engine;
 
+import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
 
-import java.io.InputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.util.*;
 
 /**
@@ -15,7 +17,10 @@ import java.util.*;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ArchetypeCatalog {
+
+    private final OrchestratorProperties props;
 
     public record Archetype(
         String id,
@@ -38,7 +43,12 @@ public class ArchetypeCatalog {
     @SuppressWarnings("unchecked")
     public void load() {
         // archetypes.yml structure: {archetypes: [{id:..., category:..., ...}, ...]}
-        try (InputStream is = new ClassPathResource("personas/archetypes.yml").getInputStream()) {
+        File archetypeFile = new File(props.getPersonasDir() + "/archetypes.yml");
+        if (!archetypeFile.exists()) {
+            log.warn("archetypes.yml not found at {}", archetypeFile.getAbsolutePath());
+            return;
+        }
+        try (FileInputStream is = new FileInputStream(archetypeFile)) {
             Yaml yaml = new Yaml();
             Map<String, Object> root = yaml.load(is);
             if (root == null) { log.warn("archetypes.yml is empty"); return; }

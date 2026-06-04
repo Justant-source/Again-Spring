@@ -108,8 +108,10 @@ services:
       AI_LEARNING_BASE_URL: http://againspring-ai-learning-dev:8099
       SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
       AI_USER_PERSONA_TARGET: ${AI_USER_PERSONA_TARGET:-50}
+      AI_USER_PERSONAS_DIR: /app/personas
     volumes:
       - ../persona-history:/app/persona-history:rw
+      - ../ai-user/docs/personas:/app/personas:ro
     depends_on:
       mariadb-dev:
         condition: service_healthy

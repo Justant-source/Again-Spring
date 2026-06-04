@@ -12,7 +12,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.*;
 
@@ -102,8 +105,9 @@ public class PersonaFactory {
         // ID 생성 (UUID 32자)
         String id = UUID.randomUUID().toString().replace("-", "");
 
-        // users 테이블 INSERT
-        String email = "ai-gen-" + id.substring(0, 8) + "@againspring.internal";
+        // users 테이블 INSERT — 순번 기반 이메일 (ai-user-{NNN}@againspring.internal)
+        long nextNum = personaRepository.count() + 1;
+        String email = String.format("ai-user-%03d@againspring.internal", nextNum);
         String pwHash = new BCryptPasswordEncoder().encode(props.getBotPassword());
         jdbcTemplate.update(
             "INSERT INTO users (id, email, password_hash, nickname, roles, is_guest, must_change_password, created_at, updated_at) " +
@@ -150,6 +154,14 @@ public class PersonaFactory {
             .createdAt(Instant.now())
             .build();
         personaRepository.save(persona);
+
+        // YAML 파일로도 저장 (ai-user/docs/personas/profiles/ai-gen-{id8}/)
+        try {
+            writePersonaYaml(id, email, nickname, age, gender, region, job, politics, voice, tier,
+                           slang, persona.getDailyTarget(), interests, bias, circadian, archetype, voiceMap);
+        } catch (Exception e) {
+            log.debug("PersonaFactory YAML write skipped: {}", e.getMessage());
+        }
 
         log.info("PersonaFactory: created persona id={} age={} gender={} voice={} politics={}", id.substring(0,8), age, gender, voice, politics);
         return true;
@@ -246,5 +258,98 @@ JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내�
 
     private <T> T pick(T[] arr) {
         return arr[RNG.nextInt(arr.length)];
+    }
+
+    private void writePersonaYaml(String id, String email, String nickname,
+                                    String age, String gender, String region, String job,
+                                    String politics, String voice, String tier, double slang,
+                                    int dailyTarget, Map<String, Double> interests,
+                                    Map<String, Double> bias, List<Double> circadian,
+                                    String archetype, Map<String, Object> voiceMap) throws Exception {
+        String shortId = email.replace("@againspring.internal", "").replace("ai-user-", "ai-user-");
+        File dir = new File(props.getPersonasDir() + "/profiles/" + shortId);
+        dir.mkdirs();
+        new File(dir, "history").mkdirs();
+
+        // profile.yml
+        StringBuilder prof = new StringBuilder();
+        prof.append("id: ").append(id).append("\n");
+        prof.append("email: ").append(email).append("\n");
+        prof.append("nickname: ").append(nickname).append("\n");
+        prof.append("demographics:\n");
+        prof.append("  age_band: ").append(age).append("\n");
+        prof.append("  gender: ").append(gender).append("\n");
+        prof.append("  region: ").append(region).append("\n");
+        prof.append("  job: ").append(job).append("\n");
+        prof.append("orientation:\n");
+        prof.append("  political: ").append(politics).append("\n");
+        prof.append("  political_strength: 0.5\n");
+        prof.append("activity:\n");
+        prof.append("  tier: ").append(tier).append("\n");
+        prof.append("  daily_target: ").append(dailyTarget).append("\n");
+        prof.append("  slang_level: ").append(String.format("%.2f", slang)).append("\n");
+        prof.append("  voice: ").append(voice).append("\n");
+        prof.append("  circadian:\n");
+        for (Double v : circadian) {
+            prof.append("  - ").append(String.format("%.1f", v)).append("\n");
+        }
+        prof.append("interests:\n");
+        interests.forEach((k, v) -> prof.append("  ").append(k).append(": ").append(String.format("%.1f", v)).append("\n"));
+        prof.append("bias_profile:\n");
+        bias.forEach((k, v) -> prof.append("  ").append(k).append(": ").append(String.format("%.2f", v)).append("\n"));
+        prof.append("archetype_preferences:\n- ").append(archetype).append("\n");
+
+        Files.writeString(dir.toPath().resolve("profile.yml"), prof.toString());
+
+        // voice.yml — voiceMap에서 주요 필드 추출
+        StringBuilder voc = new StringBuilder();
+        voc.append("persona_id: ").append(id).append("\n");
+        voc.append("nickname: ").append(nickname).append("\n");
+        voc.append("formality: ").append(voiceMap.getOrDefault("formality", "casual")).append("\n");
+        voc.append("like_score: ").append(String.format("%.2f", ((Number)voiceMap.getOrDefault("like_score", 0.45)).doubleValue())).append("\n");
+        voc.append("vote_score: ").append(String.format("%.2f", ((Number)voiceMap.getOrDefault("vote_score", 0.30)).doubleValue())).append("\n");
+        voc.append("voice_type: ").append(voice).append("\n");
+        voc.append("age: ").append(age).append("\n");
+        voc.append("political_orientation: ").append(politics).append("\n");
+
+        // 나머지 키는 voiceMap에서 단순 직렬화
+        Set<String> skipKeys = Set.of("formality", "like_score", "vote_score", "voice_type", "age", "gender",
+                                       "political_orientation", "region", "job");
+        for (Map.Entry<String, Object> entry : voiceMap.entrySet()) {
+            String key = entry.getKey();
+            if (skipKeys.contains(key)) continue;
+            Object val = entry.getValue();
+            if (val instanceof String s) {
+                if (s.contains("\n")) {
+                    voc.append(key).append(": |\n");
+                    for (String l : s.split("\n")) voc.append("  ").append(l).append("\n");
+                } else {
+                    voc.append(key).append(": ").append(s).append("\n");
+                }
+            } else if (val instanceof List<?> list) {
+                voc.append(key).append(":\n");
+                for (Object item : list) voc.append("  - \"").append(item).append("\"\n");
+            } else if (val instanceof Map<?,?> map) {
+                voc.append(key).append(":\n");
+                map.forEach((k2, v2) -> {
+                    if (v2 instanceof List<?> l2) {
+                        voc.append("  ").append(k2).append(":\n");
+                        l2.forEach(item -> voc.append("    - \"").append(item).append("\"\n"));
+                    } else {
+                        voc.append("  ").append(k2).append(": ").append(v2).append("\n");
+                    }
+                });
+            } else {
+                voc.append(key).append(": ").append(val).append("\n");
+            }
+        }
+        Files.writeString(dir.toPath().resolve("voice.yml"), voc.toString());
+
+        // history README
+        Files.writeString(
+            dir.toPath().resolve("history").resolve("README.md"),
+            "# " + nickname + " 활동 이력\n\n" +
+            "AI 유저 행동 로그는 persona-history/" + id + "/ 에 저장됩니다.\n"
+        );
     }
 }

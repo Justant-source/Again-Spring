@@ -17,4 +17,5 @@ public class OrchestratorProperties {
     private String backendBaseUrl = "http://againspring-backend-dev:8080";
     private String llmAiUserUrl = "http://againspring-llm-ai-user-dev:8092";
     private int personaTarget = 50;
+    private String personasDir = "/app/personas";
 }

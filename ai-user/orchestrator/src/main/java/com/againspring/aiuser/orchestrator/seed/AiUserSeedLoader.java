@@ -9,14 +9,13 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
 
-import java.io.InputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -43,9 +42,7 @@ public class AiUserSeedLoader {
     private boolean seedEnabled;
 
     private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder(12);
-    private static final String SENTINEL_EMAIL = "ai-user01@againspring.com";
-    private static final String PROFILES_PATTERN = "classpath:personas/profiles/*/profile.yml";
-    private static final String RELATIONSHIPS_PATH = "classpath:personas/profiles/relationships.yml";
+    private static final String SENTINEL_EMAIL = "ai-user-001@againspring.internal";
 
     @PostConstruct
     public void seed() {
@@ -81,26 +78,34 @@ public class AiUserSeedLoader {
 
     @SuppressWarnings("unchecked")
     private void loadAndInsert() throws Exception {
-        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-        Resource[] profileResources = resolver.getResources(PROFILES_PATTERN);
-
-        if (profileResources.length == 0) {
-            log.warn("No profile.yml found at {}. Skipping seed.", PROFILES_PATTERN);
+        // Load profiles from filesystem
+        File profilesDir = new File(props.getPersonasDir() + "/profiles");
+        if (!profilesDir.exists() || !profilesDir.isDirectory()) {
+            log.warn("Personas directory not found: {}", profilesDir.getAbsolutePath());
             return;
         }
-        log.info("Found {} persona profiles", profileResources.length);
+
+        File[] profileDirs = profilesDir.listFiles(
+            dir -> dir.isDirectory() && new File(dir, "profile.yml").exists()
+        );
+        if (profileDirs == null || profileDirs.length == 0) {
+            log.warn("No profile.yml found under {}", profilesDir.getAbsolutePath());
+            return;
+        }
+        log.info("Found {} persona profiles in {}", profileDirs.length, profilesDir.getAbsolutePath());
 
         String hashedPassword = PASSWORD_ENCODER.encode(props.getBotPassword());
         Instant now = Instant.now();
         int userCount = 0, personaCount = 0;
 
         Yaml yaml = new Yaml();
-        for (Resource profileRes : profileResources) {
+        for (File profileDir : profileDirs) {
             Map<String, Object> profile;
-            try (InputStream is = profileRes.getInputStream()) {
+            File profileFile = new File(profileDir, "profile.yml");
+            try (FileInputStream is = new FileInputStream(profileFile)) {
                 profile = yaml.load(is);
             } catch (Exception e) {
-                log.warn("Failed to parse {}: {}", profileRes.getFilename(), e.getMessage());
+                log.warn("Failed to parse {}: {}", profileFile.getAbsolutePath(), e.getMessage());
                 continue;
             }
 
@@ -108,12 +113,12 @@ public class AiUserSeedLoader {
             String email = str(profile.get("email"));
             String nickname = str(profile.get("nickname"));
             if (id == null || email == null || nickname == null) {
-                log.warn("Skipping profile with missing id/email/nickname: {}", profileRes.getURI());
+                log.warn("Skipping profile with missing id/email/nickname: {}", profileFile.getAbsolutePath());
                 continue;
             }
 
             // Load voice.yml from sibling path
-            Map<String, Object> voiceData = loadSiblingVoice(profileRes, id, yaml);
+            Map<String, Object> voiceData = loadSiblingVoice(profileDir, id, yaml);
 
             // Insert user
             try {
@@ -156,20 +161,20 @@ public class AiUserSeedLoader {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> loadSiblingVoice(Resource profileRes, String personaId, Yaml yaml) {
+    private Map<String, Object> loadSiblingVoice(File profileDir, String personaId, Yaml yaml) {
         try {
-            String profileUri = profileRes.getURI().toString();
-            String voiceUri = profileUri.replace("profile.yml", "voice.yml");
-            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-            // Try loading from sibling path
-            Resource voiceRes = resolver.getResource(voiceUri);
-            if (voiceRes.exists()) {
-                try (InputStream is = voiceRes.getInputStream()) {
-                    return yaml.load(is);
+            File voiceFile = new File(profileDir, "voice.yml");
+            if (!voiceFile.exists()) {
+                return Collections.emptyMap();
+            }
+            try (FileInputStream is = new FileInputStream(voiceFile)) {
+                Object loaded = yaml.load(is);
+                if (loaded instanceof Map<?, ?>) {
+                    return (Map<String, Object>) loaded;
                 }
             }
         } catch (Exception e) {
-            log.debug("voice.yml not found for persona {}: {}", personaId, e.getMessage());
+            log.debug("No voice.yml for {}: {}", personaId, e.getMessage());
         }
         return Collections.emptyMap();
     }
@@ -251,14 +256,13 @@ public class AiUserSeedLoader {
     @SuppressWarnings("unchecked")
     private void seedRelationships(Yaml yaml) {
         try {
-            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-            Resource relRes = resolver.getResource(RELATIONSHIPS_PATH);
-            if (!relRes.exists()) {
+            File relFile = new File(props.getPersonasDir() + "/profiles/relationships.yml");
+            if (!relFile.exists()) {
                 log.info("No relationships.yml found — skipping relationship seeding");
                 return;
             }
             Map<String, Object> data;
-            try (InputStream is = relRes.getInputStream()) {
+            try (FileInputStream is = new FileInputStream(relFile)) {
                 data = yaml.load(is);
             }
             List<Map<String, Object>> relList = (List<Map<String, Object>>) data.getOrDefault("relationships", List.of());

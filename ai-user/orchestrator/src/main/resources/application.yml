@@ -50,6 +50,7 @@ ai-user:
   backend-base-url: ${BACKEND_BASE_URL:http://againspring-backend-dev:8080}
   llm-ai-user-url: ${LLM_AI_USER_URL:http://againspring-llm-ai-user-dev:8092}
   history-dir: ${AI_USER_HISTORY_DIR:/app/persona-history}
+  personas-dir: ${AI_USER_PERSONAS_DIR:/app/personas}
 
 ai-learning:
   base-url: ${AI_LEARNING_BASE_URL:http://againspring-ai-learning:8099}
