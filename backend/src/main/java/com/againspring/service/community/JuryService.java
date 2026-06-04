@@ -37,6 +37,7 @@ public class JuryService {
     // private final PromptSanitizer promptSanitizer; (removed)
     private final KeywordGuard keywordGuard;
     private final ObjectMapper objectMapper;
+    private final TonalizationService tonalizationService;
 
     @Qualifier("remoteLlmProvider")
     private final LLMProvider juryLlmProvider;
@@ -79,6 +80,17 @@ public class JuryService {
         }
 
         try {
+            // 🔄 2026-06-04: 톤 정규화 추가 — 배심원 입력 품질 개선
+            TonalizationService.TonalizationResult tonalization = tonalizationService.normalize(
+                    post.getTitle(), post.getBodyPublished());
+            if (tonalization.success()) {
+                log.info("Post tonalization applied: title={}c body={}c",
+                        tonalization.titleNormalized().length(),
+                        tonalization.bodyNormalized().length());
+                post.setTitle(tonalization.titleNormalized());
+                post.setBodyPublished(tonalization.bodyNormalized());
+            }
+
             String juryPersonaPrompt = promptLoader.get("community/jury_persona.md");
 
             // 선택지 정보를 프롬프트에 포함

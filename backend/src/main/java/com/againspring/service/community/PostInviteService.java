@@ -34,6 +34,7 @@ public class PostInviteService {
     private final JurorRepository jurorRepository;
     private final VoteOptionRepository voteOptionRepository;
     private final JuryService juryService;
+    private final TonalizationService tonalizationService;
 
     @Value("${app.url:https://againspring.net}")
     private String appUrl;
@@ -112,7 +113,24 @@ public class PostInviteService {
 
         post.setPartnerUserId(partnerUserId);
         post.setPartnerBodyRaw(bodyRaw);
-        post.setPartnerBodyPublished(bodyRaw);
+
+        // 🔄 2026-06-04: 파트너 답변도 톤 정규화 — 배심원 입력 품질 개선
+        TonalizationService.TonalizationResult tonalization = tonalizationService.normalize(
+                userTitle, bodyRaw);
+        if (tonalization.success()) {
+            log.info("Partner answer tonalization applied: body={}c",
+                    tonalization.bodyNormalized().length());
+            post.setPartnerBodyPublished(tonalization.bodyNormalized());
+            if (userTitle != null && !userTitle.isBlank()) {
+                post.setUserTitle(tonalization.titleNormalized());
+            }
+        } else {
+            post.setPartnerBodyPublished(bodyRaw);
+            if (userTitle != null && !userTitle.isBlank()) {
+                post.setUserTitle(userTitle);
+            }
+        }
+
         post.setPartnerAnsweredAt(Instant.now());
 
         // WAIT_FOR_PARTNER 모드일 때 공개 및 투표 마감시간 설정
@@ -120,11 +138,6 @@ public class PostInviteService {
             post.setVisibility(PostVisibility.PUBLIC);
             int hours = (post.getVoteDurationHours() != null) ? post.getVoteDurationHours() : 72;
             post.setVoteCloseAt(post.getPartnerAnsweredAt().plusSeconds((long) hours * 3600));
-        }
-
-        // userTitle이 제공되면 업데이트 (선택사항)
-        if (userTitle != null && !userTitle.isBlank()) {
-            post.setUserTitle(userTitle);
         }
 
         postRepository.save(post);
