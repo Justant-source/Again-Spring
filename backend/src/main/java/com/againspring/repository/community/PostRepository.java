@@ -41,6 +41,83 @@ public interface PostRepository extends JpaRepository<Post, String> {
      */
     Optional<Post> findByInviteToken(String inviteToken);
 
+    /** 전체 건수 — 페이지네이션 total count */
+    long countByVisibilityAndStatus(PostVisibility visibility, PostStatus status);
+
+    /** 카테고리별 전체 건수 */
+    long countByVisibilityAndStatusAndCategory(PostVisibility visibility, PostStatus status, PostCategory category);
+
+    /**
+     * 추천순 조회 (전체) — Hacker News 스타일 시간 감쇠 + 재부상 보너스
+     * score = (4×likes + 3×comments + 2.5×votes + 0.2×views + 1) / (age_h+2)^1.5 + recency_bonus
+     */
+    @Query(value = """
+            SELECT p.* FROM posts p
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) cnt, MAX(created_at) last_at
+                FROM post_likes WHERE post_id IS NOT NULL GROUP BY post_id
+            ) pl ON pl.post_id = p.id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) cnt, MAX(created_at) last_at
+                FROM post_comments GROUP BY post_id
+            ) pc ON pc.post_id = p.id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) cnt, MAX(created_at) last_at
+                FROM votes GROUP BY post_id
+            ) v ON v.post_id = p.id
+            WHERE p.visibility = 'PUBLIC' AND p.status = 'VOTING'
+            ORDER BY (
+                (4.0*COALESCE(pl.cnt,0) + 3.0*COALESCE(pc.cnt,0) + 2.5*COALESCE(v.cnt,0) + 0.2*p.view_count + 1.0)
+                / POWER(TIMESTAMPDIFF(SECOND, p.created_at, NOW())/3600.0 + 2, 1.5)
+                + CASE
+                    WHEN TIMESTAMPDIFF(SECOND,
+                           GREATEST(p.created_at, COALESCE(pc.last_at, p.created_at), COALESCE(v.last_at, p.created_at)),
+                           NOW()) / 3600.0 < 6
+                    THEN 5.0 / (TIMESTAMPDIFF(SECOND,
+                           GREATEST(p.created_at, COALESCE(pc.last_at, p.created_at), COALESCE(v.last_at, p.created_at)),
+                           NOW()) / 3600.0 + 1)
+                    ELSE 0
+                  END
+            ) DESC, p.created_at DESC
+            LIMIT :limit OFFSET :offset
+            """, nativeQuery = true)
+    List<Post> findRecommended(@Param("limit") int limit, @Param("offset") int offset);
+
+    /** 추천순 조회 (카테고리 필터) */
+    @Query(value = """
+            SELECT p.* FROM posts p
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) cnt, MAX(created_at) last_at
+                FROM post_likes WHERE post_id IS NOT NULL GROUP BY post_id
+            ) pl ON pl.post_id = p.id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) cnt, MAX(created_at) last_at
+                FROM post_comments GROUP BY post_id
+            ) pc ON pc.post_id = p.id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) cnt, MAX(created_at) last_at
+                FROM votes GROUP BY post_id
+            ) v ON v.post_id = p.id
+            WHERE p.visibility = 'PUBLIC' AND p.status = 'VOTING' AND p.category = :category
+            ORDER BY (
+                (4.0*COALESCE(pl.cnt,0) + 3.0*COALESCE(pc.cnt,0) + 2.5*COALESCE(v.cnt,0) + 0.2*p.view_count + 1.0)
+                / POWER(TIMESTAMPDIFF(SECOND, p.created_at, NOW())/3600.0 + 2, 1.5)
+                + CASE
+                    WHEN TIMESTAMPDIFF(SECOND,
+                           GREATEST(p.created_at, COALESCE(pc.last_at, p.created_at), COALESCE(v.last_at, p.created_at)),
+                           NOW()) / 3600.0 < 6
+                    THEN 5.0 / (TIMESTAMPDIFF(SECOND,
+                           GREATEST(p.created_at, COALESCE(pc.last_at, p.created_at), COALESCE(v.last_at, p.created_at)),
+                           NOW()) / 3600.0 + 1)
+                    ELSE 0
+                  END
+            ) DESC, p.created_at DESC
+            LIMIT :limit OFFSET :offset
+            """, nativeQuery = true)
+    List<Post> findRecommendedByCategory(@Param("category") String category,
+                                          @Param("limit") int limit,
+                                          @Param("offset") int offset);
+
     @Modifying
     @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :postId")
     void incrementViewCount(@Param("postId") String postId);

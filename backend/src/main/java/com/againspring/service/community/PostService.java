@@ -2,6 +2,7 @@ package com.againspring.service.community;
 
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.community.Post;
+import com.againspring.domain.enums.PostCategory;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.repository.community.PostRepository;
@@ -36,39 +37,45 @@ public class PostService {
      * @return 공개 포스트 페이지
      */
     public Page<Post> listPublicPosts(String category, String sort, Pageable pageable) {
-        // 카테고리 필터링
-        List<Post> posts;
+        int size   = pageable.getPageSize();
+        int offset = (int) pageable.getOffset();
+
+        // 카테고리 파싱 (null 허용)
+        PostCategory cat = null;
         if (category != null && !category.isEmpty()) {
             try {
-                com.againspring.domain.enums.PostCategory cat =
-                        com.againspring.domain.enums.PostCategory.valueOf(category.toUpperCase());
-                posts = postRepository.findByVisibilityAndStatusAndCategoryOrderByCreatedAtDesc(
-                        PostVisibility.PUBLIC,
-                        PostStatus.VOTING,
-                        cat,
-                        pageable
-                );
+                cat = PostCategory.valueOf(category.toUpperCase());
             } catch (IllegalArgumentException e) {
                 log.warn("Invalid category: {}", category);
-                posts = postRepository.findByVisibilityAndStatusOrderByCreatedAtDesc(
-                        PostVisibility.PUBLIC,
-                        PostStatus.VOTING,
-                        pageable
-                );
             }
-        } else {
-            posts = postRepository.findByVisibilityAndStatusOrderByCreatedAtDesc(
-                    PostVisibility.PUBLIC,
-                    PostStatus.VOTING,
-                    pageable
-            );
         }
 
-        // "recommended" 정렬은 추후 추천도(voteCount) 컬럼 추가 예정
-        // 현재는 "latest"만 작동 (createdAt desc는 이미 적용됨)
+        List<Post> posts;
+        long total;
 
-        long total = posts.size();
-        log.info("Listed {} public posts (category={}, sort={})", total, category, sort);
+        if ("recommended".equalsIgnoreCase(sort)) {
+            // 추천순: Hacker News 스타일 시간 감쇠 + 재부상 보너스
+            if (cat != null) {
+                posts = postRepository.findRecommendedByCategory(cat.name(), size, offset);
+                total = postRepository.countByVisibilityAndStatusAndCategory(PostVisibility.PUBLIC, PostStatus.VOTING, cat);
+            } else {
+                posts = postRepository.findRecommended(size, offset);
+                total = postRepository.countByVisibilityAndStatus(PostVisibility.PUBLIC, PostStatus.VOTING);
+            }
+        } else {
+            // 최신순 (기본)
+            if (cat != null) {
+                posts = postRepository.findByVisibilityAndStatusAndCategoryOrderByCreatedAtDesc(
+                        PostVisibility.PUBLIC, PostStatus.VOTING, cat, pageable);
+                total = postRepository.countByVisibilityAndStatusAndCategory(PostVisibility.PUBLIC, PostStatus.VOTING, cat);
+            } else {
+                posts = postRepository.findByVisibilityAndStatusOrderByCreatedAtDesc(
+                        PostVisibility.PUBLIC, PostStatus.VOTING, pageable);
+                total = postRepository.countByVisibilityAndStatus(PostVisibility.PUBLIC, PostStatus.VOTING);
+            }
+        }
+
+        log.info("Listed {} public posts (category={}, sort={}, total={})", posts.size(), category, sort, total);
         return new PageImpl<>(posts, pageable, total);
     }
 
