@@ -111,6 +111,21 @@ public class ActionExecutor {
         // Phase 3: demographic
         String demographic = demographicStr(persona);
 
+        // AI Learning: 동적 예시 검색 및 주입 (RAG)
+        String dynamicExamples = "";
+        java.util.List<AiLearningClient.ExampleItem> examples = aiLearningClient.findSimilar(
+            postExcerpt,
+            "COMMENT",
+            action.targetPost().getCategory(),
+            3
+        );
+        if (!examples.isEmpty()) {
+            dynamicExamples = examples.stream()
+                .map(e -> e.getContent())
+                .collect(java.util.stream.Collectors.joining("\n---\n"));
+            log.debug("RAG: {} comments found for {}", examples.size(), corrId);
+        }
+
         java.util.Optional<String> textOpt = llmClient.generateComment(GenDto.CommentRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForComment(persona, stance))
@@ -123,6 +138,7 @@ public class ActionExecutor {
             .demographic(demographic)
             .archetypeCommentSamples(archetypeCommentSamples)
             .existingComments(existingComments)
+            .dynamicExamples(dynamicExamples)
             .correlationId(corrId)
             .build());
 
@@ -201,6 +217,21 @@ public class ActionExecutor {
         // 글 길이 다양화 — 페르소나 tier 기반 가중 랜덤
         String lengthTier = pickLengthTier(persona);
 
+        // AI Learning: 동적 예시 검색 및 주입 (RAG)
+        String dynamicExamples = "";
+        java.util.List<AiLearningClient.ExampleItem> examples = aiLearningClient.findSimilar(
+            topicSeed,
+            "POST",
+            category,
+            3
+        );
+        if (!examples.isEmpty()) {
+            dynamicExamples = examples.stream()
+                .map(e -> e.getContent())
+                .collect(java.util.stream.Collectors.joining("\n---\n"));
+            log.debug("RAG: {} posts found for {}", examples.size(), corrId);
+        }
+
         java.util.Optional<String> bodyOpt = llmClient.generatePost(GenDto.PostRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForPost(persona))
@@ -211,6 +242,7 @@ public class ActionExecutor {
             .topicSeed(topicSeed)
             .formality(voiceFormality(persona))
             .demographic(demographicStr(persona))
+            .dynamicExamples(dynamicExamples)
             .lengthTier(lengthTier)
             .correlationId(corrId)
             .build());
