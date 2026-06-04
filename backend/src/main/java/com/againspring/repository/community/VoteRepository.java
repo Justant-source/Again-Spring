@@ -1,6 +1,7 @@
 package com.againspring.repository.community;
 
 import com.againspring.domain.community.Vote;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,4 +34,9 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
      * 사용자가 투표한 모든 Vote (최신순)
      */
     List<Vote> findByVoterUserIdOrderByCreatedAtDesc(String voterUserId);
+
+    /**
+     * 특정 시간 범위의 투표 수 (일별 집계용)
+     */
+    long countByCreatedAtBetween(Instant from, Instant to);
 }

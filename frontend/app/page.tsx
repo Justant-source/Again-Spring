@@ -12,10 +12,15 @@ export default function LandingPage() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
   const [mounted, setMounted] = useState(false);
+  const [todayVoteCount, setTodayVoteCount] = useState<number | null>(null);
   useGuestInit();
 
   useEffect(() => {
     setMounted(true);
+    fetch('/api/community/stats/today')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setTodayVoteCount(data.voteCount); })
+      .catch(() => {});
   }, []);
 
   if (!mounted) return null;
@@ -128,7 +133,7 @@ export default function LandingPage() {
           >
             <div style={{ textAlign: 'center', flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--L-ink)' }}>
-                12,840
+                {todayVoteCount !== null ? todayVoteCount.toLocaleString('ko-KR') : '—'}
               </div>
               <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 2 }}>
                 오늘 모인 시선

@@ -61,6 +61,7 @@ public class SecurityConfig {
                         .requestMatchers("POST", "/api/feedbacks").permitAll()
                         .requestMatchers("GET", "/api/community/posts").permitAll()
                         .requestMatchers("GET", "/api/community/posts/*").permitAll()
+                        .requestMatchers("GET", "/api/community/stats/today").permitAll()
                         .requestMatchers("GET", "/api/community/posts/*/comments").permitAll()
                         .requestMatchers("GET", "/api/s/*").permitAll()
                         .requestMatchers("POST", "/api/s/*/answer").permitAll()

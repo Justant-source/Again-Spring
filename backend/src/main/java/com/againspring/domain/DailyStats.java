@@ -51,6 +51,9 @@ public class DailyStats {
     @Builder.Default
     private int feedbackCount = 0;
 
+    @Builder.Default
+    private int voteCount = 0;
+
     @Type(JsonType.class)
     @Column(columnDefinition = "JSON")
     private Map<String, Object> metadata;
