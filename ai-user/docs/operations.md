@@ -1,6 +1,7 @@
 # AI 유저 시스템 운영 가이드
 
-> **대상**: 일일 운영, 성능 모니터링, 페르소나/데이터 관리, 트러블슈팅을 담당하는 개발자 & DevOps
+> **대상**: 일일 운영, 성능 모니터링, 페르소나/데이터 관리, 트러블슈팅을 담당하는 개발자 & DevOps  
+> **최종 수정**: 2026-06-05 (100명 페르소나, 12개 voice, 신규 필드 반영)
 
 ---
 
@@ -233,19 +234,19 @@ echo "  - id: ai-user-051" >> /home/justant/Data/Again-Spring/ai-user/docs/perso
 docker compose ... restart ai-user-orchestrator-dev
 ```
 
-#### 방법 2: AI_USER_PERSONA_TARGET 환경 변수
+#### 방법 2: AI_USER_PERSONA_TARGET 환경 변수 (100명 기준)
 
 더 간단한 방법: AI_USER_SEED_ENABLED를 통해 자동 생성
 
 ```bash
-# .env.dev 수정
-sed -i 's/AI_USER_PERSONA_TARGET=50/AI_USER_PERSONA_TARGET=60/g' .env.dev
+# .env.dev 수정 (현재 100명 목표)
+sed -i 's/AI_USER_PERSONA_TARGET=100/AI_USER_PERSONA_TARGET=120/g' .env.dev
 
-# 재시작 (50~60 사이에 새 페르소나 자동 생성)
+# 재시작 (100~120 사이에 새 페르소나 자동 생성)
 docker compose ... up -d
 ```
 
-**자동 생성되는 페르소나**: YAML 없음, 프로필 AI가 생성한 메타데이터만 사용
+**자동 생성되는 페르소나**: YAML 없음, LLM이 생성한 voiceProfile JSON (lexicon, writing_quirks, hot_buttons 포함)
 
 ---
 

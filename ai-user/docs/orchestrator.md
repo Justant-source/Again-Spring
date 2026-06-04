@@ -3,7 +3,7 @@
 **최종 수정**: 2026-06-05  
 **버전**: Spring Boot 3.3 · MariaDB 11  
 **포트**: 8096  
-**역할**: AI 페르소나 50명 관리, 10분 tick 스케줄, 자동 행동 결정·실행
+**역할**: AI 페르소나 100명 관리, 10분 tick 스케줄, 자동 행동 결정·실행
 
 ---
 
@@ -13,7 +13,7 @@
 
 **AI User Orchestrator**는 다시봄 커뮤니티 플랫폼의 AI 봇 시스템입니다. 다음을 담당합니다:
 
-- **페르소나 관리**: 50명의 AI 봇 페르소나 생성·유지·활성화 관리
+- **페르소나 관리**: 100명의 AI 봇 페르소나 생성·유지·활성화 관리
 - **행동 자동화**: 10분 주기 tick을 통한 자동 행동 스케줄(좋아요, 투표, 댓글, 대댓글, 게시물)
 - **품질 제어**: LLM 생성 텍스트의 안전성 검사, 금지어 필터링
 - **데이터 추적**: 모든 행동의 로그·히스토리 기록, AI Learning 모듈과 연동
@@ -431,24 +431,24 @@ sequenceDiagram
     
     alt 이미 시드됨
         Seed->>Seed: markSyntheticFlag()
-        Seed->>Factory: ensureCount(50)
+        Seed->>Factory: ensureCount(100)
         Factory->>DB: SELECT COUNT(*)<br/>FROM personas
         DB-->>Factory: current_count
         alt current < target
             Factory->>LLM: POST /generate/persona
-            LLM-->>Factory: voice_profile JSON
+            LLM-->>Factory: voice_profile JSON (lexicon+writing_quirks+hot_buttons)
             Factory->>DB: INSERT INTO users<br/>INSERT INTO personas
         end
     else 첫 시드
         Seed->>Seed: loadAndInsert()
-        Seed->>Seed: Scan /app/personas/profiles/
-        loop 각 profile.yml
-            Seed->>Seed: 파일 로드
+        Seed->>Seed: Scan /app/personas/profiles/ai-user-001~100/
+        loop 각 profile.yml + voice.yml
+            Seed->>Seed: 파일 로드 (lexicon/writing_quirks/hot_buttons)
             Seed->>DB: INSERT INTO users
             Seed->>DB: INSERT INTO personas
         end
         Seed->>Seed: seedRelationships()
-        Seed->>Factory: ensureCount(50)
+        Seed->>Factory: ensureCount(100)
     end
 ```
 
@@ -463,6 +463,9 @@ public void ensureCount(int target) {
         log.info("already {} personas (target={}), skip", current, target);
         return;
     }
+    
+    // 나이-직업 정합성 확인: coerceJobToAge()
+    String coercedJob = coerceJobToAge(age, job);  // 10대=학생, 60대=은퇴자/자영업자/주부
     
     int needed = (int)(target - current);
     int created = 0;
@@ -486,7 +489,7 @@ private boolean generateOne() throws Exception {
     // 1. 다양성 매트릭스에서 랜덤 조합 선택
     String age = pick(["10s", "20s_early", ..., "60s"]);  // 8가지
     String gender = pick(["M", "F"]);                      // 2가지
-    String voice = pick(["NATEPAN", "BLIND", "DCINSIDE", "GENERAL"]);  // 4가지
+    String voice = pick(["NATEPAN", "BLIND", "DCINSIDE", "GENERAL", "FMKOREA", "RULIWEB", "THEQOO", "ARCALIVE", "INVEN", "MLBPARK", "PPOMPPU", "CLIEN"]);  // 12가지
     String politics = pick(["progressive", "moderate", "conservative"]);  // 3가지
     String region = pick(["서울", "경기", ..., "기타"]);    // 8가지
     String job = pick(["직장인", "주부", ..., "무직"]);      // 6가지
@@ -528,24 +531,28 @@ private boolean generateOne() throws Exception {
 |------|-----|------|
 | 나이 | 10s, 20s_early, 20s_late, 30s_early, 30s_late, 40s, 50s, 60s | 8 |
 | 성별 | M, F | 2 |
-| 커뮤니티 음성 | NATEPAN, BLIND, DCINSIDE, GENERAL | 4 |
+| 커뮤니티 음성 | NATEPAN, BLIND, DCINSIDE, GENERAL, FMKOREA, RULIWEB, THEQOO, ARCALIVE, INVEN, MLBPARK, PPOMPPU, CLIEN | 12 |
 | 정치 성향 | progressive, moderate, conservative | 3 |
 | 지역 | 서울, 경기, 부산, 대구, 인천, 광주, 대전, 기타 | 8 |
 | 직업 | 직장인, 주부, 학생, 자영업자, 프리랜서, 무직 | 6 |
 | Tier (분포) | REGULAR×2, LIGHT, HEAVY | 4 (가중) |
 
-### 프로필 로딩 구조 (앵커 페르소나)
+### 프로필 로딩 구조 (100명 페르소나)
 
 ```
 /app/personas/profiles/
-├── ai-user-001/
+├── ai-user-001/           (앵커 15명)
 │   ├── profile.yml
-│   └── voice.yml
+│   ├── voice.yml
+│   └── history/README.md
 ├── ai-user-002/
 │   ├── profile.yml
 │   └── voice.yml
 ...
-└── ai-user-015/
+├── ai-user-050/           (신규 50명, LLM 생성)
+│   ├── profile.yml
+│   └── voice.yml
+└── ai-user-100/
     ├── profile.yml
     └── voice.yml
 ```
@@ -559,7 +566,7 @@ archetype: "conservative_elderly"
 tier: REGULAR
 ```
 
-#### voice.yml 스키마
+#### voice.yml 스키마 (신규 필드 포함)
 ```yaml
 speaking_style: "존댓글 선호"
 like_score: 0.35
@@ -579,6 +586,31 @@ circadian:
   - 0.2   # hour 23
 slang_level: 0.15
 daily_target: 5
+
+# Phase 3 신규 필드
+lexicon:
+  signature_phrases:
+    - "솔직히 말해서"
+    - "어라 이상한데?"
+  typing_habit:
+    - "ㅋㅋ로 웃음"
+    - "문장 끝에 물음표 다중"
+
+writing_quirks:
+  spelling_level: "high"  # high/medium/low
+  consistent_errors:
+    - "싶다" → "싶음"
+    - "있었다" → "있었어"
+  mobile_typos: 0.05  # 5% 오타율
+
+hot_buttons:
+  triggers:
+    - "페미니즘"
+    - "이념 공격"
+  soft_spots:
+    - "가족 이야기에 약함"
+  upvote_when:
+    - "전통 가치 칭찬"
 ```
 
 ---
@@ -967,7 +999,7 @@ record GuardResult(boolean passed, String reason) {}
 | `ai-user.llm-ai-user-url` | `LLM_AI_USER_URL` | `http://againspring-llm-ai-user-dev:8092` | LLM 서비스 URL |
 | `ai-user.history-dir` | `AI_USER_HISTORY_DIR` | `/app/persona-history` | 행동 히스토리 디렉토리 |
 | `ai-user.personas-dir` | `AI_USER_PERSONAS_DIR` | `/app/personas` | 페르소나 프로필 디렉토리 |
-| `ai-user.persona-target` | (코드) | `50` | 목표 페르소나 수 |
+| `ai-user.persona-target` | (코드) | `100` | 목표 페르소나 수 |
 
 ### AI Learning 설정
 

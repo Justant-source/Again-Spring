@@ -49,7 +49,7 @@ grep -E "^AI_USER|^AI_LEARNING|^SELF_CRITIQUE" .env.dev
 ```
 AI_USER_ENABLED=true           ✓ 필수 (false면 비활성)
 AI_LEARNING_ENABLED=true       ✓ 필수
-AI_USER_SEED_ENABLED=true      ✓ 권장 (첫 기동 시 50개 페르소나 생성)
+AI_USER_SEED_ENABLED=true      ✓ 권장 (첫 기동 시 100명 페르소나 생성)
 SELF_CRITIQUE_ENABLED=true     ✓ 권장 (생성물 품질 검증)
 ```
 
@@ -111,7 +111,7 @@ docker exec -it againspring-mariadb-dev mariadb \
   -u againspring -pF2etXbugW0EBDZNBMX17Q \
   -e "USE againspring_dev; SELECT COUNT(*) as persona_count FROM personas;"
 
-# 예상: 50 (AI_USER_SEED_ENABLED=true 일 때)
+# 예상: 100 (AI_USER_SEED_ENABLED=true 일 때)
 ```
 
 ---
@@ -271,7 +271,7 @@ docker exec -it againspring-mariadb-dev mariadb \
 - [ ] `docker compose ... up -d --build` 실행
 - [ ] 모든 서비스 `healthy` 또는 `Up` 상태 확인
 - [ ] 5가지 헬스체크 API 응답 `UP` 확인
-- [ ] 페르소나 수 확인 (`SELECT COUNT(*) FROM personas;`)
+- [ ] 페르소나 수 확인 (`SELECT COUNT(*) FROM personas; # 예상: 100`)
 - [ ] 프론트엔드 `localhost:8090` 에서 글 1개 이상 표시 확인
 
 **완료되면 개발/운영 모드로 진입 가능! 🚀**

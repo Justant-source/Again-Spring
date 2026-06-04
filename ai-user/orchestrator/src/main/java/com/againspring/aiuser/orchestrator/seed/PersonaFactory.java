@@ -37,7 +37,7 @@ public class PersonaFactory {
     // 다양성 매트릭스 — 부족분 생성에 사용
     private static final String[] AGES      = {"10s","20s_early","20s_late","30s_early","30s_late","40s","50s","60s"};
     private static final String[] GENDERS   = {"M","F"};
-    private static final String[] VOICES    = {"NATEPAN","BLIND","DCINSIDE","GENERAL"};
+    private static final String[] VOICES    = {"NATEPAN","BLIND","DCINSIDE","GENERAL","FMKOREA","RULIWEB","THEQOO","ARCALIVE","INVEN","MLBPARK","PPOMPPU","CLIEN"};
     private static final String[] POLITICS  = {"progressive","moderate","conservative"};
     private static final String[] REGIONS   = {"서울","경기","부산","대구","인천","광주","대전","기타"};
     private static final String[] JOBS      = {"직장인","주부","학생","자영업자","프리랜서","무직"};
@@ -82,12 +82,21 @@ public class PersonaFactory {
         String politics = pick(POLITICS);
         String region   = pick(REGIONS);
         String job      = pick(JOBS);
+        job = coerceJobToAge(age, job);
         String tier     = pick(TIERS);
         double slang    = switch (voice) {
-            case "DCINSIDE" -> 0.7 + RNG.nextDouble() * 0.3;
-            case "BLIND"    -> 0.2 + RNG.nextDouble() * 0.2;
-            case "NATEPAN"  -> 0.4 + RNG.nextDouble() * 0.3;
-            default         -> 0.3 + RNG.nextDouble() * 0.3;
+            case "DCINSIDE"  -> 0.7 + RNG.nextDouble() * 0.2;
+            case "FMKOREA"   -> 0.65 + RNG.nextDouble() * 0.2;
+            case "ARCALIVE"  -> 0.65 + RNG.nextDouble() * 0.2;
+            case "THEQOO"    -> 0.4 + RNG.nextDouble() * 0.2;
+            case "INVEN"     -> 0.4 + RNG.nextDouble() * 0.2;
+            case "BLIND"     -> 0.2 + RNG.nextDouble() * 0.2;
+            case "NATEPAN"   -> 0.3 + RNG.nextDouble() * 0.2;
+            case "RULIWEB"   -> 0.3 + RNG.nextDouble() * 0.2;
+            case "MLBPARK"   -> 0.2 + RNG.nextDouble() * 0.15;
+            case "PPOMPPU"   -> 0.15 + RNG.nextDouble() * 0.15;
+            case "CLIEN"     -> 0.1 + RNG.nextDouble() * 0.15;
+            default          -> 0.3 + RNG.nextDouble() * 0.3;
         };
 
         // LLM으로 voice 블록 생성
@@ -183,6 +192,20 @@ public class PersonaFactory {
     "agree": ["동의 반응1", "동의 반응2"],
     "disagree": ["반대 반응1"],
     "curious": ["궁금 반응1"]
+  },
+  "lexicon": {
+    "signature_phrases": ["이 사람이 자주 쓰는 표현 5~6개"],
+    "typing_habit": "타이핑 습관 1줄 (이모지, 줄바꿈, 신조어 사용 경향)"
+  },
+  "writing_quirks": {
+    "spelling_level": "low|mid|high",
+    "consistent_errors": ["이 사람 고정 오류 0~3개, 없으면 빈 배열"],
+    "mobile_typos": true또는false
+  },
+  "hot_buttons": {
+    "triggers": ["발끈 포인트 3개"],
+    "soft_spots": ["공감 주제 1~2개"],
+    "upvote_when": "좋아요 기준 1줄"
   }
 }
 JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내용에 쌍따옴표 금지.
@@ -206,8 +229,21 @@ JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내�
     private String extractNickname(Map<String, Object> voiceMap, String age, String gender) {
         Object n = voiceMap.remove("nickname");
         if (n instanceof String s && !s.isBlank()) return s;
-        // fallback
+        // fallback — voice를 여기서 얻을 수 없으므로 일반 풀 사용
         String[] pool = {"별빛","산호","하늘","달","구름","바람","노을","새벽","이슬","숲길"};
+        return pick(pool) + (RNG.nextInt(99) + 1);
+    }
+
+    /** Voice 타입별 닉네임 풀 (미래 확장용) */
+    private String generateNicknameByVoice(String voice) {
+        String[] pool = switch (voice) {
+            case "DCINSIDE","FMKOREA","ARCALIVE" -> new String[]{"어둠의세력","철갑","야밤","급식왕","드립왕","새벽전사","픽셀","야근맨"};
+            case "THEQOO" -> new String[]{"봄소녀","달빛소녀","새싹이","꽃새벽","별하나","해누리","꽃내음"};
+            case "BLIND"  -> new String[]{"칼퇴요정","야근지옥","증거남겨","이직준비","퇴근후","월급날"};
+            case "CLIEN","RULIWEB" -> new String[]{"논리왕","사색가","합리주의자","데이터냥","팩폭러"};
+            case "MLBPARK","PPOMPPU" -> new String[]{"경험자","관록","동네형","알뜰살림","꽃주부","현모"};
+            default -> new String[]{"별빛","산호","하늘","달","구름","바람","노을","새벽","이슬","숲길"};
+        };
         return pick(pool) + (RNG.nextInt(99) + 1);
     }
 
@@ -258,6 +294,16 @@ JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내�
 
     private <T> T pick(T[] arr) {
         return arr[RNG.nextInt(arr.length)];
+    }
+
+    /** 나이대에 맞지 않는 직업 조합을 현실적인 값으로 보정 */
+    private String coerceJobToAge(String age, String job) {
+        return switch (age) {
+            case "10s"       -> "학생";  // 10대는 무조건 학생
+            case "20s_early" -> job.equals("주부") || job.equals("은퇴자") ? "학생" : job;
+            case "60s"       -> job.equals("학생") ? "은퇴자" : job;
+            default          -> job.equals("학생") && !age.startsWith("2") ? "직장인" : job;
+        };
     }
 
     private void writePersonaYaml(String id, String email, String nickname,

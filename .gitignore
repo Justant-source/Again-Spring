@@ -37,6 +37,8 @@ env/.env.prod
 *.key
 *.p12
 *.keystore
+# git credential store (GitHub PAT) — 절대 커밋 금지
+/.git-credentials
 
 # ===== Test reports & coverage =====
 frontend/coverage/

@@ -217,6 +217,15 @@ public class AiUserSeedLoader {
             // Reactions (agree/disagree/curious examples)
             Object reactions = voice.get("reactions");
             if (reactions instanceof Map) voiceProfile.put("reactions", reactions);
+            // 새 필드: lexicon (말투 습관)
+            Object lexicon = voice.get("lexicon");
+            if (lexicon instanceof Map) voiceProfile.put("lexicon", lexicon);
+            // 새 필드: writing_quirks (맞춤법/오탈자 패턴)
+            Object writingQuirks = voice.get("writing_quirks");
+            if (writingQuirks instanceof Map) voiceProfile.put("writing_quirks", writingQuirks);
+            // 새 필드: hot_buttons (감정 트리거)
+            Object hotButtons = voice.get("hot_buttons");
+            if (hotButtons instanceof Map) voiceProfile.put("hot_buttons", hotButtons);
             // Demographics from voice.yml top-level
             voiceProfile.put("age", str(voice.get("age"), ""));
             voiceProfile.put("gender", str(voice.get("gender"), ""));

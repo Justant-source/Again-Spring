@@ -219,7 +219,7 @@ public class PromptAssembler {
 
 %s
 
-**자연스러운 구어체** — 맞춤법이 완벽할 필요 없음. 짧은 문장들.
+**자연스러운 구어체** — 페르소나 특성의 writing_quirks에 consistent_errors가 있으면 그 오류 패턴을 **일관되게** 재현. mobile_typos: true이면 모바일 오탈자(자모분리·인접키) 2~3개 자연스럽게 포함. 맞춤법이 완벽할 필요 없음.
 
 슬랭 수준 %.1f/1.0 %s
 
