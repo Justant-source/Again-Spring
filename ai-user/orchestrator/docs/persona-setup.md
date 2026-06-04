@@ -1,6 +1,6 @@
 # AI 유저 페르소나 관리 가이드
 
-**최종 수정**: 2026-06-05  
+**최종 수정**: 2026-06-05 (voices.yml 구조 현행화)  
 **대상**: 100명 페르소나 (앵커 15 + FIX 35 + 신규 50)  
 **파일 경로**: `ai-user/docs/personas/profiles/ai-user-001~100/` (3자리 번호, 볼륨 마운트 `:ro`)
 
@@ -227,7 +227,8 @@ writing_quirks:
     - "싶다" → "싶음"
     - "있었다" → "있었어"
     - "네요" → "네"
-  mobile_typos: 0.05                       # 5% 오타율 (자리 바꿈, 빠짐)
+  mobile_typos: true                       # 모바일 오타 여부 (자리 바꿈, 빠짐)
+  features: "타이핑 속도가 빨라서 사소한 오타 발생"  # 자유 설명
 
 # 트리거 & 약점 (hot_buttons)
 hot_buttons:
@@ -441,10 +442,11 @@ voices:
        - "줄임말 선호"
    
    writing_quirks:
-     spelling_level: "medium"
+     spelling_level: "mid"
      consistent_errors:
        - "게" → "깨"
-     mobile_typos: 0.03
+     mobile_typos: true
+     features: "모바일 작성 많아 사소한 오타 발생"
    
    hot_buttons:
      triggers:
@@ -516,22 +518,30 @@ docker exec -it againspring-mariadb-dev mariadb \
 
 **spelling_level**: high / medium / low
 ```
-- high: 정확한 맞춤법 (자영업자, 직장인)
-- medium: 약간의 오류 (일반)
-- low: 잦은 오류 (10대, slang high)
+- high: 정확한 맞춤법 (자영업자, 직장인, CLIEN)
+- mid: 약간의 오류 (일반, THEQOO, BLIND)
+- low: 잦은 오류 (10대, 슬랭 높음, DCINSIDE, ARCALIVE)
 ```
 
-**consistent_errors**: 반복되는 실수
+**consistent_errors**: 반복되는 오타 패턴 (배열)
 ```
 - "싶다" → "싶음" (존댓글 화자)
-- "뭐" → "뭐" 중복 사용
+- "돼/되 혼동" (자칫하기 쉬운 실수)
+- "띄어쓰기 무시" (특정 Voice의 특징)
+- "받침 흘림" (DC 특유)
 ```
 
-**mobile_typos**: 자리 바꿈, 빠짐 비율
+**mobile_typos**: 모바일 타이핑 오타 여부 (boolean)
 ```
-- 0.05 = 5% (평균)
-- 0.10 = 10% (높은 활동도)
-- 0.01 = 1% (신중한 글)
+- true: 모바일 작성이 많아 자리 바꿈·빠짐 가능
+- false: 신중한 글 또는 PC 위주 작성
+```
+
+**features**: 자유 서술 (LLM 프롬프트 주입용)
+```
+예: "ㅠㅠ·… 빈번, 줄바꿈으로 감정 끊기"
+예: "맞춤법 의도적 파괴, ㅋㅋ 남발, 'ㅇㅇ/ㄴㄴ' 단답"
+예: "문장 길고 논리적, 인용·근거 좋아함"
 ```
 
 ### hot_buttons (트리거 & 약점)

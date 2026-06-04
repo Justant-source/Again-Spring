@@ -1,4 +1,5 @@
 import logging
+import os
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from typing import Optional, List
@@ -8,6 +9,10 @@ from app.services.embedding import EmbeddingService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 embedding_service = EmbeddingService()
+
+# Quality threshold for RAG examples (0.0-1.0 scale)
+# Default 0.5: filters out obvious noise while allowing imperfect conflict narratives
+MIN_QUALITY_SCORE = float(os.getenv("RAG_MIN_QUALITY", "0.5"))
 
 
 class SaveRequest(BaseModel):
@@ -71,22 +76,48 @@ def search_examples(req: SearchRequest, request: Request) -> List[ExampleItem]:
             conditions.append("(category = %s OR category IS NULL)")
             params.append(req.category)
 
-        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        sql = f"""
+        # Stage 1: Search with quality threshold
+        quality_condition = f"quality_score >= {MIN_QUALITY_SCORE}"
+        where_conditions = conditions + [quality_condition]
+        where = ("WHERE " + " AND ".join(where_conditions)) if where_conditions else ""
+
+        sql_with_quality = f"""
             SELECT id, content, source,
                    1 - VEC_DISTANCE_COSINE(embedding, VEC_FromText(%s)) AS similarity
             FROM example_bank
             {where}
-            ORDER BY VEC_DISTANCE_COSINE(embedding, VEC_FromText(%s)) ASC
+            ORDER BY 1 - VEC_DISTANCE_COSINE(embedding, VEC_FromText(%s)) DESC,
+                     quality_score DESC
             LIMIT %s
         """
-        # vec_str appears twice (once for SELECT, once for ORDER BY)
         all_params = [vec_str] + params + [vec_str, req.top_k]
 
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute(sql, all_params)
+                cur.execute(sql_with_quality, all_params)
                 rows = cur.fetchall()
+
+        # Fallback: if quality filter yields no results, fetch top-k without quality gate
+        # and log warning
+        if not rows:
+            logger.warning(
+                f"search_examples: No results with quality >= {MIN_QUALITY_SCORE}. "
+                f"Falling back to similarity-only search."
+            )
+            where_fallback = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            sql_fallback = f"""
+                SELECT id, content, source,
+                       1 - VEC_DISTANCE_COSINE(embedding, VEC_FromText(%s)) AS similarity
+                FROM example_bank
+                {where_fallback}
+                ORDER BY 1 - VEC_DISTANCE_COSINE(embedding, VEC_FromText(%s)) DESC
+                LIMIT %s
+            """
+            fallback_params = [vec_str] + params + [vec_str, req.top_k]
+            with get_db() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql_fallback, fallback_params)
+                    rows = cur.fetchall()
 
         return [
             ExampleItem(id=r["id"], content=r["content"],

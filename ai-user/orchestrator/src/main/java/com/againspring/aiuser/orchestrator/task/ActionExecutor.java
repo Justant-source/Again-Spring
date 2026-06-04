@@ -247,7 +247,9 @@ public class ActionExecutor {
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
             return;
         }
-        String body = bodyOpt.get();
+        String rawBody = bodyOpt.get();
+        // 부수버그: LLM 메타텍스트 제거 (예: "[원문 수정본]", "[수정본]" 등)
+        final String body = cleanLlmMetaText(rawBody);
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(body);
         if (!guard.passed()) {
             logAction(persona, action, "BLOCKED", corrId, java.util.Map.of("reason", guard.reason(), "usedLlm", true));
@@ -279,19 +281,21 @@ public class ActionExecutor {
 
     // ── Voice Profile Blocks (Phase 1b) ──────────────────────────────────────
 
-    /** 글 생성용 voice 블록: general_style + example_post_openers + age/political notes */
+    /** 글 생성용 voice 블록: general_style + example_post_openers + writing_quirks + lexicon + age/political notes */
     private String voiceBlockForPost(Persona persona) {
         Map<String, Object> vp = persona.getVoiceProfile();
         if (vp == null) return "일반 커뮤니티 사용자";
         StringBuilder sb = new StringBuilder();
         appendStr(sb, vp, "general_style");
         appendExamples(sb, vp, "example_post_openers", "글 시작 예시", 2);
+        appendWritingQuirks(sb, vp);
+        appendLexicon(sb, vp);
         appendStr(sb, vp, "age_voice_notes", "\n[연령 말투] ");
         appendStr(sb, vp, "political_voice_notes", "\n[성향 표현] ");
         return sb.toString().trim();
     }
 
-    /** 댓글 생성용 voice 블록: general_style + example_comments(stance별) + notes */
+    /** 댓글 생성용 voice 블록: general_style + example_comments(stance별) + writing_quirks + lexicon + hot_buttons + notes */
     @SuppressWarnings("unchecked")
     private String voiceBlockForComment(Persona persona, String stance) {
         Map<String, Object> vp = persona.getVoiceProfile();
@@ -299,6 +303,9 @@ public class ActionExecutor {
         StringBuilder sb = new StringBuilder();
         appendStr(sb, vp, "general_style");
         appendExamples(sb, vp, "example_comments", "댓글 예시", 3);
+        appendWritingQuirks(sb, vp);
+        appendLexicon(sb, vp);
+        appendHotButtons(sb, vp);
         // Reactions: pick by stance
         Object reactionsObj = vp.get("reactions");
         if (reactionsObj instanceof Map) {
@@ -320,7 +327,7 @@ public class ActionExecutor {
         return sb.toString().trim();
     }
 
-    /** 대댓글 생성용 voice 블록: general_style + example_replies + reactions */
+    /** 대댓글 생성용 voice 블록: general_style + example_replies + writing_quirks + lexicon + hot_buttons + reactions */
     @SuppressWarnings("unchecked")
     private String voiceBlockForReply(Persona persona) {
         Map<String, Object> vp = persona.getVoiceProfile();
@@ -328,6 +335,9 @@ public class ActionExecutor {
         StringBuilder sb = new StringBuilder();
         appendStr(sb, vp, "general_style");
         appendExamples(sb, vp, "example_replies", "대댓글 예시", 2);
+        appendWritingQuirks(sb, vp);
+        appendLexicon(sb, vp);
+        appendHotButtons(sb, vp);
         // Add all reactions as reference
         Object reactionsObj = vp.get("reactions");
         if (reactionsObj instanceof Map) {
@@ -364,6 +374,120 @@ public class ActionExecutor {
     private void appendStr(StringBuilder sb, Map<String, Object> vp, String key, String prefix) {
         Object v = vp.get(key);
         if (v != null && !v.toString().isBlank()) sb.append(prefix).append(v.toString().trim());
+    }
+
+    /**
+     * writing_quirks 맞춤법/오탈자 패턴을 프롬프트에 주입.
+     * consistent_errors(고정 오류) 또는 mobile_typos 여부를 구체적 지시로 변환.
+     */
+    @SuppressWarnings("unchecked")
+    private void appendWritingQuirks(StringBuilder sb, Map<String, Object> vp) {
+        Object quirksObj = vp.get("writing_quirks");
+        if (!(quirksObj instanceof Map)) return;
+        Map<String, Object> quirks = (Map<String, Object>) quirksObj;
+        if (quirks.isEmpty()) return;
+
+        sb.append("\n[맞춤법·오타 패턴] ");
+        boolean addedAny = false;
+
+        // consistent_errors: 고정 맞춤법 오류
+        Object errorsObj = quirks.get("consistent_errors");
+        if (errorsObj instanceof List) {
+            List<?> errors = (List<?>) errorsObj;
+            if (!errors.isEmpty()) {
+                List<?> shuffled = new ArrayList<>(errors);
+                Collections.shuffle((List<Object>) shuffled, RNG);
+                int n = Math.min(1, shuffled.size());
+                sb.append(shuffled.get(0));
+                addedAny = true;
+            }
+        }
+
+        // mobile_typos: 모바일 오타 여부
+        Object mobileObj = quirks.get("mobile_typos");
+        if (mobileObj instanceof Boolean && (Boolean) mobileObj) {
+            if (addedAny) sb.append(" / ");
+            sb.append("모바일 오타 2~3개 자연스럽게");
+            addedAny = true;
+        }
+
+        if (!addedAny) {
+            // quirks가 있지만 파싱 불가면 아무것도 추가 안 함
+            sb.setLength(sb.length() - "[맞춤법·오타 패턴] ".length());
+        }
+    }
+
+    /**
+     * lexicon (말투 습관, 자주 쓰는 표현)을 프롬프트에 주입.
+     * signature_phrases 또는 typing_habit을 샘플로 추가.
+     */
+    @SuppressWarnings("unchecked")
+    private void appendLexicon(StringBuilder sb, Map<String, Object> vp) {
+        Object lexObj = vp.get("lexicon");
+        if (!(lexObj instanceof Map)) return;
+        Map<String, Object> lexicon = (Map<String, Object>) lexObj;
+        if (lexicon.isEmpty()) return;
+
+        sb.append("\n[자주 쓰는 표현] ");
+        boolean addedAny = false;
+
+        // signature_phrases: 대표 표현
+        Object phrasesObj = lexicon.get("signature_phrases");
+        if (phrasesObj instanceof List) {
+            List<?> phrases = (List<?>) phrasesObj;
+            if (!phrases.isEmpty()) {
+                List<?> shuffled = new ArrayList<>(phrases);
+                Collections.shuffle((List<Object>) shuffled, RNG);
+                int n = Math.min(2, shuffled.size());
+                for (int i = 0; i < n; i++) {
+                    if (i > 0) sb.append(" / ");
+                    sb.append(shuffled.get(i));
+                }
+                addedAny = true;
+            }
+        }
+
+        // typing_habit: 타이핑 습관 설명
+        if (!addedAny) {
+            Object habitObj = lexicon.get("typing_habit");
+            if (habitObj != null && !habitObj.toString().isBlank()) {
+                sb.append(habitObj.toString().trim());
+                addedAny = true;
+            }
+        }
+
+        if (!addedAny) {
+            // lexicon이 있지만 파싱 불가면 아무것도 추가 안 함
+            sb.setLength(sb.length() - "[자주 쓰는 표현] ".length());
+        }
+    }
+
+    /**
+     * hot_buttons (감정 트리거/민감 주제)를 프롬프트에 주입.
+     * 댓글/대댓글 톤에 영향을 주는 민감 포인트를 간략히 표시.
+     */
+    @SuppressWarnings("unchecked")
+    private void appendHotButtons(StringBuilder sb, Map<String, Object> vp) {
+        Object buttonsObj = vp.get("hot_buttons");
+        if (!(buttonsObj instanceof Map)) return;
+        Map<String, Object> buttons = (Map<String, Object>) buttonsObj;
+        if (buttons.isEmpty()) return;
+
+        // triggers: 발끈하는 주제
+        Object triggersObj = buttons.get("triggers");
+        if (triggersObj instanceof List) {
+            List<?> triggers = (List<?>) triggersObj;
+            if (!triggers.isEmpty()) {
+                sb.append("\n[민감 주제] ");
+                List<?> shuffled = new ArrayList<>(triggers);
+                Collections.shuffle((List<Object>) shuffled, RNG);
+                int n = Math.min(2, shuffled.size());
+                for (int i = 0; i < n; i++) {
+                    if (i > 0) sb.append(" / ");
+                    sb.append(shuffled.get(i));
+                }
+            }
+        }
     }
 
     // ── 글 길이 다양화 ────────────────────────────────────────────────────────
@@ -613,10 +737,58 @@ public class ActionExecutor {
             .orElse("OTHER");
     }
 
+    /**
+     * LLM 메타 텍스트 제거: "[원문 수정본]", "[수정본]", "[제목]", "[본문]" 등
+     * 선두 메타 라인(대괄호로 감싼 머리말)과 "수정본:" / "원문:" 접두사 제거.
+     * 본문 중간의 정상 대괄호(이모지/강조)는 보존.
+     */
+    private String cleanLlmMetaText(String body) {
+        if (body == null || body.isBlank()) return body;
+
+        String[] lines = body.split("[\\n\\r]+");
+        StringBuilder result = new StringBuilder();
+        boolean skipLeadingMeta = true;
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+
+            if (skipLeadingMeta) {
+                // 선두 메타 라인 패턴: "[...]" 시작 또는 "수정본:" / "원문:" 접두
+                if (trimmed.matches("^\\[.*\\]\\s*$") ||
+                    trimmed.startsWith("수정본:") || trimmed.startsWith("원문:") ||
+                    trimmed.startsWith("제목:") || trimmed.startsWith("본문:")) {
+                    continue;  // 이 라인은 스킵
+                }
+                // 첫 실제 콘텐츠를 만나면 이후로 메타 스킵 중지
+                if (!trimmed.isEmpty()) {
+                    skipLeadingMeta = false;
+                }
+            }
+
+            if (!skipLeadingMeta) {
+                if (result.length() > 0) result.append("\n");
+                result.append(line);
+            }
+        }
+
+        return result.toString().trim();
+    }
+
     private String extractTitle(String body) {
         if (body == null) return "갈등 사연";
-        String firstLine = body.split("[\\n\\r]+")[0].trim();
-        return firstLine.length() > 80 ? firstLine.substring(0, 80) : firstLine;
+        String[] lines = body.split("[\\n\\r]+");
+
+        // 메타 라인 건너뛰고 첫 실제 문장을 제목으로
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty() && !trimmed.matches("^\\[.*\\]\\s*$") &&
+                !trimmed.startsWith("수정본:") && !trimmed.startsWith("원문:") &&
+                !trimmed.startsWith("제목:") && !trimmed.startsWith("본문:")) {
+                return trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed;
+            }
+        }
+
+        return "갈등 사연";
     }
 
     private String truncate(String s, int max) {

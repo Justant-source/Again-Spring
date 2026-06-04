@@ -80,6 +80,7 @@ public class PromptAssembler {
             - 실제 인물 실명·연락처·주소·개인정보 절대 포함 금지
             - 실제 사건 원문 복제 금지 (완전 창작)
             - 판결·처방·승패 표현 금지
+            - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지 — 한국 커뮤니티 문체만 따를 것
             %s%s""".formatted(
                 req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
                 req.getCategory() != null ? req.getCategory() : "OTHER",
@@ -107,6 +108,7 @@ public class PromptAssembler {
             이 글에 달 짧은 댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
             - 50~150자 내외
+            - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지 — 한국 커뮤니티 문체만 따를 것
             %s
             """.formatted(
                 req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
@@ -133,9 +135,10 @@ public class PromptAssembler {
             이 댓글에 대한 자연스러운 대댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
             - 초단문 필수: 15~40자만 (한 문장 반도 안 됨)
-            - 감정만 표현: "공감", "응원", "이해" 중심
-            - "정말", "진짜", "진심으로" 등 감정 강조 자연스러움
+            - 감정만 표현: 공감, 응원, 이해 중심
+            - 정말, 진짜, 진심으로 등 감정 강조 자연스러움
             - ㅠㅠ, ㅋ, 💚 같은 이모지 자연스럽게 포함
+            - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지 — 한국 커뮤니티 문체만 따를 것
             %s
             """.formatted(
                 req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
@@ -164,7 +167,16 @@ public class PromptAssembler {
 
     private String dynamicExamplesBlock(String examples) {
         if (examples == null || examples.isBlank()) return "";
-        return "\n[실제 커뮤니티 유사 예시 — 말투·구조만 참고, 내용은 완전 창작]\n" + safe(examples.trim()) + "\n";
+        // RAG 동적 예시에서 온점·쌍따옴표 정규화 — 이 예시는 구조만 참고, 문체는 위 규칙만 따르기
+        String normalized = examples.trim()
+            .replaceAll("\\.$", "")  // 문장 끝 온점 제거
+            .replaceAll("\"", "");    // 쌍따옴표 제거
+        return "\n───────────────────────────────────────\n" +
+               "[참고용 예시 — 길이·구조만 모방, 문장부호·존댓말·반말은 위 규칙만 따를 것]\n" +
+               "아래 예시의 온점, 존댓말, 표현을 절대 모방하지 말 것. 페르소나와 한국 문체 규칙 우선.\n" +
+               "───────────────────────────────────────\n" +
+               safe(normalized) + "\n" +
+               "───────────────────────────────────────\n";
     }
 
     private boolean isPolite(String formality) {
@@ -180,14 +192,16 @@ public class PromptAssembler {
         String speechRules = polite ? """
             **존댓말 사용** — 자연스러운 구어 존댓말:
             - 사용: ~요, ~어요, ~아요, ~더라고요, ~것 같아요, ~했어요, ~해요
-            - 허용: "진짜 공감해요", "저도 그랬어요", "어휴 힘드셨겠어요 ㅠㅠ"
+            - 허용 예: 진짜 공감해요 / 저도 그랬어요 / 어휴 힘드셨겠어요 ㅠㅠ
             - 금지: 지나친 격식어 (~습니다, ~입니다, 공문서 투) / 완전 반말 (~임, ~거든)
-            - 쌍따옴표("") 완전 금지 — 인용 시: ~라고 하더라고요 / ~했다고 해요
+            - 간접화법 인용 금지: 겹따옴표 사용 절대 금지 — 대신: ~라고 하더라고요 / ~했다고 해요
+            - 문장 끝 온점(.) 금지 — 한국 커뮤니티는 점 생략, ㅠ/ㅋ/...로 끊기
             """ : """
             **반말 전용** — 아래 종결어미 절대 사용 금지:
             - 금지: ~요, ~습니다, ~입니다, ~합니다, ~했어요, ~하세요
             - 사용: ~임, ~함, ~거든, ~거임, ~더라, ~한다고 함, ~했음, ~는데, ~잖아, ~야
-            - 쌍따옴표("") 완전 금지 — 인용 시: ~라고 함 / ~했다고 함
+            - 간접화법 인용 금지: 겹따옴표 사용 절대 금지 — 대신: ~라고 함 / ~했다고 함
+            - 문장 끝 온점(.) 금지 — 한국 반말에도 마찬가지로 점 생략, 그냥 끊거나 ㅠ/ㅋ/...로 끊기
             """;
 
         String slangGuide = polite

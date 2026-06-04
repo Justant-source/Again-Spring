@@ -9,6 +9,7 @@
 #   slang: slang_level 가이드 (voice+age 기반, ±0.1 허용)
 #   arch: archetype_preferences[0]
 #   concept: 1줄 페르소나 핵심 (voice.yml general_style 작성 시 기준)
+#   formality: 존댓말(formal) vs 반말(informal) 비율. 2026-06-05 기준: informal 우세(70~80%), formal~20-30% (명시적 존댓말 Voice만)
 #
 # daily_target: HEAVY=10, REGULAR=6, LIGHT=3
 # 나이-직업 정합성 규칙:
@@ -17,6 +18,12 @@
 #   20s_late → 직장인/프리랜서/무직
 #   30s~ → 직장인/자영업자/주부/프리랜서/상담사 등
 #   60s → 은퇴자/자영업자/주부
+#
+# writing_quirks 구조 (2026-06-05 강화):
+#   - spelling_level: low / mid / high (필수)
+#   - consistent_errors: [돼/되, 않/안 등] (해당 시 나열)
+#   - mobile_typos: [인접키오타, 스페이스 등] (실제 패턴만)
+#   - features: [ㅋㅋ, ..., 말줄임표 등 특유 표현] (3~4개)
 
 ## ── AGENT A1 담당: 001~017 ──────────────────────────────────────────────
 
@@ -188,7 +195,10 @@
 - 실명·전화번호·실제 주소·실제 사건 언급 금지
 - voice.yml 크기 목표: **3~4KB**. 예시는 3~4개 (패턴용, 복붙 소스 아님)
 - 새 필드 크기: lexicon 10줄 이내, writing_quirks 6줄 이내, hot_buttons 8줄 이내
-- `spelling_level`: low / mid / high 중 하나
+- **formality 기본값**: informal 우세 (반말 70~80%), formal(존댓말) 20~30%. 명시적 존댓말 Voice(CLIEN/PPOMPPU/NATEPAN사연 전용)만 formal 비율 높임
+- **writing_quirks 필수 구조**: spelling_level + consistent_errors + mobile_typos + features (위 정의 참조)
+- **온점(.) 금지**: 한국 커뮤 문체(줄바꿈·말줄임표 우위) 준수
+- **쌍따옴표 금지**: 간접화법은 `~라고`, `~한다고 함` 형식 (쌍따옴표 사용 금지)
 
 ### ANCHOR (001~015)
 - `id`, `email`, `nickname` 절대 변경 금지

@@ -47,7 +47,7 @@ sequenceDiagram
     API-->>API: {"id": new_id, "status": "saved"}
 ```
 
-### 3.2 검색 시퀀스 (POST /examples/search)
+### 3.2 검색 시퀀스 (POST /examples/search) — Quality 필터 포함
 
 ```mermaid
 sequenceDiagram
@@ -62,13 +62,18 @@ sequenceDiagram
     KURE-->>EmbedService: [float; 768]
     EmbedService-->>API: [q0, q1, ..., q767]
     API->>API: VEC_FromText 포맷팅
-    API->>DB: SELECT id, content, source,<br/>1 - VEC_DISTANCE_COSINE<br/>(embedding, query_vec)<br/>as similarity<br/>WHERE (filters)<br/>ORDER BY distance ASC<br/>LIMIT top_k
-    DB-->>DB: 코사인 거리 계산<br/>(모든 벡터 vs 쿼리)
+    API->>DB: SELECT id, content, source,<br/>1 - VEC_DISTANCE_COSINE(...)<br/>WHERE quality_score >= MIN_QUALITY<br/>AND (filters)<br/>ORDER BY similarity DESC,<br/>quality_score DESC
+    DB-->>DB: 코사인 거리 + 품질 필터
     DB-->>API: [(id, content, source, score)]
+    alt No results with quality filter
+        API->>DB: Fallback: similarity-only search<br/>(quality gate 제거)
+        DB-->>API: Top-k (품질 무관)
+        API->>API: ⚠️ 경고 로그 기록
+    end
     API-->>API: ExampleItem[] 매핑
 ```
 
-### 3.3 필터링 로직
+### 3.3 필터링 로직 — Quality Score 기반 검색
 
 ```python
 # SearchRequest
@@ -79,12 +84,31 @@ sequenceDiagram
     "top_k": 3
 }
 
-# SQL WHERE 조건 (동적)
+# SQL WHERE 조건 (동적) + Quality Filter
+MIN_QUALITY_SCORE = float(os.getenv("RAG_MIN_QUALITY", "0.5"))
+
+conditions = []
 if req.content_type:
-    WHERE content_type = %s
+    conditions.append("content_type = %s")
 if req.category:
-    WHERE (category = %s OR category IS NULL)
+    conditions.append("(category = %s OR category IS NULL)")
+
+# Stage 1: 품질 기준 이상으로 필터링
+quality_condition = f"quality_score >= {MIN_QUALITY_SCORE}"
+conditions.append(quality_condition)
+WHERE = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+# 결과 없으면 Stage 2: 품질 조건 제거 후 재검색 (Fallback)
+if not rows:
+    # Remove quality_condition and retry
+    WHERE = "WHERE " + " AND ".join(conditions[:-1]) if conditions[:-1] else ""
+    log.warning(f"No results with quality >= {MIN_QUALITY_SCORE}. Fallback to similarity-only.")
 ```
+
+**품질 점수 해석**:
+- `1.0`: 완전한 갈등 사연 (마침표 문법 완전, 반말 특성 포함)
+- `0.5`: 경계선 (불완전한 표현이나 약간의 갈등 신호)
+- `0.0`: 순수 잡음 (UI 토큰, 레시피, 갤러리 메타데이터 등)
 
 ---
 
@@ -156,6 +180,59 @@ class EmbeddingService:
 - **정규화**: `normalize_embeddings=True` (코사인 거리 최적화)
 - **차원**: 768 (mariadb VECTOR에 맞춰 후처리 가능)
 - **배치 크기**: 32 (메모리 효율)
+
+### 5.3 품질 필터 (QualityFilter)
+
+**역할**: 저장 및 검색 시 비갈등 잡음 차단 및 품질 점수 계산 (0.0~1.0)
+
+```python
+class QualityFilter:
+    # 문법 규칙
+    PERIOD_EOL = re.compile(r'[^.].{0,50}$')  # 마침표 없음
+    DOUBLE_QUOTE = re.compile(r'[""｜「」【】『』]')  # 이상한 따옴표
+    
+    # 잡음 차단 (passes())
+    UI_NOISE_TOKENS = re.compile(
+        r'\[\s*(?:원본\s*보기|더보기|본문\s*바로가기|...)\s*\]'
+    )  # UI 버튼 텍스트: "[원본 보기]", "[더보기]"
+    
+    RECIPE_SIGNALS = re.compile(
+        r'(?:레시피|재료|굽기|한\s*스푼|양념|...)'
+    )  # 요리 도메인: "레시피", "재료", "양념"
+    
+    GALLERY_NOISE = re.compile(
+        r'(?:흑백|컬러|사진|촬영|카메라|...)'
+    )  # 갤러리 메타: "사진", "촬영", "카메라"
+
+    def passes(text):
+        """
+        Returns True if text 통과 (저장 가능).
+        UI 토큰, 레시피(3개 이상 신호), 갤러리 잡음(2개+ 신호 + <200자) 차단.
+        """
+        if UI_NOISE_TOKENS.search(text):
+            return False
+        if len(RECIPE_SIGNALS.findall(text)) >= 3:
+            return False
+        if len(GALLERY_NOISE.findall(text)) >= 2 and len(text) < 200:
+            return False
+        return True
+
+    def score(text) -> float:
+        """
+        Returns quality score 0.0~1.0.
+        - 마침표/따옴표 결함: -0.3/-0.2
+        - 반말 특성(임, 함, 됨, 거든): +0.1
+        - UI/레시피/갤러리 신호: 각 -0.2~0.3
+        """
+        score = 1.0
+        score -= 0.3 if PERIOD_EOL.search(text) else 0
+        score -= 0.2 if DOUBLE_QUOTE.search(text) else 0
+        score = min(1.0, score + 0.1) if '임' in text else score
+        # ... (레시피/갤러리 신호도 감점)
+        return round(max(0.0, score), 2)
+```
+
+**데이터 정화(2026-06-05)**: 크롤링된 예시뱅크에서 웹툰 감상평·요리 레시피·사진 댓글 등 갈등과 무관한 잡음 132건을 삭제 → 224→92건 정리 (백업: `example_bank_backup_0605`). 배경: 오염 예시가 RAG 프롬프트 주입 시 생성 품질 저하 문제.
 
 ---
 
@@ -370,6 +447,11 @@ UVICORN_PORT=8099
 # 크롤링 스케줄
 CRAWLER_RUN_HOUR=3         # KST 시간
 CRAWLER_TIMEZONE=Asia/Seoul
+
+# RAG 품질 필터링 임계값 (0.0~1.0)
+# 기본값 0.5: 명백한 잡음은 차단, 불완전한 갈등 사연 허용
+# 0.0 = 품질 무시, 1.0 = 최고 품질만 선택
+RAG_MIN_QUALITY=0.5
 ```
 
 ### 11.2 requirements.txt

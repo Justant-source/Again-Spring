@@ -1,6 +1,6 @@
 # AI User Orchestrator Service 상세 문서
 
-**최종 수정**: 2026-06-05  
+**최종 수정**: 2026-06-05 (voice profile 3필드 주입 + formality 교정)
 **버전**: Spring Boot 3.3 · MariaDB 11  
 **포트**: 8096  
 **역할**: AI 페르소나 100명 관리, 10분 tick 스케줄, 자동 행동 결정·실행
@@ -495,12 +495,20 @@ private boolean generateOne() throws Exception {
     String job = pick(["직장인", "주부", ..., "무직"]);      // 6가지
     String tier = pick(["REGULAR", "REGULAR", "LIGHT", "HEAVY"]);  // 가중 분포
     
-    // 2. Voice 레벨 결정 (voice 타입별)
+    // 2. Voice 레벨 결정 (voice 타입별) — 2026-06-05: 혼용 Voice slang 상향
     double slang = switch (voice) {
-        case "DCINSIDE" -> 0.7 + random[0.0, 0.3];  // 높은 슬랭
-        case "BLIND"    -> 0.2 + random[0.0, 0.2];  // 낮은 슬랭
-        case "NATEPAN"  -> 0.4 + random[0.0, 0.3];
-        default         -> 0.3 + random[0.0, 0.3];
+        case "DCINSIDE"  -> 0.7 + random[0.0, 0.2];     // 높은 슬랭
+        case "FMKOREA"   -> 0.65 + random[0.0, 0.2];
+        case "ARCALIVE"  -> 0.65 + random[0.0, 0.2];
+        case "THEQOO"    -> 0.5 + random[0.0, 0.25];    // 혼용 스타일 — slang 범위 상향
+        case "INVEN"     -> 0.5 + random[0.0, 0.25];    // 혼용 스타일 — slang 범위 상향
+        case "BLIND"     -> 0.2 + random[0.0, 0.2];     // 낮은 슬랭
+        case "NATEPAN"   -> 0.4 + random[0.0, 0.25];    // 사연=존댓말, 댓글=혼용 — slang 범위 상향
+        case "RULIWEB"   -> 0.45 + random[0.0, 0.25];   // 혼용 스타일 — slang 범위 상향
+        case "MLBPARK"   -> 0.2 + random[0.0, 0.15];
+        case "PPOMPPU"   -> 0.25 + random[0.0, 0.2];    // 혼용으로 분류 — slang 범위 상향
+        case "CLIEN"     -> 0.1 + random[0.0, 0.15];
+        default          -> 0.3 + random[0.0, 0.3];
     };
     
     // 3. LLM으로 voice_profile 생성
@@ -523,6 +531,23 @@ private boolean generateOne() throws Exception {
     personaRepository.save(p);
     return true;
 }
+```
+
+**2026-06-05 Formality 교정**:
+
+기존: 전체 ~40% 존댓말 (과다) → 신규: ~20-30% 존댓말 (자연스러움)
+
+```
+formality 판정 로직 (PersonaFactory):
+┌─ CLIEN             → "polite" (논리적/정중한 voice)
+├─ NATEPAN          → 50% "polite", 50% "casual" (혼용)
+└─ 나머지            → slang < 0.25일 때만 "polite", 아니면 "casual"
+                      (기존 0.4 → 0.25로 임계값 낮춤)
+
+결과:
+- slang 자체가 낮은 Voice (BLIND, CLIEN, MLBPARK 등)만 polite 우세
+- THEQOO, INVEN, RULIWEB 등 혼용 Voice는 casual 우세
+- 생성된 예시 문장도 "반말 기본" 지시 추가
 ```
 
 ### 다양성 매트릭스
@@ -760,6 +785,49 @@ Optional<String> jwtOpt = tokenCache.getToken(persona.getId(), email, botPasswor
 // → 캐시: persona.id → token (만료 시까지)
 ```
 
+### Voice Profile 블록 주입 (Phase 3 강화: writing_quirks, lexicon, hot_buttons)
+
+**2026-06-05 변경사항**: 기존에 DB에서 로딩되지만 **프롬프트에 주입되지 않던** voice_profile의 3개 필드가 이제 활성화되었습니다:
+
+- **writing_quirks** (consistent_errors, mobile_typos): 고정 맞춤법 오류 패턴 및 모바일 오타 여부
+- **lexicon** (signature_phrases, typing_habit): 페르소나가 자주 쓰는 표현과 타이핑 습관
+- **hot_buttons** (triggers, soft_spots): 페르소나를 자극하는 주제와 약한 주제
+
+세 가지 헬퍼 메소드로 voice 블록에 주입됩니다:
+
+```java
+// voiceBlockForPost: writing_quirks + lexicon 추가
+private String voiceBlockForPost(Persona persona) {
+    // ... general_style, example_post_openers ...
+    appendWritingQuirks(sb, vp);    // 고정 맞춤법 오류 패턴
+    appendLexicon(sb, vp);          // 자주 쓰는 표현
+    // ... age_voice_notes, political_voice_notes ...
+}
+
+// voiceBlockForComment: writing_quirks + lexicon + hot_buttons 추가
+private String voiceBlockForComment(Persona persona, String stance) {
+    // ... general_style, example_comments ...
+    appendWritingQuirks(sb, vp);    // 고정 맞춤법 오류 패턴
+    appendLexicon(sb, vp);          // 자주 쓰는 표현
+    appendHotButtons(sb, vp);       // 민감 주제
+    // ... reactions ...
+}
+
+// voiceBlockForReply: writing_quirks + lexicon + hot_buttons 추가
+private String voiceBlockForReply(Persona persona) {
+    // ... general_style, example_replies ...
+    appendWritingQuirks(sb, vp);    // 고정 맞춤법 오류 패턴
+    appendLexicon(sb, vp);          // 자주 쓰는 표현
+    appendHotButtons(sb, vp);       // 민감 주제
+    // ... reactions ...
+}
+```
+
+**효과**:
+- LLM이 페르소나의 실제 맞춤법 오류 습관을 반영한 글 생성 (예: "싶다"→"싶음", 오타 2~3%)
+- "솔직히 말해서", "어라 이상한데?" 같은 고유 표현이 자연스럽게 나타남
+- "페미니즘", "이념" 같은 민감 주제에서 감정적 톤이 반영됨
+
 ### 행동별 실행 로직
 
 #### executeLike()
@@ -799,7 +867,7 @@ private void executeVote(Persona persona, PlannedAction action, String jwt, Stri
 **단계**:
 1. 기존 댓글 조회: GET `/api/community/posts/{id}/comments`
 2. Archetype 샘플 코드 조합
-3. Voice profile 블록 생성
+3. Voice profile 블록 생성 (writing_quirks, lexicon, hot_buttons 주입 포함)
 4. RAG 검색: AiLearningClient.findSimilar()
 5. LLM 호출: POST `/v1/invoke` (llmAiUserClient)
 6. 안전 검사: ContentSafetyGuard.check()
@@ -879,6 +947,19 @@ private void executeComment(Persona persona, PlannedAction action, String jwt, S
     logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
         Map.of("postId", postId, "len", text.length(), "usedLlm", true));
 }
+```
+
+### LLM 메타 텍스트 자동 제거 (Post 후처리)
+
+**2026-06-05 새기능**: executePost()에서 LLM이 자발 생성한 메타텍스트를 글 본문에서 제거합니다.
+
+```
+제거 대상 패턴:
+- "[원문 수정본]", "[수정본]", "[제목]", "[본문]" 등 대괄호 선두 라인
+- "수정본:", "원문:", "제목:", "본문:" 접두사
+- 동시에 extractTitle()이 메타 라인을 건너뛰고 첫 실제 문장을 제목으로 사용
+
+효과: 글 발행 시 깔끔한 콘텐츠만 노출 (사용자 혼란 방지)
 ```
 
 #### executeReply() — Phase 4b

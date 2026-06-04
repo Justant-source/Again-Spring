@@ -88,13 +88,13 @@ public class PersonaFactory {
             case "DCINSIDE"  -> 0.7 + RNG.nextDouble() * 0.2;
             case "FMKOREA"   -> 0.65 + RNG.nextDouble() * 0.2;
             case "ARCALIVE"  -> 0.65 + RNG.nextDouble() * 0.2;
-            case "THEQOO"    -> 0.4 + RNG.nextDouble() * 0.2;
-            case "INVEN"     -> 0.4 + RNG.nextDouble() * 0.2;
+            case "THEQOO"    -> 0.5 + RNG.nextDouble() * 0.25;  // 혼용 스타일 — slang 범위 상향
+            case "INVEN"     -> 0.5 + RNG.nextDouble() * 0.25;  // 혼용 스타일 — slang 범위 상향
             case "BLIND"     -> 0.2 + RNG.nextDouble() * 0.2;
-            case "NATEPAN"   -> 0.3 + RNG.nextDouble() * 0.2;
-            case "RULIWEB"   -> 0.3 + RNG.nextDouble() * 0.2;
+            case "NATEPAN"   -> 0.4 + RNG.nextDouble() * 0.25;  // 사연=존댓말, 댓글=혼용 — slang 범위 상향
+            case "RULIWEB"   -> 0.45 + RNG.nextDouble() * 0.25; // 혼용 스타일 — slang 범위 상향
             case "MLBPARK"   -> 0.2 + RNG.nextDouble() * 0.15;
-            case "PPOMPPU"   -> 0.15 + RNG.nextDouble() * 0.15;
+            case "PPOMPPU"   -> 0.25 + RNG.nextDouble() * 0.2;  // 혼용으로 분류 — slang 범위 상향
             case "CLIEN"     -> 0.1 + RNG.nextDouble() * 0.15;
             default          -> 0.3 + RNG.nextDouble() * 0.3;
         };
@@ -143,7 +143,14 @@ public class PersonaFactory {
         voiceMap.put("voice_type", voice);
         voiceMap.put("like_score", 0.4 + RNG.nextDouble() * 0.4);
         voiceMap.put("vote_score", 0.2 + RNG.nextDouble() * 0.4);
-        voiceMap.put("formality", slang < 0.4 ? "polite" : "casual");
+
+        // formality 결정: 반말 우세 원칙. 특정 Voice만 명시적으로 존댓말.
+        String formality = switch (voice) {
+            case "CLIEN"  -> "polite";                           // 논리적/정중한 voice
+            case "NATEPAN" -> RNG.nextDouble() < 0.5 ? "polite" : "casual";  // 50% 확률로 혼용
+            default -> slang < 0.25 ? "polite" : "casual";       // 나머지: slang < 0.25일 때만 polite
+        };
+        voiceMap.put("formality", formality);
 
         // archetype 선택
         String archetype = pickArchetype(age, politics, job);
@@ -209,6 +216,9 @@ public class PersonaFactory {
   }
 }
 JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내용에 쌍따옴표 금지.
+생성하는 example_comments, example_replies, example_post_openers의 모든 문장 끝에도 온점을 붙이지 마라.
+또한 간접화법 따옴표("", 역슬래시 따옴표 포함)를 이 예시들에 삽입하지 마라.
+반말이 기본이며, 존댓말은 명시적으로 지정된 voice에서만 사용하라.
 """, voice, age, gender.equals("M") ? "남성" : "여성", region, job, politics);
     }
 
