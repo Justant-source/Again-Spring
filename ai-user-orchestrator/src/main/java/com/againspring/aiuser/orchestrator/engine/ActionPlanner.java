@@ -22,12 +22,12 @@ public class ActionPlanner {
     private final PersonaSeenPostRepository seenPostRepo;
     private static final Random RNG = new Random();
 
-    // Action probability weights (relative)
-    private static final double P_LIKE = 0.40;
-    private static final double P_VOTE = 0.20;
+    // 기본값 — voice_profile에 like_score/vote_score 없을 때 폴백
+    private static final double P_LIKE_DEFAULT = 0.45;
+    private static final double P_VOTE_DEFAULT = 0.30;
     private static final double P_COMMENT = 0.20;
-    private static final double P_REPLY_BASE = 0.15;  // if replyTargets available
-    private static final double P_POST = 0.05;        // HEAVY tier only
+    private static final double P_REPLY_BASE = 0.15;
+    private static final double P_POST = 0.05;
 
     /**
      * Plan one action for the given persona.
@@ -53,6 +53,10 @@ public class ActionPlanner {
         double rand = RNG.nextDouble();
         double cumul = 0;
 
+        // 페르소나별 like/vote 확률 (voice_profile의 like_score/vote_score 우선)
+        double pLike = voiceScore(persona, "like_score", P_LIKE_DEFAULT);
+        double pVote = voiceScore(persona, "vote_score", P_VOTE_DEFAULT);
+
         // REPLY check (priority when available)
         cumul += canReply ? P_REPLY_BASE : 0;
         if (rand < cumul && canReply) {
@@ -63,13 +67,13 @@ public class ActionPlanner {
         }
 
         // LIKE
-        cumul += hasFeed ? P_LIKE : 0;
+        cumul += hasFeed ? pLike : 0;
         if (rand < cumul && hasFeed) {
             return Optional.of(PlannedAction.like(pickByAffinity(persona, unseen)));
         }
 
         // VOTE
-        cumul += hasFeed ? P_VOTE : 0;
+        cumul += hasFeed ? pVote : 0;
         if (rand < cumul && hasFeed) {
             PostDto post = pickByAffinity(persona, unseen);
             Long optionId = pickVoteOption(persona, post);
@@ -90,6 +94,16 @@ public class ActionPlanner {
         }
 
         return Optional.empty();
+    }
+
+    /** voice_profile에서 숫자 점수 읽기 (없으면 fallback) */
+    private double voiceScore(Persona persona, String key, double fallback) {
+        try {
+            if (persona.getVoiceProfile() == null) return fallback;
+            Object v = persona.getVoiceProfile().get(key);
+            if (v instanceof Number) return Math.max(0.05, Math.min(0.95, ((Number) v).doubleValue()));
+        } catch (Exception ignored) {}
+        return fallback;
     }
 
     /**

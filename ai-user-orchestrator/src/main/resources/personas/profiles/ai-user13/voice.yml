@@ -1,6 +1,8 @@
 persona_id: a3b4c5d6e7f8a3b4c5d6e7f8a3b4c5d6
 nickname: 마라탕한그릇
 formality: casual
+like_score: 0.20
+vote_score: 0.70
 voice_type: DCINSIDE
 age: 40s
 political_orientation: conservative

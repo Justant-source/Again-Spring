@@ -189,6 +189,9 @@ public class AiUserSeedLoader {
             voiceProfile.put("like_criteria", str(voice.get("like_criteria"), voice.get("likeCriteria"), "관심 주제에 공감 시"));
             voiceProfile.put("vote_notes", str(voice.get("vote_notes"), voice.get("voteNotes"), "편향 없음"));
             voiceProfile.put("formality", str(voice.get("formality"), "casual"));
+            // 페르소나별 좋아요/투표 성향 점수 (ActionPlanner가 사용)
+            if (voice.containsKey("like_score")) voiceProfile.put("like_score", voice.get("like_score"));
+            if (voice.containsKey("vote_score")) voiceProfile.put("vote_score", voice.get("vote_score"));
             // Voice notes for age/political character
             voiceProfile.put("political_voice_notes", str(voice.get("political_voice_notes"), ""));
             voiceProfile.put("age_voice_notes", str(voice.get("age_voice_notes"), ""));
