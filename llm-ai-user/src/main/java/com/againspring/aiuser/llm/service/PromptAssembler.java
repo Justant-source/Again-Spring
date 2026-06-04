@@ -37,7 +37,10 @@ public class PromptAssembler {
     }
 
     public String assemblePostPrompt(PostGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), postGuide);
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), postGuide, req.getFormality());
+        String politeSuffix = isPolite(req.getFormality())
+            ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
+            : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
         String user = """
             카테고리: %s
             아키타입: %s
@@ -48,15 +51,19 @@ public class PromptAssembler {
             - 실제 사건 원문 복제 금지 (완전 창작)
             - 판결·처방·승패 표현 금지
             - 300~600자 내외, 자연스러운 커뮤니티 말투
-            """.formatted(
+            %s""".formatted(
                 req.getCategory() != null ? req.getCategory() : "OTHER",
                 req.getArchetype() != null ? req.getArchetype() : "일반갈등",
-                req.getTopicSeed() != null ? "주제 힌트: " + req.getTopicSeed() : "");
+                req.getTopicSeed() != null ? "주제 힌트: " + req.getTopicSeed() : "",
+                politeSuffix);
         return system + "\n" + SEP + "\n" + user;
     }
 
     public String assembleCommentPrompt(CommentGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), commentGuide);
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), commentGuide, req.getFormality());
+        String toneNote = isPolite(req.getFormality())
+            ? "- 존댓말로 작성 (~요, ~어요, ~더라고요, ~것 같아요)"
+            : "- 반말로 작성 (요/습니다 금지)";
         String user = """
             글 제목: %s
             글 내용 요약: %s
@@ -64,16 +71,21 @@ public class PromptAssembler {
 
             이 글에 달 짧은 댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
-            - 50~150자 내외, 자연스러운 커뮤니티 반말 댓글
+            - 50~150자 내외
+            %s
             """.formatted(
                 req.getPostTitle() != null ? req.getPostTitle() : "",
                 req.getPostBodyExcerpt() != null ? req.getPostBodyExcerpt() : "",
-                req.getStance() != null ? req.getStance() : "NEUTRAL");
+                req.getStance() != null ? req.getStance() : "NEUTRAL",
+                toneNote);
         return system + "\n" + SEP + "\n" + user;
     }
 
     public String assembleReplyPrompt(ReplyGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), replyGuide);
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), replyGuide, req.getFormality());
+        String toneNote = isPolite(req.getFormality())
+            ? "- 존댓말로 작성 (~요, ~어요 등 자연스럽게)"
+            : "- 반말로 작성 (요/습니다 금지)";
         String user = """
             원댓글: %s
             맥락: %s
@@ -81,27 +93,47 @@ public class PromptAssembler {
 
             이 댓글에 대한 자연스러운 대댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
-            - 30~100자 내외, 커뮤니티 반말 대댓글
+            - 30~100자 내외
+            %s
             """.formatted(
                 req.getParentCommentExcerpt() != null ? req.getParentCommentExcerpt() : "",
                 req.getThreadContext() != null ? req.getThreadContext() : "",
-                req.getStance() != null ? req.getStance() : "CURIOUS");
+                req.getStance() != null ? req.getStance() : "CURIOUS",
+                toneNote);
         return system + "\n" + SEP + "\n" + user;
     }
 
-    private String buildSystem(String voiceProfile, double slangLevel, String guide) {
+    private boolean isPolite(String formality) {
+        return "polite".equalsIgnoreCase(formality);
+    }
+
+    private String buildSystem(String voiceProfile, double slangLevel, String guide, String formality) {
+        boolean polite = isPolite(formality);
+
+        String speechRules = polite ? """
+            **존댓말 사용** — 자연스러운 구어 존댓말:
+            - 사용: ~요, ~어요, ~아요, ~더라고요, ~것 같아요, ~했어요, ~해요
+            - 허용: "진짜 공감해요", "저도 그랬어요", "어휴 힘드셨겠어요 ㅠㅠ"
+            - 금지: 지나친 격식어 (~습니다, ~입니다, 공문서 투) / 완전 반말 (~임, ~거든)
+            - 쌍따옴표("") 완전 금지 — 인용 시: ~라고 하더라고요 / ~했다고 해요
+            """ : """
+            **반말 전용** — 아래 종결어미 절대 사용 금지:
+            - 금지: ~요, ~습니다, ~입니다, ~합니다, ~했어요, ~하세요
+            - 사용: ~임, ~함, ~거든, ~거임, ~더라, ~한다고 함, ~했음, ~는데, ~잖아, ~야
+            - 쌍따옴표("") 완전 금지 — 인용 시: ~라고 함 / ~했다고 함
+            """;
+
+        String slangGuide = polite
+            ? (slangLevel >= 0.5 ? "ㅠㅠ, ㅋㅋ 가끔 자연스럽게 사용 가능" : "이모지·줄임말 거의 없이 정중하게")
+            : (slangLevel >= 0.6 ? "— ㄹㅇ, ㄷㄷ, ㅋㅋㅋ, 개[형용사] 자연스럽게 사용"
+               : slangLevel >= 0.4 ? "— ㅋㅋ, ㅠㅠ 가끔 사용" : "— 줄임말 거의 없이 반말만");
+
         return """
 당신은 한국 갈등 커뮤니티 '다시봄'의 일반 사용자입니다.
 
 ## 말투 규칙 (가장 중요)
 
-**반말 전용** — 아래 종결어미 절대 사용 금지:
-- 금지: ~요, ~습니다, ~입니다, ~합니다, ~했어요, ~하세요
-- 사용: ~임, ~함, ~거든, ~거임, ~더라, ~한다고 함, ~했음, ~는데, ~잖아, ~야
-
-**쌍따옴표("") 완전 금지** — 대화 인용 방법:
-- 금지: "전여친이랑 여기 가봤는데"라고 했어요
-- 사용: 전여친이랑 여기 가봤다고 함 / 전여친 얘기를 또 꺼냄
+%s
 
 **자연스러운 구어체** — 맞춤법이 완벽할 필요 없음. 짧은 문장들.
 
@@ -117,9 +149,9 @@ public class PromptAssembler {
 - 실명, 연락처, 주소, 주민번호 등 개인정보 포함 금지
 - 실제 사건 원문 복제 금지 — 완전 창작
 - 판결·단정 표현 금지 ("네가 잘못", "저 사람이 나쁘다" 식)""".formatted(
+            speechRules,
             slangLevel,
-            slangLevel >= 0.6 ? "— ㄹㅇ, ㄷㄷ, ㅋㅋㅋ, 개[형용사] 자연스럽게 사용" :
-            slangLevel >= 0.4 ? "— ㅋㅋ, ㅠㅠ 가끔 사용" : "— 줄임말 거의 없이 반말만",
+            slangGuide,
             voiceProfile != null ? voiceProfile : "일반 커뮤니티 사용자",
             guide);
     }

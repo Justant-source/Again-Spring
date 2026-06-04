@@ -101,6 +101,7 @@ public class ActionExecutor {
             .postBodyExcerpt(postExcerpt)
             .stance(pickStance(persona, action.targetPost()))
             .category(action.targetPost().getCategory())
+            .formality(voiceFormality(persona))
             .correlationId(corrId)
             .build());
 
@@ -135,6 +136,7 @@ public class ActionExecutor {
             .parentCommentExcerpt(action.parentCommentExcerpt())
             .threadContext(action.threadContext())
             .stance("CURIOUS")
+            .formality(voiceFormality(persona))
             .correlationId(corrId)
             .build());
 
@@ -167,6 +169,7 @@ public class ActionExecutor {
             .archetype(persona.getArchetype())
             .tier(persona.getTier())
             .category(category)
+            .formality(voiceFormality(persona))
             .correlationId(corrId)
             .build());
 
@@ -289,9 +292,18 @@ public class ActionExecutor {
     private String voiceProfileStr(Persona persona) {
         try {
             if (persona.getVoiceProfile() == null) return "일반 커뮤니티 사용자";
-            java.lang.Object desc = persona.getVoiceProfile().get("description");
+            java.lang.Object desc = persona.getVoiceProfile().get("general_style");
+            if (desc == null) desc = persona.getVoiceProfile().get("description");
             return desc != null ? java.lang.String.valueOf(desc) : "일반 커뮤니티 사용자";
         } catch (Exception e) { return "일반 커뮤니티 사용자"; }
+    }
+
+    private String voiceFormality(Persona persona) {
+        try {
+            if (persona.getVoiceProfile() == null) return "casual";
+            java.lang.Object f = persona.getVoiceProfile().get("formality");
+            return f != null ? java.lang.String.valueOf(f) : "casual";
+        } catch (Exception e) { return "casual"; }
     }
 
     private String pickStance(Persona persona, PostDto post) {

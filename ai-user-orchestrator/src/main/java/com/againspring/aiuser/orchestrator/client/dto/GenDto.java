@@ -21,6 +21,7 @@ public class GenDto {
         private double slangLevel;
         private String category;
         private String topicSeed;
+        private String formality;
         private String correlationId;
         @Builder.Default
         private long timeoutMs = 120000L;
@@ -39,6 +40,7 @@ public class GenDto {
         private String postBodyExcerpt;
         private String stance;
         private String category;
+        private String formality;
         private String correlationId;
         @Builder.Default
         private long timeoutMs = 120000L;
@@ -56,6 +58,7 @@ public class GenDto {
         private String parentCommentExcerpt;
         private String threadContext;
         private String stance;
+        private String formality;
         private String correlationId;
         @Builder.Default
         private long timeoutMs = 120000L;

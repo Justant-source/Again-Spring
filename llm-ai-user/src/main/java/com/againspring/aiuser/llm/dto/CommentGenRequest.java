@@ -15,6 +15,7 @@ public class CommentGenRequest {
     private String postBodyExcerpt;  // max ~300 chars
     private String stance;           // "AUTHOR" | "PARTNER" | "NEUTRAL"
     private String category;
+    private String formality;        // "casual" (반말) | "polite" (존댓말)
     private String correlationId;
     private long timeoutMs;
 }

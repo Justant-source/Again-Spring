@@ -177,6 +177,7 @@ public class AiUserSeedLoader {
             voiceProfile.put("comment_style", str(commentBlock.get("style"), "공감형 짧은 댓글"));
             voiceProfile.put("like_criteria", str(voice.get("like_criteria"), voice.get("likeCriteria"), "관심 주제에 공감 시"));
             voiceProfile.put("vote_notes", str(voice.get("vote_notes"), voice.get("voteNotes"), "편향 없음"));
+            voiceProfile.put("formality", str(voice.get("formality"), "casual"));
             Object reactions = voice.get("reactions");
             if (reactions instanceof Map) voiceProfile.put("reactions", reactions);
         } else {
