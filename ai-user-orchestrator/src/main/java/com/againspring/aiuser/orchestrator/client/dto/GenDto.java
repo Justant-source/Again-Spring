@@ -23,6 +23,7 @@ public class GenDto {
         private String topicSeed;
         private String formality;
         private String demographic;
+        private String dynamicExamples;
         private String lengthTier;   // "SHORT"|"MEDIUM"|"LONG"|"VERYLONG"
         private String correlationId;
         @Builder.Default
@@ -44,6 +45,7 @@ public class GenDto {
         private String category;
         private String formality;
         private String demographic;
+        private String dynamicExamples;
         private String archetypeCommentSamples;
         private String existingComments;
         private String correlationId;

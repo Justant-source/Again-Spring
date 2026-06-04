@@ -1,6 +1,7 @@
 package com.againspring.aiuser.orchestrator.task;
 
 import com.againspring.aiuser.orchestrator.auth.BotTokenCache;
+import com.againspring.aiuser.orchestrator.client.AiLearningClient;
 import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.client.dto.*;
@@ -47,6 +48,7 @@ public class ActionExecutor {
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
     private final ArchetypeCatalog archetypeCatalog;
+    private final AiLearningClient aiLearningClient;
 
     @Value("${ai-user.history-dir:/app/persona-history}")
     private String historyDir;
@@ -139,6 +141,9 @@ public class ActionExecutor {
         markSeen(persona, postId, true);
         if (ok) {
             writeHistory(persona.getId(), "comments", text, postId, null);
+            // AI Learning: 합격한 댓글 예시 뱅크에 저장
+            aiLearningClient.saveAsync(text, "COMMENT",
+                action.targetPost() != null ? action.targetPost().getCategory() : "OTHER", "SELF_GENERATED");
         }
         logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
             java.util.Map.of("postId", postId, "len", text.length(), "usedLlm", true));
@@ -233,6 +238,8 @@ public class ActionExecutor {
             if (post.getId() != null) {
                 markSeen(persona, post.getId(), true);
                 writeHistory(persona.getId(), "posts", body, post.getId(), category);
+                // AI Learning: 합격한 글 예시 뱅크에 저장
+                aiLearningClient.saveAsync(body, "POST", category, "SELF_GENERATED");
                 logAction(persona, action, "POSTED", corrId,
                     java.util.Map.of("postId", post.getId(), "category", category, "usedLlm", true));
             }

@@ -17,6 +17,7 @@ public class PostGenRequest {
     private String topicSeed;        // optional hint
     private String formality;        // "casual" (반말) | "polite" (존댓말)
     private String demographic;
+    private String dynamicExamples;  // RAG: 실제 커뮤니티 유사 예시 (ai-learning 서비스에서 주입)
     private String lengthTier;       // "SHORT"|"MEDIUM"|"LONG"|"VERYLONG"
     private String correlationId;
     private long timeoutMs;

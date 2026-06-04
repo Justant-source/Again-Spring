@@ -17,6 +17,7 @@ public class CommentGenRequest {
     private String category;
     private String formality;        // "casual" (반말) | "polite" (존댓말)
     private String demographic;
+    private String dynamicExamples;  // RAG: 실제 커뮤니티 유사 예시
     private String archetypeCommentSamples;
     private String existingComments;
     private String correlationId;

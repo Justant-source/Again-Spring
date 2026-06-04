@@ -27,3 +27,7 @@ logging:
   level:
     root: INFO
     com.againspring.aiuser.llm: DEBUG
+
+self-critique:
+  enabled: ${SELF_CRITIQUE_ENABLED:false}
+  pass-threshold: ${SELF_CRITIQUE_THRESHOLD:5}

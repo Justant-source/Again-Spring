@@ -51,6 +51,12 @@ ai-user:
   llm-ai-user-url: ${LLM_AI_USER_URL:http://againspring-llm-ai-user-dev:8092}
   history-dir: ${AI_USER_HISTORY_DIR:/app/persona-history}
 
+ai-learning:
+  base-url: ${AI_LEARNING_BASE_URL:http://againspring-ai-learning:8099}
+  enabled: ${AI_LEARNING_ENABLED:false}
+  crawl:
+    enabled: ${AI_LEARNING_CRAWL_ENABLED:false}
+
 logging:
   level:
     root: INFO

@@ -73,7 +73,7 @@ public class PromptAssembler {
             아키타입: %s
             %s
             글 길이: %s
-
+            %s
             위 카테고리와 말투로 한국 갈등 커뮤니티 사연을 완전 창작해주세요.
             - 실제 인물 실명·연락처·주소·개인정보 절대 포함 금지
             - 실제 사건 원문 복제 금지 (완전 창작)
@@ -84,6 +84,7 @@ public class PromptAssembler {
                 req.getArchetype() != null ? req.getArchetype() : "일반갈등",
                 req.getTopicSeed() != null ? "상황: " + req.getTopicSeed() : "",
                 lengthInstruction(req.getLengthTier()),
+                dynamicExamplesBlock(req.getDynamicExamples()),
                 politeSuffix,
                 varietySeed);
         return system + "\n" + SEP + "\n" + user;
@@ -100,6 +101,7 @@ public class PromptAssembler {
             내 입장: %s (AUTHOR=작성자 편, PARTNER=상대방 편, NEUTRAL=중립)
             %s
             %s
+            %s
             이 글에 달 짧은 댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
             - 50~150자 내외
@@ -111,6 +113,7 @@ public class PromptAssembler {
                 req.getStance() != null ? req.getStance() : "NEUTRAL",
                 req.getArchetypeCommentSamples() != null && !req.getArchetypeCommentSamples().isBlank() ? "이 글에 자주 달리는 댓글 패턴 (참고용):\n" + req.getArchetypeCommentSamples() : "",
                 req.getExistingComments() != null && !req.getExistingComments().isBlank() ? "이미 달린 댓글들 (중복 피하고 다른 관점으로):\n" + req.getExistingComments() : "",
+                dynamicExamplesBlock(req.getDynamicExamples()),
                 toneNote);
         return system + "\n" + SEP + "\n" + user;
     }
@@ -138,6 +141,11 @@ public class PromptAssembler {
                 req.getStance() != null ? req.getStance() : "CURIOUS",
                 toneNote);
         return system + "\n" + SEP + "\n" + user;
+    }
+
+    private String dynamicExamplesBlock(String examples) {
+        if (examples == null || examples.isBlank()) return "";
+        return "\n[실제 커뮤니티 유사 예시 — 말투·구조만 참고, 내용은 완전 창작]\n" + examples.trim() + "\n";
     }
 
     private boolean isPolite(String formality) {

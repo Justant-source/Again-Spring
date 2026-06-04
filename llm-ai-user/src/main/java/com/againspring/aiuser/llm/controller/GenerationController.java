@@ -5,6 +5,7 @@ import com.againspring.aiuser.llm.exception.*;
 import com.againspring.aiuser.llm.pool.LlmWorkerPool;
 import com.againspring.aiuser.llm.service.OutputSanitizer;
 import com.againspring.aiuser.llm.service.PromptAssembler;
+import com.againspring.aiuser.llm.service.SelfCritiqueService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ public class GenerationController {
     private final LlmWorkerPool pool;
     private final PromptAssembler promptAssembler;
     private final OutputSanitizer outputSanitizer;
+    private final SelfCritiqueService selfCritique;
 
     @PostMapping("/post")
     public ResponseEntity<GenResponse> generatePost(@RequestBody PostGenRequest req) {
@@ -31,6 +33,8 @@ public class GenerationController {
             String prompt = promptAssembler.assemblePostPrompt(req);
             String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId);
             String text = outputSanitizer.sanitizePost(raw);
+            // 자기비평 루프 (enabled 시)
+            text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId);
             return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));
@@ -50,6 +54,8 @@ public class GenerationController {
             String prompt = promptAssembler.assembleCommentPrompt(req);
             String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId);
             String text = outputSanitizer.sanitizeComment(raw);
+            // 자기비평 루프 (enabled 시, 댓글은 점수 기준 완화)
+            text = selfCritique.critiqueAndRefine(text, "comment", prompt, corrId);
             return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));
