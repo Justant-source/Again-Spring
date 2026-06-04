@@ -1,0 +1,85 @@
+from fastapi import APIRouter, BackgroundTasks
+from app.db.session import get_db
+from app.services.quality_filter import QualityFilter
+import logging, asyncio
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+quality = QualityFilter()
+
+async def _do_crawl(source, daily_limit, embed_service):
+    try:
+        if source == "naver":
+            from app.crawlers.naver_comments import crawl
+        elif source == "daum":
+            from app.crawlers.daum_comments import crawl
+        elif source == "dcinside":
+            from app.crawlers.dcinside import crawl
+        elif source == "natepan":
+            from app.crawlers.natepan import crawl
+        elif source == "bobaedream":
+            from app.crawlers.bobaedream import crawl
+        elif source == "blind":
+            from app.crawlers.blind import crawl
+        else:
+            logger.warning(f"Unknown source: {source}")
+            return
+
+        items = await crawl(daily_limit=daily_limit)
+        saved = 0
+
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                for item in items:
+                    if not quality.passes(item["content"]):
+                        continue
+                    vec = embed_service.embed(item["content"][:512])
+                    vec_str = "[" + ",".join(f"{v:.8f}" for v in vec) + "]"
+
+                    sql = """INSERT INTO example_bank
+                             (content, content_type, category, source, quality_score, embedding, created_at)
+                             VALUES (%s, %s, %s, %s, %s, VEC_FromText(%s), NOW(3))"""
+                    cur.execute(sql, (
+                        item["content"],
+                        item.get("content_type", "COMMENT"),
+                        item.get("category", "OTHER"),
+                        item.get("source", source.upper()),
+                        quality.score(item["content"]),
+                        vec_str
+                    ))
+                    saved += 1
+
+                # Log crawl operation
+                log_sql = """INSERT INTO crawl_log
+                             (source, items_collected, items_saved, status, created_at)
+                             VALUES (%s, %s, %s, %s, NOW(3))"""
+                cur.execute(log_sql, (source, len(items), saved, "SUCCESS"))
+
+        logger.info(f"Crawl {source}: collected={len(items)} saved={saved}")
+    except Exception as e:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                log_sql = """INSERT INTO crawl_log
+                             (source, items_collected, items_saved, status, error_msg, created_at)
+                             VALUES (%s, %s, %s, %s, %s, NOW(3))"""
+                cur.execute(log_sql, (source, 0, 0, "FAILED", str(e)[:500]))
+        logger.error(f"Crawl {source} failed: {e}")
+
+
+@router.post("/{source}")
+async def trigger_crawl(source: str, background_tasks: BackgroundTasks, limit: int = 100):
+    from app.main import embed_service
+    background_tasks.add_task(_do_crawl, source, limit, embed_service)
+    return {"status": "started", "source": source, "limit": limit}
+
+
+@router.get("/log")
+def get_crawl_log():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT source, status, items_saved, created_at
+                          FROM crawl_log
+                          ORDER BY created_at DESC
+                          LIMIT 50""")
+            rows = cur.fetchall()
+    return [{"source": r["source"], "status": r["status"], "saved": r["items_saved"], "at": str(r["created_at"])} for r in rows]

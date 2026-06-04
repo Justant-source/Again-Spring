@@ -60,7 +60,7 @@ services:
 
   llm-ai-user-dev:
     build:
-      context: ../llm-ai-user
+      context: ../ai-user/llm
       dockerfile: Dockerfile
     image: againspring-llm-ai-user-dev
     container_name: againspring-llm-ai-user-dev
@@ -71,6 +71,8 @@ services:
       LLM_QUEUE_CAPACITY: ${AI_USER_LLM_QUEUE_CAPACITY:-100}
       LLM_QUEUE_WAIT_TIMEOUT_MS: ${AI_USER_LLM_QUEUE_WAIT_TIMEOUT_MS:-30000}
       LLM_DEFAULT_TIMEOUT_MS: ${AI_USER_LLM_DEFAULT_TIMEOUT_MS:-120000}
+      SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
+      SELF_CRITIQUE_THRESHOLD: ${SELF_CRITIQUE_THRESHOLD:-5}
     volumes:
       - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
     restart: unless-stopped
@@ -85,7 +87,7 @@ services:
 
   ai-user-orchestrator-dev:
     build:
-      context: ../ai-user-orchestrator
+      context: ../ai-user/orchestrator
       dockerfile: Dockerfile
     image: againspring-ai-user-orchestrator-dev
     container_name: againspring-ai-user-orchestrator-dev
@@ -102,6 +104,10 @@ services:
       AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-dev-pw-2026}
       AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
       AI_USER_HISTORY_DIR: ${AI_USER_HISTORY_DIR:-/app/persona-history}
+      AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
+      AI_LEARNING_BASE_URL: http://againspring-ai-learning-dev:8099
+      SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
+      AI_USER_PERSONA_TARGET: ${AI_USER_PERSONA_TARGET:-50}
     volumes:
       - ../persona-history:/app/persona-history:rw
     depends_on:
@@ -110,6 +116,8 @@ services:
       llm-ai-user-dev:
         condition: service_healthy
       backend-dev:
+        condition: service_started
+      ai-learning-dev:
         condition: service_started
     restart: unless-stopped
     networks:
@@ -120,6 +128,41 @@ services:
       timeout: 5s
       retries: 5
       start_period: 90s
+
+  ai-learning-dev:
+    build:
+      context: ../ai-user/learning
+      dockerfile: Dockerfile
+    image: againspring-ai-learning-dev
+    container_name: againspring-ai-learning-dev
+    environment:
+      DB_HOST: againspring-mariadb-dev
+      DB_PORT: "3306"
+      DB_NAME: ${MARIADB_DATABASE:-againspring_dev}
+      DB_USER: ${MARIADB_USER:-againspring}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
+      AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
+      AI_LEARNING_CRAWL_ENABLED: ${AI_LEARNING_CRAWL_ENABLED:-false}
+    ports:
+      - "8099:8099"
+    depends_on:
+      mariadb-dev:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 3000m
+        reservations:
+          memory: 512m
+    networks:
+      - againspring-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8099/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   marketing-renderer-dev:
     build:

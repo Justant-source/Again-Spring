@@ -22,7 +22,10 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
 |---|---|---|
 | FE 기능/UI | `frontend/` | `frontend/docs/README.md` |
 | BE 기능/API | `backend/` | `backend/docs/README.md` |
-| LLM 브릿지 | `backend/src/main/java/.../llm/` | `backend/docs/llm-bridge.md` |
+| LLM 브릿지 (메인 시스템) | `backend/src/main/java/.../llm/` | `backend/docs/llm-bridge.md` |
+| AI 유저 LLM 생성 | `ai-user/llm/` | `ai-user/docs/README.md` |
+| AI 유저 오케스트레이션 | `ai-user/orchestrator/` | `ai-user/docs/README.md` |
+| AI 유저 학습/RAG | `ai-user/learning/` | `ai-user/docs/README.md` |
 | 공유 타입/스키마/프롬프트 | `shared/` | `shared/docs/README.md` |
 | 환경/인프라/배포 | `env/` | `env/docs/README.md` |
 | 마케팅 자동화 (dev 전용) | `marketing/` | `marketing/README.md` |
