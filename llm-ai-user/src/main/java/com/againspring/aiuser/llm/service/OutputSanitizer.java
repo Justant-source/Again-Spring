@@ -101,7 +101,58 @@ public class OutputSanitizer {
             }
             s = s.substring(0, cutAt).stripTrailing();
         }
+
+        // 7. 불완전 종결 감지 및 정리
+        // 한국어 연결어미/관형어미로 끝나면 마지막 완결된 문장 단위까지 자름
+        s = trimIncompleteEnding(s);
+
         return s;
+    }
+
+    /**
+     * 텍스트가 불완전한 어미로 끝날 때 마지막 완결된 종결까지 잘라냄.
+     * 예: "이게 맞은" → "이게 맞은" 제거, 앞의 자연스러운 종결까지 유지
+     */
+    private String trimIncompleteEnding(String s) {
+        if (s == null || s.isBlank()) return s;
+        // 완전한 종결로 끝나면 그대로 반환
+        if (endsWithComplete(s)) return s;
+        // 마지막 완전한 종결 위치 탐색 (뒤에서 최대 80자)
+        int searchFrom = Math.max(0, s.length() - 80);
+        // 완결 종결 패턴: 문장 끝 or 자연스러운 한국어 종결어미
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+            // 마침표/물음표/느낌표, ㅋ/ㅠ 종결, 한국어 종결어미 목록
+            "[.?!]|ㅋ+|ㅠ+|" +
+            "(?:거든|거임|더라|했음|있음|없음|겠음|모르겠음|ㄴ거임|건지|는지|하는건지|뭐하는건지|" +
+            "잖아|이잖아|아니잖아|이야|야(?![^\\n])|봐(?![\\w])|봐야지|해야지|싶음|싶어|" +
+            "했거든|갔거든|겠거든|없거든|있거든|했잖아|없잖아|있잖아|" +
+            "임(?![\\w])|함(?![\\w])|됨(?![\\w])|맞음(?![\\w])|좋음(?![\\w])|나쁨(?![\\w])|" +
+            "요(?![\\w])|해요|이에요|아요|어요|네요|세요|데요|거예요)"
+        ).matcher(s.substring(searchFrom));
+        int lastComplete = -1;
+        while (m.find()) {
+            lastComplete = searchFrom + m.end();
+        }
+        if (lastComplete > searchFrom) {
+            return s.substring(0, lastComplete).stripTrailing();
+        }
+        // 탐색 범위를 넓혀서 줄바꿈 기준으로 자름
+        int lastNewline = s.lastIndexOf('\n', s.length() - 2);
+        if (lastNewline > s.length() / 2) {
+            return s.substring(0, lastNewline).stripTrailing();
+        }
+        return s;
+    }
+
+    private boolean endsWithComplete(String s) {
+        String trimmed = s.stripTrailing();
+        if (trimmed.isEmpty()) return false;
+        char last = trimmed.charAt(trimmed.length() - 1);
+        // 명백한 완결 종결
+        if (".?!ㅋㅠ".indexOf(last) >= 0) return true;
+        // 한국어 종결어미로 끝나는지 (5자 범위)
+        String tail = trimmed.length() >= 5 ? trimmed.substring(trimmed.length() - 5) : trimmed;
+        return tail.matches(".*(?:거든|거임|더라|했음|있음|없음|겠음|잖아|이야|봐야지|해야지|싶음|싶어|임|함|됨|맞음|요|해요|이에요|아요|어요|네요|데요)$");
     }
 
     /** 멀티 옵션 텍스트에서 첫 번째 실제 내용만 추출 */
