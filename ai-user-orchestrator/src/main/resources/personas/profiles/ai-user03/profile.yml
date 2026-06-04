@@ -60,5 +60,4 @@ bias_profile:
   WORK: -0.1
   OTHER: 0.3
 archetype_preferences:
-- friend_conflict
-- social_justice
+- friend_betrayal

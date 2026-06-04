@@ -16,6 +16,9 @@ public class CommentGenRequest {
     private String stance;           // "AUTHOR" | "PARTNER" | "NEUTRAL"
     private String category;
     private String formality;        // "casual" (반말) | "polite" (존댓말)
+    private String demographic;
+    private String archetypeCommentSamples;
+    private String existingComments;
     private String correlationId;
     private long timeoutMs;
 }

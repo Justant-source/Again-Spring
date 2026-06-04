@@ -16,6 +16,7 @@ public class PostGenRequest {
     private String category;         // PostCategory name: COUPLE/MARRIED/FRIEND/FAMILY/WORK/OTHER
     private String topicSeed;        // optional hint
     private String formality;        // "casual" (반말) | "polite" (존댓말)
+    private String demographic;
     private String correlationId;
     private long timeoutMs;
 }

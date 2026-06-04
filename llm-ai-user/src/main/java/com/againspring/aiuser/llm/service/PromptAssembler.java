@@ -42,7 +42,7 @@ public class PromptAssembler {
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
             : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
         String user = """
-            카테고리: %s
+            %s카테고리: %s
             아키타입: %s
             %s
 
@@ -52,6 +52,7 @@ public class PromptAssembler {
             - 판결·처방·승패 표현 금지
             - 300~600자 내외, 자연스러운 커뮤니티 말투
             %s""".formatted(
+                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + req.getDemographic() + "\n" : "",
                 req.getCategory() != null ? req.getCategory() : "OTHER",
                 req.getArchetype() != null ? req.getArchetype() : "일반갈등",
                 req.getTopicSeed() != null ? "주제 힌트: " + req.getTopicSeed() : "",
@@ -65,18 +66,22 @@ public class PromptAssembler {
             ? "- 존댓말로 작성 (~요, ~어요, ~더라고요, ~것 같아요)"
             : "- 반말로 작성 (요/습니다 금지)";
         String user = """
-            글 제목: %s
+            %s글 제목: %s
             글 내용 요약: %s
             내 입장: %s (AUTHOR=작성자 편, PARTNER=상대방 편, NEUTRAL=중립)
-
+            %s
+            %s
             이 글에 달 짧은 댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
             - 50~150자 내외
             %s
             """.formatted(
+                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + req.getDemographic() + "\n" : "",
                 req.getPostTitle() != null ? req.getPostTitle() : "",
                 req.getPostBodyExcerpt() != null ? req.getPostBodyExcerpt() : "",
                 req.getStance() != null ? req.getStance() : "NEUTRAL",
+                req.getArchetypeCommentSamples() != null && !req.getArchetypeCommentSamples().isBlank() ? "이 글에 자주 달리는 댓글 패턴 (참고용):\n" + req.getArchetypeCommentSamples() : "",
+                req.getExistingComments() != null && !req.getExistingComments().isBlank() ? "이미 달린 댓글들 (중복 피하고 다른 관점으로):\n" + req.getExistingComments() : "",
                 toneNote);
         return system + "\n" + SEP + "\n" + user;
     }
@@ -87,7 +92,7 @@ public class PromptAssembler {
             ? "- 존댓말로 작성 (~요, ~어요 등 자연스럽게)"
             : "- 반말로 작성 (요/습니다 금지)";
         String user = """
-            원댓글: %s
+            %s%s%s원댓글: %s
             맥락: %s
             반응: %s (AGREE=공감, DISAGREE=반박, CURIOUS=궁금)
 
@@ -96,6 +101,9 @@ public class PromptAssembler {
             - 30~100자 내외
             %s
             """.formatted(
+                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + req.getDemographic() + "\n" : "",
+                req.getPostBodyExcerpt() != null && !req.getPostBodyExcerpt().isBlank() ? "원글 맥락: " + req.getPostBodyExcerpt() + "\n" : "",
+                req.getSiblingComments() != null && !req.getSiblingComments().isBlank() ? "다른 댓글들:\n" + req.getSiblingComments() + "\n" : "",
                 req.getParentCommentExcerpt() != null ? req.getParentCommentExcerpt() : "",
                 req.getThreadContext() != null ? req.getThreadContext() : "",
                 req.getStance() != null ? req.getStance() : "CURIOUS",

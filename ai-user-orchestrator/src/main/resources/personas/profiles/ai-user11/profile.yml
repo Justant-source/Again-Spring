@@ -60,5 +60,5 @@ bias_profile:
   WORK: 0.2
   OTHER: 0.0
 archetype_preferences:
-- workplace_conflict
-- family_mediation
+- work_colleague_conflict
+- family_care_burden

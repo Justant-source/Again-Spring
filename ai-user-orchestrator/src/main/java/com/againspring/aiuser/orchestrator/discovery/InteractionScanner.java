@@ -40,7 +40,8 @@ public class InteractionScanner {
                 "SELECT pal.target_id AS post_id, " +
                 "       pc.id AS comment_id, " +
                 "       LEFT(pc.body, 200) AS comment_excerpt, " +
-                "       LEFT(p.user_title, 100) AS post_title " +
+                "       LEFT(p.user_title, 100) AS post_title, " +
+                "       LEFT(p.body_published, 300) AS post_body_excerpt " +
                 "FROM persona_action_log pal " +
                 "JOIN posts p ON p.id = pal.target_id " +
                 "JOIN post_comments pc ON pc.post_id = pal.target_id " +
@@ -61,8 +62,11 @@ public class InteractionScanner {
                 String excerpt = (String) row.get("comment_excerpt");
                 String postTitle = (String) row.get("post_title");
                 if (postId != null && commentId != null) {
+                    String postBodyExcerpt = (String) row.get("post_body_excerpt");
+                    // Fetch sibling comments (other top-level comments on same post)
+                    String siblingComments = fetchSiblingComments(postId, commentId);
                     targets.add(new ReplyTarget(postId, postTitle, commentId, excerpt,
-                        "다시봄 커뮤니티 갈등 글"));
+                        "다시봄 커뮤니티 갈등 글", postBodyExcerpt, siblingComments));
                 }
             }
             log.debug("InteractionScanner: found {} reply targets", targets.size());
@@ -70,6 +74,27 @@ public class InteractionScanner {
         } catch (Exception e) {
             log.warn("InteractionScanner query failed: {}", e.getMessage());
             return java.util.Collections.emptyList();
+        }
+    }
+
+    private String fetchSiblingComments(String postId, Long excludeCommentId) {
+        try {
+            List<Map<String, Object>> siblings = jdbcTemplate.queryForList(
+                "SELECT LEFT(body, 100) AS body " +
+                "FROM post_comments " +
+                "WHERE post_id = ? AND parent_comment_id IS NULL AND id != ? " +
+                "  AND author_id NOT IN (SELECT id FROM users WHERE email LIKE 'ai-user%@againspring.com') " +
+                "ORDER BY id DESC LIMIT 3",
+                postId, excludeCommentId);
+            if (siblings.isEmpty()) return null;
+            StringBuilder sb = new StringBuilder();
+            for (Map<String, Object> s : siblings) {
+                String body = (String) s.get("body");
+                if (body != null && !body.isBlank()) sb.append("- ").append(body).append("\n");
+            }
+            return sb.toString().trim();
+        } catch (Exception e) {
+            return null;
         }
     }
 }

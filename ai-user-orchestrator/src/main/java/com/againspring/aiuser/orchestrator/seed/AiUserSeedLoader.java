@@ -171,15 +171,36 @@ public class AiUserSeedLoader {
         if (!voice.isEmpty()) {
             voiceProfile.put("voice_type", str(voice.get("voice_type"), str(voice.get("voiceType"), tier)));
             voiceProfile.put("general_style", str(voice.get("general_style"), voice.get("generalStyle")));
+            // Post examples
             Map<String, Object> postBlock = mapOf(voice.get("post"));
             voiceProfile.put("post_style", str(postBlock.get("style"), "커뮤니티 반말 서술형"));
+            Object postOpeners = postBlock.get("example_post_openers");
+            if (postOpeners instanceof java.util.List) voiceProfile.put("example_post_openers", postOpeners);
+            // Comment examples
             Map<String, Object> commentBlock = mapOf(voice.get("comment"));
             voiceProfile.put("comment_style", str(commentBlock.get("style"), "공감형 짧은 댓글"));
+            Object commentExamples = commentBlock.get("example_comments");
+            if (commentExamples instanceof java.util.List) voiceProfile.put("example_comments", commentExamples);
+            // Reply examples
+            Map<String, Object> replyBlock = mapOf(voice.get("reply"));
+            Object replyExamples = replyBlock.get("example_replies");
+            if (replyExamples instanceof java.util.List) voiceProfile.put("example_replies", replyExamples);
+            // Criteria & notes
             voiceProfile.put("like_criteria", str(voice.get("like_criteria"), voice.get("likeCriteria"), "관심 주제에 공감 시"));
             voiceProfile.put("vote_notes", str(voice.get("vote_notes"), voice.get("voteNotes"), "편향 없음"));
             voiceProfile.put("formality", str(voice.get("formality"), "casual"));
+            // Voice notes for age/political character
+            voiceProfile.put("political_voice_notes", str(voice.get("political_voice_notes"), ""));
+            voiceProfile.put("age_voice_notes", str(voice.get("age_voice_notes"), ""));
+            // Reactions (agree/disagree/curious examples)
             Object reactions = voice.get("reactions");
             if (reactions instanceof Map) voiceProfile.put("reactions", reactions);
+            // Demographics from voice.yml top-level
+            voiceProfile.put("age", str(voice.get("age"), ""));
+            voiceProfile.put("gender", str(voice.get("gender"), ""));
+            voiceProfile.put("political_orientation", str(voice.get("political_orientation"), ""));
+            voiceProfile.put("political_strength", voice.containsKey("political_strength")
+                ? String.valueOf(voice.get("political_strength")) : "");
         } else {
             // Fallback from profile if voice.yml missing
             voiceProfile.put("voice_type", str(activity.get("voice"), "GENERAL"));

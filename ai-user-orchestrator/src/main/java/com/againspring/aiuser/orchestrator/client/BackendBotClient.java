@@ -1,5 +1,6 @@
 package com.againspring.aiuser.orchestrator.client;
 
+import com.againspring.aiuser.orchestrator.client.dto.CommentThreadDto;
 import com.againspring.aiuser.orchestrator.client.dto.CreateCommentDto;
 import com.againspring.aiuser.orchestrator.client.dto.CreatePostDto;
 import com.againspring.aiuser.orchestrator.client.dto.InviteDto;
@@ -154,6 +155,30 @@ public class BackendBotClient {
         } catch (Exception e) {
             log.warn("Partner answer submission failed for token {}: {}", token, e.getMessage());
             return false;
+        }
+    }
+
+    /** Fetch comments for a post (no auth required) */
+    public java.util.List<CommentThreadDto> getComments(String postId, int page, int size) {
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.List<java.util.Map<String, Object>> raw = restClient.get()
+                .uri("/api/community/posts/{postId}/comments?page={page}&size={size}", postId, page, size)
+                .retrieve()
+                .body(new org.springframework.core.ParameterizedTypeReference<java.util.List<java.util.Map<String, Object>>>(){});
+            if (raw == null) return java.util.Collections.emptyList();
+            java.util.List<CommentThreadDto> result = new java.util.ArrayList<>();
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            for (java.util.Map<String, Object> item : raw) {
+                try {
+                    CommentThreadDto dto = mapper.convertValue(item, CommentThreadDto.class);
+                    result.add(dto);
+                } catch (Exception ignored) {}
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("getComments failed for post {}: {}", postId, e.getMessage());
+            return java.util.Collections.emptyList();
         }
     }
 }

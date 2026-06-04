@@ -15,6 +15,9 @@ public class ReplyGenRequest {
     private String threadContext;
     private String stance;           // "AGREE" | "DISAGREE" | "CURIOUS"
     private String formality;        // "casual" (반말) | "polite" (존댓말)
+    private String demographic;
+    private String postBodyExcerpt;
+    private String siblingComments;
     private String correlationId;
     private long timeoutMs;
 }

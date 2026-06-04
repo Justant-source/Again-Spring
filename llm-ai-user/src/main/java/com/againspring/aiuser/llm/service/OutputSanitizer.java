@@ -19,14 +19,25 @@ public class OutputSanitizer {
         if (raw == null || raw.isBlank()) return "";
         String s = raw
             .replaceAll("(?m)^#{1,6}\\s+", "")          // strip markdown headers
-            .replaceAll("\\*{1,2}([^*]+)\\*{1,2}", "$1") // remove bold/italic markers
+            .replaceAll("\\*\\*([^*]+)\\*\\*", "$1")    // remove bold markers
+            .replaceAll("(?<![\\w가-힣])\\*([^*\\n]+)\\*(?![\\w가-힣])", "$1") // remove italic markers
             .replaceAll("`([^`]+)`", "$1")               // remove inline code
             .replaceAll("(?m)^>\\s*", "")                // remove blockquotes
             .replaceAll("\\[([^]]+)]\\([^)]+\\)", "$1")  // remove markdown links
             .trim();
-        // Remove AI assistant boilerplate
-        s = s.replaceAll("(?i)(네,? ?저는|안녕하세요|물론이죠|물론입니다|제가 도와드릴게요)", "");
+        // Remove AI assistant boilerplate (anchor to line start, remove only leading boilerplate)
+        s = s.replaceFirst("^(?i)(안녕하세요[,!. ]*|물론이죠[,. ]*|물론입니다[,. ]*|네,? 저는 [^\n]*\n?|제가 도와드릴게요[,. ]*)", "").stripLeading();
         s = s.trim();
-        return s.length() > maxLen ? s.substring(0, maxLen) : s;
+        if (s.length() > maxLen) {
+            // Find last sentence boundary near maxLen
+            int cutAt = maxLen;
+            String endings = ".!?\nㅋㅠ";
+            for (int i = maxLen - 1; i >= Math.max(0, maxLen - 60); i--) {
+                char c = s.charAt(i);
+                if (endings.indexOf(c) >= 0) { cutAt = i + 1; break; }
+            }
+            s = s.substring(0, cutAt).stripTrailing();
+        }
+        return s;
     }
 }

@@ -8,5 +8,7 @@ public record ReplyTarget(
     String postTitle,
     Long commentId,           // post_comments.id (BIGINT)
     String commentExcerpt,    // max 200 chars
-    String threadContext      // brief context
+    String threadContext,     // brief context
+    String postBodyExcerpt,   // post body preview (max 300 chars)
+    String siblingComments    // other top-level comments on same post
 ) {}

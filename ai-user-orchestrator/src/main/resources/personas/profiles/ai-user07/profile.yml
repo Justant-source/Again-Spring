@@ -60,5 +60,5 @@ bias_profile:
   WORK: 0.2
   OTHER: 0.0
 archetype_preferences:
-- workplace_conflict
+- work_colleague_conflict
 - couple_communication

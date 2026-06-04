@@ -60,5 +60,5 @@ bias_profile:
   WORK: 0.0
   OTHER: 0.1
 archetype_preferences:
-- family_mediation
-- friend_conflict
+- family_care_burden
+- friend_betrayal

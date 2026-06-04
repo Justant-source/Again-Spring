@@ -58,7 +58,8 @@ public class ActionPlanner {
         if (rand < cumul && canReply) {
             ReplyTarget rt = replyTargets.get(RNG.nextInt(replyTargets.size()));
             return Optional.of(PlannedAction.reply(
-                rt.postId(), rt.postTitle(), rt.commentId(), rt.commentExcerpt(), rt.threadContext()));
+                rt.postId(), rt.postTitle(), rt.commentId(), rt.commentExcerpt(), rt.threadContext(),
+                rt.postBodyExcerpt(), rt.siblingComments()));
         }
 
         // LIKE
