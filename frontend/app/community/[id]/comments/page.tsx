@@ -32,6 +32,7 @@ export default function PostCommentsPage({ params }: PageProps) {
   const [commentText, setCommentText] = useState('');
   const [replyToNick, setReplyToNick] = useState<string | undefined>(undefined);
   const [parentCommentId, setParentCommentId] = useState<number | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [likeToast, setLikeToast] = useState(false);
@@ -106,8 +107,20 @@ export default function PostCommentsPage({ params }: PageProps) {
   }, [loadMore]);
 
   const openCompose = (parentId?: number, replyNick?: string) => {
+    setEditingCommentId(null);
+    setCommentText('');
     setParentCommentId(parentId ?? null);
     setReplyToNick(replyNick);
+    setComposeOpen(true);
+  };
+
+  // 수정 — 기존 본문을 채운 채 "등록 직전" 컴포즈 화면을 띄운다
+  const openEdit = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setCommentText(comment.body);
+    setParentCommentId(null);
+    setReplyToNick(undefined);
+    setSubmitError(null);
     setComposeOpen(true);
   };
 
@@ -115,13 +128,48 @@ export default function PostCommentsPage({ params }: PageProps) {
     setComposeOpen(false);
     setParentCommentId(null);
     setReplyToNick(undefined);
+    setEditingCommentId(null);
+  };
+
+  // 본문만 바뀐 댓글을 목록에서 제자리 갱신 (최상위·대댓글 모두)
+  const applyEditInState = (commentId: number, newBody: string) => {
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c.id === commentId) return { ...c, body: newBody };
+        if (c.replies?.some((r) => r.id === commentId)) {
+          return { ...c, replies: c.replies.map((r) => (r.id === commentId ? { ...r, body: newBody } : r)) };
+        }
+        return c;
+      })
+    );
+  };
+
+  // 삭제된 댓글을 목록에서 제거 (최상위면 대댓글까지, 대댓글이면 해당 항목만)
+  const removeFromState = (commentId: number) => {
+    setComments((prev) =>
+      prev
+        .filter((c) => c.id !== commentId)
+        .map((c) =>
+          c.replies?.some((r) => r.id === commentId)
+            ? { ...c, replies: c.replies.filter((r) => r.id !== commentId) }
+            : c
+        )
+    );
   };
 
   const handleSubmit = async () => {
     if (!commentText.trim()) return;
     setSubmitError(null);
+    const body = commentText.trim();
     try {
-      await commentApi.add(params.id, commentText.trim(), parentCommentId || undefined);
+      if (editingCommentId != null) {
+        await commentApi.update(params.id, editingCommentId, body);
+        applyEditInState(editingCommentId, body);
+        setCommentText('');
+        closeCompose();
+        return;
+      }
+      await commentApi.add(params.id, body, parentCommentId || undefined);
       setCommentText('');
       closeCompose();
       const fresh = await commentApi.list(params.id, 0, PAGE_SIZE);
@@ -129,7 +177,19 @@ export default function PostCommentsPage({ params }: PageProps) {
       setHasMore(fresh.length === PAGE_SIZE);
       setPage(1);
     } catch {
-      setSubmitError('댓글 등록에 실패했습니다. 다시 시도해 주세요.');
+      setSubmitError(editingCommentId != null
+        ? '댓글 수정에 실패했습니다. 다시 시도해 주세요.'
+        : '댓글 등록에 실패했습니다. 다시 시도해 주세요.');
+    }
+  };
+
+  const handleDelete = async (commentId: number) => {
+    if (typeof window !== 'undefined' && !window.confirm('이 댓글을 삭제할까요?')) return;
+    try {
+      await commentApi.remove(params.id, commentId);
+      removeFromState(commentId);
+    } catch {
+      if (typeof window !== 'undefined') window.alert('댓글 삭제에 실패했습니다. 다시 시도해 주세요.');
     }
   };
 
@@ -174,12 +234,15 @@ export default function PostCommentsPage({ params }: PageProps) {
         likeCount={comment.likeCount}
         isLiked={comment.isLiked}
         isReply={isReply}
+        isMine={comment.isMine ?? false}
         onLike={() => handleLike(comment.id)}
         onReply={
           isReply
             ? undefined
             : () => openCompose(comment.id, comment.authorNickname || comment.authorId)
         }
+        onEdit={() => openEdit(comment)}
+        onDelete={() => handleDelete(comment.id)}
         onReport={() => {
           setReportTarget({ commentId: comment.id, authorId: comment.authorId });
           setReportOpen(true);

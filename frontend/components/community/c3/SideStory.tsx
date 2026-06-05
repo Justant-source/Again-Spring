@@ -55,6 +55,7 @@ export function SideStory({
         {onVote ? (
           <button
             type="button"
+            data-testid={`story-vote-btn-${side}`}
             onClick={(e) => {
               e.stopPropagation();
               if (!voteDisabled) onVote();

@@ -92,6 +92,64 @@ public class CommentService {
     }
 
     /**
+     * 댓글 수정 — 본인 댓글만 가능
+     *
+     * @param commentId 댓글 ID
+     * @param userId 요청자 ID
+     * @param body 새 댓글 내용
+     * @return 수정된 PostComment
+     * @throws BusinessException COMMENT_NOT_FOUND, ACCESS_DENIED, CRISIS_DETECTED
+     */
+    @Transactional
+    public PostComment updateComment(Long commentId, String userId, String body) {
+        PostComment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new BusinessException("COMMENT_NOT_FOUND", "Comment not found: " + commentId, 404));
+
+        if (userId == null || !userId.equals(comment.getAuthorId())) {
+            throw new BusinessException("ACCESS_DENIED", "본인 댓글만 수정할 수 있습니다.", 403);
+        }
+
+        // 위기 감지
+        keywordGuard.scanUserInput(body, userId);
+
+        comment.setBody(body);
+        comment.setUpdatedAt(Instant.now());
+        PostComment saved = commentRepository.save(comment);
+        log.info("Comment updated: {} by user {}", commentId, userId);
+        return saved;
+    }
+
+    /**
+     * 댓글 삭제 — 본인 댓글만 가능. 최상위 댓글이면 대댓글까지 함께 삭제.
+     *
+     * @param commentId 댓글 ID
+     * @param userId 요청자 ID
+     * @throws BusinessException COMMENT_NOT_FOUND, ACCESS_DENIED
+     */
+    @Transactional
+    public void deleteComment(Long commentId, String userId) {
+        PostComment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new BusinessException("COMMENT_NOT_FOUND", "Comment not found: " + commentId, 404));
+
+        if (userId == null || !userId.equals(comment.getAuthorId())) {
+            throw new BusinessException("ACCESS_DENIED", "본인 댓글만 삭제할 수 있습니다.", 403);
+        }
+
+        // 최상위 댓글이면 대댓글까지 정리 (orphan 방지)
+        if (comment.getParentCommentId() == null) {
+            List<PostComment> replies = commentRepository.findByParentCommentIdOrderByCreatedAtAsc(commentId);
+            for (PostComment reply : replies) {
+                postLikeRepository.deleteByCommentId(reply.getId());
+                commentRepository.delete(reply);
+            }
+        }
+
+        postLikeRepository.deleteByCommentId(commentId);
+        commentRepository.delete(comment);
+        log.info("Comment deleted: {} by user {}", commentId, userId);
+    }
+
+    /**
      * 최상위 댓글 목록 조회 (부모 댓글 없는 댓글들)
      *
      * @param postId 포스트 ID

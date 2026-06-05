@@ -34,10 +34,22 @@ export const GUEST_NOTICE_CONTINUE = '[data-testid="guest-notice-continue"]'
 // UserChip
 export const USER_CHIP = '[data-testid="user-chip"]'
 export const GUEST_INFO_SHEET = '[data-testid="guest-info-sheet"]'
+// 하단 네비게이션 (BottomNav)
+export const NAV_PLAZA = '[data-testid="nav-plaza"]'
+export const NAV_NOTIFICATIONS = '[data-testid="nav-notifications"]'
+export const NAV_ACTIVITY = '[data-testid="nav-activity"]'
+// 투표 (SideStory 우측 끝 버튼 · C3StoryDetail 완료 배지)
+export const STORY_VOTE_BTN = (side: 'g' | 'r') => `[data-testid="story-vote-btn-${side}"]`
+export const VOTE_COMPLETE_BADGE = '[data-testid="vote-complete-badge"]'
 // 댓글
 export const COMMENT_BAR_PLACEHOLDER = '댓글을 남겨주세요.'
 export const COMMENT_COMPOSE_TEXTAREA = 'textarea'
 export const COMMENT_SUBMIT_BTN = { name: '등록' } as const
+// 댓글 ⋯ 메뉴 (본인=수정/삭제, 타인=신고)
+export const COMMENT_MENU_TOGGLE = '[data-testid="comment-menu-toggle"]'
+export const COMMENT_MENU_EDIT = '[data-testid="comment-menu-edit"]'
+export const COMMENT_MENU_DELETE = '[data-testid="comment-menu-delete"]'
+export const COMMENT_MENU_REPORT = '[data-testid="comment-menu-report"]'
 
 // ── Invite 흐름 ──────────────────────────────────────────────────
 export const INVITE = {

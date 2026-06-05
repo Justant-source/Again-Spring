@@ -75,6 +75,7 @@ public class CommunityCommentController {
                     boolean isPartner = postPartnerUserId != null && postPartnerUserId.equals(comment.getAuthorId());
                     String authorNickname = resolveNickname(comment.getAuthorId());
                     boolean isLiked = userId != null && postLikeRepository.existsByCommentIdAndUserId(comment.getId(), userId);
+                    boolean isMine = userId != null && userId.equals(comment.getAuthorId());
 
                     List<CommentResponse> replyResponses = replies.stream()
                             .map(reply -> {
@@ -82,7 +83,8 @@ public class CommunityCommentController {
                                 boolean replyIsPartner = postPartnerUserId != null && postPartnerUserId.equals(reply.getAuthorId());
                                 String replyNickname = resolveNickname(reply.getAuthorId());
                                 boolean replyIsLiked = userId != null && postLikeRepository.existsByCommentIdAndUserId(reply.getId(), userId);
-                                return CommentResponse.from(reply, replyIsLiked, replyIsAuthor, replyIsPartner, replyNickname);
+                                boolean replyIsMine = userId != null && userId.equals(reply.getAuthorId());
+                                return CommentResponse.from(reply, replyIsLiked, replyIsAuthor, replyIsPartner, replyNickname, replyIsMine);
                             })
                             .toList();
 
@@ -96,6 +98,7 @@ public class CommunityCommentController {
                             .createdAt(comment.getCreatedAt())
                             .isAuthor(isAuthor)
                             .isPartner(isPartner)
+                            .isMine(isMine)
                             .replies(replyResponses)
                             .build();
                 })
@@ -146,6 +149,48 @@ public class CommunityCommentController {
 
         CommentResponse response = CommentResponse.from(comment, false);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 댓글 수정 (본인만)
+     * PUT /api/community/posts/{postId}/comments/{commentId}
+     */
+    @PutMapping("/{commentId}")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "댓글 수정", description = "본인이 작성한 댓글 내용 수정")
+    public ResponseEntity<CommentResponse> updateComment(
+            @PathVariable String postId,
+            @PathVariable Long commentId,
+            @Valid @RequestBody CommentRequest request,
+            Authentication authentication) {
+
+        String userId = resolveUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        PostComment updated = commentService.updateComment(commentId, userId, request.getBody());
+        boolean isLiked = postLikeRepository.existsByCommentIdAndUserId(commentId, userId);
+        String nickname = resolveNickname(updated.getAuthorId());
+        return ResponseEntity.ok(
+                CommentResponse.from(updated, isLiked, false, false, nickname, true));
+    }
+
+    /**
+     * 댓글 삭제 (본인만)
+     * DELETE /api/community/posts/{postId}/comments/{commentId}
+     */
+    @DeleteMapping("/{commentId}")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "댓글 삭제", description = "본인이 작성한 댓글 삭제 (대댓글 포함)")
+    public ResponseEntity<Void> deleteComment(
+            @PathVariable String postId,
+            @PathVariable Long commentId,
+            Authentication authentication) {
+
+        String userId = resolveUserId(authentication);
+        if (userId == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        commentService.deleteComment(commentId, userId);
+        return ResponseEntity.noContent().build();
     }
 
     /**

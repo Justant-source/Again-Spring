@@ -31,6 +31,11 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
     void deleteByCommentIdAndUserId(Long commentId, String userId);
 
     /**
+     * 특정 댓글의 모든 좋아요 삭제 (댓글 삭제 시 정리)
+     */
+    void deleteByCommentId(Long commentId);
+
+    /**
      * 포스트 좋아요 수
      */
     Long countByPostId(String postId);

@@ -38,4 +38,7 @@ public class CommentWithRepliesResponse {
     private Boolean isAuthor;
 
     private Boolean isPartner;
+
+    /** 요청자가 이 댓글의 작성자인지 — 수정·삭제 버튼 노출 판단용 */
+    private Boolean isMine;
 }

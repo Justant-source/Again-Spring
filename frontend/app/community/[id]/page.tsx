@@ -136,6 +136,7 @@ function C3StoryDetail({
   // 투표 완료 후 실제 BE 비율 사용, 투표 전 선택 시 내 한 표를 더한 예상 비율로 미리보기
   const existingTotal = post.voteResult?.totalVotes ?? 0;
   const existingAuthorCount = post.voteResult?.options?.[0]?.count ?? 0;
+  const existingPartnerCount = post.voteResult?.options?.[1]?.count ?? 0;
   const authorPct = voteResult
     ? Math.round(voteResult.options?.[0]?.percentage ?? post.authorPct ?? 50)
     : pick === 'g'
@@ -144,6 +145,18 @@ function C3StoryDetail({
       ? Math.round(existingAuthorCount / (existingTotal + 1) * 100)
       : Math.round(post.authorPct ?? 50);
   const partnerPct = 100 - authorPct;
+
+  // 표 수 — 막대는 비율(%)로, 라벨은 표 수로 표시. 선택 시 내 한 표 미리 반영
+  const authorCount = voteResult
+    ? (voteResult.options?.[0]?.count ?? 0)
+    : pick === 'g'
+      ? existingAuthorCount + 1
+      : existingAuthorCount;
+  const partnerCount = voteResult
+    ? (voteResult.options?.[1]?.count ?? 0)
+    : pick === 'r'
+      ? existingPartnerCount + 1
+      : existingPartnerCount;
 
 
   return (
@@ -156,7 +169,7 @@ function C3StoryDetail({
             <span style={{ fontSize: 13, color: 'var(--L-sub)' }}>광장</span>
           </Link>
           {voted && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div data-testid="vote-complete-badge" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${AUTHOR}`, color: AUTHOR, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>卜</span>
               <span style={{ fontSize: 11.5, color: AUTHOR, fontWeight: 500 }}>완료</span>
             </div>
@@ -217,8 +230,8 @@ function C3StoryDetail({
             <div style={{ flex: 1, background: PARTNER }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--L-sub)', marginTop: 7 }}>
-            <span>작성자 {authorPct}%</span>
-            <span>상대방 {partnerPct}%</span>
+            <span>작성자 {authorCount}표</span>
+            <span>상대방 {partnerCount}표</span>
           </div>
         </div>
 

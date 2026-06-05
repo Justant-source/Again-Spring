@@ -11,9 +11,13 @@ interface CommunityCommentProps {
   likeCount: number;
   isLiked?: boolean;
   isReply?: boolean;
+  /** 현재 사용자가 작성한 댓글 — true면 ⋯ 메뉴에 수정/삭제 노출 */
+  isMine?: boolean;
   onLike?: () => void;
   onReply?: () => void;
   onReport?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 function ThumbIcon({ color, filled }: { color: string; filled?: boolean }) {
@@ -41,11 +45,27 @@ export function CommunityComment({
   likeCount,
   isLiked = false,
   isReply = false,
+  isMine = false,
   onLike,
   onReply,
   onReport,
+  onEdit,
+  onDelete,
 }: CommunityCommentProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const menuItemStyle: React.CSSProperties = {
+    display: 'block',
+    width: '100%',
+    padding: '11px 16px',
+    background: 'none',
+    border: 'none',
+    textAlign: 'left',
+    fontSize: 13,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+  };
 
   const sub = 'var(--L-sub)';
   const ink = 'var(--L-ink)';
@@ -121,6 +141,7 @@ export function CommunityComment({
           </>
         )}
         <button
+          data-testid="comment-menu-toggle"
           onClick={() => setMenuOpen((o) => !o)}
           style={{
             marginLeft: 'auto',
@@ -159,26 +180,32 @@ export function CommunityComment({
               overflow: 'hidden',
             }}
           >
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                onReport?.();
-              }}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '11px 16px',
-                background: 'none',
-                border: 'none',
-                textAlign: 'left',
-                fontSize: 13,
-                color: 'var(--faction-partner)',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              신고
-            </button>
+            {isMine ? (
+              <>
+                <button
+                  data-testid="comment-menu-edit"
+                  onClick={() => { setMenuOpen(false); onEdit?.(); }}
+                  style={{ ...menuItemStyle, color: ink }}
+                >
+                  수정
+                </button>
+                <button
+                  data-testid="comment-menu-delete"
+                  onClick={() => { setMenuOpen(false); onDelete?.(); }}
+                  style={{ ...menuItemStyle, color: 'var(--faction-partner)', borderTop: '1px solid var(--L-border)' }}
+                >
+                  삭제
+                </button>
+              </>
+            ) : (
+              <button
+                data-testid="comment-menu-report"
+                onClick={() => { setMenuOpen(false); onReport?.(); }}
+                style={{ ...menuItemStyle, color: 'var(--faction-partner)' }}
+              >
+                신고
+              </button>
+            )}
           </div>
         </>
       )}

@@ -11,6 +11,8 @@ export interface Comment {
   replies?: Comment[];
   isAuthor?: boolean;
   isPartner?: boolean;
+  /** 현재 사용자가 이 댓글의 작성자 — 수정·삭제 노출 판단 */
+  isMine?: boolean;
 }
 
 export type CommentResponse = Comment;
@@ -21,6 +23,12 @@ export const commentApi = {
 
   add: (postId: string, body: string, parentCommentId?: number) =>
     api.post<Comment>(`/api/community/posts/${postId}/comments`, { body, parentCommentId }).then(r => r.data),
+
+  update: (postId: string, commentId: number, body: string) =>
+    api.put<Comment>(`/api/community/posts/${postId}/comments/${commentId}`, { body }).then(r => r.data),
+
+  remove: (postId: string, commentId: number) =>
+    api.delete(`/api/community/posts/${postId}/comments/${commentId}`),
 
   toggleLike: (postId: string, commentId: number) =>
     api.post<{ liked: boolean; count: number }>(

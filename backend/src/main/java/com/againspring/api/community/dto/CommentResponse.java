@@ -25,6 +25,8 @@ public class CommentResponse {
     private Instant createdAt;
     private Boolean isAuthor;
     private Boolean isPartner;
+    /** 요청자가 이 댓글의 작성자인지 — 수정·삭제 버튼 노출 판단용 */
+    private Boolean isMine;
 
     public static CommentResponse from(PostComment comment, boolean isLiked) {
         return CommentResponse.builder()
@@ -42,6 +44,10 @@ public class CommentResponse {
     }
 
     public static CommentResponse from(PostComment comment, boolean isLiked, boolean isAuthor, boolean isPartner, String authorNickname) {
+        return from(comment, isLiked, isAuthor, isPartner, authorNickname, false);
+    }
+
+    public static CommentResponse from(PostComment comment, boolean isLiked, boolean isAuthor, boolean isPartner, String authorNickname, boolean isMine) {
         return CommentResponse.builder()
                 .id(comment.getId())
                 .authorId(comment.getAuthorId())
@@ -52,6 +58,7 @@ public class CommentResponse {
                 .createdAt(comment.getCreatedAt())
                 .isAuthor(isAuthor)
                 .isPartner(isPartner)
+                .isMine(isMine)
                 .build();
     }
 }
