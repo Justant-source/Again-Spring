@@ -673,3 +673,117 @@ relationships:
   other_id: e770499b0c3245b281771bbeedfd4cd2  # 046 달구름 (30s_early M FMKOREA)
   relation_type: ACQUAINTANCE
   closeness: 0.3
+
+# ========== COUPLE/MARRIAGE 양면 시나리오 페어 ==========
+
+# COUPLE 쌍 01: couple_communication
+- persona_id: a86eb1d5f93a42c3882630b57ff78b6f
+  other_id: c5a3a050d8694986b54f6e196d0fbf75
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_communication
+
+# COUPLE 쌍 02: couple_communication
+- persona_id: ca18075399bd44e8add4e2330339b196
+  other_id: 1597041b40f0437a8c98acd3875716af
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_communication
+
+# COUPLE 쌍 03: couple_communication
+- persona_id: 05f8f3042933499ca416599a629c1c66
+  other_id: a121488480d94eb2b12cd0af03cf2a48
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_communication
+
+# COUPLE 쌍 04: couple_communication
+- persona_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+  other_id: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_communication
+
+# COUPLE 쌍 05: couple_future_plans
+- persona_id: 51734afaecd149ffa6fcf0199e99cf8b
+  other_id: 79b0488d39734a52b3921e25afd7f3ad
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_future_plans
+
+# COUPLE 쌍 06: couple_money_dating
+- persona_id: 32f774377587435b82c3d8cb8037c328
+  other_id: f0ab82a7135b4fb683bf4b17800ab12b
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_money_dating
+
+# COUPLE 쌍 07: couple_money_dating
+- persona_id: a0ff5c0e92e94ec481f7351149c5b8bf
+  other_id: 5bcee3fcd85744e9b5ea8cef85dd1c51
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_money_dating
+
+# COUPLE 쌍 08: couple_opposite_sex_friend
+- persona_id: 0e9286ff5f2e48158783c0e8142144c1
+  other_id: 7e5cd42ad22949de828ca280eb23fed4
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_opposite_sex_friend
+
+# COUPLE 쌍 09: couple_opposite_sex_friend
+- persona_id: 3f30df835a92426ebd478ff6e937c71a
+  other_id: 7ec216eb8025429e9694c38f0ab62055
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_opposite_sex_friend
+
+# COUPLE 쌍 10: couple_phone_control
+- persona_id: d118bbbad76d431c8aa29a2180556254
+  other_id: ed6dca60e36e453cb34e170f52d5203a
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: couple_phone_control
+
+# MARRIAGE 쌍 01: married_housework
+- persona_id: 92d2adb49d10469bbe9bc29ac30da3f2
+  other_id: 557757b2489d468782a1d33cae86d713
+  relation_type: MARRIAGE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: married_housework
+
+# MARRIAGE 쌍 02: married_housework+married_money_control
+- persona_id: 0d17b22f21ea4be48f035600f445f565
+  other_id: f76235031ed143a6853b690a019cf7e4
+  relation_type: MARRIAGE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: married_housework+married_money_control
+
+# MARRIAGE 쌍 03: married_communication
+- persona_id: 8f5b266a66324276b260e2881bfa3e66
+  other_id: c6da64a654e44889b0258e54f8b39667
+  relation_type: MARRIAGE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: married_communication
+
+# MARRIAGE 쌍 04: married_finance
+- persona_id: 094399c3798843cb932426ebaa6002e3
+  other_id: dcccfe3fa4b94727b4028b5877c14439
+  relation_type: MARRIAGE
+  closeness: 0.85
+  status: ACTIVE
+  # archetype: married_finance

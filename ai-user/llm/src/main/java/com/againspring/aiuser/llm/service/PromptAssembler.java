@@ -17,6 +17,7 @@ public class PromptAssembler {
     private String postGuide = "";
     private String commentGuide = "";
     private String replyGuide = "";
+    private String partnerGuide = "";
 
     @PostConstruct
     public void loadGuides() {
@@ -24,8 +25,9 @@ public class PromptAssembler {
         postGuide = loadResource("voice/post.md").replace("%", "%%");
         commentGuide = loadResource("voice/comment.md").replace("%", "%%");
         replyGuide = loadResource("voice/reply.md").replace("%", "%%");
-        log.info("Voice guides loaded: post={}c comment={}c reply={}c",
-            postGuide.length(), commentGuide.length(), replyGuide.length());
+        partnerGuide = loadResource("voice/partner.md").replace("%", "%%");
+        log.info("Voice guides loaded: post={}c comment={}c reply={}c partner={}c",
+            postGuide.length(), commentGuide.length(), replyGuide.length(), partnerGuide.length());
     }
 
     private String loadResource(String path) {
@@ -63,6 +65,11 @@ public class PromptAssembler {
     }
 
     public String assemblePostPrompt(PostGenRequest req) {
+        // PARTNER stance이면 별도 파트너 프롬프트로 분기
+        if ("PARTNER".equalsIgnoreCase(req.getStance()) && req.getCounterpartBody() != null && !req.getCounterpartBody().isBlank()) {
+            return assemblePartnerPrompt(req);
+        }
+        // 기존 로직 유지
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), postGuide, req.getFormality());
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
@@ -86,6 +93,38 @@ public class PromptAssembler {
                 req.getCategory() != null ? req.getCategory() : "OTHER",
                 req.getArchetype() != null ? req.getArchetype() : "일반갈등",
                 req.getTopicSeed() != null ? "상황: " + safe(req.getTopicSeed()) : "",
+                lengthInstruction(req.getLengthTier()),
+                dynamicExamplesBlock(req.getDynamicExamples()),
+                politeSuffix,
+                varietySeed);
+        return system + "\n" + SEP + "\n" + user;
+    }
+
+    private String assemblePartnerPrompt(PostGenRequest req) {
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), partnerGuide, req.getFormality());
+        String politeSuffix = isPolite(req.getFormality())
+            ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
+            : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
+        String varietySeed = PROMPT_RNG.nextBoolean()
+            ? "\n[스타일 힌트] " + VARIETY_SEEDS[PROMPT_RNG.nextInt(VARIETY_SEEDS.length)] : "";
+        String user = """
+            [작성자가 쓴 원글]
+            %s
+
+            카테고리: %s
+            아키타입: %s
+            글 길이: %s
+            %s
+            위 원글에서 상대방(파트너) 입장으로 같은 갈등을 1인칭으로 서술해주세요.
+            - 원글에서 언급된 구체 사건을 반드시 참조하되 해석은 자기 시각으로
+            - 방어적 해명보다 내가 느끼고 있는 것 중심
+            - 판결·처방·사과 표현 금지
+            - 실제 인물 실명·개인정보 절대 포함 금지
+            ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지
+            %s%s""".formatted(
+                safe(req.getCounterpartBody()),
+                req.getCategory() != null ? req.getCategory() : "OTHER",
+                req.getArchetype() != null ? req.getArchetype() : "갈등",
                 lengthInstruction(req.getLengthTier()),
                 dynamicExamplesBlock(req.getDynamicExamples()),
                 politeSuffix,

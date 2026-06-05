@@ -9,4 +9,6 @@ import java.util.List;
 public interface PersonaRelationshipRepository extends JpaRepository<PersonaRelationship, Long> {
     List<PersonaRelationship> findByPersonaIdAndStatus(String personaId, String status);
     List<PersonaRelationship> findByOtherIdAndStatus(String otherId, String status);
+    /** COUPLE 또는 MARRIAGE 관계 전체 조회 (PairedPostScheduler용) */
+    List<PersonaRelationship> findByRelationTypeInAndStatus(List<String> relationTypes, String status);
 }

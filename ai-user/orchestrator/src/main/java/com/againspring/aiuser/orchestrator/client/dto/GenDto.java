@@ -28,6 +28,8 @@ public class GenDto {
         private String correlationId;
         @Builder.Default
         private long timeoutMs = 120000L;
+        private String stance;           // "AUTHOR" | "PARTNER"
+        private String counterpartBody;  // PARTNER일 때 원글 본문
     }
 
     @Getter

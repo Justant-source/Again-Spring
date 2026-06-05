@@ -62,6 +62,12 @@ public class AiUserSeedLoader {
                 } catch (Exception e) {
                     log.warn("PersonaFactory.ensureCount failed (non-critical): {}", e.getMessage());
                 }
+                // 관계 시딩은 항상 실행 — 새 페어가 추가될 때 자동 반영 (중복은 save()가 무시)
+                try {
+                    seedRelationships(new org.yaml.snakeyaml.Yaml());
+                } catch (Exception e) {
+                    log.warn("Relationship re-seed failed (non-critical): {}", e.getMessage());
+                }
                 return;
             }
         } catch (Exception e) {
@@ -226,9 +232,16 @@ public class AiUserSeedLoader {
             // 새 필드: hot_buttons (감정 트리거)
             Object hotButtons = voice.get("hot_buttons");
             if (hotButtons instanceof Map) voiceProfile.put("hot_buttons", hotButtons);
-            // Demographics from voice.yml top-level
+            // Demographics from voice.yml top-level (with profile.yml fallback for gender)
             voiceProfile.put("age", str(voice.get("age"), ""));
-            voiceProfile.put("gender", str(voice.get("gender"), ""));
+            String genderVal = str(voice.get("gender"), "");
+            if (genderVal.isBlank()) {
+                Object demog = p.get("demographics");
+                if (demog instanceof Map<?,?> demogMap) {
+                    genderVal = str(demogMap.get("gender"), "");
+                }
+            }
+            voiceProfile.put("gender", genderVal);
             voiceProfile.put("political_orientation", str(voice.get("political_orientation"), ""));
             voiceProfile.put("political_strength", voice.containsKey("political_strength")
                 ? String.valueOf(voice.get("political_strength")) : "");
@@ -281,9 +294,15 @@ public class AiUserSeedLoader {
                     String pId = str(r.get("persona_id"), r.get("personaId"));
                     String oId = str(r.get("other_id"), r.get("otherId"));
                     if (pId == null || oId == null) continue;
+                    String relType = str(r.get("relation_type"), r.get("relationType"), "FRIEND");
+                    // 중복 방지 — UNIQUE KEY uk_pair(persona_id, other_id, relation_type)
+                    boolean exists = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM persona_relationships WHERE persona_id=? AND other_id=? AND relation_type=?",
+                        Integer.class, pId, oId, relType) > 0;
+                    if (exists) continue;
                     relationshipRepo.save(PersonaRelationship.builder()
                         .personaId(pId).otherId(oId)
-                        .relationType(str(r.get("relation_type"), r.get("relationType"), "FRIEND"))
+                        .relationType(relType)
                         .closeness(new BigDecimal(String.valueOf(num(r.get("closeness"), 0.5))).setScale(2, RoundingMode.HALF_UP))
                         .status(str(r.get("status"), "ACTIVE"))
                         .build());

@@ -158,6 +158,40 @@ public class BackendBotClient {
         }
     }
 
+    /** Set publish mode to WAIT_FOR_PARTNER (or PUBLISH_NOW) */
+    public boolean setPublishMode(String jwt, String postId, String mode, Integer voteDurationHours) {
+        try {
+            java.util.Map<String, Object> body = new java.util.HashMap<>();
+            body.put("mode", mode);
+            if (voteDurationHours != null) body.put("voteDurationHours", voteDurationHours);
+            restClient.patch()
+                .uri("/api/community/posts/{postId}/publish-mode", postId)
+                .header("Authorization", "Bearer " + jwt)
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
+            return true;
+        } catch (Exception e) {
+            log.warn("setPublishMode failed for post {}: {}", postId, e.getMessage());
+            return false;
+        }
+    }
+
+    /** Fetch post detail (no auth) */
+    public java.util.Optional<java.util.Map<String, Object>> getPost(String postId) {
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> resp = restClient.get()
+                .uri("/api/community/posts/{postId}", postId)
+                .retrieve()
+                .body(new org.springframework.core.ParameterizedTypeReference<java.util.Map<String, Object>>(){});
+            return java.util.Optional.ofNullable(resp);
+        } catch (Exception e) {
+            log.warn("getPost failed for {}: {}", postId, e.getMessage());
+            return java.util.Optional.empty();
+        }
+    }
+
     /** Fetch comments for a post (no auth required) */
     public java.util.List<CommentThreadDto> getComments(String postId, int page, int size) {
         try {

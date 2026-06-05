@@ -21,4 +21,6 @@ public class PostGenRequest {
     private String lengthTier;       // "SHORT"|"MEDIUM"|"LONG"|"VERYLONG"
     private String correlationId;
     private long timeoutMs;
+    private String stance;           // "AUTHOR"(기본, null이면 AUTHOR) | "PARTNER"
+    private String counterpartBody;  // PARTNER일 때: 작성자 발행 본문 (컨텍스트)
 }

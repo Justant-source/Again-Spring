@@ -51,6 +51,10 @@ ai-user:
   llm-ai-user-url: ${LLM_AI_USER_URL:http://againspring-llm-ai-user-dev:8092}
   history-dir: ${AI_USER_HISTORY_DIR:/app/persona-history}
   personas-dir: ${AI_USER_PERSONAS_DIR:/app/personas}
+  paired-post:
+    enabled: ${PAIRED_POST_ENABLED:true}
+    cron: "${PAIRED_POST_CRON:0 0 5 * * *}"
+    pairs-per-run: ${PAIRED_POST_PAIRS:2}
 
 ai-learning:
   base-url: ${AI_LEARNING_BASE_URL:http://againspring-ai-learning:8099}
