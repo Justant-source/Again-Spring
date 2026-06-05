@@ -32,12 +32,18 @@ public class PostResponse {
     private Long viewCount;
     private String authorNickname;
     private Boolean paired;
+    /** 현재 사용자가 투표한 진영: "g"=작성자, "r"=상대방, null=미투표 */
+    private String myVoteSide;
 
     public static PostResponse from(Post post, List<VoteOption> options) {
-        return from(post, options, 0L, 0L, null);
+        return from(post, options, 0L, 0L, null, null);
     }
 
     public static PostResponse from(Post post, List<VoteOption> options, Long voteCount, Long commentCount, String authorNickname) {
+        return from(post, options, voteCount, commentCount, authorNickname, null);
+    }
+
+    public static PostResponse from(Post post, List<VoteOption> options, Long voteCount, Long commentCount, String authorNickname, Long votedOptionId) {
         List<VoteOptionDto> voteDtos = options.stream()
                 .map(opt -> VoteOptionDto.builder()
                         .id(opt.getId())
@@ -45,6 +51,15 @@ public class PostResponse {
                         .orderIdx(opt.getOrderIdx())
                         .build())
                 .toList();
+
+        String myVoteSide = null;
+        if (votedOptionId != null) {
+            myVoteSide = voteDtos.stream()
+                    .filter(o -> o.getId().equals(votedOptionId))
+                    .findFirst()
+                    .map(o -> o.getOrderIdx() == 0 ? "g" : "r")
+                    .orElse(null);
+        }
 
         return PostResponse.builder()
                 .id(post.getId())
@@ -61,6 +76,7 @@ public class PostResponse {
                 .viewCount(post.getViewCount() != null ? post.getViewCount().longValue() : 0L)
                 .authorNickname(authorNickname)
                 .paired(post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null)
+                .myVoteSide(myVoteSide)
                 .build();
     }
 }

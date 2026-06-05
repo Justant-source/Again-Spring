@@ -19,8 +19,10 @@ interface FeedCardProps {
   /** 조회 수 (없으면 '조회' 라벨) */
   views?: number | string;
   href: string;
-  /** 양쪽 이야기가 모두 있으면 true — 피치+세이지 점 표시 */
+  /** 양쪽 이야기가 모두 있으면 true */
   paired?: boolean;
+  /** 현재 사용자가 이 글에 투표했으면 true */
+  voted?: boolean;
 }
 
 const STAT_COL: React.CSSProperties = {
@@ -31,7 +33,7 @@ const STAT_COL: React.CSSProperties = {
   gap: 5,
 };
 
-export function FeedCard({ cat, id, time, title, body, g, votes, c, views, href, paired }: FeedCardProps) {
+export function FeedCard({ cat, id, time, title, body, g, votes, c, views, href, paired, voted }: FeedCardProps) {
   return (
     <a
       href={href}
@@ -46,18 +48,27 @@ export function FeedCard({ cat, id, time, title, body, g, votes, c, views, href,
         position: 'relative',
       }}
     >
-      {/* paired 점 — 우상단 */}
-      {paired && (
-        <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', alignItems: 'center' }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--faction-author)', display: 'inline-block' }} />
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--faction-partner)', display: 'inline-block', marginLeft: -3 }} />
+      {/* 우상단: 투표 도장 (투표했을 때) */}
+      {voted && (
+        <div style={{ position: 'absolute', top: 11, right: 12 }}>
+          <svg width="20" height="20" viewBox="0 0 32 32" fill="none" aria-label="투표 완료">
+            <circle cx="16" cy="16" r="14" fill="none" stroke="var(--faction-author)" strokeWidth="2.4" />
+            <path d="M13 8.5 L13 23.5" stroke="var(--faction-author)" strokeWidth="2.6" strokeLinecap="round" />
+            <path d="M13 15 L21.5 10" stroke="var(--faction-author)" strokeWidth="2.6" strokeLinecap="round" />
+          </svg>
         </div>
       )}
 
       <div style={{ padding: '15px 16px' }}>
-        {/* 상단: 대분류 · 아이디 · 시간 */}
+        {/* 상단: 대분류 · [paired 점] · 아이디 · 시간 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span style={{ fontSize: 11, color: 'var(--L-bg)', background: 'var(--L-ink)', borderRadius: 999, padding: '2px 9px', flexShrink: 0 }}>{cat}</span>
+          {paired && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--faction-author)', display: 'inline-block' }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--faction-partner)', display: 'inline-block', marginLeft: -3 }} />
+            </span>
+          )}
           <span style={{ fontSize: 12, color: 'var(--L-ink)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{id}</span>
           <span style={{ fontSize: 11.5, color: 'var(--L-sub)', flexShrink: 0 }}>{time}</span>
         </div>

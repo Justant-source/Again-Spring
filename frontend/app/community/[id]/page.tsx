@@ -10,6 +10,7 @@ import { VoteBar, SideStory, JurySection, CommunityComment } from '@/components/
 import { AUTHOR, PARTNER, AUTHOR_BG, PARTNER_BG } from '@/lib/constants/factionColors';
 import { timeAgo } from '@/lib/utils/timeAgo';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
+import { useVoteStore } from '@/lib/store/voteStore';
 
 const COMMENT_PAGE_SIZE = 10;
 
@@ -59,24 +60,46 @@ function C3StoryDetail({
   loadingMoreComments: boolean;
   commentBottomRef: React.RefObject<HTMLDivElement>;
 }) {
+  const storedSide = useVoteStore((s) => s.votes[post.id] ?? null);
+  const { clearVote: storeClearVote } = useVoteStore();
   const myVotedId = post.voteResult?.myVotedOptionId;
-  const derivedSide: 'g' | 'r' | null = myVotedId != null
-    ? (myVotedId === post.voteOptions?.[0]?.id ? 'g' : 'r')
-    : (post.myVoteSide ?? null);
+
+  // 백엔드가 명시적으로 미투표라고 하면 voteStore 스테일 데이터 무시
+  const backendSaysNotVoted = post.isVoted === false && myVotedId == null;
+  const effectiveStoredSide = backendSaysNotVoted ? null : storedSide;
+
+  const derivedSide: 'g' | 'r' | null =
+    myVotedId != null
+      ? (myVotedId === post.voteOptions?.[0]?.id ? 'g' : 'r')
+      : (post.myVoteSide ?? effectiveStoredSide);
   const [pick, setPick] = useState<'g' | 'r' | null>(derivedSide);
-  const [voted, setVoted] = useState(post.isVoted || post.hasVoted || false);
+  const [voted, setVoted] = useState(
+    Boolean(post.isVoted || post.hasVoted || myVotedId != null) || effectiveStoredSide != null
+  );
+
+  // 백엔드가 미투표라 했는데 voteStore에 스테일 데이터가 있으면 정리
+  useEffect(() => {
+    if (backendSaysNotVoted && storedSide != null) {
+      storeClearVote(post.id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [localVoteCount, setLocalVoteCount] = useState(
+    voteResult?.totalVotes ?? post.voteResult?.totalVotes ?? 0
+  );
   const router = useRouter();
 
   // 우측 끝 투표 버튼 — 해당 쪽 투표 / 이미 이 쪽에 투표했으면 취소
   const handleVoteSide = async (side: 'g' | 'r') => {
     if (isVoting) return;
     if (voted && pick === side) {
-      // 취소
+      // 취소 — 즉시 카운트 감소
+      setLocalVoteCount(prev => Math.max(0, prev - 1));
       try {
         await onCancelVote();
         setPick(null);
         setVoted(false);
       } catch (err) {
+        setLocalVoteCount(prev => prev + 1); // 실패 시 롤백
         console.error('Cancel vote failed:', err);
       }
       return;
@@ -84,11 +107,15 @@ function C3StoryDetail({
     if (voted) return; // 다른 쪽에 이미 투표함 — 변경 불가
     const optionId = side === 'g' ? post.voteOptions[0]?.id : post.voteOptions[1]?.id;
     if (!optionId) return;
+    // 즉시 카운트 증가
+    setLocalVoteCount(prev => prev + 1);
     setPick(side);
     try {
       await onVote(optionId);
       setVoted(true);
     } catch (err) {
+      setLocalVoteCount(prev => Math.max(0, prev - 1)); // 실패 시 롤백
+      setPick(null);
       console.error('Vote failed:', err);
     }
   };
@@ -118,7 +145,6 @@ function C3StoryDetail({
       : Math.round(post.authorPct ?? 50);
   const partnerPct = 100 - authorPct;
 
-  const voteCount = voteResult?.totalVotes ?? post.voteResult?.totalVotes ?? 0;
 
   return (
     <div style={{ background: 'var(--L-bg)', minHeight: '100vh' }}>
@@ -132,7 +158,7 @@ function C3StoryDetail({
           {voted && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${AUTHOR}`, color: AUTHOR, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>卜</span>
-              <span style={{ fontSize: 11.5, color: AUTHOR, fontWeight: 500 }}>투표 완료</span>
+              <span style={{ fontSize: 11.5, color: AUTHOR, fontWeight: 500 }}>완료</span>
             </div>
           )}
         </div>
@@ -200,7 +226,7 @@ function C3StoryDetail({
         <div style={{ display: 'flex', alignItems: 'center', marginTop: 16, paddingTop: 14, paddingBottom: 4, borderTop: '1px solid var(--L-border)', color: 'var(--L-sub)' }}>
           <span style={ACTION_COL}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M9 11l3-8 3 8M5 11h14v8a2 2 0 01-2 2H7a2 2 0 01-2-2z" strokeLinejoin="round" /></svg>
-            {voteCount}
+            {localVoteCount}
           </span>
           <span style={ACTION_COL}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 15a2 2 0 01-2 2H8l-4 4V5a2 2 0 012-2h13a2 2 0 012 2z" strokeLinejoin="round" /></svg>
@@ -631,6 +657,7 @@ function C3Closed({
 
 export default function CommunityPostPage({ params }: PageProps) {
   useGuestInit();
+  const { setVote, clearVote, getVoteSide } = useVoteStore();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [voteResult, setVoteResult] = useState<VoteResult | null>(null);
   const [juryResult, setJuryResult] = useState<JuryResult | null>(null);
@@ -782,22 +809,30 @@ export default function CommunityPostPage({ params }: PageProps) {
       const result = await postApi.cancelVote(params.id);
       setVoteResult(result);
       setPost(prev => prev ? { ...prev, isVoted: false, hasVoted: false, myVoteSide: null } : null);
+      clearVote(params.id);
     } catch (err: any) {
       if (err?.response?.status !== 404) console.error('Cancel vote failed:', err);
     }
   };
 
   const handleVote = async (optionId: number) => {
-    // 이미 투표했으면 재투표 불가
-    if (post?.isVoted || post?.hasVoted) return;
+    if (post?.isVoted || post?.hasVoted || post?.voteResult?.myVotedOptionId != null) return;
     setIsVoting(true);
+    const side = optionId === post?.voteOptions?.[0]?.id ? 'g' : 'r';
     try {
       const result = await postApi.vote(params.id, optionId);
       setVoteResult(result);
-      setPost((prev) => prev ? { ...prev, isVoted: true, hasVoted: true, myVoteSide: optionId === prev.voteOptions?.[0]?.id ? 'g' : 'r' } : null);
+      setPost((prev) => prev ? { ...prev, isVoted: true, hasVoted: true, myVoteSide: side } : null);
+      setVote(params.id, side);
     } catch (err: any) {
-      // 409 ALREADY_VOTED는 조용히 처리 (UI는 이미 잠금 상태)
-      if (err?.response?.status !== 409) console.error('Vote failed:', err);
+      if (err?.response?.status === 409) {
+        // 이미 투표된 상태 — 로컬 상태 동기화 (재방문 직후 409가 오는 경우)
+        setVote(params.id, side);
+        setPost((prev) => prev ? { ...prev, isVoted: true, hasVoted: true, myVoteSide: side } : null);
+      } else {
+        console.error('Vote failed:', err);
+        throw err; // handleVoteSide의 catch 블록이 UI를 롤백하도록 re-throw
+      }
     } finally {
       setIsVoting(false);
     }

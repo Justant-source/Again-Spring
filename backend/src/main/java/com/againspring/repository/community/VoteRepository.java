@@ -41,6 +41,11 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
     void deleteByPostIdAndVoterUserId(String postId, String voterUserId);
 
     /**
+     * 여러 포스트에 대한 특정 사용자의 투표 일괄 조회 (피드 목록용)
+     */
+    List<Vote> findByVoterUserIdAndPostIdIn(String voterUserId, List<String> postIds);
+
+    /**
      * 특정 시간 범위의 투표 수 (일별 집계용)
      */
     long countByCreatedAtBetween(Instant from, Instant to);

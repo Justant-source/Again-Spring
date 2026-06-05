@@ -7,6 +7,7 @@ import { postApi, PostSummary } from '@/lib/api/community/postApi';
 import { FeedCard, BrandBar } from '@/components/community/c3';
 import { useUserStore } from '@/lib/store/userStore';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
+import { useVoteStore } from '@/lib/store/voteStore';
 import { timeAgo } from '@/lib/utils/timeAgo';
 
 // id = BE PostCategory enum, label = 표시 한글
@@ -28,6 +29,7 @@ export default function CommunityFeedPage() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
   useGuestInit();
+  const voteStoreVotes = useVoteStore((s) => s.votes);
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [sort, setSort] = useState<'latest' | 'recommended'>('latest');
@@ -156,6 +158,7 @@ export default function CommunityFeedPage() {
                 c={post.commentCount || 0}
                 views={post.viewCount || 0}
                 paired={post.paired}
+                voted={!!post.myVoteSide || !!voteStoreVotes[post.id]}
               />
             ))}
           </div>

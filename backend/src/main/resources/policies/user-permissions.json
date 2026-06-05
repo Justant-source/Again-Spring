@@ -8,7 +8,7 @@
       "label": "게스트",
       "summary": "회원가입 없이 체험 가능한 임시 사용자. IP·세션·턴·기간 모두 제한.",
       "auth": {
-        "tokenExpirationSeconds": 7200,
+        "tokenExpirationSeconds": 2592000,
         "requiresEmailVerification": false,
         "requiresOnboarding": false,
         "canChangePassword": false

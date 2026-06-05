@@ -79,7 +79,7 @@ export function SideStory({
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
               <path d="M9 11l3-8 3 8M5 11h14v8a2 2 0 01-2 2H7a2 2 0 01-2-2z" strokeLinejoin="round" />
             </svg>
-            {voted ? '투표함' : '투표'}
+            {voted ? '완료' : '투표'}
           </button>
         ) : clamp && onMore ? (
           <span

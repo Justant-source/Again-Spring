@@ -99,11 +99,22 @@ public class CommunityPostController {
             @RequestParam(required = false) String category,
             @RequestParam(name = "sortBy", defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
 
         // Pageable을 수동 생성 — Spring Data의 sort 파라미터와 이름 충돌 방지
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Post> posts = postService.listPublicPosts(category, sort, pageable);
+
+        // 로그인/게스트 사용자의 투표 내역 벌크 조회 → myVoteSide 표시용
+        String userId = resolveUserId(authentication);
+        java.util.Map<String, Long> myVoteMap = new java.util.HashMap<>();
+        if (userId != null) {
+            List<String> postIds = posts.stream().map(Post::getId).toList();
+            voteRepository.findByVoterUserIdAndPostIdIn(userId, postIds)
+                    .forEach(v -> myVoteMap.put(v.getPostId(), v.getOptionId()));
+        }
+
         Page<PostResponse> responses = posts.map(post -> {
             List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
             long voteCount = voteRepository.countByPostId(post.getId());
@@ -111,7 +122,8 @@ public class CommunityPostController {
             String authorNickname = userRepository.findById(post.getAuthorId())
                     .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
                     .orElse("익명");
-            return PostResponse.from(post, options, voteCount, commentCount, authorNickname);
+            Long votedOptionId = myVoteMap.get(post.getId());
+            return PostResponse.from(post, options, voteCount, commentCount, authorNickname, votedOptionId);
         });
         return ResponseEntity.ok(responses);
     }

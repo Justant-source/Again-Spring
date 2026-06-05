@@ -57,6 +57,7 @@ export interface PostSummary {
   paired?: boolean;
   bodyPublished?: string;
   authorNickname?: string;
+  myVoteSide?: 'g' | 'r' | null;
 }
 
 export interface VoteResult {

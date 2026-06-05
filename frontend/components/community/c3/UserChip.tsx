@@ -80,11 +80,22 @@ function GuestInfoSheet({ user, onClose }: { user: User; onClose: () => void }) 
             회원가입하기
           </button>
           <button
-            onClick={onClose}
+            onClick={() => { onClose(); router.push('/login'); }}
             style={{
               width: '100%', padding: '14px 0', borderRadius: 4,
-              border: '1px solid var(--L-border)', background: 'transparent',
-              color: 'var(--L-ink)', fontSize: 15, fontWeight: 400,
+              border: '1px solid var(--L-ink)', background: 'transparent',
+              color: 'var(--L-ink)', fontSize: 15, fontWeight: 500,
+              fontFamily: 'inherit', cursor: 'pointer',
+            }}
+          >
+            로그인
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              width: '100%', padding: '12px 0', borderRadius: 4,
+              border: 'none', background: 'transparent',
+              color: 'var(--L-sub)', fontSize: 14, fontWeight: 400,
               fontFamily: 'inherit', cursor: 'pointer',
             }}
           >
