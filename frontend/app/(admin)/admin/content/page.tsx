@@ -282,7 +282,16 @@ export default function AdminContentPage() {
                 {
                   key: 'authorId',
                   header: '작성자',
-                  render: (row) => <span className="text-xs text-gray-600">{row.authorId}</span>,
+                  render: (row) => (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-gray-600 truncate max-w-[80px]">{row.authorId}</span>
+                      {row.synthetic && (
+                        <Badge className="text-[10px] px-1 py-0 bg-purple-100 text-purple-700 border border-purple-200 font-normal">
+                          AI
+                        </Badge>
+                      )}
+                    </div>
+                  ),
                 },
                 {
                   key: 'category',
@@ -338,15 +347,13 @@ export default function AdminContentPage() {
                         <DropdownMenuItem onClick={() => setSelectedPost(row)}>
                           수정
                         </DropdownMenuItem>
-                        {row.synthetic && (
-                          <DropdownMenuItem
-                            onClick={() => setImprovePost(row)}
-                            className="text-purple-600"
-                          >
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            AI 개선
-                          </DropdownMenuItem>
-                        )}
+                        <DropdownMenuItem
+                          onClick={() => setImprovePost(row)}
+                          className="text-purple-600"
+                        >
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          AI 개선{row.synthetic ? '' : ' (학습 데이터)'}
+                        </DropdownMenuItem>
                         {row.status !== 'BLOCKED' && (
                           <DropdownMenuItem onClick={() => handleBlockPost(row)}>
                             차단
@@ -426,7 +433,16 @@ export default function AdminContentPage() {
                 {
                   key: 'authorId',
                   header: '작성자',
-                  render: (row) => <span className="text-xs text-gray-600">{row.authorId}</span>,
+                  render: (row) => (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-gray-600 truncate max-w-[80px]">{row.authorId}</span>
+                      {row.synthetic && (
+                        <Badge className="text-[10px] px-1 py-0 bg-purple-100 text-purple-700 border border-purple-200 font-normal">
+                          AI
+                        </Badge>
+                      )}
+                    </div>
+                  ),
                 },
                 {
                   key: 'postId',
@@ -483,15 +499,13 @@ export default function AdminContentPage() {
                         <DropdownMenuItem onClick={() => setSelectedComment(row)}>
                           수정
                         </DropdownMenuItem>
-                        {row.synthetic && (
-                          <DropdownMenuItem
-                            onClick={() => setImproveComment(row)}
-                            className="text-purple-600"
-                          >
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            AI 개선
-                          </DropdownMenuItem>
-                        )}
+                        <DropdownMenuItem
+                          onClick={() => setImproveComment(row)}
+                          className="text-purple-600"
+                        >
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          AI 개선{row.synthetic ? '' : ' (학습 데이터)'}
+                        </DropdownMenuItem>
                         {row.status !== 'BLOCKED' && (
                           <DropdownMenuItem onClick={() => handleBlockComment(row)}>
                             차단
