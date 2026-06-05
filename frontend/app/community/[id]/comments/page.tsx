@@ -59,8 +59,10 @@ export default function PostCommentsPage({ params }: PageProps) {
   }, [params.id]);
 
   // 추가 페이지 로드
+  // ⚠️ initialLoading 가드 필수 — 없으면 마운트 직후 빈 목록 때문에 observer가
+  //    즉시 발화해 첫 페이지(page=0)를 useEffect와 중복 로드 → 댓글 중복 표시
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || initialLoading) return;
     setLoadingMore(true);
     try {
       const data = await commentApi.list(params.id, page, PAGE_SIZE);
@@ -72,7 +74,7 @@ export default function PostCommentsPage({ params }: PageProps) {
     } finally {
       setLoadingMore(false);
     }
-  }, [params.id, page, loadingMore, hasMore]);
+  }, [params.id, page, loadingMore, hasMore, initialLoading]);
 
   // 알림 클릭 시 highlight 댓글로 스크롤 (loadMore 선언 이후)
   useEffect(() => {

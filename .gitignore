@@ -48,6 +48,7 @@ frontend/test-results/
 # ===== DB backups =====
 .backup/
 backup_*.sql
+backup-*.sql
 
 # ===== Tool / OS =====
 .DS_Store
