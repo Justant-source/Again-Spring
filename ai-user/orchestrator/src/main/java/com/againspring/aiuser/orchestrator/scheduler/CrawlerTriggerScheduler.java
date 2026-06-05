@@ -29,7 +29,13 @@ public class CrawlerTriggerScheduler {
         new String[]{"dcinside", "100"},
         new String[]{"natepan", "50"},
         new String[]{"bobaedream", "100"},
-        new String[]{"blind", "50"}
+        new String[]{"blind", "50"},
+        new String[]{"fmkorea", "150"},
+        new String[]{"theqoo", "120"},
+        new String[]{"clien", "100"},
+        new String[]{"ppomppu", "100"},
+        new String[]{"ruliweb", "120"},
+        new String[]{"mlbpark", "80"}
     );
 
     @Scheduled(cron = "0 30 18 * * *")  // UTC 18:30 = KST 03:30

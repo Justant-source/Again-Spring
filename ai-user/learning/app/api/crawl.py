@@ -21,6 +21,18 @@ async def _do_crawl(source, daily_limit, embed_service):
             from app.crawlers.bobaedream import crawl
         elif source == "blind":
             from app.crawlers.blind import crawl
+        elif source == "fmkorea":
+            from app.crawlers.fmkorea import crawl
+        elif source == "theqoo":
+            from app.crawlers.theqoo import crawl
+        elif source == "clien":
+            from app.crawlers.clien import crawl
+        elif source == "ppomppu":
+            from app.crawlers.ppomppu import crawl
+        elif source == "ruliweb":
+            from app.crawlers.ruliweb import crawl
+        elif source == "mlbpark":
+            from app.crawlers.mlbpark import crawl
         else:
             logger.warning(f"Unknown source: {source}")
             return
