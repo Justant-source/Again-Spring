@@ -17,6 +17,8 @@ export function CommentBar({ replyTo, onClick }: CommentBarProps) {
         bottom: 0,
         left: 0,
         right: 0,
+        maxWidth: 640,
+        margin: '0 auto',
         zIndex: 100,
         background: 'var(--L-bg)',
         borderTop: '1px solid var(--L-border)',

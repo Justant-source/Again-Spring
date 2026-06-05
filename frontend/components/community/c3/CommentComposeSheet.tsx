@@ -22,8 +22,14 @@ export function CommentComposeSheet({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    // 짧은 지연 후 포커스 (iOS 키보드 트리거)
-    const t = setTimeout(() => textareaRef.current?.focus(), 50);
+    // 짧은 지연 후 포커스 (iOS 키보드 트리거), 커서를 텍스트 끝으로 이동
+    const t = setTimeout(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+    }, 50);
     return () => clearTimeout(t);
   }, []);
 

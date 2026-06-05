@@ -7,6 +7,7 @@ import { CommunityComment } from '@/components/community/c3/CommunityComment';
 import { CommentBar } from '@/components/community/c3/CommentBar';
 import { CommentComposeSheet } from '@/components/community/c3/CommentComposeSheet';
 import { ReportModal } from '@/components/community/ReportModal';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { timeAgo } from '@/lib/utils/timeAgo';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 
@@ -39,6 +40,9 @@ export default function PostCommentsPage({ params }: PageProps) {
 
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ commentId?: number; authorId?: string } | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [deleteErrorToast, setDeleteErrorToast] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -183,13 +187,20 @@ export default function PostCommentsPage({ params }: PageProps) {
     }
   };
 
-  const handleDelete = async (commentId: number) => {
-    if (typeof window !== 'undefined' && !window.confirm('이 댓글을 삭제할까요?')) return;
+  const handleDelete = (commentId: number) => {
+    setDeleteTarget(commentId);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteTarget == null) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
     try {
-      await commentApi.remove(params.id, commentId);
-      removeFromState(commentId);
+      await commentApi.remove(params.id, id);
+      removeFromState(id);
     } catch {
-      if (typeof window !== 'undefined') window.alert('댓글 삭제에 실패했습니다. 다시 시도해 주세요.');
+      setDeleteErrorToast(true);
+      setTimeout(() => setDeleteErrorToast(false), 2500);
     }
   };
 
@@ -322,6 +333,27 @@ export default function PostCommentsPage({ params }: PageProps) {
           replyTo={replyToNick}
           error={submitError}
         />
+      )}
+
+      {/* 댓글 삭제 확인 다이얼로그 */}
+      <ConfirmDialog
+        open={deleteTarget != null}
+        title="이 댓글을 삭제할까요?"
+        confirmLabel="삭제"
+        cancelLabel="취소"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      {/* 댓글 삭제 실패 토스트 */}
+      {deleteErrorToast && (
+        <div style={{
+          position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--L-ink)', color: 'var(--L-bg)', fontSize: 13,
+          padding: '10px 20px', borderRadius: 20, zIndex: 400, whiteSpace: 'nowrap',
+        }}>
+          댓글 삭제에 실패했습니다. 다시 시도해 주세요.
+        </div>
       )}
 
       {/* 좋아요 미인증 토스트 */}
