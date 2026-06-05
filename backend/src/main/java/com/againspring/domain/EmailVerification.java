@@ -22,7 +22,7 @@ public class EmailVerification {
     @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(nullable = false, length = 6)
+    @Column(nullable = false, length = 4)
     private String code;
 
     @CreatedDate

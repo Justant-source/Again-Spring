@@ -30,6 +30,10 @@ public class GenDto {
         private long timeoutMs = 120000L;
         private String stance;           // "AUTHOR" | "PARTNER"
         private String counterpartBody;  // PARTNER일 때 원글 본문
+        /** 이 페르소나의 과거 첨삭 기반 주의사항 (개행 구분). 없으면 null. */
+        private String correctionCautions;
+        /** 모든 AI 유저 공통 전역 금지 규칙 (개행 구분). 없으면 null. */
+        private String globalForbidRules;
     }
 
     @Getter
@@ -53,6 +57,10 @@ public class GenDto {
         private String correlationId;
         @Builder.Default
         private long timeoutMs = 120000L;
+        /** 이 페르소나의 과거 첨삭 기반 주의사항 (개행 구분). 없으면 null. */
+        private String correctionCautions;
+        /** 모든 AI 유저 공통 전역 금지 규칙 (개행 구분). 없으면 null. */
+        private String globalForbidRules;
     }
 
     @Getter
@@ -74,6 +82,10 @@ public class GenDto {
         private String correlationId;
         @Builder.Default
         private long timeoutMs = 120000L;
+        /** 이 페르소나의 과거 첨삭 기반 주의사항 (개행 구분). 없으면 null. */
+        private String correctionCautions;
+        /** 모든 AI 유저 공통 전역 금지 규칙 (개행 구분). 없으면 null. */
+        private String globalForbidRules;
     }
 
     @Getter

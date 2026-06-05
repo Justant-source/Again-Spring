@@ -6,6 +6,7 @@ import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -131,4 +132,29 @@ public interface PostRepository extends JpaRepository<Post, String> {
             HAVING COUNT(j.id) < p.juror_count
             """, nativeQuery = true)
     List<String> findPostIdsNeedingJury();
+
+    /**
+     * 관리자용: 상태별 포스트 조회 (삭제되지 않은 포스트만)
+     */
+    Page<Post> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+            PostStatus status, Pageable pageable);
+
+    /**
+     * 관리자용: 여러 상태의 포스트 조회
+     */
+    @Query("SELECT p FROM Post p WHERE p.status IN :statuses AND p.deletedAt IS NULL ORDER BY p.createdAt DESC")
+    Page<Post> findByStatusInAndDeletedAtIsNull(
+            @Param("statuses") List<PostStatus> statuses, Pageable pageable);
+
+    /**
+     * 공개 피드: 삭제되고 차단되지 않은 포스트만 표시
+     */
+    Page<Post> findByVisibilityAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+            PostVisibility visibility, PostStatus status, Pageable pageable);
+
+    /** 관리자용: 삭제되지 않은 게시글 총 건수 */
+    long countByDeletedAtIsNull();
+
+    /** 관리자용: 지정된 기간에 생성된 게시글 건수 */
+    long countByDeletedAtIsNullAndCreatedAtBetween(java.time.Instant from, java.time.Instant to);
 }

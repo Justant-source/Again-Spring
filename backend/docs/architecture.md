@@ -36,7 +36,7 @@ flowchart TB
         Notify["service/notify/\nservice/notification/"]
     end
     DB[(MariaDB 11\nFlyway V1~V56)]
-    LLMWorker["againspring-llm-dev/prod\n워커 컨테이너\nClaude CLI"]
+    LLMWorker["againspring-llm\n공유 워커 컨테이너\nClaude CLI"]
 
     Client --> Filter --> Controller --> Service
     Service --> Repo --> Domain --> DB
@@ -154,7 +154,7 @@ flowchart LR
 | `logging.level.com.againspring` | `DEBUG` | `WARN` | `DEBUG` |
 | `llm.jury.provider` | `remote` (CLI) | `remote` (CLI) | `mock` |
 | `llm.compose.provider` | `remote` (CLI) | `remote` (CLI) | `mock` |
-| `llm.remote.base-url` | `http://againspring-llm-dev:8090` | `http://againspring-llm-prod:8090` | (N/A) |
+| `llm.remote.base-url` | `http://againspring-llm:8090` | `http://againspring-llm:8090` | (N/A) |
 | DB | MariaDB 3306 (host) / 컨테이너 | MariaDB internal | H2 in-memory (MariaDB mode) |
 
 ## DTO 컨벤션

@@ -48,7 +48,7 @@ ai-user:
   daily-global-cap: ${AI_USER_DAILY_GLOBAL_CAP:200}
   bot-password: ${AI_USER_BOT_PASSWORD:ai-user-dev-pw-2026}
   backend-base-url: ${BACKEND_BASE_URL:http://againspring-backend-dev:8080}
-  llm-ai-user-url: ${LLM_AI_USER_URL:http://againspring-llm-ai-user-dev:8092}
+  llm-ai-user-url: ${LLM_AI_USER_URL:http://againspring-llm-ai-user:8092}
   history-dir: ${AI_USER_HISTORY_DIR:/app/persona-history}
   personas-dir: ${AI_USER_PERSONAS_DIR:/app/personas}
   paired-post:

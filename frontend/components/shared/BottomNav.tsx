@@ -69,6 +69,9 @@ export function BottomNav() {
   const perms = permissionsFor(user);
   const [guestSheetOpen, setGuestSheetOpen] = useState(false);
 
+  // 관리자 페이지에서는 표시하지 않음
+  if (pathname.startsWith('/admin')) return null;
+
   // 광장·알림·마이페이지에서만 표시
   if (!isNavVisible(pathname)) return null;
 

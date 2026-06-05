@@ -25,7 +25,7 @@ public class RemoteLlmProvider implements LLMProvider {
     private final String defaultModel;
 
     public RemoteLlmProvider(
-            @Value("${llm.remote.base-url:http://againspring-llm-dev:8090}") String workerBaseUrl,
+            @Value("${llm.remote.base-url:http://againspring-llm:8090}") String workerBaseUrl,
             @Value("${llm.remote.default-timeout-ms:120000}") long defaultTimeoutMs,
             @Value("${llm.claude-code.model:claude-haiku-4-5-20251001}") String defaultModel) {
         this.defaultTimeoutMs = defaultTimeoutMs;

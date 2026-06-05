@@ -22,6 +22,9 @@ public class AdminUserDetailResponse {
     private String communicationStyle;
     private String provider;
     private java.util.List<String> roles;
+    private String status;
+    private Instant suspendedUntil;
+    private String suspendedReason;
     private Instant createdAt;
     private Instant deletedAt;
     private Instant onboardingCompletedAt;

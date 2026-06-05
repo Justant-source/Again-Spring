@@ -11,6 +11,7 @@ import { generateGuestNickname } from '@/lib/utils/guestNickname';
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setUser = useUserStore((s) => s.setUser);
   const guestUser = useUserStore((s) => s.user);
 
@@ -37,6 +38,20 @@ export default function SignupPage() {
       setNickname(guestUser.nickname);
     }
   }, [guestUser]);
+
+  // 메일 딥링크(/signup?email=...&code=...)로 진입 시 이메일·인증코드 자동 입력
+  useEffect(() => {
+    const urlEmail = searchParams.get('email');
+    const urlCode = searchParams.get('code');
+    if (urlEmail) {
+      setEmail(urlEmail);
+      setSentToEmail(urlEmail);
+      setCodeSent(true);
+    }
+    if (urlCode) {
+      setVerificationCode(urlCode.replace(/\D/g, '').slice(0, 4));
+    }
+  }, [searchParams]);
 
   const handleShuffleNickname = async () => {
     setNicknameShuffling(true);
@@ -113,8 +128,8 @@ export default function SignupPage() {
       setError('이메일이 변경되었어요. 새 주소로 인증코드를 다시 전송해주세요');
       return;
     }
-    if (verificationCode.length !== 6) {
-      setError('인증코드 6자리를 입력해주세요');
+    if (verificationCode.length !== 4) {
+      setError('인증코드 4자리를 입력해주세요');
       return;
     }
     if (password.length < 8) {
@@ -233,10 +248,10 @@ export default function SignupPage() {
               <div>
                 <input
                   type="text"
-                  placeholder="인증코드 6자리"
+                  placeholder="인증코드 4자리"
                   value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  maxLength={6}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  maxLength={4}
                   inputMode="numeric"
                   style={{ ...inputStyle, letterSpacing: '0.3em', fontSize: 18, textAlign: 'center' }}
                   onFocus={(e) => (e.target.style.borderBottomColor = 'var(--L-ink)')}

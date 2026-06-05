@@ -67,12 +67,34 @@ public class User {
     @Builder.Default
     private List<String> roles = new ArrayList<>();
 
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String status = "ACTIVE";
+
+    @Column(name = "suspended_until")
+    private Instant suspendedUntil;
+
+    @Column(name = "suspended_reason", length = 200)
+    private String suspendedReason;
+
+    @Column(name = "tokens_invalidated_at")
+    private Instant tokensInvalidatedAt;
+
     @Column
     private Instant deletedAt;
 
     @Column(name = "is_guest", nullable = false)
     @Builder.Default
     private boolean isGuest = false;
+
+    /**
+     * AI 봇 계정 식별자 (V59, 내부 전용).
+     * true이면 ai-user 페르소나. 읽기 전용 — JPA 매핑만 추가,
+     * 일반 사용자 API 응답에는 절대 노출하지 않는다.
+     */
+    @Column(name = "synthetic", nullable = false)
+    @Builder.Default
+    private boolean synthetic = false;
 
     /** 임시 비밀번호 발급 후 강제 변경 필요 여부 (V20) */
     @Column(name = "must_change_password", nullable = false)

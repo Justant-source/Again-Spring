@@ -1,8 +1,13 @@
 package com.againspring.repository.community;
 
 import com.againspring.domain.community.PostComment;
+import com.againspring.domain.enums.CommentStatus;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -25,4 +30,28 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
      * 포스트의 전체 댓글 수 (최상위 + 대댓글)
      */
     long countByPostId(String postId);
+
+    /**
+     * 관리자용: 상태별 댓글 조회 (삭제되지 않은 댓글만)
+     */
+    Page<PostComment> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+            CommentStatus status, Pageable pageable);
+
+    /**
+     * 관리자용: 여러 상태의 댓글 조회
+     */
+    @Query("SELECT pc FROM PostComment pc WHERE pc.status IN :statuses AND pc.deletedAt IS NULL ORDER BY pc.createdAt DESC")
+    Page<PostComment> findByStatusInAndDeletedAtIsNull(
+            @Param("statuses") List<CommentStatus> statuses, Pageable pageable);
+
+    /**
+     * 공개 피드: 삭제되고 차단되지 않은 댓글만 표시
+     */
+    List<PostComment> findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
+            String postId, CommentStatus status);
+
+    /**
+     * 관리자용: 포스트의 모든 댓글 (상태 무관, 삭제 포함)
+     */
+    Page<PostComment> findByPostIdOrderByCreatedAtDesc(String postId, Pageable pageable);
 }

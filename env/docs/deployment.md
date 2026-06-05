@@ -22,6 +22,20 @@ flowchart LR
 
 prod 환경은 **반드시 main 브랜치 기준**으로만 빌드한다.
 
+## 0단계: base 스택 (공유 LLM 워커)
+
+dev·prod 공통으로 `againspring-llm` 컨테이너를 공유한다. **dev/prod보다 먼저 기동해야 한다.**
+
+```bash
+cd env
+
+# 최초 1회 또는 llm-worker 코드 변경 시
+docker compose up -d --build
+
+# 이후 재시작만 할 때
+docker compose up -d
+```
+
 ## 1단계: dev 배포
 
 ```bash
@@ -31,7 +45,7 @@ cd env
 cp .env.dev.example .env.dev
 $EDITOR .env.dev          # MARIADB_PASSWORD, JWT_SECRET 등 실제 값 채움
 
-# 빌드 + 실행
+# 빌드 + 실행 (base 스택이 먼저 실행 중이어야 함)
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 
 # 상태
@@ -89,7 +103,7 @@ curl http://localhost:8091/actuator/health
 - [ ] main 브랜치에 push 완료 (CI 미사용 → 수동 확인)
 - [ ] `env/.env.prod` 모든 값 입력 (기본값 없음)
 - [ ] MariaDB 볼륨 백업 (`mariadb-dump`)
-- [ ] 호스트 `~/.claude` 세션 유효 (만료 시 재로그인 → `docker compose restart againspring-llm-prod`)
+- [ ] 호스트 `~/.claude` 세션 유효 (만료 시 재로그인 → `cd env && docker compose restart againspring-llm`)
 - [ ] Cloudflare Tunnel 가동 중 (`systemctl status cloudflared`)
 
 ## ⛔ prod 미지원 기능 — 절대 활성화 금지

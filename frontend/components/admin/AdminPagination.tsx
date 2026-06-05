@@ -1,68 +1,71 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface AdminPaginationProps {
-  page: number;
+  page?: number;
+  currentPage?: number;  // alias for page
   totalPages: number;
-  onPageChange: (page: number) => void;
+  onPageChange: (page: number) => void | Promise<void>;
   loading?: boolean;
   className?: string;
 }
 
 export function AdminPagination({
-  page, totalPages, onPageChange, loading, className,
+  page: pageProp,
+  currentPage,
+  totalPages,
+  onPageChange,
+  loading,
+  className,
 }: AdminPaginationProps) {
-  const pagerBtnStyle = (disabled: boolean): React.CSSProperties => ({
-    padding: '6px 10px',
-    fontSize: 12,
-    background: disabled ? '#f5f5f5' : 'white',
-    color: disabled ? '#aaa' : '#333',
-    border: '1px solid #ddd',
-    borderRadius: 4,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-  });
+  const page = pageProp ?? (currentPage !== undefined ? currentPage - 1 : 0);
+  const handleChange = (p: number) => { void onPageChange(p); };
+  const isFirstPage = page === 0;
+  const isLastPage = page >= totalPages - 1;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: 16,
-      }}
-      className={className}
-    >
-      <button
-        onClick={() => onPageChange(0)}
-        disabled={page === 0 || loading}
-        style={pagerBtnStyle(page === 0 || loading || false)}
+    <div className={cn('flex justify-center items-center gap-2 mt-4', className)}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleChange(0)}
+        disabled={isFirstPage || loading}
+        title="처음"
       >
-        « 처음
-      </button>
-      <button
-        onClick={() => onPageChange(page - 1)}
-        disabled={page === 0 || loading}
-        style={pagerBtnStyle(page === 0 || loading || false)}
+        <ChevronsLeft size={16} />
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleChange(page - 1)}
+        disabled={isFirstPage || loading}
+        title="이전"
       >
-        ‹ 이전
-      </button>
-      <span style={{ fontSize: 12, color: '#555', padding: '0 12px' }}>
+        <ChevronLeft size={16} />
+      </Button>
+      <span className="text-sm text-gray-600 px-3 whitespace-nowrap">
         {page + 1} / {totalPages}
       </span>
-      <button
-        onClick={() => onPageChange(page + 1)}
-        disabled={page >= totalPages - 1 || loading}
-        style={pagerBtnStyle(page >= totalPages - 1 || loading || false)}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleChange(page + 1)}
+        disabled={isLastPage || loading}
+        title="다음"
       >
-        다음 ›
-      </button>
-      <button
-        onClick={() => onPageChange(totalPages - 1)}
-        disabled={page >= totalPages - 1 || loading}
-        style={pagerBtnStyle(page >= totalPages - 1 || loading || false)}
+        <ChevronRight size={16} />
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleChange(totalPages - 1)}
+        disabled={isLastPage || loading}
+        title="마지막"
       >
-        마지막 »
-      </button>
+        <ChevronsRight size={16} />
+      </Button>
     </div>
   );
 }

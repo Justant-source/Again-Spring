@@ -21,13 +21,19 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Phase 4: 관리자 커뮤니티 운영
- * 신고 큐 처리, 부적절한 포스트/댓글 차단
+ * DEPRECATED: 관리자 커뮤니티 운영
+ *
+ * 이 컨트롤러는 다음으로 분리되었습니다:
+ * - AdminReportController: /api/admin/reports (신고 처리)
+ * - AdminContentController: /api/admin/content (포스트/댓글 관리)
+ *
+ * 하위 호환성을 위해 유지되지만, 새 코드는 위의 분리된 컨트롤러를 사용하세요.
  */
+@Deprecated(since = "2026-06-05", forRemoval = true)
 @RestController
 @RequestMapping("/api/admin/community")
 @RequiredArgsConstructor
-@Tag(name = "Admin — Community", description = "커뮤니티 신고 처리·포스트 관리 (ADMIN 전용)")
+@Tag(name = "Admin — Community (Deprecated)", description = "커뮤니티 신고 처리·포스트 관리 (DEPRECATED → AdminReportController, AdminContentController 사용)")
 @SecurityRequirement(name = "bearer-jwt")
 public class AdminCommunityController {
 

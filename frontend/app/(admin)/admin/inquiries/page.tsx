@@ -1,0 +1,380 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { listInquiries, getInquiryDetail } from '@/lib/api/admin/inquiries';
+import { getAdminFeedbacks, updateFeedbackStatus } from '@/lib/api/admin';
+import { AdminTable } from '@/components/admin/AdminTable';
+import { InquiryThread } from '@/components/admin/inquiries/InquiryThread';
+import { FeedbackDetailModal, AdminFeedback } from '@/components/admin/FeedbackDetailModal';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Eye, Trash2 } from 'lucide-react';
+import type { AdminInquiry } from '@/lib/api/admin/inquiries';
+import type { PageResponse } from '@/lib/api/admin';
+
+interface InquiriesPage extends PageResponse<AdminInquiry> {}
+interface FeedbacksPage {
+  content: AdminFeedback[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
+const INQUIRY_STATUS_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  OPEN: { label: '열림', variant: 'default' },
+  ANSWERED: { label: '답변됨', variant: 'secondary' },
+  CLOSED: { label: '종료', variant: 'outline' },
+};
+
+const INQUIRY_CATEGORY_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  '기술지원': { label: '기술지원', variant: 'default' },
+  '결제': { label: '결제', variant: 'secondary' },
+  '계정': { label: '계정', variant: 'secondary' },
+  '기타': { label: '기타', variant: 'outline' },
+};
+
+const FEEDBACK_CATEGORY_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  ui_bug: { label: 'UI 버그', variant: 'destructive' },
+  feature: { label: '기능 제안', variant: 'default' },
+  content: { label: '내용/카피', variant: 'secondary' },
+  crisis: { label: '위기', variant: 'destructive' },
+  praise: { label: '칭찬', variant: 'secondary' },
+  other: { label: '기타', variant: 'outline' },
+};
+
+const FEEDBACK_STATUS_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  pending: { label: '대기', variant: 'default' },
+  reviewed: { label: '검토 완료', variant: 'secondary' },
+  resolved: { label: '해결됨', variant: 'outline' },
+};
+
+export default function AdminInquiriesPage() {
+  // ===== 1:1 문의 탭 =====
+  const [inquiries, setInquiries] = useState<AdminInquiry[]>([]);
+  const [inquiryPage, setInquiryPage] = useState(0);
+  const [inquiryTotalPages, setInquiryTotalPages] = useState(0);
+  const [inquiryStatus, setInquiryStatus] = useState<string>('ALL');
+  const [inquirySearch, setInquirySearch] = useState('');
+  const [inquiryLoading, setInquiryLoading] = useState(false);
+  const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
+
+  // ===== 의견함 탭 =====
+  const [feedbacks, setFeedbacks] = useState<AdminFeedback[]>([]);
+  const [feedbackPage, setFeedbackPage] = useState(0);
+  const [feedbackTotalPages, setFeedbackTotalPages] = useState(0);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [selectedFeedback, setSelectedFeedback] = useState<AdminFeedback | null>(null);
+
+  // 1:1 문의 로드
+  const loadInquiries = async (pageNum: number = 0) => {
+    setInquiryLoading(true);
+    try {
+      const res = await listInquiries({
+        status: inquiryStatus === 'ALL' ? undefined : inquiryStatus || undefined,
+        page: pageNum,
+        size: 20,
+      });
+      // 클라이언트 측 필터링 (subject contains)
+      let filtered = res.content;
+      if (inquirySearch.trim()) {
+        const q = inquirySearch.toLowerCase();
+        filtered = filtered.filter(i => i.subject.toLowerCase().includes(q));
+      }
+      setInquiries(filtered);
+      setInquiryTotalPages(res.totalPages);
+      setInquiryPage(pageNum);
+    } catch (error) {
+      console.error('Failed to load inquiries:', error);
+    } finally {
+      setInquiryLoading(false);
+    }
+  };
+
+  // 의견함 로드
+  const loadFeedbacks = async (pageNum: number = 0) => {
+    setFeedbackLoading(true);
+    try {
+      const res = await getAdminFeedbacks({
+        page: pageNum,
+        status: undefined,
+      }) as FeedbacksPage;
+      setFeedbacks(res.content || []);
+      setFeedbackTotalPages(res.totalPages);
+      setFeedbackPage(pageNum);
+    } catch (error) {
+      console.error('Failed to load feedbacks:', error);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  // 초기 로드
+  useEffect(() => {
+    loadInquiries(0);
+  }, [inquiryStatus]);
+
+  useEffect(() => {
+    loadFeedbacks(0);
+  }, []);
+
+  // 문의 스레드 업데이트 후
+  const handleInquiryUpdated = () => {
+    loadInquiries(inquiryPage);
+  };
+
+  // 의견함 업데이트 후
+  const handleFeedbackUpdated = (updated: AdminFeedback) => {
+    setFeedbacks(feedbacks.map(f => f.id === updated.id ? updated : f));
+    setSelectedFeedback(null);
+  };
+
+  return (
+    <div className="space-y-4 p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>문의·의견함 관리</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="inquiries" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="inquiries">1:1 문의</TabsTrigger>
+              <TabsTrigger value="feedback">의견함</TabsTrigger>
+            </TabsList>
+
+            {/* ===== 1:1 문의 탭 ===== */}
+            <TabsContent value="inquiries" className="space-y-4 mt-4">
+              {/* 필터 */}
+              <div className="flex gap-3 flex-wrap">
+                <Input
+                  placeholder="제목 검색..."
+                  value={inquirySearch}
+                  onChange={(e) => setInquirySearch(e.target.value)}
+                  className="flex-1 min-w-[200px]"
+                />
+                <Select value={inquiryStatus} onValueChange={setInquiryStatus}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="상태" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">모두</SelectItem>
+                    <SelectItem value="OPEN">열림</SelectItem>
+                    <SelectItem value="ANSWERED">답변됨</SelectItem>
+                    <SelectItem value="CLOSED">종료</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 문의 테이블 */}
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold">제목</th>
+                      <th className="px-4 py-3 text-left font-semibold">사용자</th>
+                      <th className="px-4 py-3 text-left font-semibold">카테고리</th>
+                      <th className="px-4 py-3 text-left font-semibold">상태</th>
+                      <th className="px-4 py-3 text-left font-semibold">등록일</th>
+                      <th className="px-4 py-3 text-left font-semibold">마지막 답변</th>
+                      <th className="px-4 py-3 text-right font-semibold">액션</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inquiryLoading ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                          로드 중...
+                        </td>
+                      </tr>
+                    ) : inquiries.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                          문의가 없습니다.
+                        </td>
+                      </tr>
+                    ) : (
+                      inquiries.map((inq) => {
+                        const statusBadge = INQUIRY_STATUS_BADGE[inq.status] || INQUIRY_STATUS_BADGE.OPEN;
+                        const categoryBadge = INQUIRY_CATEGORY_BADGE[inq.category] || INQUIRY_CATEGORY_BADGE['기타'];
+                        return (
+                          <tr key={inq.id} className="border-b hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium truncate">{inq.subject}</td>
+                            <td className="px-4 py-3 text-xs font-mono text-gray-600">{inq.userId}</td>
+                            <td className="px-4 py-3">
+                              <Badge variant={categoryBadge.variant}>{categoryBadge.label}</Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-600">
+                              {new Date(inq.createdAt).toLocaleDateString('ko-KR')}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-600">
+                              {inq.status === 'CLOSED' ? '종료됨' : inq.status === 'ANSWERED' ? new Date(inq.updatedAt).toLocaleDateString('ko-KR') : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedInquiryId(inq.id)}
+                                className="gap-1"
+                              >
+                                <Eye size={14} />
+                                {inq.status === 'ANSWERED' ? '답변' : '상세'}
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 페이지네이션 */}
+              {inquiryTotalPages > 1 && (
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadInquiries(Math.max(0, inquiryPage - 1))}
+                    disabled={inquiryPage === 0}
+                  >
+                    이전
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    {inquiryPage + 1} / {inquiryTotalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadInquiries(Math.min(inquiryTotalPages - 1, inquiryPage + 1))}
+                    disabled={inquiryPage >= inquiryTotalPages - 1}
+                  >
+                    다음
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ===== 의견함 탭 ===== */}
+            <TabsContent value="feedback" className="space-y-4 mt-4">
+              {/* 의견함 테이블 */}
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold">카테고리</th>
+                      <th className="px-4 py-3 text-left font-semibold">내용</th>
+                      <th className="px-4 py-3 text-left font-semibold">상태</th>
+                      <th className="px-4 py-3 text-left font-semibold">회신 동의</th>
+                      <th className="px-4 py-3 text-left font-semibold">등록일</th>
+                      <th className="px-4 py-3 text-right font-semibold">액션</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {feedbackLoading ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                          로드 중...
+                        </td>
+                      </tr>
+                    ) : feedbacks.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                          의견이 없습니다.
+                        </td>
+                      </tr>
+                    ) : (
+                      feedbacks.map((fb) => {
+                        const fbCategoryBadge = FEEDBACK_CATEGORY_BADGE[fb.category] || FEEDBACK_CATEGORY_BADGE.other;
+                        const fbStatusBadge = FEEDBACK_STATUS_BADGE[fb.status] || FEEDBACK_STATUS_BADGE.pending;
+                        return (
+                          <tr key={fb.id} className="border-b hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <Badge variant={fbCategoryBadge.variant}>{fbCategoryBadge.label}</Badge>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700 max-w-xs truncate">{fb.content}</td>
+                            <td className="px-4 py-3">
+                              <Badge variant={fbStatusBadge.variant}>{fbStatusBadge.label}</Badge>
+                            </td>
+                            <td className="px-4 py-3 text-xs">
+                              {fb.contactConsent ? '동의' : '비동의'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-600">
+                              {fb.createdAt ? new Date(fb.createdAt).toLocaleDateString('ko-KR') : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedFeedback(fb)}
+                                className="gap-1"
+                              >
+                                <Eye size={14} />
+                                상세보기
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 의견함 페이지네이션 */}
+              {feedbackTotalPages > 1 && (
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadFeedbacks(Math.max(0, feedbackPage - 1))}
+                    disabled={feedbackPage === 0}
+                  >
+                    이전
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    {feedbackPage + 1} / {feedbackTotalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadFeedbacks(Math.min(feedbackTotalPages - 1, feedbackPage + 1))}
+                    disabled={feedbackPage >= feedbackTotalPages - 1}
+                  >
+                    다음
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* 문의 스레드 다이얼로그 */}
+      <InquiryThread
+        inquiryId={selectedInquiryId}
+        onClose={() => setSelectedInquiryId(null)}
+        onUpdated={handleInquiryUpdated}
+      />
+
+      {/* 의견함 상세 모달 */}
+      <FeedbackDetailModal
+        feedback={selectedFeedback}
+        onClose={() => setSelectedFeedback(null)}
+        onUpdated={handleFeedbackUpdated}
+      />
+    </div>
+  );
+}

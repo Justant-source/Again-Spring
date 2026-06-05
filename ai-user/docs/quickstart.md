@@ -53,12 +53,17 @@ AI_USER_SEED_ENABLED=true      ✓ 권장 (첫 기동 시 100명 페르소나 �
 SELF_CRITIQUE_ENABLED=true     ✓ 권장 (생성물 품질 검증)
 ```
 
-### Step 2️⃣: Dev 스택 전체 기동
+### Step 2️⃣: 스택 기동 (base → dev 순서)
+
+`againspring-llm` (AI 배심원 워커)은 dev·prod 공유 컨테이너로 **base 스택**에 있습니다. dev 스택보다 먼저 기동해야 합니다.
 
 ```bash
 cd /home/justant/Data/Again-Spring/env
 
-# 전체 스택 기동 (첫 기동 시 이미지 빌드 ~ 5분)
+# ① base 스택 기동 (againspring-llm 공유 워커 포함)
+docker compose up -d --build
+
+# ② dev 스택 기동 (첫 기동 시 이미지 빌드 ~ 5분)
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 
 # 실시간 로그 확인 (선택)
@@ -72,15 +77,22 @@ docker compose -f docker-compose.dev.yml logs -f
 ### Step 3️⃣: 서비스 상태 확인
 
 ```bash
-# 전체 스택 상태 확인
+# base 스택 상태 (공유 LLM 워커)
+docker compose ps
+
+# 예상 출력:
+# NAME                  STATUS
+# againspring-llm       healthy  ← 공유 LLM 워커 (dev·prod 동시 사용)
+
+# dev 스택 상태
 docker compose -f docker-compose.dev.yml ps
 
 # 예상 출력:
 # NAME                                    STATUS
 # againspring-mariadb-dev                 healthy
-# againspring-llm-ai-user-dev             healthy  ← LLM 워커
-# againspring-ai-user-orchestrator-dev    healthy  ← 오케스트레이터
-# againspring-ai-learning-dev             healthy  ← 학습 시스템
+# againspring-llm-ai-user                 healthy  ← AI 유저 전용 LLM 워커
+# againspring-ai-user-orchestrator        healthy  ← 오케스트레이터
+# againspring-ai-learning                 healthy  ← 학습 시스템
 # againspring-backend-dev                 Up
 # againspring-frontend-dev                Up
 ```
@@ -136,13 +148,13 @@ docker exec -it againspring-mariadb-dev mariadb \
 
 ```bash
 # 오케스트레이터 로그 (페르소나 생성 로그 포함)
-docker logs -f againspring-ai-user-orchestrator-dev
+docker logs -f againspring-ai-user-orchestrator
 
 # LLM 워커 로그 (생성 오류 추적)
-docker logs -f againspring-llm-ai-user-dev
+docker logs -f againspring-llm-ai-user
 
 # Learning 로그 (RAG 저장 추적)
-docker logs -f againspring-ai-learning-dev
+docker logs -f againspring-ai-learning
 
 # 전체 로그 스트리밍 (5초 최근만)
 docker compose -f docker-compose.dev.yml logs -f --tail=5
@@ -218,10 +230,10 @@ curl -X POST http://localhost:8096/test/generate-reply \
 docker stats --no-stream
 
 # Orchestrator CPU/메모리 (10초 간)
-docker stats --no-stream againspring-ai-user-orchestrator-dev
+docker stats --no-stream againspring-ai-user-orchestrator
 
 # LLM 워커 큐 상태 (로그에서 추출)
-docker logs againspring-llm-ai-user-dev | grep -i "queue\|pool"
+docker logs againspring-llm-ai-user | grep -i "queue\|pool"
 
 # 일일 CAP 남은 액션 수
 docker exec -it againspring-mariadb-dev mariadb \
@@ -235,10 +247,10 @@ docker exec -it againspring-mariadb-dev mariadb \
 
 | 증상 | 원인 | 확인 | 해결 |
 |------|------|------|------|
-| **orchestrator unhealthy** | 페르소나 시딩 중 | `docker logs againspring-ai-user-orchestrator-dev \| grep -i "seed\|init"` | 5-10분 대기 (AI_USER_SEED_ENABLED=true 면 느림) |
-| **RAG 저장 실패** (`500 error`) | VECTOR 차원 불일치 | `docker logs againspring-ai-learning-dev \| grep -i "vector\|dimension"` | `docker exec ... -e "DROP TABLE example_bank; -- 재생성"` |
+| **orchestrator unhealthy** | 페르소나 시딩 중 | `docker logs againspring-ai-user-orchestrator \| grep -i "seed\|init"` | 5-10분 대기 (AI_USER_SEED_ENABLED=true 면 느림) |
+| **RAG 저장 실패** (`500 error`) | VECTOR 차원 불일치 | `docker logs againspring-ai-learning \| grep -i "vector\|dimension"` | `docker exec ... -e "DROP TABLE example_bank; -- 재생성"` |
 | **글 생성 안 됨** | AI_USER_ENABLED=false | `.env.dev` 확인 | `AI_USER_ENABLED=true` 설정 후 재시작: `docker compose ... restart` |
-| **learning 헬스 실패** | 모델 다운로드 중 | `docker logs -f againspring-ai-learning-dev \| grep -i "loading\|model"` | 60초 이상 대기 (KURE-v1 로드는 느림) |
+| **learning 헬스 실패** | 모델 다운로드 중 | `docker logs -f againspring-ai-learning \| grep -i "loading\|model"` | 60초 이상 대기 (KURE-v1 로드는 느림) |
 | **"Cannot connect to DB"** | 마리아DB 시작 안 됨 | `docker logs againspring-mariadb-dev` | `docker compose ... up -d --build mariadb-dev` 재시작 |
 | **"Port 8092 already in use"** | 이전 컨테이너 미정리 | `docker ps -a \| grep again` | `docker compose ... down && docker system prune` |
 | **Claude CLI 인증 실패** | `~/.claude` 없음 | `ls -la ~/.claude/config.json` | `claude auth login` (호스트에서) |

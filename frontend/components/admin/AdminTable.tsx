@@ -1,4 +1,6 @@
 import React from 'react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 interface ColumnDef<T> {
   key: string;
@@ -26,58 +28,46 @@ export function AdminTable<T>({
   onRowClick,
 }: AdminTableProps<T>) {
   if (loading) {
-    return <p style={{ color: '#888', fontSize: 13, padding: '12px 4px' }}>불러오는 중…</p>;
+    return <p className="text-sm text-gray-500 p-3">불러오는 중…</p>;
   }
 
   if (!data || data.length === 0) {
-    return <p style={{ color: '#aaa', fontSize: 13, padding: '12px 4px' }}>{emptyMessage}</p>;
+    return <p className="text-sm text-gray-400 p-3">{emptyMessage}</p>;
   }
 
   return (
-    <div style={{ overflowX: 'auto' }} className={className}>
-      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ background: '#f5f5f5' }}>
+    <div className={cn('overflow-x-auto', className)}>
+      <Table>
+        <TableHeader>
+          <TableRow>
             {columns.map((col) => (
-              <th
-                key={col.key}
-                style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12 }}
-              >
+              <TableHead key={col.key} className="font-semibold">
                 {col.header}
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {data.map((row, idx) => {
             const key = rowKey ? rowKey(row) : idx;
             return (
-              <tr
+              <TableRow
                 key={key}
                 onClick={() => onRowClick?.(row)}
-                style={{
-                  borderBottom: '1px solid #eee',
-                  cursor: onRowClick ? 'pointer' : 'default',
-                }}
-                onMouseEnter={(e) => {
-                  if (onRowClick) {
-                    e.currentTarget.style.background = '#fafaf5';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                }}
+                className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
               >
                 {columns.map((col) => (
-                  <td key={col.key} style={{ padding: '8px 10px' }}>
+                  <TableCell key={col.key}>
                     {col.render ? col.render(row) : String((row as any)[col.key] || '')}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             );
           })}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
+
+export default AdminTable;

@@ -11,63 +11,65 @@
 
 ## 3개 스택 개요
 
-### 1. local (`docker-compose.yml`)
+### 1. base (`docker-compose.yml`) — dev/prod 공유
 
-MariaDB 단독. 로컬 머신에서 `./gradlew bootRun` + `npm run dev`로 BE/FE를 직접 띄울 때 DB만 컨테이너로 사용.
+MariaDB + **공유 LLM 워커**. dev와 prod가 동일 `againspring-llm` 컨테이너를 사용.
 
-- 서비스: `mariadb` (image: `mariadb:lts`)
-- 컨테이너: `againspring-mariadb`
-- 포트: `3306:3306`
-- 볼륨: `mariadb_data`
-- 네트워크: `againspring`
-- env 기본값: `MARIADB_ROOT_PASSWORD=changeme`, `MARIADB_DATABASE=againspring`, `MARIADB_USER=againspring`, `MARIADB_PASSWORD=changeme`
+- project name: `againspring`
+- 네트워크: `againspring` (bridge, `name: againspring` explicit)
+
+| 서비스 | 컨테이너 | 이미지 | 포트 | 역할 |
+|---|---|---|---|---|
+| `mariadb` | `againspring-mariadb` | `mariadb:lts` | `3306:3306` | 로컬 직접 실행 전용 DB |
+| `againspring-llm` | `againspring-llm` | build `../llm-worker` | internal (8090) | dev·prod 공유 LLM 워커 |
+
+llm bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude` (Claude CLI 세션 공유)
+
+**시작 순서**: base 스택 먼저 → dev/prod 스택. `backend-dev`·`backend-prod`가 `againspring` external network를 통해 `againspring-llm:8090`에 접근.
 
 ### 2. dev (`docker-compose.dev.yml`)
 
 `dev.againspring.net`에서 동작하는 풀 스택. 실 사용자에게 노출되는 dev 환경.
 
 - project name: `againspring-dev`
-- 네트워크: `againspring-dev` (bridge)
+- 네트워크: `againspring-dev` (bridge) + `againspring` (external, base 스택)
 
 | 서비스 | 컨테이너 | 이미지 | 포트 | 의존 |
 |---|---|---|---|---|
 | `mariadb-dev` | `againspring-mariadb-dev` | `mariadb:lts` | `3309:3306` (호스트 접근용) | — |
-| `llm-dev` | `againspring-llm-dev` | build `../llm-worker` | internal (8090) | — |
-| `llm-ai-user-dev` | `againspring-llm-ai-user-dev` | build `../llm-ai-user` | internal (8092) | — |
-| `backend-dev` | `againspring-backend-dev` | build `../backend` | internal | `mariadb-dev` (healthy), `llm-dev` (healthy) |
-| `ai-user-orchestrator-dev` | `againspring-ai-user-orchestrator-dev` | build `../ai-user-orchestrator` | internal (8096) | `mariadb-dev` (healthy), `llm-ai-user-dev` (healthy), `backend-dev` (started) |
+| `llm-ai-user` | `againspring-llm-ai-user` | build `../ai-user/llm` | internal (8092) | — |
+| `ai-user-orchestrator` | `againspring-ai-user-orchestrator` | build `../ai-user/orchestrator` | internal (8096) | `mariadb-dev` (healthy), `llm-ai-user` (healthy), `backend-dev` (started) |
+| `ai-learning` | `againspring-ai-learning` | build `../ai-user/learning` | `8099:8099` | `mariadb-dev` (healthy) |
+| `backend-dev` | `againspring-backend-dev` | build `../backend` | internal | `mariadb-dev` (healthy) |
 | `frontend-dev` | `againspring-frontend-dev` | build `../frontend` | internal | `backend-dev` |
-| `marketing-renderer-dev` | `againspring-marketing-renderer-dev` | build `../marketing/renderer` | internal (9000) | `backend-dev` |
-| `social-poster-dev` | `againspring-social-poster-dev` | build `../marketing/social-poster` | internal (9100) | `backend-dev` |
+| `marketing-renderer-dev` | `againspring-marketing-renderer-dev` | build `../marketing/renderer` | internal (9000) | — |
+| `social-poster-dev` | `againspring-social-poster-dev` | build `../marketing/social-poster` | internal (9100) | — |
 | `nginx-dev` | `againspring-nginx-dev` | `nginx:alpine` | `8090:80` | `frontend-dev`, `backend-dev` |
 
-llm-dev bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude` (Claude CLI 세션 공유 — backend가 아닌 llm-worker에 마운트)
-
-`llm-ai-user-dev` also shares the same `~/.claude` bind mount — both workers run `--no-session-persistence`, low concurrent volume in dev is acceptable.
+`backend-dev`는 `againspring-dev`·`againspring` 두 네트워크에 연결 → `againspring-llm:8090` 접근.
 
 `SPRING_PROFILES_ACTIVE=dev` 활성화 → Flyway disabled, ddl-auto=update, Swagger UI on.
 
 **dev 전용 추가 서비스:**
-- `marketing-renderer-dev` (포트 9000 내부): Node.js + Playwright + Sharp. 마케팅 콘텐츠용 PNG 렌더링. 엔드포인트: `/render`, `/render-chat`, `/render-quote`, `/render-card-news`, `/render-report-summary`, `/render-metaphor-card`.
-- `social-poster-dev` (포트 9100 내부): Node.js + Playwright. X·Instagram 자동 포스팅. `src/` 디렉토리가 호스트에서 bind mount되어 nodemon으로 핫리로드. 셀렉터 파일 수정 → `docker compose restart`만으로 반영.
+- `marketing-renderer-dev` (포트 9000 내부): Node.js + Playwright + Sharp. 마케팅 콘텐츠용 PNG 렌더링.
+- `social-poster-dev` (포트 9100 내부): Node.js + Playwright. X·Instagram 자동 포스팅. `src/` 디렉토리가 호스트에서 bind mount되어 nodemon으로 핫리로드.
 
 ### 3. prod (`docker-compose.prod.yml`)
 
 `againspring.net` / `www.againspring.net`에 노출되는 운영 환경.
 
 - project name: `againspring-prod`
-- 네트워크: `againspring-prod` (bridge)
+- 네트워크: `againspring-prod` (bridge) + `againspring` (external, base 스택)
 - 모든 서비스 `restart: always`
 
 | 서비스 | 컨테이너 | 메모리 limit/reservation | 외부 노출 |
 |---|---|---|---|
 | `mariadb-prod` | `againspring-mariadb-prod` | 2G / 1G | 없음 (internal) |
-| `llm-prod` | `againspring-llm-prod` | 4G / 2G | 없음 (internal) |
 | `backend-prod` | `againspring-backend-prod` | 3G / 1G | 없음 |
 | `frontend-prod` | `againspring-frontend-prod` | 512M / 256M | 없음 |
 | `nginx-prod` | `againspring-nginx-prod` | — | `8091:80` |
 
-llm-prod bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/root/.claude}:/root/.claude` (4G 한도: 100 동시 Node CLI 메모리)
+`backend-prod`는 `againspring-prod`·`againspring` 두 네트워크에 연결 → 공유 `againspring-llm:8090` 사용.
 
 `SPRING_PROFILES_ACTIVE=prod` → Flyway 활성, ddl-auto=validate, Swagger 비활성, 모든 env 필수.
 
@@ -138,8 +140,8 @@ docker compose -f docker-compose.dev.yml down -v
 
 prod는 동일하지만 `-f docker-compose.prod.yml --env-file .env.prod`. **명시적 지시 시에만 실행**.
 
-## prod 미러링 (나중에)
+## prod AI 유저 확장 (나중에)
 
-`docker-compose.prod.yml`에 두 블록을 `-prod` 접미사로 복사:
-- `llm-ai-user-prod`: 동일 패턴, `AI_USER_ENABLED=false`로 시작, `CLAUDE_HOST_CONFIG_DIR` prod 경로
-- `ai-user-orchestrator-prod`: 동일 패턴, `AI_USER_ENABLED=false`로 시작
+`ai-user-orchestrator`·`ai-learning`은 현재 dev 전용. prod에도 확장할 경우 prod 스택에 서비스 추가:
+- `ai-user-orchestrator` (prod DB 연결), `AI_USER_ENABLED=false`로 시작
+- `againspring-llm-ai-user`는 이미 base compose로 이동 가능

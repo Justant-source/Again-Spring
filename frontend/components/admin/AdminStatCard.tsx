@@ -1,4 +1,5 @@
 import React from 'react';
+import { Card } from '@/components/ui/card';
 
 interface AdminStatCardProps {
   label: string;
@@ -9,29 +10,20 @@ interface AdminStatCardProps {
 
 export function AdminStatCard({ label, value, delta, deltaPositive }: AdminStatCardProps) {
   return (
-    <div
-      style={{
-        padding: '14px 18px',
-        background: '#fafaf5',
-        borderRadius: 8,
-        border: '1px solid #e7e3d8',
-      }}
-    >
-      <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: '#1A1A2E' }}>{value}</div>
+    <Card className="p-4 border">
+      <div className="text-xs text-gray-500 mb-2">{label}</div>
+      <div className="flex items-baseline gap-2">
+        <div className="text-2xl font-semibold text-gray-900">{value}</div>
         {delta && (
           <div
-            style={{
-              fontSize: 11,
-              color: deltaPositive ? '#446620' : '#e55',
-              fontWeight: 500,
-            }}
+            className={`text-xs font-medium ${
+              deltaPositive ? 'text-green-700' : 'text-red-600'
+            }`}
           >
             {deltaPositive ? '▲' : '▼'} {delta}
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

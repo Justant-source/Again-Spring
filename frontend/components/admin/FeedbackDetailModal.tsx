@@ -2,6 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { updateFeedbackStatus } from '@/lib/api/admin';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { AlertCircle, Copy, Mail } from 'lucide-react';
 
 export interface AdminFeedback {
   id: number;
@@ -28,13 +41,16 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'resolved', label: '해결됨' },
 ];
 
-export const CATEGORY_BADGE: Record<string, { label: string; bg: string; fg: string }> = {
-  ui_bug: { label: 'UI 버그', bg: '#fde2e2', fg: '#a02020' },
-  feature: { label: '기능 제안', bg: '#dde9ff', fg: '#1a3aaa' },
-  content: { label: '내용/카피', bg: '#e7f1d8', fg: '#446620' },
-  crisis: { label: '위기', bg: '#1a1a2e', fg: '#fff' },
-  praise: { label: '칭찬', bg: '#fff2c8', fg: '#7a5a00' },
-  other: { label: '기타', bg: '#eee', fg: '#444' },
+export const CATEGORY_BADGE: Record<
+  string,
+  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
+> = {
+  ui_bug: { label: 'UI 버그', variant: 'destructive' },
+  feature: { label: '기능 제안', variant: 'default' },
+  content: { label: '내용/카피', variant: 'secondary' },
+  crisis: { label: '위기', variant: 'destructive' },
+  praise: { label: '칭찬', variant: 'secondary' },
+  other: { label: '기타', variant: 'outline' },
 };
 
 export function FeedbackDetailModal({ feedback, onClose, onUpdated }: Props) {
@@ -69,183 +85,154 @@ export function FeedbackDetailModal({ feedback, onClose, onUpdated }: Props) {
     }
   }
 
+  const handleCopyEmail = () => {
+    if (feedback.contactEmail) {
+      navigator.clipboard?.writeText(feedback.contactEmail);
+    }
+  };
+
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 10000, padding: 16,
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'white', borderRadius: 12,
-          maxWidth: 520, width: '100%',
-          maxHeight: '85vh',
-          display: 'flex', flexDirection: 'column',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-        }}
-      >
-        {/* 헤더 */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span
-              style={{
-                fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4,
-                background: badge.bg, color: badge.fg,
-              }}
-            >
-              {badge.label}
-            </span>
-            <span style={{ fontSize: 13, color: '#888' }}>#{feedback.id}</span>
+    <Dialog open={!!feedback} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <Badge variant={badge.variant}>{badge.label}</Badge>
+            <span className="text-xs text-gray-500 font-normal">#{feedback.id}</span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Meta info */}
+          <div className="space-y-2 text-sm">
+            <Meta
+              label="사용자 ID"
+              value={feedback.userId || '익명'}
+            />
+            <Meta
+              label="작성 일시"
+              value={
+                feedback.createdAt
+                  ? new Date(feedback.createdAt).toLocaleString('ko-KR')
+                  : '-'
+              }
+            />
           </div>
-          <button
-            onClick={onClose}
-            aria-label="닫기"
-            style={{ background: 'none', border: 'none', fontSize: 20, color: '#888', cursor: 'pointer', padding: 4 }}
-          >
-            ×
-          </button>
-        </div>
 
-        {/* 본문 */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', fontSize: 13 }}>
-          <Meta label="사용자 ID" value={feedback.userId || '익명'} />
-          <Meta label="작성 일시" value={feedback.createdAt ? new Date(feedback.createdAt).toLocaleString('ko-KR') : '-'} />
-
-          {/* 회신 동의 + 이메일 (회신 동의한 경우만 강조 표시) */}
+          {/* Contact email section */}
           {feedback.contactConsent && feedback.contactEmail ? (
-            <div style={{
-              marginTop: 12, marginBottom: 6,
-              padding: '10px 12px',
-              background: '#fff7e6', border: '1px solid #f3d59a', borderRadius: 6,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-            }}>
-              <div>
-                <div style={{ fontSize: 11, color: '#9a6b00', fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="2" y="5" width="20" height="14" rx="2" />
-                    <path d="M2 8 L12 14 L22 8" />
-                  </svg>
-                  회신 동의 — 답변 회신 요청
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-900 mb-1">
+                    <Mail size={14} />
+                    회신 동의 — 답변 회신 요청
+                  </div>
+                  <a
+                    href={`mailto:${feedback.contactEmail}?subject=${encodeURIComponent(
+                      `[다시봄] 의견 #${feedback.id} 답변`,
+                    )}`}
+                    className="text-sm text-blue-600 break-all hover:underline font-mono"
+                  >
+                    {feedback.contactEmail}
+                  </a>
                 </div>
-                <a
-                  href={`mailto:${feedback.contactEmail}?subject=${encodeURIComponent(`[다시봄] 의견 #${feedback.id} 답변`)}`}
-                  style={{ fontSize: 13, color: '#1a3aaa', fontFamily: 'ui-monospace, monospace', textDecoration: 'underline', wordBreak: 'break-all' }}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyEmail}
+                  className="flex-shrink-0"
                 >
-                  {feedback.contactEmail}
-                </a>
+                  <Copy size={14} />
+                </Button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (feedback.contactEmail) navigator.clipboard?.writeText(feedback.contactEmail);
-                }}
-                style={{ flexShrink: 0, padding: '5px 10px', background: 'white', border: '1px solid #ddd', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-              >
-                복사
-              </button>
             </div>
           ) : feedback.contactConsent ? (
             <Meta label="회신 동의" value="동의 (이메일 미입력)" />
           ) : (
             <Meta label="회신 동의" value="비동의" />
           )}
-          {feedback.pageUrl && <Meta label="작성 페이지" value={feedback.pageUrl} />}
 
+          {feedback.pageUrl && (
+            <Meta label="작성 페이지" value={feedback.pageUrl} />
+          )}
 
-          <div style={{ marginTop: 16, marginBottom: 6, fontSize: 12, color: '#888', fontWeight: 600 }}>의견 본문</div>
-          <div
-            style={{
-              padding: 14, background: '#f9f9f9', borderRadius: 8,
-              fontSize: 13, lineHeight: 1.7, color: '#333',
-              whiteSpace: 'pre-wrap', overflowWrap: 'break-word',
-            }}
-          >
-            {feedback.content}
+          {/* Content */}
+          <div>
+            <Label className="text-xs font-semibold mb-2 block">의견 본문</Label>
+            <div className="p-3 bg-gray-50 rounded border whitespace-pre-wrap break-words text-sm text-gray-900 max-h-32 overflow-y-auto">
+              {feedback.content}
+            </div>
           </div>
 
-          <div style={{ marginTop: 18, marginBottom: 6, fontSize: 12, color: '#888', fontWeight: 600 }}>처리 상태</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {STATUS_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                style={{
-                  padding: '6px 12px', borderRadius: 16, fontSize: 12,
-                  border: status === opt.value ? '1px solid #1A1A2E' : '1px solid #ddd',
-                  background: status === opt.value ? '#1A1A2E' : 'white',
-                  color: status === opt.value ? 'white' : '#555',
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="radio"
-                  name="feedback-status"
-                  checked={status === opt.value}
-                  onChange={() => setStatus(opt.value)}
-                  style={{ display: 'none' }}
-                />
-                {opt.label}
-              </label>
-            ))}
+          {/* Status */}
+          <div>
+            <Label className="text-xs font-semibold mb-3 block">처리 상태</Label>
+            <RadioGroup value={status} onValueChange={setStatus}>
+              <div className="flex flex-wrap gap-3">
+                {STATUS_OPTIONS.map((opt) => (
+                  <div key={opt.value} className="flex items-center space-x-2">
+                    <RadioGroupItem value={opt.value} id={`status-${opt.value}`} />
+                    <Label
+                      htmlFor={`status-${opt.value}`}
+                      className="cursor-pointer font-normal"
+                    >
+                      {opt.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </RadioGroup>
           </div>
 
-          <div style={{ marginTop: 18, marginBottom: 6, fontSize: 12, color: '#888', fontWeight: 600 }}>관리자 메모</div>
-          <textarea
-            value={adminNote}
-            onChange={(e) => setAdminNote(e.target.value)}
-            placeholder="처리 내용·후속 조치 등을 메모로 남겨주세요"
-            rows={4}
-            style={{
-              width: '100%', padding: 10, border: '1px solid #ddd', borderRadius: 6,
-              fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', resize: 'vertical',
-            }}
-          />
+          {/* Admin note */}
+          <div>
+            <Label htmlFor="admin-note" className="text-xs font-semibold mb-2 block">
+              관리자 메모
+            </Label>
+            <Textarea
+              id="admin-note"
+              value={adminNote}
+              onChange={(e) => setAdminNote(e.target.value)}
+              placeholder="처리 내용·후속 조치 등을 메모로 남겨주세요"
+              rows={4}
+            />
+          </div>
 
-          {error && <p style={{ color: '#e55', fontSize: 12, marginTop: 10 }}>{error}</p>}
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+              <AlertCircle size={16} className="flex-shrink-0" />
+              {error}
+            </div>
+          )}
         </div>
 
-        {/* 푸터 */}
-        <div style={{ padding: '14px 20px', borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
-          <button
+        <DialogFooter className="flex gap-2">
+          <Button
+            variant="outline"
             onClick={onClose}
             disabled={submitting}
-            style={{
-              flex: 1, padding: 11, borderRadius: 8, fontSize: 13,
-              background: 'white', border: '1px solid #ddd', color: '#555',
-              cursor: 'pointer',
-            }}
+            className="flex-1"
           >
             취소
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSave}
             disabled={submitting}
-            style={{
-              flex: 2, padding: 11, borderRadius: 8, fontSize: 13, fontWeight: 600,
-              background: '#1A1A2E', color: 'white', border: 'none',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              opacity: submitting ? 0.6 : 1,
-            }}
+            className="flex-[2]"
           >
             {submitting ? '저장 중...' : '저장'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', gap: 12, fontSize: 12, marginBottom: 4 }}>
-      <span style={{ color: '#888', minWidth: 80 }}>{label}</span>
-      <span style={{ color: '#333' }}>{value}</span>
+    <div className="flex gap-3 text-sm">
+      <span className="text-gray-600 min-w-[80px] flex-shrink-0">{label}</span>
+      <span className="text-gray-900 flex-1">{value}</span>
     </div>
   );
 }

@@ -79,7 +79,7 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     await titleInput.fill('테스트 제목')
     await bodyInput.fill('테스트 본문입니다.')
     const charCount = page.locator('[data-testid="compose-char-count"]')
-    await expect(charCount).toContainText('/ 1000')
+    await expect(charCount).toContainText('/ 2000')
   })
 
   test('게스트 — 올리기 클릭 시 GuestNoticeModal 표시', async ({ page }) => {

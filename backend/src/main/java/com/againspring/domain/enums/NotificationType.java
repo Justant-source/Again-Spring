@@ -7,11 +7,13 @@ package com.againspring.domain.enums;
  * PARTNER_ANSWERED: 상대방 답변 완료
  * VOTE_CLOSED: 투표 종료
  * NEW_REPLY: 댓글 답글
+ * ADMIN_BROADCAST: 관리자 공지 방송
  */
 public enum NotificationType {
     NEW_VOTE,
     NEW_COMMENT,
     PARTNER_ANSWERED,
     VOTE_CLOSED,
-    NEW_REPLY
+    NEW_REPLY,
+    ADMIN_BROADCAST
 }

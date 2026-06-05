@@ -1,10 +1,12 @@
 package com.againspring.api.admin;
 
 import com.againspring.api.dto.response.AdminUserDetailResponse;
+import com.againspring.annotation.Auditable;
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.User;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.admin.AdminUserDetailService;
+import com.againspring.service.admin.UserAnonymizationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -26,11 +29,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Tag(name = "Admin — Users", description = "사용자 조회·삭제·역할 관리 (ADMIN 전용)")
 @SecurityRequirement(name = "bearer-jwt")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminUserController {
 
     private final UserRepository userRepository;
-    // private final UserDeletionService userDeletionService; (removed)
     private final AdminUserDetailService adminUserDetailService;
+    private final UserAnonymizationService userAnonymizationService;
 
     @GetMapping("/search")
     @Operation(summary = "사용자 검색", description = "닉네임·이메일 contains 검색 (삭제된 계정 제외)")
@@ -71,13 +75,15 @@ public class AdminUserController {
     }
 
     @DeleteMapping("/{id}/data")
-    @Operation(summary = "사용자 데이터 익명화 예약", description = "PII 삭제를 비동기로 예약한다. 즉시 삭제되지 않음.")
-    @ApiResponse(responseCode = "200", description = "예약 완료 (status=scheduled)")
+    @Operation(summary = "사용자 데이터 익명화", description = "사용자의 PII(이메일, 비밀번호, OAuth 정보)를 삭제한다.")
+    @ApiResponse(responseCode = "200", description = "익명화 완료")
     @ApiResponse(responseCode = "401", description = "인증 필요")
     @ApiResponse(responseCode = "403", description = "ADMIN 권한 없음")
+    @ApiResponse(responseCode = "404", description = "사용자 없음")
+    @Auditable(action = "USER_ANONYMIZE", targetType = "USER", targetId = "#id")
     public ResponseEntity<Map<String, String>> deleteUserData(@PathVariable String id) {
-        // userDeletionService removed
-        return ResponseEntity.ok(Map.of("status", "scheduled", "userId", id));
+        userAnonymizationService.anonymize(id);
+        return ResponseEntity.ok(Map.of("status", "completed", "userId", id));
     }
 
     /**

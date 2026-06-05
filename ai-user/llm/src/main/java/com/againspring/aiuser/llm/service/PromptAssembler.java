@@ -71,7 +71,8 @@ public class PromptAssembler {
             return assemblePartnerPrompt(req);
         }
         // 기존 로직 유지
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), postGuide, req.getFormality());
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), postGuide, req.getFormality(),
+                req.getCorrectionCautions(), req.getGlobalForbidRules());
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
             : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
@@ -103,7 +104,8 @@ public class PromptAssembler {
     }
 
     private String assemblePartnerPrompt(PostGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), partnerGuide, req.getFormality());
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), partnerGuide, req.getFormality(),
+                req.getCorrectionCautions(), req.getGlobalForbidRules());
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
             : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
@@ -135,7 +137,8 @@ public class PromptAssembler {
     }
 
     public String assembleCommentPrompt(CommentGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), commentGuide, req.getFormality());
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), commentGuide, req.getFormality(),
+                req.getCorrectionCautions(), req.getGlobalForbidRules());
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요, ~더라고요, ~것 같아요)"
             : "- 반말로 작성 (요/습니다 금지)";
@@ -164,7 +167,8 @@ public class PromptAssembler {
     }
 
     public String assembleReplyPrompt(ReplyGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), replyGuide, req.getFormality());
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), replyGuide, req.getFormality(),
+                req.getCorrectionCautions(), req.getGlobalForbidRules());
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요 등 자연스럽게)"
             : "- 반말로 작성 (요/습니다 금지)";
@@ -224,11 +228,19 @@ public class PromptAssembler {
         return "polite".equalsIgnoreCase(formality);
     }
 
-    private String buildSystem(String voiceProfile, double slangLevel, String guide, String formality) {
+    private String buildSystem(String voiceProfile, double slangLevel, String guide, String formality,
+                               String correctionCautions, String globalForbidRules) {
         boolean polite = isPolite(formality);
         // % 문자가 String.formatted()의 포맷 지시자로 오해받지 않도록 이스케이프
-        String safeVoice = voiceProfile != null ? voiceProfile.replace("%", "%%") : "일반 커뮤니티 사용자";
-        String safeGuide = guide != null ? guide.replace("%", "%%") : "";
+        String safeVoice    = voiceProfile != null ? voiceProfile.replace("%", "%%") : "일반 커뮤니티 사용자";
+        String safeGuide    = guide != null ? guide.replace("%", "%%") : "";
+        // 첨삭 학습 섹션: 빈 값이면 섹션 자체를 제거
+        String cautionsSection = (correctionCautions != null && !correctionCautions.isBlank())
+            ? "\n## 주의사항 (이 작성자 과거 첨삭 반영 — 반드시 준수)\n" + correctionCautions.replace("%", "%%")
+            : "";
+        String globalRulesSection = (globalForbidRules != null && !globalForbidRules.isBlank())
+            ? "\n## 전역 금지 규칙 (모든 AI 작성자 공통 — 절대 위반 금지)\n" + globalForbidRules.replace("%", "%%")
+            : "";
 
         String speechRules = polite ? """
             **존댓말 사용** — 자연스러운 구어 존댓말:
@@ -301,7 +313,7 @@ public class PromptAssembler {
 
 ## 페르소나 특성
 %s
-
+%s%s
 ## 커뮤니티 스타일 가이드
 %s
 
@@ -313,6 +325,8 @@ public class PromptAssembler {
             slangLevel,
             slangGuide,
             safeVoice,
+            cautionsSection,
+            globalRulesSection,
             safeGuide);
     }
 }

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
 import { permissionsFor } from '@/lib/constants/userPermissions';
+import { AdminShell } from '@/components/admin/shell/AdminShell';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = useUserStore((s) => s.user);
@@ -44,5 +45,5 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  return children;
+  return <AdminShell>{children}</AdminShell>;
 }

@@ -34,7 +34,7 @@
 |---|---|---|
 | `LLM_PROVIDER` | `LLMProvider` 빈 선택 (backend) | `remote` |
 | `LLM_JURY_PROVIDER` | 배심원 생성 provider (`remote` \| `mock`) | `remote` (dev) |
-| `LLM_WORKER_URL` | backend → llm-worker 접속 URL | `http://againspring-llm-dev:8090` |
+| `LLM_WORKER_URL` | backend → llm-worker 접속 URL | `http://againspring-llm:8090` |
 | `LLM_DEFAULT_TIMEOUT_MS` | LLM 호출 타임아웃 (ms) | `120000` |
 | `CLAUDE_BIN` | llm-worker CLI 실행 파일명 | `claude` |
 | `CLAUDE_MODEL` | llm-worker `--model` 인자 (채팅) | `claude-haiku-4-5-20251001` |
@@ -114,7 +114,7 @@ prod는 `application-prod.yml`이 모든 키에 기본값 없이 환경변수를
 - [ ] `GOOGLE_*`, `KAKAO_*`, `NAVER_*` (전체 OAuth)
 - [ ] `MAIL_USERNAME` (againspring2026@gmail.com), `GMAIL_APP_PASSWORD`
 - [ ] `CLAUDE_HOST_CONFIG_DIR` 디렉토리가 호스트에 존재 + `claude` 1회 로그인 완료 (llm-worker 컨테이너가 사용)
-- [ ] `LLM_WORKER_URL` (`http://againspring-llm-prod:8090`)
+- [ ] `LLM_WORKER_URL` (`http://againspring-llm:8090`)
 - [ ] `LLM_POOL_SIZE`, `LLM_QUEUE_CAPACITY`, `LLM_QUEUE_WAIT_TIMEOUT_MS` (기본값 사용 가능)
 
 ## 변경 시 절차

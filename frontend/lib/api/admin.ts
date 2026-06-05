@@ -37,8 +37,11 @@ export interface AdminUserListItem {
   isGuest: boolean;
   provider?: string;
   roles?: string[];
-  createdAt?: string;
+  createdAt: string;
   mbtiType?: string;
+  status: string;            // ACTIVE | SUSPENDED (V66, DB default 'ACTIVE')
+  suspendedUntil?: string | null;
+  suspendedReason?: string | null;
 }
 
 export interface PageResponse<T> {

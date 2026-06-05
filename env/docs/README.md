@@ -34,15 +34,16 @@
 
 ```bash
 # 로컬 개발
-cd env && docker compose up -d               # DB만
+cd env && docker compose up -d               # DB + 공유 LLM 워커
 cd ../backend && ./gradlew bootRun           # BE :8080
 cd ../frontend && npm run dev                # FE :3000
 
-# dev 배포
+# dev 배포 (base 스택 먼저 → dev 스택)
 cd env
-docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+docker compose up -d --build                                            # ① base (공유 LLM 워커)
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build  # ② dev
 
-# prod 배포 (명시 시에만)
+# prod 배포 (명시 시에만, base 스택 실행 중이어야 함)
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 

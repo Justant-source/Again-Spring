@@ -9,13 +9,3 @@ export function getOrCreateDeviceId(): string {
   }
   return id;
 }
-
-export function deviceToGuestNickname(deviceId: string): string {
-  let hash = 0;
-  for (let i = 0; i < deviceId.length; i++) {
-    hash = ((hash << 5) - hash) + deviceId.charCodeAt(i);
-    hash |= 0;
-  }
-  const num = (Math.abs(hash) % 9000) + 1000;
-  return `게스트 ${num}`;
-}

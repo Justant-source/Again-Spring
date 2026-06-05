@@ -17,4 +17,9 @@ public interface CommunityReportRepository extends JpaRepository<CommunityReport
      * 상태별 신고 조회 (생성순 역순, 페이지네이션)
      */
     Page<CommunityReport> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
+
+    /**
+     * 상태별 신고 개수 조회 (배지 폴링용)
+     */
+    long countByStatus(String status);
 }

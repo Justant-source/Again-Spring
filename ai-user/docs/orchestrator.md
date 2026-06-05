@@ -25,7 +25,7 @@
 | **프레임워크** | Spring Boot 3.3 |
 | **데이터베이스** | MariaDB 11 (localhost:3306) |
 | **마이그레이션** | Flyway (별도 히스토리: `flyway_schema_history_aiuser`) |
-| **LLM 통신** | HTTP POST → `againspring-llm-ai-user-dev:8092` |
+| **LLM 통신** | HTTP POST → `againspring-llm-ai-user:8092` |
 | **백엔드 연동** | REST → `againspring-backend-dev:8080` |
 | **스케줄링** | Spring @Scheduled (cron) |
 | **동시성** | ThreadPoolExecutor (고급: ActionExecutor는 별도 관리) |
@@ -51,7 +51,7 @@ ai-user:
   daily-global-cap: ${AI_USER_DAILY_GLOBAL_CAP:200}  # 일일 행동 상한
   bot-password: ${AI_USER_BOT_PASSWORD:...}     # 봇 인증 암호
   backend-base-url: http://againspring-backend-dev:8080
-  llm-ai-user-url: http://againspring-llm-ai-user-dev:8092
+  llm-ai-user-url: http://againspring-llm-ai-user:8092
   history-dir: /app/persona-history             # 행동 히스토리 저장
   personas-dir: /app/personas                    # 페르소나 프로필 템플릿
   seed:
@@ -1077,7 +1077,7 @@ record GuardResult(boolean passed, String reason) {}
 | `ai-user.daily-global-cap` | `AI_USER_DAILY_GLOBAL_CAP` | `200` | 일일 행동 상한 |
 | `ai-user.bot-password` | `AI_USER_BOT_PASSWORD` | `ai-user-dev-pw-2026` | 봇 인증 암호 |
 | `ai-user.backend-base-url` | `BACKEND_BASE_URL` | `http://againspring-backend-dev:8080` | 백엔드 URL |
-| `ai-user.llm-ai-user-url` | `LLM_AI_USER_URL` | `http://againspring-llm-ai-user-dev:8092` | LLM 서비스 URL |
+| `ai-user.llm-ai-user-url` | `LLM_AI_USER_URL` | `http://againspring-llm-ai-user:8092` | LLM 서비스 URL |
 | `ai-user.history-dir` | `AI_USER_HISTORY_DIR` | `/app/persona-history` | 행동 히스토리 디렉토리 |
 | `ai-user.personas-dir` | `AI_USER_PERSONAS_DIR` | `/app/personas` | 페르소나 프로필 디렉토리 |
 | `ai-user.persona-target` | (코드) | `100` | 목표 페르소나 수 |
@@ -1104,7 +1104,7 @@ record GuardResult(boolean passed, String reason) {}
 services:
   ai-user-orchestrator:
     image: againspring-ai-user-orchestrator:dev
-    container_name: ai-user-orchestrator-dev
+    container_name: ai-user-orchestrator
     ports:
       - "8096:8096"
     environment:
@@ -1117,13 +1117,13 @@ services:
       AI_USER_DAILY_GLOBAL_CAP: "200"
       AI_USER_BOT_PASSWORD: "bot-dev-pw-2026"
       BACKEND_BASE_URL: http://againspring-backend-dev:8080
-      LLM_AI_USER_URL: http://againspring-llm-ai-user-dev:8092
+      LLM_AI_USER_URL: http://againspring-llm-ai-user:8092
       AI_LEARNING_BASE_URL: http://againspring-ai-learning:8099
       AI_LEARNING_ENABLED: "true"
     depends_on:
       - mariadb
       - againspring-backend-dev
-      - againspring-llm-ai-user-dev
+      - againspring-llm-ai-user
     networks:
       - againspring-network
 ```
@@ -1167,7 +1167,7 @@ LLM 브릿지 호출.
 ```java
 // 텍스트 생성
 Optional<String> generateComment(GenDto.CommentRequest)
-        // POST http://againspring-llm-ai-user-dev:8092/v1/invoke
+        // POST http://againspring-llm-ai-user:8092/v1/invoke
         // { "personaId": "...", "voiceProfile": {...}, "prompt": "...", ... }
 
 Optional<String> generateReply(GenDto.ReplyRequest)
@@ -1378,7 +1378,7 @@ class OrchestratorSchedulerTest {
 
 #### LLM 호출 실패
 ```
-1. LLM 서비스 헬스: curl http://againspring-llm-ai-user-dev:8092/health
+1. LLM 서비스 헬스: curl http://againspring-llm-ai-user:8092/health
 2. URL 설정: echo $LLM_AI_USER_URL (또는 config 확인)
 3. 타임아웃 로그: "LLM timeout" 검색
 ```

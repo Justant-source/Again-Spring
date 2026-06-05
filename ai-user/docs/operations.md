@@ -42,7 +42,7 @@ sed -i 's/AI_USER_ENABLED=true/AI_USER_ENABLED=false/g' /home/justant/Data/Again
 
 # 오케스트레이터만 재시작 (빠름)
 docker compose -f /home/justant/Data/Again-Spring/env/docker-compose.dev.yml \
-  -f docker-compose.dev.yml restart ai-user-orchestrator-dev
+  -f docker-compose.dev.yml restart ai-user-orchestrator
 
 # 또는 전체 스택 재시작
 cd /home/justant/Data/Again-Spring/env
@@ -231,7 +231,7 @@ EOF
 echo "  - id: ai-user-051" >> /home/justant/Data/Again-Spring/ai-user/docs/personas/roster.yml
 
 # 컨테이너 재시작
-docker compose ... restart ai-user-orchestrator-dev
+docker compose ... restart ai-user-orchestrator
 ```
 
 #### 방법 2: AI_USER_PERSONA_TARGET 환경 변수 (100명 기준)
@@ -356,35 +356,35 @@ curl http://localhost:8099/crawl/status | jq .
 
 ```bash
 # 오케스트레이터 (스케줄링 & 페르소나 관리)
-docker logs -f --tail=100 againspring-ai-user-orchestrator-dev
+docker logs -f --tail=100 againspring-ai-user-orchestrator
 
 # LLM 워커 (텍스트 생성 & 오류)
-docker logs -f --tail=100 againspring-llm-ai-user-dev
+docker logs -f --tail=100 againspring-llm-ai-user
 
 # Learning 시스템 (RAG & 크롤링)
-docker logs -f --tail=100 againspring-ai-learning-dev
+docker logs -f --tail=100 againspring-ai-learning
 
 # 특정 시간대 로그만 추출
-docker logs --since 2026-06-05T10:00:00 againspring-ai-user-orchestrator-dev
+docker logs --since 2026-06-05T10:00:00 againspring-ai-user-orchestrator
 ```
 
 ### 주요 로그 키워드 (grep)
 
 ```bash
 # 페르소나 시딩 진행률
-docker logs againspring-ai-user-orchestrator-dev | grep -i "persona\|seed" | tail -20
+docker logs againspring-ai-user-orchestrator | grep -i "persona\|seed" | tail -20
 
 # 글 생성 성공/실패
-docker logs againspring-llm-ai-user-dev | grep -i "post\|generated\|failed"
+docker logs againspring-llm-ai-user | grep -i "post\|generated\|failed"
 
 # LLM 큐 상태 (대기 중인 요청)
-docker logs againspring-llm-ai-user-dev | grep -i "queue\|pool\|pending"
+docker logs againspring-llm-ai-user | grep -i "queue\|pool\|pending"
 
 # VECTOR 관련 오류
-docker logs againspring-ai-learning-dev | grep -i "vector\|embedding"
+docker logs againspring-ai-learning | grep -i "vector\|embedding"
 
 # 응답 시간 (latency)
-docker logs againspring-llm-ai-user-dev | grep -i "latency\|duration\|ms"
+docker logs againspring-llm-ai-user | grep -i "latency\|duration\|ms"
 ```
 
 ### 리소스 모니터링
@@ -398,9 +398,9 @@ docker compose -f docker-compose.dev.yml stats
 
 # 예상:
 # CONTAINER                              MEM USAGE  LIMIT    CPU %
-# againspring-ai-user-orchestrator-dev   800MB      1000MB   5-10%
-# againspring-llm-ai-user-dev            1.2GB      2000MB   15-30%
-# againspring-ai-learning-dev            2.5GB      3000MB   10-20%
+# againspring-ai-user-orchestrator   800MB      1000MB   5-10%
+# againspring-llm-ai-user            1.2GB      2000MB   15-30%
+# againspring-ai-learning            2.5GB      3000MB   10-20%
 ```
 
 ### 데이터베이스 성능
@@ -442,7 +442,7 @@ LIMIT 10;
 - [ ] 일일 액션 CAP 확인: `SELECT actions_today FROM ai_user_runtime;`
 - [ ] 활성 페르소나 수: `SELECT COUNT(*) FROM personas WHERE active=1;`
 - [ ] 예시뱅크 크기: `SELECT COUNT(*) FROM example_bank;`
-- [ ] 최근 로그에 오류 없는지 확인: `docker logs --since 1h againspring-ai-user-orchestrator-dev`
+- [ ] 최근 로그에 오류 없는지 확인: `docker logs --since 1h againspring-ai-user-orchestrator`
 
 ### 매일 저녁 (시스템 종료 전)
 
@@ -501,7 +501,7 @@ LIMIT 10;
 
 **진단**:
 ```bash
-docker logs againspring-llm-ai-user-dev | grep -i "queue\|pending" | tail -5
+docker logs againspring-llm-ai-user | grep -i "queue\|pending" | tail -5
 # 출력: "Queue size: 150 / 100"
 ```
 
@@ -526,7 +526,7 @@ docker compose ... up -d
 
 **진단**:
 ```bash
-docker logs againspring-ai-learning-dev | grep -i "vector\|dimension"
+docker logs againspring-ai-learning | grep -i "vector\|dimension"
 # 출력: "Vector dimension mismatch: expected 768, got 512"
 ```
 
@@ -538,7 +538,7 @@ docker exec -it againspring-mariadb-dev mariadb \
   -e "DROP TABLE example_bank; DROP TABLE example_bank_vectors;"
 
 # learning 서비스 재시작 (테이블 자동 재생성)
-docker compose ... restart ai-learning-dev
+docker compose ... restart ai-learning
 
 # 5분 대기 후 확인
 curl http://localhost:8099/health
@@ -550,7 +550,7 @@ curl http://localhost:8099/health
 
 **진단**:
 ```bash
-docker logs -f --tail=50 againspring-ai-user-orchestrator-dev | grep -i "seed"
+docker logs -f --tail=50 againspring-ai-user-orchestrator | grep -i "seed"
 # "Seeding persona 10/50..." (진행 없음)
 ```
 
@@ -562,7 +562,7 @@ docker exec -it againspring-mariadb-dev mariadb \
   -e "UPDATE ai_user_runtime SET seed_in_progress=0;"
 
 # 또는 오케스트레이터 재시작
-docker compose ... restart ai-user-orchestrator-dev
+docker compose ... restart ai-user-orchestrator
 
 # 3분 대기 후 로그 확인
 ```
@@ -589,9 +589,9 @@ sed -i 's/SELF_CRITIQUE_THRESHOLD=5/SELF_CRITIQUE_THRESHOLD=7/g' .env.dev
 
 # 또는 환경 변수로 즉시 적용 (재시작 필요)
 docker exec -e SELF_CRITIQUE_THRESHOLD=7 \
-  againspring-llm-ai-user-dev sh -c "pkill -f 'java.*llm'"
+  againspring-llm-ai-user sh -c "pkill -f 'java.*llm'"
 
-docker compose ... restart llm-ai-user-dev
+docker compose ... restart llm-ai-user
 
 # 프롬프트 품질 확인
 # /home/justant/Data/Again-Spring/shared/docs/prompts/ai-user/ 검토
@@ -631,7 +631,7 @@ AI_USER_LLM_QUEUE_CAPACITY=300
 
 ```yaml
 # docker-compose.dev.yml 수정 부분
-orchestrator-dev:
+ai-user-orchestrator:
   deploy:
     resources:
       limits:
@@ -639,7 +639,7 @@ orchestrator-dev:
       reservations:
         memory: 500m
 
-llm-ai-user-dev:
+llm-ai-user:
   deploy:
     resources:
       limits:
@@ -647,7 +647,7 @@ llm-ai-user-dev:
       reservations:
         memory: 1000m
 
-ai-learning-dev:
+ai-learning:
   deploy:
     resources:
       limits:
@@ -684,10 +684,10 @@ sed -i 's/AI_USER_PERSONA_TARGET=50/AI_USER_PERSONA_TARGET=100/g' .env.dev
 
 # Step 2: 오케스트레이터 재시작
 cd /home/justant/Data/Again-Spring/env
-docker compose -f docker-compose.dev.yml --env-file .env.dev restart ai-user-orchestrator-dev
+docker compose -f docker-compose.dev.yml --env-file .env.dev restart ai-user-orchestrator
 
 # Step 3: 진행률 모니터링 (10-15분 소요)
-docker logs -f --tail=20 againspring-ai-user-orchestrator-dev
+docker logs -f --tail=20 againspring-ai-user-orchestrator
 
 # Step 4: 완료 확인
 docker exec -it againspring-mariadb-dev mariadb \

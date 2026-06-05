@@ -30,7 +30,7 @@ public class SignupRequest {
     private String nickname;
 
     @NotBlank(message = "Verification code is required")
-    @Size(min = 6, max = 6, message = "Verification code must be 6 digits")
+    @Size(min = 4, max = 4, message = "Verification code must be 4 digits")
     private String verificationCode;
 
     @AssertTrue(message = "이용약관에 동의해주세요.")

@@ -1,12 +1,15 @@
 package com.againspring.security;
 
+import com.againspring.domain.User;
 import com.againspring.repository.RevokedTokenRepository;
+import com.againspring.repository.UserRepository;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +18,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
@@ -37,6 +39,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
     private final RevokedTokenRepository revokedTokenRepository;
+    private final UserRepository userRepository;
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -80,7 +83,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     /**
      * Parse token, load user details, and set authentication.
-     * Checks if token is revoked before setting authentication.
+     * Checks if token is revoked and if token is issued before tokens_invalidated_at.
      */
     private void authenticateWithToken(String token) throws JwtException, UsernameNotFoundException {
         Optional<String> userId = jwtService.extractUserId(token);
@@ -94,6 +97,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (jti.isPresent() && revokedTokenRepository.existsByJti(jti.get())) {
             log.debug("Token is revoked: {}", jti.get());
             throw new JwtException("Token has been revoked");
+        }
+
+        // Check if token is issued before tokens_invalidated_at (force logout)
+        Optional<Instant> tokenIssuedAt = jwtService.extractIssuedAt(token);
+        if (tokenIssuedAt.isPresent()) {
+            Optional<User> user = userRepository.findByIdAndDeletedAtIsNull(userId.get());
+            if (user.isPresent() && user.get().getTokensInvalidatedAt() != null) {
+                if (tokenIssuedAt.get().isBefore(user.get().getTokensInvalidatedAt())) {
+                    log.debug("Token issued before invalidation time, rejecting: {}", userId.get());
+                    throw new JwtException("Token invalidated by force logout");
+                }
+            }
         }
 
         // Load user details by ID

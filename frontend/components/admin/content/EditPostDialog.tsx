@@ -1,0 +1,172 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { updatePost } from '@/lib/api/admin/content';
+import { AdminPost } from '@/lib/api/admin/content';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { AlertCircle } from 'lucide-react';
+
+interface Props {
+  post: AdminPost | null;
+  onClose: () => void;
+  onUpdated: (updated: AdminPost) => void;
+}
+
+const POST_STATUS_OPTIONS = [
+  { value: 'DRAFT', label: '초안' },
+  { value: 'VOTING', label: '투표 진행' },
+  { value: 'CLOSED', label: '투표 종료' },
+  { value: 'BLOCKED', label: '차단됨' },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: 'COUPLE', label: '연인' },
+  { value: 'MARRIED', label: '부부' },
+  { value: 'FRIEND', label: '친구' },
+  { value: 'FAMILY', label: '가족' },
+  { value: 'WORK', label: '직장' },
+  { value: 'OTHER', label: '기타' },
+];
+
+export function EditPostDialog({ post, onClose, onUpdated }: Props) {
+  const [title, setTitle] = useState('');
+  const [bodyRaw, setBodyRaw] = useState('');
+  const [status, setStatus] = useState('VOTING');
+  const [category, setCategory] = useState('OTHER');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!post) return;
+    setTitle(post.title || '');
+    setBodyRaw(post.bodyRaw || '');
+    setStatus(post.status || 'VOTING');
+    setCategory(post.category || 'OTHER');
+    setError('');
+  }, [post]);
+
+  if (!post) return null;
+
+  async function handleSave() {
+    if (!post) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const updated = await updatePost(post.id, {
+        title,
+        bodyRaw,
+        status,
+        category,
+      });
+      onUpdated(updated);
+      onClose();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || '저장에 실패했어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!post} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>게시글 수정</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Title */}
+          <div>
+            <Label className="block text-sm font-medium mb-2">제목</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="게시글 제목"
+              disabled={submitting}
+            />
+          </div>
+
+          {/* Category */}
+          <div>
+            <Label className="block text-sm font-medium mb-2">카테고리</Label>
+            <Select value={category} onValueChange={setCategory} disabled={submitting}>
+              <SelectTrigger>
+                <SelectValue placeholder="카테고리 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status */}
+          <div>
+            <Label className="block text-sm font-medium mb-2">상태</Label>
+            <Select value={status} onValueChange={setStatus} disabled={submitting}>
+              <SelectTrigger>
+                <SelectValue placeholder="상태 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {POST_STATUS_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Body */}
+          <div>
+            <Label className="block text-sm font-medium mb-2">본문</Label>
+            <Textarea
+              value={bodyRaw}
+              onChange={(e) => setBodyRaw(e.target.value)}
+              placeholder="게시글 본문"
+              disabled={submitting}
+              rows={8}
+              className="resize-none"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            취소
+          </Button>
+          <Button onClick={handleSave} disabled={submitting}>
+            {submitting ? '저장 중...' : '저장'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

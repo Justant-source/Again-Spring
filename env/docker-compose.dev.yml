@@ -1,6 +1,7 @@
 # 서버 dev 스택 — dev.againspring.net
 # 사용: docker compose -f docker-compose.dev.yml up -d --build
 # 환경변수: .env.dev 파일 필요 (.env.dev.example 참조)
+# 사전 조건: docker compose up -d (base 스택, againspring-llm 공유 서비스)
 
 name: againspring-dev
 
@@ -32,38 +33,12 @@ services:
     networks:
       - againspring-dev
 
-  llm-dev:
-    build:
-      context: ../llm-worker
-      dockerfile: Dockerfile
-    image: againspring-llm-dev
-    container_name: againspring-llm-dev
-    environment:
-      CLAUDE_BIN: ${CLAUDE_BIN:-claude}
-      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5-20251001}
-      REPORT_LLM_MODEL: ${REPORT_LLM_MODEL:-claude-sonnet-4-6}
-      LLM_POOL_SIZE: ${LLM_POOL_SIZE:-100}
-      LLM_QUEUE_CAPACITY: ${LLM_QUEUE_CAPACITY:-500}
-      LLM_QUEUE_WAIT_TIMEOUT_MS: ${LLM_QUEUE_WAIT_TIMEOUT_MS:-30000}
-      LLM_DEFAULT_TIMEOUT_MS: ${LLM_DEFAULT_TIMEOUT_MS:-120000}
-    volumes:
-      - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
-    restart: unless-stopped
-    networks:
-      - againspring-dev
-    healthcheck:
-      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8090/actuator/health | grep -q UP"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-
-  llm-ai-user-dev:
+  llm-ai-user:
     build:
       context: ../ai-user/llm
       dockerfile: Dockerfile
-    image: againspring-llm-ai-user-dev
-    container_name: againspring-llm-ai-user-dev
+    image: againspring-llm-ai-user
+    container_name: againspring-llm-ai-user
     environment:
       CLAUDE_BIN: ${CLAUDE_BIN:-claude}
       CLAUDE_MODEL: ${AI_USER_LLM_MODEL:-claude-haiku-4-5-20251001}
@@ -85,19 +60,19 @@ services:
       retries: 5
       start_period: 60s
 
-  ai-user-orchestrator-dev:
+  ai-user-orchestrator:
     build:
       context: ../ai-user/orchestrator
       dockerfile: Dockerfile
-    image: againspring-ai-user-orchestrator-dev
-    container_name: againspring-ai-user-orchestrator-dev
+    image: againspring-ai-user-orchestrator
+    container_name: againspring-ai-user-orchestrator
     environment:
       SPRING_PROFILES_ACTIVE: dev
       DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${MARIADB_DATABASE:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}
       BACKEND_BASE_URL: ${AI_USER_BACKEND_URL:-http://againspring-backend-dev:8080}
-      LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user-dev:8092}
+      LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
       AI_USER_ENABLED: ${AI_USER_ENABLED:-false}
       AI_USER_TICK_CRON: "0 * * * * *"
       AI_USER_DAILY_GLOBAL_CAP: ${AI_USER_DAILY_GLOBAL_CAP:-200}
@@ -105,7 +80,7 @@ services:
       AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
       AI_USER_HISTORY_DIR: ${AI_USER_HISTORY_DIR:-/app/persona-history}
       AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
-      AI_LEARNING_BASE_URL: http://againspring-ai-learning-dev:8099
+      AI_LEARNING_BASE_URL: http://againspring-ai-learning:8099
       SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
       AI_USER_PERSONA_TARGET: ${AI_USER_PERSONA_TARGET:-50}
       AI_USER_PERSONAS_DIR: /app/personas
@@ -116,11 +91,11 @@ services:
     depends_on:
       mariadb-dev:
         condition: service_healthy
-      llm-ai-user-dev:
+      llm-ai-user:
         condition: service_healthy
       backend-dev:
         condition: service_started
-      ai-learning-dev:
+      ai-learning:
         condition: service_started
     restart: unless-stopped
     networks:
@@ -132,12 +107,12 @@ services:
       retries: 5
       start_period: 90s
 
-  ai-learning-dev:
+  ai-learning:
     build:
       context: ../ai-user/learning
       dockerfile: Dockerfile
-    image: againspring-ai-learning-dev
-    container_name: againspring-ai-learning-dev
+    image: againspring-ai-learning
+    container_name: againspring-ai-learning
     environment:
       DB_HOST: againspring-mariadb-dev
       DB_PORT: "3306"
@@ -237,7 +212,7 @@ services:
       LLM_CHAT_PROVIDER: ${LLM_CHAT_PROVIDER:-remote}
       LLM_REPORT_PROVIDER: ${LLM_REPORT_PROVIDER:-remote}
       LLM_JURY_PROVIDER: ${LLM_JURY_PROVIDER:-remote}
-      LLM_WORKER_URL: ${LLM_WORKER_URL:-http://againspring-llm-dev:8090}
+      LLM_WORKER_URL: ${LLM_WORKER_URL:-http://againspring-llm:8090}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
@@ -262,11 +237,10 @@ services:
     depends_on:
       mariadb-dev:
         condition: service_healthy
-      llm-dev:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - againspring-dev
+      - againspring
 
   frontend-dev:
     build:
@@ -304,6 +278,9 @@ services:
 networks:
   againspring-dev:
     driver: bridge
+  againspring:
+    external: true
+    name: againspring
 
 volumes:
   mariadb_dev_data:

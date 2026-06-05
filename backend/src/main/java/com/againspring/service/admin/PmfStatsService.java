@@ -1,8 +1,13 @@
 package com.againspring.service.admin;
 
+import com.againspring.api.dto.response.AdminDashboardSummaryResponse;
 import com.againspring.repository.DailyStatsRepository;
 import com.againspring.repository.FeedbackRepository;
 import com.againspring.repository.UserRepository;
+import com.againspring.repository.community.CommunityReportRepository;
+import com.againspring.repository.community.PostRepository;
+import com.againspring.repository.community.VoteRepository;
+import com.againspring.repository.inquiry.InquiryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,32 +32,39 @@ public class PmfStatsService {
     private final UserRepository userRepository;
     private final FeedbackRepository feedbackRepository;
     private final DailyStatsRepository dailyStatsRepository;
+    private final PostRepository postRepository;
+    private final VoteRepository voteRepository;
+    private final CommunityReportRepository communityReportRepository;
+    private final InquiryRepository inquiryRepository;
     // private final MessageRepository messageRepository; (removed)
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getDashboardSummary() {
+    public AdminDashboardSummaryResponse getDashboardSummary() {
         LocalDate today = LocalDate.now(KST);
         Instant startOfToday = today.atStartOfDay(KST).toInstant();
         Instant startOfTomorrow = today.plusDays(1).atStartOfDay(KST).toInstant();
 
-        long todayTotal = 0;
-        long todayCompleted = 0;
-        long todayGuest = 0;
-        long todayMember = 0;
-        long newUsers = userRepository.countByIsGuestFalseAndCreatedAtBetween(startOfToday, startOfTomorrow);
-        double avgTurns = 0.0;
-        long totalFeedbacks = feedbackRepository.count();
+        long todayNewUsers = userRepository.countByIsGuestFalseAndCreatedAtBetween(startOfToday, startOfTomorrow);
+        long totalUsers = userRepository.countByIsGuestFalseAndDeletedAtIsNull();
+        long totalPosts = postRepository.countByDeletedAtIsNull();
+        long totalVotes = voteRepository.count();
+        long totalComments = 0; // TODO: add comment count query if needed
+        long pendingReports = communityReportRepository.countByStatus("PENDING");
+        long openInquiries = inquiryRepository.countByStatus("OPEN");
+        long todayFeedback = feedbackRepository.count(); // TODO: filter by today
+        long todayVotes = voteRepository.countByCreatedAtBetween(startOfToday, startOfTomorrow);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("todayTotalSessions", todayTotal);
-        result.put("todayCompletedSessions", todayCompleted);
-        result.put("todayGuestSessions", todayGuest);
-        result.put("todayMemberSessions", todayMember);
-        result.put("todayNewUsers", newUsers);
-        result.put("avgTurnsToday", Math.round(avgTurns * 100.0) / 100.0);
-        result.put("finalizeRate", todayTotal > 0 ? Math.round((double) todayCompleted / todayTotal * 10000) / 100.0 : 0.0);
-        result.put("totalFeedbacks", totalFeedbacks);
-        return result;
+        return AdminDashboardSummaryResponse.builder()
+                .todayNewUsers(todayNewUsers)
+                .totalUsers(totalUsers)
+                .totalPosts(totalPosts)
+                .totalVotes(totalVotes)
+                .totalComments(totalComments)
+                .pendingReports(pendingReports)
+                .openInquiries(openInquiries)
+                .todayFeedback(todayFeedback)
+                .todayVotes(todayVotes)
+                .build();
     }
 
     @Transactional(readOnly = true)

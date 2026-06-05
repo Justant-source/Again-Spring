@@ -4,71 +4,64 @@
 
 ## 고수준 개요
 
+dev와 prod는 **공통 LLM 워커** (`againspring-llm`)를 공유합니다. DB·웹 서비스는 환경별로 분리되어 있습니다.
+
 ```mermaid
 flowchart LR
     User[사용자 브라우저] -->|HTTPS| CF[Cloudflare Tunnel]
     CF -->|dev.againspring.net| Nginx_dev[nginx:8090]
     CF -->|againspring.net| Nginx_prod[nginx:8091]
     subgraph Host["호스트 머신"]
+        subgraph Base["base 스택 (againspring) — dev·prod 공유"]
+            LLM["againspring-llm:8090\nLLM Worker"]
+            LLM -->|claude CLI| ClaudeMount["~/.claude (host bind-mount)"]
+        end
         Nginx_dev --> FE_dev[frontend-dev:3000]
         Nginx_dev --> BE_dev[backend-dev:8080]
         Nginx_prod --> FE_prod[frontend-prod:3000]
         Nginx_prod --> BE_prod[backend-prod:8080]
         BE_dev --> DB_dev[(mariadb-dev:3306)]
         BE_prod --> DB_prod[(mariadb-prod:3306)]
-        BE_dev -->|HTTP /v1/invoke| LLM_dev[llm-dev:8090]
-        BE_prod -->|HTTP /v1/invoke| LLM_prod[llm-prod:8090]
-        LLM_dev -->|claude CLI| ClaudeMount["~/.claude (host bind-mount)"]
-        LLM_prod -->|claude CLI| ClaudeMount
+        BE_dev -->|HTTP /v1/invoke\nagainspring network| LLM
+        BE_prod -->|HTTP /v1/invoke\nagainspring network| LLM
     end
     ClaudeMount -->|Anthropic API| Anthropic[Claude Haiku 4.5]
 ```
 
-### 이 다이어그램의 ASCII 버전은 아래 참조:
+### ASCII 다이어그램
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  브라우저 (사용자)                                              │
-└────────────────────┬────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  브라우저 (사용자)                                                 │
+└────────────────────┬───────────────────────────────────────────┘
                      │ HTTPS
                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Cloudflare Tunnel                                           │
-│  ├─ dev.againspring.net  → localhost:8090                  │
-│  ├─ againspring.net      → localhost:8091                  │
-│  └─ www.againspring.net  → localhost:8091                  │
-└────────────────────┬────────────────────────────────────────┘
-                     │ HTTP
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│  호스트 (Linux 서버)                                          │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │ nginx (docker)                                        │  │
-│  │ ├─ :8090 (dev)     → backend:8080 + frontend:3000   │  │
-│  │ └─ :8091 (prod)    → backend:8080 + frontend:3000   │  │
-│  └───────────┬──────────────────────────┬───────────────┘  │
-│              │                          │                   │
-│  ┌───────────▼──────────┐  ┌───────────▼──────────┐        │
-│  │ Backend Container    │  │ Frontend Container   │        │
-│  │ (Spring Boot)        │  │ (Next.js)            │        │
-│  │ :8080                │  │ :3000                │        │
-│  └────────┬────┬────────┘  └──────────────────────┘        │
-│           │    │                                            │
-│           │ JDBC  HTTP /v1/invoke                          │
-│           ▼    ▼                                            │
-│  ┌──────────┐ ┌────────────────────────────────────────┐   │
-│  │ MariaDB  │ │ LLM Worker Container (Spring Boot)     │   │
-│  │ :3306    │ │ :8090 (internal)                       │   │
-│  └──────────┘ │ ThreadPoolExecutor(100) + Queue(500)   │   │
-│               └───────────────┬────────────────────────┘   │
-│                               │ ProcessBuilder              │
-│                               ▼                             │
-│  ┌────────────────────────────────────────────────────┐     │
-│  │ Claude Code CLI                                    │     │
-│  │ ~/.claude (host mount → /root/.claude)             │     │
-│  │ (llm-worker 컨테이너에 마운트, 인증 공유)             │     │
-│  └────────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  Cloudflare Tunnel                                               │
+│  ├─ dev.againspring.net  → localhost:8090                      │
+│  ├─ againspring.net      → localhost:8091                      │
+│  └─ www.againspring.net  → localhost:8091                      │
+└──────────┬──────────────────────────────────────────────────────┘
+           │ HTTP
+           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  호스트 (Linux 서버)                                               │
+│                                                                  │
+│  ┌────────────── BASE 스택 (againspring) ─────────────────────┐  │
+│  │  againspring-llm :8090 (internal)                          │  │
+│  │  ThreadPoolExecutor(100) + Queue(500)                      │  │
+│  │  → ProcessBuilder → claude CLI → ~/.claude (bind-mount)   │  │
+│  └────────────────────────┬───────────────────────────────────┘  │
+│                           │ HTTP /v1/invoke (againspring network) │
+│              ┌────────────┴────────────┐                         │
+│              ▼                         ▼                         │
+│  ┌─── DEV 스택 ──────────┐  ┌─── PROD 스택 ─────────────────┐   │
+│  │ nginx-dev  :8090      │  │ nginx-prod  :8091             │   │
+│  │ → backend-dev  :8080  │  │ → backend-prod  :8080         │   │
+│  │   → mariadb-dev:3306  │  │   → mariadb-prod:3306         │   │
+│  │ → frontend-dev :3000  │  │ → frontend-prod :3000         │   │
+│  └───────────────────────┘  └───────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## 환경별 포트 매핑
@@ -123,7 +116,7 @@ flowchart LR
   - 리포트 생성 (기여도, NVC 분석)
   - 이메일 인증 (Spring Mail)
 - **DB 연결**: MariaDB :3306 (내부 네트워크)
-- **LLM 연결**: `http://againspring-llm-{dev,prod}:8090` (내부 네트워크)
+- **LLM 연결**: `http://againspring-llm:8090` — base 스택 공유 컨테이너 (`againspring` external network 경유)
 
 ### LLM Worker (Spring Boot)
 
@@ -173,9 +166,13 @@ flowchart LR
 ### Claude CLI 인증 마운트
 
 ```yaml
-againspring-llm-{dev,prod}:
+againspring-llm:          # base 스택 — dev·prod 공유
   volumes:
     - ${CLAUDE_HOST_CONFIG_DIR}:/root/.claude  # bind mount
+
+againspring-llm-ai-user:  # dev 스택 전용 (AI 유저 본문 생성)
+  volumes:
+    - ${CLAUDE_HOST_CONFIG_DIR}:/root/.claude  # 동일 호스트 디렉토리 공유
 ```
 
 - **호스트 경로**: `/home/<user>/.claude` (또는 env var `CLAUDE_HOST_CONFIG_DIR`)
@@ -184,6 +181,7 @@ againspring-llm-{dev,prod}:
   - API 키 불필요 — CLI 자체 인증 사용
   - `ClaudeCliInvoker`가 `claude --print --strict-mcp-config --no-session-persistence ...` 호출 시 자동 사용
 - **backend 컨테이너에는 마운트하지 않음** (backend는 Node.js/Claude CLI 미포함)
+- **세션 충돌 없음**: 두 워커 모두 `--no-session-persistence` 플래그로 실행되어 독립 동작
 
 **전제 조건**: 호스트에서 미리 `claude` 명령으로 1회 로그인 완료.
 
@@ -194,12 +192,26 @@ againspring-llm-{dev,prod}:
 - **네트워크**: `againspring` (host 머신도 참여)
 - 호스트에서 `localhost:3306`으로 DB 직접 접근 가능
 
+### base 스택
+
+- **네트워크**: `againspring` (`name: againspring` 명시 — 프로젝트 접두사 없음)
+- `againspring-llm` 컨테이너가 이 네트워크에 위치
+
 ### dev / prod
 
 - **각각 독립 bridge 네트워크**: `againspring-dev`, `againspring-prod`
-- 컨테이너 간 DNS는 서비스명 (예: `mariadb-dev`)
+- 추가로 `againspring` external network 참여 → `backend-dev`·`backend-prod`가 공유 `againspring-llm` 접근 가능
+- 컨테이너 간 DNS는 서비스명 (예: `mariadb-dev`, `againspring-llm`)
 - 호스트 진입점은 **nginx only** (`:8090` / `:8091`)
   - backend, frontend, mariadb는 내부 네트워크에만 노출
+
+```
+네트워크 토폴로지:
+  [againspring]          → againspring-llm (base)
+       ↑                          ↑
+  [againspring-dev]     backend-dev (두 네트워크 동시 연결)
+  [againspring-prod]    backend-prod (두 네트워크 동시 연결)
+```
 
 ## 통신 흐름
 
@@ -235,7 +247,7 @@ againspring-llm-{dev,prod}:
 
 ```bash
 cd env
-docker compose up -d                    # DB
+docker compose up -d                    # DB (+ againspring-llm 공유 워커)
 cd ../backend
 ./gradlew bootRun                       # BE :8080
 cd ../frontend
@@ -246,6 +258,10 @@ npm run dev                             # FE :3000
 
 ```bash
 cd env
+# 1) base 스택 먼저 (공유 LLM 워커)
+docker compose up -d --build
+
+# 2) dev 스택
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 curl http://localhost:8090/api/health  # nginx → backend 라우팅 확인
 ```
@@ -254,6 +270,7 @@ curl http://localhost:8090/api/health  # nginx → backend 라우팅 확인
 
 ```bash
 # main 브랜치 기준으로만 빌드
+# (base 스택이 이미 실행 중이어야 함)
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 curl http://localhost:8091/api/health
 # Cloudflare: https://againspring.net 외부 접근 확인

@@ -246,11 +246,26 @@ public class AuthService {
                 : GuestNicknameGenerator.generateUnique(
                         userRepository::existsByNicknameAndDeletedAtIsNull);
 
-        // 기존 게스트 유저가 있으면 닉네임 유지
+        // ⚠️ findById는 소프트 삭제 행도 포함한다. 활성 행만 "재방문"으로 취급해야 한다.
+        //   - 활성 행 존재 → 닉네임 유지 (정상 재방문)
+        //   - 소프트 삭제 행 존재(마이그레이션·탈퇴로 deletedAt 설정) → 같은 deviceId로 돌아온 게스트.
+        //     되살리지 않으면 토큰은 발급되지만 UserDetailsService(findByIdAndDeletedAtIsNull)가
+        //     사용자를 못 찾아 모든 인증 요청이 403 → 투표 불가. 반드시 행을 재활성화한다.
+        //   - 행 없음 → 신규 생성
         var existingUser = userRepository.findById(guestId).orElse(null);
-        if (existingUser != null && existingUser.getNickname() != null) {
+        if (existingUser != null && existingUser.getDeletedAt() == null && existingUser.getNickname() != null) {
             displayNickname = existingUser.getNickname();
             log.info("Guest returning: {}, nickname={}", guestId, displayNickname);
+        } else if (existingUser != null) {
+            // 소프트 삭제됐거나 닉네임이 비어있는 행 → 활성 게스트로 재활성화 (신규 닉네임 부여)
+            existingUser.setDeletedAt(null);
+            existingUser.setNickname(displayNickname);
+            existingUser.setGuest(true);
+            if (existingUser.getRoles() == null || existingUser.getRoles().isEmpty()) {
+                existingUser.setRoles(new ArrayList<>(List.of("USER")));
+            }
+            userRepository.save(existingUser);
+            log.info("Guest user row reactivated: {}, nickname={}", guestId, displayNickname);
         } else {
             User guestUser = User.builder()
                     .id(guestId)

@@ -105,4 +105,10 @@ public class Post {
     @LastModifiedDate
     @Column(nullable = false)
     private Instant updatedAt;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "deleted_by_admin_id", length = 32)
+    private String deletedByAdminId;
 }

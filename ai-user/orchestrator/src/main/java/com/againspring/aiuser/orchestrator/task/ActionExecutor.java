@@ -6,11 +6,13 @@ import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.client.dto.*;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
+import com.againspring.aiuser.orchestrator.domain.AiGlobalRule;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.domain.PersonaActionLog;
 import com.againspring.aiuser.orchestrator.domain.PersonaSeenPost;
 import com.againspring.aiuser.orchestrator.engine.ArchetypeCatalog;
 import com.againspring.aiuser.orchestrator.engine.PlannedAction;
+import com.againspring.aiuser.orchestrator.repository.AiGlobalRuleRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaActionLogRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -49,12 +52,18 @@ public class ActionExecutor {
     private final JdbcTemplate jdbcTemplate;
     private final ArchetypeCatalog archetypeCatalog;
     private final AiLearningClient aiLearningClient;
+    private final AiGlobalRuleRepository aiGlobalRuleRepository;
 
     @Value("${ai-user.history-dir:/app/persona-history}")
     private String historyDir;
 
     private final ConcurrentHashMap<String, String> emailCache = new ConcurrentHashMap<>();
     private static final Random RNG = new Random();
+
+    /** 전역 금지 규칙 캐시 (5분 TTL). 매 생성마다 DB 조회 방지. */
+    private final AtomicReference<List<AiGlobalRule>> globalRulesCache = new AtomicReference<>(null);
+    private volatile long globalRulesCachedAt = 0L;
+    private static final long GLOBAL_RULES_TTL_MS = 5 * 60 * 1000L; // 5분
 
     public void execute(Persona persona, PlannedAction action) {
         String corrId = java.util.UUID.randomUUID().toString().substring(0, 8);
@@ -135,6 +144,8 @@ public class ActionExecutor {
             .archetypeCommentSamples(archetypeCommentSamples)
             .existingComments(existingComments)
             .dynamicExamples(dynamicExamples)
+            .correctionCautions(cautionsBlock(persona))
+            .globalForbidRules(globalRulesBlock("COMMENT"))
             .correlationId(corrId)
             .build());
 
@@ -183,6 +194,8 @@ public class ActionExecutor {
             .demographic(demographicStr(persona))
             .postBodyExcerpt(postBodyExcerpt)
             .siblingComments(siblingComments)
+            .correctionCautions(cautionsBlock(persona))
+            .globalForbidRules(globalRulesBlock("COMMENT"))
             .correlationId(corrId)
             .build());
 
@@ -240,6 +253,8 @@ public class ActionExecutor {
             .demographic(demographicStr(persona))
             .dynamicExamples(dynamicExamples)
             .lengthTier(lengthTier)
+            .correctionCautions(cautionsBlock(persona))
+            .globalForbidRules(globalRulesBlock("POST"))
             .correlationId(corrId)
             .build());
 
@@ -292,6 +307,61 @@ public class ActionExecutor {
         appendLexicon(sb, vp);
         appendStr(sb, vp, "age_voice_notes", "\n[연령 말투] ");
         appendStr(sb, vp, "political_voice_notes", "\n[성향 표현] ");
+        return sb.toString().trim();
+    }
+
+    // ── 첨삭 학습 규칙 주입 헬퍼 ──────────────────────────────────────────────
+
+    /**
+     * 이 페르소나의 voice_profile.correction_cautions 중 active=true 항목을 "- …" 목록으로 반환.
+     * 없거나 비어있으면 null 반환 → PromptAssembler에서 섹션 생략.
+     */
+    @SuppressWarnings("unchecked")
+    private String cautionsBlock(Persona persona) {
+        Map<String, Object> vp = persona.getVoiceProfile();
+        if (vp == null) return null;
+        Object raw = vp.get("correction_cautions");
+        if (!(raw instanceof List)) return null;
+        List<Object> list = (List<Object>) raw;
+        StringBuilder sb = new StringBuilder();
+        for (Object item : list) {
+            if (item instanceof Map) {
+                Map<String, Object> entry = (Map<String, Object>) item;
+                Object active = entry.get("active");
+                if (Boolean.TRUE.equals(active)) {
+                    Object text = entry.get("text");
+                    if (text != null && !text.toString().isBlank()) {
+                        sb.append("- ").append(text.toString().trim()).append("\n");
+                    }
+                }
+            }
+        }
+        return sb.length() > 0 ? sb.toString().trim() : null;
+    }
+
+    /**
+     * 전역 금지 규칙(scope=scope 또는 ALL, active=true)을 "- …" 목록으로 반환.
+     * 5분 TTL 캐시 적용. 없거나 비어있으면 null 반환.
+     */
+    private String globalRulesBlock(String scope) {
+        long now = System.currentTimeMillis();
+        List<AiGlobalRule> rules = globalRulesCache.get();
+        if (rules == null || (now - globalRulesCachedAt) > GLOBAL_RULES_TTL_MS) {
+            try {
+                // scope는 'POST' 또는 'COMMENT' — 둘 다 'ALL'도 포함하는 쿼리
+                rules = aiGlobalRuleRepository.findActiveByScope(scope);
+                globalRulesCache.set(rules);
+                globalRulesCachedAt = now;
+            } catch (Exception e) {
+                log.warn("[ActionExecutor] globalRulesBlock DB 조회 실패 (non-critical): {}", e.getMessage());
+                rules = List.of();
+            }
+        }
+        if (rules.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (AiGlobalRule rule : rules) {
+            sb.append("- ").append(rule.getRuleText().trim()).append("\n");
+        }
         return sb.toString().trim();
     }
 

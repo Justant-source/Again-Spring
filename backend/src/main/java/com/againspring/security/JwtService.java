@@ -183,4 +183,24 @@ public class JwtService {
             return Optional.empty();
         }
     }
+
+    /**
+     * Extract issued-at timestamp from token.
+     *
+     * @param token the JWT token string
+     * @return Optional containing issued-at instant if valid, empty otherwise
+     */
+    public Optional<Instant> extractIssuedAt(String token) {
+        try {
+            Claims claims = parseToken(token);
+            Date issuedAtDate = claims.getIssuedAt();
+            if (issuedAtDate != null) {
+                return Optional.of(issuedAtDate.toInstant());
+            }
+            return Optional.empty();
+        } catch (JwtException e) {
+            log.debug("Failed to extract issued-at from token: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
 }

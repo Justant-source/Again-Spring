@@ -33,7 +33,7 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
 ### 절대 규칙
 
 1. **FE는 Claude Code 직접 호출 금지** — 모든 LLM 요청은 BE 경유 (REST API)
-2. **BE는 RemoteLlmProvider만 사용** — HTTP POST → `againspring-llm-{dev,prod}:/v1/invoke`
+2. **BE는 RemoteLlmProvider만 사용** — HTTP POST → `againspring-llm:8090/v1/invoke` (base 스택 공유)
 3. **LLM 프롬프트/출력 수정 시** `shared/docs/policies/forbidden-words.md` 반드시 확인
 4. **🚨 prod 배포 절대 규칙** — 명시적 "prod에 배포해줘" 지시 없으면 배포 금지.
    **필수 순서**: ① dev 배포 → ② **e2e 테스트 (dev 대상, 전체 통과)** → ③ commit & push (main) → ④ prod 배포
@@ -100,14 +100,15 @@ curl http://localhost:8080/api/health
 
 ## 🧠 LLM 브릿지 핵심
 
-- **구조**: `againspring-backend` → HTTP → `againspring-llm` (`/v1/invoke`)
+- **구조**: `againspring-backend` → HTTP → `againspring-llm:8090` (`/v1/invoke`)
+- **공유**: `againspring-llm`은 **base 스택** 소속 — dev·prod 백엔드가 동일 컨테이너 사용
 - **모델**: `claude-haiku-4-5-20251001` · **인증**: 호스트 `~/.claude` 마운트 (API 키 불필요)
 - **플래그**: `--strict-mcp-config --no-session-persistence --print`
 - **동시성**: ThreadPoolExecutor 100 + LinkedBlockingQueue 500 · 타임아웃 120초
 
 **보안**: 사용자 입력은 반드시 `PromptSanitizer` 경유 후 `<user_input>` 태그로 삽입.
 
-세션 만료 시: 호스트 `claude` 재로그인 → `docker compose restart againspring-llm-{dev,prod}`
+세션 만료 시: 호스트 `claude` 재로그인 → `cd env && docker compose restart againspring-llm`
 
 ---
 
@@ -138,12 +139,15 @@ cd frontend && npm run test
 | prod | `againspring.net` | `docker-compose.prod.yml` + `.env.prod` | 8091 |
 
 ```bash
-# dev 배포
+# ① base 스택 (공유 LLM 워커 — dev·prod 공통, 먼저 기동)
 cd /home/justant/Data/Again-Spring/env
+docker compose up -d --build
+
+# ② dev 배포
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 curl http://localhost:8090/api/health
 
-# prod 배포 (명시적 지시 시에만 — main 브랜치 기준)
+# ③ prod 배포 (명시적 지시 시에만 — main 브랜치 기준)
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 curl http://localhost:8091/api/health
 ```

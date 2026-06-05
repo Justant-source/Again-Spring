@@ -196,7 +196,7 @@ ai-user/
 | `AI_USER_TICK_CRON` | `0 */10 * * * *` | 스케줄 주기 | orchestrator |
 | `AI_USER_PERSONAS_DIR` | `/app/personas` | 페르소나 YAML 경로 | orchestrator |
 | `AI_LEARNING_ENABLED` | `true` | RAG 예시뱅크 사용 | orchestrator |
-| `AI_LEARNING_BASE_URL` | `http://againspring-ai-learning-dev:8099` | learning 서비스 주소 | orchestrator |
+| `AI_LEARNING_BASE_URL` | `http://againspring-ai-learning:8099` | learning 서비스 주소 | orchestrator |
 | `AI_LEARNING_CRAWL_ENABLED` | `false` | 자동 크롤링 활성화 | learning |
 | `SELF_CRITIQUE_ENABLED` | `true` | 7점 루브릭 자기비평 | llm |
 | `SELF_CRITIQUE_THRESHOLD` | `5` | PASS 최소 점수 | llm |

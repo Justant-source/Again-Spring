@@ -5,7 +5,7 @@
 다시봄 백엔드는 LLM 추론을 직접 수행하지 않습니다.
 별도의 `llm-worker` 컨테이너(Claude CLI 기반)에 HTTP로 요청합니다.
 
-**흐름**: `BE (RemoteLlmProvider)` → HTTP POST → `againspring-llm-{dev,prod}:8090/v1/invoke`
+**흐름**: `BE (RemoteLlmProvider)` → HTTP POST → `againspring-llm:8090/v1/invoke` (dev·prod 공유)
 
 ---
 
@@ -30,8 +30,8 @@ backend/src/main/java/com/againspring/
 `llm/remote/RemoteLlmProvider.java`
 
 - HTTP POST `{llm.remote.base-url}/v1/invoke`
-- dev: `http://againspring-llm-dev:8090`
-- prod: `http://againspring-llm-prod:8090`
+- dev: `http://againspring-llm:8090`
+- prod: `http://againspring-llm:8090`
 - 타임아웃: `llm.remote.default-timeout-ms` (기본 120,000ms)
 - 인증: 없음 (내부 네트워크, 컨테이너 간)
 
@@ -90,7 +90,7 @@ String sanitized = promptSanitizer.sanitize(userInput);
 claude
 # 워커 재시작
 cd /home/justant/Data/Again-Spring/env
-docker compose -f docker-compose.dev.yml restart againspring-llm-dev
+docker compose restart againspring-llm   # base 스택 (dev·prod 공유)
 ```
 
 ---

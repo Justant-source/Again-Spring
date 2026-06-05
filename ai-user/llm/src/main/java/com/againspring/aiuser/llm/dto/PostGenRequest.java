@@ -23,4 +23,8 @@ public class PostGenRequest {
     private long timeoutMs;
     private String stance;           // "AUTHOR"(기본, null이면 AUTHOR) | "PARTNER"
     private String counterpartBody;  // PARTNER일 때: 작성자 발행 본문 (컨텍스트)
+    /** 이 페르소나의 과거 첨삭 기반 주의사항 (개행 구분, "- …" 형식). 없으면 null. */
+    private String correctionCautions;
+    /** 모든 AI 유저 공통 전역 금지 규칙 (개행 구분, "- …" 형식). 없으면 null. */
+    private String globalForbidRules;
 }

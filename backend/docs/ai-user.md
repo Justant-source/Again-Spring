@@ -119,36 +119,46 @@ flowchart TB
 
 ## 3. 컨테이너 구성
 
+### base 스택 (`docker-compose.yml`) — dev·prod 공유
+
+| 컨테이너 | 이미지/빌드 | 내부 포트 | 역할 |
+|---|---|---|---|
+| `againspring-llm` | `../llm-worker` | 8090 (내부) | AI 배심원 생성 — dev·prod **공유** |
+
 ### dev 스택 (`docker-compose.dev.yml`)
 
 | 컨테이너 | 이미지/빌드 | 내부 포트 | 역할 |
 |---|---|---|---|
-| `againspring-llm-ai-user-dev` | `../llm-ai-user` | 8092 (내부) | Haiku 본문 생성 워커 |
-| `againspring-ai-user-orchestrator-dev` | `../ai-user-orchestrator` | 8096 (내부) | cron·휴리스틱·봇 클라이언트 |
+| `againspring-llm-ai-user` | `../ai-user/llm` | 8092 (내부) | Haiku 본문 생성 워커 (AI 유저 전용) |
+| `againspring-ai-user-orchestrator` | `../ai-user/orchestrator` | 8096 (내부) | cron·휴리스틱·봇 클라이언트 |
+| `againspring-ai-learning` | `../ai-user/learning` | 8099 | RAG·크롤링·학습 시스템 |
 | `againspring-backend-dev` | `../backend` | 8080 (내부) | Community REST API |
 | `againspring-mariadb-dev` | `mariadb:lts` | 3309→3306 | DB |
 | `againspring-nginx-dev` | `nginx:alpine` | **8090→80** | Cloudflare Tunnel 진입점 |
-| `againspring-llm-dev` | `../llm-worker` | 8090 (내부) | AI 배심원 생성 (기존) |
 
-> **포트 분리**: `llm-ai-user` (8092)와 `llm-worker` (8090)는 각자 독립적인 `~/.claude` 마운트 없이 동일 host 디렉토리를 공유함. `--no-session-persistence` 옵션으로 세션 충돌 방지.
+> **포트 분리**: `llm-ai-user` (8092, dev 전용)와 `againspring-llm` (8090, base 공유)은 동일 호스트 `~/.claude`를 마운트. `--no-session-persistence` 플래그로 세션 충돌 없음.
 
 ### 의존성 순서
 
 ```mermaid
 graph LR
+    BASE["againspring-llm\n(base 스택, 공유)"]
     DB["mariadb-dev\n(service_healthy)"]
-    LLM1["llm-dev\n(service_healthy)"]
-    LLMAI["llm-ai-user-dev\n(service_healthy)"]
+    LLMAI["llm-ai-user\n(service_healthy)"]
     BE["backend-dev\n(service_started)"]
-    ORCH["ai-user-orchestrator-dev"]
+    ORCH["ai-user-orchestrator"]
+    LEARN["ai-learning\n(service_started)"]
 
-    DB --> LLM1
     DB --> BE
-    LLM1 --> BE
+    BASE -.->|againspring network| BE
     DB --> LLMAI
     LLMAI --> ORCH
     BE --> ORCH
+    DB --> LEARN
+    LEARN --> ORCH
 ```
+
+점선: `againspring-llm`은 base 스택 소속 — `depends_on` 불가, 먼저 기동 필요.
 
 ---
 
@@ -461,7 +471,7 @@ claude --model claude-sonnet-4-6 --no-session-persistence --strict-mcp-config --
 claude --model claude-sonnet-4-6 ... "위 프로필 기반 voice.yml 작성" > profiles/ai-user16/voice.yml
 
 # 4. 오케스트레이터 재시작 → AiUserSeedLoader 자동 감지·시드
-docker compose -f env/docker-compose.dev.yml restart ai-user-orchestrator-dev
+docker compose -f env/docker-compose.dev.yml restart ai-user-orchestrator
 ```
 
 ---
@@ -478,7 +488,7 @@ docker compose -f env/docker-compose.dev.yml restart ai-user-orchestrator-dev
 | `AI_USER_DAILY_GLOBAL_CAP` | `200` | 일일 행동 상한 |
 | `AI_USER_BOT_PASSWORD` | — | 봇 계정 공통 비밀번호 (BCrypt 12 해시) |
 | `AI_USER_BACKEND_URL` | `http://againspring-backend-dev:8080` | 백엔드 내부 URL |
-| `LLM_AI_USER_URL` | `http://againspring-llm-ai-user-dev:8092` | Haiku 워커 URL |
+| `LLM_AI_USER_URL` | `http://againspring-llm-ai-user:8092` | Haiku 워커 URL |
 | `AI_USER_HISTORY_DIR` | `/app/persona-history` | 히스토리 파일 경로 |
 
 ### llm-ai-user 컨테이너
