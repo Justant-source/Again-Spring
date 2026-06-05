@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -38,6 +39,17 @@ public class GlobalExceptionHandler {
         log.warn("Illegal state: {}", ex.getMessage());
         Map<String, Object> response = buildErrorResponse("INVALID_STATE", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /** ResponseStatusException은 HTTP 상태를 그대로 반환 — Exception.class보다 먼저 매칭. */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusException(ResponseStatusException ex) {
+        log.debug("ResponseStatusException: status={}, reason={}", ex.getStatusCode(), ex.getReason());
+        Map<String, Object> response = buildErrorResponse(
+            ex.getReason() != null ? ex.getReason() : ex.getStatusCode().toString(),
+            ex.getMessage()
+        );
+        return ResponseEntity.status(ex.getStatusCode()).body(response);
     }
 
     @ExceptionHandler(Exception.class)

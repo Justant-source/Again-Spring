@@ -19,9 +19,26 @@
 import { test, expect, request as playwrightRequest } from '@playwright/test'
 import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1, PERSONAS } from '../fixtures/personas'
+import fs from 'fs'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)
+
+/**
+ * storageState 파일에서 ADMIN JWT를 읽는다.
+ * 로그인 API 직접 호출 대신 사용해 rate limit(5/min) 회피.
+ * global-setup이 test1을 ADMIN으로 설정하고 storageState를 저장하므로 항상 최신 토큰.
+ */
+function readAdminTokenFromState(): string {
+  try {
+    const raw = fs.readFileSync(ADMIN_AUTH, 'utf-8')
+    const state = JSON.parse(raw)
+    const ls = state?.origins?.[0]?.localStorage ?? []
+    const item = ls.find((i: any) => i.name === 'again-spring-token')
+    if (item?.value) return item.value as string
+  } catch { /* storageState 미존재 시 무시 */ }
+  return ''
+}
 
 // ── A. /admin/ai-rules — 페이지 접근 및 기본 UI ──────────────────────────
 
@@ -69,12 +86,9 @@ test.describe('Flow 08-B: 전역 금지 규칙 CRUD (API)', () => {
   let createdRuleId: number
 
   test('전역 금지 규칙 추가 → 조회 → 비활성화 → 삭제', async ({ request }) => {
-    // 1) 관리자 로그인 → JWT 획득
-    const loginResp = await request.post(`${BASE}/api/auth/login`, {
-      data: { email: PERSONA_TEST1.email, password: PERSONA_TEST1.password },
-    })
-    expect(loginResp.ok()).toBeTruthy()
-    const { accessToken } = await loginResp.json()
+    // storageState 파일에서 토큰 읽기 — 로그인 API 직접 호출 시 rate limit(5/min) 걸림
+    const accessToken = readAdminTokenFromState()
+    expect(accessToken).toBeTruthy()
     const headers = { Authorization: `Bearer ${accessToken}` }
 
     // 2) 전역 규칙 추가
@@ -147,11 +161,9 @@ test.describe('Flow 08-C: /admin/content 페이지 구조', () => {
   })
 
   test('/api/admin/content/posts 응답에 synthetic 필드가 포함된다', async ({ request }) => {
-    // API 레벨 검증: synthetic 필드 노출 여부
-    const loginResp = await request.post(`${BASE}/api/auth/login`, {
-      data: { email: PERSONA_TEST1.email, password: PERSONA_TEST1.password },
-    })
-    const { accessToken } = await loginResp.json()
+    // API 레벨 검증 — storageState에서 토큰 읽기 (rate limit 회피)
+    const accessToken = readAdminTokenFromState()
+    expect(accessToken).toBeTruthy()
 
     const resp = await request.get(`${BASE}/api/admin/content/posts?status=VOTING&page=0&size=5`, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -169,10 +181,8 @@ test.describe('Flow 08-C: /admin/content 페이지 구조', () => {
   })
 
   test('/api/admin/content/comments 응답에 synthetic 필드가 포함된다', async ({ request }) => {
-    const loginResp = await request.post(`${BASE}/api/auth/login`, {
-      data: { email: PERSONA_TEST1.email, password: PERSONA_TEST1.password },
-    })
-    const { accessToken } = await loginResp.json()
+    const accessToken = readAdminTokenFromState()
+    expect(accessToken).toBeTruthy()
 
     const resp = await request.get(`${BASE}/api/admin/content/comments?status=ACTIVE&page=0&size=5`, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -204,14 +214,14 @@ test.describe('Flow 08-D: 비관리자 /admin/ai-rules 접근 차단', () => {
       data: { email: test5.email, password: test5.password },
     })
     if (!loginResp.ok()) {
-      // 로그인 실패 시 테스트 스킵 (시드 미존재 환경)
       test.skip()
       return
     }
-    const { accessToken } = await loginResp.json()
+    const body = await loginResp.json()
+    const userToken = body.token?.accessToken ?? body.accessToken ?? ''
 
     const resp = await request.get(`${BASE}/api/admin/ai-rules/global`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${userToken}` },
     })
     expect([403, 401]).toContain(resp.status())
   })
@@ -222,17 +232,21 @@ test.describe('Flow 08-D: 비관리자 /admin/ai-rules 접근 차단', () => {
 test.describe('Flow 08-E: 사이드바 AI 규칙관리 링크', () => {
   test.use({ storageState: ADMIN_AUTH })
 
-  test('관리자 사이드바에 "AI 규칙관리" 링크가 표시된다', async ({ page }) => {
+  test('관리자 사이드바에 "AI 규칙관리" 링크가 표시된다 (데스크탑)', async ({ page }) => {
+    // 관리자 사이드바는 데스크탑(≥1024px) 에서 항상 표시.
+    // 모바일(Sheet)에서는 hamburger 클릭 필요 — 이 테스트는 viewport 확장으로 처리
+    await page.setViewportSize({ width: 1280, height: 800 })
     await page.goto(`${BASE}/admin`)
     await page.waitForURL(/\/admin/, { timeout: 10_000 })
     await page.waitForTimeout(1_500)
 
-    // 사이드바의 AI 규칙관리 링크 (텍스트 기반 — nav-config.ts 라벨)
+    // nav-config.ts 라벨: 'AI 규칙관리'
     const aiRulesLink = page.getByRole('link', { name: 'AI 규칙관리' })
     await expect(aiRulesLink).toBeVisible({ timeout: 8_000 })
   })
 
   test('"AI 규칙관리" 링크 클릭 → /admin/ai-rules로 이동한다', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
     await page.goto(`${BASE}/admin`)
     await page.waitForURL(/\/admin/, { timeout: 10_000 })
     await page.waitForTimeout(1_500)
@@ -247,10 +261,9 @@ test.describe('Flow 08-E: 사이드바 AI 규칙관리 링크', () => {
 
 test.describe('Flow 08-F: 첨삭 API 계약 (비 LLM 호출 경로)', () => {
   test('/api/admin/content/corrections/commit — synthetic 아닌 글 거부(400)', async ({ request }) => {
-    const loginResp = await request.post(`${BASE}/api/auth/login`, {
-      data: { email: PERSONA_TEST1.email, password: PERSONA_TEST1.password },
-    })
-    const { accessToken } = await loginResp.json()
+    // storageState에서 토큰 읽기 (rate limit 회피)
+    const accessToken = readAdminTokenFromState()
+    expect(accessToken).toBeTruthy()
 
     // 존재하지 않는 ID로 commit 시도 → 404 또는 400 예상
     const resp = await request.post(`${BASE}/api/admin/content/corrections/commit`, {
@@ -270,10 +283,8 @@ test.describe('Flow 08-F: 첨삭 API 계약 (비 LLM 호출 경로)', () => {
   })
 
   test('/api/admin/ai-rules/global POST — ruleText 없이 요청 시 400', async ({ request }) => {
-    const loginResp = await request.post(`${BASE}/api/auth/login`, {
-      data: { email: PERSONA_TEST1.email, password: PERSONA_TEST1.password },
-    })
-    const { accessToken } = await loginResp.json()
+    const accessToken = readAdminTokenFromState()
+    expect(accessToken).toBeTruthy()
 
     const resp = await request.post(`${BASE}/api/admin/ai-rules/global`, {
       headers: { Authorization: `Bearer ${accessToken}` },
