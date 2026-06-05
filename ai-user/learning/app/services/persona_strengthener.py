@@ -33,7 +33,7 @@ def get_examples_by_source(source: str, limit: int = 30) -> list[str]:
             cur.execute("""
                 SELECT content FROM example_bank
                 WHERE source = %s AND quality_score >= 0.6
-                  AND LENGTH(content) BETWEEN 30 AND 500
+                  AND LENGTH(content) BETWEEN 30 AND 1500
                 ORDER BY quality_score DESC, created_at DESC
                 LIMIT %s
             """, (source, limit))
@@ -65,7 +65,7 @@ def analyze_style_with_llm(voice_type: str, examples: list[str]) -> dict:
 
     try:
         resp = requests.post(
-            f"{LLM_URL}/v1/invoke",
+            f"{LLM_URL}/generate/persona",
             json={"prompt": prompt, "correlationId": f"strengthen-{voice_type}"},
             timeout=60
         )
