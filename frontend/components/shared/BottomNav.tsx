@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { permissionsFor } from '@/lib/constants/userPermissions';
 import { isNavVisible } from '@/lib/utils/navVisibility';
+import { GuestInfoSheet } from '@/components/shared/GuestInfoSheet';
 
 // ─── SVG 탭 아이콘 ────────────────────────────────────────────────────
 
@@ -65,11 +67,13 @@ export function BottomNav() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
   const perms = permissionsFor(user);
+  const [guestSheetOpen, setGuestSheetOpen] = useState(false);
 
   // 광장·알림·마이페이지에서만 표시
   if (!isNavVisible(pathname)) return null;
 
   const showAdmin = perms.ui.showAdminEntryButton;
+  const isGuest = user?.isGuest ?? true;
   // 알림은 게스트·회원·admin 모두에게 표시 (백엔드가 게스트에게도 알림 생성)
 
   // /profile/info 등 서브경로에서 탭이 활성화되지 않도록 정확한 경로만 매칭
@@ -98,6 +102,7 @@ export function BottomNav() {
   const handleWrite = () => router.push('/community/new');
 
   return (
+    <>
     <nav
       data-testid="bottom-nav"
       style={{
@@ -129,15 +134,33 @@ export function BottomNav() {
           <span style={lbl(isActive('/community'))}>광장</span>
         </Link>
 
-        {/* ── 알림 (게스트·회원·관리자 모두 표시) ── */}
-        <Link
-          href="/notifications"
-          data-testid="nav-notifications"
-          style={{ ...baseTab, color: isActive('/notifications') ? 'var(--P-ink)' : 'var(--P-sub)' }}
-        >
-          <NotificationsIcon active={isActive('/notifications')} />
-          <span style={lbl(isActive('/notifications'))}>알림</span>
-        </Link>
+        {/* ── 알림 (게스트는 제약 안내 시트, 회원·관리자는 알림 페이지) ── */}
+        {isGuest ? (
+          <button
+            type="button"
+            onClick={() => setGuestSheetOpen(true)}
+            data-testid="nav-notifications"
+            style={{
+              ...baseTab,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--P-sub)',
+            }}
+          >
+            <NotificationsIcon active={false} />
+            <span style={lbl(false)}>알림</span>
+          </button>
+        ) : (
+          <Link
+            href="/notifications"
+            data-testid="nav-notifications"
+            style={{ ...baseTab, color: isActive('/notifications') ? 'var(--P-ink)' : 'var(--P-sub)' }}
+          >
+            <NotificationsIcon active={isActive('/notifications')} />
+            <span style={lbl(isActive('/notifications'))}>알림</span>
+          </Link>
+        )}
 
         {/* ── 글쓰기 / 관리 탭 (관리자) ── */}
         {!showAdmin ? (
@@ -169,16 +192,40 @@ export function BottomNav() {
           </Link>
         )}
 
-        {/* ── 내 활동 ── */}
-        <Link
-          href="/profile"
-          data-testid="nav-activity"
-          style={{ ...baseTab, color: isActive('/profile') ? 'var(--P-ink)' : 'var(--P-sub)' }}
-        >
-          <ActivityIcon active={isActive('/profile')} />
-          <span style={lbl(isActive('/profile'))}>내 활동</span>
-        </Link>
+        {/* ── 내 활동 (게스트는 제약 안내 시트, 회원은 마이페이지) ── */}
+        {isGuest ? (
+          <button
+            type="button"
+            onClick={() => setGuestSheetOpen(true)}
+            data-testid="nav-activity"
+            style={{
+              ...baseTab,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--P-sub)',
+            }}
+          >
+            <ActivityIcon active={false} />
+            <span style={lbl(false)}>내 활동</span>
+          </button>
+        ) : (
+          <Link
+            href="/profile"
+            data-testid="nav-activity"
+            style={{ ...baseTab, color: isActive('/profile') ? 'var(--P-ink)' : 'var(--P-sub)' }}
+          >
+            <ActivityIcon active={isActive('/profile')} />
+            <span style={lbl(isActive('/profile'))}>내 활동</span>
+          </Link>
+        )}
       </div>
     </nav>
+
+      {/* 게스트 제약 안내 시트 — nav(zIndex 200) 바깥 형제로 렌더 */}
+      {guestSheetOpen && user && (
+        <GuestInfoSheet user={user} onClose={() => setGuestSheetOpen(false)} />
+      )}
+    </>
   );
 }

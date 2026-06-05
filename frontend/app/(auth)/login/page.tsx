@@ -196,16 +196,6 @@ export default function LoginPage() {
             비밀번호 찾기
           </Link>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 28, marginBottom: 16 }}>
-          <div style={{ flex: 1, height: 1, background: 'var(--L-border)' }} />
-          <span style={{ fontSize: 11, color: 'var(--L-sub)', whiteSpace: 'nowrap' }}>계정이 없으신가요?</span>
-          <div style={{ flex: 1, height: 1, background: 'var(--L-border)' }} />
-        </div>
-
-        <Link href="/guest" className="btn-L ghost" style={{ textAlign: 'center', textDecoration: 'none', display: 'block' }}>
-          게스트로 둘러보기
-        </Link>
       </div>
     </PhoneFrame>
   );
