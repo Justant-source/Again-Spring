@@ -35,6 +35,7 @@ export default function CommunityFeedPage() {
   const [sort, setSort] = useState<'latest' | 'recommended'>('latest');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [, setTimeTick] = useState(0);
 
   const categoryOptions = [{ id: '', label: '전체' }, ...C3_CATS];
 
@@ -59,6 +60,11 @@ export default function CommunityFeedPage() {
 
     loadPosts();
   }, [selectedCategory, sort]);
+
+  useEffect(() => {
+    const id = setInterval(() => setTimeTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div style={{ background: 'var(--L-bg)', minHeight: '100vh' }}>
