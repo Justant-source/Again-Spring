@@ -109,6 +109,8 @@ llm:
     model: ${JURY_LLM_MODEL:claude-haiku-4-5-20251001}
   compose:
     model: ${COMPOSE_LLM_MODEL:claude-haiku-4-5-20251001}
+  correction:
+    model: ${CORRECTION_LLM_MODEL:claude-sonnet-4-6}   # 첨삭 분석 — 더 정교한 규칙 추출용 Sonnet
   remote:
     base-url: ${LLM_WORKER_URL:http://againspring-llm:8090}
     connect-timeout-ms: ${LLM_REMOTE_CONNECT_TIMEOUT_MS:5000}

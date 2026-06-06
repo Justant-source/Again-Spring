@@ -15,4 +15,10 @@ public interface AiContentCorrectionRepository extends JpaRepository<AiContentCo
     /** 페르소나별 활성 주의사항이 있는 첨삭 이력 */
     Page<AiContentCorrection> findByPersonaIdAndPersonaCautionIsNotNullOrderByCreatedAtDesc(
             String personaId, Pageable pageable);
+
+    /** 상태별 전체 이력 (최신순) */
+    Page<AiContentCorrection> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
+
+    /** 전체 이력 (최신순, 상태 필터 없음) */
+    Page<AiContentCorrection> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

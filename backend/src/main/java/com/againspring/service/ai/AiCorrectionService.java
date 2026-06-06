@@ -53,7 +53,8 @@ public class AiCorrectionService {
     @Qualifier("remoteLlmProvider")
     private final LLMProvider llmProvider;
 
-    @Value("${llm.claude-code.model:claude-haiku-4-5-20251001}")
+    /** 첨삭 분석 전용 모델 — Sonnet (더 정교한 규칙 추출) */
+    @Value("${llm.correction.model:claude-sonnet-4-6}")
     private String correctionModel;
 
     /** correction_cautions 최대 보관 수 */
@@ -125,6 +126,7 @@ public class AiCorrectionService {
                 .correctedText(req.correctedText())
                 .personaCaution(caution)
                 .adminId(adminId)
+                .status("PROCESSED")
                 .appliedLive(false)
                 .pushedToBank(false)
                 .build();
@@ -357,7 +359,6 @@ public class AiCorrectionService {
             Post post = postRepository.findById(targetId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
             post.setBodyPublished(correctedText);
-            // bodyRaw는 원본 사연 추적용으로 보존
             postRepository.save(post);
         } else {
             PostComment comment = postCommentRepository.findById(Long.parseLong(targetId))
@@ -365,5 +366,135 @@ public class AiCorrectionService {
             comment.setBody(correctedText);
             postCommentRepository.save(comment);
         }
+    }
+
+    // =====================================================================
+    // 일반 수정(수정 버튼)에서 학습 데이터 캡처
+    // =====================================================================
+
+    /**
+     * 관리자가 "수정" 버튼으로 본문을 편집할 때 원본→수정본을 PENDING 상태로 저장.
+     * 나중에 ai-rules 페이지에서 분석 후 규칙으로 승격 가능.
+     * 변경 없으면 저장 스킵.
+     */
+    @Transactional
+    public void captureEdit(String targetType, String targetId,
+                            String originalText, String correctedText, String adminId) {
+        if (originalText == null || correctedText == null) return;
+        if (originalText.equals(correctedText)) return; // 변경 없으면 스킵
+
+        String personaId = fetchPersonaId(targetType, targetId);
+        String category  = fetchCategory(targetType, targetId);
+
+        AiContentCorrection correction = AiContentCorrection.builder()
+                .targetType(targetType)
+                .targetId(targetId)
+                .personaId(personaId)
+                .category(category)
+                .originalText(originalText)
+                .correctedText(correctedText)
+                .adminId(adminId)
+                .status("PENDING")
+                .appliedLive(true) // 이미 라이브 반영됨
+                .pushedToBank(false)
+                .build();
+        correctionRepository.save(correction);
+        log.debug("[ai-correction] captured edit targetType={} targetId={}", targetType, targetId);
+    }
+
+    // =====================================================================
+    // PENDING 첨삭 → 규칙 분석 + 적용 (ai-rules 페이지에서 호출)
+    // =====================================================================
+
+    public record ApplyRequest(
+        long correctionId,
+        String scope,           // "PERSONA" | "GLOBAL" | "BOTH"
+        String personaCaution,  // nullable
+        List<String> globalRules,
+        boolean pushToBank
+    ) {}
+
+    /**
+     * 기존 correction 레코드를 LLM으로 분석, AnalyzeResult 반환.
+     * DB 변경 없음.
+     */
+    public AnalyzeResult analyzeById(long correctionId) throws Exception {
+        AiContentCorrection correction = correctionRepository.findById(correctionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "CORRECTION_NOT_FOUND"));
+
+        String diffPrompt = buildDiffPrompt(correction.getOriginalText(), correction.getCorrectedText());
+        String llmResponse = llmProvider.invoke(diffPrompt, correctionModel);
+        return parseAnalyzeResponse(llmResponse, correction.getPersonaId(), correction.getOriginalText());
+    }
+
+    /**
+     * PENDING 첨삭 레코드에 규칙을 적용하고 PROCESSED로 승격.
+     * scope: "PERSONA" → voice_profile 갱신만, "GLOBAL" → 전역 규칙만, "BOTH" → 둘 다
+     */
+    @Transactional
+    public CommitResult applyById(ApplyRequest req, String adminId) {
+        AiContentCorrection correction = correctionRepository.findById(req.correctionId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "CORRECTION_NOT_FOUND"));
+
+        String personaId = correction.getPersonaId();
+        long correctionId = req.correctionId();
+        boolean cautionApplied = false;
+        int rulesCreated = 0;
+
+        // 페르소나 주의사항
+        boolean applyPersona = "PERSONA".equals(req.scope()) || "BOTH".equals(req.scope());
+        if (applyPersona && req.personaCaution() != null && !req.personaCaution().isBlank()) {
+            mergePersonaCaution(personaId, req.personaCaution().trim(), correctionId);
+            correction.setPersonaCaution(req.personaCaution().trim());
+            cautionApplied = true;
+        }
+
+        // 전역 규칙
+        boolean applyGlobal = "GLOBAL".equals(req.scope()) || "BOTH".equals(req.scope());
+        if (applyGlobal && req.globalRules() != null) {
+            for (String rule : req.globalRules()) {
+                if (rule == null || rule.isBlank()) continue;
+                globalRuleRepository.save(AiGlobalRule.builder()
+                        .ruleText(rule.trim())
+                        .scope("ALL")
+                        .sourceCorrectionId(correctionId)
+                        .active(true)
+                        .createdBy(adminId)
+                        .build());
+                rulesCreated++;
+            }
+        }
+
+        // example_bank 환류
+        if (req.pushToBank()) {
+            try {
+                aiLearningBridge.saveCorrectedAsync(
+                        correction.getCorrectedText(),
+                        "POST".equals(correction.getTargetType()) ? "POST" : "COMMENT",
+                        correction.getCategory(), 1.0);
+                correction.setPushedToBank(true);
+            } catch (Exception e) {
+                log.warn("[ai-correction] example_bank 환류 실패: {}", e.getMessage());
+            }
+        }
+
+        correction.setStatus("PROCESSED");
+        correctionRepository.save(correction);
+
+        log.info("[ai-correction] applyById correctionId={} scope={} caution={} rules={}",
+                correctionId, req.scope(), cautionApplied, rulesCreated);
+
+        return new CommitResult(correctionId, false, rulesCreated, cautionApplied);
+    }
+
+    /**
+     * PENDING 첨삭을 SKIPPED로 표시 (학습 데이터로 사용 안 함).
+     */
+    @Transactional
+    public void skipById(long correctionId) {
+        AiContentCorrection correction = correctionRepository.findById(correctionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "CORRECTION_NOT_FOUND"));
+        correction.setStatus("SKIPPED");
+        correctionRepository.save(correction);
     }
 }

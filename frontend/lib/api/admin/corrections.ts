@@ -60,6 +60,40 @@ export interface AiCaution {
   createdAt: string;
 }
 
+// ===== 첨삭 이력 Types =====
+
+export interface AiCorrectionHistory {
+  id: number;
+  targetType: 'POST' | 'COMMENT';
+  targetId: string;
+  personaId: string;
+  category: string | null;
+  originalText: string;
+  correctedText: string;
+  personaCaution: string | null;
+  adminId: string;
+  /** PENDING | PROCESSED | SKIPPED */
+  status: 'PENDING' | 'PROCESSED' | 'SKIPPED';
+  appliedLive: boolean;
+  pushedToBank: boolean;
+  createdAt: string;
+}
+
+export interface ApplyHistoryRequest {
+  /** "PERSONA" | "GLOBAL" | "BOTH" */
+  scope: 'PERSONA' | 'GLOBAL' | 'BOTH';
+  personaCaution: string | null;
+  globalRules: string[];
+  pushToBank: boolean;
+}
+
+export interface ApplyHistoryResponse {
+  correctionId: number;
+  appliedLive: boolean;
+  rulesCreated: number;
+  cautionApplied: boolean;
+}
+
 // ===== 첨삭 분석·확정 API =====
 
 /** 단계 A: 원본↔수정본 LLM 분석 (DB 저장 없음) */
@@ -136,4 +170,45 @@ export async function toggleCaution(corrId: number, active: boolean): Promise<vo
 
 export async function deleteCaution(corrId: number): Promise<void> {
   await api.delete(`/api/admin/ai-rules/cautions/${corrId}`);
+}
+
+// ===== 첨삭 이력 API =====
+
+export async function listCorrectionHistory(params: {
+  page?: number;
+  size?: number;
+  status?: 'PENDING' | 'PROCESSED' | 'SKIPPED' | 'ALL';
+}): Promise<PageResponse<AiCorrectionHistory>> {
+  const queryParams: Record<string, any> = {
+    page: params.page ?? 0,
+    size: params.size ?? 20,
+  };
+  if (params.status && params.status !== 'ALL') queryParams.status = params.status;
+  const res = await api.get<PageResponse<AiCorrectionHistory>>('/api/admin/ai-rules/history', {
+    params: queryParams,
+  });
+  return res.data;
+}
+
+/** PENDING 첨삭을 Sonnet으로 분석 — DB 미변경 */
+export async function analyzeCorrectionHistory(corrId: number): Promise<AnalyzeResponse> {
+  const res = await api.post<AnalyzeResponse>(`/api/admin/ai-rules/history/${corrId}/analyze`);
+  return res.data;
+}
+
+/** 분석 결과를 페르소나 / 전체 규칙으로 적용 */
+export async function applyCorrectionHistory(
+  corrId: number,
+  req: ApplyHistoryRequest
+): Promise<ApplyHistoryResponse> {
+  const res = await api.post<ApplyHistoryResponse>(
+    `/api/admin/ai-rules/history/${corrId}/apply`,
+    req
+  );
+  return res.data;
+}
+
+/** PENDING 첨삭을 SKIPPED로 표시 */
+export async function skipCorrectionHistory(corrId: number): Promise<void> {
+  await api.patch(`/api/admin/ai-rules/history/${corrId}/skip`);
 }

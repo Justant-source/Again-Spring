@@ -48,6 +48,16 @@ public class AiContentCorrection {
     @Column(name = "persona_caution", columnDefinition = "TEXT")
     private String personaCaution;
 
+    /**
+     * 처리 상태.
+     * PENDING: 일반 수정(수정 버튼)에서 캡처, 아직 규칙 미적용
+     * PROCESSED: AI 개선 플로우로 규칙까지 적용 완료
+     * SKIPPED: 학습 데이터로 사용 안 하기로 결정
+     */
+    @Column(name = "status", nullable = false, length = 16)
+    @Builder.Default
+    private String status = "PENDING";
+
     @Column(name = "admin_id", nullable = false, length = 32)
     private String adminId;
 

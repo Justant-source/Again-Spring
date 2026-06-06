@@ -8,6 +8,7 @@ import com.againspring.domain.enums.PostStatus;
 import com.againspring.repository.UserRepository;
 import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.service.ai.AiCorrectionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -46,6 +47,7 @@ public class AdminContentController {
     private final PostRepository postRepository;
     private final PostCommentRepository postCommentRepository;
     private final UserRepository userRepository;
+    private final AiCorrectionService aiCorrectionService;
 
     // ===== 포스트 관리 =====
 
@@ -112,10 +114,14 @@ public class AdminContentController {
     @Auditable(action = "POST_UPDATE", targetType = "POST", targetId = "#postId")
     public ResponseEntity<Post> updatePost(
             @PathVariable String postId,
-            @RequestBody UpdatePostRequest req) {
+            @RequestBody UpdatePostRequest req,
+            org.springframework.security.core.Authentication auth) {
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
+
+        // 본문이 변경될 때 원본 저장 → 학습 데이터 후보로 캡처
+        String originalBody = post.getBodyPublished() != null ? post.getBodyPublished() : post.getBodyRaw();
 
         if (req.getTitle() != null) {
             post.setTitle(req.getTitle());
@@ -131,6 +137,17 @@ public class AdminContentController {
         }
 
         Post updated = postRepository.save(post);
+
+        // 본문(bodyRaw) 변경 시 학습 데이터 후보로 PENDING 상태 저장
+        if (req.getBodyRaw() != null && !req.getBodyRaw().equals(originalBody)) {
+            try {
+                aiCorrectionService.captureEdit("POST", postId, originalBody, req.getBodyRaw(),
+                        auth != null ? auth.getName() : "admin");
+            } catch (Exception e) {
+                // 학습 데이터 캡처 실패는 수정 자체에 영향 없음
+            }
+        }
+
         return ResponseEntity.ok(updated);
     }
 
@@ -249,16 +266,31 @@ public class AdminContentController {
     @Auditable(action = "COMMENT_UPDATE", targetType = "COMMENT", targetId = "#commentId")
     public ResponseEntity<PostComment> updateComment(
             @PathVariable Long commentId,
-            @RequestBody UpdateCommentRequest req) {
+            @RequestBody UpdateCommentRequest req,
+            org.springframework.security.core.Authentication auth) {
 
         PostComment comment = postCommentRepository.findById(commentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND"));
+
+        String originalBody = comment.getBody();
 
         if (req.getBody() != null) {
             comment.setBody(req.getBody());
         }
 
         PostComment updated = postCommentRepository.save(comment);
+
+        // 본문 변경 시 학습 데이터 후보로 PENDING 상태 저장
+        if (req.getBody() != null && !req.getBody().equals(originalBody)) {
+            try {
+                aiCorrectionService.captureEdit("COMMENT", String.valueOf(commentId),
+                        originalBody, req.getBody(),
+                        auth != null ? auth.getName() : "admin");
+            } catch (Exception e) {
+                // 학습 데이터 캡처 실패는 수정 자체에 영향 없음
+            }
+        }
+
         return ResponseEntity.ok(updated);
     }
 

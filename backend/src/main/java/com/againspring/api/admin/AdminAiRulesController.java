@@ -7,6 +7,7 @@ import com.againspring.domain.ai.PersonaVoiceRef;
 import com.againspring.repository.ai.AiContentCorrectionRepository;
 import com.againspring.repository.ai.AiGlobalRuleRepository;
 import com.againspring.repository.ai.PersonaVoiceRefRepository;
+import com.againspring.service.ai.AiCorrectionService;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +26,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 /**
  * 누적된 AI 전역 금지 규칙 · 페르소나 주의사항 관리 API (ADMIN 전용).
  * /admin/ai-rules 관리 화면의 백엔드.
@@ -41,6 +44,7 @@ public class AdminAiRulesController {
     private final AiGlobalRuleRepository globalRuleRepository;
     private final AiContentCorrectionRepository correctionRepository;
     private final PersonaVoiceRefRepository personaVoiceRefRepository;
+    private final AiCorrectionService aiCorrectionService;
     private final ObjectMapper objectMapper;
 
     // =====================================================================
@@ -198,8 +202,73 @@ public class AdminAiRulesController {
     }
 
     // =====================================================================
+    // 첨삭 이력 관리 (수정 버튼 + AI 개선 모두 집계)
+    // =====================================================================
+
+    @GetMapping("/history")
+    @Operation(summary = "첨삭 이력 전체 목록", description = "관리자 수정·AI 개선으로 생성된 모든 첨삭 이력을 조회한다. status 필터 가능(PENDING/PROCESSED/SKIPPED).")
+    public ResponseEntity<Page<AiContentCorrection>> listHistory(
+            @RequestParam(value = "status", required = false) String status,
+            Pageable pageable) {
+
+        Page<AiContentCorrection> result = (status != null && !status.isBlank())
+                ? correctionRepository.findByStatusOrderByCreatedAtDesc(status.toUpperCase(), pageable)
+                : correctionRepository.findAllByOrderByCreatedAtDesc(pageable);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/history/{corrId}/analyze")
+    @Operation(summary = "첨삭 LLM 분석 (Sonnet)",
+               description = "PENDING 첨삭을 Sonnet으로 분석해 페르소나 주의사항·전역 규칙 초안을 반환한다. DB 미변경.")
+    public ResponseEntity<AiCorrectionService.AnalyzeResult> analyzeHistory(
+            @PathVariable Long corrId) throws Exception {
+
+        AiCorrectionService.AnalyzeResult result = aiCorrectionService.analyzeById(corrId);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/history/{corrId}/apply")
+    @Operation(summary = "첨삭 규칙 적용",
+               description = "scope에 따라 페르소나 주의사항·전역 규칙으로 적용하고 PROCESSED로 승격한다.")
+    @Auditable(action = "AI_CORRECTION_APPLY", targetType = "AI_CORRECTION", targetId = "#corrId")
+    public ResponseEntity<AiCorrectionService.CommitResult> applyHistory(
+            @PathVariable Long corrId,
+            @RequestBody ApplyHistoryRequest req,
+            org.springframework.security.core.Authentication auth) {
+
+        AiCorrectionService.CommitResult result = aiCorrectionService.applyById(
+                new AiCorrectionService.ApplyRequest(
+                        corrId,
+                        req.getScope(),
+                        req.getPersonaCaution(),
+                        req.getGlobalRules(),
+                        req.isPushToBank()
+                ),
+                auth.getName()
+        );
+        return ResponseEntity.ok(result);
+    }
+
+    @PatchMapping("/history/{corrId}/skip")
+    @Operation(summary = "첨삭 건너뜀", description = "PENDING 첨삭을 SKIPPED로 표시한다.")
+    @Auditable(action = "AI_CORRECTION_SKIP", targetType = "AI_CORRECTION", targetId = "#corrId")
+    public ResponseEntity<Void> skipHistory(@PathVariable Long corrId) {
+        aiCorrectionService.skipById(corrId);
+        return ResponseEntity.ok().build();
+    }
+
+    // =====================================================================
     // Request DTOs
     // =====================================================================
+
+    @Getter @Setter
+    public static class ApplyHistoryRequest {
+        /** "PERSONA" | "GLOBAL" | "BOTH" */
+        private String scope;
+        private String personaCaution;
+        private List<String> globalRules;
+        private boolean pushToBank = true;
+    }
 
     @Getter @Setter
     public static class CreateRuleRequest {
