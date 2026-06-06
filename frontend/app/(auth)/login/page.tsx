@@ -62,7 +62,7 @@ export default function LoginPage() {
     <PhoneFrame tone="L">
       <PhoneHeader
         title="로그인"
-        onBack={() => router.back()}
+        onBack={() => window.history.length > 1 ? router.back() : router.replace('/')}
       />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div className="letter-card" style={{ padding: '28px' }}>

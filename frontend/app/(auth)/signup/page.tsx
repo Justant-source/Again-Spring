@@ -172,7 +172,7 @@ export default function SignupPage() {
     <PhoneFrame tone="L">
       <PhoneHeader
         title="회원가입"
-        onBack={() => router.back()}
+        onBack={() => window.history.length > 1 ? router.back() : router.replace('/login')}
       />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div className="letter-card" style={{ padding: '28px' }}>

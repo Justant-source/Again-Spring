@@ -51,7 +51,7 @@ export default function GuestPage() {
     <PhoneFrame tone="L">
       <PhoneHeader
         title="게스트 입장"
-        onBack={() => router.back()}
+        onBack={() => window.history.length > 1 ? router.back() : router.replace('/')}
       />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div className="letter-card" style={{ padding: '28px' }}>
