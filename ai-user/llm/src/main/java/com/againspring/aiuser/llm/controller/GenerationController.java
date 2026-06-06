@@ -31,7 +31,7 @@ public class GenerationController {
         long start = System.currentTimeMillis();
         try {
             String prompt = promptAssembler.assemblePostPrompt(req);
-            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId);
+            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
             String text = outputSanitizer.sanitizePost(raw);
             // 자기비평 루프 (enabled 시)
             text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId);
@@ -52,7 +52,7 @@ public class GenerationController {
         long start = System.currentTimeMillis();
         try {
             String prompt = promptAssembler.assembleCommentPrompt(req);
-            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId);
+            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
             String text = outputSanitizer.sanitizeComment(raw);
             // 자기비평 루프 (enabled 시, 댓글은 점수 기준 완화)
             text = selfCritique.critiqueAndRefine(text, "comment", prompt, corrId);
@@ -73,7 +73,7 @@ public class GenerationController {
         long start = System.currentTimeMillis();
         try {
             String prompt = promptAssembler.assembleReplyPrompt(req);
-            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId);
+            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
             String text = outputSanitizer.sanitizeComment(raw); // same sanitizer (short text)
             return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {

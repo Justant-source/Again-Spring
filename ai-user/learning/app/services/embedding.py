@@ -13,7 +13,14 @@ class EmbeddingService:
     def load(self):
         logger.info(f"Loading {self.MODEL_NAME}...")
         self.model = SentenceTransformer(self.MODEL_NAME)
-        logger.info("Embedding model loaded (768 dim)")
+        # KURE-v1 (BGE-M3 기반) = 1024차원. example_bank.embedding VECTOR(1024)과 일치해야 함.
+        dim = self.model.get_sentence_embedding_dimension()
+        if dim != 1024:
+            raise RuntimeError(
+                f"KURE-v1 embedding dimension mismatch: expected 1024, got {dim}. "
+                f"example_bank.embedding is VECTOR(1024) — 모델과 컬럼 차원을 일치시키세요."
+            )
+        logger.info(f"Embedding model loaded ({dim} dim)")
 
     def embed(self, text):
         if not self.model:

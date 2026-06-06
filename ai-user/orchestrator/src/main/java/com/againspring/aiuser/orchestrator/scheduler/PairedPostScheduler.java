@@ -133,7 +133,7 @@ public class PairedPostScheduler {
             return;
         }
         String authorBody = bodyOpt.get();
-        ContentSafetyGuard.GuardResult authorGuard = safetyGuard.check(authorBody);
+        ContentSafetyGuard.GuardResult authorGuard = safetyGuard.check(authorBody, ContentSafetyGuard.ContentType.POST);
         if (!authorGuard.passed()) {
             log.warn("[PairedPost] Author body blocked: {}", authorGuard.reason());
             return;
@@ -191,7 +191,7 @@ public class PairedPostScheduler {
             return;
         }
         String partnerBody = partnerBodyOpt.get();
-        ContentSafetyGuard.GuardResult partnerGuard = safetyGuard.check(partnerBody);
+        ContentSafetyGuard.GuardResult partnerGuard = safetyGuard.check(partnerBody, ContentSafetyGuard.ContentType.POST);
         if (!partnerGuard.passed()) {
             log.warn("[PairedPost] Partner body blocked: {}", partnerGuard.reason());
             return;

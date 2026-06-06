@@ -16,7 +16,9 @@ public class OrchestratorProperties {
     private String botPassword = "ai-user-dev-pw-2026";
     private String backendBaseUrl = "http://againspring-backend-dev:8080";
     private String llmAiUserUrl = "http://againspring-llm-ai-user:8092";
-    private int personaTarget = 50;
+    private int personaTarget = 10;
     private String personasDir = "/app/personas";
     private boolean forceActive = false;  // 시간대 무관 강제 활성 (dev 테스트용)
+    /** 보조 백엔드 URL (prod↔dev 동시 게시). 빈 문자열이면 미사용. */
+    private String secondaryBackendBaseUrl = "";
 }

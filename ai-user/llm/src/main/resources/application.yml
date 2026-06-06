@@ -22,6 +22,8 @@ llm:
     default-timeout-ms: ${LLM_DEFAULT_TIMEOUT_MS:120000}
     claude-binary-path: ${CLAUDE_BIN:claude}
     claude-model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
+  api:
+    prompt-caching: ${LLM_API_PROMPT_CACHING:true}
 
 logging:
   level:
@@ -31,3 +33,6 @@ logging:
 self-critique:
   enabled: ${SELF_CRITIQUE_ENABLED:false}
   pass-threshold: ${SELF_CRITIQUE_THRESHOLD:5}
+
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY:-}

@@ -1,7 +1,7 @@
 # AI 유저 시스템 운영 가이드
 
 > **대상**: 일일 운영, 성능 모니터링, 페르소나/데이터 관리, 트러블슈팅을 담당하는 개발자 & DevOps  
-> **최종 수정**: 2026-06-05 (100명 페르소나, 12개 voice, 신규 필드 반영)
+> **최종 수정**: 2026-06-06 (기본 10명 페르소나, Voice 12종, synthetic=1 식별 통일, ContentSafetyGuard 타입별 길이 상한, RAG 3단계 폴백, 1024차원 임베딩)
 
 ---
 
@@ -234,15 +234,15 @@ echo "  - id: ai-user-051" >> /home/justant/Data/Again-Spring/ai-user/docs/perso
 docker compose ... restart ai-user-orchestrator
 ```
 
-#### 방법 2: AI_USER_PERSONA_TARGET 환경 변수 (100명 기준)
+#### 방법 2: AI_USER_PERSONA_TARGET 환경 변수
 
-더 간단한 방법: AI_USER_SEED_ENABLED를 통해 자동 생성
+기본값은 10명. 더 많이 운영하려면 값을 늘리면 부족분을 자동 생성합니다.
 
 ```bash
-# .env.dev 수정 (현재 100명 목표)
-sed -i 's/AI_USER_PERSONA_TARGET=100/AI_USER_PERSONA_TARGET=120/g' .env.dev
+# .env.dev 수정 (기본 10명 → 원하는 수로 변경)
+sed -i 's/AI_USER_PERSONA_TARGET=10/AI_USER_PERSONA_TARGET=20/g' .env.dev
 
-# 재시작 (100~120 사이에 새 페르소나 자동 생성)
+# 재시작 (현재 수~목표 사이 새 페르소나 자동 생성)
 docker compose ... up -d
 ```
 
@@ -527,22 +527,23 @@ docker compose ... up -d
 **진단**:
 ```bash
 docker logs againspring-ai-learning | grep -i "vector\|dimension"
-# 출력: "Vector dimension mismatch: expected 768, got 512"
+# 출력: "Vector dimension mismatch: expected 1024, got 512"
 ```
 
-**해결**:
+**해결** (데이터 보존 방식 — DROP 금지):
 ```bash
-# 테이블 재생성 (주의: 기존 데이터 삭제됨)
-docker exec -it againspring-mariadb-dev mariadb \
-  -u againspring -pF2etXbugW0EBDZNBMX17Q againspring_dev \
-  -e "DROP TABLE example_bank; DROP TABLE example_bank_vectors;"
+# 1. 먼저 백업 (MariaDB 볼륨 백업 참고: operations.md DB 백업 섹션)
+# 2. learning 서비스 재시작 — create_tables()가 ADD COLUMN IF NOT EXISTS로 스키마 자가복구
+docker compose restart ai-learning
 
-# learning 서비스 재시작 (테이블 자동 재생성)
-docker compose ... restart ai-learning
-
-# 5분 대기 후 확인
+# 3. 확인
 curl http://localhost:8099/health
 ```
+
+> ⚠️ **DROP TABLE 금지**: example_bank는 크롤링 데이터 원장. 차원 불일치의 근본 원인은
+> 모델 출력 차원(KURE-v1 = 1024차원)과 코드의 "768차원" 주석 불일치였으며,
+> embedding.py의 startup assertion이 이제 차원 불일치를 부트 타임에 감지함.
+> 문제 발생 시 모델 버전 또는 컬럼 DDL을 확인할 것 (DROP은 최후 수단, 항상 backup-first).
 
 ### 케이스 3: "페르소나 시딩 무한 루프"
 

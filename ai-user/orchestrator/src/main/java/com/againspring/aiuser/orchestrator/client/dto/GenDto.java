@@ -34,6 +34,8 @@ public class GenDto {
         private String correctionCautions;
         /** 모든 AI 유저 공통 전역 금지 규칙 (개행 구분). 없으면 null. */
         private String globalForbidRules;
+        /** 생성 백엔드: "CLI" | "API" | null (null→CLI). §11 */
+        private String backend;
     }
 
     @Getter
@@ -61,6 +63,8 @@ public class GenDto {
         private String correctionCautions;
         /** 모든 AI 유저 공통 전역 금지 규칙 (개행 구분). 없으면 null. */
         private String globalForbidRules;
+        /** 생성 백엔드: "CLI" | "API" | null */
+        private String backend;
     }
 
     @Getter
@@ -86,6 +90,8 @@ public class GenDto {
         private String correctionCautions;
         /** 모든 AI 유저 공통 전역 금지 규칙 (개행 구분). 없으면 null. */
         private String globalForbidRules;
+        /** 생성 백엔드: "CLI" | "API" | null */
+        private String backend;
     }
 
     @Getter

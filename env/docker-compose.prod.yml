@@ -111,6 +111,146 @@ services:
     networks:
       - againspring-prod
 
+  llm-ai-user-prod:
+    build:
+      context: ../ai-user/llm
+      dockerfile: Dockerfile
+    image: againspring-llm-ai-user-prod
+    container_name: againspring-llm-ai-user-prod
+    environment:
+      CLAUDE_BIN: ${CLAUDE_BIN:-claude}
+      CLAUDE_MODEL: ${AI_USER_LLM_MODEL:-claude-haiku-4-5-20251001}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_POOL_SIZE: ${AI_USER_LLM_POOL_SIZE:-20}
+      LLM_QUEUE_CAPACITY: ${AI_USER_LLM_QUEUE_CAPACITY:-100}
+      LLM_DEFAULT_TIMEOUT_MS: ${AI_USER_LLM_DEFAULT_TIMEOUT_MS:-120000}
+      SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
+    volumes:
+      - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - againspring-prod
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8092/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  ai-learning-prod:
+    build:
+      context: ../ai-user/learning
+      dockerfile: Dockerfile
+    image: againspring-ai-learning-prod
+    container_name: againspring-ai-learning-prod
+    environment:
+      DB_HOST: againspring-mariadb-prod
+      DB_PORT: 3306
+      DB_NAME: ${MARIADB_DATABASE:-againspring}
+      DB_USER: ${MARIADB_USER:-againspring}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
+      AI_LEARNING_CRAWL_ENABLED: ${AI_LEARNING_CRAWL_ENABLED:-false}
+    depends_on:
+      mariadb-prod:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 1G
+    networks:
+      - againspring-prod
+
+  ai-user-orchestrator-prod:
+    build:
+      context: ../ai-user/orchestrator
+      dockerfile: Dockerfile
+    image: againspring-ai-user-orchestrator-prod
+    container_name: againspring-ai-user-orchestrator-prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      DB_USER: ${MARIADB_USER:-againspring}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
+      BACKEND_BASE_URL: http://againspring-backend-prod:8080
+      LLM_AI_USER_URL: http://againspring-llm-ai-user-prod:8092
+      AI_USER_ENABLED: ${AI_USER_ENABLED:-false}
+      AI_USER_TICK_CRON: "0 * * * * *"
+      AI_USER_DAILY_GLOBAL_CAP: ${AI_USER_DAILY_GLOBAL_CAP:-500}
+      AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-dev-pw-2026}
+      AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
+      AI_USER_HISTORY_DIR: /app/persona-history
+      AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
+      AI_LEARNING_BASE_URL: http://againspring-ai-learning-prod:8099
+      SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
+      AI_USER_PERSONA_TARGET: ${AI_USER_PERSONA_TARGET:-50}
+      AI_USER_PERSONAS_DIR: /app/personas
+      AI_USER_FORCE_ACTIVE: ${AI_USER_FORCE_ACTIVE:-false}
+      AI_USER_SECONDARY_BACKEND_URL: http://againspring-backend-dev:8080
+      PAIRED_POST_ENABLED: ${PAIRED_POST_ENABLED:-true}
+      PAIRED_POST_CRON: "${PAIRED_POST_CRON:-0 0 */2 * * *}"
+      PAIRED_POST_PAIRS: ${PAIRED_POST_PAIRS:-3}
+    volumes:
+      - ../persona-history:/app/persona-history:rw
+      - ../ai-user/docs/personas:/app/personas:ro
+    depends_on:
+      mariadb-prod:
+        condition: service_healthy
+      llm-ai-user-prod:
+        condition: service_healthy
+      backend-prod:
+        condition: service_started
+      ai-learning-prod:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - againspring-prod
+      - againspring-dev    # dev 백엔드에 동시 게시하기 위해 dev 네트워크도 연결
+
+  ai-content-sync:
+    build:
+      context: ../ai-user/sync
+      dockerfile: Dockerfile
+    image: againspring-ai-content-sync
+    container_name: againspring-ai-content-sync
+    environment:
+      # prod DB (소스)
+      PROD_DB_HOST: againspring-mariadb-prod
+      PROD_DB_PORT: 3306
+      PROD_DB_USER: ${MARIADB_USER:-againspring}
+      PROD_DB_PASSWORD: ${MARIADB_PASSWORD}
+      PROD_DB_NAME: ${MARIADB_DATABASE:-againspring_prod}
+      # dev DB (대상) — 별도 패스워드 (DEV_MARIADB_PASSWORD)
+      DEV_DB_HOST: againspring-mariadb-dev
+      DEV_DB_PORT: 3306
+      DEV_DB_USER: ${MARIADB_USER:-againspring}
+      DEV_DB_PASSWORD: ${DEV_MARIADB_PASSWORD}
+      DEV_DB_NAME: againspring_dev
+      # 동기화 주기 (초) + 소급 기간 (일)
+      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-300}
+      SYNC_BACKFILL_DAYS: ${SYNC_BACKFILL_DAYS:-3}
+    depends_on:
+      mariadb-prod:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - againspring-prod   # prod DB 접근
+      - againspring-dev    # dev DB 접근
+
   nginx-prod:
     image: nginx:alpine
     container_name: againspring-nginx-prod
@@ -131,6 +271,9 @@ networks:
   againspring:
     external: true
     name: againspring
+  againspring-dev:
+    external: true
+    name: againspring-dev_againspring-dev    # dev 스택이 먼저 기동돼 있어야 함
 
 volumes:
   mariadb_prod_data:

@@ -3,6 +3,7 @@ package com.againspring.aiuser.llm.pool;
 import com.againspring.aiuser.llm.dto.WorkerMetrics;
 import com.againspring.aiuser.llm.exception.*;
 import com.againspring.aiuser.llm.service.ClaudeCliInvoker;
+import com.againspring.aiuser.llm.service.InvokerRouter;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,7 @@ public class LlmWorkerPool {
     private String defaultModel;
 
     private final ClaudeCliInvoker invoker;
+    private final InvokerRouter invokerRouter;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4,
             r -> { Thread t = new Thread(r, "llm-pool-scheduler"); t.setDaemon(true); return t; });
 
@@ -54,8 +56,9 @@ public class LlmWorkerPool {
     private final AtomicLong rejectedCount = new AtomicLong(0);
     private final AtomicLong throttledCount = new AtomicLong(0);
 
-    public LlmWorkerPool(ClaudeCliInvoker invoker) {
+    public LlmWorkerPool(ClaudeCliInvoker invoker, InvokerRouter invokerRouter) {
         this.invoker = invoker;
+        this.invokerRouter = invokerRouter;
     }
 
     @PostConstruct
@@ -83,10 +86,18 @@ public class LlmWorkerPool {
      * RejectedExecutionException → LlmCapacityException (큐 포화).
      * TimeoutException → LlmTimeoutException.
      */
+    /** 하위 호환용 — backend=null 시 CLI 사용 */
     public String executeSyncTask(String prompt, String model, long timeoutMs, String correlationId)
+            throws LlmException {
+        return executeSyncTask(prompt, model, timeoutMs, correlationId, null);
+    }
+
+    /** backend: "CLI" | "API" | null (null→CLI) */
+    public String executeSyncTask(String prompt, String model, long timeoutMs, String correlationId, String backend)
             throws LlmException {
         long effectiveTimeout = timeoutMs > 0 ? timeoutMs : defaultTimeoutMs;
         String resolvedModel = (model != null && !model.isBlank()) ? model : defaultModel;
+        var selectedInvoker = invokerRouter.route(backend);
         long enqueueTime = System.currentTimeMillis();
 
         CompletableFuture<String> resultFuture = new CompletableFuture<>();
@@ -103,7 +114,7 @@ public class LlmWorkerPool {
                 }
                 activeCount.incrementAndGet();
                 try {
-                    String result = invoker.invoke(prompt, resolvedModel);
+                    String result = selectedInvoker.invoke(prompt, resolvedModel);
                     resultFuture.complete(result);
                     completedCount.incrementAndGet();
                 } catch (ClaudeCodeException e) {

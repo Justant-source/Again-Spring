@@ -114,20 +114,43 @@ public class PersonaFactory {
         // ID 생성 (UUID 32자)
         String id = UUID.randomUUID().toString().replace("-", "");
 
-        // users 테이블 INSERT — 순번 기반 이메일 (ai-user-{NNN}@againspring.internal)
+        // users 테이블 INSERT — synthetic=1 포함, 충돌 시 suffix 재계산 후 재시도
         long nextNum = personaRepository.count() + 1;
         String email = String.format("ai-user-%03d@againspring.internal", nextNum);
         String pwHash = new BCryptPasswordEncoder().encode(props.getBotPassword());
-        jdbcTemplate.update(
-            "INSERT INTO users (id, email, password_hash, nickname, roles, is_guest, must_change_password, created_at, updated_at) " +
-            "VALUES (?,?,?,?,'[\"USER\"]',0,0,NOW(3),NOW(3))",
-            id, email, pwHash, nickname
-        );
-
-        // synthetic=1 마킹 (컬럼이 없으면 무시)
-        try {
-            jdbcTemplate.update("UPDATE users SET synthetic=1 WHERE id=?", id);
-        } catch (Exception ignored) {}
+        // synthetic=1 컬럼 포함 (V59 이후). 컬럼 없으면 fallback INSERT 사용.
+        boolean inserted = false;
+        for (int attempt = 0; attempt < 5 && !inserted; attempt++) {
+            if (attempt > 0) {
+                // email 중복(삭제/동시성) 시 MAX suffix 기반 재계산
+                try {
+                    Long maxSuffix = jdbcTemplate.queryForObject(
+                        "SELECT MAX(CAST(REGEXP_REPLACE(email, '[^0-9]', '') AS UNSIGNED)) " +
+                        "FROM users WHERE email LIKE 'ai-user-%@againspring.internal'", Long.class);
+                    nextNum = (maxSuffix != null ? maxSuffix : 0L) + 1;
+                    email = String.format("ai-user-%03d@againspring.internal", nextNum);
+                } catch (Exception ignored) { nextNum++; email = String.format("ai-user-%03d@againspring.internal", nextNum); }
+            }
+            try {
+                jdbcTemplate.update(
+                    "INSERT INTO users (id, email, password_hash, nickname, roles, is_guest, must_change_password, synthetic, created_at, updated_at) " +
+                    "VALUES (?,?,?,?,'[\"USER\"]',0,0,1,NOW(3),NOW(3))",
+                    id, email, pwHash, nickname);
+                inserted = true;
+            } catch (org.springframework.dao.DuplicateKeyException dke) {
+                log.debug("Email {} already exists, retrying with next suffix", email);
+            } catch (Exception e) {
+                // synthetic 컬럼 없는 경우(V59 미적용) — 컬럼 없이 삽입
+                try {
+                    jdbcTemplate.update(
+                        "INSERT INTO users (id, email, password_hash, nickname, roles, is_guest, must_change_password, created_at, updated_at) " +
+                        "VALUES (?,?,?,?,'[\"USER\"]',0,0,NOW(3),NOW(3))",
+                        id, email, pwHash, nickname);
+                    inserted = true;
+                } catch (Exception e2) { log.warn("PersonaFactory insert failed: {}", e2.getMessage()); break; }
+            }
+        }
+        if (!inserted) { log.error("PersonaFactory: failed to insert user after 5 attempts"); return false; }
 
         // interests, bias, circadian 생성
         Map<String, Double> interests = buildInterests(age, politics, job);

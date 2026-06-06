@@ -48,7 +48,7 @@ public class InteractionScanner {
                 "WHERE pal.action_type = 'POST' " +
                 "  AND pal.created_at > ? " +
                 "  AND pc.parent_comment_id IS NULL " +
-                "  AND pc.author_id NOT IN (SELECT id FROM users WHERE email LIKE 'ai-user%@againspring.com') " +
+                "  AND pc.author_id IN (SELECT id FROM users WHERE " + com.againspring.aiuser.orchestrator.seed.AiUserIdentity.REAL_USER_AUTHOR_CONDITION + ") " +
                 "ORDER BY pc.id DESC " +
                 "LIMIT ?",
                 since, MAX_RESULTS
@@ -83,7 +83,7 @@ public class InteractionScanner {
                 "SELECT LEFT(body, 100) AS body " +
                 "FROM post_comments " +
                 "WHERE post_id = ? AND parent_comment_id IS NULL AND id != ? " +
-                "  AND author_id NOT IN (SELECT id FROM users WHERE email LIKE 'ai-user%@againspring.com') " +
+                "  AND author_id IN (SELECT id FROM users WHERE " + com.againspring.aiuser.orchestrator.seed.AiUserIdentity.REAL_USER_AUTHOR_CONDITION + ") " +
                 "ORDER BY id DESC LIMIT 3",
                 postId, excludeCommentId);
             if (siblings.isEmpty()) return null;

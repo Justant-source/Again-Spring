@@ -54,6 +54,7 @@ export const NAV_GROUPS: AdminNavGroup[] = [
     label: 'AI',
     items: [
       { label: 'AI 규칙관리', href: '/admin/ai-rules', icon: 'Sparkles' },
+      { label: 'AI 생성 관제', href: '/admin/ai-user', icon: 'Cpu' },
     ],
   },
   {

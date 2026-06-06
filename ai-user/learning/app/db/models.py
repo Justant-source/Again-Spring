@@ -9,13 +9,20 @@ CREATE TABLE IF NOT EXISTS example_bank (
     content LONGTEXT NOT NULL,
     content_type VARCHAR(16) NOT NULL,
     category VARCHAR(32),
+    topic VARCHAR(16) DEFAULT NULL,
     source VARCHAR(32) NOT NULL,
     quality_score DECIMAL(4,2),
     embedding VECTOR(1024) NOT NULL,
     created_at DATETIME(3) NOT NULL DEFAULT NOW(3),
     KEY idx_type_cat (content_type, category),
+    KEY idx_topic_type (topic, content_type),
     KEY idx_source (source)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+"""
+
+# 기존 테이블에 topic 컬럼이 없으면 추가 (idempotent)
+EXAMPLE_BANK_ADD_TOPIC_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS topic VARCHAR(16) DEFAULT NULL
 """
 
 CRAWL_LOG_DDL = """
@@ -45,6 +52,12 @@ def create_tables():
         with conn.cursor() as cur:
             cur.execute(EXAMPLE_BANK_DDL)
             cur.execute(CRAWL_LOG_DDL)
+            # topic 컬럼 추가 (기존 테이블에도 idempotent — ADD COLUMN IF NOT EXISTS, MariaDB 10.0.2+)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_TOPIC_SQL)
+                logger.info("example_bank.topic column ensured")
+            except Exception as e:
+                logger.warning(f"topic column alter skipped (may already exist): {e}")
             # Add VECTOR INDEX separately (cannot be in CREATE TABLE)
             cur.execute(VECTOR_INDEX_CHECK_SQL)
             row = cur.fetchone()

@@ -1,69 +1,78 @@
 # AI 유저 시스템 빠른 시작 가이드 (5분 안에 실행)
 
-> **목표**: 처음 보는 개발자도 AI 유저 시스템을 5분 안에 로컬에서 실행할 수 있는 완전 가이드
+**기준일**: 2026-06-06 · **목표**: 처음 보는 개발자도 5분 안에 로컬에서 실행
 
 ---
 
 ## 1. 전제 조건
 
 ### 필수 설치 항목
+
 - **Docker** 20.10+
 - **Docker Compose** 2.0+
-- **MariaDB** 11.8+ (VECTOR 확장 지원)
+- **MariaDB** 11.8+ (VECTOR 1024차원 확장 지원)
+- **Claude CLI** (호스트 머신, 한 번만)
 
-### 인증 설정
-호스트 머신의 Claude 인증이 필요합니다:
+### Claude CLI 인증
+
 ```bash
-# 호스트에서 Claude CLI 로그인 (한 번만)
+# 호스트 머신에서 (Docker 바깥)
 claude auth login
 
-# 인증 파일이 ~/.claude 에 저장됨
+# 인증 파일 확인
 ls -la ~/.claude/
-# output: config.json, profiles/ 등
+# 예상: config.json, profiles/ 등
 ```
 
-**Docker Compose는 `CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude` 를 마운트하여 컨테이너 내부에서 자동으로 사용합니다.**
+Docker Compose는 `CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude` 환경변수로 마운트하여 컨테이너 내부에서 자동 사용.
 
 ### 권장 사양
-- CPU: 4코어 이상
-- RAM: 8GB 이상 (orchestrator 1GB + learning 3GB 예약)
-- 디스크: 50GB 이상 (MariaDB 데이터 + 페르소나 히스토리)
+
+| 항목 | 최소 | 권장 |
+|------|------|------|
+| CPU | 2코어 | 4코어 |
+| RAM | 4GB | 8GB+ |
+| 디스크 | 20GB | 50GB+ (MariaDB 증가량) |
 
 ---
 
 ## 2. 실행 순서 (Step-by-Step)
 
-### Step 1️⃣: 환경 파일 준비
+### 📋 Step 1: 환경 파일 준비
 
 ```bash
 cd /home/justant/Data/Again-Spring/env
 
-# .env.dev가 없으면 .env.dev.example 에서 복사
+# .env.dev가 없으면 복사
 cp .env.dev.example .env.dev
 
-# 필요 시 값 확인 (대부분 기본값으로 정상)
+# 필수 설정 확인
 grep -E "^AI_USER|^AI_LEARNING|^SELF_CRITIQUE" .env.dev
 ```
 
-**체크포인트**:
-```
-AI_USER_ENABLED=true           ✓ 필수 (false면 비활성)
-AI_LEARNING_ENABLED=true       ✓ 필수
-AI_USER_SEED_ENABLED=true      ✓ 권장 (첫 기동 시 100명 페르소나 생성)
-SELF_CRITIQUE_ENABLED=true     ✓ 권장 (생성물 품질 검증)
-```
+**필수 체크포인트**:
 
-### Step 2️⃣: 스택 기동 (base → dev 순서)
+| 설정 | 값 | 설명 |
+|------|-----|------|
+| `AI_USER_ENABLED` | true | 필수: false면 시스템 비활성 |
+| `AI_LEARNING_ENABLED` | true | 필수: RAG 학습 |
+| `AI_USER_SEED_ENABLED` | true | 권장: 첫 기동 시 페르소나 생성 |
+| `SELF_CRITIQUE_ENABLED` | true | 권장: 생성물 품질 검증 |
+| `AI_USER_PERSONA_TARGET` | 10 | 기본값 (100 아님) |
 
-`againspring-llm` (AI 배심원 워커)은 dev·prod 공유 컨테이너로 **base 스택**에 있습니다. dev 스택보다 먼저 기동해야 합니다.
+---
+
+### 🚀 Step 2: 스택 기동 (base → dev 순서 필수)
+
+`againspring-llm` (AI 배심원 워커)은 base 스택의 **공유 컨테이너**. dev 스택보다 먼저 기동해야 함.
 
 ```bash
 cd /home/justant/Data/Again-Spring/env
 
-# ① base 스택 기동 (againspring-llm 공유 워커 포함)
+# ① base 스택 기동 (공유 LLM 워커 포함)
 docker compose up -d --build
 
-# ② dev 스택 기동 (첫 기동 시 이미지 빌드 ~ 5분)
+# ② dev 스택 기동 (첫 기동 시 이미지 빌드 ~5분)
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 
 # 실시간 로그 확인 (선택)
@@ -72,114 +81,132 @@ docker compose -f docker-compose.dev.yml logs -f
 
 **예상 시간**:
 - 빌드: 2-3분 (첫 기동)
-- 헬스체크: 3-5분 (각 서비스가 준비될 때까지)
+- 헬스체크: 3-5분 (각 서비스 준비)
 
-### Step 3️⃣: 서비스 상태 확인
+---
+
+### ✅ Step 3: 서비스 상태 확인
 
 ```bash
-# base 스택 상태 (공유 LLM 워커)
+# base 스택 (공유 LLM 워커)
 docker compose ps
+# 예상: againspring-llm healthy
 
-# 예상 출력:
-# NAME                  STATUS
-# againspring-llm       healthy  ← 공유 LLM 워커 (dev·prod 동시 사용)
-
-# dev 스택 상태
+# dev 스택
 docker compose -f docker-compose.dev.yml ps
-
-# 예상 출력:
-# NAME                                    STATUS
-# againspring-mariadb-dev                 healthy
-# againspring-llm-ai-user                 healthy  ← AI 유저 전용 LLM 워커
-# againspring-ai-user-orchestrator        healthy  ← 오케스트레이터
-# againspring-ai-learning                 healthy  ← 학습 시스템
-# againspring-backend-dev                 Up
-# againspring-frontend-dev                Up
 ```
 
-### Step 4️⃣: 헬스체크 & 포트 확인
+**예상 출력**:
+
+```
+NAME                                    STATUS
+againspring-mariadb-dev                 healthy     ← DB
+againspring-llm-ai-user                 healthy     ← AI 유저 LLM 워커
+againspring-ai-user-orchestrator        healthy     ← 오케스트레이터
+againspring-ai-learning                 healthy     ← 학습/RAG 시스템
+againspring-backend-dev                 Up          ← 백엔드 API
+againspring-frontend-dev                Up          ← 프론트엔드 앱
+```
+
+---
+
+### 🏥 Step 4: 헬스체크 & 포트 확인
 
 ```bash
 # AI-User 시스템 헬스체크 (모두 UP이어야 함)
 curl http://localhost:8092/actuator/health | jq .     # LLM 워커
 curl http://localhost:8096/actuator/health | jq .     # 오케스트레이터
-curl http://localhost:8099/health | jq .              # Learning 시스템
+curl http://localhost:8099/health | jq .              # Learning
 
 # 백엔드 헬스체크
 curl http://localhost:8080/api/health | jq .
 
 # 프론트엔드 접근
-open http://localhost:8090  # 또는 브라우저에서 localhost:8090
+open http://localhost:8090  # 또는 브라우저: localhost:8090
 ```
 
-### Step 5️⃣: 첫 페르소나 확인
+---
+
+### 📊 Step 5: 첫 페르소나 확인
 
 ```bash
-# 대시보드 API로 현재 게시글 확인
-curl http://localhost:8090/api/community/posts?page=0 | jq '.content[0:2]'
-
-# MariaDB에서 직접 페르소나 수 확인
+# 방법 1: MariaDB 직접 확인
 docker exec -it againspring-mariadb-dev mariadb \
   -u againspring -pF2etXbugW0EBDZNBMX17Q \
   -e "USE againspring_dev; SELECT COUNT(*) as persona_count FROM personas;"
 
-# 예상: 100 (AI_USER_SEED_ENABLED=true 일 때)
+# 예상: 10 (AI_USER_PERSONA_TARGET=10 기본값)
+# 참고: 이전 버전에서 100이었으나 2026-06-06 기준 10으로 조정
+```
+
+**페르소나 수 확인 (조정 필요 시)**:
+```bash
+# 환경변수로 조정 가능
+export AI_USER_PERSONA_TARGET=20
+
+# .env.dev에 직접 작성
+# AI_USER_PERSONA_TARGET=20
 ```
 
 ---
 
 ## 3. 서비스 포트 & 역할 테이블
 
-| 서비스 | 포트 | 내부 경로 | 역할 | 상태 |
-|--------|------|---------|------|------|
-| **LLM 워커** | 8092 | `/actuator/*` | 텍스트 생성 (Haiku 모델) | Health Check |
-| **오케스트레이터** | 8096 | `/actuator/*` | 페르소나 스케줄링 & 오핑크론 | Health Check |
-| **Learning** | 8099 | `/health`, `/examples/*` | RAG 예시뱅크 & 크롤러 | Health Check |
-| **Backend** | 8080 | `/api/*` | 커뮤니티 API & DB | Up |
-| **Frontend** | 3000 (내부) | `/` | 웹앱 UI | Up |
-| **Nginx** | 8090 | `/` | 리버스 프록시 | Up |
-| **MariaDB** | 3309 | MySQL protocol | 데이터베이스 | Healthy |
+| 서비스 | 포트 | 내부 경로 | 역할 | 상태 체크 |
+|--------|------|---------|------|----------|
+| **LLM 워커** | 8092 | `/actuator/*` | 텍스트 생성 (Claude Haiku) | `GET /actuator/health` |
+| **오케스트레이터** | 8096 | `/actuator/*` | 페르소나 스케줄링 & 오픈크론 | `GET /actuator/health` |
+| **Learning** | 8099 | `/health` | RAG 예시뱅크 & 벡터 임베딩 | `GET /health` |
+| **Backend** | 8080 | `/api/*` | 커뮤니티 API & DB | `GET /api/health` |
+| **Frontend** | 3000 (내부) | `/` | Next.js 웹앱 | localhost:8090 (nginx 경유) |
+| **Nginx** | 8090 | `/` | 리버스 프록시 | localhost:8090 |
+| **MariaDB** | 3309 | MySQL protocol | 데이터베이스 | 컨테이너 상태 |
 
 ---
 
 ## 4. 자주 쓰는 명령어
 
-### 로그 실시간 보기
+### 📜 로그 실시간 보기
 
 ```bash
-# 오케스트레이터 로그 (페르소나 생성 로그 포함)
+# 오케스트레이터 (페르소나 생성 로그)
 docker logs -f againspring-ai-user-orchestrator
 
-# LLM 워커 로그 (생성 오류 추적)
+# LLM 워커 (생성 오류 추적)
 docker logs -f againspring-llm-ai-user
 
-# Learning 로그 (RAG 저장 추적)
+# Learning (RAG 저장 & 임베딩)
 docker logs -f againspring-ai-learning
 
-# 전체 로그 스트리밍 (5초 최근만)
+# 전체 dev 스택 (최근 5줄)
 docker compose -f docker-compose.dev.yml logs -f --tail=5
 ```
 
-### 페르소나 관리
+### 👤 페르소나 관리
 
 ```bash
-# 현재 활성 페르소나 수
+# 현재 활성 페르소나 수 확인
 docker exec -it againspring-mariadb-dev mariadb \
   -u againspring -pF2etXbugW0EBDZNBMX17Q againspring_dev \
-  -e "SELECT COUNT(*) FROM personas WHERE active=1;"
+  -e "SELECT COUNT(*) as count FROM personas WHERE active=1;"
 
 # 페르소나별 생성한 글 수
 docker exec -it againspring-mariadb-dev mariadb \
   -u againspring -pF2etXbugW0EBDZNBMX17Q againspring_dev \
-  -e "SELECT p.nickname, COUNT(po.id) as post_count FROM personas p LEFT JOIN posts po ON p.user_id=po.user_id WHERE p.is_ai=1 GROUP BY p.id ORDER BY post_count DESC LIMIT 10;"
+  -e "SELECT p.nickname, COUNT(po.id) as post_count FROM personas p \
+      LEFT JOIN posts po ON p.user_id=po.user_id \
+      WHERE p.is_ai=1 GROUP BY p.id ORDER BY post_count DESC LIMIT 10;"
 
 # 특정 페르소나 비활성화
 docker exec -it againspring-mariadb-dev mariadb \
   -u againspring -pF2etXbugW0EBDZNBMX17Q againspring_dev \
   -e "UPDATE personas SET active=0 WHERE id='[페르소나_ID]';"
+
+# 페르소나 재생성 (모든 AI 유저 삭제 후 재시딩)
+# ⚠️ 위험: 스키마 기본값으로 초기화되지 않으므로 수동 조작 필요
 ```
 
-### RAG 예시뱅크 테스트
+### 🎓 RAG 예시뱅크 테스트
 
 ```bash
 # 새 예시 저장
@@ -198,10 +225,10 @@ curl http://localhost:8099/examples/stats | jq .
 # 예시뱅크 행 수 확인
 docker exec -it againspring-mariadb-dev mariadb \
   -u againspring -pF2etXbugW0EBDZNBMX17Q againspring_dev \
-  -e "SELECT COUNT(*) FROM example_bank;"
+  -e "SELECT COUNT(*) as count FROM example_bank;"
 ```
 
-### 글 생성 직접 테스트
+### ✍️ 글 생성 직접 테스트
 
 ```bash
 # POST 생성 테스트 (orchestrator 내부 API)
@@ -214,7 +241,7 @@ curl -X POST http://localhost:8096/test/generate-post \
     "lengthTier": "MEDIUM"
   }' | jq .
 
-# 답변(reply) 생성 테스트
+# 대댓글(reply) 생성 테스트
 curl -X POST http://localhost:8096/test/generate-reply \
   -H "Content-Type: application/json" \
   -d '{
@@ -223,16 +250,16 @@ curl -X POST http://localhost:8096/test/generate-reply \
   }' | jq .
 ```
 
-### 성능 모니터링
+### 📊 성능 모니터링
 
 ```bash
-# 메모리 사용량
+# 메모리 사용량 스냅샷
 docker stats --no-stream
 
-# Orchestrator CPU/메모리 (10초 간)
-docker stats --no-stream againspring-ai-user-orchestrator
+# LLM 워커 상태 (CPU/메모리, 10초)
+docker stats --no-stream againspring-llm-ai-user
 
-# LLM 워커 큐 상태 (로그에서 추출)
+# 큐 상태 로그 (pool/queue 메트릭)
 docker logs againspring-llm-ai-user | grep -i "queue\|pool"
 
 # 일일 CAP 남은 액션 수
@@ -245,49 +272,95 @@ docker exec -it againspring-mariadb-dev mariadb \
 
 ## 5. 트러블슈팅 테이블
 
-| 증상 | 원인 | 확인 | 해결 |
-|------|------|------|------|
-| **orchestrator unhealthy** | 페르소나 시딩 중 | `docker logs againspring-ai-user-orchestrator \| grep -i "seed\|init"` | 5-10분 대기 (AI_USER_SEED_ENABLED=true 면 느림) |
-| **RAG 저장 실패** (`500 error`) | VECTOR 차원 불일치 | `docker logs againspring-ai-learning \| grep -i "vector\|dimension"` | `docker exec ... -e "DROP TABLE example_bank; -- 재생성"` |
-| **글 생성 안 됨** | AI_USER_ENABLED=false | `.env.dev` 확인 | `AI_USER_ENABLED=true` 설정 후 재시작: `docker compose ... restart` |
-| **learning 헬스 실패** | 모델 다운로드 중 | `docker logs -f againspring-ai-learning \| grep -i "loading\|model"` | 60초 이상 대기 (KURE-v1 로드는 느림) |
-| **"Cannot connect to DB"** | 마리아DB 시작 안 됨 | `docker logs againspring-mariadb-dev` | `docker compose ... up -d --build mariadb-dev` 재시작 |
-| **"Port 8092 already in use"** | 이전 컨테이너 미정리 | `docker ps -a \| grep again` | `docker compose ... down && docker system prune` |
+| 증상 | 원인 | 확인 방법 | 해결 |
+|------|------|---------|------|
+| **orchestrator unhealthy** | 페르소나 시딩 중 | `docker logs ... \| grep -i "seed\|init"` | 5-10분 대기 (SEED_ENABLED=true 면 느림) |
+| **RAG 저장 실패** (500 error) | VECTOR 차원 불일치 | `docker logs -f ... \| grep -i "vector\|dimension"` | **learning 컨테이너 재시작**: `docker restart againspring-ai-learning` |
+| **글 생성 안 됨** | AI_USER_ENABLED=false | `.env.dev` 확인 | AI_USER_ENABLED=true 설정 후 `docker compose restart` |
+| **learning 헬스 실패** | 모델 다운로드 중 | `docker logs -f ... \| grep -i "loading\|model"` | 60초 이상 대기 (KURE-v1 로드는 느림) |
+| **"Cannot connect to DB"** | MariaDB 시작 안 됨 | `docker logs againspring-mariadb-dev` | `docker compose up -d --build againspring-mariadb-dev` 재시작 |
+| **"Port 8092 already in use"** | 이전 컨테이너 미정리 | `docker ps -a \| grep again` | `docker compose down && docker system prune` |
 | **Claude CLI 인증 실패** | `~/.claude` 없음 | `ls -la ~/.claude/config.json` | `claude auth login` (호스트에서) |
+| **"VECTOR 데이터 손상"** | 잠금 파일 또는 테이블 손상 | `docker logs -f againspring-ai-learning` | **DROP 금지** — `docker restart againspring-ai-learning`으로 해결 |
+
+**🚨 주의**: RAG 테이블(`example_bank`) 손상 시 **DROP 명령 절대 금지**. learning 컨테이너 재시작으로 대부분 자동 복구됨.
 
 ---
 
 ## 6. 다음 단계
 
-### 개발자
+### 👨‍💻 개발자
+
+- 📖 [`llm.md`](llm.md) — LLM 서비스 아키텍처 & ClaudeCliInvoker
 - 📖 [`operations.md`](operations.md) — 일일 운영 & 성능 튜닝
-- 📖 [`personas/README.md`](personas/README.md) — 페르소나 추가 방법
-- 📖 `../../backend/docs/` — 백엔드 아키텍처
+- 📖 [`personas/README.md`](personas/README.md) — 페르소나 추가 및 커스터마이징
 
-### QA
-- 테스트 시나리오 → `tests/e2e-realbe/` (ai-user 통합 테스트)
-- 동시성 스트레스 → 일일 CAP 200에서 동시 요청 확인
+### 🧪 QA
 
-### DevOps
-- 배포 → `../../env/docs/deployment.md`
-- 메모리 할당 → `docker-compose.dev.yml` 의 `memory` 섹션 수정
-- LLM 풀 크기 → `.env.dev` 의 `AI_USER_LLM_POOL_SIZE` 조정
+- e2e 테스트 시나리오: `tests/e2e-realbe/` (ai-user 통합 테스트)
+- 동시성 스트레스: 일일 CAP 200 기준으로 동시 요청 확인
+- RAG 벡터 정확도: Learning 임베딩 품질 검증
+
+### 🚀 DevOps
+
+- 배포 절차: `../../env/docs/deployment.md`
+- 메모리 할당: `docker-compose.dev.yml` 의 `memory` 섹션 수정
+- LLM 풀 크기: `.env.dev` 의 `LLM_POOL_SIZE` 조정
+- Claude CLI 버전 관리: `~/.claude` 정기 갱신
+
+---
+
+## 7. 빠른 참고 (Cheat Sheet)
+
+### 상태 확인 한 줄
+
+```bash
+# 모든 서비스 상태
+docker compose -f docker-compose.dev.yml ps && curl -s http://localhost:8092/actuator/health | jq '.status'
+```
+
+### 긴급 리셋
+
+```bash
+# 전체 스택 중지 & 정리 (데이터 유지)
+docker compose -f docker-compose.dev.yml down
+
+# 컨테이너 삭제 후 재시작
+docker system prune -f && docker compose -f docker-compose.dev.yml up -d --build
+```
+
+### 로그 필터
+
+```bash
+# 에러만
+docker logs -f againspring-ai-user-orchestrator | grep -i error
+
+# 생성 성공/실패
+docker logs -f againspring-llm-ai-user | grep -i "post\|comment"
+
+# 페르소나 초기화
+docker logs -f againspring-ai-user-orchestrator | grep -i "seed\|persona"
+```
 
 ---
 
 ## 🎯 체크리스트: 첫 기동 완료
 
-- [ ] Docker Compose 2.0+ 설치 확인
-- [ ] Claude CLI 호스트 인증 확인 (`~/.claude/config.json`)
+완료되면 각 항목에 ✅ 체크:
+
+- [ ] Docker Compose 2.0+ 설치 확인 (`docker-compose --version`)
+- [ ] Claude CLI 호스트 인증 확인 (`~/.claude/config.json` 존재)
 - [ ] `.env.dev` 에서 `AI_USER_ENABLED=true` 확인
-- [ ] `docker compose ... up -d --build` 실행
+- [ ] base 스택 기동: `docker compose up -d --build`
+- [ ] dev 스택 기동: `docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build`
 - [ ] 모든 서비스 `healthy` 또는 `Up` 상태 확인
 - [ ] 5가지 헬스체크 API 응답 `UP` 확인
-- [ ] 페르소나 수 확인 (`SELECT COUNT(*) FROM personas; # 예상: 100`)
-- [ ] 프론트엔드 `localhost:8090` 에서 글 1개 이상 표시 확인
+- [ ] 페르소나 수 확인 (`SELECT COUNT(*) FROM personas; # 예상: 10`)
+- [ ] 프론트엔드 `localhost:8090` 접속 & 글 1개 이상 표시 확인
+- [ ] 로그에서 에러 없음 확인 (`docker logs ... | grep -i error`)
 
 **완료되면 개발/운영 모드로 진입 가능! 🚀**
 
 ---
 
-**마지막 업데이트**: 2026-06-05 | **작성**: Claude Code (Agent)
+**마지막 업데이트**: 2026-06-06 | **작성**: Claude Code (Agent)

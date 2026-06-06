@@ -61,27 +61,33 @@ def save_example(req: SaveRequest, request: Request):
 
 @router.post("/search", response_model=List[ExampleItem])
 def search_examples(req: SearchRequest, request: Request) -> List[ExampleItem]:
+    """
+    3단계 폴백 검색:
+      Stage1: content_type + category + quality_score 조건
+      Stage2: content_type + category (quality 제거)
+      Stage3: content_type만 (category 완화) — 크롤링 데이터(talk/hot/freeboard 등) 도달 가능
+    """
     embed_service = request.app.state.embed_service
     try:
         vec = embed_service.embed(req.query[:512])
         vec_str = "[" + ",".join(f"{v:.8f}" for v in vec) + "]"
 
-        conditions = []
-        params: list = []
-
+        # base_conditions: content_type만 — Stage3에서도 유지
+        base_conditions: list = []
+        base_params: list = []
         if req.content_type:
-            conditions.append("content_type = %s")
-            params.append(req.content_type)
+            base_conditions.append("content_type = %s")
+            base_params.append(req.content_type)
+
+        # cat_conditions: category 필터 — Stage3에서 DROP됨
+        cat_conditions: list = []
+        cat_params: list = []
         if req.category:
-            conditions.append("(category = %s OR category IS NULL)")
-            params.append(req.category)
+            cat_conditions.append("(category = %s OR category IS NULL)")
+            cat_params.append(req.category)
 
-        # Stage 1: Search with quality threshold
-        quality_condition = f"quality_score >= {MIN_QUALITY_SCORE}"
-        where_conditions = conditions + [quality_condition]
-        where = ("WHERE " + " AND ".join(where_conditions)) if where_conditions else ""
-
-        sql_with_quality = f"""
+        # ── 공통 SELECT 템플릿 ──────────────────────────────────────────────
+        SELECT_TMPL = """
             SELECT id, content, source,
                    1 - VEC_DISTANCE_COSINE(embedding, VEC_FromText(%s)) AS similarity
             FROM example_bank
@@ -90,34 +96,43 @@ def search_examples(req: SearchRequest, request: Request) -> List[ExampleItem]:
                      quality_score DESC
             LIMIT %s
         """
-        all_params = [vec_str] + params + [vec_str, req.top_k]
 
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(sql_with_quality, all_params)
-                rows = cur.fetchall()
-
-        # Fallback: if quality filter yields no results, fetch top-k without quality gate
-        # and log warning
-        if not rows:
-            logger.warning(
-                f"search_examples: No results with quality >= {MIN_QUALITY_SCORE}. "
-                f"Falling back to similarity-only search."
-            )
-            where_fallback = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-            sql_fallback = f"""
-                SELECT id, content, source,
-                       1 - VEC_DISTANCE_COSINE(embedding, VEC_FromText(%s)) AS similarity
-                FROM example_bank
-                {where_fallback}
-                ORDER BY 1 - VEC_DISTANCE_COSINE(embedding, VEC_FromText(%s)) DESC
-                LIMIT %s
-            """
-            fallback_params = [vec_str] + params + [vec_str, req.top_k]
+        def run_query(where_conditions: list, where_params: list) -> list:
+            where = ("WHERE " + " AND ".join(where_conditions)) if where_conditions else ""
+            sql = SELECT_TMPL.format(where=where)
+            all_params = [vec_str] + where_params + [vec_str, req.top_k]
             with get_db() as conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql_fallback, fallback_params)
-                    rows = cur.fetchall()
+                    cur.execute(sql, all_params)
+                    return cur.fetchall()
+
+        # ── Stage 1: content_type + category + quality ─────────────────────
+        quality_condition = f"quality_score >= {MIN_QUALITY_SCORE}"
+        rows = run_query(
+            base_conditions + cat_conditions + [quality_condition],
+            base_params + cat_params
+        )
+
+        # ── Stage 2: content_type + category (quality 제거) ─────────────────
+        if not rows and cat_conditions:
+            logger.warning(
+                "search_examples stage2: no quality-filtered results for category=%s, "
+                "retrying without quality gate", req.category
+            )
+            rows = run_query(
+                base_conditions + cat_conditions,
+                base_params + cat_params
+            )
+
+        # ── Stage 3: content_type만 (category 완화) ──────────────────────────
+        # 크롤링 데이터(category='talk','hot','freeboard' 등)에 도달하는 경로
+        if not rows:
+            logger.warning(
+                "search_examples stage3: relaxing category filter for category=%s — "
+                "returning cross-category similarity matches (crawled data may appear)",
+                req.category
+            )
+            rows = run_query(base_conditions, base_params)
 
         return [
             ExampleItem(id=r["id"], content=r["content"],

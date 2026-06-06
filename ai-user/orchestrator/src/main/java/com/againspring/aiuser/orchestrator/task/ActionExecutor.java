@@ -7,12 +7,14 @@ import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.client.dto.*;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.AiGlobalRule;
+import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.domain.PersonaActionLog;
 import com.againspring.aiuser.orchestrator.domain.PersonaSeenPost;
 import com.againspring.aiuser.orchestrator.engine.ArchetypeCatalog;
 import com.againspring.aiuser.orchestrator.engine.PlannedAction;
 import com.againspring.aiuser.orchestrator.repository.AiGlobalRuleRepository;
+import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaActionLogRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
@@ -53,6 +55,7 @@ public class ActionExecutor {
     private final ArchetypeCatalog archetypeCatalog;
     private final AiLearningClient aiLearningClient;
     private final AiGlobalRuleRepository aiGlobalRuleRepository;
+    private final AiUserGenerationConfigRepository generationConfigRepository;
 
     @Value("${ai-user.history-dir:/app/persona-history}")
     private String historyDir;
@@ -63,6 +66,28 @@ public class ActionExecutor {
     /** 전역 금지 규칙 캐시 (5분 TTL). 매 생성마다 DB 조회 방지. */
     private final AtomicReference<List<AiGlobalRule>> globalRulesCache = new AtomicReference<>(null);
     private volatile long globalRulesCachedAt = 0L;
+
+    /** 생성 설정 캐시 (5분 TTL). backend 라우팅용. */
+    private final AtomicReference<AiUserGenerationConfig> genConfigCache = new AtomicReference<>(null);
+    private volatile long genConfigCachedAt = 0L;
+    private static final long GEN_CONFIG_TTL_MS = 5 * 60 * 1000L;
+
+    private AiUserGenerationConfig getGenConfig() {
+        long now = System.currentTimeMillis();
+        if (genConfigCache.get() == null || now - genConfigCachedAt > GEN_CONFIG_TTL_MS) {
+            generationConfigRepository.findById(1).ifPresent(c -> {
+                genConfigCache.set(c);
+                genConfigCachedAt = now;
+            });
+        }
+        return genConfigCache.get();
+    }
+
+    private String backendFor(String actionType) {
+        AiUserGenerationConfig cfg = getGenConfig();
+        if (cfg == null) return "CLI";
+        return cfg.effectiveBackend(actionType);
+    }
     private static final long GLOBAL_RULES_TTL_MS = 5 * 60 * 1000L; // 5분
 
     public void execute(Persona persona, PlannedAction action) {
@@ -147,6 +172,7 @@ public class ActionExecutor {
             .correctionCautions(cautionsBlock(persona))
             .globalForbidRules(globalRulesBlock("COMMENT"))
             .correlationId(corrId)
+            .backend(backendFor("COMMENT"))
             .build());
 
         if (textOpt.isEmpty()) {
@@ -154,7 +180,7 @@ public class ActionExecutor {
             return;
         }
         String text = textOpt.get();
-        ContentSafetyGuard.GuardResult guard = safetyGuard.check(text);
+        ContentSafetyGuard.GuardResult guard = safetyGuard.check(text, ContentSafetyGuard.ContentType.COMMENT);
         if (!guard.passed()) {
             log.warn("Comment blocked for persona {} post {}: {}", persona.getId(), postId, guard.reason());
             logAction(persona, action, "BLOCKED", corrId, java.util.Map.of("reason", guard.reason(), "usedLlm", true));
@@ -204,7 +230,7 @@ public class ActionExecutor {
             return;
         }
         String text = textOpt.get();
-        ContentSafetyGuard.GuardResult guard = safetyGuard.check(text);
+        ContentSafetyGuard.GuardResult guard = safetyGuard.check(text, ContentSafetyGuard.ContentType.COMMENT);
         if (!guard.passed()) {
             logAction(persona, action, "BLOCKED", corrId, java.util.Map.of("reason", guard.reason(), "usedLlm", true));
             return;
@@ -256,6 +282,7 @@ public class ActionExecutor {
             .correctionCautions(cautionsBlock(persona))
             .globalForbidRules(globalRulesBlock("POST"))
             .correlationId(corrId)
+            .backend(backendFor("POST"))
             .build());
 
         if (bodyOpt.isEmpty()) {
@@ -265,7 +292,7 @@ public class ActionExecutor {
         String rawBody = bodyOpt.get();
         // 부수버그: LLM 메타텍스트 제거 (예: "[원문 수정본]", "[수정본]" 등)
         final String body = cleanLlmMetaText(rawBody);
-        ContentSafetyGuard.GuardResult guard = safetyGuard.check(body);
+        ContentSafetyGuard.GuardResult guard = safetyGuard.check(body, ContentSafetyGuard.ContentType.POST);
         if (!guard.passed()) {
             logAction(persona, action, "BLOCKED", corrId, java.util.Map.of("reason", guard.reason(), "usedLlm", true));
             return;

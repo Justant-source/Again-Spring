@@ -16,15 +16,63 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
 public class BackendBotClient {
 
     private final RestClient restClient;
+    /** 보조 백엔드 클라이언트 (Optional — 설정 없으면 null). */
+    private RestClient secondaryClient;
+    /** 보조 백엔드 JWT 캐시. key = email */
+    private final ConcurrentHashMap<String, String> secondaryTokenCache = new ConcurrentHashMap<>();
 
-    public BackendBotClient(@Qualifier("backendRestClient") RestClient restClient) {
+    public BackendBotClient(
+            @Qualifier("backendRestClient") RestClient restClient,
+            @Qualifier("secondaryBackendRestClient") Optional<RestClient> secondary) {
         this.restClient = restClient;
+        secondary.ifPresent(c -> {
+            this.secondaryClient = c;
+            log.info("BackendBotClient: 보조 백엔드 활성화됨");
+        });
+    }
+
+    // ── 보조 백엔드 토큰 획득 ──────────────────────────────────────────────
+    private Optional<String> getSecondaryJwt(String email, String password) {
+        String cached = secondaryTokenCache.get(email);
+        if (cached != null) return Optional.of(cached);
+        return loginWithClient(secondaryClient, email, password).map(t -> {
+            secondaryTokenCache.put(email, t);
+            return t;
+        });
+    }
+
+    private Optional<String> loginWithClient(RestClient client, String email, String password) {
+        try {
+            LoginDto.Response resp = client.post()
+                .uri("/api/auth/login")
+                .body(LoginDto.Request.builder().email(email).password(password).build())
+                .retrieve()
+                .body(LoginDto.Response.class);
+            if (resp != null && resp.getToken() != null) return Optional.ofNullable(resp.getToken().getAccessToken());
+        } catch (Exception e) {
+            log.debug("Secondary login failed for {}: {}", email, e.getMessage());
+        }
+        return Optional.empty();
+    }
+
+    /** 보조 백엔드에 fire-and-forget 미러링 */
+    private void mirrorAsync(String email, String password, Runnable secondaryAction) {
+        if (secondaryClient == null) return;
+        CompletableFuture.runAsync(() -> {
+            try {
+                secondaryAction.run();
+            } catch (Exception e) {
+                log.debug("Secondary mirror failed: {}", e.getMessage());
+            }
+        });
     }
 
     /** Login and get JWT token */
@@ -58,8 +106,12 @@ public class BackendBotClient {
         }
     }
 
-    /** Create a post (auth required) */
+    /** Create a post (auth required). email+password 제공 시 보조 백엔드에도 미러링. */
     public Optional<PostDto> createPost(String jwt, CreatePostDto req) {
+        return createPost(jwt, req, null, null);
+    }
+
+    public Optional<PostDto> createPost(String jwt, CreatePostDto req, String email, String password) {
         try {
             PostDto result = restClient.post()
                 .uri("/api/community/posts")
@@ -67,6 +119,21 @@ public class BackendBotClient {
                 .body(req)
                 .retrieve()
                 .body(PostDto.class);
+            // 미러링 (보조 백엔드)
+            if (email != null && password != null) {
+                mirrorAsync(email, password, () ->
+                    getSecondaryJwt(email, password).ifPresent(secJwt -> {
+                        try {
+                            secondaryClient.post().uri("/api/community/posts")
+                                .header("Authorization", "Bearer " + secJwt).body(req)
+                                .retrieve().toBodilessEntity();
+                            log.debug("Secondary createPost OK for {}", email);
+                        } catch (Exception ex) {
+                            log.debug("Secondary createPost failed: {}", ex.getMessage());
+                            secondaryTokenCache.remove(email); // 토큰 만료 시 재로그인
+                        }
+                    }));
+            }
             return Optional.ofNullable(result);
         } catch (Exception e) {
             log.error("Create post failed: {}", e.getMessage());
@@ -99,12 +166,22 @@ public class BackendBotClient {
 
     /** Like a post */
     public boolean likePost(String jwt, String postId) {
+        return likePost(jwt, postId, null, null);
+    }
+
+    public boolean likePost(String jwt, String postId, String email, String password) {
         try {
-            restClient.post()
-                .uri("/api/community/posts/{postId}/like", postId)
-                .header("Authorization", "Bearer " + jwt)
-                .retrieve()
-                .toBodilessEntity();
+            restClient.post().uri("/api/community/posts/{postId}/like", postId)
+                .header("Authorization", "Bearer " + jwt).retrieve().toBodilessEntity();
+            if (email != null && password != null) {
+                mirrorAsync(email, password, () ->
+                    getSecondaryJwt(email, password).ifPresent(secJwt -> {
+                        try {
+                            secondaryClient.post().uri("/api/community/posts/{postId}/like", postId)
+                                .header("Authorization", "Bearer " + secJwt).retrieve().toBodilessEntity();
+                        } catch (Exception ex) { secondaryTokenCache.remove(email); }
+                    }));
+            }
             return true;
         } catch (Exception e) {
             log.warn("Like failed on post {}: {}", postId, e.getMessage());
@@ -114,13 +191,28 @@ public class BackendBotClient {
 
     /** Add comment or reply (parentCommentId=null for top-level) */
     public boolean addComment(String jwt, String postId, String body, Long parentCommentId) {
+        return addComment(jwt, postId, body, parentCommentId, null, null);
+    }
+
+    public boolean addComment(String jwt, String postId, String commentBody, Long parentCommentId,
+                              String email, String password) {
+        var dto = CreateCommentDto.builder().body(commentBody).parentCommentId(parentCommentId).build();
         try {
-            restClient.post()
-                .uri("/api/community/posts/{postId}/comments", postId)
-                .header("Authorization", "Bearer " + jwt)
-                .body(CreateCommentDto.builder().body(body).parentCommentId(parentCommentId).build())
-                .retrieve()
-                .toBodilessEntity();
+            restClient.post().uri("/api/community/posts/{postId}/comments", postId)
+                .header("Authorization", "Bearer " + jwt).body(dto)
+                .retrieve().toBodilessEntity();
+            if (email != null && password != null) {
+                mirrorAsync(email, password, () ->
+                    getSecondaryJwt(email, password).ifPresent(secJwt -> {
+                        try {
+                            secondaryClient.post().uri("/api/community/posts/{postId}/comments", postId)
+                                .header("Authorization", "Bearer " + secJwt).body(dto)
+                                .retrieve().toBodilessEntity();
+                        } catch (Exception ex) {
+                            secondaryTokenCache.remove(email);
+                        }
+                    }));
+            }
             return true;
         } catch (Exception e) {
             log.warn("Comment failed on post {}: {}", postId, e.getMessage());

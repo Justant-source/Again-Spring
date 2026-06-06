@@ -126,17 +126,29 @@ public class AiUserSeedLoader {
             // Load voice.yml from sibling path
             Map<String, Object> voiceData = loadSiblingVoice(profileDir, id, yaml);
 
-            // Insert user
+            // Insert user — synthetic=1 컬럼 포함 (V59 이후 스키마 기준)
+            // V59 미적용 시 synthetic 컬럼 없어 예외 발생 → catch에서 무시하지 않고
+            // markSyntheticFlag()가 boot 시 자가치유하므로 INSERT IGNORE로 안전하게 진행.
             try {
                 jdbcTemplate.update(
                     "INSERT IGNORE INTO users (id, email, password_hash, nickname, roles, " +
-                    "is_guest, must_change_password, created_at, updated_at) " +
-                    "VALUES (?, ?, ?, ?, '[\"USER\"]', 0, 0, ?, ?)",
+                    "is_guest, must_change_password, synthetic, created_at, updated_at) " +
+                    "VALUES (?, ?, ?, ?, '[\"USER\"]', 0, 0, 1, ?, ?)",
                     id, email, hashedPassword, nickname, now, now);
                 userCount++;
             } catch (Exception e) {
-                log.error("Failed to insert user {}: {}", email, e.getMessage());
-                continue;
+                // synthetic 컬럼 없는 경우(V59 미적용) — 컬럼 없이 재시도
+                try {
+                    jdbcTemplate.update(
+                        "INSERT IGNORE INTO users (id, email, password_hash, nickname, roles, " +
+                        "is_guest, must_change_password, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, ?, '[\"USER\"]', 0, 0, ?, ?)",
+                        id, email, hashedPassword, nickname, now, now);
+                    userCount++;
+                } catch (Exception e2) {
+                    log.error("Failed to insert user {}: {}", email, e2.getMessage());
+                    continue;
+                }
             }
 
             // Build and insert Persona
@@ -318,10 +330,15 @@ public class AiUserSeedLoader {
     }
 
     private void markSyntheticFlag() {
+        // 자가치유 업데이트: .internal 도메인 + personas 테이블 기준 (도메인 불문 안전)
+        // synthetic=0 또는 NULL인 봇 계정만 업데이트해 멱등성 보장.
         try {
             int updated = jdbcTemplate.update(
-                "UPDATE users SET synthetic = 1 WHERE email LIKE 'ai-user%@againspring.com'");
-            if (updated > 0) log.info("Marked {} users as synthetic=1", updated);
+                "UPDATE users SET synthetic = 1 " +
+                "WHERE (synthetic = 0 OR synthetic IS NULL) " +
+                "  AND (email LIKE 'ai-user-%@againspring.internal' " +
+                "       OR id IN (SELECT id FROM personas))");
+            if (updated > 0) log.info("markSyntheticFlag: {} users marked as synthetic=1", updated);
         } catch (Exception e) {
             log.debug("synthetic column not available yet (V59 pending): {}", e.getMessage());
         }

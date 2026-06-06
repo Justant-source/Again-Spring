@@ -1,9 +1,9 @@
 # AI User Orchestrator Service 상세 문서
 
-**최종 수정**: 2026-06-05 (voice profile 3필드 주입 + formality 교정)
+**최종 수정**: 2026-06-06  
 **버전**: Spring Boot 3.3 · MariaDB 11  
 **포트**: 8096  
-**역할**: AI 페르소나 100명 관리, 10분 tick 스케줄, 자동 행동 결정·실행
+**역할**: AI 페르소나 관리, 10분 tick 스케줄, 자동 행동 결정·실행
 
 ---
 
@@ -13,10 +13,11 @@
 
 **AI User Orchestrator**는 다시봄 커뮤니티 플랫폼의 AI 봇 시스템입니다. 다음을 담당합니다:
 
-- **페르소나 관리**: 100명의 AI 봇 페르소나 생성·유지·활성화 관리
+- **페르소나 관리**: 기본 10명의 AI 봇 페르소나 생성·유지·활성화 관리
 - **행동 자동화**: 10분 주기 tick을 통한 자동 행동 스케줄(좋아요, 투표, 댓글, 대댓글, 게시물)
 - **품질 제어**: LLM 생성 텍스트의 안전성 검사, 금지어 필터링
 - **데이터 추적**: 모든 행동의 로그·히스토리 기록, AI Learning 모듈과 연동
+- **Synthetic 식별**: `users.synthetic=1` 기반 봇 식별 (backend V59)
 
 ### 기술 스택
 
@@ -28,7 +29,7 @@
 | **LLM 통신** | HTTP POST → `againspring-llm-ai-user:8092` |
 | **백엔드 연동** | REST → `againspring-backend-dev:8080` |
 | **스케줄링** | Spring @Scheduled (cron) |
-| **동시성** | ThreadPoolExecutor (고급: ActionExecutor는 별도 관리) |
+| **동시성** | ThreadPoolExecutor (Jitter: 4개 스레드) |
 
 ### 포트 및 엔드포인트
 
@@ -37,7 +38,7 @@
 
 헬스 체크:
   GET /api/health
-
+  
 관리 엔드포인트:
   GET /actuator/health/details
 ```
@@ -46,16 +47,16 @@
 
 ```yaml
 ai-user:
-  enabled: ${AI_USER_ENABLED:false}              # 마스터 kill-switch
-  tick-cron: ${AI_USER_TICK_CRON:"0 */10 * * * *"}  # 10분 주기
+  enabled: ${AI_USER_ENABLED:false}                # 마스터 kill-switch
+  tick-cron: ${AI_USER_TICK_CRON:"0 */10 * * * *"} # 10분 주기
   daily-global-cap: ${AI_USER_DAILY_GLOBAL_CAP:200}  # 일일 행동 상한
-  bot-password: ${AI_USER_BOT_PASSWORD:...}     # 봇 인증 암호
+  bot-password: ${AI_USER_BOT_PASSWORD:...}        # 봇 인증 암호
   backend-base-url: http://againspring-backend-dev:8080
   llm-ai-user-url: http://againspring-llm-ai-user:8092
-  history-dir: /app/persona-history             # 행동 히스토리 저장
-  personas-dir: /app/personas                    # 페르소나 프로필 템플릿
+  persona-target: 10                               # 목표 페르소나 수
+  personas-dir: /app/personas                      # 페르소나 프로필 마운트
   seed:
-    enabled: true                                # 부트업 시 시드 실행 여부
+    enabled: true                                  # 부트업 시 시드 실행
 ```
 
 ---
@@ -102,7 +103,6 @@ classDiagram
     class Jitter {
         -ScheduledExecutorService scheduler
         +scheduleWithinTick() void
-        +scheduleReplyWithDelay() void
     }
     
     class ActionExecutor {
@@ -118,6 +118,12 @@ classDiagram
         +check() GuardResult
     }
     
+    class AiUserIdentity {
+        +SYNTHETIC_PREDICATE: String
+        +REAL_USER_PREDICATE: String
+        +REAL_USER_AUTHOR_CONDITION: String
+    }
+    
     OrchestratorScheduler --> BehaviorEngine
     BehaviorEngine --> VolumeQuotaCalculator
     BehaviorEngine --> PersonaSelector
@@ -128,6 +134,7 @@ classDiagram
     ActionExecutor --> BackendBotClient
     ActionExecutor --> LlmAiUserClient
     ActionExecutor --> AiLearningClient
+    BehaviorEngine -.-> AiUserIdentity
 ```
 
 ### 컴포넌트 역할
@@ -142,6 +149,7 @@ classDiagram
 | **Jitter** | 0~600ms 분산 지연 추가 (봇 탐지 회피) |
 | **ActionExecutor** | 계획된 행동 실행 (LLM 호출·안전 검사·REST 제출·로그) |
 | **ContentSafetyGuard** | LLM 생성 텍스트 검증 (금지어·위험 표현 필터) |
+| **AiUserIdentity** | 봇 식별 SQL 술어 (synthetic=1 기반) |
 
 ---
 
@@ -218,7 +226,7 @@ flowchart TD
 6. **대댓글 타겟 스캔**: InteractionScanner가 미응답 댓글 발굴
 7. **활성 페르소나 조회**: `persona.active=true`인 페르소나만
 8. **페르소나 선택 루프** (최대 `budget × 3`회 시도):
-   - 쿨다운 체크 (20분 미만이면 스킵)
+   - 쿨다운 체크 (20~90분 선형 감쇠)
    - 행동 계획 수립
    - Jitter로 분산 지연 실행
 9. **Runtime 업데이트**: `actionsToday` 카운터 증가
@@ -253,7 +261,6 @@ if (canReply && rand < 0.15) {
 
 #### LIKE (45%)
 ```java
-// 누적 rand 추적
 cumul += hasFeed ? 0.45 : 0;
 if (rand < cumul && hasFeed) {
     PostDto post = pickByAffinity(persona, unseen);
@@ -287,14 +294,7 @@ if (rand < cumul && hasFeed) {
 }
 ```
 - **조건**: 미방문 포스트 존재
-- **실행 단계**:
-  1. affinity 가중치로 포스트 선택
-  2. stance 결정 (pickStanceWeighted)
-  3. 기존 댓글 조회 (GET /api/community/posts/{id}/comments)
-  4. LLM 호출 (voice profile + 댓글 예시 + 기존 댓글 맥락)
-  5. ContentSafetyGuard 검증
-  6. REST 제출
-  7. AI Learning에 성공 사례 저장
+- **실행**: LLM 호출 후 안전 검사 후 제출
 
 #### POST (5%)
 ```java
@@ -426,35 +426,36 @@ sequenceDiagram
     participant Factory as PersonaFactory
     
     Spring->>Seed: seed()
-    Seed->>DB: SELECT COUNT(*)<br/>WHERE email='ai-user-001@...'
+    Seed->>DB: SELECT COUNT(*)<br/>WHERE email LIKE<br/>'ai-user-*@...'
     DB-->>Seed: count
     
     alt 이미 시드됨
         Seed->>Seed: markSyntheticFlag()
-        Seed->>Factory: ensureCount(100)
+        Seed->>Seed: "UPDATE users SET<br/>synthetic=1<br/>OR id IN (personas)"
+        Seed->>Factory: ensureCount(10)
         Factory->>DB: SELECT COUNT(*)<br/>FROM personas
         DB-->>Factory: current_count
         alt current < target
             Factory->>LLM: POST /generate/persona
-            LLM-->>Factory: voice_profile JSON (lexicon+writing_quirks+hot_buttons)
-            Factory->>DB: INSERT INTO users<br/>INSERT INTO personas
+            LLM-->>Factory: voice_profile JSON
+            Factory->>DB: INSERT INTO users
+            Factory->>DB: INSERT INTO personas
         end
     else 첫 시드
         Seed->>Seed: loadAndInsert()
-        Seed->>Seed: Scan /app/personas/profiles/ai-user-001~100/
-        loop 각 profile.yml + voice.yml
-            Seed->>Seed: 파일 로드 (lexicon/writing_quirks/hot_buttons)
+        Seed->>Seed: Scan /app/personas/profiles/
+        loop 각 profile.yml
             Seed->>DB: INSERT INTO users
             Seed->>DB: INSERT INTO personas
         end
         Seed->>Seed: seedRelationships()
-        Seed->>Factory: ensureCount(100)
+        Seed->>Factory: ensureCount(10)
     end
 ```
 
 ### PersonaFactory.ensureCount(target)
 
-**목표**: 현재 페르소나 수 < target이면 부족분을 LLM으로 생성
+**목표**: 현재 페르소나 수 < target(기본 10)이면 부족분을 LLM으로 생성
 
 ```java
 public void ensureCount(int target) {
@@ -463,9 +464,6 @@ public void ensureCount(int target) {
         log.info("already {} personas (target={}), skip", current, target);
         return;
     }
-    
-    // 나이-직업 정합성 확인: coerceJobToAge()
-    String coercedJob = coerceJobToAge(age, job);  // 10대=학생, 60대=은퇴자/자영업자/주부
     
     int needed = (int)(target - current);
     int created = 0;
@@ -520,7 +518,7 @@ private boolean generateOne() throws Exception {
     Map<String, Object> voiceMap = parseVoiceJson(result.get());
     Persona p = new Persona();
     p.setId(uuid());
-    p.setArchetype("generated");  // 또는 분류된 archetype
+    p.setArchetype("generated");
     p.setTier(tier);
     p.setVoiceProfile(voiceMap);
     p.setInterests(generateInterests(politics, region, job));
@@ -533,22 +531,27 @@ private boolean generateOne() throws Exception {
 }
 ```
 
-**2026-06-05 Formality 교정**:
+### Synthetic 식별 및 자가 치유
 
-기존: 전체 ~40% 존댓말 (과다) → 신규: ~20-30% 존댓말 (자연스러움)
+**AiUserIdentity.java**: 봇 식별 SQL 술어 통합 관리
 
+```java
+public final class AiUserIdentity {
+    /** WHERE 절: 봇 계정 (synthetic=1) */
+    public static final String SYNTHETIC_PREDICATE = "synthetic = 1";
+    
+    /** WHERE 절: 실유저 계정 */
+    public static final String REAL_USER_PREDICATE = "(synthetic = 0 OR synthetic IS NULL)";
+    
+    /** NOT IN 조건: 봇 저자 제외 (InteractionScanner 등에서 사용) */
+    public static final String REAL_USER_AUTHOR_CONDITION = "(synthetic = 0 OR synthetic IS NULL)";
+}
 ```
-formality 판정 로직 (PersonaFactory):
-┌─ CLIEN             → "polite" (논리적/정중한 voice)
-├─ NATEPAN          → 50% "polite", 50% "casual" (혼용)
-└─ 나머지            → slang < 0.25일 때만 "polite", 아니면 "casual"
-                      (기존 0.4 → 0.25로 임계값 낮춤)
 
-결과:
-- slang 자체가 낮은 Voice (BLIND, CLIEN, MLBPARK 등)만 polite 우세
-- THEQOO, INVEN, RULIWEB 등 혼용 Voice는 casual 우세
-- 생성된 예시 문장도 "반말 기본" 지시 추가
-```
+**markSyntheticFlag()** (AiUserSeedLoader):
+- 기존 앵커 15명에 `synthetic=1` INSERT 시 포함
+- `.internal` 이메일 패턴 + persona 멤버 자동 감지
+- V59 이전 데이터도 fallback 처리
 
 ### 다양성 매트릭스
 
@@ -562,80 +565,12 @@ formality 판정 로직 (PersonaFactory):
 | 직업 | 직장인, 주부, 학생, 자영업자, 프리랜서, 무직 | 6 |
 | Tier (분포) | REGULAR×2, LIGHT, HEAVY | 4 (가중) |
 
-### 프로필 로딩 구조 (100명 페르소나)
+### 페르소나 타겟
 
 ```
-/app/personas/profiles/
-├── ai-user-001/           (앵커 15명)
-│   ├── profile.yml
-│   ├── voice.yml
-│   └── history/README.md
-├── ai-user-002/
-│   ├── profile.yml
-│   └── voice.yml
-...
-├── ai-user-050/           (신규 50명, LLM 생성)
-│   ├── profile.yml
-│   └── voice.yml
-└── ai-user-100/
-    ├── profile.yml
-    └── voice.yml
-```
-
-#### profile.yml 스키마
-```yaml
-id: ai-user-001
-email: ai-user-001@againspring.internal
-nickname: "사용자1"
-archetype: "conservative_elderly"
-tier: REGULAR
-```
-
-#### voice.yml 스키마 (신규 필드 포함)
-```yaml
-speaking_style: "존댓글 선호"
-like_score: 0.35
-vote_score: 0.25
-emotional_temp: 0.4
-interests:
-  정치: 0.9
-  관계: 0.3
-  일: 0.2
-bias_profile:
-  정치: 0.8
-  관계: -0.2
-circadian:
-  - 0.0   # hour 0
-  - 0.0   # hour 1
-  ... (24 values)
-  - 0.2   # hour 23
-slang_level: 0.15
-daily_target: 5
-
-# Phase 3 신규 필드
-lexicon:
-  signature_phrases:
-    - "솔직히 말해서"
-    - "어라 이상한데?"
-  typing_habit:
-    - "ㅋㅋ로 웃음"
-    - "문장 끝에 물음표 다중"
-
-writing_quirks:
-  spelling_level: "high"  # high/medium/low
-  consistent_errors:
-    - "싶다" → "싶음"
-    - "있었다" → "있었어"
-  mobile_typos: 0.05  # 5% 오타율
-
-hot_buttons:
-  triggers:
-    - "페미니즘"
-    - "이념 공격"
-  soft_spots:
-    - "가족 이야기에 약함"
-  upvote_when:
-    - "전통 가치 칭찬"
+기본값: 10명
+환경변수: AI_USER_PERSONA_TARGET
+설정: OrchestratorProperties.personaTarget
 ```
 
 ---
@@ -646,15 +581,15 @@ hot_buttons:
 
 ```sql
 CREATE TABLE personas (
-    id VARCHAR(32) PRIMARY KEY,                -- users.id 참조
-    archetype VARCHAR(64) NOT NULL,            -- "conservative_elderly", "progressive_urban", etc.
+    id VARCHAR(32) PRIMARY KEY,                -- users.id 참조 (관례적)
+    archetype VARCHAR(64) NOT NULL,            -- "conservative_elderly", etc.
     tier VARCHAR(16) NOT NULL,                 -- HEAVY/REGULAR/LIGHT/DORMANT
     voice_profile JSON NOT NULL,               -- { "speaking_style": "...", "like_score": 0.6, ... }
     interests JSON NOT NULL,                   -- { "정치": 0.8, "관계": 0.5, ... }
     bias_profile JSON NOT NULL,                -- { "정치": 0.9, "관계": -0.3, ... }
     circadian JSON NOT NULL,                   -- [0.0, 0.0, ..., 0.9, 0.2] (24 시간)
     slang_level DECIMAL(3,2) NOT NULL,        -- 0.00~1.00
-    daily_target INT NOT NULL DEFAULT 6,      -- 일일 목표 행동 수
+    daily_target INT NOT NULL DEFAULT 6,      -- (현재 미사용)
     active BOOLEAN NOT NULL DEFAULT true,     -- 활성/비활성
     created_at TIMESTAMP NOT NULL,
     
@@ -669,9 +604,9 @@ CREATE TABLE personas (
 CREATE TABLE persona_action_log (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     persona_id VARCHAR(32) NOT NULL,           -- personas.id 참조
-    action_type VARCHAR(16) NOT NULL,          -- LIKE/VOTE/COMMENT/REPLY/POST/INVITE_ANSWER
+    action_type VARCHAR(16) NOT NULL,          -- LIKE/VOTE/COMMENT/REPLY/POST
     target_type VARCHAR(16),                   -- POST or COMMENT
-    target_id VARCHAR(64),                     -- 포스트 ID (VARCHAR(32)) 또는 댓글 ID (BIGINT)
+    target_id VARCHAR(64),                     -- 포스트 ID 또는 댓글 ID
     used_llm BOOLEAN NOT NULL DEFAULT false,   -- LLM 사용 여부
     status VARCHAR(16) NOT NULL DEFAULT "POSTED",  -- PLANNED/GENERATING/POSTED/FAILED/BLOCKED
     correlation_id VARCHAR(64),                -- 추적용 UUID
@@ -712,6 +647,8 @@ CREATE TABLE persona_action_log (
 CREATE TABLE persona_seen_posts (
     persona_id VARCHAR(32) NOT NULL,
     post_id VARCHAR(32) NOT NULL,
+    seen_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    acted BIT(1) NOT NULL DEFAULT 0,
     PRIMARY KEY (persona_id, post_id),
     FOREIGN KEY (persona_id) REFERENCES personas(id)
 );
@@ -745,13 +682,11 @@ id=1, enabled=false, daily_global_cap=200, actions_today=0, day_bucket=2026-06-0
 stateDiagram-v2
     [*] --> PLANNED
     PLANNED --> GENERATING
-    GENERATING --> POSTING
-    POSTING --> POSTED
-    POSTING --> FAILED
+    GENERATING --> POSTED
     GENERATING --> BLOCKED
+    POSTED --> [*]
     BLOCKED --> [*]
     FAILED --> [*]
-    POSTED --> [*]
 ```
 
 ---
@@ -772,7 +707,7 @@ execute(persona, action)
 │  ├─ REPLY → executeReply()
 │  └─ POST → executePost()
 └─ 3. 로그 기록 (personaActionLog)
-   └─ 4. 히스토리 파일 저장 (optional, COMMENT/REPLY/POST만)
+   └─ 4. 히스토리 파일 저장 (COMMENT/REPLY/POST만)
 ```
 
 ### JWT 획득 (BotTokenCache)
@@ -787,7 +722,7 @@ Optional<String> jwtOpt = tokenCache.getToken(persona.getId(), email, botPasswor
 
 ### Voice Profile 블록 주입 (Phase 3 강화: writing_quirks, lexicon, hot_buttons)
 
-**2026-06-05 변경사항**: 기존에 DB에서 로딩되지만 **프롬프트에 주입되지 않던** voice_profile의 3개 필드가 이제 활성화되었습니다:
+**2026-06-05 변경사항**: voice_profile의 3개 필드가 프롬프트에 활성 주입됩니다:
 
 - **writing_quirks** (consistent_errors, mobile_typos): 고정 맞춤법 오류 패턴 및 모바일 오타 여부
 - **lexicon** (signature_phrases, typing_habit): 페르소나가 자주 쓰는 표현과 타이핑 습관
@@ -862,15 +797,15 @@ private void executeVote(Persona persona, PlannedAction action, String jwt, Stri
 }
 ```
 
-#### executeComment() — Phase 4 (고급)
+#### executeComment() — Phase 4
 
 **단계**:
 1. 기존 댓글 조회: GET `/api/community/posts/{id}/comments`
 2. Archetype 샘플 코드 조합
 3. Voice profile 블록 생성 (writing_quirks, lexicon, hot_buttons 주입 포함)
 4. RAG 검색: AiLearningClient.findSimilar()
-5. LLM 호출: POST `/v1/invoke` (llmAiUserClient)
-6. 안전 검사: ContentSafetyGuard.check()
+5. LLM 호출: POST `/v1/invoke`
+6. 안전 검사: ContentSafetyGuard.check(text, ContentType.COMMENT)
 7. 댓글 제출: POST `/api/s/{postId}/comment`
 8. 히스토리 저장: `/app/persona-history/comments/{personaId}`
 9. AI Learning 저장: 성공한 예시 뱅크에 기록
@@ -878,43 +813,17 @@ private void executeVote(Persona persona, PlannedAction action, String jwt, Stri
 ```java
 private void executeComment(Persona persona, PlannedAction action, String jwt, String corrId) {
     String postId = action.targetPost().getId();
-    String postTitle = action.targetPost().getUserTitle();
-    String postExcerpt = truncate(action.targetPost().getBodyPublished(), 300);
-    
-    // Phase 2: stance 선택
     String stance = pickStanceWeighted(persona, action.targetPost());
     
     // Phase 4a: 기존 댓글 조회
     String existingComments = fetchExistingComments(postId);
-    
-    // Phase 2d: archetype 샘플
-    String archetypeCommentSamples = buildArchetypeCommentSamples(persona, action.targetPost());
-    
-    // Phase 3: 인구통계
-    String demographic = demographicStr(persona);
-    
-    // RAG: 동적 예시 검색
-    List<AiLearningClient.ExampleItem> examples = aiLearningClient.findSimilar(
-        postExcerpt, "COMMENT", action.targetPost().getCategory(), 3);
-    String dynamicExamples = examples.stream()
-        .map(ExampleItem::getContent)
-        .collect(joining("\n---\n"));
     
     // LLM 호출
     Optional<String> textOpt = llmClient.generateComment(GenDto.CommentRequest.builder()
         .personaId(persona.getId())
         .voiceProfile(voiceBlockForComment(persona, stance))
         .slangLevel(persona.getSlangLevel().doubleValue())
-        .postTitle(postTitle)
-        .postBodyExcerpt(postExcerpt)
-        .stance(stance)
-        .category(action.targetPost().getCategory())
-        .formality(voiceFormality(persona))
-        .demographic(demographic)
-        .archetypeCommentSamples(archetypeCommentSamples)
-        .existingComments(existingComments)
-        .dynamicExamples(dynamicExamples)
-        .correlationId(corrId)
+        // ... 기타 필드
         .build());
     
     if (textOpt.isEmpty()) {
@@ -924,8 +833,8 @@ private void executeComment(Persona persona, PlannedAction action, String jwt, S
     
     String text = textOpt.get();
     
-    // 안전 검사
-    ContentSafetyGuard.GuardResult guard = safetyGuard.check(text);
+    // 안전 검사 — ContentType.COMMENT (최대 350자)
+    ContentSafetyGuard.GuardResult guard = safetyGuard.check(text, ContentType.COMMENT);
     if (!guard.passed()) {
         log.warn("Comment blocked: {}", guard.reason());
         logAction(persona, action, "BLOCKED", corrId, Map.of("reason", guard.reason(), "usedLlm", true));
@@ -938,10 +847,7 @@ private void executeComment(Persona persona, PlannedAction action, String jwt, S
     
     if (ok) {
         writeHistory(persona.getId(), "comments", text, postId, null);
-        
-        // AI Learning 저장
-        aiLearningClient.saveAsync(text, "COMMENT",
-            action.targetPost().getCategory(), "SELF_GENERATED");
+        aiLearningClient.saveAsync(text, "COMMENT", action.targetPost().getCategory(), "SELF_GENERATED");
     }
     
     logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
@@ -949,41 +855,20 @@ private void executeComment(Persona persona, PlannedAction action, String jwt, S
 }
 ```
 
-### LLM 메타 텍스트 자동 제거 (Post 후처리)
-
-**2026-06-05 새기능**: executePost()에서 LLM이 자발 생성한 메타텍스트를 글 본문에서 제거합니다.
-
-```
-제거 대상 패턴:
-- "[원문 수정본]", "[수정본]", "[제목]", "[본문]" 등 대괄호 선두 라인
-- "수정본:", "원문:", "제목:", "본문:" 접두사
-- 동시에 extractTitle()이 메타 라인을 건너뛰고 첫 실제 문장을 제목으로 사용
-
-효과: 글 발행 시 깔끔한 콘텐츠만 노출 (사용자 혼란 방지)
-```
-
 #### executeReply() — Phase 4b
 
 ```java
 private void executeReply(Persona persona, PlannedAction action, String jwt, String corrId) {
     String postId = action.targetPost().getId();
-    String stance = pickReplyStance(persona);  // CURIOUS 고정 제거
+    String stance = pickReplyStance(persona);
     
-    String postBodyExcerpt = action.targetPost().getBodyPublished();
-    String siblingComments = action.siblingComments();
-    
+    // LLM 호출
     Optional<String> textOpt = llmClient.generateReply(GenDto.ReplyRequest.builder()
         .personaId(persona.getId())
         .voiceProfile(voiceBlockForReply(persona))
         .slangLevel(persona.getSlangLevel().doubleValue())
         .parentCommentExcerpt(action.parentCommentExcerpt())
-        .threadContext(action.threadContext())
-        .stance(stance)
-        .formality(voiceFormality(persona))
-        .demographic(demographicStr(persona))
-        .postBodyExcerpt(postBodyExcerpt)
-        .siblingComments(siblingComments)
-        .correlationId(corrId)
+        // ... 기타 필드
         .build());
     
     if (textOpt.isEmpty()) {
@@ -992,7 +877,9 @@ private void executeReply(Persona persona, PlannedAction action, String jwt, Str
     }
     
     String text = textOpt.get();
-    ContentSafetyGuard.GuardResult guard = safetyGuard.check(text);
+    
+    // 안전 검사 — ContentType.COMMENT (최대 350자)
+    ContentSafetyGuard.GuardResult guard = safetyGuard.check(text, ContentType.COMMENT);
     if (!guard.passed()) {
         logAction(persona, action, "BLOCKED", corrId, Map.of("reason", guard.reason(), "usedLlm", true));
         return;
@@ -1008,39 +895,123 @@ private void executeReply(Persona persona, PlannedAction action, String jwt, Str
 }
 ```
 
+#### executePost()
+
+```java
+private void executePost(Persona persona, String jwt, String corrId) {
+    // LLM 호출: 제목 + 본문 생성
+    Optional<String> resultOpt = llmClient.generatePost(...);
+    
+    if (resultOpt.isEmpty()) {
+        logAction(persona, action, "FAILED", corrId, Map.of("error", "gen_failed"));
+        return;
+    }
+    
+    String result = resultOpt.get();
+    
+    // LLM 메타텍스트 제거
+    String[] parts = extractTitleAndBody(result);  // "[원문 수정본]" 등 제거
+    String title = parts[0];
+    String body = parts[1];
+    
+    // 안전 검사 — ContentType.POST (최대 2200자)
+    ContentSafetyGuard.GuardResult guardTitle = safetyGuard.check(title, ContentType.POST);
+    ContentSafetyGuard.GuardResult guardBody = safetyGuard.check(body, ContentType.POST);
+    if (!guardTitle.passed() || !guardBody.passed()) {
+        logAction(persona, action, "BLOCKED", corrId, Map.of("reason", "guard_failed", "usedLlm", true));
+        return;
+    }
+    
+    // 제출
+    boolean ok = backendBot.createPost(jwt, title, body, ...);
+    
+    if (ok) {
+        writeHistory(persona.getId(), "posts", body, null, null);
+        aiLearningClient.saveAsync(body, "POST", "OTHER", "SELF_GENERATED");
+    }
+    
+    logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
+        Map.of("len", body.length(), "usedLlm", true));
+}
+```
+
 ---
 
 ## 9. ContentSafetyGuard 검사
 
-모든 LLM 생성 텍스트는 다음 항목을 검증합니다:
+모든 LLM 생성 텍스트는 다음 항목을 검증합니다.
+
+### API 인터페이스
 
 ```java
-public GuardResult check(String text) {
-    // 1. 금지어 목록 (shared/docs/policies/forbidden-words.md)
-    if (hasForbiddenWords(text)) {
-        return new GuardResult(false, "forbidden_words");
+public GuardResult check(String text, ContentType type)
+```
+
+**ContentType**:
+- `POST`: 새 게시물 (최대 2200자)
+- `COMMENT`: 댓글 또는 대댓글 (최대 350자)
+
+### 검사 항목 (5가지)
+
+```java
+public GuardResult check(String text, ContentType type) {
+    // 1. 빈 문자열 확인
+    if (text == null || text.isBlank()) {
+        return GuardResult.blocked("EMPTY_TEXT");
     }
     
-    // 2. 판결/처방 표현 (오판이라는 착각 방지)
-    if (hasJudgmentLanguage(text)) {
-        return new GuardResult(false, "judgment_language");
+    // 2. 최소 길이 (5자)
+    if (text.length() < MIN_LENGTH) {  // MIN_LENGTH = 5
+        return GuardResult.blocked("TOO_SHORT");
     }
     
-    // 3. 길이 범위
-    if (text.length() < 10 || text.length() > 2000) {
-        return new GuardResult(false, "length_invalid");
+    // 3. 타입별 최대 길이
+    int maxLen = (type == ContentType.POST) ? MAX_LEN_POST : MAX_LEN_COMMENT;
+    // MAX_LEN_POST = 2200, MAX_LEN_COMMENT = 350
+    if (text.length() > maxLen) {
+        return GuardResult.blocked("TOO_LONG: " + text.length());
+    }
+
+    // 4. PII 검사 (전화번호, 주민등록번호, 이메일, 주소 등)
+    for (Pattern p : PII_PATTERNS) {
+        if (p.matcher(text).find()) {
+            log.warn("ContentSafetyGuard: PII pattern matched");
+            return GuardResult.blocked("PII_DETECTED");
+        }
+    }
+
+    // 5. 위기 키워드 (자살, 자해 등)
+    for (String kw : CRISIS_KEYWORDS) {
+        if (text.contains(kw)) {
+            log.warn("ContentSafetyGuard: crisis keyword detected");
+            return GuardResult.blocked("CRISIS_KEYWORD");
+        }
     }
     
-    // 4. Crisis 감지 (극단 표현)
-    if (crisisGuard.detect(text)) {
-        return new GuardResult(false, "crisis_content");
+    // 6. 혐오 키워드
+    for (String kw : HATE_KEYWORDS) {
+        if (text.contains(kw)) {
+            log.warn("ContentSafetyGuard: hate keyword detected");
+            return GuardResult.blocked("HATE_KEYWORD");
+        }
     }
-    
-    return new GuardResult(true, null);
+
+    return GuardResult.ok();
 }
 
 record GuardResult(boolean passed, String reason) {}
 ```
+
+### 차단 사유 목록
+
+| 사유 | 설명 | 복구 가능 |
+|------|------|---------|
+| EMPTY_TEXT | 공백만 있는 텍스트 | ❌ |
+| TOO_SHORT | 5자 미만 | ❌ |
+| TOO_LONG | 타입별 상한 초과 (POST 2200/COMMENT 350) | ❌ |
+| PII_DETECTED | 개인정보 패턴 감지 | ❌ |
+| CRISIS_KEYWORD | 자살, 자해 등 위기 키워드 | ❌ |
+| HATE_KEYWORD | 혐오 표현 감지 | ❌ |
 
 ---
 
@@ -1060,27 +1031,20 @@ record GuardResult(boolean passed, String reason) {}
 |----|--------|------|
 | `spring.datasource.url` | `jdbc:mariadb://localhost:3306/againspring_dev` | MariaDB URL |
 | `spring.datasource.username` | `againspring` | DB 사용자 |
-| `spring.datasource.password` | `changeme` | DB 암호 |
 | `spring.datasource.driver-class-name` | `org.mariadb.jdbc.Driver` | JDBC 드라이버 |
-| `spring.datasource.hikari.maximum-pool-size` | `5` | HikariCP 최대 커넥션 |
-| `spring.jpa.hibernate.ddl-auto` | `none` | Hibernate DDL 자동화 비활성 |
-| `spring.flyway.baseline-version` | `0` | Flyway 마이그레이션 기준 버전 |
-| `spring.flyway.table` | `flyway_schema_history_aiuser` | Flyway 히스토리 테이블 (backend와 분리) |
+| `spring.flyway.table` | `flyway_schema_history_aiuser` | Flyway 히스토리 테이블 (backend 분리) |
 
 ### AI User 서비스 설정
 
 | 키 | 환경변수 | 기본값 | 설명 |
 |----|----------|--------|------|
 | `ai-user.enabled` | `AI_USER_ENABLED` | `false` | 마스터 kill-switch |
-| `ai-user.seed.enabled` | `AI_USER_SEED_ENABLED` | `true` | 부트업 시 시드 실행 |
 | `ai-user.tick-cron` | `AI_USER_TICK_CRON` | `0 */10 * * * *` | 10분 주기 cron |
 | `ai-user.daily-global-cap` | `AI_USER_DAILY_GLOBAL_CAP` | `200` | 일일 행동 상한 |
 | `ai-user.bot-password` | `AI_USER_BOT_PASSWORD` | `ai-user-dev-pw-2026` | 봇 인증 암호 |
-| `ai-user.backend-base-url` | `BACKEND_BASE_URL` | `http://againspring-backend-dev:8080` | 백엔드 URL |
-| `ai-user.llm-ai-user-url` | `LLM_AI_USER_URL` | `http://againspring-llm-ai-user:8092` | LLM 서비스 URL |
-| `ai-user.history-dir` | `AI_USER_HISTORY_DIR` | `/app/persona-history` | 행동 히스토리 디렉토리 |
-| `ai-user.personas-dir` | `AI_USER_PERSONAS_DIR` | `/app/personas` | 페르소나 프로필 디렉토리 |
-| `ai-user.persona-target` | (코드) | `100` | 목표 페르소나 수 |
+| `ai-user.backend-base-url` | (고정) | `http://againspring-backend-dev:8080` | 백엔드 URL |
+| `ai-user.llm-ai-user-url` | (고정) | `http://againspring-llm-ai-user:8092` | LLM 서비스 URL |
+| `ai-user.persona-target` | (코드) | `10` | 목표 페르소나 수 |
 
 ### AI Learning 설정
 
@@ -1088,45 +1052,12 @@ record GuardResult(boolean passed, String reason) {}
 |----|----------|--------|------|
 | `ai-learning.base-url` | `AI_LEARNING_BASE_URL` | `http://againspring-ai-learning:8099` | AI Learning 서비스 URL |
 | `ai-learning.enabled` | `AI_LEARNING_ENABLED` | `false` | AI Learning 활성화 |
-| `ai-learning.crawl.enabled` | `AI_LEARNING_CRAWL_ENABLED` | `false` | 크롤링 모드 활성화 |
 
 ### 로깅 설정
 
 | 키 | 기본값 | 설명 |
 |----|--------|------|
-| `logging.level.root` | `INFO` | 루트 로그 레벨 |
-| `logging.level.com.againspring.aiuser.orchestrator` | `DEBUG` | 오케스트레이터 로그 레벨 (DEBUG) |
-
-### 환경 변수 예시 (docker-compose)
-
-```yaml
-# docker-compose.dev.yml
-services:
-  ai-user-orchestrator:
-    image: againspring-ai-user-orchestrator:dev
-    container_name: ai-user-orchestrator
-    ports:
-      - "8096:8096"
-    environment:
-      DB_URL: jdbc:mariadb://mariadb:3306/againspring_dev
-      DB_USER: againspring
-      DB_PASSWORD: dev_password
-      AI_USER_ENABLED: "true"
-      AI_USER_SEED_ENABLED: "true"
-      AI_USER_TICK_CRON: "0 */10 * * * *"
-      AI_USER_DAILY_GLOBAL_CAP: "200"
-      AI_USER_BOT_PASSWORD: "bot-dev-pw-2026"
-      BACKEND_BASE_URL: http://againspring-backend-dev:8080
-      LLM_AI_USER_URL: http://againspring-llm-ai-user:8092
-      AI_LEARNING_BASE_URL: http://againspring-ai-learning:8099
-      AI_LEARNING_ENABLED: "true"
-    depends_on:
-      - mariadb
-      - againspring-backend-dev
-      - againspring-llm-ai-user
-    networks:
-      - againspring-network
-```
+| `logging.level.com.againspring.aiuser.orchestrator` | `DEBUG` | 오케스트레이터 로그 레벨 |
 
 ---
 
@@ -1168,7 +1099,6 @@ LLM 브릿지 호출.
 // 텍스트 생성
 Optional<String> generateComment(GenDto.CommentRequest)
         // POST http://againspring-llm-ai-user:8092/v1/invoke
-        // { "personaId": "...", "voiceProfile": {...}, "prompt": "...", ... }
 
 Optional<String> generateReply(GenDto.ReplyRequest)
         // 대댓글 생성
@@ -1186,7 +1116,6 @@ AI Learning 모듈 연동.
 // 학습 예시 검색 (RAG)
 List<ExampleItem> findSimilar(String query, String actionType, String category, int limit)
         // GET /search?query=...&type=COMMENT&category=...&limit=3
-        // List<{ "id": "...", "content": "...", "score": 0.8 }>
 
 // 성공 사례 저장
 void saveAsync(String text, String actionType, String category, String source)
@@ -1253,16 +1182,16 @@ LLM 호출: 단일 콜 (동시 다중 호출 가능, LLM 서비스 부담)
 
 ```
 피드 캐시: 없음 (매 tick마다 새 조회)
-페르소나 정보: 메모리 상주 (50개, ~1MB)
-JWT 캐시: 50개 × ~200bytes = 10KB
+페르소나 정보: 메모리 상주 (~10명, ~1MB)
+JWT 캐시: 10개 × ~200bytes = 2KB
 ```
 
 ### 데이터베이스 부하
 
 ```
 매 tick:
-- SELECT personaRepository.findByActiveTrue() [50명 조회, ~5ms]
-- SELECT personaActionLogRepository [각 페르소나마다 쿨다운 조회, ~250ms 최악]
+- SELECT personaRepository.findByActiveTrue() [10명 조회, ~5ms]
+- SELECT personaActionLogRepository [각 페르소나마다 쿨다운 조회, ~50ms 평균]
 - INSERT persona_action_log [최대 200행/day, 분산]
 
 일일 총량:
@@ -1289,7 +1218,6 @@ cd /home/justant/Data/Again-Spring/backend
 # 3. AI User Orchestrator 실행
 cd /home/justant/Data/Again-Spring/ai-user/orchestrator
 ./gradlew bootRun
-# 또는 IDE에서 AiUserOrchestratorApplication 실행
 
 # 4. 헬스 체크
 curl http://localhost:8096/actuator/health
@@ -1304,7 +1232,6 @@ cd /home/justant/Data/Again-Spring/ai-user/orchestrator
 
 # 특정 테스트 실행
 ./gradlew test --tests "*BehaviorEngineTest"
-./gradlew test --tests "*PersonaSelectorTest"
 ```
 
 ### Kill-Switch 제어 (CLI)
@@ -1314,26 +1241,6 @@ cd /home/justant/Data/Again-Spring/ai-user/orchestrator
 mysql -u againspring -p againspring_dev
 > UPDATE ai_user_runtime SET enabled=true WHERE id=1;
 > SELECT * FROM ai_user_runtime;
-
-# 확인
-curl http://localhost:8096/actuator/health/liveness
-```
-
-### 수동 tick 트리거
-
-```java
-// 테스트용: Spring Boot Test에서
-@SpringBootTest
-class OrchestratorSchedulerTest {
-    @Autowired
-    private BehaviorEngine behaviorEngine;
-    
-    @Test
-    void testTickManual() {
-        behaviorEngine.tick();  // 즉시 실행
-        // 결과 검증
-    }
-}
 ```
 
 ---
@@ -1376,11 +1283,12 @@ class OrchestratorSchedulerTest {
 4. 페르소나 쿨다운: SELECT * FROM persona_action_log ORDER BY created_at DESC LIMIT 50;
 ```
 
-#### LLM 호출 실패
+#### 페르소나 생성 실패
 ```
-1. LLM 서비스 헬스: curl http://againspring-llm-ai-user:8092/health
-2. URL 설정: echo $LLM_AI_USER_URL (또는 config 확인)
-3. 타임아웃 로그: "LLM timeout" 검색
+1. 목표 개수 확인: AI_USER_PERSONA_TARGET (기본 10)
+2. 현재 개수: SELECT COUNT(*) FROM personas;
+3. LLM 서비스 상태: curl http://againspring-llm-ai-user:8092/health
+4. PersonaFactory 로그: "generating X new personas"
 ```
 
 ### 유지보수 작업
@@ -1420,6 +1328,7 @@ UPDATE ai_user_runtime SET daily_global_cap=300 WHERE id=1;
 | **Voice Profile** | 페르소나의 말투·성향·점수를 담은 JSON |
 | **PlannedAction** | ActionPlanner가 생성한 행동 계획 (LIKE/VOTE/COMMENT/REPLY/POST) |
 | **Seen Post** | 페르소나가 이미 본 포스트 (중복 행동 방지) |
+| **Synthetic** | users.synthetic=1 기반 봇 식별 (backend V59) |
 
 ---
 
@@ -1435,7 +1344,7 @@ ai-user/orchestrator/
 │   ├── client/          # BackendBotClient, LlmAiUserClient, AiLearningClient
 │   ├── domain/          # Entity (Persona, PersonaActionLog, AiUserRuntime)
 │   ├── repository/      # JPA Repositories
-│   ├── seed/            # AiUserSeedLoader, PersonaFactory
+│   ├── seed/            # AiUserSeedLoader, PersonaFactory, AiUserIdentity
 │   ├── safety/          # ContentSafetyGuard
 │   └── config/          # OrchestratorProperties
 ├── src/main/resources/
@@ -1451,6 +1360,6 @@ ai-user/orchestrator/
 
 ---
 
-**문서 버전**: 1.0  
-**최종 수정**: 2026-06-05  
+**문서 버전**: 2.0  
+**최종 수정**: 2026-06-06  
 **작성자**: Claude Code Agent

@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets;
  */
 @Slf4j
 @Service
-public class ClaudeCliInvoker {
+public class ClaudeCliInvoker implements Invoker {
 
     private static final String USER_PROMPT_SEP = "<<<USER_PROMPT>>>";
     private static final String DEFAULT_SYSTEM =

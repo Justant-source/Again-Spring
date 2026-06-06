@@ -37,7 +37,14 @@ public class ContentSafetyGuard {
     );
 
     private static final int MIN_LENGTH = 5;
-    private static final int MAX_LENGTH = 1000;
+    // POST 상한: OutputSanitizer(llm) MAX_POST=2000보다 여유 있게 설정해 sanitizer가 실질적 상한이 됨.
+    // Phase 5에서 ai-user.limits.max-post/max-comment 환경변수로 통일 예정.
+    // TODO Phase 5: @Value("${ai-user.limits.max-post:2200}") 로 교체
+    private static final int MAX_LEN_POST    = 2200;
+    private static final int MAX_LEN_COMMENT = 350;
+
+    /** 콘텐츠 타입: executePost→POST, executeComment/executeReply→COMMENT */
+    public enum ContentType { POST, COMMENT }
 
     public record GuardResult(boolean passed, String reason) {
         public static GuardResult ok() {
@@ -49,14 +56,15 @@ public class ContentSafetyGuard {
         }
     }
 
-    public GuardResult check(String text) {
+    public GuardResult check(String text, ContentType type) {
         if (text == null || text.isBlank()) {
             return GuardResult.blocked("EMPTY_TEXT");
         }
         if (text.length() < MIN_LENGTH) {
             return GuardResult.blocked("TOO_SHORT");
         }
-        if (text.length() > MAX_LENGTH) {
+        int maxLen = (type == ContentType.POST) ? MAX_LEN_POST : MAX_LEN_COMMENT;
+        if (text.length() > maxLen) {
             return GuardResult.blocked("TOO_LONG: " + text.length());
         }
 
