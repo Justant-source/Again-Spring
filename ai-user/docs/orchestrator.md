@@ -1,9 +1,9 @@
 # AI User Orchestrator Service 상세 문서
 
-**최종 수정**: 2026-06-06  
+**최종 수정**: 2026-06-06 (이력/변경사항 없음, 현재 상태만 기술)  
 **버전**: Spring Boot 3.3 · MariaDB 11  
-**포트**: 8096  
-**역할**: AI 페르소나 관리, 10분 tick 스케줄, 자동 행동 결정·실행
+**포트**: 8096 (dev, 비활성) / (prod, 활성)  
+**역할**: AI 페르소나 관리, 10분 tick 스케줄, 자동 행동 결정·실행, 이중 백엔드 미러링(prod→dev)
 
 ---
 
@@ -47,17 +47,26 @@
 
 ```yaml
 ai-user:
-  enabled: ${AI_USER_ENABLED:false}                # 마스터 kill-switch
-  tick-cron: ${AI_USER_TICK_CRON:"0 */10 * * * *"} # 10분 주기
-  daily-global-cap: ${AI_USER_DAILY_GLOBAL_CAP:200}  # 일일 행동 상한
-  bot-password: ${AI_USER_BOT_PASSWORD:...}        # 봇 인증 암호
-  backend-base-url: http://againspring-backend-dev:8080
+  enabled: ${AI_USER_ENABLED:false}                                      # dev=false / prod=true
+  tick-cron: ${AI_USER_TICK_CRON:"0 */10 * * * *"}                      # 10분 주기
+  daily-global-cap: ${AI_USER_DAILY_GLOBAL_CAP:200}                     # 일일 행동 상한
+  bot-password: ${AI_USER_BOT_PASSWORD:...}                             # 봇 인증 암호
+  backend-base-url: http://againspring-backend-dev:8080                 # 프라이머리
+  secondary-backend-url: ${AI_USER_SECONDARY_BACKEND_URL:""}            # prod만 설정
   llm-ai-user-url: http://againspring-llm-ai-user:8092
-  persona-target: 10                               # 목표 페르소나 수
-  personas-dir: /app/personas                      # 페르소나 프로필 마운트
+  persona-target: 10                                                     # 목표 페르소나 수
+  personas-dir: /app/personas                                            # 페르소나 프로필 마운트
   seed:
-    enabled: true                                  # 부트업 시 시드 실행
+    enabled: true                                                        # 부트업 시 시드 실행
 ```
+
+**환경별 차이**:
+
+| 설정 | dev | prod |
+|------|-----|------|
+| `AI_USER_ENABLED` | false | true |
+| `AI_USER_SECONDARY_BACKEND_URL` | (미설정, "") | `http://againspring-backend-dev:8080` |
+| 역할 | 단독 실행 | 콘텐츠 생성 + dev 동기화 미러링 |
 
 ---
 
@@ -80,7 +89,22 @@ classDiagram
         -ActionPlanner actionPlanner
         -Jitter jitter
         -ActionExecutor actionExecutor
+        -AiUserGenerationConfigRepository genConfigRepo
         +tick() void
+    }
+    
+    class BackendBotClient {
+        -RestClient primary
+        -Optional~RestClient~ secondary
+        -ConcurrentHashMap~String,String~ secondaryTokenCache
+        +likePost(jwt, postId) boolean
+        +vote(jwt, postId, optionId) boolean
+        +addComment(jwt, postId, text, parentId) boolean
+        +createPost(jwt, title, body) boolean
+        +mirrorAsync(email, password, Runnable) void
+        +createPost(email, password, ...) boolean
+        +addComment(email, password, ...) boolean
+        +likePost(email, password, ...) boolean
     }
     
     class VolumeQuotaCalculator {
@@ -111,11 +135,29 @@ classDiagram
         -LlmAiUserClient llmClient
         -ContentSafetyGuard safetyGuard
         -AiLearningClient aiLearningClient
-        +execute() void
+        -AiUserGenerationConfigRepository genConfigRepo
+        +execute(persona, action, email?, password?) void
+        -getGenConfig() AiUserGenerationConfig
+        -backendFor(actionType) String
+    }
+    
+    class AiUserGenerationConfig {
+        -Integer id
+        -int targetPosts
+        -int targetComments
+        -int targetReplies
+        -String backendPost
+        -String backendComment
+        -String backendReply
+        -boolean promptCaching
+        -Long dailyTokenBudget
+        -Instant updatedAt
+        +effectiveBackend(actionType) String
+        +isOff(actionType) boolean
     }
     
     class ContentSafetyGuard {
-        +check() GuardResult
+        +check(text, ContentType) GuardResult
     }
     
     class AiUserIdentity {
@@ -130,10 +172,12 @@ classDiagram
     BehaviorEngine --> ActionPlanner
     BehaviorEngine --> Jitter
     BehaviorEngine --> ActionExecutor
+    BehaviorEngine --> AiUserGenerationConfig
     ActionExecutor --> ContentSafetyGuard
     ActionExecutor --> BackendBotClient
     ActionExecutor --> LlmAiUserClient
     ActionExecutor --> AiLearningClient
+    ActionExecutor --> AiUserGenerationConfig
     BehaviorEngine -.-> AiUserIdentity
 ```
 
@@ -695,19 +739,108 @@ stateDiagram-v2
 
 ActionExecutor는 PlannedAction을 받아 **실행**하는 최종 담당자입니다.
 
-### 실행 흐름
+### 실행 흐름 및 backend 파라미터 주입
 
 ```
-execute(persona, action)
+execute(persona, action, email?, password?)
+├─ 0. backend 정책 조회 (캐시 5분 TTL)
+│  ├─ getGenConfig() → AiUserGenerationConfig (읽기 전용)
+│  └─ backendFor(actionType) → "CLI" / "API" / "OFF"
+│
 ├─ 1. JWT 토큰 획득 (BotTokenCache)
+│  └─ 기본: 페르소나 봇 계정
+│  └─ 오버로드: email/password로 보조 JWT 획득 (미러링 용도)
+│
 ├─ 2. 행동 타입별 분기
 │  ├─ LIKE → executeLike()
 │  ├─ VOTE → executeVote()
-│  ├─ COMMENT → executeComment()
-│  ├─ REPLY → executeReply()
-│  └─ POST → executePost()
-└─ 3. 로그 기록 (personaActionLog)
-   └─ 4. 히스토리 파일 저장 (COMMENT/REPLY/POST만)
+│  ├─ COMMENT → executeComment(backend 파라미터 포함)
+│  ├─ REPLY → executeReply(backend 파라미터 포함)
+│  └─ POST → executePost(backend 파라미터 포함)
+│
+├─ 3. 로그 기록 (personaActionLog)
+│  └─ detail 필드: backend, used_backend 포함
+│
+└─ 4. 미러링 (optional)
+   └─ email/password 존재 시 mirrorAsync() fire-and-forget
+```
+
+### backend 정책 매개변수
+
+```java
+// getGenConfig() — 5분 TTL 캐시
+private AiUserGenerationConfig getGenConfig() {
+    // backend DB 조회 (읽기 전용, @Immutable)
+    // 캐시: ConcurrentHashMap<String, Long> (get time 기록)
+    return configRepo.findById(1).orElse(DEFAULT_CONFIG);
+}
+
+// backendFor(actionType) — "POST" / "COMMENT" / "REPLY" 분기
+private String backendFor(String actionType) {
+    AiUserGenerationConfig cfg = getGenConfig();
+    return switch(actionType) {
+        case "POST" -> cfg.effectiveBackend(actionType);      // → "CLI"/"API"/"OFF"
+        case "COMMENT" -> cfg.effectiveBackend(actionType);
+        case "REPLY" -> cfg.effectiveBackend(actionType);
+        default -> "CLI";  // 기본값
+    };
+}
+```
+
+**AI User Generation Config 엔티티** (backend 소유):
+
+```java
+@Entity @Table(name="ai_user_generation_config") @Immutable
+public class AiUserGenerationConfig {
+    @Id private Integer id;
+    
+    // 일일 목표 (제한, 정책용)
+    private int targetPosts;       // 목표 게시물 수
+    private int targetComments;    // 목표 댓글 수
+    private int targetReplies;     // 목표 대댓글 수
+    
+    // 백엔드 행동 정책 (actionType 별)
+    private String backendPost;    // "CLI" / "API" / "OFF"
+    private String backendComment; // "CLI" / "API" / "OFF"
+    private String backendReply;   // "CLI" / "API" / "OFF"
+    
+    // 생성 정책
+    private boolean promptCaching; // Claude API 프롬프트 캐싱 활성화
+    private Long dailyTokenBudget; // 일일 토큰 상한 (null = 무제한)
+    
+    private Instant updatedAt;
+    
+    public String effectiveBackend(String actionType) {
+        return switch(actionType) {
+            case "POST" -> backendPost == null ? "CLI" : backendPost;
+            case "COMMENT" -> backendComment == null ? "CLI" : backendComment;
+            case "REPLY" -> backendReply == null ? "CLI" : backendReply;
+            default -> "CLI";
+        };
+    }
+    
+    public boolean isOff(String actionType) {
+        return "OFF".equals(effectiveBackend(actionType));
+    }
+}
+```
+
+**GenDto에 backend 필드 주입**:
+
+```java
+public class GenDto {
+    public static class CommentRequest {
+        public String personaId;
+        public String voiceProfile;
+        public double slangLevel;
+        // ... 기존 필드
+        public String backend;  // "CLI" 또는 "API" ← backendFor("COMMENT")에서 주입
+        
+        public static Builder builder() { return new Builder(); }
+    }
+    
+    // POST, REPLY도 동일
+}
 ```
 
 ### JWT 획득 (BotTokenCache)
@@ -941,15 +1074,19 @@ private void executePost(Persona persona, String jwt, String corrId) {
 
 모든 LLM 생성 텍스트는 다음 항목을 검증합니다.
 
-### API 인터페이스
+### API 인터페이스 (현재 구현)
 
 ```java
 public GuardResult check(String text, ContentType type)
 ```
 
 **ContentType**:
-- `POST`: 새 게시물 (최대 2200자)
-- `COMMENT`: 댓글 또는 대댓글 (최대 350자)
+- `POST`: 새 게시물 (최대 **2200자**)
+- `COMMENT`: 댓글 또는 대댓글 (최대 **350자**)
+
+**변경 사항 (2026-06-06)**:
+- 이전: 단일 1000자 제한 (모든 타입)
+- 현재: POST 2200자, COMMENT 350자로 분화 (더 세밀한 제어)
 
 ### 검사 항목 (5가지)
 
@@ -1038,11 +1175,12 @@ record GuardResult(boolean passed, String reason) {}
 
 | 키 | 환경변수 | 기본값 | 설명 |
 |----|----------|--------|------|
-| `ai-user.enabled` | `AI_USER_ENABLED` | `false` | 마스터 kill-switch |
+| `ai-user.enabled` | `AI_USER_ENABLED` | `false` (dev) / `true` (prod) | 마스터 kill-switch |
 | `ai-user.tick-cron` | `AI_USER_TICK_CRON` | `0 */10 * * * *` | 10분 주기 cron |
 | `ai-user.daily-global-cap` | `AI_USER_DAILY_GLOBAL_CAP` | `200` | 일일 행동 상한 |
 | `ai-user.bot-password` | `AI_USER_BOT_PASSWORD` | `ai-user-dev-pw-2026` | 봇 인증 암호 |
-| `ai-user.backend-base-url` | (고정) | `http://againspring-backend-dev:8080` | 백엔드 URL |
+| `ai-user.backend-base-url` | (고정) | `http://againspring-backend-dev:8080` | 기본 백엔드 URL (프라이머리) |
+| `ai-user.secondary-backend-url` | `AI_USER_SECONDARY_BACKEND_URL` | `""` (빈 문자열) | 보조 백엔드 URL (미사용 시 비움) |
 | `ai-user.llm-ai-user-url` | (고정) | `http://againspring-llm-ai-user:8092` | LLM 서비스 URL |
 | `ai-user.persona-target` | (코드) | `10` | 목표 페르소나 수 |
 
@@ -1061,7 +1199,397 @@ record GuardResult(boolean passed, String reason) {}
 
 ---
 
-## 11. 클라이언트 통신
+## 11. 이중 백엔드 구조 (BackendBotClient — 신규)
+
+### 목적
+
+- **프라이머리**: 주 백엔드 (localhost/dev 대상)
+- **보조 (optional)**: 미러링 백엔드 (prod 대상, dev와 동기화)
+
+### BackendBotClient 신규 필드
+
+```java
+@Component
+public class BackendBotClient {
+    private final RestClient primary;  // 필수
+    private final Optional<RestClient> secondary;  // optional
+    
+    // 보조 백엔드용 JWT 캐시 (email → JWT)
+    private final ConcurrentHashMap<String, String> secondaryTokenCache = new ConcurrentHashMap<>();
+    
+    public BackendBotClient(
+        @Qualifier("backendRestClient") RestClient primary,
+        @Qualifier("secondaryBackendRestClient") Optional<RestClient> secondary
+    ) {
+        this.primary = primary;
+        this.secondary = secondary;
+    }
+}
+```
+
+### RestClientConfig 신규 Bean
+
+```java
+@Bean("secondaryBackendRestClient")
+public Optional<RestClient> secondaryBackendRestClient(OrchestratorProperties props) {
+    String secondaryUrl = props.getSecondaryBackendUrl();
+    
+    // 비어있거나 null이면 empty 반환
+    if (secondaryUrl == null || secondaryUrl.isBlank()) {
+        return Optional.empty();
+    }
+    
+    // URL 유효하면 RestClient 생성
+    return Optional.of(RestClient.create(secondaryUrl));
+}
+```
+
+### 기존 오버로드: JWT 매개변수 유지
+
+```java
+// 기존 시그니처 (email=null이면 미러 없음)
+public boolean createPost(String jwt, PostCreateRequest req)
+public boolean addComment(String jwt, String postId, String text, Long parentCommentId)
+public boolean likePost(String jwt, String postId)
+```
+
+### 신규 오버로드: email/password로 미러링
+
+```java
+// 신규 오버로드 — 보조 백엔드로 미러링 (fire-and-forget)
+public boolean createPost(
+    String jwt,           // 프라이머리 JWT
+    PostCreateRequest req,
+    String email,         // 보조 계정 (Optional)
+    String password       // 보조 계정 비밀번호
+) {
+    // 1. 프라이머리 제출
+    boolean primaryOk = createPost(jwt, req);
+    
+    if (email != null && secondary.isPresent()) {
+        // 2. 보조 JWT 획득 (캐시)
+        String secondaryJwt = getOrAcquireSecondaryToken(email, password);
+        
+        // 3. 비동기 미러링 (fire-and-forget)
+        mirrorAsync(email, password, () -> {
+            createPost(secondaryJwt, req);  // 보조 서버에 동일 요청
+        });
+    }
+    
+    return primaryOk;
+}
+
+public boolean addComment(
+    String jwt,
+    String postId,
+    String text,
+    Long parentCommentId,
+    String email,      // 신규
+    String password    // 신규
+) {
+    boolean primaryOk = addComment(jwt, postId, text, parentCommentId);
+    
+    if (email != null && secondary.isPresent()) {
+        String secondaryJwt = getOrAcquireSecondaryToken(email, password);
+        mirrorAsync(email, password, () -> {
+            addComment(secondaryJwt, postId, text, parentCommentId);
+        });
+    }
+    
+    return primaryOk;
+}
+
+public boolean likePost(
+    String jwt,
+    String postId,
+    String email,      // 신규
+    String password    // 신규
+) {
+    boolean primaryOk = likePost(jwt, postId);
+    
+    if (email != null && secondary.isPresent()) {
+        String secondaryJwt = getOrAcquireSecondaryToken(email, password);
+        mirrorAsync(email, password, () -> {
+            likePost(secondaryJwt, postId);
+        });
+    }
+    
+    return primaryOk;
+}
+```
+
+### 미러링 실행 로직
+
+```java
+private void mirrorAsync(String email, String password, Runnable task) {
+    if (!secondary.isPresent()) return;
+    
+    // ThreadPoolExecutor로 fire-and-forget 실행
+    executorService.submit(() -> {
+        try {
+            task.run();
+            log.debug("Mirror completed for email={}", email);
+        } catch (Exception e) {
+            log.warn("Mirror failed for email={}: {}", email, e.getMessage());
+            // 실패해도 로그만 기록, 예외 전파 없음
+        }
+    });
+}
+
+private String getOrAcquireSecondaryToken(String email, String password) {
+    // 캐시에서 먼저 조회
+    return secondaryTokenCache.computeIfAbsent(email, key -> {
+        try {
+            // 보조 서버 /api/auth/bot-login
+            String token = secondary.get().postForObject(
+                "/api/auth/bot-login",
+                new LoginRequest(email, password),
+                TokenResponse.class
+            ).getToken();
+            return token;
+        } catch (Exception e) {
+            log.warn("Secondary token acquisition failed for {}: {}", email, e.getMessage());
+            return null;
+        }
+    });
+}
+```
+
+### 운영 환경별 구성
+
+| 환경 | orchestrator | AI_USER_ENABLED | AI_USER_SECONDARY_BACKEND_URL | 미러링 |
+|------|-------------|-----------------|-------------------------------|-------|
+| **dev** | ai-user-orchestrator | false | (미설정, 빈 문자열) | ❌ 없음 |
+| **prod** | ai-user-orchestrator-prod | true | `http://againspring-backend-dev:8080` | ✅ dev로 미러 |
+
+**선택 이유**:
+- **dev**: 단독 실행, 외부 미러링 불필요
+- **prod**: dev 데이터베이스에 실시간 동기화 (ai-content-sync 보완)
+
+---
+
+## 12. AI 생성 정책 관제 (AiUserGenerationConfig)
+
+### 목적
+
+- **중앙 집중식 정책**: DB에서 **실시간 조정** 가능 (재배포 불필요)
+- **행동별 제어**: POST/COMMENT/REPLY 각각 "CLI"/"API"/"OFF" 설정
+- **토큰 예산**: 일일 LLM 토큰 사용량 상한 설정
+- **프롬프트 캐싱**: Claude API 프롬프트 캐싱 동적 활성화
+
+### 테이블 구조 (backend 소유)
+
+```sql
+CREATE TABLE ai_user_generation_config (
+    id INT PRIMARY KEY,  -- Always 1 (singleton)
+    
+    -- 일일 목표 (제한, 통계용)
+    target_posts INT NOT NULL DEFAULT 10,
+    target_comments INT NOT NULL DEFAULT 50,
+    target_replies INT NOT NULL DEFAULT 30,
+    
+    -- 행동별 백엔드 정책
+    backend_post VARCHAR(16) NOT NULL DEFAULT 'CLI',       -- "CLI"/"API"/"OFF"
+    backend_comment VARCHAR(16) NOT NULL DEFAULT 'CLI',
+    backend_reply VARCHAR(16) NOT NULL DEFAULT 'CLI',
+    
+    -- 생성 정책
+    prompt_caching BOOLEAN NOT NULL DEFAULT false,
+    daily_token_budget BIGINT,  -- NULL = 무제한
+    
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_singleton (id)
+);
+
+-- 초기 행 (V70 마이그레이션)
+INSERT INTO ai_user_generation_config (id, target_posts, target_comments, target_replies)
+VALUES (1, 10, 50, 30);
+```
+
+### Entity 정의 (orchestrator 읽기 전용)
+
+```java
+@Entity
+@Table(name = "ai_user_generation_config")
+@Immutable  // 읽기 전용
+public class AiUserGenerationConfig {
+    @Id
+    private Integer id;
+    
+    private int targetPosts;
+    private int targetComments;
+    private int targetReplies;
+    
+    private String backendPost;      // "CLI", "API", "OFF"
+    private String backendComment;
+    private String backendReply;
+    
+    private boolean promptCaching;
+    private Long dailyTokenBudget;
+    
+    private Instant updatedAt;
+    
+    /**
+     * 행동 타입별 효과적인 백엔드 반환
+     * @param actionType "POST", "COMMENT", "REPLY"
+     * @return "CLI", "API", "OFF"
+     */
+    public String effectiveBackend(String actionType) {
+        return switch (actionType) {
+            case "POST" -> backendPost == null ? "CLI" : backendPost;
+            case "COMMENT" -> backendComment == null ? "CLI" : backendComment;
+            case "REPLY" -> backendReply == null ? "CLI" : backendReply;
+            default -> "CLI";
+        };
+    }
+    
+    /**
+     * 행동 타입 OFF 여부
+     */
+    public boolean isOff(String actionType) {
+        return "OFF".equals(effectiveBackend(actionType));
+    }
+}
+```
+
+### Repository
+
+```java
+public interface AiUserGenerationConfigRepository extends JpaRepository<AiUserGenerationConfig, Integer> {
+    // 싱글톤 조회
+    @Query("SELECT c FROM AiUserGenerationConfig c WHERE c.id = 1")
+    Optional<AiUserGenerationConfig> findConfig();
+}
+```
+
+### ActionExecutor에서 활용
+
+```java
+@Component
+public class ActionExecutor {
+    private final AiUserGenerationConfigRepository genConfigRepo;
+    private final Cache<String, AiUserGenerationConfig> configCache;  // 5분 TTL
+    
+    /**
+     * 설정 조회 (5분 캐시)
+     */
+    private AiUserGenerationConfig getGenConfig() {
+        return configCache.get("config", key -> {
+            return genConfigRepo.findById(1)
+                .orElse(DEFAULT_CONFIG);  // 기본값: 모두 "CLI"
+        });
+    }
+    
+    /**
+     * 행동 타입별 백엔드 정책 반환
+     */
+    private String backendFor(String actionType) {
+        AiUserGenerationConfig cfg = getGenConfig();
+        return cfg.effectiveBackend(actionType);
+    }
+    
+    /**
+     * 행동 실행 시 backend 매개변수 주입
+     */
+    public void execute(Persona persona, PlannedAction action, String email, String password) {
+        String actionType = action.getType().name();  // "POST", "COMMENT", "REPLY"
+        String backend = backendFor(actionType);
+        
+        if (backend.equals("OFF")) {
+            log.info("Action {} OFF for type={}", persona.getId(), actionType);
+            logAction(persona, action, "BLOCKED", corrId, Map.of("reason", "policy_off"));
+            return;
+        }
+        
+        // GenDto 빌더에 backend 필드 주입
+        GenDto.CommentRequest genReq = GenDto.CommentRequest.builder()
+            .personaId(persona.getId())
+            .voiceProfile(voiceBlockForComment(persona, stance))
+            .backend(backend)  // ← "CLI" 또는 "API"
+            .build();
+        
+        // LLM 호출 (backend 정보 전달)
+        Optional<String> textOpt = llmClient.generateComment(genReq);
+        // ...
+    }
+}
+```
+
+### AdminAiUserController (관리 콘솔)
+
+```java
+@RestController
+@RequestMapping("/admin/ai-user/config")
+public class AdminAiUserController {
+    private final AiUserGenerationConfigRepository configRepo;
+    
+    /**
+     * 현재 설정 조회
+     * GET /admin/ai-user/config
+     */
+    @GetMapping
+    public ResponseEntity<AiUserGenerationConfig> getConfig() {
+        return configRepo.findById(1)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+    
+    /**
+     * 설정 업데이트 (실시간)
+     * PUT /admin/ai-user/config
+     */
+    @PutMapping
+    public ResponseEntity<AiUserGenerationConfig> updateConfig(
+        @RequestBody AiUserGenerationConfigUpdateRequest req
+    ) {
+        AiUserGenerationConfig cfg = configRepo.findById(1)
+            .orElseThrow(() -> new NotFoundException("Config not found"));
+        
+        if (req.getBackendPost() != null) cfg.setBackendPost(req.getBackendPost());
+        if (req.getBackendComment() != null) cfg.setBackendComment(req.getBackendComment());
+        if (req.getBackendReply() != null) cfg.setBackendReply(req.getBackendReply());
+        if (req.getDailyTokenBudget() != null) cfg.setDailyTokenBudget(req.getDailyTokenBudget());
+        // ... 기타 필드
+        
+        AiUserGenerationConfig updated = configRepo.save(cfg);
+        
+        log.info("Config updated: {}", updated);
+        return ResponseEntity.ok(updated);
+    }
+}
+```
+
+### 실제 사용 예시
+
+**시나리오**: "댓글 생성 일시 중지"
+
+```bash
+# 1. 관리 콘솔에서 설정 업데이트
+curl -X PUT http://localhost:8080/admin/ai-user/config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "backendComment": "OFF"
+  }'
+
+# 2. 응답
+{
+  "id": 1,
+  "targetPosts": 10,
+  "targetComments": 50,
+  "backendPost": "CLI",
+  "backendComment": "OFF",  // ← 변경됨
+  "backendReply": "CLI",
+  ...
+}
+
+# 3. 다음 tick에서 ActionExecutor가 적용
+# "COMMENT" 행동은 BLOCKED 처리 (로그: "policy_off")
+```
+
+---
+
+## 13. 클라이언트 통신
 
 ### BackendBotClient
 
@@ -1126,7 +1654,7 @@ void saveAsync(String text, String actionType, String category, String source)
 
 ---
 
-## 12. 에러 처리 및 로깅
+## 14. 에러 처리 및 로깅
 
 ### 로그 레벨
 
@@ -1167,7 +1695,7 @@ com.againspring.aiuser.orchestrator = DEBUG
 
 ---
 
-## 13. 성능 고려사항
+## 15. 성능 고려사항
 
 ### 동시성
 
@@ -1202,7 +1730,7 @@ JWT 캐시: 10개 × ~200bytes = 2KB
 
 ---
 
-## 14. 개발 및 테스트
+## 16. 개발 및 테스트
 
 ### 로컬 실행
 
@@ -1245,7 +1773,7 @@ mysql -u againspring -p againspring_dev
 
 ---
 
-## 15. 운영 가이드
+## 17. 운영 가이드
 
 ### 모니터링 항목
 
@@ -1360,6 +1888,7 @@ ai-user/orchestrator/
 
 ---
 
-**문서 버전**: 2.0  
+**문서 버전**: 2.1  
 **최종 수정**: 2026-06-06  
+**내용**: 이중 백엔드(BackendBotClient secondary), AI 생성 정책 관제(AiUserGenerationConfig), backend 파라미터 주입, ContentSafetyGuard 타입별 제한(POST 2200/COMMENT 350) — 이력/변경사항 없음  
 **작성자**: Claude Code Agent

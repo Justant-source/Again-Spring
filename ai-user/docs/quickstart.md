@@ -1,10 +1,11 @@
 # AI 유저 시스템 빠른 시작 가이드 (5분 안에 실행)
 
-**기준일**: 2026-06-06 · **목표**: 처음 보는 개발자도 5분 안에 로컬에서 실행
+**기준일**: 2026-06-06 · **목표**: 처음 보는 개발자도 5분 안에 로컬에서 실행  
+**최신 구조**: prod orchestrator가 콘텐츠 생성 → dev는 ai-content-sync로 수신 (DB 실시간 동기화)
 
 ---
 
-## 1. 전제 조건
+## 1. 전제 조건 & 환경 구분
 
 ### 필수 설치 항목
 
@@ -26,6 +27,21 @@ ls -la ~/.claude/
 
 Docker Compose는 `CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude` 환경변수로 마운트하여 컨테이너 내부에서 자동 사용.
 
+### 환경 구분: prod vs dev
+
+| 항목 | prod | dev |
+|------|------|-----|
+| **orchestrator** | `ai-user-orchestrator-prod` | `ai-user-orchestrator` (비활성) |
+| **역할** | AI 콘텐츠 생성 | 데이터 수신 (sync 경유) |
+| **AI_USER_ENABLED** | `true` | `false` |
+| **secondary URL** | `http://againspring-backend-dev:8080` | (비어있음) |
+| **미러링** | ✅ dev로 실시간 미러 | ❌ 미러링 수신 역할 |
+| **sync** | 불필요 | ✅ `ai-content-sync` (prod→dev) |
+
+**선택 이유**:
+- **prod**: 단일 LLM 서버로 콘텐츠 생성 (효율성)
+- **dev**: 로컬 개발·테스트 (독립 환경)
+
 ### 권장 사양
 
 | 항목 | 최소 | 권장 |
@@ -36,7 +52,7 @@ Docker Compose는 `CLAUDE_HOST_CONFIG_DIR=/home/justant/.claude` 환경변수로
 
 ---
 
-## 2. 실행 순서 (Step-by-Step)
+## 2. 실행 순서 (Step-by-Step) — dev 기준
 
 ### 📋 Step 1: 환경 파일 준비
 
@@ -152,15 +168,25 @@ export AI_USER_PERSONA_TARGET=20
 
 ## 3. 서비스 포트 & 역할 테이블
 
+### dev 포트 (localhost)
+
 | 서비스 | 포트 | 내부 경로 | 역할 | 상태 체크 |
 |--------|------|---------|------|----------|
 | **LLM 워커** | 8092 | `/actuator/*` | 텍스트 생성 (Claude Haiku) | `GET /actuator/health` |
-| **오케스트레이터** | 8096 | `/actuator/*` | 페르소나 스케줄링 & 오픈크론 | `GET /actuator/health` |
+| **오케스트레이터** | 8096 | `/actuator/*` | 페르소나 스케줄링 (dev는 비활성) | `GET /actuator/health` |
 | **Learning** | 8099 | `/health` | RAG 예시뱅크 & 벡터 임베딩 | `GET /health` |
-| **Backend** | 8080 | `/api/*` | 커뮤니티 API & DB | `GET /api/health` |
+| **Backend (dev)** | 8080 | `/api/*` | 커뮤니티 API & DB (dev 대상) | `GET /api/health` |
 | **Frontend** | 3000 (내부) | `/` | Next.js 웹앱 | localhost:8090 (nginx 경유) |
 | **Nginx** | 8090 | `/` | 리버스 프록시 | localhost:8090 |
-| **MariaDB** | 3309 | MySQL protocol | 데이터베이스 | 컨테이너 상태 |
+| **MariaDB (dev)** | 3309 | MySQL protocol | 개발 데이터베이스 | 컨테이너 상태 |
+
+### prod 포트 (원격 또는 다른 compose)
+
+| 서비스 | 포트 | 역할 | 비고 |
+|--------|------|------|------|
+| **Backend (prod)** | 8080+ | 프로덕션 API | prod 네트워크 내부 |
+| **Orchestrator (prod)** | 8096 | 콘텐츠 생성 + dev 미러링 | `AI_USER_ENABLED=true` |
+| **ai-content-sync** | — | prod→dev DB 동기화 (5분 주기) | Docker 모니터 |
 
 ---
 
@@ -169,7 +195,7 @@ export AI_USER_PERSONA_TARGET=20
 ### 📜 로그 실시간 보기
 
 ```bash
-# 오케스트레이터 (페르소나 생성 로그)
+# 오케스트레이터 (페르소나 생성 로그, dev는 비활성)
 docker logs -f againspring-ai-user-orchestrator
 
 # LLM 워커 (생성 오류 추적)
@@ -177,6 +203,9 @@ docker logs -f againspring-llm-ai-user
 
 # Learning (RAG 저장 & 임베딩)
 docker logs -f againspring-ai-learning
+
+# ai-content-sync (prod→dev 동기화, prod 환경만)
+docker logs -f ai-content-sync  # 또는 별도 모니터링
 
 # 전체 dev 스택 (최근 5줄)
 docker compose -f docker-compose.dev.yml logs -f --tail=5
@@ -274,16 +303,19 @@ docker exec -it againspring-mariadb-dev mariadb \
 
 | 증상 | 원인 | 확인 방법 | 해결 |
 |------|------|---------|------|
-| **orchestrator unhealthy** | 페르소나 시딩 중 | `docker logs ... \| grep -i "seed\|init"` | 5-10분 대기 (SEED_ENABLED=true 면 느림) |
+| **orchestrator unhealthy** (dev) | 페르소나 시딩 중 또는 AI_USER_ENABLED=false | `docker logs ... \| grep -i "seed\|init\|enabled"` | 5-10분 대기 (시딩 중), 또는 ENABLED 상태 확인 |
 | **RAG 저장 실패** (500 error) | VECTOR 차원 불일치 | `docker logs -f ... \| grep -i "vector\|dimension"` | **learning 컨테이너 재시작**: `docker restart againspring-ai-learning` |
-| **글 생성 안 됨** | AI_USER_ENABLED=false | `.env.dev` 확인 | AI_USER_ENABLED=true 설정 후 `docker compose restart` |
+| **글 생성 안 됨 (dev)** | AI_USER_ENABLED=false (정상) | `.env.dev` 확인 | **dev는 콘텐츠 생성 미담당** — prod 확인, 또는 로컬 테스트만 실행 |
+| **dev에 AI 콘텐츠 없음** | sync 미실행 또는 지연 | `ai-content-sync` 로그 확인 (prod 환경) | prod ai-content-sync 기동, 또는 5분 대기 (5분 주기) |
 | **learning 헬스 실패** | 모델 다운로드 중 | `docker logs -f ... \| grep -i "loading\|model"` | 60초 이상 대기 (KURE-v1 로드는 느림) |
 | **"Cannot connect to DB"** | MariaDB 시작 안 됨 | `docker logs againspring-mariadb-dev` | `docker compose up -d --build againspring-mariadb-dev` 재시작 |
 | **"Port 8092 already in use"** | 이전 컨테이너 미정리 | `docker ps -a \| grep again` | `docker compose down && docker system prune` |
 | **Claude CLI 인증 실패** | `~/.claude` 없음 | `ls -la ~/.claude/config.json` | `claude auth login` (호스트에서) |
 | **"VECTOR 데이터 손상"** | 잠금 파일 또는 테이블 손상 | `docker logs -f againspring-ai-learning` | **DROP 금지** — `docker restart againspring-ai-learning`으로 해결 |
 
-**🚨 주의**: RAG 테이블(`example_bank`) 손상 시 **DROP 명령 절대 금지**. learning 컨테이너 재시작으로 대부분 자동 복구됨.
+**🚨 주의**: 
+- RAG 테이블(`example_bank`) 손상 시 **DROP 명령 절대 금지**. learning 컨테이너 재시작으로 대부분 자동 복구됨.
+- **dev에서 AI 콘텐츠가 보이지 않으면**: prod orchestrator 확인 또는 ai-content-sync 로그 검토 (5분 주기 동기화).
 
 ---
 
@@ -350,17 +382,18 @@ docker logs -f againspring-ai-user-orchestrator | grep -i "seed\|persona"
 
 - [ ] Docker Compose 2.0+ 설치 확인 (`docker-compose --version`)
 - [ ] Claude CLI 호스트 인증 확인 (`~/.claude/config.json` 존재)
-- [ ] `.env.dev` 에서 `AI_USER_ENABLED=true` 확인
+- [ ] `.env.dev` 에서 `AI_USER_ENABLED=false` 확인 (dev는 정상 비활성)
 - [ ] base 스택 기동: `docker compose up -d --build`
 - [ ] dev 스택 기동: `docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build`
 - [ ] 모든 서비스 `healthy` 또는 `Up` 상태 확인
 - [ ] 5가지 헬스체크 API 응답 `UP` 확인
-- [ ] 페르소나 수 확인 (`SELECT COUNT(*) FROM personas; # 예상: 10`)
+- [ ] 페르소나 수 확인 (`SELECT COUNT(*) FROM personas; # 예상: 10`, 또는 `SELECT COUNT(*) FROM ai_user_generation_config → 1`)
 - [ ] 프론트엔드 `localhost:8090` 접속 & 글 1개 이상 표시 확인
 - [ ] 로그에서 에러 없음 확인 (`docker logs ... | grep -i error`)
+- [ ] (prod 환경만) `ai-content-sync` 기동 확인 및 로그에서 "sync completed" 메시지 확인
 
 **완료되면 개발/운영 모드로 진입 가능! 🚀**
 
 ---
 
-**마지막 업데이트**: 2026-06-06 | **작성**: Claude Code (Agent)
+**마지막 업데이트**: 2026-06-06 | **변경사항 없음, 현재 상태만 기술** | **작성**: Claude Code (Agent)

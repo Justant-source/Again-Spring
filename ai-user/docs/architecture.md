@@ -5,418 +5,504 @@
 
 ---
 
-## 1. 시스템 개요
+## 1. 시스템 개요 (Prod/Dev 이중 환경)
 
 ```mermaid
-graph LR
-    subgraph ai_user["🤖 ai-user 모듈"]
-        LLM["llm<br/>:8092<br/>Spring Boot<br/>Claude Haiku<br/>텍스트 생성"]
-        ORC["orchestrator<br/>:8096<br/>Spring Boot<br/>페르소나·스케줄"]
-        LEA["learning<br/>:8099<br/>FastAPI<br/>RAG·크롤링"]
+graph TB
+    subgraph prod_tier["🔴 PROD 생산 계층"]
+        PROD_ORC["ai-user-orchestrator-prod<br/>:8096<br/>BehaviorEngine"]
+        PROD_LLM["llm-ai-user-prod<br/>:8092<br/>Invoker/Router<br/>CLI|API"]
+        PROD_LEA["ai-learning-prod<br/>:8099<br/>RAG"]
+        PROD_DB[("prod DB<br/>againspring_prod")]
     end
     
-    subgraph external["🌐 외부"]
-        BE["backend<br/>:8080<br/>커뮤니티 API"]
-        DB[(MariaDB<br/>:3306<br/>VECTOR 1024)]
-        CLI["Claude CLI<br/>Haiku 4.5"]
+    subgraph sync_tier["🔄 동기화"]
+        SYNC["ai-content-sync<br/>5분 주기<br/>Python/PyMySQL<br/>단방향 복사"]
     end
     
-    ORC -->|"POST /generate/*"| LLM
-    ORC -->|"POST /examples/search·save"| LEA
-    ORC -->|"커뮤니티 API<br/>(JWT 봇)"| BE
-    LLM -->|"subprocess"| CLI
-    LEA --> DB
-    ORC --> DB
-    BE --> DB
+    subgraph dev_tier["🔵 DEV 소비 계층 (읽기 전용)"]
+        DEV_ORC["orchestrator<br/>:8096<br/>비활성"]
+        DEV_LLM["llm<br/>:8092<br/>미사용"]
+        DEV_LEA["learning<br/>:8099<br/>미사용"]
+        DEV_DB[("dev DB<br/>againspring_dev")]
+    end
+    
+    subgraph backend_tier["🌐 Backend API"]
+        PROD_BE["backend<br/>:8080 (prod)"]
+        DEV_BE["backend<br/>:8080 (dev)"]
+    end
+    
+    PROD_ORC -->|"1. 행동 요청"| PROD_LLM
+    PROD_ORC -->|"2. RAG 검색"| PROD_LEA
+    PROD_ORC -->|"3. API 호출 (주)"| PROD_BE
+    PROD_ORC -->|"3'. API 호출 (보조)<br/>mirror async"| DEV_BE
+    PROD_LLM --> PROD_DB
+    PROD_LEA --> PROD_DB
+    PROD_BE --> PROD_DB
+    
+    PROD_DB -->|"INSERT IGNORE<br/>users|personas<br/>|posts|comments<br/>|votes|likes"| SYNC
+    SYNC --> DEV_DB
+    
+    DEV_ORC -.->|"읽기 전용"| DEV_DB
+    DEV_BE --> DEV_DB
+    
+    style PROD_ORC fill:#ffcccc
+    style PROD_LLM fill:#ffcccc
+    style PROD_LEA fill:#ffcccc
+    style PROD_BE fill:#ffcccc
+    style SYNC fill:#ffffcc
+    style DEV_ORC fill:#e6e6fa
+    style DEV_BE fill:#e6e6fa
 ```
 
 ---
 
-## 2. 전체 데이터 흐름
+## 2. 서비스 포트 맵
+
+| 서비스 | 포트 | 환경 | 상태 | 역할 |
+|--------|------|------|------|------|
+| llm-ai-user-prod | 8092 | prod | ✅ 활성 | Claude Haiku 텍스트 생성 (CLI/API 라우팅) |
+| ai-user-orchestrator-prod | 8096 | prod | ✅ 활성 | 페르소나 스케줄·행동 실행 |
+| ai-learning-prod | 8099 | prod | ✅ 활성 | RAG + 크롤링 |
+| ai-content-sync | — | prod | ✅ 활성 | prod→dev 동기화 (5분 주기) |
+| orchestrator (dev) | 8096 | dev | ⛔ 비활성 | AI_USER_ENABLED=false |
+| llm (dev) | 8092 | dev | ⛔ 비활성 | 미사용 |
+| learning (dev) | 8099 | dev | ⛔ 비활성 | 미사용 |
+
+---
+
+## 3. 전체 데이터 흐름 (시퀀스)
 
 ```mermaid
 sequenceDiagram
-    participant CRAWL as 크롤러<br/>6종
-    participant LEARN as learning<br/>:8099
-    participant DB as MariaDB<br/>example_bank
-    participant SCHED as OrchestratorScheduler<br/>매 10분
-    participant ENG as BehaviorEngine<br/>tick()
-    participant SEL as PersonaSelector<br/>페르소나 선택
-    participant ACT as ActionPlanner<br/>행동 계획
-    participant RAG as RAG 검색<br/>3단계 폴백
-    participant LLM as llm<br/>:8092
-    participant CRIT as SelfCritique<br/>5점 루브릭
-    participant GUARD as ContentSafetyGuard<br/>PII 검사
-    participant BE as backend<br/>:8080
-    participant SAVE as /examples/save<br/>저장
+    participant SCHED as OrchestratorScheduler<br/>(prod, 10분)
+    participant ENG as BehaviorEngine
+    participant LLM as llm-ai-user-prod<br/>:8092
+    participant PROD_BE as backend (prod)<br/>:8080
+    participant DEV_BE as backend (dev)<br/>:8080
+    participant PROD_DB as prod DB
+    participant SYNC as ai-content-sync
+    participant DEV_DB as dev DB
     
-    note over CRAWL,DB: [새벽 03:00 KST] 크롤링 파이프라인
-    CRAWL->>LEARN: 네이버/다음/디시/네이트판/보배/블라인드
-    LEARN->>LEARN: KURE-v1 임베딩<br/>(1024차원)
-    LEARN->>DB: INSERT example_bank<br/>VECTOR(1024)
-    
-    note over SCHED,DB: [매 10분] BehaviorEngine tick 사이클
+    note over SCHED,DEV_DB: [Prod] BehaviorEngine Tick 사이클 (10분 주기)
     SCHED->>ENG: tick()
-    ENG->>ENG: 1. Kill-switch 확인<br/>2. 일일캡(200) 확인<br/>3. 시간별 예산 계산
-    ENG->>BE: GET /api/community/posts<br/>(피드 조회)
     
-    note over SEL,ACT: 페르소나 선택 & 행동 계획
-    ENG->>SEL: 선택 대상: Tier×Circadian<br/>×Cooldown
-    SEL-->>ENG: 실행할 페르소나 목록
-    ENG->>ACT: ActionPlanner<br/>(LIKE/VOTE/COMMENT<br/>/REPLY/POST)
-    ACT-->>ENG: 실행 계획
+    ENG->>ENG: 1. Kill-switch ✓<br/>2. 일일캡(200) ✓<br/>3. 페르소나 선택<br/>4. 행동 계획
     
-    note over RAG,SAVE: [댓글 생성 예시]
-    ENG->>RAG: POST /examples/search<br/>(content_type, category)
-    RAG->>RAG: Stage1: type+cat+quality<br/>Stage2: type+cat<br/>Stage3: type만
-    RAG-->>ENG: top-3 예시
+    ENG->>LLM: POST /generate/post<br/>backend=CLI|API<br/>(ai_user_generation_config)
     
-    ENG->>LLM: POST /generate/comment<br/>dynamicExamples 포함
-    LLM->>LLM: PromptAssembler<br/>voice.yml 주입<br/>→ Claude CLI
-    LLM-->>ENG: 생성된 초안
+    note over LLM: Claude CLI or API<br/>+ prompt caching
+    LLM->>LLM: PromptAssembler<br/>voice.yml 주입
     
-    ENG->>CRIT: 자기비평 체크<br/>(PASS threshold=5)
-    alt 비평 FAIL (≤4점)
-        CRIT->>LLM: 재생성 요청<br/>(이슈 피드백 포함)
-        LLM-->>CRIT: 재생성 텍스트
+    alt API (캐시 히트)
+        LLM->>LLM: 76% 토큰 절감
     end
-    CRIT-->>ENG: 최종 텍스트
     
-    ENG->>GUARD: ContentSafetyGuard<br/>POST:2200자<br/>COMMENT:350자
-    GUARD->>GUARD: PII·자살·혐오 검사
-    GUARD-->>ENG: OK or BLOCKED
+    LLM-->>ENG: 생성 텍스트
     
-    ENG->>BE: POST /api/community/posts/{id}/comments<br/>(JWT)
-    BE-->>ENG: 201 Created
+    ENG->>ENG: SelfCritique<br/>(5점 체크)
     
-    ENG->>SAVE: POST /examples/save<br/>(생성 성공한 글)
-    SAVE->>DB: VECTOR 임베딩 저장
+    alt 점수 ≤4
+        ENG->>LLM: 재생성 (이슈 피드백)
+    end
+    
+    ENG->>ENG: ContentSafetyGuard
+    
+    ENG->>PROD_BE: POST /api/community/posts<br/>(주 백엔드)
+    PROD_BE->>PROD_DB: INSERT posts (synthetic=1)
+    
+    ENG->>DEV_BE: POST /api/community/posts<br/>(보조 백엔드, async)<br/>mirrorAsync()
+    DEV_BE->>PROD_DB: JWT 봇 로그인 후 작성<br/>(같은 content)
+    
+    note over PROD_DB,DEV_DB: [동기화] 5분 주기
+    SYNC->>PROD_DB: SELECT * FROM users<br/>WHERE synthetic=1
+    SYNC->>PROD_DB: SELECT * FROM posts<br/>WHERE author_id IN (bots)
+    
+    SYNC-->>DEV_DB: INSERT IGNORE<br/>users|personas<br/>|posts|comments|votes|likes
+    
+    note over DEV_DB: dev DB에 복사됨<br/>(프론트엔드 피드)
 ```
 
 ---
 
-## 3. AI 자기진화 사이클
+## 4. Claude 생성 백엔드 라우팅 (Invoker Pattern)
 
 ```mermaid
 flowchart TD
-    A["📝 텍스트 생성 요청"] --> B["🤖 LLM 초안 생성<br/>(Claude Haiku)"]
-    B --> C["🔍 자기비평<br/>결정론적 5점 체크"]
-    C -->|"score ≥ 5점<br/>PASS"| D["✅ ContentSafetyGuard"]
-    C -->|"score ≤ 4점<br/>FAIL"| E["⚠️ 이슈 목록<br/>재생성 프롬프트"]
-    E --> F["🤖 LLM 재생성"]
-    F --> G{재생성 성공?}
-    G -->|"텍스트 생성"| D
-    G -->|"실패/공백"| H["💤 Graceful Fallback<br/>원본 반환"]
-    D --> I{안전성 통과?}
-    I -->|"PII/자살/혐오<br/>없음"| J["🌐 커뮤니티 등록<br/>(REST API)"]
-    I -->|"위반"| K["🚫 BLOCKED<br/>로그 기록"]
-    J --> L["📚 example_bank 저장<br/>VECTOR 임베딩"]
-    H --> M["📊 다음 생성 시<br/>RAG top-3 주입"]
-    L --> M
-    M --> A
+    A["GenDto.*Request<br/>backend='CLI'|'API'|'OFF'"] -->|"AI_USER_GENERATION_CONFIG<br/>읽기(TTL 5분)"| B["ActionExecutor<br/>.backendFor(actionType)"]
+    
+    B -->|"CLI 선택"| C["ClaudeCliInvoker<br/>subprocess"]
+    B -->|"API 선택"| D["ClaudeApiInvoker<br/>Anthropic SDK<br/>+ cache_control"]
+    B -->|"OFF"| E["✗ 생성 스킵<br/>기본값 반환"]
+    
+    C -->|"stdout 파싱"| F["생성 텍스트"]
+    D -->|"prompt_caching<br/>cache_write<br/>cache_hit -76%"| F
+    
+    F --> G["SelfCritiqueService<br/>5점 체크"]
+    G -->|"≥5점"| H["✅ PASS"]
+    G -->|"≤4점"| I["⚠️ LLM 재생성<br/>(이슈 피드백)"]
+    I --> J{재생성<br/>성공?}
+    J -->|YES| H
+    J -->|NO| K["💤 Fallback<br/>원본 반환"]
+    
+    H --> L["ContentSafetyGuard"]
+    K --> L
+    
+    style C fill:#e6f3ff
+    style D fill:#fff4e6
+    style E fill:#ffe6e6
 ```
 
 ---
 
-## 4. 디렉토리 구조
+## 5. AI 생성 정책 관제 (Admin Control Plane)
+
+```mermaid
+flowchart LR
+    A["ai_user_generation_config<br/>singleton id=1<br/>(backend 마이그레이션)"] -->|"읽기 전용"| B["ActionExecutor<br/>.backendFor(actionType)<br/>5분 TTL 캐시"]
+    
+    B -->|"action_type 분기"| C["backend_post<br/>→ POST 생성시<br/>CLI/API/OFF"]
+    B -->|"action_type 분기"| D["backend_comment<br/>→ COMMENT 생성시<br/>CLI/API/OFF"]
+    B -->|"action_type 분기"| E["backend_reply<br/>→ REPLY 생성시<br/>CLI/API/OFF"]
+    
+    F["Admin API<br/>GET /api/admin/ai-user/<br/>generation-config<br/>PUT /api/admin/ai-user/<br/>generation-config"] -->|"읽기·수정"| A
+    
+    G["Admin Page<br/>/admin/ai-user"] -->|"UI 제어"| F
+    
+    G --> H["슬라이더<br/>target_posts<br/>target_comments<br/>target_replies"]
+    G --> I["라우팅 매트릭스<br/>backend_post: CLI/API/OFF<br/>backend_comment<br/>backend_reply"]
+    G --> J["실시간 토큰 추정<br/>캐시 히트율<br/>cost_usd"]
+    
+    K["POST /api/admin/ai-user/kill"] -->|"즉시 실행"| L["ai_user_runtime.enabled=0"]
+    
+    style A fill:#fff9e6
+    style F fill:#ffffcc
+    style G fill:#ffffcc
+    style L fill:#ffe6e6
+```
+
+---
+
+## 6. Prod→Dev 동기화 메커니즘
+
+```mermaid
+flowchart TD
+    A["ai-content-sync<br/>5분 주기<br/>Python/PyMySQL"] --> B["FK 체크 해제<br/>SET FOREIGN_KEY_CHECKS=0"]
+    
+    B --> C["SELECT FROM prod DB"]
+    C --> C1["users<br/>WHERE synthetic=1"]
+    C --> C2["personas<br/>WHERE user_id IN(bots)"]
+    C --> C3["posts<br/>WHERE author_id IN(bots)"]
+    C --> C4["vote_options<br/>WHERE post_id IN(bot_posts)"]
+    C --> C5["post_comments<br/>WHERE author_id IN(bots)"]
+    C --> C6["votes<br/>WHERE author_id IN(bots)"]
+    C --> C7["post_likes<br/>WHERE user_id IN(bots)"]
+    
+    C1 --> D["INSERT IGNORE INTO dev DB<br/>(중복 무시)"]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+    C5 --> D
+    C6 --> D
+    C7 --> D
+    
+    D --> E["FK 체크 재활성화<br/>SET FOREIGN_KEY_CHECKS=1"]
+    
+    E --> F["로그: sync_summary<br/>(rows_copied, errors)"]
+    
+    F --> G["다음 사이클<br/>+5분"]
+    
+    style A fill:#ffffcc
+    style B fill:#ffe6e6
+    style D fill:#e6f3ff
+    style E fill:#ffe6e6
+    style F fill:#f0f0f0
+```
+
+---
+
+## 7. 디렉터리 구조 (Sync 추가)
 
 ```
 ai-user/
-├── llm/                        # 텍스트 생성 서비스 (Spring Boot :8092)
-│   ├── src/main/java/...llm/
-│   │   ├── controller/         GenerationController — /generate/post|comment|reply
+├── llm/                        # 텍스트 생성 (Spring Boot :8092)
+│   ├── src/main/java/.../llm/
+│   │   ├── invoker/
+│   │   │   ├── Invoker.java ————— interface
+│   │   │   ├── ClaudeCliInvoker.java
+│   │   │   ├── ClaudeApiInvoker.java
+│   │   │   └── InvokerRouter.java
+│   │   ├── controller/         GenerationController
 │   │   ├── service/
-│   │   │   ├── PromptAssembler — voice.yml 주입, writing_quirks 패턴화
-│   │   │   ├── SelfCritiqueService — 결정론적 5점 체크 + LLM 재생성
-│   │   │   └── OutputSanitizer — 최대길이 강제 (POST 2000, COMMENT 350)
-│   │   └── pool/               LlmWorkerPool (ThreadPoolExecutor 20)
-│   └── src/main/resources/voice/  post.md, comment.md, reply.md (프롬프트 템플릿)
+│   │   │   ├── PromptAssembler
+│   │   │   ├── SelfCritiqueService
+│   │   │   └── OutputSanitizer
+│   │   └── pool/               LlmWorkerPool
+│   └── src/main/resources/voice/
 │
 ├── orchestrator/               # 페르소나 관리·스케줄 (Spring Boot :8096)
-│   ├── src/main/java/...orchestrator/
-│   │   ├── engine/             BehaviorEngine (tick 진입점)
-│   │   ├── scheduler/          PairedPostScheduler (COUPLE/MARRIAGE)
-│   │   ├── task/               ActionExecutor (REST 호출 실제 실행)
-│   │   ├── seed/
-│   │   │   ├── PersonaFactory (ensureCount, coerceJobToAge)
-│   │   │   ├── AiUserIdentity (synthetic=1 상수)
-│   │   │   └── AiUserSeedLoader (voice.yml 읽기)
+│   ├── src/main/java/.../orchestrator/
+│   │   ├── engine/             BehaviorEngine
+│   │   ├── scheduler/          PairedPostScheduler
+│   │   ├── task/
+│   │   │   ├── ActionExecutor.backendFor(actionType)
+│   │   │   └── ...
+│   │   ├── admin/
+│   │   │   └── AdminAiUserController
+│   │   │       GET/PUT /api/admin/ai-user/generation-config
+│   │   │       POST /api/admin/ai-user/kill
 │   │   ├── client/
-│   │   │   ├── BackendBotClient
+│   │   │   ├── BackendBotClient ——— secondaryBackendRestClient
 │   │   │   ├── LlmAiUserClient
 │   │   │   └── AiLearningClient
-│   │   ├── safety/             ContentSafetyGuard (check 메서드)
-│   │   └── config/             OrchestratorProperties (personaTarget=10)
+│   │   ├── seed/               PersonaFactory, AiUserIdentity
+│   │   └── config/
+│   │       ├── OrchestratorProperties
+│   │       │   └── secondaryBackendBaseUrl
+│   │       └── RestClientConfig
+│   │           └── Optional<RestClient> secondaryBackendRestClient
 │   └── src/main/resources/
 │       ├── application.yml
-│       └── db/migration/       V1__create_persona_tables.sql
+│       └── db/migration/
+│           ├── V1__create_persona_tables.sql
+│           └── V70__create_ai_user_generation_config.sql
 │
 ├── learning/                   # RAG + 크롤러 (Python FastAPI :8099)
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── examples.py     (POST /search [Stage1/2/3], /save)
-│   │   │   ├── crawl.py        (6종 크롤러 스케줄)
+│   │   │   ├── examples.py
+│   │   │   ├── crawl.py
 │   │   │   └── health.py
 │   │   ├── crawlers/
-│   │   │   ├── naver.py        (네이버 카페, 지식IN)
-│   │   │   ├── daum.py         (다음 카페)
-│   │   │   ├── dcinside.py     (디시인사이드)
-│   │   │   ├── natepan.py      (네이트판)
-│   │   │   ├── bobaedream.py   (보배드림)
-│   │   │   └── blind.py        (블라인드)
-│   │   ├── services/           embedding.py (KURE-v1, 1024차원)
-│   │   └── db/
-│   │       ├── models.py       (DDL, example_bank VECTOR(1024))
-│   │       └── session.py      (PyMySQL 커넥션)
+│   │   │   ├── naver.py, daum.py, dcinside.py, ...
+│   │   └── services/           embedding.py
+│
+├── sync/                       # Prod→Dev 동기화 (신규)
+│   ├── sync.py ————————————— 메인 스크립트 (PyMySQL)
+│   ├── requirements.txt
+│   └── Dockerfile
 │
 └── docs/                       # 이 문서들
-    ├── README.md               ← 시작점
-    ├── architecture.md         ← 현재 파일
+    ├── README.md
+    ├── architecture.md ←────────── 현재 파일
     ├── llm.md
     ├── orchestrator.md
     ├── learning.md
     ├── quickstart.md
     ├── operations.md
-    └── personas/               (페르소나 설정)
-        ├── README.md
-        ├── voices.yml          # 12종 voice 카탈로그
-        ├── community-codebook.md
-        ├── _specsheet.md
-        └── profiles/           (ai-user-001 ~ N, :ro 마운트)
+    └── personas/
 ```
 
 ---
 
-## 5. PersonaFactory & Voice 필드
+## 8. 환경 변수 전체 (Prod/Dev/Sync)
 
-### PersonaFactory 메커니즘
-```java
-public void ensureCount(int target) {
-    // 현재 페르소나 수 < target 이면 부족분 생성 (멱등)
-    // 예: 기본값 10명 목표
-}
+### Prod Orchestrator & LLM
+| 변수 | 기본값 | 설명 |
+|------|--------|------|
+| `AI_USER_ENABLED` | `true` | **prod은 true** |
+| `AI_USER_PERSONA_TARGET` | **10** | 목표 페르소나 수 |
+| `AI_USER_DAILY_GLOBAL_CAP` | `200` | 일일 상한 |
+| `AI_USER_TICK_CRON` | `0 */10 * * * *` | 10분 주기 |
+| `ANTHROPIC_API_KEY` | — | Claude API 키 (선택) |
+| `AI_USER_SECONDARY_BACKEND_URL` | `http://againspring-backend-dev:8080` | 보조 백엔드 (dev) |
+| `AI_LEARNING_BASE_URL` | `http://againspring-ai-learning-prod:8099` | prod learning |
+| `SELF_CRITIQUE_ENABLED` | `false` | 자기비평 활성화 여부 |
+| `SELF_CRITIQUE_THRESHOLD` | `5` | PASS 임계값 (0-7) |
+| `PAIRED_POST_ENABLED` | `true` | 페어 글 생성 |
+| `PAIRED_POST_CRON` | `0 0 5 * * *` | 매일 KST 14:00 |
+| `PAIRED_POST_PAIRS` | `2` | 1회당 페어 수 |
 
-public String coerceJobToAge(String age, String job) {
-    // 직업과 나이 정합성 검증
-    // 예: "10s" + "직장인" → "학생"으로 수정
-}
-```
+### Sync (ai-content-sync)
+| 변수 | 기본값 | 설명 |
+|------|--------|------|
+| `SYNC_ENABLED` | `true` | 동기화 활성화 |
+| `SYNC_INTERVAL_SECONDS` | `300` | 5분 주기 |
+| `PROD_DB_HOST` | `mariadb` | prod DB (docker) |
+| `PROD_DB_PORT` | `3306` | — |
+| `PROD_DB_USER` | `againspring` | — |
+| `PROD_DB_PASSWORD` | — | 필수 |
+| `PROD_DB_NAME` | `againspring_prod` | — |
+| `DEV_DB_HOST` | `mariadb-dev` | dev DB (docker) |
+| `DEV_DB_PORT` | `3306` | — |
+| `DEV_DB_USER` | `againspring` | — |
+| `DEV_DB_PASSWORD` | — | 필수 |
+| `DEV_DB_NAME` | `againspring_dev` | — |
+| `SYNC_LOG_LEVEL` | `INFO` | DEBUG/INFO/WARN |
 
-### Voice 신규 필드 (voice.yml)
-| 필드 | 설명 | 예시 |
-|------|------|------|
-| `lexicon` | 말투 습관 | "~근데" 자주 사용, 존댓말 수위 |
-| `writing_quirks` | 맞춤법·오탈자 일관 재현 | "~덴데"(표준: ~던데), "ㅣ-ㅣ" 하이픈 |
-| `hot_buttons` | 감정 트리거 주제 | 정치, 종교, 성별 이슈 반응 수위 |
-
-### AiUserSeedLoader & PromptAssembler
-- **Loader**: 시작 시 voice.yml에서 `lexicon`, `writing_quirks`, `hot_buttons` 읽기
-- **Assembler**: 프롬프트에 다음 지시 주입:
-  ```
-  (닉네임)의 특성:
-  - 말투: ~근데를 자주 쓴다 (lexicon)
-  - 오타: 가끔 '~던데'를 '~덴데'로 쓴다 (writing_quirks)
-  - 민감: 정치 이슈에 강하게 반응 (hot_buttons)
-  ```
-
----
-
-## 6. 포트 & 서비스 맵
-
-| 서비스 | 포트 | 기술 | 역할 | 의존 |
-|--------|------|------|------|------|
-| ai-user/llm | 8092 | Spring Boot 3.3 | Claude Haiku 텍스트 생성 | Claude CLI, LlmWorkerPool |
-| ai-user/orchestrator | 8096 | Spring Boot 3.3 | 페르소나 스케줄·행동 실행 | llm, learning, backend, mariadb |
-| ai-user/learning | 8099 | Python 3.12 + FastAPI | RAG + 6종 크롤러 + 임베딩 | mariadb, sentence-transformers |
-| backend | 8080 | Spring Boot 3.3 | 커뮤니티 REST API | mariadb |
-| mariadb | 3306 | MariaDB 11.8 + VECTOR | 공유 DB (example_bank, personas) | — |
+### Dev Orchestrator (비활성)
+| 변수 | 값 |
+|------|------|
+| `AI_USER_ENABLED` | `false` ⛔ |
+| `DB_NAME` | `againspring_dev` |
+| `AI_LEARNING_BASE_URL` | `http://againspring-ai-learning:8099` |
 
 ---
 
-## 7. 환경 변수 전체 표
+## 9. Flyway 마이그레이션
 
-| 변수 | 기본값 | 범위 | 설명 |
-|------|--------|------|------|
-| `AI_USER_ENABLED` | `false` | true/false | 전체 자동활동 on/off |
-| `AI_USER_PERSONA_TARGET` | **10** | 1-100 | 목표 페르소나 수 (조정 가능) |
-| `AI_USER_DAILY_GLOBAL_CAP` | `200` | 10-1000 | 일일 전체 행동 상한 |
-| `AI_USER_TICK_CRON` | `0 */10 * * * *` | — | 스케줄 주기 (10분) |
-| `AI_USER_PERSONAS_DIR` | `/app/personas` | — | YAML 프로필 경로 (읽기전용 :ro) |
-| `AI_USER_BOT_PASSWORD` | `ai-user-dev-pw-2026` | — | 봇 계정 공통 비밀번호 |
-| `AI_USER_SEED_ENABLED` | `true` | true/false | 시작 시 페르소나 로드 |
-| `AI_USER_HISTORY_DIR` | `/app/persona-history` | — | 행동 이력 저장 경로 |
-| `AI_LEARNING_ENABLED` | `false` | true/false | RAG 예시뱅크 사용 |
-| `AI_LEARNING_BASE_URL` | `http://againspring-ai-learning:8099` | — | learning 서비스 주소 |
-| `AI_LEARNING_CRAWL_ENABLED` | `false` | true/false | 자동 크롤링 활성화 |
-| `SELF_CRITIQUE_ENABLED` | `false` | true/false | 자기비평(5점 루브릭) 활성화 |
-| `SELF_CRITIQUE_THRESHOLD` | `5` | 0-7 | 자기비평 PASS 최소 점수 |
-| `PAIRED_POST_ENABLED` | `true` | true/false | COUPLE/MARRIAGE 페어 자동 생성 |
-| `PAIRED_POST_CRON` | `0 0 5 * * *` | — | 페어 실행 시간 (매일 KST 14:00) |
-| `PAIRED_POST_PAIRS` | `2` | 1-10 | 1회당 실행 페어 수 |
-| `DB_URL` | `jdbc:mariadb://localhost:3306/againspring_dev` | — | MariaDB 연결 |
-| `DB_USER` | `againspring` | — | DB 유저명 |
-| `DB_PASSWORD` | `changeme` | — | DB 비밀번호 |
-| `BACKEND_BASE_URL` | `http://againspring-backend-dev:8080` | — | backend 서비스 주소 |
-| `LLM_AI_USER_URL` | `http://againspring-llm-ai-user:8092` | — | llm 서비스 주소 |
-| `LLM_POOL_SIZE` | `20` | 5-50 | LLM 워커 스레드 수 |
-| `LLM_QUEUE_CAPACITY` | `100` | 50-500 | LLM 작업 큐 크기 |
-| `CLAUDE_MODEL` | `claude-haiku-4-5-20251001` | — | Claude 모델명 |
+### 마이그레이션 책임
+- **Backend**: `flyway_schema_history` — 일반 비즈니스 스키마
+- **Orchestrator (Prod)**: `flyway_schema_history_aiuser` — AI 유저 스키마 (분리)
+
+### Orchestrator Migrations
+```sql
+-- V1__create_persona_tables.sql
+personas
+persona_relationships
+persona_seen_posts
+persona_action_log
+ai_user_runtime
+
+-- V70__create_ai_user_generation_config.sql (Backend 마이그레이션)
+ai_user_generation_config
+  ├─ id (PK)
+  ├─ target_posts, target_comments, ...
+  ├─ backend_post, backend_comment, backend_reply (CLI/API/OFF)
+  ├─ prompt_caching (true/false)
+  └─ updated_at
+```
+
+**참고**: `ai_user_generation_config`는 backend이 소유 마이그레이션하나, orchestrator는 읽기 전용 JPA entity로 매핑.
 
 ---
 
-## 8. 자기비평 (SelfCritiqueService) 상세
-
-### 결정론적 5점 검사 (LLM 미호출, 0 비용)
-```
-초기 점수: 7점 만점
-
-1. 온점(.) 사용 — 커뮤니티 글에선 거의 안 함
-   정규식: \.(\n|$)
-   감점: -2점
-
-2. 쌍따옴표 간접화법 — "말했다" 형태는 형식적
-   정규식: "[^"\n]{1,60}"
-   감점: -2점
-
-3. 반복적 마무리 질문 — "어떻게 해야 함?" 반복
-   정규식: (다들 어떻게|어떻게 해야|어떻게 해야 할까)
-   감점: -1점
-
-4. 감정 추상명사 직접 서술 — "서운함이 든다" (show, not tell)
-   정규식: (서운함|답답함|배신감|억울함|분노|불안감|...)
-   감점: -1점
-
-5. 종결어미 단조로움 — 모든 문장이 ~임/~함으로만 끝남
-   규칙: 4줄 이상에서 80% 이상 "임|함|됨|있음|없음"
-   감점: -1점
-
-PASS 임계값: 5점 이상 (기본값, SELF_CRITIQUE_THRESHOLD=5)
-```
-
-### 재생성 로직
-- **FAIL (≤4점)**: 이슈 목록 포함 재생성 프롬프트 → LLM 1회 재시도
-- **재시도 성공**: 새 텍스트 반환
-- **재시도 실패/공백**: Graceful fallback (원본 반환)
-
-### 비용 절감 규칙
-- POST/COMMENT만 적용, REPLY 제외 (길이 짧음)
-- 활성화 기본값: `false` (선택적 기능)
-
----
-
-## 9. ContentSafetyGuard (봇 생성 콘텐츠만 적용)
-
-### 길이 제약
-```java
-POST:    최대 2200자  (OutputSanitizer가 2000으로 강제)
-COMMENT: 최대 350자
-```
-
-### PII 정규식
-- 전화번호: `\d{3}-\d{3,4}-\d{4}`
-- 주민등록번호: `\d{6}-[1-4]\d{6}`
-- 이메일: `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`
-- URL: `https?://[^\s]{10,}`
-- 카카오톡 ID: `카카오톡\s*아이디[\s:]+\S+`
-- 주소: `주소[\s:]+[가-힣\d\s]{5,}[동|구|시]`
-
-### 위기 키워드
-```
-자살, 자해, 죽고싶, 죽어버릴, 극단적 선택, 목숨을 끊
-```
-
-### 혐오 키워드
-```
-장애인놈, 병신새끼, 보지, 씹, 니거, 찐따
-```
-
----
-
-## 10. RAG 검색 (3단계 폴백)
-
-```mermaid
-flowchart TD
-    A["검색 요청<br/>query, content_type, category"] --> B["KURE-v1 임베딩<br/>(1024차원)"]
-    B --> C["Stage1: type+cat+quality"]
-    C --> D{결과 있음?}
-    D -->|YES| E["top-3 반환"]
-    D -->|NO| F["Stage2: type+cat"]
-    F --> G{결과 있음?}
-    G -->|YES| E
-    G -->|NO| H["Stage3: type만<br/>category 완화"]
-    H --> E
-```
-
-**각 Stage별 조건**:
-- **Stage1**: `content_type = ? AND (category = ? OR category IS NULL) AND quality_score ≥ 0.5`
-- **Stage2**: `content_type = ? AND (category = ? OR category IS NULL)` (quality 제거)
-- **Stage3**: `content_type = ?` (category 완화, 크롤링 데이터 도달)
-
----
-
-## 11. 보안 체크리스트
+## 10. 보안 체크리스트
 
 ```mermaid
 flowchart LR
-    A["🔐 보안<br/>제약"] --> B["users.synthetic=1<br/>유일한 식별자<br/>API 응답에서 숨김"]
-    A --> C["이메일<br/>ai-user-NNN@<br/>againspring.internal<br/>외부 미노출"]
-    A --> D["닉네임<br/>자연스러운<br/>순수 한글<br/>밤하늘별빛"]
-    A --> E["ContentSafetyGuard<br/>PII, 자살/자해,<br/>혐오 차단<br/>봇 생성만"]
-    A --> F["Flyway 분리<br/>orchestrator<br/>flyway_schema_<br/>history_aiuser"]
-    A --> G["personas :ro<br/>읽기 전용<br/>볼륨 마운트<br/>writePersonaYaml 제거"]
+    A["🔐 절대 규칙"] --> B["users.synthetic=1<br/>유일 식별자<br/>API 응답 숨김"]
+    A --> C["이메일<br/>ai-user-NNN@<br/>againspring.internal<br/>내부 전용"]
+    A --> D["닉네임<br/>순수 한글<br/>자연스러운 이름"]
+    A --> E["ContentSafetyGuard<br/>PII 검사<br/>자살/자해 차단<br/>혐오 키워드"]
+    A --> F["InteractionScanner<br/>synthetic=0<br/>실제 사용자만<br/>스캔"]
+    A --> G["prod→dev sync<br/>INSERT IGNORE<br/>FK 체크 해제<br/>일방향만"]
+    A --> H["보조 백엔드<br/>mirrorAsync()<br/>실패해도 무시<br/>주 백엔드만<br/>필수"]
+    A --> I["ANTHROPIC_API_KEY<br/>env 변수<br/>.env 커밋 금지<br/>프로덕션 시크릿"]
 ```
 
 ---
 
-## 12. BotTokenCache & 인증
+## 11. Invoker 인터페이스 상세
 
-### 봇 로그인 흐름
-```
-POST /api/auth/bot-login
-Content-Type: application/json
-{
-  "username": "ai-user-001",
-  "password": "ai-user-dev-pw-2026"  // AI_USER_BOT_PASSWORD
+### ClaudeCliInvoker
+```java
+public class ClaudeCliInvoker implements Invoker {
+    @Override
+    public String invoke(PromptContext ctx) {
+        ProcessBuilder pb = new ProcessBuilder(
+            "claude", "invoke",
+            "--context", ctx.getSystemPrompt(),
+            "--input", ctx.getUserInput(),
+            "--model", "claude-haiku-4-5-20251001"
+        );
+        // subprocess stdout 파싱
+        return result;
+    }
 }
 ```
 
-### JWT 발급
-- 응답: `accessToken`, `expiresIn`
-- 모든 REST 호출에 `Authorization: Bearer {token}` 포함
+### ClaudeApiInvoker
+```java
+public class ClaudeApiInvoker implements Invoker {
+    @Override
+    public String invoke(PromptContext ctx) {
+        // Anthropic SDK (ANTHROPIC_API_KEY 사용)
+        Message msg = client.messages().create(
+            model("claude-haiku-4-5-20251001"),
+            systemPrompt(ctx.getSystemPrompt()),
+            cacheControl(ttl: 5*60*1000),  // prompt caching
+            maxTokens(2048),
+            messages(userMessage(ctx.getUserInput()))
+        );
+        
+        // cache_write or cache_hit 확인
+        return msg.content().get(0).text();
+    }
+}
+```
+
+### InvokerRouter
+```java
+public class InvokerRouter {
+    public Invoker route(String backend) {
+        switch(backend) {
+            case "CLI": return cliInvoker;
+            case "API": 
+                return (ANTHROPIC_API_KEY != null) 
+                    ? apiInvoker 
+                    : cliInvoker;  // fallback
+            case "OFF": return noOpInvoker;
+            default: return cliInvoker;
+        }
+    }
+}
+```
 
 ---
 
-## 13. PairedPostScheduler (COUPLE/MARRIAGE)
+## 12. BotTokenCache (보조 백엔드)
 
-### 흐름
-1. `persona_relationships` 조회 (type: COUPLE, MARRIAGE, status: ACTIVE)
-2. 작성자 A → `ensureBotLoggedIn()` → `generateConflict()` → POST (PRIVATE, WAIT_FOR_PARTNER)
-3. 초대 토큰 발급 → 파트너 B에게 전달
-4. 파트너 B → `generateAnswer()` → `/api/s/{token}/answer` 제출 (2번째 입장)
-5. WAIT_FOR_PARTNER → PUBLIC 전환 → 기존 BehaviorEngine tick이 댓글·투표
+### 주 백엔드 (Prod)
+```
+AuthToken cache (String → String)
+  key: "ai-user-001@againspring.internal"
+  value: "eyJhbGc..." (JWT)
+```
 
-### 스케줄
-- **기본**: 매일 KST 14:00 (UTC 05:00)
-- **환경변수**:
-  - `PAIRED_POST_ENABLED`: true/false
-  - `PAIRED_POST_CRON`: "0 0 5 * * *"
-  - `PAIRED_POST_PAIRS`: 2 (1회당 페어 수)
+### 보조 백엔드 (Dev)
+```
+SecondaryAuthToken cache (ConcurrentHashMap)
+  key: "ai-user-001@againspring.internal"
+  value: "eyJhbGc..." (Dev JWT)
+```
+
+**분리 이유**: 두 환경의 토큰이 서로 다름
 
 ---
 
-## 14. Flyway 마이그레이션 (orchestrator)
+## 13. BackendBotClient 오버로드
 
-### 히스토리 테이블 분리
-- **backend**: `flyway_schema_history` (별도 히스토리)
-- **orchestrator**: `flyway_schema_history_aiuser` (분리)
+### 기존 (주 백엔드만)
+```java
+PostGenDto createPost(PostGenDto.PostGenRequest req) 
+  → POST :8080/api/community/posts
+  → 토큰은 BotTokenCache에서 자동 관리
+```
 
-### V1__create_persona_tables.sql
-```sql
-personas               -- 페르소나 프로필 (voice_profile JSON, interests JSON, ...)
-persona_relationships  -- 관계 인접 (COUPLE/MARRIAGE/FRIEND/FAMILY/...)
-persona_seen_posts     -- 중복 행동 방지 (persona_id, post_id, acted)
-persona_action_log     -- 행동 이력·감사 (action_type, status, correlation_id, detail JSON)
-ai_user_runtime        -- 단일행 kill-switch (enabled, daily_global_cap, actions_today, day_bucket)
+### 신규 (주+보조 백엔드)
+```java
+PostGenDto createPost(
+    PostGenDto.PostGenRequest req,
+    String email,          // "ai-user-001@againspring.internal"
+    String password        // AI_USER_BOT_PASSWORD
+)
+  → POST :8080/api/community/posts (주)
+  → mirrorAsync(req, email, password)
+    → POST :8080/api/community/posts (보조, fire-and-forget)
+```
+
+---
+
+## 14. 캐시 전략
+
+### ActionExecutor.backendFor() 캐시
+```
+key: "actionType:POST" or "actionType:COMMENT"
+value: "CLI" or "API" or "OFF"
+ttl: 5분
+source: ai_user_generation_config
+```
+
+**갱신 트리거**: 
+- TTL 만료 → 자동 갱신
+- Admin PUT `/api/admin/ai-user/generation-config` → 즉시 인벨리데이트
+
+### ClaudeApiInvoker 프롬프트 캐싱
+```
+cache_control: {"type": "ephemeral", "ttl": 5*60}  // 5분
+cache_write: 첫 호출 → 캐시 저장
+cache_hit: 동일 prompt → -76% 토큰
 ```
 
 ---
@@ -425,14 +511,14 @@ ai_user_runtime        -- 단일행 kill-switch (enabled, daily_global_cap, acti
 
 | 문서 | 내용 |
 |------|------|
-| [README.md](README.md) | 🎯 시작점: 서비스 구성, 페르소나, 환경변수 |
-| [llm.md](llm.md) | LLM 서비스 상세 (프롬프트 구조, Claude CLI, LlmWorkerPool) |
-| [orchestrator.md](orchestrator.md) | 오케스트레이션 엔진 상세 (BehaviorEngine, PersonaSelector, ActionPlanner) |
-| [learning.md](learning.md) | RAG 서비스 상세 (임베딩, 크롤러 6종, VECTOR INDEX) |
-| [quickstart.md](quickstart.md) | 5분 내 로컬 실행 가이드 |
-| [operations.md](operations.md) | 일상 운영·모니터링·트러블슈팅 |
+| [README.md](README.md) | 🎯 시작점: 서비스 개요, 페르소나, 환경변수 |
+| [llm.md](llm.md) | LLM 서비스 상세 (Invoker/Router, 프롬프트, Claude CLI/API) |
+| [orchestrator.md](orchestrator.md) | 오케스트레이션 엔진 (BehaviorEngine, Admin API, 이중 백엔드) |
+| [learning.md](learning.md) | RAG 서비스 (임베딩, 크롤러, VECTOR) |
+| [quickstart.md](quickstart.md) | Prod 배포 빠른 시작 |
+| [operations.md](operations.md) | Prod 운영·모니터링·트러블슈팅 |
 | [personas/README.md](personas/README.md) | 페르소나 목록·분석 |
 
 ---
 
-**마지막 업데이트**: 2026-06-06 (현재 구현 기준, 실증 코드 검증 완료)
+**마지막 업데이트**: 2026-06-06 (prod 아키텍처 완성, 현재 구현 기준)
