@@ -15,6 +15,9 @@ import { CommentBar } from '@/components/community/c3/CommentBar';
 import { CommentComposeSheet } from '@/components/community/c3/CommentComposeSheet';
 import { ReportModal } from '@/components/community/ReportModal';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { InviteSheet } from '@/components/community/InviteSheet';
+import { GuestInfoSheet } from '@/components/shared/GuestInfoSheet';
+import { useUserStore } from '@/lib/store/userStore';
 
 const COMMENT_PAGE_SIZE = 10;
 
@@ -63,6 +66,15 @@ function C3StoryDetail({
   onCommentComposeClose,
   replyToNick,
   submitError,
+  isAuthor = false,
+  activeInviteToken,
+  onInviteClick,
+  inviteSheetOpen = false,
+  onInviteClose,
+  onInviteSent,
+  guestSheetOpen = false,
+  onGuestSheetClose,
+  user,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
@@ -86,6 +98,16 @@ function C3StoryDetail({
   onCommentComposeClose: () => void;
   replyToNick: string | undefined;
   submitError: string | null;
+  // 초대 관련
+  isAuthor?: boolean;
+  activeInviteToken?: string | null;
+  onInviteClick?: () => void;
+  inviteSheetOpen?: boolean;
+  onInviteClose?: () => void;
+  onInviteSent?: (token: string) => void;
+  guestSheetOpen?: boolean;
+  onGuestSheetClose?: () => void;
+  user?: import('@/lib/types/user').User | null;
 }) {
   const router = useRouter();
   const storedSide = useVoteStore((s) => s.votes[post.id] ?? null);
@@ -249,19 +271,17 @@ function C3StoryDetail({
           )}
         </div>
 
-        {/* 제목 + 메타 */}
+        {/* 제목 */}
         <h1 style={{ fontSize: 20, color: 'var(--L-ink)', fontWeight: 500, fontFamily: 'var(--font-serif)', margin: 0, marginTop: 10, lineHeight: 1.4 }}>
           {post.title}
         </h1>
-        <div style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 6 }}>
-          익명 · {timeAgo(post.createdAt)}
-        </div>
 
-        {/* 양쪽 사연 (clamp=true) — 박스 클릭=전문 보기, 우측 끝 버튼=투표 */}
+        {/* 양쪽 사연 — 작성자 위, 상대방 아래 / 닉네임·시간은 각 카드 라벨 오른쪽 */}
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 9 }}>
           <SideStory
             side="g"
             label="작성자"
+            meta={`익명 · ${timeAgo(post.createdAt)}`}
             body={post.bodyPublished}
             clamp
             selected={pick === 'g'}
@@ -270,17 +290,70 @@ function C3StoryDetail({
             onSelect={() => router.push(`/community/${post.id}/read?side=g`)}
             onVote={() => handleVoteSide('g')}
           />
-          <SideStory
-            side="r"
-            label="상대방"
-            body={post.partnerBodyPublished || ''}
-            clamp
-            selected={pick === 'r'}
-            voted={voted && pick === 'r'}
-            voteDisabled={isVoting || (voted && pick !== 'r')}
-            onSelect={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
-            onVote={() => handleVoteSide('r')}
-          />
+          {post.partnerBodyPublished ? (
+            // 상대방 이야기가 있을 때 — 모두 동일
+            <SideStory
+              side="r"
+              label="상대방"
+              meta={post.partnerAnsweredAt ? `익명 · ${timeAgo(post.partnerAnsweredAt)}` : '익명'}
+              body={post.partnerBodyPublished}
+              clamp
+              selected={pick === 'r'}
+              voted={voted && pick === 'r'}
+              voteDisabled={isVoting || (voted && pick !== 'r')}
+              onSelect={() => router.push(`/community/${post.id}/read?side=r`)}
+              onVote={() => handleVoteSide('r')}
+            />
+          ) : isAuthor ? (
+            // 작성자 — 초대 또는 대기 슬롯
+            activeInviteToken ? (
+              <div
+                style={{ border: `1.5px dashed ${PARTNER}`, borderRadius: 12, padding: '13px 14px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  minHeight: 96, background: 'rgba(95,143,118,0.04)' }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: PARTNER, marginBottom: 8 }} />
+                <span style={{ fontSize: 12, color: PARTNER, fontWeight: 500 }}>초대함 · 답변 대기 중</span>
+                <button
+                  onClick={onInviteClick}
+                  style={{ marginTop: 8, fontSize: 11, color: 'var(--L-point)', fontWeight: 500,
+                    background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  링크 다시 보내기
+                </button>
+              </div>
+            ) : (
+              <button
+                data-testid="invite-partner-btn"
+                onClick={onInviteClick}
+                style={{ border: `1.5px dashed ${PARTNER}`, borderRadius: 12, padding: '13px 14px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  minHeight: 96, cursor: 'pointer', background: 'rgba(95,143,118,0.04)', width: '100%',
+                  fontFamily: 'inherit' }}
+              >
+                <div style={{ width: 32, height: 32, borderRadius: '50%', border: `1.5px solid ${PARTNER}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PARTNER} strokeWidth="2" strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </div>
+                <span style={{ fontSize: 12, color: PARTNER, fontWeight: 500 }}>상대 초대하기</span>
+                <span style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 3 }}>상대의 이야기로 채워주세요</span>
+              </button>
+            )
+          ) : (
+            // 관람자 — 빈 상대 슬롯 (투표 가능)
+            <SideStory
+              side="r"
+              label="상대방"
+              body=""
+              clamp
+              selected={pick === 'r'}
+              voted={voted && pick === 'r'}
+              voteDisabled={isVoting || (voted && pick !== 'r')}
+              onVote={() => handleVoteSide('r')}
+            />
+          )}
         </div>
 
         {/* 라이브 비율 막대 (얇은 8px + 좌우 라벨) */}
@@ -345,6 +418,21 @@ function C3StoryDetail({
           replyTo={replyToNick}
           error={submitError}
         />
+      )}
+
+      {/* 초대 바텀시트 */}
+      {inviteSheetOpen && onInviteClose && onInviteSent && (
+        <InviteSheet
+          postId={post.id}
+          initialToken={activeInviteToken}
+          onClose={onInviteClose}
+          onSent={onInviteSent}
+        />
+      )}
+
+      {/* 게스트 안내 시트 */}
+      {guestSheetOpen && user && onGuestSheetClose && (
+        <GuestInfoSheet user={user} onClose={onGuestSheetClose} />
       )}
     </div>
   );
@@ -687,6 +775,7 @@ function C3Closed({
 export default function CommunityPostPage({ params }: PageProps) {
   useGuestInit();
   const { setVote, clearVote, getVoteSide } = useVoteStore();
+  const user = useUserStore((s) => s.user);
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get('highlight') ? Number(searchParams.get('highlight')) : null;
@@ -721,6 +810,11 @@ export default function CommunityPostPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isVoting, setIsVoting] = useState(false);
   const commentBottomRef = useRef<HTMLDivElement>(null);
+
+  // 초대 state
+  const [inviteSheetOpen, setInviteSheetOpen] = useState(false);
+  const [localInviteToken, setLocalInviteToken] = useState<string | null>(null);
+  const [guestSheetOpen, setGuestSheetOpen] = useState(false);
 
   // 초기 포스트 + 댓글 로드
   useEffect(() => {
@@ -954,6 +1048,29 @@ export default function CommunityPostPage({ params }: PageProps) {
     setReportOpen(true);
   };
 
+  // 초대 관련
+  const activeInviteToken = post?.inviteToken ?? localInviteToken;
+
+  const handleInviteClick = () => {
+    if (user?.isGuest) { setGuestSheetOpen(true); return; }
+    setInviteSheetOpen(true);
+  };
+
+  // 파트너 도착 폴링 — 작성자가 초대 링크를 보낸 후
+  useEffect(() => {
+    if (!post?.isAuthor || !activeInviteToken || post.partnerBodyPublished) return;
+    const timer = setInterval(async () => {
+      try {
+        const data = await postApi.get(params.id);
+        if (data.paired || data.partnerBodyPublished) {
+          setPost(data);
+          clearInterval(timer);
+        }
+      } catch { /* ignore */ }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [post?.id, post?.isAuthor, activeInviteToken, post?.partnerBodyPublished]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleCancelVote = async () => {
     try {
       const result = await postApi.cancelVote(params.id);
@@ -1013,85 +1130,72 @@ export default function CommunityPostPage({ params }: PageProps) {
     );
   }
 
-  // Render logic
-  if (!post.isAuthor) {
-    // View A: 관람자 — full comments merged
-    return (
-      <>
-        <C3StoryDetail
-          post={post}
-          voteResult={voteResult}
-          comments={comments}
-          onVote={handleVote}
-          onCancelVote={handleCancelVote}
-          onLike={handleLike}
-          isVoting={isVoting}
-          hasMoreComments={hasMoreComments}
-          loadingMoreComments={loadingMoreComments}
-          commentBottomRef={commentBottomRef}
-          onOpenCompose={openCompose}
-          onEditComment={openEdit}
-          onDeleteComment={handleDeleteComment}
-          onReportComment={handleReportComment}
-          highlightedId={highlightedId}
-          composeOpen={composeOpen}
-          commentText={commentText}
-          onCommentTextChange={setCommentText}
-          onCommentSubmit={handleCommentSubmit}
-          onCommentComposeClose={closeCompose}
-          replyToNick={replyToNick}
-          submitError={submitError}
-        />
-        {/* 댓글 삭제 확인 다이얼로그 */}
-        <ConfirmDialog
-          open={deleteTarget != null}
-          title="이 댓글을 삭제할까요?"
-          confirmLabel="삭제"
-          cancelLabel="취소"
-          onConfirm={confirmDelete}
-          onCancel={() => setDeleteTarget(null)}
-        />
-
-        {/* 댓글 삭제 실패 토스트 */}
-        {deleteErrorToast && (
-          <div style={{
-            position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
-            background: 'var(--L-ink)', color: 'var(--L-bg)', fontSize: 13,
-            padding: '10px 20px', borderRadius: 20, zIndex: 400, whiteSpace: 'nowrap',
-          }}>
-            댓글 삭제에 실패했습니다. 다시 시도해 주세요.
-          </div>
-        )}
-
-        {/* 좋아요 미인증 토스트 */}
-        {likeToast && (
-          <div style={{
-            position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
-            background: 'var(--L-ink)', color: 'var(--L-bg)', fontSize: 13,
-            padding: '10px 20px', borderRadius: 20, zIndex: 300, whiteSpace: 'nowrap',
-          }}>
-            좋아요는 로그인 또는 게스트 시작 후 가능합니다.
-          </div>
-        )}
-
-        {/* 신고 모달 */}
-        <ReportModal
-          isOpen={reportOpen}
-          onClose={() => { setReportOpen(false); setReportTarget(null); }}
-          postId={params.id}
-          commentId={reportTarget?.commentId}
-          authorId={reportTarget?.authorId}
-        />
-      </>
-    );
-  } else if (post.status === 'VOTING' && !post.paired) {
-    // View B: 작성자 + VOTING + partner 없음
-    return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} jury={juryResult} juryExhausted={juryPollingExhausted} onRetryJury={handleRetryJury} />;
-  } else if (post.status === 'VOTING' && post.paired) {
-    // View C: 작성자 + VOTING + partner 있음
-    return <C3ResultPair post={post} voteResult={voteResult} comments={comments} jury={juryResult} juryExhausted={juryPollingExhausted} onRetryJury={handleRetryJury} />;
-  } else {
-    // View D: status=CLOSED
+  // CLOSED: 별도 결과 화면
+  if (post.status === 'CLOSED') {
     return <C3Closed post={post} voteResult={voteResult} jury={juryResult} juryExhausted={juryPollingExhausted} onRetryJury={handleRetryJury} />;
   }
+
+  // 작성자·관람자 모두 동일한 C3StoryDetail — 작성자는 상대 슬롯 클릭 시 초대
+  return (
+    <>
+      <C3StoryDetail
+        post={post}
+        voteResult={voteResult}
+        comments={comments}
+        onVote={handleVote}
+        onCancelVote={handleCancelVote}
+        onLike={handleLike}
+        isVoting={isVoting}
+        hasMoreComments={hasMoreComments}
+        loadingMoreComments={loadingMoreComments}
+        commentBottomRef={commentBottomRef}
+        onOpenCompose={openCompose}
+        onEditComment={openEdit}
+        onDeleteComment={handleDeleteComment}
+        onReportComment={handleReportComment}
+        highlightedId={highlightedId}
+        composeOpen={composeOpen}
+        commentText={commentText}
+        onCommentTextChange={setCommentText}
+        onCommentSubmit={handleCommentSubmit}
+        onCommentComposeClose={closeCompose}
+        replyToNick={replyToNick}
+        submitError={submitError}
+        isAuthor={post.isAuthor ?? false}
+        activeInviteToken={activeInviteToken}
+        onInviteClick={handleInviteClick}
+        inviteSheetOpen={inviteSheetOpen}
+        onInviteClose={() => setInviteSheetOpen(false)}
+        onInviteSent={(token) => { setLocalInviteToken(token); setInviteSheetOpen(false); }}
+        guestSheetOpen={guestSheetOpen}
+        onGuestSheetClose={() => setGuestSheetOpen(false)}
+        user={user}
+      />
+      <ConfirmDialog
+        open={deleteTarget != null}
+        title="이 댓글을 삭제할까요?"
+        confirmLabel="삭제"
+        cancelLabel="취소"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+      {deleteErrorToast && (
+        <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', background: 'var(--L-ink)', color: 'var(--L-bg)', fontSize: 13, padding: '10px 20px', borderRadius: 20, zIndex: 400, whiteSpace: 'nowrap' }}>
+          댓글 삭제에 실패했습니다. 다시 시도해 주세요.
+        </div>
+      )}
+      {likeToast && (
+        <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', background: 'var(--L-ink)', color: 'var(--L-bg)', fontSize: 13, padding: '10px 20px', borderRadius: 20, zIndex: 300, whiteSpace: 'nowrap' }}>
+          좋아요는 로그인 또는 게스트 시작 후 가능합니다.
+        </div>
+      )}
+      <ReportModal
+        isOpen={reportOpen}
+        onClose={() => { setReportOpen(false); setReportTarget(null); }}
+        postId={params.id}
+        commentId={reportTarget?.commentId}
+        authorId={reportTarget?.authorId}
+      />
+    </>
+  );
 }

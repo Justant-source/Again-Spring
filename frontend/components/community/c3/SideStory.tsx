@@ -6,6 +6,8 @@ interface SideStoryProps {
   body: string;
   clamp?: boolean;
   selected?: boolean;
+  /** 라벨 오른쪽에 표시할 메타 정보 (닉네임 · 시간 등) */
+  meta?: string;
   /** 박스(본문) 클릭 — 사연 전문 보기로 이동 */
   onSelect?: () => void;
   /** (legacy) clamp 시 우상단 "더 보기 ›" 링크 */
@@ -24,6 +26,7 @@ export function SideStory({
   body,
   clamp = false,
   selected = false,
+  meta,
   onSelect,
   onMore,
   onVote,
@@ -46,11 +49,16 @@ export function SideStory({
         transition: 'border-color 0.15s',
       }}
     >
-      {/* 상단: 색점 + 라벨 + (투표함) / 우측 끝 투표 버튼 또는 더 보기 */}
+      {/* 상단: 색점 + 라벨 + 메타(라벨 바로 오른쪽) / 우측 투표 버튼 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: c, fontWeight: 500 }}>{label}</span>
+          <span style={{ fontSize: 11, color: c, fontWeight: 500, flexShrink: 0 }}>{label}</span>
+          {meta && (
+            <span style={{ fontSize: 11, color: 'var(--L-sub)', whiteSpace: 'nowrap' }}>
+              {meta}
+            </span>
+          )}
         </div>
         {onVote ? (
           <button

@@ -23,7 +23,7 @@ export default function PartnerAnswerPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Form state
-  const [userTitle, setUserTitle] = useState('');
+  // 제목은 읽기 전용 — 작성자 제목 그대로 사용
   const [bodyRaw, setBodyRaw] = useState('');
 
   // Load post preview on mount
@@ -56,7 +56,7 @@ export default function PartnerAnswerPage() {
       setSubmitting(true);
       setError(null);
       await postInviteApi.submitAnswer(token, {
-        userTitle: userTitle.trim() || post?.userTitle || '상대방',
+        userTitle: post?.userTitle || '상대방',
         bodyRaw: bodyRaw.trim(),
       });
       router.push(post?.postId ? `/community/${post.postId}` : '/community');
@@ -141,27 +141,24 @@ export default function PartnerAnswerPage() {
         />
       </div>
 
-      {/* Title input */}
+      {/* Title — 읽기 전용 (작성자 제목 그대로) */}
       <div style={{ marginBottom: 20 }}>
         <label style={{ fontSize: 12, color: 'var(--P-sub)', display: 'block', marginBottom: 8 }}>
-          제목 · 수정 가능
+          제목
         </label>
-        <input
-          type="text"
-          value={userTitle}
-          onChange={(e) => setUserTitle(e.target.value)}
-          placeholder={post.userTitle}
+        <div
           style={{
             width: '100%',
             padding: '10px 12px',
             border: '1px solid var(--P-border)',
             borderRadius: 8,
             fontSize: 13,
-            color: 'var(--P-ink)',
-            background: 'white',
-            outline: 'none',
+            color: 'var(--P-sub)',
+            background: 'var(--P-card)',
           }}
-        />
+        >
+          {post.userTitle}
+        </div>
       </div>
 
       {/* Body textarea */}
