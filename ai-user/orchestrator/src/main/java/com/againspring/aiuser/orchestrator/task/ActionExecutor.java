@@ -107,6 +107,7 @@ public class ActionExecutor {
             case COMMENT -> executeComment(persona, action, jwt, corrId);
             case REPLY -> executeReply(persona, action, jwt, corrId);
             case POST -> executePost(persona, action, jwt, corrId);
+            case VIEW -> executeView(persona, action, jwt, corrId);
             default -> log.warn("Unhandled action type: {}", action.type());
         }
     }
@@ -116,6 +117,17 @@ public class ActionExecutor {
         String postId = action.targetPost().getId();
         boolean ok = backendBot.likePost(jwt, postId);
         markSeen(persona, postId, true);
+        logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
+            java.util.Map.of("postId", postId, "usedLlm", false));
+    }
+
+    private void executeView(Persona persona, PlannedAction action, String jwt, String corrId) {
+        if (action.targetPost() == null || action.targetPost().getId() == null) return;
+        String postId = action.targetPost().getId();
+        // deviceId = "ai-bot-{personaId}" — 페르소나당 포스트당 1회만 카운트
+        String deviceId = "ai-bot-" + persona.getId();
+        boolean ok = backendBot.viewPost(postId, deviceId);
+        // VIEW는 markSeen 하지 않음 — 이후 댓글/투표 행동 차단 방지
         logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
             java.util.Map.of("postId", postId, "usedLlm", false));
     }
@@ -806,7 +818,7 @@ public class ActionExecutor {
                 targetId = java.lang.String.valueOf(action.parentCommentId());
             }
             String targetType = switch (action.type()) {
-                case LIKE, VOTE, COMMENT, POST -> "POST";
+                case LIKE, VOTE, COMMENT, POST, VIEW -> "POST";
                 case REPLY, INVITE_ANSWER -> "COMMENT";
             };
             actionLogRepo.save(PersonaActionLog.builder()

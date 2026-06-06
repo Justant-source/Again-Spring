@@ -189,6 +189,30 @@ public class BackendBotClient {
         }
     }
 
+    /** Record a view (POST /view with deviceId — auth 불필요, deviceId로 중복 방지) */
+    public boolean viewPost(String postId, String deviceId) {
+        try {
+            restClient.post().uri("/api/community/posts/{postId}/view", postId)
+                .body(java.util.Map.of("deviceId", deviceId))
+                .retrieve().toBodilessEntity();
+            if (secondaryClient != null) {
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        secondaryClient.post().uri("/api/community/posts/{postId}/view", postId)
+                            .body(java.util.Map.of("deviceId", deviceId))
+                            .retrieve().toBodilessEntity();
+                    } catch (Exception ex) {
+                        log.debug("Secondary viewPost failed: {}", ex.getMessage());
+                    }
+                });
+            }
+            return true;
+        } catch (Exception e) {
+            log.debug("View post failed on {}: {}", postId, e.getMessage());
+            return false;
+        }
+    }
+
     /** Add comment or reply (parentCommentId=null for top-level) */
     public boolean addComment(String jwt, String postId, String body, Long parentCommentId) {
         return addComment(jwt, postId, body, parentCommentId, null, null);
