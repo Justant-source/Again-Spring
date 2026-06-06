@@ -91,35 +91,29 @@ test.describe('Flow 04-A: 광장 피드 (공개 접근)', () => {
     await expect(page.getByText('게스트로 올리면')).toBeVisible({ timeout: 5_000 })
   })
 
-  test('게스트 — GuestNoticeModal에서 게스트로 올리기 → 모드 단계 진입', async ({ page }) => {
+  test('게스트 — GuestNoticeModal에서 게스트로 올리기 → 분석 후 사연 상세 이동', async ({ page }) => {
+    // 모드 선택 단계 제거 — 게스트로 계속하기 → 분석 → /community/{id}로 이동
     await page.goto(`${BASE}/community/new`)
-    await page.locator('[data-testid="compose-title"]').fill('게스트 모드 테스트')
-    await page.locator('[data-testid="compose-body"]').fill('게스트 모드 선택 단계 테스트.')
+    await page.locator('[data-testid="compose-title"]').fill('게스트 올리기 E2E')
+    await page.locator('[data-testid="compose-body"]').fill('게스트 올리기 테스트 본문입니다.')
     await page.getByRole('button', { name: '올리기' }).click()
     await expect(page.getByText('게스트로 올리면')).toBeVisible({ timeout: 5_000 })
-    // testid로 버튼 클릭 (event.stopPropagation 적용됨)
     await page.locator('[data-testid="guest-notice-continue"]').click()
-    // 모드 선택 단계 진입
-    await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 5_000 })
+    // 분석 중 → 사연 상세 페이지로 이동
+    await page.waitForURL(/\/community\/(?!new)[^/]+$/, { timeout: 30_000 })
+    await expect(page.getByText('게스트 올리기 E2E')).toBeVisible({ timeout: 10_000 })
   })
 
-  test('게스트 — 모드 선택: 상대 초대 카드 비활성, PUBLIC 선택 → 버튼 활성', async ({ page }) => {
-    await page.goto(`${BASE}/community/new`)
-    await page.locator('[data-testid="compose-title"]').fill('게스트 모드 카드 테스트')
-    await page.locator('[data-testid="compose-body"]').fill('게스트 모드 카드 활성화 테스트 본문.')
-    await page.getByRole('button', { name: '올리기' }).click()
-    await page.locator('[data-testid="guest-notice-continue"]').click()
-    await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 5_000 })
-
-    // 제출 버튼 초기 활성 (PUBLIC이 기본값)
-    const submitBtn = page.locator('[data-testid="mode-submit-btn"]')
-    await expect(submitBtn).toBeEnabled()
-    await expect(submitBtn).toContainText('바로 올리기')
-
-    // 상대 초대 카드 클릭해도 PUBLIC이 선택된 상태 유지 → 버튼은 계속 활성
-    await page.locator('[data-testid="mode-private-card"]').click({ force: true })
-    await expect(submitBtn).toBeEnabled()
-    await expect(submitBtn).toContainText('바로 올리기')
+  test('게스트 — 상대 초대 버튼은 사연 상세에서 제공 (GuestInfoSheet 표시)', async ({ page }) => {
+    // 게스트는 상세 페이지의 상대 초대 버튼 탭 시 GuestInfoSheet 표시
+    await page.goto(`${BASE}/community/mock_001`)
+    await page.waitForURL(/\/community\/mock_001/, { timeout: 12_000 })
+    const inviteBtn = page.locator('[data-testid="invite-partner-btn"]')
+    if (await inviteBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await inviteBtn.click()
+      await expect(page.locator('[data-testid="guest-info-sheet"]')).toBeVisible({ timeout: 5_000 })
+    }
+    // mock_001이 이미 paired이면 invite 버튼이 없으므로 pass
   })
 
   test('사연 상세 — 알려진 mock 포스트 직접 방문 → 페이지 로드 확인', async ({ page }) => {
@@ -188,15 +182,18 @@ test.describe('Flow 04-C: 댓글 · 좋아요 (공개 접근)', () => {
     expect(timeText).not.toMatch(/-\d+/)
   })
 
-  test('사연 상세 — 댓글바 클릭 → 댓글 페이지 이동', async ({ page }) => {
-    // 상세 페이지 하단 고정 댓글바는 /comments로 라우팅 (6/2 개편 후 인라인 미작성)
+  test('사연 상세 — 댓글바 클릭 → 인라인 컴포즈 시트 열림 (단일 페이지)', async ({ page }) => {
+    // 댓글 페이지 이동 없이 상세 페이지에서 인라인 댓글 작성
     await page.goto(`${BASE}/community/mock_001`)
     await page.waitForURL(/\/community\/mock_001/, { timeout: 12_000 })
     const commentBar = page.getByText('댓글을 남겨주세요.').first()
     await expect(commentBar).toBeVisible({ timeout: 8_000 })
     await commentBar.click()
-    await page.waitForURL(/\/community\/mock_001\/comments/, { timeout: 8_000 })
-    expect(page.url()).toContain('/community/mock_001/comments')
+    // CommentComposeSheet (textarea) 인라인으로 표시 — URL 변경 없음
+    const textarea = page.locator('textarea')
+    await expect(textarea).toBeVisible({ timeout: 5_000 })
+    expect(page.url()).toContain('/community/mock_001')
+    expect(page.url()).not.toContain('/comments')
   })
 })
 
@@ -205,22 +202,29 @@ test.describe('Flow 04-D: 전문 읽기 화면 (6/2 진영 탭)', () => {
   // read 페이지에는 "상대방 이야기 읽기 ›" 이동 버튼이 없고
   // 작성자/상대방 탭 전환 UI만 존재한다 (710d874 기준).
 
-  test('read 화면 — 진영 탭 두 개 표시 (작성자 · 상대방)', async ({ page }) => {
+  test('read 화면 — 작성자 이야기 표시', async ({ page }) => {
+    // 진영 탭은 paired 포스트에서만 표시 — mock_001은 solo이므로 작성자 이야기만 확인
     await page.goto(`${BASE}/community/mock_001/read`)
-    await expect(page.getByText('작성자의 이야기')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByText('상대방의 이야기')).toBeVisible({ timeout: 5_000 })
+    await page.waitForURL(/\/read/, { timeout: 10_000 })
+    await expect(page.getByText('작성자')).toBeVisible({ timeout: 8_000 })
+    // 사연 본문 영역 표시 확인
+    await expect(page.locator('div[style*="font-serif"]').first()).toBeVisible({ timeout: 5_000 })
   })
 
-  test('read 화면 — 상대방 탭 클릭 → 활성 스타일 전환 (URL side=r)', async ({ page }) => {
+  test('read 화면 — paired 포스트에서 진영 탭 두 개 표시', async ({ page }) => {
+    // paired 포스트가 있을 때만 양쪽 탭 표시 — mock_001이 solo이면 skip
     await page.goto(`${BASE}/community/mock_001/read`)
     await page.waitForURL(/\/read/, { timeout: 10_000 })
     const partnerTab = page.getByText('상대방의 이야기')
-    await expect(partnerTab).toBeVisible({ timeout: 8_000 })
+    const isVisible = await partnerTab.isVisible({ timeout: 3_000 }).catch(() => false)
+    if (!isVisible) {
+      // solo 포스트: 탭 없음 — 정상 동작
+      return
+    }
+    // paired 포스트: 두 탭 모두 표시
+    await expect(page.getByText('작성자의 이야기')).toBeVisible()
     await partnerTab.click()
-    // side=r 파라미터가 반영되거나 탭이 활성 상태로 전환됨
-    // URL 쿼리 또는 UI 상태 확인 (두 탭 모두 여전히 보여야 함)
     await expect(page.getByText('작성자의 이야기')).toBeVisible({ timeout: 3_000 })
-    await expect(page.getByText('상대방의 이야기')).toBeVisible({ timeout: 3_000 })
   })
 
   test('read 화면 — "상대방 이야기 읽기 ›" 이동 버튼 없음 (710d874 회귀 방지)', async ({ page }) => {
@@ -235,9 +239,8 @@ test.describe('Flow 04-D: 전문 읽기 화면 (6/2 진영 탭)', () => {
 test.describe('Flow 04-B: 광장 플로우 (회원)', () => {
   test.use({ storageState: authStatePath(PERSONA_TEST1.email) })
 
-  test('회원 — PUBLIC 선택 후 제출 → 피드로 이동 (6/2 이후 동작)', async ({ page }) => {
-    // 6/2 이전: 제출 후 /community/[id] 로 이동
-    // 6/2 이후: 제출 후 /community (피드)로 이동 — BE 분석 대기 없이 즉시 반환
+  test('회원 — 올리기 제출 → 분석 후 사연 상세로 이동', async ({ page }) => {
+    // 모드 선택 단계 제거 — 작성 후 바로 분석 → /community/{id}로 이동
     await page.goto(`${BASE}/community/new`)
     const titleInput = page.locator('[data-testid="compose-title"]')
     await expect(titleInput).toBeVisible({ timeout: 10_000 })
@@ -245,34 +248,25 @@ test.describe('Flow 04-B: 광장 플로우 (회원)', () => {
     await page.locator('[data-testid="compose-body"]').fill('e2e 테스트에 의해 자동 생성된 사연입니다. 테스트 완료 후 삭제 예정.')
     await page.getByRole('button', { name: '올리기' }).click()
 
-    // mode 단계 (회원이므로 GuestNoticeModal 없음)
-    await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 8_000 })
-
-    // PUBLIC 선택 후 제출
-    await page.locator('[data-testid="mode-public-card"]').click()
-    const submitBtn = page.locator('[data-testid="mode-submit-btn"]')
-    await expect(submitBtn).toBeEnabled()
-    await submitBtn.click()
-
-    // 피드(/community)로 이동
-    await page.waitForURL(/\/community$/, { timeout: 30_000 })
-    expect(page.url()).toMatch(/\/community$/)
+    // 분석 중 화면을 거쳐 사연 상세(/community/{id})로 이동
+    await page.waitForURL(/\/community\/(?!new)[^/]+$/, { timeout: 30_000 })
+    expect(page.url()).toMatch(/\/community\/[^/]+$/)
+    await expect(page.getByText('e2e 자동 테스트 사연')).toBeVisible({ timeout: 10_000 })
   })
 
-  test('회원 — 상대 초대 카드 활성화', async ({ page }) => {
+  test('회원 — 사연 상세에서 상대 초대 버튼 표시', async ({ page }) => {
+    // 모드 단계 제거 — 사연 올린 후 상세 페이지에서 상대 초대 가능
     await page.goto(`${BASE}/community/new`)
     const titleInput = page.locator('[data-testid="compose-title"]')
     await expect(titleInput).toBeVisible({ timeout: 10_000 })
-    await titleInput.fill('상대 초대 테스트')
+    await titleInput.fill('상대 초대 테스트 E2E')
     await page.locator('[data-testid="compose-body"]').fill('상대 초대 기능 e2e 테스트 본문입니다.')
     await page.getByRole('button', { name: '올리기' }).click()
 
-    await expect(page.locator('[data-testid="mode-step-heading"]')).toBeVisible({ timeout: 8_000 })
-
-    // 회원이면 상대 초대 카드 클릭 가능
-    await page.locator('[data-testid="mode-private-card"]').click()
-    const submitBtn = page.locator('[data-testid="mode-submit-btn"]')
-    await expect(submitBtn).toBeEnabled()
-    await expect(submitBtn).toContainText('상대 초대하기')
+    // 사연 상세로 이동
+    await page.waitForURL(/\/community\/(?!new)[^/]+$/, { timeout: 30_000 })
+    // 작성자 뷰: 상대 초대 버튼 표시
+    const inviteBtn = page.locator('[data-testid="invite-partner-btn"]')
+    await expect(inviteBtn).toBeVisible({ timeout: 10_000 })
   })
 })

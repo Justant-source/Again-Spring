@@ -59,13 +59,15 @@ export default function PartnerAnswerPage() {
         userTitle: userTitle.trim() || post?.userTitle || '상대방',
         bodyRaw: bodyRaw.trim(),
       });
-      // Navigate to community post page
-      if (post?.postId) {
-        router.push(`/community/${post.postId}`);
-      }
-    } catch (err) {
+      router.push(post?.postId ? `/community/${post.postId}` : '/community');
+    } catch (err: unknown) {
       console.error('Failed to submit answer:', err);
-      setError('답변을 제출할 수 없습니다. 다시 시도해주세요.');
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 409) {
+        setError('이미 답변이 등록된 초대 링크입니다.');
+      } else {
+        setError('답변을 제출할 수 없습니다. 잠시 후 다시 시도해주세요.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -136,8 +138,6 @@ export default function PartnerAnswerPage() {
           body={post.authorBodyPublished}
           clamp={false}
           selected={false}
-          onSelect={() => {}}
-          onMore={() => {}}
         />
       </div>
 

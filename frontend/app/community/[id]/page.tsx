@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { postApi, PostDetail, JuryResult, VoteResult } from '@/lib/api/community/postApi';
 import { commentApi, Comment } from '@/lib/api/community/commentApi';
 import { getOrCreateDeviceId } from '@/lib/utils/deviceId';
@@ -11,13 +11,16 @@ import { AUTHOR, PARTNER, AUTHOR_BG, PARTNER_BG } from '@/lib/constants/factionC
 import { timeAgo } from '@/lib/utils/timeAgo';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { useVoteStore } from '@/lib/store/voteStore';
+import { CommentBar } from '@/components/community/c3/CommentBar';
+import { CommentComposeSheet } from '@/components/community/c3/CommentComposeSheet';
+import { ReportModal } from '@/components/community/ReportModal';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 const COMMENT_PAGE_SIZE = 10;
 
 interface PageProps {
   params: { id: string };
 }
-
 
 // 카테고리 enum → 표시 한글 (피드와 동일)
 const CAT_LABELS: Record<string, string> = {
@@ -48,6 +51,18 @@ function C3StoryDetail({
   isVoting,
   loadingMoreComments,
   commentBottomRef,
+  onOpenCompose,
+  onEditComment,
+  onDeleteComment,
+  onReportComment,
+  highlightedId,
+  composeOpen,
+  commentText,
+  onCommentTextChange,
+  onCommentSubmit,
+  onCommentComposeClose,
+  replyToNick,
+  submitError,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
@@ -59,6 +74,18 @@ function C3StoryDetail({
   hasMoreComments: boolean;
   loadingMoreComments: boolean;
   commentBottomRef: React.RefObject<HTMLDivElement>;
+  onOpenCompose: (parentId?: number, replyNick?: string) => void;
+  onEditComment: (comment: Comment) => void;
+  onDeleteComment: (commentId: number) => void;
+  onReportComment: (commentId: number, authorId: string) => void;
+  highlightedId: number | null;
+  composeOpen: boolean;
+  commentText: string;
+  onCommentTextChange: (v: string) => void;
+  onCommentSubmit: () => Promise<void>;
+  onCommentComposeClose: () => void;
+  replyToNick: string | undefined;
+  submitError: string | null;
 }) {
   const storedSide = useVoteStore((s) => s.votes[post.id] ?? null);
   const { clearVote: storeClearVote } = useVoteStore();
@@ -86,7 +113,6 @@ function C3StoryDetail({
   const [localVoteCount, setLocalVoteCount] = useState(
     voteResult?.totalVotes ?? post.voteResult?.totalVotes ?? 0
   );
-  const router = useRouter();
 
   // 우측 끝 투표 버튼 — 해당 쪽 투표 / 이미 이 쪽에 투표했으면 취소
   const handleVoteSide = async (side: 'g' | 'r') => {
@@ -158,9 +184,42 @@ function C3StoryDetail({
       ? existingPartnerCount + 1
       : existingPartnerCount;
 
+  const renderComment = (comment: Comment, isReply = false) => (
+    <div
+      key={comment.id}
+      id={`comment-${comment.id}`}
+      style={comment.id === highlightedId ? {
+        borderRadius: 8,
+        outline: '2px solid var(--L-point)',
+        transition: 'outline 0.5s ease',
+      } : undefined}
+    >
+      <CommunityComment
+        nick={comment.authorNickname || comment.authorId}
+        isAuthor={comment.isAuthor ?? false}
+        isPartner={comment.isPartner ?? false}
+        time={timeAgo(comment.createdAt)}
+        text={comment.body}
+        likeCount={comment.likeCount}
+        isLiked={comment.isLiked}
+        isReply={isReply}
+        isMine={comment.isMine ?? false}
+        onLike={() => onLike(comment.id)}
+        onReply={
+          isReply
+            ? undefined
+            : () => onOpenCompose(comment.id, comment.authorNickname || comment.authorId)
+        }
+        onEdit={() => onEditComment(comment)}
+        onDelete={() => onDeleteComment(comment.id)}
+        onReport={() => onReportComment(comment.id, comment.authorId)}
+      />
+      {!isReply && comment.replies?.map((r) => renderComment(r, true))}
+    </div>
+  );
 
   return (
-    <div style={{ background: 'var(--L-bg)', minHeight: '100vh' }}>
+    <div style={{ background: 'var(--L-bg)', minHeight: '100vh', position: 'relative' }}>
       <div style={{ padding: '14px 20px 160px' }}>
         {/* 상단: ‹ 광장 + 투표 완료 도장 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -207,7 +266,7 @@ function C3StoryDetail({
             selected={pick === 'g'}
             voted={voted && pick === 'g'}
             voteDisabled={isVoting || (voted && pick !== 'g')}
-            onSelect={() => router.push(`/community/${post.id}/read?side=g`)}
+            onSelect={() => {}}
             onVote={() => handleVoteSide('g')}
           />
           <SideStory
@@ -218,7 +277,7 @@ function C3StoryDetail({
             selected={pick === 'r'}
             voted={voted && pick === 'r'}
             voteDisabled={isVoting || (voted && pick !== 'r')}
-            onSelect={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
+            onSelect={post.partnerBodyPublished ? () => {} : undefined}
             onVote={() => handleVoteSide('r')}
           />
         </div>
@@ -251,42 +310,14 @@ function C3StoryDetail({
           </button>
         </div>
 
-        {/* 댓글 인라인 목록 — 블라인드 방식 (무한스크롤) */}
+        {/* 댓글 전체 목록 — 블라인드 방식 (무한스크롤) */}
         <div style={{ marginTop: 4, marginBottom: 80 }}>
           {comments.length === 0 && (
             <div style={{ fontSize: 12, color: 'var(--L-sub)', padding: '16px 0', textAlign: 'center' }}>
               아직 댓글이 없습니다
             </div>
           )}
-          {comments.map((comment) => (
-            <div key={comment.id}>
-              <CommunityComment
-                nick={comment.authorNickname || comment.authorId}
-                isAuthor={comment.isAuthor ?? false}
-                isPartner={comment.isPartner ?? false}
-                time={timeAgo(comment.createdAt)}
-                text={comment.body}
-                likeCount={comment.likeCount}
-                isLiked={comment.isLiked}
-                onLike={() => onLike(comment.id)}
-                onReply={() => router.push(`/community/${post.id}/comments`)}
-              />
-              {comment.replies?.map((reply) => (
-                <CommunityComment
-                  key={reply.id}
-                  nick={reply.authorNickname || reply.authorId}
-                  isAuthor={reply.isAuthor ?? false}
-                  isPartner={reply.isPartner ?? false}
-                  time={timeAgo(reply.createdAt)}
-                  text={reply.body}
-                  likeCount={reply.likeCount}
-                  isLiked={reply.isLiked}
-                  isReply
-                  onLike={() => onLike(reply.id)}
-                />
-              ))}
-            </div>
-          ))}
+          {comments.map((c) => renderComment(c, false))}
           {/* 무한스크롤 트리거 */}
           <div ref={commentBottomRef} style={{ height: 16 }} />
           {loadingMoreComments && (
@@ -295,23 +326,25 @@ function C3StoryDetail({
         </div>
       </div>
 
-      {/* 하단 고정 영역: 댓글 입력바 (투표는 각 사연 우측 끝 버튼으로) */}
+      {/* 하단 고정 영역: 댓글 입력바 */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto', background: 'var(--L-bg)' }}>
-        {/* 댓글 입력바 — 탭하면 댓글 페이지로 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => router.push(`/community/${post.id}/comments`)}
-          onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/community/${post.id}/comments`); }}
-          style={{
-            borderTop: '1px solid var(--L-border)',
-            padding: '14px 20px calc(14px + env(safe-area-inset-bottom))',
-            cursor: 'text',
-          }}
-        >
-          <span style={{ fontSize: 14.5, color: 'var(--L-sub)' }}>댓글을 남겨주세요.</span>
-        </div>
+        <CommentBar
+          replyTo={replyToNick}
+          onClick={() => onOpenCompose(undefined, undefined)}
+        />
       </div>
+
+      {/* 댓글 작성 바텀시트 */}
+      {composeOpen && (
+        <CommentComposeSheet
+          value={commentText}
+          onChange={(v) => { onCommentTextChange(v); }}
+          onSubmit={onCommentSubmit}
+          onClose={onCommentComposeClose}
+          replyTo={replyToNick}
+          error={submitError}
+        />
+      )}
     </div>
   );
 }
@@ -373,7 +406,7 @@ function C3ResultSolo({
           clamp={false}
           selected={false}
           onSelect={() => {}}
-          onMore={() => router.push(`/community/${post.id}/read?side=g`)}
+          onMore={() => {}}
         />
         <SideStory
           side="r"
@@ -382,7 +415,7 @@ function C3ResultSolo({
           clamp={false}
           selected={false}
           onSelect={undefined}
-          onMore={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
+          onMore={undefined}
         />
       </div>
 
@@ -426,22 +459,6 @@ function C3ResultSolo({
         >
           상대 초대하기
         </button>
-        <button
-          onClick={() => router.push(`/community/${post.id}/comments`)}
-          style={{
-            flex: 1,
-            padding: '12px 16px',
-            background: 'transparent',
-            color: 'var(--P-ink)',
-            border: `1px solid var(--P-border)`,
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          댓글 보기
-        </button>
       </div>
     </div>
   );
@@ -463,8 +480,6 @@ function C3ResultPair({
   juryExhausted?: boolean;
   onRetryJury?: () => void;
 }) {
-  const router = useRouter();
-
   const handleShare = async () => {
     const url = typeof window !== 'undefined' ? window.location.href : '';
     try {
@@ -671,20 +686,42 @@ function C3Closed({
 export default function CommunityPostPage({ params }: PageProps) {
   useGuestInit();
   const { setVote, clearVote, getVoteSide } = useVoteStore();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get('highlight') ? Number(searchParams.get('highlight')) : null;
+  const scrolledRef = useRef(false);
+
   const [post, setPost] = useState<PostDetail | null>(null);
   const [voteResult, setVoteResult] = useState<VoteResult | null>(null);
   const [juryResult, setJuryResult] = useState<JuryResult | null>(null);
   const [juryPollingExhausted, setJuryPollingExhausted] = useState(false);
   const [juryRetryKey, setJuryRetryKey] = useState(0);
+
+  // Comment state
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentPage, setCommentPage] = useState(0);
   const [hasMoreComments, setHasMoreComments] = useState(true);
   const [loadingMoreComments, setLoadingMoreComments] = useState(false);
+  const [initialCommentLoading, setInitialCommentLoading] = useState(true);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [replyToNick, setReplyToNick] = useState<string | undefined>(undefined);
+  const [parentCommentId, setParentCommentId] = useState<number | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [likeToast, setLikeToast] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{ commentId?: number; authorId?: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [deleteErrorToast, setDeleteErrorToast] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isVoting, setIsVoting] = useState(false);
   const commentBottomRef = useRef<HTMLDivElement>(null);
 
+  // 초기 포스트 + 댓글 로드
   useEffect(() => {
     const loadPost = async () => {
       try {
@@ -697,11 +734,12 @@ export default function CommunityPostPage({ params }: PageProps) {
         setComments(commentsData);
         setHasMoreComments(commentsData.length === COMMENT_PAGE_SIZE);
         setCommentPage(1);
+        setInitialCommentLoading(false);
 
         // 조회수 기록 (fire & forget) — 디바이스 기준 중복 방지
         postApi.recordView(params.id, getOrCreateDeviceId()).catch(() => {});
 
-        // Get jury result — author only (BE는 401 반환, 비로그인 시 전역 auth 에러 유발 방지)
+        // Get jury result — author only
         if (postData.isAuthor) {
           postApi.getJury(params.id).then(setJuryResult).catch(() => {});
         }
@@ -716,18 +754,30 @@ export default function CommunityPostPage({ params }: PageProps) {
     loadPost();
   }, [params.id]);
 
-  // AI 배심원 폴링 — 작성자이고 배심원이 아직 도착 중일 때 3초마다 재조회
-  // ⚠️ deps에 juryResult 포함 금지 (setJuryResult마다 interval 재구독 → 폴링 폭주)
+  // 알림 클릭 시 highlight 댓글로 스크롤
+  useEffect(() => {
+    if (!highlightId || scrolledRef.current || initialCommentLoading) return;
+    const el = document.getElementById(`comment-${highlightId}`);
+    if (el) {
+      scrolledRef.current = true;
+      setHighlightedId(highlightId);
+      setTimeout(() => {
+        const top = el.getBoundingClientRect().top + window.scrollY - 60;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }, 50);
+      setTimeout(() => setHighlightedId(null), 2000);
+    }
+  }, [highlightId, comments, initialCommentLoading]);
+
+  // AI 배심원 폴링
   useEffect(() => {
     if (!post?.isAuthor) return;
     const target = post.jurorCount ?? 0;
     if (target === 0) return;
-    // 이미 완료된 경우 구독 즉시 종료
     if (juryResult && juryResult.jurors.length >= target) return;
 
     setJuryPollingExhausted(false);
     let attempts = 0;
-    // 배심원 1인당 ~25초 × 2배 여유 = 50초 → 50/3 ≈ 17폴. 최소 60(3분)
     const MAX = Math.max(60, target * 17);
     const timer = setInterval(async () => {
       attempts += 1;
@@ -755,27 +805,13 @@ export default function CommunityPostPage({ params }: PageProps) {
       setJuryPollingExhausted(false);
       setJuryRetryKey(k => k + 1);
     } catch {
-      // retry 409이면 이미 완료 — 재조회
       postApi.getJury(post.id).then(setJuryResult).catch(() => {});
     }
   }, [post]);
 
-  // 댓글 페이지에서 돌아올 때 commentCount 갱신
-  useEffect(() => {
-    const refresh = () => {
-      if (document.visibilityState === 'visible') {
-        postApi.get(params.id).then((data) => {
-          setPost((prev) => prev ? { ...prev, commentCount: data.commentCount } : prev);
-        }).catch(() => {});
-      }
-    };
-    document.addEventListener('visibilitychange', refresh);
-    return () => document.removeEventListener('visibilitychange', refresh);
-  }, [params.id]);
-
   // 댓글 추가 로드 (무한스크롤)
   const loadMoreComments = useCallback(async () => {
-    if (loadingMoreComments || !hasMoreComments || !post) return;
+    if (loadingMoreComments || !hasMoreComments || !post || initialCommentLoading) return;
     setLoadingMoreComments(true);
     try {
       const data = await commentApi.list(post.id, commentPage, COMMENT_PAGE_SIZE);
@@ -787,7 +823,7 @@ export default function CommunityPostPage({ params }: PageProps) {
     } finally {
       setLoadingMoreComments(false);
     }
-  }, [post, commentPage, loadingMoreComments, hasMoreComments]);
+  }, [post, commentPage, loadingMoreComments, hasMoreComments, initialCommentLoading]);
 
   useEffect(() => {
     const el = commentBottomRef.current;
@@ -799,6 +835,98 @@ export default function CommunityPostPage({ params }: PageProps) {
     observer.observe(el);
     return () => observer.disconnect();
   }, [loadMoreComments]);
+
+  // Comment handlers
+  const openCompose = (parentId?: number, replyNick?: string) => {
+    setEditingCommentId(null);
+    setCommentText('');
+    setParentCommentId(parentId ?? null);
+    setReplyToNick(replyNick);
+    setComposeOpen(true);
+  };
+
+  const openEdit = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setCommentText(comment.body);
+    setParentCommentId(null);
+    setReplyToNick(undefined);
+    setSubmitError(null);
+    setComposeOpen(true);
+  };
+
+  const closeCompose = () => {
+    setComposeOpen(false);
+    setParentCommentId(null);
+    setReplyToNick(undefined);
+    setEditingCommentId(null);
+  };
+
+  const applyEditInState = (commentId: number, newBody: string) => {
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c.id === commentId) return { ...c, body: newBody };
+        if (c.replies?.some((r) => r.id === commentId)) {
+          return { ...c, replies: c.replies.map((r) => (r.id === commentId ? { ...r, body: newBody } : r)) };
+        }
+        return c;
+      })
+    );
+  };
+
+  const removeFromState = (commentId: number) => {
+    setComments((prev) =>
+      prev
+        .filter((c) => c.id !== commentId)
+        .map((c) =>
+          c.replies?.some((r) => r.id === commentId)
+            ? { ...c, replies: c.replies.filter((r) => r.id !== commentId) }
+            : c
+        )
+    );
+  };
+
+  const handleCommentSubmit = async () => {
+    if (!commentText.trim()) return;
+    setSubmitError(null);
+    const body = commentText.trim();
+    try {
+      if (editingCommentId != null) {
+        await commentApi.update(params.id, editingCommentId, body);
+        applyEditInState(editingCommentId, body);
+        setCommentText('');
+        closeCompose();
+        return;
+      }
+      await commentApi.add(params.id, body, parentCommentId || undefined);
+      setCommentText('');
+      closeCompose();
+      const fresh = await commentApi.list(params.id, 0, COMMENT_PAGE_SIZE);
+      setComments(fresh);
+      setHasMoreComments(fresh.length === COMMENT_PAGE_SIZE);
+      setCommentPage(1);
+    } catch {
+      setSubmitError(editingCommentId != null
+        ? '댓글 수정에 실패했습니다. 다시 시도해 주세요.'
+        : '댓글 등록에 실패했습니다. 다시 시도해 주세요.');
+    }
+  };
+
+  const handleDeleteComment = (commentId: number) => {
+    setDeleteTarget(commentId);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteTarget == null) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
+    try {
+      await commentApi.remove(params.id, id);
+      removeFromState(id);
+    } catch {
+      setDeleteErrorToast(true);
+      setTimeout(() => setDeleteErrorToast(false), 2500);
+    }
+  };
 
   const handleLike = async (commentId: number) => {
     try {
@@ -812,9 +940,17 @@ export default function CommunityPostPage({ params }: PageProps) {
           return c.replies ? { ...c, replies: updatedReplies } : c;
         })
       );
-    } catch {
-      // 401 등 — axios interceptor가 처리
+    } catch (e: any) {
+      if (e?.response?.status === 403 || e?.response?.status === 401) {
+        setLikeToast(true);
+        setTimeout(() => setLikeToast(false), 2500);
+      }
     }
+  };
+
+  const handleReportComment = (commentId: number, authorId: string) => {
+    setReportTarget({ commentId, authorId });
+    setReportOpen(true);
   };
 
   const handleCancelVote = async () => {
@@ -839,12 +975,11 @@ export default function CommunityPostPage({ params }: PageProps) {
       setVote(params.id, side);
     } catch (err: any) {
       if (err?.response?.status === 409) {
-        // 이미 투표된 상태 — 로컬 상태 동기화 (재방문 직후 409가 오는 경우)
         setVote(params.id, side);
         setPost((prev) => prev ? { ...prev, isVoted: true, hasVoted: true, myVoteSide: side } : null);
       } else {
         console.error('Vote failed:', err);
-        throw err; // handleVoteSide의 catch 블록이 UI를 롤백하도록 re-throw
+        throw err;
       }
     } finally {
       setIsVoting(false);
@@ -879,8 +1014,75 @@ export default function CommunityPostPage({ params }: PageProps) {
 
   // Render logic
   if (!post.isAuthor) {
-    // View A: 관람자
-    return <C3StoryDetail post={post} voteResult={voteResult} comments={comments} onVote={handleVote} onCancelVote={handleCancelVote} onLike={handleLike} isVoting={isVoting} hasMoreComments={hasMoreComments} loadingMoreComments={loadingMoreComments} commentBottomRef={commentBottomRef} />;
+    // View A: 관람자 — full comments merged
+    return (
+      <>
+        <C3StoryDetail
+          post={post}
+          voteResult={voteResult}
+          comments={comments}
+          onVote={handleVote}
+          onCancelVote={handleCancelVote}
+          onLike={handleLike}
+          isVoting={isVoting}
+          hasMoreComments={hasMoreComments}
+          loadingMoreComments={loadingMoreComments}
+          commentBottomRef={commentBottomRef}
+          onOpenCompose={openCompose}
+          onEditComment={openEdit}
+          onDeleteComment={handleDeleteComment}
+          onReportComment={handleReportComment}
+          highlightedId={highlightedId}
+          composeOpen={composeOpen}
+          commentText={commentText}
+          onCommentTextChange={setCommentText}
+          onCommentSubmit={handleCommentSubmit}
+          onCommentComposeClose={closeCompose}
+          replyToNick={replyToNick}
+          submitError={submitError}
+        />
+        {/* 댓글 삭제 확인 다이얼로그 */}
+        <ConfirmDialog
+          open={deleteTarget != null}
+          title="이 댓글을 삭제할까요?"
+          confirmLabel="삭제"
+          cancelLabel="취소"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+
+        {/* 댓글 삭제 실패 토스트 */}
+        {deleteErrorToast && (
+          <div style={{
+            position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+            background: 'var(--L-ink)', color: 'var(--L-bg)', fontSize: 13,
+            padding: '10px 20px', borderRadius: 20, zIndex: 400, whiteSpace: 'nowrap',
+          }}>
+            댓글 삭제에 실패했습니다. 다시 시도해 주세요.
+          </div>
+        )}
+
+        {/* 좋아요 미인증 토스트 */}
+        {likeToast && (
+          <div style={{
+            position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+            background: 'var(--L-ink)', color: 'var(--L-bg)', fontSize: 13,
+            padding: '10px 20px', borderRadius: 20, zIndex: 300, whiteSpace: 'nowrap',
+          }}>
+            좋아요는 로그인 또는 게스트 시작 후 가능합니다.
+          </div>
+        )}
+
+        {/* 신고 모달 */}
+        <ReportModal
+          isOpen={reportOpen}
+          onClose={() => { setReportOpen(false); setReportTarget(null); }}
+          postId={params.id}
+          commentId={reportTarget?.commentId}
+          authorId={reportTarget?.authorId}
+        />
+      </>
+    );
   } else if (post.status === 'VOTING' && !post.paired) {
     // View B: 작성자 + VOTING + partner 없음
     return <C3ResultSolo post={post} voteResult={voteResult} comments={comments} jury={juryResult} juryExhausted={juryPollingExhausted} onRetryJury={handleRetryJury} />;

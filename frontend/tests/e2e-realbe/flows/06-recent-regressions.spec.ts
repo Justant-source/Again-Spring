@@ -183,7 +183,9 @@ test.describe('Flow 06-G: 댓글 수정·삭제 (본인 댓글)', () => {
     // 댓글 0개인 신규 포스트 생성 → 내 댓글이 첫 페이지에 단독 표시되도록 격리
     const postId = await createFreshPost(request)
 
+    // /comments → /community/{id}로 redirect (댓글이 상세 페이지에 통합)
     await page.goto(`${BASE}/community/${postId}/comments`)
+    await page.waitForURL(new RegExp(`/community/${postId}$`), { timeout: 8_000 })
     await page.waitForTimeout(GUEST_INIT_MS)
 
     // 댓글 작성
@@ -218,11 +220,12 @@ test.describe('Flow 06-G: 댓글 수정·삭제 (본인 댓글)', () => {
     await expect(page.getByText(edited)).toBeVisible({ timeout: 5_000 })
     await expect(page.getByText(original, { exact: true })).toHaveCount(0)
 
-    // 삭제 — confirm 다이얼로그 자동 수락
-    page.on('dialog', (d) => d.accept())
+    // 삭제 — 커스텀 ConfirmDialog (native dialog 아님)
     const card2 = page.locator('[id^="comment-"]').filter({ hasText: edited }).first()
     await card2.locator(COMMENT_MENU_TOGGLE).click()
     await card2.locator(COMMENT_MENU_DELETE).click()
+    // ConfirmDialog의 "삭제" 버튼 클릭
+    await page.getByRole('button', { name: '삭제' }).click()
     await expect(page.getByText(edited)).toHaveCount(0, { timeout: 5_000 })
   })
 
