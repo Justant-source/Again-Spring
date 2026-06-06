@@ -28,12 +28,13 @@ import {
   analyzeCorrectionHistory,
   applyCorrectionHistory,
   skipCorrectionHistory,
+  analyzeBatchCorrections,
   AiGlobalRule,
   AiCaution,
   AiCorrectionHistory,
   AnalyzeResponse,
 } from '@/lib/api/admin/corrections';
-import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 
 const SCOPE_LABELS: Record<string, string> = {
   ALL: '전체',
@@ -358,6 +359,8 @@ export default function AiRulesPage() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'ALL' | 'PENDING' | 'PROCESSED' | 'SKIPPED'>('ALL');
 
   const [error, setError] = useState('');
+  const [batchAnalyzing, setBatchAnalyzing] = useState(false);
+  const [batchMessage, setBatchMessage] = useState('');
 
   // ─── 로드 ───
   const loadRules = useCallback(async (page: number) => {
@@ -415,6 +418,22 @@ export default function AiRulesPage() {
     catch { alert('삭제에 실패했습니다.'); }
   }
 
+  async function handleBatchAnalyze() {
+    if (!window.confirm('PENDING 상태의 첨삭 전체를 백그라운드에서 LLM 분석 후 자동 적용합니다.\n계속하시겠습니까?')) return;
+    setBatchAnalyzing(true); setBatchMessage(''); setError('');
+    try {
+      const res = await analyzeBatchCorrections();
+      setBatchMessage(res.message);
+      if (res.queued > 0) {
+        setTimeout(() => loadHistory(0), 3000);
+      }
+    } catch (e: any) {
+      setError(e?.response?.data?.message || '일괄 분석 요청에 실패했습니다.');
+    } finally {
+      setBatchAnalyzing(false);
+    }
+  }
+
   async function handleDeleteCaution(caution: AiCaution) {
     if (!window.confirm('이 주의사항을 삭제하시겠습니까?')) return;
     try { await deleteCaution(caution.id); loadCautions(cautionsPage); }
@@ -455,8 +474,8 @@ export default function AiRulesPage() {
             <p>PENDING 항목을 <strong>Sonnet 분석</strong> → <strong>범위 선택(이 AI 유저만 / 전체 / 둘 다)</strong> → <strong>학습 데이터 적용</strong>하세요.</p>
           </div>
 
-          {/* 필터 */}
-          <div className="flex gap-2 items-center">
+          {/* 필터 + 일괄 분석 */}
+          <div className="flex gap-2 items-center flex-wrap">
             <Select value={historyStatusFilter} onValueChange={(v: any) => setHistoryStatusFilter(v)}>
               <SelectTrigger className="w-36 h-8">
                 <SelectValue />
@@ -469,6 +488,23 @@ export default function AiRulesPage() {
               </SelectContent>
             </Select>
             <span className="text-xs text-muted-foreground">총 {historyTotalElements}건</span>
+
+            <div className="ml-auto flex items-center gap-2">
+              {batchMessage && (
+                <span className="text-xs text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded">
+                  {batchMessage}
+                </span>
+              )}
+              <Button
+                size="sm"
+                onClick={handleBatchAnalyze}
+                disabled={batchAnalyzing}
+                className="bg-purple-600 hover:bg-purple-700 text-white h-8 px-3"
+              >
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+                {batchAnalyzing ? '요청 중…' : 'PENDING 일괄 분석'}
+              </Button>
+            </div>
           </div>
 
           {/* 이력 목록 */}

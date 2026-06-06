@@ -1,6 +1,25 @@
 import { api } from '@/lib/api/client';
 import type { PageResponse } from '../admin';
 
+// ===== 즉시 저장 (LLM 없음) Types =====
+
+export interface SaveCorrectionRequest {
+  targetType: 'POST' | 'COMMENT';
+  targetId: string;
+  correctedText: string;
+  applyLive: boolean;
+}
+
+export interface SaveCorrectionResponse {
+  correctionId: number;
+  appliedLive: boolean;
+}
+
+export interface BatchAnalyzeResponse {
+  queued: number;
+  message: string;
+}
+
 // ===== AI 첨삭 학습 Types =====
 
 export interface AnalyzeRequest {
@@ -95,6 +114,21 @@ export interface ApplyHistoryResponse {
 }
 
 // ===== 첨삭 분석·확정 API =====
+
+/** LLM 없이 즉시 PENDING 저장 (applyLive=true 시 라이브 교체 포함) */
+export async function saveCorrection(req: SaveCorrectionRequest): Promise<SaveCorrectionResponse> {
+  const res = await api.post<SaveCorrectionResponse>(
+    '/api/admin/content/corrections/save',
+    req
+  );
+  return res.data;
+}
+
+/** PENDING 첨삭 전체를 백그라운드에서 일괄 LLM 분석 요청 */
+export async function analyzeBatchCorrections(): Promise<BatchAnalyzeResponse> {
+  const res = await api.post<BatchAnalyzeResponse>('/api/admin/ai-rules/history/analyze-batch');
+  return res.data;
+}
 
 /** 단계 A: 원본↔수정본 LLM 분석 (DB 저장 없음) */
 export async function analyzeCorrection(req: AnalyzeRequest): Promise<AnalyzeResponse> {

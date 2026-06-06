@@ -21,4 +21,10 @@ public interface AiContentCorrectionRepository extends JpaRepository<AiContentCo
 
     /** 전체 이력 (최신순, 상태 필터 없음) */
     Page<AiContentCorrection> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    /** 상태별 건수 */
+    long countByStatus(String status);
+
+    /** 상태별 전체 목록 (일괄 처리용) */
+    java.util.List<AiContentCorrection> findByStatus(String status);
 }

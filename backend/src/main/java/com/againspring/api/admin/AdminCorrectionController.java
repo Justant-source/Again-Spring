@@ -32,6 +32,27 @@ public class AdminCorrectionController {
     private final AiCorrectionService correctionService;
 
     // =====================================================================
+    // 즉시 저장 (LLM 없음 — PENDING 상태로 쌓기)
+    // =====================================================================
+
+    @PostMapping("/save")
+    @Operation(
+        summary = "첨삭 즉시 저장 (LLM 없음)",
+        description = "수정본을 PENDING 상태로 즉시 저장. LLM 호출 없이 반환. applyLive=true 시 라이브 본문도 즉시 교체."
+    )
+    public ResponseEntity<SaveResponse> save(
+            @RequestBody SaveRequest req,
+            org.springframework.security.core.Authentication auth) {
+
+        String adminId = auth.getName();
+        AiCorrectionService.SaveResult result = correctionService.savePending(
+                req.getTargetType(), req.getTargetId(), req.getCorrectedText(),
+                req.isApplyLive(), adminId);
+
+        return ResponseEntity.ok(new SaveResponse(result.correctionId(), result.appliedLive()));
+    }
+
+    // =====================================================================
     // 단계 A: 분석 (DB 미변경)
     // =====================================================================
 
@@ -85,6 +106,25 @@ public class AdminCorrectionController {
     // =====================================================================
     // Request / Response DTOs
     // =====================================================================
+
+    @Getter @Setter
+    public static class SaveRequest {
+        private String targetType;
+        private String targetId;
+        private String correctedText;
+        private boolean applyLive;
+    }
+
+    @Getter
+    public static class SaveResponse {
+        private final long correctionId;
+        private final boolean appliedLive;
+
+        public SaveResponse(long correctionId, boolean appliedLive) {
+            this.correctionId = correctionId;
+            this.appliedLive = appliedLive;
+        }
+    }
 
     @Getter @Setter
     public static class AnalyzeRequest {

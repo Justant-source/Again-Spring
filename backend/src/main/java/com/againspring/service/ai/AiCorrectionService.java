@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -366,6 +367,110 @@ public class AiCorrectionService {
             comment.setBody(correctedText);
             postCommentRepository.save(comment);
         }
+    }
+
+    // =====================================================================
+    // AI 개선 다이얼로그 — LLM 없이 즉시 PENDING 저장
+    // =====================================================================
+
+    public record SaveResult(long correctionId, boolean appliedLive) {}
+
+    /**
+     * 원본↔수정본을 PENDING 상태로 즉시 저장 (LLM 호출 없음).
+     * applyLive=true 이면 라이브 본문도 즉시 교체.
+     * 변경이 없으면 correctionId=-1 반환.
+     */
+    @Transactional
+    public SaveResult savePending(String targetType, String targetId,
+                                  String correctedText, boolean applyLive, String adminId) {
+        String originalText = fetchOriginalText(targetType, targetId);
+        if (originalText.equals(correctedText)) {
+            return new SaveResult(-1, false);
+        }
+
+        String personaId = fetchPersonaId(targetType, targetId);
+        String category  = fetchCategory(targetType, targetId);
+
+        AiContentCorrection correction = AiContentCorrection.builder()
+                .targetType(targetType)
+                .targetId(targetId)
+                .personaId(personaId)
+                .category(category)
+                .originalText(originalText)
+                .correctedText(correctedText)
+                .adminId(adminId)
+                .status("PENDING")
+                .appliedLive(applyLive)
+                .pushedToBank(false)
+                .build();
+        correction = correctionRepository.save(correction);
+
+        if (applyLive) {
+            applyLiveCorrection(targetType, targetId, correctedText);
+        }
+
+        log.info("[ai-correction] savePending correctionId={} targetType={} applyLive={}",
+                correction.getId(), targetType, applyLive);
+        return new SaveResult(correction.getId(), applyLive);
+    }
+
+    // =====================================================================
+    // 일괄 비동기 분석 (PENDING → PROCESSED)
+    // =====================================================================
+
+    /**
+     * 모든 PENDING 첨삭을 비동기로 LLM 분석 후 자동 적용.
+     * scope=BOTH, pushToBank=true 로 자동 처리.
+     * HTTP 응답은 즉시 반환하고 백그라운드에서 실행.
+     */
+    @Async("taskExecutor")
+    public void analyzePendingBatchAsync(String adminId) {
+        List<AiContentCorrection> pending = correctionRepository.findByStatus("PENDING");
+        log.info("[ai-correction] batch start — {} pending corrections", pending.size());
+
+        int processed = 0;
+        for (AiContentCorrection correction : pending) {
+            try {
+                String diffPrompt = buildDiffPrompt(correction.getOriginalText(), correction.getCorrectedText());
+                String llmResponse = llmProvider.invoke(diffPrompt, correctionModel);
+                AnalyzeResult result = parseAnalyzeResponse(llmResponse, correction.getPersonaId(), correction.getOriginalText());
+
+                // 페르소나 주의사항 머지
+                if (result.suggestedCaution() != null && !result.suggestedCaution().isBlank()) {
+                    mergePersonaCaution(correction.getPersonaId(), result.suggestedCaution(), correction.getId());
+                    correction.setPersonaCaution(result.suggestedCaution());
+                }
+
+                // 전역 금지 규칙 저장
+                for (String rule : result.suggestedGlobalRules()) {
+                    if (rule == null || rule.isBlank()) continue;
+                    globalRuleRepository.save(AiGlobalRule.builder()
+                            .ruleText(rule.trim()).scope("ALL")
+                            .sourceCorrectionId(correction.getId())
+                            .active(true).createdBy(adminId).build());
+                }
+
+                // example_bank 환류
+                try {
+                    aiLearningBridge.saveCorrectedAsync(
+                            correction.getCorrectedText(),
+                            "POST".equals(correction.getTargetType()) ? "POST" : "COMMENT",
+                            correction.getCategory(), 1.0);
+                    correction.setPushedToBank(true);
+                } catch (Exception e) {
+                    log.warn("[ai-correction] batch bank push failed correctionId={}: {}", correction.getId(), e.getMessage());
+                }
+
+                correction.setStatus("PROCESSED");
+                correctionRepository.save(correction);
+                processed++;
+                log.debug("[ai-correction] batch processed correctionId={}", correction.getId());
+            } catch (Exception e) {
+                log.warn("[ai-correction] batch failed correctionId={}: {}", correction.getId(), e.getMessage());
+            }
+        }
+
+        log.info("[ai-correction] batch complete — {}/{} processed", processed, pending.size());
     }
 
     // =====================================================================

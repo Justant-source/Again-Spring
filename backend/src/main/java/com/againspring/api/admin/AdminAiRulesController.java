@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 누적된 AI 전역 금지 규칙 · 페르소나 주의사항 관리 API (ADMIN 전용).
@@ -255,6 +256,27 @@ public class AdminAiRulesController {
     public ResponseEntity<Void> skipHistory(@PathVariable Long corrId) {
         aiCorrectionService.skipById(corrId);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/history/analyze-batch")
+    @Operation(
+        summary = "PENDING 첨삭 일괄 분석 (비동기)",
+        description = "모든 PENDING 첨삭을 백그라운드에서 LLM 분석 후 자동 적용(scope=BOTH). 즉시 202 반환."
+    )
+    @Auditable(action = "AI_CORRECTION_BATCH_ANALYZE", targetType = "AI_CORRECTION", targetId = "")
+    public ResponseEntity<Map<String, Object>> analyzeBatch(
+            org.springframework.security.core.Authentication auth) {
+
+        long pendingCount = correctionRepository.countByStatus("PENDING");
+        if (pendingCount == 0) {
+            return ResponseEntity.ok(Map.of("queued", 0, "message", "분석 대기 중인 첨삭이 없습니다."));
+        }
+
+        aiCorrectionService.analyzePendingBatchAsync(auth.getName());
+        return ResponseEntity.accepted().body(Map.of(
+                "queued", pendingCount,
+                "message", pendingCount + "건의 첨삭 분석을 백그라운드에서 시작했습니다."
+        ));
     }
 
     // =====================================================================
