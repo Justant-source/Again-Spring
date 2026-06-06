@@ -56,6 +56,8 @@ public class PostDetailResponse {
 
     private String partnerBodyPublished;
 
+    private Instant partnerAnsweredAt;
+
     private String inviteToken;
 
     /** 요청자가 작성자이면 true — 배심원 폴링·작성자 전용 UI 노출 여부 결정 */
@@ -113,6 +115,7 @@ public class PostDetailResponse {
                 .jurorCount(post.getJurorCount())
                 .paired(post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null)
                 .partnerBodyPublished(post.getPartnerBodyPublished())
+                .partnerAnsweredAt(post.getPartnerAnsweredAt())
                 .inviteToken(post.getInviteToken())
                 .isAuthor(requestUserId != null && requestUserId.equals(post.getAuthorId()))
                 .build();
