@@ -87,6 +87,7 @@ function C3StoryDetail({
   replyToNick: string | undefined;
   submitError: string | null;
 }) {
+  const router = useRouter();
   const storedSide = useVoteStore((s) => s.votes[post.id] ?? null);
   const { clearVote: storeClearVote } = useVoteStore();
   const myVotedId = post.voteResult?.myVotedOptionId;
@@ -266,7 +267,7 @@ function C3StoryDetail({
             selected={pick === 'g'}
             voted={voted && pick === 'g'}
             voteDisabled={isVoting || (voted && pick !== 'g')}
-            onSelect={() => {}}
+            onSelect={() => router.push(`/community/${post.id}/read?side=g`)}
             onVote={() => handleVoteSide('g')}
           />
           <SideStory
@@ -277,7 +278,7 @@ function C3StoryDetail({
             selected={pick === 'r'}
             voted={voted && pick === 'r'}
             voteDisabled={isVoting || (voted && pick !== 'r')}
-            onSelect={post.partnerBodyPublished ? () => {} : undefined}
+            onSelect={post.partnerBodyPublished ? () => router.push(`/community/${post.id}/read?side=r`) : undefined}
             onVote={() => handleVoteSide('r')}
           />
         </div>
