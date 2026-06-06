@@ -19,6 +19,8 @@ export interface AdminPost {
   userTitle?: string;
   bodyRaw?: string;
   bodyPublished?: string;
+  partnerBodyRaw?: string;
+  partnerBodyPublished?: string;
   voteCloseAt?: string;
   visibility?: string;
   publishMode?: string;
@@ -80,7 +82,7 @@ export async function getAdminPost(postId: string): Promise<AdminPost> {
 
 export async function updatePost(
   postId: string,
-  data: Partial<{ title: string; bodyRaw: string; status: string; category: string }>
+  data: Partial<{ title: string; bodyRaw: string; partnerBodyRaw: string; status: string; category: string }>
 ): Promise<AdminPost> {
   const res = await api.patch<AdminPost>(`/api/admin/content/posts/${postId}`, data);
   return res.data;

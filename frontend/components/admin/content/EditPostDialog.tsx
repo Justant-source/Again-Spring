@@ -48,6 +48,7 @@ const CATEGORY_OPTIONS = [
 export function EditPostDialog({ post, onClose, onUpdated }: Props) {
   const [title, setTitle] = useState('');
   const [bodyRaw, setBodyRaw] = useState('');
+  const [partnerBodyRaw, setPartnerBodyRaw] = useState('');
   const [status, setStatus] = useState('VOTING');
   const [category, setCategory] = useState('OTHER');
   const [submitting, setSubmitting] = useState(false);
@@ -56,7 +57,8 @@ export function EditPostDialog({ post, onClose, onUpdated }: Props) {
   useEffect(() => {
     if (!post) return;
     setTitle(post.title || '');
-    setBodyRaw(post.bodyRaw || '');
+    setBodyRaw(post.bodyRaw || post.bodyPublished || '');
+    setPartnerBodyRaw(post.partnerBodyRaw || post.partnerBodyPublished || '');
     setStatus(post.status || 'VOTING');
     setCategory(post.category || 'OTHER');
     setError('');
@@ -69,12 +71,9 @@ export function EditPostDialog({ post, onClose, onUpdated }: Props) {
     setSubmitting(true);
     setError('');
     try {
-      const updated = await updatePost(post.id, {
-        title,
-        bodyRaw,
-        status,
-        category,
-      });
+      const payload: Parameters<typeof updatePost>[1] = { title, bodyRaw, status, category };
+      if (partnerBodyRaw) payload.partnerBodyRaw = partnerBodyRaw;
+      const updated = await updatePost(post.id, payload);
       onUpdated(updated);
       onClose();
     } catch (err: any) {
@@ -144,18 +143,33 @@ export function EditPostDialog({ post, onClose, onUpdated }: Props) {
             </Select>
           </div>
 
-          {/* Body */}
+          {/* 작성자 본문 */}
           <div>
-            <Label className="block text-sm font-medium mb-2">본문</Label>
+            <Label className="block text-sm font-medium mb-2">작성자 본문</Label>
             <Textarea
               value={bodyRaw}
               onChange={(e) => setBodyRaw(e.target.value)}
-              placeholder="게시글 본문"
+              placeholder="작성자 본문"
               disabled={submitting}
               rows={8}
               className="resize-none"
             />
           </div>
+
+          {/* 상대방 본문 — 상대방 답변이 있을 때만 표시 */}
+          {(post.partnerBodyPublished || post.partnerBodyRaw) && (
+            <div>
+              <Label className="block text-sm font-medium mb-2">상대방 본문</Label>
+              <Textarea
+                value={partnerBodyRaw}
+                onChange={(e) => setPartnerBodyRaw(e.target.value)}
+                placeholder="상대방 본문"
+                disabled={submitting}
+                rows={8}
+                className="resize-none"
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter>

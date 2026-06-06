@@ -128,6 +128,12 @@ public class AdminContentController {
         }
         if (req.getBodyRaw() != null) {
             post.setBodyRaw(req.getBodyRaw());
+            // 관리자 수정은 tonalization 없이 즉시 반영
+            post.setBodyPublished(req.getBodyRaw());
+        }
+        if (req.getPartnerBodyRaw() != null) {
+            post.setPartnerBodyRaw(req.getPartnerBodyRaw());
+            post.setPartnerBodyPublished(req.getPartnerBodyRaw());
         }
         if (req.getStatus() != null) {
             post.setStatus(PostStatus.valueOf(req.getStatus()));
@@ -416,6 +422,7 @@ public class AdminContentController {
     public static class UpdatePostRequest {
         private String title;
         private String bodyRaw;
+        private String partnerBodyRaw;
         private String status;
         private String category;
     }
