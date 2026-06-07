@@ -49,9 +49,13 @@ export function isGuestToken(token: string): boolean {
 /** localStorage에 만료되지 않은 토큰이 있으면 반환, 없으면 null */
 export function getValidToken(): string | null {
   if (typeof window === 'undefined') return null;
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) return null;
-  return isJwtExpired(token) ? null : token;
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return null;
+    return isJwtExpired(token) ? null : token;
+  } catch {
+    return null;
+  }
 }
 
 // 동시 발급 방지용 in-flight 프라미스 (중복 /api/auth/guest 호출 차단)
@@ -69,7 +73,9 @@ async function requestGuestToken(): Promise<string> {
 
   const { user, token } = res.data;
   if (token?.accessToken) {
-    localStorage.setItem(TOKEN_KEY, token.accessToken);
+    try {
+      localStorage.setItem(TOKEN_KEY, token.accessToken);
+    } catch { /* 카카오톡 인앱 등 localStorage 제한 환경 — 세션 내에서만 유효 */ }
   }
   if (user) {
     // BE가 돌려준 닉네임으로 갱신 → 구버전 "게스트 4179" 등 stale 닉네임도 자동 치유.

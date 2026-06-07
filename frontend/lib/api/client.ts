@@ -10,10 +10,12 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('again-spring-token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    try {
+      const token = localStorage.getItem('again-spring-token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch { /* localStorage 차단 환경 (카카오톡 인앱 등) — 인증 헤더 없이 계속 */ }
   }
   return config;
 });
@@ -50,7 +52,9 @@ api.interceptors.response.use(
     if (status === 401) {
       // community 엔드포인트의 401은 토큰 삭제하지 않음 (게스트 처리용)
       if (!url.includes('/api/community/')) {
-        if (typeof window !== 'undefined') localStorage.removeItem('again-spring-token');
+        if (typeof window !== 'undefined') {
+          try { localStorage.removeItem('again-spring-token'); } catch { /* noop */ }
+        }
         useUiStore.getState().setAuthError('unauthorized');
       }
     } else if (status === 402 && code === 'GUEST_LIMIT_REACHED') {
