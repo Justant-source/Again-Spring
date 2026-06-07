@@ -49,12 +49,27 @@ public class BehaviorEngine {
     @Autowired(required = false)
     private com.againspring.aiuser.orchestrator.task.ActionExecutor actionExecutor;
 
+    /** 목표 게시글 1개당 필요한 총 행동 수 (vote+comment+like+reply+comment_like+post+여유). */
+    private static final int ACTIONS_PER_TARGET_POST = 20;
+
     public void tick() {
         // 1. Kill-switch check
         AiUserRuntime rt = runtimeRepo.findById(1).orElse(null);
         if (rt == null || !rt.isEnabled()) {
             log.debug("BehaviorEngine tick skipped: kill-switch OFF or runtime not initialized");
             return;
+        }
+
+        // 1.5. personaTarget 기반 daily cap 자동 동기화
+        // AI_USER_PERSONA_TARGET 변경(+재시작)만으로 cap이 자동 반영됨.
+        if (props.getPersonaTarget() > 0) {
+            int autoCap = props.getPersonaTarget() * ACTIONS_PER_TARGET_POST;
+            if (rt.getDailyGlobalCap() != autoCap) {
+                log.info("Daily cap auto-sync: {}posts × {} = {} (was {})",
+                    props.getPersonaTarget(), ACTIONS_PER_TARGET_POST, autoCap, rt.getDailyGlobalCap());
+                rt.setDailyGlobalCap(autoCap);
+                runtimeRepo.save(rt);
+            }
         }
 
         // 2. Day bucket rollover
