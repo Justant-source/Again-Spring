@@ -265,7 +265,7 @@ export default function ContentDetailPage() {
 
   return (
     <>
-      <AdminSection title={`콘텐츠 #${content.id}`} subtitle={`시뮬레이션 ID: ${content.simulationId}`}>
+      <AdminSection title={`콘텐츠 #${content.id}`} subtitle={`사연: ${content.sourcePostId ?? '-'}`}>
         {error && (
           <div
             style={{

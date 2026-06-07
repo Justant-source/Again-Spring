@@ -4,8 +4,6 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 
 const MARKETING_TABS = [
-  { label: '사연', href: '/admin/marketing/stories' },
-  { label: '시뮬레이션', href: '/admin/marketing/simulations' },
   { label: '콘텐츠', href: '/admin/marketing/contents' },
   { label: '캘린더', href: '/admin/marketing/calendar' },
   { label: '템플릿', href: '/admin/marketing/templates' },

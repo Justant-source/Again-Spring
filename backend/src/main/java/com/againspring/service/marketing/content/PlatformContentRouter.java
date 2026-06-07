@@ -21,17 +21,17 @@ public class PlatformContentRouter {
     private final ContentGeneratorRegistry registry;
     private final PlatformDescriptorLoader descriptorLoader;
 
-    public GenerationOutput generate(MarketingContent.Platform platform, String simulationSummary,
+    public GenerationOutput generate(MarketingContent.Platform platform, String sourceContent,
             String relationType) throws Exception {
         PlatformDescriptor descriptor = descriptorLoader.get(platform);
-        GenerationContext ctx = GenerationContext.of(simulationSummary, relationType, descriptor);
+        GenerationContext ctx = GenerationContext.of(sourceContent, relationType, descriptor);
         return registry.resolve(platform).generate(ctx);
     }
 
-    public GenerationOutput generateWithTemplate(MarketingContent.Platform platform, String simulationSummary,
+    public GenerationOutput generateWithTemplate(MarketingContent.Platform platform, String sourceContent,
             String relationType, String templateBody) throws Exception {
         PlatformDescriptor descriptor = descriptorLoader.get(platform);
-        GenerationContext ctx = new GenerationContext(simulationSummary, relationType, descriptor, templateBody, null);
+        GenerationContext ctx = new GenerationContext(sourceContent, relationType, descriptor, templateBody, null);
         return registry.resolve(platform).generate(ctx);
     }
 }

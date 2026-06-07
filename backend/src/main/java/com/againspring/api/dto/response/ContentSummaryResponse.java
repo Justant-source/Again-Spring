@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ContentSummaryResponse {
 	private Long id;
-	private Long simulationId;
+	private String sourcePostId;
 	private String platform; // X, INSTAGRAM, NAVER_BLOG
 	private String status; // DRAFT, REVIEW, APPROVED, EXPORTED, REJECTED
 	private Instant createdAt;
@@ -31,7 +31,7 @@ public class ContentSummaryResponse {
 	public static ContentSummaryResponse from(MarketingContent content) {
 		return ContentSummaryResponse.builder()
 				.id(content.getId())
-				.simulationId(content.getSimulationId())
+				.sourcePostId(content.getSourcePostId())
 				.platform(content.getPlatform().toString())
 				.status(content.getStatus().toString())
 				.createdAt(content.getCreatedAt())

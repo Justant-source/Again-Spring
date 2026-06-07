@@ -1,7 +1,6 @@
 package com.againspring.service.marketing.image;
 
 import com.againspring.domain.marketing.MarketingContent;
-import com.againspring.domain.marketing.MarketingSimulation;
 import com.againspring.service.marketing.ImageRenderClient;
 import com.againspring.service.marketing.content.GenerationOutput;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +18,7 @@ import java.util.Map;
 
 /**
  * Image composition strategy for X (Twitter).
- * Renders: (1) quote card from quoteCard JSON field, (2) optional chat key-moment screenshot.
+ * Renders: (1) metaphor cover card, (2) quote card from quoteCard JSON field.
  */
 @Slf4j
 @Component
@@ -40,8 +39,7 @@ public class XImageStrategy implements ImageCompositionStrategy {
     @SuppressWarnings("unchecked")
     public List<RenderedImage> compose(
             GenerationOutput output,
-            MarketingSimulation sim,
-            Object report,  // Stub: was Report report
+            String relationType,
             Long contentId,
             String imageDir
     ) throws IOException {
@@ -50,8 +48,8 @@ public class XImageStrategy implements ImageCompositionStrategy {
         Files.createDirectories(dir);
         int order = 1;
 
-        // 1. METAPHOR_COVER — first tweet image (hook card: SVG centered + hook text)
-        String svgFilename = metaphorSelector.selectFilename(sim, report);
+        // 1. METAPHOR_COVER
+        String svgFilename = metaphorSelector.selectFilename(relationType);
         String hookText    = metaphorSelector.extractHookText(output, MarketingContent.Platform.X);
         byte[] coverPng    = renderClient.renderMetaphorCard(svgFilename, hookText, contentId, 1, 2);
         if (coverPng != null && coverPng.length > 0) {
@@ -75,24 +73,10 @@ public class XImageStrategy implements ImageCompositionStrategy {
             if (png != null && png.length > 0) {
                 String filename = "quote_" + contentId + ".png";
                 Files.write(dir.resolve(filename), png);
-                results.add(new RenderedImage(filename, "QUOTE_CARD", "TWEET_2", line1, order++));
+                results.add(new RenderedImage(filename, "QUOTE_CARD", "TWEET_2", line1, order));
                 log.info("Quote card saved: {}/{}", imageDir, filename);
             }
-        } else if (report != null && "" != null) {
-            byte[] png = renderClient.renderQuote(
-                    "",
-                    "",
-                    "다시봄", "warm");
-            if (png != null && png.length > 0) {
-                String filename = "quote_" + contentId + ".png";
-                Files.write(dir.resolve(filename), png);
-                results.add(new RenderedImage(filename, "QUOTE_CARD", "TWEET_2",
-                        "", order++));
-            }
         }
-
-        // 3. Optional chat key-moment screenshot (last tweet)
-        // TODO: Implement chat preview rendering for marketing simulation
 
         return results;
     }

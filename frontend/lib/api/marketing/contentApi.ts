@@ -2,7 +2,7 @@ import { api } from '../client';
 
 export interface ContentResponse {
   id: number;
-  simulationId: number;
+  sourcePostId: string | null;
   platform: 'x' | 'instagram' | 'naver_blog' | 'threads' | 'facebook';
   title?: string;
   bodyText: string;
@@ -20,19 +20,28 @@ export interface ContentResponse {
 
 export interface ContentSummaryResponse {
   id: number;
-  simulationId: number;
+  sourcePostId: string | null;
   platform: string;
   status: string;
   createdAt: string;
   imagePaths?: string;
 }
 
-export async function generateContent(
-  simulationId: number,
-  platform: 'x' | 'instagram' | 'naver_blog' | 'threads' | 'facebook'
-): Promise<ContentResponse> {
-  const res = await api.post<ContentResponse>(
-    `/api/admin/marketing/contents/generate?simulationId=${simulationId}&platform=${platform}`
+/**
+ * 커뮤니티 게시글로부터 마케팅 콘텐츠를 생성한다.
+ * platforms 미지정 시 서버에서 x, instagram, naver_blog 3종 동시 생성.
+ */
+export async function generateFromPost(
+  postId: string,
+  platforms?: ('x' | 'instagram' | 'naver_blog' | 'threads' | 'facebook')[]
+): Promise<ContentResponse[]> {
+  const params = new URLSearchParams();
+  params.set('postId', postId);
+  if (platforms && platforms.length > 0) {
+    platforms.forEach((p) => params.append('platforms', p));
+  }
+  const res = await api.post<ContentResponse[]>(
+    `/api/admin/marketing/contents/generate-from-post?${params.toString()}`
   );
   return res.data;
 }

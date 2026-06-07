@@ -1,10 +1,7 @@
 package com.againspring.service.marketing.image;
 
 import com.againspring.domain.marketing.MarketingContent;
-import com.againspring.domain.marketing.MarketingSimulation;
-import com.againspring.repository.marketing.MarketingSourceStoryRepository;
 import com.againspring.service.marketing.content.GenerationOutput;
-import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -13,21 +10,18 @@ import java.util.Map;
 
 /**
  * Selects the most contextually appropriate metaphor SVG for a marketing content piece.
- * NOTE: Report class removed due to deletion of mediation code. Stub implementation.
+ * Selects based on relationType string — no simulation or story dependency.
  */
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(name = "app.features.marketing.enabled", havingValue = "true")
 public class MarketingMetaphorSelector {
-
-    private final MarketingSourceStoryRepository storyRepo;
 
     private static final Map<String, List<String>> BY_RELATION = Map.of(
         "couple",      List.of("14-melting-candle.svg", "17-tangled-thread.svg",
                                "15-parallel-rails.svg", "13-two-compasses-apart.svg",
                                "22-back-to-back-umbrellas.svg", "19-one-candle-out.svg",
                                "11-half-open-letter.svg"),
-        "marriage",    List.of("18-dying-stove.svg", "22-back-to-back-umbrellas.svg",
+        "married",     List.of("18-dying-stove.svg", "22-back-to-back-umbrellas.svg",
                                "15-parallel-rails.svg", "20-empty-photo-frame.svg",
                                "24-empty-nest.svg",   "59-two-compasses-aligned.svg"),
         "friend",      List.of("25-dried-bouquet.svg", "28-broken-thread.svg",
@@ -36,10 +30,7 @@ public class MarketingMetaphorSelector {
         "family",      List.of("44-empty-dining-table.svg", "42-trees-growing-apart.svg",
                                "43-cracked-bowl.svg", "40-small-birdcage.svg",
                                "46-closed-diary.svg", "45-wilting-plant.svg"),
-        "parent_child",List.of("47-long-shadow.svg", "41-tall-fence.svg",
-                               "40-small-birdcage.svg", "46-closed-diary.svg",
-                               "42-trees-growing-apart.svg"),
-        "colleague",   List.of("33-tilted-scale.svg", "39-gears-not-meshing.svg",
+        "work",        List.of("33-tilted-scale.svg", "39-gears-not-meshing.svg",
                                "34-overflowing-papers.svg", "38-too-many-keys.svg",
                                "36-light-under-door.svg", "35-empty-trophy.svg")
     );
@@ -50,13 +41,12 @@ public class MarketingMetaphorSelector {
     );
 
     /**
-     * Selects an SVG filename appropriate for the given simulation and report context.
-     * Stub: returns relationType-based SVG.
+     * Selects an SVG filename appropriate for the given relationType.
      */
-    public String selectFilename(MarketingSimulation sim, Object report) {
-        // Stub: skip report (was Report report)
-        String relationType = resolveRelationType(sim);
-        List<String> candidates = BY_RELATION.getOrDefault(relationType, GENERAL_FALLBACK);
+    public String selectFilename(String relationType) {
+        List<String> candidates = BY_RELATION.getOrDefault(
+                relationType != null ? relationType.toLowerCase() : "other",
+                GENERAL_FALLBACK);
         return candidates.get(0);
     }
 
@@ -115,14 +105,5 @@ public class MarketingMetaphorSelector {
     private String clamp(String s, int maxLen) {
         if (s == null) return "";
         return s.length() <= maxLen ? s : s.substring(0, maxLen - 1) + "…";
-    }
-
-    private String resolveRelationType(MarketingSimulation sim) {
-        if (sim.getSourceStoryId() != null) {
-            return storyRepo.findById(sim.getSourceStoryId())
-                .map(s -> s.getRelationType() != null ? s.getRelationType() : "general")
-                .orElse("general");
-        }
-        return "general";
     }
 }

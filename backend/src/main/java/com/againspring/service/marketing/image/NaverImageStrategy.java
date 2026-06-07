@@ -1,7 +1,6 @@
 package com.againspring.service.marketing.image;
 
 import com.againspring.domain.marketing.MarketingContent;
-import com.againspring.domain.marketing.MarketingSimulation;
 import com.againspring.service.marketing.ImageRenderClient;
 import com.againspring.service.marketing.content.GenerationOutput;
 import lombok.RequiredArgsConstructor;
@@ -14,14 +13,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Image composition strategy for Naver Blog.
- * Renders up to 3 images: chat preview, report summary, quote card.
- * Replaces <!-- IMG:xxx --> markers in the markdown body text.
+ * Renders: metaphor cover + per-slot images (chat-preview, report-needs, quote-card).
  */
 @Slf4j
 @Component
@@ -42,8 +39,7 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
     @SuppressWarnings("unchecked")
     public List<RenderedImage> compose(
             GenerationOutput output,
-            MarketingSimulation sim,
-            Object report,  // Stub: was Report report
+            String relationType,
             Long contentId,
             String imageDir
     ) throws IOException {
@@ -57,8 +53,8 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
 
         List<RenderedImage> results = new ArrayList<>();
 
-        // ── 최상단: METAPHOR_COVER (hook card PNG) ────────────────────
-        String svgFilename = metaphorSelector.selectFilename(sim, report);
+        // METAPHOR_COVER (hook card PNG)
+        String svgFilename = metaphorSelector.selectFilename(relationType);
         String hookText    = metaphorSelector.extractHookText(output, MarketingContent.Platform.NAVER_BLOG);
         int totalSlots     = imageSlots != null ? imageSlots.size() + 1 : 1;
         byte[] coverPng    = renderClient.renderMetaphorCard(svgFilename, hookText, contentId, 1, totalSlots);
@@ -82,12 +78,11 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
             String idx = String.format("%02d", i + 1);
 
             byte[] png = switch (kind) {
-                case "chat" -> renderChatImage(sim, contentId);
+                case "chat" -> null; // community post: no session chat to render
                 case "report-needs", "report-ratio", "report-combined" -> null;
                 case "quote" -> {
                     String quoteText = (String) slot.get("quoteText");
-                    if (quoteText == null)
-                        quoteText = "";
+                    if (quoteText == null) quoteText = "";
                     yield renderClient.renderQuote(quoteText, "", "다시봄", "warm");
                 }
                 default -> null;
@@ -102,46 +97,18 @@ public class NaverImageStrategy implements ImageCompositionStrategy {
             Files.write(dir.resolve(filename), png);
 
             String roleKey = switch (kind) {
-                case "chat" -> "CHAT_PREVIEW";
-                case "report-needs" -> "REPORT_NEEDS";
-                case "report-ratio" -> "REPORT_RATIO";
-                case "report-combined" -> "REPORT_COMBINED";
                 case "quote" -> "QUOTE_CARD";
                 default -> kind.toUpperCase();
             };
             String alt = switch (kind) {
-                case "chat" -> "AI와의 대화 장면";
-                case "report-needs" -> "NeedsMap 다이어그램";
-                case "report-ratio" -> "화해 기여도 그래프";
-                case "report-combined" -> "리포트 요약";
                 case "quote" -> "메타포 인용 카드";
                 default -> filename;
             };
 
-            // order starts at 2 because metaphor cover is at order 1
             results.add(new RenderedImage(filename, roleKey, slotMarker, alt, i + 2));
             log.info("Naver image saved: {}/{}", imageDir, filename);
         }
 
         return results;
-    }
-
-    private byte[] renderChatImage(MarketingSimulation sim, Long contentId) {
-        if (sim.getSessionId() == null) return null;
-        // TODO: Implement chat image rendering for marketing simulation
-        log.warn("Chat image rendering not yet implemented for marketing simulation {}", sim.getId());
-        return null;
-    }
-
-    private byte[] renderReportImage(Object report, String mode) {
-        if (report == null) return null;
-        Map<String, Object> reportData = buildReportData(report);
-        return renderClient.renderReportSummary(reportData, mode);
-    }
-
-    private Map<String, Object> buildReportData(Object report) {
-        // Stub: Report class removed
-        log.warn("renderReportImage not yet implemented for refactored architecture");
-        return new HashMap<>();
     }
 }

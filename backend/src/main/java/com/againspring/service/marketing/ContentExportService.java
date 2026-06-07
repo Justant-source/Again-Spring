@@ -58,7 +58,7 @@ public class ContentExportService {
             zos.putNextEntry(metadataEntry);
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("id", content.getId());
-            metadata.put("simulationId", content.getSimulationId());
+            metadata.put("sourcePostId", content.getSourcePostId());
             metadata.put("platform", content.getPlatform().toString());
             metadata.put("status", content.getStatus().toString());
             metadata.put("createdAt", content.getCreatedAt().toString());

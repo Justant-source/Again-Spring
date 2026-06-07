@@ -8,25 +8,18 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * 마케팅 콘텐츠 저장소 (JPA/MariaDB)
- * 시뮬레이션 결과로부터 생성된 플랫폼별 마케팅 콘텐츠 조회
+ * 커뮤니티 게시글로부터 생성된 플랫폼별 마케팅 콘텐츠 조회
  */
 @Repository
 public interface MarketingContentRepository extends JpaRepository<MarketingContent, Long> {
 
     /**
-     * 특정 시뮬레이션과 플랫폼의 콘텐츠 단건 조회
+     * 특정 커뮤니티 게시글의 모든 콘텐츠 조회
      */
-    Optional<MarketingContent> findBySimulationIdAndPlatform(
-            Long simulationId, MarketingContent.Platform platform);
-
-    /**
-     * 특정 시뮬레이션의 모든 콘텐츠 조회
-     */
-    List<MarketingContent> findBySimulationId(Long simulationId);
+    List<MarketingContent> findBySourcePostId(String sourcePostId);
 
     /**
      * 특정 상태의 콘텐츠 페이징 조회

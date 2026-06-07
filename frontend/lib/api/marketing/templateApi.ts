@@ -56,13 +56,13 @@ export async function deleteTemplate(id: number): Promise<void> {
 
 export async function generateFromTemplate(
   templateId: number,
-  simulationId: number,
+  postId: string,
   platform: string | undefined,
   variables: Record<string, string>
 ): Promise<ContentResponse> {
   const res = await api.post<ContentResponse>(
     `/api/admin/marketing/contents/from-template/${templateId}`,
-    { simulationId, platform, variables }
+    { postId, platform, variables }
   );
   return res.data;
 }

@@ -1,10 +1,7 @@
 package com.againspring.service.marketing;
 
 import com.againspring.domain.marketing.MarketingContent;
-import com.againspring.domain.marketing.MarketingSimulation;
-import com.againspring.domain.marketing.MarketingSourceStory;
 import com.againspring.repository.marketing.MarketingContentRepository;
-import com.againspring.repository.marketing.MarketingSourceStoryRepository;
 import com.againspring.safety.MarketingCopyGuard;
 import com.againspring.service.marketing.content.GenerationOutput;
 import com.againspring.service.marketing.content.PlatformContentRouter;
@@ -23,7 +20,7 @@ import java.util.List;
 
 /**
  * 콘텐츠 비동기 생성 실행 빈.
- * NOTE: Report 클래스 삭제 후 스텁으로 변경됨.
+ * 커뮤니티 게시글을 소스로 플랫폼별 마케팅 카피를 생성한다.
  * ContentService와 분리된 빈으로 @Async 프록시가 올바르게 적용되도록 함.
  */
 @Slf4j
@@ -33,34 +30,28 @@ import java.util.List;
 public class ContentGenerationExecutor {
 
     private final MarketingContentRepository contentRepo;
-    private final MarketingSourceStoryRepository storyRepo;
     private final PlatformContentRouter router;
     private final MarketingCopyGuard copyGuard;
     private final ImageCompositionStrategyRegistry imageStrategyRegistry;
+    private final CommunityPostMarketingReader postReader;
     private final ObjectMapper objectMapper;
 
     @Value("${app.features.marketing.image-dir:/tmp/marketing-images}")
     private String imageDir;
 
     @Async("marketingExecutor")
-    public void execute(Long contentId, MarketingSimulation simulation, MarketingContent.Platform platform) {
+    public void executeFromPost(Long contentId, String postId, MarketingContent.Platform platform) {
         try {
-            String simulationSummary = buildSummary(simulation);
+            // 커뮤니티 게시글 로드 + 요약 생성
+            CommunityPostMarketingReader.PostMarketingData data = postReader.load(postId);
+            String sourceContent = postReader.buildSourceContent(data);
+            String relationType = data.relationType();
 
-            String relationType = "general";
-            if (simulation.getSourceStoryId() != null) {
-                MarketingSourceStory story = storyRepo.findById(simulation.getSourceStoryId()).orElse(null);
-                if (story != null && story.getRelationType() != null) {
-                    relationType = story.getRelationType();
-                }
-            }
-
-            GenerationOutput output = router.generate(platform, simulationSummary, relationType);
+            GenerationOutput output = router.generate(platform, sourceContent, relationType);
 
             boolean hasViolations = output.bodyText() != null && copyGuard.hasViolations(output.bodyText());
 
-            // Image composition per platform strategy (Report stub: null)
-            String finalImagePaths = composeAndSaveImages(platform, output, simulation, null, contentId);
+            String finalImagePaths = composeAndSaveImages(platform, output, relationType, contentId);
 
             MarketingContent content = contentRepo.findById(contentId).orElseThrow();
             content.setBodyText(output.bodyText());
@@ -70,10 +61,10 @@ public class ContentGenerationExecutor {
             if (finalImagePaths != null) content.setImagePaths(finalImagePaths);
             contentRepo.save(content);
 
-            log.info("Content generation completed: id={}, platform={}, status={}, hasImages={}",
-                    contentId, platform, content.getStatus(), finalImagePaths != null);
+            log.info("Content generation completed: id={}, platform={}, status={}, postId={}, hasImages={}",
+                    contentId, platform, content.getStatus(), postId, finalImagePaths != null);
         } catch (Exception e) {
-            log.error("Content generation failed: id={}", contentId, e);
+            log.error("Content generation failed: id={}, postId={}", contentId, postId, e);
             contentRepo.findById(contentId).ifPresent(c -> {
                 c.setStatus(MarketingContent.Status.REJECTED);
                 c.setSafetyCheckJson(String.format(
@@ -88,13 +79,12 @@ public class ContentGenerationExecutor {
     private String composeAndSaveImages(
             MarketingContent.Platform platform,
             GenerationOutput output,
-            MarketingSimulation simulation,
-            Object report,  // Stub: was Report report
+            String relationType,
             Long contentId
     ) {
         return imageStrategyRegistry.find(platform).map(strategy -> {
             try {
-                List<RenderedImage> images = strategy.compose(output, simulation, null, contentId, imageDir);
+                List<RenderedImage> images = strategy.compose(output, relationType, contentId, imageDir);
                 if (images.isEmpty()) return null;
                 return objectMapper.writeValueAsString(images.stream()
                         .map(img -> java.util.Map.of(
@@ -109,17 +99,6 @@ public class ContentGenerationExecutor {
                 return null;
             }
         }).orElse(null);
-    }
-
-    private String buildSummary(MarketingSimulation simulation) {
-        if (simulation.getConversationLog() != null && !simulation.getConversationLog().isBlank()) {
-            return String.format("대화 기록:\n%s\n\n턴 수: %d",
-                    simulation.getConversationLog(),
-                    simulation.getActualTurnCount() != null ? simulation.getActualTurnCount() : 0);
-        }
-        return String.format("Persona A: %s\nTurns: %d",
-                simulation.getPersonaA() != null ? simulation.getPersonaA() : "Unknown",
-                simulation.getActualTurnCount() != null ? simulation.getActualTurnCount() : 0);
     }
 
     private String buildSafetyJson(boolean hasViolations) {

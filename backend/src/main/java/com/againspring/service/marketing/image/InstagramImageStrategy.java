@@ -1,7 +1,6 @@
 package com.againspring.service.marketing.image;
 
 import com.againspring.domain.marketing.MarketingContent;
-import com.againspring.domain.marketing.MarketingSimulation;
 import com.againspring.service.marketing.ImageRenderClient;
 import com.againspring.service.marketing.content.GenerationOutput;
 import lombok.RequiredArgsConstructor;
@@ -18,15 +17,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Instagram card-news composition:
- *   slide 1  — METAPHOR_COVER (1080×1080 PNG: metaphor SVG centered + hook text)
- *   slide 2  — COVER from LLM output (커뮤니티 글 특징 요약)
- *   slides 3+ — SCENE / FEELING / NVC / CTA / BONUS from LLM output
- */
-
-/**
  * Image composition strategy for Instagram.
  * Renders 6-7 card-news slides from the slides[] JSON array in structuredPayload.
+ * Slide 1 = METAPHOR_COVER (metaphor SVG + hook text), slides 2+ = LLM card-news.
  */
 @Slf4j
 @Component
@@ -46,8 +39,7 @@ public class InstagramImageStrategy implements ImageCompositionStrategy {
     @SuppressWarnings("unchecked")
     public List<RenderedImage> compose(
             GenerationOutput output,
-            MarketingSimulation sim,
-            Object report,  // Stub: was Report report
+            String relationType,
             Long contentId,
             String imageDir
     ) throws IOException {
@@ -65,31 +57,29 @@ public class InstagramImageStrategy implements ImageCompositionStrategy {
         Files.createDirectories(dir);
 
         List<RenderedImage> results = new ArrayList<>();
-        // total = metaphor cover (1) + llm slides
         int total = slides.size() + 1;
 
-        // ── slide 1: METAPHOR_COVER ──────────────────────────────────
-        String svgFilename = metaphorSelector.selectFilename(sim, report);
+        // slide 1: METAPHOR_COVER
+        String svgFilename = metaphorSelector.selectFilename(relationType);
         String hookText    = metaphorSelector.extractHookText(output, MarketingContent.Platform.INSTAGRAM);
         byte[] coverPng    = renderClient.renderMetaphorCard(svgFilename, hookText, contentId, 1, total);
         if (coverPng != null && coverPng.length > 0) {
             String coverFilename = "metaphor_cover_" + contentId + ".png";
             Files.write(dir.resolve(coverFilename), coverPng);
-            results.add(new RenderedImage(coverFilename, "METAPHOR_COVER", "SLIDE_1",
-                    hookText, 1));
+            results.add(new RenderedImage(coverFilename, "METAPHOR_COVER", "SLIDE_1", hookText, 1));
             log.info("Metaphor cover saved: {}/{}", imageDir, coverFilename);
         } else {
             log.warn("InstagramImageStrategy: metaphor cover render failed for contentId={}", contentId);
-            total--; // adjust total if metaphor card failed
+            total--;
         }
 
-        // ── slides 2+: LLM card-news (story summary first, then NVC/CTA/…) ──
+        // slides 2+: LLM card-news
         List<ImageRenderClient.CardNewsSlide> rendered =
                 renderClient.renderCardNews(slides, "warm", contentId);
 
         if (rendered.isEmpty()) {
             log.warn("InstagramImageStrategy: renderCardNews returned empty for contentId={}", contentId);
-            return results; // return whatever we have (at least the metaphor cover)
+            return results;
         }
 
         for (int i = 0; i < rendered.size(); i++) {

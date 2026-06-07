@@ -1,6 +1,6 @@
 package com.againspring.api.dto.request;
 
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 import java.util.Map;
@@ -10,8 +10,8 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ContentFromTemplateRequest {
-    @NotNull
-    private Long simulationId;
+    @NotBlank
+    private String postId;
 
     private String platform;
 

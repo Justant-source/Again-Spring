@@ -207,51 +207,38 @@ flowchart LR
 |---|---|---|---|---|
 | POST | `/api/admin/test/reset` | JWT | 200 | [admin.md](admin.md) |
 
-### 15. Admin — Marketing: Source Stories (app.features.marketing.enabled=true, dev-only)
+### 15. Admin — Marketing: Candidate Posts (app.features.marketing.enabled=true, dev-only)
+
+> 커뮤니티 게시글을 홍보 소스로 선택하는 picker API. 사연/시뮬레이션 흐름 제거 후 도입(2026-06-08).
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
-| POST | `/api/admin/marketing/source-stories` | **JWT + ADMIN** | 201 / 400 / 422 | 사연 등록 (익명화 포함) |
-| GET | `/api/admin/marketing/source-stories` | **JWT + ADMIN** | 200 | 목록 조회 |
-| GET | `/api/admin/marketing/source-stories/{id}` | **JWT + ADMIN** | 200 / 404 | 단건 조회 |
-| DELETE | `/api/admin/marketing/source-stories/{id}` | **JWT + ADMIN** | 204 / 404 | 삭제 |
-| POST | `/api/admin/marketing/source-stories/{id}/approve` | **JWT + ADMIN** | 200 / 404 | 승인 |
-| POST | `/api/admin/marketing/source-stories/{id}/reject` | **JWT + ADMIN** | 200 / 404 | 거부 (이유 포함) |
+| GET | `/api/admin/marketing/candidate-posts` | **JWT + ADMIN** | 200 | 후보 사연 목록 (`?sortBy=recommended\|latest&category=&q=&page=&size=`) |
 
-### 16. Admin — Marketing: Simulations (app.features.marketing.enabled=true, dev-only)
+### 16. Admin — Marketing: Contents (app.features.marketing.enabled=true, dev-only)
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
-| POST | `/api/admin/marketing/simulations` | **JWT + ADMIN** | 201 / 400 | 시뮬레이션 생성 + 큐 등록 |
-| GET | `/api/admin/marketing/simulations` | **JWT + ADMIN** | 200 | 목록 조회 |
-| GET | `/api/admin/marketing/simulations/{id}` | **JWT + ADMIN** | 200 / 404 | 단건 조회 |
-| DELETE | `/api/admin/marketing/simulations/{id}` | **JWT + ADMIN** | 204 / 404 | 삭제 |
-| GET | `/api/admin/marketing/simulations/{id}/cost` | **JWT + ADMIN** | 200 | 비용 상세 |
-
-### 17. Admin — Marketing: Contents (app.features.marketing.enabled=true, dev-only)
-
-| Method | Path | Auth | 상태코드 | 설명 |
-|---|---|---|---|---|
-| POST | `/api/admin/marketing/contents/generate` | **JWT + ADMIN** | 202 / 400 | 콘텐츠 비동기 생성 (`?simulationId=&platform=`) |
+| POST | `/api/admin/marketing/contents/generate-from-post` | **JWT + ADMIN** | 202 / 400 | 커뮤니티 게시글 기반 콘텐츠 비동기 생성 (`?postId=&platforms=`) — 기본 x,instagram,naver_blog 3종 |
 | GET | `/api/admin/marketing/contents` | **JWT + ADMIN** | 200 | 콘텐츠 목록 |
 | GET | `/api/admin/marketing/contents/{id}` | **JWT + ADMIN** | 200 / 404 | 콘텐츠 단건 조회 |
 | PUT | `/api/admin/marketing/contents/{id}` | **JWT + ADMIN** | 200 / 404 | 본문 수정 (`bodyText`) |
 | DELETE | `/api/admin/marketing/contents/{id}` | **JWT + ADMIN** | 204 / 404 | 삭제 |
 | POST | `/api/admin/marketing/contents/{id}/approve` | **JWT + ADMIN** | 200 / 404 | 승인 (APPROVED) |
 | POST | `/api/admin/marketing/contents/{id}/reject` | **JWT + ADMIN** | 200 / 404 | 거부 (`?reason=`, REJECTED) |
+| POST | `/api/admin/marketing/contents/from-template/{templateId}` | **JWT + ADMIN** | 201 / 400 | 템플릿 기반 생성 (`{postId, platform, variables}`) |
 
-### 18. Admin — Marketing: Images (app.features.marketing.enabled=true, dev-only)
+### 17. Admin — Marketing: Images (app.features.marketing.enabled=true, dev-only)
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
-| GET | `/api/admin/marketing/images/{filename}` | **JWT + ADMIN** | 200 / 400 / 404 | 채팅 스크린샷 PNG 서빙. `..` / `/` 포함 파일명 400 |
+| GET | `/api/admin/marketing/images/{filename}` | **JWT + ADMIN** | 200 / 400 / 404 | 이미지 PNG 서빙. `..` / `/` 포함 파일명 400 |
 
-### 19. Admin — Marketing: Cost (app.features.marketing.enabled=true, dev-only)
+### 18. Admin — Marketing: Cost (app.features.marketing.enabled=true, dev-only)
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | GET | `/api/admin/marketing/cost/monthly` | **JWT + ADMIN** | 200 | 월 누적 비용 + 한도 퍼센트 |
-| GET | `/api/admin/marketing/cost/simulation/{id}` | **JWT + ADMIN** | 200 / 404 | 시뮬레이션별 비용 내역 |
 
 ---
 

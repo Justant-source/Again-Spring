@@ -12,8 +12,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 /**
- * 마케팅 시뮬레이션 LLM 사용 로그 (MariaDB JPA)
- * 각 시뮬레이션 실행 시 Claude API 토큰 사용량, 모델, 비용 기록
+ * 마케팅 LLM 사용 로그 (MariaDB JPA)
+ * 콘텐츠 생성 시 Claude API 토큰 사용량, 모델, 비용 기록
  */
 @Getter
 @Setter
@@ -28,9 +28,6 @@ public class MarketingUsageLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "simulation_id")
-    private Long simulationId;
 
     @Column(nullable = false, length = 100)
     private String model;

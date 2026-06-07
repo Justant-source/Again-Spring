@@ -37,8 +37,8 @@ public class MarketingContent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "simulation_id", nullable = false)
-    private Long simulationId;
+    @Column(name = "source_post_id", length = 32)
+    private String sourcePostId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

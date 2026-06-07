@@ -3,8 +3,6 @@ package com.againspring.service.marketing;
 import com.againspring.api.dto.response.ContentResponse;
 import com.againspring.domain.marketing.MarketingContent;
 import com.againspring.repository.marketing.MarketingContentRepository;
-import com.againspring.repository.marketing.MarketingSimulationRepository;
-import com.againspring.repository.marketing.MarketingSourceStoryRepository;
 import com.againspring.safety.MarketingCopyGuard;
 import com.againspring.service.marketing.content.PlatformContentRouter;
 import jakarta.persistence.EntityNotFoundException;
@@ -21,10 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class RepurposeService {
 
     private final MarketingContentRepository contentRepo;
-    private final MarketingSimulationRepository simRepo;
-    private final MarketingSourceStoryRepository storyRepo;
     private final PlatformContentRouter router;
     private final MarketingCopyGuard copyGuard;
+    private final CommunityPostMarketingReader postReader;
 
     @Transactional
     public ContentResponse repurpose(Long sourceId, String targetPlatformStr) throws Exception {
@@ -68,7 +65,7 @@ public class RepurposeService {
         String bodyText = output.bodyText() != null ? output.bodyText() : "";
 
         MarketingContent repurposed = MarketingContent.builder()
-                .simulationId(source.getSimulationId())
+                .sourcePostId(source.getSourcePostId())
                 .platform(targetPlatform)
                 .bodyText(bodyText)
                 .hashtags(output.hashtags())
@@ -85,14 +82,13 @@ public class RepurposeService {
     }
 
     private String resolveRelationType(MarketingContent source) {
-        if (source.getSimulationId() == null) return "general";
-        return simRepo.findById(source.getSimulationId())
-                .map(sim -> {
-                    if (sim.getSourceStoryId() == null) return "general";
-                    return storyRepo.findById(sim.getSourceStoryId())
-                            .map(story -> story.getRelationType() != null ? story.getRelationType() : "general")
-                            .orElse("general");
-                })
-                .orElse("general");
+        if (source.getSourcePostId() == null) return "other";
+        try {
+            CommunityPostMarketingReader.PostMarketingData data = postReader.load(source.getSourcePostId());
+            return data.relationType();
+        } catch (Exception e) {
+            log.warn("Could not resolve relationType for postId={}: {}", source.getSourcePostId(), e.getMessage());
+            return "other";
+        }
     }
 }

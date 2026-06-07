@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getTemplates, generateFromTemplate, type Template } from '@/lib/api/marketing/templateApi';
-import { getSimulations, type SimulationSummaryResponse } from '@/lib/api/marketing/simulationApi';
+import { getCandidatePosts, type CandidatePostResponse } from '@/lib/api/marketing/candidatePostApi';
 
 interface Props {
   onClose: () => void;
@@ -10,27 +10,36 @@ interface Props {
 }
 
 const PLATFORMS = ['X', 'INSTAGRAM', 'NAVER_BLOG', 'THREADS', 'FACEBOOK'];
-const PLATFORM_LABELS: Record<string, string> = { X: 'X', INSTAGRAM: 'Instagram', NAVER_BLOG: '네이버블로그', THREADS: 'Threads', FACEBOOK: 'Facebook' };
+const PLATFORM_LABELS: Record<string, string> = {
+  X: 'X', INSTAGRAM: 'Instagram', NAVER_BLOG: '네이버블로그', THREADS: 'Threads', FACEBOOK: 'Facebook',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  COUPLE: '연인', MARRIED: '부부', FRIEND: '친구', FAMILY: '가족', WORK: '직장', OTHER: '기타',
+};
 
 function extractVariables(template: string): string[] {
   const matches = template.match(/\$\{([^}]+)\}/g) ?? [];
-  return [...new Set(matches.map(m => m.slice(2, -1)))];
+  return [...new Set(matches.map((m) => m.slice(2, -1)))];
 }
 
 export function TemplatePickerModal({ onClose, onGenerated }: Props) {
-  const [step, setStep] = useState<'template' | 'variables'>('template');
+  const [step, setStep] = useState<'template' | 'post-and-vars'>('template');
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [sims, setSims] = useState<SimulationSummaryResponse[]>([]);
+  const [candidates, setCandidates] = useState<CandidatePostResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [selectedSimId, setSelectedSimId] = useState<number | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([getTemplates(undefined, true), getSimulations('COMPLETED')])
-      .then(([tmpl, simList]) => { setTemplates(tmpl); setSims(simList); })
+    Promise.all([getTemplates(undefined, true), getCandidatePosts({ sortBy: 'recommended' })])
+      .then(([tmpl, posts]) => {
+        setTemplates(tmpl);
+        setCandidates(posts);
+      })
       .catch(() => setError('데이터 로딩 실패'))
       .finally(() => setLoading(false));
   }, []);
@@ -39,38 +48,50 @@ export function TemplatePickerModal({ onClose, onGenerated }: Props) {
     setSelectedTemplate(t);
     const vars = extractVariables(t.bodyTemplate);
     const init: Record<string, string> = {};
-    vars.forEach(v => { init[v] = ''; });
+    vars.forEach((v) => { init[v] = ''; });
     setVariables(init);
-    if (vars.length > 0) setStep('variables');
-    else setStep('variables');
+    setStep('post-and-vars');
   }
 
   async function handleGenerate() {
-    if (!selectedTemplate || !selectedSimId) { setError('템플릿과 시뮬레이션을 선택해주세요.'); return; }
+    if (!selectedTemplate || !selectedPostId) {
+      setError('템플릿과 사연을 선택해주세요.');
+      return;
+    }
     setGenerating(true);
     setError('');
     try {
-      await generateFromTemplate(selectedTemplate.id, selectedSimId, undefined, variables);
+      await generateFromTemplate(selectedTemplate.id, selectedPostId, undefined, variables);
       onGenerated();
       onClose();
     } catch (e: any) {
       setError(e.response?.data?.message ?? '생성 실패');
-    } finally { setGenerating(false); }
+    } finally {
+      setGenerating(false);
+    }
   }
 
   const varKeys = selectedTemplate ? extractVariables(selectedTemplate.bodyTemplate) : [];
 
   return (
     <div
-      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.5)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}
       onClick={onClose}
     >
       <div
-        style={{ background: 'white', borderRadius: 12, padding: 24, maxWidth: 480, width: '90%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}
-        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'white', borderRadius: 12, padding: 24, maxWidth: 500,
+          width: '90%', maxHeight: '85vh', overflowY: 'auto',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: '#1A1A2E' }}>
-          {step === 'template' ? '템플릿 선택' : '변수 입력'}
+          {step === 'template' ? '템플릿 선택' : '사연 · 변수 입력'}
         </h3>
 
         {error && <p style={{ color: '#b33333', fontSize: 13, marginBottom: 12 }}>{error}</p>}
@@ -83,19 +104,34 @@ export function TemplatePickerModal({ onClose, onGenerated }: Props) {
               <p style={{ color: '#aaa', fontSize: 13 }}>활성화된 템플릿이 없습니다.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                {templates.map(t => (
+                {templates.map((t) => (
                   <div
                     key={t.id}
                     onClick={() => handleSelectTemplate(t)}
-                    style={{ padding: '12px 14px', border: '1px solid', borderColor: selectedTemplate?.id === t.id ? '#1A1A2E' : '#e7e3d8', borderRadius: 8, cursor: 'pointer', background: selectedTemplate?.id === t.id ? '#f0f2f8' : 'white' }}
+                    style={{
+                      padding: '12px 14px', border: '1px solid',
+                      borderColor: selectedTemplate?.id === t.id ? '#1A1A2E' : '#e7e3d8',
+                      borderRadius: 8, cursor: 'pointer',
+                      background: selectedTemplate?.id === t.id ? '#f0f2f8' : 'white',
+                    }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', background: '#1A1A2E', color: 'white', borderRadius: 3 }}>
+                      <span
+                        style={{
+                          fontSize: 11, fontWeight: 600, padding: '1px 6px',
+                          background: '#1A1A2E', color: 'white', borderRadius: 3,
+                        }}
+                      >
                         {PLATFORM_LABELS[t.platform] ?? t.platform}
                       </span>
                       <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1A2E' }}>{t.name}</span>
                     </div>
-                    <p style={{ margin: 0, fontSize: 11, color: '#888', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                    <p
+                      style={{
+                        margin: 0, fontSize: 11, color: '#888',
+                        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                      }}
+                    >
                       {t.bodyTemplate.slice(0, 60)}...
                     </p>
                   </div>
@@ -105,27 +141,64 @@ export function TemplatePickerModal({ onClose, onGenerated }: Props) {
           </>
         ) : (
           <>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 6 }}>시뮬레이션 선택</label>
-              <div style={{ maxHeight: 140, overflowY: 'auto', border: '1px solid #eee', borderRadius: 6 }}>
-                {sims.map(s => (
-                  <div key={s.id} onClick={() => setSelectedSimId(s.id)}
-                    style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', background: selectedSimId === s.id ? '#f0f4ff' : 'white', borderLeft: selectedSimId === s.id ? '3px solid #2d4a7a' : '3px solid transparent' }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E' }}>#{s.id} · 사연 #{s.storyId}</div>
-                    <div style={{ fontSize: 11, color: '#888' }}>{s.turnCount}턴</div>
-                  </div>
-                ))}
-              </div>
+            {/* 사연 선택 */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 6 }}>
+                홍보 사연 선택
+              </label>
+              {candidates.length === 0 ? (
+                <p style={{ fontSize: 12, color: '#aaa' }}>공개 사연이 없습니다.</p>
+              ) : (
+                <div
+                  style={{
+                    maxHeight: 180, overflowY: 'auto', border: '1px solid #eee', borderRadius: 6,
+                  }}
+                >
+                  {candidates.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => setSelectedPostId(c.id)}
+                      style={{
+                        padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0',
+                        background: selectedPostId === c.id ? '#f0f4ff' : 'white',
+                        borderLeft: selectedPostId === c.id ? '3px solid #2d4a7a' : '3px solid transparent',
+                      }}
+                    >
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E' }}>{c.title}</div>
+                      <div style={{ fontSize: 10, color: '#999' }}>
+                        {CATEGORY_LABELS[c.category] ?? c.category}
+                        {c.voteCount > 0
+                          ? ` · 작성자 ${c.authorPct}% : 상대방 ${c.partnerPct}%`
+                          : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {/* 변수 입력 */}
             {varKeys.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 8 }}>변수 입력</label>
-                {varKeys.map(k => (
+                <label
+                  style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 8 }}
+                >
+                  변수 입력
+                </label>
+                {varKeys.map((k) => (
                   <div key={k} style={{ marginBottom: 8 }}>
-                    <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 3 }}>{k}</label>
-                    <input type="text" value={variables[k] ?? ''} onChange={e => setVariables(prev => ({ ...prev, [k]: e.target.value }))}
-                      style={{ width: '100%', padding: '7px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }} />
+                    <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 3 }}>
+                      {k}
+                    </label>
+                    <input
+                      type="text"
+                      value={variables[k] ?? ''}
+                      onChange={(e) => setVariables((prev) => ({ ...prev, [k]: e.target.value }))}
+                      style={{
+                        width: '100%', padding: '7px 10px', border: '1px solid #ddd',
+                        borderRadius: 6, fontSize: 13, boxSizing: 'border-box',
+                      }}
+                    />
                   </div>
                 ))}
               </div>
@@ -134,15 +207,37 @@ export function TemplatePickerModal({ onClose, onGenerated }: Props) {
         )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          {step === 'variables' && (
-            <button onClick={() => setStep('template')} style={{ padding: '8px 14px', background: 'white', border: '1px solid #ddd', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
+          {step === 'post-and-vars' && (
+            <button
+              onClick={() => setStep('template')}
+              style={{
+                padding: '8px 14px', background: 'white', border: '1px solid #ddd',
+                borderRadius: 6, cursor: 'pointer', fontSize: 13,
+              }}
+            >
               이전
             </button>
           )}
-          <button onClick={onClose} style={{ padding: '8px 14px', background: 'white', border: '1px solid #ddd', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>취소</button>
-          {step === 'variables' && (
-            <button onClick={handleGenerate} disabled={generating || !selectedSimId}
-              style={{ padding: '8px 16px', background: '#1A1A2E', color: 'white', border: 'none', borderRadius: 6, cursor: (generating || !selectedSimId) ? 'not-allowed' : 'pointer', fontSize: 13, opacity: (generating || !selectedSimId) ? 0.6 : 1 }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 14px', background: 'white', border: '1px solid #ddd',
+              borderRadius: 6, cursor: 'pointer', fontSize: 13,
+            }}
+          >
+            취소
+          </button>
+          {step === 'post-and-vars' && (
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !selectedPostId}
+              style={{
+                padding: '8px 16px', background: '#1A1A2E', color: 'white',
+                border: 'none', borderRadius: 6, fontSize: 13,
+                cursor: generating || !selectedPostId ? 'not-allowed' : 'pointer',
+                opacity: generating || !selectedPostId ? 0.6 : 1,
+              }}
+            >
               {generating ? '생성 중...' : '생성'}
             </button>
           )}

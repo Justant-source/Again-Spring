@@ -50,7 +50,7 @@ export default function MarketingPage() {
         <h1 style={{ fontSize: 18, fontWeight: 600, color: '#1A1A2E', margin: '0 0 8px' }}>
           마케팅 자동화 대시보드
         </h1>
-        <p style={{ fontSize: 14, color: '#888', margin: 0 }}>시뮬레이션 현황 및 비용 관리</p>
+        <p style={{ fontSize: 14, color: '#888', margin: 0 }}>커뮤니티 사연 홍보 콘텐츠 생성 및 비용 관리</p>
       </div>
 
       {error && (
@@ -185,10 +185,10 @@ export default function MarketingPage() {
         </h2>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {[
-            { href: '/admin/marketing/stories', label: '사연 관리' },
-            { href: '/admin/marketing/simulations', label: '시뮬레이션' },
-            { href: '/admin/marketing/contents', label: '콘텐츠' },
+            { href: '/admin/marketing/contents', label: '콘텐츠 생성' },
             { href: '/admin/marketing/calendar', label: '캘린더' },
+            { href: '/admin/marketing/templates', label: '템플릿' },
+            { href: '/admin/marketing/hashtags', label: '해시태그' },
           ].map(({ href, label }) => (
             <Link
               key={href}

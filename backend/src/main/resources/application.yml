@@ -89,6 +89,8 @@ app:
     marketing:
       enabled: ${MARKETING_ENABLED:false}        # dev 전용 — prod에서 절대 true 설정 금지
       renderer-url: ${MARKETING_RENDERER_URL:http://localhost:9000}
+    marketing:
+      public-base-url: ${MARKETING_PUBLIC_BASE_URL:https://againspring.net}  # 홍보 사연 링크 도메인
   categories:
     path: ${CATEGORIES_PATH:./shared/docs/categories.yml}
   user-permissions:

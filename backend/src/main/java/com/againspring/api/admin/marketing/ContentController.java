@@ -36,6 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Admin API controller for managing marketing content generation.
  * Secured to ADMIN role only.
+ * 소스: 커뮤니티 게시글(Post) — 외부사연/시뮬레이션 제거.
  */
 @RestController
 @RequestMapping("/api/admin/marketing/contents")
@@ -51,30 +52,28 @@ public class ContentController {
 	private final PerformanceService performanceService;
 
 	/**
-	 * Generate marketing content for a completed simulation.
+	 * 커뮤니티 게시글로부터 마케팅 콘텐츠를 비동기 생성한다.
+	 * platforms 미지정 시 x, instagram, naver_blog 3종 동시 생성.
 	 *
-	 * @param simulationId ID of the completed simulation
-	 * @param platform Target platform (x, instagram, naver_blog)
-	 * @return Generated content (201 Created)
+	 * @param postId    소스 커뮤니티 게시글 ID
+	 * @param platforms 생성할 플랫폼 목록 (쉼표 구분 or 반복 파라미터)
+	 * @return 생성 요청된 콘텐츠 목록 (202 Accepted, GENERATING 상태)
 	 */
-	@PostMapping("/generate")
-	@Operation(summary = "Generate marketing content (async)", description = "Queue content generation — returns 202 with GENERATING record immediately")
-	public ResponseEntity<ContentResponse> generate(
-			@RequestParam Long simulationId,
-			@RequestParam String platform) {
-		ContentResponse response = contentService.generateAsync(simulationId, platform);
-		return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+	@PostMapping("/generate-from-post")
+	@Operation(summary = "Generate marketing content from community post (async)",
+	           description = "Queue content generation from a community post — returns 202 with GENERATING records immediately")
+	public ResponseEntity<List<ContentResponse>> generateFromPost(
+			@RequestParam String postId,
+			@RequestParam(required = false) List<String> platforms) {
+		List<ContentResponse> responses = contentService.generateFromPost(postId, platforms);
+		return ResponseEntity.status(HttpStatus.ACCEPTED).body(responses);
 	}
 
 	/**
 	 * List all marketing content with optional filters.
-	 *
-	 * @param status Filter by status (DRAFT, REVIEW, APPROVED, EXPORTED, REJECTED)
-	 * @param platform Filter by platform (X, INSTAGRAM, NAVER_BLOG)
-	 * @return List of content summaries
 	 */
 	@GetMapping
-	@Operation(summary = "List marketing content", description = "List all marketing content with optional filters")
+	@Operation(summary = "List marketing content")
 	public ResponseEntity<List<ContentSummaryResponse>> list(
 			@RequestParam(required = false) String status,
 			@RequestParam(required = false) String platform) {
@@ -84,12 +83,9 @@ public class ContentController {
 
 	/**
 	 * Get single marketing content by ID.
-	 *
-	 * @param id Content ID
-	 * @return Content details
 	 */
 	@GetMapping("/{id}")
-	@Operation(summary = "Get content details", description = "Retrieve full details of marketing content")
+	@Operation(summary = "Get content details")
 	public ResponseEntity<ContentResponse> getById(@PathVariable Long id) {
 		ContentResponse response = contentService.findById(id);
 		return ResponseEntity.ok(response);
@@ -97,13 +93,9 @@ public class ContentController {
 
 	/**
 	 * Update marketing content body text.
-	 *
-	 * @param id Content ID
-	 * @param request Update request containing new body text
-	 * @return Updated content
 	 */
 	@PutMapping("/{id}")
-	@Operation(summary = "Update content", description = "Update marketing content body text")
+	@Operation(summary = "Update content body text")
 	public ResponseEntity<ContentResponse> update(
 			@PathVariable Long id,
 			@RequestBody ContentRequest request) {
@@ -113,13 +105,9 @@ public class ContentController {
 
 	/**
 	 * Approve marketing content after manual review.
-	 * Re-runs safety checks before approval.
-	 *
-	 * @param id Content ID
-	 * @return Approved content
 	 */
 	@PostMapping("/{id}/approve")
-	@Operation(summary = "Approve content", description = "Approve content and re-run safety checks")
+	@Operation(summary = "Approve content")
 	public ResponseEntity<ContentResponse> approve(@PathVariable Long id) {
 		ContentResponse response = contentService.approve(id);
 		return ResponseEntity.ok(response);
@@ -127,12 +115,9 @@ public class ContentController {
 
 	/**
 	 * Delete marketing content permanently.
-	 *
-	 * @param id Content ID
-	 * @return 204 No Content
 	 */
 	@DeleteMapping("/{id}")
-	@Operation(summary = "Delete content", description = "Permanently delete marketing content")
+	@Operation(summary = "Delete content")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
 		contentService.delete(id);
 		return ResponseEntity.noContent().build();
@@ -140,13 +125,9 @@ public class ContentController {
 
 	/**
 	 * Reject marketing content with reason.
-	 *
-	 * @param id Content ID
-	 * @param reason Rejection reason
-	 * @return Rejected content
 	 */
 	@PostMapping("/{id}/reject")
-	@Operation(summary = "Reject content", description = "Reject content with reason")
+	@Operation(summary = "Reject content")
 	public ResponseEntity<ContentResponse> reject(
 			@PathVariable Long id,
 			@RequestParam(required = false) String reason) {
