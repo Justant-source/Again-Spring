@@ -195,6 +195,30 @@ public class BackendBotClient {
         }
     }
 
+    /** Like a comment or reply (toggle — 이미 좋아요면 취소됨 → 복구 재호출). 대댓글도 동일 엔드포인트. */
+    public boolean likeComment(String jwt, String postId, Long commentId) {
+        try {
+            String body = restClient.post()
+                .uri("/api/community/posts/{postId}/comments/{commentId}/like", postId, commentId)
+                .header("Authorization", "Bearer " + jwt)
+                .retrieve()
+                .body(String.class);
+            // toggle 감지: liked=false면 의도치 않게 좋아요 취소됨 → 재호출로 복구
+            if (body != null && body.contains("\"liked\":false")) {
+                restClient.post()
+                    .uri("/api/community/posts/{postId}/comments/{commentId}/like", postId, commentId)
+                    .header("Authorization", "Bearer " + jwt)
+                    .retrieve()
+                    .toBodilessEntity();
+                log.debug("Like re-applied on comment {} post {} (toggle recovery)", commentId, postId);
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("Like comment failed on post {} comment {}: {}", postId, commentId, e.getMessage());
+            return false;
+        }
+    }
+
     /** Record a view (POST /view with deviceId — auth 불필요, deviceId로 중복 방지) */
     public boolean viewPost(String postId, String deviceId) {
         try {

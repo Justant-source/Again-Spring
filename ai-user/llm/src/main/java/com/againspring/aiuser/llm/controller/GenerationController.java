@@ -53,10 +53,13 @@ public class GenerationController {
         try {
             String prompt = promptAssembler.assembleCommentPrompt(req);
             String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
-            String text = outputSanitizer.sanitizeComment(raw);
+            // 센티넬 분리 먼저 (sanitize/critique 전에) — OutputSanitizer가 <<<REACT>>> 이하를 파괴하기 전에 추출
+            String[] split = splitReactions(raw);
+            String reactionsJson = split[1];  // 최초 raw에서 캡처 (critique 재생성으로도 보존됨)
+            String text = outputSanitizer.sanitizeComment(split[0]);
             // 자기비평 루프 (enabled 시, 댓글은 점수 기준 완화) — 동일 backend 승계
             text = selfCritique.critiqueAndRefine(text, "comment", prompt, corrId, req.getBackend());
-            return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
+            return ResponseEntity.ok(GenResponse.success(text, reactionsJson, System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));
         } catch (LlmTimeoutException e) {
@@ -74,8 +77,10 @@ public class GenerationController {
         try {
             String prompt = promptAssembler.assembleReplyPrompt(req);
             String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
-            String text = outputSanitizer.sanitizeComment(raw); // same sanitizer (short text)
-            return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
+            // 센티넬 분리 먼저 — OutputSanitizer가 <<<REACT>>> 이하를 파괴하기 전에 추출
+            String[] split = splitReactions(raw);
+            String text = outputSanitizer.sanitizeComment(split[0]); // same sanitizer (short text)
+            return ResponseEntity.ok(GenResponse.success(text, split[1], System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));
         } catch (LlmTimeoutException e) {
@@ -112,5 +117,22 @@ public class GenerationController {
 
     private String corrId(String provided) {
         return (provided != null && !provided.isBlank()) ? provided : UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    /**
+     * 원문(raw)에서 <<<REACT>>> 센티넬을 기준으로 본문과 반응 JSON을 분리한다.
+     * split[0] = 본문(센티넬 이전), split[1] = 반응 JSON 문자열 또는 null.
+     * 센티넬 없거나 JSON 파싱 불가 → split[1] = null (graceful degrade).
+     */
+    private String[] splitReactions(String raw) {
+        if (raw == null) return new String[]{"", null};
+        int sentinelIdx = raw.indexOf("<<<REACT>>>");
+        if (sentinelIdx < 0) return new String[]{raw, null};
+        String textPart = raw.substring(0, sentinelIdx).trim();
+        String after = raw.substring(sentinelIdx + "<<<REACT>>>".length()).trim();
+        int jsonStart = after.indexOf('{');
+        int jsonEnd = after.lastIndexOf('}');
+        String reactionsJson = (jsonStart >= 0 && jsonEnd > jsonStart) ? after.substring(jsonStart, jsonEnd + 1) : null;
+        return new String[]{textPart, reactionsJson};
     }
 }

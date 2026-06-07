@@ -19,6 +19,9 @@ public class LlmAiUserClient {
         this.restClient = restClient;
     }
 
+    /** 피기백 반응을 포함한 생성 결과. */
+    public record GenResult(String text, String reactionsJson) {}
+
     public Optional<String> generatePost(GenDto.PostRequest req) {
         return generate("/generate/post", req);
     }
@@ -29,6 +32,36 @@ public class LlmAiUserClient {
 
     public Optional<String> generateReply(GenDto.ReplyRequest req) {
         return generate("/generate/reply", req);
+    }
+
+    /** comment 생성 — 피기백 반응 JSON 포함 버전. */
+    public Optional<GenResult> generateCommentR(GenDto.CommentRequest req) {
+        return generateWithReactions("/generate/comment", req);
+    }
+
+    /** reply 생성 — 피기백 반응 JSON 포함 버전. */
+    public Optional<GenResult> generateReplyR(GenDto.ReplyRequest req) {
+        return generateWithReactions("/generate/reply", req);
+    }
+
+    private Optional<GenResult> generateWithReactions(String path, Object req) {
+        try {
+            GenDto.Response resp = restClient.post()
+                .uri(path)
+                .body(req)
+                .retrieve()
+                .body(GenDto.Response.class);
+            if (resp != null && resp.isSuccess()) {
+                return Optional.of(new GenResult(resp.getText(), resp.getReactionsJson()));
+            }
+            if (resp != null && resp.getError() != null) {
+                log.warn("Gen error on {}: type={} msg={}", path, resp.getErrorType(), resp.getError());
+            }
+            return Optional.empty();
+        } catch (Exception e) {
+            log.error("LlmAiUser call failed on {}: {}", path, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**

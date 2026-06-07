@@ -149,6 +149,8 @@ public class PromptAssembler {
             %s
             %s
             %s
+            %s
+            %s
             이 글에 달 짧은 댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
             - 50~150자 내외
@@ -162,6 +164,8 @@ public class PromptAssembler {
                 req.getArchetypeCommentSamples() != null && !req.getArchetypeCommentSamples().isBlank() ? "이 글에 자주 달리는 댓글 패턴 (참고용):\n" + safe(req.getArchetypeCommentSamples()) : "",
                 req.getExistingComments() != null && !req.getExistingComments().isBlank() ? "이미 달린 댓글들 (중복 피하고 다른 관점으로):\n" + safe(req.getExistingComments()) : "",
                 dynamicExamplesBlock(req.getDynamicExamples()),
+                req.getDispositionNote() != null && !req.getDispositionNote().isBlank() ? "내 성향: " + safe(req.getDispositionNote()) : "",
+                req.getReactableComments() != null && !req.getReactableComments().isBlank() ? "이미 달린 댓글들 (번호로 좋아요 표시 가능):\n" + safe(req.getReactableComments()) : "",
                 toneNote);
         return system + "\n" + SEP + "\n" + user;
     }
@@ -176,7 +180,7 @@ public class PromptAssembler {
             %s%s%s원댓글: %s
             맥락: %s
             반응: %s (AGREE=공감, DISAGREE=반박, CURIOUS=궁금)
-
+            %s
             이 댓글에 대한 자연스러운 대댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
             - 초단문 필수: 15~40자만 (한 문장 반도 안 됨)
@@ -192,6 +196,7 @@ public class PromptAssembler {
                 safe(req.getParentCommentExcerpt() != null ? req.getParentCommentExcerpt() : ""),
                 safe(req.getThreadContext() != null ? req.getThreadContext() : ""),
                 req.getStance() != null ? req.getStance() : "CURIOUS",
+                req.getDispositionNote() != null && !req.getDispositionNote().isBlank() ? "내 성향: " + safe(req.getDispositionNote()) : "",
                 toneNote);
         return system + "\n" + SEP + "\n" + user;
     }

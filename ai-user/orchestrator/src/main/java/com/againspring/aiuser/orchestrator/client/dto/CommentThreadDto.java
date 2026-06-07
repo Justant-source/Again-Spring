@@ -17,6 +17,8 @@ public class CommentThreadDto {
     private Long id;
     private String body;
     private String authorNickname;
+    /** 작성자 userId — 자기 댓글 좋아요 방지용. 백엔드 JSON에 존재하나 기존엔 드롭됨. */
+    private String authorId;
     private boolean isAuthor;
     private boolean isPartner;
     private int likeCount;

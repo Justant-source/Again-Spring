@@ -95,17 +95,7 @@ public class ActionPlanner {
                 rt.postBodyExcerpt(), rt.siblingComments()));
         }
 
-        // LIKE (선별적·콘텐츠 인식)
-        cumul += hasFeed ? pLike : 0;
-        if (rand < cumul && hasFeed) {
-            PostDto chosen = pickByLikeScore(persona, unseen);
-            if (chosen != null && passesLikeGate(persona, chosen)) {
-                return Optional.of(PlannedAction.like(chosen));
-            }
-            return Optional.empty();  // 공명하는 글 없음 → 이번엔 안 누름 (선별적)
-        }
-
-        // VOTE (방향성·콘텐츠 인식)
+        // VOTE (방향성·콘텐츠 인식) — LIKE 앞으로 이동: 투표 기근 해소
         cumul += hasFeed ? pVote : 0;
         if (rand < cumul && hasFeed) {
             PostDto post = pickByVoteScore(persona, unseen);
@@ -115,7 +105,17 @@ public class ActionPlanner {
                     return Optional.of(PlannedAction.vote(post, optionId));
                 }
             }
-            return Optional.empty();
+            // 투표가능 글 없음 → fallthrough to LIKE (Optional.empty() 반환 제거로 낭비 없앰)
+        }
+
+        // LIKE (선별적·콘텐츠 인식)
+        cumul += hasFeed ? pLike : 0;
+        if (rand < cumul && hasFeed) {
+            PostDto chosen = pickByLikeScore(persona, unseen);
+            if (chosen != null && passesLikeGate(persona, chosen)) {
+                return Optional.of(PlannedAction.like(chosen));
+            }
+            // 공명하는 글 없음 → fallthrough to COMMENT (선별적, 낭비 없앰)
         }
 
         // COMMENT

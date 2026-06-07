@@ -26,4 +26,6 @@ public class ReplyGenRequest {
     private String globalForbidRules;
     /** 생성 백엔드: "CLI" | "API" | null */
     private String backend;
+    /** 좋아요/투표 성향 수치 ("좋아요 성향 0.7/1.0, 투표 성향 0.4/1.0"). 없으면 null. */
+    private String dispositionNote;
 }

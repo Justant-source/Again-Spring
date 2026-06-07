@@ -24,10 +24,10 @@ public class ViewDispatcher {
 
     private final JdbcTemplate jdbcTemplate;
 
-    private static final int VIEW_PER_COMMENT = 20;
-    private static final int VIEW_PER_VOTE = 5;
-    private static final int VIEW_PER_LIKE = 5;
-    private static final int BASE_VIEWS = 30;   // 참여 0이어도 최소 노출
+    private static final int VIEW_PER_COMMENT = 8;
+    private static final int VIEW_PER_VOTE = 6;
+    private static final int VIEW_PER_LIKE = 2;
+    private static final int BASE_VIEWS = 12;   // 참여 0이어도 최소 노출 (균형 보정: ~12-15:1)
 
     public int dispatchViews() {
         try {

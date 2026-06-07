@@ -65,6 +65,10 @@ public class GenDto {
         private String globalForbidRules;
         /** 생성 백엔드: "CLI" | "API" | null */
         private String backend;
+        /** 번호 매긴 댓글 목록 ("1. 본문\n2. ↳ 대댓글\n..."). 피기백 반응용. 없으면 null. */
+        private String reactableComments;
+        /** 좋아요/투표 성향 수치 ("좋아요 성향 0.7/1.0, 투표 성향 0.4/1.0"). 없으면 null. */
+        private String dispositionNote;
     }
 
     @Getter
@@ -92,6 +96,8 @@ public class GenDto {
         private String globalForbidRules;
         /** 생성 백엔드: "CLI" | "API" | null */
         private String backend;
+        /** 좋아요/투표 성향 수치 ("좋아요 성향 0.7/1.0, 투표 성향 0.4/1.0"). 없으면 null. */
+        private String dispositionNote;
     }
 
     @Getter
@@ -101,6 +107,8 @@ public class GenDto {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Response {
         private String text;
+        /** 피기백 반응 JSON (comment/reply 전용). null이면 반응 없음. */
+        private String reactionsJson;
         private long latencyMs;
         private String correlationId;
         private String error;

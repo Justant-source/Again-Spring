@@ -148,8 +148,8 @@ public class ActionExecutor {
         String postExcerpt = truncate(action.targetPost().getBodyPublished(), 300);
         String stance = pickStanceWeighted(persona, action.targetPost());
 
-        // Phase 4a: 기존 댓글 조회 (GET /api/community/posts/{id}/comments)
-        String existingComments = fetchExistingComments(postId);
+        // Phase 4a: 댓글 조회 + 피기백 반응 대상 목록
+        CommentContext ctx = fetchReactableComments(postId);
 
         // Phase 2d: archetype stance별 few-shot
         String archetypeCommentSamples = buildArchetypeCommentSamples(persona, action.targetPost());
@@ -168,7 +168,7 @@ public class ActionExecutor {
             log.debug("RAG: {} comments found corr={}", examples.size(), corrId);
         }
 
-        java.util.Optional<String> textOpt = llmClient.generateComment(GenDto.CommentRequest.builder()
+        java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateCommentR(GenDto.CommentRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForComment(persona, stance))
             .slangLevel(persona.getSlangLevel().doubleValue())
@@ -179,7 +179,9 @@ public class ActionExecutor {
             .formality(voiceFormality(persona))
             .demographic(demographic)
             .archetypeCommentSamples(archetypeCommentSamples)
-            .existingComments(existingComments)
+            .existingComments(null)  // reactableComments가 대체 (번호 형식으로 겸용)
+            .reactableComments(ctx.promptList())
+            .dispositionNote(dispositionNote(persona))
             .dynamicExamples(dynamicExamples)
             .correctionCautions(cautionsBlock(persona))
             .globalForbidRules(globalRulesBlock("COMMENT"))
@@ -187,11 +189,12 @@ public class ActionExecutor {
             .backend(backendFor("COMMENT"))
             .build());
 
-        if (textOpt.isEmpty()) {
+        if (resultOpt.isEmpty()) {
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
             return;
         }
-        String text = textOpt.get();
+        LlmAiUserClient.GenResult res = resultOpt.get();
+        String text = res.text();
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(text, ContentSafetyGuard.ContentType.COMMENT);
         if (!guard.passed()) {
             log.warn("Comment blocked for persona {} post {}: {}", persona.getId(), postId, guard.reason());
@@ -205,6 +208,8 @@ public class ActionExecutor {
             // AI Learning: 합격한 댓글 예시 뱅크에 저장
             aiLearningClient.saveAsync(text, "COMMENT",
                 action.targetPost() != null ? action.targetPost().getCategory() : "OTHER", "SELF_GENERATED");
+            // 피기백 반응 디스패치 (추가 LLM 호출 0건)
+            dispatchReactions(persona, jwt, action.targetPost(), res.reactionsJson(), ctx.items(), corrId);
         }
         logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
             java.util.Map.of("postId", postId, "len", text.length(), "usedLlm", true));
@@ -221,7 +226,7 @@ public class ActionExecutor {
         String postBodyExcerpt = action.targetPost().getBodyPublished();
         String siblingComments = action.siblingComments();
 
-        java.util.Optional<String> textOpt = llmClient.generateReply(GenDto.ReplyRequest.builder()
+        java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateReplyR(GenDto.ReplyRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForReply(persona))
             .slangLevel(persona.getSlangLevel().doubleValue())
@@ -236,13 +241,15 @@ public class ActionExecutor {
             .globalForbidRules(globalRulesBlock("COMMENT"))
             .correlationId(corrId)
             .backend(backendFor("REPLY"))
+            .dispositionNote(dispositionNote(persona))
             .build());
 
-        if (textOpt.isEmpty()) {
+        if (resultOpt.isEmpty()) {
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
             return;
         }
-        String text = textOpt.get();
+        LlmAiUserClient.GenResult res = resultOpt.get();
+        String text = res.text();
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(text, ContentSafetyGuard.ContentType.COMMENT);
         if (!guard.passed()) {
             logAction(persona, action, "BLOCKED", corrId, java.util.Map.of("reason", guard.reason(), "usedLlm", true));
@@ -251,6 +258,11 @@ public class ActionExecutor {
         boolean ok = backendBot.addComment(jwt, postId, text, action.parentCommentId());
         if (ok) {
             writeHistory(persona.getId(), "comments", text, postId, null);
+            // 피기백 반응 디스패치 — 부모 댓글(항목 1)만 대상
+            // ActionPlanner가 자작 댓글 reply 타겟을 사전 제외하므로 authorId 검사 불필요
+            java.util.List<ReactableItem> parentItems = java.util.List.of(
+                new ReactableItem(action.parentCommentId(), null));
+            dispatchReactions(persona, jwt, action.targetPost(), res.reactionsJson(), parentItems, corrId);
         }
         logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
             java.util.Map.of("commentId", action.parentCommentId(), "len", text.length(), "usedLlm", true));
@@ -686,24 +698,157 @@ public class ActionExecutor {
         };
     }
 
-    // ── Phase 4a: Existing comments context ──────────────────────────────────
+    // ── 피기백 반응 지원 타입 ──────────────────────────────────────────────────
 
-    private String fetchExistingComments(String postId) {
+    private record CommentContext(String promptList, List<ReactableItem> items) {}
+    private record ReactableItem(long commentId, String authorId) {}
+
+    // ── Phase 4a: 댓글 조회 + 피기백 반응 대상 목록 ──────────────────────────
+
+    /**
+     * 게시글의 댓글+대댓글을 표시순으로 평탄화해 번호 매긴 목록과 ReactableItem 목록으로 반환.
+     * 번호(1-based)가 likeComments JSON 배열의 인덱스와 1:1 대응한다.
+     */
+    private CommentContext fetchReactableComments(String postId) {
         try {
             List<CommentThreadDto> comments = backendBot.getComments(postId, 0, 5);
-            if (comments == null || comments.isEmpty()) return null;
+            if (comments == null || comments.isEmpty()) return new CommentContext(null, Collections.emptyList());
             StringBuilder sb = new StringBuilder();
-            int count = 0;
+            List<ReactableItem> items = new ArrayList<>();
+            int idx = 1;
             for (CommentThreadDto c : comments) {
-                if (c.getBody() == null || c.getBody().isBlank()) continue;
-                sb.append("- ").append(truncate(c.getBody(), 80)).append("\n");
-                if (++count >= 4) break;
+                if (c.getId() == null || c.getBody() == null || c.getBody().isBlank()) continue;
+                sb.append(idx).append(". ").append(truncate(c.getBody(), 60)).append("\n");
+                items.add(new ReactableItem(c.getId(), c.getAuthorId()));
+                idx++;
+                if (c.getReplies() != null) {
+                    for (CommentThreadDto r : c.getReplies()) {
+                        if (r.getId() == null || r.getBody() == null || r.getBody().isBlank()) continue;
+                        sb.append(idx).append(". ↳ ").append(truncate(r.getBody(), 50)).append("\n");
+                        items.add(new ReactableItem(r.getId(), r.getAuthorId()));
+                        idx++;
+                        if (idx > 8) break;
+                    }
+                }
+                if (idx > 8) break;
             }
-            return sb.length() > 0 ? sb.toString().trim() : null;
+            return new CommentContext(sb.length() > 0 ? sb.toString().trim() : null, items);
         } catch (Exception e) {
-            log.debug("fetchExistingComments failed for post {}: {}", postId, e.getMessage());
-            return null;
+            log.debug("fetchReactableComments failed for post {}: {}", postId, e.getMessage());
+            return new CommentContext(null, Collections.emptyList());
         }
+    }
+
+    // ── 피기백 반응 디스패치 ──────────────────────────────────────────────────
+
+    /**
+     * LLM이 반환한 reactionsJson을 파싱해 vote·likePost·likeComments를 순서대로 디스패치.
+     * 파싱/디스패치 실패는 debug 로그 후 no-op (graceful degrade — 본문에 영향 없음).
+     */
+    private void dispatchReactions(Persona persona, String jwt, PostDto post, String reactionsJson,
+                                   List<ReactableItem> items, String corrId) {
+        if (reactionsJson == null || reactionsJson.isBlank()) return;
+        try {
+            String json = extractReactJson(reactionsJson);
+            if (json == null) return;
+            com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(json);
+            String postId = post != null ? post.getId() : null;
+
+            // 1. vote
+            String voteSide = node.path("vote").asText("none");
+            if (postId != null && !"none".equalsIgnoreCase(voteSide)) {
+                Long optionId = resolveVoteOption(post, voteSide);
+                if (optionId != null) {
+                    boolean ok = backendBot.vote(jwt, postId, optionId);
+                    logPiggyback(persona, corrId, "VOTE", postId, null, ok);
+                }
+            }
+
+            // 2. likePost
+            if (postId != null && node.path("likePost").asBoolean(false)) {
+                boolean ok = backendBot.likePost(jwt, postId);
+                logPiggyback(persona, corrId, "LIKE", postId, null, ok);
+            }
+
+            // 3. likeComments
+            com.fasterxml.jackson.databind.JsonNode likeArr = node.path("likeComments");
+            if (likeArr.isArray() && !items.isEmpty()) {
+                Set<Long> dedup = new HashSet<>();
+                for (com.fasterxml.jackson.databind.JsonNode numNode : likeArr) {
+                    int num = numNode.asInt(0);
+                    if (num < 1 || num > items.size()) continue;
+                    ReactableItem item = items.get(num - 1);
+                    if (dedup.contains(item.commentId())) continue;
+                    // 자기 댓글 좋아요 방지
+                    if (item.authorId() != null && persona.getId().equals(item.authorId())) continue;
+                    dedup.add(item.commentId());
+                    boolean ok = backendBot.likeComment(jwt, postId != null ? postId : "", item.commentId());
+                    logPiggyback(persona, corrId, "COMMENT_LIKE", postId, item.commentId(), ok);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("dispatchReactions failed corr={}: {}", corrId, e.getMessage());
+        }
+    }
+
+    private void logPiggyback(Persona persona, String corrId, String type, String postId, Long commentId, boolean ok) {
+        try {
+            Map<String, Object> detail = new HashMap<>();
+            detail.put("via", "piggyback");
+            detail.put("usedLlm", false);
+            if (postId != null) detail.put("postId", postId);
+            if (commentId != null) detail.put("commentId", commentId);
+            String targetType = "COMMENT_LIKE".equals(type) ? "COMMENT" : "POST";
+            String targetId = commentId != null ? String.valueOf(commentId) : postId;
+            actionLogRepo.save(PersonaActionLog.builder()
+                .personaId(persona.getId())
+                .actionType(type)
+                .targetType(targetType)
+                .targetId(targetId)
+                .usedLlm(false)
+                .status(ok ? "POSTED" : "FAILED")
+                .correlationId(corrId)
+                .detail(detail)
+                .createdAt(Instant.now())
+                .build());
+        } catch (Exception e) {
+            log.debug("logPiggyback failed: {}", e.getMessage());
+        }
+    }
+
+    /** 작성자/상대방 라벨 → voteOptionId 변환. voteOptions<2개 또는 라벨 없으면 null. */
+    private Long resolveVoteOption(PostDto post, String side) {
+        if (post == null || post.getVoteOptions() == null || post.getVoteOptions().size() < 2) return null;
+        String label = "author".equalsIgnoreCase(side) ? "작성자" : "상대방";
+        return post.getVoteOptions().stream()
+            .filter(o -> label.equals(o.getLabel()))
+            .map(PostDto.VoteOptionDto::getId)
+            .findFirst()
+            .orElse(null);
+    }
+
+    /** 페르소나 좋아요/투표 성향 수치 문자열 (LLM 프롬프트 주입용). */
+    private String dispositionNote(Persona persona) {
+        double like = voiceScoreLocal(persona, "like_score", 0.45);
+        double vote = voiceScoreLocal(persona, "vote_score", 0.30);
+        return String.format("좋아요 성향 %.1f/1.0, 투표 성향 %.1f/1.0", like, vote);
+    }
+
+    private double voiceScoreLocal(Persona persona, String key, double fallback) {
+        try {
+            if (persona.getVoiceProfile() == null) return fallback;
+            Object v = persona.getVoiceProfile().get(key);
+            if (v instanceof Number) return Math.max(0.05, Math.min(0.95, ((Number) v).doubleValue()));
+        } catch (Exception ignored) {}
+        return fallback;
+    }
+
+    /** reactionsJson 문자열에서 첫 { … 끝 } JSON 추출. */
+    private String extractReactJson(String raw) {
+        if (raw == null) return null;
+        int s = raw.indexOf('{');
+        int e = raw.lastIndexOf('}');
+        return (s >= 0 && e > s) ? raw.substring(s, e + 1) : null;
     }
 
     // ── Phase 4b: Reply stance diversification ────────────────────────────────
@@ -820,7 +965,7 @@ public class ActionExecutor {
             }
             String targetType = switch (action.type()) {
                 case LIKE, VOTE, COMMENT, POST, VIEW -> "POST";
-                case REPLY, INVITE_ANSWER -> "COMMENT";
+                case REPLY, INVITE_ANSWER, COMMENT_LIKE -> "COMMENT";
             };
             actionLogRepo.save(PersonaActionLog.builder()
                 .personaId(persona.getId())

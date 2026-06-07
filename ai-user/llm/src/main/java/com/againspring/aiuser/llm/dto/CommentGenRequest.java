@@ -28,4 +28,8 @@ public class CommentGenRequest {
     private String globalForbidRules;
     /** 생성 백엔드: "CLI" | "API" | null */
     private String backend;
+    /** 번호 매긴 댓글 목록 ("1. 본문\n2. ↳ 대댓글\n..."). 피기백 반응용. 없으면 null. */
+    private String reactableComments;
+    /** 좋아요/투표 성향 수치 ("좋아요 성향 0.7/1.0, 투표 성향 0.4/1.0"). 없으면 null. */
+    private String dispositionNote;
 }

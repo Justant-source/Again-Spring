@@ -6,6 +6,8 @@ import lombok.*;
 @Builder
 public class GenResponse {
     private final String text;
+    /** 피기백 반응 JSON (comment/reply 전용). null이면 반응 없음. */
+    private final String reactionsJson;
     private final long latencyMs;
     private final String correlationId;
     private final String error;
@@ -14,6 +16,16 @@ public class GenResponse {
     public static GenResponse success(String text, long latencyMs, String correlationId) {
         return GenResponse.builder()
             .text(text)
+            .latencyMs(latencyMs)
+            .correlationId(correlationId)
+            .build();
+    }
+
+    /** comment/reply 전용 — reactionsJson 포함 버전. */
+    public static GenResponse success(String text, String reactionsJson, long latencyMs, String correlationId) {
+        return GenResponse.builder()
+            .text(text)
+            .reactionsJson(reactionsJson)
             .latencyMs(latencyMs)
             .correlationId(correlationId)
             .build();
