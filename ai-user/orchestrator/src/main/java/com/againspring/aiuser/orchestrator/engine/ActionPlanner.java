@@ -108,9 +108,18 @@ public class ActionPlanner {
             // 투표가능 글 없음 → fallthrough to LIKE (Optional.empty() 반환 제거로 낭비 없앰)
         }
 
-        // LIKE (선별적·콘텐츠 인식)
+        // LIKE / COMMENT_LIKE (같은 확률 밴드 — like_score 성향으로 분기)
         cumul += hasFeed ? pLike : 0;
         if (rand < cumul && hasFeed) {
+            // like_score에 비례해 댓글 좋아요 비율 결정 (0.0~0.55)
+            // like_score 높은 페르소나일수록 댓글 좋아요를 더 자주 선택
+            double commentLikeRatio = voiceScore(persona, "like_score", P_LIKE_DEFAULT) * 0.55;
+            if (RNG.nextDouble() < commentLikeRatio) {
+                // 전체 피드(seen 포함) 중 관심도 기반 선택 — 기존 댓글 소급 적용 위해
+                List<PostDto> pool = !feedPosts.isEmpty() ? feedPosts : unseen;
+                PostDto target = pickByAffinity(persona, pool);
+                if (target != null) return Optional.of(PlannedAction.commentLike(target));
+            }
             PostDto chosen = pickByLikeScore(persona, unseen);
             if (chosen != null && passesLikeGate(persona, chosen)) {
                 return Optional.of(PlannedAction.like(chosen));

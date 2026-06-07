@@ -108,7 +108,32 @@ public class ActionExecutor {
             case REPLY -> executeReply(persona, action, jwt, corrId);
             case POST -> executePost(persona, action, jwt, corrId);
             case VIEW -> executeView(persona, action, jwt, corrId);
+            case COMMENT_LIKE -> executeCommentLike(persona, action, jwt, corrId);
             default -> log.warn("Unhandled action type: {}", action.type());
+        }
+    }
+
+    private void executeCommentLike(Persona persona, PlannedAction action, String jwt, String corrId) {
+        if (action.targetPost() == null || action.targetPost().getId() == null) return;
+        String postId = action.targetPost().getId();
+        CommentContext ctx = fetchReactableComments(postId);
+        if (ctx.items().isEmpty()) {
+            log.debug("COMMENT_LIKE skip: no comments on post {}", postId);
+            return;
+        }
+        double likeThreshold = voiceScoreLocal(persona, "like_score", 0.45);
+        int liked = 0;
+        for (ReactableItem item : ctx.items()) {
+            if (liked >= 3) break;
+            if (item.authorId() != null && persona.getId().equals(item.authorId())) continue;
+            if (Math.random() < likeThreshold) {
+                boolean ok = backendBot.likeComment(jwt, postId, item.commentId());
+                logPiggyback(persona, corrId, "COMMENT_LIKE", postId, item.commentId(), ok);
+                if (ok) liked++;
+            }
+        }
+        if (liked == 0) {
+            log.debug("COMMENT_LIKE: no comments passed gate for persona {} on post {}", persona.getId(), postId);
         }
     }
 

@@ -41,4 +41,8 @@ public record PlannedAction(
     public static PlannedAction view(PostDto post) {
         return new PlannedAction(ActionType.VIEW, post, null, null, null, null, null);
     }
+    /** 독립적 댓글 좋아요 — LLM 0콜, like_score 기반. targetPost에서 댓글 조회 후 좋아요. */
+    public static PlannedAction commentLike(PostDto post) {
+        return new PlannedAction(ActionType.COMMENT_LIKE, post, null, null, null, null, null);
+    }
 }
