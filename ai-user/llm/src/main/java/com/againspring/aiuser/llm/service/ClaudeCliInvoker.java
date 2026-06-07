@@ -182,7 +182,7 @@ public class ClaudeCliInvoker implements Invoker {
             userPart = prompt;
         }
 
-        return new ProcessBuilder(
+        ProcessBuilder pb = new ProcessBuilder(
                 claudeBinaryPath,
                 "--print",
                 "--output-format", "stream-json",
@@ -194,5 +194,9 @@ public class ClaudeCliInvoker implements Invoker {
                 "--system-prompt", systemPart,
                 userPart
         );
+        // CLI 모드는 OAuth(구독) 사용 — ANTHROPIC_API_KEY가 env에 있으면 CLI가 API 크레딧으로 전환됨.
+        // ClaudeApiInvoker는 Java 레벨에서 키를 직접 주입하므로 여기서 제거해도 무관.
+        pb.environment().remove("ANTHROPIC_API_KEY");
+        return pb;
     }
 }
