@@ -11,6 +11,9 @@ import { LegalFooter } from '@/components/shared/LegalFooter';
 import { BottomNav } from '@/components/shared/BottomNav';
 
 export const metadata: Metadata = {
+  // og:image / og:url 의 상대 경로 → 절대 URL 해소 기준점
+  // NEXT_PUBLIC_APP_URL: docker-compose build arg (prod: https://againspring.net, dev: https://dev.againspring.net)
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://againspring.net'),
   title: '다시봄 · Again Spring',
   description:
     '싸운 두 사람 사이에 조용히 앉는 AI 중재자. 판결이 아니라 중재입니다.',

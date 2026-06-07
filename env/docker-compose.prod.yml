@@ -101,6 +101,8 @@ services:
     container_name: againspring-frontend-prod
     environment:
       NODE_ENV: production
+      # 서버사이드 OG fetch 용 — Next.js 서버에서 내부 Docker 네트워크로 백엔드 직접 호출
+      BACKEND_INTERNAL_URL: http://againspring-backend-prod:8080
     depends_on:
       - backend-prod
     restart: always
