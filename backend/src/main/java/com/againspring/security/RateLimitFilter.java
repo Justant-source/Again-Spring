@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -31,6 +32,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private final ConcurrentHashMap<String, Bucket> cache = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
+
+    /**
+     * 인증 엔드포인트(signup/login/forgot-password/send-verification) 분당 허용 횟수.
+     * prod 기본값 5 (브루트포스 방어 유지). dev/e2e는 env로 상향(예: 1000)해 다회 로그인 허용.
+     */
+    @Value("${security.rate-limit.auth-per-minute:5}")
+    private int authPerMinute;
 
     private static final String SIGNUP_ENDPOINT = "/api/auth/signup";
     private static final String LOGIN_ENDPOINT = "/api/auth/login";
@@ -54,11 +62,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         int limit = -1;
         if ("POST".equals(method)) {
             if (isSignupOrLogin(requestPath)) {
-                limit = 5; // 5 requests per minute
+                limit = authPerMinute; // 기본 5/분 (prod), dev/e2e는 env로 상향
             } else if (isForgotPassword(requestPath)) {
-                limit = 5;
+                limit = authPerMinute;
             } else if (isSendVerification(requestPath)) {
-                limit = 5;
+                limit = authPerMinute;
             } else if (isCreateTurn(requestPath)) {
                 limit = 30; // 30 requests per minute
             } else if (isFeedbacks(requestPath)) {

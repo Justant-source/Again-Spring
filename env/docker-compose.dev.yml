@@ -218,6 +218,8 @@ services:
       LLM_REPORT_PROVIDER: ${LLM_REPORT_PROVIDER:-remote}
       LLM_JURY_PROVIDER: ${LLM_JURY_PROVIDER:-remote}
       LLM_WORKER_URL: ${LLM_WORKER_URL:-http://againspring-llm:8090}
+      # dev/e2e: 다회 로그인 허용 (prod는 코드 기본값 5/분 유지). e2e-realbe 로그인 429 방지.
+      SECURITY_RATE_LIMIT_AUTH_PER_MINUTE: ${SECURITY_RATE_LIMIT_AUTH_PER_MINUTE:-1000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
