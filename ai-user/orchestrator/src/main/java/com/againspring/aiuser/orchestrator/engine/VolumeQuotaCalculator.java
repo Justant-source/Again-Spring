@@ -49,10 +49,14 @@ public class VolumeQuotaCalculator {
     public int estimateTicksPerDay(String cronExpr) {
         if (cronExpr == null) return 144; // default 10-min ticks
         try {
-            // Expect "0 */N * * * *" pattern — extract N
+            // Expect "0 */N * * * *" or "0 * * * * *" pattern
             String[] parts = cronExpr.trim().split("\\s+");
             if (parts.length >= 2) {
                 String minPart = parts[1];
+                if ("*".equals(minPart)) {
+                    // "0 * * * * *" = every minute = 1440 ticks/day
+                    return 1440;
+                }
                 if (minPart.startsWith("*/")) {
                     int interval = Integer.parseInt(minPart.substring(2));
                     return 60 / interval * 24;
