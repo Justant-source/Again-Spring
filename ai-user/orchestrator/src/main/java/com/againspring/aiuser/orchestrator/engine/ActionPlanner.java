@@ -7,8 +7,12 @@ import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
 import com.againspring.aiuser.orchestrator.service.PostAnalysisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -25,7 +29,9 @@ public class ActionPlanner {
 
     private final PersonaSeenPostRepository seenPostRepo;
     private final PostAnalysisService analysisService;
+    private final JdbcTemplate jdbcTemplate;
     private static final Random RNG = new Random();
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     // ── 행동 타입 확률 (voice_profile의 like_score/vote_score 우선) ──
     private static final double P_LIKE_DEFAULT = 0.45;
@@ -65,7 +71,12 @@ public class ActionPlanner {
             .filter(p -> !seenPostRepo.existsByPersonaIdAndPostId(persona.getId(), p.getId()))
             .collect(Collectors.toList());
 
-        boolean canReply = !replyTargets.isEmpty();
+        // 자기 댓글에 자답 금지 — 본인이 작성한 댓글 타겟 제외
+        List<ReplyTarget> eligibleReplies = replyTargets.stream()
+            .filter(rt -> !persona.getId().equals(rt.commentAuthorId()))
+            .collect(Collectors.toList());
+
+        boolean canReply = !eligibleReplies.isEmpty();
         boolean canPost = "HEAVY".equals(persona.getTier());
         boolean hasFeed = !unseen.isEmpty();
 
@@ -78,7 +89,7 @@ public class ActionPlanner {
         // REPLY (priority when available)
         cumul += canReply ? P_REPLY_BASE : 0;
         if (rand < cumul && canReply) {
-            ReplyTarget rt = replyTargets.get(RNG.nextInt(replyTargets.size()));
+            ReplyTarget rt = eligibleReplies.get(RNG.nextInt(eligibleReplies.size()));
             return Optional.of(PlannedAction.reply(
                 rt.postId(), rt.postTitle(), rt.commentId(), rt.commentExcerpt(), rt.threadContext(),
                 rt.postBodyExcerpt(), rt.siblingComments()));
@@ -113,12 +124,29 @@ public class ActionPlanner {
             return Optional.of(PlannedAction.comment(pickByAffinity(persona, unseen)));
         }
 
-        // POST (HEAVY only)
-        if (canPost && RNG.nextDouble() < P_POST) {
+        // POST (HEAVY only, 1인 1일 1글 — 같은 페르소나는 하루 최대 1글)
+        if (canPost && RNG.nextDouble() < P_POST && !alreadyPostedToday(persona)) {
             return Optional.of(PlannedAction.newPost());
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * 오늘(KST) 이미 글을 1개 이상 작성했으면 true — 1인 1일 1글 규칙 enforcement.
+     * posts 테이블 직접 조회(닉네임=author 기준 source of truth) — 재배정·삭제도 정확히 반영.
+     */
+    private boolean alreadyPostedToday(Persona persona) {
+        try {
+            Instant since = LocalDate.now(KST).atStartOfDay(KST).toInstant();
+            Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM posts WHERE author_id = ? AND deleted_at IS NULL AND created_at >= ?",
+                Long.class, persona.getId(), java.sql.Timestamp.from(since));
+            return count != null && count >= 1;
+        } catch (Exception e) {
+            log.warn("alreadyPostedToday check failed for persona {}: {}", persona.getId(), e.getMessage());
+            return false; // 조회 실패 시 가용성 우선 — 막지 않음
+        }
     }
 
     // ══════════════════════ LIKE ══════════════════════

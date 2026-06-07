@@ -10,5 +10,6 @@ public record ReplyTarget(
     String commentExcerpt,    // max 200 chars
     String threadContext,     // brief context
     String postBodyExcerpt,   // post body preview (max 300 chars)
-    String siblingComments    // other top-level comments on same post
+    String siblingComments,   // other top-level comments on same post
+    String commentAuthorId    // 댓글 작성자 user id — 자기 댓글에 자답 방지용
 ) {}

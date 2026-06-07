@@ -1,83 +1,52 @@
 package com.againspring.aiuser.orchestrator.engine;
 
-import com.againspring.aiuser.orchestrator.client.BackendBotClient;
-import com.againspring.aiuser.orchestrator.client.dto.PostDto;
-import com.againspring.aiuser.orchestrator.client.dto.PostFeedPage;
-import com.againspring.aiuser.orchestrator.domain.Persona;
-import com.againspring.aiuser.orchestrator.domain.PersonaDailyQuota;
-import com.againspring.aiuser.orchestrator.repository.PersonaDailyQuotaRepository;
-import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
-import com.againspring.aiuser.orchestrator.task.ActionExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-
+/**
+ * 조회수 보정 — 참여(댓글·좋아요·투표)에 비례해 posts.view_count를 직접 갱신.
+ *
+ * <p>기존 봇 VIEW 디스패치는 ViewService의 device_id 중복 방지 때문에 페르소나당 글당 1회만
+ * 카운트되어 조회수가 과소 집계됐다(글당 ~페르소나 수 cap, 게다가 무작위 분산 → 글마다 0~수회).
+ * 현실 커뮤니티는 참여 1건당 수십 명이 조회하므로 denormalized view_count를 참여에 비례해 직접 보정한다.
+ *
+ * <p>공식: view_count = max(현재, BASE + (20·댓글 + 5·투표 + 5·좋아요) × 글별변동계수)
+ * - 비율(20/댓글, 5/투표)은 DailyPlanner의 기존 의도값 계승, 좋아요(5) 추가.
+ * - 글별변동계수 0.85~1.44 = CRC32(id) 기반 — 글마다 고정이되 서로 다른 자연스러운 분포.
+ * - GREATEST로 단조 증가 → 실유저 조회 보존. 매 틱 실행, 참여 증가 시 조회수도 비례 상승.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ViewDispatcher {
 
-    private final PersonaDailyQuotaRepository quotaRepository;
-    private final PersonaRepository personaRepository;
-    private final BackendBotClient backendBotClient;
-    private final Jitter jitter;
+    private final JdbcTemplate jdbcTemplate;
 
-    @Autowired(required = false)
-    private ActionExecutor actionExecutor;
-
-    private static final Random RNG = new Random();
+    private static final int VIEW_PER_COMMENT = 20;
+    private static final int VIEW_PER_VOTE = 5;
+    private static final int VIEW_PER_LIKE = 5;
+    private static final int BASE_VIEWS = 30;   // 참여 0이어도 최소 노출
 
     public int dispatchViews() {
-        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
-        List<PersonaDailyQuota> todayQuotas = quotaRepository.findByDayBucket(today);
-
-        int totalDispatched = 0;
-
-        for (PersonaDailyQuota quota : todayQuotas) {
-            int remaining = quota.getTargetViews() - quota.getDoneViews();
-            if (remaining <= 0) continue;
-
-            Optional<Persona> personaOpt = personaRepository.findById(quota.getPersonaId());
-            if (personaOpt.isEmpty()) continue;
-
-            Persona persona = personaOpt.get();
-
-            // Fetch feed
-            List<PostDto> feedPosts = backendBotClient.getFeed(0, 30)
-                .map(PostFeedPage::getContent)
-                .orElse(Collections.emptyList());
-
-            if (feedPosts.isEmpty()) continue;
-
-            // Generate up to 'remaining' VIEW actions
-            for (int i = 0; i < remaining; i++) {
-                PostDto post = feedPosts.get(RNG.nextInt(feedPosts.size()));
-                PlannedAction viewAction = PlannedAction.view(post);
-
-                if (actionExecutor != null) {
-                    jitter.scheduleWithinTick(() -> {
-                        actionExecutor.execute(persona, viewAction);
-                        // Update quota
-                        quota.setDoneViews(quota.getDoneViews() + 1);
-                        quotaRepository.save(quota);
-                    });
-                }
-                totalDispatched++;
+        try {
+            int updated = jdbcTemplate.update(
+                "UPDATE posts p SET p.view_count = GREATEST(p.view_count, " +
+                "  " + BASE_VIEWS + " + ROUND( ( " +
+                "      " + VIEW_PER_COMMENT + " * (SELECT COUNT(*) FROM post_comments c WHERE c.post_id=p.id AND c.deleted_at IS NULL) " +
+                "    + " + VIEW_PER_VOTE + " * (SELECT COUNT(*) FROM votes v WHERE v.post_id=p.id) " +
+                "    + " + VIEW_PER_LIKE + " * (SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) " +
+                "  ) * (0.85 + (CRC32(p.id) % 60)/100.0) ) ) " +
+                "WHERE p.deleted_at IS NULL AND p.status = 'VOTING'"
+            );
+            if (updated > 0) {
+                log.info("ViewDispatcher: recomputed proportional view_count for {} posts", updated);
             }
+            return updated;
+        } catch (Exception e) {
+            log.warn("ViewDispatcher proportional recompute failed: {}", e.getMessage());
+            return 0;
         }
-
-        if (totalDispatched > 0) {
-            log.info("ViewDispatcher: dispatched {} VIEW actions for {}", totalDispatched, today);
-        }
-
-        return totalDispatched;
     }
 }
