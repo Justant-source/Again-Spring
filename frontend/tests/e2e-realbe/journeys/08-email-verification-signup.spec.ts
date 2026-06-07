@@ -17,7 +17,7 @@ const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 // 일회용 가입 이메일 — teardown이 'e2e-signup%@example.com' 패턴으로 정리
 const SIGNUP_EMAIL = `e2e-signup-${Date.now()}@example.com`
 const SIGNUP_PASSWORD = 'E2Etest123!'
-const SIGNUP_NICKNAME = `E2E${Date.now()}`.slice(0, 10)
+const SIGNUP_NICKNAME = `E2E${String(Date.now()).slice(-7)}`  // 마지막 7자리 — 실행마다 달라짐
 
 // ── A. send-verification 스모크 ───────────────────────────────────
 test.describe('Journey 08-A: send-verification 200 스모크', () => {
