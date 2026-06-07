@@ -4,6 +4,20 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CommunicationStyle, MbtiProfile, User } from '@/lib/types';
 
+// 카카오톡 인앱 등 localStorage 제한 환경에서 setItem/removeItem이 throw할 수 있으므로
+// 모든 접근을 try-catch로 감싼 어댑터를 사용한다.
+const safeStorage = {
+  getItem: (name: string): string | null => {
+    try { return localStorage.getItem(name); } catch { return null; }
+  },
+  setItem: (name: string, value: string): void => {
+    try { localStorage.setItem(name, value); } catch { /* noop */ }
+  },
+  removeItem: (name: string): void => {
+    try { localStorage.removeItem(name); } catch { /* noop */ }
+  },
+};
+
 interface UserState {
   user: User | null;
   _hasHydrated: boolean;
@@ -87,14 +101,14 @@ export const useUserStore = create<UserState>()(
         ),
       clear: () => {
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('again-spring-token');
+          try { localStorage.removeItem('again-spring-token'); } catch { /* noop */ }
         }
         return set({ user: null });
       },
     }),
     {
       name: 'again-spring-user',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeStorage as unknown as Storage),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated(true);
       },

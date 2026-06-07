@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import axios from 'axios';
 import { useUserStore } from '@/lib/store/userStore';
-import { api } from '@/lib/api/client';
 import { isJwtExpired, isGuestToken } from '@/lib/api/guestAuth';
 import type { User } from '@/lib/types';
 
@@ -24,10 +24,10 @@ export function AuthBootstrap() {
 
     const { user, setUser, clear } = useUserStore.getState();
 
-    const token =
-      typeof window !== 'undefined'
-        ? localStorage.getItem('again-spring-token')
-        : null;
+    let token: string | null = null;
+    try {
+      token = typeof window !== 'undefined' ? localStorage.getItem('again-spring-token') : null;
+    } catch { /* localStorage 제한 환경 */ }
 
     const isMember = !!user && !user.isGuest;
 
@@ -43,10 +43,13 @@ export function AuthBootstrap() {
     if (isGuestToken(token)) return;
 
     // 유효한 회원 토큰 — 최신 동의/프로필 상태 동기화 (stale user 방지)
-    api.get<User>('/api/users/me').then((res) => {
+    // raw axios 사용: api 인터셉터가 401→authError→/login 리다이렉트를 유발하지 않도록.
+    // 사연 상세 등 공개 페이지에서 stale 토큰으로 인한 불필요한 로그인 리다이렉트 방지.
+    axios.get<User>('/api/users/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then((res) => {
       setUser(res.data);
     }).catch(() => {
-      // /me 실패(드묾) — 회원만 정리. 게스트는 재발급 흐름에 맡김.
       if (isMember) clear();
     });
   }, [hasHydrated]);
