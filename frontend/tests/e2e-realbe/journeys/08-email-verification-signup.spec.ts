@@ -36,18 +36,31 @@ test.describe('Journey 08-A: send-verification 200 스모크', () => {
 // ── B. 실제 가입 완주 ─────────────────────────────────────────────
 test.describe('Journey 08-B: 이메일 인증 → 가입 완주', () => {
 
-  test('send-verification → DB 코드 읽기 → /signup 폼 → 가입 성공', async ({ page, request }) => {
-    // 1. 인증코드 발송
-    const sendResp = await request.post(`${BASE}/api/auth/send-verification`, {
-      data: { email: SIGNUP_EMAIL },
-    })
-    expect(sendResp.status()).toBe(200)
+  test('send-verification → DB 코드 읽기 → /signup UI → 가입 성공', async ({ page }) => {
+    // 1. /signup 페이지 접근
+    await page.goto(`${BASE}/signup`)
+    await page.waitForURL(/\/signup/, { timeout: 10_000 })
 
-    // 2. DB에서 코드 읽기 (email_verifications 테이블)
-    //    dev 환경: SMTP 실패 시 코드를 로그에 출력하고 DB에는 저장됨
+    // 2. 닉네임 입력
+    const nicknameInput = page.getByPlaceholder('닉네임')
+    await expect(nicknameInput).toBeVisible({ timeout: 8_000 })
+    await nicknameInput.fill(SIGNUP_NICKNAME)
+
+    // 3. 이메일 입력
+    await page.getByPlaceholder('이메일').fill(SIGNUP_EMAIL)
+
+    // 4. "인증코드 전송" 버튼 클릭 → API 호출 + codeSent=true → 코드 입력란 표시
+    const sendBtn = page.getByRole('button', { name: /인증코드 전송|재전송/ })
+    await expect(sendBtn).toBeVisible({ timeout: 5_000 })
+    await sendBtn.click()
+
+    // 5. 코드 입력란이 나타날 때까지 대기 (codeSent=true 시 표시)
+    const codeInput = page.getByPlaceholder('인증코드 4자리')
+    await expect(codeInput).toBeVisible({ timeout: 10_000 })
+
+    // 6. DB에서 코드 읽기 (email_verifications 테이블에 평문 저장)
     let code: string | null = null
-    // 코드 저장까지 최대 3초 대기
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 10; i++) {
       code = latestVerificationCode(SIGNUP_EMAIL)
       if (code && code.length === 4) break
       await new Promise(r => setTimeout(r, 500))
@@ -55,33 +68,16 @@ test.describe('Journey 08-B: 이메일 인증 → 가입 완주', () => {
     expect(code, 'DB에서 인증 코드를 읽어야 합니다. email_verifications 테이블 확인 필요').toBeTruthy()
     expect(code!.length).toBe(4)
 
-    // 3. /signup 폼 접근 → 이메일·코드·닉네임·비밀번호 입력
-    await page.goto(`${BASE}/signup`)
-    await page.waitForURL(/\/signup/, { timeout: 10_000 })
-
-    // 닉네임 입력
-    const nicknameInput = page.getByPlaceholder('닉네임')
-    await expect(nicknameInput).toBeVisible({ timeout: 8_000 })
-    await nicknameInput.fill(SIGNUP_NICKNAME)
-
-    // 이메일 입력
-    await page.getByPlaceholder('이메일').fill(SIGNUP_EMAIL)
-
-    // 인증코드 입력
-    const codeInput = page.getByPlaceholder(/인증코드/)
-    await expect(codeInput).toBeVisible({ timeout: 5_000 })
+    // 7. 코드 입력
     await codeInput.fill(code!)
 
-    // 비밀번호 입력
-    const pwInputs = page.locator('input[type="password"]')
-    await pwInputs.first().fill(SIGNUP_PASSWORD)
-    await pwInputs.nth(1).fill(SIGNUP_PASSWORD)
+    // 8. 비밀번호 입력 (strict mode: '비밀번호'는 2개 매칭 → .first() 사용)
+    await page.getByPlaceholder('비밀번호').first().fill(SIGNUP_PASSWORD)
+    await page.getByPlaceholder('비밀번호 확인').fill(SIGNUP_PASSWORD)
 
-    // 가입하기 버튼 클릭
-    await page.getByRole('button', { name: '가입하기' }).click()
-
-    // 4. 가입 성공 → 로그인 상태로 리다이렉트 (커뮤니티 또는 홈)
-    await page.waitForURL(/\/community|\/\?|^\/?$|\/session/, { timeout: 15_000 })
+    // 9. 가입하기 클릭 → 성공 후 /signup을 벗어나면 성공 (/, /community, /session 등)
+    await page.locator('button[type="submit"]').click()
+    await page.waitForURL(url => !url.toString().includes('/signup'), { timeout: 20_000 })
 
     const token = await page.evaluate(() => localStorage.getItem('again-spring-token'))
     expect(token).toBeTruthy()

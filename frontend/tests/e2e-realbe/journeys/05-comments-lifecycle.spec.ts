@@ -124,7 +124,7 @@ test.describe('Journey 05-C: 댓글 무한스크롤 중복 방지 (bd7589c 회�
 
     // 새로고침 → 첫 로드 경로 재현
     await page.reload()
-    await expect(page.locator(COMMENT_BAR_PLACEHOLDER)).toBeVisible({ timeout: 12_000 })
+    await expect(page.getByText(COMMENT_BAR_PLACEHOLDER)).toBeVisible({ timeout: 12_000 })
 
     // 버그 발생 시: 첫 페이지 댓글 2배 중복 → id가 2개씩 존재
     const ids = await page

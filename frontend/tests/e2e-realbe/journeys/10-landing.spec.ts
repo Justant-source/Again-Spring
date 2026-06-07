@@ -50,9 +50,10 @@ test.describe('Journey 10: 랜딩 페이지', () => {
 
   test('@mobile 랜딩 — "다시봄 광장" CTA → /community 이동', async ({ page }) => {
     await page.goto(`${BASE}/`)
-    const cta = page.locator(LANDING.cta)
-    await expect(cta).toBeVisible({ timeout: 8_000 })
-    await cta.click()
+    // testid 또는 role 기반 선택 (testid는 FE 재빌드 후 활성, role은 항상 유효)
+    const cta = page.locator(LANDING.cta).or(page.getByRole('button', { name: '다시봄 광장' }))
+    await expect(cta.first()).toBeVisible({ timeout: 8_000 })
+    await cta.first().click()
     await page.waitForURL(/\/community/, { timeout: 10_000 })
     expect(page.url()).toContain('/community')
   })

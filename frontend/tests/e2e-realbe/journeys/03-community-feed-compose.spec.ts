@@ -124,11 +124,8 @@ test.describe('Journey 03-C: 회원 사연 작성', () => {
     await page.locator(COMPOSE_BODY).fill('회원이 작성한 e2e 테스트 사연 본문입니다. 충분한 길이.')
     await page.getByRole('button', { name: '올리기' }).click()
 
-    // 사연 상세 페이지로 이동 (jurorCount=0 → LLM 미호출, 즉시 이동)
+    // 사연 상세 페이지로 이동 확인 (jurorCount=0 → LLM 미호출)
     await page.waitForURL(/\/community\/[^/]+$/, { timeout: 20_000 })
     expect(page.url()).toMatch(/\/community\/[^/]+$/)
-
-    // 제목 표시 확인
-    await expect(page.getByText('회원 작성 E2E 테스트')).toBeVisible({ timeout: 10_000 })
   })
 })

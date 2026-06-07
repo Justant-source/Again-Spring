@@ -43,8 +43,9 @@ export const PERSONA_MAP = Object.fromEntries(PERSONAS.map((p) => [p.email, p]))
  * Rate Limit(5/min): 4개 × 13s 간격 → 안전
  */
 export const PRELOGIN_PERSONAS: Persona[] = [
-  PERSONAS[0], // test1
-  PERSONAS[1], // test2
-  PERSONAS[2], // test3
-  PERSONAS[4], // test5
+  PERSONAS[0], // test1 (ADMIN)
+  PERSONAS[1], // test2 (TESTER)
+  PERSONAS[2], // test3 (TESTER)
+  PERSONAS[3], // test4 — /profile/info 닉네임 변경 테스트 전용 (파괴적 변경 격리)
+  PERSONAS[4], // test5 (USER only — /admin 접근 거부 검증)
 ]

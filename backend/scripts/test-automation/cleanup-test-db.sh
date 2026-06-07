@@ -107,8 +107,9 @@ WHERE user_id IN (
 );
 
 -- 2-C. 조회 기록 삭제 (테스트 유저가 작성한 포스트의 조회 포함)
+-- post_views.post_id collation=utf8mb4_uca1400_ai_ci (V58), posts.id=utf8mb4_unicode_ci → CONVERT 필요
 DELETE FROM post_views
-WHERE post_id IN (
+WHERE CONVERT(post_id USING utf8mb4) COLLATE utf8mb4_unicode_ci IN (
   SELECT id FROM posts
   WHERE author_id IN (
     SELECT id FROM users
