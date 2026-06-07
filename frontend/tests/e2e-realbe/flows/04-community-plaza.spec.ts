@@ -207,8 +207,8 @@ test.describe('Flow 04-D: 전문 읽기 화면 (6/2 진영 탭)', () => {
     await page.goto(`${BASE}/community/mock_001/read`)
     await page.waitForURL(/\/read/, { timeout: 10_000 })
     await expect(page.getByText('작성자')).toBeVisible({ timeout: 8_000 })
-    // 사연 본문 영역 표시 확인
-    await expect(page.locator('div[style*="font-serif"]').first()).toBeVisible({ timeout: 5_000 })
+    // 사연 본문 영역 표시 확인 — 본문은 <p style="font-family: var(--font-serif)">로 렌더됨 (div 아님)
+    await expect(page.locator('[style*="font-serif"]').first()).toBeVisible({ timeout: 5_000 })
   })
 
   test('read 화면 — paired 포스트에서 진영 탭 두 개 표시', async ({ page }) => {
