@@ -142,6 +142,21 @@ public class AdminTriggerController {
         log.info("[backfill-comment-likes] done: {} posts processed", processed.get());
     }
 
+    /** AI 댓글 ㅠ{2,} → ㅠ 정규화 (synthetic=1 유저만) */
+    @PostMapping("/cleanup-ㅠ")
+    public ResponseEntity<Map<String, Object>> cleanupDoubleㅠ() {
+        int updated = jdbcTemplate.update(
+            "UPDATE post_comments pc " +
+            "JOIN users u ON pc.author_id = u.id " +
+            "SET pc.body = REGEXP_REPLACE(pc.body, 'ㅠ{2,}', 'ㅠ') " +
+            "WHERE u.synthetic = 1 " +
+            "  AND pc.deleted_at IS NULL " +
+            "  AND pc.body REGEXP 'ㅠ{2,}'"
+        );
+        log.info("[cleanup-ㅠ] normalized double-ㅠ in {} AI comments", updated);
+        return ResponseEntity.ok(Map.of("updated", updated));
+    }
+
     /** daily_global_cap 변경 — 재배포 없이 일일 한도 조정 */
     @PostMapping("/update-cap")
     public ResponseEntity<Map<String, Object>> updateCap(@RequestParam int cap) {
