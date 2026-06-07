@@ -67,6 +67,7 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-againspring2026@gmail.com}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
+      AI_USER_LLM_URL: http://againspring-llm-ai-user-prod:8092
     volumes:
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro
       - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro
@@ -125,8 +126,14 @@ services:
       LLM_QUEUE_CAPACITY: ${AI_USER_LLM_QUEUE_CAPACITY:-100}
       LLM_DEFAULT_TIMEOUT_MS: ${AI_USER_LLM_DEFAULT_TIMEOUT_MS:-120000}
       SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
+      DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      DB_USER: ${MARIADB_USER}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
     volumes:
       - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
+    depends_on:
+      mariadb-prod:
+        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:

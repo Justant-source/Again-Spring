@@ -3,31 +3,70 @@ package com.againspring.aiuser.llm.service;
 import com.againspring.aiuser.llm.dto.*;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Slf4j
 @Service
 public class PromptAssembler {
     private static final String SEP = "<<<USER_PROMPT>>>";
 
-    private String postGuide = "";
-    private String commentGuide = "";
-    private String replyGuide = "";
-    private String partnerGuide = "";
+    private volatile String postGuide = "";
+    private volatile String commentGuide = "";
+    private volatile String replyGuide = "";
+    private volatile String partnerGuide = "";
+
+    @Autowired(required = false)
+    private JdbcTemplate jdbcTemplate;
 
     @PostConstruct
     public void loadGuides() {
+        reload();
+    }
+
+    /** 관리자 요청 또는 스케줄에 의한 DB 기반 재로드. */
+    public synchronized void reload() {
         // % 문자를 %% 로 이스케이프 — buildSystem()에서 String.formatted()에 넘기기 때문
-        postGuide = loadResource("voice/post.md").replace("%", "%%");
-        commentGuide = loadResource("voice/comment.md").replace("%", "%%");
-        replyGuide = loadResource("voice/reply.md").replace("%", "%%");
-        partnerGuide = loadResource("voice/partner.md").replace("%", "%%");
+        postGuide    = loadGuide("voice/post",    "voice/post.md").replace("%", "%%");
+        commentGuide = loadGuide("voice/comment", "voice/comment.md").replace("%", "%%");
+        replyGuide   = loadGuide("voice/reply",   "voice/reply.md").replace("%", "%%");
+        partnerGuide = loadGuide("voice/partner", "voice/partner.md").replace("%", "%%");
         log.info("Voice guides loaded: post={}c comment={}c reply={}c partner={}c",
             postGuide.length(), commentGuide.length(), replyGuide.length(), partnerGuide.length());
+    }
+
+    private String loadGuide(String dbKey, String classpathPath) {
+        if (jdbcTemplate != null) {
+            try {
+                List<String> rows = jdbcTemplate.queryForList(
+                    "SELECT content FROM ai_prompt_template WHERE `key` = ? AND content != ''",
+                    String.class, dbKey);
+                if (!rows.isEmpty() && rows.get(0) != null && !rows.get(0).isBlank()) {
+                    log.debug("Voice guide '{}' loaded from DB ({}c)", dbKey, rows.get(0).length());
+                    return rows.get(0);
+                }
+            } catch (Exception e) {
+                log.warn("DB read failed for '{}', falling back to classpath: {}", dbKey, e.getMessage());
+            }
+        }
+        String content = loadResource(classpathPath);
+        // 첫 기동 시 classpath 내용을 DB에 시드 (빈 레코드만 업데이트)
+        if (jdbcTemplate != null && !content.isBlank()) {
+            try {
+                jdbcTemplate.update(
+                    "UPDATE ai_prompt_template SET content = ? WHERE `key` = ? AND (content IS NULL OR content = '')",
+                    content, dbKey);
+            } catch (Exception e) {
+                log.warn("DB seed failed for '{}': {}", dbKey, e.getMessage());
+            }
+        }
+        return content;
     }
 
     private String loadResource(String path) {

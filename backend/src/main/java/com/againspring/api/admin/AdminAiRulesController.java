@@ -3,9 +3,11 @@ package com.againspring.api.admin;
 import com.againspring.annotation.Auditable;
 import com.againspring.domain.ai.AiContentCorrection;
 import com.againspring.domain.ai.AiGlobalRule;
+import com.againspring.domain.ai.AiPromptTemplate;
 import com.againspring.domain.ai.PersonaVoiceRef;
 import com.againspring.repository.ai.AiContentCorrectionRepository;
 import com.againspring.repository.ai.AiGlobalRuleRepository;
+import com.againspring.repository.ai.AiPromptTemplateRepository;
 import com.againspring.repository.ai.PersonaVoiceRefRepository;
 import com.againspring.service.ai.AiCorrectionService;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -18,14 +20,17 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -46,7 +51,11 @@ public class AdminAiRulesController {
     private final AiContentCorrectionRepository correctionRepository;
     private final PersonaVoiceRefRepository personaVoiceRefRepository;
     private final AiCorrectionService aiCorrectionService;
+    private final AiPromptTemplateRepository promptTemplateRepository;
     private final ObjectMapper objectMapper;
+
+    @Value("${ai.prompt.llm-url:http://againspring-llm-ai-user:8092}")
+    private String llmAiUserUrl;
 
     // =====================================================================
     // 전역 금지 규칙 관리
@@ -283,6 +292,58 @@ public class AdminAiRulesController {
     // Request DTOs
     // =====================================================================
 
+    // =====================================================================
+    // 기본 프롬프트 템플릿 관리 (voice/post, voice/comment, voice/reply, voice/partner)
+    // =====================================================================
+
+    @GetMapping("/prompts")
+    @Operation(summary = "AI 유저 기본 프롬프트 목록", description = "voice/* 프롬프트 템플릿 전체 목록을 반환한다.")
+    public ResponseEntity<List<AiPromptTemplate>> listPromptTemplates() {
+        return ResponseEntity.ok(promptTemplateRepository.findAllByOrderByKeyAsc());
+    }
+
+    @GetMapping("/prompts/{key}")
+    @Operation(summary = "AI 유저 기본 프롬프트 단건 조회")
+    public ResponseEntity<AiPromptTemplate> getPromptTemplate(@PathVariable String key) {
+        AiPromptTemplate tpl = promptTemplateRepository.findById(key)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "PROMPT_NOT_FOUND"));
+        return ResponseEntity.ok(tpl);
+    }
+
+    @PutMapping("/prompts/{key}")
+    @Operation(summary = "AI 유저 기본 프롬프트 수정", description = "내용을 저장하고 ai-user/llm 서비스에 즉시 반영(best-effort)한다.")
+    @Auditable(action = "AI_PROMPT_UPDATE", targetType = "AI_PROMPT", targetId = "#key")
+    public ResponseEntity<AiPromptTemplate> updatePromptTemplate(
+            @PathVariable String key,
+            @RequestBody UpdatePromptRequest req,
+            org.springframework.security.core.Authentication auth) {
+
+        AiPromptTemplate tpl = promptTemplateRepository.findById(key)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "PROMPT_NOT_FOUND"));
+        tpl.setContent(req.getContent() != null ? req.getContent() : "");
+        tpl.setUpdatedAt(Instant.now());
+        tpl.setUpdatedBy(auth.getName());
+        promptTemplateRepository.save(tpl);
+
+        triggerLlmReload();
+        return ResponseEntity.ok(tpl);
+    }
+
+    private void triggerLlmReload() {
+        try {
+            RestClient.create().post()
+                    .uri(llmAiUserUrl + "/internal/prompts/reload")
+                    .retrieve().toBodilessEntity();
+            log.info("[ai-rules] llm-ai-user reload triggered");
+        } catch (Exception e) {
+            log.warn("[ai-rules] llm-ai-user reload failed (best-effort): {}", e.getMessage());
+        }
+    }
+
+    // =====================================================================
+    // Request DTOs
+    // =====================================================================
+
     @Getter @Setter
     public static class ApplyHistoryRequest {
         /** "PERSONA" | "GLOBAL" | "BOTH" */
@@ -302,5 +363,10 @@ public class AdminAiRulesController {
     @Getter @Setter
     public static class ToggleRequest {
         private boolean active;
+    }
+
+    @Getter @Setter
+    public static class UpdatePromptRequest {
+        private String content;
     }
 }

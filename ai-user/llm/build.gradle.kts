@@ -15,6 +15,8 @@ repositories {
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
+    runtimeOnly("org.mariadb.jdbc:mariadb-java-client:3.4.1")
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")

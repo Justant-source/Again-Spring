@@ -122,6 +122,10 @@ ai-learning:
   enabled: ${AI_LEARNING_ENABLED:false}
   base-url: ${AI_LEARNING_URL:http://againspring-ai-learning:8099}
 
+ai:
+  prompt:
+    llm-url: ${AI_USER_LLM_URL:http://againspring-llm-ai-user:8092}
+
 logging:
   level:
     root: INFO

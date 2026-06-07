@@ -49,8 +49,14 @@ services:
       LLM_DEFAULT_TIMEOUT_MS: ${AI_USER_LLM_DEFAULT_TIMEOUT_MS:-120000}
       SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
       SELF_CRITIQUE_THRESHOLD: ${SELF_CRITIQUE_THRESHOLD:-5}
+      DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${MARIADB_DATABASE:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      DB_USER: ${MARIADB_USER:-againspring}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
     volumes:
       - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
+    depends_on:
+      mariadb-dev:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - againspring-dev
@@ -235,6 +241,7 @@ services:
       SOCIAL_PUBLISHING_ENABLED: ${SOCIAL_PUBLISHING_ENABLED:-true}
       SOCIAL_WEBHOOK_URL: ${SOCIAL_WEBHOOK_URL:-}
       SOCIAL_EMAIL: ${SOCIAL_EMAIL:-}
+      AI_USER_LLM_URL: http://againspring-llm-ai-user:8092
     volumes:
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro
       - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro

@@ -246,3 +246,28 @@ export async function applyCorrectionHistory(
 export async function skipCorrectionHistory(corrId: number): Promise<void> {
   await api.patch(`/api/admin/ai-rules/history/${corrId}/skip`);
 }
+
+// ===== 기본 프롬프트 템플릿 API =====
+
+export interface AiPromptTemplate {
+  key: string;
+  description: string | null;
+  content: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export async function listPromptTemplates(): Promise<AiPromptTemplate[]> {
+  const res = await api.get<AiPromptTemplate[]>('/api/admin/ai-rules/prompts');
+  return res.data;
+}
+
+export async function getPromptTemplate(key: string): Promise<AiPromptTemplate> {
+  const res = await api.get<AiPromptTemplate>(`/api/admin/ai-rules/prompts/${encodeURIComponent(key)}`);
+  return res.data;
+}
+
+export async function updatePromptTemplate(key: string, content: string): Promise<AiPromptTemplate> {
+  const res = await api.put<AiPromptTemplate>(`/api/admin/ai-rules/prompts/${encodeURIComponent(key)}`, { content });
+  return res.data;
+}

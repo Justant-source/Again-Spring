@@ -29,12 +29,15 @@ import {
   applyCorrectionHistory,
   skipCorrectionHistory,
   analyzeBatchCorrections,
+  listPromptTemplates,
+  updatePromptTemplate,
   AiGlobalRule,
   AiCaution,
   AiCorrectionHistory,
+  AiPromptTemplate,
   AnalyzeResponse,
 } from '@/lib/api/admin/corrections';
-import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp, Zap, FileText, Save } from 'lucide-react';
 
 const SCOPE_LABELS: Record<string, string> = {
   ALL: '전체',
@@ -332,6 +335,84 @@ function HistoryRow({
 
 // ── 메인 페이지 ──────────────────────────────────────────────────────────────
 
+// ── 기본 프롬프트 탭 ─────────────────────────────────────────────────────────
+
+const PROMPT_LABELS: Record<string, string> = {
+  'voice/post':    '게시글 스타일',
+  'voice/comment': '댓글 스타일',
+  'voice/reply':   '대댓글 스타일',
+  'voice/partner': '상대방 게시글 스타일',
+};
+
+function PromptTemplateEditor({
+  tpl,
+  onSaved,
+}: {
+  tpl: AiPromptTemplate;
+  onSaved: () => void;
+}) {
+  const [content, setContent] = useState(tpl.content);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function handleSave() {
+    setSaving(true); setErr(''); setSaved(false);
+    try {
+      await updatePromptTemplate(tpl.key, content);
+      setSaved(true);
+      onSaved();
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e: any) {
+      setErr(e?.response?.data?.message || '저장 실패');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const label = PROMPT_LABELS[tpl.key] || tpl.key;
+  const dirty = content !== tpl.content;
+
+  return (
+    <div className="border rounded-lg overflow-hidden mb-4">
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium text-sm">{label}</span>
+          <span className="text-xs font-mono text-muted-foreground">{tpl.key}</span>
+          {dirty && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">미저장</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {tpl.updatedBy && (
+            <span className="text-xs text-muted-foreground">
+              마지막 수정: {tpl.updatedBy} · {tpl.updatedAt ? new Date(tpl.updatedAt).toLocaleDateString('ko-KR') : '-'}
+            </span>
+          )}
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={saving || !dirty}
+            className={`h-7 px-3 text-xs ${saved ? 'bg-green-600 hover:bg-green-700' : ''}`}
+          >
+            <Save className="h-3.5 w-3.5 mr-1" />
+            {saving ? '저장 중…' : saved ? '저장됨' : '저장'}
+          </Button>
+        </div>
+      </div>
+      {err && <p className="text-xs text-red-600 bg-red-50 px-3 py-1.5">{err}</p>}
+      <textarea
+        className="w-full font-mono text-xs p-3 resize-y focus:outline-none focus:ring-1 focus:ring-blue-300"
+        style={{ minHeight: '320px' }}
+        value={content}
+        onChange={e => setContent(e.target.value)}
+        spellCheck={false}
+      />
+    </div>
+  );
+}
+
+// ── 메인 페이지 ──────────────────────────────────────────────────────────────
+
 export default function AiRulesPage() {
   // ─── 전역 금지 규칙 ───
   const [rules, setRules] = useState<AiGlobalRule[]>([]);
@@ -357,6 +438,10 @@ export default function AiRulesPage() {
   const [historyTotalElements, setHistoryTotalElements] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'ALL' | 'PENDING' | 'PROCESSED' | 'SKIPPED'>('ALL');
+
+  // ─── 기본 프롬프트 ───
+  const [prompts, setPrompts] = useState<AiPromptTemplate[]>([]);
+  const [promptsLoading, setPromptsLoading] = useState(false);
 
   const [error, setError] = useState('');
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
@@ -391,9 +476,18 @@ export default function AiRulesPage() {
     } catch (e) { console.error(e); } finally { setHistoryLoading(false); }
   }, [historyStatusFilter]);
 
+  const loadPrompts = useCallback(async () => {
+    setPromptsLoading(true);
+    try {
+      const res = await listPromptTemplates();
+      setPrompts(res);
+    } catch (e) { console.error(e); } finally { setPromptsLoading(false); }
+  }, []);
+
   useEffect(() => { loadRules(0); }, [rulesActiveFilter, loadRules]);
   useEffect(() => { loadCautions(0); }, [personaIdFilter, loadCautions]);
   useEffect(() => { loadHistory(0); }, [historyStatusFilter, loadHistory]);
+  useEffect(() => { loadPrompts(); }, [loadPrompts]);
 
   // ─── 핸들러 ───
   async function handleAddRule() {
@@ -463,6 +557,7 @@ export default function AiRulesPage() {
           </TabsTrigger>
           <TabsTrigger value="global">전역 금지 규칙</TabsTrigger>
           <TabsTrigger value="cautions">페르소나 주의사항</TabsTrigger>
+          <TabsTrigger value="prompts">기본 프롬프트</TabsTrigger>
         </TabsList>
 
         {/* ── 첨삭 이력 탭 ── */}
@@ -628,6 +723,27 @@ export default function AiRulesPage() {
             />
           </div>
           <AdminPagination page={cautionsPage} totalPages={cautionsTotalPages} onPageChange={loadCautions} />
+        </TabsContent>
+
+        {/* ── 기본 프롬프트 탭 ── */}
+        <TabsContent value="prompts" className="space-y-4">
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800 space-y-1">
+            <p className="font-semibold">📝 기본 프롬프트란?</p>
+            <p>AI 유저가 게시글·댓글·대댓글을 작성할 때 기본으로 주입되는 스타일 가이드입니다.</p>
+            <p>저장하면 <strong>즉시</strong> AI 유저 생성 서비스에 반영됩니다. <code className="bg-blue-100 px-1 rounded">ㅠ</code> 빈도, 말투, 이모지 규칙 등을 여기서 조정하세요.</p>
+          </div>
+
+          {promptsLoading ? (
+            <p className="text-sm text-muted-foreground text-center py-8">로딩 중…</p>
+          ) : prompts.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              프롬프트가 없습니다. AI 유저 서비스 재시작 후 자동 시드됩니다.
+            </p>
+          ) : (
+            prompts.map(tpl => (
+              <PromptTemplateEditor key={tpl.key} tpl={tpl} onSaved={loadPrompts} />
+            ))
+          )}
         </TabsContent>
       </Tabs>
     </AdminSection>

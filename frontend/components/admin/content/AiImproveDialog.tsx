@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { saveCorrection } from '@/lib/api/admin/corrections';
+import { updatePost } from '@/lib/api/admin/content';
 import type { AdminPost, AdminComment } from '@/lib/api/admin/content';
 import {
   Dialog,
@@ -74,7 +75,108 @@ function renderDiff(parts: DiffOp[], side: 'left' | 'right') {
   });
 }
 
-// ─── 컴포넌트 ────────────────────────────────────────────────────────────────
+// ─── DiffPanel ───────────────────────────────────────────────────────────────
+
+interface DiffPanelProps {
+  label: string;
+  original: string;
+  corrected: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+  height?: string;
+  singleLine?: boolean;
+  placeholder?: string;
+}
+
+function DiffPanel({
+  label,
+  original,
+  corrected,
+  onChange,
+  disabled,
+  height = 'h-44',
+  singleLine = false,
+  placeholder = '직접 수정하세요.',
+}: DiffPanelProps) {
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLTextAreaElement>(null);
+
+  const diff = useMemo(() => computeDiff(original, corrected), [original, corrected]);
+  const removedCount = diff.left.filter(p => p.type === 'removed' && p.text.trim()).length;
+  const addedCount   = diff.right.filter(p => p.type === 'added'   && p.text.trim()).length;
+  const hasChanges   = removedCount > 0 || addedCount > 0;
+
+  function handleRightScroll() {
+    if (leftScrollRef.current && rightScrollRef.current) {
+      leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-700">{label}</span>
+        <div className="flex items-center gap-1.5 text-xs">
+          {hasChanges ? (
+            <>
+              {removedCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
+                  -{removedCount} 단어
+                </span>
+              )}
+              {addedCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                  +{addedCount} 단어
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-[10px] text-muted-foreground">변경 없음</span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-0 rounded-lg border overflow-hidden">
+        {/* 원본 (읽기 전용) */}
+        <div className="flex flex-col border-r">
+          <div className="px-3 py-1.5 bg-gray-50 border-b flex items-center justify-between">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">원본</span>
+            <span className="text-[10px] text-muted-foreground border rounded px-1 py-0.5">읽기 전용</span>
+          </div>
+          <div
+            ref={leftScrollRef}
+            className={`${height} overflow-y-auto p-3 text-sm leading-relaxed whitespace-pre-wrap bg-gray-50/50 text-gray-700`}
+          >
+            {original
+              ? renderDiff(diff.left, 'left')
+              : <span className="text-muted-foreground italic">(내용 없음)</span>
+            }
+          </div>
+        </div>
+
+        {/* 수정본 (편집) */}
+        <div className="flex flex-col">
+          <div className="px-3 py-1.5 bg-white border-b flex items-center justify-between">
+            <span className="text-[10px] font-semibold text-purple-600 uppercase tracking-wide">수정본</span>
+            <span className="text-[10px] text-muted-foreground">직접 편집</span>
+          </div>
+          <textarea
+            ref={rightScrollRef}
+            value={corrected}
+            onChange={e => onChange(e.target.value)}
+            onScroll={handleRightScroll}
+            disabled={disabled}
+            placeholder={placeholder}
+            rows={singleLine ? 1 : undefined}
+            className={`${height} resize-none p-3 text-sm leading-relaxed w-full border-none outline-none bg-white text-gray-900 disabled:opacity-50`}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 
 type TargetType = 'POST' | 'COMMENT';
 
@@ -88,66 +190,87 @@ interface Props {
 export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) {
   const targetType: TargetType = post ? 'POST' : 'COMMENT';
   const targetId = post ? post.id : String(comment?.id ?? '');
-  const originalBody = post
-    ? (post.bodyPublished ?? post.bodyRaw ?? '')
-    : (comment?.body ?? '');
 
   const isOpen = !!(post || comment);
 
-  const [correctedText, setCorrectedText] = useState(originalBody);
-  const [applyLive, setApplyLive] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  // POST 필드 원본값
+  const origTitle       = post?.title ?? '';
+  const origBody        = post ? (post.bodyPublished ?? post.bodyRaw ?? '') : (comment?.body ?? '');
+  const origPartnerBody = post ? (post.partnerBodyPublished ?? post.partnerBodyRaw ?? '') : '';
 
-  const leftScrollRef = useRef<HTMLDivElement>(null);
-  const rightScrollRef = useRef<HTMLTextAreaElement>(null);
+  const [corrTitle,       setCorrTitle]       = useState(origTitle);
+  const [corrBody,        setCorrBody]        = useState(origBody);
+  const [corrPartnerBody, setCorrPartnerBody] = useState(origPartnerBody);
+  const [applyLive,       setApplyLive]       = useState(true);
+  const [saving,          setSaving]          = useState(false);
+  const [error,           setError]           = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setCorrectedText(originalBody);
+      setCorrTitle(origTitle);
+      setCorrBody(origBody);
+      setCorrPartnerBody(origPartnerBody);
       setError('');
     }
-  }, [isOpen, originalBody]);
+  }, [isOpen, origTitle, origBody, origPartnerBody]);
 
-  function handleRightScroll() {
-    if (leftScrollRef.current && rightScrollRef.current) {
-      leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
-    }
-  }
-
-  const diff = useMemo(
-    () => computeDiff(originalBody, correctedText),
-    [originalBody, correctedText]
-  );
-
-  const removedCount = diff.left.filter(p => p.type === 'removed' && p.text.trim()).length;
-  const addedCount   = diff.right.filter(p => p.type === 'added'   && p.text.trim()).length;
-  const hasChanges   = removedCount > 0 || addedCount > 0;
+  const titleChanged       = corrTitle       !== origTitle;
+  const bodyChanged        = corrBody        !== origBody;
+  const partnerBodyChanged = corrPartnerBody !== origPartnerBody;
+  const hasAnyChange       = titleChanged || bodyChanged || partnerBodyChanged;
 
   function handleOpenChange(open: boolean) {
     if (!open) handleClose();
   }
 
   function handleClose() {
-    setCorrectedText(originalBody);
+    setCorrTitle(origTitle);
+    setCorrBody(origBody);
+    setCorrPartnerBody(origPartnerBody);
     setError('');
     setSaving(false);
     onClose();
   }
 
   async function handleSave() {
-    if (!correctedText.trim()) {
-      setError('수정본을 입력해주세요.');
-      return;
-    }
-    if (!hasChanges) {
+    if (!hasAnyChange) {
       setError('원본과 동일합니다. 수정 후 저장하세요.');
       return;
     }
     setError('');
     setSaving(true);
     try {
-      await saveCorrection({ targetType, targetId, correctedText, applyLive });
+      if (targetType === 'POST') {
+        // 본문 변경 → saveCorrection (학습 데이터 + bodyPublished 교체)
+        if (bodyChanged) {
+          await saveCorrection({
+            targetType: 'POST',
+            targetId,
+            correctedText: corrBody,
+            applyLive,
+          });
+        }
+        // 제목·상대방 본문 변경 → updatePost
+        if (titleChanged || partnerBodyChanged) {
+          await updatePost(targetId, {
+            ...(titleChanged       ? { title:          corrTitle       } : {}),
+            ...(partnerBodyChanged ? { partnerBodyRaw: corrPartnerBody } : {}),
+          });
+        }
+      } else {
+        // 댓글: 단일 본문 saveCorrection
+        if (!bodyChanged) {
+          setError('원본과 동일합니다. 수정 후 저장하세요.');
+          setSaving(false);
+          return;
+        }
+        await saveCorrection({
+          targetType: 'COMMENT',
+          targetId,
+          correctedText: corrBody,
+          applyLive,
+        });
+      }
       onCommitted();
       handleClose();
     } catch (err: any) {
@@ -157,8 +280,7 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
     }
   }
 
-  const title = targetType === 'POST' ? 'AI 게시글 개선' : 'AI 댓글 개선';
-  const panelH = 'h-56';
+  const dialogTitle = targetType === 'POST' ? 'AI 게시글 개선' : 'AI 댓글 개선';
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -166,7 +288,7 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-500" />
-            {title}
+            {dialogTitle}
           </DialogTitle>
         </DialogHeader>
 
@@ -176,6 +298,9 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
           <span>
             저장하면 학습 데이터가 쌓입니다.{' '}
             <strong>AI 규칙 관리 → 첨삭 이력</strong>에서 일괄 분석을 요청할 수 있습니다.
+            {targetType === 'POST' && (
+              <> 제목·상대방 본문은 즉시 교체되며 학습 데이터에는 포함되지 않습니다.</>
+            )}
           </span>
         </div>
 
@@ -186,65 +311,45 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
           </div>
         )}
 
-        {/* 변경 통계 배지 */}
-        <div className="flex items-center gap-2 text-xs">
-          {hasChanges ? (
-            <>
-              {removedCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
-                  -{removedCount} 단어 삭제
-                </span>
-              )}
-              {addedCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
-                  +{addedCount} 단어 추가
-                </span>
-              )}
-            </>
-          ) : (
-            <span className="text-muted-foreground">아직 변경 없음 — 오른쪽에서 수정하세요</span>
+        {/* 필드 패널들 */}
+        <div className="space-y-5">
+          {targetType === 'POST' && (
+            <DiffPanel
+              label="제목"
+              original={origTitle}
+              corrected={corrTitle}
+              onChange={setCorrTitle}
+              disabled={saving}
+              height="h-14"
+              placeholder="제목을 수정하세요."
+            />
+          )}
+
+          <DiffPanel
+            label={targetType === 'POST' ? '작성자 본문' : '댓글 내용'}
+            original={origBody}
+            corrected={corrBody}
+            onChange={setCorrBody}
+            disabled={saving}
+            height="h-44"
+            placeholder={targetType === 'POST' ? '작성자 본문을 수정하세요.' : 'AI가 작성한 원본을 이곳에서 수정하세요.'}
+          />
+
+          {targetType === 'POST' && (
+            <DiffPanel
+              label="상대방 본문"
+              original={origPartnerBody}
+              corrected={corrPartnerBody}
+              onChange={setCorrPartnerBody}
+              disabled={saving}
+              height="h-44"
+              placeholder="상대방 본문을 수정하세요."
+            />
           )}
         </div>
 
-        {/* 좌우 패널 */}
-        <div className="grid grid-cols-2 gap-0 rounded-lg border overflow-hidden">
-          {/* 왼쪽: 원본 (읽기 전용, diff 하이라이트) */}
-          <div className="flex flex-col border-r">
-            <div className="px-3 py-2 bg-gray-50 border-b flex items-center justify-between">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">원본</span>
-              <span className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5">읽기 전용</span>
-            </div>
-            <div
-              ref={leftScrollRef}
-              className={`${panelH} overflow-y-auto p-3 text-sm leading-relaxed whitespace-pre-wrap bg-gray-50/50 text-gray-700`}
-            >
-              {originalBody
-                ? renderDiff(diff.left, 'left')
-                : <span className="text-muted-foreground italic">(내용 없음)</span>
-              }
-            </div>
-          </div>
-
-          {/* 오른쪽: 수정본 (편집 가능) */}
-          <div className="flex flex-col">
-            <div className="px-3 py-2 bg-white border-b flex items-center justify-between">
-              <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">수정본</span>
-              <span className="text-[10px] text-muted-foreground">직접 편집</span>
-            </div>
-            <textarea
-              ref={rightScrollRef}
-              value={correctedText}
-              onChange={e => setCorrectedText(e.target.value)}
-              onScroll={handleRightScroll}
-              disabled={saving}
-              placeholder="AI가 작성한 원본을 이곳에서 수정하세요."
-              className={`${panelH} resize-none p-3 text-sm leading-relaxed w-full border-none outline-none bg-white text-gray-900 disabled:opacity-50`}
-            />
-          </div>
-        </div>
-
         {/* 라이브 반영 체크박스 */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pt-1">
           <Checkbox
             id="applyLive"
             checked={applyLive}
@@ -262,13 +367,13 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
           </Button>
           <Button
             onClick={handleSave}
-            disabled={saving || !correctedText.trim() || !hasChanges}
+            disabled={saving || !hasAnyChange}
             className="bg-purple-600 hover:bg-purple-700 text-white"
           >
             {saving ? '저장 중...' : (
               <>
                 <Save className="h-4 w-4 mr-1.5" />
-                학습 데이터 저장
+                {bodyChanged ? '학습 데이터 저장' : '저장'}
               </>
             )}
           </Button>
