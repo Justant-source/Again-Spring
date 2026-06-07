@@ -27,9 +27,14 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
     List<PostComment> findByParentCommentIdOrderByCreatedAtAsc(Long parentCommentId);
 
     /**
-     * 포스트의 전체 댓글 수 (최상위 + 대댓글)
+     * 포스트의 전체 댓글 수 (최상위 + 대댓글, 상태 무관 — 관리/통계용)
      */
     long countByPostId(String postId);
+
+    /**
+     * 공개용 댓글 수: 차단/삭제 제외 (status=ACTIVE, deletedAt IS NULL)
+     */
+    long countByPostIdAndStatusAndDeletedAtIsNull(String postId, CommentStatus status);
 
     /**
      * 관리자용: 상태별 댓글 조회 (삭제되지 않은 댓글만)
@@ -45,10 +50,16 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
             @Param("statuses") List<CommentStatus> statuses, Pageable pageable);
 
     /**
-     * 공개 피드: 삭제되고 차단되지 않은 댓글만 표시
+     * 공개 피드: 최상위 댓글 — 차단/삭제 제외 (status=ACTIVE, deletedAt IS NULL)
      */
     List<PostComment> findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
             String postId, CommentStatus status);
+
+    /**
+     * 공개 피드: 답글 — 차단/삭제 제외 (status=ACTIVE, deletedAt IS NULL)
+     */
+    List<PostComment> findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
+            Long parentCommentId, CommentStatus status);
 
     /**
      * 관리자용: 포스트의 모든 댓글 (상태 무관, 삭제 포함)

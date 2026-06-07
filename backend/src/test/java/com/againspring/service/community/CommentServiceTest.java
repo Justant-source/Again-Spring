@@ -1,0 +1,106 @@
+package com.againspring.service.community;
+
+import com.againspring.domain.community.PostComment;
+import com.againspring.domain.enums.CommentStatus;
+import com.againspring.repository.community.PostCommentRepository;
+import com.againspring.repository.community.PostLikeRepository;
+import com.againspring.repository.community.PostRepository;
+import com.againspring.safety.KeywordGuard;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * CommentService 공개 피드 필터 회귀 테스트.
+ * 2026-06-07: 공개 댓글 목록이 deleted_at/status를 필터링하지 않아 차단·삭제 댓글이 노출되던 버그 수정.
+ */
+@ExtendWith(MockitoExtension.class)
+@DisplayName("CommentService — 공개 피드 차단/삭제 필터")
+class CommentServiceTest {
+
+    @Mock private PostCommentRepository commentRepository;
+    @Mock private PostRepository postRepository;
+    @Mock private PostLikeRepository postLikeRepository;
+    @Mock private KeywordGuard keywordGuard;
+    @Mock private ApplicationEventPublisher eventPublisher;
+
+    @InjectMocks private CommentService commentService;
+
+    private static final String POST_ID = "post_abc";
+
+    @Test
+    @DisplayName("getTopLevelComments — ACTIVE & deletedAt IS NULL 필터 쿼리만 사용 (무필터 쿼리 미사용)")
+    void getTopLevelComments_usesActiveFilteredQuery() {
+        PostComment visible = PostComment.builder()
+                .id(1L).postId(POST_ID).body("보임").status(CommentStatus.ACTIVE).build();
+        when(commentRepository
+                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(POST_ID, CommentStatus.ACTIVE))
+                .thenReturn(List.of(visible));
+
+        List<PostComment> result = commentService.getTopLevelComments(POST_ID);
+
+        assertThat(result).containsExactly(visible);
+        verify(commentRepository)
+                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(POST_ID, CommentStatus.ACTIVE);
+        // 무필터(레거시) 쿼리는 더 이상 호출되면 안 됨
+        verify(commentRepository, never()).findByPostIdAndParentCommentIdIsNullOrderByCreatedAtAsc(anyString());
+    }
+
+    @Test
+    @DisplayName("getReplies — ACTIVE & deletedAt IS NULL 필터 쿼리만 사용 (무필터 쿼리 미사용)")
+    void getReplies_usesActiveFilteredQuery() {
+        Long parentId = 10L;
+        PostComment reply = PostComment.builder()
+                .id(11L).postId(POST_ID).parentCommentId(parentId).body("답글").status(CommentStatus.ACTIVE).build();
+        when(commentRepository
+                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(parentId, CommentStatus.ACTIVE))
+                .thenReturn(List.of(reply));
+
+        List<PostComment> result = commentService.getReplies(parentId);
+
+        assertThat(result).containsExactly(reply);
+        verify(commentRepository)
+                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(parentId, CommentStatus.ACTIVE);
+        verify(commentRepository, never()).findByParentCommentIdOrderByCreatedAtAsc(anyLong());
+    }
+
+    @Test
+    @DisplayName("deleteComment(최상위) — 대댓글 정리는 무필터 쿼리로 차단·삭제 답글까지 전부 삭제 (orphan 방지)")
+    void deleteComment_topLevel_cascadesUsingUnfilteredQuery() {
+        Long commentId = 100L;
+        String userId = "user-1";
+        PostComment top = PostComment.builder()
+                .id(commentId).postId(POST_ID).authorId(userId).body("최상위").status(CommentStatus.ACTIVE).build();
+        PostComment blockedReply = PostComment.builder()
+                .id(101L).postId(POST_ID).parentCommentId(commentId).authorId(userId).body("차단된 답글").status(CommentStatus.BLOCKED).build();
+
+        when(commentRepository.findById(commentId)).thenReturn(Optional.of(top));
+        when(commentRepository.findByParentCommentIdOrderByCreatedAtAsc(commentId)).thenReturn(List.of(blockedReply));
+
+        commentService.deleteComment(commentId, userId);
+
+        // cascade는 무필터 쿼리로 (차단·삭제된 답글도 함께 제거되어야 함)
+        verify(commentRepository).findByParentCommentIdOrderByCreatedAtAsc(commentId);
+        verify(commentRepository, never())
+                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(anyLong(), any());
+        verify(commentRepository).delete(blockedReply);
+        verify(commentRepository).delete(top);
+        verify(postLikeRepository).deleteByCommentId(101L);
+        verify(postLikeRepository).deleteByCommentId(commentId);
+    }
+}

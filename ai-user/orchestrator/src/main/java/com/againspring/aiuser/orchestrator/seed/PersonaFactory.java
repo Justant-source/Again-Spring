@@ -211,9 +211,8 @@ public class PersonaFactory {
 한국 커뮤니티 사이트 '%s' 스타일의 사용자 voice 프로필을 JSON으로 생성하라.
 사용자 특성: 연령=%s, 성별=%s, 지역=%s, 직업=%s, 정치성향=%s
 
-반드시 아래 JSON 구조로만 응답:
+반드시 아래 JSON 구조로만 응답 (닉네임은 시스템이 자동 배정하므로 포함하지 말 것):
 {
-  "nickname": "2~4글자 순수 한글 닉네임 (예: 별빛, 산호, 하늘이, 달팽이)",
   "general_style": "한 줄 스타일 묘사",
   "example_post_openers": ["게시글 첫 줄 예시1", "예시2"],
   "example_comments": ["댓글 예시1 (40자 이내)", "댓글 예시2", "댓글 예시3"],
@@ -259,12 +258,23 @@ JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내�
         }
     }
 
+    /** 닉네임 = 4스타일 혼합 생성기(꾸밈말+동물·영어숫자·바코드·보배드림 = 50:20:20:10). 중복 시 새 조합 재시도. */
     private String extractNickname(Map<String, Object> voiceMap, String age, String gender) {
-        Object n = voiceMap.remove("nickname");
-        if (n instanceof String s && !s.isBlank()) return s;
-        // fallback — voice를 여기서 얻을 수 없으므로 일반 풀 사용
-        String[] pool = {"별빛","산호","하늘","달","구름","바람","노을","새벽","이슬","숲길"};
-        return pick(pool) + (RNG.nextInt(99) + 1);
+        voiceMap.remove("nickname"); // LLM이 닉네임을 줘도 무시 — 시스템 생성기 사용
+        try {
+            for (int i = 0; i < 25; i++) {
+                String candidate = PersonaNicknameGenerator.generate(RNG);
+                if (!nicknameExists(candidate)) return candidate;
+            }
+        } catch (Exception ignored) {}
+        // 조회 실패·충돌 폴백
+        return PersonaNicknameGenerator.generate(RNG) + (RNG.nextInt(89) + 10);
+    }
+
+    private boolean nicknameExists(String nickname) {
+        Integer c = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM users WHERE nickname = ?", Integer.class, nickname);
+        return c != null && c > 0;
     }
 
     /** Voice 타입별 닉네임 풀 (미래 확장용) */

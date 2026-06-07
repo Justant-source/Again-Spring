@@ -30,7 +30,10 @@ public class ClaudeApiInvoker implements Invoker {
 
     private static final String API_URL        = "https://api.anthropic.com/v1/messages";
     private static final String API_VER        = "2023-06-01";
-    private static final String CACHE_BETA     = "prompt-caching-2024-07-31";
+    // 프롬프트 캐싱 + 1시간 TTL 베타. AI 유저 tick은 10분 주기이고 jitter로 행동이 10~60분 창에 분산되므로
+    // 기본 5분 TTL로는 틱 사이에 캐시가 항상 만료된다(히트율 0%). 1h TTL로 여러 틱을 하나의 캐시로 커버.
+    private static final String CACHE_BETA     = "prompt-caching-2024-07-31,extended-cache-ttl-2025-04-11";
+    private static final String CACHE_TTL      = "1h";
     private static final String SEP            = "<<<USER_PROMPT>>>";
     private static final String PERSONA_SEP    = "<<<PERSONA_SECTION>>>";
     private static final int    MAX_TOKENS     = 2048;
@@ -90,10 +93,12 @@ public class ClaudeApiInvoker implements Invoker {
                 // Block 1: 정적 규칙 섹션 — cache_control 적용 (캐시 히트 대상)
                 String staticPart  = systemPart.substring(0, personaIdx).trim();
                 String dynamicPart = systemPart.substring(personaIdx + PERSONA_SEP.length()).trim();
+                log.info("CACHE DEBUG: promptCaching={} staticPartChars={} dynamicPartChars={}",
+                    promptCaching, staticPart.length(), dynamicPart.length());
                 ObjectNode block1 = systemArr.addObject();
                 block1.put("type", "text");
                 block1.put("text", staticPart);
-                block1.putObject("cache_control").put("type", "ephemeral");
+                block1.putObject("cache_control").put("type", "ephemeral").put("ttl", CACHE_TTL);
                 // Block 2: 페르소나별 섹션 — cache_control 없음 (호출마다 다름)
                 if (!dynamicPart.isBlank()) {
                     ObjectNode block2 = systemArr.addObject();
@@ -106,7 +111,7 @@ public class ClaudeApiInvoker implements Invoker {
                 textBlock.put("type", "text");
                 textBlock.put("text", systemPart.replace(PERSONA_SEP, "").trim());
                 if (promptCaching) {
-                    textBlock.putObject("cache_control").put("type", "ephemeral");
+                    textBlock.putObject("cache_control").put("type", "ephemeral").put("ttl", CACHE_TTL);
                 }
             }
         }
@@ -152,11 +157,13 @@ public class ClaudeApiInvoker implements Invoker {
             // 토큰 사용량 로깅
             JsonNode usage = resp.get("usage");
             if (usage != null) {
-                log.debug("API usage: input={} output={} cache_read={} cache_write={}",
-                    usage.path("input_tokens").asInt(),
-                    usage.path("output_tokens").asInt(),
-                    usage.path("cache_read_input_tokens").asInt(0),
-                    usage.path("cache_creation_input_tokens").asInt(0));
+                int inTok    = usage.path("input_tokens").asInt();
+                int cacheRead = usage.path("cache_read_input_tokens").asInt(0);
+                int cacheWrite = usage.path("cache_creation_input_tokens").asInt(0);
+                long denom = (long) inTok + cacheRead + cacheWrite;
+                int hitPct = denom > 0 ? (int) Math.round(cacheRead * 100.0 / denom) : 0;
+                log.info("API usage: input={} output={} cache_read={} cache_write={} cache_hit={}%",
+                    inTok, usage.path("output_tokens").asInt(), cacheRead, cacheWrite, hitPct);
             }
 
             JsonNode contentArr = resp.path("content");

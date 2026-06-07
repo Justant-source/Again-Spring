@@ -4,6 +4,7 @@ import com.againspring.api.community.dto.*;
 import com.againspring.domain.community.Juror;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.VoteOption;
+import com.againspring.domain.enums.CommentStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.repository.community.CommunityReportRepository;
 import com.againspring.repository.community.JurorRepository;
@@ -119,7 +120,7 @@ public class CommunityPostController {
         Page<PostResponse> responses = posts.map(post -> {
             List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
             long voteCount = voteRepository.countByPostId(post.getId());
-            long commentCount = postCommentRepository.countByPostId(post.getId());
+            long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
             String authorNickname = userRepository.findById(post.getAuthorId())
                     .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
                     .orElse("익명");
@@ -149,7 +150,7 @@ public class CommunityPostController {
                 .map(post -> {
                     List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
                     long voteCount = voteRepository.countByPostId(post.getId());
-                    long commentCount = postCommentRepository.countByPostId(post.getId());
+                    long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
                     String authorNickname = userRepository.findById(post.getAuthorId())
                             .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
                             .orElse("익명");
@@ -174,7 +175,7 @@ public class CommunityPostController {
         List<PostResponse> responses = posts.stream().map(post -> {
             List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
             long voteCount = voteRepository.countByPostId(post.getId());
-            long commentCount = postCommentRepository.countByPostId(post.getId());
+            long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
             String authorNickname = userRepository.findById(post.getAuthorId())
                     .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
                     .orElse("익명");
@@ -198,7 +199,7 @@ public class CommunityPostController {
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
         Map<Long, Long> voteResult = voteService.getVoteResult(id);
         Optional<Long> myVote = userId != null ? voteService.getMyVote(id, userId) : Optional.empty();
-        long commentCount = postCommentRepository.countByPostId(id);
+        long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(id, CommentStatus.ACTIVE);
 
         String authorNickname = userRepository.findById(post.getAuthorId())
                 .map(u -> u.getNickname() != null ? u.getNickname() : "익명")

@@ -4,6 +4,7 @@ import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.PostComment;
 import com.againspring.domain.community.PostLike;
+import com.againspring.domain.enums.CommentStatus;
 import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
@@ -156,7 +157,10 @@ public class CommentService {
      * @return 최상위 댓글 목록
      */
     public List<PostComment> getTopLevelComments(String postId) {
-        List<PostComment> comments = commentRepository.findByPostIdAndParentCommentIdIsNullOrderByCreatedAtAsc(postId);
+        // 공개 피드: 차단(BLOCKED)·삭제(deletedAt)된 댓글은 제외 — ACTIVE & deletedAt IS NULL만
+        List<PostComment> comments = commentRepository
+                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
+                        postId, CommentStatus.ACTIVE);
         log.info("Listed {} top-level comments for post {}", comments.size(), postId);
         return comments;
     }
@@ -168,7 +172,10 @@ public class CommentService {
      * @return 대댓글 목록
      */
     public List<PostComment> getReplies(Long parentCommentId) {
-        List<PostComment> replies = commentRepository.findByParentCommentIdOrderByCreatedAtAsc(parentCommentId);
+        // 공개 피드: 차단(BLOCKED)·삭제(deletedAt)된 답글은 제외 — ACTIVE & deletedAt IS NULL만
+        List<PostComment> replies = commentRepository
+                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
+                        parentCommentId, CommentStatus.ACTIVE);
         log.info("Listed {} replies for comment {}", replies.size(), parentCommentId);
         return replies;
     }

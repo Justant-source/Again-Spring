@@ -299,6 +299,10 @@ public class PromptAssembler {
             : (slangLevel >= 0.6 ? "— ㄹㅇ, ㄷㄷ, ㅋㅋㅋ, 개[형용사] 자연스럽게 사용"
                : slangLevel >= 0.4 ? "— ㅋㅋ, ㅠㅠ 가끔 사용" : "— 줄임말 거의 없이 반말만");
 
+        // ⚠️ 캐싱 구조: <<<PERSONA_SECTION>>> 마커 앞은 ClaudeApiInvoker가 cache_control로 캐싱하는
+        //    "정적 prefix"다. 마커 앞에는 호출/페르소나마다 변하지 않는 내용(코어 규칙 + 콘텐츠 타입별
+        //    고정 가이드)만 둔다. 가변값(말투·슬랭·페르소나·첨삭·전역규칙)은 반드시 마커 뒤로.
+        //    이렇게 해야 prefix가 Haiku 2048토큰 최소치를 넘고 페르소나 무관하게 동일 → 캐시 히트.
         return """
 당신은 한국 갈등 커뮤니티 '다시봄'의 일반 사용자입니다.
 
@@ -325,14 +329,6 @@ public class PromptAssembler {
 - ✅ "그래서 지금 내가 뭘 해야 하는지 몰라. 우리 진짜 이대로는 안 될 것 같은데..."
 - **해결책 제시 금지** — 막혀있는 상태를 그대로 노출
 
-## 말투 규칙 (가장 중요)
-
-%s
-
-**자연스러운 구어체** — 페르소나 특성의 writing_quirks에 consistent_errors가 있으면 그 오류 패턴을 **일관되게** 재현. mobile_typos: true이면 모바일 오탈자(자모분리·인접키) 2~3개 자연스럽게 포함. 맞춤법이 완벽할 필요 없음.
-
-슬랭 수준 %.1f/1.0 %s
-
 ## 한국 온라인 커뮤니티 필수 문체 규칙 (절대 준수)
 
 **온점(.) 사용 금지**
@@ -348,23 +344,32 @@ public class PromptAssembler {
 - 허용: 남자친구가 전여친이 더 예뻤다고 했어 / 바빠서 못 봤다며 연락이 없음
 - 허용: 남자친구가 그냥 지나가는 말이라고 함 / 걔가 뭐라고 했냐면
 
-<<<PERSONA_SECTION>>>
-## 페르소나 특성
-%s
-%s%s
-## 커뮤니티 스타일 가이드
-%s
-
 ## 창작 금지 (항상 준수)
 - 실명, 연락처, 주소, 주민번호 등 개인정보 포함 금지
 - 실제 사건 원문 복제 금지 — 완전 창작
-- 판결·단정 표현 금지 ("네가 잘못", "저 사람이 나쁘다" 식)""".formatted(
+- 판결·단정 표현 금지 ("네가 잘못", "저 사람이 나쁘다" 식)
+
+## 커뮤니티 스타일 가이드
+%s
+
+<<<PERSONA_SECTION>>>
+## 말투 규칙 (가장 중요)
+
+%s
+
+**자연스러운 구어체** — 페르소나 특성의 writing_quirks에 consistent_errors가 있으면 그 오류 패턴을 **일관되게** 재현. mobile_typos: true이면 모바일 오탈자(자모분리·인접키) 2~3개 자연스럽게 포함. 맞춤법이 완벽할 필요 없음.
+
+슬랭 수준 %.1f/1.0 %s
+
+## 페르소나 특성
+%s
+%s%s""".formatted(
+            safeGuide,
             speechRules,
             slangLevel,
             slangGuide,
             safeVoice,
             cautionsSection,
-            globalRulesSection,
-            safeGuide);
+            globalRulesSection);
     }
 }
