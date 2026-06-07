@@ -93,8 +93,6 @@ public class ClaudeApiInvoker implements Invoker {
                 // Block 1: 정적 규칙 섹션 — cache_control 적용 (캐시 히트 대상)
                 String staticPart  = systemPart.substring(0, personaIdx).trim();
                 String dynamicPart = systemPart.substring(personaIdx + PERSONA_SEP.length()).trim();
-                log.info("CACHE DEBUG: promptCaching={} staticPartChars={} dynamicPartChars={}",
-                    promptCaching, staticPart.length(), dynamicPart.length());
                 ObjectNode block1 = systemArr.addObject();
                 block1.put("type", "text");
                 block1.put("text", staticPart);
