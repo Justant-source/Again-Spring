@@ -1,1 +1,17 @@
+# Python 가상환경 (대용량 — 절대 커밋 금지)
 learning/venv/
+learning/.venv/
+# ML 모델 가중치 / Playwright 드라이버
+learning/**/*.pt
+learning/**/*.pth
+learning/**/*.bin
+learning/**/*.safetensors
+learning/**/playwright/driver/
+# Python 캐시
+learning/**/__pycache__/
+learning/**/*.pyc
+# Gradle 빌드 산출물
+llm/build/
+llm/.gradle/
+orchestrator/build/
+orchestrator/.gradle/

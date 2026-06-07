@@ -40,6 +40,8 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
    e2e-realbe는 **반드시 dev(localhost:8090)에서만** 실행한다. prod 대상 실행 금지.
 5. **`.env.prod` git 커밋 절대 금지**
 6. **문서 위치** — 루트는 `README.md`, `CLAUDE.md`만. 상세 문서는 4개 docs 디렉토리만 허용.
+7. **🚨 LLM 토큰/크레딧 소진 = 오류, 콘텐츠 아님** — CLI든 API든 토큰·크레딧·쿼터가 모자라면(예: "Credit balance is too low", usage/rate limit, overloaded) **그 오류 문자열을 글·댓글 본문으로 절대 게시 금지**. 반드시 ① ERROR 로그 기록 → ② 생성 실패 처리(예외) → ③ prod·dev 어디에도 작성하지 않음.
+   방어 계층: ai-user/llm 인보커(`ClaudeCliInvoker`·`ClaudeApiInvoker`)가 제공자 오류를 감지해 예외를 던지고, orchestrator `ContentSafetyGuard`가 오류 시그니처를 최종 차단(`LLM_ERROR_SIGNATURE`). 시그니처 추가 시 두 곳(`LlmErrorSignature`, `ContentSafetyGuard`) 모두 갱신. (2026-06-07 prod 인시던트)
 
 ---
 

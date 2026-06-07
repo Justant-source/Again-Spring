@@ -141,7 +141,9 @@ public class ClaudeApiInvoker implements Invoker {
                 throw new ClaudeCodeException("THROTTLED", "Anthropic API overloaded (529)", 529, null);
             }
             if (res.statusCode() != 200) {
-                log.warn("Anthropic API error {}: {}", res.statusCode(), res.body());
+                // 크레딧/쿼터 소진 등 모든 비정상 응답 → ERROR 로그 + 예외 (절대 콘텐츠로 게시 안 됨)
+                log.error("Anthropic API error {} — generation failed, NOT publishing: {}",
+                    res.statusCode(), res.body());
                 throw new ClaudeCodeException("API_ERROR", "API status " + res.statusCode(), res.statusCode(), null);
             }
 
@@ -159,7 +161,13 @@ public class ClaudeApiInvoker implements Invoker {
 
             JsonNode contentArr = resp.path("content");
             if (contentArr.isArray() && contentArr.size() > 0) {
-                return contentArr.get(0).path("text").asText("");
+                String text = contentArr.get(0).path("text").asText("");
+                // 방어: 제공자 오류 문자열이 본문에 섞여 나오면 실패 처리 (게시 차단)
+                if (LlmErrorSignature.looksLikeProviderError(text)) {
+                    log.error("API output looks like a provider error — refusing to return as content");
+                    throw new ClaudeCodeException("PROVIDER_ERROR", "Provider error text in API output", -1, null);
+                }
+                return text;
             }
             return "";
 

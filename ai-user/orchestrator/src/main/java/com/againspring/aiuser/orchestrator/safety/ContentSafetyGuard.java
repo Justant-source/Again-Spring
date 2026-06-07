@@ -36,6 +36,16 @@ public class ContentSafetyGuard {
         "장애인놈", "병신새끼", "보지", "씹", "니거", "찐따"
     );
 
+    // 제공자(LLM) 오류 문자열 — 토큰/크레딧 소진 시 본문으로 새는 영어 오류.
+    // 절대 prod에 게시 금지 (2026-06-07 "Credit balance is too low" 인시던트). 모두 소문자.
+    private static final List<String> LLM_ERROR_SIGNATURES = List.of(
+        "credit balance", "too low to access", "purchase credits", "plans & billing",
+        "usage limit", "reached your usage", "5-hour limit", "rate limit", "rate_limit",
+        "overloaded", "invalid_request_error", "authentication_error", "api_error",
+        "anthropic api", "insufficient credit", "too many requests",
+        "service unavailable", "internal server error"
+    );
+
     private static final int MIN_LENGTH = 5;
     // POST 상한: OutputSanitizer(llm) MAX_POST=2000보다 여유 있게 설정해 sanitizer가 실질적 상한이 됨.
     // Phase 5에서 ai-user.limits.max-post/max-comment 환경변수로 통일 예정.
@@ -59,6 +69,14 @@ public class ContentSafetyGuard {
     public GuardResult check(String text, ContentType type) {
         if (text == null || text.isBlank()) {
             return GuardResult.blocked("EMPTY_TEXT");
+        }
+        // 제공자 오류 문자열 차단 (최종 안전망: 인보커가 놓쳐도 여기서 게시 차단)
+        String lower = text.toLowerCase();
+        for (String sig : LLM_ERROR_SIGNATURES) {
+            if (lower.contains(sig)) {
+                log.error("ContentSafetyGuard: LLM provider-error signature in content — BLOCKED ('{}'). 토큰 부족 의심.", sig);
+                return GuardResult.blocked("LLM_ERROR_SIGNATURE");
+            }
         }
         if (text.length() < MIN_LENGTH) {
             return GuardResult.blocked("TOO_SHORT");

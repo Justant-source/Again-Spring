@@ -126,17 +126,37 @@ public class ClaudeCliInvoker implements Invoker {
                             }
                         }
                     } else if ("result".equals(type)) {
+                        // 오류 result 차단: is_error=true 또는 subtype!=success → 콘텐츠로 쓰지 않고 실패 처리.
+                        // (토큰/크레딧 소진 시 CLI가 오류 메시지를 result로 내보내는 경우 게시 방지)
+                        boolean isError = node.path("is_error").asBoolean(false);
+                        String subtype = node.path("subtype").asText("");
                         String r = node.path("result").asText("");
+                        if (isError || (!subtype.isBlank() && !"success".equals(subtype))) {
+                            throw new ClaudeCodeException("CLAUDE_ERROR",
+                                "Claude CLI error result (subtype=" + subtype + "): " + truncate(r), -1, null);
+                        }
                         if (!r.isBlank()) finalResult = r;
                     }
+                } catch (ClaudeCodeException e) {
+                    throw e;  // 제공자 오류 — 전파 (절대 콘텐츠로 사용 금지)
                 } catch (Exception ignored) {
                     // 파싱 불가 라인 무시
                 }
             }
         }
         // result 이벤트 우선 (깔끔한 최종 텍스트), 없으면 누적 partial 사용
-        String answer = finalResult.isBlank() ? accumulated.toString() : finalResult;
-        return answer.trim();
+        String answer = (finalResult.isBlank() ? accumulated.toString() : finalResult).trim();
+        // 최종 안전망: 제공자 오류 문자열("Credit balance is too low" 등)이 본문으로 새면 실패 처리
+        if (LlmErrorSignature.looksLikeProviderError(answer)) {
+            log.error("CLI output looks like a provider error — refusing to return as content: {}", truncate(answer));
+            throw new ClaudeCodeException("PROVIDER_ERROR", "Provider error text in CLI output", -1, null);
+        }
+        return answer;
+    }
+
+    private static String truncate(String s) {
+        if (s == null) return "";
+        return s.length() <= 200 ? s : s.substring(0, 200) + "…";
     }
 
     /** stderr를 데몬 스레드로 drain — 파이프 버퍼 포화(데드락) 방지 */

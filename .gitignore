@@ -71,3 +71,25 @@ backend/scripts/test-automation/results/
 
 # AI 유저 활동 히스토리 (선택적 추적 — 기본 gitignore)
 persona-history/
+
+# ===== Python / AI (대용량 파일 절대 커밋 금지) =====
+# Python 가상환경 — venv/는 ai-user/.gitignore에도 별도 등록
+**/venv/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+# PyTorch / ML 모델 가중치 (수백 MB)
+**/*.pt
+**/*.pth
+**/*.onnx
+**/*.bin
+**/*.safetensors
+# Playwright 드라이버 바이너리
+**/playwright/driver/
+# HuggingFace 캐시
+**/.cache/huggingface/
+# ai-user Gradle 빌드
+ai-user/**/build/
+ai-user/**/.gradle/
