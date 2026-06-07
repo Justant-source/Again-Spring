@@ -142,6 +142,48 @@ public class AdminTriggerController {
         log.info("[backfill-comment-likes] done: {} posts processed", processed.get());
     }
 
+    /**
+     * AI 신규 글 즉시 생성 (동기). count개를 HEAVY 페르소나(부족하면 활성 전체)로 생성한다.
+     * tick의 POST 분기는 HEAVY 티어 + 희박 확률 + 1일1글이라 정확한 개수를 보장 못 하므로
+     * executePost(=ActionExecutor.execute + PlannedAction.newPost)를 직접 호출한다.
+     * 본문은 LLM 생성 + ContentSafetyGuard를 그대로 거친다(손수 작성 아님).
+     */
+    @PostMapping("/generate-posts")
+    public ResponseEntity<Map<String, Object>> generatePosts(
+            @RequestParam(defaultValue = "2") int count) {
+
+        int n = Math.max(1, Math.min(count, 10)); // 안전 상한
+        var active = new java.util.ArrayList<>(personaRepo.findByActiveTrue());
+        if (active.isEmpty()) {
+            return ResponseEntity.ok(Map.of("attempted", 0, "message", "활성 페르소나 없음"));
+        }
+        var heavy = active.stream()
+            .filter(p -> "HEAVY".equals(p.getTier()))
+            .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+        List<com.againspring.aiuser.orchestrator.domain.Persona> pool =
+            (heavy.size() >= n) ? heavy : active;
+        Collections.shuffle(pool);
+
+        int attempted = 0;
+        List<String> personaIds = new java.util.ArrayList<>();
+        for (int i = 0; i < n && i < pool.size(); i++) {
+            var persona = pool.get(i);
+            try {
+                actionExecutor.execute(persona, PlannedAction.newPost());
+                personaIds.add(persona.getId());
+                attempted++;
+            } catch (Exception e) {
+                log.warn("[generate-posts] persona={} error={}", persona.getId(), e.getMessage());
+            }
+        }
+        log.info("[generate-posts] {} post(s) attempted (count={})", attempted, n);
+        return ResponseEntity.ok(Map.of(
+            "attempted", attempted,
+            "personaIds", personaIds,
+            "message", attempted + "개 글 생성 시도 완료(LLM+세이프가드 통과분만 게시됨)."
+        ));
+    }
+
     /** AI 댓글 ㅠ{2,} → ㅠ 정규화 (synthetic=1 유저만) */
     @PostMapping("/cleanup-ㅠ")
     public ResponseEntity<Map<String, Object>> cleanupDoubleㅠ() {
