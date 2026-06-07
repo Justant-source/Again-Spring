@@ -58,17 +58,29 @@ public class AdminContentController {
     @GetMapping("/posts")
     @Operation(
         summary = "포스트 목록 조회",
-        description = "상태별로 포스트를 조회 (관리자용, 모든 상태 포함). synthetic 필드로 AI 봇 작성 여부 확인 가능 (ADMIN 전용)."
+        description = "삭제되지 않은 전체 포스트를 조회. synthetic=true/false 로 AI/일반 유저 필터 가능 (ADMIN 전용)."
     )
     @ApiResponse(responseCode = "200", description = "포스트 목록 페이지")
     @ApiResponse(responseCode = "403", description = "ADMIN 권한 없음")
     public ResponseEntity<Page<AdminPostView>> getPosts(
-            @RequestParam(value = "status", defaultValue = "VOTING") String status,
+            @RequestParam(value = "synthetic", required = false) Boolean syntheticFilter,
             Pageable pageable) {
 
-        PostStatus postStatus = PostStatus.valueOf(status.toUpperCase());
-        Page<Post> posts = postRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
-                postStatus, pageable);
+        Page<Post> posts;
+        if (syntheticFilter == null) {
+            posts = postRepository.findByDeletedAtIsNullOrderByCreatedAtDesc(pageable);
+        } else {
+            Set<String> allSyntheticIds = userRepository.findAllSyntheticIds();
+            if (syntheticFilter) {
+                posts = allSyntheticIds.isEmpty()
+                        ? org.springframework.data.domain.Page.empty(pageable)
+                        : postRepository.findByAuthorIdInAndDeletedAtIsNullOrderByCreatedAtDesc(allSyntheticIds, pageable);
+            } else {
+                posts = allSyntheticIds.isEmpty()
+                        ? postRepository.findByDeletedAtIsNullOrderByCreatedAtDesc(pageable)
+                        : postRepository.findByAuthorIdNotInAndDeletedAtIsNull(allSyntheticIds, pageable);
+            }
+        }
 
         // authorId 배치 조회로 synthetic 판별 (ADMIN 전용 — 공개 API 미노출)
         Set<String> authorIds = posts.getContent().stream()

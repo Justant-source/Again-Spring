@@ -50,7 +50,7 @@ export interface AdminComment {
 export async function listAdminPosts(params: {
   page?: number;
   size?: number;
-  status?: string;
+  synthetic?: boolean;
   category?: string;
   search?: string;
 }): Promise<PageResponse<AdminPost>> {
@@ -59,8 +59,8 @@ export async function listAdminPosts(params: {
     size: params.size ?? 20,
   };
 
-  if (params.status && params.status !== 'ALL') {
-    queryParams.status = params.status;
+  if (params.synthetic !== undefined) {
+    queryParams.synthetic = params.synthetic;
   }
   if (params.category && params.category !== 'ALL') {
     queryParams.category = params.category;

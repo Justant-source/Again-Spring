@@ -69,4 +69,7 @@ public interface UserRepository extends JpaRepository<User, String> {
      */
     @Query("SELECT u.id FROM User u WHERE u.id IN :ids AND u.synthetic = true")
     Set<String> findSyntheticIds(@Param("ids") Collection<String> ids);
+
+    @Query("SELECT u.id FROM User u WHERE u.synthetic = true")
+    Set<String> findAllSyntheticIds();
 }

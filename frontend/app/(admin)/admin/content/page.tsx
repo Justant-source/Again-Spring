@@ -39,13 +39,6 @@ import { AdminSection } from '@/components/admin/AdminSection';
 import { AiImproveDialog } from '@/components/admin/content/AiImproveDialog';
 import { MoreVertical, ExternalLink, Sparkles } from 'lucide-react';
 
-const POST_STATUS_LABELS: Record<string, { label: string; variant: any }> = {
-  DRAFT: { label: '초안', variant: 'secondary' },
-  VOTING: { label: '투표 진행', variant: 'default' },
-  CLOSED: { label: '투표 종료', variant: 'outline' },
-  BLOCKED: { label: '차단됨', variant: 'destructive' },
-};
-
 const COMMENT_STATUS_LABELS: Record<string, { label: string; variant: any }> = {
   ACTIVE: { label: '활성', variant: 'default' },
   BLOCKED: { label: '차단됨', variant: 'destructive' },
@@ -68,7 +61,7 @@ export default function AdminContentPage() {
   const [postsPage, setPostsPage] = useState(0);
   const [postsTotalPages, setPostsTotalPages] = useState(0);
   const [postsLoading, setPostsLoading] = useState(false);
-  const [postStatusFilter, setPostStatusFilter] = useState('VOTING');
+  const [postAuthorTypeFilter, setPostAuthorTypeFilter] = useState('ALL');
   const [postCategoryFilter, setPostCategoryFilter] = useState('');
   const [postSearchQuery, setPostSearchQuery] = useState('');
   const [selectedPost, setSelectedPost] = useState<AdminPost | null>(null);
@@ -92,7 +85,12 @@ export default function AdminContentPage() {
         const res = await listAdminPosts({
           page,
           size: 20,
-          status: postStatusFilter === 'ALL' ? undefined : postStatusFilter,
+          synthetic:
+            postAuthorTypeFilter === 'AI'
+              ? true
+              : postAuthorTypeFilter === 'USER'
+              ? false
+              : undefined,
           category: postCategoryFilter === 'ALL' ? undefined : postCategoryFilter || undefined,
           search: postSearchQuery || undefined,
         });
@@ -105,7 +103,7 @@ export default function AdminContentPage() {
         setPostsLoading(false);
       }
     },
-    [postStatusFilter, postCategoryFilter, postSearchQuery]
+    [postAuthorTypeFilter, postCategoryFilter, postSearchQuery]
   );
 
   // Load comments
@@ -134,7 +132,7 @@ export default function AdminContentPage() {
   // Load on mount and when filters change
   useEffect(() => {
     loadPosts(0);
-  }, [postStatusFilter, postCategoryFilter, postSearchQuery, loadPosts]);
+  }, [postAuthorTypeFilter, postCategoryFilter, postSearchQuery, loadPosts]);
 
   useEffect(() => {
     loadComments(0);
@@ -221,17 +219,15 @@ export default function AdminContentPage() {
           {/* Filters */}
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[200px]">
-              <label className="text-sm font-medium block mb-1">상태</label>
-              <Select value={postStatusFilter} onValueChange={setPostStatusFilter}>
+              <label className="text-sm font-medium block mb-1">작성자 유형</label>
+              <Select value={postAuthorTypeFilter} onValueChange={setPostAuthorTypeFilter}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">전체</SelectItem>
-                  <SelectItem value="DRAFT">초안</SelectItem>
-                  <SelectItem value="VOTING">투표 진행</SelectItem>
-                  <SelectItem value="CLOSED">투표 종료</SelectItem>
-                  <SelectItem value="BLOCKED">차단됨</SelectItem>
+                  <SelectItem value="AI">AI 유저</SelectItem>
+                  <SelectItem value="USER">일반 유저</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -301,17 +297,6 @@ export default function AdminContentPage() {
                       {CATEGORY_LABELS[row.category] || row.category}
                     </Badge>
                   ),
-                },
-                {
-                  key: 'status',
-                  header: '상태',
-                  render: (row) => {
-                    const statusInfo = POST_STATUS_LABELS[row.status] || {
-                      label: row.status,
-                      variant: 'outline',
-                    };
-                    return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
-                  },
                 },
                 {
                   key: 'viewCount',

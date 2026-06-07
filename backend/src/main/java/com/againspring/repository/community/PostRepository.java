@@ -148,6 +148,18 @@ public interface PostRepository extends JpaRepository<Post, String> {
     Page<Post> findByStatusInAndDeletedAtIsNull(
             @Param("statuses") List<PostStatus> statuses, Pageable pageable);
 
+    /** 관리자용: 삭제되지 않은 전체 게시글 */
+    Page<Post> findByDeletedAtIsNullOrderByCreatedAtDesc(Pageable pageable);
+
+    /** 관리자용: 특정 작성자(AI) 게시글 */
+    Page<Post> findByAuthorIdInAndDeletedAtIsNullOrderByCreatedAtDesc(
+            java.util.Collection<String> authorIds, Pageable pageable);
+
+    /** 관리자용: 특정 작성자(AI) 제외 게시글 */
+    @Query("SELECT p FROM Post p WHERE p.authorId NOT IN :authorIds AND p.deletedAt IS NULL ORDER BY p.createdAt DESC")
+    Page<Post> findByAuthorIdNotInAndDeletedAtIsNull(
+            @Param("authorIds") java.util.Collection<String> authorIds, Pageable pageable);
+
     /** 관리자용: 삭제되지 않은 게시글 총 건수 */
     long countByDeletedAtIsNull();
 
