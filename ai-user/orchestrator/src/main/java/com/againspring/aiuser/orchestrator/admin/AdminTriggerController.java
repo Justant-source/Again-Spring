@@ -1,18 +1,26 @@
 package com.againspring.aiuser.orchestrator.admin;
 
 import com.againspring.aiuser.orchestrator.engine.BehaviorEngine;
+import com.againspring.aiuser.orchestrator.engine.PlannedAction;
 import com.againspring.aiuser.orchestrator.repository.AiUserRuntimeRepository;
+import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
+import com.againspring.aiuser.orchestrator.task.ActionExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 개발·테스트용 수동 트리거 엔드포인트.
@@ -27,6 +35,9 @@ public class AdminTriggerController {
     private final BehaviorEngine behaviorEngine;
     private final PairedPostScheduler pairedPostScheduler;
     private final AiUserRuntimeRepository runtimeRepo;
+    private final PersonaRepository personaRepo;
+    private final ActionExecutor actionExecutor;
+    private final JdbcTemplate jdbcTemplate;
 
     /** BehaviorEngine 즉시 tick — 좋아요/댓글/투표/게시 1회 실행 */
     @PostMapping("/tick")
@@ -68,6 +79,67 @@ public class AdminTriggerController {
             log.info("[AdminTrigger] Counter reset: {} → 0", prev);
             return ResponseEntity.ok(Map.of("status", "ok", "prev", (Object) prev, "now", (Object) 0));
         }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * 기존 게시글 댓글 좋아요 소급 적용 (비동기).
+     * days: 최근 N일치 게시글 대상. personasPerPost: 게시글당 랜덤 샘플 페르소나 수.
+     */
+    @PostMapping("/backfill-comment-likes")
+    public ResponseEntity<Map<String, Object>> backfillCommentLikes(
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(defaultValue = "8") int personasPerPost) {
+
+        List<String> postIds = jdbcTemplate.queryForList(
+            "SELECT id FROM posts WHERE deleted_at IS NULL AND created_at >= NOW() - INTERVAL ? DAY",
+            String.class, days);
+
+        if (postIds.isEmpty()) {
+            return ResponseEntity.ok(Map.of("queued", 0, "message", "대상 게시글 없음"));
+        }
+
+        var personas = personaRepo.findByActiveTrue();
+        if (personas.isEmpty()) {
+            return ResponseEntity.ok(Map.of("queued", 0, "message", "활성 페르소나 없음"));
+        }
+
+        long queued = (long) postIds.size() * Math.min(personasPerPost, personas.size());
+        log.info("[backfill-comment-likes] posts={} personas={} personasPerPost={} queued={}",
+            postIds.size(), personas.size(), personasPerPost, queued);
+
+        runBackfillAsync(postIds, personas, personasPerPost);
+        return ResponseEntity.accepted().body(Map.of(
+            "queued", queued,
+            "posts", postIds.size(),
+            "personasPerPost", personasPerPost,
+            "message", "백그라운드 좋아요 백필을 시작했습니다. 완료까지 수 분이 소요될 수 있습니다."
+        ));
+    }
+
+    @Async
+    void runBackfillAsync(List<String> postIds, List<com.againspring.aiuser.orchestrator.domain.Persona> personas, int personasPerPost) {
+        AtomicInteger processed = new AtomicInteger(0);
+        for (String postId : postIds) {
+            var shuffled = new java.util.ArrayList<>(personas);
+            Collections.shuffle(shuffled);
+            int take = Math.min(personasPerPost, shuffled.size());
+            for (int i = 0; i < take; i++) {
+                var persona = shuffled.get(i);
+                try {
+                    com.againspring.aiuser.orchestrator.client.dto.PostDto stub =
+                        new com.againspring.aiuser.orchestrator.client.dto.PostDto();
+                    stub.setId(postId);
+                    actionExecutor.execute(persona, PlannedAction.commentLike(stub));
+                } catch (Exception e) {
+                    log.warn("[backfill-comment-likes] persona={} post={} error={}", persona.getId(), postId, e.getMessage());
+                }
+            }
+            int done = processed.incrementAndGet();
+            if (done % 50 == 0) {
+                log.info("[backfill-comment-likes] progress {}/{}", done, postIds.size());
+            }
+        }
+        log.info("[backfill-comment-likes] done: {} posts processed", processed.get());
     }
 
     /** daily_global_cap 변경 — 재배포 없이 일일 한도 조정 */

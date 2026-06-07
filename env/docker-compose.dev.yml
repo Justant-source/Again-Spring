@@ -242,6 +242,7 @@ services:
       SOCIAL_WEBHOOK_URL: ${SOCIAL_WEBHOOK_URL:-}
       SOCIAL_EMAIL: ${SOCIAL_EMAIL:-}
       AI_USER_LLM_URL: http://againspring-llm-ai-user:8092
+      AI_USER_ORCHESTRATOR_URL: http://againspring-ai-user-orchestrator:8096
     volumes:
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro
       - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro

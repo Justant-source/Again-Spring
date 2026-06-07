@@ -7,14 +7,18 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * AI 유저 생성 정책 관리 API (ADMIN 전용, §11 토큰 관제 콘솔).
@@ -33,6 +37,10 @@ import java.util.List;
 public class AdminAiUserController {
 
     private final AiUserGenerationConfigRepository configRepository;
+    private final JdbcTemplate jdbcTemplate;
+
+    @Value("${ai.user.orchestrator-url:http://againspring-ai-user-orchestrator:8096}")
+    private String orchestratorUrl;
 
     // ── §11.5 토큰 추정 상수 ─────────────────────────────────────────────
     // 실측 기준 (ClaudeApiInvoker 로그 avg): input ~4600, output ~100
@@ -110,6 +118,51 @@ public class AdminAiUserController {
     }
 
     // =====================================================================
+    // =====================================================================
+    // POST /api/admin/ai-user/cleanup/reduce-ㅠ — AI 댓글 ㅠ 과다 정규화
+    // =====================================================================
+
+    @PostMapping("/cleanup/reduce-ㅠ")
+    @Operation(summary = "AI 댓글 ㅠ 연속 정규화",
+               description = "AI 유저(synthetic=1)가 쓴 댓글의 ㅠ{2,} 를 단일 ㅠ 로 줄인다.")
+    public ResponseEntity<Map<String, Object>> reduceEmojiㅠ() {
+        int updated = jdbcTemplate.update(
+            "UPDATE post_comments pc " +
+            "JOIN users u ON pc.author_id = u.id " +
+            "SET pc.body = REGEXP_REPLACE(pc.body, 'ㅠ{2,}', 'ㅠ') " +
+            "WHERE u.synthetic = 1 " +
+            "  AND pc.deleted_at IS NULL " +
+            "  AND pc.body REGEXP 'ㅠ{2,}'"
+        );
+        log.info("[cleanup] reduced ㅠ in {} AI comments", updated);
+        return ResponseEntity.ok(Map.of("updated", updated, "message", updated + "건 정규화 완료"));
+    }
+
+    // =====================================================================
+    // POST /api/admin/ai-user/backfill-comment-likes — 오케스트레이터 프록시
+    // =====================================================================
+
+    @PostMapping("/backfill-comment-likes")
+    @Operation(summary = "기존 댓글 좋아요 소급 적용",
+               description = "오케스트레이터에 백필 요청을 전달한다. 비동기 실행 (202 Accepted).")
+    public ResponseEntity<Map<String, Object>> backfillCommentLikes(
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(defaultValue = "8") int personasPerPost) {
+        try {
+            String url = orchestratorUrl + "/admin/trigger/backfill-comment-likes"
+                + "?days=" + days + "&personasPerPost=" + personasPerPost;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> resp = RestClient.create().post().uri(url)
+                    .retrieve().body(Map.class);
+            log.info("[backfill-comment-likes] orchestrator response: {}", resp);
+            return ResponseEntity.accepted().body(resp != null ? resp : Map.of("status", "queued"));
+        } catch (Exception e) {
+            log.error("[backfill-comment-likes] orchestrator call failed: {}", e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // POST /api/admin/ai-user/kill — 비상 정지 (모든 backend=OFF)
     // =====================================================================
 

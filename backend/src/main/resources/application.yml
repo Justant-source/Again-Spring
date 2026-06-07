@@ -125,6 +125,8 @@ ai-learning:
 ai:
   prompt:
     llm-url: ${AI_USER_LLM_URL:http://againspring-llm-ai-user:8092}
+  user:
+    orchestrator-url: ${AI_USER_ORCHESTRATOR_URL:http://againspring-ai-user-orchestrator:8096}
 
 logging:
   level:

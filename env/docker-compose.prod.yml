@@ -68,6 +68,7 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-againspring2026@gmail.com}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       AI_USER_LLM_URL: http://againspring-llm-ai-user-prod:8092
+      AI_USER_ORCHESTRATOR_URL: http://againspring-ai-user-orchestrator-prod:8096
     volumes:
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro
       - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro
