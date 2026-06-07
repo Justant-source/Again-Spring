@@ -235,6 +235,7 @@ public class ActionExecutor {
             .correctionCautions(cautionsBlock(persona))
             .globalForbidRules(globalRulesBlock("COMMENT"))
             .correlationId(corrId)
+            .backend(backendFor("REPLY"))
             .build());
 
         if (textOpt.isEmpty()) {

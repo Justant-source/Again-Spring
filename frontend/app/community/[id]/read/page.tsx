@@ -22,6 +22,12 @@ export default function C3StoryRead({ params }: PageProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
+  // 수정 시트
+  const [editOpen, setEditOpen] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   useEffect(() => {
     const loadPost = async () => {
       try {
@@ -55,6 +61,39 @@ export default function C3StoryRead({ params }: PageProps) {
   const bg = side === 'g' ? AUTHOR_BG : PARTNER_BG;
   const label = side === 'g' ? '작성자' : '상대방';
   const body = side === 'g' ? post.bodyPublished : post.partnerBodyPublished;
+
+  // 현재 보는 진영이 내 글인지
+  const isMySide = (side === 'g' && post.isAuthor) || (side === 'r' && post.isPartner);
+
+  const openEdit = () => {
+    setEditText(body || '');
+    setEditError(null);
+    setEditOpen(true);
+    setMenuOpen(false);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editText.trim()) return;
+    setEditSubmitting(true);
+    setEditError(null);
+    try {
+      if (side === 'g') {
+        await postApi.editAuthorBody(params.id, editText.trim());
+      } else {
+        await postApi.editPartnerBody(params.id, editText.trim());
+      }
+      // 로컬 상태 즉시 반영
+      setPost(prev => prev ? {
+        ...prev,
+        ...(side === 'g' ? { bodyPublished: editText.trim() } : { partnerBodyPublished: editText.trim() }),
+      } : null);
+      setEditOpen(false);
+    } catch {
+      setEditError('수정에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--L-bg)', padding: '14px 20px 28px' }}>
@@ -121,7 +160,7 @@ export default function C3StoryRead({ params }: PageProps) {
           {body}
         </p>
 
-        {/* ⋯ 신고 버튼 */}
+        {/* ⋯ 버튼 */}
         <button
           onClick={() => setMenuOpen((o) => !o)}
           style={{
@@ -159,27 +198,81 @@ export default function C3StoryRead({ params }: PageProps) {
                 overflow: 'hidden',
               }}
             >
-              <button
-                onClick={() => { setMenuOpen(false); setReportOpen(true); }}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  padding: '11px 16px',
-                  background: 'none',
-                  border: 'none',
-                  textAlign: 'left',
-                  fontSize: 13,
-                  color: 'var(--faction-partner)',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
-              >
-                신고
-              </button>
+              {isMySide ? (
+                <button
+                  onClick={openEdit}
+                  style={{
+                    display: 'block', width: '100%', padding: '11px 16px',
+                    background: 'none', border: 'none', textAlign: 'left',
+                    fontSize: 13, color: 'var(--L-ink)', cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  수정
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setMenuOpen(false); setReportOpen(true); }}
+                  style={{
+                    display: 'block', width: '100%', padding: '11px 16px',
+                    background: 'none', border: 'none', textAlign: 'left',
+                    fontSize: 13, color: 'var(--faction-partner)', cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  신고
+                </button>
+              )}
             </div>
           </>
         )}
       </div>
+
+      {/* 수정 바텀시트 */}
+      {editOpen && (
+        <div
+          onClick={() => setEditOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--L-bg)', borderRadius: '16px 16px 0 0', padding: '20px 20px 36px', width: '100%', maxWidth: 640 }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--L-ink)', marginBottom: 14 }}>
+              {label}의 이야기 수정
+            </div>
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              maxLength={600}
+              style={{
+                width: '100%', minHeight: 200, padding: '12px 14px',
+                border: `1px solid ${c}`, borderRadius: 8,
+                background: bg, fontSize: 14,
+                fontFamily: 'var(--font-serif)', lineHeight: 1.7,
+                color: 'var(--P-ink)', outline: 'none', resize: 'vertical',
+              }}
+            />
+            <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--L-sub)', marginTop: 4 }}>
+              {editText.length} / 600
+            </div>
+            {editError && (
+              <div style={{ fontSize: 12, color: '#c33', marginTop: 8 }}>{editError}</div>
+            )}
+            <button
+              onClick={handleEditSubmit}
+              disabled={editSubmitting || !editText.trim()}
+              style={{
+                marginTop: 14, width: '100%', padding: '13px 0',
+                background: editSubmitting ? 'var(--L-border)' : c,
+                color: 'white', border: 'none', borderRadius: 8,
+                fontSize: 14, fontWeight: 500, cursor: editSubmitting ? 'wait' : 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              {editSubmitting ? '저장 중...' : '저장'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <ReportModal
         isOpen={reportOpen}

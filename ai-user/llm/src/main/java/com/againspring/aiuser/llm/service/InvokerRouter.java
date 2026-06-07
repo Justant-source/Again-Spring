@@ -23,11 +23,13 @@ public class InvokerRouter {
     public Invoker route(String backend) {
         if ("API".equalsIgnoreCase(backend)) {
             if (apiKey == null || apiKey.isBlank()) {
-                log.warn("Backend=API requested but ANTHROPIC_API_KEY not set — falling back to CLI");
+                log.warn("[InvokerRouter] backend=API 요청됐으나 ANTHROPIC_API_KEY 미설정 → CLI 폴백");
                 return cliInvoker;
             }
+            log.info("[InvokerRouter] ⚠️  backend=API 선택 — Anthropic API 직접 호출 (과금 발생)");
             return apiInvoker;
         }
+        log.debug("[InvokerRouter] backend={} → CLI 선택", backend);
         return cliInvoker;  // CLI | null | OFF 모두 CLI
     }
 }

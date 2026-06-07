@@ -95,6 +95,13 @@ public class ArchetypeCatalog {
         return Optional.of(list.get(RNG.nextInt(list.size())));
     }
 
+    /** 카테고리별 archetype id 전체 (분석 프롬프트 후보 힌트용). 없으면 빈 리스트. */
+    public List<String> idsForCategory(String category) {
+        List<Archetype> list = byCategory.get(category);
+        if (list == null || list.isEmpty()) return Collections.emptyList();
+        return list.stream().map(Archetype::id).toList();
+    }
+
     public boolean isValidId(String id) {
         return id != null && catalog.containsKey(id);
     }

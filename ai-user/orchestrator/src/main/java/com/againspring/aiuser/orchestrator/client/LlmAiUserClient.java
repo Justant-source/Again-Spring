@@ -31,6 +31,40 @@ public class LlmAiUserClient {
         return generate("/generate/reply", req);
     }
 
+    /**
+     * 글 분석 호출 → JSON 문자열 반환 (실패 시 empty). 좋아요·투표 결정용 신호.
+     * archetypeHints: 카테고리별 후보 archetype id (콤마 구분), 없으면 null.
+     */
+    public Optional<String> analyzePost(String postId, String title, String body,
+                                        String category, String archetypeHints) {
+        try {
+            Map<String, Object> req = new java.util.HashMap<>();
+            req.put("postId", postId != null ? postId : "");
+            req.put("title", title != null ? title : "");
+            req.put("bodyPublished", body != null ? body : "");
+            req.put("category", category != null ? category : "");
+            if (archetypeHints != null && !archetypeHints.isBlank()) {
+                req.put("archetypeHints", archetypeHints);
+            }
+            req.put("correlationId", "post-analysis-" + System.nanoTime());
+            GenDto.Response resp = restClient.post()
+                .uri("/analyze/post")
+                .body(req)
+                .retrieve()
+                .body(GenDto.Response.class);
+            if (resp != null && resp.isSuccess()) {
+                return Optional.of(resp.getText());
+            }
+            if (resp != null && resp.getError() != null) {
+                log.warn("Post analysis error: type={} msg={}", resp.getErrorType(), resp.getError());
+            }
+            return Optional.empty();
+        } catch (Exception e) {
+            log.error("LlmAiUser analyzePost call failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     private Optional<String> generate(String path, Object req) {
         try {
             GenDto.Response resp = restClient.post()

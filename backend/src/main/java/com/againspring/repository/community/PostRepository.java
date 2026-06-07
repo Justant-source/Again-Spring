@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 포스트 저장소 (V17 커뮤니티)
@@ -21,15 +22,15 @@ import org.springframework.stereotype.Repository;
 public interface PostRepository extends JpaRepository<Post, String> {
 
     /**
-     * 공개 여부 및 상태로 포스트 조회 (생성순 역순)
+     * 공개 피드: 소프트 삭제되지 않은 포스트만 조회 (생성순 역순)
      */
-    List<Post> findByVisibilityAndStatusOrderByCreatedAtDesc(
+    Page<Post> findByVisibilityAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
             PostVisibility visibility, PostStatus status, Pageable pageable);
 
     /**
-     * 공개 여부, 상태, 카테고리로 포스트 조회 (생성순 역순)
+     * 공개 피드: 소프트 삭제되지 않은 포스트만 조회 — 카테고리 포함 (생성순 역순)
      */
-    List<Post> findByVisibilityAndStatusAndCategoryOrderByCreatedAtDesc(
+    Page<Post> findByVisibilityAndStatusAndCategoryAndDeletedAtIsNullOrderByCreatedAtDesc(
             PostVisibility visibility, PostStatus status, PostCategory category, Pageable pageable);
 
     /**
@@ -42,11 +43,11 @@ public interface PostRepository extends JpaRepository<Post, String> {
      */
     Optional<Post> findByInviteToken(String inviteToken);
 
-    /** 전체 건수 — 페이지네이션 total count */
-    long countByVisibilityAndStatus(PostVisibility visibility, PostStatus status);
+    /** 공개 피드 전체 건수 (소프트 삭제 제외) */
+    long countByVisibilityAndStatusAndDeletedAtIsNull(PostVisibility visibility, PostStatus status);
 
-    /** 카테고리별 전체 건수 */
-    long countByVisibilityAndStatusAndCategory(PostVisibility visibility, PostStatus status, PostCategory category);
+    /** 공개 피드 카테고리별 전체 건수 (소프트 삭제 제외) */
+    long countByVisibilityAndStatusAndCategoryAndDeletedAtIsNull(PostVisibility visibility, PostStatus status, PostCategory category);
 
     /**
      * 추천순 조회 (전체) — Hacker News 스타일 시간 감쇠 + 재부상 보너스
@@ -66,7 +67,7 @@ public interface PostRepository extends JpaRepository<Post, String> {
                 SELECT post_id, COUNT(*) cnt, MAX(created_at) last_at
                 FROM votes GROUP BY post_id
             ) v ON v.post_id = p.id
-            WHERE p.visibility = 'PUBLIC' AND p.status = 'VOTING'
+            WHERE p.visibility = 'PUBLIC' AND p.status = 'VOTING' AND p.deleted_at IS NULL
             ORDER BY (
                 (4.0*COALESCE(pl.cnt,0) + 3.0*COALESCE(pc.cnt,0) + 2.5*COALESCE(v.cnt,0) + 0.2*p.view_count + 1.0)
                 / POWER(TIMESTAMPDIFF(SECOND, p.created_at, NOW())/3600.0 + 2, 1.5)
@@ -99,7 +100,7 @@ public interface PostRepository extends JpaRepository<Post, String> {
                 SELECT post_id, COUNT(*) cnt, MAX(created_at) last_at
                 FROM votes GROUP BY post_id
             ) v ON v.post_id = p.id
-            WHERE p.visibility = 'PUBLIC' AND p.status = 'VOTING' AND p.category = :category
+            WHERE p.visibility = 'PUBLIC' AND p.status = 'VOTING' AND p.deleted_at IS NULL AND p.category = :category
             ORDER BY (
                 (4.0*COALESCE(pl.cnt,0) + 3.0*COALESCE(pc.cnt,0) + 2.5*COALESCE(v.cnt,0) + 0.2*p.view_count + 1.0)
                 / POWER(TIMESTAMPDIFF(SECOND, p.created_at, NOW())/3600.0 + 2, 1.5)
@@ -120,6 +121,7 @@ public interface PostRepository extends JpaRepository<Post, String> {
                                           @Param("offset") int offset);
 
     @Modifying
+    @Transactional
     @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :postId")
     void incrementViewCount(@Param("postId") String postId);
 
@@ -145,12 +147,6 @@ public interface PostRepository extends JpaRepository<Post, String> {
     @Query("SELECT p FROM Post p WHERE p.status IN :statuses AND p.deletedAt IS NULL ORDER BY p.createdAt DESC")
     Page<Post> findByStatusInAndDeletedAtIsNull(
             @Param("statuses") List<PostStatus> statuses, Pageable pageable);
-
-    /**
-     * 공개 피드: 삭제되고 차단되지 않은 포스트만 표시
-     */
-    Page<Post> findByVisibilityAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
-            PostVisibility visibility, PostStatus status, Pageable pageable);
 
     /** 관리자용: 삭제되지 않은 게시글 총 건수 */
     long countByDeletedAtIsNull();

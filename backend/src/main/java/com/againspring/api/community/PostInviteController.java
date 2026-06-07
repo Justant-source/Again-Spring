@@ -57,15 +57,17 @@ public class PostInviteController {
     /**
      * 파트너 답변 제출
      * POST /api/s/{token}/answer
-     * 인증 불필요 (공개 링크)
+     * 인증 불필요 (공개 링크) — 로그인 상태면 실제 userId 사용, 아니면 익명 ID
      */
     @PostMapping("/s/{token}/answer")
     @Operation(summary = "파트너 답변 제출")
     public ResponseEntity<Void> submitPartnerAnswer(
             @PathVariable String token,
-            @Valid @RequestBody PostInviteDto.PartnerAnswerRequest request) {
-        // 파트너는 로그인하지 않은 사용자일 수 있으므로 익명으로 처리
-        String partnerUserId = "partner_" + System.nanoTime();
+            @Valid @RequestBody PostInviteDto.PartnerAnswerRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String partnerUserId = (userDetails != null)
+                ? userDetails.getUsername()
+                : "partner_" + System.nanoTime();
         postInviteService.submitPartnerAnswer(token, partnerUserId, request.getBodyRaw(), request.getUserTitle());
         return ResponseEntity.ok().build();
     }

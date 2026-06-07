@@ -171,8 +171,14 @@ public class BackendBotClient {
 
     public boolean likePost(String jwt, String postId, String email, String password) {
         try {
-            restClient.post().uri("/api/community/posts/{postId}/like", postId)
-                .header("Authorization", "Bearer " + jwt).retrieve().toBodilessEntity();
+            String body = restClient.post().uri("/api/community/posts/{postId}/like", postId)
+                .header("Authorization", "Bearer " + jwt).retrieve().body(String.class);
+            // toggle 감지: liked=false면 의도치 않게 좋아요 취소됨 → 재호출로 복구
+            if (body != null && body.contains("\"liked\":false")) {
+                restClient.post().uri("/api/community/posts/{postId}/like", postId)
+                    .header("Authorization", "Bearer " + jwt).retrieve().toBodilessEntity();
+                log.debug("Like re-applied on post {} (toggle recovery)", postId);
+            }
             if (email != null && password != null) {
                 mirrorAsync(email, password, () ->
                     getSecondaryJwt(email, password).ifPresent(secJwt -> {

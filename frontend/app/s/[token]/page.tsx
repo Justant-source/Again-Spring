@@ -1,9 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { postInviteApi } from '@/lib/api/community/postInviteApi';
 import { SideStory } from '@/components/community/c3/SideStory';
+import { UserChip } from '@/components/community/c3/UserChip';
+import { useUserStore } from '@/lib/store/userStore';
+import { useGuestInit } from '@/lib/hooks/useGuestInit';
 
 interface PostPreview {
   postId: string;
@@ -16,6 +20,8 @@ export default function PartnerAnswerPage() {
   const router = useRouter();
   const params = useParams();
   const token = params?.token as string;
+  const user = useUserStore((s) => s.user);
+  useGuestInit();
 
   const [post, setPost] = useState<PostPreview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -125,8 +131,25 @@ export default function PartnerAnswerPage() {
         >
           상대방으로 답하기
         </h1>
-        <div style={{ width: 24 }}>
-          <span style={{ fontSize: 11, color: 'var(--P-sub)' }}>익명</span>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {user ? (
+            <UserChip user={user} />
+          ) : (
+            <Link
+              href={`/login?next=${encodeURIComponent(`/s/${token}`)}`}
+              style={{
+                fontSize: 12,
+                color: 'var(--P-sub)',
+                textDecoration: 'none',
+                padding: '4px 10px',
+                border: '1px solid var(--P-border)',
+                borderRadius: 999,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              로그인 / 회원가입
+            </Link>
+          )}
         </div>
       </div>
 

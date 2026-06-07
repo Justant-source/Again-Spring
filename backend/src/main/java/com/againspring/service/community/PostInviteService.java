@@ -2,7 +2,6 @@ package com.againspring.service.community;
 
 import com.againspring.api.community.dto.PostInviteDto;
 import com.againspring.domain.community.Post;
-import com.againspring.domain.community.VoteOption;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.domain.enums.PublishMode;
@@ -14,8 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -35,6 +32,7 @@ public class PostInviteService {
     private final VoteOptionRepository voteOptionRepository;
     private final JuryService juryService;
     private final TonalizationService tonalizationService;
+    private final AnswerProcessingService answerProcessingService;
 
     @Value("${app.url:https://againspring.net}")
     private String appUrl;
@@ -113,22 +111,10 @@ public class PostInviteService {
 
         post.setPartnerUserId(partnerUserId);
         post.setPartnerBodyRaw(bodyRaw);
-
-        // 🔄 2026-06-04: 파트너 답변도 톤 정규화 — 배심원 입력 품질 개선
-        TonalizationService.TonalizationResult tonalization = tonalizationService.normalize(
-                userTitle, bodyRaw);
-        if (tonalization.success()) {
-            log.info("Partner answer tonalization applied: body={}c",
-                    tonalization.bodyNormalized().length());
-            post.setPartnerBodyPublished(tonalization.bodyNormalized());
-            if (userTitle != null && !userTitle.isBlank()) {
-                post.setUserTitle(tonalization.titleNormalized());
-            }
-        } else {
-            post.setPartnerBodyPublished(bodyRaw);
-            if (userTitle != null && !userTitle.isBlank()) {
-                post.setUserTitle(userTitle);
-            }
+        // 원문을 즉시 저장 — tonalization은 비동기로 덮어씀
+        post.setPartnerBodyPublished(bodyRaw);
+        if (userTitle != null && !userTitle.isBlank()) {
+            post.setUserTitle(userTitle);
         }
 
         post.setPartnerAnsweredAt(Instant.now());
@@ -140,19 +126,17 @@ public class PostInviteService {
             post.setVoteCloseAt(post.getPartnerAnsweredAt().plusSeconds((long) hours * 3600));
         }
 
-        postRepository.save(post);
-        log.info("Partner {} submitted answer to invite {}", partnerUserId, token);
-
-        // 파트너 답변 후 배심원 재평가 — 기존 배심원 삭제 후 양측 사연을 모두 반영해 재생성
+        // 기존 배심원 삭제 (재생성 준비)
         int jurorCount = post.getJurorCount();
         if (jurorCount > 0) {
             jurorRepository.deleteByPostId(post.getId());
-            List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
-            if (!options.isEmpty()) {
-                juryService.generateJuryAsync(post, options, jurorCount);
-                log.info("Re-triggered jury generation for post {} after partner answer", post.getId());
-            }
         }
+
+        postRepository.save(post);
+        log.info("Partner {} submitted answer to invite {} — async processing scheduled", partnerUserId, token);
+
+        // tonalization + jury 비동기 처리 — HTTP 응답을 블록하지 않음
+        answerProcessingService.processAsync(post.getId(), bodyRaw, userTitle, jurorCount);
     }
 
     /**

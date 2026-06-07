@@ -104,8 +104,9 @@ public class SelfCritiqueService {
      * 자기비평 + 재생성.
      * quickCheck FAIL 시 비평 결과를 포함한 재생성 프롬프트로 1회 재시도.
      * 재시도도 빈 텍스트이면 원본 반환 (graceful fallback).
+     * backend: 원래 요청과 동일한 backend("CLI"|"API"|null) — 설정 일관성 유지.
      */
-    public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId) {
+    public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId, String backend) {
         if (!enabled || draft == null || draft.isBlank()) return draft;
 
         CritiqueResult result = quickCheck(draft, contentType);
@@ -120,7 +121,7 @@ public class SelfCritiqueService {
         String retryPrompt = buildRetryPrompt(originalPrompt, draft, result.issues());
 
         try {
-            String raw = pool.executeSyncTask(retryPrompt, null, 90000L, corrId + "-retry");
+            String raw = pool.executeSyncTask(retryPrompt, null, 90000L, corrId + "-retry", backend);
             String refined = "post".equalsIgnoreCase(contentType)
                 ? outputSanitizer.sanitizePost(raw)
                 : outputSanitizer.sanitizeComment(raw);

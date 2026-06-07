@@ -50,33 +50,32 @@ public class PostService {
             }
         }
 
-        List<Post> posts;
-        long total;
-
         if ("recommended".equalsIgnoreCase(sort)) {
             // 추천순: Hacker News 스타일 시간 감쇠 + 재부상 보너스
+            List<Post> posts;
+            long total;
             if (cat != null) {
                 posts = postRepository.findRecommendedByCategory(cat.name(), size, offset);
-                total = postRepository.countByVisibilityAndStatusAndCategory(PostVisibility.PUBLIC, PostStatus.VOTING, cat);
+                total = postRepository.countByVisibilityAndStatusAndCategoryAndDeletedAtIsNull(PostVisibility.PUBLIC, PostStatus.VOTING, cat);
             } else {
                 posts = postRepository.findRecommended(size, offset);
-                total = postRepository.countByVisibilityAndStatus(PostVisibility.PUBLIC, PostStatus.VOTING);
+                total = postRepository.countByVisibilityAndStatusAndDeletedAtIsNull(PostVisibility.PUBLIC, PostStatus.VOTING);
             }
-        } else {
-            // 최신순 (기본)
-            if (cat != null) {
-                posts = postRepository.findByVisibilityAndStatusAndCategoryOrderByCreatedAtDesc(
-                        PostVisibility.PUBLIC, PostStatus.VOTING, cat, pageable);
-                total = postRepository.countByVisibilityAndStatusAndCategory(PostVisibility.PUBLIC, PostStatus.VOTING, cat);
-            } else {
-                posts = postRepository.findByVisibilityAndStatusOrderByCreatedAtDesc(
-                        PostVisibility.PUBLIC, PostStatus.VOTING, pageable);
-                total = postRepository.countByVisibilityAndStatus(PostVisibility.PUBLIC, PostStatus.VOTING);
-            }
+            log.info("Listed {} public posts (category={}, sort=recommended, total={})", posts.size(), category, total);
+            return new PageImpl<>(posts, pageable, total);
         }
 
-        log.info("Listed {} public posts (category={}, sort={}, total={})", posts.size(), category, sort, total);
-        return new PageImpl<>(posts, pageable, total);
+        // 최신순 (기본)
+        Page<Post> page;
+        if (cat != null) {
+            page = postRepository.findByVisibilityAndStatusAndCategoryAndDeletedAtIsNullOrderByCreatedAtDesc(
+                    PostVisibility.PUBLIC, PostStatus.VOTING, cat, pageable);
+        } else {
+            page = postRepository.findByVisibilityAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                    PostVisibility.PUBLIC, PostStatus.VOTING, pageable);
+        }
+        log.info("Listed {} public posts (category={}, sort=latest, total={})", page.getNumberOfElements(), category, page.getTotalElements());
+        return page;
     }
 
     /**

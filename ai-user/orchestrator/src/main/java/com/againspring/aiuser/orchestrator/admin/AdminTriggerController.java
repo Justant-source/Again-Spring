@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
@@ -66,6 +67,24 @@ public class AdminTriggerController {
             runtimeRepo.save(rt);
             log.info("[AdminTrigger] Counter reset: {} → 0", prev);
             return ResponseEntity.ok(Map.of("status", "ok", "prev", (Object) prev, "now", (Object) 0));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /** daily_global_cap 변경 — 재배포 없이 일일 한도 조정 */
+    @PostMapping("/update-cap")
+    public ResponseEntity<Map<String, Object>> updateCap(@RequestParam int cap) {
+        if (cap < 1 || cap > 10000) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("status", "error", "message", "cap must be between 1 and 10000"));
+        }
+        log.info("[AdminTrigger] Update daily_global_cap requested: {}", cap);
+        return runtimeRepo.findById(1).<ResponseEntity<Map<String, Object>>>map(rt -> {
+            int prev = rt.getDailyGlobalCap();
+            rt.setDailyGlobalCap(cap);
+            rt.setUpdatedAt(Instant.now());
+            runtimeRepo.save(rt);
+            log.info("[AdminTrigger] daily_global_cap: {} → {}", prev, cap);
+            return ResponseEntity.ok(Map.of("status", "ok", "prev", (Object) prev, "now", (Object) cap));
         }).orElse(ResponseEntity.notFound().build());
     }
 }

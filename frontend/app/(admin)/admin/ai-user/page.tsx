@@ -21,14 +21,15 @@ import {
 } from 'lucide-react';
 
 // ── §11.5 클라이언트 측 추정 상수 ────────────────────────────────────────
+// 실측 기준 (ClaudeApiInvoker 로그 avg): input ~4600, output ~100
 const PERCALL = {
-  post:    { in: 5_900, out: 300  },
-  comment: { in: 5_200, out: 70   },
-  reply:   { in: 3_800, out: 25   },
+  post:    { in: 4_800, out: 300  },  // self-critique 포함 약간 높음
+  comment: { in: 4_600, out: 100  },
+  reply:   { in: 4_300, out: 80   },
 };
-const MAX5X_DAILY  = 420_000;
-const MAX5X_WINDOW = 88_000;
-const PEAK_SHARE   = 0.35;
+const MAX5X_DAILY  = 2_100_000;  // Max 5x = Pro(420K) × 5
+const MAX5X_WINDOW = 440_000;    // Max 5x = Pro(88K) × 5
+const PEAK_SHARE   = 0.208;      // 균등분포 기준 5h/24h
 const HAIKU_IN_RATE  = 1.0;   // $/Mtok
 const HAIKU_OUT_RATE = 5.0;   // $/Mtok
 const CACHE_FACTOR   = 0.235;

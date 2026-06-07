@@ -281,7 +281,7 @@ function C3StoryDetail({
           <SideStory
             side="g"
             label="작성자"
-            meta={`익명 · ${timeAgo(post.createdAt)}`}
+            meta={`${post.authorNickname || '익명'} · ${timeAgo(post.createdAt)}`}
             body={post.bodyPublished}
             clamp
             selected={pick === 'g'}
@@ -295,7 +295,7 @@ function C3StoryDetail({
             <SideStory
               side="r"
               label="상대방"
-              meta={post.partnerAnsweredAt ? `익명 · ${timeAgo(post.partnerAnsweredAt)}` : '익명'}
+              meta={post.partnerAnsweredAt ? `${post.partnerNickname || '익명'} · ${timeAgo(post.partnerAnsweredAt)}` : (post.partnerNickname || '익명')}
               body={post.partnerBodyPublished}
               clamp
               selected={pick === 'r'}

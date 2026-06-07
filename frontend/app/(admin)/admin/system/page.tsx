@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useUserStore } from '@/lib/store/userStore';
 import { SystemHealthPanel } from '@/components/admin/SystemHealthPanel';
 import { LlmFailureRateChart } from '@/components/admin/LlmFailureRateChart';
-import { reloadPrompts } from '@/lib/api/admin/system';
+import { reloadPrompts, getSystemLogs, type SystemLogEntry } from '@/lib/api/admin/system';
 
 const KNOWN_FEATURE_FLAGS = [
   { key: 'app.admin.enabled', label: 'Admin Panel', description: '관리자 패널 활성화' },
@@ -16,8 +16,28 @@ export default function SystemPage() {
   const user = useUserStore((s) => s.user);
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [reloadingPrompts, setReloadingPrompts] = useState(false);
+  const [logs, setLogs] = useState<SystemLogEntry[]>([]);
+  const [logLevel, setLogLevel] = useState<'ERROR' | 'WARN' | ''>('');
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [expandedLog, setExpandedLog] = useState<number | null>(null);
 
   const isAuthorizedAdmin = !!user && !user.isGuest && !!user.roles?.includes('ADMIN');
+
+  async function loadLogs(level: 'ERROR' | 'WARN' | '') {
+    setLogsLoading(true);
+    try {
+      const data = await getSystemLogs(level || undefined, 200);
+      setLogs(data.reverse());
+    } catch {
+      setLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (isAuthorizedAdmin) loadLogs(logLevel);
+  }, [isAuthorizedAdmin, logLevel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleReloadPrompts() {
     setReloadingPrompts(true);
@@ -126,6 +146,91 @@ export default function SystemPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* 애플리케이션 로그 (ERROR / WARN) */}
+        <div style={{ marginBottom: 22, padding: 16, background: 'white', borderRadius: 12, border: '1px solid #e7e3d8' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E', margin: 0 }}>
+              애플리케이션 로그
+            </h2>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {(['', 'ERROR', 'WARN'] as const).map((lv) => (
+                <button
+                  key={lv}
+                  onClick={() => setLogLevel(lv)}
+                  style={{
+                    padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: logLevel === lv ? '#1A1A2E' : '#e7e3d8',
+                    background: logLevel === lv ? '#1A1A2E' : 'white',
+                    color: logLevel === lv ? 'white' : (lv === 'ERROR' ? '#d33' : lv === 'WARN' ? '#c80' : '#666'),
+                  }}
+                >
+                  {lv || '전체'}
+                </button>
+              ))}
+              <button
+                onClick={() => loadLogs(logLevel)}
+                style={{ padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: '1px solid #e7e3d8', background: 'white', color: '#666' }}
+              >
+                ↺
+              </button>
+            </div>
+          </div>
+
+          {logsLoading ? (
+            <div style={{ fontSize: 12, color: '#888', padding: '12px 0' }}>불러오는 중...</div>
+          ) : logs.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#aaa', padding: '12px 0', textAlign: 'center' }}>수집된 로그가 없습니다</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 480, overflowY: 'auto' }}>
+              {logs.map((log, i) => (
+                <div
+                  key={i}
+                  onClick={() => setExpandedLog(expandedLog === i ? null : i)}
+                  style={{
+                    padding: '7px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
+                    background: log.level === 'ERROR' ? '#fdf2f2' : '#fffbe6',
+                    border: `1px solid ${log.level === 'ERROR' ? '#f5c0c0' : '#ffe58f'}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                    <span style={{
+                      fontWeight: 700, flexShrink: 0,
+                      color: log.level === 'ERROR' ? '#c0392b' : '#b7820a',
+                    }}>
+                      {log.level}
+                    </span>
+                    <span style={{ color: '#666', flexShrink: 0 }}>
+                      {new Date(log.timestamp).toLocaleTimeString('ko-KR')}
+                    </span>
+                    <span style={{ color: '#999', flexShrink: 0, fontFamily: 'ui-monospace', fontSize: 10 }}>
+                      {log.logger.split('.').pop()}
+                    </span>
+                    <span style={{ color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {log.message}
+                    </span>
+                  </div>
+                  {expandedLog === i && (
+                    <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                      <div style={{ color: '#555', wordBreak: 'break-all', whiteSpace: 'pre-wrap', marginBottom: log.exception ? 6 : 0 }}>
+                        {log.message}
+                      </div>
+                      {log.exception && (
+                        <div style={{ color: '#c0392b', fontFamily: 'ui-monospace', fontSize: 10, wordBreak: 'break-all' }}>
+                          {log.exception}
+                        </div>
+                      )}
+                      <div style={{ color: '#999', fontSize: 10, marginTop: 4, fontFamily: 'ui-monospace' }}>
+                        {log.logger}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 프롬프트 재로드 */}

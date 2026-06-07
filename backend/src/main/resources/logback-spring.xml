@@ -18,15 +18,19 @@
         </encoder>
     </appender>
 
+    <appender name="BUFFER" class="com.againspring.config.LogBufferAppender"/>
+
     <springProfile name="prod">
         <root level="${LOG_LEVEL}">
             <appender-ref ref="CONSOLE_PRETTY"/>
+            <appender-ref ref="BUFFER"/>
         </root>
     </springProfile>
 
     <springProfile name="!prod">
         <root level="${LOG_LEVEL}">
             <appender-ref ref="CONSOLE_PRETTY"/>
+            <appender-ref ref="BUFFER"/>
         </root>
     </springProfile>
 

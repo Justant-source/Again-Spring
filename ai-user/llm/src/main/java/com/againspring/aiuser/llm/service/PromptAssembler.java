@@ -205,6 +205,43 @@ public class PromptAssembler {
         return req.getPrompt() != null ? req.getPrompt() : "";
     }
 
+    /**
+     * 글 분석 프롬프트 조립 — 좋아요·투표 결정용 구조화 신호 추출.
+     * 최소 프롬프트(생성 가이드 미주입) → 토큰 절약. formatted() 미사용 → 본문의 % 안전.
+     */
+    public String assemblePostAnalysisPrompt(PostAnalysisRequest req) {
+        String title    = req.getTitle() != null ? req.getTitle() : "";
+        String body     = req.getBodyPublished() != null ? req.getBodyPublished() : "";
+        String category = req.getCategory() != null ? req.getCategory() : "OTHER";
+        String hints    = req.getArchetypeHints() != null ? req.getArchetypeHints() : "";
+
+        String system = """
+당신은 한국 갈등 커뮤니티 글을 분석하는 도구입니다.
+주어진 글을 읽고 아래 7개 항목을 판단해 JSON 객체 1개만 출력합니다. 설명·코드펜스(```) 절대 금지.
+
+- author_sympathy (0~1): 글의 서술이 '작성자' 본인을 정당하다/피해자로 보이게 하는 정도. 0=작성자가 명백히 잘못, 0.5=반반, 1=작성자가 명백한 피해자.
+- ambiguity (0~1): 상황이 애매하고 양쪽 주장이 팽팽한 정도. 한쪽 주장만 일방적으로 강하면 높음.
+- severity (0~1): 갈등의 감정적 강도. 차분=0, 극심한 분노·절망=1.
+- topics: 핵심 주제 키워드 한국어 3개 이하 (예: 가사분담, 연락, 금전).
+- emotions: 드러난 감정 한국어 3개 이하 (예: 억울함, 분노, 불안).
+- archetype_frame: 주어진 후보 id 중 가장 맞는 1개, 맞는 게 없으면 null.
+- political_hint: 글이 진보/보수 프레임 중 어디에 가까운지 ("progressive"|"conservative"|"neutral").
+
+반드시 아래 형식의 JSON 1개만 출력:
+{"author_sympathy":0.0,"ambiguity":0.0,"severity":0.0,"topics":[],"emotions":[],"archetype_frame":null,"political_hint":"neutral"}""";
+
+        StringBuilder user = new StringBuilder();
+        user.append("카테고리: ").append(category).append("\n");
+        if (!hints.isBlank()) {
+            user.append("archetype_frame 후보: ").append(hints).append("\n");
+        }
+        user.append("제목: ").append(title).append("\n\n");
+        user.append("본문:\n").append(body).append("\n\n");
+        user.append("위 글을 분석해 JSON 1개만 출력하세요.");
+
+        return system + "\n" + SEP + "\n" + user;
+    }
+
     /** String.formatted()에 넘기기 전 % 이스케이프 */
     private String safe(String s) {
         return s != null ? s.replace("%", "%%") : "";
@@ -311,6 +348,7 @@ public class PromptAssembler {
 - 허용: 남자친구가 전여친이 더 예뻤다고 했어 / 바빠서 못 봤다며 연락이 없음
 - 허용: 남자친구가 그냥 지나가는 말이라고 함 / 걔가 뭐라고 했냐면
 
+<<<PERSONA_SECTION>>>
 ## 페르소나 특성
 %s
 %s%s

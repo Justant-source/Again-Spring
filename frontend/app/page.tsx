@@ -30,7 +30,7 @@ export default function LandingPage() {
   const showMarketingEntry = perms.admin.canAccessMarketing;
 
   return (
-    <div style={{ background: 'var(--L-bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: 'var(--L-bg)', minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       <div className="flex flex-col flex-1 px-7 pt-6 pb-5" style={{ maxWidth: 640, margin: '0 auto', width: '100%' }}>
         {/* 헤더: 다시봄 + 우측 유저 칩 */}
         <BrandBar title="다시봄" user={user} />
@@ -157,8 +157,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* 스페이서 */}
-          <div className="flex-1" />
+          {/* 스페이서 — 최대 48px로 제한해 소형 화면에서 버튼이 잘리지 않도록 */}
+          <div style={{ flex: '1 0 0', maxHeight: 48 }} />
 
           {/* 하단 버튼 */}
           <button

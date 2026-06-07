@@ -38,4 +38,7 @@ public record PlannedAction(
     public static PlannedAction newPost() {
         return new PlannedAction(ActionType.POST, null, null, null, null, null, null);
     }
+    public static PlannedAction view(PostDto post) {
+        return new PlannedAction(ActionType.VIEW, post, null, null, null, null, null);
+    }
 }

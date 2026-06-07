@@ -33,8 +33,8 @@ public class GenerationController {
             String prompt = promptAssembler.assemblePostPrompt(req);
             String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
             String text = outputSanitizer.sanitizePost(raw);
-            // 자기비평 루프 (enabled 시)
-            text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId);
+            // 자기비평 루프 (enabled 시) — 동일 backend 승계
+            text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId, req.getBackend());
             return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));
@@ -54,8 +54,8 @@ public class GenerationController {
             String prompt = promptAssembler.assembleCommentPrompt(req);
             String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
             String text = outputSanitizer.sanitizeComment(raw);
-            // 자기비평 루프 (enabled 시, 댓글은 점수 기준 완화)
-            text = selfCritique.critiqueAndRefine(text, "comment", prompt, corrId);
+            // 자기비평 루프 (enabled 시, 댓글은 점수 기준 완화) — 동일 backend 승계
+            text = selfCritique.critiqueAndRefine(text, "comment", prompt, corrId, req.getBackend());
             return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));

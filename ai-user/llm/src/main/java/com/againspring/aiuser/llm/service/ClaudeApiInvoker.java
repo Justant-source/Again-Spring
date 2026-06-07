@@ -28,10 +28,12 @@ import java.time.Duration;
 @Service
 public class ClaudeApiInvoker implements Invoker {
 
-    private static final String API_URL  = "https://api.anthropic.com/v1/messages";
-    private static final String API_VER  = "2023-06-01";
-    private static final String SEP      = "<<<USER_PROMPT>>>";
-    private static final int    MAX_TOKENS = 2048;
+    private static final String API_URL        = "https://api.anthropic.com/v1/messages";
+    private static final String API_VER        = "2023-06-01";
+    private static final String CACHE_BETA     = "prompt-caching-2024-07-31";
+    private static final String SEP            = "<<<USER_PROMPT>>>";
+    private static final String PERSONA_SEP    = "<<<PERSONA_SECTION>>>";
+    private static final int    MAX_TOKENS     = 2048;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -83,13 +85,29 @@ public class ClaudeApiInvoker implements Invoker {
 
         if (!systemPart.isBlank()) {
             ArrayNode systemArr = body.putArray("system");
-            ObjectNode textBlock = systemArr.addObject();
-            textBlock.put("type", "text");
-            textBlock.put("text", systemPart);
-            if (promptCaching) {
-                // 시스템 프롬프트 캐싱 (입력 토큰 ~76.5% 절감)
-                ObjectNode cacheCtrl = textBlock.putObject("cache_control");
-                cacheCtrl.put("type", "ephemeral");
+            int personaIdx = systemPart.indexOf(PERSONA_SEP);
+            if (promptCaching && personaIdx >= 0) {
+                // Block 1: 정적 규칙 섹션 — cache_control 적용 (캐시 히트 대상)
+                String staticPart  = systemPart.substring(0, personaIdx).trim();
+                String dynamicPart = systemPart.substring(personaIdx + PERSONA_SEP.length()).trim();
+                ObjectNode block1 = systemArr.addObject();
+                block1.put("type", "text");
+                block1.put("text", staticPart);
+                block1.putObject("cache_control").put("type", "ephemeral");
+                // Block 2: 페르소나별 섹션 — cache_control 없음 (호출마다 다름)
+                if (!dynamicPart.isBlank()) {
+                    ObjectNode block2 = systemArr.addObject();
+                    block2.put("type", "text");
+                    block2.put("text", dynamicPart);
+                }
+            } else {
+                // 구분자 없거나 캐싱 비활성 — 단일 블록
+                ObjectNode textBlock = systemArr.addObject();
+                textBlock.put("type", "text");
+                textBlock.put("text", systemPart.replace(PERSONA_SEP, "").trim());
+                if (promptCaching) {
+                    textBlock.putObject("cache_control").put("type", "ephemeral");
+                }
             }
         }
 
@@ -104,12 +122,16 @@ public class ClaudeApiInvoker implements Invoker {
         try {
             String requestBody = MAPPER.writeValueAsString(body);
 
-            HttpRequest req = HttpRequest.newBuilder()
+            HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(API_URL))
                 .timeout(Duration.ofMillis(timeoutMs))
                 .header("x-api-key", apiKey)
                 .header("anthropic-version", API_VER)
-                .header("content-type", "application/json")
+                .header("content-type", "application/json");
+            if (promptCaching) {
+                reqBuilder.header("anthropic-beta", CACHE_BETA);
+            }
+            HttpRequest req = reqBuilder
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 

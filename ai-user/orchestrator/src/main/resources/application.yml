@@ -56,6 +56,9 @@ ai-user:
     enabled: ${PAIRED_POST_ENABLED:true}
     cron: "${PAIRED_POST_CRON:0 0 5 * * *}"
     pairs-per-run: ${PAIRED_POST_PAIRS:2}
+  content-aware-decisions:
+    enabled: ${AI_USER_CONTENT_AWARE_DECISIONS_ENABLED:true}
+    analysis-budget-per-tick: ${AI_USER_ANALYSIS_BUDGET_PER_TICK:3}
 
 ai-learning:
   base-url: ${AI_LEARNING_BASE_URL:http://againspring-ai-learning:8099}

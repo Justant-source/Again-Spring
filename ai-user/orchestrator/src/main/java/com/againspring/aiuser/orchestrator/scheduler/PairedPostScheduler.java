@@ -7,8 +7,10 @@ import com.againspring.aiuser.orchestrator.client.dto.CreatePostDto;
 import com.againspring.aiuser.orchestrator.client.dto.GenDto;
 import com.againspring.aiuser.orchestrator.client.dto.PostDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
+import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.domain.PersonaRelationship;
+import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRelationshipRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
@@ -46,6 +48,7 @@ public class PairedPostScheduler {
     private final OrchestratorProperties props;
     private final JdbcTemplate jdbcTemplate;
     private final ContentSafetyGuard safetyGuard;
+    private final AiUserGenerationConfigRepository generationConfigRepository;
 
     @Value("${ai-user.paired-post.enabled:true}")
     private boolean pairedEnabled;
@@ -88,6 +91,13 @@ public class PairedPostScheduler {
         runPairedPosts();
     }
 
+    /** 관리자 설정 기반 backend 조회 — AiUserGenerationConfig.backend_post 우선. */
+    private String backendForPost() {
+        return generationConfigRepository.findById(1)
+            .map(c -> c.effectiveBackend("POST"))
+            .orElse("CLI");
+    }
+
     // ── 핵심 실행 흐름 ─────────────────────────────────────────────────────────
 
     private void executePair(PersonaRelationship rel) {
@@ -116,6 +126,8 @@ public class PairedPostScheduler {
 
         // ── Step 2: 작성자 본문 생성 (AUTHOR stance) ──────────────────────────
         String lengthTier = RNG.nextDouble() < 0.55 ? "MEDIUM" : "LONG";
+        String backend = backendForPost();
+        log.info("[PairedPost] backend={} corrId={}", backend, corrId);
         Optional<String> bodyOpt = llmClient.generatePost(GenDto.PostRequest.builder()
             .personaId(author.getId())
             .voiceProfile(buildVoiceBlock(author))
@@ -127,6 +139,7 @@ public class PairedPostScheduler {
             .lengthTier(lengthTier)
             .stance("AUTHOR")
             .correlationId(corrId + "-A")
+            .backend(backend)
             .build());
         if (bodyOpt.isEmpty()) {
             log.warn("[PairedPost] Author body gen failed corrId={}", corrId);
@@ -185,6 +198,7 @@ public class PairedPostScheduler {
             .stance("PARTNER")
             .counterpartBody(authorBodyPublished)
             .correlationId(corrId + "-P")
+            .backend(backend)
             .build());
         if (partnerBodyOpt.isEmpty()) {
             log.warn("[PairedPost] Partner body gen failed for post={}", postId);

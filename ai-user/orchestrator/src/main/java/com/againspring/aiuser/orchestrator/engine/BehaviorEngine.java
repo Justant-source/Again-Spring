@@ -38,7 +38,9 @@ public class BehaviorEngine {
     private final PersonaSelector personaSelector;
     private final ActionPlanner actionPlanner;
     private final Jitter jitter;
+    private final ViewDispatcher viewDispatcher;
     private final OrchestratorProperties props;
+    private final com.againspring.aiuser.orchestrator.service.PostAnalysisService postAnalysisService;
 
     // InteractionScanner and ActionExecutor injected lazily to avoid circular dependency issues
     @Autowired(required = false)
@@ -85,13 +87,37 @@ public class BehaviorEngine {
 
         if (budget <= 0) {
             log.debug("Zero budget for this tick. Skipping.");
+            // Save dayBucket even when skipping so it doesn't repeatedly log rollover
+            runtimeRepo.save(rt);
             return;
         }
 
-        // 5. Fetch feed
-        List<PostDto> feedPosts = backendBotClient.getFeed(0, 20)
-            .map(PostFeedPage::getContent)
-            .orElse(Collections.emptyList());
+        // 5. Fetch feed — 여러 페이지 병합으로 충분한 게시물 확보
+        List<PostDto> feedPosts = new java.util.ArrayList<>();
+        for (int p = 0; p < 5; p++) {
+            java.util.List<PostDto> page = backendBotClient.getFeed(p, 20)
+                .map(PostFeedPage::getContent)
+                .orElse(Collections.emptyList());
+            feedPosts.addAll(page);
+            if (page.size() < 20) break; // 마지막 페이지면 종료
+        }
+
+        // 5.5 콘텐츠 인식 결정용 지연 분석 — 틱당 budget 제한으로 토큰 통제.
+        // 신규(미분석) 글만, 최대 budget건. 캐시되면 이후 좋아요·투표는 LLM 0.
+        if (props.isContentAwareEnabled()) {
+            int budgetAnalyze = props.getAnalysisBudgetPerTick();
+            int attempts = 0;
+            for (PostDto post : feedPosts) {
+                if (attempts >= budgetAnalyze) break;            // LLM 호출 상한 (성공·실패 무관)
+                if (post.getId() == null) continue;
+                if (postAnalysisService.getCached(post.getId()) != null) continue; // 이미 분석됨
+                attempts++;
+                postAnalysisService.analyzeAndSave(post);
+            }
+            if (attempts > 0) {
+                log.info("Content analysis: {} new post(s) attempted (budget {})", attempts, budgetAnalyze);
+            }
+        }
 
         // 6. Get reply targets
         List<ReplyTarget> replyTargets = (interactionScanner != null)
@@ -132,7 +158,10 @@ public class BehaviorEngine {
         rt.setUpdatedAt(Instant.now());
         runtimeRepo.save(rt);
 
-        log.info("Tick complete: planned={} actionsToday={}/{} hour={}",
-            actionsPlanned, rt.getActionsToday(), rt.getDailyGlobalCap(), currentHour);
+        // 10. Dispatch VIEW actions from daily quotas
+        int viewsDispatched = viewDispatcher.dispatchViews();
+
+        log.info("Tick complete: planned={} views={} actionsToday={}/{} hour={}",
+            actionsPlanned, viewsDispatched, rt.getActionsToday(), rt.getDailyGlobalCap(), currentHour);
     }
 }

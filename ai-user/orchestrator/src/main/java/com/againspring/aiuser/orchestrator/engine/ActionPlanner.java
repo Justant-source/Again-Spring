@@ -2,7 +2,9 @@ package com.againspring.aiuser.orchestrator.engine;
 
 import com.againspring.aiuser.orchestrator.client.dto.PostDto;
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.domain.PostAnalysis;
 import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
+import com.againspring.aiuser.orchestrator.service.PostAnalysisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -12,7 +14,9 @@ import java.util.stream.Collectors;
 
 /**
  * 페르소나에게 어떤 행동을 할지 결정.
- * LLM 미사용 — 확률·affinity 기반.
+ * 좋아요·투표는 PostAnalysis(글마다 1회 캐시) + 페르소나 필드로 로컬 산정 — LLM 토큰 0.
+ * 분석은 캐시 조회만(getCached) — LLM 트리거는 BehaviorEngine이 틱당 budget 제한으로 수행.
+ * 분석값 없으면 기존 affinity/bias 동작으로 graceful degrade.
  */
 @Slf4j
 @Component
@@ -20,22 +24,37 @@ import java.util.stream.Collectors;
 public class ActionPlanner {
 
     private final PersonaSeenPostRepository seenPostRepo;
+    private final PostAnalysisService analysisService;
     private static final Random RNG = new Random();
 
-    // 기본값 — voice_profile에 like_score/vote_score 없을 때 폴백
+    // ── 행동 타입 확률 (voice_profile의 like_score/vote_score 우선) ──
     private static final double P_LIKE_DEFAULT = 0.45;
     private static final double P_VOTE_DEFAULT = 0.30;
     private static final double P_COMMENT = 0.20;
     private static final double P_REPLY_BASE = 0.15;
     private static final double P_POST = 0.05;
 
+    // ── 좋아요 공명(resonance) 가중치 — 합 1.0 ──
+    private static final double W_INTERESTS  = 0.35;
+    private static final double W_EMOTIONS   = 0.35;
+    private static final double W_HOTBUTTON  = 0.30;
+    // 선별 게이트: gate = clamp(LIKE_GATE_SLOPE*(resonance - LIKE_GATE_PIVOT), 0.05, 0.95)
+    // 공명 낮은 글은 대부분 건너뜀, 높은 글은 거의 누름.
+    private static final double LIKE_GATE_SLOPE = 1.4;
+    private static final double LIKE_GATE_PIVOT = 0.25;
+
+    // ── 투표 방향성(현실적 합의) ──
+    // score = (k1*(author_sympathy-0.5) + k2*political_strength*bias[cat] + k3*archetypeAlign)*(1-0.3*ambiguity)
+    // authorProb = clamp(sigmoid(score), 0.12, 0.88) → 명백한 글 ~80% 쏠림 + 소수 반대표 항상 보장.
+    private static final double VOTE_K_CONTENT   = 3.0;
+    private static final double VOTE_K_PERSONA   = 1.2;
+    private static final double VOTE_K_ARCHETYPE = 0.4;
+    private static final double VOTE_AMBIGUITY_DAMP = 0.3;
+    private static final double VOTE_PROB_FLOOR = 0.12;
+    private static final double VOTE_PROB_CEIL  = 0.88;
+
     /**
      * Plan one action for the given persona.
-     *
-     * @param persona       acting persona
-     * @param feedPosts     recent posts from community feed
-     * @param replyTargets  reply opportunities from InteractionScanner
-     * @return planned action, or empty if no suitable target
      */
     public Optional<PlannedAction> plan(Persona persona,
                                          List<PostDto> feedPosts,
@@ -53,11 +72,10 @@ public class ActionPlanner {
         double rand = RNG.nextDouble();
         double cumul = 0;
 
-        // 페르소나별 like/vote 확률 (voice_profile의 like_score/vote_score 우선)
         double pLike = voiceScore(persona, "like_score", P_LIKE_DEFAULT);
         double pVote = voiceScore(persona, "vote_score", P_VOTE_DEFAULT);
 
-        // REPLY check (priority when available)
+        // REPLY (priority when available)
         cumul += canReply ? P_REPLY_BASE : 0;
         if (rand < cumul && canReply) {
             ReplyTarget rt = replyTargets.get(RNG.nextInt(replyTargets.size()));
@@ -66,20 +84,27 @@ public class ActionPlanner {
                 rt.postBodyExcerpt(), rt.siblingComments()));
         }
 
-        // LIKE
+        // LIKE (선별적·콘텐츠 인식)
         cumul += hasFeed ? pLike : 0;
         if (rand < cumul && hasFeed) {
-            return Optional.of(PlannedAction.like(pickByAffinity(persona, unseen)));
+            PostDto chosen = pickByLikeScore(persona, unseen);
+            if (chosen != null && passesLikeGate(persona, chosen)) {
+                return Optional.of(PlannedAction.like(chosen));
+            }
+            return Optional.empty();  // 공명하는 글 없음 → 이번엔 안 누름 (선별적)
         }
 
-        // VOTE
+        // VOTE (방향성·콘텐츠 인식)
         cumul += hasFeed ? pVote : 0;
         if (rand < cumul && hasFeed) {
-            PostDto post = pickByAffinity(persona, unseen);
-            Long optionId = pickVoteOption(persona, post);
-            if (optionId != null) {
-                return Optional.of(PlannedAction.vote(post, optionId));
+            PostDto post = pickByVoteScore(persona, unseen);
+            if (post != null) {
+                Long optionId = pickVoteOptionByContent(persona, post);
+                if (optionId != null) {
+                    return Optional.of(PlannedAction.vote(post, optionId));
+                }
             }
+            return Optional.empty();
         }
 
         // COMMENT
@@ -96,7 +121,144 @@ public class ActionPlanner {
         return Optional.empty();
     }
 
-    /** voice_profile에서 숫자 점수 읽기 (없으면 fallback) */
+    // ══════════════════════ LIKE ══════════════════════
+
+    /** 좋아요 후보 글을 공명 점수로 가중 추출. */
+    private PostDto pickByLikeScore(Persona persona, List<PostDto> posts) {
+        if (posts.isEmpty()) return null;
+        double[] weights = posts.stream().mapToDouble(p -> likeWeight(persona, p)).toArray();
+        return weightedPick(posts, weights);
+    }
+
+    /** 좋아요 가중치 = like_score × (0.3 + 0.7×resonance). */
+    private double likeWeight(Persona persona, PostDto post) {
+        double personaLike = voiceScore(persona, "like_score", P_LIKE_DEFAULT);
+        double resonance = resonance(persona, post);
+        return personaLike * (0.3 + 0.7 * resonance);
+    }
+
+    /** 선별 게이트 — 선택된 글의 공명도가 낮으면 좋아요를 건너뜀. */
+    private boolean passesLikeGate(Persona persona, PostDto post) {
+        double r = resonance(persona, post);
+        double gate = clamp(LIKE_GATE_SLOPE * (r - LIKE_GATE_PIVOT), 0.05, 0.95);
+        return RNG.nextDouble() < gate;
+    }
+
+    /**
+     * 글-페르소나 공명도 [0,1] = 0.35·관심도 + 0.35·감정강도 + 0.30·hot_button 일치.
+     * 분석 없으면 관심도 기반으로 degrade.
+     */
+    private double resonance(Persona persona, PostDto post) {
+        double interestMatch = interestAffinity(persona, post);
+        PostAnalysis a = (post.getId() != null) ? analysisService.getCached(post.getId()) : null;
+        if (a == null) {
+            // degrade: 관심도만 (기존 동작 근사)
+            return clamp(interestMatch, 0.0, 1.0);
+        }
+        double severity = bd(a.getSeverity());
+        double emotionalAppeal = severity >= 0.7 ? 1.0 : severity / 0.7;
+        double hotButton = hotButtonResonance(persona, a);
+        double res = W_INTERESTS * interestMatch
+                   + W_EMOTIONS * emotionalAppeal
+                   + W_HOTBUTTON * hotButton;
+        return clamp(res, 0.0, 1.0);
+    }
+
+    /**
+     * hot_button 공명 [0,1].
+     * 016+ 생성형: voice_profile.hot_buttons.{triggers,soft_spots} ↔ 분석 topics/emotions 교집합.
+     * 001–015 앵커: like_criteria 텍스트에 topic/emotion 키워드 등장 여부.
+     * 둘 다 없으면 중립 baseline 0.3.
+     */
+    @SuppressWarnings("unchecked")
+    private double hotButtonResonance(Persona persona, PostAnalysis a) {
+        Map<String, Object> vp = persona.getVoiceProfile();
+        if (vp == null) return 0.3;
+
+        Object hbObj = vp.get("hot_buttons");
+        if (hbObj instanceof Map) {
+            Map<String, Object> hb = (Map<String, Object>) hbObj;
+            double triggerMatch = listOverlap(asStrList(hb.get("triggers")), a.getTopics());
+            double softMatch = listOverlap(asStrList(hb.get("soft_spots")), a.getEmotions());
+            return clamp(0.5 * triggerMatch + 0.5 * softMatch, 0.0, 1.0);
+        }
+
+        Object crit = vp.get("like_criteria");
+        if (crit instanceof String && !((String) crit).isBlank()) {
+            String c = ((String) crit).toLowerCase();
+            List<String> signals = new ArrayList<>();
+            signals.addAll(a.getTopics());
+            signals.addAll(a.getEmotions());
+            boolean hit = signals.stream().anyMatch(s -> !s.isBlank() && c.contains(s.toLowerCase()));
+            return hit ? 0.55 : 0.2;
+        }
+        return 0.3;
+    }
+
+    // ══════════════════════ VOTE ══════════════════════
+
+    /** 투표 후보 글(작성자/상대방 옵션 ≥2)을 vote 관련도로 가중 추출. */
+    private PostDto pickByVoteScore(Persona persona, List<PostDto> posts) {
+        List<PostDto> votable = posts.stream()
+            .filter(p -> p.getVoteOptions() != null && p.getVoteOptions().size() >= 2)
+            .collect(Collectors.toList());
+        if (votable.isEmpty()) return null;
+        double[] weights = votable.stream().mapToDouble(p -> voteWeight(persona, p)).toArray();
+        return weightedPick(votable, weights);
+    }
+
+    /** 투표 가중치 = vote_score × 관심도 × (0.5 + 0.5×severity). 격한 글일수록 투표 유발. */
+    private double voteWeight(Persona persona, PostDto post) {
+        double personaVote = voiceScore(persona, "vote_score", P_VOTE_DEFAULT);
+        double categoryAffinity = interestAffinity(persona, post);
+        PostAnalysis a = (post.getId() != null) ? analysisService.getCached(post.getId()) : null;
+        double severityBoost = (a != null) ? 0.5 + 0.5 * bd(a.getSeverity()) : 0.75;
+        return personaVote * categoryAffinity * severityBoost;
+    }
+
+    /** 작성자/상대방 옵션 결정 — 콘텐츠(author_sympathy) + 페르소나(정치성향·편향) 결합. */
+    private Long pickVoteOptionByContent(Persona persona, PostDto post) {
+        List<PostDto.VoteOptionDto> options = post.getVoteOptions();
+        if (options == null || options.isEmpty()) return null;
+        if (options.size() == 1) return options.get(0).getId();
+
+        Long authorId = options.stream().filter(o -> "작성자".equals(o.getLabel()))
+            .map(PostDto.VoteOptionDto::getId).findFirst().orElse(null);
+        Long partnerId = options.stream().filter(o -> "상대방".equals(o.getLabel()))
+            .map(PostDto.VoteOptionDto::getId).findFirst().orElse(null);
+        if (authorId == null || partnerId == null) return options.get(0).getId();
+
+        double authorProb = computeAuthorProb(persona, post);
+        return RNG.nextDouble() < authorProb ? authorId : partnerId;
+    }
+
+    /** 작성자 옵션 투표 확률 [VOTE_PROB_FLOOR, VOTE_PROB_CEIL]. */
+    private double computeAuthorProb(Persona persona, PostDto post) {
+        double categoryBias = categoryBias(persona, post);
+        PostAnalysis a = (post.getId() != null) ? analysisService.getCached(post.getId()) : null;
+
+        if (a == null) {
+            // degrade: 편향만 반영 (현행 동작과 동일 계열)
+            return clamp(0.5 + categoryBias * 3.0, 0.15, 0.85);
+        }
+
+        double contentTerm = VOTE_K_CONTENT * (bd(a.getAuthorSympathy()) - 0.5);
+        double politicalStrength = voiceScore(persona, "political_strength", 0.5);
+        double personaTerm = VOTE_K_PERSONA * politicalStrength * categoryBias;
+
+        double archetypeTerm = 0.0;
+        if (a.getArchetypeFrame() != null && a.getArchetypeFrame().equalsIgnoreCase(persona.getArchetype())) {
+            archetypeTerm = VOTE_K_ARCHETYPE * Math.signum(categoryBias);  // 페르소나 성향 강화
+        }
+
+        double ambiguityFactor = 1.0 - VOTE_AMBIGUITY_DAMP * bd(a.getAmbiguity());
+        double score = (contentTerm + personaTerm + archetypeTerm) * ambiguityFactor;
+        double authorProb = 1.0 / (1.0 + Math.exp(-score));  // sigmoid
+        return clamp(authorProb, VOTE_PROB_FLOOR, VOTE_PROB_CEIL);
+    }
+
+    // ══════════════════════ Helpers ══════════════════════
+
     private double voiceScore(Persona persona, String key, double fallback) {
         try {
             if (persona.getVoiceProfile() == null) return fallback;
@@ -106,10 +268,20 @@ public class ActionPlanner {
         return fallback;
     }
 
-    /**
-     * Pick a post weighted by persona's category affinity.
-     * Falls back to random if no interests or no match.
-     */
+    private double interestAffinity(Persona persona, PostDto post) {
+        if (post == null || post.getCategory() == null) return 0.1;
+        Map<String, Double> interests = persona.getInterests();
+        if (interests == null || interests.isEmpty()) return 0.1;
+        return interests.getOrDefault(post.getCategory(), 0.1);
+    }
+
+    private double categoryBias(Persona persona, PostDto post) {
+        Map<String, Double> biasProfile = persona.getBiasProfile();
+        if (biasProfile == null || post.getCategory() == null) return 0.0;
+        return biasProfile.getOrDefault(post.getCategory(), 0.0);
+    }
+
+    /** 관심도 가중 글 선택 (분석 불필요 — COMMENT 등 fallback 경로). */
     private PostDto pickByAffinity(Persona persona, List<PostDto> posts) {
         Map<String, Double> interests = persona.getInterests();
         if (interests == null || interests.isEmpty()) {
@@ -118,6 +290,12 @@ public class ActionPlanner {
         double[] weights = posts.stream()
             .mapToDouble(p -> interests.getOrDefault(p.getCategory(), 0.1))
             .toArray();
+        return weightedPick(posts, weights);
+    }
+
+    /** 가중치 비례 1개 추출. 합≤0이면 균등 랜덤. */
+    private PostDto weightedPick(List<PostDto> posts, double[] weights) {
+        if (posts.isEmpty()) return null;
         double total = Arrays.stream(weights).sum();
         if (total <= 0) return posts.get(RNG.nextInt(posts.size()));
         double r = RNG.nextDouble() * total;
@@ -129,23 +307,29 @@ public class ActionPlanner {
         return posts.get(posts.size() - 1);
     }
 
-    /**
-     * Pick vote option based on persona bias_profile.
-     * bias > 0 → lean toward "작성자" (AUTHOR), bias < 0 → lean toward "상대방" (PARTNER).
-     * Returns null if post has no vote options.
-     */
-    private Long pickVoteOption(Persona persona, PostDto post) {
-        List<PostDto.VoteOptionDto> options = post.getVoteOptions();
-        if (options == null || options.isEmpty()) return null;
-        if (options.size() == 1) return options.get(0).getId();
+    private double bd(java.math.BigDecimal v) {
+        return v != null ? v.doubleValue() : 0.5;
+    }
 
-        double bias = 0.0;
-        Map<String, Double> biasProfile = persona.getBiasProfile();
-        if (biasProfile != null && post.getCategory() != null) {
-            bias = biasProfile.getOrDefault(post.getCategory(), 0.0);
+    private double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> asStrList(Object obj) {
+        if (obj instanceof List) {
+            List<String> out = new ArrayList<>();
+            for (Object o : (List<Object>) obj) if (o != null) out.add(o.toString());
+            return out;
         }
-        // bias in [-1, 1]. 0.5 + bias/2 = probability of choosing first option (작성자)
-        double probFirst = Math.max(0.05, Math.min(0.95, 0.5 + bias / 2.0));
-        return RNG.nextDouble() < probFirst ? options.get(0).getId() : options.get(1).getId();
+        return Collections.emptyList();
+    }
+
+    /** 부분일치 허용 교집합 비율 [0,1] — 한국어 키워드(연락 ↔ 연락 빈도) 대응. */
+    private double listOverlap(List<String> a, List<String> b) {
+        if (a == null || a.isEmpty() || b == null || b.isEmpty()) return 0.0;
+        long m = a.stream().filter(x -> !x.isBlank() && b.stream()
+            .anyMatch(y -> !y.isBlank() && (y.contains(x) || x.contains(y)))).count();
+        return Math.min(1.0, (double) m / a.size());
     }
 }

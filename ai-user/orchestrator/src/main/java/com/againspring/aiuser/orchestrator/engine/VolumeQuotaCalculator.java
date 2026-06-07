@@ -33,9 +33,9 @@ public class VolumeQuotaCalculator {
      */
     public double circadianWeight(int hour, double[] globalCurve) {
         if (globalCurve == null || globalCurve.length < 24) {
-            // Default: quiet at night, active evening
-            double[] defaultCurve = {0.0,0.0,0.0,0.0,0.0,0.0,0.1,0.2,0.4,0.5,0.5,0.5,
-                                     0.4,0.4,0.4,0.5,0.5,0.6,0.7,0.8,0.9,0.8,0.6,0.2};
+            // 0~5시 낮은 야간 활동, 저녁 피크
+            double[] defaultCurve = {0.1,0.1,0.1,0.1,0.1,0.1,0.2,0.3,0.4,0.5,0.5,0.5,
+                                     0.4,0.4,0.4,0.5,0.5,0.6,0.7,0.8,0.9,0.8,0.6,0.3};
             double max = 0.9;
             return defaultCurve[Math.min(hour, 23)] / max;
         }

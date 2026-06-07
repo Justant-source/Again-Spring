@@ -39,6 +39,9 @@ export interface PostDetail {
   isAuthor?: boolean;
   hasVoted?: boolean;
   myVoteSide?: 'g' | 'r' | null;
+  authorNickname?: string;
+  partnerNickname?: string;
+  isPartner?: boolean;
 }
 
 export interface PostSummary {
@@ -121,4 +124,10 @@ export const postApi = {
 
   retryJury: (postId: string) =>
     api.post(`/api/community/posts/${postId}/jury/retry`),
+
+  editAuthorBody: (postId: string, bodyRaw: string) =>
+    api.patch(`/api/community/posts/${postId}/body`, { bodyRaw }),
+
+  editPartnerBody: (postId: string, bodyRaw: string) =>
+    api.patch(`/api/community/posts/${postId}/partner-body`, { bodyRaw }),
 };

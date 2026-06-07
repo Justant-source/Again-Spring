@@ -58,6 +58,7 @@ public class CommunityPostController {
     private final com.againspring.repository.UserRepository userRepository;
     private final com.againspring.repository.community.PostCommentRepository postCommentRepository;
     private final com.againspring.repository.community.VoteRepository voteRepository;
+    private final com.againspring.repository.community.PostRepository postRepository;
 
     /**
      * 포스트 생성 — 원문 즉시 등록 + VoteOption 저장 + jurorCount > 0이면 배심원 비동기 생성
@@ -199,7 +200,17 @@ public class CommunityPostController {
         Optional<Long> myVote = userId != null ? voteService.getMyVote(id, userId) : Optional.empty();
         long commentCount = postCommentRepository.countByPostId(id);
 
-        return ResponseEntity.ok(PostDetailResponse.from(post, options, voteResult, myVote, commentCount, userId));
+        String authorNickname = userRepository.findById(post.getAuthorId())
+                .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                .orElse("익명");
+        String partnerNickname = post.getPartnerUserId() != null
+                ? userRepository.findById(post.getPartnerUserId())
+                        .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                        .orElse("익명")
+                : null;
+        boolean isPartner = userId != null && userId.equals(post.getPartnerUserId());
+
+        return ResponseEntity.ok(PostDetailResponse.from(post, options, voteResult, myVote, commentCount, userId, authorNickname, partnerNickname, isPartner));
     }
 
     /**
@@ -444,6 +455,52 @@ public class CommunityPostController {
         boolean liked = commentService.togglePostLike(id, userId);
         long count = commentService.getPostLikeCount(id);
         return ResponseEntity.ok(LikeResponse.builder().liked(liked).count(count).build());
+    }
+
+    /**
+     * 작성자 본문 수정
+     */
+    @PatchMapping("/{id}/body")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "작성자 본문 수정")
+    public ResponseEntity<Void> editAuthorBody(
+            @PathVariable String id,
+            @RequestBody java.util.Map<String, String> body,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String userId = userDetails.getUsername();
+        Post post = postService.getPost(id, userId);
+        if (!userId.equals(post.getAuthorId())) {
+            return ResponseEntity.status(403).build();
+        }
+        String newBody = body.get("bodyRaw");
+        if (newBody == null || newBody.isBlank()) return ResponseEntity.badRequest().build();
+        post.setBodyRaw(newBody);
+        post.setBodyPublished(newBody);
+        postRepository.save(post);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 상대방 본문 수정
+     */
+    @PatchMapping("/{id}/partner-body")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "상대방 본문 수정")
+    public ResponseEntity<Void> editPartnerBody(
+            @PathVariable String id,
+            @RequestBody java.util.Map<String, String> body,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String userId = userDetails.getUsername();
+        Post post = postService.getPost(id, userId);
+        if (!userId.equals(post.getPartnerUserId())) {
+            return ResponseEntity.status(403).build();
+        }
+        String newBody = body.get("bodyRaw");
+        if (newBody == null || newBody.isBlank()) return ResponseEntity.badRequest().build();
+        post.setPartnerBodyRaw(newBody);
+        post.setPartnerBodyPublished(newBody);
+        postRepository.save(post);
+        return ResponseEntity.ok().build();
     }
 
     private String resolveUserId(Authentication authentication) {

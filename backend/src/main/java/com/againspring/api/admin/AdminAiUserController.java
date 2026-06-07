@@ -35,16 +35,17 @@ public class AdminAiUserController {
     private final AiUserGenerationConfigRepository configRepository;
 
     // ── §11.5 토큰 추정 상수 ─────────────────────────────────────────────
-    private static final int POST_IN    = 5_900;
+    // 실측 기준 (ClaudeApiInvoker 로그 avg): input ~4600, output ~100
+    private static final int POST_IN    = 4_800;  // post는 self-critique 포함 약간 높음
     private static final int POST_OUT   = 300;
-    private static final int COMMENT_IN = 5_200;
-    private static final int COMMENT_OUT = 70;
-    private static final int REPLY_IN   = 3_800;
-    private static final int REPLY_OUT  = 25;
+    private static final int COMMENT_IN = 4_600;
+    private static final int COMMENT_OUT = 100;
+    private static final int REPLY_IN   = 4_300;  // reply는 컨텍스트 짧아 소폭 낮음
+    private static final int REPLY_OUT  = 80;
 
-    private static final long   MAX5X_DAILY  = 420_000L;   // 88K/5h × (24/5)
-    private static final long   MAX5X_WINDOW = 88_000L;
-    private static final double PEAK_SHARE   = 0.35;
+    private static final long   MAX5X_DAILY  = 2_100_000L; // Max 5x = Pro(420K) × 5
+    private static final long   MAX5X_WINDOW = 440_000L;   // Max 5x = Pro(88K) × 5
+    private static final double PEAK_SHARE   = 0.208;      // 균등분포 기준 5h/24h
     private static final double HAIKU_IN_PER_M  = 1.0;     // $/Mtok
     private static final double HAIKU_OUT_PER_M = 5.0;     // $/Mtok
     private static final double CACHE_FACTOR    = 0.235;   // 캐싱 시 입력 ≈ 23.5%
