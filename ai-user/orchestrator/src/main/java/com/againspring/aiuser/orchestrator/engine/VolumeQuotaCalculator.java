@@ -22,8 +22,28 @@ public class VolumeQuotaCalculator {
         double basePerTick = (double) dailyGlobalCap / Math.max(ticksPerDay, 1);
         // Apply circadian weight (0 = night silence, 1 = peak activity)
         // Multiply by 2 to allow peaks to compensate for off-peak silence
-        int tickBudget = (int) Math.round(basePerTick * hourWeightNorm * 2.0);
+        double expected = basePerTick * hourWeightNorm * 2.0;
+        // 확률적 반올림: round()는 expected<0.5를 0으로 버려 저활동 시간대(야간)를
+        // 매분 틱(1440/일)·저cap 환경에서 영구 침묵시킨다. floor+확률 방식은
+        // E[result]=expected 라 시간대 비율과 일 총량을 보존하면서 야간 0을 면한다.
+        int tickBudget = stochasticRound(expected);
         return Math.max(0, Math.min(tickBudget, remainingToday));
+    }
+
+    /**
+     * 기대값을 보존하는 확률적 반올림: floor(v) + (rand &lt; frac ? 1 : 0).
+     * 예) v=0.15 → 15% 틱에서 1, 85% 틱에서 0 (평균 0.15). round()와 달리 0으로 죽지 않음.
+     */
+    int stochasticRound(double value) {
+        if (value <= 0.0) return 0;
+        int floor = (int) Math.floor(value);
+        double frac = value - floor;
+        return floor + (nextRandom() < frac ? 1 : 0);
+    }
+
+    /** 난수원 [0.0, 1.0) — 테스트에서 오버라이드 가능. */
+    protected double nextRandom() {
+        return Math.random();
     }
 
     /**
