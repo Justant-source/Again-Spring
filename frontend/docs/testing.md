@@ -78,55 +78,84 @@ MSW는 dev 모드에서 자동 활성화됩니다. 실제 페이지 플로우를
 [ ] 위기 모달 닫기 (ESC/바깥클릭 차단 확인)
 ```
 
-### 4. E2E 테스트 (Playwright)
+### 4. E2E 테스트 (Playwright — 실 BE 대상)
 
-#### Playwright 설정 및 실행
+#### 사전 조건 및 실행
 
 ```bash
-# 개발 환경 (localhost:3000 + MSW)
-npm run test:e2e
+# 1. dev 스택 기동 (8090)
+cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d
+curl http://localhost:8090/api/health  # UP 확인
 
-# 실서버 (dev/prod 환경)
-npm run test:e2e:realbe
+# 2. e2e 실행 (prod 게이트)
+cd frontend
+E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 ```
 
-**설정 파일**:
-- `playwright.config.ts` — 로컬 a11y 테스트
-- `playwright.realbe.config.ts` — 실서버 e2e
+> **prod 배포 게이트**: e2e-realbe 전체 통과 후에만 prod 배포 진행 (`CLAUDE.md` 절대 규칙 #4).
+> **dev(8090)에서만 실행. prod(8091) 대상 실행 절대 금지.**
 
-#### Flow 테스트
+**설정 파일**: `playwright.realbe.config.ts`
 
-위치: `tests/e2e-realbe/flows/`
+#### Journey 테스트
 
-| Flow | 파일 | 대상 |
+위치: `tests/e2e-realbe/journeys/`
+
+| Journey | 파일 | 시나리오 |
 |---|---|---|
-| 01 | `01-auth/` | 로그인, OAuth, 게스트 진입 |
-| 02 | `02-permissions/` | 권한 게이팅 (3-tier) |
-| 03 | `03-email-verification/` | 이메일 인증 |
-| 04 | `04-community-plaza/` | 광장 피드, 게시글 작성, 배심원 조회, 투표, 댓글 |
+| 01 | `01-guest-golden-path.spec.ts` | 게스트 진입→피드→투표→댓글 (@mobile) |
+| 02 | `02-member-auth-session.spec.ts` | 이메일 로그인·로그아웃·storageState 재사용 |
+| 03 | `03-community-feed-compose.spec.ts` | 피드 로드·정렬·카테고리·작성 폼·게스트 올리기·회원 작성 |
+| 04 | `04-voting.spec.ts` | 게스트 투표 지속성·회원 투표·soft-delete 복구 회귀 |
+| 05 | `05-comments-lifecycle.spec.ts` | 댓글 추가·수정·삭제·타인=신고만·중복 렌더 방지 |
+| 06 | `06-partner-invite-answer.spec.ts` | 초대 버튼·InviteSheet·URL·paired·관람자 투표·답변 화면 |
+| 07 | `07-profile.spec.ts` | 마이페이지·3탭·닉네임 유지·게스트 가드·profile/info |
+| 08 | `08-email-verification-signup.spec.ts` | send-verification 200·DB 코드 읽기·실제 가입 완주 |
+| 09 | `09-permissions-guards.spec.ts` | 미인증/게스트/등록 회원 라우트 가드·하단 탭 시트·로그인 정리 |
+| 10 | `10-landing.spec.ts` | 방금 올라온 사연·오늘의 사연·CTA (@mobile) |
+| 11 | `11-admin-ai-rules.spec.ts` | AI 규칙관리 페이지·CRUD API·비admin 403·비-LLM 경로 |
 
-#### Invariant 테스트
+#### ⚠️ LLM 절대 호출 금지 규칙
 
-위치: `tests/e2e-realbe/invariants/`
+**모든 spec은 `@playwright/test` 대신 `support/no-llm-fixture.ts`를 import한다.**
 
-| Invariant | 파일 | 목표 |
-|---|---|---|
-| community-legal-notice | `community-legal-notice.spec.ts` | 모든 공개 게시글에 법적 안내(약관 링크)가 표시되는가 |
+```typescript
+import { test, expect } from '../support/no-llm-fixture'
+```
+
+가드레일이 자동 차단하는 엔드포인트:
+- `POST /api/community/posts/{id}/jury/retry`
+- `POST /api/admin/content/corrections/analyze`
+- `POST /api/admin/ai-rules/history/*/analyze`, `/analyze-batch`
+- `POST /api/admin/marketing/*/(generate|simulation|story)`
+- `POST /api/community/posts` — `jurorCount > 0`인 경우
+
+**왜 필요한가**: BE의 `RemoteLlmProvider`가 `@Primary` 무조건 → `application-test.yml`의 `llm.provider:mock`은 실행 중인 BE에 무효. `jurorCount=0` 하드코딩(`app/community/new/page.tsx`)과 이 가드레일이 두 겹으로 보호.
+
+게시글 셋업은 반드시 `support/api.ts`의 `createPost`를 사용한다(항상 `jurorCount:0` 강제).
+
+#### 기능↔e2e 동기화 규칙
+
+| 변경 유형 | e2e 대응 |
+|---|---|
+| FE/BE 기능 **추가** | `journeys/`에 대응 spec 또는 테스트 케이스 추가 |
+| FE/BE 기능 **수정** | 해당 journey spec 갱신 |
+| FE/BE 기능 **삭제** | 해당 journey spec 또는 테스트 케이스 제거 |
+| `data-testid` 추가/변경 | `support/selectors.ts` 동시 갱신 |
+
+#### storageState 및 DB 관리
+
+- **storageState**: `global-setup.ts`가 test1(ADMIN)/test2(TESTER)/test3(TESTER)/test5(USER) 로그인을 1회 실행해 `.auth/<email>.json`에 저장. 이후 spec은 `test.use({ storageState })` 또는 `tokenFromStorageState(email)`로 재사용.
+- **DB 정리**: `cleanup-test-db.sh`를 `global-setup`(실행 전)과 `global-teardown`(실행 후) 양쪽에서 실행. `test%@again.com` 페르소나 + 게스트 + `e2e-signup%` 일회용 유저의 모든 커뮤니티 산출물 삭제. `mock_001`과 `users` 행은 보존.
+- **dev DB는 폐기 가능**: prod-like 컨테이너명 가드(`prod` 포함 시 즉시 abort).
 
 #### Selector 관리
 
 `tests/e2e-realbe/support/selectors.ts` — `data-testid` 중앙화
 
-```typescript
-export const selectors = {
-  feedCard: (id) => `feed-card-${id}`,
-  jurorCard: (id) => `juror-card-${id}`,
-  voteBar: (id) => `vote-bar-${id}`,
-  // ...
-}
-```
+**선호 우선순위**: `getByRole` > `getByTestId` > `getByText` (한국어 리터럴 최후 수단)
 
-**중요**: `data-testid` 변경 시 항상 `selectors.ts` 동기화.
+**중요**: `data-testid` 추가·변경·삭제 시 반드시 `selectors.ts` 동기화. 컴포넌트에 testid가 없으면 `getByRole`을 우선 사용한다.
 
 ### 5. 보안 테스트
 
@@ -303,4 +332,4 @@ export const communityHandlers = [
 
 ---
 
-**마지막 업데이트**: 2026-06-03
+**마지막 업데이트**: 2026-06-07

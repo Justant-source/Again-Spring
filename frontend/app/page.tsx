@@ -144,6 +144,7 @@ export default function LandingPage() {
           {/* 방금 올라온 사연 — 최신글 제목 1줄 알약 */}
           {latestPost && (
             <button
+              data-testid="landing-latest-pill"
               onClick={() => router.push('/community/' + latestPost.id)}
               style={{
                 display: 'inline-flex',
@@ -173,6 +174,7 @@ export default function LandingPage() {
             <>
               <div style={{ fontSize: 12.5, color: 'var(--L-sub)', marginBottom: 10 }}>오늘의 사연</div>
               <button
+                data-testid="landing-today-card"
                 onClick={() => router.push('/community/' + todayPost.id)}
                 style={{
                   display: 'block',
@@ -226,6 +228,7 @@ export default function LandingPage() {
 
           {/* 하단 버튼 */}
           <button
+            data-testid="landing-cta"
             onClick={() => router.push('/community')}
             style={{
               width: '100%',

@@ -1,6 +1,5 @@
 import { chromium, request as playwrightRequest } from '@playwright/test'
 import { spawnSync } from 'child_process'
-import path from 'path'
 import fs from 'fs'
 import {
   PRELOGIN_PERSONAS,
@@ -10,25 +9,9 @@ import {
 } from '../fixtures/personas'
 import { saveAuthState, AUTH_STATE_DIR } from '../fixtures/auth-state'
 import { cleanup } from '../fixtures/cleanup'
+import { readEnvVar } from './db'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
-// process.cwd() = frontend/ (playwright 실행 디렉토리)
-const ENV_FILE = path.resolve(process.cwd(), '../env/.env.dev')
-
-function readEnvVar(key: string): string {
-  if (process.env[key]) return process.env[key]!
-  if (fs.existsSync(ENV_FILE)) {
-    const line = fs
-      .readFileSync(ENV_FILE, 'utf-8')
-      .split('\n')
-      .find((l) => l.trimStart().startsWith(`${key}=`))
-    if (line) {
-      const val = line.slice(line.indexOf('=') + 1).replace(/^['"]|['"]$/g, '').trim()
-      return val
-    }
-  }
-  return ''
-}
 
 /**
  * SQL로 직접 처리:
@@ -45,7 +28,7 @@ function bootstrapViaSql(): void {
   const user = readEnvVar('MARIADB_USER') || 'againspring'
   if (!pass) {
     console.warn('[global-setup] MARIADB_PASSWORD 미확인 — SQL 부트스트랩 건너뜀')
-    console.warn('[global-setup] ENV_FILE 경로:', ENV_FILE, '| 존재:', fs.existsSync(ENV_FILE))
+    console.warn('[global-setup] env/.env.dev 파일을 확인하세요 (db.ts readEnvVar 경유)')
     return
   }
 
@@ -81,7 +64,7 @@ function bootstrapViaSql(): void {
   console.log('[global-setup] tutorial_completed_at 설정 완료 (test%@again.com)')
 }
 
-/** Rate Limit 회피: 로그인 사이에 짧은 대기 */
+/** 로그인 사이 짧은 간격 (rate limit 1000/min으로 상향됐지만 안전용 1s 유지) */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -144,8 +127,9 @@ export default async function globalSetup(): Promise<void> {
   for (let i = 0; i < PRELOGIN_PERSONAS.length; i++) {
     const persona = PRELOGIN_PERSONAS[i]
     if (i > 0) {
-      // Rate Limit 5/min: 60s/5 = 12s 간격 + 여유 1s
-      await sleep(13_000)
+      // dev 환경: SECURITY_RATE_LIMIT_AUTH_PER_MINUTE=1000 (docker-compose.dev.yml)
+      // 안전용 1초 간격만 유지 (13초 고정 sleep 제거)
+      await sleep(1_000)
     }
     const context = await browser.newContext()
     try {

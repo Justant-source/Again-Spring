@@ -1,0 +1,212 @@
+/**
+ * Journey 11: 관리자 AI 규칙관리 (비-LLM 경로만)
+ *
+ * - /admin/ai-rules 페이지 로드 + 페르소나 탭 전환
+ * - 전역 금지 규칙 CRUD (API — create/list/toggle/delete)
+ * - /admin/content 페이지 + 게시글/댓글 탭 구조
+ * - synthetic 필드 계약 확인 (API 레벨)
+ * - 비관리자(test5) 403 — storageState 재사용, 중복 login() 제거
+ * - 사이드바 "AI 규칙관리" 링크 + 이동
+ * - /api/admin/content/corrections/commit 400 (비-LLM 경로)
+ * - ruleText 빈 값 POST (500 미만 검증)
+ *
+ * LLM 가드레일: /analyze, /analyze-batch 요청 시 no-llm-fixture가 자동 차단.
+ */
+import { test, expect } from '../support/no-llm-fixture'
+import { authStatePath } from '../fixtures/auth-state'
+import { PERSONA_TEST1, PERSONAS } from '../fixtures/personas'
+import { tokenFromStorageState } from '../support/api'
+
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)
+// test5 storageState (global-setup이 저장)
+const TEST5_AUTH = authStatePath(PERSONAS[4].email)
+
+// ── A. /admin/ai-rules 페이지 ────────────────────────────────────
+test.describe('Journey 11-A: /admin/ai-rules 페이지', () => {
+  test.use({ storageState: ADMIN_AUTH })
+
+  test('관리자 — /admin/ai-rules 페이지 로드', async ({ page }) => {
+    await page.goto(`${BASE}/admin/ai-rules`)
+    await page.waitForURL(/\/admin\/ai-rules/, { timeout: 10_000 })
+    await expect(page.getByText('AI 규칙 관리')).toBeVisible({ timeout: 8_000 })
+  })
+
+  test('페르소나 주의사항 탭 전환', async ({ page }) => {
+    await page.goto(`${BASE}/admin/ai-rules`)
+    await page.waitForURL(/\/admin\/ai-rules/)
+
+    await page.getByRole('tab', { name: '페르소나 주의사항' }).click()
+    await expect(page.getByText('페르소나 ID 필터')).toBeVisible({ timeout: 5_000 })
+  })
+})
+
+// ── B. 전역 금지 규칙 CRUD (API) ─────────────────────────────────
+test.describe('Journey 11-B: 전역 금지 규칙 CRUD', () => {
+  let createdRuleId: number
+
+  test('전역 규칙 추가 → 조회 → 비활성화 → 삭제', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+    const headers = { Authorization: `Bearer ${accessToken}` }
+
+    // 추가
+    const createResp = await request.post(`${BASE}/api/admin/ai-rules/global`, {
+      headers,
+      data: { ruleText: '[e2e테스트] 자동화 테스트 전역 규칙 — 삭제 예정', scope: 'ALL' },
+    })
+    expect(createResp.status()).toBe(201)
+    const created = await createResp.json()
+    createdRuleId = created.id
+    expect(created.ruleText).toContain('e2e테스트')
+    expect(created.active).toBe(true)
+
+    // 조회
+    const listResp = await request.get(`${BASE}/api/admin/ai-rules/global`, { headers })
+    expect(listResp.ok()).toBeTruthy()
+    const list = await listResp.json()
+    const found = list.content.find((r: any) => r.id === createdRuleId)
+    expect(found).toBeTruthy()
+    expect(found.scope).toBe('ALL')
+
+    // 비활성화
+    const toggleResp = await request.patch(`${BASE}/api/admin/ai-rules/global/${createdRuleId}`, {
+      headers,
+      data: { active: false },
+    })
+    expect(toggleResp.ok()).toBeTruthy()
+    expect((await toggleResp.json()).active).toBe(false)
+
+    // 삭제
+    const deleteResp = await request.delete(`${BASE}/api/admin/ai-rules/global/${createdRuleId}`, { headers })
+    expect(deleteResp.status()).toBe(204)
+
+    // 삭제 확인
+    const listAfterResp = await request.get(`${BASE}/api/admin/ai-rules/global`, { headers })
+    const listAfter = await listAfterResp.json()
+    expect(listAfter.content.find((r: any) => r.id === createdRuleId)).toBeFalsy()
+  })
+})
+
+// ── C. /admin/content 페이지 구조 + synthetic 계약 ───────────────
+test.describe('Journey 11-C: /admin/content 페이지 + API 계약', () => {
+  test.use({ storageState: ADMIN_AUTH })
+
+  test('관리자 — /admin/content 게시글 탭 로드', async ({ page }) => {
+    await page.goto(`${BASE}/admin/content`)
+    await page.waitForURL(/\/admin\/content/, { timeout: 10_000 })
+    await expect(page.getByText('콘텐츠 관리')).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByRole('tab', { name: '게시글' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: '댓글·대댓글' })).toBeVisible()
+  })
+
+  test('게시글 탭 — 액션 컬럼 존재', async ({ page }) => {
+    await page.goto(`${BASE}/admin/content`)
+    await page.waitForURL(/\/admin\/content/)
+    await expect(page.getByRole('columnheader', { name: '액션' }).first()).toBeVisible({ timeout: 10_000 })
+  })
+
+  test('/api/admin/content/posts 응답 — synthetic 필드 포함', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+    const resp = await request.get(`${BASE}/api/admin/content/posts?status=VOTING&page=0&size=5`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    expect(resp.ok()).toBeTruthy()
+    const data = await resp.json()
+    if (data.content && data.content.length > 0) {
+      expect(typeof data.content[0].synthetic).toBe('boolean')
+    }
+    expect(typeof data.totalElements).toBe('number')
+    expect(typeof data.totalPages).toBe('number')
+  })
+
+  test('/api/admin/content/comments 응답 — synthetic 필드 포함', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+    const resp = await request.get(`${BASE}/api/admin/content/comments?status=ACTIVE&page=0&size=5`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    expect(resp.ok()).toBeTruthy()
+    const data = await resp.json()
+    if (data.content && data.content.length > 0) {
+      expect(typeof data.content[0].synthetic).toBe('boolean')
+    }
+    expect(typeof data.totalElements).toBe('number')
+  })
+})
+
+// ── D. 비관리자 접근 차단 ─────────────────────────────────────────
+test.describe('Journey 11-D: 비관리자 접근 차단', () => {
+
+  test('미로그인 — /admin/ai-rules → /login 리다이렉트', async ({ page }) => {
+    await page.goto(`${BASE}/admin/ai-rules`)
+    await page.waitForURL(/\/login/, { timeout: 10_000 })
+    expect(page.url()).toContain('/login')
+  })
+
+  test('일반 회원(USER only) — /api/admin/ai-rules/global → 403', async ({ request }) => {
+    // test5 storageState에서 토큰 읽기 (중복 login() 제거)
+    const userToken = tokenFromStorageState(PERSONAS[4].email)
+    if (!userToken) {
+      test.skip()
+      return
+    }
+    const resp = await request.get(`${BASE}/api/admin/ai-rules/global`, {
+      headers: { Authorization: `Bearer ${userToken}` },
+    })
+    expect([403, 401]).toContain(resp.status())
+  })
+})
+
+// ── E. 사이드바 AI 규칙관리 링크 ─────────────────────────────────
+test.describe('Journey 11-E: 사이드바 AI 규칙관리 링크', () => {
+  test.use({ storageState: ADMIN_AUTH })
+
+  test('관리자 사이드바 — "AI 규칙관리" 링크 표시 + 이동 (데스크탑)', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto(`${BASE}/admin`)
+    await page.waitForURL(/\/admin/, { timeout: 10_000 })
+
+    const aiRulesLink = page.getByRole('link', { name: 'AI 규칙관리' })
+    await expect(aiRulesLink).toBeVisible({ timeout: 8_000 })
+
+    await aiRulesLink.click()
+    await page.waitForURL(/\/admin\/ai-rules/, { timeout: 8_000 })
+    await expect(page.getByText('AI 규칙 관리')).toBeVisible({ timeout: 8_000 })
+  })
+})
+
+// ── F. 첨삭 API 계약 (비-LLM 경로) ──────────────────────────────
+test.describe('Journey 11-F: 첨삭 API 계약 (비-LLM)', () => {
+
+  test('/api/admin/content/corrections/commit — 없는 ID → 4xx', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+
+    const resp = await request.post(`${BASE}/api/admin/content/corrections/commit`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      data: {
+        targetType: 'POST',
+        targetId: 'nonexistent-post-id-00000000000000',
+        correctedText: '수정본',
+        personaCaution: null,
+        globalRules: [],
+        applyLive: false,
+      },
+    })
+    expect(resp.status()).toBeGreaterThanOrEqual(400)
+    expect(resp.status()).toBeLessThan(500)
+  })
+
+  test('/api/admin/ai-rules/global POST — ruleText 빈 값 → 500 미만', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+
+    const resp = await request.post(`${BASE}/api/admin/ai-rules/global`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      data: { ruleText: '', scope: 'ALL' },
+    })
+    expect(resp.status()).toBeLessThan(500)
+  })
+})

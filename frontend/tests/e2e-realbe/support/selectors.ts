@@ -7,9 +7,11 @@
  *   2. getByTestId (data-testid 박힌 경우)
  *   3. getByText  (한국어 리터럴 — i18n 위험, 최후 수단)
  *
+ * ✋ 죽은 항목(MODE_*, JURY.*) 제거 완료 (2026-06-07 재편 기준).
+ *    컴포넌트에 testid가 없으면 getByRole을 우선 사용한다.
  */
 
-// ── 인증 ──────────────────────────────────────────────────────
+// ── 인증 ──────────────────────────────────────────────────────────
 export const EMAIL_INPUT_PLACEHOLDER = '이메일'
 export const PASSWORD_INPUT_PLACEHOLDER = '비밀번호'
 export const LOGIN_BUTTON = { name: '로그인' } as const
@@ -24,11 +26,6 @@ export const FEED_SORT_RECOMMENDED = '[data-testid="feed-sort-recommended"]'
 export const COMPOSE_TITLE = '[data-testid="compose-title"]'
 export const COMPOSE_BODY = '[data-testid="compose-body"]'
 export const COMPOSE_CHAR_COUNT = '[data-testid="compose-char-count"]'
-// Mode 선택
-export const MODE_STEP_HEADING = '[data-testid="mode-step-heading"]'
-export const MODE_PUBLIC_CARD = '[data-testid="mode-public-card"]'
-export const MODE_PRIVATE_CARD = '[data-testid="mode-private-card"]'
-export const MODE_SUBMIT_BTN = '[data-testid="mode-submit-btn"]'
 // Guest 모달
 export const GUEST_NOTICE_CONTINUE = '[data-testid="guest-notice-continue"]'
 // UserChip
@@ -52,17 +49,17 @@ export const COMMENT_MENU_DELETE = '[data-testid="comment-menu-delete"]'
 export const COMMENT_MENU_REPORT = '[data-testid="comment-menu-report"]'
 
 // ── Invite 흐름 ──────────────────────────────────────────────────
+// 실제 컴포넌트 testid와 일치하는 항목 (2026-06-07 교정)
 export const INVITE = {
-  linkGenBtn: '[data-testid="invite-link-gen-btn"]',     // 링크 생성 버튼
-  arrivedResultBtn: '[data-testid="arrived-result-btn"]', // 답변 도착 후 결과 보기 버튼
+  partnerBtn: '[data-testid="invite-partner-btn"]',  // 작성자 뷰 초대 버튼
+  sheet:      '[data-testid="invite-sheet"]',         // InviteSheet 바텀시트
+  urlText:    '[data-testid="invite-url-text"]',      // 생성된 초대 URL 텍스트
 } as const
 
-// ── AI 배심원 (Jury) ──────────────────────────────────────────────
-export const JURY = {
-  section:         '[data-testid="jury-section"]',          // 전체 섹션 컨테이너
-  pending:         '[data-testid="jury-pending"]',          // 대기 중 스피너 블록
-  distributionBar: '[data-testid="jury-distribution-bar"]', // 공감 분포 바 래퍼
-  summary:         '[data-testid="jury-summary"]',          // 요약 줄 ("N인 중 M인이...")
-  jurorCard:       '[data-testid="juror-card"]',            // 배심원 카드 (복수)
-  legalNotice:     '[data-testid="jury-legal-notice"]',     // 법적 고지
+// ── 랜딩 페이지 ──────────────────────────────────────────────────
+// app/page.tsx에 추가된 data-testid (2026-06-07 e2e 재편 시 부착)
+export const LANDING = {
+  latestPill: '[data-testid="landing-latest-pill"]', // 방금 올라온 사연 알약 버튼
+  todayCard:  '[data-testid="landing-today-card"]',  // 오늘의 사연 카드
+  cta:        '[data-testid="landing-cta"]',          // "다시봄 광장" CTA 버튼
 } as const

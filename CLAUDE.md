@@ -129,6 +129,13 @@ cd backend && ./gradlew test
 cd frontend && npm run test
 ```
 
+### e2e ↔ 기능 동기화 규칙 (prod 게이트)
+
+FE/BE 기능을 **추가**하면 대응 e2e를 `frontend/tests/e2e-realbe/journeys/`에 추가, **수정**하면 e2e 갱신, **삭제**하면 e2e 제거한다.
+e2e-realbe 전체 통과는 dev→prod 배포의 필수 게이트(절대 규칙 #4).
+e2e는 **실 BE(8090)** 응답을 쓰되 **LLM 절대 호출 금지** — 가드레일 픽스처(`support/no-llm-fixture.ts`)가 `jurorCount>0` 및 분석·마케팅 생성 엔드포인트를 자동 차단한다.
+권위본: [`frontend/docs/testing.md`](frontend/docs/testing.md)
+
 ---
 
 ## 🚀 배포 핵심
@@ -165,12 +172,14 @@ Cloudflare Tunnel: `dev.againspring.net → :8090` · `againspring.net → :8091
 - [ ] `npm run lint:words` 통과
 - [ ] `npm run build` 성공
 - [ ] `data-testid` 변경 시 `tests/e2e-realbe/support/selectors.ts` 동기화
+- [ ] **기능 추가/수정/삭제 시 `journeys/` e2e 동기화** (테스트 정책 §e2e 규칙 참조)
 - [ ] pre-commit hook (vitest) 통과 (긴급 우회: `SKIP_TESTS=1 git commit`)
 
 ### BE 수정 시
 - [ ] `shared/docs/api/rest-spec.md` 명세 일치 확인
 - [ ] LLM 호출 시 `PromptSanitizer` 경유 확인
 - [ ] 테스트 커버리지 80% 이상
+- [ ] **기능 추가/수정/삭제 시 `journeys/` e2e 동기화** (테스트 정책 §e2e 규칙 참조)
 
 ### prod 배포 전 (명시적 지시 시에만) — 순서 엄수
 - [ ] ① dev 빌드·배포 완료 (`docker-compose.dev.yml`)
