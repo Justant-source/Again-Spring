@@ -38,7 +38,7 @@ export default defineConfig({
   testMatch: ['journeys/**/*.spec.ts'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  retries: 1,
   workers: 1,
   reporter: 'html',
   globalSetup: path.resolve('./tests/e2e-realbe/support/global-setup.ts'),
