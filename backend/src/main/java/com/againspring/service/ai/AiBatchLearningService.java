@@ -8,8 +8,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -44,6 +46,11 @@ public class AiBatchLearningService {
 
     @Qualifier("remoteLlmProvider")
     private final LLMProvider llmProvider;
+
+    /** 자기 주입 — @Async 자기 호출 시 AOP 프록시 우회 방지 */
+    @Lazy
+    @Autowired
+    private AiBatchLearningService self;
 
     /** MAP 단계: 청크별 패턴 추출 — Sonnet */
     @Value("${llm.correction.model:claude-sonnet-4-6}")
@@ -176,7 +183,7 @@ public class AiBatchLearningService {
         BatchJob job = new BatchJob(jobId, adminId, pending.size(), chunks.size());
         jobRegistry.put(jobId, job);
 
-        runAnalysisAsync(job, chunks);
+        self.runAnalysisAsync(job, chunks);
 
         log.info("[batch-learning] startAnalysis jobId={} pending={} chunks={}",
                 jobId, pending.size(), chunks.size());
