@@ -15,11 +15,11 @@ const PARTNER_COLOR = '#5F8F76';  // 상대방 세이지
 const PARTNER_DK    = '#487961';  // 상대방 라벨
 const PARTNER_MUTED = '#E6EFE8';  // votes=0 시 muted fill
 
-const BRAND_INK  = '#5C4030';
-const BRAND_SUB  = '#A08670';
-const BRAND_BG   = '#FBF3EC';
-const BRAND_CARD = '#F2E7DA';
-const BRAND_BORDER = '#EADFD0';
+const BRAND_INK  = '#2E3A2E';
+const BRAND_SUB  = '#7C8A77';
+const BRAND_BG   = '#EDF1E8';
+const BRAND_CARD = '#F7F9F2';
+const BRAND_BORDER = '#D3DCC9';
 
 // ── Satori는 React 없이 JSX만 소비 — 타입 alias ──────────────────
 type CSSProp = Record<string, string | number>;
