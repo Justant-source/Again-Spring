@@ -6,11 +6,10 @@ import com.againspring.llm.PromptSanitizer;
 import com.againspring.repository.ai.AiContentCorrectionRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -34,19 +33,27 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AiBatchLearningService {
 
     private final AiContentCorrectionRepository correctionRepository;
     private final AiCorrectionService aiCorrectionService;
     private final PromptSanitizer promptSanitizer;
     private final ObjectMapper objectMapper;
-
-    @Qualifier("remoteLlmProvider")
     private final LLMProvider llmProvider;
 
-    @Qualifier("taskExecutor")
-    private final TaskExecutor taskExecutor;
+    @Autowired
+    public AiBatchLearningService(
+            AiContentCorrectionRepository correctionRepository,
+            AiCorrectionService aiCorrectionService,
+            PromptSanitizer promptSanitizer,
+            ObjectMapper objectMapper,
+            @Qualifier("remoteLlmProvider") LLMProvider llmProvider) {
+        this.correctionRepository = correctionRepository;
+        this.aiCorrectionService  = aiCorrectionService;
+        this.promptSanitizer      = promptSanitizer;
+        this.objectMapper         = objectMapper;
+        this.llmProvider          = llmProvider;
+    }
 
     /** MAP 단계: 청크별 패턴 추출 — Haiku (빠름, 청크별 호출이 많아 속도가 중요) */
     @Value("${llm.correction.map-model:claude-haiku-4-5-20251001}")
@@ -179,11 +186,13 @@ public class AiBatchLearningService {
         BatchJob job = new BatchJob(jobId, adminId, pending.size(), chunks.size());
         jobRegistry.put(jobId, job);
 
-        // taskExecutor에 직접 제출 — @Async 프록시 우회 없이 확실한 비동기 실행
-        taskExecutor.execute(() -> runAnalysisAsync(job, chunks));
+        // raw Thread — Spring executor/proxy 우회, 단건 관리자 작업에 적합
+        Thread t = new Thread(() -> runAnalysisAsync(job, chunks), "batch-analysis-" + jobId);
+        t.setDaemon(true);
+        t.start();
 
-        log.info("[batch-learning] startAnalysis jobId={} pending={} chunks={}",
-                jobId, pending.size(), chunks.size());
+        log.warn("[batch-learning] startAnalysis jobId={} pending={} chunks={} thread={}",
+                jobId, pending.size(), chunks.size(), t.getName());
         return jobId;
     }
 
@@ -221,6 +230,8 @@ public class AiBatchLearningService {
 
     public void runAnalysisAsync(BatchJob job, List<List<AiContentCorrection>> chunks) {
         try {
+            log.warn("[batch-learning] MAP 시작 jobId={} thread={} chunks={}",
+                    job.jobId, Thread.currentThread().getName(), chunks.size());
             // ── MAP 단계 ──────────────────────────────────────────────────
             List<Observation> allObservations = new ArrayList<>();
             Set<Long> allCorrIds = new LinkedHashSet<>();
