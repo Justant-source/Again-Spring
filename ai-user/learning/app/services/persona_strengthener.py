@@ -87,8 +87,9 @@ def update_persona_profiles(voice_type: str, patterns: dict) -> int:
     sig_phrases = patterns.get("signature_phrases", [])
     errors = patterns.get("consistent_errors", [])
     typing_habit = patterns.get("typing_habit", "")
+    hot_topics = patterns.get("hot_topics", [])
 
-    if not sig_phrases and not errors:
+    if not sig_phrases and not errors and not hot_topics:
         return 0
 
     with get_db() as conn:
@@ -123,6 +124,11 @@ def update_persona_profiles(voice_type: str, patterns: dict) -> int:
                         existing_errs = vp["writing_quirks"].get("consistent_errors", [])
                         merged_errs = list(dict.fromkeys(existing_errs + errors))[:4]
                         vp["writing_quirks"]["consistent_errors"] = merged_errs
+                    # hot_topics 저장 — topic_synthesizer가 힌트로 소비
+                    if hot_topics:
+                        existing_topics = vp.get("hot_topics", [])
+                        merged_topics = list(dict.fromkeys(existing_topics + hot_topics))[:5]
+                        vp["hot_topics"] = merged_topics
 
                     cur.execute(
                         "UPDATE personas SET voice_profile = %s WHERE id = %s",

@@ -4,10 +4,13 @@ import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.dto.PostDto;
 import com.againspring.aiuser.orchestrator.client.dto.PostFeedPage;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
+import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
 import com.againspring.aiuser.orchestrator.domain.AiUserRuntime;
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserRuntimeRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
+import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +44,8 @@ public class BehaviorEngine {
     private final ViewDispatcher viewDispatcher;
     private final OrchestratorProperties props;
     private final com.againspring.aiuser.orchestrator.service.PostAnalysisService postAnalysisService;
+    private final DailyPostQuotaService postQuotaService;
+    private final AiUserGenerationConfigRepository generationConfigRepository;
 
     // InteractionScanner and ActionExecutor injected lazily to avoid circular dependency issues
     @Autowired(required = false)
@@ -97,8 +102,19 @@ public class BehaviorEngine {
             ? Math.max(3, quotaCalc.calculate(rt.getDailyGlobalCap(), ticksPerDay, hourWeight, remaining))
             : quotaCalc.calculate(rt.getDailyGlobalCap(), ticksPerDay, hourWeight, remaining);
 
-        log.debug("Tick: hour={} hourWeight={} budget={} remaining={} forceActive={}",
-            currentHour, String.format("%.2f", hourWeight), budget, remaining, props.isForceActive());
+        // 4.5 POST 쿼터 — targetPosts(관리자 설정)를 실제 글 발행 수로 시행
+        int targetPosts = generationConfigRepository.findById(1)
+            .map(AiUserGenerationConfig::getTargetPosts)
+            .orElse(0);
+        int remainingPosts = postQuotaService.remaining(targetPosts);
+        // circadian×stochasticRound 방식으로 틱당 POST 허용량 분산
+        int postBudgetThisTick = props.isForceActive()
+            ? Math.max(1, quotaCalc.stochasticRound((double) remainingPosts / Math.max(ticksPerDay / 2, 1)))
+            : quotaCalc.stochasticRound((double) remainingPosts * hourWeight * 2.0 / Math.max(ticksPerDay, 1));
+
+        log.debug("Tick: hour={} hourWeight={} budget={} remaining={} postsToday={}/{} postBudgetThisTick={} forceActive={}",
+            currentHour, String.format("%.2f", hourWeight), budget, remaining,
+            postQuotaService.postsCreatedToday(), targetPosts, postBudgetThisTick, props.isForceActive());
 
         if (budget <= 0) {
             log.debug("Zero budget for this tick. Skipping.");
@@ -148,6 +164,7 @@ public class BehaviorEngine {
 
         // 8. Execute actions up to budget
         int actionsPlanned = 0;
+        int postsPlannedThisTick = 0;
         for (int i = 0; i < budget * 3 && actionsPlanned < budget; i++) {
             // pick a persona (try up to 3x budget to find non-cooldown ones)
             Optional<Persona> pOpt = personaSelector.pick(activePersonas, currentHour);
@@ -156,10 +173,13 @@ public class BehaviorEngine {
 
             if (personaSelector.isOnCooldown(persona)) continue;
 
-            Optional<PlannedAction> actionOpt = actionPlanner.plan(persona, feedPosts, replyTargets);
+            Optional<PlannedAction> actionOpt = actionPlanner.plan(persona, feedPosts, replyTargets, postBudgetThisTick - postsPlannedThisTick);
             if (actionOpt.isEmpty()) continue;
 
             PlannedAction action = actionOpt.get();
+            if (action.type() == com.againspring.aiuser.orchestrator.domain.enums.ActionType.POST) {
+                postsPlannedThisTick++;
+            }
             if (actionExecutor != null) {
                 final Persona finalPersona = persona;
                 final PlannedAction finalAction = action;
@@ -176,7 +196,9 @@ public class BehaviorEngine {
         // 10. Dispatch VIEW actions from daily quotas
         int viewsDispatched = viewDispatcher.dispatchViews();
 
-        log.info("Tick complete: planned={} views={} actionsToday={}/{} hour={}",
-            actionsPlanned, viewsDispatched, rt.getActionsToday(), rt.getDailyGlobalCap(), currentHour);
+        log.info("Tick complete: planned={} postsThisTick={} views={} actionsToday={}/{} postsToday={}/{} hour={}",
+            actionsPlanned, postsPlannedThisTick, viewsDispatched,
+            rt.getActionsToday(), rt.getDailyGlobalCap(),
+            postQuotaService.postsCreatedToday(), targetPosts, currentHour);
     }
 }

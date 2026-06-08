@@ -37,6 +37,31 @@ CREATE TABLE IF NOT EXISTS crawl_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 """
 
+DAILY_TOPIC_DDL = """
+CREATE TABLE IF NOT EXISTS daily_topic (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    day DATE NOT NULL COMMENT 'KST 날짜',
+    category VARCHAR(32) NOT NULL COMMENT 'COUPLE|MARRIED|FRIEND|FAMILY|WORK|OTHER',
+    seed_text LONGTEXT NOT NULL COMMENT '추상화 갈등 시드 (1~2문장, 원문/PII 없음)',
+    source_signal VARCHAR(255) COMMENT '반영된 hot_topic 라벨',
+    used_count INT NOT NULL DEFAULT 0 COMMENT '오케스트레이터 사용 횟수',
+    quality_score DECIMAL(4,2) DEFAULT 0.80,
+    embedding VECTOR(1024) NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT NOW(3),
+    KEY idx_day_cat (day, category),
+    KEY idx_used (used_count)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+"""
+
+DAILY_TOPIC_VECTOR_INDEX_CHECK_SQL = """
+SELECT COUNT(*) AS cnt FROM information_schema.statistics
+WHERE table_schema = DATABASE()
+  AND table_name = 'daily_topic'
+  AND index_name = 'idx_daily_topic_emb'
+"""
+
+DAILY_TOPIC_VECTOR_INDEX_DDL = "ALTER TABLE daily_topic ADD VECTOR INDEX idx_daily_topic_emb (embedding)"
+
 VECTOR_INDEX_CHECK_SQL = """
 SELECT COUNT(*) AS cnt FROM information_schema.statistics
 WHERE table_schema = DATABASE()
@@ -52,13 +77,14 @@ def create_tables():
         with conn.cursor() as cur:
             cur.execute(EXAMPLE_BANK_DDL)
             cur.execute(CRAWL_LOG_DDL)
+            cur.execute(DAILY_TOPIC_DDL)
             # topic 컬럼 추가 (기존 테이블에도 idempotent — ADD COLUMN IF NOT EXISTS, MariaDB 10.0.2+)
             try:
                 cur.execute(EXAMPLE_BANK_ADD_TOPIC_SQL)
                 logger.info("example_bank.topic column ensured")
             except Exception as e:
                 logger.warning(f"topic column alter skipped (may already exist): {e}")
-            # Add VECTOR INDEX separately (cannot be in CREATE TABLE)
+            # VECTOR INDEX for example_bank
             cur.execute(VECTOR_INDEX_CHECK_SQL)
             row = cur.fetchone()
             if row and row["cnt"] == 0:
@@ -67,5 +93,14 @@ def create_tables():
                     logger.info("VECTOR INDEX idx_emb created on example_bank")
                 except Exception as e:
                     logger.warning(f"VECTOR INDEX creation skipped: {e}")
+            # VECTOR INDEX for daily_topic
+            cur.execute(DAILY_TOPIC_VECTOR_INDEX_CHECK_SQL)
+            row2 = cur.fetchone()
+            if row2 and row2["cnt"] == 0:
+                try:
+                    cur.execute(DAILY_TOPIC_VECTOR_INDEX_DDL)
+                    logger.info("VECTOR INDEX idx_daily_topic_emb created on daily_topic")
+                except Exception as e:
+                    logger.warning(f"VECTOR INDEX for daily_topic skipped: {e}")
         conn.commit()
-    logger.info("example_bank and crawl_log tables ready")
+    logger.info("example_bank, crawl_log, daily_topic tables ready")

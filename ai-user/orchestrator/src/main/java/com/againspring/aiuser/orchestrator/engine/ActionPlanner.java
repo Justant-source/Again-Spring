@@ -61,10 +61,12 @@ public class ActionPlanner {
 
     /**
      * Plan one action for the given persona.
+     * @param postBudgetRemaining 이번 틱에 남은 POST 허용량. 0이면 POST 금지, 음수이면 쿼터 비활성(legacy 호환).
      */
     public Optional<PlannedAction> plan(Persona persona,
                                          List<PostDto> feedPosts,
-                                         List<ReplyTarget> replyTargets) {
+                                         List<ReplyTarget> replyTargets,
+                                         int postBudgetRemaining) {
         // Filter already-seen posts
         List<PostDto> unseen = feedPosts.stream()
             .filter(p -> p.getId() != null)
@@ -133,9 +135,15 @@ public class ActionPlanner {
             return Optional.of(PlannedAction.comment(pickByAffinity(persona, unseen)));
         }
 
-        // POST (HEAVY only, 1인 1일 1글 — 같은 페르소나는 하루 최대 1글)
-        if (canPost && RNG.nextDouble() < P_POST && !alreadyPostedToday(persona)) {
-            return Optional.of(PlannedAction.newPost());
+        // POST (HEAVY only, 1인 1일 1글, 틱당 POST 예산 내)
+        // postBudgetRemaining < 0 → 쿼터 비활성(legacy), >= 0 → 쿼터 시행
+        boolean postAllowedByQuota = postBudgetRemaining < 0 || postBudgetRemaining > 0;
+        if (canPost && postAllowedByQuota && !alreadyPostedToday(persona)) {
+            // 쿼터 내에서는 P_POST 확률 완화: 예산이 있으면 적극 소비 (언더슈트 방지)
+            double effectivePPost = postBudgetRemaining > 0 ? Math.max(P_POST, 0.15) : P_POST;
+            if (RNG.nextDouble() < effectivePPost) {
+                return Optional.of(PlannedAction.newPost());
+            }
         }
 
         return Optional.empty();

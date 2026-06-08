@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.db.models import create_tables
 from app.services.embedding import EmbeddingService
-from app.api import embed, examples, crawl, health, strengthen
+from app.api import embed, examples, crawl, health, strengthen, topics
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -28,3 +28,4 @@ app.include_router(embed.router, prefix="/embed")
 app.include_router(examples.router, prefix="/examples")
 app.include_router(crawl.router, prefix="/crawl")
 app.include_router(strengthen.router, prefix="/strengthen")
+app.include_router(topics.router, prefix="/topics")

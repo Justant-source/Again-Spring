@@ -67,6 +67,16 @@ public class AiLearningClient {
         private Double score;
     }
 
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class DailyTopicItem {
+        private Long id;
+        private String category;
+        private String text;
+        private Integer usedCount;
+        private Double qualityScore;
+    }
+
     /** 합격한 생성 텍스트를 예시 뱅크에 저장 (비동기, 실패 silent) */
     public void saveAsync(String content, String contentType, String category, String source) {
         if (!enabled || content == null || content.isBlank()) return;
@@ -94,6 +104,34 @@ public class AiLearningClient {
         } catch (Exception e) {
             log.debug("AiLearning search failed (non-critical): {}", e.getMessage());
             return Collections.emptyList();
+        }
+    }
+
+    /** 오늘의 갈등 주제 시드 조회 (least-used 우선). 실패 시 빈 리스트 반환 */
+    public List<DailyTopicItem> fetchDailyTopics(String category, int limit) {
+        if (!enabled || category == null || category.isBlank()) return Collections.emptyList();
+        try {
+            List<DailyTopicItem> result = restClient.get()
+                .uri("/topics/today?category={category}&limit={limit}", category, limit)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<DailyTopicItem>>() {});
+            return result != null ? result : Collections.emptyList();
+        } catch (Exception e) {
+            log.debug("AiLearning fetchDailyTopics failed (non-critical): {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /** 토픽 사용 카운트 +1 (fire-and-forget, 실패 silent) */
+    public void markTopicUsed(Long topicId) {
+        if (!enabled || topicId == null) return;
+        try {
+            restClient.post()
+                .uri("/topics/{id}/use", topicId)
+                .retrieve()
+                .toBodilessEntity();
+        } catch (Exception e) {
+            log.debug("AiLearning markTopicUsed failed (non-critical): {}", e.getMessage());
         }
     }
 

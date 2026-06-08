@@ -656,9 +656,24 @@ public class ActionExecutor {
     // ── Phase 2c: ArchetypeCatalog topicSeed ─────────────────────────────────
 
     private String buildTopicSeed(Persona persona) {
+        String category = topCategory(persona);
+
+        // 우선순위 1: 오늘의 크롤 기반 토픽 시드 뱅크
+        List<AiLearningClient.DailyTopicItem> dailyTopics = aiLearningClient.fetchDailyTopics(category, 5);
+        if (!dailyTopics.isEmpty()) {
+            // least-used 상위 2개 중 랜덤 선택으로 로테이션
+            int pickIdx = RNG.nextInt(Math.min(2, dailyTopics.size()));
+            AiLearningClient.DailyTopicItem chosen = dailyTopics.get(pickIdx);
+            aiLearningClient.markTopicUsed(chosen.getId());
+            log.debug("buildTopicSeed: daily topic id={} category={} persona={}", chosen.getId(), category, persona.getId());
+            return chosen.getText();
+        }
+
+        // 우선순위 2: 학습 off 또는 오늘 시드 없음 → archetype 기반 fallback
+        log.debug("buildTopicSeed: no daily topics for category={}, using archetype fallback", category);
         String archetypeId = persona.getArchetype();
         ArchetypeCatalog.Archetype arch = archetypeCatalog.get(archetypeId)
-            .orElseGet(() -> archetypeCatalog.byCategory(topCategory(persona)).orElse(null));
+            .orElseGet(() -> archetypeCatalog.byCategory(category).orElse(null));
         if (arch == null) return null;
         return archetypeCatalog.buildTopicSeed(arch, RNG);
     }
