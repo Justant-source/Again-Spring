@@ -150,6 +150,17 @@ public class ActionPlanner {
     }
 
     /**
+     * POST 전용 계획 — BehaviorEngine 전용 패스에서만 호출.
+     * HEAVY 페르소나, 1인 1일 1글 rule 적용.
+     * plan()의 누적확률 체인(REPLY+VOTE+LIKE+COMMENT > 1.0)을 우회해 POST를 보장.
+     */
+    public Optional<PlannedAction> planPost(Persona persona) {
+        if (!"HEAVY".equals(persona.getTier())) return Optional.empty();
+        if (alreadyPostedToday(persona)) return Optional.empty();
+        return Optional.of(PlannedAction.newPost());
+    }
+
+    /**
      * 오늘(KST) 이미 글을 1개 이상 작성했으면 true — 1인 1일 1글 규칙 enforcement.
      * posts 테이블 직접 조회(닉네임=author 기준 source of truth) — 재배정·삭제도 정확히 반영.
      */

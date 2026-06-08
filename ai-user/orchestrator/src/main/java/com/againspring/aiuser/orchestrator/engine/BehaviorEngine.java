@@ -23,6 +23,7 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * AI 유저 행동 엔진 — cron tick의 진입점.
@@ -107,10 +108,13 @@ public class BehaviorEngine {
             .map(AiUserGenerationConfig::getTargetPosts)
             .orElse(0);
         int remainingPosts = postQuotaService.remaining(targetPosts);
-        // circadian×stochasticRound 방식으로 틱당 POST 허용량 분산
+        // 남은 시간 기준으로 분산 — 전체 틱(1440)으로 나누면 확률이 너무 낮아 prod에서 목표 미달
+        // 예) hour=17, remaining=46: 1440분모→prob=0.043(4.3%), 420분모→prob=0.147(14.7%)
+        int remainingHours = Math.max(1, 24 - currentHour);
+        int remainingTicksEst = Math.max(1, ticksPerDay * remainingHours / 24);
         int postBudgetThisTick = props.isForceActive()
             ? Math.max(1, quotaCalc.stochasticRound((double) remainingPosts / Math.max(ticksPerDay / 2, 1)))
-            : quotaCalc.stochasticRound((double) remainingPosts * hourWeight * 2.0 / Math.max(ticksPerDay, 1));
+            : quotaCalc.stochasticRound((double) remainingPosts * hourWeight * 2.0 / remainingTicksEst);
 
         log.debug("Tick: hour={} hourWeight={} budget={} remaining={} postsToday={}/{} postBudgetThisTick={} forceActive={}",
             currentHour, String.format("%.2f", hourWeight), budget, remaining,
@@ -188,16 +192,42 @@ public class BehaviorEngine {
             actionsPlanned++;
         }
 
+        // 8.5 POST 전용 패스 — ActionPlanner 누적확률 체인 문제 우회
+        // 구조적 원인: REPLY(0.15)+VOTE(0.30)+LIKE(0.45)+COMMENT(0.20) = 1.10 > 1.0
+        // rand∈[0,1] 이므로 COMMENT가 항상 먼저 캐치 → POST 코드 도달 불가.
+        // 해결: postBudgetThisTick > 0일 때 HEAVY 페르소나를 직접 지명해 POST 예약.
+        int postsScheduled = 0;
+        if (postBudgetThisTick > 0 && actionExecutor != null) {
+            List<Persona> heavyReady = activePersonas.stream()
+                .filter(p -> "HEAVY".equals(p.getTier()))
+                .filter(p -> !personaSelector.isOnCooldown(p))
+                .collect(Collectors.toList());
+            Collections.shuffle(heavyReady);
+            for (Persona hp : heavyReady) {
+                if (postsScheduled >= postBudgetThisTick) break;
+                Optional<PlannedAction> postOpt = actionPlanner.planPost(hp);
+                if (postOpt.isPresent()) {
+                    postsScheduled++;
+                    final Persona fhp = hp;
+                    final PlannedAction fa = postOpt.get();
+                    jitter.scheduleWithinTick(() -> actionExecutor.execute(fhp, fa));
+                }
+            }
+            if (postsScheduled > 0) {
+                log.debug("POST 전용 패스: {}개 예약 (postBudgetThisTick={})", postsScheduled, postBudgetThisTick);
+            }
+        }
+
         // 9. Update runtime counter
-        rt.setActionsToday(rt.getActionsToday() + actionsPlanned);
+        rt.setActionsToday(rt.getActionsToday() + actionsPlanned + postsScheduled);
         rt.setUpdatedAt(Instant.now());
         runtimeRepo.save(rt);
 
         // 10. Dispatch VIEW actions from daily quotas
         int viewsDispatched = viewDispatcher.dispatchViews();
 
-        log.info("Tick complete: planned={} postsThisTick={} views={} actionsToday={}/{} postsToday={}/{} hour={}",
-            actionsPlanned, postsPlannedThisTick, viewsDispatched,
+        log.info("Tick complete: planned={} postsScheduled={} views={} actionsToday={}/{} postsToday={}/{} hour={}",
+            actionsPlanned, postsScheduled, viewsDispatched,
             rt.getActionsToday(), rt.getDailyGlobalCap(),
             postQuotaService.postsCreatedToday(), targetPosts, currentHour);
     }
