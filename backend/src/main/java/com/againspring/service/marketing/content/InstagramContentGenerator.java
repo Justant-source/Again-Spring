@@ -47,7 +47,7 @@ public class InstagramContentGenerator implements ContentGenerator {
                 양쪽 입장을 분석하고 '공감 비율'을 보여주는 광장형 서비스.
                 철학: "공감이지 판결이 아니다." 누가 잘못했는지 판결하지 않고 여러 시선을 빌려줍니다.
                 톤: 존댓말, 따뜻하고 차분하게. 이모지 금지. 금지어: 판결/유죄/가해자/과실비율,
-                진단명/상담/치료/정신과, 확실/보장/100%.
+                진단명/상담/치료/정신과, 확실/보장/100%%.
 
                 아래 다시봄 커뮤니티 사연을 인스타그램 카드뉴스로 만드세요.
                 궁금증을 자극하면서도 명확하게 소개해, 사람들이 다시봄 광장에 접속해
@@ -66,7 +66,7 @@ public class InstagramContentGenerator implements ContentGenerator {
                     {"role": "COVER",   "title": "사연 제목·상황 한 줄 (25자 이내)", "body": "", "visualHint": "gradient-warm"},
                     {"role": "SCENE",   "title": "작성자 입장 한 줄", "body": "핵심 발언이나 갈등 장면 (40자 이내)", "visualHint": "chat-bubble"},
                     {"role": "FEELING", "title": "상대방 입장 한 줄", "body": "상대방 관점이나 감정 (40자 이내)", "visualHint": "emotion-palette"},
-                    {"role": "NVC",     "title": "공감 비율", "body": "작성자 X% : 상대방 Y% — 당신은?", "visualHint": "two-line"},
+                    {"role": "NVC",     "title": "공감 비율", "body": "작성자 X%% : 상대방 Y%% — 당신은?", "visualHint": "two-line"},
                     {"role": "CTA",     "title": "다시봄에서 직접 보기", "body": "링크를 눌러 양쪽 입장 읽고 투표하기", "visualHint": "cta-logo"}
                   ]
                 }
