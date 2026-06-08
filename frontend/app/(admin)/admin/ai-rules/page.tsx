@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,8 +36,9 @@ import {
   AiPromptTemplate,
   AnalyzeResponse,
 } from '@/lib/api/admin/corrections';
-import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp, Zap, FileText, Save, MessageSquare } from 'lucide-react';
+import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp, Zap, FileText, Save, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
 import { BatchAnalysisReviewDialog } from '@/components/admin/ai-rules/BatchAnalysisReviewDialog';
+import { startBatchAnalysis, getBatchAnalysisJob, type BatchJobSnapshot } from '@/lib/api/admin/corrections';
 
 const SCOPE_LABELS: Record<string, string> = {
   ALL: '전체',
@@ -450,7 +451,15 @@ export default function AiRulesPage() {
   const [promptsLoading, setPromptsLoading] = useState(false);
 
   const [error, setError] = useState('');
-  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+
+  // ─── 일괄 분석 (페이지 레벨 상태) ───
+  const [batchPhase, setBatchPhase] = useState<'idle' | 'starting' | 'polling'>('idle');
+  const [batchSnapshot, setBatchSnapshot] = useState<BatchJobSnapshot | null>(null);
+  const [batchError, setBatchError] = useState('');
+  const [reviewSnapshot, setReviewSnapshot] = useState<BatchJobSnapshot | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const batchPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const batchJobIdRef   = useRef<string>('');
 
   // ─── 로드 ───
   const loadRules = useCallback(async (page: number) => {
@@ -494,6 +503,9 @@ export default function AiRulesPage() {
   useEffect(() => { loadHistory(0); }, [historyStatusFilter, loadHistory]);
   useEffect(() => { loadPrompts(); }, [loadPrompts]);
 
+  // 폴링 cleanup
+  useEffect(() => () => { if (batchPollingRef.current) clearInterval(batchPollingRef.current); }, []);
+
   // ─── 핸들러 ───
   async function handleAddRule() {
     if (!newRuleText.trim()) return;
@@ -517,8 +529,44 @@ export default function AiRulesPage() {
     catch { alert('삭제에 실패했습니다.'); }
   }
 
-  function handleBatchAnalyze() {
-    setBatchDialogOpen(true);
+  async function handleBatchAnalyze() {
+    setBatchPhase('starting');
+    setBatchError('');
+    setBatchSnapshot(null);
+    try {
+      const res = await startBatchAnalysis();
+      if (!res.jobId) {
+        setBatchError(res.message || '분석 대기 중인 첨삭이 없습니다.');
+        setBatchPhase('idle');
+        return;
+      }
+      batchJobIdRef.current = res.jobId;
+      setBatchPhase('polling');
+      if (batchPollingRef.current) clearInterval(batchPollingRef.current);
+      batchPollingRef.current = setInterval(async () => {
+        try {
+          const snap = await getBatchAnalysisJob(batchJobIdRef.current);
+          setBatchSnapshot(snap);
+          if (snap.status === 'READY') {
+            clearInterval(batchPollingRef.current!);
+            setReviewSnapshot(snap);
+            setReviewOpen(true);
+            setBatchPhase('idle');
+            setBatchSnapshot(null);
+          } else if (snap.status === 'FAILED') {
+            clearInterval(batchPollingRef.current!);
+            setBatchError(snap.error || '분석 중 오류가 발생했습니다. 다시 시도해주세요.');
+            setBatchPhase('idle');
+            setBatchSnapshot(null);
+          }
+        } catch {
+          // 일시적 네트워크 오류 무시
+        }
+      }, 2500);
+    } catch (e: any) {
+      setBatchError(e?.response?.data?.message || '분석 시작에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      setBatchPhase('idle');
+    }
   }
 
   async function handleDeleteCaution(caution: AiCaution) {
@@ -530,9 +578,10 @@ export default function AiRulesPage() {
   return (
     <>
     <BatchAnalysisReviewDialog
-      open={batchDialogOpen}
-      onClose={() => setBatchDialogOpen(false)}
-      onApplied={() => { setBatchDialogOpen(false); loadHistory(0); loadRules(0); loadCautions(0); }}
+      open={reviewOpen}
+      initialSnapshot={reviewSnapshot}
+      onClose={() => { setReviewOpen(false); setReviewSnapshot(null); }}
+      onApplied={() => { setReviewOpen(false); setReviewSnapshot(null); loadHistory(0); loadRules(0); loadCautions(0); }}
     />
     <AdminSection title="AI 규칙 관리">
       <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
@@ -583,15 +632,58 @@ export default function AiRulesPage() {
             </Select>
             <span className="text-xs text-muted-foreground">총 {historyTotalElements}건</span>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex flex-col items-end gap-1.5">
               <Button
                 size="sm"
                 onClick={handleBatchAnalyze}
-                className="bg-purple-600 hover:bg-purple-700 text-white h-8 px-3"
+                disabled={batchPhase !== 'idle'}
+                className="bg-purple-600 hover:bg-purple-700 text-white h-8 px-3 disabled:opacity-60"
               >
-                <Zap className="h-3.5 w-3.5 mr-1.5" />
-                PENDING 일괄 분석
+                {batchPhase !== 'idle' ? (
+                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />분석 중…</>
+                ) : (
+                  <><Zap className="h-3.5 w-3.5 mr-1.5" />PENDING 일괄 분석</>
+                )}
               </Button>
+
+              {/* 인라인 진행 표시 */}
+              {(batchPhase === 'starting' || batchPhase === 'polling') && (
+                <div className="w-64 p-2 bg-purple-50 border border-purple-200 rounded-md space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-purple-700">
+                    <span>
+                      {batchPhase === 'starting'
+                        ? '분석 시작 중…'
+                        : batchSnapshot
+                          ? `MAP ${batchSnapshot.chunksDone}/${batchSnapshot.chunksTotal} 청크`
+                          : '청크 분석 중…'}
+                    </span>
+                    {batchSnapshot && (
+                      <span className="text-[10px] text-purple-500">{batchSnapshot.pendingCount}건</span>
+                    )}
+                  </div>
+                  <div className="h-1.5 bg-purple-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-purple-500 transition-all duration-500"
+                      style={{
+                        width: batchSnapshot && batchSnapshot.chunksTotal > 0
+                          ? `${Math.max(5, Math.round((batchSnapshot.chunksDone / batchSnapshot.chunksTotal) * 90))}%`
+                          : '5%',
+                      }}
+                    />
+                  </div>
+                  {batchSnapshot && batchSnapshot.chunksTotal > 0 && batchSnapshot.chunksDone >= batchSnapshot.chunksTotal && (
+                    <p className="text-[10px] text-purple-600">REDUCE(Opus) 통합 중…</p>
+                  )}
+                </div>
+              )}
+
+              {/* 오류 표시 */}
+              {batchPhase === 'idle' && batchError && (
+                <div className="flex items-start gap-1.5 w-64 p-2 bg-red-50 border border-red-200 rounded-md">
+                  <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700">{batchError}</p>
+                </div>
+              )}
             </div>
           </div>
 

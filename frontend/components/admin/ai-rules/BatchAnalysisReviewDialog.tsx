@@ -36,6 +36,8 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onApplied: () => void;
+  /** 페이지 레벨에서 이미 분석 완료된 snapshot — 있으면 review 단계부터 바로 시작 */
+  initialSnapshot?: BatchJobSnapshot | null;
 }
 
 // ── 전역 규칙 편집 상태 ─────────────────────────────────────────────────────
@@ -62,7 +64,7 @@ const SCOPE_LABELS: Record<string, string> = {
   COMMENT: '댓글만',
 };
 
-export function BatchAnalysisReviewDialog({ open, onClose, onApplied }: Props) {
+export function BatchAnalysisReviewDialog({ open, onClose, onApplied, initialSnapshot }: Props) {
   const [phase, setPhase] = useState<'idle' | 'starting' | 'polling' | 'review' | 'applying' | 'done' | 'error'>('idle');
   const [jobSnapshot, setJobSnapshot] = useState<BatchJobSnapshot | null>(null);
   const [globalRules, setGlobalRules] = useState<GlobalRuleState[]>([]);
@@ -77,7 +79,7 @@ export function BatchAnalysisReviewDialog({ open, onClose, onApplied }: Props) {
   // ── 다이얼로그 열릴 때마다 초기화 ────────────────────────────────────────────
   useEffect(() => {
     if (open) {
-      setPhase('idle');
+      if (pollingRef.current) clearInterval(pollingRef.current);
       setJobSnapshot(null);
       setGlobalRules([]);
       setPersonaCautions([]);
@@ -85,11 +87,19 @@ export function BatchAnalysisReviewDialog({ open, onClose, onApplied }: Props) {
       setErrorMsg('');
       setApplyResult(null);
       jobIdRef.current = '';
+
+      // 페이지 레벨에서 이미 분석 완료된 경우 review 단계로 바로 진입
+      if (initialSnapshot?.status === 'READY') {
+        initReviewState(initialSnapshot);
+        setPhase('review');
+      } else {
+        setPhase('idle');
+      }
     }
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [open]);
+  }, [open, initialSnapshot]);
 
   // ── 분석 시작 ────────────────────────────────────────────────────────────────
   async function handleStart() {
