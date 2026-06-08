@@ -202,6 +202,7 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
   const [corrBody,        setCorrBody]        = useState(origBody);
   const [corrPartnerBody, setCorrPartnerBody] = useState(origPartnerBody);
   const [applyLive,       setApplyLive]       = useState(true);
+  const [adminOpinion,    setAdminOpinion]    = useState('');
   const [saving,          setSaving]          = useState(false);
   const [error,           setError]           = useState('');
 
@@ -210,6 +211,7 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
       setCorrTitle(origTitle);
       setCorrBody(origBody);
       setCorrPartnerBody(origPartnerBody);
+      setAdminOpinion('');
       setError('');
     }
   }, [isOpen, origTitle, origBody, origPartnerBody]);
@@ -227,6 +229,7 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
     setCorrTitle(origTitle);
     setCorrBody(origBody);
     setCorrPartnerBody(origPartnerBody);
+    setAdminOpinion('');
     setError('');
     setSaving(false);
     onClose();
@@ -248,6 +251,7 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
             targetId,
             correctedText: corrBody,
             applyLive,
+            adminOpinion: adminOpinion.trim() || null,
           });
         }
         // 제목·상대방 본문 변경 → updatePost
@@ -269,6 +273,7 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
           targetId,
           correctedText: corrBody,
           applyLive,
+          adminOpinion: adminOpinion.trim() || null,
         });
       }
       onCommitted();
@@ -359,6 +364,29 @@ export function AiImproveDialog({ post, comment, onClose, onCommitted }: Props) 
           <Label htmlFor="applyLive" className="text-sm cursor-pointer">
             실제 게시글/댓글 본문도 수정본으로 즉시 교체
           </Label>
+        </div>
+
+        {/* 관리자 의견 (선택) — 본문/댓글 교정에만 귀속 */}
+        <div className="space-y-1.5 pt-1">
+          <Label className="text-sm font-medium">
+            관리자 의견{' '}
+            <span className="text-xs font-normal text-muted-foreground">
+              (선택 · 일괄 분석 시 참고)
+            </span>
+          </Label>
+          {targetType === 'POST' && !bodyChanged && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+              의견은 <strong>본문(작성자)</strong> 수정 시에만 저장됩니다. 제목·상대방 본문만 바꾸는 경우 의견은 저장되지 않습니다.
+            </p>
+          )}
+          <textarea
+            value={adminOpinion}
+            onChange={e => setAdminOpinion(e.target.value)}
+            disabled={saving}
+            rows={3}
+            placeholder="왜 이렇게 고쳤는지, 다음에 어떤 방향으로 쓰길 원하는지 간단히 적어주세요. (비워도 됩니다)"
+            className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+          />
         </div>
 
         <DialogFooter className="gap-2 pt-2">

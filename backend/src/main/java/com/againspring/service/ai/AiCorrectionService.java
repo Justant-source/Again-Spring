@@ -54,7 +54,7 @@ public class AiCorrectionService {
     @Qualifier("remoteLlmProvider")
     private final LLMProvider llmProvider;
 
-    /** 첨삭 분석 전용 모델 — Sonnet (더 정교한 규칙 추출) */
+    /** 첨삭 분석 전용 모델 — Sonnet (MAP 단계: 청크별 패턴 추출) */
     @Value("${llm.correction.model:claude-sonnet-4-6}")
     private String correctionModel;
 
@@ -82,7 +82,7 @@ public class AiCorrectionService {
         String originalText = fetchOriginalText(req.targetType(), req.targetId());
         String personaId    = fetchPersonaId(req.targetType(), req.targetId());
 
-        String diffPrompt = buildDiffPrompt(originalText, req.correctedText());
+        String diffPrompt = buildDiffPrompt(originalText, req.correctedText(), null);
         String llmResponse = llmProvider.invoke(diffPrompt, correctionModel);
 
         return parseAnalyzeResponse(llmResponse, personaId, originalText);
@@ -275,10 +275,16 @@ public class AiCorrectionService {
         return null;
     }
 
-    private String buildDiffPrompt(String originalText, String correctedText) {
+    private String buildDiffPrompt(String originalText, String correctedText, String adminOpinion) {
         // 사용자 입력은 PromptSanitizer 경유 + <user_input> 태그 (CLAUDE.md 보안 규칙)
         String safeOriginal   = promptSanitizer.sanitize(originalText);
         String safeCorrected  = promptSanitizer.sanitize(correctedText);
+
+        String opinionBlock = "";
+        if (adminOpinion != null && !adminOpinion.isBlank()) {
+            String safeOpinion = promptSanitizer.sanitize(adminOpinion);
+            opinionBlock = "\n[관리자 의견]\n" + safeOpinion + "\n";
+        }
 
         return """
 다음은 AI 유저가 한국 커뮤니티에 작성한 글(원본)과 관리자가 수정한 버전(수정본)입니다.
@@ -290,10 +296,12 @@ public class AiCorrectionService {
 
 [수정본]
 %s
+%s
 </user_input>
 
 분석 지침:
 - 원본과 수정본의 차이(삭제·추가·변경)를 파악하세요.
+- 관리자 의견이 있다면 수정 의도의 핵심 신호로 활용하세요.
 - 이 AI 작성자가 다음 글을 쓸 때 반드시 주의해야 할 사항 1문장을 생성하세요 (persona_caution).
   - 구체적이어야 하며 "~하지 말 것" 또는 "~에 주의할 것" 형태.
 - 수정이 시사하는 일반 규칙(모든 AI 유저에게 공통 적용할 수 있는 것) 0~3개를 생성하세요 (global_rules).
@@ -305,8 +313,120 @@ public class AiCorrectionService {
   "persona_caution": "...",
   "global_rules": ["...", "..."]
 }
-""".formatted(safeOriginal, safeCorrected);
+""".formatted(safeOriginal, safeCorrected, opinionBlock);
     }
+
+    // =====================================================================
+    // 일괄 분석 통합 플랜 적용 (AiBatchLearningService에서 호출)
+    // =====================================================================
+
+    /**
+     * map-reduce 일괄 분석 결과(통합 플랜)를 DB에 영속화한다.
+     * - 전역 규칙: ai_global_rules에 저장
+     * - 페르소나 주의사항: voice_profile.correction_cautions에 머지
+     * - 출처 첨삭 레코드: status = PROCESSED로 승격
+     * - pushToBank=true: 교정본을 example_bank로 환류
+     * DB 쓰기 일원화 — AiBatchLearningService는 이 메서드만 호출한다.
+     */
+    @Transactional
+    public ConsolidatedApplyResult applyConsolidatedPlan(
+            List<GlobalRuleItem> globalRules,
+            List<PersonaCautionItem> personaCautions,
+            List<Long> allSourceCorrIds,
+            boolean pushToBank,
+            String adminId) {
+
+        int rulesCreated = 0;
+        int cautionsApplied = 0;
+        int corrProcessed = 0;
+
+        // 1) 전역 규칙 저장 (오류 시그니처 검증 포함)
+        for (GlobalRuleItem item : globalRules) {
+            if (item.ruleText() == null || item.ruleText().isBlank()) continue;
+            if (isErrorSignature(item.ruleText())) {
+                log.warn("[ai-correction] 배치 플랜: 오류 시그니처 감지 → 전역 규칙 저장 건너뜀: {}", item.ruleText().substring(0, Math.min(40, item.ruleText().length())));
+                continue;
+            }
+            Long sourceCorrId = (item.sourceCorrIds() != null && !item.sourceCorrIds().isEmpty())
+                    ? item.sourceCorrIds().get(0) : null;
+            AiGlobalRule rule = AiGlobalRule.builder()
+                    .ruleText(item.ruleText().trim())
+                    .scope(item.scope() != null ? item.scope() : "ALL")
+                    .sourceCorrectionId(sourceCorrId)
+                    .active(true)
+                    .createdBy(adminId)
+                    .build();
+            globalRuleRepository.save(rule);
+            rulesCreated++;
+        }
+
+        // 2) 페르소나 주의사항 머지 (오류 시그니처 검증 포함)
+        for (PersonaCautionItem item : personaCautions) {
+            if (item.cautionText() == null || item.cautionText().isBlank()) continue;
+            if (isErrorSignature(item.cautionText())) {
+                log.warn("[ai-correction] 배치 플랜: 오류 시그니처 감지 → 주의사항 저장 건너뜀: {}", item.cautionText().substring(0, Math.min(40, item.cautionText().length())));
+                continue;
+            }
+            Long sourceCorrId = (item.sourceCorrIds() != null && !item.sourceCorrIds().isEmpty())
+                    ? item.sourceCorrIds().get(0) : null;
+            mergePersonaCaution(item.personaId(), item.cautionText().trim(),
+                    sourceCorrId != null ? sourceCorrId : -1L);
+            cautionsApplied++;
+        }
+
+        // 3) 출처 첨삭 레코드 PROCESSED 승격 + example_bank 환류
+        if (allSourceCorrIds != null) {
+            for (Long corrId : allSourceCorrIds) {
+                correctionRepository.findById(corrId).ifPresent(correction -> {
+                    correction.setStatus("PROCESSED");
+
+                    if (pushToBank) {
+                        try {
+                            aiLearningBridge.saveCorrectedAsync(
+                                    correction.getCorrectedText(),
+                                    "POST".equals(correction.getTargetType()) ? "POST" : "COMMENT",
+                                    correction.getCategory(), 1.0);
+                            correction.setPushedToBank(true);
+                        } catch (Exception e) {
+                            log.warn("[ai-correction] batch bank push failed correctionId={}: {}", corrId, e.getMessage());
+                        }
+                    }
+
+                    correctionRepository.save(correction);
+                });
+            }
+            corrProcessed = allSourceCorrIds.size();
+        }
+
+        log.info("[ai-correction] applyConsolidatedPlan complete — rules={} cautions={} corrections={}",
+                rulesCreated, cautionsApplied, corrProcessed);
+
+        return new ConsolidatedApplyResult(rulesCreated, cautionsApplied, corrProcessed);
+    }
+
+    /** 텍스트가 LLM 제공자 오류 시그니처를 포함하는지 확인 (CLAUDE.md 규칙 #7) */
+    public static boolean isErrorSignature(String text) {
+        if (text == null || text.isBlank()) return false;
+        String t = text.toLowerCase();
+        return t.contains("credit balance") || t.contains("too low to access")
+                || t.contains("usage limit") || t.contains("rate limit")
+                || t.contains("rate_limit") || t.contains("overloaded")
+                || t.contains("invalid_request_error") || t.contains("authentication_error")
+                || t.contains("api_error") || t.contains("anthropic api")
+                || t.contains("too many requests") || t.contains("service unavailable")
+                || t.contains("internal server error") || t.contains("purchase credits")
+                || t.contains("insufficient credit");
+    }
+
+    // =====================================================================
+    // 배치 학습 플랜 관련 타입
+    // =====================================================================
+
+    public record GlobalRuleItem(String ruleText, String scope, List<Long> sourceCorrIds) {}
+
+    public record PersonaCautionItem(String personaId, String cautionText, List<Long> sourceCorrIds) {}
+
+    public record ConsolidatedApplyResult(int rulesCreated, int cautionsApplied, int corrProcessed) {}
 
     private AnalyzeResult parseAnalyzeResponse(String llmResponse, String personaId, String originalText) {
         try {
@@ -379,10 +499,12 @@ public class AiCorrectionService {
      * 원본↔수정본을 PENDING 상태로 즉시 저장 (LLM 호출 없음).
      * applyLive=true 이면 라이브 본문도 즉시 교체.
      * 변경이 없으면 correctionId=-1 반환.
+     * adminOpinion: 관리자가 입력한 수정 의도/방향 (선택, null 허용).
      */
     @Transactional
     public SaveResult savePending(String targetType, String targetId,
-                                  String correctedText, boolean applyLive, String adminId) {
+                                  String correctedText, boolean applyLive,
+                                  String adminId, String adminOpinion) {
         String originalText = fetchOriginalText(targetType, targetId);
         if (originalText.equals(correctedText)) {
             return new SaveResult(-1, false);
@@ -391,6 +513,9 @@ public class AiCorrectionService {
         String personaId = fetchPersonaId(targetType, targetId);
         String category  = fetchCategory(targetType, targetId);
 
+        String opinion = (adminOpinion != null && !adminOpinion.isBlank())
+                ? adminOpinion.trim() : null;
+
         AiContentCorrection correction = AiContentCorrection.builder()
                 .targetType(targetType)
                 .targetId(targetId)
@@ -398,6 +523,7 @@ public class AiCorrectionService {
                 .category(category)
                 .originalText(originalText)
                 .correctedText(correctedText)
+                .adminOpinion(opinion)
                 .adminId(adminId)
                 .status("PENDING")
                 .appliedLive(applyLive)
@@ -431,7 +557,7 @@ public class AiCorrectionService {
         int processed = 0;
         for (AiContentCorrection correction : pending) {
             try {
-                String diffPrompt = buildDiffPrompt(correction.getOriginalText(), correction.getCorrectedText());
+                String diffPrompt = buildDiffPrompt(correction.getOriginalText(), correction.getCorrectedText(), correction.getAdminOpinion());
                 String llmResponse = llmProvider.invoke(diffPrompt, correctionModel);
                 AnalyzeResult result = parseAnalyzeResponse(llmResponse, correction.getPersonaId(), correction.getOriginalText());
 
@@ -527,7 +653,8 @@ public class AiCorrectionService {
         AiContentCorrection correction = correctionRepository.findById(correctionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "CORRECTION_NOT_FOUND"));
 
-        String diffPrompt = buildDiffPrompt(correction.getOriginalText(), correction.getCorrectedText());
+        String diffPrompt = buildDiffPrompt(correction.getOriginalText(), correction.getCorrectedText(),
+                correction.getAdminOpinion());
         String llmResponse = llmProvider.invoke(diffPrompt, correctionModel);
         return parseAnalyzeResponse(llmResponse, correction.getPersonaId(), correction.getOriginalText());
     }

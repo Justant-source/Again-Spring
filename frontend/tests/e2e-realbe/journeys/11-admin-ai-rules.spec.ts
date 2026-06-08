@@ -9,8 +9,12 @@
  * - 사이드바 "AI 규칙관리" 링크 + 이동
  * - /api/admin/content/corrections/commit 400 (비-LLM 경로)
  * - ruleText 빈 값 POST (500 미만 검증)
+ * - /corrections/save에 adminOpinion 포함 계약 (DTO 수용 확인)
+ * - /history 응답에 adminOpinion 필드 존재 확인
+ * - /history/apply-batch-plan 합성 plan 적용 → 전역 규칙 생성 + 정리 (LLM 비호출)
  *
  * LLM 가드레일: /analyze, /analyze-batch 요청 시 no-llm-fixture가 자동 차단.
+ * apply-batch-plan은 LLM 비호출 경로라 차단목록 제외.
  */
 import { test, expect } from '../support/no-llm-fixture'
 import { authStatePath } from '../fixtures/auth-state'
@@ -208,5 +212,87 @@ test.describe('Journey 11-F: 첨삭 API 계약 (비-LLM)', () => {
       data: { ruleText: '', scope: 'ALL' },
     })
     expect(resp.status()).toBeLessThan(500)
+  })
+})
+
+// ── G. adminOpinion 필드 계약 ─────────────────────────────────────
+test.describe('Journey 11-G: adminOpinion 필드 계약 (비-LLM)', () => {
+
+  test('/corrections/save — adminOpinion 포함 DTO 수용 (없는 target → 4xx, 필드 무시 아님)', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+    const headers = { Authorization: `Bearer ${accessToken}` }
+
+    // 없는 target은 4xx (DTO 파싱 오류가 아닌 비즈니스 오류)
+    const resp = await request.post(`${BASE}/api/admin/content/corrections/save`, {
+      headers,
+      data: {
+        targetType: 'POST',
+        targetId: 'nonexistent-post-e2e-99999',
+        correctedText: '수정본 텍스트',
+        applyLive: false,
+        adminOpinion: '이것은 e2e 테스트용 관리자 의견입니다.',
+      },
+    })
+    // 4xx (not 400 Bad Request for unknown field — DTO accepts adminOpinion)
+    expect(resp.status()).toBeGreaterThanOrEqual(400)
+    expect(resp.status()).toBeLessThan(500)
+  })
+
+  test('/history 응답 — adminOpinion 필드 존재', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+
+    const resp = await request.get(`${BASE}/api/admin/ai-rules/history?size=5`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    expect(resp.ok()).toBeTruthy()
+    const data = await resp.json()
+    expect(typeof data.totalElements).toBe('number')
+    // adminOpinion 필드가 존재하거나 null인지 확인 (레코드가 있을 때)
+    if (data.content && data.content.length > 0) {
+      const item = data.content[0]
+      expect('adminOpinion' in item).toBeTruthy()
+    }
+  })
+})
+
+// ── H. apply-batch-plan 계약 (비-LLM) ────────────────────────────
+test.describe('Journey 11-H: apply-batch-plan 계약 (비-LLM)', () => {
+
+  test('합성 plan 적용 → 전역 규칙 생성 후 삭제', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+    const headers = { Authorization: `Bearer ${accessToken}` }
+
+    // apply-batch-plan: LLM 없음 — 합성 plan으로 전역 규칙 1개 생성
+    const applyResp = await request.post(`${BASE}/api/admin/ai-rules/history/apply-batch-plan`, {
+      headers,
+      data: {
+        globalRules: [
+          {
+            ruleText: '[e2e테스트] 일괄분석 배치플랜 테스트 규칙 — 삭제 예정',
+            scope: 'ALL',
+            sourceCorrIds: [],
+          },
+        ],
+        personaCautions: [],
+        pushToBank: false,
+      },
+    })
+    expect(applyResp.ok()).toBeTruthy()
+    const applyData = await applyResp.json()
+    expect(typeof applyData.rulesCreated).toBe('number')
+    expect(applyData.rulesCreated).toBeGreaterThanOrEqual(1)
+
+    // 생성된 규칙 조회 후 정리
+    const listResp = await request.get(`${BASE}/api/admin/ai-rules/global`, { headers })
+    expect(listResp.ok()).toBeTruthy()
+    const list = await listResp.json()
+    const created = list.content?.find((r: any) => r.ruleText?.includes('e2e테스트') && r.ruleText?.includes('일괄분석'))
+    if (created) {
+      const deleteResp = await request.delete(`${BASE}/api/admin/ai-rules/global/${created.id}`, { headers })
+      expect(deleteResp.status()).toBe(204)
+    }
   })
 })

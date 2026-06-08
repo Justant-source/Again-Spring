@@ -28,7 +28,6 @@ import {
   analyzeCorrectionHistory,
   applyCorrectionHistory,
   skipCorrectionHistory,
-  analyzeBatchCorrections,
   listPromptTemplates,
   updatePromptTemplate,
   AiGlobalRule,
@@ -37,7 +36,8 @@ import {
   AiPromptTemplate,
   AnalyzeResponse,
 } from '@/lib/api/admin/corrections';
-import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp, Zap, FileText, Save } from 'lucide-react';
+import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp, Zap, FileText, Save, MessageSquare } from 'lucide-react';
+import { BatchAnalysisReviewDialog } from '@/components/admin/ai-rules/BatchAnalysisReviewDialog';
 
 const SCOPE_LABELS: Record<string, string> = {
   ALL: '전체',
@@ -158,9 +158,15 @@ function HistoryRow({
           </div>
         </div>
 
-        {/* 날짜 */}
-        <div className="shrink-0 text-xs text-muted-foreground">
-          {new Date(row.createdAt).toLocaleDateString('ko-KR')}
+        {/* 관리자 의견 + 날짜 */}
+        <div className="shrink-0 text-xs text-muted-foreground space-y-0.5">
+          <div>{new Date(row.createdAt).toLocaleDateString('ko-KR')}</div>
+          {row.adminOpinion && (
+            <div className="flex items-start gap-1 max-w-[120px]">
+              <MessageSquare className="h-3 w-3 text-purple-400 shrink-0 mt-0.5" />
+              <span className="text-[10px] text-purple-700 line-clamp-2">{row.adminOpinion}</span>
+            </div>
+          )}
         </div>
 
         {/* 액션 버튼 */}
@@ -444,8 +450,7 @@ export default function AiRulesPage() {
   const [promptsLoading, setPromptsLoading] = useState(false);
 
   const [error, setError] = useState('');
-  const [batchAnalyzing, setBatchAnalyzing] = useState(false);
-  const [batchMessage, setBatchMessage] = useState('');
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
 
   // ─── 로드 ───
   const loadRules = useCallback(async (page: number) => {
@@ -512,20 +517,8 @@ export default function AiRulesPage() {
     catch { alert('삭제에 실패했습니다.'); }
   }
 
-  async function handleBatchAnalyze() {
-    if (!window.confirm('PENDING 상태의 첨삭 전체를 백그라운드에서 LLM 분석 후 자동 적용합니다.\n계속하시겠습니까?')) return;
-    setBatchAnalyzing(true); setBatchMessage(''); setError('');
-    try {
-      const res = await analyzeBatchCorrections();
-      setBatchMessage(res.message);
-      if (res.queued > 0) {
-        setTimeout(() => loadHistory(0), 3000);
-      }
-    } catch (e: any) {
-      setError(e?.response?.data?.message || '일괄 분석 요청에 실패했습니다.');
-    } finally {
-      setBatchAnalyzing(false);
-    }
+  function handleBatchAnalyze() {
+    setBatchDialogOpen(true);
   }
 
   async function handleDeleteCaution(caution: AiCaution) {
@@ -535,6 +528,12 @@ export default function AiRulesPage() {
   }
 
   return (
+    <>
+    <BatchAnalysisReviewDialog
+      open={batchDialogOpen}
+      onClose={() => setBatchDialogOpen(false)}
+      onApplied={() => { setBatchDialogOpen(false); loadHistory(0); loadRules(0); loadCautions(0); }}
+    />
     <AdminSection title="AI 규칙 관리">
       <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
         <Sparkles className="h-4 w-4 text-purple-500" />
@@ -585,19 +584,13 @@ export default function AiRulesPage() {
             <span className="text-xs text-muted-foreground">총 {historyTotalElements}건</span>
 
             <div className="ml-auto flex items-center gap-2">
-              {batchMessage && (
-                <span className="text-xs text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded">
-                  {batchMessage}
-                </span>
-              )}
               <Button
                 size="sm"
                 onClick={handleBatchAnalyze}
-                disabled={batchAnalyzing}
                 className="bg-purple-600 hover:bg-purple-700 text-white h-8 px-3"
               >
                 <Zap className="h-3.5 w-3.5 mr-1.5" />
-                {batchAnalyzing ? '요청 중…' : 'PENDING 일괄 분석'}
+                PENDING 일괄 분석
               </Button>
             </div>
           </div>
@@ -747,5 +740,6 @@ export default function AiRulesPage() {
         </TabsContent>
       </Tabs>
     </AdminSection>
+    </>
   );
 }

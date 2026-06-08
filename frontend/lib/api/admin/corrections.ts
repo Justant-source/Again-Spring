@@ -8,6 +8,8 @@ export interface SaveCorrectionRequest {
   targetId: string;
   correctedText: string;
   applyLive: boolean;
+  /** 관리자가 첨삭 시 남긴 수정 의도·방향 (선택) */
+  adminOpinion?: string | null;
 }
 
 export interface SaveCorrectionResponse {
@@ -16,6 +18,7 @@ export interface SaveCorrectionResponse {
 }
 
 export interface BatchAnalyzeResponse {
+  jobId: string;
   queued: number;
   message: string;
 }
@@ -89,6 +92,8 @@ export interface AiCorrectionHistory {
   category: string | null;
   originalText: string;
   correctedText: string;
+  /** 관리자가 첨삭 시 남긴 수정 의도·방향 */
+  adminOpinion: string | null;
   personaCaution: string | null;
   adminId: string;
   /** PENDING | PROCESSED | SKIPPED */
@@ -245,6 +250,84 @@ export async function applyCorrectionHistory(
 /** PENDING 첨삭을 SKIPPED로 표시 */
 export async function skipCorrectionHistory(corrId: number): Promise<void> {
   await api.patch(`/api/admin/ai-rules/history/${corrId}/skip`);
+}
+
+// ===== 일괄 분석 (map-reduce) Types =====
+
+export interface GlobalRuleProposal {
+  ruleText: string;
+  scope: 'ALL' | 'POST' | 'COMMENT';
+  sourceCorrIds: number[];
+  rationale: string;
+}
+
+export interface PersonaCautionProposal {
+  personaId: string;
+  cautionText: string;
+  sourceCorrIds: number[];
+  rationale: string;
+}
+
+export interface BatchPlan {
+  globalRules: GlobalRuleProposal[];
+  personaCautions: PersonaCautionProposal[];
+  allSourceCorrIds: number[];
+}
+
+export type BatchJobStatus = 'RUNNING' | 'READY' | 'FAILED';
+
+export interface BatchJobSnapshot {
+  jobId: string;
+  status: BatchJobStatus;
+  pendingCount: number;
+  chunksDone: number;
+  chunksTotal: number;
+  plan: BatchPlan | null;
+  error: string | null;
+}
+
+export interface ApprovedGlobalRule {
+  ruleText: string;
+  scope: 'ALL' | 'POST' | 'COMMENT';
+  sourceCorrIds: number[];
+}
+
+export interface ApprovedPersonaCaution {
+  personaId: string;
+  cautionText: string;
+  sourceCorrIds: number[];
+}
+
+export interface ApplyBatchRequest {
+  globalRules: ApprovedGlobalRule[];
+  personaCautions: ApprovedPersonaCaution[];
+  pushToBank: boolean;
+}
+
+export interface ConsolidatedApplyResult {
+  rulesCreated: number;
+  cautionsApplied: number;
+  corrProcessed: number;
+}
+
+// ===== 일괄 분석 API =====
+
+/** PENDING 첨삭 일괄 분석 시작 → jobId 반환 */
+export async function startBatchAnalysis(): Promise<BatchAnalyzeResponse> {
+  const res = await api.post<BatchAnalyzeResponse>('/api/admin/ai-rules/history/analyze-batch');
+  return res.data;
+}
+
+/** 일괄 분석 job 상태 폴링 */
+export async function getBatchAnalysisJob(jobId: string): Promise<BatchJobSnapshot> {
+  const res = await api.get<BatchJobSnapshot>(`/api/admin/ai-rules/history/analyze-batch/${jobId}`);
+  return res.data;
+}
+
+/** 관리자 승인된 플랜 적용 (LLM 없음) */
+export async function applyBatchPlan(req: ApplyBatchRequest): Promise<ConsolidatedApplyResult> {
+  const res = await api.post<ConsolidatedApplyResult>('/api/admin/ai-rules/history/apply-batch-plan', req);
+  return res.data;
 }
 
 // ===== 기본 프롬프트 템플릿 API =====

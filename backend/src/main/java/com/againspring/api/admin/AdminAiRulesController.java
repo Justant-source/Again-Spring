@@ -10,6 +10,7 @@ import com.againspring.repository.ai.AiGlobalRuleRepository;
 import com.againspring.repository.ai.AiPromptTemplateRepository;
 import com.againspring.repository.ai.PersonaVoiceRefRepository;
 import com.againspring.service.ai.AiCorrectionService;
+import com.againspring.service.ai.AiBatchLearningService;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,6 +34,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 누적된 AI 전역 금지 규칙 · 페르소나 주의사항 관리 API (ADMIN 전용).
@@ -51,6 +53,7 @@ public class AdminAiRulesController {
     private final AiContentCorrectionRepository correctionRepository;
     private final PersonaVoiceRefRepository personaVoiceRefRepository;
     private final AiCorrectionService aiCorrectionService;
+    private final AiBatchLearningService aiBatchLearningService;
     private final AiPromptTemplateRepository promptTemplateRepository;
     private final ObjectMapper objectMapper;
 
@@ -269,8 +272,10 @@ public class AdminAiRulesController {
 
     @PostMapping("/history/analyze-batch")
     @Operation(
-        summary = "PENDING 첨삭 일괄 분석 (비동기)",
-        description = "모든 PENDING 첨삭을 백그라운드에서 LLM 분석 후 자동 적용(scope=BOTH). 즉시 202 반환."
+        summary = "PENDING 첨삭 일괄 분석 시작 (map-reduce, 비동기)",
+        description = "PENDING 첨삭을 청크로 분할해 Sonnet MAP + Opus REDUCE로 통합 분석. 즉시 jobId 반환(202). " +
+                      "관리자가 GET /history/analyze-batch/{jobId}로 폴링 후 검토, " +
+                      "POST /history/apply-batch-plan으로 승인 적용."
     )
     @Auditable(action = "AI_CORRECTION_BATCH_ANALYZE", targetType = "AI_CORRECTION", targetId = "")
     public ResponseEntity<Map<String, Object>> analyzeBatch(
@@ -278,14 +283,48 @@ public class AdminAiRulesController {
 
         long pendingCount = correctionRepository.countByStatus("PENDING");
         if (pendingCount == 0) {
-            return ResponseEntity.ok(Map.of("queued", 0, "message", "분석 대기 중인 첨삭이 없습니다."));
+            return ResponseEntity.ok(Map.of("jobId", "", "queued", 0,
+                    "message", "분석 대기 중인 첨삭이 없습니다."));
         }
 
-        aiCorrectionService.analyzePendingBatchAsync(auth.getName());
-        return ResponseEntity.accepted().body(Map.of(
-                "queued", pendingCount,
-                "message", pendingCount + "건의 첨삭 분석을 백그라운드에서 시작했습니다."
-        ));
+        try {
+            String jobId = aiBatchLearningService.startAnalysis(auth.getName());
+            return ResponseEntity.accepted().body(Map.of(
+                    "jobId", jobId,
+                    "queued", pendingCount,
+                    "message", pendingCount + "건의 첨삭 분석을 백그라운드에서 시작했습니다."
+            ));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.ok(Map.of("jobId", "", "queued", 0, "message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/history/analyze-batch/{jobId}")
+    @Operation(
+        summary = "일괄 분석 job 상태 조회",
+        description = "analyze-batch 결과를 폴링한다. status=RUNNING 이면 계속 폴링, READY면 plan 포함, FAILED면 error 포함."
+    )
+    public ResponseEntity<AiBatchLearningService.JobSnapshot> getBatchAnalysisJob(
+            @PathVariable String jobId) {
+
+        Optional<AiBatchLearningService.JobSnapshot> snapshot = aiBatchLearningService.getJob(jobId);
+        return snapshot.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/history/apply-batch-plan")
+    @Operation(
+        summary = "일괄 분석 플랜 승인 적용 (LLM 없음)",
+        description = "관리자가 검토·편집한 전역 규칙 + 페르소나 주의사항을 적용하고 출처 첨삭을 PROCESSED로 승격한다."
+    )
+    @Auditable(action = "AI_BATCH_PLAN_APPLY", targetType = "AI_CORRECTION", targetId = "")
+    public ResponseEntity<AiCorrectionService.ConsolidatedApplyResult> applyBatchPlan(
+            @RequestBody AiBatchLearningService.ApplyBatchRequest req,
+            org.springframework.security.core.Authentication auth) {
+
+        AiCorrectionService.ConsolidatedApplyResult result =
+                aiBatchLearningService.applyPlan(req, auth.getName());
+        return ResponseEntity.ok(result);
     }
 
     // =====================================================================

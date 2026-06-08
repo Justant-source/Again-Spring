@@ -47,7 +47,7 @@ public class AdminCorrectionController {
         String adminId = auth.getName();
         AiCorrectionService.SaveResult result = correctionService.savePending(
                 req.getTargetType(), req.getTargetId(), req.getCorrectedText(),
-                req.isApplyLive(), adminId);
+                req.isApplyLive(), adminId, req.getAdminOpinion());
 
         return ResponseEntity.ok(new SaveResponse(result.correctionId(), result.appliedLive()));
     }
@@ -113,6 +113,8 @@ public class AdminCorrectionController {
         private String targetId;
         private String correctedText;
         private boolean applyLive;
+        /** 관리자가 첨삭 시 남긴 수정 의도·방향 (선택, null 허용) */
+        private String adminOpinion;
     }
 
     @Getter

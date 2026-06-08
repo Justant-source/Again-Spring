@@ -44,6 +44,10 @@ public class AiContentCorrection {
     @Column(name = "corrected_text", nullable = false, columnDefinition = "LONGTEXT")
     private String correctedText;
 
+    /** 관리자가 첨삭 시 남긴 수정 의도·방향 (선택). 일괄 분석 시 참고 신호로 사용. */
+    @Column(name = "admin_opinion", columnDefinition = "TEXT")
+    private String adminOpinion;
+
     /** 확정된 페르소나 주의사항(단문). 없으면 NULL. */
     @Column(name = "persona_caution", columnDefinition = "TEXT")
     private String personaCaution;
