@@ -3,6 +3,7 @@ const { chromium } = require('playwright');
 
 const publishXRouter = require('./routes/publish-x');
 const publishInstagramRouter = require('./routes/publish-instagram');
+const publishNaverBlogRouter = require('./routes/publish-naver-blog');
 const sessionHealthRouter = require('./routes/session-health');
 const testLoginRouter = require('./routes/test-login');
 
@@ -29,6 +30,7 @@ app.get('/health', (req, res) => {
 
 app.use('/publish/x', publishXRouter);
 app.use('/publish/instagram', publishInstagramRouter);
+app.use('/publish/naver-blog', publishNaverBlogRouter);
 app.use('/session', sessionHealthRouter);
 app.use('/test-login', testLoginRouter);
 

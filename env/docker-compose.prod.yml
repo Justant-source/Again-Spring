@@ -69,11 +69,19 @@ services:
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       AI_USER_LLM_URL: http://againspring-llm-ai-user-prod:8092
       AI_USER_ORCHESTRATOR_URL: http://againspring-ai-user-orchestrator-prod:8096
+      MARKETING_ENABLED: ${MARKETING_ENABLED:-false}
+      MARKETING_RENDERER_URL: ${MARKETING_RENDERER_URL:-http://againspring-marketing-renderer-prod:9000}
+      SOCIAL_MASTER_KEY: ${SOCIAL_MASTER_KEY:-}
+      SOCIAL_POSTER_URL: ${SOCIAL_POSTER_URL:-http://againspring-social-poster-prod:9100}
+      SOCIAL_PUBLISHING_ENABLED: ${SOCIAL_PUBLISHING_ENABLED:-true}
+      SOCIAL_WEBHOOK_URL: ${SOCIAL_WEBHOOK_URL:-}
+      SOCIAL_EMAIL: ${SOCIAL_EMAIL:-}
     volumes:
       - ../shared/docs/prompts:/app/shared/docs/prompts:ro
       - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro
       - ../shared/docs/policies/user-permissions.json:/app/shared/docs/policies/user-permissions.json:ro
       - ../shared/docs/templates:/app/shared/docs/templates:ro
+      - marketing_assets_prod:/var/marketing-assets:rw
     depends_on:
       mariadb-prod:
         condition: service_healthy
@@ -261,6 +269,41 @@ services:
       - againspring-prod   # prod DB 접근
       - againspring-dev    # dev DB 접근
 
+  marketing-renderer-prod:
+    build:
+      context: ../marketing/renderer
+      dockerfile: Dockerfile
+    image: againspring-marketing-renderer-prod
+    container_name: againspring-marketing-renderer-prod
+    environment:
+      PORT: 9000
+      FRONTEND_BASE_URL: http://againspring-frontend-prod:3000
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - againspring-prod
+
+  social-poster-prod:
+    build:
+      context: ../marketing/social-poster
+      dockerfile: Dockerfile
+    image: againspring-social-poster-prod
+    container_name: againspring-social-poster-prod
+    environment:
+      PORT: 9100
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    networks:
+      - againspring-prod
+
   nginx-prod:
     image: nginx:alpine
     container_name: againspring-nginx-prod
@@ -287,3 +330,4 @@ networks:
 
 volumes:
   mariadb_prod_data:
+  marketing_assets_prod:

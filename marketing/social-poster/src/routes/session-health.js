@@ -23,6 +23,11 @@ router.post('/health', async (req, res) => {
       } else if (platform === 'INSTAGRAM') {
         await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 15000 });
         loggedIn = !page.url().includes('/accounts/login');
+      } else if (platform === 'NAVER_BLOG') {
+        await page.goto('https://www.naver.com/', { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await page.waitForTimeout(2000);
+        const loggedInEl = await page.$('.gnb_name, .MyView-module__user_info, #account, .gnb_my_section');
+        loggedIn = !!loggedInEl;
       } else {
         return res.status(400).json({ ok: false, loggedIn: false, platform, error: 'unknown platform' });
       }

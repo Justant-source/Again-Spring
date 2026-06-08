@@ -212,7 +212,7 @@ public class SocialPublishController {
     @GetMapping("/sessions/status")
     @Operation(summary = "Get session status", description = "Check browser session status for all platforms")
     public ResponseEntity<?> getSessionStatus() {
-        List<Map<String, Object>> statuses = List.of("X", "INSTAGRAM").stream()
+        List<Map<String, Object>> statuses = List.of("X", "INSTAGRAM", "NAVER_BLOG").stream()
                 .map(platform -> {
                     Map<String, Object> statusMap = new HashMap<>();
                     statusMap.put("platform", platform);

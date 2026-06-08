@@ -138,6 +138,50 @@ async function testIgLogin(browser, email, password) {
   }
 }
 
+async function testNaverLogin(browser, naverId, password) {
+  let context;
+  try {
+    context = await browser.newContext({
+      userAgent: REALISTIC_UA,
+      viewport: { width: 1920, height: 1080 },
+      locale: 'ko-KR',
+      timezoneId: 'Asia/Seoul',
+    });
+    const page = await context.newPage();
+    await maskWebdriver(page);
+
+    await page.goto('https://nid.naver.com/nidlogin.login', { waitUntil: 'networkidle', timeout: 30000 });
+    await humanDelay(page, 1000, 2000);
+
+    const idInput = await page.$('input#id');
+    if (!idInput) {
+      return { ok: false, error: `LOGIN_INPUT_NOT_FOUND (url=${page.url()})` };
+    }
+    await page.fill('input#id', naverId);
+    await humanDelay(page, 500, 1000);
+    await page.fill('input#pw', password);
+    await humanDelay(page, 800, 1500);
+
+    const submitBtn = await page.$('button#log\\.login, button.btn_login');
+    if (submitBtn) {
+      await submitBtn.click();
+    } else {
+      await page.press('input#pw', 'Enter');
+    }
+    await page.waitForTimeout(5000);
+
+    const url = page.url();
+    if (url.includes('captcha') || url.includes('saftycheck') || url.includes('nidlogin.login')) {
+      return { ok: false, error: 'CHALLENGE_REQUIRED or LOGIN_FAILED' };
+    }
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  } finally {
+    if (context) await context.close().catch(() => {});
+  }
+}
+
 router.post('/', async (req, res) => {
   const { platform, credentials = {} } = req.body;
   const { email, password } = credentials;
@@ -154,6 +198,8 @@ router.post('/', async (req, res) => {
     result = await testXLogin(browser, email, password);
   } else if (platform === 'INSTAGRAM') {
     result = await testIgLogin(browser, email, password);
+  } else if (platform === 'NAVER_BLOG') {
+    result = await testNaverLogin(browser, email, password);
   } else {
     return res.status(400).json({ ok: false, error: `Unknown platform: ${platform}` });
   }

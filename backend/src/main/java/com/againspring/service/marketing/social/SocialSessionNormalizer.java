@@ -37,6 +37,7 @@ public class SocialSessionNormalizer {
         return switch (platform == null ? "" : platform.toUpperCase()) {
             case "X" -> "auth_token";
             case "INSTAGRAM" -> "sessionid";
+            case "NAVER_BLOG" -> "NID_AUT";
             default -> null;
         };
     }

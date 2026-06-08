@@ -69,9 +69,12 @@ public class SocialPublishExecutor {
                         .orElseThrow(() -> new RuntimeException("Content not found: " + contentId));
 
                 Map<String, Object> requestBody = buildRequestBody(platform, content, linkMode, storageStateJson, credentials);
-                SocialPosterClient.PublishOutcome outcome = "X".equals(platform)
-                        ? posterClient.publishX(requestBody)
-                        : posterClient.publishInstagram(requestBody);
+                SocialPosterClient.PublishOutcome outcome = switch (platform) {
+                    case "X" -> posterClient.publishX(requestBody);
+                    case "INSTAGRAM" -> posterClient.publishInstagram(requestBody);
+                    case "NAVER_BLOG" -> posterClient.publishNaverBlog(requestBody);
+                    default -> posterClient.publishX(requestBody);
+                };
 
                 SocialPublishResult result = resultRepository.findByContentIdAndPlatform(contentId, MarketingContent.Platform.valueOf(platform))
                         .orElseThrow(() -> new RuntimeException("Result record not found for contentId=" + contentId + ", platform=" + platform));
@@ -185,6 +188,25 @@ public class SocialPublishExecutor {
                 contentMap.put("imageBase64", coverBase64);
                 contentMap.put("imageFilename", "cover.png");
             }
+
+            Map<String, Object> request = new HashMap<>();
+            request.put("storageState", storageStateJson);
+            request.put("credentials", credentials);
+            request.put("content", contentMap);
+            return request;
+
+        } else if ("NAVER_BLOG".equals(platform)) {
+            String title = content.getTitle() != null && !content.getTitle().isBlank()
+                    ? content.getTitle()
+                    : "다시봄 사연";
+            String body = content.getBodyText();
+            if (content.getHashtags() != null && !content.getHashtags().isBlank()) {
+                body = body + "\n\n" + content.getHashtags();
+            }
+
+            Map<String, Object> contentMap = new HashMap<>();
+            contentMap.put("title", title);
+            contentMap.put("body", body);
 
             Map<String, Object> request = new HashMap<>();
             request.put("storageState", storageStateJson);

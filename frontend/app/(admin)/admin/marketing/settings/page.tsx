@@ -24,24 +24,30 @@ export default function MarketingSettingsPage() {
   const [xPassword, setXPassword] = useState('');
   const [igEmail, setIgEmail] = useState('');
   const [igPassword, setIgPassword] = useState('');
+  const [naverNaverId, setNaverNaverId] = useState('');
+  const [naverPassword, setNaverPassword] = useState('');
 
   // Session seeding state
   const [xStorageState, setXStorageState] = useState('');
   const [igStorageState, setIgStorageState] = useState('');
+  const [naverStorageState, setNaverStorageState] = useState('');
 
   // Loading states
   const [savingX, setSavingX] = useState(false);
   const [savingIG, setSavingIG] = useState(false);
+  const [savingNaver, setSavingNaver] = useState(false);
   const [seedingX, setSeedingX] = useState(false);
   const [seedingIG, setSeedingIG] = useState(false);
+  const [seedingNaver, setSeedingNaver] = useState(false);
   const [testingX, setTestingX] = useState(false);
   const [testingIG, setTestingIG] = useState(false);
+  const [testingNaver, setTestingNaver] = useState(false);
 
   // Toast messages
   const [saveSuccess, setSaveSuccess] = useState('');
 
   async function handleTestLogin(platform: SocialPlatform) {
-    const setter = platform === 'X' ? setTestingX : setTestingIG;
+    const setter = platform === 'X' ? setTestingX : platform === 'INSTAGRAM' ? setTestingIG : setTestingNaver;
     setter(true);
     setError('');
     try {
@@ -81,15 +87,18 @@ export default function MarketingSettingsPage() {
   }
 
   async function handleSaveCredentials(platform: SocialPlatform) {
-    const [email, password] =
-      platform === 'X' ? [xEmail, xPassword] : [igEmail, igPassword];
+    let email: string;
+    let password: string;
+    if (platform === 'X') { email = xEmail; password = xPassword; }
+    else if (platform === 'INSTAGRAM') { email = igEmail; password = igPassword; }
+    else { email = naverNaverId; password = naverPassword; }
 
     if (!email.trim() || !password.trim()) {
-      setError('이메일과 비밀번호를 입력해주세요.');
+      setError(platform === 'NAVER_BLOG' ? '네이버 ID와 비밀번호를 입력해주세요.' : '이메일과 비밀번호를 입력해주세요.');
       return;
     }
 
-    const setter = platform === 'X' ? setSavingX : setSavingIG;
+    const setter = platform === 'X' ? setSavingX : platform === 'INSTAGRAM' ? setSavingIG : setSavingNaver;
     setter(true);
     setError('');
 
@@ -98,14 +107,9 @@ export default function MarketingSettingsPage() {
       setSaveSuccess(`${platform} 자격증명이 저장되었습니다.`);
       setTimeout(() => setSaveSuccess(''), 3000);
 
-      // Reset form
-      if (platform === 'X') {
-        setXEmail('');
-        setXPassword('');
-      } else {
-        setIgEmail('');
-        setIgPassword('');
-      }
+      if (platform === 'X') { setXEmail(''); setXPassword(''); }
+      else if (platform === 'INSTAGRAM') { setIgEmail(''); setIgPassword(''); }
+      else { setNaverNaverId(''); setNaverPassword(''); }
 
       await loadStatus();
     } catch (e: any) {
@@ -118,14 +122,14 @@ export default function MarketingSettingsPage() {
   }
 
   async function handleSeedSession(platform: SocialPlatform) {
-    const storageState = platform === 'X' ? xStorageState : igStorageState;
+    const storageState = platform === 'X' ? xStorageState : platform === 'INSTAGRAM' ? igStorageState : naverStorageState;
 
     if (!storageState.trim()) {
       setError('storageState JSON을 붙여넣어주세요.');
       return;
     }
 
-    const setter = platform === 'X' ? setSeedingX : setSeedingIG;
+    const setter = platform === 'X' ? setSeedingX : platform === 'INSTAGRAM' ? setSeedingIG : setSeedingNaver;
     setter(true);
     setError('');
 
@@ -134,12 +138,9 @@ export default function MarketingSettingsPage() {
       setSaveSuccess(`${platform} 세션이 등록되었습니다.`);
       setTimeout(() => setSaveSuccess(''), 3000);
 
-      // Reset form
-      if (platform === 'X') {
-        setXStorageState('');
-      } else {
-        setIgStorageState('');
-      }
+      if (platform === 'X') setXStorageState('');
+      else if (platform === 'INSTAGRAM') setIgStorageState('');
+      else setNaverStorageState('');
 
       await loadStatus();
     } catch (e: any) {
@@ -361,6 +362,129 @@ export default function MarketingSettingsPage() {
             }}
           >
             {seedingX ? '등록 중...' : '세션 등록'}
+          </button>
+        </div>
+      </div>
+
+      {/* Naver Blog Settings */}
+      <div style={{ marginBottom: 24, padding: 16, background: '#f9f9f9', borderRadius: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E', margin: 0 }}>네이버 블로그</h3>
+          <span
+            style={{
+              padding: '3px 8px',
+              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              background: credentialStatus.find(c => c.platform === 'NAVER_BLOG')?.configured ? '#d1fae5' : '#f3f4f6',
+              color: credentialStatus.find(c => c.platform === 'NAVER_BLOG')?.configured ? '#065f46' : '#6b7280',
+            }}
+          >
+            {credentialStatus.find(c => c.platform === 'NAVER_BLOG')?.configured ? '설정됨' : '미설정'}
+          </span>
+        </div>
+
+        <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #e5e7eb' }}>
+          <h4 style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E', margin: '0 0 10px' }}>
+            계정 자격증명
+          </h4>
+          <p style={{ fontSize: 11, color: '#888', margin: '0 0 10px' }}>
+            이메일 칸에 <b>네이버 ID</b>를 입력하세요 (블로그 주소에 사용되는 ID). 비밀번호는 네이버 로그인 비밀번호.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, color: '#666', fontWeight: 500, display: 'block', marginBottom: 4 }}>
+                네이버 ID (blogId)
+              </label>
+              <input
+                type="text"
+                placeholder="네이버 ID (예: mynaverid)"
+                value={naverNaverId}
+                onChange={(e) => setNaverNaverId(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: '#666', fontWeight: 500, display: 'block', marginBottom: 4 }}>
+                비밀번호
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={naverPassword}
+                onChange={(e) => setNaverPassword(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={() => handleSaveCredentials('NAVER_BLOG')}
+              disabled={savingNaver}
+              style={{
+                padding: '7px 16px', background: savingNaver ? '#ccc' : '#1A1A2E', color: 'white',
+                border: 'none', borderRadius: 6, cursor: savingNaver ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 500,
+              }}
+            >
+              {savingNaver ? '저장 중...' : '자격증명 저장'}
+            </button>
+            <button
+              onClick={() => handleTestLogin('NAVER_BLOG')}
+              disabled={testingNaver || !credentialStatus.find(c => c.platform === 'NAVER_BLOG')?.configured}
+              style={{
+                padding: '7px 16px',
+                background: testingNaver ? '#ccc' : '#2563eb',
+                color: 'white', border: 'none', borderRadius: 6,
+                cursor: (testingNaver || !credentialStatus.find(c => c.platform === 'NAVER_BLOG')?.configured) ? 'not-allowed' : 'pointer',
+                fontSize: 13, fontWeight: 500,
+              }}
+            >
+              {testingNaver ? '테스트 중...' : '로그인 테스트'}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h4 style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E', margin: '0 0 10px' }}>
+            브라우저 세션 시드
+          </h4>
+          <div style={{ marginBottom: 12 }}>
+            <span
+              style={{
+                padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                background: sessionStatus.find(s => s.platform === 'NAVER_BLOG')?.status === 'SEEDED' ? '#d1fae5'
+                  : sessionStatus.find(s => s.platform === 'NAVER_BLOG')?.status === 'EXPIRED' ? '#fee2e2' : '#f3f4f6',
+                color: sessionStatus.find(s => s.platform === 'NAVER_BLOG')?.status === 'SEEDED' ? '#065f46'
+                  : sessionStatus.find(s => s.platform === 'NAVER_BLOG')?.status === 'EXPIRED' ? '#b33333' : '#6b7280',
+              }}
+            >
+              {sessionStatus.find(s => s.platform === 'NAVER_BLOG')?.status === 'SEEDED' ? '세션 시드됨'
+               : sessionStatus.find(s => s.platform === 'NAVER_BLOG')?.status === 'EXPIRED' ? '세션 만료' : '미시딩'}
+            </span>
+          </div>
+          <p style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, margin: '0 0 8px', background: '#fffbe6', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 10px' }}>
+            ✅ 권장: <b>Cookie-Editor</b> 확장 설치 → naver.com 로그인 상태에서 Export → <b>Export as JSON</b> → 붙여넣기 (<b>NID_AUT</b> httpOnly 쿠키 포함).<br />
+            또는 로컬에서 <code>node seed-cli.js --platform naver_blog</code> 실행.
+          </p>
+          <textarea
+            placeholder="Cookie-Editor 'Export as JSON' 결과 (NID_AUT 쿠키 포함) 붙여넣기"
+            value={naverStorageState}
+            onChange={(e) => setNaverStorageState(e.target.value)}
+            style={{
+              width: '100%', minHeight: 120, padding: '10px 10px', border: '1px solid #ddd',
+              borderRadius: 6, fontSize: 12, fontFamily: 'monospace', marginBottom: 10, boxSizing: 'border-box',
+            }}
+          />
+          <button
+            onClick={() => handleSeedSession('NAVER_BLOG')}
+            disabled={seedingNaver}
+            style={{
+              padding: '7px 16px', background: seedingNaver ? '#ccc' : '#00c73c',
+              color: 'white', border: 'none', borderRadius: 6,
+              cursor: seedingNaver ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 500,
+            }}
+          >
+            {seedingNaver ? '등록 중...' : '세션 등록'}
           </button>
         </div>
       </div>

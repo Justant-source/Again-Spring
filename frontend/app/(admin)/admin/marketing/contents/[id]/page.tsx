@@ -75,7 +75,7 @@ export default function ContentDetailPage() {
   useEffect(() => {
     if (!content) return;
     const p = content.platform?.toUpperCase();
-    if (p === 'X' || p === 'INSTAGRAM') {
+    if (p === 'X' || p === 'INSTAGRAM' || p === 'NAVER_BLOG') {
       setSocialTargets([p as SocialPlatform]);
     }
   }, [content?.platform]);
@@ -532,7 +532,7 @@ export default function ContentDetailPage() {
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               {content && (() => {
                 const p = content.platform?.toUpperCase() as SocialPlatform;
-                if (p !== 'X' && p !== 'INSTAGRAM') return null;
+                if (p !== 'X' && p !== 'INSTAGRAM' && p !== 'NAVER_BLOG') return null;
                 const succeeded = socialPublishResults.some(r => r.platform === p && r.state === 'SUCCEEDED');
                 const failed = socialPublishResults.some(r => r.platform === p && r.state === 'FAILED');
                 return (
@@ -550,6 +550,7 @@ export default function ContentDetailPage() {
                 );
               })()}
             </div>
+            {/* 발행 결과 필터 — content.platform에 해당하는 결과만 표시 */}
             {/* Link mode — X 콘텐츠 전용 */}
             {content?.platform?.toUpperCase() === 'X' && (
             <div style={{ marginBottom: 12, display: 'flex', gap: 12, fontSize: 13 }}>

@@ -72,6 +72,23 @@ public class SocialPosterClient {
     }
 
     /**
+     * Publish a post to Naver Blog.
+     */
+    public PublishOutcome publishNaverBlog(Map<String, Object> requestBody) {
+        try {
+            byte[] response = restClient.post()
+                    .uri("/publish/naver-blog")
+                    .body(requestBody)
+                    .retrieve()
+                    .body(byte[].class);
+            return parseOutcome(response);
+        } catch (Exception e) {
+            log.error("[SOCIAL_POSTER] publishNaverBlog failed: {}", e.getMessage());
+            return new PublishOutcome(false, null, e.getMessage(), false, null);
+        }
+    }
+
+    /**
      * Test login with stored credentials.
      */
     public Map<String, Object> testLogin(String platform, Map<String, Object> credentials) {

@@ -1,6 +1,6 @@
 import { api } from '../client';
 
-export type SocialPlatform = 'X' | 'INSTAGRAM';
+export type SocialPlatform = 'X' | 'INSTAGRAM' | 'NAVER_BLOG';
 export type SocialState = 'PENDING' | 'SUCCEEDED' | 'FAILED';
 export type SessionStatus = 'SEEDED' | 'EXPIRED' | 'NOT_SEEDED';
 

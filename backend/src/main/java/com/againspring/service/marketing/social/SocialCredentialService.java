@@ -51,7 +51,7 @@ public class SocialCredentialService {
      * 플랫폼별 자격증 설정 상태 조회
      */
     public List<Map<String, Object>> getCredentialStatus() {
-        return List.of("X", "INSTAGRAM").stream()
+        return List.of("X", "INSTAGRAM", "NAVER_BLOG").stream()
                 .map(platform -> {
                     Map<String, Object> status = new HashMap<>();
                     status.put("platform", platform);
