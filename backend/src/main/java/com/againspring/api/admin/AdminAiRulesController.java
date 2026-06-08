@@ -341,21 +341,26 @@ public class AdminAiRulesController {
         return ResponseEntity.ok(promptTemplateRepository.findAllByOrderByKeyAsc());
     }
 
-    @GetMapping("/prompts/{key}")
+    @GetMapping("/prompts/{category}/{name}")
     @Operation(summary = "AI 유저 기본 프롬프트 단건 조회")
-    public ResponseEntity<AiPromptTemplate> getPromptTemplate(@PathVariable String key) {
+    public ResponseEntity<AiPromptTemplate> getPromptTemplate(
+            @PathVariable String category,
+            @PathVariable String name) {
+        String key = category + "/" + name;
         AiPromptTemplate tpl = promptTemplateRepository.findById(key)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "PROMPT_NOT_FOUND"));
         return ResponseEntity.ok(tpl);
     }
 
-    @PutMapping("/prompts/{key}")
+    @PutMapping("/prompts/{category}/{name}")
     @Operation(summary = "AI 유저 기본 프롬프트 수정", description = "내용을 저장하고 ai-user/llm 서비스에 즉시 반영(best-effort)한다.")
-    @Auditable(action = "AI_PROMPT_UPDATE", targetType = "AI_PROMPT", targetId = "#key")
+    @Auditable(action = "AI_PROMPT_UPDATE", targetType = "AI_PROMPT", targetId = "#category + '/' + #name")
     public ResponseEntity<AiPromptTemplate> updatePromptTemplate(
-            @PathVariable String key,
+            @PathVariable String category,
+            @PathVariable String name,
             @RequestBody UpdatePromptRequest req,
             org.springframework.security.core.Authentication auth) {
+        String key = category + "/" + name;
 
         AiPromptTemplate tpl = promptTemplateRepository.findById(key)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "PROMPT_NOT_FOUND"));

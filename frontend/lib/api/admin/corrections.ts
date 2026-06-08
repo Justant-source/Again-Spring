@@ -346,11 +346,11 @@ export async function listPromptTemplates(): Promise<AiPromptTemplate[]> {
 }
 
 export async function getPromptTemplate(key: string): Promise<AiPromptTemplate> {
-  const res = await api.get<AiPromptTemplate>(`/api/admin/ai-rules/prompts/${encodeURIComponent(key)}`);
+  const res = await api.get<AiPromptTemplate>(`/api/admin/ai-rules/prompts/${key}`);
   return res.data;
 }
 
 export async function updatePromptTemplate(key: string, content: string): Promise<AiPromptTemplate> {
-  const res = await api.put<AiPromptTemplate>(`/api/admin/ai-rules/prompts/${encodeURIComponent(key)}`, { content });
+  const res = await api.put<AiPromptTemplate>(`/api/admin/ai-rules/prompts/${key}`, { content });
   return res.data;
 }

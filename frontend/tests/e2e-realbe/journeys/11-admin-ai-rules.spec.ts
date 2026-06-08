@@ -257,6 +257,47 @@ test.describe('Journey 11-G: adminOpinion 필드 계약 (비-LLM)', () => {
   })
 })
 
+// ── I. 기본 프롬프트 템플릿 저장 (슬래시 키 경로 인코딩 버그 회귀) ──
+test.describe('Journey 11-I: 기본 프롬프트 템플릿 CRUD', () => {
+
+  test('GET /prompts → 4개 템플릿 목록 반환', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+
+    const resp = await request.get(`${BASE}/api/admin/ai-rules/prompts`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    expect(resp.ok()).toBeTruthy()
+    const data = await resp.json()
+    expect(Array.isArray(data)).toBeTruthy()
+    expect(data.length).toBeGreaterThanOrEqual(4)
+    const keys = data.map((t: any) => t.key)
+    expect(keys).toContain('voice/post')
+    expect(keys).toContain('voice/comment')
+  })
+
+  test('PUT /prompts/voice/post → 저장 성공 (슬래시 키 경로 버그 회귀 방지)', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+    const headers = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+
+    // 현재 내용 읽기
+    const getResp = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/post`, { headers })
+    expect(getResp.ok()).toBeTruthy()
+    const original = await getResp.json()
+
+    // 저장 (원본 내용 그대로 PUT → 응답 확인 후 복원 불필요)
+    const putResp = await request.put(`${BASE}/api/admin/ai-rules/prompts/voice/post`, {
+      headers,
+      data: { content: original.content },
+    })
+    expect(putResp.ok()).toBeTruthy()
+    const updated = await putResp.json()
+    expect(updated.key).toBe('voice/post')
+    expect(typeof updated.content).toBe('string')
+  })
+})
+
 // ── H. apply-batch-plan 계약 (비-LLM) ────────────────────────────
 test.describe('Journey 11-H: apply-batch-plan 계약 (비-LLM)', () => {
 
