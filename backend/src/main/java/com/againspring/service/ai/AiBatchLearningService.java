@@ -10,8 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationContext;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -46,7 +45,8 @@ public class AiBatchLearningService {
     @Qualifier("remoteLlmProvider")
     private final LLMProvider llmProvider;
 
-    private final ApplicationContext ctx;
+    @Qualifier("taskExecutor")
+    private final TaskExecutor taskExecutor;
 
     /** MAP 단계: 청크별 패턴 추출 — Haiku (빠름, 청크별 호출이 많아 속도가 중요) */
     @Value("${llm.correction.map-model:claude-haiku-4-5-20251001}")
@@ -179,8 +179,8 @@ public class AiBatchLearningService {
         BatchJob job = new BatchJob(jobId, adminId, pending.size(), chunks.size());
         jobRegistry.put(jobId, job);
 
-        // ApplicationContext로 자신의 Spring AOP 프록시를 획득 → @Async 올바르게 적용
-        ctx.getBean(AiBatchLearningService.class).runAnalysisAsync(job, chunks);
+        // taskExecutor에 직접 제출 — @Async 프록시 우회 없이 확실한 비동기 실행
+        taskExecutor.execute(() -> runAnalysisAsync(job, chunks));
 
         log.info("[batch-learning] startAnalysis jobId={} pending={} chunks={}",
                 jobId, pending.size(), chunks.size());
@@ -219,7 +219,6 @@ public class AiBatchLearningService {
     // 비동기 MAP → REDUCE 실행
     // =====================================================================
 
-    @Async("taskExecutor")
     public void runAnalysisAsync(BatchJob job, List<List<AiContentCorrection>> chunks) {
         try {
             // ── MAP 단계 ──────────────────────────────────────────────────
