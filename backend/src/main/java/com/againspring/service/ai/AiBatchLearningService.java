@@ -52,8 +52,8 @@ public class AiBatchLearningService {
     @Autowired
     private AiBatchLearningService self;
 
-    /** MAP 단계: 청크별 패턴 추출 — Sonnet */
-    @Value("${llm.correction.model:claude-sonnet-4-6}")
+    /** MAP 단계: 청크별 패턴 추출 — Haiku (빠름, 청크별 호출이 많아 속도가 중요) */
+    @Value("${llm.correction.map-model:claude-haiku-4-5-20251001}")
     private String mapModel;
 
     /** REDUCE 단계: 통합 + scope 판정 — Opus (1회, Sonnet 폴백) */
@@ -61,8 +61,8 @@ public class AiBatchLearningService {
     private String reduceModel;
 
     // ── 청킹 파라미터 ──────────────────────────────────────────────────────────
-    private static final int MAX_CHARS_PER_CHUNK  = 22_000; // ≈ 11K 토큰
-    private static final int MAX_ITEMS_PER_CHUNK  = 40;
+    private static final int MAX_CHARS_PER_CHUNK  = 5_000; // ≈ 2.5K 토큰 — Haiku 120s 타임아웃 안쪽
+    private static final int MAX_ITEMS_PER_CHUNK  = 10;
     private static final int REDUCE_TIER2_THRESHOLD = 150;  // observation 수 초과 시 계층 reduce
 
     // ── in-memory job 레지스트리 ───────────────────────────────────────────────

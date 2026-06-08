@@ -111,8 +111,9 @@ llm:
   compose:
     model: ${COMPOSE_LLM_MODEL:claude-haiku-4-5-20251001}
   correction:
-    model: ${CORRECTION_LLM_MODEL:claude-sonnet-4-6}        # MAP 단계 (청크별 패턴 추출) — Sonnet
-    reduce-model: ${CORRECTION_REDUCE_LLM_MODEL:claude-opus-4-8}  # REDUCE 단계 (통합·scope 판정) — Opus
+    model: ${CORRECTION_LLM_MODEL:claude-sonnet-4-6}             # 단건 분석 (analyzeById) — Sonnet
+    map-model: ${CORRECTION_MAP_LLM_MODEL:claude-haiku-4-5-20251001}  # 일괄 MAP 단계 (청크별 패턴 추출) — Haiku
+    reduce-model: ${CORRECTION_REDUCE_LLM_MODEL:claude-opus-4-8}      # REDUCE 단계 (통합·scope 판정) — Opus
   remote:
     base-url: ${LLM_WORKER_URL:http://againspring-llm:8090}
     connect-timeout-ms: ${LLM_REMOTE_CONNECT_TIMEOUT_MS:5000}
