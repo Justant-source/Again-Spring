@@ -19,7 +19,6 @@ const LLM_DANGEROUS_PATHS = [
   /\/api\/admin\/content\/corrections\/analyze/,
   /\/api\/admin\/ai-rules\/history\/[^/]+\/analyze/,
   /\/api\/admin\/ai-rules\/history\/analyze-batch/,
-  /\/api\/admin\/marketing\/.*\/(generate|simulation|story)/,
 ]
 
 export function assertNoLlmRequest(url: string, method: string, body?: string): void {

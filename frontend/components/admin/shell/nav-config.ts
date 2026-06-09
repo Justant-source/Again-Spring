@@ -45,12 +45,6 @@ export const NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: '마케팅',
-    items: [
-      { label: '마케팅', href: '/admin/marketing', icon: 'TrendingUp' },
-    ],
-  },
-  {
     label: 'AI',
     items: [
       { label: 'AI 규칙관리', href: '/admin/ai-rules', icon: 'Sparkles' },
