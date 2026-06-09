@@ -41,10 +41,9 @@ interface AdminUserDetail {
   privacyAgreedAt?: string;
   disclaimerAgreedAt?: string;
   marketingAgreedAt?: string;
-  totalSessions: number;
-  completedSessions: number;
-  feedbackCount: number;
-  lastSessionAt?: string;
+  postCount: number;
+  commentCount: number;
+  voteCount: number;
   status?: string;
   suspendedUntil?: string | null;
   suspendedReason?: string | null;
@@ -321,26 +320,26 @@ export default function UserDetailPage() {
         <div className="grid grid-cols-3 gap-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">총 세션</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">게시글</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{user.totalSessions}</p>
+              <p className="text-2xl font-bold">{user.postCount}</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">완료 세션</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">댓글</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{user.completedSessions}</p>
+              <p className="text-2xl font-bold">{user.commentCount}</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">의견 수</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">투표</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{user.feedbackCount}</p>
+              <p className="text-2xl font-bold">{user.voteCount}</p>
             </CardContent>
           </Card>
         </div>

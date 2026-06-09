@@ -46,6 +46,9 @@ public interface PostRepository extends JpaRepository<Post, String> {
     /** 공개 피드 전체 건수 (소프트 삭제 제외) */
     long countByVisibilityAndStatusAndDeletedAtIsNull(PostVisibility visibility, PostStatus status);
 
+    /** 특정 작성자의 게시글 수 (소프트 삭제 제외) */
+    long countByAuthorIdAndDeletedAtIsNull(String authorId);
+
     /** 공개 피드 카테고리별 전체 건수 (소프트 삭제 제외) */
     long countByVisibilityAndStatusAndCategoryAndDeletedAtIsNull(PostVisibility visibility, PostStatus status, PostCategory category);
 

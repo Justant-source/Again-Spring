@@ -45,6 +45,9 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
      */
     List<Vote> findByVoterUserIdAndPostIdIn(String voterUserId, List<String> postIds);
 
+    /** 특정 사용자의 투표 수 */
+    long countByVoterUserId(String voterUserId);
+
     /**
      * 특정 시간 범위의 투표 수 (일별 집계용)
      */

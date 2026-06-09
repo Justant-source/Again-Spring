@@ -107,10 +107,9 @@ export function UserDetailModal({ userId, onClose, onAnonymized }: Props) {
               </Section>
 
               <Section title="활동 통계">
-                <Meta label="총 세션" value={`${detail.totalSessions}건`} />
-                <Meta label="완료 세션" value={`${detail.completedSessions}건`} />
-                <Meta label="의견 제출" value={`${detail.feedbackCount}건`} />
-                <Meta label="마지막 세션" value={fmt(detail.lastSessionAt) || '없음'} />
+                <Meta label="게시글" value={`${detail.postCount}건`} />
+                <Meta label="댓글" value={`${detail.commentCount}건`} />
+                <Meta label="투표" value={`${detail.voteCount}건`} />
               </Section>
             </div>
           )}

@@ -35,6 +35,7 @@ export interface AdminUserListItem {
   email?: string;
   nickname: string;
   isGuest: boolean;
+  synthetic: boolean;
   provider?: string;
   roles?: string[];
   createdAt: string;
@@ -86,10 +87,9 @@ export interface AdminUserDetail {
   privacyAgreedAt?: string;
   disclaimerAgreedAt?: string;
   marketingAgreedAt?: string;
-  totalSessions: number;
-  completedSessions: number;
-  feedbackCount: number;
-  lastSessionAt?: string;
+  postCount: number;
+  commentCount: number;
+  voteCount: number;
 }
 
 export async function getAdminUserDetail(id: string): Promise<AdminUserDetail> {

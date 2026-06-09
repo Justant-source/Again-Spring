@@ -3,8 +3,10 @@ package com.againspring.service.admin;
 import com.againspring.api.dto.response.AdminUserDetailResponse;
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.User;
-import com.againspring.repository.FeedbackRepository;
 import com.againspring.repository.UserRepository;
+import com.againspring.repository.community.PostCommentRepository;
+import com.againspring.repository.community.PostRepository;
+import com.againspring.repository.community.VoteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,18 +19,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminUserDetailService {
 
     private final UserRepository userRepository;
-    // private final SessionRepository sessionRepository; (removed)
-    private final FeedbackRepository feedbackRepository;
+    private final PostRepository postRepository;
+    private final PostCommentRepository postCommentRepository;
+    private final VoteRepository voteRepository;
 
     @Transactional(readOnly = true)
     public AdminUserDetailResponse getUserDetail(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요.", 404));
 
-        long total = 0;
-        long completed = 0;
-        long fbCount = feedbackRepository.countByUserId(userId);
-        java.time.Instant lastSession = null;
+        long postCount = postRepository.countByAuthorIdAndDeletedAtIsNull(userId);
+        long commentCount = postCommentRepository.countByAuthorIdAndDeletedAtIsNull(userId);
+        long voteCount = voteRepository.countByVoterUserId(userId);
 
         return AdminUserDetailResponse.builder()
                 .id(user.getId())
@@ -49,10 +51,9 @@ public class AdminUserDetailService {
                 .privacyAgreedAt(user.getPrivacyAgreedAt())
                 .disclaimerAgreedAt(user.getDisclaimerAgreedAt())
                 .marketingAgreedAt(user.getMarketingAgreedAt())
-                .totalSessions(total)
-                .completedSessions(completed)
-                .feedbackCount(fbCount)
-                .lastSessionAt(lastSession)
+                .postCount(postCount)
+                .commentCount(commentCount)
+                .voteCount(voteCount)
                 .build();
     }
 }

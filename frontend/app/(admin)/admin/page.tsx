@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useUserStore } from '@/lib/store/userStore';
 import { getDashboardSummary, type DashboardSummaryResponse } from '@/lib/api/admin/dashboard';
 import { getDailyStats, type DailyStatsResponse } from '@/lib/api/admin/stats';
@@ -11,16 +10,6 @@ import { SystemHealthPanel } from '@/components/admin/SystemHealthPanel';
 import { LlmFailureRateChart } from '@/components/admin/LlmFailureRateChart';
 import { AdminStatCard } from '@/components/admin/AdminStatCard';
 
-const QUICK_LINKS = [
-  { label: '회원 관리', href: '/admin/users', icon: '👥' },
-  { label: '콘텐츠 관리', href: '/admin/content', icon: '📝' },
-  { label: '신고 관리', href: '/admin/reports', icon: '🚩' },
-  { label: '문의 관리', href: '/admin/inquiries', icon: '💬' },
-  { label: '통계', href: '/admin/stats', icon: '📊' },
-  { label: '공지관리', href: '/admin/announcements', icon: '📢' },
-  { label: '감사로그', href: '/admin/audit', icon: '🔍' },
-  { label: '시스템', href: '/admin/system', icon: '⚙️' },
-];
 
 export default function AdminPage() {
   const user = useUserStore((s) => s.user);
@@ -193,55 +182,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Quick Links */}
-        <div
-          style={{
-            marginBottom: 22,
-            padding: 16,
-            background: 'white',
-            borderRadius: 12,
-            border: '1px solid #e7e3d8',
-          }}
-        >
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E', margin: '0 0 12px' }}>
-            빠른 이동
-          </h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-              gap: 10,
-            }}
-          >
-            {QUICK_LINKS.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <div
-                  style={{
-                    padding: '12px 10px',
-                    background: '#f7f6f2',
-                    border: '1px solid #e7e3d8',
-                    borderRadius: 8,
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    textDecoration: 'none',
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = '#ede8dd';
-                    (e.currentTarget as HTMLElement).style.borderColor = '#d4c9b5';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = '#f7f6f2';
-                    (e.currentTarget as HTMLElement).style.borderColor = '#e7e3d8';
-                  }}
-                >
-                  <div style={{ fontSize: 20, marginBottom: 4 }}>{link.icon}</div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: '#333' }}>{link.label}</div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -31,6 +31,9 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
      */
     long countByPostId(String postId);
 
+    /** 특정 작성자의 댓글 수 (소프트 삭제 제외) */
+    long countByAuthorIdAndDeletedAtIsNull(String authorId);
+
     /**
      * 공개용 댓글 수: 차단/삭제 제외 (status=ACTIVE, deletedAt IS NULL)
      */

@@ -33,9 +33,8 @@ public class AdminUserDetailResponse {
     private Instant disclaimerAgreedAt;
     private Instant marketingAgreedAt;
 
-    // 집계 통계
-    private long totalSessions;
-    private long completedSessions;
-    private long feedbackCount;
-    private Instant lastSessionAt;
+    // 집계 통계 (커뮤니티 모델 기준)
+    private long postCount;
+    private long commentCount;
+    private long voteCount;
 }

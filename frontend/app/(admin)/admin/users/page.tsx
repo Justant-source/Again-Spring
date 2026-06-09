@@ -40,6 +40,7 @@ const ROLE_FILTERS = [
   { value: 'TESTER', label: 'TESTER' },
   { value: 'USER', label: 'USER' },
   { value: 'GUEST', label: 'GUEST' },
+  { value: 'AI_USER', label: 'AI USER' },
 ];
 
 export default function UsersPage() {
@@ -96,9 +97,9 @@ export default function UsersPage() {
     .filter((user) => {
       if (statusFilter && user.status !== statusFilter) return false;
       if (roleFilter) {
-        if (roleFilter === 'GUEST') {
-          return user.isGuest;
-        }
+        if (roleFilter === 'AI_USER') return user.synthetic;
+        if (roleFilter === 'GUEST') return user.isGuest;
+        if (roleFilter === 'USER') return user.roles?.includes('USER') && !user.synthetic;
         return user.roles?.includes(roleFilter);
       }
       return true;
