@@ -28,7 +28,7 @@ public class JobResponse {
     private String remoteJobId;
 
     @JsonProperty("post_id")
-    private Long postId;
+    private String postId;
 
     private String status;
 
@@ -49,7 +49,7 @@ public class JobResponse {
     private String errorMessage;
 
     @JsonProperty("requested_by")
-    private Long requestedBy;
+    private String requestedBy;
 
     @JsonProperty("poll_fail_count")
     private Integer pollFailCount;

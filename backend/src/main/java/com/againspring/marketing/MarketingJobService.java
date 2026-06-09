@@ -38,8 +38,8 @@ public class MarketingJobService {
     /**
      * Create a new marketing job for a post
      */
-    public MarketingJob createJob(Long postId, List<String> targets, boolean autoPublish, Long requestedBy) {
-        Post post = postRepository.findById(String.valueOf(postId))
+    public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
+        Post post = postRepository.findById(postId)
             .orElseThrow(() -> new IllegalArgumentException("Post not found: " + postId));
 
         // Build brief from post
@@ -81,7 +81,7 @@ public class MarketingJobService {
         // Save marketing job
         MarketingJob job = MarketingJob.builder()
             .remoteJobId(response.getJobId())
-            .postId(Long.parseLong(post.getId()))
+            .postId(post.getId())
             .status(response.getStatus())
             .autoPublish(autoPublish)
             .requestedBy(requestedBy)

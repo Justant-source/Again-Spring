@@ -29,8 +29,8 @@ public class MarketingJob {
     @Column(unique = true, length = 64)
     private String remoteJobId;
 
-    @Column(nullable = false)
-    private Long postId;
+    @Column(nullable = false, length = 32)
+    private String postId;
 
     @Column(nullable = false, length = 20)
     @Builder.Default
@@ -59,8 +59,8 @@ public class MarketingJob {
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
-    @Column
-    private Long requestedBy;
+    @Column(length = 32)
+    private String requestedBy;
 
     @Column
     @Builder.Default

@@ -16,7 +16,7 @@ import java.util.List;
 public class CreateJobRequest {
 
     @NotNull(message = "postId는 필수입니다")
-    private Long postId;
+    private String postId;
 
     @NotEmpty(message = "targets는 최소 1개 이상이어야 합니다")
     private List<String> targets;
