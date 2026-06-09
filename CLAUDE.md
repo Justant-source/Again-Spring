@@ -34,6 +34,7 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
 
 - **SSH**: `ssh justant@100.115.252.61`
 - **프로젝트 경로**: `/home/justant/Data/Again-Spring-Marketing`
+- **GitHub**: `https://github.com/Justant-source/Again-Spring-Marketing` (private)
 - **권한**: 코드 수정·commit·push 모두 허용 (명시적 지시 기준)
 - **스택**: Python 3.12 + FastAPI + Alembic / Node.js 서브서비스 (`services/`)
 - **실행 중 서비스**: `docker compose up -d` (ASM 서버 포트 8200)
