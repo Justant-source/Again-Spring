@@ -63,8 +63,8 @@ public class MarketingJobService {
             .build();
 
         OptionsDto options = OptionsDto.builder()
-            .voiceId(null)
-            .tone(null)
+            .voiceId("default")
+            .tone("warm")
             .autoPublish(autoPublish)
             .build();
 

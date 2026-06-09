@@ -3,7 +3,6 @@ package com.againspring.marketing;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.marketing.dto.CreateJobRequest;
 import com.againspring.marketing.dto.CreateJobResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -15,21 +14,17 @@ import org.springframework.web.client.RestClient;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class AsmClient {
 
     private final AsmProperties asmProperties;
-    private RestClient restClient;
+    private final RestClient restClient;
 
-    private RestClient getRestClient() {
-        if (restClient == null) {
-            restClient = RestClient.builder()
-                .baseUrl(asmProperties.getBaseUrl())
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + asmProperties.getApiToken())
-                .build();
-        }
-        return restClient;
+    public AsmClient(AsmProperties asmProperties, RestClient.Builder restClientBuilder) {
+        this.asmProperties = asmProperties;
+        this.restClient = restClientBuilder
+            .baseUrl(asmProperties.getBaseUrl())
+            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + asmProperties.getApiToken())
+            .build();
     }
 
     /**
@@ -37,9 +32,10 @@ public class AsmClient {
      */
     public CreateJobResponse createJob(CreateJobRequest request) {
         try {
-            return getRestClient()
+            return restClient
                 .post()
                 .uri("/api/v1/jobs")
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
                 .retrieve()
                 .body(CreateJobResponse.class);
@@ -54,7 +50,7 @@ public class AsmClient {
      */
     public AsmJobView getJob(String jobId) {
         try {
-            return getRestClient()
+            return restClient
                 .get()
                 .uri("/api/v1/jobs/{jobId}", jobId)
                 .retrieve()
@@ -70,9 +66,10 @@ public class AsmClient {
      */
     public AsmJobView publish(String jobId) {
         try {
-            return getRestClient()
+            return restClient
                 .post()
                 .uri("/api/v1/jobs/{jobId}/publish", jobId)
+                .contentType(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .body(AsmJobView.class);
         } catch (Exception e) {
