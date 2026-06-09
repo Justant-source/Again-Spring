@@ -63,7 +63,7 @@ export function CreateMarketingJobDialog({ postId, onClose, onCreated }: Props) 
     setError('');
     try {
       const job = await createMarketingJob(
-        parseInt(postId),
+        postId,
         Array.from(selectedPlatforms),
         autoPublish
       );

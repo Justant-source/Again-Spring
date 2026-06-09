@@ -5,7 +5,7 @@ import { api } from '@/lib/api/client';
 export interface MarketingJob {
   id: number;
   remoteJobId: string | null;
-  postId: number;
+  postId: string;
   status: string; // REQUESTED|QUEUED|RUNNING|READY|PUBLISHING|PUBLISHED|FAILED|STALE
   phase: string | null;
   progress: number;
@@ -21,7 +21,7 @@ export interface MarketingJob {
 }
 
 export interface CreateMarketingJobRequest {
-  postId: number;
+  postId: string;
   targets: string[];
   autoPublish: boolean;
 }
@@ -29,7 +29,7 @@ export interface CreateMarketingJobRequest {
 // ===== API Functions =====
 
 export async function createMarketingJob(
-  postId: number,
+  postId: string,
   targets: string[],
   autoPublish: boolean
 ): Promise<MarketingJob> {
