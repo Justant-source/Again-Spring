@@ -1,7 +1,6 @@
 package com.againspring.api.admin.dto;
 
 import com.againspring.domain.marketing.MarketingJob;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
@@ -23,44 +22,20 @@ import java.util.Map;
 public class JobResponse {
 
     private Long id;
-
-    @JsonProperty("remote_job_id")
     private String remoteJobId;
-
-    @JsonProperty("post_id")
     private String postId;
-
     private String status;
-
     private String phase;
-
     private Double progress;
-
     private List<String> targets;
-
-    @JsonProperty("auto_publish")
     private Boolean autoPublish;
-
     private Map<String, Object> artifacts;
-
     private List<Map<String, Object>> publications;
-
-    @JsonProperty("error_message")
     private String errorMessage;
-
-    @JsonProperty("requested_by")
     private String requestedBy;
-
-    @JsonProperty("poll_fail_count")
     private Integer pollFailCount;
-
-    @JsonProperty("last_polled_at")
     private Instant lastPolledAt;
-
-    @JsonProperty("created_at")
     private Instant createdAt;
-
-    @JsonProperty("updated_at")
     private Instant updatedAt;
 
     /**

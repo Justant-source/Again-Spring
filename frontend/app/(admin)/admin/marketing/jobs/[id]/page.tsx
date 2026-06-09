@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,13 +25,8 @@ const STATUS_COLORS: Record<string, string> = {
   STALE: 'bg-gray-400 text-white',
 };
 
-interface PageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function MarketingJobDetailPage({ params }: PageProps) {
+export default function MarketingJobDetailPage() {
+  const params = useParams();
   const router = useRouter();
   const [job, setJob] = useState<MarketingJob | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +39,7 @@ export default function MarketingJobDetailPage({ params }: PageProps) {
   const loadJob = async () => {
     setLoading(true);
     try {
-      const data = await getMarketingJob(parseInt(params.id));
+      const data = await getMarketingJob(parseInt(params.id as string));
       setJob(data);
     } catch (error) {
       console.error('Failed to load marketing job:', error);
@@ -121,7 +116,9 @@ export default function MarketingJobDetailPage({ params }: PageProps) {
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">진행률</label>
-              <p className="text-lg">{job.progress}%</p>
+              <p className="text-lg">
+                {typeof job.progress === 'number' ? `${Math.round(job.progress * 100)}%` : '-'}
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">자동 게시</label>
@@ -162,7 +159,7 @@ export default function MarketingJobDetailPage({ params }: PageProps) {
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">타겟 플랫폼</h3>
           <div className="flex flex-wrap gap-2">
-            {job.targets.map((target) => (
+            {(job.targets ?? []).map((target) => (
               <Badge key={target} variant="secondary">
                 {target}
               </Badge>
@@ -175,21 +172,24 @@ export default function MarketingJobDetailPage({ params }: PageProps) {
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">생성된 아티팩트</h3>
             <div className="space-y-2">
-              {Object.entries(job.artifacts).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <span className="font-mono text-sm">{key}</span>
-                  {value && value.startsWith('http') ? (
-                    <a href={value} target="_blank" rel="noopener noreferrer">
-                      <Button variant="ghost" size="sm">
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        보기
-                      </Button>
-                    </a>
-                  ) : (
-                    <span className="text-xs text-gray-500">{value || '없음'}</span>
-                  )}
-                </div>
-              ))}
+              {Object.entries(job.artifacts).map(([key, value]) => {
+                const strVal = typeof value === 'string' ? value : JSON.stringify(value);
+                return (
+                  <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                    <span className="font-mono text-sm">{key}</span>
+                    {strVal && strVal.startsWith('http') ? (
+                      <a href={strVal} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="sm">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          보기
+                        </Button>
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-500 max-w-[300px] truncate">{strVal || '없음'}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Card>
         )}
