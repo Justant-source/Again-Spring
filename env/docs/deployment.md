@@ -106,19 +106,15 @@ curl http://localhost:8091/actuator/health
 - [ ] 호스트 `~/.claude` 세션 유효 (만료 시 재로그인 → `cd env && docker compose restart againspring-llm`)
 - [ ] Cloudflare Tunnel 가동 중 (`systemctl status cloudflared`)
 
-## ⛔ prod 미지원 기능 — 절대 활성화 금지
+## 마케팅 기능 (ASM으로 분리)
 
-아래 기능은 **prod에 포함하지 않는다**. Q1/Q2/Q3 답변 완료 + 명시적 prod 배포 지시 전까지 잠금.
+마케팅 기능은 별도 서비스 **Again-Spring-Marketing (ASM)** 으로 분리됨.
 
-| 기능 | 이유 |
-|---|---|
-| **마케팅 자동화 대시보드** (`/admin/marketing`) | 저작권·사이드프로젝트정책·익명운영 미결(Q1~Q3) |
-| `marketing-renderer` 컨테이너 | 마케팅 대시보드 미지원이므로 불필요 |
-| `MARKETING_ENABLED=true` | prod `.env.prod`에 추가 절대 금지 |
+- Again-Spring은 ASM을 호출하는 thin client만 담당
+- `ASM_ENABLED=false` 기본값 (활성화 불필요)
+- `ASM_BASE_URL`, `ASM_API_TOKEN` 비워둔 상태 유지
 
-prod 배포 시 `docker-compose.prod.yml`에 `marketing-renderer` 서비스가 없으며, BE의 모든 마케팅 빈은 `@ConditionalOnProperty`로 미등록 상태. `/api/admin/marketing/**` 엔드포인트 없음.
-
-상세 정책: `shared/docs/v15/marketing-dev-only-policy.md`
+ASM 배포 문서: Again-Spring-Marketing 프로젝트 참조
 
 ## 롤백
 

@@ -195,13 +195,7 @@ flowchart LR
 |---|---|---|---|---|
 | POST | `/api/admin/prompts/reload` | **JWT + ADMIN** | 200 / 500 | [admin.md](admin.md) |
 
-### 11. Admin — Marketing (dev 전용)
-
-| Method | Path | Auth | 상태코드 | 설명 |
-|---|---|---|---|---|
-| 다수 | `/api/admin/marketing/**` | **JWT + ADMIN** | 200~500 | Story, Simulation, Content, Template, Hashtag, Calendar, Cost, SocialPublish, MarketingImage, Repurpose, Dashboard |
-
-### 12. Admin — Content Management (AI 콘텐츠 조회·첨삭)
+### 11. Admin — Content Management (AI 콘텐츠 조회·첨삭)
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
@@ -213,9 +207,9 @@ flowchart LR
 
 > `adminOpinion` (TEXT, nullable): 관리자가 첨삭 시 남긴 수정 의도·방향. 일괄 분석 MAP 프롬프트에 입력 신호로 사용됨 (V74 추가, 2026-06-08).
 
-### 13. Admin — AI Rules (전역 금지 규칙·페르소나 주의사항·첨삭 이력·일괄 분석)
+### 12. Admin — AI Rules (전역 금지 규칙·페르소나 주의사항·첨삭 이력·일괄 분석)
 
-#### 13-A. 전역 금지 규칙
+#### 12-A. 전역 금지 규칙
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
@@ -224,7 +218,7 @@ flowchart LR
 | PATCH | `/api/admin/ai-rules/global/{id}` | **JWT + ADMIN** | 200 / 404 | 활성/비활성 토글. Body: `{active}` |
 | DELETE | `/api/admin/ai-rules/global/{id}` | **JWT + ADMIN** | 204 / 404 | 삭제 |
 
-#### 13-B. 페르소나 주의사항
+#### 12-B. 페르소나 주의사항
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
@@ -232,7 +226,7 @@ flowchart LR
 | PATCH | `/api/admin/ai-rules/cautions/{corrId}` | **JWT + ADMIN** | 200 | 토글. Body: `{active}` |
 | DELETE | `/api/admin/ai-rules/cautions/{corrId}` | **JWT + ADMIN** | 204 | 삭제 |
 
-#### 13-C. 첨삭 이력
+#### 12-C. 첨삭 이력
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
@@ -241,7 +235,7 @@ flowchart LR
 | POST | `/api/admin/ai-rules/history/{id}/apply` | **JWT + ADMIN** | 200 / 404 | 단건 분석 결과 적용. Body: `{scope, personaCaution?, globalRules[], pushToBank}` |
 | PATCH | `/api/admin/ai-rules/history/{id}/skip` | **JWT + ADMIN** | 204 / 404 | SKIPPED 처리 |
 
-#### 13-D. 일괄 분석 map-reduce (비동기 job)
+#### 12-D. 일괄 분석 map-reduce (비동기 job)
 
 > MAP=Sonnet(청크별 패턴 추출) + REDUCE=Opus(통합·scope 판정). CLI 전용(API 키 미사용). (2026-06-08 추가)
 
@@ -262,7 +256,7 @@ flowchart LR
 
 **job TTL**: 30분(인메모리). 백엔드 재시작 시 유실 → 재실행으로 복구.
 
-#### 13-E. 프롬프트 템플릿
+#### 12-E. 프롬프트 템플릿
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
@@ -272,44 +266,15 @@ flowchart LR
 
 ---
 
-### 14. Admin — Test (@Profile dev only)
+### 13. Admin — Test (@Profile dev only)
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
 | POST | `/api/admin/test/reset` | JWT | 200 | [admin.md](admin.md) |
 
-### 15. Admin — Marketing: Candidate Posts (app.features.marketing.enabled=true, dev-only)
+### Marketing API
 
-> 커뮤니티 게시글을 홍보 소스로 선택하는 picker API. 사연/시뮬레이션 흐름 제거 후 도입(2026-06-08).
-
-| Method | Path | Auth | 상태코드 | 설명 |
-|---|---|---|---|---|
-| GET | `/api/admin/marketing/candidate-posts` | **JWT + ADMIN** | 200 | 후보 사연 목록 (`?sortBy=recommended\|latest&category=&q=&page=&size=`) |
-
-### 16. Admin — Marketing: Contents (app.features.marketing.enabled=true, dev-only)
-
-| Method | Path | Auth | 상태코드 | 설명 |
-|---|---|---|---|---|
-| POST | `/api/admin/marketing/contents/generate-from-post` | **JWT + ADMIN** | 202 / 400 | 커뮤니티 게시글 기반 콘텐츠 비동기 생성 (`?postId=&platforms=`) — 기본 x,instagram,naver_blog 3종 |
-| GET | `/api/admin/marketing/contents` | **JWT + ADMIN** | 200 | 콘텐츠 목록 |
-| GET | `/api/admin/marketing/contents/{id}` | **JWT + ADMIN** | 200 / 404 | 콘텐츠 단건 조회 |
-| PUT | `/api/admin/marketing/contents/{id}` | **JWT + ADMIN** | 200 / 404 | 본문 수정 (`bodyText`) |
-| DELETE | `/api/admin/marketing/contents/{id}` | **JWT + ADMIN** | 204 / 404 | 삭제 |
-| POST | `/api/admin/marketing/contents/{id}/approve` | **JWT + ADMIN** | 200 / 404 | 승인 (APPROVED) |
-| POST | `/api/admin/marketing/contents/{id}/reject` | **JWT + ADMIN** | 200 / 404 | 거부 (`?reason=`, REJECTED) |
-| POST | `/api/admin/marketing/contents/from-template/{templateId}` | **JWT + ADMIN** | 201 / 400 | 템플릿 기반 생성 (`{postId, platform, variables}`) |
-
-### 17. Admin — Marketing: Images (app.features.marketing.enabled=true, dev-only)
-
-| Method | Path | Auth | 상태코드 | 설명 |
-|---|---|---|---|---|
-| GET | `/api/admin/marketing/images/{filename}` | **JWT + ADMIN** | 200 / 400 / 404 | 이미지 PNG 서빙. `..` / `/` 포함 파일명 400 |
-
-### 18. Admin — Marketing: Cost (app.features.marketing.enabled=true, dev-only)
-
-| Method | Path | Auth | 상태코드 | 설명 |
-|---|---|---|---|---|
-| GET | `/api/admin/marketing/cost/monthly` | **JWT + ADMIN** | 200 | 월 누적 비용 + 한도 퍼센트 |
+마케팅 API는 ASM 서비스(`/api/v1/jobs`)로 이전됨. Again-Spring-Marketing 프로젝트 문서 참조.
 
 ---
 

@@ -47,10 +47,6 @@ Again-Spring/
 │
 ├── env/                       # 인프라 (Docker Compose 3-variant, nginx, Cloudflare)
 │   └── docs/
-│
-└── marketing/                 # 마케팅 자동화 사이드카 (dev 전용, 현재 비사용)
-    ├── renderer/              # 이미지 렌더링 (Playwright + Sharp, 포트 9000)
-    └── social-poster/         # 소셜 포스팅 (Playwright, 포트 9100)
 ```
 
 > **문서 규칙**: 상세 문서는 4개 docs 디렉토리(`shared/docs/`, `backend/docs/`, `frontend/docs/`, `env/docs/`)에만. 루트는 `README.md`·`CLAUDE.md`만.
@@ -81,8 +77,6 @@ Again-Spring/
 | nginx (외부 노출) | prod | 8091 |
 | llm-ai-user | dev 컨테이너 (내부) | 8092 |
 | ai-user-orchestrator | dev 컨테이너 (내부) | 8096 |
-| marketing-renderer | dev 컨테이너 | 9000 |
-| social-poster | dev 컨테이너 | 9100 |
 | BE | 로컬 개발 | 8080 |
 | FE | 로컬 개발 | 3000 |
 
@@ -162,6 +156,7 @@ cd frontend && npm run lint:emoji
 3. **prod 배포**: 명시적 "prod에 배포해줘" 지시 없으면 배포 금지
 4. **`.env.prod` git 커밋 금지**
 5. **AI 출력**: `판결/처방/승패` 표현 금지 → `공감 비율/관점` 사용
-6. **marketing**: dev 전용 사이드카 (prod 미사용)
+
+마케팅 자동화는 별도 서비스 Again-Spring-Marketing(ASM)으로 분리됨.
 
 > 상세 규칙: [`CLAUDE.md`](CLAUDE.md)

@@ -28,7 +28,6 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
 | AI 유저 학습/RAG | `ai-user/learning/` | `ai-user/docs/README.md` |
 | 공유 타입/스키마/프롬프트 | `shared/` | `shared/docs/README.md` |
 | 환경/인프라/배포 | `env/` | `env/docs/README.md` |
-| 마케팅 자동화 (dev 전용) | `marketing/` | `marketing/README.md` |
 
 ### 절대 규칙
 
@@ -133,7 +132,7 @@ cd frontend && npm run test
 
 FE/BE 기능을 **추가**하면 대응 e2e를 `frontend/tests/e2e-realbe/journeys/`에 추가, **수정**하면 e2e 갱신, **삭제**하면 e2e 제거한다.
 e2e-realbe 전체 통과는 dev→prod 배포의 필수 게이트(절대 규칙 #4).
-e2e는 **실 BE(8090)** 응답을 쓰되 **LLM 절대 호출 금지** — 가드레일 픽스처(`support/no-llm-fixture.ts`)가 `jurorCount>0` 및 분석·마케팅 생성 엔드포인트를 자동 차단한다.
+e2e는 **실 BE(8090)** 응답을 쓰되 **LLM 절대 호출 금지** — 가드레일 픽스처(`support/no-llm-fixture.ts`)가 `jurorCount>0` 및 분석 생성 엔드포인트를 자동 차단한다.
 권위본: [`frontend/docs/testing.md`](frontend/docs/testing.md)
 
 ---

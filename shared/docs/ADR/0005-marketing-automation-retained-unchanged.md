@@ -1,147 +1,41 @@
-# ADR-0005: Marketing Automation Retained Unchanged
+# ADR-0005: Marketing Automation — Moved to Again-Spring-Marketing
 
-**Date**: 2026-06-02
-**Status**: ✅ Accepted
-**Deciders**: Marketing & infrastructure team
-**Related ADRs**: [ADR-0001](./0001-pivot-to-community-plaza.md) (pivot context)
+**Status**: SUPERSEDED (2026-06-09)
+**Previous Status**: ✅ Accepted (2026-06-02)
+**Superseded By**: WO-ASM-01 (Again-Spring-Marketing extraction work order)
 
-## Context
+## Supersession Notice
 
-**V15 Marketing Automation** (Flyway V28–V39, 2026-05-31) is a dev-only subsystem that:
+The marketing automation system described in ADR-0005 (V15, 2026-06-02) has been extracted from Again-Spring into a dedicated service project:
 
-1. **Simulates social posting**: `marketing-renderer` (Chrome headless) + `social-poster` (Playwright) automate post creation to:
-   - Threads (Meta)
-   - Facebook (Meta)
-   - (Instagram scaffolded, not yet enabled)
+**Again-Spring-Marketing (ASM)** — Hosted on the WSL GPU server.
 
-2. **Content generation**: `ContentGenerator` interfaces + `ContentGeneratorRegistry` produce platform-specific post variations (copy, images, hashtags).
+This repository now acts as a thin trigger/client only, calling ASM APIs for marketing operations.
 
-3. **Image rendering**: `/render-chat` endpoint (HTTP GET) returns HTML/CSS → PNG (chat UI mockup for social previews).
+## What Changed
 
-4. **Admin dashboard**: `marketing/admin` endpoints for managing content/campaigns (read-only in v1, write in v2).
+- **Before (2026-06-02)**: Marketing services (`marketing-renderer`, `social-poster`) were sidecars in `docker-compose.dev.yml`.
+- **After (2026-06-09)**: Marketing services removed. `marketing/` directory deleted. BE now calls ASM via HTTP (configurable `ASM_BASE_URL`).
 
-**Artifact locations**:
-- Code: `backend/src/main/java/com/againspring/service/marketing/`, `backend/src/main/java/com/againspring/api/admin/SocialPublishController.java`
-- Services: `marketing-renderer/` (Express), `social-poster/` (Node CLI wrapper on Playwright)
-- Database: `contents` table (Flyway V35+), `social_credentials`, `content_schedules`
-- Docs: `shared/docs/v15/`, `marketing/docs/` (dev-only)
+## References
 
-**With community plaza pivot**:
+- **ASM Project**: `Again-Spring-Marketing/` (separate repository)
+- **Integration Point**: `ASM_BASE_URL`, `ASM_API_TOKEN`, `ASM_ENABLED` env vars in Again-Spring backend
+- **API Gateway**: nginx `/api/admin/marketing/` reverse-proxies to ASM when enabled
 
-The old 1:1 chat code (Session/Turn/Message) used by V15 for `/render-chat` is now deleted. Question arises:
+## Migration Path
 
-> Does V15 marketing automation depend on legacy chat code and break with the pivot?
+For dev/testing:
+1. Clone `Again-Spring-Marketing` to WSL GPU server
+2. Configure Again-Spring `ASM_BASE_URL=http://100.115.252.61:8200`
+3. Backend calls ASM endpoints as needed
 
-**Investigation result**: **No dependency detected**. V15 is fully isolated:
-- `/render-chat` endpoint is no-op (returns placeholder HTML, doesn't render real sessions)
-- `ContentGenerator` is abstract; implementations exist for each platform (no chat coupling)
-- No `SessionService` calls in `SocialPublishController`
-- Database: `contents`, `social_credentials`, `content_schedules` tables exist independently
+For prod:
+- Set `ASM_ENABLED=false` (default)
+- Omit `ASM_BASE_URL`, `ASM_API_TOKEN` from `.env.prod`
 
-**Decision question**: Retain V15 unchanged, or prune/upgrade?
-
-## Decision
-
-**Retain V15 marketing automation unchanged**.
-
-1. **No breaking changes**: Legacy code deletion doesn't affect V15 (verified).
-2. **Keep isolation**: V15 is development-only; no prod customer impact.
-3. **Future integration point**: V15.10+ can integrate real community posts into content generation (e.g., "trending posts" feature).
-4. **Minimal effort**: Retaining is cheaper than removing + re-building later.
-
-## Rationale
-
-| Factor | Retain | Remove | Winner |
-|--------|--------|--------|--------|
-| **Breaking changes** | None | None (fully isolated) | Tie |
-| **Cleanup cost** | Zero (already isolated) | Moderate (7 files, 2 tables) | Retain |
-| **Future value** | High (content pipeline) | None | Retain |
-| **Prod risk** | Zero (dev-only) | Zero | Tie |
-| **Maintenance burden** | Minimal (no active use) | Minimal (already gone) | Tie |
-| **Learning value** | Templates for next feature | Lost | Retain |
-
-**Strategic choice**: Retain as template for future community + social integration.
-
-## Positive Consequences
-
-- ✅ **Zero work**: No changes needed; V15 works as-is.
-- ✅ **Preserved template**: `ContentGenerator` interface is reusable for v2 (real posts → social).
-- ✅ **Future integration**: Can generate social content from trending community posts (quick MVP).
-- ✅ **Dev tooling**: Marketing team keeps dev testing environment operational.
-
-## Negative Consequences
-
-- ❌ **Code cruft**: 3 services + 7 services files remain unused in prod.
-- ❌ **Documentation`: V15 docs are dev-only; confusing for main product docs.
-- ❌ **Testing**: V15 tests not run in prod pipeline (E2E only covers community plaza).
-- ❌ **Maintenance debt**: If V15 is revived, code may have rotted (dependencies, security patches).
-
-## Implementation Notes
-
-### V15 Isolation Verified
-
-**Checked dependencies**:
-- ❌ `SocialPublishController` → SessionService: NOT FOUND
-- ❌ `ContentGenerator` → ChatService: NOT FOUND
-- ❌ `MarketingImageController` → Turn/Message: NOT FOUND
-- ✅ `ContentsTable` → independent schema (Flyway V35+)
-- ✅ `/render-chat` endpoint → returns static HTML (no render logic)
-
-**Services (unchanged)**:
-- `marketing-renderer` (Express server, `/render-chat`, `/render-post`)
-- `social-poster` (Node CLI for Threads/Facebook/Instagram)
-- `social-credentials`, `content_schedules` tables (Flyway V36, V37)
-
-### No Code Changes
-
-- ✅ `backend/src/main/java/com/againspring/service/marketing/` — unchanged
-- ✅ `backend/src/main/java/com/againspring/api/admin/SocialPublishController.java` — unchanged
-- ✅ `marketing/` module — unchanged
-- ✅ Database: Flyway V28–V39 migrations retained
-
-### Documentation Updates
-
-**Mark V15 as dev-only** in main docs:
-- Add header to `shared/docs/README.md`: "**V15 Marketing Automation (dev-only)** — See `shared/docs/v15/` for details."
-- Link: `[V15 Documentation](shared/docs/v15/README.md)`
-
-**Separate docs path**:
-- Main product docs: `shared/docs/api/`, `shared/docs/policies/`, `backend/docs/`, `frontend/docs/`
-- V15 marketing docs: `shared/docs/v15/` (development-only, not indexed in main README)
-
-### Rollout
-
-- **Dev**: V15 fully operational. No changes needed.
-- **Prod**: V15 containers (`marketing-renderer`, `social-poster`) not deployed (dev-only environment variables not set in prod).
-
-## Future Integration (V15.10+)
-
-Once V15 is considered for prod, integrate with community plaza:
-
-```
-Community Post (FE user input)
-    ↓
-PostComposeService (backend)
-    ↓
-ContentGenerator (extends for auto-social)
-    ↓
-SocialPublishController
-    ↓
-Threads/Facebook/Instagram (auto-posting)
-```
-
-See `marketing/docs/` for roadmap.
-
-## Related Assets
-
-- **Marketing services**: `backend/src/main/java/com/againspring/service/marketing/`
-- **Social publishing**: `backend/src/main/java/com/againspring/api/admin/SocialPublishController.java`
-- **V15 documentation**: `shared/docs/v15/README.md`, `marketing/docs/`
-- **Content tables**: Flyway V35–V39 (`contents`, `social_credentials`, `content_schedules`)
-- **Renderer service**: `marketing-renderer/` (Express server)
-- **Poster service**: `social-poster/` (Playwright automation)
-- **Docker compose**: `env/docker-compose.dev.yml` (only includes marketing services)
+See ASM project documentation for full integration guide.
 
 ---
 
-**Next ADR**: ADR-0006 (Legacy Deletion and Git Recovery)
+**Previous ADR Content**: See `git show 99322622:shared/docs/ADR/0005-marketing-automation-retained-unchanged.md` (archived before extraction)

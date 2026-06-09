@@ -59,7 +59,6 @@
         "canAnonymizeUser": false,
         "canViewCrisisMonitor": false,
         "canViewSystemHealth": false,
-        "canAccessMarketing": false
       }
     },
     "registered": {
@@ -117,7 +116,6 @@
         "canAnonymizeUser": false,
         "canViewCrisisMonitor": false,
         "canViewSystemHealth": false,
-        "canAccessMarketing": false
       }
     },
     "admin": {
@@ -210,7 +208,6 @@
     "admin.canModifyFeedback": "의견함 상태 변경·관리자 메모",
     "admin.canAnonymizeUser": "사용자 데이터 익명화 (되돌릴 수 없음)",
     "admin.canViewCrisisMonitor": "위기 메시지 메타데이터 모니터 (본문은 항상 노출 X)",
-    "admin.canViewSystemHealth": "시스템 헬스 패널·LLM 실패율 차트",
-    "admin.canAccessMarketing": "마케팅 자동화 대시보드(/admin/marketing) 접근 가능 여부"
+    "admin.canViewSystemHealth": "시스템 헬스 패널·LLM 실패율 차트"
   }
 }

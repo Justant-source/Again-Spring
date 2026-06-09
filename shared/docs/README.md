@@ -11,7 +11,7 @@
 - [ADR-0002](./ADR/0002-psychology-model-repurposed-for-jurors.md) — 심리학 모델 배심원 페르소나화 (Gottman/NVC/EFT)
 - [ADR-0003](./ADR/0003-llm-consolidated-to-claude-code-cli.md) — LLM 통합 (Claude Code CLI 단일 경로)
 - [ADR-0004](./ADR/0004-onboarding-mbti-hidden-not-removed.md) — 온보딩/MBTI 숨김 (삭제 아님)
-- [ADR-0005](./ADR/0005-marketing-automation-retained-unchanged.md) — V15 마케팅 자동화 유지 (격리됨)
+- [ADR-0005](./ADR/0005-marketing-automation-retained-unchanged.md) — 마케팅 자동화 → Again-Spring-Marketing(ASM) 분리 (2026-06-09 superseded)
 - [ADR-0006](./ADR/0006-legacy-deletion-and-git-recovery.md) — 🔴 **삭제 원장 및 복구 경로** (60+ 파일, 8 테이블)
 
 ## 문서 인덱스
