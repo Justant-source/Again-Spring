@@ -105,7 +105,6 @@ Again-Spring/
 | **`backend/`** | API + 비즈니스 + DB + 프롬프트 어셈블 + 보안 — JVM 프로세스 |
 | **`llm-worker/`** | Claude CLI 실행 전용 워커 — 100풀 + 큐500, HTTP API |
 | **`frontend/`** | UI + 라우팅 + 상태 + axios — Next.js 프로세스 |
-| **`marketing/`** | 마케팅 자동화 통합 (dev 전용) — `docs/` 전략 문서 · `renderer/` 이미지 렌더링(9000) · `social-poster/` 소셜 발행(9100, Playwright 세션 재사용) |
 | **`shared/docs/`** | 양쪽이 합의한 정책/명세/아키텍처 — **유일한 공유 문서** |
 | **`shared/docs/prompts/`** | LLM 시스템·턴 프롬프트 — BE가 시작 시 로드 (런타임 자산) |
 

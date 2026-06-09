@@ -42,17 +42,11 @@ llm bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude`
 | `ai-learning` | `againspring-ai-learning` | build `../ai-user/learning` | `8099:8099` | `mariadb-dev` (healthy) |
 | `backend-dev` | `againspring-backend-dev` | build `../backend` | internal | `mariadb-dev` (healthy) |
 | `frontend-dev` | `againspring-frontend-dev` | build `../frontend` | internal | `backend-dev` |
-| `marketing-renderer-dev` | `againspring-marketing-renderer-dev` | build `../marketing/renderer` | internal (9000) | — |
-| `social-poster-dev` | `againspring-social-poster-dev` | build `../marketing/social-poster` | internal (9100) | — |
 | `nginx-dev` | `againspring-nginx-dev` | `nginx:alpine` | `8090:80` | `frontend-dev`, `backend-dev` |
 
 `backend-dev`는 `againspring-dev`·`againspring` 두 네트워크에 연결 → `againspring-llm:8090` 접근.
 
 `SPRING_PROFILES_ACTIVE=dev` 활성화 → Flyway disabled, ddl-auto=update, Swagger UI on.
-
-**dev 전용 추가 서비스:**
-- `marketing-renderer-dev` (포트 9000 내부): Node.js + Playwright + Sharp. 마케팅 콘텐츠용 PNG 렌더링.
-- `social-poster-dev` (포트 9100 내부): Node.js + Playwright. X·Instagram 자동 포스팅. `src/` 디렉토리가 호스트에서 bind mount되어 nodemon으로 핫리로드.
 
 ### 3. prod (`docker-compose.prod.yml`)
 

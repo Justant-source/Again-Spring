@@ -39,13 +39,4 @@ management:
 
 app:
   features:
-    marketing:
-      enabled: ${MARKETING_ENABLED:false}
-      renderer-url: ${MARKETING_RENDERER_URL:http://againspring-marketing-renderer-prod:9000}
-      social-poster-url: ${SOCIAL_POSTER_URL:http://againspring-social-poster-prod:9100}
-      image-dir: /var/marketing-assets
-  social:
-    master-key: ${SOCIAL_MASTER_KEY:}
-    publishing-enabled: ${SOCIAL_PUBLISHING_ENABLED:true}
-    webhook-url: ${SOCIAL_WEBHOOK_URL:}
-    email: ${SOCIAL_EMAIL:}
+    duo-mode: ${DUO_MODE_ENABLED:false}
