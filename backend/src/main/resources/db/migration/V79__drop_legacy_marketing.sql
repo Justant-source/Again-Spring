@@ -16,5 +16,5 @@ DROP TABLE IF EXISTS marketing_source_stories;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
--- Remove marketing_system seed user if present
-DELETE FROM users WHERE username = 'marketing_system' LIMIT 1;
+-- Remove marketing_system seed user if present (id column, not username)
+DELETE FROM users WHERE id = 'marketing_system' LIMIT 1;
