@@ -28,6 +28,15 @@ FE: Next.js 14 · BE: Spring Boot 3.3 + MariaDB 11 + Claude Code LLM 브릿지 (
 | AI 유저 학습/RAG | `ai-user/learning/` | `ai-user/docs/README.md` |
 | 공유 타입/스키마/프롬프트 | `shared/` | `shared/docs/README.md` |
 | 환경/인프라/배포 | `env/` | `env/docs/README.md` |
+| **마케팅 콘텐츠 생성 서비스 (ASM)** | SSH: `justant@100.115.252.61` | `/home/justant/Data/Again-Spring-Marketing/CLAUDE.md` |
+
+### ASM (Again-Spring-Marketing) 접근
+
+- **SSH**: `ssh justant@100.115.252.61`
+- **프로젝트 경로**: `/home/justant/Data/Again-Spring-Marketing`
+- **권한**: 코드 수정·commit·push 모두 허용 (명시적 지시 기준)
+- **스택**: Python 3.12 + FastAPI + Alembic / Node.js 서브서비스 (`services/`)
+- **실행 중 서비스**: `docker compose up -d` (ASM 서버 포트 8200)
 
 ### 절대 규칙
 
@@ -190,4 +199,4 @@ Cloudflare Tunnel: `dev.againspring.net → :8090` · `againspring.net → :8091
 
 ---
 
-**마지막 업데이트**: 2026-06-03 | **담당**: Claude Code (Agent)
+**마지막 업데이트**: 2026-06-09 | **담당**: Claude Code (Agent)
