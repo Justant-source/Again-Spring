@@ -131,6 +131,13 @@ ai:
   user:
     orchestrator-url: ${AI_USER_ORCHESTRATOR_URL:http://againspring-ai-user-orchestrator:8096}
 
+asm:
+  base-url: ${ASM_BASE_URL:http://100.115.252.61:8200}
+  api-token: ${ASM_API_TOKEN:asm-dev-token-change-in-prod}
+  poll-interval-ms: ${ASM_POLL_INTERVAL_MS:15000}
+  request-timeout-ms: ${ASM_REQUEST_TIMEOUT_MS:10000}
+  enabled: ${ASM_ENABLED:true}
+
 logging:
   level:
     root: INFO
