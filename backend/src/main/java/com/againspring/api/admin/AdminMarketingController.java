@@ -89,7 +89,7 @@ public class AdminMarketingController {
     /**
      * Proxy artifact download from ASM — streams file bytes with original content-type
      */
-    @GetMapping("/jobs/{id}/artifacts/{name}")
+    @GetMapping("/jobs/{id}/artifacts/{name:.+}")
     @Operation(summary = "Download artifact", description = "ASM 아티팩트 파일 프록시 다운로드")
     public ResponseEntity<Resource> getArtifact(@PathVariable Long id, @PathVariable String name) {
         MarketingJob job = marketingJobRepository.findById(id)
