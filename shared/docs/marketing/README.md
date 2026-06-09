@@ -45,6 +45,7 @@ shared/docs/marketing/
 ├── architecture.md     ← 시스템 설계 결정 및 데이터 흐름
 ├── asm-setup.md        ← ASM 서버 설치·운영 가이드
 ├── platforms.md        ← 지원 플랫폼 및 콘텐츠 형식
+├── credentials.md      ← 플랫폼 계정 자격증명 저장·암호화 정책
 └── social-poster.md    ← social-poster 서비스 운영 가이드
 ```
 
@@ -83,6 +84,9 @@ REQUESTED → QUEUED → RUNNING → READY → PUBLISHING → PUBLISHED
 | `ASM_POLL_INTERVAL_MS` | `15000` | 폴링 주기 (밀리초) |
 | `ASM_REQUEST_TIMEOUT_MS` | `10000` | ASM HTTP 타임아웃 |
 
+> **ASM 측 추가 env**: `ASM_CREDENTIAL_KEY` (base64 32바이트) — 플랫폼 계정 자격증명 AES-256-GCM 마스터키.
+> ASM `.env`에만 두고 git 커밋 금지. 생성: `openssl rand -base64 32`. 상세: [`credentials.md`](credentials.md)
+
 ---
 
 ## 관련 코드 위치
@@ -97,5 +101,7 @@ REQUESTED → QUEUED → RUNNING → READY → PUBLISHING → PUBLISHED
 | FE 잡 상세 | `frontend/app/(admin)/admin/marketing/jobs/[id]/page.tsx` |
 | FE 생성 다이얼로그 | `frontend/components/admin/content/CreateMarketingJobDialog.tsx` |
 | FE API 클라이언트 | `frontend/lib/api/admin/marketing.ts` |
+| FE 플랫폼 계정 UI | `frontend/components/admin/marketing/PlatformCredentialsSection.tsx` |
+| ASM 자격증명 (crypto/스키마/API) | `app/core/crypto.py` · `app/domain/credentials.py` · `app/api/routes_credentials.py` |
 | ASM 프로젝트 | `/home/justant/Data/Again-Spring-Marketing/` (WSL) |
 | ASM social-poster | `ASM/services/social-poster/` (WSL) |

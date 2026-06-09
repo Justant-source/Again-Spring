@@ -85,6 +85,22 @@ Authorization: Bearer <admin-jwt>
 
 ---
 
+### 1.5 플랫폼 자격증명 관리
+
+> ASM `/api/v1/credentials`로 투명 프록시. 시크릿은 ASM이 암호화·마스킹. 상세: [`credentials.md`](credentials.md)
+
+```
+GET    /api/admin/marketing/credentials             # 7개 플랫폼 상태 (시크릿 마스킹)
+PUT    /api/admin/marketing/credentials/{platform}  # 저장/수정  body: {"values": {...}}
+DELETE /api/admin/marketing/credentials/{platform}  # 삭제 (204, 멱등)
+Authorization: Bearer <admin-jwt>
+```
+
+**GET Response 200** — `CredentialStatus[]` (아래 ASM 2.5 형식과 동일)
+**PUT**: 성공 시 단일 `CredentialStatus`. **오류**: 400 (미지원 platform / 필수 누락)
+
+---
+
 ## 2. ASM (Again-Spring-Marketing) API
 
 > Base URL: `http://100.115.252.61:8200`  
@@ -145,18 +161,19 @@ Authorization: Bearer <asm-token>
 {
   "job_id": "01HX...",
   "status": "RUNNING",
-  "phase": "copy",
-  "progress": 0.3,
+  "phase": "VIDEO",
+  "progress": 0.5,
   "artifacts": {
-    "video_mp4": "/api/v1/jobs/{id}/artifacts/video.mp4",
-    "thumbnail": "/api/v1/jobs/{id}/artifacts/thumb.png",
-    "blog_md":   "/api/v1/jobs/{id}/artifacts/blog.md",
-    "images":    []
+    "x":          { "card": "/api/v1/jobs/01HX.../artifacts/x/card.png", "caption": "..." },
+    "naver_blog": { "blog_md": "/api/v1/jobs/01HX.../artifacts/naver_blog/post.md" }
   },
   "publications": [],
   "error": null
 }
 ```
+
+> **`artifacts`는 플랫폼별 패키지 맵**(`dict[str, Any]`)이다 — `targets`에 포함된 플랫폼 value를 키로, 해당 플랫폼이 필요로 하는 아티팩트 묶음을 값으로 갖는다. (과거 문서의 평면 `video_mp4`/`thumbnail`/`blog_md`/`images` 형태는 폐기됨 — ASM commit `9aaa03d` "per-platform artifact packages".)
+> **`phase`** 는 ASM `JobPhase` enum: `SCRIPT` → `TTS` → `VIDEO` → `RENDER` → `IMAGE` → `PUBLISH` (대문자). 폴링 파서(`MarketingJob.applyRemote`)는 맵 형태 `artifacts`를 그대로 JSON 컬럼에 저장한다.
 
 ---
 
@@ -181,6 +198,40 @@ Authorization: Bearer <asm-token>
 ```
 
 **Response**: 파일 스트림 (FileResponse)
+
+---
+
+### 2.5 자격증명 (credentials)
+
+> AES-256-GCM 암호화 저장. 시크릿은 평문 미반환. 필드 스키마·병합 규칙: [`credentials.md`](credentials.md)
+
+```
+GET    /api/v1/credentials             # 7개 플랫폼 전체 상태
+PUT    /api/v1/credentials/{platform}  # 저장/수정 (병합)  body: {"values": {...}}
+DELETE /api/v1/credentials/{platform}  # 삭제 (204)
+Authorization: Bearer <asm-token>
+```
+
+**GET Response 200 (CredentialStatus[])**
+```json
+[
+  {
+    "platform": "x",
+    "fields": [
+      { "key": "email", "secret": false, "required": true },
+      { "key": "password", "secret": true, "required": true },
+      { "key": "totp_secret", "secret": true, "required": false },
+      { "key": "storage_state", "secret": true, "required": false }
+    ],
+    "configured": true,
+    "values": { "email": "again_spring@example.com" },
+    "secret_set": { "password": true, "totp_secret": false, "storage_state": false },
+    "updated_at": "2026-06-09T05:00:00"
+  }
+]
+```
+
+**오류**: 400 (미지원 platform / 필수 필드 누락), 401 (Bearer 누락)
 
 ---
 
