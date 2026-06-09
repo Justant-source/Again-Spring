@@ -4,6 +4,7 @@ import com.againspring.annotation.Auditable;
 import com.againspring.api.admin.dto.JobResponse;
 import com.againspring.api.admin.dto.CreateJobRequest;
 import com.againspring.domain.marketing.MarketingJob;
+import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,6 +39,7 @@ public class AdminMarketingController {
 
     private final MarketingJobService marketingJobService;
     private final MarketingJobRepository marketingJobRepository;
+    private final AsmClient asmClient;
 
     /**
      * Create a new marketing job for a post
@@ -81,6 +84,20 @@ public class AdminMarketingController {
         MarketingJob job = marketingJobRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
         return ResponseEntity.ok(JobResponse.from(job));
+    }
+
+    /**
+     * Proxy artifact download from ASM — streams file bytes with original content-type
+     */
+    @GetMapping("/jobs/{id}/artifacts/{name}")
+    @Operation(summary = "Download artifact", description = "ASM 아티팩트 파일 프록시 다운로드")
+    public ResponseEntity<Resource> getArtifact(@PathVariable Long id, @PathVariable String name) {
+        MarketingJob job = marketingJobRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        if (job.getRemoteJobId() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Job has no remote ID");
+        }
+        return asmClient.getArtifact(job.getRemoteJobId(), name);
     }
 
     /**

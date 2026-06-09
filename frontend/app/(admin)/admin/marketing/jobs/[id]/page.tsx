@@ -13,6 +13,7 @@ import {
   MarketingJob,
 } from '@/lib/api/admin/marketing';
 import { ExternalLink } from 'lucide-react';
+import { ArtifactSection } from '@/components/admin/marketing/ArtifactSection';
 
 const STATUS_COLORS: Record<string, string> = {
   REQUESTED: 'bg-gray-200 text-gray-800',
@@ -169,29 +170,7 @@ export default function MarketingJobDetailPage() {
 
         {/* 아티팩트 */}
         {job.artifacts && Object.keys(job.artifacts).length > 0 && (
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">생성된 아티팩트</h3>
-            <div className="space-y-2">
-              {Object.entries(job.artifacts).map(([key, value]) => {
-                const strVal = typeof value === 'string' ? value : JSON.stringify(value);
-                return (
-                  <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                    <span className="font-mono text-sm">{key}</span>
-                    {strVal && strVal.startsWith('http') ? (
-                      <a href={strVal} target="_blank" rel="noopener noreferrer">
-                        <Button variant="ghost" size="sm">
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          보기
-                        </Button>
-                      </a>
-                    ) : (
-                      <span className="text-xs text-gray-500 max-w-[300px] truncate">{strVal || '없음'}</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
+          <ArtifactSection jobId={job.id} artifacts={job.artifacts} />
         )}
 
         {/* 게시 기록 */}

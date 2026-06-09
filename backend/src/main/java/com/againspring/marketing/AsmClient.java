@@ -4,8 +4,10 @@ import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.marketing.dto.CreateJobRequest;
 import com.againspring.marketing.dto.CreateJobResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -58,6 +60,22 @@ public class AsmClient {
         } catch (Exception e) {
             log.warn("Failed to poll ASM job {}: {}", jobId, e.getMessage());
             throw new AsmUnavailableException("Failed to poll ASM job: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Download artifact from ASM as a raw byte resource
+     */
+    public ResponseEntity<Resource> getArtifact(String jobId, String name) {
+        try {
+            return restClient
+                .get()
+                .uri("/api/v1/jobs/{jobId}/artifacts/{name}", jobId, name)
+                .retrieve()
+                .toEntity(Resource.class);
+        } catch (Exception e) {
+            log.error("Failed to fetch ASM artifact {}/{}", jobId, name, e);
+            throw new AsmUnavailableException("Failed to fetch artifact: " + e.getMessage(), e);
         }
     }
 
