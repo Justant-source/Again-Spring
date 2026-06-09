@@ -5,10 +5,12 @@ import com.againspring.domain.ai.AiContentCorrection;
 import com.againspring.domain.ai.AiGlobalRule;
 import com.againspring.domain.ai.AiPromptTemplate;
 import com.againspring.domain.ai.PersonaVoiceRef;
+import com.againspring.domain.ai.SystemSetting;
 import com.againspring.repository.ai.AiContentCorrectionRepository;
 import com.againspring.repository.ai.AiGlobalRuleRepository;
 import com.againspring.repository.ai.AiPromptTemplateRepository;
 import com.againspring.repository.ai.PersonaVoiceRefRepository;
+import com.againspring.repository.ai.SystemSettingRepository;
 import com.againspring.service.ai.AiCorrectionService;
 import com.againspring.service.ai.AiBatchLearningService;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -56,6 +58,7 @@ public class AdminAiRulesController {
     private final AiBatchLearningService aiBatchLearningService;
     private final AiPromptTemplateRepository promptTemplateRepository;
     private final ObjectMapper objectMapper;
+    private final SystemSettingRepository systemSettingRepository;
 
     @Value("${ai.prompt.llm-url:http://againspring-llm-ai-user:8092}")
     private String llmAiUserUrl;
@@ -412,5 +415,65 @@ public class AdminAiRulesController {
     @Getter @Setter
     public static class UpdatePromptRequest {
         private String content;
+    }
+
+    // =====================================================================
+    // 시스템 설정 — Claude / Anthropic API 키 관리
+    // =====================================================================
+
+    private static final String KEY_ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY";
+
+    @GetMapping("/settings/anthropic-api-key")
+    @Operation(summary = "Anthropic API 키 상태 조회", description = "설정 여부와 마스킹된 값을 반환합니다.")
+    public ResponseEntity<Map<String, Object>> getAnthropicApiKey() {
+        return systemSettingRepository.findById(KEY_ANTHROPIC_API_KEY)
+                .map(s -> {
+                    String val = s.getSettingValue();
+                    String masked = maskApiKey(val);
+                    return ResponseEntity.ok(Map.<String, Object>of(
+                            "isSet", true,
+                            "maskedValue", masked,
+                            "updatedAt", s.getUpdatedAt() != null ? s.getUpdatedAt().toString() : null,
+                            "updatedBy", s.getUpdatedBy() != null ? s.getUpdatedBy() : ""
+                    ));
+                })
+                .orElseGet(() -> ResponseEntity.ok(Map.of("isSet", false, "maskedValue", "", "updatedAt", "", "updatedBy", "")));
+    }
+
+    @PutMapping("/settings/anthropic-api-key")
+    @Operation(summary = "Anthropic API 키 저장/갱신")
+    @Auditable(action = "UPSERT_ANTHROPIC_API_KEY")
+    public ResponseEntity<Map<String, Object>> upsertAnthropicApiKey(
+            @RequestBody Map<String, String> body,
+            org.springframework.security.core.Authentication auth) {
+        String value = body.get("value");
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "value is required");
+        }
+        SystemSetting setting = systemSettingRepository.findById(KEY_ANTHROPIC_API_KEY)
+                .orElse(SystemSetting.builder().settingKey(KEY_ANTHROPIC_API_KEY).build());
+        setting.setSettingValue(value.strip());
+        setting.setUpdatedAt(Instant.now());
+        setting.setUpdatedBy(auth.getName());
+        systemSettingRepository.save(setting);
+        return ResponseEntity.ok(Map.of(
+                "isSet", true,
+                "maskedValue", maskApiKey(value.strip()),
+                "updatedAt", setting.getUpdatedAt().toString(),
+                "updatedBy", auth.getName()
+        ));
+    }
+
+    @DeleteMapping("/settings/anthropic-api-key")
+    @Operation(summary = "Anthropic API 키 삭제")
+    @Auditable(action = "DELETE_ANTHROPIC_API_KEY")
+    public ResponseEntity<Void> deleteAnthropicApiKey() {
+        systemSettingRepository.deleteById(KEY_ANTHROPIC_API_KEY);
+        return ResponseEntity.noContent().build();
+    }
+
+    private static String maskApiKey(String key) {
+        if (key == null || key.length() < 8) return "****";
+        return key.substring(0, 7) + "..." + key.substring(key.length() - 4);
     }
 }

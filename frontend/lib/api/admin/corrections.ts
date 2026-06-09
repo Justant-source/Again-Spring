@@ -354,3 +354,26 @@ export async function updatePromptTemplate(key: string, content: string): Promis
   const res = await api.put<AiPromptTemplate>(`/api/admin/ai-rules/prompts/${key}`, { content });
   return res.data;
 }
+
+// ===== 시스템 설정 — Anthropic API 키 =====
+
+export interface ApiKeyStatus {
+  isSet: boolean;
+  maskedValue: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export async function getAnthropicApiKey(): Promise<ApiKeyStatus> {
+  const res = await api.get<ApiKeyStatus>('/api/admin/ai-rules/settings/anthropic-api-key');
+  return res.data;
+}
+
+export async function upsertAnthropicApiKey(value: string): Promise<ApiKeyStatus> {
+  const res = await api.put<ApiKeyStatus>('/api/admin/ai-rules/settings/anthropic-api-key', { value });
+  return res.data;
+}
+
+export async function deleteAnthropicApiKey(): Promise<void> {
+  await api.delete('/api/admin/ai-rules/settings/anthropic-api-key');
+}
