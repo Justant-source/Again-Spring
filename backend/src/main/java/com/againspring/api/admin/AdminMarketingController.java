@@ -14,7 +14,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -43,7 +46,7 @@ public class AdminMarketingController {
     @ApiResponse(responseCode = "201", description = "Job created successfully")
     @ApiResponse(responseCode = "400", description = "Invalid request")
     @Auditable(action = "CREATE_MARKETING_JOB")
-    public ResponseEntity<JobResponse> createJob(@RequestBody CreateJobRequest req) {
+    public ResponseEntity<JobResponse> createJob(@Valid @RequestBody CreateJobRequest req) {
         MarketingJob job = marketingJobService.createJob(
             req.getPostId(),
             req.getTargets(),
