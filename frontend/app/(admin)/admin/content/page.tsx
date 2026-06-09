@@ -23,6 +23,7 @@ import { AdminTable } from '@/components/admin/AdminTable';
 import { AdminPagination } from '@/components/admin/AdminPagination';
 import { EditPostDialog } from '@/components/admin/content/EditPostDialog';
 import { EditCommentDialog } from '@/components/admin/content/EditCommentDialog';
+import { CreateMarketingJobDialog } from '@/components/admin/content/CreateMarketingJobDialog';
 import {
   listAdminPosts,
   listAdminComments,
@@ -37,7 +38,7 @@ import {
 } from '@/lib/api/admin/content';
 import { AdminSection } from '@/components/admin/AdminSection';
 import { AiImproveDialog } from '@/components/admin/content/AiImproveDialog';
-import { MoreVertical, ExternalLink, Sparkles } from 'lucide-react';
+import { MoreVertical, ExternalLink, Sparkles, Zap } from 'lucide-react';
 
 const COMMENT_STATUS_LABELS: Record<string, { label: string; variant: any }> = {
   ACTIVE: { label: '활성', variant: 'default' },
@@ -66,6 +67,7 @@ export default function AdminContentPage() {
   const [postSearchQuery, setPostSearchQuery] = useState('');
   const [selectedPost, setSelectedPost] = useState<AdminPost | null>(null);
   const [improvePost, setImprovePost] = useState<AdminPost | null>(null);
+  const [marketingPostId, setMarketingPostId] = useState<string | null>(null);
 
   // Comments state
   const [comments, setComments] = useState<AdminComment[]>([]);
@@ -339,6 +341,10 @@ export default function AdminContentPage() {
                           <Sparkles className="h-4 w-4 mr-2" />
                           AI 개선{row.synthetic ? '' : ' (학습 데이터)'}
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setMarketingPostId(row.id)}>
+                          <Zap className="h-4 w-4 mr-2" />
+                          마케팅 제작 요청
+                        </DropdownMenuItem>
                         {row.status !== 'BLOCKED' && (
                           <DropdownMenuItem onClick={() => handleBlockPost(row)}>
                             차단
@@ -560,6 +566,16 @@ export default function AdminContentPage() {
         onCommitted={() => {
           setImproveComment(null);
           loadComments(commentsPage);
+        }}
+      />
+
+      {/* 마케팅 제작 요청 다이얼로그 */}
+      <CreateMarketingJobDialog
+        postId={marketingPostId}
+        onClose={() => setMarketingPostId(null)}
+        onCreated={() => {
+          setMarketingPostId(null);
+          alert('마케팅 제작을 요청했습니다. 마케팅 잡 관리에서 진행상황을 확인할 수 있습니다.');
         }}
       />
     </AdminSection>

@@ -13,3 +13,4 @@ export * from './announcements';
 export * from './notifications';
 export * from './audit';
 export * from './system';
+export * from './marketing';
