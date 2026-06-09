@@ -162,7 +162,7 @@ test.describe('Journey 13-C: 마케팅 잡 생성·조회 흐름 (ASM 스텁)', 
       },
     })
 
-    expect(res.status(), '잡 생성 응답 코드').toBeOneOf([200, 201])
+    expect([200, 201], '잡 생성 응답 코드 200/201').toContain(res.status())
     const job = await res.json()
     expect(job.id, '잡 ID 존재').toBeTruthy()
     expect(job.status, '초기 상태').toMatch(/^(REQUESTED|QUEUED)$/)

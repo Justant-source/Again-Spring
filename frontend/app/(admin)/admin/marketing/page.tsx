@@ -23,6 +23,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PlatformCredentialsSection } from '@/components/admin/marketing/PlatformCredentialsSection';
 import {
   listMarketingJobs,
   createMarketingJob,
@@ -43,10 +45,15 @@ const STATUS_COLORS: Record<string, string> = {
 const TARGET_PLATFORMS = [
   { value: 'naver_blog', label: '네이버 블로그' },
   { value: 'x', label: 'X (트위터)' },
-  { value: 'instagram', label: '인스타그램' },
+  { value: 'instagram_feed', label: '인스타그램 피드' },
+  { value: 'instagram_reels', label: '인스타그램 릴스' },
+  { value: 'youtube_shorts', label: 'YouTube Shorts' },
+  { value: 'naver_clip', label: '네이버 클립' },
+  { value: 'threads', label: 'Threads' },
 ];
 
 export default function MarketingJobsPage() {
+  const [activeTab, setActiveTab] = useState('jobs');
   const [jobs, setJobs] = useState<MarketingJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +117,14 @@ export default function MarketingJobsPage() {
   };
 
   return (
-    <AdminSection title="마케팅 잡 관리">
+    <AdminSection title="마케팅">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="jobs">마케팅 잡</TabsTrigger>
+          <TabsTrigger value="credentials">플랫폼 계정</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="jobs">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-gray-500">
           사연을 선택하고 ASM(Again-Spring-Marketing) 서버에 콘텐츠 생성을 요청합니다.
@@ -201,6 +215,12 @@ export default function MarketingJobsPage() {
           </div>
         )}
       </Card>
+        </TabsContent>
+
+        <TabsContent value="credentials">
+          <PlatformCredentialsSection />
+        </TabsContent>
+      </Tabs>
 
       {/* 새 마케팅 잡 생성 다이얼로그 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

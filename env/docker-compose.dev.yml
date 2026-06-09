@@ -85,7 +85,7 @@ services:
       AI_USER_DAILY_GLOBAL_CAP: ${AI_USER_DAILY_GLOBAL_CAP:-200}
       AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-dev-pw-2026}
       AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
-      AI_USER_HISTORY_DIR: ${AI_USER_HISTORY_DIR:-/app/persona-history}
+      AI_USER_HISTORY_DIR: ${AI_USER_HISTORY_DIR:-/app/personas/profiles}
       AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
       AI_LEARNING_BASE_URL: http://againspring-ai-learning:8099
       SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
@@ -97,8 +97,7 @@ services:
       PAIRED_POST_CRON: "${PAIRED_POST_CRON:-0 0 */2 * * *}"
       PAIRED_POST_PAIRS: ${PAIRED_POST_PAIRS:-3}
     volumes:
-      - ../persona-history:/app/persona-history:rw
-      - ../ai-user/docs/personas:/app/personas:ro
+      - ../ai-user/docs/personas:/app/personas:rw
     depends_on:
       mariadb-dev:
         condition: service_healthy

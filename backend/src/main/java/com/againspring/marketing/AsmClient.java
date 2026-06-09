@@ -3,13 +3,17 @@ package com.againspring.marketing;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.marketing.dto.CreateJobRequest;
 import com.againspring.marketing.dto.CreateJobResponse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * HTTP client for ASM (Again-Spring-Marketing) service
@@ -19,10 +23,12 @@ import org.springframework.web.client.RestClient;
 public class AsmClient {
 
     private final AsmProperties asmProperties;
+    private final ObjectMapper objectMapper;
     private final RestClient restClient;
 
-    public AsmClient(AsmProperties asmProperties, RestClient.Builder restClientBuilder) {
+    public AsmClient(AsmProperties asmProperties, RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
         this.asmProperties = asmProperties;
+        this.objectMapper = objectMapper;
         this.restClient = restClientBuilder
             .baseUrl(asmProperties.getBaseUrl())
             .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + asmProperties.getApiToken())
@@ -94,5 +100,76 @@ public class AsmClient {
             log.error("Failed to publish ASM job {}", jobId, e);
             throw new AsmUnavailableException("Failed to publish ASM job: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * List all platform credential statuses (secrets masked by ASM)
+     */
+    public JsonNode listCredentials() {
+        try {
+            return restClient
+                .get()
+                .uri("/api/v1/credentials")
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (Exception e) {
+            log.error("Failed to list ASM credentials", e);
+            throw new AsmUnavailableException("Failed to list credentials: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Create or update credentials for a platform. ASM encrypts at rest and
+     * returns the masked status. 4xx from ASM (e.g. unsupported platform,
+     * missing required field) is surfaced to the caller with its status.
+     */
+    public JsonNode upsertCredential(String platform, JsonNode body) {
+        try {
+            return restClient
+                .put()
+                .uri("/api/v1/credentials/{platform}", platform)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to upsert ASM credential for {}", platform, e);
+            throw new AsmUnavailableException("Failed to upsert credential: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Delete credentials for a platform
+     */
+    public void deleteCredential(String platform) {
+        try {
+            restClient
+                .delete()
+                .uri("/api/v1/credentials/{platform}", platform)
+                .retrieve()
+                .toBodilessEntity();
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to delete ASM credential for {}", platform, e);
+            throw new AsmUnavailableException("Failed to delete credential: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Extract FastAPI's {"detail": "..."} message from an ASM 4xx response body.
+     */
+    private String asmErrorDetail(HttpClientErrorException e) {
+        try {
+            JsonNode detail = objectMapper.readTree(e.getResponseBodyAsString()).get("detail");
+            if (detail != null && detail.isTextual()) {
+                return detail.asText();
+            }
+        } catch (Exception ignored) {
+            // fall through to generic message
+        }
+        return "ASM rejected the request (" + e.getStatusCode().value() + ")";
     }
 }

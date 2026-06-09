@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -19,13 +20,14 @@ import java.time.Duration;
 
 /**
  * Anthropic Messages API를 직접 호출하는 LLM 인보커.
- * - ANTHROPIC_API_KEY 환경변수 필요
+ * - API 키: ApiKeyProvider 경유 (DB 우선 → 환경변수 폴백)
  * - 시스템 프롬프트: <<<USER_PROMPT>>> 앞 부분
  * - 유저 메시지: <<<USER_PROMPT>>> 뒤 부분
  * - 프롬프트 캐싱: system 파트의 첫 번째 text block에 cache_control 적용
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ClaudeApiInvoker implements Invoker {
 
     private static final String API_URL        = "https://api.anthropic.com/v1/messages";
@@ -40,8 +42,7 @@ public class ClaudeApiInvoker implements Invoker {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    @Value("${anthropic.api-key:}")
-    private String apiKey;
+    private final ApiKeyProvider apiKeyProvider;
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}")
     private String defaultModel;
@@ -66,6 +67,7 @@ public class ClaudeApiInvoker implements Invoker {
     }
 
     private String call(String prompt, String model, long timeoutMs) throws LlmException {
+        String apiKey = apiKeyProvider.getKey();
         if (apiKey == null || apiKey.isBlank()) {
             throw new ClaudeCodeException("API_KEY_MISSING", "ANTHROPIC_API_KEY not configured", -1, null);
         }

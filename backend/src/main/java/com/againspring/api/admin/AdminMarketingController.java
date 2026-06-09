@@ -7,6 +7,7 @@ import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
 import com.againspring.repository.marketing.MarketingJobRepository;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -112,5 +113,43 @@ public class AdminMarketingController {
     public ResponseEntity<JobResponse> publishJob(@PathVariable Long id) {
         MarketingJob job = marketingJobService.triggerPublish(id);
         return ResponseEntity.ok(JobResponse.from(job));
+    }
+
+    // ===== Platform credentials (proxied to ASM; encrypted at rest in ASM) =====
+
+    /**
+     * List per-platform credential status. Secrets are masked by ASM —
+     * only public field values and a per-secret set/unset flag are returned.
+     */
+    @GetMapping("/credentials")
+    @Operation(summary = "List platform credentials", description = "플랫폼별 계정 설정 상태 조회 (시크릿 마스킹)")
+    @ApiResponse(responseCode = "200", description = "Credential statuses listed")
+    public ResponseEntity<JsonNode> listCredentials() {
+        return ResponseEntity.ok(asmClient.listCredentials());
+    }
+
+    /**
+     * Create or update the credentials for a platform. Body is {@code {"values": {...}}};
+     * blank secret fields preserve the existing stored value (ASM merge semantics).
+     */
+    @PutMapping("/credentials/{platform}")
+    @Operation(summary = "Upsert platform credential", description = "플랫폼 계정정보 저장/수정 (ASM에서 암호화)")
+    @ApiResponse(responseCode = "200", description = "Credential saved")
+    @ApiResponse(responseCode = "400", description = "Unsupported platform or missing required field")
+    @Auditable(action = "UPSERT_MARKETING_CREDENTIAL", targetType = "MARKETING_CREDENTIAL", targetId = "#platform")
+    public ResponseEntity<JsonNode> upsertCredential(@PathVariable String platform, @RequestBody JsonNode body) {
+        return ResponseEntity.ok(asmClient.upsertCredential(platform, body));
+    }
+
+    /**
+     * Delete the stored credentials for a platform.
+     */
+    @DeleteMapping("/credentials/{platform}")
+    @Operation(summary = "Delete platform credential", description = "플랫폼 계정정보 삭제")
+    @ApiResponse(responseCode = "204", description = "Credential deleted (idempotent)")
+    @Auditable(action = "DELETE_MARKETING_CREDENTIAL", targetType = "MARKETING_CREDENTIAL", targetId = "#platform")
+    public ResponseEntity<Void> deleteCredential(@PathVariable String platform) {
+        asmClient.deleteCredential(platform);
+        return ResponseEntity.noContent().build();
     }
 }

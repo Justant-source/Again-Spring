@@ -229,7 +229,7 @@ public class ActionExecutor {
         boolean ok = backendBot.addComment(jwt, postId, text, null);
         markSeen(persona, postId, true);
         if (ok) {
-            writeHistory(persona.getId(), "comments", text, postId, null);
+            writeHistory(persona, "comments", text, postId, null);
             // AI Learning: 합격한 댓글 예시 뱅크에 저장
             aiLearningClient.saveAsync(text, "COMMENT",
                 action.targetPost() != null ? action.targetPost().getCategory() : "OTHER", "SELF_GENERATED");
@@ -282,7 +282,7 @@ public class ActionExecutor {
         }
         boolean ok = backendBot.addComment(jwt, postId, text, action.parentCommentId());
         if (ok) {
-            writeHistory(persona.getId(), "comments", text, postId, null);
+            writeHistory(persona, "comments", text, postId, null);
             // 피기백 반응 디스패치 — 부모 댓글(항목 1)만 대상
             // ActionPlanner가 자작 댓글 reply 타겟을 사전 제외하므로 authorId 검사 불필요
             java.util.List<ReactableItem> parentItems = java.util.List.of(
@@ -359,7 +359,7 @@ public class ActionExecutor {
         postOpt.ifPresent(post -> {
             if (post.getId() != null) {
                 markSeen(persona, post.getId(), true);
-                writeHistory(persona.getId(), "posts", body, post.getId(), category);
+                writeHistory(persona, "posts", body, post.getId(), category);
                 // AI Learning: 합격한 글 예시 뱅크에 저장
                 aiLearningClient.saveAsync(body, "POST", category, "SELF_GENERATED");
                 logAction(persona, action, "POSTED", corrId,
@@ -950,9 +950,11 @@ public class ActionExecutor {
         return f != null ? f : "casual";
     }
 
-    private String writeHistory(String personaId, String type, String content, String postId, String category) {
+    private void writeHistory(Persona persona, String type, String content, String postId, String category) {
         try {
-            java.nio.file.Path dir = java.nio.file.Paths.get(historyDir, personaId);
+            String email = botEmail(persona);
+            String profileName = email.contains("@") ? email.split("@")[0] : persona.getId();
+            java.nio.file.Path dir = java.nio.file.Paths.get(historyDir, profileName, "history");
             java.nio.file.Files.createDirectories(dir);
             java.nio.file.Path file = dir.resolve(type + ".md");
 
@@ -975,9 +977,8 @@ public class ActionExecutor {
                 java.nio.file.StandardOpenOption.CREATE,
                 java.nio.file.StandardOpenOption.APPEND);
         } catch (Exception e) {
-            log.debug("History write failed for persona {} type {}: {}", personaId, type, e.getMessage());
+            log.debug("History write failed for persona {} type {}: {}", persona.getId(), type, e.getMessage());
         }
-        return null;
     }
 
     private void markSeen(Persona persona, String postId, boolean acted) {

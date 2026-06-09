@@ -2,12 +2,11 @@ package com.againspring.aiuser.llm.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
  * backend 파라미터("CLI" | "API" | null)에 따라 Invoker를 선택.
- * API 키가 없으면 API 요청도 CLI로 폴백.
+ * API 키: ApiKeyProvider 경유 (DB 우선 → 환경변수 폴백). 키 없으면 CLI 폴백.
  */
 @Slf4j
 @Service
@@ -16,13 +15,12 @@ public class InvokerRouter {
 
     private final ClaudeCliInvoker cliInvoker;
     private final ClaudeApiInvoker apiInvoker;
-
-    @Value("${anthropic.api-key:}")
-    private String apiKey;
+    private final ApiKeyProvider   apiKeyProvider;
 
     public Invoker route(String backend) {
         if ("API".equalsIgnoreCase(backend)) {
-            if (apiKey == null || apiKey.isBlank()) {
+            String key = apiKeyProvider.getKey();
+            if (key == null || key.isBlank()) {
                 log.warn("[InvokerRouter] backend=API 요청됐으나 ANTHROPIC_API_KEY 미설정 → CLI 폴백");
                 return cliInvoker;
             }

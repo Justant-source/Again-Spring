@@ -434,11 +434,12 @@ JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내�
         }
         Files.writeString(dir.toPath().resolve("voice.yml"), voc.toString());
 
-        // history README
+        // history README — 실제 히스토리 파일(posts.md, comments.md)도 이 디렉토리에 저장됩니다
         Files.writeString(
             dir.toPath().resolve("history").resolve("README.md"),
             "# " + nickname + " 활동 이력\n\n" +
-            "AI 유저 행동 로그는 persona-history/" + id + "/ 에 저장됩니다.\n"
+            "- `posts.md` — 작성한 사연 히스토리\n" +
+            "- `comments.md` — 댓글/대댓글 히스토리\n"
         );
     }
 }
