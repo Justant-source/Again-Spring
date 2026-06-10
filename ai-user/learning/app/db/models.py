@@ -12,17 +12,24 @@ CREATE TABLE IF NOT EXISTS example_bank (
     topic VARCHAR(16) DEFAULT NULL,
     source VARCHAR(32) NOT NULL,
     quality_score DECIMAL(4,2),
+    register VARCHAR(16) DEFAULT NULL COMMENT 'casual|polite|mixed',
     embedding VECTOR(1024) NOT NULL,
     created_at DATETIME(3) NOT NULL DEFAULT NOW(3),
     KEY idx_type_cat (content_type, category),
     KEY idx_topic_type (topic, content_type),
-    KEY idx_source (source)
+    KEY idx_source (source),
+    KEY idx_register (register)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 """
 
 # 기존 테이블에 topic 컬럼이 없으면 추가 (idempotent)
 EXAMPLE_BANK_ADD_TOPIC_SQL = """
 ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS topic VARCHAR(16) DEFAULT NULL
+"""
+
+# 기존 테이블에 register 컬럼이 없으면 추가 (idempotent)
+EXAMPLE_BANK_ADD_REGISTER_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS register VARCHAR(16) DEFAULT NULL COMMENT 'casual|polite|mixed'
 """
 
 CRAWL_LOG_DDL = """
@@ -84,6 +91,12 @@ def create_tables():
                 logger.info("example_bank.topic column ensured")
             except Exception as e:
                 logger.warning(f"topic column alter skipped (may already exist): {e}")
+            # register 컬럼 추가
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_REGISTER_SQL)
+                logger.info("example_bank.register column ensured")
+            except Exception as e:
+                logger.warning(f"register column alter skipped (may already exist): {e}")
             # VECTOR INDEX for example_bank
             cur.execute(VECTOR_INDEX_CHECK_SQL)
             row = cur.fetchone()

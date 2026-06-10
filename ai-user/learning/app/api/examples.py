@@ -27,6 +27,8 @@ class SearchRequest(BaseModel):
     query: str
     content_type: Optional[str] = None
     category: Optional[str] = None
+    register: Optional[str] = None  # 'casual' | 'polite' | 'mixed' | None
+    exclude_self_generated: bool = True  # SELF_GENERATED 제외 여부
     top_k: int = 3
 
 
@@ -39,18 +41,20 @@ class ExampleItem(BaseModel):
 
 @router.post("/save")
 def save_example(req: SaveRequest, request: Request):
+    from app.services.register_classifier import classify as classify_register
     embed_service = request.app.state.embed_service
     try:
         vec = embed_service.embed(req.content[:512])
         vec_str = "[" + ",".join(f"{v:.8f}" for v in vec) + "]"
+        register = classify_register(req.content)
         sql = """INSERT INTO example_bank
-                 (content, content_type, category, source, quality_score, embedding, created_at)
-                 VALUES (%s, %s, %s, %s, %s, VEC_FromText(%s), NOW(3))"""
+                 (content, content_type, category, source, quality_score, register, embedding, created_at)
+                 VALUES (%s, %s, %s, %s, %s, %s, VEC_FromText(%s), NOW(3))"""
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, (
                     req.content, req.content_type, req.category,
-                    req.source, req.quality_score, vec_str
+                    req.source, req.quality_score, register, vec_str
                 ))
                 new_id = cur.lastrowid
         return {"id": new_id, "status": "saved"}
@@ -86,6 +90,20 @@ def search_examples(req: SearchRequest, request: Request) -> List[ExampleItem]:
             cat_conditions.append("(category = %s OR category IS NULL)")
             cat_params.append(req.category)
 
+        # source_conditions: SELF_GENERATED 제외
+        source_conditions: list = []
+        source_params: list = []
+        if req.exclude_self_generated:
+            source_conditions.append("source != %s")
+            source_params.append("SELF_GENERATED")
+
+        # register_conditions: 문체 필터 — Stage3에서도 유지 (quality와 다르게)
+        register_conditions: list = []
+        register_params: list = []
+        if req.register:
+            register_conditions.append("(register = %s OR register = %s)")
+            register_params.extend([req.register, 'mixed'])
+
         # ── 공통 SELECT 템플릿 ──────────────────────────────────────────────
         SELECT_TMPL = """
             SELECT id, content, source,
@@ -106,33 +124,34 @@ def search_examples(req: SearchRequest, request: Request) -> List[ExampleItem]:
                     cur.execute(sql, all_params)
                     return cur.fetchall()
 
-        # ── Stage 1: content_type + category + quality ─────────────────────
+        # ── Stage 1: content_type + category + quality + source + register ─────────────────────
         quality_condition = f"quality_score >= {MIN_QUALITY_SCORE}"
         rows = run_query(
-            base_conditions + cat_conditions + [quality_condition],
-            base_params + cat_params
+            base_conditions + cat_conditions + source_conditions + register_conditions + [quality_condition],
+            base_params + cat_params + source_params + register_params
         )
 
-        # ── Stage 2: content_type + category (quality 제거) ─────────────────
+        # ── Stage 2: content_type + category + source + register (quality 제거) ─────────────────
         if not rows and cat_conditions:
             logger.warning(
                 "search_examples stage2: no quality-filtered results for category=%s, "
                 "retrying without quality gate", req.category
             )
             rows = run_query(
-                base_conditions + cat_conditions,
-                base_params + cat_params
+                base_conditions + cat_conditions + source_conditions + register_conditions,
+                base_params + cat_params + source_params + register_params
             )
 
-        # ── Stage 3: content_type만 (category 완화) ──────────────────────────
-        # 크롤링 데이터(category='talk','hot','freeboard' 등)에 도달하는 경로
+        # ── Stage 3: content_type + source + register (category + quality 완화) ──────────────────────────
+        # 크롤링 데이터(category='talk','hot','freeboard' 등)에 도달하는 경로, source + register 유지
         if not rows:
             logger.warning(
                 "search_examples stage3: relaxing category filter for category=%s — "
                 "returning cross-category similarity matches (crawled data may appear)",
                 req.category
             )
-            rows = run_query(base_conditions, base_params)
+            rows = run_query(base_conditions + source_conditions + register_conditions,
+                           base_params + source_params + register_params)
 
         return [
             ExampleItem(id=r["id"], content=r["content"],

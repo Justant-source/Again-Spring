@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks
 from app.db.session import get_db
 from app.services.quality_filter import QualityFilter
+from app.services.register_classifier import classify as classify_register
 import logging, asyncio
 
 logger = logging.getLogger(__name__)
@@ -47,16 +48,18 @@ async def _do_crawl(source, daily_limit, embed_service):
                         continue
                     vec = embed_service.embed(item["content"][:512])
                     vec_str = "[" + ",".join(f"{v:.8f}" for v in vec) + "]"
+                    register = classify_register(item["content"])
 
                     sql = """INSERT INTO example_bank
-                             (content, content_type, category, source, quality_score, embedding, created_at)
-                             VALUES (%s, %s, %s, %s, %s, VEC_FromText(%s), NOW(3))"""
+                             (content, content_type, category, source, quality_score, register, embedding, created_at)
+                             VALUES (%s, %s, %s, %s, %s, %s, VEC_FromText(%s), NOW(3))"""
                     cur.execute(sql, (
                         item["content"],
                         item.get("content_type", "COMMENT"),
                         item.get("category", "OTHER"),
                         item.get("source", source.upper()),
                         quality.score(item["content"]),
+                        register,
                         vec_str
                     ))
                     saved += 1

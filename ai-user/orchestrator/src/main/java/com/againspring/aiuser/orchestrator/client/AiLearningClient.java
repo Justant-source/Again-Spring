@@ -52,9 +52,19 @@ public class AiLearningClient {
         private String contentType;
         private String category;
         private int topK;
+        private String register;             // "casual" | "polite" | "mixed" | null
+        private boolean excludeSelfGenerated; // true이면 SELF_GENERATED 제외
         public SearchRequest(String query, String contentType, String category, int topK) {
             this.query = query; this.contentType = contentType;
             this.category = category; this.topK = topK;
+            this.register = null;
+            this.excludeSelfGenerated = false;
+        }
+        public SearchRequest(String query, String contentType, String category, int topK, String register) {
+            this.query = query; this.contentType = contentType;
+            this.category = category; this.topK = topK;
+            this.register = register;
+            this.excludeSelfGenerated = true;
         }
     }
 
@@ -93,11 +103,16 @@ public class AiLearningClient {
 
     /** 유사 예시 top-K 검색. 실패 시 빈 리스트 반환 */
     public List<ExampleItem> findSimilar(String query, String contentType, String category, int topK) {
+        return findSimilar(query, contentType, category, topK, null);
+    }
+
+    /** 유사 예시 top-K 검색 (register/excludeSelfGenerated 포함). 실패 시 빈 리스트 반환 */
+    public List<ExampleItem> findSimilar(String query, String contentType, String category, int topK, String register) {
         if (!enabled || query == null || query.isBlank()) return Collections.emptyList();
         try {
             List<ExampleItem> result = restClient.post()
                 .uri("/examples/search")
-                .body(new SearchRequest(query, contentType, category, topK))
+                .body(new SearchRequest(query, contentType, category, topK, register))
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<ExampleItem>>() {});
             return result != null ? result : Collections.emptyList();

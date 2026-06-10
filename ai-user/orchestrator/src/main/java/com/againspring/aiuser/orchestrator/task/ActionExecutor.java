@@ -182,10 +182,11 @@ public class ActionExecutor {
         // Phase 3: demographic
         String demographic = demographicStr(persona);
 
-        // RAG: AiLearningClient 동적 예시 검색
+        // RAG: AiLearningClient 동적 예시 검색 (register 파라미터 전달)
         String dynamicExamples = "";
+        String register = resolveRegister(persona);
         java.util.List<AiLearningClient.ExampleItem> examples = aiLearningClient.findSimilar(
-            postExcerpt, "COMMENT", action.targetPost().getCategory(), 3);
+            postExcerpt, "COMMENT", action.targetPost().getCategory(), 3, register);
         if (!examples.isEmpty()) {
             dynamicExamples = examples.stream()
                 .map(AiLearningClient.ExampleItem::getContent)
@@ -302,13 +303,15 @@ public class ActionExecutor {
         // 글 길이 다양화 — 페르소나 tier 기반 가중 랜덤
         String lengthTier = pickLengthTier(persona);
 
-        // AI Learning: 동적 예시 검색 및 주입 (RAG)
+        // AI Learning: 동적 예시 검색 및 주입 (RAG) (register 파라미터 전달)
         String dynamicExamples = "";
+        String register = resolveRegister(persona);
         java.util.List<AiLearningClient.ExampleItem> examples = aiLearningClient.findSimilar(
             topicSeed,
             "POST",
             category,
-            3
+            3,
+            register
         );
         if (!examples.isEmpty()) {
             dynamicExamples = examples.stream()
@@ -369,6 +372,17 @@ public class ActionExecutor {
         if (postOpt.isEmpty()) {
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "post_failed", "usedLlm", true));
         }
+    }
+
+    // ── Register Resolver (문체 → register 변환) ──────────────────────────────
+
+    /** formality → register 변환. polite=>"polite", 기본="casual" */
+    private String resolveRegister(Persona persona) {
+        Map<String, Object> vp = persona.getVoiceProfile();
+        if (vp == null) return null;
+        Object formality = vp.get("formality");
+        if ("polite".equalsIgnoreCase(String.valueOf(formality))) return "polite";
+        return "casual";
     }
 
     // ── Voice Profile Blocks (Phase 1b) ──────────────────────────────────────
