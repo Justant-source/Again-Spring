@@ -60,15 +60,15 @@ test.describe('Journey 13-D: PARTIAL 상태 배지 표시', () => {
 test.describe('Journey 13-E: 콜백 엔드포인트 인증', () => {
 
   const CALLBACK_URL = `${BASE}/api/internal/marketing/callback`
-  const VALID_TOKEN = process.env.ASM_CALLBACK_TOKEN ?? 'test-callback-token-123'
+  const VALID_TOKEN = process.env.ASM_CALLBACK_TOKEN ?? 'asm-callback-token-dev'
   const INVALID_TOKEN = 'invalid-token-xyz'
 
-  // 콜백 payload 샘플
+  // 콜백 payload 샘플 — artifacts는 Map<String,Object>(JSON object), publications는 List<Map>(JSON array)
   const VALID_PAYLOAD = {
     job_id: 'remote-job-e2e-' + Date.now(),
     status: 'PUBLISHED',
     event: 'PUBLISHED',
-    artifacts: [],
+    artifacts: {},
     publications: [],
   }
 
