@@ -10,9 +10,9 @@
 | X (트위터) | `x` | 텍스트 + 이미지 | Playwright 자동 로그인 |
 | 인스타그램 피드 | `instagram_feed` | 이미지 + 캡션 | Playwright 자동 로그인 |
 | 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Playwright 자동 로그인 |
-| YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | API (미구현) |
+| YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | API (OAuth 2.0) |
 | 네이버 클립 | `naver_clip` | 세로형 영상 (9:16) | Playwright (미구현) |
-| Threads | `threads` | 텍스트 + 이미지 | API (미구현) |
+| Threads | `threads` | 텍스트 + 이미지 | Playwright 자동 로그인 (인스타 계정 상속) |
 
 > **게시 계정 자격증명**: 각 플랫폼의 로그인/API 계정 정보는 어드민 `/admin/marketing → 플랫폼 계정`
 > 탭에서 입력하며 ASM이 암호화 저장한다. 플랫폼별 필드 스키마·암호화 정책은 [`credentials.md`](credentials.md) 참조.

@@ -175,4 +175,34 @@ public class AdminMarketingController {
         asmClient.deleteCredential(platform);
         return ResponseEntity.noContent().build();
     }
+
+    // ===== YouTube Shorts OAuth 2.0 authorization-code flow =====
+
+    /**
+     * YouTube OAuth — Google 인증 URL 생성.
+     * client_id/client_secret이 저장된 상태에서 호출.
+     * Body: {"redirect_uri": "https://..."}
+     * 반환: {"auth_url": "https://accounts.google.com/o/oauth2/v2/auth?..."}
+     */
+    @PostMapping("/credentials/youtube_shorts/oauth/start")
+    @Operation(summary = "YouTube OAuth start", description = "Google 인증 URL 생성 (OAuth 2.0 authorization-code)")
+    @ApiResponse(responseCode = "200", description = "auth_url returned")
+    @ApiResponse(responseCode = "400", description = "client_id/client_secret 미설정 또는 redirect_uri 불허")
+    public ResponseEntity<JsonNode> youtubeOauthStart(@RequestBody JsonNode body) {
+        return ResponseEntity.ok(asmClient.youtubeOauthStart(body));
+    }
+
+    /**
+     * YouTube OAuth — authorization code 교환 → refresh_token 저장.
+     * Body: {"code": "...", "state": "..."}
+     * 반환: CredentialStatus (secrets 마스킹)
+     */
+    @PostMapping("/credentials/youtube_shorts/oauth/exchange")
+    @Operation(summary = "YouTube OAuth exchange", description = "authorization code → refresh_token 저장")
+    @ApiResponse(responseCode = "200", description = "refresh_token 저장 완료 — CredentialStatus 반환")
+    @ApiResponse(responseCode = "400", description = "state 검증 실패 또는 Google OAuth 오류")
+    @Auditable(action = "YOUTUBE_OAUTH_EXCHANGE", targetType = "MARKETING_CREDENTIAL", targetId = "youtube_shorts")
+    public ResponseEntity<JsonNode> youtubeOauthExchange(@RequestBody JsonNode body) {
+        return ResponseEntity.ok(asmClient.youtubeOauthExchange(body));
+    }
 }

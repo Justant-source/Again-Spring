@@ -100,3 +100,32 @@ export async function upsertPlatformCredential(
 export async function deletePlatformCredential(platform: string): Promise<void> {
   await api.delete(`/api/admin/marketing/credentials/${platform}`);
 }
+
+// ===== YouTube Shorts OAuth 2.0 =====
+
+/**
+ * OAuth start — Google 인증 URL 생성.
+ * redirectUri: 팝업이 리다이렉트될 콜백 URL (등록된 허용 호스트여야 함).
+ */
+export async function startYoutubeOauth(redirectUri: string): Promise<{ auth_url: string }> {
+  const res = await api.post<{ auth_url: string }>(
+    '/api/admin/marketing/credentials/youtube_shorts/oauth/start',
+    { redirect_uri: redirectUri }
+  );
+  return res.data;
+}
+
+/**
+ * OAuth exchange — authorization code → refresh_token 저장.
+ * code, state: 콜백 URL 쿼리파라미터에서 추출.
+ */
+export async function exchangeYoutubeOauth(
+  code: string,
+  state: string
+): Promise<PlatformCredentialStatus> {
+  const res = await api.post<PlatformCredentialStatus>(
+    '/api/admin/marketing/credentials/youtube_shorts/oauth/exchange',
+    { code, state }
+  );
+  return res.data;
+}

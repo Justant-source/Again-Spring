@@ -17,6 +17,7 @@ import {
   listPlatformCredentials,
   upsertPlatformCredential,
   deletePlatformCredential,
+  startYoutubeOauth,
   PlatformCredentialStatus,
 } from '@/lib/api/admin/marketing';
 
@@ -68,6 +69,10 @@ export function PlatformCredentialsSection() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  // YouTube OAuth
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+
   useEffect(() => {
     load();
   }, []);
@@ -94,6 +99,42 @@ export function PlatformCredentialsSection() {
     setFormValues(init);
     setSaveError(null);
     setEditing(cred);
+  };
+
+  /** YouTube OAuth 팝업 실행 */
+  const handleYoutubeOauth = async () => {
+    if (!editing) return;
+    setOauthLoading(true);
+    setOauthError(null);
+    try {
+      const redirectUri = `${window.location.origin}/admin/marketing/youtube-oauth/callback`;
+      const { auth_url } = await startYoutubeOauth(redirectUri);
+
+      // 팝업 오픈
+      const popup = window.open(auth_url, 'youtube-oauth', 'width=600,height=700,noopener');
+      if (!popup) {
+        setOauthError('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.');
+        return;
+      }
+
+      // 콜백에서 postMessage 수신
+      const onMessage = async (e: MessageEvent) => {
+        if (e.origin !== window.location.origin) return;
+        if (e.data === 'youtube-oauth-success') {
+          window.removeEventListener('message', onMessage);
+          setEditing(null);
+          await load();
+        } else if (typeof e.data === 'string' && e.data.startsWith('youtube-oauth-error:')) {
+          window.removeEventListener('message', onMessage);
+          setOauthError(`Google 연결 실패: ${e.data.replace('youtube-oauth-error:', '')}`);
+        }
+      };
+      window.addEventListener('message', onMessage);
+    } catch (err: unknown) {
+      setOauthError(`Google 연결 시작 실패: ${extractError(err)}`);
+    } finally {
+      setOauthLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -232,29 +273,53 @@ export function PlatformCredentialsSection() {
 
           {editing && (
             <div className="space-y-4 py-2">
-              {editing.fields.map((f) => {
-                const storedSecret = f.secret && editing.secret_set[f.key];
-                return (
-                  <div key={f.key} className="space-y-1">
-                    <Label htmlFor={`cred-${f.key}`}>
-                      {fieldLabel(f.key)}
-                      {f.required && <span className="ml-1 text-red-500">*</span>}
-                      {f.secret && <span className="ml-1 text-xs text-gray-400">(암호화)</span>}
-                    </Label>
-                    <Input
-                      id={`cred-${f.key}`}
-                      type={f.secret ? 'password' : 'text'}
-                      autoComplete={f.secret ? 'new-password' : 'off'}
-                      value={formValues[f.key] ?? ''}
-                      onChange={(e) =>
-                        setFormValues((prev) => ({ ...prev, [f.key]: e.target.value }))
-                      }
-                      placeholder={storedSecret ? '설정됨 — 변경하려면 입력' : ''}
-                      className="text-sm"
+              {/* Threads: 인스타 계정 자동 상속 — 입력 불필요 */}
+              {editing.platform === 'threads' ? (
+                <ThreadsCredentialInfo creds={creds} />
+              ) : (
+                <>
+                  {editing.fields
+                    .filter((f) => {
+                      // YouTube Shorts: refresh_token은 OAuth로 자동 획득 — 입력 숨김
+                      if (editing.platform === 'youtube_shorts' && f.key === 'refresh_token') return false;
+                      return true;
+                    })
+                    .map((f) => {
+                      const storedSecret = f.secret && editing.secret_set[f.key];
+                      return (
+                        <div key={f.key} className="space-y-1">
+                          <Label htmlFor={`cred-${f.key}`}>
+                            {fieldLabel(f.key)}
+                            {f.required && <span className="ml-1 text-red-500">*</span>}
+                            {f.secret && <span className="ml-1 text-xs text-gray-400">(암호화)</span>}
+                          </Label>
+                          <Input
+                            id={`cred-${f.key}`}
+                            type={f.secret ? 'password' : 'text'}
+                            autoComplete={f.secret ? 'new-password' : 'off'}
+                            value={formValues[f.key] ?? ''}
+                            onChange={(e) =>
+                              setFormValues((prev) => ({ ...prev, [f.key]: e.target.value }))
+                            }
+                            placeholder={storedSecret ? '설정됨 — 변경하려면 입력' : ''}
+                            className="text-sm"
+                          />
+                        </div>
+                      );
+                    })}
+
+                  {/* YouTube Shorts: Google 계정 연결 섹션 */}
+                  {editing.platform === 'youtube_shorts' && (
+                    <YoutubeOAuthSection
+                      editing={editing}
+                      formValues={formValues}
+                      oauthLoading={oauthLoading}
+                      oauthError={oauthError}
+                      onConnect={handleYoutubeOauth}
                     />
-                  </div>
-                );
-              })}
+                  )}
+                </>
+              )}
 
               {saveError && (
                 <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -288,4 +353,103 @@ function extractError(err: unknown): string {
     if (anyErr.message) return anyErr.message;
   }
   return String(err);
+}
+
+// ---------------------------------------------------------------------------
+// YouTube Shorts — OAuth 연결 섹션 서브컴포넌트
+// ---------------------------------------------------------------------------
+interface YoutubeOAuthSectionProps {
+  editing: PlatformCredentialStatus;
+  formValues: Record<string, string>;
+  oauthLoading: boolean;
+  oauthError: string | null;
+  onConnect: () => void;
+}
+
+function YoutubeOAuthSection({
+  editing,
+  formValues,
+  oauthLoading,
+  oauthError,
+  onConnect,
+}: YoutubeOAuthSectionProps) {
+  const refreshConnected = editing.secret_set['refresh_token'] ?? false;
+
+  // 연결 버튼 활성 조건: client_id/client_secret이 이미 저장되어 있거나 폼에 입력됨
+  const hasClientId =
+    (formValues['client_id'] ?? '').trim() !== '' || (editing.values['client_id'] ?? '') !== '';
+  const hasClientSecret =
+    (formValues['client_secret'] ?? '').trim() !== '' || (editing.secret_set['client_secret'] ?? false);
+  const canConnect = hasClientId && hasClientSecret;
+
+  return (
+    <div className="rounded border border-gray-200 bg-gray-50 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-700">YouTube 계정 연결 상태</span>
+        <Badge
+          className={
+            refreshConnected ? 'bg-green-200 text-green-800' : 'bg-yellow-100 text-yellow-800'
+          }
+        >
+          {refreshConnected ? '연결됨' : '미연결'}
+        </Badge>
+      </div>
+      <p className="mb-3 text-xs text-gray-500">
+        {refreshConnected
+          ? 'Google 계정이 연결되어 있습니다. 재연결하려면 아래 버튼을 클릭하세요.'
+          : 'Client ID와 Client Secret 저장 후 아래 버튼으로 Google 계정을 연결해주세요.'}
+      </p>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={!canConnect || oauthLoading}
+        onClick={onConnect}
+        className="w-full"
+      >
+        {oauthLoading ? '연결 중…' : refreshConnected ? 'Google 계정 재연결' : 'Google 계정 연결'}
+      </Button>
+      {oauthError && (
+        <div className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {oauthError}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Threads — 인스타그램 계정 상속 안내 서브컴포넌트
+// ---------------------------------------------------------------------------
+interface ThreadsCredentialInfoProps {
+  creds: PlatformCredentialStatus[];
+}
+
+function ThreadsCredentialInfo({ creds }: ThreadsCredentialInfoProps) {
+  const igFeed = creds.find((c) => c.platform === 'instagram_feed');
+  const igEmail = igFeed?.values['email'] ?? null;
+  const igConfigured = igFeed?.configured ?? false;
+
+  return (
+    <div className="rounded border border-blue-100 bg-blue-50 p-3 text-sm">
+      <p className="mb-1 font-medium text-blue-800">Instagram 계정 정보를 사용합니다</p>
+      <p className="text-xs text-blue-700">
+        Threads는 별도 로그인 없이 Instagram 피드 계정으로 자동 로그인합니다.
+        threads.net 세션은 첫 게시 시 자동으로 생성됩니다.
+      </p>
+      <div className="mt-2 flex items-center gap-2">
+        <Badge
+          className={igConfigured ? 'bg-green-200 text-green-800' : 'bg-red-100 text-red-800'}
+        >
+          {igConfigured ? '인스타 설정됨' : '인스타 미설정'}
+        </Badge>
+        {igEmail && <span className="truncate font-mono text-xs text-gray-600">{igEmail}</span>}
+      </div>
+      {!igConfigured && (
+        <p className="mt-2 text-xs text-red-600">
+          먼저 Instagram 피드 계정 정보를 설정해주세요.
+        </p>
+      )}
+    </div>
+  );
 }

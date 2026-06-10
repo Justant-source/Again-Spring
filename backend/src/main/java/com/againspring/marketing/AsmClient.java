@@ -183,6 +183,50 @@ public class AsmClient {
     }
 
     /**
+     * YouTube OAuth — /start: Google 인증 URL 생성.
+     * body: {"redirect_uri": "..."}
+     * 반환: {"auth_url": "..."}
+     */
+    public JsonNode youtubeOauthStart(JsonNode body) {
+        try {
+            return restClient
+                .post()
+                .uri("/api/v1/credentials/youtube_shorts/oauth/start")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to start YouTube OAuth", e);
+            throw new AsmUnavailableException("Failed to start YouTube OAuth: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * YouTube OAuth — /exchange: authorization code 교환 → refresh_token 저장.
+     * body: {"code": "...", "state": "..."}
+     * 반환: CredentialStatus (마스킹)
+     */
+    public JsonNode youtubeOauthExchange(JsonNode body) {
+        try {
+            return restClient
+                .post()
+                .uri("/api/v1/credentials/youtube_shorts/oauth/exchange")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to exchange YouTube OAuth code", e);
+            throw new AsmUnavailableException("Failed to exchange YouTube OAuth code: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Extract FastAPI's {"detail": "..."} message from an ASM 4xx response body.
      */
     private String asmErrorDetail(HttpClientErrorException e) {
