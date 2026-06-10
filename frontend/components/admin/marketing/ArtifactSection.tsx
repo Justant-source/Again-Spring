@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,43 @@ function proxyUrl(jobId: number, artifactKey: string) {
   return `/api/admin/marketing/jobs/${jobId}/artifacts/${name}`;
 }
 
+// 아티팩트 프록시는 ADMIN JWT 필수 — <img src>/<a href>는 Authorization 헤더를 못 붙이므로
+// 인증된 axios 클라이언트로 blob을 받아 object URL로 표시/다운로드한다.
+async function fetchArtifactBlobUrl(url: string): Promise<string> {
+  const res = await api.get<Blob>(url, { responseType: 'blob' });
+  return URL.createObjectURL(res.data);
+}
+
+async function downloadArtifact(url: string, filename: string) {
+  const objectUrl = await fetchArtifactBlobUrl(url);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+function DownloadButton({ url, filename }: { url: string; filename: string }) {
+  const [busy, setBusy] = useState(false);
+  const handleClick = async () => {
+    setBusy(true);
+    try {
+      await downloadArtifact(url, filename);
+    } catch {
+      alert('다운로드에 실패했습니다.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button variant="outline" size="sm" onClick={handleClick} disabled={busy}>
+      <Download className="w-3 h-3 mr-1" />{busy ? '다운로드 중…' : '다운로드'}
+    </Button>
+  );
+}
+
 function UploadJsonPreview({ url, filename }: { url: string; filename: string }) {
   const [content, setContent] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -64,9 +102,8 @@ function UploadJsonPreview({ url, filename }: { url: string; filename: string })
     if (content) { setOpen(!open); return; }
     setLoading(true);
     try {
-      const res = await fetch(url);
-      const text = await res.text();
-      setContent(JSON.parse(text));
+      const res = await api.get(url);
+      setContent(res.data);
       setOpen(true);
     } catch {
       setContent({ error: '내용을 불러오지 못했습니다.' });
@@ -82,11 +119,7 @@ function UploadJsonPreview({ url, filename }: { url: string; filename: string })
         <Button variant="outline" size="sm" onClick={handleLoad} disabled={loading}>
           {loading ? '로드 중…' : open ? <><ChevronUp className="w-3 h-3 mr-1" />닫기</> : <><ChevronDown className="w-3 h-3 mr-1" />내용 보기</>}
         </Button>
-        <a href={url} download={filename}>
-          <Button variant="outline" size="sm">
-            <Download className="w-3 h-3 mr-1" />다운로드
-          </Button>
-        </a>
+        <DownloadButton url={url} filename={filename} />
       </div>
 
       {open && content && (
@@ -146,29 +179,52 @@ function UploadJsonPreview({ url, filename }: { url: string; filename: string })
 
 function MediaFile({ url, kind, label, filename }: { url: string; kind: 'image' | 'video'; label: string; filename: string }) {
   const [open, setOpen] = useState(false);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const Icon = kind === 'video' ? Video : ImageIcon;
+
+  useEffect(() => {
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [blobUrl]);
+
+  const handleToggle = async () => {
+    if (open) { setOpen(false); return; }
+    if (blobUrl) { setOpen(true); return; }
+    setLoading(true);
+    setLoadError(false);
+    try {
+      setBlobUrl(await fetchArtifactBlobUrl(url));
+      setOpen(true);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div>
       <div className="flex items-center gap-2 mt-2">
         <Icon className="w-4 h-4 text-gray-400" />
         <span className="text-xs text-gray-600">{label}</span>
-        <Button variant="outline" size="sm" onClick={() => setOpen(!open)}>
-          {open ? '닫기' : '미리보기'}
+        <Button variant="outline" size="sm" onClick={handleToggle} disabled={loading}>
+          {loading ? '로드 중…' : open ? '닫기' : '미리보기'}
         </Button>
-        <a href={url} download={filename}>
-          <Button variant="outline" size="sm">
-            <Download className="w-3 h-3 mr-1" />다운로드
-          </Button>
-        </a>
+        <DownloadButton url={url} filename={filename} />
       </div>
-      {open && kind === 'image' && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={label} className="mt-2 max-w-xs rounded border" />
+      {loadError && (
+        <p className="mt-1 text-xs text-red-600">미리보기를 불러오지 못했습니다.</p>
       )}
-      {open && kind === 'video' && (
+      {open && blobUrl && kind === 'image' && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={blobUrl} alt={label} className="mt-2 max-w-xs rounded border" />
+      )}
+      {open && blobUrl && kind === 'video' && (
         <video controls className="mt-2 max-w-xs rounded border">
-          <source src={url} />
+          <source src={blobUrl} />
         </video>
       )}
     </div>
@@ -234,9 +290,7 @@ export function ArtifactSection({ jobId, artifacts }: Props) {
             <div key={key} className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-gray-400" />
               <span className="font-mono text-sm">{key}</span>
-              <a href={proxyUrl(jobId, String(val))} download={key}>
-                <Button variant="outline" size="sm"><Download className="w-3 h-3 mr-1" />다운로드</Button>
-              </a>
+              <DownloadButton url={proxyUrl(jobId, String(val))} filename={key} />
             </div>
           ))}
         </div>
