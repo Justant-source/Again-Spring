@@ -63,3 +63,16 @@ export const LANDING = {
   todayCard:  '[data-testid="landing-today-card"]',  // 오늘의 사연 카드
   cta:        '[data-testid="landing-cta"]',          // "다시봄 광장" CTA 버튼
 } as const
+
+// ── AI 유저 생성 현황 패널 ──────────────────────────────────────
+export const AI_GEN_STATUS = {
+  panel:       '[data-testid="ai-gen-status-panel"]',
+  refreshBtn:  '[data-testid="ai-gen-status-refresh-btn"]',
+  autoRefresh: '[data-testid="ai-gen-status-auto-refresh"]',
+  empty:       '[data-testid="ai-gen-status-empty"]',
+  posts:       '[data-testid="ai-gen-status-posts"]',
+  comments:    '[data-testid="ai-gen-status-comments"]',
+  replies:     '[data-testid="ai-gen-status-replies"]',
+  votes:       '[data-testid="ai-gen-status-votes"]',
+  likes:       '[data-testid="ai-gen-status-likes"]',
+} as const

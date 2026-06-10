@@ -49,6 +49,18 @@ API 키 없이 동작 — 호스트의 `~/.claude` 세션을 **llm-worker** 컨�
 
 긴급 롤백: `LLM_PROVIDER=claude-code`로 변경 → backend에서 in-process 직접 호출 (backend Dockerfile revert 필요).
 
+### AI 유저 오케스트레이션
+
+| 변수 | 사용처 | dev 기본 | prod |
+|---|---|---|---|
+| `AI_USER_ENABLED` | AI 유저 행동 활성화 (오케스트레이터) | `false` | **필수** |
+| `AI_USER_PERSONA_TARGET` | 🚨 **2026-06-10 변경**: 일일 총량 fallback (admin UI 목표 > 0일 때는 무시됨) | `100` | 변경 필요시 admin UI |
+
+> ⚠️ **2026-06-10 변경**: 일일 5개 타입(posts/comments/replies/votes/likes) 목표는 `admin UI(/admin/ai-user)`에서 설정합니다.
+> 총량은 **UI 목표 합 × 1.1**로 자동 계산됩니다.
+> 이 env var는 **admin UI 목표가 모두 0일 때만 fallback**으로 동작합니다.
+> 운영 중 목표 조정은 **admin UI를 사용**하세요 (재배포 불필요).
+
 ### OAuth2
 
 | 변수 | 비고 |

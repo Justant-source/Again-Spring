@@ -16,9 +16,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * AI 유저 생성 정책 관리 API (ADMIN 전용, §11 토큰 관제 콘솔).
@@ -182,6 +185,91 @@ public class AdminAiUserController {
     }
 
     // =====================================================================
+    // GET /api/admin/ai-user/generation-status
+    // =====================================================================
+
+    @GetMapping("/generation-status")
+    @Operation(summary = "오늘 AI 유저 행동 진행 현황", description = "KST 기준 오늘의 타입별 완료·목표·진행률 및 실패/차단 횟수를 반환한다.")
+    public ResponseEntity<GenerationStatusResponse> getGenerationStatus() {
+        LocalDate todayKst = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        java.sql.Timestamp dayStart = java.sql.Timestamp.from(todayKst.atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant());
+
+        // Query 1: 오늘 synthetic=1 유저가 생성한 게시글
+        Integer postsDone = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM posts p " +
+            "JOIN users u ON p.author_id = u.id " +
+            "WHERE u.synthetic = 1 AND p.deleted_at IS NULL AND p.created_at >= ?",
+            Integer.class,
+            dayStart
+        );
+        postsDone = postsDone != null ? postsDone : 0;
+
+        // Query 2: action_log GROUP BY action_type, status
+        List<Map<String, Object>> actionStats = jdbcTemplate.queryForList(
+            "SELECT action_type, status, COUNT(*) as cnt " +
+            "FROM persona_action_log " +
+            "WHERE created_at >= ? " +
+            "  AND action_type IN ('LIKE','VOTE','COMMENT','REPLY','COMMENT_LIKE') " +
+            "GROUP BY action_type, status",
+            dayStart
+        );
+
+        // Aggregation
+        int commentsDone = 0, repliesDone = 0, votesDone = 0, likesDone = 0;
+        int totalFailed = 0, totalBlocked = 0;
+
+        for (Map<String, Object> row : actionStats) {
+            String actionType = (String) row.get("action_type");
+            String status = (String) row.get("status");
+            int cnt = ((Number) row.get("cnt")).intValue();
+
+            if ("POSTED".equals(status)) {
+                if ("COMMENT".equals(actionType)) {
+                    commentsDone += cnt;
+                } else if ("REPLY".equals(actionType)) {
+                    repliesDone += cnt;
+                } else if ("VOTE".equals(actionType)) {
+                    votesDone += cnt;
+                } else if ("LIKE".equals(actionType) || "COMMENT_LIKE".equals(actionType)) {
+                    likesDone += cnt;
+                }
+            } else if ("FAILED".equals(status)) {
+                totalFailed += cnt;
+            } else if ("BLOCKED".equals(status)) {
+                totalBlocked += cnt;
+            }
+        }
+
+        // Load targets from ai_user_generation_config
+        AiUserGenerationConfig cfg = loadOrInit();
+        int targetPosts = cfg.getTargetPosts();
+        int targetComments = cfg.getTargetComments();
+        int targetReplies = cfg.getTargetReplies();
+        int targetVotes = cfg.getTargetVotes();
+        int targetLikes = cfg.getTargetLikes();
+
+        // Build response
+        GenerationStatusResponse resp = new GenerationStatusResponse(
+                todayKst.toString(),
+                new GenerationStatusResponse.Targets(
+                        new GenerationStatusResponse.Metric(postsDone, targetPosts, computePercent(postsDone, targetPosts)),
+                        new GenerationStatusResponse.Metric(commentsDone, targetComments, computePercent(commentsDone, targetComments)),
+                        new GenerationStatusResponse.Metric(repliesDone, targetReplies, computePercent(repliesDone, targetReplies)),
+                        new GenerationStatusResponse.Metric(votesDone, targetVotes, computePercent(votesDone, targetVotes)),
+                        new GenerationStatusResponse.Metric(likesDone, targetLikes, computePercent(likesDone, targetLikes))
+                ),
+                new GenerationStatusResponse.Failures(totalFailed, totalBlocked)
+        );
+
+        return ResponseEntity.ok(resp);
+    }
+
+    private static int computePercent(int done, int target) {
+        if (target == 0) return 0;
+        return Math.min(100, (int) Math.round(100.0 * done / target));
+    }
+
+    // =====================================================================
     // 내부 헬퍼
     // =====================================================================
 
@@ -335,5 +423,34 @@ public class AdminAiUserController {
         private final String status;
         private final String message;
         private final String killedAt;
+    }
+
+    @Getter @AllArgsConstructor
+    public static class GenerationStatusResponse {
+        private final String todayKst;
+        private final Targets targets;
+        private final Failures failures;
+
+        @Getter @AllArgsConstructor
+        public static class Targets {
+            private final Metric posts;
+            private final Metric comments;
+            private final Metric replies;
+            private final Metric votes;
+            private final Metric likes;
+        }
+
+        @Getter @AllArgsConstructor
+        public static class Metric {
+            private final int done;
+            private final int target;
+            private final int percent;
+        }
+
+        @Getter @AllArgsConstructor
+        public static class Failures {
+            private final int failed;
+            private final int blocked;
+        }
     }
 }

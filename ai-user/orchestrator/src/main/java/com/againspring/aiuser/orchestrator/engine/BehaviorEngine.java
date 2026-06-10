@@ -7,9 +7,11 @@ import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
 import com.againspring.aiuser.orchestrator.domain.AiUserRuntime;
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.domain.enums.ActionType;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserRuntimeRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
+import com.againspring.aiuser.orchestrator.service.ActionTypeQuotaService;
 import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +23,9 @@ import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -47,6 +51,7 @@ public class BehaviorEngine {
     private final com.againspring.aiuser.orchestrator.service.PostAnalysisService postAnalysisService;
     private final DailyPostQuotaService postQuotaService;
     private final AiUserGenerationConfigRepository generationConfigRepository;
+    private final ActionTypeQuotaService actionTypeQuotaService;
 
     // InteractionScanner and ActionExecutor injected lazily to avoid circular dependency issues
     @Autowired(required = false)
@@ -66,15 +71,28 @@ public class BehaviorEngine {
             return;
         }
 
-        // 1.5. personaTarget 기반 daily cap 자동 동기화
-        // AI_USER_PERSONA_TARGET 변경(+재시작)만으로 cap이 자동 반영됨.
-        if (props.getPersonaTarget() > 0) {
-            int autoCap = props.getPersonaTarget() * ACTIONS_PER_TARGET_POST;
-            if (rt.getDailyGlobalCap() != autoCap) {
-                log.info("Daily cap auto-sync: {}posts × {} = {} (was {})",
-                    props.getPersonaTarget(), ACTIONS_PER_TARGET_POST, autoCap, rt.getDailyGlobalCap());
-                rt.setDailyGlobalCap(autoCap);
-                runtimeRepo.save(rt);
+        // 1.5. daily_global_cap = 5개 목표 합 × 1.1 (admin UI 단일 진실원)
+        // generation_config 부재/합 0이면 env var fallback.
+        AiUserGenerationConfig genConfig = generationConfigRepository.findById(1).orElse(null);
+        if (genConfig != null) {
+            int targetSum = genConfig.getTargetPosts() + genConfig.getTargetComments()
+                          + genConfig.getTargetReplies() + genConfig.getTargetVotes()
+                          + genConfig.getTargetLikes();
+            if (targetSum > 0) {
+                int autoCap = (int) Math.ceil(targetSum * 1.1);
+                if (rt.getDailyGlobalCap() != autoCap) {
+                    log.info("Daily cap 갱신: targets합={} → cap={} (이전={})", targetSum, autoCap, rt.getDailyGlobalCap());
+                    rt.setDailyGlobalCap(autoCap);
+                    runtimeRepo.save(rt);
+                }
+            } else if (props.getPersonaTarget() > 0) {
+                // fallback: config 목표가 모두 0일 때만 env var 사용
+                int fallbackCap = props.getPersonaTarget() * ACTIONS_PER_TARGET_POST;
+                if (rt.getDailyGlobalCap() != fallbackCap) {
+                    log.warn("generation_config 목표 모두 0 — env var fallback cap={}", fallbackCap);
+                    rt.setDailyGlobalCap(fallbackCap);
+                    runtimeRepo.save(rt);
+                }
             }
         }
 
@@ -103,22 +121,23 @@ public class BehaviorEngine {
             ? Math.max(3, quotaCalc.calculate(rt.getDailyGlobalCap(), ticksPerDay, hourWeight, remaining))
             : quotaCalc.calculate(rt.getDailyGlobalCap(), ticksPerDay, hourWeight, remaining);
 
-        // 4.5 POST 쿼터 — targetPosts(관리자 설정)를 실제 글 발행 수로 시행
-        int targetPosts = generationConfigRepository.findById(1)
-            .map(AiUserGenerationConfig::getTargetPosts)
-            .orElse(0);
-        int remainingPosts = postQuotaService.remaining(targetPosts);
-        // 남은 시간 기준으로 분산 — 전체 틱(1440)으로 나누면 확률이 너무 낮아 prod에서 목표 미달
-        // 예) hour=17, remaining=46: 1440분모→prob=0.043(4.3%), 420분모→prob=0.147(14.7%)
+        // 4.5 타입별 결손 스냅샷 — 틱 시작 시 1회 집계
+        // 틱 내 계획 시 in-memory 차감 → 행동당 DB 쿼리 없음
         int remainingHours = Math.max(1, 24 - currentHour);
         int remainingTicksEst = Math.max(1, ticksPerDay * remainingHours / 24);
-        int postBudgetThisTick = props.isForceActive()
-            ? Math.max(1, quotaCalc.stochasticRound((double) remainingPosts / Math.max(ticksPerDay / 2, 1)))
-            : quotaCalc.stochasticRound((double) remainingPosts * hourWeight * 2.0 / remainingTicksEst);
+        Map<ActionType, ActionTypeQuotaService.TypeQuota> quotaSnapshot =
+            (genConfig != null)
+                ? actionTypeQuotaService.computeToday(genConfig)
+                : Collections.emptyMap();
 
-        log.debug("Tick: hour={} hourWeight={} budget={} remaining={} postsToday={}/{} postBudgetThisTick={} forceActive={}",
+        // 틱당 타입별 예산 = deficit × hourWeight × 2.0 / remainingTicksEst (결손 분산)
+        // 단, budget=0이면 전체 skip 이미 처리됨
+        Map<ActionType, Integer> tickTypeBudget = computeTickTypeBudgetForTest(
+            quotaSnapshot, hourWeight, remainingTicksEst);
+
+        log.debug("Tick: hour={} hourWeight={} budget={} remaining={} forceActive={} hasQuota={}",
             currentHour, String.format("%.2f", hourWeight), budget, remaining,
-            postQuotaService.postsCreatedToday(), targetPosts, postBudgetThisTick, props.isForceActive());
+            props.isForceActive(), !quotaSnapshot.isEmpty());
 
         if (budget <= 0) {
             log.debug("Zero budget for this tick. Skipping.");
@@ -166,69 +185,134 @@ public class BehaviorEngine {
             return;
         }
 
-        // 8. Execute actions up to budget
+        // 8. 결손 가중 추첨으로 행동 타입 선택 → planForType() 실행
         int actionsPlanned = 0;
-        int postsPlannedThisTick = 0;
+        // tickTypeBudget의 in-memory 가변 복사본 (틱 내 차감용)
+        Map<ActionType, Integer> remaining_type_budget = new EnumMap<>(tickTypeBudget);
+        // quota가 비어있으면 전체 budget을 균등 배분 (legacy / 초기 설정 없음)
+        boolean hasQuota = !remaining_type_budget.isEmpty()
+                           && remaining_type_budget.values().stream().anyMatch(v -> v > 0);
+
         for (int i = 0; i < budget * 3 && actionsPlanned < budget; i++) {
-            // pick a persona (try up to 3x budget to find non-cooldown ones)
             Optional<Persona> pOpt = personaSelector.pick(activePersonas, currentHour);
             if (pOpt.isEmpty()) break;
             Persona persona = pOpt.get();
-
             if (personaSelector.isOnCooldown(persona)) continue;
 
-            Optional<PlannedAction> actionOpt = actionPlanner.plan(persona, feedPosts, replyTargets, postBudgetThisTick - postsPlannedThisTick);
-            if (actionOpt.isEmpty()) continue;
+            // 타입 선택: 결손 가중 추첨
+            ActionType selectedType = hasQuota
+                ? pickTypeByDeficit(remaining_type_budget, persona, replyTargets, feedPosts)
+                : pickTypeLegacy(persona, replyTargets, feedPosts); // fallback (초기 config 없음)
 
-            PlannedAction action = actionOpt.get();
-            if (action.type() == com.againspring.aiuser.orchestrator.domain.enums.ActionType.POST) {
-                postsPlannedThisTick++;
+            if (selectedType == null) continue;
+
+            Optional<PlannedAction> actionOpt = actionExecutor != null
+                ? actionPlanner.planForType(persona, selectedType, feedPosts, replyTargets)
+                : Optional.empty();
+
+            if (actionOpt.isEmpty()) {
+                // 해당 타입 실행 불가 — 틱 예산 소모 없이 시도 횟수만 증가
+                remaining_type_budget.computeIfPresent(selectedType, (k, v) -> Math.max(0, v - 1));
+                continue;
             }
+
             if (actionExecutor != null) {
                 final Persona finalPersona = persona;
-                final PlannedAction finalAction = action;
+                final PlannedAction finalAction = actionOpt.get();
                 jitter.scheduleWithinTick(() -> actionExecutor.execute(finalPersona, finalAction));
             }
+            remaining_type_budget.computeIfPresent(selectedType, (k, v) -> Math.max(0, v - 1));
             actionsPlanned++;
         }
 
-        // 8.5 POST 전용 패스 — ActionPlanner 누적확률 체인 문제 우회
-        // 구조적 원인: REPLY(0.15)+VOTE(0.30)+LIKE(0.45)+COMMENT(0.20) = 1.10 > 1.0
-        // rand∈[0,1] 이므로 COMMENT가 항상 먼저 캐치 → POST 코드 도달 불가.
-        // 해결: postBudgetThisTick > 0일 때 HEAVY 페르소나를 직접 지명해 POST 예약.
-        int postsScheduled = 0;
-        if (postBudgetThisTick > 0 && actionExecutor != null) {
-            List<Persona> heavyReady = activePersonas.stream()
-                .filter(p -> "HEAVY".equals(p.getTier()))
-                .filter(p -> !personaSelector.isOnCooldown(p))
-                .collect(Collectors.toList());
-            Collections.shuffle(heavyReady);
-            for (Persona hp : heavyReady) {
-                if (postsScheduled >= postBudgetThisTick) break;
-                Optional<PlannedAction> postOpt = actionPlanner.planPost(hp);
-                if (postOpt.isPresent()) {
-                    postsScheduled++;
-                    final Persona fhp = hp;
-                    final PlannedAction fa = postOpt.get();
-                    jitter.scheduleWithinTick(() -> actionExecutor.execute(fhp, fa));
-                }
-            }
-            if (postsScheduled > 0) {
-                log.debug("POST 전용 패스: {}개 예약 (postBudgetThisTick={})", postsScheduled, postBudgetThisTick);
-            }
-        }
-
         // 9. Update runtime counter
-        rt.setActionsToday(rt.getActionsToday() + actionsPlanned + postsScheduled);
+        rt.setActionsToday(rt.getActionsToday() + actionsPlanned);
         rt.setUpdatedAt(Instant.now());
         runtimeRepo.save(rt);
 
         // 10. Dispatch VIEW actions from daily quotas
         int viewsDispatched = viewDispatcher.dispatchViews();
 
-        log.info("Tick complete: planned={} postsScheduled={} views={} actionsToday={}/{} postsToday={}/{} hour={}",
-            actionsPlanned, postsScheduled, viewsDispatched,
-            rt.getActionsToday(), rt.getDailyGlobalCap(),
-            postQuotaService.postsCreatedToday(), targetPosts, currentHour);
+        log.info("Tick complete: planned={} views={} actionsToday={}/{} hour={}",
+            actionsPlanned, viewsDispatched,
+            rt.getActionsToday(), rt.getDailyGlobalCap(), currentHour);
+    }
+
+    // ══════════════════════ Helper Methods ══════════════════════
+
+    /**
+     * Computes per-tick budget for each action type based on deficit.
+     * Package-private for testing.
+     */
+    Map<ActionType, Integer> computeTickTypeBudgetForTest(
+            Map<ActionType, ActionTypeQuotaService.TypeQuota> quotas,
+            double hourWeight, int remainingTicksEst) {
+        Map<ActionType, Integer> result = new EnumMap<>(ActionType.class);
+        for (Map.Entry<ActionType, ActionTypeQuotaService.TypeQuota> e : quotas.entrySet()) {
+            ActionTypeQuotaService.TypeQuota q = e.getValue();
+            if (q.deficit() <= 0) {
+                result.put(e.getKey(), 0);
+            } else {
+                double expected = (double) q.deficit() * hourWeight * 2.0 / Math.max(remainingTicksEst, 1);
+                result.put(e.getKey(), quotaCalc.stochasticRound(expected));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Pick action type by deficit-weighted distribution.
+     * Returns null if no eligible type found.
+     */
+    private ActionType pickTypeByDeficit(
+            Map<ActionType, Integer> budgets,
+            Persona persona,
+            List<ReplyTarget> replyTargets,
+            List<PostDto> feedPosts) {
+
+        // 실행 불가 타입 사전 필터
+        boolean hasReplies = replyTargets.stream()
+            .anyMatch(rt -> !persona.getId().equals(rt.commentAuthorId()));
+        boolean hasFeed = !feedPosts.isEmpty();
+        boolean isHeavy = "HEAVY".equals(persona.getTier());
+
+        // 실행 가능한 타입만 후보로
+        List<Map.Entry<ActionType, Integer>> candidates = budgets.entrySet().stream()
+            .filter(e -> e.getValue() > 0)
+            .filter(e -> switch (e.getKey()) {
+                case REPLY -> hasReplies;
+                case VOTE, LIKE, COMMENT, COMMENT_LIKE -> hasFeed;
+                case POST -> isHeavy;
+                default -> false;
+            })
+            .collect(Collectors.toList());
+
+        if (candidates.isEmpty()) return null;
+
+        // 결손 합계 기준 가중 추첨
+        int total = candidates.stream().mapToInt(Map.Entry::getValue).sum();
+        double r = Math.random() * total;
+        double cumul = 0;
+        for (Map.Entry<ActionType, Integer> entry : candidates) {
+            cumul += entry.getValue();
+            if (r < cumul) return entry.getKey();
+        }
+        return candidates.get(candidates.size() - 1).getKey();
+    }
+
+    /**
+     * Legacy fallback: pick type by simple probabilities.
+     * Used when quota configuration is not available.
+     */
+    private ActionType pickTypeLegacy(Persona persona, List<ReplyTarget> replyTargets, List<PostDto> feedPosts) {
+        boolean hasReplies = replyTargets.stream().anyMatch(rt -> !persona.getId().equals(rt.commentAuthorId()));
+        boolean hasFeed = !feedPosts.isEmpty();
+        // Simple priority: REPLY > VOTE > LIKE > COMMENT > POST
+        if (hasReplies && Math.random() < 0.15) return ActionType.REPLY;
+        if (hasFeed && Math.random() < 0.35) return ActionType.VOTE;
+        if (hasFeed && Math.random() < 0.50) return ActionType.LIKE;
+        if (hasFeed && Math.random() < 0.25) return ActionType.COMMENT;
+        if ("HEAVY".equals(persona.getTier())) return ActionType.POST;
+        return hasFeed ? ActionType.LIKE : null;
     }
 }

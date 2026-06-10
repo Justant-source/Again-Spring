@@ -3,6 +3,7 @@ package com.againspring.aiuser.orchestrator.engine;
 import com.againspring.aiuser.orchestrator.client.dto.PostDto;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.domain.PostAnalysis;
+import com.againspring.aiuser.orchestrator.domain.enums.ActionType;
 import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
 import com.againspring.aiuser.orchestrator.service.PostAnalysisService;
 import lombok.RequiredArgsConstructor;
@@ -62,7 +63,10 @@ public class ActionPlanner {
     /**
      * Plan one action for the given persona.
      * @param postBudgetRemaining 이번 틱에 남은 POST 허용량. 0이면 POST 금지, 음수이면 쿼터 비활성(legacy 호환).
+     * @deprecated Use {@link #planForType(Persona, ActionType, List, List)} instead.
+     *             BehaviorEngine will call planForType with pre-selected ActionType.
      */
+    @Deprecated
     public Optional<PlannedAction> plan(Persona persona,
                                          List<PostDto> feedPosts,
                                          List<ReplyTarget> replyTargets,
@@ -158,6 +162,73 @@ public class ActionPlanner {
         if (!"HEAVY".equals(persona.getTier())) return Optional.empty();
         if (alreadyPostedToday(persona)) return Optional.empty();
         return Optional.of(PlannedAction.newPost());
+    }
+
+    /**
+     * BehaviorEngine이 결손 가중 추첨으로 선택한 ActionType에 대해
+     * 구체적 대상(어떤 글/댓글)을 결정한다.
+     * 누적확률 체인 없음 — 타입은 이미 외부에서 결정됨.
+     *
+     * @param persona 페르소나
+     * @param type 실행할 액션 타입 (REPLY, VOTE, LIKE, COMMENT_LIKE, COMMENT, POST 등)
+     * @param feedPosts 피드 글 목록
+     * @param replyTargets 댓글 타겟 목록
+     * @return 구체적 대상이 결정된 PlannedAction, 또는 해당 타입을 실행할 수 없으면 empty
+     */
+    public Optional<PlannedAction> planForType(
+            Persona persona,
+            ActionType type,
+            List<PostDto> feedPosts,
+            List<ReplyTarget> replyTargets) {
+
+        List<PostDto> unseen = feedPosts.stream()
+            .filter(p -> p.getId() != null)
+            .filter(p -> !seenPostRepo.existsByPersonaIdAndPostId(persona.getId(), p.getId()))
+            .collect(Collectors.toList());
+
+        List<ReplyTarget> eligibleReplies = replyTargets.stream()
+            .filter(rt -> !persona.getId().equals(rt.commentAuthorId()))
+            .collect(Collectors.toList());
+
+        return switch (type) {
+            case REPLY -> {
+                if (eligibleReplies.isEmpty()) yield Optional.empty();
+                ReplyTarget rt = eligibleReplies.get(RNG.nextInt(eligibleReplies.size()));
+                yield Optional.of(PlannedAction.reply(
+                    rt.postId(), rt.postTitle(), rt.commentId(), rt.commentExcerpt(),
+                    rt.threadContext(), rt.postBodyExcerpt(), rt.siblingComments()));
+            }
+            case VOTE -> {
+                if (unseen.isEmpty()) yield Optional.empty();
+                PostDto post = pickByVoteScore(persona, unseen);
+                if (post == null) yield Optional.empty();
+                Long optionId = pickVoteOptionByContent(persona, post);
+                yield optionId != null ? Optional.of(PlannedAction.vote(post, optionId)) : Optional.empty();
+            }
+            case LIKE -> {
+                if (unseen.isEmpty()) yield Optional.empty();
+                PostDto chosen = pickByLikeScore(persona, unseen);
+                if (chosen == null || !passesLikeGate(persona, chosen)) yield Optional.empty();
+                yield Optional.of(PlannedAction.like(chosen));
+            }
+            case COMMENT_LIKE -> {
+                List<PostDto> pool = !feedPosts.isEmpty() ? feedPosts : unseen;
+                if (pool.isEmpty()) yield Optional.empty();
+                PostDto target = pickByAffinity(persona, pool);
+                yield target != null ? Optional.of(PlannedAction.commentLike(target)) : Optional.empty();
+            }
+            case COMMENT -> {
+                if (unseen.isEmpty()) yield Optional.empty();
+                PostDto chosen = pickByAffinity(persona, unseen);
+                yield chosen != null ? Optional.of(PlannedAction.comment(chosen)) : Optional.empty();
+            }
+            case POST -> {
+                if (!"HEAVY".equals(persona.getTier())) yield Optional.empty();
+                if (alreadyPostedToday(persona)) yield Optional.empty();
+                yield Optional.of(PlannedAction.newPost());
+            }
+            default -> Optional.empty();
+        };
     }
 
     /**

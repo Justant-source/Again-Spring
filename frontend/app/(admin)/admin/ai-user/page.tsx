@@ -11,10 +11,12 @@ import {
   getGenerationConfig,
   updateGenerationConfig,
   killAllBackends,
+  getGenerationStatus,
   type GenerationConfig,
   type Backend,
   type UpdateConfigRequest,
   type EstimateResult,
+  type GenerationStatus,
 } from '@/lib/api/admin/ai-user';
 import {
   Cpu, Zap, Power, Save, AlertTriangle, AlertCircle, Info, RefreshCw,
@@ -216,6 +218,11 @@ export default function AiUserPage() {
   const [budget,   setBudget]   = useState<string>('');
   const [ratios,   setRatios]   = useState({ comment: 7.6, reply: 4.4, vote: 6.5, like: 15.7 });
 
+  // ── 진행 현황 상태 ───────────────────────────────────────────────
+  const [genStatus, setGenStatus] = useState<GenerationStatus | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
   // ── 초기 로드 ─────────────────────────────────────────────────────
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -294,6 +301,27 @@ export default function AiUserPage() {
       setKilling(false);
     }
   };
+
+  // ── 진행 현황 조회 ────────────────────────────────────────────────
+  const fetchStatus = useCallback(async () => {
+    setStatusLoading(true);
+    try {
+      const s = await getGenerationStatus();
+      setGenStatus(s);
+    } catch (e) {
+      // 실패 시 이전 값 유지
+    } finally {
+      setStatusLoading(false);
+    }
+  }, []);
+
+  // ── 자동 새로고침 ──────────────────────────────────────────────────
+  useEffect(() => {
+    fetchStatus(); // initial load
+    if (!autoRefresh) return;
+    const id = setInterval(fetchStatus, 60_000);
+    return () => clearInterval(id);
+  }, [autoRefresh, fetchStatus]);
 
   if (loading) {
     return (
@@ -535,6 +563,78 @@ export default function AiUserPage() {
         </div>
 
       </div>
+
+      {/* 오늘 진행 현황 */}
+      <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-800">오늘 진행 현황</h2>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-sm text-gray-500 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={e => setAutoRefresh(e.target.checked)}
+                className="rounded"
+                data-testid="ai-gen-status-auto-refresh"
+              />
+              자동 새로고침 (60초)
+            </label>
+            <button
+              onClick={fetchStatus}
+              disabled={statusLoading}
+              className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              data-testid="ai-gen-status-refresh-btn"
+            >
+              {statusLoading ? '...' : '새로고침'}
+            </button>
+          </div>
+        </div>
+
+        {genStatus ? (
+          <>
+            <p className="text-xs text-gray-400 mb-4">{genStatus.todayKst} 기준 (KST)</p>
+            <div className="space-y-3" data-testid="ai-gen-status-panel">
+              {([
+                { key: 'posts',    label: '글' },
+                { key: 'comments', label: '댓글' },
+                { key: 'replies',  label: '대댓글' },
+                { key: 'votes',    label: '투표' },
+                { key: 'likes',    label: '좋아요' },
+              ] as { key: keyof GenerationStatus['targets']; label: string }[]).map(({ key, label }) => {
+                const t = genStatus.targets[key];
+                const pct = t.percent;
+                const barColor = pct >= 100 ? 'bg-green-500' : pct >= 70 ? 'bg-[#5F8F76]' : 'bg-gray-400';
+                return (
+                  <div key={key} data-testid={`ai-gen-status-${key}`}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-700">{label}</span>
+                      <span className="text-gray-500">
+                        {t.done.toLocaleString()} / {t.target.toLocaleString()}
+                        {t.target > 0 && <span className="ml-1 text-gray-400">({pct}%)</span>}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${barColor}`}
+                        style={{ width: `${Math.min(100, pct)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {(genStatus.failures.failed > 0 || genStatus.failures.blocked > 0) && (
+              <p className="mt-3 text-xs text-gray-400">
+                실패 {genStatus.failures.failed}건 · 차단 {genStatus.failures.blocked}건 (오늘)
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-gray-400" data-testid="ai-gen-status-empty">
+            {statusLoading ? '불러오는 중...' : '새로고침을 눌러 현황을 조회하세요.'}
+          </p>
+        )}
+      </section>
     </div>
   );
 }

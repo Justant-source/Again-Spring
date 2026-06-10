@@ -68,3 +68,31 @@ export async function killAllBackends(): Promise<{ status: string; message: stri
   const res = await api.post('/api/admin/ai-user/kill');
   return res.data;
 }
+
+// ── Generation Status ────────────────────────────────────────────────────
+
+export interface TypeProgress {
+  done: number;
+  target: number;
+  percent: number;
+}
+
+export interface GenerationStatus {
+  todayKst: string;
+  targets: {
+    posts: TypeProgress;
+    comments: TypeProgress;
+    replies: TypeProgress;
+    votes: TypeProgress;
+    likes: TypeProgress;
+  };
+  failures: {
+    failed: number;
+    blocked: number;
+  };
+}
+
+export async function getGenerationStatus(): Promise<GenerationStatus> {
+  const res = await api.get('/api/admin/ai-user/generation-status');
+  return res.data;
+}

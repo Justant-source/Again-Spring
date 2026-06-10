@@ -189,7 +189,18 @@ flowchart LR
 | GET | `/api/admin/feedbacks` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | PATCH | `/api/admin/feedbacks/{id}` | **JWT + ADMIN** | 200 / 400 / 404 | [admin.md](admin.md) |
 
-### 10. Admin — Prompts (app.admin.enabled=true)
+### 10. Admin — AI User Generation (AI 유저 생성 정책·진행 현황)
+
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| GET | `/api/admin/ai-user/generation-config` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| PUT | `/api/admin/ai-user/generation-config` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/ai-user/generation-status` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| POST | `/api/admin/ai-user/cleanup/reduce-ㅠ` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| POST | `/api/admin/ai-user/backfill-comment-likes` | **JWT + ADMIN** | 202 | [admin.md](admin.md) |
+| POST | `/api/admin/ai-user/kill` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+
+### 10.1. Admin — Prompts (app.admin.enabled=true)
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
 |---|---|---|---|---|
