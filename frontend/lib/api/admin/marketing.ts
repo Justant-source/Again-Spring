@@ -56,6 +56,11 @@ export async function publishMarketingJob(id: number): Promise<MarketingJob> {
   return res.data;
 }
 
+export async function republishMarketingJob(id: number): Promise<MarketingJob> {
+  const res = await api.post<MarketingJob>(`/api/admin/marketing/jobs/${id}/republish`);
+  return res.data;
+}
+
 // ===== Platform credentials =====
 // NOTE: this payload is proxied verbatim from ASM (FastAPI) → snake_case keys,
 // unlike the camelCase MarketingJob above. ASM is the single source of truth for

@@ -109,6 +109,24 @@ public class AsmClient {
     }
 
     /**
+     * Re-queue a PARTIAL/FAILED marketing job for publishing.
+     * Resets NEEDS_AUTH/FAILED publications to PENDING before retrying.
+     */
+    public AsmJobView republish(String jobId) {
+        try {
+            return restClient
+                .post()
+                .uri("/api/v1/jobs/{jobId}/republish", jobId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(AsmJobView.class);
+        } catch (Exception e) {
+            log.error("Failed to republish ASM job {}", jobId, e);
+            throw new AsmUnavailableException("Failed to republish ASM job: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * List all platform credential statuses (secrets masked by ASM)
      */
     public JsonNode listCredentials() {

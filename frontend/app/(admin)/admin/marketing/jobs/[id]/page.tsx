@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
@@ -10,9 +10,10 @@ import { AdminSection } from '@/components/admin/AdminSection';
 import {
   getMarketingJob,
   publishMarketingJob,
+  republishMarketingJob,
   MarketingJob,
 } from '@/lib/api/admin/marketing';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
 import { ArtifactSection } from '@/components/admin/marketing/ArtifactSection';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -27,15 +28,55 @@ const STATUS_COLORS: Record<string, string> = {
   PARTIAL: 'bg-yellow-500 text-white',
 };
 
+const PUB_STATE_COLORS: Record<string, string> = {
+  PUBLISHED: 'bg-green-200 text-green-800',
+  NEEDS_AUTH: 'bg-red-200 text-red-800',
+  FAILED: 'bg-red-200 text-red-800',
+  MANUAL: 'bg-gray-200 text-gray-800',
+  PENDING: 'bg-blue-100 text-blue-800',
+  PUBLISHING: 'bg-orange-100 text-orange-800',
+};
+
+const ACTIVE_STATUSES = new Set(['REQUESTED', 'QUEUED', 'RUNNING', 'PUBLISHING']);
+const TERMINAL_STATUSES = new Set(['PUBLISHED', 'PARTIAL', 'FAILED', 'STALE']);
+
+function hasNeedsAuth(job: MarketingJob): boolean {
+  return (job.publications ?? []).some((p) => p.state === 'NEEDS_AUTH');
+}
+
 export default function MarketingJobDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [job, setJob] = useState<MarketingJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
+  const [republishing, setRepublishing] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPoll = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const startPoll = () => {
+    stopPoll();
+    pollRef.current = setInterval(async () => {
+      try {
+        const data = await getMarketingJob(parseInt(params.id as string));
+        setJob(data);
+        if (TERMINAL_STATUSES.has(data.status)) stopPoll();
+      } catch {
+        // keep polling — transient error
+      }
+    }, 3000);
+  };
 
   useEffect(() => {
     loadJob();
+    return stopPoll;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
   const loadJob = async () => {
@@ -43,8 +84,8 @@ export default function MarketingJobDetailPage() {
     try {
       const data = await getMarketingJob(parseInt(params.id as string));
       setJob(data);
-    } catch (error) {
-      console.error('Failed to load marketing job:', error);
+      if (ACTIVE_STATUSES.has(data.status)) startPoll();
+    } catch {
       alert('마케팅 잡을 불러오지 못했습니다.');
       router.push('/admin/marketing');
     } finally {
@@ -60,12 +101,28 @@ export default function MarketingJobDetailPage() {
     try {
       const updated = await publishMarketingJob(job.id);
       setJob(updated);
-      alert('게시가 완료되었습니다.');
-    } catch (error) {
-      console.error('Failed to publish marketing job:', error);
-      alert('게시에 실패했습니다.');
+      // Start polling until the dispatcher finishes (PUBLISHING → terminal)
+      startPoll();
+    } catch {
+      alert('게시 요청에 실패했습니다.');
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handleRepublish = async () => {
+    if (!job) return;
+    if (!confirm('플랫폼 계정 설정 후 게시를 재시도하시겠습니까?')) return;
+
+    setRepublishing(true);
+    try {
+      const updated = await republishMarketingJob(job.id);
+      setJob(updated);
+      startPoll();
+    } catch {
+      alert('게시 재시도에 실패했습니다.');
+    } finally {
+      setRepublishing(false);
     }
   };
 
@@ -89,9 +146,39 @@ export default function MarketingJobDetailPage() {
     );
   }
 
+  const needsAuthExists = hasNeedsAuth(job);
+  const canRepublish = ['PARTIAL', 'FAILED', 'PUBLISHED'].includes(job.status);
+
   return (
     <AdminSection title="마케팅 잡 상세">
       <div className="space-y-6">
+        {/* NEEDS_AUTH 안내 배너 */}
+        {needsAuthExists && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-amber-800">플랫폼 계정 인증이 필요합니다</p>
+              <p className="text-sm text-amber-700 mt-1">
+                하나 이상의 플랫폼에서 인증 정보가 없어 게시에 실패했습니다.
+                플랫폼 계정을 설정한 후 "게시 재시도"를 눌러주세요.
+              </p>
+              <Link href="/admin/marketing?tab=credentials">
+                <Button size="sm" variant="outline" className="mt-2 border-amber-400 text-amber-800 hover:bg-amber-100">
+                  플랫폼 계정 설정하기
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* 게시 진행 중 안내 */}
+        {ACTIVE_STATUSES.has(job.status) && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 flex items-center gap-3">
+            <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+            <p className="text-sm text-blue-700">게시 처리 중... 자동으로 상태가 갱신됩니다.</p>
+          </div>
+        )}
+
         {/* 기본 정보 */}
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">기본 정보</h3>
@@ -192,7 +279,9 @@ export default function MarketingJobDetailPage() {
                     <tr key={idx} className="border-b">
                       <td className="py-2 px-3 font-mono">{pub.platform}</td>
                       <td className="py-2 px-3">
-                        <Badge variant="outline">{pub.state}</Badge>
+                        <Badge className={PUB_STATE_COLORS[pub.state] || 'bg-gray-200 text-gray-800'}>
+                          {pub.state === 'NEEDS_AUTH' ? '인증 필요' : pub.state}
+                        </Badge>
                       </td>
                       <td className="py-2 px-3">
                         {pub.url && pub.url.startsWith('http') ? (
@@ -225,26 +314,30 @@ export default function MarketingJobDetailPage() {
           </Card>
         )}
 
-        {/* 게시 승인 버튼 */}
-        {job.status === 'READY' && !job.autoPublish && (
-          <div className="flex gap-2 justify-end">
-            <Link href="/admin/marketing">
-              <Button variant="outline">돌아가기</Button>
-            </Link>
+        {/* 액션 버튼 */}
+        <div className="flex gap-2 justify-end">
+          <Link href="/admin/marketing">
+            <Button variant="outline">돌아가기</Button>
+          </Link>
+
+          {/* 게시 재시도 — PARTIAL/FAILED/PUBLISHED 잡에 노출 */}
+          {canRepublish && (
+            <Button
+              variant="outline"
+              onClick={handleRepublish}
+              disabled={republishing || ACTIVE_STATUSES.has(job.status)}
+            >
+              {republishing ? '재시도 중...' : '게시 재시도'}
+            </Button>
+          )}
+
+          {/* 최초 게시 승인 — READY이고 자동게시 꺼진 경우 */}
+          {job.status === 'READY' && !job.autoPublish && (
             <Button onClick={handlePublish} disabled={publishing}>
               {publishing ? '게시 중...' : '게시 승인'}
             </Button>
-          </div>
-        )}
-
-        {/* 돌아가기 버튼 */}
-        {!(job.status === 'READY' && !job.autoPublish) && (
-          <div className="flex justify-end">
-            <Link href="/admin/marketing">
-              <Button variant="outline">돌아가기</Button>
-            </Link>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </AdminSection>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { AdminSection } from '@/components/admin/AdminSection';
@@ -54,7 +55,8 @@ const TARGET_PLATFORMS = [
 ];
 
 export default function MarketingJobsPage() {
-  const [activeTab, setActiveTab] = useState('jobs');
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') ?? 'jobs');
   const [jobs, setJobs] = useState<MarketingJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

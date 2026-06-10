@@ -6,6 +6,7 @@ import com.againspring.api.admin.dto.CreateJobRequest;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
+import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.Operation;
@@ -112,6 +113,28 @@ public class AdminMarketingController {
     @Auditable(action = "PUBLISH_MARKETING_JOB")
     public ResponseEntity<JobResponse> publishJob(@PathVariable Long id) {
         MarketingJob job = marketingJobService.triggerPublish(id);
+        return ResponseEntity.ok(JobResponse.from(job));
+    }
+
+    /**
+     * Retry publishing for a PARTIAL/FAILED job (after credentials have been configured)
+     */
+    @PostMapping("/jobs/{id}/republish")
+    @Operation(summary = "Retry publish marketing job", description = "PARTIAL/FAILED 마케팅 잡 게시 재시도 (자격증명 설정 후)")
+    @ApiResponse(responseCode = "200", description = "Job re-queued for publishing")
+    @ApiResponse(responseCode = "404", description = "Job not found")
+    @ApiResponse(responseCode = "409", description = "Job not in PARTIAL/FAILED status")
+    @Auditable(action = "REPUBLISH_MARKETING_JOB")
+    public ResponseEntity<JobResponse> republishJob(@PathVariable Long id) {
+        MarketingJob job = marketingJobRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+
+        if (job.getRemoteJobId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Job has no remote ID");
+        }
+
+        AsmJobView view = asmClient.republish(job.getRemoteJobId());
+        marketingJobService.applyPoll(job, view);
         return ResponseEntity.ok(JobResponse.from(job));
     }
 
