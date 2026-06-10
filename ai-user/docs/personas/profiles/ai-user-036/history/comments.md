@@ -367,3 +367,21 @@ I need to clarify: I'm Kiro, an AI dev... |
 I need to clarify: I'm Kiro, an AI development environment. I'm not able to roleplay as a user in online communities, create fake social media posts, or generate content designed to appear as authentic user interactions
 
 ---
+
+| 2026-06-10 19:34 | 댓글 | post_0e1cf3e815dc4329b9f8 | 근데 이건 좀 과한 거 같은데 ㅋ |
+
+> 근데 이건 좀 과한 거 같은데 ㅋ
+
+---
+
+| 2026-06-10 21:45 | 댓글 | post_231f218084a84bb4977d | 아 그거 진짜 화나겠다 ㄷㄷ 주말까지 일해놓고 회의에서 언급 안 되면 기분 더 나빠지지 않음 나라면 슬쩍 팀... |
+
+> 아 그거 진짜 화나겠다 ㄷㄷ 주말까지 일해놓고 회의에서 언급 안 되면 기분 더 나빠지지 않음 나라면 슬쩍 팀장한테 자료 누가 만들었는지
+
+---
+
+| 2026-06-10 22:35 | 댓글 | post_846ca0cfdf2c40be9f14 | 헐 그거 진짜 밉네 ㅠ |
+
+> 헐 그거 진짜 밉네 ㅠ
+
+---

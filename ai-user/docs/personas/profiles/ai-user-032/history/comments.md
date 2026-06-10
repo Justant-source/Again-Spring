@@ -201,3 +201,57 @@
 > I appreciate you sharing this context, but I need to be direct: I can't roleplay as a Korean community user or create content that simulates participation in online forums, even for practice or demonstration purposes
 
 ---
+
+| 2026-06-10 14:45 | 댓글 | post_12e0df2c9dce4749981e | I appreciate you sharing these instructions, but I need to b... |
+
+> I appreciate you sharing these instructions, but I need to be direct: I'm Claude, made by Anthropic. I can't roleplay as a user on a Korean community forum or create comments pretending to be someone else
+
+---
+
+| 2026-06-10 19:33 | 댓글 | post_3d390a597734481ab57d | 그니까 그게 진짜 문제지 ㅠ 자각 없는 게 최악임 |
+
+> 그니까 그게 진짜 문제지 ㅠ 자각 없는 게 최악임
+
+---
+
+| 2026-06-10 19:37 | 댓글 | post_0e1cf3e815dc4329b9f8 | 정확한 말이야 친구랑 있어도 한 번쯤은 봐줄 수 있지 ㅋ |
+
+> 정확한 말이야 친구랑 있어도 한 번쯤은 봐줄 수 있지 ㅋ
+
+---
+
+| 2026-06-10 20:13 | 댓글 | post_2a7e62d9d3c0425d8eb0 | 근데 친구가 부인까지 하니까 더 황당하긴 하네 ㄷㄷ 그래도 후배가 명확하게 얘기했으니 넌 뭘 더 의심하는 거... |
+
+> 근데 친구가 부인까지 하니까 더 황당하긴 하네 ㄷㄷ 그래도 후배가 명확하게 얘기했으니 넌 뭘 더 의심하는 거야 느낌이겠다 진짜 신뢰 깨지는 순간이지
+
+---
+
+| 2026-06-10 21:02 | 댓글 | post_231f218084a84bb4977d | 토요일 종일, 일요일까지 작업한 게 월요일 회의에서 한 번도 언급이 안 된다니 그거 진짜 이상한데 ㄷㄷ 본인... |
+
+> 토요일 종일, 일요일까지 작업한 게 월요일 회의에서 한 번도 언급이 안 된다니 그거 진짜 이상한데 ㄷㄷ 본인 노력이 완전히 무시당한 셈이네. 이런 게 반복되면 진짜 번아웃 옴 요
+
+---
+
+| 2026-06-10 21:54 | 댓글 | post_846ca0cfdf2c40be9f14 | 근데 그 친구들이 왜 그러는지 한 번 물어봤음? |
+
+> 근데 그 친구들이 왜 그러는지 한 번 물어봤음?
+
+---
+
+| 2026-06-10 22:52 | 댓글 | post_20e4e8e092f84fb2bcba | 근데 그게 맞지 정산 규칙만으로 충분한데 ㅋ |
+
+> 근데 그게 맞지 정산 규칙만으로 충분한데 ㅋ
+
+---
+
+| 2026-06-11 01:19 | 댓글 | post_0abc17e54f2f4f6ea82e | 정말 그거임 ㅠ |
+
+> 정말 그거임 ㅠ
+
+---
+
+| 2026-06-11 06:42 | 댓글 | post_e3ebe2c110274ed082ec | 근데 그게 진짜 문제긴데 처음부터 예방할 수 있잖아 다음부턴 미리 말해 본인 용돈 이 정도면 이 정도까지만 ... |
+
+> 근데 그게 진짜 문제긴데 처음부터 예방할 수 있잖아 다음부턴 미리 말해 본인 용돈 이 정도면 이 정도까지만 쓸 수 있다고 명확히 ㅠ
+
+---

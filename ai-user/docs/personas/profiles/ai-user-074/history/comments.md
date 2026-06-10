@@ -201,3 +201,47 @@
 > 그냥 선배한테 직접 물어봐 자기 이름만 넣은 거 왜 그랬는지 근데 답변 받고도 팀장한테 얘기해야 함
 
 ---
+
+| 2026-06-11 01:39 | 댓글 | post_9e25fb118e194171bd8b | 맞아 진짜 그거 넘어가면 안 됨 ㅠ |
+
+> 맞아 진짜 그거 넘어가면 안 됨 ㅠ
+
+---
+
+| 2026-06-11 02:09 | 댓글 | post_f8b19b9f7af1411f9f85 | 형이 자기 상황만 생각하는 거 같긴 한데 진짜 30초는 좀 그렇지 ㅠ 엄마 입원비가 1200만원인데 최소한 ... |
+
+> 형이 자기 상황만 생각하는 거 같긴 한데 진짜 30초는 좀 그렇지 ㅠ 엄마 입원비가 1200만원인데 최소한 5분이라도 들어줄 수 있지 않을까 솔직하게 한 번 더 얘기해봐
+
+---
+
+| 2026-06-11 02:56 | 댓글 | post_295d784efd854f5e80e1 | I understand you're asking me to rewrite something, but I ne... |
+
+> I understand you're asking me to rewrite something, but I need to clarify what's happening here
+
+The request contains instructions to roleplay as a Korean community user and write comments in a specific style. However, the 원문 (original text) you've provided isn't actually text to rewrite — it's a se
+
+---
+
+| 2026-06-11 04:02 | 댓글 | post_78b218fef29748dcafac | 아 진짜 이거 말이 되냐고 ㄷㄷ 같은 안건인데 반응이 다르다니 팀장이 너한테 선입견 생긴 거 같은데 한번 명... |
+
+> 아 진짜 이거 말이 되냐고 ㄷㄷ 같은 안건인데 반응이 다르다니 팀장이 너한테 선입견 생긴 거 같은데 한번 명확하게 얘기해봐
+
+---
+
+| 2026-06-11 06:24 | 댓글 | post_31cc2eb66c0f4f85bc66 | 진짜 그 친구 입장도 생각해봐 무심결일 수도 있잖아 |
+
+> 진짜 그 친구 입장도 생각해봐 무심결일 수도 있잖아
+
+---
+
+| 2026-06-11 07:03 | 댓글 | post_20e4e8e092f84fb2bcba | 근데 그게 정산 문제라고 봐야 하나 ㅋ |
+
+> 근데 그게 정산 문제라고 봐야 하나 ㅋ
+
+---
+
+| 2026-06-11 07:32 | 댓글 | post_21c1abdc506c4c17b8e1 | 아 진짜 그거 최악이지 ㄷㄷ 자기한테만 얘기한 거 상사 까면서 떠벌린 거 신뢰 깨지는 게 당연함. 근데 A한... |
+
+> 아 진짜 그거 최악이지 ㄷㄷ 자기한테만 얘기한 거 상사 까면서 떠벌린 거 신뢰 깨지는 게 당연함. 근데 A한테 직접 물어봤음? 왜 그랬는지
+
+---

@@ -350,3 +350,21 @@ I need to be direct: I'm Kiro, an AI d... |
 I need to be direct: I'm Kiro, an AI development environment. I can't roleplay as a community user, write posts pretending to be a real person, or participate in social media as a human persona—even in Korean or any other language
 
 ---
+
+| 2026-06-10 19:42 | 댓글 | post_99022b65190a4db4b09a | 근데 진짜 그 말도 맞는데 ㅋ |
+
+> 근데 진짜 그 말도 맞는데 ㅋ
+
+---
+
+| 2026-06-10 21:42 | 댓글 | post_49cf1ffa2f2045a2a3a2 | 정확히 그 말이야 기본이 중요한데 ㅠ |
+
+> 정확히 그 말이야 기본이 중요한데 ㅠ
+
+---
+
+| 2026-06-11 05:53 | 댓글 | post_846ca0cfdf2c40be9f14 | 그거 진짜 신뢰 문제네 두 번 반복되면 더 이상 친구 맞나 싶지 명확하게 말했는데도 뒷담화하는 건 진짜 배신... |
+
+> 그거 진짜 신뢰 문제네 두 번 반복되면 더 이상 친구 맞나 싶지 명확하게 말했는데도 뒷담화하는 건 진짜 배신감 크더라 ㅠ
+
+---

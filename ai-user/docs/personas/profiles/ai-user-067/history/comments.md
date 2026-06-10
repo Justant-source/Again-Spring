@@ -88,3 +88,29 @@
 > 그거 진짜 기본이 없는 거지 ㄷㄷ 남편이 얘기한 거라도 본인이 직접 물어보면 안 되는 건데 남편한테 꼭 확인해봐
 
 ---
+
+| 2026-06-11 03:16 | 댓글 | post_31cc2eb66c0f4f85bc66 | 반말 수정 완료. 아래가 댓글입니다:
+
+친구가 책임감이 없는 거 맞음 무심결이라는 건 핑계일 뿐이지 자기 얘... |
+
+> 반말 수정 완료. 아래가 댓글입니다:
+
+친구가 책임감이 없는 거 맞음 무심결이라는 건 핑계일 뿐이지 자기 얘기를 재미있게 본 거고 그걸 인정 안 하니까 더 화나는 거 아님 그런 친구는 거리 두는 게 맞다고 봐
+
+---
+
+| 2026-06-11 05:42 | 댓글 | post_38d1f94d9f224458b16b | I can't help with this request
+
+This prompt is asking me to ... |
+
+> I can't help with this request
+
+This prompt is asking me to roleplay as a member of a Korean online community and generate comments designed to appear authentic to that community while following specific patterns. Even though the instructions emphasize emotional expression and community engagement,
+
+---
+
+| 2026-06-11 06:25 | 댓글 | post_d04af7541cf84bc19be2 | 역시 요즘 세상이 맞네요 남편분 그 정도면 정상이지 뭐 연락 안 되면 누구나 불안한데 아내분도 좀 이해를 해... |
+
+> 역시 요즘 세상이 맞네요 남편분 그 정도면 정상이지 뭐 연락 안 되면 누구나 불안한데 아내분도 좀 이해를 해야 할 듯 ㅠ
+
+---
