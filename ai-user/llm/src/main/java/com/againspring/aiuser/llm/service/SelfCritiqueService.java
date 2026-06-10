@@ -42,11 +42,27 @@ public class SelfCritiqueService {
     private static final Pattern PERFECT_STRUCTURE = Pattern.compile("(?s)(배경|상황).*갈등.*질문|도입.*사건.*갈등.*질문");
     private static final Pattern EMOTION_TELL     = Pattern.compile("(?:서운함|답답함|배신감|억울함|분노|불안감|자존감 하락|허탈함)[이가이을를]?");
 
+    // formality 체크용 패턴
+    private static final Pattern POLITE_ENDING = Pattern.compile(
+        "(?:(?:했|했었|었|이었|이)어요|(?:했|했었|었|이었|이)?에요|(?:했|해)요|습니다|니다|세요|예요)\\s*$",
+        Pattern.MULTILINE);
+    private static final Pattern SAME_ENDING_SEQ = Pattern.compile(
+        "(?:어요|아요|했어요|었어요|이에요|예요)[^\\S\\n]*(?:\\n|$).*?(?:어요|아요|했어요|었어요|이에요|예요)[^\\S\\n]*(?:\\n|$)",
+        Pattern.DOTALL);
+
     /**
      * 결정론적(0비용) 빠른 체크. LLM 호출 없이 점수 산출.
      * 점수가 passThreshold-1 이하일 때만 LLM 비평 호출.
      */
     public CritiqueResult quickCheck(String text, String contentType) {
+        return quickCheck(text, contentType, null);
+    }
+
+    /**
+     * 결정론적(0비용) 빠른 체크 (formality 고려).
+     * formality: "casual" (반말) | "polite" (존댓말) | null (기본값)
+     */
+    public CritiqueResult quickCheck(String text, String contentType, String formality) {
         if (!enabled || text == null || text.isBlank()) {
             return new CritiqueResult(true, 7, List.of());
         }
@@ -78,9 +94,10 @@ public class SelfCritiqueService {
             issues.add("감정 추상명사 직접 서술");
         }
 
-        // 5. 종결어미 단조로움: 모든 문장이 ~임/~함으로만 끝남
+        // 5. 종결어미 단조로움: casual 모드에서만 ~임/~함 단조 체크
         String[] lines = text.split("[\\n\\r]+");
         int totalLines = 0, uniformEnding = 0;
+        boolean isCasual = !"polite".equalsIgnoreCase(formality);
         for (String line : lines) {
             String t = line.trim();
             if (t.length() > 5) {
@@ -90,9 +107,52 @@ public class SelfCritiqueService {
                 }
             }
         }
-        if (totalLines >= 4 && uniformEnding * 100 / totalLines > 80) {
+        if (isCasual && totalLines >= 4 && uniformEnding * 100 / totalLines > 80) {
             score -= 1;
-            issues.add("종결어미 단조로움");
+            issues.add("종결어미 단조로움(~임/~함 과다)");
+        }
+
+        // 6. casual 모드인데 존댓말 어미 사용 — 큰 감점
+        if (isCasual && formality != null) {
+            long politeLines = 0L;
+            long checkedLines = 0L;
+            for (String line : lines) {
+                String t = line.trim();
+                if (t.length() > 5) {
+                    checkedLines++;
+                    if (POLITE_ENDING.matcher(t).find()) {
+                        politeLines++;
+                    }
+                }
+            }
+            if (checkedLines > 0 && politeLines > 0) {
+                score -= 3;
+                issues.add("반말 위반(~요/~어요 사용) — ~음/~임/~더라 류 반말로 고쳐라");
+            }
+        }
+
+        // 7. polite 모드 — 어미 단조로움 체크
+        if (!isCasual && formality != null) {
+            // 연속 같은 어미 체크
+            if (SAME_ENDING_SEQ.matcher(text).find()) {
+                score -= 1;
+                issues.add("존댓말 어미 단조 반복(같은 어미 2연속) — 매 문장 다른 어미 사용");
+            }
+            // ~어요/~했어요 비율 과다 체크
+            long totalEndings = 0L, ayoEndings = 0L;
+            for (String line : lines) {
+                String t = line.trim();
+                if (t.length() > 5) {
+                    totalEndings++;
+                    if (t.endsWith("어요") || t.endsWith("했어요") || t.endsWith("았어요")) {
+                        ayoEndings++;
+                    }
+                }
+            }
+            if (totalEndings >= 4 && ayoEndings * 100 / totalEndings > 60) {
+                score -= 1;
+                issues.add("존댓말 어미 단조(~어요/~했어요 60%↑) — 다른 어미 섞기");
+            }
         }
 
         boolean passed = score >= passThreshold;
@@ -105,11 +165,19 @@ public class SelfCritiqueService {
      * quickCheck FAIL 시 비평 결과를 포함한 재생성 프롬프트로 1회 재시도.
      * 재시도도 빈 텍스트이면 원본 반환 (graceful fallback).
      * backend: 원래 요청과 동일한 backend("CLI"|"API"|null) — 설정 일관성 유지.
+     * formality: "casual" (반말) | "polite" (존댓말) | null (기본값)
      */
     public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId, String backend) {
+        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, backend, null);
+    }
+
+    /**
+     * 자기비평 + 재생성 (formality 고려).
+     */
+    public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId, String backend, String formality) {
         if (!enabled || draft == null || draft.isBlank()) return draft;
 
-        CritiqueResult result = quickCheck(draft, contentType);
+        CritiqueResult result = quickCheck(draft, contentType, formality);
         if (result.passed()) {
             log.debug("critique PASS corr={} score={}", corrId, result.score());
             return draft;
@@ -140,18 +208,26 @@ public class SelfCritiqueService {
 
     private String buildRetryPrompt(String originalPrompt, String draft, List<String> issues) {
         String issueText = String.join(", ", issues);
+
+        // 반말/존댓말 위반에 대한 상세 지시 추가
+        String issueDetail = issueText.contains("반말 위반")
+            ? issueText + " — ~요/~어요/~했어요로 끝나는 모든 문장을 ~음/~임/~더라/~잖아/~거든 류 반말로 바꿔라"
+            : issueText.contains("존댓말 어미 단조")
+            ? issueText + " — 매 문장마다 다른 종결어미 사용(~요 / ~더라고요 / ~거든요 / ~네요 / 명사종결 등 혼용)"
+            : issueText;
+
         // system 부분 유지, user 부분에 피드백 추가
         String sep = "<<<USER_PROMPT>>>";
         if (originalPrompt.contains(sep)) {
             String[] parts = originalPrompt.split(sep, 2);
             String system = parts[0];
             String user = parts.length > 1 ? parts[1] : "";
-            String retryUser = "[수정 요청] 아래 글에서 다음 문제를 수정해 다시 써라: " + issueText +
+            String retryUser = "[수정 요청] 아래 글에서 다음 문제를 수정해 다시 써라: " + issueDetail +
                                "\n원문:\n" + draft.substring(0, Math.min(draft.length(), 400)) +
                                "\n\n원래 요청:\n" + user;
             return system + "\n" + sep + "\n" + retryUser;
         }
         // 구분자 없으면 그냥 붙임
-        return originalPrompt + "\n\n[수정 요청] 다음 문제 수정: " + issueText + "\n원문: " + draft.substring(0, Math.min(300, draft.length()));
+        return originalPrompt + "\n\n[수정 요청] 다음 문제 수정: " + issueDetail + "\n원문: " + draft.substring(0, Math.min(300, draft.length()));
     }
 }
