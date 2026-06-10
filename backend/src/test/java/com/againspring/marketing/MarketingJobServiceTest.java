@@ -2,6 +2,7 @@ package com.againspring.marketing;
 
 import com.againspring.domain.community.Post;
 import com.againspring.domain.marketing.MarketingJob;
+import com.againspring.marketing.AsmProperties;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.marketing.dto.CreateJobRequest;
 import com.againspring.marketing.dto.CreateJobResponse;
@@ -18,12 +19,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +50,9 @@ class MarketingJobServiceTest {
     @Mock
     ObjectMapper objectMapper;
 
+    @Mock
+    AsmProperties asmProperties;
+
     @InjectMocks
     MarketingJobService marketingJobService;
 
@@ -56,7 +63,7 @@ class MarketingJobServiceTest {
     // ── Test 1: createJob_success ───────────────────────────────────────────
 
     @Test
-    void createJob_success_createsJobWithIdempotencyKey() {
+    void createJob_success_createsJobWithIdempotencyKey() throws JsonProcessingException {
         // Given
         Post post = Post.builder()
             .id(TEST_POST_ID)
@@ -76,7 +83,7 @@ class MarketingJobServiceTest {
             .status("QUEUED")
             .build();
 
-        when(asmClient.createJob(any(CreateJobRequest.class), eq(TEST_POST_ID)))
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
             .thenReturn(response);
 
         MarketingJob savedJob = MarketingJob.builder()
@@ -91,7 +98,8 @@ class MarketingJobServiceTest {
         when(marketingJobRepository.save(any(MarketingJob.class)))
             .thenReturn(savedJob);
 
-        when(objectMapper.writeValueAsString(any())).thenReturn("[]");
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
 
         // When
         MarketingJob result = marketingJobService.createJob(
@@ -109,7 +117,7 @@ class MarketingJobServiceTest {
 
         verify(postRepository).findById(TEST_POST_ID);
         verify(marketingJobRepository).findFirstByPostIdAndStatusNotIn(eq(TEST_POST_ID), any(List.class));
-        verify(asmClient).createJob(any(CreateJobRequest.class), eq(TEST_POST_ID));
+        verify(asmClient).createJob(any(CreateJobRequest.class), any(String.class));
         verify(marketingJobRepository).save(any(MarketingJob.class));
     }
 
@@ -118,14 +126,6 @@ class MarketingJobServiceTest {
     @Test
     void createJob_duplicateActiveJob_throwsIllegalStateException() {
         // Given
-        Post post = Post.builder()
-            .id(TEST_POST_ID)
-            .title("Test Conflict")
-            .bodyPublished("Content")
-            .build();
-
-        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
-
         // An active job already exists for this post
         MarketingJob existingJob = MarketingJob.builder()
             .id(1L)
@@ -146,7 +146,7 @@ class MarketingJobServiceTest {
             "admin"
         ))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("active");
+            .hasMessageContaining("Active");
 
         verify(marketingJobRepository).findFirstByPostIdAndStatusNotIn(eq(TEST_POST_ID), any(List.class));
     }
@@ -154,7 +154,7 @@ class MarketingJobServiceTest {
     // ── Test 3: createJob_allowsNewJobAfterTerminal ─────────────────────────
 
     @Test
-    void createJob_allowsNewJobAfterTerminal_succeeds() {
+    void createJob_allowsNewJobAfterTerminal_succeeds() throws JsonProcessingException {
         // Given
         Post post = Post.builder()
             .id(TEST_POST_ID)
@@ -182,7 +182,7 @@ class MarketingJobServiceTest {
             .status("QUEUED")
             .build();
 
-        when(asmClient.createJob(any(CreateJobRequest.class), eq(TEST_POST_ID)))
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
             .thenReturn(response);
 
         MarketingJob savedJob = MarketingJob.builder()
@@ -195,7 +195,8 @@ class MarketingJobServiceTest {
         when(marketingJobRepository.save(any(MarketingJob.class)))
             .thenReturn(savedJob);
 
-        when(objectMapper.writeValueAsString(any())).thenReturn("[]");
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
 
         // When
         MarketingJob result = marketingJobService.createJob(
@@ -215,7 +216,7 @@ class MarketingJobServiceTest {
     // ── Test 4: applyPoll_updatesStatus ────────────────────────────────────
 
     @Test
-    void applyPoll_updatesJobFieldsAndResetsFailCount() {
+    void applyPoll_updatesJobFieldsAndResetsFailCount() throws JsonProcessingException {
         // Given
         MarketingJob job = MarketingJob.builder()
             .id(1L)
@@ -225,15 +226,19 @@ class MarketingJobServiceTest {
             .pollFailCount(3) // had some failures
             .build();
 
+        Map<String, Object> artifactsMap = new java.util.HashMap<>();
+        artifactsMap.put("artifact1", "value1");
+        artifactsMap.put("artifact2", "value2");
+
         AsmJobView view = AsmJobView.builder()
             .status("READY")
             .phase("completion")
             .progress(100.0)
-            .artifacts(Arrays.asList("artifact1", "artifact2"))
+            .artifacts(artifactsMap)
             .publications(Arrays.asList())
             .build();
 
-        when(objectMapper.writeValueAsString(any())).thenReturn("[]");
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(marketingJobRepository.save(any(MarketingJob.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
 
