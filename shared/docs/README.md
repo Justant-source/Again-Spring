@@ -17,6 +17,7 @@
 ## 문서 인덱스
 
 ### 입문
+- [manifest.yaml](./manifest.yaml) — **문서 권위 그래프 SSOT** (충돌 시 어느 파일이 권위본인지 결정)
 - [structure.md](./structure.md) — 모노레포 4-분할 구조 (env/ backend/ frontend/ shared/)
 - [architecture.md](./architecture.md) — 시스템 전체 아키텍처 (브라우저↔Tunnel↔Nginx↔FE↔BE↔DB↔LLM, 커뮤니티 광장 기준)
 

@@ -161,7 +161,7 @@ sequenceDiagram
 - `jury_persona.md`: 9개 페르소나 정의 (심리상담사, 경계 전문가 등)
 - `neutralize.md`: NVC 중립화 규칙
 
-상세는 [`backend/docs/llm-bridge.md`](../backend/docs/llm-bridge.md) (LLM 워커) 참조.
+상세는 [`backend/docs/llm-bridge.md`](../../backend/docs/llm-bridge.md) (LLM 워커) 참조.
 
 ### 5) 데이터 보존
 
@@ -197,5 +197,4 @@ sequenceDiagram
 
 ---
 
-**마지막 업데이트**: 2026-06-03 (커뮤니티 광장 피벗)
 **관련 ADR**: [ADR-0001](./ADR/0001-pivot-to-community-plaza.md) (피벗), [ADR-0003](./ADR/0003-llm-consolidated-to-claude-code-cli.md) (LLM 통합)

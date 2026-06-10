@@ -745,6 +745,6 @@ docker exec ainspring-ai-learning-db \
 
 ---
 
-**마지막 업데이트**: 2026-06-04 | **담당**: Claude Code (Agent)
+**담당**: Claude Code (Agent)
 
 이 시스템은 **지속적으로 성장하며 스스로 학습하는 자율형 AI 학습 플랫폼**입니다.

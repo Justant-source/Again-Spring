@@ -129,7 +129,6 @@ FE는 이들을 **참조하고 구현**할 뿐, 독립적으로 정의하지 않
 - [ ] `npm run lint:words` 통과
 - [ ] `npm run lint` 통과
 - [ ] structure.md의 폴더 규칙 준수
-- [ ] 입력 필드 → `KeywordGuard` 컴포넌트
 - [ ] 위기 키워드 감지 → `CrisisResourceModal` 렌더
 
 ### 배포 전
@@ -207,8 +206,8 @@ frontend/
 - ✅ 금지어 검사
 - ✅ 3-Tone 디자인 시스템
 - ✅ 댓글 무한스크롤
-- ⏳ Jest/Vitest 단위 테스트 (향후)
-- ⏳ Playwright E2E 테스트 (향후)
+- ✅ Vitest 단위 테스트 (`npm run test`)
+- ✅ Playwright E2E (e2e-realbe — prod 배포 게이트)
 
 ---
 
@@ -234,7 +233,6 @@ frontend/
 ../../shared/docs/
 ├── policies/
 │   ├── forbidden-words.md          # 금지어 정의 (권위본)
-│   ├── categories.md               # 갈등 카테고리 (권위본 — 아래와 중복 제거)
 │   ├── categories.md               # 갈등 카테고리 (권위본)
 │   └── ratio-calculation.md        # 화해 기여도 계산
 ├── api/

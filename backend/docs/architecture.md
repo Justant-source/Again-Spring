@@ -168,9 +168,9 @@ flowchart LR
 
 | 컴포넌트 | 역할 | 정책 문서 |
 |---|---|---|
-| `JwtAuthFilter` | 모든 요청에서 토큰 검증 + 폐기 확인 | [policies/auth-jwt.md](./policies/auth-jwt.md) |
-| `RateLimitFilter` | bucket4j 기반 IP/유저별 제한 | `shared/docs/policies/auth.md` |
-| `KeywordGuard` | 금지어 검사 (입력+응답 양방향) | [policies/keyword-guard.md](./policies/keyword-guard.md) |
+| `JwtAuthFilter` | 모든 요청에서 토큰 검증 + 폐기 확인 | [`shared/docs/policies/auth.md`](../../shared/docs/policies/auth.md) |
+| `RateLimitFilter` | bucket4j 기반 IP/유저별 제한 | [`shared/docs/policies/auth.md`](../../shared/docs/policies/auth.md) |
+| `KeywordGuard` | 금지어 검사 (입력+응답 양방향) | [`shared/docs/policies/forbidden-words.md`](../../shared/docs/policies/forbidden-words.md) |
 | `CrisisDetector` | 위기 키워드 감지 → 관리자 알림 | `shared/docs/policies/forbidden-words.md` |
 | `PromptSanitizer` | LLM 입력 inject 방지 | `backend/docs/llm-bridge.md` |
 | `RatioEnforcer` | 공감 비율 범위 강제 (0~100%) | `shared/docs/policies/forbidden-words.md` |
@@ -212,5 +212,3 @@ flowchart LR
 | 트레이싱 | `correlationId` (UUID, X-Request-ID 헤더) — `LLMCallLogger` 등에 전파 |
 
 ---
-
-**마지막 업데이트**: 2026-05-30

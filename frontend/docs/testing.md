@@ -331,5 +331,3 @@ export const communityHandlers = [
 - 성능 모니터링 자동화 미구현
 
 ---
-
-**마지막 업데이트**: 2026-06-07

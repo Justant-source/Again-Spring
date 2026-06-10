@@ -126,6 +126,6 @@ Again-Spring/
 | API 추가/변경 | `backend/src/.../api/`, `frontend/lib/api/` | `shared/docs/api/rest-spec.md` → 해당 도메인 `.md` |
 | DB 스키마 변경 | `backend/src/main/resources/db/migration/V{n+1}__*.sql` | `shared/docs/api/database-schema.md` |
 | 프롬프트 변경 | `shared/docs/prompts/*.md` (런타임 자산) | `shared/docs/prompts/README.md` |
-| LLM 브릿지 코드 | `backend/.../llm/remote/`, `llm/PromptSanitizer.java` | [`backend/docs/llm-bridge.md`](../backend/docs/llm-bridge.md) |
+| LLM 브릿지 코드 | `backend/.../llm/remote/`, `llm/PromptSanitizer.java` | [`backend/docs/llm-bridge.md`](../../backend/docs/llm-bridge.md) |
 | 정책 검증 (금지어/위험) | `frontend/lib/constants/`, `backend/.../safety/` | `shared/docs/policies/forbidden-words.md` |
 | 도커 / nginx / 배포 | `env/` | `env/docs/` |

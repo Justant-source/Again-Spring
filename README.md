@@ -69,18 +69,20 @@ Again-Spring/
 
 ## 🔌 포트 점유표
 
-| 서비스 | 환경 | 포트 |
-|---|---|---|
-| MariaDB | dev (로컬/컨테이너) | 3306 |
-| MariaDB | prod | 3309 |
-| nginx (외부 노출) | dev | 8090 |
-| nginx (외부 노출) | prod | 8091 |
-| llm-ai-user | dev 컨테이너 (내부) | 8092 |
-| ai-user-orchestrator | dev 컨테이너 (내부) | 8096 |
-| BE | 로컬 개발 | 8080 |
-| FE | 로컬 개발 | 3000 |
+| 서비스 | 환경 | 포트 | 네트워크 |
+|---|---|---|---|
+| nginx | dev | 8090 | host (Cloudflare Tunnel 진입점) |
+| nginx | prod | 8091 | host (Cloudflare Tunnel 진입점) |
+| againspring-llm | base 스택 공유 | 8090 | container-only (`againspring` 네트워크) |
+| MariaDB | dev | 3306 | host |
+| MariaDB | prod | 3309 | host |
+| llm-ai-user | dev | 8092 | container-only |
+| ai-user-orchestrator | dev | 8096 | container-only |
+| BE | 로컬 개발 | 8080 | localhost |
+| FE | 로컬 개발 | 3000 | localhost |
 
-> Cloudflare Tunnel: `dev.againspring.net → :8090` · `againspring.net → :8091`
+> nginx dev(:8090 host)와 againspring-llm(:8090 container)은 **동일 번호, 다른 네트워크** — 충돌 없음.
+> 컨테이너 토폴로지 다이어그램: [`env/docs/architecture.md`](env/docs/architecture.md)
 
 ---
 
@@ -149,14 +151,4 @@ cd frontend && npm run lint:emoji
 
 ---
 
-## ⚠️ 핵심 규칙 (빠른 참조)
-
-1. **FE → LLM 직접 호출 금지** — 모든 LLM 요청은 BE 경유
-2. **BE LLM = RemoteLlmProvider 단일** — HTTP → `againspring-llm-{dev,prod}:8090`
-3. **prod 배포**: 명시적 "prod에 배포해줘" 지시 없으면 배포 금지
-4. **`.env.prod` git 커밋 금지**
-5. **AI 출력**: `판결/처방/승패` 표현 금지 → `공감 비율/관점` 사용
-
-마케팅 자동화는 별도 서비스 Again-Spring-Marketing(ASM)으로 분리됨.
-
-> 상세 규칙: [`CLAUDE.md`](CLAUDE.md)
+> 작업 규칙 전체(절대 규칙 포함): [`CLAUDE.md`](CLAUDE.md)

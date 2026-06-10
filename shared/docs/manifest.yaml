@@ -1,0 +1,106 @@
+# shared/docs/manifest.yaml — 문서 권위 그래프 SSOT
+#
+# 충돌 해결 규칙: 두 문서가 같은 사실을 다르게 서술할 경우 authority 파일을 따른다.
+# derived 파일은 authority 삭제/변경 시 함께 갱신하거나 제거한다.
+# AI agent는 이 manifest를 참조해 충돌 시 어느 파일을 신뢰할지 결정한다.
+#
+# 필드:
+#   authority : 해당 토픽의 단일 진실 출처 (SSOT)
+#   derived   : authority 기반으로 생성/요약된 파일 (독립 정의 금지)
+#   runtime   : 코드로 구현된 산출물 (코드가 항상 우선)
+
+decision_rule: >
+  authority > derived > runtime 순으로 신뢰.
+  코드(runtime)가 모든 문서보다 최신이며, 문서는 코드를 따라야 한다.
+
+topics:
+
+  # ── 콘텐츠 정책 ─────────────────────────────────────────────────────
+  forbidden-words:
+    authority: shared/docs/policies/forbidden-words.md
+    derived:
+      - frontend/docs/policies/forbidden-words-lint.md   # lint 사용법
+      - CLAUDE.md                                         # 요약
+    runtime:
+      - frontend/lib/constants/forbiddenWords.ts
+      - backend/src/main/java/.../safety/KeywordGuard.java
+
+  categories:
+    authority: shared/docs/policies/categories.md
+    derived: []
+    runtime:
+      - frontend/lib/constants/categories.ts             # gen:categories 스크립트로 생성
+
+  user-permissions:
+    authority: shared/docs/policies/user-permissions.json
+    derived: []
+    runtime:
+      - backend/src/main/resources/user-permissions.json  # fallback 사본 (볼륨 마운트 없을 때)
+
+  # ── 설계 시스템 ──────────────────────────────────────────────────────
+  design-tokens:
+    authority: frontend/docs/design/system.md
+    derived:
+      - CLAUDE.md                                         # 진영색 요약
+    runtime:
+      - frontend/tailwind.config.ts                       # CSS 변수 구현
+
+  ux-principles:
+    authority: frontend/docs/ux/principles.md
+    derived:
+      - frontend/docs/ux/hax-checklist.md                # 체크리스트 형태 파생
+      - CLAUDE.md                                         # 요약
+
+  # ── API / 데이터 ─────────────────────────────────────────────────────
+  rest-api:
+    authority: shared/docs/api/rest-spec.md
+    derived:
+      - shared/docs/api/auth.md
+      - shared/docs/api/user.md
+      - shared/docs/api/admin.md
+      - shared/docs/api/feedback.md
+    runtime:
+      - backend/src/main/java/.../api/*Controller.java    # 실제 동작이 우선
+
+  database-schema:
+    authority: shared/docs/api/database-schema.md
+    derived: []
+    runtime:
+      - backend/src/main/resources/db/migration/V*.sql   # Flyway 마이그레이션이 실제
+
+  # ── LLM ──────────────────────────────────────────────────────────────
+  llm-prompts:
+    authority: shared/docs/prompts/
+    derived: []
+    runtime:
+      - backend/src/main/java/.../llm/                   # BE 런타임 로딩
+
+  llm-bridge:
+    authority: backend/docs/llm-bridge.md
+    derived:
+      - CLAUDE.md                                         # 요약
+
+  # ── 환경 / 포트 ──────────────────────────────────────────────────────
+  ports:
+    authority: env/docs/architecture.md                   # mermaid L2 토폴로지 + 포트 표
+    derived:
+      - README.md                                         # 빠른 참조 표 (링크로만 유지 권장)
+      - CLAUDE.md                                         # 핵심 명령어 예시
+
+  deployment-procedure:
+    authority: env/docs/deployment.md
+    derived:
+      - CLAUDE.md                                         # 3-step 요약
+
+  environment-variables:
+    authority: env/docs/environment-variables.md
+    derived: []
+
+  # ── 마케팅 (ASM) ─────────────────────────────────────────────────────
+  marketing:
+    authority: shared/docs/marketing/README.md
+    derived:
+      - shared/docs/marketing/api.md
+      - shared/docs/marketing/architecture.md
+      - shared/docs/marketing/platforms.md
+      - shared/docs/marketing/social-poster.md

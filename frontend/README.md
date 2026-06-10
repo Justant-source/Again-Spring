@@ -127,5 +127,3 @@ npm run test:e2e:realbe  # 실서버 e2e (Playwright)
 - [ ] 모바일 반응형 확인
 
 ---
-
-**마지막 업데이트**: 2026-06-03

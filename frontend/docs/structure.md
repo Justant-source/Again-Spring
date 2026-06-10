@@ -232,5 +232,3 @@ frontend/
 | MSW 핸들러 | `mocks/handlers/{community,notifications,user}.ts` |
 | e2e 테스트 | `tests/e2e-realbe/` |
 | 테스트 ID 관리 | `tests/e2e-realbe/support/selectors.ts` |
-
-**마지막 업데이트**: 2026-06-03

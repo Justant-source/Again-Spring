@@ -588,4 +588,4 @@ ai-user-orchestrator/.../scheduler/
 
 ---
 
-**마지막 업데이트**: 2026-06-04 | **관련 문서**: [`ai-user.md`](ai-user.md) | **담당**: Claude Code (Agent)
+**관련 문서**: [`ai-user.md`](ai-user.md) | **담당**: Claude Code (Agent)
