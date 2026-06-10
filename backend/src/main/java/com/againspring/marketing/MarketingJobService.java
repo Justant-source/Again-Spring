@@ -42,13 +42,13 @@ public class MarketingJobService {
      * Create a new marketing job for a post
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
-        // Idempotency check: reject if active marketing job already exists
-        List<String> terminalStatuses = Arrays.asList("PUBLISHED", "FAILED", "PARTIAL");
-        marketingJobRepository.findFirstByPostIdAndStatusNotIn(postId, terminalStatuses)
+        // Idempotency check: reject if a job is actively being processed
+        // READY/PUBLISHED/FAILED/PARTIAL are terminal — new generation is allowed over them
+        List<String> activeStatuses = Arrays.asList("REQUESTED", "QUEUED", "RUNNING", "PUBLISHING", "STALE");
+        marketingJobRepository.findFirstByPostIdAndStatusIn(postId, activeStatuses)
             .ifPresent(existing -> {
                 throw new IllegalStateException(
-                    "Active marketing job already exists for post " + postId +
-                    " (id=" + existing.getId() + ", status=" + existing.getStatus() + ")"
+                    "이미 처리 중인 마케팅 잡이 있습니다 (id=" + existing.getId() + ", 상태=" + existing.getStatus() + "). 완료 후 다시 시도해주세요."
                 );
             });
 

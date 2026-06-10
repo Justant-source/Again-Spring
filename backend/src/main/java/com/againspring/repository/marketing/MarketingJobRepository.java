@@ -18,4 +18,6 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     Optional<MarketingJob> findByRemoteJobId(String remoteJobId);
 
     Optional<MarketingJob> findFirstByPostIdAndStatusNotIn(String postId, List<String> statuses);
+
+    Optional<MarketingJob> findFirstByPostIdAndStatusIn(String postId, List<String> statuses);
 }

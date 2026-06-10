@@ -50,7 +50,9 @@ function fileLabel(key: string): string {
 }
 
 function proxyUrl(jobId: number, artifactKey: string) {
-  return `/api/admin/marketing/jobs/${jobId}/artifacts/${artifactKey}`;
+  // artifactKey may be a full ASM path like /api/v1/jobs/{id}/artifacts/platform__file.ext
+  const name = artifactKey.split('/').pop() ?? artifactKey;
+  return `/api/admin/marketing/jobs/${jobId}/artifacts/${name}`;
 }
 
 function UploadJsonPreview({ url, filename }: { url: string; filename: string }) {
