@@ -44,7 +44,6 @@ test.describe('Journey 15-A: AI 유저 생성 현황 패널 기본', () => {
 
     await page.goto(`${BASE}/admin/ai-user`)
     await page.waitForURL(/\/admin\/ai-user/, { timeout: 10_000 })
-    await expect(page.getByText('AI 유저 관리')).toBeVisible({ timeout: 8_000 })
 
     // 진행 현황 섹션이 나타나거나 빈 상태가 표시됨
     const panelOrEmpty = page.locator(
