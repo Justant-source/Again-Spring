@@ -54,6 +54,18 @@ public class CreateJobRequest {
         @JsonProperty("jury_gist")
         private String juryGist;
 
+        @JsonProperty("jury_opinions")
+        private List<String> juryOpinions;
+
+        @JsonProperty("top_comments")
+        private List<String> topComments;
+
+        @JsonProperty("vote_labels")
+        private Map<String, Integer> voteLabels;
+
+        @JsonProperty("post_url")
+        private String postUrl;
+
         private List<String> tags;
 
         private PolicyDto policy;

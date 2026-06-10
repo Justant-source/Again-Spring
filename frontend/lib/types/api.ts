@@ -2438,6 +2438,11 @@ export interface components {
             /** Format: int64 */
             deliveredBy?: number;
             deliveryMemo?: string;
+            baseProbability?: number;
+            pityBonus?: number;
+            /** Format: int32 */
+            pityStacksAtDraw?: number;
+            activityBonus?: number;
             /** Format: date-time */
             createdAt?: string;
         };

@@ -37,7 +37,7 @@ test.describe('Journey 03-A: 광장 피드 공개 열람', () => {
     await page.goto(`${BASE}/community`)
     await expect(page.locator(FEED_POST_LIST)).toBeVisible({ timeout: 12_000 })
     await expect(page.getByText('다시봄 광장')).toBeVisible()
-    await expect(page.getByText('전체')).toBeVisible()
+    await expect(page.getByRole('button', { name: '전체' })).toBeVisible()
     await expect(page.getByRole('button', { name: '연인' })).toBeVisible()
     // 6/2 피벗 이후 피드 페이지에서 "내 사연 올리기" 버튼 없음
     await expect(page.getByText('내 사연 올리기')).not.toBeVisible()

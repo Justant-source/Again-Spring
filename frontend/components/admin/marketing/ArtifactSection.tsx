@@ -25,6 +25,9 @@ const PLATFORM_LABELS: Record<string, string> = {
   naver_blog: '네이버 블로그',
   instagram_feed: '인스타그램 피드',
   instagram_reels: '인스타그램 릴스',
+  threads: '스레드',
+  youtube_shorts: '유튜브 쇼츠',
+  naver_clip: '네이버 클립',
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -32,11 +35,17 @@ const PLATFORM_COLORS: Record<string, string> = {
   naver_blog: 'bg-green-600 text-white',
   instagram_feed: 'bg-pink-600 text-white',
   instagram_reels: 'bg-purple-600 text-white',
+  threads: 'bg-gray-800 text-white',
+  youtube_shorts: 'bg-red-600 text-white',
+  naver_clip: 'bg-green-700 text-white',
 };
 
 function fileKind(key: string): 'video' | 'image' | 'json' {
-  if (key === 'video') return 'video';
-  if (key === 'card' || key === 'thumbnail') return 'image';
+  if (key === 'video' || key.startsWith('video')) return 'video';
+  if (
+    key === 'card' || key === 'thumbnail' ||
+    key.startsWith('card_') || key.startsWith('img_')
+  ) return 'image';
   return 'json';
 }
 
@@ -231,9 +240,266 @@ function MediaFile({ url, kind, label, filename }: { url: string; kind: 'image' 
   );
 }
 
+function CarouselPreview({ pkg, jobId, uploadData }: {
+  pkg: PlatformPackage; jobId: number; uploadData?: Record<string, unknown>;
+}) {
+  const cardKeys = Object.keys(pkg).filter(k => k.startsWith('card_')).sort();
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [blobUrls, setBlobUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    cardKeys.forEach(key => {
+      const url = proxyUrl(jobId, pkg[key]!);
+      fetchArtifactBlobUrl(url)
+        .then(blobUrl => setBlobUrls(prev => ({ ...prev, [key]: blobUrl })))
+        .catch(() => {});
+    });
+    return () => {
+      Object.values(blobUrls).forEach(u => URL.revokeObjectURL(u));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (cardKeys.length === 0) return null;
+  const caption = typeof uploadData?.caption === 'string' ? uploadData.caption : '';
+  const hashtags = Array.isArray(uploadData?.hashtags) ? uploadData.hashtags as string[] : [];
+
+  return (
+    <div data-testid="artifact-carousel">
+      <div className="flex gap-2 overflow-x-auto pb-2 mt-2">
+        {cardKeys.map((key, i) => (
+          <button
+            key={key}
+            onClick={() => setActiveIdx(i)}
+            className={`relative flex-shrink-0 w-28 h-36 rounded border-2 overflow-hidden bg-gray-100 transition-all ${
+              activeIdx === i ? 'border-pink-500 ring-2 ring-pink-200' : 'border-gray-200'
+            }`}
+          >
+            {blobUrls[key] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={blobUrls[key]} alt={`card ${i + 1}`} className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex items-center justify-center h-full text-xs text-gray-400">
+                {i + 1}/{cardKeys.length}
+              </div>
+            )}
+            <div className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1 rounded">
+              {i + 1}/{cardKeys.length}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {blobUrls[cardKeys[activeIdx]] && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={blobUrls[cardKeys[activeIdx]]}
+          alt={`card ${activeIdx + 1}`}
+          className="mt-3 max-w-xs rounded border shadow"
+        />
+      )}
+
+      {caption && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-gray-500 mb-1">캡션 (첫 125자)</p>
+          <pre className="whitespace-pre-wrap text-sm bg-gray-50 rounded border p-2 max-h-20 overflow-auto">
+            {caption.slice(0, 125)}
+          </pre>
+        </div>
+      )}
+
+      {hashtags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {hashtags.map(tag => (
+            <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 mt-3">
+        {cardKeys.map((key, i) => (
+          <DownloadButton
+            key={key}
+            url={proxyUrl(jobId, pkg[key]!)}
+            filename={`instagram_card_${String(i + 1).padStart(2, '0')}.png`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function XTweetMockup({ pkg, jobId, uploadData }: {
+  pkg: PlatformPackage; jobId: number; uploadData?: Record<string, unknown>;
+}) {
+  const cardKeys = Object.keys(pkg).filter(k => k.startsWith('card_')).sort().slice(0, 2);
+  const [blobUrls, setBlobUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    cardKeys.forEach(key => {
+      const url = proxyUrl(jobId, pkg[key]!);
+      fetchArtifactBlobUrl(url)
+        .then(blobUrl => setBlobUrls(prev => ({ ...prev, [key]: blobUrl })))
+        .catch(() => {});
+    });
+    return () => {
+      Object.values(blobUrls).forEach(u => URL.revokeObjectURL(u));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const text = typeof uploadData?.text === 'string' ? uploadData.text : '';
+  const hashtags = Array.isArray(uploadData?.hashtags) ? uploadData.hashtags as string[] : [];
+  const charCount = text.length + hashtags.join(' ').length + (hashtags.length > 0 ? 1 : 0);
+
+  return (
+    <div data-testid="artifact-x-mockup" className="mt-2 rounded-xl border border-gray-200 p-4 bg-white max-w-md shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold">다</div>
+        <div>
+          <div className="font-bold text-sm">다시봄</div>
+          <div className="text-xs text-gray-500">@againspring</div>
+        </div>
+      </div>
+      {text && (
+        <p className="text-sm whitespace-pre-wrap mb-3">
+          {text}
+          {hashtags.length > 0 && (
+            <span className="text-blue-500"> {hashtags.join(' ')}</span>
+          )}
+        </p>
+      )}
+      {cardKeys.length > 0 && (
+        <div className={`grid gap-1 mb-2 ${cardKeys.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {cardKeys.map(key => (
+            <div key={key} className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+              {blobUrls[key] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={blobUrls[key]} alt="card" className="w-full h-full object-cover" />
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-gray-400">로딩 중…</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="text-xs text-gray-400 mt-2">{charCount}/280자</div>
+      <div className="flex gap-2 mt-2">
+        {cardKeys.map((key, i) => (
+          <DownloadButton key={key} url={proxyUrl(jobId, pkg[key]!)} filename={`x_card_${i + 1}.png`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type BlogSection = { type: string; text: string; position: number };
+
+function BlogPreview({ pkg, jobId, uploadData }: {
+  pkg: PlatformPackage; jobId: number; uploadData?: Record<string, unknown>;
+}) {
+  const imgKeys = Object.keys(pkg).filter(k => k.startsWith('img_')).sort();
+  const [imgBlobUrls, setImgBlobUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    imgKeys.forEach(key => {
+      const url = proxyUrl(jobId, pkg[key]!);
+      fetchArtifactBlobUrl(url)
+        .then(blobUrl => setImgBlobUrls(prev => ({ ...prev, [key]: blobUrl })))
+        .catch(() => {});
+    });
+    return () => {
+      Object.values(imgBlobUrls).forEach(u => URL.revokeObjectURL(u));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sections = Array.isArray(uploadData?.sections)
+    ? uploadData.sections as BlogSection[]
+    : [];
+  const bodyMarkdown = typeof uploadData?.body_markdown === 'string' ? uploadData.body_markdown : '';
+  const title = typeof uploadData?.title === 'string' ? uploadData.title : '';
+  const tags = Array.isArray(uploadData?.tags) ? uploadData.tags as string[] : [];
+  const charCount = bodyMarkdown.length;
+  const imgKeyList = imgKeys;
+
+  return (
+    <div data-testid="artifact-blog-preview" className="mt-2 max-w-lg">
+      {title && (
+        <h2 className="text-lg font-bold mb-3 text-gray-800">{title}</h2>
+      )}
+
+      {sections.length > 0 ? (
+        <div className="space-y-3 text-sm">
+          {sections.map((section, i) => {
+            if (section.type === 'heading') {
+              return <h3 key={i} className="text-base font-bold mt-4 text-gray-700">{section.text}</h3>;
+            }
+            if (section.type === 'paragraph') {
+              return <p key={i} className="text-gray-700 leading-relaxed whitespace-pre-wrap">{section.text}</p>;
+            }
+            if (section.type === 'image_marker') {
+              const markerNum = sections.slice(0, i).filter(s => s.type === 'image_marker').length;
+              const imgKey = imgKeyList[markerNum];
+              return (
+                <div key={i} className="my-3 rounded-lg border border-dashed border-amber-300 bg-amber-50 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="text-amber-600 border-amber-400 text-xs">수동 첨부 필요</Badge>
+                    <span className="text-xs text-amber-700">{section.text}</span>
+                  </div>
+                  {imgKey && imgBlobUrls[imgKey] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imgBlobUrls[imgKey]} alt={`image ${markerNum + 1}`} className="max-w-xs rounded border" />
+                  ) : imgKey ? (
+                    <div className="text-xs text-gray-400">이미지 로딩 중…</div>
+                  ) : null}
+                  {imgKey && (
+                    <div className="mt-2">
+                      <DownloadButton
+                        url={proxyUrl(jobId, pkg[imgKey]!)}
+                        filename={`${imgKey}.png`}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return null;
+          })}
+        </div>
+      ) : bodyMarkdown ? (
+        <pre className="whitespace-pre-wrap text-sm bg-gray-50 rounded border p-3 max-h-80 overflow-auto">
+          {bodyMarkdown}
+        </pre>
+      ) : null}
+
+      <div className="mt-3 text-xs text-gray-400">{charCount}자</div>
+
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {tags.map(tag => (
+            <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlatformCard({ platform, pkg, jobId }: { platform: string; pkg: PlatformPackage; jobId: number }) {
   const label = PLATFORM_LABELS[platform] ?? platform;
   const colorClass = PLATFORM_COLORS[platform] ?? 'bg-gray-600 text-white';
+  const [uploadData, setUploadData] = useState<Record<string, unknown> | undefined>(undefined);
+
+  useEffect(() => {
+    const uploadKey = Object.keys(pkg).find(k => k === 'upload' || k.endsWith('upload'));
+    if (!uploadKey || !pkg[uploadKey]) return;
+    const url = proxyUrl(jobId, pkg[uploadKey]!);
+    api.get(url).then(res => setUploadData(res.data as Record<string, unknown>)).catch(() => {});
+  }, [pkg, jobId]);
+
+  const hasCards = Object.keys(pkg).some(k => k.startsWith('card_'));
+  const hasImgs = Object.keys(pkg).some(k => k.startsWith('img_'));
 
   return (
     <div className="rounded-lg border bg-white p-5">
@@ -258,6 +524,8 @@ function PlatformCard({ platform, pkg, jobId }: { platform: string; pkg: Platfor
               </div>
             );
           }
+          // Individual card images and img_ images: skip in generic list (shown in platform preview)
+          if (key.startsWith('card_') || key.startsWith('img_')) return null;
 
           return (
             <MediaFile
@@ -265,11 +533,22 @@ function PlatformCard({ platform, pkg, jobId }: { platform: string; pkg: Platfor
               url={url}
               kind={kind}
               label={fileLabel(key)}
-              filename={`${platform}_${key}.${key === 'video' ? 'mp4' : 'png'}`}
+              filename={`${platform}_${key}.${kind === 'video' ? 'mp4' : 'png'}`}
             />
           );
         })}
       </div>
+
+      {/* Platform-specific rich preview below generic items */}
+      {platform === 'instagram_feed' && hasCards && (
+        <CarouselPreview pkg={pkg} jobId={jobId} uploadData={uploadData} />
+      )}
+      {platform === 'x' && hasCards && (
+        <XTweetMockup pkg={pkg} jobId={jobId} uploadData={uploadData} />
+      )}
+      {platform === 'naver_blog' && (hasImgs || (uploadData?.sections !== undefined)) && (
+        <BlogPreview pkg={pkg} jobId={jobId} uploadData={uploadData} />
+      )}
     </div>
   );
 }

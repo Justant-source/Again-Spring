@@ -1,14 +1,20 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.community.Post;
+import com.againspring.domain.community.PostComment;
+import com.againspring.domain.community.VoteOption;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.AsmProperties;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.marketing.dto.CreateJobRequest;
 import com.againspring.marketing.dto.CreateJobResponse;
 import com.againspring.marketing.dto.JobCallbackPayload;
+import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
+import com.againspring.service.community.CommentService;
+import com.againspring.service.community.VoteService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,6 +59,18 @@ class MarketingJobServiceTest {
     @Mock
     AsmProperties asmProperties;
 
+    @Mock
+    JurorRepository jurorRepository;
+
+    @Mock
+    VoteService voteService;
+
+    @Mock
+    CommentService commentService;
+
+    @Mock
+    VoteOptionRepository voteOptionRepository;
+
     @InjectMocks
     MarketingJobService marketingJobService;
 
@@ -74,9 +92,15 @@ class MarketingJobServiceTest {
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
 
         // Idempotency check: no active job exists
-        when(marketingJobRepository.findFirstByPostIdAndStatusNotIn(
+        when(marketingJobRepository.findFirstByPostIdAndStatusIn(
             eq(TEST_POST_ID), any(List.class)
         )).thenReturn(Optional.empty());
+
+        // Mock community data services
+        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
 
         CreateJobResponse response = CreateJobResponse.builder()
             .jobId(TEST_JOB_ID)
@@ -116,7 +140,7 @@ class MarketingJobServiceTest {
         assertThat(result.getStatus()).isEqualTo("QUEUED");
 
         verify(postRepository).findById(TEST_POST_ID);
-        verify(marketingJobRepository).findFirstByPostIdAndStatusNotIn(eq(TEST_POST_ID), any(List.class));
+        verify(marketingJobRepository).findFirstByPostIdAndStatusIn(eq(TEST_POST_ID), any(List.class));
         verify(asmClient).createJob(any(CreateJobRequest.class), any(String.class));
         verify(marketingJobRepository).save(any(MarketingJob.class));
     }
@@ -134,7 +158,7 @@ class MarketingJobServiceTest {
             .status("RUNNING") // non-terminal status
             .build();
 
-        when(marketingJobRepository.findFirstByPostIdAndStatusNotIn(
+        when(marketingJobRepository.findFirstByPostIdAndStatusIn(
             eq(TEST_POST_ID), any(List.class)
         )).thenReturn(Optional.of(existingJob));
 
@@ -146,9 +170,9 @@ class MarketingJobServiceTest {
             "admin"
         ))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Active");
+            .hasMessageContaining("이미 처리 중인");
 
-        verify(marketingJobRepository).findFirstByPostIdAndStatusNotIn(eq(TEST_POST_ID), any(List.class));
+        verify(marketingJobRepository).findFirstByPostIdAndStatusIn(eq(TEST_POST_ID), any(List.class));
     }
 
     // ── Test 3: createJob_allowsNewJobAfterTerminal ─────────────────────────
@@ -172,10 +196,16 @@ class MarketingJobServiceTest {
             .status("PUBLISHED") // terminal status
             .build();
 
-        // findFirstByPostIdAndStatusNotIn filters out terminal statuses
-        when(marketingJobRepository.findFirstByPostIdAndStatusNotIn(
+        // findFirstByPostIdAndStatusIn filters out terminal statuses (returns empty)
+        when(marketingJobRepository.findFirstByPostIdAndStatusIn(
             eq(TEST_POST_ID), any(List.class)
         )).thenReturn(Optional.empty());
+
+        // Mock community data services
+        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
 
         CreateJobResponse response = CreateJobResponse.builder()
             .jobId("new-job-222")

@@ -1,6 +1,8 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.community.Post;
+import com.againspring.domain.community.PostComment;
+import com.againspring.domain.community.VoteOption;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.marketing.dto.CreateJobRequest;
@@ -10,8 +12,12 @@ import com.againspring.marketing.dto.CreateJobRequest.OptionsDto;
 import com.againspring.marketing.dto.CreateJobRequest.PolicyDto;
 import com.againspring.marketing.dto.CreateJobResponse;
 import com.againspring.marketing.dto.JobCallbackPayload;
+import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
+import com.againspring.service.community.CommentService;
+import com.againspring.service.community.VoteService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -19,9 +25,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Service for managing marketing jobs
@@ -37,6 +47,10 @@ public class MarketingJobService {
     private final PostRepository postRepository;
     private final MarketingJobRepository marketingJobRepository;
     private final ObjectMapper objectMapper;
+    private final JurorRepository jurorRepository;
+    private final VoteService voteService;
+    private final CommentService commentService;
+    private final VoteOptionRepository voteOptionRepository;
 
     /**
      * Create a new marketing job for a post
@@ -55,23 +69,107 @@ public class MarketingJobService {
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new IllegalArgumentException("Post not found: " + postId));
 
-        // Build brief from post
+        // Build brief from post — inject real data
         String summary = post.getBodyPublished() != null ? post.getBodyPublished() : post.getBodyRaw();
         if (summary != null && summary.length() > 500) {
             summary = summary.substring(0, 500);
         }
 
+        // Side A: author's actual text (up to 300 chars)
+        String sideAText = post.getBodyPublished() != null ? post.getBodyPublished() : post.getBodyRaw();
+        if (sideAText != null && sideAText.length() > 300) sideAText = sideAText.substring(0, 300);
+        if (sideAText == null) sideAText = "작성자 관점";
+
+        // Side B: partner's text (up to 300 chars), or placeholder
+        String sideBText = post.getPartnerBodyPublished() != null ? post.getPartnerBodyPublished() : post.getPartnerBodyRaw();
+        if (sideBText != null && sideBText.length() > 300) sideBText = sideBText.substring(0, 300);
+        if (sideBText == null || sideBText.isBlank()) sideBText = "상대방 입장은 아직 등록되지 않았어요";
+
+        // Vote results → empathy ratio
+        int empathyA = 50, empathyB = 50;
+        Map<String, Integer> voteLabels = new LinkedHashMap<>();
+        try {
+            List<VoteOption> voteOptions = voteOptionRepository.findByPostIdOrderByOrderIdx(postId);
+            Map<Long, Long> voteResults = voteService.getVoteResult(postId);
+            long totalVotes = voteResults.values().stream().mapToLong(Long::longValue).sum();
+            if (!voteOptions.isEmpty() && totalVotes > 0) {
+                long optionACount = voteResults.getOrDefault(voteOptions.get(0).getId(), 0L);
+                empathyA = (int) Math.round((double) optionACount / totalVotes * 100);
+                empathyB = 100 - empathyA;
+            }
+            for (VoteOption opt : voteOptions) {
+                long count = voteResults.getOrDefault(opt.getId(), 0L);
+                String label = opt.getLabel() != null ? opt.getLabel() : "선택지";
+                voteLabels.put(label, (int) count);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to load vote data for post {}: {}", postId, e.getMessage());
+        }
+
+        // Juror opinions
+        String juryGist = "";
+        List<String> juryOpinions = new ArrayList<>();
+        try {
+            List<com.againspring.domain.community.Juror> jurors = jurorRepository.findByPostId(postId);
+            List<String> comments = jurors.stream()
+                .map(j -> j.getEmpathyComment())
+                .filter(c -> c != null && !c.isBlank())
+                .collect(Collectors.toList());
+            // juryOpinions: top 3, each max 100 chars
+            juryOpinions = comments.stream()
+                .limit(3)
+                .map(c -> c.length() > 100 ? c.substring(0, 100) : c)
+                .collect(Collectors.toList());
+            // juryGist: combine into 200-char summary
+            if (!comments.isEmpty()) {
+                String combined = String.join(" / ", comments);
+                juryGist = combined.length() > 200 ? combined.substring(0, 200) : combined;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to load juror data for post {}: {}", postId, e.getMessage());
+        }
+
+        // Top comments by likeCount (descending), each max 100 chars
+        List<String> topComments = new ArrayList<>();
+        try {
+            List<PostComment> comments = commentService.getTopLevelComments(postId);
+            topComments = comments.stream()
+                .filter(c -> c.getBody() != null && !c.getBody().isBlank())
+                .sorted((a, b) -> {
+                    int la = a.getLikeCount() != null ? a.getLikeCount() : 0;
+                    int lb = b.getLikeCount() != null ? b.getLikeCount() : 0;
+                    return Integer.compare(lb, la);
+                })
+                .limit(3)
+                .map(c -> c.getBody().length() > 100 ? c.getBody().substring(0, 100) : c.getBody())
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("Failed to load comments for post {}: {}", postId, e.getMessage());
+        }
+
+        // Category → Korean tag
+        List<String> tags = new ArrayList<>();
+        if (post.getCategory() != null) {
+            tags.add(post.getCategory().getDisplayName());
+        }
+
+        String postUrl = "https://againspring.net/community/posts/" + postId;
+
         BriefDto brief = BriefDto.builder()
             .title(post.getTitle())
             .neutralSummary(summary)
-            .sideA("작성자 관점")
-            .sideB("상대방 관점")
-            .empathyRatio(EmpathyRatioDto.builder().a(50).b(50).build())
-            .juryGist("")
-            .tags(List.of())
+            .sideA(sideAText)
+            .sideB(sideBText)
+            .empathyRatio(EmpathyRatioDto.builder().a(empathyA).b(empathyB).build())
+            .juryGist(juryGist)
+            .juryOpinions(juryOpinions)
+            .topComments(topComments)
+            .voteLabels(voteLabels)
+            .postUrl(postUrl)
+            .tags(tags)
             .policy(PolicyDto.builder()
                 .noEmoji(true)
-                .forbiddenTerms(Arrays.asList("판결", "처방", "승패", "승자", "패자"))
+                .forbiddenTerms(Arrays.asList("판결", "처방", "승패", "승자", "패자", "가해자", "피해자"))
                 .build())
             .build();
 
