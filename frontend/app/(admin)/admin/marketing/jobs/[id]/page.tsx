@@ -11,7 +11,9 @@ import {
   getMarketingJob,
   publishMarketingJob,
   republishMarketingJob,
+  getJobTraffic,
   MarketingJob,
+  JobTrafficDto,
 } from '@/lib/api/admin/marketing';
 import { ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
 import { ArtifactSection } from '@/components/admin/marketing/ArtifactSection';
@@ -51,6 +53,7 @@ export default function MarketingJobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [republishing, setRepublishing] = useState(false);
+  const [traffic, setTraffic] = useState<JobTrafficDto | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPoll = () => {
@@ -78,6 +81,16 @@ export default function MarketingJobDetailPage() {
     return stopPoll;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  useEffect(() => {
+    if (job?.status === 'PUBLISHED') {
+      getJobTraffic(job.id)
+        .then(setTraffic)
+        .catch(() => {
+          // silently fail
+        });
+    }
+  }, [job?.status]);
 
   const loadJob = async () => {
     setLoading(true);
@@ -311,6 +324,45 @@ export default function MarketingJobDetailPage() {
           <Card className="p-6 bg-red-50 border-red-200">
             <h3 className="text-lg font-semibold mb-4 text-red-800">오류</h3>
             <p className="text-red-700 font-mono text-sm">{job.errorMessage}</p>
+          </Card>
+        )}
+
+        {/* 유입 통계 */}
+        {traffic && (
+          <Card className="p-6 bg-blue-50 border border-blue-200">
+            <h3 className="text-lg font-semibold mb-4 text-blue-900">유입 통계</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-blue-700">총 방문</p>
+                  <p className="text-2xl font-mono font-semibold text-blue-900">
+                    {traffic.visits}회
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-blue-700">고유 세션</p>
+                  <p className="text-2xl font-mono font-semibold text-blue-900">
+                    {traffic.uniqueSessions}개
+                  </p>
+                </div>
+              </div>
+              {traffic.bySources.length > 0 && (
+                <div className="border-t pt-3">
+                  <p className="text-sm font-medium text-blue-800 mb-2">출처별 방문</p>
+                  <div className="space-y-1">
+                    {traffic.bySources.map((source) => (
+                      <div
+                        key={source.source}
+                        className="flex justify-between items-center text-sm"
+                      >
+                        <span className="text-blue-700">{source.source}</span>
+                        <span className="font-mono text-blue-900">{source.visits}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </Card>
         )}
 

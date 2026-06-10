@@ -3,22 +3,36 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
-import { getDashboardSummary, type DashboardSummaryResponse } from '@/lib/api/admin/dashboard';
+import {
+  getActionCenter,
+  getKpiMetrics,
+  getCommunityPulse,
+  getHotPosts,
+  type ActionCenterResponse,
+  type KpiMetricDto,
+  type PulseSlot,
+  type HotPostDto,
+} from '@/lib/api/admin/dashboard';
 import { getDailyStats, type DailyStatsResponse } from '@/lib/api/admin/stats';
-import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend } from 'recharts';
+import { RefreshControl } from '@/components/admin/RefreshControl';
+import { ActionCenter } from '@/components/admin/dashboard/ActionCenter';
+import { KpiGrid } from '@/components/admin/dashboard/KpiGrid';
+import { CommunityPulseChart } from '@/components/admin/dashboard/CommunityPulseChart';
+import { HotPostsCard } from '@/components/admin/dashboard/HotPostsCard';
 import { SystemHealthPanel } from '@/components/admin/SystemHealthPanel';
 import { LlmFailureRateChart } from '@/components/admin/LlmFailureRateChart';
-import { AdminStatCard } from '@/components/admin/AdminStatCard';
-
 
 export default function AdminPage() {
   const user = useUserStore((s) => s.user);
   const router = useRouter();
-  const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null);
-  const [dailyStats, setDailyStats] = useState<DailyStatsResponse[]>([]);
+
+  const [actionCenter, setActionCenter] = useState<ActionCenterResponse | null>(null);
+  const [kpiMetrics, setKpiMetrics] = useState<KpiMetricDto[]>([]);
+  const [pulseData, setPulseData] = useState<PulseSlot[]>([]);
+  const [hotPosts, setHotPosts] = useState<HotPostDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [refreshSignal, setRefreshSignal] = useState(0);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const isAuthorizedAdmin = !!user && !user.isGuest && !!user.roles?.includes('ADMIN');
 
@@ -28,12 +42,17 @@ export default function AdminPage() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [s, d] = await Promise.all([
-          getDashboardSummary(),
-          getDailyStats(7),
+        const [ac, kpi, pulse, hot] = await Promise.all([
+          getActionCenter().catch(() => null),
+          getKpiMetrics(7).catch(() => []),
+          getCommunityPulse(24).catch(() => ({ data: [] })),
+          getHotPosts(48, 10).catch(() => []),
         ]);
-        setSummary(s);
-        setDailyStats(d);
+
+        setActionCenter(ac);
+        setKpiMetrics(kpi);
+        setPulseData(pulse?.data || []);
+        setHotPosts(hot);
         setError('');
       } catch (e: any) {
         if (e.response?.status === 403) router.replace('/');
@@ -44,144 +63,61 @@ export default function AdminPage() {
     };
 
     loadData();
-  }, [isAuthorizedAdmin, router]);
+  }, [isAuthorizedAdmin, router, refreshTrigger]);
 
   function handleRefresh() {
-    setRefreshSignal((n) => n + 1);
+    setRefreshTrigger((n) => n + 1);
   }
 
-  if (loading) {
-    return <div style={{ padding: 40, fontFamily: 'sans-serif' }}>로딩 중...</div>;
-  }
   if (error) {
-    return <div style={{ padding: 40, color: '#e55', fontFamily: 'sans-serif' }}>{error}</div>;
+    return (
+      <div className="p-8 text-red-600 font-medium">
+        {error}
+      </div>
+    );
   }
 
-  // KPI 데이터 매핑 (순서 맞춤: 2x4 그리드)
-  const kpis = [
-    { label: '오늘 신규 회원', value: summary?.todayNewUsers ?? 0 },
-    { label: '총 회원', value: summary?.totalUsers ?? 0 },
-    { label: '총 게시글', value: summary?.totalPosts ?? 0 },
-    { label: '총 투표', value: summary?.totalVotes ?? 0 },
-    { label: '대기 신고', value: summary?.pendingReports ?? 0, link: '/admin/reports' },
-    { label: '미처리 문의', value: summary?.openInquiries ?? 0, link: '/admin/inquiries' },
-  ];
-
-  const chartData = [...dailyStats].reverse();
+  const isDataLoaded = !loading && (actionCenter || kpiMetrics.length > 0);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f7f6f2', fontFamily: 'sans-serif' }}>
-      {/* 헤더 */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          background: 'white',
-          borderBottom: '1px solid #e7e3d8',
-          padding: '12px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E' }}>관리자 대시보드</div>
-        <button
-          onClick={handleRefresh}
-          style={{
-            background: '#1A1A2E',
-            color: 'white',
-            border: 'none',
-            padding: '6px 12px',
-            borderRadius: 6,
-            fontSize: 12,
-            cursor: 'pointer',
-          }}
-        >
-          ↻ 새로고침
-        </button>
-      </header>
+    <div className="space-y-6">
+      {/* Header with refresh control */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-gray-900">관리자 대시보드</h1>
+        <RefreshControl
+          onRefresh={handleRefresh}
+          loading={loading}
+          autoRefreshSeconds={60}
+          data-testid="admin-page-refresh"
+        />
+      </div>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px 60px' }}>
-        {/* 시스템 헬스 */}
-        <SystemHealthPanel refreshSignal={refreshSignal} />
+      {/* Action Center */}
+      <ActionCenter data={actionCenter} loading={loading} />
 
-        {/* KPI 카드 (2x4 그리드) */}
-        {summary && (
-          <div
-            style={{
-              marginBottom: 22,
-              padding: 16,
-              background: 'white',
-              borderRadius: 12,
-              border: '1px solid #e7e3d8',
-            }}
-          >
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E', margin: '0 0 12px' }}>
-              주요 지표
-            </h2>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                gap: 12,
-              }}
-            >
-              {kpis.map((kpi, i) => (
-                <div key={i} onClick={() => kpi.link && window.location.assign(kpi.link)}>
-                  <AdminStatCard label={kpi.label} value={kpi.value.toLocaleString()} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* KPI Grid */}
+      <KpiGrid metrics={kpiMetrics} loading={loading} />
 
-        {/* 추세 차트 (최근 7일) */}
-        <div
-          style={{
-            marginBottom: 22,
-            padding: 16,
-            background: 'white',
-            borderRadius: 12,
-            border: '1px solid #e7e3d8',
-          }}
-        >
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E', margin: '0 0 12px' }}>
-            추세 (최근 7일)
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 18 }}>
-            {/* 투표 + 신규 회원 차트 */}
-            <div>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 8, fontWeight: 600 }}>
-                투표 & 신규 회원
-              </div>
-              {chartData.length === 0 ? (
-                <p style={{ color: '#aaa', fontSize: 13 }}>데이터 없음</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="statDate" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Line type="monotone" dataKey="voteCount" stroke="#1A1A2E" dot={false} name="투표" />
-                    <Line type="monotone" dataKey="newUsers" stroke="#888" dot={false} name="신규" />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-
-            {/* LLM 실패율 차트 */}
-            <div>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 8, fontWeight: 600 }}>
-                LLM 호출 실패율 (최근 7일)
-              </div>
-              <LlmFailureRateChart days={7} refreshSignal={refreshSignal} />
-            </div>
-          </div>
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Community Pulse (2/3) */}
+        <div className="lg:col-span-2">
+          <CommunityPulseChart data={pulseData} loading={loading} />
         </div>
 
+        {/* Hot Posts (1/3) */}
+        <div className="lg:col-span-1">
+          <HotPostsCard posts={hotPosts} loading={loading} />
+        </div>
+      </div>
+
+      {/* System Health & LLM Failure */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SystemHealthPanel refreshSignal={refreshTrigger} />
+        <div className="p-6 bg-white rounded-lg border">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">LLM 호출 실패율 (최근 7일)</h2>
+          <LlmFailureRateChart days={7} refreshSignal={refreshTrigger} />
+        </div>
       </div>
     </div>
   );

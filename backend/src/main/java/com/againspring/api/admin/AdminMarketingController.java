@@ -8,6 +8,7 @@ import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.repository.marketing.MarketingJobRepository;
+import com.againspring.service.admin.MarketingStatsService;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,6 +26,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -42,6 +44,7 @@ public class AdminMarketingController {
     private final MarketingJobService marketingJobService;
     private final MarketingJobRepository marketingJobRepository;
     private final AsmClient asmClient;
+    private final MarketingStatsService marketingStatsService;
 
     /**
      * Create a new marketing job for a post
@@ -204,5 +207,42 @@ public class AdminMarketingController {
     @Auditable(action = "YOUTUBE_OAUTH_EXCHANGE", targetType = "MARKETING_CREDENTIAL", targetId = "youtube_shorts")
     public ResponseEntity<JsonNode> youtubeOauthExchange(@RequestBody JsonNode body) {
         return ResponseEntity.ok(asmClient.youtubeOauthExchange(body));
+    }
+
+    // ===== Marketing Statistics =====
+
+    /**
+     * Get platform performance metrics over the last N days
+     */
+    @GetMapping("/performance")
+    @Operation(summary = "Platform performance metrics", description = "플랫폼별 마케팅 성공률·게시 현황 조회")
+    @ApiResponse(responseCode = "200", description = "Performance metrics listed")
+    public ResponseEntity<List<MarketingStatsService.PlatformStatsDto>> getPerformance(
+            @RequestParam(defaultValue = "30") int days) {
+        List<MarketingStatsService.PlatformStatsDto> performance = marketingStatsService.getPlatformPerformance(days);
+        return ResponseEntity.ok(performance);
+    }
+
+    /**
+     * Get publication timeline of recent jobs
+     */
+    @GetMapping("/timeline")
+    @Operation(summary = "Publication timeline", description = "최근 마케팅 게시 현황 타임라인")
+    @ApiResponse(responseCode = "200", description = "Timeline events listed")
+    public ResponseEntity<List<MarketingStatsService.TimelineEventDto>> getTimeline(
+            @RequestParam(defaultValue = "20") int limit) {
+        List<MarketingStatsService.TimelineEventDto> timeline = marketingStatsService.getPublicationTimeline(limit);
+        return ResponseEntity.ok(timeline);
+    }
+
+    /**
+     * Get traffic metrics for a specific job
+     */
+    @GetMapping("/jobs/{id}/traffic")
+    @Operation(summary = "Job traffic metrics", description = "마케팅 잡의 visit_events 기반 트래픽 분석")
+    @ApiResponse(responseCode = "200", description = "Traffic metrics")
+    public ResponseEntity<MarketingStatsService.JobTrafficDto> getJobTraffic(@PathVariable long id) {
+        MarketingStatsService.JobTrafficDto traffic = marketingStatsService.getJobTraffic(id);
+        return ResponseEntity.ok(traffic);
     }
 }

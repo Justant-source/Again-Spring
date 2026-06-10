@@ -113,6 +113,50 @@ test.describe('Journey 13-B: 마케팅 잡 UI 페이지', () => {
     const url = page.url()
     expect(url).toBeTruthy()
   })
+
+  test('어드민 — 마케팅 잡 보드(JobBoard)가 렌더됨', async ({ page }) => {
+    await page.goto(`${BASE}/admin/marketing`)
+    await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
+
+    const jobBoard = page.locator('[data-testid="marketing-job-board"]')
+    await expect(jobBoard).toBeVisible({ timeout: 10_000 })
+  })
+
+  test('어드민 — 플랫폼 성과 카드가 렌더됨', async ({ page }) => {
+    await page.goto(`${BASE}/admin/marketing`)
+    await page.waitForURL(/\/admin\/marketing/)
+
+    const perfCards = page.locator('[data-testid="marketing-platform-performance"]')
+    await expect(perfCards).toBeVisible({ timeout: 10_000 })
+  })
+})
+
+// ── 13-D. 신규 마케팅 통계 API ───────────────────────────────────
+test.describe('Journey 13-D: 마케팅 통계 API (신규)', () => {
+
+  test('GET /api/admin/marketing/performance → 200 + 배열', async ({ request }) => {
+    const token = tokenFromStorageState(PERSONA_TEST1.email)
+    test.skip(!token, 'ADMIN storageState 없음')
+
+    const res = await request.get(`${BASE}/api/admin/marketing/performance?days=30`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(res.status()).toBe(200)
+    const body = await res.json()
+    expect(Array.isArray(body)).toBe(true)
+  })
+
+  test('GET /api/admin/marketing/timeline → 200 + 배열', async ({ request }) => {
+    const token = tokenFromStorageState(PERSONA_TEST1.email)
+    test.skip(!token, 'ADMIN storageState 없음')
+
+    const res = await request.get(`${BASE}/api/admin/marketing/timeline?limit=20`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(res.status()).toBe(200)
+    const body = await res.json()
+    expect(Array.isArray(body)).toBe(true)
+  })
 })
 
 // ── C. 잡 생성·조회 흐름 (ASM M0 스텁 필요) ─────────────────────

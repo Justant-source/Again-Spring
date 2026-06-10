@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminTopBar } from './AdminTopBar';
+import { CommandPalette } from './CommandPalette';
 import { PendingAlertsProvider } from './PendingAlertsContext';
 
 interface AdminShellProps {
@@ -14,8 +15,13 @@ export function AdminShell({ children }: AdminShellProps) {
 
   return (
     <PendingAlertsProvider>
+      {/* Command Palette */}
+      <CommandPalette />
+
       {/* Fixed topbar — spans full width */}
-      <AdminTopBar onMobileMenuClick={() => setSidebarOpen(true)} />
+      <AdminTopBar
+        onMobileMenuClick={() => setSidebarOpen(true)}
+      />
 
       {/* Below topbar: sidebar + main in a flex row */}
       <div className="flex pt-14 h-screen overflow-hidden">

@@ -104,5 +104,8 @@ public class CreateJobRequest {
 
         @JsonProperty("auto_publish")
         private boolean autoPublish;
+
+        @JsonProperty("utm_campaign")
+        private String utmCampaign;
     }
 }

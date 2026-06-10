@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, LogOut, Menu } from 'lucide-react';
+import { ChevronRight, LogOut, Menu, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface AdminTopBarProps {
@@ -24,7 +24,7 @@ export function AdminTopBar({ onMobileMenuClick }: AdminTopBarProps) {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
   const userClear = useUserStore((s) => s.clear);
-  const { pendingReports, pendingInquiries } = usePendingAlerts();
+  const { pendingReports, pendingInquiries, marketingPending, aiFailures } = usePendingAlerts();
 
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ label: string; href: string }>>([]);
 
@@ -96,8 +96,27 @@ export function AdminTopBar({ onMobileMenuClick }: AdminTopBarProps) {
           </div>
         </div>
 
-        {/* Right: Alerts & User Menu */}
+        {/* Right: Cmd+K Button, Alerts & User Menu */}
         <div className="flex items-center gap-3">
+          {/* Cmd+K Search hint (desktop only) */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              const event = new KeyboardEvent('keydown', {
+                key: 'k',
+                code: 'KeyK',
+                ctrlKey: true,
+                metaKey: true,
+              });
+              window.dispatchEvent(event);
+            }}
+            className="hidden md:flex items-center gap-1 text-xs text-gray-500 border border-gray-300 rounded px-2 py-1 hover:bg-gray-50 transition-colors"
+            title="검색 및 이동 (⌘K)"
+          >
+            <Search size={14} />
+            <span>⌘K</span>
+          </button>
+
           {/* Pending alerts badges */}
           <div className="flex gap-2">
             {pendingReports > 0 && (
@@ -108,6 +127,16 @@ export function AdminTopBar({ onMobileMenuClick }: AdminTopBarProps) {
             {pendingInquiries > 0 && (
               <Badge variant="destructive" className="bg-orange-600">
                 문의 {pendingInquiries}
+              </Badge>
+            )}
+            {marketingPending > 0 && (
+              <Badge variant="destructive" className="bg-amber-600">
+                마케팅 {marketingPending}
+              </Badge>
+            )}
+            {aiFailures > 0 && (
+              <Badge variant="destructive" className="bg-purple-600">
+                AI {aiFailures}
               </Badge>
             )}
           </div>

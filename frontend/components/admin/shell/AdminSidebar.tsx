@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { NAV_GROUPS } from './nav-config';
+import { usePendingAlerts } from './PendingAlertsContext';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import * as Icons from 'lucide-react';
 
@@ -18,6 +20,7 @@ interface AdminSidebarProps {
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
   const user = useUserStore((s) => s.user);
+  const alerts = usePendingAlerts();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -82,6 +85,19 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               {group.items.map((item) => {
                 const Icon = getLucideIcon(item.icon);
                 const active = isActive(item.href);
+
+                // Determine badge count based on type
+                let badgeCount = 0;
+                if (item.badge === 'reports') {
+                  badgeCount = alerts.pendingReports;
+                } else if (item.badge === 'inquiries') {
+                  badgeCount = alerts.pendingInquiries;
+                } else if (item.badge === 'marketing') {
+                  badgeCount = alerts.marketingPending;
+                } else if (item.badge === 'aiUser') {
+                  badgeCount = alerts.aiFailures;
+                }
+
                 return (
                   <Link
                     key={item.href}
@@ -96,7 +112,14 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                   >
                     <Icon size={18} className="shrink-0" />
                     {!collapsed && (
-                      <span className="flex-1 truncate">{item.label}</span>
+                      <>
+                        <span className="flex-1 truncate">{item.label}</span>
+                        {badgeCount > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {badgeCount}
+                          </Badge>
+                        )}
+                      </>
                     )}
                   </Link>
                 );

@@ -2,6 +2,7 @@ package com.againspring.api.admin;
 
 import com.againspring.domain.ai.AiUserGenerationConfig;
 import com.againspring.repository.ai.AiUserGenerationConfigRepository;
+import com.againspring.service.admin.AiUserMonitorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +42,7 @@ public class AdminAiUserController {
 
     private final AiUserGenerationConfigRepository configRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final AiUserMonitorService aiUserMonitorService;
 
     @Value("${ai.user.orchestrator-url:http://againspring-ai-user-orchestrator:8096}")
     private String orchestratorUrl;
@@ -452,5 +454,43 @@ public class AdminAiUserController {
             private final int failed;
             private final int blocked;
         }
+    }
+
+    // =====================================================================
+    // GET /api/admin/ai-user/action-feed
+    // =====================================================================
+
+    @GetMapping("/action-feed")
+    @Operation(summary = "AI 유저 행동 피드", description = "persona_action_log 최근 기록 조회 (선택적 필터링)")
+    public ResponseEntity<AiUserMonitorService.ActionFeedDto> getActionFeed(
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String actionType) {
+        AiUserMonitorService.ActionFeedDto feed = aiUserMonitorService.getActionFeed(limit, status, actionType);
+        return ResponseEntity.ok(feed);
+    }
+
+    // =====================================================================
+    // GET /api/admin/ai-user/persona-performance
+    // =====================================================================
+
+    @GetMapping("/persona-performance")
+    @Operation(summary = "페르소나 성능 지표", description = "최근 24시간 또는 7일간 페르소나별 행동 완료율·실패율 집계")
+    public ResponseEntity<List<AiUserMonitorService.PersonaPerformanceDto>> getPersonaPerformance(
+            @RequestParam(defaultValue = "24h") String range) {
+        List<AiUserMonitorService.PersonaPerformanceDto> performance = aiUserMonitorService.getPersonaPerformance(range);
+        return ResponseEntity.ok(performance);
+    }
+
+    // =====================================================================
+    // GET /api/admin/ai-user/hourly-distribution
+    // =====================================================================
+
+    @GetMapping("/hourly-distribution")
+    @Operation(summary = "시간대별 행동 분포", description = "최근 N시간(기본 24)의 시간대별 게시 행동 분포 (0-23시)")
+    public ResponseEntity<AiUserMonitorService.HourlyDistributionDto> getHourlyDistribution(
+            @RequestParam(defaultValue = "24") int hours) {
+        AiUserMonitorService.HourlyDistributionDto distribution = aiUserMonitorService.getHourlyDistribution(hours);
+        return ResponseEntity.ok(distribution);
     }
 }

@@ -203,3 +203,81 @@ test.describe('Journey 15-C: 비관리자 접근 차단', () => {
     expect(page.url()).toContain('/login')
   })
 })
+
+// ── D. Tabs 구조 + 실시간 관제 탭 (V2 개편) ────────────────────────
+test.describe('Journey 15-D: Tabs 구조 및 AI 관제 탭', () => {
+  test.use({ storageState: ADMIN_AUTH })
+
+  test('heading "AI 생성 관제" 텍스트가 유지됨 (e2e 보호)', async ({ page }) => {
+    await page.route('**/api/admin/ai-user/generation-status', route => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        todayKst: '2026-06-10',
+        targets: { posts: { done: 0, target: 0, percent: 0 }, comments: { done: 0, target: 0, percent: 0 },
+          replies: { done: 0, target: 0, percent: 0 }, votes: { done: 0, target: 0, percent: 0 }, likes: { done: 0, target: 0, percent: 0 } },
+        failures: { failed: 0, blocked: 0 },
+      }) })
+    })
+
+    await page.goto(`${BASE}/admin/ai-user`)
+    await page.waitForURL(/\/admin\/ai-user/)
+
+    await expect(page.getByRole('heading', { name: 'AI 생성 관제' })).toBeVisible({ timeout: 8_000 })
+  })
+
+  test('"생성 설정" 탭이 표시됨', async ({ page }) => {
+    await page.goto(`${BASE}/admin/ai-user`)
+    await page.waitForURL(/\/admin\/ai-user/)
+
+    await expect(page.getByRole('tab', { name: '생성 설정' })).toBeVisible({ timeout: 8_000 })
+  })
+
+  test('"실시간 관제" 탭이 표시됨', async ({ page }) => {
+    await page.goto(`${BASE}/admin/ai-user`)
+    await page.waitForURL(/\/admin\/ai-user/)
+
+    await expect(page.getByRole('tab', { name: '실시간 관제' })).toBeVisible({ timeout: 8_000 })
+  })
+
+  test('기존 data-testid(ai-gen-status-panel, refresh-btn, auto-refresh)가 유지됨', async ({ page }) => {
+    await page.route('**/api/admin/ai-user/generation-status', route => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        todayKst: '2026-06-10',
+        targets: { posts: { done: 3, target: 10, percent: 30 }, comments: { done: 0, target: 0, percent: 0 },
+          replies: { done: 0, target: 0, percent: 0 }, votes: { done: 0, target: 0, percent: 0 }, likes: { done: 0, target: 0, percent: 0 } },
+        failures: { failed: 0, blocked: 0 },
+      }) })
+    })
+
+    await page.goto(`${BASE}/admin/ai-user`)
+    await page.waitForURL(/\/admin\/ai-user/)
+
+    // "생성 설정" 탭이 기본값이어야 함 (기존 data-testid 보호)
+    const panel = page.locator('[data-testid="ai-gen-status-panel"], [data-testid="ai-gen-status-empty"]')
+    await expect(panel).toBeVisible({ timeout: 8_000 })
+
+    await expect(page.locator('[data-testid="ai-gen-status-refresh-btn"]')).toBeVisible()
+    await expect(page.locator('[data-testid="ai-gen-status-auto-refresh"]')).toBeVisible()
+  })
+
+  test('"실시간 관제" 탭 클릭 시 행동 피드가 렌더됨', async ({ page }) => {
+    await page.route('**/api/admin/ai-user/action-feed**', route => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        feeds: [], total: 0,
+      }) })
+    })
+    await page.route('**/api/admin/ai-user/persona-performance**', route => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+    })
+    await page.route('**/api/admin/ai-user/hourly-distribution**', route => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hours: [] }) })
+    })
+
+    await page.goto(`${BASE}/admin/ai-user`)
+    await page.waitForURL(/\/admin\/ai-user/)
+
+    await page.getByRole('tab', { name: '실시간 관제' }).click()
+
+    const actionFeed = page.locator('[data-testid="ai-action-feed"]')
+    await expect(actionFeed).toBeVisible({ timeout: 8_000 })
+  })
+})

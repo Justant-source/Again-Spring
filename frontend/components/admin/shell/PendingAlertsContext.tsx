@@ -6,11 +6,15 @@ import { api } from '@/lib/api/client';
 interface PendingAlerts {
   pendingReports: number;
   pendingInquiries: number;
+  marketingPending: number;
+  aiFailures: number;
 }
 
 const PendingAlertsContext = createContext<PendingAlerts>({
   pendingReports: 0,
   pendingInquiries: 0,
+  marketingPending: 0,
+  aiFailures: 0,
 });
 
 export function usePendingAlerts() {
@@ -29,6 +33,8 @@ export function PendingAlertsProvider({ children }: PendingAlertsProviderProps) 
   const [alerts, setAlerts] = useState<PendingAlerts>({
     pendingReports: 0,
     pendingInquiries: 0,
+    marketingPending: 0,
+    aiFailures: 0,
   });
 
   useEffect(() => {
@@ -37,15 +43,15 @@ export function PendingAlertsProvider({ children }: PendingAlertsProviderProps) 
 
     const fetchAlerts = async () => {
       try {
-        const [reportsRes, inquiriesRes] = await Promise.all([
-          api.get('/api/admin/reports/count').catch(() => ({ data: { count: 0 } })),
-          api.get('/api/admin/inquiries/count').catch(() => ({ data: { count: 0 } })),
-        ]);
+        const res = await api.get<any>('/api/admin/dashboard/action-center').catch(() => ({ data: {} }));
 
         if (isMounted) {
+          const data = res.data || {};
           setAlerts({
-            pendingReports: reportsRes.data?.count ?? 0,
-            pendingInquiries: inquiriesRes.data?.count ?? 0,
+            pendingReports: data.pendingReports ?? 0,
+            pendingInquiries: data.openInquiries ?? 0,
+            marketingPending: (data.marketingAwaitingApproval ?? 0) + (data.marketingFailed ?? 0),
+            aiFailures: (data.aiFailuresToday ?? 0) + (data.aiBlockedToday ?? 0),
           });
         }
       } catch (error) {

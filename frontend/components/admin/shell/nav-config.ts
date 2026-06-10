@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 
-export type AdminNavBadgeType = 'reports' | 'inquiries';
+export type AdminNavBadgeType = 'reports' | 'inquiries' | 'marketing' | 'aiUser';
 
 export interface AdminNavItem {
   label: string;
@@ -47,14 +47,14 @@ export const NAV_GROUPS: AdminNavGroup[] = [
   {
     label: '마케팅',
     items: [
-      { label: '마케팅 잡', href: '/admin/marketing', icon: 'Zap' },
+      { label: '마케팅 잡', href: '/admin/marketing', icon: 'Zap', badge: 'marketing' },
     ],
   },
   {
     label: 'AI',
     items: [
       { label: 'AI 규칙관리', href: '/admin/ai-rules', icon: 'Sparkles' },
-      { label: 'AI 생성 관제', href: '/admin/ai-user', icon: 'Cpu' },
+      { label: 'AI 생성 관제', href: '/admin/ai-user', icon: 'Cpu', badge: 'aiUser' },
     ],
   },
   {

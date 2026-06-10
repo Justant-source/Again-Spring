@@ -5,14 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { AdminSection } from '@/components/admin/AdminSection';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,10 +18,21 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlatformCredentialsSection } from '@/components/admin/marketing/PlatformCredentialsSection';
+import { JobBoard } from '@/components/admin/marketing/JobBoard';
+import { PlatformPerformanceCards } from '@/components/admin/marketing/PlatformPerformanceCards';
+import { PublicationTimeline } from '@/components/admin/marketing/PublicationTimeline';
+import { PostPickerDialog } from '@/components/admin/marketing/PostPickerDialog';
+import { RefreshControl } from '@/components/admin/RefreshControl';
 import {
   listMarketingJobs,
   createMarketingJob,
+  publishMarketingJob,
+  republishMarketingJob,
+  getMarketingPerformance,
+  getPublicationTimeline,
   MarketingJob,
+  PlatformStatsDto,
+  TimelineEventDto,
 } from '@/lib/api/admin/marketing';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -63,16 +66,23 @@ export default function MarketingJobsPage() {
 
   // Create dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [pickerDialogOpen, setPickerDialogOpen] = useState(false);
   const [postId, setPostId] = useState('');
   const [targets, setTargets] = useState<string[]>(['naver_blog']);
   const [autoPublish, setAutoPublish] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  // Analytics state
+  const [performance, setPerformance] = useState<PlatformStatsDto[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEventDto[]>([]);
+  const [perfLoading, setPerfLoading] = useState(false);
+
   const ACTIVE_STATUSES = ['QUEUED', 'RUNNING', 'READY', 'PUBLISHING'];
 
   useEffect(() => {
     loadJobs();
+    loadAnalytics();
   }, []);
 
   useEffect(() => {
@@ -98,10 +108,46 @@ export default function MarketingJobsPage() {
     }
   };
 
+  const loadAnalytics = async () => {
+    setPerfLoading(true);
+    try {
+      const [perf, tl] = await Promise.all([
+        getMarketingPerformance(30),
+        getPublicationTimeline(20),
+      ]);
+      setPerformance(perf);
+      setTimeline(tl);
+    } catch {
+      // silently fail
+    } finally {
+      setPerfLoading(false);
+    }
+  };
+
   const toggleTarget = (value: string) => {
     setTargets((prev) =>
       prev.includes(value) ? prev.filter((t) => t !== value) : [...prev, value]
     );
+  };
+
+  const handlePublish = async (id: number) => {
+    try {
+      const updated = await publishMarketingJob(id);
+      setJobs((prev) => prev.map((j) => (j.id === id ? updated : j)));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`게시 요청에 실패했습니다: ${msg}`);
+    }
+  };
+
+  const handleRepublish = async (id: number) => {
+    try {
+      const updated = await republishMarketingJob(id);
+      setJobs((prev) => prev.map((j) => (j.id === id ? updated : j)));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`게시 재시도에 실패했습니다: ${msg}`);
+    }
   };
 
   const handleCreate = async () => {
@@ -121,6 +167,7 @@ export default function MarketingJobsPage() {
       setPostId('');
       setTargets(['naver_blog']);
       setAutoPublish(false);
+      setPickerDialogOpen(false);
       await loadJobs();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -128,6 +175,11 @@ export default function MarketingJobsPage() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const handlePickPost = (pickedPostId: string) => {
+    setPostId(pickedPostId);
+    setPickerDialogOpen(false);
   };
 
   return (
@@ -139,99 +191,61 @@ export default function MarketingJobsPage() {
         </TabsList>
 
         <TabsContent value="jobs">
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          사연을 선택하고 ASM(Again-Spring-Marketing) 서버에 콘텐츠 생성을 요청합니다.
-        </p>
-        <div className="flex gap-2 items-center">
-          <Button variant="outline" size="sm" onClick={() => loadJobs(true)} disabled={loading}>
-            {loading ? '로드 중…' : '새로고침'}
-          </Button>
-          {jobs.some(j => ACTIVE_STATUSES.includes(j.status)) && (
-            <span className="text-xs text-blue-500 animate-pulse">● 자동 갱신 중</span>
+          <div className="mb-4 space-y-4">
+            <p className="text-sm text-gray-500">
+              사연을 선택하고 ASM(Again-Spring-Marketing) 서버에 콘텐츠 생성을 요청합니다.
+            </p>
+
+            <div className="flex items-center justify-between">
+              <RefreshControl
+                onRefresh={() => {
+                  loadJobs(true);
+                  loadAnalytics();
+                }}
+                loading={loading}
+                autoRefreshSeconds={0}
+              />
+              <Button size="sm" onClick={() => { setCreateError(null); setDialogOpen(true); }}>
+                + 새 마케팅 잡
+              </Button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
           )}
-          <Button size="sm" onClick={() => { setCreateError(null); setDialogOpen(true); }}>
-            + 새 마케팅 잡
-          </Button>
-        </div>
-      </div>
 
-      {error && (
-        <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+          {loading ? (
+            <Card className="p-6">
+              <div className="py-8 text-center text-gray-400">로드 중…</div>
+            </Card>
+          ) : (
+            <>
+              <JobBoard
+                jobs={jobs}
+                onPublish={handlePublish}
+                onRepublish={handleRepublish}
+              />
 
-      <Card className="p-6">
-        {loading ? (
-          <div className="py-8 text-center text-gray-400">로드 중…</div>
-        ) : jobs.length === 0 ? (
-          <div className="py-8 text-center text-gray-400">
-            마케팅 잡이 없습니다.
-            <br />
-            <button
-              className="mt-2 text-sm text-blue-500 hover:underline"
-              onClick={() => setDialogOpen(true)}
-            >
-              + 첫 번째 잡 만들기
-            </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>사연 ID</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead>단계</TableHead>
-                  <TableHead>진행률</TableHead>
-                  <TableHead>타겟</TableHead>
-                  <TableHead>생성일</TableHead>
-                  <TableHead>액션</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {jobs.map((job) => (
-                  <TableRow key={job.id}>
-                    <TableCell className="font-mono text-sm">{job.id}</TableCell>
-                    <TableCell className="max-w-[120px] truncate font-mono text-xs">
-                      {job.postId}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={STATUS_COLORS[job.status] || 'bg-gray-200'}>
-                        {job.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{job.phase || '-'}</TableCell>
-                    <TableCell className="text-sm">
-                      {typeof job.progress === 'number'
-                        ? `${Math.round(job.progress * 100)}%`
-                        : '-'}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {(job.targets ?? []).join(', ')}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {new Date(job.createdAt).toLocaleDateString('ko-KR', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/admin/marketing/jobs/${job.id}`}>
-                        <Button variant="outline" size="sm">상세</Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </Card>
+              <div className="mt-8 pt-6 border-t">
+                <h3 className="font-semibold text-gray-800 mb-4">플랫폼 성과</h3>
+                <PlatformPerformanceCards
+                  data={performance}
+                  loading={perfLoading}
+                />
+              </div>
+
+              <div className="mt-8 pt-6 border-t">
+                <h3 className="font-semibold text-gray-800 mb-4">게시 이력</h3>
+                <PublicationTimeline
+                  events={timeline}
+                  loading={perfLoading}
+                />
+              </div>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="credentials">
@@ -246,20 +260,45 @@ export default function MarketingJobsPage() {
             <DialogTitle>새 마케팅 잡 만들기</DialogTitle>
           </DialogHeader>
 
+          <Tabs defaultValue="picker" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="picker">사연 선택</TabsTrigger>
+              <TabsTrigger value="direct">직접 입력</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="picker" className="space-y-4 py-2">
+              <div>
+                <Label className="block mb-2 text-sm font-medium">
+                  게시글 검색
+                </Label>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left"
+                  onClick={() => setPickerDialogOpen(true)}
+                >
+                  {postId ? `선택됨: ${postId.substring(0, 20)}...` : '게시글 선택'}
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="direct" className="space-y-4 py-2">
+              <div className="space-y-1">
+                <Label htmlFor="postId">사연 ID</Label>
+                <Input
+                  id="postId"
+                  value={postId}
+                  onChange={(e) => setPostId(e.target.value)}
+                  placeholder="예: abc123def456"
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-gray-400">
+                  사연 상세 페이지 URL의 마지막 경로 또는 DB의 post.id 값
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+
           <div className="space-y-4 py-2">
-            <div className="space-y-1">
-              <Label htmlFor="postId">사연 ID</Label>
-              <Input
-                id="postId"
-                value={postId}
-                onChange={(e) => setPostId(e.target.value)}
-                placeholder="예: abc123def456"
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-gray-400">
-                사연 상세 페이지 URL의 마지막 경로 또는 DB의 post.id 값
-              </p>
-            </div>
 
             <div className="space-y-2">
               <Label>타겟 플랫폼</Label>
@@ -311,6 +350,13 @@ export default function MarketingJobsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 사연 선택 다이얼로그 */}
+      <PostPickerDialog
+        open={pickerDialogOpen}
+        onClose={() => setPickerDialogOpen(false)}
+        onSelect={handlePickPost}
+      />
     </AdminSection>
   );
 }

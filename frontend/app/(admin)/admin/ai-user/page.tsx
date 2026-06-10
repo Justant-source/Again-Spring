@@ -6,7 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminSection } from '@/components/admin/AdminSection';
+import { ActionFeed } from '@/components/admin/ai-user/ActionFeed';
+import { PersonaPerformanceTable } from '@/components/admin/ai-user/PersonaPerformanceTable';
+import { HourlyDistributionChart } from '@/components/admin/ai-user/HourlyDistributionChart';
 import {
   getGenerationConfig,
   updateGenerationConfig,
@@ -359,7 +363,15 @@ export default function AiUserPage() {
       {error    && <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {savedMsg && <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{savedMsg}</div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 탭 구조 */}
+      <Tabs defaultValue="settings" className="w-full">
+        <TabsList>
+          <TabsTrigger value="settings">생성 설정</TabsTrigger>
+          <TabsTrigger value="monitor">실시간 관제</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="settings" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* ── 왼쪽 2/3: 설정 영역 ─────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-6">
@@ -562,79 +574,89 @@ export default function AiUserPage() {
           </div>
         </div>
 
-      </div>
-
-      {/* 오늘 진행 현황 */}
-      <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-gray-800">오늘 진행 현황</h2>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-sm text-gray-500 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={e => setAutoRefresh(e.target.checked)}
-                className="rounded"
-                data-testid="ai-gen-status-auto-refresh"
-              />
-              자동 새로고침 (60초)
-            </label>
-            <button
-              onClick={fetchStatus}
-              disabled={statusLoading}
-              className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
-              data-testid="ai-gen-status-refresh-btn"
-            >
-              {statusLoading ? '...' : '새로고침'}
-            </button>
-          </div>
         </div>
 
-        {genStatus ? (
-          <>
-            <p className="text-xs text-gray-400 mb-4">{genStatus.todayKst} 기준 (KST)</p>
-            <div className="space-y-3" data-testid="ai-gen-status-panel">
-              {([
-                { key: 'posts',    label: '글' },
-                { key: 'comments', label: '댓글' },
-                { key: 'replies',  label: '대댓글' },
-                { key: 'votes',    label: '투표' },
-                { key: 'likes',    label: '좋아요' },
-              ] as { key: keyof GenerationStatus['targets']; label: string }[]).map(({ key, label }) => {
-                const t = genStatus.targets[key];
-                const pct = t.percent;
-                const barColor = pct >= 100 ? 'bg-green-500' : pct >= 70 ? 'bg-[#5F8F76]' : 'bg-gray-400';
-                return (
-                  <div key={key} data-testid={`ai-gen-status-${key}`}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-700">{label}</span>
-                      <span className="text-gray-500">
-                        {t.done.toLocaleString()} / {t.target.toLocaleString()}
-                        {t.target > 0 && <span className="ml-1 text-gray-400">({pct}%)</span>}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${barColor}`}
-                        style={{ width: `${Math.min(100, pct)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+          {/* 오늘 진행 현황 */}
+          <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-gray-800">오늘 진행 현황</h2>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-sm text-gray-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoRefresh}
+                    onChange={e => setAutoRefresh(e.target.checked)}
+                    className="rounded"
+                    data-testid="ai-gen-status-auto-refresh"
+                  />
+                  자동 새로고침 (60초)
+                </label>
+                <button
+                  onClick={fetchStatus}
+                  disabled={statusLoading}
+                  className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                  data-testid="ai-gen-status-refresh-btn"
+                >
+                  {statusLoading ? '...' : '새로고침'}
+                </button>
+              </div>
             </div>
-            {(genStatus.failures.failed > 0 || genStatus.failures.blocked > 0) && (
-              <p className="mt-3 text-xs text-gray-400">
-                실패 {genStatus.failures.failed}건 · 차단 {genStatus.failures.blocked}건 (오늘)
+
+            {genStatus ? (
+              <>
+                <p className="text-xs text-gray-400 mb-4">{genStatus.todayKst} 기준 (KST)</p>
+                <div className="space-y-3" data-testid="ai-gen-status-panel">
+                  {([
+                    { key: 'posts',    label: '글' },
+                    { key: 'comments', label: '댓글' },
+                    { key: 'replies',  label: '대댓글' },
+                    { key: 'votes',    label: '투표' },
+                    { key: 'likes',    label: '좋아요' },
+                  ] as { key: keyof GenerationStatus['targets']; label: string }[]).map(({ key, label }) => {
+                    const t = genStatus.targets[key];
+                    const pct = t.percent;
+                    const barColor = pct >= 100 ? 'bg-green-500' : pct >= 70 ? 'bg-[#5F8F76]' : 'bg-gray-400';
+                    return (
+                      <div key={key} data-testid={`ai-gen-status-${key}`}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-700">{label}</span>
+                          <span className="text-gray-500">
+                            {t.done.toLocaleString()} / {t.target.toLocaleString()}
+                            {t.target > 0 && <span className="ml-1 text-gray-400">({pct}%)</span>}
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${barColor}`}
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {(genStatus.failures.failed > 0 || genStatus.failures.blocked > 0) && (
+                  <p className="mt-3 text-xs text-gray-400">
+                    실패 {genStatus.failures.failed}건 · 차단 {genStatus.failures.blocked}건 (오늘)
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-400" data-testid="ai-gen-status-empty">
+                {statusLoading ? '불러오는 중...' : '새로고침을 눌러 현황을 조회하세요.'}
               </p>
             )}
-          </>
-        ) : (
-          <p className="text-sm text-gray-400" data-testid="ai-gen-status-empty">
-            {statusLoading ? '불러오는 중...' : '새로고침을 눌러 현황을 조회하세요.'}
-          </p>
-        )}
-      </section>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="monitor" className="mt-6 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ActionFeed />
+            <PersonaPerformanceTable />
+          </div>
+          <HourlyDistributionChart />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

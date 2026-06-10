@@ -129,3 +129,79 @@ export async function exchangeYoutubeOauth(
   );
   return res.data;
 }
+
+// ===== Marketing Analytics =====
+
+export interface PlatformStatsDto {
+  platform: string;
+  attempted: number;
+  published: number;
+  failed: number;
+  successRate: number;
+  lastPublishedUrl: string | null;
+  lastPublishedAt: string | null;
+}
+
+export async function getMarketingPerformance(days?: number): Promise<PlatformStatsDto[]> {
+  const params = new URLSearchParams();
+  if (days !== undefined) params.append('days', String(days));
+  const res = await api.get<PlatformStatsDto[]>(
+    `/api/admin/marketing/performance${params.size > 0 ? '?' + params.toString() : ''}`
+  );
+  return res.data;
+}
+
+// ===== Publication Timeline =====
+
+export interface TimelineEventDto {
+  jobId: number;
+  postId: string;
+  platform: string;
+  url: string | null;
+  state: string;
+  publishedAt: string | null;
+}
+
+export async function getPublicationTimeline(limit?: number): Promise<TimelineEventDto[]> {
+  const params = new URLSearchParams();
+  if (limit !== undefined) params.append('limit', String(limit));
+  const res = await api.get<TimelineEventDto[]>(
+    `/api/admin/marketing/timeline${params.size > 0 ? '?' + params.toString() : ''}`
+  );
+  return res.data;
+}
+
+// ===== Job Traffic =====
+
+export interface JobTrafficDto {
+  jobId: number;
+  visits: number;
+  uniqueSessions: number;
+  bySources: Array<{ source: string; visits: number }>;
+}
+
+export async function getJobTraffic(id: number): Promise<JobTrafficDto> {
+  const res = await api.get<JobTrafficDto>(`/api/admin/marketing/jobs/${id}/traffic`);
+  return res.data;
+}
+
+// ===== Admin Posts for Picker (별도 타입 — content.ts의 AdminPost와 구분) =====
+
+export interface PickerPost {
+  id: string;
+  title: string;
+  authorNickname: string | null;
+  voteCount: number;
+  commentCount: number;
+  createdAt: string;
+}
+
+export async function listAdminPostsForPicker(page?: number): Promise<PickerPost[]> {
+  const params = new URLSearchParams();
+  if (page !== undefined) params.append('page', String(page));
+  params.append('size', '20');
+  const res = await api.get<PickerPost[]>(
+    `/api/admin/content/posts${params.size > 0 ? '?' + params.toString() : ''}`
+  );
+  return res.data;
+}

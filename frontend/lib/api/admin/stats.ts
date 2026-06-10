@@ -10,6 +10,38 @@ export interface DailyStatsResponse {
   feedbackCount: number;
 }
 
+// Community Insights API Types
+export interface InsightsDto {
+  dau: number;
+  wau: number;
+  mau: number;
+  stickiness: number | null;
+  funnel: {
+    active: number;
+    voters: number;
+    commenters: number;
+    posters: number;
+    realUserOnly: boolean;
+  };
+  contentHealth: {
+    avgCommentsPerPost: number;
+    noComments24hRate: number; // percent 0~100
+  };
+  productionSeries: Array<{
+    date: string;
+    realPosts: number;
+    aiPosts: number;
+    realComments: number;
+    aiComments: number;
+  }>;
+}
+
+export interface TrafficDto {
+  dailySeries: Array<{ date: string; visits: number; uniqueSessions: number }>;
+  topSources: Array<{ source: string; visits: number }>;
+  topCampaigns: Array<{ campaign: string; visits: number }>;
+}
+
 /**
  * 일별 통계 조회 (최근 N일)
  */
@@ -43,6 +75,28 @@ export async function exportStatsCSV(days: number = 30): Promise<Blob> {
   const res = await api.get<Blob>('/api/admin/dashboard/daily-stats/export', {
     params: { days },
     responseType: 'blob',
+  });
+  return res.data;
+}
+
+/**
+ * 커뮤니티 인사이트 조회
+ * GET /api/admin/dashboard/insights?days=30&realOnly=true
+ */
+export async function getCommunityInsights(days: number = 30, realOnly: boolean = true): Promise<InsightsDto> {
+  const res = await api.get<InsightsDto>('/api/admin/dashboard/insights', {
+    params: { days, realOnly },
+  });
+  return res.data;
+}
+
+/**
+ * 트래픽 요약 조회
+ * GET /api/admin/dashboard/traffic?days=30
+ */
+export async function getTrafficSummary(days: number = 30): Promise<TrafficDto> {
+  const res = await api.get<TrafficDto>('/api/admin/dashboard/traffic', {
+    params: { days },
   });
   return res.data;
 }

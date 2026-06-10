@@ -3,6 +3,7 @@ package com.againspring.api.admin;
 import com.againspring.api.dto.response.DailyStatsResponse;
 import com.againspring.api.dto.response.AdminDashboardSummaryResponse;
 import com.againspring.service.DailyStatsAggregatorService;
+import com.againspring.service.admin.DashboardOpsService;
 import com.againspring.service.admin.PmfStatsService;
 import com.againspring.service.admin.RetentionCohortService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +28,7 @@ public class AdminDashboardController {
     private final PmfStatsService pmfStatsService;
     private final RetentionCohortService retentionCohortService;
     private final DailyStatsAggregatorService dailyStatsAggregatorService;
+    private final DashboardOpsService dashboardOpsService;
 
     @GetMapping("/summary")
     @PreAuthorize("hasRole('ADMIN')")
@@ -69,5 +71,54 @@ public class AdminDashboardController {
                 "from", from.toString(),
                 "to", to.toString()
         ));
+    }
+
+    @GetMapping("/action-center")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "액션 센터 - 즉시 조치 필요 항목")
+    public ResponseEntity<DashboardOpsService.ActionCenterDto> getActionCenter() {
+        return ResponseEntity.ok(dashboardOpsService.getActionCenter());
+    }
+
+    @GetMapping("/kpis")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "KPI 메트릭 - 주요 성과 지표")
+    public ResponseEntity<List<DashboardOpsService.KpiMetricDto>> getKpis(
+            @RequestParam(defaultValue = "7") int days) {
+        return ResponseEntity.ok(dashboardOpsService.getKpiMetrics(days));
+    }
+
+    @GetMapping("/pulse")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "커뮤니티 맥박 - 시간대별 콘텐츠 생성")
+    public ResponseEntity<DashboardOpsService.PulseDto> getPulse(
+            @RequestParam(defaultValue = "24") int hours) {
+        return ResponseEntity.ok(dashboardOpsService.getCommunityPulse(hours));
+    }
+
+    @GetMapping("/hot-posts")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "핫 포스트 - 고참여 게시글")
+    public ResponseEntity<List<DashboardOpsService.HotPostDto>> getHotPosts(
+            @RequestParam(defaultValue = "48") int hours,
+            @RequestParam(defaultValue = "5") int limit) {
+        return ResponseEntity.ok(dashboardOpsService.getHotPosts(hours, limit));
+    }
+
+    @GetMapping("/insights")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "커뮤니티 인사이트 - DAU/WAU/MAU, 펀넬, 콘텐츠 건강도")
+    public ResponseEntity<DashboardOpsService.InsightsDto> getInsights(
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(defaultValue = "true") boolean realOnly) {
+        return ResponseEntity.ok(dashboardOpsService.getCommunityInsights(days, realOnly));
+    }
+
+    @GetMapping("/traffic")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "트래픽 요약 - 방문 이벤트 분석")
+    public ResponseEntity<DashboardOpsService.TrafficDto> getTraffic(
+            @RequestParam(defaultValue = "30") int days) {
+        return ResponseEntity.ok(dashboardOpsService.getTraffic(days));
     }
 }

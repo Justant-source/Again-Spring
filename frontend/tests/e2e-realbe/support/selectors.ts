@@ -76,3 +76,36 @@ export const AI_GEN_STATUS = {
   votes:       '[data-testid="ai-gen-status-votes"]',
   likes:       '[data-testid="ai-gen-status-likes"]',
 } as const
+
+// ── 어드민 대시보드 홈 (V2 개편) ────────────────────────────────
+export const ADMIN_DASHBOARD = {
+  actionCenter:  '[data-testid="admin-action-center"]',
+  kpiGrid:       '[data-testid="admin-kpi-grid"]',
+  pulseChart:    '[data-testid="admin-pulse-chart"]',
+  hotPosts:      '[data-testid="admin-hot-posts"]',
+  commandPalette:'[data-testid="admin-command-palette"]',
+} as const
+
+// ── 어드민 커뮤니티 인사이트 (/admin/stats) ─────────────────────
+export const ADMIN_STATS = {
+  periodSelect:  '[data-testid="admin-stats-period-select"]',
+  insights:      '[data-testid="admin-stats-insights"]',
+  funnel:        '[data-testid="admin-stats-funnel"]',
+  productionRatio: '[data-testid="admin-stats-production-ratio"]',
+} as const
+
+// ── 어드민 마케팅 허브 (/admin/marketing) ───────────────────────
+export const ADMIN_MARKETING = {
+  jobBoard:          '[data-testid="marketing-job-board"]',
+  pendingApproval:   '[data-testid="marketing-pending-approval"]',
+  platformPerformance: '[data-testid="marketing-platform-performance"]',
+  timeline:          '[data-testid="marketing-timeline"]',
+  postPickerDialog:  '[data-testid="post-picker-dialog"]',
+} as const
+
+// ── 어드민 AI 관제 탭 (/admin/ai-user > 실시간 관제) ────────────
+export const ADMIN_AI_MONITOR = {
+  actionFeed:       '[data-testid="ai-action-feed"]',
+  personaPerformance: '[data-testid="ai-persona-performance"]',
+  hourlyChart:      '[data-testid="ai-hourly-chart"]',
+} as const

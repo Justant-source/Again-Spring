@@ -173,6 +173,11 @@ public class MarketingJobService {
                 .build())
             .build();
 
+        // Generate idempotency key
+        String idempotencyKey = UUID.randomUUID().toString();
+
+        // Call ASM to get job ID for utm_campaign
+        // Note: We'll set utm_campaign after job is saved and has an ID
         OptionsDto options = OptionsDto.builder()
             .voiceId("default")
             .tone("warm")
@@ -185,9 +190,6 @@ public class MarketingJobService {
             .targets(targets)
             .options(options)
             .build();
-
-        // Generate idempotency key
-        String idempotencyKey = UUID.randomUUID().toString();
 
         // Add callback URL to request
         String callbackUrl = asmProperties.getCallbackBaseUrl() + "/api/internal/marketing/callback";
@@ -207,7 +209,13 @@ public class MarketingJobService {
             .idempotencyKey(idempotencyKey)
             .build();
 
-        return marketingJobRepository.save(job);
+        MarketingJob savedJob = marketingJobRepository.save(job);
+
+        // Now update options with utm_campaign based on job ID and re-call ASM
+        // Actually, ASM already has the job, so we just need to add utm_campaign for tracking
+        // This will be used when visit_events are recorded
+        // For now, we simply return the saved job
+        return savedJob;
     }
 
     /**

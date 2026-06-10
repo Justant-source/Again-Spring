@@ -3,13 +3,29 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
-import { getDailyStats, getRetentionCohort, backfillStats, type DailyStatsResponse } from '@/lib/api/admin/stats';
+import {
+  getDailyStats,
+  getRetentionCohort,
+  backfillStats,
+  getCommunityInsights,
+  getTrafficSummary,
+  type DailyStatsResponse,
+  type InsightsDto,
+  type TrafficDto,
+} from '@/lib/api/admin/stats';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend } from 'recharts';
 import { AdminStatCard } from '@/components/admin/AdminStatCard';
+import { RefreshControl } from '@/components/admin/RefreshControl';
+import { EngagementFunnel } from '@/components/admin/stats/EngagementFunnel';
+import { ProductionRatioChart } from '@/components/admin/stats/ProductionRatioChart';
+import { ContentHealthCards } from '@/components/admin/stats/ContentHealthCards';
+import { TrafficPanel } from '@/components/admin/stats/TrafficPanel';
 
 export default function StatsPage() {
   const user = useUserStore((s) => s.user);
   const router = useRouter();
+
+  // Existing stats
   const [stats, setStats] = useState<DailyStatsResponse[]>([]);
   const [retention, setRetention] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>(() => {
@@ -27,8 +43,42 @@ export default function StatsPage() {
   const [backfilling, setBackfilling] = useState(false);
   const [error, setError] = useState('');
 
+  // New insights & traffic
+  const [days, setDays] = useState(30);
+  const [realOnly, setRealOnly] = useState(true);
+  const [insights, setInsights] = useState<InsightsDto | null>(null);
+  const [traffic, setTraffic] = useState<TrafficDto | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+
   const isAuthorizedAdmin = !!user && !user.isGuest && !!user.roles?.includes('ADMIN');
 
+  // Load insights and traffic on mount and when days/realOnly change
+  useEffect(() => {
+    if (!isAuthorizedAdmin) return;
+
+    const loadInsights = async () => {
+      try {
+        setInsightsLoading(true);
+        const [i, t] = await Promise.all([
+          getCommunityInsights(days, realOnly),
+          getTrafficSummary(days),
+        ]);
+        setInsights(i);
+        setTraffic(t);
+      } catch (e: any) {
+        if (e.response?.status === 403) {
+          router.replace('/');
+        }
+        // Silently fail on insights/traffic; they're optional enhancements
+      } finally {
+        setInsightsLoading(false);
+      }
+    };
+
+    loadInsights();
+  }, [isAuthorizedAdmin, days, realOnly, router]);
+
+  // Load legacy stats and retention on mount
   useEffect(() => {
     if (!isAuthorizedAdmin) return;
 
@@ -72,6 +122,22 @@ export default function StatsPage() {
     }
   }
 
+  async function handleRefresh() {
+    try {
+      setInsightsLoading(true);
+      const [i, t] = await Promise.all([
+        getCommunityInsights(days, realOnly),
+        getTrafficSummary(days),
+      ]);
+      setInsights(i);
+      setTraffic(t);
+    } catch {
+      // Silently fail
+    } finally {
+      setInsightsLoading(false);
+    }
+  }
+
   if (loading) {
     return <div style={{ padding: 40, fontFamily: 'sans-serif' }}>로딩 중...</div>;
   }
@@ -101,6 +167,92 @@ export default function StatsPage() {
       </header>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px 60px' }}>
+        {/* 커뮤니티 인사이트 섹션 */}
+        <div className="mb-6 space-y-4">
+          {/* 기간 선택 및 제목 */}
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-gray-900">커뮤니티 인사이트</h1>
+            <RefreshControl
+              onRefresh={handleRefresh}
+              loading={insightsLoading}
+              autoRefreshSeconds={60}
+              data-testid="admin-stats-refresh"
+            />
+          </div>
+
+          {/* 기간 선택 버튼 */}
+          <div className="flex gap-2" data-testid="admin-stats-period-select">
+            {[7, 14, 30, 90].map((d) => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
+                  days === d
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                {d}일
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 핵심 지표 카드 */}
+        <div
+          className="grid grid-cols-4 gap-4 mb-6"
+          data-testid="admin-stats-insights"
+        >
+          <AdminStatCard
+            label="일 평균 활성 사용자"
+            value={insightsLoading ? '-' : insights?.dau ?? 0}
+          />
+          <AdminStatCard
+            label="주 평균 활성 사용자"
+            value={insightsLoading ? '-' : insights?.wau ?? 0}
+          />
+          <AdminStatCard
+            label="월 활성 사용자"
+            value={insightsLoading ? '-' : insights?.mau ?? 0}
+          />
+          <AdminStatCard
+            label="Stickiness"
+            value={
+              insightsLoading || !insights?.stickiness
+                ? '-'
+                : `${(insights.stickiness * 100).toFixed(1)}%`
+            }
+          />
+        </div>
+
+        {/* 퍼널 + 콘텐츠 건강도 */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <EngagementFunnel
+            funnel={insights?.funnel ?? null}
+            realOnlyToggle={realOnly}
+            onToggle={setRealOnly}
+            loading={insightsLoading}
+          />
+          <ContentHealthCards
+            health={insights?.contentHealth ?? null}
+            loading={insightsLoading}
+          />
+        </div>
+
+        {/* 자생도 차트 */}
+        <div className="mb-6">
+          <ProductionRatioChart
+            series={insights?.productionSeries ?? []}
+            loading={insightsLoading}
+          />
+        </div>
+
+        {/* 트래픽 패널 */}
+        <div className="mb-6">
+          <TrafficPanel traffic={traffic} loading={insightsLoading} />
+        </div>
+
+        {/* 기존 섹션들 (하단) */}
         {/* 날짜 범위 선택 */}
         <div
           style={{

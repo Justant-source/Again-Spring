@@ -1,4 +1,5 @@
 import './globals.css';
+import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { MSWProvider } from '@/components/shared/MSWProvider';
 import { AuthBootstrap } from '@/components/shared/AuthBootstrap';
@@ -9,6 +10,7 @@ import { ForcePasswordChangeModal } from '@/components/auth/ForcePasswordChangeM
 import { BetaBanner } from '@/components/shared/BetaBanner';
 import { LegalFooter } from '@/components/shared/LegalFooter';
 import { BottomNav } from '@/components/shared/BottomNav';
+import { VisitTracker } from '@/components/VisitTracker';
 
 export const metadata: Metadata = {
   // og:image / og:url 의 상대 경로 → 절대 URL 해소 기준점
@@ -50,6 +52,9 @@ export default function RootLayout({
           <ForcePasswordChangeModal />
           <LegalFooter />
           <BottomNav />
+          <Suspense fallback={null}>
+            <VisitTracker />
+          </Suspense>
           <div style={{ paddingTop: '30px', paddingBottom: '0px' }}>{children}</div>
         </MSWProvider>
       </body>

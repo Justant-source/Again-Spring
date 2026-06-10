@@ -60,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         .requestMatchers("POST", "/api/feedbacks").permitAll()
+                        .requestMatchers("POST", "/api/public/visits").permitAll()
                         .requestMatchers("GET", "/api/community/posts").permitAll()
                         .requestMatchers("GET", "/api/community/posts/*").permitAll()
                         .requestMatchers("GET", "/api/community/stats/today").permitAll()

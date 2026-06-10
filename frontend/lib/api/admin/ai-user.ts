@@ -96,3 +96,78 @@ export async function getGenerationStatus(): Promise<GenerationStatus> {
   const res = await api.get('/api/admin/ai-user/generation-status');
   return res.data;
 }
+
+// ── Action Feed ──────────────────────────────────────────────────────────
+
+export interface ActionFeedItem {
+  id: number;
+  personaId: string;
+  personaNickname: string | null;
+  personaTier: string | null;
+  action: string; // LIKE/VOTE/COMMENT/REPLY/POST
+  status: string; // POSTED/FAILED/BLOCKED/GENERATING/PLANNED
+  targetType: string | null;
+  targetId: string | null;
+  detail: string | null; // raw JSON string
+  failed: boolean;
+  blocked: boolean;
+  createdAt: string;
+}
+
+export interface ActionFeedResponse {
+  feeds: ActionFeedItem[];
+  total: number;
+}
+
+export async function getActionFeed(
+  limit?: number,
+  status?: string,
+  actionType?: string
+): Promise<ActionFeedResponse> {
+  const params = new URLSearchParams();
+  if (limit !== undefined) params.append('limit', String(limit));
+  if (status) params.append('status', status);
+  if (actionType) params.append('actionType', actionType);
+  const res = await api.get(`/api/admin/ai-user/action-feed?${params.toString()}`);
+  return res.data;
+}
+
+// ── Persona Performance ──────────────────────────────────────────────────
+
+export interface PersonaPerformanceDto {
+  personaId: string;
+  nickname: string | null;
+  tier: string | null;
+  active: boolean;
+  actionsCompleted: number;
+  failed: number;
+  blocked: number;
+  failureRate: number;
+  realUserReactions: number;
+}
+
+export async function getPersonaPerformance(range?: '24h' | '7d'): Promise<PersonaPerformanceDto[]> {
+  const params = new URLSearchParams();
+  if (range) params.append('range', range);
+  const res = await api.get(`/api/admin/ai-user/persona-performance?${params.toString()}`);
+  return res.data;
+}
+
+// ── Hourly Distribution ──────────────────────────────────────────────────
+
+export interface HourSlot {
+  hour: number;
+  actual: number;
+  byType: Record<string, number>;
+}
+
+export interface HourlyDistributionResponse {
+  hours: HourSlot[];
+}
+
+export async function getHourlyDistribution(hours?: number): Promise<HourlyDistributionResponse> {
+  const params = new URLSearchParams();
+  if (hours !== undefined) params.append('hours', String(hours));
+  const res = await api.get(`/api/admin/ai-user/hourly-distribution?${params.toString()}`);
+  return res.data;
+}
