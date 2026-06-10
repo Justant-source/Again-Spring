@@ -37,7 +37,7 @@ public class ContentSafetyGuard {
     );
 
     // 제공자(LLM) 오류 문자열 — 토큰/크레딧 소진 또는 프록시 라우팅 오류로 본문에 새는 텍스트.
-    // 절대 prod에 게시 금지 (2026-06-07 인시던트 + 2026-06-10 Kiro 라우팅 인시던트). 모두 소문자.
+    // 절대 prod에 게시 금지 (2026-06-07 인시던트 + 2026-06-10 Kiro/Claude 자기정체 인시던트). 모두 소문자.
     private static final List<String> LLM_ERROR_SIGNATURES = List.of(
         // 크레딧/쿼터 오류
         "credit balance", "too low to access", "purchase credits", "plans & billing",
@@ -47,9 +47,13 @@ public class ContentSafetyGuard {
         "service unavailable", "internal server error",
         // LLM 자기 정체 노출 / 역할극 거절 (프록시 라우팅 오류 등)
         "i'm kiro", "i am kiro", "저는 kiro", "kiro입니다",
+        "i'm claude", "i am claude", "i'm an ai assistant", "저는 claude",
         "i can't discuss that", "i cannot roleplay", "i'm not able to roleplay",
         "not able to roleplay", "not set up to generate",
-        "i need to be direct: i can't", "i need to clarify: i'm",
+        "can't roleplay", "cannot roleplay as", "won't roleplay",
+        "i need to be direct: i can't", "i need to be direct: i'm",
+        "i need to clarify: i'm", "i need to be transparent",
+        "i appreciate you", "i appreciate you sharing", "i appreciate you testing",
         "i'm an ai", "i am an ai", "as an ai", "저는 ai"
     );
 
