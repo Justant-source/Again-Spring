@@ -16,6 +16,7 @@ public final class LlmErrorSignature {
     private LlmErrorSignature() {}
 
     private static final List<String> SIGNATURES = List.of(
+        // 토큰/크레딧 오류
         "credit balance",
         "too low to access",
         "purchase credits",
@@ -34,7 +35,23 @@ public final class LlmErrorSignature {
         "insufficient credit",
         "too many requests",
         "service unavailable",
-        "internal server error"
+        "internal server error",
+        // LLM 자기 정체 노출 / 역할극 거절 (프록시 라우팅 오류 등)
+        "i'm kiro",
+        "i am kiro",
+        "저는 kiro",
+        "kiro입니다",
+        "i can't discuss that",
+        "i cannot roleplay",
+        "i'm not able to roleplay",
+        "not able to roleplay",
+        "not set up to generate",
+        "i need to be direct: i can't",
+        "i need to clarify: i'm",
+        "i'm an ai",
+        "i am an ai",
+        "as an ai",
+        "저는 ai"
     );
 
     /** 텍스트에 제공자 오류 시그니처가 포함되면 true. */

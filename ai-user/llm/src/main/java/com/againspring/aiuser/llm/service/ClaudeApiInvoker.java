@@ -21,9 +21,10 @@ import java.time.Duration;
 /**
  * Anthropic Messages API를 직접 호출하는 LLM 인보커.
  * - API 키: ApiKeyProvider 경유 (DB 우선 → 환경변수 폴백)
- * - 시스템 프롬프트: <<<USER_PROMPT>>> 앞 부분
+ * - 시스템 프롬프트: <<<USER_PROMPT>>> 앞 부분 → &lt;instructions&gt; 태그로 user 메시지에 주입
  * - 유저 메시지: <<<USER_PROMPT>>> 뒤 부분
- * - 프롬프트 캐싱: system 파트의 첫 번째 text block에 cache_control 적용
+ *
+ * clcocloud 프록시는 system 필드 포함 요청을 다른 모델로 라우팅하므로 system 필드 미사용.
  */
 @Slf4j
 @Service
@@ -32,10 +33,6 @@ public class ClaudeApiInvoker implements Invoker {
 
     private static final String API_PATH       = "/v1/messages";
     private static final String API_VER        = "2023-06-01";
-    // 프롬프트 캐싱 + 1시간 TTL 베타. AI 유저 tick은 10분 주기이고 jitter로 행동이 10~60분 창에 분산되므로
-    // 기본 5분 TTL로는 틱 사이에 캐시가 항상 만료된다(히트율 0%). 1h TTL로 여러 틱을 하나의 캐시로 커버.
-    private static final String CACHE_BETA     = "prompt-caching-2024-07-31,extended-cache-ttl-2025-04-11";
-    private static final String CACHE_TTL      = "1h";
     private static final String SEP            = "<<<USER_PROMPT>>>";
     private static final String PERSONA_SEP    = "<<<PERSONA_SECTION>>>";
     private static final int    MAX_TOKENS     = 2048;
@@ -46,9 +43,6 @@ public class ClaudeApiInvoker implements Invoker {
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}")
     private String defaultModel;
-
-    @Value("${llm.api.prompt-caching:true}")
-    private boolean promptCaching;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(15))
@@ -84,37 +78,16 @@ public class ClaudeApiInvoker implements Invoker {
         }
 
         // ── 요청 JSON 구성 ─────────────────────────────────────────────────
+        // clcocloud 프록시는 system 필드 포함 요청을 다른 모델로 라우팅함.
+        // system 내용을 user 메시지에 <instructions> 태그로 주입해 문제 우회.
         ObjectNode body = MAPPER.createObjectNode();
         body.put("model", resolvedModel);
         body.put("max_tokens", MAX_TOKENS);
 
-        if (!systemPart.isBlank()) {
-            ArrayNode systemArr = body.putArray("system");
-            int personaIdx = systemPart.indexOf(PERSONA_SEP);
-            if (promptCaching && personaIdx >= 0) {
-                // Block 1: 정적 규칙 섹션 — cache_control 적용 (캐시 히트 대상)
-                String staticPart  = systemPart.substring(0, personaIdx).trim();
-                String dynamicPart = systemPart.substring(personaIdx + PERSONA_SEP.length()).trim();
-                ObjectNode block1 = systemArr.addObject();
-                block1.put("type", "text");
-                block1.put("text", staticPart);
-                block1.putObject("cache_control").put("type", "ephemeral").put("ttl", CACHE_TTL);
-                // Block 2: 페르소나별 섹션 — cache_control 없음 (호출마다 다름)
-                if (!dynamicPart.isBlank()) {
-                    ObjectNode block2 = systemArr.addObject();
-                    block2.put("type", "text");
-                    block2.put("text", dynamicPart);
-                }
-            } else {
-                // 구분자 없거나 캐싱 비활성 — 단일 블록
-                ObjectNode textBlock = systemArr.addObject();
-                textBlock.put("type", "text");
-                textBlock.put("text", systemPart.replace(PERSONA_SEP, "").trim());
-                if (promptCaching) {
-                    textBlock.putObject("cache_control").put("type", "ephemeral").put("ttl", CACHE_TTL);
-                }
-            }
-        }
+        String cleanSystem = systemPart.replace(PERSONA_SEP, "").trim();
+        String fullUserText = cleanSystem.isBlank()
+            ? userPart
+            : "<instructions>\n" + cleanSystem + "\n</instructions>\n\n" + userPart;
 
         ArrayNode messages = body.putArray("messages");
         ObjectNode userMsg = messages.addObject();
@@ -122,7 +95,7 @@ public class ClaudeApiInvoker implements Invoker {
         ArrayNode content = userMsg.putArray("content");
         ObjectNode textNode = content.addObject();
         textNode.put("type", "text");
-        textNode.put("text", userPart);
+        textNode.put("text", fullUserText);
 
         try {
             String requestBody = MAPPER.writeValueAsString(body);
@@ -134,9 +107,6 @@ public class ClaudeApiInvoker implements Invoker {
                 .header("x-api-key", apiKey)
                 .header("anthropic-version", API_VER)
                 .header("content-type", "application/json");
-            if (promptCaching) {
-                reqBuilder.header("anthropic-beta", CACHE_BETA);
-            }
             HttpRequest req = reqBuilder
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
