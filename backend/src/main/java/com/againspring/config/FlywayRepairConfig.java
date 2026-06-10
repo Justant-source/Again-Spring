@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Profile;
  * V79 드롭 마이그레이션 FK 오류로 인한 failed 상태 복구용으로 도입(2026-06-09).
  */
 @Configuration
-@Profile("prod")
+@Profile({"dev", "prod"})
 public class FlywayRepairConfig {
 
     private static final Logger log = LoggerFactory.getLogger(FlywayRepairConfig.class);

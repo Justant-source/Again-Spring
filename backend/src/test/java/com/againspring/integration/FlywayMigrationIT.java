@@ -35,9 +35,9 @@ class FlywayMigrationIT extends MariaDbIntegrationSupport {
 
         assertThat(failedCount).as("실패한 마이그레이션").isZero();
         assertThat(pendingCount).as("미적용 마이그레이션").isZero();
-        // V81(create_system_setting) + V82(marketing_job_idempotency) 추가됨 — 총 82개
+        // V83(create_visit_events) + V84(add_user_acquisition) 추가됨 — 총 84개
         // 주의: 마이그레이션 추가 시 이 숫자도 함께 갱신할 것
-        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(82);
+        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(84);
     }
 
     @Test
