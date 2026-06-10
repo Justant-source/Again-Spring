@@ -30,7 +30,7 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class ClaudeApiInvoker implements Invoker {
 
-    private static final String API_URL        = "https://api.anthropic.com/v1/messages";
+    private static final String API_PATH       = "/v1/messages";
     private static final String API_VER        = "2023-06-01";
     // 프롬프트 캐싱 + 1시간 TTL 베타. AI 유저 tick은 10분 주기이고 jitter로 행동이 10~60분 창에 분산되므로
     // 기본 5분 TTL로는 틱 사이에 캐시가 항상 만료된다(히트율 0%). 1h TTL로 여러 틱을 하나의 캐시로 커버.
@@ -127,8 +127,9 @@ public class ClaudeApiInvoker implements Invoker {
         try {
             String requestBody = MAPPER.writeValueAsString(body);
 
+            String baseUrl = apiKeyProvider.getBaseUrl().replaceAll("/+$", "");
             HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(API_URL))
+                .uri(URI.create(baseUrl + API_PATH))
                 .timeout(Duration.ofMillis(timeoutMs))
                 .header("x-api-key", apiKey)
                 .header("anthropic-version", API_VER)

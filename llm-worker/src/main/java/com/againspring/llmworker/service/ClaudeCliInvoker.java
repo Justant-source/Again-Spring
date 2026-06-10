@@ -33,8 +33,15 @@ public class ClaudeCliInvoker {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    @Value("${llm.worker.claude-binary-path:claude}")
-    private String claudeBinaryPath;
+    private final String claudeBinaryPath;
+    private final LlmConfigService llmConfigService;
+
+    public ClaudeCliInvoker(
+            @Value("${llm.worker.claude-binary-path:claude}") String claudeBinaryPath,
+            LlmConfigService llmConfigService) {
+        this.claudeBinaryPath = claudeBinaryPath;
+        this.llmConfigService = llmConfigService;
+    }
 
     /**
      * 동기 invoke (취소 불가). sync POST /v1/invoke 경로.
@@ -161,7 +168,7 @@ public class ClaudeCliInvoker {
             userPart = prompt;
         }
 
-        return new ProcessBuilder(
+        ProcessBuilder pb = new ProcessBuilder(
                 claudeBinaryPath,
                 "--print",
                 "--output-format", "stream-json",
@@ -173,5 +180,10 @@ public class ClaudeCliInvoker {
                 "--system-prompt", systemPart,
                 userPart
         );
+        String baseUrl = llmConfigService.getAnthropicBaseUrl();
+        if (baseUrl != null && !baseUrl.isBlank()) {
+            pb.environment().put("ANTHROPIC_BASE_URL", baseUrl);
+        }
+        return pb;
     }
 }

@@ -377,3 +377,26 @@ export async function upsertAnthropicApiKey(value: string): Promise<ApiKeyStatus
 export async function deleteAnthropicApiKey(): Promise<void> {
   await api.delete('/api/admin/ai-rules/settings/anthropic-api-key');
 }
+
+// ===== 시스템 설정 — Anthropic API Base URL =====
+
+export interface ApiBaseUrlStatus {
+  isSet: boolean;
+  value: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export async function getAnthropicBaseUrl(): Promise<ApiBaseUrlStatus> {
+  const res = await api.get<ApiBaseUrlStatus>("/api/admin/ai-rules/settings/anthropic-base-url");
+  return res.data;
+}
+
+export async function upsertAnthropicBaseUrl(value: string): Promise<ApiBaseUrlStatus> {
+  const res = await api.put<ApiBaseUrlStatus>("/api/admin/ai-rules/settings/anthropic-base-url", { value });
+  return res.data;
+}
+
+export async function deleteAnthropicBaseUrl(): Promise<void> {
+  await api.delete("/api/admin/ai-rules/settings/anthropic-base-url");
+}

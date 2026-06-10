@@ -21,8 +21,7 @@ public class InvokerRouter {
         if ("API".equalsIgnoreCase(backend)) {
             String key = apiKeyProvider.getKey();
             if (key == null || key.isBlank()) {
-                log.warn("[InvokerRouter] backend=API 요청됐으나 ANTHROPIC_API_KEY 미설정 → CLI 폴백");
-                return cliInvoker;
+                throw new IllegalStateException("backend=API 요청됐으나 ANTHROPIC_API_KEY 미설정");
             }
             log.info("[InvokerRouter] ⚠️  backend=API 선택 — Anthropic API 직접 호출 (과금 발생)");
             return apiInvoker;

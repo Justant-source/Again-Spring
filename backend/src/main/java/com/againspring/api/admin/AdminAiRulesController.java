@@ -29,6 +29,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
@@ -62,6 +63,9 @@ public class AdminAiRulesController {
 
     @Value("${ai.prompt.llm-url:http://againspring-llm-ai-user:8092}")
     private String llmAiUserUrl;
+
+    @Value("${llm.remote.base-url:http://againspring-llm:8090}")
+    private String llmWorkerUrl;
 
     // =====================================================================
     // 전역 금지 규칙 관리
@@ -470,6 +474,78 @@ public class AdminAiRulesController {
     public ResponseEntity<Void> deleteAnthropicApiKey() {
         systemSettingRepository.deleteById(KEY_ANTHROPIC_API_KEY);
         return ResponseEntity.noContent().build();
+    }
+
+    // =====================================================================
+    // 시스템 설정 — Anthropic Base URL 관리
+    // =====================================================================
+
+    private static final String KEY_ANTHROPIC_BASE_URL = "ANTHROPIC_BASE_URL";
+    private static final String DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
+
+    @GetMapping("/settings/anthropic-base-url")
+    @Operation(summary = "Anthropic Base URL 조회", description = "설정된 Anthropic Base URL을 반환합니다. 미설정 시 기본값을 반환합니다.")
+    public ResponseEntity<Map<String, Object>> getAnthropicBaseUrl() {
+        return systemSettingRepository.findById(KEY_ANTHROPIC_BASE_URL)
+                .map(s -> ResponseEntity.ok(Map.<String, Object>of(
+                        "isSet", true,
+                        "value", s.getSettingValue(),
+                        "updatedAt", s.getUpdatedAt() != null ? s.getUpdatedAt().toString() : null,
+                        "updatedBy", s.getUpdatedBy() != null ? s.getUpdatedBy() : ""
+                )))
+                .orElseGet(() -> ResponseEntity.ok(Map.of(
+                        "isSet", false,
+                        "value", DEFAULT_ANTHROPIC_BASE_URL,
+                        "updatedAt", "",
+                        "updatedBy", ""
+                )));
+    }
+
+    @PutMapping("/settings/anthropic-base-url")
+    @Operation(summary = "Anthropic Base URL 저장/갱신")
+    @Auditable(action = "UPSERT_ANTHROPIC_BASE_URL")
+    public ResponseEntity<Map<String, Object>> upsertAnthropicBaseUrl(
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        String value = body.get("value");
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "value is required");
+        }
+        SystemSetting setting = systemSettingRepository.findById(KEY_ANTHROPIC_BASE_URL)
+                .orElse(SystemSetting.builder().settingKey(KEY_ANTHROPIC_BASE_URL).build());
+        setting.setSettingValue(value.strip());
+        setting.setUpdatedAt(Instant.now());
+        setting.setUpdatedBy(auth.getName());
+        systemSettingRepository.save(setting);
+        triggerLlmBaseUrlUpdate(value.strip());
+        return ResponseEntity.ok(Map.of(
+                "isSet", true,
+                "value", value.strip(),
+                "updatedAt", setting.getUpdatedAt().toString(),
+                "updatedBy", auth.getName()
+        ));
+    }
+
+    @DeleteMapping("/settings/anthropic-base-url")
+    @Operation(summary = "Anthropic Base URL 삭제 (기본값으로 초기화)")
+    @Auditable(action = "DELETE_ANTHROPIC_BASE_URL")
+    public ResponseEntity<Void> deleteAnthropicBaseUrl() {
+        systemSettingRepository.deleteById(KEY_ANTHROPIC_BASE_URL);
+        triggerLlmBaseUrlUpdate(DEFAULT_ANTHROPIC_BASE_URL);
+        return ResponseEntity.noContent().build();
+    }
+
+    private void triggerLlmBaseUrlUpdate(String baseUrl) {
+        try {
+            RestClient.create().post()
+                    .uri(llmWorkerUrl + "/internal/config/anthropic-base-url")
+                    .header("Content-Type", "application/json")
+                    .body(Map.of("baseUrl", baseUrl))
+                    .retrieve().toBodilessEntity();
+            log.info("[ai-rules] llm-worker anthropic-base-url updated to: {}", baseUrl);
+        } catch (Exception e) {
+            log.warn("[ai-rules] llm-worker base-url update failed (best-effort): {}", e.getMessage());
+        }
     }
 
     private static String maskApiKey(String key) {

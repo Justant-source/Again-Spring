@@ -33,12 +33,16 @@ import {
   getAnthropicApiKey,
   upsertAnthropicApiKey,
   deleteAnthropicApiKey,
+  getAnthropicBaseUrl,
+  upsertAnthropicBaseUrl,
+  deleteAnthropicBaseUrl,
   AiGlobalRule,
   AiCaution,
   AiCorrectionHistory,
   AiPromptTemplate,
   AnalyzeResponse,
   ApiKeyStatus,
+  ApiBaseUrlStatus,
 } from '@/lib/api/admin/corrections';
 import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp, Zap, FileText, Save, MessageSquare, Loader2, AlertCircle, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { BatchAnalysisReviewDialog } from '@/components/admin/ai-rules/BatchAnalysisReviewDialog';
@@ -839,10 +843,11 @@ export default function AiRulesPage() {
         {/* ── API 설정 탭 ── */}
         <TabsContent value="api-settings" className="space-y-4">
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 space-y-1">
-            <p className="font-semibold">🔑 Claude / Anthropic API 키</p>
-            <p>Anthropic API를 직접 호출하는 기능(수정 분석, API 모드 AI 유저 등)에 사용되는 키입니다.</p>
-            <p>키는 DB에 저장되며 응답 시 항상 마스킹됩니다.</p>
+            <p className="font-semibold">🔑 Claude / Anthropic API 설정</p>
+            <p>Anthropic API를 직접 호출하는 기능(수정 분석, API 모드 AI 유저 등)에 사용되는 설정입니다.</p>
+            <p>키와 Base URL은 DB에 저장됩니다. Base URL 변경 시 llm-worker에 즉시 반영됩니다.</p>
           </div>
+          <AnthropicBaseUrlPanel />
           <AnthropicApiKeyPanel />
         </TabsContent>
       </Tabs>
@@ -977,6 +982,166 @@ function AnthropicApiKeyPanel() {
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={handleSave} disabled={saving || !inputValue.trim()}>
+              {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+              저장
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { setShowInput(false); setInputValue(''); setError(''); }}>
+              취소
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {success && <p className="text-sm text-green-600">{success}</p>}
+    </div>
+  );
+}
+
+
+// ── Anthropic API Base URL 관리 패널 ──────────────────────────────────────────
+
+function AnthropicBaseUrlPanel() {
+  const DEFAULT_URL = 'https://api.anthropic.com/v1';
+  const [status, setStatus] = useState<ApiBaseUrlStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [inputValue, setInputValue] = useState('');
+  const [showInput, setShowInput] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => { loadStatus(); }, []);
+
+  const loadStatus = async () => {
+    setLoading(true);
+    try {
+      const data = await getAnthropicBaseUrl();
+      setStatus(data);
+    } catch {
+      setError('Base URL 상태를 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateUrl = (url: string): string => {
+    if (!url.trim()) return '';
+    try {
+      const u = new URL(url.trim());
+      if (!['http:', 'https:'].includes(u.protocol)) return '올바른 URL을 입력하세요 (.../v1)';
+      return '';
+    } catch {
+      return '올바른 URL을 입력하세요 (.../v1)';
+    }
+  };
+
+  const urlError = validateUrl(inputValue);
+
+  const handleSave = async () => {
+    if (urlError) return;
+    if (!inputValue.trim()) { setError('URL을 입력해주세요.'); return; }
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      const data = await upsertAnthropicBaseUrl(inputValue.trim());
+      setStatus(data);
+      setInputValue('');
+      setShowInput(false);
+      setSuccess('API Base URL이 저장됩니다.');
+    } catch {
+      setError('저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!confirm(`기본값(${DEFAULT_URL})으로 초기화하시겠습니까?`)) return;
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await deleteAnthropicBaseUrl();
+      setStatus({ isSet: false, value: DEFAULT_URL, updatedAt: null, updatedBy: null });
+      setSuccess('기본값으로 초기화됩니다.');
+    } catch {
+      setError('초기화에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <p className="text-sm text-muted-foreground text-center py-4">로딩 중…</p>;
+
+  const currentUrl = status?.value || DEFAULT_URL;
+
+  return (
+    <div className="space-y-4 max-w-xl">
+      <div className="rounded-lg border bg-white p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-amber-600" />
+          <span className="font-medium text-sm">API Base URL</span>
+          {status?.isSet ? (
+            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">커스텀</span>
+          ) : (
+            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">기본값</span>
+          )}
+        </div>
+
+        <div className="font-mono bg-gray-50 rounded px-3 py-2 text-gray-600 text-sm break-all">
+          {currentUrl}
+        </div>
+
+        {status?.updatedAt && (
+          <p className="text-xs text-gray-400">
+            마지막 수정: {new Date(status.updatedAt).toLocaleString('ko-KR')}
+            {status.updatedBy ? ` (${status.updatedBy})` : ''}
+          </p>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <Button variant="outline" size="sm" onClick={() => {
+            setInputValue(currentUrl);
+            setShowInput(!showInput);
+            setError('');
+            setSuccess('');
+          }}>
+            <Zap className="w-3 h-3 mr-1" />
+            URL 변경
+          </Button>
+          {status?.isSet && (
+            <Button variant="outline" size="sm" onClick={handleReset} disabled={saving}
+              className="text-gray-600 hover:text-gray-700">
+              {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+              기본값으로 초기화
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {showInput && (
+        <div className="rounded-lg border bg-white p-5 space-y-3">
+          <p className="text-sm font-medium">API Base URL 변경</p>
+          <p className="text-xs text-gray-500">
+            <code className="bg-gray-100 px-1 rounded">.../v1</code> 형태로 입력하세요.{' '}
+            <code className="bg-gray-100 px-1 rounded">/messages</code>는 자동으로 붙습니다.
+            공식: <code className="bg-gray-100 px-1 rounded">https://api.anthropic.com/v1</code>
+          </p>
+          <div>
+            <Input
+              type="text"
+              placeholder="https://api.anthropic.com/v1"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              className={`font-mono text-sm ${urlError ? 'border-red-400' : ''}`}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
+            />
+            {urlError && <p className="text-xs text-red-500 mt-1">{urlError}</p>}
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleSave} disabled={saving || !!urlError || !inputValue.trim()}>
               {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
               저장
             </Button>

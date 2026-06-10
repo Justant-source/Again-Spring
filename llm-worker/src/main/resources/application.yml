@@ -29,3 +29,6 @@ logging:
   level:
     root: INFO
     com.againspring.llmworker: DEBUG
+
+anthropic:
+  base-url: ${ANTHROPIC_BASE_URL:}

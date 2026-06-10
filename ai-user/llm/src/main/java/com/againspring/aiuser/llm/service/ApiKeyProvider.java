@@ -33,12 +33,21 @@ public class ApiKeyProvider {
         this.jdbc = jdbc;
     }
 
+    private static final String DB_BASE_URL_KEY = "ANTHROPIC_BASE_URL";
+    private static final String DEFAULT_BASE_URL = "https://api.anthropic.com";
+
+    @Value("${anthropic.base-url:}")
+    private String envBaseUrl;
+
+    private volatile String cachedBaseUrl    = null;
+    private volatile Instant baseUrlExpiry   = Instant.EPOCH;
+
     public String getKey() {
         Instant now = Instant.now();
         if (cachedKey != null && now.isBefore(cacheExpiry)) {
             return cachedKey;
         }
-        String dbKey = fetchFromDb();
+        String dbKey = fetchFromDb(DB_KEY);
         if (dbKey != null && !dbKey.isBlank()) {
             log.debug("[ApiKeyProvider] DB에서 ANTHROPIC_API_KEY 로드 (캐시 5분)");
             cachedKey    = dbKey;
@@ -54,17 +63,37 @@ public class ApiKeyProvider {
         return null;
     }
 
+    public String getBaseUrl() {
+        Instant now = Instant.now();
+        if (cachedBaseUrl != null && now.isBefore(baseUrlExpiry)) {
+            return cachedBaseUrl;
+        }
+        String dbUrl = fetchFromDb(DB_BASE_URL_KEY);
+        if (dbUrl != null && !dbUrl.isBlank()) {
+            log.debug("[ApiKeyProvider] DB에서 ANTHROPIC_BASE_URL 로드: {}", dbUrl);
+            cachedBaseUrl  = dbUrl;
+            baseUrlExpiry  = now.plusMillis(CACHE_MS);
+            return cachedBaseUrl;
+        }
+        if (envBaseUrl != null && !envBaseUrl.isBlank()) {
+            cachedBaseUrl  = envBaseUrl;
+            baseUrlExpiry  = now.plusMillis(CACHE_MS);
+            return cachedBaseUrl;
+        }
+        return DEFAULT_BASE_URL;
+    }
+
     /** DB system_setting 에서 키 조회. 테이블 미존재나 값 없으면 null 반환. */
-    private String fetchFromDb() {
+    private String fetchFromDb(String key) {
         try {
             return jdbc.queryForObject(
                 "SELECT setting_value FROM system_setting WHERE setting_key = ?",
-                String.class, DB_KEY
+                String.class, key
             );
         } catch (EmptyResultDataAccessException e) {
             return null;
         } catch (Exception e) {
-            log.warn("[ApiKeyProvider] system_setting 조회 실패 (환경변수 폴백): {}", e.getMessage());
+            log.warn("[ApiKeyProvider] system_setting 조회 실패 key={}: {}", key, e.getMessage());
             return null;
         }
     }
