@@ -337,3 +337,64 @@ test.describe('Journey 11-H: apply-batch-plan 계약 (비-LLM)', () => {
     }
   })
 })
+
+// ── J. voice 가이드 품질 회귀 가드 ────────────────────────────────
+// 목적: comment.md casual 섹션의 존댓말 예시 모순이 DB/classpath에서 재발하는 것을 방지.
+//       (~일 것 같아요 / ~더라고요 등이 반말 규칙 섹션에 등장하면 실패)
+test.describe('Journey 11-J: voice 가이드 품질 회귀 가드', () => {
+  test.use({ storageState: authStatePath(PERSONA_TEST1.email) })
+
+  test('voice/comment 가이드 — casual 절대 규칙에 존댓말 어미 없음', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+    const headers = { Authorization: `Bearer ${accessToken}` }
+
+    const resp = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/comment`, { headers })
+    expect(resp.ok()).toBeTruthy()
+    const data = await resp.json()
+    const content: string = data.content ?? ''
+
+    // 가이드가 비어있지 않아야 함
+    expect(content.length).toBeGreaterThan(100)
+
+    // 반말 규칙 1이 존재해야 함
+    expect(content).toMatch(/반말만|요.*금지|습니다.*금지/)
+
+    // casual 절대 규칙 섹션 내에 "일 것 같아요" / "더라고요" 존댓말 예시 없어야 함
+    // (polite 전용 섹션이 있으면 그 안의 것은 허용 — casual 섹션만 검사)
+    const casualSection = content.split(/존댓말\s*모드|polite\s*mode/i)[0]
+    expect(casualSection).not.toMatch(/일 것 같아요/)
+    expect(casualSection).not.toMatch(/더라고요.*조언|조언.*더라고요/)
+  })
+
+  test('voice/comment 가이드 — 4개 voice 템플릿 모두 로드됨', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    const headers = { Authorization: `Bearer ${accessToken}` }
+
+    const resp = await request.get(`${BASE}/api/admin/ai-rules/prompts`, { headers })
+    expect(resp.ok()).toBeTruthy()
+    const list = await resp.json()
+    expect(Array.isArray(list)).toBeTruthy()
+
+    const keys = list.map((t: any) => t.key ?? t.name ?? '')
+    const required = ['voice/comment', 'voice/post', 'voice/reply', 'voice/partner']
+    for (const key of required) {
+      expect(keys.some((k: string) => k.includes(key.split('/')[1]))).toBeTruthy()
+    }
+  })
+
+  test('voice/post 가이드 — 구체 사건(trigger) 필수 규칙 포함', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    const headers = { Authorization: `Bearer ${accessToken}` }
+
+    const resp = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/post`, { headers })
+    expect(resp.ok()).toBeTruthy()
+    const data = await resp.json()
+    const content: string = data.content ?? ''
+
+    // 구체 사건(trigger) 필수 규칙이 살아있어야 함
+    expect(content).toMatch(/구체.*사건|trigger|X가 Y/)
+    // 온점 금지 규칙 존재 확인
+    expect(content).toMatch(/온점.*금지|금지.*온점/)
+  })
+})
