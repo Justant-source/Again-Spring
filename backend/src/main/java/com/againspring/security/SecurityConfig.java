@@ -52,6 +52,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("POST", "/api/internal/marketing/callback").permitAll()
                         .requestMatchers("/api/auth/agree").authenticated()
                         .requestMatchers("/api/auth/logout").authenticated()
                         .requestMatchers("/api/auth/**").permitAll()

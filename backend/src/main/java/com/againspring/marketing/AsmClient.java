@@ -10,6 +10,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -29,21 +30,26 @@ public class AsmClient {
     public AsmClient(AsmProperties asmProperties, RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
         this.asmProperties = asmProperties;
         this.objectMapper = objectMapper;
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(asmProperties.getRequestTimeoutMs());
+        factory.setReadTimeout(asmProperties.getRequestTimeoutMs());
         this.restClient = restClientBuilder
+            .requestFactory(factory)
             .baseUrl(asmProperties.getBaseUrl())
             .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + asmProperties.getApiToken())
             .build();
     }
 
     /**
-     * Create a new job in ASM
+     * Create a new job in ASM with idempotency support
      */
-    public CreateJobResponse createJob(CreateJobRequest request) {
+    public CreateJobResponse createJob(CreateJobRequest request, String idempotencyKey) {
         try {
             return restClient
                 .post()
                 .uri("/api/v1/jobs")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", idempotencyKey)
                 .body(request)
                 .retrieve()
                 .body(CreateJobResponse.class);

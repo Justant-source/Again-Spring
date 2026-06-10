@@ -40,6 +40,7 @@ const STATUS_COLORS: Record<string, string> = {
   PUBLISHED: 'bg-green-600 text-white',
   FAILED: 'bg-red-200 text-red-800',
   STALE: 'bg-gray-400 text-white',
+  PARTIAL: 'bg-yellow-500 text-white',
 };
 
 const TARGET_PLATFORMS = [
@@ -66,12 +67,23 @@ export default function MarketingJobsPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  const ACTIVE_STATUSES = ['QUEUED', 'RUNNING', 'READY', 'PUBLISHING'];
+
   useEffect(() => {
     loadJobs();
   }, []);
 
-  const loadJobs = async () => {
-    setLoading(true);
+  useEffect(() => {
+    const hasActiveJobs = jobs.some(j => ACTIVE_STATUSES.includes(j.status));
+    if (!hasActiveJobs) return;
+    const intervalId = setInterval(() => {
+      loadJobs(false);
+    }, 5000);
+    return () => clearInterval(intervalId);
+  }, [jobs]);
+
+  const loadJobs = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     setError(null);
     try {
       const data = await listMarketingJobs();
@@ -80,7 +92,7 @@ export default function MarketingJobsPage() {
       const msg = err instanceof Error ? err.message : String(err);
       setError(`마케팅 잡 목록을 불러오지 못했습니다: ${msg}`);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
@@ -129,10 +141,13 @@ export default function MarketingJobsPage() {
         <p className="text-sm text-gray-500">
           사연을 선택하고 ASM(Again-Spring-Marketing) 서버에 콘텐츠 생성을 요청합니다.
         </p>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadJobs} disabled={loading}>
+        <div className="flex gap-2 items-center">
+          <Button variant="outline" size="sm" onClick={() => loadJobs(true)} disabled={loading}>
             {loading ? '로드 중…' : '새로고침'}
           </Button>
+          {jobs.some(j => ACTIVE_STATUSES.includes(j.status)) && (
+            <span className="text-xs text-blue-500 animate-pulse">● 자동 갱신 중</span>
+          )}
           <Button size="sm" onClick={() => { setCreateError(null); setDialogOpen(true); }}>
             + 새 마케팅 잡
           </Button>

@@ -2,16 +2,17 @@
 
 ## 설계 원칙
 
-1. **AS = 얇은 트리거** — Again-Spring은 잡 생성·폴링·상태 표시만 담당. 콘텐츠 생성 로직 없음.
+1. **AS = 얇은 트리거** — Again-Spring은 잡 생성·콜백 수신·폴링·상태 표시만 담당. 콘텐츠 생성 로직 없음.
 2. **ASM = 콘텐츠 공장** — 카피라이팅·음성·영상·이미지·게시 전담. GPU 서버(WSL RTX 3090).
-3. **비동기 폴링** — 잡 생성 후 AS는 15초마다 ASM의 상태를 폴링해서 DB에 반영.
-4. **단방향 계약** — ASM은 AS를 모른다. AS만 ASM을 호출한다.
+3. **이중 동기화** — 푸시(콜백) + 풀(폴링). ASM이 종료 상태 도달 시 AS 콜백 엔드포인트로 즉시 전송, 폴링은 콜백 미수신 시 재조정용.
+4. **멱등성** — AS가 각 잡 생성 시도마다 Idempotency-Key(UUID)를 발송. ASM이 중복 감지 후 같은 응답 반환.
+5. **단방향 초기 요청** — 잡 생성은 AS → ASM. 이후 ASM → AS 콜백 + AS 폴링으로 동기화.
 
 ---
 
 ## 데이터 흐름
 
-### 잡 생성
+### 1. 잡 생성 (Idempotency 포함)
 
 ```
 어드민 클릭 "마케팅 제작 요청"
@@ -26,19 +27,38 @@ AdminMarketingController
 MarketingJobService.createJob()
     ├── Post 조회 (PostRepository)
     ├── StoryBrief 생성 (제목·요약·관점·empathy_ratio)
-    ├── AsmClient.createJob(brief, targets, options)
-    │       └── POST http://100.115.252.61:8200/api/v1/jobs
-    │               └── ASM이 ULID job_id 반환 + DB 저장
+    ├── Idempotency-Key 생성 (UUID)
+    ├── AsmClient.createJob(brief, targets, options, idempotencyKey, callbackBaseUrl)
+    │       └── POST http://100.115.252.61:8200/api/v1/jobs + Idempotency-Key
+    │               └── ASM이 ULID job_id 반환, idempotency 캐시에 저장
     └── MarketingJob 저장 { remoteJobId, postId, status=REQUESTED, ... }
 ```
 
-### 폴링 루프
+### 2. 콜백 모델 (즉시 동기화)
+
+```
+ASM이 READY/PUBLISHED/PARTIAL/FAILED 도달
+    │
+    ▼
+ASM: POST /api/internal/marketing/callback
+    ├── Authorization: Bearer {ASM_CALLBACK_TOKEN}
+    ├── body: { job_id, status, phase, progress, artifacts, publications, error }
+    │
+    ▼
+AS CallbackController
+    ├── 토큰 검증
+    ├── job.applyRemote(status, phase, progress, ...)
+    ├── poll_fail_count = 0 (재설정)
+    └── 응답 204 No Content
+```
+
+### 3. 폴링 루프 (재조정용)
 
 ```
 MarketingPollingScheduler (15초마다)
     │
     ▼
-findByStatusIn([QUEUED, RUNNING, READY, PUBLISHING])
+findByStatusIn([QUEUED, RUNNING, READY, PUBLISHING, STALE])
     │
     ▼
 for each job:
@@ -49,9 +69,10 @@ for each job:
     │
     └── 실패 → job.markPollFailure()
                 poll_fail_count >= 5 → status = STALE
+                (STALE 후 24시간 재시도, 초과 시 FAILED)
 ```
 
-### 수동 게시 승인
+### 4. 수동 게시 승인
 
 ```
 어드민 "게시 승인" 클릭 (status==READY && autoPublish==false)
@@ -64,7 +85,37 @@ MarketingJobService.triggerPublish(id)
     ├── status == READY 검증
     └── AsmClient.publish(remoteJobId)
             └── POST /api/v1/jobs/{remote_job_id}/publish
-                    └── ASM: status = PUBLISHING → 소셜 게시 → PUBLISHED
+                    └── ASM: status = PUBLISHING → 소셜 게시 → PUBLISHED (콜백)
+```
+
+### 데이터 흐름 다이어그램
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Again-Spring (AS) 어드민                                     │
+└────────┬──────────────────────────────────────────────────┘
+         │
+         │ 1. POST /api/admin/marketing/jobs
+         ▼
+┌────────────────────────────────────────────────────────────┐
+│ Again-Spring Backend                                        │
+│ ├─ POST /api/admin/marketing/jobs                          │
+│ ├─ GenerateIdempotency-Key (UUID)                          │
+│ └─ CreateJob + Callback URL 포함                            │
+└────┬──────────────────────────────────────────┬──────────┘
+     │                                          │
+     │ 2. POST /api/v1/jobs                    │ 3. [Callback] POST /api/internal/marketing/callback
+     │ + Idempotency-Key                       │    + Status/Artifacts (READY/PUBLISHED/PARTIAL/FAILED)
+     │                                          │
+     ▼                                          │
+┌──────────────────────────────────────┐       │
+│ ASM (Again-Spring-Marketing)         │       │
+│ ├─ QUEUED → RUNNING → READY/FAILED   │──────┘
+│ └─ Content Generation Pipeline       │
+└──────────────────────────────────────┘
+     │
+     ▼
+AS 어드민: 폴링 재조정 (15초, STALE 상태 지수 백오프)
 ```
 
 ---

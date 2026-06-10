@@ -82,10 +82,14 @@ frontend도 build-time ARG로 `NEXT_PUBLIC_{GOOGLE,KAKAO,NAVER}_CLIENT_ID`를 �
 | 변수 | 사용처 | dev | prod |
 |---|---|---|---|
 | `ASM_BASE_URL` | Again-Spring-Marketing 게이트웨이 (HTTP) | `http://100.115.252.61:8200` | 비워둠 |
-| `ASM_API_TOKEN` | ASM 인증 토큰 | 필요시 입력 | 비워둠 |
+| `ASM_API_TOKEN` | ASM 인증 토큰 (AS → ASM) | 필요시 입력 | 비워둠 |
+| `ASM_CALLBACK_TOKEN` | ASM이 콜백 인증에 사용 (ASM → AS) | `asm-callback-token-dev` | **필수 (비밀값)** |
+| `ASM_CALLBACK_BASE_URL` | AS가 jobCreate 요청 시 포함, ASM이 콜백 URL 생성용 | `http://100.81.189.92:8090` | `http://100.81.189.92:8091` |
 | `ASM_ENABLED` | 마케팅 기능 활성화 | `false` (기본) | `false` (변경 금지) |
 
 마케팅 관련 환경변수는 ASM 프로젝트로 이동. ASM_BASE_URL/ASM_API_TOKEN/ASM_ENABLED 참조.
+- `ASM_CALLBACK_TOKEN`: Bearer 토큰. `POST /api/internal/marketing/callback` 인증용. dev 기본값은 `asm-callback-token-dev`.
+- `ASM_CALLBACK_BASE_URL`: AS의 외부 접근 URL. ASM이 콜백을 보낼 대상 도메인. 통상 LB/nginx 외부 IP:port.
 
 ### 위기 알림 (선택사항)
 

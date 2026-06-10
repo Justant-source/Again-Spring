@@ -111,12 +111,17 @@ Authorization: Bearer <admin-jwt>
 ```
 POST /api/v1/jobs
 Authorization: Bearer <asm-token>
+Idempotency-Key: <uuid>
 ```
+
+**Request Header**
+- `Idempotency-Key`: UUID 형식. AS가 생성 시도마다 새로운 UUID를 보냄. ASM은 동일 key로 오는 중복 요청을 감지해 같은 응답 반환 (멱등성).
 
 **Request Body (StoryBrief)**
 ```json
 {
   "source_id": "abc123def456",
+  "callback_base_url": "http://100.81.189.92:8090",  // AS가 포함 — ASM이 콜백 URL 생성 시 사용
   "brief": {
     "title": "사연 제목",
     "neutral_summary": "중립 요약 (최대 500자)",
@@ -168,12 +173,14 @@ Authorization: Bearer <asm-token>
     "naver_blog": { "blog_md": "/api/v1/jobs/01HX.../artifacts/naver_blog/post.md" }
   },
   "publications": [],
+  "event": "progress",
   "error": null
 }
 ```
 
 > **`artifacts`는 플랫폼별 패키지 맵**(`dict[str, Any]`)이다 — `targets`에 포함된 플랫폼 value를 키로, 해당 플랫폼이 필요로 하는 아티팩트 묶음을 값으로 갖는다. (과거 문서의 평면 `video_mp4`/`thumbnail`/`blog_md`/`images` 형태는 폐기됨 — ASM commit `9aaa03d` "per-platform artifact packages".)
 > **`phase`** 는 ASM `JobPhase` enum: `SCRIPT` → `TTS` → `VIDEO` → `RENDER` → `IMAGE` → `PUBLISH` (대문자). 폴링 파서(`MarketingJob.applyRemote`)는 맵 형태 `artifacts`를 그대로 JSON 컬럼에 저장한다.
+> **`event`** 필드는 콜백 및 폴링에서 공통으로 사용 — `progress`, `terminal_state_transition` 등.
 
 ---
 
@@ -235,9 +242,46 @@ Authorization: Bearer <asm-token>
 
 ---
 
+### 2.6 콜백 엔드포인트 (ASM → AS)
+
+ASM은 잡이 종료 상태(`READY`, `PUBLISHED`, `PARTIAL`, `FAILED`)로 전환될 때 AS의 콜백 엔드포인트를 호출합니다.
+
+```
+POST /api/internal/marketing/callback
+Authorization: Bearer {ASM_CALLBACK_TOKEN}
+```
+
+**Request Body**
+```json
+{
+  "job_id": "01HX...",
+  "status": "PUBLISHED",
+  "phase": "PUBLISH",
+  "progress": 1.0,
+  "artifacts": {
+    "x": { "card": "/api/v1/jobs/01HX.../artifacts/x/card.png" },
+    "naver_blog": { "blog_md": "/api/v1/jobs/01HX.../artifacts/naver_blog/post.md" }
+  },
+  "publications": [
+    { "platform": "x", "state": "published", "url": "https://x.com/..." }
+  ],
+  "event": "terminal_state_transition",
+  "error": null
+}
+```
+
+**Response 204 No Content** — 성공 시 본문 없음  
+**오류**: 
+- 401 — 잘못된 또는 누락된 `Authorization` 헤더
+- 400 — 필수 필드 누락
+
+**목적**: AS는 콜백 수신 후 원격 상태(`status`, `phase`, `progress`, `artifacts`, `publications`)를 DB에 반영하고 폴링 오류 카운트를 초기화합니다.
+
+---
+
 ## 3. 폴링 흐름 (AS 내부)
 
-`MarketingPollingScheduler`가 15초마다 비종료 잡 (`QUEUED`, `RUNNING`, `READY`, `PUBLISHING`) 을 폴링:
+`MarketingPollingScheduler`가 15초마다 비종료 잡 (`QUEUED`, `RUNNING`, `READY`, `PUBLISHING`, `STALE`) 을 폴링:
 
 ```
 AS polling → GET /api/v1/jobs/{remote_job_id} → ASM
@@ -248,4 +292,21 @@ AS polling → GET /api/v1/jobs/{remote_job_id} → ASM
                   ↓ (ASM 연결 실패 시)
            job.markPollFailure() → poll_fail_count++
            poll_fail_count >= 5 → status = STALE
+           
+           (STALE 상태 시)
+           → 지수 백오프 재시도 (exponential backoff)
+           → 24시간 초과 시 FAILED로 전환
 ```
+
+**상태 정의**
+| 상태 | 설명 | 종료 여부 |
+|---|---|---|
+| `REQUESTED` | AS가 생성 요청 완료 | X |
+| `QUEUED` | ASM이 수신, 큐 대기 중 | X |
+| `RUNNING` | 콘텐츠 생성 중 | X |
+| `READY` | 생성 완료, 게시 대기 | X |
+| `PUBLISHING` | 게시 중 | X |
+| `STALE` | 폴링 5회 연속 실패 (복구 가능, 24h 재시도 후 FAILED) | X |
+| `PUBLISHED` | 게시 성공 (모든 플랫폼) | O |
+| `PARTIAL` | 혼합 결과 (일부 플랫폼 성공, 일부 실패) | O |
+| `FAILED` | 최종 실패 또는 STALE 24h 초과 | O |

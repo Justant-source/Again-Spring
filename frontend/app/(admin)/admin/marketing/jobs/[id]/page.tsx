@@ -24,6 +24,7 @@ const STATUS_COLORS: Record<string, string> = {
   PUBLISHED: 'bg-green-600 text-white',
   FAILED: 'bg-red-200 text-red-800',
   STALE: 'bg-gray-400 text-white',
+  PARTIAL: 'bg-yellow-500 text-white',
 };
 
 export default function MarketingJobDetailPage() {

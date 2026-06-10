@@ -19,4 +19,6 @@ public class AsmProperties {
     private long pollIntervalMs;
     private int requestTimeoutMs;
     private boolean enabled;
+    private String callbackToken;
+    private String callbackBaseUrl;
 }

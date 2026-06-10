@@ -9,6 +9,7 @@ import com.againspring.marketing.dto.CreateJobRequest.EmpathyRatioDto;
 import com.againspring.marketing.dto.CreateJobRequest.OptionsDto;
 import com.againspring.marketing.dto.CreateJobRequest.PolicyDto;
 import com.againspring.marketing.dto.CreateJobResponse;
+import com.againspring.marketing.dto.JobCallbackPayload;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Service for managing marketing jobs
@@ -31,6 +33,7 @@ import java.util.List;
 public class MarketingJobService {
 
     private final AsmClient asmClient;
+    private final AsmProperties asmProperties;
     private final PostRepository postRepository;
     private final MarketingJobRepository marketingJobRepository;
     private final ObjectMapper objectMapper;
@@ -39,6 +42,16 @@ public class MarketingJobService {
      * Create a new marketing job for a post
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
+        // Idempotency check: reject if active marketing job already exists
+        List<String> terminalStatuses = Arrays.asList("PUBLISHED", "FAILED", "PARTIAL");
+        marketingJobRepository.findFirstByPostIdAndStatusNotIn(postId, terminalStatuses)
+            .ifPresent(existing -> {
+                throw new IllegalStateException(
+                    "Active marketing job already exists for post " + postId +
+                    " (id=" + existing.getId() + ", status=" + existing.getStatus() + ")"
+                );
+            });
+
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new IllegalArgumentException("Post not found: " + postId));
 
@@ -75,8 +88,15 @@ public class MarketingJobService {
             .options(options)
             .build();
 
+        // Generate idempotency key
+        String idempotencyKey = UUID.randomUUID().toString();
+
+        // Add callback URL to request
+        String callbackUrl = asmProperties.getCallbackBaseUrl() + "/api/internal/marketing/callback";
+        request.setCallbackUrl(callbackUrl);
+
         // Call ASM
-        CreateJobResponse response = asmClient.createJob(request);
+        CreateJobResponse response = asmClient.createJob(request, idempotencyKey);
 
         // Save marketing job
         MarketingJob job = MarketingJob.builder()
@@ -86,9 +106,28 @@ public class MarketingJobService {
             .autoPublish(autoPublish)
             .requestedBy(requestedBy)
             .targets(serializeJson(targets))
+            .idempotencyKey(idempotencyKey)
             .build();
 
         return marketingJobRepository.save(job);
+    }
+
+    /**
+     * Apply callback from ASM
+     */
+    @Transactional
+    public void applyCallback(JobCallbackPayload payload) {
+        marketingJobRepository.findByRemoteJobId(payload.getJobId()).ifPresent(job -> {
+            job.applyRemote(
+                payload.getStatus(),
+                payload.getPhase(),
+                payload.getProgress() != null ? payload.getProgress() : 0.0,
+                serializeJson(payload.getArtifacts()),
+                serializeJson(payload.getPublications())
+            );
+            marketingJobRepository.save(job);
+            log.info("Callback applied for remote job {}: status={}", payload.getJobId(), payload.getStatus());
+        });
     }
 
     /**

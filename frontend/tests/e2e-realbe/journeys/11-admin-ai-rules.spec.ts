@@ -397,4 +397,63 @@ test.describe('Journey 11-J: voice 가이드 품질 회귀 가드', () => {
     // 온점 금지 규칙 존재 확인
     expect(content).toMatch(/온점.*금지|금지.*온점/)
   })
+
+  test('voice/comment 가이드 — polite 섹션은 해요체 예시 포함', async ({ request }) => {
+    // polite 전용 섹션이 존재하고, 거기에는 해요체 예시가 있어야 한다
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    const headers = { Authorization: `Bearer ${accessToken}` }
+
+    const resp = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/comment`, { headers })
+    expect(resp.ok()).toBeTruthy()
+    const content: string = (await resp.json()).content ?? ''
+
+    // polite 섹션이 존재해야 함
+    expect(content).toMatch(/존댓말\s*모드|formality.*polite|polite.*페르소나/i)
+
+    // polite 섹션 내에 해요체 예시가 있어야 함
+    const politeSection = content.split(/존댓말\s*모드|polite\s*mode/i)[1] ?? ''
+    expect(politeSection).toMatch(/어요|더라고요|것 같아요/)
+  })
+
+  test('프롬프트 PUT → 재조회 일관성 (reload 체인 회귀 가드)', async ({ request }) => {
+    // PUT 후 GET 시 동일 내용이 반환되는지 확인 — PUT이 DB 저장 + llm reload까지 완료됨을 검증
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    const headers = { Authorization: `Bearer ${accessToken}` }
+
+    // 현재 내용 읽기
+    const getResp = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/reply`, { headers })
+    expect(getResp.ok()).toBeTruthy()
+    const original = await getResp.json()
+    expect(original.content?.length).toBeGreaterThan(100)
+
+    // 동일 내용으로 PUT (내용 변경 없음 — 저장 경로만 검증)
+    const putResp = await request.put(`${BASE}/api/admin/ai-rules/prompts/voice/reply`, {
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      data: { content: original.content },
+    })
+    expect(putResp.ok()).toBeTruthy()
+
+    // 재조회 — 동일 내용 반환 확인
+    const getResp2 = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/reply`, { headers })
+    expect(getResp2.ok()).toBeTruthy()
+    const updated = await getResp2.json()
+    expect(updated.content).toBe(original.content)
+  })
+
+  test('voice/reply 가이드 — 초단문 규칙 + 온점·쌍따옴표 금지 포함', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    const headers = { Authorization: `Bearer ${accessToken}` }
+
+    const resp = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/reply`, { headers })
+    expect(resp.ok()).toBeTruthy()
+    const content: string = (await resp.json()).content ?? ''
+
+    expect(content.length).toBeGreaterThan(100)
+    // 초단문 규칙
+    expect(content).toMatch(/초단|15.*40자|40자/)
+    // 온점 금지 확인
+    expect(content).toMatch(/온점.*금지|금지.*온점/)
+    // 쌍따옴표 금지 확인
+    expect(content).toMatch(/쌍따옴표.*금지|금지.*쌍따옴표/)
+  })
 })

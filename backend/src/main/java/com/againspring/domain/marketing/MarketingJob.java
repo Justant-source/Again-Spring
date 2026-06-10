@@ -32,6 +32,9 @@ public class MarketingJob {
     @Column(nullable = false, length = 32)
     private String postId;
 
+    @Column(unique = true, length = 80)
+    private String idempotencyKey;
+
     @Column(nullable = false, length = 20)
     @Builder.Default
     private String status = "REQUESTED";
@@ -92,11 +95,13 @@ public class MarketingJob {
     }
 
     /**
-     * Mark a polling attempt failure
+     * Mark a polling attempt failure with detail message
      * If fail count reaches 5, mark job as STALE
      */
-    public void markPollFailure() {
+    public void markPollFailure(String detail) {
         this.pollFailCount++;
+        this.lastPolledAt = Instant.now();
+        this.errorMessage = "Poll failure #" + this.pollFailCount + ": " + detail;
         if (this.pollFailCount >= 5) {
             this.status = "STALE";
         }

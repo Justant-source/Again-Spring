@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import java.util.Map;
  * Request to create a marketing job in ASM
  */
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -26,6 +28,9 @@ public class CreateJobRequest {
     private List<String> targets;
 
     private OptionsDto options;
+
+    @JsonProperty("callback_url")
+    private String callbackUrl;
 
     @Getter
     @Builder
