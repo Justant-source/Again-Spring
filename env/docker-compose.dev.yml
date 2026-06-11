@@ -42,8 +42,10 @@ services:
     environment:
       CLAUDE_BIN: ${CLAUDE_BIN:-claude}
       CLAUDE_MODEL: ${AI_USER_LLM_MODEL:-claude-haiku-4-5-20251001}
-      # 글(POST)만 Sonnet 승격 (문체 현실화 S5) — 빈 값으로 두면 CLAUDE_MODEL 사용
-      LLM_POST_MODEL: ${LLM_POST_MODEL:-claude-sonnet-4-6}
+      # 글(POST) 모델 오버라이드 (문체 현실화 S5). 빈 값=CLAUDE_MODEL(haiku) 사용.
+      # ⚠️ 2026-06-11: sonnet은 OutputSanitizer가 출력을 ~50% 문장중간 절단(prod 실측) → haiku로 환원.
+      #    sonnet 재승격은 OutputSanitizer의 sonnet 포맷 처리 + 최소길이 재생성 가드 선행 필요.
+      LLM_POST_MODEL: ${LLM_POST_MODEL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LLM_POOL_SIZE: ${AI_USER_LLM_POOL_SIZE:-20}
       LLM_QUEUE_CAPACITY: ${AI_USER_LLM_QUEUE_CAPACITY:-100}
