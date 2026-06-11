@@ -97,11 +97,12 @@ public class PromptAssembler {
 
     private String lengthInstruction(String tier) {
         if (tier == null) return "자연스러운 길이로.";
+        // ⚠️ backend 사연 본문 제한 1000자(PostCreateRequest @Size) — 모든 티어가 이 이하여야 게시됨
         return switch (tier) {
             case "SHORT"    -> "아주 짧게 — 50~120자. 핵심 상황 하나만 툭 던지는 초단 글.";
             case "MEDIUM"   -> "짧게 — 150~350자. 상황과 감정 간략히.";
-            case "LONG"     -> "보통 — 400~800자. 사건 흐름 상세히.";
-            case "VERYLONG" -> "길게 — 900~1800자. 길게 쏟아내는 글. 사족·반복·감정 흐름 자연스럽게 포함.";
+            case "LONG"     -> "보통 — 400~650자. 사건 흐름 상세히.";
+            case "VERYLONG" -> "길게 — 650~950자. 길게 쏟아내는 글. 사족·반복·감정 흐름 자연스럽게 포함 (절대 950자 넘기지 말 것).";
             default         -> "자연스러운 길이로.";
         };
     }

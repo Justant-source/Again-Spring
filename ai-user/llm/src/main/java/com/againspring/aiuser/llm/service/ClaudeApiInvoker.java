@@ -192,8 +192,9 @@ public class ClaudeApiInvoker implements Invoker {
                 int cacheWrite = usage.path("cache_creation_input_tokens").asInt(0);
                 long denom = (long) inTok + cacheRead + cacheWrite;
                 int hitPct = denom > 0 ? (int) Math.round(cacheRead * 100.0 / denom) : 0;
-                log.info("API usage: model={} input={} output={} cache_read={} cache_write={} cache_hit={}%",
-                    resp.path("model").asText(resolvedModel),
+                // stop= max_tokens면 길이 제한 절단, end_turn이면 모델 자연 종료 (글 짧음 원인 진단용)
+                log.info("API usage: model={} stop={} input={} output={} cache_read={} cache_write={} cache_hit={}%",
+                    resp.path("model").asText(resolvedModel), resp.path("stop_reason").asText("?"),
                     inTok, usage.path("output_tokens").asInt(), cacheRead, cacheWrite, hitPct);
             }
 

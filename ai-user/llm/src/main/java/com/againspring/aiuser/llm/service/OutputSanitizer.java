@@ -7,7 +7,8 @@ import java.util.regex.Pattern;
 
 @Service
 public class OutputSanitizer {
-    private static final int MAX_POST = 2000;
+    // backend 사연 본문 @Size(max=1000)와 일치 — 초과분은 문장 경계로 컷해 게시 거부(400) 방지
+    private static final int MAX_POST = 1000;
     private static final int MAX_COMMENT = 300;
 
     // LLM이 여러 옵션을 제시할 때 첫 번째 옵션만 추출
@@ -17,6 +18,8 @@ public class OutputSanitizer {
     );
     // 첫 코드블록(```) 안의 내용 추출
     private static final Pattern CODE_BLOCK = Pattern.compile("```[^\n]*\n?(.*?)```", Pattern.DOTALL);
+    // 수평 구분선 (--- 단독 줄) — Sonnet의 "제목\n---\n본문" 분리에 쓰임
+    private static final Pattern HR_LINE = Pattern.compile("\n[ \\t]*-{3,}[ \\t]*\n");
     // AI 메타 응답 패턴 (앞부분에서만 제거)
     private static final Pattern LEADING_META = Pattern.compile(
         "^(?:안녕하세요[,!. ]*|물론이죠[,. ]*|물론입니다[,. ]*|네,? 저는 [^\n]*\n?|제가 도와드릴게요[,. ]*" +
@@ -72,10 +75,20 @@ public class OutputSanitizer {
         // 단일 백틱 인라인 코드 제거
         s = s.replaceAll("`([^`]+)`", "$1");
 
-        // 3. 마크다운 제거 + 구분선 이후 AI 분석 제거
-        // "---" 구분선은 커뮤니티 댓글에 절대 없으므로 이후 전체 삭제
-        s = s.replaceAll("(?s)\\n---+\\n.*$", "")
-             .replaceAll("(?m)^#{1,6}\\s+", "")
+        // 3. "---" 구분선 처리 (2026-06-11 수정)
+        // Sonnet은 "제목\n\n---\n\n본문" 형태로 쓰는 습관 → 무조건 이후 삭제하면 본문 전체가 날아감.
+        // 첫 구분선 뒤가 충분히 길면(본문) 구분선만 제거하고 보존, 짧으면(AI가 덧붙인 메타) 뒤를 삭제.
+        Matcher hr = HR_LINE.matcher(s);
+        if (hr.find()) {
+            String before = s.substring(0, hr.start()).stripTrailing();
+            String after  = s.substring(hr.end()).stripLeading();
+            s = after.length() >= 40 ? (before + "\n\n" + after) : before;
+        }
+        // 본문 중간에 남은 구분선은 빈 줄로 정리
+        s = s.replaceAll("(?m)^[ \\t]*-{3,}[ \\t]*$", "").replaceAll("\n{3,}", "\n\n");
+
+        // 마크다운 제거 + 분석 줄 제거
+        s = s.replaceAll("(?m)^#{1,6}\\s+", "")
              .replaceAll("\\*\\*([^*]+)\\*\\*", "$1")
              .replaceAll("(?<![\\w가-힣])\\*([^*\\n]+)\\*(?![\\w가-힣])", "$1")
              .replaceAll("(?m)^>\\s*", "")
@@ -117,26 +130,34 @@ public class OutputSanitizer {
         return s;
     }
 
+    // 한국어 자연 종결어미 — 평서/의문/반말/존댓말 (단어 경계 (?![가-힣]) 로 "화요일"의 "요" 등 오매칭 방지).
+    // ㅆ음 계열(었음/왔음/이었음 등)·다고/라고·는데/은데·거야/건가 등을 포함해 정상 종결을 불완전으로 오판하지 않게 함.
+    private static final String ENDING_ALT =
+        "거든|거임|거야|건가|건지|더라|" +
+        "했음|있음|없음|겠음|었음|았음|였음|왔음|갔음|봤음|났음|졌음|줬음|썼음|" +
+        "했어|았어|었어|였어|왔어|갔어|봤어|났어|졌어|줬어|썼어|" +
+        "임|함|됨|맞음|좋음|나쁨|싶음|싶어|" +
+        "다고|라고|냐고|는데|은데|" +
+        "잖아|이야|아니야|는가|을까|ㄹ까|구나|" +
+        "해요|이에요|예요|아요|어요|네요|세요|데요|까요|거예요|죠|요";
+    /** 마침표·물음표·느낌표·ㅋ·ㅠ 또는 한국어 종결어미로 끝나는지 (단어 경계 적용). */
+    private static final Pattern COMPLETE_ENDING = Pattern.compile(
+        "(?s).*(?:[.?!]|ㅋ+|ㅠ+|(?:" + ENDING_ALT + ")(?![가-힣]))$");
+    /** 텍스트 중간/끝의 종결 위치 탐색용 (trim 시 마지막 완결점 찾기). */
+    private static final Pattern ENDING_FINDER = Pattern.compile(
+        "[.?!]|ㅋ+|ㅠ+|(?:" + ENDING_ALT + ")(?![가-힣])");
+
     /**
      * 텍스트가 불완전한 어미로 끝날 때 마지막 완결된 종결까지 잘라냄.
-     * 예: "이게 맞은" → "이게 맞은" 제거, 앞의 자연스러운 종결까지 유지
+     * 예: "이게 맞은" → 불완전 → 앞의 자연스러운 종결까지 유지.
+     * 정상 종결로 끝나면(COMPLETE_ENDING) 그대로 보존 — 긴 본문 오절단 방지(2026-06-11).
      */
     private String trimIncompleteEnding(String s) {
         if (s == null || s.isBlank()) return s;
-        // 완전한 종결로 끝나면 그대로 반환
         if (endsWithComplete(s)) return s;
         // 마지막 완전한 종결 위치 탐색 (뒤에서 최대 80자)
         int searchFrom = Math.max(0, s.length() - 80);
-        // 완결 종결 패턴: 문장 끝 or 자연스러운 한국어 종결어미
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
-            // 마침표/물음표/느낌표, ㅋ/ㅠ 종결, 한국어 종결어미 목록
-            "[.?!]|ㅋ+|ㅠ+|" +
-            "(?:거든|거임|더라|했음|있음|없음|겠음|모르겠음|ㄴ거임|건지|는지|하는건지|뭐하는건지|" +
-            "잖아|이잖아|아니잖아|이야|야(?![^\\n])|봐(?![\\w])|봐야지|해야지|싶음|싶어|" +
-            "했거든|갔거든|겠거든|없거든|있거든|했잖아|없잖아|있잖아|" +
-            "임(?![\\w])|함(?![\\w])|됨(?![\\w])|맞음(?![\\w])|좋음(?![\\w])|나쁨(?![\\w])|" +
-            "요(?![\\w])|해요|이에요|아요|어요|네요|세요|데요|거예요)"
-        ).matcher(s.substring(searchFrom));
+        Matcher m = ENDING_FINDER.matcher(s.substring(searchFrom));
         int lastComplete = -1;
         while (m.find()) {
             lastComplete = searchFrom + m.end();
@@ -144,7 +165,7 @@ public class OutputSanitizer {
         if (lastComplete > searchFrom) {
             return s.substring(0, lastComplete).stripTrailing();
         }
-        // 탐색 범위를 넓혀서 줄바꿈 기준으로 자름
+        // 탐색 범위 내 종결 없으면 줄바꿈 기준 (본문 절반 이상 보존될 때만)
         int lastNewline = s.lastIndexOf('\n', s.length() - 2);
         if (lastNewline > s.length() / 2) {
             return s.substring(0, lastNewline).stripTrailing();
@@ -155,12 +176,7 @@ public class OutputSanitizer {
     private boolean endsWithComplete(String s) {
         String trimmed = s.stripTrailing();
         if (trimmed.isEmpty()) return false;
-        char last = trimmed.charAt(trimmed.length() - 1);
-        // 명백한 완결 종결
-        if (".?!ㅋㅠ".indexOf(last) >= 0) return true;
-        // 한국어 종결어미로 끝나는지 (5자 범위)
-        String tail = trimmed.length() >= 5 ? trimmed.substring(trimmed.length() - 5) : trimmed;
-        return tail.matches(".*(?:거든|거임|더라|했음|있음|없음|겠음|잖아|이야|봐야지|해야지|싶음|싶어|임|함|됨|맞음|요|해요|이에요|아요|어요|네요|데요)$");
+        return COMPLETE_ENDING.matcher(trimmed).matches();
     }
 
     /** 멀티 옵션 텍스트에서 첫 번째 실제 내용만 추출 */

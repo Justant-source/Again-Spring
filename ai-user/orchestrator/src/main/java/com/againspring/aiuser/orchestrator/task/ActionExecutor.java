@@ -64,6 +64,10 @@ public class ActionExecutor {
     @Value("${ai-user.repetition-threshold:0.45}")
     private double repetitionThreshold;
 
+    /** 최소 글 길이 — 이보다 짧으면 1회 재생성 (제목만 남거나 불완결 절단 방어). */
+    @Value("${ai-user.min-post-chars:50}")
+    private int minPostChars;
+
     private final ConcurrentHashMap<String, String> emailCache = new ConcurrentHashMap<>();
     private static final Random RNG = new Random();
 
@@ -393,6 +397,17 @@ public class ActionExecutor {
             genReq.setRecentOutputs(repetitionRetryFeedback(genReq.getRecentOutputs(), rawBody, "글"));
             java.util.Optional<String> retryOpt = llmClient.generatePost(genReq);
             if (retryOpt.isPresent() && !retryOpt.get().isBlank()) {
+                rawBody = retryOpt.get();
+            }
+        }
+        // 최소길이 가드: 비정상적으로 짧은 글(제목만 남거나 불완결로 잘린 경우)은 1회 재생성.
+        // SHORT 티어 정상 글도 50자는 넘으므로 명백한 실패만 잡음. (Sonnet 짧은-글 방어, 모델 무관)
+        if (rawBody.strip().length() < minPostChars) {
+            log.info("Too-short post ({}c) for persona {} corr={} — regenerating once",
+                rawBody.strip().length(), persona.getId(), corrId);
+            genReq.setLengthTier("MEDIUM");  // 재시도는 중간 길이로 강제 (SHORT 재추첨 방지)
+            java.util.Optional<String> retryOpt = llmClient.generatePost(genReq);
+            if (retryOpt.isPresent() && retryOpt.get().strip().length() > rawBody.strip().length()) {
                 rawBody = retryOpt.get();
             }
         }

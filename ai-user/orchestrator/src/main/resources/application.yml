@@ -53,6 +53,8 @@ ai-user:
   personas-dir: ${AI_USER_PERSONAS_DIR:/app/personas}
   # 반복 가드: 생성문 vs 최근 출력 2-gram Jaccard 임계 (초과 시 1회 재생성)
   repetition-threshold: ${AI_USER_REPETITION_THRESHOLD:0.45}
+  # 최소 글 길이 — 이보다 짧으면 1회 재생성 (제목만 남거나 불완결 절단 방어)
+  min-post-chars: ${AI_USER_MIN_POST_CHARS:50}
   secondary-backend-base-url: ${AI_USER_SECONDARY_BACKEND_URL:}
   paired-post:
     enabled: ${PAIRED_POST_ENABLED:true}

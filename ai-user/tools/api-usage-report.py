@@ -20,7 +20,7 @@ from collections import defaultdict
 
 LINE = re.compile(
     r"^(?P<date>\d{4}-\d{2}-\d{2})T.*API usage: "
-    r"model=(?P<model>\S+) input=(?P<input>\d+) output=(?P<output>\d+) "
+    r"model=(?P<model>\S+) (?:stop=\S+ )?input=(?P<input>\d+) output=(?P<output>\d+) "
     r"cache_read=(?P<read>\d+) cache_write=(?P<write>\d+)")
 # model= 필드 도입(2026-06-11) 이전 구형 라인도 집계
 LINE_OLD = re.compile(
