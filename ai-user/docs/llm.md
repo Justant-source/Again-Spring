@@ -1006,6 +1006,28 @@ AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 
 - post: AI 티 패턴 섹션 추가 (진짜/정말 2회 초과 금지, 시작 다양화, 문장 길이 변주).
 - ⚠️ 반영 절차: DB `ai_prompt_template`이 우선이므로 가이드 수정 시 **DB 갱신 + `POST /internal/prompts/reload` 필수** (배포 전 DB 내용과 diff — admin 수동 편집 보존).
 
+
+## 16. 프롬프트 캐싱 복원 — 프록시 안전형 (2026-06-11, 캐싱 P1)
+
+**경위**: 06-07 system 2블록 캐싱(85~87% 히트) → 06-10 clcocloud가 system 필드 요청을 Kiro로 오라우팅하는
+버그 우회(5fba9ae4) 때 캐싱까지 제거됨(0%) → 06-11 user-block 방식으로 복원.
+
+**구조 (`ClaudeApiInvoker.buildRequestBody`)**: system 필드는 계속 미사용. user content를 2블록으로 분리 —
+- block1 = `<instructions>\n` + PERSONA_SECTION 앞 정적 prefix + **cache_control(ephemeral)** ← 타입별 공통, 4.3~5.5k tok
+- block2 = 페르소나 섹션 + `</instructions>` + 유저 요청 ← 가변
+- 두 블록을 이으면 기존 단일 블록과 의미 동일 → 모델 동작 불변 (`ClaudeApiInvokerCacheTest`)
+
+**TTL 정책 (프로브 실측 2026-06-11, `ai-user/tools/cache-probe.py`)**:
+- 기본 **5m (GA)** — beta 헤더 불필요, clcocloud 패스스루 확인 (write 8063 → read 8100)
+- ⚠️ **1h TTL의 anthropic-beta 헤더는 clcocloud에서 Kiro 오라우팅을 유발** ("저는 Kiro" 응답 + model 필드 위조 실측)
+  → `LLM_API_CACHE_TTL=1h`는 직접 api.anthropic.com 전환 시에만 사용
+- Haiku 최소 캐시 prefix 4096토큰 — 미달 시 조용히 스킵 (실측: 3.9k input 프롬프트에서 write=0).
+  인보커가 정적부 4,800자 미만이면 WARN. **voice 가이드 축소 시 주의.**
+
+**설정**: `llm.api.prompt-caching`(기본 true) · `llm.api.cache-ttl`(기본 5m)
+**측정**: `python3 ai-user/tools/api-usage-report.py [--container ... --since 24h]` — 일별·모델별 히트율·과금등가·절감률
+**주의**: clcocloud의 usage 수치는 일부 가공 정황(input=0 등) — 청구 절감의 최종 증빙은 크레딧 소모 속도 비교.
+
 ---
 
 **마지막 업데이트**: 2026-06-11 | **버전**: Invoker 인터페이스 계층 v1.0

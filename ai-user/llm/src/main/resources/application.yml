@@ -37,6 +37,8 @@ llm:
   post-model: ${LLM_POST_MODEL:}
   api:
     prompt-caching: ${LLM_API_PROMPT_CACHING:true}
+    # 캐시 TTL: "5m"(기본, GA — beta 헤더 없음) | "1h"(beta 헤더 — ⚠️ clcocloud에서 Kiro 오라우팅 유발, 직접 API 전용)
+    cache-ttl: ${LLM_API_CACHE_TTL:5m}
 
 logging:
   level:
