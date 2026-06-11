@@ -32,6 +32,11 @@ public class SelfCritiqueService {
     @Value("${self-critique.pass-threshold:5}")
     private int passThreshold;   // 7점 만점에서 이 점수 이상이면 PASS
 
+    /** 추가 상투구 (쉼표 구분, 리터럴 매칭) — 운영 중 발견한 AI투를 재배포 없이 등록. */
+    @Value("${self-critique.extra-cliches:}")
+    private String extraCliches;
+    private volatile Pattern extraClichePattern;
+
     public record CritiqueResult(boolean passed, int score, List<String> issues) {}
 
     // ── 빠른 결정론적 체크 (LLM 호출 전 0비용) ─────────────────────
@@ -41,6 +46,16 @@ public class SelfCritiqueService {
     private static final Pattern REPEATED_ENDING  = Pattern.compile("(다들 어떻게|어떻게 해야 함\\?|어떻게 해야 할까)");
     private static final Pattern PERFECT_STRUCTURE = Pattern.compile("(?s)(배경|상황).*갈등.*질문|도입.*사건.*갈등.*질문");
     private static final Pattern EMOTION_TELL     = Pattern.compile("(?:서운함|답답함|배신감|억울함|분노|불안감|자존감 하락|허탈함)[이가이을를]?");
+
+    // ── AI투 상투구 체크 (문체 현실화 S4) ────────────────────────────────
+    /** 상담원·응원 멘트 — 실제 커뮤니티에선 거의 안 쓰는 강한 AI 시그널. */
+    private static final Pattern AI_CLICHE = Pattern.compile(
+        "정말 공감|공감되네요|공감됩니다|힘내세요|응원합니다|응원할게요|응원해요|" +
+        "마음이 느껴|충분히 .{0,6}(?:할 수|이해)|그렇군요|좋은 결과 있|기원합니다|화이팅!");
+    /** 강조어 남발 감지 — "진짜"·"정말" 합산. */
+    private static final Pattern EMPHASIS_WORD = Pattern.compile("진짜|정말");
+    /** ㅠ/ㅜ 묶음 — 3회 이상이면 남발. */
+    private static final Pattern SOB_RUN = Pattern.compile("[ㅠㅜ]+");
 
     // formality 체크용 패턴
     private static final Pattern POLITE_ENDING = Pattern.compile(
@@ -92,6 +107,26 @@ public class SelfCritiqueService {
         if (EMOTION_TELL.matcher(text).find()) {
             score -= 1;
             issues.add("감정 추상명사 직접 서술");
+        }
+
+        // 8. AI 상투구 — 상담원·응원 멘트 (문체 현실화 S4)
+        if (AI_CLICHE.matcher(text).find() || matchesExtraCliche(text)) {
+            score -= 2;
+            issues.add("AI 상투구(공감되네요/힘내세요/응원합니다 류) — 구체적인 자기 말로 교체");
+        }
+
+        // 9. 강조어 남발 — 진짜/정말 합산 3회 이상
+        int emphasis = countMatches(EMPHASIS_WORD, text);
+        if (emphasis >= 3) {
+            score -= 1;
+            issues.add("강조어 남발(진짜/정말 " + emphasis + "회) — 아예/완전/걍 등으로 변주");
+        }
+
+        // 10. ㅠ 남발 — ㅠ/ㅜ 묶음 3회 이상
+        int sobRuns = countMatches(SOB_RUN, text);
+        if (sobRuns >= 3) {
+            score -= 1;
+            issues.add("ㅠ 남발(" + sobRuns + "회) — 일부 제거하거나 다른 종결로");
         }
 
         // 5. 종결어미 단조로움: casual 모드에서만 ~임/~함 단조 체크
@@ -175,6 +210,14 @@ public class SelfCritiqueService {
      * 자기비평 + 재생성 (formality 고려).
      */
     public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId, String backend, String formality) {
+        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, backend, formality, null);
+    }
+
+    /**
+     * 자기비평 + 재생성 (formality·model 고려). model=null이면 풀 기본 모델.
+     */
+    public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId,
+                                    String backend, String formality, String model) {
         if (!enabled || draft == null || draft.isBlank()) return draft;
 
         CritiqueResult result = quickCheck(draft, contentType, formality);
@@ -189,7 +232,7 @@ public class SelfCritiqueService {
         String retryPrompt = buildRetryPrompt(originalPrompt, draft, result.issues());
 
         try {
-            String raw = pool.executeSyncTask(retryPrompt, null, 90000L, corrId + "-retry", backend);
+            String raw = pool.executeSyncTask(retryPrompt, model, 90000L, corrId + "-retry", backend);
             String refined = "post".equalsIgnoreCase(contentType)
                 ? outputSanitizer.sanitizePost(raw)
                 : outputSanitizer.sanitizeComment(raw);
@@ -204,6 +247,29 @@ public class SelfCritiqueService {
 
         // fallback: 원본 반환
         return draft;
+    }
+
+    private int countMatches(Pattern p, String text) {
+        java.util.regex.Matcher m = p.matcher(text);
+        int n = 0;
+        while (m.find()) n++;
+        return n;
+    }
+
+    /** extra-cliches 프로퍼티(쉼표 구분 리터럴) 매칭 — 최초 사용 시 컴파일 후 캐시. */
+    private boolean matchesExtraCliche(String text) {
+        if (extraCliches == null || extraCliches.isBlank()) return false;
+        Pattern p = extraClichePattern;
+        if (p == null) {
+            String joined = java.util.Arrays.stream(extraCliches.split(","))
+                .map(String::trim).filter(s -> !s.isEmpty())
+                .map(Pattern::quote)
+                .collect(java.util.stream.Collectors.joining("|"));
+            if (joined.isEmpty()) return false;
+            p = Pattern.compile(joined);
+            extraClichePattern = p;
+        }
+        return p.matcher(text).find();
     }
 
     private String buildRetryPrompt(String originalPrompt, String draft, List<String> issues) {

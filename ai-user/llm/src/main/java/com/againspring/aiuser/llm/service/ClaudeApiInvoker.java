@@ -125,7 +125,7 @@ public class ClaudeApiInvoker implements Invoker {
 
             JsonNode resp = MAPPER.readTree(res.body());
 
-            // 토큰 사용량 로깅
+            // 토큰 사용량 로깅 (model=응답이 실제 처리된 모델 — POST 전용 Sonnet 승격 검증용)
             JsonNode usage = resp.get("usage");
             if (usage != null) {
                 int inTok    = usage.path("input_tokens").asInt();
@@ -133,7 +133,8 @@ public class ClaudeApiInvoker implements Invoker {
                 int cacheWrite = usage.path("cache_creation_input_tokens").asInt(0);
                 long denom = (long) inTok + cacheRead + cacheWrite;
                 int hitPct = denom > 0 ? (int) Math.round(cacheRead * 100.0 / denom) : 0;
-                log.info("API usage: input={} output={} cache_read={} cache_write={} cache_hit={}%",
+                log.info("API usage: model={} input={} output={} cache_read={} cache_write={} cache_hit={}%",
+                    resp.path("model").asText(resolvedModel),
                     inTok, usage.path("output_tokens").asInt(), cacheRead, cacheWrite, hitPct);
             }
 

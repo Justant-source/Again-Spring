@@ -1,7 +1,8 @@
 import logging
 import os
 from fastapi import APIRouter, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 from typing import Optional, List
 from app.db.session import get_db
 from app.services.embedding import EmbeddingService
@@ -15,7 +16,16 @@ embedding_service = EmbeddingService()
 MIN_QUALITY_SCORE = float(os.getenv("RAG_MIN_QUALITY", "0.5"))
 
 
-class SaveRequest(BaseModel):
+class CamelCompatModel(BaseModel):
+    """orchestrator(Java) 클라이언트는 camelCase(JSON)로 직렬화 — snake/camel 모두 수용.
+
+    주의: 기존엔 alias가 없어 contentType/topK 등이 조용히 무시되고
+    save는 content_type 필수 누락으로 422가 났음 (2026-06-11 수정).
+    """
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
+
+
+class SaveRequest(CamelCompatModel):
     content: str
     content_type: str
     category: Optional[str] = None
@@ -23,13 +33,22 @@ class SaveRequest(BaseModel):
     quality_score: Optional[float] = None
 
 
-class SearchRequest(BaseModel):
+class SearchRequest(CamelCompatModel):
     query: str
     content_type: Optional[str] = None
     category: Optional[str] = None
     register: Optional[str] = None  # 'casual' | 'polite' | 'mixed' | None
     exclude_self_generated: bool = True  # SELF_GENERATED 제외 여부
     top_k: int = 3
+
+
+class StyleSampleRequest(CamelCompatModel):
+    """문체 앵커용 랜덤 샘플 요청 — 주제 무관, 말투(소스·레지스터)만 일치."""
+    content_type: str = "COMMENT"
+    source: Optional[str] = None     # 크롤 소스 (natepan 등). None=전체 크롤 소스
+    register: Optional[str] = None   # 'casual' | 'polite' (mixed 포함 매칭)
+    top_k: int = 3
+    max_len: int = 300               # 본문 최대 길이 (자)
 
 
 class ExampleItem(BaseModel):
@@ -160,6 +179,74 @@ def search_examples(req: SearchRequest, request: Request) -> List[ExampleItem]:
         ]
     except Exception as e:
         logger.error(f"search_examples error: {e}")
+        return []
+
+
+@router.post("/style-sample", response_model=List[ExampleItem])
+def style_sample(req: StyleSampleRequest) -> List[ExampleItem]:
+    """문체 앵커용 랜덤 샘플 — 주제 무관, 소스·레지스터·타입만 일치 (문체 현실화 S2).
+
+    임베딩 불사용(ORDER BY RAND()) — 가볍고 호출마다 다른 예시 반환.
+    SELF_GENERATED 제외 필수: 자기 출력 재학습 → AI투 증폭 루프 방지.
+
+    폴백 순서:
+      Stage1: source + content_type + register + quality
+      Stage2: source 완화 (전체 크롤 소스, 타입·레지스터 유지)
+      Stage3: COMMENT 요청인데 코퍼스 부족 시 → 같은 소스의 짧은 POST (캐던스 앵커 대용)
+    """
+    def run(conditions: list, params: list) -> list:
+        where = "WHERE " + " AND ".join(conditions)
+        sql = f"""SELECT id, content, source, quality_score AS score
+                  FROM example_bank {where}
+                  ORDER BY RAND() LIMIT %s"""
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params + [req.top_k])
+                return cur.fetchall()
+
+    try:
+        base_conds = ["source != %s", "CHAR_LENGTH(content) BETWEEN 15 AND %s"]
+        base_params: list = ["SELF_GENERATED", req.max_len]
+        if req.register:
+            base_conds.append("(register = %s OR register = %s)")
+            base_params.extend([req.register, "mixed"])
+
+        # Stage 1: 소스 일치 + 타입 일치 + 품질 (문체 앵커는 검색 RAG보다 높은 0.6 하한)
+        style_min_quality = max(0.6, MIN_QUALITY_SCORE)
+        conds1 = list(base_conds) + ["content_type = %s", f"quality_score >= {style_min_quality}"]
+        params1 = list(base_params) + [req.content_type]
+        if req.source:
+            conds1.append("source = %s")
+            params1.append(req.source)
+        rows = run(conds1, params1)
+
+        # Stage 2: 소스 완화 (전체 크롤 소스)
+        if not rows and req.source:
+            rows = run(list(base_conds) + ["content_type = %s"],
+                       list(base_params) + [req.content_type])
+
+        # Stage 3: COMMENT 코퍼스 부족 → 같은 소스의 짧은 POST를 캐던스 앵커로
+        if not rows and req.content_type == "COMMENT":
+            short_cap = min(200, req.max_len)
+            conds3 = ["source != %s", "CHAR_LENGTH(content) BETWEEN 15 AND %s", "content_type = %s"]
+            params3: list = ["SELF_GENERATED", short_cap, "POST"]
+            if req.register:
+                conds3.append("(register = %s OR register = %s)")
+                params3.extend([req.register, "mixed"])
+            if req.source:
+                conds3.append("source = %s")
+                params3.append(req.source)
+            rows = run(conds3, params3)
+            if not rows and req.source:  # 소스도 완화
+                rows = run(conds3[:-1], params3[:-1])
+
+        return [
+            ExampleItem(id=r["id"], content=r["content"], source=r["source"],
+                        score=float(r["score"]) if r.get("score") is not None else None)
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error(f"style_sample error: {e}")
         return []
 
 

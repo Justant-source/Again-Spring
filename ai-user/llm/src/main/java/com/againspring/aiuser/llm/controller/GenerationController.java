@@ -25,16 +25,21 @@ public class GenerationController {
     private final OutputSanitizer outputSanitizer;
     private final SelfCritiqueService selfCritique;
 
+    /** 글(POST) 전용 모델 오버라이드 — 빈 값이면 풀 기본 모델 (문체 현실화 S5: 글만 Sonnet 승격). */
+    @org.springframework.beans.factory.annotation.Value("${llm.post-model:}")
+    private String postModel;
+
     @PostMapping("/post")
     public ResponseEntity<GenResponse> generatePost(@RequestBody PostGenRequest req) {
         String corrId = corrId(req.getCorrelationId());
         long start = System.currentTimeMillis();
         try {
+            String model = (postModel != null && !postModel.isBlank()) ? postModel.trim() : null;
             String prompt = promptAssembler.assemblePostPrompt(req);
-            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
+            String raw = pool.executeSyncTask(prompt, model, req.getTimeoutMs(), corrId, req.getBackend());
             String text = outputSanitizer.sanitizePost(raw);
-            // 자기비평 루프 (enabled 시) — 동일 backend 승계, formality 전달
-            text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId, req.getBackend(), req.getFormality());
+            // 자기비평 루프 (enabled 시) — 동일 backend·model 승계, formality 전달
+            text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId, req.getBackend(), req.getFormality(), model);
             return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));

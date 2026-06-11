@@ -60,6 +60,10 @@ public class ActionExecutor {
     @Value("${ai-user.history-dir:/app/persona-history}")
     private String historyDir;
 
+    /** 반복 가드 임계 — 생성문 vs 최근 출력의 문자 2-gram Jaccard 최대값이 이 값을 넘으면 1회 재생성. */
+    @Value("${ai-user.repetition-threshold:0.45}")
+    private double repetitionThreshold;
+
     private final ConcurrentHashMap<String, String> emailCache = new ConcurrentHashMap<>();
     private static final Random RNG = new Random();
 
@@ -182,19 +186,14 @@ public class ActionExecutor {
         // Phase 3: demographic
         String demographic = demographicStr(persona);
 
-        // RAG: AiLearningClient 동적 예시 검색 (register 파라미터 전달)
-        String dynamicExamples = "";
-        String register = resolveRegister(persona);
-        java.util.List<AiLearningClient.ExampleItem> examples = aiLearningClient.findSimilar(
-            postExcerpt, "COMMENT", action.targetPost().getCategory(), 3, register);
-        if (!examples.isEmpty()) {
-            dynamicExamples = examples.stream()
-                .map(AiLearningClient.ExampleItem::getContent)
-                .collect(java.util.stream.Collectors.joining("\n---\n"));
-            log.debug("RAG: {} comments found corr={}", examples.size(), corrId);
-        }
+        // 문체 앵커: voice 소스 크롤 코퍼스 랜덤 샘플 (문체 현실화 S2)
+        // 주제-RAG(findSimilar) 대체 — 댓글은 주제 유사성보다 실제 댓글의 캐던스가 중요
+        String styleExamples = styleExamplesFor(persona, "COMMENT", 3, 300);
 
-        java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateCommentR(GenDto.CommentRequest.builder()
+        // 반복 방지: 최근 댓글 히스토리 주입 (문체 현실화 S1)
+        java.util.List<String> recentBodies = loadRecentBodies(persona, "comments", 5);
+
+        GenDto.CommentRequest genReq = GenDto.CommentRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForComment(persona, stance))
             .slangLevel(persona.getSlangLevel().doubleValue())
@@ -208,12 +207,15 @@ public class ActionExecutor {
             .existingComments(null)  // reactableComments가 대체 (번호 형식으로 겸용)
             .reactableComments(ctx.promptList())
             .dispositionNote(dispositionNote(persona))
-            .dynamicExamples(dynamicExamples)
+            .styleExamples(styleExamples)
             .correctionCautions(cautionsBlock(persona))
             .globalForbidRules(globalRulesBlock("COMMENT"))
             .correlationId(corrId)
             .backend(backendFor("COMMENT"))
-            .build());
+            .recentOutputs(formatRecentOutputs(recentBodies, 150))
+            .modeHint(commentModeHint(pickCommentMode(persona, stance)))
+            .build();
+        java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateCommentR(genReq);
 
         if (resultOpt.isEmpty()) {
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
@@ -221,6 +223,19 @@ public class ActionExecutor {
         }
         LlmAiUserClient.GenResult res = resultOpt.get();
         String text = res.text();
+
+        // 반복 가드: 최근 출력과 거의 같으면 1회만 재생성, 그래도 같으면 그대로 게시 (활동 누락 방지)
+        boolean repetitive = maxBigramJaccard(text, recentBodies) > repetitionThreshold;
+        if (repetitive) {
+            log.info("Repetitive comment for persona {} corr={} — regenerating once", persona.getId(), corrId);
+            genReq.setRecentOutputs(repetitionRetryFeedback(genReq.getRecentOutputs(), text, "댓글"));
+            java.util.Optional<LlmAiUserClient.GenResult> retryOpt = llmClient.generateCommentR(genReq);
+            if (retryOpt.isPresent() && retryOpt.get().text() != null && !retryOpt.get().text().isBlank()) {
+                res = retryOpt.get();
+                text = res.text();
+                repetitive = maxBigramJaccard(text, recentBodies) > repetitionThreshold;
+            }
+        }
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(text, ContentSafetyGuard.ContentType.COMMENT);
         if (!guard.passed()) {
             log.warn("Comment blocked for persona {} post {}: {}", persona.getId(), postId, guard.reason());
@@ -238,7 +253,7 @@ public class ActionExecutor {
             dispatchReactions(persona, jwt, action.targetPost(), res.reactionsJson(), ctx.items(), corrId);
         }
         logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
-            java.util.Map.of("postId", postId, "len", text.length(), "usedLlm", true));
+            java.util.Map.of("postId", postId, "len", text.length(), "usedLlm", true, "repetitive", repetitive));
     }
 
     private void executeReply(Persona persona, PlannedAction action, String jwt, String corrId) {
@@ -252,7 +267,10 @@ public class ActionExecutor {
         String postBodyExcerpt = action.targetPost().getBodyPublished();
         String siblingComments = action.siblingComments();
 
-        java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateReplyR(GenDto.ReplyRequest.builder()
+        // 반복 방지: 최근 댓글(대댓글 포함) 히스토리 주입 (문체 현실화 S1)
+        java.util.List<String> recentBodies = loadRecentBodies(persona, "comments", 5);
+
+        GenDto.ReplyRequest genReq = GenDto.ReplyRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForReply(persona))
             .slangLevel(persona.getSlangLevel().doubleValue())
@@ -268,7 +286,11 @@ public class ActionExecutor {
             .correlationId(corrId)
             .backend(backendFor("REPLY"))
             .dispositionNote(dispositionNote(persona))
-            .build());
+            .styleExamples(styleExamplesFor(persona, "COMMENT", 2, 80))
+            .recentOutputs(formatRecentOutputs(recentBodies, 150))
+            .modeHint(replyLengthHint())
+            .build();
+        java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateReplyR(genReq);
 
         if (resultOpt.isEmpty()) {
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
@@ -276,6 +298,17 @@ public class ActionExecutor {
         }
         LlmAiUserClient.GenResult res = resultOpt.get();
         String text = res.text();
+
+        // 반복 가드 (초단문은 charBigrams가 빈 셋을 반환해 자동 제외)
+        if (maxBigramJaccard(text, recentBodies) > repetitionThreshold) {
+            log.info("Repetitive reply for persona {} corr={} — regenerating once", persona.getId(), corrId);
+            genReq.setRecentOutputs(repetitionRetryFeedback(genReq.getRecentOutputs(), text, "대댓글"));
+            java.util.Optional<LlmAiUserClient.GenResult> retryOpt = llmClient.generateReplyR(genReq);
+            if (retryOpt.isPresent() && retryOpt.get().text() != null && !retryOpt.get().text().isBlank()) {
+                res = retryOpt.get();
+                text = res.text();
+            }
+        }
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(text, ContentSafetyGuard.ContentType.COMMENT);
         if (!guard.passed()) {
             logAction(persona, action, "BLOCKED", corrId, java.util.Map.of("reason", guard.reason(), "usedLlm", true));
@@ -319,8 +352,16 @@ public class ActionExecutor {
                 .collect(java.util.stream.Collectors.joining("\n---\n"));
             log.debug("RAG: {} posts found for {}", examples.size(), corrId);
         }
+        if (dynamicExamples.isBlank()) {
+            // 주제-RAG 미스 시 voice 소스 문체 샘플로 보충 (문체 현실화 S2)
+            String styleFallback = styleExamplesFor(persona, "POST", 2, 600);
+            if (styleFallback != null) dynamicExamples = styleFallback;
+        }
 
-        java.util.Optional<String> bodyOpt = llmClient.generatePost(GenDto.PostRequest.builder()
+        // 반복 방지: 최근 글 히스토리 주입 — 같은 소재·표현 재탕 차단 (문체 현실화 S1)
+        java.util.List<String> recentBodies = loadRecentBodies(persona, "posts", 3);
+
+        GenDto.PostRequest genReq = GenDto.PostRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForPost(persona))
             .slangLevel(persona.getSlangLevel().doubleValue())
@@ -336,13 +377,25 @@ public class ActionExecutor {
             .globalForbidRules(globalRulesBlock("POST"))
             .correlationId(corrId)
             .backend(backendFor("POST"))
-            .build());
+            .recentOutputs(formatRecentOutputs(recentBodies, 200))
+            .build();
+        java.util.Optional<String> bodyOpt = llmClient.generatePost(genReq);
 
         if (bodyOpt.isEmpty()) {
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
             return;
         }
         String rawBody = bodyOpt.get();
+
+        // 반복 가드: 최근 글과 거의 같으면 1회만 재생성
+        if (maxBigramJaccard(rawBody, recentBodies) > repetitionThreshold) {
+            log.info("Repetitive post for persona {} corr={} — regenerating once", persona.getId(), corrId);
+            genReq.setRecentOutputs(repetitionRetryFeedback(genReq.getRecentOutputs(), rawBody, "글"));
+            java.util.Optional<String> retryOpt = llmClient.generatePost(genReq);
+            if (retryOpt.isPresent() && !retryOpt.get().isBlank()) {
+                rawBody = retryOpt.get();
+            }
+        }
         // 부수버그: LLM 메타텍스트 제거 (예: "[원문 수정본]", "[수정본]" 등)
         final String body = cleanLlmMetaText(rawBody);
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(body, ContentSafetyGuard.ContentType.POST);
@@ -993,6 +1046,184 @@ public class ActionExecutor {
         } catch (Exception e) {
             log.debug("History write failed for persona {} type {}: {}", persona.getId(), type, e.getMessage());
         }
+    }
+
+    // ── 댓글 모드·길이 샘플링 (문체 현실화 S3) ───────────────────────────────
+    // "공감→경험담→조언" 획일 구조 해체 — 매 댓글마다 반응 모드를 확률 선택.
+
+    enum CommentMode { REACTION_ONLY, SHORT_AGREE, QUESTION, DISAGREE, EXPERIENCE, ADVICE, TANGENT }
+
+    /** 페르소나 성향(slang·formality)·stance 반영 가중 랜덤. 테스트를 위해 package-private. */
+    CommentMode pickCommentMode(Persona persona, String stance) {
+        double slang = persona.getSlangLevel() != null ? persona.getSlangLevel().doubleValue() : 0.3;
+        boolean polite = "polite".equalsIgnoreCase(voiceFormality(persona));
+
+        // 기본 가중치 — 초단문 모드(반응만+동조+사족) 합산 ~37%
+        java.util.EnumMap<CommentMode, Double> w = new java.util.EnumMap<>(CommentMode.class);
+        w.put(CommentMode.REACTION_ONLY, 0.22);
+        w.put(CommentMode.SHORT_AGREE,   0.12);
+        w.put(CommentMode.QUESTION,      0.15);
+        w.put(CommentMode.DISAGREE,      0.12);
+        w.put(CommentMode.EXPERIENCE,    0.18);
+        w.put(CommentMode.ADVICE,        0.15);
+        w.put(CommentMode.TANGENT,       0.06);
+
+        if (slang >= 0.6) {            // 거친 커뮤 보이스 — 딴지·드립 비중↑
+            w.merge(CommentMode.DISAGREE, 0.05, Double::sum);
+            w.merge(CommentMode.TANGENT, 0.03, Double::sum);
+            w.merge(CommentMode.EXPERIENCE, -0.06, Double::sum);
+        }
+        if (polite) {                  // 존댓말 페르소나 — 경험담·조언형 비중↑, 드립↓
+            w.merge(CommentMode.EXPERIENCE, 0.06, Double::sum);
+            w.merge(CommentMode.ADVICE, 0.04, Double::sum);
+            w.put(CommentMode.TANGENT, 0.01);
+            w.merge(CommentMode.REACTION_ONLY, -0.05, Double::sum);
+        }
+        if ("PARTNER".equalsIgnoreCase(stance)) {  // 상대방 편 — 반박 결이 자연스러움
+            w.merge(CommentMode.DISAGREE, 0.10, Double::sum);
+            w.merge(CommentMode.REACTION_ONLY, -0.05, Double::sum);
+        }
+
+        double total = w.values().stream().mapToDouble(v -> Math.max(0, v)).sum();
+        double r = RNG.nextDouble() * total;
+        for (java.util.Map.Entry<CommentMode, Double> e : w.entrySet()) {
+            r -= Math.max(0, e.getValue());
+            if (r <= 0) return e.getKey();
+        }
+        return CommentMode.EXPERIENCE;
+    }
+
+    /** 모드 → 프롬프트 지시문 (PromptAssembler가 고정 "50~150자" 대신 그대로 렌더). */
+    String commentModeHint(CommentMode mode) {
+        return switch (mode) {
+            case REACTION_ONLY -> "반응만: 감정 한 줄만 툭 던지기 — 조언·경험담·질문 금지, 10~30자";
+            case SHORT_AGREE   -> "짧은 동조: 한마디로 맞장구만 — 10~25자";
+            case QUESTION      -> "되묻기: 궁금한 점 딱 하나만 물어보기 — 조언 금지, 15~40자";
+            case DISAGREE      -> "딴지: 글쓴이와 살짝 다른 시각이나 반박 한 줄 — 사과·완곡어 없이, 20~60자";
+            case EXPERIENCE    -> "경험담: 내 비슷한 경험만 풀기 — 조언으로 마무리하지 말 것, 40~120자";
+            case ADVICE        -> "훈수: 결론부터 단호하게 한마디 — 공감 인사 생략, 20~60자";
+            case TANGENT       -> "사족: 본문에서 살짝 어긋난 혼잣말·드립 한 줄 — 10~30자";
+        };
+    }
+
+    /** 대댓글 길이 2단 샘플링 — 획일한 15~40자 대신 초단문 위주로 분산. */
+    String replyLengthHint() {
+        return RNG.nextDouble() < 0.6
+            ? "초단문: 8~25자 한마디만 (한 문장도 안 됨)"
+            : "짧게: 25~60자 (최대 두 마디)";
+    }
+
+    // ── 문체 앵커 샘플링 (문체 현실화 S2) ────────────────────────────────────
+
+    /** voice_type(NATEPAN 등) → example_bank 크롤 source 매핑. 매핑 없으면 null=전체 크롤 소스. */
+    private static final java.util.Map<String, String> VOICE_SOURCE = java.util.Map.of(
+        "NATEPAN", "natepan", "DCINSIDE", "dcinside", "BLIND", "blind",
+        "FMKOREA", "fmkorea", "THEQOO", "theqoo", "CLIEN", "clien",
+        "PPOMPPU", "ppomppu", "RULIWEB", "ruliweb", "MLBPARK", "mlbpark");
+
+    /** 페르소나 voice 소스·레지스터 기반 문체 few-shot ("---" 구분). 없으면 null. */
+    private String styleExamplesFor(Persona persona, String contentType, int topK, int maxLen) {
+        try {
+            String voiceType = voiceProfileField(persona, "voice_type");
+            String source = voiceType != null ? VOICE_SOURCE.get(voiceType.trim().toUpperCase()) : null;
+            java.util.List<AiLearningClient.ExampleItem> items =
+                aiLearningClient.styleSample(source, contentType, resolveRegister(persona), topK, maxLen);
+            if (items.isEmpty()) return null;
+            return items.stream()
+                .map(AiLearningClient.ExampleItem::getContent)
+                .collect(java.util.stream.Collectors.joining("\n---\n"));
+        } catch (Exception e) {
+            log.debug("styleExamplesFor failed for persona {}: {}", persona.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    // ── 최근 출력 히스토리 — 반복 방지 (문체 현실화 S1) ──────────────────────
+
+    /**
+     * 히스토리 파일에서 이 페르소나의 최근 본문 n개 추출 (오래된 → 최신 순).
+     * writeHistory 포맷 역파싱: 엔트리 구분 "---", comments=첫 "> " 이후, posts="### …" 헤더 다음 줄부터.
+     * 실패 시 빈 리스트 — 생성은 계속 진행.
+     */
+    private java.util.List<String> loadRecentBodies(Persona persona, String type, int n) {
+        try {
+            String email = botEmail(persona);
+            String profileName = email.contains("@") ? email.split("@")[0] : persona.getId();
+            java.nio.file.Path file = java.nio.file.Paths.get(historyDir, profileName, "history", type + ".md");
+            if (!java.nio.file.Files.exists(file)) return java.util.List.of();
+            String raw = java.nio.file.Files.readString(file);
+            java.util.List<String> bodies = new java.util.ArrayList<>();
+            for (String block : raw.split("\\n---")) {
+                String body = extractHistoryBody(block, type);
+                if (body != null && !body.isBlank()) bodies.add(body);
+            }
+            int from = Math.max(0, bodies.size() - n);
+            return new java.util.ArrayList<>(bodies.subList(from, bodies.size()));
+        } catch (Exception e) {
+            log.debug("loadRecentBodies failed for persona {} type {}: {}", persona.getId(), type, e.getMessage());
+            return java.util.List.of();
+        }
+    }
+
+    /** writeHistory 엔트리 블록에서 본문만 추출. 매칭 실패 시 null. */
+    static String extractHistoryBody(String block, String type) {
+        if (block == null || block.isBlank()) return null;
+        if ("posts".equals(type)) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?m)^### [^\\n]*\\n").matcher(block);
+            return m.find() ? block.substring(m.end()).trim() : null;
+        }
+        // comments: 본문은 "> "로 시작 (본문 내 개행은 접두사 없이 이어짐)
+        int idx = block.indexOf("\n> ");
+        if (idx >= 0) return block.substring(idx + 3).trim();
+        return block.stripLeading().startsWith("> ") ? block.stripLeading().substring(2).trim() : null;
+    }
+
+    /** 최근 본문들 → 프롬프트 주입용 "- …" 목록 (최신이 위, 각 항목 eachMaxLen 컷). 없으면 null. */
+    static String formatRecentOutputs(java.util.List<String> bodies, int eachMaxLen) {
+        if (bodies == null || bodies.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (int i = bodies.size() - 1; i >= 0; i--) {
+            String b = bodies.get(i).replaceAll("\\s+", " ").trim();
+            if (b.length() > eachMaxLen) b = b.substring(0, eachMaxLen) + "…";
+            sb.append("- ").append(b).append('\n');
+        }
+        return sb.toString().trim();
+    }
+
+    /** 반복 가드 재시도용 피드백 — 기존 recentOutputs에 직전 실패 시도를 덧붙임. */
+    static String repetitionRetryFeedback(String recentOutputs, String failedDraft, String label) {
+        String draft = failedDraft.replaceAll("\\s+", " ").trim();
+        if (draft.length() > 150) draft = draft.substring(0, 150) + "…";
+        return (recentOutputs != null ? recentOutputs + "\n" : "")
+            + "- [직전 시도 — 반려됨] " + draft + "\n"
+            + "→ 직전 시도가 위 최근 " + label + "과 거의 똑같았다. 시작 문구·어휘·전개를 전부 바꿔서 완전히 다르게 다시 쓸 것";
+    }
+
+    /** 생성문 vs 최근 출력들의 문자 2-gram Jaccard 최대값 (0.0~1.0). */
+    static double maxBigramJaccard(String text, java.util.List<String> recents) {
+        java.util.Set<String> a = charBigrams(text);
+        if (a.isEmpty() || recents == null) return 0.0;
+        double max = 0.0;
+        for (String r : recents) {
+            java.util.Set<String> b = charBigrams(r);
+            if (b.isEmpty()) continue;
+            int inter = 0;
+            for (String g : a) if (b.contains(g)) inter++;
+            int union = a.size() + b.size() - inter;
+            double j = union > 0 ? (double) inter / union : 0.0;
+            if (j > max) max = j;
+        }
+        return max;
+    }
+
+    /** 공백 제거 후 문자 2-gram 집합. 12자 미만 초단문은 노이즈가 커서 빈 셋 반환(가드 제외). */
+    static java.util.Set<String> charBigrams(String text) {
+        if (text == null) return java.util.Set.of();
+        String t = text.replaceAll("\\s+", "");
+        if (t.length() < 12) return java.util.Set.of();
+        java.util.Set<String> grams = new java.util.HashSet<>();
+        for (int i = 0; i < t.length() - 1; i++) grams.add(t.substring(i, i + 2));
+        return grams;
     }
 
     private void markSeen(Persona persona, String postId, boolean acted) {

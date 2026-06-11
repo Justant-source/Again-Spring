@@ -36,6 +36,8 @@ public class GenDto {
         private String globalForbidRules;
         /** 생성 백엔드: "CLI" | "API" | null (null→CLI). §11 */
         private String backend;
+        /** 이 페르소나의 최근 글 본문들 ("- ..." 개행 구분) — 반복 방지 주입. 없으면 null. */
+        private String recentOutputs;
     }
 
     @Getter
@@ -69,6 +71,12 @@ public class GenDto {
         private String reactableComments;
         /** 좋아요/투표 성향 수치 ("좋아요 성향 0.7/1.0, 투표 성향 0.4/1.0"). 없으면 null. */
         private String dispositionNote;
+        /** 이 페르소나의 최근 댓글 본문들 ("- ..." 개행 구분) — 반복 방지 주입. 없으면 null. */
+        private String recentOutputs;
+        /** 문체 few-shot — voice 소스 크롤 코퍼스에서 랜덤 샘플 ("---" 구분). 없으면 null. */
+        private String styleExamples;
+        /** 댓글 모드·길이 지시문 (렌더된 한국어 1~2줄). 없으면 null. */
+        private String modeHint;
     }
 
     @Getter
@@ -98,6 +106,12 @@ public class GenDto {
         private String backend;
         /** 좋아요/투표 성향 수치 ("좋아요 성향 0.7/1.0, 투표 성향 0.4/1.0"). 없으면 null. */
         private String dispositionNote;
+        /** 이 페르소나의 최근 댓글 본문들 ("- ..." 개행 구분) — 반복 방지 주입. 없으면 null. */
+        private String recentOutputs;
+        /** 문체 few-shot — voice 소스 크롤 코퍼스에서 랜덤 샘플 ("---" 구분). 없으면 null. */
+        private String styleExamples;
+        /** 대댓글 길이 지시문 (렌더된 한국어 1줄). 없으면 null. */
+        private String modeHint;
     }
 
     @Getter

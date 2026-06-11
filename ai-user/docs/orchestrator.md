@@ -1841,6 +1841,27 @@ UPDATE ai_user_runtime SET daily_global_cap=300 WHERE id=1;
 
 ---
 
+## 18. 문체 현실화 (2026-06-11)
+
+같은 페르소나의 반복·AI투 문제 대응. ActionExecutor 중심 (llm.md §15, learning.md §19 참조).
+
+**히스토리 주입 + 반복 가드 (S1)**
+- `loadRecentBodies()`: `historyDir/{프로필}/history/{type}.md`를 역파싱해 최근 댓글 5개/글 3개 추출 → `recentOutputs`로 프롬프트 주입 ("반복 시 실격").
+- 생성 후 `maxBigramJaccard()`(문자 2-gram, 12자 미만 제외)가 `ai-user.repetition-threshold`(기본 0.45, env `AI_USER_REPETITION_THRESHOLD`) 초과 시 **1회만 재생성**, 그래도 초과면 게시하되 action log detail에 `repetitive=true`.
+
+**문체 앵커 (S2)**
+- `styleExamplesFor()`: voiceProfile의 `voice_type` → 크롤 source 매핑(`VOICE_SOURCE`) 후 learning `/examples/style-sample` 호출.
+- 댓글: 기존 주제-RAG(findSimilar) **대체** (캐던스가 더 중요). 대댓글: 신규 주입(maxLen 80). 글: 주제-RAG 미스 시 보충.
+
+**반응 모드·길이 샘플링 (S3)**
+- `pickCommentMode()`: REACTION_ONLY/SHORT_AGREE/QUESTION/DISAGREE/EXPERIENCE/ADVICE/TANGENT 가중 랜덤 (slang↑→딴지·드립↑, polite→경험담·조언↑, PARTNER stance→DISAGREE↑). 초단문 모드 합산 ~37%.
+- `commentModeHint()` 렌더 결과가 `modeHint`로 전달 — llm 쪽 고정 길이 지시 대체. 대댓글은 `replyLengthHint()` 2단(8~25자 60% / 25~60자 40%).
+
+**ContentSafetyGuard 오탐 수정**
+- "씹"·"보지"·"니거" substring 매칭이 정상 구어(읽씹/보지 않고/니거야=네 것)를 차단 → 문맥 패턴(`HATE_PATTERNS`)으로 교체. Sonnet 구어체 도입 후 글 차단의 주원인이었음 (회귀 테스트: ContentSafetyGuardTest).
+
+**측정 도구**: `ai-user/tools/style-report.py` — opener 중복률·상투 토큰·길이 분포·인접 유사도. baseline은 `tools/reports/` (gitignore).
+
 ## 부록 A. 용어 정의
 
 | 용어 | 정의 |

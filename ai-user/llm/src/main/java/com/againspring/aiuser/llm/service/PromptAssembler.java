@@ -126,6 +126,7 @@ public class PromptAssembler {
             %s
             글 길이: %s
             %s
+            %s
             위 카테고리와 말투로 한국 갈등 커뮤니티 사연을 완전 창작해주세요.
             - 🚨 구체적 사건 필수: "어제/지난주에 X가 Y를 했다" 형태의 사건 1개 이상 포함. 감정만 나열하는 한탄 글 금지.
             - 실제 인물 실명·연락처·주소·개인정보 절대 포함 금지
@@ -139,6 +140,7 @@ public class PromptAssembler {
                 req.getTopicSeed() != null ? "상황: " + safe(req.getTopicSeed()) : "",
                 lengthInstruction(req.getLengthTier()),
                 dynamicExamplesBlock(req.getDynamicExamples()),
+                recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 같은 소재·사건 유형 반복 금지 — 완전히 다른 상황·디테일로"),
                 politeSuffix,
                 varietySeed);
         return system + "\n" + SEP + "\n" + user;
@@ -160,6 +162,7 @@ public class PromptAssembler {
             아키타입: %s
             글 길이: %s
             %s
+            %s
             위 원글에서 상대방(파트너) 입장으로 같은 갈등을 1인칭으로 서술해주세요.
             - 원글에서 언급된 구체 사건을 반드시 참조하되 해석은 자기 시각으로
             - 방어적 해명보다 내가 느끼고 있는 것 중심
@@ -172,6 +175,7 @@ public class PromptAssembler {
                 req.getArchetype() != null ? req.getArchetype() : "갈등",
                 lengthInstruction(req.getLengthTier()),
                 dynamicExamplesBlock(req.getDynamicExamples()),
+                recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 같은 표현·말버릇 반복 금지"),
                 politeSuffix,
                 varietySeed);
         return system + "\n" + SEP + "\n" + user;
@@ -183,6 +187,10 @@ public class PromptAssembler {
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요, ~더라고요, ~것 같아요)"
             : "- 반말로 작성 (요/습니다 금지)";
+        // 모드 힌트가 있으면 고정 길이 지시 대신 모드별 지시 사용 (문체 현실화 S3)
+        String lengthLine = req.getModeHint() != null && !req.getModeHint().isBlank()
+            ? "- " + safe(req.getModeHint())
+            : "- 50~150자 내외";
         String user = """
             %s글 제목: %s
             글 내용 요약: %s
@@ -192,9 +200,11 @@ public class PromptAssembler {
             %s
             %s
             %s
+            %s
+            %s
             이 글에 달 짧은 댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
-            - 50~150자 내외
+            %s
             - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지 — 한국 커뮤니티 문체만 따를 것
             %s
             """.formatted(
@@ -204,9 +214,12 @@ public class PromptAssembler {
                 req.getStance() != null ? req.getStance() : "NEUTRAL",
                 req.getArchetypeCommentSamples() != null && !req.getArchetypeCommentSamples().isBlank() ? "이 글에 자주 달리는 댓글 패턴 (참고용):\n" + safe(req.getArchetypeCommentSamples()) : "",
                 req.getExistingComments() != null && !req.getExistingComments().isBlank() ? "이미 달린 댓글들 (중복 피하고 다른 관점으로):\n" + safe(req.getExistingComments()) : "",
+                styleExamplesBlock(req.getStyleExamples()),
                 dynamicExamplesBlock(req.getDynamicExamples()),
                 req.getDispositionNote() != null && !req.getDispositionNote().isBlank() ? "내 성향: " + safe(req.getDispositionNote()) : "",
                 req.getReactableComments() != null && !req.getReactableComments().isBlank() ? "이미 달린 댓글들 (번호로 좋아요 표시 가능):\n" + safe(req.getReactableComments()) : "",
+                recentOutputsBlock(req.getRecentOutputs(), "댓글", "위와 같은 전개(공감→경험담→조언)였다면 이번엔 다른 전개로"),
+                lengthLine,
                 toneNote);
         return system + "\n" + SEP + "\n" + user;
     }
@@ -217,17 +230,22 @@ public class PromptAssembler {
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요 등 자연스럽게)"
             : "- 반말로 작성 (요/습니다 금지)";
+        // 모드 힌트가 있으면 고정 길이 지시 대신 사용 (문체 현실화 S3)
+        String lengthLine = req.getModeHint() != null && !req.getModeHint().isBlank()
+            ? "- " + safe(req.getModeHint())
+            : "- 초단문 필수: 15~40자 (한 문장 반도 안 됨)";
         String user = """
             %s%s%s원댓글: %s
             맥락: %s
             반응: %s (AGREE=공감, DISAGREE=반박, CURIOUS=궁금)
             %s
+            %s
+            %s
             이 댓글에 대한 자연스러운 대댓글을 작성해주세요.
             - 실제 인물 실명·개인정보 절대 포함 금지
-            - 초단문 필수: 15~40자만 (한 문장 반도 안 됨)
-            - 감정만 표현: 공감, 응원, 이해 중심
-            - 정말, 진짜, 진심으로 등 감정 강조 자연스러움
-            - ㅠㅠ, ㅋ, 💚 같은 이모지 자연스럽게 포함
+            %s
+            - 원댓글 단어 하나를 받아 감정 한 방으로 반응 — 분석·요약·조언 나열 금지
+            - 정말/진짜 같은 강조어와 ㅠㅠ를 습관처럼 쓰지 말 것 — 매번 다른 반응어로
             - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지 — 한국 커뮤니티 문체만 따를 것
             %s
             """.formatted(
@@ -238,6 +256,9 @@ public class PromptAssembler {
                 safe(req.getThreadContext() != null ? req.getThreadContext() : ""),
                 req.getStance() != null ? req.getStance() : "CURIOUS",
                 req.getDispositionNote() != null && !req.getDispositionNote().isBlank() ? "내 성향: " + safe(req.getDispositionNote()) : "",
+                styleExamplesBlock(req.getStyleExamples()),
+                recentOutputsBlock(req.getRecentOutputs(), "댓글", null),
+                lengthLine,
                 toneNote);
         return system + "\n" + SEP + "\n" + user;
     }
@@ -303,6 +324,37 @@ public class PromptAssembler {
                "[실제 커뮤니티 예시 — 당신의 말투(반말/해요체)와 같은 register로 선별됨]\n" +
                "이 예시들의 종결어미·문장 호흡·끊는 방식·어휘 톤을 모방하라\n" +
                "단, 내용·구체 표현·온점·쌍따옴표는 모방 금지 (온점·쌍따옴표는 항상 제거)\n" +
+               "───────────────────────────────────────\n" +
+               safe(normalized) + "\n" +
+               "───────────────────────────────────────\n";
+    }
+
+    /**
+     * 반복 방지 블록 — 이 페르소나의 최근 출력을 보여주고 같은 시작·말버릇·전개를 금지.
+     * 호출마다 변하는 내용이므로 반드시 USER 섹션에만 주입 (캐시 prefix 보호).
+     */
+    private String recentOutputsBlock(String recentOutputs, String label, String extraRule) {
+        if (recentOutputs == null || recentOutputs.isBlank()) return "";
+        return "\n───────────────────────────────────────\n" +
+               "[내가 최근에 쓴 " + label + " — 반복 방지]\n" +
+               safe(recentOutputs) + "\n" +
+               "🚨 위 " + label + "에서 쓴 시작 문구·말버릇·문장 구조를 이번에 또 쓰면 실격\n" +
+               "- 위에서 쓴 첫 단어로 또 시작하지 말 것\n" +
+               "- 위에 2번 이상 나온 단어·이모티콘(예: 진짜/공감/ㅠㅠ)은 이번엔 빼기\n" +
+               (extraRule != null && !extraRule.isBlank() ? "- " + extraRule + "\n" : "") +
+               "───────────────────────────────────────\n";
+    }
+
+    /** 문체 few-shot 블록 — voice 소스 크롤 코퍼스 랜덤 샘플. 말투만 모방, 내용 모방 금지. */
+    private String styleExamplesBlock(String examples) {
+        if (examples == null || examples.isBlank()) return "";
+        String normalized = examples.trim()
+            .replaceAll("(?m)(?<![.?!])\\.\\s*$", "")  // 줄 끝 온점 제거 (말줄임표 보존)
+            .replaceAll("\"", "");
+        return "\n───────────────────────────────────────\n" +
+               "[실제 커뮤니티 문체 샘플 — 주제 무관, 말투만 참고]\n" +
+               "종결어미·문장 호흡·끊는 방식·리듬만 모방하라\n" +
+               "내용·소재·구체 표현은 절대 가져오지 말 것 (온점·쌍따옴표도 항상 제거)\n" +
                "───────────────────────────────────────\n" +
                safe(normalized) + "\n" +
                "───────────────────────────────────────\n";

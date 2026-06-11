@@ -33,4 +33,24 @@ class ContentSafetyGuardTest {
         assertTrue(guard.check("어제 남친이 내 말 끊었어 진짜 답답해 ㅠㅠ", ContentType.COMMENT).passed());
         assertTrue(guard.check("벌써 세 번째야 내가 뭘 잘못한 건지 모르겠어", ContentType.POST).passed());
     }
+
+    /**
+     * 2026-06-11 회귀 방지: 짧은 혐오 토큰의 substring 오탐.
+     * "읽씹"·"보지 않고"·"니거야(네 것)"는 갈등 사연에 흔한 정상 구어 — 차단되면 안 됨.
+     */
+    @Test
+    void allowsColloquialFalsePositives() {
+        assertTrue(guard.check("남친이 내 카톡 읽씹한 지 이틀째야", ContentType.POST).passed());
+        assertTrue(guard.check("회의에서 내 의견을 또 씹고 넘어갔음", ContentType.COMMENT).passed());
+        assertTrue(guard.check("남편이 내 얼굴도 보지 않고 나가버렸어", ContentType.POST).passed());
+        assertTrue(guard.check("다신 걔 얼굴 보지 말자고 했어", ContentType.COMMENT).passed());
+        assertTrue(guard.check("어 이 우산 니거야? 내가 잘못 가져왔나", ContentType.COMMENT).passed());
+    }
+
+    @Test
+    void stillBlocksRealHateSpeech() {
+        assertFalse(guard.check("이 씹창난 상황 어쩔 거임", ContentType.COMMENT).passed());
+        assertFalse(guard.check("걔는 진짜 병신새끼임", ContentType.COMMENT).passed());
+        assertEquals("HATE_KEYWORD", guard.check("씹년이 따로 없네", ContentType.COMMENT).reason());
+    }
 }

@@ -70,6 +70,20 @@ public class AiLearningClient {
 
     @Getter @Setter @NoArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class StyleSampleRequest {
+        private String contentType;   // "POST" | "COMMENT"
+        private String source;        // 크롤 소스 (natepan 등). null=전체 크롤 소스
+        private String register;      // "casual" | "polite" | null
+        private int topK;
+        private int maxLen;           // 본문 최대 길이 (자)
+        public StyleSampleRequest(String contentType, String source, String register, int topK, int maxLen) {
+            this.contentType = contentType; this.source = source;
+            this.register = register; this.topK = topK; this.maxLen = maxLen;
+        }
+    }
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ExampleItem {
         private Long id;
         private String content;
@@ -118,6 +132,25 @@ public class AiLearningClient {
             return result != null ? result : Collections.emptyList();
         } catch (Exception e) {
             log.debug("AiLearning search failed (non-critical): {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * 문체 앵커용 랜덤 샘플 — 주제 무관, 소스(voice)·레지스터·타입만 일치 (문체 현실화 S2).
+     * 호출마다 다른 예시가 반환됨 (learning 쪽 ORDER BY RAND()). 실패 시 빈 리스트.
+     */
+    public List<ExampleItem> styleSample(String source, String contentType, String register, int topK, int maxLen) {
+        if (!enabled) return Collections.emptyList();
+        try {
+            List<ExampleItem> result = restClient.post()
+                .uri("/examples/style-sample")
+                .body(new StyleSampleRequest(contentType, source, register, topK, maxLen))
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<ExampleItem>>() {});
+            return result != null ? result : Collections.emptyList();
+        } catch (Exception e) {
+            log.debug("AiLearning styleSample failed (non-critical): {}", e.getMessage());
             return Collections.emptyList();
         }
     }

@@ -22,6 +22,20 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 ]
 
+# 댓글 수집 (문체 현실화 S2 — AI 댓글 문체 앵커용 코퍼스)
+COMMENT_LIMIT = 200       # 일일 댓글 수집 상한
+COMMENTS_PER_POST = 10    # 글당 상위 댓글 수
+
+
+def _extract_comments(soup) -> List[str]:
+    """상세 페이지에서 댓글 텍스트 추출 — 서버 렌더링 `.cmt_list dd.usertxt` (2026-06-11 검증)."""
+    texts = []
+    for el in soup.select(".cmt_list dd.usertxt")[:COMMENTS_PER_POST]:
+        txt = el.get_text(" ", strip=True)
+        if txt and 5 <= len(txt) <= 500:
+            texts.append(txt)
+    return texts
+
 
 async def crawl(daily_limit: int = 400) -> List[Dict]:
     """네이트판 크롤링 — WaggleBot 포팅"""
@@ -75,9 +89,11 @@ async def crawl(daily_limit: int = 400) -> List[Dict]:
 
     logger.info(f"Total posts found: {len(posts)}")
 
-    # Step 2: 각 게시글 상세 페이지에서 내용 추출
+    # Step 2: 각 게시글 상세 페이지에서 내용 추출 (+ 같은 페이지에서 댓글 수집)
+    post_count = 0
+    comment_count = 0
     for post in posts:
-        if len(results) >= daily_limit:
+        if post_count >= daily_limit:
             break
 
         try:
@@ -99,11 +115,28 @@ async def crawl(daily_limit: int = 400) -> List[Dict]:
                         "source": "natepan",
                         "category": "talk",
                     })
+                    post_count += 1
                     logger.debug(f"Post {post['origin_id']}: saved {len(content)} chars")
+
+            # Step 2b: 댓글 추출 — 실패해도 글 수집에 영향 없음 (문체 현실화 S2)
+            if comment_count < COMMENT_LIMIT:
+                try:
+                    for txt in _extract_comments(soup):
+                        if comment_count >= COMMENT_LIMIT:
+                            break
+                        results.append({
+                            "content": txt,
+                            "content_type": "COMMENT",
+                            "source": "natepan",
+                            "category": "talk",
+                        })
+                        comment_count += 1
+                except Exception as ce:
+                    logger.debug(f"Comment parse failed {post['url']}: {ce}")
 
         except Exception as e:
             logger.debug(f"Failed to parse post {post['url']}: {e}")
             continue
 
-    logger.info(f"Nate Pann crawl completed: {len(results)} items")
+    logger.info(f"Nate Pann crawl completed: {post_count} posts + {comment_count} comments")
     return results

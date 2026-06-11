@@ -980,7 +980,33 @@ docker logs -f againspring-llm-ai-user | grep -E "FAIL|PASS|timeout"
 }
 ```
 
+
+## 15. 문체 현실화 (2026-06-11)
+
+AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 문제의 대응 (orchestrator·learning과 공동 작업).
+
+**프롬프트 블록 (PromptAssembler — 전부 USER 섹션, 캐시 prefix 불변)**
+- `recentOutputs`: 이 페르소나의 최근 출력 목록 + "같은 시작·말버릇·전개 반복 시 실격" 지시. post/comment/reply 전부.
+- `styleExamples`: voice 소스 크롤 코퍼스의 랜덤 문체 샘플 ("종결어미·호흡만 모방, 내용 모방 금지"). comment/reply.
+- `modeHint`: 오케스트레이터가 샘플링한 반응 모드·길이 지시 — 고정 "50~150자"·"초단문 15~40자"를 대체.
+- reply 프롬프트의 "정말/진짜 강조 반복 자연스러움"·"💚 이모지" 하드코딩 제거 (AI투 직접 권장이었음).
+
+**모델 분리 (S5)**
+- `llm.post-model` (`LLM_POST_MODEL`, compose 기본 `claude-sonnet-4-6`): 글(POST)+partner 생성만 모델 오버라이드. 댓글/대댓글은 `CLAUDE_MODEL`(Haiku) 유지. 빈 값 = 비활성. SelfCritique 재생성도 동일 모델 승계.
+- ClaudeApiInvoker usage 로그에 `model=` 필드 추가 — 응답이 실제 처리된 모델 확인용.
+
+**SelfCritique 추가 체크 (S4)**
+- ⑧ AI 상투구 (정말 공감/힘내세요/응원합니다/마음이 느껴/충분히~/그렇군요 등) −2
+- ⑨ "진짜"·"정말" 합산 3회 이상 −1 / ⑩ ㅠ·ㅜ 묶음 3회 이상 −1
+- `self-critique.extra-cliches` (`SELF_CRITIQUE_EXTRA_CLICHES`, 쉼표 구분 리터럴): 운영 중 발견한 상투구를 재배포 없이 추가.
+
+**voice/*.md 가이드 개정**
+- comment: 고정 "공감 먼저→경험→조언" 구조 해체 → [반응 모드] 지시 최우선. 상투구 금지 목록 추가.
+- reply: "정말/진짜 반복 자연스러움" 규칙 삭제 → 강조어 변주 규칙. 💚 제거.
+- post: AI 티 패턴 섹션 추가 (진짜/정말 2회 초과 금지, 시작 다양화, 문장 길이 변주).
+- ⚠️ 반영 절차: DB `ai_prompt_template`이 우선이므로 가이드 수정 시 **DB 갱신 + `POST /internal/prompts/reload` 필수** (배포 전 DB 내용과 diff — admin 수동 편집 보존).
+
 ---
 
-**마지막 업데이트**: 2026-06-06 | **버전**: Invoker 인터페이스 계층 v1.0
+**마지막 업데이트**: 2026-06-11 | **버전**: Invoker 인터페이스 계층 v1.0
 **기반**: ClaudeCliInvoker, ClaudeApiInvoker, InvokerRouter, SelfCritiqueService, OutputSanitizer

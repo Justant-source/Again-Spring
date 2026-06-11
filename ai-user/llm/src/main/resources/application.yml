@@ -33,6 +33,8 @@ llm:
     default-timeout-ms: ${LLM_DEFAULT_TIMEOUT_MS:120000}
     claude-binary-path: ${CLAUDE_BIN:claude}
     claude-model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
+  # 글(POST) 전용 모델 오버라이드 — 빈 값이면 claude-model 사용 (문체 현실화 S5)
+  post-model: ${LLM_POST_MODEL:}
   api:
     prompt-caching: ${LLM_API_PROMPT_CACHING:true}
 
@@ -44,6 +46,8 @@ logging:
 self-critique:
   enabled: ${SELF_CRITIQUE_ENABLED:false}
   pass-threshold: ${SELF_CRITIQUE_THRESHOLD:5}
+  # 추가 AI 상투구 (쉼표 구분 리터럴) — 운영 중 발견 시 재배포 없이 등록
+  extra-cliches: ${SELF_CRITIQUE_EXTRA_CLICHES:}
 
 anthropic:
   api-key: ${ANTHROPIC_API_KEY:-}

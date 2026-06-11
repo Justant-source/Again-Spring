@@ -4,6 +4,8 @@
 import json
 import logging
 import os
+import random
+import re
 import requests
 from app.db.session import get_db
 
@@ -22,8 +24,14 @@ VOICE_SOURCE_MAP = {
     "PPOMPPU":  "ppomppu",
     "RULIWEB":  "ruliweb",
     "MLBPARK":  "mlbpark",
-    "GENERAL":  None,  # 여러 소스 혼합
+    "GENERAL":  None,   # 여러 소스 혼합
+    "ARCALIVE": None,   # 전용 크롤러 없음 — 혼합 소스 풀만
+    "INVEN":    None,   # 전용 크롤러 없음 — 혼합 소스 풀만
 }
+
+# 예시 풀 목표 크기 (문체 현실화 S5) — 고정 3~4개 → 풀 확장 후 생성 시 랜덤 서브셋 주입
+POOL_TARGET_COMMENTS = 12
+POOL_TARGET_REPLIES = 8
 
 
 def get_examples_by_source(source: str, limit: int = 30) -> list[str]:
@@ -142,19 +150,115 @@ def update_persona_profiles(voice_type: str, patterns: dict) -> int:
     return updated
 
 
+def _clean_example(text: str) -> str:
+    """풀 예시 정규화 — 문장 끝 온점·쌍따옴표 제거 (플랫폼 문체 규칙과 일치)."""
+    t = re.sub(r'(?<![.?!])\.\s*$', '', text.strip())
+    return t.replace('"', '').strip()
+
+
+def get_example_pool(source: str | None, content_type: str, limit: int,
+                     min_len: int, max_len: int) -> list[str]:
+    """크롤 코퍼스에서 예시 후보 랜덤 추출. SELF_GENERATED 제외 — AI투 증폭 루프 방지."""
+    conds = ["source != 'SELF_GENERATED'", "content_type = %s",
+             "quality_score >= 0.6", "CHAR_LENGTH(content) BETWEEN %s AND %s"]
+    params: list = [content_type, min_len, max_len]
+    if source:
+        conds.append("source = %s")
+        params.append(source)
+    sql = f"""SELECT DISTINCT content FROM example_bank
+              WHERE {' AND '.join(conds)}
+              ORDER BY RAND() LIMIT %s"""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params + [limit])
+            rows = cur.fetchall()
+    return [_clean_example(r["content"] if isinstance(r, dict) else r[0]) for r in rows]
+
+
+def expand_persona_example_pools(voice_type: str, source: str | None) -> int:
+    """voice_profile의 example_comments/example_replies 풀 확장 (문체 현실화 S5).
+
+    - 수제(큐레이션) 예시는 보존 — pool_meta.curated_*로 첫 실행 시 개수를 기록,
+      이후 실행에선 크롤 추가분만 새 랜덤 샘플로 교체 (매일 새벽 자연 회전)
+    - 페르소나마다 후보군에서 서로 다른 랜덤 서브셋 배정 → 동일 voice 페르소나 간 획일화 방지
+    - 오케스트레이터 appendExamples는 풀에서 shuffle 후 2~3개만 주입하므로 호출마다 예시가 달라짐
+    """
+    comment_cands = get_example_pool(source, "COMMENT", limit=80, min_len=15, max_len=200)
+    if len(comment_cands) < 8:
+        # 댓글 코퍼스 부족 → 짧은 글로 보충 (캐던스 앵커 대용)
+        comment_cands += get_example_pool(source, "POST", limit=40, min_len=20, max_len=200)
+    if len(comment_cands) < 8 and source:
+        # 소스 전용 코퍼스 자체가 부족 (전용 크롤러 없는 voice) → 혼합 소스 폴백
+        comment_cands += get_example_pool(None, "COMMENT", limit=60, min_len=15, max_len=200)
+    reply_cands = [c for c in comment_cands if len(c) <= 80] or comment_cands
+    if not comment_cands:
+        logger.info(f"[{voice_type}] pool skip — no candidates (source={source})")
+        return 0
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, voice_profile FROM personas
+                WHERE JSON_UNQUOTE(JSON_EXTRACT(voice_profile, '$.voice_type')) = %s
+                LIMIT 100
+            """, (voice_type,))
+            rows = cur.fetchall()
+
+            updated = 0
+            for row in rows:
+                persona_id = row["id"] if isinstance(row, dict) else row[0]
+                vp_raw = row["voice_profile"] if isinstance(row, dict) else row[1]
+                try:
+                    vp = json.loads(vp_raw) if isinstance(vp_raw, str) else vp_raw
+                    meta = vp.get("pool_meta") or {}
+
+                    for key, cands, target, meta_key in (
+                        ("example_comments", comment_cands, POOL_TARGET_COMMENTS, "curated_comments"),
+                        ("example_replies", reply_cands, POOL_TARGET_REPLIES, "curated_replies"),
+                    ):
+                        current = vp.get(key) or []
+                        if not isinstance(current, list):
+                            current = []
+                        if meta_key not in meta:
+                            meta[meta_key] = len(current)  # 첫 실행: 현재 예시 전부를 수제로 기록
+                        curated = current[:meta[meta_key]]
+                        need = max(0, target - len(curated))
+                        picked = random.sample(cands, min(need, len(cands))) if need else []
+                        merged = list(dict.fromkeys(curated + picked))  # 중복 제거, 순서 보존
+                        vp[key] = merged[:target] if len(merged) > target else merged
+
+                    vp["pool_meta"] = meta
+                    cur.execute(
+                        "UPDATE personas SET voice_profile = %s WHERE id = %s",
+                        (json.dumps(vp, ensure_ascii=False), persona_id)
+                    )
+                    updated += 1
+                except Exception as e:
+                    logger.debug(f"Pool expand failed for persona {persona_id}: {e}")
+                    continue
+    return updated
+
+
 def strengthen_all(min_examples: int = 10) -> dict:
-    """전체 Voice 타입 강화 실행"""
+    """전체 Voice 타입 강화 실행 (말투 분석 + 예시 풀 확장)"""
     results = {}
     for voice_type, source in VOICE_SOURCE_MAP.items():
         if source is None:
+            # 전용 크롤러 없는 voice — 분석은 스킵, 예시 풀만 혼합 소스로 확장
+            pool_n = expand_persona_example_pools(voice_type, None)
+            results[voice_type] = {"status": "pool-only", "pool_updated": pool_n}
             continue
         examples = get_examples_by_source(source, limit=30)
         if len(examples) < min_examples:
-            logger.info(f"[{voice_type}] skip — only {len(examples)} examples (need {min_examples})")
-            results[voice_type] = {"status": "skip", "examples": len(examples)}
+            logger.info(f"[{voice_type}] analysis skip — only {len(examples)} examples (need {min_examples})")
+            # 분석은 스킵해도 예시 풀은 확장 (혼합 소스 폴백 포함)
+            pool_n = expand_persona_example_pools(voice_type, source)
+            results[voice_type] = {"status": "skip", "examples": len(examples), "pool_updated": pool_n}
             continue
         patterns = analyze_style_with_llm(voice_type, examples)
         updated = update_persona_profiles(voice_type, patterns)
-        logger.info(f"[{voice_type}] strengthened {updated} personas")
-        results[voice_type] = {"status": "ok", "updated": updated, "patterns": list(patterns.keys())}
+        pool_n = expand_persona_example_pools(voice_type, source)
+        logger.info(f"[{voice_type}] strengthened {updated} personas, pool expanded {pool_n}")
+        results[voice_type] = {"status": "ok", "updated": updated, "pool_updated": pool_n,
+                               "patterns": list(patterns.keys())}
     return results

@@ -29,4 +29,6 @@ public class PostGenRequest {
     private String globalForbidRules;
     /** 생성 백엔드: "CLI" | "API" | null (null→CLI). §11 토큰 관제 */
     private String backend;
+    /** 이 페르소나의 최근 글 본문들 ("- …" 개행 구분) — 소재·표현 반복 방지 주입. 없으면 null. */
+    private String recentOutputs;
 }

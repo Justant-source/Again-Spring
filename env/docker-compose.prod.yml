@@ -127,11 +127,14 @@ services:
     environment:
       CLAUDE_BIN: ${CLAUDE_BIN:-claude}
       CLAUDE_MODEL: ${AI_USER_LLM_MODEL:-claude-haiku-4-5-20251001}
+      # 글(POST)만 Sonnet 승격 (문체 현실화 S5) — 빈 값으로 두면 CLAUDE_MODEL 사용
+      LLM_POST_MODEL: ${LLM_POST_MODEL:-claude-sonnet-4-6}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LLM_POOL_SIZE: ${AI_USER_LLM_POOL_SIZE:-20}
       LLM_QUEUE_CAPACITY: ${AI_USER_LLM_QUEUE_CAPACITY:-100}
       LLM_DEFAULT_TIMEOUT_MS: ${AI_USER_LLM_DEFAULT_TIMEOUT_MS:-120000}
       SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
+      SELF_CRITIQUE_EXTRA_CLICHES: ${SELF_CRITIQUE_EXTRA_CLICHES:-}
       DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER}
       DB_PASSWORD: ${MARIADB_PASSWORD}
@@ -167,6 +170,8 @@ services:
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}
       AI_LEARNING_CRAWL_ENABLED: ${AI_LEARNING_CRAWL_ENABLED:-false}
+      # persona_strengthener의 LLM 분석용 — 미설정 시 잘못된 기본값(-dev 접미사)으로 silent 실패했음
+      LLM_AI_USER_URL: http://againspring-llm-ai-user-prod:8092
     depends_on:
       mariadb-prod:
         condition: service_healthy
@@ -199,6 +204,7 @@ services:
       AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-dev-pw-2026}
       AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
       AI_USER_HISTORY_DIR: /app/personas/profiles
+      AI_USER_REPETITION_THRESHOLD: ${AI_USER_REPETITION_THRESHOLD:-0.45}
       AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
       AI_LEARNING_BASE_URL: http://againspring-ai-learning-prod:8099
       SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}

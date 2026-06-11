@@ -31,9 +31,19 @@ public class ContentSafetyGuard {
         "자살", "자해", "죽고싶", "죽어버릴", "극단적 선택", "목숨을 끊"
     );
 
-    // 혐오·차별 키워드
+    // 혐오·차별 키워드 — 단순 포함 매칭 (문맥 오탐이 없는 토큰만)
     private static final List<String> HATE_KEYWORDS = List.of(
-        "장애인놈", "병신새끼", "보지", "씹", "니거", "찐따"
+        "장애인놈", "병신새끼", "찐따"
+    );
+
+    // 혐오·차별 문맥 패턴 (2026-06-11) — 짧은 토큰의 substring 오탐 제거:
+    // · "씹": "읽씹/안읽씹/말 씹고"(무시하다)는 정상 구어 → 욕설 연결형만 차단
+    // · "보지": "보지 않/도/말/마/못"(동사 활용)은 정상 → 명사(비속어) 용법만 차단
+    // · "니거": "이거 니거야?"(네 것)는 정상 구어 → 복수 멸칭형만 차단
+    private static final List<Pattern> HATE_PATTERNS = List.of(
+        Pattern.compile("씹(?=[년놈새창할쓰])"),
+        Pattern.compile("(?<![가-힣])보지(?!\\s*(?:않|도|말|마|못|는))"),
+        Pattern.compile("니거(?=들)")
     );
 
     // 제공자(LLM) 오류 문자열 — 토큰/크레딧 소진 또는 프록시 라우팅 오류로 본문에 새는 텍스트.
@@ -117,6 +127,14 @@ public class ContentSafetyGuard {
         for (String kw : HATE_KEYWORDS) {
             if (text.contains(kw)) {
                 log.warn("ContentSafetyGuard: hate keyword detected: {}", kw);
+                return GuardResult.blocked("HATE_KEYWORD");
+            }
+        }
+
+        // 혐오 문맥 패턴 (substring 오탐 방지형)
+        for (Pattern p : HATE_PATTERNS) {
+            if (p.matcher(text).find()) {
+                log.warn("ContentSafetyGuard: hate pattern matched: {}", p.pattern());
                 return GuardResult.blocked("HATE_KEYWORD");
             }
         }

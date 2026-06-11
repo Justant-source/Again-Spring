@@ -968,7 +968,31 @@ graph TB
     style Crawlers fill:#ffcc99
 ```
 
+
+## 19. 문체 현실화 (2026-06-11)
+
+**`POST /examples/style-sample` — 문체 앵커 샘플링**
+- 주제 무관, `source`(voice)·`register`·`content_type`만 일치하는 랜덤 예시 (`ORDER BY RAND()`, 임베딩 미사용).
+- `SELF_GENERATED` 제외 필수 (자기 출력 재학습 → AI투 증폭 루프 방지). 품질 하한 max(0.6, RAG_MIN_QUALITY).
+- 폴백: 소스+타입 → 소스 완화 → COMMENT 부족 시 같은 소스의 짧은 POST(≤200자).
+- 오케스트레이터 `AiLearningClient.styleSample()`이 댓글(3개)·대댓글(2개) 생성마다 호출.
+
+**커뮤니티 댓글 코퍼스 (크롤러 확장)**
+- `natepan.py`: 글 상세의 `.cmt_list dd.usertxt` → COMMENT 수집 (글당 10, 일 200 한도).
+- `clien.py`: `.comment_row .comment_view` → COMMENT 수집 (존댓말 레지스터 커버). 목록 셀렉터도 `a.list_subject`로 수정 (기존 셀렉터 방향 반대라 0건이었음).
+- theqoo는 댓글이 AJAX 로딩이라 제외.
+
+**페르소나 예시 풀 확장 (persona_strengthener)**
+- `expand_persona_example_pools()`: voice_profile의 `example_comments` 12개 / `example_replies` 8개로 확장.
+- 수제 예시는 `pool_meta.curated_*`로 보존, 크롤 추가분만 매일 새벽 회전. 페르소나마다 다른 랜덤 서브셋 (동일 voice 간 획일화 방지).
+- 전용 크롤러 없는 voice(FMKOREA/PPOMPPU/BLIND/MLBPARK/ARCALIVE/INVEN 등)는 혼합 소스 폴백.
+
+**camelCase 정합 수정 (중요 버그픽스)**
+- orchestrator(Java)·backend는 `contentType`/`topK` 등 camelCase JSON을 보내는데 pydantic 모델이 snake_case뿐이라
+  ① `/examples/search`의 content_type·register·top_k 필터가 조용히 무시되고 ② `/examples/save`는 필수 필드 누락 422로 전부 실패했었음 (backend 첨삭본 환류 포함).
+- `CamelCompatModel`(populate_by_name + to_camel alias)로 snake/camel 양쪽 수용.
+
 ---
 
-**마지막 업데이트**: 2026-06-06 · **담당**: Claude Code Agent
+**마지막 업데이트**: 2026-06-11 · **담당**: Claude Code Agent
 **이력/변경사항 없음** — 현재 구현 기준 전면 재작성

@@ -95,3 +95,7 @@ persona-history/
 # ai-user Gradle 빌드
 ai-user/**/build/
 ai-user/**/.gradle/
+# 문체 리포트 산출물 (style-report.py)
+ai-user/tools/reports/
+# DB 부분 백업 덤프 (배포 절차 산출물)
+env/backups/
