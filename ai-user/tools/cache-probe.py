@@ -42,10 +42,17 @@ def fetch_setting(key: str) -> str | None:
 
 
 def static_prefix(nonce: str) -> str:
-    """실제 프롬프트와 동일한 성격의 정적 텍스트 (~5k+ 토큰). 변형·실행별 nonce로 캐시 분리."""
+    """실제 프롬프트와 동일한 성격의 정적 텍스트. 변형·실행별 nonce로 캐시 분리.
+
+    Haiku 캐시 최소 4096토큰을 확실히 넘기도록 가이드 4종 전부 + 반복 패딩
+    (2026-06-12 토큰 다이어트로 개별 가이드가 작아져 2개로는 미달).
+    """
     guide_dir = REPO / "ai-user/llm/src/main/resources/voice"
-    body = (guide_dir / "comment.md").read_text(encoding="utf-8") + \
-           "\n\n" + (guide_dir / "post.md").read_text(encoding="utf-8")
+    parts = [(guide_dir / f"{n}.md").read_text(encoding="utf-8")
+             for n in ("comment", "post", "reply", "partner")]
+    body = "\n\n".join(parts)
+    while len(body) < 6000:  # ≈5.2k 토큰 — 4096 최소치 여유 확보
+        body += "\n\n[패딩 — 프로브 전용 반복]\n" + parts[0]
     return f"[cache-probe {nonce}]\n당신은 한국 갈등 커뮤니티의 일반 사용자입니다.\n다음 가이드를 따르세요.\n\n{body}"
 
 

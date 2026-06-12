@@ -351,8 +351,9 @@ public class ActionExecutor {
             register
         );
         if (!examples.isEmpty()) {
+            // 항목당 350자 컷 — example_bank 글은 최대 2000자라 3개 풀주입 시 최대 ~5k 토큰 (다이어트)
             dynamicExamples = examples.stream()
-                .map(e -> e.getContent())
+                .map(e -> truncate(e.getContent(), 350))
                 .collect(java.util.stream.Collectors.joining("\n---\n"));
             log.debug("RAG: {} posts found for {}", examples.size(), corrId);
         }
@@ -1170,7 +1171,13 @@ public class ActionExecutor {
             java.util.List<String> bodies = new java.util.ArrayList<>();
             for (String block : raw.split("\\n---")) {
                 String body = extractHistoryBody(block, type);
-                if (body != null && !body.isBlank()) bodies.add(body);
+                if (body == null || body.isBlank()) continue;
+                // 오염 면역(2026-06-12): 과거 시그니처 미스로 게시·기록된 LLM 거절문이
+                // recentOutputs로 재주입되며 후속 생성까지 오염시킴 → 가드 통과분만 사용
+                ContentSafetyGuard.ContentType guardType = "posts".equals(type)
+                    ? ContentSafetyGuard.ContentType.POST : ContentSafetyGuard.ContentType.COMMENT;
+                if (!safetyGuard.check(body, guardType).passed()) continue;
+                bodies.add(body);
             }
             int from = Math.max(0, bodies.size() - n);
             return new java.util.ArrayList<>(bodies.subList(from, bodies.size()));

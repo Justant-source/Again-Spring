@@ -97,9 +97,12 @@ public class ClaudeApiInvoker implements Invoker {
             String staticPart  = systemPart.substring(0, personaIdx).trim();
             String dynamicPart = systemPart.substring(personaIdx + PERSONA_SEP.length()).trim();
             if (staticPart.length() < CACHE_MIN_PREFIX_CHARS) {
-                // Haiku 최소 4096토큰 미달이면 cache_control이 있어도 조용히 스킵됨 — 가이드 축소 시 감지용
-                log.warn("cache prefix {} chars < {} — 4096토큰 최소치 미달로 캐싱이 스킵될 수 있음 "
-                    + "(voice 가이드 축소 주의)", staticPart.length(), CACHE_MIN_PREFIX_CHARS);
+                // Haiku 최소 4096토큰 미달이면 cache_control이 있어도 조용히 스킵됨.
+                // 2026-06-12 토큰 다이어트 이후 comment/reply는 의도적으로 미달 상태 —
+                // clcocloud가 캐싱을 간헐적으로만 존중함이 실측 확정돼 prefix 축소가 더 확실한 절감.
+                // Sonnet(최소 1024토큰)은 여전히 캐시 가능하므로 cache_control 자체는 유지. WARN→DEBUG.
+                log.debug("cache prefix {} chars < {} — Haiku 4096토큰 미달 (다이어트로 의도된 상태)",
+                    staticPart.length(), CACHE_MIN_PREFIX_CHARS);
             }
             ObjectNode block1 = content.addObject();
             block1.put("type", "text");

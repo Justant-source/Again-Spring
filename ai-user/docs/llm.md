@@ -1028,7 +1028,29 @@ AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 
 **측정**: `python3 ai-user/tools/api-usage-report.py [--container ... --since 24h]` — 일별·모델별 히트율·과금등가·절감률
 **주의**: clcocloud의 usage 수치는 일부 가공 정황(input=0 등) — 청구 절감의 최종 증빙은 크레딧 소모 속도 비교.
 
+
+## 17. 토큰 다이어트 (2026-06-12)
+
+**배경**: clcocloud 캐싱 신뢰불가 정산(§16 — 간헐 작동, 실현 절감 6%→0%) → 호출마다 전액 과금되는
+정적 prefix 자체를 축소. 문체 현실화(§15)의 런타임 동적 주입(styleExamples·recentOutputs·modeHint·
+페르소나 예시 풀)이 정적 예시를 대체하므로 가능해짐.
+
+**내용**:
+- voice 가이드 4종: 예시 모음 섹션 삭제, 규칙·AI투 금지목록·REACT 지시 보존 —
+  comment 3,698→1,920c · reply 3,618→1,477c · post 4,378→1,662c · partner 4,179→1,416c
+- buildSystem 코어: ❌/✅ 예시 각 1개로 압축 (규칙 무손실, −~600c)
+- ActionExecutor: 글 dynamicExamples 항목당 350자 컷 (최대 ~5k tok 폭주 방지)
+- ClaudeApiInvoker: prefix 4096tok 미달 WARN→DEBUG (다이어트로 의도된 상태)
+
+**실측 절감** (dev): 글(sonnet) input등가 7.7~8.6k → **평균 4,984 tok (−40%)** ·
+댓글 prefix 동일조건 비교 4,724 → 2,765 tok (**−1,959 tok, −41%**).
+절단 0 · 1000자 초과 0 · critique FAIL 0.
+
+**한글 토큰 비율 정정**: 실측 ~1.8 tok/char (이전 기록 0.87은 오류) — 다이어트 후에도
+comment prefix가 4096tok을 넘어 Haiku 캐시 기회는 보존됨.
+
+⚠️ 가이드를 다시 늘릴 땐 DB `ai_prompt_template` 갱신 절차(§16) 필수.
 ---
 
-**마지막 업데이트**: 2026-06-11 | **버전**: Invoker 인터페이스 계층 v1.0
+**마지막 업데이트**: 2026-06-12 | **버전**: Invoker 인터페이스 계층 v1.0
 **기반**: ClaudeCliInvoker, ClaudeApiInvoker, InvokerRouter, SelfCritiqueService, OutputSanitizer

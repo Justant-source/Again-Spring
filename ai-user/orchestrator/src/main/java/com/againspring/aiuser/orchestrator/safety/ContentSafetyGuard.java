@@ -64,7 +64,12 @@ public class ContentSafetyGuard {
         "i need to be direct: i can't", "i need to be direct: i'm",
         "i need to clarify: i'm", "i need to be transparent",
         "i appreciate you", "i appreciate you sharing", "i appreciate you testing",
-        "i'm an ai", "i am an ai", "as an ai", "저는 ai"
+        "i'm an ai", "i am an ai", "as an ai", "저는 ai",
+        // 2026-06-12 인시던트: 시그니처 미스로 거절문이 게시됨 (LlmErrorSignature와 동기 유지 — 절대규칙 #7)
+        "can't help with this", "cannot help with this", "unable to help with",
+        "i can't assist", "cannot assist with", "role-play as", "this is asking me to",
+        "이 요청을 도와드릴 수 없", "요청을 도와드릴 수가 없", "죄송하지만 저는 이 요청",
+        "이 프롬프트는", "프롬프트 인젝션"
     );
 
     private static final int MIN_LENGTH = 5;
