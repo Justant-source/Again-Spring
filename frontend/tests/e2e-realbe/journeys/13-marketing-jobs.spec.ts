@@ -99,9 +99,10 @@ test.describe('Journey 13-B: 마케팅 잡 UI 페이지', () => {
   test('어드민 — 사이드바에 마케팅 잡 링크 존재', async ({ page }) => {
     await page.goto(`${BASE}/admin`)
     await page.waitForURL(/\/admin/, { timeout: 10_000 })
-    // 사이드바 링크 확인
+    // 사이드바 링크 확인 — href 기준 (본문에 "마케팅" 포함한 AI 글 링크가 뜨면
+    // name 정규식이 strict-mode 충돌하는 flaky 방지, 2026-06-12)
     await expect(
-      page.getByRole('link', { name: /마케팅/i }),
+      page.locator('a[href="/admin/marketing"]').first(),
     ).toBeVisible({ timeout: 8_000 })
   })
 
