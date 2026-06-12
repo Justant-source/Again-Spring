@@ -66,9 +66,36 @@ public class ClaudeApiInvoker implements Invoker {
         .connectTimeout(Duration.ofSeconds(15))
         .build();
 
+    /** clcocloud 거절 노드 대응 재시도 횟수 (PROVIDER_ERROR 한정). */
+    @Value("${llm.api.refusal-retries:2}")
+    private int refusalRetries;
+
+    /** 재시도 소진 후 1회 폴백할 모델 (예: claude-sonnet-4-6). 빈 값 = 폴백 비활성. */
+    @Value("${llm.api.refusal-fallback-model:}")
+    private String refusalFallbackModel;
+
     @Override
     public String invoke(String prompt, String model) throws LlmException {
-        return call(prompt, model, 120_000);
+        // 2026-06-12 clcocloud 인시던트: Haiku 풀에 거절 노드 혼입 — 동일 요청이 확률적으로
+        // "I appreciate you testing…" 류 거절 응답을 받음 (prefill·모델명 alias 무관, 4분면 실측).
+        // 거절(PROVIDER_ERROR)에 한해 재시도하고, 소진 시 폴백 모델(거절 0% 실측인 sonnet)로 1회 승격.
+        ClaudeCodeException lastRefusal = null;
+        for (int attempt = 0; attempt <= refusalRetries; attempt++) {
+            try {
+                if (attempt > 0) {
+                    log.info("PROVIDER_ERROR retry {}/{} (clcocloud refusal node)", attempt, refusalRetries);
+                }
+                return call(prompt, model, 120_000);
+            } catch (ClaudeCodeException e) {
+                if (!"PROVIDER_ERROR".equals(e.getErrorCode())) throw e;  // 거절 외 오류는 즉시 전파
+                lastRefusal = e;
+            }
+        }
+        if (refusalFallbackModel != null && !refusalFallbackModel.isBlank()) {
+            log.warn("PROVIDER_ERROR {}회 — 폴백 모델 {}로 1회 승격", refusalRetries + 1, refusalFallbackModel.trim());
+            return call(prompt, refusalFallbackModel.trim(), 120_000);
+        }
+        throw lastRefusal;
     }
 
     /**
@@ -130,9 +157,9 @@ public class ClaudeApiInvoker implements Invoker {
 
     @Override
     public String invokeWithCancelSupport(String prompt, String model, CancelableInvocation inv) throws Exception {
-        // API 경로는 취소가 없음 — 동기 호출로 처리
+        // API 경로는 취소가 없음 — 동기 호출로 처리 (invoke()를 타서 거절 재시도·폴백 포함)
         if (inv.isCanceled()) throw new com.againspring.aiuser.llm.exception.InvocationCanceledException("Pre-cancel", inv.getInvocationId());
-        return call(prompt, model, 120_000);
+        return invoke(prompt, model);
     }
 
     private String call(String prompt, String model, long timeoutMs) throws LlmException {

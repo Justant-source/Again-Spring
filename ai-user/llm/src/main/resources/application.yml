@@ -39,6 +39,9 @@ llm:
     prompt-caching: ${LLM_API_PROMPT_CACHING:true}
     # 캐시 TTL: "5m"(기본, GA — beta 헤더 없음) | "1h"(beta 헤더 — ⚠️ clcocloud에서 Kiro 오라우팅 유발, 직접 API 전용)
     cache-ttl: ${LLM_API_CACHE_TTL:5m}
+    # clcocloud Haiku 풀 거절 노드 대응 (2026-06-12): 거절(PROVIDER_ERROR) 한정 재시도 + 소진 시 폴백 모델 1회
+    refusal-retries: ${LLM_API_REFUSAL_RETRIES:2}
+    refusal-fallback-model: ${LLM_API_REFUSAL_FALLBACK_MODEL:claude-sonnet-4-6}
 
 logging:
   level:
