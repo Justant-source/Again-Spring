@@ -394,8 +394,8 @@ flowchart TD
 |------|------|---------|
 | **SHORT** | 50~120자 | "아주 짧게 — 핵심 상황 하나만" |
 | **MEDIUM** | 150~350자 | "짧게 — 상황과 감정 간략히" |
-| **LONG** | 400~800자 | "보통 — 사건 흐름 상세히" |
-| **VERYLONG** | 900~1800자 | "길게 — 감정 흐름, 사족 자연스럽게" |
+| **LONG** | 400~650자 | "보통 — 사건 흐름 상세히" |
+| **VERYLONG** | 650~950자 | "길게 — 감정 흐름, 사족 자연스럽게 (backend 1000자 제한 §6.3)" |
 
 ---
 
@@ -451,7 +451,7 @@ flowchart TD
     --> E["3️⃣ 마크다운 제거<br/>(##, **, 링크, 인용)"]
     --> F["4️⃣ AI 메타 선두<br/>제거"]
     --> G["5️⃣ 문체 후처리<br/>(온점, 따옴표 제거)"]
-    --> H["6️⃣ 길이 자르기<br/>(post:2000, comment:300)"]
+    --> H["6️⃣ 길이 자르기<br/>(post:1000, comment:300)"]
     --> I["💬 Sanitized Output"]
 ```
 
@@ -467,7 +467,7 @@ flowchart TD
 | **3. 마크다운** | `##`, `**`, `[링크]()` | "**진짜**" | "진짜" |
 | **4. 선두 제거** | LEADING_META | "물론이죠 글입니다" | "글입니다" |
 | **5. 문체** | `\.(?!\.\.\|\!)`, `"..."` | "했음.\n" | "했음\n" |
-| **6. 길이 자르기** | substring(maxLen) | 2500자 텍스트 | 2000자 텍스트 |
+| **6. 길이 자르기** | substring(maxLen) | 1500자 텍스트 | 1000자 텍스트 |
 
 ---
 
@@ -475,13 +475,34 @@ flowchart TD
 
 | ContentType | 최대 길이 | 비고 |
 |-------------|---------|------|
-| **POST** | 2000자 | OutputSanitizer MAX_POST |
+| **POST** | **1000자** | OutputSanitizer MAX_POST — backend `PostCreateRequest @Size(max=1000)`와 일치 (2026-06-11) |
 | **COMMENT** | 300자 | OutputSanitizer MAX_COMMENT |
 | **REPLY** | 100자 이하 | 자르기 적용 안 함 (이미 짧음) |
 
 **추가 체크**: ContentSafetyGuard (orchestrator)에서 별도 제한
 - POST: 2200자
 - COMMENT: 350자
+
+---
+
+### 6.3 "---" 구분선 처리 — 글 절단 근본 수정 (2026-06-11)
+
+**증상**: 글 Sonnet 승격 시 prod 글 ~50%가 문장 중간에서 절단 ("어젯밤에 남친이 게임"만 22자). Haiku는 0%.
+
+**원인 (stop_reason 직접 캡처로 규명)**: 모델 출력은 정상(`stop_reason=end_turn`, 1286자). 범인은
+OutputSanitizer 3단계의 `\n---\n.*$` 삭제 규칙 — **Sonnet은 "제목\n\n---\n\n본문" 형태로 쓰는 습관**이라
+본문 1200자가 통째로 날아갔다. Haiku는 `---`를 안 써서 안 드러났던 잠복 버그.
+
+**수정**:
+- 첫 `---` 구분선 뒤가 길면(본문, ≥40자) **구분선만 제거하고 보존**, 짧으면(AI 메타) 뒤를 삭제 (`HR_LINE` 패턴)
+- `trimIncompleteEnding` 종결어미 통일·확장 — "느낌이었음"(었음 계열) 오판 + "화**요**일"의 "요"를
+  한글 `\w` 미인식으로 종결 오매칭하던 버그 동반 수정 (`ENDING_ALT`/`COMPLETE_ENDING`/`ENDING_FINDER`)
+- 길이 정책 정합: `lengthInstruction` VERYLONG "900~1800자" → **650~950자** (backend 1000자 제한 위반 방지),
+  `MAX_POST` 2000→1000. 본문 보존하니 드러난 잠복 모순.
+- orchestrator `executePost`에 **최소길이 재생성 가드** (`ai-user.min-post-chars`, 기본 50 — 제목만 남는 절단 방어)
+
+**검증**: `OutputSanitizerHrTest` 5종 + dev sonnet 글 19건 절단 0·1000초과 0·400거부 0.
+`ClaudeApiInvoker`에 `stop_reason` 로깅 추가 (max_tokens 절단 모니터링).
 
 ---
 
@@ -630,17 +651,20 @@ llm:
     default-timeout-ms: ${LLM_DEFAULT_TIMEOUT_MS:120000}
     claude-binary-path: ${CLAUDE_BIN:claude}
     claude-model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
-  
+  post-model: ${LLM_POST_MODEL:}               # 글(POST)+partner 전용 모델 (빈 값=claude-model 폴백)
   api:
-    enabled: ${LLM_API_ENABLED:false}           # Anthropic API 활성화 (기본: 비활성화)
-    prompt-caching: ${LLM_API_PROMPT_CACHING:true}  # 프롬프트 캐싱 활성화
+    prompt-caching: ${LLM_API_PROMPT_CACHING:true}        # user-block cache_control 캐싱
+    cache-ttl: ${LLM_API_CACHE_TTL:5m}                    # 5m(GA) | 1h(beta — clcocloud Kiro 오라우팅 유발)
+    refusal-retries: ${LLM_API_REFUSAL_RETRIES:2}         # clcocloud 거절 노드 재시도 (§18)
+    refusal-fallback-model: ${LLM_API_REFUSAL_FALLBACK_MODEL:claude-sonnet-4-6}  # 재시도 소진 시 폴백
 
 self-critique:
-  enabled: ${SELF_CRITIQUE_ENABLED:false}      # 🚨 기본값: false
+  enabled: ${SELF_CRITIQUE_ENABLED:false}      # 🚨 기본값: false (compose dev/prod는 true)
   pass-threshold: ${SELF_CRITIQUE_THRESHOLD:5}
+  extra-cliches: ${SELF_CRITIQUE_EXTRA_CLICHES:}  # 추가 AI 상투구 (쉼표 구분 리터럴, 무배포 등록)
 
 anthropic:
-  api-key: ${ANTHROPIC_API_KEY:-}              # Anthropic API 키 (선택)
+  api-key: ${ANTHROPIC_API_KEY:-}              # Anthropic API 키 (DB system_setting 우선)
 
 logging:
   level:
@@ -652,15 +676,19 @@ logging:
 
 | 변수 | 기본값 | 설명 |
 |------|-------|------|
-| `LLM_API_ENABLED` | `false` | Anthropic API 활성화 여부 |
-| `LLM_API_PROMPT_CACHING` | `true` | 프롬프트 캐싱 활성화 여부 |
-| `ANTHROPIC_API_KEY` | (없음) | Anthropic API 키 (없으면 CLI 폴백) |
+| `LLM_API_PROMPT_CACHING` | `true` | user-block 캐싱 (clcocloud 간헐 무시 §16) |
+| `LLM_API_CACHE_TTL` | `5m` | 캐시 TTL — `1h`은 직접 API 전용 (§16) |
+| `LLM_POST_MODEL` | (빈 값) | 글+partner 전용 모델 (compose 기본 sonnet) |
+| `LLM_API_REFUSAL_RETRIES` | `2` | clcocloud 거절 재시도 (§18) |
+| `LLM_API_REFUSAL_FALLBACK_MODEL` | `claude-sonnet-4-6` | 거절 폴백 모델 (§18) |
+| `ANTHROPIC_API_KEY` | (없음) | API 키 (DB system_setting 우선, 없으면 CLI 폴백) |
 | `LLM_POOL_SIZE` | `20` | 스레드 풀 크기 |
 | `LLM_QUEUE_CAPACITY` | `100` | 대기열 크기 |
 | `LLM_DEFAULT_TIMEOUT_MS` | `120000` | 타임아웃 (ms) |
-| `SELF_CRITIQUE_ENABLED` | `false` | 자기비평 활성화 |
+| `SELF_CRITIQUE_ENABLED` | `false` (compose는 true) | 자기비평 활성화 |
+| `SELF_CRITIQUE_EXTRA_CLICHES` | (빈 값) | 추가 AI 상투구 (§15) |
 | `CLAUDE_BIN` | `claude` | Claude CLI 바이너리 경로 |
-| `CLAUDE_MODEL` | `claude-haiku-4-5-20251001` | 모델명 |
+| `CLAUDE_MODEL` | `claude-haiku-4-5-20251001` | 댓글/대댓글 모델 |
 
 ---
 
@@ -1026,7 +1054,13 @@ AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 
 
 **설정**: `llm.api.prompt-caching`(기본 true) · `llm.api.cache-ttl`(기본 5m)
 **측정**: `python3 ai-user/tools/api-usage-report.py [--container ... --since 24h]` — 일별·모델별 히트율·과금등가·절감률
-**주의**: clcocloud의 usage 수치는 일부 가공 정황(input=0 등) — 청구 절감의 최종 증빙은 크레딧 소모 속도 비교.
+
+**🔴 정산 결론 (2026-06-12, prod 8.5h 실측)**: **clcocloud 캐싱은 신뢰 불가 — 사실상 절감 없음.**
+07:15~08:36엔 캐싱 존중(read 발생)하다가 **08:36 이후 완전 무시**(input≈8000인데 write=0). 같은 날
+재프로브도 동일 프롬프트 2연속 둘 다 write/read=0. 우리 코드는 정상(07:15 히트가 증명) — 순수
+**프록시측 간헐 비활성**. 게다가 prod 호출 간격 ~13분 ≫ 5m TTL이라 켜져 있어도 히트율 낮음(dev 90%는
+5분내 버스트 워밍). → **캐싱은 "되면 보너스", 신뢰 절감 경로는 토큰 다이어트(§17).** `prompt-caching=true`는
+유지(무시되면 무해, Sonnet 글은 최소 1024tok라 여전히 기회). 청구 절감 최종 증빙은 크레딧 소모 속도.
 
 
 ## 17. 토큰 다이어트 (2026-06-12)
@@ -1050,6 +1084,31 @@ AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 
 comment prefix가 4096tok을 넘어 Haiku 캐시 기회는 보존됨.
 
 ⚠️ 가이드를 다시 늘릴 땐 DB `ai_prompt_template` 갱신 절차(§16) 필수.
+
+## 18. clcocloud 거절 노드 대응 — 재시도 + 모델 폴백 (2026-06-12)
+
+**증상**: dev·prod 댓글/대댓글(Haiku)이 일제히 FAILED — 모델이 "I appreciate you testing my consistency"·
+"I can't help with this request"·"죄송하지만 저는 이 요청…" 류 영어/한국어 메타 거절만 반환. Sonnet(글)은 정상.
+
+**진단 (실측)**: 프롬프트로 우회 불가 — **assistant prefill조차 무시**(진짜 Claude면 prefill을 이어가므로
+프록시가 자체 거절 응답을 주입한다는 결정적 증거), 모델명 alias(`claude-haiku-4-5`)도 1/4만 통과 →
+**clcocloud Haiku 풀에 거절 노드가 확률적으로 혼입**. 시간대별로 전면 거절↔정상 변덕. **운영 방침: CLI 전환
+금지, clcocloud API 유지.**
+
+**대응 (`ClaudeApiInvoker.invoke`)**:
+- 거절(`PROVIDER_ERROR`) **한정** 재시도 — `llm.api.refusal-retries`(기본 2). 거절 외 오류는 즉시 전파
+- 재시도 소진 시 폴백 모델 1회 승격 — `llm.api.refusal-fallback-model`(기본 `claude-sonnet-4-6`, 거절 0% 실측)
+- clcocloud 정상 시 재시도 미발동(추가 비용 0). 거절 1회당 input ~5k tok 추가 과금은 감수(생성 중단보다 우선)
+- `invokeWithCancelSupport`도 `invoke()` 경유 → 동일 재시도·폴백 적용
+
+**LLM 거절문 게시 차단 보강 (절대규칙 #7)**: 과거 시그니처 미스로 거절문이 가드 2계층을 통과해 게시됨
+(dev 63건·prod 1건 정화). `LlmErrorSignature`(llm) + `ContentSafetyGuard.LLM_ERROR_SIGNATURES`(orchestrator)에
+12종 동시 보강: `can't help with this`·`role-play as`·`이 요청을 도와드릴 수 없`·`이 프롬프트는` 등.
+**오염 루프 차단**: 게시→history→`recentOutputs` 재주입 경로에서 후속 생성까지 거절시키던 문제 →
+`ActionExecutor.loadRecentBodies`에 `ContentSafetyGuard` 통과분만 사용하는 필터 추가.
+
+**라이브 증명** (prod 04:22): Haiku 3연속 거절(input 5037×3) → Sonnet 폴백 성공 → 대댓글 게시.
+
 ---
 
 **마지막 업데이트**: 2026-06-12 | **버전**: Invoker 인터페이스 계층 v1.0

@@ -61,6 +61,30 @@ API 키 없이 동작 — 호스트의 `~/.claude` 세션을 **llm-worker** 컨�
 > 이 env var는 **admin UI 목표가 모두 0일 때만 fallback**으로 동작합니다.
 > 운영 중 목표 조정은 **admin UI를 사용**하세요 (재배포 불필요).
 
+#### 문체·반복 가드 (orchestrator)
+
+| 변수 | 사용처 | 기본 |
+|---|---|---|
+| `AI_USER_REPETITION_THRESHOLD` | 생성문 vs 최근 출력 2-gram Jaccard 임계 — 초과 시 1회 재생성 (llm.md §15) | `0.45` |
+| `AI_USER_MIN_POST_CHARS` | 글 최소 길이 — 미달 시 1회 재생성 (제목만 남는 절단 방어, llm.md §6.3) | `50` |
+
+### AI 유저 LLM 생성 (`againspring-llm-ai-user` 컨테이너, 8092)
+
+backend의 `againspring-llm`(8090, 채팅·배심원)과 **별개 서비스**. 글/댓글/대댓글 생성 전용.
+`backend=API` 경로는 `ANTHROPIC_API_KEY`/`ANTHROPIC_BASE_URL`(DB `system_setting` 우선)로 clcocloud 프록시 호출.
+
+| 변수 | 사용처 | dev/기본 | 비고 |
+|---|---|---|---|
+| `AI_USER_LLM_MODEL` | `CLAUDE_MODEL` — 댓글/대댓글 기본 모델 | `claude-haiku-4-5-20251001` | |
+| `LLM_POST_MODEL` | 글(POST)+partner 전용 모델 오버라이드 | `claude-sonnet-4-6` | 빈 값=`CLAUDE_MODEL` 폴백 (llm.md §6.3) |
+| `LLM_API_PROMPT_CACHING` | user-block `cache_control` 캐싱 | `true` | clcocloud 간헐 무시 — "되면 보너스" (llm.md §16) |
+| `LLM_API_CACHE_TTL` | 캐시 TTL `5m`(GA) \| `1h`(beta) | `5m` | ⚠️ `1h`은 clcocloud Kiro 오라우팅 유발 — 직접 API 전용 |
+| `LLM_API_REFUSAL_RETRIES` | clcocloud 거절(PROVIDER_ERROR) 재시도 횟수 | `2` | llm.md §18 |
+| `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 시 폴백 모델 (거절 0% 실측) | `claude-sonnet-4-6` | 빈 값=폴백 비활성 |
+| `SELF_CRITIQUE_ENABLED` | 생성 후 자기비평 루프 | `true` | |
+| `SELF_CRITIQUE_THRESHOLD` | 비평 통과 점수 (7점 만점) | `5` | |
+| `SELF_CRITIQUE_EXTRA_CLICHES` | 추가 AI 상투구 (쉼표 구분 리터럴) — 무배포 등록 | `""` | llm.md §15 |
+
 ### OAuth2
 
 | 변수 | 비고 |

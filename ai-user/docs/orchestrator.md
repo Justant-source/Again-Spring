@@ -1862,6 +1862,20 @@ UPDATE ai_user_runtime SET daily_global_cap=300 WHERE id=1;
 
 **측정 도구**: `ai-user/tools/style-report.py` — opener 중복률·상투 토큰·길이 분포·인접 유사도. baseline은 `tools/reports/` (gitignore).
 
+## 19. 글 절단·토큰 다이어트·거절 면역 (2026-06-12)
+
+llm.md §6.3 / §17 / §18과 연동된 orchestrator 측 변경.
+
+**최소길이 재생성 가드 (S5 글 Sonnet 안정화)**
+- `executePost`: 생성문이 `ai-user.min-post-chars`(기본 50, env `AI_USER_MIN_POST_CHARS`)보다 짧으면 1회 재생성 (재시도는 `lengthTier=MEDIUM` 강제). 제목만 남는 절단·불완결 방어 — 모델 무관.
+
+**dynamicExamples 토큰 캡 (토큰 다이어트)**
+- `executePost`의 주제-RAG 예시를 항목당 `truncate(…, 350)` 후 join. example_bank 글은 최대 2,000자라 3개 풀주입 시 최대 ~5k tok 폭주 → 350자 컷으로 스타일 참고에 충분한 선에서 절감.
+
+**거절문 오염 면역 (절대규칙 #7)**
+- `ContentSafetyGuard.LLM_ERROR_SIGNATURES`에 12종 보강 (llm `LlmErrorSignature`와 **동기 유지 필수**): `can't help with this`·`role-play as`·`이 요청을 도와드릴 수 없`·`이 프롬프트는` 등. 2026-06-12 clcocloud Haiku 거절 노드 인시던트 대응.
+- `loadRecentBodies()`: 히스토리에서 읽은 본문이 `ContentSafetyGuard`를 통과하지 못하면 제외 — 과거 게시된 거절문이 `recentOutputs`로 재주입돼 후속 생성까지 연쇄 거절시키던 **오염 루프 차단**. (posts→POST, comments→COMMENT 타입 매핑)
+
 ## 부록 A. 용어 정의
 
 | 용어 | 정의 |

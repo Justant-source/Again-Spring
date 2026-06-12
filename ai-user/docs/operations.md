@@ -495,6 +495,27 @@ LIMIT 10;
 
 ## 8. 트러블슈팅 고급 사례
 
+### 케이스 0: "댓글/대댓글이 일제히 안 생성됨 (FAILED gen_failed)" — clcocloud 거절 노드
+
+**증상**: `persona_action_log`에서 COMMENT/REPLY가 대량 FAILED(`{"error":"gen_failed"}`), 글(POST/Sonnet)은 정상.
+프록시 키(`backend=API`)가 clcocloud일 때 발생.
+
+**진단**:
+```bash
+docker logs againspring-llm-ai-user-prod | grep -i "provider error\|appreciate\|can't help" | tail
+# clcocloud Haiku 풀에 거절 노드 혼입 — "I appreciate you testing…" / "I can't help with this request"
+```
+
+**현재 동작 (자동 대응, 2026-06-12)**: `ClaudeApiInvoker`가 거절(PROVIDER_ERROR)을 `LLM_API_REFUSAL_RETRIES`(기본 2)회
+재시도 후 `LLM_API_REFUSAL_FALLBACK_MODEL`(기본 sonnet, 거절 0%)로 폴백 → 게시는 지속됨. 거절문은
+`LlmErrorSignature`/`ContentSafetyGuard`가 차단해 절대 게시 안 됨 (절대규칙 #7). 상세: ai-user/docs/llm.md §18.
+
+**운영 메모**: clcocloud 변덕이 심하면 폴백 발동률이 올라 sonnet 비용 증가 → clcocloud 측에 "Haiku 간헐 거절"
+문의 권장. **CLI 전환은 운영 방침상 금지** (clcocloud API 유지). 복구되면 재시도 미발동(haiku 단독).
+
+**거절문이 이미 게시됐다면** (구버전): `pc.body LIKE "%can't help%" OR "%appreciate%" OR "%죄송하지만 저는%"`로
+soft-delete + `example_bank`/history 정화 (history 오염은 `loadRecentBodies` 가드가 자동 차단하나, 과거분은 수동).
+
 ### 케이스 1: "LLM 워커 큐 가득 참 (pending 100개 이상)"
 
 **증상**: 글 생성이 늦음 (5분 이상 소요)

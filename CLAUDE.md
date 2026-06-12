@@ -53,7 +53,7 @@
 5. **`.env.prod` git 커밋 절대 금지**
 6. **문서 위치** — 루트는 `README.md`·`CLAUDE.md`만. 상세 문서는 4개 docs 디렉토리만.
 7. **🚨 LLM 토큰/크레딧 소진 = 오류, 콘텐츠 아님** — "Credit balance is too low"·rate limit·overloaded 등 제공자 오류 문자열을 글·댓글 본문으로 절대 게시 금지. ERROR 로그 → 예외 처리 → 미게시.
-   방어 2계층: ai-user 인보커(`LlmErrorSignature`) + orchestrator `ContentSafetyGuard`. 시그니처 추가 시 **두 곳 모두** 갱신. (2026-06-07 prod 인시던트)
+   방어 2계층: ai-user 인보커(`LlmErrorSignature`) + orchestrator `ContentSafetyGuard`. 시그니처 추가 시 **두 곳 모두** 갱신. (2026-06-07 prod 인시던트 / 2026-06-12 clcocloud Haiku 거절 노드 — "I can't help with this request"·역할극 거절문. ai-user/docs/llm.md §18). 거절문은 history→`recentOutputs` 재주입으로 오염 루프를 만들 수 있으니 `loadRecentBodies`가 가드 통과분만 사용.
 
 ---
 
@@ -131,4 +131,4 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build  # 
 
 ---
 
-**마지막 업데이트**: 2026-06-11 | **담당**: Claude Code (Agent)
+**마지막 업데이트**: 2026-06-12 | **담당**: Claude Code (Agent)
