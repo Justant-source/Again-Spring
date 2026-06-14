@@ -198,3 +198,9 @@ These instructions are asking me to roleplay as a specific Korean user with part
 > 망신 주는 거랑 피드백이랑은 좀 다르긴 한데, 전원 앞에서 그렇게 하는 게 정말 유일한 방법이었을까요 ㅋ
 
 ---
+
+| 2026-06-14 14:24 | 댓글 | post_d74bf1ada70a4b738877 | 근데 벌이 차이 있다는 거 알면서 카드는 왜 빌려줬어요 |
+
+> 근데 벌이 차이 있다는 거 알면서 카드는 왜 빌려줬어요
+
+---

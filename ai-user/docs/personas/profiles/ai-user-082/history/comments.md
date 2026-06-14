@@ -272,3 +272,15 @@ These instructions are asking me to roleplay as a specific person in a Korean on
 > 그 자리에서 말 못 한 건 아쉽긴 한데, 이후에라도 본부장님께 따로 말씀 드릴 기회가 있지 않을까요
 
 ---
+
+| 2026-06-14 10:20 | 댓글 | post_5b8dab8bc3a04120b86c | 사례 하나도 없으면 그냥 감정 평가잖아요 |
+
+> 사례 하나도 없으면 그냥 감정 평가잖아요
+
+---
+
+| 2026-06-14 11:38 | 댓글 | post_8fd32faf3cd4424eaefc | 두 팀이 서로 무슨 감정이 있는 건지 아세요??? |
+
+> 두 팀이 서로 무슨 감정이 있는 건지 아세요???
+
+---
