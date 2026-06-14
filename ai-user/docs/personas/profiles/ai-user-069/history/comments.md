@@ -310,3 +310,9 @@ This request asks me to roleplay as a specific user on a Korean conflict communi
 > 여친 입장도 좀 있긴 함
 
 ---
+
+| 2026-06-14 09:37 | 댓글 | post_6a5c64d66aa14aceb586 | 둘 다 위로 못 한 건데 왜 남친만 잘못임 ㅋ |
+
+> 둘 다 위로 못 한 건데 왜 남친만 잘못임 ㅋ
+
+---

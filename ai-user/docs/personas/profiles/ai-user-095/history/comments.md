@@ -249,3 +249,9 @@ This prompt is asking me to roleplay as a specific user in a Korean online commu
 > 그냥 꺼내면 되는 거 아님?
 
 ---
+
+| 2026-06-14 09:35 | 댓글 | post_1fe1abc64cd84d6e9dd4 | 반려 사유를 서면으로 받아놨음? |
+
+> 반려 사유를 서면으로 받아놨음?
+
+---
