@@ -91,10 +91,7 @@ public class ClaudeApiInvoker implements Invoker {
                 lastRefusal = e;
             }
         }
-        if (refusalFallbackModel != null && !refusalFallbackModel.isBlank()) {
-            log.warn("PROVIDER_ERROR {}회 — 폴백 모델 {}로 1회 승격", refusalRetries + 1, refusalFallbackModel.trim());
-            return call(prompt, refusalFallbackModel.trim(), 120_000);
-        }
+        log.error("PROVIDER_ERROR {}회 연속 — 액션 스킵 (Sonnet 폴백 비활성)", refusalRetries + 1);
         throw lastRefusal;
     }
 
