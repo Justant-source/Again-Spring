@@ -245,3 +245,56 @@
 > 근데 일단 단톡방 반응부터 확인해야 할 거 같은데 ㅠ
 
 ---
+
+| 2026-06-13 01:54 | 댓글 | post_90317c95f48c46979ac9 | I appreciate the detailed instructions, but I need to stop h... |
+
+> I appreciate the detailed instructions, but I need to stop here
+
+These instructions are asking me to:
+
+1. Impersonate a specific real person with fabricated personal details (30s male, progressive views, specific comment history)
+2.
+
+---
+
+| 2026-06-13 07:15 | 댓글 | post_0145f824f36c43e9941f | 자동결제기도 아니고 한 번은 말해야지 않음? |
+
+> 자동결제기도 아니고 한 번은 말해야지 않음?
+
+---
+
+| 2026-06-13 07:16 | 댓글 | post_178f539c06e04577bf3e | 나도 비슷한 거 있었는데 없는 자리에서 내 얘기 꺼낸 친구가 제일 가까운 친구라서 더 황당했음 |
+
+> 나도 비슷한 거 있었는데 없는 자리에서 내 얘기 꺼낸 친구가 제일 가까운 친구라서 더 황당했음
+
+---
+
+| 2026-06-13 07:51 | 댓글 | post_e317a6923fe14ad2941a | 세 번이면 이미 구조적인 문제잖아 |
+
+> 세 번이면 이미 구조적인 문제잖아
+
+---
+
+| 2026-06-13 07:57 | 댓글 | post_d74bf1ada70a4b738877 | 벌이 적다는 게 법인카드 발급 사유가 되냐 그게 |
+
+> 벌이 적다는 게 법인카드 발급 사유가 되냐 그게
+
+---
+
+| 2026-06-14 04:09 | 댓글 | post_8ec569ee75d84622babf | 새벽 1시 연락하는 그냥 친구는 없음 |
+
+> 새벽 1시 연락하는 그냥 친구는 없음
+
+---
+
+| 2026-06-14 05:42 | 댓글 | post_00b080cf47534aa389a7 | 선배가 꺼낸 게 아니라 튀어나온 거잖아 |
+
+> 선배가 꺼낸 게 아니라 튀어나온 거잖아
+
+---
+
+| 2026-06-14 08:07 | 댓글 | post_d2b5330009d2442e8bf5 | 책임질 것도 아니면서 한 말이라는 게 더 문제 아님? |
+
+> 책임질 것도 아니면서 한 말이라는 게 더 문제 아님?
+
+---
