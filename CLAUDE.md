@@ -62,6 +62,7 @@
    ③ `cd frontend && npm run lint:docs` 통과
    ④ 갱신 대상 없으면 커밋 메시지에 `Doc-Sync: 없음` 명시
    **HALT** — API/포트/ER/상태전이/정책/환경변수 변경인데 대응 문서 못 찾으면 push 중단·보고
+9. **브랜치 정책 — main 단일 브랜치** — 모든 작업은 `main`에서 직접 commit·push. feature/topic 브랜치 생성 금지. worktree 에이전트가 만든 임시 브랜치는 작업 완료 즉시 삭제.
 
 ---
 
