@@ -39,32 +39,30 @@ flowchart TD
 ## 2. 아키텍처
 
 ```mermaid
-C4Context
-    title AI Learning System — 컨테이너 구조
+flowchart TB
+    dev_user["👤 개발자<br/>kill-switch 관리"]
 
-    Person(dev_user, "개발자", "kill-switch 관리")
-    
-    Boundary(shared, "공용 서비스 (dev·prod 공유)") {
-        Container(ai_learning, "ai-learning", "Python FastAPI\n포트 8099", "임베딩·예시뱅크·크롤러")
-        ContainerDb(pg_db, "ai-learning-db", "PostgreSQL 15\n+pgvector", "example_bank, crawl_log")
-    }
+    subgraph shared_stack["공용 서비스 (dev·prod 공유)"]
+        ai_learning["ai-learning<br/>Python FastAPI :8099<br/>임베딩·예시뱅크·크롤러"]
+        pg_db[("ai-learning-db<br/>PostgreSQL 15+pgvector<br/>example_bank, crawl_log")]
+    end
 
-    Boundary(dev, "Dev Stack (포트 8090)") {
-        Container(llm_ai_user_dev, "llm-ai-user-dev", "Spring Boot\n포트 8092", "Haiku 생성 워커\n자기비평 포함")
-        Container(orchestrator_dev, "ai-user-orchestrator-dev", "Spring Boot\n포트 8096", "봇 행동 브레인")
-    }
+    subgraph dev_stack["Dev Stack (포트 8090)"]
+        llm_dev["llm-ai-user-dev<br/>Spring Boot :8092<br/>Haiku 생성·자기비평"]
+        orc_dev["ai-user-orchestrator-dev<br/>Spring Boot :8096<br/>봇 행동 브레인"]
+    end
 
-    Boundary(prod, "Prod Stack (포트 8091)") {
-        Container(llm_ai_user_prod, "llm-ai-user-prod", "Spring Boot\n포트 8092", "Haiku 생성 워커")
-        Container(orchestrator_prod, "ai-user-orchestrator-prod", "Spring Boot\n포트 8096", "봇 행동 브레인")
-    }
+    subgraph prod_stack["Prod Stack (포트 8091)"]
+        llm_prod["llm-ai-user-prod<br/>Spring Boot :8092<br/>Haiku 생성"]
+        orc_prod["ai-user-orchestrator-prod<br/>Spring Boot :8096<br/>봇 행동 브레인"]
+    end
 
-    Rel(orchestrator_dev, ai_learning, "예시 저장/검색\nPOST /examples/save\nPOST /examples/search")
-    Rel(orchestrator_prod, ai_learning, "예시 저장/검색")
-    Rel(orchestrator_dev, ai_learning, "크롤 트리거\nPOST /crawl/{source}")
-    Rel(ai_learning, pg_db, "SQL + pgvector\ncosine similarity")
-    Rel(llm_ai_user_dev, llm_ai_user_dev, "자기비평 루프\n내부 2차 LLM 호출")
-    Rel(dev_user, ai_learning, "GET /examples/count\nGET /crawl/log")
+    orc_dev -->|"예시 저장/검색<br/>POST /examples/save·search"| ai_learning
+    orc_prod -->|"예시 저장/검색"| ai_learning
+    orc_dev -->|"크롤 트리거<br/>POST /crawl/{source}"| ai_learning
+    ai_learning --> pg_db
+    orc_dev -->|"자기비평 루프 포함"| llm_dev
+    dev_user -->|"GET /examples/count·/crawl/log"| ai_learning
 ```
 
 ---

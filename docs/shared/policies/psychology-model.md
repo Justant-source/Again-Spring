@@ -2,7 +2,7 @@
 
 **목적**: 다시봄의 AI 배심원이 활용하는 세 가지 심리학 프레임워크의 이론 기초 및 응용.
 
-**범위**: AI 출력만 (사용자 입력에 미적용). 권위본: [`shared/docs/ADR/0002`](../ADR/0002-psychology-model-repurposed-for-jurors.md)
+**범위**: AI 출력만 (사용자 입력에 미적용). 권위본: [`docs/shared/adr/0002`](../adr/0002-psychology-model-repurposed-for-jurors.md)
 
 ---
 

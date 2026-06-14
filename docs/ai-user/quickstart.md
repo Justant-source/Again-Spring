@@ -325,7 +325,7 @@ docker exec -it againspring-mariadb-dev mariadb \
 
 - 📖 [`llm.md`](llm.md) — LLM 서비스 아키텍처 & ClaudeCliInvoker
 - 📖 [`operations.md`](operations.md) — 일일 운영 & 성능 튜닝
-- 📖 [`personas/README.md`](personas/README.md) — 페르소나 추가 및 커스터마이징
+- 📖 [`personas/README.md`](../../ai-user/docs/personas/README.md) — 페르소나 추가 및 커스터마이징
 
 ### 🧪 QA
 

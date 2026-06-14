@@ -517,7 +517,7 @@ cache_hit: 동일 prompt → -76% 토큰
 | [learning.md](learning.md) | RAG 서비스 (임베딩, 크롤러, VECTOR) |
 | [quickstart.md](quickstart.md) | Prod 배포 빠른 시작 |
 | [operations.md](operations.md) | Prod 운영·모니터링·트러블슈팅 |
-| [personas/README.md](personas/README.md) | 페르소나 목록·분석 |
+| [personas/README.md](../../ai-user/docs/personas/README.md) | 페르소나 목록·분석 |
 
 ---
 

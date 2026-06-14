@@ -6,18 +6,18 @@
 
 2026-06-02 커뮤니티 광장 피벗 관련 주요 결정사항:
 
-- [**ADR/README.md**](./ADR/README.md) — ADR 인덱스 및 작성법
-- [**ADR-0001**](./ADR/0001-pivot-to-community-plaza.md) — 🟥 **커뮤니티 광장 피벗** (1:1 중재 채팅 → 공개 게시글 + AI 배심원)
-- [ADR-0002](./ADR/0002-psychology-model-repurposed-for-jurors.md) — 심리학 모델 배심원 페르소나화 (Gottman/NVC/EFT)
-- [ADR-0003](./ADR/0003-llm-consolidated-to-claude-code-cli.md) — LLM 통합 (Claude Code CLI 단일 경로)
-- [ADR-0004](./ADR/0004-onboarding-mbti-hidden-not-removed.md) — 온보딩/MBTI 숨김 (삭제 아님)
-- [ADR-0005](./ADR/0005-marketing-automation-retained-unchanged.md) — 마케팅 자동화 → Again-Spring-Marketing(ASM) 분리 (2026-06-09 superseded)
-- [ADR-0006](./ADR/0006-legacy-deletion-and-git-recovery.md) — 🔴 **삭제 원장 및 복구 경로** (60+ 파일, 8 테이블)
+- [**ADR/README.md**](./adr/README.md) — ADR 인덱스 및 작성법
+- [**ADR-0001**](./adr/0001-pivot-to-community-plaza.md) — 🟥 **커뮤니티 광장 피벗** (1:1 중재 채팅 → 공개 게시글 + AI 배심원)
+- [ADR-0002](./adr/0002-psychology-model-repurposed-for-jurors.md) — 심리학 모델 배심원 페르소나화 (Gottman/NVC/EFT)
+- [ADR-0003](./adr/0003-llm-consolidated-to-claude-code-cli.md) — LLM 통합 (Claude Code CLI 단일 경로)
+- [ADR-0004](./adr/0004-onboarding-mbti-hidden-not-removed.md) — 온보딩/MBTI 숨김 (삭제 아님)
+- [ADR-0005](./adr/0005-marketing-automation-retained-unchanged.md) — 마케팅 자동화 → Again-Spring-Marketing(ASM) 분리 (2026-06-09 superseded)
+- [ADR-0006](./adr/0006-legacy-deletion-and-git-recovery.md) — 🔴 **삭제 원장 및 복구 경로** (60+ 파일, 8 테이블)
 
 ## 문서 인덱스
 
 ### 입문
-- [manifest.yaml](./manifest.yaml) — **문서 권위 그래프 SSOT** (충돌 시 어느 파일이 권위본인지 결정)
+- [docs/_index.md](../../docs/_index.md) — **문서 권위 그래프 SSOT + Doc-Sync 트리거맵** (구 manifest.yaml 흡수)
 - [structure.md](./structure.md) — 모노레포 4-분할 구조 (env/ backend/ frontend/ shared/)
 - [architecture.md](./architecture.md) — 시스템 전체 아키텍처 (브라우저↔Tunnel↔Nginx↔FE↔BE↔DB↔LLM, 커뮤니티 광장 기준)
 

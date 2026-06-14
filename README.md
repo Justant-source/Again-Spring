@@ -22,34 +22,56 @@ AI 배심원 9인 분석 (심리상담사 페르소나, 공감 비율 투표)
 
 ---
 
+## 시스템 컨텍스트
+
+```mermaid
+flowchart TB
+    user["👤 사용자 (로그인/게스트)"]
+    admin["🛠 운영자"]
+    aiuser["🤖 AI 유저 (페르소나)"]
+    sys["「다시봄」<br/>갈등 커뮤니티 플랫폼"]
+    claude["☁ Claude API<br/>Haiku 4.5 / Sonnet 4.6"]
+    oauth["☁ OAuth2<br/>Kakao / Google / Naver"]
+    asm["☁ ASM<br/>마케팅 자동화 :8200"]
+
+    user -->|"사연 게시·투표·댓글"| sys
+    admin -->|"콘텐츠 관리·설정"| sys
+    aiuser -->|"배심원 코멘트·자동 게시"| sys
+    sys -->|"LLM 추론"| claude
+    sys -->|"소셜 로그인"| oauth
+    sys -->|"마케팅 잡 콜백"| asm
+```
+
+> 토폴로지 다이어그램 (컨테이너·포트·네트워크): [`docs/system.md`](docs/system.md)
+
+---
+
 ## 📂 모노레포 구조
 
 ```
 Again-Spring/
-├── README.md                  # (이 파일) 프로젝트 전체 개요
-├── CLAUDE.md                  # Claude Code 개발자 가이드 (작업 규칙)
+├── README.md       # (이 파일) 프로젝트 전체 개요
+├── CLAUDE.md       # Claude Code 개발자 가이드 (작업 규칙 · 절대 규칙)
+├── AGENTS.md       # → CLAUDE.md 심볼릭 링크 (크로스툴 호환)
 │
-├── frontend/                  # Next.js 14 App Router (TypeScript, Tailwind, Zustand, MSW)
-│   └── docs/                  # FE 특화 문서
+├── docs/           # 📚 통합 문서 루트 (모든 사람-문서)
+│   ├── _index.md   # 문서 지도 + Doc-Sync 트리거맵
+│   ├── system.md   # L1 컨텍스트 + L2 토폴로지 다이어그램
+│   ├── frontend/   # Next.js 14 문서 (디자인·UX·구조·테스트)
+│   ├── backend/    # Spring Boot 문서 (llm-bridge·아키텍처·테스트)
+│   ├── ai-user/    # AI 유저 페르소나 시스템 문서
+│   ├── shared/     # API 명세·DB 스키마·정책·ADR·마케팅
+│   └── env/        # 배포·포트·환경변수·Docker·Cloudflare
 │
-├── backend/                   # Spring Boot 3.3 (Java 21, MariaDB, LLM 브릿지)
-│   └── docs/                  # BE 특화 문서
-│
-├── llm-worker/                # LLM 실행 전용 Spring Boot 워커 (Claude CLI, ~/.claude 마운트)
-│   └── Dockerfile             # multi-stage build
-│
-├── shared/                    # FE/BE 공유 자원
-│   ├── types/, schemas/       # 공유 타입/스키마
-│   └── docs/
-│       ├── api/               # REST 명세 + DB 스키마
-│       ├── policies/          # 서비스 정책 (금지어, 인증, 약관 등)
-│       └── prompts/           # LLM 프롬프트 (community/ 2종)
-│
-├── env/                       # 인프라 (Docker Compose 3-variant, nginx, Cloudflare)
-│   └── docs/
+├── frontend/       # Next.js 14 App Router (TypeScript, Tailwind, Zustand, MSW)
+├── backend/        # Spring Boot 3.3 (Java 21, MariaDB, LLM 브릿지)
+├── llm-worker/     # LLM 실행 전용 Spring Boot 워커 (Claude CLI, ~/.claude 마운트)
+├── ai-user/        # AI 유저 생성·오케스트레이션·학습 시스템
+├── shared/         # FE/BE 공유 자원 + 런타임 자산
+│   └── docs/       # ⚠️ 런타임 자산 컨테이너 (prompts/·templates/·categories.yml·user-permissions.json)
+│                   #    이동 금지 — 볼륨 마운트 경로 하드코딩
+└── env/            # 인프라 (Docker Compose 3-variant, nginx, Cloudflare)
 ```
-
-> **문서 규칙**: 상세 문서는 4개 docs 디렉토리(`shared/docs/`, `backend/docs/`, `frontend/docs/`, `env/docs/`)에만. 루트는 `README.md`·`CLAUDE.md`만.
 
 ---
 
@@ -82,7 +104,7 @@ Again-Spring/
 | FE | 로컬 개발 | 3000 | localhost |
 
 > nginx dev(:8090 host)와 againspring-llm(:8090 container)은 **동일 번호, 다른 네트워크** — 충돌 없음.
-> 컨테이너 토폴로지 다이어그램: [`env/docs/architecture.md`](env/docs/architecture.md)
+> 컨테이너 토폴로지 다이어그램: [`docs/system.md`](docs/system.md) · 상세: [`docs/env/architecture.md`](docs/env/architecture.md)
 
 ---
 
@@ -117,7 +139,7 @@ curl http://localhost:8080/api/health   # 로컬 BE
 curl http://localhost:8090/api/health   # dev 컨테이너
 ```
 
-> 상세 배포·Cloudflare Tunnel 설정: [`env/docs/deployment.md`](env/docs/deployment.md)
+> 상세 배포·Cloudflare Tunnel 설정: [`docs/env/deployment.md`](docs/env/deployment.md)
 
 ---
 
@@ -142,12 +164,15 @@ cd frontend && npm run lint:emoji
 
 | 영역 | 진입점 |
 |---|---|
-| 시스템 전체 / API / 정책 / 프롬프트 | [`shared/docs/README.md`](shared/docs/README.md) |
-| 백엔드 (Spring Boot, JPA, LLM 브릿지) | [`backend/docs/README.md`](backend/docs/README.md) |
-| 프론트엔드 (Next.js, MSW, UX) | [`frontend/docs/README.md`](frontend/docs/README.md) |
-| 환경 / 배포 (Docker, Cloudflare) | [`env/docs/README.md`](env/docs/README.md) |
+| 문서 지도 + Doc-Sync 트리거맵 | [`docs/_index.md`](docs/_index.md) |
+| 시스템 컨텍스트 + 토폴로지 | [`docs/system.md`](docs/system.md) |
+| API 명세 + DB 스키마 + 정책 | [`docs/shared/README.md`](docs/shared/README.md) |
+| 백엔드 (Spring Boot, JPA, LLM 브릿지) | [`docs/backend/README.md`](docs/backend/README.md) |
+| 프론트엔드 (Next.js, MSW, UX) | [`docs/frontend/README.md`](docs/frontend/README.md) |
+| 환경 / 배포 (Docker, Cloudflare) | [`docs/env/README.md`](docs/env/README.md) |
+| AI 유저 시스템 | [`docs/ai-user/README.md`](docs/ai-user/README.md) |
 | 작업 규칙 (Claude Code 협업 가이드) | [`CLAUDE.md`](CLAUDE.md) |
-| ADR (아키텍처 의사결정 기록) | [`shared/docs/ADR/README.md`](shared/docs/ADR/README.md) |
+| ADR (아키텍처 의사결정 기록) | [`docs/shared/adr/README.md`](docs/shared/adr/README.md) |
 
 ---
 

@@ -120,5 +120,5 @@
 **참고**:  
 - HAX 컴포넌트 체크리스트: [`hax-checklist.md`](hax-checklist.md)  
 - CLAUDE.md: [`../../../CLAUDE.md`](../../../CLAUDE.md)  
-- 금지어 정책: [`../../../shared/docs/policies/forbidden-words.md`](../../../shared/docs/policies/forbidden-words.md)
+- 금지어 정책: [`../../shared/policies/forbidden-words.md`](../../shared/policies/forbidden-words.md)
 

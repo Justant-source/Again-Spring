@@ -85,7 +85,7 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 - **상시 핫라인 리소스** 노출 (CrisisResourceModal)
 - 입력 차단이나 세션 중단 없음
 
-정책 상세: **[shared/docs/policies/forbidden-words.md](../../shared/docs/policies/forbidden-words.md)**
+정책 상세: **[shared/policies/forbidden-words.md](../shared/policies/forbidden-words.md)**
 
 ---
 

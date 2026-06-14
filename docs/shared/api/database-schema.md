@@ -1,6 +1,96 @@
 # 데이터베이스 스키마 (MariaDB 11)
 
+> last-verified: 2026-06-14 · code-ref: `backend/src/main/resources/db/migration/V48~V84.sql` · `backend/.../domain/community/`
+>
+> 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
+
 **주의**: 2026-06-02 커뮤니티 광장 피벗 완료. V56 = `DROP TABLE sessions, turns, messages, reports` (구 중재 모델 제거).
+
+## 핵심 도메인 ER 다이어그램
+
+```mermaid
+erDiagram
+    users {
+        varchar32 id PK
+        varchar255 email UK
+        varchar255 passwordHash
+        varchar50 provider
+        varchar255 providerId
+        varchar50 nickname
+        varchar20 status
+        boolean isGuest
+        boolean synthetic
+        json roles
+    }
+
+    posts {
+        varchar32 id PK
+        varchar32 authorId FK
+        varchar50 category
+        varchar20 status
+        varchar20 visibility
+        longtext bodyRaw
+        longtext bodyPublished
+        int jurorCount
+        int viewCount
+        timestamp deletedAt
+    }
+
+    vote_options {
+        bigint id PK
+        varchar32 postId FK
+        varchar100 label
+        int orderIdx
+    }
+
+    votes {
+        bigint id PK
+        varchar32 postId FK
+        bigint optionId FK
+        varchar32 voterUserId FK
+    }
+
+    jurors {
+        bigint id PK
+        varchar32 postId FK
+        bigint chosenOptionId FK
+        json persona
+        text empathyComment
+    }
+
+    post_comments {
+        bigint id PK
+        varchar32 postId FK
+        bigint parentCommentId FK
+        varchar32 authorId FK
+        varchar20 status
+        text content
+        int likeCount
+        timestamp deletedAt
+    }
+
+    post_likes {
+        bigint id PK
+        varchar32 postId FK
+        bigint commentId FK
+        varchar32 userId FK
+    }
+
+    users ||--o{ posts : "writes"
+    users ||--o{ votes : "casts"
+    users ||--o{ post_comments : "writes"
+    users ||--o{ post_likes : "gives"
+    posts ||--o{ vote_options : "has"
+    posts ||--o{ votes : "receives"
+    posts ||--o{ jurors : "generates"
+    posts ||--o{ post_comments : "has"
+    vote_options ||--o{ votes : "receives"
+    vote_options ||--o{ jurors : "chosen by"
+    post_comments ||--o{ post_comments : "replies"
+    post_comments ||--o{ post_likes : "liked by"
+```
+
+> UNIQUE 제약: `votes(postId, voterUserId)` — 사용자 1인 1투표.
 
 ## Source of truth
 
