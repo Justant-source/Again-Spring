@@ -1,5 +1,6 @@
 package com.againspring.common.exception;
 
+import com.againspring.marketing.AsmUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,6 +51,13 @@ public class GlobalExceptionHandler {
             ex.getMessage()
         );
         return ResponseEntity.status(ex.getStatusCode()).body(response);
+    }
+
+    @ExceptionHandler(AsmUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleAsmUnavailable(AsmUnavailableException ex) {
+        log.warn("ASM unavailable: {}", ex.getMessage());
+        Map<String, Object> response = buildErrorResponse("ASM_UNAVAILABLE", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
     }
 
     @ExceptionHandler(Exception.class)

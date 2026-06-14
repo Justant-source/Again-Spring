@@ -56,6 +56,9 @@ public class MarketingJobService {
      * Create a new marketing job for a post
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
+        if (!asmProperties.isEnabled()) {
+            throw new AsmUnavailableException("ASM is disabled (ASM_ENABLED=false)");
+        }
         // Idempotency check: reject if a job is actively being processed
         // READY/PUBLISHED/FAILED/PARTIAL are terminal — new generation is allowed over them
         List<String> activeStatuses = Arrays.asList("REQUESTED", "QUEUED", "RUNNING", "PUBLISHING", "STALE");

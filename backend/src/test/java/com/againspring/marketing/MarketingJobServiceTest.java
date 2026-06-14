@@ -90,6 +90,7 @@ class MarketingJobServiceTest {
             .build();
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
 
         // Idempotency check: no active job exists
         when(marketingJobRepository.findFirstByPostIdAndStatusIn(
@@ -158,6 +159,7 @@ class MarketingJobServiceTest {
             .status("RUNNING") // non-terminal status
             .build();
 
+        when(asmProperties.isEnabled()).thenReturn(true);
         when(marketingJobRepository.findFirstByPostIdAndStatusIn(
             eq(TEST_POST_ID), any(List.class)
         )).thenReturn(Optional.of(existingJob));
@@ -187,6 +189,7 @@ class MarketingJobServiceTest {
             .build();
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
 
         // Only a terminal (PUBLISHED) job exists
         MarketingJob terminalJob = MarketingJob.builder()
