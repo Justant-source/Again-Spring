@@ -616,7 +616,7 @@ docker exec -e SELF_CRITIQUE_THRESHOLD=7 \
 docker compose ... restart llm-ai-user
 
 # 프롬프트 품질 확인
-# /home/justant/Data/Again-Spring/shared/docs/prompts/ai-user/ 검토
+# /home/justant/Data/Again-Spring/docs/shared/prompts/ai-user/ 검토
 ```
 
 ---

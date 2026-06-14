@@ -50,7 +50,7 @@
 
 ### Backend (Java)
 
-`backend/src/main/java/com/againspring/config/UserPermissionsConfig.java`가 시작 시 `shared/docs/policies/user-permissions.json`을 로드(파일 경로는 `app.user-permissions-path` 설정으로 오버라이드 가능).
+`backend/src/main/java/com/againspring/config/UserPermissionsConfig.java`가 시작 시 `docs/shared/policies/user-permissions.json`을 로드(파일 경로는 `app.user-permissions-path` 설정으로 오버라이드 가능).
 
 주요 참조 지점:
 
@@ -75,8 +75,8 @@
 
 ## 데이터 동기화 규칙
 
-1. **권위본**: `shared/docs/policies/user-permissions.json` (모든 변경의 시작점)
-2. **BE 미러**: 없음 — 컨테이너에 볼륨 마운트로 직접 사용 (`docker-compose.dev.yml`에서 `../shared/docs/policies` 마운트)
+1. **권위본**: `docs/shared/policies/user-permissions.json` (모든 변경의 시작점)
+2. **BE 미러**: 없음 — 컨테이너에 볼륨 마운트로 직접 사용 (`docker-compose.dev.yml`에서 `../docs/shared/policies` 마운트)
 3. **FE 미러**: `frontend/lib/constants/userPermissions.ts` — 수동 동기화. JSON과 일치하지 않으면 빌드 시 ESLint 경고(향후 자동화 검토)
 
 ---

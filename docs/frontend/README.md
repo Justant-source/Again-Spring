@@ -116,7 +116,7 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 
 ### 4. 대기관 정책
 
-모든 서비스 정책(금지어, 위기 감지, 카테고리, 온보딩 매핑, 화해 기여도 계산, ToS)의 **권위본은 `../../shared/docs/policies/` 와 `../../shared/docs/v1/`** 에 있습니다.
+모든 서비스 정책(금지어, 위기 감지, 카테고리, 온보딩 매핑, 화해 기여도 계산, ToS)의 **권위본은 `../shared/policies/` 와 `../shared/v1/`** 에 있습니다.
 
 FE는 이들을 **참조하고 구현**할 뿐, 독립적으로 정의하지 않습니다.
 
@@ -230,7 +230,7 @@ frontend/
 ### shared 문서 (권위본)
 
 ```
-../../shared/docs/
+../shared/
 ├── policies/
 │   ├── forbidden-words.md          # 금지어 정의 (권위본)
 │   ├── categories.md               # 갈등 카테고리 (권위본)

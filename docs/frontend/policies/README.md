@@ -1,6 +1,6 @@
 # 정책 문서 (Policies)
 
-프론트엔드에서 강제해야 할 서비스 정책들의 구현 가이드입니다. 정책의 권위본은 모두 `../../shared/docs/policies/` 에 있으며, 이 디렉토리는 FE 특화 구현 방법을 설명합니다.
+프론트엔드에서 강제해야 할 서비스 정책들의 구현 가이드입니다. 정책의 권위본은 모두 `../shared/policies/` 에 있으며, 이 디렉토리는 FE 특화 구현 방법을 설명합니다.
 
 ---
 
@@ -11,7 +11,7 @@
    - Level 1/2/3 금지어 분류
    - 위기 키워드 즉시 감지
    - CI/CD 통합
-   - **권위본**: `../../shared/docs/policies/forbidden-words.md`
+   - **권위본**: `../shared/policies/forbidden-words.md`
 
 
 > 위기 처리 흐름: [`../ux/flows/08-crisis.md`](../ux/flows/08-crisis.md) 참조.
@@ -88,7 +88,7 @@ KeywordGuard [서버]
 
 이 디렉토리의 모든 문서는 shared 문서의 FE 구현 레이어입니다. 정책 변경은 항상 다음 순서로:
 
-1. `../../shared/docs/policies/` 수정
+1. `../shared/policies/` 수정
 2. `frontend/lib/constants/` 데이터 동기화
 3. `frontend/docs/policies/` 구현 가이드 업데이트
 4. (필요 시) BE 규칙도 함께 업데이트

@@ -294,6 +294,6 @@ flowchart LR
 1. 컨트롤러에 엔드포인트 추가/변경
 2. 해당 도메인 `.md` 파일 업데이트 (예: `auth.md`, `session-chat.md`)
 3. 이 문서(rest-spec.md) 마스터 표 및 에러코드 업데이트
-4. `admin.md` 또는 `shared/docs/admin-dashboard.md` (admin 엔드포인트인 경우)
+4. `admin.md` 또는 `docs/shared/admin-dashboard.md` (admin 엔드포인트인 경우)
 5. `database-schema.md` (스키마 변경 있는 경우)
 6. Swagger 어노테이션(`@Operation`, `@ApiResponse`) 컨트롤러에 반영

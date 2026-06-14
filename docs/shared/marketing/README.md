@@ -1,6 +1,6 @@
 # 마케팅 자동화 시스템 — 개요
 
-> **권위본**: 이 디렉터리 (`shared/docs/marketing/`) 가 마케팅 관련 모든 정책·API·아키텍처의 권위본입니다.
+> **권위본**: 이 디렉터리 (`docs/shared/marketing/`) 가 마케팅 관련 모든 정책·API·아키텍처의 권위본입니다.
 
 ---
 
@@ -39,7 +39,7 @@
 ## 파일 구조
 
 ```
-shared/docs/marketing/
+docs/shared/marketing/
 ├── README.md           ← 이 파일: 전체 개요
 ├── api.md              ← AS ↔ ASM REST API 명세
 ├── architecture.md     ← 시스템 설계 결정 및 데이터 흐름

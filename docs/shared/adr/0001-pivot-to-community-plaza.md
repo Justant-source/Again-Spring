@@ -100,8 +100,8 @@ The original Again Spring product (Sessions V1–V13) operated as a 1:1 mediatio
 - Refactored: `layout.tsx`, `page.tsx`, `profile/` (remove session history)
 
 **Prompts**:
-- New: `/shared/docs/prompts/community/` (jury_persona.md, neutralize.md)
-- Deleted: `/shared/docs/prompts/chat/` (solo_chat.md, duo_chat.md)
+- New: `/docs/shared/prompts/community/` (jury_persona.md, neutralize.md)
+- Deleted: `/docs/shared/prompts/chat/` (solo_chat.md, duo_chat.md)
 
 ### Testing & Validation
 
@@ -117,7 +117,7 @@ The original Again Spring product (Sessions V1–V13) operated as a 1:1 mediatio
 
 ## Recovery (If Reverting)
 
-1. **Restore old model**: `git checkout defc742 -- backend/ frontend/ shared/docs/` (partial, selective)
+1. **Restore old model**: `git checkout defc742 -- backend/ frontend/ docs/shared/` (partial, selective)
 2. **Restore DB**: Pre-V56 backup restore (requires explicit save before V56 migration)
 3. **Reverse Flyway**: Manual downgrade to V55 (not automated)
 
@@ -127,9 +127,9 @@ See ADR-0006 for complete deletion record with per-file recovery paths.
 
 - **Frontend routes**: `frontend/app/community/[id]/page.tsx`, `frontend/app/community/new/page.tsx`
 - **Backend controller**: `backend/src/main/java/com/againspring/api/community/CommunityPostController.java`
-- **LLM prompts**: `shared/docs/prompts/community/jury_persona.md`, `neutralize.md`
-- **API spec**: `shared/docs/api/rest-spec.md` (Community section)
-- **DB schema**: `shared/docs/api/database-schema.md` (posts, post_comments, votes, jurors)
+- **LLM prompts**: `docs/shared/prompts/community/jury_persona.md`, `neutralize.md`
+- **API spec**: `docs/shared/api/rest-spec.md` (Community section)
+- **DB schema**: `docs/shared/api/database-schema.md` (posts, post_comments, votes, jurors)
 - **E2E test**: `frontend/tests/e2e-realbe/flows/04-community-plaza.spec.ts`
 - **Deletion record**: [ADR-0006](./0006-legacy-deletion-and-git-recovery.md)
 

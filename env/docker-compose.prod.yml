@@ -73,10 +73,10 @@ services:
       AI_USER_LLM_URL: http://againspring-llm-ai-user-prod:8092
       AI_USER_ORCHESTRATOR_URL: http://againspring-ai-user-orchestrator-prod:8096
     volumes:
-      - ../shared/docs/prompts:/app/shared/docs/prompts:ro
-      - ../shared/docs/categories.yml:/app/shared/docs/categories.yml:ro
-      - ../shared/docs/policies/user-permissions.json:/app/shared/docs/policies/user-permissions.json:ro
-      - ../shared/docs/templates:/app/shared/docs/templates:ro
+      - ../docs/shared/prompts:/app/shared/docs/prompts:ro
+      - ../docs/shared/categories.yml:/app/shared/docs/categories.yml:ro
+      - ../docs/shared/policies/user-permissions.json:/app/shared/docs/policies/user-permissions.json:ro
+      - ../docs/shared/templates:/app/shared/docs/templates:ro
     depends_on:
       mariadb-prod:
         condition: service_healthy

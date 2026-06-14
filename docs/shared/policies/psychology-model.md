@@ -58,7 +58,7 @@ Marshall Rosenberg의 NVC는 4단계 구조로 상대를 경청하고 자신의 
 
 ### 배심원 활용
 
-`shared/docs/prompts/community/neutralize.md`에서 정의된 규칙:
+`docs/shared/prompts/community/neutralize.md`에서 정의된 규칙:
 - **사용자 입력 재구성**: 비난 → 관찰 + 감정 + 필요로 번역
 - **배심원 관점 일관성**: "NVC 관점에서 본다면, 상대는 이 필요를 표현하려 했을 것 같습니다."
 - **PromptSanitizer**: 배심원이 "판결 표현" 생성 시 제거
@@ -133,9 +133,9 @@ EFT 관점 재프레임:
 ## 5. 구현 위치
 
 ### 프롬프트
-- `shared/docs/prompts/system.md` — 모든 AI의 기본 정체성 (배심원, 중립, 공감)
-- `shared/docs/prompts/community/jury_persona.md` — 9개 페르소나 상세 정의
-- `shared/docs/prompts/community/neutralize.md` — NVC 중립화 규칙
+- `docs/shared/prompts/system.md` — 모든 AI의 기본 정체성 (배심원, 중립, 공감)
+- `docs/shared/prompts/community/jury_persona.md` — 9개 페르소나 상세 정의
+- `docs/shared/prompts/community/neutralize.md` — NVC 중립화 규칙
 
 ### 코드
 - `JuryService.generateJurors()` — 9개 페르소나 프롬프트 병렬 실행

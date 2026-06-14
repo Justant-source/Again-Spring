@@ -119,7 +119,7 @@ public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest req
 ## API 명세는 어디서 보나
 
 - **Swagger UI** = 클릭 가능한 인터랙티브 명세 (개발/QA용)
-- **`shared/docs/api/rest-spec.md`** = 엔드포인트 전체 표 + 정책 (사람용 빠른 참조)
+- **`docs/shared/api/rest-spec.md`** = 엔드포인트 전체 표 + 정책 (사람용 빠른 참조)
 
 두 문서가 어긋나면 Swagger가 우선 (코드에서 자동 생성).
 

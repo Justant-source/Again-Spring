@@ -72,8 +72,8 @@ String sanitized = promptSanitizer.sanitize(userInput);
 
 | 용도 | 파일 | 로드 서비스 |
 |---|---|---|
-| 배심원 생성 | `shared/docs/prompts/community/jury_persona.md` | `JuryService` |
-| 사연 중립화 | `shared/docs/prompts/community/neutralize.md` | `PostComposeService` |
+| 배심원 생성 | `docs/shared/prompts/community/jury_persona.md` | `JuryService` |
+| 사연 중립화 | `docs/shared/prompts/community/neutralize.md` | `PostComposeService` |
 
 ---
 

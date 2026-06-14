@@ -170,8 +170,8 @@ git checkout defc742 -- <file-path>
 
 | File | Description | Recovery |
 |------|-------------|----------|
-| `shared/docs/reports/duo_report_spec.md` | Deleted 2026-06-03 (Phase 2) | Will be in this commit |
-| `shared/docs/reports/solo_report_spec.md` | Deleted 2026-06-03 (Phase 2) | Will be in this commit |
+| `docs/shared/reports/duo_report_spec.md` | Deleted 2026-06-03 (Phase 2) | Will be in this commit |
+| `docs/shared/reports/solo_report_spec.md` | Deleted 2026-06-03 (Phase 2) | Will be in this commit |
 | `backend/docs/test-automation.md` | Session/chat test strategy (obsolete) | `git checkout defc742 -- ...` |
 | `frontend/docs/ux/flows/05-session-chat.md` | UX doc for chat flow | `git checkout defc742 -- ...` |
 | `frontend/docs/ux/flows/06-duo.md` | UX doc for duo mode | `git checkout defc742 -- ...` |
@@ -200,8 +200,8 @@ DROP TABLE IF EXISTS reports;
 
 | File | Description | Recovery |
 |------|-------------|----------|
-| `shared/docs/reports/duo_report_spec.md` | Deleted this commit | `git checkout HEAD^ -- ...` (parent commit) |
-| `shared/docs/reports/solo_report_spec.md` | Deleted this commit | `git checkout HEAD^ -- ...` (parent commit) |
+| `docs/shared/reports/duo_report_spec.md` | Deleted this commit | `git checkout HEAD^ -- ...` (parent commit) |
+| `docs/shared/reports/solo_report_spec.md` | Deleted this commit | `git checkout HEAD^ -- ...` (parent commit) |
 
 **Note**: These are ADR-0006 itself, so recovery means checking prior history.
 
@@ -240,7 +240,7 @@ git commit -m "Restore legacy ChatService (recovery only, not production-ready)"
 ```bash
 # Recover all deleted files from commit defc742
 git checkout defc742 -- backend/ frontend/
-git checkout defc742 -- shared/docs/reports/
+git checkout defc742 -- docs/shared/reports/
 
 # Re-apply Flyway migrations (reversing V56 DROP)
 # — requires manual .sql files (not automated in current project)

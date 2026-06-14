@@ -25,7 +25,7 @@
 
 ## 다른 문서와의 관계
 
-- **API / DB / LLM**: `shared/docs/` 참조
+- **API / DB / LLM**: `docs/shared/` 참조
 - **백엔드 코드**: `backend/docs/` 참조
 - **프론트엔드 코드**: `frontend/docs/` 참조
 - **배포/환경**: 이 디렉토리 (env/docs/)

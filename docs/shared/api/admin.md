@@ -14,7 +14,7 @@
 | Prompts 컨트롤러 | `backend/src/main/java/com/againspring/api/AdminPromptsController.java` |
 | Test 컨트롤러 | `backend/src/main/java/com/againspring/api/AdminTestController.java` |
 | Debug 컨트롤러 | `backend/src/main/java/com/againspring/api/SessionContextDebugController.java` |
-| 관리자 가이드 | `shared/docs/admin-dashboard.md` |
+| 관리자 가이드 | `docs/shared/admin-dashboard.md` |
 
 ## 환경별 활성화 규칙
 
@@ -122,7 +122,7 @@ flowchart LR
 | `POST` | `/reload` | 디스크에서 LLM 프롬프트 전체 리로드 | `{ status, message }` |
 
 > 프롬프트 파일 변경 후 재배포 없이 즉시 적용하려면 이 API 호출.
-> `shared/docs/prompts/` 경로의 `.md` 파일을 모두 재로드.
+> `docs/shared/prompts/` 경로의 `.md` 파일을 모두 재로드.
 
 ## Social Publishing API
 
@@ -144,6 +144,6 @@ flowchart LR
 
 ## 변경 시 절차
 
-- 신규 admin 엔드포인트 추가: 이 문서 + `shared/docs/admin-dashboard.md` 동시 갱신
+- 신규 admin 엔드포인트 추가: 이 문서 + `docs/shared/admin-dashboard.md` 동시 갱신
 - TESTER role 지정: `PATCH /api/admin/users/{id}/roles { "roles": ["USER", "TESTER"] }`
-- 역할 체계 변경: `shared/docs/policies/user-permissions.md` 권위본 + `AdminRoleAssigner.java`
+- 역할 체계 변경: `docs/shared/policies/user-permissions.md` 권위본 + `AdminRoleAssigner.java`

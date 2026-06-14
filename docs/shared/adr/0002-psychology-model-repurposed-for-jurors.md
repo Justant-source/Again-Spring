@@ -21,7 +21,7 @@ The original 1:1 chat model employed three psychology frameworks:
 **Code implementation** (now deleted):
 - `EnforcedRatio` class: computed per-turn Gottman scores (not exposed to UI, only internal).
 - `PromptSanitizer`: post-processing of LLM output to remove "judgment" language.
-- Prompts: `shared/docs/prompts/chat/{solo_chat,duo_chat}.md` (task-specific system prompts).
+- Prompts: `docs/shared/prompts/chat/{solo_chat,duo_chat}.md` (task-specific system prompts).
 
 **With pivot to community plaza**, the question arises:
 
@@ -70,11 +70,11 @@ Rather than per-turn inference, each juror represents a distinct perspective gro
 
 ### Prompt Structure
 
-**System prompt** (`shared/docs/prompts/system.md`):
+**System prompt** (`docs/shared/prompts/system.md`):
 - Describes AI role: "You are part of a diverse jury of psychology perspectives."
 - Constraints: No judgment, no "should" prescriptions, focus on reframing.
 
-**Persona prompts** (`shared/docs/prompts/community/jury_persona.md`):
+**Persona prompts** (`docs/shared/prompts/community/jury_persona.md`):
 - 9 distinct personas, each with:
   - Name (e.g., "Attachment Specialist")
   - Psychology school (Gottman/NVC/EFT/etc.)
@@ -94,7 +94,7 @@ Rather than per-turn inference, each juror represents a distinct perspective gro
 **Preserved (not deleted)**:
 - `PromptSanitizer` — still used in `JuryService` to clean juror outputs.
 - `EnforcedRatio` class — not wired to UI, not deleted. Future use: per-juror scoring (optional).
-- Prompts directory structure — `/shared/docs/prompts/community/`.
+- Prompts directory structure — `/docs/shared/prompts/community/`.
 
 **Deleted** (at defc742):
 - Per-turn `PsychologyFeedbackFormatter` — no longer applies Gottman scoring to each message.
@@ -115,10 +115,10 @@ Rather than per-turn inference, each juror represents a distinct perspective gro
 
 ## Related Assets
 
-- **Persona definitions**: `shared/docs/prompts/community/jury_persona.md`
-- **Neutralization guide**: `shared/docs/prompts/community/neutralize.md` (NVC reframing rules)
-- **System prompt**: `shared/docs/prompts/system.md` (applies to all AI output)
-- **Psychology policy**: `shared/docs/policies/psychology-model.md` (defines Gottman/NVC/EFT frameworks)
+- **Persona definitions**: `docs/shared/prompts/community/jury_persona.md`
+- **Neutralization guide**: `docs/shared/prompts/community/neutralize.md` (NVC reframing rules)
+- **System prompt**: `docs/shared/prompts/system.md` (applies to all AI output)
+- **Psychology policy**: `docs/shared/policies/psychology-model.md` (defines Gottman/NVC/EFT frameworks)
 - **Sanitizer**: `backend/src/main/java/com/againspring/service/llm/PromptSanitizer.java`
 - **Service**: `backend/src/main/java/com/againspring/service/community/JuryService.java`
 

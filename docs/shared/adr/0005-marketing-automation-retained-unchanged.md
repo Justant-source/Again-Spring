@@ -38,4 +38,4 @@ See ASM project documentation for full integration guide.
 
 ---
 
-**Previous ADR Content**: See `git show 99322622:shared/docs/ADR/0005-marketing-automation-retained-unchanged.md` (archived before extraction)
+**Previous ADR Content**: See `git show 99322622:docs/shared/ADR/0005-marketing-automation-retained-unchanged.md` (archived before extraction)

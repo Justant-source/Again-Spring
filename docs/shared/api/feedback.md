@@ -69,5 +69,5 @@ flowchart LR
 
 ## 변경 시 절차
 
-- 카테고리 추가 시: `FeedbackService` 허용 목록 + FE 드롭다운 + `shared/docs/api/feedback.md` 동시 수정
+- 카테고리 추가 시: `FeedbackService` 허용 목록 + FE 드롭다운 + `docs/shared/api/feedback.md` 동시 수정
 - 관리자용 피드백 조회·상태 관리: [`admin.md#admin-feedbacks`](admin.md)

@@ -97,14 +97,14 @@ flowchart TB
 
 > 내부 서비스(BE :8080, FE :3000, llm-worker :8090·8092·8096 등)는 호스트에 노출되지 않음.
 
-### 볼륨 마운트 (런타임 자산 — 이동 금지)
+### 볼륨 마운트 (런타임 자산)
 
-| 경로 (호스트) | 마운트 대상 | 읽기모드 |
+| 경로 (호스트) | 마운트 대상 (컨테이너) | 읽기모드 |
 |---|---|---|
-| `shared/docs/prompts/` | `/app/shared/docs/prompts` | `:ro` |
-| `shared/docs/templates/` | `/app/shared/docs/templates` | `:ro` |
-| `shared/docs/categories.yml` | `/app/shared/docs/categories.yml` | `:ro` |
-| `shared/docs/policies/user-permissions.json` | `/app/.../user-permissions.json` | `:ro` |
+| `docs/shared/prompts/` | `/app/shared/docs/prompts` | `:ro` |
+| `docs/shared/templates/` | `/app/shared/docs/templates` | `:ro` |
+| `docs/shared/categories.yml` | `/app/shared/docs/categories.yml` | `:ro` |
+| `docs/shared/policies/user-permissions.json` | `/app/shared/docs/policies/user-permissions.json` | `:ro` |
 | `ai-user/docs/personas/` | `/app/personas` | **`:rw`** |
 | `~/.claude/` | `/root/.claude` | `:rw` |
 

@@ -19,7 +19,7 @@ To preserve decision rationale and support future maintenance, recovery, and fea
 
 ## Decision
 
-1. **Adopt ADRs** in `/shared/docs/ADR/` as the source of truth for architectural decisions post-pivot.
+1. **Adopt ADRs** in `/docs/shared/ADR/` as the source of truth for architectural decisions post-pivot.
 2. **Document all 7 major decisions** from the pivot in dedicated ADRs (0001–0006).
 3. **Use the template** defined in [ADR README](./README.md) for future decisions.
 4. **Link ADRs** from relevant code comments, backend docs, and CLAUDE.md.
@@ -53,7 +53,7 @@ To preserve decision rationale and support future maintenance, recovery, and fea
 
 ## Related Assets
 
-- ADR directory: `/shared/docs/ADR/`
+- ADR directory: `/docs/shared/ADR/`
 - Pivot commit: defc742b1e15c0550dd7bd7a80c744f35b120ebf (last of old model)
 - CLAUDE.md: Links to specific ADRs where relevant
 - backend/docs: Sections on legacy deletion and recovery procedures

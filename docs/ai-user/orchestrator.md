@@ -1918,8 +1918,8 @@ ai-user/orchestrator/
 
 ### 관련 문서
 - `/home/justant/Data/Again-Spring/CLAUDE.md` — 프로젝트 전체 가이드
-- `/home/justant/Data/Again-Spring/shared/docs/api/rest-spec.md` — API 명세
-- `/home/justant/Data/Again-Spring/shared/docs/policies/forbidden-words.md` — 금지어 정책
+- `/home/justant/Data/Again-Spring/docs/shared/api/rest-spec.md` — API 명세
+- `/home/justant/Data/Again-Spring/docs/shared/policies/forbidden-words.md` — 금지어 정책
 
 ---
 

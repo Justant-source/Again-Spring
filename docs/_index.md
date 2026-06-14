@@ -3,7 +3,7 @@
 > **충돌 해결**: 코드(runtime) > authority > derived. 두 문서가 같은 사실을 다르게 서술하면
 > `authority` 파일을 따른다. `derived` 파일은 독립 정의 금지 — authority 변경 시 함께 갱신.
 >
-> 이 파일은 `shared/docs/manifest.yaml`을 흡수했다 (2026-06-14).
+> 이 파일은 `docs/shared/manifest.yaml`을 흡수했다 (2026-06-14). `shared/` 모듈은 2026-06-14 삭제되어 `docs/shared/`로 통합됐다.
 
 ---
 
@@ -30,7 +30,7 @@
 |---|---|---|---|
 | 금지어 | `docs/shared/policies/forbidden-words.md` | `docs/frontend/policies/forbidden-words-lint.md`·`CLAUDE.md` | `frontend/lib/constants/forbiddenWords.ts`·`backend/.../safety/KeywordGuard.java` |
 | 분류 카테고리 | `docs/shared/policies/categories.md` | — | `frontend/lib/constants/categories.ts` |
-| 사용자 권한 | **`shared/docs/policies/user-permissions.json`** (런타임 자산·볼륨마운트) | `docs/shared/policies/user-permissions.md` | `backend/src/main/resources/user-permissions.json` (fallback) |
+| 사용자 권한 | **`docs/shared/policies/user-permissions.json`** (런타임 자산·볼륨마운트) | `docs/shared/policies/user-permissions.md` | `backend/src/main/resources/user-permissions.json` (fallback) |
 
 ### 설계 시스템
 
@@ -50,7 +50,7 @@
 
 | 토픽 | authority | derived | runtime |
 |---|---|---|---|
-| LLM 프롬프트 | **`shared/docs/prompts/`** (런타임 자산·볼륨마운트·수정금지) | — | `backend/.../llm/prompt/PromptLoader.java` |
+| LLM 프롬프트 | **`docs/shared/prompts/`** (런타임 자산·볼륨마운트) | — | `backend/.../llm/prompt/PromptLoader.java` |
 | LLM 브릿지 | `docs/backend/llm-bridge.md` | `CLAUDE.md` (요약) | `backend/.../llm/remote/RemoteLlmProvider.java` |
 
 ### 환경 / 인프라
@@ -69,20 +69,18 @@
 
 ---
 
-## 🚨 런타임 자산 (문서가 아님 — 이동 금지)
+## 🚨 런타임 자산 (볼륨 마운트 경로 변경 시 docker-compose도 함께 갱신)
 
-아래 경로는 `docs/`-이름 디렉토리 안에 있지만 **볼륨 마운트 + `application.yml` 하드코딩된
-런타임 자산**이다. 이 파일들을 옮기면 dev/prod가 즉시 깨진다. **이번 재구성 범위 밖**.
+아래 파일들은 **볼륨 마운트 + `application.yml`이 참조하는 런타임 자산**이다.
+`docs/shared/` 아래에 위치하며, 컨테이너 내부 경로(`/app/shared/docs/...`)는 변경하지 않는다.
 
-| 경로 | 종류 | 마운트 / 참조 |
-|---|---|---|
-| `shared/docs/prompts/` | LLM 프롬프트 (read-only) | `app.prompts.path` / `PromptLoader` / `AdminAiRulesController` |
-| `shared/docs/templates/first_message/*.json` | 첫 메시지 템플릿 (read-only) | `TEMPLATES_PATH` / compose `:ro` |
-| `shared/docs/categories.yml` | 카테고리 마스터 (read-only) | `app.categories.path` / compose `:ro` |
-| `shared/docs/policies/user-permissions.json` | 권한 설정 (read-only) | `UserPermissionsConfig` / compose `:ro` |
-| `ai-user/docs/personas/profiles/` | 페르소나 코퍼스 (read-write!) | `/app/personas` 마운트 / `loadRecentBodies` 읽기·쓰기 |
-
-이 자산들 때문에 `shared/docs/`와 `ai-user/docs/`는 이동 후에도 **남아있다**. 의도된 구조.
+| 경로 (호스트) | 종류 | 컨테이너 내부 경로 | 참조 |
+|---|---|---|---|
+| `docs/shared/prompts/` | LLM 프롬프트 (read-only) | `/app/shared/docs/prompts` | `app.prompts.path` / `PromptLoader` / `AdminAiRulesController` |
+| `docs/shared/templates/first_message/*.json` | 첫 메시지 템플릿 (read-only) | `/app/shared/docs/templates` | `TEMPLATES_PATH` / compose `:ro` |
+| `docs/shared/categories.yml` | 카테고리 마스터 (read-only) | `/app/shared/docs/categories.yml` | `app.categories.path` / compose `:ro` |
+| `docs/shared/policies/user-permissions.json` | 권한 설정 (read-only) | `/app/shared/docs/policies/user-permissions.json` | `UserPermissionsConfig` / compose `:ro` |
+| `ai-user/docs/personas/profiles/` | 페르소나 코퍼스 (read-write!) | `/app/personas` | `loadRecentBodies` 읽기·쓰기 |
 
 ---
 
@@ -99,8 +97,8 @@
 | `env/docker-compose*` · `env/nginx/*` | `docs/system.md` · `docs/env/architecture.md` · README 포트표 |
 | `domain/enums/*Status*.java` · `MarketingJob*.java` · orchestrator `ActionStatus*.java` | 해당 모듈의 stateDiagram (`docs/ai-user/orchestrator.md` 등) |
 | `backend/.../safety/**` · `llm/PromptSanitizer*` · `LlmErrorSignature*` · `ContentSafetyGuard*` | `docs/shared/policies/forbidden-words.md` · `.claude/rules/llm-safety.md` |
-| `shared/docs/policies/forbidden-words.md` | `.claude/rules/llm-safety.md` · `docs/frontend/policies/forbidden-words-lint.md` |
+| `docs/shared/policies/forbidden-words.md` | `.claude/rules/llm-safety.md` · `docs/frontend/policies/forbidden-words-lint.md` |
 | `backend/.../llm/**` | `docs/backend/llm-bridge.md` |
 | `frontend/tailwind.config.ts` · `frontend/app/globals.css` | `docs/frontend/design/system.md` |
 | 환경변수 추가/변경 (`.env.*` · `application*.yml`) | `docs/env/environment-variables.md` · README |
-| `shared/docs/policies/user-permissions.json` | `docs/shared/policies/user-permissions.md` · CLAUDE.md |
+| `docs/shared/policies/user-permissions.json` | `docs/shared/policies/user-permissions.md` · CLAUDE.md |

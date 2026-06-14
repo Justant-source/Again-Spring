@@ -321,14 +321,14 @@ backend/src/main/resources/
 
 | 작업 | 파일 위치 | 참고 docs |
 |---|---|---|
-| 새 API 추가 | `api/*Controller.java` + `api/dto/` | `shared/docs/api/rest-spec.md` |
-| 새 DB 컬럼 | `domain/*.java` + `db/migration/V{n+1}__*.sql` | `shared/docs/api/database-schema.md` |
-| Admin API | `api/admin/*Controller.java` | `shared/docs/api/admin.md` |
-| 광장 게시글 | `service/community/CommunityPostService.java` | `shared/docs/api/community.md` |
-| 보안 정책 | `safety/*.java` + `security/*.java` | `shared/docs/policies/` |
-| 프롬프트 변경 | `shared/docs/prompts/*.md` | `shared/docs/prompts/README.md` |
+| 새 API 추가 | `api/*Controller.java` + `api/dto/` | `docs/shared/api/rest-spec.md` |
+| 새 DB 컬럼 | `domain/*.java` + `db/migration/V{n+1}__*.sql` | `docs/shared/api/database-schema.md` |
+| Admin API | `api/admin/*Controller.java` | `docs/shared/api/admin.md` |
+| 광장 게시글 | `service/community/CommunityPostService.java` | `docs/shared/api/community.md` |
+| 보안 정책 | `safety/*.java` + `security/*.java` | `docs/shared/policies/` |
+| 프롬프트 변경 | `docs/shared/prompts/*.md` | `docs/shared/prompts/README.md` |
 | LLM 브릿지 | `llm/remote/*.java` | `backend/docs/llm-bridge.md` |
-| 역할/권한 | `config/UserPermissionsConfig.java` | `shared/docs/policies/user-permissions.md` |
+| 역할/권한 | `config/UserPermissionsConfig.java` | `docs/shared/policies/user-permissions.md` |
 
 ---
 

@@ -1,6 +1,6 @@
 # 금지어 린트 검사 (npm run lint:words)
 
-금지어 정의의 권위본은 `../../../shared/docs/policies/forbidden-words.md` 입니다. 이 문서는 FE에서 그 정책을 어떻게 강제하는지를 다룹니다.
+금지어 정의의 권위본은 `../../shared/policies/forbidden-words.md` 입니다. 이 문서는 FE에서 그 정책을 어떻게 강제하는지를 다룹니다.
 
 ---
 
@@ -213,7 +213,7 @@ const text = "금지된 단어... (예외적으로 필요한 경우만)";
 
 ## 정책 업데이트
 
-금지어 목록은 `../../../shared/docs/policies/forbidden-words.md`에서 중앙 관리됩니다.
+금지어 목록은 `../../shared/policies/forbidden-words.md`에서 중앙 관리됩니다.
 
 정책 변경 시:
 1. shared 문서 수정

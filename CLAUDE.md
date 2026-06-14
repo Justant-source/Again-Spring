@@ -37,7 +37,7 @@
 | AI 유저 (생성·오케스트레이션·학습) | `ai-user/` | `docs/ai-user/README.md` |
 | API 명세 + DB 스키마 | — | `docs/shared/api/` |
 | 정책 (금지어·인증·약관·권한) | — | `docs/shared/policies/` |
-| LLM 프롬프트 (런타임 자산) | `shared/docs/prompts/` | 同 위치 (이동 금지) |
+| LLM 프롬프트 (런타임 자산) | `docs/shared/prompts/` | 同 위치 |
 | 환경/인프라/배포 | `env/` | `docs/env/deployment.md` · `docs/env/architecture.md` |
 | 환경 변수 사전 | — | `docs/env/environment-variables.md` |
 | **마케팅 (ASM — 별도 서버)** | SSH `justant@100.115.252.61`<br>`~/Data/Again-Spring-Marketing` | ASM 저장소의 `CLAUDE.md` |

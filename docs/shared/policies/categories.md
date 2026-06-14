@@ -125,11 +125,11 @@ Gottman 모델로 잡히지 않는 한국 관계 패턴. 학술 근거는 [psych
 
 이 컨텍스트가 있어야 LLM이 카테고리 특화 후속 질문 생성.
 
-구현: `backend/src/main/java/com/againspring/service/prompt/CategoryContextFragment.java`. 카테고리 catalog는 `shared/docs/categories.yml` (FE/BE 공유 권위본, `frontend/lib/constants/categories.ts` 미러링).
+구현: `backend/src/main/java/com/againspring/service/prompt/CategoryContextFragment.java`. 카테고리 catalog는 `docs/shared/categories.yml` (FE/BE 공유 권위본, `frontend/lib/constants/categories.ts` 미러링).
 
 ## 변경 시 절차
 
 1. `frontend/lib/constants/categories.ts` 갱신
 2. 신규 `relationType` 추가 시 `backend/.../domain/enums/RelationType.java`도 추가
 3. 본 문서 갱신
-4. 관련 프롬프트 (`shared/docs/prompts/community/jury_persona.md`)에 카테고리 인지 안내 보강 검토
+4. 관련 프롬프트 (`docs/shared/prompts/community/jury_persona.md`)에 카테고리 인지 안내 보강 검토

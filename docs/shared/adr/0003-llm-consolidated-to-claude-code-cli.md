@@ -157,7 +157,7 @@ If `RemoteLlmProvider` proves too slow:
 - **Worker container**: `env/docker-compose.{dev,prod}.yml` (`againspring-llm-{dev,prod}`)
 - **Worker env**: `env/.env.{dev,prod}.example` (`LLM_WORKER_URL`, `CLAUDE_HOST_CONFIG_DIR`)
 - **Config**: `backend/src/main/resources/application-{dev,prod}.yml` (llm.* settings)
-- **Documentation**: `backend/docs/llm-bridge.md`, `shared/docs/prompts/README.md`
+- **Documentation**: `backend/docs/llm-bridge.md`, `docs/shared/prompts/README.md`
 
 ---
 

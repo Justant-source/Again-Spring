@@ -394,7 +394,7 @@ Based on forbidden-words policy and platform research:
 
 **Document Status**: Ready for AI Persona Development
 **Next Steps**: 
-1. Integrate into `shared/docs/prompts/` for jury persona
+1. Integrate into `docs/shared/prompts/` for jury persona
 2. Test responses against authentic community scenarios
 3. Monitor for bias/overgeneralization
 4. Update quarterly with new community behavior patterns

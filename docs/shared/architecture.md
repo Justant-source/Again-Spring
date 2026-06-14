@@ -21,7 +21,7 @@ flowchart TB
     end
     DB[(MariaDB 11<br/>posts, post_comments<br/>votes, jurors<br/>+ llm_call_logs)]
     Claude[Claude CLI<br/>Haiku 4.5]
-    Prompts["shared/docs/prompts/<br/>system.md<br/>+ community/<br/>{jury_persona.md<br/>neutralize.md}"]
+    Prompts["docs/shared/prompts/<br/>system.md<br/>+ community/<br/>{jury_persona.md<br/>neutralize.md}"]
 
     Browser -->|HTTPS + JWT| API
     API --> Auth
@@ -157,7 +157,7 @@ sequenceDiagram
     Svc->>DB: Juror 엔티티 저장
 ```
 
-**프롬프트 구조** (`shared/docs/prompts/community/`):
+**프롬프트 구조** (`docs/shared/prompts/community/`):
 - `jury_persona.md`: 9개 페르소나 정의 (심리상담사, 경계 전문가 등)
 - `neutralize.md`: NVC 중립화 규칙
 
