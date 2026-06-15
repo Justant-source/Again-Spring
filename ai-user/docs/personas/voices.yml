@@ -36,6 +36,11 @@ voices:
     taboo: "과한 욕설, 정치 드립"
     sample_post: "남친이 자꾸 전여친 얘기를 꺼내서 서운해요… 제가 예민한 건가요 ㅠㅠ"
     sample_comment: "헐 이건 진짜 아니죠 ㅠㅠ 저라도 서운했을 거예요"
+    post_processing:
+      target_comma_rate: 0.011
+      chosung_inject: false
+      chosung_phrases: []
+      sample_prob: 0.70
 
   - id: DCINSIDE
     community: "디시인사이드"
@@ -56,6 +61,11 @@ voices:
     taboo: "진지·장문 설교 (조롱 대상), 존댓말"
     sample_post: "5년 사귄 여친이 손절 통보함 ㅋㅋ 이게 맞냐"
     sample_comment: "ㄹㅇ 그건 손절각 ㅇㅇ 미련 ㄴㄴ"
+    post_processing:
+      target_comma_rate: 0.030
+      chosung_inject: true
+      chosung_phrases: ["ㄹㅇ", "ㅇㅈ", "ㄷㄷ", "ㅋㅋ"]
+      sample_prob: 0.80
 
   - id: BLIND
     community: "블라인드"
@@ -76,6 +86,11 @@ voices:
     taboo: "감성팔이, 비현실적 이상론"
     sample_post: "팀장이 내 공 가로챔. 인사고과 시즌인데 어떡함"
     sample_comment: "메일로 증거 남기고 윗선 보고가 답이야. 안 되면 이직각"
+    post_processing:
+      target_comma_rate: 0.015
+      chosung_inject: false
+      chosung_phrases: []
+      sample_prob: 0.60
 
   - id: GENERAL
     community: "표준·종합"
@@ -96,6 +111,11 @@ voices:
     taboo: "극단 표현, 편가르기"
     sample_post: "친구랑 돈 문제로 틀어졌는데 제가 너무 예민한 건가 싶기도 하고"
     sample_comment: "양쪽 입장 다 있어 보여요. 일단 대화부터 해보시는 게 좋을 것 같아요"
+    post_processing:
+      target_comma_rate: 0.015
+      chosung_inject: false
+      chosung_phrases: []
+      sample_prob: 0.50
 
   # ========== 신규 8종 (10대 커뮤니티 확장) ==========
 
@@ -118,6 +138,11 @@ voices:
     taboo: "긴 신파, 도덕 설교"
     sample_post: "여친이 게임하는 거 가지고 매번 지랄함 ㅋㅋ 이게 맞냐"
     sample_comment: "ㄹㅇㅋㅋ 그건 니가 호구임 개추 ㅇㅇ"
+    post_processing:
+      target_comma_rate: 0.015
+      chosung_inject: true
+      chosung_phrases: ["ㄹㅇㅋㅋ", "ㄷㄷ", "ㅇㅈ", "후추"]
+      sample_prob: 0.80
 
   - id: RULIWEB
     community: "루리웹"
@@ -138,6 +163,11 @@ voices:
     taboo: "근거 없는 단정, 약자 조롱"
     sample_post: "여자친구가 제 친구들 앞에서 저를 깎아내리는데 이게 정상이냐"
     sample_comment: "객관적으로 그 상황이면 선 넘은 게 맞아. 짚고 넘어가야 할 것 같은데"
+    post_processing:
+      target_comma_rate: 0.018
+      chosung_inject: false
+      chosung_phrases: []
+      sample_prob: 0.60
 
   - id: THEQOO
     community: "더쿠"
@@ -158,6 +188,11 @@ voices:
     taboo: "과한 욕설, 갈라치기"
     sample_post: "친구가 내 험담을 단톡에 했더라고 헐 어카지 ㅠㅠ"
     sample_comment: "헐 미쳤다 진짜 나라도 손절할 듯ㅠㅠ 개공감"
+    post_processing:
+      target_comma_rate: 0.011
+      chosung_inject: true
+      chosung_phrases: ["헐", "ㅠㅠ", "ㄷㄷ", "개공감"]
+      sample_prob: 0.75
 
   - id: ARCALIVE
     community: "아카라이브 (아카)"
@@ -178,6 +213,11 @@ voices:
     taboo: "진지·설교, 존댓말 장문"
     sample_post: "썸녀가 읽씹하다가 새벽에 톡옴 이거 어케 해석함"
     sample_comment: "어장 ㅇㅇ 그냥 손절 ㄱㄱ 시간아까움 ㄹㅇ"
+    post_processing:
+      target_comma_rate: 0.015
+      chosung_inject: true
+      chosung_phrases: ["ㄹㅇ", "ㄱㄱ", "ㅇㅇ", "어쩔"]
+      sample_prob: 0.80
 
   - id: INVEN
     community: "인벤"
@@ -198,6 +238,11 @@ voices:
     taboo: "답 없는 감정 토로 늘어놓기"
     sample_post: "여친이랑 데이트 비용 매번 내가 다 냄. 이거 정배 맞음"
     sample_comment: "걍 더치페이 제안해봐. 그걸로 틀어지면 답 나온 거 ㅇㅇ"
+    post_processing:
+      target_comma_rate: 0.015
+      chosung_inject: false
+      chosung_phrases: []
+      sample_prob: 0.60
 
   - id: MLBPARK
     community: "엠엘비파크 (엠팍)"
@@ -218,6 +263,11 @@ voices:
     taboo: "근거 없는 감정, 신조어 남발"
     sample_post: "맞벌이인데 가사를 아내가 다 하는 구조가 됐네요. 다들 어떠신지 궁금합니다"
     sample_comment: "냉정하게 말씀드리자면 맞벌이면 가사분담이 맞습니다. 대화로 풀어야 할 문제네요"
+    post_processing:
+      target_comma_rate: 0.020
+      chosung_inject: false
+      chosung_phrases: []
+      sample_prob: 0.50
 
   - id: PPOMPPU
     community: "뽐뿌"
@@ -238,6 +288,11 @@ voices:
     taboo: "허세·과소비 옹호"
     sample_post: "남편이 매달 카드값을 숨겨요 가계부를 같이 못 보게 하는데 정상인가요"
     sample_comment: "재정은 투명하게 공유하는 게 맞습니다. 통장은 따로라도 내역은 봐야 해요"
+    post_processing:
+      target_comma_rate: 0.015
+      chosung_inject: false
+      chosung_phrases: []
+      sample_prob: 0.55
 
   - id: CLIEN
     community: "클리앙"
@@ -258,6 +313,11 @@ voices:
     taboo: "반말·욕설, 단정적 조롱"
     sample_post: "처가와의 명절 문제로 아내와 이견이 있습니다. 조심스럽게 여쭤봅니다"
     sample_comment: "경험상 이런 부부 문제는 두 분이 먼저 한 팀이 되시는 게 맞더라고요. 응원합니다"
+    post_processing:
+      target_comma_rate: 0.022
+      chosung_inject: false
+      chosung_phrases: []
+      sample_prob: 0.60
 
 # ========== 슬랭 레벨 가이드 (코드 slang_level과 정합) ==========
 # 0.0~0.2  거의 없음 (CLIEN, PPOMPPU, MLBPARK, 중장년 NATEPAN)

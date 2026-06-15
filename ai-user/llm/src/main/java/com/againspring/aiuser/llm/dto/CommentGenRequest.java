@@ -38,4 +38,6 @@ public class CommentGenRequest {
     private String styleExamples;
     /** 댓글 모드·길이 지시문 (오케스트레이터가 렌더한 한국어 1~2줄). 없으면 null. */
     private String modeHint;
+    /** 커뮤니티 voice 타입 (NATEPAN/DCINSIDE/THEQOO 등) — OutputSanitizer 분포 매칭용. 없으면 null. */
+    private String voiceType;
 }

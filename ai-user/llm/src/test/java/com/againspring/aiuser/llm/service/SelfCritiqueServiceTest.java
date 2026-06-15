@@ -76,4 +76,19 @@ class SelfCritiqueServiceTest {
         ReflectionTestUtils.setField(service, "enabled", false);
         assertTrue(service.quickCheck("정말 공감되네요 힘내세요 응원합니다", "comment", "polite").passed());
     }
+
+    @Test
+    void detectsExcessiveCommaRate() {
+        // 쉼표 10개 / 100자 = 10% > 5% 임계 → 감지
+        String highComma = "어제,학교,갔는데,친구,만나서,같이,밥,먹었음,진짜,좋았음 그랬는데 이상하게 됐어";
+        SelfCritiqueService.CritiqueResult result = service.quickCheck(highComma, "comment", "casual");
+        assertTrue(result.issues().stream().anyMatch(i -> i.contains("쉼표 과다")),
+            "쉼표 과다(10%) 감지 실패");
+
+        // 쉼표 1개 / 100자 = 1% < 5% → 통과
+        String lowComma = "어제 학교 갔는데 친구 만나서 같이 밥 먹었음 진짜 좋았음 그랬는데 이상하게 됐어";
+        SelfCritiqueService.CritiqueResult clean = service.quickCheck(lowComma, "comment", "casual");
+        assertTrue(clean.issues().stream().noneMatch(i -> i.contains("쉼표 과다")),
+            "정상 쉼표율 오감지");
+    }
 }

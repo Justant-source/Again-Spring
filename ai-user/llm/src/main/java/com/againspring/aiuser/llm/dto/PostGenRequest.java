@@ -40,4 +40,6 @@ public class PostGenRequest {
     private String sourceBody;
     /** scope=RECONSTRUCTION 전역 규칙 목록 ("- …" 개행 구분). 없으면 null. */
     private String reconstructionRules;
+    /** 커뮤니티 voice 타입 (NATEPAN/DCINSIDE/THEQOO 등) — OutputSanitizer 분포 매칭용. 없으면 null. */
+    private String voiceType;
 }

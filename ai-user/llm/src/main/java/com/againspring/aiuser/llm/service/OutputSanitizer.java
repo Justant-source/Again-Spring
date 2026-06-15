@@ -29,12 +29,91 @@ public class OutputSanitizer {
         Pattern.CASE_INSENSITIVE
     );
 
+    // ── 커뮤니티별 분포 매칭 설정 (Step 6) ──────────────────────────────────────
+    private record VoiceDistribution(double targetCommaRate, boolean chosungInject,
+                                     String[] chosungPhrases, double sampleProb) {}
+
+    private static final java.util.Map<String, VoiceDistribution> VOICE_DIST;
+    static {
+        VOICE_DIST = new java.util.HashMap<>();
+        VOICE_DIST.put("NATEPAN",  new VoiceDistribution(0.011, false, null, 0.70));
+        VOICE_DIST.put("DCINSIDE", new VoiceDistribution(0.030, true,
+            new String[]{"ㄹㅇ","ㅇㅈ","ㄷㄷ","ㅋㅋ"}, 0.80));
+        VOICE_DIST.put("BLIND",    new VoiceDistribution(0.015, false, null, 0.60));
+        VOICE_DIST.put("GENERAL",  new VoiceDistribution(0.015, false, null, 0.50));
+        VOICE_DIST.put("FMKOREA",  new VoiceDistribution(0.015, true,
+            new String[]{"ㄹㅇㅋㅋ","ㄷㄷ","ㅇㅈ","후추"}, 0.80));
+        VOICE_DIST.put("RULIWEB",  new VoiceDistribution(0.018, false, null, 0.60));
+        VOICE_DIST.put("THEQOO",   new VoiceDistribution(0.011, true,
+            new String[]{"헐","ㅠㅠ","ㄷㄷ","개공감"}, 0.75));
+        VOICE_DIST.put("ARCALIVE", new VoiceDistribution(0.015, true,
+            new String[]{"ㄹㅇ","ㄱㄱ","ㅇㅇ","어쩔"}, 0.80));
+        VOICE_DIST.put("INVEN",    new VoiceDistribution(0.015, false, null, 0.60));
+        VOICE_DIST.put("MLBPARK",  new VoiceDistribution(0.020, false, null, 0.50));
+        VOICE_DIST.put("PPOMPPU",  new VoiceDistribution(0.015, false, null, 0.55));
+        VOICE_DIST.put("CLIEN",    new VoiceDistribution(0.022, false, null, 0.60));
+    }
+    private static final java.util.Random DIST_RNG = new java.util.Random();
+
     public String sanitizePost(String raw) {
         return sanitize(raw, MAX_POST);
     }
 
     public String sanitizeComment(String raw) {
         return sanitize(raw, MAX_COMMENT);
+    }
+
+    public String sanitizePost(String raw, String voiceType) {
+        String base = sanitize(raw, MAX_POST);
+        return applyDist(base, voiceType, true);
+    }
+
+    public String sanitizeComment(String raw, String voiceType) {
+        String base = sanitize(raw, MAX_COMMENT);
+        return applyDist(base, voiceType, false);
+    }
+
+    private String applyDist(String text, String voiceType, boolean allowChosung) {
+        if (voiceType == null || text.isBlank()) return text;
+        VoiceDistribution dist = VOICE_DIST.get(voiceType.toUpperCase());
+        if (dist == null) return text;
+        if (DIST_RNG.nextDouble() > dist.sampleProb()) return text;
+        String s = normalizeCommaRate(text, dist.targetCommaRate());
+        if (allowChosung && dist.chosungInject() && dist.chosungPhrases() != null) {
+            s = injectChosung(s, dist.chosungPhrases());
+        }
+        return s;
+    }
+
+    private String normalizeCommaRate(String text, double targetRate) {
+        long commaCount = text.chars().filter(c -> c == ',').count();
+        if (text.isEmpty() || (double) commaCount / text.length() <= targetRate * 1.5) return text;
+        int targetCommas = (int) (text.length() * targetRate);
+        int toRemove = (int) commaCount - targetCommas;
+        if (toRemove <= 0) return text;
+        StringBuilder sb = new StringBuilder(text);
+        int removed = 0;
+        for (int i = sb.length() - 1; i >= 0 && removed < toRemove; i--) {
+            if (sb.charAt(i) == ',' && DIST_RNG.nextBoolean()) {
+                sb.deleteCharAt(i);
+                removed++;
+            }
+        }
+        return sb.toString();
+    }
+
+    private String injectChosung(String text, String[] phrases) {
+        String[] lines = text.split("[\\n\\r]+");
+        if (lines.length < 2) return text;
+        java.util.List<Integer> candidates = new java.util.ArrayList<>();
+        for (int i = 0; i < lines.length - 1; i++) {
+            if (lines[i].trim().length() > 10) candidates.add(i);
+        }
+        if (candidates.isEmpty()) return text;
+        int lineIdx = candidates.get(DIST_RNG.nextInt(candidates.size()));
+        String phrase = phrases[DIST_RNG.nextInt(phrases.length)];
+        lines[lineIdx] = lines[lineIdx] + " " + phrase;
+        return String.join("\n", lines);
     }
 
     // LLM이 콘텐츠 대신 질문하거나 생성 거부하는 패턴 — 빈 문자열 반환 → ActionExecutor FAILED 처리

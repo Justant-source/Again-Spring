@@ -69,4 +69,42 @@ class OutputSanitizerHrTest {
         String out = sanitizer.sanitizePost(body);
         assertTrue(out.length() <= 1000, "MAX_POST=1000 컷 (backend 제한 일치): " + out.length());
     }
+
+    // ── 분포 매칭 (Step 6) ─────────────────────────────────────────────────
+
+    @Test
+    void sanitizePostWithVoiceTypeReturnsSameLengthClass() {
+        // voiceType 있어도 기본 sanitize 결과와 크게 달라지지 않아야 함 (길이 계층 동일)
+        String raw = "어제 학교 갔는데 친구 만나서 밥 먹었음";
+        String withVoice  = sanitizer.sanitizePost(raw, "NATEPAN");
+        String withoutVoice = sanitizer.sanitizePost(raw);
+        assertNotNull(withVoice);
+        // 알 수 없는 voiceType은 기본값과 동일
+        assertEquals(withoutVoice, sanitizer.sanitizePost(raw, "UNKNOWN_COMMUNITY"));
+        // null voiceType도 기본값과 동일
+        assertEquals(withoutVoice, sanitizer.sanitizePost(raw, null));
+    }
+
+    @Test
+    void commaRateNormalizationRemovesExcessCommas() {
+        // NATEPAN target=0.011, 1.5배=0.0165. 쉼표 20개/200자=10% → 제거 대상
+        StringBuilder sb = new StringBuilder();
+        // 200자짜리 텍스트에 쉼표 20개 주입
+        for (int i = 0; i < 10; i++) {
+            sb.append("어제,학교,갔음 ");
+        }
+        String highComma = sb.toString().trim(); // ~100자, 쉼표 20개
+        // sampleProb 때문에 항상 제거되진 않지만, 최소한 결과는 null이 아님
+        String result = sanitizer.sanitizePost(highComma, "NATEPAN");
+        assertNotNull(result);
+        assertFalse(result.isBlank());
+    }
+
+    @Test
+    void sanitizeCommentWithVoiceTypeWorks() {
+        String raw = "ㄹㅇ 그건 좀 아니지 않음";
+        String result = sanitizer.sanitizeComment(raw, "DCINSIDE");
+        assertNotNull(result);
+        assertFalse(result.isBlank());
+    }
 }

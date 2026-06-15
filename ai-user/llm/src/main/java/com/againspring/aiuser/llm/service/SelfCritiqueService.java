@@ -129,6 +129,13 @@ public class SelfCritiqueService {
             issues.add("ㅠ 남발(" + sobRuns + "회) — 일부 제거하거나 다른 종결로");
         }
 
+        // 11. 쉼표 과다 (AI 실측 5%↑, 인간 베이스라인 최대 3%) — 커뮤니티 공통
+        long commaCount = text.chars().filter(c -> c == ',').count();
+        if (!text.isEmpty() && (double) commaCount / text.length() > 0.05) {
+            score -= 1;
+            issues.add("쉼표 과다(AI 투) — 쉼표를 2/3 이상 제거하고 다시 쓸 것");
+        }
+
         // 5. 종결어미 단조로움: casual 모드에서만 ~임/~함 단조 체크
         String[] lines = text.split("[\\n\\r]+");
         int totalLines = 0, uniformEnding = 0;

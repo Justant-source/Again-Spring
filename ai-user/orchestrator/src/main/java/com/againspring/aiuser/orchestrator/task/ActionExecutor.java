@@ -222,6 +222,7 @@ public class ActionExecutor {
             .backend(backendFor("COMMENT"))
             .recentOutputs(formatRecentOutputs(recentBodies, 150))
             .modeHint(commentModeHint(pickCommentMode(persona, stance)))
+            .voiceType(voiceProfileField(persona, "voice_type"))
             .build();
         java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateCommentR(genReq);
 
@@ -411,6 +412,7 @@ public class ActionExecutor {
             .reconstructMode(primarySource != null)
             .sourceExampleId(primarySource != null ? primarySource.getId() : null)
             .sourceBody(primarySource != null ? primarySource.getContent() : null)
+            .voiceType(voiceProfileField(persona, "voice_type"))
             .build();
         // Best-of-N reranking — active when ai-user-ml.enabled=true
         String rawBody;

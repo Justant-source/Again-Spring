@@ -37,7 +37,7 @@ public class GenerationController {
             String model = (postModel != null && !postModel.isBlank()) ? postModel.trim() : null;
             String prompt = promptAssembler.assemblePostPrompt(req);
             String raw = pool.executeSyncTask(prompt, model, req.getTimeoutMs(), corrId, req.getBackend());
-            String text = outputSanitizer.sanitizePost(raw);
+            String text = outputSanitizer.sanitizePost(raw, req.getVoiceType());
             // 자기비평 루프 (enabled 시) — 동일 backend·model 승계, formality 전달
             text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId, req.getBackend(), req.getFormality(), model);
             return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
@@ -61,7 +61,7 @@ public class GenerationController {
             // 센티넬 분리 먼저 (sanitize/critique 전에) — OutputSanitizer가 <<<REACT>>> 이하를 파괴하기 전에 추출
             String[] split = splitReactions(raw);
             String reactionsJson = split[1];  // 최초 raw에서 캡처 (critique 재생성으로도 보존됨)
-            String text = outputSanitizer.sanitizeComment(split[0]);
+            String text = outputSanitizer.sanitizeComment(split[0], req.getVoiceType());
             // 자기비평 루프 (enabled 시, 댓글은 점수 기준 완화) — 동일 backend 승계, formality 전달
             text = selfCritique.critiqueAndRefine(text, "comment", prompt, corrId, req.getBackend(), req.getFormality());
             return ResponseEntity.ok(GenResponse.success(text, reactionsJson, System.currentTimeMillis() - start, corrId));
