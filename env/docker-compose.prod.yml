@@ -137,6 +137,7 @@ services:
       LLM_DEFAULT_TIMEOUT_MS: ${AI_USER_LLM_DEFAULT_TIMEOUT_MS:-120000}
       SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
       SELF_CRITIQUE_EXTRA_CLICHES: ${SELF_CRITIQUE_EXTRA_CLICHES:-}
+      LLM_API_REFUSAL_RETRIES: ${LLM_API_REFUSAL_RETRIES:-0}
       DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER}
       DB_PASSWORD: ${MARIADB_PASSWORD}
@@ -201,7 +202,7 @@ services:
       BACKEND_BASE_URL: http://againspring-backend-prod:8080
       LLM_AI_USER_URL: http://againspring-llm-ai-user-prod:8092
       AI_USER_ENABLED: ${AI_USER_ENABLED:-false}
-      AI_USER_TICK_CRON: "0 * * * * *"
+      AI_USER_TICK_CRON: "${AI_USER_TICK_CRON:-0 */10 * * * *}"
       AI_USER_DAILY_GLOBAL_CAP: ${AI_USER_DAILY_GLOBAL_CAP:-500}
       AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-dev-pw-2026}
       AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
