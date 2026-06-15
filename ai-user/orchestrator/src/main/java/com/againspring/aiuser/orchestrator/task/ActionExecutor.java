@@ -2,6 +2,7 @@ package com.againspring.aiuser.orchestrator.task;
 
 import com.againspring.aiuser.orchestrator.auth.BotTokenCache;
 import com.againspring.aiuser.orchestrator.client.AiLearningClient;
+import com.againspring.aiuser.orchestrator.client.AiUserMlClient;
 import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.client.dto.*;
@@ -54,6 +55,7 @@ public class ActionExecutor {
     private final JdbcTemplate jdbcTemplate;
     private final ArchetypeCatalog archetypeCatalog;
     private final AiLearningClient aiLearningClient;
+    private final AiUserMlClient aiUserMlClient;
     private final AiGlobalRuleRepository aiGlobalRuleRepository;
     private final AiUserGenerationConfigRepository generationConfigRepository;
 
@@ -255,6 +257,8 @@ public class ActionExecutor {
             // AI Learning: 합격한 댓글 예시 뱅크에 저장
             aiLearningClient.saveAsync(text, "COMMENT",
                 action.targetPost() != null ? action.targetPost().getCategory() : "OTHER", "SELF_GENERATED");
+            // AI-User ML: 게시 완료 댓글을 AI negative 코퍼스에 push (판별기 학습용)
+            aiUserMlClient.pushNegative(voiceProfileField(persona, "voice_type"), "COMMENT", text);
             // 피기백 반응 디스패치 (추가 LLM 호출 0건)
             dispatchReactions(persona, jwt, action.targetPost(), res.reactionsJson(), ctx.items(), corrId);
         }
@@ -408,13 +412,47 @@ public class ActionExecutor {
             .sourceExampleId(primarySource != null ? primarySource.getId() : null)
             .sourceBody(primarySource != null ? primarySource.getContent() : null)
             .build();
-        java.util.Optional<String> bodyOpt = llmClient.generatePost(genReq);
-
-        if (bodyOpt.isEmpty()) {
-            logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
-            return;
+        // Best-of-N reranking — active when ai-user-ml.enabled=true
+        String rawBody;
+        if (aiUserMlClient.isEnabled()) {
+            int n = aiUserMlClient.getBestOfN();
+            java.util.List<AiUserMlClient.CandidateItem> candidates = new java.util.ArrayList<>();
+            String firstValid = null;
+            for (int i = 0; i < n; i++) {
+                java.util.Optional<String> draftOpt = llmClient.generatePost(genReq);
+                if (draftOpt.isEmpty() || draftOpt.get().isBlank()) continue;
+                String draft = draftOpt.get();
+                if (firstValid == null) firstValid = draft;
+                candidates.add(new AiUserMlClient.CandidateItem("draft-" + i, draft));
+            }
+            if (firstValid == null) {
+                logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
+                return;
+            }
+            String community = voiceProfileField(persona, "voice_type");
+            java.util.Optional<AiUserMlClient.RerankResponse> rerankOpt =
+                aiUserMlClient.rerank(community, "POST", candidates);
+            if (rerankOpt.isPresent() && rerankOpt.get().getWinnerId() != null) {
+                final String winnerId = rerankOpt.get().getWinnerId();
+                rawBody = candidates.stream()
+                    .filter(c -> winnerId.equals(c.getId()))
+                    .map(AiUserMlClient.CandidateItem::getText)
+                    .findFirst()
+                    .orElse(firstValid);
+                log.info("Best-of-N: winner={} from {} drafts persona={} corr={}",
+                    winnerId, candidates.size(), persona.getId(), corrId);
+            } else {
+                rawBody = firstValid;
+                log.debug("Best-of-N rerank unavailable, using first draft persona={} corr={}", persona.getId(), corrId);
+            }
+        } else {
+            java.util.Optional<String> bodyOpt = llmClient.generatePost(genReq);
+            if (bodyOpt.isEmpty()) {
+                logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
+                return;
+            }
+            rawBody = bodyOpt.get();
         }
-        String rawBody = bodyOpt.get();
 
         // 반복 가드: 최근 글과 거의 같으면 1회만 재생성
         if (maxBigramJaccard(rawBody, recentBodies) > repetitionThreshold) {
@@ -467,6 +505,8 @@ public class ActionExecutor {
                 writeHistory(persona, "posts", body, post.getId(), category);
                 // AI Learning: 합격한 글 예시 뱅크에 저장
                 aiLearningClient.saveAsync(body, "POST", category, "SELF_GENERATED");
+                // AI-User ML: 게시 완료 글을 AI negative 코퍼스에 push (판별기 학습용)
+                aiUserMlClient.pushNegative(voiceProfileField(persona, "voice_type"), "POST", body);
                 logAction(persona, action, "POSTED", corrId,
                     java.util.Map.of("postId", post.getId(), "category", category, "usedLlm", true));
             }

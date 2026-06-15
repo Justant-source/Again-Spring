@@ -1,0 +1,154 @@
+package com.againspring.aiuser.orchestrator.client;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * AI-User ML 서비스 클라이언트 (WSL, RTX 3090, port 8201).
+ * /rerank: Best-of-N 초안 중 KcELECTRA+KatFishNet 인간다움 점수 최고 winner 선택.
+ * /corpus/ingest: 게시 완료 텍스트를 AI negative 코퍼스에 push.
+ * enabled=false 기본 — feature flag로 점진 롤아웃. WSL 다운 시 graceful skip.
+ */
+@Slf4j
+@Component
+public class AiUserMlClient {
+
+    private final String baseUrl;
+    private final String apiToken;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
+    @Value("${ai-user-ml.enabled:false}")
+    private boolean enabled;
+
+    @Value("${ai-user-ml.best-of-n:4}")
+    private int bestOfN;
+
+    public AiUserMlClient(
+            @Value("${ai-user-ml.base-url:http://100.115.252.61:8201}") String baseUrl,
+            @Value("${ai-user-ml.api-token:aiuser-ml-api-token-dev-2026}") String apiToken,
+            ObjectMapper objectMapper) {
+        this.baseUrl = baseUrl;
+        this.apiToken = apiToken;
+        this.restTemplate = new RestTemplate();
+        this.objectMapper = objectMapper;
+    }
+
+    private <T> String postJson(String path, T body) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + apiToken);
+            String json = objectMapper.writeValueAsString(body);
+            HttpEntity<String> entity = new HttpEntity<>(json, headers);
+            return restTemplate.postForEntity(baseUrl + path, entity, String.class).getBody();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // ── DTOs ──────────────────────────────────────────────────────────────────
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class CandidateItem {
+        private String id;
+        private String text;
+        public CandidateItem(String id, String text) { this.id = id; this.text = text; }
+    }
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RerankRequest {
+        private String community;
+        private String contentType;
+        private List<CandidateItem> candidates;
+        public RerankRequest(String community, String contentType, List<CandidateItem> candidates) {
+            this.community = community; this.contentType = contentType; this.candidates = candidates;
+        }
+    }
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RankedItem {
+        private String id;
+        private double humanProb;
+    }
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RerankResponse {
+        private String winnerId;
+        private List<RankedItem> ranked;
+        private boolean degraded;
+    }
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class IngestItem {
+        private String community;
+        private String contentType;
+        private String text;
+        private String label;
+        public IngestItem(String community, String contentType, String text, String label) {
+            this.community = community; this.contentType = contentType;
+            this.text = text; this.label = label;
+        }
+    }
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class IngestRequest {
+        private List<IngestItem> items;
+        public IngestRequest(List<IngestItem> items) { this.items = items; }
+    }
+
+    // ── Methods ───────────────────────────────────────────────────────────────
+
+    /**
+     * N개 초안 중 인간다움 점수 최고 winner 반환.
+     * enabled=false 또는 WSL 다운 시 Optional.empty() → ActionExecutor가 첫 번째 초안으로 폴백.
+     */
+    public Optional<RerankResponse> rerank(String community, String contentType, List<CandidateItem> candidates) {
+        if (!enabled || candidates == null || candidates.isEmpty()) return Optional.empty();
+        try {
+            String body = postJson("/rerank", new RerankRequest(community, contentType, candidates));
+            if (body == null) return Optional.empty();
+            return Optional.of(objectMapper.readValue(body, RerankResponse.class));
+        } catch (Exception e) {
+            log.debug("AiUserMl rerank failed (non-critical, fallback to first draft): {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * 게시 완료 텍스트를 AI negative 코퍼스에 push (fire-and-forget).
+     * enabled=false 또는 WSL 다운 시 silent skip.
+     */
+    public void pushNegative(String community, String contentType, String text) {
+        if (!enabled || text == null || text.isBlank()) return;
+        try {
+            postJson("/corpus/ingest",
+                new IngestRequest(List.of(new IngestItem(community, contentType, text, "ai"))));
+        } catch (Exception e) {
+            log.debug("AiUserMl corpus ingest failed (non-critical): {}", e.getMessage());
+        }
+    }
+
+    public boolean isEnabled() { return enabled; }
+    public int getBestOfN() { return bestOfN; }
+}

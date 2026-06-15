@@ -68,6 +68,16 @@ API 키 없이 동작 — 호스트의 `~/.claude` 세션을 **llm-worker** 컨�
 | `AI_USER_REPETITION_THRESHOLD` | 생성문 vs 최근 출력 2-gram Jaccard 임계 — 초과 시 1회 재생성 (llm.md §15) | `0.45` |
 | `AI_USER_MIN_POST_CHARS` | 글 최소 길이 — 미달 시 1회 재생성 (제목만 남는 절단 방어, llm.md §6.3) | `50` |
 
+#### AI-User ML 서비스 연동 (Best-of-N 리랭킹, WSL 100.115.252.61:8201)
+
+| 변수 | 사용처 | 기본 |
+|---|---|---|
+| `AI_USER_ML_BASE_URL` | ML 서비스 base URL (WSL Tailscale) | `http://100.115.252.61:8201` |
+| `AI_USER_ML_API_TOKEN` | Bearer 인증 토큰 (ML → AS 단방향) | `aiuser-ml-api-token-dev-2026` |
+| `AI_USER_ML_ENABLED` | Best-of-N 활성화 (false=단일초안 기존 경로) | `false` |
+| `AI_USER_ML_BEST_OF_N` | 초안 생성 수 (활성화 시) | `4` |
+| `AI_USER_ML_TIMEOUT_MS` | ML 서비스 응답 타임아웃 (ms) | `500` |
+
 ### AI 유저 LLM 생성 (`againspring-llm-ai-user` 컨테이너, 8092)
 
 backend의 `againspring-llm`(8090, 채팅·배심원)과 **별개 서비스**. 글/댓글/대댓글 생성 전용.
