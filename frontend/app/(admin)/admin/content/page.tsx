@@ -341,7 +341,7 @@ export default function AdminContentPage() {
                           <Sparkles className="h-4 w-4 mr-2" />
                           AI 개선{row.synthetic ? '' : ' (학습 데이터)'}
                         </DropdownMenuItem>
-                        {row.synthetic && row.sourceExampleId && (
+                        {row.synthetic && (
                           <DropdownMenuItem asChild className="text-blue-600">
                             <Link href={`/admin/content/${row.id}/compare`}>
                               <GitCompare className="h-4 w-4 mr-2" />
