@@ -25,6 +25,7 @@ import {
 import {
   Cpu, Zap, Power, Save, AlertTriangle, AlertCircle, Info, RefreshCw,
 } from 'lucide-react';
+import { AnthropicApiKeyPanel, AnthropicBaseUrlPanel } from '@/components/admin/ai-rules/AnthropicApiPanels';
 
 // ── §11.5 클라이언트 측 추정 상수 ────────────────────────────────────────
 // 실측 기준 (ClaudeApiInvoker 로그 avg): input ~4600, output ~100
@@ -368,6 +369,7 @@ export default function AiUserPage() {
         <TabsList>
           <TabsTrigger value="settings">생성 설정</TabsTrigger>
           <TabsTrigger value="monitor">실시간 관제</TabsTrigger>
+          <TabsTrigger value="api-settings">API 설정</TabsTrigger>
         </TabsList>
 
         <TabsContent value="settings" className="mt-6">
@@ -655,6 +657,16 @@ export default function AiUserPage() {
             <PersonaPerformanceTable />
           </div>
           <HourlyDistributionChart />
+        </TabsContent>
+
+        <TabsContent value="api-settings" className="mt-6 space-y-4">
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 space-y-1">
+            <p className="font-semibold">🔑 Claude / Anthropic API 설정</p>
+            <p>Anthropic API를 직접 호출하는 기능(수정 분석, API 모드 AI 유저 등)에 사용되는 설정입니다.</p>
+            <p>키와 Base URL은 DB에 저장됩니다. Base URL 변경 시 llm-worker에 즉시 반영됩니다.</p>
+          </div>
+          <AnthropicBaseUrlPanel />
+          <AnthropicApiKeyPanel />
         </TabsContent>
       </Tabs>
     </div>
