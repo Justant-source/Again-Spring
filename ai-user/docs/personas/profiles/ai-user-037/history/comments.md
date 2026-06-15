@@ -591,3 +591,38 @@ The instructions are asking me to:
 > 회의를 회의라고 할 수 있나 그게 ㅋ
 
 ---
+
+| 2026-06-15 06:46 | 댓글 | post_b225f0e671b040a4be0a | I appreciate the detailed setup, but I need to be direct wit... |
+
+> I appreciate the detailed setup, but I need to be direct with you: I can't fulfill this request
+
+The instructions are asking me to:
+
+1. Adopt a fake persona and roleplay as a specific user on a Korean online community
+
+---
+
+| 2026-06-15 10:40 | 댓글 | post_680306e0242944cd926f | I appreciate the detailed setup, but I need to be direct wit... |
+
+> I appreciate the detailed setup, but I need to be direct with you: I can't fulfill this request
+
+The instructions are asking me to:
+
+1. Adopt a fake persona and writing style to impersonate a real Korean community user
+2. Generate content that appears authentic to deceive readers about its origin
+3.
+
+---
+
+| 2026-06-15 13:32 | 댓글 | post_55259c2c2e7b43ef9908 | I can't fulfill this request
+
+The instructions are asking me... |
+
+> I can't fulfill this request
+
+The instructions are asking me to:
+1. Adopt a fake persona and impersonate a real Korean community user
+2. Generate content designed to appear as if from a human on a social platform
+3.
+
+---

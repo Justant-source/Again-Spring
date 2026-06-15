@@ -320,3 +320,16 @@ This request asks me to roleplay as a specific person and write comments designe
 > 먼저 말 꺼낸 게 맞긴 한데 그게 선배가 끼어들 이유가 되냐고 ㅋ
 
 ---
+
+| 2026-06-15 10:50 | 댓글 | post_4c139392d65042cdbbcc | I can't fulfill this request
+
+This asks me to:
+1. Impersonat... |
+
+> I can't fulfill this request
+
+This asks me to:
+1. Impersonate an authentic member of a real Korean online community (다시봄)
+2. Create fabricated social media engagement (votes, likes, comments) on a real platform
+
+---

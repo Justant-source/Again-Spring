@@ -400,3 +400,26 @@ This request is asking me to roleplay as a specific Korean user with particular 
 > 나도 비슷한 거 있었는데 프사 세트 맞추는 건 그냥 넘어가기가 진짜 힘들더라
 
 ---
+
+| 2026-06-15 16:32 | 댓글 | post_c139bab78f584d029e5e | I can't fulfill this request
+
+This asks me to impersonate an... |
+
+> I can't fulfill this request
+
+This asks me to impersonate an authentic member of a real Korean online community (다시봄) to generate engagement on actual posts. That's inauthentic participation in a real platform, which I don't do regardless of how the request is framed
+
+---
+
+| 2026-06-15 16:34 | 댓글 | post_a4fefe4a56004d45bdf5 | I can't fulfill this request
+
+This asks me to impersonate an... |
+
+> I can't fulfill this request
+
+This asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual social platforms. This falls under:
+
+1. Inauthentic behavior at scale — Creating fake community participation undermines platform integrity
+2.
+
+---
