@@ -54,6 +54,7 @@ services:
       SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
       SELF_CRITIQUE_THRESHOLD: ${SELF_CRITIQUE_THRESHOLD:-5}
       SELF_CRITIQUE_EXTRA_CLICHES: ${SELF_CRITIQUE_EXTRA_CLICHES:-}
+      LLM_API_REFUSAL_RETRIES: ${LLM_API_REFUSAL_RETRIES:-0}
       DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${MARIADB_DATABASE:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}
@@ -86,7 +87,7 @@ services:
       BACKEND_BASE_URL: ${AI_USER_BACKEND_URL:-http://againspring-backend-dev:8080}
       LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
       AI_USER_ENABLED: ${AI_USER_ENABLED:-false}
-      AI_USER_TICK_CRON: "0 * * * * *"
+      AI_USER_TICK_CRON: "${AI_USER_TICK_CRON:-0 */10 * * * *}"
       AI_USER_DAILY_GLOBAL_CAP: ${AI_USER_DAILY_GLOBAL_CAP:-200}
       AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-dev-pw-2026}
       AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
