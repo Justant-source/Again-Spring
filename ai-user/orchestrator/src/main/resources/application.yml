@@ -74,6 +74,7 @@ ai-user-ml:
   base-url: ${AI_USER_ML_BASE_URL:http://100.115.252.61:8201}
   api-token: ${AI_USER_ML_API_TOKEN:aiuser-ml-api-token-dev-2026}
   enabled: ${AI_USER_ML_ENABLED:false}
+  collect: ${AI_USER_ML_COLLECT:false}
   best-of-n: ${AI_USER_ML_BEST_OF_N:4}
   timeout-ms: ${AI_USER_ML_TIMEOUT_MS:500}
 

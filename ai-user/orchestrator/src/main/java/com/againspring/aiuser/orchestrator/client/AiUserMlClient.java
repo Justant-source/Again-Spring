@@ -35,6 +35,9 @@ public class AiUserMlClient {
     @Value("${ai-user-ml.enabled:false}")
     private boolean enabled;
 
+    @Value("${ai-user-ml.collect:false}")
+    private boolean collect;
+
     @Value("${ai-user-ml.best-of-n:4}")
     private int bestOfN;
 
@@ -137,10 +140,10 @@ public class AiUserMlClient {
 
     /**
      * 게시 완료 텍스트를 AI negative 코퍼스에 push (fire-and-forget).
-     * enabled=false 또는 WSL 다운 시 silent skip.
+     * collect=false 또는 WSL 다운 시 silent skip.
      */
     public void pushNegative(String community, String contentType, String text) {
-        if (!enabled || text == null || text.isBlank()) return;
+        if (!collect || text == null || text.isBlank()) return;
         try {
             postJson("/corpus/ingest",
                 new IngestRequest(List.of(new IngestItem(community, contentType, text, "ai"))));
@@ -150,5 +153,6 @@ public class AiUserMlClient {
     }
 
     public boolean isEnabled() { return enabled; }
+    public boolean isCollectEnabled() { return collect; }
     public int getBestOfN() { return bestOfN; }
 }

@@ -74,7 +74,8 @@ API 키 없이 동작 — 호스트의 `~/.claude` 세션을 **llm-worker** 컨�
 |---|---|---|
 | `AI_USER_ML_BASE_URL` | ML 서비스 base URL (WSL Tailscale) | `http://100.115.252.61:8201` |
 | `AI_USER_ML_API_TOKEN` | Bearer 인증 토큰 (ML → AS 단방향) | `aiuser-ml-api-token-dev-2026` |
-| `AI_USER_ML_ENABLED` | Best-of-N 활성화 (false=단일초안 기존 경로) | `false` |
+| `AI_USER_ML_ENABLED` | Best-of-N 리랭킹 활성화 (false=단일초안 기존 경로) — 수집은 `AI_USER_ML_COLLECT`로 별도 제어 | `false` |
+| `AI_USER_ML_COLLECT` | AI negative 코퍼스 수집 단독 활성화. `AI_USER_ML_ENABLED`(리랭킹)와 독립. 판별기 AUC가 낮을 때(0.55 미만) 수집만 켜고 리랭킹은 OFF 유지해야 출력 악화 방지 | `false` |
 | `AI_USER_ML_BEST_OF_N` | 초안 생성 수 (활성화 시) | `4` |
 | `AI_USER_ML_TIMEOUT_MS` | ML 서비스 응답 타임아웃 (ms) | `500` |
 

@@ -34,8 +34,8 @@ class AiUserMlClientTest {
     }
 
     @Test
-    void pushNegative_whenDisabled_doesNotThrow() {
-        ReflectionTestUtils.setField(client, "enabled", false);
+    void pushNegative_whenCollectOff_isNoOp() {
+        ReflectionTestUtils.setField(client, "collect", false);
         client.pushNegative("NATEPAN", "POST", "테스트 글");
     }
 
@@ -138,6 +138,31 @@ class AiUserMlClientTest {
     void isEnabled_defaultFalse() {
         // @Value field not injected without Spring → false (int zero)
         assertThat(client.isEnabled()).isFalse();
+    }
+
+    @Test
+    void isCollectEnabled_defaultFalse() {
+        // @Value not injected → false
+        assertThat(client.isCollectEnabled()).isFalse();
+    }
+
+    @Test
+    void pushNegative_collectOnRerankOff_attemptsSilentlyNoThrow() {
+        // collect=true, enabled=false: rerank는 동작 안 하지만 수집은 시도(네트워크 실패시 무에러)
+        ReflectionTestUtils.setField(client, "collect", true);
+        ReflectionTestUtils.setField(client, "enabled", false);
+        // port 9999 not listening → caught silently inside pushNegative
+        client.pushNegative("NATEPAN", "POST", "테스트 글");
+    }
+
+    @Test
+    void rerank_enabledOffCollectOn_returnsEmpty() {
+        // collect=true여도 rerank는 enabled=false면 동작 안 함 (분리 검증)
+        ReflectionTestUtils.setField(client, "collect", true);
+        ReflectionTestUtils.setField(client, "enabled", false);
+        Optional<AiUserMlClient.RerankResponse> result = client.rerank(
+            "NATEPAN", "POST", List.of(new AiUserMlClient.CandidateItem("d0", "테스트 글")));
+        assertThat(result).isEmpty();
     }
 
     @Test

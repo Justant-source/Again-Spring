@@ -218,6 +218,11 @@ services:
       PAIRED_POST_ENABLED: ${PAIRED_POST_ENABLED:-true}
       PAIRED_POST_CRON: "${PAIRED_POST_CRON:-0 0 */2 * * *}"
       PAIRED_POST_PAIRS: ${PAIRED_POST_PAIRS:-3}
+      AI_USER_ML_BASE_URL: ${AI_USER_ML_BASE_URL:-http://100.115.252.61:8201}
+      AI_USER_ML_ENABLED: ${AI_USER_ML_ENABLED:-false}
+      AI_USER_ML_COLLECT: ${AI_USER_ML_COLLECT:-false}
+      AI_USER_ML_BEST_OF_N: ${AI_USER_ML_BEST_OF_N:-4}
+      AI_USER_ML_TIMEOUT_MS: ${AI_USER_ML_TIMEOUT_MS:-500}
     volumes:
       - ../ai-user/docs/personas:/app/personas:rw
     depends_on:
