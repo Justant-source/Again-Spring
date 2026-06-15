@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,7 @@ import { CreateMarketingJobDialog } from '@/components/admin/content/CreateMarke
 import {
   listAdminPosts,
   listAdminComments,
+  getAdminPost,
   deletePost,
   blockPost,
   unblockPost,
@@ -55,6 +57,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export default function AdminContentPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'posts' | 'comments'>('posts');
 
   // Posts state
@@ -107,6 +111,18 @@ export default function AdminContentPage() {
     },
     [postAuthorTypeFilter, postCategoryFilter, postSearchQuery]
   );
+
+  // ?openImprove=<postId> → AI 개선 다이얼로그 자동 오픈 (compare 페이지 리다이렉트 경유)
+  useEffect(() => {
+    const improveId = searchParams.get('openImprove');
+    if (!improveId) return;
+    getAdminPost(improveId)
+      .then((post) => {
+        setImprovePost(post);
+        router.replace('/admin/content');
+      })
+      .catch(() => {});
+  }, []);
 
   // Load comments
   const loadComments = useCallback(

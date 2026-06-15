@@ -72,13 +72,18 @@ export default function ContentComparePage() {
     setLoading(true);
     getSourceComparison(postId)
       .then((res) => {
+        if (!res.hasSource) {
+          // 크롤 원본 없는 AI 글 → AI 개선 화면으로 리다이렉트
+          router.replace(`/admin/content?openImprove=${postId}`);
+          return;
+        }
         setData(res);
         setEditedTitle(res.generated?.title ?? '');
         setEditedBody(res.generated?.body ?? '');
       })
       .catch((e) => setError(e?.message ?? '데이터를 불러올 수 없습니다.'))
       .finally(() => setLoading(false));
-  }, [postId]);
+  }, [postId, router]);
 
   // ── Phase A: 분석 ───────────────────────────────────────────────────────────
 
@@ -148,21 +153,6 @@ export default function ContentComparePage() {
         <AlertCircle className="h-8 w-8 text-red-500" />
         <p className="text-sm text-red-600">{error ?? '데이터 없음'}</p>
         <Button variant="outline" size="sm" onClick={() => router.back()}>돌아가기</Button>
-      </div>
-    );
-  }
-
-  if (!data.hasSource) {
-    return (
-      <div className="p-6 flex flex-col items-center gap-4 text-center">
-        <AlertCircle className="h-8 w-8 text-amber-400" />
-        <p className="text-sm text-muted-foreground">
-          이 글은 단일 크롤 원본과 1:1로 연결된 글이 아닙니다.<br />
-          기존 AI 사연 또는 daily_topic 기반 생성물입니다.
-        </p>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/admin/content"><ArrowLeft className="h-4 w-4 mr-1" /> 콘텐츠 관리로</Link>
-        </Button>
       </div>
     );
   }
