@@ -82,6 +82,25 @@ def _get_hot_topics_hint() -> list[str]:
     return deduped[:10]
 
 
+def _get_reconstruction_rules() -> list[str]:
+    """
+    ai_global_rules 테이블에서 scope='RECONSTRUCTION' + active=1 규칙 텍스트 목록 반환.
+    관리자가 원본 비교 화면에서 저장한 재구성 규칙 (원본→사연 변환 지침).
+    DB 오류 시 빈 목록 반환(non-critical).
+    """
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT rule_text FROM ai_global_rules WHERE scope = 'RECONSTRUCTION' AND active = 1 ORDER BY id ASC"
+                )
+                rows = cur.fetchall()
+        return [r["rule_text"] for r in rows if r.get("rule_text")]
+    except Exception as e:
+        logger.warning(f"[topic_synthesizer] RECONSTRUCTION rules 조회 실패 (non-critical): {e}")
+        return []
+
+
 def _synthesize_with_llm(posts_sample: list[str], hot_topics_hint: list[str]) -> list[dict]:
     """
     LLM 호출: 크롤 샘플 + hot_topics 힌트 → 앱 카테고리별 추상화 주제 시드 목록.
@@ -93,7 +112,19 @@ def _synthesize_with_llm(posts_sample: list[str], hot_topics_hint: list[str]) ->
     cats_desc = "\n".join(f"  - {c}: {APP_CATEGORY_KR[c]}" for c in APP_CATEGORIES)
     n = TOPICS_PER_RUN
 
-    prompt = f"""당신은 한국 인터넷 커뮤니티 갈등 소재 분석 전문가입니다.
+    # 재구성 규칙 주입 — 관리자가 원본 비교 화면에서 학습시킨 원본→사연 변환 지침
+    reconstruction_rules = _get_reconstruction_rules()
+    if reconstruction_rules:
+        rules_block = "\n".join(f"- {r}" for r in reconstruction_rules)
+        recon_section = f"""
+## 재구성 규칙 (원본→사연 변환 지침 — 반드시 준수)
+아래 규칙은 관리자가 실제 사연 품질 피드백으로 학습시킨 변환 기준입니다:
+{rules_block}
+"""
+    else:
+        recon_section = ""
+
+    prompt = f"""당신은 한국 인터넷 커뮤니티 갈등 소재 분석 전문가입니다.{recon_section}
 
 아래는 오늘 수집된 커뮤니티 갈등 게시글 샘플입니다:
 ---

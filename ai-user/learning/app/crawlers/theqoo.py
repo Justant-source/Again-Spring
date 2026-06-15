@@ -112,6 +112,8 @@ async def crawl(daily_limit: int = 300) -> List[Dict]:
                         "content_type": "POST",
                         "source": "theqoo",
                         "category": "hot",
+                        "title": post.get("title"),
+                        "source_url": post.get("url"),
                     })
                     logger.debug(f"theqoo {post['origin_id']}: saved {len(content)} chars")
 

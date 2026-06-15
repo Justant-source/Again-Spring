@@ -34,6 +34,18 @@ public class PostComposeService {
     private final KeywordGuard keywordGuard;
 
     /**
+     * 재구성 출처 스냅샷 — 재구성 모드 생성 시만 전달되며 posts 테이블에 저장.
+     * null = 일반(창작) 생성.
+     */
+    public record SourceSnapshot(
+        Long exampleId,
+        String community,
+        String url,
+        String originalTitle,
+        String originalBody
+    ) {}
+
+    /**
      * 사연을 원문 그대로 즉시 등록.
      * 위기 감지 시 IllegalArgumentException("CRISIS_DETECTED") 발생.
      *
@@ -44,11 +56,13 @@ public class PostComposeService {
      * @param visibility 공개/비공개 설정
      * @param jurorCount AI 배심원 인원 (0-9)
      * @param sessionId  관련 세션 ID (nullable)
+     * @param source     크롤 원본 스냅샷 — 재구성 모드 시만 비-null
      * @return 등록된 Post 객체 (status=VOTING)
      */
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
-                                  int jurorCount, String sessionId) {
+                                  int jurorCount, String sessionId,
+                                  SourceSnapshot source) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
         // 위기 감지 (이중방어 — FE에서도 감지)
@@ -59,7 +73,7 @@ public class PostComposeService {
 
         String postId = "post_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
 
-        Post post = Post.builder()
+        Post.PostBuilder postBuilder = Post.builder()
                 .id(postId)
                 .authorId(authorId)
                 .sessionId(sessionId)
@@ -75,8 +89,17 @@ public class PostComposeService {
                 .neutralizationPassed(true)   // 항상 통과로 간주 (컬럼 잔존)
                 .voteCloseAt(Instant.now().plusSeconds(7L * 24 * 3600))
                 .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
+                .updatedAt(Instant.now());
+        // 재구성 출처 스냅샷 (재구성 모드 시만 비-null)
+        if (source != null) {
+            postBuilder
+                .sourceExampleId(source.exampleId())
+                .sourceCommunity(source.community())
+                .sourceUrl(source.url())
+                .sourceOriginalTitle(source.originalTitle())
+                .sourceOriginalBody(source.originalBody());
+        }
+        Post post = postBuilder.build();
 
         postRepository.save(post);
         log.info("Post published immediately: {}", postId);

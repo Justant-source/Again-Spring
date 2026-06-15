@@ -112,6 +112,8 @@ async def crawl(daily_limit: int = 350) -> List[Dict]:
                         "content_type": "POST",
                         "source": "fmkorea",
                         "category": "best",
+                        "title": post.get("title"),
+                        "source_url": post.get("url"),
                     })
                     logger.debug(f"FM Korea {post['origin_id']}: saved {len(content)} chars")
 

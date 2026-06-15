@@ -211,10 +211,13 @@ flowchart LR
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | GET | `/api/admin/content/posts` | **JWT + ADMIN** | 200 | AI 게시글 목록 (`?status=VOTING&page=&size=`) — `synthetic` 필드 포함 |
+| GET | `/api/admin/content/posts/{postId}/source-comparison` | **JWT + ADMIN** | 200 / 404 | 원본 비교 조회. 응답: `{synthetic, hasSource, source{community,url,title,body}, generated{title,body}}` |
 | GET | `/api/admin/content/comments` | **JWT + ADMIN** | 200 | AI 댓글 목록 (`?status=ACTIVE&page=&size=`) — `synthetic` 필드 포함 |
 | POST | `/api/admin/content/corrections/save` | **JWT + ADMIN** | 201 / 404 | LLM 없이 즉시 PENDING 저장. `applyLive=true`이면 본문도 교체. Body: `{targetType, targetId, correctedText, applyLive, adminOpinion?}` |
 | POST | `/api/admin/content/corrections/analyze` | **JWT + ADMIN** | 200 / 404 | 단건 LLM 분석 (DB 미변경). Body: `{targetType, targetId, correctedText}` |
 | POST | `/api/admin/content/corrections/commit` | **JWT + ADMIN** | 200 / 404 | 분석 결과 확정 저장. Body: `{targetType, targetId, correctedText, personaCaution?, globalRules[], applyLive}` |
+| POST | `/api/admin/content/corrections/reconstruction/analyze` | **JWT + ADMIN** | 200 / 404 | 재구성 규칙 분석 (LLM). Body: `{personaId, generatedText}`. 응답: `{personaId, generatedText, suggestedReconstructionRules}` |
+| POST | `/api/admin/content/corrections/reconstruction/commit` | **JWT + ADMIN** | 200 / 404 | 재구성 규칙 적용. Body: `{correctionId, appliedLive, rulesCreated, cautionApplied}`. 응답: `{appliedLive, rulesCreated, cautionApplied}` |
 
 > `adminOpinion` (TEXT, nullable): 관리자가 첨삭 시 남긴 수정 의도·방향. 일괄 분석 MAP 프롬프트에 입력 신호로 사용됨 (V74 추가, 2026-06-08).
 
@@ -225,7 +228,7 @@ flowchart LR
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | GET | `/api/admin/ai-rules/global` | **JWT + ADMIN** | 200 | 목록 (`?page=&size=&active=`) |
-| POST | `/api/admin/ai-rules/global` | **JWT + ADMIN** | 201 | 추가. Body: `{ruleText, scope: ALL\|POST\|COMMENT}` |
+| POST | `/api/admin/ai-rules/global` | **JWT + ADMIN** | 201 | 추가. Body: `{ruleText, scope: ALL\|POST\|COMMENT\|RECONSTRUCTION}` |
 | PATCH | `/api/admin/ai-rules/global/{id}` | **JWT + ADMIN** | 200 / 404 | 활성/비활성 토글. Body: `{active}` |
 | DELETE | `/api/admin/ai-rules/global/{id}` | **JWT + ADMIN** | 204 / 404 | 삭제 |
 

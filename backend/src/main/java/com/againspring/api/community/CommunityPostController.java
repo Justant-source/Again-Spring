@@ -72,6 +72,17 @@ public class CommunityPostController {
             @AuthenticationPrincipal UserDetails userDetails) {
 
         String userId = userDetails.getUsername();
+        // 재구성 출처 스냅샷 (AI 봇 전용, 일반 사용자는 null)
+        com.againspring.service.community.PostComposeService.SourceSnapshot source = null;
+        if (request.getSourceExampleId() != null) {
+            source = new com.againspring.service.community.PostComposeService.SourceSnapshot(
+                request.getSourceExampleId(),
+                request.getSourceCommunity(),
+                request.getSourceUrl(),
+                request.getSourceOriginalTitle(),
+                request.getSourceOriginalBody()
+            );
+        }
         Post post = composeService.composeAndPublish(
                 userId,
                 request.getUserTitle(),
@@ -79,7 +90,8 @@ public class CommunityPostController {
                 request.getCategory(),
                 request.getVisibility(),
                 request.getJurorCount(),
-                request.getSessionId()
+                request.getSessionId(),
+                source
         );
 
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());

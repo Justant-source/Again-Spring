@@ -182,7 +182,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56)
+### `posts` (V48~V56, V85)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
@@ -199,6 +199,11 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `publish_mode` | VARCHAR(32) | V54 | one_way / two_way / three_way |
 | `expires_at` | TIMESTAMP(3) | V48 | 게시글 만료 시각 (선택) |
 | `empathy_ratio` | DECIMAL(5,2) | V48 | 공감 비율 (0.0~1.0, 동적 계산) |
+| `source_example_id` | BIGINT | **V85** | 원본 사례 예제 ID (nullable) |
+| `source_community` | VARCHAR(64) | **V85** | 원본 커뮤니티명 (nullable) |
+| `source_url` | VARCHAR(1024) | **V85** | 원본 URL (nullable) |
+| `source_original_title` | VARCHAR(512) | **V85** | 원본 제목 (nullable) |
+| `source_original_body` | LONGTEXT | **V85** | 원본 본문 (nullable) |
 | `created_at`, `updated_at` | TIMESTAMP(3) | V48 | |
 
 ---
@@ -284,6 +289,40 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
+### `ai_content_corrections` (V68, V74, V86)
+
+| 컬럼 | 타입 | Flyway | 비고 |
+|---|---|---|---|
+| `id` | BIGINT auto PK | V68 | |
+| `target_type` | VARCHAR(16) | V68 | POST \| COMMENT |
+| `target_id` | VARCHAR(64) | V68 | 게시글/댓글 ID (문자열화) |
+| `persona_id` | VARCHAR(32) FK | V68 | users.id (AI 페르소나) |
+| `category` | VARCHAR(50) | V68 | 글 카테고리 (nullable, 예제뱅크 환류 시 사용) |
+| `original_text` | LONGTEXT | V68 | 첨삭 전 본문 |
+| `corrected_text` | LONGTEXT | V68 | 관리자 수정본 |
+| `persona_caution` | TEXT | V68 | 확정된 페르소나 주의사항 (nullable) |
+| `admin_id` | VARCHAR(32) FK | V68 | 처리한 관리자 users.id |
+| `applied_live` | BIT(1) | V68 | 라이브 글 교체 완료 여부 |
+| `pushed_to_bank` | BIT(1) | V68 | 예제뱅크 환류 여부 |
+| `source_original_text` | LONGTEXT | **V86** | 원본 비교 시 원본 본문 (nullable) |
+| `created_at` | TIMESTAMP(3) | V68 | |
+
+---
+
+### `ai_global_rules` (V68)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `rule_text` | VARCHAR(500) | 규칙 텍스트 (예: "~하지 말 것" 형식) |
+| `scope` | VARCHAR(16) | POST \| COMMENT \| ALL \| RECONSTRUCTION |
+| `source_correction_id` | BIGINT FK | ai_content_corrections.id (nullable, 수동 추가 시 NULL) |
+| `active` | BIT(1) | 활성화 여부 |
+| `created_by` | VARCHAR(32) FK | 생성한 관리자 users.id |
+| `created_at` | TIMESTAMP(3) | |
+
+---
+
 ### `feedbacks` (V16)
 
 | 컬럼 | 타입 | 비고 |
@@ -302,7 +341,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-## 마이그레이션 요약 (V1~V56)
+## 마이그레이션 요약 (V1~V86)
 
 | 범위 | 설명 |
 |---|---|
@@ -311,6 +350,12 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | **V40~V47** | (미사용) |
 | **V48~V55** | 광장형 신규 (posts, votes, comments, jurors, notifications 등) |
 | **V56** | **DROP TABLE sessions, turns, messages, reports** |
+| **V57~V67** | 마케팅 기능 확장 (ASM 이관 관련) |
+| **V68~V74** | AI 첨삭 학습 시스템 (corrections, global_rules) |
+| **V75~V76** | 마케팅 ENUM 정규화 |
+| **V77~V84** | (마케팅/운영 기능) |
+| **V85** | posts 테이블에 원본 비교 컬럼 추가 (source_example_id, source_community, source_url, source_original_title, source_original_body) |
+| **V86** | ai_content_corrections 테이블에 source_original_text 컬럼 추가 |
 
 ---
 

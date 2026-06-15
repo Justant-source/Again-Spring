@@ -56,6 +56,8 @@ class ExampleItem(BaseModel):
     content: str
     source: str
     score: Optional[float] = None
+    title: Optional[str] = None
+    source_url: Optional[str] = None
 
 
 @router.post("/save")
@@ -125,7 +127,7 @@ def search_examples(req: SearchRequest, request: Request) -> List[ExampleItem]:
 
         # ── 공통 SELECT 템플릿 ──────────────────────────────────────────────
         SELECT_TMPL = """
-            SELECT id, content, source,
+            SELECT id, content, source, title, source_url,
                    1 - VEC_DISTANCE_COSINE(embedding, VEC_FromText(%s)) AS similarity
             FROM example_bank
             {where}
@@ -173,8 +175,9 @@ def search_examples(req: SearchRequest, request: Request) -> List[ExampleItem]:
                            base_params + source_params + register_params)
 
         return [
-            ExampleItem(id=r["id"], content=r["content"],
-                        source=r["source"], score=float(r["similarity"]))
+            ExampleItem(id=r["id"], content=r["content"], source=r["source"],
+                        score=float(r["similarity"]),
+                        title=r.get("title"), source_url=r.get("source_url"))
             for r in rows
         ]
     except Exception as e:
@@ -242,12 +245,32 @@ def style_sample(req: StyleSampleRequest) -> List[ExampleItem]:
 
         return [
             ExampleItem(id=r["id"], content=r["content"], source=r["source"],
-                        score=float(r["score"]) if r.get("score") is not None else None)
+                        score=float(r["score"]) if r.get("score") is not None else None,
+                        title=r.get("title"), source_url=r.get("source_url"))
             for r in rows
         ]
     except Exception as e:
         logger.error(f"style_sample error: {e}")
         return []
+
+
+@router.get("/{example_id}", response_model=ExampleItem)
+def get_example(example_id: int) -> ExampleItem:
+    """단일 원본 조회 — 원본 비교 화면에서 정확한 1건을 id로 가져오는 경로."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, content, source, title, source_url FROM example_bank WHERE id = %s",
+                (example_id,)
+            )
+            row = cur.fetchone()
+    if not row:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="example not found")
+    return ExampleItem(
+        id=row["id"], content=row["content"], source=row["source"],
+        title=row.get("title"), source_url=row.get("source_url")
+    )
 
 
 @router.get("/count")

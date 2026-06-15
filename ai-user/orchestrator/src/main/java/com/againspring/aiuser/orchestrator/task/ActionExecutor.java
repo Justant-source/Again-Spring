@@ -71,9 +71,11 @@ public class ActionExecutor {
     private final ConcurrentHashMap<String, String> emailCache = new ConcurrentHashMap<>();
     private static final Random RNG = new Random();
 
-    /** 전역 금지 규칙 캐시 (5분 TTL). 매 생성마다 DB 조회 방지. */
-    private final AtomicReference<List<AiGlobalRule>> globalRulesCache = new AtomicReference<>(null);
-    private volatile long globalRulesCachedAt = 0L;
+    /** 전역 금지 규칙 캐시 (5분 TTL, scope별). scope → (rules, cachedAt) */
+    private final java.util.concurrent.ConcurrentHashMap<String, List<AiGlobalRule>> globalRulesCache =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> globalRulesCachedAtMap =
+        new java.util.concurrent.ConcurrentHashMap<>();
 
     /** 생성 설정 캐시 (5분 TTL). backend 라우팅용. */
     private final AtomicReference<AiUserGenerationConfig> genConfigCache = new AtomicReference<>(null);
@@ -350,12 +352,29 @@ public class ActionExecutor {
             3,
             register
         );
+
+        // ── 재구성 모드 판별 ────────────────────────────────────────────────────
+        // findSimilar 1순위 결과가 실제 크롤 원본(source_url 보유)이면 재구성 모드로 전환.
+        // 재구성 모드: 단일 크롤 원본 1건을 충실히 사연으로 재서사. 폴백은 기존 경로.
+        AiLearningClient.ExampleItem primarySource = null;
+        if (!examples.isEmpty() && examples.get(0).hasSourceProvenance()) {
+            primarySource = examples.get(0);
+            // 재구성 원본을 topic seed로 업데이트 (원본 내용 기반 주제 사용)
+            topicSeed = truncate(primarySource.getContent(), 200);
+        }
+
         if (!examples.isEmpty()) {
+            // 재구성 모드: primary source를 제외한 나머지를 문체 앵커로만 사용
+            java.util.List<AiLearningClient.ExampleItem> styleExamples = (primarySource != null)
+                ? examples.subList(1, examples.size())
+                : examples;
             // 항목당 350자 컷 — example_bank 글은 최대 2000자라 3개 풀주입 시 최대 ~5k 토큰 (다이어트)
-            dynamicExamples = examples.stream()
-                .map(e -> truncate(e.getContent(), 350))
-                .collect(java.util.stream.Collectors.joining("\n---\n"));
-            log.debug("RAG: {} posts found for {}", examples.size(), corrId);
+            if (!styleExamples.isEmpty()) {
+                dynamicExamples = styleExamples.stream()
+                    .map(e -> truncate(e.getContent(), 350))
+                    .collect(java.util.stream.Collectors.joining("\n---\n"));
+            }
+            log.debug("RAG: {} posts found for {}, reconstructMode={}", examples.size(), corrId, primarySource != null);
         }
         if (dynamicExamples.isBlank()) {
             // 주제-RAG 미스 시 voice 소스 문체 샘플로 보충 (문체 현실화 S2)
@@ -380,9 +399,14 @@ public class ActionExecutor {
             .lengthTier(lengthTier)
             .correctionCautions(cautionsBlock(persona))
             .globalForbidRules(globalRulesBlock("POST"))
+            .reconstructionRules(globalRulesBlock("RECONSTRUCTION"))
             .correlationId(corrId)
             .backend(backendFor("POST"))
             .recentOutputs(formatRecentOutputs(recentBodies, 200))
+            // 재구성 모드 필드
+            .reconstructMode(primarySource != null)
+            .sourceExampleId(primarySource != null ? primarySource.getId() : null)
+            .sourceBody(primarySource != null ? primarySource.getContent() : null)
             .build();
         java.util.Optional<String> bodyOpt = llmClient.generatePost(genReq);
 
@@ -420,13 +444,22 @@ public class ActionExecutor {
             return;
         }
         String title = extractTitle(body);
-        java.util.Optional<PostDto> postOpt = backendBot.createPost(jwt, CreatePostDto.builder()
+        CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
             .userTitle(title)
             .bodyRaw(body)
             .category(category)
             .visibility("PUBLIC")
-            .jurorCount(0)
-            .build());
+            .jurorCount(0);
+        // 재구성 모드: 출처 스냅샷을 BE로 전달 → posts 테이블에 source_* 컬럼 저장
+        if (primarySource != null) {
+            postBuilder
+                .sourceExampleId(primarySource.getId())
+                .sourceCommunity(primarySource.getSource())
+                .sourceUrl(primarySource.getSourceUrl())
+                .sourceOriginalTitle(primarySource.getTitle())
+                .sourceOriginalBody(truncate(primarySource.getContent(), 2000));
+        }
+        java.util.Optional<PostDto> postOpt = backendBot.createPost(jwt, postBuilder.build());
 
         postOpt.ifPresent(post -> {
             if (post.getId() != null) {
@@ -505,15 +538,15 @@ public class ActionExecutor {
      */
     private String globalRulesBlock(String scope) {
         long now = System.currentTimeMillis();
-        List<AiGlobalRule> rules = globalRulesCache.get();
-        if (rules == null || (now - globalRulesCachedAt) > GLOBAL_RULES_TTL_MS) {
+        Long cachedAt = globalRulesCachedAtMap.get(scope);
+        List<AiGlobalRule> rules = globalRulesCache.get(scope);
+        if (rules == null || cachedAt == null || (now - cachedAt) > GLOBAL_RULES_TTL_MS) {
             try {
-                // scope는 'POST' 또는 'COMMENT' — 둘 다 'ALL'도 포함하는 쿼리
                 rules = aiGlobalRuleRepository.findActiveByScope(scope);
-                globalRulesCache.set(rules);
-                globalRulesCachedAt = now;
+                globalRulesCache.put(scope, rules);
+                globalRulesCachedAtMap.put(scope, now);
             } catch (Exception e) {
-                log.warn("[ActionExecutor] globalRulesBlock DB 조회 실패 (non-critical): {}", e.getMessage());
+                log.warn("[ActionExecutor] globalRulesBlock DB 조회 실패 scope={} (non-critical): {}", scope, e.getMessage());
                 rules = List.of();
             }
         }

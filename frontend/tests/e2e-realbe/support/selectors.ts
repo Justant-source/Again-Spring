@@ -103,6 +103,25 @@ export const ADMIN_MARKETING = {
   postPickerDialog:  '[data-testid="post-picker-dialog"]',
 } as const
 
+// ── 어드민 원본 비교 (/admin/content/[postId]/compare) ───────────
+export const ADMIN_CONTENT_COMPARE = {
+  /** 왼쪽 패널: 크롤 원본 정보 */
+  sourcePanel:          '[data-testid="compare-source-panel"]',
+  sourceCommunity:      '[data-testid="compare-source-community"]',
+  sourceTitle:          '[data-testid="compare-source-title"]',
+  sourceBody:           '[data-testid="compare-source-body"]',
+  sourceUrl:            '[data-testid="compare-source-url"]',
+  /** 오른쪽 패널: AI 생성본 편집 */
+  generatedPanel:       '[data-testid="compare-generated-panel"]',
+  titleDiffPanel:       '[data-testid="compare-diff-title"]',
+  bodyDiffPanel:        '[data-testid="compare-diff-body"]',
+  adminOpinionInput:    '[data-testid="compare-admin-opinion"]',
+  analyzeBtn:           '[data-testid="compare-analyze-btn"]',
+  commitBtn:            '[data-testid="compare-commit-btn"]',
+  applyLiveCheckbox:    '[data-testid="compare-apply-live"]',
+  rulesPreview:         '[data-testid="compare-rules-preview"]',
+} as const
+
 // ── 어드민 AI 관제 탭 (/admin/ai-user > 실시간 관제) ────────────
 export const ADMIN_AI_MONITOR = {
   actionFeed:       '[data-testid="ai-action-feed"]',

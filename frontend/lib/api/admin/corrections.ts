@@ -153,6 +153,62 @@ export async function commitCorrection(req: CommitRequest): Promise<CommitRespon
   return res.data;
 }
 
+// ===== 재구성 첨삭 API (원본 비교 화면) =====
+
+export interface ReconstructionAnalyzeRequest {
+  targetType: 'POST' | 'COMMENT';
+  targetId: string;
+  /** 크롤 원본 전체 본문 (왼쪽 패널) */
+  sourceOriginalText: string;
+  /** 관리자가 오른쪽에서 수정한 사연 제목+본문 */
+  correctedText: string;
+  adminOpinion?: string | null;
+}
+
+export interface ReconstructionAnalyzeResponse {
+  personaId: string;
+  generatedText: string;
+  suggestedReconstructionRules: string[];
+}
+
+export interface ReconstructionCommitRequest {
+  targetType: 'POST' | 'COMMENT';
+  targetId: string;
+  correctedText: string;
+  sourceOriginalText: string;
+  reconstructionRules: string[];
+  applyLive: boolean;
+}
+
+export interface ReconstructionCommitResponse {
+  correctionId: number;
+  appliedLive: boolean;
+  rulesCreated: number;
+  cautionApplied: boolean;
+}
+
+/** 재구성 3-way 분석: 크롤 원본·AI 생성본·관리자 수정본 diff → Sonnet 규칙 초안 */
+export async function analyzeReconstruction(
+  req: ReconstructionAnalyzeRequest
+): Promise<ReconstructionAnalyzeResponse> {
+  const res = await api.post<ReconstructionAnalyzeResponse>(
+    '/api/admin/content/corrections/reconstruction/analyze',
+    req
+  );
+  return res.data;
+}
+
+/** 재구성 첨삭 확정: 규칙(scope=RECONSTRUCTION) 저장 + 옵션으로 라이브 교체 */
+export async function commitReconstruction(
+  req: ReconstructionCommitRequest
+): Promise<ReconstructionCommitResponse> {
+  const res = await api.post<ReconstructionCommitResponse>(
+    '/api/admin/content/corrections/reconstruction/commit',
+    req
+  );
+  return res.data;
+}
+
 // ===== 전역 금지 규칙 관리 API =====
 
 export async function listGlobalRules(params: {

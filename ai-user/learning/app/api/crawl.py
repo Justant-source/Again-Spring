@@ -51,8 +51,9 @@ async def _do_crawl(source, daily_limit, embed_service):
                     register = classify_register(item["content"])
 
                     sql = """INSERT INTO example_bank
-                             (content, content_type, category, source, quality_score, register, embedding, created_at)
-                             VALUES (%s, %s, %s, %s, %s, %s, VEC_FromText(%s), NOW(3))"""
+                             (content, content_type, category, source, quality_score, register,
+                              title, source_url, embedding, created_at)
+                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, VEC_FromText(%s), NOW(3))"""
                     cur.execute(sql, (
                         item["content"],
                         item.get("content_type", "COMMENT"),
@@ -60,6 +61,8 @@ async def _do_crawl(source, daily_limit, embed_service):
                         item.get("source", source.upper()),
                         quality.score(item["content"]),
                         register,
+                        item.get("title"),
+                        item.get("source_url"),
                         vec_str
                     ))
                     saved += 1

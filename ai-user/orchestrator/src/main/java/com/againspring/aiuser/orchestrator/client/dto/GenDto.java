@@ -38,6 +38,16 @@ public class GenDto {
         private String backend;
         /** 이 페르소나의 최근 글 본문들 ("- ..." 개행 구분) — 반복 방지 주입. 없으면 null. */
         private String recentOutputs;
+        // ── 재구성 모드 (원본 비교 기능) ────────────────────────────────────────────
+        /** true = 단일 크롤 원본을 기반으로 사연을 재구성하는 모드. */
+        @Builder.Default
+        private boolean reconstructMode = false;
+        /** 재구성 원본 example_bank.id (reconstruct_mode=true 시 필수) */
+        private Long sourceExampleId;
+        /** 재구성할 크롤 원본 본문 (reconstruct_mode=true 시 필수) */
+        private String sourceBody;
+        /** scope=RECONSTRUCTION 전역 규칙 목록 ("- …" 개행 구분). 없으면 null. */
+        private String reconstructionRules;
     }
 
     @Getter

@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS example_bank (
     source VARCHAR(32) NOT NULL,
     quality_score DECIMAL(4,2),
     register VARCHAR(16) DEFAULT NULL COMMENT 'casual|polite|mixed',
+    title VARCHAR(512) DEFAULT NULL COMMENT '원본 커뮤니티 글 제목 (신규 크롤부터)',
+    source_url VARCHAR(1024) DEFAULT NULL COMMENT '원본 커뮤니티 글 URL',
     embedding VECTOR(1024) NOT NULL,
     created_at DATETIME(3) NOT NULL DEFAULT NOW(3),
     KEY idx_type_cat (content_type, category),
@@ -30,6 +32,16 @@ ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS topic VARCHAR(16) DEFAULT NULL
 # 기존 테이블에 register 컬럼이 없으면 추가 (idempotent)
 EXAMPLE_BANK_ADD_REGISTER_SQL = """
 ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS register VARCHAR(16) DEFAULT NULL COMMENT 'casual|polite|mixed'
+"""
+
+# 기존 테이블에 title 컬럼이 없으면 추가 (idempotent) — 원본 비교 기능용
+EXAMPLE_BANK_ADD_TITLE_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS title VARCHAR(512) DEFAULT NULL COMMENT '원본 커뮤니티 글 제목 (신규 크롤부터)'
+"""
+
+# 기존 테이블에 source_url 컬럼이 없으면 추가 (idempotent) — 원본 비교 기능용
+EXAMPLE_BANK_ADD_SOURCE_URL_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS source_url VARCHAR(1024) DEFAULT NULL COMMENT '원본 커뮤니티 글 URL'
 """
 
 CRAWL_LOG_DDL = """
@@ -97,6 +109,18 @@ def create_tables():
                 logger.info("example_bank.register column ensured")
             except Exception as e:
                 logger.warning(f"register column alter skipped (may already exist): {e}")
+            # title 컬럼 추가 (원본 비교 기능)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_TITLE_SQL)
+                logger.info("example_bank.title column ensured")
+            except Exception as e:
+                logger.warning(f"title column alter skipped (may already exist): {e}")
+            # source_url 컬럼 추가 (원본 비교 기능)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_SOURCE_URL_SQL)
+                logger.info("example_bank.source_url column ensured")
+            except Exception as e:
+                logger.warning(f"source_url column alter skipped (may already exist): {e}")
             # VECTOR INDEX for example_bank
             cur.execute(VECTOR_INDEX_CHECK_SQL)
             row = cur.fetchone()

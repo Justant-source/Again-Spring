@@ -76,4 +76,11 @@ public class AiContentCorrection {
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    /**
+     * 재구성 첨삭 전용: 크롤 원본 본문 스냅샷.
+     * null = 기존 POST/COMMENT 첨삭. 비-null = 재구성 첨삭 (scope=RECONSTRUCTION 규칙 생성).
+     */
+    @Column(name = "source_original_text", columnDefinition = "LONGTEXT")
+    private String sourceOriginalText;
 }

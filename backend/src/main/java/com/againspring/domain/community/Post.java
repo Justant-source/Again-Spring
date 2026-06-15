@@ -111,4 +111,25 @@ public class Post {
 
     @Column(name = "deleted_by_admin_id", length = 32)
     private String deletedByAdminId;
+
+    // ── 원본 비교 기능: 재구성 출처 스냅샷 (재구성 모드 생성 시만 비-null) ─────────────────
+    /** example_bank.id — 재구성 원본 크롤 행 ID. null = 일반(창작) 생성 */
+    @Column(name = "source_example_id")
+    private Long sourceExampleId;
+
+    /** 크롤 커뮤니티 식별자 (예: natepan, dcinside) */
+    @Column(name = "source_community", length = 64)
+    private String sourceCommunity;
+
+    /** 크롤 원본 URL */
+    @Column(name = "source_url", length = 1024)
+    private String sourceUrl;
+
+    /** 크롤 원본 제목 스냅샷 */
+    @Column(name = "source_original_title", length = 512)
+    private String sourceOriginalTitle;
+
+    /** 크롤 원본 본문 스냅샷 (최대 2000자) */
+    @Column(name = "source_original_body", columnDefinition = "LONGTEXT")
+    private String sourceOriginalBody;
 }

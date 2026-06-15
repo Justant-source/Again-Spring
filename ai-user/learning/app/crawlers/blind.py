@@ -107,6 +107,7 @@ async def crawl(daily_limit: int = 240) -> List[Dict]:
                             "content_type": "POST",
                             "source": "blind",
                             "category": "workplace",
+                            "source_url": post_url,
                         })
                         logger.debug(f"Blind post: saved")
                         posts_found += 1

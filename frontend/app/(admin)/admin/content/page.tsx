@@ -38,7 +38,7 @@ import {
 } from '@/lib/api/admin/content';
 import { AdminSection } from '@/components/admin/AdminSection';
 import { AiImproveDialog } from '@/components/admin/content/AiImproveDialog';
-import { MoreVertical, ExternalLink, Sparkles, Zap } from 'lucide-react';
+import { MoreVertical, ExternalLink, Sparkles, Zap, GitCompare } from 'lucide-react';
 
 const COMMENT_STATUS_LABELS: Record<string, { label: string; variant: any }> = {
   ACTIVE: { label: '활성', variant: 'default' },
@@ -341,6 +341,14 @@ export default function AdminContentPage() {
                           <Sparkles className="h-4 w-4 mr-2" />
                           AI 개선{row.synthetic ? '' : ' (학습 데이터)'}
                         </DropdownMenuItem>
+                        {row.synthetic && row.sourceExampleId && (
+                          <DropdownMenuItem asChild className="text-blue-600">
+                            <Link href={`/admin/content/${row.id}/compare`}>
+                              <GitCompare className="h-4 w-4 mr-2" />
+                              원본 비교
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => setMarketingPostId(row.id)}>
                           <Zap className="h-4 w-4 mr-2" />
                           마케팅 제작 요청

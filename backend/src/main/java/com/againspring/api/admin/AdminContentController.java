@@ -113,6 +113,39 @@ public class AdminContentController {
     }
 
     /**
+     * GET /api/admin/content/posts/{postId}/source-comparison
+     * 원본 비교 화면 데이터 — 왼쪽(원본) + 오른쪽(생성본) 정보를 한 번에 반환.
+     * hasSource=false이면 원본 정보 없는 일반(창작) 사연.
+     */
+    @GetMapping("/posts/{postId}/source-comparison")
+    @Operation(
+        summary = "원본 비교 데이터 조회",
+        description = "재구성 사연의 크롤 원본(왼쪽)과 생성본(오른쪽) 정보를 반환"
+    )
+    @ApiResponse(responseCode = "200", description = "비교 데이터")
+    @ApiResponse(responseCode = "404", description = "포스트 없음")
+    public ResponseEntity<SourceComparisonResponse> getSourceComparison(@PathVariable String postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
+        Set<String> syntheticIds = userRepository.findSyntheticIds(java.util.List.of(post.getAuthorId()));
+        boolean synthetic = syntheticIds.contains(post.getAuthorId());
+        boolean hasSource = post.getSourceExampleId() != null;
+
+        SourceComparisonResponse.SourceData source = hasSource
+            ? new SourceComparisonResponse.SourceData(
+                post.getSourceExampleId(),
+                post.getSourceCommunity(),
+                post.getSourceUrl(),
+                post.getSourceOriginalTitle(),
+                post.getSourceOriginalBody())
+            : null;
+        SourceComparisonResponse.GeneratedData generated =
+            new SourceComparisonResponse.GeneratedData(post.getTitle(), post.getBodyPublished());
+
+        return ResponseEntity.ok(new SourceComparisonResponse(synthetic, hasSource, source, generated));
+    }
+
+    /**
      * PATCH /api/admin/content/posts/{postId}
      * 포스트 수정 (제목, 본문, 상태, 카테고리)
      */
@@ -424,6 +457,52 @@ public class AdminContentController {
         public AdminCommentView(PostComment comment, boolean synthetic) {
             this.comment = comment;
             this.synthetic = synthetic;
+        }
+    }
+
+    // ===== Response DTOs =====
+
+    /** 원본 비교 화면 응답 */
+    @Getter
+    public static class SourceComparisonResponse {
+        private final boolean synthetic;
+        private final boolean hasSource;
+        private final SourceData source;
+        private final GeneratedData generated;
+
+        public SourceComparisonResponse(boolean synthetic, boolean hasSource, SourceData source, GeneratedData generated) {
+            this.synthetic = synthetic;
+            this.hasSource = hasSource;
+            this.source = source;
+            this.generated = generated;
+        }
+
+        @Getter
+        public static class SourceData {
+            private final Long exampleId;
+            private final String community;
+            private final String url;
+            private final String title;
+            private final String body;
+
+            public SourceData(Long exampleId, String community, String url, String title, String body) {
+                this.exampleId = exampleId;
+                this.community = community;
+                this.url = url;
+                this.title = title;
+                this.body = body;
+            }
+        }
+
+        @Getter
+        public static class GeneratedData {
+            private final String title;
+            private final String body;
+
+            public GeneratedData(String title, String body) {
+                this.title = title;
+                this.body = body;
+            }
         }
     }
 

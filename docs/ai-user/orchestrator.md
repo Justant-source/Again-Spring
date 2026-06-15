@@ -156,6 +156,24 @@ classDiagram
         +isOff(actionType) boolean
     }
     
+    class GenDto {
+        -class PostRequest
+        -boolean reconstructMode
+        -String sourceBody
+        -Long sourceExampleId
+        -String reconstructionRules
+    }
+    
+    class CreatePostDto {
+        -String title
+        -String body
+        -Long sourceExampleId
+        -String sourceCommunity
+        -String sourceUrl
+        -String sourceOriginalTitle
+        -String sourceOriginalBody
+    }
+    
     class ContentSafetyGuard {
         +check(text, ContentType) GuardResult
     }
@@ -178,6 +196,8 @@ classDiagram
     ActionExecutor --> LlmAiUserClient
     ActionExecutor --> AiLearningClient
     ActionExecutor --> AiUserGenerationConfig
+    ActionExecutor --> GenDto
+    ActionExecutor --> CreatePostDto
     BehaviorEngine -.-> AiUserIdentity
 ```
 
@@ -1028,12 +1048,46 @@ private void executeReply(Persona persona, PlannedAction action, String jwt, Str
 }
 ```
 
-#### executePost()
+#### executePost() — 재구성 모드 지원
 
+**재구성 감지 로직**:
 ```java
-private void executePost(Persona persona, String jwt, String corrId) {
-    // LLM 호출: 제목 + 본문 생성
-    Optional<String> resultOpt = llmClient.generatePost(...);
+// ActionPlanner에서 PlannedAction 생성 시,
+// findSimilar()의 첫 번째 결과에서 source provenance 감지
+List<ExampleItem> examples = aiLearningClient.findSimilar(
+    topicSeed, "POST", category, limit=10
+);
+
+if (!examples.isEmpty() && examples.get(0).hasSourceProvenance()) {
+    // 재구성 모드: 원문 기반 생성으로 전환
+    reconstructMode = true;
+    sourceExampleId = examples.get(0).getId();
+    sourceBody = examples.get(0).getContent();
+    primarySource = examples.get(0);  // 다른 스타일 예시와 혼합 X
+    topicSeed = extractTopicFromSource(sourceBody);  // 원문 기반 주제
+    reconstructionRules = globalRulesBlock("RECONSTRUCTION");
+}
+```
+
+**실행 상세**:
+```java
+private void executePost(Persona persona, PlannedAction action, String jwt, String corrId) {
+    // 1. 재구성 모드 플래그 설정
+    boolean reconstructMode = action.isReconstructMode();
+    String sourceBody = action.getSourceBody();
+    Long sourceExampleId = action.getSourceExampleId();
+    String reconstructionRules = action.getReconstructionRules();
+    
+    // 2. LLM 호출 (backend 정책 포함)
+    Optional<String> resultOpt = llmClient.generatePost(GenDto.PostRequest.builder()
+        .personaId(persona.getId())
+        .voiceProfile(voiceBlockForPost(persona))
+        .reconstructMode(reconstructMode)
+        .sourceBody(reconstructMode ? sourceBody : null)
+        .sourceExampleId(reconstructMode ? sourceExampleId : null)
+        .reconstructionRules(reconstructMode ? reconstructionRules : null)
+        .backend(backendFor("POST"))
+        .build());
     
     if (resultOpt.isEmpty()) {
         logAction(persona, action, "FAILED", corrId, Map.of("error", "gen_failed"));
@@ -1042,12 +1096,22 @@ private void executePost(Persona persona, String jwt, String corrId) {
     
     String result = resultOpt.get();
     
-    // LLM 메타텍스트 제거
-    String[] parts = extractTitleAndBody(result);  // "[원문 수정본]" 등 제거
+    // 3. 제목·본문 추출
+    String[] parts = extractTitleAndBody(result);
     String title = parts[0];
     String body = parts[1];
     
-    // 안전 검사 — ContentType.POST (최대 2200자)
+    // 4. 최소길이 재생성 가드 (글 절단 방지)
+    if (body.length() < aiUserMinPostChars) {
+        // 재시도: lengthTier 강제 MEDIUM
+        resultOpt = llmClient.generatePost(GenDto.PostRequest.builder()
+            .lengthTier("MEDIUM")
+            // ... 동일 파라미터
+            .build());
+        // 재시도 실패 시 원본 로그 후 통과
+    }
+    
+    // 5. 안전 검사
     ContentSafetyGuard.GuardResult guardTitle = safetyGuard.check(title, ContentType.POST);
     ContentSafetyGuard.GuardResult guardBody = safetyGuard.check(body, ContentType.POST);
     if (!guardTitle.passed() || !guardBody.passed()) {
@@ -1055,8 +1119,18 @@ private void executePost(Persona persona, String jwt, String corrId) {
         return;
     }
     
-    // 제출
-    boolean ok = backendBot.createPost(jwt, title, body, ...);
+    // 6. 제출 (source snapshot 포함)
+    CreatePostDto createPostDto = CreatePostDto.builder()
+        .title(title)
+        .body(body)
+        .sourceExampleId(reconstructMode ? sourceExampleId : null)      // 원본 example id
+        .sourceCommunity(reconstructMode ? primarySource.getSource() : null)  // 원본 커뮤니티
+        .sourceUrl(reconstructMode ? primarySource.getSourceUrl() : null)     // 원본 URL
+        .sourceOriginalTitle(reconstructMode ? primarySource.getTitle() : null)  // 원본 제목
+        .sourceOriginalBody(reconstructMode ? sourceBody : null)           // 원본 본문
+        .build();
+    
+    boolean ok = backendBot.createPost(jwt, createPostDto);
     
     if (ok) {
         writeHistory(persona.getId(), "posts", body, null, null);
@@ -1064,13 +1138,68 @@ private void executePost(Persona persona, String jwt, String corrId) {
     }
     
     logAction(persona, action, ok ? "POSTED" : "FAILED", corrId,
-        Map.of("len", body.length(), "usedLlm", true));
+        Map.of("len", body.length(), "usedLlm", true, "reconstructMode", reconstructMode));
 }
 ```
 
 ---
 
-## 9. ContentSafetyGuard 검사
+## 9. 재구성 모드 검출 및 제어
+
+### 9.1 ActionPlanner에서 재구성 감지
+
+**플로우**:
+```java
+// ActionPlanner.plan() 내부
+List<ExampleItem> examples = aiLearningClient.findSimilar(
+    query=topicSeed,
+    type="POST",
+    category=persona.category,
+    limit=10
+);
+
+if (!examples.isEmpty()) {
+    ExampleItem firstExample = examples.get(0);
+    
+    // 원본 provenance 확인
+    if (firstExample.hasSourceProvenance()) {
+        // sourceProvenance = (title != null && source_url != null)
+        return PlannedAction.post(
+            reconstructMode=true,
+            sourceExampleId=firstExample.getId(),
+            sourceBody=firstExample.getContent(),
+            primarySource=firstExample
+        );
+    }
+}
+```
+
+**source provenance 조건**:
+- `title IS NOT NULL` AND `source_url IS NOT NULL`
+- 크롤러는 모든 POST에 title·source_url 설정
+- 사용자·AI 자가생성 예시는 이 필드 미포함 (또는 NULL)
+
+### 9.2 GlobalRulesBlock 주입 (RECONSTRUCTION 스코프)
+
+**orchestrator 측**:
+```java
+// ActionExecutor.executePost()
+String reconstructionRules = globalRulesBlock("RECONSTRUCTION");
+// → DB: ai_global_rules WHERE scope='RECONSTRUCTION' AND active=1
+// → 예: "원문 제목·구조를 기본으로 하되 우리 문체로 자연스럽게..."
+```
+
+**LLM 측**:
+```java
+// PromptAssembler.buildSystem()
+if (reconstructMode && reconstructionRules != null) {
+    systemBlock += "\n\n[재구성 규칙]\n" + reconstructionRules;
+}
+```
+
+---
+
+## 10. ContentSafetyGuard 검사
 
 모든 LLM 생성 텍스트는 다음 항목을 검증합니다.
 
@@ -1152,7 +1281,7 @@ record GuardResult(boolean passed, String reason) {}
 
 ---
 
-## 10. 설정 전체 표 (application.yml)
+## 11. 설정 전체 표 (application.yml)
 
 ### Spring Boot 기본 설정
 
@@ -1199,7 +1328,7 @@ record GuardResult(boolean passed, String reason) {}
 
 ---
 
-## 11. 이중 백엔드 구조 (BackendBotClient — 신규)
+## 12. 이중 백엔드 구조 (BackendBotClient — 신규)
 
 ### 목적
 
@@ -1368,7 +1497,7 @@ private String getOrAcquireSecondaryToken(String email, String password) {
 
 ---
 
-## 12. AI 생성 정책 관제 (AiUserGenerationConfig)
+## 13. AI 생성 정책 관제 (AiUserGenerationConfig)
 
 ### 목적
 
@@ -1589,7 +1718,7 @@ curl -X PUT http://localhost:8080/admin/ai-user/config \
 
 ---
 
-## 13. 클라이언트 통신
+## 14. 클라이언트 통신
 
 ### BackendBotClient
 
@@ -1654,7 +1783,7 @@ void saveAsync(String text, String actionType, String category, String source)
 
 ---
 
-## 14. 에러 처리 및 로깅
+## 15. 에러 처리 및 로깅
 
 ### 로그 레벨
 
@@ -1695,7 +1824,7 @@ com.againspring.aiuser.orchestrator = DEBUG
 
 ---
 
-## 15. 성능 고려사항
+## 16. 성능 고려사항
 
 ### 동시성
 
@@ -1730,7 +1859,7 @@ JWT 캐시: 10개 × ~200bytes = 2KB
 
 ---
 
-## 16. 개발 및 테스트
+## 17. 개발 및 테스트
 
 ### 로컬 실행
 
@@ -1773,7 +1902,7 @@ mysql -u againspring -p againspring_dev
 
 ---
 
-## 17. 운영 가이드
+## 18. 운영 가이드
 
 ### 모니터링 항목
 
@@ -1841,7 +1970,7 @@ UPDATE ai_user_runtime SET daily_global_cap=300 WHERE id=1;
 
 ---
 
-## 18. 문체 현실화 (2026-06-11)
+## 19. 문체 현실화 (2026-06-11)
 
 같은 페르소나의 반복·AI투 문제 대응. ActionExecutor 중심 (llm.md §15, learning.md §19 참조).
 
@@ -1862,7 +1991,7 @@ UPDATE ai_user_runtime SET daily_global_cap=300 WHERE id=1;
 
 **측정 도구**: `ai-user/tools/style-report.py` — opener 중복률·상투 토큰·길이 분포·인접 유사도. baseline은 `tools/reports/` (gitignore).
 
-## 19. 글 절단·토큰 다이어트·거절 면역 (2026-06-12)
+## 20. 글 절단·토큰 다이어트·거절 면역 (2026-06-12)
 
 llm.md §6.3 / §17 / §18과 연동된 orchestrator 측 변경.
 

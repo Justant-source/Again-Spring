@@ -89,6 +89,15 @@ public class AiLearningClient {
         private String content;
         private String source;
         private Double score;
+        /** 원본 비교 기능: 크롤 원본 제목 (신규 크롤부터, 기존 행은 null) */
+        private String title;
+        /** 원본 비교 기능: 크롤 원본 URL */
+        private String sourceUrl;
+
+        /** 이 항목이 단일 원본 재구성 소스로 사용 가능한지 — source_url 보유 여부로 판단 */
+        public boolean hasSourceProvenance() {
+            return sourceUrl != null && !sourceUrl.isBlank();
+        }
     }
 
     @Getter @Setter @NoArgsConstructor

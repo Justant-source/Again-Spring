@@ -20,6 +20,7 @@
 |--------|------|------|---------|------|
 | **POST** | `/examples/save` | 예시 저장 (자동 임베딩) | `SaveRequest` | `{"id": int, "status": "saved"}` |
 | **POST** | `/examples/search` | 코사인 유사도 검색 | `SearchRequest` | `List[ExampleItem]` |
+| **GET** | `/examples/{id}` | 단일 예시 조회 (원본 포함) | (없음) | `ExampleItem` |
 | **GET** | `/examples/count` | 소스별 통계 | (없음) | `{"source": count, ...}` |
 | **POST** | `/crawl/{source}` | 크롤링 수동 트리거 | (없음) | `{"status": "queued"}` |
 | **POST** | `/embed` | 텍스트 임베딩 (디버그용) | `{"text": str}` | `{"embedding": [float]}` |
@@ -178,6 +179,8 @@ CREATE TABLE IF NOT EXISTS example_bank (
 | `category` | VARCHAR(32) | 카테고리 (크롤러 기준) | "talk", "hot", "freeboard", "workplace", ... |
 | `topic` | VARCHAR(16) | 앱 토픽 분류 (Phase 4+) | "COUPLE", "MARRIED", "WORK", ... |
 | `source` | VARCHAR(32) | 크롤러 소스 | "naver_news", "dcinside", "blind", ... |
+| `title` | VARCHAR(512) | 원문 제목 (optional, 글만 해당) | "남편의 일기장 침해 사건" |
+| `source_url` | VARCHAR(1024) | 원문 출처 URL (optional) | "https://www.naver.com/..." |
 | `quality_score` | DECIMAL(4,2) | 품질 점수 | 0.50, 0.85, 1.00 |
 | `embedding` | VECTOR(1024) | 1024차원 벡터 | `[0.123, 0.456, ...]` |
 | `created_at` | DATETIME(3) | 저장 시각 (마이크로초) | 2026-06-06 14:23:45.123 |
@@ -743,6 +746,8 @@ curl -X POST http://localhost:8099/examples/search \
     "id": 5678,
     "content": "남편이 내 개인정보를 봤어...",
     "source": "naver_news",
+    "title": "남편의 일기장 침해",
+    "source_url": "https://www.naver.com/...",
     "score": 0.89
   },
   {
@@ -754,7 +759,25 @@ curl -X POST http://localhost:8099/examples/search \
 ]
 ```
 
-### 14.3 소스별 통계
+### 14.3 단일 예시 조회 (원본 비교용)
+
+```bash
+curl http://localhost:8099/examples/12345
+
+응답:
+{
+  "id": 12345,
+  "content": "남편이 내 개인정보를 봤어. 정말 화난다",
+  "source": "naver_news",
+  "title": "남편의 일기장 침해",
+  "source_url": "https://www.naver.com/...",
+  "score": null
+}
+```
+
+**목적**: "원본 비교" 기능에서 크롤링된 원문(title + source_url)을 AI 재구성 생성 시에 참고 자료로 활용
+
+### 14.4 소스별 통계
 
 ```bash
 curl http://localhost:8099/examples/count
@@ -777,7 +800,7 @@ curl http://localhost:8099/examples/count
 }
 ```
 
-### 14.4 헬스체크
+### 14.5 헬스체크
 
 ```bash
 curl http://localhost:8099/health

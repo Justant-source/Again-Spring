@@ -317,6 +317,176 @@ public class AiCorrectionService {
     }
 
     // =====================================================================
+    // 재구성 첨삭 (원본 비교 기능)
+    // =====================================================================
+
+    /**
+     * 재구성 분석 요청 — 원본 커뮤니티 글, AI 생성본, 관리자 수정본 3-way diff.
+     * DB 저장 없음 (관리자 검토용 초안 반환).
+     */
+    public record ReconstructionAnalyzeRequest(
+        String targetType,          // "POST"
+        String targetId,
+        String sourceOriginalText,  // 크롤 원본
+        String correctedText,       // 관리자 수정본
+        String adminOpinion
+    ) {}
+
+    public record ReconstructionAnalyzeResult(
+        String personaId,
+        String generatedText,       // AI 생성본 (BE에서 가져옴)
+        List<String> suggestedReconstructionRules
+    ) {}
+
+    /**
+     * 3-way diff (원본/AI생성/관리자수정) → Sonnet → 재구성 규칙 초안.
+     */
+    public ReconstructionAnalyzeResult analyzeReconstruction(ReconstructionAnalyzeRequest req, String adminId) throws Exception {
+        String generatedText = fetchOriginalText(req.targetType(), req.targetId());
+        String personaId     = fetchPersonaId(req.targetType(), req.targetId());
+        String prompt = buildReconstructionPrompt(req.sourceOriginalText(), generatedText, req.correctedText(), req.adminOpinion());
+        String llmResponse = llmProvider.invoke(prompt, correctionModel);
+        return parseReconstructionAnalyzeResponse(llmResponse, personaId, generatedText);
+    }
+
+    /**
+     * 재구성 커밋 — scope=RECONSTRUCTION 전역 규칙 저장.
+     * 기존 POST/COMMENT commit과 분리되어 scope 혼입 없음.
+     */
+    public record ReconstructionCommitRequest(
+        String targetType,
+        String targetId,
+        String correctedText,
+        String sourceOriginalText,
+        List<String> reconstructionRules,
+        boolean applyLive
+    ) {}
+
+    @Transactional
+    public CommitResult commitReconstruction(ReconstructionCommitRequest req, String adminId) {
+        String generatedText = fetchOriginalText(req.targetType(), req.targetId());
+        String personaId     = fetchPersonaId(req.targetType(), req.targetId());
+        String category      = fetchCategory(req.targetType(), req.targetId());
+
+        // 1) 첨삭 기록 저장 (sourceOriginalText 포함 — 재구성 표시)
+        AiContentCorrection correction = AiContentCorrection.builder()
+                .targetType(req.targetType())
+                .targetId(req.targetId())
+                .personaId(personaId)
+                .category(category)
+                .originalText(generatedText)
+                .correctedText(req.correctedText())
+                .sourceOriginalText(req.sourceOriginalText())
+                .adminId(adminId)
+                .status("PROCESSED")
+                .appliedLive(false)
+                .pushedToBank(false)
+                .build();
+        correction = correctionRepository.save(correction);
+        long correctionId = correction.getId();
+
+        // 2) 라이브 본문 교체
+        boolean appliedLive = false;
+        if (req.applyLive()) {
+            applyLiveCorrection(req.targetType(), req.targetId(), req.correctedText());
+            correction.setAppliedLive(true);
+            appliedLive = true;
+        }
+
+        // 3) 전역 재구성 규칙 저장 (scope=RECONSTRUCTION)
+        int rulesCreated = 0;
+        if (req.reconstructionRules() != null) {
+            for (String rule : req.reconstructionRules()) {
+                if (rule == null || rule.isBlank()) continue;
+                AiGlobalRule globalRule = AiGlobalRule.builder()
+                        .ruleText(rule.trim())
+                        .scope("RECONSTRUCTION")
+                        .sourceCorrectionId(correctionId)
+                        .active(true)
+                        .createdBy(adminId)
+                        .build();
+                globalRuleRepository.save(globalRule);
+                rulesCreated++;
+            }
+        }
+
+        // 4) example_bank 환류 (교정본)
+        String contentType = "POST".equals(req.targetType()) ? "POST" : "COMMENT";
+        try {
+            aiLearningBridge.saveCorrectedAsync(req.correctedText(), contentType, category, 1.0);
+            correction.setPushedToBank(true);
+        } catch (Exception e) {
+            log.warn("[ai-reconstruction] example_bank 환류 실패 (non-critical): {}", e.getMessage());
+        }
+
+        correctionRepository.save(correction);
+        log.info("[ai-reconstruction] commit complete correctionId={} persona={} rules={} live={}",
+                correctionId, personaId, rulesCreated, appliedLive);
+
+        return new CommitResult(correctionId, appliedLive, rulesCreated, false);
+    }
+
+    private String buildReconstructionPrompt(String sourceOriginal, String generatedText,
+                                              String correctedText, String adminOpinion) {
+        // 사용자 입력 전부 PromptSanitizer 경유 + <user_input> 태그 (CLAUDE.md 보안 규칙)
+        String safeSource    = promptSanitizer.sanitize(sourceOriginal != null ? sourceOriginal : "");
+        String safeGenerated = promptSanitizer.sanitize(generatedText);
+        String safeCorrected = promptSanitizer.sanitize(correctedText);
+
+        String opinionBlock = "";
+        if (adminOpinion != null && !adminOpinion.isBlank()) {
+            opinionBlock = "\n[관리자 의견]\n" + promptSanitizer.sanitize(adminOpinion) + "\n";
+        }
+
+        return """
+다음은 외부 커뮤니티 원본 글, AI가 이를 재구성한 사연, 관리자가 수정한 최종본입니다.
+세 텍스트의 차이를 분석하여 아래 JSON 형식으로 응답하세요.
+
+<user_input>
+[원본 커뮤니티 글]
+%s
+
+[AI 재구성본]
+%s
+
+[관리자 수정본]
+%s
+%s
+</user_input>
+
+분석 지침:
+- 원본 → AI 재구성본 → 관리자 수정본으로 이어지는 변화를 파악하세요.
+- 관리자가 AI 재구성본에서 무엇을 고쳤는지, 원본의 어떤 요소가 잘못 변환되었는지 분석하세요.
+- 이 패턴을 바탕으로 "원본 커뮤니티 글을 다시봄 사연으로 재구성할 때 지켜야 할 규칙" 1~3개를 생성하세요 (reconstruction_rules).
+  - 구체적이고 일반화 가능해야 합니다 ("~로 유지할 것", "~를 변환할 것", "~를 생략하지 말 것" 형태).
+  - 없으면 빈 배열.
+
+반드시 아래 JSON만 반환하세요 (마크다운 코드블록 없이):
+{
+  "reconstruction_rules": ["...", "..."]
+}
+""".formatted(safeSource, safeGenerated, safeCorrected, opinionBlock);
+    }
+
+    private ReconstructionAnalyzeResult parseReconstructionAnalyzeResponse(
+            String llmResponse, String personaId, String generatedText) throws Exception {
+        String jsonStr = llmResponse.trim();
+        if (jsonStr.startsWith("```")) {
+            jsonStr = jsonStr.replaceAll("```[a-z]*\\n?", "").replaceAll("```", "").trim();
+        }
+        JsonNode node = objectMapper.readTree(jsonStr);
+        List<String> rules = new ArrayList<>();
+        JsonNode rulesNode = node.get("reconstruction_rules");
+        if (rulesNode != null && rulesNode.isArray()) {
+            for (JsonNode r : rulesNode) {
+                String text = r.asText("").trim();
+                if (!text.isBlank()) rules.add(text);
+            }
+        }
+        return new ReconstructionAnalyzeResult(personaId, generatedText, rules);
+    }
+
+    // =====================================================================
     // 일괄 분석 통합 플랜 적용 (AiBatchLearningService에서 호출)
     // =====================================================================
 

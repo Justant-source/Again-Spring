@@ -112,9 +112,13 @@ public class PromptAssembler {
         if ("PARTNER".equalsIgnoreCase(req.getStance()) && req.getCounterpartBody() != null && !req.getCounterpartBody().isBlank()) {
             return assemblePartnerPrompt(req);
         }
+        // 재구성 모드: 단일 크롤 원본을 페르소나 보이스로 사연화
+        if (req.isReconstructMode() && req.getSourceBody() != null && !req.getSourceBody().isBlank()) {
+            return assembleReconstructPrompt(req);
+        }
         // 기존 로직 유지
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), postGuide, req.getFormality(),
-                req.getCorrectionCautions(), req.getGlobalForbidRules());
+                req.getCorrectionCautions(), req.getGlobalForbidRules(), req.getReconstructionRules());
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
             : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
@@ -147,9 +151,58 @@ public class PromptAssembler {
         return system + "\n" + SEP + "\n" + user;
     }
 
+    /**
+     * 재구성 프롬프트 — 단일 크롤 원본을 페르소나 보이스로 사연으로 재서사.
+     * post.md 가이드의 "실제 사건 원문 복제 금지(완전 창작)" 규칙과 충돌하므로
+     * 별도 reconstruct 가이드를 사용하고 postGuide를 쓰지 않음.
+     * DB에 voice/reconstruct 키가 있으면 그것을, 없으면 인라인 가이드를 사용.
+     */
+    private String assembleReconstructPrompt(PostGenRequest req) {
+        String reconstructGuide = loadGuide("voice/reconstruct", null);
+        if (reconstructGuide == null || reconstructGuide.isBlank()) {
+            reconstructGuide = """
+당신은 한국 갈등 커뮤니티 '다시봄'의 일반 사용자입니다.
+아래 지시에 따라 외부 커뮤니티 원본 글을 '다시봄' 사연으로 재구성합니다.
+
+## 재구성 규칙
+- 원본의 갈등 상황·사건·감정을 충실히 반영하되 **원문 직접 복사 금지**
+- 실명·연락처·주소 등 개인정보를 **완전히 제거·변환**
+- A(작성자)/B(상대방) 이분법 유지 (판결·처방·승패 표현 금지)
+- 다시봄 커뮤니티 문체: 온점(.) 금지, 쌍따옴표 금지, 한국 구어체
+- "X가 Y를 했다" 형태의 구체 사건 최소 1개 포함
+""";
+        }
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(),
+                reconstructGuide.replace("%", "%%"), req.getFormality(),
+                req.getCorrectionCautions(), req.getGlobalForbidRules(), req.getReconstructionRules());
+        String politeSuffix = isPolite(req.getFormality())
+            ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
+            : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
+        String user = """
+            [원본 커뮤니티 글 — 재구성 대상]
+            %s
+
+            카테고리: %s
+            글 길이: %s
+            %s
+            위 원본을 바탕으로 '다시봄' 사연으로 재구성해주세요.
+            - 원본의 핵심 갈등·사건·감정을 유지하되 표현·순서는 자유롭게 재창작
+            - 개인정보(실명·연락처·주소) 완전 제거 또는 일반화 (남자친구→남자친구 등)
+            - 판결·처방·승패 표현 금지
+            - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지
+            %s%s""".formatted(
+                safe(req.getSourceBody().length() > 800 ? req.getSourceBody().substring(0, 800) + "…" : req.getSourceBody()),
+                req.getCategory() != null ? req.getCategory() : "OTHER",
+                lengthInstruction(req.getLengthTier()),
+                dynamicExamplesBlock(req.getDynamicExamples()),
+                politeSuffix,
+                recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 같은 소재·사건 유형 반복 금지"));
+        return system + "\n" + SEP + "\n" + user;
+    }
+
     private String assemblePartnerPrompt(PostGenRequest req) {
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), partnerGuide, req.getFormality(),
-                req.getCorrectionCautions(), req.getGlobalForbidRules());
+                req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
             : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
@@ -184,7 +237,7 @@ public class PromptAssembler {
 
     public String assembleCommentPrompt(CommentGenRequest req) {
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), commentGuide, req.getFormality(),
-                req.getCorrectionCautions(), req.getGlobalForbidRules());
+                req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요, ~더라고요, ~것 같아요)"
             : "- 반말로 작성 (요/습니다 금지)";
@@ -227,7 +280,7 @@ public class PromptAssembler {
 
     public String assembleReplyPrompt(ReplyGenRequest req) {
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), replyGuide, req.getFormality(),
-                req.getCorrectionCautions(), req.getGlobalForbidRules());
+                req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요 등 자연스럽게)"
             : "- 반말로 작성 (요/습니다 금지)";
@@ -366,7 +419,7 @@ public class PromptAssembler {
     }
 
     private String buildSystem(String voiceProfile, double slangLevel, String guide, String formality,
-                               String correctionCautions, String globalForbidRules) {
+                               String correctionCautions, String globalForbidRules, String reconstructionRules) {
         boolean polite = isPolite(formality);
         // % 문자가 String.formatted()의 포맷 지시자로 오해받지 않도록 이스케이프
         String safeVoice    = voiceProfile != null ? voiceProfile.replace("%", "%%") : "일반 커뮤니티 사용자";
@@ -377,6 +430,9 @@ public class PromptAssembler {
             : "";
         String globalRulesSection = (globalForbidRules != null && !globalForbidRules.isBlank())
             ? "\n## 전역 금지 규칙 (모든 AI 작성자 공통 — 절대 위반 금지)\n" + globalForbidRules.replace("%", "%%")
+            : "";
+        String reconstructionRulesSection = (reconstructionRules != null && !reconstructionRules.isBlank())
+            ? "\n## 재구성 규칙 (원본 → 다시봄 사연 변환 시 준수)\n" + reconstructionRules.replace("%", "%%")
             : "";
 
         String speechRules = polite ? """
@@ -450,13 +506,14 @@ public class PromptAssembler {
 
 ## 페르소나 특성
 %s
-%s%s""".formatted(
+%s%s%s""".formatted(
             safeGuide,
             speechRules,
             slangLevel,
             slangGuide,
             safeVoice,
             cautionsSection,
-            globalRulesSection);
+            globalRulesSection,
+            reconstructionRulesSection);
     }
 }

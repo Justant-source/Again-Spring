@@ -18,4 +18,15 @@ public class CreatePostDto {
     private String visibility; // "PUBLIC"
     @Builder.Default
     private int jurorCount = 0;  // AI 배심원 모드 숨김 처리 — 0으로 고정
+    // ── 원본 비교 기능: 재구성 출처 스냅샷 ───────────────────────────────────────
+    /** example_bank.id (재구성 모드 시). null = 일반 생성 */
+    private Long sourceExampleId;
+    /** 크롤 커뮤니티 식별자 (예: "natepan", "dcinside") */
+    private String sourceCommunity;
+    /** 크롤 원본 URL */
+    private String sourceUrl;
+    /** 크롤 원본 제목 */
+    private String sourceOriginalTitle;
+    /** 크롤 원본 본문 스냅샷 (최대 2000자) */
+    private String sourceOriginalBody;
 }

@@ -41,4 +41,11 @@ public class PostCreateRequest {
     private int jurorCount = 3;
 
     private String sessionId; // nullable
+
+    // ── 원본 비교 기능: 재구성 출처 스냅샷 (AI 봇 전용, 일반 사용자는 null) ──────────────
+    private Long sourceExampleId;
+    private String sourceCommunity;
+    private String sourceUrl;
+    private String sourceOriginalTitle;
+    private String sourceOriginalBody;
 }

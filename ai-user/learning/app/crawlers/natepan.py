@@ -114,6 +114,8 @@ async def crawl(daily_limit: int = 400) -> List[Dict]:
                         "content_type": "POST",
                         "source": "natepan",
                         "category": "talk",
+                        "title": post.get("title"),
+                        "source_url": post.get("url"),
                     })
                     post_count += 1
                     logger.debug(f"Post {post['origin_id']}: saved {len(content)} chars")
@@ -129,6 +131,7 @@ async def crawl(daily_limit: int = 400) -> List[Dict]:
                             "content_type": "COMMENT",
                             "source": "natepan",
                             "category": "talk",
+                            "source_url": post.get("url"),
                         })
                         comment_count += 1
                 except Exception as ce:

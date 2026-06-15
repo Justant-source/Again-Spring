@@ -122,6 +122,8 @@ async def crawl(daily_limit: int = 250) -> List[Dict]:
                         "content_type": "POST",
                         "source": "ppomppu",
                         "category": "freeboard",
+                        "title": post.get("title"),
+                        "source_url": post.get("url"),
                     })
                     logger.debug(f"Post {post['post_id']}: saved {len(content)} chars")
 

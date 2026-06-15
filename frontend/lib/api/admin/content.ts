@@ -27,6 +27,11 @@ export interface AdminPost {
   neutralizationPassed?: boolean;
   /** AI 봇 작성 여부. ADMIN 전용 — 공개 API 미노출. */
   synthetic?: boolean;
+  /** 원본 비교 기능: 재구성 모드로 생성된 글의 크롤 원본 example_bank ID. null이면 원본 없음. */
+  sourceExampleId?: number | null;
+  sourceCommunity?: string | null;
+  sourceUrl?: string | null;
+  sourceOriginalTitle?: string | null;
 }
 
 export interface AdminComment {
@@ -85,6 +90,37 @@ export async function updatePost(
   data: Partial<{ title: string; bodyRaw: string; partnerBodyRaw: string; status: string; category: string }>
 ): Promise<AdminPost> {
   const res = await api.patch<AdminPost>(`/api/admin/content/posts/${postId}`, data);
+  return res.data;
+}
+
+// ===== 원본 비교 API =====
+
+export interface SourceData {
+  community: string | null;
+  url: string | null;
+  title: string | null;
+  body: string | null;
+}
+
+export interface GeneratedData {
+  title: string | null;
+  body: string | null;
+}
+
+export interface SourceComparisonResponse {
+  /** 이 글이 AI 봇 생성 글인지 */
+  synthetic: boolean;
+  /** 크롤 원본 1:1 링크가 있는지 */
+  hasSource: boolean;
+  source: SourceData | null;
+  generated: GeneratedData | null;
+}
+
+/** 원본 비교 화면용 데이터: 크롤 원본(왼쪽) + AI 생성본(오른쪽) */
+export async function getSourceComparison(postId: string): Promise<SourceComparisonResponse> {
+  const res = await api.get<SourceComparisonResponse>(
+    `/api/admin/content/posts/${postId}/source-comparison`
+  );
   return res.data;
 }
 

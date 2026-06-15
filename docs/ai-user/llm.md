@@ -42,18 +42,107 @@ flowchart LR
     D -->|API 키 없음<br/>또는 OFF| F["⚙️ ClaudeCliInvoker<br/>claude CLI subprocess<br/>stdin ← prompt"]
     E -->|API 응답| G["📊 Usage 로깅<br/>(cache_read/cache_write)"]
     F -->|CLI stdout| G
-    G -->|raw output| H["🧹 OutputSanitizer<br/>(6단계 정제)"]
-    H -->|sanitized text| I{"🤔 SelfCritiqueService<br/>quickCheck(5 체크)"}
-    I -->|Pass 점수 >= 5| J["✅ 응답 반환<br/>(critiqueScore, passed)"]
-    I -->|Fail 점수 < 5| K["🔄 재생성 프롬프트<br/>(이슈 피드백 주입)"]
-    K -->|retry<br/>90초| D
-    K -->|재생성 실패| L["🛡️ Graceful Fallback<br/>(원본 반환, 로그 기록)"]
-    L --> J
+    G -->|raw output| H{{"🤔 재구성 모드?<br/>reconstructMode=true?"}}
+    H -->|YES| H1["🔨 assembleReconstructPrompt()<br/>voice/reconstruct 가이드<br/>source body 주입"]
+    H -->|NO| H2["📝 assemblePostPrompt()<br/>일반 생성 프롬프트"]
+    H1 -->|prompt| I["🧹 OutputSanitizer<br/>(6단계 정제)"]
+    H2 -->|prompt| I
+    I -->|sanitized text| J{"🤔 SelfCritiqueService<br/>quickCheck(5 체크)"}
+    J -->|Pass 점수 >= 5| K["✅ 응답 반환<br/>(critiqueScore, passed)"]
+    J -->|Fail 점수 < 5| L["🔄 재생성 프롬프트<br/>(이슈 피드백 주입)"]
+    L -->|retry<br/>90초| D
+    L -->|재생성 실패| M["🛡️ Graceful Fallback<br/>(원본 반환, 로그 기록)"]
+    M --> K
 ```
 
 ---
 
-## 3. Invoker 계층 — 엔드포인트 추상화
+## 3. 재구성 생성 모드 (Reconstruction Mode)
+
+### 3.0 개요
+
+**재구성 생성 모드(Reconstruction Mode)**는 외부 원문(예: 뉴스·커뮤니티 글)을 학습 예시로부터 자동 감지하여 그 내용을 AI가 **우리 플랫폼의 문체로 자연스럽게 재구성**하는 기능입니다.
+
+| 항목 | 설명 |
+|------|------|
+| **활성화 조건** | `PostGenRequest.reconstructMode=true` |
+| **트리거** | Orchestrator가 `findSimilar` 결과의 첫 항목에서 `hasSourceProvenance()=true` 감지 |
+| **프롬프트** | voice/reconstruct 가이드 사용 (일반 post.md 대신) |
+| **주요 특성** | 원문 URL·제목 제공, "원문 복제 금지" 대신 "자연스러운 재표현" 강조 |
+| **반환 필드** | `reconstructMode`, `sourceExampleId`, `sourceBody`, `reconstructionRules` |
+
+### 3.1 재구성 프롬프트 구조 (`assembleReconstructPrompt`)
+
+```
+[SYSTEM 부분]
+  ├─ 페르소나 특성 (voiceProfile)
+  ├─ 재구성 가이드 (voice/reconstruct.md)
+  │  └─ "원문을 이해하고 우리 커뮤니티 문체로 자연스럽게 표현"
+  ├─ 원문 정보 제공
+  │  ├─ source_url (원출처)
+  │  └─ source_title (원제목)
+  ├─ RECONSTRUCTION 스코프 규칙 (전역 규칙)
+  └─ 창작·표절 금지 규칙 (재구성이므로 명확히 지시)
+
+<<<USER_PROMPT>>>
+
+[USER 부분]
+  ├─ 사용자 프로필 (demographic)
+  ├─ 카테고리 (category)
+  ├─ 원문 본문 (sourceBody) ← <user_input> 태그로 PromptSanitizer 경유
+  ├─ 원문에서 추출한 주제 시드 (topicSeed)
+  ├─ 길이 지시 (lengthTier)
+  ├─ 반응 모드/스타일 지시
+  └─ RECONSTRUCTION 추가 규칙 블록
+```
+
+**특징**:
+- System 부분에 `cache_control: ephemeral` 적용 가능 (API 사용 시)
+- 원문 body는 반드시 `<user_input>` 태그로 `PromptSanitizer` 경유
+- 원문 URL·제목은 "참고용"으로만 제시 (직접 인용 금지)
+
+### 3.2 PostGenRequest 확장 필드
+
+```java
+public class PostGenRequest {
+    // 기존 필드
+    private String voiceProfile;
+    private String category;
+    private String archetype;
+    private String topicSeed;
+    private String lengthTier;
+    // ...
+    
+    // 신규: 재구성 모드 필드
+    private boolean reconstructMode;           // true면 assembleReconstructPrompt 사용
+    private String sourceBody;                 // 원문 본문 (sanitize 필수)
+    private Long sourceExampleId;              // 원문의 example_bank id
+    private String reconstructionRules;        // RECONSTRUCTION 스코프 규칙 블록
+}
+```
+
+### 3.3 buildSystem 확장
+
+```java
+// 기존
+private String buildSystem(VoiceProfile vp, String formality, double slangLevel, 
+                          String globalRulesBlock) { ... }
+
+// 신규 오버로드
+private String buildSystem(VoiceProfile vp, String formality, double slangLevel,
+                          String globalRulesBlock,
+                          String reconstructionRules) {  // ← 신규 매개변수
+    // RECONSTRUCTION 스코프면 reconstructionRules를 시스템 끝에 삽입
+    if (reconstructionRules != null && !reconstructionRules.isEmpty()) {
+        systemBlock += "\n\n[재구성 규칙]\n" + reconstructionRules;
+    }
+    return systemBlock;
+}
+```
+
+---
+
+## 4. Invoker 계층 — 엔드포인트 추상화
 
 ### 3.0 계층 구조
 
@@ -261,7 +350,7 @@ public class InvokerRouter {
 
 ---
 
-## 4. SelfCritiqueService — 자기비평 루프
+## 5. SelfCritiqueService — 자기비평 루프
 
 ### 4.1 활성화 조건
 
@@ -347,7 +436,7 @@ flowchart TD
 
 ---
 
-## 5. PromptAssembler — 프롬프트 구성
+## 6. PromptAssembler — 프롬프트 구성
 
 ### 5.1 구조 및 구분자
 
@@ -440,7 +529,7 @@ String normalized = examples.trim()
 
 ---
 
-## 6. OutputSanitizer — 6단계 정제 파이프라인
+## 7. OutputSanitizer — 6단계 정제 파이프라인
 
 ```mermaid
 flowchart TD
@@ -506,7 +595,7 @@ OutputSanitizer 3단계의 `\n---\n.*$` 삭제 규칙 — **Sonnet은 "제목\n\
 
 ---
 
-## 7. 문체 규칙 (TonalizationService + PromptAssembler)
+## 8. 문체 규칙 (TonalizationService + PromptAssembler)
 
 ### 7.1 반말 모드 (기본값)
 
@@ -553,7 +642,7 @@ OutputSanitizer 3단계의 `\n---\n.*$` 삭제 규칙 — **Sonnet은 "제목\n\
 
 ---
 
-## 8. LlmWorkerPool — 동시성 관리
+## 9. LlmWorkerPool — 동시성 관리
 
 ### 8.1 스레드 풀 설정
 
@@ -624,7 +713,7 @@ Invoker.invoke() 실행 (120초 타임아웃)
 
 ---
 
-## 9. 설정 파일 (application.yml)
+## 10. 설정 파일 (application.yml)
 
 ```yaml
 spring:
@@ -692,7 +781,7 @@ logging:
 
 ---
 
-## 10. DTO 변경: backend 필드
+## 11. DTO 변경: backend 필드
 
 **영향받는 DTO**:
 - `PostGenRequest` — `private String backend` 추가
@@ -715,7 +804,7 @@ logging:
 
 ---
 
-## 11. 요청/응답 예시
+## 12. 요청/응답 예시
 
 ### 11.1 POST /generate/post (backend 파라미터 포함)
 
@@ -802,7 +891,7 @@ logging:
 
 ---
 
-## 12. 에러 처리 및 문제 해결
+## 13. 에러 처리 및 문제 해결
 
 ### 12.1 Claude CLI 호출 실패
 
@@ -917,7 +1006,7 @@ docker logs -f againspring-llm-ai-user | grep critique
 
 ---
 
-## 13. 모니터링 & 성능 튜닝
+## 14. 모니터링 & 성능 튜닝
 
 ### 13.1 실시간 모니터링
 
@@ -944,7 +1033,7 @@ docker logs -f againspring-llm-ai-user | grep -E "FAIL|PASS|timeout"
 
 ---
 
-## 14. 주요 패턴과 설계
+## 15. 주요 패턴과 설계
 
 ### 14.1 Graceful Fallback 철학
 
@@ -1009,7 +1098,7 @@ docker logs -f againspring-llm-ai-user | grep -E "FAIL|PASS|timeout"
 ```
 
 
-## 15. 문체 현실화 (2026-06-11)
+## 16. 문체 현실화 (2026-06-11)
 
 AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 문제의 대응 (orchestrator·learning과 공동 작업).
 
@@ -1035,7 +1124,7 @@ AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 
 - ⚠️ 반영 절차: DB `ai_prompt_template`이 우선이므로 가이드 수정 시 **DB 갱신 + `POST /internal/prompts/reload` 필수** (배포 전 DB 내용과 diff — admin 수동 편집 보존).
 
 
-## 16. 프롬프트 캐싱 복원 — 프록시 안전형 (2026-06-11, 캐싱 P1)
+## 17. 프롬프트 캐싱 복원 — 프록시 안전형 (2026-06-11, 캐싱 P1)
 
 **경위**: 06-07 system 2블록 캐싱(85~87% 히트) → 06-10 clcocloud가 system 필드 요청을 Kiro로 오라우팅하는
 버그 우회(5fba9ae4) 때 캐싱까지 제거됨(0%) → 06-11 user-block 방식으로 복원.
@@ -1063,7 +1152,7 @@ AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 
 유지(무시되면 무해, Sonnet 글은 최소 1024tok라 여전히 기회). 청구 절감 최종 증빙은 크레딧 소모 속도.
 
 
-## 17. 토큰 다이어트 (2026-06-12)
+## 18. 토큰 다이어트 (2026-06-12)
 
 **배경**: clcocloud 캐싱 신뢰불가 정산(§16 — 간헐 작동, 실현 절감 6%→0%) → 호출마다 전액 과금되는
 정적 prefix 자체를 축소. 문체 현실화(§15)의 런타임 동적 주입(styleExamples·recentOutputs·modeHint·
@@ -1085,7 +1174,7 @@ comment prefix가 4096tok을 넘어 Haiku 캐시 기회는 보존됨.
 
 ⚠️ 가이드를 다시 늘릴 땐 DB `ai_prompt_template` 갱신 절차(§16) 필수.
 
-## 18. clcocloud 거절 노드 대응 — 재시도 + 모델 폴백 (2026-06-12)
+## 19. clcocloud 거절 노드 대응 — 재시도 + 모델 폴백 (2026-06-12)
 
 **증상**: dev·prod 댓글/대댓글(Haiku)이 일제히 FAILED — 모델이 "I appreciate you testing my consistency"·
 "I can't help with this request"·"죄송하지만 저는 이 요청…" 류 영어/한국어 메타 거절만 반환. Sonnet(글)은 정상.

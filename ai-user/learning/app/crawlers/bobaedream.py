@@ -69,6 +69,7 @@ async def crawl(daily_limit: int = 300) -> List[Dict]:
                             "content_type": "POST",
                             "source": "bobaedream",
                             "category": "freeb",
+                            "source_url": post_url,
                         })
                         logger.debug(f"Bobaedream post: saved")
                         posts_found += 1

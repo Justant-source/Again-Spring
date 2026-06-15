@@ -104,6 +104,51 @@ public class AdminCorrectionController {
     }
 
     // =====================================================================
+    // 재구성 첨삭 (원본 비교 기능) — 기존 /save /analyze /commit 경로 무수정
+    // =====================================================================
+
+    @PostMapping("/reconstruction/analyze")
+    @Operation(
+        summary = "재구성 3-way 분석",
+        description = "크롤 원본·AI 생성본·관리자 수정본 3-way diff를 Sonnet으로 분석, 재구성 규칙 초안 반환. DB 저장 없음."
+    )
+    public ResponseEntity<ReconstructionAnalyzeResponse> analyzeReconstruction(
+            @RequestBody ReconstructionAnalyzeRequest req,
+            org.springframework.security.core.Authentication auth) throws Exception {
+
+        String adminId = auth.getName();
+        AiCorrectionService.ReconstructionAnalyzeResult result = correctionService.analyzeReconstruction(
+                new AiCorrectionService.ReconstructionAnalyzeRequest(
+                        req.getTargetType(), req.getTargetId(),
+                        req.getSourceOriginalText(), req.getCorrectedText(), req.getAdminOpinion()),
+                adminId);
+
+        return ResponseEntity.ok(new ReconstructionAnalyzeResponse(
+                result.personaId(), result.generatedText(), result.suggestedReconstructionRules()));
+    }
+
+    @PostMapping("/reconstruction/commit")
+    @Operation(
+        summary = "재구성 첨삭 확정",
+        description = "재구성 규칙(scope=RECONSTRUCTION)을 ai_global_rules에 저장. 기존 POST/COMMENT scope와 격리."
+    )
+    @Auditable(action = "AI_RECONSTRUCTION_COMMIT", targetType = "#req.targetType", targetId = "#req.targetId")
+    public ResponseEntity<CommitResponse> commitReconstruction(
+            @RequestBody ReconstructionCommitRequest req,
+            org.springframework.security.core.Authentication auth) {
+
+        String adminId = auth.getName();
+        AiCorrectionService.CommitResult result = correctionService.commitReconstruction(
+                new AiCorrectionService.ReconstructionCommitRequest(
+                        req.getTargetType(), req.getTargetId(), req.getCorrectedText(),
+                        req.getSourceOriginalText(), req.getReconstructionRules(), req.isApplyLive()),
+                adminId);
+
+        return ResponseEntity.ok(new CommitResponse(
+                result.correctionId(), result.appliedLive(), result.rulesCreated(), result.cautionApplied()));
+    }
+
+    // =====================================================================
     // Request / Response DTOs
     // =====================================================================
 
@@ -180,5 +225,48 @@ public class AdminCorrectionController {
             this.rulesCreated = rulesCreated;
             this.cautionApplied = cautionApplied;
         }
+    }
+
+    // --- 재구성 전용 DTOs ---
+
+    @Getter @Setter
+    public static class ReconstructionAnalyzeRequest {
+        /** 'POST' | 'COMMENT' */
+        private String targetType;
+        private String targetId;
+        /** 크롤 원본 전체 본문 (왼쪽 패널) */
+        private String sourceOriginalText;
+        /** 관리자가 오른쪽 패널에서 수정한 사연 제목+본문 */
+        private String correctedText;
+        /** 관리자 의도 메모 (선택) */
+        private String adminOpinion;
+    }
+
+    @Getter
+    public static class ReconstructionAnalyzeResponse {
+        private final String personaId;
+        private final String generatedText;
+        private final List<String> suggestedReconstructionRules;
+
+        public ReconstructionAnalyzeResponse(String personaId, String generatedText,
+                                              List<String> suggestedReconstructionRules) {
+            this.personaId = personaId;
+            this.generatedText = generatedText;
+            this.suggestedReconstructionRules = suggestedReconstructionRules;
+        }
+    }
+
+    @Getter @Setter
+    public static class ReconstructionCommitRequest {
+        private String targetType;
+        private String targetId;
+        /** 관리자 최종 수정본 */
+        private String correctedText;
+        /** 크롤 원본 스냅샷 */
+        private String sourceOriginalText;
+        /** 확정할 재구성 규칙 목록 (scope=RECONSTRUCTION) */
+        private List<String> reconstructionRules;
+        /** true면 라이브 사연 본문도 correctedText로 교체 */
+        private boolean applyLive;
     }
 }
