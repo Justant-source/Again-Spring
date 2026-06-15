@@ -1,14 +1,20 @@
 package com.againspring.aiuser.orchestrator.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.List;
@@ -22,13 +28,31 @@ import java.util.List;
 @Component
 public class AiLearningClient {
 
-    private final RestClient restClient;
+    private final String baseUrl;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${ai-learning.enabled:false}")
     private boolean enabled;
 
-    public AiLearningClient(@Value("${ai-learning.base-url:http://againspring-ai-learning:8099}") String baseUrl) {
-        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+    public AiLearningClient(
+            @Value("${ai-learning.base-url:http://againspring-ai-learning:8099}") String baseUrl,
+            ObjectMapper objectMapper) {
+        this.baseUrl = baseUrl;
+        this.restTemplate = new RestTemplate();
+        this.objectMapper = objectMapper;
+    }
+
+    private <T> ResponseEntity<String> postJson(String path, T body) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            String json = objectMapper.writeValueAsString(body);
+            HttpEntity<String> entity = new HttpEntity<>(json, headers);
+            return restTemplate.postForEntity(baseUrl + path, entity, String.class);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Getter @Setter @NoArgsConstructor
@@ -92,6 +116,7 @@ public class AiLearningClient {
         /** 원본 비교 기능: 크롤 원본 제목 (신규 크롤부터, 기존 행은 null) */
         private String title;
         /** 원본 비교 기능: 크롤 원본 URL */
+        @JsonProperty("source_url")
         private String sourceUrl;
 
         /** 이 항목이 단일 원본 재구성 소스로 사용 가능한지 — source_url 보유 여부로 판단 */
@@ -114,11 +139,7 @@ public class AiLearningClient {
     public void saveAsync(String content, String contentType, String category, String source) {
         if (!enabled || content == null || content.isBlank()) return;
         try {
-            restClient.post()
-                .uri("/examples/save")
-                .body(new SaveRequest(content, contentType, category, source, null))
-                .retrieve()
-                .toBodilessEntity();
+            postJson("/examples/save", new SaveRequest(content, contentType, category, source, null));
         } catch (Exception e) {
             log.debug("AiLearning save failed (non-critical): {}", e.getMessage());
         }
@@ -133,11 +154,11 @@ public class AiLearningClient {
     public List<ExampleItem> findSimilar(String query, String contentType, String category, int topK, String register) {
         if (!enabled || query == null || query.isBlank()) return Collections.emptyList();
         try {
-            List<ExampleItem> result = restClient.post()
-                .uri("/examples/search")
-                .body(new SearchRequest(query, contentType, category, topK, register))
-                .retrieve()
-                .body(new ParameterizedTypeReference<List<ExampleItem>>() {});
+            ResponseEntity<String> resp = postJson("/examples/search",
+                new SearchRequest(query, contentType, category, topK, register));
+            if (resp.getBody() == null) return Collections.emptyList();
+            List<ExampleItem> result = objectMapper.readValue(resp.getBody(),
+                new TypeReference<List<ExampleItem>>() {});
             return result != null ? result : Collections.emptyList();
         } catch (Exception e) {
             log.debug("AiLearning search failed (non-critical): {}", e.getMessage());
@@ -152,11 +173,11 @@ public class AiLearningClient {
     public List<ExampleItem> styleSample(String source, String contentType, String register, int topK, int maxLen) {
         if (!enabled) return Collections.emptyList();
         try {
-            List<ExampleItem> result = restClient.post()
-                .uri("/examples/style-sample")
-                .body(new StyleSampleRequest(contentType, source, register, topK, maxLen))
-                .retrieve()
-                .body(new ParameterizedTypeReference<List<ExampleItem>>() {});
+            ResponseEntity<String> resp = postJson("/examples/style-sample",
+                new StyleSampleRequest(contentType, source, register, topK, maxLen));
+            if (resp.getBody() == null) return Collections.emptyList();
+            List<ExampleItem> result = objectMapper.readValue(resp.getBody(),
+                new TypeReference<List<ExampleItem>>() {});
             return result != null ? result : Collections.emptyList();
         } catch (Exception e) {
             log.debug("AiLearning styleSample failed (non-critical): {}", e.getMessage());
@@ -168,10 +189,11 @@ public class AiLearningClient {
     public List<DailyTopicItem> fetchDailyTopics(String category, int limit) {
         if (!enabled || category == null || category.isBlank()) return Collections.emptyList();
         try {
-            List<DailyTopicItem> result = restClient.get()
-                .uri("/topics/today?category={category}&limit={limit}", category, limit)
-                .retrieve()
-                .body(new ParameterizedTypeReference<List<DailyTopicItem>>() {});
+            String url = baseUrl + "/topics/today?category=" + category + "&limit=" + limit;
+            String body = restTemplate.getForObject(url, String.class);
+            if (body == null) return Collections.emptyList();
+            List<DailyTopicItem> result = objectMapper.readValue(body,
+                new TypeReference<List<DailyTopicItem>>() {});
             return result != null ? result : Collections.emptyList();
         } catch (Exception e) {
             log.debug("AiLearning fetchDailyTopics failed (non-critical): {}", e.getMessage());
@@ -183,10 +205,9 @@ public class AiLearningClient {
     public void markTopicUsed(Long topicId) {
         if (!enabled || topicId == null) return;
         try {
-            restClient.post()
-                .uri("/topics/{id}/use", topicId)
-                .retrieve()
-                .toBodilessEntity();
+            HttpHeaders headers = new HttpHeaders();
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            restTemplate.postForEntity(baseUrl + "/topics/" + topicId + "/use", entity, Void.class);
         } catch (Exception e) {
             log.debug("AiLearning markTopicUsed failed (non-critical): {}", e.getMessage());
         }
@@ -196,10 +217,9 @@ public class AiLearningClient {
     public void triggerCrawl(String source, int limit) {
         if (!enabled) return;
         try {
-            restClient.post()
-                .uri("/crawl/{source}?limit={limit}", source, limit)
-                .retrieve()
-                .toBodilessEntity();
+            HttpHeaders headers = new HttpHeaders();
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            restTemplate.postForEntity(baseUrl + "/crawl/" + source + "?limit=" + limit, entity, Void.class);
             log.info("Crawl triggered: source={} limit={}", source, limit);
         } catch (Exception e) {
             log.debug("Crawl trigger failed: {}", e.getMessage());

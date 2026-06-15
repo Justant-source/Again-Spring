@@ -55,6 +55,7 @@ public class PromptAssembler {
                 log.warn("DB read failed for '{}', falling back to classpath: {}", dbKey, e.getMessage());
             }
         }
+        if (classpathPath == null) return null;
         String content = loadResource(classpathPath);
         // 첫 기동 시 classpath 내용을 DB에 시드 (빈 레코드만 업데이트)
         if (jdbcTemplate != null && !content.isBlank()) {
