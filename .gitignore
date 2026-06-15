@@ -99,3 +99,4 @@ ai-user/**/.gradle/
 ai-user/tools/reports/
 # DB 부분 백업 덤프 (배포 절차 산출물)
 env/backups/
+backups/
