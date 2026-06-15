@@ -20,7 +20,7 @@ Claude CLI 또는 Anthropic Messages API를 통해 한국어 커뮤니티 텍스
 | **동시성** | ThreadPoolExecutor 20 + LinkedBlockingQueue 100 |
 | **타임아웃** | 120초 (설정 가능) |
 | **플래그** | `--strict-mcp-config --no-session-persistence --print --output-format stream-json` (CLI만) |
-| **프롬프트 캐싱** | ✅ 활성화 가능 (Anthropic API) — System 블록에 `cache_control: {type:"ephemeral"}` |
+| **프롬프트 캐싱** | **Haiku 전용** user-block `cache_control` (Sonnet 제외 §20). ⚠️ clcocloud 현재 미작동(§20) |
 
 **엔드포인트**:
 - `POST /generate/post` — 글 생성 (backend 파라미터 선택 가능)
@@ -765,7 +765,7 @@ logging:
 
 | 변수 | 기본값 | 설명 |
 |------|-------|------|
-| `LLM_API_PROMPT_CACHING` | `true` | user-block 캐싱 (clcocloud 간헐 무시 §16) |
+| `LLM_API_PROMPT_CACHING` | `true` | user-block 캐싱 — **Haiku 전용**(Sonnet 제외 §20). clcocloud 미작동(§20) |
 | `LLM_API_CACHE_TTL` | `5m` | 캐시 TTL — `1h`은 직접 API 전용 (§16) |
 | `LLM_POST_MODEL` | (빈 값) | 글+partner 전용 모델 (compose 기본 sonnet) |
 | `LLM_API_REFUSAL_RETRIES` | `2` | clcocloud 거절 재시도 (§18) |
@@ -1130,7 +1130,7 @@ AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 
 버그 우회(5fba9ae4) 때 캐싱까지 제거됨(0%) → 06-11 user-block 방식으로 복원.
 
 **구조 (`ClaudeApiInvoker.buildRequestBody`)**: system 필드는 계속 미사용. user content를 2블록으로 분리 —
-- block1 = `<instructions>\n` + PERSONA_SECTION 앞 정적 prefix + **cache_control(ephemeral)** ← 타입별 공통, 4.3~5.5k tok
+- block1 = `<instructions>\n` + PERSONA_SECTION 앞 정적 prefix + **cache_control(ephemeral, Haiku만 §20)** ← 타입별 공통, 다이어트 후 ~2.5~2.8k tok(4096 미만)
 - block2 = 페르소나 섹션 + `</instructions>` + 유저 요청 ← 가변
 - 두 블록을 이으면 기존 단일 블록과 의미 동일 → 모델 동작 불변 (`ClaudeApiInvokerCacheTest`)
 
@@ -1169,8 +1169,11 @@ AI 유저 출력이 "AI투"로 수렴하고 같은 페르소나가 반복하는 
 댓글 prefix 동일조건 비교 4,724 → 2,765 tok (**−1,959 tok, −41%**).
 절단 0 · 1000자 초과 0 · critique FAIL 0.
 
-**한글 토큰 비율 정정**: 실측 ~1.8 tok/char (이전 기록 0.87은 오류) — 다이어트 후에도
-comment prefix가 4096tok을 넘어 Haiku 캐시 기회는 보존됨.
+**한글 토큰 비율 (정정 2026-06-15)**: 실측 ~0.55~0.6 tok/char. (이전 기록 0.87·1.8 모두 오류 —
+1.8은 "전체 input 5.3k tok인데 block1만 7.9k"라는 모순을 낳음.) 이 비율이면 **다이어트 후 comment
+정적 prefix ≈ 2,765 tok < 4096** (위 실측과 일치) → **Haiku 캐시 임계 미달이 정상 상태**. 즉 다이어트는
+캐시를 끄는 방향이며, 캐싱 복원은 prefix를 4096↑로 키워야 하나 §20대로 clcocloud가 캐싱 자체를
+미작동시키므로 prefix 확대는 순손실 → **금지**.
 
 ⚠️ 가이드를 다시 늘릴 땐 DB `ai_prompt_template` 갱신 절차(§16) 필수.
 
@@ -1196,9 +1199,31 @@ comment prefix가 4096tok을 넘어 Haiku 캐시 기회는 보존됨.
 **오염 루프 차단**: 게시→history→`recentOutputs` 재주입 경로에서 후속 생성까지 거절시키던 문제 →
 `ActionExecutor.loadRecentBodies`에 `ContentSafetyGuard` 통과분만 사용하는 필터 추가.
 
-**라이브 증명** (prod 04:22): Haiku 3연속 거절(input 5037×3) → Sonnet 폴백 성공 → 대댓글 게시.
+> ⚠️ **코드 정정 (2026-06-15)**: 현행 `ClaudeApiInvoker.invoke`는 재시도 소진 시 폴백을 실제로
+> 호출하지 않고 예외를 던진다(로그 "Sonnet 폴백 비활성"). `refusal-fallback-model` 필드는 주입만 되고
+> 미사용. 위 폴백 설명(1192·1202)은 과거 설계 기록 — 실동작은 "재시도 소진 → 액션 스킵".
+
+## 20. 캐싱 Haiku 전용화 + clcocloud 캐싱 미작동 재확정 (2026-06-15)
+
+**계기**: clcocloud 청구 분석. 사용내역 `costUsd` 기준 Haiku 실효단가 input $1.235/M·output $6.30/M
+(Anthropic 정가 $1·$5 대비 ~24% 마크업). 캐시 read 적중은 전 요청 0%.
+
+**프로브 재실측 (`cache-probe.py`, prefix 6,494 tok)**: v1~v4(단일/2블록 5m/2블록 1h/system) 전부
+**1·2차 모두 cache_write=0·cache_read=0**. → prefix가 4096을 한참 넘어도 캐시가 **생성조차 안 됨** =
+clcocloud가 cache_control을 Anthropic에 전달하지 않음(미작동). "적중률 차이"가 아니라 캐싱 자체 비활성.
+clcocloud 측 "캐싱 지원중" 답변과 배치됨.
+
+**조치 (`ClaudeApiInvoker`)**:
+- **Sonnet 캐싱 OFF** — `isHaiku()` 게이트로 Sonnet은 cache_control 미부착(단일 블록). 근거: Sonnet은
+  cache_write>0(프리미엄 청구)인데 cache_read=0(재사용 0)이라 캐싱이 오히려 비쌌음.
+- **Haiku는 cache_control 계속 전송** — clcocloud가 무시해 write=0(프리미엄 0, 무해), 프록시 수정 시 자동 작동.
+- **prefix 확대(다이어트 복원) 금지** — 캐싱 미작동 확정이라 prefix를 키우면 매 호출 전액 과금 = 순손실.
+
+**dev 비용 절감 동반 조치 (dev 전용)**: `LLM_API_REFUSAL_RETRIES=0`(거절 재시도 낭비 제거),
+tick-cron 하드코딩(매분) 해제→10분, PairedPost 2h/3쌍→1일1회/1쌍, DB `ai_user_generation_config`
+생성 cap 축소(글50→10·댓글380→80·대댓글220→50). prod 무변경.
 
 ---
 
-**마지막 업데이트**: 2026-06-12 | **버전**: Invoker 인터페이스 계층 v1.0
+**마지막 업데이트**: 2026-06-15 | **버전**: 캐싱 Haiku 전용화 + dev 비용 절감
 **기반**: ClaudeCliInvoker, ClaudeApiInvoker, InvokerRouter, SelfCritiqueService, OutputSanitizer

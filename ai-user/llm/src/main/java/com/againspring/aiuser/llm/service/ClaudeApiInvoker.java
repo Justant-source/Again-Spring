@@ -26,12 +26,18 @@ import java.time.Duration;
  *
  * clcocloud 프록시는 system 필드 포함 요청을 다른 모델로 라우팅하므로 system 필드 미사용.
  *
- * 프롬프트 캐싱 (2026-06-11 복원, 캐싱 P1):
- * - user content를 2블록으로 분리 — block1=&lt;instructions&gt;+정적 prefix(PERSONA_SECTION 앞)에
+ * 프롬프트 캐싱 (2026-06-11 복원 / 2026-06-15 Haiku 전용화):
+ * - **Haiku에만 캐싱 적용.** Sonnet은 cache_read 적중 0%인데 cache_write 프리미엄만 매 호출
+ *   청구되어 캐싱이 오히려 비싸므로 cache_control 미부착(단일 블록). isHaiku()로 분기.
+ * - Haiku: user content를 2블록으로 분리 — block1=&lt;instructions&gt;+정적 prefix(PERSONA_SECTION 앞)에
  *   cache_control, block2=페르소나 섹션+유저 요청. system 필드 없이 캐싱 (Kiro 라우팅 버그 회피 유지).
  * - 기본 TTL 5m (GA — beta 헤더 불필요). ⚠️ 1h TTL의 anthropic-beta 헤더는 clcocloud에서
  *   Kiro 오라우팅을 유발함이 프로브로 확인됨(2026-06-11) — LLM_API_CACHE_TTL=1h는 직접 API 전환 시에만.
- * - Haiku 4.5 최소 캐시 prefix 4096토큰 — 미달 시 조용히 스킵되므로 길이 WARN 가드 포함.
+ * - ⚠️ Haiku 캐시가 실제로 작동하려면 정적 prefix(block1)가 4096토큰 이상이어야 함. 미달 시
+ *   Anthropic이 cache_control을 조용히 무시(cache_write=0). PromptAssembler의 prefix 길이 참조.
+ * - ⚠️ 2026-06-15 프로브(cache-probe.py): clcocloud는 prefix 6,494토큰 + cache_control에도
+ *   cache_write=0 — 프록시가 캐싱을 Anthropic에 전달하지 않음(미작동). 따라서 prefix 확대는
+ *   순손실이라 금지(토큰 다이어트 유지). cache_control 전송은 무해하므로 유지(프록시 수정 시 자동 작동).
  */
 @Slf4j
 @Service
@@ -49,6 +55,11 @@ public class ClaudeApiInvoker implements Invoker {
     private static final int    CACHE_MIN_PREFIX_CHARS = 4800;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /** 프롬프트 캐싱 적용 대상 모델 판별 — Haiku 전용 (Sonnet은 제외, 위 § 캐싱 정책). */
+    private static boolean isHaiku(String model) {
+        return model != null && model.toLowerCase().contains("haiku");
+    }
 
     private final ApiKeyProvider apiKeyProvider;
 
@@ -116,8 +127,11 @@ public class ClaudeApiInvoker implements Invoker {
         userMsg.put("role", "user");
         ArrayNode content = userMsg.putArray("content");
 
+        // 캐싱은 Haiku에만 적용 (2026-06-15): Sonnet은 cache_read 적중 0%인데 cache_write
+        // 프리미엄만 매 호출 청구되어 캐싱을 끄는 게 더 저렴 — Sonnet은 단일 블록(cache_control 미부착).
+        boolean cacheable = promptCaching && isHaiku(resolvedModel);
         int personaIdx = systemPart != null ? systemPart.indexOf(PERSONA_SEP) : -1;
-        if (promptCaching && personaIdx >= 0) {
+        if (cacheable && personaIdx >= 0) {
             String staticPart  = systemPart.substring(0, personaIdx).trim();
             String dynamicPart = systemPart.substring(personaIdx + PERSONA_SEP.length()).trim();
             if (staticPart.length() < CACHE_MIN_PREFIX_CHARS) {
@@ -189,8 +203,8 @@ public class ClaudeApiInvoker implements Invoker {
                 .header("x-api-key", apiKey)
                 .header("anthropic-version", API_VER)
                 .header("content-type", "application/json");
-            // ⚠️ beta 헤더는 1h TTL 명시 설정 시에만 — clcocloud에서 Kiro 오라우팅 유발 (2026-06-11 프로브)
-            if (promptCaching && "1h".equals(cacheTtl)) {
+            // ⚠️ beta 헤더는 Haiku 캐싱 + 1h TTL 명시 설정 시에만 — clcocloud에서 Kiro 오라우팅 유발 (2026-06-11 프로브)
+            if (promptCaching && isHaiku(resolvedModel) && "1h".equals(cacheTtl)) {
                 reqBuilder.header("anthropic-beta", CACHE_BETA_1H);
             }
             HttpRequest req = reqBuilder
