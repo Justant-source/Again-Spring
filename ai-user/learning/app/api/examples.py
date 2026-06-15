@@ -1,6 +1,6 @@
 import logging
 import os
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 from typing import Optional, List
@@ -256,8 +256,8 @@ def style_sample(req: StyleSampleRequest) -> List[ExampleItem]:
 
 @router.get("/export")
 def export_examples(
-    content_type: Optional[str] = None,
-    source_class: str = "human",
+    content_type: Optional[str] = Query(default=None, alias="contentType"),
+    source_class: str = Query(default="human", alias="sourceClass"),
     since: Optional[str] = None,
     limit: int = 1000,
     offset: int = 0,
