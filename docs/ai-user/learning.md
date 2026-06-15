@@ -22,6 +22,7 @@
 | **POST** | `/examples/search` | 코사인 유사도 검색 | `SearchRequest` | `List[ExampleItem]` |
 | **GET** | `/examples/{id}` | 단일 예시 조회 (원본 포함) | (없음) | `ExampleItem` |
 | **GET** | `/examples/count` | 소스별 통계 | (없음) | `{"source": count, ...}` |
+| **GET** | `/examples/export` | 인간/AI 코퍼스 export (내부 전용, Step 2) | (없음) | 코퍼스 데이터 |
 | **POST** | `/crawl/{source}` | 크롤링 수동 트리거 | (없음) | `{"status": "queued"}` |
 | **POST** | `/embed` | 텍스트 임베딩 (디버그용) | `{"text": str}` | `{"embedding": [float]}` |
 | **GET** | `/health` | 헬스체크 | (없음) | `{"status": "ok"}` |

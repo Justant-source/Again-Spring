@@ -254,6 +254,78 @@ def style_sample(req: StyleSampleRequest) -> List[ExampleItem]:
         return []
 
 
+@router.get("/export")
+def export_examples(
+    content_type: Optional[str] = None,
+    source_class: str = "human",
+    since: Optional[str] = None,
+    limit: int = 1000,
+    offset: int = 0,
+):
+    """코퍼스 export — ASAU ML 서비스가 학습 데이터 pull 시 사용.
+
+    source_class:
+      'human' (default) → source != 'SELF_GENERATED' (크롤 데이터)
+      'ai'              → source  = 'SELF_GENERATED' (봇 생성)
+      'all'             → 전체
+
+    since: ISO datetime (예: '2026-01-01 00:00:00') — 커서 기반 페이지네이션
+    limit: 최대 1000, offset: 페이지네이션
+    """
+    conditions: list = []
+    params: list = []
+
+    if content_type:
+        conditions.append("content_type = %s")
+        params.append(content_type)
+
+    if source_class == "human":
+        conditions.append("source != %s")
+        params.append("SELF_GENERATED")
+    elif source_class == "ai":
+        conditions.append("source = %s")
+        params.append("SELF_GENERATED")
+    # source_class == "all" → no filter
+
+    if since:
+        conditions.append("created_at > %s")
+        params.append(since)
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    sql = f"""
+        SELECT id, content, content_type, source, created_at
+        FROM example_bank
+        {where}
+        ORDER BY created_at ASC
+        LIMIT %s OFFSET %s
+    """
+    params.extend([min(int(limit), 5000), int(offset)])
+
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+        return {
+            "items": [
+                {
+                    "id": r["id"],
+                    "content": r["content"],
+                    "contentType": r["content_type"],
+                    "source": r["source"],
+                    "createdAt": str(r["created_at"]) if r.get("created_at") else None,
+                }
+                for r in rows
+            ],
+            "total": len(rows),
+            "offset": int(offset),
+            "limit": int(limit),
+        }
+    except Exception as e:
+        logger.error(f"export_examples error: {e}")
+        return {"items": [], "total": 0, "offset": int(offset), "limit": int(limit), "error": str(e)}
+
+
 @router.get("/{example_id}", response_model=ExampleItem)
 def get_example(example_id: int) -> ExampleItem:
     """단일 원본 조회 — 원본 비교 화면에서 정확한 1건을 id로 가져오는 경로."""
