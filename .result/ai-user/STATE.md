@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 9 — Base Hardening Phase A 완료: T1~T4+T7)
+**최종 갱신**: 2026-06-16 (세션 10 — T8 THEQOO TSD 프롬프팅 완료)
 
 ## ⚠️ 관점 교정 (Step 9 "ready_count=4/4"의 올바른 해석)
 
@@ -161,7 +161,7 @@
 | Step 14 (T7) | ENABLE 게이트 구현 | ✅ 완료 — /metrics/enable-candidates, 0/12 (정상) |
 | Step 15 (T6) | 독립 검증 harness | ✅ 완료 — A-B rerank vs random, Δ=+0.044~0.048 (marginal) |
 | Step 16 (T5) | POST 샘플 보강 | 🔜 Phase C |
-| Step 17 (T8) | THEQOO TSD 프롬프팅 | 🔜 Phase C |
+| Step 17 (T8) | THEQOO TSD 프롬프팅 | ✅ 완료 — [문체 패턴] 주입, dev DB 업데이트 |
 
 ## Step 15 완료 (2026-06-16)
 
@@ -218,21 +218,37 @@ cond4_ab_mauve:
 | COMMENT MAUVE | 미측정 | **0.060** (NATEPAN), 0.068 (CLIEN) |
 | pytest | 65/65 | **82/82** (T6 10 tests baked into rebuilt container) |
 
-## 다음 구체 작업
+## Step 17 완료 (T8 — 2026-06-16)
 
-- **Phase B 완료 (T6)**: ✅ 실측 완료 — cond4 미충족 (THEQOO 역전, CLIEN 무신호), 원인 진단 완료.
-- **Phase C (T5+T8) — 핵심 수정 방향**:
-  - **T8 (Step 17)**: THEQOO 프롬프팅 개선. 목표: 오케스트레이터 생성 MAUVE=0.345 → 0.60+.
-    - 실마리: run_ab_test.py 단순 프롬프트로 MAUVE=0.985 달성 → 오케스트레이터 생성 방식 문제
-    - PromptAssembler의 THEQOO 시스템 프롬프트에 TSD 제약 추가 (짧은 문장, burstiness, 자연스러운 자모)
-    - 변경 후 AI corpus re-collect → baseline 재측정
-  - **T5 (Step 16)**: THEQOO/DCINSIDE/NATEPAN n_ai → 100 돌파 (자연 축적 + 수동 시딩)
-    - 특히 THEQOO: 65→100 = 35개 더 필요 (가장 근접)
-    - T8 이후 신선 데이터로 재수집해야 더 의미 있음
-  - **THEQOO 코퍼스 정제 (T6 재실행 전제)**:
-    - 인간 코퍼스에서 링크포스트·공지·짧은 반응 제거 → 갈등 사연 POST만 유지
-    - OR: 갈등 관련 키워드 필터로 인간 corpus 정제
-  - T5+T8 완료 → discriminator 재학습 → A-B 재측정 → cond4 확인 (목표: Δ > 0.05)
+| 기준 | 결과 |
+|---|---|
+| `appendWritingQuirks` features 읽기 추가 | ✅ `[문체 패턴]` 섹션 신규 출력 |
+| THEQOO 10개 voice.yml features 추가 | ✅ (profiles/ 파일 기반 — 신규 시드용) |
+| dev DB 7개 THEQOO 페르소나 JSON_SET | ✅ writing_quirks.features 삽입 확인 |
+| dev 배포 (orchestrator rebuild) | ✅ |
+| e2e-realbe 142/147 | ✅ |
+| main push | ✅ commit `88018822` |
+
+### T8 핵심 발견
+
+- **근본 원인**: `voiceBlockForPost`가 THEQOO 페르소나에 대해 `writing_quirks.features` 필드를 읽지 않음 → 시스템 프롬프트의 `## 페르소나 특성` 섹션이 거의 비어 있었음
+- **DB 페르소나 구조 이슈**: DB의 THEQOO 페르소나(7개) IDs ≠ voice.yml IDs (다른 세대 생성) → DB 직접 업데이트 필요
+- **기대 효과**: `[문체 패턴] 짧은 문장 단위 (한 문장 10~20자 이내). 단락 없이 한 덩어리로. 헐/ㅠㅠ/ㄷㄷ 문장 중간 삽입. ~당/~징/~음/ㅎㅎ 종결 위주.` → 오케스트레이터 MAUVE 0.345 → 0.60+ 목표
+
+## 다음 구체 작업 (Phase C 후속)
+
+**우선순위 1 — THEQOO MAUVE 재측정** (T8 효과 검증):
+- `POST /eval/baseline` 트리거 → THEQOO MAUVE before/after 비교
+- 신선 THEQOO 봇 게시글이 충분히 축적되면 의미 있는 비교 가능
+
+**우선순위 2 — T5 (Step 16)**: THEQOO/DCINSIDE/NATEPAN n_ai → 100 돌파
+- THEQOO: 현재 65, 35개 더 필요 (T8 이후 신선 데이터 우선)
+- NATEPAN: 0 POST — 오케스트레이터가 NATEPAN 게시글을 생성하도록 설정 필요
+
+**우선순위 3 — THEQOO 코퍼스 정제** (T6 재실행 전제):
+- 인간 코퍼스에서 링크포스트·공지·짧은 반응 제거 → 갈등 사연 POST만 유지
+- discriminator 재학습 → A-B 재측정 → cond4 확인 (목표: Δ > 0.05)
+
 - `AI_USER_ML_ENABLED=true` 활성화는 5조건(D-17) 전부 충족 후 수동으로 — 코드 변경 금지
 
 ## 운영 메모 / 권한
