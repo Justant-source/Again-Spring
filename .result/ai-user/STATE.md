@@ -17,9 +17,9 @@
 
 ## 현재 위치
 
-- **Phase**: Base Hardening 완료 (Step 0~17 전부 ✅)
+- **Phase**: Base Hardening 2라운드 진행 중 (Step 18~26)
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **다음 세션 최우선**: T8 효과 검증 (THEQOO MAUVE 재측정) + T5 (n_ai→100)
+- **현재 세션 완료**: N4 ✅ · N2(WSL) ✅ · N3(WSL) ✅ · N1(WSL 코퍼스 정제) ✅ · N6(코드 완료/e2e 대기) · N7+N8(a)(AS 진행 중)
 
 ---
 
@@ -65,8 +65,8 @@
 |---|---|---|
 | CLIEN | **0.970** | 우수 (ceiling 근접) |
 | DCINSIDE | **0.9999** | 최우수 |
-| NATEPAN | null | AI POST 0개 |
-| THEQOO | **0.345** | 최하 — T8 적용 후 재측정 필요 |
+| NATEPAN | null | AI POST 0개 (N8a 완료 후 생성 예정) |
+| THEQOO | **0.345** | 최하 — T8 적용 후 재측정 필요 (N9) |
 
 ### A-B 테스트 결과 (Step 15, 2026-06-16)
 | 커뮤니티 | MAUVE(rerank) | MAUVE(random) | Δ | cond4 |
@@ -83,6 +83,23 @@ blocker:
   cond4: Δ<0 (THEQOO 역전) / Δ=0 (CLIEN 무신호)
   cond5: 사람 블라인드 미실시
 ```
+
+---
+
+## Base Hardening 2라운드 진행 현황 (Step 18~26)
+
+| Step | 작업 | 상태 | 핵심 수치 |
+|---|---|---|---|
+| N4 (Step 21) | 15-ab-harness.md VOID 헤더 | ✅ | commit aa39e042 |
+| N2 (Step 19) | D-21 분리기 단위테스트 | ✅ WSL | 13/13 PASS, DC avg_sl=2.62 (commit 73f227c) |
+| N3 (Step 20) | enable-gate cond3/cond5 정정 | ✅ WSL | cond3=True, cond5 ≤0.60 (commit dac259b) |
+| N1 (Step 18) | THEQOO 코퍼스 디오염 | ✅ WSL (부분) | 168/344 삭제, 252 클린. P(human) 역전 유지(재학습 필요) |
+| N6 (Step 23) | 댓글 초성체 allowChosung | 🔄 코드 완료 | e2e 게이트 대기 |
+| N7 (Step 24) | DB general_style 정정 | 🔄 진행 중 | AS 에이전트 실행 중 |
+| N8(a) (Step 25) | NATEPAN/INVEN HEAVY 승격 | 🔄 진행 중 | AS 에이전트 실행 중 |
+| N5 (Step 22) | 블라인드 자가 라벨링 | 🔄 진행 중 | WSL 에이전트 실행 중 |
+| N8(b) (Step 25) | AI POST 생성 n_ai→100 | 🔄 진행 중 | POST 트리거 에이전트 실행 중 |
+| N9 (Step 26) | 클린 A-B + T8 MAUVE | ⏳ 대기 | N1+N8 완료 필요 |
 
 ---
 

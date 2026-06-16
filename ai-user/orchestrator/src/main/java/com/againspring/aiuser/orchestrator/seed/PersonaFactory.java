@@ -83,7 +83,20 @@ public class PersonaFactory {
         String region   = pick(REGIONS);
         String job      = pick(JOBS);
         job = coerceJobToAge(age, job);
-        String tier     = pick(TIERS);
+
+        // voice별 HEAVY≥1 보장: 이 voice에 HEAVY가 없으면 tier=HEAVY로 강제
+        String tier = pick(TIERS);
+        try {
+            Long heavyCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM personas WHERE tier='HEAVY' AND JSON_EXTRACT(voice_profile,'$.voice_type')=?",
+                Long.class, voice);
+            if (heavyCount != null && heavyCount == 0) {
+                tier = "HEAVY";
+                log.info("PersonaFactory: forcing HEAVY for {} (no HEAVY exists yet)", voice);
+            }
+        } catch (Exception e) {
+            log.debug("PersonaFactory HEAVY check failed, using random tier: {}", e.getMessage());
+        }
         double slang    = switch (voice) {
             case "DCINSIDE"  -> 0.7 + RNG.nextDouble() * 0.2;
             case "FMKOREA"   -> 0.65 + RNG.nextDouble() * 0.2;
@@ -207,13 +220,35 @@ public class PersonaFactory {
     }
 
     private String buildPersonaPrompt(String age, String gender, String voice, String politics, String region, String job) {
+        // voice별 커뮤니티 특성 가이드 (LLM general_style 품질 향상)
+        String voiceGuide = switch (voice) {
+            case "NATEPAN"  -> "따뜻하고 공감적인 사연 커뮤니티. 감정을 길게 풀어쓰는 서술형. 존댓말·반말 혼용. 자기고백형 갈등 서술.";
+            case "DCINSIDE" -> "직설적이고 속어 자유. 초성체(ㄹㅇ/ㅇㅈ/ㄷㄷ) 사용. 짧고 임팩트 있는 반응. 솔직한 비판과 공감 혼재.";
+            case "BLIND"    -> "직장인 커뮤니티. 냉정하고 현실적. 감정보다 상황 분석 우선. 쓴소리를 사실처럼 말함.";
+            case "GENERAL"  -> "범용 인터넷 사용자. 중립적이고 무난한 표현. 표준 맞춤법 위주. 특정 커뮤니티 색채 없음.";
+            case "FMKOREA"  -> "남초 커뮤니티. 초성체+신조어 사용. 유머와 직설적 반응 혼합. 밈 표현 자유.";
+            case "RULIWEB"  -> "게임·만화 주제 커뮤니티. 인터넷 밈과 팬덤 용어 사용. 유쾌한 반응 위주.";
+            case "THEQOO"   -> "여초 커뮤니티(더쿠). 감성·공감 중심. 헐·ㅠㅠ·당 자유사용. 짧은 문장 단위로 감정 표현. 연애·인간관계 서사 위주.";
+            case "ARCALIVE" -> "Z세대 초성체·신조어 최다. 빠르고 가볍게 반응. 밈·짤 문화 흡수. 어쩔티비·ㄱㄱ 등 현재 유행어.";
+            case "INVEN"    -> "게임 전문 커뮤니티. 하드코어 플레이어 어체. 논리적 분석과 강한 의견. 게임 전문용어·영어 약어 자연스럽게 사용.";
+            case "MLBPARK"  -> "스포츠·시사 남초 커뮤니티. 직설적이나 비교적 점잖은 어체. 사실 기반 논쟁 스타일.";
+            case "PPOMPPU"  -> "쇼핑·일상 주제 커뮤니티. 친근하고 정보 공유 지향. 실용적이고 긍정적 톤. 후기·경험 공유 형식.";
+            case "CLIEN"    -> "IT 전문가·블루슈머 커뮤니티. 논리적이고 정중한 문체. 맞춤법 정확, 문어체 혼용. 근거 중심 의견 제시.";
+            default         -> "";
+        };
+
         return String.format("""
 한국 커뮤니티 사이트 '%s' 스타일의 사용자 voice 프로필을 JSON으로 생성하라.
+커뮤니티 특성: %s
 사용자 특성: 연령=%s, 성별=%s, 지역=%s, 직업=%s, 정치성향=%s
+
+general_style은 위 커뮤니티 특성과 사용자 특성을 반영한 한 줄 묘사여야 함.
+예시 (THEQOO, 20대 초반 여성): "더쿠의 20대 초반 여성 톤. 연애 불안·설렘 표현 빈번. 헐·ㅠㅠ·당 자유사용. 짧은 구어체."
+예시 (CLIEN, 30대 남성 직장인): "클리앙의 30대 IT 직장인 톤. 논리적·정중한 문체. 근거 중심 의견 제시. 맞춤법 정확."
 
 반드시 아래 JSON 구조로만 응답 (닉네임은 시스템이 자동 배정하므로 포함하지 말 것):
 {
-  "general_style": "한 줄 스타일 묘사",
+  "general_style": "한 줄 스타일 묘사 (커뮤니티 특성 반영 필수)",
   "example_post_openers": ["게시글 첫 줄 예시1", "예시2"],
   "example_comments": ["댓글 예시1 (40자 이내)", "댓글 예시2", "댓글 예시3"],
   "example_replies": ["대댓글 예시1 (20자 이내)", "예시2"],
@@ -241,7 +276,7 @@ JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내�
 생성하는 example_comments, example_replies, example_post_openers의 모든 문장 끝에도 온점을 붙이지 마라.
 또한 간접화법 따옴표("", 역슬래시 따옴표 포함)를 이 예시들에 삽입하지 마라.
 반말이 기본이며, 존댓말은 명시적으로 지정된 voice에서만 사용하라.
-""", voice, age, gender.equals("M") ? "남성" : "여성", region, job, politics);
+""", voice, voiceGuide, age, gender.equals("M") ? "남성" : "여성", region, job, politics);
     }
 
     @SuppressWarnings("unchecked")
