@@ -62,6 +62,7 @@ writing_quirks:
   spelling_level: mid
   consistent_errors: []
   mobile_typos: true
+  features: "짧은 문장 단위 (한 문장 10~20자 이내). 단락 없이 한 덩어리로. 헐/ㅠㅠ/ㄷㄷ 문장 중간 삽입. ~당/~징/~음/ㅎㅎ 종결 위주."
 hot_buttons:
   triggers:
   - 부모의 간섭

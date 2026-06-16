@@ -682,8 +682,8 @@ public class ActionExecutor {
     }
 
     /**
-     * writing_quirks 맞춤법/오탈자 패턴을 프롬프트에 주입.
-     * consistent_errors(고정 오류) 또는 mobile_typos 여부를 구체적 지시로 변환.
+     * writing_quirks 맞춤법/오탈자 패턴 + 문체 패턴(TSD)을 프롬프트에 주입.
+     * features(TSD 문체 제약), consistent_errors(고정 오류), mobile_typos 순으로 출력.
      */
     @SuppressWarnings("unchecked")
     private void appendWritingQuirks(StringBuilder sb, Map<String, Object> vp) {
@@ -691,6 +691,15 @@ public class ActionExecutor {
         if (!(quirksObj instanceof Map)) return;
         Map<String, Object> quirks = (Map<String, Object>) quirksObj;
         if (quirks.isEmpty()) return;
+
+        // features: 커뮤니티별 문체 구조 제약 (TSD)
+        Object featuresObj = quirks.get("features");
+        if (featuresObj instanceof String) {
+            String featureStr = ((String) featuresObj).trim();
+            if (!featureStr.isEmpty()) {
+                sb.append("\n[문체 패턴] ").append(featureStr);
+            }
+        }
 
         sb.append("\n[맞춤법·오타 패턴] ");
         boolean addedAny = false;
