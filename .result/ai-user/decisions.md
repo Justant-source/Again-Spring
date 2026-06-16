@@ -233,3 +233,32 @@
 - **결정**: P(human) 교정 이전에 측정한 delta=-0.1092는 무효 데이터. 교정 후 모델로 재측정 필수.
 - **기대**: P(human) 올바른 방향이면 리랭커가 가장 인간다운 초안 선택 → delta>0 기대.
 - **완료 기준**: delta>0 AND std<delta (≥40 contexts, K=3 seeds).
+- **결과**: ✅ 완료 → D-41 참조.
+
+## 2026-06-16 — 세션 17 결정 (D-41~D-44)
+
+### D-41: NATEPAN cond4 PASS 확정 (eval_run id=100)
+- **결정**: NATEPAN cond4 **PASS**. P(human) 교정 모델(v37) 기준 재측정.
+- **수치**: delta=+0.1667, std=0.1257, n_ctx=40, K=3 seeds.
+  - delta > 0: ✅, std < delta: ✅, D-27 기준 충족.
+  - rerank MAUVE = 0.8590, random_mean = 0.6923.
+- **오케스트레이터 비퇴행**: rerank MAUVE 0.8437(구)→0.8590(신) 개선 확인.
+- **이전 FAIL(id=91, delta=-0.1092)**: P(human) 역전 상태의 구 모델로 측정 — 무효.
+
+### D-42: CUDA 학습 에러 수정 — n_jobs=-1 → n_jobs=1
+- **결정**: train_pipeline.py의 sklearn `n_jobs=-1` → `n_jobs=1`. discriminator.py에 `torch.cuda.empty_cache()` 추가.
+- **근거**: sklearn multiprocessing 워커가 CUDA state를 상속받아 device mismatch 발생.
+- **부작용**: 학습 단일 프로세스화 → 약간 속도 저하. 허용 가능 (GPU 40초 수준 유지).
+- **재학습 결과**: NATEPAN AUC=0.9989, THEQOO AUC=0.9985, CLIEN AUC=0.9968 (안정).
+
+### D-43: THEQOO corpus ai 541건 전량 삭제 (사용자 승인, 2026-06-16)
+- **결정**: THEQOO corpus_item label='ai' 541건 DELETE. 전부 오라벨(실제 더쿠 인간 게시물).
+- **구성**: 423 BACKFILL_SELF_GENERATED + 103 NULL source + 14 ctx_*/test_draft.
+- **이유**: P(human) 완전 역전의 근본 원인. 오염 데이터를 학습하면 "인간 게시물=AI" 역학습 지속.
+- **현재 상태**: THEQOO ai=0건, human=376건. 판별기 학습 불가 → n_ai≥100 재수집 필요.
+- **경로**: 오케스트레이터 자연 틱 → THEQOO AI 생성물 corpus 수집 → n_ai≥100 후 재학습.
+
+### D-44: contentType camelCase 필수 (API 호출 규칙)
+- **결정**: ML score API는 `contentType` (camelCase) 필드 필수. snake_case `content_type`은 422 에러.
+- **근거**: FastAPI Pydantic 모델이 camelCase 별칭 사용. 세션 16에서 snake_case로 호출 시 다른 결과가 나온 혼선의 원인.
+- **적용**: 모든 `/score`, `/rerank` 호출에 `contentType` 사용.

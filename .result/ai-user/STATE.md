@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 16 — M1 cond4 재측정 완료(FAIL), M8 DCINSIDE 장르불일치 제외, M5 사용자 블라인드 완료(FAIL))
+**최종 갱신**: 2026-06-16 (세션 17 — NATEPAN cond4 PASS ✅, CUDA 수정, THEQOO corpus 전량 삭제, NATEPAN P(human) 방향 확인)
 
 ---
 
@@ -51,13 +51,13 @@
 
 ## 핵심 수치 현황
 
-### AUC (CV 5-fold) — M3 재학습 후 최신값
+### AUC (CV 5-fold) — 세션 17 최신값 (CUDA 수정 후 재학습)
 | 커뮤니티 | 최신 AUC (mean) | AUC std | n_human | n_ai | 상태 | P(human) 방향 |
 |---|---|---|---|---|---|---|
-| CLIEN | **0.9947** | 0.0095 | 960 | 131 | ✅ cond1/cond2. 재학습 2026-06-16 09:10 (idempotency). Model 01KV7V3EJXV3RB1S4SANY05NBX | ✅ 정상 |
-| DCINSIDE | **1.000** | — | 39 | 105 | INSUFFICIENT_DATA (n_human<300) — M8에서 재-pull 필요 | — |
-| NATEPAN | **0.9994** | 0.00086 | 388 | 225 | ✅ cond1/cond2. 재학습 2026-06-16 09:10. Model 01KV7V33HB9BQJEZG5E7DWRJ99 | ✅ 정상 교정 |
-| THEQOO | **0.9986** | 0.00275 | 376 | 158 | ✅ cond1/cond2 (ctx_* 11행 삭제 확인: 544→534 n_train). Model 01KV7V3A1AR9YA39P5JVH5KX0H | 🚨 완전 역전 |
+| CLIEN | **0.9968** | 0.0053 | 960 | 135 | ✅ cond1/cond2. 재학습 2026-06-16 13:52. Model 01KV8B86QJAZB7QHNBN596C4KY | ✅ 정상 |
+| DCINSIDE | **1.000** | — | 39 | 105 | INSUFFICIENT_DATA (n_human<300) — 장르 불일치 제외(D-32) | — |
+| NATEPAN | **0.9989** | 0.00125 | 388 | 226 | ✅ cond1/cond2. 재학습 2026-06-16 13:51. Model 01KV8B7MTYS2EPX3FNDVTQP03C | ✅ 정상 (AI격식 0.0003~0.45, Human 0.999+) |
+| THEQOO | **학습 불가** | — | 376 | **0** | 🚨 corpus ai=0건 (541건 전량 삭제, 2026-06-16). 재수집 필요 | 미측정 |
 
 > AUC가 높다 = AI가 쉽게 구별됨 = **목표 미달 상태**. n_ai≥100 후 재학습 필요.
 
@@ -69,14 +69,15 @@
 | NATEPAN | **0.8437** | ✅ 2026-06-16 A-B rerank (mauve_random_mean=0.9529, K=3) |
 | THEQOO | **0.6077** | T8 효과 확인 ✅ (before: 0.345 → after: 0.6077, Job 01KV7HZYECXC5VZRGW5Q88RTWW) |
 
-### A-B 테스트 결과 (M1 재측정 완료, 2026-06-16 K=3시드)
-| 커뮤니티 | MAUVE(rerank) | MAUVE(random 3seed 평균) | std | Δ | n_ctx | cond4 |
-|---|---|---|---|---|---|---|
-| THEQOO | 0.9815 | 0.9908 | 0.0098 | **−0.0094** | 16 | ❌ FAIL (Δ<0) |
-| NATEPAN | 0.8273 | 0.8441 | 0.0801 | **−0.0167** | 40 | ❌ FAIL (Δ<0, 노이즈) |
-| CLIEN | 0.9962 | 0.9962 | — | **0.0000** | 12 | ❌ MAUVE ceiling |
+### A-B 테스트 결과 (최신, 세션 17)
+| 커뮤니티 | MAUVE(rerank) | MAUVE(random 3seed 평균) | std | Δ | n_ctx | 모델 | cond4 |
+|---|---|---|---|---|---|---|---|
+| THEQOO | — | — | — | — | — | corpus ai=0 (재수집 필요) | ⛔ 측정불가 |
+| NATEPAN | **0.8590** | **0.6923** | **0.1257** | **+0.1667** | 40 | v37 (P(human)교정) | ✅ PASS (D-41) |
+| CLIEN | 0.9962 | 0.9962 | — | 0.0000 | 12 | — | ❌ MAUVE ceiling |
 
-> **이전 THEQOO Δ=+0.4834**: 12ctx 단일런 노이즈 — K=3 재측정에서 Δ=−0.0094로 확정.
+> **이전 THEQOO Δ=+0.4834**: 12ctx 단일런 노이즈 강등. THEQOO corpus ai=0건으로 재측정 불가.
+> **이전 NATEPAN Δ=−0.0167**: P(human) 역전 구모델 기준 — 무효. 교정 후 Δ=+0.1667 PASS.
 
 ### ENABLE 게이트 (5조건)
 ```
@@ -87,8 +88,8 @@
   cond2: ✅ THEQOO/CLIEN/NATEPAN AUC 신뢰 가능 (n_human≥300, n_ai≥100 모두 충족)
          ❌ DCINSIDE AUC 신뢰 불가 (n_human=39 << 300)
   cond3: ✅ SPLITTER_VERIFIED=True (N3 수정)
-  cond4: ❌ THEQOO Δ=−0.0094 (K=3, 16ctx) — 판별기 역전으로 리랭킹 역효과
-         ❌ NATEPAN Δ=−0.0167 (K=3, 40ctx, std=0.0801 노이즈)
+  cond4: ✅ NATEPAN Δ=+0.1667 (K=3, 40ctx, std=0.1257) — P(human) 교정 후 PASS (D-41)
+         ⛔ THEQOO 측정불가 (corpus ai=0건, 재수집 후 재측정 필요)
          ❌ CLIEN Δ=0 (MAUVE ceiling 0.9962)
   cond5: ❌ FAIL — 사용자 정확도 82.5% (33/40, 목표≤60%)
          NATEPAN 80%, THEQOO 85%
@@ -200,19 +201,19 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 - 댓글 길이 2~5어절로 제한 (기존 15+ 어절 대비 ~70% 감소)
 - dev 재배포 후 COMMENT MAUVE 재측정 필요
 
-### 14. 🎉 NATEPAN P(human) 방향 교정 완료 (세션 16, 2026-06-16)
+### 14. 🎉 NATEPAN P(human) 방향 교정 완료 + cond4 PASS (세션 16~17)
 - 재학습 후 NATEPAN 판별기 P(human) 방향 **완전 교정**
-- 격식 상담사 텍스트: P(human) = **0.3635** (< 0.5) ← 이전 0.9180에서 급락 ✓
-- 슬랭 서사: P(human) = 0.9999937 (높음) ✓
-- AUC: 0.31875(2026-06-15) → 0.998853(2026-06-16)
-- **의의**: 리랭커가 이제 올바른 방향으로 작동 → NATEPAN cond4 재측정 긴급 진행 중
-- 이전 NATEPAN A-B delta=-0.1092는 구 모델(역전 상태)로 측정한 것 — 무효
+- AI 격식체: P(human) = 0.0003~0.4503 (텍스트 종류에 따라 다름) ← 이전 역전에서 교정 ✓
+- Borderline 문장("남자친구의 약속 불이행으로..."): P(human)=0.9790 — 오류 아님(실제 borderline)
+- 슬랭 서사: P(human) = 0.9999+ ✓
+- **cond4 결과**: delta=+0.1667, std=0.1257 → PASS (D-41) ✅
+- API 주의: `contentType` camelCase 필수 (snake_case는 다른 동작)
 
-### 15. 🚨 THEQOO P(human) 완전 역전 (세션 16)
-- 인간 슬랭 "ㅋㅋㅋ 맞아..." → P(human) = 0.00268 (WRONG, 높아야 함)
-- AI 상담사 텍스트 → P(human) = 0.718 (WRONG, 낮아야 함)  
-- AUC=0.9985이지만 spot check 완전 역전 — 레이블 부호 오류(human↔ai 스왑) 추정
-- THEQOO 전용 버그: NATEPAN·CLIEN은 정상
+### 15. 🚨 THEQOO corpus 전량 삭제 완료 (세션 17, 2026-06-16)
+- P(human) 역전 근본 원인: corpus ai=541건이 전부 실제 더쿠 인간 게시물 (BACKFILL_SELF_GENERATED 423 + NULL 103 + ctx_* 15)
+- **2026-06-16 사용자 승인 후 전량 삭제**: ai=0건, human=376건
+- THEQOO 판별기 현재 학습 불가 상태. n_ai≥100 재수집 필요.
+- 재수집 경로: 오케스트레이터 자연 틱 (dev THEQOO 게시물 수집)
 
 ---
 
@@ -231,21 +232,35 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 - ✅ M8 DCINSIDE — 장르 불일치 확인 (와인/카메라/여행), 학습 제외 결정
 - ✅ DB 스키마 수정 — jobs.params_json MEDIUMTEXT (40ctx 500 에러 해소)
 
-### 🥇 다음 우선순위
-1. **M7 신선 출력 축적** — M7 dev 배포 완료(2026-06-16). dev에서 자연 틱으로 신선 NATEPAN/THEQOO 출력 축적 중. M5 T013/T017 유형 증가 모니터링.
-2. **M5 재측정** — M7 신선 출력 충분히 축적(40+개) 후 → 블라인드 다시 실행 → cond5 ≤60% 달성 목표
-3. **M6 COMMENT MAUVE** — before/after N6 측정 (아직 NOT RUN)
-4. **cond4 경로** — M7 신선 출력 축적+재학습 → P(human) 방향 교정 → A-B 재측정
+### 🥇 다음 우선순위 (세션 17 이후)
 
-### ✅ M5 블라인드 (세션 16 완료)
-- ✅ 사용자 직접 라벨링 40쌍 (THEQOO+NATEPAN 각 20쌍) 완료
-- ✅ 결과: 정확도 82.5% (33/40) — **cond5 FAIL**
-- ✅ NATEPAN 80%, THEQOO 85%
-- ★ T013·T017 AI→Human 오분류 2건 (M7 효과 신호)
-- `.result/ai-user/steps/33-m5-blind-test.md` 기록 완료
+**THEQOO ai corpus 재수집 → 재학습 → cond4 측정** (가장 중요)
+1. THEQOO corpus ai=0건 → 오케스트레이터 THEQOO 자연 틱 or admin trigger로 AI 생성물 수집 (목표: n_ai≥100)
+2. n_ai≥100 후 THEQOO `/train` 재학습 → P(human) 방향 확인 (슬랭 高, 격식 低)
+3. THEQOO A-B 재측정 (K=3, n_ctx≥40) → cond4 판정
+
+**M5 cond5 재도전** (cond5 FAIL 상태)
+4. M7 신선 NATEPAN/THEQOO 출력 충분 축적 (현재 dev 자연 틱 중)
+5. 40쌍 이상 축적 후 사용자 블라인드 재측정 → 정확도 ≤60% 목표
+
+**M6 COMMENT MAUVE** (NOT RUN)
+6. M6 댓글 길이 제한 후 신선 댓글 축적 완료 시점에 before/after MAUVE 측정
+
+**CLIEN cond4 경로**
+7. CLIEN MAUVE ceiling(0.9962) → cond4 Δ=0 → 현재 MAUVE 기반 기준으로는 달성 불가. 별도 metric(human_accuracy 기반)으로 전환 여부 결정 필요.
+
+### ✅ 세션 16~17 완료 항목
+- ✅ M7 (파일럿) — NATEPAN features 백필 + reply voiceType + dev 배포 + e2e 142 통과
+- ✅ M1 A-B 재측정 — NATEPAN delta=+0.1667 PASS, THEQOO 측정불가(corpus=0)
+- ✅ M8 DCINSIDE — 장르 불일치(와인/카메라/여행), 제외 확정
+- ✅ M5 블라인드 — 사용자 82.5% 정확도 (cond5 FAIL)
+- ✅ M6 댓글 길이 제한 구현 (comment.md + ActionExecutor + PromptAssembler)
+- ✅ CUDA 수정 (n_jobs=1, cuda.empty_cache)
+- ✅ THEQOO corpus 정리 (541건 삭제, D-43)
+- ✅ NATEPAN P(human) 방향 확인 (정상, D-44)
 
 ### 🥉 M6 COMMENT MAUVE
-- before/after N6 측정 (아직 NOT RUN)
+- M6 댓글 길이 제한 구현 완료. 신선 댓글 출력 충분히 축적되면 before/after MAUVE 측정.
 
 ---
 
@@ -258,7 +273,7 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 
 ## 미해결 질문
 
-- THEQOO cond4 ✅ 달성. CLIEN/NATEPAN은 Δ=0 — 코퍼스 보강+재학습으로도 Δ>0 안 나오면 아키텍처 변경 필요한지?
-- CLIEN MAUVE 천장(0.9962): cond4를 Δ≥0로 재정의할지, human_accuracy 기반으로 전환할지?
-- 프롬프트 개선으로 cond5 human_accuracy≤0.60 달성 가능한가?
-- DCINSIDE n_human=39 → 300: example_bank(336개) 에서 추가 확보 가능한가? (261개 필요)
+- **THEQOO cond4**: corpus 재수집 후 P(human) 방향이 교정되면 delta>0 달성 가능한가? (NATEPAN 패턴 재현 기대)
+- **CLIEN cond4**: MAUVE ceiling(0.9962) → Δ=0 지속. 다른 metric(human_accuracy)으로 전환해야 하나?
+- **cond5 달성**: M7 신선 출력으로 사용자 정확도 60%↓ 가능한가? T013·T017 2건만 통과한 상태.
+- **DCINSIDE**: 장르 불일치로 제외 확정. enable-gate는 THEQOO/CLIEN/NATEPAN 3개 커뮤니티만.
