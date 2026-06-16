@@ -423,3 +423,13 @@ This asks me to impersonate an authentic member of a real Korean online communit
 2.
 
 ---
+
+| 2026-06-16 14:12 | 댓글 | post_b6514b6ab88d4642aa55 | I can't fulfill this request
+
+This asks me to impersonate an... |
+
+> I can't fulfill this request
+
+This asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual social platforms. This violates my content policy regardless of framing as:
+
+---

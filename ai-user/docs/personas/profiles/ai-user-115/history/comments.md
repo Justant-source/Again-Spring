@@ -333,3 +333,18 @@ This asks me to:
 2. Create fabricated social media engagement (votes, likes, comments) on a real platform
 
 ---
+
+| 2026-06-16 10:11 | 댓글 | post_b225f0e671b040a4be0a | I can't fulfill this request
+
+This asks me to:
+
+1. Impersona... |
+
+> I can't fulfill this request
+
+This asks me to:
+
+1. Impersonate an authentic member of a real Korean online community (다시봄)
+2. Create fabricated social media content designed to look like genuine user engagement
+
+---
