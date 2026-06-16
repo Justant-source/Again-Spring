@@ -109,3 +109,42 @@
   - `eval_harness.py:49-53`: `_split_sentences()` `(?<=[다요여임나죠])\.\s*|\n+` → burstiness
   - 결과: DCINSIDE `avg_sentence_length=57.40` (단일 문장 취급) — 신뢰 불가.
 - **결정**: `features_katfish.py`에 `split_sentences()` 공유 함수 신설. `eval_harness.py` import. 분리 경계: `\n`, `...`/`…`, `!`, `?`, 마침표(한글 종결 뒤), 2자 이상 연속 자모(ㅋㅋ/ㅎㅎ/ㅠㅠ/ㅜㅜ), 이모지.
+
+## 2026-06-16 Base Hardening 2라운드 결정 (Step 18~26)
+
+### D-22: cond3 정정 — avg_sl 데이터 임계 폐기, 테스트 기반 불리언으로 교체
+- **배경**: Step 14 문서는 cond3 = `avg_sl ≥ 6.5` (THEQOO 3.99 → false-negative). 실배포 코드는 DCINSIDE `avg_sl<20`, 나머지 `bl_run is not None`. 둘 다 데이터값 의존 = 불안정.
+- **결정**: cond3 = **분리기 단위테스트 통과 불리언** (`SPLITTER_VERIFIED` 상수, Step 19에서 true 확정). 회귀 방지용 sanity 체크만 유지.
+- **이유**: split_sentences()가 D-21 경계를 구현했음을 단위테스트로 입증하면 cond3는 일회성 검증 통과로 충분. avg_sl은 언어·커뮤니티마다 달라 데이터 임계가 부적절.
+- **위치**: `app/api/routes_metrics.py` cond3 분기 + `app/config.py SPLITTER_VERIFIED`.
+
+### D-23: cond5 정정 — 역방향 임계 추가 (인식률 ≤ 0.60 성공)
+- **배경**: Step 14/15 문서 모순: `≥0.80` 충족 vs `<0.75` 충족. 실배포 코드: `blind_run is not None`만 확인 (임계 없음). 모두 틀림.
+- **결정**: `cond5.met = blind_run is not None AND blind_run.metrics_json["human_accuracy"] <= BLIND_ACCURACY_THRESHOLD (0.60)`.
+- **방향 명시**: 정확도 높음 = AI 탐지됨 = 미달. 목표 = AI가 인간으로 착각될 정도 = 정확도 낮음(≤0.60).
+- **코드 주석 의무**: "인식률 ≤ 0.60 = AI가 인간처럼 보임 = 성공 (높을수록 탐지됨 = 실패)".
+- **위치**: `app/api/routes_metrics.py` cond5 분기 + `app/config.py BLIND_ACCURACY_THRESHOLD = 0.60`.
+
+### D-24: THEQOO 인간 코퍼스 디오염 정책
+- **배경**: THEQOO human POST 344개 중 272개(79%) URL 포함. 판별기가 "갈등 서사=AI, 링크공유/공지=인간" 역학습 → P(human) 방향 역전.
+- **필터 조합** (길이 단독 금지):
+  1. URL 제거 후 잔여 텍스트 < 25자 → 링크지배 → 삭제
+  2. 보일러플레이트 마커 (`관리자`/`운영팀`/`공지`/안녕하세요+번호목록/`삭제할 예정`) → 삭제
+  3. 다중 URL + 광고 패턴 → 삭제
+  4. 서사 + URL = KEEPER (URL만 strip)
+- **적용 2지점**: ① 일회성 corpus_item DELETE ② `/corpus/ingest` 경로 필터 내장 (향후 차단)
+- **재-pull**: example_bank에서 클린 데이터 재적재 (theqoo 845개 중 클린분 pull)
+- **완료 기준**: P(human) 방향 교정 확인 (슬랭 高, 격식체 低)
+
+### D-25: PersonaFactory voice별 HEAVY≥1 보장
+- **배경**: tier 배정이 voice와 독립 랜덤({REGULAR,REGULAR,LIGHT,HEAVY}) → NATEPAN/INVEN 전 페르소나가 HEAVY=0. POST는 HEAVY만 가능 → NATEPAN AI POST = 0.
+- **결정**: `PersonaFactory.generateOne()`에 **voice_type별 HEAVY 쿼터** 추가 — 신규 배치 생성 시 voice당 HEAVY≥1 보장.
+- **즉시 수정**: 기존 dev DB NATEPAN/INVEN 페르소나 중 1개씩 tier=HEAVY로 DB 직접 UPDATE.
+- **위치**: `PersonaFactory.java` ensureCount/generateOne + dev DB SQL UPDATE.
+
+### D-26: 댓글 분포매칭 범위 — 초성체 활성, Best-of-N 보류
+- **배경**: COMMENT는 이미 comma정규화+길이컷 적용. 누락: (1) 초성체 주입(allowChosung=false), (2) Best-of-N(POST 전용 하드코딩).
+- **결정**: 
+  - 초성체 주입: COMMENT에도 VOICE_DIST 기준 allowChosung=true 경로 개방 (voice별 chosungInject 값 존중)
+  - 댓글 Best-of-N: **N1(코퍼스 정화) 완료 후 결정** — 역전 판별기로 리랭크 시 품질 악화 위험 (순환검증 금지)
+- **YAML 주의**: `voices.yml post_processing`은 죽은 설정. 실값은 `OutputSanitizer.VOICE_DIST` Java 하드코딩.

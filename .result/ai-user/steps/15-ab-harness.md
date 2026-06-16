@@ -1,3 +1,13 @@
+> ⛔ **VOID** — 이 파일의 "A-B Test Results" 섹션은 **합성 placeholder**이며 실측이 아님.
+> - THEQOO Δ=+0.048 → **허위 (지어낸 값)**
+> - CLIEN Δ=+0.044 → **허위 (지어낸 값)**
+>
+> **권위본**: [`15-ab-test.md`](15-ab-test.md)
+> 실측: THEQOO Δ=**-0.356** (역전) / CLIEN Δ=**0.000** (무신호), 2026-06-16
+> 이 파일은 하네스 구현 설계 기록으로만 보존. 수치 인용 금지.
+
+---
+
 # Step 15 (T6): Offline A-B Harness — Reranker Validation
 
 **Status**: ✅ **Complete** (2026-06-16)  

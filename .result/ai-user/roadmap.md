@@ -231,3 +231,110 @@
 3. **THEQOO 코퍼스 정제** — 링크/공지/짧은반응 제거 → A-B 재실행 → cond4
 4. **cond5** — 사람 블라인드 JSONL 라벨링
 5. **5조건 충족 시** → 수동 `AI_USER_ML_ENABLED=true` (코드 변경 금지)
+
+---
+
+## ⚠️ Base Hardening 2라운드 — Step 18~26 (2026-06-16~)
+
+> **관점**: 1라운드 구조 위에 토대 정정. 코퍼스 오염 제거 → 게이트 오류 수정 → 미실행 검증 실제 실행 → n_ai≥100/재학습.
+> **불변**: `AI_USER_ML_ENABLED=false` 유지. enable은 5조건 전부 충족 후 수동으로.
+
+---
+
+## Step 18 (N1) — THEQOO 인간 코퍼스 디오염 ★최우선 · WSL
+
+**목표**: THEQOO human POST 코퍼스에서 링크지배·공지·광고덤프 제거 → P(human) 방향 교정.
+**완료 기준**:
+- [ ] `decontaminate.py` 필터 구현 + corpus_item 정제 완료
+- [ ] `/corpus/ingest` 경로에 필터 내장 (향후 오염 차단)
+- [ ] THEQOO 클린 데이터 재-pull → n_human ≥ 300 복원
+- [ ] P(human) 스팟체크: `"어제 남친이…ㅠㅠ"` → 高, 격식체 `"당신의…"` → 低
+- [ ] 커뮤니티별 필터 전/후 카운트 표
+
+**필터 규칙**: URL 제거 후 잔여 <25자 → 삭제 · 보일러플레이트 마커(`관리자`/`공지` 등) → 삭제 · 서사+링크 → KEEPER
+
+---
+
+## Step 19 (N2) — 분리기 D-21 준수 검증 · WSL
+
+**목표**: 배포된 `split_sentences()`가 D-21 경계 전부 처리함을 단위테스트로 입증.
+**완료 기준**:
+- [ ] `tests/test_features.py` — D-21 경계 케이스 (개행·ㅋㅋ·이모지·혼합자모·len>2 필터) 추가
+- [ ] `pytest tests/test_features.py -v` 전체 통과
+- [ ] DC 실측 avg_sl 값·근거 기록 (57→7 재현 확인)
+
+---
+
+## Step 20 (N3) — enable-gate 로직 정정 · WSL
+
+**목표**: cond3(avg_sl 임계→테스트 기반 불리언) + cond5(역방향 임계 추가) 수정.
+**완료 기준**:
+- [ ] cond3: 분리기 테스트 통과 불리언 (THEQOO 3.99 false-negative 제거)
+- [ ] cond5: `blind_run 존재 AND human_accuracy ≤ 0.60` (방향 주석 포함)
+- [ ] `GET /metrics/enable-candidates` 정정된 로직으로 현황 보고
+- [ ] 역방향 임계 잔존 0 확인
+
+---
+
+## Step 21 (N4) — 조작 기록 무효화 ✅ 완료
+
+**목표**: `steps/15-ab-harness.md`의 합성 A-B 결과 무효화.
+**완료 기준**:
+- [x] VOID 헤더 추가 (Δ=+0.048/+0.044 = 합성 placeholder, 실측 아님)
+- [x] 권위본 포인터: `15-ab-test.md` (Δ=-0.356/0.000)
+- [x] 가짜 +0.048 인용처 0
+
+---
+
+## Step 22 (N5) — 사람 블라인드 baseline 실제 실행 · WSL
+
+**목표**: cond5 정답값 확보 — 커뮤니티별 사람탐지 정확도 실측.
+**완료 기준**:
+- [ ] `/corpus/export/blind` → 균형셋(human/AI n≥30) export
+- [ ] 자가 라벨링 → 정답률 산출
+- [ ] `EvalRun(kind="human_blind")` 기록 (정정된 방향)
+- [ ] 커뮤니티별 실측 정답률 (불가시 NOT RUN 명기)
+
+---
+
+## Step 23 (N6) — 댓글 분포매칭 활성 · AS-side · 배포게이트
+
+**목표**: COMMENT에 초성체 주입 적용 (현재 allowChosung=false).
+**완료 기준**:
+- [ ] `OutputSanitizer.sanitizeComment()` VOICE_DIST 기준 allowChosung 파라미터화
+- [ ] COMMENT MAUVE before/after 측정
+- [ ] 댓글 Best-of-N 결정 기록 (N1 완료 후 결정)
+- [ ] dev 배포 + e2e-realbe 통과
+
+---
+
+## Step 24 (N7) — DB 페르소나 general_style 정정 · AS-side · 배포게이트
+
+**목표**: LLM 생성 부정확 general_style을 voice_type별 큐레이션 값으로 교체.
+**완료 기준**:
+- [ ] voice_type별 큐레이션 general_style JSON_SET (dev DB 100개 페르소나)
+- [ ] PersonaFactory.buildPersonaPrompt 보정
+- [ ] 커뮤니티별 DB general_style 스팟체크 일치
+
+---
+
+## Step 25 (N8) — n_ai≥100 + 첫 진짜 CV-AUC + ablation · AS+WSL · 배포게이트
+
+**목표**: NATEPAN/INVEN HEAVY 확보 + 전 커뮤니티 n_ai≥100 + 첫 실측 CV-AUC.
+**선결**: N1·N2 완료
+**완료 기준**:
+- [ ] NATEPAN/INVEN HEAVY 페르소나 ≥1 (DB tier 승격 + PersonaFactory 보장)
+- [ ] 커뮤니티별 n_ai POST ≥ 100
+- [ ] 첫 진짜 CV-AUC(mean±std) 실측 표
+- [ ] ablation 실측 (katfish_9/electra_768/combined_777, C 선택 근거)
+- [ ] NATEPAN POST > 0 확인
+
+---
+
+## Step 26 (N9) — 클린 모델 A-B 재실행 + T8 검증 · AS+WSL
+
+**목표**: 디오염 판별기로 A-B 재실행 + THEQOO T8 MAUVE 재측정.
+**선결**: N1·N8 완료
+**완료 기준**:
+- [ ] `/eval/ab-test` (n_contexts≥50) 디오염 판별기 결과 (cond4)
+- [ ] THEQOO T8 MAUVE before(0.345) / after delta 기록
