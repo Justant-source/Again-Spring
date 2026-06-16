@@ -55,7 +55,7 @@
 | 커뮤니티 | 최신 AUC | n_human(POST) | n_ai(POST) | 상태 |
 |---|---|---|---|---|
 | CLIEN | **0.996** | 974 | 131 | ✅ cond1/cond2 충족 |
-| DCINSIDE | **1.000** | 234 | ~20 | INSUFFICIENT_DATA (n_ai<100) |
+| DCINSIDE | **1.000** | 39 | 103 | INSUFFICIENT_DATA (n_human<300) — cond1 ✅, cond2 ❌ |
 | NATEPAN | **0.999** | 445 | 225 | ✅ cond1/cond2 충족 |
 | THEQOO | **0.999** | 387 | 157 | ✅ cond1/cond2 충족 |
 
@@ -66,8 +66,8 @@
 |---|---|---|
 | CLIEN | **0.970** | 우수 (ceiling 근접) |
 | DCINSIDE | **0.9999** | 최우수 |
-| NATEPAN | null | AI POST 0개 (N8a 완료 후 생성 예정) |
-| THEQOO | **0.345** | 최하 — T8 적용 후 재측정 필요 (N9) |
+| NATEPAN | null | N8a 완료(n_ai=225), 오케스트레이터 `/eval/baseline` 재실행 필요 |
+| THEQOO | **0.6077** | T8 효과 확인 ✅ (before: 0.345 → after: 0.6077, Job 01KV7HZYECXC5VZRGW5Q88RTWW) |
 
 ### A-B 테스트 결과 (Step 15→N9, 2026-06-16)
 | 커뮤니티 | MAUVE(rerank) | MAUVE(random) | Δ | cond4 |
@@ -81,9 +81,9 @@
 현재: 3+/12 커뮤니티×조건 충족 (N9 Round3 이후)
 상태:
   cond1: ✅ THEQOO n_ai=157≥100, CLIEN n_ai=131≥100, NATEPAN n_ai=225≥100
-         ❌ DCINSIDE n_ai=88 (20 미달)
+         ✅ DCINSIDE n_ai=103≥100 (세션12 달성) — BUT n_human=39 → 학습 불가
   cond2: ✅ THEQOO/CLIEN/NATEPAN AUC 신뢰 가능 (n_human≥300, n_ai≥100 모두 충족)
-         ❌ DCINSIDE AUC 신뢰 불가
+         ❌ DCINSIDE AUC 신뢰 불가 (n_human=39 << 300)
   cond3: ✅ SPLITTER_VERIFIED=True (N3 수정)
   cond4: ✅ THEQOO Δ=+0.4834 (Round3 新모델, n_human=387)
          ❌ CLIEN Δ=0 (MAUVE ceiling 0.9962 — cond4 재정의 검토 필요)
@@ -205,6 +205,7 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 
 ## 미해결 질문
 
-- cond4(Δ>0) 달성 경로? N8b/c 코퍼스 보강만으로는 Δ=0 수렴 → 아키텍처 변경 필요한지?
-- DCINSIDE n_ai=88 → 100: 오케스트레이터 페르소나 활동 가속화 가능한가?
-- 프롬프트 개선으로 cond5 human_accuracy>0.60 달성 가능한가?
+- THEQOO cond4 ✅ 달성. CLIEN/NATEPAN은 Δ=0 — 코퍼스 보강+재학습으로도 Δ>0 안 나오면 아키텍처 변경 필요한지?
+- CLIEN MAUVE 천장(0.9962): cond4를 Δ≥0로 재정의할지, human_accuracy 기반으로 전환할지?
+- 프롬프트 개선으로 cond5 human_accuracy≤0.60 달성 가능한가?
+- DCINSIDE n_human=39 → 300: example_bank(336개) 에서 추가 확보 가능한가? (261개 필요)

@@ -194,16 +194,16 @@
 
 ---
 
-## Step 16 (T5) — POST 샘플 보강 🔜 진행 중
+## Step 16 (T5) — POST 샘플 보강 ✅ 완료 (N8b에서 달성)
 
 **목표:** POST 희소 커뮤니티 n_ai→100 도달.
-**현황:**
-- [ ] THEQOO: ~65 POST, **35개 더 필요** (가장 근접)
-- [ ] CLIEN: ~40 POST, 60개 더 필요
-- [ ] DCINSIDE: ~20 POST, 80개 더 필요
-- [ ] NATEPAN: 0 POST — ActionPlanner NATEPAN POST 배정 여부 확인 필요
+**최종 현황 (2026-06-16, N8b 완료):**
+- [x] THEQOO: n_ai=157 ✅
+- [x] CLIEN: n_ai=131 ✅
+- [x] NATEPAN: n_ai=225 ✅ (N8a HEAVY 승격 후 급증)
+- [x] DCINSIDE: n_ai=103 ✅ (세션12 trigger 15회×10으로 100 돌파)
 
-**진행 방법**: 자연 축적 (봇 자동 활동) + 필요시 `generate-posts` 수동 트리거.
+**주의**: DCINSIDE n_human=39 (n_human<300) → 학습 게이트 FAIL. cond2 블로커.
 
 ---
 
@@ -216,7 +216,7 @@
 - [x] dev DB 7개 THEQOO 페르소나 JSON_SET 완료
 - [x] dev 배포 + e2e-realbe 142/147
 - [x] commit `88018822`
-- [ ] **재측정 대기**: THEQOO 신선 출력 축적 후 `/eval/baseline` 재실행 → before/after delta 기록
+- [x] **재측정 완료** (N9, 2026-06-16): THEQOO 오케스트레이터 MAUVE 0.345 → **0.6077** (+76.3%) — Job `01KV7HZYECXC5VZRGW5Q88RTWW`, n_human=387, n_ai=158
 
 **핵심 발견**:
 - `writing_quirks.features` 필드는 voices.yml에 있었으나 Java 코드에서 **미사용** (dead field) → T8에서 수정
@@ -224,13 +224,21 @@
 
 ---
 
-## 다음 단계 요약
+## 다음 단계 요약 (2라운드 N1~N9 완료 후 현황)
 
-1. **T8 재측정** — `/eval/baseline` 재실행 → THEQOO MAUVE before/after
-2. **T5** — THEQOO n_ai→100 달성 → discriminator 재학습
-3. **THEQOO 코퍼스 정제** — 링크/공지/짧은반응 제거 → A-B 재실행 → cond4
-4. **cond5** — 사람 블라인드 JSONL 라벨링
-5. **5조건 충족 시** → 수동 `AI_USER_ML_ENABLED=true` (코드 변경 금지)
+**완료**: T5(n_ai≥100), T8(MAUVE 0.6077), N1 디오염, N1~N9 전체 ✅
+
+**미충족 조건 (3개 커뮤니티 × cond5)**:
+1. **cond5(THEQOO/CLIEN)** — human_accuracy=1.0 → ≤0.60 필요. 프롬프트 개선 후 재라벨링.
+2. **cond4(CLIEN/NATEPAN)** — CLIEN Δ=0(MAUVE 천장), NATEPAN Δ=0. THEQOO만 cond4 ✅.
+3. **DCINSIDE 블로커** — n_human=39 → 261개 추가 필요, example_bank에서 확보 가능 여부 미확인.
+
+**다음 액션**:
+- THEQOO cond5: T8 적용 봇 출력 축적 → `/corpus/export/blind` → 재라벨링
+- CLIEN cond4 정책: Δ≥0으로 재정의 or MAUVE=0.99 자체를 "통과"로 인정 결정
+- NATEPAN: T8 스타일 강화 후 A-B 재실행 → cond4 재도전
+- DCINSIDE: example_bank n_human 261개 ingest → 학습 → AUC 재확인
+- **5조건 충족 시** → 수동 `AI_USER_ML_ENABLED=true` (코드 변경 금지)
 
 ---
 
