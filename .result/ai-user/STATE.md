@@ -52,12 +52,12 @@
 ## 핵심 수치 현황
 
 ### AUC (CV 5-fold) — M3 재학습 후 최신값
-| 커뮤니티 | 최신 AUC (mean) | AUC std | n_human | n_ai | 상태 |
-|---|---|---|---|---|---|
-| CLIEN | **0.9947** | 0.0095 | 960 | 131 | ✅ cond1/cond2. 재학습 2026-06-16 09:10 (idempotency). Model 01KV7V3EJXV3RB1S4SANY05NBX |
-| DCINSIDE | **1.000** | — | 39 | 105 | INSUFFICIENT_DATA (n_human<300) — M8에서 재-pull 필요 |
-| NATEPAN | **0.9994** | 0.00086 | 388 | 225 | ✅ cond1/cond2. 재학습 2026-06-16 09:10. Model 01KV7V33HB9BQJEZG5E7DWRJ99 |
-| THEQOO | **0.9986** | 0.00275 | 376 | 158 | ✅ cond1/cond2 (ctx_* 11행 삭제 확인: 544→534 n_train). Model 01KV7V3A1AR9YA39P5JVH5KX0H |
+| 커뮤니티 | 최신 AUC (mean) | AUC std | n_human | n_ai | 상태 | P(human) 방향 |
+|---|---|---|---|---|---|---|
+| CLIEN | **0.9947** | 0.0095 | 960 | 131 | ✅ cond1/cond2. 재학습 2026-06-16 09:10 (idempotency). Model 01KV7V3EJXV3RB1S4SANY05NBX | ✅ 정상 |
+| DCINSIDE | **1.000** | — | 39 | 105 | INSUFFICIENT_DATA (n_human<300) — M8에서 재-pull 필요 | — |
+| NATEPAN | **0.9994** | 0.00086 | 388 | 225 | ✅ cond1/cond2. 재학습 2026-06-16 09:10. Model 01KV7V33HB9BQJEZG5E7DWRJ99 | ✅ 정상 교정 |
+| THEQOO | **0.9986** | 0.00275 | 376 | 158 | ✅ cond1/cond2 (ctx_* 11행 삭제 확인: 544→534 n_train). Model 01KV7V3A1AR9YA39P5JVH5KX0H | 🚨 완전 역전 |
 
 > AUC가 높다 = AI가 쉽게 구별됨 = **목표 미달 상태**. n_ai≥100 후 재학습 필요.
 
@@ -66,7 +66,7 @@
 |---|---|---|
 | CLIEN | **0.970** | 우수 (ceiling 근접) |
 | DCINSIDE | **0.9999** | 최우수 |
-| NATEPAN | **0.8395** | ✅ 2026-06-16 10:31:58 baseline 완료 (eval_run id=78) |
+| NATEPAN | **0.8437** | ✅ 2026-06-16 A-B rerank (mauve_random_mean=0.9529, K=3) |
 | THEQOO | **0.6077** | T8 효과 확인 ✅ (before: 0.345 → after: 0.6077, Job 01KV7HZYECXC5VZRGW5Q88RTWW) |
 
 ### A-B 테스트 결과 (M1 재측정 완료, 2026-06-16 K=3시드)
@@ -182,6 +182,37 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 - NATEPAN human 샘플: 갈등 키워드 필터 적용 (남편/시어머니 등) — 10건
 - THEQOO human 샘플: 갈등 필터 미통과 (4건뿐), 랜덤 10건 사용 — 해석 주의
 - 사용자가 m5-blind-display.txt 보고 H/A 라벨링 → 정확도 산출 후 cond5 기록
+
+### 11. NATEPAN A-B 재측정 결과 (세션 16, 2026-06-16)
+- mauve_rerank=0.8437, mauve_random_mean=0.9529 (seeds: 0.9803/0.8924/0.9860)
+- delta=-0.1092, std=0.0428
+- cond4 FAIL 유지. 리랭커가 여전히 역효과.
+- **하지만 주목**: random_mean=0.9529는 매우 높음 — NATEPAN AI 초안 자체가 인간 분포에 가까움
+- P(human) 방향: 슬랭 서사→0.9999, 격식체→0.9180 (격식체가 여전히 0.9+ → 역전 부분 해소됨?)
+
+### 12. THEQOO 재학습 CUDA 에러 (세션 16)
+- 에러: "Expected all tensors to be on the same device, cpu and cuda:0"
+- CUDA device mismatch in training pipeline
+- 수정 중
+
+### 13. M6 댓글 길이 개선 배포 (세션 16)
+- comment.md + ActionExecutor.java + PromptAssembler.java 수정
+- 댓글 길이 2~5어절로 제한 (기존 15+ 어절 대비 ~70% 감소)
+- dev 재배포 후 COMMENT MAUVE 재측정 필요
+
+### 14. 🎉 NATEPAN P(human) 방향 교정 완료 (세션 16, 2026-06-16)
+- 재학습 후 NATEPAN 판별기 P(human) 방향 **완전 교정**
+- 격식 상담사 텍스트: P(human) = **0.3635** (< 0.5) ← 이전 0.9180에서 급락 ✓
+- 슬랭 서사: P(human) = 0.9999937 (높음) ✓
+- AUC: 0.31875(2026-06-15) → 0.998853(2026-06-16)
+- **의의**: 리랭커가 이제 올바른 방향으로 작동 → NATEPAN cond4 재측정 긴급 진행 중
+- 이전 NATEPAN A-B delta=-0.1092는 구 모델(역전 상태)로 측정한 것 — 무효
+
+### 15. 🚨 THEQOO P(human) 완전 역전 (세션 16)
+- 인간 슬랭 "ㅋㅋㅋ 맞아..." → P(human) = 0.00268 (WRONG, 높아야 함)
+- AI 상담사 텍스트 → P(human) = 0.718 (WRONG, 낮아야 함)  
+- AUC=0.9985이지만 spot check 완전 역전 — 레이블 부호 오류(human↔ai 스왑) 추정
+- THEQOO 전용 버그: NATEPAN·CLIEN은 정상
 
 ---
 
