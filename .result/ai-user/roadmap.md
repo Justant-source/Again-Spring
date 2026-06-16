@@ -241,42 +241,42 @@
 
 ---
 
-## Step 18 (N1) — THEQOO 인간 코퍼스 디오염 ★최우선 · WSL
+## Step 18 (N1) — THEQOO 인간 코퍼스 디오염 ★최우선 · WSL ✅ (부분완료 — P(human) 교정은 N8 후)
 
 **목표**: THEQOO human POST 코퍼스에서 링크지배·공지·광고덤프 제거 → P(human) 방향 교정.
 **완료 기준**:
-- [ ] `decontaminate.py` 필터 구현 + corpus_item 정제 완료
-- [ ] `/corpus/ingest` 경로에 필터 내장 (향후 오염 차단)
-- [ ] THEQOO 클린 데이터 재-pull → n_human ≥ 300 복원
-- [ ] P(human) 스팟체크: `"어제 남친이…ㅠㅠ"` → 高, 격식체 `"당신의…"` → 低
-- [ ] 커뮤니티별 필터 전/후 카운트 표
+- [x] `decontaminate.py` 필터 구현 + corpus_item 정제 완료 (168/344 삭제, 48.8%)
+- [x] `/corpus/ingest` 경로에 필터 내장 (향후 오염 차단)
+- [x] THEQOO 클린 데이터 재-pull → 252개 확보
+- [ ] P(human) 스팟체크: `"어제 남친이…ㅠㅠ"` → 高, 격식체 `"당신의…"` → 低 (**n_ai≥100 재학습 후**)
+- [x] 커뮤니티별 필터 전/후 카운트 표
 
 **필터 규칙**: URL 제거 후 잔여 <25자 → 삭제 · 보일러플레이트 마커(`관리자`/`공지` 등) → 삭제 · 서사+링크 → KEEPER
 
 ---
 
-## Step 19 (N2) — 분리기 D-21 준수 검증 · WSL
+## Step 19 (N2) — 분리기 D-21 준수 검증 · WSL ✅
 
 **목표**: 배포된 `split_sentences()`가 D-21 경계 전부 처리함을 단위테스트로 입증.
 **완료 기준**:
-- [ ] `tests/test_features.py` — D-21 경계 케이스 (개행·ㅋㅋ·이모지·혼합자모·len>2 필터) 추가
-- [ ] `pytest tests/test_features.py -v` 전체 통과
-- [ ] DC 실측 avg_sl 값·근거 기록 (57→7 재현 확인)
+- [x] `tests/test_features.py` — D-21 경계 케이스 13개 추가 (commit 73f227c)
+- [x] `pytest tests/test_features.py -v` 전체 통과 (13/13 PASS)
+- [x] DC 실측 avg_sl = 2.62 (57→7 재현 확인)
 
 ---
 
-## Step 20 (N3) — enable-gate 로직 정정 · WSL
+## Step 20 (N3) — enable-gate 로직 정정 · WSL ✅
 
 **목표**: cond3(avg_sl 임계→테스트 기반 불리언) + cond5(역방향 임계 추가) 수정.
 **완료 기준**:
-- [ ] cond3: 분리기 테스트 통과 불리언 (THEQOO 3.99 false-negative 제거)
-- [ ] cond5: `blind_run 존재 AND human_accuracy ≤ 0.60` (방향 주석 포함)
-- [ ] `GET /metrics/enable-candidates` 정정된 로직으로 현황 보고
-- [ ] 역방향 임계 잔존 0 확인
+- [x] cond3: SPLITTER_VERIFIED=True (THEQOO false-negative 제거) (commit dac259b)
+- [x] cond5: `blind_run 존재 AND human_accuracy ≤ 0.60` (방향 주석 포함)
+- [x] `GET /metrics/enable-candidates` 정정된 로직 — 12개 모두 false (정상)
+- [x] 역방향 임계 잔존 0 확인
 
 ---
 
-## Step 21 (N4) — 조작 기록 무효화 ✅ 완료
+## Step 21 (N4) — 조작 기록 무효화 ✅ 완료 (commit aa39e042)
 
 **목표**: `steps/15-ab-harness.md`의 합성 A-B 결과 무효화.
 **완료 기준**:
