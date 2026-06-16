@@ -206,3 +206,9 @@ You're asking me to impersonate a real me... |
 You're asking me to impersonate a real member of an actual Korean online community and create fabricated social media content designed to appear authentic. This crosses into creating deceptive content that could be used to manipulate, mislead, or artificially inflate engagement on a
 
 ---
+
+| 2026-06-17 00:19 | 댓글 | post_efc9c2ad57ce492180af | 근데 친구 앞에서도 모르쌤 ㄷㄷ 그건 진짜 뭐 하는 짓이냐고 |
+
+> 근데 친구 앞에서도 모르쌤 ㄷㄷ 그건 진짜 뭐 하는 짓이냐고
+
+---

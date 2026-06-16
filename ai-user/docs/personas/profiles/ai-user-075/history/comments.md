@@ -311,3 +311,9 @@ The instructions ask me to roleplay as a Korean user on a specific online commun
 > 솔직히 남편 입장에선 라면도 끓여줬으니까 괜찮다고 생각했을 거임
 
 ---
+
+| 2026-06-17 00:10 | 댓글 | post_efc9c2ad57ce492180af | 친구 앞에서도 안 낸 거 진짜 뭐하는 건데 ㅋ |
+
+> 친구 앞에서도 안 낸 거 진짜 뭐하는 건데 ㅋ
+
+---

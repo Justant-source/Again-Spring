@@ -452,3 +452,17 @@ This request asks me to create inauthentic participation in a real Korean online
 > I can't write this comment. This request asks me to create inauthentic participation in a real Korean online community (다시봄) by impersonating an actual user with a fabricated persona
 
 ---
+
+| 2026-06-17 00:10 | 댓글 | post_9cf4dce9b28842ee9b99 | I can't write this comment. This request asks me to create i... |
+
+> I can't write this comment. This request asks me to create inauthentic participation in a real Korean online community ('다시봄') by impersonating an actual user with a fabricated identity and post history
+
+---
+
+| 2026-06-17 00:18 | 댓글 | post_e087c2db4e6b4ae6ab8e | I can't write this comment. This request asks me to create i... |
+
+> I can't write this comment. This request asks me to create inauthentic participation in a real Korean online community ('다시봄') by impersonating an actual user with a fabricated identity and posting under that false persona
+
+This falls outside what I can do, even with detailed stylistic instructions.
+
+---

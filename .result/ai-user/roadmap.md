@@ -388,6 +388,103 @@
 
 ---
 
+## ⚠️ Base Hardening 6라운드 (R0~R8) — 오라벨 정화 + 생성 레버 (2026-06-16~)
+
+> **전제**: 5라운드 cond4 PASS(NATEPAN Δ=+0.1667)·CUDA 수정·THEQOO corpus 541건 삭제 완료.
+> **근본 발견**: 백필 스크립트가 `users.synthetic=1` 조인으로 크롤 인간 글을 'ai'로 오라벨. 유일한 정답 출처 = example_bank.source.
+> **불변**: `AI_USER_ML_ENABLED=false` 유지. enable은 5조건 전부 충족 후 수동으로.
+
+---
+
+## Step 39 (R0) — clcocloud API-우선 래퍼 🔄 진행 예정
+
+**목표**: `run_ab_test.py` generate_post를 clcocloud API 우선 → CLI 폴백 구조로 변환.
+**완료 기준**:
+- [ ] API 경로 1회 성공 + 강제 실패 시 CLI 폴백 동작 확인
+- [ ] DENY_SIGS 재사용(backfill_ai_negatives.py:48-65) + system→`<instructions>` 주입 + no anthropic-beta 헤더
+
+---
+
+## Step 40 (R1) — 오라벨 정밀 대조 (example_bank 크로스레퍼런스) ★최우선 🔄 진행 예정
+
+**목표**: corpus_item label='ai'(NATEPAN·CLIEN)를 example_bank ground truth와 해시 대조 → 오라벨 human 삭제.
+**완료 기준**:
+- [ ] 커뮤니티별 "오라벨 human 삭제 / 진짜 AI 유지" 카운트 표
+- [ ] ctx_* 테스트 누수 잔여(NATEPAN 2, CLIEN ~35) DELETE
+- [ ] NATEPAN cond4 PASS가 깨끗한 코퍼스 위였는지 판정 → R8 분기 결정
+- **사용자 승인 후 DELETE 실행** (과삭제 방지: 무일치는 KEEP)
+
+---
+
+## Step 41 (R2) — scorer 인코딩 검증 + 회귀 테스트 🔄 진행 예정
+
+**목표**: D-39 인코딩 가설 기각 문서화 + 방향 회귀 테스트.
+**완료 기준**:
+- [ ] `tests/test_label_direction.py` PASS (실제 데이터 fit → 슬랭 高/격식 低 단언)
+- [ ] decisions.md에 D-45(D-39 기각) 기록
+
+---
+
+## Step 42 (R3) — 안전 출처 분리 양면 가드 🔄 진행 예정
+
+**목표**: 재오염 차단 — AS측 source 마커 + ML측 ai ingest 가드.
+**완료 기준**:
+- [ ] `AiUserMlClient.pushNegative` → source='SELF_GENERATED' 전송
+- [ ] `routes_corpus.py` ai ingest: source 허용목록 가드
+- [ ] "human→ai 라벨 불가" 단위 테스트 PASS
+- [ ] (AS측 변경) e2e dev:8090 통과
+
+---
+
+## Step 43 (R4) — 생성 스타일: CLIEN de-counselor 🔄 진행 예정
+
+**목표**: CLIEN 7개 프로필 features 신규 + general_style de-counselor 개정 + DB sync.
+**완료 기준**:
+- [ ] voice.yml ai-user-{036,081,082,083,084,085,086} features 작성
+- [ ] general_style "정중·체계적 장문" → 단편화·구어·비격식 개정
+- [ ] dev DB JSON_SET 완료
+- [ ] e2e dev:8090 통과
+
+---
+
+## Step 44 (R5) — R4 효과 측정 🔄 진행 예정
+
+**목표**: CLIEN 신선 출력 MAUVE 전/후 + micro 사용자 블라인드.
+**완료 기준**:
+- [ ] 커뮤니티별 전/후 MAUVE 수치
+- [ ] 사용자 블라인드 정확도 전/후
+
+---
+
+## Step 45 (R6) — THEQOO 코퍼스 재구축 → 재학습 🔄 진행 예정
+
+**목표**: 진짜 THEQOO 봇 POST n_ai≥100 축적 → 재학습 → P(human) 방향 교정.
+**선결**: R3(안전 출처)+R4(스타일 개선) 적용 후.
+**완료 기준**:
+- [ ] n_ai≥100 (자연 틱 + voice 필터 트리거, R0 경로)
+- [ ] CV-AUC(mean±std) + P(human) 슬랭 高/격식 低
+
+---
+
+## Step 46 (R7) — 댓글 MAUVE 전/후 🔄 진행 예정
+
+**목표**: COMMENT MAUVE 측정 + D-37 길이 제한+비격식 적용 후 재측정.
+**완료 기준**:
+- [ ] COMMENT MAUVE 전/후 수치
+- [ ] 길이 분포 전/후
+
+---
+
+## Step 47 (R8) — A-B 동결 + NATEPAN cond4 분기 🔄 진행 예정
+
+**목표**: R1 결과 기반 NATEPAN cond4 재확인 or 유지.
+**완료 기준**:
+- [ ] R1 오염분 유의미 삭제 시 → 재학습 → cond4 재측정
+- [ ] R1 삭제 미미 시 → PASS 유지
+- [ ] enable-candidate 5조건 현황 보고 (ENABLED 불변)
+
+---
+
 ## Step 28 (M2) — P(human) 스팟체크 재실행 ✅ 완료 (2026-06-16)
 
 **목표**: N1 디오염이 P(human) 역전을 교정했는지 실측.

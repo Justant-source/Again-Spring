@@ -18,6 +18,27 @@ ML_API_TOKEN = "aiuser-ml-api-token-dev-2026"
 CLAUDE_CLI_PATH = "/home/justant/.nvm/versions/node/v24.14.1/bin/claude"
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 
+# clcocloud 거절·오류 시그니처 (LlmErrorSignature.java 미러, R0)
+# 이 텍스트가 포함된 응답은 거절로 간주 → 재시도 or CLI 폴백
+DENY_SIGS = [
+    "credit balance", "too low to access", "purchase credits", "plans & billing",
+    "usage limit", "reached your usage", "5-hour limit", "rate limit", "rate_limit",
+    "overloaded", "invalid_request_error", "authentication_error", "permission_error",
+    "api_error", "anthropic api", "insufficient credit", "too many requests",
+    "service unavailable", "internal server error",
+    "i'm kiro", "i am kiro", "저는 kiro", "kiro입니다",
+    "i'm claude", "i am claude", "i'm an ai assistant", "저는 claude",
+    "i can't discuss that", "i cannot roleplay", "i'm not able to roleplay",
+    "not able to roleplay", "can't roleplay", "cannot roleplay as", "won't roleplay",
+    "can't help with this", "cannot help with this", "unable to help with",
+    "i can't assist", "cannot assist with", "role-play as", "this is asking me to",
+    "이 요청을 도와드릴 수 없", "요청을 도와드릴 수가 없", "죄송하지만 저는 이 요청",
+    "이 프롬프트는", "프롬프트 인젝션", "not set up to generate",
+    "i need to be direct: i can't", "i need to be direct: i'm",
+    "i need to clarify: i'm", "i need to be transparent",
+    "i appreciate you", "i'm an ai", "i am an ai", "as an ai", "저는 ai",
+]
+
 COMMUNITY_CFG = {
     "THEQOO": {
         "trait": "여성 중심 커뮤니티, 짧고 구어체, 감탄사(ㅋㅋ/헐/와 등), 이모지 가끔",
@@ -203,8 +224,132 @@ def api(method, path, data=None):
         raise RuntimeError(f"HTTP {e.code}: {e.read().decode()[:300]}")
 
 
-def generate_post(theme, trait, dry_run=False, max_retries=2):
-    """Generate one POST-style 갈등 사연 using claude CLI with retry logic."""
+def _api_generate(prompt: str, max_retries: int = 2) -> str | None:
+    """
+    R0: clcocloud API 우선 생성 시도.
+
+    clcocloud 필수 규칙 (ClaudeApiInvoker.java 미러):
+      - system 필드 금지 (Kiro 오라우팅) → <instructions> 태그로 user 메시지에 주입
+      - anthropic-beta 헤더 금지 (동일 오라우팅 버그)
+      - DENY_SIGS 포함 텍스트는 거절로 간주 → 재시도
+    """
+    api_key  = os.environ.get("ANTHROPIC_API_KEY", "")
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/")
+    if not api_key:
+        log.debug("ANTHROPIC_API_KEY 미설정 — API 경로 스킵")
+        return None
+
+    body = json.dumps({
+        "model": CLAUDE_MODEL,
+        "max_tokens": 512,
+        "messages": [
+            {
+                "role": "user",
+                # clcocloud: system 내용을 <instructions> 태그로 user 메시지에 주입
+                "content": f"<instructions>\n{prompt}\n</instructions>",
+            }
+        ],
+        # NOTE: anthropic-beta 헤더 금지 (아래 헤더 참조)
+    }).encode("utf-8")
+
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        # ⚠️ anthropic-beta 헤더 절대 금지 — clcocloud에서 Kiro 오라우팅 유발
+    }
+
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(
+                base_url + "/v1/messages",
+                data=body,
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=45) as r:
+                resp = json.loads(r.read().decode("utf-8"))
+
+            text = (resp.get("content") or [{}])[0].get("text", "").strip()
+            if not text:
+                log.warning(f"API 빈 텍스트 (attempt {attempt+1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                continue
+
+            # 거절 시그니처 체크
+            text_lower = text.lower()
+            if any(sig in text_lower for sig in DENY_SIGS):
+                log.warning(f"API 거절 감지 (attempt {attempt+1}/{max_retries}): {text[:80]}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                continue
+
+            log.info(f"API 생성 성공 (attempt {attempt+1})")
+            return text
+
+        except urllib.error.HTTPError as e:
+            log.warning(f"API HTTP 에러 {e.code} (attempt {attempt+1}/{max_retries}): {e.read()[:100]}")
+            if attempt < max_retries - 1:
+                time.sleep(2)
+        except Exception as e:
+            log.warning(f"API 예외 (attempt {attempt+1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+
+    log.warning("API 경로 소진 → CLI 폴백")
+    return None
+
+
+def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
+    """CLI 폴백 생성 (기존 로직)."""
+    claude_path = find_claude_cli()
+    if not claude_path:
+        log.error("Claude CLI를 찾을 수 없음")
+        return None
+
+    for attempt in range(max_retries):
+        try:
+            r = subprocess.run(
+                [claude_path, "-p", prompt, "--model", CLAUDE_MODEL],
+                capture_output=True, text=True, timeout=40,
+            )
+            text = r.stdout.strip()
+            if text and r.returncode == 0:
+                # 거절 시그니처 체크
+                if any(sig in text.lower() for sig in DENY_SIGS):
+                    log.warning(f"CLI 거절 감지 (attempt {attempt+1}/{max_retries}): {text[:80]}")
+                    if attempt < max_retries - 1:
+                        time.sleep(1)
+                    continue
+                log.info(f"CLI 생성 성공 (attempt {attempt+1})")
+                return text
+            log.warning(f"CLI returncode={r.returncode} stderr={r.stderr[:100]}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+        except subprocess.TimeoutExpired:
+            log.error(f"CLI timeout (attempt {attempt+1}/{max_retries})")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+        except FileNotFoundError as e:
+            log.error(f"CLI binary not found: {e}")
+            return None
+        except Exception as e:
+            log.error(f"CLI error: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+    return None
+
+
+def generate_post(theme: str, trait: str, dry_run: bool = False, max_retries: int = 2) -> str | None:
+    """
+    R0: clcocloud API 우선 → CLI 폴백으로 갈등 사연 POST 생성.
+
+    clcocloud API 우선 (ANTHROPIC_API_KEY env 필요):
+      - system 필드 금지, <instructions> 태그 주입
+      - DENY_SIGS 거절 감지 후 재시도
+    CLI 폴백: API 실패 or ANTHROPIC_API_KEY 미설정 시
+    """
     prompt = (
         f"당신은 한국 온라인 커뮤니티 사용자입니다. 커뮤니티 특성: {trait}\n"
         f"아래 상황에 처한 사람이 커뮤니티에 올리는 갈등 사연 글을 써주세요.\n"
@@ -217,42 +362,14 @@ def generate_post(theme, trait, dry_run=False, max_retries=2):
     if dry_run:
         return f"[DRY RUN] {theme[:30]}…"
 
-    claude_path = find_claude_cli()
-    if not claude_path:
-        log.error(f"Cannot find claude CLI. Cannot generate for theme: {theme[:30]}")
-        return None
+    # 1) clcocloud API 우선
+    result = _api_generate(prompt, max_retries=max_retries)
+    if result:
+        return result
 
-    for attempt in range(max_retries):
-        try:
-            r = subprocess.run(
-                [claude_path, "-p", prompt, "--model", CLAUDE_MODEL],
-                capture_output=True, text=True, timeout=40,
-            )
-            text = r.stdout.strip()
-            if text and r.returncode == 0:
-                return text
-            log.warning(f"claude returncode={r.returncode} stderr={r.stderr[:100]}")
-            if attempt < max_retries - 1:
-                log.info(f"Retrying… (attempt {attempt+1}/{max_retries})")
-                time.sleep(1)
-            return None
-        except subprocess.TimeoutExpired:
-            log.error(f"claude timeout (attempt {attempt+1}/{max_retries})")
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            return None
-        except FileNotFoundError as e:
-            log.error(f"claude binary not found: {e} (attempt {attempt+1}/{max_retries})")
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            return None
-        except Exception as e:
-            log.error(f"claude error: {e} (attempt {attempt+1}/{max_retries})")
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            return None
-
-    return None
+    # 2) CLI 폴백
+    log.info("CLI 폴백으로 재시도...")
+    return _cli_generate(prompt, max_retries=max_retries)
 
 
 def _gen_draft_task(args):

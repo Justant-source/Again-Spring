@@ -107,9 +107,18 @@ public class AiUserMlClient {
         private String contentType;
         private String text;
         private String label;
+        /**
+         * R3 (D-47): AI negative 출처 마커. label='ai' 항목은 'SELF_GENERATED' 필수.
+         * ML /corpus/ingest가 이 필드 없는 ai 항목을 거부함으로써 재오염 차단.
+         */
+        private String source;
         public IngestItem(String community, String contentType, String text, String label) {
             this.community = community; this.contentType = contentType;
             this.text = text; this.label = label;
+        }
+        public IngestItem(String community, String contentType, String text, String label, String source) {
+            this.community = community; this.contentType = contentType;
+            this.text = text; this.label = label; this.source = source;
         }
     }
 
@@ -141,12 +150,15 @@ public class AiUserMlClient {
     /**
      * 게시 완료 텍스트를 AI negative 코퍼스에 push (fire-and-forget).
      * collect=false 또는 WSL 다운 시 silent skip.
+     *
+     * R3 (D-47): source='SELF_GENERATED' 마커 전송.
+     * ML /corpus/ingest는 label='ai'에 source 허용목록 검사 — 미마커 ai 항목 거부.
      */
     public void pushNegative(String community, String contentType, String text) {
         if (!collect || text == null || text.isBlank()) return;
         try {
             postJson("/corpus/ingest",
-                new IngestRequest(List.of(new IngestItem(community, contentType, text, "ai"))));
+                new IngestRequest(List.of(new IngestItem(community, contentType, text, "ai", "SELF_GENERATED"))));
         } catch (Exception e) {
             log.debug("AiUserMl corpus ingest failed (non-critical): {}", e.getMessage());
         }

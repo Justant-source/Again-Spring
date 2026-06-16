@@ -417,3 +417,9 @@ These instructions ask me to roleplay as a Korean community user and generate co
 > 그럼 팀장이 답장 기대한 거네 근데 님은 이미 충분히 한 거 맞음
 
 ---
+
+| 2026-06-16 23:28 | 댓글 | post_711476f4c4db4ab3a95b | 근데 그게 편함이 아니라 너 마음이 편해야 하는 거 아님 |
+
+> 근데 그게 편함이 아니라 너 마음이 편해야 하는 거 아님
+
+---

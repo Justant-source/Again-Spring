@@ -262,3 +262,37 @@
 - **결정**: ML score API는 `contentType` (camelCase) 필드 필수. snake_case `content_type`은 422 에러.
 - **근거**: FastAPI Pydantic 모델이 camelCase 별칭 사용. 세션 16에서 snake_case로 호출 시 다른 결과가 나온 혼선의 원인.
 - **적용**: 모든 `/score`, `/rerank` 호출에 `contentType` 사용.
+
+## 2026-06-16 — 6라운드 결정 (D-45~D-49)
+
+### D-45: D-39 인코딩 가설 기각 — 역전 원인은 오라벨 데이터
+- **결정**: D-39의 "scorer.py `proba[1]` 반환 시 label encoding `ai=1, human=0` 역전" 가설 기각.
+- **실측 근거**: `train_pipeline.py:108` = `labels = [1 if l=="human" else 0]` (human=1, ai=0). `discriminator.py:90-91` = `predict_proba(feats)[:,1]` = index 1 = human. sklearn `classes_=[0,1]` → 인덱스 1 = class '1' = human. **학습·추론 완전 일치. LabelEncoder 없음.**
+- **정정**: P(human) 역전의 진짜 원인은 오라벨 데이터 — human 글이 'ai'로 라벨된 corpus로 학습 → 역방향 판별. THEQOO 541건 삭제(D-43)가 정당했음을 입증.
+- **회귀 테스트**: WSL `tests/test_label_direction.py` 추가 — 실제 데이터로 방향 단언.
+
+### D-46: R1 정밀 대조 — example_bank 크로스레퍼런스 (Option A)
+- **결정**: corpus_item label='ai' 오라벨 검사는 AS 러닝 서비스(8099) example_bank 크로스레퍼런스로 정밀 대조.
+- **방법**: /examples/export?sourceClass=human 전량 pull → SHA-256 해시 인덱스 → corpus_item 'ai' 항목 각각 해시 대조. human 인덱스 일치 → DELETE, SELF_GENERATED 일치 or 무일치 → KEEP.
+- **원칙**: 과삭제 방지 — 무일치는 보수적 KEEP (증명된 human만 삭제).
+- **실현 가능성**: curl http://100.81.189.92:8099/health → UP, /examples/export 두 sourceClass 모두 응답 확인(2026-06-16 세션 17).
+
+### D-47: R3 양면 가드 — AS+ML 동시 차단
+- **결정**: corpus 오염 재발 방지를 AS측+ML측 양면에서 동시 차단.
+  - AS측: `AiUserMlClient.pushNegative`에 `source=SELF_GENERATED` 마커 추가 (현재 미전송→NULL).
+  - ML측: `routes_corpus.py` `/corpus/ingest` — `label='ai'` 항목은 `source` 허용목록(`SELF_GENERATED`) 필수. 미마커 'ai' 거부.
+- **이유**: AS측만 수정 시 과거 NULL source 'ai'가 남아 모호성 유지. ML측만 수정 시 이미 들어온 오라벨은 미삭제. 양면 모두 필요.
+- **의존**: AS측 변경 → e2e dev:8090 게이트 필수.
+
+### D-48: R4 CLIEN de-counselor — features 신규 + general_style 개정
+- **결정**: CLIEN 7개 프로필(ai-user-{036,081,082,083,084,085,086})에 features 신규 작성 + general_style "정중·체계적 장문" 폐기 → 단편화·구어·비격식·짧은 호흡으로 개정.
+- **방향**: 번호목록·균형구조·상담조 완전 금지. 반말 가능, 2~3문장 단편, 감정 서술 집중.
+- **Java 변경 없음**: `ActionExecutor.appendWritingQuirks`(690-733)·`PersonaFactory.buildPersonaPrompt` 스키마·`OutputSanitizer.VOICE_DIST` 커뮤니티 무관 → 데이터 편집만.
+- **DB sync**: dev DB `JSON_SET($.writing_quirks.features)` + `JSON_SET($.general_style)`.
+
+### D-49: R8 cond4 분기 결정 (R1 결과 의존)
+- **결정**: R1 정밀 대조 후 NATEPAN 오염분 삭제 규모에 따라 분기.
+  - 삭제 유의미(기존 corpus 구성이 크게 바뀜) → 재학습 → cond4 재측정. 현 PASS(eval_run id=100, Δ=+0.1667)는 **provisional**.
+  - 삭제 미미(corpus 구성 변동 < 5%) → PASS 유지. 재측정 생략.
+- **현재 상태**: NATEPAN corpus 'ai' 항목: NULL source 231건(라이브 AI 추정), BACKFILL 295건(오라벨 의심). 대조 전까지 provisional.
+- **A-B 토큰 금지**: 분기 결정 전까지 A-B 재실행 불허.
