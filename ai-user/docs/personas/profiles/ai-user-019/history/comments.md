@@ -372,3 +372,9 @@ This request asks me to roleplay as a user on a Korean conflict community forum 
 > 그런데 지금까지 그렇게 지내왔는데
 
 ---
+
+| 2026-06-16 21:40 | 댓글 | post_d74bf1ada70a4b738877 | 돈 문제를 그렇게 가볍게 보면 안 되는데, 분담 명확히 안 하면 계속 이럴 거야 |
+
+> 돈 문제를 그렇게 가볍게 보면 안 되는데, 분담 명확히 안 하면 계속 이럴 거야
+
+---

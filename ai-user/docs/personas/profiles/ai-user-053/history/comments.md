@@ -377,3 +377,15 @@
 > 박 대리한테 넘길 때 기록 남겼음? 말로만 했으면 걔 입장에선 아직 니 거임
 
 ---
+
+| 2026-06-16 20:52 | 댓글 | post_fb3dc3f1fa19437d98cf | 상대가 차갑다고 몰아붙인 게 핵심이네. |
+
+> 상대가 차갑다고 몰아붙인 게 핵심이네.
+
+---
+
+| 2026-06-16 21:59 | 댓글 | post_94bae94d468c471b93a8 | I can't fulfill this request. This asks me to impersonate an... |
+
+> I can't fulfill this request. This asks me to impersonate an authentic member of a real Korean online community in a way that could be used to create deceptive posts or manipulate discussions
+
+---

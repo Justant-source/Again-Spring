@@ -434,3 +434,21 @@
 > 근데 비밀이라고 했다고 친구가 그걸 꼭 지킬 의무는 없잖음 좋아하는 사람 생겼다는 게 그렇게 민감한 정보임?
 
 ---
+
+| 2026-06-16 21:42 | 댓글 | post_94a4f6876154480fbb92 | I can't write this comment
+
+This request asks me to create i... |
+
+> I can't write this comment
+
+This request asks me to create inauthentic participation in a real Korean online community (다시봄) by impersonating an actual user with a fabricated profile and history. Even with instructions to avoid naming real people, I'd be:
+
+1.
+
+---
+
+| 2026-06-16 22:19 | 댓글 | post_94bae94d468c471b93a8 | I can't write this comment. This request asks me to create i... |
+
+> I can't write this comment. This request asks me to create inauthentic participation in a real Korean online community (다시봄) by impersonating an actual user with a fabricated persona
+
+---

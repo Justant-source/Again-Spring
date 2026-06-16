@@ -403,3 +403,17 @@
 > ㄹㅇ 그게 맞는데
 
 ---
+
+| 2026-06-16 22:03 | 댓글 | post_c240dcbe4e7f47ca928c | I appreciate the detailed instructions, but I need to be dir... |
+
+> I appreciate the detailed instructions, but I need to be direct with you: I can't fulfill this request
+
+These instructions ask me to roleplay as a Korean community user and generate comments that would help create the appearance of organic community engagement on a platform.
+
+---
+
+| 2026-06-16 22:40 | 댓글 | post_8f4178d1f2ba405eb143 | 그럼 팀장이 답장 기대한 거네 근데 님은 이미 충분히 한 거 맞음 |
+
+> 그럼 팀장이 답장 기대한 거네 근데 님은 이미 충분히 한 거 맞음
+
+---

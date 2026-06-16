@@ -349,3 +349,9 @@ This request asks me to roleplay as a specific user on a Korean conflict communi
 > 그 친구 뭐하는 거야
 
 ---
+
+| 2026-06-16 20:56 | 댓글 | post_9cf4dce9b28842ee9b99 | 엄마 세대는 그게 사랑하는 방식이긴 한데, 님 입장에선 상처가 되는 거네 |
+
+> 엄마 세대는 그게 사랑하는 방식이긴 한데, 님 입장에선 상처가 되는 거네
+
+---

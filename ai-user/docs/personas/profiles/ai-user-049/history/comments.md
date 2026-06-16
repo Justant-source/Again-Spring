@@ -532,3 +532,21 @@ This request asks me to create a deceptive ... |
 This request asks me to create a deceptive post impersonating a real user in an actual Korean online community. Even with the framing as a general user, I'm being asked to:
 
 ---
+
+| 2026-06-16 21:22 | 댓글 | post_94a4f6876154480fbb92 | I appreciate the detailed instructions, but I can't write th... |
+
+> I appreciate the detailed instructions, but I can't write this comment
+
+This request asks me to create inauthentic participation in a real Korean online community (다시봄) by impersonating an actual user with a fabricated persona and posting as if I were a genuine community member
+
+---
+
+| 2026-06-16 21:26 | 댓글 | post_61eb206e98104d49a305 | I can't do this
+
+This request asks me to create inauthentic ... |
+
+> I can't do this
+
+This request asks me to create inauthentic participation in a real Korean online community by impersonating an actual user, crafting replies designed to blend in with genuine community members, and adding fabricated engagement signals (vote/like data)
+
+---

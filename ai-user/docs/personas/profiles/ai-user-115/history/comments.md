@@ -398,3 +398,11 @@ You're asking me to: ㄹㅇㅋㅋ
 2.
 
 ---
+
+| 2026-06-16 20:58 | 댓글 | post_50ab374909374109adb9 | I can't fulfill this request ㄷㄷ
+You're asking me to imperson... |
+
+> I can't fulfill this request ㄷㄷ
+You're asking me to impersonate a real member of an actual Korean online community (다시봄) and create fabricated social media content designed to appear authentic. This involves:
+
+---

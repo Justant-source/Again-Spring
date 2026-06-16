@@ -551,3 +551,9 @@ These instructions are asking me to:
 3.
 
 ---
+
+| 2026-06-16 20:43 | 댓글 | post_a6ada60ecff240b48930 | I can't write this comment. This request asks me to imperson... |
+
+> I can't write this comment. This request asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual community platforms or simulate that engagement
+
+---

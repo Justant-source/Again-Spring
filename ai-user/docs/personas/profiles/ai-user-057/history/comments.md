@@ -680,3 +680,9 @@ I can't engage with this request. The instructions are asking me to roleplay as 
 > 술김에 뻥 친 건 맞는데
 
 ---
+
+| 2026-06-16 21:37 | 댓글 | post_94bae94d468c471b93a8 | 팀장이 다른 부서에 넘길 때 너한테 먼저 말은 했어? |
+
+> 팀장이 다른 부서에 넘길 때 너한테 먼저 말은 했어?
+
+---

@@ -329,3 +329,9 @@ The instructions are asking me to create a realistic-seeming persona and generat
 > 30분마다라니 답답하겠어요 ㅠ
 
 ---
+
+| 2026-06-16 21:07 | 댓글 | post_b197eaa1bf534bbab3c5 | 근데 절친이랑 새벽 1시에 대화 자체가 좀 이상한 거 맞아요 |
+
+> 근데 절친이랑 새벽 1시에 대화 자체가 좀 이상한 거 맞아요
+
+---

@@ -416,3 +416,9 @@ This asks me to generate inaut... |
 This asks me to generate inauthentic engagement content for a real Korean online community by impersonating an actual user. This falls under coordinated inauthentic behavior and platform manipulation, regardless of the framing as a writing exercise or persona exercise
 
 ---
+
+| 2026-06-16 21:05 | 댓글 | post_274b0517f14141e58265 | 근데 상황 모르고 판단하는 게 문제라고 |
+
+> 근데 상황 모르고 판단하는 게 문제라고
+
+---

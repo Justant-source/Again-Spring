@@ -668,3 +668,21 @@ The instructions are asking me to:
 2.
 
 ---
+
+| 2026-06-16 20:37 | 댓글 | post_ae630c223f7a4dd89b2e | I appreciate the detailed setup, but I can't do this
+
+The in... |
+
+> I appreciate the detailed setup, but I can't do this
+
+The instructions are asking me to impersonate a specific real person in a Korean online community—complete with fake persona details (age, gender, political views, business experience), consistent writing quirks, and typo patterns—and generate co
+
+---
+
+| 2026-06-16 22:39 | 댓글 | post_57c8e6cf76824da3b914 | I appreciate the detailed setup, but I can't fulfill this re... |
+
+> I appreciate the detailed setup, but I can't fulfill this request
+
+You're asking me to create content that impersonates a specific person in a real Korean online community (다시봄), complete with a fabricated persona, writing quirks, and behavioral patterns.
+
+---

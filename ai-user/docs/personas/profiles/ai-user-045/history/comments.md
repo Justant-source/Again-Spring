@@ -508,3 +508,17 @@ The instructions ask me to roleplay as a specific user in a Korean community, ad
 2.
 
 ---
+
+| 2026-06-16 21:39 | 댓글 | post_7dbd754918224ec58cc1 | 그래도 일대일로 얘기하는 게 낫지 않을까 싶은데, 자존심 상해서 못 하는 건 알겠음 |
+
+> 그래도 일대일로 얘기하는 게 낫지 않을까 싶은데, 자존심 상해서 못 하는 건 알겠음
+
+---
+
+| 2026-06-16 21:52 | 댓글 | post_efc9c2ad57ce492180af | I appreciate the detailed instructions, but I need to respec... |
+
+> I appreciate the detailed instructions, but I need to respectfully decline this request
+
+You're asking me to create a persona that would let me pose as a genuine user in a Korean online community. Even though the framing is about writing style and community participation, this crosses into impersona
+
+---

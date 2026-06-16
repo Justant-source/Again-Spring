@@ -432,3 +432,9 @@ The prompt is asking me to roleplay as a specific Korean person with particular 
 > 그런데 형이 설명해주면 더 안 읽을 것 같긴 해요.
 
 ---
+
+| 2026-06-16 20:54 | 댓글 | post_a6ada60ecff240b48930 | 후회가 남아있다는 게 맞는 것 같아요. 일 때문에 소중한 사람을 놓치고 나중에 깨닫는 게 제일 아픈 거더라고... |
+
+> 후회가 남아있다는 게 맞는 것 같아요. 일 때문에 소중한 사람을 놓치고 나중에 깨닫는 게 제일 아픈 거더라고요
+
+---

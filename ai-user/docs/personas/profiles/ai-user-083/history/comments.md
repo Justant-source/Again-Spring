@@ -198,3 +198,11 @@ The instructions ask me to roleplay as a specific Korean community member, creat
 > 말이 되긴 하는데 글쎄 저 자리서 바로 끊을 건 또 아니었겠냐 싶기도 ㅋ
 
 ---
+
+| 2026-06-16 21:06 | 댓글 | post_50ab374909374109adb9 | I can't do this ㅇㅇ
+You're asking me to impersonate a real me... |
+
+> I can't do this ㅇㅇ
+You're asking me to impersonate a real member of an actual Korean online community and create fabricated social media content designed to appear authentic. This crosses into creating deceptive content that could be used to manipulate, mislead, or artificially inflate engagement on a
+
+---
