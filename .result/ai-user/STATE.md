@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 12 — N8b/N8c/N9 완료)
+**최종 갱신**: 2026-06-16 (세션 13 — N9 완료, 결과 정리)
 
 ---
 
@@ -170,25 +170,29 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 
 ## 다음 세션 작업 목록 (우선순위 순)
 
-### 🥇 우선순위 1 — Round 3 A-B CLIEN 결과 수령
-- **CLIEN** Round 3 (新모델, n_human=974) A-B 결과 수령
-- THEQOO Round 3 cond4 달성 ✅ 확정 (Δ=+0.4834)
-- CLIEN cond4 달성 여부 확인
+### 🥇 Priority 1 — THEQOO cond4✅ 달성 후 cond5(블라인드) 측정
+- **THEQOO** Round 3 cond4 달성 ✅ (Δ=+0.4834, n_human=387)
+- 다음: cond5 측정 — human_accuracy≤0.60 필요 (현재 1.0)
+- 프롬프트 개선 후 재라벨링: `/corpus/export/blind` → 사람 정확도 재측정
 
-### 🥈 우선순위 2 — DCINSIDE n_ai 100 달성
-- 현재: DCINSIDE n_ai=88 (20 미달)
-- 오케스트레이터 DCINSIDE 페르소나 활동 가속화 필요 (현재 ~40/월 속도)
-- 또는 AS example_bank에서 추가 인간 POST 수입
+### 🥈 Priority 2 — CLIEN cond4 판단 (MAUVE ceiling 대응)
+- CLIEN Round 3: Δ=0 (MAUVE=0.9962 ceiling)
+- 판단: cond4를 **Δ≥0로 재정의**할지, 아니면 MAUVE 기반 다른 조건으로 전환할지 검토
+- MAUVE ceiling은 더이상 개선 불가능 → 다른 평가 지표(e.g. human accuracy) 고려
 
-### 🥉 우선순위 3 — cond5 (블라인드 라벨링) NATEPAN/CLIEN/THEQOO 추가 측정
-- 현재 정확도: THEQOO/CLIEN=1.0, NATEPAN 미측정
-- 프롬프트 개선 후 재라벨링: `/corpus/export/blind` → 사람 라벨링 → `/eval/human-blind` 기록
-- 목표: human_accuracy > 0.60
+### 🥉 Priority 3 — NATEPAN cond4 해결방법 검토
+- 현재: Δ=0 (Round1 데이터만 사용, rerank/random 동일)
+- 가설: 코퍼스 오염(T1/N1 경험) 또는 페르소나 부실
+- 해결책: ① NATEPAN human corpus 정제 ② NATEPAN AI 페르소나 voice 강화 (T8 적용)
 
-### 🔄 우선순위 4 — prod 배포 검토
-- N7 general_style SQL prod 적용 여부
-- N8 NATEPAN/INVEN HEAVY 승격 및 voice 필터 prod 적용
-- N9 A-B 결과 기반 모델 업데이트 (Δ≥0 달성 시)
+### 🔄 Priority 4 — DCINSIDE human corpus 확보 (261개 추가 필요)
+- 현재: DCINSIDE n_ai=103 (✅ cond1 달성), n_human=39 (❌ cond2 FAIL)
+- AS example_bank에서 DCINSIDE POST 대량 수입 필요 (또는 수동 크롤링)
+- 목표: n_human≥300 → 신뢰 가능한 AUC 재학습
+
+### 🔄 Priority 5 — prod 배포 N7 SQL 반영
+- N7 general_style 큐레이션 SQL 결과 검증
+- prod DB에 적용 여부 판단 (dev 검증 완료 확인)
 
 ---
 
