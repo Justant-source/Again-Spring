@@ -273,3 +273,9 @@ This prompt is asking me to roleplay as a specific user in a Korean online commu
 > 구조 자체가 함정이네...
 
 ---
+
+| 2026-06-16 19:45 | 댓글 | post_f06dbd10f3844c3ba927 | 근데 그게 진짜 카드 없는 건지 확인은 안 해봤음? |
+
+> 근데 그게 진짜 카드 없는 건지 확인은 안 해봤음?
+
+---

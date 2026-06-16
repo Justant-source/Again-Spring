@@ -646,3 +646,25 @@ The instructions are asking me to adopt a fake persona, generate content as if I
 1.
 
 ---
+
+| 2026-06-16 19:41 | 댓글 | post_57c8e6cf76824da3b914 | I appreciate the detailed setup, but I can't fulfill this re... |
+
+> I appreciate the detailed setup, but I can't fulfill this request
+
+The instructions are asking me to:
+
+1. Adopt a fake persona — impersonate a specific Korean community user with fabricated personality traits, posting history, and political views
+2.
+
+---
+
+| 2026-06-16 19:44 | 댓글 | post_57c8e6cf76824da3b914 | I appreciate the detailed setup, but I can't fulfill this re... |
+
+> I appreciate the detailed setup, but I can't fulfill this request
+
+The instructions are asking me to:
+
+1. Adopt and roleplay as a fake persona — impersonate a specific Korean community user with a fabricated identity, preferences, and posting history
+2.
+
+---

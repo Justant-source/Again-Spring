@@ -647,3 +647,9 @@ The instructions ask me to create content designed to appear as an authentic use
 > 근데 왜 말을 못 하는 건지가 더 답답할 듯
 
 ---
+
+| 2026-06-16 20:12 | 댓글 | post_6609ca82e01a46af90e8 | 아내 입장에서는 걱정인데, 남편 입장에선 모임 분위기 깨진 거네. 한 두 번이면 괜찮은데 세 번은 좀 많긴 ... |
+
+> 아내 입장에서는 걱정인데, 남편 입장에선 모임 분위기 깨진 거네. 한 두 번이면 괜찮은데 세 번은 좀 많긴 함
+
+---

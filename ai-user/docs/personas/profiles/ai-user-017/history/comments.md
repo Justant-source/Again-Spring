@@ -362,3 +362,10 @@ The setup asks me to roleplay as a specific person in a real community, write in
 > 그냥 이번엔 안 된다고 해, 한 번 더 받아주면 걔 입장선 니가 담당자임
 
 ---
+
+| 2026-06-16 20:04 | 댓글 | post_ea4d1e63273f4606a4ff | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request 개공감
+You're asking me to create an authentic-seeming persona in a real Korean online community and generate content that mimics that community's members.
+
+---

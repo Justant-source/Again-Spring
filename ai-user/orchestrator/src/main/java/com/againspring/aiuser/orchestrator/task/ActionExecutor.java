@@ -1194,16 +1194,16 @@ public class ActionExecutor {
         return CommentMode.EXPERIENCE;
     }
 
-    /** 모드 → 프롬프트 지시문 (PromptAssembler가 고정 "50~150자" 대신 그대로 렌더). */
+    /** 모드 → 프롬프트 지시문 (PromptAssembler가 고정 "50~150자" 대신 그대로 렌더). 길이 상한 초단문화 2026-06-16. */
     String commentModeHint(CommentMode mode) {
         return switch (mode) {
-            case REACTION_ONLY -> "반응만: 감정 한 줄만 툭 던지기 — 조언·경험담·질문 금지, 10~30자";
-            case SHORT_AGREE   -> "짧은 동조: 한마디로 맞장구만 — 10~25자";
-            case QUESTION      -> "되묻기: 궁금한 점 딱 하나만 물어보기 — 조언 금지, 15~40자";
-            case DISAGREE      -> "딴지: 글쓴이와 살짝 다른 시각이나 반박 한 줄 — 사과·완곡어 없이, 20~60자";
-            case EXPERIENCE    -> "경험담: 내 비슷한 경험만 풀기 — 조언으로 마무리하지 말 것, 40~120자";
-            case ADVICE        -> "훈수: 결론부터 단호하게 한마디 — 공감 인사 생략, 20~60자";
-            case TANGENT       -> "사족: 본문에서 살짝 어긋난 혼잣말·드립 한 줄 — 10~30자";
+            case REACTION_ONLY -> "반응만: 감정 한 마디만 — 조언·경험담·질문 금지, 최대 20자 (예: '그거 공감돼', '진짜?', '헐')";
+            case SHORT_AGREE   -> "짧은 동조: 한마디 맞장구 — 최대 15자 (예: 'ㅋㅋ 맞아', '정말')";
+            case QUESTION      -> "되묻기: 궁금한 점만 물어보기 — 조언 금지, 최대 25자";
+            case DISAGREE      -> "딴지: 다른 시각이나 반박 한 줄 — 사과·완곡어 없이, 최대 35자";
+            case EXPERIENCE    -> "경험담: 내 비슷한 경험 한두 문장만 — 조언으로 마무리 금지, 최대 50자";
+            case ADVICE        -> "훈수: 조언을 한마디로 — 공감 인사 생략, 최대 30자";
+            case TANGENT       -> "사족: 혼잣말·드립 한 줄 — 최대 20자";
         };
     }
 

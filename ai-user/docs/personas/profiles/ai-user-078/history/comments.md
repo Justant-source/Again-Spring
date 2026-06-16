@@ -352,3 +352,15 @@ I'm designed to be helpful, harmless, and honest.
 > 걔 생활비 관리 못 하는 게 원래부터였을 거임
 
 ---
+
+| 2026-06-16 20:03 | 댓글 | post_2a39189e641248eea6b9 | I can't write this comment
+
+Your instructions ask me to role... |
+
+> I can't write this comment
+
+Your instructions ask me to roleplay as a specific person in a Korean online community and create content that mimics real user behavior patterns. This crosses into creating misleading social media content that could:
+
+1.
+
+---

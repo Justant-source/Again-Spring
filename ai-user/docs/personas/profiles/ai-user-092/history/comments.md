@@ -349,3 +349,25 @@
 > 지갑 안 꺼낸 건 봐줄 수 있는데 용돈 얘기까진 진짜 뭐 하는 짓이냐 ㅋ
 
 ---
+
+| 2026-06-16 19:34 | 댓글 | post_ad98b84a273942b09ea8 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to:
+
+1. Roleplay as an authentic member of a real Korean online community platform (다시봄)
+2. Generate engagement (comments, votes, likes) on actual user-generated content
+3.
+
+---
+
+| 2026-06-16 19:38 | 댓글 | post_40720af5a66c4b6b9955 | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+These guidelines are asking me to roleplay as an authentic member of a real Korean online community platform and generate engagement content (comments, votes, likes) that would be posted there.
+
+---

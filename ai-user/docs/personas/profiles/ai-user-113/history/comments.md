@@ -368,3 +368,9 @@ The instructions ask me to roleplay as a real person on an actual Korean online 
 > 공통친구도 좀 걸리긴 함
 
 ---
+
+| 2026-06-16 20:31 | 댓글 | post_b5d7776d3c244f50b074 | 팀장이 능력을 착취하고 있는 거 아님? 빨리 일 처리하는 걸 자기 팀 효율이라고 착각하는 거잖아 |
+
+> 팀장이 능력을 착취하고 있는 거 아님? 빨리 일 처리하는 걸 자기 팀 효율이라고 착각하는 거잖아
+
+---

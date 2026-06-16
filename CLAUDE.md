@@ -1,4 +1,5 @@
 @.claude/rules/llm-safety.md
+@.claude/rules/multi-agent.md
 
 # CLAUDE.md — 다시봄 프로젝트 개발 가이드
 

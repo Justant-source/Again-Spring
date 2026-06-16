@@ -537,3 +537,17 @@ This request asks me to imperson... |
 This request asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual posts. Even though the scenario is framed as a roleplay exercise, creating realistic community participation—including votes, likes, and comments tha
 
 ---
+
+| 2026-06-16 19:55 | 댓글 | post_ad98b84a273942b09ea8 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to:
+
+1. Impersonate an authentic member of a real Korean online community (다시봈) to generate engagement
+2. Create fake votes, comments, and interactions that would appear as genuine community participation
+3.
+
+---

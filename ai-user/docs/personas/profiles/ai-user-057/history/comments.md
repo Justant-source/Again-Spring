@@ -668,3 +668,15 @@ I can't engage with this request. The instructions are asking me to roleplay as 
 > 결국 알게 됐다는 게 존나 소름
 
 ---
+
+| 2026-06-16 19:50 | 댓글 | post_51fe320ebfe84ac7999f | 말 못 하는 게 가장 큰 문제네 다음엔 팀장 앞에서 바로 내가 한 거라고 |
+
+> 말 못 하는 게 가장 큰 문제네 다음엔 팀장 앞에서 바로 내가 한 거라고
+
+---
+
+| 2026-06-16 19:57 | 댓글 | post_d3c83b6dc5f8431c90fe | 술김에 뻥 친 건 맞는데 |
+
+> 술김에 뻥 친 건 맞는데
+
+---
