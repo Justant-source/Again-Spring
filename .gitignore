@@ -58,7 +58,8 @@ Thumbs.db
 .history/
 .claude/worktrees/
 .request/
-.result/
+.result/*
+!.result/ai-user/
 # ===== Editor caches =====
 .idea/
 *.iml
