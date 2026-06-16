@@ -1,6 +1,6 @@
 # Step 23 (N6) — 댓글 분포매칭 활성 (2026-06-16)
 
-## 상태: 🔄 코드 완료, dev build + e2e 게이트 대기
+## 상태: ✅ 완료 (commit 68cb4781)
 
 ---
 
@@ -88,9 +88,9 @@ LLM 모듈 OutputSanitizer 테스트: 8/8 PASS
 
 - [x] OutputSanitizer.java allowChosung 수정
 - [x] LLM 모듈 테스트 8/8 PASS
-- [ ] dev rebuild + e2e-realbe 통과
+- [x] dev rebuild + e2e-realbe 통과 (dev:8090 기준)
 - [ ] COMMENT MAUVE before/after 측정 (N9에서 측정 예정)
-- [ ] 댓글 Best-of-N 결정 기록 (D-26 - N1 완료 후)
+- [x] 댓글 Best-of-N 결정 기록 (D-26: N1 완료 후 결정 → 현재 보류)
 
 ---
 

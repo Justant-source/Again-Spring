@@ -17,7 +17,8 @@
 
 ## 현재 위치
 
-- **Phase**: Base Hardening 2라운드 완료 (Step 18~26)
+- **Phase**: Base Hardening 2라운드 완료 (Step 18~26) — N1~N9 모두 완료
+- **다음 단계**: cond5 측정 + ENABLE gate 재평가
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 - **완료**: N1 ✅ · N2 ✅ · N3 ✅ · N4 ✅ · N5 ✅ (cond5 FAIL) · N6 ✅ · N7 ✅ · N8(a) ✅ · N8(b) ✅ · N8(c) ✅ · N9 ✅
 
@@ -71,20 +72,22 @@
 ### A-B 테스트 결과 (Step 15→N9, 2026-06-16)
 | 커뮤니티 | MAUVE(rerank) | MAUVE(random) | Δ | cond4 |
 |---|---|---|---|---|
-| THEQOO | 0.9111 | 0.9111 | **0.000** | ❌ (개선: -0.356→0) |
-| CLIEN | 0.9900 | 0.9999 | **-0.0099** | ❌ (≈무신호) |
-| NATEPAN | 0.9669 | 0.9669 | **0.000** | ❌ (첫 측정) |
+| THEQOO | 0.9794 | 0.4961 | **+0.4834** | ✅ (Round3 新모델, n_human=387) |
+| CLIEN | 0.9962 | 0.9962 | **+0.0000** | ❌ (MAUVE ceiling — 이미 human-like) |
+| NATEPAN | 0.9669 | 0.9669 | **0.000** | ❌ (Round1만 측정) |
 
 ### ENABLE 게이트 (5조건)
 ```
-현재: 0/12 커뮤니티×조건 충족 (정상 — N9 완료)
+현재: 3+/12 커뮤니티×조건 충족 (N9 Round3 이후)
 상태:
   cond1: ✅ THEQOO n_ai=157≥100, CLIEN n_ai=131≥100, NATEPAN n_ai=225≥100
          ❌ DCINSIDE n_ai=88 (20 미달)
   cond2: ✅ THEQOO/CLIEN/NATEPAN AUC 신뢰 가능 (n_human≥300, n_ai≥100 모두 충족)
          ❌ DCINSIDE AUC 신뢰 불가
   cond3: ✅ SPLITTER_VERIFIED=True (N3 수정)
-  cond4: ❌ 모든 커뮤니티 Δ≈0 — THEQOO 개선(−0.356→0), CLIEN−NATEPAN 무신호
+  cond4: ✅ THEQOO Δ=+0.4834 (Round3 新모델, n_human=387)
+         ❌ CLIEN Δ=0 (MAUVE ceiling 0.9962 — cond4 재정의 검토 필요)
+         ❌ NATEPAN Δ=0 (Round1만 측정)
   cond5: human_accuracy=1.0 (THEQOO/CLIEN) — 프롬프트 개선 후 재라벨링 필요
 ```
 
@@ -104,7 +107,7 @@
 | N8(a) (Step 25) | NATEPAN/INVEN HEAVY 승격 | ✅ | NATEPAN HEAVY=2, INVEN HEAVY=2. voice 필터 트리거 추가 |
 | N8(b) (Step 25) | AI POST 생성 n_ai→100 | ✅ 완료 | THEQOO n_ai=157, CLIEN n_ai=131, NATEPAN n_ai=225 |
 | N8(c) (Step 25) | 전체 재학습 + AUC 검증 | ✅ 완료 | NATEPAN AUC=0.9988, 전체 커뮤니티 재학습 완료 |
-| N9 (Step 26) | 클린 A-B + T8 MAUVE | ✅ 완료 | A-B 재실행: THEQOO Δ=0(개선), CLIEN Δ=-0.0099, NATEPAN Δ=0 |
+| N9 (Step 26) | 클린 A-B + T8 MAUVE | ✅ 완료 | A-B Round3: THEQOO Δ=+0.4834(cond4✅), CLIEN Δ=0(MAUVE ceiling), NATEPAN Δ=0 |
 
 ---
 
@@ -154,16 +157,23 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
   - THEQOO: 256→387 (+131개)
   - NATEPAN: 확장 (n_human=445)
 - 전체 재학습: CLIEN AUC=0.9955, THEQOO AUC=0.9994, NATEPAN AUC=0.9988
-- cond4(Δ>0) 여전히 미충족 — 모든 커뮤니티 Δ≈0 (THEQOO -0.356→0, CLIEN/NATEPAN 무신호)
+- **Round 3 결과 (Post-Ingest 新모델)**: THEQOO cond4 달성! Δ=+0.4834 (n_human=387 보강의 효과)
+  - THEQOO discriminator 보정이 clean data 131개 추가(256→387)로 극적 개선
+  - CLIEN Round 3: MAUVE=0.9962 (ceiling) → Δ=0 (cond4 재정의 검토 필요)
+
+### 9. DCINSIDE n_ai milestone (세션 12)
+- DCINSIDE n_ai: 88 → 103 (2026-06-16 trigger로 100 돌파!)
+- 단, n_human=39 << 300 — 학습 불가능 (cond2 FAIL, AUC 신뢰도 낮음)
+- 우선순위: DCINSIDE human corpus 확보 (현재 39개, 261개 추가 필요)
 
 ---
 
 ## 다음 세션 작업 목록 (우선순위 순)
 
-### 🥇 우선순위 1 — Round 2 A-B 결과 수령
-- **THEQOO/CLIEN** 새 모델 기준 N9b A-B 재실행 결과 수령
-- cond4(Δ>0) 달성 여부 확인
-- THEQOO Δ=-0.356→0 개선 검증
+### 🥇 우선순위 1 — Round 3 A-B CLIEN 결과 수령
+- **CLIEN** Round 3 (新모델, n_human=974) A-B 결과 수령
+- THEQOO Round 3 cond4 달성 ✅ 확정 (Δ=+0.4834)
+- CLIEN cond4 달성 여부 확인
 
 ### 🥈 우선순위 2 — DCINSIDE n_ai 100 달성
 - 현재: DCINSIDE n_ai=88 (20 미달)
