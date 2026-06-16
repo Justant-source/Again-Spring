@@ -54,4 +54,24 @@
 
 ### D-12: Phase 2/3 (QLoRA+DPO) 진입 조건 명시
 - **조건**: 실제 AUC(n_ai≥30 후 재학습) 측정값 기준으로 AUC>0.75 OR MAUVE<0.80 정체 시만 진입.
-- **현재**: 대기 (실제 AUC 아직 미측정)
+- **현재**: 대기. CLIEN/DCINSIDE/THEQOO AUC 이미 0.98~1.0 = QLoRA 불필요. THEQOO MAUVE=0.345 → TSD 먼저(생성 개선), Phase 2/3는 TSD 후 재측정.
+
+## 2026-06-16 Step 9 결정 (AI negative 백필)
+
+### D-13: historical SELF_GENERATED = 정당한 AI negative
+- **결정**: 봇이 이미 작성·게시한 글/댓글/대댓글을 `label=ai`로 corpus에 직접 백필.
+- **이유**: 페르소나별 voice_type에 맞춰 생성된 진짜 AI 출력 = 가장 정확한 negative 샘플. 토큰 재생성 0.
+- **안전 4중 필터**: ① `synthetic=1` ② voice_type 12종 화이트리스트 ③ `deleted_at IS NULL` ④ LlmErrorSignature 40+ 시그니처 denylist.
+- **결과**: 5803행 추가, 3건 오류 텍스트 차단, 첫 실제 AUC 확보.
+
+### D-14: community 라벨 = voice_type (≠ posts.category)
+- **결정**: 판별기 community 키 = `personas.voice_profile.voice_type` (NATEPAN/DCINSIDE/...), **`posts.category`(COUPLE/MARRIED/...) 아님**.
+- **이유**: `pushNegative(voiceProfileField(persona,"voice_type"), ...)` 라이브 경로와 동일 키를 사용해야 corpus가 오염 없이 라이브와 병합됨.
+
+### D-15: 학습 파이프라인 POST 전용 + 주의사항
+- **확인**: `train_pipeline`/`eval_harness` = `content_type=POST`만 사용. COMMENT 백필은 retrain trigger(n_ai≥30)엔 기여하나 AUC/MAUVE 수치에는 미반영.
+- **함의**: NATEPAN처럼 봇 글(POST)이 없는 커뮤니티는 댓글 백필로는 AUC를 개선할 수 없음 → 자연 봇 활동 대기.
+
+### D-16: 멱등 백필 dedup 키 = text SHA-256
+- **확인**: `/corpus/ingest` dedup은 text SHA-256 UNIQUE 제약 (community/label 무관). 백필 재실행·live 재푸시 모두 자동 skip.
+- **롤백**: `DELETE FROM corpus_item WHERE source='BACKFILL_SELF_GENERATED'`

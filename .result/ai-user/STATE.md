@@ -2,12 +2,13 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 6 — Step 8 ✅ 완료 — 수집/리랭킹 분리 + MAUVE 계기판)
+**최종 갱신**: 2026-06-16 (세션 7 — Step 9 ✅ 완료 — AI negative 백필 + 첫 실제 AUC)
 
 ## 현재 위치
 
-- **Step**: 8 완료 (수집/리랭킹 분리 + MAUVE 계기판)
-- **전체 진행**: Step 0–8 완료. prod AI_USER_ML_COLLECT=true, ENABLED=false 유지
+- **Step**: 9 완료 (AI negative 백필 + 첫 실제 AUC 확보)
+- **전체 진행**: Step 0–9 완료. **ready_count=4/4 달성** (CLIEN/DCINSIDE/NATEPAN/THEQOO AUC≥0.55)
+- **다음 결정**: `AI_USER_ML_ENABLED=true` 활성화 (조건 충족) 또는 3순위 TSD 프롬프팅 착수
 
 ## Step 1 완료 확인 (2026-06-15)
 
@@ -115,12 +116,34 @@
 | mauve-text 설치 + MAUVE_OK | ✅ |
 | dev + prod 배포 (AI_USER_ML_COLLECT=true) | ✅ |
 
+## Step 9 완료 (2026-06-16)
+
+| 기준 | 결과 |
+|---|---|
+| AI negative 백필 5803행 (dev DB, 토큰비용 0) | ✅ |
+| 시그니처 필터 3건 차단 (실제 오류/거절 텍스트) | ✅ |
+| n_ai: 0→323(CLIEN), 143(DCINSIDE), 295(NATEPAN), 423(THEQOO) | ✅ |
+| 수동 `/train` → 첫 실제 AUC 확보 | ✅ |
+| `/eval/baseline` → MAUVE 비null값 확보 | ✅ |
+| `ready_count=4/4` | ✅ |
+
+### 첫 실제 AUC (job 01KV6XZA5F41T9DDNK42C539BE)
+
+| 커뮤니티 | 이전 AUC (synthetic) | **실제 AUC** | MAUVE |
+|---|---|---|---|
+| CLIEN | 0.304 | **0.989** | 0.970 |
+| DCINSIDE | 0.429 | **1.000** | 0.9999 |
+| NATEPAN | 0.319 | **0.562*** | null (AI POST 없음) |
+| THEQOO | 0.200 | **0.980** | 0.345 |
+
+*NATEPAN: dev에 봇 글 없음, 댓글 295개는 eval/학습 미사용(POST only). 마진 작음.
+
 ## 다음 구체 작업
 
-1. `GET /metrics/readiness` 모니터링 → n_ai 상승 확인
-2. n_ai≥30/커뮤니티 → `retrain_loop` 자동 발동 대기
-3. 첫 실제 AUC 확인 후 TSD 프롬프팅 착수 (3순위)
-4. AUC≥0.55 → `AI_USER_ML_ENABLED=true` 수동 활성화
+1. **즉시 가능**: `AI_USER_ML_ENABLED=true` 활성화 (CLIEN/DCINSIDE/THEQOO 안전, NATEPAN 마진 작음)
+2. **3순위 TSD 프롬프팅** (THEQOO MAUVE=0.345 — 개선 여지 최대. 측정 기반 착수 가능)
+3. prod DB 백필 (선택 — auto-mode 차단됨, prod 수동 실행 필요)
+4. NATEPAN AI POST 자연 축적 → 다음 retrain(6h 자동) → NATEPAN AUC 개선 기대
 
 ## 운영 메모 / 권한
 
@@ -130,8 +153,8 @@
 
 ## 미해결 질문
 
-- AI negative 실제 축적까지: `AI_USER_ML_ENABLED=false` 유지 권장. 커뮤니티별 n_ai≥30 확인 후 롤아웃.
-- `/corpus/ingest` push가 `voice_type=null` 페르소나에서 community=null 전달될 수 있음 — ML 서비스 측 null community 처리 확인 필요
+- NATEPAN 판별기: AI POST 0개 → AUC 0.562 마진 작음. prod 봇 NATEPAN 글 자연 축적 대기 or prod DB 백필 후 retrain.
+- `AI_USER_ML_ENABLED=true` 활성화 시 NATEPAN 판별기 신뢰도 낮음 → NATEPAN 커뮤니티에서 rerank 품질 불확실. CLIEN/DCINSIDE/THEQOO는 안전.
 
 ## 블로커
 
