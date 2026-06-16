@@ -2,13 +2,24 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 7 — Step 9 ✅ 완료 — AI negative 백필 + 첫 실제 AUC)
+**최종 갱신**: 2026-06-16 (세션 8 — Base Hardening Step 0 문서화 완료, Phase A 실행 중)
+
+## ⚠️ 관점 교정 (Step 9 "ready_count=4/4"의 올바른 해석)
+
+> Step 9의 `ready_count=4/4`, AUC 0.98~1.0은 **성공이 아니라 측정의 시작점이다.**
+> - **프로젝트 성공** = AUC→0.5, MAUVE→1.0, 사람 블라인드 정확도→~50%
+> - 높은 AUC = "AI가 아직 쉽게 구별됨 = 목표 미달" (동시에 리랭커 작동 전제이기도 함)
+> - "AUC≥0.55=ready"는 **"리랭커 배포 가능"**만 의미 — 절대 "사람 같다"가 아님
+> - 현재 AUC 수치 자체가 **신뢰 불가**: 단일split+소표본누수·합성음성위조·readiness카운팅버그
+>
+> **따라서 `AI_USER_ML_ENABLED=true` 활성화는 Base Hardening(Step 10~17) 완료 후 5조건 충족 시에만.**
 
 ## 현재 위치
 
-- **Step**: 9 완료 (AI negative 백필 + 첫 실제 AUC 확보)
-- **전체 진행**: Step 0–9 완료. **ready_count=4/4 달성** (CLIEN/DCINSIDE/NATEPAN/THEQOO AUC≥0.55)
-- **다음 결정**: `AI_USER_ML_ENABLED=true` 활성화 (조건 충족) 또는 3순위 TSD 프롬프팅 착수
+- **Step**: Base Hardening Phase A 시작 (Step 10~14 진행 중)
+- **전체 진행**: Step 0–9 완료. Step 10~17 = Base Hardening 실행 중.
+- **다음 작업**: T1(분리기)→T2(CV AUC)→T3+T4 병렬→T7(ENABLE 게이트)
+- **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 
 ## Step 1 완료 확인 (2026-06-15)
 
@@ -138,12 +149,24 @@
 
 *NATEPAN: dev에 봇 글 없음, 댓글 295개는 eval/학습 미사용(POST only). 마진 작음.
 
+## Base Hardening 진행 상황 (Step 10~17)
+
+| Step | Task | 상태 |
+|---|---|---|
+| Step 0 | 문서 선행 (roadmap/decisions/STATE) | ✅ 완료 |
+| Step 10 (T1) | DCINSIDE 문장 분리기 수정 | 🔄 진행 중 |
+| Step 11 (T2) | 신뢰 가능한 AUC (CV 5-fold) | 🔜 T1 이후 |
+| Step 12 (T3) | readiness 게이트 버그 수정 | 🔜 T2 이후 |
+| Step 13 (T4) | COMMENT 측정 추가 | 🔜 T2 이후 (T3 병렬) |
+| Step 14 (T7) | ENABLE 게이트 구현 | 🔜 T3+T4 이후 |
+| Step 15 (T6) | 독립 검증 harness | 🔜 T7 이후 |
+| Step 16 (T5) | POST 샘플 보강 | 🔜 Phase C |
+| Step 17 (T8) | THEQOO TSD 프롬프팅 | 🔜 Phase C |
+
 ## 다음 구체 작업
 
-1. **즉시 가능**: `AI_USER_ML_ENABLED=true` 활성화 (CLIEN/DCINSIDE/THEQOO 안전, NATEPAN 마진 작음)
-2. **3순위 TSD 프롬프팅** (THEQOO MAUVE=0.345 — 개선 여지 최대. 측정 기반 착수 가능)
-3. prod DB 백필 (선택 — auto-mode 차단됨, prod 수동 실행 필요)
-4. NATEPAN AI POST 자연 축적 → 다음 retrain(6h 자동) → NATEPAN AUC 개선 기대
+- Base Hardening Phase A 멀티에이전트 병렬 실행 중
+- `AI_USER_ML_ENABLED=true` 활성화는 5조건(D-17) 전부 충족 후 수동으로 — 코드 변경 금지
 
 ## 운영 메모 / 권한
 

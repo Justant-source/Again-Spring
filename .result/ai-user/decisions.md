@@ -75,3 +75,37 @@
 ### D-16: 멱등 백필 dedup 키 = text SHA-256
 - **확인**: `/corpus/ingest` dedup은 text SHA-256 UNIQUE 제약 (community/label 무관). 백필 재실행·live 재푸시 모두 자동 skip.
 - **롤백**: `DELETE FROM corpus_item WHERE source='BACKFILL_SELF_GENERATED'`
+
+## 2026-06-16 Base Hardening 결정 (Step 10~17)
+
+### D-17: ENABLE 게이트 5조건 (커뮤니티별 모두 충족 시에만 enable-candidate)
+- **결정**: `AI_USER_ML_ENABLED=true`로 전환 판단은 아래 5조건 **전부** 충족 시에만 사람이 수동으로.
+- **조건 1**: POST 실제 n_ai≥100 AND n_human≥300 (synthetic 포함 위조 샘플 0)
+- **조건 2**: CV-AUC mean≥0.75 AND std≤0.1 (stratified 5-fold, 단일 split 아님)
+- **조건 3**: T1 클린 피처 확인 (분리기 정상화로 avg_sentence_length 신뢰 가능)
+- **조건 4**: 오프라인 A-B `MAUVE(rerank) > MAUVE(random)` 且 지표 퇴행 없음 (판별기로 검증 금지 — 순환)
+- **조건 5**: 사람 블라인드 baseline 정확도 확보 (목표 ~50%)
+- **구현**: `GET /metrics/enable-candidates` 엔드포인트 (Step 14/T7).
+- **코드에서 enable 플래그 변경 절대 금지** — 게이트 충족 후 ops가 수동으로 `.env.dev/.env.prod`에서 변경.
+
+### D-18: AUC 두 가지 의미 혼동 금지 (관점 교정)
+- **결정**: 코드·주석·응답 필드 어디서도 "AUC≥0.55=사람 같음"으로 해석하는 표현 금지.
+- "AUC≥0.55=ready"는 **"리랭커 배포 가능"**만 의미. 사람 같음(MAUVE→1.0, 블라인드~50%) 과 별개.
+- `ready` 필드 응답에 "reranker-deployable (NOT human-like)" 주석 추가.
+
+### D-19: 합성 음성 위조 금지 (AUC 부풀림 근본 원인 차단)
+- **발견**: `train_pipeline.py:120-132` — real n_ai<MIN_SAMPLES_PER_CLASS 시 human 텍스트를 복제해 label=0 음성으로 위조. 이것이 NATEPAN AUC=0.562, DCINSIDE AUC=1.000의 원인.
+- **결정**: 위조 경로를 `INSUFFICIENT_DATA` 게이팅으로 대체. POST real n_ai<100 OR n_human<300 → 학습 스킵 + INSUFFICIENT_DATA 마킹. ready 제외.
+- **이유**: 위조 샘플로 학습한 판별기는 신뢰 불가. 리랭커 배포 판단 근거로 사용 금지.
+
+### D-20: CV AUC 저장 = ModelVersion.auc (스키마 변경 0)
+- **결정**: `Base.metadata.create_all`은 컬럼 추가 불가(누락 테이블만 생성) → ModelVersion 스키마 미변경.
+- `ModelVersion.auc`에 **CV mean** 저장 (기존 readiness 읽기 경로 무변경).
+- CV std·ablation·선택된 C는 **`EvalRun(kind="cv").metrics_json`** 저장 (컬럼 추가 0).
+
+### D-21: 문장 분리기 공유 함수로 통일
+- **발견**: 분리기가 2곳에 중복, 서로 다른 regex — 공유 유틸 없음.
+  - `features_katfish.py:93-99`: `re.split(r'[.!?]')` → `avg_sentence_length`
+  - `eval_harness.py:49-53`: `_split_sentences()` `(?<=[다요여임나죠])\.\s*|\n+` → burstiness
+  - 결과: DCINSIDE `avg_sentence_length=57.40` (단일 문장 취급) — 신뢰 불가.
+- **결정**: `features_katfish.py`에 `split_sentences()` 공유 함수 신설. `eval_harness.py` import. 분리 경계: `\n`, `...`/`…`, `!`, `?`, 마침표(한글 종결 뒤), 2자 이상 연속 자모(ㅋㅋ/ㅎㅎ/ㅠㅠ/ㅜㅜ), 이모지.
