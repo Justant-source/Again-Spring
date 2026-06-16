@@ -143,8 +143,38 @@
 - **위치**: `PersonaFactory.java` ensureCount/generateOne + dev DB SQL UPDATE.
 
 ### D-26: 댓글 분포매칭 범위 — 초성체 활성, Best-of-N 보류
+
 - **배경**: COMMENT는 이미 comma정규화+길이컷 적용. 누락: (1) 초성체 주입(allowChosung=false), (2) Best-of-N(POST 전용 하드코딩).
 - **결정**: 
   - 초성체 주입: COMMENT에도 VOICE_DIST 기준 allowChosung=true 경로 개방 (voice별 chosungInject 값 존중)
   - 댓글 Best-of-N: **N1(코퍼스 정화) 완료 후 결정** — 역전 판별기로 리랭크 시 품질 악화 위험 (순환검증 금지)
 - **YAML 주의**: `voices.yml post_processing`은 죽은 설정. 실값은 `OutputSanitizer.VOICE_DIST` Java 하드코딩.
+
+---
+
+## 2026-06-16 — 3라운드 결정 (D-27~D-31)
+
+### D-27: cond4 반복 측정 기준 — 단일런 노이즈 인정
+- **배경**: N9 Round3 THEQOO Δ+0.4834가 단일런 노이즈임을 확인. random arm이 무시드 `random.randint()`로 3런에서 0.9111/None/0.4961로 출렁임. n_contexts=12로 소표본.
+- **결정**: cond4 충족 기준 = Δ 평균(≥3 시드) > 0 **AND** std < 평균 **AND** 오케스트레이터 실제 출력 비퇴행. 단일런 Δ+값 = UNVERIFIED로 강등.
+- **즉시 조치**: `routes_eval.py`에서 random arm K≥3 시드 반복 평균±std 구현. 참조 코퍼스 1회 스냅샷 고정. n_contexts ≥ 40.
+
+### D-28: ctx_* 오염 정리 (A-B 테스트 누수)
+- **배경**: `run_ab_test.py`가 A-B 컨텍스트 제출 시 `source='ctx_0..ctx_9'`로 저장 → label=human으로 혼입. THEQOO 11, CLIEN 9, NATEPAN 2 = 총 22행.
+- **결정**: 해당 22행 DELETE. 이후 테스트 컨텍스트는 corpus에 기록 안 함 (source 필터 추가).
+- **완료**: 2026-06-16, DB에서 22행 삭제 확인 (THEQOO n_train 544→534로 검증).
+
+### D-29: 전 커뮤니티 N1 디오염 — ctx_* 우선, 장르 필터는 단계적
+- **배경**: M2에서 P(human) 역전이 T8 이후 AI corpus 슬랭화 + human corpus 장르 다양성 혼재가 원인임을 확인. 단순 링크 제거만으론 부족.
+- **결정**: 1단계 = ctx_* 삭제(완료). 2단계 = NATEPAN/CLIEN decontaminate 확장(URL+<25자 필터). 3단계 = corpus 장르 필터(갈등 서사 POST만)는 M7 후 신선 AI corpus 축적 후 판단.
+- **이유**: 장르 필터 과적용 시 human corpus 급감 위험. M7로 AI corpus 스타일을 먼저 교정한 뒤 판별기 재학습이 더 효과적.
+
+### D-30: M5 사용자 라벨링 — M7 신선 출력 축적 후
+- **배경**: N5에서 에이전트 자가 라벨링 정확도=1.00 (cond5 FAIL). 사용자가 M5는 "M7 개선 후 직접 라벨링"으로 결정.
+- **결정**: M7 dev 배포 후 자연 틱 or admin trigger로 THEQOO+NATEPAN 신선 출력 40쌍 이상 축적 → 사용자에게 라벨 숨긴 파일 제시 → 정확도 산출.
+- **기준**: 정확도 ≤ 0.60 = cond5 met. 50% ≈ 랜덤 = 이상적.
+
+### D-31: M7 파일럿 범위 — THEQOO+NATEPAN 한정, reply voiceType 전역 수정
+- **배경**: 생성 문체가 "격식 상담사"로 수렴해 100% AI 탐지됨. 가장 강력한 레버는 문체 다양화.
+- **결정**: features 백필은 THEQOO(기존) + NATEPAN(신규) 파일럿. reply voiceType 수정은 전 커뮤니티 적용 (버그 수정 성격). SelfCritiqueService voiceType 오버로드 추가 (post/comment 정제 경로 정합성).
+- **구현**: GenDto.ReplyRequest + ReplyGenRequest.java voiceType 필드 추가. ActionExecutor reply builder voiceType 설정. GenerationController/SelfCritiqueService 수정. dev e2e 142 passed.

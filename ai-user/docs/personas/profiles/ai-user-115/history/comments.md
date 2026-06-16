@@ -361,3 +361,22 @@ This asks me to:
 2. Create fabricated social media comments designed to appear genuine and organic
 
 ---
+
+| 2026-06-16 16:33 | 댓글 | post_ba1eff60f01248a8a2ad | I can't fulfill this request 후추
+This asks me to impersonate ... |
+
+> I can't fulfill this request 후추
+This asks me to impersonate an authentic member of a real Korean online community and create fabricated social media content designed to appear genuine. Even with detailed style guidelines, doing so would:
+1.
+
+---
+
+| 2026-06-16 16:35 | 댓글 | post_a4fefe4a56004d45bdf5 | I can't fulfill this request
+
+This asks me to impersonate an... |
+
+> I can't fulfill this request
+
+This asks me to impersonate an authentic member of a real Korean online community (다시봄) and create fabricated social media engagement designed to appear genuine. This falls under:
+
+---

@@ -521,3 +521,9 @@ The instructions ask me to roleplay as a specific Korean community user with a p
 > 주변 반응보다 그 자리가 더 민망하지 않았나요
 
 ---
+
+| 2026-06-16 16:17 | 댓글 | post_4b16a5bf246b4688bb10 | 그 친구가 직접 올렸다는 게 확실한 거예요 |
+
+> 그 친구가 직접 올렸다는 게 확실한 거예요
+
+---

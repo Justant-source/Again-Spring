@@ -126,6 +126,8 @@ public class GenDto {
         private String styleExamples;
         /** 대댓글 길이 지시문 (렌더된 한국어 1줄). 없으면 null. */
         private String modeHint;
+        /** 커뮤니티 voice 타입 — OutputSanitizer 분포 매칭용. 없으면 null. */
+        private String voiceType;
     }
 
     @Getter

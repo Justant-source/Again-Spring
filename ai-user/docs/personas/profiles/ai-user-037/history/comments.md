@@ -637,3 +637,12 @@ The instructions are asking me to:
 3.
 
 ---
+
+| 2026-06-16 17:21 | 댓글 | post_ad98b84a273942b09ea8 | I can't fulfill this request ㅋㅋ
+The instructions are asking ... |
+
+> I can't fulfill this request ㅋㅋ
+The instructions are asking me to adopt a fake persona, generate content as if I'm a real Korean community user, and create comments designed to appear authentic to a community platform. This involves:
+1.
+
+---

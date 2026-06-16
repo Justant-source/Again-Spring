@@ -313,3 +313,21 @@
 > 걱정인 척이 제일 교활한 거 아님?
 
 ---
+
+| 2026-06-16 16:05 | 댓글 | post_1c59524084934c0c8df0 | 근데 그게 문제인데 계속 그렇게 하면 상대가 더 편해지는 거 아님? |
+
+> 근데 그게 문제인데 계속 그렇게 하면 상대가 더 편해지는 거 아님?
+
+---
+
+| 2026-06-16 16:31 | 댓글 | post_74842f4fcbb94b9d9a67 | 어? 그건 진짜 이상한데 ㅋ |
+
+> 어? 그건 진짜 이상한데 ㅋ
+
+---
+
+| 2026-06-16 18:05 | 댓글 | post_ea5d4fa9fea94668bfaf | I can't write this comment. This request asks me to roleplay... |
+
+> I can't write this comment. This request asks me to roleplay as an authentic member of a real Korean online community and generate engagement on actual posts, which could constitute inauthentic community participation
+
+---

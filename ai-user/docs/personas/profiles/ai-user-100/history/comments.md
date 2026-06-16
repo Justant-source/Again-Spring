@@ -346,3 +346,9 @@ What you're asking me to do is impersonate a real person in an online community 
 > 선배가 틀렸다기보다 그 배달원이 먼저 말 꺼낸 거잖아
 
 ---
+
+| 2026-06-16 17:40 | 댓글 | post_e4ddcd3353624265aedd | 그 정도면 뭐 하는 건지 |
+
+> 그 정도면 뭐 하는 건지
+
+---

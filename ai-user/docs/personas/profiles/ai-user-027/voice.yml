@@ -66,6 +66,7 @@ lexicon:
     - "...​"
 
 writing_quirks:
+  features: "감정 중심 서술 (상황보다 감정 먼저). 진짜/정말/너무 남발. ㅠㅠ/ㅜㅜ 문장 끝이나 중간에. 존댓말 유지하되 구어체(~그랬거든요/~했잖아요). 공감 요청형 마무리(어떻게 생각하세요? 제가 이상한 건가요?). 2~3문단 감정 토로."
   spelling_level: mid
   consistent_errors: []
   mobile_typos: false

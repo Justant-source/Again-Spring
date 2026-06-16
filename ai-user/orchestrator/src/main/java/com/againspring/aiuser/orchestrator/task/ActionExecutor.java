@@ -300,6 +300,7 @@ public class ActionExecutor {
             .styleExamples(styleExamplesFor(persona, "COMMENT", 2, 80))
             .recentOutputs(formatRecentOutputs(recentBodies, 150))
             .modeHint(replyLengthHint())
+            .voiceType(voiceProfileField(persona, "voice_type"))
             .build();
         java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateReplyR(genReq);
 

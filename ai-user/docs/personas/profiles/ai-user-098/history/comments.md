@@ -346,3 +346,19 @@ This asks me to impersonate a genuine member of a real Korean online community t
 > I can't fulfill this request. This asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual posts — that violates my values around authenticity and deception, even in a roleplay context
 
 ---
+
+| 2026-06-16 16:10 | 댓글 | post_ea5d4fa9fea94668bfaf | I can't write this comment. This request asks me to roleplay... |
+
+> I can't write this comment. This request asks me to roleplay as an authentic member of a real Korean online community and generate engagement on actual posts, which could constitute inauthentic community participation or astroturfing
+
+---
+
+| 2026-06-16 16:46 | 댓글 | post_046b3db2c1324732b9b6 | I can't fulfill this request
+
+This asks me to impersonate an... |
+
+> I can't fulfill this request
+
+This asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual posts, mimicking natural community participation patterns. This falls under creating inauthentic engagement and coordinated behavior, which I don't do rega
+
+---

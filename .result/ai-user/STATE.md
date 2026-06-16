@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 13 — N9 완료, 결과 정리)
+**최종 갱신**: 2026-06-16 (세션 15 — M3 재학습 완료, M4 CV 추출, M7 NATEPAN features+reply voiceType 수정 dev 배포+e2e 통과)
 
 ---
 
@@ -17,10 +17,10 @@
 
 ## 현재 위치
 
-- **Phase**: Base Hardening 2라운드 완료 (Step 18~26) — N1~N9 모두 완료
-- **다음 단계**: cond5 측정 + ENABLE gate 재평가
+- **Phase**: Base Hardening 3라운드 (M1~M8) 진행 중
+- **다음 단계**: Base Hardening 3라운드 (M1~M8) 진행 중
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **완료**: N1 ✅ · N2 ✅ · N3 ✅ · N4 ✅ · N5 ✅ (cond5 FAIL) · N6 ✅ · N7 ✅ · N8(a) ✅ · N8(b) ✅ · N8(c) ✅ · N9 ✅
+- **완료**: N1 ✅ · N2 ✅ · N3 ✅ · N4 ✅ · N5 ✅ (cond5 FAIL) · N6 ✅ · N7 ✅ · N8(a) ✅ · N8(b) ✅ · N8(c) ✅ · N9 ✅ | 3라운드 M1~M8 진행 중
 
 ---
 
@@ -51,13 +51,13 @@
 
 ## 핵심 수치 현황
 
-### AUC (CV 5-fold)
-| 커뮤니티 | 최신 AUC | n_human(POST) | n_ai(POST) | 상태 |
-|---|---|---|---|---|
-| CLIEN | **0.996** | 974 | 131 | ✅ cond1/cond2 충족 |
-| DCINSIDE | **1.000** | 39 | 103 | INSUFFICIENT_DATA (n_human<300) — cond1 ✅, cond2 ❌ |
-| NATEPAN | **0.999** | 445 | 225 | ✅ cond1/cond2 충족 |
-| THEQOO | **0.999** | 387 | 157 | ✅ cond1/cond2 충족 |
+### AUC (CV 5-fold) — M3 재학습 후 최신값
+| 커뮤니티 | 최신 AUC (mean) | AUC std | n_human | n_ai | 상태 |
+|---|---|---|---|---|---|
+| CLIEN | **0.9947** | 0.0095 | 960 | 131 | ✅ cond1/cond2. 재학습 2026-06-16 09:10 (idempotency). Model 01KV7V3EJXV3RB1S4SANY05NBX |
+| DCINSIDE | **1.000** | — | 39 | 105 | INSUFFICIENT_DATA (n_human<300) — M8에서 재-pull 필요 |
+| NATEPAN | **0.9994** | 0.00086 | 388 | 225 | ✅ cond1/cond2. 재학습 2026-06-16 09:10. Model 01KV7V33HB9BQJEZG5E7DWRJ99 |
+| THEQOO | **0.9986** | 0.00275 | 376 | 158 | ✅ cond1/cond2 (ctx_* 11행 삭제 확인: 544→534 n_train). Model 01KV7V3A1AR9YA39P5JVH5KX0H |
 
 > AUC가 높다 = AI가 쉽게 구별됨 = **목표 미달 상태**. n_ai≥100 후 재학습 필요.
 
@@ -72,7 +72,7 @@
 ### A-B 테스트 결과 (Step 15→N9, 2026-06-16)
 | 커뮤니티 | MAUVE(rerank) | MAUVE(random) | Δ | cond4 |
 |---|---|---|---|---|
-| THEQOO | 0.9794 | 0.4961 | **+0.4834** | ✅ (Round3 新모델, n_human=387) |
+| THEQOO | 0.9794 | 0.4961 | **+0.4834** | ⚠️ UNVERIFIED — 12ctx 단일런 노이즈 (무시드 random, M1에서 ≥40ctx×3seed 재측정) |
 | CLIEN | 0.9962 | 0.9962 | **+0.0000** | ❌ (MAUVE ceiling — 이미 human-like) |
 | NATEPAN | 0.9669 | 0.9669 | **0.000** | ❌ (Round1만 측정) |
 
@@ -85,7 +85,7 @@
   cond2: ✅ THEQOO/CLIEN/NATEPAN AUC 신뢰 가능 (n_human≥300, n_ai≥100 모두 충족)
          ❌ DCINSIDE AUC 신뢰 불가 (n_human=39 << 300)
   cond3: ✅ SPLITTER_VERIFIED=True (N3 수정)
-  cond4: ✅ THEQOO Δ=+0.4834 (Round3 新모델, n_human=387)
+  cond4: ⚠️ UNVERIFIED THEQOO Δ=+0.4834 (12ctx 단일런 노이즈 — M1 ≥40ctx×3seed 재측정 예정)
          ❌ CLIEN Δ=0 (MAUVE ceiling 0.9962 — cond4 재정의 검토 필요)
          ❌ NATEPAN Δ=0 (Round1만 측정)
   cond5: human_accuracy=1.0 (THEQOO/CLIEN) — 프롬프트 개선 후 재라벨링 필요
@@ -107,7 +107,7 @@
 | N8(a) (Step 25) | NATEPAN/INVEN HEAVY 승격 | ✅ | NATEPAN HEAVY=2, INVEN HEAVY=2. voice 필터 트리거 추가 |
 | N8(b) (Step 25) | AI POST 생성 n_ai→100 | ✅ 완료 | THEQOO n_ai=157, CLIEN n_ai=131, NATEPAN n_ai=225 |
 | N8(c) (Step 25) | 전체 재학습 + AUC 검증 | ✅ 완료 | NATEPAN AUC=0.9988, 전체 커뮤니티 재학습 완료 |
-| N9 (Step 26) | 클린 A-B + T8 MAUVE | ✅ 완료 | A-B Round3: THEQOO Δ=+0.4834(cond4✅), CLIEN Δ=0(MAUVE ceiling), NATEPAN Δ=0 |
+| N9 (Step 26) | 클린 A-B + T8 MAUVE | ✅ 완료 | A-B Round3: THEQOO Δ=+0.4834(⚠️UNVERIFIED 단일런노이즈), CLIEN Δ=0, NATEPAN Δ=0 |
 
 ---
 
@@ -151,15 +151,22 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 - `routes_eval.py` → `patch("app.api.routes_eval.get_session")`
 - `routes_corpus.py` → `patch("app.api.routes_corpus.get_session")`
 
-### 8. Corpus Ingest 보강 (세션 12)
+### 8. Corpus Ingest 보강 (세션 12) + M1 강등 (세션 14)
 - AS example_bank에서 추가 인간 POST 적재:
   - CLIEN: 294→974 (+680개)
   - THEQOO: 256→387 (+131개)
   - NATEPAN: 확장 (n_human=445)
 - 전체 재학습: CLIEN AUC=0.9955, THEQOO AUC=0.9994, NATEPAN AUC=0.9988
-- **Round 3 결과 (Post-Ingest 新모델)**: THEQOO cond4 달성! Δ=+0.4834 (n_human=387 보강의 효과)
-  - THEQOO discriminator 보정이 clean data 131개 추가(256→387)로 극적 개선
-  - CLIEN Round 3: MAUVE=0.9962 (ceiling) → Δ=0 (cond4 재정의 검토 필요)
+- **Round 3 A-B (Post-Ingest 新모델)**: THEQOO Δ=+0.4834 ← ⚠️ **UNVERIFIED 단일런 노이즈** (M1에서 강등)
+  - 원인: 무시드 random.randint() + 12ctx + 3런 random arm = 0.9111/None/0.4961
+  - CLIEN Round 3: MAUVE=0.9962 (ceiling) → Δ=0
+
+### 9b. M2 발견 (세션 14) — P(human) 방향 N1 이후에도 여전히 역전
+- THEQOO discriminator 스팟체크: 슬랭서사→P(human)=0.0000044, 격식AI→P(human)=0.9976 ❌ 완전 역전
+- 코드 버그 아님 — `predict_proba[:, 1]` = P(class=1=human) 정상
+- **실제 원인**: T8 이후 AI corpus(label=ai)에 슬랭체 출력 축적 → 판별기가 "슬랭=AI, 격식=human" 역학습
+- **함의**: Best-of-N 현재 활성화 시 최악 출력을 winner 선택 (AI_USER_ML_ENABLED=false 유지 필수)
+- **M3 추가 과제**: corpus 장르 필터 — 갈등 서사 POST만 남기기 (링크 제거만으론 부족)
 
 ### 9. DCINSIDE n_ai milestone (세션 12)
 - DCINSIDE n_ai: 88 → 103 (2026-06-16 trigger로 100 돌파!)
@@ -168,31 +175,27 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 
 ---
 
-## 다음 세션 작업 목록 (우선순위 순)
+## 다음 세션 작업 목록 (3라운드 M1~M8 진행 중)
 
-### 🥇 Priority 1 — THEQOO cond4✅ 달성 후 cond5(블라인드) 측정
-- **THEQOO** Round 3 cond4 달성 ✅ (Δ=+0.4834, n_human=387)
-- 다음: cond5 측정 — human_accuracy≤0.60 필요 (현재 1.0)
-- 프롬프트 개선 후 재라벨링: `/corpus/export/blind` → 사람 정확도 재측정
+### 완료 (세션 14~15)
+- ✅ cond4 UNVERIFIED 강등 (STATE.md/roadmap/steps/decisions 갱신)
+- ✅ M2 P(human) 스팟체크 — 역전 확인, 코드 버그 아님, corpus 장르 편향이 원인 (steps/28-m2-p-human-spotcheck.md)
+- ✅ M3 — ctx_* 22행 삭제(THEQOO 11, CLIEN 9, NATEPAN 2) + NATEPAN/CLIEN 디오염
+- ✅ M3 재학습 — THEQOO/CLIEN/NATEPAN `/train` 완료 (새 CV-AUC 추출)
+- ✅ M4 CV 추출 — THEQOO mean=0.9986/std=0.00275, CLIEN 0.9947/0.0095, NATEPAN 0.9994/0.00086 (steps/30-m4-cv-ablation.md)
+- ✅ M7 (파일럿 완료) — NATEPAN voice.yml 16개 features 백필 + GenDto.ReplyRequest voiceType 필드 추가 + ActionExecutor reply voiceType 전달 + GenerationController/SelfCritiqueService voiceType 경로 보정 + PersonaFactory schema features 추가 + dev DB NATEPAN 6개 JSON_SET + dev 배포 + e2e 142/142 통과 (5 skip)
 
-### 🥈 Priority 2 — CLIEN cond4 판단 (MAUVE ceiling 대응)
-- CLIEN Round 3: Δ=0 (MAUVE=0.9962 ceiling)
-- 판단: cond4를 **Δ≥0로 재정의**할지, 아니면 MAUVE 기반 다른 조건으로 전환할지 검토
-- MAUVE ceiling은 더이상 개선 불가능 → 다른 평가 지표(e.g. human accuracy) 고려
+### 🥇 다음 우선순위
+1. **main push** — M7 e2e 통과 완료, commit & push 필요
+2. **M1 A-B 재설계** — routes_eval.py K≥3 시드 평균±std 수정 + 40+ contexts THEQOO/NATEPAN 재실행
+3. **M8 DCINSIDE** — cursor 리셋 + example_bank 재-pull → n_human 39→~300 목표
 
-### 🥉 Priority 3 — NATEPAN cond4 해결방법 검토
-- 현재: Δ=0 (Round1 데이터만 사용, rerank/random 동일)
-- 가설: 코퍼스 오염(T1/N1 경험) 또는 페르소나 부실
-- 해결책: ① NATEPAN human corpus 정제 ② NATEPAN AI 페르소나 voice 강화 (T8 적용)
+### 🥈 M5 블라인드 (M7 배포 후 신선 출력 축적 대기)
+- 사용자 직접 라벨링 40쌍 (THEQOO+NATEPAN 각 20쌍)
+- 현재 M7 출력 아직 dev에서 생성 중 — 자연 틱 or admin trigger
 
-### 🔄 Priority 4 — DCINSIDE human corpus 확보 (261개 추가 필요)
-- 현재: DCINSIDE n_ai=103 (✅ cond1 달성), n_human=39 (❌ cond2 FAIL)
-- AS example_bank에서 DCINSIDE POST 대량 수입 필요 (또는 수동 크롤링)
-- 목표: n_human≥300 → 신뢰 가능한 AUC 재학습
-
-### 🔄 Priority 5 — prod 배포 N7 SQL 반영
-- N7 general_style 큐레이션 SQL 결과 검증
-- prod DB에 적용 여부 판단 (dev 검증 완료 확인)
+### 🥉 M6 COMMENT MAUVE
+- before/after N6 측정 (아직 NOT RUN)
 
 ---
 

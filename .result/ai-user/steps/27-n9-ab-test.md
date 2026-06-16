@@ -78,9 +78,13 @@
 
 THEQOO:
 - Before T8 (Step 13 baseline, orc bot): MAUVE=0.345
-- After T8: MAUVE=0.9111 (rerank) / 0.9111 (random) — A-B test AI candidate MAUVE (not orc bot MAUVE)
-
-Note: The A-B test MAUVE uses claude-haiku generated drafts (simpler, more direct) not the full orchestrator output. For orc bot MAUVE improvement (T8 effect), baseline rerun needed.
+- After T8 (A-B test AI candidates): MAUVE=0.9111 (rerank) / 0.9111 (random) — claude-haiku generated drafts (simpler, more direct)
+- **T8 effect (orc bot baseline)**: Job=01KV7HZYECXC5VZRGW5Q88RTWW
+  - Date: 2026-06-16
+  - Current orc bot MAUVE: **0.6077**
+  - Delta from Step 13: 0.6077 - 0.345 = **+0.2627**
+  - Corpus: n_human=387, n_ai=158 (after ingest 256→387)
+  - **Conclusion**: T8 improved orc bot MAUVE from 0.345 to 0.6077 (+76.3%). Gap between A-B test candidates (0.9111) and orc bot (0.6077) suggests room for further orchestration tuning.
 
 ## cond4 현황 (Round3 이후)
 

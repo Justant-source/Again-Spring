@@ -34,6 +34,38 @@ COMMUNITY_CFG = {
             "직장 상사가 일을 자꾸 떠넘길 때",
             "엄마가 내 연애에 지나치게 간섭할 때",
             "자취방 집주인이 갑자기 계약 해지를 요구할 때",
+            "남자친구가 내 감정을 무시할 때",
+            "직장에서 나만 눈치 보게 만들 때",
+            "친구가 내 비밀을 퍼뜨렸을 때",
+            "남자친구 친구들이 나를 싫어할 때",
+            "부모님이 내 직업을 반대할 때",
+            "오빠가 가부장적으로 굴 때",
+            "친구가 자꾸 비교하며 기죽일 때",
+            "남자친구가 내 외모를 지적할 때",
+            "회사 여자 동료가 나를 따돌릴 때",
+            "카카오톡 단체방에서 나만 무시당할 때",
+            "남자친구 어머니가 나를 싫어하는 것 같을 때",
+            "직장 상사가 나에게만 가혹할 때",
+            "친구가 내 남자친구를 가로챌 때",
+            "사이버불링 당했을 때",
+            "썸남이 갑자기 연락을 끊었을 때",
+            "남자친구가 일을 핑계로 데이트를 자꾸 취소할 때",
+            "친정 부모님이 남자친구를 못 마땅해할 때",
+            "직장 후배가 나보다 빨리 승진했을 때",
+            "베프 남자친구가 나한테 이상하게 굴 때",
+            "남자친구가 내 돈을 자꾸 빌릴 때",
+            "친구 모임에서 나만 왕따당하는 것 같을 때",
+            "남자친구가 내 친구들을 싫어할 때",
+            "회사에서 성희롱 당했을 때",
+            "언니와 사이가 나빠졌을 때",
+            "남자친구가 전 여자친구와 연락할 때",
+            "직장에서 실수를 했는데 혼자 뒤집어썼을 때",
+            "집주인이 보증금을 안 돌려줄 때",
+            "온라인 쇼핑 환불 거절당했을 때",
+            "남자친구가 내 이야기를 다른 사람들에게 퍼뜨릴 때",
+            "회사 술자리에서 괜히 취급당할 때",
+            "친구가 내 물건을 허락 없이 빌릴 때",
+            "남자친구가 내 의견을 무시하고 자기 생각만 고집할 때",
         ],
     },
     "CLIEN": {
@@ -76,6 +108,40 @@ COMMUNITY_CFG = {
             "남편이 가사는 전혀 안 하면서 지적만 할 때",
             "친정과 시댁 사이에서 눈치를 봐야 할 때",
             "남편이 내 친구 관계를 못마땅해할 때",
+            "시어머니가 우리 집에 너무 자주 올 때",
+            "남편이 가족 행사만 되면 술을 마실 때",
+            "아이 양육 방식을 두고 남편과 갈등이 생겼을 때",
+            "친정엄마와 남편이 갈등을 빚을 때",
+            "아이 유치원 엄마들 사이에서 소외감이 들 때",
+            "남편이 내 친정에 가기 싫어할 때",
+            "직장 다니면서 육아까지 혼자 다 할 때",
+            "시어머니가 내 요리를 매번 비교할 때",
+            "아파트 층간소음 때문에 이웃과 싸웠을 때",
+            "남편이 용돈을 줄이겠다고 했을 때",
+            "아이 교육비 문제로 남편과 다툴 때",
+            "가족 카톡방에서 시댁 식구들에게 무시당할 때",
+            "남편이 내 직장 동료를 의심할 때",
+            "친척들이 아이 교육에 간섭할 때",
+            "아이 학교 선생님과 갈등이 생겼을 때",
+            "남편이 집안일을 도와달라는 말을 무시할 때",
+            "시부모님과 명절 집안일 갈등",
+            "남편 형제들이 재산 문제로 다툴 때",
+            "아이 친구 부모와 갈등이 생겼을 때",
+            "경력단절 후 재취업하려는데 남편이 반대할 때",
+            "시어머니가 손자녀 교육을 마음대로 할 때",
+            "남편이 친구들과 너무 자주 어울릴 때",
+            "이사 문제로 남편과 갈등이 생겼을 때",
+            "남편 직장 동료 부인이 나를 무시할 때",
+            "가사 도우미 문제로 시어머니와 갈등이 생겼을 때",
+            "남편이 내 건강 문제를 심각하게 여기지 않을 때",
+            "친정 부모님과 남편 사이에서 양쪽 눈치 볼 때",
+            "유치원 학부모 단체채팅방에서 왕따당할 때",
+            "남편이 나한테 사과를 절대 안 할 때",
+            "아이가 학교에서 따돌림 당한다는 것을 알게 됐을 때",
+            "남편과 섹스 횟수 차이로 갈등할 때",
+            "아이 학원비 때문에 남편과 싸울 때",
+            "시어머니가 내 자식들을 차별할 때",
+            "남편이 명절 고향 내려가는 것을 강요할 때",
         ],
     },
 }
@@ -209,14 +275,20 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8):
             result = job.get("result") or {}
             log.info("=== RESULT ===")
             mr = result.get("mauve_rerank")
-            mrand = result.get("mauve_random")
+            mr_mean = result.get("mauve_random_mean")
+            mr_std = result.get("mauve_random_std")
+            mr_seeds = result.get("mauve_random_seeds", [])
             delta = result.get("delta")
-            log.info(f"  community    : {community}")
-            log.info(f"  mauve_rerank : {mr:.4f}" if mr is not None else "  mauve_rerank : None")
-            log.info(f"  mauve_random : {mrand:.4f}" if mrand is not None else "  mauve_random : None")
-            log.info(f"  delta        : {delta:+.4f}" if delta is not None else "  delta        : None")
-            log.info(f"  n_contexts   : {result.get('n_contexts')}")
-            log.info(f"  degraded     : {result.get('degraded')}")
+            log.info(f"  community           : {community}")
+            log.info(f"  mauve_rerank        : {mr:.4f}" if mr is not None else "  mauve_rerank        : None")
+            log.info(f"  mauve_random_mean   : {mr_mean:.4f}" if mr_mean is not None else "  mauve_random_mean   : None")
+            log.info(f"  mauve_random_std    : {mr_std:.4f}" if mr_std is not None else "  mauve_random_std    : None")
+            if mr_seeds:
+                log.info(f"  mauve_random_seeds  : {[round(s, 4) for s in mr_seeds]}")
+            log.info(f"  delta (rerank-mean) : {delta:+.4f}" if delta is not None else "  delta (rerank-mean) : None")
+            log.info(f"  n_contexts          : {result.get('n_contexts')}")
+            log.info(f"  snapshot_size       : {result.get('snapshot_size')}")
+            log.info(f"  degraded            : {result.get('degraded')}")
             return result
         elif status in ("FAILED", "ERROR"):
             log.error(f"Job {status}: {job}")

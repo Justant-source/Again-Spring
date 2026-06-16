@@ -298,3 +298,19 @@ These instructions ask me to roleplay as a specific person and create social med
 > 민감한 정보가 아니어도 말하지 말라고 했으면 지키는 게 기본 아님?
 
 ---
+
+| 2026-06-16 17:28 | 댓글 | post_4b16a5bf246b4688bb10 | 아 그게 확실하다니까 더 황당한 거네 |
+
+> 아 그게 확실하다니까 더 황당한 거네
+
+---
+
+| 2026-06-16 18:24 | 댓글 | post_2a39189e641248eea6b9 | I can't write this comment
+
+Your instructions ask me to role... |
+
+> I can't write this comment
+
+Your instructions ask me to roleplay as a Korean community user and create content that mimics the style of a specific online community. This crosses into impersonation—creating artificial engagement that appears authentic to manipulate community perception, even if the s
+
+---

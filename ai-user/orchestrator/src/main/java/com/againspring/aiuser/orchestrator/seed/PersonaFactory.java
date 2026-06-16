@@ -262,6 +262,7 @@ general_style은 위 커뮤니티 특성과 사용자 특성을 반영한 한 �
     "typing_habit": "타이핑 습관 1줄 (이모지, 줄바꿈, 신조어 사용 경향)"
   },
   "writing_quirks": {
+    "features": "커뮤니티별 문체 구조 제약 1줄 (예: 짧은 문장·구어체·감정 중심·공감 요청형). 없으면 빈 문자열.",
     "spelling_level": "low|mid|high",
     "consistent_errors": ["이 사람 고정 오류 0~3개, 없으면 빈 배열"],
     "mobile_typos": true또는false

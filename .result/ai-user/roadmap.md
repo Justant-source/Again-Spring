@@ -357,3 +357,114 @@
 **N1 효과 검증**: THEQOO -0.356 → 0 로 대폭 개선. 코퍼스 디오염의 실제 영향 확인 (cond4 미충족 상태 유지)
 
 **cond4 판정**: 모든 커뮤니티 Δ ≤ 0 → **미충족**. MAUVE 우수도 증명 필요 (블라인드 비율↑ required)
+
+---
+
+## Base Hardening 3라운드 (M1~M8) — 검증 정직화 + 생성 레버
+
+> **3라운드 전제**: N9 cond4 Δ+0.4834가 단일런 노이즈임을 확인(D-27). 검증 정직화 + 진짜 생성 레버(M7)로 전환.
+
+---
+
+## Step 27 (M1) — cond4 UNVERIFIED 강등 + A-B 재설계 ⏳
+
+**목표**: Δ+0.4834 단일런 노이즈 인정 + routes_eval.py K≥3시드 평균±std + ≥40ctx 재실행.
+**완료 기준**:
+- [x] cond4 강등 (UNVERIFIED) — STATE.md/steps/27-n9-ab-test.md 갱신
+- [x] run_ab_test.py THEQOO/NATEPAN 테마 40+로 확장 (M1 에이전트)
+- [ ] routes_eval.py K≥3 시드 평균±std 수정 (WSL ML 서비스)
+- [ ] ≥40ctx A-B 재실행 → Δ 평균±std 기록
+
+**판정**: Δ>0 AND std<평균이면 cond4 met. 아니면 솔직히 "무신호" 기록.
+
+---
+
+## Step 28 (M2) — P(human) 스팟체크 재실행 ✅ 완료 (2026-06-16)
+
+**목표**: N1 디오염이 P(human) 역전을 교정했는지 실측.
+**완료 기준**:
+- [x] THEQOO 재학습 모델로 /rerank 스팟체크 4개 텍스트
+- [x] 방향 확인: 슬랭 서사 HIGH, 격식 AI LOW
+- **결과**: ❌ 여전히 역전 — 슬랭 P(human)=0.0000044, 격식AI P(human)=0.9976
+- **원인 확정**: T8 AI corpus 슬랭화 → 판별기 역방향 학습. 코드 버그 아님.
+- **함의**: Best-of-N 현재 역효과 (AI_USER_ML_ENABLED=false 필수)
+- **기록**: steps/28-m2-p-human-spotcheck.md
+
+---
+
+## Step 29 (M3) — 전 커뮤니티 디오염 + ctx_* 정리 ✅ 완료 (2026-06-16)
+
+**목표**: ctx_* 오염 제거 + CLIEN/NATEPAN decontaminate 확장 + 재학습.
+**완료 기준**:
+- [x] ctx_* 22행 DELETE (THEQOO 11, CLIEN 9, NATEPAN 2) — label=human 테스트 누수
+- [x] THEQOO/CLIEN/NATEPAN `/train` 완료 → 새 CV-AUC
+- **결과**:
+  - THEQOO: n_train 544→534 (ctx_* 10행 삭제 확인), AUC=0.9986±0.00275
+  - CLIEN: AUC=0.9947±0.0095, n_train=1091
+  - NATEPAN: AUC=0.9994±0.00086, n_train=613
+
+---
+
+## Step 30 (M4) — ablation + CV std 실제 산출 ✅ 완료 (2026-06-16)
+
+**목표**: eval_run(kind=cv) 기존 행에서 실수치 표 추출.
+**결과** (M3 재학습 후 신규 모델 기준):
+
+| 커뮤니티 | CV mean | CV std | best_C | katfish_9(C=1) | electra_768(C=1) | combined_777(C=1) |
+|---|---|---|---|---|---|---|
+| THEQOO | 0.9986 | 0.00275 | 1.0 | 0.9682±0.0191 | 0.9985±0.00272 | 0.9986±0.00275 |
+| CLIEN | 0.9947 | 0.0095 | 1.0 | 0.892±0.0179 | 0.9947±0.00997 | 0.9947±0.00951 |
+| NATEPAN | 0.9994 | 0.00086 | 1.0 | 0.809±0.030 | 0.9996±0.00066 | 0.9994±0.00086 |
+
+**n_val=0 해명**: `cross_val_score`는 단일 holdout셋 안 만듦 — placeholder.
+**피처셋 결론**: katfish_9(어휘) 단독보다 electra_768 임베딩이 압도적으로 우수. combined_777≈electra_768.
+
+---
+
+## Step 31 (M7) — 생성 스타일 다양화: NATEPAN features + reply voiceType ✅ dev 배포 완료 (2026-06-16)
+
+**목표**: THEQOO+NATEPAN 파일럿 — 비-상담사 문체 구조 주입 + reply VOICE_DIST 우회 수정.
+**완료 기준**:
+- [x] NATEPAN voice.yml 16개 features 백필 (`감정 중심 서술/구어체/공감 요청형 마무리/2~3문단`)
+- [x] THEQOO voice.yml 10개는 기존 features 유지 (`짧은 문장/헐ㅠㅠ/~당~징 종결`)
+- [x] GenDto.ReplyRequest voiceType 필드 추가
+- [x] ReplyGenRequest.java voiceType 필드 추가
+- [x] ActionExecutor.executeReply() voiceType 설정 (`.voiceType(voiceProfileField(persona, "voice_type"))`)
+- [x] GenerationController.generateReply() `sanitizeComment(split[0], req.getVoiceType())` 수정
+- [x] SelfCritiqueService 신규 오버로드 `critiqueAndRefine(..., voiceType)` + `sanitizePost/Comment(raw, voiceType)` 적용
+- [x] PersonaFactory schema `writing_quirks.features` 추가
+- [x] dev DB NATEPAN 6개 personas JSON_SET
+- [x] dev rebuild + e2e-realbe 142 passed (5 skipped)
+- **완료 기준 미달**: main push 아직 (이 세션에서 진행)
+- **M7 효과 측정**: M1 신뢰 MAUVE + M5 사람 블라인드로 before/after 필요 (신선 출력 축적 중)
+
+---
+
+## Step 32 (M6) — COMMENT MAUVE 측정 ⏳ NOT RUN
+
+**목표**: N6(allowChosung) 전/후 COMMENT MAUVE 실측.
+**완료 기준**:
+- [ ] COMMENT MAUVE before (Step 13 baseline: NATEPAN 0.060/CLIEN 0.068)
+- [ ] after N6 적용 신선 댓글 MAUVE 측정
+- 아직 미실행.
+
+---
+
+## Step 33 (M5) — 진짜 사람 블라인드 평가 ⏳ 대기 중 (M7 신선 출력 축적 후)
+
+**목표**: M7 적용 후 사용자 직접 라벨링 cond5 측정.
+**완료 기준**:
+- [ ] 균형 블라인드셋 40쌍 (THEQOO+NATEPAN 각 20) 생성
+- [ ] 사용자 라벨링 → 정확도 산출
+- [ ] EvalRun(kind="human_blind") 기록
+- 목표: 정확도 ≤ 0.60 (현재 baseline = 1.00 N5 자가라벨)
+
+---
+
+## Step 34 (M8) — DCINSIDE 재-pull + 학습 가능성 판정 ⏳
+
+**목표**: cursor 리셋으로 39→~300 복구.
+**완료 기준**:
+- [ ] `/app/data/.corpus_pull_cursor` 리셋 (또는 full pull 트리거)
+- [ ] decontaminate 통과 후 n_human 실측
+- [ ] ≥300이면 `/train` → CV-AUC / 미달이면 "불가" 명시

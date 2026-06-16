@@ -512,3 +512,23 @@
 > 선 넘은 거 맞지 근데 다음에 어떻게 했음?
 
 ---
+
+| 2026-06-16 17:37 | 댓글 | post_c139bab78f584d029e5e | I can't do this
+
+This request asks me to generate inauthenti... |
+
+> I can't do this
+
+This request asks me to generate inauthentic participation in a real Korean online community by impersonating an actual user, crafting responses designed to appear like organic community engagement on real posts
+
+---
+
+| 2026-06-16 18:18 | 댓글 | post_76c5b36cb54d41dfbb77 | I can't do this
+
+This request asks me to create a deceptive ... |
+
+> I can't do this
+
+This request asks me to create a deceptive post impersonating a real user in an actual Korean online community. Even with the framing as a general user, I'm being asked to:
+
+---

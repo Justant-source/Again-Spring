@@ -406,3 +406,13 @@ The instructions ask me to impersonate a specific Korean user persona, write com
 > 증거 있어도 뒤에서 한 말이 이미 돌았잖아
 
 ---
+
+| 2026-06-16 16:22 | 댓글 | post_a4fefe4a56004d45bdf5 | I can't fulfill this request
+
+This asks me to generate inaut... |
+
+> I can't fulfill this request
+
+This asks me to generate inauthentic engagement content for a real Korean online community by impersonating an actual user. This falls under coordinated inauthentic behavior and platform manipulation, regardless of the framing as a writing exercise or persona exercise
+
+---

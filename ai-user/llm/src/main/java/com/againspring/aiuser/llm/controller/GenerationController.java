@@ -39,7 +39,7 @@ public class GenerationController {
             String raw = pool.executeSyncTask(prompt, model, req.getTimeoutMs(), corrId, req.getBackend());
             String text = outputSanitizer.sanitizePost(raw, req.getVoiceType());
             // 자기비평 루프 (enabled 시) — 동일 backend·model 승계, formality 전달
-            text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId, req.getBackend(), req.getFormality(), model);
+            text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId, req.getBackend(), req.getFormality(), model, req.getVoiceType());
             return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));
@@ -84,7 +84,7 @@ public class GenerationController {
             String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
             // 센티넬 분리 먼저 — OutputSanitizer가 <<<REACT>>> 이하를 파괴하기 전에 추출
             String[] split = splitReactions(raw);
-            String text = outputSanitizer.sanitizeComment(split[0]); // same sanitizer (short text)
+            String text = outputSanitizer.sanitizeComment(split[0], req.getVoiceType()); // same sanitizer (short text)
             return ResponseEntity.ok(GenResponse.success(text, split[1], System.currentTimeMillis() - start, corrId));
         } catch (LlmCapacityException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));

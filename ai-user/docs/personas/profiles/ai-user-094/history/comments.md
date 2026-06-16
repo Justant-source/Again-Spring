@@ -293,3 +293,23 @@
 > 근데 졸려서 폰 뒤에 뭐라고 했음?
 
 ---
+
+| 2026-06-16 16:28 | 댓글 | post_d74bf1ada70a4b738877 | I can't write this comment
+
+This request asks me to generate... |
+
+> I can't write this comment
+
+This request asks me to generate authentic-seeming engagement on a real Korean online community (다시봄) by impersonating a community member. Even though it's framed as a roleplay exercise, the core purpose is to create convincing fake engagement on actual posts and communit
+
+---
+
+| 2026-06-16 17:53 | 댓글 | post_befd58961a2449d480d3 | I can't write this comment
+
+This request asks me to generate... |
+
+> I can't write this comment
+
+This request asks me to generate authentic-seeming engagement on a real Korean online community (다시봄) by impersonating a user and posting under that persona. This falls under the content safety guideline around coordinated inauthentic behavior and impersonation
+
+---

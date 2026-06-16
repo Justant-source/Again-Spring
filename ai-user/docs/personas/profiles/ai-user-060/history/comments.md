@@ -433,3 +433,13 @@ This asks me to impersonate an... |
 This asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual social platforms. This violates my content policy regardless of framing as:
 
 ---
+
+| 2026-06-16 16:10 | 댓글 | post_15ca9401386345ad99f3 | I can't fulfill this request
+
+This asks me to impersonate an... |
+
+> I can't fulfill this request
+
+This asks me to impersonate an authentic member of a real Korean online community (다시봈) to generate engagement on actual social posts. Even with detailed stylistic instructions, creating fake community participation—especially with reaction metrics and voting—crosses in
+
+---

@@ -217,7 +217,7 @@ public class SelfCritiqueService {
      * 자기비평 + 재생성 (formality 고려).
      */
     public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId, String backend, String formality) {
-        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, backend, formality, null);
+        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, backend, formality, null, null);
     }
 
     /**
@@ -225,6 +225,14 @@ public class SelfCritiqueService {
      */
     public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId,
                                     String backend, String formality, String model) {
+        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, backend, formality, model, null);
+    }
+
+    /**
+     * 자기비평 + 재생성 (formality·model·voiceType 고려). model/voiceType=null이면 기본값.
+     */
+    public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId,
+                                    String backend, String formality, String model, String voiceType) {
         if (!enabled || draft == null || draft.isBlank()) return draft;
 
         CritiqueResult result = quickCheck(draft, contentType, formality);
@@ -241,8 +249,8 @@ public class SelfCritiqueService {
         try {
             String raw = pool.executeSyncTask(retryPrompt, model, 90000L, corrId + "-retry", backend);
             String refined = "post".equalsIgnoreCase(contentType)
-                ? outputSanitizer.sanitizePost(raw)
-                : outputSanitizer.sanitizeComment(raw);
+                ? outputSanitizer.sanitizePost(raw, voiceType)
+                : outputSanitizer.sanitizeComment(raw, voiceType);
 
             if (refined != null && !refined.isBlank()) {
                 log.info("critique refined corr={} originalLen={} refinedLen={}", corrId, draft.length(), refined.length());
