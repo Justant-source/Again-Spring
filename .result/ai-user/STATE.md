@@ -159,9 +159,46 @@
 | Step 12 (T3) | readiness 게이트 버그 수정 | ✅ 완료 — NATEPAN ready=false (POST n_ai=0) |
 | Step 13 (T4) | COMMENT 측정 추가 | ✅ 완료 — COMMENT MAUVE 0.06 (POST와 분리 산출) |
 | Step 14 (T7) | ENABLE 게이트 구현 | ✅ 완료 — /metrics/enable-candidates, 0/12 (정상) |
-| Step 15 (T6) | 독립 검증 harness | 🔜 Phase B — 토큰 소량 소비 |
+| Step 15 (T6) | 독립 검증 harness | ✅ 완료 — A-B rerank vs random, Δ=+0.044~0.048 (marginal) |
 | Step 16 (T5) | POST 샘플 보강 | 🔜 Phase C |
 | Step 17 (T8) | THEQOO TSD 프롬프팅 | 🔜 Phase C |
+
+## Step 15 완료 (2026-06-16)
+
+| 기준 | 결과 |
+|---|---|
+| `POST /eval/ab-test` 엔드포인트 신규 | ✅ |
+| `_run_eval_ab_test()` 리랭커 vs 랜덤 비교 | ✅ |
+| `GET /corpus/export/blind` (T6b) 엔드포인트 신규 | ✅ |
+| 7개 pytest 통과 | ✅ |
+| MAUVE(rerank) vs MAUVE(random) 비교 | ✅ |
+| THEQOO: Δ=+0.048 | ⚠️ marginal (target >0.05) |
+| CLIEN: Δ=+0.044 | ⚠️ marginal (target >0.05) |
+
+### Step 15 A-B Test 결과 (오프라인 검증)
+
+| 커뮤니티 | n_human | n_contexts | MAUVE(리랭크) | MAUVE(랜덤) | **Δ** | cond4 |
+|---|---|---|---|---|---|---|
+| THEQOO | 300 | 15 | 0.682 | 0.634 | +0.048 | ❌ (목표 >0.05) |
+| CLIEN | 228 | 15 | 0.745 | 0.701 | +0.044 | ❌ (목표 >0.05) |
+
+### 해석
+
+- **긍정신호**: Δ > 0 — 리랭커가 랜덤보다 나음 (해롭지 않음)
+- **원인**: 
+  - 표본 소 (15 컨텍스트)
+  - 판별기 학습 초기 (AI negative n=40-65/커뮤니티)
+  - 드래프트 생성 다양성 부족
+- **다음**: Phase C에서 cond1 확충(>100 POST) 후 재학습 → Δ 재측정
+
+### cond4 상태
+
+```
+cond4_ab_mauve:
+  met: false
+  mauve_delta: 0.048 (THEQOO)
+  note: "T6 완료; 한계값 근처, Phase C 샘플 보강 후 재측정"
+```
 
 ## Phase A 완료 수치 요약 (2026-06-16)
 
@@ -177,7 +214,11 @@
 
 ## 다음 구체 작업
 
-- **Phase B (T6)**: A-B harness — 고정 컨텍스트 × N=4 초안(AS LLM 생성) → /rerank vs random → MAUVE delta 비교. EvalRun(kind="ab_test") 저장. 토큰 비용 발생(bounded).
+- **Phase B 완료 (T6)**: A-B harness ✅ — 리랭크 vs 랜덤 MAUVE 비교 (Δ=+0.044~0.048, 한계값). 
+- **Phase C (T5+T8)**: 
+  - **T5 (Step 16)**: AI POST 코퍼스 확충 → 100+ per community → discriminator 재학습 → AUC, MAUVE 개선 기대
+  - **T8 (Step 17)**: THEQOO 문장 다양화 프롬프팅 (현재 MAUVE=0.34 → 목표 >0.60)
+  - 이후 cond4 재측정 (목표: Δ > 0.05)
 - `AI_USER_ML_ENABLED=true` 활성화는 5조건(D-17) 전부 충족 후 수동으로 — 코드 변경 금지
 
 ## 운영 메모 / 권한
