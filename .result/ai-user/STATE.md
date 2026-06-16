@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-17 (세션 18 — 6라운드 R0~R4 완료, R1 DELETE 승인 대기)
+**최종 갱신**: 2026-06-17 (세션 19 — P0 ✅ corpus 축적 재개, R1 DELETE 승인 대기, R5~R8 진행 중)
 
 ---
 
@@ -16,21 +16,23 @@
 
 ## 현재 위치
 
-- **Phase**: Base Hardening 6라운드 (R0~R8) — R4까지 완료, **R1 DELETE 승인 대기 중**
+- **Phase**: Base Hardening 6라운드 (R0~R8) — **P0 ✅** / R5~R8 진행 중 / **R1 DELETE 승인 대기**
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 - **직전 커밋**: `96fdfdcd` (2026-06-17) — R0~R4 + Step 39~43 docs
+- **Step 44**: P0 ✅ — 오케스트레이터 재배포 (빌드 00:59:27 > R3 커밋 00:26:53), ML ACCEPTED +3건, e2e 142 passed
 
 ---
 
 ## 🚨 다음 세션 시작 전 필수 확인
 
-### ① R1 DELETE (사용자 승인 대기)
+### ① R1 DELETE (사용자 승인 대기) — 세션 19 dry-run 재확인 완료
 ```bash
 cd /home/justant/Data/Again-Spring/.result/ai-user/scripts
 python3 audit_mislabels.py --delete
 ```
-- 대상: ctx_* 오염분 34건 (CLIEN 32 + NATEPAN 2)
-- NATEPAN cond4 영향: 2/528 = 0.38% → 미미 → PASS 유지 예정
+- 대상: ctx_* 오염분 34건 (CLIEN 32 + NATEPAN 2) — dry-run 2회 동일 결과
+- human_match_delete=0 (과삭제 없음 확인)
+- NATEPAN cond4 영향: 2/528 = 0.38% → 미미 → PASS 유지
 - **사용자 "삭제 승인" 확인 후에만 실행**
 
 ### ② 다음 작업 순서 (R5~R8)
@@ -47,15 +49,16 @@ python3 audit_mislabels.py --delete
 
 | 단계 | 내용 | 상태 | 수치 |
 |---|---|---|---|
+| **P0** | R3 오케스트레이터 재배포 (축적 잠금 해제) | ✅ | 빌드 00:59:27 > R3 00:26:53, ML ACCEPTED +3건, e2e 142P |
 | **R0** | clcocloud API-우선 래퍼 (run_ab_test.py) | ✅ | DENY_SIGS 재시도 + CLI 폴백 |
-| **R1** | corpus 오라벨 정밀 대조 (audit_mislabels.py) | ⏳ DELETE 승인 대기 | 34건 ctx_* (human 오라벨 0건) |
+| **R1** | corpus 오라벨 정밀 대조 (audit_mislabels.py) | ⏳ DELETE 승인 대기 | 34건 ctx_* (human_match=0, dry-run 2회 동일) |
 | **R2** | 인코딩 방향 회귀 테스트 | ✅ 5/6 passed + 1 xfailed | D-45 확정: 인코딩 정상 |
 | **R3** | AS+ML 양면 소스 가드 | ✅ | pushNegative SELF_GENERATED + routes_corpus.py 가드 |
 | **R4** | CLIEN de-counselor + features | ✅ | 7 voice.yml + dev DB 5건 JSON_SET |
-| **R5** | R4 효과 MAUVE 측정 | 🔜 | 신선 출력 대기 |
-| **R6** | THEQOO corpus 재구축 | 🔜 | n_ai=0 → ≥100 목표 |
-| **R7** | COMMENT MAUVE | 🔜 | |
-| **R8** | A-B 동결 + cond4 분기 | 🔜 | R1 결과 의존 |
+| **R5** | R4 효과 MAUVE 측정 | 🔄 진행 중 | CLIEN 신선분 축적 중 (현재 n_ai=137) |
+| **R6** | THEQOO corpus 재구축 | 🔄 진행 중 | n_ai=0 → ≥100 목표, 자연 틱 축적 중 |
+| **R7** | COMMENT MAUVE | 🔄 M-before 진행 중 | 기존 corpus(ai=321, human=1023) 즉시 측정 가능 |
+| **R8** | A-B 동결 + cond4 분기 | 🔜 | R1+R5+R6+R7 완료 후 |
 
 ---
 
@@ -155,4 +158,5 @@ cond5: ❌ FAIL — 사용자 정확도 82.5% (목표 ≤60%)
 | Step 27~34 | 14~16 | 3라운드 M1~M8 + CUDA 수정 | ✅ |
 | Step 35~38 | 16~17 | M1 A-B 재실행, M6 댓글, NATEPAN 교정, THEQOO corpus 삭제 | ✅ |
 | Step 39~43 | 18 | 6라운드 R0~R4 (API래퍼·소스가드·CLIEN de-counselor) | ✅ |
-| Step 44~ | 18~ | R5~R8 (MAUVE·THEQOO재구축·cond4) | 🔜 |
+| **Step 44** | 19 | P0: R3 오케스트레이터 재배포 + e2e + corpus 축적 확인 | ✅ |
+| Step 45~ | 19~ | R5~R8 (MAUVE·THEQOO재구축·cond4) | 🔄 |
