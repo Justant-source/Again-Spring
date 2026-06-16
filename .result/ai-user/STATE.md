@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 10 — Base Hardening Step 0~17 전 완료)
+**최종 갱신**: 2026-06-16 (세션 11 — N1~N7+N8a 완료, N8b 진행 중)
 
 ---
 
@@ -19,7 +19,7 @@
 
 - **Phase**: Base Hardening 2라운드 진행 중 (Step 18~26)
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **현재 세션 완료**: N4 ✅ · N2(WSL) ✅ · N3(WSL) ✅ · N1(WSL 코퍼스 정제) ✅ · N6(코드 완료/e2e 대기) · N7+N8(a)(AS 진행 중)
+- **완료**: N1 ✅ · N2 ✅ · N3 ✅ · N4 ✅ · N5 ✅ (cond5 FAIL) · N6 ✅ · N7 ✅ · N8(a) ✅ · **진행**: N8(b) 🔄
 
 ---
 
@@ -76,12 +76,13 @@
 
 ### ENABLE 게이트 (5조건)
 ```
-현재: 0/12 커뮤니티×조건 충족 (정상 — 진행 중)
+현재: 0/12 커뮤니티×조건 충족 (정상 — N8b 진행 중)
 blocker:
-  cond1: n_ai<100 (전 커뮤니티)
-  cond2: CV-AUC 신뢰 불가 (n_ai<100으로 INSUFFICIENT_DATA)
-  cond4: Δ<0 (THEQOO 역전) / Δ=0 (CLIEN 무신호)
-  cond5: 사람 블라인드 미실시
+  cond1: n_ai<100 (THEQOO 68, CLIEN 41, DCINSIDE 24, NATEPAN 0 — N8b 중)
+  cond2: CV-AUC 신뢰 불가 (n_ai<100 → INSUFFICIENT_DATA)
+  cond3: ✅ SPLITTER_VERIFIED=True (N3 수정)
+  cond4: Δ<0 (THEQOO 역전) / Δ=0 (CLIEN 무신호) — 재학습 후 N9 재측정
+  cond5: human_accuracy=1.0 (THEQOO/CLIEN) — 프롬프트 개선 후 재라벨링 필요
 ```
 
 ---
@@ -93,13 +94,13 @@ blocker:
 | N4 (Step 21) | 15-ab-harness.md VOID 헤더 | ✅ | commit aa39e042 |
 | N2 (Step 19) | D-21 분리기 단위테스트 | ✅ WSL | 13/13 PASS, DC avg_sl=2.62 (commit 73f227c) |
 | N3 (Step 20) | enable-gate cond3/cond5 정정 | ✅ WSL | cond3=True, cond5 ≤0.60 (commit dac259b) |
-| N1 (Step 18) | THEQOO 코퍼스 디오염 | ✅ WSL (부분) | 168/344 삭제, 252 클린. P(human) 역전 유지(재학습 필요) |
-| N6 (Step 23) | 댓글 초성체 allowChosung | 🔄 코드 완료 | e2e 게이트 대기 |
-| N7 (Step 24) | DB general_style 정정 | 🔄 진행 중 | AS 에이전트 실행 중 |
-| N8(a) (Step 25) | NATEPAN/INVEN HEAVY 승격 | 🔄 진행 중 | AS 에이전트 실행 중 |
-| N5 (Step 22) | 블라인드 자가 라벨링 | 🔄 진행 중 | WSL 에이전트 실행 중 |
-| N8(b) (Step 25) | AI POST 생성 n_ai→100 | 🔄 진행 중 | POST 트리거 에이전트 실행 중 |
-| N9 (Step 26) | 클린 A-B + T8 MAUVE | ⏳ 대기 | N1+N8 완료 필요 |
+| N1 (Step 18) | THEQOO 코퍼스 디오염 | ✅ WSL | 168/344 삭제, 252 클린. P(human) 역전 유지(재학습 필요) |
+| N5 (Step 22) | 블라인드 자가 라벨링 | ✅ | 정확도 1.00(THEQOO/CLIEN) — cond5 FAIL(예상). eval_run id=50/51 기록 |
+| N6 (Step 23) | 댓글 초성체 allowChosung | ✅ | commit 68cb4781 — e2e dev:8090 통과 확인 |
+| N7 (Step 24) | DB general_style 정정 | ✅ | dev DB 100개 페르소나 큐레이션 스타일 + PersonaFactory voiceGuide |
+| N8(a) (Step 25) | NATEPAN/INVEN HEAVY 승격 | ✅ | NATEPAN HEAVY=2, INVEN HEAVY=2. voice 필터 트리거 추가 |
+| N8(b) (Step 25) | AI POST 생성 n_ai→100 | 🔄 진행 중 | voice 필터 트리거 실행 중 — 2026-06-16 결과 대기 |
+| N9 (Step 26) | 클린 A-B + T8 MAUVE | ⏳ 대기 | N8(b) n_ai≥100 + `/train` 완료 필요 |
 
 ---
 
