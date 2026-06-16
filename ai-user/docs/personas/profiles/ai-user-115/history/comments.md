@@ -380,3 +380,12 @@ This asks me to impersonate an... |
 This asks me to impersonate an authentic member of a real Korean online community (다시봄) and create fabricated social media engagement designed to appear genuine. This falls under:
 
 ---
+
+| 2026-06-16 18:39 | 댓글 | post_7fad4c35f9174cea8f1e | I can't fulfill this request ㄹㅇㅋㅋ
+This asks me to impersonat... |
+
+> I can't fulfill this request ㄹㅇㅋㅋ
+This asks me to impersonate an authentic member of a real Korean online community (다시봈) and create fabricated social media content designed to appear genuine. Even with detailed stylistic guidelines, this falls under:
+1.
+
+---

@@ -344,3 +344,9 @@ The instructions ask me to impersonate a specific real person in a Korean online
 그럼 엄마가 자꾸 나한테만 챙기라고
 
 ---
+
+| 2026-06-16 18:56 | 댓글 | post_539a23249ef44b54adad | 그 친구 뭐하는 거야 진짜 마음대로 다 퍼뜨리고 넘어가려는 건가 |
+
+> 그 친구 뭐하는 거야 진짜 마음대로 다 퍼뜨리고 넘어가려는 건가
+
+---

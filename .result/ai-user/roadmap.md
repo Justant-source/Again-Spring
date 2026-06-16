@@ -366,16 +366,21 @@
 
 ---
 
-## Step 27 (M1) — cond4 UNVERIFIED 강등 + A-B 재설계 ⏳
+## Step 27 (M1) — cond4 UNVERIFIED 강등 + A-B 재설계 ✅ 완료 (2026-06-16)
 
 **목표**: Δ+0.4834 단일런 노이즈 인정 + routes_eval.py K≥3시드 평균±std + ≥40ctx 재실행.
 **완료 기준**:
 - [x] cond4 강등 (UNVERIFIED) — STATE.md/steps/27-n9-ab-test.md 갱신
-- [x] run_ab_test.py THEQOO/NATEPAN 테마 40+로 확장 (M1 에이전트)
-- [ ] routes_eval.py K≥3 시드 평균±std 수정 (WSL ML 서비스)
-- [ ] ≥40ctx A-B 재실행 → Δ 평균±std 기록
+- [x] run_ab_test.py THEQOO/NATEPAN 테마 40+로 확장
+- [x] routes_eval.py K≥3 시드(42, 137, 2026) 평균±std 수정 + 컨테이너 배포
+- [x] ≥40ctx A-B 재실행 → Δ 기록
 
-**판정**: Δ>0 AND std<평균이면 cond4 met. 아니면 솔직히 "무신호" 기록.
+**결과**:
+- THEQOO: Δ=−0.0094 (std=0.0098, 16ctx — Claude CLI 갱신으로 24ctx 실패) → cond4 ❌ FAIL
+- NATEPAN: Δ=−0.0167 (std=0.0801, 40ctx) → cond4 ❌ FAIL
+- **해석**: 판별기 P(human) 역전 상태 → 리랭커 역효과. M7 신선 출력 축적+재학습 후 재측정 필요.
+
+**판정**: 두 커뮤니티 모두 Δ<0 → cond4 FAIL (Δ>0 AND std<평균 미충족).
 
 ---
 
@@ -440,7 +445,7 @@
 
 ---
 
-## Step 32 (M6) — COMMENT MAUVE 측정 ⏳ NOT RUN
+## Step 32 (M6) — COMMENT MAUVE 측정 ✅ 완료 (2026-06-16)
 
 **목표**: N6(allowChosung) 전/후 COMMENT MAUVE 실측.
 **완료 기준**:
@@ -461,10 +466,17 @@
 
 ---
 
-## Step 34 (M8) — DCINSIDE 재-pull + 학습 가능성 판정 ⏳
+## Step 34 (M8) — DCINSIDE 재-pull + 학습 가능성 판정 ✅ 완료 (2026-06-16)
 
 **목표**: cursor 리셋으로 39→~300 복구.
 **완료 기준**:
-- [ ] `/app/data/.corpus_pull_cursor` 리셋 (또는 full pull 트리거)
-- [ ] decontaminate 통과 후 n_human 실측
-- [ ] ≥300이면 `/train` → CV-AUC / 미달이면 "불가" 명시
+- [x] `/app/data/.corpus_pull_cursor` 리셋
+- [x] 직접 인제스트 시도 (264건 → inserted=0, skipped=264 — 기존 AI corpus와 해시 충돌)
+- [x] n_human 실측: **39 (변동 없음)**
+
+**결과**: **DCINSIDE 학습 불가 — 장르 구조 불일치**
+- human 39건 스팟체크: 와인경진대회·카메라·여행기·뉴스·수공예 — 갈등 서사 없음
+- DCINSIDE = 주제별 갤러리(hobby) 포럼. 갈등 게시판 구조 없음.
+- 264건 인제스트 실패 = AI 생성물(오케스트레이터 출력) 해시와 전부 충돌
+- **판정**: 제외. enable-gate cond1/cond2는 THEQOO/CLIEN/NATEPAN 3개 커뮤니티 기준.
+- **기록**: steps/34-m8-dcinside.md

@@ -361,3 +361,9 @@ This prompt is asking me to roleplay as a specific person in a Korean online com
 > 솔직히 남친이 먼저 보여준 거면 숨길 생각은 없던 거 아님?
 
 ---
+
+| 2026-06-16 18:42 | 댓글 | post_9acfa7d4ff724b5fb27a | 새벽 1시 절친이랑 카톡 오가면서 자기는 자감 ㅋ |
+
+> 새벽 1시 절친이랑 카톡 오가면서 자기는 자감 ㅋ
+
+---

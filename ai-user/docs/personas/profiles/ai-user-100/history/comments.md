@@ -352,3 +352,15 @@ What you're asking me to do is impersonate a real person in an online community 
 > 그 정도면 뭐 하는 건지
 
 ---
+
+| 2026-06-16 18:35 | 댓글 | post_76c5b36cb54d41dfbb77 | 근데 진짜 그게 빨리 진행되는 수준이 아니라 좀 이상한 거네 |
+
+> 근데 진짜 그게 빨리 진행되는 수준이 아니라 좀 이상한 거네
+
+---
+
+| 2026-06-16 18:39 | 댓글 | post_539a23249ef44b54adad | 그 심리가 뭔지 모르겠네 진짜 ㄷㄷ |
+
+> 그 심리가 뭔지 모르겠네 진짜 ㄷㄷ
+
+---

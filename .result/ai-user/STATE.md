@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 15 — M3 재학습 완료, M4 CV 추출, M7 NATEPAN features+reply voiceType 수정 dev 배포+e2e 통과)
+**최종 갱신**: 2026-06-16 (세션 16 — M1 cond4 재측정 완료(FAIL), M8 DCINSIDE 장르불일치 제외)
 
 ---
 
@@ -69,25 +69,27 @@
 | NATEPAN | null | N8a 완료(n_ai=225), 오케스트레이터 `/eval/baseline` 재실행 필요 |
 | THEQOO | **0.6077** | T8 효과 확인 ✅ (before: 0.345 → after: 0.6077, Job 01KV7HZYECXC5VZRGW5Q88RTWW) |
 
-### A-B 테스트 결과 (Step 15→N9, 2026-06-16)
-| 커뮤니티 | MAUVE(rerank) | MAUVE(random) | Δ | cond4 |
-|---|---|---|---|---|
-| THEQOO | 0.9794 | 0.4961 | **+0.4834** | ⚠️ UNVERIFIED — 12ctx 단일런 노이즈 (무시드 random, M1에서 ≥40ctx×3seed 재측정) |
-| CLIEN | 0.9962 | 0.9962 | **+0.0000** | ❌ (MAUVE ceiling — 이미 human-like) |
-| NATEPAN | 0.9669 | 0.9669 | **0.000** | ❌ (Round1만 측정) |
+### A-B 테스트 결과 (M1 재측정 완료, 2026-06-16 K=3시드)
+| 커뮤니티 | MAUVE(rerank) | MAUVE(random 3seed 평균) | std | Δ | n_ctx | cond4 |
+|---|---|---|---|---|---|---|
+| THEQOO | 0.9815 | 0.9908 | 0.0098 | **−0.0094** | 16 | ❌ FAIL (Δ<0) |
+| NATEPAN | 0.8273 | 0.8441 | 0.0801 | **−0.0167** | 40 | ❌ FAIL (Δ<0, 노이즈) |
+| CLIEN | 0.9962 | 0.9962 | — | **0.0000** | 12 | ❌ MAUVE ceiling |
+
+> **이전 THEQOO Δ=+0.4834**: 12ctx 단일런 노이즈 — K=3 재측정에서 Δ=−0.0094로 확정.
 
 ### ENABLE 게이트 (5조건)
 ```
 현재: 3+/12 커뮤니티×조건 충족 (N9 Round3 이후)
 상태:
-  cond1: ✅ THEQOO n_ai=157≥100, CLIEN n_ai=131≥100, NATEPAN n_ai=225≥100
-         ✅ DCINSIDE n_ai=103≥100 (세션12 달성) — BUT n_human=39 → 학습 불가
+  cond1: ✅ THEQOO n_ai=158≥100, CLIEN n_ai=131≥100, NATEPAN n_ai=225≥100
+         ❌ DCINSIDE: 장르 불일치 → 제외 (n_human=39, 콘텐츠=와인/카메라/여행, 갈등 서사 아님)
   cond2: ✅ THEQOO/CLIEN/NATEPAN AUC 신뢰 가능 (n_human≥300, n_ai≥100 모두 충족)
          ❌ DCINSIDE AUC 신뢰 불가 (n_human=39 << 300)
   cond3: ✅ SPLITTER_VERIFIED=True (N3 수정)
-  cond4: ⚠️ UNVERIFIED THEQOO Δ=+0.4834 (12ctx 단일런 노이즈 — M1 ≥40ctx×3seed 재측정 예정)
-         ❌ CLIEN Δ=0 (MAUVE ceiling 0.9962 — cond4 재정의 검토 필요)
-         ❌ NATEPAN Δ=0 (Round1만 측정)
+  cond4: ❌ THEQOO Δ=−0.0094 (K=3, 16ctx) — 판별기 역전으로 리랭킹 역효과
+         ❌ NATEPAN Δ=−0.0167 (K=3, 40ctx, std=0.0801 노이즈)
+         ❌ CLIEN Δ=0 (MAUVE ceiling 0.9962)
   cond5: human_accuracy=1.0 (THEQOO/CLIEN) — 프롬프트 개선 후 재라벨링 필요
 ```
 
@@ -185,14 +187,19 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 - ✅ M4 CV 추출 — THEQOO mean=0.9986/std=0.00275, CLIEN 0.9947/0.0095, NATEPAN 0.9994/0.00086 (steps/30-m4-cv-ablation.md)
 - ✅ M7 (파일럿 완료) — NATEPAN voice.yml 16개 features 백필 + GenDto.ReplyRequest voiceType 필드 추가 + ActionExecutor reply voiceType 전달 + GenerationController/SelfCritiqueService voiceType 경로 보정 + PersonaFactory schema features 추가 + dev DB NATEPAN 6개 JSON_SET + dev 배포 + e2e 142/142 통과 (5 skip)
 
+### ✅ 완료 (세션 16)
+- ✅ M1 A-B 재측정 — K=3 시드, routes_eval.py 배포, THEQOO Δ=−0.0094 FAIL, NATEPAN Δ=−0.0167 FAIL
+- ✅ M8 DCINSIDE — 장르 불일치 확인 (와인/카메라/여행), 학습 제외 결정
+- ✅ DB 스키마 수정 — jobs.params_json MEDIUMTEXT (40ctx 500 에러 해소)
+
 ### 🥇 다음 우선순위
-1. **main push** — M7 e2e 통과 완료, commit & push 필요
-2. **M1 A-B 재설계** — routes_eval.py K≥3 시드 평균±std 수정 + 40+ contexts THEQOO/NATEPAN 재실행
-3. **M8 DCINSIDE** — cursor 리셋 + example_bank 재-pull → n_human 39→~300 목표
+1. **M5 블라인드** — M7 배포 후 신선 출력 축적 대기 (dev에서 자연 틱 중)
+2. **M6 COMMENT MAUVE** — before/after N6 측정 (아직 NOT RUN)
+3. **cond4 경로** — M7 신선 출력 축적 → 재학습 → P(human) 방향 교정 → A-B 재측정
 
 ### 🥈 M5 블라인드 (M7 배포 후 신선 출력 축적 대기)
 - 사용자 직접 라벨링 40쌍 (THEQOO+NATEPAN 각 20쌍)
-- 현재 M7 출력 아직 dev에서 생성 중 — 자연 틱 or admin trigger
+- M7 features(NATEPAN) + voiceType reply 경로 적용 → 신선 출력 dev에서 자연 틱 중
 
 ### 🥉 M6 COMMENT MAUVE
 - before/after N6 측정 (아직 NOT RUN)

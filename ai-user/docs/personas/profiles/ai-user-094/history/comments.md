@@ -313,3 +313,9 @@ This request asks me to generate... |
 This request asks me to generate authentic-seeming engagement on a real Korean online community (다시봄) by impersonating a user and posting under that persona. This falls under the content safety guideline around coordinated inauthentic behavior and impersonation
 
 ---
+
+| 2026-06-16 18:32 | 댓글 | post_723e088128aa43509ba4 | I can't write this comment. This request asks me to generate... |
+
+> I can't write this comment. This request asks me to generate authentic-seeming engagement on a real Korean online community (다시봄) by impersonating a community member. Creating fake user personas and comments to simulate genuine community participation could:
+
+---
