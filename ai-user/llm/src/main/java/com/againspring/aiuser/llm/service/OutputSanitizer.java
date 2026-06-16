@@ -70,7 +70,9 @@ public class OutputSanitizer {
 
     public String sanitizeComment(String raw, String voiceType) {
         String base = sanitize(raw, MAX_COMMENT);
-        return applyDist(base, voiceType, false);
+        // N6: allowChosung=true — VOICE_DIST.chosungInject 값이 voice별 주입 여부를 결정
+        // (이전: false 하드코딩 → DCINSIDE/THEQOO/FMKOREA/ARCALIVE 댓글 초성체 완전 차단)
+        return applyDist(base, voiceType, true);
     }
 
     private String applyDist(String text, String voiceType, boolean allowChosung) {

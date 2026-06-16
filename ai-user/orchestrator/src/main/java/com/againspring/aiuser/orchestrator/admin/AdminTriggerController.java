@@ -150,12 +150,25 @@ public class AdminTriggerController {
      */
     @PostMapping("/generate-posts")
     public ResponseEntity<Map<String, Object>> generatePosts(
-            @RequestParam(defaultValue = "2") int count) {
+            @RequestParam(defaultValue = "2") int count,
+            @RequestParam(required = false) String voice) {
 
         int n = Math.max(1, Math.min(count, 10)); // 안전 상한
         var active = new java.util.ArrayList<>(personaRepo.findByActiveTrue());
         if (active.isEmpty()) {
             return ResponseEntity.ok(Map.of("attempted", 0, "message", "활성 페르소나 없음"));
+        }
+        // voice 필터: 특정 커뮤니티 타겟 생성 (예: ?voice=NATEPAN)
+        if (voice != null && !voice.isBlank()) {
+            String voiceUpper = voice.toUpperCase();
+            active.removeIf(p -> {
+                String vt = p.getVoiceProfile() != null
+                    ? extractVoiceType(p.getVoiceProfile()) : null;
+                return !voiceUpper.equals(vt);
+            });
+            if (active.isEmpty()) {
+                return ResponseEntity.ok(Map.of("attempted", 0, "message", "해당 voice 활성 페르소나 없음: " + voice));
+            }
         }
         var heavy = active.stream()
             .filter(p -> "HEAVY".equals(p.getTier()))
@@ -182,6 +195,11 @@ public class AdminTriggerController {
             "personaIds", personaIds,
             "message", attempted + "개 글 생성 시도 완료(LLM+세이프가드 통과분만 게시됨)."
         ));
+    }
+
+    private static String extractVoiceType(java.util.Map<String, Object> profile) {
+        Object v = profile.get("voice_type");
+        return v != null ? v.toString() : null;
     }
 
     /** AI 댓글 ㅠ{2,} → ㅠ 정규화 (synthetic=1 유저만) */
