@@ -170,34 +170,40 @@
 | `POST /eval/ab-test` 엔드포인트 신규 | ✅ |
 | `_run_eval_ab_test()` 리랭커 vs 랜덤 비교 | ✅ |
 | `GET /corpus/export/blind` (T6b) 엔드포인트 신규 | ✅ |
-| 7개 pytest 통과 | ✅ |
-| MAUVE(rerank) vs MAUVE(random) 비교 | ✅ |
-| THEQOO: Δ=+0.048 | ⚠️ marginal (target >0.05) |
-| CLIEN: Δ=+0.044 | ⚠️ marginal (target >0.05) |
+| 10/10 pytest 통과 (patch target 수정 포함) | ✅ |
+| `POST /eval/ab-test` 실제 실행 (2026-06-16) | 🔄 진행 중 — 결과 대기 |
 
-### Step 15 A-B Test 결과 (오프라인 검증)
+### Step 15 A-B Test 결과 (실제 측정 중)
 
 | 커뮤니티 | n_human | n_contexts | MAUVE(리랭크) | MAUVE(랜덤) | **Δ** | cond4 |
 |---|---|---|---|---|---|---|
-| THEQOO | 300 | 15 | 0.682 | 0.634 | +0.048 | ❌ (목표 >0.05) |
-| CLIEN | 228 | 15 | 0.745 | 0.701 | +0.044 | ❌ (목표 >0.05) |
+| THEQOO | 344 | 10 | 0.629 | 0.985 | **-0.356** | ❌ (반전 — 아래 진단) |
+| CLIEN | 294 | 10 | 0.9998 | 0.9998 | **0.000** | ❌ (무신호) |
 
-### 해석
+### 진단 (2026-06-16 실측)
 
-- **긍정신호**: Δ > 0 — 리랭커가 랜덤보다 나음 (해롭지 않음)
-- **원인**: 
-  - 표본 소 (15 컨텍스트)
-  - 판별기 학습 초기 (AI negative n=40-65/커뮤니티)
-  - 드래프트 생성 다양성 부족
-- **다음**: Phase C에서 cond1 확충(>100 POST) 후 재학습 → Δ 재측정
+**THEQOO Δ = -0.356 (역전)**: 판별기가 "갈등 사연 = AI" 학습 오염.
+- 원인: THEQOO 인간 코퍼스에 링크포스트·공지·짧은 반응이 대거 포함됨 → 판별기가 "긴 갈등 서사 = AI, 짧은 반응/링크 = 인간"으로 학습
+- A-B 테스트 초안은 전부 갈등 서사 → 판별기가 P(human)을 역방향으로 평가
+- rerank 선택 = "갈등 서사 중 가장 짧은/비서사적" → MAUVE 오히려 낮음
+- **긍정 발견**: random 초안의 MAUVE=0.985 (높음!) — `run_ab_test.py`의 단순 THEQOO 트레이트 프롬프트가 이미 인간-유사도 높음. 실제 봇 코퍼스 MAUVE=0.345는 오케스트레이터 생성 방식의 문제
+
+**CLIEN Δ = 0.000**: 판별기 신호 없음.
+- 원인: CLIEN AI 텍스트와 인간 텍스트가 이미 매우 유사(MAUVE=0.9998) → 선택의 여지 없음
+
+**핵심 결론**: 리랭커는 현재 두 커뮤니티 모두 유용한 신호 제공 불가.
+- THEQOO: 코퍼스 정제 필요 (갈등 사연 POST만 인간 레이블)
+- 두 커뮤니티 모두 n_ai < 100 → T2 게이트로 재학습 불가
 
 ### cond4 상태
 
 ```
 cond4_ab_mauve:
   met: false
-  mauve_delta: 0.048 (THEQOO)
-  note: "T6 완료; 한계값 근처, Phase C 샘플 보강 후 재측정"
+  THEQOO_delta: -0.356 (역전)
+  CLIEN_delta: 0.000 (무신호)
+  fix_needed: "THEQOO 인간 코퍼스 갈등 사연 POST로 필터링 후 재학습"
+  blocker: "n_ai < 100 → INSUFFICIENT_DATA 게이트 → 재학습 불가"
 ```
 
 ## Phase A 완료 수치 요약 (2026-06-16)
@@ -210,15 +216,23 @@ cond4_ab_mauve:
 | ready_count | 4/4 | **0/12** (실제 데이터 기준) |
 | enable-candidates | 없음 | **0/12** (5조건 모두 미충족 정상) |
 | COMMENT MAUVE | 미측정 | **0.060** (NATEPAN), 0.068 (CLIEN) |
-| pytest | 65/65 | **70/70** |
+| pytest | 65/65 | **82/82** (T6 10 tests baked into rebuilt container) |
 
 ## 다음 구체 작업
 
-- **Phase B 완료 (T6)**: A-B harness ✅ — 리랭크 vs 랜덤 MAUVE 비교 (Δ=+0.044~0.048, 한계값). 
-- **Phase C (T5+T8)**: 
-  - **T5 (Step 16)**: AI POST 코퍼스 확충 → 100+ per community → discriminator 재학습 → AUC, MAUVE 개선 기대
-  - **T8 (Step 17)**: THEQOO 문장 다양화 프롬프팅 (현재 MAUVE=0.34 → 목표 >0.60)
-  - 이후 cond4 재측정 (목표: Δ > 0.05)
+- **Phase B 완료 (T6)**: ✅ 실측 완료 — cond4 미충족 (THEQOO 역전, CLIEN 무신호), 원인 진단 완료.
+- **Phase C (T5+T8) — 핵심 수정 방향**:
+  - **T8 (Step 17)**: THEQOO 프롬프팅 개선. 목표: 오케스트레이터 생성 MAUVE=0.345 → 0.60+.
+    - 실마리: run_ab_test.py 단순 프롬프트로 MAUVE=0.985 달성 → 오케스트레이터 생성 방식 문제
+    - PromptAssembler의 THEQOO 시스템 프롬프트에 TSD 제약 추가 (짧은 문장, burstiness, 자연스러운 자모)
+    - 변경 후 AI corpus re-collect → baseline 재측정
+  - **T5 (Step 16)**: THEQOO/DCINSIDE/NATEPAN n_ai → 100 돌파 (자연 축적 + 수동 시딩)
+    - 특히 THEQOO: 65→100 = 35개 더 필요 (가장 근접)
+    - T8 이후 신선 데이터로 재수집해야 더 의미 있음
+  - **THEQOO 코퍼스 정제 (T6 재실행 전제)**:
+    - 인간 코퍼스에서 링크포스트·공지·짧은 반응 제거 → 갈등 사연 POST만 유지
+    - OR: 갈등 관련 키워드 필터로 인간 corpus 정제
+  - T5+T8 완료 → discriminator 재학습 → A-B 재측정 → cond4 확인 (목표: Δ > 0.05)
 - `AI_USER_ML_ENABLED=true` 활성화는 5조건(D-17) 전부 충족 후 수동으로 — 코드 변경 금지
 
 ## 운영 메모 / 권한
