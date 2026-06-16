@@ -42,8 +42,29 @@ D-52: R4 de-counselor 이후 신선 CLIEN POST의 MAUVE 전/후 비교 진행 �
   ```
 - 신선분만 MAUVE 계산 (Python mauve 라이브러리 직접)
 
+## R5 M-after 결과 (세션 19, n=22)
+
+| 측정 | 값 | 비고 |
+|---|---|---|
+| fresh CLIEN ai POST | 22건 | ingested_at > 2026-06-16 15:59:00 |
+| human reference | 500건 | random sample |
+| **MAUVE (fresh R4)** | **0.3527** | WSL mauve-text 계산 |
+| MAUVE M-before (전체) | 0.6277 | n_ai=142 전체 corpus |
+
+### 해석 주의사항
+- MAUVE 0.6277 → 0.3527: **하락** = fresh R4 posts가 human과 더 다름
+- 가능한 설명:
+  1. 소표본 노이즈 (n=22): 신뢰 구간 넓음
+  2. 주제 분포 차이: 22건 모두 소수 archetype에서 생성 (FAMILY 위주)
+  3. R4 de-counselor가 예상과 다른 방향 = 상담조 제거 후 다른 AI 특성 부각
+- **결론**: 방향 불확실. micro 블라인드 20쌍 필요 (사용자 참여).
+
+### 추가 분석 (나중에)
+- spacing_error_rate 비교: R4 신선분 vs human vs 구 corpus
+- R4 de-counselor가 실제로 "덜 상담조"를 달성했는지 샘플 리뷰
+
 ## 상태
 - **M-before**: ✅ CLIEN POST MAUVE=0.6277
-- **Trigger**: ✅ 수행 중 (신선분 7건 확인, 추가 트리거 중)
-- **Wait**: ⏳ ≥25건 목표
-- **M-after**: 🔜 25건 도달 후
+- **Trigger**: ✅ 22건 신선분 확보
+- **M-after**: ✅ MAUVE=0.3527 (소표본 주의)
+- **micro 블라인드**: ⏳ 사용자 참여 필요

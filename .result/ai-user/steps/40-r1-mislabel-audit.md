@@ -27,8 +27,18 @@ D-46: audit_mislabels.py로 학습 코퍼스 오라벨 감지 (test contaminatio
 - BACKFILL = PersonaFactory 자동 생성 (정상)
 
 ## 상태
-- DELETE 승인 대기 중
+- **✅ COMPLETE** (2026-06-17 세션 19 — 사용자 승인 후 실행)
+
+## DELETE 실행 결과 (세션 19)
+- CLIEN: 32건 삭제 ✅
+- NATEPAN: 2건 삭제 ✅
+- 총 34건 삭제, human_match=0 (과삭제 없음)
+- NATEPAN 0.4% < 5% → **cond4 PASS 유지(provisional 아님)** 확정
+
+## R1 이후 재학습
+- CLIEN: AUC=0.9965 (재학습 완료)
+- NATEPAN: AUC=0.9989 (재학습 완료)
+- 양 커뮤니티 AUC 유지 — R1 삭제 영향 미미
 
 ## 다음
-- R2: 인코딩 검증 (human P(human) 방향 확인)
-- R3: source='SELF_GENERATED' 가드 추가
+- R8 입력: NATEPAN cond4 PASS 확정 → A-B 재실행 불필요(동결)

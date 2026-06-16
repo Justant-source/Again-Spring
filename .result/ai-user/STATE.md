@@ -51,13 +51,13 @@ python3 audit_mislabels.py --delete
 |---|---|---|---|
 | **P0** | R3 오케스트레이터 재배포 (축적 잠금 해제) | ✅ | 빌드 00:59:27 > R3 00:26:53, ML ACCEPTED +3건, e2e 142P |
 | **R0** | clcocloud API-우선 래퍼 (run_ab_test.py) | ✅ | DENY_SIGS 재시도 + CLI 폴백 |
-| **R1** | corpus 오라벨 정밀 대조 (audit_mislabels.py) | ⏳ DELETE 승인 대기 | 34건 ctx_* (human_match=0, dry-run 2회 동일) |
+| **R1** | corpus 오라벨 정밀 대조 (audit_mislabels.py) | ✅ DELETE 완료 | CLIEN −32 / NATEPAN −2 / 재학습 CLIEN=0.9965 NATEPAN=0.9989 |
 | **R2** | 인코딩 방향 회귀 테스트 | ✅ 5/6 passed + 1 xfailed | D-45 확정: 인코딩 정상 |
 | **R3** | AS+ML 양면 소스 가드 | ✅ | pushNegative SELF_GENERATED + routes_corpus.py 가드 |
-| **R4** | CLIEN de-counselor + features | ✅ | 7 voice.yml + dev DB 5건 JSON_SET |
-| **R5** | R4 효과 MAUVE 측정 | 🔄 진행 중 | CLIEN 신선분 축적 중 (현재 n_ai=137) |
-| **R6** | THEQOO corpus 재구축 | 🔄 진행 중 | n_ai=0 → ≥100 목표, 자연 틱 축적 중 |
-| **R7** | COMMENT MAUVE | 🔄 M-before 진행 중 | 기존 corpus(ai=321, human=1023) 즉시 측정 가능 |
+| **R4** | CLIEN de-counselor + features | ✅ | 7 voice.yml + DB 5건 JSON_SET (R7 typo+length 업데이트 포함) |
+| **R5** | R4 효과 MAUVE 측정 | 🔄 M-after=0.3527 | 신선 22건 소표본 (주의: 노이즈). micro 블라인드 필요 |
+| **R6** | THEQOO corpus 재구축 | 🔄 진행 중 | n_ai=59→(축적 중)/100 목표 |
+| **R7** | COMMENT MAUVE + typo/length 수정 | 🔄 M-before 완료 | voice.yml+DB 업데이트 완료, 신선 댓글 축적 대기 |
 | **R8** | A-B 동결 + cond4 분기 | 🔜 | R1+R5+R6+R7 완료 후 |
 
 ---
@@ -165,7 +165,8 @@ cond5: ❌ FAIL — 사용자 정확도 82.5% (목표 ≤60%)
 | Step 35~38 | 16~17 | M1 A-B 재실행, M6 댓글, NATEPAN 교정, THEQOO corpus 삭제 | ✅ |
 | Step 39~43 | 18 | 6라운드 R0~R4 (API래퍼·소스가드·CLIEN de-counselor) | ✅ |
 | **Step 44** | 19 | P0: R3 오케스트레이터 재배포 + e2e + corpus 축적 확인 | ✅ |
-| **Step 45** | 19 | R5: CLIEN POST MAUVE (M-before=0.6277, 신선분 축적 중) | 🔄 |
-| **Step 46** | 19 | R6: THEQOO corpus 재구축 (ai=0→7건, 목표 ≥100) | 🔄 |
-| **Step 47** | 19 | R7: COMMENT MAUVE M-before (CLIEN 0.0677, NATEPAN 0.0598) | 🔄 M-after 대기 |
+| **Step 45** | 19 | R5: CLIEN MAUVE M-before=0.6277 / M-after=0.3527(신선22건) | 🔄 micro blind 필요 |
+| **Step 46** | 19 | R6: THEQOO corpus 재구축 (ai=59/100) | 🔄 축적 중 |
+| **Step 47** | 19 | R7: M-before(CLIEN 0.0677) + voice.yml/DB typo 업데이트 완료 | 🔄 M-after 대기 |
+| **Step 40(완)** | 17+19 | R1 DELETE 완료 — CLIEN−32, NATEPAN−2, 재학습 DONE | ✅ |
 | Step 48 | 19~ | R8: cond4 분기 + 5조건 최종 | 🔜 |
