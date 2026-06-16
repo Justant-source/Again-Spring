@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 8 — Base Hardening Step 0 문서화 완료, Phase A 실행 중)
+**최종 갱신**: 2026-06-16 (세션 9 — Base Hardening Phase A 완료: T1~T4+T7)
 
 ## ⚠️ 관점 교정 (Step 9 "ready_count=4/4"의 올바른 해석)
 
@@ -16,9 +16,9 @@
 
 ## 현재 위치
 
-- **Step**: Base Hardening Phase A 시작 (Step 10~14 진행 중)
-- **전체 진행**: Step 0–9 완료. Step 10~17 = Base Hardening 실행 중.
-- **다음 작업**: T1(분리기)→T2(CV AUC)→T3+T4 병렬→T7(ENABLE 게이트)
+- **Step**: Base Hardening Phase A 완료 → Phase B(T6) 대기
+- **전체 진행**: Step 0–14 완료. Step 15~17 = Phase B·C 대기.
+- **다음 작업**: T6 (오프라인 A-B harness + 사람 블라인드 — 토큰 소량 소비)
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 
 ## Step 1 완료 확인 (2026-06-15)
@@ -154,18 +154,30 @@
 | Step | Task | 상태 |
 |---|---|---|
 | Step 0 | 문서 선행 (roadmap/decisions/STATE) | ✅ 완료 |
-| Step 10 (T1) | DCINSIDE 문장 분리기 수정 | 🔄 진행 중 |
-| Step 11 (T2) | 신뢰 가능한 AUC (CV 5-fold) | 🔜 T1 이후 |
-| Step 12 (T3) | readiness 게이트 버그 수정 | 🔜 T2 이후 |
-| Step 13 (T4) | COMMENT 측정 추가 | 🔜 T2 이후 (T3 병렬) |
-| Step 14 (T7) | ENABLE 게이트 구현 | 🔜 T3+T4 이후 |
-| Step 15 (T6) | 독립 검증 harness | 🔜 T7 이후 |
+| Step 10 (T1) | DCINSIDE 문장 분리기 수정 | ✅ 완료 — avg_sl 57.40→7.02 |
+| Step 11 (T2) | 신뢰 가능한 AUC (CV 5-fold) | ✅ 완료 — INSUFFICIENT_DATA 게이트 작동 |
+| Step 12 (T3) | readiness 게이트 버그 수정 | ✅ 완료 — NATEPAN ready=false (POST n_ai=0) |
+| Step 13 (T4) | COMMENT 측정 추가 | ✅ 완료 — COMMENT MAUVE 0.06 (POST와 분리 산출) |
+| Step 14 (T7) | ENABLE 게이트 구현 | ✅ 완료 — /metrics/enable-candidates, 0/12 (정상) |
+| Step 15 (T6) | 독립 검증 harness | 🔜 Phase B — 토큰 소량 소비 |
 | Step 16 (T5) | POST 샘플 보강 | 🔜 Phase C |
 | Step 17 (T8) | THEQOO TSD 프롬프팅 | 🔜 Phase C |
 
+## Phase A 완료 수치 요약 (2026-06-16)
+
+| 항목 | 이전 | 이후 |
+|---|---|---|
+| DCINSIDE avg_sentence_length | 57.40 | **7.02** |
+| NATEPAN ready | true (버그, n_ai=295 COMMENT) | **false** (POST n_ai=0) |
+| 합성 위조 학습 | 있음 | **없음** (INSUFFICIENT_DATA) |
+| ready_count | 4/4 | **0/12** (실제 데이터 기준) |
+| enable-candidates | 없음 | **0/12** (5조건 모두 미충족 정상) |
+| COMMENT MAUVE | 미측정 | **0.060** (NATEPAN), 0.068 (CLIEN) |
+| pytest | 65/65 | **70/70** |
+
 ## 다음 구체 작업
 
-- Base Hardening Phase A 멀티에이전트 병렬 실행 중
+- **Phase B (T6)**: A-B harness — 고정 컨텍스트 × N=4 초안(AS LLM 생성) → /rerank vs random → MAUVE delta 비교. EvalRun(kind="ab_test") 저장. 토큰 비용 발생(bounded).
 - `AI_USER_ML_ENABLED=true` 활성화는 5조건(D-17) 전부 충족 후 수동으로 — 코드 변경 금지
 
 ## 운영 메모 / 권한
@@ -176,8 +188,9 @@
 
 ## 미해결 질문
 
-- NATEPAN 판별기: AI POST 0개 → AUC 0.562 마진 작음. prod 봇 NATEPAN 글 자연 축적 대기 or prod DB 백필 후 retrain.
-- `AI_USER_ML_ENABLED=true` 활성화 시 NATEPAN 판별기 신뢰도 낮음 → NATEPAN 커뮤니티에서 rerank 품질 불확실. CLIEN/DCINSIDE/THEQOO는 안전.
+- NATEPAN: AI POST 0개 → 자연 축적 대기. CLIEN(40)/DCINSIDE(20)/THEQOO(65)도 100 미달. 가장 빨리 도달할 것: THEQOO(65→100 = 35 더 필요).
+- COMMENT MAUVE 0.06 — AI 댓글 품질 매우 낮음. T6 A-B에서 COMMENT도 포함 여부 결정 필요 (계획은 POST 우선).
+- 분리기 정상화 후 cond3가 CLIEN/NATEPAN/THEQOO/DCINSIDE 모두 true — cond1,2,4,5가 남은 병목.
 
 ## 블로커
 
