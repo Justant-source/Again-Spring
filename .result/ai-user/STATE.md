@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-16 (세션 16 — M1 cond4 재측정 완료(FAIL), M8 DCINSIDE 장르불일치 제외)
+**최종 갱신**: 2026-06-16 (세션 16 — M1 cond4 재측정 완료(FAIL), M8 DCINSIDE 장르불일치 제외, M5 사용자 블라인드 완료(FAIL))
 
 ---
 
@@ -80,7 +80,7 @@
 
 ### ENABLE 게이트 (5조건)
 ```
-현재: 3+/12 커뮤니티×조건 충족 (N9 Round3 이후)
+현재: 3/12 커뮤니티×조건 충족 (M5 블라인드 후)
 상태:
   cond1: ✅ THEQOO n_ai=158≥100, CLIEN n_ai=131≥100, NATEPAN n_ai=225≥100
          ❌ DCINSIDE: 장르 불일치 → 제외 (n_human=39, 콘텐츠=와인/카메라/여행, 갈등 서사 아님)
@@ -90,7 +90,9 @@
   cond4: ❌ THEQOO Δ=−0.0094 (K=3, 16ctx) — 판별기 역전으로 리랭킹 역효과
          ❌ NATEPAN Δ=−0.0167 (K=3, 40ctx, std=0.0801 노이즈)
          ❌ CLIEN Δ=0 (MAUVE ceiling 0.9962)
-  cond5: human_accuracy=1.0 (THEQOO/CLIEN) — 프롬프트 개선 후 재라벨링 필요
+  cond5: ❌ FAIL — 사용자 정확도 82.5% (33/40, 목표≤60%)
+         NATEPAN 80%, THEQOO 85%
+         ★ T013·T017 AI→Human 오분류 (M7 효과 신호, 2건만)
 ```
 
 ---
@@ -199,14 +201,17 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 - ✅ DB 스키마 수정 — jobs.params_json MEDIUMTEXT (40ctx 500 에러 해소)
 
 ### 🥇 다음 우선순위
-1. **M5 블라인드** — ✅ 준비 완료. `.result/ai-user/m5-blind-display.txt` 생성 (NATEPAN 20쌍, THEQOO 20쌍). **사용자 라벨링 대기 중.**
-2. **M6 COMMENT MAUVE** — before/after N6 측정 (아직 NOT RUN)
-3. **cond4 경로** — M7 신선 출력 축적 → 재학습 → P(human) 방향 교정 → A-B 재측정
+1. **M7 신선 출력 축적** — M7 dev 배포 완료(2026-06-16). dev에서 자연 틱으로 신선 NATEPAN/THEQOO 출력 축적 중. M5 T013/T017 유형 증가 모니터링.
+2. **M5 재측정** — M7 신선 출력 충분히 축적(40+개) 후 → 블라인드 다시 실행 → cond5 ≤60% 달성 목표
+3. **M6 COMMENT MAUVE** — before/after N6 측정 (아직 NOT RUN)
+4. **cond4 경로** — M7 신선 출력 축적+재학습 → P(human) 방향 교정 → A-B 재측정
 
-### ✅ M5 블라인드 (세션 16 준비 완료)
-- 사용자 직접 라벨링 40쌍 (THEQOO+NATEPAN 각 20쌍)
-- M7 features(NATEPAN) + voiceType reply 경로 적용 → 신선 출력 dev에서 자연 틱 중
-- `.result/ai-user/m5-blind-display.txt`: 40쌍 준비 완료
+### ✅ M5 블라인드 (세션 16 완료)
+- ✅ 사용자 직접 라벨링 40쌍 (THEQOO+NATEPAN 각 20쌍) 완료
+- ✅ 결과: 정확도 82.5% (33/40) — **cond5 FAIL**
+- ✅ NATEPAN 80%, THEQOO 85%
+- ★ T013·T017 AI→Human 오분류 2건 (M7 효과 신호)
+- `.result/ai-user/steps/33-m5-blind-test.md` 기록 완료
 
 ### 🥉 M6 COMMENT MAUVE
 - before/after N6 측정 (아직 NOT RUN)
