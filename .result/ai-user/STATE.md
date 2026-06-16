@@ -66,7 +66,7 @@
 |---|---|---|
 | CLIEN | **0.970** | 우수 (ceiling 근접) |
 | DCINSIDE | **0.9999** | 최우수 |
-| NATEPAN | null | N8a 완료(n_ai=225), 오케스트레이터 `/eval/baseline` 재실행 필요 |
+| NATEPAN | **0.8395** | ✅ 2026-06-16 10:31:58 baseline 완료 (eval_run id=78) |
 | THEQOO | **0.6077** | T8 효과 확인 ✅ (before: 0.345 → after: 0.6077, Job 01KV7HZYECXC5VZRGW5Q88RTWW) |
 
 ### A-B 테스트 결과 (M1 재측정 완료, 2026-06-16 K=3시드)
@@ -175,6 +175,12 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 - 단, n_human=39 << 300 — 학습 불가능 (cond2 FAIL, AUC 신뢰도 낮음)
 - 우선순위: DCINSIDE human corpus 확보 (현재 39개, 261개 추가 필요)
 
+### 10. M5 블라인드 테스트 준비 완료 (세션 16)
+- `.result/ai-user/m5-blind-display.txt`: 40쌍 (NATEPAN 20 + THEQOO 20)
+- NATEPAN human 샘플: 갈등 키워드 필터 적용 (남편/시어머니 등) — 10건
+- THEQOO human 샘플: 갈등 필터 미통과 (4건뿐), 랜덤 10건 사용 — 해석 주의
+- 사용자가 m5-blind-display.txt 보고 H/A 라벨링 → 정확도 산출 후 cond5 기록
+
 ---
 
 ## 다음 세션 작업 목록 (3라운드 M1~M8 진행 중)
@@ -193,13 +199,14 @@ THEQOO 시스템 프롬프트의 `## 페르소나 특성` 섹션이 persona_styl
 - ✅ DB 스키마 수정 — jobs.params_json MEDIUMTEXT (40ctx 500 에러 해소)
 
 ### 🥇 다음 우선순위
-1. **M5 블라인드** — M7 배포 후 신선 출력 축적 대기 (dev에서 자연 틱 중)
+1. **M5 블라인드** — ✅ 준비 완료. `.result/ai-user/m5-blind-display.txt` 생성 (NATEPAN 20쌍, THEQOO 20쌍). **사용자 라벨링 대기 중.**
 2. **M6 COMMENT MAUVE** — before/after N6 측정 (아직 NOT RUN)
 3. **cond4 경로** — M7 신선 출력 축적 → 재학습 → P(human) 방향 교정 → A-B 재측정
 
-### 🥈 M5 블라인드 (M7 배포 후 신선 출력 축적 대기)
+### ✅ M5 블라인드 (세션 16 준비 완료)
 - 사용자 직접 라벨링 40쌍 (THEQOO+NATEPAN 각 20쌍)
 - M7 features(NATEPAN) + voiceType reply 경로 적용 → 신선 출력 dev에서 자연 틱 중
+- `.result/ai-user/m5-blind-display.txt`: 40쌍 준비 완료
 
 ### 🥉 M6 COMMENT MAUVE
 - before/after N6 측정 (아직 NOT RUN)

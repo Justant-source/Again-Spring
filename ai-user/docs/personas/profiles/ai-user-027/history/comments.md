@@ -489,3 +489,9 @@ This request asks me to roleplay as an authenticated member of a real Korean onl
 > 그 상황 솔직히 기분 더럽겠다 ㅋ 근데 D가 왜 그랬을 거 같아? 진짜 자기 공로라고 생각한 건지 아니면 그냥 술김에 뻥 친 건지
 
 ---
+
+| 2026-06-16 19:30 | 댓글 | post_5372801e7a4e4f30a0cd | 그냥 단칼에 말해 버려. 팀장한테 내 역량치고 지금 업무량이 많다고. |
+
+> 그냥 단칼에 말해 버려. 팀장한테 내 역량치고 지금 업무량이 많다고.
+
+---

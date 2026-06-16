@@ -178,3 +178,25 @@
 - **배경**: 생성 문체가 "격식 상담사"로 수렴해 100% AI 탐지됨. 가장 강력한 레버는 문체 다양화.
 - **결정**: features 백필은 THEQOO(기존) + NATEPAN(신규) 파일럿. reply voiceType 수정은 전 커뮤니티 적용 (버그 수정 성격). SelfCritiqueService voiceType 오버로드 추가 (post/comment 정제 경로 정합성).
 - **구현**: GenDto.ReplyRequest + ReplyGenRequest.java voiceType 필드 추가. ActionExecutor reply builder voiceType 설정. GenerationController/SelfCritiqueService 수정. dev e2e 142 passed.
+
+## 2026-06-16 — 4라운드 결정 (D-32~D-35)
+
+### D-32: DCINSIDE 학습 제외 — 장르 구조 불일치
+- **결정**: DCINSIDE를 enable-gate cond1/cond2 에서 제외
+- **근거**: human corpus 39건 샘플 체크 → 와인경진대회, 카메라 리뷰, 여행기, 뉴스 기사, 수공예 — 갈등 서사 전무. DCINSIDE = 주제별 갤러리(hobby) 포럼, 갈등 게시판 구조 없음. 264건 직접 인제스트 시도 → 전부 AI corpus 해시 충돌 (오케스트레이터 생성물)
+- **대안**: THEQOO/CLIEN/NATEPAN 3개 커뮤니티로 enable-gate 운영
+
+### D-33: cond4 FAIL 확정 — 리랭커 역효과 (판별기 역전 상태)
+- **결정**: cond4 현재 FAIL. 판별기 역전이 해소될 때까지 리랭커 비활성 유지.
+- **근거**: K=3 시드 재측정 결과 — THEQOO Δ=−0.0094 (std=0.0098, 16ctx), NATEPAN Δ=−0.0167 (std=0.0801, 40ctx). 두 커뮤니티 모두 delta<0. 역전된 판별기가 "격식적=human" 오판 → 가장 AI다운 초안이 winner 선택 → MAUVE 저하.
+- **경로**: M7 신선 출력 축적 → 재학습 → P(human) 방향 교정 → A-B 재측정
+
+### D-34: M5 blind test 인간 샘플 전략 — corpus 장르 한계 반영
+- **결정**: M5 blind test에서 NATEPAN은 갈등 키워드 필터(남편/시어머니/남친/싸웠/갈등/억울) 적용 human 샘플 사용. THEQOO는 갈등 서사 human 샘플 부족(4건)으로 랜덤 인간 샘플 사용 — THEQOO M5 결과는 보수적으로 해석 필요.
+- **근거**: ML corpus human 항목이 갈등 서사만 필터링되지 않음. NATEPAN 16건, THEQOO 4건만 갈등 필터 통과.
+- **영향**: THEQOO M5 정확도 = 장르 구별(쉬움) 일부 반영될 수 있음 → NATEPAN M5만 신뢰 가능한 측정.
+
+### D-35: DB jobs.params_json MEDIUMTEXT — 40ctx 제출 필수
+- **결정**: ML 서비스 jobs 테이블 params_json을 TEXT(64KB)에서 MEDIUMTEXT(16MB)로 변경.
+- **근거**: 40 contexts × 4 drafts × ~1500자 Korean = ~240KB → TEXT 한계 초과로 500 에러.
+- **조치**: ALTER TABLE 직접 실행 + models.py Text(16777215) 업데이트 (WSL 서버).

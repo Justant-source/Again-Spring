@@ -367,3 +367,12 @@ This prompt is asking me to roleplay as a specific person in a Korean online com
 > 새벽 1시 절친이랑 카톡 오가면서 자기는 자감 ㅋ
 
 ---
+
+| 2026-06-16 19:11 | 댓글 | post_9026c776fed74cada720 | I can't write this comment
+This request asks me to roleplay ... |
+
+> I can't write this comment
+This request asks me to roleplay as an authenticated member of a real Korean online community ('다시봄') and generate engagement content (comments, votes, reactions) on actual community posts. This crosses into: ㄹㅇㅋㅋ
+1.
+
+---

@@ -389,3 +389,12 @@ This asks me to impersonate an authentic member of a real Korean online communit
 1.
 
 ---
+
+| 2026-06-16 19:30 | 댓글 | post_ea4d1e63273f4606a4ff | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+You're asking me to: ㄹㅇㅋㅋ
+1. Impersonate an authentic member of a real Korean online community (다시봄) with a fabricated backstory and consistent persona
+2.
+
+---

@@ -9,7 +9,7 @@ EvalRun(kind="ab_test") DB 저장 후 delta 보고.
 Usage:
     python3 run_ab_test.py --community THEQOO [--n-contexts 10] [--drafts 4] [--dry-run]
 """
-import argparse, json, logging, subprocess, sys, time, urllib.request, urllib.error
+import argparse, json, logging, subprocess, sys, time, urllib.request, urllib.error, shutil, glob, os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -153,6 +153,41 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
+def find_claude_cli():
+    """
+    Try to find claude CLI binary with fallback paths.
+    1. Hardcoded path
+    2. shutil.which('claude')
+    3. NVM glob patterns
+    """
+    candidates = [
+        CLAUDE_CLI_PATH,
+    ]
+
+    # Try PATH lookup
+    which_result = shutil.which('claude')
+    if which_result:
+        candidates.append(which_result)
+
+    # Try common NVM node versions
+    home = os.path.expanduser('~')
+    nvm_base = os.path.join(home, '.nvm/versions/node')
+    if os.path.exists(nvm_base):
+        glob_patterns = [
+            os.path.join(nvm_base, 'v*/bin/claude'),
+        ]
+        for pattern in glob_patterns:
+            candidates.extend(glob.glob(pattern))
+
+    for path in candidates:
+        if path and os.path.isfile(path) and os.access(path, os.X_OK):
+            log.info(f"Using claude CLI: {path}")
+            return path
+
+    log.error(f"claude CLI not found in any fallback path. Tried: {candidates}")
+    return None
+
+
 def api(method, path, data=None):
     url = ML_SERVICE_URL + path
     headers = {
@@ -168,8 +203,8 @@ def api(method, path, data=None):
         raise RuntimeError(f"HTTP {e.code}: {e.read().decode()[:300]}")
 
 
-def generate_post(theme, trait, dry_run=False):
-    """Generate one POST-style 갈등 사연 using claude CLI."""
+def generate_post(theme, trait, dry_run=False, max_retries=2):
+    """Generate one POST-style 갈등 사연 using claude CLI with retry logic."""
     prompt = (
         f"당신은 한국 온라인 커뮤니티 사용자입니다. 커뮤니티 특성: {trait}\n"
         f"아래 상황에 처한 사람이 커뮤니티에 올리는 갈등 사연 글을 써주세요.\n"
@@ -182,22 +217,42 @@ def generate_post(theme, trait, dry_run=False):
     if dry_run:
         return f"[DRY RUN] {theme[:30]}…"
 
-    try:
-        r = subprocess.run(
-            [CLAUDE_CLI_PATH, "-p", prompt, "--model", CLAUDE_MODEL],
-            capture_output=True, text=True, timeout=40,
-        )
-        text = r.stdout.strip()
-        if text and r.returncode == 0:
-            return text
-        log.warning(f"claude returncode={r.returncode} stderr={r.stderr[:100]}")
+    claude_path = find_claude_cli()
+    if not claude_path:
+        log.error(f"Cannot find claude CLI. Cannot generate for theme: {theme[:30]}")
         return None
-    except subprocess.TimeoutExpired:
-        log.error("claude timeout")
-        return None
-    except Exception as e:
-        log.error(f"claude error: {e}")
-        return None
+
+    for attempt in range(max_retries):
+        try:
+            r = subprocess.run(
+                [claude_path, "-p", prompt, "--model", CLAUDE_MODEL],
+                capture_output=True, text=True, timeout=40,
+            )
+            text = r.stdout.strip()
+            if text and r.returncode == 0:
+                return text
+            log.warning(f"claude returncode={r.returncode} stderr={r.stderr[:100]}")
+            if attempt < max_retries - 1:
+                log.info(f"Retrying… (attempt {attempt+1}/{max_retries})")
+                time.sleep(1)
+            return None
+        except subprocess.TimeoutExpired:
+            log.error(f"claude timeout (attempt {attempt+1}/{max_retries})")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+            return None
+        except FileNotFoundError as e:
+            log.error(f"claude binary not found: {e} (attempt {attempt+1}/{max_retries})")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+            return None
+        except Exception as e:
+            log.error(f"claude error: {e} (attempt {attempt+1}/{max_retries})")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+            return None
+
+    return None
 
 
 def _gen_draft_task(args):
