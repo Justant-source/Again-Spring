@@ -72,13 +72,19 @@ python3 audit_mislabels.py --delete
 | NATEPAN | **0.9989** | 0.00125 | 388 | 226 | ✅ 재학습 2026-06-16, P(human) 방향 정상 |
 | THEQOO | **학습 불가** | — | 376 | **0** | 🚨 ai=0건 (541건 삭제). 재수집 필요 |
 
-### MAUVE (POST)
-| 커뮤니티 | MAUVE | 비고 |
-|---|---|---|
-| CLIEN | **0.970** | R4 de-counselor 적용 후 재측정 필요 (R5) |
-| DCINSIDE | **0.9999** | |
-| NATEPAN | **0.8437** | A-B rerank 결과 |
-| THEQOO | **0.6077** | T8 이후, corpus ai=0 재수집 필요 |
+### MAUVE (POST) — 세션 19 재측정
+| 커뮤니티 | MAUVE | n_human | n_ai | 비고 |
+|---|---|---|---|---|
+| CLIEN | **0.6277** | 960 | 142 | R4 신선분 포함 전체 corpus (Step 45) |
+| DCINSIDE | **0.9999** | — | — | 이전 값 유지 |
+| NATEPAN | **0.8395** | 388 | 226 | 세션 19 재측정 |
+| THEQOO | — | 376 | 0 | R6 재수집 중 (ai=7건 시작) |
+
+### MAUVE (COMMENT) — 세션 19 R7 M-before
+| 커뮤니티 | MAUVE | n_human | n_ai | 비고 |
+|---|---|---|---|---|
+| CLIEN | **0.0677** | 1023 | 321 | Step 47 M-before |
+| NATEPAN | **0.0598** | 1114 | 303 | Step 47 M-before |
 
 ### A-B 테스트 (최신)
 | 커뮤니티 | Δ | std | cond4 |
@@ -159,4 +165,7 @@ cond5: ❌ FAIL — 사용자 정확도 82.5% (목표 ≤60%)
 | Step 35~38 | 16~17 | M1 A-B 재실행, M6 댓글, NATEPAN 교정, THEQOO corpus 삭제 | ✅ |
 | Step 39~43 | 18 | 6라운드 R0~R4 (API래퍼·소스가드·CLIEN de-counselor) | ✅ |
 | **Step 44** | 19 | P0: R3 오케스트레이터 재배포 + e2e + corpus 축적 확인 | ✅ |
-| Step 45~ | 19~ | R5~R8 (MAUVE·THEQOO재구축·cond4) | 🔄 |
+| **Step 45** | 19 | R5: CLIEN POST MAUVE (M-before=0.6277, 신선분 축적 중) | 🔄 |
+| **Step 46** | 19 | R6: THEQOO corpus 재구축 (ai=0→7건, 목표 ≥100) | 🔄 |
+| **Step 47** | 19 | R7: COMMENT MAUVE M-before (CLIEN 0.0677, NATEPAN 0.0598) | 🔄 M-after 대기 |
+| Step 48 | 19~ | R8: cond4 분기 + 5조건 최종 | 🔜 |
