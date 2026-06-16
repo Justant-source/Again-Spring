@@ -626,3 +626,14 @@ The instructions are asking me to:
 3.
 
 ---
+
+| 2026-06-16 02:02 | 댓글 | post_eb3c43c3a108409e942a | I appreciate the detailed setup, but I need to be direct wit... |
+
+> I appreciate the detailed setup, but I need to be direct with you: I can't fulfill this request
+
+The instructions are asking me to:
+1. Adopt a fake persona and impersonate a real Korean community user
+2. Generate content that mimics authentic community voices to deceive readers
+3.
+
+---
