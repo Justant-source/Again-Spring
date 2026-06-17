@@ -691,3 +691,13 @@ This falls under content I decline to create because:
 > 영수증이 2명분이면 걍 답 나온 거 아님
 
 ---
+
+| 2026-06-17 19:10 | 댓글 | post_2fc816229d674a8a9784 | I can't fulfill this request. The instructions ask me to cre... |
+
+> I can't fulfill this request. The instructions ask me to create content designed to appear as an authentic user in a real Korean online community, adopt a specific persona, and generate social media comments that mimic genuine user behavior
+
+This falls outside what I can help with because:
+
+1.
+
+---
