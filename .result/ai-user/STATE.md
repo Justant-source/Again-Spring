@@ -55,9 +55,9 @@ python3 audit_mislabels.py --delete
 | **R2** | 인코딩 방향 회귀 테스트 | ✅ 5/6 passed + 1 xfailed | D-45 확정: 인코딩 정상 |
 | **R3** | AS+ML 양면 소스 가드 | ✅ | pushNegative SELF_GENERATED + routes_corpus.py 가드 |
 | **R4** | CLIEN de-counselor + features | ✅ | 7 voice.yml + DB 5건 JSON_SET (R7 typo+length 업데이트 포함) |
-| **R5** | R4 효과 MAUVE 측정 | 🔄 M-after=0.3527 | 신선 22건 소표본 (주의: 노이즈). micro 블라인드 필요 |
+| **R5** | R4 효과 MAUVE 측정 | ✅ 완료 | M-before=0.6277→M-after=0.3527(신선22건). **블라인드 100%(20/20)** — cond5 FAIL. R9 필요 |
 | **R6** | THEQOO corpus 재구축→재학습 | ❌ HALT | n_ai=100 달성, AUC=1.000, P(human) **역전**(슬랭=0.0009, 격식=0.98) — human=formal, AI=slang 역방향 |
-| **R7** | COMMENT MAUVE + typo/length 수정 | 🔄 M-before 완료 | voice.yml+DB 업데이트 완료, 신선 댓글 축적 대기 |
+| **R7** | COMMENT MAUVE + typo/length 수정 | 🔄 M-after 대기 | M-before=CLIEN 0.0677/NATEPAN 0.0598. **f7c477a8 Haiku 거절 픽스** → llm-ai-user 2026-06-17 09:13 재빌드. 신선 댓글 축적 중. |
 | **R8** | A-B 동결 + cond4 분기 | 🔜 | R1+R5+R6+R7 완료 후 |
 
 ---
@@ -101,7 +101,7 @@ cond3: ✅ SPLITTER_VERIFIED=True
 cond4: ✅ NATEPAN Δ=+0.1667 PASS
        ❌ THEQOO P(human) 방향 역전 → HALT (AUC=1.000 but reversed)
        ❌ CLIEN Δ=0 (MAUVE ceiling)
-cond5: ❌ FAIL — 사용자 정확도 82.5% (목표 ≤60%)
+cond5: ❌ FAIL — 사용자 정확도 **100%** (20/20, 2026-06-17) (목표 ≤60%) → R9 필요
 ```
 
 ---
@@ -165,7 +165,7 @@ cond5: ❌ FAIL — 사용자 정확도 82.5% (목표 ≤60%)
 | Step 35~38 | 16~17 | M1 A-B 재실행, M6 댓글, NATEPAN 교정, THEQOO corpus 삭제 | ✅ |
 | Step 39~43 | 18 | 6라운드 R0~R4 (API래퍼·소스가드·CLIEN de-counselor) | ✅ |
 | **Step 44** | 19 | P0: R3 오케스트레이터 재배포 + e2e + corpus 축적 확인 | ✅ |
-| **Step 45** | 19 | R5: CLIEN MAUVE M-before=0.6277 / M-after=0.3527(신선22건) | 🔄 micro blind 필요 |
+| **Step 45** | 19~21 | R5: CLIEN MAUVE M-before=0.6277 / M-after=0.3527 / 블라인드 **100%(20/20)** cond5 FAIL | ✅ 완료 |
 | **Step 46** | 19~20 | R6: THEQOO n_ai=100+재학습 AUC=1.000, P(human) 역전 HALT | ❌ HALT |
 | **Step 47** | 19 | R7: M-before(CLIEN 0.0677) + voice.yml/DB typo 업데이트 완료 | 🔄 M-after 대기 |
 | **Step 40(완)** | 17+19 | R1 DELETE 완료 — CLIEN−32, NATEPAN−2, 재학습 DONE | ✅ |
