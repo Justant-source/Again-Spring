@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-17 (세션 21 — R5~R8 완료, R9 착수 대기)
+**최종 갱신**: 2026-06-17 (세션 22 — R9 Track A+B 구현·배포 완료, 측정 대기)
 
 ---
 
@@ -16,9 +16,9 @@
 
 ## 현재 위치
 
-- **Phase**: Base Hardening 6라운드 완료 → **R9 (cond5 전용 스타일 강화) 착수 필요**
+- **Phase**: R9 Track A+B **구현·dev 배포 완료** → 신선 축적 대기 → 블라인드①② + MAUVE 재측정 예정
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **직전 커밋**: `32b562e7` (2026-06-17) — API 우선순위 + 재시도 3회 규칙
+- **직전 커밋**: `74e2b283` (2026-06-17) — R9 Track A(결정론적 오타) + Track B(일상 글 25%)
 
 ---
 
@@ -36,6 +36,8 @@
 | **R6** | THEQOO corpus n_ai=100 + 재학습 | AUC=1.000이지만 **P(human) 방향 역전 HALT** |
 | **R7** | COMMENT MAUVE M-before 측정 + Haiku 거절 픽스 | M-before CLIEN=0.0677, NATEPAN=0.0598. llm-ai-user 2026-06-17 재빌드. **M-after 대기 중** |
 | **R8** | 6라운드 최종 현황 결산 | cond5 FAIL 확정, R9 계획 수립 |
+| **R9 Track A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | 구현·35테스트 통과·dev배포 ✅ |
+| **R9 Track B** | CASUAL 25% 분기 + assembleCasualPostPrompt + voice/post_casual.md | 구현·e2e 통과·dev배포 ✅ |
 
 ### 시스템 픽스 이력 (세션 21)
 - `f7c477a8`: Haiku 역할극 거절 방지 — 시스템 프롬프트 persona framing 제거 (`당신은 X입니다` 삭제)
@@ -45,21 +47,22 @@
 
 ## 🔜 앞으로 해야 할 것
 
-### 즉시 가능 (R9 준비)
+### 즉시 가능 (R9 배포 완료, 축적 대기)
 
 | 작업 | 내용 | 위치 | 선결 |
 |---|---|---|---|
-| **R7 M-after** | COMMENT MAUVE 재측정 (픽스 후 신선 ai ≥50건 축적 확인) | WSL python3 mauve | llm-ai-user 재빌드 완료 ✅, 신선분 축적 중 |
-| **R9 오타 주입** | voice.yml mobile_typos=true + consistent_errors 추가 → DB JSON_SET | ai-user/llm/src/.../voice/ | 즉시 가능 |
-| **R9 블라인드** | 갈등 주제 매칭 20쌍 재측정 (순수 문체 cond5) | ai-user/blind/ | R9 오타 후 |
+| **R7 M-after** | COMMENT MAUVE 재측정 (신선 ai ≥50건) | WSL python3 mauve | Track A+B 배포 ✅, 신선분 축적 중 |
+| **blind ①** | 갈등 매칭 20쌍 (주제 제거 → 순수 문체 cond5) | ai-user/blind/ | Track A 신선 CONFLICT 축적 후 |
+| **blind ②** | 혼합주제 20쌍 (현실 cond5, CASUAL 포함) | ai-user/blind/ | Track B CASUAL 신선 축적 후 |
+| **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | 신선분 충분 후 |
 
-### 중기 (R9 본격 착수)
+### 중기
 
 | 작업 | 내용 | 위치 | 비고 |
 |---|---|---|---|
-| **R9 주제 다양화** | CLIEN 봇이 갈등 서사 외 주제 생성 허용 | AS BE 수정 | e2e 게이트 필요 |
-| **THEQOO 방향 수정** | human corpus = 격식 AS글 vs AI = 슬랭 역방향 해소 | corpus 소스 변경 | 큰 작업 |
-| **COMMENT M-after** | NATEPAN도 측정 후 R7 완료 | WSL | 신선분 축적 후 |
+| **THEQOO corpus 교정** | human corpus 소스 변경 (격식→슬랭 역방향 해소) | corpus 소스 변경 | R10 예정 (D-52) |
+| **COMMENT M-after** | NATEPAN 측정 후 R7 완료 | WSL | 신선분 축적 후 |
+| **에스컬레이션 평가** | blind①② 후 D-12 Phase 2/3 진입조건 보고 | — | blind 결과 후 |
 
 ### prod 배포 게이트 (5조건 — 아직 미충족)
 
@@ -101,16 +104,19 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 
 ---
 
-## R9 방향 (cond5 전용 스타일 강화)
+## R9 진행 현황 (cond5 전용 스타일 강화)
 
-| 레버 | 현재 | 목표 | 구현 위치 |
+| Track | 레버 | 상태 | 결과 |
 |---|---|---|---|
-| **오타 주입** | mobile_typos=false, consistent_errors=[] | mobile_typos=true, 1-2 오타 패턴 추가 | voice.yml + DB JSON_SET |
-| **주제 다양화** | 갈등 서사만 | 일상/잡담 혼합 | AS BE (e2e 필요) |
-| **길이 변동** | 균일 5~8줄 | 1~2문장 초단문 ~ 10줄+ 혼합 | 프롬프트 수정 |
-| **레지스터 회전** | 상대적 격식 | 반말/갑작스런 종결/결론 없는 마무리 | voice.yml |
+| **A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | ✅ 배포 완료 | 신선 축적 대기 |
+| **B** | executePost CASUAL 25% 분기 + assembleCasualPostPrompt | ✅ 배포 완료 | 신선 축적 대기 |
+| **C-R7** | COMMENT MAUVE M-after (신선 ≥50건) | 🔄 축적 대기 | Haiku 픽스 후 자연 틱 |
+| **C-THEQOO** | human corpus 소스 교정 | ⏸ R10 이연 | D-52 |
 
-**R9 측정**: 갈등 주제 매칭 20쌍 (human 갈등 서사 vs AI 갈등 서사) → 순수 문체 cond5 재측정
+**R9 측정 (배포 후 신선 축적 필요)**:
+- blind ① 갈등 매칭 20쌍 → Track A 순수 문체 cond5
+- blind ② 혼합주제 20쌍 → Track B + 현실 cond5 (목표 ≤60%)
+- MAUVE 재측정: CLIEN/NATEPAN POST+COMMENT 전후 비교
 
 ---
 
@@ -125,6 +131,17 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 ---
 
 ## 특이사항 / 함정 (세션 간 공유 필수)
+
+### [S22] R9 피벗 — 프롬프트 레벨 오타 주입은 이미 죽었다
+- CLIEN 5/5 페르소나 `mobile_typos=true`이 이미 DB에 있는데도 AI POST 오타 0 = Haiku가 무시
+- **Track A 전략 전환**: LLM 지시 대신 `OutputSanitizer.injectTypos()` 결정론적 후처리 (injectChosung 선례)
+- **Track B**: 갈등 서사 하드코딩 탈출 — CASUAL 25% 분기 (voice/post_casual.md, 사건 의무 해제)
+- appendWritingQuirks `Math.min(1→2)` — 사소한 보강, 본질은 injectTypos
+
+### [S22] injectTypos 핵심 불변식
+- T1~T8 transforms, budget=1~2, fireProb 게이트(≈45% 클린 유지)
+- 첫 줄(hook) 보호, len<40 skip, UNKNOWN voice 무변
+- applyDist에서 normalizeCommaRate·injectChosung **다음(마지막)** 호출 → 하류 정규화 불침범
 
 ### [S21] cond5 100% 원인 — 주제+문체 복합
 - CLIEN ai corpus = 갈등 서사만 / human = 다양 주제 → 주제로 구별 가능
@@ -168,4 +185,6 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 | **Step 46** | 19~20 | R6: THEQOO n_ai=100 + AUC=1.000, P(human) 역전 HALT | ❌ HALT |
 | **Step 47** | 19 | R7: M-before(CLIEN 0.0677, NATEPAN 0.0598) + Haiku 거절 픽스 | 🔄 M-after 대기 |
 | **Step 48** | 21 | R8: 6라운드 결산 + cond5 FAIL 확정 + R9 계획 | ✅ |
-| Step 49+ | 22~ | **R9: cond5 강화 (오타 주입, 주제 다양화, 블라인드 재측정)** | 🔜 |
+| **Step 49** | 22 | R9 Track A: OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 | ✅ 배포완료 |
+| **Step 50** | 22 | R9 Track B: CASUAL 25% 분기 + PromptAssembler.assembleCasualPostPrompt | ✅ 배포완료 |
+| **Step 51** | 22~ | R9 blind①②+MAUVE 재측정 + 에스컬레이션 평가 | 🔄 축적 대기 |
