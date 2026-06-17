@@ -102,7 +102,11 @@ public class ClaudeApiInvoker implements Invoker {
                 lastRefusal = e;
             }
         }
-        log.error("PROVIDER_ERROR {}회 연속 — 액션 스킵 (Sonnet 폴백 비활성)", refusalRetries + 1);
+        if (refusalFallbackModel != null && !refusalFallbackModel.isBlank()) {
+            log.info("PROVIDER_ERROR {}회 연속 — {} 폴백 시도", refusalRetries + 1, refusalFallbackModel);
+            return call(prompt, refusalFallbackModel, 120_000);
+        }
+        log.error("PROVIDER_ERROR {}회 연속 — 액션 스킵 (폴백 모델 미설정)", refusalRetries + 1);
         throw lastRefusal;
     }
 
@@ -244,7 +248,8 @@ public class ClaudeApiInvoker implements Invoker {
                 String text = contentArr.get(0).path("text").asText("");
                 // 방어: 제공자 오류 문자열이 본문에 섞여 나오면 실패 처리 (게시 차단)
                 if (LlmErrorSignature.looksLikeProviderError(text)) {
-                    log.error("API output looks like a provider error — refusing to return as content");
+                    log.error("API output looks like a provider error — refusing to return as content. first200=[{}]",
+                        text.length() > 200 ? text.substring(0, 200) : text);
                     throw new ClaudeCodeException("PROVIDER_ERROR", "Provider error text in API output", -1, null);
                 }
                 return text;
