@@ -50,3 +50,32 @@ THEQOO ai POST: 7 → (두 번째 트리거 후 확인 필요)
 - **Wait**: ⏳ n_ai ≥ 100 목표
 - **Train**: 🔜 n_ai 충족 후
 - **Measure (P(human))**: 🔜 학습 후
+
+---
+
+## R6 학습 결과 (세션 20)
+
+### 완료 수치
+| 항목 | 값 |
+|---|---|
+| n_ai | 100 (목표 달성) |
+| n_human | 393 |
+| CV-AUC | **1.000 ± 0.001** (bestC=1.0) |
+| 학습 완료 | job 01KV9DMSNC971TQXRMEEM0M44Q |
+
+### P(human) 방향 스팟체크 ❌ HALT
+| 텍스트 | P(human) | 기대 방향 | 실제 |
+|---|---|---|---|
+| 슬랭 "어제 남친이 제 친구한테 연락했다는 거 알고ㅠㅠ 진짜 너무하는 거 아님?" | **0.0009** | HIGH | ❌ LOW |
+| 격식 "해당 상황에 대한 다양한 관점을 종합적으로 분석하면..." | **0.9801** | LOW | ❌ HIGH |
+| AI 내러티브 "저도 예전에 비슷한 상황이 있었는데요. 파트너가 저의 친한..." | **0.9281** | LOW | ❌ HIGH |
+
+### 판정: HALT (계획 §R6 halt 조건 충족)
+**방향 역전 지속 — 슬랭=AI, 격식=Human으로 학습됨**
+
+**근본원인 가설**: 
+- Human corpus(AS 학습 API 출처): Again Spring 플랫폼 사용자 글 = 구조적 갈등 내러티브 (formal)
+- AI corpus: THEQOO voice(T8 features — 더쿠 슬랭, ㅠㅠ, ㅋㅋ) → informal/slang 생성
+- 결과: classifier가 "슬랭=AI, 격식=Human" 역방향 학습
+
+**THEQOO cond4 측정 보류** (역전 상태에서 MAUVE delta 무의미)

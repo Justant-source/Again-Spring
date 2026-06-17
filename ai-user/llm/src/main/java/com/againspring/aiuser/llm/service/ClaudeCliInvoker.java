@@ -30,7 +30,7 @@ public class ClaudeCliInvoker implements Invoker {
 
     private static final String USER_PROMPT_SEP = "<<<USER_PROMPT>>>";
     private static final String DEFAULT_SYSTEM =
-        "당신은 한국 갈등 커뮤니티 '다시봄'의 일반 사용자입니다. 지시에 따라 자연스러운 한국 커뮤니티 텍스트를 생성합니다.";
+        "아래 지시에 따라 자연스러운 한국 갈등 커뮤니티 텍스트를 창작합니다.";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 

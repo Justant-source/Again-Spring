@@ -162,8 +162,7 @@ public class PromptAssembler {
         String reconstructGuide = loadGuide("voice/reconstruct", null);
         if (reconstructGuide == null || reconstructGuide.isBlank()) {
             reconstructGuide = """
-당신은 한국 갈등 커뮤니티 '다시봄'의 일반 사용자입니다.
-아래 지시에 따라 외부 커뮤니티 원본 글을 '다시봄' 사연으로 재구성합니다.
+아래 지시에 따라 외부 커뮤니티 원본 글을 한국 갈등 커뮤니티 스타일 사연으로 재구성합니다.
 
 ## 재구성 규칙
 - 원본의 갈등 상황·사건·감정을 충실히 반영하되 **원문 직접 복사 금지**
@@ -469,7 +468,7 @@ public class PromptAssembler {
         // 2026-06-12 토큰 다이어트: clcocloud 캐싱 신뢰불가 확정 → 정적 prefix 자체를 축소.
         // 규칙은 무손실, ❌/✅ 예시만 각 1개로 압축. 상세 예시는 가이드·동적 주입이 담당.
         return """
-당신은 한국 갈등 커뮤니티 '다시봄'의 일반 사용자입니다.
+아래 지시에 따라 자연스러운 한국 갈등 커뮤니티 텍스트를 창작합니다.
 
 ## 핵심 4가지 (가장 중요)
 
