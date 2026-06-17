@@ -368,3 +368,32 @@ prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #
 
 **적용 대상**: blind ① Track A 신선분, blind ②, 이후 모든 테스트.
 **이유 형식**: 한 줄 이내, 자유 형식. 예: "갈등 글이라서", "오타 있어서", "말투가 딱딱해서"
+
+## D-56 — AI_USER_ENABLED=false 발견 + 선택지 (2026-06-17)
+
+**발견**: `.env.dev`에 `AI_USER_ENABLED=false` 설정(`cda5bb2d fix(dev-cost)` 때 의도적 비활성화).
+자동 스케줄 틱이 매 10분 fire되나 `enabled=false`로 전부 스킵 → **신선 POST 자동 생성 없음**.
+- 신선 CLIEN POST: 0건 (Track A blind 불가)
+- 신선 CLIEN COMMENT: 3건 (R7 M-after 불가, 목표 50건)
+- 수동 admin trigger는 정상 작동
+
+**선택지**:
+- A) `.env.dev AI_USER_ENABLED=true` 임시 전환 → 자동 틱 재개 → 빠른 축적 (Sonnet 비용 발생)
+- B) 수동 트리거 유지 → 틱 1회당 소량 생성, 점진 축적 (저비용)
+
+**사용자 결정 대기 중** (2026-06-17)
+
+## D-57 — LLM 토큰 소모 패턴 확인 (2026-06-17)
+
+**확인**: 모든 LLM 호출이 `clcocloud API` → Haiku 시도 → PROVIDER_ERROR → Sonnet 폴백 패턴.
+
+| 항목 | 상태 |
+|---|---|
+| 호출 경로 | clcocloud API (`https://api.clcocloud.com/claude`) — CLI 아님 |
+| 기본 모델 | claude-haiku-4-5-20251001 |
+| 실제 소모 | Haiku 실패(소량) + Sonnet 성공 = **이중 과금** |
+| Sonnet 캐시 히트 | 70~72% (캐싱 정상) |
+| Haiku 실패 원인 | clcocloud Haiku 풀 Kiro 노드 혼입 지속 (e67d8014 폴백으로 차단은 됨) |
+| ContentSafetyGuard | 'credit balance' 차단 지속 — SEED/PAIRED 기능에서 Kiro 응답 필터 중 |
+
+**현재 운영 방침**: Kiro 혼입은 clcocloud 서비스 측 이슈 → 수동 해소 불가. Sonnet 폴백으로 안전망 유지.

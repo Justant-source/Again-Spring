@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-17 (세션 22 — R9 Track A+B 구현·배포 완료, 측정 대기)
+**최종 갱신**: 2026-06-17 (세션 22 — blind① 기존코퍼스 완료 100% FAIL, AI_USER_ENABLED=false 발견)
 
 ---
 
@@ -16,9 +16,10 @@
 
 ## 현재 위치
 
-- **Phase**: R9 Track A+B **구현·dev 배포 완료** → 신선 축적 대기 → 블라인드①② + MAUVE 재측정 예정
+- **Phase**: R9 blind① 기존코퍼스 완료(100% FAIL) → 신선 축적 차단(AI_USER_ENABLED=false) → 사용자 활성화 결정 대기
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **직전 커밋**: `74e2b283` (2026-06-17) — R9 Track A(결정론적 오타) + Track B(일상 글 25%)
+- **직전 커밋**: `051e025f` (2026-06-17) — D-55 blind 이유 칸 추가 정책
+- **🚨 차단 원인**: `.env.dev AI_USER_ENABLED=false` → 자동 틱 스킵 → 신선 POST 0건 (D-56)
 
 ---
 
@@ -51,11 +52,11 @@
 
 | 작업 | 내용 | 위치 | 선결 |
 |---|---|---|---|
-| **R7 M-after** | COMMENT MAUVE 재측정 (신선 ai ≥50건) | WSL python3 mauve | Track A+B 배포 ✅, 신선분 축적 중 |
+| **R7 M-after** | COMMENT MAUVE 재측정 (신선 CLIEN ai ≥50건) | WSL python3 mauve | ⚠️ AI_USER_ENABLED=false 차단 중 (CLIEN 3건) |
 | **blind ① 기존코퍼스** | ✅ 완료 — 100% FAIL (베이스라인) | .result/ai-user/blind/ | — |
-| **blind ① Track A 신선분** | 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/ | 신선 CONFLICT ≥10건 후 |
-| **blind ②** | 혼합주제 20쌍 (현실 cond5, CASUAL 포함) | .result/ai-user/blind/ | 신선 CASUAL ≥10건 후 |
-| **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | 신선분 충분 후 |
+| **blind ① Track A 신선분** | 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/ | ⚠️ AI_USER_ENABLED=false로 CLIEN POST 0건 차단 |
+| **blind ②** | 혼합주제 20쌍 (현실 cond5, CASUAL 포함) | .result/ai-user/blind/ | ⚠️ 동일 차단 (CASUAL 0건) |
+| **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | ⚠️ 동일 차단 |
 
 ### 중기
 
@@ -110,9 +111,9 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 
 | Track | 레버 | 상태 | 결과 |
 |---|---|---|---|
-| **A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | ✅ 배포 완료 | 신선 축적 대기 |
-| **B** | executePost CASUAL 25% 분기 + assembleCasualPostPrompt | ✅ 배포 완료 | 신선 축적 대기 |
-| **C-R7** | COMMENT MAUVE M-after (신선 ≥50건) | 🔄 축적 대기 | Haiku 픽스 후 자연 틱 |
+| **A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | ✅ 배포 완료 | ⚠️ AI_USER_ENABLED=false로 신선 POST 미생성 |
+| **B** | executePost CASUAL 25% 분기 + assembleCasualPostPrompt | ✅ 배포 완료 | ⚠️ 동일 차단 |
+| **C-R7** | COMMENT MAUVE M-after (신선 CLIEN ≥50건) | 🔄 CLIEN 3/50건 | ⚠️ AI_USER_ENABLED=false 차단 |
 | **C-THEQOO** | human corpus 소스 교정 | ⏸ R10 이연 | D-52 |
 
 **R9 측정 (배포 후 신선 축적 필요)**:
@@ -150,10 +151,28 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 - 문체 신호도 기여: "저도 비슷한 상황이었는데요..." 패턴, 균일 길이, 오타 0
 - 순수 문체 cond5는 갈등 매칭 쌍으로 재측정 필요
 
-### [S21] R7 M-after 선결 조건
+### [S22] AI_USER_ENABLED=false — 신선 축적 차단 (D-56)
+
+- `.env.dev`에 `AI_USER_ENABLED=false` 설정됨 (`cda5bb2d fix(dev-cost)` 때 의도적 비활성화)
+- 자동 스케줄 틱: 매 10분 fire되지만 `enabled=false`로 전부 스킵 → **신선 POST 자동 생성 없음**
+- 수동 admin trigger는 작동 (`docker exec againspring-ai-user-orchestrator wget ... /admin/trigger/tick`)
+- **선택지**: A) `AI_USER_ENABLED=true` 임시 전환 → 빠른 축적 (비용↑) / B) 수동 트리거 유지 (저비용)
+- **사용자 결정 대기 중** (2026-06-17)
+
+### [S22] LLM 토큰 소모 패턴 (D-57)
+
+- **경로**: clcocloud API (`https://api.clcocloud.com/claude`) — CLI 아님
+- **패턴**: Haiku 호출 → 매번 PROVIDER_ERROR (Kiro 혼입) → Sonnet 폴백 → **사실상 Sonnet 토큰만 소모**
+- **이중 과금**: Haiku 실패분(소량) + Sonnet 성공분 (매 액션)
+- **Sonnet 캐시 히트**: 70~72% (캐싱 정상 작동)
+- **해소 조건**: clcocloud Haiku 풀에서 Kiro 노드 제거 (서비스 측 이슈, 당장 수동 해결 불가)
+- ContentSafetyGuard 'credit balance' 차단 지속 — SEED/PAIRED 기능에서 Kiro 응답 일부 필터 중
+
+### [S22] R7 M-after 선결 조건
 - llm-ai-user 재빌드: 2026-06-17 09:13 KST ✅
-- 신선 COMMENT ai 축적 중 (09:13 이후 아직 0건 — 자연 틱 대기)
+- 신선 COMMENT ai 축적 현황 (2026-06-17 기준): CLIEN 3건, NATEPAN 5건, THEQOO 6건 (목표: CLIEN ≥50)
 - corpus 확인: `SELECT ... WHERE content_type='COMMENT' AND label='ai' AND ingested_at > '2026-06-17 00:13:00'`
+- **AI_USER_ENABLED=false 중 — 자동 축적 차단됨**
 
 ### [S20] Haiku 역할극 거절 픽스 (f7c477a8)
 - 원인: `당신은 한국 갈등 커뮤니티 '다시봄'의 일반 사용자입니다` → clcocloud Haiku 거절
