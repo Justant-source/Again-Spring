@@ -52,8 +52,9 @@
 | 작업 | 내용 | 위치 | 선결 |
 |---|---|---|---|
 | **R7 M-after** | COMMENT MAUVE 재측정 (신선 ai ≥50건) | WSL python3 mauve | Track A+B 배포 ✅, 신선분 축적 중 |
-| **blind ①** | 갈등 매칭 20쌍 (주제 제거 → 순수 문체 cond5) | ai-user/blind/ | Track A 신선 CONFLICT 축적 후 |
-| **blind ②** | 혼합주제 20쌍 (현실 cond5, CASUAL 포함) | ai-user/blind/ | Track B CASUAL 신선 축적 후 |
+| **blind ① 기존코퍼스** | ✅ 완료 — 100% FAIL (베이스라인) | .result/ai-user/blind/ | — |
+| **blind ① Track A 신선분** | 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/ | 신선 CONFLICT ≥10건 후 |
+| **blind ②** | 혼합주제 20쌍 (현실 cond5, CASUAL 포함) | .result/ai-user/blind/ | 신선 CASUAL ≥10건 후 |
 | **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | 신선분 충분 후 |
 
 ### 중기
@@ -101,6 +102,7 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 |---|---|---|---|
 | M5 (세션 16) | NATEPAN+THEQOO | 82.5% (33/40) | ≤60% ❌ |
 | R5 (세션 21) | CLIEN | **100% (20/20)** | ≤60% ❌ |
+| R9 blind① 기존 (세션 22) | CLIEN | **100% (20/20)** | ≤60% ❌ (베이스라인 확인) |
 
 ---
 

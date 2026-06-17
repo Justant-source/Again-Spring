@@ -344,3 +344,16 @@
 
 **결과**: Haiku PROVIDER_ERROR 시 Sonnet 자동 폴백. Sonnet 거절율 0%(실측). dev 반영.
 prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #4 순서로.
+
+## 2026-06-17 — R9 blind① 기본측정 (D-54)
+
+### D-54: R9 blind① 기존코퍼스 결과: 100% FAIL (2026-06-17)
+
+**결정**: 기존 코퍼스 기준 blind① = 20/20 (100%) — R5 동일. Track A 효과는 신선 CONFLICT 글에만 적용되므로 **Track A 신선분 별도 재측정 필요**.
+
+**근거**:
+- 탐지 1순위 단서: 주제(갈등 = AI, 비갈등 = human) → Track B(CASUAL) 핵심
+- 탐지 2순위 단서: 문체(오타 0, 균일 길이) → Track A(injectTypos) 타깃
+- 기존 코퍼스에는 injectTypos 미적용 → 변화 없음이 정상
+
+**다음**: 신선 CONFLICT ≥10 → Track A 신선분 blind / 신선 CASUAL ≥10 → blind②
