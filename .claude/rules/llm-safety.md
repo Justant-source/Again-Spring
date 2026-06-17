@@ -69,7 +69,25 @@ AI 배심원·요약 출력에서 아래 표현은 **절대 금지**. 위반 시
 
 ---
 
-## 4. LLM 브릿지 (요약 — 상세: `docs/backend/llm-bridge.md`)
+## 4. Claude API 우선순위 + 재시도 규칙 (Claude Code 행동 규칙)
+
+**우선순위**: `1. clcocloud claude API` → `2. Claude Code CLI` (폴백)
+
+**재시도 한도: 최대 3회** — Claude Code가 수동으로 trigger, tick, API 호출 등을 반복할 때의 상한.
+- tick/trigger 수동 실행: 3회 이하
+- API 호출 실패 후 재시도: 3회 이하
+- 3회 소진 후 실패 시 → 오류 로그 + 중단 (10회·무한 재시도 금지)
+
+**코드 설정값** (ai-user llm):
+- `LLM_API_REFUSAL_RETRIES=0` (dev·prod .env) → 거절 노드 재시도 1회
+- 기본값 (`application.yml`): `refusal-retries: 2` (= 총 3회) → 위 규칙과 일치
+- `refusal-fallback-model` 미설정 = Sonnet 폴백 비활성
+
+**Sonnet 4.6 인시던트 대응**: Sonnet 4.6 다운 시 Haiku 생성은 영향 없음. run_ab_test.py 평가나 report 엔드포인트만 영향 받음 → 해당 작업 연기.
+
+---
+
+## 5. LLM 브릿지 (요약 — 상세: `docs/backend/llm-bridge.md`)
 
 - 호출 경로: `backend` → HTTP POST → `againspring-llm:8090/v1/invoke`
 - 모델: `claude-haiku-4-5-20251001` (기본) / `claude-sonnet-4-6` (report)
