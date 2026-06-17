@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: R9 Track A+B 배포 완료 → CLI-Haiku 94 신선 POST 축적 → CASUAL 오염 수정(D-60) → blind①② 재생성(D-61) 완료 (⏳ 사용자 응답 대기)
+- **Phase**: R9 **cond5 PASS** ✅ (blind② 25%) → ML 활성화 5조건 재검토 단계
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 - **직전 커밋**: `051e025f` (2026-06-17) — D-55 blind 이유 칸 추가 정책
 - **Track A+B**: 구현 배포 확정 ✅ / 런타임 검증 완료 ✅ (오타 발견, CASUAL 글 확인)
@@ -106,7 +106,7 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 | R5 (세션 21) | CLIEN | **100% (20/20)** | ≤60% ❌ |
 | R9 blind① 기존 (세션 22) | CLIEN | **100% (20/20)** | ≤60% ❌ (베이스라인 확인) |
 | R9 blind① Track A 신선분 (세션 23) | CLIEN fresh | ⏳ 사용자 응답 대기 | ≤60% 목표 |
-| R9 blind② 혼합주제 (세션 23) | CLIEN mixed | ⏳ 사용자 응답 대기 | ≤60% 목표 |
+| R9 blind② 혼합주제 (세션 24) | CLIEN mixed | **25% (5/20) ✅ PASS** | ≤60% 목표 |
 
 ---
 
