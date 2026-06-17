@@ -322,3 +322,25 @@
 - **배경**: human corpus=격식 AS 갈등 서사 vs AI THEQOO=슬랭 더쿠체 → P(human) 역전(S17/D-39). 교정하려면 human corpus 소스 변경 필요(큰 작업).
 - **결정**: R9 범위 밖. **R10에서 처리**. R9는 THEQOO A-B 금지(HALT) 유지.
 - **이유**: R9는 Track A+B(injectTypos+casual)가 in-scope 마지막 레버. THEQOO corpus 교정은 별도 라운드로 집중 처리 효율적.
+
+## 2026-06-17 — Kiro 버그 진단 + Sonnet 폴백 구현 (D-53)
+
+### D-53: clcocloud Haiku 노드 Amazon Kiro 혼입 확인 + Sonnet 폴백 미구현 버그 수정
+
+**배경**: R9 Track A+B 배포 후 오케스트레이터 오류율 84.6% 감지.
+진단 로그 추가 후 실제 거절 텍스트 확인:
+- `"I'm Kiro, an AI agent made by Amazon"` — Amazon AI 에이전트가 Claude Haiku를 위장
+- `"I appreciate you testing my consistency, but I need to be direct: I'm declining this request."`
+
+**근본 원인 2가지**:
+1. clcocloud Haiku 노드 풀에 Amazon Kiro 에이전트 84.6% 혼입 (2026-06-17 실측)
+2. `ClaudeApiInvoker.invoke()`: `refusalFallbackModel` 필드가 있었으나 실제 `call()` 없이 `throw lastRefusal` — Sonnet 폴백이 설정되어 있어도 **작동 안 함** (코드 버그)
+
+**수정 (e67d8014)**:
+- `invoke()` 루프 소진 후 `refusalFallbackModel`이 설정되어 있으면 Sonnet으로 1회 폴백
+- 기존 `application.yml` 기본값 `refusal-fallback-model: claude-sonnet-4-6` 활용
+- 진단 로그: 거절 시 first200 chars 기록 (영구 유지 — 향후 새 거절 패턴 조기 발견)
+- `LLM_API_REFUSAL_RETRIES=0` (.env) 유지 — Haiku 1회 → 폴백 1회 = 최소 비용
+
+**결과**: Haiku PROVIDER_ERROR 시 Sonnet 자동 폴백. Sonnet 거절율 0%(실측). dev 반영.
+prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #4 순서로.
