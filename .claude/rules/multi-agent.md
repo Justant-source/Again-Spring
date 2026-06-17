@@ -6,7 +6,7 @@
 
 ## 1. 로컬 머신 (메인 Claude Code 세션)
 
-- **최대 8개 에이전트** 동시 병렬 실행
+- **최대 6개 에이전트** 동시 병렬 실행
 - 독립 작업(문서 작성, 코드 수정, 분석 등)은 항상 병렬 Agent() 호출로 처리
 - 직렬 의존성이 없는 작업은 절대 순차 실행하지 않는다
 
@@ -48,8 +48,8 @@ ssh justant@100.115.252.61 "source ~/.nvm/nvm.sh && npm install -g @anthropic-ai
 
 | 작업 유형 | 실행 위치 | 최대 에이전트 |
 |---|---|---|
-| AS 레포 코드 수정 (java/ts/yml) | 로컬 | 8 |
-| 문서 작성/갱신 (.result/, docs/) | 로컬 | 8 |
+| AS 레포 코드 수정 (java/ts/yml) | 로컬 | 6 |
+| 문서 작성/갱신 (.result/, docs/) | 로컬 | 6 |
 | ML 학습·평가·스크립트 | **WSL Claude Code** | 16 |
 | run_ab_test.py, corpus 분석 | **WSL Claude Code** | 16 |
 | Docker/DB 조작 | SSH Bash 직접 or WSL Claude Code | — |
