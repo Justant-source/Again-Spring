@@ -397,3 +397,55 @@ prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #
 | ContentSafetyGuard | 'credit balance' 차단 지속 — SEED/PAIRED 기능에서 Kiro 응답 필터 중 |
 
 **현재 운영 방침**: Kiro 혼입은 clcocloud 서비스 측 이슈 → 수동 해소 불가. Sonnet 폴백으로 안전망 유지.
+
+## D-58 — CLI-Haiku 94 POST 배치 전환·되돌림 (2026-06-17)
+
+**결정**: POST 생성 경로를 일시적으로 API+Sonnet → CLI+Haiku로 전환하여 신선 CLIEN POST 94건 생성 후 원복.
+
+**이유**: generate-posts가 AI_USER_ENABLED=false를 우회. ClaudeCliInvoker는 Kiro 오염 없는 순수 구독 OAuth 경로.
+
+**설정**: .env.dev LLM_POST_MODEL=haiku + DB backend_post=CLI + force-recreate → 6병렬 에이전트 × 3콜 × 5건 = 90시도 → 94 corpus 기록 (~17분).
+
+**원복**: LLM_POST_MODEL 제거(→ sonnet 기본값) + backend_post=API + force-recreate. .env.dev는 gitignored.
+
+**후속**: Phase 4 완료. 측정(blind①②)은 코퍼스 읽기만 → 원복 후 진행.
+
+## D-59 — 런타임 실태 정정: POST는 Sonnet via API였음 (2026-06-17)
+
+**정정**: 기존 계획의 "Haiku가 오타 지시를 무시" 분석은 오귀속.
+
+실제로 docker-compose.dev.yml:48 LLM_POST_MODEL=${LLM_POST_MODEL:-claude-sonnet-4-6} 기본값이 적용되어 POST는 Sonnet 생성이었음.
+
+**교정**: Track A(결정론적 후처리)의 필요성은 모델 무관하게 여전히 유효.
+
+새 신선분(94건)은 명시적으로 Haiku+CLI로 생성됨 — 모델 교란 변수 존재.
+
+**영향**: blind① 결과 해석 시 모델 변화(Sonnet→Haiku)가 교란 변수임을 명시 필요.
+
+## D-60 — CASUAL 포스트 오염 버그 수정 (2026-06-17)
+
+**현상**: Haiku가 CASUAL 글 생성 시 "커뮤니티 글 창작", "문체 분석:", "작성 현황:", "✅" 등 메타 자기분석 섹션을 본문 뒤에 붙임. OutputSanitizer가 미제거 → dev 사이트 5건 + ML 코퍼스 5건 오염.
+
+**원인**: assembleCasualPostPrompt 프롬프트가 "완전 창작해주세요" 형태 → Haiku가 교과서 형식으로 태스크 제목·분석 출력. OutputSanitizer의 ✅ 패턴이 특정 키워드 기반이라 일반 ✅ 체크리스트를 못 잡음.
+
+**수정**:
+1. `OutputSanitizer.sanitize()`: ✅/❌ 줄 전체 제거 패턴 강화 + "문체 분석:", "작성 현황:", "작성 포인트:", "수정 사항 정리:", "체크:" 이후 전부 삭제 + 선두 "XX 글 창작", "XX 경험 공유글" 에코 제거
+2. `PromptAssembler.assembleCasualPostPrompt()`: "완전 창작해주세요" → "글만 써줘. 분석·설명·체크리스트 절대 금지." + "⚠️ '문체 분석', '✅' 출력 절대 금지" 명시 추가
+3. llm-ai-user 컨테이너 재빌드·재배포 (dev only)
+
+**정리**: dev 오염 5건 soft-delete (posts 테이블). ML 코퍼스 5건 hard-delete (corpus_item 12754, 12768, 12793, 12805, 12820).
+
+**후속**: blind①② 재생성 (D-61).
+
+## D-61 — blind①② 재생성 (2026-06-17)
+
+**이유**: D-60 오염 제거 후 정합 데이터로 재생성. 기존 파일 두 가지 결함:
+1. blind① 날짜 필터 오류 — `ingested_at > '2026-06-16 00:00'`(250+건) 대신 `> '2026-06-17 12:00'`(89건 순수 신선분)
+2. blind② 쌍 #2 [B] — 오염 포스트(corpus 12820) 포함
+
+**새 파일**: AI=CLIEN 신선 89건(오염 제거 후), human=dev DB 시딩 포스트(source_community 있는 실 커뮤니티 발췌). 각 20쌍 × 2파일, contaminated=False 검증 완료.
+
+**생성 방식**: Python 직접 빌드 (clien_classification_result.json → CASUAL 24건 / CONFLICT 65건 분류, seed=42).
+
+**blind①**: 갈등매칭 20쌍 (AI CONFLICT vs human CONFLICT) — Track A 문체 격리 측정.
+**blind②**: 혼합 20쌍 (10 CASUAL + 10 CONFLICT AI vs human 다양주제) — cond5 측정.

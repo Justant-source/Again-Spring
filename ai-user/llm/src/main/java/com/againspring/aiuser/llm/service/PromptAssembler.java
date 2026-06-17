@@ -232,11 +232,12 @@ public class PromptAssembler {
             글 길이: %s
             %s
             %s
-            위 카테고리와 말투로 일상적인 한국 커뮤니티 글을 완전 창작해주세요.
+            위 카테고리와 말투로 일상적인 한국 커뮤니티 글만 써줘. 분석·설명·체크리스트 절대 금지.
             - 🚨 갈등 서사 금지 — 연애·가족·직장 분쟁 이야기 절대 금지. 일상 관찰·취향·수다·경험 공유로.
             - 사건(trigger) 의무 없음 — "X가 Y를 했다" 형태 불필요. 큰 결론·해결책 없이 끝내도 됨.
             - 실제 인물 실명·연락처·주소·개인정보 절대 포함 금지
             - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지 — 한국 커뮤니티 문체만 따를 것
+            - ⚠️ "문체 분석", "✅", 체크리스트, 설명문 출력 절대 금지 — 커뮤니티 글 본문만
             %s%s""".formatted(
                 req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
                 req.getCategory() != null ? req.getCategory() : "OTHER",

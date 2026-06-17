@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-17 (세션 22 — blind① 기존코퍼스 완료 100% FAIL, AI_USER_ENABLED=false 발견)
+**최종 갱신**: 2026-06-17 세션 24 (CASUAL 오염 수정 + llm-ai-user 재빌드 + blind①② 재생성 완료)
 
 ---
 
@@ -16,10 +16,11 @@
 
 ## 현재 위치
 
-- **Phase**: R9 blind① 기존코퍼스 완료(100% FAIL) → 신선 축적 차단(AI_USER_ENABLED=false) → 사용자 활성화 결정 대기
+- **Phase**: R9 Track A+B 배포 완료 → CLI-Haiku 94 신선 POST 축적 → CASUAL 오염 수정(D-60) → blind①② 재생성(D-61) 완료 (⏳ 사용자 응답 대기)
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 - **직전 커밋**: `051e025f` (2026-06-17) — D-55 blind 이유 칸 추가 정책
-- **🚨 차단 원인**: `.env.dev AI_USER_ENABLED=false` → 자동 틱 스킵 → 신선 POST 0건 (D-56)
+- **Track A+B**: 구현 배포 확정 ✅ / 런타임 검증 완료 ✅ (오타 발견, CASUAL 글 확인)
+- **CASUAL 오염 수정**: llm-ai-user 재빌드 완료(dev), 오염 5건 정리 완료 ✅
 
 ---
 
@@ -37,8 +38,8 @@
 | **R6** | THEQOO corpus n_ai=100 + 재학습 | AUC=1.000이지만 **P(human) 방향 역전 HALT** |
 | **R7** | COMMENT MAUVE M-before 측정 + Haiku 거절 픽스 | M-before CLIEN=0.0677, NATEPAN=0.0598. llm-ai-user 2026-06-17 재빌드. **M-after 대기 중** |
 | **R8** | 6라운드 최종 현황 결산 | cond5 FAIL 확정, R9 계획 수립 |
-| **R9 Track A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | 구현·35테스트 통과·dev배포 ✅ |
-| **R9 Track B** | CASUAL 25% 분기 + assembleCasualPostPrompt + voice/post_casual.md | 구현·e2e 통과·dev배포 ✅ |
+| **R9 Track A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | 구현·35테스트 통과·dev배포 ✅ · 런타임검증(오타확인) ✅ |
+| **R9 Track B** | CASUAL 25% 분기 + assembleCasualPostPrompt + voice/post_casual.md | 구현·e2e 통과·dev배포 ✅ · 런타임검증(27% CASUAL) ✅ |
 
 ### 시스템 픽스 이력 (세션 21)
 - `f7c477a8`: Haiku 역할극 거절 방지 — 시스템 프롬프트 persona framing 제거 (`당신은 X입니다` 삭제)
@@ -52,11 +53,11 @@
 
 | 작업 | 내용 | 위치 | 선결 |
 |---|---|---|---|
-| **R7 M-after** | COMMENT MAUVE 재측정 (신선 CLIEN ai ≥50건) | WSL python3 mauve | ⚠️ AI_USER_ENABLED=false 차단 중 (CLIEN 3건) |
+| **R7 M-after** | COMMENT MAUVE 재측정 (신선 CLIEN ai ≥50건) | WSL python3 mauve | ✅ CLIEN 94 신선분 축적 완료 |
 | **blind ① 기존코퍼스** | ✅ 완료 — 100% FAIL (베이스라인) | .result/ai-user/blind/ | — |
-| **blind ① Track A 신선분** | 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/ | ⚠️ AI_USER_ENABLED=false로 CLIEN POST 0건 차단 |
-| **blind ②** | 혼합주제 20쌍 (현실 cond5, CASUAL 포함) | .result/ai-user/blind/ | ⚠️ 동일 차단 (CASUAL 0건) |
-| **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | ⚠️ 동일 차단 |
+| **blind ① Track A 신선분** | ✅ 파일 생성 — 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/r9-blind1-fresh-survey.md | ⏳ 사용자 응답 대기 |
+| **blind ②** | ✅ 파일 생성 — 혼합주제 20쌍 (CONFLICT+CASUAL AI vs human) | .result/ai-user/blind/r9-blind2-mixed-survey.md | ⏳ 사용자 응답 대기 |
+| **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | ✅ 신선분 축적 가능 |
 
 ### 중기
 
@@ -104,6 +105,8 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 | M5 (세션 16) | NATEPAN+THEQOO | 82.5% (33/40) | ≤60% ❌ |
 | R5 (세션 21) | CLIEN | **100% (20/20)** | ≤60% ❌ |
 | R9 blind① 기존 (세션 22) | CLIEN | **100% (20/20)** | ≤60% ❌ (베이스라인 확인) |
+| R9 blind① Track A 신선분 (세션 23) | CLIEN fresh | ⏳ 사용자 응답 대기 | ≤60% 목표 |
+| R9 blind② 혼합주제 (세션 23) | CLIEN mixed | ⏳ 사용자 응답 대기 | ≤60% 목표 |
 
 ---
 
@@ -120,6 +123,39 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 - blind ① 갈등 매칭 20쌍 → Track A 순수 문체 cond5
 - blind ② 혼합주제 20쌍 → Track B + 현실 cond5 (목표 ≤60%)
 - MAUVE 재측정: CLIEN/NATEPAN POST+COMMENT 전후 비교
+
+---
+
+## [S23] 세션 23 실측 (2026-06-17)
+
+### CLI-Haiku POST 배치
+- 전환: LLM_POST_MODEL=haiku + backend_post=CLI (일시적)
+- 생성: 6병렬 에이전트 × 3콜 × 5건 = 94 corpus 기록 (~17분)
+- 원복: sonnet+API 복원 완료
+- **이유**: API+Sonnet에서 Kiro 혼입 차단 목표 (신선 분석용)
+
+### Track A+B 런타임 확인
+- **Track A (injectTypos T1~T8)**: 질레야·들어왓어요·있엇는데 등 오타 발견 ✅
+- **Track B (CASUAL 25%)**: 카페·드라마·육아·날씨 글 ~27% 확인 ✅
+- **POST 모델 정정**: 기존분 = Sonnet via API (not Haiku), 신선분 = Haiku+CLI
+  - 교란 변수 존재: blind① 결과 해석 시 모델 변화(Sonnet→Haiku) 명시 필요
+
+### blind 설문 파일 생성
+- **blind①**: `.result/ai-user/blind/r9-blind1-fresh-survey.md`
+  - 갈등 매칭 20쌍 (Haiku+CLI 신선분)
+  - 주의: human 일부 비갈등 포함 가능 → 정밀도 제한 명시
+  
+- **blind②**: `.result/ai-user/blind/r9-blind2-mixed-survey.md`
+  - 혼합주제 20쌍 (10 CONFLICT + 10 CASUAL AI vs 20 human 다양주제)
+  - cond5 핵심 측정 (목표 ≤60%)
+  - 각 쌍마다 탐지 이유 수집 (D-55 정책)
+
+### 신선 축적 현황
+- **CLIEN POST ai**: +94 신선 (→ 총 256+)
+- **CLIEN COMMENT ai**: 미배치 (별도 필요, R7 M-after 용)
+- **THEQOO**: HALT 유지 (P(human) 역전 미해결, D-52)
+
+---
 
 ---
 

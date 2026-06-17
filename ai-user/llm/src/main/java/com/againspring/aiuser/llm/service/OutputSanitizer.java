@@ -309,9 +309,25 @@ public class OutputSanitizer {
              .replaceAll("(?<![\\w가-힣])\\*([^*\\n]+)\\*(?![\\w가-힣])", "$1")
              .replaceAll("(?m)^>\\s*", "")
              .replaceAll("\\[([^]]+)]\\([^)]+\\)", "$1")
-             // 분석/평가 줄 제거 (✅, ❌, -, •로 시작하는 분석 항목)
-             .replaceAll("(?m)^\\s*[✅❌📌🔍\\-•]\\s+(?:반말|존댓말|공감|분석|평가|자연스|어색|길이|[0-9]+점)[^\n]*\n?", "")
+             // ✅/❌ 분석 체크리스트 줄 전체 제거 (CASUAL 자기분석 방어)
+             .replaceAll("(?m)^\\s*[✅❌]\\s+[^\n]*\n?", "")
+             // 그 외 키워드 기반 분석 줄 제거
+             .replaceAll("(?m)^\\s*[📌🔍\\-•]\\s+(?:반말|존댓말|공감|분석|평가|자연스|어색|길이|[0-9]+점)[^\n]*\n?", "")
              .trim();
+
+        // 3.5 AI 메타 분석 섹션 제거 — 모델이 자기 분석/체크리스트를 본문 뒤에 붙이는 패턴 방어
+        // "문체 분석:", "작성 현황:", "작성 포인트:", "수정 사항 정리:", "체크:" 이후 전부 삭제
+        String[] META_SECTION_HEADERS = {"문체 분석:", "작성 현황:", "작성 포인트:", "수정 사항 정리:", "체크:"};
+        for (String header : META_SECTION_HEADERS) {
+            int idx = s.indexOf(header);
+            if (idx > 0) {
+                s = s.substring(0, idx).stripTrailing();
+                break;
+            }
+        }
+        // 선두 작업명 에코 제거: "커뮤니티 글 창작", "일상 글 창작", "카페 경험 공유글" 등
+        s = s.replaceAll("(?m)^[^\n]{1,20}글 창작[^\n]*\n?", "").stripLeading();
+        s = s.replaceAll("(?m)^[^\n]{1,20} 경험 공유글[^\n]*\n?", "").stripLeading();
 
         // 4. AI 메타 응답 선두 제거
         s = LEADING_META.matcher(s).replaceFirst("").stripLeading();

@@ -1,0 +1,128 @@
+{
+  "type": "blind1_conflict_fresh",
+  "date": "2026-06-17",
+  "filter": "ingested_at > '2026-06-17 12:00:00'",
+  "note": "갈등매칭 20쌍, Track A 신선분(Haiku CLI, injectTypos 적용), R9",
+  "pairs": [
+    {
+      "pair": 1,
+      "human_is": "A",
+      "ai_corpus_id": 12804,
+      "human_post_id": "post_df0e85f4d84d46a5b9fb"
+    },
+    {
+      "pair": 2,
+      "human_is": "A",
+      "ai_corpus_id": 12819,
+      "human_post_id": "post_6c3d1e4e0a7342d5886c"
+    },
+    {
+      "pair": 3,
+      "human_is": "A",
+      "ai_corpus_id": 12750,
+      "human_post_id": "post_bc1f8149fbd64b6c85b6"
+    },
+    {
+      "pair": 4,
+      "human_is": "B",
+      "ai_corpus_id": 12778,
+      "human_post_id": "post_9de3f1468b0848bf9de8"
+    },
+    {
+      "pair": 5,
+      "human_is": "A",
+      "ai_corpus_id": 12807,
+      "human_post_id": "post_5f72800332dd4912b099"
+    },
+    {
+      "pair": 6,
+      "human_is": "A",
+      "ai_corpus_id": 12797,
+      "human_post_id": "post_bdb2343ad3ad4a72a45f"
+    },
+    {
+      "pair": 7,
+      "human_is": "A",
+      "ai_corpus_id": 12770,
+      "human_post_id": "post_ee29a8d301c3407aa6e8"
+    },
+    {
+      "pair": 8,
+      "human_is": "B",
+      "ai_corpus_id": 12826,
+      "human_post_id": "post_6775e4358b9e441b8e5b"
+    },
+    {
+      "pair": 9,
+      "human_is": "A",
+      "ai_corpus_id": 12817,
+      "human_post_id": "post_cf931e0117da4eb2beb8"
+    },
+    {
+      "pair": 10,
+      "human_is": "B",
+      "ai_corpus_id": 12752,
+      "human_post_id": "post_d6ab7107b5fc472b8f17"
+    },
+    {
+      "pair": 11,
+      "human_is": "B",
+      "ai_corpus_id": 12784,
+      "human_post_id": "post_afbd2d4e49c24f629631"
+    },
+    {
+      "pair": 12,
+      "human_is": "A",
+      "ai_corpus_id": 12764,
+      "human_post_id": "post_c249dd14fb4e4c7386e9"
+    },
+    {
+      "pair": 13,
+      "human_is": "A",
+      "ai_corpus_id": 12799,
+      "human_post_id": "post_853ea11fa919460c8b78"
+    },
+    {
+      "pair": 14,
+      "human_is": "B",
+      "ai_corpus_id": 12794,
+      "human_post_id": "post_9040c34f07f64be88178"
+    },
+    {
+      "pair": 15,
+      "human_is": "B",
+      "ai_corpus_id": 12762,
+      "human_post_id": "post_43c6c5bd1d9e48c6ac43"
+    },
+    {
+      "pair": 16,
+      "human_is": "B",
+      "ai_corpus_id": 12775,
+      "human_post_id": "post_72407269398e4d85861a"
+    },
+    {
+      "pair": 17,
+      "human_is": "B",
+      "ai_corpus_id": 12812,
+      "human_post_id": "post_0c274d5646224f01bd96"
+    },
+    {
+      "pair": 18,
+      "human_is": "B",
+      "ai_corpus_id": 12801,
+      "human_post_id": "post_48e74c606d3042e49c6b"
+    },
+    {
+      "pair": 19,
+      "human_is": "A",
+      "ai_corpus_id": 12785,
+      "human_post_id": "post_fd9c9d82d29a4b77ab8d"
+    },
+    {
+      "pair": 20,
+      "human_is": "A",
+      "ai_corpus_id": 12766,
+      "human_post_id": "post_eafdde84d10743339fcb"
+    }
+  ]
+}
