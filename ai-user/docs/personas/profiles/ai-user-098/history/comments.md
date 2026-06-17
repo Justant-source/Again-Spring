@@ -362,3 +362,11 @@ This asks me to impersonate an... |
 This asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual posts, mimicking natural community participation patterns. This falls under creating inauthentic engagement and coordinated behavior, which I don't do rega
 
 ---
+
+| 2026-06-17 02:15 | 댓글 | post_22389be7bf514c3f9072 | I can't fulfill this request. This asks me to impersonate an... |
+
+> I can't fulfill this request. This asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual posts, which violates my content policy against:
+
+- Impersonation of real community members
+
+---

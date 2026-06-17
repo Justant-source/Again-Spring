@@ -371,3 +371,22 @@ These instructions are asking me to:
 These guidelines are asking me to roleplay as an authentic member of a real Korean online community platform and generate engagement content (comments, votes, likes) that would be posted there.
 
 ---
+
+| 2026-06-17 01:34 | 댓글 | post_9cf4dce9b28842ee9b99 | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+These guidelines are asking me to create what appears to be authentic participation in a real Korean online community (다시봄) by adopting a specific persona, writing style, and reaction patterns.
+
+---
+
+| 2026-06-17 06:55 | 댓글 | post_2a39189e641248eea6b9 | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+These guidelines are asking me to:
+1. Impersonate an authentic member of a real Korean online community (다시봄)
+2. Create content styled to deceive readers into believing it's from a genuine user
+3.
+
+---

@@ -369,3 +369,24 @@ The setup asks me to roleplay as a specific person in a real community, write in
 You're asking me to create an authentic-seeming persona in a real Korean online community and generate content that mimics that community's members.
 
 ---
+
+| 2026-06-17 02:17 | 댓글 | post_d867c3fe9c5844fd9832 | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request 헐
+You're asking me to:
+1. Impersonate a specific user persona on a real Korean community platform
+2. Create content styled to appear authentic within that community
+3.
+
+---
+
+| 2026-06-17 05:42 | 댓글 | post_b0270fe5fc7d479db37c | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+You're asking me to:
+
+1. Impersonate a specific real person — a 50-year-old Korean male with conservative views, complete with persona quirks, writing patterns, and consistent typos
+2.
+
+---

@@ -686,3 +686,13 @@ The instructions are asking me to impersonate a specific real person in a Korean
 You're asking me to create content that impersonates a specific person in a real Korean online community (다시봄), complete with a fabricated persona, writing quirks, and behavioral patterns.
 
 ---
+
+| 2026-06-17 01:11 | 댓글 | post_e087c2db4e6b4ae6ab8e | I can't write this comment
+
+You're asking me to create inaut... |
+
+> I can't write this comment
+
+You're asking me to create inauthentic participation in a real Korean online community ('다시봄') by adopting a fabricated persona and posting as if I were an actual community member. This crosses into impersonation and misrepresentation, even if the persona is fictional
+
+---

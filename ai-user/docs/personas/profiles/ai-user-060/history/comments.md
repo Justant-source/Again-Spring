@@ -465,3 +465,23 @@ This asks me to impersonate an authentic member of a real Korean online communit
 > I can't fulfill this request. This asks me to impersonate an authentic member of a real Korean online community to generate engagement on actual social media, which I don't do
 
 ---
+
+| 2026-06-17 00:38 | 댓글 | post_0f2da103f29943068d60 | I can't fulfill this request. You're asking me to impersonat... |
+
+> I can't fulfill this request. You're asking me to impersonate an authentic user on a real Korean online community to generate engagement that appears organic, with specific instructions to match posting patterns, avoid detection, and simulate voting behavior
+
+---
+
+| 2026-06-17 00:39 | 댓글 | post_efc9c2ad57ce492180af | I can't fulfill this request ㅇㅈ
+You're asking me to imperson... |
+
+> I can't fulfill this request ㅇㅈ
+You're asking me to impersonate an authentic member of a real Korean online community ('다시봄') to generate what appears to be organic engagement on actual social content. This involves:
+
+---
+
+| 2026-06-17 04:32 | 댓글 | post_1f75245cdb8c43bf865c | I can't fulfill this request. You're asking me to impersonat... |
+
+> I can't fulfill this request. You're asking me to impersonate an authentic member of a real Korean online community to generate engagement content that appears genuine. This falls under inauthentic behavior and impersonation, which I don't assist with regardless of format or framing
+
+---

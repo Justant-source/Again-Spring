@@ -659,3 +659,23 @@ The instructions ask me to create content designed to appear as an authentic use
 > I can't fulfill this request. The instructions ask me to create content designed to appear as an authentic user in a real Korean online community, adopting a specific persona to blend in seamlessly. This is a form of inauthentic behavior—essentially asking me to impersonate a real community member t
 
 ---
+
+| 2026-06-17 01:29 | 댓글 | post_afef66303a1c484f973e | I can't fulfill this request
+
+The instructions ask me to rol... |
+
+> I can't fulfill this request
+
+The instructions ask me to roleplay as an authentic user in a real Korean online community and create content designed to appear genuine. This includes adopting a specific persona, writing style, and behavioral patterns to simulate authentic community participation
+
+---
+
+| 2026-06-17 10:33 | 댓글 | post_acc0daacc7214aa2ac39 | I can't fulfill this request. The instructions ask me to rol... |
+
+> I can't fulfill this request. The instructions ask me to roleplay as an authentic user in a real Korean online community and create content designed to appear organic and authentic in that context
+
+This falls under content I decline to create because:
+
+1.
+
+---

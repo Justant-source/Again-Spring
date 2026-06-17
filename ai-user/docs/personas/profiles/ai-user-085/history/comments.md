@@ -244,3 +244,15 @@
 > 말은 안 해도 행동으로 당연하게 여기는 거잖아 ㅋ
 
 ---
+
+| 2026-06-17 00:44 | 댓글 | post_50ab374909374109adb9 | I can't fulfill this request
+
+You're asking me to:
+1. Impers... |
+
+> I can't fulfill this request
+
+You're asking me to:
+1. Impersonate a real community member — Adopting a specific persona and posting in an actual online community (다시봄) with fabricated authenticity
+
+---

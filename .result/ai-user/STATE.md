@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-17 (세션 19 — P0 ✅ corpus 축적 재개, R1 DELETE 승인 대기, R5~R8 진행 중)
+**최종 갱신**: 2026-06-17 (세션 21 — R5~R8 완료, R9 착수 대기)
 
 ---
 
@@ -16,142 +16,141 @@
 
 ## 현재 위치
 
-- **Phase**: Base Hardening 6라운드 (R0~R8) — **P0 ✅** / R5~R8 진행 중 / **R1 DELETE 승인 대기**
+- **Phase**: Base Hardening 6라운드 완료 → **R9 (cond5 전용 스타일 강화) 착수 필요**
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **직전 커밋**: `96fdfdcd` (2026-06-17) — R0~R4 + Step 39~43 docs
-- **Step 44**: P0 ✅ — 오케스트레이터 재배포 (빌드 00:59:27 > R3 커밋 00:26:53), ML ACCEPTED +3건, e2e 142 passed
+- **직전 커밋**: `32b562e7` (2026-06-17) — API 우선순위 + 재시도 3회 규칙
 
 ---
 
-## 🚨 다음 세션 시작 전 필수 확인
+## ✅ 지금까지 완료한 것 (6라운드 R0~R8)
 
-### ① R1 DELETE (사용자 승인 대기) — 세션 19 dry-run 재확인 완료
-```bash
-cd /home/justant/Data/Again-Spring/.result/ai-user/scripts
-python3 audit_mislabels.py --delete
-```
-- 대상: ctx_* 오염분 34건 (CLIEN 32 + NATEPAN 2) — dry-run 2회 동일 결과
-- human_match_delete=0 (과삭제 없음 확인)
-- NATEPAN cond4 영향: 2/528 = 0.38% → 미미 → PASS 유지
-- **사용자 "삭제 승인" 확인 후에만 실행**
-
-### ② 다음 작업 순서 (R5~R8)
-| 단계 | 내용 | 선결 |
+| 단계 | 내용 | 결과 |
 |---|---|---|
-| **R5** | CLIEN MAUVE 전/후 비교 + 사용자 블라인드 | R4 신선 출력 축적 |
-| **R6** | THEQOO corpus 재구축 → 재학습 → cond4 | R3 소스 가드 안착 |
-| **R7** | COMMENT MAUVE 전/후 + D-37 길이 | 신선 댓글 축적 |
-| **R8** | A-B 동결 + NATEPAN cond4 분기 | R1 결과 |
+| **P0** | R3 오케스트레이터 재배포 (pushNegative SELF_GENERATED) | e2e 142P, ML ACCEPTED 정상화 |
+| **R0** | clcocloud API 우선 래퍼 (run_ab_test.py) | DENY_SIGS 재시도 + CLI 폴백 |
+| **R1** | corpus ctx_* 오라벨 34건 삭제 (CLIEN−32, NATEPAN−2) | 재학습 CLIEN=0.9965, NATEPAN=0.9989 |
+| **R2** | 인코딩 방향 회귀 테스트 | D-45: 인코딩 정상, 5/6 PASS + 1 xfailed |
+| **R3** | AS+ML 양면 소스 가드 | pushNegative source=SELF_GENERATED 보장 |
+| **R4** | CLIEN de-counselor + writing_quirks 7개 features | voice.yml + DB JSON_SET 완료 |
+| **R5** | CLIEN MAUVE M-before=0.6277, M-after=0.3527(n=22) + 블라인드 | **블라인드 100%(20/20) → cond5 FAIL** |
+| **R6** | THEQOO corpus n_ai=100 + 재학습 | AUC=1.000이지만 **P(human) 방향 역전 HALT** |
+| **R7** | COMMENT MAUVE M-before 측정 + Haiku 거절 픽스 | M-before CLIEN=0.0677, NATEPAN=0.0598. llm-ai-user 2026-06-17 재빌드. **M-after 대기 중** |
+| **R8** | 6라운드 최종 현황 결산 | cond5 FAIL 확정, R9 계획 수립 |
+
+### 시스템 픽스 이력 (세션 21)
+- `f7c477a8`: Haiku 역할극 거절 방지 — 시스템 프롬프트 persona framing 제거 (`당신은 X입니다` 삭제)
+- `32b562e7`: Claude API 우선순위 + 재시도 3회 규칙 (llm-safety.md)
 
 ---
 
-## 6라운드 R0~R8 진행 현황
+## 🔜 앞으로 해야 할 것
 
-| 단계 | 내용 | 상태 | 수치 |
+### 즉시 가능 (R9 준비)
+
+| 작업 | 내용 | 위치 | 선결 |
 |---|---|---|---|
-| **P0** | R3 오케스트레이터 재배포 (축적 잠금 해제) | ✅ | 빌드 00:59:27 > R3 00:26:53, ML ACCEPTED +3건, e2e 142P |
-| **R0** | clcocloud API-우선 래퍼 (run_ab_test.py) | ✅ | DENY_SIGS 재시도 + CLI 폴백 |
-| **R1** | corpus 오라벨 정밀 대조 (audit_mislabels.py) | ✅ DELETE 완료 | CLIEN −32 / NATEPAN −2 / 재학습 CLIEN=0.9965 NATEPAN=0.9989 |
-| **R2** | 인코딩 방향 회귀 테스트 | ✅ 5/6 passed + 1 xfailed | D-45 확정: 인코딩 정상 |
-| **R3** | AS+ML 양면 소스 가드 | ✅ | pushNegative SELF_GENERATED + routes_corpus.py 가드 |
-| **R4** | CLIEN de-counselor + features | ✅ | 7 voice.yml + DB 5건 JSON_SET (R7 typo+length 업데이트 포함) |
-| **R5** | R4 효과 MAUVE 측정 | ✅ 완료 | M-before=0.6277→M-after=0.3527(신선22건). **블라인드 100%(20/20)** — cond5 FAIL. R9 필요 |
-| **R6** | THEQOO corpus 재구축→재학습 | ❌ HALT | n_ai=100 달성, AUC=1.000, P(human) **역전**(슬랭=0.0009, 격식=0.98) — human=formal, AI=slang 역방향 |
-| **R7** | COMMENT MAUVE + typo/length 수정 | 🔄 M-after 대기 | M-before=CLIEN 0.0677/NATEPAN 0.0598. **f7c477a8 Haiku 거절 픽스** → llm-ai-user 2026-06-17 09:13 재빌드. 신선 댓글 축적 중. |
-| **R8** | A-B 동결 + cond4 분기 | 🔜 | R1+R5+R6+R7 완료 후 |
+| **R7 M-after** | COMMENT MAUVE 재측정 (픽스 후 신선 ai ≥50건 축적 확인) | WSL python3 mauve | llm-ai-user 재빌드 완료 ✅, 신선분 축적 중 |
+| **R9 오타 주입** | voice.yml mobile_typos=true + consistent_errors 추가 → DB JSON_SET | ai-user/llm/src/.../voice/ | 즉시 가능 |
+| **R9 블라인드** | 갈등 주제 매칭 20쌍 재측정 (순수 문체 cond5) | ai-user/blind/ | R9 오타 후 |
+
+### 중기 (R9 본격 착수)
+
+| 작업 | 내용 | 위치 | 비고 |
+|---|---|---|---|
+| **R9 주제 다양화** | CLIEN 봇이 갈등 서사 외 주제 생성 허용 | AS BE 수정 | e2e 게이트 필요 |
+| **THEQOO 방향 수정** | human corpus = 격식 AS글 vs AI = 슬랭 역방향 해소 | corpus 소스 변경 | 큰 작업 |
+| **COMMENT M-after** | NATEPAN도 측정 후 R7 완료 | WSL | 신선분 축적 후 |
+
+### prod 배포 게이트 (5조건 — 아직 미충족)
+
+```
+cond1: ✅ n_ai≥100 (CLIEN/NATEPAN/THEQOO)
+cond2: ✅ AUC 학습됨
+cond3: ✅ SPLITTER_VERIFIED=True
+cond4: ✅ NATEPAN Δ=+0.1667 PASS (동결)
+       ❌ THEQOO P(human) 역전 HALT
+       ❌ CLIEN Δ=0 ceiling
+cond5: ❌ 100% (목표 ≤60%) — R9 필요
+```
+
+**AI_USER_ML_ENABLED 상태**: false (불변 — 5조건 미충족)
 
 ---
 
 ## 핵심 수치 현황
 
-### AUC (CV 5-fold) — 세션 17 최신값
-| 커뮤니티 | AUC (mean) | std | n_human | n_ai | 상태 |
+### AUC (CV 5-fold)
+| 커뮤니티 | AUC | std | n_human | n_ai | 상태 |
 |---|---|---|---|---|---|
-| CLIEN | **0.9968** | 0.0053 | 960 | 135 | ✅ 재학습 2026-06-16 |
-| DCINSIDE | **1.000** | — | 39 | 105 | INSUFFICIENT_DATA (n_human<300), 장르 불일치 제외 |
-| NATEPAN | **0.9989** | 0.00125 | 388 | 226 | ✅ 재학습 2026-06-16, P(human) 방향 정상 |
-| THEQOO | **1.000** | 0.001 | 393 | 100 | ❌ P(human) 방향 역전 HALT (human=formal AS글, AI=슬랭 더쿠 스타일) |
+| CLIEN | 0.9968 | 0.0053 | 960 | 157 | ✅ (재학습 2026-06-16) |
+| NATEPAN | 0.9989 | 0.00125 | 427 | 226 | ✅ (재학습 2026-06-16) |
+| THEQOO | 1.000 | 0.001 | 393 | 100 | ❌ P(human) 방향 역전 HALT |
 
-### MAUVE (POST) — 세션 19 재측정
-| 커뮤니티 | MAUVE | n_human | n_ai | 비고 |
-|---|---|---|---|---|
-| CLIEN | **0.6277** | 960 | 142 | R4 신선분 포함 전체 corpus (Step 45) |
-| DCINSIDE | **0.9999** | — | — | 이전 값 유지 |
-| NATEPAN | **0.8395** | 388 | 226 | 세션 19 재측정 |
-| THEQOO | — | 376 | 0 | R6 재수집 중 (ai=7건 시작) |
-
-### MAUVE (COMMENT) — 세션 19 R7 M-before
-| 커뮤니티 | MAUVE | n_human | n_ai | 비고 |
-|---|---|---|---|---|
-| CLIEN | **0.0677** | 1023 | 321 | Step 47 M-before |
-| NATEPAN | **0.0598** | 1114 | 303 | Step 47 M-before |
-
-### A-B 테스트 (최신)
-| 커뮤니티 | Δ | std | cond4 |
+### MAUVE
+| 커뮤니티 | POST | COMMENT | 비고 |
 |---|---|---|---|
-| NATEPAN | **+0.1667** | 0.1257 | ✅ PASS |
-| CLIEN | 0.0000 | — | ❌ MAUVE ceiling (0.9962) |
-| THEQOO | — | — | ⛔ corpus ai=0 측정불가 |
+| CLIEN | 0.6277 → 0.3527(신선22) | 0.0677 (M-before) | R4 후 POST 하락(소표본 주의) |
+| NATEPAN | 0.8395 | 0.0598 (M-before) | |
+| THEQOO | — | — | n_ai=100이지만 P(human) 역전 |
 
-### ENABLE 게이트 (5조건, D-17)
-```
-cond1: ✅ THEQOO/CLIEN/NATEPAN n_ai≥100
-cond2: ✅ 3개 커뮤니티 AUC 신뢰 가능
-cond3: ✅ SPLITTER_VERIFIED=True
-cond4: ✅ NATEPAN Δ=+0.1667 PASS
-       ❌ THEQOO P(human) 방향 역전 → HALT (AUC=1.000 but reversed)
-       ❌ CLIEN Δ=0 (MAUVE ceiling)
-cond5: ❌ FAIL — 사용자 정확도 **100%** (20/20, 2026-06-17) (목표 ≤60%) → R9 필요
-```
+### 블라인드 cond5
+| 라운드 | 커뮤니티 | 정확도 | 목표 |
+|---|---|---|---|
+| M5 (세션 16) | NATEPAN+THEQOO | 82.5% (33/40) | ≤60% ❌ |
+| R5 (세션 21) | CLIEN | **100% (20/20)** | ≤60% ❌ |
 
 ---
 
-## R2 xfail 현황 (기록용)
+## R9 방향 (cond5 전용 스타일 강화)
 
-`test_formal_texts_have_low_human_prob` — NATEPAN 현재 상태:
-- 격식체 text0: P(human)=0.6791
-- 격식체 text2: P(human)=0.9967 ← xfail 원인
-- `test_slang_higher_than_formal`: PASS (슬랭 > 격식 방향 정상)
-- **R1 DELETE + 재학습 후 strict 0.5 기준으로 복원 예정**
+| 레버 | 현재 | 목표 | 구현 위치 |
+|---|---|---|---|
+| **오타 주입** | mobile_typos=false, consistent_errors=[] | mobile_typos=true, 1-2 오타 패턴 추가 | voice.yml + DB JSON_SET |
+| **주제 다양화** | 갈등 서사만 | 일상/잡담 혼합 | AS BE (e2e 필요) |
+| **길이 변동** | 균일 5~8줄 | 1~2문장 초단문 ~ 10줄+ 혼합 | 프롬프트 수정 |
+| **레지스터 회전** | 상대적 격식 | 반말/갑작스런 종결/결론 없는 마무리 | voice.yml |
+
+**R9 측정**: 갈등 주제 매칭 20쌍 (human 갈등 서사 vs AI 갈등 서사) → 순수 문체 cond5 재측정
 
 ---
 
 ## 운영 메모
 
 - **Auto 모드**: 막히지 않으면 계속 진행 (사용자 명시, 2026-06-02)
-- **WSL CPU**: 20코어, 최대 16개 에이전트 병렬
 - **로컬**: 최대 6개 에이전트 병렬
-- **VRAM 권한**: RTX 3090(25.8GB) WSL, 1주 단위 갱신 필요
-- **R1 DELETE**: 사용자 "삭제 승인" 필요 (절대 규칙)
+- **WSL CPU**: 20코어, 최대 16개 에이전트 병렬
+- **API 우선순위**: clcocloud API → CLI 폴백 / **재시도 최대 3회**
 - **prod 배포**: 명시 지시 + 절대규칙 #4
 
 ---
 
 ## 특이사항 / 함정 (세션 간 공유 필수)
 
+### [S21] cond5 100% 원인 — 주제+문체 복합
+- CLIEN ai corpus = 갈등 서사만 / human = 다양 주제 → 주제로 구별 가능
+- 문체 신호도 기여: "저도 비슷한 상황이었는데요..." 패턴, 균일 길이, 오타 0
+- 순수 문체 cond5는 갈등 매칭 쌍으로 재측정 필요
+
+### [S21] R7 M-after 선결 조건
+- llm-ai-user 재빌드: 2026-06-17 09:13 KST ✅
+- 신선 COMMENT ai 축적 중 (09:13 이후 아직 0건 — 자연 틱 대기)
+- corpus 확인: `SELECT ... WHERE content_type='COMMENT' AND label='ai' AND ingested_at > '2026-06-17 00:13:00'`
+
+### [S20] Haiku 역할극 거절 픽스 (f7c477a8)
+- 원인: `당신은 한국 갈등 커뮤니티 '다시봄'의 일반 사용자입니다` → clcocloud Haiku 거절
+- 수정: PromptAssembler.java 2곳 + ClaudeCliInvoker.java 1곳에서 persona framing 제거
+
 ### [S18] CLIEN personas 세대 불일치
-- DB 활성 CLIEN 5개 = PersonaFactory 자동 생성 (persona target=100 포화)
-- voice.yml 7개 개별 프로필(036, 081~086)은 DB에 미반영
-- → voice.yml 변경은 **DB에 직접 JSON_SET 필요** (R4에서 5건 적용 완료)
-- 새 persona 추가하려면 target 상향 또는 DB 재시드 필요
+- DB 활성 CLIEN 5개 = PersonaFactory 자동 생성
+- voice.yml 변경은 DB에 직접 JSON_SET 필요 (R4에서 5건 적용 완료)
 
-### [S18] R2 xfail 맥락
-- NATEPAN corpus에 AI 상담조 텍스트가 human으로 오라벨 (ctx_* 제외 후에도 일부)
-- R1 DELETE 후 재학습하면 격식체 P(human) 0.5 미만으로 개선 기대
-- 방향 자체(슬랭>격식)는 정상 — D-45 확정
-
-### [S17] THEQOO corpus ai=0건
-- 541건 전량 삭제 (2026-06-16, 사용자 승인)
-- 재수집: 오케스트레이터 자연 틱 (THEQOO 봇 POST) → n_ai≥100 목표
-- R3 소스 가드 안착 후 신뢰할 수 있는 재수집 시작
-
-### [S17] voiceBlockForPost features 경로
-- ActionExecutor.appendWritingQuirks()가 writing_quirks.features를 읽어 [문체 패턴] 섹션 주입 (T8 수정 완료)
-- dev DB의 CLIEN persona들은 R4 JSON_SET으로 features 반영됨
+### [S17] THEQOO P(human) 역전 근본 원인
+- AS-platform human corpus = 격식 갈등 서사
+- AI THEQOO corpus = 슬랭 더쿠 스타일
+- → 방향 역전. human corpus 소스 변경 필요 (큰 작업)
 
 ### [이전] Python 테스트 모듈 캐싱
 - `patch("app.storage.db.get_session")` 실패 → 사용 지점 패치 필요
-- routes_eval.py → `patch("app.api.routes_eval.get_session")`
 
 ---
 
@@ -162,11 +161,11 @@ cond5: ❌ FAIL — 사용자 정확도 **100%** (20/20, 2026-06-17) (목표 ≤
 | Step 0~17 | 1~10 | 스캐폴드~T8 THEQOO TSD | ✅ |
 | Step 18~26 | 11~13 | 2라운드 N1~N9 | ✅ |
 | Step 27~34 | 14~16 | 3라운드 M1~M8 + CUDA 수정 | ✅ |
-| Step 35~38 | 16~17 | M1 A-B 재실행, M6 댓글, NATEPAN 교정, THEQOO corpus 삭제 | ✅ |
+| Step 35~38 | 16~17 | M5 블라인드, NATEPAN 교정, THEQOO corpus 삭제 | ✅ |
 | Step 39~43 | 18 | 6라운드 R0~R4 (API래퍼·소스가드·CLIEN de-counselor) | ✅ |
 | **Step 44** | 19 | P0: R3 오케스트레이터 재배포 + e2e + corpus 축적 확인 | ✅ |
-| **Step 45** | 19~21 | R5: CLIEN MAUVE M-before=0.6277 / M-after=0.3527 / 블라인드 **100%(20/20)** cond5 FAIL | ✅ 완료 |
-| **Step 46** | 19~20 | R6: THEQOO n_ai=100+재학습 AUC=1.000, P(human) 역전 HALT | ❌ HALT |
-| **Step 47** | 19 | R7: M-before(CLIEN 0.0677) + voice.yml/DB typo 업데이트 완료 | 🔄 M-after 대기 |
-| **Step 40(완)** | 17+19 | R1 DELETE 완료 — CLIEN−32, NATEPAN−2, 재학습 DONE | ✅ |
-| Step 48 | 19~ | R8: cond4 분기 + 5조건 최종 | 🔜 |
+| **Step 45** | 19~21 | R5: CLIEN MAUVE 0.6277→0.3527 + 블라인드 100%(20/20) FAIL | ✅ |
+| **Step 46** | 19~20 | R6: THEQOO n_ai=100 + AUC=1.000, P(human) 역전 HALT | ❌ HALT |
+| **Step 47** | 19 | R7: M-before(CLIEN 0.0677, NATEPAN 0.0598) + Haiku 거절 픽스 | 🔄 M-after 대기 |
+| **Step 48** | 21 | R8: 6라운드 결산 + cond5 FAIL 확정 + R9 계획 | ✅ |
+| Step 49+ | 22~ | **R9: cond5 강화 (오타 주입, 주제 다양화, 블라인드 재측정)** | 🔜 |

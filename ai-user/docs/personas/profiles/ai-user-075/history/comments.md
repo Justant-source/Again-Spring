@@ -317,3 +317,9 @@ The instructions ask me to roleplay as a Korean user on a specific online commun
 > 친구 앞에서도 안 낸 거 진짜 뭐하는 건데 ㅋ
 
 ---
+
+| 2026-06-17 00:41 | 댓글 | post_673c0d9d4dc641c9b4e5 | 미리 말했는데 |
+
+> 미리 말했는데
+
+---
