@@ -1,178 +1,169 @@
-# Step 51 — R9 측정: blind①② + MAUVE 재측정
+# Step 51 — R9 측정: blind①② + MAUVE
 
-**세션**: 22~ | **날짜**: 2026-06-17~ | **상태**: 🔄 신선 축적 대기 중
-
----
-
-## 📋 수동 작업 지시서
-
-> 이 파일에 결과를 직접 기록하면 다음 세션에서 Claude가 분석·에스컬레이션 평가를 자동 수행.
+**세션**: 22~ | **날짜**: 2026-06-17~ | **상태**: 🔄 진행 가능
 
 ---
 
-## ① 현재 축적 상태 확인 명령
+## ✅ TL;DR — 사용자가 해야 할 것 딱 1가지
 
-```bash
-# 언제든 이 쿼리로 신선 축적 확인 (KST 기준 오늘 12:03 이후)
-ssh justant@100.115.252.61 "docker exec again-spring-ai-user-aiuser-ml-db-1 \
-  mariadb -uaiuser_ml -paiuser_ml_dev aiuser_ml -e \"
-  SELECT content_type, community, label, COUNT(*) as n_fresh
-  FROM corpus_item
-  WHERE ingested_at > '2026-06-17 03:03:00'
-  GROUP BY content_type, community, label
-  ORDER BY content_type, community, label;
-\""
-```
-
-**축적 기준 (측정 시작 OK 조건)**:
-- blind ①: CLIEN POST ai ≥10건 신선 (Track A 오타 주입 적용분)
-- blind ②: CLIEN POST ai 중 비갈등 글 ≥5건 확인 (Track B CASUAL 확인)
-- R7 M-after: CLIEN COMMENT ai ≥50건 신선
+> **"블라인드 시작해줘"** 라고 말하면 됩니다.
+>
+> Claude가 코퍼스에서 글을 뽑아서 **A / B 두 쌍**으로 보여드립니다.
+> 각 쌍마다 **"A가 사람 같다" 또는 "B가 사람 같다"** 라고 답하면 끝.
+>
+> 사연을 직접 가져올 필요 없습니다. 점수 계산도 Claude가 합니다.
 
 ---
 
-## ② CASUAL 글 출현 스팟 체크 (수동)
+## 현재 상태 (2026-06-17 기준)
 
-Track B가 작동하는지 확인. 오케스트레이터 로그에서 "CASUAL" 키워드 확인:
+| 항목 | 상태 | 메모 |
+|---|---|---|
+| **blind ① 지금 시작 가능?** | ✅ 가능 | 기존 CLIEN AI 157건 충분 (Track A 적용분은 추후 별도 재측정) |
+| **blind ② 지금 시작 가능?** | ⚠️ 일부 가능 | CASUAL 글 아직 0건 → AI 갈등글만 섞어서 선행 측정 가능 |
+| Track A 신선분 (오타 주입 적용) | 🔄 Kiro 수정 후 쌓이는 중 | 오늘 저녁~내일 중 충분할 예정 |
+| MAUVE 재측정 | 🔄 자동 (Claude가 알아서) | 신선분 50건+ 쌓이면 Claude가 실행 |
 
-```bash
-docker logs againspring-ai-user-orchestrator --since 2h 2>&1 | grep -i "casual\|postKind" | tail -20
+---
+
+## 블라인드 테스트란?
+
+**목적**: AI 글이 사람 눈에 얼마나 들키는가 측정.  
+지금 R5 측정에서 **100% (20/20 정확도)** — 즉 AI 글이 너무 쉽게 구별됨.  
+Track A(오타 주입) + Track B(일상 글) 후 이 수치가 ≤60%로 내려가야 cond5 통과.
+
+**사용자가 하는 것**: 두 글 중 어느 쪽이 사람 글인지 맞추기 (퀴즈)  
+**Claude가 하는 것**: 글 뽑기 → 라벨 숨기기 → 제시 → 채점
+
+---
+
+## 예시 — 실제 이런 식으로 진행됩니다
+
+Claude가 이렇게 보여줍니다:
+
+---
+
+**쌍 #1**
+
+**[A]**
+```
+이번 주에 여행 경비 얘기하다가 완전 막혔거든요
+형제네는 부부 둘이고 저희는 아이 둘에 부모님까지 모시는 구조인데,
+인당으로 나누자고 하더라고요 그렇게 하면 저희가 거의 두 배 가까이 내는 건데,
+그걸 배려라고 포장하는 게 좀 이상하지 않나요
+조건 달린 나눔이라는 게 나눔이긴 한 건지... 나는 지금도 어떻게 말을 꺼내야 할지 모르겠는 거예요
 ```
 
-또는 dev DB에서 최신 AI 글 5개 직접 읽기:
-
-```bash
-docker exec againspring-mariadb-dev mariadb -uagainspring -pF2etXbugW0EBDZNBMX17Q againspring_dev -e "
-SELECT id, title, LEFT(content,100) as snippet, created_at
-FROM posts
-WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@ai.againspring.net')
-ORDER BY created_at DESC
-LIMIT 10;" 2>&1
+**[B]**
 ```
-
-**✏️ 결과 기록 (여기에 작성)**:
-```
-확인 날짜: 
-갈등 아닌 글 출현: Y / N
-예시 (있으면):
+안녕하세요. 평생을 안고 살던 오랜 고민거리 하나가 속 시원하게 풀려서,
+혹시 저 같은 분들이 또 계실까 싶어 반가운 마음에 글을 남겨봅니다.
+저는 살면서 옛날 일들, 특히 대학교 때나 군대 시절 기억이 거의 안 나서 늘 찜찜했거든요.
+방금 물건 둔 곳이나 일할 때 필요한 정보는 기가 막히게 잘 찾는데 유독 제 과거 경험은 뭉텅이로 날아간 느낌이었습니다.
 ```
 
 ---
 
-## ③ blind ① — 순수 문체 cond5 (20쌍, 갈등 매칭)
+사용자가 답합니다: **"B가 사람 같다"**
 
-**목적**: Track A 오타 주입 효과 측정 — 주제 단서 없이 문체만으로 구별 가능한가?
+→ 20쌍 다 끝나면 Claude가 라벨 공개 + 정확도 계산.
 
-**진행 방법**:
+---
 
-1. Claude에게 "blind ① 쌍을 뽑아줘" 요청 → Claude가 ML 코퍼스에서 자동 추출
-   - 조건: CLIEN POST ai(신선, 갈등 서사) 20건 + CLIEN POST human(갈등 서사) 20건
-   - 주제 키워드 매칭(남친/직장/가족 카테고리 균형), 무작위 순서로 섞기
-2. 각 쌍을 보고 **"어느 쪽이 사람 글인가?"** 판단
-   - 판단 근거 적어도 됨 (선택)
-   - 빠르게 직관으로 판단 (심사숙고X — 실제 독자 경험 기준)
-3. 아래 표에 기록
+## 진행 방법
 
-**✏️ 결과 기록**:
+### 지금 바로 시작하려면
+
+```
+"blind ① 시작해줘"
+```
+
+라고 말하면 Claude가:
+1. CLIEN AI 글 20건 + CLIEN Human 글 20건 코퍼스에서 추출
+2. 20쌍으로 묶어서 A/B 순서 무작위 섞기
+3. 한 쌍씩 채팅에서 보여줌 (또는 한 번에 20쌍 제시 — 원하는 방식 말해주세요)
+4. 사용자 답변 수집 → 채점 → 정확도 리포트
+
+**팁**: 빠르게 직관으로 판단하세요. 심사숙고하지 않는 게 실제 독자 경험에 가깝습니다.
+
+### Track A 적용분 별도 측정 (나중에)
+
+Track A(오타 주입) 신선 글이 쌓이면 같은 방식으로 1회 더 진행.  
+→ 신선분 10건 이상 쌓이면 Claude가 먼저 알려드릴게요.
+
+---
+
+## ✏️ 결과 기록 (Claude가 채워줌)
+
+### blind ① — 기존 코퍼스 (Track A 전 베이스라인)
 
 ```
 측정 날짜:
 총 쌍 수: 20
-정답 (AI 맞춤): ___ / 20  ← 사후에 Claude가 라벨 공개 후 채점
-정확도: ___%
+AI 맞춤 (정확도): ___ / 20  (___ %)
+이전 R5 기록: 20/20 (100%)
+변화: ___
 ```
 
-| 쌍 # | 내 판단 (A=사람 / B=사람) | 메모 |
-|---|---|---|
-| 1 | | |
-| 2 | | |
-| 3 | | |
-| ... | | |
-| 20 | | |
-
-**판단 기준 힌트 (읽기 전에 보지 말 것)**:
-<details>
-<summary>채점 후 참고</summary>
-
-- 오타/띄어쓰기 오류: 인간 쪽에 자연스러운 오타
-- 문장 균일성: AI는 비슷한 길이·구조 반복
-- 마무리: AI는 수사 의문문으로 끝나는 경향
-- 주제 도입: AI는 "어제/이번 주에" + trigger 사건 도식
-
-</details>
-
----
-
-## ④ blind ② — 현실 cond5 (20쌍, 혼합 주제)
-
-**목적**: Track A+B 합산 효과 — 실제 운영 환경에서 구별 가능한가? (cond5 실측)
-
-**진행 방법**: blind ①과 동일하나 AI쪽이 갈등+일상 혼합 (CASUAL 포함)
-
-**✏️ 결과 기록**:
+### blind ① — Track A 신선분 (오타 주입 적용)
 
 ```
 측정 날짜:
 총 쌍 수: 20
-정답 (AI 맞춤): ___ / 20
-정확도: ___%
+AI 맞춤 (정확도): ___ / 20  (___ %)
+Track A 전 대비 변화: ___
 ```
 
-**cond5 판정**:
-- ≤60% → ✅ cond5 PASS
-- 61~75% → ❌ FAIL (에스컬레이션 평가 필요)
-- >75% → ❌ FAIL (D-12 Phase 2/3 보고)
-
----
-
-## ⑤ R7 M-after — COMMENT MAUVE (자동, Claude에게 요청)
-
-**목적**: Haiku 거절 픽스(2026-06-17 00:13) + Track A 오타 주입 후 COMMENT MAUVE 재측정
-
-**진행 방법**: "R7 M-after 측정해줘" 요청 → Claude가 WSL에서 자동 실행
-
-**✏️ 결과 기록** (Claude가 채워줌):
+### blind ② — 혼합주제 (CASUAL 포함)
 
 ```
 측정 날짜:
-CLIEN COMMENT MAUVE: (M-before: 0.0677)
-  - M-after =
-  - Δ =
-NATEPAN COMMENT MAUVE: (M-before: 0.0598)
-  - M-after =
-  - Δ =
+총 쌍 수: 20
+AI 맞춤 (정확도): ___ / 20  (___ %)
+
+cond5 판정:
+  ≤60% → ✅ PASS
+  >60% → ❌ FAIL
 ```
 
 ---
 
-## ⑥ POST MAUVE 재측정 (자동, Claude에게 요청)
+## 자동 측정 (Claude가 알아서 함)
 
-**목적**: Track A+B 배포 후 POST MAUVE 전후 비교
+아래는 사용자가 신경 쓸 필요 없습니다. 조건 충족되면 Claude가 자동으로 실행합니다.
 
-**진행 방법**: "MAUVE 재측정해줘" 요청
+### R7 M-after — COMMENT MAUVE
 
-**✏️ 결과 기록**:
-
+**조건**: 신선 CLIEN COMMENT ai ≥50건 쌓인 후 (현재 0건, 곧 쌓임)  
+**결과 기록**:
 ```
 측정 날짜:
-CLIEN POST MAUVE:
-  - 이전 = 0.3527 (R5, n=22 신선)
-  - 이후 =
-  - Δ =
-NATEPAN POST MAUVE:
-  - 이전 = 0.8395
-  - 이후 =
-  - Δ =
+CLIEN COMMENT MAUVE M-before: 0.0677
+CLIEN COMMENT MAUVE M-after: (미측정)
+NATEPAN COMMENT MAUVE M-before: 0.0598
+NATEPAN COMMENT MAUVE M-after: (미측정)
+```
+
+### POST MAUVE 재측정
+
+**조건**: Track A 신선 POST ≥40건 쌓인 후  
+**결과 기록**:
+```
+측정 날짜:
+CLIEN POST MAUVE 이전: 0.3527 (R5)
+CLIEN POST MAUVE 이후: (미측정)
+NATEPAN POST MAUVE 이전: 0.8395
+NATEPAN POST MAUVE 이후: (미측정)
 ```
 
 ---
 
-## 에스컬레이션 평가 기준 (D-12)
+## 에스컬레이션 판정 기준
 
-blind ② 결과 후 Claude가 자동 평가:
+blind ② 결과로 Claude가 자동 판정합니다.
 
-| 결과 | 판정 | 다음 단계 |
+| blind ② 정확도 | 판정 | 다음 단계 |
 |---|---|---|
-| ≤60% | ✅ cond5 PASS | AI_USER_ML_ENABLED 5조건 재검토 |
-| 61~75% | ❌ 추가 레버 탐색 | length/register 회전 (R10) |
-| >75% | ❌ D-12 Phase 2/3 보고 | **QLoRA/DPO — 사용자 명시 승인 필요** |
+| ≤60% | ✅ cond5 PASS | ML 활성화 5조건 재검토 |
+| 61~75% | ❌ FAIL | R10 length/register 회전 |
+| >75% | ❌ FAIL (심각) | D-12 Phase 2/3 — QLoRA/DPO 사용자 승인 필요 |
