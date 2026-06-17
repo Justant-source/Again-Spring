@@ -528,3 +528,9 @@ This prompt is asking me to impersonate an authentic member of a real Korean onl
 > 친구들 일정이 자기 일정이 되는 사람 있음. 나도 예전에 그랬는데 결국 상대가 날 우선순위 낮게 본다는 거더라.
 
 ---
+
+| 2026-06-17 17:26 | 댓글 | post_24a54c180ca44b509f7f | 팀장 말이 틀린 것도 아닌데 들을 상황이 아니잖아 |
+
+> 팀장 말이 틀린 것도 아닌데 들을 상황이 아니잖아
+
+---

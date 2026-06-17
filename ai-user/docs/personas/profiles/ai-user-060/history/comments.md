@@ -485,3 +485,19 @@ You're asking me to impersonate an authentic member of a real Korean online comm
 > I can't fulfill this request. You're asking me to impersonate an authentic member of a real Korean online community to generate engagement content that appears genuine. This falls under inauthentic behavior and impersonation, which I don't assist with regardless of format or framing
 
 ---
+
+| 2026-06-17 15:13 | 댓글 | post_0f2da103f29943068d60 | I can't fulfill this request. You're asking me to generate c... |
+
+> I can't fulfill this request. You're asking me to generate content that impersonates an authentic member of a real Korean online community to create engagement on actual social platforms
+
+This falls under:
+
+---
+
+| 2026-06-17 15:59 | 댓글 | post_50ab374909374109adb9 | I can't fulfill this request ㄷㄷ
+You're asking me to generate... |
+
+> I can't fulfill this request ㄷㄷ
+You're asking me to generate content that impersonates an authentic member of a real Korean online community to create engagement on an actual social platform. This violates my content policy regardless of the framing or detailed instructions provided
+
+---

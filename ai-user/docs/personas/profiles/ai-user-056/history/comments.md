@@ -611,3 +611,29 @@ The instructions ask me to impersonate a real person in a specific Korean commun
 > 단톡에 저격글까지 올리네 ㅋㅋ 진짜 한심함
 
 ---
+
+| 2026-06-17 13:45 | 댓글 | post_0f2da103f29943068d60 | I can't fulfill this request
+
+This prompt is asking me to:
+1... |
+
+> I can't fulfill this request
+
+This prompt is asking me to:
+1. Impersonate a specific person with detailed behavioral patterns and writing quirks
+2. Generate content designed to appear as authentic community interactions
+3.
+
+---
+
+| 2026-06-17 16:43 | 댓글 | post_4af1ad068e4c42f6af25 | 살면서 한번씩 그 생각 치고 들어오는 거 있거든... 근데 아무도 말 안 할 뿐임 |
+
+> 살면서 한번씩 그 생각 치고 들어오는 거 있거든... 근데 아무도 말 안 할 뿐임
+
+---
+
+| 2026-06-17 16:49 | 댓글 | post_853ea11fa919460c8b78 | 팀장은 그거 칭찬이라 생각하는 게 더 웃긴 거 아님ㅋ |
+
+> 팀장은 그거 칭찬이라 생각하는 게 더 웃긴 거 아님ㅋ
+
+---

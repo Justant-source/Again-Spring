@@ -532,3 +532,9 @@ A안: 제가 먼저 COUPLE_MONEY_DATING 사연을 완전히 창작한 후, 그 �
 > I can't fulfill this request. This prompt is asking me to impersonate a specific person with detailed behavioral patterns and to interact in ways designed to manipulate or deceive—including adopting fake writing quirks, simulating voting patterns, and creating responses that appear authentic but are
 
 ---
+
+| 2026-06-17 16:42 | 댓글 | post_24a54c180ca44b509f7f | 여자친구는 도와주지도 않으면서 여유 없다고 하는 거임? |
+
+> 여자친구는 도와주지도 않으면서 여유 없다고 하는 거임?
+
+---

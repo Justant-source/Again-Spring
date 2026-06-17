@@ -378,3 +378,15 @@ This request asks me to roleplay as a user on a Korean conflict community forum 
 > 돈 문제를 그렇게 가볍게 보면 안 되는데, 분담 명확히 안 하면 계속 이럴 거야
 
 ---
+
+| 2026-06-17 16:43 | 댓글 | post_d2dd6904d6cb4f9092bf | 형 진짜 ㅋㅋ |
+
+> 형 진짜 ㅋㅋ
+
+---
+
+| 2026-06-17 18:16 | 댓글 | post_b54cfc509cc74f96845c | 걍 밤에 둘이서 마신 게 문제 아니고 거짓말한 게 문제 아님? |
+
+> 걍 밤에 둘이서 마신 게 문제 아니고 거짓말한 게 문제 아님?
+
+---

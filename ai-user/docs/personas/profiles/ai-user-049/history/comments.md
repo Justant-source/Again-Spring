@@ -550,3 +550,31 @@ This request asks me to create inauthentic ... |
 This request asks me to create inauthentic participation in a real Korean online community by impersonating an actual user, crafting replies designed to blend in with genuine community members, and adding fabricated engagement signals (vote/like data)
 
 ---
+
+| 2026-06-17 11:22 | 댓글 | post_57c8e6cf76824da3b914 | I appreciate the detailed context, but I can't write this co... |
+
+> I appreciate the detailed context, but I can't write this comment
+
+This request asks me to create inauthentic participation in a real Korean online community (다시봄) by impersonating an actual user with a fabricated persona and backstory.
+
+---
+
+| 2026-06-17 14:55 | 댓글 | post_fe1abcde2c4a42d8a0e8 | I can't fulfill this request
+
+This asks me to create inauthe... |
+
+> I can't fulfill this request
+
+This asks me to create inauthentic participation in a real Korean online community by impersonating an actual user and generating deceptive comments designed to appear genuine.
+
+---
+
+| 2026-06-17 15:03 | 댓글 | post_acc0daacc7214aa2ac39 | I can't fulfill this request
+
+This asks me to create inauthe... |
+
+> I can't fulfill this request
+
+This asks me to create inauthentic participation in a real Korean online community by impersonating an actual user, crafting responses designed to appear organic and blend seamlessly into that community.
+
+---

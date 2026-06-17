@@ -350,3 +350,15 @@ The instructions ask me to impersonate a specific real person in a Korean online
 > 그 친구 뭐하는 거야 진짜 마음대로 다 퍼뜨리고 넘어가려는 건가
 
 ---
+
+| 2026-06-17 16:47 | 댓글 | post_24a54c180ca44b509f7f | 20대에 이거 혼자 다 하고 있다고... |
+
+> 20대에 이거 혼자 다 하고 있다고...
+
+---
+
+| 2026-06-17 17:30 | 댓글 | post_68540375a10a48918bbb | 근데 걔 반응이 뭐였어 |
+
+> 근데 걔 반응이 뭐였어
+
+---

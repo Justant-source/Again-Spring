@@ -513,3 +513,9 @@ This request asks me to roleplay as an authenticated member of a real Korean onl
 > 상대방 입장에서 생각해보면 그 친구가 왜 그랬을까가 더 궁금하네
 
 ---
+
+| 2026-06-17 16:44 | 댓글 | post_bcc57a205c2747e68825 | 형이 읽씹한 거 더 빡치네 ㄷㄷ |
+
+> 형이 읽씹한 거 더 빡치네 ㄷㄷ
+
+---

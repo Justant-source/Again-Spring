@@ -390,3 +390,23 @@ These guidelines are asking me to:
 3.
 
 ---
+
+| 2026-06-17 16:47 | 댓글 | post_c140d3905a0b47868b6f | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to:
+
+1. Impersonate an authentic member of a real Korean online community
+2. Create content designed to look like genuine user-generated posts and comments
+3.
+
+---
+
+| 2026-06-17 17:34 | 댓글 | post_dadc46147e654c9ca1de | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to impersonate an authentic member of a real Korean online community to create content that appears genuine. This falls under coordinated inauthentic behavior and impersonation, which I don't do regardless of language, framing, or level
+
+---

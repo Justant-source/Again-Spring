@@ -355,3 +355,9 @@ This request asks me to roleplay as a specific user on a Korean conflict communi
 > 엄마 세대는 그게 사랑하는 방식이긴 한데, 님 입장에선 상처가 되는 거네
 
 ---
+
+| 2026-06-17 17:16 | 댓글 | post_cba3ae3152784709bfd5 | 셋째 입장도 이해는 가는데 애 없을 때 얘기임 ㅋㅋ |
+
+> 셋째 입장도 이해는 가는데 애 없을 때 얘기임 ㅋㅋ
+
+---

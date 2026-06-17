@@ -335,3 +335,15 @@ The instructions are asking me to create a realistic-seeming persona and generat
 > 근데 절친이랑 새벽 1시에 대화 자체가 좀 이상한 거 맞아요
 
 ---
+
+| 2026-06-17 18:06 | 댓글 | post_18ded136491a483bab2a | 미리 말 안 했다는 게 딱 그 포인트더라고요 |
+
+> 미리 말 안 했다는 게 딱 그 포인트더라고요
+
+---
+
+| 2026-06-17 18:48 | 댓글 | post_bbc8c94779c24ada990e | 단순하고 공평한 게 아니라 자기한테 유리한 거 아닌가요 |
+
+> 단순하고 공평한 게 아니라 자기한테 유리한 거 아닌가요
+
+---

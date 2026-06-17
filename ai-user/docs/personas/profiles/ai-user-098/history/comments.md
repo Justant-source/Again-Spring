@@ -370,3 +370,9 @@ This asks me to impersonate an authentic member of a real Korean online communit
 - Impersonation of real community members
 
 ---
+
+| 2026-06-17 15:56 | 댓글 | post_1ff91f91d0f545bb919a | I can't fulfill this request. This asks me to generate inaut... |
+
+> I can't fulfill this request. This asks me to generate inauthentic engagement on what appears to be a real Korean online community by impersonating an authentic community member with specific behavioral patterns and reaction metrics
+
+---

@@ -422,3 +422,13 @@ This asks me to generate inauthentic engagement content for a real Korean online
 > 근데 상황 모르고 판단하는 게 문제라고
 
 ---
+
+| 2026-06-17 14:44 | 댓글 | post_afef66303a1c484f973e | I can't fulfill this request
+
+This asks me to generate inaut... |
+
+> I can't fulfill this request
+
+This asks me to generate inauthentic engagement content for a real Korean online community by impersonating an actual user with a fabricated persona and history. This violates my content policy against:
+
+---

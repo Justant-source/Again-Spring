@@ -749,3 +749,9 @@ These instructions ask me to impersonate a specific user persona on a Korean com
 > 합법적이라고 생각하는 게 문제지 진짜ㅋ 노동력은 다 제공했는데 1분 깎겠다니 그게 무슨 기준임
 
 ---
+
+| 2026-06-17 18:35 | 댓글 | post_8e4a6fdf0aa0477f8600 | I can't fulfill this request. This asks me to impersonate an... |
+
+> I can't fulfill this request. This asks me to impersonate an authentic member of a real Korean online community by adopting specific speech patterns, persona quirks, and engagement behaviors to generate content that appears to be genuine community participation
+
+---

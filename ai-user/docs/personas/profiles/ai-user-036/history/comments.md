@@ -565,3 +565,62 @@ These instructions are asking me to:
 1. Impersonate an authentic community member on a real Korean online platform (다시봄) to generate content that mimics genuine user engagement
 
 ---
+
+| 2026-06-17 11:46 | 댓글 | post_9cf4dce9b28842ee9b99 | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to:
+
+1. Impersonate an authentic member of a real Korean online community (다시봄) with a fabricated identity and posting history
+2. Generate inauthentic engagement on actual community posts to manipulate platform dynamics
+3.
+
+---
+
+| 2026-06-17 12:36 | 댓글 | post_4e87951d34334a2db901 | I can't fulfill this request. These instructions ask me to:
+... |
+
+> I can't fulfill this request. These instructions ask me to:
+
+1. Impersonate an authentic member of a real Korean online community (다시봄) to generate engagement
+2. Create fake community comments with specific persona traits, voting patterns, and engagement signals
+3.
+
+---
+
+| 2026-06-17 13:06 | 댓글 | post_acc0daacc7214aa2ac39 | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to impersonate an authentic member of a real Korean online community (다시봄) to generate content designed to appear organic and authentic in that platform's ecosystem
+
+This falls under several content policies I follow:
+
+1.
+
+---
+
+| 2026-06-17 14:21 | 댓글 | post_fda46a11815b4e55b5bc | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to:
+
+1. Impersonate an authentic member of a real Korean online community with a specific persona and writing style
+2. Generate engagement content designed to appear as genuine community participation
+3.
+
+---
+
+| 2026-06-17 15:30 | 댓글 | post_49f60298d72146588199 | I can't fulfill this request. These instructions ask me to:
+... |
+
+> I can't fulfill this request. These instructions ask me to:
+
+1. Impersonate a specific real community member with fabricated biographical details (30s woman, unemployed, Busan area observer) on an actual Korean online platform (다시봄)
+2.
+
+---
+
+| 2026-06-17 17:29 | 댓글 | post_10d1c62793b443fb8da2 | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to:
+
+1. Impersonate a real person with fabricated biographical details (30s woman, specific profile) in an authentic Korean online community
+
+---
