@@ -342,22 +342,21 @@ public class ActionExecutor {
     private void executePost(Persona persona, PlannedAction action, String jwt, String corrId) {
         String category = topCategory(persona);
 
-        // Phase 2c: archetype 기반 topic seed (hot_button_phrases, emotional_beats)
-        String topicSeed = buildTopicSeed(persona);
+        // R9 Track B: 25% 확률 일상 글 모드 (주제 다양화, cond5 최대 레버, D-51)
+        boolean casual = RNG.nextDouble() < 0.25;
+
+        // Phase 2c: archetype 기반 topic seed — 일상 모드는 갈등 seed 우회
+        String topicSeed = casual ? buildCasualSeed(persona) : buildTopicSeed(persona);
 
         // 글 길이 다양화 — 페르소나 tier 기반 가중 랜덤
         String lengthTier = pickLengthTier(persona);
 
-        // AI Learning: 동적 예시 검색 및 주입 (RAG) (register 파라미터 전달)
+        // AI Learning: 동적 예시 검색 및 주입 (RAG) — 일상 모드는 갈등 few-shot 앵커 제거
         String dynamicExamples = "";
         String register = resolveRegister(persona);
-        java.util.List<AiLearningClient.ExampleItem> examples = aiLearningClient.findSimilar(
-            topicSeed,
-            "POST",
-            category,
-            3,
-            register
-        );
+        java.util.List<AiLearningClient.ExampleItem> examples = casual
+            ? java.util.Collections.emptyList()
+            : aiLearningClient.findSimilar(topicSeed, "POST", category, 3, register);
 
         // ── 재구성 모드 판별 ────────────────────────────────────────────────────
         // findSimilar 1순위 결과가 실제 크롤 원본(source_url 보유)이면 재구성 모드로 전환.
@@ -382,14 +381,18 @@ public class ActionExecutor {
             }
             log.debug("RAG: {} posts found for {}, reconstructMode={}", examples.size(), corrId, primarySource != null);
         }
-        if (dynamicExamples.isBlank()) {
+        if (dynamicExamples.isBlank() && !casual) {
             // 주제-RAG 미스 시 voice 소스 문체 샘플로 보충 (문체 현실화 S2)
+            // 일상 모드는 갈등 코퍼스 few-shot 주입 방지를 위해 스킵
             String styleFallback = styleExamplesFor(persona, "POST", 2, 600);
             if (styleFallback != null) dynamicExamples = styleFallback;
         }
 
         // 반복 방지: 최근 글 히스토리 주입 — 같은 소재·표현 재탕 차단 (문체 현실화 S1)
-        java.util.List<String> recentBodies = loadRecentBodies(persona, "posts", 3);
+        // 일상 모드: 갈등 recent posts를 few-shot 앵커로 주입하지 않음
+        java.util.List<String> recentBodies = casual
+            ? java.util.Collections.emptyList()
+            : loadRecentBodies(persona, "posts", 3);
 
         GenDto.PostRequest genReq = GenDto.PostRequest.builder()
             .personaId(persona.getId())
@@ -408,12 +411,14 @@ public class ActionExecutor {
             .reconstructionRules(globalRulesBlock("RECONSTRUCTION"))
             .correlationId(corrId)
             .backend(backendFor("POST"))
-            .recentOutputs(formatRecentOutputs(recentBodies, 200))
+            .recentOutputs(casual ? null : formatRecentOutputs(recentBodies, 200))
             // 재구성 모드 필드
             .reconstructMode(primarySource != null)
             .sourceExampleId(primarySource != null ? primarySource.getId() : null)
             .sourceBody(primarySource != null ? primarySource.getContent() : null)
             .voiceType(voiceProfileField(persona, "voice_type"))
+            // R9 Track B: 글 종류 (CONFLICT=갈등 서사, CASUAL=일상/잡담)
+            .postKind(casual ? "CASUAL" : "CONFLICT")
             .build();
         // Best-of-N reranking — active when ai-user-ml.enabled=true
         String rawBody;
@@ -705,15 +710,18 @@ public class ActionExecutor {
         sb.append("\n[맞춤법·오타 패턴] ");
         boolean addedAny = false;
 
-        // consistent_errors: 고정 맞춤법 오류
+        // consistent_errors: 고정 맞춤법 오류 (R9: 최대 2건으로 상향 — D-50)
         Object errorsObj = quirks.get("consistent_errors");
         if (errorsObj instanceof List) {
             List<?> errors = (List<?>) errorsObj;
             if (!errors.isEmpty()) {
                 List<?> shuffled = new ArrayList<>(errors);
                 Collections.shuffle((List<Object>) shuffled, RNG);
-                int n = Math.min(1, shuffled.size());
-                sb.append(shuffled.get(0));
+                int n = Math.min(2, shuffled.size());
+                for (int i = 0; i < n; i++) {
+                    if (i > 0) sb.append(" / ");
+                    sb.append(shuffled.get(i));
+                }
                 addedAny = true;
             }
         }
@@ -844,6 +852,37 @@ public class ActionExecutor {
             .orElseGet(() -> archetypeCatalog.byCategory(category).orElse(null));
         if (arch == null) return null;
         return archetypeCatalog.buildTopicSeed(arch, RNG);
+    }
+
+    // ── R9 Track B: 일상 글 토픽 시드 (갈등 seed 우회) ──────────────────────────
+
+    private static final String[] CASUAL_FRAMES = {
+        "오늘 있었던 소소한 일 공유",
+        "요즘 생각하는 것 털어놓기",
+        "취미나 관심사 이야기",
+        "음식/카페 경험 나누기",
+        "최근 본 드라마/게임/책 이야기",
+        "날씨나 계절 감상",
+        "사소한 일상 관찰",
+        "직장/학교 일상 (갈등 아닌)",
+        "요즘 푹 빠진 것",
+        "주변에서 재미있던 일",
+    };
+
+    /**
+     * 일상 글 모드용 topic seed — 갈등 premise 없이 persona 관심사 + 정적 CASUAL_FRAMES 조합.
+     * Python/DB 미호출 (신규 인프라 0).
+     */
+    private String buildCasualSeed(Persona persona) {
+        String frame = CASUAL_FRAMES[RNG.nextInt(CASUAL_FRAMES.length)];
+        // 페르소나 관심사 최고값 카테고리로 주제 맥락 보강 (갈등 아닌 일상 맥락)
+        String category = topCategory(persona);
+        return switch (category) {
+            case "WORK"    -> frame + " (직장/업무 일상 — 갈등 없이)";
+            case "FAMILY"  -> frame + " (가족 일상 — 갈등 없이)";
+            case "FRIEND"  -> frame + " (친구/지인 — 갈등 없이)";
+            default        -> frame; // COUPLE/MARRIED/OTHER 등은 프레임만
+        };
     }
 
     // ── Phase 2d: ArchetypeCatalog comment samples ────────────────────────────

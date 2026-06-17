@@ -72,7 +72,8 @@ class PromptAssemblerStyleTest {
         String user = prompt.split("<<<USER_PROMPT>>>", 2)[1];
         assertFalse(user.contains("[내가 최근에 쓴"), "히스토리 없으면 블록 생략");
         assertFalse(user.contains("[실제 커뮤니티 문체 샘플"));
-        assertTrue(user.contains("50~150자 내외"), "모드 힌트 없으면 기본 길이 지시");
+        // 2026-06-16 초단문화: 기본 fallback이 "초단문 필수: 10~35자"로 변경됨 (50~150자 → 폐기)
+        assertTrue(user.contains("초단문 필수"), "모드 힌트 없으면 초단문 길이 지시");
     }
 
     @Test

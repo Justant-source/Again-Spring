@@ -296,3 +296,29 @@
   - 삭제 미미(corpus 구성 변동 < 5%) → PASS 유지. 재측정 생략.
 - **현재 상태**: NATEPAN corpus 'ai' 항목: NULL source 231건(라이브 AI 추정), BACKFILL 295건(오라벨 의심). 대조 전까지 provisional.
 - **A-B 토큰 금지**: 분기 결정 전까지 A-B 재실행 불허.
+
+## 2026-06-17 — R9 결정 (D-50~D-52)
+
+### D-50: Track A — 결정론적 후처리 messiness 주입 (OutputSanitizer.injectTypos)
+- **배경**: CLIEN 5/5 활성 페르소나가 `mobile_typos=true`임에도 R5 블라인드=100%. Haiku가 "모바일 오타 2~3개" 지시를 조용히 무시. 프롬프트 레벨 오타 주입은 무효(증명됨).
+- **결정**: `OutputSanitizer`에 `injectTypos()` 신설. `injectChosung` 선례 그대로. LLM 준수 비의존 — 후처리에서 결정론적으로 오타 주입.
+  - T1(됐/됬·웬/왠), T2(종결요탈락), T3(띄어쓰기붙이기), T4(조사분리), T5(의→에혼동), T6(ㅋㅋ/ㅎㅎ삽입), T7(받침단순화), T8(이중자음) — 8개 transform, 셔플 후 1~2개 적용.
+  - `VOICE_DIST` 레코드에 `typoInject`, `typoProb` 추가. CLIEN typoProb=0.55, THEQOO=0.30(단문).
+  - `ActionExecutor.appendWritingQuirks` `Math.min(1→2)` cap 상향 + loop 2건 주입 (프롬프트 보강).
+  - `applyDist()` 마지막에 호출(chomping/chosung 이후).
+- **완료기준**: gradle test 통과, 단위테스트 통계적 불변식, e2e dev:8090 통과.
+
+### D-51: Track B — 일상 글 모드 25% (주제 다양화, cond5 최대 레버)
+- **배경**: CLIEN AI 글 전부 갈등 서사 → 주제만으로 탐지 가능. 인간 CLIEN = 정치·음식·주식 등 다양.
+- **결정**: `executePost`에 CONFLICT 75% / CASUAL 25% 분기 추가.
+  - CASUAL: `buildCasualSeed` (CASUAL_FRAMES 회전), `dynamicExamples=""`, `reconstructMode=false`, `postKind="CASUAL"`.
+  - `PostGenRequest`·`GenDto.PostRequest`에 `postKind` 필드 추가(Jackson 브리지).
+  - `PromptAssembler.assembleCasualPostPrompt()`: buildSystem + casual guide + user 블록 갈등 금지.
+  - `PostCategory` enum 변경 없음 — `OTHER` 재사용(리플 0).
+  - `voice/post_casual.md` 신규 가이드. `casualPostGuide` volatile 로드.
+- **완료기준**: PromptAssembler 단위테스트(CASUAL 프롬프트 내 "갈등 서사 금지" 존재, "구체적 사건 필수" 부재), e2e dev:8090 통과, 배포 후 CASUAL POST 스팟체크.
+
+### D-52: THEQOO corpus 교정 R10 이연 (사용자 결정 2026-06-17)
+- **배경**: human corpus=격식 AS 갈등 서사 vs AI THEQOO=슬랭 더쿠체 → P(human) 역전(S17/D-39). 교정하려면 human corpus 소스 변경 필요(큰 작업).
+- **결정**: R9 범위 밖. **R10에서 처리**. R9는 THEQOO A-B 금지(HALT) 유지.
+- **이유**: R9는 Track A+B(injectTypos+casual)가 in-scope 마지막 레버. THEQOO corpus 교정은 별도 라운드로 집중 처리 효율적.

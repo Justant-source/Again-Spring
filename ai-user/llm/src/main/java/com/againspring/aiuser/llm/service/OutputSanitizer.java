@@ -30,30 +30,120 @@ public class OutputSanitizer {
     );
 
     // ── 커뮤니티별 분포 매칭 설정 (Step 6) ──────────────────────────────────────
+    // typoInject/typoProb: Track A R9 결정론적 오타 주입 (D-50). LLM 준수 비의존.
     private record VoiceDistribution(double targetCommaRate, boolean chosungInject,
-                                     String[] chosungPhrases, double sampleProb) {}
+                                     String[] chosungPhrases, double sampleProb,
+                                     boolean typoInject, double typoProb) {}
 
     private static final java.util.Map<String, VoiceDistribution> VOICE_DIST;
     static {
         VOICE_DIST = new java.util.HashMap<>();
-        VOICE_DIST.put("NATEPAN",  new VoiceDistribution(0.011, false, null, 0.70));
+        VOICE_DIST.put("NATEPAN",  new VoiceDistribution(0.011, false, null, 0.70, true, 0.50));
         VOICE_DIST.put("DCINSIDE", new VoiceDistribution(0.030, true,
-            new String[]{"ㄹㅇ","ㅇㅈ","ㄷㄷ","ㅋㅋ"}, 0.80));
-        VOICE_DIST.put("BLIND",    new VoiceDistribution(0.015, false, null, 0.60));
-        VOICE_DIST.put("GENERAL",  new VoiceDistribution(0.015, false, null, 0.50));
+            new String[]{"ㄹㅇ","ㅇㅈ","ㄷㄷ","ㅋㅋ"}, 0.80, true, 0.50));
+        VOICE_DIST.put("BLIND",    new VoiceDistribution(0.015, false, null, 0.60, true, 0.45));
+        VOICE_DIST.put("GENERAL",  new VoiceDistribution(0.015, false, null, 0.50, true, 0.45));
         VOICE_DIST.put("FMKOREA",  new VoiceDistribution(0.015, true,
-            new String[]{"ㄹㅇㅋㅋ","ㄷㄷ","ㅇㅈ","후추"}, 0.80));
-        VOICE_DIST.put("RULIWEB",  new VoiceDistribution(0.018, false, null, 0.60));
+            new String[]{"ㄹㅇㅋㅋ","ㄷㄷ","ㅇㅈ","후추"}, 0.80, true, 0.50));
+        VOICE_DIST.put("RULIWEB",  new VoiceDistribution(0.018, false, null, 0.60, true, 0.45));
         VOICE_DIST.put("THEQOO",   new VoiceDistribution(0.011, true,
-            new String[]{"헐","ㅠㅠ","ㄷㄷ","개공감"}, 0.75));
+            new String[]{"헐","ㅠㅠ","ㄷㄷ","개공감"}, 0.75, true, 0.30));
         VOICE_DIST.put("ARCALIVE", new VoiceDistribution(0.015, true,
-            new String[]{"ㄹㅇ","ㄱㄱ","ㅇㅇ","어쩔"}, 0.80));
-        VOICE_DIST.put("INVEN",    new VoiceDistribution(0.015, false, null, 0.60));
-        VOICE_DIST.put("MLBPARK",  new VoiceDistribution(0.020, false, null, 0.50));
-        VOICE_DIST.put("PPOMPPU",  new VoiceDistribution(0.015, false, null, 0.55));
-        VOICE_DIST.put("CLIEN",    new VoiceDistribution(0.022, false, null, 0.60));
+            new String[]{"ㄹㅇ","ㄱㄱ","ㅇㅇ","어쩔"}, 0.80, true, 0.40));
+        VOICE_DIST.put("INVEN",    new VoiceDistribution(0.015, false, null, 0.60, true, 0.45));
+        VOICE_DIST.put("MLBPARK",  new VoiceDistribution(0.020, false, null, 0.50, true, 0.45));
+        VOICE_DIST.put("PPOMPPU",  new VoiceDistribution(0.015, false, null, 0.55, true, 0.50));
+        VOICE_DIST.put("CLIEN",    new VoiceDistribution(0.022, false, null, 0.60, true, 0.55));
     }
     private static final java.util.Random DIST_RNG = new java.util.Random();
+
+    // ── R9 Track A: 결정론적 오타 주입 변환 테이블 (T1~T8) ────────────────────────
+    // null 반환 = 이 변환 미적용 (다음 변환으로 넘어감). replaceFirst — 1개만 변형.
+    // 각 변환은 '첫 줄 이후' 텍스트에만 적용 (injectTypos가 첫 줄을 분리해서 전달).
+    @SuppressWarnings("unchecked")
+    private static final java.util.List<java.util.function.Function<String, String>> TYPO_TRANSFORMS;
+    static {
+        java.util.List<java.util.function.Function<String, String>> t = new java.util.ArrayList<>();
+        // T1: 됐/됬, 웬/왠 혼동 (가장 흔한 한국어 맞춤법 오류)
+        t.add(s -> {
+            if (s.contains("됐")) return s.replaceFirst("됐", "됬");
+            if (s.contains("됬")) return s.replaceFirst("됬", "됐");
+            if (s.contains("웬")) return s.replaceFirst("웬", "왠");
+            if (s.contains("왠")) return s.replaceFirst("왠", "웬");
+            return null;
+        });
+        // T2: 종결 '요' 탈락 — "인데요"→"인데", 끝 15자 보호 (마지막 문장 유지)
+        t.add(s -> {
+            if (s.length() < 20) return null;
+            String[] pats = {"인데요", "거든요", "는데요", "라서요"};
+            for (String p : pats) {
+                int idx = s.indexOf(p);
+                if (idx >= 0 && idx < s.length() - 15) {
+                    // p.length()=3 ("인데요"=인+데+요), 마지막 자('요') 제거
+                    return s.substring(0, idx + p.length() - 1) + s.substring(idx + p.length());
+                }
+            }
+            return null;
+        });
+        // T3: 띄어쓰기 붙이기 (조금 더→조금더)
+        t.add(s -> {
+            String[][] pairs = {{"조금 더", "조금더"}, {"너무 힘", "너무힘"},
+                                {"진짜 너무", "진짜너무"}, {"많이 좋", "많이좋"}};
+            for (String[] p : pairs) {
+                if (s.contains(p[0])) return s.replaceFirst(java.util.regex.Pattern.quote(p[0]), p[1]);
+            }
+            return null;
+        });
+        // T4: 후치 조사 분리 (진짜로→진짜 로, 그래서→그래 서)
+        t.add(s -> {
+            String[][] pairs = {{"진짜로", "진짜 로"}, {"정말로", "정말 로"},
+                                {"그래서", "그래 서"}, {"솔직히", "솔직 히"}};
+            for (String[] p : pairs) {
+                if (s.contains(p[0])) return s.replaceFirst(java.util.regex.Pattern.quote(p[0]), p[1]);
+            }
+            return null;
+        });
+        // T5: 조사 '의'→'에' 혼동 (나의→나에, 흔한 모바일 오타)
+        t.add(s -> {
+            int idx = s.indexOf("의 ");
+            if (idx > 3) { // 글 맨 앞 3자 보호
+                return s.substring(0, idx) + "에 " + s.substring(idx + 2);
+            }
+            return null;
+        });
+        // T6: ㅋㅋ/ㅎㅎ 줄 끝 삽입 (이미 초성체 있는 줄 스킵)
+        t.add(s -> {
+            String[] lines = s.split("\n");
+            if (lines.length < 2) return null;
+            java.util.List<Integer> cands = new java.util.ArrayList<>();
+            for (int i = 0; i < lines.length - 1; i++) {
+                String l = lines[i].trim();
+                if (l.length() > 8 && !l.contains("ㅋ") && !l.contains("ㅎ")) cands.add(i);
+            }
+            if (cands.isEmpty()) return null;
+            String[] ins = {"ㅋㅋ", "ㅎㅎ", "ㅋㅋㅋ"};
+            int li = cands.get(DIST_RNG.nextInt(cands.size()));
+            lines[li] = lines[li] + " " + ins[DIST_RNG.nextInt(ins.length)];
+            return String.join("\n", lines);
+        });
+        // T7: 받침 단순화 (갔어→갓어, 왔어→왓어)
+        t.add(s -> {
+            String[][] pairs = {{"갔어", "갓어"}, {"왔어", "왓어"}, {"봤어", "봣어"}};
+            for (String[] p : pairs) {
+                if (s.contains(p[0])) return s.replaceFirst(java.util.regex.Pattern.quote(p[0]), p[1]);
+            }
+            return null;
+        });
+        // T8: 이중자음 오타 (있었→있엇, 없었→없엇)
+        t.add(s -> {
+            String[][] pairs = {{"있었", "있엇"}, {"없었", "없엇"}, {"했었", "했엇"}};
+            for (String[] p : pairs) {
+                if (s.contains(p[0])) return s.replaceFirst(java.util.regex.Pattern.quote(p[0]), p[1]);
+            }
+            return null;
+        });
+        TYPO_TRANSFORMS = java.util.Collections.unmodifiableList(t);
+    }
 
     public String sanitizePost(String raw) {
         return sanitize(raw, MAX_POST);
@@ -65,14 +155,19 @@ public class OutputSanitizer {
 
     public String sanitizePost(String raw, String voiceType) {
         String base = sanitize(raw, MAX_POST);
-        return applyDist(base, voiceType, true);
+        String result = applyDist(base, voiceType, true);
+        // T6 등 injectTypos가 수 글자 추가할 수 있으므로 MAX_POST 재보장
+        if (result.length() > MAX_POST) result = result.substring(0, MAX_POST).stripTrailing();
+        return result;
     }
 
     public String sanitizeComment(String raw, String voiceType) {
         String base = sanitize(raw, MAX_COMMENT);
         // N6: allowChosung=true — VOICE_DIST.chosungInject 값이 voice별 주입 여부를 결정
         // (이전: false 하드코딩 → DCINSIDE/THEQOO/FMKOREA/ARCALIVE 댓글 초성체 완전 차단)
-        return applyDist(base, voiceType, true);
+        String result = applyDist(base, voiceType, true);
+        if (result.length() > MAX_COMMENT) result = result.substring(0, MAX_COMMENT).stripTrailing();
+        return result;
     }
 
     private String applyDist(String text, String voiceType, boolean allowChosung) {
@@ -83,6 +178,10 @@ public class OutputSanitizer {
         String s = normalizeCommaRate(text, dist.targetCommaRate());
         if (allowChosung && dist.chosungInject() && dist.chosungPhrases() != null) {
             s = injectChosung(s, dist.chosungPhrases());
+        }
+        // R9 Track A: 결정론적 오타 주입 (LLM 무시 우회) — chosung 이후 마지막으로 실행
+        if (dist.typoInject()) {
+            s = injectTypos(s, dist.typoProb());
         }
         return s;
     }
@@ -116,6 +215,42 @@ public class OutputSanitizer {
         String phrase = phrases[DIST_RNG.nextInt(phrases.length)];
         lines[lineIdx] = lines[lineIdx] + " " + phrase;
         return String.join("\n", lines);
+    }
+
+    /**
+     * R9 Track A: 결정론적 한국어 오타 주입 (D-50).
+     * - 첫 줄(hook) 보호, budget 1~2개, transform 순서 셔플 → 매 글마다 다른 오타 패턴
+     * - fireProb 게이트: 약 절반은 오타 0 → 인간 corpus 이봉분포 모사
+     * - len<40: 단문(초단문 댓글)은 건드리지 않음
+     */
+    private String injectTypos(String text, double fireProb) {
+        if (text == null || text.length() < 40) return text;
+        if (DIST_RNG.nextDouble() > fireProb) return text; // fireProb 게이트
+
+        // 첫 줄 분리 (보호)
+        int firstNl = text.indexOf('\n');
+        String firstLine = firstNl >= 0 ? text.substring(0, firstNl + 1) : "";
+        String workText = firstNl >= 0 ? text.substring(firstNl + 1) : text;
+        if (workText.isBlank()) return text; // 단일 줄이면 건드리지 않음
+
+        int budget = 1 + DIST_RNG.nextInt(2); // 1~2개
+
+        // transform 순서 셔플 (글마다 다른 오타 종류 회전)
+        java.util.List<Integer> order = new java.util.ArrayList<>();
+        for (int i = 0; i < TYPO_TRANSFORMS.size(); i++) order.add(i);
+        java.util.Collections.shuffle(order, DIST_RNG);
+
+        String result = workText;
+        int applied = 0;
+        for (int idx : order) {
+            if (applied >= budget) break;
+            String transformed = TYPO_TRANSFORMS.get(idx).apply(result);
+            if (transformed != null && !transformed.equals(result)) {
+                result = transformed;
+                applied++;
+            }
+        }
+        return firstLine + result;
     }
 
     // LLM이 콘텐츠 대신 질문하거나 생성 거부하는 패턴 — 빈 문자열 반환 → ActionExecutor FAILED 처리

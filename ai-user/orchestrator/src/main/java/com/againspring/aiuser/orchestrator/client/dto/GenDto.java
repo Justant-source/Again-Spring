@@ -50,6 +50,8 @@ public class GenDto {
         private String reconstructionRules;
         /** 커뮤니티 voice 타입 — OutputSanitizer 분포 매칭용. 없으면 null. */
         private String voiceType;
+        /** 글 생성 모드: "CONFLICT"(갈등 서사, 기본) | "CASUAL"(일상/잡담). PromptAssembler 분기용. */
+        private String postKind;
     }
 
     @Getter

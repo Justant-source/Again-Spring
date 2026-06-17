@@ -21,6 +21,8 @@ public class PromptAssembler {
     private volatile String commentGuide = "";
     private volatile String replyGuide = "";
     private volatile String partnerGuide = "";
+    /** R9 Track B: 일상 글 모드 가이드 (voice/post_casual.md). 빈 문자열이면 인라인 기본값 사용. */
+    private volatile String casualPostGuide = "";
 
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
@@ -33,12 +35,15 @@ public class PromptAssembler {
     /** 관리자 요청 또는 스케줄에 의한 DB 기반 재로드. */
     public synchronized void reload() {
         // % 문자를 %% 로 이스케이프 — buildSystem()에서 String.formatted()에 넘기기 때문
-        postGuide    = loadGuide("voice/post",    "voice/post.md").replace("%", "%%");
-        commentGuide = loadGuide("voice/comment", "voice/comment.md").replace("%", "%%");
-        replyGuide   = loadGuide("voice/reply",   "voice/reply.md").replace("%", "%%");
-        partnerGuide = loadGuide("voice/partner", "voice/partner.md").replace("%", "%%");
-        log.info("Voice guides loaded: post={}c comment={}c reply={}c partner={}c",
-            postGuide.length(), commentGuide.length(), replyGuide.length(), partnerGuide.length());
+        postGuide       = loadGuide("voice/post",        "voice/post.md").replace("%", "%%");
+        commentGuide    = loadGuide("voice/comment",     "voice/comment.md").replace("%", "%%");
+        replyGuide      = loadGuide("voice/reply",       "voice/reply.md").replace("%", "%%");
+        partnerGuide    = loadGuide("voice/partner",     "voice/partner.md").replace("%", "%%");
+        // R9 Track B: 일상 글 모드 가이드 (D-51) — 없으면 "" (assembleCasualPostPrompt 인라인 폴백)
+        String rawCasual = loadGuide("voice/post_casual", "voice/post_casual.md");
+        casualPostGuide = rawCasual != null ? rawCasual.replace("%", "%%") : "";
+        log.info("Voice guides loaded: post={}c comment={}c reply={}c partner={}c casual={}c",
+            postGuide.length(), commentGuide.length(), replyGuide.length(), partnerGuide.length(), casualPostGuide.length());
     }
 
     private String loadGuide(String dbKey, String classpathPath) {
@@ -116,6 +121,10 @@ public class PromptAssembler {
         // 재구성 모드: 단일 크롤 원본을 페르소나 보이스로 사연화
         if (req.isReconstructMode() && req.getSourceBody() != null && !req.getSourceBody().isBlank()) {
             return assembleReconstructPrompt(req);
+        }
+        // R9 Track B: 일상 글 모드 — 갈등 서사 금지, 사건 의무 없음 (D-51)
+        if ("CASUAL".equalsIgnoreCase(req.getPostKind())) {
+            return assembleCasualPostPrompt(req);
         }
         // 기존 로직 유지
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), postGuide, req.getFormality(),
@@ -197,6 +206,46 @@ public class PromptAssembler {
                 dynamicExamplesBlock(req.getDynamicExamples()),
                 politeSuffix,
                 recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 같은 소재·사건 유형 반복 금지"));
+        return system + "\n" + SEP + "\n" + user;
+    }
+
+    /**
+     * R9 Track B: 일상 글 모드 프롬프트 (D-51).
+     * 갈등 서사 금지, 사건(trigger) 의무 없음. user 블록이 system의 "핵심 4가지" 보다 구체적으로 지시.
+     * guide = casualPostGuide(voice/post_casual.md) → buildSystem의 "커뮤니티 스타일 가이드" 섹션에 주입.
+     */
+    private String assembleCasualPostPrompt(PostGenRequest req) {
+        // 일상 가이드: 없으면 인라인 최소 기본값 사용
+        String guide = (casualPostGuide != null && !casualPostGuide.isBlank())
+            ? casualPostGuide
+            : "일상 글 모드 — 갈등/분쟁 서사 금지. 일상 관찰·취향·수다·경험 공유. 큰 결론 없이 끝내도 됨.";
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide, req.getFormality(),
+                req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
+        String politeSuffix = isPolite(req.getFormality())
+            ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
+            : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
+        String varietySeed = PROMPT_RNG.nextBoolean()
+            ? "\n[스타일 힌트] " + VARIETY_SEEDS[PROMPT_RNG.nextInt(VARIETY_SEEDS.length)] : "";
+        String user = """
+            %s카테고리: %s
+            %s
+            글 길이: %s
+            %s
+            %s
+            위 카테고리와 말투로 일상적인 한국 커뮤니티 글을 완전 창작해주세요.
+            - 🚨 갈등 서사 금지 — 연애·가족·직장 분쟁 이야기 절대 금지. 일상 관찰·취향·수다·경험 공유로.
+            - 사건(trigger) 의무 없음 — "X가 Y를 했다" 형태 불필요. 큰 결론·해결책 없이 끝내도 됨.
+            - 실제 인물 실명·연락처·주소·개인정보 절대 포함 금지
+            - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지 — 한국 커뮤니티 문체만 따를 것
+            %s%s""".formatted(
+                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
+                req.getCategory() != null ? req.getCategory() : "OTHER",
+                req.getTopicSeed() != null ? "주제: " + safe(req.getTopicSeed()) : "",
+                lengthInstruction(req.getLengthTier()),
+                dynamicExamplesBlock(req.getDynamicExamples()),
+                recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 다른 주제·내용으로"),
+                politeSuffix,
+                varietySeed);
         return system + "\n" + SEP + "\n" + user;
     }
 
