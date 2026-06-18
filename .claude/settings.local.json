@@ -1,0 +1,59 @@
+{
+  "codex": {
+    "policy": {
+      "mode": "apply-claude-local-permissions-intent",
+      "defaultBehavior": "continue-without-confirmation-when-platform-allows",
+      "allowIntent": [
+        "Bash(*)",
+        "Edit(*)",
+        "Write(*)",
+        "Read(*)",
+        "WebFetch(*)",
+        "WebSearch(*)",
+        "Glob(*)",
+        "Grep(*)",
+        "Skill(update-config)"
+      ],
+      "denyIntent": [
+        "Bash(git merge*)",
+        "Bash(git rebase*)",
+        "Bash(git reset*)",
+        "Bash(git revert*)",
+        "Bash(git tag*)",
+        "Bash(git stash drop*)",
+        "Bash(git branch -d*)",
+        "Bash(git branch -D*)",
+        "Bash(git checkout -B*)"
+      ],
+      "notes": [
+        "Codex must proceed without asking for non-destructive work whenever the platform approval model allows it.",
+        "Platform-enforced sandbox or escalation prompts cannot be disabled from repository files.",
+        "Reuse approved prefix rules whenever possible instead of asking again."
+      ]
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Edit(*)",
+      "Write(*)",
+      "Read(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "Skill(update-config)"
+    ],
+    "deny": [
+      "Bash(git merge*)",
+      "Bash(git rebase*)",
+      "Bash(git reset*)",
+      "Bash(git revert*)",
+      "Bash(git tag*)",
+      "Bash(git stash drop*)",
+      "Bash(git branch -d*)",
+      "Bash(git branch -D*)",
+      "Bash(git checkout -B*)"
+    ]
+  }
+}
