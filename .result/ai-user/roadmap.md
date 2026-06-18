@@ -674,36 +674,56 @@
 
 ---
 
-## Step 55 (R13-1) — THEQOO 진짜코퍼스 단독 검증
+## Step 55 (R13-1) — THEQOO 진짜코퍼스 단독 검증 ✅ 완료
 
 **목표**: ab_test를 source_filter="theqoo"(진짜 111건)로 재실행 → D-66 Δ=+0.4458의 합성 의존 여부 확인.
 
 **완료 기준**:
-- [ ] source_filter 파라미터 구현 (schemas.py, routes_eval.py, run_ab_test.py)
-- [ ] THEQOO Δ_real(진짜 111건) 측정 완료
-- [ ] D-68 선등록 임계 기준으로 판정 기록
+- [x] source_filter 파라미터 구현 (schemas.py, routes_eval.py, run_ab_test.py)
+- [x] THEQOO Δ_real(진짜 111건) 측정 완료
+- [x] D-68 선등록 임계 기준으로 판정 기록 → **Δ_real=-0.1117 FAIL. Step 52-53 재개 필요**
 - **halt**: Δ_real ≤ 0 → Step 52-53 재개 검토 보고
 
 ---
 
-## Step 56 (R13-2) — head-to-head 인간 블라인드 설문
+## Step 56 (R13-2) — head-to-head 인간 블라인드 설문 ✅ 완료
 
 **목표**: 커뮤니티별(CLIEN/NATEPAN/THEQOO) 리랭커 top-1 vs random draft 쌍 → 인간 판정.
 
 **완료 기준**:
-- [ ] build_h2h_survey.py 구현 + survey.md 생성(각 커뮤니티 ≥20쌍)
-- [ ] 친구+오너 각 응답 수집 (이유 한 줄 포함, D-55)
-- [ ] D-68 합격선 기준 커뮤니티별 판정
+- [x] build_h2h_survey.py 구현 + survey.md 생성(CLIEN 12쌍, NATEPAN 20쌍)
+- [x] 오너 응답 수집 완료 (이유 한 줄 포함, D-55)
+- [x] D-68 합격선 기준 커뮤니티별 판정 → CLIEN PASS / NATEPAN PASS / THEQOO 미측정(corpus 미충족)
 - **halt**: 리랭커 탐지율 > random → 해당 커뮤니티 활성화 제외
 
 ---
 
-## Step 57 (R13-3) — 커뮤니티별 go/no-go 표 + 전역 활성화 판정
+## Step 57 (R13-3) — 커뮤니티별 go/no-go 표 + 전역 활성화 판정 ✅ 완료
 
 **목표**: Step 55+56 결과로 최종 go/no-go 표 작성 + 전역 활성화 준비.
 
 **완료 기준**:
-- [ ] 커뮤니티별 3조건(cond4-MAUVE/h2h/cond5) 표 작성
-- [ ] 전략 노트: 리랭커 한계효용 평가(토큰 비용 대비 h2h 개선폭)
-- [ ] 활성화 런북 준비 (롤백 트리거 포함)
+- [x] 커뮤니티별 3조건(cond4-MAUVE/h2h/cond5) 표 작성 → `.result/ai-user/blind/r13-h2h-results-summary.md`
+- [x] 전략 노트 작성 (리랭커 한계효용 평가)
+- [x] 활성화 런북 (롤백 트리거 포함) — results-summary.md 내 기재
+- [x] 결론: CLIEN+NATEPAN PASS / THEQOO FAIL → 전역 활성화 차단
+
+---
+
+## Step 58 (R13-next) — THEQOO corpus 수집 전략 결정
+
+**목표**: 실제 더쿠 스타일 한국어 corpus ≥300건 확보 방법 결정.
+
+**배경**: R13 Phase 1에서 THEQOO 진짜 corpus(111건)로 측정 시 Δ_real=-0.1117. 합성 200건 제거 필요.
+
+**선택지**:
+1. **A) AS 플랫폼 내 자체 수집**: 서비스 이용자의 THEQOO 스타일 글 200건+ 직접 주석
+2. **B) 외부 공개 데이터셋**: AI Hub/국립국어원 등 인터넷 커뮤니티 텍스트 활용
+3. **C) 크롤링**: 법적·인프라 검토 후 진행
+
+**완료 기준**:
+- [ ] 오너 수집 전략 결정 (A/B/C 중 선택)
+- [ ] human corpus n_theqoo ≥ 300건 확보
+- [ ] ML 재학습 + Δ_real > 0 확인
+- [ ] THEQOO h2h survey 재생성 + 응답 수집
 - [ ] 사용자에게 `AI_USER_ML_ENABLED=true` 수동 활성화 보고

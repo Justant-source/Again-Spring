@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-18 세션 27 (R13 — Phase 1·2·3 병렬 실행 중, D-68 선등록 완료)
+**최종 갱신**: 2026-06-18 세션 27 (R13 — Phase 1~4 완료, D-70 확정)
 
 ---
 
@@ -16,11 +16,11 @@
 
 ## 현재 위치
 
-- **Phase**: R13 진행 중 — cond4 재정의 + h2h 검증 (Phase 1 측정 중)
-- **5조건 차단 현황**: **cond4 재정의 진행 중** — 신 cond4(D-68): do-no-harm MAUVE AND h2h 비퇴행
+- **Phase**: R13 완료 — 신 cond4 PASS(CLIEN/NATEPAN) + THEQOO corpus 차단
+- **5조건 차단 현황**: **cond4 THEQOO corpus 미충족** — CLIEN/NATEPAN은 신 cond4 PASS, THEQOO Δ_real=-0.1117
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **차단 사유**: MAUVE 포화 전역 발생 → 신 임계치 도입 (D-68)
-- **직전 측정**: R12 cond4 재측정 완료 (2026-06-18) / R13 Phase 1 실행 중
+- **차단 사유**: THEQOO 진짜 corpus 부족 (111건, 목표 ≥300) → 전역 게이트 차단
+- **직전 측정**: R13 Phase 4 완료 (2026-06-18) — r13-h2h-results-summary.md
 
 ---
 
@@ -58,6 +58,7 @@
 | **blind ① Track A 신선분** | ✅ 파일 생성 — 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/r9-blind1-fresh-survey.md | ⏳ 사용자 응답 대기 |
 | **blind ②** | ✅ 파일 생성 — 혼합주제 20쌍 (CONFLICT+CASUAL AI vs human) | .result/ai-user/blind/r9-blind2-mixed-survey.md | ⏳ 사용자 응답 대기 |
 | **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | ✅ 신선분 축적 가능 |
+| **Step 58** | THEQOO corpus 수집 전략 결정 (A/B/C) + ≥300건 확보 | 오너 결정 | — |
 
 ### 중기
 
@@ -73,13 +74,13 @@
 cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/311)
 cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9973
 cond3: ✅ SPLITTER_VERIFIED=True
-cond4: ❌ NATEPAN Δ=-0.0001 FAIL (R12, MAUVE 포화)
-       ⚠️ CLIEN Δ=+0.0134 (R12, MAUVE 포화로 급락)
-       ❌ THEQOO Δ_real=-0.1117 FAIL (R13 Phase1, 진짜 111건, D-66 아티팩트 확정)
+cond4: ✅ CLIEN Δ=+0.0134 AND h2h 50%≤50% PASS (R13, 신 cond4 D-68)
+       ✅ NATEPAN Δ=-0.0001 AND h2h 47.1%≤52.9% PASS (R13, 신 cond4 D-68)
+       ❌ THEQOO Δ_real=-0.1117 FAIL (R13, 진짜 111건, corpus 수집 필요)
 cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 
-**AI_USER_ML_ENABLED 상태**: false → **활성화 차단** (5조건 미충족, NATEPAN cond4 FAIL, R12 재학습 필요)
+**AI_USER_ML_ENABLED 상태**: false → **활성화 차단** (THEQOO cond4 FAIL — 전역 게이트 차단, Step 58)
 
 ---
 
@@ -90,7 +91,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | **P1** | **THEQOO human corpus 소스** (R10 핵심) | dev DB 7건·AS export = 다시봄 갈등체 → 실제 더쿠 슬랭 아님. 현재 human 410건이 격식체라 P(human) 역전 | A) THEQOO 직접 크롤(법적·인프라 검토 필요) / B) 외부 공개 데이터셋 / C) AS 플랫폼 내 THEQOO 스타일 글 직접 주석 수집 |
 | **P2** | ~~COMMENT 생성 배치 (R7 M-after)~~ | ✅ 완료 — WSL 배치 B 경로로 해결 (2026-06-18) | — |
 | **P3** | **AI_USER_ML_ENABLED 활성화 시기** | THEQOO cond4 미충족 → ML 리랭커 활성화 불가 | 자동: THEQOO cond4 해소 후 수동 활성화 / 선택: CLIEN+NATEPAN만 부분 활성화 가능 여부 검토 |
-| **P4** | ✅ **NATEPAN cond4 재측정 완료** | R11 결과: Δ=-0.2901 FAIL (기존 M1 Δ=+0.1667과 대조) — 리랭커 성능 저하, P(human) 역전 | R12: 판별기 재학습 필요 |
+| **P5** | **THEQOO corpus 수집 방법** | Δ_real=-0.1117로 전역 활성화 차단. 진짜 더쿠 corpus ≥300건 필요. | A) AS 플랫폼 자체수집 / B) 외부데이터셋 / C) 크롤링 |
 
 ---
 
@@ -193,9 +194,10 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 |---|---|---|
 | **P3 선등록** | D-68 cond4 재정의 선등록 (decisions.md + roadmap.md) | ✅ 완료 (7bb048f3) |
 | **P1 구현** | source_filter 구현 (WSL routes_eval.py + schemas.py) | ✅ 완료 |
-| **P1 측정** | THEQOO Δ_real (source_filter="theqoo", 진짜 111건) | ⏳ 실행 중 |
-| **P2 구현** | build_h2h_survey.py | ⏳ 실행 중 |
-| **P2 설문** | 커뮤니티별 h2h survey.md 생성 | ⏳ P2 구현 완료 후 |
+| **P1 측정** | THEQOO Δ_real (source_filter="theqoo", 진짜 111건) | ✅ 완료 Δ_real=-0.1117 FAIL |
+| **P2 구현** | build_h2h_survey.py | ✅ 완료 |
+| **P2 설문** | 커뮤니티별 h2h survey.md 생성 | ✅ 완료 |
+| **P4 집계** | D-70 + r13-h2h-results-summary.md | ✅ 완료 |
 
 ### D-68 선등록 임계 (측정 전 확정)
 - THEQOO Δ_real > 0 → cond4 A 충족 ✅ (Phase 2 h2h 진행)
@@ -358,3 +360,5 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | **Step 49** | 22 | R9 Track A: OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 | ✅ 배포완료 |
 | **Step 50** | 22 | R9 Track B: CASUAL 25% 분기 + PromptAssembler.assembleCasualPostPrompt | ✅ 배포완료 |
 | **Step 51** | 22~ | R9 blind①②+MAUVE 재측정 + 에스컬레이션 평가 | 🔄 축적 대기 |
+| **Step 55~57** | 27 | R13: source_filter + h2h survey + go/no-go 표 | ✅ |
+| **Step 58** | — | THEQOO corpus 수집 전략 결정 | 🔴 사용자 결정 대기 |

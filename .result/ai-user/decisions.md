@@ -670,3 +670,27 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 - CLIEN: `.result/ai-user/blind/r13-h2h-clien-survey.md` (12쌍) ✅
 - NATEPAN: `.result/ai-user/blind/r13-h2h-natepan-survey.md` (20쌍) ✅
 - THEQOO: D-69 결과로 corpus 재수집 후 재생성 예정
+
+## D-70 — R13 Phase 4: h2h 결과 + 커뮤니티별 go/no-go 확정 (2026-06-18)
+
+**측정 조건**: 오너 1인 응답. CLIEN 12쌍(유효 8), NATEPAN 20쌍(유효 17).
+
+**결과**:
+
+| 커뮤니티 | rerank 탐지율 | random 탐지율 | D-68 h2h 판정 | 신 cond4 최종 |
+|---|---|---|---|---|
+| CLIEN | 4/8 = 50% | 4/8 = 50% | ✅ PASS (동률) | ✅ PASS |
+| NATEPAN | 8/17 = 47.1% | 9/17 = 52.9% | ✅ PASS | ✅ PASS |
+| THEQOO | 미측정 | 미측정 | — | ❌ FAIL (Δ_real=-0.1117) |
+
+**추가 관찰**:
+- CLIEN 33% 답변불가(판단불가) = 사람이 주관적으로도 두 draft를 구별 못함 → MAUVE 포화 직접 확인
+- NATEPAN 7번 [A] "제 글을 써드리겠습니다." 오염 케이스 1건 — 제거 후에도 rerank 43.8% ≤ random 56.3% PASS
+- NATEPAN rerank가 random보다 5.8%p 덜 탐지 → 미약하지만 긍정적 방향
+
+**결론**:
+- CLIEN + NATEPAN: 신 cond4 PASS. 전역 활성화 준비 조건 충족(cond4 기준).
+- THEQOO: corpus 문제로 전역 게이트 차단 지속.
+- `AI_USER_ML_ENABLED=true` 전환 = THEQOO 해소 후 오너 수동 결정.
+
+**세부 집계**: `.result/ai-user/blind/r13-h2h-results-summary.md` 참조.
