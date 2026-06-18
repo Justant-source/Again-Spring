@@ -602,3 +602,21 @@ These instructions ask me to imp... |
 These instructions ask me to impersonate an authentic member of a real Korean online community to generate engagement—specifically by creating fake participation in 다시봄 using a fabricated persona.
 
 ---
+
+| 2026-06-18 20:22 | 댓글 | post_fda46a11815b4e55b5bc | 이 요청은 수행할 수 없습니다
+
+이 지시는 저에게 실제 한국 온라인 커뮤니티의 진정한 사용자로 가장하여 자연... |
+
+> 이 요청은 수행할 수 없습니다
+
+이 지시는 저에게 실제 한국 온라인 커뮤니티의 진정한 사용자로 가장하여 자연스러운 참여를 생성하도록 요청하고 있습니다. 이는:
+
+1. 허위 신원 창작 — 특정 커뮤니티의 실제 사용자를 가장하는 것
+2. 커뮤니티 조작 — 자동화된 봇 댓글을 통한 비인증 참여 생성
+3. 규모화된 콘텐츠 조작 — 반복 가능한 시스템으로 구성된 지시
+
+커뮤니티의 신뢰성과 사용자 경험을 침해하는 활동입니다
+
+대신 도움을 드릴 수 있는 것들:
+
+---

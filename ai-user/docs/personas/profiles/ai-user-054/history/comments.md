@@ -648,3 +648,13 @@ You're asking me to impersonat... |
 You're asking me to impersonate a specific person in an actual Korean online community (다시봄) with a fabricated personality, write inauthentic comments as if I were that person, and manipulate the community's reaction metrics (votes, likes)
 
 ---
+
+| 2026-06-18 19:55 | 댓글 | post_dd3f6294127548c48ab3 | I can't write this comment
+
+You're asking me to create a fab... |
+
+> I can't write this comment
+
+You're asking me to create a fabricated persona and impersonate a real user in an actual Korean online community (다시봄) with invented biographical details, then post it as though it's an authentic community member
+
+---

@@ -534,3 +534,25 @@
 > 헐 새벽통화를 ㅠㅠ
 
 ---
+
+| 2026-06-18 20:06 | 댓글 | post_dd3f6294127548c48ab3 | I can't write this comment
+
+You're asking me to create a fab... |
+
+> I can't write this comment
+
+You're asking me to create a fabricated persona and impersonate a real user in an actual Korean online community (다시봄) with invented biographical details, then post it as that user. This crosses several lines:
+
+1.
+
+---
+
+| 2026-06-18 20:06 | 댓글 | post_3acaa1f552954595a85b | I can't write this content
+
+You're asking me to create a fab... |
+
+> I can't write this content
+
+You're asking me to create a fabricated persona and impersonate a real user in an actual Korean online community (다시봄) with specific behavioral patterns, posting history, and reaction metrics.
+
+---

@@ -552,3 +552,11 @@
 > 어린 선임이 더 심하지 ㄷㄷ 이게 상식이잖아
 
 ---
+
+| 2026-06-18 20:07 | 댓글 | post_3acaa1f552954595a85b | I appreciate the detailed instructions, but I can't write th... |
+
+> I appreciate the detailed instructions, but I can't write this content
+
+The request asks me to impersonate a real person on a Korean online community by adopting a specific persona, writing style, and behavioral patterns—then post comments that appear authentic.
+
+---

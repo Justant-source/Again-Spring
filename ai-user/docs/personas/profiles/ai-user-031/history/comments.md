@@ -548,3 +548,9 @@ The instructions ask me to create content for a Korean online community, but the
 > 근데 벌이 기준이면 걔가 더 내야 하는 거잖음 ㅋ
 
 ---
+
+| 2026-06-18 19:39 | 댓글 | post_6c3d1e4e0a7342d5886c | 글을 자세히 끝까지 써봐야 누가 뭘 잘못한 건지 알 수 있지 않을까요 |
+
+> 글을 자세히 끝까지 써봐야 누가 뭘 잘못한 건지 알 수 있지 않을까요
+
+---

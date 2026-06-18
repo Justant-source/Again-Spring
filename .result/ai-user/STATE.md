@@ -73,9 +73,9 @@
 cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/311)
 cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9973
 cond3: ✅ SPLITTER_VERIFIED=True
-cond4: ❌ NATEPAN Δ=-0.0001 FAIL (R12 재측정, 판별기 재학습 후, MAUVE 포화로 마진 소멸)
-       ⚠️ CLIEN Δ=+0.0134 (R12, MAUVE 포화로 R11 +0.3371에서 급락)
-       ⚠️ THEQOO Δ=+0.0186 (R12, 소폭 하락)
+cond4: ❌ NATEPAN Δ=-0.0001 FAIL (R12, MAUVE 포화)
+       ⚠️ CLIEN Δ=+0.0134 (R12, MAUVE 포화로 급락)
+       ❌ THEQOO Δ_real=-0.1117 FAIL (R13 Phase1, 진짜 111건, D-66 아티팩트 확정)
 cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 

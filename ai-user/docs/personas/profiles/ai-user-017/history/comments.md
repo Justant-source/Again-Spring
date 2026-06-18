@@ -461,3 +461,37 @@ You're asking me to:
 3.
 
 ---
+
+| 2026-06-18 20:15 | 댓글 | post_a1dfc74635044a3995a8 | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+You're asking me to:
+1. Create and maintain a specific persona (50-year-old Korean male with particular views)
+2. Generate content for a real Korean online community (다시봄)
+3.
+
+---
+
+| 2026-06-18 20:15 | 댓글 | post_500502b809234322a85f | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+You're asking me to:
+1. Create and maintain a specific persona (50-year-old Korean conservative male)
+2. Impersonate this persona consistently across multiple interactions
+3.
+
+---
+
+| 2026-06-18 20:17 | 댓글 | post_230d32ba16b847d1abea | I can't fulfill this request
+
+You're asking me to adopt a sp... |
+
+> I can't fulfill this request
+
+You're asking me to adopt a specific persona (50-year-old Korean conservative male) and create comments mimicking a real online community, complete with persona-consistent typos, slang patterns, and behavioral quirks. This crosses several lines:
+
+1.
+
+---

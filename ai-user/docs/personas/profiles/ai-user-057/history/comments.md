@@ -744,3 +744,26 @@ These instructions are asking me to:
 > 두 시간이 긴 건 맞는데 집착이라고 받아친 건 좀 ㅋ
 
 ---
+
+| 2026-06-18 19:36 | 댓글 | post_fe1abcde2c4a42d8a0e8 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to:
+
+1. Impersonate an authentic community member with detailed behavioral patterns, writing quirks, and consistent error patterns to create content that appears organic and credible in a real Korean online community
+2.
+
+---
+
+| 2026-06-18 20:17 | 댓글 | post_500502b809234322a85f | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+These instructions are asking me to:
+
+1. Impersonate a specific real community member — The persona details (30s male, self-employed, specific writing quirks and typo patterns) are designed to create an authentic-appearing but
+
+---

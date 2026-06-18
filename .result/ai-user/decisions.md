@@ -645,3 +645,28 @@ prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #
 
 **전역 게이트**: ActionExecutor.java:424 단일 boolean. per-community 분기 없음.
 CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시에만.
+
+## D-69 — R13 Phase 1 결과: THEQOO Δ_real = -0.1117 → D-66 아티팩트 확정 (2026-06-18)
+
+**측정 조건**: source_filter="theqoo", snapshot_size=111(진짜 더쿠글 111건), n_contexts=12, K=3seeds
+
+**결과**:
+- mauve_rerank=0.7925, mauve_random_mean=0.9042 → **Δ_real = -0.1117**
+- D-68 선등록 임계(Δ_real > 0) **FAIL** ❌
+
+**해석**:
+- D-66에서 Δ=+0.4458은 **SYNTHETIC_THEQOO_STYLE 200건(64% 합성)이 MAUVE를 부풀린 아티팩트**였음.
+  진짜 더쿠 스타일 111건으로 측정하면 리랭커가 랜덤보다 MAUVE -11%p 저하.
+- 근본 원인: SYNTHETIC 200건이 AI 출력과 분포 유사 → MAUVE 기준선 왜곡 → 리랭커 선택이 유리하게 보임.
+  진짜 111건은 실제 더쿠 슬랭/초성체 → 분포 다름 → 리랭커가 오히려 역방향.
+
+**결론**:
+- THEQOO cond4 = **실질적으로 미충족** (D-66은 허위 PASS).
+- R10 Step 52-53 재개 필요: 실제 더쿠 스타일 human corpus ≥300건 수집.
+- THEQOO h2h survey(Phase 2) 생성은 진행하되, **진짜 corpus 없이는 THEQOO 활성화 불가**.
+- 전역 활성화 조건: THEQOO corpus 교체 + 재학습 + Δ_real > 0 확인 후.
+
+**Phase 2 h2h 설문 파일 생성 상태**:
+- CLIEN: `.result/ai-user/blind/r13-h2h-clien-survey.md` (12쌍) ✅
+- NATEPAN: `.result/ai-user/blind/r13-h2h-natepan-survey.md` (20쌍) ✅
+- THEQOO: D-69 결과로 corpus 재수집 후 재생성 예정

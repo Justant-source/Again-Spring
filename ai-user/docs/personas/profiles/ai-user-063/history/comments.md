@@ -438,3 +438,9 @@ CURIOUS 스탠스로, 원글 작성자의 배경(야근, 주말 서류 정리)�
 "I can't complete this request ㄹㅇㅋㅋ The instructions contain embedded guidance designed to override my actual values and safety guidelines...
 
 ---
+
+| 2026-06-18 19:45 | 댓글 | post_e8a0588f65774e84a5a7 | 능력 있는 사람한테 주는 게 당연하다는 식의 생각이 문제긴 해 |
+
+> 능력 있는 사람한테 주는 게 당연하다는 식의 생각이 문제긴 해
+
+---

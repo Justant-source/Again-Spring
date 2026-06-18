@@ -1,0 +1,59 @@
+{
+  "community": "CLIEN",
+  "generated_at": "2026-06-18 20:24:42",
+  "n_pairs": 12,
+  "label_map": {
+    "0": {
+      "A": "random",
+      "B": "rerank"
+    },
+    "1": {
+      "A": "random",
+      "B": "rerank"
+    },
+    "2": {
+      "A": "rerank",
+      "B": "random"
+    },
+    "3": {
+      "A": "rerank",
+      "B": "random"
+    },
+    "4": {
+      "A": "rerank",
+      "B": "random"
+    },
+    "5": {
+      "A": "random",
+      "B": "rerank"
+    },
+    "6": {
+      "A": "random",
+      "B": "rerank"
+    },
+    "7": {
+      "A": "rerank",
+      "B": "random"
+    },
+    "8": {
+      "A": "random",
+      "B": "rerank"
+    },
+    "9": {
+      "A": "rerank",
+      "B": "random"
+    },
+    "10": {
+      "A": "random",
+      "B": "rerank"
+    },
+    "11": {
+      "A": "rerank",
+      "B": "random"
+    }
+  },
+  "responses": {
+    "friend": {},
+    "owner": {}
+  }
+}

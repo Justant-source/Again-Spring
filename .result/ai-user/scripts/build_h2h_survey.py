@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """
-run_ab_test.py — Phase B A-B test driver
+build_h2h_survey.py — R13 head-to-head 블라인드 설문 생성기
 
-갈등 주제 M개 × N=4 POST-style 초안 → /eval/ab-test
-MAUVE(rerank_winners, human) vs MAUVE(random_winners, human) 측정.
-EvalRun(kind="ab_test") DB 저장 후 delta 보고.
+N draft 생성 → /rerank top-1 선택 → (top-1, random) 쌍 → survey.md 출력.
 
 Usage:
-    python3 run_ab_test.py --community THEQOO [--n-contexts 10] [--drafts 4] [--dry-run]
+    python3 build_h2h_survey.py --community CLIEN [--n-contexts 20] [--drafts 4] [--dry-run]
 """
-import argparse, json, logging, subprocess, sys, time, urllib.request, urllib.error, shutil, glob, os
+import argparse, json, logging, subprocess, sys, time, urllib.request, urllib.error, shutil, glob, os, random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -19,7 +17,6 @@ CLAUDE_CLI_PATH = "/home/justant/.nvm/versions/node/v24.14.1/bin/claude"
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 
 # clcocloud 거절·오류 시그니처 (LlmErrorSignature.java 미러, R0)
-# 이 텍스트가 포함된 응답은 거절로 간주 → 재시도 or CLI 폴백
 DENY_SIGS = [
     "credit balance", "too low to access", "purchase credits", "plans & billing",
     "usage limit", "reached your usage", "5-hour limit", "rate limit", "rate_limit",
@@ -63,30 +60,6 @@ COMMUNITY_CFG = {
             "오빠가 가부장적으로 굴 때",
             "친구가 자꾸 비교하며 기죽일 때",
             "남자친구가 내 외모를 지적할 때",
-            "회사 여자 동료가 나를 따돌릴 때",
-            "카카오톡 단체방에서 나만 무시당할 때",
-            "남자친구 어머니가 나를 싫어하는 것 같을 때",
-            "직장 상사가 나에게만 가혹할 때",
-            "친구가 내 남자친구를 가로챌 때",
-            "사이버불링 당했을 때",
-            "썸남이 갑자기 연락을 끊었을 때",
-            "남자친구가 일을 핑계로 데이트를 자꾸 취소할 때",
-            "친정 부모님이 남자친구를 못 마땅해할 때",
-            "직장 후배가 나보다 빨리 승진했을 때",
-            "베프 남자친구가 나한테 이상하게 굴 때",
-            "남자친구가 내 돈을 자꾸 빌릴 때",
-            "친구 모임에서 나만 왕따당하는 것 같을 때",
-            "남자친구가 내 친구들을 싫어할 때",
-            "회사에서 성희롱 당했을 때",
-            "언니와 사이가 나빠졌을 때",
-            "남자친구가 전 여자친구와 연락할 때",
-            "직장에서 실수를 했는데 혼자 뒤집어썼을 때",
-            "집주인이 보증금을 안 돌려줄 때",
-            "온라인 쇼핑 환불 거절당했을 때",
-            "남자친구가 내 이야기를 다른 사람들에게 퍼뜨릴 때",
-            "회사 술자리에서 괜히 취급당할 때",
-            "친구가 내 물건을 허락 없이 빌릴 때",
-            "남자친구가 내 의견을 무시하고 자기 생각만 고집할 때",
         ],
     },
     "CLIEN": {
@@ -104,16 +77,6 @@ COMMUNITY_CFG = {
             "회의가 너무 많아서 일을 못할 때",
             "상사가 개인 프로젝트를 업무시간에 시킬 때",
             "팀원이 내 기술적 의견을 무시할 때",
-        ],
-    },
-    "DCINSIDE": {
-        "trait": "직설적, 남성 구어체, 은어(ㄹㅇ/ㅇㅈ/개), 짧고 직설적",
-        "themes": [
-            "친구가 내 물건 허락 없이 쓸 때",
-            "알바 사장이 월급을 안 줄 때",
-            "이웃이 층간소음을 낼 때",
-            "게임 팀원이 트롤할 때",
-            "선배가 자꾸 시비 걸 때",
         ],
     },
     "NATEPAN": {
@@ -139,30 +102,6 @@ COMMUNITY_CFG = {
             "시어머니가 내 요리를 매번 비교할 때",
             "아파트 층간소음 때문에 이웃과 싸웠을 때",
             "남편이 용돈을 줄이겠다고 했을 때",
-            "아이 교육비 문제로 남편과 다툴 때",
-            "가족 카톡방에서 시댁 식구들에게 무시당할 때",
-            "남편이 내 직장 동료를 의심할 때",
-            "친척들이 아이 교육에 간섭할 때",
-            "아이 학교 선생님과 갈등이 생겼을 때",
-            "남편이 집안일을 도와달라는 말을 무시할 때",
-            "시부모님과 명절 집안일 갈등",
-            "남편 형제들이 재산 문제로 다툴 때",
-            "아이 친구 부모와 갈등이 생겼을 때",
-            "경력단절 후 재취업하려는데 남편이 반대할 때",
-            "시어머니가 손자녀 교육을 마음대로 할 때",
-            "남편이 친구들과 너무 자주 어울릴 때",
-            "이사 문제로 남편과 갈등이 생겼을 때",
-            "남편 직장 동료 부인이 나를 무시할 때",
-            "가사 도우미 문제로 시어머니와 갈등이 생겼을 때",
-            "남편이 내 건강 문제를 심각하게 여기지 않을 때",
-            "친정 부모님과 남편 사이에서 양쪽 눈치 볼 때",
-            "유치원 학부모 단체채팅방에서 왕따당할 때",
-            "남편이 나한테 사과를 절대 안 할 때",
-            "아이가 학교에서 따돌림 당한다는 것을 알게 됐을 때",
-            "남편과 섹스 횟수 차이로 갈등할 때",
-            "아이 학원비 때문에 남편과 싸울 때",
-            "시어머니가 내 자식들을 차별할 때",
-            "남편이 명절 고향 내려가는 것을 강요할 때",
         ],
     },
 }
@@ -175,41 +114,27 @@ log = logging.getLogger(__name__)
 
 
 def find_claude_cli():
-    """
-    Try to find claude CLI binary with fallback paths.
-    1. Hardcoded path
-    2. shutil.which('claude')
-    3. NVM glob patterns
-    """
-    candidates = [
-        CLAUDE_CLI_PATH,
-    ]
-
-    # Try PATH lookup
+    """Try to find claude CLI binary with fallback paths."""
+    candidates = [CLAUDE_CLI_PATH]
     which_result = shutil.which('claude')
     if which_result:
         candidates.append(which_result)
-
-    # Try common NVM node versions
     home = os.path.expanduser('~')
     nvm_base = os.path.join(home, '.nvm/versions/node')
     if os.path.exists(nvm_base):
-        glob_patterns = [
-            os.path.join(nvm_base, 'v*/bin/claude'),
-        ]
+        glob_patterns = [os.path.join(nvm_base, 'v*/bin/claude')]
         for pattern in glob_patterns:
             candidates.extend(glob.glob(pattern))
-
     for path in candidates:
         if path and os.path.isfile(path) and os.access(path, os.X_OK):
             log.info(f"Using claude CLI: {path}")
             return path
-
-    log.error(f"claude CLI not found in any fallback path. Tried: {candidates}")
+    log.error(f"claude CLI not found in any fallback path")
     return None
 
 
 def api(method, path, data=None):
+    """HTTP API call to ML service."""
     url = ML_SERVICE_URL + path
     headers = {
         "Authorization": f"Bearer {ML_API_TOKEN}",
@@ -225,14 +150,7 @@ def api(method, path, data=None):
 
 
 def _api_generate(prompt: str, max_retries: int = 2) -> str | None:
-    """
-    R0: clcocloud API 우선 생성 시도.
-
-    clcocloud 필수 규칙 (ClaudeApiInvoker.java 미러):
-      - system 필드 금지 (Kiro 오라우팅) → <instructions> 태그로 user 메시지에 주입
-      - anthropic-beta 헤더 금지 (동일 오라우팅 버그)
-      - DENY_SIGS 포함 텍스트는 거절로 간주 → 재시도
-    """
+    """clcocloud API 우선 생성."""
     api_key  = os.environ.get("ANTHROPIC_API_KEY", "")
     base_url = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/")
     if not api_key:
@@ -242,67 +160,51 @@ def _api_generate(prompt: str, max_retries: int = 2) -> str | None:
     body = json.dumps({
         "model": CLAUDE_MODEL,
         "max_tokens": 512,
-        "messages": [
-            {
-                "role": "user",
-                # clcocloud: system 내용을 <instructions> 태그로 user 메시지에 주입
-                "content": f"<instructions>\n{prompt}\n</instructions>",
-            }
-        ],
-        # NOTE: anthropic-beta 헤더 금지 (아래 헤더 참조)
+        "messages": [{
+            "role": "user",
+            "content": f"<instructions>\n{prompt}\n</instructions>",
+        }],
     }).encode("utf-8")
 
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
-        # ⚠️ anthropic-beta 헤더 절대 금지 — clcocloud에서 Kiro 오라우팅 유발
     }
 
     for attempt in range(max_retries):
         try:
-            req = urllib.request.Request(
-                base_url + "/v1/messages",
-                data=body,
-                headers=headers,
-                method="POST",
-            )
+            req = urllib.request.Request(base_url + "/v1/messages", data=body, headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=45) as r:
                 resp = json.loads(r.read().decode("utf-8"))
-
             text = (resp.get("content") or [{}])[0].get("text", "").strip()
             if not text:
                 log.warning(f"API 빈 텍스트 (attempt {attempt+1}/{max_retries})")
                 if attempt < max_retries - 1:
                     time.sleep(1)
                 continue
-
-            # 거절 시그니처 체크
             text_lower = text.lower()
             if any(sig in text_lower for sig in DENY_SIGS):
                 log.warning(f"API 거절 감지 (attempt {attempt+1}/{max_retries}): {text[:80]}")
                 if attempt < max_retries - 1:
                     time.sleep(1)
                 continue
-
             log.info(f"API 생성 성공 (attempt {attempt+1})")
             return text
-
         except urllib.error.HTTPError as e:
-            log.warning(f"API HTTP 에러 {e.code} (attempt {attempt+1}/{max_retries}): {e.read()[:100]}")
+            log.warning(f"API HTTP 에러 {e.code} (attempt {attempt+1}/{max_retries})")
             if attempt < max_retries - 1:
                 time.sleep(2)
         except Exception as e:
             log.warning(f"API 예외 (attempt {attempt+1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
                 time.sleep(1)
-
     log.warning("API 경로 소진 → CLI 폴백")
     return None
 
 
 def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
-    """CLI 폴백 생성 (기존 로직)."""
+    """CLI 폴백 생성."""
     claude_path = find_claude_cli()
     if not claude_path:
         log.error("Claude CLI를 찾을 수 없음")
@@ -310,13 +212,10 @@ def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
 
     for attempt in range(max_retries):
         try:
-            r = subprocess.run(
-                [claude_path, "-p", prompt, "--model", CLAUDE_MODEL],
-                capture_output=True, text=True, timeout=40,
-            )
+            r = subprocess.run([claude_path, "-p", prompt, "--model", CLAUDE_MODEL],
+                              capture_output=True, text=True, timeout=40)
             text = r.stdout.strip()
             if text and r.returncode == 0:
-                # 거절 시그니처 체크
                 if any(sig in text.lower() for sig in DENY_SIGS):
                     log.warning(f"CLI 거절 감지 (attempt {attempt+1}/{max_retries}): {text[:80]}")
                     if attempt < max_retries - 1:
@@ -324,16 +223,13 @@ def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
                     continue
                 log.info(f"CLI 생성 성공 (attempt {attempt+1})")
                 return text
-            log.warning(f"CLI returncode={r.returncode} stderr={r.stderr[:100]}")
+            log.warning(f"CLI returncode={r.returncode}")
             if attempt < max_retries - 1:
                 time.sleep(1)
         except subprocess.TimeoutExpired:
             log.error(f"CLI timeout (attempt {attempt+1}/{max_retries})")
             if attempt < max_retries - 1:
                 time.sleep(1)
-        except FileNotFoundError as e:
-            log.error(f"CLI binary not found: {e}")
-            return None
         except Exception as e:
             log.error(f"CLI error: {e}")
             if attempt < max_retries - 1:
@@ -342,14 +238,7 @@ def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
 
 
 def generate_post(theme: str, trait: str, dry_run: bool = False, max_retries: int = 2) -> str | None:
-    """
-    R0: clcocloud API 우선 → CLI 폴백으로 갈등 사연 POST 생성.
-
-    clcocloud API 우선 (ANTHROPIC_API_KEY env 필요):
-      - system 필드 금지, <instructions> 태그 주입
-      - DENY_SIGS 거절 감지 후 재시도
-    CLI 폴백: API 실패 or ANTHROPIC_API_KEY 미설정 시
-    """
+    """clcocloud API 우선 → CLI 폴백으로 갈등 사연 POST 생성."""
     prompt = (
         f"당신은 한국 온라인 커뮤니티 사용자입니다. 커뮤니티 특성: {trait}\n"
         f"아래 상황에 처한 사람이 커뮤니티에 올리는 갈등 사연 글을 써주세요.\n"
@@ -358,16 +247,11 @@ def generate_post(theme: str, trait: str, dry_run: bool = False, max_retries: in
         f"- 출력: 사연 본문만 (제목 없이)\n\n"
         f"[상황]\n{theme}"
     )
-
     if dry_run:
         return f"[DRY RUN] {theme[:30]}…"
-
-    # 1) clcocloud API 우선
     result = _api_generate(prompt, max_retries=max_retries)
     if result:
         return result
-
-    # 2) CLI 폴백
     log.info("CLI 폴백으로 재시도...")
     return _cli_generate(prompt, max_retries=max_retries)
 
@@ -379,7 +263,7 @@ def _gen_draft_task(args):
     return ctx_i, draft_i, text
 
 
-def run(community, n_contexts, n_drafts, dry_run, workers=8, source_filter=None):
+def run(community, n_contexts, n_drafts, dry_run, workers=8):
     cfg = COMMUNITY_CFG.get(community)
     if not cfg:
         log.error(f"Unknown community: {community}. Available: {list(COMMUNITY_CFG)}")
@@ -388,18 +272,13 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8, source_filter=None)
     themes = cfg["themes"][:n_contexts]
     trait = cfg["trait"]
     total = len(themes) * n_drafts
-    log.info(f"A-B test: {community} | {len(themes)} contexts × {n_drafts} drafts = {total} LLM calls | workers={workers}")
+    log.info(f"H2H survey: {community} | {len(themes)} contexts × {n_drafts} drafts = {total} LLM calls | workers={workers}")
 
     # Generate all drafts in parallel
-    tasks = [
-        (i, j, theme, trait, dry_run)
-        for i, theme in enumerate(themes)
-        for j in range(n_drafts)
-    ]
-
-    # results[ctx_i][draft_i] = text
+    tasks = [(i, j, theme, trait, dry_run) for i, theme in enumerate(themes) for j in range(n_drafts)]
     results = [[None] * n_drafts for _ in range(len(themes))]
     done = 0
+
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(_gen_draft_task, t): t for t in tasks}
         for fut in as_completed(futures):
@@ -410,92 +289,179 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8, source_filter=None)
             status = f"{text[:60]}…" if text else "FAILED"
             log.info(f"[{done}/{total}] ctx={ctx_i+1} draft={draft_i+1} ({theme_short}): {status}")
 
+    # Collect valid drafts
     drafts_by_context = []
     for i, theme in enumerate(themes):
         drafts = [t for t in results[i] if t]
         if len(drafts) >= 2:
             drafts_by_context.append({
                 "contextId": f"ctx_{i}_{community.lower()}",
+                "theme": theme,
                 "drafts": drafts,
             })
         else:
             log.warning(f"Context {i+1} ({theme[:30]}): only {len(drafts)} drafts — skip")
 
+    if len(drafts_by_context) < 10:
+        log.error(f"Too few valid contexts ({len(drafts_by_context)}) — need ≥10. Aborting")
+        return None
+
+    log.info(f"Collected {len(drafts_by_context)} valid contexts")
+
     if dry_run:
-        log.info(f"[DRY RUN] Would submit {len(drafts_by_context)} contexts to /eval/ab-test")
+        log.info(f"[DRY RUN] Would create {len(drafts_by_context)} pairs from reranking")
         return None
 
-    if len(drafts_by_context) < 3:
-        log.error(f"Too few valid contexts ({len(drafts_by_context)}) — aborting")
+    # Call /rerank for each context
+    pairs = []
+    label_map = {}
+    seed_label_rng = random.Random(2026)
+
+    for pair_idx, ctx_info in enumerate(drafts_by_context):
+        drafts = ctx_info["drafts"]
+        ctx_id = ctx_info["contextId"]
+        theme = ctx_info["theme"]
+
+        # Build rerank request
+        candidates = [{"id": f"d{i}", "text": d} for i, d in enumerate(drafts)]
+        log.info(f"Reranking pair {pair_idx+1}/{len(drafts_by_context)}: {ctx_id} with {len(drafts)} drafts")
+
+        try:
+            resp = api("POST", "/rerank", {
+                "community": community,
+                "contentType": "POST",
+                "candidates": candidates,
+            })
+            degraded = resp.get("degraded", False)
+            winner_id = resp.get("winnerId")  # camelCase from API
+
+            if degraded or not winner_id:
+                log.warning(f"  Pair {pair_idx+1}: degraded={degraded}, skipping (no valid rerank)")
+                continue
+
+            # Get top-1 (rerank winner)
+            winner_idx = int(winner_id.replace("d", ""))
+            text_top1 = drafts[winner_idx]
+
+            # Select random from non-winner drafts
+            other_indices = [i for i in range(len(drafts)) if i != winner_idx]
+            random_idx = random.Random(42).choice(other_indices)
+            text_random = drafts[random_idx]
+
+            # Random label assignment (seed=2026+pair_idx for reproducibility)
+            label_rng = random.Random(2026 + pair_idx)
+            labels = ["rerank", "random"]
+            label_rng.shuffle(labels)
+            label_map[str(pair_idx)] = {
+                "A": labels[0],
+                "B": labels[1],
+            }
+
+            # Assign texts to A/B based on shuffled labels
+            text_a = text_top1 if labels[0] == "rerank" else text_random
+            text_b = text_random if labels[0] == "rerank" else text_top1
+
+            pairs.append({
+                "pair_id": pair_idx,
+                "context_id": ctx_id,
+                "theme": theme,
+                "text_a": text_a,
+                "text_b": text_b,
+            })
+            log.info(f"  Pair {pair_idx+1}: created ({len(text_a)} + {len(text_b)} chars)")
+
+        except RuntimeError as e:
+            log.error(f"  Pair {pair_idx+1}: /rerank failed: {e}")
+            continue
+
+    if len(pairs) < 10:
+        log.error(f"Too few valid pairs ({len(pairs)}) after reranking — need ≥10. Aborting")
         return None
 
-    idempotency_key = f"ab-{community.lower()}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    log.info(f"Submitting {len(drafts_by_context)} contexts to /eval/ab-test …")
-    payload = {
+    log.info(f"Successfully created {len(pairs)} pairs for survey")
+
+    # Generate survey markdown
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    survey_md = f"""# R13 h2h 설문 — {community}
+> 생성: {now} | n_contexts={len(drafts_by_context)} | drafted={len(pairs)} | seed_label=2026
+> 지시: 각 번호에서 A/B 중 **사람이 쓴 글에 더 가까운 것**을 골라 `1-A 이유한줄` 형식으로 답하세요.
+
+---
+
+"""
+    for pair in pairs:
+        pair_id = pair["pair_id"]
+        text_a = pair["text_a"]
+        text_b = pair["text_b"]
+        survey_md += f"""## {pair_id+1}번
+**[A]**
+{text_a}
+
+**[B]**
+{text_b}
+
+---
+
+"""
+
+    # Generate answers template
+    answers_template = {
         "community": community,
-        "draftsByContext": drafts_by_context,
-        "idempotencyKey": idempotency_key,
+        "generated_at": now,
+        "n_pairs": len(pairs),
+        "label_map": label_map,
+        "responses": {
+            "friend": {},
+            "owner": {},
+        },
     }
-    if source_filter:
-        payload["sourceFilter"] = source_filter
-    resp = api("POST", "/eval/ab-test", payload)
-    job_id = resp["job_id"]
-    log.info(f"Job queued: {job_id}")
 
-    for tick in range(120):
-        time.sleep(5)
-        job = api("GET", f"/eval/{job_id}")
-        status = job.get("status")
-        if status == "DONE":
-            result = job.get("result") or {}
-            log.info("=== RESULT ===")
-            mr = result.get("mauve_rerank")
-            mr_mean = result.get("mauve_random_mean")
-            mr_std = result.get("mauve_random_std")
-            mr_seeds = result.get("mauve_random_seeds", [])
-            delta = result.get("delta")
-            log.info(f"  community           : {community}")
-            log.info(f"  mauve_rerank        : {mr:.4f}" if mr is not None else "  mauve_rerank        : None")
-            log.info(f"  mauve_random_mean   : {mr_mean:.4f}" if mr_mean is not None else "  mauve_random_mean   : None")
-            log.info(f"  mauve_random_std    : {mr_std:.4f}" if mr_std is not None else "  mauve_random_std    : None")
-            if mr_seeds:
-                log.info(f"  mauve_random_seeds  : {[round(s, 4) for s in mr_seeds]}")
-            log.info(f"  delta (rerank-mean) : {delta:+.4f}" if delta is not None else "  delta (rerank-mean) : None")
-            if source_filter:
-                log.info(f"  source_filter       : {source_filter}")
-            log.info(f"  n_contexts          : {result.get('n_contexts')}")
-            log.info(f"  snapshot_size       : {result.get('snapshot_size')}")
-            log.info(f"  degraded            : {result.get('degraded')}")
-            return result
-        elif status in ("FAILED", "ERROR"):
-            log.error(f"Job {status}: {job}")
-            return None
-        else:
-            log.info(f"  [{tick*5}s] status={status}")
+    # Save files
+    output_dir = "/home/justant/Data/Again-Spring/.result/ai-user/blind"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+    survey_path = os.path.join(output_dir, f"r13-h2h-{community.lower()}-survey.md")
+    answers_path = os.path.join(output_dir, f"r13-h2h-{community.lower()}-answers-template.json")
 
-    log.error("Timeout (600s) waiting for job")
-    return None
+    with open(survey_path, "w", encoding="utf-8") as f:
+        f.write(survey_md)
+    log.info(f"Survey saved: {survey_path}")
+
+    with open(answers_path, "w", encoding="utf-8") as f:
+        json.dump(answers_template, f, ensure_ascii=False, indent=2)
+    log.info(f"Answers template saved: {answers_path}")
+
+    return {
+        "n_pairs": len(pairs),
+        "survey_path": survey_path,
+        "answers_path": answers_path,
+        "label_map_sample": dict(list(label_map.items())[:3]),
+    }
 
 
 def main():
-    p = argparse.ArgumentParser(description="A-B test driver — rerank vs random MAUVE delta")
-    p.add_argument("--community", default="THEQOO",
+    p = argparse.ArgumentParser(description="R13 head-to-head blind survey builder")
+    p.add_argument("--community", default="CLIEN",
                    help=f"Community ({'/'.join(COMMUNITY_CFG)})")
-    p.add_argument("--n-contexts", type=int, default=10,
-                   help="Number of conflict themes to test (default: 10)")
+    p.add_argument("--n-contexts", type=int, default=20,
+                   help="Number of conflict themes to test (default: 20)")
     p.add_argument("--drafts", type=int, default=4,
                    help="Drafts per context (default: 4)")
     p.add_argument("--dry-run", action="store_true",
-                   help="Print prompts without calling API")
+                   help="Generate drafts without calling /rerank or saving files")
     p.add_argument("--workers", type=int, default=8,
-                   help="Parallel LLM workers for draft generation (default: 8)")
-    p.add_argument("--source-filter", default=None,
-                   help="Optional: filter human corpus by source (e.g. 'theqoo' for real-only)")
+                   help="Parallel LLM workers (default: 8)")
     args = p.parse_args()
 
-    result = run(args.community.upper(), args.n_contexts, args.drafts, args.dry_run, args.workers, args.source_filter)
-    if result is None and not args.dry_run:
-        sys.exit(1)
+    result = run(args.community.upper(), args.n_contexts, args.drafts, args.dry_run, args.workers)
+    if result is None:
+        if not args.dry_run:
+            sys.exit(1)
+    else:
+        log.info(f"=== RESULT ===")
+        log.info(f"  n_pairs       : {result['n_pairs']}")
+        log.info(f"  survey_path   : {result['survey_path']}")
+        log.info(f"  answers_path  : {result['answers_path']}")
 
 
 if __name__ == "__main__":
