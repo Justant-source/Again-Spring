@@ -36,14 +36,16 @@
 | `LLM_JURY_PROVIDER` | 배심원 생성 provider (`remote` \| `mock`) | `remote` (dev) |
 | `LLM_WORKER_URL` | backend → llm-worker 접속 URL | `http://againspring-llm:8090` |
 | `LLM_DEFAULT_TIMEOUT_MS` | LLM 호출 타임아웃 (ms) | `120000` |
-| `CLAUDE_BIN` | llm-worker CLI 실행 파일명 | `claude` |
-| `CLAUDE_MODEL` | llm-worker `--model` 인자 (채팅) | `claude-haiku-4-5-20251001` |
+| `CODEX_BIN` | llm-worker Codex CLI 실행 파일명 | `codex` |
+| `CODEX_MODEL` | llm-worker `codex exec --model` 인자 | `gpt-5.4` |
+| `CLAUDE_BIN` | 레거시 CLI 경로 호환용 | `claude` |
+| `CLAUDE_MODEL` | 레거시 모델명 호환용 | `claude-haiku-4-5-20251001` |
 | `REPORT_LLM_MODEL` | llm-worker 리포트 모델 | `claude-sonnet-4-6` |
 | `CLAUDE_HOST_CONFIG_DIR` | bind mount 원본 (`→ /root/.claude`) — **llm-worker에 마운트** | dev: `/home/justant/.claude` / prod: `/root/.claude` |
 | `LLM_POOL_SIZE` | ThreadPoolExecutor 상한 | `100` |
 | `LLM_QUEUE_CAPACITY` | LinkedBlockingQueue 용량 | `500` |
 | `LLM_QUEUE_WAIT_TIMEOUT_MS` | 큐 대기 최대 시간 (ms) | `30000` |
-| `ANTHROPIC_API_KEY` | claude CLI 인증 fallback (정상 케이스에선 비워둠) | `""` |
+| `ANTHROPIC_API_KEY` | 레거시 clcocloud API 키 (현재 런타임 미사용) | `""` |
 
 API 키 없이 동작 — 호스트의 `~/.claude` 세션을 **llm-worker** 컨테이너가 공유. backend 컨테이너에는 마운트 불필요.
 

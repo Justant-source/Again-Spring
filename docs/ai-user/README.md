@@ -85,24 +85,24 @@ THEQOO, ARCALIVE, INVEN, MLBPARK, PPOMPPU, CLIEN
 
 ---
 
-## Claude 생성 백엔드 (CLI vs API 라우팅)
+## 생성 백엔드 (Codex CLI bridge 단일 경로)
 
 ### Invoker 인터페이스
 ```
 Invoker (interface)
-  ├─ ClaudeCliInvoker ——— Claude CLI subprocess (기존)
-  └─ ClaudeApiInvoker ——— Anthropic Messages API + 프롬프트 캐싱
+  ├─ CodexCliInvoker ——— Codex CLI subprocess (활성)
+  └─ ClaudeApiInvoker ——— Anthropic/clcocloud 레거시 (런타임 비활성)
 ```
 
 ### InvokerRouter 라우팅
 - **`GenDto.*Request` 필드**: `backend` = "CLI" | "API" | "OFF"
 - **ActionExecutor.backendFor(actionType)** — `ai_user_generation_config` 읽기 (5분 TTL 캐시)
-- **API 키 미보유** → CLI 자동 폴백
+- **런타임 동작**: `backend=API` 요청도 무시하고 Codex CLI bridge로 강제
 
-### ClaudeApiInvoker 특징
-- **cache_control**: 프롬프트 캐싱으로 API 비용 76% 절감 (캐시 히트 시)
-- **ANTHROPIC_API_KEY** env 필수
-- **재생성 프롬프트 캐싱** — 동일 context 반복 호출 시 토큰 절감
+### CodexCliInvoker 특징
+- `codex exec` 단일 경로 사용
+- clcocloud/Anthropic API 키에 의존하지 않음
+- `ANTHROPIC_*` 환경변수는 subprocess에서 제거
 
 ---
 

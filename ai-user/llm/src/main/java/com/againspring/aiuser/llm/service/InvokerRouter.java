@@ -5,28 +5,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * backend 파라미터("CLI" | "API" | null)에 따라 Invoker를 선택.
- * API 키: ApiKeyProvider 경유 (DB 우선 → 환경변수 폴백). 키 없으면 CLI 폴백.
+ * backend 파라미터와 무관하게 Codex CLI bridge만 사용한다.
+ * legacy backend=API 요청은 무시한다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class InvokerRouter {
 
-    private final ClaudeCliInvoker cliInvoker;
-    private final ClaudeApiInvoker apiInvoker;
-    private final ApiKeyProvider   apiKeyProvider;
+    private final CodexCliInvoker cliInvoker;
 
     public Invoker route(String backend) {
         if ("API".equalsIgnoreCase(backend)) {
-            String key = apiKeyProvider.getKey();
-            if (key == null || key.isBlank()) {
-                throw new IllegalStateException("backend=API 요청됐으나 ANTHROPIC_API_KEY 미설정");
-            }
-            log.info("[InvokerRouter] ⚠️  backend=API 선택 — Anthropic API 직접 호출 (과금 발생)");
-            return apiInvoker;
+            log.warn("[InvokerRouter] backend=API 요청 무시 — clcocloud API는 비활성, Codex CLI bridge만 사용");
         }
-        log.debug("[InvokerRouter] backend={} → CLI 선택", backend);
-        return cliInvoker;  // CLI | null | OFF 모두 CLI
+        log.debug("[InvokerRouter] backend={} → Codex CLI 선택", backend);
+        return cliInvoker;
     }
 }

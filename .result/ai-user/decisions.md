@@ -710,3 +710,32 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 리랭커가 진짜 더쿠 corpus 기준으로 오히려 -20%p 저하 → human corpus 방향 오염이 근본 원인.
 
 **결론**: THEQOO corpus 교정 없이는 Δ개선 불가. Step 58 결정 후 재학습 필요.
+
+## D-72 — Step 58 착수: C(크롤링) 선택 + Codex CLI bridge 전환 (2026-06-19)
+
+**결정**:
+- THEQOO real corpus 확보 경로는 **C) 크롤링**으로 진행.
+- `run_ab_test.py`의 생성 경로는 **clcocloud API 비활성 + Codex CLI bridge only**로 전환.
+
+**실행 결과**:
+- 1차 crawl batch (`square/hot/ktalk/beauty`, p1-8): inserted **31**
+- 2차 deeper batch (p9-16): inserted **2**
+- 3차 `job` 집중 batch: inserted **10**
+- `/corpus/stats`: THEQOO human **386**, ai **116**
+- THEQOO 재학습 후 Codex-only `source_filter="theqoo"` A-B:
+  - snapshot_size = **142**
+  - mauve_rerank = **0.9907**
+  - mauve_random_mean = **0.8510**
+  - **Δ_real = +0.1397**
+
+**해석**:
+- 좋은 신호: THEQOO `Δ_real`이 음수에서 **양수로 회복**됨.
+- 미완료: real-only corpus가 아직 약 **154/300** 수준이라 Step 58 완료 아님.
+- 보드 효율:
+  - `square/beauty/hot` deeper page는 거의 소진
+  - `love/talk` 상세는 403 패턴
+  - `job`은 `p1-2`에서만 유의미한 수확
+
+**결론**:
+- 전역 차단 원인은 이제 "Δ 방향"보다 **real corpus 양 부족**으로 좁혀짐.
+- 다음 작업은 `job p1-2` 변형/헤더 최적화 또는 추가 source 발굴로 real snapshot 300+ 달성.

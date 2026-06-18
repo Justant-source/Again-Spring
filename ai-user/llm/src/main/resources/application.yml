@@ -31,17 +31,15 @@ llm:
     queue-capacity: ${LLM_QUEUE_CAPACITY:100}
     queue-wait-timeout-ms: ${LLM_QUEUE_WAIT_TIMEOUT_MS:30000}
     default-timeout-ms: ${LLM_DEFAULT_TIMEOUT_MS:120000}
-    claude-binary-path: ${CLAUDE_BIN:claude}
-    claude-model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
-  # 글(POST) 전용 모델 오버라이드 — 빈 값이면 claude-model 사용 (문체 현실화 S5)
+    codex-binary-path: ${CODEX_BIN:codex}
+    codex-model: ${CODEX_MODEL:gpt-5.4}
+  # 글(POST) 전용 모델 오버라이드 — 빈 값이면 codex-model 사용
   post-model: ${LLM_POST_MODEL:}
   api:
-    prompt-caching: ${LLM_API_PROMPT_CACHING:true}
-    # 캐시 TTL: "5m"(기본, GA — beta 헤더 없음) | "1h"(beta 헤더 — ⚠️ clcocloud에서 Kiro 오라우팅 유발, 직접 API 전용)
+    prompt-caching: ${LLM_API_PROMPT_CACHING:false}
     cache-ttl: ${LLM_API_CACHE_TTL:5m}
-    # clcocloud Haiku 풀 거절 노드 대응 (2026-06-12): 거절(PROVIDER_ERROR) 한정 재시도 + 소진 시 폴백 모델 1회
-    refusal-retries: ${LLM_API_REFUSAL_RETRIES:2}
-    refusal-fallback-model: ${LLM_API_REFUSAL_FALLBACK_MODEL:claude-sonnet-4-6}
+    refusal-retries: ${LLM_API_REFUSAL_RETRIES:0}
+    refusal-fallback-model: ${LLM_API_REFUSAL_FALLBACK_MODEL:}
 
 logging:
   level:

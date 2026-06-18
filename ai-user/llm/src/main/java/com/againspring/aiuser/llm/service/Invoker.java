@@ -5,7 +5,7 @@ import com.againspring.aiuser.llm.pool.CancelableInvocation;
 
 /**
  * LLM 텍스트 생성 인터페이스.
- * CLI(ClaudeCliInvoker) 또는 API(ClaudeApiInvoker) 구현체 선택은 InvokerRouter가 담당.
+ * 런타임 구현체 선택은 InvokerRouter가 담당한다.
  */
 public interface Invoker {
 

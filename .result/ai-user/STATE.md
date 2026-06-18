@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-18 세션 27 (R13 — Phase 1~4 완료, D-70 확정)
+**최종 갱신**: 2026-06-19 세션 28 (Step 58 진행 중 — C 크롤링 착수 + Codex bridge 전환)
 
 ---
 
@@ -16,11 +16,11 @@
 
 ## 현재 위치
 
-- **Phase**: R13 완료 — 신 cond4 PASS(CLIEN/NATEPAN) + THEQOO corpus 차단
-- **5조건 차단 현황**: **cond4 THEQOO corpus 미충족** — CLIEN/NATEPAN은 신 cond4 PASS, THEQOO Δ_real=-0.1117
+- **Phase**: Step 58 진행 중 — C(크롤링) 착수 + Codex-only A-B 경로 전환
+- **5조건 차단 현황**: **THEQOO real corpus 미충족** — Δ_real은 **+0.1397**로 양전환됐지만 real snapshot=142→약154로 아직 300 미만
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **차단 사유**: THEQOO 진짜 corpus 부족 (111건, 목표 ≥300) → 전역 게이트 차단
-- **직전 측정**: R13 Phase 4 완료 (2026-06-18) — r13-h2h-results-summary.md
+- **차단 사유**: THEQOO 진짜 corpus(source=`theqoo`) 부족 (현재 약154건, 목표 ≥300) → 전역 게이트 차단
+- **직전 측정**: Codex-only `source_filter="theqoo"` A-B (2026-06-19) — Δ_real=+0.1397, snapshot=142
 
 ---
 
@@ -29,7 +29,7 @@
 | 단계 | 내용 | 결과 |
 |---|---|---|
 | **P0** | R3 오케스트레이터 재배포 (pushNegative SELF_GENERATED) | e2e 142P, ML ACCEPTED 정상화 |
-| **R0** | clcocloud API 우선 래퍼 (run_ab_test.py) | DENY_SIGS 재시도 + CLI 폴백 |
+| **R0** | clcocloud API 우선 래퍼 (run_ab_test.py) | 이후 세션 28에서 **Codex CLI bridge only**로 전환 |
 | **R1** | corpus ctx_* 오라벨 34건 삭제 (CLIEN−32, NATEPAN−2) | 재학습 CLIEN=0.9965, NATEPAN=0.9989 |
 | **R2** | 인코딩 방향 회귀 테스트 | D-45: 인코딩 정상, 5/6 PASS + 1 xfailed |
 | **R3** | AS+ML 양면 소스 가드 | pushNegative source=SELF_GENERATED 보장 |
@@ -58,7 +58,7 @@
 | **blind ① Track A 신선분** | ✅ 파일 생성 — 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/r9-blind1-fresh-survey.md | ⏳ 사용자 응답 대기 |
 | **blind ②** | ✅ 파일 생성 — 혼합주제 20쌍 (CONFLICT+CASUAL AI vs human) | .result/ai-user/blind/r9-blind2-mixed-survey.md | ⏳ 사용자 응답 대기 |
 | **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | ✅ 신선분 축적 가능 |
-| **Step 58** | THEQOO corpus 수집 전략 결정 (A/B/C) + ≥300건 확보 | 오너 결정 | — |
+| **Step 58** | THEQOO corpus 수집 전략 결정 (A/B/C) + ≥300건 확보 | **C 선택 완료 · 수집 진행 중** | real snapshot≈154/300 |
 
 ### 중기
 
@@ -76,7 +76,7 @@ cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9973
 cond3: ✅ SPLITTER_VERIFIED=True
 cond4: ✅ CLIEN Δ=+0.0134 AND h2h 50%≤50% PASS (R13, 신 cond4 D-68)
        ✅ NATEPAN Δ=-0.0001 AND h2h 47.1%≤52.9% PASS (R13, 신 cond4 D-68)
-       ❌ THEQOO Δ_real=-0.2070 FAIL (R13 재확인 n=20, 진짜 111건, corpus 수집 필요)
+       ⚠️ THEQOO Δ_real=+0.1397 회복 (Codex-only, snapshot=142) / **real corpus 300 미달로 전역 차단 지속**
 cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 
@@ -91,7 +91,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | **P1** | **THEQOO human corpus 소스** (R10 핵심) | dev DB 7건·AS export = 다시봄 갈등체 → 실제 더쿠 슬랭 아님. 현재 human 410건이 격식체라 P(human) 역전 | A) THEQOO 직접 크롤(법적·인프라 검토 필요) / B) 외부 공개 데이터셋 / C) AS 플랫폼 내 THEQOO 스타일 글 직접 주석 수집 |
 | **P2** | ~~COMMENT 생성 배치 (R7 M-after)~~ | ✅ 완료 — WSL 배치 B 경로로 해결 (2026-06-18) | — |
 | **P3** | **AI_USER_ML_ENABLED 활성화 시기** | THEQOO cond4 미충족 → ML 리랭커 활성화 불가 | 자동: THEQOO cond4 해소 후 수동 활성화 / 선택: CLIEN+NATEPAN만 부분 활성화 가능 여부 검토 |
-| **P5** | **THEQOO corpus 수집 방법** | Δ_real=-0.1117로 전역 활성화 차단. 진짜 더쿠 corpus ≥300건 필요. | A) AS 플랫폼 자체수집 / B) 외부데이터셋 / C) 크롤링 |
+| **P5** | **THEQOO corpus 수집 방법** | ✅ **C) 크롤링 선택 및 진행 중**. real-only corpus를 300+까지 증설 필요. | next: job/love/talk 보드 최적화 |
 
 ---
 
@@ -102,14 +102,14 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 |---|---|---|---|---|---|
 | CLIEN | 0.9968 | 0.0053 | 960 | 157 | ✅ (재학습 2026-06-16) |
 | NATEPAN | 0.9989 | 0.00125 | 427 | 226 | ✅ (재학습 2026-06-16) |
-| THEQOO | 1.000 | 0.001 | 393 | 100 | ❌ P(human) 방향 역전 HALT |
+| THEQOO | 0.9958 | — | 374 | 100 | ⚠️ 재학습 완료, P(human) 일부 개선/역전 잔존 |
 
 ### MAUVE
 | 커뮤니티 | POST | COMMENT | 비고 |
 |---|---|---|---|
 | CLIEN | 0.644(baseline) → **0.9811**(ab-test n=50) Δ=+0.3371 ✅ | 0.0677(M-before) → **0.4661**(M-after) Δ=+0.3984 ✅ | cond4 PASS (2026-06-18) |
 | NATEPAN | 0.8395 | 0.0598(M-before) → **0.9107**(M-after) Δ=+0.8509 / **M-after(R11) Δ=-0.2901** ❌ | R7 배치=+0.8509, R11 재측정=Δ=-0.2901 FAIL |
-| THEQOO | — | **R10 Δ=+0.4458 vs R11 Δ=+0.0417 vs R13재확인(n=20) Δ=-0.2070** ❌ | 진짜corpus 111건 기준 — corpus 교정 필요 |
+| THEQOO | **Codex-only Δ_real=+0.1397 (snapshot=142)** | — | 방향 회복 확인, real corpus 300 미달 |
 
 ### 블라인드 cond5
 | 라운드 | 커뮤니티 | 정확도 | 목표 |

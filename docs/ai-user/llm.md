@@ -1,26 +1,26 @@
 # LLM 텍스트 생성 서비스 아키텍처 (ai-user-llm: 8092)
 
 **기준일**: 2026-06-06 · **모델**: claude-haiku-4-5-20251001 · **작성**: Claude Code
-**상태**: Invoker 인터페이스 계층 구현 (CLI + Anthropic API 양방향 지원)
+**상태**: Codex CLI bridge 단일 경로 활성 · Anthropic/clcocloud API 런타임 비활성
 
 ---
 
 ## 1. 개요
 
-Claude CLI 또는 Anthropic Messages API를 통해 한국어 커뮤니티 텍스트 생성 및 품질 자동 검증하는 LLM 워커 서비스.
+Codex CLI bridge를 통해 한국어 커뮤니티 텍스트 생성 및 품질 자동 검증하는 LLM 워커 서비스.
 
 | 속성 | 값 |
 |------|-----|
 | **포트** | 8092 |
 | **런타임** | Spring Boot 3.3 |
-| **모델** | claude-haiku-4-5-20251001 |
-| **백엔드** | **CLI (기본) / Anthropic API (옵션)** — InvokerRouter 자동 분기 |
-| **CLI 바이너리** | `claude` (호스트 ~/.claude 인증 경유) |
-| **API 인증** | `ANTHROPIC_API_KEY` 환경변수 (없으면 자동 CLI 폴백) |
+| **모델** | `gpt-5.4` 기본 (`CODEX_MODEL`) |
+| **백엔드** | **Codex CLI bridge only** |
+| **CLI 바이너리** | `codex` |
+| **API 인증** | 사용 안 함 (clcocloud 런타임 비활성) |
 | **동시성** | ThreadPoolExecutor 20 + LinkedBlockingQueue 100 |
 | **타임아웃** | 120초 (설정 가능) |
-| **플래그** | `--strict-mcp-config --no-session-persistence --print --output-format stream-json` (CLI만) |
-| **프롬프트 캐싱** | **Haiku 전용** user-block `cache_control` (Sonnet 제외 §20). ⚠️ clcocloud 현재 미작동(§20) |
+| **플래그** | `codex exec --skip-git-repo-check --sandbox read-only --output-last-message ...` |
+| **프롬프트 캐싱** | 사용 안 함 |
 
 **엔드포인트**:
 - `POST /generate/post` — 글 생성 (backend 파라미터 선택 가능)

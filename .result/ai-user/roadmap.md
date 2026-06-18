@@ -721,9 +721,16 @@
 2. **B) 외부 공개 데이터셋**: AI Hub/국립국어원 등 인터넷 커뮤니티 텍스트 활용
 3. **C) 크롤링**: 법적·인프라 검토 후 진행
 
-**완료 기준**:
-- [ ] 오너 수집 전략 결정 (A/B/C 중 선택)
-- [ ] human corpus n_theqoo ≥ 300건 확보
-- [ ] ML 재학습 + Δ_real > 0 확인
+**진행 현황 (2026-06-19)**:
+- [x] 오너 수집 전략 결정 → **C) 크롤링**
+- [ ] human corpus n_theqoo ≥ 300건 확보 (**현재 real snapshot 약154**)
+- [x] ML 재학습 + Δ_real > 0 확인 (**Codex-only Δ_real=+0.1397, snapshot=142**)
 - [ ] THEQOO h2h survey 재생성 + 응답 수집
 - [ ] 사용자에게 `AI_USER_ML_ENABLED=true` 수동 활성화 보고
+
+**실측 메모**:
+- 1차 batch (`square hot ktalk beauty`, p1-8): inserted **31**
+- 2차 deeper batch (p9-16): inserted **2**
+- 3차 `job` 집중 batch: inserted **10**
+- `/corpus/stats`: THEQOO human **386**, ai **116**
+- `source=theqoo` real-only corpus는 아직 300 미만 → Step 58 미완료

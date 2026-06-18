@@ -8,28 +8,28 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-public class ClaudeCliHealthIndicator implements HealthIndicator {
+public class CodexCliHealthIndicator implements HealthIndicator {
 
-    @Value("${llm.worker.claude-binary-path:claude}")
-    private String claudeBinaryPath;
+    @Value("${llm.worker.codex-binary-path:codex}")
+    private String codexBinaryPath;
 
     @Override
     public Health health() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(claudeBinaryPath, "--version");
+            ProcessBuilder pb = new ProcessBuilder(codexBinaryPath, "--version");
             pb.redirectErrorStream(true);
             Process p = pb.start();
             String output = new String(p.getInputStream().readAllBytes()).trim();
             int exitCode = p.waitFor();
 
             if (exitCode == 0) {
-                return Health.up().withDetail("claude-version", output).build();
+                return Health.up().withDetail("codex-version", output).build();
             } else {
-                log.warn("claude --version exited with code {}: {}", exitCode, output);
+                log.warn("codex --version exited with code {}: {}", exitCode, output);
                 return Health.down().withDetail("exitCode", exitCode).withDetail("output", output).build();
             }
         } catch (Exception e) {
-            log.error("Claude CLI health check failed: {}", e.getMessage());
+            log.error("Codex CLI health check failed: {}", e.getMessage());
             return Health.down().withException(e).build();
         }
     }

@@ -2,7 +2,7 @@ package com.againspring.aiuser.llm.pool;
 
 import com.againspring.aiuser.llm.dto.WorkerMetrics;
 import com.againspring.aiuser.llm.exception.*;
-import com.againspring.aiuser.llm.service.ClaudeCliInvoker;
+import com.againspring.aiuser.llm.service.CodexCliInvoker;
 import com.againspring.aiuser.llm.service.InvokerRouter;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -40,10 +40,10 @@ public class LlmWorkerPool {
     @Value("${llm.worker.default-timeout-ms:120000}")
     private long defaultTimeoutMs;
 
-    @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}")
+    @Value("${llm.worker.codex-model:gpt-5.4}")
     private String defaultModel;
 
-    private final ClaudeCliInvoker invoker;
+    private final CodexCliInvoker invoker;
     private final InvokerRouter invokerRouter;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4,
             r -> { Thread t = new Thread(r, "llm-pool-scheduler"); t.setDaemon(true); return t; });
@@ -56,7 +56,7 @@ public class LlmWorkerPool {
     private final AtomicLong rejectedCount = new AtomicLong(0);
     private final AtomicLong throttledCount = new AtomicLong(0);
 
-    public LlmWorkerPool(ClaudeCliInvoker invoker, InvokerRouter invokerRouter) {
+    public LlmWorkerPool(CodexCliInvoker invoker, InvokerRouter invokerRouter) {
         this.invoker = invoker;
         this.invokerRouter = invokerRouter;
     }
