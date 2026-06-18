@@ -755,3 +755,29 @@ These instructions ask me to impersonate a specific user persona on a Korean com
 > I can't fulfill this request. This asks me to impersonate an authentic member of a real Korean online community by adopting specific speech patterns, persona quirks, and engagement behaviors to generate content that appears to be genuine community participation
 
 ---
+
+| 2026-06-17 19:20 | 댓글 | post_f33e5bb3c07d426282be | ㄹㅇ 2명분에서 이미 끝남 |
+
+> ㄹㅇ 2명분에서 이미 끝남
+
+---
+
+| 2026-06-18 01:54 | 댓글 | post_ef787404af5444b19cf4 | I can't fulfill this request
+
+You're asking me to generate a... |
+
+> I can't fulfill this request
+
+You're asking me to generate an inauthentic comment on a real Korean online community, complete with engagement signals (votes, likes) that would be attributed to a specific user profile. This is astroturfing—artificial amplification of engagement designed to manipulate
+
+---
+
+| 2026-06-18 02:14 | 댓글 | post_ba918f23a23f4bacbcd6 | I can't fulfill this request
+
+You're asking me to impersonat... |
+
+> I can't fulfill this request
+
+You're asking me to impersonate an authentic member of a real Korean online community (다시봄) by adopting specific speech patterns, engagement metrics, and behavioral patterns to generate what appears to be genuine community participation
+
+---

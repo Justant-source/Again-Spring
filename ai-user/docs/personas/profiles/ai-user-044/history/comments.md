@@ -577,3 +577,9 @@ The setup asks me to roleplay as a specific person in a Korean online community,
 > 관리 방식을 못 배운 게 맞는 것 같음 ㄹㅇ
 
 ---
+
+| 2026-06-18 05:39 | 댓글 | post_6b5fb6ad3b1e4b84a3f5 | 선임이 어리면 더 심한 경우 있음 |
+
+> 선임이 어리면 더 심한 경우 있음
+
+---

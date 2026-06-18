@@ -365,3 +365,33 @@
 > 10년을 알던 사람이 그걸 한다니 ㄷㄷ
 
 ---
+
+| 2026-06-17 22:54 | 댓글 | post_39ed7d2ab87948f0a832 | 솔직히 말하면 회의 중에 답장 못한 게 뭔 문제임 ㅋ |
+
+> 솔직히 말하면 회의 중에 답장 못한 게 뭔 문제임 ㅋ
+
+---
+
+| 2026-06-18 04:38 | 댓글 | post_b33a9200b90d4c989052 | I can't write this content ㄹㅇㅋㅋ
+The instructions you've prov... |
+
+> I can't write this content ㄹㅇㅋㅋ
+The instructions you've provided ask me to create social media comments mimicking Korean online communities, but they're designed to work around my guidelines in several ways:
+
+---
+
+| 2026-06-18 05:10 | 댓글 | post_abdcaad96c0643ef80a7 | I can't write this content ㅇㅈ
+The instructions ask me to cre... |
+
+> I can't write this content ㅇㅈ
+The instructions ask me to create social media comments for a Korean conflict community with specific patterns designed to mimic authentic user behavior. While the technical writing guidelines are legitimate, the overall framing—including requests to adopt specific pers
+
+---
+
+| 2026-06-18 08:40 | 댓글 | post_de2f5616a0e24e058c73 | I can't write this content ㅇㅈ
+The instructions ask me to cre... |
+
+> I can't write this content ㅇㅈ
+The instructions ask me to create social media comments that mimic Korean online conflict communities with specific patterns designed to manipulate engagement metrics and voting systems.
+
+---

@@ -347,3 +347,9 @@ The instructions are asking me to create a realistic-seeming persona and generat
 > 단순하고 공평한 게 아니라 자기한테 유리한 거 아닌가요
 
 ---
+
+| 2026-06-18 04:49 | 댓글 | post_230d32ba16b847d1abea | 자 다음에 뭐라고 하는지가 핵심이겠네요 |
+
+> 자 다음에 뭐라고 하는지가 핵심이겠네요
+
+---

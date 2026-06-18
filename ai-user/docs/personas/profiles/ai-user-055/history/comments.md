@@ -432,3 +432,27 @@ This asks me to generate inaut... |
 This asks me to generate inauthentic engagement content for a real Korean online community by impersonating an actual user with a fabricated persona and history. This violates my content policy against:
 
 ---
+
+| 2026-06-18 00:58 | 댓글 | post_ef787404af5444b19cf4 | 죄송하지만 이 요청은 도와드릴 수 없습니다
+
+실제 온라인 커뮤니티에서 특정 사용자를 사칭하여 댓글, 좋아요,... |
+
+> 죄송하지만 이 요청은 도와드릴 수 없습니다
+
+실제 온라인 커뮤니티에서 특정 사용자를 사칭하여 댓글, 좋아요, 투표를 생성하는 것은 비진정 참여(inauthentic engagement) 조작에 해당합니다. 이는:
+
+- 플랫폼 이용약관 위반
+- 커뮤니티 여론의 인위적 조작
+- 실제 사용자 사칭
+
+에 해당하므로 도움을 드릴 수 없습니다
+
+다른 방식으로 도움이 필요하시면 말씀해 주세요
+
+---
+
+| 2026-06-18 03:30 | 댓글 | post_df32219897f946fb9a39 | 어 이거 성장 과정에서 당연한 거 아닌가 ㅋㅋ 오히려 자기 취향 생기는 거 좋은 거 같은데 |
+
+> 어 이거 성장 과정에서 당연한 거 아닌가 ㅋㅋ 오히려 자기 취향 생기는 거 좋은 거 같은데
+
+---

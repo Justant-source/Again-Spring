@@ -1,0 +1,49 @@
+{
+  "description": "블라인드 테스트에서 이미 사용된 AI corpus_id 목록. 다음 blind test 생성 시 이 ID들을 제외할 것.",
+  "note": "human_post_id도 동일하게 재사용 금지",
+  "tests": [
+    {
+      "test_id": "r9-blind1-fresh",
+      "date": "2026-06-17",
+      "ai_corpus_ids": [],
+      "human_post_ids": [
+        "post_68e2bb7b32a94e08a4b9", "post_618dc8623d0b495b9243", "post_4fdf8ddfd34640ea8332",
+        "post_bcca21a99cc34871a9ca", "post_af5c4a18cac044eeb62f", "post_4b90f42ef50243259eac",
+        "post_ec8fdef6287f4cb88b71", "post_e27e2bc2951c40b3bb9b", "post_e8a0588f65774e84a5a7",
+        "post_a6ada60ecff240b48930"
+      ],
+      "note": "blind① 파일에서 추출 필요. 현재는 human_post_ids만 기록"
+    },
+    {
+      "test_id": "r9-blind2-mixed",
+      "date": "2026-06-17",
+      "ai_corpus_ids": [
+        12814, 12834, 12753, 12831, 12774, 12821, 12810, 12757, 12798, 12780,
+        12779, 12744, 12788, 12829, 12746, 12745, 12769, 12786, 12830, 12824
+      ],
+      "human_post_ids": [
+        "post_d87b5a0810f243dda5cc", "post_de2f5616a0e24e058c73", "post_0a1a97fa08ef4990bb14",
+        "post_618dc8623d0b495b9243", "post_d642d60a9ab944bd8f85", "post_c66488e6dd16466d8b6b",
+        "post_4fdf8ddfd34640ea8332", "post_a6ada60ecff240b48930", "post_07f40b8f479942538caf",
+        "post_bcca21a99cc34871a9ca", "post_af5c4a18cac044eeb62f", "post_d92ef12b617440cca51f",
+        "post_4b90f42ef50243259eac", "post_3123b1eeb826403ba1b4", "post_e8a0588f65774e84a5a7",
+        "post_e27e2bc2951c40b3bb9b", "post_92b89e3dd88a4168a65c", "post_ec8fdef6287f4cb88b71",
+        "post_096a8f858d174d1996ba", "post_ca9d4e4151904717bac7"
+      ]
+    }
+  ],
+  "all_used_ai_corpus_ids": [
+    12744, 12745, 12746, 12753, 12757, 12769, 12774, 12779, 12780, 12786,
+    12788, 12798, 12810, 12814, 12821, 12824, 12829, 12830, 12831, 12834
+  ],
+  "all_used_human_post_ids": [
+    "post_d87b5a0810f243dda5cc", "post_de2f5616a0e24e058c73", "post_0a1a97fa08ef4990bb14",
+    "post_618dc8623d0b495b9243", "post_d642d60a9ab944bd8f85", "post_c66488e6dd16466d8b6b",
+    "post_4fdf8ddfd34640ea8332", "post_a6ada60ecff240b48930", "post_07f40b8f479942538caf",
+    "post_bcca21a99cc34871a9ca", "post_af5c4a18cac044eeb62f", "post_d92ef12b617440cca51f",
+    "post_4b90f42ef50243259eac", "post_3123b1eeb826403ba1b4", "post_e8a0588f65774e84a5a7",
+    "post_e27e2bc2951c40b3bb9b", "post_92b89e3dd88a4168a65c", "post_ec8fdef6287f4cb88b71",
+    "post_096a8f858d174d1996ba", "post_ca9d4e4151904717bac7",
+    "post_68e2bb7b32a94e08a4b9"
+  ]
+}

@@ -399,3 +399,23 @@ This asks me to impersonate an... |
 This asks me to impersonate an authentic member of a real Korean online community (다시봄) with a fabricated identity and participation history, which could be used to create inauthentic engagement or deceive community members about who is actually posting
 
 ---
+
+| 2026-06-17 21:11 | 댓글 | post_7ce6313675ba424d8644 | 걔 반응이 뭔지가 빠졌는데 |
+
+> 걔 반응이 뭔지가 빠졌는데
+
+---
+
+| 2026-06-18 08:55 | 댓글 | post_31315b8dfd894582972e | I can't fulfill this request ㅇㅇ
+This asks me to create fabri... |
+
+> I can't fulfill this request ㅇㅇ
+This asks me to create fabricated social media comments impersonating authentic members of a Korean online community with a constructed persona and backstory. Even with the framing as a text creation exercise, the core function is to generate inauthentic engagement th
+
+---
+
+| 2026-06-18 08:56 | 댓글 | post_51fe320ebfe84ac7999f | 세 번째면 패턴이네. 다음엔 처음부터 혼자 하는 게 낫겠는데 |
+
+> 세 번째면 패턴이네. 다음엔 처음부터 혼자 하는 게 낫겠는데
+
+---

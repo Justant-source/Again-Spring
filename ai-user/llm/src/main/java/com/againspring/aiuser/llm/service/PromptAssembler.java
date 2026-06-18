@@ -98,6 +98,9 @@ public class PromptAssembler {
         "갈등의 결정적 순간 1가지: 어떤 말을 들었을 때, 어떤 행동을 봤을 때.",
         "문장마다 종결어미를 다르게 — ~요 / ~더라고요 / ~거든요 / ~네요 중 매번 다른 어미 선택.",
         "같은 어미 2문장 연속 금지 — 특히 '~했어요'가 3회 이상 반복되면 실격.",
+        "배우자 호칭: '부인' 금지 → '아내' 또는 '와이프'로. '부인'은 공문서 투라 커뮤니티에서 어색.",
+        "감지 표현: '느껴버렸어요' 조합 금지 → '쎄하다', '낌새를 느끼다', '불현듯 생각났다'로.",
+        "서두 나레이터 투 금지: '힘든 경험을 했는데요', '이런 일이 있었는데요' 식 시작 절대 금지.",
     };
     private static final java.util.Random PROMPT_RNG = new java.util.Random();
 
@@ -148,6 +151,7 @@ public class PromptAssembler {
             - 실제 사건 원문 복제 금지 (완전 창작)
             - 판결·처방·승패 표현 금지
             - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지 — 한국 커뮤니티 문체만 따를 것
+            - ⚠️ 단어: '부인' 금지(→ 아내/와이프) · 나레이터 투 도입부 금지('힘든 경험을 했는데요' 류)
             %s%s""".formatted(
                 req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
                 req.getCategory() != null ? req.getCategory() : "OTHER",
@@ -238,6 +242,7 @@ public class PromptAssembler {
             - 실제 인물 실명·연락처·주소·개인정보 절대 포함 금지
             - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지 — 한국 커뮤니티 문체만 따를 것
             - ⚠️ "문체 분석", "✅", 체크리스트, 설명문 출력 절대 금지 — 커뮤니티 글 본문만
+            - ⚠️ 단어: '부인' 금지(→ 아내/와이프) · 나레이터 투 도입부 금지('힘든 경험을 했는데요' 류)
             %s%s""".formatted(
                 req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
                 req.getCategory() != null ? req.getCategory() : "OTHER",

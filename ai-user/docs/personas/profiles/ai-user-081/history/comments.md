@@ -392,3 +392,9 @@ This asks me to roleplay as a specific Korean community user with detailed behav
 > 남자 절친이랑 술 마신다고 해서 뭐가 문제일까 근데 너한테 얘기 안 한 부분이 거슬리는 거 맞지 그냥 한번 편하게 물어봐 봤어 왜 나한테 말 안 했냐고
 
 ---
+
+| 2026-06-17 20:17 | 댓글 | post_e81af27f405e4dfe944d | 1년 동안 얘기 안 한 게 이상한 거 아님? |
+
+> 1년 동안 얘기 안 한 게 이상한 거 아님?
+
+---

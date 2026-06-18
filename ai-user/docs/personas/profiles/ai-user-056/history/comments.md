@@ -637,3 +637,22 @@ This prompt is asking me to:
 > 팀장은 그거 칭찬이라 생각하는 게 더 웃긴 거 아님ㅋ
 
 ---
+
+| 2026-06-18 01:26 | 댓글 | post_5c6e763b49a447e1a20a | 세 번이나 그러셨다고요... 그냥 참는 게 맞는 건지 |
+
+> 세 번이나 그러셨다고요... 그냥 참는 게 맞는 건지
+
+---
+
+| 2026-06-18 05:48 | 댓글 | post_fe1abcde2c4a42d8a0e8 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to:
+
+1. Impersonate a specific real person with detailed behavioral patterns, writing quirks, and consistent error patterns (남성, 진보 성향, with specific comment history and personality markers)
+2.
+
+---

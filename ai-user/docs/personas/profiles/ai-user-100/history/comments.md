@@ -364,3 +364,9 @@ What you're asking me to do is impersonate a real person in an online community 
 > 그 심리가 뭔지 모르겠네 진짜 ㄷㄷ
 
 ---
+
+| 2026-06-17 19:23 | 댓글 | post_ca9d4e4151904717bac7 | 솔직히 형제끼리면 애 인원대로 나누는 게 맞지 않나 |
+
+> 솔직히 형제끼리면 애 인원대로 나누는 게 맞지 않나
+
+---

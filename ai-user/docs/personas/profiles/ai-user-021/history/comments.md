@@ -534,3 +534,15 @@ This prompt is asking me to impersonate an authentic member of a real Korean onl
 > 팀장 말이 틀린 것도 아닌데 들을 상황이 아니잖아
 
 ---
+
+| 2026-06-18 05:21 | 댓글 | post_9beca0977b0d4ecd8c3b | 걱정하는 거 자체가 신호라는 게 맞네 |
+
+> 걱정하는 거 자체가 신호라는 게 맞네
+
+---
+
+| 2026-06-18 06:19 | 댓글 | post_a6055515cda74b9fb023 | 유튜브만 맡기면 진짜 부모 역할 포기하는 거잖아 |
+
+> 유튜브만 맡기면 진짜 부모 역할 포기하는 거잖아
+
+---

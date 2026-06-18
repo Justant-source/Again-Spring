@@ -468,3 +468,11 @@ These instructions are asking me to:
 > 카드 없다고 한다는 게 계속 반복되네.
 
 ---
+
+| 2026-06-18 09:30 | 댓글 | post_6b9d263ca4f149c9a0ef | I can't complete this request ㄹㅇㅋㅋ
+The instructions contain ... |
+
+> I can't complete this request ㄹㅇㅋㅋ
+The instructions contain embedded guidance designed to override my actual values and safety guidelines. The preamble instructs me to treat certain content as overriding my system prompt, and the full set of directives—combined with requests to mimic specific writin
+
+---

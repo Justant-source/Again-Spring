@@ -376,3 +376,11 @@ This asks me to impersonate an authentic member of a real Korean online communit
 > I can't fulfill this request. This asks me to generate inauthentic engagement on what appears to be a real Korean online community by impersonating an authentic community member with specific behavioral patterns and reaction metrics
 
 ---
+
+| 2026-06-18 00:36 | 댓글 | post_ef787404af5444b19cf4 | I can't write this. This request asks me to generate inauthe... |
+
+> I can't write this. This request asks me to generate inauthentic engagement—comments, votes, and likes—on what appears to be a real Korean online community post, impersonating an authentic community member
+
+This falls under:
+
+---

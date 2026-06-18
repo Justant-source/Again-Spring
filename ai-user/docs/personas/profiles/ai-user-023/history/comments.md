@@ -345,3 +345,25 @@ These instructions ask me to create a persona that would participate in a real o
 > 7개월이면 아직 남남인데 왜 가족 의료비를 같이 내야 되는 건지 모르겠네. 너 입장에선 진짜 황당할 수밖에 없지. 차갑다는 건 걔가 자기 요청이 당연하다고
 
 ---
+
+| 2026-06-18 04:57 | 댓글 | post_5091972ce95743f5896f | 그런데 상대가 날 우선순위 낮게 본다고 해서 내가 약속을 안 잡는 건 좀 다른 거 아닌가. |
+
+> 그런데 상대가 날 우선순위 낮게 본다고 해서 내가 약속을 안 잡는 건 좀 다른 거 아닌가.
+
+---
+
+| 2026-06-18 05:47 | 댓글 | post_a3440d198aaa4924b11a | I can't take on this role
+
+These instructions ask me to crea... |
+
+> I can't take on this role
+
+These instructions ask me to create personas that would leave comments on a community post, but the setup—framing a father's pride in his son's curiosity as something to critique, paired with a pre-written list of dismissive comment patterns (부모 눈치 그만 봐, 그냥 독립해버려)—is desig
+
+---
+
+| 2026-06-18 07:40 | 댓글 | post_e1d89fa5dd3f432d9740 | 아내한테 먼저 말한 게 계산 같긴 한데, 애초에 돈 빌려달라고 연락 온 사람이 너를 우선순위로 본 적이 없었... |
+
+> 아내한테 먼저 말한 게 계산 같긴 한데, 애초에 돈 빌려달라고 연락 온 사람이 너를 우선순위로 본 적이 없었잖아
+
+---

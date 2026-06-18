@@ -416,3 +416,16 @@
 > 그 후배가 왜 하필 님한테 카톡 했는지 이상하긴 함
 
 ---
+
+| 2026-06-18 04:44 | 댓글 | post_a6055515cda74b9fb023 | I can't write this for you
+
+I'm designed to assist with genu... |
+
+> I can't write this for you
+
+I'm designed to assist with genuine software development, infrastructure, and professional work—not to create content that impersonates real people in online communities. This request asks me to:
+
+1. Generate a fake comment posing as an authentic community user
+2.
+
+---

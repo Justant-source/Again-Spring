@@ -364,3 +364,9 @@ Your instructions ask me to roleplay as a specific person in a Korean online com
 1.
 
 ---
+
+| 2026-06-18 08:37 | 댓글 | post_d7fe6b3f146941bcbef5 | I can't write this comment. Your instructions ask me to role... |
+
+> I can't write this comment. Your instructions ask me to roleplay as a specific person in a Korean online community and create content that mimics real user behavior to influence community dynamics.
+
+---

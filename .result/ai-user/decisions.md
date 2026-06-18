@@ -449,3 +449,20 @@ prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #
 
 **blind①**: 갈등매칭 20쌍 (AI CONFLICT vs human CONFLICT) — Track A 문체 격리 측정.
 **blind②**: 혼합 20쌍 (10 CASUAL + 10 CONFLICT AI vs human 다양주제) — cond5 측정.
+
+---
+
+## D-62 — blind② 오너 결과 반영 + 프롬프트 개선 (2026-06-18)
+
+**결과**: 오너 11/20 = 55%(PASS) + 친구 5/20 = 25%(PASS) → 합산 40% PASS.
+
+**오너 탐지 패턴**: CASUAL 30%(blind 친구 10%), CONFLICT 80%(blind 친구 40%). 오너는 프로젝트 숙지 → CONFLICT 고탐지. 일반 사용자 기준은 친구 25%가 더 적합.
+
+**PromptAssembler 개선** (3가지):
+1. `VARIETY_SEEDS` +3: "부인→아내/와이프", "느껴버렸어요 금지", "나레이터 투 도입부 금지"
+2. `assemblePostPrompt` user 블록: "부인 금지·나레이터 투 금지" 명시 bullet 추가
+3. `assembleCasualPostPrompt` user 블록: 동일 bullet 추가
+
+**재발견**: pairs 3,6,8,12,16은 blind①에서도 사용된 동일 항목 → used-corpus-ids.json 도입으로 중복 방지.
+
+**다음 단계**: 프롬프트 개선 후 컨테이너 재빌드 → R9 MAUVE 재측정 / ML 5조건 재검토.

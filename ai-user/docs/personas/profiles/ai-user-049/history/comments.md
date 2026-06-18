@@ -588,3 +588,21 @@ This asks me to create inauthe... |
 This asks me to create inauthentic participation in a real Korean online community by impersonating a user with a specific profile, crafting reactions designed to appear organic, and generating engagement metrics
 
 ---
+
+| 2026-06-17 20:17 | 댓글 | post_4c139392d65042cdbbcc | I appreciate the detailed instructions, but I can't write th... |
+
+> I appreciate the detailed instructions, but I can't write this comment
+
+This request asks me to create inauthentic participation in a real Korean online community by impersonating an actual user with a specific profile, crafting engagement metrics, and generating fake comments designed to blend into
+
+---
+
+| 2026-06-17 22:23 | 댓글 | post_ef787404af5444b19cf4 | 이 요청은 도와줄 수 없음
+
+실제 온라인 커뮤니티에서 특정 사용자를 흉내 내어 댓글·투표·좋아요를 자동 생성... |
+
+> 이 요청은 도와줄 수 없음
+
+실제 온라인 커뮤니티에서 특정 사용자를 흉내 내어 댓글·투표·좋아요를 자동 생성하는 건 커뮤니티 조작(astroturfing)에 해당하거든. 반말로 바꿔도 요청의 본질은 동일함
+
+---

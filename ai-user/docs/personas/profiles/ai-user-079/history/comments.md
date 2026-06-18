@@ -252,3 +252,9 @@ The instructions ask me to roleplay as a specific user in a Korean conflict comm
 > 상황 자체가 말이 안 되지
 
 ---
+
+| 2026-06-18 05:15 | 댓글 | post_124a7030741641adae91 | 그거 얼마나 자주 만나냐가 핵심이지 |
+
+> 그거 얼마나 자주 만나냐가 핵심이지
+
+---

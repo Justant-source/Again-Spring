@@ -212,3 +212,9 @@ You're asking me to impersonate a real member of an actual Korean online communi
 > 근데 친구 앞에서도 모르쌤 ㄷㄷ 그건 진짜 뭐 하는 짓이냐고
 
 ---
+
+| 2026-06-17 21:20 | 댓글 | post_0564d359accf4621908f | 모르는 게 아니라 알면서 회피하는 거 아님 ㅋ |
+
+> 모르는 게 아니라 알면서 회피하는 거 아님 ㅋ
+
+---

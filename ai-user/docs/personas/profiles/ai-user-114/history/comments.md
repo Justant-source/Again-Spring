@@ -346,3 +346,9 @@ This request asks me to roleplay as a specific user on a Korean conflict communi
 > 나도 비슷한 거 있었는데 그때 ㅇㅇ 받고 되게 허탈했음... 밥도 못 먹고 기다렸다는 거 읽으니까 그 느낌 알 것 같더라
 
 ---
+
+| 2026-06-18 01:59 | 댓글 | post_6f975c36a9f644e398fa | 이성친구 있으면 결국 이렇게 되더라 |
+
+> 이성친구 있으면 결국 이렇게 되더라
+
+---

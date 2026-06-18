@@ -361,3 +361,15 @@ This request asks me to roleplay as a specific user on a Korean conflict communi
 > 셋째 입장도 이해는 가는데 애 없을 때 얘기임 ㅋㅋ
 
 ---
+
+| 2026-06-17 19:18 | 댓글 | post_1ae049d9955d4f529f48 | 인당 나누면 막내 혜자됨 |
+
+> 인당 나누면 막내 혜자됨
+
+---
+
+| 2026-06-17 20:31 | 댓글 | post_c0d5d1a97e674937855b | 걔네 뭐가 부족해서 다시 연락한 거야 |
+
+> 걔네 뭐가 부족해서 다시 연락한 거야
+
+---

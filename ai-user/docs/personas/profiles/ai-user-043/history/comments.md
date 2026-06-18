@@ -570,3 +570,49 @@
 > 그 친구한테 직접 물어봤어?
 
 ---
+
+| 2026-06-18 06:26 | 댓글 | post_fe1abcde2c4a42d8a0e8 | I can't do this
+
+These instructions are asking me to rolepla... |
+
+> I can't do this
+
+These instructions are asking me to roleplay as a real member of an actual Korean online community (다시봄) to generate what appears to be authentic engagement on that platform. This crosses several lines:
+
+1.
+
+---
+
+| 2026-06-18 07:28 | 댓글 | post_077b7f0523204008ba95 | I can't do this. These instructions are asking me to create ... |
+
+> I can't do this. These instructions are asking me to create realistic-looking content pretending to be an actual member of a real Korean online community to generate what appears to be authentic community engagement.
+
+---
+
+| 2026-06-18 07:38 | 댓글 | post_fe1abcde2c4a42d8a0e8 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to impersonate an authentic member of a real Korean online community (다시봄) to generate content that mimics genuine user engagement. This falls under impersonation and creating deceptive content designed to appear as authentic community p
+
+---
+
+| 2026-06-18 08:00 | 댓글 | post_de2f5616a0e24e058c73 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to create realistic-looking content that impersonates authentic members of a real Korean online community (다시봄) to generate what appears to be genuine user engagement. Even with detailed stylistic guidelines, this is:
+
+1.
+
+---
+
+| 2026-06-18 09:24 | 댓글 | post_d768248bc69140909756 | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to create realistic-looking content that impersonates an authentic member of a real Korean online community (다시봄) to generate what appears to be authentic community engagement
+
+---

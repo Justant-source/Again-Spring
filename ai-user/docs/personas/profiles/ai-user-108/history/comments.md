@@ -204,3 +204,9 @@ These instructions are asking me to roleplay as a specific Korean user with part
 > 근데 벌이 차이 있다는 거 알면서 카드는 왜 빌려줬어요
 
 ---
+
+| 2026-06-18 03:33 | 댓글 | post_e23e2f38be024dff8409 | 그 선임도 같이 나눠먹었어요 아니면 끝까지 자기들끼리만요? |
+
+> 그 선임도 같이 나눠먹었어요 아니면 끝까지 자기들끼리만요?
+
+---

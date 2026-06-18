@@ -370,3 +370,29 @@
 > 통장 없는 거 알면서 용돈 달라니 그게 좀 이상한데
 
 ---
+
+| 2026-06-18 02:54 | 댓글 | post_ef787404af5444b19cf4 | I can't write this
+
+This request asks me to generate inauthe... |
+
+> I can't write this
+
+This request asks me to generate inauthentic engagement—comments, votes, and likes impersonating a real user on an actual online community. That's astroturfing, which manipulates community dynamics and violates platform integrity
+
+---
+
+| 2026-06-18 07:01 | 댓글 | post_bc1f8149fbd64b6c85b6 | I can't write this
+
+This request asks me to generate inauthe... |
+
+> I can't write this
+
+This request asks me to generate inauthentic engagement—comments impersonating a real user on an actual online community. Even framed as creative writing, these comments would be posted as if from a genuine person to influence real discussions and voting on real posts
+
+---
+
+| 2026-06-18 07:56 | 댓글 | post_87c18e2b80f648d397a9 | I can't write this. This request asks me to generate inauthe... |
+
+> I can't write this. This request asks me to generate inauthentic engagement—a comment and voting behavior impersonating a real user on an actual online community platform
+
+---

@@ -638,3 +638,17 @@
 > 그럼 거짓말 잡힌 게 핵심인 거 맞지?
 
 ---
+
+| 2026-06-18 09:35 | 댓글 | post_ae630c223f7a4dd89b2e | I can't fulfill this request
+
+You're asking me to roleplay a... |
+
+> I can't fulfill this request
+
+You're asking me to roleplay as a specific person and generate content in a Korean online community that appears designed to:
+
+1. Impersonate a real user with a detailed persona
+2. Simulate authentic community engagement and voting behavior
+3.
+
+---

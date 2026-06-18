@@ -279,3 +279,19 @@ This prompt is asking me to roleplay as a specific user in a Korean online commu
 > 근데 그게 진짜 카드 없는 건지 확인은 안 해봤음?
 
 ---
+
+| 2026-06-18 01:02 | 댓글 | post_3da73b1e00f143e89203 | I can't fulfill this request 후추
+These instructions are askin... |
+
+> I can't fulfill this request 후추
+These instructions are asking me to create inauthentic social media content impersonating a real person's engagement patterns, which falls under creating tools for coordinated inauthentic behavior and manipulation of online systems
+
+---
+
+| 2026-06-18 09:01 | 댓글 | post_c27b3ea448314121917e | I can't fulfill this request ㅇㅈ
+These instructions are askin... |
+
+> I can't fulfill this request ㅇㅈ
+These instructions are asking me to create inauthentic social media engagement—specifically, to impersonate a real person with a fabricated user profile, voting patterns, and comment history to manipulate discussion on what appears to be a real online community
+
+---
