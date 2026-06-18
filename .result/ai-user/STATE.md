@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-18 세션 27 (R12 — NATEPAN 재학습(AUC=0.9989) + cond4 재측정: NATEPAN Δ=-0.0001 FAIL(개선중), MAUVE 포화 전역 발생, **go/no-go = NO GO**)
+**최종 갱신**: 2026-06-18 세션 27 (R13 — Phase 1·2·3 병렬 실행 중, D-68 선등록 완료)
 
 ---
 
@@ -16,11 +16,11 @@
 
 ## 현재 위치
 
-- **Phase**: R12 완료 — **go/no-go 판정 = NO GO** ❌
-- **5조건 차단 현황**: **cond4 FAIL** — NATEPAN Δ=-0.0001 (사실상 0, 음수, 전역 게이트 차단)
+- **Phase**: R13 진행 중 — cond4 재정의 + h2h 검증 (Phase 1 측정 중)
+- **5조건 차단 현황**: **cond4 재정의 진행 중** — 신 cond4(D-68): do-no-harm MAUVE AND h2h 비퇴행
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **차단 사유**: MAUVE 포화 전역 발생 — 전 커뮤니티 0.97+로 수렴, rerank/random 마진 소멸
-- **직전 측정**: R12 cond4 재측정 완료 (2026-06-18)
+- **차단 사유**: MAUVE 포화 전역 발생 → 신 임계치 도입 (D-68)
+- **직전 측정**: R12 cond4 재측정 완료 (2026-06-18) / R13 Phase 1 실행 중
 
 ---
 
@@ -182,6 +182,25 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 - **THEQOO**: HALT 유지 (P(human) 역전 미해결, D-52)
 
 ---
+
+---
+
+## [R13] 라운드 13 진행 중 — cond4 재정의 + h2h 검증 (2026-06-18~)
+
+### Phase 진행 현황
+
+| Phase | 내용 | 상태 |
+|---|---|---|
+| **P3 선등록** | D-68 cond4 재정의 선등록 (decisions.md + roadmap.md) | ✅ 완료 (7bb048f3) |
+| **P1 구현** | source_filter 구현 (WSL routes_eval.py + schemas.py) | ✅ 완료 |
+| **P1 측정** | THEQOO Δ_real (source_filter="theqoo", 진짜 111건) | ⏳ 실행 중 |
+| **P2 구현** | build_h2h_survey.py | ⏳ 실행 중 |
+| **P2 설문** | 커뮤니티별 h2h survey.md 생성 | ⏳ P2 구현 완료 후 |
+
+### D-68 선등록 임계 (측정 전 확정)
+- THEQOO Δ_real > 0 → cond4 A 충족 ✅ (Phase 2 h2h 진행)
+- THEQOO Δ_real ≤ 0 → 진짜코퍼스 없이 미검증 ❌ (Step 52-53 재개)
+- h2h 합격: 리랭커 탐지율 ≤ random 탐지율 (per-person)
 
 ---
 
