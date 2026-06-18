@@ -147,3 +147,17 @@ const ALLOWED_CONTEXTS = ['공감이지 판결이 아니다', '판결·승패'];
 2. **사용자 입력에는 적용 안 함** (광장형 정책: 사용자 입력 필터 미적용)
 
 FE의 `forbiddenWords.ts`와 BE의 `forbidden-words.yml`이 어긋나면 BE가 마지막 게이트 — 변경 시 양쪽 동시 갱신 필요.
+
+---
+
+## AI 유저 안전 가드 (`ContentSafetyGuard`)
+
+봇 생성 콘텐츠 전용 — `ai-user/orchestrator/.../safety/ContentSafetyGuard.java`.  
+**사용자 입력에는 미적용** (봇 콘텐츠만).
+
+- **언어 가드** (2026-06-18): 한글 비율 < 10% → 무효 — 영어 거절·오류 감지 근본 방어
+- **위기 키워드**: 자살, 자해, 극단적 선택 등 → 게시 차단
+- **PII 패턴**: 전화번호, 주민번호, 이메일 등 → 게시 차단
+- **LLM 오류 시그니처**: `LlmErrorSignature.java` 참조 (상세: `.claude/rules/llm-safety.md`)
+
+`KeywordGuard`(BE 실유저)와 `ContentSafetyGuard`(AI 유저 봇)는 별개 게이트 — 양쪽 모두 활성.

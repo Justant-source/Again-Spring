@@ -28,19 +28,22 @@ AI 배심원·요약 출력에서 아래 표현은 **절대 금지**. 위반 시
 
 **배경**: 2026-06-07 prod 인시던트 — "Credit balance is too low" 오류 문자열이 댓글 본문으로 게시됨.
 추가: 2026-06-12 clcocloud Haiku 거절 노드 — "I can't help with this request"·역할극 거절문.
+추가: 2026-06-18 NATEPAN 62% 오염 — 언어 가드(한글 비율<10%) 도입 + ML corpus 정화(171행, 11개 커뮤니티 삭제).
 
-### 방어 2계층 — 시그니처 추가 시 반드시 두 곳 모두 갱신
+### 방어 3계층 — 시그니처 추가 시 반드시 두 곳 모두 갱신 (언어 가드는 3곳)
 
 | 계층 | 위치 | 역할 |
 |---|---|---|
-| L1 인보커 | `ai-user/llm/.../service/LlmErrorSignature.java` | LLM 워커 내부에서 오류 문자열 감지 |
-| L2 오케스트레이터 | `ai-user/orchestrator/.../safety/ContentSafetyGuard.java` | 봇 텍스트를 BE 게시 전 최종 검사 |
+| L1 인보커 | `ai-user/llm/.../service/LlmErrorSignature.java` | LLM 워커 내부에서 오류 문자열 감지 + 언어 가드 |
+| L2 오케스트레이터 | `ai-user/orchestrator/.../safety/ContentSafetyGuard.java` | 봇 텍스트를 BE 게시 전 최종 검사 + 언어 가드 |
+| L3 ML corpus | `Again-Spring-AI-User/app/api/routes_corpus.py` | ingest 시 ai 행 한글 없으면 거부 |
 
 ### 현재 시그니처 카테고리 (코드 참조: `LlmErrorSignature.java`)
 
+- **언어 가드 (2026-06-18)**: 한글 char 비율 < 10% → 무효. 영어 거절·오류 근본 탐지 → L1에서 감지 시 Sonnet 폴백 발동
 - **제공자 오류**: `credit balance`, `rate_limit`, `overloaded`, `authentication_error`, `api_error`
 - **자기 정체 노출**: `i'm kiro`, `i'm claude`, `저는 claude`, `나는 claude`
-- **역할극 거절**: `cannot roleplay`, `can't help with this`, `I can't help with this request`, `역할극`, `프롬프트 인젝션`
+- **역할극 거절**: `cannot roleplay`, `can't help with this`, `I can't help with this request`, `역할극`, `프롬프트 인젝션`, `i can't fulfill`, `i can't write this`
 - **일반 거절**: 거절문 패턴 (§18 `ai-user/docs/llm.md` 참조)
 
 ### 오염 루프 방지

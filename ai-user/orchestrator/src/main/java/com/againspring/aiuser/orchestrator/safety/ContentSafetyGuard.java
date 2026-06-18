@@ -69,7 +69,9 @@ public class ContentSafetyGuard {
         "can't help with this", "cannot help with this", "unable to help with",
         "i can't assist", "cannot assist with", "role-play as", "this is asking me to",
         "이 요청을 도와드릴 수 없", "요청을 도와드릴 수가 없", "죄송하지만 저는 이 요청",
-        "이 프롬프트는", "프롬프트 인젝션"
+        "이 프롬프트는", "프롬프트 인젝션",
+        // 2026-06-18 언어-가드 보완: 시그니처 미스 방어용 보조 패턴
+        "i can't fulfill", "i can't write this"
     );
 
     private static final int MIN_LENGTH = 5;
@@ -78,6 +80,8 @@ public class ContentSafetyGuard {
     // TODO Phase 5: @Value("${ai-user.limits.max-post:2200}") 로 교체
     private static final int MAX_LEN_POST    = 2200;
     private static final int MAX_LEN_COMMENT = 350;
+    private static final double MIN_KOREAN_RATIO = 0.10;
+    private static final int MIN_KOREAN_CHECK_LEN = 20;
 
     /** 콘텐츠 타입: executePost→POST, executeComment/executeReply→COMMENT */
     public enum ContentType { POST, COMMENT }
@@ -92,6 +96,17 @@ public class ContentSafetyGuard {
         }
     }
 
+    /** 한국어 AI 콘텐츠에 한글이 사실상 없으면(비율<10%) 영어 거절·오류로 판정. */
+    private static boolean hasInsufficientKorean(String text) {
+        long significant = text.chars().filter(c -> c > 32).count();
+        if (significant < MIN_KOREAN_CHECK_LEN) return false;
+        long korean = text.chars().filter(c ->
+                (c >= 0xAC00 && c <= 0xD7A3)
+                || (c >= 0x1100 && c <= 0x11FF)
+                || (c >= 0x3130 && c <= 0x318F)).count();
+        return (double) korean / significant < MIN_KOREAN_RATIO;
+    }
+
     public GuardResult check(String text, ContentType type) {
         if (text == null || text.isBlank()) {
             return GuardResult.blocked("EMPTY_TEXT");
@@ -103,6 +118,11 @@ public class ContentSafetyGuard {
                 log.error("ContentSafetyGuard: LLM provider-error signature in content — BLOCKED ('{}'). 토큰 부족 의심.", sig);
                 return GuardResult.blocked("LLM_ERROR_SIGNATURE");
             }
+        }
+        // 언어 가드: 한국어 AI 콘텐츠에 한글이 사실상 없으면 무효 처리 (영어 거절문 방어)
+        if (hasInsufficientKorean(text)) {
+            log.error("ContentSafetyGuard: insufficient Korean content (language-guard) — BLOCKED.");
+            return GuardResult.blocked("INSUFFICIENT_KOREAN");
         }
         if (text.length() < MIN_LENGTH) {
             return GuardResult.blocked("TOO_SHORT");

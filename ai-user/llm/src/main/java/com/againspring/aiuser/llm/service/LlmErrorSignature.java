@@ -74,12 +74,30 @@ public final class LlmErrorSignature {
         "i'm an ai",
         "i am an ai",
         "as an ai",
-        "저는 ai"
+        "저는 ai",
+        // 2026-06-18 언어-가드 보완: 시그니처 미스 방어용 보조 패턴
+        "i can't fulfill",
+        "i can't write this"
     );
+
+    private static final double MIN_KOREAN_RATIO = 0.10;
+    private static final int MIN_KOREAN_CHECK_LEN = 20;
+
+    /** 한국어 AI 콘텐츠에 한글이 사실상 없으면(비율<10%) 영어 거절·오류로 판정. */
+    private static boolean hasInsufficientKorean(String text) {
+        long significant = text.chars().filter(c -> c > 32).count();
+        if (significant < MIN_KOREAN_CHECK_LEN) return false;
+        long korean = text.chars().filter(c ->
+                (c >= 0xAC00 && c <= 0xD7A3)
+                || (c >= 0x1100 && c <= 0x11FF)
+                || (c >= 0x3130 && c <= 0x318F)).count();
+        return (double) korean / significant < MIN_KOREAN_RATIO;
+    }
 
     /** 텍스트에 제공자 오류 시그니처가 포함되면 true. */
     public static boolean looksLikeProviderError(String text) {
         if (text == null || text.isBlank()) return false;
+        if (hasInsufficientKorean(text)) return true;
         String t = text.toLowerCase();
         for (String s : SIGNATURES) {
             if (t.contains(s)) return true;
