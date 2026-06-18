@@ -489,3 +489,24 @@ prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #
 - THEQOO: P(human) 역전 해소 전까지 HALT (D-52, R10 이연)
 
 **R7 M-after 현황**: CLIEN COMMENT 신선분 7건 (목표 50건 미달) → 댓글 생성 배치 진행 중.
+
+## D-64 — R10 계획: THEQOO cond4 P(human) 역전 해소 (2026-06-18)
+
+**배경**: cond4 5조건 중 THEQOO만 ❌. 원인=human corpus 스타일 불일치.
+- Human corpus(410건): AS 플랫폼 갈등 서사 스타일 (격식체, 다시봄 문체)
+- AI THEQOO corpus(100건): 실제 더쿠 스타일 (슬랭, 초성체, 여초 반말)
+- → 판별기가 "AI가 더 human-like"로 학습 = P(human) 역전
+
+**R10 목표**: THEQOO human corpus를 실제 더쿠/여초 스타일로 교체.
+
+**계획**:
+1. 현재 THEQOO human corpus 410건 분석 → 역전 원인 확인
+2. 실제 더쿠/여초 스타일 human 포스트 수집 (AS export or 직접 수집)
+3. 기존 THEQOO human corpus 교체 (AS-platform 스타일 → 실제 THEQOO 스타일)
+4. 재학습 → P(human) 방향 확인 → cond4 THEQOO ab-test 재실행
+
+**선결조건**:
+- 실제 THEQOO/더쿠 스타일 human 포스트 수집 (최소 300건)
+- THEQOO AI corpus(100건) 스타일 분석 (현재 스타일 파악)
+
+**예상 결과**: P(human) 방향 정상화 → cond4 THEQOO PASS → 5조건 전부 충족 → AI_USER_ML_ENABLED=true 수동 활성화 가능
