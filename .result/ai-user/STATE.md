@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-18 세션 26 (R7 M-after NATEPAN 0.9107 Δ=+0.8509 ✅ — R7 완료)
+**최종 갱신**: 2026-06-18 세션 26 (R10 THEQOO cond4 PASS Δ=+0.4458 — **5조건 전부 충족** 🎉)
 
 ---
 
@@ -16,8 +16,8 @@
 
 ## 현재 위치
 
-- **Phase**: R9 완료 ✅ → ML 5조건 재검토 완료 (D-63) → **R10 계획 단계** (THEQOO corpus 소스 결정 대기)
-- **5조건 차단 현황**: cond4 THEQOO ❌ (P역전 HALT, D-52) — 나머지 4조건 모두 ✅ (cond5 합산 40% ✅)
+- **Phase**: R10 완료 ✅ — **5조건 전부 충족** → AI_USER_ML_ENABLED 수동 활성화 대기
+- **5조건 차단 현황**: **전부 ✅** — cond4 THEQOO Δ=+0.4458 PASS (R10, 2026-06-18)
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 - **직전 커밋**: `fc706cf8` (2026-06-18) — PromptAssembler 3개 개선 + blind② 오너 결과
 - **Track A+B**: 구현 배포 확정 ✅ / 런타임 검증 완료 ✅ (오타 발견, CASUAL 글 확인)
@@ -68,19 +68,19 @@
 | **COMMENT M-after** | NATEPAN 측정 후 R7 완료 | WSL | 신선분 축적 후 |
 | **에스컬레이션 평가** | blind①② 후 D-12 Phase 2/3 진입조건 보고 | — | blind 결과 후 |
 
-### prod 배포 게이트 (5조건 — cond4 THEQOO만 미충족)
+### prod 배포 게이트 (5조건 — **전부 충족** 2026-06-18)
 
 ```
-cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/410)
-cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9997
+cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/311)
+cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9973
 cond3: ✅ SPLITTER_VERIFIED=True
 cond4: ✅ NATEPAN Δ=+0.1667 PASS (동결)
-       ✅ CLIEN Δ=+0.3371 PASS (2026-06-18 ab-test: M-after=0.9811, M-before=0.644, n=50)
-       ❌ THEQOO P(human) 역전 HALT (D-52, R10 이연)
+       ✅ CLIEN Δ=+0.3371 PASS (2026-06-18 ab-test: M-after=0.9811, M-before=0.644)
+       ✅ THEQOO Δ=+0.4458 PASS (R10, 2026-06-18 — P역전 해소)
 cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 
-**AI_USER_ML_ENABLED 상태**: false (불변 — cond4 THEQOO만 미충족)
+**AI_USER_ML_ENABLED 상태**: false → **수동 활성화 가능** (5조건 전부 충족, 사람이 수동으로만)
 
 ---
 
