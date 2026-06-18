@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-18 세션 27 (R11 cond4 재측정 — NATEPAN FAIL Δ=-0.2901, 전역 게이트 차단, **go/no-go = NO GO**)
+**최종 갱신**: 2026-06-18 세션 27 (R12 — NATEPAN 재학습(AUC=0.9989) + cond4 재측정: NATEPAN Δ=-0.0001 FAIL(개선중), MAUVE 포화 전역 발생, **go/no-go = NO GO**)
 
 ---
 
@@ -16,12 +16,11 @@
 
 ## 현재 위치
 
-- **Phase**: R11 완료 — **go/no-go 판정 = NO GO** ❌
-- **5조건 차단 현황**: **cond4 FAIL** — NATEPAN Δ=-0.2901 (전역 게이트, 분리 불가)
+- **Phase**: R12 완료 — **go/no-go 판정 = NO GO** ❌
+- **5조건 차단 현황**: **cond4 FAIL** — NATEPAN Δ=-0.0001 (사실상 0, 음수, 전역 게이트 차단)
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **차단 사유**: NATEPAN 재측정 결과 MAUVE 저하 (리랭커가 랜덤보다 나쁜 초안 선택), P(human) 역전
-- **R12 계획**: NATEPAN 판별기 재학습 필요 (기존 모델 포화, 훈련 데이터 정제/증강 검토)
-- **직전 측정**: R11 cond4 재측정 완료 (2026-06-18)
+- **차단 사유**: MAUVE 포화 전역 발생 — 전 커뮤니티 0.97+로 수렴, rerank/random 마진 소멸
+- **직전 측정**: R12 cond4 재측정 완료 (2026-06-18)
 
 ---
 
@@ -74,9 +73,9 @@
 cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/311)
 cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9973
 cond3: ✅ SPLITTER_VERIFIED=True
-cond4: ❌ NATEPAN Δ=-0.2901 FAIL (R11 재측정, P(human) 역전, 리랭커 성능 저하)
-       ✅ CLIEN Δ=+0.3371 PASS (2026-06-18 ab-test: M-after=0.9811, M-before=0.644)
-       ⚠️ THEQOO Δ=+0.0417 (R11 Phase1b, Haiku, 한계선, Sonnet 포화)
+cond4: ❌ NATEPAN Δ=-0.0001 FAIL (R12 재측정, 판별기 재학습 후, MAUVE 포화로 마진 소멸)
+       ⚠️ CLIEN Δ=+0.0134 (R12, MAUVE 포화로 R11 +0.3371에서 급락)
+       ⚠️ THEQOO Δ=+0.0186 (R12, 소폭 하락)
 cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 
@@ -183,6 +182,47 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 - **THEQOO**: HALT 유지 (P(human) 역전 미해결, D-52)
 
 ---
+
+---
+
+## [R12] 라운드 12 — NATEPAN 재학습 + cond4 재측정 (2026-06-18)
+
+### 재학습 결과
+- NATEPAN 판별기: AUC=**0.9989**, n_train=695 (n_human=469, n_ai=226) ✅
+- THEQOO: AUC=0.9972 (함께 갱신)
+- CLIEN: AUC=0.9975 (함께 갱신)
+
+### cond4 재측정 결과
+
+| 커뮤니티 | R11 delta | R12 delta | 판정 |
+|---|---|---|---|
+| NATEPAN | -0.2901 | **-0.0001** | ❌ FAIL (사실상 0, 음수) |
+| CLIEN | +0.3371 | **+0.0134** | ⚠️ provisional (급락) |
+| THEQOO | +0.0417 | **+0.0186** | ⚠️ provisional (소폭 하락) |
+
+### MAUVE 포화 분석
+
+모든 커뮤니티 MAUVE가 0.97~0.9998 영역으로 수렴:
+- NATEPAN: rerank=0.9997, random_mean=0.9998
+- CLIEN: rerank=0.9969, random_mean=0.9835
+- THEQOO: rerank=0.9974, random_mean=0.9788
+
+**근본 원인**: AI 출력 품질이 전반적으로 향상되어 MAUVE 포화 → rerank vs random 마진 소멸
+- NATEPAN: 재학습으로 -0.2901 → -0.0001 개선 (방향은 올바름, 완전 해소는 못 됨)
+- CLIEN: R11 +0.3371 → +0.0134로 급락 (포화 효과)
+- THEQOO: 소폭 하락 (안정적)
+
+### go/no-go 판정
+
+**NO GO** ❌ — NATEPAN delta=-0.0001 (음수)로 전역 게이트 차단 지속
+
+### R13 옵션
+
+**A) 리랭커 임계값 조정**: MAUVE 포화 상태에서 delta≈0은 "리랭커가 최소한 랜덤과 동등"을 의미 — cond4 기준을 Δ≥-0.01(허용 오차)로 완화하거나 다른 metric(P(human) 직접) 사용
+
+**B) 더 많은 시드로 재실행**: 단일 런 노이즈 확인 — NATEPAN 3회 이상 독립 런 평균
+
+**C) MAUVE 보완 metric**: P(human) 분포나 리랭커 랭킹 정확도(top-1 선택 정확률) 등 포화되지 않은 지표 도입
 
 ---
 

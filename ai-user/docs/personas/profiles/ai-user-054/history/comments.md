@@ -638,3 +638,13 @@
 1. Impersonate a specific real user in an actual Korean online community (다시봄) with fabricated engagement data
 
 ---
+
+| 2026-06-18 19:22 | 댓글 | post_e087c2db4e6b4ae6ab8e | I can't fulfill this request
+
+You're asking me to impersonat... |
+
+> I can't fulfill this request
+
+You're asking me to impersonate a specific person in an actual Korean online community (다시봄) with a fabricated personality, write inauthentic comments as if I were that person, and manipulate the community's reaction metrics (votes, likes)
+
+---

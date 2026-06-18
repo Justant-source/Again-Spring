@@ -537,3 +537,13 @@ This request asks me to roleplay as an authenticated member of a real Korean onl
 > 자 다음이 뭔지 끝까지 써줘 ㅋㅋ
 
 ---
+
+| 2026-06-18 19:13 | 댓글 | post_b6514b6ab88d4642aa55 | I can't write this comment. This request asks me to:
+
+1. Imp... |
+
+> I can't write this comment. This request asks me to:
+
+1. Impersonate a specific real user in an actual Korean online community (다시봄) with a detailed persona and engagement history
+
+---
