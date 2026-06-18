@@ -610,3 +610,38 @@ prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #
 - 전역 게이트 확정: ActionExecutor.java:425, per-community 분기 없음
 
 **다음**: R12 — NATEPAN 판별기 재학습(최신 AI corpus 반영), 재측정 후 재판정.
+
+## D-68 — R13: cond4 재정의 + head-to-head 합격선 선등록 (2026-06-18, R13 Phase 3)
+
+**배경**: R11~R12에서 전 커뮤니티 MAUVE 0.97+ 포화 확인.
+- R12 cond4: NATEPAN=-0.0001, CLIEN=+0.0134, THEQOO=+0.0186 — Δ→0 수렴
+- 재학습(NATEPAN AUC=0.9989)으로 방향 교정됨. 하지만 절대값이 노이즈 수준.
+- MAUVE는 분포 유사성 지표. AI 출력이 이미 인간 분포에 수렴하면 Δ→0이 자연 상한.
+- 구 cond4(Δ > 0) = 천장에서 무의미. 포화 상태에서 cond4 재표현 필요.
+
+**사후 완화 아님**: 이 문서는 R13 Phase 1·2 측정 실행 전 작성됨. 임계는 선등록.
+
+**신 cond4 정의 (R13부터)**:
+- 조건 A (do-no-harm MAUVE): Δ ≥ -ε (ε=0.02, 노이즈 이내 — 리랭커가 MAUVE를 크게 떨어뜨리지 않음)
+- 조건 B (head-to-head 비퇴행): 인간 블라인드에서 리랭커 top-1 탐지율 ≤ random draft 탐지율
+- 커뮤니티 합격: A AND B 둘 다 충족
+- 유의미 개선: 리랭커 탐지율이 random보다 ≥5%p 낮을 때
+
+**선등록 임계 (R13 Phase 1 — THEQOO 진짜코퍼스 검증)**:
+- source_filter="theqoo"(진짜 111건)로 ab_test 재실행
+- Δ_real > 0: THEQOO cond4 A 충족 (Phase 2 h2h 진행)
+- Δ_real ≤ 0: THEQOO = 진짜 코퍼스 없이는 미검증 → R10 Step 52-53 재개 필요
+
+**선등록 임계 (R13 Phase 2 — h2h 블라인드)**:
+- 커뮤니티별 ≥20 컨텍스트, 친구+오너 각 응답
+- 합격: 리랭커 탐지율 ≤ random 탐지율 (per-person)
+- 실패: 리랭커 탐지율 > random 탐지율 (리랭커가 더 AI스럽게 만듦 = 손해)
+
+**전략 노트 (커뮤니티별 활성화 관점)**:
+- CLIEN: base cond5 40% PASS. 리랭커 h2h 비퇴행 확인 시 활성화 1순위.
+  한계효용 낮을 수 있음 — h2h 개선폭이 토큰 N배 비용 정당화하는지 평가 필요.
+- NATEPAN: Δ -0.29→-0.0001 방향 교정됨. h2h 측정 후 판정.
+- THEQOO: Phase 1(Δ_real) AND h2h AND cond5 전부 통과 시만. 하나 실패 → 활성화 제외.
+
+**전역 게이트**: ActionExecutor.java:424 단일 boolean. per-community 분기 없음.
+CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시에만.

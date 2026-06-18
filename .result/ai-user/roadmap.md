@@ -664,3 +664,46 @@
 - Step 56: go/no-go 표 + 모니터링/롤백 런북
 
 **전역 ON 조건**: 세 다리(CLIEN ✅ / NATEPAN / THEQOO) 모두 cond4+cond5 PASS.
+
+---
+
+## R13 — cond4 재정의 + head-to-head 검증 (D-68, 2026-06-18~)
+
+> **목표**: MAUVE 포화 대응. 비순환 지표(인간 블라인드 head-to-head)로 cond4 대체 본체 구축.
+> **불변**: AI_USER_ML_ENABLED=false 유지. 이 라운드는 판정·준비만.
+
+---
+
+## Step 55 (R13-1) — THEQOO 진짜코퍼스 단독 검증
+
+**목표**: ab_test를 source_filter="theqoo"(진짜 111건)로 재실행 → D-66 Δ=+0.4458의 합성 의존 여부 확인.
+
+**완료 기준**:
+- [ ] source_filter 파라미터 구현 (schemas.py, routes_eval.py, run_ab_test.py)
+- [ ] THEQOO Δ_real(진짜 111건) 측정 완료
+- [ ] D-68 선등록 임계 기준으로 판정 기록
+- **halt**: Δ_real ≤ 0 → Step 52-53 재개 검토 보고
+
+---
+
+## Step 56 (R13-2) — head-to-head 인간 블라인드 설문
+
+**목표**: 커뮤니티별(CLIEN/NATEPAN/THEQOO) 리랭커 top-1 vs random draft 쌍 → 인간 판정.
+
+**완료 기준**:
+- [ ] build_h2h_survey.py 구현 + survey.md 생성(각 커뮤니티 ≥20쌍)
+- [ ] 친구+오너 각 응답 수집 (이유 한 줄 포함, D-55)
+- [ ] D-68 합격선 기준 커뮤니티별 판정
+- **halt**: 리랭커 탐지율 > random → 해당 커뮤니티 활성화 제외
+
+---
+
+## Step 57 (R13-3) — 커뮤니티별 go/no-go 표 + 전역 활성화 판정
+
+**목표**: Step 55+56 결과로 최종 go/no-go 표 작성 + 전역 활성화 준비.
+
+**완료 기준**:
+- [ ] 커뮤니티별 3조건(cond4-MAUVE/h2h/cond5) 표 작성
+- [ ] 전략 노트: 리랭커 한계효용 평가(토큰 비용 대비 h2h 개선폭)
+- [ ] 활성화 런북 준비 (롤백 트리거 포함)
+- [ ] 사용자에게 `AI_USER_ML_ENABLED=true` 수동 활성화 보고
