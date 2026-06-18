@@ -67,19 +67,19 @@
 | **COMMENT M-after** | NATEPAN 측정 후 R7 완료 | WSL | 신선분 축적 후 |
 | **에스컬레이션 평가** | blind①② 후 D-12 Phase 2/3 진입조건 보고 | — | blind 결과 후 |
 
-### prod 배포 게이트 (5조건 — 아직 미충족)
+### prod 배포 게이트 (5조건 — cond4 THEQOO만 미충족)
 
 ```
-cond1: ✅ n_ai≥100 (CLIEN/NATEPAN/THEQOO)
-cond2: ✅ AUC 학습됨
+cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/410)
+cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9997
 cond3: ✅ SPLITTER_VERIFIED=True
 cond4: ✅ NATEPAN Δ=+0.1667 PASS (동결)
-       ❌ THEQOO P(human) 역전 HALT
-       ❌ CLIEN Δ=0 ceiling
-cond5: ❌ 100% (목표 ≤60%) — R9 필요
+       ✅ CLIEN Δ=+0.3371 PASS (2026-06-18 ab-test: M-after=0.9811, M-before=0.644, n=50)
+       ❌ THEQOO P(human) 역전 HALT (D-52, R10 이연)
+cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 
-**AI_USER_ML_ENABLED 상태**: false (불변 — 5조건 미충족)
+**AI_USER_ML_ENABLED 상태**: false (불변 — cond4 THEQOO만 미충족)
 
 ---
 
@@ -95,7 +95,7 @@ cond5: ❌ 100% (목표 ≤60%) — R9 필요
 ### MAUVE
 | 커뮤니티 | POST | COMMENT | 비고 |
 |---|---|---|---|
-| CLIEN | 0.6277 → 0.3527(신선22) | 0.0677 (M-before) | R4 후 POST 하락(소표본 주의) |
+| CLIEN | 0.644(baseline) → **0.9811**(ab-test n=50) Δ=+0.3371 ✅ | 0.0677 (M-before, R7 M-after 미측정) | cond4 PASS (2026-06-18) |
 | NATEPAN | 0.8395 | 0.0598 (M-before) | |
 | THEQOO | — | — | n_ai=100이지만 P(human) 역전 |
 

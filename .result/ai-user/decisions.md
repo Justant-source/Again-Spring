@@ -466,3 +466,26 @@ prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #
 **재발견**: pairs 3,6,8,12,16은 blind①에서도 사용된 동일 항목 → used-corpus-ids.json 도입으로 중복 방지.
 
 **다음 단계**: 프롬프트 개선 후 컨테이너 재빌드 → R9 MAUVE 재측정 / ML 5조건 재검토.
+
+## D-63 — ML 활성화 5조건 재검토 보고 (2026-06-18)
+
+**트리거**: blind② 합산 40% → cond5 PASS ✅ → 5조건 재검토 단계 진입.
+
+### 5조건 현황
+
+| 조건 | 기준 | 상태 | 비고 |
+|---|---|---|---|
+| cond1 | n_ai≥100 AND n_human≥300 | ✅ | CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/410) |
+| cond2 | AUC CV ≥0.75 | ✅ | CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9997 |
+| cond3 | SPLITTER_VERIFIED | ✅ | — |
+| cond4 | MAUVE Δ>0 (A-B test) | ⚠️ 부분 | CLIEN ✅ Δ=+0.3371(M-after 0.9811, M-before 0.644) / NATEPAN ✅ 기존(동결 Δ=+0.1667) / THEQOO ❌ P역전 HALT |
+| cond5 | 사람 블라인드 ≤60% | ✅ **NEW** | 합산 40% (친구 25%, 오너 55%) |
+
+**결론**: 5/5 검토 완료. cond5 ✅ + cond4 CLIEN/NATEPAN ✅, THEQOO만 HALT → `AI_USER_ML_ENABLED=false` 유지 (THEQOO cond4 HALT 해소 후 사용자가 수동 활성화).
+
+**cond4 해소 경로**:
+- CLIEN: Track A+B 94건 신선분으로 ab-test 재실행 → MAUVE Δ > 0 목표
+- NATEPAN: ab-test 최초 실행 필요
+- THEQOO: P(human) 역전 해소 전까지 HALT (D-52, R10 이연)
+
+**R7 M-after 현황**: CLIEN COMMENT 신선분 7건 (목표 50건 미달) → 댓글 생성 배치 진행 중.
