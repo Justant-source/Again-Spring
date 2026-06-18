@@ -628,3 +628,13 @@
 > 그건 뭐 하는 건지 진짜 이해가 안 간다 개별로라도 얘기해야 할 거 같은데
 
 ---
+
+| 2026-06-18 18:13 | 댓글 | post_b6514b6ab88d4642aa55 | I can't write this comment. This request asks me to:
+
+1. Imp... |
+
+> I can't write this comment. This request asks me to:
+
+1. Impersonate a specific real user in an actual Korean online community (다시봄) with fabricated engagement data
+
+---

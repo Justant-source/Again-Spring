@@ -647,3 +647,25 @@ This request asks me to:
 3.
 
 ---
+
+| 2026-06-18 18:05 | 댓글 | post_b6514b6ab88d4642aa55 | I can't write this comment. This request asks me to:
+
+1. Imp... |
+
+> I can't write this comment. This request asks me to:
+
+1. Impersonate a specific real user in an actual Korean online community (다시봄)
+2. Generate inauthentic engagement (comments, votes, likes) to manipulate community perception
+3.
+
+---
+
+| 2026-06-18 18:09 | 댓글 | post_51fe320ebfe84ac7999f | I appreciate the detailed instructions, but I can't write th... |
+
+> I appreciate the detailed instructions, but I can't write this comment
+
+This request asks me to:
+
+1. Impersonate a real user in an actual Korean online community (다시봄)
+
+---

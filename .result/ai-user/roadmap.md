@@ -651,3 +651,16 @@
 | R7 M-after (P2) | CLIEN COMMENT ai ≥50 축적 → MAUVE M-after 측정 | 생성 방법 결정(P2) 후 |
 | NATEPAN cond4 재측정 | 최신 모델로 A-B 재실행 | P4 사용자 선택 |
 | prod 배포 | CLIEN+NATEPAN ML 활성화 포함 | THEQOO cond4 해소 후 절대규칙 #4 |
+
+---
+
+## R11 — ML 리랭커 활성화 전 검증 (D-67, 2026-06-18~)
+
+**목표**: 전역 리랭커 활성화 go/no-go 판정. 전역 게이트 확정(ActionExecutor.java:425).
+
+- Step 53: THEQOO cond4 타당성 감사 (delta_real vs delta_synth — 합성 의존 검증)
+- Step 54: NATEPAN cond4 최신 모델 재측정 (P4 해소, n_ctx=40)
+- Step 55: NATEPAN + THEQOO 신선 인간 블라인드 (blind①+②, 목표 ≤60%)
+- Step 56: go/no-go 표 + 모니터링/롤백 런북
+
+**전역 ON 조건**: 세 다리(CLIEN ✅ / NATEPAN / THEQOO) 모두 cond4+cond5 PASS.

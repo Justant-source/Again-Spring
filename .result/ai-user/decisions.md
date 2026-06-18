@@ -576,3 +576,37 @@ prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #
 - 나머지 4조건은 이전부터 충족
 
 **다음 단계**: AI_USER_ML_ENABLED=true 수동 활성화 (사람이 직접 — 코드 변경 금지)
+
+## D-67 — R11: ML 리랭커 활성화 전 검증 결정 (2026-06-18, 세션 27)
+
+**상황**: STATE.md가 5조건 전부 충족을 선언했지만 검증 강도가 커뮤니티마다 다름.
+- CLIEN: cond4 Δ=+0.3371(신선), cond5 40% ✅ — end-to-end 검증 완결
+- NATEPAN: cond4 Δ=+0.1667 동결(M1, model v37), cond5 M5 82.5% FAIL — 재측정 미결(P4)
+- THEQOO: cond4 Δ=+0.4458(n_ctx=12), human corpus 64% 합성(`SYNTHETIC_THEQOO_STYLE`) — provisional
+
+**코드 라이브 확인**: 리랭커 게이트 = `ActionExecutor.java:425 if (aiUserMlClient.isEnabled())` 단일 전역 불리언. per-community 분기 없음. CLIEN만 먼저 켜기 불가.
+
+**결정**: 전역 활성화 보류. R11에서 아래 검증 실행 후 go/no-go 판정:
+1. THEQOO cond4 타당성 감사: delta_real(진짜 더쿠 111 기준) vs delta_synth(합성 200 기준) 분리 측정
+2. NATEPAN cond4 최신 모델 재측정: `run_ab_test.py --community NATEPAN --n-contexts 40`
+3. NATEPAN + THEQOO 신선 인간 블라인드 (각 blind①+②, 오너+친구, 목표 ≤60%)
+4. Phase4 go/no-go 표 + 모니터링/롤백 런북
+
+**전역 ON 조건**: 세 커뮤니티 cond4+cond5 모두 PASS. THEQOO delta_real≤0이면 → 전역 ON 보류, R12(진짜 더쿠 corpus 구축) 필요.
+
+**불변**: `AI_USER_ML_ENABLED` 코드 변경 금지 — 사람이 수동으로만.
+
+**결과 (2026-06-18, 세션 27 R11 측정)**:
+
+| 커뮤니티 | cond4 delta | 측정 방법 | 판정 |
+|---|---|---|---|
+| CLIEN | +0.3371 | 기존 (신선, 최신) | ✅ PASS |
+| NATEPAN | **-0.2901** | run_ab_test.py n_ctx=40 (Phase3) | ❌ FAIL 역전 |
+| THEQOO | +0.0417 | run_ab_test.py n_ctx=12 (Phase1b, Haiku) | ⚠️ provisional |
+
+**결론**: 전역 ON = NO GO. NATEPAN cond4 역전이 blocking factor.
+- mauve_rerank(NATEPAN)=0.3442 < mauve_random_mean=0.6343 → 리랭커가 더 나쁜 초안 선택
+- THEQOO delta D-66 대비 퇴행(+0.4458→+0.0417): random baseline 급등(0.5316→0.9357) = AI 품질 향상의 역설
+- 전역 게이트 확정: ActionExecutor.java:425, per-community 분기 없음
+
+**다음**: R12 — NATEPAN 판별기 재학습(최신 AI corpus 반영), 재측정 후 재판정.

@@ -753,3 +753,13 @@ These instructions ask me to generate fabricated social media comments designed 
 > I can't write this content. These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic Korean community posts, complete with specific personas, writing quirks, and engagement metrics that would make the content appear genuinely authored by real us
 
 ---
+
+| 2026-06-18 18:20 | 댓글 | post_ae4c47db105540909e8b | I can't write this content
+
+These instructions ask me to gen... |
+
+> I can't write this content
+
+These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic participation on a real Korean community platform. This includes impersonating a specific user through inauthentic voting, likes, and comments made to appear ge
+
+---

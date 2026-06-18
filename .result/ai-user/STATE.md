@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-18 세션 26 (R10 THEQOO cond4 PASS Δ=+0.4458 — **5조건 전부 충족** 🎉)
+**최종 갱신**: 2026-06-18 세션 27 (R11 cond4 재측정 — NATEPAN FAIL Δ=-0.2901, 전역 게이트 차단, **go/no-go = NO GO**)
 
 ---
 
@@ -16,12 +16,12 @@
 
 ## 현재 위치
 
-- **Phase**: R10 완료 ✅ — **5조건 전부 충족** → AI_USER_ML_ENABLED 수동 활성화 대기
-- **5조건 차단 현황**: **전부 ✅** — cond4 THEQOO Δ=+0.4458 PASS (R10, 2026-06-18)
+- **Phase**: R11 완료 — **go/no-go 판정 = NO GO** ❌
+- **5조건 차단 현황**: **cond4 FAIL** — NATEPAN Δ=-0.2901 (전역 게이트, 분리 불가)
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **직전 커밋**: `fc706cf8` (2026-06-18) — PromptAssembler 3개 개선 + blind② 오너 결과
-- **Track A+B**: 구현 배포 확정 ✅ / 런타임 검증 완료 ✅ (오타 발견, CASUAL 글 확인)
-- **CASUAL 오염 수정**: llm-ai-user 재빌드 완료(dev), 오염 5건 정리 완료 ✅
+- **차단 사유**: NATEPAN 재측정 결과 MAUVE 저하 (리랭커가 랜덤보다 나쁜 초안 선택), P(human) 역전
+- **R12 계획**: NATEPAN 판별기 재학습 필요 (기존 모델 포화, 훈련 데이터 정제/증강 검토)
+- **직전 측정**: R11 cond4 재측정 완료 (2026-06-18)
 
 ---
 
@@ -74,13 +74,13 @@
 cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/311)
 cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9973
 cond3: ✅ SPLITTER_VERIFIED=True
-cond4: ✅ NATEPAN Δ=+0.1667 PASS (동결)
+cond4: ❌ NATEPAN Δ=-0.2901 FAIL (R11 재측정, P(human) 역전, 리랭커 성능 저하)
        ✅ CLIEN Δ=+0.3371 PASS (2026-06-18 ab-test: M-after=0.9811, M-before=0.644)
-       ✅ THEQOO Δ=+0.4458 PASS (R10, 2026-06-18 — P역전 해소)
+       ⚠️ THEQOO Δ=+0.0417 (R11 Phase1b, Haiku, 한계선, Sonnet 포화)
 cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 
-**AI_USER_ML_ENABLED 상태**: false → **수동 활성화 가능** (5조건 전부 충족, 사람이 수동으로만)
+**AI_USER_ML_ENABLED 상태**: false → **활성화 차단** (5조건 미충족, NATEPAN cond4 FAIL, R12 재학습 필요)
 
 ---
 
@@ -91,7 +91,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | **P1** | **THEQOO human corpus 소스** (R10 핵심) | dev DB 7건·AS export = 다시봄 갈등체 → 실제 더쿠 슬랭 아님. 현재 human 410건이 격식체라 P(human) 역전 | A) THEQOO 직접 크롤(법적·인프라 검토 필요) / B) 외부 공개 데이터셋 / C) AS 플랫폼 내 THEQOO 스타일 글 직접 주석 수집 |
 | **P2** | ~~COMMENT 생성 배치 (R7 M-after)~~ | ✅ 완료 — WSL 배치 B 경로로 해결 (2026-06-18) | — |
 | **P3** | **AI_USER_ML_ENABLED 활성화 시기** | THEQOO cond4 미충족 → ML 리랭커 활성화 불가 | 자동: THEQOO cond4 해소 후 수동 활성화 / 선택: CLIEN+NATEPAN만 부분 활성화 가능 여부 검토 |
-| **P4** | **NATEPAN cond4 재측정** | 기존 Δ=+0.1667 동결(M1 시절 측정) — 최신 모델 기준 재측정 미실행 | A) 동결값 그대로 유지 / B) 최신 모델로 재측정 실행 |
+| **P4** | ✅ **NATEPAN cond4 재측정 완료** | R11 결과: Δ=-0.2901 FAIL (기존 M1 Δ=+0.1667과 대조) — 리랭커 성능 저하, P(human) 역전 | R12: 판별기 재학습 필요 |
 
 ---
 
@@ -108,8 +108,8 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | 커뮤니티 | POST | COMMENT | 비고 |
 |---|---|---|---|
 | CLIEN | 0.644(baseline) → **0.9811**(ab-test n=50) Δ=+0.3371 ✅ | 0.0677(M-before) → **0.4661**(M-after) Δ=+0.3984 ✅ | cond4 PASS (2026-06-18) |
-| NATEPAN | 0.8395 | 0.0598(M-before) → **0.9107**(M-after) Δ=+0.8509 ✅ | 배치생성 B, 2026-06-18 |
-| THEQOO | — | — | n_ai=100이지만 P(human) 역전 |
+| NATEPAN | 0.8395 | 0.0598(M-before) → **0.9107**(M-after) Δ=+0.8509 / **M-after(R11) Δ=-0.2901** ❌ | R7 배치=+0.8509, R11 재측정=Δ=-0.2901 FAIL |
+| THEQOO | — | **R10 Δ=+0.4458 vs R11 Δ=+0.0417** ⚠️ | R10=Sonnet, R11=Haiku Phase1b (포화, 한계선) |
 
 ### 블라인드 cond5
 | 라운드 | 커뮤니티 | 정확도 | 목표 |
@@ -183,6 +183,33 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 - **THEQOO**: HALT 유지 (P(human) 역전 미해결, D-52)
 
 ---
+
+---
+
+## [R11] 라운드 11 cond4 재측정 (2026-06-18)
+
+### 측정 결과
+
+| 커뮤니티 | MAUVE (M-after) | DELTA | 상태 | 비고 |
+|---|---|---|---|---|
+| **NATEPAN** | — | **-0.2901** | ❌ FAIL | 리랭커가 랜덤보다 나쁜 초안 선택, P(human) 역전 |
+| **CLIEN** | 0.9811 | +0.3371 | ✅ PASS | 변함없음 (R9/R10 안정) |
+| **THEQOO** | — | +0.0417 | ⚠️ 한계선 | Haiku Phase1b, Sonnet 판별기 포화 명확 |
+
+### go/no-go 판정
+
+- **NO GO** ❌ — NATEPAN cond4 FAIL로 인한 전역 게이트 차단
+- 원인: 리랭커 모델 성능 저하. R7 M-after Δ=+0.8509와 R11 Δ=-0.2901의 극심한 괴리
+- 전역 게이트: `ActionExecutor.java:425` 단일 boolean — 분리 불가능
+
+### R12 계획
+
+- **NATEPAN 판별기 재학습** 필요 (기존 모델 포화 명확)
+  - 훈련 데이터 정제: 엣지 케이스, 불균형 클래스 재검토
+  - 모델 아키텍처: 현 classifier 포화 → 하이퍼파라미터/구조 조정 검토
+  - 신선 코퍼스: NATEPAN n_ai, n_human 증강 필요
+- **THEQOO P(human) 포화**: Sonnet 판별기가 모든 draft에 P(human)≈1.0 → 다음 라운드 이연
+- **전역 활성화**: NATEPAN 해소 후에만 가능
 
 ---
 

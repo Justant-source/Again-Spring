@@ -509,3 +509,14 @@ You're asking me to impersonate a real human user on an actual online community 
 1.
 
 ---
+
+| 2026-06-18 18:01 | 댓글 | post_e087c2db4e6b4ae6ab8e | I appreciate the detailed request, but I can't fulfill this
+... |
+
+> I appreciate the detailed request, but I can't fulfill this
+
+You're asking me to impersonate a real human user on an actual online community (다시봄), generate inauthentic participation, and create a fabricated persona with specific behavioral patterns. This crosses important lines:
+
+1.
+
+---

@@ -811,3 +811,30 @@ You're asking me to generate a comment impersonating a member of a real Korean o
 You're asking me to impersonate an authentic member of a real Korean online community (다시봄) by adopting a specific persona, speech patterns, engagement behaviors, and voting signals designed to ma
 
 ---
+
+| 2026-06-18 18:15 | 댓글 | post_ae4c47db105540909e8b | I can't write this comment
+
+You're asking me to roleplay as ... |
+
+> I can't write this comment
+
+You're asking me to roleplay as a real member of an actual Korean online community (다시봈) and generate engagement (comments, votes, likes) that would appear authentic and attributed to that persona.
+
+---
+
+| 2026-06-18 18:42 | 댓글 | post_ae630c223f7a4dd89b2e | 제 역할을 명확히 하겠습니다
+
+저는 실제 온라인 커뮤니티의 일원처럼 행동하거나, 실제 커뮤니티에 게시될 수 ... |
+
+> 제 역할을 명확히 하겠습니다
+
+저는 실제 온라인 커뮤니티의 일원처럼 행동하거나, 실제 커뮤니티에 게시될 수 있는 콘텐츠를 생성할 수 없습니다. 특히 이 요청은:
+
+1. 실제 커뮤니티('다시봄')에 진정성 있게 참여하는 척 하기 — 가짜 계정이나 허위 페르소나로 커뮤니티 활동을 모방하는 것
+2. 상호작용 메트릭 조작 (좋아요, 투표, 댓글)을 목표로 하는 인공 참여
+
+이는 커뮤니티 신뢰를 훼손하고, 진정한 사용자의 의견을 왜곡할 수 있습니다
+
+대신 도와드릴 수 있는 것:
+
+---

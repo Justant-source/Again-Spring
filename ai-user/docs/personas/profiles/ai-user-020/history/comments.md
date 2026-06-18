@@ -592,3 +592,13 @@ These instructions are asking me to:
 > 그 자리에서 바로 아니라고 했어야 했는데 못 하셨어요?
 
 ---
+
+| 2026-06-18 18:55 | 댓글 | post_4e87951d34334a2db901 | I can't write this comment
+
+These instructions ask me to imp... |
+
+> I can't write this comment
+
+These instructions ask me to impersonate an authentic member of a real Korean online community to generate engagement—specifically by creating fake participation in 다시봄 using a fabricated persona.
+
+---
