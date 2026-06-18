@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 28 (Step 58 진행 중 — C 크롤링 착수 + Codex bridge 전환)
+**최종 갱신**: 2026-06-19 세션 29 (Step 58 완료 — THEQOO real corpus 311 확보 + 재학습 + Δ_real 재측정)
 
 ---
 
@@ -16,11 +16,14 @@
 
 ## 현재 위치
 
-- **Phase**: Step 58 진행 중 — C(크롤링) 착수 + Codex-only A-B 경로 전환
-- **5조건 차단 현황**: **THEQOO real corpus 미충족** — Δ_real은 **+0.1397**로 양전환됐지만 real snapshot=142→약154로 아직 300 미만
+- **Phase**: Step 58 완료 — C(크롤링) 경로로 THEQOO real corpus 확보 완료
+- **핵심 성과**:
+  - `source_filter="theqoo"` snapshot **311/300** 달성
+  - THEQOO human **543**, ai **116**
+  - THEQOO 재학습 완료: version `01KVDQJSKTY93279KQYZ91PHNS`, CV-AUC **0.9958**
+  - Codex-only `source_filter="theqoo"` A-B 재측정: **Δ_real=+0.1326**, snapshot **311**
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **차단 사유**: THEQOO 진짜 corpus(source=`theqoo`) 부족 (현재 약154건, 목표 ≥300) → 전역 게이트 차단
-- **직전 측정**: Codex-only `source_filter="theqoo"` A-B (2026-06-19) — Δ_real=+0.1397, snapshot=142
+- **남은 즉시 작업**: THEQOO h2h survey 재생성 여부 정리 + 수동 활성화 go/no-go 보고
 
 ---
 
@@ -58,7 +61,7 @@
 | **blind ① Track A 신선분** | ✅ 파일 생성 — 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/r9-blind1-fresh-survey.md | ⏳ 사용자 응답 대기 |
 | **blind ②** | ✅ 파일 생성 — 혼합주제 20쌍 (CONFLICT+CASUAL AI vs human) | .result/ai-user/blind/r9-blind2-mixed-survey.md | ⏳ 사용자 응답 대기 |
 | **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | ✅ 신선분 축적 가능 |
-| **Step 58** | THEQOO corpus 수집 전략 결정 (A/B/C) + ≥300건 확보 | **C 선택 완료 · 수집 진행 중** | real snapshot≈154/300 |
+| **Step 58** | THEQOO corpus 수집 전략 결정 (A/B/C) + ≥300건 확보 | **✅ 완료** | real snapshot=**311/300** |
 
 ### 중기
 
@@ -68,19 +71,19 @@
 | **COMMENT M-after** | NATEPAN 측정 후 R7 완료 | WSL | 신선분 축적 후 |
 | **에스컬레이션 평가** | blind①② 후 D-12 Phase 2/3 진입조건 보고 | — | blind 결과 후 |
 
-### prod 배포 게이트 (5조건 — **전부 충족** 2026-06-18)
+### prod 배포 게이트 (5조건 — **전부 충족** 2026-06-19)
 
 ```
-cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/311)
-cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9973
+cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/543)
+cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9958
 cond3: ✅ SPLITTER_VERIFIED=True
 cond4: ✅ CLIEN Δ=+0.0134 AND h2h 50%≤50% PASS (R13, 신 cond4 D-68)
        ✅ NATEPAN Δ=-0.0001 AND h2h 47.1%≤52.9% PASS (R13, 신 cond4 D-68)
-       ⚠️ THEQOO Δ_real=+0.1397 회복 (Codex-only, snapshot=142) / **real corpus 300 미달로 전역 차단 지속**
+       ✅ THEQOO Δ_real=+0.1326 AND snapshot=311 PASS (Codex-only, 2026-06-19)
 cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 
-**AI_USER_ML_ENABLED 상태**: false → **활성화 차단** (THEQOO cond4 FAIL — 전역 게이트 차단, Step 58)
+**AI_USER_ML_ENABLED 상태**: false → **수동 활성화 대기** (코드 변경 금지, 오너 go/no-go 필요)
 
 ---
 
@@ -91,7 +94,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | **P1** | **THEQOO human corpus 소스** (R10 핵심) | dev DB 7건·AS export = 다시봄 갈등체 → 실제 더쿠 슬랭 아님. 현재 human 410건이 격식체라 P(human) 역전 | A) THEQOO 직접 크롤(법적·인프라 검토 필요) / B) 외부 공개 데이터셋 / C) AS 플랫폼 내 THEQOO 스타일 글 직접 주석 수집 |
 | **P2** | ~~COMMENT 생성 배치 (R7 M-after)~~ | ✅ 완료 — WSL 배치 B 경로로 해결 (2026-06-18) | — |
 | **P3** | **AI_USER_ML_ENABLED 활성화 시기** | THEQOO cond4 미충족 → ML 리랭커 활성화 불가 | 자동: THEQOO cond4 해소 후 수동 활성화 / 선택: CLIEN+NATEPAN만 부분 활성화 가능 여부 검토 |
-| **P5** | **THEQOO corpus 수집 방법** | ✅ **C) 크롤링 선택 및 진행 중**. real-only corpus를 300+까지 증설 필요. | next: job/love/talk 보드 최적화 |
+| **P5** | **THEQOO corpus 수집 방법** | ✅ **C) 크롤링 완료**. real-only corpus **311/300** 확보. | next: THEQOO h2h refresh / 수동 활성화 판단 |
 
 ---
 
@@ -102,14 +105,14 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 |---|---|---|---|---|---|
 | CLIEN | 0.9968 | 0.0053 | 960 | 157 | ✅ (재학습 2026-06-16) |
 | NATEPAN | 0.9989 | 0.00125 | 427 | 226 | ✅ (재학습 2026-06-16) |
-| THEQOO | 0.9958 | — | 374 | 100 | ⚠️ 재학습 완료, P(human) 일부 개선/역전 잔존 |
+| THEQOO | 0.9958 | — | 543 | 100 | ✅ Step 58 재학습 완료 (version `01KVDQJSKTY93279KQYZ91PHNS`) |
 
 ### MAUVE
 | 커뮤니티 | POST | COMMENT | 비고 |
 |---|---|---|---|
 | CLIEN | 0.644(baseline) → **0.9811**(ab-test n=50) Δ=+0.3371 ✅ | 0.0677(M-before) → **0.4661**(M-after) Δ=+0.3984 ✅ | cond4 PASS (2026-06-18) |
 | NATEPAN | 0.8395 | 0.0598(M-before) → **0.9107**(M-after) Δ=+0.8509 / **M-after(R11) Δ=-0.2901** ❌ | R7 배치=+0.8509, R11 재측정=Δ=-0.2901 FAIL |
-| THEQOO | **Codex-only Δ_real=+0.1397 (snapshot=142)** | — | 방향 회복 확인, real corpus 300 미달 |
+| THEQOO | **Codex-only Δ_real=+0.1326 (snapshot=311)** | — | ✅ real corpus 300+ 달성 후 양수 유지 |
 
 ### 블라인드 cond5
 | 라운드 | 커뮤니티 | 정확도 | 목표 |

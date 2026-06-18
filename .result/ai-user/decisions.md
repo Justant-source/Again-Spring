@@ -739,3 +739,41 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **결론**:
 - 전역 차단 원인은 이제 "Δ 방향"보다 **real corpus 양 부족**으로 좁혀짐.
 - 다음 작업은 `job p1-2` 변형/헤더 최적화 또는 추가 source 발굴로 real snapshot 300+ 달성.
+
+## D-73 — Step 58 완료: source=theqoo 311 확보 + 재학습 + Δ_real 재확인 (2026-06-19)
+
+**실행**:
+- `crawl_theqoo.py` 링크 정규화 수정
+  - `category` / `event` 오탐 제거
+  - `/{board}/{id}?page=N` 패턴 허용 후 query/hash 제거
+- 8-way 병렬 배치 재실행
+  - p1-3 재수집/검증: inserted **17**
+  - p2-3: inserted **33**
+  - p4-5: inserted **50**
+  - p6-7: inserted **57**
+  - **합계: +157**
+
+**검증 결과**:
+- `/corpus/stats`: THEQOO human **543**, ai **116**
+- `source_filter="theqoo"` snapshot probe:
+  - before final batch: **254**
+  - after final batch: **311**
+- THEQOO 재학습:
+  - job `01KVDQJSKCSK9S8VPW4H8SW7NW`
+  - version `01KVDQJSKTY93279KQYZ91PHNS`
+  - CV-AUC **0.9958**
+  - n_human **543**, n_ai **100**
+- Codex-only A-B (`source_filter="theqoo"`, n_contexts=12):
+  - mauve_rerank **0.8761**
+  - mauve_random_mean **0.7434**
+  - **Δ_real = +0.1326**
+  - snapshot_size **311**
+
+**해석**:
+- Step 58의 하드 목표였던 **real-only corpus 300+** 달성.
+- THEQOO cond4의 핵심 입력인 **Δ_real > 0** 유지 확인.
+- 기존 전역 차단 사유였던 "THEQOO real corpus 부족"은 해소.
+
+**다음 작업**:
+- THEQOO h2h survey 재생성 여부 정리
+- `AI_USER_ML_ENABLED` 수동 활성화 go/no-go 보고

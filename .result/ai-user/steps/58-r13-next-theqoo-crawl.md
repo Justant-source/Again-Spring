@@ -1,10 +1,11 @@
-# Step 58 (R13-next) — THEQOO 크롤링 실행 준비
+# Step 58 (R13-next) — THEQOO 크롤링 실행 및 완료
 
 ## 상태
 
 - 선택지: **C) 크롤링**
 - 실행 형태: **최대 8-way 병렬 shard**
 - 목적: `source="theqoo"` human corpus를 300+까지 증설해 Step 58 재학습 입력으로 사용
+- **최종 상태 (2026-06-19 세션 29)**: **완료** — `source_filter="theqoo"` snapshot **311**
 
 ---
 
@@ -140,6 +141,70 @@
 1. `job p1-2` 주변의 헤더/세션 전략 조정
 2. 상세 403이 나는 `love/talk` 보드 우회 가능성 점검
 3. real-only snapshot 300+ 도달 후 `source_filter=theqoo` 재측정 반복
+
+---
+
+## 세션 29 완료 결과 (2026-06-19)
+
+### 크롤러 보정
+
+- 파일: `.result/ai-user/scripts/crawl_theqoo.py`
+- 수정:
+  - `category` / `event` 링크를 실제 글로 오인하던 패턴 제거
+  - `/{board}/{id}?page=N` / `#comment` 꼬리를 제거해 실제 게시글 경로로 정규화
+  - 상세 요청에 board referer를 붙여 fetch 안정화
+
+### 병렬 수집 배치
+
+실수확 기준 inserted:
+
+| batch | 구간 | inserted |
+|---|---|---:|
+| A | p1-3 재수집 + 페이지네이션 보정 검증 | 17 |
+| B | p2-3 | 33 |
+| C | p4-5 | 50 |
+| D | p6-7 | 57 |
+| **합계** |  | **157** |
+
+보드 메모:
+- `square`, `hot`, `job`가 주 수확원
+- `beauty`는 dry-run 대비 dedup이 많아 실수확이 낮음
+- `ktalk`는 링크는 많지만 실수확은 낮음
+- `love`, `talk`는 실제 게시글 상세가 계속 403이라 본 배치에서 제외
+
+### corpus / snapshot / train
+
+- `/corpus/stats`: THEQOO human **386 → 543**, ai **116 유지**
+- 더미 `source_filter="theqoo"` A-B probe:
+  - before latest batches: snapshot **254**
+  - after latest batches: snapshot **311**
+- `/train` (THEQOO only):
+  - job = `01KVDQJSKCSK9S8VPW4H8SW7NW`
+  - version = `01KVDQJSKTY93279KQYZ91PHNS`
+  - CV-AUC = **0.9958**
+  - n_human = **543**
+  - n_ai = **100**
+
+### Codex-only Δ_real 재측정
+
+- command path: `run_ab_test.py` → `codex exec` only
+- source_filter = `theqoo`
+- n_contexts = **12**
+- snapshot_size = **311**
+- mauve_rerank = **0.8761**
+- mauve_random_mean = **0.7434**
+- delta = **+0.1326**
+
+해석:
+- **Step 58 목표 달성**: real-only corpus가 **311/300**으로 기준 초과
+- **Δ_real 양수 유지**: 기존 `+0.1397` 대비 소폭 하락했지만 여전히 **positive**
+- 전역 차단 원인이던 "THEQOO real corpus 부족"은 해소
+
+### 다음 즉시 작업
+
+1. THEQOO h2h survey 재생성 여부 결정
+2. `AI_USER_ML_ENABLED` 수동 활성화 go/no-go 정리
+3. 필요 시 P(human) spot-check 추가
 
 ---
 

@@ -81,23 +81,27 @@ def get_post_links(session: requests.Session, board: str, page: int) -> list[str
         log.warning("board fetch failed %s p%d: %s", board, page, e)
         return []
 
-    candidates = re.findall(r'href="(/[^"#?]+/\d+)"', r.text)
+    candidates = re.findall(
+        rf'href="(/{re.escape(board)}/\d+(?:\?[^"#]*)?(?:#[^"]*)?)"',
+        r.text,
+    )
     normalized: list[str] = []
     seen = set()
     for path in candidates:
-        if not path.startswith("/") or path in seen:
+        clean_path = path.split("#", 1)[0].split("?", 1)[0]
+        if not clean_path.startswith("/") or clean_path in seen:
             continue
-        if not re.search(r"/\d+$", path):
+        if not re.fullmatch(rf"/{re.escape(board)}/\d+", clean_path):
             continue
-        seen.add(path)
-        normalized.append(path)
+        seen.add(clean_path)
+        normalized.append(clean_path)
     return normalized
 
 
-def fetch_post(session: requests.Session, path: str) -> Optional[str]:
+def fetch_post(session: requests.Session, board: str, path: str) -> Optional[str]:
     url = f"https://theqoo.net{path}"
     try:
-        r = session.get(url, timeout=10)
+        r = session.get(url, timeout=10, headers={"Referer": build_board_url(board, 1)})
         r.raise_for_status()
     except Exception as e:
         log.warning("post fetch failed %s: %s", path, e)
@@ -159,7 +163,7 @@ def main():
             log.info("  p%d: %d links", page, len(links))
             for path in links:
                 time.sleep(DELAY)
-                text = fetch_post(session, path)
+                text = fetch_post(session, board, path)
                 if not text or len(text) < MIN_LEN:
                     total_filtered += 1
                     continue
