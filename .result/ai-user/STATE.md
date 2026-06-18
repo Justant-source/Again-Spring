@@ -37,7 +37,7 @@
 | **R4** | CLIEN de-counselor + writing_quirks 7개 features | voice.yml + DB JSON_SET 완료 |
 | **R5** | CLIEN MAUVE M-before=0.6277, M-after=0.3527(n=22) + 블라인드 | **블라인드 100%(20/20) → cond5 FAIL** |
 | **R6** | THEQOO corpus n_ai=100 + 재학습 | AUC=1.000이지만 **P(human) 방향 역전 HALT** |
-| **R7** | COMMENT MAUVE M-before 측정 + Haiku 거절 픽스 | M-before CLIEN=0.0677, NATEPAN=0.0598. llm-ai-user 2026-06-17 재빌드. **M-after 대기 중** |
+| **R7** | COMMENT MAUVE M-before·M-after 측정 + 언어 가드 3계층 구현 | M-before CLIEN=0.0677/NATEPAN=0.0598. M-after CLIEN=**0.4661** Δ=+0.3984 ✅. NATEPAN NOT RUN(25건<50) |
 | **R8** | 6라운드 최종 현황 결산 | cond5 FAIL 확정, R9 계획 수립 |
 | **R9 Track A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | 구현·35테스트 통과·dev배포 ✅ · 런타임검증(오타확인) ✅ |
 | **R9 Track B** | CASUAL 25% 분기 + assembleCasualPostPrompt + voice/post_casual.md | 구현·e2e 통과·dev배포 ✅ · 런타임검증(27% CASUAL) ✅ |
@@ -107,7 +107,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 ### MAUVE
 | 커뮤니티 | POST | COMMENT | 비고 |
 |---|---|---|---|
-| CLIEN | 0.644(baseline) → **0.9811**(ab-test n=50) Δ=+0.3371 ✅ | 0.0677 (M-before, R7 M-after 미측정) | cond4 PASS (2026-06-18) |
+| CLIEN | 0.644(baseline) → **0.9811**(ab-test n=50) Δ=+0.3371 ✅ | 0.0677(M-before) → **0.4661**(M-after) Δ=+0.3984 ✅ | cond4 PASS (2026-06-18) |
 | NATEPAN | 0.8395 | 0.0598 (M-before) | |
 | THEQOO | — | — | n_ai=100이지만 P(human) 역전 |
 
@@ -129,7 +129,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 |---|---|---|---|
 | **A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | ✅ 배포 완료 | ⚠️ AI_USER_ENABLED=false로 신선 POST 미생성 |
 | **B** | executePost CASUAL 25% 분기 + assembleCasualPostPrompt | ✅ 배포 완료 | ⚠️ 동일 차단 |
-| **C-R7** | COMMENT MAUVE M-after (신선 CLIEN ≥50건) | 🔄 CLIEN 3/50건 | ⚠️ AI_USER_ENABLED=false 차단 |
+| **C-R7** | COMMENT MAUVE M-after (신선 CLIEN ≥50건) | ✅ CLIEN 62건(0.4661 Δ+0.3984) / 🔄 NATEPAN 25건 | AI_USER_ENABLED=true 축적 진행 중 |
 | **C-THEQOO** | human corpus 소스 교정 | ⏸ R10 이연 | D-52 |
 
 **R9 측정 (배포 후 신선 축적 필요)**:
@@ -267,7 +267,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | **Step 44** | 19 | P0: R3 오케스트레이터 재배포 + e2e + corpus 축적 확인 | ✅ |
 | **Step 45** | 19~21 | R5: CLIEN MAUVE 0.6277→0.3527 + 블라인드 100%(20/20) FAIL | ✅ |
 | **Step 46** | 19~20 | R6: THEQOO n_ai=100 + AUC=1.000, P(human) 역전 HALT | ❌ HALT |
-| **Step 47** | 19 | R7: M-before(CLIEN 0.0677, NATEPAN 0.0598) + Haiku 거절 픽스 | 🔄 M-after 대기 |
+| **Step 47** | 19·26 | R7: M-before(CLIEN 0.0677, NATEPAN 0.0598) + 언어 가드 3계층 + M-after CLIEN 0.4661 | 🔄 NATEPAN 미달(25건) |
 | **Step 48** | 21 | R8: 6라운드 결산 + cond5 FAIL 확정 + R9 계획 | ✅ |
 | **Step 49** | 22 | R9 Track A: OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 | ✅ 배포완료 |
 | **Step 50** | 22 | R9 Track B: CASUAL 25% 분기 + PromptAssembler.assembleCasualPostPrompt | ✅ 배포완료 |

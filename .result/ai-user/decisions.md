@@ -510,3 +510,32 @@ prod도 동일 이슈 확인 — prod 배포는 명시 지시 후 절대규칙 #
 - THEQOO AI corpus(100건) 스타일 분석 (현재 스타일 파악)
 
 **예상 결과**: P(human) 방향 정상화 → cond4 THEQOO PASS → 5조건 전부 충족 → AI_USER_ML_ENABLED=true 수동 활성화 가능
+
+## D-65 — R7 M-after 전략 A 실행 결과 (2026-06-18, 세션 26)
+
+**배경**: R7 COMMENT MAUVE M-after 측정을 위해 전략 A(AI_USER_ENABLED=true 틱) 실행.
+선행: 언어 가드(한글 비율 < 10% → 무효) 3계층 구현(cb57c25f) + ML corpus 오염 171건 정화.
+
+**실행**:
+- generation_config: target_comments=300, target_votes=40, target_likes=40, target_posts=2
+- AI_USER_DAILY_GLOBAL_CAP=500, actions_today 리셋
+- AI_USER_ENABLED=true (DB ai_user_runtime.enabled=1)
+
+**결과**:
+
+| 커뮤니티 | n_ai_fresh | M-before | M-after | Δ | 판정 |
+|---|---|---|---|---|---|
+| CLIEN | 62 | 0.0677 | **0.4661** | **+0.3984** | ✅ 개선 확인 |
+| NATEPAN | 25 | 0.0598 | NOT RUN (< 50) | — | 🔄 축적 진행 |
+
+**기술 관찰**:
+- 언어 가드 적용 후 Haiku 100% 거절(Kiro 풀 그대로) → L1 감지 → Sonnet 폴백 발동
+- Sonnet 성공률 ~25% (7-8 토큰 거절 vs 62+ 토큰 성공)
+- 1 tick = budget=7, planned=~2 actions, ~0.35 COMMENT 성공/tick
+- 추정 NATEPAN 도달 시간: 80-120h (>24h 시간 박스) — 자연 축적 진행 중
+
+**교란 변수**: M-before=Haiku 직접 생성 / M-after=Sonnet 폴백 경로. 모델 변화+N6+R7 복합.
+
+**판정**: CLIEN COMMENT Δ=+0.3984 — R7 개선 효과 입증. NATEPAN은 축적 후 별도 측정 예정(비크리티컬).
+
+**원복 필요 시**: AI_USER_ENABLED=false + generation_config 원복(80/325/785/10/50) + cap 원복(200).

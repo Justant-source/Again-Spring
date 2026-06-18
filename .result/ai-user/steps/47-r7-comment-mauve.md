@@ -52,6 +52,30 @@ D-51: COMMENT M-before 측정 완료. AI와 human COMMENT 분포 격차 정량�
 - 신선 댓글 축적 (자연 틱): NATEPAN/CLIEN 댓글은 자연 틱으로 생성됨
 - M-after 측정: 축적 후 eval/baseline 재실행
 
+## R7 M-after 결과 (2026-06-18, 세션 26)
+
+**전략 A 실행**: `AI_USER_ENABLED=true` 틱 라이프사이클 (target_comments=300, cap=500)
+
+| 커뮤니티 | n_ai_fresh | n_human | MAUVE M-after | ΔMAUVE | 판정 |
+|---|---|---|---|---|---|
+| CLIEN | 62 | 200 | **0.4661 ± 0.0** (5-run) | **+0.3984** | ✅ 개선 확인 |
+| NATEPAN | 25 | — | NOT RUN (25 < 50 미달) | — | 🔄 축적 진행 중 |
+
+**측정 세부**:
+- 기준선: `ingested_at > '2026-06-17 09:13:00'` (언어 가드 정화 후 신선분)
+- 도구: `mauve-text 0.4+`, `featurize_model_name='gpt2'`, `device_id=0 (RTX 3090)`
+- 변동성: std=0.0 (5회 모두 동일 — deterministic featurization, fixed data)
+
+**교란 변수**:
+- M-before(0.0677): Haiku 경로 (Kiro 혼입 시절, 대부분 영어 거절 후 필터)
+- M-after(0.4661): Sonnet 폴백 경로 (언어 가드→Haiku 거절 감지→Sonnet 재생성)
+- 모델 변화(Haiku→Sonnet) + N6+R7 개선 복합 기여 — 단독 귀속 불가
+
+**R7 판정**: CLIEN ΔMAUVE=+0.3984 — **명확한 개선 확인** (N6+R7+Sonnet 경로 복합)
+
+---
+
 ## 상태
 - **M-before**: ✅ 완료
-- **M-after**: ⏳ 축적 대기 (신선 댓글 필요)
+- **M-after CLIEN**: ✅ 0.4661 (Δ=+0.3984, 2026-06-18)
+- **M-after NATEPAN**: 🔄 신선 25건, 50건 미달 — 축적 진행 중
