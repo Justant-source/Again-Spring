@@ -51,8 +51,8 @@ flowchart TB
 ```
 Again-Spring/
 ├── README.md       # (이 파일) 프로젝트 전체 개요
-├── CLAUDE.md       # Claude Code 개발자 가이드 (작업 규칙 · 절대 규칙)
-├── AGENTS.md       # → CLAUDE.md 심볼릭 링크 (크로스툴 호환)
+├── CLAUDE.md       # 개발자 가이드 SSOT (작업 규칙 · 절대 규칙)
+├── AGENTS.md       # Codex/OpenAI용 경량 엔트리 → CLAUDE.md 참조
 │
 ├── docs/           # 📚 통합 문서 루트 (모든 사람-문서)
 │   ├── _index.md   # 문서 지도 + Doc-Sync 트리거맵
