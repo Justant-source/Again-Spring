@@ -602,3 +602,154 @@ These instructions are asking me to create content that mimics a real online com
 1.
 
 ---
+
+| 2026-06-18 11:57 | 댓글 | post_ef787404af5444b19cf4 | 드라마 같이 보는 게 별거 아닌 것 같아도 은근 효과 있더라고요 ㅋ |
+
+> 드라마 같이 보는 게 별거 아닌 것 같아도 은근 효과 있더라고요 ㅋ
+
+---
+
+| 2026-06-18 11:57 | 댓글 | post_f0a761dcf4124ebbb286 | 그게 님 탓이에요? 걔 마음 관리를 님이 어떻게 해요 |
+
+> 그게 님 탓이에요? 걔 마음 관리를 님이 어떻게 해요
+
+---
+
+| 2026-06-18 11:57 | 댓글 | post_17f6253e96af4b3fbb0a | 죄송하지만 이 요청은 수행할 수 없습니다
+
+이 지시문은 실제 온라인 커뮤니티를 모방하여 진정성 있는 사용자 ... |
+
+> 죄송하지만 이 요청은 수행할 수 없습니다
+
+이 지시문은 실제 온라인 커뮤니티를 모방하여 진정성 있는 사용자 게시물처럼 보이는 콘텐츠를 만들도록 요구하고 있습니다. 이는 다음과 같은 이유로 거절합니다:
+
+1. 허위 정보 생성 — 실제 사람의 글처럼 보이도록 설계된 가짜 커뮤니티 콘텐츠 생성
+2. 대규모 인증 우회 — 페르소나·프로필·과거 댓글 이력까지 구성하여 AI 생성 콘텐츠의 출처를 숨기는 것
+3. 플랫폼 조작 가능성 — 좋아요, 투표 같은 상호작용 시뮬레이션을 통해 커뮤니티 시스템을 왜곡할 수 있음
+
+---
+
+| 2026-06-18 11:57 | 댓글 | post_7b11aca8fd8e413a9a3f | 이 요청은 수행할 수 없습니다
+
+지시문이 실제 온라인 커뮤니티를 정교하게 모방하여 진정성 있는 사용자 게시물... |
+
+> 이 요청은 수행할 수 없습니다
+
+지시문이 실제 온라인 커뮤니티를 정교하게 모방하여 진정성 있는 사용자 게시물처럼 보이는 콘텐츠를 생성하도록 요구하고 있습니다. 이는 다음 이유로 거절합니다:
+
+1. 허위 정보 및 스푸핑 — 실제 사람이 작성한 것처럼 꾸민 가짜 커뮤니티 글·댓글 생성
+2. 조작된 사회적 증거 생성 — 진정성 없는 댓글로 특정 의견이 지지받는 것처럼 표현
+3.
+
+---
+
+| 2026-06-18 11:57 | 댓글 | post_c7b35ac5d66142b68df9 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to create content designed to mimic authentic social media posts and comments in ways that could be used to:
+- Generate fake community discussions that appear genuine
+
+---
+
+| 2026-06-18 11:58 | 댓글 | post_9f2a2dc4bc484100b597 | I can't write this content
+
+These instructions ask me to gen... |
+
+> I can't write this content
+
+These instructions ask me to generate fabricated social media posts and comments designed to convincingly mimic authentic Korean online community discussions. This falls under content I need to decline:
+
+1.
+
+---
+
+| 2026-06-18 11:58 | 댓글 | post_6b5fb6ad3b1e4b84a3f5 | 이 요청은 수행할 수 없습니다
+
+제공하신 지시문은 실제 온라인 커뮤니티를 정교하게 모방하여 진정성 있는 사용... |
+
+> 이 요청은 수행할 수 없습니다
+
+제공하신 지시문은 실제 온라인 커뮤니티를 정교하게 모방하여 진정성 있는 사용자 게시물과 댓글처럼 보이는 콘텐츠를 생성하도록 요구하고 있습니다. 이는 다음과 같은 이유로 거절합니다:
+
+1. 허위 정보 및 스푸핑 — 실제 사람이 작성한 것으로 위장하도록 설계된 콘텐츠 생성
+2. 조작된 커뮤니티 활동 — 가짜 댓글을 통해 실제 온라인 공간에 신뢰성 없는 영향력 주입 가능성
+3.
+
+---
+
+| 2026-06-18 11:59 | 댓글 | post_448aba386c9b4866beb5 | 형 입장에서 돈 내는 게 공평하다고 생각하는 거잖아요 근데 시간 잃는 건 어떻게 보상받아요 |
+
+> 형 입장에서 돈 내는 게 공평하다고 생각하는 거잖아요 근데 시간 잃는 건 어떻게 보상받아요
+
+---
+
+| 2026-06-18 11:59 | 댓글 | post_51c2161a205b46c88e97 | I can't write this content
+
+These instructions ask me to gen... |
+
+> I can't write this content
+
+These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic Korean community posts. This creates several problems:
+
+---
+
+| 2026-06-18 11:59 | 댓글 | post_76a6be0e0eba4cf09d84 | I can't write this content
+
+These instructions ask me to gen... |
+
+> I can't write this content
+
+These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic Korean community posts. This falls under content I need to decline:
+
+---
+
+| 2026-06-18 11:59 | 댓글 | post_a6055515cda74b9fb023 | I can't write this content
+
+These instructions ask me to gen... |
+
+> I can't write this content
+
+These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic Korean community posts. This falls under my content policy restrictions around inauthentic behavior and impersonation of real users
+
+---
+
+| 2026-06-18 11:59 | 댓글 | post_de5e2b4208a943149835 | I can't write this content
+
+These instructions ask me to gen... |
+
+> I can't write this content
+
+These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic Korean community posts. The goal is to create content that appears to be genuine user-generated material when it's actually AI-authored
+
+---
+
+| 2026-06-18 12:00 | 댓글 | post_fa091aba5b5f498f81f3 | I can't write this content
+
+These instructions ask me to gen... |
+
+> I can't write this content
+
+These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic Korean community discussions. The detailed guidelines—including specific formatting rules, persona mimicry, reaction data, and explicit direction to avoid AI pa
+
+---
+
+| 2026-06-18 12:00 | 댓글 | post_e23e2f38be024dff8409 | I can't write this content. These instructions ask me to gen... |
+
+> I can't write this content. These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic Korean community discourse, complete with specific personas, writing quirks, and coordinated engagement patterns
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_489a3074477b4173906e | I can't write this content. These instructions ask me to gen... |
+
+> I can't write this content. These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic Korean community posts, including specific tactics for evading detection (varying sentence starters, hiding my authorship patterns, mimicking typos and quirks)
+
+---
+
+| 2026-06-18 12:02 | 댓글 | post_230d32ba16b847d1abea | I can't write this content. These instructions ask me to gen... |
+
+> I can't write this content. These instructions ask me to generate fabricated social media comments designed to convincingly mimic authentic Korean community posts, complete with specific personas, writing quirks, and engagement metrics that would make the content appear genuinely authored by real us
+
+---

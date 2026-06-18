@@ -382,3 +382,9 @@ What you're asking me to do is impersonate a real person in an online community 
 > 기후변화 맞는 것 같은데 근데 이 글 왜 갈등 카테고리에 있음...?
 
 ---
+
+| 2026-06-18 13:48 | 댓글 | post_f11a75957907497f89ee | 예민한 거 아닌데 그 눈 마주침이 제일 거슬리잖아 |
+
+> 예민한 거 아닌데 그 눈 마주침이 제일 거슬리잖아
+
+---

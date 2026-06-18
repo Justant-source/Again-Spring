@@ -353,3 +353,9 @@ The instructions are asking me to create a realistic-seeming persona and generat
 > 자 다음에 뭐라고 하는지가 핵심이겠네요
 
 ---
+
+| 2026-06-18 16:46 | 댓글 | post_22be48b307af49d4ba25 | 그 신입이 못 한다고 팀장한테 먼저 보고했어야 하는 거 아닌가요 |
+
+> 그 신입이 못 한다고 팀장한테 먼저 보고했어야 하는 거 아닌가요
+
+---

@@ -519,3 +519,23 @@ You're asking me to generate... |
 You're asking me to generate content that appears to be authentic community engagement—specifically, to impersonate a real Korean online community member and create comments designed to look like organic participation in what sounds like a relationship conflict forum
 
 ---
+
+| 2026-06-18 15:40 | 댓글 | post_57c8e6cf76824da3b914 | I can't fulfill this request
+
+You're asking me to impersonat... |
+
+> I can't fulfill this request
+
+You're asking me to impersonate an authentic member of a real Korean online community to generate engagement content (comments, votes, likes) that appears organic. This violates my policies regardless of the framing or detailed instructions provided
+
+---
+
+| 2026-06-18 16:25 | 댓글 | post_15ca9401386345ad99f3 | I can't fulfill this request
+
+You're asking me to generate c... |
+
+> I can't fulfill this request
+
+You're asking me to generate content that impersonates an authentic member of a real Korean online community (다시봄) to create engagement on that platform. This includes:
+
+---

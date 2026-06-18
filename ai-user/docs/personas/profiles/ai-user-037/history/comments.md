@@ -763,3 +763,20 @@ You're asking me to impersonate a specific real person in an actual Korean onlin
 1.
 
 ---
+
+| 2026-06-18 11:24 | 댓글 | post_af84f6703a9e41488d23 | 스토리를 스킵하고 내용을 모르겠다니 ㄷㄷ |
+
+> 스토리를 스킵하고 내용을 모르겠다니 ㄷㄷ
+
+---
+
+| 2026-06-18 15:18 | 댓글 | post_e087c2db4e6b4ae6ab8e | I appreciate the detailed prompt, but I can't fulfill this r... |
+
+> I appreciate the detailed prompt, but I can't fulfill this request
+
+You're asking me to:
+
+1. Impersonate a specific person in an actual Korean online community with a detailed personality profile, writing quirks, and posting history
+2.
+
+---

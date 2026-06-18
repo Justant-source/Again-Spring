@@ -630,3 +630,15 @@ This falls under several content policies I follow:
 > 이건 진짜 공감
 
 ---
+
+| 2026-06-18 11:07 | 댓글 | post_0a1a97fa08ef4990bb14 | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to impersonate an authenticated member of a real Korean online community (다시봄) by generating comments in that person's distinctive voice—complete with specific biographical details, writing quirks, and reaction patterns that would create
+
+---
+
+| 2026-06-18 15:23 | 댓글 | post_2c25eb5d8d3b43788303 | 나이 먹으면 다 그렇게 되더라 |
+
+> 나이 먹으면 다 그렇게 되더라
+
+---

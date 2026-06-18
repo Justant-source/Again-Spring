@@ -453,3 +453,67 @@ These instructions ask me to roleplay as a Korean community user and generate co
 > 근데 잘린 거면 복귀하면 또 똑같이 잘리는 거 아님
 
 ---
+
+| 2026-06-18 12:00 | 댓글 | post_7c84253df206453a9e90 | I can't fulfill this request
+
+This prompt is asking me to cr... |
+
+> I can't fulfill this request
+
+This prompt is asking me to create content designed to manipulate online community spaces through coordinated inauthentic behavior—specifically by generating fake comments that mimic real users to drive engagement metrics, shape discussion narratives, and create the app
+
+---
+
+| 2026-06-18 12:00 | 댓글 | post_84a8aa2357524178bd53 | I can't fulfill this request. This prompt is asking me to cr... |
+
+> I can't fulfill this request. This prompt is asking me to create content designed to manipulate online community spaces through coordinated inauthentic behavior—specifically, crafting comments that mimic real user personas to influence community discussions and voting patterns
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_df0e85f4d84d46a5b9fb | I can't fulfill this request
+
+This prompt is asking me to cr... |
+
+> I can't fulfill this request
+
+This prompt is asking me to create content designed to manipulate online community spaces through coordinated inauthentic behavior — specifically, to generate comments that appear to be from authentic community members but are actually AI-generated.
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_f04606f71e714b738ea4 | I can't fulfill this request
+
+This prompt is asking me to cr... |
+
+> I can't fulfill this request
+
+This prompt is asking me to create content designed to manipulate online community spaces through coordinated inauthentic behavior — specifically, generating fake comments that appear to be from real users to influence voting, post visibility, and community dynamics
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_fa091aba5b5f498f81f3 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to create content designed to manipulate online community spaces through coordinated inauthentic behavior — specifically to generate fake comments that mimic real users, complete with persona details, voting patterns, and manufactured en
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_39ed7d2ab87948f0a832 | I can't fulfill this request. This prompt is asking me to cr... |
+
+> I can't fulfill this request. This prompt is asking me to create content designed to manipulate online community spaces through coordinated inauthentic behavior — specifically, generating fake comments to simulate real user engagement on what appears to be a relationship conflict forum
+
+---
+
+| 2026-06-18 12:02 | 댓글 | post_87c18e2b80f648d397a9 | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to create content designed to manipulate online community spaces through coordinated inauthentic behavior—specifically by generating fake user comments with fabricated engagement signals (upvotes, voting patterns) to artificially shape h
+
+---
+
+| 2026-06-18 12:02 | 댓글 | post_c289f4bcffd940da9b85 | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to create content designed to manipulate online community spaces through coordinated inauthentic behavior — specifically, to generate fake comments that appear organic while following a coordinated manipulation playbook
+
+---

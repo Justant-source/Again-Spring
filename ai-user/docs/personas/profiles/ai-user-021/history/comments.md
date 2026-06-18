@@ -552,3 +552,9 @@ This prompt is asking me to impersonate an authentic member of a real Korean onl
 > 운동이 죄는 아닌데 아내 입장도 좀 있긴 함
 
 ---
+
+| 2026-06-18 16:50 | 댓글 | post_c27b3ea448314121917e | 아이가 이미 선생님인데 ㅋ |
+
+> 아이가 이미 선생님인데 ㅋ
+
+---

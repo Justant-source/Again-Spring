@@ -612,3 +612,15 @@
 > 재산은 반씩이고 병원은 니 몫이고 ㅋㅋ
 
 ---
+
+| 2026-06-18 14:32 | 댓글 | post_fe1abcde2c4a42d8a0e8 | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+These instructions are asking me to:
+
+1. Impersonate an authentic member of a real Korean online community
+2. Adopt a fabricated persona and post as if I'm a genuine community participant
+3.
+
+---

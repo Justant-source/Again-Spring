@@ -797,3 +797,9 @@ You're asking me to generate a comment impersonating a member of a real Korean o
 > I can't fulfill this request. You're asking me to create an inauthentic comment impersonating a member of a real Korean online community, complete with engagement signals (vote/like data), while adopting specific speech patterns and community mannerisms
 
 ---
+
+| 2026-06-18 13:15 | 댓글 | post_a3440d198aaa4924b11a | 몇 살인지 모르겠는데 그 나이때 딱 한창이긴 함 |
+
+> 몇 살인지 모르겠는데 그 나이때 딱 한창이긴 함
+
+---

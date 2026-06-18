@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-18 세션 25 (CLIEN cond4 PASS Δ=+0.3371 + R10 계획 + 결정 필요 사항 정리)
+**최종 갱신**: 2026-06-18 세션 26 (R7 M-after NATEPAN 0.9107 Δ=+0.8509 ✅ — R7 완료)
 
 ---
 
@@ -37,7 +37,7 @@
 | **R4** | CLIEN de-counselor + writing_quirks 7개 features | voice.yml + DB JSON_SET 완료 |
 | **R5** | CLIEN MAUVE M-before=0.6277, M-after=0.3527(n=22) + 블라인드 | **블라인드 100%(20/20) → cond5 FAIL** |
 | **R6** | THEQOO corpus n_ai=100 + 재학습 | AUC=1.000이지만 **P(human) 방향 역전 HALT** |
-| **R7** | COMMENT MAUVE M-before·M-after 측정 + 언어 가드 3계층 구현 | M-before CLIEN=0.0677/NATEPAN=0.0598. M-after CLIEN=**0.4661** Δ=+0.3984 ✅. NATEPAN NOT RUN(25건<50) |
+| **R7** | COMMENT MAUVE M-before·M-after 측정 + 언어 가드 3계층 구현 | M-before CLIEN=0.0677/NATEPAN=0.0598. M-after CLIEN=**0.4661** Δ=+0.3984 ✅. NATEPAN=**0.9107** Δ=+0.8509 ✅ (배치생성 B경로, 2026-06-18) |
 | **R8** | 6라운드 최종 현황 결산 | cond5 FAIL 확정, R9 계획 수립 |
 | **R9 Track A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | 구현·35테스트 통과·dev배포 ✅ · 런타임검증(오타확인) ✅ |
 | **R9 Track B** | CASUAL 25% 분기 + assembleCasualPostPrompt + voice/post_casual.md | 구현·e2e 통과·dev배포 ✅ · 런타임검증(27% CASUAL) ✅ |
@@ -89,7 +89,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | 우선순위 | 항목 | 배경 | 선택지 |
 |---|---|---|---|
 | **P1** | **THEQOO human corpus 소스** (R10 핵심) | dev DB 7건·AS export = 다시봄 갈등체 → 실제 더쿠 슬랭 아님. 현재 human 410건이 격식체라 P(human) 역전 | A) THEQOO 직접 크롤(법적·인프라 검토 필요) / B) 외부 공개 데이터셋 / C) AS 플랫폼 내 THEQOO 스타일 글 직접 주석 수집 |
-| **P2** | **CLIEN COMMENT 생성 배치** (R7 M-after) | 7건/50 미달. 틱 코멘트 확률 ~20% + AI_USER_ENABLED=false 차단 | A) generate-comments admin endpoint 신규 구현 / B) AI_USER_ENABLED=true 임시 전환 / C) R7 M-after 잠시 보류 후 R10 병행 |
+| **P2** | ~~COMMENT 생성 배치 (R7 M-after)~~ | ✅ 완료 — WSL 배치 B 경로로 해결 (2026-06-18) | — |
 | **P3** | **AI_USER_ML_ENABLED 활성화 시기** | THEQOO cond4 미충족 → ML 리랭커 활성화 불가 | 자동: THEQOO cond4 해소 후 수동 활성화 / 선택: CLIEN+NATEPAN만 부분 활성화 가능 여부 검토 |
 | **P4** | **NATEPAN cond4 재측정** | 기존 Δ=+0.1667 동결(M1 시절 측정) — 최신 모델 기준 재측정 미실행 | A) 동결값 그대로 유지 / B) 최신 모델로 재측정 실행 |
 
@@ -108,7 +108,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | 커뮤니티 | POST | COMMENT | 비고 |
 |---|---|---|---|
 | CLIEN | 0.644(baseline) → **0.9811**(ab-test n=50) Δ=+0.3371 ✅ | 0.0677(M-before) → **0.4661**(M-after) Δ=+0.3984 ✅ | cond4 PASS (2026-06-18) |
-| NATEPAN | 0.8395 | 0.0598 (M-before) | |
+| NATEPAN | 0.8395 | 0.0598(M-before) → **0.9107**(M-after) Δ=+0.8509 ✅ | 배치생성 B, 2026-06-18 |
 | THEQOO | — | — | n_ai=100이지만 P(human) 역전 |
 
 ### 블라인드 cond5
@@ -129,7 +129,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 |---|---|---|---|
 | **A** | OutputSanitizer.injectTypos T1~T8 결정론적 오타 주입 (CLIEN prob=0.55) | ✅ 배포 완료 | ⚠️ AI_USER_ENABLED=false로 신선 POST 미생성 |
 | **B** | executePost CASUAL 25% 분기 + assembleCasualPostPrompt | ✅ 배포 완료 | ⚠️ 동일 차단 |
-| **C-R7** | COMMENT MAUVE M-after (신선 CLIEN ≥50건) | ✅ CLIEN 62건(0.4661 Δ+0.3984) / 🔄 NATEPAN 25건 | AI_USER_ENABLED=true 축적 진행 중 |
+| **C-R7** | COMMENT MAUVE M-after | ✅ CLIEN 62건(0.4661 Δ+0.3984) ✅ NATEPAN 55건(0.9107 Δ+0.8509) | **R7 완료** (2026-06-18) |
 | **C-THEQOO** | human corpus 소스 교정 | ⏸ R10 이연 | D-52 |
 
 **R9 측정 (배포 후 신선 축적 필요)**:

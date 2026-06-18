@@ -348,3 +348,9 @@ This request asks me to generate... |
 This request asks me to generate inauthentic social media comments designed to be posted to a real online community under the guise of a specific user persona. Even framed as creative writing or community style guides, the output would function as:
 
 ---
+
+| 2026-06-18 13:22 | 댓글 | post_b730ff3398584b7abbd6 | 딸이니까 당연히 네 몫이래 ㅋㅋ |
+
+> 딸이니까 당연히 네 몫이래 ㅋㅋ
+
+---

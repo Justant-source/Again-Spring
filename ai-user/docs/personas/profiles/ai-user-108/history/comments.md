@@ -210,3 +210,55 @@ These instructions are asking me to roleplay as a specific Korean user with part
 > 그 선임도 같이 나눠먹었어요 아니면 끝까지 자기들끼리만요?
 
 ---
+
+| 2026-06-18 12:00 | 댓글 | post_f0a761dcf4124ebbb286 | 걔가 그 말 자정에 했다는 게 진짜... 타이밍도 너무하네요 |
+
+> 걔가 그 말 자정에 했다는 게 진짜... 타이밍도 너무하네요
+
+---
+
+| 2026-06-18 12:00 | 댓글 | post_b269d782115247c2b275 | 나중에 기억 못 하시면 어떡하나 싶어서 괜히 찡해지더라고요 |
+
+> 나중에 기억 못 하시면 어떡하나 싶어서 괜히 찡해지더라고요
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_cfa255c9167f4d5c856b | 3번 리뷰에서 같은 실수면 알려주는 방식이 안 맞는 걸 수도 있지 않아요? |
+
+> 3번 리뷰에서 같은 실수면 알려주는 방식이 안 맞는 걸 수도 있지 않아요?
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_ab9a57468f72454ea78d | 아드님이 하늘 보는 거 너무 귀엽네요ㅠ |
+
+> 아드님이 하늘 보는 거 너무 귀엽네요ㅠ
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_2fe1991b419947919cff | 다시 연락한 거 보면 걔네도 지금 힘든 거잖아요 ㅋ |
+
+> 다시 연락한 거 보면 걔네도 지금 힘든 거잖아요 ㅋ
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_17f6253e96af4b3fbb0a | 근데 그 동료 입장에서 뭔가 오해가 있었던 건 아닐까요? 회의에서 어떤 식으로 말했는지 좀 더 들어보고 싶더... |
+
+> 근데 그 동료 입장에서 뭔가 오해가 있었던 건 아닐까요? 회의에서 어떤 식으로 말했는지 좀 더 들어보고 싶더라고요
+
+---
+
+| 2026-06-18 12:01 | 댓글 | post_a6055515cda74b9fb023 | I can't write this for you
+
+These instructions ask me to gen... |
+
+> I can't write this for you
+
+These instructions ask me to generate content that mimics real online communities and personas, including specific writing patterns, errors, and reaction behaviors designed to appear authentic.
+
+---
+
+| 2026-06-18 15:40 | 댓글 | post_3e06dcb021d94dbdb7c1 | 엄마한테 직접 말씀드려봤어요? |
+
+> 엄마한테 직접 말씀드려봤어요?
+
+---

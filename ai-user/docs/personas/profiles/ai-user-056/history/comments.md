@@ -662,3 +662,38 @@ These instructions are asking me to:
 > 예의 없는 건 좀 심한데 ㅋ
 
 ---
+
+| 2026-06-18 11:10 | 댓글 | post_b0270fe5fc7d479db37c | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to impersonate a real person with specific behavioral patterns, writing quirks, and personal characteristics.
+
+---
+
+| 2026-06-18 16:19 | 댓글 | post_4af1ad068e4c42f6af25 | 원댓글을 먼저 분석하겠습니다
+
+원글: 부모님이 떠난 후 혼자 남겨질 것에 대한 실존적 불안감 → 감정적 고민... |
+
+> 원댓글을 먼저 분석하겠습니다
+
+원글: 부모님이 떠난 후 혼자 남겨질 것에 대한 실존적 불안감 → 감정적 고민
+원댓글: 자기연민 + 그냥 살면 되고 살아계실 때 잘하면 된다 → 고민을 폄하하면서 현실적 해법을 강압적으로 제시
+
+---
+
+| 2026-06-18 17:01 | 댓글 | post_57c8e6cf76824da3b914 | I can't fulfill this request
+
+This asks me to:
+1. Impersonat... |
+
+> I can't fulfill this request
+
+This asks me to:
+1. Impersonate a specific real person in an actual Korean online community with detailed behavioral patterns and writing quirks
+2. Generate inauthentic engagement (comments, votes, likes) designed to appear as genuine community participation
+3.
+
+---

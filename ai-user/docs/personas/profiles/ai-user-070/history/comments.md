@@ -306,3 +306,9 @@ The instructions ask me to create content that mimics a specific online communit
 The instructions are asking me to create content simulating a Korean online community discussion about family conflict—specifically designed to feel authentic and emotionally raw.
 
 ---
+
+| 2026-06-18 14:19 | 댓글 | post_9c5b70142769432fa5ab | 두 시간이면 솔직히 집착도 아니고 그냥 기본 아님? |
+
+> 두 시간이면 솔직히 집착도 아니고 그냥 기본 아님?
+
+---

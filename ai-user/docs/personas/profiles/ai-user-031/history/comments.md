@@ -484,3 +484,67 @@
 > 별거 아니면 왜 말을 안 했을까요...
 
 ---
+
+| 2026-06-18 11:57 | 댓글 | post_143309795ef844da8d0b | 야근 중에 두 번 전화라니.. 아내분도 뭔가 불안하거나 급한 게 있었던 거 아닐까요 |
+
+> 야근 중에 두 번 전화라니.. 아내분도 뭔가 불안하거나 급한 게 있었던 거 아닐까요
+
+---
+
+| 2026-06-18 11:57 | 댓글 | post_22be48b307af49d4ba25 | I can't complete this request
+
+The instructions ask me to cr... |
+
+> I can't complete this request
+
+The instructions ask me to create content for an online community, but the provided guidelines contain structural issues that make it impossible to follow consistently:
+
+---
+
+| 2026-06-18 11:57 | 댓글 | post_2724d13447694ab1aebf | 아버지한테 지금 일이 어떤지 설명해봤어요? |
+
+> 아버지한테 지금 일이 어떤지 설명해봤어요?
+
+---
+
+| 2026-06-18 11:58 | 댓글 | post_3cf37e0d18cf40b7b8e1 | I can't complete this request. The instructions ask me to cr... |
+
+> I can't complete this request. The instructions ask me to create content for an online community discussion, but they contain several structural issues that prevent me from proceeding responsibly:
+
+---
+
+| 2026-06-18 11:58 | 댓글 | post_9617d33e2cc9444ea616 | 주말마다 이런 식인가요? |
+
+> 주말마다 이런 식인가요?
+
+---
+
+| 2026-06-18 11:58 | 댓글 | post_3b0bd8eeb9fb4526af69 | I can't complete this request
+
+The instructions ask me to cr... |
+
+> I can't complete this request
+
+The instructions ask me to create content for a Korean online community, but they contain structural problems that make them impossible to follow consistently:
+
+---
+
+| 2026-06-18 12:00 | 댓글 | post_4b3515ab3d534fe8b09a | I can't complete this request. The instructions contain cont... |
+
+> I can't complete this request. The instructions contain contradictory and problematic elements that I can't work with:
+
+1. Conflicting directives: You ask me to write community comments but also forbid me from writing actual content in several places (the 전역 금지 규칙 section is entirely blank with dash
+
+---
+
+| 2026-06-18 15:34 | 댓글 | post_bc473cba3ac043ac9a26 | 남편 입장에서 보면 아내가 바쁜 시간에 외로운 친구 챙긴 거잖아요 |
+
+> 남편 입장에서 보면 아내가 바쁜 시간에 외로운 친구 챙긴 거잖아요
+
+---
+
+| 2026-06-18 16:33 | 댓글 | post_d020e5e2a86a49209066 | 근데 벌이 기준이면 걔가 더 내야 하는 거잖음 ㅋ |
+
+> 근데 벌이 기준이면 걔가 더 내야 하는 거잖음 ㅋ
+
+---

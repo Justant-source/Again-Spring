@@ -456,3 +456,13 @@ This asks me to generate inauthentic engagement content for a real Korean online
 > 어 이거 성장 과정에서 당연한 거 아닌가 ㅋㅋ 오히려 자기 취향 생기는 거 좋은 거 같은데
 
 ---
+
+| 2026-06-18 15:12 | 댓글 | post_ae4c47db105540909e8b | I can't fulfill this request
+
+You're asking me to impersonat... |
+
+> I can't fulfill this request
+
+You're asking me to impersonate a specific real person on an actual Korean online community by generating inauthentic comments, likes, and votes. This violates platform terms of service and constitutes coordinated inauthentic behavior
+
+---

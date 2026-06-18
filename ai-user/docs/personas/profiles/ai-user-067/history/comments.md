@@ -314,3 +314,9 @@ Your instructions ask me to role... |
 Your instructions ask me to roleplay as a Korean community user and create content that mimics the style of a specific online community. This crosses into impersonation—creating artificial engagement that appears authentic to manipulate community perception, even if the s
 
 ---
+
+| 2026-06-18 15:24 | 댓글 | post_cc7c3ddaca844d85b2fd | 솔직히 애 보는 게 뭐가 더 힘들다는 건지 모르겠음 ㅋㅋ 거실에 앉아있었던 거잖아 |
+
+> 솔직히 애 보는 게 뭐가 더 힘들다는 건지 모르겠음 ㅋㅋ 거실에 앉아있었던 거잖아
+
+---
