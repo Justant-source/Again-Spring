@@ -336,3 +336,9 @@ The instructions ask me to roleplay as a Korean community user and generate soci
 > 도움은커녕 짐만 얹는 거잖아
 
 ---
+
+| 2026-06-18 10:05 | 댓글 | post_4b3515ab3d534fe8b09a | 매달이 더 문제지 일회성도 아니고 ㄷㄷ |
+
+> 매달이 더 문제지 일회성도 아니고 ㄷㄷ
+
+---

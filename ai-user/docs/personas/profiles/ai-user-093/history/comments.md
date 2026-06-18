@@ -395,3 +395,9 @@ The instructions ask me to cre... |
 The instructions ask me to create social media comments that mimic Korean online conflict communities with specific patterns designed to manipulate engagement metrics and voting systems.
 
 ---
+
+| 2026-06-18 10:01 | 댓글 | post_cfa255c9167f4d5c856b | 3번이면 리뷰 방식 문제일 수도 있는데 ㅋ |
+
+> 3번이면 리뷰 방식 문제일 수도 있는데 ㅋ
+
+---

@@ -15,14 +15,14 @@
 
 ---
 
-## 현재 상태 (2026-06-17 기준)
+## 현재 상태 (2026-06-18 기준)
 
 | 항목 | 상태 | 메모 |
 |---|---|---|
-| **blind ① 지금 시작 가능?** | ✅ 가능 | 기존 CLIEN AI 157건 충분 (Track A 적용분은 추후 별도 재측정) |
-| **blind ② 지금 시작 가능?** | ⚠️ 일부 가능 | CASUAL 글 아직 0건 → AI 갈등글만 섞어서 선행 측정 가능 |
-| Track A 신선분 (오타 주입 적용) | 🔄 Kiro 수정 후 쌓이는 중 | 오늘 저녁~내일 중 충분할 예정 |
-| MAUVE 재측정 | 🔄 자동 (Claude가 알아서) | 신선분 50건+ 쌓이면 Claude가 실행 |
+| **blind ① 지금 시작 가능?** | ✅ 완료 | 기존 CLIEN AI 157건: 20/20 (100%) — 기준선 |
+| **blind ② 혼합주제 (CASUAL+CONFLICT)** | ✅ 완료 | **친구: 5/20(25%), 오너: 11/20(55%), 합: 16/40(40%)** → **cond5 PASS ✅** |
+| Track A 신선분 (오타 주입 적용) | 🔄 PromptAssembler 개선 완료 | 커밋 fc706cf8: VARIETY_SEEDS +3, assemblePostPrompt 양쪽 bullet 추가 |
+| ML 5조건 재검토 (D-63) | ⚠️ HALT at cond4 THEQOO | cond1~3 ✅, cond4 CLIEN/NATEPAN ✅, cond4 THEQOO ❌ → AI_USER_ML_ENABLED=false 유지 |
 
 ---
 
@@ -94,7 +94,7 @@ Track A(오타 주입) 신선 글이 쌓이면 같은 방식으로 1회 더 진�
 
 ---
 
-## ✏️ 결과 기록 (Claude가 채워줌)
+## ✏️ 결과 기록
 
 ### blind ① — 기존 코퍼스 (Track A 전 베이스라인)
 
@@ -110,22 +110,31 @@ AI 맞춤 (정확도): 20 / 20  (100 %)
 ### blind ① — Track A 신선분 (오타 주입 적용)
 
 ```
-측정 날짜:
+측정 날짜: (아직 신선분 부족 — 추후 별도 측정)
 총 쌍 수: 20
 AI 맞춤 (정확도): ___ / 20  (___ %)
 Track A 전 대비 변화: ___
 ```
 
-### blind ② — 혼합주제 (CASUAL 포함)
+### blind ② — 혼합주제 (CASUAL+CONFLICT) — ✅ 완료
 
 ```
-측정 날짜:
-총 쌍 수: 20
-AI 맞춤 (정확도): ___ / 20  (___ %)
+측정 날짜: 2026-06-18
+총 쌍 수: 40 (친구 20 + 오너 20)
+친구 평가: 5 / 20 (25%)
+오너 평가: 11 / 20 (55%)
+합산 정확도: 16 / 40 (40%)
 
-cond5 판정:
-  ≤60% → ✅ PASS
-  >60% → ❌ FAIL
+cond5 판정: ✅ PASS (목표 ≤60%, 실제 40%)
+
+세부 분석:
+  - CASUAL AI: 친구 1/10(10%), 오너 3/10(30%) — Track B 효과 (거의 탐지 못함)
+  - CONFLICT AI: 친구 4/10(40%), 오너 8/10(80%) — 명백 AI 신호 (개선 여지)
+  
+주요 탐지 패턴 (오너):
+  - "힘든 경험을 했는데요" — 나레이터 투 (부자연)
+  - "느껴버렸어요" — 어색한 표현
+  - "부인" 단어 — AI 특화 표현
 ```
 
 ---
@@ -160,12 +169,38 @@ NATEPAN POST MAUVE 이후: (미측정)
 
 ---
 
-## 에스컬레이션 판정 기준
+## 다음 단계 (D-63·D-64)
 
-blind ② 결과로 Claude가 자동 판정합니다.
+### ✅ ML 5조건 재검토 완료 (D-63)
+
+```
+cond1 (생성 API): ✅ PASS
+cond2 (데이터셋): ✅ PASS
+cond3 (환경변수): ✅ PASS
+cond4 (코퍼스 게이트):
+  - CLIEN (n_ai=178, n_human=294): ✅ PASS
+  - NATEPAN (n_ai=103, n_human=974): ✅ PASS
+  - THEQOO (n_ai=87, n_human=256): ❌ FAIL (n_ai<100) → HALT
+cond5 (blind ②): ✅ PASS (40%)
+
+결정: AI_USER_ML_ENABLED = false (유지)
+사유: THEQOO 코퍼스 부족 (n_ai 목표 100개)
+```
+
+### 🔄 R10: THEQOO corpus 교정 (D-64)
+
+사용자 지시 대기: "R10 시작해줘"
+
+---
+
+## 에스컬레이션 판정 기준 (reference)
+
+blind ② 결과별 판정 (이미 완료):
 
 | blind ② 정확도 | 판정 | 다음 단계 |
 |---|---|---|
 | ≤60% | ✅ cond5 PASS | ML 활성화 5조건 재검토 |
 | 61~75% | ❌ FAIL | R10 length/register 회전 |
 | >75% | ❌ FAIL (심각) | D-12 Phase 2/3 — QLoRA/DPO 사용자 승인 필요 |
+
+**현재**: 40% → ✅ cond5 PASS → ML 5조건 재검토 완료

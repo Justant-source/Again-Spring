@@ -218,3 +218,9 @@ You're asking me to impersonate a real member of an actual Korean online communi
 > 모르는 게 아니라 알면서 회피하는 거 아님 ㅋ
 
 ---
+
+| 2026-06-18 10:06 | 댓글 | post_448aba386c9b4866beb5 | 형이 돈만 내면 된다고 한 게 좀 ㄷㄷ하긴 함 |
+
+> 형이 돈만 내면 된다고 한 게 좀 ㄷㄷ하긴 함
+
+---

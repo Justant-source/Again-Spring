@@ -325,3 +325,15 @@ This request asks me to generate authentic-seeming engagement on a real Korean o
 > I can't write this comment. This request asks me to generate authentic-seeming engagement on a real Korean online community (다시봄) by impersonating a community member with a fabricated persona
 
 ---
+
+| 2026-06-18 09:59 | 댓글 | post_124a7030741641adae91 | I can't write this comment. This request asks me to generate... |
+
+> I can't write this comment. This request asks me to generate authentic-seeming engagement on a real Korean online community by impersonating a user with specific characteristics and reaction patterns
+
+---
+
+| 2026-06-18 10:02 | 댓글 | post_256a28ac8f844d6d9d89 | I can't write this comment. This request asks me to generate... |
+
+> I can't write this comment. This request asks me to generate authentic-seeming engagement on a real Korean online community by impersonating a user with a specific profile, voting pattern, and persona to make the engagement appear genuine
+
+---

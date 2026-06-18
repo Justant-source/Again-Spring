@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-18 세션 25 (blind② 55% PASS + 합산 40% + PromptAssembler 개선)
+**최종 갱신**: 2026-06-18 세션 25 (CLIEN cond4 PASS Δ=+0.3371 + R10 계획 + 결정 필요 사항 정리)
 
 ---
 
@@ -16,9 +16,10 @@
 
 ## 현재 위치
 
-- **Phase**: R9 **cond5 PASS** ✅ (blind② 25%) → ML 활성화 5조건 재검토 단계
+- **Phase**: R9 완료 ✅ → ML 5조건 재검토 완료 (D-63) → **R10 계획 단계** (THEQOO corpus 소스 결정 대기)
+- **5조건 차단 현황**: cond4 THEQOO ❌ (P역전 HALT, D-52) — 나머지 4조건 모두 ✅ (cond5 합산 40% ✅)
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **직전 커밋**: `051e025f` (2026-06-17) — D-55 blind 이유 칸 추가 정책
+- **직전 커밋**: `fc706cf8` (2026-06-18) — PromptAssembler 3개 개선 + blind② 오너 결과
 - **Track A+B**: 구현 배포 확정 ✅ / 런타임 검증 완료 ✅ (오타 발견, CASUAL 글 확인)
 - **CASUAL 오염 수정**: llm-ai-user 재빌드 완료(dev), 오염 5건 정리 완료 ✅
 
@@ -53,7 +54,7 @@
 
 | 작업 | 내용 | 위치 | 선결 |
 |---|---|---|---|
-| **R7 M-after** | COMMENT MAUVE 재측정 (신선 CLIEN ai ≥50건) | WSL python3 mauve | ✅ CLIEN 94 신선분 축적 완료 |
+| **R7 M-after** | COMMENT MAUVE 재측정 (신선 CLIEN COMMENT ai ≥50건) | WSL python3 mauve | ❌ CLIEN COMMENT 7건/50 미달 (POST 94건은 별개, 결정P2 대기) |
 | **blind ① 기존코퍼스** | ✅ 완료 — 100% FAIL (베이스라인) | .result/ai-user/blind/ | — |
 | **blind ① Track A 신선분** | ✅ 파일 생성 — 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/r9-blind1-fresh-survey.md | ⏳ 사용자 응답 대기 |
 | **blind ②** | ✅ 파일 생성 — 혼합주제 20쌍 (CONFLICT+CASUAL AI vs human) | .result/ai-user/blind/r9-blind2-mixed-survey.md | ⏳ 사용자 응답 대기 |
@@ -80,6 +81,17 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 ```
 
 **AI_USER_ML_ENABLED 상태**: false (불변 — cond4 THEQOO만 미충족)
+
+---
+
+## 🔴 결정 필요 사항 (사용자 결정 대기)
+
+| 우선순위 | 항목 | 배경 | 선택지 |
+|---|---|---|---|
+| **P1** | **THEQOO human corpus 소스** (R10 핵심) | dev DB 7건·AS export = 다시봄 갈등체 → 실제 더쿠 슬랭 아님. 현재 human 410건이 격식체라 P(human) 역전 | A) THEQOO 직접 크롤(법적·인프라 검토 필요) / B) 외부 공개 데이터셋 / C) AS 플랫폼 내 THEQOO 스타일 글 직접 주석 수집 |
+| **P2** | **CLIEN COMMENT 생성 배치** (R7 M-after) | 7건/50 미달. 틱 코멘트 확률 ~20% + AI_USER_ENABLED=false 차단 | A) generate-comments admin endpoint 신규 구현 / B) AI_USER_ENABLED=true 임시 전환 / C) R7 M-after 잠시 보류 후 R10 병행 |
+| **P3** | **AI_USER_ML_ENABLED 활성화 시기** | THEQOO cond4 미충족 → ML 리랭커 활성화 불가 | 자동: THEQOO cond4 해소 후 수동 활성화 / 선택: CLIEN+NATEPAN만 부분 활성화 가능 여부 검토 |
+| **P4** | **NATEPAN cond4 재측정** | 기존 Δ=+0.1667 동결(M1 시절 측정) — 최신 모델 기준 재측정 미실행 | A) 동결값 그대로 유지 / B) 최신 모델로 재측정 실행 |
 
 ---
 

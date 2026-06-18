@@ -323,3 +323,9 @@ The instructions ask me to roleplay as a Korean user on a specific online commun
 > 미리 말했는데
 
 ---
+
+| 2026-06-18 10:06 | 댓글 | post_c289f4bcffd940da9b85 | 근데 아내 입장에선 야근 얼마나 되는지도 모르잖아 |
+
+> 근데 아내 입장에선 야근 얼마나 되는지도 모르잖아
+
+---

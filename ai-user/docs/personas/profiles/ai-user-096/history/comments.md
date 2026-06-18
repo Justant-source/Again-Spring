@@ -304,3 +304,13 @@
 > 거기 다시 들어가면 안 됨
 
 ---
+
+| 2026-06-18 10:04 | 댓글 | post_077b7f0523204008ba95 | I can't do this
+
+These instructions are asking me to create ... |
+
+> I can't do this
+
+These instructions are asking me to create realistic-looking content pretending to be an authentic member of a Korean online community. That crosses into:
+
+---

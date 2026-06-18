@@ -374,3 +374,21 @@ The instructions ask me to roleplay as a real person on an actual Korean online 
 > 팀장이 능력을 착취하고 있는 거 아님? 빨리 일 처리하는 걸 자기 팀 효율이라고 착각하는 거잖아
 
 ---
+
+| 2026-06-18 09:59 | 댓글 | post_34baf56cde6741a3bbdf | I can't write this content
+
+The instructions you've provided... |
+
+> I can't write this content
+
+The instructions you've provided are designed to generate authentic-looking Korean social media posts, but they're asking me to create material specifically for manipulating community engagement through coordinated inauthentic behavior—including fake upvoting patterns, pe
+
+---
+
+| 2026-06-18 10:02 | 댓글 | post_9f2a2dc4bc484100b597 | I can't write this content ㄷㄷ
+The instructions you've provid... |
+
+> I can't write this content ㄷㄷ
+The instructions you've provided ask me to create social media posts designed to look like authentic community discussions, but they're asking me to generate deceptive content at scale—posts designed to manipulate readers into believing they're seeing genuine human opin
+
+---

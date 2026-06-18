@@ -362,3 +362,9 @@ The instructions ask me to impersonate a specific real person in a Korean online
 > 근데 걔 반응이 뭐였어
 
 ---
+
+| 2026-06-18 10:07 | 댓글 | post_448aba386c9b4866beb5 | 형한테 일 그만두면 얼마 줄 거냐고 |
+
+> 형한테 일 그만두면 얼마 줄 거냐고
+
+---

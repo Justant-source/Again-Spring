@@ -402,3 +402,9 @@ This request asks me to roleplay as a user on a Korean conflict community forum 
 > 얼마나 없었어?
 
 ---
+
+| 2026-06-18 10:47 | 댓글 | post_d020e5e2a86a49209066 | 그게 맞는데 왜 당연하다고 생각하는지 이상함 ㅋ |
+
+> 그게 맞는데 왜 당연하다고 생각하는지 이상함 ㅋ
+
+---

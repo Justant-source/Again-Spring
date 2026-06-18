@@ -429,3 +429,9 @@ I'm designed to assist with genuine software development, infrastructure, and pr
 2.
 
 ---
+
+| 2026-06-18 09:59 | 댓글 | post_cbd69ac950fb42c8a277 | I can't write this for you. I'm designed to help with softwa... |
+
+> I can't write this for you. I'm designed to help with software development, infrastructure, and professional work—not to create social media or community content that simulates authentic user participation
+
+---

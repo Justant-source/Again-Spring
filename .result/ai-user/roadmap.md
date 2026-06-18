@@ -584,3 +584,70 @@
 - 264건 인제스트 실패 = AI 생성물(오케스트레이터 출력) 해시와 전부 충돌
 - **판정**: 제외. enable-gate cond1/cond2는 THEQOO/CLIEN/NATEPAN 3개 커뮤니티 기준.
 - **기록**: steps/34-m8-dcinside.md
+
+---
+
+## Base Hardening 7라운드 — R10: THEQOO corpus 교정 (🔴 소스 결정 대기)
+
+> **목표**: THEQOO human corpus를 실제 더쿠/여초 스타일로 교체 → P(human) 역전 해소 → cond4 THEQOO PASS → 5조건 전부 충족 → AI_USER_ML_ENABLED=true 수동 활성화
+> **불변**: AI_USER_ML_ENABLED=false 유지. enable은 5조건 전부 충족 후 수동으로.
+> **전제**: D-64 계획, D-52 HALT. 소스 결정(P1) → 착수.
+
+---
+
+## Step 52 (R10-1) — THEQOO human corpus 스타일 분석 + 소스 결정 🔴
+
+**목표**: 현재 human corpus 410건의 실제 스타일 분석 → P역전 원인 확인 → 대체 소스 결정.
+
+**배경**:
+- Human corpus 410건: AS 플랫폼 갈등 서사 스타일 (격식체, 마침표, 한자어)
+- AI THEQOO corpus 100건: 실제 더쿠 스타일 (헐ㄷㄷ/ㅠㅠ/~당, 초성체, 짧은 문장, 반말)
+- P(human) 역전: 판별기가 "슬랭=AI, 격식=human"으로 학습됨
+
+**소스 선택지** (사용자 결정 필요 — P1):
+- A) THEQOO/더쿠 직접 크롤 — 최고 품질, 법적·인프라 검토 필요
+- B) 외부 공개 여초/커뮤니티 데이터셋 — 스타일 매칭 검증 필요
+- C) AS 플랫폼 내 THEQOO voice 봇 글을 human corpus 씨앗으로 재사용 (circular risk 주의)
+
+**완료 기준**:
+- [ ] human corpus 410건 어체 분포 분석 보고 (평균 길이/어체/주제)
+- [ ] 소스 결정 + 수집 계획 확정
+- **halt**: 소스 결정 없으면 착수 금지
+
+---
+
+## Step 53 (R10-2) — THEQOO human corpus 교체 + 재학습
+
+**목표**: 실제 더쿠/여초 스타일 human 포스트 ≥300건 수집 → corpus 교체 → 재학습.
+
+**선결**: Step 52 소스 결정 + 수집 완료.
+
+**완료 기준**:
+- [ ] 기존 THEQOO human corpus 스타일 불일치분 삭제 (사용자 승인 필수 — 대량 삭제)
+- [ ] 신규 human corpus ≥300건 ingest + 스팟체크 (슬랭 High 확인)
+- [ ] `/train` 재실행 → CV-AUC + P(human) 방향 확인 (슬랭 高/격식 低)
+- **halt**: P(human) 방향 역전 잔존 시 → 소스 재검토
+
+---
+
+## Step 54 (R10-3) — THEQOO cond4 A-B 재실행
+
+**목표**: 교정된 판별기로 cond4 THEQOO MAUVE A-B 재측정 → PASS 여부 판정.
+
+**선결**: Step 53 완료 + P(human) 정상화 확인.
+
+**완료 기준**:
+- [ ] MAUVE A-B n≥50 ctx, K≥3 시드 → Δ>0 확인
+- [ ] cond4 THEQOO PASS ✅ → 5조건 전부 충족
+- [ ] enable-candidates 엔드포인트 확인 → 사용자에게 `AI_USER_ML_ENABLED=true` 수동 활성화 보고
+- **cond4 판별기로 검증 금지(순환)** — MAUVE A-B만
+
+---
+
+## 병행 가능 작업 (R10 진행 중)
+
+| 작업 | 내용 | 선결 |
+|---|---|---|
+| R7 M-after (P2) | CLIEN COMMENT ai ≥50 축적 → MAUVE M-after 측정 | 생성 방법 결정(P2) 후 |
+| NATEPAN cond4 재측정 | 최신 모델로 A-B 재실행 | P4 사용자 선택 |
+| prod 배포 | CLIEN+NATEPAN ML 활성화 포함 | THEQOO cond4 해소 후 절대규칙 #4 |

@@ -741,3 +741,25 @@ You're asking me to:
 2.
 
 ---
+
+| 2026-06-18 10:02 | 댓글 | post_4804507be61a4048a1a2 | 근데 화면을 왜 돌리는거임 그게 제일 이상하지않음? |
+
+> 근데 화면을 왜 돌리는거임 그게 제일 이상하지않음?
+
+---
+
+| 2026-06-18 10:43 | 댓글 | post_af84f6703a9e41488d23 | 그게 본인 책임을 남에게 떠넘기는 거 아니냐고 |
+
+> 그게 본인 책임을 남에게 떠넘기는 거 아니냐고
+
+---
+
+| 2026-06-18 10:46 | 댓글 | post_fdfae390fd8c4830b73b | I appreciate the detailed prompt, but I can't fulfill this r... |
+
+> I appreciate the detailed prompt, but I can't fulfill this request
+
+You're asking me to impersonate a specific real person in an actual Korean online community (다시봄) by adopting a detailed persona with consistent patterns, writing quirks, and error behaviors. This crosses into:
+
+1.
+
+---

@@ -489,3 +489,9 @@ This prompt is asking me to:
 > 일요일 오후에 월요일 오전까지라니 그냥 명백한 야근 강요네 근데 그걸 왜 본인 잘못처럼 생각해
 
 ---
+
+| 2026-06-18 09:59 | 댓글 | post_87c18e2b80f648d397a9 | I can't write this. This request asks me to generate content... |
+
+> I can't write this. This request asks me to generate content that mimics real people's conflicts and family dynamics in ways that could normalize bias or unfair treatment based on birth order or gender
+
+---

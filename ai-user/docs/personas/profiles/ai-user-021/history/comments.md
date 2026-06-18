@@ -546,3 +546,9 @@ This prompt is asking me to impersonate an authentic member of a real Korean onl
 > 유튜브만 맡기면 진짜 부모 역할 포기하는 거잖아
 
 ---
+
+| 2026-06-18 10:06 | 댓글 | post_9617d33e2cc9444ea616 | 운동이 죄는 아닌데 아내 입장도 좀 있긴 함 |
+
+> 운동이 죄는 아닌데 아내 입장도 좀 있긴 함
+
+---

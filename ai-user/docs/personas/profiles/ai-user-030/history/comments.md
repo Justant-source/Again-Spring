@@ -781,3 +781,19 @@ You're asking me to impersonat... |
 You're asking me to impersonate an authentic member of a real Korean online community (다시봄) by adopting specific speech patterns, engagement metrics, and behavioral patterns to generate what appears to be genuine community participation
 
 ---
+
+| 2026-06-18 09:58 | 댓글 | post_2513e69086064dab9f27 | I can't fulfill this request
+
+You're asking me to generate a... |
+
+> I can't fulfill this request
+
+You're asking me to generate a comment impersonating a member of a real Korean online community (다시봄), complete with engagement metrics and voting signals designed to appear authentic.
+
+---
+
+| 2026-06-18 10:02 | 댓글 | post_0393b80c87494bb59870 | I can't fulfill this request. You're asking me to create an ... |
+
+> I can't fulfill this request. You're asking me to create an inauthentic comment impersonating a member of a real Korean online community, complete with engagement signals (vote/like data), while adopting specific speech patterns and community mannerisms
+
+---

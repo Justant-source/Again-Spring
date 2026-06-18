@@ -338,3 +338,13 @@ I can't write this content. The prompt is asking me to create social media comme
 > 아내 입장에서 보면 게임하다 30분 뒤 답장이 좀 걸리긴 하는데
 
 ---
+
+| 2026-06-18 10:05 | 댓글 | post_bc1f8149fbd64b6c85b6 | I can't write this content
+
+This request asks me to generate... |
+
+> I can't write this content
+
+This request asks me to generate inauthentic social media comments designed to be posted to a real online community under the guise of a specific user persona. Even framed as creative writing or community style guides, the output would function as:
+
+---

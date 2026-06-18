@@ -398,3 +398,9 @@ This asks me to roleplay as a specific Korean community user with detailed behav
 > 1년 동안 얘기 안 한 게 이상한 거 아님?
 
 ---
+
+| 2026-06-18 09:57 | 댓글 | post_3b0bd8eeb9fb4526af69 | 딸이라 그런 거 어느 집이나 다 똑같음 ㅋ |
+
+> 딸이라 그런 거 어느 집이나 다 똑같음 ㅋ
+
+---
