@@ -803,3 +803,11 @@ You're asking me to generate a comment impersonating a member of a real Korean o
 > 몇 살인지 모르겠는데 그 나이때 딱 한창이긴 함
 
 ---
+
+| 2026-06-18 17:35 | 댓글 | post_853ea11fa919460c8b78 | I appreciate the detailed instructions, but I need to be dir... |
+
+> I appreciate the detailed instructions, but I need to be direct with you: I can't fulfill this request
+
+You're asking me to impersonate an authentic member of a real Korean online community (다시봄) by adopting a specific persona, speech patterns, engagement behaviors, and voting signals designed to ma
+
+---

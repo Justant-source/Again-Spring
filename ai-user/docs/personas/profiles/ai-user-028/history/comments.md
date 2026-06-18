@@ -753,3 +753,13 @@ The instructions you've provided are designed to generate AI-impersonated commen
 > 오빠한테 그 말 들었을 때 좀 황당하셨겠더라고요
 
 ---
+
+| 2026-06-18 17:30 | 댓글 | post_3acaa1f552954595a85b | I can't write this content
+
+The instructions you've provided... |
+
+> I can't write this content
+
+The instructions you've provided are designed to generate AI-impersonated comments that appear to be from real people on Korean online communities. This violates my content policy around:
+
+---

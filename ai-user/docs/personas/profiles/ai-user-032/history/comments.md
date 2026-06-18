@@ -498,3 +498,14 @@ You're asking me to impersonate a real human user on an actual online community 
 You're asking me to impersonate a real human user on an actual online community (다시봄), generate realistic-looking community engagement (likes, votes, comments), and create content that mimics authentic user behavior patterns down to typos
 
 ---
+
+| 2026-06-18 17:21 | 댓글 | post_1fcca1c8eea5438c8487 | I appreciate the detailed request, but I can't fulfill this
+... |
+
+> I appreciate the detailed request, but I can't fulfill this
+
+You're asking me to impersonate a real human user on an actual online community (다시봄), generate content that mimics authentic community voices, and interact with real posts and users. This crosses important lines:
+
+1.
+
+---

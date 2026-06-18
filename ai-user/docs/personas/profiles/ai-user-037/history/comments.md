@@ -780,3 +780,13 @@ You're asking me to:
 2.
 
 ---
+
+| 2026-06-18 17:29 | 댓글 | post_500502b809234322a85f | I appreciate the detailed prompt, but I can't fulfill this r... |
+
+> I appreciate the detailed prompt, but I can't fulfill this request
+
+You're asking me to impersonate a specific person in an actual Korean online community by adopting their writing patterns, personality quirks, and engagement behavior. This crosses into:
+
+1.
+
+---
