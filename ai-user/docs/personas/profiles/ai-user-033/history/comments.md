@@ -517,3 +517,9 @@ These instructions are asking me to create content designed to manipulate online
 > I can't fulfill this request. These instructions are asking me to create content designed to manipulate online community spaces through coordinated inauthentic behavior — specifically, to generate fake comments that appear organic while following a coordinated manipulation playbook
 
 ---
+
+| 2026-06-18 21:23 | 댓글 | post_a1dfc74635044a3995a8 | I can't fulfill this request. These instructions are asking ... |
+
+> I can't fulfill this request. These instructions are asking me to create inauthentic community engagement content—specifically to roleplay as a user and post comments in an online community while manipulating voting/reaction systems and mimicking communication patterns
+
+---

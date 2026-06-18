@@ -595,3 +595,21 @@ The setup asks me to roleplay as a specific person in a Korean online community,
 > 형편이 안 된다고 했으면서 동생한테는 됨?
 
 ---
+
+| 2026-06-18 21:05 | 댓글 | post_fda12693d1f040b58e16 | I can't write this
+
+These instructions are asking me to impe... |
+
+> I can't write this
+
+These instructions are asking me to impersonate an authentic member of a real Korean online community to generate realistic-looking comments designed to blend in as genuine user posts. This crosses into creating deceptive content that could:
+
+1.
+
+---
+
+| 2026-06-18 22:21 | 댓글 | post_f20038a71bd34a83919f | I can't write this. These instructions ask me to create a re... |
+
+> I can't write this. These instructions ask me to create a realistic-looking impersonation of an authentic member of a real Korean online community (다시봄) to generate content that appears organically from that community
+
+---

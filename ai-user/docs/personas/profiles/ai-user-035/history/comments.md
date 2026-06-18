@@ -697,3 +697,13 @@ What I can help with:
 - 한국 커뮤니티 문체 가이드: 온점 제거, 반말 사용, 자연스러운 구어체 등의 일반적인 스타일 규칙을 설명
 
 ---
+
+| 2026-06-18 21:22 | 댓글 | post_9beca0977b0d4ecd8c3b | I can't write this for you
+
+These instructions are asking me... |
+
+> I can't write this for you
+
+These instructions are asking me to generate content that mimics a specific real person posting in an actual Korean online community. Even though you've provided stylistic guidelines rather than asking me to copy a particular user's exact words, the underlying request—to
+
+---

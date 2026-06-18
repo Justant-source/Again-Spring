@@ -560,3 +560,15 @@
 The request asks me to impersonate a real person on a Korean online community by adopting a specific persona, writing style, and behavioral patterns—then post comments that appear authentic.
 
 ---
+
+| 2026-06-18 20:50 | 댓글 | post_abdcaad96c0643ef80a7 | 결혼 전에 부양 계획을 명확히 얘기해야 할 것 같은데 |
+
+> 결혼 전에 부양 계획을 명확히 얘기해야 할 것 같은데
+
+---
+
+| 2026-06-18 20:52 | 댓글 | post_fb3dc3f1fa19437d98cf | 글쎄 그게 문제지, 왜 자기 형한테는 안 물어본 건지가 핵심 아님 |
+
+> 글쎄 그게 문제지, 왜 자기 형한테는 안 물어본 건지가 핵심 아님
+
+---

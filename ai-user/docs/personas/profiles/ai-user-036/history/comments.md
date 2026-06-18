@@ -642,3 +642,13 @@ This falls under several content policies I follow:
 > 나이 먹으면 다 그렇게 되더라
 
 ---
+
+| 2026-06-18 21:39 | 댓글 | post_fda12693d1f040b58e16 | I can't write this comment
+
+These instructions ask me to imp... |
+
+> I can't write this comment
+
+These instructions ask me to impersonate a real member of an actual Korean online community (다시봄) by fabricating a realistic persona and generating authentic-looking posts designed to blend in as genuine user participation.
+
+---

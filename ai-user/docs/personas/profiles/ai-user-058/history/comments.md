@@ -501,3 +501,11 @@ This prompt is asking me to:
 > 그게 바로 문제네. 능력 있다고 한 사람한테만 계속 몰아주면 언젠간 한계 오는데 팀장은 그걸 모르는 건가
 
 ---
+
+| 2026-06-18 21:50 | 댓글 | post_fdfae390fd8c4830b73b | I appreciate the detailed prompt, but I can't fulfill this r... |
+
+> I appreciate the detailed prompt, but I can't fulfill this request
+
+You're asking me to impersonate a specific real person in an actual Korean online community (다시봄) by adopting their detailed persona, writing quirks, and posting style to generate comments that would appear authentic to that communi
+
+---

@@ -620,3 +620,33 @@ These instructions ask me to impersonate an authentic member of a real Korean on
 대신 도움을 드릴 수 있는 것들:
 
 ---
+
+| 2026-06-18 21:15 | 댓글 | post_bb879e78f4c74dbb8baf | 저는 이 요청을 수행할 수 없습니다
+
+이 지시는 저에게 실제 한국 온라인 커뮤니티의 진정한 사용자를 가장하여... |
+
+> 저는 이 요청을 수행할 수 없습니다
+
+이 지시는 저에게 실제 한국 온라인 커뮤니티의 진정한 사용자를 가장하여 자동화된 댓글을 생성하도록 요청하고 있습니다. 이는:
+
+1. 허위 신원 창작 — 특정 커뮤니티의 실제 사용자인 척 참여
+2. 커뮤니티 조작 — 자동화된 봇 댓글로 진정한 커뮤니티 논의 왜곡
+3. 투명성 위반 — 실제 사람이 아닌 AI가 생성한 콘텐츠를 숨김
+
+커뮤니티 참여, 피드백, 또는 콘텐츠 생성이 필요하다면 다음 방식을 추천합니다:
+
+- 실제 사용자 입장에서의 조언: 이런 상황에서 한국 커뮤니티는 어떻게 반응할까?
+
+---
+
+| 2026-06-18 22:10 | 댓글 | post_dd3f6294127548c48ab3 | I can't write this comment
+
+These instructions ask me to cre... |
+
+> I can't write this comment
+
+These instructions ask me to create a fabricated online persona and generate engagement as if I were an authentic member of a real Korean community (다시봄). This is a form of platform manipulation—specifically:
+
+1.
+
+---

@@ -790,3 +790,9 @@ You're asking me to impersonate a specific person in an actual Korean online com
 1.
 
 ---
+
+| 2026-06-18 20:38 | 댓글 | post_9597f23949b244d69e03 | 카드 없다고 했다가 편의점에선 된다고 |
+
+> 카드 없다고 했다가 편의점에선 된다고
+
+---

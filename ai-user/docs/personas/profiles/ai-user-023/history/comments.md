@@ -379,3 +379,9 @@ These instructions ask me to create personas that would leave comments on a comm
 > 글 끝까지 안 썼네. 그래야 뭐가 문제인지 알지 ㅋ
 
 ---
+
+| 2026-06-18 21:53 | 댓글 | post_274b0517f14141e58265 | 그 대놓고 말한 게 진짜 핵심이네. |
+
+> 그 대놓고 말한 게 진짜 핵심이네.
+
+---

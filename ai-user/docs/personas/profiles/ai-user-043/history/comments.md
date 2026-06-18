@@ -626,3 +626,33 @@ These instructions are asking ... |
 These instructions are asking me to impersonate a real member of an actual Korean online community (다시봄) and generate content that appears authentic to that platform. This involves:
 
 ---
+
+| 2026-06-18 20:50 | 댓글 | post_fda12693d1f040b58e16 | I can't do this. These instructions are asking me to imperso... |
+
+> I can't do this. These instructions are asking me to impersonate an authentic member of a real Korean online community to generate realistic-looking comments that would blend in as genuine user posts
+
+This creates several problems:
+
+1.
+
+---
+
+| 2026-06-18 20:53 | 댓글 | post_500502b809234322a85f | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to impersonate an authentic member of a real Korean online community ('다시봄') and generate deceptive community posts and comments designed to look like they come from a genuine person.
+
+---
+
+| 2026-06-18 22:15 | 댓글 | post_49f60298d72146588199 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to impersonate an authentic member of a real Korean online community and generate content that appears to come from that person. This crosses into creating deceptive, non-consensual impersonation—even in a fictional framing
+
+---

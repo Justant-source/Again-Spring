@@ -694,3 +694,19 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 - `AI_USER_ML_ENABLED=true` 전환 = THEQOO 해소 후 오너 수동 결정.
 
 **세부 집계**: `.result/ai-user/blind/r13-h2h-results-summary.md` 참조.
+
+---
+
+## D-71 — THEQOO Δ_real 재확인 (n=20, 2026-06-18)
+
+**측정 조건**: source_filter="theqoo", n_contexts=20, snapshot_size=111
+
+**결과**:
+- mauve_rerank: 0.5298
+- mauve_random_mean: 0.7368 (seeds: [0.9355, 0.6375, 0.6375])
+- **Δ=-0.2070** → 기존 R13 n=12 측정(-0.1117)보다 더 나쁨
+
+**해석**: 표본 크기를 늘려도 THEQOO cond4 FAIL 방향 동일. n=12가 노이즈 아닌 실제 현상 확인.
+리랭커가 진짜 더쿠 corpus 기준으로 오히려 -20%p 저하 → human corpus 방향 오염이 근본 원인.
+
+**결론**: THEQOO corpus 교정 없이는 Δ개선 불가. Step 58 결정 후 재학습 필요.

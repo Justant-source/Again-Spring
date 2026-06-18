@@ -520,3 +520,12 @@ You're asking me to impersonate a real human user on an actual online community 
 1.
 
 ---
+
+| 2026-06-18 21:25 | 댓글 | post_a1dfc74635044a3995a8 | I appreciate the detailed request, but I can't fulfill this
+... |
+
+> I appreciate the detailed request, but I can't fulfill this
+
+You're asking me to impersonate a real human user on an actual online community (다시봄), generate what appears to be authentic community engagement, and produce reaction metadata that would make the output look like genuine platform activity
+
+---

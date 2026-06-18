@@ -447,3 +447,9 @@ I'm designed to assist with genuine software development, infrastructure, and pr
 > 그 친구 왔을 때 표정부터 달라지지 않았음?
 
 ---
+
+| 2026-06-18 21:53 | 댓글 | post_a6ada60ecff240b48930 | 연락은 뭐하려고… 자기가 이별 통보한 쪽인데 |
+
+> 연락은 뭐하려고… 자기가 이별 통보한 쪽인데
+
+---

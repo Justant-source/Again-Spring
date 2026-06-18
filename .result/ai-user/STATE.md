@@ -76,7 +76,7 @@ cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9973
 cond3: ✅ SPLITTER_VERIFIED=True
 cond4: ✅ CLIEN Δ=+0.0134 AND h2h 50%≤50% PASS (R13, 신 cond4 D-68)
        ✅ NATEPAN Δ=-0.0001 AND h2h 47.1%≤52.9% PASS (R13, 신 cond4 D-68)
-       ❌ THEQOO Δ_real=-0.1117 FAIL (R13, 진짜 111건, corpus 수집 필요)
+       ❌ THEQOO Δ_real=-0.2070 FAIL (R13 재확인 n=20, 진짜 111건, corpus 수집 필요)
 cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 
@@ -109,7 +109,7 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 |---|---|---|---|
 | CLIEN | 0.644(baseline) → **0.9811**(ab-test n=50) Δ=+0.3371 ✅ | 0.0677(M-before) → **0.4661**(M-after) Δ=+0.3984 ✅ | cond4 PASS (2026-06-18) |
 | NATEPAN | 0.8395 | 0.0598(M-before) → **0.9107**(M-after) Δ=+0.8509 / **M-after(R11) Δ=-0.2901** ❌ | R7 배치=+0.8509, R11 재측정=Δ=-0.2901 FAIL |
-| THEQOO | — | **R10 Δ=+0.4458 vs R11 Δ=+0.0417** ⚠️ | R10=Sonnet, R11=Haiku Phase1b (포화, 한계선) |
+| THEQOO | — | **R10 Δ=+0.4458 vs R11 Δ=+0.0417 vs R13재확인(n=20) Δ=-0.2070** ❌ | 진짜corpus 111건 기준 — corpus 교정 필요 |
 
 ### 블라인드 cond5
 | 라운드 | 커뮤니티 | 정확도 | 목표 |

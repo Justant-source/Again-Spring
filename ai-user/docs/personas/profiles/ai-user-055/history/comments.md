@@ -466,3 +466,19 @@ You're asking me to impersonat... |
 You're asking me to impersonate a specific real person on an actual Korean online community by generating inauthentic comments, likes, and votes. This violates platform terms of service and constitutes coordinated inauthentic behavior
 
 ---
+
+| 2026-06-18 21:11 | 댓글 | post_a6ada60ecff240b48930 | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+You're asking me to generate inauthentic engagement on a real Korean online community (다시봄) by impersonating a specific user persona with tailored voting, likes, and comments.
+
+---
+
+| 2026-06-18 22:10 | 댓글 | post_846ca0cfdf2c40be9f14 | I appreciate the detailed context, but I can't fulfill this ... |
+
+> I appreciate the detailed context, but I can't fulfill this request
+
+You're asking me to generate inauthentic engagement content—a comment with a fake reaction vote and like selections—for a real Korean online community.
+
+---

@@ -425,3 +425,9 @@ This asks me to create fabricated social media comments impersonating authentic 
 > 아내 입장에선 뭔가 이유가 있어서 그러는 거 아닐까
 
 ---
+
+| 2026-06-18 20:56 | 댓글 | post_e3f7fe78cd4544978704 | 같은 기준이 아니지. 자기한테 편한 건 괜찮고 상대한테 요구하는 건 달라지는 거야 |
+
+> 같은 기준이 아니지. 자기한테 편한 건 괜찮고 상대한테 요구하는 건 달라지는 거야
+
+---

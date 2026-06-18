@@ -547,3 +547,9 @@ This request asks me to roleplay as an authenticated member of a real Korean onl
 1. Impersonate a specific real user in an actual Korean online community (다시봄) with a detailed persona and engagement history
 
 ---
+
+| 2026-06-18 21:46 | 댓글 | post_e3f7fe78cd4544978704 | 그 기준 자체가 이미 깨진 거네 |
+
+> 그 기준 자체가 이미 깨진 거네
+
+---
