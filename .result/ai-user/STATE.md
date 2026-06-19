@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 46 (Step 76 완료 — automatic pre-blind gates)
+**최종 갱신**: 2026-06-19 세션 47 (Step 77 완료 — runtime host recovery handoff)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 76 완료 — automatic pre-blind gates
+- **Phase**: Step 77 완료 — runtime host recovery handoff
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -120,6 +120,7 @@
   - 필요 시 THEQOO cond5 friend 응답 추가
   - automatic gate reports는 새 라운드 survey 생성 직후 먼저 실행
   - `benefit_pp >= 5%p`인 community만 selective gate(B) 후보로 평가
+  - host 접근 주체는 `recover_runtime_host.py`로 `docker compose up` + `:8092` health polling을 한 번에 실행
 - **이번 추가 하드닝**:
   - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
   - runtime `OutputSanitizer`와 CLI fallback 하네스(`build_h2h_survey.py`, `run_ab_test.py`) 동시 반영
@@ -130,6 +131,10 @@
     - `/corpus/stats` 최신 수치 확인 완료
     - `localhost:8092` health still down
     - `/usr/bin/ssh` 실행 권한 거부, local `docker` 부재 → host handoff 필요
+  - host-side recovery helper:
+    - `.result/ai-user/scripts/recover_runtime_host.py`
+    - `docker compose -f env/docker-compose.dev.yml --env-file env/.env.dev up -d llm-ai-user`
+    - `curl` 없이 Python urllib로 `:8092/actuator/health`를 polling
 
 ---
 
@@ -186,6 +191,7 @@
 | **Step 74** | R14 blind fingerprint registry | **✅ 완료** | text fingerprint dedupe + file lock + exact 재사용 차단 |
 | **Step 75** | R14 THEQOO fresh cond5 owner | **✅ 완료** | owner 19/20 유효, 84.2% FAIL, feedback hardening 반영 |
 | **Step 76** | R14 automatic pre-blind gates | **✅ 완료** | tell scan / proxy judge / adversarial shortlist 추가 및 실측 |
+| **Step 77** | R14 runtime host recovery handoff | **✅ 완료** | host용 `docker compose up` + `:8092` health polling helper 추가 |
 
 ### 중기
 

@@ -1283,3 +1283,25 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **의미**:
 - 자동화 3종으로 수동 라운드 수는 줄일 수 있다.
 - 하지만 현재 증거상, 이 자동화만으로 `AI_USER_ML_ENABLED` 판단을 대체하면 과신 위험이 크다.
+
+## D-91 — runtime 복구는 host-side helper로 handoff하고, 현재 셸에서는 더 진행하지 않는다 (2026-06-19)
+
+**배경**:
+- Step 68/D-82에서 이미 확인했듯 현재 셸은 `docker`가 없고 `ssh`도 권한 거부다.
+- 이번 세션에서도 다시 확인한 결과는 동일했다.
+  - `docker`: 없음
+  - `curl`: 없음
+  - `localhost:8092/actuator/health`: connection refused
+- 따라서 "다음 순서"의 1번은 여전히 runtime host 접근 확보이며, 이 셸에서 반복 측정으로 우회할 수 없다.
+
+**결정**:
+- host 접근 주체가 바로 실행할 수 있도록 `.result/ai-user/scripts/recover_runtime_host.py`를 추가한다.
+- 이 스크립트는 아래를 한 번에 수행한다.
+  1. `docker compose -f env/docker-compose.dev.yml --env-file env/.env.dev up -d llm-ai-user`
+  2. `:8092/actuator/health` polling
+  3. 성공 시 `probe_runtime_pipeline.py --strict-runtime` 후속 명령 제시
+- R14의 공식 다음 단계는 이 helper가 `status=OK`를 반환한 뒤에만 시작한다.
+
+**의미**:
+- 현재 셸에서는 할 수 있는 자동 진행을 모두 마쳤다.
+- 남은 크리티컬 패스는 code change가 아니라 host execution이다.

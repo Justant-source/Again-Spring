@@ -1,7 +1,7 @@
 # STATE — Request Snapshot
 
 **최종 갱신**: 2026-06-19
-**기준 원본**: `.result/ai-user/STATE.md` Step 76
+**기준 원본**: `.result/ai-user/STATE.md` Step 77
 
 ## 현재 상태
 
@@ -9,7 +9,8 @@
 - `AI_USER_ML_ENABLED=false` 유지
 - 가장 큰 블로커는 여전히 `:8092` runtime host 접근 불가
   - 현재 셸에서는 `ssh` 권한 거부
-  - local `docker` 부재
+  - local `docker`/`curl` 부재
+  - 대신 host용 helper `.result/ai-user/scripts/recover_runtime_host.py` 준비 완료
 
 ## 최신 핵심 결과
 

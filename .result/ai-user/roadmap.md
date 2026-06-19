@@ -947,3 +947,15 @@
 - [x] NATEPAN proxy blind judge 실측 (`45.0%`)
 - [x] THEQOO adversarial shortlist 생성
 - [x] 자동 게이트는 pre-screen only라는 해석 규칙 기록
+
+## Step 77 (R14-phase0 ops) — runtime host recovery handoff ✅ 완료
+
+**목표**: 현재 셸의 `docker`/`curl` 부재와 `ssh` 권한 거부를 우회할 수는 없으므로, host 접근 주체가 한 번에 `llm-ai-user`를 복구하고 `:8092` health를 확인할 수 있는 진입점을 준비한다.
+
+**완료 기준**:
+- [x] `recover_runtime_host.py` 추가
+- [x] `docker compose ... up -d llm-ai-user` 실행 래핑
+- [x] `curl` 없이 Python urllib로 `:8092/actuator/health` polling
+- [x] 성공 시 다음 probe 명령 3개(THEQOO/CLIEN/NATEPAN) 출력
+- [x] `.requesr/ai-user/NEXT.md`를 host-side helper 기준으로 동기화
+- [ ] docker가 있는 실제 dev host에서 helper 실측

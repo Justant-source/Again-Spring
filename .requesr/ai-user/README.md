@@ -9,6 +9,7 @@
 - 최신 스텝:
   - `.result/ai-user/steps/75-r14-theqoo-fresh-cond5-owner.md`
   - `.result/ai-user/steps/76-r14-automatic-preblind-gates.md`
+  - `.result/ai-user/steps/77-r14-runtime-host-recovery-handoff.md`
 
 이 디렉토리의 목적은 다음 두 가지다.
 
