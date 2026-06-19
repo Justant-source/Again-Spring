@@ -1209,3 +1209,37 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 - text fingerprint dedupe는 "같은 본문 재사용"을 막는 보완책이다.
 - source id 메타가 없는 이상, 의미상 거의 같은 다른 문장이나 endpoint reshuffle까지 완전하게 증명하는 장치는 아니다.
 - `r9-blind1`처럼 survey 포맷이 표준 A/B 블록과 다르면 fingerprint 추출이 0건일 수 있으므로, 이 경우는 별도 포맷 보강 대상이다.
+
+## D-89 — THEQOO fresh cond5 owner는 84.2% FAIL, feedback 기반 cleanup을 추가로 좁힌다 (2026-06-19)
+
+**배경**:
+- `r14-cond5-theqoo-survey.md` owner 응답을 import 후 집계했다.
+- 결과는 유효 `19/20`, AI 탐지 정확도 `84.2% (16/19)`로 cond5 기준 `<= 60%`를 크게 넘겼다.
+- runtime host는 아직 막혀 있어 공식 cond4 재측정은 못 하지만, owner 이유에서 탐지 신호는 충분히 구체적이었다.
+
+**결정**:
+- THEQOO fresh cond5 owner는 **FAIL**로 기록한다.
+- 동시에 아래 신호를 THEQOO cleanup과 CLI fallback 하네스에 좁게 반영한다.
+  - inline `개공감` / `헐`
+  - `1도 모르겠음`, `1도 이해가 안 됨` 같은 남발
+  - `월·화·수` middle dot 요일 표기
+- 구현 위치:
+  - `OutputSanitizer.cleanupTheqoo`
+  - `.result/ai-user/scripts/build_h2h_survey.py`
+  - `.result/ai-user/scripts/run_ab_test.py`
+
+**owner 탐지 신호 요약**:
+- 감탄사/반응어:
+  - `개공감`, `헐`이 문장 안에서 뜬금없이 삽입됨
+- 문체 패턴:
+  - `1도 ~`를 너무 넓은 문맥에 씀
+  - `월·화·수`처럼 사람이 잘 안 쓰는 middle dot 표기
+- 내용 구조:
+  - 같은 갈등 주제가 여러 라운드에서 반복됨
+  - THEQOO 대비 글이 길고 장황함
+  - `"통장 합치기 얘기가 또 나왔음"` 같은 topic-first opener가 부자연스럽게 보임
+
+**의미**:
+- THEQOO는 fresh cond5 기준으로 아직 "AI vs human"에서 잘 숨지 못한다.
+- 따라서 runtime cond4-B를 나중에 다시 PASS하더라도, cond5 관점에서는 지금 바로 활성화할 근거가 없다.
+- 다음 수동 병목은 `NATEPAN` fresh cond5와 runtime host 복구다.

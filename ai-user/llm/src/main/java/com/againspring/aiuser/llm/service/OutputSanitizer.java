@@ -30,12 +30,15 @@ public class OutputSanitizer {
     );
     // THEQOO h2h에서 반복 검출된 신호 제거: 문장 끝/중간의 뜬금없는 감탄사와 장난스러운 유니코드 이모지.
     private static final Pattern THEQOO_TRAILING_REACTION = Pattern.compile("\\s+(?:헐|개공감)(?:[~….!?ㅋㅠ; ]*)$");
-    private static final Pattern THEQOO_REACTION_AFTER_PUNCT = Pattern.compile("([.?!…~]+)\\s*헐\\s+");
-    private static final Pattern THEQOO_STANDALONE_HEOL = Pattern.compile("\\s헐\\s+(?=(?:제가|내가|이게|그게|근데|그냥|뭔가|싶(?:음|은|은데|어|어서)|같(?:음|아)|느낌|기분))");
+    private static final Pattern THEQOO_REACTION_AFTER_PUNCT = Pattern.compile("([.?!…~]+)\\s*(?:헐|개공감)\\s+");
+    private static final Pattern THEQOO_STANDALONE_REACTION = Pattern.compile("\\s(?:헐|개공감)\\s+(?=(?:제가|내가|이게|그게|근데|그냥|뭔가|싶(?:음|은|은데|어|어서)|같(?:음|아)|느낌|기분|왜|아니|그리고))");
     private static final Pattern UNICODE_EMOJI = Pattern.compile("[\\x{2600}-\\x{27BF}\\x{1F300}-\\x{1FAFF}]");
     private static final Pattern UNICODE_ELLIPSIS = Pattern.compile("[…⋯]+");
     private static final Pattern THEQOO_TRASH_PHRASE = Pattern.compile("쓰레기 차도");
     private static final Pattern THEQOO_BROTHER_DAUGHTER_PHRASE = Pattern.compile("집에서는 딸이 더 조심해야");
+    private static final Pattern THEQOO_ONE_DO_MORUGET = Pattern.compile("1도\\s+모르겠(음|고)");
+    private static final Pattern THEQOO_ONE_DO_IDEAL = Pattern.compile("1도\\s+이해가\\s+안\\s*됨");
+    private static final Pattern THEQOO_WEEKDAY_MIDDOT = Pattern.compile("([월화수목금토일])·(?=[월화수목금토일])");
 
     // ── 커뮤니티별 분포 매칭 설정 (Step 6) ──────────────────────────────────────
     // typoInject/typoProb: Track A R9 결정론적 오타 주입 (D-50). LLM 준수 비의존.
@@ -210,8 +213,11 @@ public class OutputSanitizer {
         s = UNICODE_ELLIPSIS.matcher(s).replaceAll("...");
         s = THEQOO_TRASH_PHRASE.matcher(s).replaceAll("쓰레기통이 차도");
         s = THEQOO_BROTHER_DAUGHTER_PHRASE.matcher(s).replaceAll("집에서는 여자가 더 조심해야");
+        s = THEQOO_ONE_DO_MORUGET.matcher(s).replaceAll(match -> "진짜 모르겠" + match.group(1));
+        s = THEQOO_ONE_DO_IDEAL.matcher(s).replaceAll("도무지 이해가 안 됨");
+        s = THEQOO_WEEKDAY_MIDDOT.matcher(s).replaceAll("$1, ");
         s = THEQOO_REACTION_AFTER_PUNCT.matcher(s).replaceAll("$1 ");
-        s = THEQOO_STANDALONE_HEOL.matcher(s).replaceAll(" ");
+        s = THEQOO_STANDALONE_REACTION.matcher(s).replaceAll(" ");
         s = THEQOO_TRAILING_REACTION.matcher(s).replaceFirst("");
         s = s.replaceAll(" {2,}", " ").replaceAll("\\n{3,}", "\n\n");
         return s.stripTrailing();

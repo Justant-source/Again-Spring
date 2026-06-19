@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 44 (Step 74 완료 — blind fingerprint registry)
+**최종 갱신**: 2026-06-19 세션 45 (Step 75 완료 — THEQOO fresh cond5 owner 반영)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 74 완료 — blind fingerprint registry
+- **Phase**: Step 75 완료 — THEQOO fresh cond5 owner 반영
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -64,6 +64,16 @@
   - 응답 처리 자동화 완료:
     - `import_survey_answers.py`로 survey markdown의 `정답/이유`를 answers json으로 직접 반영 가능
     - cond5 current survey 헤더에 import 명령 추가 완료
+  - THEQOO fresh cond5 owner 결과 반영:
+    - survey import: `20/20` 성공
+    - 유효 응답 **19/20**
+    - AI 탐지 정확도 **84.2% (16/19)**
+    - owner 기준 **cond5 FAIL**
+    - 주요 탐지 신호:
+      - inline `개공감` / `헐`
+      - `1도 모르겠음`, `1도 이해가 안 됨` 같은 남발
+      - `월·화·수` middle dot 표기
+      - 같은 갈등 주제 반복, 긴 서술형 전개
   - blind export 제약 보완:
     - `/corpus/export/blind`는 source id 메타를 비워서 반환
     - source id 기반 dedupe는 여전히 완전하지 않다
@@ -74,13 +84,14 @@
       - all_used_text_fingerprints **163**
     - THEQOO cond5를 같은 seed로 다시 fetch하면 `humans=0 ais=0 need=20`으로 즉시 중단됨
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **상태**: **HOLD** — `:8092` host 접근 블로커 + runtime 공식 재측정 부재 + NATEPAN/THEQOO fresh cond5 공백
+- **상태**: **HOLD** — `:8092` host 접근 블로커 + runtime 공식 재측정 부재 + NATEPAN fresh cond5 공백 + THEQOO fresh cond5 owner FAIL
 - **남은 즉시 작업**:
   - `:8092`를 올릴 수 있는 dev host에 먼저 접근
   - runtime 배관 검증: `probe_runtime_pipeline.py`로 health, 4-draft 생성, `/rerank`, known tell scan 확인
   - host 로그에서 실제 backend/model 확인
   - THEQOO runtime h2h를 owner+friend로 다시 수집
-  - 준비된 cond5 설문에 owner/friend 수동 응답 수집
+  - `r14-cond5-natepan-survey.md` 수동 응답 수집
+  - 필요 시 THEQOO cond5 friend 응답 추가
   - `benefit_pp >= 5%p`인 community만 selective gate(B) 후보로 평가
 - **이번 추가 하드닝**:
   - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
@@ -146,6 +157,7 @@
 | **Step 72** | R14 fresh cond5 surveys prepared | **✅ 완료** | NATEPAN/THEQOO cond5 survey+template+pending results 생성, metadata gap 확인 |
 | **Step 73** | R14 survey answer importer | **✅ 완료** | md 설문 답변을 answers json으로 자동 반영 |
 | **Step 74** | R14 blind fingerprint registry | **✅ 완료** | text fingerprint dedupe + file lock + exact 재사용 차단 |
+| **Step 75** | R14 THEQOO fresh cond5 owner | **✅ 완료** | owner 19/20 유효, 84.2% FAIL, feedback hardening 반영 |
 
 ### 중기
 
@@ -163,7 +175,8 @@ cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9958
 cond3: ✅ SPLITTER_VERIFIED=True
 cond4: ⚠️ 공식값은 runtime strict 재측정 필요 (현재 수치는 CLI proxy/fallback 비중 존재)
 cond5: ✅ CLIEN only — blind② 합산 40% (친구 25% / 오너 55%)
-       ⚠️ NATEPAN/THEQOO fresh community-specific PASS 없음
+       ❌ THEQOO fresh owner 84.2% FAIL (19/20 valid, friend 미측정)
+       ⚠️ NATEPAN fresh community-specific PASS 없음
 ```
 
 **AI_USER_ML_ENABLED 상태**: false 유지. 현재는 **수동 활성화 판단 단계 아님**.

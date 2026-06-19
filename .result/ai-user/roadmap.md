@@ -920,3 +920,15 @@
 - [x] registry write를 atomic + file lock으로 보강
 - [x] THEQOO cond5 동일 seed 재생성 시 exact reuse 차단 확인
 - [ ] runtime host 복구 후 fresh runtime 설문도 같은 registry 경로로 예약
+
+## Step 75 (R14-phase3 feedback) — THEQOO fresh cond5 owner 반영 ✅ 완료
+
+**목표**: THEQOO fresh cond5 owner 응답을 공식 결과로 반영하고, 반복 탐지 신호를 다음 runtime 라운드 전에 cleanup에 반영한다.
+
+**완료 기준**:
+- [x] `r14-cond5-theqoo-survey.md` owner 답변 import
+- [x] `r14-cond5-theqoo-results.md` 재집계
+- [x] owner 기준 `19/20`, `84.2%` FAIL 기록
+- [x] inline `개공감/헐`, `1도 ~`, `월·화·수` 신호 cleanup 반영
+- [ ] NATEPAN fresh cond5 owner/friend 응답 수집
+- [ ] runtime host 복구 후 THEQOO runtime h2h owner+friend 재측정

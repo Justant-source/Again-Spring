@@ -41,12 +41,15 @@ DENY_SIGS = [
 ]
 
 THEQOO_TRAILING_REACTION = re.compile(r"\s+(?:헐|개공감)(?:[~….!?ㅋㅠ; ]*)$")
-THEQOO_REACTION_AFTER_PUNCT = re.compile(r"([.?!…~]+)\s*헐\s+")
-THEQOO_STANDALONE_HEOL = re.compile(r"\s헐\s+(?=(?:제가|내가|이게|그게|근데|그냥|뭔가|싶(?:음|은|은데|어|어서)|같(?:음|아)|느낌|기분))")
+THEQOO_REACTION_AFTER_PUNCT = re.compile(r"([.?!…~]+)\s*(?:헐|개공감)\s+")
+THEQOO_STANDALONE_REACTION = re.compile(r"\s(?:헐|개공감)\s+(?=(?:제가|내가|이게|그게|근데|그냥|뭔가|싶(?:음|은|은데|어|어서)|같(?:음|아)|느낌|기분|왜|아니|그리고))")
 UNICODE_EMOJI = re.compile(r"[\u2600-\u27BF\U0001F300-\U0001FAFF]")
 UNICODE_ELLIPSIS = re.compile(r"[…⋯]+")
 THEQOO_TRASH_PHRASE = re.compile(r"쓰레기 차도")
 THEQOO_BROTHER_DAUGHTER_PHRASE = re.compile(r"집에서는 딸이 더 조심해야")
+THEQOO_ONE_DO_MORUGET = re.compile(r"1도\s+모르겠(음|고)")
+THEQOO_ONE_DO_IDEAL = re.compile(r"1도\s+이해가\s+안\s*됨")
+THEQOO_WEEKDAY_MIDDOT = re.compile(r"([월화수목금토일])·(?=[월화수목금토일])")
 
 COMMUNITY_CFG = {
     "THEQOO": {
@@ -257,8 +260,11 @@ def cleanup_theqoo_text(text: str | None, community: str) -> str | None:
     s = UNICODE_ELLIPSIS.sub("...", s)
     s = THEQOO_TRASH_PHRASE.sub("쓰레기통이 차도", s)
     s = THEQOO_BROTHER_DAUGHTER_PHRASE.sub("집에서는 여자가 더 조심해야", s)
+    s = THEQOO_ONE_DO_MORUGET.sub(lambda m: f"진짜 모르겠{m.group(1)}", s)
+    s = THEQOO_ONE_DO_IDEAL.sub("도무지 이해가 안 됨", s)
+    s = THEQOO_WEEKDAY_MIDDOT.sub(r"\1, ", s)
     s = THEQOO_REACTION_AFTER_PUNCT.sub(r"\1 ", s)
-    s = THEQOO_STANDALONE_HEOL.sub(" ", s)
+    s = THEQOO_STANDALONE_REACTION.sub(" ", s)
     s = THEQOO_TRAILING_REACTION.sub("", s)
     s = re.sub(r" {2,}", " ", s)
     s = re.sub(r"\n{3,}", "\n\n", s)

@@ -129,6 +129,15 @@ class OutputSanitizerHrTest {
     }
 
     @Test
+    void theqooCleanupRemovesInlineGaegonggam() {
+        String raw = "지난주 영화도 내가 냈고 개공감 근데 또 내가 더 내래";
+        String result = sanitizer.sanitizePost(raw, "THEQOO");
+
+        assertFalse(result.contains("개공감 근데"), "문장 중간 standalone 개공감 제거");
+        assertTrue(result.contains("내가 냈고 근데"));
+    }
+
+    @Test
     void theqooCleanupNormalizesUnicodeEllipsis() {
         String raw = "남친이 또 저한테 예민하다고 하는데… 내가 이상한 건지 모르겠음…";
         String result = sanitizer.sanitizePost(raw, "THEQOO");
@@ -147,5 +156,17 @@ class OutputSanitizerHrTest {
         assertTrue(result.contains("집에서는 여자가 더 조심해야"), "THEQOO 오빠 화자에서 어색한 딸 지칭 정규화");
         assertFalse(result.contains("쓰레기 차도"));
         assertFalse(result.contains("집에서는 딸이 더 조심해야"));
+    }
+
+    @Test
+    void theqooCleanupNormalizesOneDoAndWeekdayMiddot() {
+        String raw = "나는 이게 1도 모르겠고 월·화·수 내내 연락 기다렸는데 1도 이해가 안 됨";
+        String result = sanitizer.sanitizePost(raw, "THEQOO");
+
+        assertTrue(result.contains("진짜 모르겠고"), "남발된 1도 모르겠고는 덜 튀는 표현으로 정규화");
+        assertTrue(result.contains("월, 화, 수"), "요일 사이 middle dot은 쉼표로 정규화");
+        assertTrue(result.contains("도무지 이해가 안 됨"), "1도 이해가 안 됨은 과한 패턴을 줄인다");
+        assertFalse(result.contains("1도 모르겠고"));
+        assertFalse(result.contains("월·화·수"));
     }
 }
