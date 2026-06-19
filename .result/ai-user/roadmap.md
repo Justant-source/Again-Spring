@@ -982,3 +982,14 @@
 - [x] `run_python_in_dev_network.sh` 추가
 - [x] THEQOO strict runtime probe / h2h / A-B 실행 명령을 dev host 기준으로 정리
 - [ ] dev host에서 network harness 실측
+
+## Step 80 (R14-phase1 prep) — host-side Phase 1 batch runner ✅ 완료
+
+**목표**: 현재 셸에서 docker가 계속 없더라도, dev host에서 Phase 1의 기계 작업을 한 번에 실행하도록 묶는다.
+
+**완료 기준**:
+- [x] local shell에서 `probe_dev_ai_user_stack.py` 재실행 (`status=OK`)
+- [x] local shell에서 `run_python_in_dev_network.sh` 재실행 (`docker: command not found`)으로 blocker 재확인
+- [x] `run_r14_runtime_phase1.sh` 추가
+- [x] runner에 strict runtime probe 3커뮤니티 + h2h 3커뮤니티 + THEQOO runtime A-B 포함
+- [ ] dev host에서 one-shot runner 실측

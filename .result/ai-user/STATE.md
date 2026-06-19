@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 49 (Step 79 완료 — dev host network harness)
+**최종 갱신**: 2026-06-19 세션 50 (Step 80 완료 — host-side Phase 1 batch runner)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 79 완료 — dev host network harness
+- **Phase**: Step 80 완료 — host-side Phase 1 batch runner
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -70,6 +70,12 @@
   - 크리티컬 패스용 dev host helper 추가:
     - `.result/ai-user/scripts/run_python_in_dev_network.sh`
     - `againspring-dev` 네트워크 안에서 existing runtime harness를 그대로 실행
+  - Phase 1 one-shot runner 추가:
+    - `.result/ai-user/scripts/run_r14_runtime_phase1.sh`
+    - dev host에서 strict runtime probe + 3커뮤니티 h2h + THEQOO runtime A-B를 순서대로 실행
+  - 이번 세션 재확인:
+    - `python3 .result/ai-user/scripts/probe_dev_ai_user_stack.py` → `status=OK`
+    - `bash .result/ai-user/scripts/run_python_in_dev_network.sh ...probe_runtime_pipeline.py...` → `docker: command not found`
   - host가 열리면 즉시 실행할 준비물:
     - `probe_runtime_pipeline.py` — internal `/generate/post` / `/rerank` strict 검증용
     - `build_cond5_blind.py` — community별 fresh cond5 설문 생성
@@ -132,10 +138,7 @@
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 - **상태**: **HOLD** — dev host docker-network runtime harness 미실행 + NATEPAN fresh cond5 공백 + THEQOO fresh cond5 owner FAIL
 - **남은 즉시 작업**:
-  - dev host에서 `run_python_in_dev_network.sh`로 strict runtime harness 실행
-  - 먼저 `probe_runtime_pipeline.py --community THEQOO --strict-runtime`
-  - 그 다음 `build_h2h_survey.py --community THEQOO --generator runtime --strict-runtime`
-  - 필요 시 `run_ab_test.py --community THEQOO --generator runtime`
+  - dev host에서 `run_r14_runtime_phase1.sh` 실행
   - THEQOO runtime h2h를 owner+friend로 다시 수집
   - `r14-cond5-natepan-survey.md` 수동 응답 수집
   - 필요 시 THEQOO cond5 friend 응답 추가
@@ -214,6 +217,7 @@
 | **Step 77** | R14 runtime host recovery handoff | **✅ 완료** | host용 `docker compose up` + `:8092` health polling helper 추가 |
 | **Step 78** | R14 runtime probe correction | **✅ 완료** | 8092 internal-only 정정, live internal reachability 재해석 |
 | **Step 79** | R14 dev host network harness | **✅ 완료** | write-free probe 정리, proxy deferred, dev network runner 추가 |
+| **Step 80** | R14 host-side Phase 1 batch runner | **✅ 완료** | one-shot dev host runner 추가, local shell docker 부재 재확인 |
 
 ### 중기
 

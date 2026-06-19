@@ -1352,3 +1352,22 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **의미**:
 - 이번 라운드의 목표는 새 Java surface를 여는 것이 아니라, 기존 runtime path를 정확히 측정 가능한 위치에서 실행하는 것이다.
 - THEQOO runtime h2h는 여전히 codex→Sonnet 전환 후 첫 공식 측정이며, 재실패 가능성을 열어 둔다.
+
+## D-94 — 현재 셸에서는 runtime Phase 1을 더 밀 수 없으므로 dev host one-shot runner로 묶는다 (2026-06-19)
+
+**배경**:
+- Step 80에서 `run_python_in_dev_network.sh`를 실제로 다시 실행했지만, 이 셸은 여전히 `docker: command not found`다.
+- read-only live probe는 `status=OK`였지만, strict runtime `/generate/post` 측정은 docker network 실행 없이는 진전이 없다.
+
+**결정**:
+- Phase 1 기계 작업은 `.result/ai-user/scripts/run_r14_runtime_phase1.sh`로 단일화한다.
+- 이 runner는 다음 순서로만 돈다:
+  1. read-only live probe
+  2. THEQOO/CLIEN/NATEPAN strict runtime probe
+  3. 3커뮤니티 runtime h2h survey 생성
+  4. THEQOO runtime A-B
+- 이 runner 성공 이후부터가 수동 응답 구간이다.
+
+**의미**:
+- 현재 남은 핵심 blocker는 "측정 설계"가 아니라 "docker가 있는 dev host에서 한 번 실행하는 것"이다.
+- 자동 진행은 여기까지고, 다음 병목은 다시 사람 응답이다.

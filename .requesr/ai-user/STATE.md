@@ -1,7 +1,7 @@
 # STATE — Request Snapshot
 
 **최종 갱신**: 2026-06-19
-**기준 원본**: `.result/ai-user/STATE.md` Step 79
+**기준 원본**: `.result/ai-user/STATE.md` Step 80
 
 ## 현재 상태
 
@@ -11,6 +11,9 @@
   - `8092/8096`은 dev compose에서 internal 서비스
   - historical write probes로 internal route 존재는 확인
 - 현재 실제 블로커는 **dev host docker-network 안에서 runtime harness를 아직 실행하지 못한 것**
+- 이번 세션 재확인:
+  - read-only probe는 `OK`
+  - local helper는 여전히 `docker: command not found`
 
 ## 최신 핵심 결과
 
