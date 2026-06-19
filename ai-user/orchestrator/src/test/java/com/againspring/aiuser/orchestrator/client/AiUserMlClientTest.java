@@ -170,4 +170,36 @@ class AiUserMlClientTest {
         ReflectionTestUtils.setField(client, "bestOfN", 4);
         assertThat(client.getBestOfN()).isEqualTo(4);
     }
+
+    @Test
+    void isEnabledFor_whenDisabled_returnsFalse() {
+        ReflectionTestUtils.setField(client, "enabled", false);
+        ReflectionTestUtils.setField(client, "enabledCommunities", "CLIEN,THEQOO");
+        assertThat(client.isEnabledFor("CLIEN")).isFalse();
+    }
+
+    @Test
+    void isEnabledFor_withBlankScope_keepsGlobalBehavior() {
+        ReflectionTestUtils.setField(client, "enabled", true);
+        ReflectionTestUtils.setField(client, "enabledCommunities", " ");
+        assertThat(client.isEnabledFor("CLIEN")).isTrue();
+        assertThat(client.isEnabledFor("THEQOO")).isTrue();
+    }
+
+    @Test
+    void isEnabledFor_matchesConfiguredCommunitiesCaseInsensitively() {
+        ReflectionTestUtils.setField(client, "enabled", true);
+        ReflectionTestUtils.setField(client, "enabledCommunities", " clien, theqoo ");
+        assertThat(client.isEnabledFor("CLIEN")).isTrue();
+        assertThat(client.isEnabledFor("theqoo")).isTrue();
+        assertThat(client.isEnabledFor("NATEPAN")).isFalse();
+    }
+
+    @Test
+    void isEnabledFor_withMissingCommunity_returnsFalseWhenScoped() {
+        ReflectionTestUtils.setField(client, "enabled", true);
+        ReflectionTestUtils.setField(client, "enabledCommunities", "CLIEN");
+        assertThat(client.isEnabledFor(null)).isFalse();
+        assertThat(client.isEnabledFor(" ")).isFalse();
+    }
 }

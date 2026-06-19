@@ -132,6 +132,8 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 curl http://localhost:8090/api/health
 ```
 
+> AI-user Best-of-N 리랭킹은 `AI_USER_ML_ENABLED=true`일 때만 동작하며, `AI_USER_ML_ENABLED_COMMUNITIES=CLIEN,NATEPAN`처럼 community별로 제한할 수 있습니다. 상세는 [`docs/env/environment-variables.md`](docs/env/environment-variables.md).
+
 ### C. 헬스 체크
 
 ```bash

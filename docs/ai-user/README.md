@@ -168,6 +168,7 @@ void mirrorAsync(...)  // 보조 백엔드 fire-and-forget
 | `AI_LEARNING_ENABLED` | `false` | RAG 예시뱅크 사용 | orchestrator |
 | `AI_LEARNING_BASE_URL` | `http://againspring-ai-learning:8099` | learning 서비스 주소 | orchestrator |
 | `AI_LEARNING_CRAWL_ENABLED` | `false` | 자동 크롤링 활성화 | learning |
+| `AI_USER_ML_ENABLED_COMMUNITIES` | `""` | Best-of-N 리랭킹 대상 `voice_type` 목록. `AI_USER_ML_ENABLED=true`일 때만 의미가 있으며, 비어 있으면 전역 적용 | orchestrator |
 | `SELF_CRITIQUE_ENABLED` | `false` | 자기비평(5점 루브릭) 활성화 | llm |
 | `SELF_CRITIQUE_THRESHOLD` | `5` | 자기비평 PASS 최소 점수 | llm |
 | `PAIRED_POST_ENABLED` | `true` | 연인/부부 페어 갈등글 자동 생성 | orchestrator |

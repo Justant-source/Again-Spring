@@ -14,8 +14,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * AI-User ML 서비스 클라이언트 (WSL, RTX 3090, port 8201).
@@ -40,6 +42,9 @@ public class AiUserMlClient {
 
     @Value("${ai-user-ml.best-of-n:4}")
     private int bestOfN;
+
+    @Value("${ai-user-ml.enabled-communities:}")
+    private String enabledCommunities;
 
     public AiUserMlClient(
             @Value("${ai-user-ml.base-url:http://100.115.252.61:8201}") String baseUrl,
@@ -165,6 +170,27 @@ public class AiUserMlClient {
     }
 
     public boolean isEnabled() { return enabled; }
+    public boolean isEnabledFor(String community) {
+        if (!enabled) return false;
+        Set<String> scopedCommunities = parseEnabledCommunities();
+        if (scopedCommunities.isEmpty()) return true;
+        if (community == null || community.isBlank()) return false;
+        return scopedCommunities.contains(community.trim().toUpperCase());
+    }
     public boolean isCollectEnabled() { return collect; }
     public int getBestOfN() { return bestOfN; }
+
+    private Set<String> parseEnabledCommunities() {
+        if (enabledCommunities == null || enabledCommunities.isBlank()) {
+            return Collections.emptySet();
+        }
+        Set<String> normalized = new LinkedHashSet<>();
+        for (String raw : enabledCommunities.split(",")) {
+            String item = raw == null ? "" : raw.trim().toUpperCase();
+            if (!item.isEmpty()) {
+                normalized.add(item);
+            }
+        }
+        return normalized;
+    }
 }

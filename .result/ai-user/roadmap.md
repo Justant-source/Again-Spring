@@ -835,3 +835,29 @@
 - [x] CLI 경로 survey/AB 재생성
 - [x] regenerated survey 기준 문제 표현/특수문자 신호 0건 확인
 - [ ] `:8092` runtime 복구 후 동일 경로 재검증
+
+## Step 68 (R14-phase0) — runtime gate + host handoff ✅ 완료(HALT 기록)
+
+**목표**: R14 Phase 1 진입 전에 `:8092` runtime 복구 가능 여부와 최신 live 수치를 확인한다.
+
+**완료 기준**:
+- [x] `git log --oneline -8` 기준점 기록
+- [x] live `/corpus/stats` 재조회 (`THEQOO human=562, ai=116`)
+- [x] local `localhost:8092/actuator/health` down 재확인
+- [x] local env 제약 확인: `/usr/bin/ssh` 실행 권한 거부, `docker` 부재
+- [x] dev host handoff 필요 사실 기록
+- [ ] dev host에서 `docker compose ... up -d llm-ai-user`
+- [ ] `:8092` health `UP`
+
+## Step 69 (R14-phase2-prep) — selective rerank gate 구현 ✅ 완료
+
+**목표**: 비용/효용 판단에서 B안(per-community gate)을 선택할 수 있도록 dormant 구현을 먼저 넣는다.
+
+**완료 기준**:
+- [x] 신규 env `AI_USER_ML_ENABLED_COMMUNITIES`
+- [x] `AiUserMlClient.isEnabledFor(community)` 추가
+- [x] `ActionExecutor` POST rerank gate를 community-aware로 전환
+- [x] env 미설정 시 기존 전역 동작 유지
+- [x] unit test 추가
+- [ ] Java 테스트 실행
+- [ ] dev:8090 e2e 검증

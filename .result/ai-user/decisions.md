@@ -1020,3 +1020,53 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **해석**:
 - hardening 이후에도 오프라인 cond4-A는 여전히 양수다.
 - 다만 runtime 경로가 죽어 있어, 이 수치는 어디까지나 CLI fallback 경로 기준 확인으로 관리한다.
+
+## D-82 — R14 시작: 활성화 전 runtime 재검증은 필수 게이트, local env에서는 host handoff로 전환 (2026-06-19)
+
+**배경**:
+- R13 종료 시점의 GO candidate는 THEQOO cond4-B가 CLI proxy/CLI fallback 측정에 크게 의존한다.
+- D-77에 따라 cond4-B 공식 증거는 runtime `/generate/post` 경로만 유효하다.
+- 이번 세션의 live 확인 결과:
+  - `/corpus/stats` 최신값: `THEQOO human=562, ai=116`
+  - `localhost:8092/actuator/health`: connection refused
+  - 현재 셸은 `/usr/bin/ssh` 실행 권한이 거부되고, `docker` 바이너리도 없다.
+
+**결정**:
+- R14 Phase 0의 runtime 복구는 **dev host handoff 작업**으로 관리한다.
+- local repo에서는:
+  1. 최신 live 수치 동기화
+  2. runtime gate 필요성 문서화
+  3. runtime 복구 후 바로 쓸 selective gate/code/doc 준비
+  까지만 수행한다.
+
+**이유**:
+- 이 환경에서는 `:8092`를 직접 올릴 수 없으므로, runtime revalidation을 가장한 CLI proxy 재측정을 반복하는 것은 D-77 위반이다.
+- 다만 selective gate 구현은 dormant 상태로 선반영해도 `AI_USER_ML_ENABLED=false` 하에서 동작 변화가 없다.
+
+**다음 작업**:
+1. dev host에서 `llm-ai-user` 컨테이너 복구
+2. runtime `/generate/post`로 THEQOO/CLIEN/NATEPAN h2h 재측정
+3. B안(per-community gate) 실제 채택 여부를 비용/효용 표로 최종 결정
+
+## D-83 — B안 대비: per-community selective rerank gate를 dormant 구현으로 선반영 (2026-06-19)
+
+**배경**:
+- D-68, Step 56, R14 계획에서 반복적으로 나온 쟁점은 "리랭커 효용이 커뮤니티마다 다를 수 있는데 게이트가 전역 boolean 하나뿐"이라는 점이었다.
+- 현재 runtime 코드는 `ActionExecutor.java:425`에서 `aiUserMlClient.isEnabled()`만 보므로, 전역 on/off 외의 선택지가 없다.
+
+**결정**:
+- 신규 env `AI_USER_ML_ENABLED_COMMUNITIES`를 추가한다.
+- 규칙:
+  - `AI_USER_ML_ENABLED=false` → 모든 community rerank off
+  - `AI_USER_ML_ENABLED=true` + 목록 비어 있음 → 기존처럼 전역 rerank on
+  - `AI_USER_ML_ENABLED=true` + 목록 존재 → 목록에 있는 `voice_type`만 rerank on
+
+**구현 위치**:
+- `AiUserMlClient.isEnabledFor(String community)`
+- `ActionExecutor.executePost()` rerank gate
+- `AiUserMlClientTest` unit 추가
+- `docs/env/environment-variables.md` 동기화
+
+**의미**:
+- 이 구현만으로 활성화가 되지는 않는다. `AI_USER_ML_ENABLED`는 여전히 false 유지.
+- R14 Phase 2에서 B안을 최종 선택하면 추가 설계 없이 바로 env만 조정 가능하다.

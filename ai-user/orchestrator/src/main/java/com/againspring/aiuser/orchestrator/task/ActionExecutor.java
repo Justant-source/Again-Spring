@@ -420,9 +420,11 @@ public class ActionExecutor {
             // R9 Track B: 글 종류 (CONFLICT=갈등 서사, CASUAL=일상/잡담)
             .postKind(casual ? "CASUAL" : "CONFLICT")
             .build();
+        String community = voiceProfileField(persona, "voice_type");
         // Best-of-N reranking — active when ai-user-ml.enabled=true
+        // If ai-user-ml.enabled-communities is set, only listed communities use reranking.
         String rawBody;
-        if (aiUserMlClient.isEnabled()) {
+        if (aiUserMlClient.isEnabledFor(community)) {
             int n = aiUserMlClient.getBestOfN();
             java.util.List<AiUserMlClient.CandidateItem> candidates = new java.util.ArrayList<>();
             String firstValid = null;
@@ -437,7 +439,6 @@ public class ActionExecutor {
                 logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
                 return;
             }
-            String community = voiceProfileField(persona, "voice_type");
             java.util.Optional<AiUserMlClient.RerankResponse> rerankOpt =
                 aiUserMlClient.rerank(community, "POST", candidates);
             if (rerankOpt.isPresent() && rerankOpt.get().getWinnerId() != null) {

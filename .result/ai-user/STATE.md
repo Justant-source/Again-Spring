@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 38 (Step 67 완료 — THEQOO awkward phrase hardening)
+**최종 갱신**: 2026-06-19 세션 39 (Step 69 완료 — R14 selective rerank gate prep)
 
 ---
 
@@ -16,10 +16,10 @@
 
 ## 현재 위치
 
-- **Phase**: Step 67 완료 — THEQOO awkward phrase hardening
+- **Phase**: Step 69 완료 — R14 selective rerank gate prep
 - **핵심 성과**:
-  - `source_filter="theqoo"` snapshot **311/300** 달성
-  - THEQOO human **543**, ai **116**
+  - `source_filter="theqoo"` latest measured snapshot **330**
+  - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
   - THEQOO 재학습 완료: version `01KVDQJSKTY93279KQYZ91PHNS`, CV-AUC **0.9958**
   - Codex-only `source_filter="theqoo"` A-B 재측정: **Δ_real=+0.1326**, snapshot **311**
   - THEQOO h2h survey **20쌍** 생성 완료:
@@ -41,15 +41,26 @@
     - `Δ_real=+0.0087`
     - `mauve_rerank=0.9907`
     - `mauve_random_mean=0.9820`
+  - R14 selective rerank gate 구현 완료:
+    - 신규 env `AI_USER_ML_ENABLED_COMMUNITIES`
+    - `AI_USER_ML_ENABLED=true`여도 community 목록으로 rerank 대상을 제한 가능
+    - 비어 있으면 기존 전역 동작 유지
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **상태**: 연구 게이트 기준 **수동 활성화 가능(GO candidate)**, 단 `:8092` 런타임 복구와 최종 수동 판단 필요
-- **남은 즉시 작업**: `:8092` 복구 후 운영 경로 검증 + 필요 시 THEQOO 새 사람 응답 라운드 판단
+- **상태**: 연구 게이트 기준 **수동 활성화 가능(GO candidate)**, 단 `:8092` 런타임 복구와 runtime 경로 재검증이 아직 필수
+- **남은 즉시 작업**:
+  - dev host에서 `:8092` 복구 (`ssh`/`docker`는 현재 셸에서 직접 실행 불가)
+  - runtime `/generate/post` 기준 THEQOO/CLIEN/NATEPAN h2h 재측정
+  - selective gate 실제 사용 여부(A/B/C) 최종 결정
 - **이번 추가 하드닝**:
   - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
   - runtime `OutputSanitizer`와 CLI fallback 하네스(`build_h2h_survey.py`, `run_ab_test.py`) 동시 반영
   - `쓰레기 차도` → `쓰레기통이 차도`
   - `집에서는 딸이 더 조심해야` → `집에서는 여자가 더 조심해야`
   - regenerated survey 기준 `쓰레기 차도` / `집에서는 딸이 더 조심해야` / `…` / `헐` / `개공감` / `😥` / `🥲` 모두 **0건**
+  - local Phase 0 probe:
+    - `/corpus/stats` 최신 수치 확인 완료
+    - `localhost:8092` health still down
+    - `/usr/bin/ssh` 실행 권한 거부, local `docker` 부재 → host handoff 필요
 
 ---
 
@@ -97,6 +108,8 @@
 | **Step 65** | THEQOO owner v2 h2h 집계 + 전역 재판정 | **✅ 완료** | 연구 게이트 기준 GO candidate |
 | **Step 66** | THEQOO ellipsis hardening | **✅ 완료** | `…` → `...` 정규화, 재측정은 runtime 복구 후 |
 | **Step 67** | THEQOO awkward phrase hardening | **✅ 완료** | 2개 잔여 표현 정규화, 오프라인 재생성 완료 |
+| **Step 68** | R14 runtime gate + host handoff | **✅ 완료(HALT 기록)** | local env에서 `ssh`/`docker` 불가, dev host 복구 절차로 전환 |
+| **Step 69** | R14 selective rerank gate prep | **✅ 완료** | `AI_USER_ML_ENABLED_COMMUNITIES` 구현, 기본 동작 불변 |
 
 ### 중기
 
@@ -109,7 +122,7 @@
 ### prod 배포 게이트 (5조건 — **연구 게이트 충족** 2026-06-19)
 
 ```
-cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/543)
+cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(116/562)
 cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9958
 cond3: ✅ SPLITTER_VERIFIED=True
 cond4: ✅ CLIEN Δ=+0.0134 AND h2h 50%≤50% PASS (R13, 신 cond4 D-68)
@@ -127,9 +140,9 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | 우선순위 | 항목 | 배경 | 선택지 |
 |---|---|---|---|
 | **P2** | ~~COMMENT 생성 배치 (R7 M-after)~~ | ✅ 완료 — WSL 배치 B 경로로 해결 (2026-06-18) | — |
-| **P3** | **AI_USER_ML_ENABLED 활성화 시기** | 연구 게이트는 해소됨. 다만 `:8092` 런타임이 내려가 있어 운영 경로 검증이 아직 없다 | 자동: runtime 복구 후 수동 활성화 / 선택: 오프라인 상태 유지 |
+| **P3** | **AI_USER_ML_ENABLED 활성화 시기** | 연구 게이트는 해소됨. 다만 `:8092` 런타임 재검증이 없고 cond4-B 공식 증거가 아직 CLI proxy 기반이다 | 자동: runtime 복구 후 수동 활성화 / 선택: selective gate 준비 상태로 보류 |
 | **P5** | **THEQOO corpus 수집 방법** | ✅ **C) 크롤링 완료**. real-only corpus **311/300** 확보. | closed |
-| **P6** | **THEQOO 개선 방향** | owner v2까지 PASS. `…`와 2개 잔여 표현 정규화는 반영 완료. 남은 저비용 후보는 runtime 경로 복구와 새 사람 응답 라운드 여부 결정 | A) runtime 서비스 복구 / B) 새 h2h 응답 라운드 / C) 수동 활성화 판단 |
+| **P6** | **THEQOO 개선 방향** | owner v2까지 PASS. `…`와 2개 잔여 표현 정규화는 반영 완료. 남은 핵심은 runtime 경로 공식 재측정과 friend 응답 추가다 | A) runtime 서비스 복구 / B) runtime h2h 재응답 / C) selective gate 활용 판단 |
 
 ---
 
