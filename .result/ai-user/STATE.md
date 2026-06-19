@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 42 (Step 72 완료 — fresh cond5 surveys prepared)
+**최종 갱신**: 2026-06-19 세션 43 (Step 73 완료 — survey answer importer)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 72 완료 — fresh cond5 surveys prepared
+- **Phase**: Step 73 완료 — survey answer importer
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -61,6 +61,9 @@
     - [r14-cond5-natepan-survey.md](/home/justant/Data/Again-Spring/.result/ai-user/blind/r14-cond5-natepan-survey.md)
     - [r14-cond5-theqoo-survey.md](/home/justant/Data/Again-Spring/.result/ai-user/blind/r14-cond5-theqoo-survey.md)
     - 대응 answers/results 템플릿까지 생성 완료
+  - 응답 처리 자동화 완료:
+    - `import_survey_answers.py`로 survey markdown의 `정답/이유`를 answers json으로 직접 반영 가능
+    - cond5 current survey 헤더에 import 명령 추가 완료
   - blind export 제약 확인:
     - `/corpus/export/blind`는 source id 메타를 비워서 반환
     - `used-corpus-ids.json` 중복 필터는 현재 fresh cond5 세트에 완전 적용 불가
@@ -135,6 +138,7 @@
 | **Step 70** | R14 activation gate correction | **✅ 완료** | host blocker / strict runtime / per-community cond5 / selective gate 임계 정정 |
 | **Step 71** | R14 runtime probe + cond5 tooling | **✅ 완료** | host 복구 직후 쓸 probe/blind/summarizer 추가 |
 | **Step 72** | R14 fresh cond5 surveys prepared | **✅ 완료** | NATEPAN/THEQOO cond5 survey+template+pending results 생성, metadata gap 확인 |
+| **Step 73** | R14 survey answer importer | **✅ 완료** | md 설문 답변을 answers json으로 자동 반영 |
 
 ### 중기
 

@@ -1155,3 +1155,27 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 - owner/friend 응답 수집은 바로 시작할 수 있다.
 - 다만 이 cond5 세트는 "fresh"이긴 해도, source id 차원의 중복 배제는 export endpoint 개선 전까지 보장되지 않는다.
 - 따라서 최종 해석 시 이 제약을 footnote로 반드시 명시한다.
+
+## D-87 — 설문 응답은 markdown 직접 작성 후 importer로 JSON 반영한다 (2026-06-19)
+
+**배경**:
+- h2h와 cond5 모두 사용자가 markdown 설문에 직접 `정답/이유`를 적는 흐름이 가장 편하다.
+- 하지만 그 뒤 answers template json으로 옮기는 수작업이 남아 있으면 반복 라운드에서 병목이 된다.
+
+**결정**:
+- `import_survey_answers.py`를 추가한다.
+- 입력:
+  - survey markdown
+  - answers template json
+  - respondent (`owner` or `friend`)
+- 출력:
+  - `responses.<respondent>.<pair>`에 `choice/reason` 자동 반영
+
+**검증**:
+- blank survey → `pairs_parsed=0`
+- filled temp survey → 2건 import 성공
+- current cond5 survey header에 import 명령 안내 추가
+
+**의미**:
+- 다음 라운드부터는 사용자가 survey md만 채우면 된다.
+- 에이전트는 importer 실행 후 `summarize_h2h_results.py` 또는 `summarize_cond5_results.py`만 돌리면 된다.

@@ -454,6 +454,7 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8, generator="runtime"
 > 공식 runtime 측정 조건: `generator=runtime` + `strict_runtime=true` + `cli_fallbacks=0`
 > 응답 규칙: 각 번호에서 **AI가 쓴 것처럼 느껴지는 쪽**을 `A` 또는 `B`로 적고 바로 아래 `이유`를 한 줄 이상 적으세요. 애매하면 `판단불가`라고 적으세요.
 > 유효 응답 집계: `A/B`만 유효, 빈칸/판단불가/기타 응답은 무효 처리됩니다.
+> 응답 후 import: `python3 .result/ai-user/scripts/import_survey_answers.py --survey <survey.md> --answers <answers.json> --respondent owner`
 
 ---
 

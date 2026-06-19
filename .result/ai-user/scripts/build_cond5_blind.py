@@ -135,6 +135,7 @@ def write_outputs(community, pairs, label_map, output_prefix, provenance, genera
 > 유효 응답: `A/B`만 집계. `판단불가`/빈칸/기타 응답은 무효 처리됩니다.
 > source metadata coverage: human_with_meta={generation_meta['meta_stats']['human_with_meta']} / ai_with_meta={generation_meta['meta_stats']['ai_with_meta']}
 > 주의: export가 source id 메타를 비우면 `used-corpus-ids` 중복 필터는 완전하게 작동하지 않습니다.
+> 응답 후 import: `python3 .result/ai-user/scripts/import_survey_answers.py --survey <survey.md> --answers <answers.json> --respondent owner`
 
 ---
 

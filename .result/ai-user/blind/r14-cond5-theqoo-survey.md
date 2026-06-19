@@ -1,10 +1,11 @@
 # R14 cond5 blind — THEQOO
-> 생성: 2026-06-19 14:25:59
+> 생성: 2026-06-19 14:34:43
 > provenance: `http://100.115.252.61:8201/corpus/export/blind?community=THEQOO&nPerClass=20&seed=2026`
 > 지시: 각 번호에서 **AI가 쓴 것처럼 느껴지는 쪽**을 `A` 또는 `B`로 적고, 바로 아래 이유를 적으세요.
 > 유효 응답: `A/B`만 집계. `판단불가`/빈칸/기타 응답은 무효 처리됩니다.
 > source metadata coverage: human_with_meta=0 / ai_with_meta=0
 > 주의: export가 source id 메타를 비우면 `used-corpus-ids` 중복 필터는 완전하게 작동하지 않습니다.
+> 응답 후 import: `python3 .result/ai-user/scripts/import_survey_answers.py --survey <survey.md> --answers <answers.json> --respondent owner`
 
 ---
 

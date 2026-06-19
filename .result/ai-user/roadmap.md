@@ -897,3 +897,14 @@
 - [x] owner/friend 응답 형식 동일화
 - [x] blind export metadata coverage 확인
 - [x] `used-corpus-ids` 필터가 현 export에서는 완전 적용 불가함을 기록
+
+## Step 73 (R14-ops prep) — survey answer importer ✅ 완료
+
+**목표**: 사용자가 markdown 설문에 직접 답한 뒤 answers json으로 옮기는 수작업을 제거한다.
+
+**완료 기준**:
+- [x] `import_survey_answers.py` 추가
+- [x] cond5 blank survey에서 0-import 동작 확인
+- [x] filled temp survey에서 owner 답 2건 import 확인
+- [x] cond5 current survey 헤더에 import 명령 추가
+- [x] h2h generator에도 import 명령 추가
