@@ -27,14 +27,14 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TonalizationService {
 
-    private final CodexCliInvoker llmInvoker;
+    private final ClaudeCliInvoker llmInvoker;
     private final ObjectMapper objectMapper;
 
     @Value("${tonalization.enabled:true}")
     private boolean enabled;
 
-    @Value("${llm.worker.codex-model:gpt-5.4}")
-    private String codexModel;
+    @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}")
+    private String claudeModel;
 
     public record TonalizationResult(String titleNormalized, String bodyNormalized, boolean success) {}
 
@@ -51,7 +51,7 @@ public class TonalizationService {
 
         try {
             String prompt = buildPrompt(title, body);
-            String result = llmInvoker.invoke(prompt, codexModel);
+            String result = llmInvoker.invoke(prompt, claudeModel);
             return parseResult(title, body, result);
         } catch (Exception e) {
             log.warn("Tonalization failed, using original text: {}", e.getMessage());

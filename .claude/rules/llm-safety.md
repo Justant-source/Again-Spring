@@ -45,7 +45,7 @@ AI 배심원·요약 출력에서 아래 표현은 **절대 금지**. 위반 시
 - **제공자 오류**: `credit balance`, `rate_limit`, `overloaded`, `authentication_error`, `api_error`
 - **자기 정체 노출**: `i'm kiro`, `i'm claude`, `저는 claude`, `나는 claude`
 - **역할극 거절**: `cannot roleplay`, `can't help with this`, `I can't help with this request`, `역할극`, `프롬프트 인젝션`, `i can't fulfill`, `i can't write this`, `i can't do this`
-- **2026-06-19 Codex 거절 노드**: `i appreciate the context`, `i appreciate the detailed request`, `these instructions ask me`, `operating online community`, `actual operating online community`, `authentic community member`, `이 요청은 수행할 수 없습니다`, `실제 온라인 커뮤니티`, `가짜 페르소나`, `신원 위장`, `사용자 조작`
+- **2026-06-19 거절 노드**: `i appreciate the context`, `i appreciate the detailed request`, `these instructions ask me`, `operating online community`, `actual operating online community`, `authentic community member`, `이 요청은 수행할 수 없습니다`, `실제 온라인 커뮤니티`, `가짜 페르소나`, `신원 위장`, `사용자 조작`
 - **일반 거절**: 거절문 패턴 (§18 `ai-user/docs/llm.md` 참조)
 
 ### 오염 루프 방지
@@ -85,9 +85,10 @@ AI 배심원·요약 출력에서 아래 표현은 **절대 금지**. 위반 시
 - 3회 소진 후 실패 시 → 오류 로그 + 중단 (10회·무한 재시도 금지)
 
 **코드 설정값** (ai-user llm):
-- `LLM_API_REFUSAL_RETRIES=0` (dev·prod .env) → 거절 노드 재시도 1회
-- 기본값 (`application.yml`): `refusal-retries: 2` (= 총 3회) → 위 규칙과 일치
-- `refusal-fallback-model` 미설정 = Sonnet 폴백 비활성
+- `LLM_API_REFUSAL_RETRIES=1` (dev .env) → 거절 노드 재시도 최대 2회(초기+재시도 1회)
+- `LLM_API_REFUSAL_FALLBACK_MODEL=claude-sonnet-4-6` (dev .env에서 설정)
+- 기본값 (`application.yml`): `refusal-retries: 2` (= 총 3회) — 프롬프트 인젝션 방어
+- Sonnet 폴백은 Haiku의 거절 노드 소진 후 1회 승격(거절율 0% 실측)
 
 **Sonnet 4.6 인시던트 대응**: Sonnet 4.6 다운 시 Haiku 생성은 영향 없음. run_ab_test.py 평가나 report 엔드포인트만 영향 받음 → 해당 작업 연기.
 

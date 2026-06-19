@@ -31,9 +31,9 @@ llm:
     queue-capacity: ${LLM_QUEUE_CAPACITY:100}
     queue-wait-timeout-ms: ${LLM_QUEUE_WAIT_TIMEOUT_MS:30000}
     default-timeout-ms: ${LLM_DEFAULT_TIMEOUT_MS:120000}
-    codex-binary-path: ${CODEX_BIN:codex}
-    codex-model: ${CODEX_MODEL:gpt-5.4}
-  # 글(POST) 전용 모델 오버라이드 — 빈 값이면 codex-model 사용
+    claude-binary-path: ${CLAUDE_BIN:claude}
+    claude-model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
+  # 글(POST) 전용 모델 오버라이드 — 빈 값이면 claude-model 사용
   post-model: ${LLM_POST_MODEL:}
   api:
     prompt-caching: ${LLM_API_PROMPT_CACHING:false}

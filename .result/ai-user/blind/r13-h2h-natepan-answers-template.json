@@ -1,6 +1,6 @@
 {
   "community": "NATEPAN",
-  "generated_at": "2026-06-18 20:24:24",
+  "generated_at": "2026-06-19 21:23:07",
   "n_pairs": 20,
   "label_map": {
     "0": {
@@ -83,6 +83,34 @@
       "A": "random",
       "B": "rerank"
     }
+  },
+  "response_instructions": {
+    "accepted_keys": "responses.<respondent> 에는 pair 번호를 1-based(1..N) 또는 0-based(0..N-1)로 넣을 수 있음",
+    "accepted_values": [
+      "A",
+      "B",
+      "답변불가",
+      "판단불가",
+      "미응답"
+    ],
+    "validity_rule": "공식 집계는 A/B만 유효. 판단불가/미응답/기타는 invalid로 계산됨",
+    "recommended_shape": {
+      "1": {
+        "choice": "A",
+        "reason": "문체가 더 부자연스러움"
+      }
+    }
+  },
+  "generation_meta": {
+    "requested_generator": "runtime",
+    "strict_runtime": true,
+    "source_counts": {
+      "runtime": 80,
+      "cli": 0,
+      "failed": 0,
+      "dry-run": 0
+    },
+    "official_runtime_measurement": true
   },
   "responses": {
     "friend": {},

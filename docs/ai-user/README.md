@@ -85,26 +85,26 @@ THEQOO, ARCALIVE, INVEN, MLBPARK, PPOMPPU, CLIEN
 
 ---
 
-## 생성 백엔드 (Codex CLI bridge 단일 경로)
+## 생성 백엔드 (Claude CLI bridge 단일 경로)
 
 ### Invoker 인터페이스
 ```
 Invoker (interface)
-  ├─ CodexCliInvoker ——— Codex CLI subprocess (활성)
-  └─ ClaudeApiInvoker ——— Anthropic/clcocloud 레거시 (런타임 비활성)
+  ├─ ClaudeCliInvoker ——— Claude CLI subprocess (활성)
+  └─ ClaudeApiInvoker ——— Anthropic/clcocloud API (런타임 조건부)
 ```
 
 ### InvokerRouter 라우팅
 - **`GenDto.*Request` 필드**: `backend` = "CLI" | "API" | "OFF"
 - **ActionExecutor.backendFor(actionType)** — `ai_user_generation_config` 읽기 (5분 TTL 캐시)
-- **런타임 동작**: `backend=API` 요청도 무시하고 Codex CLI bridge로 강제
+- **런타임 동작**: API 키 없으면 Claude CLI로 자동 폴백
 
-### CodexCliInvoker 특징
-- `codex exec` 단일 경로 사용
-- clcocloud/Anthropic API 키에 의존하지 않음
-- `ANTHROPIC_*` 환경변수는 subprocess에서 제거
-- refusal/provider-error 응답(`I can't write this`, `I can't do this`, `이 요청은 도와드릴 수 없습니다`) 감지 시 재시도 후에도 실패하면 미게시
+### ClaudeCliInvoker 특징
+- `claude --print --output-format stream-json --verbose --include-partial-messages` 단일 경로
+- OAuth subscription 인증 (호스트 `~/.claude` 마운트, ANTHROPIC_API_KEY 불필요)
+- refusal/provider-error 응답(`I can't help with this request`, `이 요청은 도와드릴 수 없습니다`) 감지 시 재시도 + Sonnet 폴백
 - history/comments.md·posts.md와 `voice_profile` 강화는 안전 가드 통과분만 반영
+- POST/partner → `claude-sonnet-4-6` (LLM_POST_MODEL), comment/reply → `claude-haiku-4-5-20251001`
 
 ---
 

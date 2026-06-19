@@ -36,10 +36,8 @@
 | `LLM_JURY_PROVIDER` | 배심원 생성 provider (`remote` \| `mock`) | `remote` (dev) |
 | `LLM_WORKER_URL` | backend → llm-worker 접속 URL | `http://againspring-llm:8090` |
 | `LLM_DEFAULT_TIMEOUT_MS` | LLM 호출 타임아웃 (ms) | `120000` |
-| `CODEX_BIN` | llm-worker Codex CLI 실행 파일명 | `codex` |
-| `CODEX_MODEL` | llm-worker `codex exec --model` 인자 | `gpt-5.4` |
-| `CLAUDE_BIN` | 레거시 CLI 경로 호환용 | `claude` |
-| `CLAUDE_MODEL` | 레거시 모델명 호환용 | `claude-haiku-4-5-20251001` |
+| `CLAUDE_BIN` | llm-worker Claude CLI 실행 파일명 | `claude` |
+| `CLAUDE_MODEL` | llm-worker `claude --model` 인자 (기본 모델) | `claude-haiku-4-5-20251001` |
 | `REPORT_LLM_MODEL` | llm-worker 리포트 모델 | `claude-sonnet-4-6` |
 | `CLAUDE_HOST_CONFIG_DIR` | bind mount 원본 (`→ /root/.claude`) — **llm-worker에 마운트** | dev: `/home/justant/.claude` / prod: `/root/.claude` |
 | `LLM_POOL_SIZE` | ThreadPoolExecutor 상한 | `100` |
@@ -91,10 +89,10 @@ backend의 `againspring-llm`(8090, 채팅·배심원)과 **별개 서비스**. �
 |---|---|---|---|
 | `AI_USER_LLM_MODEL` | `CLAUDE_MODEL` — 댓글/대댓글 기본 모델 | `claude-haiku-4-5-20251001` | |
 | `LLM_POST_MODEL` | 글(POST)+partner 전용 모델 오버라이드 | `claude-sonnet-4-6` | 빈 값=`CLAUDE_MODEL` 폴백 (llm.md §6.3) |
-| `LLM_API_PROMPT_CACHING` | user-block `cache_control` 캐싱 | `true` | clcocloud 간헐 무시 — "되면 보너스" (llm.md §16) |
+| `LLM_API_PROMPT_CACHING` | user-block `cache_control` 캐싱 | `true` | clcocloud 간헐 무시 — "되면 보너스" (llm.md §20) |
 | `LLM_API_CACHE_TTL` | 캐시 TTL `5m`(GA) \| `1h`(beta) | `5m` | ⚠️ `1h`은 clcocloud Kiro 오라우팅 유발 — 직접 API 전용 |
-| `LLM_API_REFUSAL_RETRIES` | clcocloud 거절(PROVIDER_ERROR) 재시도 횟수 | `2` | llm.md §18 |
-| `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 시 폴백 모델 (거절 0% 실측) | `claude-sonnet-4-6` | 빈 값=폴백 비활성 |
+| `LLM_API_REFUSAL_RETRIES` | 거절(PROVIDER_ERROR) 재시도 횟수 | `1` | Haiku 거절 시 재시도 최대 2회(1회 재시도) (llm.md §19) |
+| `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 시 폴백 모델 (거절 0% 실측) | `claude-sonnet-4-6` | Sonnet은 거절 0%, 프롬프트 인젝션 방어 |
 | `SELF_CRITIQUE_ENABLED` | 생성 후 자기비평 루프 | `true` | |
 | `SELF_CRITIQUE_THRESHOLD` | 비평 통과 점수 (7점 만점) | `5` | |
 | `SELF_CRITIQUE_EXTRA_CLICHES` | 추가 AI 상투구 (쉼표 구분 리터럴) — 무배포 등록 | `""` | llm.md §15 |

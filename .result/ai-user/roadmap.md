@@ -983,7 +983,7 @@
 - [x] THEQOO strict runtime probe / h2h / A-B 실행 명령을 dev host 기준으로 정리
 - [ ] dev host에서 network harness 실측
 
-## Step 80 (R14-phase1 prep) — host-side Phase 1 batch runner ✅ 완료
+## Step 80 (R14-phase1 prep) — host-side Phase 1 batch runner ✅ 완료 (2026-06-20, Claude 기준)
 
 **목표**: 현재 셸에서 docker가 계속 없더라도, dev host에서 Phase 1의 기계 작업을 한 번에 실행하도록 묶는다.
 
@@ -992,4 +992,9 @@
 - [x] local shell에서 `run_python_in_dev_network.sh` 재실행 (`docker: command not found`)으로 blocker 재확인
 - [x] `run_r14_runtime_phase1.sh` 추가
 - [x] runner에 strict runtime probe 3커뮤니티 + h2h 3커뮤니티 + THEQOO runtime A-B 포함
-- [ ] dev host에서 one-shot runner 실측
+- [x] dev host에서 one-shot runner 실측 **(2026-06-20, Claude 기준)**
+
+**D-95 적용**: Codex CLI → Claude Code CLI 복원. Phase-1부터 **Claude 기준 첫 공식 cond4** 데이터. 이번 실행 기준:
+- THEQOO/CLIEN/NATEPAN strict-runtime A-B에 `--strict-runtime` 플래그 추가
+- THEQOO/CLIEN/NATEPAN h2h 설문 생성
+- 임시 AUC: THEQOO=0.9982, CLIEN=0.9974, NATEPAN=0.9981

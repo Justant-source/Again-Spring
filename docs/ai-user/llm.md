@@ -1,26 +1,26 @@
 # LLM 텍스트 생성 서비스 아키텍처 (ai-user-llm: 8092)
 
 **기준일**: 2026-06-06 · **모델**: claude-haiku-4-5-20251001 · **작성**: Claude Code
-**상태**: Codex CLI bridge 단일 경로 활성 · Anthropic/clcocloud API 런타임 비활성
+**상태**: Claude CLI bridge 단일 경로 활성 · Anthropic/clcocloud API 조건부 폴백
 
 ---
 
 ## 1. 개요
 
-Codex CLI bridge를 통해 한국어 커뮤니티 텍스트 생성 및 품질 자동 검증하는 LLM 워커 서비스.
+Claude CLI subprocess를 통해 한국어 커뮤니티 텍스트 생성 및 품질 자동 검증하는 LLM 워커 서비스.
 
 | 속성 | 값 |
 |------|-----|
 | **포트** | 8092 |
 | **런타임** | Spring Boot 3.3 |
-| **모델** | `gpt-5.4` 기본 (`CODEX_MODEL`) |
-| **백엔드** | **Codex CLI bridge only** |
-| **CLI 바이너리** | `codex` |
-| **API 인증** | 사용 안 함 (clcocloud 런타임 비활성) |
+| **모델** | `claude-haiku-4-5-20251001` 기본 (`CLAUDE_MODEL`) |
+| **백엔드** | **Claude CLI bridge + API 폴백** |
+| **CLI 바이너리** | `claude` (OAuth subscription auth) |
+| **API 인증** | clcocloud API (선택적, 조건 만족 시) |
 | **동시성** | ThreadPoolExecutor 20 + LinkedBlockingQueue 100 |
 | **타임아웃** | 120초 (설정 가능) |
-| **플래그** | `codex exec --skip-git-repo-check --sandbox read-only --output-last-message ...` |
-| **프롬프트 캐싱** | 사용 안 함 |
+| **플래그** | `claude --print --output-format stream-json --verbose --include-partial-messages --model <model> --strict-mcp-config --no-session-persistence` |
+| **프롬프트 캐싱** | user-block 방식, Haiku 전용 |
 
 **엔드포인트**:
 - `POST /generate/post` — 글 생성 (backend 파라미터 선택 가능)
@@ -201,18 +201,17 @@ public interface Invoker {
 
 ---
 
-### 3.2 ClaudeCliInvoker (기존, Invoker 구현 추가)
+### 3.2 ClaudeCliInvoker (Claude CLI subprocess)
 
 **프로세스 호출**:
 ```bash
-claude chat \
-  --model claude-haiku-4-5-20251001 \
-  --strict-mcp-config \
-  --no-session-persistence \
-  --print \
+claude --print \
   --output-format stream-json \
   --verbose \
-  --include-partial-messages
+  --include-partial-messages \
+  --model claude-haiku-4-5-20251001 \
+  --strict-mcp-config \
+  --no-session-persistence
 ```
 
 **프롬프트 구분**:
@@ -226,8 +225,9 @@ claude chat \
 
 **특징**:
 - stdin에 프롬프트 전달
-- stdout 전체 수집 (비스트리밍 모드)
-- 인증: 호스트 `~/.claude` 마운트 (환경변수 불필요)
+- stdout 전체 수집 (stream-json 모드)
+- 인증: 호스트 `~/.claude` 마운트 (OAuth subscription)
+- 환경변수: `CLAUDE_BIN` (기본 `claude`), `CLAUDE_MODEL` (기본 `claude-haiku-4-5-20251001`)
 
 ---
 

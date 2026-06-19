@@ -15,8 +15,8 @@ from pathlib import Path
 
 from survey_fingerprints import extract_ab_texts, extract_pairs
 
-CODEX_CLI_PATH = os.environ.get("CODEX_BIN", "codex")
-CODEX_MODEL = os.environ.get("CODEX_MODEL", "gpt-5.4")
+CLAUDE_CLI_PATH = os.environ.get("CLAUDE_BIN", "claude")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 
 DENY_SIGS = [
     "credit balance", "too low to access", "purchase credits", "plans & billing",
@@ -66,9 +66,9 @@ def load_text(path: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
-def find_codex_cli() -> str | None:
-    candidates = [CODEX_CLI_PATH]
-    which_result = shutil.which("codex")
+def find_claude_cli() -> str | None:
+    candidates = [CLAUDE_CLI_PATH]
+    which_result = shutil.which("claude")
     if which_result:
         candidates.append(which_result)
     for path in candidates:
@@ -77,41 +77,34 @@ def find_codex_cli() -> str | None:
     return None
 
 
-def codex_exec(prompt: str, timeout: int = 60) -> str | None:
-    codex_path = find_codex_cli()
-    if not codex_path:
+def claude_exec(prompt: str, timeout: int = 60) -> str | None:
+    claude_path = find_claude_cli()
+    if not claude_path:
         return None
-    with tempfile.NamedTemporaryFile(prefix="blind-gate-", suffix=".txt", delete=False) as tmp:
-        out_path = tmp.name
     try:
         result = subprocess.run(
             [
-                codex_path,
-                "exec",
-                "--skip-git-repo-check",
-                "--sandbox", "read-only",
-                "--cd", "/tmp",
-                "--color", "never",
-                "--output-last-message", out_path,
-                "--model", CODEX_MODEL,
+                claude_path,
+                "--print",
+                "--model", CLAUDE_MODEL,
+                "--no-session-persistence",
                 prompt,
             ],
             capture_output=True,
             text=True,
             timeout=timeout,
         )
-        text = ""
-        if os.path.exists(out_path):
-            text = Path(out_path).read_text(encoding="utf-8").strip()
-        if result.returncode != 0 or not text:
+        text = result.stdout.strip() if result.returncode == 0 else ""
+        if not text:
             return None
         lowered = text.lower()
         if any(sig in lowered for sig in DENY_SIGS):
             return None
         return text
-    finally:
-        if os.path.exists(out_path):
-            os.unlink(out_path)
+    except subprocess.TimeoutExpired:
+        return None
+    except Exception:
+        return None
 
 
 def tokenize(text: str) -> list[str]:

@@ -16,7 +16,8 @@
 
 ## 현재 위치
 
-- **Phase**: Step 80 완료 — host-side Phase 1 batch runner
+- **Phase**: Step 80 완료 → **Phase-1 완료 (2026-06-20 06:39 KST)**
+- **D-95 (2026-06-20)**: Codex CLI → Claude Code CLI 복원. 이번 Phase-1부터 Claude 기준 첫 공식 cond4. ✅ 완료
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -136,9 +137,9 @@
       - all_used_text_fingerprints **163**
     - THEQOO cond5를 같은 seed로 다시 fetch하면 `humans=0 ais=0 need=20`으로 즉시 중단됨
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **상태**: **HOLD** — dev host docker-network runtime harness 미실행 + NATEPAN fresh cond5 공백 + THEQOO fresh cond5 owner FAIL
+- **상태**: **HOLD** → **Phase-1 실행 진행 중 (2026-06-20 Claude 기준)**
 - **남은 즉시 작업**:
-  - dev host에서 `run_r14_runtime_phase1.sh` 실행
+  - dev host에서 `run_r14_runtime_phase1.sh` 실행 **(2026-06-20 Claude 기준 실행 중)**
   - THEQOO runtime h2h를 owner+friend로 다시 수집
   - `r14-cond5-natepan-survey.md` 수동 응답 수집
   - 필요 시 THEQOO cond5 friend 응답 추가
@@ -256,6 +257,19 @@ cond5: ✅ CLIEN only — blind② 합산 40% (친구 25% / 오너 55%)
 ---
 
 ## 핵심 수치 현황
+
+### cond4 MAUVE (Phase-1 Claude 기준 공식 결과, 2026-06-20)
+
+| 커뮤니티 | mauve_rerank | mauve_random_mean | delta | 판정 |
+|---|---|---|---|---|
+| **THEQOO** | 0.9907 | 0.9435 (±0.0386) | **+0.0472** | ✅ PASS |
+| **CLIEN** | 0.7757 | 0.8422 (±0.0941) | **-0.0665** | ❌ FAIL |
+| **NATEPAN** | 0.9969 | 0.9745 (±0.0281) | **+0.0225** | ✅ PASS |
+
+**주의사항**:
+- 모두 `strict_runtime=True`, `draft_sources: runtime=N cli=0 failed=0` 확인됨
+- **CLIEN delta 음수 (-0.0665)**: 높은 분산(std=0.0941), 스냅샷 크기(1167)가 크고 seed 3개 중 2개가 0.7757로 동일 → MAUVE 평가 아티팩트 의심. 향후 재검토 필요.
+- THEQOO와 NATEPAN은 cond4 통과(delta > 0)
 
 ### AUC (CV 5-fold)
 | 커뮤니티 | AUC | std | n_human | n_ai | 상태 |

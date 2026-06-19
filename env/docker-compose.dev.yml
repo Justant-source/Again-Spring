@@ -55,6 +55,7 @@ services:
       SELF_CRITIQUE_THRESHOLD: ${SELF_CRITIQUE_THRESHOLD:-5}
       SELF_CRITIQUE_EXTRA_CLICHES: ${SELF_CRITIQUE_EXTRA_CLICHES:-}
       LLM_API_REFUSAL_RETRIES: ${LLM_API_REFUSAL_RETRIES:-0}
+      LLM_API_REFUSAL_FALLBACK_MODEL: ${LLM_API_REFUSAL_FALLBACK_MODEL:-}
       DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${MARIADB_DATABASE:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}

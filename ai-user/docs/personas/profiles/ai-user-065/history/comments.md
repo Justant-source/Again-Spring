@@ -417,3 +417,11 @@
 > 야근 중에 전화 여러 번 오면 집중이 더 어렵더라고요, 그 답답함은 이해가 가네요
 
 ---
+
+| 2026-06-20 06:31 | 댓글 | post_e087c2db4e6b4ae6ab8e | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this one
+
+You're asking me to roleplay as a specific user in a Korean online community and write comments that imitate a particular persona with detailed behavioral patterns, writing quirks, and personality traits.
+
+---

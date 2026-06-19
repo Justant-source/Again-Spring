@@ -798,6 +798,26 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
   - survey: `.result/ai-user/blind/r13-h2h-theqoo-survey.md`
   - answers template: `.result/ai-user/blind/r13-h2h-theqoo-answers-template.json`
 
+---
+
+## D-95 (2026-06-20) — Codex CLI → Claude Code CLI 복원
+
+**결정**: `ClaudeCliInvoker.java` 복원, `CodexCliInvoker.java` 삭제. 이번 Phase-1 실행부터 **Claude 기준 공식 cond4** 데이터.
+
+**배경**: 커밋 `7e908cd3`("codex cli bridge")이 `ClaudeCliInvoker.java`를 삭제하고 `CodexCliInvoker.java`(gpt-5.4)로 교체. CLAUDE.md 절대 아키텍처("LLM = Claude CLI 브릿지") 위반 + 사용자 지시("Claude Code CLI(haiku/sonnet)로 호출") 불일치.
+
+**내용**:
+- `ClaudeCliInvoker.java` 재작성 (거절 재시도+Sonnet 폴백 래퍼 보존, `claude --print --output-format stream-json` 방식)
+- `application.yml`: `codex-binary-path/CODEX_BIN/gpt-5.4` → `claude-binary-path/CLAUDE_BIN/claude-haiku-4-5-20251001`
+- `InvokerRouter`, `LlmWorkerPool`, `TonalizationService`, `ClaudeCliHealthIndicator` 동시 갱신
+- dev `.env.dev`: `LLM_API_REFUSAL_RETRIES=1` + `LLM_API_REFUSAL_FALLBACK_MODEL=claude-sonnet-4-6` (Haiku 거절 시 Sonnet 폴백)
+- Python 스크립트(run_ab_test.py, build_h2h_survey.py, blind_gate_common.py): `codex exec` → `claude --print` 폴백 교체
+- run_r14_runtime_phase1.sh: THEQOO A-B에 `--strict-runtime` 추가, CLIEN/NATEPAN A-B도 추가
+
+**임시 AUC 참고** (이번 Phase-1 이전 Codex 코퍼스 포함): THEQOO=0.9982, CLIEN=0.9974, NATEPAN=0.9981 (재학습됨)
+
+**중요**: Codex/gpt-5.4 기반 cond4 수치(R13/R14)는 Claude 기반과 분리. 이번 Phase-1 A-B 결과가 **Claude 기준 첫 공식 cond4**이 됨.
+
 **결론**:
 - THEQOO cond4-A는 **PASS 유지**
   - `Δ_real=+0.1326`

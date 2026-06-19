@@ -1,6 +1,6 @@
 {
   "community": "THEQOO",
-  "generated_at": "2026-06-19 11:33:18",
+  "generated_at": "2026-06-19 21:13:11",
   "n_pairs": 20,
   "label_map": {
     "0": {
@@ -93,12 +93,24 @@
       "판단불가",
       "미응답"
     ],
+    "validity_rule": "공식 집계는 A/B만 유효. 판단불가/미응답/기타는 invalid로 계산됨",
     "recommended_shape": {
       "1": {
         "choice": "A",
         "reason": "문체가 더 부자연스러움"
       }
     }
+  },
+  "generation_meta": {
+    "requested_generator": "runtime",
+    "strict_runtime": true,
+    "source_counts": {
+      "runtime": 80,
+      "cli": 0,
+      "failed": 0,
+      "dry-run": 0
+    },
+    "official_runtime_measurement": true
   },
   "responses": {
     "friend": {},

@@ -44,15 +44,22 @@ for community in THEQOO CLIEN NATEPAN; do
 done
 
 echo
-echo "[phase1] runtime A-B spot check (THEQOO)"
-run_net \
-  .result/ai-user/scripts/run_ab_test.py \
-  --community THEQOO \
-  --generator runtime \
-  --n-contexts 20 \
-  --drafts "${DRAFTS}" \
-  --workers "${WORKERS}" \
-  --source-filter theqoo
+echo "[phase1] runtime A-B (공식 cond4 측정 — strict-runtime Claude)"
+for community in THEQOO CLIEN NATEPAN; do
+  sf=$(echo "${community}" | tr '[:upper:]' '[:lower:]')
+  n_ctx=20
+  [ "${community}" = "CLIEN" ] && n_ctx=12
+  echo "  - ${community} (${n_ctx} contexts)"
+  run_net \
+    .result/ai-user/scripts/run_ab_test.py \
+    --community "${community}" \
+    --generator runtime \
+    --strict-runtime \
+    --n-contexts "${n_ctx}" \
+    --drafts "${DRAFTS}" \
+    --workers "${WORKERS}" \
+    --source-filter "${sf}"
+done
 
 cat <<'EOF'
 

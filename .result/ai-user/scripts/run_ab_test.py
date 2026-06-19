@@ -16,8 +16,8 @@ from datetime import datetime
 ML_SERVICE_URL = "http://100.115.252.61:8201"
 ML_API_TOKEN = "aiuser-ml-api-token-dev-2026"
 LLM_AI_USER_URL = os.environ.get("LLM_AI_USER_URL", "http://localhost:8092")
-CODEX_CLI_PATH = os.environ.get("CODEX_BIN", "codex")
-CODEX_MODEL = os.environ.get("CODEX_MODEL", "gpt-5.4")
+CLAUDE_CLI_PATH = os.environ.get("CLAUDE_BIN", "claude")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 
 # clcocloud 거절·오류 시그니처 (LlmErrorSignature.java 미러, R0)
 # 이 텍스트가 포함된 응답은 거절로 간주 → 재시도 or CLI 폴백
@@ -202,25 +202,25 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-def find_codex_cli():
+def find_claude_cli():
     """
-    Try to find codex CLI binary with fallback paths.
+    Try to find claude CLI binary with fallback paths.
     """
     candidates = [
-        CODEX_CLI_PATH,
+        CLAUDE_CLI_PATH,
     ]
 
     # Try PATH lookup
-    which_result = shutil.which('codex')
+    which_result = shutil.which('claude')
     if which_result:
         candidates.append(which_result)
 
     for path in candidates:
         if path and os.path.isfile(path) and os.access(path, os.X_OK):
-            log.info(f"Using codex CLI: {path}")
+            log.info(f"Using claude CLI: {path}")
             return path
 
-    log.error(f"codex CLI not found in any fallback path. Tried: {candidates}")
+    log.error(f"claude CLI not found in any fallback path. Tried: {candidates}")
     return None
 
 
@@ -277,54 +277,45 @@ def _api_generate(prompt: str, max_retries: int = 2) -> str | None:
 
 
 def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
-    """Codex CLI bridge 생성."""
-    codex_path = find_codex_cli()
-    if not codex_path:
-        log.error("Codex CLI를 찾을 수 없음")
+    """Claude CLI bridge 생성."""
+    claude_path = find_claude_cli()
+    if not claude_path:
+        log.error("Claude CLI를 찾을 수 없음")
         return None
 
     for attempt in range(max_retries):
         try:
-            with tempfile.NamedTemporaryFile(prefix="ab-codex-", suffix=".txt", delete=False) as tmp:
-                out_path = tmp.name
             r = subprocess.run(
                 [
-                    codex_path,
-                    "exec",
-                    "--skip-git-repo-check",
-                    "--sandbox", "read-only",
-                    "--cd", "/tmp",
-                    "--color", "never",
-                    "--output-last-message", out_path,
-                    "--model", CODEX_MODEL,
+                    claude_path,
+                    "--print",
+                    "--model", CLAUDE_MODEL,
+                    "--no-session-persistence",
                     prompt + "\n\n중요: 결과 본문만 출력하고 설명은 쓰지 마.",
                 ],
-                capture_output=True, text=True, timeout=40,
+                capture_output=True, text=True, timeout=45,
             )
-            text = ""
-            if os.path.exists(out_path):
-                text = open(out_path, encoding="utf-8").read().strip()
-                os.unlink(out_path)
-            if text and r.returncode == 0:
+            text = r.stdout.strip() if r.returncode == 0 else ""
+            if text:
                 if any(sig in text.lower() for sig in DENY_SIGS):
-                    log.warning(f"Codex CLI 거절 감지 (attempt {attempt+1}/{max_retries}): {text[:80]}")
+                    log.warning(f"Claude CLI 거절 감지 (attempt {attempt+1}/{max_retries}): {text[:80]}")
                     if attempt < max_retries - 1:
                         time.sleep(1)
                     continue
-                log.info(f"Codex CLI 생성 성공 (attempt {attempt+1})")
+                log.info(f"Claude CLI 생성 성공 (attempt {attempt+1})")
                 return text
-            log.warning(f"Codex CLI returncode={r.returncode} stderr={r.stderr[:100]}")
+            log.warning(f"Claude CLI returncode={r.returncode} stderr={r.stderr[:100]}")
             if attempt < max_retries - 1:
                 time.sleep(1)
         except subprocess.TimeoutExpired:
-            log.error(f"Codex CLI timeout (attempt {attempt+1}/{max_retries})")
+            log.error(f"Claude CLI timeout (attempt {attempt+1}/{max_retries})")
             if attempt < max_retries - 1:
                 time.sleep(1)
         except FileNotFoundError as e:
-            log.error(f"Codex binary not found: {e}")
+            log.error(f"Claude binary not found: {e}")
             return None
         except Exception as e:
-            log.error(f"Codex CLI error: {e}")
+            log.error(f"Claude CLI error: {e}")
             if attempt < max_retries - 1:
                 time.sleep(1)
     return None
@@ -334,7 +325,7 @@ def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
                   max_retries: int = 2, generator: str = "runtime",
                   strict_runtime: bool = False) -> tuple[str | None, str]:
     """
-    런타임 /generate/post 우선, 실패 시 Codex CLI fallback.
+    런타임 /generate/post 우선, 실패 시 Claude CLI fallback.
     """
     trait = cfg["trait"]
     prompt = (
@@ -382,9 +373,9 @@ def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
         if strict_runtime:
             log.error("Runtime 생성 실패 — strict_runtime enabled, CLI fallback 금지")
             return None, "failed"
-        log.warning("Runtime 생성 실패 — Codex CLI fallback 사용")
+        log.warning("Runtime 생성 실패 — Claude CLI fallback 사용")
 
-    log.info("Codex CLI bridge로 생성...")
+    log.info("Claude CLI bridge로 생성...")
     text = _cli_generate(prompt, max_retries=max_retries)
     return cleanup_theqoo_text(text, community), ("cli" if text else "failed")
 
