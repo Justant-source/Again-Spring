@@ -1137,3 +1137,21 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 - `probe_runtime_pipeline.py --strict-runtime`는 현재 `runtime_down` HALT를 정상 출력
 - `build_cond5_blind.py --fetch-export` smoke 성공
 - `summarize_cond5_results.py` empty-response `PENDING` markdown 생성 성공
+
+## D-86 — NATEPAN/THEQOO fresh cond5 설문은 미리 생성, 그러나 blind export source metadata gap을 명시한다 (2026-06-19)
+
+**배경**:
+- cond5는 per-community 활성화 게이트이므로 NATEPAN/THEQOO에 fresh blind가 필요하다.
+- host blocker와 별개로, 사람 응답 설문은 지금 미리 만들어 둘 수 있다.
+- 실제 fetch 결과를 확인해 보니 `/corpus/export/blind`는 현재 `blind_items[].meta`에 source id를 담아주지 않는다.
+
+**결정**:
+- `r14-cond5-natepan-*`, `r14-cond5-theqoo-*` 설문/answers/pending-results를 선생성한다.
+- 동시에 builder와 survey header에 아래 제한을 명시한다.
+  - `used-corpus-ids.json` 필터 요청은 가능하지만
+  - export가 source id 메타를 비우면 중복 방지는 **완전하지 않다**
+
+**의미**:
+- owner/friend 응답 수집은 바로 시작할 수 있다.
+- 다만 이 cond5 세트는 "fresh"이긴 해도, source id 차원의 중복 배제는 export endpoint 개선 전까지 보장되지 않는다.
+- 따라서 최종 해석 시 이 제약을 footnote로 반드시 명시한다.

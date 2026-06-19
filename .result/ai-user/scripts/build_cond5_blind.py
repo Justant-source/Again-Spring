@@ -52,38 +52,47 @@ def extract_items(payload):
     ground_truth = payload.get("ground_truth") or {}
     humans = []
     ais = []
+    meta_stats = {"human_with_meta": 0, "human_without_meta": 0, "ai_with_meta": 0, "ai_without_meta": 0}
     for item in blind_items:
         item_id = str(item.get("id"))
         label = ground_truth.get(item_id)
         text = (item.get("text") or "").strip()
         if not text or label not in {"human", "ai"}:
             continue
+        meta = item.get("meta") or {}
         normalized = {
             "id": item_id,
             "text": text,
             "label": label,
-            "meta": item.get("meta") or {},
+            "meta": meta,
         }
+        key = f"{label}_{'with_meta' if meta else 'without_meta'}"
+        meta_stats[key] += 1
         if label == "human":
             humans.append(normalized)
         else:
             ais.append(normalized)
-    return humans, ais
+    return humans, ais, meta_stats
 
 
 def filter_used(items, used_ids, kind):
     if not used_ids:
-        return items
+        return items, 0, 0
     kept = []
     skipped = 0
+    unfilterable = 0
     for item in items:
         meta = item.get("meta") or {}
         candidate_id = meta.get("ai_corpus_id") if kind == "ai" else meta.get("human_post_id")
-        if candidate_id is not None and candidate_id in used_ids:
+        if candidate_id is None:
+            unfilterable += 1
+            kept.append(item)
+            continue
+        if candidate_id in used_ids:
             skipped += 1
             continue
         kept.append(item)
-    return kept, skipped
+    return kept, skipped, unfilterable
 
 
 def pair_items(community, humans, ais, n_pairs, seed):
@@ -113,7 +122,7 @@ def pair_items(community, humans, ais, n_pairs, seed):
     return pairs, label_map
 
 
-def write_outputs(community, pairs, label_map, output_prefix, provenance):
+def write_outputs(community, pairs, label_map, output_prefix, provenance, generation_meta):
     os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
     survey_path = os.path.join(DEFAULT_OUTPUT_DIR, f"{output_prefix}-survey.md")
     answers_path = os.path.join(DEFAULT_OUTPUT_DIR, f"{output_prefix}-answers-template.json")
@@ -124,6 +133,8 @@ def write_outputs(community, pairs, label_map, output_prefix, provenance):
 > provenance: `{provenance}`
 > 지시: 각 번호에서 **AI가 쓴 것처럼 느껴지는 쪽**을 `A` 또는 `B`로 적고, 바로 아래 이유를 적으세요.
 > 유효 응답: `A/B`만 집계. `판단불가`/빈칸/기타 응답은 무효 처리됩니다.
+> source metadata coverage: human_with_meta={generation_meta['meta_stats']['human_with_meta']} / ai_with_meta={generation_meta['meta_stats']['ai_with_meta']}
+> 주의: export가 source id 메타를 비우면 `used-corpus-ids` 중복 필터는 완전하게 작동하지 않습니다.
 
 ---
 
@@ -151,6 +162,7 @@ def write_outputs(community, pairs, label_map, output_prefix, provenance):
         "n_pairs": len(pairs),
         "label_map": label_map,
         "provenance": provenance,
+        "generation_meta": generation_meta,
         "response_instructions": {
             "accepted_keys": "responses.<respondent> 에는 pair 번호를 1-based(1..N) 또는 0-based(0..N-1)로 넣을 수 있음",
             "accepted_values": ["A", "B", "답변불가", "판단불가", "미응답"],
@@ -207,17 +219,18 @@ def main():
         payload = load_json(args.export_json)
         provenance = os.path.abspath(args.export_json)
 
-    humans, ais = extract_items(payload)
+    humans, ais, meta_stats = extract_items(payload)
     used_ai_ids = set()
     used_human_ids = set()
     if args.used_ids:
         used = load_json(args.used_ids)
         used_ai_ids = set(used.get("all_used_ai_corpus_ids") or [])
         used_human_ids = set(used.get("all_used_human_post_ids") or [])
-        ais, skipped_ai = filter_used(ais, used_ai_ids, "ai")
-        humans, skipped_human = filter_used(humans, used_human_ids, "human")
+        ais, skipped_ai, unfilterable_ai = filter_used(ais, used_ai_ids, "ai")
+        humans, skipped_human, unfilterable_human = filter_used(humans, used_human_ids, "human")
     else:
         skipped_ai = skipped_human = 0
+        unfilterable_ai = unfilterable_human = 0
 
     if len(humans) < args.n_pairs or len(ais) < args.n_pairs:
         raise SystemExit(
@@ -226,7 +239,20 @@ def main():
 
     pairs, label_map = pair_items(community, humans, ais, args.n_pairs, args.seed)
     prefix = args.output_prefix or f"r14-cond5-{community.lower()}"
-    survey_path, answers_path = write_outputs(community, pairs, label_map, prefix, provenance)
+    generation_meta = {
+        "meta_stats": meta_stats,
+        "used_ids_filter_requested": bool(args.used_ids),
+        "filtered_used_ai": skipped_ai,
+        "filtered_used_human": skipped_human,
+        "unfilterable_ai": unfilterable_ai,
+        "unfilterable_human": unfilterable_human,
+        "warning": (
+            "source metadata missing from blind export; used-corpus filtering could not be fully applied"
+            if unfilterable_ai or unfilterable_human
+            else ""
+        ),
+    }
+    survey_path, answers_path = write_outputs(community, pairs, label_map, prefix, provenance, generation_meta)
     print(json.dumps({
         "community": community,
         "survey_path": survey_path,
@@ -234,6 +260,9 @@ def main():
         "pairs": len(pairs),
         "filtered_used_ai": skipped_ai,
         "filtered_used_human": skipped_human,
+        "unfilterable_ai": unfilterable_ai,
+        "unfilterable_human": unfilterable_human,
+        "warning": generation_meta["warning"],
     }, ensure_ascii=False))
 
 

@@ -1,0 +1,260 @@
+{
+  "type": "cond5_blind",
+  "community": "THEQOO",
+  "generated_at": "2026-06-19 14:25:59",
+  "n_pairs": 20,
+  "label_map": {
+    "0": {
+      "A": "human",
+      "B": "ai"
+    },
+    "1": {
+      "A": "ai",
+      "B": "human"
+    },
+    "2": {
+      "A": "human",
+      "B": "ai"
+    },
+    "3": {
+      "A": "ai",
+      "B": "human"
+    },
+    "4": {
+      "A": "human",
+      "B": "ai"
+    },
+    "5": {
+      "A": "ai",
+      "B": "human"
+    },
+    "6": {
+      "A": "human",
+      "B": "ai"
+    },
+    "7": {
+      "A": "human",
+      "B": "ai"
+    },
+    "8": {
+      "A": "ai",
+      "B": "human"
+    },
+    "9": {
+      "A": "human",
+      "B": "ai"
+    },
+    "10": {
+      "A": "human",
+      "B": "ai"
+    },
+    "11": {
+      "A": "ai",
+      "B": "human"
+    },
+    "12": {
+      "A": "ai",
+      "B": "human"
+    },
+    "13": {
+      "A": "human",
+      "B": "ai"
+    },
+    "14": {
+      "A": "ai",
+      "B": "human"
+    },
+    "15": {
+      "A": "human",
+      "B": "ai"
+    },
+    "16": {
+      "A": "human",
+      "B": "ai"
+    },
+    "17": {
+      "A": "human",
+      "B": "ai"
+    },
+    "18": {
+      "A": "ai",
+      "B": "human"
+    },
+    "19": {
+      "A": "human",
+      "B": "ai"
+    }
+  },
+  "provenance": "http://100.115.252.61:8201/corpus/export/blind?community=THEQOO&nPerClass=20&seed=2026",
+  "generation_meta": {
+    "meta_stats": {
+      "human_with_meta": 0,
+      "human_without_meta": 20,
+      "ai_with_meta": 0,
+      "ai_without_meta": 20
+    },
+    "used_ids_filter_requested": true,
+    "filtered_used_ai": 0,
+    "filtered_used_human": 0,
+    "unfilterable_ai": 20,
+    "unfilterable_human": 20,
+    "warning": "source metadata missing from blind export; used-corpus filtering could not be fully applied"
+  },
+  "response_instructions": {
+    "accepted_keys": "responses.<respondent> 에는 pair 번호를 1-based(1..N) 또는 0-based(0..N-1)로 넣을 수 있음",
+    "accepted_values": [
+      "A",
+      "B",
+      "답변불가",
+      "판단불가",
+      "미응답"
+    ],
+    "validity_rule": "공식 집계는 A/B만 유효. 나머지는 invalid"
+  },
+  "pair_metadata": [
+    {
+      "pair": 1,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 2,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 3,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 4,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 5,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 6,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 7,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 8,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 9,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 10,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 11,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 12,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 13,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 14,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 15,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 16,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 17,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 18,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 19,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 20,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    }
+  ],
+  "responses": {
+    "friend": {},
+    "owner": {}
+  }
+}

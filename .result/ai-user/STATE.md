@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 41 (Step 71 완료 — runtime probe + cond5 tooling)
+**최종 갱신**: 2026-06-19 세션 42 (Step 72 완료 — fresh cond5 surveys prepared)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 71 완료 — runtime probe + cond5 tooling
+- **Phase**: Step 72 완료 — fresh cond5 surveys prepared
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -57,6 +57,13 @@
   - cond5 smoke 검증 완료:
     - `build_cond5_blind.py --fetch-export`로 CLIEN 2쌍 survey/template 생성 성공
     - `summarize_cond5_results.py`로 empty-response `PENDING` results 생성 성공
+  - fresh cond5 설문 준비 완료:
+    - [r14-cond5-natepan-survey.md](/home/justant/Data/Again-Spring/.result/ai-user/blind/r14-cond5-natepan-survey.md)
+    - [r14-cond5-theqoo-survey.md](/home/justant/Data/Again-Spring/.result/ai-user/blind/r14-cond5-theqoo-survey.md)
+    - 대응 answers/results 템플릿까지 생성 완료
+  - blind export 제약 확인:
+    - `/corpus/export/blind`는 source id 메타를 비워서 반환
+    - `used-corpus-ids.json` 중복 필터는 현재 fresh cond5 세트에 완전 적용 불가
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 - **상태**: **HOLD** — `:8092` host 접근 블로커 + runtime 공식 재측정 부재 + NATEPAN/THEQOO fresh cond5 공백
 - **남은 즉시 작업**:
@@ -127,6 +134,7 @@
 | **Step 69** | R14 selective rerank gate prep | **✅ 완료** | `AI_USER_ML_ENABLED_COMMUNITIES` 구현, 기본 동작 불변 |
 | **Step 70** | R14 activation gate correction | **✅ 완료** | host blocker / strict runtime / per-community cond5 / selective gate 임계 정정 |
 | **Step 71** | R14 runtime probe + cond5 tooling | **✅ 완료** | host 복구 직후 쓸 probe/blind/summarizer 추가 |
+| **Step 72** | R14 fresh cond5 surveys prepared | **✅ 완료** | NATEPAN/THEQOO cond5 survey+template+pending results 생성, metadata gap 확인 |
 
 ### 중기
 

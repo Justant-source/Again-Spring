@@ -886,3 +886,14 @@
 - [x] cond5 결과를 owner/friend/combined로 자동 집계 가능
 - [ ] 실제 `/corpus/export/blind` fetch 샘플 검증
 - [ ] dev host에서 runtime probe 실측
+
+## Step 72 (R14-phase3 prep) — NATEPAN/THEQOO fresh cond5 설문 준비 ✅ 완료
+
+**목표**: runtime blocker가 풀리기 전에도 사람 응답이 필요한 cond5 세트를 미리 준비한다.
+
+**완료 기준**:
+- [x] NATEPAN cond5 survey / answers / pending results 생성
+- [x] THEQOO cond5 survey / answers / pending results 생성
+- [x] owner/friend 응답 형식 동일화
+- [x] blind export metadata coverage 확인
+- [x] `used-corpus-ids` 필터가 현 export에서는 완전 적용 불가함을 기록
