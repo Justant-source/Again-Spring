@@ -1070,3 +1070,40 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **의미**:
 - 이 구현만으로 활성화가 되지는 않는다. `AI_USER_ML_ENABLED`는 여전히 false 유지.
 - R14 Phase 2에서 B안을 최종 선택하면 추가 설계 없이 바로 env만 조정 가능하다.
+
+## D-84 — R14 활성화 기준 보정: host 접근이 선행 블로커, cond5는 per-community gate, 전역 ON은 기본값이 아님 (2026-06-19)
+
+**배경**:
+- Step 68/D-82에서 이미 확인했듯 현재 셸은 `ssh` 권한 거부 + `docker` 부재라 `:8092` 복구를 직접 수행할 수 없다.
+- 따라서 R14의 크리티컬 패스는 "THEQOO 측정" 이전에 **runtime host에 닿는 것**이다.
+- 또한 기존 문서 일부가 `CLIEN blind② 40%`를 NATEPAN/THEQOO cond5 근거처럼 확장 해석했는데, 이는 fresh community-specific 근거가 아니다.
+- 현재 코드 진실(2026-06-19):
+  - `InvokerRouter`는 `backend=API` 요청도 무시하고 Codex CLI bridge만 사용한다.
+  - 즉, 역사적 D-57~D-59의 Sonnet/API 서술은 **현재 runtime에 대한 보장**이 아니라 검증 필요 항목이다.
+
+**결정**:
+- R14 공식 runtime 측정 조건은 아래 셋을 모두 만족해야 한다.
+  1. `:8092` health `UP`를 확인한 host에서 실행
+  2. `--generator runtime --strict-runtime`
+  3. 생성 메타에서 `cli_fallbacks=0`
+- runtime h2h는 "재확인"이 아니라 **공식 첫 측정**으로 취급한다. 실행 전후에 실제 backend/model, 4-draft 생성, `/rerank` winner/random 배관을 함께 검증한다.
+- cond5는 커뮤니티별 활성화 게이트다.
+  - `CLIEN`: blind② 40% PASS 근거 유지
+  - `NATEPAN/THEQOO`: fresh community-specific cond5 PASS가 없으므로 **활성화 보류**
+- 리랭커 운영 결정 기본값:
+  - `benefit_pp = random 탐지율 - rerank 탐지율`
+  - `benefit_pp >= 5%p`인 community만 selective gate(B) 후보
+  - 그 미만이면 기본값은 C(계속 OFF)
+  - A(전역 ON)는 예외적 선택지
+
+**이유**:
+- runtime 공식 측정에 CLI fallback이 섞이면 D-77 위반이다.
+- h2h(cond4-B)는 rerank vs random 비교이지 AI vs human 증명이 아니므로, cond5는 별도 커뮤니티 게이트가 맞다.
+- 현재 MAUVE 포화와 CLIEN h2h 동률을 고려하면 "이미 충분히 human-like 해서 리랭커 비용을 정당화하지 못할" 가능성을 정면으로 평가해야 한다.
+
+**다음 작업**:
+1. dev host 접근 확보 및 `:8092` 복구
+2. runtime 배관 검증 로그 확보
+3. THEQOO owner+friend runtime h2h
+4. NATEPAN/THEQOO fresh cond5
+5. `benefit_pp` 기준으로 B/C 최종 권고

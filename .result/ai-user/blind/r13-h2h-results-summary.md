@@ -107,9 +107,9 @@
 
 | 커뮤니티 | cond4-MAUVE Δ | D-68 Δ≥-0.02 | h2h 비퇴행 | cond5 | **신 cond4** | 전체 판정 |
 |---|---|---|---|---|---|---|
-| **CLIEN** | +0.0134 | ✅ | ✅ 50%≤50% | ✅ (cond5 40%) | ✅ PASS | ✅ 활성화 준비 가능 |
-| **NATEPAN** | -0.0001 | ✅ (-0.02 이내) | ✅ 47.1%≤52.9% | ✅ (cond5 40% 합산) | ✅ PASS | ✅ 활성화 준비 가능 |
-| **THEQOO** | Δ_real=+0.0686 | ✅ | ✅ 25.0%≤75.0% | ✅ (R9 cond5 합산 40%) | ✅ PASS | ✅ 활성화 준비 가능 |
+| **CLIEN** | +0.0134 | ✅ | ⚠️ runtime strict 재확인 필요 | ✅ (blind② 40%) | ⚠️ provisional | ⚠️ runtime 공식값 필요 |
+| **NATEPAN** | -0.0001 | ✅ (-0.02 이내) | ⚠️ runtime strict 재확인 필요 | ⚠️ fresh PASS 없음 | ⚠️ provisional | ⛔ cond5 + runtime 보강 필요 |
+| **THEQOO** | Δ_real=+0.0686 | ✅ | ⚠️ owner-only CLI fallback 기반 PASS | ⚠️ fresh PASS 없음 | ⚠️ provisional | ⛔ host 복구 + runtime + cond5 필요 |
 
 ---
 
@@ -130,9 +130,9 @@
 
 ### 전역 게이트 상황
 
-- `ActionExecutor.java:424` 단일 boolean — CLIEN/NATEPAN만 켜기 불가.
-- 세 커뮤니티 모두 PASS → 연구 게이트 기준 전역 활성화 차단 요인 해소.
-- 단, 실제 운영 전 `:8092` 런타임 복구와 수동 enable 절차가 남아 있음.
+- `ActionExecutor.java:424` 단일 boolean 문제는 `AI_USER_ML_ENABLED_COMMUNITIES`로 준비만 완료된 상태다.
+- 전역 ON은 더 이상 기본값이 아니다. runtime strict 결과와 `benefit_pp >= 5%p` 조건을 통과한 community만 selective gate 후보로 본다.
+- `:8092` 런타임 복구와 community별 cond5 보강 전에는 활성화 판단을 내리지 않는다.
 
 ### 롤백 트리거 (활성화 후 모니터링)
 
@@ -144,10 +144,14 @@
 
 ## 결론
 
-**R13 Phase 4 판정**:
-- CLIEN + NATEPAN + THEQOO: 신 cond4(D-68) **PASS**
-- **전역 활성화 연구 게이트**: 해소 완료
-- `AI_USER_ML_ENABLED=true` 전환 시기: **수동 활성화 가능(GO candidate)** 단, 코드 변경 금지
+**R13/R14 경계 판정**:
+- 현재 h2h 문서는 cond4 참고자료로만 유지한다.
+- 공식 활성화 상태는 **HOLD**다.
+- 남은 선행조건:
+  1. `:8092` host 복구
+  2. runtime strict cond4 재측정
+  3. NATEPAN/THEQOO fresh cond5
+  4. selective gate(B) vs OFF(C) 비용/효용 결정
 
 **다음 스텝**:
 1. `:8092` 런타임 복구 후 동일 샘플 경로 재검증

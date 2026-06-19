@@ -105,6 +105,8 @@ def summarize_respondent(respondent, answers, label_map, n_pairs):
         "rows": rows,
         "valid": valid,
         "total": n_pairs,
+        "invalid": n_pairs - valid,
+        "invalid_rate": ((n_pairs - valid) / n_pairs) if n_pairs else None,
         "rerank_hits": rerank_hits,
         "random_hits": random_hits,
         "rerank_rate": (rerank_hits / valid) if valid else None,
@@ -115,6 +117,7 @@ def summarize_respondent(respondent, answers, label_map, n_pairs):
 
 def combine_summaries(community, summaries):
     valid = sum(item["valid"] for item in summaries)
+    total = sum(item["total"] for item in summaries)
     rerank_hits = sum(item["rerank_hits"] for item in summaries)
     random_hits = sum(item["random_hits"] for item in summaries)
     if valid == 0:
@@ -126,7 +129,9 @@ def combine_summaries(community, summaries):
     return {
         "respondent": f"{community}-combined",
         "valid": valid,
-        "total": sum(item["total"] for item in summaries),
+        "total": total,
+        "invalid": total - valid,
+        "invalid_rate": ((total - valid) / total) if total else None,
         "rerank_hits": rerank_hits,
         "random_hits": random_hits,
         "rerank_rate": (rerank_hits / valid) if valid else None,
@@ -154,12 +159,12 @@ def render_summary(data, answers_path):
 
 ## 응답 현황
 
-| 응답자 | 유효 응답 | rerank 탐지율 | random 탐지율 | 판정 |
-|---|---:|---:|---:|---|
+| 응답자 | 유효 응답 | 무효 응답 | rerank 탐지율 | random 탐지율 | 판정 |
+|---|---:|---:|---:|---:|---|
 """
     for item in summaries:
-        md += f"| {item['respondent']} | {item['valid']}/{item['total']} | {fmt_rate(item['rerank_rate'])} | {fmt_rate(item['random_rate'])} | {item['verdict']} |\n"
-    md += f"| combined | {combined['valid']}/{combined['total']} | {fmt_rate(combined['rerank_rate'])} | {fmt_rate(combined['random_rate'])} | {combined['verdict']} |\n"
+        md += f"| {item['respondent']} | {item['valid']}/{item['total']} | {item['invalid']}/{item['total']} | {fmt_rate(item['rerank_rate'])} | {fmt_rate(item['random_rate'])} | {item['verdict']} |\n"
+    md += f"| combined | {combined['valid']}/{combined['total']} | {combined['invalid']}/{combined['total']} | {fmt_rate(combined['rerank_rate'])} | {fmt_rate(combined['random_rate'])} | {combined['verdict']} |\n"
 
     for item in summaries:
         md += f"""
@@ -177,6 +182,7 @@ def render_summary(data, answers_path):
         md += f"""
 
 - 유효 응답: {item['valid']}/{item['total']}
+- 무효 응답: {item['invalid']}/{item['total']} = **{fmt_rate(item['invalid_rate'])}**
 - rerank 탐지: {item['rerank_hits']}/{item['valid']} = **{fmt_rate(item['rerank_rate'])}**
 - random 탐지: {item['random_hits']}/{item['valid']} = **{fmt_rate(item['random_rate'])}**
 - D-68 판정: **{item['verdict']}**
@@ -189,6 +195,7 @@ def render_summary(data, answers_path):
 ## combined 판정
 
 - 유효 응답 합산: {combined['valid']}/{combined['total']}
+- 무효 응답 합산: {combined['invalid']}/{combined['total']} = **{fmt_rate(combined['invalid_rate'])}**
 - rerank 탐지율: **{fmt_rate(combined['rerank_rate'])}**
 - random 탐지율: **{fmt_rate(combined['random_rate'])}**
 - 최종 상태: **{combined['verdict']}**

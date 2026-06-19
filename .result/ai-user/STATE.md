@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 39 (Step 69 완료 — R14 selective rerank gate prep)
+**최종 갱신**: 2026-06-19 세션 40 (Step 70 완료 — R14 activation gate correction)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 69 완료 — R14 selective rerank gate prep
+- **Phase**: Step 70 완료 — R14 activation gate correction
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -45,12 +45,19 @@
     - 신규 env `AI_USER_ML_ENABLED_COMMUNITIES`
     - `AI_USER_ML_ENABLED=true`여도 community 목록으로 rerank 대상을 제한 가능
     - 비어 있으면 기존 전역 동작 유지
+- **판정 보정**:
+  - `:8092` 복구는 여전히 **host 접근 블로커**다. 현재 셸에서는 `ssh` 권한 거부 + `docker` 부재라 직접 해결 불가
+  - R14 공식 runtime 측정은 `--generator runtime --strict-runtime` + `cli_fallbacks=0` 조건으로만 인정
+  - `CLIEN blind② 40%`는 CLIEN 전용 cond5 근거다. NATEPAN/THEQOO까지 확장 해석하지 않음
+  - 현재 활성화 준비 상태는 **GO candidate가 아니라 HOLD**
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **상태**: 연구 게이트 기준 **수동 활성화 가능(GO candidate)**, 단 `:8092` 런타임 복구와 runtime 경로 재검증이 아직 필수
+- **상태**: **HOLD** — `:8092` host 접근 블로커 + runtime 공식 재측정 부재 + NATEPAN/THEQOO fresh cond5 공백
 - **남은 즉시 작업**:
-  - dev host에서 `:8092` 복구 (`ssh`/`docker`는 현재 셸에서 직접 실행 불가)
-  - runtime `/generate/post` 기준 THEQOO/CLIEN/NATEPAN h2h 재측정
-  - selective gate 실제 사용 여부(A/B/C) 최종 결정
+  - `:8092`를 올릴 수 있는 dev host에 먼저 접근
+  - runtime 배관 검증: 실제 backend/model, 4-draft 생성, `/rerank` winner/random 분기, CLI fallback=0 확인
+  - THEQOO runtime h2h를 owner+friend로 다시 수집
+  - NATEPAN/THEQOO fresh cond5 블라인드 재측정
+  - `benefit_pp >= 5%p`인 community만 selective gate(B) 후보로 평가
 - **이번 추가 하드닝**:
   - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
   - runtime `OutputSanitizer`와 CLI fallback 하네스(`build_h2h_survey.py`, `run_ab_test.py`) 동시 반영
@@ -110,6 +117,7 @@
 | **Step 67** | THEQOO awkward phrase hardening | **✅ 완료** | 2개 잔여 표현 정규화, 오프라인 재생성 완료 |
 | **Step 68** | R14 runtime gate + host handoff | **✅ 완료(HALT 기록)** | local env에서 `ssh`/`docker` 불가, dev host 복구 절차로 전환 |
 | **Step 69** | R14 selective rerank gate prep | **✅ 완료** | `AI_USER_ML_ENABLED_COMMUNITIES` 구현, 기본 동작 불변 |
+| **Step 70** | R14 activation gate correction | **✅ 완료** | host blocker / strict runtime / per-community cond5 / selective gate 임계 정정 |
 
 ### 중기
 
@@ -119,19 +127,18 @@
 | **COMMENT M-after** | NATEPAN 측정 후 R7 완료 | WSL | 신선분 축적 후 |
 | **에스컬레이션 평가** | blind①② 후 D-12 Phase 2/3 진입조건 보고 | — | blind 결과 후 |
 
-### prod 배포 게이트 (5조건 — **연구 게이트 충족** 2026-06-19)
+### 활성화 게이트 (R14 보정본, 2026-06-19)
 
 ```
 cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(116/562)
 cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9958
 cond3: ✅ SPLITTER_VERIFIED=True
-cond4: ✅ CLIEN Δ=+0.0134 AND h2h 50%≤50% PASS (R13, 신 cond4 D-68)
-       ✅ NATEPAN Δ=-0.0001 AND h2h 47.1%≤52.9% PASS (R13, 신 cond4 D-68)
-       ✅ THEQOO Δ_real=+0.0686 AND h2h owner v2 25.0%≤75.0% PASS
-cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
+cond4: ⚠️ 공식값은 runtime strict 재측정 필요 (현재 수치는 CLI proxy/fallback 비중 존재)
+cond5: ✅ CLIEN only — blind② 합산 40% (친구 25% / 오너 55%)
+       ⚠️ NATEPAN/THEQOO fresh community-specific PASS 없음
 ```
 
-**AI_USER_ML_ENABLED 상태**: false → **수동 활성화 가능(GO candidate)** (코드 변경 금지, 운영자가 수동 판단)
+**AI_USER_ML_ENABLED 상태**: false 유지. 현재는 **수동 활성화 판단 단계 아님**.
 
 ---
 
@@ -140,9 +147,10 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | 우선순위 | 항목 | 배경 | 선택지 |
 |---|---|---|---|
 | **P2** | ~~COMMENT 생성 배치 (R7 M-after)~~ | ✅ 완료 — WSL 배치 B 경로로 해결 (2026-06-18) | — |
-| **P3** | **AI_USER_ML_ENABLED 활성화 시기** | 연구 게이트는 해소됨. 다만 `:8092` 런타임 재검증이 없고 cond4-B 공식 증거가 아직 CLI proxy 기반이다 | 자동: runtime 복구 후 수동 활성화 / 선택: selective gate 준비 상태로 보류 |
+| **P3** | **AI_USER_ML_ENABLED 활성화 시기** | host blocker + runtime 공식 cond4-B 부재 + NATEPAN/THEQOO cond5 공백 때문에 아직 판정 단계가 아님 | 자동: host 복구 후 runtime/cond5 재측정 / 선택: 계속 false 유지 |
 | **P5** | **THEQOO corpus 수집 방법** | ✅ **C) 크롤링 완료**. real-only corpus **311/300** 확보. | closed |
-| **P6** | **THEQOO 개선 방향** | owner v2까지 PASS. `…`와 2개 잔여 표현 정규화는 반영 완료. 남은 핵심은 runtime 경로 공식 재측정과 friend 응답 추가다 | A) runtime 서비스 복구 / B) runtime h2h 재응답 / C) selective gate 활용 판단 |
+| **P6** | **THEQOO 개선 방향** | owner v2 PASS는 CLI fallback 기반이고 유효 12/20으로 얇다. runtime strict 첫 측정 + friend 추가가 핵심이다 | A) host 접근 확보 / B) runtime h2h owner+friend / C) fresh cond5 |
+| **P7** | **Selective gate 채택 기준** | 전역 ON은 기본값이 아니다. `benefit_pp >= 5%p`인 community만 B안 후보로 본다 | A) B selective gate / B) C 유지 / C) A는 예외적 |
 
 ---
 

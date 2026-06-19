@@ -861,3 +861,15 @@
 - [x] unit test 추가
 - [ ] Java 테스트 실행
 - [ ] dev:8090 e2e 검증
+
+## Step 70 (R14-phase1/2 gate correction) — host blocker + strict runtime + cond5 범위 정정 ✅ 완료
+
+**목표**: R14 실행 순서를 현실에 맞게 바로잡고, 잘못 확장된 활성화 근거를 정정한다.
+
+**완료 기준**:
+- [x] `:8092` 복구는 현재 셸이 아니라 dev host 접근 문제임을 명시
+- [x] 공식 runtime 측정 조건을 `--generator runtime --strict-runtime` + `cli_fallbacks=0`으로 고정
+- [x] runtime 측정 전 배관 검증 항목(backend/model, 4 drafts, `/rerank`) 추가
+- [x] `CLIEN blind② 40%`를 NATEPAN/THEQOO cond5 근거로 쓰지 않도록 정정
+- [x] selective gate 임계: `benefit_pp >= 5%p` 기본 규칙 반영
+- [x] 설문 무효율 추적과 응답 형식 힌트 보강

@@ -325,7 +325,8 @@ def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
 
 
 def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
-                  max_retries: int = 2, generator: str = "runtime") -> str | None:
+                  max_retries: int = 2, generator: str = "runtime",
+                  strict_runtime: bool = False) -> tuple[str | None, str]:
     """
     런타임 /generate/post 우선, 실패 시 Codex CLI fallback.
     """
@@ -340,7 +341,7 @@ def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
     )
 
     if dry_run:
-        return f"[DRY RUN] {theme[:30]}…"
+        return f"[DRY RUN] {theme[:30]}…", "dry-run"
 
     if generator == "runtime":
         payload = {
@@ -366,27 +367,38 @@ def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
                 if text:
                     text = cleanup_theqoo_text(text, community)
                     log.info("Runtime /generate/post 생성 성공 (attempt %s)", attempt + 1)
-                    return text
+                    return text, "runtime"
             except Exception as e:
                 log.warning("Runtime /generate/post 실패 (attempt %s/%s): %s",
                             attempt + 1, max_retries, e)
                 if attempt < max_retries - 1:
                     time.sleep(1)
+        if strict_runtime:
+            log.error("Runtime 생성 실패 — strict_runtime enabled, CLI fallback 금지")
+            return None, "failed"
         log.warning("Runtime 생성 실패 — Codex CLI fallback 사용")
 
     log.info("Codex CLI bridge로 생성...")
     text = _cli_generate(prompt, max_retries=max_retries)
-    return cleanup_theqoo_text(text, community)
+    return cleanup_theqoo_text(text, community), ("cli" if text else "failed")
 
 
 def _gen_draft_task(args):
-    """Thread-pool worker: (context_idx, draft_idx, theme, community, cfg, dry_run, generator)."""
-    ctx_i, draft_i, theme, community, cfg, dry_run, generator = args
-    text = generate_post(theme, community, cfg, dry_run, generator=generator)
-    return ctx_i, draft_i, text
+    """Thread-pool worker: (context_idx, draft_idx, theme, community, cfg, dry_run, generator, strict_runtime)."""
+    ctx_i, draft_i, theme, community, cfg, dry_run, generator, strict_runtime = args
+    text, source = generate_post(
+        theme,
+        community,
+        cfg,
+        dry_run,
+        generator=generator,
+        strict_runtime=strict_runtime,
+    )
+    return ctx_i, draft_i, text, source
 
 
-def run(community, n_contexts, n_drafts, dry_run, workers=8, source_filter=None, generator="runtime"):
+def run(community, n_contexts, n_drafts, dry_run, workers=8, source_filter=None,
+        generator="runtime", strict_runtime=False):
     cfg = COMMUNITY_CFG.get(community)
     if not cfg:
         log.error(f"Unknown community: {community}. Available: {list(COMMUNITY_CFG)}")
@@ -398,23 +410,30 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8, source_filter=None,
 
     # Generate all drafts in parallel
     tasks = [
-        (i, j, theme, community, cfg, dry_run, generator)
+        (i, j, theme, community, cfg, dry_run, generator, strict_runtime)
         for i, theme in enumerate(themes)
         for j in range(n_drafts)
     ]
 
     # results[ctx_i][draft_i] = text
     results = [[None] * n_drafts for _ in range(len(themes))]
+    source_counts = {"runtime": 0, "cli": 0, "failed": 0, "dry-run": 0}
     done = 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(_gen_draft_task, t): t for t in tasks}
         for fut in as_completed(futures):
-            ctx_i, draft_i, text = fut.result()
+            ctx_i, draft_i, text, source = fut.result()
             results[ctx_i][draft_i] = text
+            source_counts[source] = source_counts.get(source, 0) + 1
             done += 1
             theme_short = themes[ctx_i][:20]
             status = f"{text[:60]}…" if text else "FAILED"
-            log.info(f"[{done}/{total}] ctx={ctx_i+1} draft={draft_i+1} ({theme_short}): {status}")
+            log.info(f"[{done}/{total}] ctx={ctx_i+1} draft={draft_i+1} ({theme_short}) [{source}]: {status}")
+
+    log.info("Draft source summary: runtime=%s cli=%s failed=%s",
+             source_counts.get("runtime", 0),
+             source_counts.get("cli", 0),
+             source_counts.get("failed", 0))
 
     drafts_by_context = []
     for i, theme in enumerate(themes):
@@ -472,6 +491,18 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8, source_filter=None,
             log.info(f"  n_contexts          : {result.get('n_contexts')}")
             log.info(f"  snapshot_size       : {result.get('snapshot_size')}")
             log.info(f"  degraded            : {result.get('degraded')}")
+            log.info("  generator_requested : %s", generator)
+            log.info("  strict_runtime      : %s", strict_runtime)
+            log.info("  draft_sources       : runtime=%s cli=%s failed=%s",
+                     source_counts.get("runtime", 0),
+                     source_counts.get("cli", 0),
+                     source_counts.get("failed", 0))
+            result["generation_meta"] = {
+                "requested_generator": generator,
+                "strict_runtime": strict_runtime,
+                "source_counts": source_counts,
+                "official_runtime_measurement": generator == "runtime" and strict_runtime and source_counts.get("cli", 0) == 0,
+            }
             return result
         elif status in ("FAILED", "ERROR"):
             log.error(f"Job {status}: {job}")
@@ -499,10 +530,12 @@ def main():
                    help="Optional: filter human corpus by source (e.g. 'theqoo' for real-only)")
     p.add_argument("--generator", choices=["runtime", "cli"], default="runtime",
                    help="Draft generation path (default: runtime, fallback to cli)")
+    p.add_argument("--strict-runtime", action="store_true",
+                   help="When generator=runtime, abort/fail instead of falling back to cli")
     args = p.parse_args()
 
     result = run(args.community.upper(), args.n_contexts, args.drafts, args.dry_run,
-                 args.workers, args.source_filter, args.generator)
+                 args.workers, args.source_filter, args.generator, args.strict_runtime)
     if result is None and not args.dry_run:
         sys.exit(1)
 

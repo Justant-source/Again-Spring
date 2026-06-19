@@ -256,7 +256,8 @@ def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
 
 
 def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
-                  max_retries: int = 2, generator: str = "runtime") -> str | None:
+                  max_retries: int = 2, generator: str = "runtime",
+                  strict_runtime: bool = False) -> tuple[str | None, str]:
     """런타임 /generate/post 우선, 실패 시 Codex CLI fallback."""
     trait = cfg["trait"]
     prompt = (
@@ -268,7 +269,7 @@ def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
         f"[상황]\n{theme}"
     )
     if dry_run:
-        return f"[DRY RUN] {theme[:30]}…"
+        return f"[DRY RUN] {theme[:30]}…", "dry-run"
     if generator == "runtime":
         payload = {
             "personaId": f"h2h-{community.lower()}",
@@ -293,26 +294,37 @@ def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
                 if text:
                     text = cleanup_theqoo_text(text, community)
                     log.info("Runtime /generate/post 생성 성공 (attempt %s)", attempt + 1)
-                    return text
+                    return text, "runtime"
             except Exception as e:
                 log.warning("Runtime /generate/post 실패 (attempt %s/%s): %s",
                             attempt + 1, max_retries, e)
                 if attempt < max_retries - 1:
                     time.sleep(1)
+        if strict_runtime:
+            log.error("Runtime 생성 실패 — strict_runtime enabled, CLI fallback 금지")
+            return None, "failed"
         log.warning("Runtime 생성 실패 — Codex CLI fallback 사용")
     log.info("Codex CLI bridge로 생성...")
     text = _cli_generate(prompt, max_retries=max_retries)
-    return cleanup_theqoo_text(text, community)
+    return cleanup_theqoo_text(text, community), ("cli" if text else "failed")
 
 
 def _gen_draft_task(args):
-    """Thread-pool worker: (context_idx, draft_idx, theme, community, cfg, dry_run, generator)."""
-    ctx_i, draft_i, theme, community, cfg, dry_run, generator = args
-    text = generate_post(theme, community, cfg, dry_run, generator=generator)
-    return ctx_i, draft_i, text
+    """Thread-pool worker: (context_idx, draft_idx, theme, community, cfg, dry_run, generator, strict_runtime)."""
+    ctx_i, draft_i, theme, community, cfg, dry_run, generator, strict_runtime = args
+    text, source = generate_post(
+        theme,
+        community,
+        cfg,
+        dry_run,
+        generator=generator,
+        strict_runtime=strict_runtime,
+    )
+    return ctx_i, draft_i, text, source
 
 
-def run(community, n_contexts, n_drafts, dry_run, workers=8, generator="runtime"):
+def run(community, n_contexts, n_drafts, dry_run, workers=8, generator="runtime",
+        strict_runtime=False):
     cfg = COMMUNITY_CFG.get(community)
     if not cfg:
         log.error(f"Unknown community: {community}. Available: {list(COMMUNITY_CFG)}")
@@ -323,20 +335,27 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8, generator="runtime"
     log.info(f"H2H survey: {community} | {len(themes)} contexts × {n_drafts} drafts = {total} LLM calls | workers={workers}")
 
     # Generate all drafts in parallel
-    tasks = [(i, j, theme, community, cfg, dry_run, generator)
+    tasks = [(i, j, theme, community, cfg, dry_run, generator, strict_runtime)
              for i, theme in enumerate(themes) for j in range(n_drafts)]
     results = [[None] * n_drafts for _ in range(len(themes))]
+    source_counts = {"runtime": 0, "cli": 0, "failed": 0, "dry-run": 0}
     done = 0
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(_gen_draft_task, t): t for t in tasks}
         for fut in as_completed(futures):
-            ctx_i, draft_i, text = fut.result()
+            ctx_i, draft_i, text, source = fut.result()
             results[ctx_i][draft_i] = text
+            source_counts[source] = source_counts.get(source, 0) + 1
             done += 1
             theme_short = themes[ctx_i][:20]
             status = f"{text[:60]}…" if text else "FAILED"
-            log.info(f"[{done}/{total}] ctx={ctx_i+1} draft={draft_i+1} ({theme_short}): {status}")
+            log.info(f"[{done}/{total}] ctx={ctx_i+1} draft={draft_i+1} ({theme_short}) [{source}]: {status}")
+
+    log.info("Draft source summary: runtime=%s cli=%s failed=%s",
+             source_counts.get("runtime", 0),
+             source_counts.get("cli", 0),
+             source_counts.get("failed", 0))
 
     # Collect valid drafts
     drafts_by_context = []
@@ -431,7 +450,10 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8, generator="runtime"
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     survey_md = f"""# R13 h2h 설문 — {community}
 > 생성: {now} | n_contexts={len(drafts_by_context)} | drafted={len(pairs)} | seed_label=2026
-> 지시: 각 번호에서 A/B 중 **AI가 쓴 것처럼 느껴지는 쪽**을 골라 `1-A 이유한줄` 형식으로 답하세요.
+> generator_requested={generator} | strict_runtime={str(strict_runtime).lower()} | runtime_drafts={source_counts.get("runtime", 0)} | cli_fallbacks={source_counts.get("cli", 0)} | failed={source_counts.get("failed", 0)}
+> 공식 runtime 측정 조건: `generator=runtime` + `strict_runtime=true` + `cli_fallbacks=0`
+> 응답 규칙: 각 번호에서 **AI가 쓴 것처럼 느껴지는 쪽**을 `A` 또는 `B`로 적고 바로 아래 `이유`를 한 줄 이상 적으세요. 애매하면 `판단불가`라고 적으세요.
+> 유효 응답 집계: `A/B`만 유효, 빈칸/판단불가/기타 응답은 무효 처리됩니다.
 
 ---
 
@@ -464,12 +486,19 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8, generator="runtime"
         "response_instructions": {
             "accepted_keys": "responses.<respondent> 에는 pair 번호를 1-based(1..N) 또는 0-based(0..N-1)로 넣을 수 있음",
             "accepted_values": ["A", "B", "답변불가", "판단불가", "미응답"],
+            "validity_rule": "공식 집계는 A/B만 유효. 판단불가/미응답/기타는 invalid로 계산됨",
             "recommended_shape": {
                 "1": {
                     "choice": "A",
                     "reason": "문체가 더 부자연스러움",
                 }
             },
+        },
+        "generation_meta": {
+            "requested_generator": generator,
+            "strict_runtime": strict_runtime,
+            "source_counts": source_counts,
+            "official_runtime_measurement": generator == "runtime" and strict_runtime and source_counts.get("cli", 0) == 0,
         },
         "responses": {
             "friend": {},
@@ -497,6 +526,7 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8, generator="runtime"
         "survey_path": survey_path,
         "answers_path": answers_path,
         "label_map_sample": dict(list(label_map.items())[:3]),
+        "source_counts": source_counts,
     }
 
 
@@ -514,10 +544,12 @@ def main():
                    help="Parallel LLM workers (default: 8)")
     p.add_argument("--generator", choices=["runtime", "cli"], default="runtime",
                    help="Draft generation path (default: runtime, fallback to cli)")
+    p.add_argument("--strict-runtime", action="store_true",
+                   help="When generator=runtime, abort/fail instead of falling back to cli")
     args = p.parse_args()
 
     result = run(args.community.upper(), args.n_contexts, args.drafts, args.dry_run,
-                 args.workers, args.generator)
+                 args.workers, args.generator, args.strict_runtime)
     if result is None:
         if not args.dry_run:
             sys.exit(1)
