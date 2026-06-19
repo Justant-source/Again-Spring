@@ -5,16 +5,17 @@ build_h2h_survey.py — R13 head-to-head 블라인드 설문 생성기
 N draft 생성 → /rerank top-1 선택 → (top-1, random) 쌍 → survey.md 출력.
 
 Usage:
-    python3 build_h2h_survey.py --community CLIEN [--n-contexts 20] [--drafts 4] [--dry-run]
+    python3 build_h2h_survey.py --community CLIEN [--n-contexts 20] [--drafts 4] [--generator runtime|cli] [--dry-run]
 """
-import argparse, json, logging, subprocess, sys, time, urllib.request, urllib.error, shutil, glob, os, random
+import argparse, json, logging, subprocess, sys, time, urllib.request, urllib.error, shutil, os, random, tempfile, re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 ML_SERVICE_URL = "http://100.115.252.61:8201"
 ML_API_TOKEN = "aiuser-ml-api-token-dev-2026"
-CLAUDE_CLI_PATH = "/home/justant/.nvm/versions/node/v24.14.1/bin/claude"
-CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+LLM_AI_USER_URL = os.environ.get("LLM_AI_USER_URL", "http://localhost:8092")
+CODEX_CLI_PATH = os.environ.get("CODEX_BIN", "codex")
+CODEX_MODEL = os.environ.get("CODEX_MODEL", "gpt-5.4")
 
 # clcocloud 거절·오류 시그니처 (LlmErrorSignature.java 미러, R0)
 DENY_SIGS = [
@@ -36,9 +37,21 @@ DENY_SIGS = [
     "i appreciate you", "i'm an ai", "i am an ai", "as an ai", "저는 ai",
 ]
 
+THEQOO_TRAILING_REACTION = re.compile(r"\s+(?:헐|개공감)(?:[~….!?ㅋㅠ; ]*)$")
+THEQOO_REACTION_AFTER_PUNCT = re.compile(r"([.?!…~]+)\s*헐\s+")
+THEQOO_STANDALONE_HEOL = re.compile(r"\s헐\s+(?=(?:제가|내가|이게|그게|근데|그냥|뭔가|싶(?:음|은|은데|어|어서)|같(?:음|아)|느낌|기분))")
+UNICODE_EMOJI = re.compile(r"[\u2600-\u27BF\U0001F300-\U0001FAFF]")
+UNICODE_ELLIPSIS = re.compile(r"[…⋯]+")
+THEQOO_TRASH_PHRASE = re.compile(r"쓰레기 차도")
+THEQOO_BROTHER_DAUGHTER_PHRASE = re.compile(r"집에서는 딸이 더 조심해야")
+
 COMMUNITY_CFG = {
     "THEQOO": {
-        "trait": "여성 중심 커뮤니티, 짧고 구어체, 감탄사(ㅋㅋ/헐/와 등), 이모지 가끔",
+        "trait": "여성 중심 커뮤니티, 짧고 구어체, 반말 위주, 공감형",
+        "voice_profile": "더쿠 스타일 사용자. 짧은 구어체, 반말 위주, 공감형, 갈등 사연 중심",
+        "slang_level": 0.48,
+        "formality": "casual",
+        "category": "OTHER",
         "themes": [
             "남자친구가 약속을 또 어겼을 때",
             "직장 동료가 내 아이디어를 가로챌 때",
@@ -64,6 +77,10 @@ COMMUNITY_CFG = {
     },
     "CLIEN": {
         "trait": "IT 직장인, 논리적 서술, 경어 사용, 중간 길이",
+        "voice_profile": "클리앙 스타일 사용자. 논리적 서술, 구어 존댓말, IT 직장인 톤",
+        "slang_level": 0.18,
+        "formality": "polite",
+        "category": "WORK",
         "themes": [
             "팀장이 일정을 무리하게 당겼을 때",
             "동료가 내 코드를 허락 없이 수정했을 때",
@@ -81,6 +98,10 @@ COMMUNITY_CFG = {
     },
     "NATEPAN": {
         "trait": "주부/직장 여성, 공감형, 감정 서술 위주, 길고 자세함",
+        "voice_profile": "네이트판 스타일 사용자. 감정 서술 위주, 공감형, 사연 커뮤니티 톤",
+        "slang_level": 0.52,
+        "formality": "polite",
+        "category": "OTHER",
         "themes": [
             "남편이 육아를 전혀 도와주지 않을 때",
             "시댁이 갑자기 방문한다고 할 때",
@@ -113,23 +134,17 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-def find_claude_cli():
-    """Try to find claude CLI binary with fallback paths."""
-    candidates = [CLAUDE_CLI_PATH]
-    which_result = shutil.which('claude')
+def find_codex_cli():
+    """Try to find codex CLI binary with fallback paths."""
+    candidates = [CODEX_CLI_PATH]
+    which_result = shutil.which("codex")
     if which_result:
         candidates.append(which_result)
-    home = os.path.expanduser('~')
-    nvm_base = os.path.join(home, '.nvm/versions/node')
-    if os.path.exists(nvm_base):
-        glob_patterns = [os.path.join(nvm_base, 'v*/bin/claude')]
-        for pattern in glob_patterns:
-            candidates.extend(glob.glob(pattern))
     for path in candidates:
         if path and os.path.isfile(path) and os.access(path, os.X_OK):
-            log.info(f"Using claude CLI: {path}")
+            log.info(f"Using codex CLI: {path}")
             return path
-    log.error(f"claude CLI not found in any fallback path")
+    log.error(f"codex CLI not found in any fallback path. Tried: {candidates}")
     return None
 
 
@@ -149,96 +164,101 @@ def api(method, path, data=None):
         raise RuntimeError(f"HTTP {e.code}: {e.read().decode()[:300]}")
 
 
+def llm_api_generate_post(payload, timeout=45):
+    url = LLM_AI_USER_URL.rstrip("/") + "/generate/post"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = json.loads(r.read().decode())
+    text = (data or {}).get("text")
+    return text.strip() if isinstance(text, str) and text.strip() else None
+
+
+def cleanup_theqoo_text(text: str | None, community: str) -> str | None:
+    if community != "THEQOO" or not text:
+        return text
+    s = UNICODE_EMOJI.sub("", text)
+    s = UNICODE_ELLIPSIS.sub("...", s)
+    s = THEQOO_TRASH_PHRASE.sub("쓰레기통이 차도", s)
+    s = THEQOO_BROTHER_DAUGHTER_PHRASE.sub("집에서는 여자가 더 조심해야", s)
+    s = THEQOO_REACTION_AFTER_PUNCT.sub(r"\1 ", s)
+    s = THEQOO_STANDALONE_HEOL.sub(" ", s)
+    s = THEQOO_TRAILING_REACTION.sub("", s)
+    s = re.sub(r" {2,}", " ", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
+
+
 def _api_generate(prompt: str, max_retries: int = 2) -> str | None:
-    """clcocloud API 우선 생성."""
-    api_key  = os.environ.get("ANTHROPIC_API_KEY", "")
-    base_url = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/")
-    if not api_key:
-        log.debug("ANTHROPIC_API_KEY 미설정 — API 경로 스킵")
-        return None
-
-    body = json.dumps({
-        "model": CLAUDE_MODEL,
-        "max_tokens": 512,
-        "messages": [{
-            "role": "user",
-            "content": f"<instructions>\n{prompt}\n</instructions>",
-        }],
-    }).encode("utf-8")
-
-    headers = {
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
-
-    for attempt in range(max_retries):
-        try:
-            req = urllib.request.Request(base_url + "/v1/messages", data=body, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=45) as r:
-                resp = json.loads(r.read().decode("utf-8"))
-            text = (resp.get("content") or [{}])[0].get("text", "").strip()
-            if not text:
-                log.warning(f"API 빈 텍스트 (attempt {attempt+1}/{max_retries})")
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                continue
-            text_lower = text.lower()
-            if any(sig in text_lower for sig in DENY_SIGS):
-                log.warning(f"API 거절 감지 (attempt {attempt+1}/{max_retries}): {text[:80]}")
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                continue
-            log.info(f"API 생성 성공 (attempt {attempt+1})")
-            return text
-        except urllib.error.HTTPError as e:
-            log.warning(f"API HTTP 에러 {e.code} (attempt {attempt+1}/{max_retries})")
-            if attempt < max_retries - 1:
-                time.sleep(2)
-        except Exception as e:
-            log.warning(f"API 예외 (attempt {attempt+1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(1)
-    log.warning("API 경로 소진 → CLI 폴백")
+    log.info("API generation path disabled — Codex CLI bridge only")
     return None
 
 
 def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
-    """CLI 폴백 생성."""
-    claude_path = find_claude_cli()
-    if not claude_path:
-        log.error("Claude CLI를 찾을 수 없음")
+    """Codex CLI bridge 생성."""
+    codex_path = find_codex_cli()
+    if not codex_path:
+        log.error("Codex CLI를 찾을 수 없음")
         return None
 
     for attempt in range(max_retries):
         try:
-            r = subprocess.run([claude_path, "-p", prompt, "--model", CLAUDE_MODEL],
-                              capture_output=True, text=True, timeout=40)
-            text = r.stdout.strip()
+            with tempfile.NamedTemporaryFile(prefix="h2h-codex-", suffix=".txt", delete=False) as tmp:
+                out_path = tmp.name
+            r = subprocess.run(
+                [
+                    codex_path,
+                    "exec",
+                    "--skip-git-repo-check",
+                    "--sandbox", "read-only",
+                    "--cd", "/tmp",
+                    "--color", "never",
+                    "--output-last-message", out_path,
+                    "--model", CODEX_MODEL,
+                    prompt + "\n\n중요: 결과 본문만 출력하고 설명은 쓰지 마.",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=40,
+            )
+            text = ""
+            if os.path.exists(out_path):
+                with open(out_path, encoding="utf-8") as f:
+                    text = f.read().strip()
+                os.unlink(out_path)
             if text and r.returncode == 0:
                 if any(sig in text.lower() for sig in DENY_SIGS):
-                    log.warning(f"CLI 거절 감지 (attempt {attempt+1}/{max_retries}): {text[:80]}")
+                    log.warning(f"Codex CLI 거절 감지 (attempt {attempt+1}/{max_retries}): {text[:80]}")
                     if attempt < max_retries - 1:
                         time.sleep(1)
                     continue
-                log.info(f"CLI 생성 성공 (attempt {attempt+1})")
+                log.info(f"Codex CLI 생성 성공 (attempt {attempt+1})")
                 return text
-            log.warning(f"CLI returncode={r.returncode}")
+            log.warning(f"Codex CLI returncode={r.returncode} stderr={r.stderr[:100]}")
             if attempt < max_retries - 1:
                 time.sleep(1)
         except subprocess.TimeoutExpired:
-            log.error(f"CLI timeout (attempt {attempt+1}/{max_retries})")
+            log.error(f"Codex CLI timeout (attempt {attempt+1}/{max_retries})")
             if attempt < max_retries - 1:
                 time.sleep(1)
+        except FileNotFoundError as e:
+            log.error(f"Codex binary not found: {e}")
+            return None
         except Exception as e:
-            log.error(f"CLI error: {e}")
+            log.error(f"Codex CLI error: {e}")
             if attempt < max_retries - 1:
                 time.sleep(1)
     return None
 
 
-def generate_post(theme: str, trait: str, dry_run: bool = False, max_retries: int = 2) -> str | None:
-    """clcocloud API 우선 → CLI 폴백으로 갈등 사연 POST 생성."""
+def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
+                  max_retries: int = 2, generator: str = "runtime") -> str | None:
+    """런타임 /generate/post 우선, 실패 시 Codex CLI fallback."""
+    trait = cfg["trait"]
     prompt = (
         f"당신은 한국 온라인 커뮤니티 사용자입니다. 커뮤니티 특성: {trait}\n"
         f"아래 상황에 처한 사람이 커뮤니티에 올리는 갈등 사연 글을 써주세요.\n"
@@ -249,33 +269,62 @@ def generate_post(theme: str, trait: str, dry_run: bool = False, max_retries: in
     )
     if dry_run:
         return f"[DRY RUN] {theme[:30]}…"
-    result = _api_generate(prompt, max_retries=max_retries)
-    if result:
-        return result
-    log.info("CLI 폴백으로 재시도...")
-    return _cli_generate(prompt, max_retries=max_retries)
+    if generator == "runtime":
+        payload = {
+            "personaId": f"h2h-{community.lower()}",
+            "archetype": "일반갈등",
+            "voiceProfile": cfg.get("voice_profile", trait),
+            "tier": "REGULAR",
+            "slangLevel": cfg.get("slang_level", 0.4),
+            "category": cfg.get("category", "OTHER"),
+            "topicSeed": theme,
+            "formality": cfg.get("formality", "casual"),
+            "demographic": f"{community} 커뮤니티 사용자",
+            "lengthTier": "MEDIUM",
+            "correlationId": f"h2h-{community.lower()}-{int(time.time() * 1000)}",
+            "timeoutMs": 120000,
+            "backend": "CLI",
+            "voiceType": community,
+            "postKind": "CONFLICT",
+        }
+        for attempt in range(max_retries):
+            try:
+                text = llm_api_generate_post(payload)
+                if text:
+                    text = cleanup_theqoo_text(text, community)
+                    log.info("Runtime /generate/post 생성 성공 (attempt %s)", attempt + 1)
+                    return text
+            except Exception as e:
+                log.warning("Runtime /generate/post 실패 (attempt %s/%s): %s",
+                            attempt + 1, max_retries, e)
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+        log.warning("Runtime 생성 실패 — Codex CLI fallback 사용")
+    log.info("Codex CLI bridge로 생성...")
+    text = _cli_generate(prompt, max_retries=max_retries)
+    return cleanup_theqoo_text(text, community)
 
 
 def _gen_draft_task(args):
-    """Thread-pool worker: (context_idx, draft_idx, theme, trait, dry_run) → (ctx_i, draft_i, text|None)."""
-    ctx_i, draft_i, theme, trait, dry_run = args
-    text = generate_post(theme, trait, dry_run)
+    """Thread-pool worker: (context_idx, draft_idx, theme, community, cfg, dry_run, generator)."""
+    ctx_i, draft_i, theme, community, cfg, dry_run, generator = args
+    text = generate_post(theme, community, cfg, dry_run, generator=generator)
     return ctx_i, draft_i, text
 
 
-def run(community, n_contexts, n_drafts, dry_run, workers=8):
+def run(community, n_contexts, n_drafts, dry_run, workers=8, generator="runtime"):
     cfg = COMMUNITY_CFG.get(community)
     if not cfg:
         log.error(f"Unknown community: {community}. Available: {list(COMMUNITY_CFG)}")
         return None
 
     themes = cfg["themes"][:n_contexts]
-    trait = cfg["trait"]
     total = len(themes) * n_drafts
     log.info(f"H2H survey: {community} | {len(themes)} contexts × {n_drafts} drafts = {total} LLM calls | workers={workers}")
 
     # Generate all drafts in parallel
-    tasks = [(i, j, theme, trait, dry_run) for i, theme in enumerate(themes) for j in range(n_drafts)]
+    tasks = [(i, j, theme, community, cfg, dry_run, generator)
+             for i, theme in enumerate(themes) for j in range(n_drafts)]
     results = [[None] * n_drafts for _ in range(len(themes))]
     done = 0
 
@@ -315,8 +364,6 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8):
     # Call /rerank for each context
     pairs = []
     label_map = {}
-    seed_label_rng = random.Random(2026)
-
     for pair_idx, ctx_info in enumerate(drafts_by_context):
         drafts = ctx_info["drafts"]
         ctx_id = ctx_info["contextId"]
@@ -384,7 +431,7 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     survey_md = f"""# R13 h2h 설문 — {community}
 > 생성: {now} | n_contexts={len(drafts_by_context)} | drafted={len(pairs)} | seed_label=2026
-> 지시: 각 번호에서 A/B 중 **사람이 쓴 글에 더 가까운 것**을 골라 `1-A 이유한줄` 형식으로 답하세요.
+> 지시: 각 번호에서 A/B 중 **AI가 쓴 것처럼 느껴지는 쪽**을 골라 `1-A 이유한줄` 형식으로 답하세요.
 
 ---
 
@@ -400,6 +447,10 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8):
 **[B]**
 {text_b}
 
+**정답:**
+
+**이유:**
+
 ---
 
 """
@@ -410,6 +461,16 @@ def run(community, n_contexts, n_drafts, dry_run, workers=8):
         "generated_at": now,
         "n_pairs": len(pairs),
         "label_map": label_map,
+        "response_instructions": {
+            "accepted_keys": "responses.<respondent> 에는 pair 번호를 1-based(1..N) 또는 0-based(0..N-1)로 넣을 수 있음",
+            "accepted_values": ["A", "B", "답변불가", "판단불가", "미응답"],
+            "recommended_shape": {
+                "1": {
+                    "choice": "A",
+                    "reason": "문체가 더 부자연스러움",
+                }
+            },
+        },
         "responses": {
             "friend": {},
             "owner": {},
@@ -451,9 +512,12 @@ def main():
                    help="Generate drafts without calling /rerank or saving files")
     p.add_argument("--workers", type=int, default=8,
                    help="Parallel LLM workers (default: 8)")
+    p.add_argument("--generator", choices=["runtime", "cli"], default="runtime",
+                   help="Draft generation path (default: runtime, fallback to cli)")
     args = p.parse_args()
 
-    result = run(args.community.upper(), args.n_contexts, args.drafts, args.dry_run, args.workers)
+    result = run(args.community.upper(), args.n_contexts, args.drafts, args.dry_run,
+                 args.workers, args.generator)
     if result is None:
         if not args.dry_run:
             sys.exit(1)

@@ -191,8 +191,8 @@ voices:
     post_processing:
       target_comma_rate: 0.011
       chosung_inject: true
-      chosung_phrases: ["헐", "ㅠㅠ", "ㄷㄷ", "개공감"]
-      sample_prob: 0.75
+      chosung_phrases: ["ㅠㅠ", "ㄷㄷ", "그니까", "ㅇㅇ"]
+      sample_prob: 0.60
 
   - id: ARCALIVE
     community: "아카라이브 (아카)"

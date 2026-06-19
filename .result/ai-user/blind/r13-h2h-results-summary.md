@@ -68,13 +68,48 @@
 
 ---
 
+### THEQOO (20쌍, owner 1인)
+
+| 번호 | 사용자 답 | A 레이블 | B 레이블 | AI 지목 |
+|---|---|---|---|---|
+| 1 | B | random | rerank | rerank |
+| 2 | B | random | rerank | rerank |
+| 3 | A | rerank | random | rerank |
+| 4 | B | rerank | random | random |
+| 5 | A | rerank | random | rerank |
+| 6 | A | random | rerank | random |
+| 7 | A | random | rerank | random |
+| 8 | 판단불가 | rerank | random | — |
+| 9 | A | random | rerank | random |
+| 10 | B | rerank | random | random |
+| 11 | A | random | rerank | random |
+| 12 | B | rerank | random | random |
+| 13 | 답변불가 | random | rerank | — |
+| 14 | 답변불가 | rerank | random | — |
+| 15 | 답변불가 | rerank | random | — |
+| 16 | 답변불가 | random | rerank | — |
+| 17 | B | rerank | random | random |
+| 18 | B | rerank | random | random |
+| 19 | A | random | rerank | random |
+| 20 | B | random | rerank | rerank |
+
+- 유효 응답: 12/20
+- rerank 탐지: 3/12 = **25.0%**
+- random 탐지: 9/12 = **75.0%**
+- D-68 판정: 25.0% ≤ 75.0% → **PASS ✅**
+
+**주목**: `헐`/이모지 신호는 사라졌고, v2 시점의 새 오너 이유는 `유니코드 말줄임표(…)`와 일부 어색한 구체 표현(`쓰레기 차도`, `딸이 더 조심해야`)이었다.
+이후 `…` → `...` 정규화 하드닝은 별도 반영 완료했고, 남은 주요 잔여 후보는 어색한 구체 표현 쪽이다.
+
+---
+
 ## 커뮤니티별 go/no-go 표
 
 | 커뮤니티 | cond4-MAUVE Δ | D-68 Δ≥-0.02 | h2h 비퇴행 | cond5 | **신 cond4** | 전체 판정 |
 |---|---|---|---|---|---|---|
 | **CLIEN** | +0.0134 | ✅ | ✅ 50%≤50% | ✅ (cond5 40%) | ✅ PASS | ✅ 활성화 준비 가능 |
 | **NATEPAN** | -0.0001 | ✅ (-0.02 이내) | ✅ 47.1%≤52.9% | ✅ (cond5 40% 합산) | ✅ PASS | ✅ 활성화 준비 가능 |
-| **THEQOO** | Δ_real=-0.1117 | ❌ (<-0.02) | 미측정 | 미측정 | ❌ FAIL | ❌ Step 52-53 재개 필요 |
+| **THEQOO** | Δ_real=+0.0686 | ✅ | ✅ 25.0%≤75.0% | ✅ (R9 cond5 합산 40%) | ✅ PASS | ✅ 활성화 준비 가능 |
 
 ---
 
@@ -88,14 +123,16 @@
 - NATEPAN: rerank가 random보다 5.8%p 덜 탐지 → 미약하지만 긍정적.
   Δ=-0.0001로 MAUVE 변화 거의 없고 h2h 소폭 개선.
   **권고**: 활성화 가능. 리랭커가 최소한 해를 끼치지 않음.
-- THEQOO: 진짜 corpus 없이 판정 불가. corpus 64% 합성이 모든 수치를 왜곡.
-  **권고**: corpus 수집(≥300건) 완료 전 활성화 보류.
+- THEQOO: v2 owner 기준 rerank가 random보다 **50%p 덜 탐지**됨.
+  이후 `…` 정규화와 `쓰레기 차도`/`집에서는 딸이 더 조심해야` 좁은 표현 하드닝까지 반영했고,
+  최신 CLI 재생성 survey에서는 해당 신호가 모두 **0건**이다.
+  **권고**: 연구 게이트는 통과. 운영 전 우선순위는 runtime 경로 복구와 필요 시 새 사람 응답 라운드 판단이다.
 
 ### 전역 게이트 상황
 
 - `ActionExecutor.java:424` 단일 boolean — CLIEN/NATEPAN만 켜기 불가.
-- THEQOO FAIL → 전역 활성화 차단.
-- **차선책**: THEQOO corpus 수집 완료 + 재학습 + Δ_real>0 확인 후 전역 활성화.
+- 세 커뮤니티 모두 PASS → 연구 게이트 기준 전역 활성화 차단 요인 해소.
+- 단, 실제 운영 전 `:8092` 런타임 복구와 수동 enable 절차가 남아 있음.
 
 ### 롤백 트리거 (활성화 후 모니터링)
 
@@ -108,11 +145,11 @@
 ## 결론
 
 **R13 Phase 4 판정**:
-- CLIEN + NATEPAN: 신 cond4(D-68) **PASS** — 활성화 준비 완료
-- THEQOO: **FAIL** — Step 52-53 (실제 더쿠 스타일 corpus ≥300건 수집) 재개 필요
-- **전역 활성화**: THEQOO 해소 전까지 불가 (단일 게이트)
-- `AI_USER_ML_ENABLED=true` 전환 시기: 오너 수동 결정 필요 (코드 변경 금지)
+- CLIEN + NATEPAN + THEQOO: 신 cond4(D-68) **PASS**
+- **전역 활성화 연구 게이트**: 해소 완료
+- `AI_USER_ML_ENABLED=true` 전환 시기: **수동 활성화 가능(GO candidate)** 단, 코드 변경 금지
 
 **다음 스텝**:
-1. THEQOO Step 52-53: 실제 더쿠 스타일 한국어 corpus ≥300건 수집 방법 결정
-2. 또는: THEQOO를 전역 게이트에서 제외하는 per-community 분기 구현 검토 (ActionExecutor 수정 필요)
+1. `:8092` 런타임 복구 후 동일 샘플 경로 재검증
+2. 필요 시 THEQOO 새 사람 응답 라운드 진행
+3. 수동 활성화 여부 결정

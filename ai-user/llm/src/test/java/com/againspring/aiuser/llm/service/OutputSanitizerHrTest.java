@@ -107,4 +107,45 @@ class OutputSanitizerHrTest {
         assertNotNull(result);
         assertFalse(result.isBlank());
     }
+
+    @Test
+    void theqooCleanupRemovesTrailingHeol() {
+        String raw = "남친이 또 약속 어겼어요 ㅋㅋ 이번엔 진짜 안 그럴게 해놓고 당일에 취소함ㅠㅠ 제가 예민한 건지 헷갈려요 헐";
+        String result = sanitizer.sanitizePost(raw, "THEQOO");
+
+        assertFalse(result.endsWith("헐"), "THEQOO 후처리는 문장 끝 standalone 헐을 제거해야 함");
+        assertFalse(result.contains("헷갈려요 헐"));
+        assertTrue(result.contains("헷갈려요"));
+    }
+
+    @Test
+    void theqooCleanupRemovesStandaloneHeolAndEmoji() {
+        String raw = "동료가 제 아이디어 가로채서 너무 짜증나요... 헐 제가 예민한 건지 모르겠어요 😥";
+        String result = sanitizer.sanitizePost(raw, "THEQOO");
+
+        assertFalse(result.contains("헐 제가"), "문장 중간 standalone 헐 제거");
+        assertFalse(result.contains("😥"), "장난스러운 유니코드 이모지 제거");
+        assertTrue(result.contains("제가 예민한 건지 모르겠어요"));
+    }
+
+    @Test
+    void theqooCleanupNormalizesUnicodeEllipsis() {
+        String raw = "남친이 또 저한테 예민하다고 하는데… 내가 이상한 건지 모르겠음…";
+        String result = sanitizer.sanitizePost(raw, "THEQOO");
+
+        assertFalse(result.contains("…"), "유니코드 말줄임표는 ASCII 점 세 개로 정규화");
+        assertTrue(result.contains("모르겠음..."), "THEQOO 잔여 탐지 신호를 ASCII ellipsis로 치환");
+    }
+
+    @Test
+    void theqooCleanupNormalizesAwkwardSpecificPhrases() {
+        String raw = "진짜 내가 예민한 건가 싶어서 올려봐... 룸메가 같이 사는데 집안일을 너무 안 해. 쓰레기 차도 안 버리고.\n"
+            + "오빠가 자꾸 집에서는 딸이 더 조심해야 된다 이래서 답답함.";
+        String result = sanitizer.sanitizePost(raw, "THEQOO");
+
+        assertTrue(result.contains("쓰레기통이 차도 안 버리고"), "THEQOO 어색한 쓰레기 표현 정규화");
+        assertTrue(result.contains("집에서는 여자가 더 조심해야"), "THEQOO 오빠 화자에서 어색한 딸 지칭 정규화");
+        assertFalse(result.contains("쓰레기 차도"));
+        assertFalse(result.contains("집에서는 딸이 더 조심해야"));
+    }
 }

@@ -721,16 +721,117 @@
 2. **B) 외부 공개 데이터셋**: AI Hub/국립국어원 등 인터넷 커뮤니티 텍스트 활용
 3. **C) 크롤링**: 법적·인프라 검토 후 진행
 
-**진행 현황 (2026-06-19)**:
+**진행 현황 (2026-06-19 최신)**:
 - [x] 오너 수집 전략 결정 → **C) 크롤링**
-- [ ] human corpus n_theqoo ≥ 300건 확보 (**현재 real snapshot 약154**)
-- [x] ML 재학습 + Δ_real > 0 확인 (**Codex-only Δ_real=+0.1397, snapshot=142**)
-- [ ] THEQOO h2h survey 재생성 + 응답 수집
-- [ ] 사용자에게 `AI_USER_ML_ENABLED=true` 수동 활성화 보고
+- [x] human corpus n_theqoo ≥ 300건 확보 (**snapshot=311**)
+- [x] ML 재학습 + Δ_real > 0 확인 (**Codex-only Δ_real=+0.1326, snapshot=311**)
+- [x] THEQOO h2h survey 재생성 (**20쌍 생성**)
+- [x] 활성화 상태 보고 → **HOLD** (`AI_USER_ML_ENABLED=false` 유지, 응답 수집 전 no-go)
 
 **실측 메모**:
-- 1차 batch (`square hot ktalk beauty`, p1-8): inserted **31**
-- 2차 deeper batch (p9-16): inserted **2**
-- 3차 `job` 집중 batch: inserted **10**
-- `/corpus/stats`: THEQOO human **386**, ai **116**
-- `source=theqoo` real-only corpus는 아직 300 미만 → Step 58 미완료
+- 최종 `/corpus/stats`: THEQOO human **543**, ai **116**
+- `source_filter="theqoo"` snapshot: **311**
+- THEQOO 재학습 version: `01KVDQJSKTY93279KQYZ91PHNS`
+- 이후 산출물:
+  - `.result/ai-user/blind/r13-h2h-theqoo-survey.md`
+  - `.result/ai-user/blind/r13-h2h-theqoo-answers-template.json`
+
+## Step 59 (R13-next2) — THEQOO h2h survey 재생성 + 활성화 HOLD 보고 ✅ 완료
+
+**목표**: real-only corpus 기준 THEQOO h2h survey를 재생성하고, 수동 활성화 판단을 최신 기준으로 정리.
+
+**완료 기준**:
+- [x] `build_h2h_survey.py`를 Codex CLI bridge 경로로 정합화
+- [x] THEQOO 20 contexts × 4 drafts → h2h pair 20쌍 생성
+- [x] 활성화 상태를 **HOLD**로 정리 (`AI_USER_ML_ENABLED=false` 유지)
+- [ ] 오너/친구 응답 수집 후 THEQOO cond4-B 최종 판정
+
+## Step 60 (R13-next3) — THEQOO h2h 집계 자동화 ✅ 완료
+
+**목표**: 사람 응답이 들어오면 answers JSON만으로 h2h 결과 markdown을 자동 생성.
+
+**완료 기준**:
+- [x] `summarize_h2h_results.py` 추가
+- [x] answers template에 입력 형식 힌트 추가
+- [x] THEQOO pending 결과 파일 생성
+
+## Step 61 (R13-next4) — THEQOO owner h2h 집계 + 전역 활성화 판정 ✅ 완료
+
+**목표**: owner 응답을 반영해 THEQOO cond4-B를 최종 판정하고 전역 활성화 go/no-go를 확정.
+
+**완료 기준**:
+- [x] owner 응답 JSON 반영
+- [x] 집계기 1-based key 해석 버그 수정
+- [x] THEQOO owner h2h 결과: rerank **61.1%**, random **38.9%**
+- [x] 판정: **FAIL → 전역 NO GO**
+
+## Step 62 (R13-next5) — THEQOO post-processing 축소 패치 ✅ 완료
+
+**목표**: owner h2h에서 반복 검출된 `헐`/유니코드 이모지 신호를 THEQOO 후처리에서 먼저 제거해 다음 재측정의 명확한 개선 후보를 만든다.
+
+**완료 기준**:
+- [x] `OutputSanitizer`에 THEQOO 전용 cleanup 추가
+- [x] trailing standalone `헐` 제거
+- [x] 유니코드 이모지 제거
+- [x] `THEQOO` 주입 후보를 덜 튀는 표현으로 축소
+- [ ] survey 재생성 + h2h 재측정
+
+## Step 63 (R13-next6) — h2h/ab 하네스 런타임 정합화 ✅ 완료
+
+**목표**: THEQOO 후처리 패치 효과를 실제 측정에 반영할 수 있도록 설문/AB 생성기를 `PromptAssembler + OutputSanitizer` 경로와 정합화한다.
+
+**완료 기준**:
+- [x] `build_h2h_survey.py` 기본 생성 경로를 `runtime(/generate/post)` 우선으로 전환
+- [x] `run_ab_test.py`도 동일하게 `runtime(/generate/post)` 우선으로 전환
+- [x] direct CLI fallback 유지
+- [x] 스크립트 문법 검증
+- [ ] `LLM_AI_USER_URL(:8092)` 복구 후 실제 재생성/재측정
+
+## Step 64 (R13-next7) — THEQOO survey v2 재생성 + A-B 재측정 ✅ 완료
+
+**목표**: THEQOO 1차 후처리 교정이 실제 블라인드 샘플과 오프라인 Δ에 반영되는지 즉시 재확인한다.
+
+**완료 기준**:
+- [x] CLI fallback에도 THEQOO cleanup 동기화
+- [x] THEQOO survey v2 재생성 (`20 contexts × 4 drafts`, workers=8)
+- [x] 새 survey에서 `헐/개공감/😥/🥲` 0건 확인
+- [x] `run_ab_test.py --source-filter theqoo --generator cli` 재측정
+- [x] 결과: `mauve_rerank=0.9907`, `mauve_random_mean=0.9221`, `Δ=+0.0686`
+- [x] owner 응답 수집 후 cond4-B 재판정
+
+## Step 65 (R13-next8) — THEQOO owner v2 h2h 집계 + 전역 재판정 ✅ 완료
+
+**목표**: 새 THEQOO survey v2에 대한 owner 응답을 반영해 cond4-B와 전역 활성화 판정을 다시 계산한다.
+
+**완료 기준**:
+- [x] answered survey 파일에서 owner 응답 추출
+- [x] answers template JSON 반영
+- [x] `summarize_h2h_results.py` 재실행
+- [x] THEQOO owner v2 결과: `12/20`, rerank `25.0%`, random `75.0%`
+- [x] THEQOO cond4-B: **PASS**
+- [x] 연구 게이트 기준 전역 상태: **수동 활성화 가능(GO candidate)**
+
+## Step 66 (R13-next9) — THEQOO ellipsis hardening ✅ 완료
+
+**목표**: owner v2에서 새 잔여 탐지 신호로 드러난 `유니코드 말줄임표(…)`를 THEQOO 경로에서 저비용으로 제거한다.
+
+**완료 기준**:
+- [x] `OutputSanitizer` THEQOO cleanup에 `…`/`⋯` → `...` 정규화 추가
+- [x] `build_h2h_survey.py` CLI fallback cleanup 동기화
+- [x] `run_ab_test.py` CLI fallback cleanup 동기화
+- [x] Java 회귀 테스트 추가
+- [ ] `:8092` runtime 복구 후 동일 경로 재생성/재측정
+
+## Step 67 (R13-next10) — THEQOO awkward phrase hardening ✅ 완료
+
+**목표**: owner v2에서 이유로 지적된 잔여 어색한 구체 표현 2개를 THEQOO 경로에서 좁게 정규화한다.
+
+**완료 기준**:
+- [x] `쓰레기 차도` → `쓰레기통이 차도`
+- [x] `집에서는 딸이 더 조심해야` → `집에서는 여자가 더 조심해야`
+- [x] runtime `OutputSanitizer` 반영
+- [x] CLI fallback 하네스 2종 동기화
+- [x] Java 회귀 테스트 추가
+- [x] CLI 경로 survey/AB 재생성
+- [x] regenerated survey 기준 문제 표현/특수문자 신호 0건 확인
+- [ ] `:8092` runtime 복구 후 동일 경로 재검증

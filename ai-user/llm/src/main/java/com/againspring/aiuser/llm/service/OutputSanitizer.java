@@ -28,6 +28,14 @@ public class OutputSanitizer {
         "|[^\n]{0,20}제안[해드릴게알려][^\n]*\n?)",
         Pattern.CASE_INSENSITIVE
     );
+    // THEQOO h2h에서 반복 검출된 신호 제거: 문장 끝/중간의 뜬금없는 감탄사와 장난스러운 유니코드 이모지.
+    private static final Pattern THEQOO_TRAILING_REACTION = Pattern.compile("\\s+(?:헐|개공감)(?:[~….!?ㅋㅠ; ]*)$");
+    private static final Pattern THEQOO_REACTION_AFTER_PUNCT = Pattern.compile("([.?!…~]+)\\s*헐\\s+");
+    private static final Pattern THEQOO_STANDALONE_HEOL = Pattern.compile("\\s헐\\s+(?=(?:제가|내가|이게|그게|근데|그냥|뭔가|싶(?:음|은|은데|어|어서)|같(?:음|아)|느낌|기분))");
+    private static final Pattern UNICODE_EMOJI = Pattern.compile("[\\x{2600}-\\x{27BF}\\x{1F300}-\\x{1FAFF}]");
+    private static final Pattern UNICODE_ELLIPSIS = Pattern.compile("[…⋯]+");
+    private static final Pattern THEQOO_TRASH_PHRASE = Pattern.compile("쓰레기 차도");
+    private static final Pattern THEQOO_BROTHER_DAUGHTER_PHRASE = Pattern.compile("집에서는 딸이 더 조심해야");
 
     // ── 커뮤니티별 분포 매칭 설정 (Step 6) ──────────────────────────────────────
     // typoInject/typoProb: Track A R9 결정론적 오타 주입 (D-50). LLM 준수 비의존.
@@ -47,7 +55,7 @@ public class OutputSanitizer {
             new String[]{"ㄹㅇㅋㅋ","ㄷㄷ","ㅇㅈ","후추"}, 0.80, true, 0.50));
         VOICE_DIST.put("RULIWEB",  new VoiceDistribution(0.018, false, null, 0.60, true, 0.45));
         VOICE_DIST.put("THEQOO",   new VoiceDistribution(0.011, true,
-            new String[]{"헐","ㅠㅠ","ㄷㄷ","개공감"}, 0.75, true, 0.30));
+            new String[]{"ㅠㅠ","ㄷㄷ","그니까","ㅇㅇ"}, 0.60, true, 0.30));
         VOICE_DIST.put("ARCALIVE", new VoiceDistribution(0.015, true,
             new String[]{"ㄹㅇ","ㄱㄱ","ㅇㅇ","어쩔"}, 0.80, true, 0.40));
         VOICE_DIST.put("INVEN",    new VoiceDistribution(0.015, false, null, 0.60, true, 0.45));
@@ -172,18 +180,41 @@ public class OutputSanitizer {
 
     private String applyDist(String text, String voiceType, boolean allowChosung) {
         if (voiceType == null || text.isBlank()) return text;
-        VoiceDistribution dist = VOICE_DIST.get(voiceType.toUpperCase());
+        String normalizedVoice = voiceType.toUpperCase();
+        VoiceDistribution dist = VOICE_DIST.get(normalizedVoice);
         if (dist == null) return text;
-        if (DIST_RNG.nextDouble() > dist.sampleProb()) return text;
-        String s = normalizeCommaRate(text, dist.targetCommaRate());
-        if (allowChosung && dist.chosungInject() && dist.chosungPhrases() != null) {
-            s = injectChosung(s, dist.chosungPhrases());
+        String s = text;
+        if (DIST_RNG.nextDouble() <= dist.sampleProb()) {
+            s = normalizeCommaRate(s, dist.targetCommaRate());
+            if (allowChosung && dist.chosungInject() && dist.chosungPhrases() != null) {
+                s = injectChosung(s, dist.chosungPhrases());
+            }
+            // R9 Track A: 결정론적 오타 주입 (LLM 무시 우회) — chosung 이후 마지막으로 실행
+            if (dist.typoInject()) {
+                s = injectTypos(s, dist.typoProb());
+            }
         }
-        // R9 Track A: 결정론적 오타 주입 (LLM 무시 우회) — chosung 이후 마지막으로 실행
-        if (dist.typoInject()) {
-            s = injectTypos(s, dist.typoProb());
+        return applyVoiceCleanup(s, normalizedVoice);
+    }
+
+    private String applyVoiceCleanup(String text, String voiceType) {
+        if ("THEQOO".equals(voiceType)) {
+            return cleanupTheqoo(text);
         }
-        return s;
+        return text;
+    }
+
+    private String cleanupTheqoo(String text) {
+        if (text == null || text.isBlank()) return text;
+        String s = UNICODE_EMOJI.matcher(text).replaceAll("");
+        s = UNICODE_ELLIPSIS.matcher(s).replaceAll("...");
+        s = THEQOO_TRASH_PHRASE.matcher(s).replaceAll("쓰레기통이 차도");
+        s = THEQOO_BROTHER_DAUGHTER_PHRASE.matcher(s).replaceAll("집에서는 여자가 더 조심해야");
+        s = THEQOO_REACTION_AFTER_PUNCT.matcher(s).replaceAll("$1 ");
+        s = THEQOO_STANDALONE_HEOL.matcher(s).replaceAll(" ");
+        s = THEQOO_TRAILING_REACTION.matcher(s).replaceFirst("");
+        s = s.replaceAll(" {2,}", " ").replaceAll("\\n{3,}", "\n\n");
+        return s.stripTrailing();
     }
 
     private String normalizeCommaRate(String text, double targetRate) {

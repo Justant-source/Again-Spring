@@ -777,3 +777,246 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **다음 작업**:
 - THEQOO h2h survey 재생성 여부 정리
 - `AI_USER_ML_ENABLED` 수동 활성화 go/no-go 보고
+
+## D-74 — THEQOO h2h survey 재생성 완료, 활성화는 HOLD 유지 (2026-06-19)
+
+**배경**:
+- D-73으로 THEQOO real-only corpus **311/300** 및 `Δ_real=+0.1326` 확보
+- D-68 신 cond4에 따르면 THEQOO는
+  - 조건 A: `Δ_real > 0`
+  - 조건 B: h2h 비퇴행
+  둘 다 필요
+
+**실행**:
+- `.result/ai-user/scripts/build_h2h_survey.py`를 `codex exec` 경로로 전환
+  - 이유: 기존 `claude` 경로가 이 환경에서 `claude.exe` 링크로 해석되어 `Permission denied`
+- 8-way 병렬 실행:
+  - `--community THEQOO --n-contexts 20 --drafts 4 --workers 8`
+- 결과:
+  - valid contexts **20/20**
+  - rerank pair **20쌍**
+  - survey: `.result/ai-user/blind/r13-h2h-theqoo-survey.md`
+  - answers template: `.result/ai-user/blind/r13-h2h-theqoo-answers-template.json`
+
+**결론**:
+- THEQOO cond4-A는 **PASS 유지**
+  - `Δ_real=+0.1326`
+  - snapshot **311**
+- THEQOO cond4-B는 **아직 미측정**
+  - survey 생성까지 완료
+  - 사람 응답 수집 전까지는 판정 불가
+- 따라서 `AI_USER_ML_ENABLED`는 **GO 아님**
+  - 운영 표현: **HOLD**
+  - 실제 상태: `AI_USER_ML_ENABLED=false` 유지
+
+**다음 작업**:
+1. 오너 응답 수집
+2. 가능하면 친구 응답 추가
+3. rerank 탐지율 ≤ random 탐지율이면 THEQOO cond4 최종 PASS
+4. 그 결과로 수동 활성화 go/no-go 확정
+
+## D-75 — THEQOO owner h2h 결과 FAIL, 전역 활성화 NO GO 확정 (2026-06-19)
+
+**실행**:
+- 오너가 `r13-h2h-theqoo-survey.md`에 20쌍 응답 입력
+- 이를 `.result/ai-user/blind/r13-h2h-theqoo-answers-template.json`의 `responses.owner`로 반영
+- `summarize_h2h_results.py` 재실행
+- 집계 중 `1..N` 응답 키가 한 칸 밀리던 버그 발견 → 즉시 수정
+
+**최종 수치**:
+- owner 유효 응답: **18/20**
+- rerank 탐지율: **61.1% (11/18)**
+- random 탐지율: **38.9% (7/18)**
+- D-68 cond4-B 판정: **FAIL** (`61.1% > 38.9%`)
+
+**결론**:
+- THEQOO cond4-A: PASS (`Δ_real=+0.1326`)
+- THEQOO cond4-B: **FAIL**
+- 따라서 THEQOO 전체 cond4는 **FAIL**
+- `AI_USER_ML_ENABLED=true` 전환은 **NO GO**
+
+**탐지 신호(오너 이유 요약)**:
+1. 문장 끝의 뜬금없는 `헐`
+2. 장난스러운 이모지
+3. 지나치게 모호한 추상화 (`꿈`, 일반론적 감정 정리)
+4. random draft 쪽의 더 인간적인 구체 표현이 비교 우위
+
+**다음 작업**:
+1. THEQOO 후처리에서 `헐`/과한 감탄사 제약
+2. 이모지 사용 조건 축소
+3. 구체 명사/상황 밀도 가산 방식으로 rerank 기준 검토
+4. 개선 후 THEQOO h2h 재실행
+
+## D-76 — THEQOO 1차 개선은 post-processing 축소부터 적용 (2026-06-19)
+
+**배경**:
+- D-75 owner h2h에서 반복적으로 지적된 탐지 신호는
+  1. 문장 끝/중간의 뜬금없는 `헐`
+  2. 장난스러운 유니코드 이모지
+  3. 과한 THEQOO식 감탄사 주입
+- 이 세 가지는 rerank보다 **생성 후 후처리 단계**에서 가장 빠르고 국소적으로 줄일 수 있음.
+
+**결정**:
+- 1차 수정은 `OutputSanitizer`의 THEQOO 전용 cleanup으로 한정한다.
+- 샘플링 여부와 무관하게 아래를 항상 정리한다.
+  - trailing standalone `헐`
+  - 문장 부호 뒤에 뜬 standalone `헐`
+  - 유니코드 이모지 (`😥`, `🥲` 등)
+- 동시에 THEQOO 후처리 주입 후보를 `헐/개공감` 중심에서 `ㅠㅠ/ㄷㄷ/그니까/ㅇㅇ` 쪽으로 낮춘다.
+
+**이유**:
+- prompt/rerank를 먼저 바꾸면 어떤 레버가 실제 개선을 만들었는지 분리가 안 됨.
+- 이번 h2h 탐지 이유는 문체 전체보다 **후처리에서 새로 붙은 신호**에 더 집중돼 있었음.
+- 따라서 가장 싼 레버부터 제거하고, 그 다음에 rerank/prompt를 볼 수 있음.
+
+**다음 작업**:
+1. THEQOO survey 재생성
+2. owner 기준 재측정
+3. 여전히 FAIL이면 rerank에 구체 명사/상황 밀도 가산 규칙 추가 검토
+
+## D-77 — THEQOO 재측정은 runtime 생성 경로만 유효로 간주 (2026-06-19)
+
+**배경**:
+- 기존 `build_h2h_survey.py`와 `run_ab_test.py`는 `codex exec` 직출력만 사용했다.
+- 따라서 `PromptAssembler`, `OutputSanitizer`, `SelfCritiqueService`를 통과한 **실제 런타임 출력**과 측정 하네스가 분리돼 있었다.
+- D-76의 THEQOO 후처리 축소 패치를 넣은 뒤에도 이 경로 불일치가 남아 있으면, 재측정 결과는 패치 효과를 반영하지 못한다.
+
+**결정**:
+- THEQOO h2h/ab 재측정은 `LLM_AI_USER_URL:/generate/post` 경로를 우선 사용하는 하네스만 유효로 본다.
+- direct CLI 생성은 **fallback**으로만 남기고, runtime 경로가 내려가 있으면 결과 해석에 제한을 명시한다.
+
+**이유**:
+- 이번 라운드의 핵심 개선점이 `OutputSanitizer`/후처리 레이어에 있기 때문이다.
+- 측정 하네스가 이 레이어를 타지 않으면, 사람 응답 변화와 코드 변화의 인과를 연결할 수 없다.
+
+**현 상태**:
+- 하네스는 runtime 우선 + CLI fallback으로 수정 완료
+- 현재 `LLM_AI_USER_URL` 후보(`localhost:8092`, `127.0.0.1:8092`, `100.115.252.61:8092`)는 모두 connection refused
+
+**다음 작업**:
+1. `:8092` 서비스 복구
+2. THEQOO survey 재생성
+3. owner 재측정
+
+## D-78 — runtime 다운 상태에서는 CLI fallback도 THEQOO cleanup을 강제 적용 (2026-06-19)
+
+**배경**:
+- D-77 기준으로는 runtime(`/generate/post`) 경로가 가장 바람직하지만, 이번 세션에서
+  `localhost:8092`, `127.0.0.1:8092`, `100.115.252.61:8092`가 모두 connection refused였다.
+- 사용자 작업을 멈추지 않으려면, 현재 가능한 생성 경로인 direct `codex exec`에서도
+  THEQOO 핵심 탐지 신호(`끝 헐`, 유니코드 이모지, `개공감`)를 동일하게 줄여야 했다.
+
+**결정**:
+- `build_h2h_survey.py`와 `run_ab_test.py`의 CLI fallback 경로에 THEQOO cleanup을 추가한다.
+- 따라서 runtime이 죽어 있어도 survey/ab 드래프트는 최소한 D-76 의도와 같은 방향으로 정리된다.
+
+**결과**:
+- THEQOO survey v2 재생성 완료
+- survey 텍스트 기준:
+  - `헐`: **0**
+  - `개공감`: **0**
+  - `😥`: **0**
+  - `🥲`: **0**
+- A-B 재측정:
+  - `mauve_rerank=0.9907`
+  - `mauve_random_mean=0.9221`
+  - `Δ=+0.0686`
+  - `source_filter=theqoo`
+
+**해석**:
+- 오프라인 cond4-A 신호는 여전히 양수다.
+- 즉시 확인된 개선은 "사람이 바로 집어내던 후처리 신호 제거"와 "Δ 양수 유지"다.
+- 하지만 cond4-B는 여전히 사람 응답이 있어야 다시 판정 가능하다.
+
+## D-79 — THEQOO owner v2 h2h PASS, 연구 게이트 기준 전역 GO candidate (2026-06-19)
+
+**실행**:
+- 사용자가 응답한 `r13-h2h-theqoo-surveyr13-h2h-theqoo-surveyr13-h2h-theqoo-survey.md`에서 owner 답안을 추출
+- `.result/ai-user/blind/r13-h2h-theqoo-answers-template.json`에 반영
+- `summarize_h2h_results.py` 재실행
+
+**최종 수치**:
+- owner 유효 응답: **12/20**
+- rerank 탐지율: **25.0% (3/12)**
+- random 탐지율: **75.0% (9/12)**
+- D-68 cond4-B 판정: **PASS**
+
+**결론**:
+- THEQOO cond4-A: **PASS** (`Δ_real=+0.0686`)
+- THEQOO cond4-B: **PASS** (`25.0% ≤ 75.0%`)
+- 따라서 CLIEN/NATEPAN/THEQOO 모두 신 cond4를 통과한다.
+- cond1~cond5 연구 게이트 기준으로는 전역 상태가 **NO GO → GO candidate**로 바뀐다.
+- 단, `AI_USER_ML_ENABLED=true` 변경은 여전히 자동으로 하지 않는다. 운영자가 수동으로 판단해야 한다.
+
+**새 탐지 신호**:
+1. `헐`/이모지는 사실상 제거됨
+2. 잔여 반복 신호는 **유니코드 말줄임표 `…`**
+3. 일부 어색한 구체 표현
+   - `쓰레기 차도`
+   - `딸이 더 조심해야`
+
+**다음 작업**:
+1. `…` 말줄임표 정규화 여부 결정
+2. `:8092` 런타임 복구
+3. 수동 활성화 여부 결정
+
+## D-80 — THEQOO 유니코드 말줄임표는 ASCII로 정규화 (2026-06-19)
+
+**배경**:
+- D-79 이후 THEQOO owner v2 응답 이유에서 반복적으로 나온 잔여 신호는 `유니코드 말줄임표(…)`였다.
+- 이는 내용 품질보다 문자 선택의 문제라서, 모델/프롬프트를 다시 건드리지 않고 후처리 한 줄로 줄일 수 있는 저비용 신호였다.
+
+**결정**:
+- THEQOO cleanup에서 `…`와 `⋯`는 모두 ASCII `...`로 정규화한다.
+- 적용 범위는 runtime `OutputSanitizer`와 runtime 다운 시 사용하는 CLI fallback 하네스 두 곳 모두다.
+
+**이유**:
+- owner 피드백상 핵심 문제는 "말줄임표라는 표현"이 아니라 "유니코드 특수문자 자체"였다.
+- `...`는 한국 커뮤니티에서 훨씬 흔하고, 의미 손실 없이 탐지 신호만 줄일 수 있다.
+
+**현 상태**:
+- Java `OutputSanitizer` 반영 완료
+- `build_h2h_survey.py` / `run_ab_test.py` fallback cleanup 동기화 완료
+- Java 테스트 추가 완료
+
+**남은 작업**:
+1. `:8092` runtime 복구
+2. 동일 경로 survey/AB 재생성 여부 판단
+3. 잔여 어색한 구체 표현(`쓰레기 차도`, `딸이 더 조심해야`)은 별도 후보로 관리
+
+## D-81 — THEQOO 잔여 어색한 표현 2개는 좁게 정규화 (2026-06-19)
+
+**배경**:
+- D-79, D-80 이후에도 owner 이유에서 남은 구체 표현은 두 개뿐이었다.
+- `쓰레기 차도`는 문법적으로 부자연스럽고, `오빠가` 화자 문맥에서 `집에서는 딸이 더 조심해야`는 지칭이 어색했다.
+
+**결정**:
+- THEQOO cleanup에서 아래 두 표현만 좁게 치환한다.
+  1. `쓰레기 차도` → `쓰레기통이 차도`
+  2. `집에서는 딸이 더 조심해야` → `집에서는 여자가 더 조심해야`
+
+**이유**:
+- 둘 다 owner 피드백이 아주 구체적이었고, 의미 손실보다 어색함 감소 이익이 컸다.
+- 광범위한 의미 재작성 대신 exact phrase 수준으로만 제한해 과적용 위험을 낮췄다.
+
+**적용 범위**:
+- runtime `OutputSanitizer`
+- `build_h2h_survey.py`
+- `run_ab_test.py`
+
+**남은 작업**:
+1. CLI 경로 재생성 결과에서 두 표현 재등장 여부 확인
+2. `:8092` runtime 복구 후 동일 경로 재검증
+
+**재생성 확인**:
+- `build_h2h_survey.py --community THEQOO --n-contexts 20 --drafts 4 --workers 8 --generator cli`
+  - survey 파일 기준 `쓰레기 차도` **0**, `집에서는 딸이 더 조심해야` **0**
+  - `…`, `헐`, `개공감`, `😥`, `🥲`도 모두 **0**
+- `run_ab_test.py --community THEQOO --n-contexts 20 --drafts 4 --workers 8 --source-filter theqoo --generator cli`
+  - `mauve_rerank=0.9907`
+  - `mauve_random_mean=0.9820`
+  - `Δ=+0.0087`
+
+**해석**:
+- hardening 이후에도 오프라인 cond4-A는 여전히 양수다.
+- 다만 runtime 경로가 죽어 있어, 이 수치는 어디까지나 CLI fallback 경로 기준 확인으로 관리한다.

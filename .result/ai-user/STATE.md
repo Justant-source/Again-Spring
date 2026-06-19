@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 29 (Step 58 완료 — THEQOO real corpus 311 확보 + 재학습 + Δ_real 재측정)
+**최종 갱신**: 2026-06-19 세션 38 (Step 67 완료 — THEQOO awkward phrase hardening)
 
 ---
 
@@ -16,14 +16,40 @@
 
 ## 현재 위치
 
-- **Phase**: Step 58 완료 — C(크롤링) 경로로 THEQOO real corpus 확보 완료
+- **Phase**: Step 67 완료 — THEQOO awkward phrase hardening
 - **핵심 성과**:
   - `source_filter="theqoo"` snapshot **311/300** 달성
   - THEQOO human **543**, ai **116**
   - THEQOO 재학습 완료: version `01KVDQJSKTY93279KQYZ91PHNS`, CV-AUC **0.9958**
   - Codex-only `source_filter="theqoo"` A-B 재측정: **Δ_real=+0.1326**, snapshot **311**
+  - THEQOO h2h survey **20쌍** 생성 완료:
+    - survey: `.result/ai-user/blind/r13-h2h-theqoo-survey.md`
+    - answers template: `.result/ai-user/blind/r13-h2h-theqoo-answers-template.json`
+  - h2h 집계 스크립트 추가:
+    - `.result/ai-user/scripts/summarize_h2h_results.py`
+    - 결과: `.result/ai-user/blind/r13-h2h-theqoo-results.md`
+  - THEQOO owner v2 h2h 결과:
+    - 유효 응답 **12/20**
+    - rerank 탐지 **25.0% (3/12)**
+    - random 탐지 **75.0% (9/12)**
+    - **cond4-B PASS**
+  - THEQOO A-B v2:
+    - `Δ_real=+0.0686`
+    - `mauve_rerank=0.9907`
+    - `mauve_random_mean=0.9221`
+  - THEQOO A-B v3 (CLI hardening 확인):
+    - `Δ_real=+0.0087`
+    - `mauve_rerank=0.9907`
+    - `mauve_random_mean=0.9820`
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **남은 즉시 작업**: THEQOO h2h survey 재생성 여부 정리 + 수동 활성화 go/no-go 보고
+- **상태**: 연구 게이트 기준 **수동 활성화 가능(GO candidate)**, 단 `:8092` 런타임 복구와 최종 수동 판단 필요
+- **남은 즉시 작업**: `:8092` 복구 후 운영 경로 검증 + 필요 시 THEQOO 새 사람 응답 라운드 판단
+- **이번 추가 하드닝**:
+  - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
+  - runtime `OutputSanitizer`와 CLI fallback 하네스(`build_h2h_survey.py`, `run_ab_test.py`) 동시 반영
+  - `쓰레기 차도` → `쓰레기통이 차도`
+  - `집에서는 딸이 더 조심해야` → `집에서는 여자가 더 조심해야`
+  - regenerated survey 기준 `쓰레기 차도` / `집에서는 딸이 더 조심해야` / `…` / `헐` / `개공감` / `😥` / `🥲` 모두 **0건**
 
 ---
 
@@ -62,6 +88,15 @@
 | **blind ②** | ✅ 파일 생성 — 혼합주제 20쌍 (CONFLICT+CASUAL AI vs human) | .result/ai-user/blind/r9-blind2-mixed-survey.md | ⏳ 사용자 응답 대기 |
 | **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | ✅ 신선분 축적 가능 |
 | **Step 58** | THEQOO corpus 수집 전략 결정 (A/B/C) + ≥300건 확보 | **✅ 완료** | real snapshot=**311/300** |
+| **Step 59** | THEQOO h2h survey 재생성 | **✅ 완료** | 응답 수집만 남음 |
+| **Step 60** | THEQOO h2h 집계 자동화 | **✅ 완료** | JSON 응답만 채우면 결과 갱신 가능 |
+| **Step 61** | THEQOO owner h2h 집계 + go/no-go 확정 | **✅ 완료** | v1 owner 기준 FAIL → 전역 NO GO |
+| **Step 62** | THEQOO post-processing 축소 패치 | **✅ 완료** | 재생성·재측정만 남음 |
+| **Step 63** | h2h/ab 하네스 런타임 정합화 | **✅ 완료** | `:8092` 복구 후 재측정 실행 |
+| **Step 64** | THEQOO survey v2 재생성 + A-B 재측정 | **✅ 완료** | owner 응답만 남음 |
+| **Step 65** | THEQOO owner v2 h2h 집계 + 전역 재판정 | **✅ 완료** | 연구 게이트 기준 GO candidate |
+| **Step 66** | THEQOO ellipsis hardening | **✅ 완료** | `…` → `...` 정규화, 재측정은 runtime 복구 후 |
+| **Step 67** | THEQOO awkward phrase hardening | **✅ 완료** | 2개 잔여 표현 정규화, 오프라인 재생성 완료 |
 
 ### 중기
 
@@ -71,7 +106,7 @@
 | **COMMENT M-after** | NATEPAN 측정 후 R7 완료 | WSL | 신선분 축적 후 |
 | **에스컬레이션 평가** | blind①② 후 D-12 Phase 2/3 진입조건 보고 | — | blind 결과 후 |
 
-### prod 배포 게이트 (5조건 — **전부 충족** 2026-06-19)
+### prod 배포 게이트 (5조건 — **연구 게이트 충족** 2026-06-19)
 
 ```
 cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(100/543)
@@ -79,11 +114,11 @@ cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9958
 cond3: ✅ SPLITTER_VERIFIED=True
 cond4: ✅ CLIEN Δ=+0.0134 AND h2h 50%≤50% PASS (R13, 신 cond4 D-68)
        ✅ NATEPAN Δ=-0.0001 AND h2h 47.1%≤52.9% PASS (R13, 신 cond4 D-68)
-       ✅ THEQOO Δ_real=+0.1326 AND snapshot=311 PASS (Codex-only, 2026-06-19)
+       ✅ THEQOO Δ_real=+0.0686 AND h2h owner v2 25.0%≤75.0% PASS
 cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18)
 ```
 
-**AI_USER_ML_ENABLED 상태**: false → **수동 활성화 대기** (코드 변경 금지, 오너 go/no-go 필요)
+**AI_USER_ML_ENABLED 상태**: false → **수동 활성화 가능(GO candidate)** (코드 변경 금지, 운영자가 수동 판단)
 
 ---
 
@@ -91,10 +126,10 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 
 | 우선순위 | 항목 | 배경 | 선택지 |
 |---|---|---|---|
-| **P1** | **THEQOO human corpus 소스** (R10 핵심) | dev DB 7건·AS export = 다시봄 갈등체 → 실제 더쿠 슬랭 아님. 현재 human 410건이 격식체라 P(human) 역전 | A) THEQOO 직접 크롤(법적·인프라 검토 필요) / B) 외부 공개 데이터셋 / C) AS 플랫폼 내 THEQOO 스타일 글 직접 주석 수집 |
 | **P2** | ~~COMMENT 생성 배치 (R7 M-after)~~ | ✅ 완료 — WSL 배치 B 경로로 해결 (2026-06-18) | — |
-| **P3** | **AI_USER_ML_ENABLED 활성화 시기** | THEQOO cond4 미충족 → ML 리랭커 활성화 불가 | 자동: THEQOO cond4 해소 후 수동 활성화 / 선택: CLIEN+NATEPAN만 부분 활성화 가능 여부 검토 |
-| **P5** | **THEQOO corpus 수집 방법** | ✅ **C) 크롤링 완료**. real-only corpus **311/300** 확보. | next: THEQOO h2h refresh / 수동 활성화 판단 |
+| **P3** | **AI_USER_ML_ENABLED 활성화 시기** | 연구 게이트는 해소됨. 다만 `:8092` 런타임이 내려가 있어 운영 경로 검증이 아직 없다 | 자동: runtime 복구 후 수동 활성화 / 선택: 오프라인 상태 유지 |
+| **P5** | **THEQOO corpus 수집 방법** | ✅ **C) 크롤링 완료**. real-only corpus **311/300** 확보. | closed |
+| **P6** | **THEQOO 개선 방향** | owner v2까지 PASS. `…`와 2개 잔여 표현 정규화는 반영 완료. 남은 저비용 후보는 runtime 경로 복구와 새 사람 응답 라운드 여부 결정 | A) runtime 서비스 복구 / B) 새 h2h 응답 라운드 / C) 수동 활성화 판단 |
 
 ---
 
@@ -201,6 +236,10 @@ cond5: ✅ blind② 합산 40% (친구 25% / 오너 55%) — R9 PASS (2026-06-18
 | **P2 구현** | build_h2h_survey.py | ✅ 완료 |
 | **P2 설문** | 커뮤니티별 h2h survey.md 생성 | ✅ 완료 |
 | **P4 집계** | D-70 + r13-h2h-results-summary.md | ✅ 완료 |
+| **P5 Step58** | real-only corpus 311 확보 + 재학습 + Δ_real 회복 | ✅ 완료 |
+| **P6 Step59** | THEQOO h2h survey 재생성 (20쌍) | ✅ 완료 / 응답 대기 |
+| **P7 Step60** | h2h 집계 자동화 + pending results 생성 | ✅ 완료 |
+| **P8 Step61** | owner h2h 집계 + 전역 NO GO 확정 | ✅ 완료 |
 
 ### D-68 선등록 임계 (측정 전 확정)
 - THEQOO Δ_real > 0 → cond4 A 충족 ✅ (Phase 2 h2h 진행)

@@ -7,14 +7,15 @@ MAUVE(rerank_winners, human) vs MAUVE(random_winners, human) 측정.
 EvalRun(kind="ab_test") DB 저장 후 delta 보고.
 
 Usage:
-    python3 run_ab_test.py --community THEQOO [--n-contexts 10] [--drafts 4] [--dry-run]
+    python3 run_ab_test.py --community THEQOO [--n-contexts 10] [--drafts 4] [--generator runtime|cli] [--dry-run]
 """
-import argparse, json, logging, subprocess, sys, time, urllib.request, urllib.error, shutil, glob, os, tempfile
+import argparse, json, logging, subprocess, sys, time, urllib.request, urllib.error, shutil, glob, os, tempfile, re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 ML_SERVICE_URL = "http://100.115.252.61:8201"
 ML_API_TOKEN = "aiuser-ml-api-token-dev-2026"
+LLM_AI_USER_URL = os.environ.get("LLM_AI_USER_URL", "http://localhost:8092")
 CODEX_CLI_PATH = os.environ.get("CODEX_BIN", "codex")
 CODEX_MODEL = os.environ.get("CODEX_MODEL", "gpt-5.4")
 
@@ -39,9 +40,21 @@ DENY_SIGS = [
     "i appreciate you", "i'm an ai", "i am an ai", "as an ai", "저는 ai",
 ]
 
+THEQOO_TRAILING_REACTION = re.compile(r"\s+(?:헐|개공감)(?:[~….!?ㅋㅠ; ]*)$")
+THEQOO_REACTION_AFTER_PUNCT = re.compile(r"([.?!…~]+)\s*헐\s+")
+THEQOO_STANDALONE_HEOL = re.compile(r"\s헐\s+(?=(?:제가|내가|이게|그게|근데|그냥|뭔가|싶(?:음|은|은데|어|어서)|같(?:음|아)|느낌|기분))")
+UNICODE_EMOJI = re.compile(r"[\u2600-\u27BF\U0001F300-\U0001FAFF]")
+UNICODE_ELLIPSIS = re.compile(r"[…⋯]+")
+THEQOO_TRASH_PHRASE = re.compile(r"쓰레기 차도")
+THEQOO_BROTHER_DAUGHTER_PHRASE = re.compile(r"집에서는 딸이 더 조심해야")
+
 COMMUNITY_CFG = {
     "THEQOO": {
-        "trait": "여성 중심 커뮤니티, 짧고 구어체, 감탄사(ㅋㅋ/헐/와 등), 이모지 가끔",
+        "trait": "여성 중심 커뮤니티, 짧고 구어체, 반말 위주, 공감형",
+        "voice_profile": "더쿠 스타일 사용자. 짧은 구어체, 반말 위주, 공감형, 갈등 사연 중심",
+        "slang_level": 0.48,
+        "formality": "casual",
+        "category": "OTHER",
         "themes": [
             "남자친구가 약속을 또 어겼을 때",
             "직장 동료가 내 아이디어를 가로챌 때",
@@ -91,6 +104,10 @@ COMMUNITY_CFG = {
     },
     "CLIEN": {
         "trait": "IT 직장인, 논리적 서술, 경어 사용, 중간 길이",
+        "voice_profile": "클리앙 스타일 사용자. 논리적 서술, 구어 존댓말, IT 직장인 톤",
+        "slang_level": 0.18,
+        "formality": "polite",
+        "category": "WORK",
         "themes": [
             "팀장이 일정을 무리하게 당겼을 때",
             "동료가 내 코드를 허락 없이 수정했을 때",
@@ -108,6 +125,10 @@ COMMUNITY_CFG = {
     },
     "DCINSIDE": {
         "trait": "직설적, 남성 구어체, 은어(ㄹㅇ/ㅇㅈ/개), 짧고 직설적",
+        "voice_profile": "디시인사이드 스타일 사용자. 반말, 직설적, 짧고 빠른 반응",
+        "slang_level": 0.78,
+        "formality": "casual",
+        "category": "OTHER",
         "themes": [
             "친구가 내 물건 허락 없이 쓸 때",
             "알바 사장이 월급을 안 줄 때",
@@ -118,6 +139,10 @@ COMMUNITY_CFG = {
     },
     "NATEPAN": {
         "trait": "주부/직장 여성, 공감형, 감정 서술 위주, 길고 자세함",
+        "voice_profile": "네이트판 스타일 사용자. 감정 서술 위주, 공감형, 사연 커뮤니티 톤",
+        "slang_level": 0.52,
+        "formality": "polite",
+        "category": "OTHER",
         "themes": [
             "남편이 육아를 전혀 도와주지 않을 때",
             "시댁이 갑자기 방문한다고 할 때",
@@ -211,6 +236,35 @@ def api(method, path, data=None):
         raise RuntimeError(f"HTTP {e.code}: {e.read().decode()[:300]}")
 
 
+def llm_api_generate_post(payload, timeout=45):
+    url = LLM_AI_USER_URL.rstrip("/") + "/generate/post"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = json.loads(r.read().decode())
+    text = (data or {}).get("text")
+    return text.strip() if isinstance(text, str) and text.strip() else None
+
+
+def cleanup_theqoo_text(text: str | None, community: str) -> str | None:
+    if community != "THEQOO" or not text:
+        return text
+    s = UNICODE_EMOJI.sub("", text)
+    s = UNICODE_ELLIPSIS.sub("...", s)
+    s = THEQOO_TRASH_PHRASE.sub("쓰레기통이 차도", s)
+    s = THEQOO_BROTHER_DAUGHTER_PHRASE.sub("집에서는 여자가 더 조심해야", s)
+    s = THEQOO_REACTION_AFTER_PUNCT.sub(r"\1 ", s)
+    s = THEQOO_STANDALONE_HEOL.sub(" ", s)
+    s = THEQOO_TRAILING_REACTION.sub("", s)
+    s = re.sub(r" {2,}", " ", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
+
+
 def _api_generate(prompt: str, max_retries: int = 2) -> str | None:
     log.info("API generation path disabled — Codex CLI bridge only")
     return None
@@ -270,10 +324,12 @@ def _cli_generate(prompt: str, max_retries: int = 2) -> str | None:
     return None
 
 
-def generate_post(theme: str, trait: str, dry_run: bool = False, max_retries: int = 2) -> str | None:
+def generate_post(theme: str, community: str, cfg: dict, dry_run: bool = False,
+                  max_retries: int = 2, generator: str = "runtime") -> str | None:
     """
-    Codex CLI bridge로 갈등 사연 POST 생성.
+    런타임 /generate/post 우선, 실패 시 Codex CLI fallback.
     """
+    trait = cfg["trait"]
     prompt = (
         f"당신은 한국 온라인 커뮤니티 사용자입니다. 커뮤니티 특성: {trait}\n"
         f"아래 상황에 처한 사람이 커뮤니티에 올리는 갈등 사연 글을 써주세요.\n"
@@ -286,31 +342,63 @@ def generate_post(theme: str, trait: str, dry_run: bool = False, max_retries: in
     if dry_run:
         return f"[DRY RUN] {theme[:30]}…"
 
+    if generator == "runtime":
+        payload = {
+            "personaId": f"ab-{community.lower()}",
+            "archetype": "일반갈등",
+            "voiceProfile": cfg.get("voice_profile", trait),
+            "tier": "REGULAR",
+            "slangLevel": cfg.get("slang_level", 0.4),
+            "category": cfg.get("category", "OTHER"),
+            "topicSeed": theme,
+            "formality": cfg.get("formality", "casual"),
+            "demographic": f"{community} 커뮤니티 사용자",
+            "lengthTier": "MEDIUM",
+            "correlationId": f"ab-{community.lower()}-{int(time.time() * 1000)}",
+            "timeoutMs": 120000,
+            "backend": "CLI",
+            "voiceType": community,
+            "postKind": "CONFLICT",
+        }
+        for attempt in range(max_retries):
+            try:
+                text = llm_api_generate_post(payload)
+                if text:
+                    text = cleanup_theqoo_text(text, community)
+                    log.info("Runtime /generate/post 생성 성공 (attempt %s)", attempt + 1)
+                    return text
+            except Exception as e:
+                log.warning("Runtime /generate/post 실패 (attempt %s/%s): %s",
+                            attempt + 1, max_retries, e)
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+        log.warning("Runtime 생성 실패 — Codex CLI fallback 사용")
+
     log.info("Codex CLI bridge로 생성...")
-    return _cli_generate(prompt, max_retries=max_retries)
+    text = _cli_generate(prompt, max_retries=max_retries)
+    return cleanup_theqoo_text(text, community)
 
 
 def _gen_draft_task(args):
-    """Thread-pool worker: (context_idx, draft_idx, theme, trait, dry_run) → (ctx_i, draft_i, text|None)."""
-    ctx_i, draft_i, theme, trait, dry_run = args
-    text = generate_post(theme, trait, dry_run)
+    """Thread-pool worker: (context_idx, draft_idx, theme, community, cfg, dry_run, generator)."""
+    ctx_i, draft_i, theme, community, cfg, dry_run, generator = args
+    text = generate_post(theme, community, cfg, dry_run, generator=generator)
     return ctx_i, draft_i, text
 
 
-def run(community, n_contexts, n_drafts, dry_run, workers=8, source_filter=None):
+def run(community, n_contexts, n_drafts, dry_run, workers=8, source_filter=None, generator="runtime"):
     cfg = COMMUNITY_CFG.get(community)
     if not cfg:
         log.error(f"Unknown community: {community}. Available: {list(COMMUNITY_CFG)}")
         return None
 
     themes = cfg["themes"][:n_contexts]
-    trait = cfg["trait"]
     total = len(themes) * n_drafts
     log.info(f"A-B test: {community} | {len(themes)} contexts × {n_drafts} drafts = {total} LLM calls | workers={workers}")
 
     # Generate all drafts in parallel
     tasks = [
-        (i, j, theme, trait, dry_run)
+        (i, j, theme, community, cfg, dry_run, generator)
         for i, theme in enumerate(themes)
         for j in range(n_drafts)
     ]
@@ -409,9 +497,12 @@ def main():
                    help="Parallel LLM workers for draft generation (default: 8)")
     p.add_argument("--source-filter", default=None,
                    help="Optional: filter human corpus by source (e.g. 'theqoo' for real-only)")
+    p.add_argument("--generator", choices=["runtime", "cli"], default="runtime",
+                   help="Draft generation path (default: runtime, fallback to cli)")
     args = p.parse_args()
 
-    result = run(args.community.upper(), args.n_contexts, args.drafts, args.dry_run, args.workers, args.source_filter)
+    result = run(args.community.upper(), args.n_contexts, args.drafts, args.dry_run,
+                 args.workers, args.source_filter, args.generator)
     if result is None and not args.dry_run:
         sys.exit(1)
 
