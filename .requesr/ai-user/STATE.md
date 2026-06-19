@@ -1,7 +1,7 @@
 # STATE — Request Snapshot
 
 **최종 갱신**: 2026-06-19
-**기준 원본**: `.result/ai-user/STATE.md` Step 78
+**기준 원본**: `.result/ai-user/STATE.md` Step 79
 
 ## 현재 상태
 
@@ -9,9 +9,8 @@
 - `AI_USER_ML_ENABLED=false` 유지
 - 기존 `:8092 down` 가정은 철회됨
   - `8092/8096`은 dev compose에서 internal 서비스
-  - backend → orchestrator proxy는 live `202` 확인
-  - backend → `llm-ai-user:8092/internal/prompts/reload`도 live probe 성공
-- 현재 실제 블로커는 external strict runtime generate probe 부재와 direct `/admin/trigger/*` 500
+  - historical write probes로 internal route 존재는 확인
+- 현재 실제 블로커는 **dev host docker-network 안에서 runtime harness를 아직 실행하지 못한 것**
 
 ## 최신 핵심 결과
 

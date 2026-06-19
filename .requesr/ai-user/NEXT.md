@@ -11,26 +11,27 @@
 
 ### 1. dev probe 재확인
 
-이제 `localhost:8092`는 1순위 체크가 아니다. 먼저 live dev admin 경로에서 internal stack이 정상인지 다시 확인한다.
+이제 `localhost:8092`는 1순위 체크가 아니다. 먼저 read-only live dev admin 경로를 확인한다.
 
 ```bash
-python3 .result/ai-user/scripts/probe_dev_ai_user_stack.py --probe-orchestrator
+python3 .result/ai-user/scripts/probe_dev_ai_user_stack.py
 ```
 
-### 2. backend proxy 배포
+### 2. dev host docker network 안에서 strict runtime probe
 
 ```bash
-# 새 external proxy 엔드포인트
-# POST /api/admin/ai-user/generate-posts
-# POST /api/admin/ai-user/reset-counter
+bash .result/ai-user/scripts/run_python_in_dev_network.sh \
+  .result/ai-user/scripts/probe_runtime_pipeline.py \
+  --community THEQOO --strict-runtime
 ```
 
-### 3. generate-posts proxy live 검증
+### 3. THEQOO runtime h2h 생성
 
 ```bash
-curl -X POST \
-  'http://100.81.189.92:8090/api/admin/ai-user/generate-posts?voice=THEQOO&count=1' \
-  -H 'Authorization: Bearer <ADMIN_JWT>'
+bash .result/ai-user/scripts/run_python_in_dev_network.sh \
+  .result/ai-user/scripts/build_h2h_survey.py \
+  --community THEQOO --generator runtime --strict-runtime \
+  --n-contexts 20 --drafts 4 --workers 8
 ```
 
 ### 4. NATEPAN cond5 수동 응답
@@ -57,7 +58,7 @@ python3 .result/ai-user/scripts/summarize_cond5_results.py \
 
 ### 5. THEQOO runtime h2h
 
-proxy live 검증 뒤에만 공식값으로 인정한다.
+dev host network probe 통과 뒤에만 공식값으로 인정한다.
 
 ```bash
 python3 .result/ai-user/scripts/build_h2h_survey.py \
@@ -68,6 +69,6 @@ python3 .result/ai-user/scripts/build_h2h_survey.py \
 ## 주의
 
 - direct `/admin/trigger/*`는 외부에서 403/500이라 공식 진입점으로 쓰지 않는다.
-- 새 `generate-posts/reset-counter` backend proxy는 코드 준비만 된 상태고, live 사용 전 dev 배포가 필요하다.
+- `generate-posts`류 프록시는 h2h raw draft 경로를 대체하지 못하므로 현재 크리티컬 패스가 아니다.
 - `AI_USER_ML_ENABLED=true` 전환은 여전히 사람이 수동으로만 한다.
 - 자동 proxy/judge 결과는 참고용이다. 최종 cond5 대체물로 쓰지 않는다.

@@ -15,7 +15,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -23,7 +22,6 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -156,55 +154,15 @@ public class AdminAiUserController {
             @RequestParam(defaultValue = "30") int days,
             @RequestParam(defaultValue = "8") int personasPerPost) {
         try {
-            Map<String, Object> resp = postOrchestrator(
-                    "/admin/trigger/backfill-comment-likes",
-                    UriComponentsBuilder.newInstance()
-                            .queryParam("days", days)
-                            .queryParam("personasPerPost", personasPerPost));
+            String url = orchestratorUrl + "/admin/trigger/backfill-comment-likes"
+                + "?days=" + days + "&personasPerPost=" + personasPerPost;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> resp = RestClient.create().post().uri(url)
+                    .retrieve().body(Map.class);
             log.info("[backfill-comment-likes] orchestrator response: {}", resp);
             return ResponseEntity.accepted().body(resp != null ? resp : Map.of("status", "queued"));
         } catch (Exception e) {
             log.error("[backfill-comment-likes] orchestrator call failed: {}", e.getMessage());
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    @PostMapping("/generate-posts")
-    @Operation(summary = "AI 신규 글 즉시 생성",
-               description = "오케스트레이터 generate-posts를 backend admin 경로로 프록시한다. "
-                       + "외부에서 /admin/trigger를 직접 호출하지 않고 dev runtime 글 생성 검증에 사용한다.")
-    public ResponseEntity<Map<String, Object>> generatePosts(
-            @RequestParam(defaultValue = "2") int count,
-            @RequestParam(required = false) String voice) {
-        try {
-            UriComponentsBuilder query = UriComponentsBuilder.newInstance()
-                    .queryParam("count", count);
-            Optional.ofNullable(voice)
-                    .filter(v -> !v.isBlank())
-                    .ifPresent(v -> query.queryParam("voice", v));
-
-            Map<String, Object> resp = postOrchestrator("/admin/trigger/generate-posts", query);
-            log.info("[generate-posts] orchestrator response: {}", resp);
-            return ResponseEntity.ok(resp != null ? resp : Map.of("status", "ok"));
-        } catch (Exception e) {
-            log.error("[generate-posts] orchestrator call failed: {}", e.getMessage());
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    @PostMapping("/reset-counter")
-    @Operation(summary = "일일 카운터 리셋",
-               description = "오케스트레이터 reset-counter를 backend admin 경로로 프록시한다. "
-                       + "직접 /admin/trigger 호출이 막힌 환경에서 최소 영향 진단용으로 사용한다.")
-    public ResponseEntity<Map<String, Object>> resetCounter() {
-        try {
-            Map<String, Object> resp = postOrchestrator("/admin/trigger/reset-counter", UriComponentsBuilder.newInstance());
-            log.info("[reset-counter] orchestrator response: {}", resp);
-            return ResponseEntity.ok(resp != null ? resp : Map.of("status", "ok"));
-        } catch (Exception e) {
-            log.error("[reset-counter] orchestrator call failed: {}", e.getMessage());
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", e.getMessage()));
         }
@@ -320,17 +278,6 @@ public class AdminAiUserController {
     private AiUserGenerationConfig loadOrInit() {
         return configRepository.findById(1)
                 .orElseGet(() -> configRepository.save(AiUserGenerationConfig.builder().build()));
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> postOrchestrator(String path, UriComponentsBuilder query) {
-        String url = UriComponentsBuilder.fromUriString(orchestratorUrl)
-                .path(path)
-                .query(query.build().getQuery())
-                .build(true)
-                .toUriString();
-        return RestClient.create().post().uri(url)
-                .retrieve().body(Map.class);
     }
 
     private ConfigResponse toResponse(AiUserGenerationConfig cfg) {

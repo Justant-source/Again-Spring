@@ -960,15 +960,25 @@
 - [x] `.requesr/ai-user/NEXT.md`를 host-side helper 기준으로 동기화
 - [ ] docker가 있는 실제 dev host에서 helper 실측
 
-## Step 78 (R14-phase0 correction) — runtime probe correction + admin proxy prep ✅ 완료
+## Step 78 (R14-phase0 correction) — runtime probe correction ✅ 완료
 
-**목표**: `localhost:8092` down을 runtime down으로 오판한 부분을 바로잡고, 외부 dev shell에서 쓸 공식 프록시 경로를 backend admin API에 준비한다.
+**목표**: `localhost:8092` down을 runtime down으로 오판한 부분을 바로잡고, live dev 경로에서 실제 reachability를 재해석한다.
 
 **완료 기준**:
 - [x] `8092/8096`은 host 공개 포트가 아니라 internal 서비스라는 점 재확인
 - [x] `100.81.189.92:8090/api/health` + admin login + system health 실측
-- [x] `POST /api/admin/ai-user/backfill-comment-likes` 202로 backend → orchestrator 프록시 확인
-- [x] no-op `PUT /api/admin/ai-rules/prompts/voice/post` 200 + reload-failed WARN 부재로 backend → llm-ai-user reachability 확인
-- [x] `probe_dev_ai_user_stack.py` 추가
-- [x] `POST /api/admin/ai-user/generate-posts` / `reset-counter` backend proxy 코드 추가
-- [ ] dev host에서 backend 재배포 후 새 proxy live 검증
+- [x] historical write probes로 internal route 존재 재해석
+- [x] `probe_dev_ai_user_stack.py` 초안 추가
+- [x] external direct `/admin/trigger/*` 500 확인
+
+## Step 79 (R14-phase0 correction-2) — dev host network harness ✅ 완료
+
+**목표**: strict runtime h2h의 크리티컬 패스를 외부 proxy가 아니라 dev host docker network 안의 existing harness 실행으로 고정한다.
+
+**완료 기준**:
+- [x] write-based live probe는 진단 루틴에서 제외
+- [x] `probe_dev_ai_user_stack.py`를 read-only probe로 축소
+- [x] backend admin proxy 아이디어는 보류로 정리
+- [x] `run_python_in_dev_network.sh` 추가
+- [x] THEQOO strict runtime probe / h2h / A-B 실행 명령을 dev host 기준으로 정리
+- [ ] dev host에서 network harness 실측

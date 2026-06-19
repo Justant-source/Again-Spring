@@ -1327,11 +1327,28 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 - 현재 live blocker는 외부 셸에서 직접 쓰는 `/admin/trigger/*` 경로다.
   - unauth `403`
   - admin bearer `500 INTERNAL_ERROR`
-- 따라서 외부 운영/진단용 공식 경로는 backend admin proxy 쪽으로 옮긴다.
-  - 신규 준비 코드:
-    - `POST /api/admin/ai-user/generate-posts`
-    - `POST /api/admin/ai-user/reset-counter`
+- 다만 `backfill-comment-likes`와 no-op prompt PUT은 **write probe**였으므로, 이후 반복 진단에 쓰지 않는다.
 
 **의미**:
 - `:8092` 컨테이너를 무조건 다시 띄워야 하는 상황으로 단정할 수는 없다.
 - R14의 남은 기술 블로커는 "runtime이 죽었다"보다 "strict runtime `/generate/post`를 외부에서 어떻게 합법적으로 검증할 것인가"에 가깝다.
+
+## D-93 — admin proxy는 보류, 크리티컬 패스는 dev host docker-network harness다 (2026-06-19)
+
+**배경**:
+- 동료 리뷰 기준으로 `generate-posts`는 최종 글 1건일 뿐이고, h2h가 필요한 raw `/generate/post` 4-draft 경로를 대체하지 못한다.
+- 또한 현재 셸에는 `docker`, `java`, `npm`, `ssh` 제약이 동시에 걸려 있어, 외부에서 remote stack을 더 우회하려는 시도는 계속 비효율적이다.
+- strict runtime h2h는 dev host의 docker network 안에서 existing harness를 실행하면 바로 풀린다.
+
+**결정**:
+- backend admin proxy 추가는 **현 라운드 크리티컬 패스에서 제외**한다.
+- 외부 진단 스크립트 `probe_dev_ai_user_stack.py`는 **read-only** 용도로만 유지한다.
+- 실제 다음 단계는 dev host에서 아래 helper로 runtime harness를 실행하는 것이다.
+  - `.result/ai-user/scripts/run_python_in_dev_network.sh`
+  - 예:
+    - `probe_runtime_pipeline.py --community THEQOO --strict-runtime`
+    - `build_h2h_survey.py --community THEQOO --generator runtime --strict-runtime`
+
+**의미**:
+- 이번 라운드의 목표는 새 Java surface를 여는 것이 아니라, 기존 runtime path를 정확히 측정 가능한 위치에서 실행하는 것이다.
+- THEQOO runtime h2h는 여전히 codex→Sonnet 전환 후 첫 공식 측정이며, 재실패 가능성을 열어 둔다.

@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 48 (Step 78 완료 — runtime probe correction + admin proxy prep)
+**최종 갱신**: 2026-06-19 세션 49 (Step 79 완료 — dev host network harness)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 78 완료 — runtime probe correction + admin proxy prep
+- **Phase**: Step 79 완료 — dev host network harness
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -51,10 +51,12 @@
     - `http://100.81.189.92:8090/api/health` → `200`
     - admin login (`test1@again.com` / `test123`) 성공, roles=`USER,ADMIN`
     - `GET /api/admin/health/system` → `200`
-    - `POST /api/admin/ai-user/backfill-comment-likes?days=1&personasPerPost=1` → `202`
-    - `PUT /api/admin/ai-rules/prompts/voice/post` with same content → `200`
-    - 직후 WARN 로그에 `llm-ai-user reload failed` 없음
-  - 따라서 **backend → orchestrator internal route**와 **backend → llm-ai-user:8092/internal/prompts/reload**는 live dev 기준 도달 가능으로 본다.
+    - historical write probes:
+      - `POST /api/admin/ai-user/backfill-comment-likes?days=1&personasPerPost=1` → `202`
+      - `PUT /api/admin/ai-rules/prompts/voice/post` with same content → `200`
+      - 직후 WARN 로그에 `llm-ai-user reload failed` 없음
+  - 따라서 live dev에서 internal route가 존재한다는 정정 자체는 유지한다.
+  - 다만 위 2개는 **write action**이므로 앞으로 진단 경로로 반복 사용하지 않는다.
   - 현재 깨진 경로는 외부 `POST /admin/trigger/*` direct route다.
     - unauth: `403`
     - admin bearer: `500 INTERNAL_ERROR`
@@ -62,15 +64,14 @@
   - R14 공식 runtime 측정은 `--generator runtime --strict-runtime` + `cli_fallbacks=0` 조건으로만 인정
   - `CLIEN blind② 40%`는 CLIEN 전용 cond5 근거다. NATEPAN/THEQOO까지 확장 해석하지 않음
   - 현재 활성화 준비 상태는 **GO candidate가 아니라 HOLD**
-  - 외부 셸에서 쓸 live probe 추가:
+  - 외부 셸에서 쓸 **read-only** live probe 추가:
     - `.result/ai-user/scripts/probe_dev_ai_user_stack.py`
-    - backend/admin login, system health, generation-config, no-op prompt reload, optional orchestrator proxy probe
-  - backend admin proxy 구현 준비:
-    - `POST /api/admin/ai-user/generate-posts`
-    - `POST /api/admin/ai-user/reset-counter`
-    - direct `/admin/trigger/*` 대신 이 경로를 공식 외부 진입점으로 사용 예정
+    - backend/admin login, system health, generation-config, generation-status, prompt fetch only
+  - 크리티컬 패스용 dev host helper 추가:
+    - `.result/ai-user/scripts/run_python_in_dev_network.sh`
+    - `againspring-dev` 네트워크 안에서 existing runtime harness를 그대로 실행
   - host가 열리면 즉시 실행할 준비물:
-    - `probe_runtime_pipeline.py` — internal `/generate/post` / `/rerank` 검증용
+    - `probe_runtime_pipeline.py` — internal `/generate/post` / `/rerank` strict 검증용
     - `build_cond5_blind.py` — community별 fresh cond5 설문 생성
     - `summarize_cond5_results.py` — owner/friend cond5 집계
   - cond5 smoke 검증 완료:
@@ -129,11 +130,12 @@
       - all_used_text_fingerprints **163**
     - THEQOO cond5를 같은 seed로 다시 fetch하면 `humans=0 ais=0 need=20`으로 즉시 중단됨
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **상태**: **HOLD** — external strict runtime generate probe 부재 + direct `/admin/trigger/*` 500 + NATEPAN fresh cond5 공백 + THEQOO fresh cond5 owner FAIL
+- **상태**: **HOLD** — dev host docker-network runtime harness 미실행 + NATEPAN fresh cond5 공백 + THEQOO fresh cond5 owner FAIL
 - **남은 즉시 작업**:
-  - backend admin proxy (`generate-posts`, `reset-counter`)를 dev에 배포
-  - `.result/ai-user/scripts/probe_dev_ai_user_stack.py --probe-orchestrator`로 live stack 재확인
-  - 그 다음 runtime 배관 검증: `probe_runtime_pipeline.py` 또는 backend proxy generate 경로로 internal `/generate/post` 실측
+  - dev host에서 `run_python_in_dev_network.sh`로 strict runtime harness 실행
+  - 먼저 `probe_runtime_pipeline.py --community THEQOO --strict-runtime`
+  - 그 다음 `build_h2h_survey.py --community THEQOO --generator runtime --strict-runtime`
+  - 필요 시 `run_ab_test.py --community THEQOO --generator runtime`
   - THEQOO runtime h2h를 owner+friend로 다시 수집
   - `r14-cond5-natepan-survey.md` 수동 응답 수집
   - 필요 시 THEQOO cond5 friend 응답 추가
@@ -210,7 +212,8 @@
 | **Step 75** | R14 THEQOO fresh cond5 owner | **✅ 완료** | owner 19/20 유효, 84.2% FAIL, feedback hardening 반영 |
 | **Step 76** | R14 automatic pre-blind gates | **✅ 완료** | tell scan / proxy judge / adversarial shortlist 추가 및 실측 |
 | **Step 77** | R14 runtime host recovery handoff | **✅ 완료** | host용 `docker compose up` + `:8092` health polling helper 추가 |
-| **Step 78** | R14 runtime probe correction + admin proxy prep | **✅ 완료** | 8092 internal-only 정정, live internal reachability 검증, backend proxy code 추가 |
+| **Step 78** | R14 runtime probe correction | **✅ 완료** | 8092 internal-only 정정, live internal reachability 재해석 |
+| **Step 79** | R14 dev host network harness | **✅ 완료** | write-free probe 정리, proxy deferred, dev network runner 추가 |
 
 ### 중기
 
