@@ -118,6 +118,10 @@ Invoker (interface)
 
 ### Admin API & 페이지
 - **GET/PUT** `/api/admin/ai-user/generation-config` — 설정 읽기·수정
+- **GET** `/api/admin/ai-user/generation-status` — 오늘 생성 진행 현황
+- **POST** `/api/admin/ai-user/generate-posts?count=&voice=` — backend 경유 즉시 글 생성
+- **POST** `/api/admin/ai-user/reset-counter` — backend 경유 일일 카운터 리셋
+- **POST** `/api/admin/ai-user/backfill-comment-likes` — backend 경유 댓글 좋아요 백필
 - **POST** `/api/admin/ai-user/kill` — kill-switch 즉시 실행
 - **UI**: `/admin/ai-user` — 슬라이더·라우팅 매트릭스·실시간 토큰 추정 패널
 

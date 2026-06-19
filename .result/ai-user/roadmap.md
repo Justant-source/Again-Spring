@@ -959,3 +959,16 @@
 - [x] 성공 시 다음 probe 명령 3개(THEQOO/CLIEN/NATEPAN) 출력
 - [x] `.requesr/ai-user/NEXT.md`를 host-side helper 기준으로 동기화
 - [ ] docker가 있는 실제 dev host에서 helper 실측
+
+## Step 78 (R14-phase0 correction) — runtime probe correction + admin proxy prep ✅ 완료
+
+**목표**: `localhost:8092` down을 runtime down으로 오판한 부분을 바로잡고, 외부 dev shell에서 쓸 공식 프록시 경로를 backend admin API에 준비한다.
+
+**완료 기준**:
+- [x] `8092/8096`은 host 공개 포트가 아니라 internal 서비스라는 점 재확인
+- [x] `100.81.189.92:8090/api/health` + admin login + system health 실측
+- [x] `POST /api/admin/ai-user/backfill-comment-likes` 202로 backend → orchestrator 프록시 확인
+- [x] no-op `PUT /api/admin/ai-rules/prompts/voice/post` 200 + reload-failed WARN 부재로 backend → llm-ai-user reachability 확인
+- [x] `probe_dev_ai_user_stack.py` 추가
+- [x] `POST /api/admin/ai-user/generate-posts` / `reset-counter` backend proxy 코드 추가
+- [ ] dev host에서 backend 재배포 후 새 proxy live 검증

@@ -124,6 +124,24 @@ flowchart LR
 > 프롬프트 파일 변경 후 재배포 없이 즉시 적용하려면 이 API 호출.
 > `docs/shared/prompts/` 경로의 `.md` 파일을 모두 재로드.
 
+## AI User API — 생성 정책 · 수동 트리거 프록시
+
+**Base path:** `/api/admin/ai-user` — 인증: JWT + ADMIN
+
+| Method | Path | 설명 | 응답 |
+|---|---|---|---|
+| `GET` | `/generation-config` | AI 유저 생성 목표량/백엔드/토큰 추정 조회 | `ConfigResponse` |
+| `PUT` | `/generation-config` | 생성 목표량/백엔드/토큰 추정 설정 저장 | `ConfigResponse` |
+| `GET` | `/generation-status` | 오늘 KST 기준 생성 진행 현황 | `GenerationStatusResponse` |
+| `POST` | `/generate-posts?count=2&voice=THEQOO` | backend admin 경유로 orchestrator `generate-posts` 호출 | `{ attempted, personaIds, message }` |
+| `POST` | `/reset-counter` | backend admin 경유로 orchestrator `reset-counter` 호출 | `{ status, prev, now }` |
+| `POST` | `/backfill-comment-likes?days=30&personasPerPost=8` | backend admin 경유로 orchestrator 백필 호출 | `{ queued, posts, personasPerPost, message }` |
+| `POST` | `/kill` | POST/COMMENT/REPLY backend를 모두 `OFF`로 전환 | `{ status, message, killedAt }` |
+
+메모:
+- `/admin/trigger/*` direct 경로는 외부 dev shell에서 일관되게 쓰기 어렵다.
+- 수동 운영/진단은 `/api/admin/ai-user/*` 프록시 경로를 우선 사용한다.
+
 ## Social Publishing API
 
 소셜 게시 API는 ASM 서비스로 이전됨. Again-Spring-Marketing 프로젝트 문서 참조.
@@ -140,7 +158,8 @@ flowchart LR
 | AdminTestController | 2 | `@Profile("dev")` |
 | SessionContextDebugController | 1 | `app.admin.enabled=true` |
 | SocialPublishController | 7 | `app.features.marketing.enabled=true` (dev) |
-| **합계** | **24** | |
+| AdminAiUserController | 7 | 항상 |
+| **합계** | **31** | |
 
 ## 변경 시 절차
 

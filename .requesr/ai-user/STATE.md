@@ -1,16 +1,17 @@
 # STATE — Request Snapshot
 
 **최종 갱신**: 2026-06-19
-**기준 원본**: `.result/ai-user/STATE.md` Step 77
+**기준 원본**: `.result/ai-user/STATE.md` Step 78
 
 ## 현재 상태
 
 - R14 기준 상태는 **HOLD**
 - `AI_USER_ML_ENABLED=false` 유지
-- 가장 큰 블로커는 여전히 `:8092` runtime host 접근 불가
-  - 현재 셸에서는 `ssh` 권한 거부
-  - local `docker`/`curl` 부재
-  - 대신 host용 helper `.result/ai-user/scripts/recover_runtime_host.py` 준비 완료
+- 기존 `:8092 down` 가정은 철회됨
+  - `8092/8096`은 dev compose에서 internal 서비스
+  - backend → orchestrator proxy는 live `202` 확인
+  - backend → `llm-ai-user:8092/internal/prompts/reload`도 live probe 성공
+- 현재 실제 블로커는 external strict runtime generate probe 부재와 direct `/admin/trigger/*` 500
 
 ## 최신 핵심 결과
 

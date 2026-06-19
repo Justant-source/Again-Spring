@@ -1305,3 +1305,33 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **의미**:
 - 현재 셸에서는 할 수 있는 자동 진행을 모두 마쳤다.
 - 남은 크리티컬 패스는 code change가 아니라 host execution이다.
+
+## D-92 — `8092 down` 가정은 철회, live dev의 실제 블로커는 external trigger/probe 경로다 (2026-06-19)
+
+**배경**:
+- Step 68~77에서는 `localhost:8092` / `100.115.252.61:8092` connection refused를 runtime down 근거처럼 취급했다.
+- 하지만 `env/docker-compose.dev.yml` 기준 `llm-ai-user(8092)`와 `ai-user-orchestrator(8096)`는 **host port 미공개 internal 서비스**다.
+- 이번 세션 실측:
+  - `GET http://100.81.189.92:8090/api/health` → `200`
+  - admin login (`test1@again.com` / `test123`) 성공
+  - `GET /api/admin/health/system` → `200`
+  - `POST /api/admin/ai-user/backfill-comment-likes?days=1&personasPerPost=1` → `202`
+  - no-op `PUT /api/admin/ai-rules/prompts/voice/post` → `200`
+  - 이후 backend WARN 로그에 `llm-ai-user reload failed` 없음
+
+**결정**:
+- `localhost:8092` / `100.81.189.92:8092` refused만으로 runtime down 판정을 내리지 않는다.
+- live dev 기준으로는 다음 두 사실을 분리한다.
+  1. **backend → orchestrator internal route는 도달 가능**
+  2. **backend → llm-ai-user:8092 internal reload route는 도달 가능**
+- 현재 live blocker는 외부 셸에서 직접 쓰는 `/admin/trigger/*` 경로다.
+  - unauth `403`
+  - admin bearer `500 INTERNAL_ERROR`
+- 따라서 외부 운영/진단용 공식 경로는 backend admin proxy 쪽으로 옮긴다.
+  - 신규 준비 코드:
+    - `POST /api/admin/ai-user/generate-posts`
+    - `POST /api/admin/ai-user/reset-counter`
+
+**의미**:
+- `:8092` 컨테이너를 무조건 다시 띄워야 하는 상황으로 단정할 수는 없다.
+- R14의 남은 기술 블로커는 "runtime이 죽었다"보다 "strict runtime `/generate/post`를 외부에서 어떻게 합법적으로 검증할 것인가"에 가깝다.

@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 47 (Step 77 완료 — runtime host recovery handoff)
+**최종 갱신**: 2026-06-19 세션 48 (Step 78 완료 — runtime probe correction + admin proxy prep)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 77 완료 — runtime host recovery handoff
+- **Phase**: Step 78 완료 — runtime probe correction + admin proxy prep
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -46,12 +46,31 @@
     - `AI_USER_ML_ENABLED=true`여도 community 목록으로 rerank 대상을 제한 가능
     - 비어 있으면 기존 전역 동작 유지
 - **판정 보정**:
-  - `:8092` 복구는 여전히 **host 접근 블로커**다. 현재 셸에서는 `ssh` 권한 거부 + `docker` 부재라 직접 해결 불가
+  - `localhost:8092` / `100.81.189.92:8092` probe는 **유효한 liveness 근거가 아니었다**. `llm-ai-user`와 `orchestrator`는 dev compose에서 host 포트를 공개하지 않는 internal 서비스다.
+  - 이번 세션 실측:
+    - `http://100.81.189.92:8090/api/health` → `200`
+    - admin login (`test1@again.com` / `test123`) 성공, roles=`USER,ADMIN`
+    - `GET /api/admin/health/system` → `200`
+    - `POST /api/admin/ai-user/backfill-comment-likes?days=1&personasPerPost=1` → `202`
+    - `PUT /api/admin/ai-rules/prompts/voice/post` with same content → `200`
+    - 직후 WARN 로그에 `llm-ai-user reload failed` 없음
+  - 따라서 **backend → orchestrator internal route**와 **backend → llm-ai-user:8092/internal/prompts/reload**는 live dev 기준 도달 가능으로 본다.
+  - 현재 깨진 경로는 외부 `POST /admin/trigger/*` direct route다.
+    - unauth: `403`
+    - admin bearer: `500 INTERNAL_ERROR`
+    - 이 경로는 R14 측정/진단용 공식 진입점으로 쓰기 어렵다.
   - R14 공식 runtime 측정은 `--generator runtime --strict-runtime` + `cli_fallbacks=0` 조건으로만 인정
   - `CLIEN blind② 40%`는 CLIEN 전용 cond5 근거다. NATEPAN/THEQOO까지 확장 해석하지 않음
   - 현재 활성화 준비 상태는 **GO candidate가 아니라 HOLD**
-  - host가 열리면 즉시 실행할 준비물 추가:
-    - `probe_runtime_pipeline.py` — health / 4 drafts / `/rerank` / known tell scan
+  - 외부 셸에서 쓸 live probe 추가:
+    - `.result/ai-user/scripts/probe_dev_ai_user_stack.py`
+    - backend/admin login, system health, generation-config, no-op prompt reload, optional orchestrator proxy probe
+  - backend admin proxy 구현 준비:
+    - `POST /api/admin/ai-user/generate-posts`
+    - `POST /api/admin/ai-user/reset-counter`
+    - direct `/admin/trigger/*` 대신 이 경로를 공식 외부 진입점으로 사용 예정
+  - host가 열리면 즉시 실행할 준비물:
+    - `probe_runtime_pipeline.py` — internal `/generate/post` / `/rerank` 검증용
     - `build_cond5_blind.py` — community별 fresh cond5 설문 생성
     - `summarize_cond5_results.py` — owner/friend cond5 집계
   - cond5 smoke 검증 완료:
@@ -110,28 +129,27 @@
       - all_used_text_fingerprints **163**
     - THEQOO cond5를 같은 seed로 다시 fetch하면 `humans=0 ais=0 need=20`으로 즉시 중단됨
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **상태**: **HOLD** — `:8092` host 접근 블로커 + runtime 공식 재측정 부재 + NATEPAN fresh cond5 공백 + THEQOO fresh cond5 owner FAIL
+- **상태**: **HOLD** — external strict runtime generate probe 부재 + direct `/admin/trigger/*` 500 + NATEPAN fresh cond5 공백 + THEQOO fresh cond5 owner FAIL
 - **남은 즉시 작업**:
-  - `:8092`를 올릴 수 있는 dev host에 먼저 접근
-  - runtime 배관 검증: `probe_runtime_pipeline.py`로 health, 4-draft 생성, `/rerank`, known tell scan 확인
-  - host 로그에서 실제 backend/model 확인
+  - backend admin proxy (`generate-posts`, `reset-counter`)를 dev에 배포
+  - `.result/ai-user/scripts/probe_dev_ai_user_stack.py --probe-orchestrator`로 live stack 재확인
+  - 그 다음 runtime 배관 검증: `probe_runtime_pipeline.py` 또는 backend proxy generate 경로로 internal `/generate/post` 실측
   - THEQOO runtime h2h를 owner+friend로 다시 수집
   - `r14-cond5-natepan-survey.md` 수동 응답 수집
   - 필요 시 THEQOO cond5 friend 응답 추가
   - automatic gate reports는 새 라운드 survey 생성 직후 먼저 실행
   - `benefit_pp >= 5%p`인 community만 selective gate(B) 후보로 평가
-  - host 접근 주체는 `recover_runtime_host.py`로 `docker compose up` + `:8092` health polling을 한 번에 실행
 - **이번 추가 하드닝**:
   - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
   - runtime `OutputSanitizer`와 CLI fallback 하네스(`build_h2h_survey.py`, `run_ab_test.py`) 동시 반영
   - `쓰레기 차도` → `쓰레기통이 차도`
   - `집에서는 딸이 더 조심해야` → `집에서는 여자가 더 조심해야`
   - regenerated survey 기준 `쓰레기 차도` / `집에서는 딸이 더 조심해야` / `…` / `헐` / `개공감` / `😥` / `🥲` 모두 **0건**
-  - local Phase 0 probe:
+  - historical Phase 0 probe:
     - `/corpus/stats` 최신 수치 확인 완료
-    - `localhost:8092` health still down
-    - `/usr/bin/ssh` 실행 권한 거부, local `docker` 부재 → host handoff 필요
-  - host-side recovery helper:
+    - external `localhost:8092` health down 관측은 있었지만, Step 78에서 internal-only 포트라 해석을 정정
+    - `/usr/bin/ssh` 실행 권한 거부, local `docker` 부재는 여전히 host-side deploy blocker
+  - historical host-side recovery helper:
     - `.result/ai-user/scripts/recover_runtime_host.py`
     - `docker compose -f env/docker-compose.dev.yml --env-file env/.env.dev up -d llm-ai-user`
     - `curl` 없이 Python urllib로 `:8092/actuator/health`를 polling
@@ -192,6 +210,7 @@
 | **Step 75** | R14 THEQOO fresh cond5 owner | **✅ 완료** | owner 19/20 유효, 84.2% FAIL, feedback hardening 반영 |
 | **Step 76** | R14 automatic pre-blind gates | **✅ 완료** | tell scan / proxy judge / adversarial shortlist 추가 및 실측 |
 | **Step 77** | R14 runtime host recovery handoff | **✅ 완료** | host용 `docker compose up` + `:8092` health polling helper 추가 |
+| **Step 78** | R14 runtime probe correction + admin proxy prep | **✅ 완료** | 8092 internal-only 정정, live internal reachability 검증, backend proxy code 추가 |
 
 ### 중기
 
