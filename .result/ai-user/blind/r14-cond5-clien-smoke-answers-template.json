@@ -1,0 +1,48 @@
+{
+  "type": "cond5_blind",
+  "community": "CLIEN",
+  "generated_at": "2026-06-19 14:21:25",
+  "n_pairs": 2,
+  "label_map": {
+    "0": {
+      "A": "human",
+      "B": "ai"
+    },
+    "1": {
+      "A": "ai",
+      "B": "human"
+    }
+  },
+  "provenance": "http://100.115.252.61:8201/corpus/export/blind?community=CLIEN&nPerClass=4&seed=2026",
+  "response_instructions": {
+    "accepted_keys": "responses.<respondent> 에는 pair 번호를 1-based(1..N) 또는 0-based(0..N-1)로 넣을 수 있음",
+    "accepted_values": [
+      "A",
+      "B",
+      "답변불가",
+      "판단불가",
+      "미응답"
+    ],
+    "validity_rule": "공식 집계는 A/B만 유효. 나머지는 invalid"
+  },
+  "pair_metadata": [
+    {
+      "pair": 1,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {}
+    },
+    {
+      "pair": 2,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {},
+      "b_meta": {}
+    }
+  ],
+  "responses": {
+    "friend": {},
+    "owner": {}
+  }
+}

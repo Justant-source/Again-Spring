@@ -1107,3 +1107,33 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 3. THEQOO owner+friend runtime h2h
 4. NATEPAN/THEQOO fresh cond5
 5. `benefit_pp` 기준으로 B/C 최종 권고
+
+## D-85 — host 복구 직후 실행할 runtime probe와 cond5 도구를 선반영 (2026-06-19)
+
+**배경**:
+- 현재 blocker는 여전히 host 접근이다.
+- 그렇지만 host가 열리면 바로 배관 검증과 cond5를 재측정해야 하므로, 도구가 없어서 시간을 다시 쓰면 안 된다.
+
+**결정**:
+- 아래 세 스크립트를 추가한다.
+  1. `probe_runtime_pipeline.py`
+     - `:8092` health
+     - `/generate/post` 4 drafts
+     - ML `/rerank`
+     - THEQOO 알려진 tell 스캔
+     - 육안 검토용 md 보고서 저장
+  2. `build_cond5_blind.py`
+     - `/corpus/export/blind` raw export 또는 fetch 결과를 pairwise survey로 변환
+     - owner/friend answers template 동시 생성
+  3. `summarize_cond5_results.py`
+     - cond5 answers template에서 owner/friend/combined 정확도와 판정 계산
+
+**의미**:
+- host가 열리는 즉시 공식 순서를 그대로 수행할 수 있다.
+- runtime probe는 `runtime_down`이면 곧바로 HALT를 반환하므로, 측정 전 단계에서 시간을 낭비하지 않는다.
+
+**검증**:
+- `py_compile` 통과
+- `probe_runtime_pipeline.py --strict-runtime`는 현재 `runtime_down` HALT를 정상 출력
+- `build_cond5_blind.py --fetch-export` smoke 성공
+- `summarize_cond5_results.py` empty-response `PENDING` markdown 생성 성공

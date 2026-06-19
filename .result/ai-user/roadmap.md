@@ -873,3 +873,16 @@
 - [x] `CLIEN blind② 40%`를 NATEPAN/THEQOO cond5 근거로 쓰지 않도록 정정
 - [x] selective gate 임계: `benefit_pp >= 5%p` 기본 규칙 반영
 - [x] 설문 무효율 추적과 응답 형식 힌트 보강
+
+## Step 71 (R14-phase1/3 prep) — runtime probe + cond5 tooling ✅ 완료
+
+**목표**: host 복구 직후 즉시 쓸 진단/설문 도구를 미리 준비한다.
+
+**완료 기준**:
+- [x] `probe_runtime_pipeline.py` 추가
+- [x] health down 시 HALT 결과 출력 확인
+- [x] `build_cond5_blind.py` 추가
+- [x] `summarize_cond5_results.py` 추가
+- [x] cond5 결과를 owner/friend/combined로 자동 집계 가능
+- [ ] 실제 `/corpus/export/blind` fetch 샘플 검증
+- [ ] dev host에서 runtime probe 실측

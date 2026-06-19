@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 40 (Step 70 완료 — R14 activation gate correction)
+**최종 갱신**: 2026-06-19 세션 41 (Step 71 완료 — runtime probe + cond5 tooling)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 70 완료 — R14 activation gate correction
+- **Phase**: Step 71 완료 — runtime probe + cond5 tooling
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -50,13 +50,21 @@
   - R14 공식 runtime 측정은 `--generator runtime --strict-runtime` + `cli_fallbacks=0` 조건으로만 인정
   - `CLIEN blind② 40%`는 CLIEN 전용 cond5 근거다. NATEPAN/THEQOO까지 확장 해석하지 않음
   - 현재 활성화 준비 상태는 **GO candidate가 아니라 HOLD**
+  - host가 열리면 즉시 실행할 준비물 추가:
+    - `probe_runtime_pipeline.py` — health / 4 drafts / `/rerank` / known tell scan
+    - `build_cond5_blind.py` — community별 fresh cond5 설문 생성
+    - `summarize_cond5_results.py` — owner/friend cond5 집계
+  - cond5 smoke 검증 완료:
+    - `build_cond5_blind.py --fetch-export`로 CLIEN 2쌍 survey/template 생성 성공
+    - `summarize_cond5_results.py`로 empty-response `PENDING` results 생성 성공
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 - **상태**: **HOLD** — `:8092` host 접근 블로커 + runtime 공식 재측정 부재 + NATEPAN/THEQOO fresh cond5 공백
 - **남은 즉시 작업**:
   - `:8092`를 올릴 수 있는 dev host에 먼저 접근
-  - runtime 배관 검증: 실제 backend/model, 4-draft 생성, `/rerank` winner/random 분기, CLI fallback=0 확인
+  - runtime 배관 검증: `probe_runtime_pipeline.py`로 health, 4-draft 생성, `/rerank`, known tell scan 확인
+  - host 로그에서 실제 backend/model 확인
   - THEQOO runtime h2h를 owner+friend로 다시 수집
-  - NATEPAN/THEQOO fresh cond5 블라인드 재측정
+  - `build_cond5_blind.py`로 NATEPAN/THEQOO fresh cond5 블라인드 재생성
   - `benefit_pp >= 5%p`인 community만 selective gate(B) 후보로 평가
 - **이번 추가 하드닝**:
   - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
@@ -118,6 +126,7 @@
 | **Step 68** | R14 runtime gate + host handoff | **✅ 완료(HALT 기록)** | local env에서 `ssh`/`docker` 불가, dev host 복구 절차로 전환 |
 | **Step 69** | R14 selective rerank gate prep | **✅ 완료** | `AI_USER_ML_ENABLED_COMMUNITIES` 구현, 기본 동작 불변 |
 | **Step 70** | R14 activation gate correction | **✅ 완료** | host blocker / strict runtime / per-community cond5 / selective gate 임계 정정 |
+| **Step 71** | R14 runtime probe + cond5 tooling | **✅ 완료** | host 복구 직후 쓸 probe/blind/summarizer 추가 |
 
 ### 중기
 
