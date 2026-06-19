@@ -1243,3 +1243,43 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 - THEQOO는 fresh cond5 기준으로 아직 "AI vs human"에서 잘 숨지 못한다.
 - 따라서 runtime cond4-B를 나중에 다시 PASS하더라도, cond5 관점에서는 지금 바로 활성화할 근거가 없다.
 - 다음 수동 병목은 `NATEPAN` fresh cond5와 runtime host 복구다.
+
+## D-90 — 자동 pre-blind gate 3종은 수동 cond5 대체가 아니라 pre-screen으로만 쓴다 (2026-06-19)
+
+**배경**:
+- 사용자는 "수동 없이 GPU/토큰을 써서 충분히 테스트할 방법"을 요청했다.
+- 이에 따라 아래 자동 게이트 3종을 추가했다.
+  1. `auto_tell_scan.py`
+  2. `ensemble_blind_judge.py`
+  3. `adversarial_generate_and_filter.py`
+- 실측도 바로 수행했다.
+  - THEQOO proxy blind judge: **50.0%**
+  - NATEPAN proxy blind judge: **45.0%**
+  - THEQOO owner 실제 cond5: **84.2% FAIL**
+
+**결정**:
+- 자동 게이트는 **수동 cond5의 대체 판정**으로 쓰지 않는다.
+- 역할은 아래로 한정한다.
+  - manual blind 전에 위험 신호를 먼저 거르는 pre-screen
+  - 어떤 표현/주제/길이가 반복 탐지되는지 빨리 찾는 triage
+  - 새 survey 생성 직후 owner/friend 시간을 쓰기 전에 빨간 샘플을 shortlist
+- 운영 규칙:
+  - tell scan / proxy judge / adversarial shortlist를 새 blind 세트마다 먼저 실행
+  - proxy가 낮아도 사람 cond5를 건너뛰지 않는다
+  - proxy가 높으면 사람 응답 전에 바로 하드닝 대상으로 본다
+
+**현재 실측 해석**:
+- THEQOO:
+  - tell scan hit 상위 = `1도 패턴`, `reaction_word(헐/개공감)`, `many_dots`
+  - proxy blind judge = `50.0%`
+  - human owner = `84.2%`
+  - 즉 proxy는 **낙관 편향**이 있다
+- NATEPAN:
+  - tell scan hit 상위 = `many_dots`, `1도 패턴`
+  - proxy blind judge = `45.0%`
+  - 아직 human cond5 없음
+  - 따라서 manual cond5 전 pre-screen 신호로만 해석
+
+**의미**:
+- 자동화 3종으로 수동 라운드 수는 줄일 수 있다.
+- 하지만 현재 증거상, 이 자동화만으로 `AI_USER_ML_ENABLED` 판단을 대체하면 과신 위험이 크다.

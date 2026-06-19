@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 45 (Step 75 완료 — THEQOO fresh cond5 owner 반영)
+**최종 갱신**: 2026-06-19 세션 46 (Step 76 완료 — automatic pre-blind gates)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 75 완료 — THEQOO fresh cond5 owner 반영
+- **Phase**: Step 76 완료 — automatic pre-blind gates
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -74,6 +74,32 @@
       - `1도 모르겠음`, `1도 이해가 안 됨` 같은 남발
       - `월·화·수` middle dot 표기
       - 같은 갈등 주제 반복, 긴 서술형 전개
+  - 자동 pre-blind 게이트 3종 추가:
+    - `auto_tell_scan.py`
+    - `ensemble_blind_judge.py`
+    - `adversarial_generate_and_filter.py`
+  - 자동 게이트 실측:
+    - THEQOO tell scan:
+      - AI text 20개
+      - 상위 hit: `1도 패턴 7`, `reaction_word 7`, `many_dots 6`
+      - report: `.result/ai-user/blind/r14-cond5-theqoo-survey-auto-tell-scan.md`
+    - NATEPAN tell scan:
+      - AI text 20개
+      - 상위 hit: `many_dots 15`, `1도 패턴 7`
+      - report: `.result/ai-user/blind/r14-cond5-natepan-survey-auto-tell-scan.md`
+    - proxy blind judge:
+      - THEQOO **50.0%**
+      - NATEPAN **45.0%**
+      - reports:
+        - `.result/ai-user/blind/r14-cond5-theqoo-survey-ensemble-judge.md`
+        - `.result/ai-user/blind/r14-cond5-natepan-survey-ensemble-judge.md`
+    - adversarial shortlist (CLI THEQOO 12샘플):
+      - top combined score **0**
+      - all 12 samples proxy `human`
+      - report: `.result/ai-user/blind/r14-adversarial-theqoo.md`
+  - 자동 vs 수동 차이:
+    - THEQOO proxy judge는 **50.0%**였지만 owner 실제 cond5는 **84.2% FAIL**
+    - 따라서 자동 게이트는 **수동 cond5 대체물이 아니라 pre-screen 용도**로만 사용
   - blind export 제약 보완:
     - `/corpus/export/blind`는 source id 메타를 비워서 반환
     - source id 기반 dedupe는 여전히 완전하지 않다
@@ -92,6 +118,7 @@
   - THEQOO runtime h2h를 owner+friend로 다시 수집
   - `r14-cond5-natepan-survey.md` 수동 응답 수집
   - 필요 시 THEQOO cond5 friend 응답 추가
+  - automatic gate reports는 새 라운드 survey 생성 직후 먼저 실행
   - `benefit_pp >= 5%p`인 community만 selective gate(B) 후보로 평가
 - **이번 추가 하드닝**:
   - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
@@ -158,6 +185,7 @@
 | **Step 73** | R14 survey answer importer | **✅ 완료** | md 설문 답변을 answers json으로 자동 반영 |
 | **Step 74** | R14 blind fingerprint registry | **✅ 완료** | text fingerprint dedupe + file lock + exact 재사용 차단 |
 | **Step 75** | R14 THEQOO fresh cond5 owner | **✅ 완료** | owner 19/20 유효, 84.2% FAIL, feedback hardening 반영 |
+| **Step 76** | R14 automatic pre-blind gates | **✅ 완료** | tell scan / proxy judge / adversarial shortlist 추가 및 실측 |
 
 ### 중기
 

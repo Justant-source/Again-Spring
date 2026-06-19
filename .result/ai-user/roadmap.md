@@ -932,3 +932,18 @@
 - [x] inline `개공감/헐`, `1도 ~`, `월·화·수` 신호 cleanup 반영
 - [ ] NATEPAN fresh cond5 owner/friend 응답 수집
 - [ ] runtime host 복구 후 THEQOO runtime h2h owner+friend 재측정
+
+## Step 76 (R14-phase3 automation) — automatic pre-blind gates ✅ 완료
+
+**목표**: manual blind 전에 자동 신호 3종으로 빨간 샘플을 먼저 걸러낸다.
+
+**완료 기준**:
+- [x] `auto_tell_scan.py` 추가
+- [x] `ensemble_blind_judge.py` 추가
+- [x] `adversarial_generate_and_filter.py` 추가
+- [x] THEQOO tell scan report 생성
+- [x] NATEPAN tell scan report 생성
+- [x] THEQOO proxy blind judge 실측 (`50.0%`)
+- [x] NATEPAN proxy blind judge 실측 (`45.0%`)
+- [x] THEQOO adversarial shortlist 생성
+- [x] 자동 게이트는 pre-screen only라는 해석 규칙 기록
