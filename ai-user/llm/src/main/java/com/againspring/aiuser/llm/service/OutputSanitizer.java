@@ -409,12 +409,12 @@ public class OutputSanitizer {
         "다고|라고|냐고|는데|은데|" +
         "잖아|이야|아니야|는가|을까|ㄹ까|구나|" +
         "해요|이에요|예요|아요|어요|네요|세요|데요|까요|거예요|죠|요";
-    /** 마침표·물음표·느낌표·ㅋ·ㅠ 또는 한국어 종결어미로 끝나는지 (단어 경계 적용). */
+    /** ASCII/Unicode 문장부호·ㅋ·ㅠ 또는 한국어 종결어미로 끝나는지 (단어 경계 적용). */
     private static final Pattern COMPLETE_ENDING = Pattern.compile(
-        "(?s).*(?:[.?!]|ㅋ+|ㅠ+|(?:" + ENDING_ALT + ")(?![가-힣]))$");
+        "(?s).*(?:[.?!…⋯]|ㅋ+|ㅠ+|(?:" + ENDING_ALT + ")(?![가-힣]))$");
     /** 텍스트 중간/끝의 종결 위치 탐색용 (trim 시 마지막 완결점 찾기). */
     private static final Pattern ENDING_FINDER = Pattern.compile(
-        "[.?!]|ㅋ+|ㅠ+|(?:" + ENDING_ALT + ")(?![가-힣])");
+        "[.?!…⋯]|ㅋ+|ㅠ+|(?:" + ENDING_ALT + ")(?![가-힣])");
 
     /**
      * 텍스트가 불완전한 어미로 끝날 때 마지막 완결된 종결까지 잘라냄.
