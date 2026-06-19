@@ -1,0 +1,10 @@
+[2026-06-18T23:13:23+09:00] start w01-hot-p001
+[cmd] python3 [cmd] /home/justant/Data/Again-Spring/.result/ai-user/scripts/crawl_theqoo.py [cmd] --boards [cmd] hot [cmd] --page-start [cmd] 1 [cmd] --pages [cmd] 4 
+INFO === board: hot, pages: 1-4 ===
+INFO   p1: 36 links
+INFO   p2: 12 links
+INFO   p3: 12 links
+INFO   p4: 12 links
+INFO batch ingested: +6 skipped=6
+INFO done — inserted=6 skipped=6 filtered=58
+[2026-06-18T23:14:57+09:00] done w01-hot-p001

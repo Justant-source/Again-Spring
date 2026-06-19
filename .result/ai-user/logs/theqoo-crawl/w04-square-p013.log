@@ -1,0 +1,10 @@
+[2026-06-19T00:18:28+09:00] start w04-square-p013
+[cmd] python3 [cmd] /home/justant/Data/Again-Spring/.result/ai-user/scripts/crawl_theqoo.py [cmd] --boards [cmd] square [cmd] --page-start [cmd] 13 [cmd] --pages [cmd] 4 
+INFO === board: square, pages: 13-16 ===
+INFO   p13: 7 links
+INFO   p14: 7 links
+INFO   p15: 7 links
+INFO   p16: 7 links
+INFO batch ingested: +0 skipped=4
+INFO done — inserted=0 skipped=4 filtered=24
+[2026-06-19T00:19:08+09:00] done w04-square-p013

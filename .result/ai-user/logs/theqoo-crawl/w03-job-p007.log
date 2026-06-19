@@ -1,0 +1,8 @@
+[2026-06-19T00:30:56+09:00] start w03-job-p007
+[cmd] python3 [cmd] /home/justant/Data/Again-Spring/.result/ai-user/scripts/crawl_theqoo.py [cmd] --boards [cmd] job [cmd] --page-start [cmd] 7 [cmd] --pages [cmd] 2 
+INFO === board: job, pages: 7-8 ===
+INFO   p7: 7 links
+INFO   p8: 7 links
+INFO batch ingested: +0 skipped=2
+INFO done — inserted=0 skipped=2 filtered=12
+[2026-06-19T00:31:16+09:00] done w03-job-p007

@@ -1,0 +1,10 @@
+[2026-06-19T00:18:28+09:00] start w07-beauty-p013
+[cmd] python3 [cmd] /home/justant/Data/Again-Spring/.result/ai-user/scripts/crawl_theqoo.py [cmd] --boards [cmd] beauty [cmd] --page-start [cmd] 13 [cmd] --pages [cmd] 4 
+INFO === board: beauty, pages: 13-16 ===
+INFO   p13: 8 links
+INFO   p14: 8 links
+INFO   p15: 8 links
+INFO   p16: 8 links
+INFO batch ingested: +0 skipped=4
+INFO done — inserted=0 skipped=4 filtered=28
+[2026-06-19T00:19:13+09:00] done w07-beauty-p013

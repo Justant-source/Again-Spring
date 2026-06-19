@@ -1,0 +1,10 @@
+[2026-06-19T00:18:28+09:00] start w02-ktalk-p009
+[cmd] python3 [cmd] /home/justant/Data/Again-Spring/.result/ai-user/scripts/crawl_theqoo.py [cmd] --boards [cmd] ktalk [cmd] --page-start [cmd] 9 [cmd] --pages [cmd] 4 
+INFO === board: ktalk, pages: 9-12 ===
+INFO   p9: 6 links
+INFO   p10: 6 links
+INFO   p11: 6 links
+INFO   p12: 6 links
+INFO batch ingested: +0 skipped=4
+INFO done — inserted=0 skipped=4 filtered=20
+[2026-06-19T00:19:03+09:00] done w02-ktalk-p009
