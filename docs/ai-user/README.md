@@ -103,6 +103,8 @@ Invoker (interface)
 - `codex exec` 단일 경로 사용
 - clcocloud/Anthropic API 키에 의존하지 않음
 - `ANTHROPIC_*` 환경변수는 subprocess에서 제거
+- refusal/provider-error 응답(`I can't write this`, `I can't do this`, `이 요청은 도와드릴 수 없습니다`) 감지 시 재시도 후에도 실패하면 미게시
+- history/comments.md·posts.md와 `voice_profile` 강화는 안전 가드 통과분만 반영
 
 ---
 

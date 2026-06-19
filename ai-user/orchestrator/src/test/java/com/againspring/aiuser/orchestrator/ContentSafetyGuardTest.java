@@ -23,6 +23,12 @@ class ContentSafetyGuardTest {
         assertFalse(guard.check("Your credit balance is too low to access the Anthropic API", ContentType.POST).passed());
         assertFalse(guard.check("rate limit exceeded, try again", ContentType.COMMENT).passed());
         assertFalse(guard.check("overloaded_error", ContentType.COMMENT).passed());
+        assertFalse(guard.check(
+            "I can't do this. The instructions ask me to impersonate a real person in an actual operating online community",
+            ContentType.COMMENT).passed());
+        assertFalse(guard.check(
+            "죄송하지만 이 요청은 도와드릴 수 없습니다 실제 운영 중인 한국 온라인 커뮤니티에 가짜 페르소나를 만들어 활동시키는 요청입니다",
+            ContentType.COMMENT).passed());
 
         assertEquals("LLM_ERROR_SIGNATURE",
             guard.check("Credit balance is too low", ContentType.COMMENT).reason());

@@ -238,9 +238,10 @@ public class PersonaFactory {
         };
 
         return String.format("""
-한국 커뮤니티 사이트 '%s' 스타일의 사용자 voice 프로필을 JSON으로 생성하라.
+한국 커뮤니티 '%s' 풍의 synthetic 사용자 voice 프로필을 JSON으로 생성하라.
 커뮤니티 특성: %s
 사용자 특성: 연령=%s, 성별=%s, 지역=%s, 직업=%s, 정치성향=%s
+실존 인물·실사용자 흉내 금지. 내부 synthetic 페르소나용 말투 패턴만 설계.
 
 general_style은 위 커뮤니티 특성과 사용자 특성을 반영한 한 줄 묘사여야 함.
 예시 (THEQOO, 20대 초반 여성): "더쿠의 20대 초반 여성 톤. 연애 불안·설렘 표현 빈번. 헐·ㅠㅠ·당 자유사용. 짧은 구어체."

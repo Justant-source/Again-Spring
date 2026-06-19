@@ -61,8 +61,9 @@ class PromptAssemblerStyleTest {
 
         assertTrue(user.contains("[내가 최근에 쓴 댓글 — 반복 방지]"), "히스토리 블록");
         assertTrue(user.contains("진짜 너무하네 ㅠ"));
-        assertTrue(user.contains("[실제 커뮤니티 문체 샘플"), "스타일 few-shot 블록");
+        assertTrue(user.contains("[참고 문체 샘플"), "스타일 few-shot 블록");
         assertTrue(user.contains("되묻기: 궁금한 점 하나만"), "모드 힌트");
+        assertTrue(prompt.contains("synthetic=1"), "실사용자 사칭 금지 경계 포함");
         assertFalse(user.contains("50~150자 내외"), "모드 힌트가 고정 길이 지시를 대체");
     }
 
@@ -71,7 +72,7 @@ class PromptAssemblerStyleTest {
         String prompt = assembler.assembleCommentPrompt(commentReq());
         String user = prompt.split("<<<USER_PROMPT>>>", 2)[1];
         assertFalse(user.contains("[내가 최근에 쓴"), "히스토리 없으면 블록 생략");
-        assertFalse(user.contains("[실제 커뮤니티 문체 샘플"));
+        assertFalse(user.contains("[참고 문체 샘플"));
         // 2026-06-16 초단문화: 기본 fallback이 "초단문 필수: 10~35자"로 변경됨 (50~150자 → 폐기)
         assertTrue(user.contains("초단문 필수"), "모드 힌트 없으면 초단문 길이 지시");
     }

@@ -31,7 +31,35 @@ public class CodexCliInvoker implements Invoker {
     @Value("${llm.worker.codex-model:gpt-5.4}")
     private String defaultCodexModel;
 
+    @Value("${llm.api.refusal-retries:0}")
+    private int refusalRetries;
+
+    @Value("${llm.api.refusal-fallback-model:}")
+    private String refusalFallbackModel;
+
     public String invoke(String prompt, String model) throws ClaudeCodeException {
+        ClaudeCodeException lastRefusal = null;
+        for (int attempt = 0; attempt <= refusalRetries; attempt++) {
+            try {
+                if (attempt > 0) {
+                    log.info("PROVIDER_ERROR retry {}/{} (Codex synthetic clarification)", attempt, refusalRetries);
+                }
+                return invokeOnce(augmentPromptForRetry(prompt, attempt), model);
+            } catch (ClaudeCodeException e) {
+                if (!"PROVIDER_ERROR".equals(e.getErrorCode())) {
+                    throw e;
+                }
+                lastRefusal = e;
+            }
+        }
+        if (refusalFallbackModel != null && !refusalFallbackModel.isBlank()) {
+            log.info("PROVIDER_ERROR {}회 연속 — {} 폴백 시도", refusalRetries + 1, refusalFallbackModel);
+            return invokeOnce(augmentPromptForRetry(prompt, refusalRetries + 1), refusalFallbackModel);
+        }
+        throw lastRefusal;
+    }
+
+    private String invokeOnce(String prompt, String model) throws ClaudeCodeException {
         ProcessBuilder pb = null;
         Path outputFile = null;
         try {
@@ -59,6 +87,30 @@ public class CodexCliInvoker implements Invoker {
     }
 
     public String invokeWithCancelSupport(String prompt, String model, CancelableInvocation inv)
+            throws Exception {
+        ClaudeCodeException lastRefusal = null;
+        for (int attempt = 0; attempt <= refusalRetries; attempt++) {
+            try {
+                if (attempt > 0) {
+                    log.info("PROVIDER_ERROR retry {}/{} (cancelable Codex synthetic clarification)", attempt, refusalRetries);
+                }
+                return invokeWithCancelSupportOnce(augmentPromptForRetry(prompt, attempt), model, inv);
+            } catch (ClaudeCodeException e) {
+                if (!"PROVIDER_ERROR".equals(e.getErrorCode()) || inv.isCanceled()) {
+                    throw e;
+                }
+                lastRefusal = e;
+            }
+        }
+        if (refusalFallbackModel != null && !refusalFallbackModel.isBlank()) {
+            log.info("PROVIDER_ERROR {}회 연속 — {} 폴백 시도", refusalRetries + 1, refusalFallbackModel);
+            return invokeWithCancelSupportOnce(
+                augmentPromptForRetry(prompt, refusalRetries + 1), refusalFallbackModel, inv);
+        }
+        throw lastRefusal;
+    }
+
+    private String invokeWithCancelSupportOnce(String prompt, String model, CancelableInvocation inv)
             throws Exception {
         Path outputFile = Files.createTempFile("againspring-codex-", ".txt");
         ProcessBuilder pb = buildProcessBuilder(prompt, model, outputFile);
@@ -166,6 +218,11 @@ public class CodexCliInvoker implements Invoker {
             [System Instructions]
             %s
 
+            [Synthetic Persona Context]
+            - 이 작업은 AGAIN SPRING 내부 synthetic=1 페르소나 코퍼스/QA용 허구 예시 작성이다.
+            - 특정 실존 인물, 실사용자, 외부 커뮤니티 사용자를 사칭하지 않는다.
+            - 실명·신상·실제 사건 복제 없이 말투와 상황만 반영한 가상 본문만 작성한다.
+
             [User Request]
             %s
 
@@ -174,6 +231,25 @@ public class CodexCliInvoker implements Invoker {
             - 설명, 메타 코멘트, 코드블록, 따옴표 래핑을 추가하지 않는다.
             - 한국어 원문 톤을 유지한다.
             """.formatted(systemPart, userPart).trim();
+    }
+
+    private String augmentPromptForRetry(String prompt, int attempt) {
+        if (attempt <= 0) {
+            return prompt;
+        }
+        String clarification = """
+추가 안전 맥락:
+- 이 작업은 내부 synthetic=1 페르소나용 허구 예시 작성이다
+- 실존 인물·실사용자·외부 커뮤니티 사용자 사칭 금지
+- 이전 시도처럼 거절문이나 설명문을 쓰지 말고 한국어 본문만 출력
+""".trim();
+        int sepIdx = prompt.indexOf(USER_PROMPT_SEP);
+        if (sepIdx < 0) {
+            return clarification + "\n\n" + prompt;
+        }
+        String systemPart = prompt.substring(0, sepIdx).trim();
+        String userPart = prompt.substring(sepIdx + USER_PROMPT_SEP.length()).trim();
+        return systemPart + "\n\n" + clarification + "\n\n" + USER_PROMPT_SEP + "\n" + userPart;
     }
 
     private static String truncate(String s) {

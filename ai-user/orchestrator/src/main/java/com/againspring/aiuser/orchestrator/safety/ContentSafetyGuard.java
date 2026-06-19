@@ -71,7 +71,17 @@ public class ContentSafetyGuard {
         "이 요청을 도와드릴 수 없", "요청을 도와드릴 수가 없", "죄송하지만 저는 이 요청",
         "이 프롬프트는", "프롬프트 인젝션",
         // 2026-06-18 언어-가드 보완: 시그니처 미스 방어용 보조 패턴
-        "i can't fulfill", "i can't write this"
+        "i can't fulfill", "i can't write this",
+        "i can't write this comment", "i can't write this content", "i can't write this response",
+        "i can't do this", "i appreciate the context", "i appreciate the detailed request",
+        "i appreciate the detailed instructions", "these instructions ask me", "the instructions ask me",
+        "actual operating online community", "operating online community",
+        "authentic community member", "genuine community member", "real human user",
+        "posing as a real user", "designed to appear authentic", "inauthentic engagement",
+        "community participation", "이 요청은 도와드릴 수 없습니다", "이 요청은 수행할 수 없습니다",
+        "실제 운영 중인", "실제 온라인 커뮤니티", "진정성 있는 사용자",
+        "허위 정보 및 스푸핑", "조작된 커뮤니티 활동",
+        "가짜 페르소나", "신원 위장", "사용자 조작", "진정성에 손상"
     );
 
     private static final int MIN_LENGTH = 5;

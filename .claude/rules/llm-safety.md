@@ -30,26 +30,29 @@ AI 배심원·요약 출력에서 아래 표현은 **절대 금지**. 위반 시
 추가: 2026-06-12 clcocloud Haiku 거절 노드 — "I can't help with this request"·역할극 거절문.
 추가: 2026-06-18 NATEPAN 62% 오염 — 언어 가드(한글 비율<10%) 도입 + ML corpus 정화(171행, 11개 커뮤니티 삭제).
 
-### 방어 3계층 — 시그니처 추가 시 반드시 두 곳 모두 갱신 (언어 가드는 3곳)
+### 방어 4계층 — 시그니처 추가 시 반드시 코드/문서 모두 갱신
 
 | 계층 | 위치 | 역할 |
 |---|---|---|
 | L1 인보커 | `ai-user/llm/.../service/LlmErrorSignature.java` | LLM 워커 내부에서 오류 문자열 감지 + 언어 가드 |
 | L2 오케스트레이터 | `ai-user/orchestrator/.../safety/ContentSafetyGuard.java` | 봇 텍스트를 BE 게시 전 최종 검사 + 언어 가드 |
-| L3 ML corpus | `Again-Spring-AI-User/app/api/routes_corpus.py` | ingest 시 ai 행 한글 없으면 거부 |
+| L3 페르소나 히스토리 | `ActionExecutor.writeHistory` + `loadRecentBodies` | guard 통과분만 history 반영 / 과거 오염 재주입 차단 |
+| L4 페르소나 강화 | `ai-user/learning/app/services/persona_strengthener.py` | refusal/error 응답·필드가 `voice_profile`에 합쳐지지 않게 차단 |
 
 ### 현재 시그니처 카테고리 (코드 참조: `LlmErrorSignature.java`)
 
 - **언어 가드 (2026-06-18)**: 한글 char 비율 < 10% → 무효. 영어 거절·오류 근본 탐지 → L1에서 감지 시 Sonnet 폴백 발동
 - **제공자 오류**: `credit balance`, `rate_limit`, `overloaded`, `authentication_error`, `api_error`
 - **자기 정체 노출**: `i'm kiro`, `i'm claude`, `저는 claude`, `나는 claude`
-- **역할극 거절**: `cannot roleplay`, `can't help with this`, `I can't help with this request`, `역할극`, `프롬프트 인젝션`, `i can't fulfill`, `i can't write this`
+- **역할극 거절**: `cannot roleplay`, `can't help with this`, `I can't help with this request`, `역할극`, `프롬프트 인젝션`, `i can't fulfill`, `i can't write this`, `i can't do this`
+- **2026-06-19 Codex 거절 노드**: `i appreciate the context`, `i appreciate the detailed request`, `these instructions ask me`, `operating online community`, `actual operating online community`, `authentic community member`, `이 요청은 수행할 수 없습니다`, `실제 온라인 커뮤니티`, `가짜 페르소나`, `신원 위장`, `사용자 조작`
 - **일반 거절**: 거절문 패턴 (§18 `ai-user/docs/llm.md` 참조)
 
 ### 오염 루프 방지
 
 거절문이 `loadRecentBodies`를 통해 다음 프롬프트에 재주입되면 루프가 생긴다.
 `ActionExecutor.loadRecentBodies`는 **ContentSafetyGuard 통과분만** history에 저장한다.
+`persona_strengthener.py`도 동일하게 refusal/error 필드를 버린 뒤에만 `voice_profile`을 갱신한다.
 
 ### 처리 원칙
 

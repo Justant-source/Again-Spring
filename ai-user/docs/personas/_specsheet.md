@@ -193,6 +193,7 @@
 ### 공통
 - `%` 문자 YAML에 절대 사용 금지 (PromptAssembler 포맷 버그)
 - 실명·전화번호·실제 주소·실제 사건 언급 금지
+- **LLM 거절/오류 문자열 반영 금지**: `"I can't write this"`, `"I can't do this"`, `"이 요청은 도와드릴 수 없습니다"` 류 문장은 `history/*.md`, `voice.yml`, `profile.yml` 어디에도 저장 금지. 발견 시 해당 엔트리 폐기 후 재호출 또는 미반영
 - voice.yml 크기 목표: **3~4KB**. 예시는 3~4개 (패턴용, 복붙 소스 아님)
 - 새 필드 크기: lexicon 10줄 이내, writing_quirks 6줄 이내, hot_buttons 8줄 이내
 - **formality 기본값**: informal 우세 (반말 70~80%), formal(존댓말) 20~30%. 명시적 존댓말 Voice(CLIEN/PPOMPPU/NATEPAN사연 전용)만 formal 비율 높임

@@ -32,6 +32,82 @@ VOICE_SOURCE_MAP = {
 # 예시 풀 목표 크기 (문체 현실화 S5) — 고정 3~4개 → 풀 확장 후 생성 시 랜덤 서브셋 주입
 POOL_TARGET_COMMENTS = 12
 POOL_TARGET_REPLIES = 8
+MIN_KOREAN_RATIO = 0.10
+MIN_KOREAN_CHECK_LEN = 20
+LLM_ERROR_SIGNATURES = [
+    "i can't write", "i can't do this", "i can't fulfill",
+    "i appreciate the context", "i appreciate the detailed",
+    "these instructions ask me", "the instructions ask me",
+    "actual operating online community", "operating online community",
+    "authentic community member", "genuine community member",
+    "designed to appear authentic", "community participation",
+    "이 요청은 도와드릴 수 없습니다", "이 요청은 수행할 수 없습니다",
+    "실제 운영 중인", "실제 온라인 커뮤니티", "진정성 있는 사용자",
+    "허위 정보 및 스푸핑", "조작된 커뮤니티 활동",
+    "가짜 페르소나", "신원 위장", "사용자 조작",
+]
+
+
+def _has_insufficient_korean(text: str) -> bool:
+    significant = sum(1 for ch in text if not ch.isspace())
+    if significant < MIN_KOREAN_CHECK_LEN:
+        return False
+    korean = sum(
+        1 for ch in text
+        if "\uac00" <= ch <= "\ud7a3"
+        or "\u1100" <= ch <= "\u11ff"
+        or "\u3130" <= ch <= "\u318f"
+    )
+    return korean / significant < MIN_KOREAN_RATIO
+
+
+def _looks_like_llm_error(text: str) -> bool:
+    if not text or not text.strip():
+        return False
+    if _has_insufficient_korean(text):
+        return True
+    lower = re.sub(r"\s+", " ", text).strip().lower()
+    return any(sig in lower for sig in LLM_ERROR_SIGNATURES)
+
+
+def _sanitize_text_item(text: str) -> str | None:
+    if text is None:
+        return None
+    cleaned = re.sub(r"\s+", " ", str(text)).strip()
+    if not cleaned or _looks_like_llm_error(cleaned):
+        return None
+    return cleaned
+
+
+def _sanitize_text_list(values, limit: int) -> list[str]:
+    cleaned: list[str] = []
+    for value in values or []:
+        item = _sanitize_text_item(value)
+        if item and item not in cleaned:
+            cleaned.append(item)
+        if len(cleaned) >= limit:
+            break
+    return cleaned
+
+
+def _sanitize_patterns(patterns: dict) -> dict:
+    if not isinstance(patterns, dict):
+        return {}
+    signature_phrases = _sanitize_text_list(patterns.get("signature_phrases", []), 8)
+    consistent_errors = _sanitize_text_list(patterns.get("consistent_errors", []), 4)
+    hot_topics = _sanitize_text_list(patterns.get("hot_topics", []), 5)
+    typing_habit = _sanitize_text_item(patterns.get("typing_habit", ""))
+
+    sanitized = {}
+    if signature_phrases:
+        sanitized["signature_phrases"] = signature_phrases
+    if consistent_errors:
+        sanitized["consistent_errors"] = consistent_errors
+    if hot_topics:
+        sanitized["hot_topics"] = hot_topics
+    if typing_habit:
+        sanitized["typing_habit"] = typing_habit
+    return sanitized
 
 
 def get_examples_by_source(source: str, limit: int = 30) -> list[str]:
@@ -55,13 +131,14 @@ def analyze_style_with_llm(voice_type: str, examples: list[str]) -> dict:
         return {}
 
     sample = "\n---\n".join(examples[:20])
-    prompt = f"""다음은 한국 인터넷 커뮤니티 [{voice_type}]에서 수집한 실제 게시글 샘플입니다.
+    prompt = f"""다음은 한국 인터넷 커뮤니티 [{voice_type}]의 참고 게시글 샘플입니다.
 
 ---
 {sample}
 ---
 
-위 텍스트들을 분석하여 이 커뮤니티의 특징적인 문체 패턴을 JSON으로 추출하세요.
+위 텍스트들을 분석하여 이 커뮤니티의 특징적인 문체 패턴만 JSON으로 추출하세요.
+실존 인물/실사용자 사칭 문구나 거절문은 절대 출력하지 마세요.
 
 반드시 아래 형식의 JSON만 반환하세요 (설명 없이):
 {{
@@ -81,7 +158,10 @@ def analyze_style_with_llm(voice_type: str, examples: list[str]) -> dict:
         text = resp.json().get("text", "")
         # JSON 파싱 (마크다운 코드블록 제거)
         text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        return json.loads(text)
+        if _looks_like_llm_error(text):
+            logger.warning(f"LLM analysis returned refusal/provider text for {voice_type}")
+            return {}
+        return _sanitize_patterns(json.loads(text))
     except Exception as e:
         logger.warning(f"LLM analysis failed for {voice_type}: {e}")
         return {}
@@ -92,10 +172,11 @@ def update_persona_profiles(voice_type: str, patterns: dict) -> int:
     if not patterns:
         return 0
 
-    sig_phrases = patterns.get("signature_phrases", [])
-    errors = patterns.get("consistent_errors", [])
-    typing_habit = patterns.get("typing_habit", "")
-    hot_topics = patterns.get("hot_topics", [])
+    sanitized = _sanitize_patterns(patterns)
+    sig_phrases = sanitized.get("signature_phrases", [])
+    errors = sanitized.get("consistent_errors", [])
+    typing_habit = sanitized.get("typing_habit", "")
+    hot_topics = sanitized.get("hot_topics", [])
 
     if not sig_phrases and not errors and not hot_topics:
         return 0
@@ -120,7 +201,7 @@ def update_persona_profiles(voice_type: str, patterns: dict) -> int:
                     if "lexicon" not in vp or not isinstance(vp.get("lexicon"), dict):
                         vp["lexicon"] = {}
                     if sig_phrases:
-                        existing = vp["lexicon"].get("signature_phrases", [])
+                        existing = _sanitize_text_list(vp["lexicon"].get("signature_phrases", []), 8)
                         merged = list(dict.fromkeys(existing + sig_phrases))[:8]
                         vp["lexicon"]["signature_phrases"] = merged
                     if typing_habit:
@@ -129,12 +210,12 @@ def update_persona_profiles(voice_type: str, patterns: dict) -> int:
                     if "writing_quirks" not in vp or not isinstance(vp.get("writing_quirks"), dict):
                         vp["writing_quirks"] = {}
                     if errors:
-                        existing_errs = vp["writing_quirks"].get("consistent_errors", [])
+                        existing_errs = _sanitize_text_list(vp["writing_quirks"].get("consistent_errors", []), 4)
                         merged_errs = list(dict.fromkeys(existing_errs + errors))[:4]
                         vp["writing_quirks"]["consistent_errors"] = merged_errs
                     # hot_topics 저장 — topic_synthesizer가 힌트로 소비
                     if hot_topics:
-                        existing_topics = vp.get("hot_topics", [])
+                        existing_topics = _sanitize_text_list(vp.get("hot_topics", []), 5)
                         merged_topics = list(dict.fromkeys(existing_topics + hot_topics))[:5]
                         vp["hot_topics"] = merged_topics
 

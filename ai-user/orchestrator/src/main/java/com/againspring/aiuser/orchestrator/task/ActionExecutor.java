@@ -1160,6 +1160,15 @@ public class ActionExecutor {
 
     private void writeHistory(Persona persona, String type, String content, String postId, String category) {
         try {
+            ContentSafetyGuard.ContentType guardType = "posts".equals(type)
+                ? ContentSafetyGuard.ContentType.POST : ContentSafetyGuard.ContentType.COMMENT;
+            if (safetyGuard != null) {
+                ContentSafetyGuard.GuardResult guard = safetyGuard.check(content, guardType);
+                if (!guard.passed()) {
+                    log.warn("History write blocked for persona {} type {}: {}", persona.getId(), type, guard.reason());
+                    return;
+                }
+            }
             String email = botEmail(persona);
             String profileName = email.contains("@") ? email.split("@")[0] : persona.getId();
             java.nio.file.Path dir = java.nio.file.Paths.get(historyDir, profileName, "history");
