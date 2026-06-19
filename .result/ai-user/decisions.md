@@ -1179,3 +1179,33 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **의미**:
 - 다음 라운드부터는 사용자가 survey md만 채우면 된다.
 - 에이전트는 importer 실행 후 `summarize_h2h_results.py` 또는 `summarize_cond5_results.py`만 돌리면 된다.
+
+## D-88 — blind export metadata gap은 text fingerprint registry로 보완한다 (2026-06-19)
+
+**배경**:
+- D-86에서 확인했듯 `/corpus/export/blind`는 source id 메타를 비워서 내려준다.
+- 그래서 `used-corpus-ids.json`의 `ai_corpus_id` / `human_post_id` 기반 dedupe만으로는 fresh cond5의 재사용을 충분히 막을 수 없다.
+- R14에서 사람이 곧 수동 설문을 시작할 예정이므로, 같은 blind 텍스트를 다시 export해 재사용하는 경로는 지금 막아야 한다.
+
+**결정**:
+- `survey_fingerprints.py`를 추가한다.
+  - survey markdown의 각 pair A/B 본문을 정규화하고 SHA-256 fingerprint를 만든다.
+  - registry load/save는 atomic write + file lock으로 처리한다.
+- `reserve_blind_set.py`를 추가한다.
+  - 기존 survey/answers를 읽어 `used-corpus-ids.json`에 `text_fingerprints` / `pair_fingerprints`를 backfill한다.
+- `build_cond5_blind.py`는 `all_used_text_fingerprints`를 읽어 exact 동일 본문을 사전에 제외한다.
+  - `--reserve-used`를 주면 새로 만든 blind 세트를 즉시 registry에 예약한다.
+
+**검증**:
+- `py_compile` 통과
+- current registry backfill 후:
+  - `tests=6`
+  - `all_used_text_fingerprints=163`
+- THEQOO cond5를 같은 seed로 다시 fetch + filter하면:
+  - `Not enough items after filtering: humans=0 ais=0 need=20`
+  - 즉, exact 재사용은 차단된다.
+
+**제한**:
+- text fingerprint dedupe는 "같은 본문 재사용"을 막는 보완책이다.
+- source id 메타가 없는 이상, 의미상 거의 같은 다른 문장이나 endpoint reshuffle까지 완전하게 증명하는 장치는 아니다.
+- `r9-blind1`처럼 survey 포맷이 표준 A/B 블록과 다르면 fingerprint 추출이 0건일 수 있으므로, 이 경우는 별도 포맷 보강 대상이다.

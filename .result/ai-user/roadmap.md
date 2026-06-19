@@ -884,7 +884,7 @@
 - [x] `build_cond5_blind.py` 추가
 - [x] `summarize_cond5_results.py` 추가
 - [x] cond5 결과를 owner/friend/combined로 자동 집계 가능
-- [ ] 실제 `/corpus/export/blind` fetch 샘플 검증
+- [x] 실제 `/corpus/export/blind` fetch 샘플 검증
 - [ ] dev host에서 runtime probe 실측
 
 ## Step 72 (R14-phase3 prep) — NATEPAN/THEQOO fresh cond5 설문 준비 ✅ 완료
@@ -908,3 +908,15 @@
 - [x] filled temp survey에서 owner 답 2건 import 확인
 - [x] cond5 current survey 헤더에 import 명령 추가
 - [x] h2h generator에도 import 명령 추가
+
+## Step 74 (R14-phase3 guard) — blind fingerprint registry ✅ 완료
+
+**목표**: blind export의 source metadata 공백 때문에 생기는 재사용 위험을 text fingerprint registry로 보완한다.
+
+**완료 기준**:
+- [x] `survey_fingerprints.py` 추가
+- [x] `reserve_blind_set.py` 추가
+- [x] `used-corpus-ids.json`에 `all_used_text_fingerprints` 누적
+- [x] registry write를 atomic + file lock으로 보강
+- [x] THEQOO cond5 동일 seed 재생성 시 exact reuse 차단 확인
+- [ ] runtime host 복구 후 fresh runtime 설문도 같은 registry 경로로 예약

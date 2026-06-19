@@ -18,6 +18,7 @@ import random
 import urllib.parse
 import urllib.request
 from datetime import datetime
+from survey_fingerprints import load_registry, merge_unique, text_fingerprint, upsert_test_entry, update_registry
 
 DEFAULT_API_BASE = os.environ.get("AI_USER_ML_BASE_URL", "http://100.115.252.61:8201")
 DEFAULT_API_TOKEN = os.environ.get("AI_USER_ML_API_TOKEN", "aiuser-ml-api-token-dev-2026")
@@ -75,13 +76,18 @@ def extract_items(payload):
     return humans, ais, meta_stats
 
 
-def filter_used(items, used_ids, kind):
-    if not used_ids:
-        return items, 0, 0
+def filter_used(items, used_ids, used_text_fingerprints, kind):
+    if not used_ids and not used_text_fingerprints:
+        return items, 0, 0, 0
     kept = []
     skipped = 0
     unfilterable = 0
+    skipped_by_text = 0
     for item in items:
+        fp = text_fingerprint(item.get("text") or "")
+        if fp in used_text_fingerprints:
+            skipped_by_text += 1
+            continue
         meta = item.get("meta") or {}
         candidate_id = meta.get("ai_corpus_id") if kind == "ai" else meta.get("human_post_id")
         if candidate_id is None:
@@ -92,7 +98,7 @@ def filter_used(items, used_ids, kind):
             skipped += 1
             continue
         kept.append(item)
-    return kept, skipped, unfilterable
+    return kept, skipped, unfilterable, skipped_by_text
 
 
 def pair_items(community, humans, ais, n_pairs, seed):
@@ -192,6 +198,31 @@ def write_outputs(community, pairs, label_map, output_prefix, provenance, genera
     return survey_path, answers_path
 
 
+def reserve_registry(registry_path, test_id, survey_path, answers_path, generation_meta):
+    pair_fingerprints = generation_meta.get("pair_fingerprints") or []
+    text_fingerprints = []
+    for row in pair_fingerprints:
+        text_fingerprints.extend([row["a_fingerprint"], row["b_fingerprint"]])
+    entry = {
+        "test_id": test_id,
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "survey_path": survey_path,
+        "answers_path": answers_path,
+        "ai_corpus_ids": [],
+        "human_post_ids": [],
+        "text_fingerprints": sorted(set(text_fingerprints)),
+        "pair_fingerprints": pair_fingerprints,
+        "note": generation_meta.get("warning") or "reserved by build_cond5_blind",
+    }
+    def mutator(registry):
+        upsert_test_entry(registry, entry)
+        registry["all_used_text_fingerprints"] = merge_unique(
+            registry.get("all_used_text_fingerprints", []) + entry["text_fingerprints"]
+        )
+
+    update_registry(registry_path, mutator)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build per-community cond5 blind survey")
     parser.add_argument("--community", required=True)
@@ -204,6 +235,8 @@ def main():
     parser.add_argument("--seed", type=int, default=2026)
     parser.add_argument("--used-ids", default=None, help="Optional used-corpus-ids.json")
     parser.add_argument("--output-prefix", default=None)
+    parser.add_argument("--reserve-used", action="store_true",
+                        help="Reserve generated pair text fingerprints into used registry")
     args = parser.parse_args()
 
     if bool(args.export_json) == bool(args.fetch_export):
@@ -223,15 +256,18 @@ def main():
     humans, ais, meta_stats = extract_items(payload)
     used_ai_ids = set()
     used_human_ids = set()
+    used_text_fingerprints = set()
     if args.used_ids:
-        used = load_json(args.used_ids)
+        used = load_registry(args.used_ids)
         used_ai_ids = set(used.get("all_used_ai_corpus_ids") or [])
         used_human_ids = set(used.get("all_used_human_post_ids") or [])
-        ais, skipped_ai, unfilterable_ai = filter_used(ais, used_ai_ids, "ai")
-        humans, skipped_human, unfilterable_human = filter_used(humans, used_human_ids, "human")
+        used_text_fingerprints = set(used.get("all_used_text_fingerprints") or [])
+        ais, skipped_ai, unfilterable_ai, skipped_ai_text = filter_used(ais, used_ai_ids, used_text_fingerprints, "ai")
+        humans, skipped_human, unfilterable_human, skipped_human_text = filter_used(humans, used_human_ids, used_text_fingerprints, "human")
     else:
         skipped_ai = skipped_human = 0
         unfilterable_ai = unfilterable_human = 0
+        skipped_ai_text = skipped_human_text = 0
 
     if len(humans) < args.n_pairs or len(ais) < args.n_pairs:
         raise SystemExit(
@@ -245,8 +281,18 @@ def main():
         "used_ids_filter_requested": bool(args.used_ids),
         "filtered_used_ai": skipped_ai,
         "filtered_used_human": skipped_human,
+        "filtered_used_text_ai": skipped_ai_text,
+        "filtered_used_text_human": skipped_human_text,
         "unfilterable_ai": unfilterable_ai,
         "unfilterable_human": unfilterable_human,
+        "pair_fingerprints": [
+            {
+                "pair": pair["pair"],
+                "a_fingerprint": text_fingerprint(pair["text_a"]),
+                "b_fingerprint": text_fingerprint(pair["text_b"]),
+            }
+            for pair in pairs
+        ],
         "warning": (
             "source metadata missing from blind export; used-corpus filtering could not be fully applied"
             if unfilterable_ai or unfilterable_human
@@ -254,6 +300,8 @@ def main():
         ),
     }
     survey_path, answers_path = write_outputs(community, pairs, label_map, prefix, provenance, generation_meta)
+    if args.reserve_used and args.used_ids:
+        reserve_registry(args.used_ids, prefix, survey_path, answers_path, generation_meta)
     print(json.dumps({
         "community": community,
         "survey_path": survey_path,
@@ -261,6 +309,8 @@ def main():
         "pairs": len(pairs),
         "filtered_used_ai": skipped_ai,
         "filtered_used_human": skipped_human,
+        "filtered_used_text_ai": skipped_ai_text,
+        "filtered_used_text_human": skipped_human_text,
         "unfilterable_ai": unfilterable_ai,
         "unfilterable_human": unfilterable_human,
         "warning": generation_meta["warning"],

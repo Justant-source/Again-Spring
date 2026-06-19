@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 43 (Step 73 완료 — survey answer importer)
+**최종 갱신**: 2026-06-19 세션 44 (Step 74 완료 — blind fingerprint registry)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 73 완료 — survey answer importer
+- **Phase**: Step 74 완료 — blind fingerprint registry
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -64,9 +64,15 @@
   - 응답 처리 자동화 완료:
     - `import_survey_answers.py`로 survey markdown의 `정답/이유`를 answers json으로 직접 반영 가능
     - cond5 current survey 헤더에 import 명령 추가 완료
-  - blind export 제약 확인:
+  - blind export 제약 보완:
     - `/corpus/export/blind`는 source id 메타를 비워서 반환
-    - `used-corpus-ids.json` 중복 필터는 현재 fresh cond5 세트에 완전 적용 불가
+    - source id 기반 dedupe는 여전히 완전하지 않다
+    - 대신 `survey_fingerprints.py` + `reserve_blind_set.py`로 survey A/B 본문 fingerprint를 registry에 저장
+    - `build_cond5_blind.py`는 `used-corpus-ids.json`의 `all_used_text_fingerprints`를 읽어 exact 재사용을 차단
+    - current registry:
+      - tests **6**
+      - all_used_text_fingerprints **163**
+    - THEQOO cond5를 같은 seed로 다시 fetch하면 `humans=0 ais=0 need=20`으로 즉시 중단됨
 - **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
 - **상태**: **HOLD** — `:8092` host 접근 블로커 + runtime 공식 재측정 부재 + NATEPAN/THEQOO fresh cond5 공백
 - **남은 즉시 작업**:
@@ -74,7 +80,7 @@
   - runtime 배관 검증: `probe_runtime_pipeline.py`로 health, 4-draft 생성, `/rerank`, known tell scan 확인
   - host 로그에서 실제 backend/model 확인
   - THEQOO runtime h2h를 owner+friend로 다시 수집
-  - `build_cond5_blind.py`로 NATEPAN/THEQOO fresh cond5 블라인드 재생성
+  - 준비된 cond5 설문에 owner/friend 수동 응답 수집
   - `benefit_pp >= 5%p`인 community만 selective gate(B) 후보로 평가
 - **이번 추가 하드닝**:
   - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
@@ -139,6 +145,7 @@
 | **Step 71** | R14 runtime probe + cond5 tooling | **✅ 완료** | host 복구 직후 쓸 probe/blind/summarizer 추가 |
 | **Step 72** | R14 fresh cond5 surveys prepared | **✅ 완료** | NATEPAN/THEQOO cond5 survey+template+pending results 생성, metadata gap 확인 |
 | **Step 73** | R14 survey answer importer | **✅ 완료** | md 설문 답변을 answers json으로 자동 반영 |
+| **Step 74** | R14 blind fingerprint registry | **✅ 완료** | text fingerprint dedupe + file lock + exact 재사용 차단 |
 
 ### 중기
 
