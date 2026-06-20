@@ -1621,3 +1621,40 @@ r15-cond5-theqoo-claude-survey.md에 대해 ensemble blind judge 3명(Claude 기
 - 갈등글 인제스트: THEQOO+17건, NATEPAN+111건 ✅
 - 그러나 갈등글 특화 재학습 + 룰 기반 reranking 모두 proxy 개선 실패
 - **Step 91 COMPLETED** — 결론: reranking(어떤 방식이든) 비효과적, 다음 전략 전환 필요
+
+## D-107 (2026-06-21) — Wind-Down: Best-of-N reranking 영구 폐기 + 성공 재정의 + closeout 전환
+
+**결정 범위**: D-106의 논리적 귀결. 더 이상 `AI_USER_ML_ENABLED` 활성화를 향해 일하지 않는다.
+
+**a) Best-of-N reranking 영구 폐기 (ML·rule 불문)**
+- r15 baseline=0.150, r16 ML=0.283, r17 rule=0.317 — 모든 reranking 방식이 역효과 확정
+- 근본 원인: Best-of-N 선택 편향 → 극단 초안(너무 격식 또는 너무 슬랭) → AI 탐지 용이
+- 탐지 신호는 formality 레벨이 아닌 **내러티브 구조·어휘 일관성·자연스러움**에서 발생
+- KcELECTRA+KatFishNet stacking discriminator, rule-based 점수, Best-of-N 선택 — **전부 아카이브**
+
+**b) `AI_USER_ML_ENABLED=false` 영구**
+- 코드 변경 없이 env로 유지. `ActionExecutor.java:427`의 `isEnabledFor` gate 코드 미변경.
+- `AiUserMlClient.java:174`의 `enabled==false` 즉시 반환 로직 미변경.
+- ML 서비스는 COLLECT-only(추론 OFF)로 유지 또는 향후 decommission(D-108에서 결정).
+
+**c) 성공 재정의**
+- **Goal A** (글 1개 단독 열람 = 사람 같음) = **in-scope, 사실상 달성** (r15 baseline 0.150)
+- **Goal B** (계정 누적 관찰 = 구별 불가) = **out-of-scope**, 메시지 단위 생성으로 해결 불가 → 추가 추진 안 함
+- `AI_USER_ML_ENABLED` 활성화 추진 → **종료(closeout)** 로 전환
+
+**d) cond4·cond5 proxy를 의사결정 근거에서 제외**
+- cond4(MAUVE): D-68 포화 확정 → Δ>0 기준 무력화. 더 이상 의사결정 근거로 쓰지 않음.
+- cond5 LLM proxy: D-101 gap_hi=0.54 보수 상한 → proxy 단독으로 활성화 의사결정 불가.
+- 5조건 활성화 게이트(D-17)는 Goal B 재개 시에만 유효 — 현재 closeout 상태에서 적용 안 함.
+
+**실제로 효과 있던 레버 (Phase 1 출하 대상)**
+- `OutputSanitizer.injectTypos()` (Track A, T1~T8) — post-processing tell 제거
+- `OutputSanitizer.cleanupTheqoo()` (THEQOO cleanup, `:210–224`) — 12개 후처리 변환
+- `ActionExecutor.java:346` `boolean casual = RNG.nextDouble() < 0.25;` (CASUAL 25%) — 주제 다양화
+- 세 레버 모두 HEAD(`4ffabf4a`)에 이미 포함됨. Phase 1에서 prod 이미지 신선도 확인만 필요.
+
+**다음 단계**
+- Phase 0: 이 결정(D-107)을 decisions.md·STATE.md·roadmap.md에 동결 ← **현재 실행 중**
+- Phase 1: 세 레버 prod 이미지 신선도 감사 → 필요 시 재빌드 + e2e-realbe PASS
+- Phase 2: 계정 단위 1회 휴먼 수용 검사(Goal B acceptance test, dev only)
+- Phase 3: `PROJECT-CLOSEOUT.md` 작성 + ML 서비스 옵션 제시 + STATE.md = CLOSED

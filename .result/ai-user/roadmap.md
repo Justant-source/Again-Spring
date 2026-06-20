@@ -1142,7 +1142,9 @@
 
 ---
 
-## Step 93 (단일 초안 생성 품질 강화 + r18 tell-scan) 🔜 대기 중
+## Step 93 (단일 초안 생성 품질 강화 + r18 tell-scan) ❌ CANCELLED / SUPERSEDED-by-closeout (D-107, 2026-06-21)
+
+> ⚠️ **CANCELLED**: D-107(2026-06-21) closeout 전환으로 폐기. 성공 기준이 Goal A(달성)로 재정의되어 추가 측정 루프 없음.
 
 **목표**: reranking 없이 1-shot 생성 자체의 품질을 높여 proxy ≤ 0.15 유지 or 개선.
 
@@ -1156,7 +1158,9 @@
 
 ---
 
-## Step 92 (NATEPAN retrain — n_human=2589 기반) 🔄 실행 중 (2026-06-20)
+## Step 92 (NATEPAN retrain — n_human=2589 기반) ❌ CANCELLED / SUPERSEDED-by-closeout (D-107, 2026-06-21)
+
+> ⚠️ **CANCELLED**: D-107(2026-06-21) closeout 전환으로 폐기. cond4/cond5는 더 이상 의사결정 근거로 쓰지 않음. NATEPAN 활성화 추진 종료.
 
 **목표**: NATEPAN cond4 FAIL(-0.1048) 회복. 크롤링 200건 인제스트 후 GPU 재학습 → cond4 재측정.
 

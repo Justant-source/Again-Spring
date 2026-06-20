@@ -2,21 +2,25 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-21 세션 (Step 91 완료 — r17 rule-based reranking PROXY-FAIL, D-106 Best-of-4 전면 폐기)
+**최종 갱신**: 2026-06-21 세션 (Phase 0 — D-107 closeout 전환: Best-of-N 영구 폐기, 성공=Goal A, ML 종료)
 
 ---
 
 ## ⚠️ 관점 교정 (절대 잊지 말 것)
 
-> - **프로젝트 성공** = AUC→0.5, MAUVE→1.0, 사람 블라인드 정확도→~50%
-> - 높은 AUC(0.98~1.0) = "AI가 아직 쉽게 구별됨 = 목표 미달"
-> - **`AI_USER_ML_ENABLED=true` 활성화는 5조건(D-17) 전부 충족 후 사람이 수동으로 — 코드 변경 금지**
+> - **🚫 WIND-DOWN (D-107, 2026-06-21)**: 더 이상 `AI_USER_ML_ENABLED` 활성화를 향해 일하지 않는다.
+> - **성공 재정의**: Goal A (글 1개 단독 = 사람 같음) = **달성**. Goal B (계정 누적 구별 불가) = out-of-scope, 추진 종료.
+> - **`AI_USER_ML_ENABLED=false` 영구** — env 유지, 코드 변경 금지. `ActionExecutor.java:427` 미변경.
+> - Best-of-N reranking(ML·rule) = 영구 폐기. cond4/cond5 proxy = 의사결정 근거 제외.
 
 ---
 
 ## 현재 위치
 
-- **Phase**: Step 91 ✅ 완료 → Step 93 시작 (D-106 Best-of-4 폐기, 생성 품질 개선 방향)
+- **Phase**: **WIND-DOWN — Phase 0 진행 중 (D-107 closeout 전환, 2026-06-21)**
+  - Step 91 ✅ 완료 (r17 PROXY-FAIL → D-106 Best-of-4 전면 폐기)
+  - Step 92 ❌ CANCELLED / SUPERSEDED-by-closeout (D-107)
+  - Step 93 ❌ CANCELLED / SUPERSEDED-by-closeout (D-107)
 - **D-95**: Codex CLI → Claude Code CLI 복원 ✅
 - **D-96~D-97**: CLIEN cond4 재측정 → -0.0436 FAIL 확정 ❌
 - **D-101 (2026-06-20)**: cross-era 보정 실패 확인 + 보정형 3-state cond5 게이트 채택 (gap_hi=0.54)
@@ -39,10 +43,10 @@
 | **NATEPAN** | ✅ | ✅ | ✅ | ❌ -0.1048 | ❌ PROXY-FAIL (0.84) | 제외 |
 | **CLIEN** | ✅ | ✅ | ✅ | ❌ -0.0436 (구조적) | 미측정 | 제외 |
 
-**`AI_USER_ML_ENABLED=false` 유지** — D-106 Best-of-4 reranking 전면 폐기
-- r16 ML reranking mean=0.283, r17 rule-based mean=0.317 — 둘 다 baseline(0.150) 대비 역효과
-- 근본 원인: Best-of-4 선택 편향 (극단 초안 선택 → 탐지 용이). 탐지 신호 = 내러티브 구조, formality 아님
-- 다음 방향: 단일 초안 생성 품질 강화 (base 프롬프트/페르소나/자기비판)
+**`AI_USER_ML_ENABLED=false` 영구 (D-107, closeout)** — Best-of-N reranking 전면 폐기 확정
+- r16 ML=0.283, r17 rule=0.317 — 모두 baseline(r15=0.150) 대비 역효과. 추가 측정 없음.
+- **WIND-DOWN**: 활성화 추진 종료. Phase 1(prod 이미지 확인) → Phase 2(1회 수용 검사) → Phase 3(closeout doc) 순으로 종료.
+- ML 서비스 COLLECT-only 유지 또는 decommission(D-108, Phase 3에서 옵션 제시 후 사용자 결정).
 
 ### cond5 보정 게이트 요약 (D-101)
 
