@@ -1,0 +1,20 @@
+{
+  "community": "THEQOO",
+  "survey": "../blind/r15-cond5-theqoo-claude-survey.md",
+  "answers": "../blind/r15-cond5-theqoo-claude-answers-template.json",
+  "ensemble": "../blind/r15-cond5-theqoo-claude-survey-ensemble-judge-v2.json",
+  "tell_scan": "../blind/r15-cond5-theqoo-claude-survey-auto-tell-scan.json",
+  "verdict": "PROXY-FAIL",
+  "estimated_human_detection_upper_bound": 0.69,
+  "proxy_accuracy": 0.15,
+  "gap_hi_applied": 0.54,
+  "fail_reasons": [
+    "human_est_upper=0.690 > 0.60",
+    "confused_frac=0.200 > 0.15"
+  ],
+  "caveat": "proxy 파생·cross-era(Codex→Claude)·Claude 컨텐츠 미검증. PROXY-INCONCLUSIVE는 사람 PASS 아님. stateless LLM은 주제 과사용·출처 정보비대칭 감지 불가(미검증 unrecoverable gap).",
+  "tell_top_score": 2,
+  "rep_pairs": 0,
+  "topic_overlap": 0,
+  "confused_frac": 0.2
+}

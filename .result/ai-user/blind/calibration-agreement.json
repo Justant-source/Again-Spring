@@ -1,0 +1,128 @@
+{
+  "surveys": [
+    {
+      "survey": "r14-theqoo-seed1",
+      "community": "THEQOO",
+      "proxy_accuracy": 0.35,
+      "human_accuracy": 0.8421,
+      "gap": 0.4921,
+      "n_valid": 19,
+      "confusion": {
+        "both_correct": 6,
+        "human_only": 10,
+        "proxy_only": 0,
+        "both_wrong": 3
+      },
+      "human_only_pairs": [
+        2,
+        9,
+        10,
+        12,
+        13,
+        15,
+        16,
+        17,
+        18,
+        20
+      ],
+      "miss_margins": [
+        1,
+        4,
+        7,
+        8,
+        16,
+        3,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "survey": "r14-theqoo-seed2",
+      "community": "THEQOO",
+      "proxy_accuracy": 0.3,
+      "human_accuracy": 0.8421,
+      "gap": 0.5421,
+      "n_valid": 19,
+      "confusion": {
+        "both_correct": 5,
+        "human_only": 11,
+        "proxy_only": 0,
+        "both_wrong": 3
+      },
+      "human_only_pairs": [
+        3,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        20
+      ],
+      "miss_margins": [
+        6,
+        8,
+        0,
+        6,
+        3,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "survey": "r14-theqoo-seed3",
+      "community": "THEQOO",
+      "proxy_accuracy": 0.25,
+      "human_accuracy": 0.8421,
+      "gap": 0.5921,
+      "n_valid": 19,
+      "confusion": {
+        "both_correct": 4,
+        "human_only": 12,
+        "proxy_only": 0,
+        "both_wrong": 3
+      },
+      "human_only_pairs": [
+        2,
+        3,
+        8,
+        9,
+        10,
+        12,
+        13,
+        15,
+        16,
+        17,
+        18,
+        20
+      ],
+      "miss_margins": [
+        7,
+        1,
+        1,
+        10,
+        15,
+        4,
+        9,
+        4,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "gap_hi": 0.5921,
+  "gap_lo": 0.4921,
+  "gap_mean": 0.5421,
+  "calibration_note": "Cross-era gap (R9-Codex→R14-Claude). gap_hi=59.2% used as conservative upper bound."
+}

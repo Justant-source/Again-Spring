@@ -420,3 +420,34 @@
 - 실제 사용자 입장에서의 조언: 이런 상황에서 한국 커뮤니티는 어떻게 반응할까?
 
 ---
+
+| 2026-06-20 10:42 | 댓글 | post_e087c2db4e6b4ae6ab8e | I appreciate the detailed prompt, but I can't fulfill this r... |
+
+> I appreciate the detailed prompt, but I can't fulfill this request
+
+You're asking me to:
+
+1. Impersonate a specific real person in an actual Korean online community
+2. Generate inauthentic community participation using a detailed persona and behavioral patterns
+3.
+
+---
+
+| 2026-06-20 11:20 | 댓글 | post_2a3cdc791aa745da8440 | I appreciate the detailed prompt, but I can't fulfill this r... |
+
+> I appreciate the detailed prompt, but I can't fulfill this request
+
+You're asking me to generate automated comments posing as a real user in an actual Korean online community. This involves:
+
+---
+
+| 2026-06-20 13:08 | 댓글 | post_fb7dd61b710d4dce9dda | I appreciate the detailed prompt, but I can't fulfill this r... |
+
+> I appreciate the detailed prompt, but I can't fulfill this request
+
+You're asking me to generate automated comments posing as a real user in an actual Korean online community. This involves:
+
+1. Impersonation — Creating a fake identity to participate authentically in a real community
+2.
+
+---

@@ -1,0 +1,89 @@
+{
+  "type": "converted_from_r9",
+  "community": "CLIEN",
+  "source": "r9-blind2-mixed-answers.json",
+  "n_pairs": 20,
+  "label_map": {
+    "0": {
+      "A": "human",
+      "B": "ai"
+    },
+    "1": {
+      "A": "human",
+      "B": "ai"
+    },
+    "2": {
+      "A": "ai",
+      "B": "human"
+    },
+    "3": {
+      "A": "human",
+      "B": "ai"
+    },
+    "4": {
+      "A": "ai",
+      "B": "human"
+    },
+    "5": {
+      "A": "ai",
+      "B": "human"
+    },
+    "6": {
+      "A": "human",
+      "B": "ai"
+    },
+    "7": {
+      "A": "human",
+      "B": "ai"
+    },
+    "8": {
+      "A": "human",
+      "B": "ai"
+    },
+    "9": {
+      "A": "ai",
+      "B": "human"
+    },
+    "10": {
+      "A": "ai",
+      "B": "human"
+    },
+    "11": {
+      "A": "ai",
+      "B": "human"
+    },
+    "12": {
+      "A": "ai",
+      "B": "human"
+    },
+    "13": {
+      "A": "ai",
+      "B": "human"
+    },
+    "14": {
+      "A": "human",
+      "B": "ai"
+    },
+    "15": {
+      "A": "human",
+      "B": "ai"
+    },
+    "16": {
+      "A": "human",
+      "B": "ai"
+    },
+    "17": {
+      "A": "ai",
+      "B": "human"
+    },
+    "18": {
+      "A": "ai",
+      "B": "human"
+    },
+    "19": {
+      "A": "human",
+      "B": "ai"
+    }
+  },
+  "responses": {}
+}

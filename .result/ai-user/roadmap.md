@@ -1001,6 +1001,14 @@
 
 ---
 
+## Step 86 — 공식 GPU MAUVE cond4 측정 ✅ (2026-06-20)
+THEQOO +0.1380 PASS / NATEPAN -0.1048 FAIL (D-102). strict-runtime 10-context 4-draft.
+
+## Step 87 — NATEPAN Phase 4b 적대적 생성 (2026-06-20)
+60 샘플 생성, tell-score 평균 0.37, proxy judge 100% unknown. 향후 corpus 보강용 보존 (D-103).
+
+---
+
 **Step 84** (2026-06-20) ✅ NATEPAN r15 cond5 설문 생성 + ensemble judge
 - r15-cond5-natepan-claude-survey.md 생성 (Claude runtime, 20 pairs)
 - tell-scan: top_score=2 (clean)

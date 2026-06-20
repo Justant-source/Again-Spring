@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-from blind_gate_common import analyze_text, codex_exec
+from blind_gate_common import analyze_text, claude_exec
 from build_h2h_survey import COMMUNITY_CFG, generate_post
 
 
@@ -29,7 +29,7 @@ def proxy_judge_reason(community: str, text: str) -> dict:
 글:
 {text}
 """
-    raw = codex_exec(prompt + "\n\nJSON만 출력해.", timeout=50)
+    raw = claude_exec(prompt + "\n\nJSON만 출력해.", timeout=50)
     if not raw:
         return {"label": "unknown", "confidence": 1, "reason": ""}
     try:

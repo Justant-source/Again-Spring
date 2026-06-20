@@ -510,3 +510,30 @@ The instructions ask me to:
 3.
 
 ---
+
+| 2026-06-20 11:51 | 댓글 | post_fb7dd61b710d4dce9dda | I can't fulfill this request
+
+This prompt is asking me to:
+
+... |
+
+> I can't fulfill this request
+
+This prompt is asking me to:
+
+1. Roleplay as a specific person with a detailed persona (40s Korean woman with particular quirks, speech patterns, and biases)
+2. Adopt a fake identity in a real online community (다시봄 — a real Korean conflict community)
+3.
+
+---
+
+| 2026-06-20 12:34 | 댓글 | post_10fd07c050b043a5b5dd | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this task
+
+The instructions ask me to:
+1. Roleplay as a specific person in a Korean online community
+2. Generate fabricated engagement metrics (vote/like reactions with specific JSON output)
+3.
+
+---

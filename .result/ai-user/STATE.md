@@ -235,22 +235,30 @@
 
 ### 활성화 게이트 (R14/Phase-1 보정본, 2026-06-20)
 
+**Cross-era 보정 실패 확인 (D-101)**:
+- r14 THEQOO(Codex/gpt-5.4): proxy ~30%, 사람 84.2% → gap +54pp (proxy 과소탐지)
+- r9-blind2(Haiku): proxy ~88%, 사람 40% → gap -48pp (proxy 과탐지)
+- **결론**: 반대 방향 갭, 단순 오프셋 불가
+- **채택**: gap_hi=0.54 (보수 상한), human_est_upper=min(1.0, proxy+0.54)
+
 ```
 cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(116/562)
 cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9958
 cond3: ✅ SPLITTER_VERIFIED=True
 cond4: 🔴 CLIEN ❌ FAIL (delta=-0.0436, consistent negative)
-       ✅ NATEPAN PASS (runtime pending)
-       ✅ THEQOO PASS (delta_real=+0.0686, cond4-A ✅ cond4-B ✅)
+       ❌ NATEPAN FAIL (delta=-0.1048, reversed from +0.0225)
+       ✅ THEQOO PASS (delta=+0.1380, strict-runtime official)
 cond5: ✅ CLIEN — blind② 합산 40% (친구 25% / 오너 55%)
-       ✅ THEQOO proxy — ensemble judge 15% PASS (Claude runtime)
-       ✅ NATEPAN proxy — ensemble judge 35% PASS (Claude runtime)
+       🔴 THEQOO r15 — proxy judge 15% (3/20) ✅ raw PASS, 보수 상한 gap_hi=0.54 적용 → upper=0.69 → PROXY-FAIL
+                       단 intrinsic evidence 강함(cond4 ✅ + tell-scan + h2h owner 25% PASS) → activation candidate 부분 유지
+       🔴 NATEPAN r15 — proxy judge 35% (7/20) ✅ raw PASS, 보수 상한 적용 → upper=0.89 → PROXY-FAIL
+                         Phase 4b adversarial 생성 실행 완료(D-103), 추가 corpus 보강 대기
 ```
 
 **AI_USER_ML_ENABLED 상태**: false 유지. 현재는 **수동 활성화 판단 단계 아님**.
-- CLIEN cond4 FAIL(지속적 음수)로 전역 활성화 불가
-- THEQOO cond5 proxy PASS지만 human owner 응답 추가 수집 필요
-- NATEPAN cond5 human 응답 대기
+- NATEPAN cond4 FAIL(번복 -0.1048)로 전역 활성화 불가
+- THEQOO cond4 공식 확정 PASS ✅이나 cond5 PROXY-FAIL로 추가 검토 필요
+- CLIEN cond4 지속적 음수로 제외
 
 ---
 
@@ -272,9 +280,9 @@ cond5: ✅ CLIEN — blind② 합산 40% (친구 25% / 오너 55%)
 
 | 커뮤니티 | mauve_rerank | mauve_random_mean | delta | 판정 |
 |---|---|---|---|---|
-| **THEQOO** | 0.9907 | 0.9435 (±0.0386) | **+0.0472** | ✅ PASS |
+| **THEQOO** | 0.9591 | 0.8210 | **+0.1380** | ✅ PASS |
 | **CLIEN** | 0.9099 | 0.9535 (±0.0308) | **-0.0436** | ❌ FAIL |
-| **NATEPAN** | 0.9969 | 0.9745 (±0.0281) | **+0.0225** | ✅ PASS |
+| **NATEPAN** | 0.6209 | 0.7257 | **-0.1048** | ❌ FAIL |
 
 **주의사항**:
 - 모두 `strict_runtime=True`, `draft_sources: runtime=46 cli=0 failed=2` 확인됨
@@ -306,7 +314,9 @@ cond5: ✅ CLIEN — blind② 합산 40% (친구 25% / 오너 55%)
 | R9 blind② 혼합주제 (세션 24) | CLIEN mixed | **25% (5/20) / 55% (11/20) 오너** | ≤60% 목표 |
 | **R9 합산** (세션 25) | 친구+오너 | **40% (16/40) ✅ PASS** | ≤60% 목표 |
 | **R14 CLIEN cond4** | CLIEN n_drafts=8 | runtime=48 cli=0 failed=48 (ctx=12 타임아웃) | mauve_rerank=None ❌ |
-| **r15 THEQOO cond5 proxy** | THEQOO (Claude ensemble judge) | **15% (3/20) ✅ PASS** | ≤60% 목표 |
+| **r15 THEQOO cond5 proxy** | THEQOO (Claude ensemble judge, 4-judge) | **15% (3/20) ✅ raw PASS** | — |
+| **r15 NATEPAN cond5 proxy** | NATEPAN (Claude ensemble judge, 4-judge) | **35% (7/20) ✅ raw PASS** | — |
+| **r15 보정 결과 (D-101)** | THEQOO + NATEPAN | gap_hi=0.54 적용 후: THEQOO upper=0.69, NATEPAN upper=0.89 | ≤60% PROXY-FAIL |
 | **r14 THEQOO cond5** (Codex, stale) | THEQOO | 84.2% (16/19) ❌ FAIL | ≤60% — 폐기됨 |
 
 ---

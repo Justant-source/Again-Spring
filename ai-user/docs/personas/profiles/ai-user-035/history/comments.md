@@ -582,3 +582,14 @@ This prompt is asking me to:
 You're asking me to impersonate a specific user persona in a real Korean online community and generate comments that imitate their particular writing style, speech patterns, and personality traits.
 
 ---
+
+| 2026-06-20 14:06 | 댓글 | post_70edba3d48ab45f2acff | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this one
+
+You're asking me to:
+1. Impersonate a specific user persona in a real Korean online community
+2. Adopt their established writing patterns, speech quirks, and comment history
+3.
+
+---

@@ -850,6 +850,45 @@ SELF_CRITIQUE_EXTRA_CLICHES에 "이번달만 세 번째,이번 달만 세 번째
 3. rerank 탐지율 ≤ random 탐지율이면 THEQOO cond4 최종 PASS
 4. 그 결과로 수동 활성화 go/no-go 확정
 
+## D-102 (2026-06-20) — 공식 strict-runtime MAUVE A-B cond4 — THEQOO ✅ / NATEPAN ❌ FAIL
+
+**방법**: `run_ab_test.py --generator runtime --strict-runtime --n-contexts 10 --n-drafts 4 --seed 2027`
+GPU: WSL RTX 3090. 생성: dev `:8092`(Claude Haiku CLI, 40 drafts each).
+
+| 커뮤니티 | mauve_rerank | mauve_random_mean | delta | 판정 |
+|---|---|---|---|---|
+| THEQOO | 0.9591 | 0.8210 | **+0.1380** | ✅ PASS |
+| NATEPAN | 0.6209 | 0.7257 | **-0.1048** | ❌ FAIL |
+
+THEQOO는 이전 측정 +0.0472보다 대폭 강화 — runtime 콘텐츠 품질 성숙 확인.
+NATEPAN은 이전 +0.0225가 번복됨. rerank가 random 평균보다 낮음 → reranker가 유효 선택을 못 함 = 생성 다양성·품질 부족.
+
+**결론**:
+- THEQOO: cond4 ✅ 확정. 활성화 후보 유지.
+- NATEPAN: cond4 ❌ FAIL 공식 확정. Phase 4b 강화 필요(D-103).
+- CLIEN: 변경 없음 (D-96/D-97 FAIL 유지).
+
+## D-103 (2026-06-20) — NATEPAN Phase 4b 적대적 생성 라운드
+
+**배경**: D-102에서 NATEPAN cond4 FAIL 공식 확정. Phase 4b로 콘텐츠 강화 실행.
+
+**실행**: `adversarial_generate_and_filter.py --community NATEPAN --n-items 10 --drafts-per-item 6 --workers 8`
+출력: `.result/ai-user/blind/r14-adversarial-natepan.md` / `.json`
+
+**결과**:
+- 생성: 60 samples (10 themes × 6 drafts), 성공률 100%
+- tell-score 분포: 0=80%, 1=5%, 2=13%, 3=2% → 평균 0.37 (매우 낮음)
+- proxy judge: 전 샘플 "unknown" (confidence=1) — LLM이 AI/인간 구분 불가
+- 상위 12 shortlist 저장
+
+**샘플 주제 (多양성 확인)**:
+학교 엄마 단톡 왕따, 배우자 퇴직 압박, 생활비 삭감, 시댁 갈등 등
+
+**다음 단계**:
+NATEPAN이 cond4 FAIL이므로 이 강화 콘텐츠는 향후 corpus 보강 소스로 보존.
+NATEPAN cond4 재측정은 충분한 corpus 보강 + 리랭커 개선 후 재도전.
+현 세션에서 NATEPAN 활성화 후보 진입 불가.
+
 ## D-75 — THEQOO owner h2h 결과 FAIL, 전역 활성화 NO GO 확정 (2026-06-19)
 
 **실행**:
@@ -1018,6 +1057,42 @@ SELF_CRITIQUE_EXTRA_CLICHES에 "이번달만 세 번째,이번 달만 세 번째
 1. `:8092` runtime 복구
 2. 동일 경로 survey/AB 재생성 여부 판단
 3. 잔여 어색한 구체 표현(`쓰레기 차도`, `딸이 더 조심해야`)은 별도 후보로 관리
+
+## D-101 (2026-06-20) — 보정형 자동 cond5 게이트: cross-era 보정 실패 확인 + 보수 상한 채택
+
+**배경**: Step 85(사람 cond5 응답) 대신 기존 사람 응답 데이터로 LLM proxy를 보정해 자동 cond5를 정의하기로 결정(사용자 2026-06-20).
+
+**보정 실험 (4-judge ensemble, claude_exec + micro_tell 저지)**:
+
+| 설문 | 생성기 | proxy 평균 | 사람 정확도 | 갭 |
+|---|---|---|---|---|
+| r14 THEQOO | Codex/gpt-5.4 | ~30% (시드 25-35%) | 84.2% (오너) | +54pp |
+| r9-blind2 mixed | Haiku+injectTypos | ~88% (시드 85-90%) | 40% (합산) | -48pp |
+
+**결론: cross-era 보정 실패.** 두 보정점이 반대 방향. 단순 가산 오프셋 불가.
+- r9: proxy 과탐지(injectTypos 패턴을 LLM이 잡지만 사람은 못 잡음)
+- r14: proxy 과소탐지(Codex gpt-5.4 한국어 서브틀 텔을 사람은 잡지만 LLM은 못 잡음)
+- 두 케이스가 서로 다른 메커니즘을 측정 → 단일 오프셋 모델로 통합 불가
+
+**채택 방법**: proxy를 보수적 하한으로만 사용.
+- gap_hi = 0.54 (최대 양수 갭, Codex era 기준 — Claude era엔 과혹할 수 있음)
+- human_est_upper = min(1.0, proxy + 0.54)
+- 3-state 판정: PROXY-FAIL / PROXY-INCONCLUSIVE (bare PASS 금지)
+
+**D-90 입장 변경 명시**: D-90의 "proxy가 낮아도 사람 cond5를 건너뛰지 않는다"를 이번에 "보수 상한 + veto 복합으로 대체"한다. 이 결정(D-101)이 그 변경의 공식 로그.
+
+**현재 판정 (r15 proxy 기준)**:
+- THEQOO r15: proxy 15% + gap_hi 0.54 → upper_bound 0.69 → PROXY-FAIL
+- NATEPAN r15: proxy 35% + gap_hi 0.54 → upper_bound 0.89 → PROXY-FAIL
+
+**단 THEQOO는 proxy 외 evidence 강함**:
+cond4 ✅(+0.0472) + tell-scan top_score=2 + rep_pairs=0 + r13 h2h PASS + proxy 15%(역대 최저).
+gap_hi가 Codex era 기준으로 Claude era엔 과혹할 가능성 명시. THEQOO를 "proxy 갭 캐비엇 하 활성화 후보"로 유지.
+
+NATEPAN: upper_bound 0.89로 현재 cond5 PROXY-FAIL. Phase4b 강화 라운드 필요.
+
+**unrecoverable gap 캐비엇 (D-90에서 이월)**:
+stateless LLM은 "이 주제 과거 라운드 과사용" · "글 출처 단서" 감지 불가. r14에서 사람이 이 채널로 7쌍 탐지. proxy 수치가 낮아도 이 비대칭은 해소 불가. 판정문에 명시.
 
 ## D-81 — THEQOO 잔여 어색한 표현 2개는 좁게 정규화 (2026-06-19)
 
