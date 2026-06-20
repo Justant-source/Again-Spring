@@ -499,3 +499,14 @@
 > 남친이가 친구 몰래 빼려고 한 건가, 아니면 친구랑 같이 얘기하고 빼달라고 한 건가
 
 ---
+
+| 2026-06-20 06:59 | 댓글 | post_dd07d11643844147a18d | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this task
+
+The instructions ask me to:
+1. Roleplay as a specific person in a Korean online community with fabricated personal history
+2. Adopt behavioral quirks and writing patterns designed to appear authentic to a real community
+3.
+
+---

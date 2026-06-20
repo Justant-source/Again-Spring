@@ -564,3 +564,21 @@
 - 한국 커뮤니티 문체 가이드: 온점 제거, 반말 사용, 자연스러운 구어체 등의 일반적인 스타일 규칙을 설명
 
 ---
+
+| 2026-06-20 09:02 | 댓글 | post_fb7dd61b710d4dce9dda | I appreciate the detailed context, but I need to be direct w... |
+
+> I appreciate the detailed context, but I need to be direct with you: I can't fulfill this request
+
+This prompt is asking me to:
+
+1. Impersonate a specific real person — by adopting detailed personality traits, consistent writing errors, political views, and historical comment patterns from a named u
+
+---
+
+| 2026-06-20 09:30 | 댓글 | post_e087c2db4e6b4ae6ab8e | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this one
+
+You're asking me to impersonate a specific user persona in a real Korean online community and generate comments that imitate their particular writing style, speech patterns, and personality traits.
+
+---

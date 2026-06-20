@@ -998,3 +998,54 @@
 - THEQOO/CLIEN/NATEPAN strict-runtime A-B에 `--strict-runtime` 플래그 추가
 - THEQOO/CLIEN/NATEPAN h2h 설문 생성
 - 임시 AUC: THEQOO=0.9982, CLIEN=0.9974, NATEPAN=0.9981
+
+---
+
+**Step 84** (2026-06-20) ✅ NATEPAN r15 cond5 설문 생성 + ensemble judge
+- r15-cond5-natepan-claude-survey.md 생성 (Claude runtime, 20 pairs)
+- tell-scan: top_score=2 (clean)
+- ensemble judge: 35% → proxy PASS
+- D-100 참조
+
+**Step 85** ⏳ 사람 cond5 응답 수집 (r15 THEQOO + r15 NATEPAN)
+- r15-cond5-theqoo-claude-survey.md — 오너+지인 20 pairs 응답 필요
+- r15-cond5-natepan-claude-survey.md — 오너+지인 20 pairs 응답 필요
+- 공식 cond5 PASS 확인 후 → ML 활성화 후보 검토
+
+---
+
+## Step 81 (R14-phase1 CLIEN cond4 재측정) ✅ 완료
+
+**목표**: CLIEN cond4 n_drafts=4 재확인 후, n_drafts=8 시도로 판별기 성능 한계 재검증.
+
+**완료 기준**:
+- [x] n_drafts=4 재측정: delta=-0.0436 (두 번 연속 음수 → FAIL 확정)
+- [x] n_drafts=8 시도: ctx=12 전체 타임아웃 → mauve_rerank=None → draft 수 증가로 개선 불가
+- [x] 결론: CLIEN discriminator 구조 문제 (D-96, D-97)
+
+**기록**: `.result/ai-user/steps/81-clien-cond4-n_drafts-test.md`
+
+---
+
+## Step 82 (R14-phase1 THEQOO 신선 cond5 설문) ✅ 완료
+
+**목표**: R14 후처리 효과를 신규 Claude 기반 설문으로 재측정 (Codex는 무효 판정).
+
+**완료 기준**:
+- [x] r15-cond5-theqoo-claude-survey.md: 20 pairs, Claude runtime, success=20 failed=0
+- [x] 구 r14 cond5(84.2% FAIL)는 Codex 기반 → 무효
+- [x] 설문 사람 응답 대기 중
+
+**기록**: `.result/ai-user/blind/r15-cond5-theqoo-claude-survey.md`
+
+---
+
+## Step 83 (R14-phase1 SELF_CRITIQUE_EXTRA_CLICHES 업데이트) ✅ 완료
+
+**목표**: "이번달만 세 번째" 패턴 억제 (Phase-1 r15 생성 내용에서 관측).
+
+**완료 기준**:
+- [x] "이번달만 세 번째" 패턴 억제 추가 (OutputSanitizer/SelfCritiqueService)
+- [x] llm-ai-user 컨테이너 재시작 완료
+
+**기록**: `.result/ai-user/steps/83-extra-cliches-update.md`

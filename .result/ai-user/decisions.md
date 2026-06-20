@@ -818,6 +818,21 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 
 **중요**: Codex/gpt-5.4 기반 cond4 수치(R13/R14)는 Claude 기반과 분리. 이번 Phase-1 A-B 결과가 **Claude 기준 첫 공식 cond4**이 됨.
 
+## D-98 (2026-06-20) — THEQOO cond5 기준선 무효화 + Claude 기반 재설정
+
+r14-cond5-theqoo-survey.md의 84.2% FAIL 결과는 Codex/gpt-5.4 기반이라 무효.
+Claude CLI 복원 후(D-95, 2026-06-20) Claude 기반 fresh cond5가 필요했음.
+
+r15-cond5-theqoo-claude-survey.md 생성:
+- 20 pairs: Claude runtime AI 글 + corpus 인간 글
+- success=20 failed=0
+- 관측된 Claude AI 패턴: "이번달만 세 번째임" 반복 (4개 draft에서 출현)
+
+SELF_CRITIQUE_EXTRA_CLICHES에 "이번달만 세 번째,이번 달만 세 번째,이번주만 세 번째,이번 주만 세 번째" 추가.
+
+다음 단계: r15 설문에 사람이 응답하면 Claude 기반 THEQOO cond5 수치 확보.
+이 수치가 ≤60%이면 THEQOO cond5 PASS → AI_USER_ML_ENABLED에 추가 검토 가능.
+
 **결론**:
 - THEQOO cond4-A는 **PASS 유지**
   - `Δ_real=+0.1326`
@@ -1062,6 +1077,24 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **이유**:
 - 이 환경에서는 `:8092`를 직접 올릴 수 없으므로, runtime revalidation을 가장한 CLI proxy 재측정을 반복하는 것은 D-77 위반이다.
 - 다만 selective gate 구현은 dormant 상태로 선반영해도 `AI_USER_ML_ENABLED=false` 하에서 동작 변화가 없다.
+
+---
+
+## D-100 (2026-06-20) — NATEPAN cond5 proxy PASS (Claude 기반 35%)
+
+NATEPAN r15-cond5-natepan-claude-survey.md에 대해:
+- Runtime 생성: success=20/20 (Claude runtime, 2 drafts reranked)
+- Tell-scan: top_score=2, repetition_pairs=0 (THEQOO와 동일 수준)
+- Ensemble judge: accuracy=0.35 (35%) → proxy PASS (≤60% 기준)
+
+THEQOO(15%)보다 약간 높지만 여전히 기준 내. NATEPAN 컨텐츠(가정/시댁 갈등 주제)가 고유한 리얼 패턴을 잘 포착함.
+
+현황 종합:
+- NATEPAN: cond4 ✅ (+0.0225) + cond5 proxy ✅ (35%)
+- THEQOO: cond4 ✅ (+0.0472) + cond5 proxy ✅ (15%)
+- CLIEN: cond4 ❌ (-0.0436) + cond5 unknown (데이터 부족)
+
+다음 단계: 사람 응답으로 cond5 공식 확인 (r15 THEQOO + r15 NATEPAN 설문).
 
 **다음 작업**:
 1. dev host에서 `llm-ai-user` 컨테이너 복구
@@ -1391,3 +1424,57 @@ CLIEN만 켜기 불가 — 전역 활성화 = 세 커뮤니티 모두 충족 시
 **의미**:
 - 현재 남은 핵심 blocker는 "측정 설계"가 아니라 "docker가 있는 dev host에서 한 번 실행하는 것"이다.
 - 자동 진행은 여기까지고, 다음 병목은 다시 사람 응답이다.
+
+## D-96 (2026-06-20) — CLIEN cond4 진짜 FAIL 확정
+
+CLIEN cond4를 두 번 측정했지만 delta가 계속 음수였다.
+
+**측정 결과:**
+- 1차 (2026-06-20 Phase-1): mauve_rerank=0.7757, random_mean=0.8422 (±0.094), delta=-0.0665
+- 2차 (재측정): mauve_rerank=0.9099, random_mean=0.9535 (±0.031), delta=-0.0436
+- 두 번 모두 strict_runtime=True, cli=0
+
+**결론:** CLIEN discriminator가 P(human) 기준으로 선택한 draft의 MAUVE가 random_mean보다 낮다. 즉, ML 리랭킹이 CLIEN 분포 유사도(MAUVE)와 역상관. 단순 noise가 아닌 실제 특성.
+
+**원인 가설:** CLIEN n_ai=157로 학습 예제가 부족하거나, discriminator가 MAUVE와 다른 방향으로 "human-like"를 정의함 (고AUC=0.9968이지만 MAUVE 역방향).
+
+**다음 시도:** n_drafts=8 (후보군 확대) → 여전히 음수면 discriminator 개선 또는 CLIEN 특화 프롬프트 개선 필요.
+
+## D-97 (2026-06-20) — CLIEN cond4 n_drafts=8 실패 + 근본 원인 확정
+
+n_drafts=4→8로 확대 시도. runtime=48 성공, failed=48 (ctx=12 전체 타임아웃). mauve_rerank=None.
+
+**결론:** draft 수 증가로 CLIEN cond4를 개선할 수 없음. 근본 원인은 discriminator가 P(human) 기준으로 선택한 draft의 MAUVE가 random 평균보다 낮은 구조적 문제.
+
+**다음 방향:**
+1. CLIEN discriminator 재설계 (multi-objective: P(human) + distributional diversity)
+2. 또는 CLIEN n_ai 증가 (현재 247 → 300+) 후 재학습
+3. 단기: CLIEN은 cond4 보류, THEQOO/NATEPAN 중심으로 선택적 활성화 추진
+
+## D-99 (2026-06-20) — THEQOO cond5 proxy PASS (Claude 기반 15%)
+
+r15-cond5-theqoo-claude-survey.md에 대해 ensemble blind judge 3명(Claude 기반) 실행:
+- accuracy = 0.15 (3/20 pairs 탐지)
+- Claude-generated THEQOO 글이 AI judge에게도 탐지 어려움
+
+**이전 Codex-only THEQOO cond5**: 84.2% FAIL (D-89, r14 기반)
+- Codex/gpt-5.4 기반 cond5는 stale로 폐기
+- Claude API/CLI 기반 신선 측정만 권위본
+
+**Claude 기반 cond5 proxy 판정**: 15% (≤60% 기준 충족) → **PASS ✅**
+
+**해석**:
+- D-95(Claude CLI 복원) 효과 직접 관측
+- Codex gpt-5.4는 AI 탐지 패턴이 훨씬 명확했음(84.2%)
+- Claude로 전환 후 THEQOO AI 글의 탐지 난이도가 극적으로 상향
+- judge 3명의 agreement도 낮음 → human과 AI 경계 흐릿함
+
+**cond5 해석 주의**:
+- 이 15% 수치는 AI judge 판정. 인간 응답은 별개
+- cond4 PASS(Δ_real=+0.1326) + cond5 proxy PASS(15%) ≠ 운영 활성화 자동 허용
+- NATEPAN cond5도 fresh survey + human 응답 필요
+
+**다음 단계**:
+1. THEQOO cond5 사람 응답 추가 수집(현재 owner only) → final 판정
+2. NATEPAN fresh cond5 owner 응답 수집 시작
+3. 5조건 전부(cond4-B runtime + cond5 human) 확인 후 활성화 판단

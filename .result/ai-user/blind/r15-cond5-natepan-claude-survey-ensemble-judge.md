@@ -1,0 +1,158 @@
+# Ensemble Blind Judge — NATEPAN
+> 생성: 2026-06-20 10:16:12
+> survey: `/home/justant/Data/Again-Spring/.result/ai-user/blind/r15-cond5-natepan-claude-survey.md`
+> answers: `/home/justant/Data/Again-Spring/.result/ai-user/blind/r15-cond5-natepan-claude-answers-template.json`
+> proxy metric: judge ensemble AI detection accuracy
+
+## Summary
+
+- pairs: **20**
+- proxy accuracy: **35.0%**
+
+## Pair Results
+
+| pair | final | A | B | predicted | O/X | judge votes |
+|---|---|---|---|---|---|---|
+| 1 | B | ai | human | human | X | community_fit=A3, narrative_flow=B4, style_tells=B5 |
+| 2 | B | human | ai | ai | O | community_fit=A4, narrative_flow=B3, style_tells=B2 |
+| 3 | B | ai | human | human | X | community_fit=B3, narrative_flow=B4, style_tells=B2 |
+| 4 | A | human | ai | human | X | community_fit=A4, narrative_flow=A4, style_tells=A2 |
+| 5 | B | ai | human | human | X | community_fit=B4, narrative_flow=B3, style_tells=B2 |
+| 6 | B | human | ai | ai | O | community_fit=B3, narrative_flow=B4, style_tells=B3 |
+| 7 | A | human | ai | human | X | community_fit=A4, narrative_flow=A4, style_tells=A3 |
+| 8 | B | ai | human | human | X | community_fit=B4, narrative_flow=B4, style_tells=B3 |
+| 9 | A | human | ai | human | X | community_fit=A4, narrative_flow=A4, style_tells=A4 |
+| 10 | B | human | ai | ai | O | community_fit=B4, narrative_flow=B4, style_tells=B3 |
+| 11 | B | ai | human | human | X | community_fit=A4, narrative_flow=B4, style_tells=B3 |
+| 12 | B | ai | human | human | X | community_fit=B4, narrative_flow=B4, style_tells=B4 |
+| 13 | B | human | ai | ai | O | community_fit=B3, narrative_flow=B4, style_tells=B3 |
+| 14 | B | ai | human | human | X | community_fit=B4, narrative_flow=B4, style_tells=B2 |
+| 15 | A | human | ai | human | X | community_fit=A4, narrative_flow=A4, style_tells=A3 |
+| 16 | B | human | ai | ai | O | community_fit=B4, narrative_flow=B3, style_tells=B3 |
+| 17 | B | human | ai | ai | O | community_fit=B4, narrative_flow=B4, style_tells=B3 |
+| 18 | B | ai | human | human | X | community_fit=B5, narrative_flow=B4, style_tells=B3 |
+| 19 | A | human | ai | human | X | community_fit=A4, narrative_flow=A4, style_tells=B2 |
+| 20 | B | human | ai | ai | O | community_fit=B4, narrative_flow=B4, style_tells=A3 |
+
+## Judge Reasons
+
+### Pair 1
+
+- `community_fit` A3: A는 문제-상황-감정-결론의 체계적 구조가 일관되고 비표준 표현이 거의 없어 정제된 톤을 유지. B는 은어(ㄷ짐, ㅅㅇ), ㅋㅋㅋ 반복, 많은 연예인 이름 나열로 감정의 기복과 자유로움이 두드러지며 더 인간다운 표현 특성을 보임.
+- `narrative_flow` B4: 마지막에 갑자기 연예인 이름을 무더기 나열하는 부분이 AI 특징. 앞부분은 자연스러우나 마지막 문단이 문맥과 무관하게 관련 항목들을 기계적으로 나열하는 패턴 보임
+- `style_tells` B5: 끝부분 아이돌 이름 줄줄이 나열(카리나 장원영 유나...)이 맥락과 단절되고, '올려치기' 표현 반복, 산만한 문장 구조가 AI 생성 특징
+
+### Pair 2
+
+- `community_fit` A4: 정보만 단순 나열, 감정·개인 경험 없음, 구어체 부족. NATEPAN 실제 글은 [B]처럼 구체적 상황·감정·호소 포함
+- `narrative_flow` B3: 구체적인 상황과 감정을 자연스럽게 쌓아올린 후 도움 요청으로 끝내는 패턴이 AI 사연 생성의 전형적 구조(topic-first → 공감 유발 → 마무리)처럼 보임
+- `style_tells` B2: 감정 표현 반복('저만', '완전', 'ㅠ' 연속) 과 형식적 감정 진행 패턴. A는 단순 정보 나열이라 판단 불가.
+
+### Pair 3
+
+- `community_fit` B3: 정보 전달적이고 설명적 톤. 마지막 문장('아리랑 넣는거도...의견 제시하는거')이 자연스럽지 않고 논리적. 또한 K-pop 팬덤 주제는 NATEPAN(생활/관계 커뮤니티)의 전형적 글감과 맞지 않음.
+- `narrative_flow` B4: 문장 연결이 끊어지고(욕→결정), 마지막이 '의견 제시하는거'로 뻣뻣하게 마무리. 정보 나열식 톤이 구어체 자연스러움과 맞지 않음.
+- `style_tells` B2: 정보 전달적이고 설명 톤이 딱딱함. 특히 '긴 버전으로 가자는 의견 제시하는거' 부분이 기계적. A는 생활 불만의 감정과 구체성이 자연스러움
+
+### Pair 4
+
+- `community_fit` A4: A는 너무 짧고 '뇌내 속에서' 같은 어색한 조합, 인위적인 줄 나누기. B는 구체적 상황(금요일, 5일째)과 자연스러운 대화체('~하더라고요', 'ㅠ')로 실제 커뮤니티 글처럼 느껴짐.
+- `narrative_flow` A4: A는 구체적 사건 없이 추상적 감정만 나열하고 문장이 뻣뻣함. B는 시어머니 방문이라는 구체적 상황, 자연스러운 대화체와 시간 표현, 인간다운 불편함 표현
+- `style_tells` A2: '뇌내 속에서'와 '(망상 약간임)'이 부자연스러운 표현. B는 구체적인 상황·감정·행동제약이 일관되고 자연스러움
+
+### Pair 5
+
+- `community_fit` B4: B는 문법이 어색하고 논리 전개가 부자연스러움. 'ㅡ 없음 ㅡ' 시작, '기부 강요해' 등 문장 구조가 일관성 없음. A는 시어머니 방문 일상 고민으로 감정 표현이 생생하고 자연스러운 NATEPAN 문체
+- `narrative_flow` B3: topic-first opener('ㅡ 없음 ㅡ')이 비자연스럽고, 정치 주장이 로직적으로 구조화됨. 결말('기부 좀 시켜')이 뻣뻣한 반전형 마무리. A는 시어머니 방문 상황이 구체적이고 감정 흐름이 자연스러움.
+- `style_tells` B2: B의 '니네 우파 언니 오빠 형 누나들부터' 같은 표현과 논리 흐름이 다소 부자연스러움. A는 감정 발달과 구체적 맥락이 리얼함.
+
+### Pair 6
+
+- `community_fit` B3: [B]는 상황 설명과 감정 표현이 깔끔하게 구조화되어 있고, 일관된 논리 흐름(문제 → 상황 설명 → 감정)이 AI의 패턴을 보인다. [A]는 NATEPAN 특유의 짧은 댓글 문체, 은어(원탑, 반박시), 띄어쓰기가 자연스럽다.
+- `narrative_flow` B4: 체계적 사건 제시(어제 퇴근) → 배경 설명 → 병렬 상황 나열(아파도/야근해도) → 감정-고민으로 닫는 논리적 흐름이 정돈됨. '못하면 바로 저러니까'의 인과 연결도 딱딱. A는 즉흥적 톤과 밈 사용으로 더 자연스러움.
+- `style_tells` B3: 패턴 반복('내가 하고, 내가 하고')과 구조화된 감정 표현. 상황→배경→결론 흐름이 체계적이고 감정을 규칙적으로 강조하는 방식이 AI 스타일. A는 즉각적인 반응과 인터넷 특유 용어(여돌, 원탑)로 더 인간다움.
+
+### Pair 7
+
+- `community_fit` A4: [A]는 추상적 감정과 시 인용으로 자연성 떨어지고 문장 구조가 어색. [B]는 구체적 상황(새벽 1시, 세 번째)과 일상 톤이 NATEPAN 실제 문체에 훨씬 가깝다.
+- `narrative_flow` A4: 감정만 나열하는 구조, 마지막의 시 형식 결말이 뻣뻣함, '그녀에 대한 내마음이 진심이었다면' 같은 인위적 표현. B는 구체적 사건 서술과 자연스러운 대화 인용으로 더 인간적
+- `style_tells` A3: '가져가야할 스탠스', '그녀에 대한 내마음이 진심이었다면' 같은 표현이 인위적. 감정 자조가 자연스럽지만 노래 가사 인용 방식이 맥락에서 떨어짐. B는 새벽 1시 상황의 현장감과 '황당해서' 같은 구어 표현이 훨씬 자연스러움
+
+### Pair 8
+
+- `community_fit` B4: [B]는 구체적 사건이 없고 추상적 관념만 나열. '내면이 고운', '선하고 고운' 표현이 NATEPAN 톤보다 관념적이고 어색. [A]는 엄마와의 구체적 갈등, 자연스러운 구어체, 감정 표현이 실제 커뮤니티 글답다.
+- `narrative_flow` B4: 구체적 갈등이 없고, 일반화된 관찰('사람은 비슷한 사람끼리 만남')을 topic-first로 제시한 뒤 단순 소망으로 끝남. A는 구체적 사건·자연스러운 감정 표현·진정한 의문으로 끝남.
+- `style_tells` B3: 구체적 상황 전무, '고운' 단어 반복, 추상적 자기반성만 반복. NATEPAN 보통 갈등 상황인데 스토리 완전 부재.
+
+### Pair 9
+
+- `community_fit` A4: A는 구조가 과도하게 정제되고 모든 문장이 문법적으로 완벽하며 논리적 배열이 정계산된 느낌. B는 구어체, 문법 약간 느슨함, 감정 즉각적으로 터짐
+- `narrative_flow` A4: 안녕하세요로 시작하는 형식적 인사, 불안형·회피형 같은 심리학 용어, 과도하게 체계적인 3단계 구성, 마지막 질문의 뻣뻣한 형식성 - 모두 AI의 특징. B는 어제 남편이 갑자기로 시작해 구어체와 감정이 생생하고 불완전한 표현(1도 모르겠는 ㅠㅠ)이 인간다움.
+- `style_tells` A4: 구조화된 설명과 체계적 논리 전개. 불안형/회피형 성향 분석, 5단계 문제-원인-과정-현재-질문 구조, 일관된 문체가 AI 생성 패턴과 일치. B는 감정적·단순한 일상 언어로 더 자연스러움.
+
+### Pair 10
+
+- `community_fit` B4: B는 문법이 정확하고 상황을 시간순으로 체계적으로 설명했으며, NATEPAN 특유의 거친 말투·비문법성·짧은 길이가 없음. A는 짧고 투박하며 축약어·띄어쓰기 불규칙이 자연스러운 네이트판 문체
+- `narrative_flow` B4: 시어머니 방문→반응→남편 대응→자기 의문이라는 명확한 topic-first 구조, 시간 순서의 자연스러운 흐름, 그리고 '진짜 모르겠어요ㅠ'로 정제된 감정으로 마무리하는 교과서적 사연 결말 패턴
+- `style_tells` B3: 상황 설명이 체계적이고 문장 구조가 정연함. 마지막 감정 표현이 뒤에 붙는 패턴(진짜 모르겠어요ㅠ). A는 끝이 끊기고 약자·오류가 자연스러운 실제 글
+
+### Pair 11
+
+- `community_fit` A4: 구조와 감정 표현이 너무 완벽하고 자연스러움. NATEPAN 문체를 정확하게 따르고 있어 AI가 학습하고 생성한 글처럼 보임. B는 댓글 같은 단편적 형태로 불완전해 보임.
+- `narrative_flow` B4: [B]는 주제-오프닝이 약하고 '노오력→세금폭탄' 문맥이 끊어지며, 뻣뻣한 의문형 결말. [A]는 구체적 상황, 자연스러운 감정 표현, 이모지 활용이 휴먼다움.
+- `style_tells` B3: '~할 줄 알고 그런가'는 부자연스러운 문법. AI가 추측을 표현할 때 쓰는 어색한 패턴
+
+### Pair 12
+
+- `community_fit` B4: B는 구체적 상황 없이 추상적 감정만 반복하며 문학적으로 정제된 문체. NATEPAN은 실제 생활의 구체적 갈등 중심인데 A는 자연스러운 구어체와 상황 설정으로 진정성 있음
+- `narrative_flow` B4: B는 구체적 사건이 전혀 없고 추상적 감정만 체계적 시적 표현으로 정제. A는 시부모님 기념일, 남편 음주, 말 어눈함 등 구체 사건 다수로 자연스러운 커뮤니티 사연
+- `style_tells` B4: B는 과도한 병렬 구조(~이고/~이라면/~도/~는)의 반복과 운문식 행갈이가 AI의 문장 구성 패턴을 드러냄. A는 일상의 답답함을 자연스럽게 서술하는 커뮤니티 글의 전형.
+
+### Pair 13
+
+- `community_fit` B3: 문장 구조가 너무 일관성 있고 정제됨. 상황→감정→고민 순서가 체계적. NATEPAN의 실제 글은 A처럼 더 단편적·캐주얼하고 오타 섞임.
+- `narrative_flow` B4: 구체적 사건(식탁)으로 topic-first 시작, 갈등→배경→고민으로 완결된 사연 흐름이 AI 생성의 전형. [A]는 신조어·불완전한 문법으로 오히려 실제 커뮤니티 글로 보임.
+- `style_tells` B3: 문법과 감정 전개가 너무 체계적이고 정제됨. 문법 오류나 부자연스러운 표현 없이 매끄러움.
+
+### Pair 14
+
+- `community_fit` B4: 높은 정보밀도와 체계적 논리(산-골 비유→구체 수치→섭리 결론)가 AI 분석의 특징. A는 감정표현(나는뭐야, ㅠㅋㅋ)과 끊어진 문장이 자연스러운 사람 글
+- `narrative_flow` B4: 구체 수치(마이크론 -13%) + 일반화된 격언(산이 높으면 골이 깊은법) + 논리적 당위성 구조(오버슈팅 → 폭락 → 자연스런 섭리)가 AI 분석 톤. [A]는 감정이 살아있고 불완전한 문장과 열린 결말로 인간적임.
+- `style_tells` B2: '미친'이 2회 반복되고, '자연스런 주식 바닥의 섭리'라는 표현이 다소 다듬어져 보임
+
+### Pair 15
+
+- `community_fit` A4: 시적 구조와 정제된 반복 패턴이 자연스럽지 않음. NATEPAN은 [B]처럼 구체적 상황 중심인데 [A]는 감정을 과도하게 문학적으로 정돈함
+- `narrative_flow` A4: 구체적 사건 부재·추상적 감정만 나열. 상대 입장을 과도하게 헤아리는 뻣뻣한 결말('네가 궁금한 것도 비슷하지 않을까'). B는 갈비찜·시어머니 비교 같은 구체적 트리거가 명확함.
+- `style_tells` A3: '~는지' 문법 4회 연달아 반복(언제부터 좋아했는지→어떻게 인정하게 됐는지→언제 어떻게 알게 됐는지→어떤 점이 좋은지). B는 구체적 사건(갈비찜·대추·형님) 가득해 인간다움.
+
+### Pair 16
+
+- `community_fit` B4: 상황을 시간순으로 너무 체계적으로 나열(어젯밤→8시간→몇달째)하고, 구체적 행동들(재우기→설거지→빨래→픽업→저녁)을 일목요연하게 정렬한 형태. 실제 네이트판 글은 감정 터놓기 중심으로 좀더 산발적인데 B는 과도하게 구조화됨.
+- `narrative_flow` B3: B는 상황→갈등→감정으로 논리적 구성, 구체적 디테일로 topic-first 시작, 결말이 '내가 뭘 원하는지도 모르겠고' 같은 약간 뻣뻣한 반성으로 끝남. A는 감정적 폭발로 자연스러운 커뮤니티 글의 비논리성이 두드러짐.
+- `style_tells` B3: B는 상황→문제→감정을 체계적으로 구조화하고, '~거든요', '~더라고요', '~잖아요' 등 일관된 종결사로 진행하는 방식이 AI의 전형적인 감정 글 패턴. A는 비논리적이고 즉흥적인 악플 스타일로 더 인간다움.
+
+### Pair 17
+
+- `community_fit` B4: [B]는 상황을 시간순서대로 체계적으로 설명하고 감정을 점진적으로 구성하는 구조화된 방식. [A]는 극도로 짧고 직설적인 NATEPAN 커뮤니티의 전형적인 실제 톤
+- `narrative_flow` B4: B는 구체적 상황(추석 전날)과 사건(전/나물/과일)으로 시작해 반응(남편/명절문화)-의문-신체감각으로 자연스럽게 흐르는 구조화된 전개가 있고, A는 맥락이 불명확한 단편적 댓글처럼 보인다
+- `style_tells` B3: 구조화된 스토리 전개(상황→갈등→의문→감정), '본인은' 약간 어색, '다' 나열의 체계적 반복. A는 격한 감정과 자연스러운 슬랭 사용으로 실제 사람의 분노가 느껴짐.
+
+### Pair 18
+
+- `community_fit` B5: NATEPAN은 구체적 상황과 길이 있는 고민글 커뮤니티인데, B는 너무 짧고 구체적 사건 없이 순수 감정만 나열. 시적 운율은 AI의 전형적 특징
+- `narrative_flow` B4: 구체적 사건·트리거 없이 감정만 추상적으로 나열. 문장 연결 어색('아닌사람이라'띄어쓰기·문법), 뻣뻣한 결말('진짜 인연인건가'). A는 제사·결혼기념일 겹침 같은 구체 상황이 자연스러운 흐름으로 전개.
+- `style_tells` B3: 띄어쓰기 오류(아닌사람이라, 당신이란사람)와 문법 어색함. A는 구어체 감정 표현이 자연스러움
+
+### Pair 19
+
+- `community_fit` A4: 뉴스 정보만 나열, 실제 커뮤니티 글처럼 보이지 않음. 개인 이야기도 없고 문장이 어색하고 너무 짧음
+- `narrative_flow` A4: [A]는 뉴스 헤드라인 같은 단절된 문맥(주제-첫줄 형식), 내용 전개 없음, 뻣뻣한 마침. [B]는 구체 상황(친정엄마 방문), 자연스러운 구어(ㅠ, 1도), 감정 흐름이 인간다움
+- `style_tells` B2: 상황 설명과 감정 표현이 체계적으로 구성되어 있고, 구체적 반복 패턴('한 번도 안 나왔어요', '방문만 닫아버리더라고요', '세 번째')이 정리된 느낌
+
+### Pair 20
+
+- `community_fit` B4: 너무 논리적으로 정렬된 상황-불만-질문 구조. 실제 NATEPAN은 [A]처럼 더 거칠고 산발적.
+- `narrative_flow` B4: 구체적 갈등 구조(남편의 친구 간섭) + 시간 흐름(어제→반복성 언급) + 선택지 제시 결말이 체계적. A는 정치 이슈로 사연 아니고 톤이 불안정함.
+- `style_tells` A3: 문장 흐름이 끊기고 '할 줄 아는 게 머야'라는 표현이 부자연스러움. 경제 논리의 연결도 약해 AI가 짧게 생성한 듯함
+

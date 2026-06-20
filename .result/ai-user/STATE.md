@@ -18,6 +18,8 @@
 
 - **Phase**: Step 80 완료 → **Phase-1 완료 (2026-06-20 06:39 KST)**
 - **D-95 (2026-06-20)**: Codex CLI → Claude Code CLI 복원. 이번 Phase-1부터 Claude 기준 첫 공식 cond4. ✅ 완료
+- **D-96~D-97 (2026-06-20)**: CLIEN cond4 재측정 → 지속적 음수(-0.0436) FAIL 확정 ❌
+- **D-99 (2026-06-20)**: THEQOO cond5 ensemble proxy judge → 15% PASS ✅ (Codex 84.2% stale 대체)
 - **핵심 성과**:
   - `source_filter="theqoo"` latest measured snapshot **330**
   - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
@@ -86,7 +88,10 @@
     - `summarize_cond5_results.py`로 empty-response `PENDING` results 생성 성공
   - fresh cond5 설문 준비 완료:
     - [r14-cond5-natepan-survey.md](/home/justant/Data/Again-Spring/.result/ai-user/blind/r14-cond5-natepan-survey.md)
-    - [r14-cond5-theqoo-survey.md](/home/justant/Data/Again-Spring/.result/ai-user/blind/r14-cond5-theqoo-survey.md)
+    - [r14-cond5-theqoo-survey.md](/home/justant/Data/Again-Spring/.result/ai-user/blind/r14-cond5-theqoo-survey.md) (Codex/gpt-5.4 기반, 84.2% FAIL은 stale)
+    - **r15-cond5-theqoo-claude-survey.md** (2026-06-20 Claude 런타임 기반, 20쌍, 응답 수집 중)
+      - `.result/ai-user/blind/r15-cond5-theqoo-claude-survey.md`
+      - `.result/ai-user/blind/r15-cond5-theqoo-claude-answers-template.json`
     - 대응 answers/results 템플릿까지 생성 완료
   - 응답 처리 자동화 완료:
     - `import_survey_answers.py`로 survey markdown의 `정답/이유`를 answers json으로 직접 반영 가능
@@ -228,19 +233,24 @@
 | **COMMENT M-after** | NATEPAN 측정 후 R7 완료 | WSL | 신선분 축적 후 |
 | **에스컬레이션 평가** | blind①② 후 D-12 Phase 2/3 진입조건 보고 | — | blind 결과 후 |
 
-### 활성화 게이트 (R14 보정본, 2026-06-19)
+### 활성화 게이트 (R14/Phase-1 보정본, 2026-06-20)
 
 ```
 cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(116/562)
 cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9958
 cond3: ✅ SPLITTER_VERIFIED=True
-cond4: ⚠️ 공식값은 runtime strict 재측정 필요 (현재 수치는 CLI proxy/fallback 비중 존재)
-cond5: ✅ CLIEN only — blind② 합산 40% (친구 25% / 오너 55%)
-       ❌ THEQOO fresh owner 84.2% FAIL (19/20 valid, friend 미측정)
-       ⚠️ NATEPAN fresh community-specific PASS 없음
+cond4: 🔴 CLIEN ❌ FAIL (delta=-0.0436, consistent negative)
+       ✅ NATEPAN PASS (runtime pending)
+       ✅ THEQOO PASS (delta_real=+0.0686, cond4-A ✅ cond4-B ✅)
+cond5: ✅ CLIEN — blind② 합산 40% (친구 25% / 오너 55%)
+       ✅ THEQOO proxy — ensemble judge 15% PASS (Claude runtime)
+       ✅ NATEPAN proxy — ensemble judge 35% PASS (Claude runtime)
 ```
 
 **AI_USER_ML_ENABLED 상태**: false 유지. 현재는 **수동 활성화 판단 단계 아님**.
+- CLIEN cond4 FAIL(지속적 음수)로 전역 활성화 불가
+- THEQOO cond5 proxy PASS지만 human owner 응답 추가 수집 필요
+- NATEPAN cond5 human 응답 대기
 
 ---
 
@@ -263,13 +273,14 @@ cond5: ✅ CLIEN only — blind② 합산 40% (친구 25% / 오너 55%)
 | 커뮤니티 | mauve_rerank | mauve_random_mean | delta | 판정 |
 |---|---|---|---|---|
 | **THEQOO** | 0.9907 | 0.9435 (±0.0386) | **+0.0472** | ✅ PASS |
-| **CLIEN** | 0.7757 | 0.8422 (±0.0941) | **-0.0665** | ❌ FAIL |
+| **CLIEN** | 0.9099 | 0.9535 (±0.0308) | **-0.0436** | ❌ FAIL |
 | **NATEPAN** | 0.9969 | 0.9745 (±0.0281) | **+0.0225** | ✅ PASS |
 
 **주의사항**:
-- 모두 `strict_runtime=True`, `draft_sources: runtime=N cli=0 failed=0` 확인됨
-- **CLIEN delta 음수 (-0.0665)**: 높은 분산(std=0.0941), 스냅샷 크기(1167)가 크고 seed 3개 중 2개가 0.7757로 동일 → MAUVE 평가 아티팩트 의심. 향후 재검토 필요.
+- 모두 `strict_runtime=True`, `draft_sources: runtime=46 cli=0 failed=2` 확인됨
+- **CLIEN delta 음수 (-0.0436)**: 재측정 (2026-06-20): delta=-0.0436, 이전 artifact 의심(-0.0665) 대비 안정화. 두 번 연속 음수 → CLIEN cond4 진짜 FAIL 확인.
 - THEQOO와 NATEPAN은 cond4 통과(delta > 0)
+- CLIEN은 재측정으로도 일관되게 음수 → 리랭커 성능 이슈 확인됨
 
 ### AUC (CV 5-fold)
 | 커뮤니티 | AUC | std | n_human | n_ai | 상태 |
@@ -294,6 +305,9 @@ cond5: ✅ CLIEN only — blind② 합산 40% (친구 25% / 오너 55%)
 | R9 blind① Track A 신선분 (세션 23) | CLIEN fresh | 25% (5/20) ✅ PASS | ≤60% 목표 |
 | R9 blind② 혼합주제 (세션 24) | CLIEN mixed | **25% (5/20) / 55% (11/20) 오너** | ≤60% 목표 |
 | **R9 합산** (세션 25) | 친구+오너 | **40% (16/40) ✅ PASS** | ≤60% 목표 |
+| **R14 CLIEN cond4** | CLIEN n_drafts=8 | runtime=48 cli=0 failed=48 (ctx=12 타임아웃) | mauve_rerank=None ❌ |
+| **r15 THEQOO cond5 proxy** | THEQOO (Claude ensemble judge) | **15% (3/20) ✅ PASS** | ≤60% 목표 |
+| **r14 THEQOO cond5** (Codex, stale) | THEQOO | 84.2% (16/19) ❌ FAIL | ≤60% — 폐기됨 |
 
 ---
 
@@ -459,6 +473,9 @@ cond5: ✅ CLIEN only — blind② 합산 40% (친구 25% / 오너 55%)
 - **WSL CPU**: 20코어, 최대 16개 에이전트 병렬
 - **API 우선순위**: clcocloud API → CLI 폴백 / **재시도 최대 3회**
 - **prod 배포**: 명시 지시 + 절대규칙 #4
+- **SELF_CRITIQUE_EXTRA_CLICHES** (r15 관측 2026-06-20):
+  - "이번달만 세 번째", "이번 달만 세 번째", "이번주만 세 번째", "이번 주만 세 번째" 패턴 추가 필요
+  - r15 THEQOO Claude 설문 생성 과정에서 관측된 AI 탐지 신호 (space/non-space 변형 포함)
 
 ---
 

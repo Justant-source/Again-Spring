@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-ensemble_blind_judge.py — codex 기반 proxy blind judge ensemble
+ensemble_blind_judge.py — Claude CLI 기반 proxy blind judge ensemble
 
 Usage:
   python3 .result/ai-user/scripts/ensemble_blind_judge.py \
-    --survey .result/ai-user/blind/r14-cond5-theqoo-survey.md \
-    --answers .result/ai-user/blind/r14-cond5-theqoo-answers-template.json \
+    --survey .result/ai-user/blind/r15-cond5-theqoo-claude-survey.md \
+    --answers .result/ai-user/blind/r15-cond5-theqoo-claude-answers-template.json \
     --workers 8
 """
 
@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-from blind_gate_common import codex_exec, parse_survey_pairs, try_parse_json_response
+from blind_gate_common import claude_exec as codex_exec, parse_survey_pairs, try_parse_json_response
 
 JUDGES = [
     {

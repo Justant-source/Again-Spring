@@ -1,0 +1,444 @@
+{
+  "type": "cond5_blind",
+  "community": "THEQOO",
+  "generated_at": "2026-06-20 00:57:27",
+  "n_pairs": 20,
+  "label_map": {
+    "0": {
+      "A": "ai",
+      "B": "human"
+    },
+    "1": {
+      "A": "human",
+      "B": "ai"
+    },
+    "2": {
+      "A": "ai",
+      "B": "human"
+    },
+    "3": {
+      "A": "human",
+      "B": "ai"
+    },
+    "4": {
+      "A": "ai",
+      "B": "human"
+    },
+    "5": {
+      "A": "human",
+      "B": "ai"
+    },
+    "6": {
+      "A": "human",
+      "B": "ai"
+    },
+    "7": {
+      "A": "ai",
+      "B": "human"
+    },
+    "8": {
+      "A": "human",
+      "B": "ai"
+    },
+    "9": {
+      "A": "human",
+      "B": "ai"
+    },
+    "10": {
+      "A": "ai",
+      "B": "human"
+    },
+    "11": {
+      "A": "ai",
+      "B": "human"
+    },
+    "12": {
+      "A": "human",
+      "B": "ai"
+    },
+    "13": {
+      "A": "ai",
+      "B": "human"
+    },
+    "14": {
+      "A": "human",
+      "B": "ai"
+    },
+    "15": {
+      "A": "human",
+      "B": "ai"
+    },
+    "16": {
+      "A": "human",
+      "B": "ai"
+    },
+    "17": {
+      "A": "ai",
+      "B": "human"
+    },
+    "18": {
+      "A": "human",
+      "B": "ai"
+    },
+    "19": {
+      "A": "human",
+      "B": "ai"
+    }
+  },
+  "provenance": "runtime:http://againspring-llm-ai-user:8092",
+  "generation_meta": {
+    "meta_stats": {
+      "human_with_meta": 0,
+      "human_without_meta": 20,
+      "ai_with_meta": 20,
+      "ai_without_meta": 0
+    },
+    "used_ids_filter_requested": false,
+    "filtered_used_ai": 0,
+    "filtered_used_human": 0,
+    "filtered_used_text_ai": 0,
+    "filtered_used_text_human": 0,
+    "unfilterable_ai": 0,
+    "unfilterable_human": 0,
+    "pair_fingerprints": [
+      {
+        "pair": 1,
+        "a_fingerprint": "6b41ed9f57966797b0d0dc512990d93da171f3c5f7022211747fd3d61ea4de70",
+        "b_fingerprint": "4af6d9a579bd2178735a6bb0f1a8c31859c030e1072fc5e95d60a863142b1e30"
+      },
+      {
+        "pair": 2,
+        "a_fingerprint": "e17a1b5feae1e068b2e204e0680a8ef1055d6c386b6ee6155e952e0353abe38d",
+        "b_fingerprint": "0ca2fc93b79c59c8e9a39cccc495b47d42598c89b47800eb478c0354ca29990c"
+      },
+      {
+        "pair": 3,
+        "a_fingerprint": "6c4218b8ce62a57bc062862e16844918d75521e724409282c86a1de5ab291e2a",
+        "b_fingerprint": "064393d7d8f7a6f6c8656869b0290203a90b2f71a2f5ab3a42f12acfc148b72e"
+      },
+      {
+        "pair": 4,
+        "a_fingerprint": "bdcd206b609187dc7c5ceebeb3e291aac05d997dc0fcb7fbb8dccc4e4606e47f",
+        "b_fingerprint": "fe7573ca95af57dc7a4bf06e0ec51ea76ffadea0a971cacd5aff8f3186181cdf"
+      },
+      {
+        "pair": 5,
+        "a_fingerprint": "91c5a554622d04985c9e7f84bad154c0c5a83dbbd279cabe081e73579f9ef74b",
+        "b_fingerprint": "a34e929a47cc30060f59ff716a9cf7bf61e5be2e0e487df5e3a468ff9836c6e5"
+      },
+      {
+        "pair": 6,
+        "a_fingerprint": "83b521844ab07eab8f5fe05ad3e683a2d842c7704ea56f8aff251666f4973578",
+        "b_fingerprint": "aac217550d9c4ab544382bb4fadace56003096d48d2f6c30cc6409f2d5b79ab9"
+      },
+      {
+        "pair": 7,
+        "a_fingerprint": "44ab513baa5178ffca4bf158d9b622f8ef3438b5905c912da3aab9cbf58c196b",
+        "b_fingerprint": "3a2c829542afe354520ee98214035c56f9f9928dded042d018b8a85659098dc4"
+      },
+      {
+        "pair": 8,
+        "a_fingerprint": "de8a7c7c161d2c0226caeeeb74ff1617533beda4621c33aa58384413e1d0f9f4",
+        "b_fingerprint": "dbefe0ab70154236a15e23dff641b7ab6f1bae42da194e8356b432ce293c1edb"
+      },
+      {
+        "pair": 9,
+        "a_fingerprint": "58f8e63f7cfa559bf1be1514e8bff6e5a63d10f6a664323a61ff8fcdaad02602",
+        "b_fingerprint": "ef1986d0db913f13704b1e39edacfdaa9660165c41a29440ade81c39daf52716"
+      },
+      {
+        "pair": 10,
+        "a_fingerprint": "61c20244725546aea502f2b306aa32442010e1f31402e463dde78f2596133471",
+        "b_fingerprint": "90f99ce57050bbabd9843ecf91fd4675b0e493068fadf0e5781eff1bf2600480"
+      },
+      {
+        "pair": 11,
+        "a_fingerprint": "3355791e7143a02f74ac57c7bf8b26ec4b463a65dfeec23a1f6b8ca6d26f8759",
+        "b_fingerprint": "5824179dc6c63ca3b2739f0af28839f3c3b0da39bbe3869ab71207a52ddbf5e6"
+      },
+      {
+        "pair": 12,
+        "a_fingerprint": "8c135c45f097d33508c4c025f12321fdfa053a6819a1f25ff5bab76f1aea9790",
+        "b_fingerprint": "3ec36692df43c6c372f6d0420d1c41b94934807d4c228d557573781a3d4df15f"
+      },
+      {
+        "pair": 13,
+        "a_fingerprint": "42fad518928fd498c5b61b3a0c927e1ad939fb86cfcafb256750a5a986ed2ac2",
+        "b_fingerprint": "1d7d3cb985f9f13f78f2a8fe32be6fb92ffdca0ce8b1205a5fff37bc5dcb77c1"
+      },
+      {
+        "pair": 14,
+        "a_fingerprint": "388e8ea49fd7520c2a8060eeeab05aa804849e74c84586bf1b8ba2070f8c9bf6",
+        "b_fingerprint": "7c1916fc618471fd2b6001a2bd5a2278f1fa10c76a7a162de1a16a14dffcb6e5"
+      },
+      {
+        "pair": 15,
+        "a_fingerprint": "dbac91d10c107f6b0080e6b78b5282cfcfc5c98170aaed6ba30a3fa6618f1f74",
+        "b_fingerprint": "56bd79794de3c73a62ab7e1f663db4448368880df1bfacba51d56096e6c7ec5d"
+      },
+      {
+        "pair": 16,
+        "a_fingerprint": "3e4041efd2a6f8ffa7db36b29b92c76f23352b6051036e375dc3c6a945ba48f9",
+        "b_fingerprint": "bf7a6517c58762429e709632ee32802a8fe83becc9cc2ff6c5992c88e69ce092"
+      },
+      {
+        "pair": 17,
+        "a_fingerprint": "0c1e9b4646d4fa91b2c24e1074f9273f1890c46c8ee64f93dc2e5653c82d7fa2",
+        "b_fingerprint": "1b495421c94bc829a9cd811e880ae043ea178a9ec49617d7969e98382595a8b1"
+      },
+      {
+        "pair": 18,
+        "a_fingerprint": "7a0534043179c177efc800fc9680eac3cf237defba4fb4c5ebbcf08cf9ed74c8",
+        "b_fingerprint": "182a8ae9b532477cba02c6ce8bf11640909ce2be432523ad5e90b2cdc8cbfb3a"
+      },
+      {
+        "pair": 19,
+        "a_fingerprint": "4b9d7362868aabe156ecde89888c51c51a8c6cdfd6044f97ea55fd5410221ab3",
+        "b_fingerprint": "9679b21894c7236021b4725a027520ed5dbd8ae1d2508b9aec2f532b9f4aff32"
+      },
+      {
+        "pair": 20,
+        "a_fingerprint": "8fb8beb913e3da8c658871221d3e45e920cab8ae5aa182ebd0093e6bb850c6e8",
+        "b_fingerprint": "113fb5fce463920e0037dc79dd76d86d7d288b4d05abaa10fa6dd63ae73a7f8f"
+      }
+    ],
+    "warning": ""
+  },
+  "response_instructions": {
+    "accepted_keys": "responses.<respondent> 에는 pair 번호를 1-based(1..N) 또는 0-based(0..N-1)로 넣을 수 있음",
+    "accepted_values": [
+      "A",
+      "B",
+      "답변불가",
+      "판단불가",
+      "미응답"
+    ],
+    "validity_rule": "공식 집계는 A/B만 유효. 나머지는 invalid"
+  },
+  "pair_metadata": [
+    {
+      "pair": 1,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "남자친구가 약속을 또 어겼을 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 2,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "남자친구가 내 감정을 무시할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 3,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "베프가 갑자기 연락이 끊겼을 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 4,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "남자친구가 내 외모를 지적할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 5,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "직장 동료가 내 아이디어를 가로챌 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 6,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "친구가 돈을 빌려가고 안 갚을 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 7,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "친구가 내 비밀을 퍼뜨렸을 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 8,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "회사에서 나만 야근시킬 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 9,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "남자친구 친구들이 나를 싫어할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 10,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "엄마가 내 연애에 지나치게 간섭할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 11,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "남친 가족이 나를 무시할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 12,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "자취방 집주인이 갑자기 계약 해지를 요구할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 13,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "친구가 자꾸 비교하며 기죽일 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 14,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "룸메이트가 집안일을 안 할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 15,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "부모님이 내 직업을 반대할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 16,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "직장에서 나만 눈치 보게 만들 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 17,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "오빠가 가부장적으로 굴 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 18,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "남자친구가 게임만 할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 19,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "시어머니가 명절에 모든 걸 강요할 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    },
+    {
+      "pair": 20,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "직장 상사가 일을 자꾸 떠넘길 때",
+        "generator": "runtime",
+        "community": "THEQOO"
+      }
+    }
+  ],
+  "responses": {
+    "friend": {},
+    "owner": {}
+  }
+}

@@ -419,3 +419,13 @@
 > 비밀이라고 못 박지 않은 게 내 잘못이라니 그건 말이 안 되지.
 
 ---
+
+| 2026-06-20 06:41 | 댓글 | post_dd07d11643844147a18d | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this task
+
+The instructions ask me to roleplay as a specific user persona in a Korean online community and generate content that mimics real community culture. This involves:
+
+1.
+
+---

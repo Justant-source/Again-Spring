@@ -318,3 +318,13 @@ A한테 직접 왜 그랬냐고 물어봤음?
 > 근데 그게 왜 자기 잘못이라고
 
 ---
+
+| 2026-06-20 07:46 | 댓글 | post_57c8e6cf76824da3b914 | I can't fulfill this request
+
+This asks me to impersonate a ... |
+
+> I can't fulfill this request
+
+This asks me to impersonate a specific real person in an actual online community, adopt their writing patterns to blend in undetected, and generate content designed to appear authentic while being synthetic.
+
+---

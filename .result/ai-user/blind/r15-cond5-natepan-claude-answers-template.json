@@ -1,0 +1,444 @@
+{
+  "type": "cond5_blind",
+  "community": "NATEPAN",
+  "generated_at": "2026-06-20 01:10:11",
+  "n_pairs": 20,
+  "label_map": {
+    "0": {
+      "A": "ai",
+      "B": "human"
+    },
+    "1": {
+      "A": "human",
+      "B": "ai"
+    },
+    "2": {
+      "A": "ai",
+      "B": "human"
+    },
+    "3": {
+      "A": "human",
+      "B": "ai"
+    },
+    "4": {
+      "A": "ai",
+      "B": "human"
+    },
+    "5": {
+      "A": "human",
+      "B": "ai"
+    },
+    "6": {
+      "A": "human",
+      "B": "ai"
+    },
+    "7": {
+      "A": "ai",
+      "B": "human"
+    },
+    "8": {
+      "A": "human",
+      "B": "ai"
+    },
+    "9": {
+      "A": "human",
+      "B": "ai"
+    },
+    "10": {
+      "A": "ai",
+      "B": "human"
+    },
+    "11": {
+      "A": "ai",
+      "B": "human"
+    },
+    "12": {
+      "A": "human",
+      "B": "ai"
+    },
+    "13": {
+      "A": "ai",
+      "B": "human"
+    },
+    "14": {
+      "A": "human",
+      "B": "ai"
+    },
+    "15": {
+      "A": "human",
+      "B": "ai"
+    },
+    "16": {
+      "A": "human",
+      "B": "ai"
+    },
+    "17": {
+      "A": "ai",
+      "B": "human"
+    },
+    "18": {
+      "A": "human",
+      "B": "ai"
+    },
+    "19": {
+      "A": "human",
+      "B": "ai"
+    }
+  },
+  "provenance": "runtime:http://againspring-llm-ai-user:8092",
+  "generation_meta": {
+    "meta_stats": {
+      "human_with_meta": 0,
+      "human_without_meta": 20,
+      "ai_with_meta": 20,
+      "ai_without_meta": 0
+    },
+    "used_ids_filter_requested": false,
+    "filtered_used_ai": 0,
+    "filtered_used_human": 0,
+    "filtered_used_text_ai": 0,
+    "filtered_used_text_human": 0,
+    "unfilterable_ai": 0,
+    "unfilterable_human": 0,
+    "pair_fingerprints": [
+      {
+        "pair": 1,
+        "a_fingerprint": "23376d7089bcabea2004838d14d3e05332e4a91d43e9c3c757e4826c8470fc37",
+        "b_fingerprint": "f4fbb0bbe137552b66cb0c6fb9c86fb478554df057de8a68f4ea56a8efd7e09a"
+      },
+      {
+        "pair": 2,
+        "a_fingerprint": "efd1ba25b3afcc222262bbd8d395271c0a17ed54eb4171b7a04397e86d8dcd3d",
+        "b_fingerprint": "4a439d4077cca8ad913461ea17b838a449bfeac06c0374c19b9aa75877acdb3b"
+      },
+      {
+        "pair": 3,
+        "a_fingerprint": "57aeff74e5e2b3968b2e53636bc8be35699d60c356be88ddec6e127080efc995",
+        "b_fingerprint": "ce33116dacd7ecd5e908e9b460556b3e6957cc2ff463316eec2e6ee0513e0237"
+      },
+      {
+        "pair": 4,
+        "a_fingerprint": "7886e2f9dd5cbedef7e3622552f8c6ce2af0cefca1c780709afc01ee72cdd6f3",
+        "b_fingerprint": "57a1464abf91eaf17d58fa60fadaba9a295be1b69a36dc19f47348cfdf997717"
+      },
+      {
+        "pair": 5,
+        "a_fingerprint": "91d59b98dbaa2da77f76c582db2e2308e09d7fe00ab5b0ea7e78367d0005898e",
+        "b_fingerprint": "57aa698d7ed934d42fd7e32fed2ba71cb4816d11800ad62f38111cdc496a2bbb"
+      },
+      {
+        "pair": 6,
+        "a_fingerprint": "5de5ce48aa83fe290161c72ecc91746083e25fb753bb3bfe310b6f929716b451",
+        "b_fingerprint": "81ef943377bc2611e41f77535b3586d550a9bfc79827576cfe9610523bd98d1c"
+      },
+      {
+        "pair": 7,
+        "a_fingerprint": "b6ea264040fe438bf3792ca891601de171e43fa8e27f71085afa078dd5c72ad6",
+        "b_fingerprint": "d27e9bf72304ed53bacd27c275f99f4b434989634e77fd159531b8a402c8df98"
+      },
+      {
+        "pair": 8,
+        "a_fingerprint": "53a87b886d8749e0cba20ac71ffe3ec7f88ea6337c82d444368c268eabe084fd",
+        "b_fingerprint": "0cae7041aff3bbe21e7ce792ed634eed800939c3a5cc767f5c6968c5f2736ea2"
+      },
+      {
+        "pair": 9,
+        "a_fingerprint": "d0194f0b0c9681a59b2f384386e6f4751d30a2622c241a64b5137f75eda648a6",
+        "b_fingerprint": "cde4fe47f33dd3c54994afc974e3bff1fb3ec3e612f63f341fe36541934c214f"
+      },
+      {
+        "pair": 10,
+        "a_fingerprint": "14d406ffb27f3ce60ed8f19d52a2d0d458d389d38c07941a3d496645a4aa04c8",
+        "b_fingerprint": "8e58a840cab587f06d87b7b1c61fbb18427e47f62f63c238d382cdeff7da2561"
+      },
+      {
+        "pair": 11,
+        "a_fingerprint": "529772591d7927295a9d5abf25adf3818d650450cfc6916a98abf46601672ad8",
+        "b_fingerprint": "db4a9597fd2f2070409cea73def4e329e2b59ed1d9511eb62d74b6283baae22f"
+      },
+      {
+        "pair": 12,
+        "a_fingerprint": "8082ecf8e3e218705c7c813901dddb724cdec9f7938f451dc126f872e6f3f1e1",
+        "b_fingerprint": "3461485b7808f5430f5cadb6ad9e68ef4697fadb7a41e0086ed62bbe0f10ea67"
+      },
+      {
+        "pair": 13,
+        "a_fingerprint": "678ae66fdc626e461bfe92fbe5d18b11ad43818ed98eab8079252664801befc4",
+        "b_fingerprint": "9f863455629a2ec2f4d8528efa10ac0a38ee78d8f8cafc679e3ae05fd8532109"
+      },
+      {
+        "pair": 14,
+        "a_fingerprint": "72119ebabd2371e967b3251c87f0eef17b2273f1b40211b49c1d5d9854a3ce50",
+        "b_fingerprint": "c857d544fb5b99f2e20acafdd7a66b9c1befd38f2343efaa67e99ad738d86fff"
+      },
+      {
+        "pair": 15,
+        "a_fingerprint": "9ed0159d2cc9035ad474384ffefb293782bacf0a2cce4bd3d70d519c0314e2ed",
+        "b_fingerprint": "e7ae16a7bd0deb185951c86de9609e4dc5b8212a849a9aebd7947d80edf181a6"
+      },
+      {
+        "pair": 16,
+        "a_fingerprint": "1d1f4c19505652c77dbc9eade656cbb66459b970b99ef7a91055d987dc9ab870",
+        "b_fingerprint": "dd69a0b81080820192dee1f4dc7ea5e5e3f2ad4738b9a0fde360e6540299b40a"
+      },
+      {
+        "pair": 17,
+        "a_fingerprint": "525a285a233c5ba49bfe6eb3b4fc9c17327f34059666f231c272ebac49e7c169",
+        "b_fingerprint": "d040227a6738cdc316b1ae55a323c8cbb8eee7d7c8c9871a32fc8291edeac9f9"
+      },
+      {
+        "pair": 18,
+        "a_fingerprint": "3e92fcca29cf654cf38bbf0ba73fc776b91ef9f6ba33271046ec83dbfda383f5",
+        "b_fingerprint": "ceb97572656a32f4e965d395b2f2fbfb35be551653dc981ed709619ba8016e44"
+      },
+      {
+        "pair": 19,
+        "a_fingerprint": "42a1af7a7aebfb518c5250e8a6e539fe777e8522f28e191c458458c892b9dec4",
+        "b_fingerprint": "7cc4dd196cd4ef15e8186e3720ae0e162ada4bd0e607125bac3a27545e376a2f"
+      },
+      {
+        "pair": 20,
+        "a_fingerprint": "c038de2999177947aaa4b9d083ff0a32d53bd26456ef407db1a23e35316491de",
+        "b_fingerprint": "33face5072b0d9dc733067440d7c0712c7f0b7a63fb855720f40e051c3db9223"
+      }
+    ],
+    "warning": ""
+  },
+  "response_instructions": {
+    "accepted_keys": "responses.<respondent> 에는 pair 번호를 1-based(1..N) 또는 0-based(0..N-1)로 넣을 수 있음",
+    "accepted_values": [
+      "A",
+      "B",
+      "답변불가",
+      "판단불가",
+      "미응답"
+    ],
+    "validity_rule": "공식 집계는 A/B만 유효. 나머지는 invalid"
+  },
+  "pair_metadata": [
+    {
+      "pair": 1,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "남편이 육아를 전혀 도와주지 않을 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 2,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "아이 양육 방식을 두고 남편과 갈등이 생겼을 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 3,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "남편이 생활비를 줄이겠다고 할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 4,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "시댁 식구들이 우리 집에서 눌러앉을 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 5,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "시댁이 갑자기 방문한다고 할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 6,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "남편이 가사는 전혀 안 하면서 지적만 할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 7,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "아파트 층간소음 때문에 이웃과 싸웠을 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 8,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "시어머니가 손주 양육에 간섭할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 9,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "남편이 용돈을 줄이겠다고 했을 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 10,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "시어머니가 우리 집에 너무 자주 올 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 11,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "남편이 내 직장을 그만두라고 강요할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 12,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "남편이 가족 행사만 되면 술을 마실 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 13,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "남편이 내 의견을 무시할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 14,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "아이 학교 엄마들과 갈등이 생겼을 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 15,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "시어머니가 내 요리를 매번 비교할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 16,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "직장 다니면서 육아까지 혼자 다 할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 17,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "시어머니가 명절 준비를 혼자 다 시킬 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 18,
+      "a_label": "ai",
+      "b_label": "human",
+      "a_meta": {
+        "theme": "친정과 시댁 사이에서 눈치를 봐야 할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      },
+      "b_meta": {}
+    },
+    {
+      "pair": 19,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "친정엄마와 남편이 사이가 안 좋을 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    },
+    {
+      "pair": 20,
+      "a_label": "human",
+      "b_label": "ai",
+      "a_meta": {},
+      "b_meta": {
+        "theme": "남편이 내 친구 관계를 못마땅해할 때",
+        "generator": "runtime",
+        "community": "NATEPAN"
+      }
+    }
+  ],
+  "responses": {
+    "friend": {},
+    "owner": {}
+  }
+}
