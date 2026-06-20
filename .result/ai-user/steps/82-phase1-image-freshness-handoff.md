@@ -30,10 +30,20 @@ docker inspect againspring-llm-ai-user-prod --format '{{.Created}}'
 docker inspect againspring-ai-user-orchestrator-prod --format '{{.Created}}'
 ```
 
-**판정 기준**:
-- 이미지 Created ≥ `b783168d` 커밋 시각 (2026-06-20 05:12:18) → **이미 반영됨 (no-op)**
-- 이미지 Created < `74e2b283` 커밋 시각 (2026-06-17 12:02:16) → **미반영 → dev 재빌드 필요**
-- 이미지 Created 사이 → **부분 반영, 확인 필요**
+**실측 결과 (2026-06-21)**:
+
+| 이미지 | Created (KST) | 판정 |
+|---|---|---|
+| `againspring-llm-ai-user-prod` | 2026-06-15 21:59 | ❌ STALE — `74e2b283` (2026-06-17) 이전 |
+| `againspring-ai-user-orchestrator-prod` | 2026-06-16 08:53 | ❌ STALE — `74e2b283` (2026-06-17) 이전 |
+| `againspring-llm-ai-user` (dev) | 2026-06-20 19:52 | ✅ FRESH — `b783168d` (2026-06-20 05:12) 이후 |
+| `againspring-ai-user-orchestrator` (dev) | 2026-06-20 19:51 | ✅ FRESH |
+
+→ **Prod 재빌드 필요** (cheap-win 3개 레버 미반영).
+→ Dev는 이미 fresh, 재빌드 생략.
+→ **e2e-realbe dev:8090 → 142 PASS / 5 skip / 0 FAIL (2026-06-21)** ✅
+
+**다음**: 사용자의 명시적 "prod에 배포해줘" 지시 후 명령 4 실행.
 
 ## 명령 2: .env.prod 점검 (prod host에서 실행)
 
