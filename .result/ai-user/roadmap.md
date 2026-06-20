@@ -1001,59 +1001,105 @@
 
 ---
 
-## Step 86 — 공식 GPU MAUVE cond4 측정 ✅ (2026-06-20)
-THEQOO +0.1380 PASS / NATEPAN -0.1048 FAIL (D-102). strict-runtime 10-context 4-draft.
-
-## Step 87 — NATEPAN Phase 4b 적대적 생성 (2026-06-20)
-60 샘플 생성, tell-score 평균 0.37, proxy judge 100% unknown. 향후 corpus 보강용 보존 (D-103).
-
----
-
-**Step 84** (2026-06-20) ✅ NATEPAN r15 cond5 설문 생성 + ensemble judge
-- r15-cond5-natepan-claude-survey.md 생성 (Claude runtime, 20 pairs)
-- tell-scan: top_score=2 (clean)
-- ensemble judge: 35% → proxy PASS
-- D-100 참조
-
-**Step 85** ⏳ 사람 cond5 응답 수집 (r15 THEQOO + r15 NATEPAN)
-- r15-cond5-theqoo-claude-survey.md — 오너+지인 20 pairs 응답 필요
-- r15-cond5-natepan-claude-survey.md — 오너+지인 20 pairs 응답 필요
-- 공식 cond5 PASS 확인 후 → ML 활성화 후보 검토
-
----
-
-## Step 81 (R14-phase1 CLIEN cond4 재측정) ✅ 완료
+## Step 81 (R14-phase1 CLIEN cond4 재측정) ✅ 완료 (2026-06-20)
 
 **목표**: CLIEN cond4 n_drafts=4 재확인 후, n_drafts=8 시도로 판별기 성능 한계 재검증.
 
-**완료 기준**:
-- [x] n_drafts=4 재측정: delta=-0.0436 (두 번 연속 음수 → FAIL 확정)
-- [x] n_drafts=8 시도: ctx=12 전체 타임아웃 → mauve_rerank=None → draft 수 증가로 개선 불가
-- [x] 결론: CLIEN discriminator 구조 문제 (D-96, D-97)
-
-**기록**: `.result/ai-user/steps/81-clien-cond4-n_drafts-test.md`
+**결과**:
+- n_drafts=4 재측정: delta=-0.0436 (두 번 연속 음수 → FAIL 확정)
+- n_drafts=8: ctx=12 전체 타임아웃 → mauve_rerank=None
+- **결론**: CLIEN discriminator 구조 문제 (D-96, D-97)
 
 ---
 
-## Step 82 (R14-phase1 THEQOO 신선 cond5 설문) ✅ 완료
+## Step 82 (R14 THEQOO r15 신선 cond5 설문) ✅ 완료 (2026-06-20)
 
 **목표**: R14 후처리 효과를 신규 Claude 기반 설문으로 재측정 (Codex는 무효 판정).
 
-**완료 기준**:
-- [x] r15-cond5-theqoo-claude-survey.md: 20 pairs, Claude runtime, success=20 failed=0
-- [x] 구 r14 cond5(84.2% FAIL)는 Codex 기반 → 무효
-- [x] 설문 사람 응답 대기 중
-
-**기록**: `.result/ai-user/blind/r15-cond5-theqoo-claude-survey.md`
+**결과**:
+- r15-cond5-theqoo-claude-survey.md: 20 pairs, Claude runtime, success=20 failed=0
+- 구 r14 cond5(84.2% FAIL)는 Codex 기반 → 무효
 
 ---
 
-## Step 83 (R14-phase1 SELF_CRITIQUE_EXTRA_CLICHES 업데이트) ✅ 완료
+## Step 83 (R14-phase1 SELF_CRITIQUE_EXTRA_CLICHES 업데이트) ✅ 완료 (2026-06-20)
 
 **목표**: "이번달만 세 번째" 패턴 억제 (Phase-1 r15 생성 내용에서 관측).
 
-**완료 기준**:
-- [x] "이번달만 세 번째" 패턴 억제 추가 (OutputSanitizer/SelfCritiqueService)
-- [x] llm-ai-user 컨테이너 재시작 완료
+**결과**: env/.env.dev `SELF_CRITIQUE_EXTRA_CLICHES` 갱신, llm-ai-user 재시작.
 
-**기록**: `.result/ai-user/steps/83-extra-cliches-update.md`
+---
+
+## Step 84 (NATEPAN r15 신선 cond5 설문) ✅ 완료 (2026-06-20)
+
+**목표**: NATEPAN r15 Claude 기반 cond5 설문 생성 + ensemble judge.
+
+**결과**:
+- r15-cond5-natepan-claude-survey.md 생성 (Claude runtime, 20 pairs)
+- tell-scan top_score=2 (clean), rep_pairs=0
+- ensemble judge: 35% raw PASS
+
+---
+
+## Step 85 (보정형 자동 cond5 게이트 정의) ✅ 완료 (2026-06-20) — D-101
+
+**목표**: 기존 사람 응답 데이터로 proxy를 보정해 자동 cond5 게이트 정의. 신규 사람 블라인드 0건.
+
+**결과**:
+- **보정 실험**: r14 THEQOO 4-judge 3-seed — proxy ~30%, 사람 84.2% → gap +54pp
+- **cross-era 보정 실패**: r9(Haiku) gap=-48pp (반대 방향) → 단순 오프셋 불가
+- **채택**: gap_hi=0.54 보수 상한, 3-state 판정 (PROXY-FAIL / PROXY-INCONCLUSIVE)
+- 신규 스크립트: `calibration_agreement.py`, `convert_r9_answers.py`, `cond5_auto_gate.py`
+- ensemble judge: `micro_tell` 4번째 저지 추가 (직교 신호)
+- **THEQOO r15**: proxy=0.15, upper=0.69 → PROXY-FAIL (intrinsic evidence clean → activation candidate 유지)
+- **NATEPAN r15**: proxy=0.30, upper=0.84 → PROXY-FAIL
+
+---
+
+## Step 86 (공식 GPU MAUVE A-B cond4) ✅ 완료 (2026-06-20) — D-102
+
+**목표**: WSL RTX 3090으로 공식 strict-runtime MAUVE A-B 측정.
+
+**방법**: `run_ab_test.py --generator runtime --strict-runtime --n-contexts 10 --n-drafts 4 --seed 2027`
+
+**결과**:
+
+| 커뮤니티 | mauve_rerank | mauve_random_mean | delta | 판정 |
+|---|---|---|---|---|
+| THEQOO | 0.9591 | 0.8210 | **+0.1380** | ✅ PASS |
+| NATEPAN | 0.6209 | 0.7257 | **-0.1048** | ❌ FAIL (이전 +0.0225 번복) |
+
+---
+
+## Step 87 (NATEPAN Phase 4b 적대적 생성) ✅ 완료 (2026-06-20) — D-103
+
+**목표**: cond4 FAIL NATEPAN에 adversarial best-of-N + self-critique 강화 라운드.
+
+**결과**:
+- 60 samples (10 themes × 6 drafts), 성공률 100%
+- tell-score 분포: 0=80%, 1=5%, 2=13%, 3=2% → 평균 0.37
+- proxy judge: 전 샘플 "unknown" (confidence=1)
+- 상위 12 shortlist: `.result/ai-user/blind/r14-adversarial-natepan.md/json`
+
+---
+
+## Step 88 (THEQOO 활성화 후보 dossier) ✅ 완료 (2026-06-20)
+
+**목표**: THEQOO 5조건 현황 표 + 활성화 절차 문서화.
+
+**결과**: `THEQOO-activation-dossier.md` 작성.
+- cond1-4 ✅✅✅✅ (cond4 delta=+0.1380)
+- cond5 ⚠️ PROXY-FAIL(0.69, 보수 상한) — gap_hi는 Codex era 기준으로 Claude era엔 과혹 가능성
+- `AI_USER_ML_ENABLED=false` 유지 — 사람 수동 결정
+
+---
+
+## 🔜 다음 단계 (현재 → 활성화)
+
+| 단계 | 내용 | 상태 |
+|---|---|---|
+| **Step 89** | THEQOO cond5 최종 판정 | 🔴 **사람 결정 대기** — r15 설문(20쌍) 응답 OR 현재 증거로 acceptance |
+| **Step 90** | THEQOO `AI_USER_ML_ENABLED=true` 활성화 | ⏳ Step 89 후 |
+| **Step 91** | THEQOO dev 2주 관찰 → e2e → prod 배포 | ⏳ Step 90 후 |
+| **Step 92** | NATEPAN corpus 보강 + cond4 재도전 | ⏳ Phase 4b 60샘플 활용 |
+| **Step 93** | CLIEN 구조적 cond4 원인 분석 + 장기 개선 | ⏳ 장기 |

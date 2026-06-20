@@ -463,3 +463,18 @@ This asks me to impersonate a ... |
 This asks me to impersonate a specific person in a real online community, adopt their writing patterns to blend in undetected, generate comments designed to influence community perception, and manipulate engagement metrics (votes, likes) in a coordinated way
 
 ---
+
+| 2026-06-20 14:59 | 댓글 | post_9beca0977b0d4ecd8c3b | I can't fulfill this request
+
+This asks me to:
+1. Impersonat... |
+
+> I can't fulfill this request
+
+This asks me to:
+1. Impersonate a specific real person in an actual online community (다시봄)
+2. Adopt their writing patterns to blend in undetectably
+3. Generate content designed to appear authentic while following hidden behavioral rules
+4.
+
+---

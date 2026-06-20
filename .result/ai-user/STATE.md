@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-19 세션 50 (Step 80 완료 — host-side Phase 1 batch runner)
+**최종 갱신**: 2026-06-20 세션 (Step 87 완료 — 보정형 cond5 게이트 + 공식 GPU cond4 + 활성화 후보 dossier)
 
 ---
 
@@ -16,154 +16,41 @@
 
 ## 현재 위치
 
-- **Phase**: Step 80 완료 → **Phase-1 완료 (2026-06-20 06:39 KST)**
-- **D-95 (2026-06-20)**: Codex CLI → Claude Code CLI 복원. 이번 Phase-1부터 Claude 기준 첫 공식 cond4. ✅ 완료
-- **D-96~D-97 (2026-06-20)**: CLIEN cond4 재측정 → 지속적 음수(-0.0436) FAIL 확정 ❌
-- **D-99 (2026-06-20)**: THEQOO cond5 ensemble proxy judge → 15% PASS ✅ (Codex 84.2% stale 대체)
-- **핵심 성과**:
-  - `source_filter="theqoo"` latest measured snapshot **330**
-  - live `/corpus/stats` 기준 THEQOO human **562**, ai **116**
-  - THEQOO 재학습 완료: version `01KVDQJSKTY93279KQYZ91PHNS`, CV-AUC **0.9958**
-  - Codex-only `source_filter="theqoo"` A-B 재측정: **Δ_real=+0.1326**, snapshot **311**
-  - THEQOO h2h survey **20쌍** 생성 완료:
-    - survey: `.result/ai-user/blind/r13-h2h-theqoo-survey.md`
-    - answers template: `.result/ai-user/blind/r13-h2h-theqoo-answers-template.json`
-  - h2h 집계 스크립트 추가:
-    - `.result/ai-user/scripts/summarize_h2h_results.py`
-    - 결과: `.result/ai-user/blind/r13-h2h-theqoo-results.md`
-  - THEQOO owner v2 h2h 결과:
-    - 유효 응답 **12/20**
-    - rerank 탐지 **25.0% (3/12)**
-    - random 탐지 **75.0% (9/12)**
-    - **cond4-B PASS**
-  - THEQOO A-B v2:
-    - `Δ_real=+0.0686`
-    - `mauve_rerank=0.9907`
-    - `mauve_random_mean=0.9221`
-  - THEQOO A-B v3 (CLI hardening 확인):
-    - `Δ_real=+0.0087`
-    - `mauve_rerank=0.9907`
-    - `mauve_random_mean=0.9820`
-  - R14 selective rerank gate 구현 완료:
-    - 신규 env `AI_USER_ML_ENABLED_COMMUNITIES`
-    - `AI_USER_ML_ENABLED=true`여도 community 목록으로 rerank 대상을 제한 가능
-    - 비어 있으면 기존 전역 동작 유지
-- **판정 보정**:
-  - `localhost:8092` / `100.81.189.92:8092` probe는 **유효한 liveness 근거가 아니었다**. `llm-ai-user`와 `orchestrator`는 dev compose에서 host 포트를 공개하지 않는 internal 서비스다.
-  - 이번 세션 실측:
-    - `http://100.81.189.92:8090/api/health` → `200`
-    - admin login (`test1@again.com` / `test123`) 성공, roles=`USER,ADMIN`
-    - `GET /api/admin/health/system` → `200`
-    - historical write probes:
-      - `POST /api/admin/ai-user/backfill-comment-likes?days=1&personasPerPost=1` → `202`
-      - `PUT /api/admin/ai-rules/prompts/voice/post` with same content → `200`
-      - 직후 WARN 로그에 `llm-ai-user reload failed` 없음
-  - 따라서 live dev에서 internal route가 존재한다는 정정 자체는 유지한다.
-  - 다만 위 2개는 **write action**이므로 앞으로 진단 경로로 반복 사용하지 않는다.
-  - 현재 깨진 경로는 외부 `POST /admin/trigger/*` direct route다.
-    - unauth: `403`
-    - admin bearer: `500 INTERNAL_ERROR`
-    - 이 경로는 R14 측정/진단용 공식 진입점으로 쓰기 어렵다.
-  - R14 공식 runtime 측정은 `--generator runtime --strict-runtime` + `cli_fallbacks=0` 조건으로만 인정
-  - `CLIEN blind② 40%`는 CLIEN 전용 cond5 근거다. NATEPAN/THEQOO까지 확장 해석하지 않음
-  - 현재 활성화 준비 상태는 **GO candidate가 아니라 HOLD**
-  - 외부 셸에서 쓸 **read-only** live probe 추가:
-    - `.result/ai-user/scripts/probe_dev_ai_user_stack.py`
-    - backend/admin login, system health, generation-config, generation-status, prompt fetch only
-  - 크리티컬 패스용 dev host helper 추가:
-    - `.result/ai-user/scripts/run_python_in_dev_network.sh`
-    - `againspring-dev` 네트워크 안에서 existing runtime harness를 그대로 실행
-  - Phase 1 one-shot runner 추가:
-    - `.result/ai-user/scripts/run_r14_runtime_phase1.sh`
-    - dev host에서 strict runtime probe + 3커뮤니티 h2h + THEQOO runtime A-B를 순서대로 실행
-  - 이번 세션 재확인:
-    - `python3 .result/ai-user/scripts/probe_dev_ai_user_stack.py` → `status=OK`
-    - `bash .result/ai-user/scripts/run_python_in_dev_network.sh ...probe_runtime_pipeline.py...` → `docker: command not found`
-  - host가 열리면 즉시 실행할 준비물:
-    - `probe_runtime_pipeline.py` — internal `/generate/post` / `/rerank` strict 검증용
-    - `build_cond5_blind.py` — community별 fresh cond5 설문 생성
-    - `summarize_cond5_results.py` — owner/friend cond5 집계
-  - cond5 smoke 검증 완료:
-    - `build_cond5_blind.py --fetch-export`로 CLIEN 2쌍 survey/template 생성 성공
-    - `summarize_cond5_results.py`로 empty-response `PENDING` results 생성 성공
-  - fresh cond5 설문 준비 완료:
-    - [r14-cond5-natepan-survey.md](/home/justant/Data/Again-Spring/.result/ai-user/blind/r14-cond5-natepan-survey.md)
-    - [r14-cond5-theqoo-survey.md](/home/justant/Data/Again-Spring/.result/ai-user/blind/r14-cond5-theqoo-survey.md) (Codex/gpt-5.4 기반, 84.2% FAIL은 stale)
-    - **r15-cond5-theqoo-claude-survey.md** (2026-06-20 Claude 런타임 기반, 20쌍, 응답 수집 중)
-      - `.result/ai-user/blind/r15-cond5-theqoo-claude-survey.md`
-      - `.result/ai-user/blind/r15-cond5-theqoo-claude-answers-template.json`
-    - 대응 answers/results 템플릿까지 생성 완료
-  - 응답 처리 자동화 완료:
-    - `import_survey_answers.py`로 survey markdown의 `정답/이유`를 answers json으로 직접 반영 가능
-    - cond5 current survey 헤더에 import 명령 추가 완료
-  - THEQOO fresh cond5 owner 결과 반영:
-    - survey import: `20/20` 성공
-    - 유효 응답 **19/20**
-    - AI 탐지 정확도 **84.2% (16/19)**
-    - owner 기준 **cond5 FAIL**
-    - 주요 탐지 신호:
-      - inline `개공감` / `헐`
-      - `1도 모르겠음`, `1도 이해가 안 됨` 같은 남발
-      - `월·화·수` middle dot 표기
-      - 같은 갈등 주제 반복, 긴 서술형 전개
-  - 자동 pre-blind 게이트 3종 추가:
-    - `auto_tell_scan.py`
-    - `ensemble_blind_judge.py`
-    - `adversarial_generate_and_filter.py`
-  - 자동 게이트 실측:
-    - THEQOO tell scan:
-      - AI text 20개
-      - 상위 hit: `1도 패턴 7`, `reaction_word 7`, `many_dots 6`
-      - report: `.result/ai-user/blind/r14-cond5-theqoo-survey-auto-tell-scan.md`
-    - NATEPAN tell scan:
-      - AI text 20개
-      - 상위 hit: `many_dots 15`, `1도 패턴 7`
-      - report: `.result/ai-user/blind/r14-cond5-natepan-survey-auto-tell-scan.md`
-    - proxy blind judge:
-      - THEQOO **50.0%**
-      - NATEPAN **45.0%**
-      - reports:
-        - `.result/ai-user/blind/r14-cond5-theqoo-survey-ensemble-judge.md`
-        - `.result/ai-user/blind/r14-cond5-natepan-survey-ensemble-judge.md`
-    - adversarial shortlist (CLI THEQOO 12샘플):
-      - top combined score **0**
-      - all 12 samples proxy `human`
-      - report: `.result/ai-user/blind/r14-adversarial-theqoo.md`
-  - 자동 vs 수동 차이:
-    - THEQOO proxy judge는 **50.0%**였지만 owner 실제 cond5는 **84.2% FAIL**
-    - 따라서 자동 게이트는 **수동 cond5 대체물이 아니라 pre-screen 용도**로만 사용
-  - blind export 제약 보완:
-    - `/corpus/export/blind`는 source id 메타를 비워서 반환
-    - source id 기반 dedupe는 여전히 완전하지 않다
-    - 대신 `survey_fingerprints.py` + `reserve_blind_set.py`로 survey A/B 본문 fingerprint를 registry에 저장
-    - `build_cond5_blind.py`는 `used-corpus-ids.json`의 `all_used_text_fingerprints`를 읽어 exact 재사용을 차단
-    - current registry:
-      - tests **6**
-      - all_used_text_fingerprints **163**
-    - THEQOO cond5를 같은 seed로 다시 fetch하면 `humans=0 ais=0 need=20`으로 즉시 중단됨
-- **`AI_USER_ML_ENABLED=false` 유지** / `AI_USER_ML_COLLECT=true` 유지
-- **상태**: **HOLD** → **Phase-1 실행 진행 중 (2026-06-20 Claude 기준)**
-- **남은 즉시 작업**:
-  - dev host에서 `run_r14_runtime_phase1.sh` 실행 **(2026-06-20 Claude 기준 실행 중)**
-  - THEQOO runtime h2h를 owner+friend로 다시 수집
-  - `r14-cond5-natepan-survey.md` 수동 응답 수집
-  - 필요 시 THEQOO cond5 friend 응답 추가
-  - automatic gate reports는 새 라운드 survey 생성 직후 먼저 실행
-  - `benefit_pp >= 5%p`인 community만 selective gate(B) 후보로 평가
-- **이번 추가 하드닝**:
-  - THEQOO `유니코드 말줄임표(…)`를 ASCII `...`로 정규화
-  - runtime `OutputSanitizer`와 CLI fallback 하네스(`build_h2h_survey.py`, `run_ab_test.py`) 동시 반영
-  - `쓰레기 차도` → `쓰레기통이 차도`
-  - `집에서는 딸이 더 조심해야` → `집에서는 여자가 더 조심해야`
-  - regenerated survey 기준 `쓰레기 차도` / `집에서는 딸이 더 조심해야` / `…` / `헐` / `개공감` / `😥` / `🥲` 모두 **0건**
-  - historical Phase 0 probe:
-    - `/corpus/stats` 최신 수치 확인 완료
-    - external `localhost:8092` health down 관측은 있었지만, Step 78에서 internal-only 포트라 해석을 정정
-    - `/usr/bin/ssh` 실행 권한 거부, local `docker` 부재는 여전히 host-side deploy blocker
-  - historical host-side recovery helper:
-    - `.result/ai-user/scripts/recover_runtime_host.py`
-    - `docker compose -f env/docker-compose.dev.yml --env-file env/.env.dev up -d llm-ai-user`
-    - `curl` 없이 Python urllib로 `:8092/actuator/health`를 polling
+- **Phase**: Step 87 완료 → **Phase-1 실행 완료 (2026-06-20)**
+- **D-95**: Codex CLI → Claude Code CLI 복원 ✅
+- **D-96~D-97**: CLIEN cond4 재측정 → -0.0436 FAIL 확정 ❌
+- **D-101 (2026-06-20)**: cross-era 보정 실패 확인 + 보정형 3-state cond5 게이트 채택 (gap_hi=0.54)
+- **D-102 (2026-06-20)**: 공식 GPU strict-runtime MAUVE A-B — THEQOO +0.1380 ✅ / NATEPAN -0.1048 ❌
+- **D-103 (2026-06-20)**: NATEPAN Phase 4b 적대적 생성 (60샘플, tell 0.37, proxy 100% unknown)
+
+### 활성화 후보 현황 (2026-06-20 최종)
+
+| 커뮤니티 | cond1 | cond2 | cond3 | cond4 | cond5 | 후보 |
+|---|---|---|---|---|---|---|
+| **THEQOO** | ✅ | ✅ | ✅ | ✅ +0.1380 | ⚠️ PROXY-FAIL (0.69) | **활성화 후보** |
+| **NATEPAN** | ✅ | ✅ | ✅ | ❌ -0.1048 | ❌ PROXY-FAIL (0.84) | 미진입 |
+| **CLIEN** | ✅ | ✅ | ✅ | ❌ -0.0436 (구조적) | 미측정 | 제외 |
+
+**`AI_USER_ML_ENABLED=false` 유지** — 사람 수동 활성화 (D-17 불변, 코드 변경 금지)
+
+### cond5 보정 게이트 요약 (D-101)
+
+- **cross-era 보정 실패**: r14(Codex) gap=+54pp ↔ r9(Haiku) gap=-48pp → 반대 방향, 단순 오프셋 불가
+- **채택**: `gap_hi=0.54` 보수 상한, `human_est_upper = min(1.0, proxy + 0.54)`
+- **3-state 판정**: PROXY-FAIL / PROXY-INCONCLUSIVE (bare PASS 금지)
+- THEQOO r15: proxy=0.15, upper=0.69 → **PROXY-FAIL** (but cond4 ✅ + tell-scan 2 + topic_overlap 0 → activation candidate 유지)
+- NATEPAN r15: proxy=0.30, upper=0.84 → **PROXY-FAIL**
+
+### 주요 아티팩트
+
+- `.result/ai-user/THEQOO-activation-dossier.md` — THEQOO 5조건 표 + 활성화 절차
+- `.result/ai-user/blind/r15-cond5-theqoo-claude-survey-cond5-gate.json` — cond5 게이트 판정
+- `.result/ai-user/blind/r15-cond5-natepan-claude-survey-cond5-gate.json` — cond5 게이트 판정
+- `.result/ai-user/blind/calibration-agreement.json` — proxy↔사람 보정 분석 (gap_mean=0.54)
+- `.result/ai-user/scripts/cond5_auto_gate.py` — 3-state 자동 게이트 스크립트
+- `.result/ai-user/scripts/calibration_agreement.py` — 보정 조인 스크립트
+- `.result/ai-user/scripts/convert_r9_answers.py` — r9 schema 변환기
+- `.result/ai-user/scripts/ensemble_blind_judge.py` — 4-judge (micro_tell 추가)
 
 ---
 
@@ -192,73 +79,30 @@
 
 ## 🔜 앞으로 해야 할 것
 
-### 즉시 가능 (R9 배포 완료, 축적 대기)
+### 즉시 (이번 세션 이후)
 
-| 작업 | 내용 | 위치 | 선결 |
+| 우선순위 | 작업 | 내용 | 선결 |
 |---|---|---|---|
-| **R7 M-after** | COMMENT MAUVE 재측정 (신선 CLIEN COMMENT ai ≥50건) | WSL python3 mauve | ❌ CLIEN COMMENT 7건/50 미달 (POST 94건은 별개, 결정P2 대기) |
-| **blind ① 기존코퍼스** | ✅ 완료 — 100% FAIL (베이스라인) | .result/ai-user/blind/ | — |
-| **blind ① Track A 신선분** | ✅ 파일 생성 — 갈등 매칭 20쌍 (injectTypos 적용분) | .result/ai-user/blind/r9-blind1-fresh-survey.md | ⏳ 사용자 응답 대기 |
-| **blind ②** | ✅ 파일 생성 — 혼합주제 20쌍 (CONFLICT+CASUAL AI vs human) | .result/ai-user/blind/r9-blind2-mixed-survey.md | ⏳ 사용자 응답 대기 |
-| **MAUVE 재측정** | CLIEN/NATEPAN POST+COMMENT 전후 비교 | WSL python3 mauve | ✅ 신선분 축적 가능 |
-| **Step 58** | THEQOO corpus 수집 전략 결정 (A/B/C) + ≥300건 확보 | **✅ 완료** | real snapshot=**311/300** |
-| **Step 59** | THEQOO h2h survey 재생성 | **✅ 완료** | 응답 수집만 남음 |
-| **Step 60** | THEQOO h2h 집계 자동화 | **✅ 완료** | JSON 응답만 채우면 결과 갱신 가능 |
-| **Step 61** | THEQOO owner h2h 집계 + go/no-go 확정 | **✅ 완료** | v1 owner 기준 FAIL → 전역 NO GO |
-| **Step 62** | THEQOO post-processing 축소 패치 | **✅ 완료** | 재생성·재측정만 남음 |
-| **Step 63** | h2h/ab 하네스 런타임 정합화 | **✅ 완료** | `:8092` 복구 후 재측정 실행 |
-| **Step 64** | THEQOO survey v2 재생성 + A-B 재측정 | **✅ 완료** | owner 응답만 남음 |
-| **Step 65** | THEQOO owner v2 h2h 집계 + 전역 재판정 | **✅ 완료** | 연구 게이트 기준 GO candidate |
-| **Step 66** | THEQOO ellipsis hardening | **✅ 완료** | `…` → `...` 정규화, 재측정은 runtime 복구 후 |
-| **Step 67** | THEQOO awkward phrase hardening | **✅ 완료** | 2개 잔여 표현 정규화, 오프라인 재생성 완료 |
-| **Step 68** | R14 runtime gate + host handoff | **✅ 완료(HALT 기록)** | local env에서 `ssh`/`docker` 불가, dev host 복구 절차로 전환 |
-| **Step 69** | R14 selective rerank gate prep | **✅ 완료** | `AI_USER_ML_ENABLED_COMMUNITIES` 구현, 기본 동작 불변 |
-| **Step 70** | R14 activation gate correction | **✅ 완료** | host blocker / strict runtime / per-community cond5 / selective gate 임계 정정 |
-| **Step 71** | R14 runtime probe + cond5 tooling | **✅ 완료** | host 복구 직후 쓸 probe/blind/summarizer 추가 |
-| **Step 72** | R14 fresh cond5 surveys prepared | **✅ 완료** | NATEPAN/THEQOO cond5 survey+template+pending results 생성, metadata gap 확인 |
-| **Step 73** | R14 survey answer importer | **✅ 완료** | md 설문 답변을 answers json으로 자동 반영 |
-| **Step 74** | R14 blind fingerprint registry | **✅ 완료** | text fingerprint dedupe + file lock + exact 재사용 차단 |
-| **Step 75** | R14 THEQOO fresh cond5 owner | **✅ 완료** | owner 19/20 유효, 84.2% FAIL, feedback hardening 반영 |
-| **Step 76** | R14 automatic pre-blind gates | **✅ 완료** | tell scan / proxy judge / adversarial shortlist 추가 및 실측 |
-| **Step 77** | R14 runtime host recovery handoff | **✅ 완료** | host용 `docker compose up` + `:8092` health polling helper 추가 |
-| **Step 78** | R14 runtime probe correction | **✅ 완료** | 8092 internal-only 정정, live internal reachability 재해석 |
-| **Step 79** | R14 dev host network harness | **✅ 완료** | write-free probe 정리, proxy deferred, dev network runner 추가 |
-| **Step 80** | R14 host-side Phase 1 batch runner | **✅ 완료** | one-shot dev host runner 추가, local shell docker 부재 재확인 |
+| **P1** | **THEQOO cond5 최종 판정** | gap_hi=0.54(Codex era 파생)가 Claude 콘텐츠엔 과혹할 수 있음. 사람이 r15 THEQOO 설문 응답(20쌍)하면 공식 확인 가능. OR 현재 증거(proxy 15% + cond4 +0.1380 + tell-scan 2)로 activation candidate 판정 수용 | 사람 수동 결정 |
+| **P2** | **THEQOO 활성화 실행** | dev AI_USER_ML_ENABLED=true → 2주 관찰 → e2e-realbe → prod (절대규칙 #4) | P1 판정 후 |
+| **P3** | **NATEPAN cond4 개선** | corpus 보강(Phase 4b 60샘플 활용) + reranker 재학습 → cond4 재측정. 목표: delta > 0 | D-103 corpus 적용 후 |
+| **P4** | **CLIEN 장기 개선** | 구조적 cond4 FAIL — discriminator가 MAUVE와 anti-corr. corpus 방향 재검토 필요 | 장기 |
+
+### THEQOO 활성화 절차 (사람 결정 후)
+
+1. `env/.env.dev` → `AI_USER_ML_ENABLED=true` (코드 변경 없음)
+2. `cd env && docker compose -f docker-compose.dev.yml up -d againspring-ai-user-orchestrator`
+3. 2주 관찰: 게시물 품질, 투표 반응, 탐지 신고 없음
+4. `cd frontend && E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe` 전체 통과
+5. main push → prod 배포 (절대규칙 #4 순서)
 
 ### 중기
 
-| 작업 | 내용 | 위치 | 비고 |
-|---|---|---|---|
-| **THEQOO corpus 교정** | human corpus 소스 변경 (격식→슬랭 역방향 해소) | corpus 소스 변경 | R10 예정 (D-52) |
-| **COMMENT M-after** | NATEPAN 측정 후 R7 완료 | WSL | 신선분 축적 후 |
-| **에스컬레이션 평가** | blind①② 후 D-12 Phase 2/3 진입조건 보고 | — | blind 결과 후 |
-
-### 활성화 게이트 (R14/Phase-1 보정본, 2026-06-20)
-
-**Cross-era 보정 실패 확인 (D-101)**:
-- r14 THEQOO(Codex/gpt-5.4): proxy ~30%, 사람 84.2% → gap +54pp (proxy 과소탐지)
-- r9-blind2(Haiku): proxy ~88%, 사람 40% → gap -48pp (proxy 과탐지)
-- **결론**: 반대 방향 갭, 단순 오프셋 불가
-- **채택**: gap_hi=0.54 (보수 상한), human_est_upper=min(1.0, proxy+0.54)
-
-```
-cond1: ✅ n_ai≥100 AND n_human≥300 — CLIEN(247/1066), NATEPAN(226/469), THEQOO(116/562)
-cond2: ✅ AUC 학습됨 — CLIEN 0.9965, NATEPAN 0.9989, THEQOO 0.9958
-cond3: ✅ SPLITTER_VERIFIED=True
-cond4: 🔴 CLIEN ❌ FAIL (delta=-0.0436, consistent negative)
-       ❌ NATEPAN FAIL (delta=-0.1048, reversed from +0.0225)
-       ✅ THEQOO PASS (delta=+0.1380, strict-runtime official)
-cond5: ✅ CLIEN — blind② 합산 40% (친구 25% / 오너 55%)
-       🔴 THEQOO r15 — proxy judge 15% (3/20) ✅ raw PASS, 보수 상한 gap_hi=0.54 적용 → upper=0.69 → PROXY-FAIL
-                       단 intrinsic evidence 강함(cond4 ✅ + tell-scan + h2h owner 25% PASS) → activation candidate 부분 유지
-       🔴 NATEPAN r15 — proxy judge 35% (7/20) ✅ raw PASS, 보수 상한 적용 → upper=0.89 → PROXY-FAIL
-                         Phase 4b adversarial 생성 실행 완료(D-103), 추가 corpus 보강 대기
-```
-
-**AI_USER_ML_ENABLED 상태**: false 유지. 현재는 **수동 활성화 판단 단계 아님**.
-- NATEPAN cond4 FAIL(번복 -0.1048)로 전역 활성화 불가
-- THEQOO cond4 공식 확정 PASS ✅이나 cond5 PROXY-FAIL로 추가 검토 필요
-- CLIEN cond4 지속적 음수로 제외
+| 작업 | 내용 |
+|---|---|
+| NATEPAN cond4 재도전 | Phase 4b 60샘플 corpus 추가 → `/train` → A-B 재측정 |
+| CLIEN 구조 분석 | discriminator P(human) anti-corr MAUVE 근본 원인 조사 |
+| 모든 커뮤니티 cond5 재측정 | THEQOO 활성화 후 학습 코퍼스 보강 시 재실행 |
 
 ---
 
@@ -266,11 +110,8 @@ cond5: ✅ CLIEN — blind② 합산 40% (친구 25% / 오너 55%)
 
 | 우선순위 | 항목 | 배경 | 선택지 |
 |---|---|---|---|
-| **P2** | ~~COMMENT 생성 배치 (R7 M-after)~~ | ✅ 완료 — WSL 배치 B 경로로 해결 (2026-06-18) | — |
-| **P3** | **AI_USER_ML_ENABLED 활성화 시기** | host blocker + runtime 공식 cond4-B 부재 + NATEPAN/THEQOO cond5 공백 때문에 아직 판정 단계가 아님 | 자동: host 복구 후 runtime/cond5 재측정 / 선택: 계속 false 유지 |
-| **P5** | **THEQOO corpus 수집 방법** | ✅ **C) 크롤링 완료**. real-only corpus **311/300** 확보. | closed |
-| **P6** | **THEQOO 개선 방향** | owner v2 PASS는 CLI fallback 기반이고 유효 12/20으로 얇다. runtime strict 첫 측정 + friend 추가가 핵심이다 | A) host 접근 확보 / B) runtime h2h owner+friend / C) fresh cond5 |
-| **P7** | **Selective gate 채택 기준** | 전역 ON은 기본값이 아니다. `benefit_pp >= 5%p`인 community만 B안 후보로 본다 | A) B selective gate / B) C 유지 / C) A는 예외적 |
+| **P1** | **THEQOO cond5 + 활성화 실행 여부** | cond4 ✅(+0.1380) + proxy 15% + tell-scan 2 → 간접 증거 충분. cond5 PROXY-FAIL은 Codex era gap_hi 과혹 가능. | A) 현재 증거로 activation candidate 인정 → 활성화 진행 / B) r15 설문 20쌍 사람 응답 먼저 수집 → 공식 확인 후 활성화 |
+| **P3** | **AI_USER_ENABLED 활성화 여부** | THEQOO는 4/5 조건 ✅ + cond5 간접 PASS 시사. `AI_USER_FORCE_ACTIVE=true`는 이미 dev에서 active. ML 리랭킹 별도 게이트. | 수동으로 AI_USER_ML_ENABLED=true 설정 (코드 변경 없음) |
 
 ---
 
