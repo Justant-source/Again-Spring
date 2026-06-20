@@ -77,32 +77,40 @@ def find_claude_cli() -> str | None:
     return None
 
 
+def _check_deny_sigs(text: str) -> bool:
+    return any(sig in text.lower() for sig in DENY_SIGS)
+
+
 def claude_exec(prompt: str, timeout: int = 60) -> str | None:
+    # SDK path: thread-safe, no file-lock contention from concurrent subprocesses
+    try:
+        import anthropic
+        client = anthropic.Anthropic()
+        msg = client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+            timeout=timeout,
+        )
+        text = msg.content[0].text.strip() if msg.content else ""
+        if not text or _check_deny_sigs(text):
+            return None
+        return text
+    except Exception:
+        pass
+    # CLI fallback
     claude_path = find_claude_cli()
     if not claude_path:
         return None
     try:
         result = subprocess.run(
-            [
-                claude_path,
-                "--print",
-                "--model", CLAUDE_MODEL,
-                "--no-session-persistence",
-                prompt,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
+            [claude_path, "--print", "--model", CLAUDE_MODEL, "--no-session-persistence", prompt],
+            capture_output=True, text=True, timeout=timeout,
         )
         text = result.stdout.strip() if result.returncode == 0 else ""
-        if not text:
-            return None
-        lowered = text.lower()
-        if any(sig in lowered for sig in DENY_SIGS):
+        if not text or _check_deny_sigs(text):
             return None
         return text
-    except subprocess.TimeoutExpired:
-        return None
     except Exception:
         return None
 

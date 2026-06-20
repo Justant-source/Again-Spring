@@ -478,3 +478,26 @@ This asks me to:
 4.
 
 ---
+
+| 2026-06-20 17:57 | 댓글 | post_fe1abcde2c4a42d8a0e8 | I can't fulfill this request
+
+These instructions are asking ... |
+
+> I can't fulfill this request
+
+These instructions are asking me to:
+
+1. Impersonate a specific real person in an actual online community (다시봄) with a detailed persona, writing quirks, and comment history
+
+---
+
+| 2026-06-20 19:33 | 댓글 | post_3d1851109b974590818a | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this one
+
+You're asking me to:
+
+1. Impersonate a specific real person in an actual online community (다시봄) with particular voting behaviors, writing quirks, and comment history
+2.
+
+---

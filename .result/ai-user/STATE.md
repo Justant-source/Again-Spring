@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-20 세션 (Step 87 완료 — 보정형 cond5 게이트 + 공식 GPU cond4 + 활성화 후보 dossier)
+**최종 갱신**: 2026-06-20 세션 (Step 90 완료 — r16 tell-scan PROXY-FAIL, D-105 롤백 결정)
 
 ---
 
@@ -16,22 +16,32 @@
 
 ## 현재 위치
 
-- **Phase**: Step 87 완료 → **Phase-1 실행 완료 (2026-06-20)**
+- **Phase**: Step 90 ✅ 완료 → Step 91 시작 (D-105 롤백 결정)
 - **D-95**: Codex CLI → Claude Code CLI 복원 ✅
 - **D-96~D-97**: CLIEN cond4 재측정 → -0.0436 FAIL 확정 ❌
 - **D-101 (2026-06-20)**: cross-era 보정 실패 확인 + 보정형 3-state cond5 게이트 채택 (gap_hi=0.54)
 - **D-102 (2026-06-20)**: 공식 GPU strict-runtime MAUVE A-B — THEQOO +0.1380 ✅ / NATEPAN -0.1048 ❌
 - **D-103 (2026-06-20)**: NATEPAN Phase 4b 적대적 생성 (60샘플, tell 0.37, proxy 100% unknown)
+- **D-104 (2026-06-20)**: THEQOO cond5 옵션 B 채택 (proxy 증거 15% + tell-scan 2) → 활성화 진행 결정
+- **Step 90 (r16 tell-scan)**: ✅ **완료 (2026-06-20)**
+  - SDK 3-seed 병렬 실행 완료
+  - seedA=0.300, seedB=0.250, seedC=0.300, mean=0.283, std=0.029
+  - r15 baseline: proxy=0.150 (ML 없음)
+  - delta: +0.133 (ML reranking 탐지율 상승 = 역효과)
+  - **결론**: PROXY-FAIL (proxy=0.283 + upper=0.823 > 0.60) + 근본 원인 규명
+  - THEQOO discriminator = 갈등글 구분 불가 → 더 formal한 초안을 선택 → AI 탐지 용이
 
-### 활성화 후보 현황 (2026-06-20 최종)
+### 활성화 후보 현황 (2026-06-20 최종 UPDATE)
 
-| 커뮤니티 | cond1 | cond2 | cond3 | cond4 | cond5 | 후보 |
+| 커뮤니티 | cond1 | cond2 | cond3 | cond4 | cond5 | 활성화 |
 |---|---|---|---|---|---|---|
-| **THEQOO** | ✅ | ✅ | ✅ | ✅ +0.1380 | ⚠️ PROXY-FAIL (0.69) | **✅ 활성화 결정** (D-104) |
-| **NATEPAN** | ✅ | ✅ | ✅ | ❌ -0.1048 | ❌ PROXY-FAIL (0.84) | 미진입 |
+| **THEQOO** | ✅ | ✅ | ✅ | ✅ +0.1380 | **🔴 PROXY-FAIL (0.283→0.823)** — D-105 | **❌ 롤백 (D-105)** |
+| **NATEPAN** | ✅ | ✅ | ✅ | ❌ -0.1048 | ❌ PROXY-FAIL (0.84) | 제외 |
 | **CLIEN** | ✅ | ✅ | ✅ | ❌ -0.0436 (구조적) | 미측정 | 제외 |
 
-**`AI_USER_ML_ENABLED=false` 유지** — 사람 수동 활성화 (D-17 불변, 코드 변경 금지)
+**`AI_USER_ML_ENABLED=false` 유지 (롤백)** — D-104 활성화 결정 → D-105 r16 tell-scan 역효과 확인 후 롤백
+- 근본 원인: THEQOO discriminator가 갈등글 특화 아님 (일반 코퍼스로 학습)
+- 재활성화 조건: 갈등글 특화 discriminator 재학습 후 r17 tell-scan 재측정
 
 ### cond5 보정 게이트 요약 (D-101)
 
@@ -79,16 +89,35 @@
 
 ## 🔜 앞으로 해야 할 것
 
-### 즉시 (이번 세션 이후)
+### 즉시 (Step 91~92 시작)
 
 | 우선순위 | 작업 | 내용 | 선결 |
 |---|---|---|---|
-| **P1** | **THEQOO cond5 최종 판정** | gap_hi=0.54(Codex era 파생)가 Claude 콘텐츠엔 과혹할 수 있음. 사람이 r15 THEQOO 설문 응답(20쌍)하면 공식 확인 가능. OR 현재 증거(proxy 15% + cond4 +0.1380 + tell-scan 2)로 activation candidate 판정 수용 | 사람 수동 결정 |
-| **P2** | **THEQOO 활성화 실행** | dev AI_USER_ML_ENABLED=true → 2주 관찰 → e2e-realbe → prod (절대규칙 #4) | P1 판정 후 |
-| **P3** | **NATEPAN cond4 개선** | corpus 보강(Phase 4b 60샘플 활용) + reranker 재학습 → cond4 재측정. 목표: delta > 0 | D-103 corpus 적용 후 |
-| **P4** | **CLIEN 장기 개선** | 구조적 cond4 FAIL — discriminator가 MAUVE와 anti-corr. corpus 방향 재검토 필요 | 장기 |
+| **P0** | **Step 91: THEQOO 갈등글 특화 discriminator 재학습** | AS 플랫폼 사용자 게시글만 사용 → 갈등글 특화 학습. 기존 일반 THEQOO 코퍼스(food/news) 제거 또는 downweight | D-105 결정 후 |
+| **P1** | **Step 92: r17 tell-scan 재측정** | 갈등글 특화 재학습 후 SDK 3-seed 재측정 → proxy ≤ 0.15 회복 여부 확인 | Step 91 완료 후 |
+| **P2** | **NATEPAN n_human=2589 재학습** | D-105에 언급된 QUEUED 재학습 작업. 동일 discriminator 문제 확인 필요 | 병렬 가능 |
+| **P3** | **NATEPAN cond4 개선** | corpus 보강(Phase 4b 60샘플 활용) + reranker 재학습 → cond4 재측정. 목표: delta > 0 | Step 91/92 완료 후 |
+| **P4** | **CLIEN 장기 개선** | 구조적 cond4 FAIL — discriminator가 MAUVE와 anti-corr. 갈등글 특화 코퍼스 필요 여부 평가 | 장기 |
 
-### THEQOO 활성화 절차 (사람 결정 후)
+### r16~r17 Step 90~92 진행 (discriminator 재학습 기반)
+
+**Step 90 (✅ 완료)**:
+- r16 tell-scan SDK 3-seed 병렬 실행 완료
+- 결과: seedA=0.300, seedB=0.250, seedC=0.300, mean=0.283, std=0.029
+- r15 baseline (ML 없음): proxy=0.150
+- D-105: PROXY-FAIL, 근본 원인 규명 (갈등글 특화 아님)
+
+**Step 91 (진행 중)**:
+- AS 플랫폼 갈등글 특화 discriminator 재학습
+- 기존 일반 THEQOO 코퍼스 제거 또는 downweight
+- n_human, n_ai 프로필 검증 후 `/train` 실행
+
+**Step 92 (다음)**:
+- r17 tell-scan SDK 3-seed 재측정
+- 목표: proxy ≤ 0.15 회복 (r15 baseline 수준 이하)
+- PROXY-FAIL → PROXY-INCONCLUSIVE OR PASS 전환 여부 판정
+
+### THEQOO 활성화 절차 (Step 91 결과 + 사람 결정 후)
 
 1. `env/.env.dev` → `AI_USER_ML_ENABLED=true` (코드 변경 없음)
 2. `cd env && docker compose -f docker-compose.dev.yml up -d againspring-ai-user-orchestrator`

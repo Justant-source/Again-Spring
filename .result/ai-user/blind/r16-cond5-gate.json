@@ -1,0 +1,19 @@
+{
+  "community": "THEQOO",
+  "survey": "/home/justant/Data/Again-Spring/.result/ai-user/blind/r16-ml-reranked-theqoo-survey-fixed.md",
+  "answers": "/home/justant/Data/Again-Spring/.result/ai-user/blind/r16-ml-reranked-theqoo-survey.json",
+  "ensemble": "/home/justant/Data/Again-Spring/.result/ai-user/blind/r16-ml-reranked-theqoo-ensemble-summary.json",
+  "tell_scan": "/home/justant/Data/Again-Spring/.result/ai-user/blind/r16-ml-reranked-theqoo-survey-fixed-auto-tell-scan.json",
+  "verdict": "PROXY-FAIL",
+  "estimated_human_detection_upper_bound": 0.823,
+  "proxy_accuracy": 0.283,
+  "gap_hi_applied": 0.54,
+  "fail_reasons": [
+    "human_est_upper=0.823 > 0.60"
+  ],
+  "caveat": "proxy 파생·cross-era(Codex→Claude)·Claude 컨텐츠 미검증. PROXY-INCONCLUSIVE는 사람 PASS 아님. stateless LLM은 주제 과사용·출처 정보비대칭 감지 불가(미검증 unrecoverable gap).",
+  "tell_top_score": 0,
+  "rep_pairs": 0,
+  "topic_overlap": 0,
+  "confused_frac": 0.0
+}

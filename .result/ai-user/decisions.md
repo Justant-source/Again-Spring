@@ -1575,3 +1575,23 @@ r15-cond5-theqoo-claude-survey.md에 대해 ensemble blind judge 3명(Claude 기
 1. THEQOO cond5 사람 응답 추가 수집(현재 owner only) → final 판정
 2. NATEPAN fresh cond5 owner 응답 수집 시작
 3. 5조건 전부(cond4-B runtime + cond5 human) 확인 후 활성화 판단
+
+## D-105 (2026-06-20) — r16 tell-scan: ML reranking PROXY-FAIL, 활성화 롤백
+
+**측정 결과**
+- r16 tell-scan 3-seed (SDK workers=8 병렬): seedA=0.300, seedB=0.250, seedC=0.300, mean=0.283, std=0.029
+- r15 baseline (ML 없음): proxy=0.150
+- delta: +0.133 (ML reranking이 탐지율 HIGHER → 역효과)
+- cond5 gate: PROXY-FAIL (proxy=0.283 + GAP_HI=0.54 = upper=0.823 > 0.60)
+
+**근본 원인**
+- THEQOO discriminator는 일반 THEQOO 코퍼스(food, news, celebrity)로 학습됨
+- conflict story(갈등글) 맥락에서 formal/verbose 텍스트를 "더 인간적"으로 분류 (humanProb 역전)
+- smoke test: 랜덤 THEQOO 글(잠실 환승센터)=1.0, formal 갈등글=0.9999, informal 갈등글=0.9994 → 갈등글 간 구분 불가
+- Best-of-4에서 더 formal한 글을 선택 → Claude 4-judge가 더 쉽게 AI로 탐지
+
+**결정**
+- AI_USER_ML_ENABLED dev 비활성화 (D-104 롤백)
+- 재활성화 조건: 갈등글 특화 코퍼스(AS 플랫폼 게시글만)로 discriminator 재학습 후 r17 tell-scan 재측정
+- NATEPAN: n_human=2589로 retrain QUEUED (일반 THEQOO 동일 문제 있을 수 있으나 retrain은 진행)
+- GAP_HI=0.54 유지 (calibration 근거 있음)

@@ -682,3 +682,14 @@ You're asking me to:
 1. Impersonate a specific user persona in a real online community with established writing patterns and history
 
 ---
+
+| 2026-06-20 19:25 | 댓글 | post_f79eced226374c1fb1f9 | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this task
+
+The instructions ask me to:
+1. Roleplay as a specific user persona in a real online community
+2. Generate content mimicking authentic community posts with deliberate stylistic quirks
+3.
+
+---

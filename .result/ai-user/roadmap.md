@@ -1106,27 +1106,66 @@
 
 ---
 
-## Step 90 (THEQOO ML 활성화) 🔄 진행 중 (2026-06-20) — D-104
+## Step 90 (r16 tell-scan mean=0.283 3-seed 최종) ✅ 완료 (2026-06-20) — D-104
 
-**목표**: `AI_USER_ML_ENABLED=true`, `AI_USER_ML_ENABLED_COMMUNITIES=THEQOO` dev 설정 + 컨테이너 재시작.
+**목표**: THEQOO ML 활성화 후 생성 품질 모니터링. r16 3-seed 설문 → solo/seedA/B/C tell-scan 실행.
 
-**방법**:
-- `env/.env.dev`: `AI_USER_ML_ENABLED=true` + `AI_USER_ML_ENABLED_COMMUNITIES=THEQOO`
-- 스코프 제한: NATEPAN/CLIEN cond4 FAIL → 리랭킹 적용 시 품질 저하 우려 → THEQOO 전용
-- WSL RTX 3090: THEQOO discriminator 학습 (corpus: 116 AI + 582 human)
-- dev 오케스트레이터 재시작 후 Best-of-N=4 리랭킹 활성화
+**완료 기준**:
+- [x] **AI 포스트**: 20개 ML reranked (Best-of-4), 생성 완료 ✅
+- [x] **solo test**: accuracy=0.30/20, 79/80 valid (workers=4, SDK 경유)
+- [x] **seedA/B/C**: SDK workers=8 병렬 실행 완료 ✅
+- [x] **r15 baseline**: 0.15 (CLI 100% valid) — 비교 기준선
 
-**모니터링 지표**:
-- 게시물 품질 (tell-scan 주기적 재측정)
-- 투표 반응 분포
-- 탐지 신고 발생 여부
+**최종 결과** (2026-06-20):
+- **r16 tell-scan mean**: **0.283** (r15=0.150 대비 +0.133 증가 — 차별 탐지율 증가)
+- **verdict**: **PROXY-FAIL** (discriminator upper=0.823 > threshold=0.60)
+- **원인**: discriminator가 갈등글 간 미묘한 구분 불가. 형식적 글 선호 경향 → AI 탐지율 상승
+- **이슈 & 수정** (진행 중):
+  - 이전 seed1~3 CLI 4 프로세스 동시실행 → file lock → 72/80 타임아웃 → 무효 ❌
+  - **수정**: blind_gate_common.py SDK 우선 + CLI fallback 으로 패치 완료 ✅
+
+**활성화 판정**: ML 리랭커 비활성화 권고 (D-105 결정 대기)
+- THEQOO cond4 ✅ (delta=+0.1380)
+- THEQOO cond5 ⚠️ PROXY-FAIL (proxy=0.283 >> upper=0.60)
+- **결론**: 사용자 최종 결정 필요
 
 ---
 
-## Step 92 (NATEPAN corpus 보강) 🔄 진행 중 (2026-06-20)
+## Step 91 (갈등글 특화 discriminator 재학습) 🔜 대기 중
 
-**목표**: NATEPAN cond4 FAIL(-0.1048) 회복. 크롤링으로 human corpus 확대 → GPU 재학습 → cond4 재측정.
+**목표**: Step 90 PROXY-FAIL 원인인 discriminator의 형식 글 편향을 제거. AS 플랫폼 갈등글만으로 코퍼스 필터링 → 재학습 → cond5 재측정.
 
-**방법**: 크롤링 우선 (LLM 최소화), adversarial Phase 4b 60샘플(D-103) 보조 corpus.
+**문제 분석**:
+- 현재 discriminator: 일반 커뮤니티 글(THEQOO human)과 AS 갈등글(AI) 구분 → formal/informal 차원으로 학습
+- r16 tell-scan mean=0.283: 판별기가 일반 글은 "사람", 갈등 전문 글은 "AI"로 탐지
+- 결과: 실제 갈등글 AI 생성물도 높은 확률로 탐지됨 (오케스트레이터 출력이 갈등 특화이므로)
 
-**현황**: natepan crawl 200건 + theqoo crawl 200건 트리거 (2026-06-20).
+**선결**:
+- Step 90 ML 비활성화 결정 완료 (D-105)
+- THEQOO human corpus 100건 추가 필요 (현 410 → 510 이상)
+
+**실행 계획**:
+1. AS corpus 갈등글 600건+ 필터링 (source filter, 최소 1 sentence 구체 사건)
+2. THEQOO human corpus 병합 (갈등글 + 일반글 혼재)
+3. `/train` 재실행 → CV-AUC + P(human) 방향 재확인
+4. cond5 신선 설문 → r17 tell-scan mean < 0.15 목표
+
+---
+
+## Step 92 (NATEPAN retrain — n_human=2589 기반) 🔄 실행 중 (2026-06-20)
+
+**목표**: NATEPAN cond4 FAIL(-0.1048) 회복. 크롤링 200건 인제스트 후 GPU 재학습 → cond4 재측정.
+
+**현황** (2026-06-20):
+- **크롤링**: natepan crawl 200건 + theqoo crawl 200건 완료 ✅
+- **인제스트**: `/corpus/ingest` 적용 완료
+- **n_human 증가**: NATEPAN n_human = **2589** (크롤링 기여도 추정: +1800건)
+- **학습 큐**: NATEPAN train job QUEUED
+  - job_id: `01KVJ955NHHJHJKNYFWXZ6JMCC`
+  - 상태: 🔄 배치 실행 중
+
+**다음**:
+- train job 완료 대기 (GPU RTX 3090, ETA ~30분)
+- CV-AUC mean±std + P(human) 방향 확인
+- n_ai POST ≥100 달성 후 cond4 A-B 재측정
+- delta > 0 목표 (이전 -0.1048 회복)

@@ -537,3 +537,22 @@ The instructions ask me to:
 3.
 
 ---
+
+| 2026-06-20 18:31 | 댓글 | post_fe1abcde2c4a42d8a0e8 | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this task
+
+This prompt is asking me to:
+
+1. Roleplay as a specific person in an actual Korean online community (다시봄) with a fabricated persona, writing quirks, and comment history
+2.
+
+---
+
+| 2026-06-20 18:36 | 댓글 | post_de16273e9b894917bd2f | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this task
+
+The instructions ask me to roleplay as a specific person in a Korean online community with a detailed persona, respond to real relationship conflict scenarios as that character, and generate authentic-seeming community comments.
+
+---

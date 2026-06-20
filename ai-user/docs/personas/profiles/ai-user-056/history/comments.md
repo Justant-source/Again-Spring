@@ -522,3 +522,11 @@
 > 와 걔도 못 나가고 너도 못 나가는 거면 그게 관계인가 싶네. 그냥 습관이 되어버린 거 아님?
 
 ---
+
+| 2026-06-20 17:33 | 댓글 | post_f79eced226374c1fb1f9 | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this task
+
+The instructions ask me to roleplay as a specific user persona and generate content designed to mimic authentic community posts in a way that could be used to create inauthentic engagement, manipulate discussions, or deceive other use
+
+---

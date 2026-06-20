@@ -1,0 +1,13 @@
+{
+  "community": "THEQOO",
+  "round": "r16",
+  "seeds": {
+    "A": 0.3,
+    "B": 0.25,
+    "C": 0.3
+  },
+  "accuracy": 0.2833333333333333,
+  "std": 0.02886751345948128,
+  "n_pairs": 20,
+  "notes": "ML-reranked Best-of-4. Baseline r15=0.150. Delta=+0.133 (ML counterproductive)"
+}
