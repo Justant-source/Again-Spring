@@ -1131,24 +1131,28 @@
 
 ---
 
-## Step 91 (갈등글 특화 discriminator 재학습) 🔜 대기 중
+## Step 91 (갈등글 특화 discriminator 재학습 + r17 rule-based tell-scan) ✅ 완료 (2026-06-21)
 
-**목표**: Step 90 PROXY-FAIL 원인인 discriminator의 형식 글 편향을 제거. AS 플랫폼 갈등글만으로 코퍼스 필터링 → 재학습 → cond5 재측정.
+**결과**:
+- 갈등글 인제스트: THEQOO +17건, NATEPAN +111건
+- GPU 재학습: THEQOO AUC=0.9976(n=715), NATEPAN AUC=0.9978(n=906)
+- r17 rule-based Best-of-4 tell-scan 3-seed: A=0.25, B=0.25, C=0.45, **mean=0.317 PROXY-FAIL**
+- D-106: Best-of-4 reranking 전면 폐기 — ML(r16=0.283)·rule(r17=0.317) 모두 baseline(r15=0.150) 대비 역효과
+- 근본 원인: Best-of-4 선택 편향 → 극단 초안(ML=너무 격식, rule=너무 슬랭) → 탐지 용이
 
-**문제 분석**:
-- 현재 discriminator: 일반 커뮤니티 글(THEQOO human)과 AS 갈등글(AI) 구분 → formal/informal 차원으로 학습
-- r16 tell-scan mean=0.283: 판별기가 일반 글은 "사람", 갈등 전문 글은 "AI"로 탐지
-- 결과: 실제 갈등글 AI 생성물도 높은 확률로 탐지됨 (오케스트레이터 출력이 갈등 특화이므로)
+---
 
-**선결**:
-- Step 90 ML 비활성화 결정 완료 (D-105)
-- THEQOO human corpus 100건 추가 필요 (현 410 → 510 이상)
+## Step 93 (단일 초안 생성 품질 강화 + r18 tell-scan) 🔜 대기 중
 
-**실행 계획**:
-1. AS corpus 갈등글 600건+ 필터링 (source filter, 최소 1 sentence 구체 사건)
-2. THEQOO human corpus 병합 (갈등글 + 일반글 혼재)
-3. `/train` 재실행 → CV-AUC + P(human) 방향 재확인
-4. cond5 신선 설문 → r17 tell-scan mean < 0.15 목표
+**목표**: reranking 없이 1-shot 생성 자체의 품질을 높여 proxy ≤ 0.15 유지 or 개선.
+
+**방향 (D-106 결정)**:
+1. 프롬프트 내 자기비판 강화 — AI 티 제거 기준 명시 (클리셰·내러티브 과구조화 경계)
+2. SELF_CRITIQUE_EXTRA_CLICHES 목록 확장 (r15 관측 + r17 tell-scan 고탐지 쌍 분석)
+3. 페르소나 보이스 다양화 — casual/tense/fragmented 스타일 변형 확대
+4. 단일 고품질 초안 → r18 3-seed tell-scan → proxy 측정
+
+**성공 기준**: r18 3-seed mean proxy ≤ 0.150 (r15 baseline 유지 or 개선)
 
 ---
 

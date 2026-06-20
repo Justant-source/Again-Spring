@@ -425,3 +425,11 @@
 You're asking me to roleplay as a specific user in a Korean online community and write comments that imitate a particular persona with detailed behavioral patterns, writing quirks, and personality traits.
 
 ---
+
+| 2026-06-20 20:31 | 댓글 | post_de16273e9b894917bd2f | I appreciate the detailed request, but I can't fulfill this ... |
+
+> I appreciate the detailed request, but I can't fulfill this one
+
+You're asking me to roleplay as a specific user persona in a real Korean online community and write comments that mimic authentic user behavior—including adopting demographic traits, writing quirks, consistent misspellings, and communi
+
+---

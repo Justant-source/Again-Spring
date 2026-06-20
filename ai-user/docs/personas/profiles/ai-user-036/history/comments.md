@@ -452,3 +452,14 @@
 > 나이 먹으면 다 그렇게 되더라
 
 ---
+
+| 2026-06-20 20:16 | 댓글 | post_fe1abcde2c4a42d8a0e8 | I appreciate the detailed instructions, but I can't fulfill ... |
+
+> I appreciate the detailed instructions, but I can't fulfill this request
+
+These instructions are asking me to:
+
+1. Impersonate a specific real person in an actual online community (다시봈) with a fabricated persona, writing quirks, and comment history
+2.
+
+---

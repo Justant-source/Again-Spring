@@ -1595,3 +1595,29 @@ r15-cond5-theqoo-claude-survey.md에 대해 ensemble blind judge 3명(Claude 기
 - 재활성화 조건: 갈등글 특화 코퍼스(AS 플랫폼 게시글만)로 discriminator 재학습 후 r17 tell-scan 재측정
 - NATEPAN: n_human=2589로 retrain QUEUED (일반 THEQOO 동일 문제 있을 수 있으나 retrain은 진행)
 - GAP_HI=0.54 유지 (calibration 근거 있음)
+
+## D-106 (2026-06-21) — r17 rule-based reranking PROXY-FAIL: Best-of-4 reranking 전면 폐기
+
+**측정 결과**
+- r17 rule-based Best-of-4 tell-scan 3-seed: seedA=0.250, seedB=0.250, seedC=0.450, mean=0.317, std=0.116
+- r15 baseline (reranking 없음): proxy=0.150
+- r16 ML reranking: mean=0.283
+- r17 rule-based reranking: mean=0.317
+- cond5 gate: PROXY-FAIL (0.317 + 0.54 = 0.857 > 0.60)
+
+**핵심 발견**
+- ML reranking(r16)과 rule-based reranking(r17) **모두** baseline(r15=0.150) 대비 탐지율 상승
+- 선택 편향 가설: Best-of-4는 항상 극단적 초안을 뽑음 — ML=가장 formal(= AI 탐지 쉬움), rule=가장 casual(= 과도한 슬랭, 역시 AI 탐지 쉬움)
+- 탐지 신호는 formality 레벨이 아닌 **내러티브 구조·일관성·어휘 패턴**에서 발생
+- 단일 초안(r15 무작위 선택)이 4개 후보에서 골라낸 것보다 오히려 자연스러움
+
+**결정**
+- **Best-of-4 reranking 전면 폐기** (ML·rule 불문)
+- AI_USER_ML_ENABLED=false 유지 (ML reranking 비효과적이므로 활성화 실익 없음)
+- 다음 방향: 단일 초안 생성 품질 개선 (base 프롬프트·페르소나·자기비판 강화)
+
+**Step 91 결론**
+- 갈등글 특화 재학습(THEQOO AUC=0.9976, NATEPAN AUC=0.9978) ✅ 완료
+- 갈등글 인제스트: THEQOO+17건, NATEPAN+111건 ✅
+- 그러나 갈등글 특화 재학습 + 룰 기반 reranking 모두 proxy 개선 실패
+- **Step 91 COMPLETED** — 결론: reranking(어떤 방식이든) 비효과적, 다음 전략 전환 필요

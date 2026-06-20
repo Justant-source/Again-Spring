@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-20 세션 (Step 90 완료 — r16 tell-scan PROXY-FAIL, D-105 롤백 결정)
+**최종 갱신**: 2026-06-21 세션 (Step 91 완료 — r17 rule-based reranking PROXY-FAIL, D-106 Best-of-4 전면 폐기)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 현재 위치
 
-- **Phase**: Step 90 ✅ 완료 → Step 91 시작 (D-105 롤백 결정)
+- **Phase**: Step 91 ✅ 완료 → Step 93 시작 (D-106 Best-of-4 폐기, 생성 품질 개선 방향)
 - **D-95**: Codex CLI → Claude Code CLI 복원 ✅
 - **D-96~D-97**: CLIEN cond4 재측정 → -0.0436 FAIL 확정 ❌
 - **D-101 (2026-06-20)**: cross-era 보정 실패 확인 + 보정형 3-state cond5 게이트 채택 (gap_hi=0.54)
@@ -35,13 +35,14 @@
 
 | 커뮤니티 | cond1 | cond2 | cond3 | cond4 | cond5 | 활성화 |
 |---|---|---|---|---|---|---|
-| **THEQOO** | ✅ | ✅ | ✅ | ✅ +0.1380 | **🔴 PROXY-FAIL (0.283→0.823)** — D-105 | **❌ 롤백 (D-105)** |
+| **THEQOO** | ✅ | ✅ | ✅ | ✅ +0.1380 | **🔴 PROXY-FAIL r16=0.283/r17=0.317** — D-105/D-106 | **❌ 롤백 (Best-of-4 폐기)** |
 | **NATEPAN** | ✅ | ✅ | ✅ | ❌ -0.1048 | ❌ PROXY-FAIL (0.84) | 제외 |
 | **CLIEN** | ✅ | ✅ | ✅ | ❌ -0.0436 (구조적) | 미측정 | 제외 |
 
-**`AI_USER_ML_ENABLED=false` 유지 (롤백)** — D-104 활성화 결정 → D-105 r16 tell-scan 역효과 확인 후 롤백
-- 근본 원인: THEQOO discriminator가 갈등글 특화 아님 (일반 코퍼스로 학습)
-- 재활성화 조건: 갈등글 특화 discriminator 재학습 후 r17 tell-scan 재측정
+**`AI_USER_ML_ENABLED=false` 유지** — D-106 Best-of-4 reranking 전면 폐기
+- r16 ML reranking mean=0.283, r17 rule-based mean=0.317 — 둘 다 baseline(0.150) 대비 역효과
+- 근본 원인: Best-of-4 선택 편향 (극단 초안 선택 → 탐지 용이). 탐지 신호 = 내러티브 구조, formality 아님
+- 다음 방향: 단일 초안 생성 품질 강화 (base 프롬프트/페르소나/자기비판)
 
 ### cond5 보정 게이트 요약 (D-101)
 
@@ -89,15 +90,13 @@
 
 ## 🔜 앞으로 해야 할 것
 
-### 즉시 (Step 91~92 시작)
+### 즉시 (Step 93 시작)
 
 | 우선순위 | 작업 | 내용 | 선결 |
 |---|---|---|---|
-| **P0** | **Step 91: THEQOO 갈등글 특화 discriminator 재학습** | AS 플랫폼 사용자 게시글만 사용 → 갈등글 특화 학습. 기존 일반 THEQOO 코퍼스(food/news) 제거 또는 downweight | D-105 결정 후 |
-| **P1** | **Step 92: r17 tell-scan 재측정** | 갈등글 특화 재학습 후 SDK 3-seed 재측정 → proxy ≤ 0.15 회복 여부 확인 | Step 91 완료 후 |
-| **P2** | **NATEPAN n_human=2589 재학습** | D-105에 언급된 QUEUED 재학습 작업. 동일 discriminator 문제 확인 필요 | 병렬 가능 |
-| **P3** | **NATEPAN cond4 개선** | corpus 보강(Phase 4b 60샘플 활용) + reranker 재학습 → cond4 재측정. 목표: delta > 0 | Step 91/92 완료 후 |
-| **P4** | **CLIEN 장기 개선** | 구조적 cond4 FAIL — discriminator가 MAUVE와 anti-corr. 갈등글 특화 코퍼스 필요 여부 평가 | 장기 |
+| **P0** | **Step 93: 단일 초안 생성 품질 강화** | Best-of-4 reranking 폐기 → 1-shot 생성 자체를 개선. 방향: ①프롬프트 내 자기비판 강화 ②페르소나 보이스 다양화 ③SELF_CRITIQUE_EXTRA_CLICHES 확장 | D-106 결정 후 |
+| **P1** | **Step 93: r18 tell-scan 측정** | 단일 초안 개선 후 proxy 재측정. 목표: r15 baseline(0.150) 이하 유지 or 개선 | Step 93 구현 후 |
+| **P2** | **NATEPAN cond4 개선** | n_human=2589 재학습 완료 → cond4 재측정. 목표: delta > 0 | 병렬 진행 |
 
 ### r16~r17 Step 90~92 진행 (discriminator 재학습 기반)
 
@@ -107,15 +106,15 @@
 - r15 baseline (ML 없음): proxy=0.150
 - D-105: PROXY-FAIL, 근본 원인 규명 (갈등글 특화 아님)
 
-**Step 91 (진행 중)**:
-- AS 플랫폼 갈등글 특화 discriminator 재학습
-- 기존 일반 THEQOO 코퍼스 제거 또는 downweight
-- n_human, n_ai 프로필 검증 후 `/train` 실행
+**Step 91 (✅ 완료, 2026-06-21)**:
+- 갈등글 인제스트: THEQOO +17건, NATEPAN +111건
+- GPU 재학습: THEQOO AUC=0.9976 / NATEPAN AUC=0.9978
+- r17 rule-based Best-of-4 tell-scan: A=0.25, B=0.25, C=0.45, mean=0.317 → PROXY-FAIL
+- **결론**: Best-of-4 reranking 전면 폐기 (D-106). ML·rule 불문 선택 편향이 탐지율 상승 유발
 
-**Step 92 (다음)**:
-- r17 tell-scan SDK 3-seed 재측정
-- 목표: proxy ≤ 0.15 회복 (r15 baseline 수준 이하)
-- PROXY-FAIL → PROXY-INCONCLUSIVE OR PASS 전환 여부 판정
+**Step 93 (시작)**:
+- 단일 초안 생성 품질 강화
+- r18 tell-scan → proxy ≤ 0.15 목표
 
 ### THEQOO 활성화 절차 (Step 91 결과 + 사람 결정 후)
 
@@ -437,3 +436,6 @@
 | **Step 51** | 22~ | R9 blind①②+MAUVE 재측정 + 에스컬레이션 평가 | 🔄 축적 대기 |
 | **Step 55~57** | 27 | R13: source_filter + h2h survey + go/no-go 표 | ✅ |
 | **Step 58** | — | THEQOO corpus 수집 전략 결정 | 🔴 사용자 결정 대기 |
+| **Step 90** | — | r16 ML reranking tell-scan: mean=0.283 PROXY-FAIL (D-105) | ✅ |
+| **Step 91** | — | 갈등글 특화 재학습 + r17 rule-based tell-scan: mean=0.317 PROXY-FAIL (D-106) | ✅ |
+| **Step 93** | — | 단일 초안 생성 품질 강화 + r18 tell-scan | 🔜 대기 |
