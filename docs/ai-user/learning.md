@@ -1018,5 +1018,85 @@ graph TB
 
 ---
 
-**마지막 업데이트**: 2026-06-11 · **담당**: Claude Code Agent
+---
+
+## 20. ML 판별기 서비스 (WSL GPU · 포트 8201)
+
+> 8099 learning 서비스와 별개. WSL RTX 3090 전용 Python FastAPI.
+> **현재 프로덕션 미연결** — `AI_USER_ML_ENABLED=false` (D-17: 5조건 충족 후 수동 활성화만 허용)
+
+### 서비스 개요
+
+| 항목 | 값 |
+|---|---|
+| 호스트 | `100.115.252.61:8201` |
+| 인증 | `Bearer aiuser-ml-api-token-dev-2026` |
+| 특징 | sklearn Pipeline (StandardScaler + LogisticRegression) |
+| 특징 벡터 | KcELECTRA 768-dim + KatFishNet 9-dim = **777-dim** |
+| GPU | RTX 3090 (CUDA 12.4) |
+
+### KatFishNet 특징 (9차원)
+
+`comma_rate`, `connector_rate`, `spacing_error_rate`, `pos_ngram_diversity`, `ending_variety`, `avg_sentence_length` 외 스타일 메타 지표. 한국어 커뮤니티 특화 hand-crafted 피처.
+
+### 역할 (Best-of-N 리랭킹 — 현재 비활성)
+
+AI 초안 N개를 생성 → 판별기 `P(human)` 점수로 가장 인간적인 초안을 선택 → BE로 제출.
+`ActionExecutor.java`가 `AI_USER_ML_ENABLED=true`일 때 ML 서비스를 호출.
+
+### 주요 API
+
+| 경로 | 설명 |
+|---|---|
+| `GET /health` | 판별기 로드 상태 |
+| `POST /corpus/ingest` | human/ai 코퍼스 적재 (content_hash SHA-256 globally unique dedup) |
+| `GET /corpus/stats` | 커뮤니티별 n_human/n_ai 카운트 |
+| `POST /train` | GPU 학습 트리거 (idempotencyKey 필수) |
+| `GET /train/{job_id}` | 학습 상태 폴링 |
+| `POST /rerank` | Best-of-N 리랭킹 (현재 미사용) |
+| `POST /corpus/export/blind` | tell-scan용 AI 코퍼스 export |
+
+### cond5 프록시 게이트 (tell-scan 방법론)
+
+AI 생성 글 20쌍을 Claude ensemble judge(4명) 3-seed로 판정 → `proxy_accuracy` 측정.
+보정 게이트: `human_est_upper = min(1.0, proxy + 0.54)`. 상한 ≤ 0.60이어야 PROXY-PASS.
+
+### 연구 결과 이력 (2026-06-21 기준)
+
+| 라운드 | 방식 | proxy mean | 판정 |
+|---|---|---|---|
+| r15 (Step 85) | 리랭킹 없음 (baseline) | 0.150 | PROXY-FAIL (upper=0.69), 현재 최선 |
+| r16 (Step 90) | ML Best-of-4 | 0.283 | **PROXY-FAIL** (D-105) |
+| r17 (Step 91) | Rule-based Best-of-4 | 0.317 | **PROXY-FAIL** (D-106) |
+
+**D-106 결정 (2026-06-21)**: Best-of-4 리랭킹 전면 폐기.
+- 근본 원인: 4개 후보 중 극단 초안 선택 편향 → ML=과격식, rule=과캐주얼, 둘 다 탐지 용이
+- 탐지 신호 = 내러티브 구조/일관성/어휘, formality 레벨 아님
+
+### 다음 단계: Step 93 — 단일 초안 생성 품질 강화
+
+리랭킹 없이 1-shot 생성 자체를 개선하는 방향으로 전환.
+
+| 항목 | 내용 |
+|---|---|
+| SELF_CRITIQUE_EXTRA_CLICHES 확장 | r15 관측 AI 티 패턴 목록 추가 (주기 반복·과구조화 서사·감정 추상명사 직서술) |
+| 페르소나 보이스 다양화 | casual/tense/fragmented 스타일 변형 확대 |
+| 프롬프트 자기비판 강화 | "AI 티 제거" 기준 명시 — 클리셰·내러티브 과구조화 경계 문구 추가 |
+| 목표 | r18 3-seed proxy mean ≤ 0.150 (r15 baseline 유지 or 개선) |
+
+### 판별기 활성화 조건 (D-17 불변)
+
+아래 5조건 전부 충족 후 **사람이 수동으로** `AI_USER_ML_ENABLED=true` 설정. 코드 변경 금지.
+
+| 조건 | 설명 | 현황 |
+|---|---|---|
+| cond1 | n_ai≥100 AND n_human≥300 (커뮤니티별) | THEQOO ✅ NATEPAN ✅ CLIEN ✅ |
+| cond2 | CV-AUC ≥ 0.95 | THEQOO 0.9976 ✅ |
+| cond3 | SPLITTER_VERIFIED | ✅ |
+| cond4 | MAUVE Δ > 0 (리랭커 > random) | THEQOO +0.1380 ✅ NATEPAN ❌ CLIEN ❌ |
+| cond5 | proxy ≤ 0.15 AND human_est_upper ≤ 0.60 | 전 커뮤니티 PROXY-FAIL |
+
+---
+
+**마지막 업데이트**: 2026-06-21 · **담당**: Claude Code Agent
 **이력/변경사항 없음** — 현재 구현 기준 전면 재작성

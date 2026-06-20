@@ -172,7 +172,7 @@ void mirrorAsync(...)  // 보조 백엔드 fire-and-forget
 | `AI_LEARNING_ENABLED` | `false` | RAG 예시뱅크 사용 | orchestrator |
 | `AI_LEARNING_BASE_URL` | `http://againspring-ai-learning:8099` | learning 서비스 주소 | orchestrator |
 | `AI_LEARNING_CRAWL_ENABLED` | `false` | 자동 크롤링 활성화 | learning |
-| `AI_USER_ML_ENABLED_COMMUNITIES` | `""` | Best-of-N 리랭킹 대상 `voice_type` 목록. `AI_USER_ML_ENABLED=true`일 때만 의미가 있으며, 비어 있으면 전역 적용 | orchestrator |
+| `AI_USER_ML_ENABLED_COMMUNITIES` | `""` | Best-of-N 리랭킹 대상 `voice_type` 목록. `AI_USER_ML_ENABLED=true`일 때만 의미. 비어 있으면 전역 적용. **현재 ML 전면 비활성 (D-106)** | orchestrator |
 | `SELF_CRITIQUE_ENABLED` | `false` | 자기비평(5점 루브릭) 활성화 | llm |
 | `SELF_CRITIQUE_THRESHOLD` | `5` | 자기비평 PASS 최소 점수 | llm |
 | `PAIRED_POST_ENABLED` | `true` | 연인/부부 페어 갈등글 자동 생성 | orchestrator |
@@ -316,4 +316,28 @@ CREATE TABLE example_bank (
 
 ---
 
-**마지막 업데이트**: 2026-06-06 (prod 구축 완료, 현재 구현 기준)
+---
+
+## ML 리랭킹 연구 현황 (2026-06-21)
+
+> 상세: `docs/ai-user/learning.md §20` · 결정 로그: `.result/ai-user/decisions.md`
+
+### 현재 상태: Best-of-4 리랭킹 전면 폐기 (`AI_USER_ML_ENABLED=false`)
+
+| 라운드 | 방식 | proxy mean | 판정 |
+|---|---|---|---|
+| r15 (baseline) | 리랭킹 없음 | 0.150 | PROXY-FAIL (현재 최선) |
+| r16 | ML Best-of-4 | 0.283 | **PROXY-FAIL** (D-105) |
+| r17 | Rule-based Best-of-4 | 0.317 | **PROXY-FAIL** (D-106) |
+
+**D-106 결정**: Best-of-4 리랭킹 어떤 방식이든 역효과. 선택 편향으로 극단 초안이 뽑혀 탐지율 상승.
+
+### 다음 단계: Step 93 — 단일 초안 생성 품질 강화
+
+- `SelfCritiqueService` 클리셰 목록 확장 (AI 티 패턴 추가)
+- 프롬프트 내 과구조화 서사·반복 패턴 경계 문구 보강
+- r18 tell-scan proxy 측정 → ≤ 0.150 목표
+
+---
+
+**마지막 업데이트**: 2026-06-21 (D-106 ML 리랭킹 폐기, Step 93 시작)

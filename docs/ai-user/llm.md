@@ -1229,5 +1229,22 @@ tick-cron 하드코딩(매분) 해제→10분, PairedPost 2h/3쌍→1일1회/1�
 
 ---
 
-**마지막 업데이트**: 2026-06-15 | **버전**: 캐싱 Haiku 전용화 + dev 비용 절감
+## 21. SELF_CRITIQUE_EXTRA_CLICHES (AI 탐지 패턴, 2026-06-20~)
+
+r15 tell-scan에서 관측된 AI 특유 패턴. `SelfCritiqueService` 확장 대상(Step 93).
+
+| 패턴 | 유형 | 비고 |
+|---|---|---|
+| "이번달만 세 번째" / "이번 달만 세 번째" | 주기 반복 서술 | space/non-space 변형 포함 |
+| "이번주만 세 번째" / "이번 주만 세 번째" | 주기 반복 서술 | space/non-space 변형 포함 |
+| "저는 오늘", "저는 현재", "저는 매우" | 자기 소개형 시작 | AI 전형 패턴 |
+| 감정 추상명사 직서술 (예: "분노를 느꼈습니다") | 감정 과명시 | 구체 장면 없이 감정명 나열 |
+| 과구조화 3단 서사 (배경→사건→감정 정확히) | 내러티브 과정렬 | 인간은 비선형 서술 |
+
+**적용 절차**: 운영 중 발견한 상투구 목록을 environment 변수 `SELF_CRITIQUE_EXTRA_CLICHES`(쉼표 구분 리터럴)로 등록 후 
+`SelfCritiqueService`의 quickCheck 로직에 통합. 재배포 불필요 — .env 갱신만으로 적용.
+
+---
+
+**마지막 업데이트**: 2026-06-21 | **버전**: SELF_CRITIQUE_EXTRA_CLICHES 문서화 + Step 93 로드맵
 **기반**: ClaudeCliInvoker, ClaudeApiInvoker, InvokerRouter, SelfCritiqueService, OutputSanitizer

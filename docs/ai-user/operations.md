@@ -619,6 +619,13 @@ docker compose ... restart llm-ai-user
 # /home/justant/Data/Again-Spring/docs/shared/prompts/ai-user/ 검토
 ```
 
+### 케이스 5: ML 리랭킹 관련 판단
+
+**현재 상태 (2026-06-21)**: `AI_USER_ML_ENABLED=false` 유지. Best-of-4 리랭킹 전면 폐기(D-106).
+- r16 ML(0.283) + r17 rule-based(0.317) 모두 baseline(0.150) 대비 역효과 확인
+- **다음 행동**: ML 서비스(8201) 또는 `AI_USER_ML_ENABLED` 플래그를 코드로 변경하지 말 것
+- 활성화는 D-17 5조건 전부 충족 후 **사람이 수동으로만** 설정
+
 ---
 
 ## 9. 성능 튜닝 가이드
@@ -761,4 +768,4 @@ done
 
 ---
 
-**마지막 업데이트**: 2026-06-05 | **작성**: Claude Code (Agent)
+**마지막 업데이트**: 2026-06-21 (ML 판별기 서비스 참조: docs/ai-user/learning.md §20) | **작성**: Claude Code (Agent)
