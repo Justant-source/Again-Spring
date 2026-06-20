@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-21 세션 (Phase 0 — D-107 closeout 전환: Best-of-N 영구 폐기, 성공=Goal A, ML 종료)
+**최종 갱신**: 2026-06-21 세션 (Phase 3 완료 — PROJECT-CLOSEOUT.md 작성, STATE = CLOSED)
 
 ---
 
@@ -17,7 +17,11 @@
 
 ## 현재 위치
 
-- **Phase**: **WIND-DOWN — Phase 0 진행 중 (D-107 closeout 전환, 2026-06-21)**
+- **Phase**: **🔒 CLOSED (D-107, 2026-06-21)**
+  - Phase 0 ✅ D-107 closeout 동결
+  - Phase 1 ✅ cheap-win 3개 레버 prod 반영 (2026-06-21 01:14 KST, e2e 142 PASS)
+  - Phase 2 ✅ 블라인드 평가 자료 준비 완료 → `.result/ai-user/phase2-blind-eval/` 참조 (사람 평가 대기)
+  - Phase 3 ✅ PROJECT-CLOSEOUT.md 작성 + ML 서비스 옵션 A/B 제시
   - Step 91 ✅ 완료 (r17 PROXY-FAIL → D-106 Best-of-4 전면 폐기)
   - Step 92 ❌ CANCELLED / SUPERSEDED-by-closeout (D-107)
   - Step 93 ❌ CANCELLED / SUPERSEDED-by-closeout (D-107)
