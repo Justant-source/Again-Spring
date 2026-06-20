@@ -1658,3 +1658,22 @@ r15-cond5-theqoo-claude-survey.md에 대해 ensemble blind judge 3명(Claude 기
 - Phase 1: 세 레버 prod 이미지 신선도 감사 → 필요 시 재빌드 + e2e-realbe PASS
 - Phase 2: 계정 단위 1회 휴먼 수용 검사(Goal B acceptance test, dev only)
 - Phase 3: `PROJECT-CLOSEOUT.md` 작성 + ML 서비스 옵션 제시 + STATE.md = CLOSED
+
+---
+
+## D-108 (2026-06-21) — ML 서비스 처리: 옵션 A (COLLECT-only monitor 유지)
+
+**결정**: **옵션 A — COLLECT-only monitor 유지** (decommission 하지 않음)
+
+| 항목 | 내용 |
+|---|---|
+| **현재 상태** | `AI_USER_ML_ENABLED=false` 영구, ML 추론 비활성 |
+| **유지 내용** | WSL(100.115.252.61) ML 컨테이너 가동 유지 + `example_bank` 코퍼스 누적 계속 |
+| **비활성 내용** | ML reranking 추론 (discriminator 호출 없음) |
+| **편익** | Goal B를 향후 재개할 경우 데이터 연속성 보존, 재구축 비용 없음 |
+| **비용** | WSL GPU·메모리 점유 지속 (RTX 3090 대기 상태) |
+
+**운영 지침**
+- `AI_USER_ML_COLLECT` 설정값 변경 없음 (dev=true, prod=false)
+- decommission 결정 시 별도 D-109로 기록
+- Goal B 재개 여부는 별도 신규 Decision으로 열 것
