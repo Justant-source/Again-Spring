@@ -27,7 +27,7 @@
 
 | 커뮤니티 | cond1 | cond2 | cond3 | cond4 | cond5 | 후보 |
 |---|---|---|---|---|---|---|
-| **THEQOO** | ✅ | ✅ | ✅ | ✅ +0.1380 | ⚠️ PROXY-FAIL (0.69) | **활성화 후보** |
+| **THEQOO** | ✅ | ✅ | ✅ | ✅ +0.1380 | ⚠️ PROXY-FAIL (0.69) | **✅ 활성화 결정** (D-104) |
 | **NATEPAN** | ✅ | ✅ | ✅ | ❌ -0.1048 | ❌ PROXY-FAIL (0.84) | 미진입 |
 | **CLIEN** | ✅ | ✅ | ✅ | ❌ -0.0436 (구조적) | 미측정 | 제외 |
 
@@ -110,7 +110,7 @@
 
 | 우선순위 | 항목 | 배경 | 선택지 |
 |---|---|---|---|
-| **P1** | **THEQOO cond5 + 활성화 실행 여부** | cond4 ✅(+0.1380) + proxy 15% + tell-scan 2 → 간접 증거 충분. cond5 PROXY-FAIL은 Codex era gap_hi 과혹 가능. | A) 현재 증거로 activation candidate 인정 → 활성화 진행 / B) r15 설문 20쌍 사람 응답 먼저 수집 → 공식 확인 후 활성화 |
+| **P1** | **THEQOO cond5 + 활성화 실행 여부** | cond4 ✅(+0.1380) + proxy 15% + tell-scan 2 → 간접 증거 충분. cond5 PROXY-FAIL은 Codex era gap_hi 과혹 가능. | **✅ B 채택 (2026-06-20, D-104)** — proxy 증거 수락, 활성화 진행 |
 | **P3** | **AI_USER_ENABLED 활성화 여부** | THEQOO는 4/5 조건 ✅ + cond5 간접 PASS 시사. `AI_USER_FORCE_ACTIVE=true`는 이미 dev에서 active. ML 리랭킹 별도 게이트. | 수동으로 AI_USER_ML_ENABLED=true 설정 (코드 변경 없음) |
 
 ---

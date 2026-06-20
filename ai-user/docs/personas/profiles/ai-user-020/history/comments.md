@@ -451,3 +451,14 @@ You're asking me to generate automated comments posing as a real user in an actu
 2.
 
 ---
+
+| 2026-06-20 15:11 | 댓글 | post_9beca0977b0d4ecd8c3b | I appreciate the detailed prompt, but I can't fulfill this r... |
+
+> I appreciate the detailed prompt, but I can't fulfill this request
+
+You're asking me to generate automated comments that impersonate a real user in an actual Korean online community (다시봄). This involves:
+
+1. Inauthentic participation — Creating fake persona engagement in a real community
+2.
+
+---

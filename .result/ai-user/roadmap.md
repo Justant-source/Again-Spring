@@ -1098,8 +1098,35 @@
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| **Step 89** | THEQOO cond5 최종 판정 | 🔴 **사람 결정 대기** — r15 설문(20쌍) 응답 OR 현재 증거로 acceptance |
-| **Step 90** | THEQOO `AI_USER_ML_ENABLED=true` 활성화 | ⏳ Step 89 후 |
+| **Step 89** | THEQOO cond5 최종 판정 | ✅ **B 채택 (2026-06-20, D-104)** — proxy 증거 수락 |
+| **Step 90** | THEQOO `AI_USER_ML_ENABLED=true` 활성화 | 🔄 **진행 중** (2026-06-20) |
 | **Step 91** | THEQOO dev 2주 관찰 → e2e → prod 배포 | ⏳ Step 90 후 |
-| **Step 92** | NATEPAN corpus 보강 + cond4 재도전 | ⏳ Phase 4b 60샘플 활용 |
+| **Step 92** | NATEPAN corpus 보강 (크롤링) + cond4 재도전 | 🔄 **크롤링 진행 중** (2026-06-20) |
 | **Step 93** | CLIEN 구조적 cond4 원인 분석 + 장기 개선 | ⏳ 장기 |
+
+---
+
+## Step 90 (THEQOO ML 활성화) 🔄 진행 중 (2026-06-20) — D-104
+
+**목표**: `AI_USER_ML_ENABLED=true`, `AI_USER_ML_ENABLED_COMMUNITIES=THEQOO` dev 설정 + 컨테이너 재시작.
+
+**방법**:
+- `env/.env.dev`: `AI_USER_ML_ENABLED=true` + `AI_USER_ML_ENABLED_COMMUNITIES=THEQOO`
+- 스코프 제한: NATEPAN/CLIEN cond4 FAIL → 리랭킹 적용 시 품질 저하 우려 → THEQOO 전용
+- WSL RTX 3090: THEQOO discriminator 학습 (corpus: 116 AI + 582 human)
+- dev 오케스트레이터 재시작 후 Best-of-N=4 리랭킹 활성화
+
+**모니터링 지표**:
+- 게시물 품질 (tell-scan 주기적 재측정)
+- 투표 반응 분포
+- 탐지 신고 발생 여부
+
+---
+
+## Step 92 (NATEPAN corpus 보강) 🔄 진행 중 (2026-06-20)
+
+**목표**: NATEPAN cond4 FAIL(-0.1048) 회복. 크롤링으로 human corpus 확대 → GPU 재학습 → cond4 재측정.
+
+**방법**: 크롤링 우선 (LLM 최소화), adversarial Phase 4b 60샘플(D-103) 보조 corpus.
+
+**현황**: natepan crawl 200건 + theqoo crawl 200건 트리거 (2026-06-20).

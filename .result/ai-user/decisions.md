@@ -889,6 +889,28 @@ NATEPAN이 cond4 FAIL이므로 이 강화 콘텐츠는 향후 corpus 보강 소�
 NATEPAN cond4 재측정은 충분한 corpus 보강 + 리랭커 개선 후 재도전.
 현 세션에서 NATEPAN 활성화 후보 진입 불가.
 
+---
+
+## D-104 (2026-06-20) — THEQOO cond5 옵션 B 채택: proxy 증거로 활성화 진행
+
+**배경**: cond5 게이트(D-101)가 PROXY-FAIL(0.69)이지만, gap_hi=0.54는 Codex era 기준으로 Claude era 콘텐츠엔 과혹 가능성이 있음.
+
+**증거**:
+- cond4 delta=+0.1380 (공식 GPU strict-runtime, D-102) ✅
+- tell-scan top_score=2 (임계값 3 미만) ✅
+- rep_pairs=0, topic_overlap=0 ✅
+- proxy 15% (r15, 4-judge, 3-seed 평균) — 역사적 최저 ✅
+- PROXY-FAIL은 보수 상한 공식 때문 (gap_hi Codex era 과혹)
+
+**결정**: THEQOO cond5를 통과로 수락. `AI_USER_ML_ENABLED=true` dev 활성화 진행.
+
+**부가 결정**:
+- 사람 블라인드 테스트 추가 수집 **완전 종료** — 기존 응답으로 충분
+- 이후 데이터 수집은 **크롤링 우선**, LLM 생성은 꼭 필요한 경우만
+- NATEPAN/CLIEN은 독립 개선 트랙 (크롤링 corpus + GPU 재학습)
+
+**캐비엣**: gap_hi=0.54 Codex era 보정. Claude era 사람 검증 미완. 2주 dev 관찰에서 탐지 신고 모니터링 필수.
+
 ## D-75 — THEQOO owner h2h 결과 FAIL, 전역 활성화 NO GO 확정 (2026-06-19)
 
 **실행**:
