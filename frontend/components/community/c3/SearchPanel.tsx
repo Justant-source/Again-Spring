@@ -62,7 +62,6 @@ export function SearchPanel({ currentCategory, onSearch, onCategorySelect, onClo
     <div style={{
       position: 'fixed', inset: 0, background: 'var(--L-bg)',
       zIndex: 1000, display: 'flex', flexDirection: 'column',
-      maxWidth: 640, left: '50%', transform: 'translateX(-50%)',
     }}>
       {/* 검색 입력 헤더 */}
       <div style={{
