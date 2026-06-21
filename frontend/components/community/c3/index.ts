@@ -9,3 +9,4 @@ export { CommentBar } from './CommentBar';
 export { CommentComposeSheet } from './CommentComposeSheet';
 export { UserChip } from './UserChip';
 export { BrandBar } from './BrandBar';
+export { SearchPanel } from './SearchPanel';

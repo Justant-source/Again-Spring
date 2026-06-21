@@ -105,6 +105,52 @@ public class CommunityPostController {
     }
 
     /**
+     * 포스트 검색 — 제목/본문 키워드 LIKE 검색
+     */
+    @GetMapping("/search")
+    @Operation(summary = "포스트 검색 (제목/본문 키워드)")
+    public ResponseEntity<Page<PostResponse>> searchPosts(
+            @RequestParam String q,
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+
+        if (q == null || q.isBlank()) return ResponseEntity.ok(Page.empty());
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Post> posts = postService.searchPosts(q, category, pageable);
+
+        String userId = resolveUserId(authentication);
+        java.util.Map<String, Long> myVoteMap = new java.util.HashMap<>();
+        if (userId != null) {
+            List<String> postIds = posts.stream().map(Post::getId).toList();
+            voteRepository.findByVoterUserIdAndPostIdIn(userId, postIds)
+                    .forEach(v -> myVoteMap.put(v.getPostId(), v.getOptionId()));
+        }
+
+        Page<PostResponse> responses = posts.map(post -> {
+            List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
+            long voteCount = voteRepository.countByPostId(post.getId());
+            long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
+            String authorNickname = userRepository.findById(post.getAuthorId())
+                    .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                    .orElse("익명");
+            Long votedOptionId = myVoteMap.get(post.getId());
+            return PostResponse.from(post, options, voteCount, commentCount, authorNickname, votedOptionId);
+        });
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 광장별 글 수 — 검색 패널의 "다른 광장" 표시용
+     */
+    @GetMapping("/counts")
+    @Operation(summary = "광장별 공개 글 수")
+    public ResponseEntity<java.util.Map<String, Long>> getCounts() {
+        return ResponseEntity.ok(postService.getCategoryCounts());
+    }
+
+    /**
      * 공개 포스트 목록 조회
      */
     @GetMapping

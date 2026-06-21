@@ -94,6 +94,30 @@ public class PostService {
         return postRepository.findById(postId);
     }
 
+    /** 제목/본문 키워드 검색 */
+    public Page<Post> searchPosts(String q, String category, Pageable pageable) {
+        String like = "%" + q + "%";
+        PostCategory cat = null;
+        if (category != null && !category.isEmpty()) {
+            try { cat = PostCategory.valueOf(category.toUpperCase()); }
+            catch (IllegalArgumentException e) { log.warn("Invalid category for search: {}", category); }
+        }
+        if (cat != null) {
+            return postRepository.searchPublicByCategory(like, cat, pageable);
+        }
+        return postRepository.searchPublic(like, pageable);
+    }
+
+    /** 광장별 글 수 (다른 광장 패널용) */
+    public java.util.Map<String, Long> getCategoryCounts() {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("", postRepository.countPublicAll());
+        for (PostCategory cat : PostCategory.values()) {
+            counts.put(cat.name(), postRepository.countPublicByCategory(cat));
+        }
+        return counts;
+    }
+
     /**
      * 포스트 상세 조회
      * - 공개(PUBLIC): 누구나 조회 가능

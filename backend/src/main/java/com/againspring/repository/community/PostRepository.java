@@ -169,6 +169,32 @@ public interface PostRepository extends JpaRepository<Post, String> {
     /** 관리자용: 지정된 기간에 생성된 게시글 건수 */
     long countByDeletedAtIsNullAndCreatedAtBetween(java.time.Instant from, java.time.Instant to);
 
+    // ── 검색 쿼리 ────────────────────────────────────────────────────────
+
+    /** 제목/본문 키워드 검색 — 전체 (PUBLIC, VOTING+CLOSED, 삭제 안됨) */
+    @Query("SELECT p FROM Post p WHERE p.visibility = com.againspring.domain.enums.PostVisibility.PUBLIC " +
+           "AND p.status IN (com.againspring.domain.enums.PostStatus.VOTING, com.againspring.domain.enums.PostStatus.CLOSED) " +
+           "AND p.deletedAt IS NULL AND (p.title LIKE :q OR p.bodyPublished LIKE :q) ORDER BY p.createdAt DESC")
+    Page<Post> searchPublic(@Param("q") String q, Pageable pageable);
+
+    /** 제목/본문 키워드 검색 — 카테고리 필터 */
+    @Query("SELECT p FROM Post p WHERE p.visibility = com.againspring.domain.enums.PostVisibility.PUBLIC " +
+           "AND p.status IN (com.againspring.domain.enums.PostStatus.VOTING, com.againspring.domain.enums.PostStatus.CLOSED) " +
+           "AND p.category = :category AND p.deletedAt IS NULL AND (p.title LIKE :q OR p.bodyPublished LIKE :q) ORDER BY p.createdAt DESC")
+    Page<Post> searchPublicByCategory(@Param("q") String q, @Param("category") PostCategory category, Pageable pageable);
+
+    /** 광장별 글 수 (PUBLIC, VOTING+CLOSED, 삭제 안됨) */
+    @Query("SELECT COUNT(p) FROM Post p WHERE p.visibility = com.againspring.domain.enums.PostVisibility.PUBLIC " +
+           "AND p.status IN (com.againspring.domain.enums.PostStatus.VOTING, com.againspring.domain.enums.PostStatus.CLOSED) " +
+           "AND p.category = :category AND p.deletedAt IS NULL")
+    long countPublicByCategory(@Param("category") PostCategory category);
+
+    /** 전체 글 수 (PUBLIC, VOTING+CLOSED, 삭제 안됨) */
+    @Query("SELECT COUNT(p) FROM Post p WHERE p.visibility = com.againspring.domain.enums.PostVisibility.PUBLIC " +
+           "AND p.status IN (com.againspring.domain.enums.PostStatus.VOTING, com.againspring.domain.enums.PostStatus.CLOSED) " +
+           "AND p.deletedAt IS NULL")
+    long countPublicAll();
+
     // ── 마케팅용 쿼리 ────────────────────────────────────────────────────
 
     /**

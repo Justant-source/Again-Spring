@@ -130,4 +130,11 @@ export const postApi = {
 
   editPartnerBody: (postId: string, bodyRaw: string) =>
     api.patch(`/api/community/posts/${postId}/partner-body`, { bodyRaw }),
+
+  search: (q: string, params?: { category?: string; page?: number; size?: number }) =>
+    api.get<{ content: PostSummary[]; totalElements: number; totalPages: number }>(
+      '/api/community/posts/search', { params: { q, ...params } }).then(r => r.data),
+
+  counts: () =>
+    api.get<Record<string, number>>('/api/community/posts/counts').then(r => r.data),
 };

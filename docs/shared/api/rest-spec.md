@@ -103,6 +103,8 @@ flowchart LR
 |---|---|---|---|---|
 | POST | `/api/community/posts` | **JWT** | 201 / 422 | 게시글 작성 |
 | GET | `/api/community/posts` | 공개 | 200 | 게시글 목록 |
+| GET | `/api/community/posts/search` | 공개 | 200 | 키워드 검색 (`?q=`, `category=`, `page=`, `size=`) |
+| GET | `/api/community/posts/counts` | 공개 | 200 | 광장별 글 수 (`{"":.., "COUPLE":.., ...}`) |
 | GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | 게시글 상세 |
 | PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만) |
 | DELETE | `/api/community/posts/{id}` | **JWT** | 204 / 403 / 404 | 게시글 삭제 (작성자만) |

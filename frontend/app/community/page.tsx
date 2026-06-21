@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { postApi, PostSummary } from '@/lib/api/community/postApi';
-import { FeedCard, BrandBar } from '@/components/community/c3';
+import { FeedCard, BrandBar, SearchPanel } from '@/components/community/c3';
 import { useUserStore } from '@/lib/store/userStore';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { useVoteStore } from '@/lib/store/voteStore';
@@ -26,7 +25,6 @@ function getCategoryLabel(categoryId: string): string {
 }
 
 export default function CommunityFeedPage() {
-  const router = useRouter();
   const user = useUserStore((s) => s.user);
   useGuestInit();
   const voteStoreVotes = useVoteStore((s) => s.votes);
@@ -36,6 +34,8 @@ export default function CommunityFeedPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, setTimeTick] = useState(0);
+  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
+  const [activeSearch, setActiveSearch] = useState<{ q: string; category: string } | null>(null);
 
   const categoryOptions = [{ id: '', label: '전체' }, ...C3_CATS];
 
@@ -44,10 +44,12 @@ export default function CommunityFeedPage() {
       try {
         setLoading(true);
         setError(null);
-        const result = await postApi.list({
-          category: selectedCategory || undefined,
-          sort,
-        });
+        let result;
+        if (activeSearch) {
+          result = await postApi.search(activeSearch.q, { category: activeSearch.category || undefined });
+        } else {
+          result = await postApi.list({ category: selectedCategory || undefined, sort });
+        }
         setPosts(result.content);
       } catch (err) {
         console.error('Failed to load posts:', err);
@@ -59,18 +61,25 @@ export default function CommunityFeedPage() {
     };
 
     loadPosts();
-  }, [selectedCategory, sort]);
+  }, [selectedCategory, sort, activeSearch]);
 
   useEffect(() => {
     const id = setInterval(() => setTimeTick(t => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
 
+  const handleSearch = (q: string, category: string) => {
+    setActiveSearch({ q, category });
+    if (category) setSelectedCategory(category);
+  };
+
+  const clearSearch = () => setActiveSearch(null);
+
   return (
     <div style={{ background: 'var(--L-bg)', minHeight: '100vh' }}>
       <div style={{ padding: '18px 22px 90px' }}>
-        {/* 상단 헤더: 다시봄 광장 + 우측 유저 칩 */}
-        <BrandBar title="다시봄 광장" user={user} />
+        {/* 상단 헤더: 다시봄 광장 + 검색 아이콘 + 유저 칩 */}
+        <BrandBar title="다시봄 광장" user={user} onSearchOpen={() => setSearchPanelOpen(true)} />
 
         {/* 카테고리 필터 — 가로 스크롤 칩 */}
         <div style={{ display: 'flex', gap: 7, marginTop: 16, overflowX: 'auto', scrollbarWidth: 'none' }}>
@@ -79,7 +88,7 @@ export default function CommunityFeedPage() {
             return (
               <button
                 key={opt.id}
-                onClick={() => setSelectedCategory(opt.id)}
+                onClick={() => { setSelectedCategory(opt.id); clearSearch(); }}
                 style={{
                   flexShrink: 0,
                   padding: '6px 13px',
@@ -99,31 +108,48 @@ export default function CommunityFeedPage() {
           })}
         </div>
 
-        {/* 정렬 토글 — 우측 정렬 */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 14 }}>
-          <button
-            data-testid="feed-sort-latest"
-            onClick={() => setSort('latest')}
-            style={{
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              fontSize: 12.5, fontWeight: 500,
-              color: sort === 'latest' ? 'var(--L-ink)' : 'var(--L-sub)',
-            }}
-          >
-            최신순
-          </button>
-          <button
-            data-testid="feed-sort-recommended"
-            onClick={() => setSort('recommended')}
-            style={{
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              fontSize: 12.5, fontWeight: sort === 'recommended' ? 500 : 400,
-              color: sort === 'recommended' ? 'var(--L-ink)' : 'var(--L-sub)',
-            }}
-          >
-            추천순
-          </button>
-        </div>
+        {/* 검색 중 뱃지 */}
+        {activeSearch && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+            <span style={{ fontSize: 13, color: 'var(--L-sub)' }}>
+              {activeSearch.category ? `'${getCategoryLabel(activeSearch.category)}'에서 ` : ''}&apos;{activeSearch.q}&apos; 검색 중
+            </span>
+            <button
+              onClick={clearSearch}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--L-sub)', padding: 0 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* 정렬 토글 — 검색 중에는 숨김 */}
+        {!activeSearch && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 14 }}>
+            <button
+              data-testid="feed-sort-latest"
+              onClick={() => setSort('latest')}
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                fontSize: 12.5, fontWeight: 500,
+                color: sort === 'latest' ? 'var(--L-ink)' : 'var(--L-sub)',
+              }}
+            >
+              최신순
+            </button>
+            <button
+              data-testid="feed-sort-recommended"
+              onClick={() => setSort('recommended')}
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                fontSize: 12.5, fontWeight: sort === 'recommended' ? 500 : 400,
+                color: sort === 'recommended' ? 'var(--L-ink)' : 'var(--L-sub)',
+              }}
+            >
+              추천순
+            </button>
+          </div>
+        )}
 
         {/* 로딩 상태 */}
         {loading && (
@@ -173,25 +199,37 @@ export default function CommunityFeedPage() {
         {/* 빈 상태 */}
         {!loading && posts.length === 0 && !error && (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--L-sub)' }}>
-            <div style={{ fontSize: 14, marginBottom: 12 }}>아직 사연이 없습니다</div>
-            <Link
-              href="/community/new"
-              style={{
-                display: 'inline-block',
-                padding: '10px 16px',
-                background: 'var(--L-ink)',
-                color: 'var(--L-bg)',
-                borderRadius: 6,
-                fontSize: 13,
-                textDecoration: 'none',
-              }}
-            >
-              첫 사연 올리기
-            </Link>
+            <div style={{ fontSize: 14, marginBottom: 12 }}>
+              {activeSearch ? '검색 결과가 없습니다' : '아직 사연이 없습니다'}
+            </div>
+            {!activeSearch && (
+              <Link
+                href="/community/new"
+                style={{
+                  display: 'inline-block',
+                  padding: '10px 16px',
+                  background: 'var(--L-ink)',
+                  color: 'var(--L-bg)',
+                  borderRadius: 6,
+                  fontSize: 13,
+                  textDecoration: 'none',
+                }}
+              >
+                첫 사연 올리기
+              </Link>
+            )}
           </div>
         )}
       </div>
 
+      {searchPanelOpen && (
+        <SearchPanel
+          currentCategory={selectedCategory}
+          onSearch={handleSearch}
+          onCategorySelect={(id) => { setSelectedCategory(id); clearSearch(); }}
+          onClose={() => setSearchPanelOpen(false)}
+        />
+      )}
     </div>
   );
 }
