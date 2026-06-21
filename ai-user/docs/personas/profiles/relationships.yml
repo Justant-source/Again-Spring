@@ -1,789 +1,348 @@
 relationships:
-# ========== 기존 8개 관계 (유지) ==========
-- persona_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
-  other_id: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5
-  relation_type: ACQUAINTANCE
-  closeness: 0.4
 
-- persona_id: c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6
-  other_id: d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1
+# ======================================================================
+# prod persona IDs — 2026-06-21 갱신
+# 이전 파일의 모든 ID는 플레이스홀더(a1b2c3...)라 FK 위반 유발
+# 이 파일은 prod DB의 실제 50개 persona ID로 재작성됨
+#
+# archetype 그룹:
+#   couple_communication (6): 716d..., e8af..., 10f8..., 1ea0..., 59ce..., 617c...
+#   couple_money_dating (10): 70ae..., 01e9..., 402d..., 423d..., b2c6...,
+#                              4de5..., 65a8..., cf6c..., e801..., f663...
+#   couple_opposite_sex_friend (3): d703..., 196c..., a010...
+#   family_care_burden (3): 3da5..., b854..., b57d...
+#   family_generation_gap (8): da1d..., 2ce9..., 3dce..., 5b52..., 65cc...,
+#                               7e7c..., a71e..., e4b7...
+#   friend_betrayal (5): 011c..., 1625..., 7ff0..., 1ef8..., 5d0a...
+#   work_colleague_conflict (10): 0695..., 0934..., 5a9f..., 1fd8..., 622e...,
+#                                  656b..., 8df8..., b307..., bcea..., d418...
+#   work_toxic (5): 1774..., fcf1..., 4a73..., 515d..., 590b...
+# ======================================================================
+
+# ==================== COUPLE (PairedPostScheduler) ====================
+# couple_communication 쌍 — 두 페르소나가 연인 갈등 양측을 대변
+
+- persona_id: 716d380821d7453984e1e9ef493dc0ca  # couple_comm HEAVY
+  other_id:   e8af7d23f93b4bf29a68c71a363ccd85  # couple_comm HEAVY
+  relation_type: COUPLE
+  closeness: 0.85
+  status: ACTIVE
+
+- persona_id: 10f8a35a7825434ea75dfe46aca74c53  # couple_comm REG
+  other_id:   1ea0b95318644bb6a07ad681c37c8a58  # couple_comm REG
+  relation_type: COUPLE
+  closeness: 0.80
+  status: ACTIVE
+
+- persona_id: 59ce1b6e3013478f9df83afcb9706959  # couple_comm REG
+  other_id:   617c187ad5dc4788ad3eebd05bbb6523  # couple_comm REG
+  relation_type: COUPLE
+  closeness: 0.80
+  status: ACTIVE
+
+# couple_money_dating 쌍
+- persona_id: 70ae854d7b144f258066237053dcb466  # couple_money HEAVY
+  other_id:   e801ae60fd904a7ab6856921c2c86354  # couple_money REG
+  relation_type: COUPLE
+  closeness: 0.82
+  status: ACTIVE
+
+- persona_id: 4de5596df77e487fa8626d994cf0149e  # couple_money REG
+  other_id:   65a847fbd107405c8edc2246bf7f9b23  # couple_money REG
+  relation_type: COUPLE
+  closeness: 0.78
+  status: ACTIVE
+
+# ==================== MARRIAGE (PairedPostScheduler) ====================
+# couple_money_dating LIGHT 쌍 — 금전 갈등 겪는 기혼 페르소나
+
+- persona_id: 01e99095413b401e954378ecc108f44c  # couple_money LIGHT
+  other_id:   402df832161c44f18444968f6410e5fe  # couple_money LIGHT
+  relation_type: MARRIAGE
+  closeness: 0.85
+  status: ACTIVE
+
+- persona_id: cf6c4e11e6a14586a987ff2d1b2e97eb  # couple_money REG
+  other_id:   f66327a5954a4b8395e0ba68f0c30fc8  # couple_money REG
+  relation_type: MARRIAGE
+  closeness: 0.82
+  status: ACTIVE
+
+- persona_id: 423d7c5d41864974a47d199ef6e9afce  # couple_money LIGHT
+  other_id:   b2c6aaa69243458cae718f9a999b6be1  # couple_money LIGHT
+  relation_type: MARRIAGE
+  closeness: 0.80
+  status: ACTIVE
+
+# ==================== FRIEND ====================
+# friend_betrayal 그룹 — 배신 경험 공유, 복잡한 우정
+
+- persona_id: 011cd2636dba4b9384b53a2702755cdd  # friend_betrayal HEAVY
+  other_id:   16258dd597ba4b80895225020c212669  # friend_betrayal HEAVY
   relation_type: FRIEND
-  closeness: 0.6
+  closeness: 0.70
 
-- persona_id: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-  other_id: f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3
+- persona_id: 16258dd597ba4b80895225020c212669
+  other_id:   011cd2636dba4b9384b53a2702755cdd
   relation_type: FRIEND
-  closeness: 0.7
+  closeness: 0.70
 
-- persona_id: a7b8c9d0e1f2a7b8c9d0e1f2a7b8c9d0
-  other_id: b8c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-- persona_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2
-  other_id: d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7
-  relation_type: ACQUAINTANCE
-  closeness: 0.5
-
-- persona_id: e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7b8
-  other_id: f2a7b8c9d0e1f2a7b8c9d0e1f2a7b8c9
-  relation_type: COLLEAGUE
-  closeness: 0.4
-
-- persona_id: a3b4c5d6e7f8a3b4c5d6e7f8a3b4c5d6
-  other_id: b4c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-- persona_id: c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7f8
-  other_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
-  relation_type: ACQUAINTANCE
-  closeness: 0.4
-
-# ========== 신규 관계 (001~015 ANCHOR 중심) ==========
-
-# NATEPAN 그룹 (ANCHOR에서 NATEPAN: 001, 003, 005, 008, 010, 012, 014, 015)
-- persona_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4  # 001 밤하늘별빛
-  other_id: c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6  # 003 오늘도맑음
-  relation_type: ACQUAINTANCE
-  closeness: 0.35
-
-- persona_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4  # 001 밤하늘별빛
-  other_id: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  # 005 초록빛하루
-  relation_type: FRIEND
-  closeness: 0.6
-
-- persona_id: c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6  # 003 오늘도맑음
-  other_id: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  # 005 초록빛하루
+- persona_id: 7ff000fb782e4c7fb2a9edf6dd7ba3e6  # friend_betrayal HEAVY
+  other_id:   1ef8c584c1ee4c2cabeaac4ae3c067e8  # friend_betrayal REG
   relation_type: FRIEND
   closeness: 0.65
 
-- persona_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4  # 001 밤하늘별빛
-  other_id: d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7  # 010 봄비내리는날
-  relation_type: COLLEAGUE
-  closeness: 0.5
-
-# DCINSIDE 그룹 (006, 013, 017)
-- persona_id: f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3  # 006 새벽세시반
-  other_id: a3b4c5d6e7f8a3b4c5d6e7f8a3b4c5d6  # 013 마라탕한그릇
-  relation_type: ACQUAINTANCE
-  closeness: 0.35
-
-# BLIND 그룹 (002, 007, 033, 034)
-- persona_id: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5 # 002 퇴근후치맥
-  other_id: a7b8c9d0e1f2a7b8c9d0e1f2a7b8c9d0  # 007 달달한오후
-  relation_type: COLLEAGUE
-  closeness: 0.55
-
-- persona_id: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5 # 002 퇴근후치맥
-  other_id: a7b8c9d0e1f2a7b8c9d0e1f2a7b8c9d0  # 007 달달한오후
-  relation_type: COLLEAGUE
-  closeness: 0.55
-
-# GENERAL 그룹 (004, 009, 011)
-- persona_id: d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1  # 004 커피한잔째
-  other_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2  # 009 야식천국
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-- persona_id: d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1  # 004 커피한잔째
-  other_id: e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7b8  # 011 차한잔의여유
-  relation_type: ACQUAINTANCE
-  closeness: 0.4
-
-# 다양한 Voice 조합 (같은 연령대·성별·정치성향)
-- persona_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4  # 001 밤하늘별빛 (40s F conservative)
-  other_id: b4c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7  # 014 들꽃향기 (30s F progressive) — 약간 차이
-  relation_type: ACQUAINTANCE
-  closeness: 0.25
-
-- persona_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4  # 001 밤하늘별빛
-  other_id: c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7f8  # 015 오늘도감사해요 (50s F conservative)
+- persona_id: 1ef8c584c1ee4c2cabeaac4ae3c067e8
+  other_id:   7ff000fb782e4c7fb2a9edf6dd7ba3e6
   relation_type: FRIEND
-  closeness: 0.7
+  closeness: 0.65
 
-# 직장인 동료 관계 (COLLEAGUE)
-- persona_id: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5  # 002 퇴근후치맥 (30s M BLIND)
-  other_id: a7b8c9d0e1f2a7b8c9d0e1f2a7b8c9d0  # 007 달달한오후 (30s M BLIND)
-  relation_type: COLLEAGUE
-  closeness: 0.5
+- persona_id: 1ef8c584c1ee4c2cabeaac4ae3c067e8  # friend_betrayal REG
+  other_id:   5d0a04b65171429da9b08105a80b2e2a  # friend_betrayal REG
+  relation_type: FRIEND
+  closeness: 0.60
 
-- persona_id: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5  # 002 퇴근후치맥
-  other_id: d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1  # 004 커피한잔째 (40s M GENERAL)
-  relation_type: COLLEAGUE
-  closeness: 0.45
+- persona_id: 5d0a04b65171429da9b08105a80b2e2a
+  other_id:   1ef8c584c1ee4c2cabeaac4ae3c067e8
+  relation_type: FRIEND
+  closeness: 0.60
 
-- persona_id: a7b8c9d0e1f2a7b8c9d0e1f2a7b8c9d0  # 007 달달한오후
-  other_id: d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1  # 004 커피한잔째
-  relation_type: COLLEAGUE
-  closeness: 0.4
+# couple_opposite_sex_friend 그룹 — 이성 친구 갈등
+- persona_id: d703486f47c7476aa80ed27c765e8281  # opposite_sex_friend LIGHT
+  other_id:   196c0e9c4fcb45f8b94e0bf5f08ccae1  # opposite_sex_friend REG
+  relation_type: FRIEND
+  closeness: 0.55
 
-# 부부/연인 관계는 없음 (ANCHOR에 정의되지 않아 스킵)
-# 가족 관계 (부모-자식, 형제 관계 모의)
-- persona_id: c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7f8  # 015 오늘도감사해요 (50s F)
-  other_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4  # 001 밤하늘별빛 (40s F) — 모-딸 관계 모의
+- persona_id: 196c0e9c4fcb45f8b94e0bf5f08ccae1
+  other_id:   d703486f47c7476aa80ed27c765e8281
+  relation_type: FRIEND
+  closeness: 0.55
+
+- persona_id: 196c0e9c4fcb45f8b94e0bf5f08ccae1  # opposite_sex_friend REG
+  other_id:   a010c66ef1484e18a993fa6dff8f4568  # opposite_sex_friend REG
+  relation_type: FRIEND
+  closeness: 0.60
+
+- persona_id: a010c66ef1484e18a993fa6dff8f4568
+  other_id:   196c0e9c4fcb45f8b94e0bf5f08ccae1
+  relation_type: FRIEND
+  closeness: 0.60
+
+# ==================== FAMILY ====================
+# family_care_burden — 돌봄 부담 공유 (부모-자녀 또는 형제)
+- persona_id: 3da5e20473bb45f9a02528adde461eed  # family_care_burden HEAVY
+  other_id:   b854bc44c0534270b6f48a39e39db026  # family_care_burden LIGHT
+  relation_type: FAMILY
+  closeness: 0.80
+
+- persona_id: b854bc44c0534270b6f48a39e39db026
+  other_id:   3da5e20473bb45f9a02528adde461eed
+  relation_type: FAMILY
+  closeness: 0.80
+
+# family_generation_gap — 세대 갈등 (부모-자녀)
+- persona_id: da1de65b180a4d7ea59be2b25d66a44b  # family_gen_gap HEAVY
+  other_id:   2ce94051e9f14b3085830248a2b0d49d  # family_gen_gap LIGHT
   relation_type: FAMILY
   closeness: 0.75
 
-- persona_id: e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7b8  # 011 차한잔의여유 (50s M)
-  other_id: d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1  # 004 커피한잔째 (40s M) — 형-아우 관계
+- persona_id: 2ce94051e9f14b3085830248a2b0d49d
+  other_id:   da1de65b180a4d7ea59be2b25d66a44b
   relation_type: FAMILY
-  closeness: 0.6
+  closeness: 0.75
 
-# ========== 신규 016~050 추가 관계 ==========
+- persona_id: 3dce28e949c947d989253276df92ce1d  # family_gen_gap REG
+  other_id:   5b52500533fb4d2aafbb0e70fdc6bcd4  # family_gen_gap REG
+  relation_type: FAMILY
+  closeness: 0.70
 
-# 016 나래 (40s M FMKOREA progressive) — 펨코 사용자
-- persona_id: 05f8f3042933499ca416599a629c1c66  # 016 나래
-  other_id: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5  # 002 퇴근후치맥 (같은 연령대 남성)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
+- persona_id: 5b52500533fb4d2aafbb0e70fdc6bcd4
+  other_id:   3dce28e949c947d989253276df92ce1d
+  relation_type: FAMILY
+  closeness: 0.70
 
-- persona_id: 05f8f3042933499ca416599a629c1c66  # 016 나래
-  other_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2  # 009 야식천국 (20s M)
-  relation_type: ACQUAINTANCE
-  closeness: 0.25
-
-# 017 해솔 (30s_late M DCINSIDE) — 디시 사용자
-- persona_id: 0bf14948be8b4d67a653f45cf666f142  # 017 해솔
-  other_id: f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3  # 006 새벽세시반 (20s_late F DCINSIDE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.35
-
-- persona_id: 0bf14948be8b4d67a653f45cf666f142  # 017 해솔
-  other_id: a3b4c5d6e7f8a3b4c5d6e7f8a3b4c5d6  # 013 마라탕한그릇 (40s M DCINSIDE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 018 산길 (60s M MLBPARK moderate) — 엠팍 사용자 (나이 많음)
-- persona_id: 0c467d2b9b8d46ecbdf3ac654459bc49  # 018 산길
-  other_id: e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7b8  # 011 차한잔의여유 (50s M GENERAL)
-  relation_type: ACQUAINTANCE
-  closeness: 0.35
-
-# 019 산호 (30s_late F NATEPAN conservative) — 나이 선후 여성끼리
-- persona_id: 0f3d69e15a2c44d597c8728c2839215d  # 019 산호
-  other_id: c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7f8  # 015 오늘도감사해요 (50s F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-- persona_id: 0f3d69e15a2c44d597c8728c2839215d  # 019 산호
-  other_id: b4c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7  # 014 들꽃향기 (30s F NATEPAN)
-  relation_type: FRIEND
+# ==================== COLLEAGUE ====================
+# work_colleague_conflict 그룹
+- persona_id: 069557e27a15451e8902718e8e60579e  # work_colleague HEAVY
+  other_id:   0934b4e5132a4da0bab8eb28190a9426  # work_colleague HEAVY
+  relation_type: COLLEAGUE
   closeness: 0.55
 
-# 020 참바람 (50s F PPOMPPU conservative) — 뽐뿌 사용자
-- persona_id: 126accc8d7bc40debc726eb51b208b5b  # 020 참바람
-  other_id: c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7f8  # 015 오늘도감사해요 (50s F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.35
-
-- persona_id: 126accc8d7bc40debc726eb51b208b5b  # 020 참바람
-  other_id: b8c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1  # 008 오후의햇살 (50s F NATEPAN)
-  relation_type: FRIEND
-  closeness: 0.5
-
-# 021 달희 (10s F THEQOO conservative) — 더쿠 사용자 (학생)
-- persona_id: 12b922ef7e214b118ff71ccaf8d5341d  # 021 달희
-  other_id: c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6  # 003 오늘도맑음 (20s_late F NATEPAN) — 연상 여성
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 022 하늘소녀 (20s_late F THEQOO moderate) — 더쿠 사용자
-- persona_id: 1597041b40f0437a8c98acd3875716af  # 022 하늘소녀
-  other_id: c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6  # 003 오늘도맑음 (20s_late F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.35
-
-- persona_id: 1597041b40f0437a8c98acd3875716af  # 022 하늘소녀
-  other_id: f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3  # 006 새벽세시반 (20s_late F DCINSIDE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.25
-
-# 023 해맞이 (30s_early F NATEPAN conservative) — NATEPAN 여성
-- persona_id: 1b64264e180f4944af6a037864962bd0  # 023 해맞이
-  other_id: b4c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7  # 014 들꽃향기 (30s F NATEPAN)
-  relation_type: FRIEND
-  closeness: 0.5
-
-# 024 봄향 (40s F DCINSIDE conservative) — DCINSIDE 여성
-- persona_id: 292103dfe6fc4325832813be37ce9f00  # 024 봄향
-  other_id: f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3  # 006 새벽세시반 (20s_late F DCINSIDE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 025 산들 (10s M ARCALIVE moderate) — 아카 사용자 (학생)
-- persona_id: 2bf53867b5c64b5b99c9f5e0acdd8a1b  # 025 산들
-  other_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2  # 009 야식천국 (20s_early M GENERAL) — 연상 남성
-  relation_type: ACQUAINTANCE
-  closeness: 0.25
-
-# 026 인천달 (40s F NATEPAN moderate) — 40대 여성
-- persona_id: 3f40a749061a49d3bcc2938ee8228847  # 026 인천달
-  other_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4  # 001 밤하늘별빛 (40s F NATEPAN)
-  relation_type: FRIEND
+- persona_id: 0934b4e5132a4da0bab8eb28190a9426
+  other_id:   069557e27a15451e8902718e8e60579e
+  relation_type: COLLEAGUE
   closeness: 0.55
 
-# 027 아련 (50s F NATEPAN progressive) — 50대 여성, NATEPAN
-- persona_id: 47561784a53a4d139eb9e293d1c4e443  # 027 아련
-  other_id: b8c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1  # 008 오후의햇살 (50s F NATEPAN)
-  relation_type: FRIEND
-  closeness: 0.6
+- persona_id: 5a9fe9eb19914c2785494937b40dc906  # work_colleague HEAVY
+  other_id:   1fd85e7310e24a158e6c65574f62692d  # work_colleague REG
+  relation_type: COLLEAGUE
+  closeness: 0.50
 
-# 028 꽃내음 (20s_early F NATEPAN conservative) — 20대 초 여성
-- persona_id: 563e78d580b64877a389428e286d0e55  # 028 꽃내음
-  other_id: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  # 005 초록빛하루 (20s_early F NATEPAN)
-  relation_type: FRIEND
-  closeness: 0.55
+- persona_id: 1fd85e7310e24a158e6c65574f62692d
+  other_id:   5a9fe9eb19914c2785494937b40dc906
+  relation_type: COLLEAGUE
+  closeness: 0.50
 
-# 029 달팽이 (60s F GENERAL moderate) — 60대 여성
-- persona_id: 584208d351454df6aa7c514f7b1d6d17  # 029 달팽이
-  other_id: c5d6e7f8a3b4c5d6e7f8a3b4c5d6e7f8  # 015 오늘도감사해요 (50s F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.35
-
-# 030 별빛 (30s_late F DCINSIDE conservative) — 30대 후 여성
-- persona_id: 591de84272c247f59052dedd21be79b4  # 030 별빛
-  other_id: f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3  # 006 새벽세시반 (20s_late F DCINSIDE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 031 봄날아저씨 (60s M MLBPARK moderate) — 60대 남성
-- persona_id: 70ccd37889d145a8ba0c60601705f0f5  # 031 봄날아저씨
-  other_id: 0c467d2b9b8d46ecbdf3ac654459bc49  # 018 산길 (60s M MLBPARK)
-  relation_type: ACQUAINTANCE
-  closeness: 0.35
-
-# 032 겨울 (30s_late M BLIND moderate) — 30대 후 남성, BLIND
-- persona_id: 7ccd0c84495d417d9b4a39377057ab49  # 032 겨울
-  other_id: 0bf14948be8b4d67a653f45cf666f142  # 017 해솔 (30s_late M DCINSIDE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-- persona_id: 7ccd0c84495d417d9b4a39377057ab49  # 032 겨울
-  other_id: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5  # 002 퇴근후치맥 (30s M BLIND)
+- persona_id: 622ea95cb0c74e6f884668e5624b9803  # work_colleague REG
+  other_id:   656b3c8d6f604fc9a38434a3e0196eff  # work_colleague REG
   relation_type: COLLEAGUE
   closeness: 0.45
 
-# 033 파도 (20s_early M BLIND progressive) — 20대 초 남성
-- persona_id: 7e5cd42ad22949de828ca280eb23fed4  # 033 파도
-  other_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2  # 009 야식천국 (20s_early M GENERAL)
-  relation_type: FRIEND
-  closeness: 0.5
-
-# 034 늦바람 (50s M BLIND progressive) — 50대 남성, BLIND
-- persona_id: 7ec216eb8025429e9694c38f0ab62055  # 034 늦바람
-  other_id: e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7b8  # 011 차한잔의여유 (50s M GENERAL)
-  relation_type: COLLEAGUE
-  closeness: 0.4
-
-# 035 나리 (10s F THEQOO progressive) — 더쿠 학생
-- persona_id: 8a02ce56a75f4eaeaa96593c06fe2c98  # 035 나리
-  other_id: 12b922ef7e214b118ff71ccaf8d5341d  # 021 달희 (10s F THEQOO)
-  relation_type: FRIEND
-  closeness: 0.5
-
-# 036 산빛 (60s M CLIEN progressive) — 클리앙 사용자
-- persona_id: 8b8d72f47e394329a25de307da06065b  # 036 산빛
-  other_id: 0c467d2b9b8d46ecbdf3ac654459bc49  # 018 산길 (60s M MLBPARK)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 037 산책 (40s M GENERAL moderate) — GENERAL 40대 남성
-- persona_id: a121488480d94eb2b12cd0af03cf2a48  # 037 산책
-  other_id: d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1  # 004 커피한잔째 (40s M GENERAL)
+- persona_id: 656b3c8d6f604fc9a38434a3e0196eff
+  other_id:   622ea95cb0c74e6f884668e5624b9803
   relation_type: COLLEAGUE
   closeness: 0.45
 
-# 038 봄여울 (20s_early F GENERAL moderate) — 20대 초 여성
-- persona_id: a6cc82bd06d4486ebb27dab0925456af  # 038 봄여울
-  other_id: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  # 005 초록빛하루 (20s_early F NATEPAN)
-  relation_type: FRIEND
-  closeness: 0.5
+- persona_id: 8df8d72034754df8ba39a3575fd6ce47  # work_colleague REG
+  other_id:   b3075610117649988e5a651defe253fa  # work_colleague REG
+  relation_type: COLLEAGUE
+  closeness: 0.50
 
-# 039 유진 (30s_late F NATEPAN conservative) — 30대 후 여성
-- persona_id: a86eb1d5f93a42c3882630b57ff78b6f  # 039 유진
-  other_id: 0f3d69e15a2c44d597c8728c2839215d  # 019 산호 (30s_late F NATEPAN)
-  relation_type: FRIEND
-  closeness: 0.55
+- persona_id: b3075610117649988e5a651defe253fa
+  other_id:   8df8d72034754df8ba39a3575fd6ce47
+  relation_type: COLLEAGUE
+  closeness: 0.50
 
-# 040 해숨 (50s F DCINSIDE progressive) — 50대 여성, DCINSIDE
-- persona_id: c344a0ea94fa4f8887dd7fc05736e962  # 040 해숨
-  other_id: 47561784a53a4d139eb9e293d1c4e443  # 027 아련 (50s F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 041 파랑새 (30s_late F RULIWEB progressive) — 루리웹 사용자
-- persona_id: cc29c73e9b2f404786ea54ccca4e40c7  # 041 파랑새
-  other_id: 0f3d69e15a2c44d597c8728c2839215d  # 019 산호 (30s_late F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 042 온새미 (30s_early F GENERAL moderate) — 30대 초 여성
-- persona_id: d21e86a792164fc1abeef92deae42d0e  # 042 온새미
-  other_id: 1b64264e180f4944af6a037864962bd0  # 023 해맞이 (30s_early F NATEPAN)
-  relation_type: FRIEND
-  closeness: 0.5
-
-# 043 길잡이 (50s M BLIND progressive) — 50대 남성, BLIND
-- persona_id: d3dc8e5adfa440d29ee92a61ef6339c8  # 043 길잡이
-  other_id: 7ec216eb8025429e9694c38f0ab62055  # 034 늦바람 (50s M BLIND)
+- persona_id: bcea071f126b4eb29ad708f8d41b77d7  # work_colleague REG
+  other_id:   d418e1e8631840dcbd2fbb67eed81247  # work_colleague REG
   relation_type: COLLEAGUE
   closeness: 0.45
 
-# 044 보라 (10s F ARCALIVE progressive) — 아카 학생
-- persona_id: d8ced59e9ed045fbad5b1fbd700450b4  # 044 보라
-  other_id: 2bf53867b5c64b5b99c9f5e0acdd8a1b  # 025 산들 (10s M ARCALIVE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.25
-
-# 045 구름산 (30s_late M GENERAL progressive) — 30대 후 남성
-- persona_id: dc9e54252b394a81be28a002aa2737dd  # 045 구름산
-  other_id: a121488480d94eb2b12cd0af03cf2a48  # 037 산책 (40s M GENERAL)
-  relation_type: COLLEAGUE
-  closeness: 0.4
-
-# 046 달구름 (30s_early M FMKOREA progressive) — 30대 초 남성, 펨코
-- persona_id: e770499b0c3245b281771bbeedfd4cd2  # 046 달구름
-  other_id: 05f8f3042933499ca416599a629c1c66  # 016 나래 (40s M FMKOREA)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 047 해빛 (20s_early M GENERAL progressive) — 20대 초 남성
-- persona_id: f4e225a5a75646dbb8edfb98f0795e7d  # 047 해빛
-  other_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2  # 009 야식천국 (20s_early M GENERAL)
-  relation_type: FRIEND
-  closeness: 0.5
-
-# 048 참나 (50s M BLIND conservative) — 50s M BLIND
-- persona_id: f5646675dcfc47b8a468b4da1e00b839  # 048 참나
-  other_id: 7ec216eb8025429e9694c38f0ab62055  # 034 늦바람 (50s M BLIND)
-  relation_type: COLLEAGUE
-  closeness: 0.4
-
-# 049 검은별 (20s_late M DCINSIDE conservative) — 20대 후 남성
-- persona_id: f92104059be14e10944a56f25c084d70  # 049 검은별
-  other_id: 0bf14948be8b4d67a653f45cf666f142  # 017 해솔 (30s_late M DCINSIDE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.25
-
-# 050 새벽비 (30s_early M FMKOREA progressive) — 30대 초 남성, 펨코
-- persona_id: fabb8d82ed48409995b9601f9f024b55  # 050 새벽비
-  other_id: e770499b0c3245b281771bbeedfd4cd2  # 046 달구름 (30s_early M FMKOREA)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# ========== 신규 051~100 추가 관계 ==========
-
-# 051 살구꽃 (30s_late F NATEPAN moderate) — NATEPAN 여성
-- persona_id: 92d2adb49d10469bbe9bc29ac30da3f2  # 051 살구꽃
-  other_id: a86eb1d5f93a42c3882630b57ff78b6f  # 039 유진 (30s_late F NATEPAN)
-  relation_type: FRIEND
-  closeness: 0.55
-
-# 052 구름한점 (50s M NATEPAN conservative) — 50대 남성
-- persona_id: f7dc445cb42b4e89b99a2702a02370c0  # 052 구름한점
-  other_id: e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7b8  # 011 차한잔의여유 (50s M GENERAL)
-  relation_type: COLLEAGUE
-  closeness: 0.4
-
-# 053 봄소녀13 (10s F THEQOO progressive) — 더쿠 학생
-- persona_id: e84e4598cf104657b8135d553864ae8e  # 053 봄소녀13
-  other_id: 8a02ce56a75f4eaeaa96593c06fe2c98  # 035 나리 (10s F THEQOO)
-  relation_type: FRIEND
-  closeness: 0.5
-
-# 054 별하나 (20s_early F THEQOO moderate) — 20대 초 여성
-- persona_id: 86e4248f1a4646d6808e30c5e2811eb5  # 054 별하나
-  other_id: 1597041b40f0437a8c98acd3875716af  # 022 하늘소녀 (20s_late F THEQOO)
-  relation_type: FRIEND
-  closeness: 0.55
-
-# 055 하루해 (20s_late F THEQOO moderate) — 20대 후 여성
-- persona_id: 5bcee3fcd85744e9b5ea8cef85dd1c51  # 055 하루해
-  other_id: c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6  # 003 오늘도맑음 (20s_late F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 056 달빛소녀 (30s_early F THEQOO conservative) — 30대 초 여성
-- persona_id: de4686c6416542ee8a15fbab827d395d  # 056 달빛소녀
-  other_id: 1b64264e180f4944af6a037864962bd0  # 023 해맞이 (30s_early F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 057 새싹이 (20s_early F THEQOO progressive) — 20대 초 여성
-- persona_id: acebd42fd76740e59d8b74f2caebca73  # 057 새싹이
-  other_id: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  # 005 초록빛하루 (20s_early F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 058 꽃새벽 (30s_early F THEQOO moderate) — 30대 초 여성
-- persona_id: 79b0488d39734a52b3921e25afd7f3ad  # 058 꽃새벽
-  other_id: 1b64264e180f4944af6a037864962bd0  # 023 해맞이 (30s_early F NATEPAN)
-  relation_type: FRIEND
-  closeness: 0.5
-
-# 059 해누리 (20s_late F THEQOO progressive) — 20대 후 여성
-- persona_id: d118bbbad76d431c8aa29a2180556254  # 059 해누리
-  other_id: 5bcee3fcd85744e9b5ea8cef85dd1c51  # 055 하루해 (20s_late F THEQOO)
-  relation_type: FRIEND
-  closeness: 0.55
-
-# 060 어둠의세력 (20s_early M DCINSIDE moderate) — 20대 초 남성
-- persona_id: f71d142585e14290b974eb602224c10e  # 060 어둠의세력
-  other_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2  # 009 야식천국 (20s_early M GENERAL)
-  relation_type: ACQUAINTANCE
-  closeness: 0.25
-
-# 061 철갑상어 (30s_early M DCINSIDE moderate) — 30대 초 남성
-- persona_id: 524782782c32403984a3cbdfa87f70ad  # 061 철갑상어
-  other_id: 0bf14948be8b4d67a653f45cf666f142  # 017 해솔 (30s_late M DCINSIDE)
-  relation_type: COLLEAGUE
-  closeness: 0.4
-
-# 062 야밤드립 (20s_late F DCINSIDE conservative) — 20대 후 여성
-- persona_id: c5a3a050d8694986b54f6e196d0fbf75  # 062 야밤드립
-  other_id: f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3  # 006 새벽세시반 (20s_late F DCINSIDE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 063 급식왕 (20s_early M FMKOREA moderate) — 20대 초 남성, 펨코
-- persona_id: 1d0565e9edec4be8a7486c1dc1bab971  # 063 급식왕
-  other_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2  # 009 야식천국 (20s_early M GENERAL)
-  relation_type: ACQUAINTANCE
-  closeness: 0.25
-
-# 064 퇴근마렵 (20s_late M FMKOREA conservative) — 20대 후 남성, 펨코
-- persona_id: b422022694934a06b9692c38ec42793a  # 064 퇴근마렵
-  other_id: 0bf14948be8b4d67a653f45cf666f142  # 017 해솔 (30s_late M DCINSIDE)
-  relation_type: COLLEAGUE
-  closeness: 0.35
-
-# 065 야근지옥 (30s_early M FMKOREA moderate) — 30대 초 남성, 펨코
-- persona_id: daf848eaf3b2415792be2a0f58de14de  # 065 야근지옥
-  other_id: e770499b0c3245b281771bbeedfd4cd2  # 046 달구름 (30s_early M FMKOREA)
+- persona_id: d418e1e8631840dcbd2fbb67eed81247
+  other_id:   bcea071f126b4eb29ad708f8d41b77d7
   relation_type: COLLEAGUE
   closeness: 0.45
 
-# 066 수원남자 (30s_late M FMKOREA conservative) — 30대 후 남성, 펨코
-- persona_id: 0e9286ff5f2e48158783c0e8142144c1  # 066 수원남자
-  other_id: 05f8f3042933499ca416599a629c1c66  # 016 나래 (40s M FMKOREA)
+# work_toxic 그룹
+- persona_id: 17740843c58842fba988b87f141afe5e  # work_toxic LIGHT
+  other_id:   4a7305dac5ed4160b927998c3b0864f6  # work_toxic REG
   relation_type: COLLEAGUE
-  closeness: 0.4
+  closeness: 0.40
 
-# 067 경기둘레길 (40s M FMKOREA conservative) — 40대 남성, 펨코
-- persona_id: fa0f200d91d9401887398c1829e6e80e  # 067 경기둘레길
-  other_id: 05f8f3042933499ca416599a629c1c66  # 016 나래 (40s M FMKOREA)
+- persona_id: 4a7305dac5ed4160b927998c3b0864f6
+  other_id:   17740843c58842fba988b87f141afe5e
   relation_type: COLLEAGUE
-  closeness: 0.45
+  closeness: 0.40
 
-# 068 핫도그녀 (20s_late F FMKOREA progressive) — 20대 후 여성
-- persona_id: 32f774377587435b82c3d8cb8037c328  # 068 핫도그녀
-  other_id: 5bcee3fcd85744e9b5ea8cef85dd1c51  # 055 하루해 (20s_late F THEQOO)
+- persona_id: fcf1bfcd555542fab84c0554b8e9cfb1  # work_toxic LIGHT
+  other_id:   515d27c3763c496f95469acfb324a5ad  # work_toxic REG
+  relation_type: COLLEAGUE
+  closeness: 0.42
+
+- persona_id: 515d27c3763c496f95469acfb324a5ad
+  other_id:   fcf1bfcd555542fab84c0554b8e9cfb1
+  relation_type: COLLEAGUE
+  closeness: 0.42
+
+- persona_id: 590bad6f93a34581bf4f2f2b8ddeaf15  # work_toxic REG
+  other_id:   069557e27a15451e8902718e8e60579e  # work_colleague HEAVY (cross)
+  relation_type: COLLEAGUE
+  closeness: 0.38
+
+- persona_id: 069557e27a15451e8902718e8e60579e
+  other_id:   590bad6f93a34581bf4f2f2b8ddeaf15
+  relation_type: COLLEAGUE
+  closeness: 0.38
+
+# ==================== ACQUAINTANCE ====================
+# 약한 아는 사이 — 서로 다른 갈등 유형의 페르소나 연결
+
+- persona_id: b57d5ceba86340658be7e816d477a1aa  # family_care_burden REG
+  other_id:   65cce05989964d4fa159af44d5245f6d  # family_gen_gap REG
   relation_type: ACQUAINTANCE
-  closeness: 0.3
+  closeness: 0.30
 
-# 069 칼퇴요정 (30s_late F BLIND progressive) — 30대 후 여성, BLIND
-- persona_id: dd63014779ac4fdabe1bcd288a78dfbe  # 069 칼퇴요정
-  other_id: 0f3d69e15a2c44d597c8728c2839215d  # 019 산호 (30s_late F NATEPAN)
-  relation_type: COLLEAGUE
-  closeness: 0.4
+- persona_id: 65cce05989964d4fa159af44d5245f6d
+  other_id:   b57d5ceba86340658be7e816d477a1aa
+  relation_type: ACQUAINTANCE
+  closeness: 0.30
 
-# 070 픽셀전사 (10s M ARCALIVE moderate) — 10대 남학생, 아카
-- persona_id: b6ce1ca573604028aeee848760d5b3d5  # 070 픽셀전사
-  other_id: 2bf53867b5c64b5b99c9f5e0acdd8a1b  # 025 산들 (10s M ARCALIVE)
+- persona_id: 011cd2636dba4b9384b53a2702755cdd  # friend_betrayal HEAVY
+  other_id:   069557e27a15451e8902718e8e60579e  # work_colleague HEAVY
   relation_type: ACQUAINTANCE
   closeness: 0.25
 
-# 071 세계수 (20s_early M ARCALIVE moderate) — 20대 초 남성
-- persona_id: 609d3ae148bc42238a23ba0b8bc07781  # 071 세계수
-  other_id: 2bf53867b5c64b5b99c9f5e0acdd8a1b  # 025 산들 (10s M ARCALIVE)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 072 심연탐험가 (20s_late M ARCALIVE conservative) — 20대 후 남성
-- persona_id: ca18075399bd44e8add4e2330339b196  # 072 심연탐험가
-  other_id: 0bf14948be8b4d67a653f45cf666f142  # 017 해솔 (30s_late M DCINSIDE)
+- persona_id: 069557e27a15451e8902718e8e60579e
+  other_id:   011cd2636dba4b9384b53a2702755cdd
   relation_type: ACQUAINTANCE
   closeness: 0.25
 
-# 073 강남사나이 (30s_early M ARCALIVE moderate) — 30대 초 남성
-- persona_id: 0b3be192119c4ede9b458f34893fc160  # 073 강남사나이
-  other_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2  # 009 야식천국 (20s_early M GENERAL)
+- persona_id: a010c66ef1484e18a993fa6dff8f4568  # opposite_sex_friend REG
+  other_id:   1fd85e7310e24a158e6c65574f62692d  # work_colleague REG
   relation_type: ACQUAINTANCE
-  closeness: 0.25
+  closeness: 0.28
 
-# 074 밤하늘밈 (20s_late F ARCALIVE progressive) — 20대 후 여성
-- persona_id: ed6dca60e36e453cb34e170f52d5203a  # 074 밤하늘밈
-  other_id: d118bbbad76d431c8aa29a2180556254  # 059 해누리 (20s_late F THEQOO)
+- persona_id: 1fd85e7310e24a158e6c65574f62692d
+  other_id:   a010c66ef1484e18a993fa6dff8f4568
   relation_type: ACQUAINTANCE
-  closeness: 0.3
+  closeness: 0.28
 
-# 075 논리왕 (30s_late F RULIWEB moderate) — 루리웹 사용자
-- persona_id: 1ee45553c8324387867111cf7c104e77  # 075 논리왕
-  other_id: cc29c73e9b2f404786ea54ccca4e40c7  # 041 파랑새 (30s_late F RULIWEB)
-  relation_type: FRIEND
-  closeness: 0.55
-
-# 076 팩폭러 (40s M RULIWEB progressive) — 40대 남성, 루리웹
-- persona_id: 6b76e5e38d964aaf8a75daafa94ce0d3  # 076 팩폭러
-  other_id: 05f8f3042933499ca416599a629c1c66  # 016 나래 (40s M FMKOREA)
-  relation_type: COLLEAGUE
+- persona_id: 7e7cd314f33d47f7a49121d5f27779b7  # family_gen_gap REG
+  other_id:   a71eb60378bd4d64b28bd77fcea3f7ca  # family_gen_gap REG
+  relation_type: ACQUAINTANCE
   closeness: 0.35
 
-# 077 사색가 (50s M RULIWEB conservative) — 50대 남성, 루리웹
-- persona_id: df642b478ffd4adc8d872c84887b9cce  # 077 사색가
-  other_id: 0c467d2b9b8d46ecbdf3ac654459bc49  # 018 산길 (60s M MLBPARK)
+- persona_id: a71eb60378bd4d64b28bd77fcea3f7ca
+  other_id:   7e7cd314f33d47f7a49121d5f27779b7
   relation_type: ACQUAINTANCE
-  closeness: 0.3
+  closeness: 0.35
 
-# 078 합리주의자 (40s M RULIWEB moderate) — 40대 남성
-- persona_id: dcccfe3fa4b94727b4028b5877c14439  # 078 합리주의자
-  other_id: a121488480d94eb2b12cd0af03cf2a48  # 037 산책 (40s M GENERAL)
-  relation_type: COLLEAGUE
-  closeness: 0.4
-
-# 079 정의구현 (30s_early F RULIWEB progressive) — 30대 초 여성
-- persona_id: a543a1afcb7d49499eddb35c88a6735d  # 079 정의구현
-  other_id: 1b64264e180f4944af6a037864962bd0  # 023 해맞이 (30s_early F NATEPAN)
+- persona_id: e4b7d3198e214df89bde9d58a2ba33a3  # family_gen_gap REG
+  other_id:   b854bc44c0534270b6f48a39e39db026  # family_care_burden LIGHT
   relation_type: ACQUAINTANCE
-  closeness: 0.3
+  closeness: 0.30
 
-# 080 데이터냥 (20s_late M RULIWEB moderate) — 20대 후 남성
-- persona_id: 51734afaecd149ffa6fcf0199e99cf8b  # 080 데이터냥
-  other_id: 5bcee3fcd85744e9b5ea8cef85dd1c51  # 055 하루해 (20s_late F THEQOO)
+- persona_id: b854bc44c0534270b6f48a39e39db026
+  other_id:   e4b7d3198e214df89bde9d58a2ba33a3
+  relation_type: ACQUAINTANCE
+  closeness: 0.30
+
+- persona_id: 5d0a04b65171429da9b08105a80b2e2a  # friend_betrayal REG
+  other_id:   d703486f47c7476aa80ed27c765e8281  # opposite_sex_friend LIGHT
   relation_type: ACQUAINTANCE
   closeness: 0.25
 
-# 081 IT덕후 (40s F CLIEN progressive) — 40대 여성, 클리앙
-- persona_id: 8f5b266a66324276b260e2881bfa3e66  # 081 IT덕후
-  other_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4  # 001 밤하늘별빛 (40s F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 082 느린보행자 (50s M CLIEN progressive) — 50대 남성, 클리앙
-- persona_id: 737adf3d824f4c3aa36c008f976137c2  # 082 느린보행자
-  other_id: e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7b8  # 011 차한잔의여유 (50s M GENERAL)
-  relation_type: COLLEAGUE
-  closeness: 0.35
-
-# 083 노년산책 (60s M CLIEN moderate) — 60대 남성, 클리앙
-- persona_id: 4d902f08918a4dd89f7a78a94f7c189e  # 083 노년산책
-  other_id: 0c467d2b9b8d46ecbdf3ac654459bc49  # 018 산길 (60s M MLBPARK)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 084 얼리어답터 (40s F CLIEN progressive) — 40대 여성
-- persona_id: 334b814bdf45444e862d9b80e5458cfd  # 084 얼리어답터
-  other_id: 8f5b266a66324276b260e2881bfa3e66  # 081 IT덕후 (40s F CLIEN)
-  relation_type: FRIEND
-  closeness: 0.55
-
-# 085 수도꼭지 (50s M CLIEN conservative) — 50대 남성, 클리앙
-- persona_id: f76235031ed143a6853b690a019cf7e4  # 085 수도꼭지
-  other_id: 0c467d2b9b8d46ecbdf3ac654459bc49  # 018 산길 (60s M MLBPARK)
-  relation_type: COLLEAGUE
-  closeness: 0.35
-
-# 086 다가치 (40s F CLIEN moderate) — 40대 여성
-- persona_id: 3f30df835a92426ebd478ff6e937c71a  # 086 다가치
-  other_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4  # 001 밤하늘별빛 (40s F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 087 쓴소리남 (40s M MLBPARK conservative) — 40대 남성, 엠팍
-- persona_id: 2f9648aba29840289c5117c332e7298e  # 087 쓴소리남
-  other_id: 0c467d2b9b8d46ecbdf3ac654459bc49  # 018 산길 (60s M MLBPARK)
-  relation_type: COLLEAGUE
-  closeness: 0.4
-
-# 088 경험자 (50s M MLBPARK conservative) — 50대 남성, 엠팍
-- persona_id: 07947516ee904fea8f068b6e5fdbdc4d  # 088 경험자
-  other_id: 70ccd37889d145a8ba0c60601705f0f5  # 031 봄날아저씨 (60s M MLBPARK)
-  relation_type: COLLEAGUE
-  closeness: 0.4
-
-# 089 관록 (60s M MLBPARK moderate) — 60대 남성
-- persona_id: edcfa3742fbf45aa9f3c8a8364126411  # 089 관록
-  other_id: 0c467d2b9b8d46ecbdf3ac654459bc49  # 018 산길 (60s M MLBPARK)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 090 불평등전사 (40s M MLBPARK progressive) — 40대 남성, 엠팍
-- persona_id: 0a03d954f0214c1290fe40fb11c78a1e  # 090 불평등전사
-  other_id: 87쓴소리남 (40s M MLBPARK)
-  relation_type: COLLEAGUE
-  closeness: 0.35
-
-# 091 현모 (50s F MLBPARK moderate) — 50대 여성, 엠팍
-- persona_id: 0d17b22f21ea4be48f035600f445f565  # 091 현모
-  other_id: b8c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1  # 008 오후의햇살 (50s F NATEPAN)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 092 꽃주부 (40s F PPOMPPU conservative) — 40대 여성, 뽐뿌
-- persona_id: 557757b2489d468782a1d33cae86d713  # 092 꽃주부
-  other_id: 126accc8d7bc40debc726eb51b208b5b  # 020 참바람 (50s F PPOMPPU)
-  relation_type: FRIEND
-  closeness: 0.55
-
-# 093 알뜰살림 (50s F PPOMPPU conservative) — 50대 여성, 뽐뿌
-- persona_id: 1d42c368083e4637be5a7c5e4985255b  # 093 알뜰살림
-  other_id: 126accc8d7bc40debc726eb51b208b5b  # 020 참바람 (50s F PPOMPPU)
-  relation_type: FRIEND
-  closeness: 0.55
-
-# 094 아낀다 (40s F PPOMPPU moderate) — 40대 여성
-- persona_id: 094399c3798843cb932426ebaa6002e3  # 094 아낀다
-  other_id: 557757b2489d468782a1d33cae86d713  # 092 꽃주부 (40s F PPOMPPU)
-  relation_type: FRIEND
-  closeness: 0.5
-
-# 095 아끼미 (30s_late F PPOMPPU moderate) — 30대 후 여성
-- persona_id: a0ff5c0e92e94ec481f7351149c5b8bf  # 095 아끼미
-  other_id: 126accc8d7bc40debc726eb51b208b5b  # 020 참바람 (50s F PPOMPPU)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 096 노후준비중 (60s F PPOMPPU conservative) — 60대 여성
-- persona_id: 4977ce6317c64cdbb715fe49d547a832  # 096 노후준비중
-  other_id: 584208d351454df6aa7c514f7b1d6d17  # 029 달팽이 (60s F GENERAL)
-  relation_type: ACQUAINTANCE
-  closeness: 0.3
-
-# 097 동네형 (50s M PPOMPPU conservative) — 50대 남성
-- persona_id: da24722dcef643c48f3ce87c97ff9a2c  # 097 동네형
-  other_id: e1f2a7b8c9d0e1f2a7b8c9d0e1f2a7b8  # 011 차한잔의여유 (50s M GENERAL)
-  relation_type: COLLEAGUE
-  closeness: 0.35
-
-# 098 정배요정 (20s_early M INVEN moderate) — 20대 초 남성, 인벤
-- persona_id: f0ab82a7135b4fb683bf4b17800ab12b  # 098 정배요정
-  other_id: c9d0e1f2a7b8c9d0e1f2a7b8c9d0e1f2  # 009 야식천국 (20s_early M GENERAL)
+- persona_id: d703486f47c7476aa80ed27c765e8281
+  other_id:   5d0a04b65171429da9b08105a80b2e2a
   relation_type: ACQUAINTANCE
   closeness: 0.25
 
-# 099 핵딜러 (20s_late M INVEN moderate) — 20대 후 남성, 인벤
-- persona_id: 949a4951ec844e318e668e5fe1b7f11b  # 099 핵딜러
-  other_id: 5bcee3fcd85744e9b5ea8cef85dd1c51  # 055 하루해 (20s_late F THEQOO)
+- persona_id: f66327a5954a4b8395e0ba68f0c30fc8  # couple_money REG (MARRIAGE)
+  other_id:   622ea95cb0c74e6f884668e5624b9803  # work_colleague REG
   relation_type: ACQUAINTANCE
-  closeness: 0.25
+  closeness: 0.22
 
-# 100 탱커인생 (30s_early M INVEN moderate) — 30대 초 남성
-- persona_id: c6da64a654e44889b0258e54f8b39667  # 100 탱커인생
-  other_id: e770499b0c3245b281771bbeedfd4cd2  # 046 달구름 (30s_early M FMKOREA)
+- persona_id: 622ea95cb0c74e6f884668e5624b9803
+  other_id:   f66327a5954a4b8395e0ba68f0c30fc8
   relation_type: ACQUAINTANCE
-  closeness: 0.3
+  closeness: 0.22
 
-# ========== COUPLE/MARRIAGE 양면 시나리오 페어 ==========
+- persona_id: 617c187ad5dc4788ad3eebd05bbb6523  # couple_comm REG
+  other_id:   1ef8c584c1ee4c2cabeaac4ae3c067e8  # friend_betrayal REG
+  relation_type: ACQUAINTANCE
+  closeness: 0.28
 
-# COUPLE 쌍 01: couple_communication
-- persona_id: a86eb1d5f93a42c3882630b57ff78b6f
-  other_id: c5a3a050d8694986b54f6e196d0fbf75
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_communication
+- persona_id: 1ef8c584c1ee4c2cabeaac4ae3c067e8
+  other_id:   617c187ad5dc4788ad3eebd05bbb6523
+  relation_type: ACQUAINTANCE
+  closeness: 0.28
 
-# COUPLE 쌍 02: couple_communication
-- persona_id: ca18075399bd44e8add4e2330339b196
-  other_id: 1597041b40f0437a8c98acd3875716af
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_communication
+- persona_id: 590bad6f93a34581bf4f2f2b8ddeaf15  # work_toxic REG
+  other_id:   3dce28e949c947d989253276df92ce1d  # family_gen_gap REG
+  relation_type: ACQUAINTANCE
+  closeness: 0.20
 
-# COUPLE 쌍 03: couple_communication
-- persona_id: 05f8f3042933499ca416599a629c1c66
-  other_id: a121488480d94eb2b12cd0af03cf2a48
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_communication
+- persona_id: 3dce28e949c947d989253276df92ce1d
+  other_id:   590bad6f93a34581bf4f2f2b8ddeaf15
+  relation_type: ACQUAINTANCE
+  closeness: 0.20
 
-# COUPLE 쌍 04: couple_communication
-- persona_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
-  other_id: e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_communication
+- persona_id: b57d5ceba86340658be7e816d477a1aa  # family_care_burden REG
+  other_id:   bcea071f126b4eb29ad708f8d41b77d7  # work_colleague REG
+  relation_type: ACQUAINTANCE
+  closeness: 0.22
 
-# COUPLE 쌍 05: couple_future_plans
-- persona_id: 51734afaecd149ffa6fcf0199e99cf8b
-  other_id: 79b0488d39734a52b3921e25afd7f3ad
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_future_plans
-
-# COUPLE 쌍 06: couple_money_dating
-- persona_id: 32f774377587435b82c3d8cb8037c328
-  other_id: f0ab82a7135b4fb683bf4b17800ab12b
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_money_dating
-
-# COUPLE 쌍 07: couple_money_dating
-- persona_id: a0ff5c0e92e94ec481f7351149c5b8bf
-  other_id: 5bcee3fcd85744e9b5ea8cef85dd1c51
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_money_dating
-
-# COUPLE 쌍 08: couple_opposite_sex_friend
-- persona_id: 0e9286ff5f2e48158783c0e8142144c1
-  other_id: 7e5cd42ad22949de828ca280eb23fed4
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_opposite_sex_friend
-
-# COUPLE 쌍 09: couple_opposite_sex_friend
-- persona_id: 3f30df835a92426ebd478ff6e937c71a
-  other_id: 7ec216eb8025429e9694c38f0ab62055
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_opposite_sex_friend
-
-# COUPLE 쌍 10: couple_phone_control
-- persona_id: d118bbbad76d431c8aa29a2180556254
-  other_id: ed6dca60e36e453cb34e170f52d5203a
-  relation_type: COUPLE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: couple_phone_control
-
-# MARRIAGE 쌍 01: married_housework
-- persona_id: 92d2adb49d10469bbe9bc29ac30da3f2
-  other_id: 557757b2489d468782a1d33cae86d713
-  relation_type: MARRIAGE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: married_housework
-
-# MARRIAGE 쌍 02: married_housework+married_money_control
-- persona_id: 0d17b22f21ea4be48f035600f445f565
-  other_id: f76235031ed143a6853b690a019cf7e4
-  relation_type: MARRIAGE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: married_housework+married_money_control
-
-# MARRIAGE 쌍 03: married_communication
-- persona_id: 8f5b266a66324276b260e2881bfa3e66
-  other_id: c6da64a654e44889b0258e54f8b39667
-  relation_type: MARRIAGE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: married_communication
-
-# MARRIAGE 쌍 04: married_finance
-- persona_id: 094399c3798843cb932426ebaa6002e3
-  other_id: dcccfe3fa4b94727b4028b5877c14439
-  relation_type: MARRIAGE
-  closeness: 0.85
-  status: ACTIVE
-  # archetype: married_finance
+- persona_id: bcea071f126b4eb29ad708f8d41b77d7
+  other_id:   b57d5ceba86340658be7e816d477a1aa
+  relation_type: ACQUAINTANCE
+  closeness: 0.22
