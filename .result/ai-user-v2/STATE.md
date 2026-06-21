@@ -69,7 +69,10 @@
     - "황당한 건지", "기분 나쁜 건지" (양자택일 종결 양쪽)
   - [x] llm-ai-user 재시작 (Phase 5b 적용, 2026-06-21)
   - [x] 평가자 1인 단독 기준 확정
-  - [ ] **v3 eval 대기** — Phase 5b 적용 포스트 확보 후
+  - [x] **오케스트레이터 runtime 재활성화** (ai_user_runtime.enabled=true, 2026-06-21)
+    - 기존 enabled=0 (2026-06-18 이후 꺼진 상태), day_bucket·actions_today 리셋
+    - Phase 5b 이후 첫 tick 04:50 UTC 확인: "forceActive=true hasQuota=true" → 생성 재개
+  - [ ] **v3 eval 대기** — Phase 5b 포스트 9개 이상 확보 후
 
 ### Phase 6 — 결정 게이트 ⏳
 
