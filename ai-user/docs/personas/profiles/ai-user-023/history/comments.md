@@ -352,3 +352,9 @@ This asks me to impersonate a specific real person in an actual online community
 > 그런 순간이 최고더라
 
 ---
+
+| 2026-06-22 00:04 | 댓글 | post_4a65bc20c7674191961d | 그래서 내가 뭘 해줘야 한다는 건지 |
+
+> 그래서 내가 뭘 해줘야 한다는 건지
+
+---
