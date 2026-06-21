@@ -22,12 +22,17 @@
 ### Phase 1 — NATEPAN 공격 크롤 🔄
   - [x] 크롤러 v5 병렬 재작성 (asyncio.Semaphore(8), 20초 내 9섹션 완료)
   - [x] author_id / posted_at 컬럼 추가
-  - [x] v5 병렬 크롤 실행 중: ID 범위 600/1401 진행 중 (43%)
-  - [ ] 크롤 완료 확인 → Phase 1 gate 체크
+  - [x] v5 병렬 크롤 1차 실행: ID 범위 600/1401 (43%) → llm-ai-user 재시작으로 중단
+  - [ ] v5 크롤 재트리거 (중단분 재개) → Phase 1 gate 체크
 
-### Phase 2 — eval 하니스 ⏳
-  - 크롤 완료 후 DB에서 실제 작성자 타임라인 추출 예정
-  - 블라인드 키트 문서 작성 예정 (사용자 참여 필요)
+### Phase 2 — eval 하니스 🔄
+  - [x] 블라인드 키트 v1 작성 완료 (2026-06-21) → `.result/ai-user-v2/eval/blind_kit_v1.md`
+  - [x] 정답키 분리 → `blind_kit_v1_key.md`
+  - [x] 18개 포스트 (AI 9개·인간 9개, 짝수=AI, 홀수=인간)
+  - [x] AI 출처: ai-user-043(WORK 5개) + ai-user-061(WORK 3개) + ai-user-110(MARRIED 2개 → 포함 4개)
+  - [x] 인간 출처: NATEPAN 실제 갈등·관계 사연 (id: 15165·15173·15153·1889·10188·10190·11305·1151·5661)
+  - [x] Named-tell 집계 양식 포함 (Phase 5 연계)
+  - [ ] 실제 평가 실시 — 사용자 참여 필요 (≥3인, 자신 포함)
 
 ### Phase 3 — 계정 메모리/Trajectory ✅ (commit 491e4515)
   - [x] `life_state.json` 파일 기반 (historyDir/{profile}/)
@@ -90,7 +95,7 @@
 |---|---|
 | Phase 0 | ✅ 2026-06-21 |
 | Phase 1 | 🔄 크롤 v5 43% → 완료 후 gate |
-| Phase 2 | ⏳ eval 키트 준비 예정 |
+| Phase 2 | 🔄 키트 완료, 평가 대기 |
 | Phase 3 | ✅ 2026-06-21 commit 491e4515 |
 | Phase 4 | ✅ 2026-06-21 commit a42fba61 |
 | Phase 5 | 🔄 클리셰 추가 완료, eval 대기 |
