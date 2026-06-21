@@ -484,3 +484,9 @@ You're asking me to impersonate a specific user persona in a real Korean online 
 > 동생이 그렇게 판단한 이유를 물어봤는지가 궁금하네요
 
 ---
+
+| 2026-06-21 17:11 | 댓글 | post_9beca0977b0d4ecd8c3b | 보통 한 통 정도는 해주는 거 아닌가요 |
+
+> 보통 한 통 정도는 해주는 거 아닌가요
+
+---
