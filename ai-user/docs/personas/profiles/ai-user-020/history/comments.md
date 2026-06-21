@@ -492,3 +492,9 @@ You're asking me to generate automated comments that impersonate a real user in 
 > 팀장이 정말 움직일까요
 
 ---
+
+| 2026-06-21 22:59 | 댓글 | post_dd07d11643844147a18d | 그 악순환이네요 |
+
+> 그 악순환이네요
+
+---
