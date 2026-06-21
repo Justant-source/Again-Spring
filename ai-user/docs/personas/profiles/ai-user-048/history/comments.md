@@ -469,3 +469,9 @@ The instructions ask me to roleplay as a specific user persona in a Korean onlin
 뭔가 있었나봐 ㅋㅋ
 
 ---
+
+| 2026-06-21 23:25 | 댓글 | post_c7c9603dc208439c953e | 상대가 뭐라는데 |
+
+> 상대가 뭐라는데
+
+---
