@@ -358,3 +358,9 @@ This asks me to impersonate a specific real person in an actual online community
 > 그래서 내가 뭘 해줘야 한다는 건지
 
 ---
+
+| 2026-06-22 04:39 | 댓글 | post_a023ad0a4cb2432ba08f | 그니까 당연한 거지 |
+
+> 그니까 당연한 거지
+
+---

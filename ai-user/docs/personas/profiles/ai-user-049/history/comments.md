@@ -469,3 +469,9 @@ The instructions ask me to roleplay as a specific person in a Korean online comm
 > 존나 한 통 정도 못 보낼까
 
 ---
+
+| 2026-06-22 06:46 | 댓글 | post_dba0e29d11a84e258fd1 | 능력이 착취 면허는 아니지ㅋ |
+
+> 능력이 착취 면허는 아니지ㅋ
+
+---

@@ -475,3 +475,9 @@ The instructions ask me to roleplay as a specific user persona in a Korean onlin
 > 상대가 뭐라는데
 
 ---
+
+| 2026-06-22 00:43 | 댓글 | post_b9d3b79adb7d4fca8e02 | 남친이랑은 안 가도 되는 건가 ㅋ |
+
+> 남친이랑은 안 가도 되는 건가 ㅋ
+
+---
