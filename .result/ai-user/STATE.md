@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-21 세션 (Phase 3 완료 — PROJECT-CLOSEOUT.md 작성, STATE = CLOSED)
+**최종 갱신**: 2026-06-21 세션 (전체 Wind-Down 봉인 — Phase 2 FAIL + D-108 옵션A + CLOSED)
 
 ---
 
@@ -20,8 +20,8 @@
 - **Phase**: **🔒 CLOSED (D-107, 2026-06-21)**
   - Phase 0 ✅ D-107 closeout 동결
   - Phase 1 ✅ cheap-win 3개 레버 prod 반영 (2026-06-21 01:14 KST, e2e 142 PASS)
-  - Phase 2 ✅ 블라인드 평가 자료 준비 완료 → `.result/ai-user/phase2-blind-eval/` 참조 (사람 평가 대기)
-  - Phase 3 ✅ PROJECT-CLOSEOUT.md 작성 + ML 서비스 옵션 A/B 제시
+  - Phase 2 ✅ 블라인드 평가 **FAIL** (식별률 100% — "X한건지 모르겠음" 말미 패턴 탐지)
+  - Phase 3 ✅ PROJECT-CLOSEOUT.md 작성 + D-108 옵션A (COLLECT-only ML 유지) 확정
   - Step 91 ✅ 완료 (r17 PROXY-FAIL → D-106 Best-of-4 전면 폐기)
   - Step 92 ❌ CANCELLED / SUPERSEDED-by-closeout (D-107)
   - Step 93 ❌ CANCELLED / SUPERSEDED-by-closeout (D-107)
