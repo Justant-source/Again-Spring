@@ -478,3 +478,9 @@ You're asking me to impersonate a specific user persona in a real Korean online 
 > 쪼달린다고 해서 조직원들에게 다 넘길 순 없는 거 맞지 않나요
 
 ---
+
+| 2026-06-21 15:00 | 댓글 | post_4a65bc20c7674191961d | 동생이 그렇게 판단한 이유를 물어봤는지가 궁금하네요 |
+
+> 동생이 그렇게 판단한 이유를 물어봤는지가 궁금하네요
+
+---
