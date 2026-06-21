@@ -1,7 +1,15 @@
-# AI-User v2 — Roadmap
+# AI-User v2 / v2.1 — Roadmap
+
+> **⛔ v2 — CLOSED 2026-06-21** — Phase 0~6 완료, PASS (5/9=55.6%, 오너 1인). 측정 착시 2개(오라클 오염·tell 생존) 확인 → v2.1로 계속.
+> v2.1 섹션은 이 파일 하단 참조.
+
+---
+
+## v2 — CLOSED (2026-06-21)
 
 > **프로젝트**: 계정 단위 현실성 — NATEPAN 전용  
-> **시작일**: 2026-06-21 · **규율**: `README.md` R1~R8
+> **기간**: 2026-06-21 (1일 집중) · **규율**: `README.md` R1~R8  
+> **결과**: v1 88.9% → v2 66.7% → v3 55.6% PASS (-33.3pp) · **prod 출하 완료**
 
 ---
 
@@ -268,3 +276,209 @@
 - **prod 출하**: llm-ai-user-prod SELF_CRITIQUE_EXTRA_CLICHES 35종 + bug fix 2건
 - **교훈 문서**: `.result/ai-user-v2/lessons.md`
 - **QLoRA 게이트**: 미발동 (PASS 달성으로 plateau 조건 불충족)
+- **측정 착시**: (a) 오너 1인 오염 (b) tell 생존(P3·P5·P13·P15 묻힘) → v2.1 계속
+
+---
+
+---
+
+# v2.1 — 광장 정렬(Plaza-Alignment)
+
+> **프로젝트**: 제품 적합성 정렬 — 다시봄 6 광장  
+> **시작일**: 2026-06-21 · **전임**: v2 CLOSED · **규율**: `charter-v2.1.md` R1~R8  
+> **단일 오라클**: 신선 캐주얼 독자 ≥3인 계정 블라인드. proxy/MAUVE/LLM-judge 금지.
+
+---
+
+## Phase 0 — 창립 & 동결 (v2.1 Charter) 🔄
+
+**목표**: v2.1 창립. 진단 승계 + 제품적합성 재구성 + eval 재정립 설계 동결. 새 kill criterion 오너 사전 등록.
+
+**Gate**: 4개 문서 + **kill criterion 오너 등록 타임스탬프(측정 전)** + `lint:docs`
+
+**Halt**: 오너 kill criterion 미확정 → Phase 1 진행 보류·보고
+
+**토큰·GPU**: 낮음/0 | **위치**: 로컬 8 | **세션**: 독립
+
+| 작업 | 파일 |
+|---|---|
+| roadmap.md v2 CLOSED + v2.1 섹션 | `.result/ai-user-v2/roadmap.md` |
+| 재구성 3명제 동결 | `charter-v2.1.md` |
+| V2-D04·D05 | `decisions.md` |
+| 🔴 **kill criterion 오너 확정** (제안: ≤60% naive ≥3인) | `STATE.md` |
+| v2.1 라이브 포인터 초기화 | `STATE.md` |
+
+---
+
+## Phase 1 — Eval 재정립 (오라클 수정, 설계 only) 🌱
+
+**목표**: 새 오라클 설계 동결. naive ≥3 모집·지시 프로토콜, 광장별 계정 타임라인 블라인드 키트 SPEC, 회전 레지스트리(기억 방지), 오너=캘리브레이션. (키트 채움·측정은 Phase 5.)
+
+**Gate**: 3개 eval 설계 문서 + 회전 레지스트리 초기화 + kill criterion 정합 + `lint:docs`. **측정 0회.**
+
+**Halt**: naive ≥3 확보 불가 → 완화 옵션(2인+오너 캘리브레이션 혼합) 제시까지만·보고
+
+**토큰·GPU**: 낮음/0 | **위치**: 로컬 8 | **세션**: 독립 (Phase 2와 병렬)
+
+| 작업 | 파일 |
+|---|---|
+| naive 평가자 정의·지시문·채점법·집계 규칙 | `eval/v2.1/oracle-protocol.md` |
+| 광장별 키트 템플릿 (계정당 ≥3 포스트, 정답키 분리) | `eval/v2.1/blind-kit-spec.md` |
+| 패널 회전 레지스트리 (오너=캘리브레이션 전용 표기) | `eval/v2.1/evaluator-registry.md` |
+| 라운드 예산 (baseline Ph5 + 최종 Ph8 = 2회) | oracle-protocol 내 |
+| 캘리브레이션 절차 (오너 별도 채점·차이 측정·게이트 아님) | oracle-protocol 내 |
+
+---
+
+## Phase 2 — 토픽 분류기 + NATEPAN 6광장 분류 + 인벤토리 🖥️ GPU
+
+**목표**: 기존 `example_bank` NATEPAN **7,106건**을 6 광장으로 1회성 분류. 광장별 clean count + thin 광장 식별. 신규 크롤러 금지.
+
+**Gate**: 7,106건 100% 라벨 + 광장별 count 스냅샷 + thin 광장 명시 + 스팟체크 정확도. (분포 = **sanity 게이트**, humanness 아님)
+
+**Halt**: 스팟체크 정확도 < 임계 → 시드/키워드 보강 후 재실행(3회 한도)
+
+**토큰·GPU**: Claude ≈0 / **GPU 집약** | **위치**: WSL 16 (RTX 3090) | **세션**: 독립 (Phase 0 후)
+
+| 작업 | 상세 |
+|---|---|
+| 시드 라벨 | 키워드 앵커(남친·여친→COUPLE·남편·아내·시댁→MARRIED·친구→FRIEND·엄마·아빠·동생→FAMILY·회사·팀장→WORK·else→OTHER) + 저신뢰 ~300건 LLM-classify(`topic_synthesizer` 템플릿) |
+| KURE-v1 임베딩 | `EmbeddingService.embed_batch`(`embedding.py:31`), 3090 |
+| centroid kNN 할당 | 코사인 + 저신뢰→OTHER. lovetalk 섹션(`natepan.py:29-32`) 존재 행 COUPLE 가중 |
+| **적재** | **`example_bank.category` 덮어쓰기**(현 'talk' → 6광장) → stage-1 RAG 즉시 활성화(검색 코드 0변경) |
+| 인벤토리 리포트 | `crawl/v2.1-plaza-inventory.md` (광장별 count + thin 광장) |
+
+---
+
+## Phase 3 — 빈약 광장 외과적 보강 + 작성자 타임라인 메타 🖥️
+
+**목표**: Phase 2 thin 광장만 보강 크롤. 기존 `natepan.py` 섹션 활용, 6 새 크롤러 금지. author_id·posted_at 보존.
+
+**Gate**: thin 광장 RAG 앵커 최소치(광장당 clean ≥ M, Phase 1/2 확정) + 정화 리포트 + author 메타 보존
+
+**Halt**: 크롤 차단/rate-limit → 정중 백오프·보고. 잔존 < 목표 → 보고 후 게이트 조정(합성 금지)
+
+**토큰·GPU**: 낮/중(임베딩) | **위치**: WSL 16 | **세션**: 독립 (Phase 2 후)
+
+| 작업 | 상세 |
+|---|---|
+| thin 광장 타깃 크롤 | `STATIC_SECTIONS` lovetalk→COUPLE 등 광장 친화 섹션 |
+| 섹션→광장 힌트 보존 | `_parse_post_detail`(`:147`)에 `sec["name"]` 전달, 'talk' 하드코딩 제거(`natepan.py:166`) |
+| ToS·politeness | rate-limit 백오프, open-web NATEPAN 우선, auth-wall(Blind 등) 제외 |
+| 정화 | 한글<10% drop, URL-heavy drop, `content_hash` dedup |
+| 신규 ingest | Phase 2 분류기 자동 적용 + author_id/posted_at 적재 |
+
+---
+
+## Phase 4 — 페르소나↔광장 정렬 + 카테고리 조건부 RAG 생성 🔧
+
+**목표**: 페르소나를 6 광장에 균등 매핑(WORK 편중 해소), few-shot 앵커를 해당 광장 코퍼스에서만 추출. 목표 tell = 맥락 불일치·주제 편중 소멸.
+
+**Gate**: 페르소나 6광장 균등 분포 + 샘플 생성에서 광장-매칭 앵커 확인 + 맥락 불일치/주제 편중 **육안 소멸** + 빌드/`lint:docs`. (육안 sanity, humanness 판정 아님)
+
+**Halt**: `ContentSafetyGuard` 오염루프 → 즉시 보고(절대규칙 #7). R7 훼손 감지 → 롤백·보고
+
+**토큰·GPU**: 중/낮(재임베딩 WSL) | **위치**: 로컬 8 (+ WSL) | **세션**: 독립 (Phase 2·3 후)
+
+| 작업 | 코드 |
+|---|---|
+| 페르소나↔광장 정렬 | `profile.yml interests` argmax 감사·재배분(코드 변경 0: `topCategory`:1506-1513) |
+| 카테고리 조건부 RAG | Phase 2 라벨로 stage-1 필터 광장-매칭 앵커 반환. thin 광장 stage-3 누수캡(`examples.py`, 선택) |
+| CASUAL 프레임 정렬 | `CASUAL_FRAMES`(:868-879) 광장-관계 친화·갈등 인접으로 정렬(화목/날씨 무관글 제거). **확률 25%·메커니즘 불변(R7)** |
+| 검증 | 광장별 샘플 생성 → 앵커 동일 광장 확인 + 맥락 일치. 빌드/테스트 |
+
+---
+
+## Phase 5 — 광장별 baseline 블라인드 1회 (naive ≥3) 👥
+
+**목표**: Phase 1 새 오라클로 첫 측정. 광장별 계정 타임라인 블라인드. named-tell 라벨셋 v0 산출.
+
+**Gate**: 광장별 식별률 + named-tell 라벨셋 v0 + 회전 레지스트리 갱신 + kill criterion 대비 판정
+
+**Halt**: naive <3 → Phase 1 완화 옵션 발동·보고. 인간 계정 타임라인 부족 → Phase 2/3 회귀
+
+**토큰·GPU**: 낮음/0 — **인간 바운드** | **위치**: 로컬 8 + 인간 | **세션**: 독립 (Phase 1·4 후)
+
+| 작업 | 상세 |
+|---|---|
+| 키트 채움 | 광장당 AI 계정(Phase 4) + 인간 계정(NATEPAN 작성자 타임라인, 쓰니 661 등), 계정당 ≥3 포스트 |
+| 평가 실시 | naive ≥3 (회전 레지스트리 기록). 오너 = 별도 캘리브레이션 채점(게이트 아님) |
+| named-tell 라벨셋 산출 | 봇 판정마다 이유 명명 → Phase 6 다양화 타깃 |
+| 기록 | kill criterion 대비 baseline 식별률(측정 1회, R3) |
+
+---
+
+## Phase 6 — 잔존 생성 tell 결정론적 다양화 1라운드 🔧
+
+**목표**: Phase 5 라벨셋의 생성 스타일 tell(수렴 종결·감정 평탄화·이중질문 종결) 다양화. **1라운드 한정.** whack-a-mole 금지.
+
+**Gate**: 종결·감정 분포가 baseline 대비 다양화(분포 sanity) + 빌드/`lint:docs`. (humanness 판정은 Phase 8)
+
+**Halt**: 1라운드 후 육안 정체 → QLoRA 게이트(Phase 7) 분기. 표면형 추가 추격 금지.
+
+**토큰·GPU**: 중/0 (판별기 진단 WSL) | **위치**: 로컬 8 (+ WSL) | **세션**: 독립 (Phase 5 후)
+
+| 작업 | 상세 |
+|---|---|
+| 종결 다양화 | 어미 추격(whack-a-mole) 금지. 종결 **유형** 분산(질문·감정폭발·미완 혼합) — `PromptAssembler` 또는 `OutputSanitizer` |
+| 감정 다양화 | 느낌표·감정 수식어·감정 선행 패턴 다양화(단조 사건 나열 분산) |
+| 단일 변수 | 이 1라운드 = 종결·감정 다양화 1개 변수(R3). SelfCritique 임계(5/7) 불변 |
+| 판별기 진단 | feature attribution으로 tell 진단만(R6). rerank OFF |
+
+---
+
+## Phase 7 — QLoRA 데이터게이트 판정 + (충족시) 광장별 fine-tune 🖥️ GPU(조건부)
+
+**목표**: 3조건 AND 충족 시에만 3090 QLoRA. 미충족 = 100% 프롬프트 유지. 이미 이긴 적 재타격 금지.
+
+**Gate**: 3조건 판정 기록(발동/비발동 근거) + (발동시) 어댑터 산출 + 광장별 검증
+
+**Halt**: 조건 미충족 발동 시도 = **금지**. 데이터 부족 → 비발동·보고
+
+**토큰·GPU**: Claude ≈0 / **(발동시) GPU 집약**, 미발동 0 | **위치**: WSL 16 | **세션**: 독립 (Phase 6 후)
+
+**3조건 AND 판정**:
+1. 재정립 eval(naive ≥3) 식별률 여전히 kill 임계 **초과**
+2. 잔존 탐지가 **생성 스타일 tell에 귀속**(맥락·편중 아님 — Phase 4 처리)
+3. 광장별 clean ≥ 임계(오너 확정, 예 광장당 수백~수천)
+
+미충족 → Phase 8. 충족 → SFT 데이터빌더 → 3090 QLoRA 어댑터 → 어댑터 레지스트리 (별도 work-order).
+
+---
+
+## Phase 8 — kill criterion 최종 판정 + 출하/피벗 + 교훈 봉인 🚀
+
+**목표**: 새 오라클로 최종 측정 → kill criterion 판정 → 출하 or 피벗 **옵션 제시(임의 결정 금지)**. 교훈 봉인.
+
+**Gate**: 최종 판정 기록 + 출하 완료(PASS) 또는 옵션 제시(FAIL) + 교훈 문서 + `lint:docs` + 절대규칙 #4·#8
+
+**Halt**: 옵션 임의 결정 금지. prod 배포 = 명시적 지시 + 절대규칙 #4 순서
+
+**토큰·GPU**: 낮음/0 — **인간 바운드** + 배포 | **위치**: 로컬 8 + 인간 | **세션**: 독립 (Phase 7 후)
+
+| 판정 | 결과 |
+|---|---|
+| **PASS** | 절대규칙 #4: dev → e2e-realbe dev:8090 PASS → main push → DB 백업 → prod. 레버 보존, ML false 유지. |
+| **FAIL** | 옵션 제시까지만: (a) QLoRA 데이터게이트 (b) 품질-피벗 (c) 광장 보강. **오너 결정.** |
+
+| 작업 | 파일 |
+|---|---|
+| 최종 블라인드 (신선 패널) | `eval/v2.1/` 키트 |
+| 교훈 봉인 | `lessons.md` v2.1 추가 + `LESSONS-FOR-WAGGLEBOT.md` 갱신 |
+| 최종 폐쇄 | `STATE.md` SHIPPED 또는 옵션 대기 + `lint:docs` + commit/push |
+
+---
+
+## 실행 분배 (v2.1)
+
+| 작업 유형 | 위치 | 최대 에이전트 |
+|---|---|---|
+| Phase 0·1·5·8 (문서·eval·배포) | 로컬 | 8 |
+| Phase 2 (분류·임베딩) | **WSL Claude Code** | 16 |
+| Phase 3 (크롤·정화·임베딩) | **WSL Claude Code** | 16 |
+| Phase 4·6 (Java·Python 코드) | 로컬 | 8 |
+| Phase 7 QLoRA (발동시) | **WSL Claude Code** | 16 |
+
+---
+
+**kill criterion 재등록(오너 확정) 전까지 어떤 humanness PASS/FAIL 판정도 금지.**
