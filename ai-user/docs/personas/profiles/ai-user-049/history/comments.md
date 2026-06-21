@@ -463,3 +463,9 @@ The instructions ask me to roleplay as a specific person in a Korean online comm
 > 아이 입장에서는 아직 경험이 없어서 단순한 거 아닐까
 
 ---
+
+| 2026-06-21 19:00 | 댓글 | post_9beca0977b0d4ecd8c3b | 존나 한 통 정도 못 보낼까 |
+
+> 존나 한 통 정도 못 보낼까
+
+---

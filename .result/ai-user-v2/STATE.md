@@ -72,6 +72,10 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 - [x] `natepan.py`: `section_name` 파라미터 추가, 연애 섹션→COUPLE, 나머지→OTHER
 - [x] 신규 크롤 데이터가 즉시 광장 조건부 RAG에 반영
 - [x] 빌드·배포 완료
+- **Phase 3 보강 결과**:
+  - 크롤 데이터: Phase 1(1,481건) + Phase 3(295건) = **1,776건 누적**
+  - 신규 AI 포스트: WORK 2건 + COUPLE 1건 = **3건 생성**
+  - `example_bank` 최종 분포: FRIEND 161·WORK 139·COUPLE 323·MARRIED 507·FAMILY 457·OTHER 1,709
 
 ---
 
@@ -108,14 +112,21 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 
 ---
 
-## NATEPAN 코퍼스 현황 (v2 기준, 분류 전)
+## NATEPAN 코퍼스 현황 (Phase 3 보강 + thin plaza 재분류 후, 2026-06-21)
 
 | 구분 | 현황 |
 |---|---|
-| `example_bank` natepan POST | **7,106** |
-| author_id 있는 POST | **1,631** |
-| 계정 ≥3건 실저자 | 13명 (쓰니 661건·좋은글 27건·냉동딸기 9건 등) |
-| `category` 값 | 전량 `'talk'` (상수) → Phase 2 6광장 덮어쓰기 예정 |
+| COUPLE POST | **358** |
+| MARRIED POST | **539** |
+| FRIEND POST | **165** |
+| FAMILY POST | **488** |
+| WORK POST | **156** |
+| OTHER POST | **1,590** |
+| **합계** | **3,296** |
+| 크롤 누적 | Phase 1(1,481) + Phase 3 보강(295+α) |
+| `example_bank` natepan 전체 | **7,106** (POST + COMMENT) |
+
+> thin 광장(FRIEND·WORK) NATEPAN 랭킹 섹션 특성상 300건 목표 미달(165·156). 랭킹 베스트 섹션 = 연애·가족 편중 구조적 한계. Phase 5 진행은 현 RAG 건수로 가능.
 
 ---
 

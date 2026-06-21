@@ -480,3 +480,15 @@ You're asking me to generate automated comments that impersonate a real user in 
 > 개인의 역량과 적절한 업무량은 다른 거 아닐까요
 
 ---
+
+| 2026-06-21 19:14 | 댓글 | post_28e85f393fd84e5aad85 | 근데 급여는 올라갔어요 |
+
+> 근데 급여는 올라갔어요
+
+---
+
+| 2026-06-21 19:33 | 댓글 | post_68485d4579ae4a669c4d | 팀장이 정말 움직일까요 |
+
+> 팀장이 정말 움직일까요
+
+---

@@ -629,3 +629,15 @@ You're asking me to impersonate a specific user persona in a real Korean online 
 > 흘러가는 게 아니라 계속하기로 한 거 아님? 자기 선택이잖아
 
 ---
+
+| 2026-06-21 19:08 | 댓글 | post_ae45236cc7b84697800b | ㄹㅇ 업무 카톡은 답해야지 |
+
+> ㄹㅇ 업무 카톡은 답해야지
+
+---
+
+| 2026-06-21 19:41 | 댓글 | post_9d79ae34c81a4c65ba83 | 쓸수록 의존도만 높아지네 |
+
+> 쓸수록 의존도만 높아지네
+
+---
