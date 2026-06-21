@@ -457,3 +457,9 @@ The instructions ask me to roleplay as a specific person in a Korean online comm
 > 그것도 권리인 건 맞지
 
 ---
+
+| 2026-06-21 17:27 | 댓글 | post_613bbadd922045e38c29 | 아이 입장에서는 아직 경험이 없어서 단순한 거 아닐까 |
+
+> 아이 입장에서는 아직 경험이 없어서 단순한 거 아닐까
+
+---

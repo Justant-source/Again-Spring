@@ -474,3 +474,9 @@ You're asking me to generate automated comments that impersonate a real user in 
 > 어 근데 그럼 천천히 하면 되잖아요
 
 ---
+
+| 2026-06-21 18:04 | 댓글 | post_27396a2a9e0c496fbe50 | 개인의 역량과 적절한 업무량은 다른 거 아닐까요 |
+
+> 개인의 역량과 적절한 업무량은 다른 거 아닐까요
+
+---

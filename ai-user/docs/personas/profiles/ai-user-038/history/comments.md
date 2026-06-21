@@ -490,3 +490,15 @@ You're asking me to impersonate a specific user persona in a real Korean online 
 > 보통 한 통 정도는 해주는 거 아닌가요
 
 ---
+
+| 2026-06-21 17:18 | 댓글 | post_cb0960f3c02246238c02 | 정상이면 왜 다들 불평하네요 |
+
+> 정상이면 왜 다들 불평하네요
+
+---
+
+| 2026-06-21 17:18 | 댓글 | post_28e85f393fd84e5aad85 | 상황에 따라 달라질 수도 있지 않을까요 |
+
+> 상황에 따라 달라질 수도 있지 않을까요
+
+---
