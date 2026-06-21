@@ -258,3 +258,13 @@
 | Phase 1 크롤·정화·임베딩 | **WSL Claude Code** | 16 |
 | Phase 5 판별기 진단 | **WSL Claude Code** | 16 |
 | (발동시) QLoRA | **WSL Claude Code** | 16 |
+
+---
+
+## 프로젝트 최종 결과 (2026-06-21 CLOSED)
+
+- **총 소요**: 1일 집중 작업 (Phase 0~6)
+- **결과**: v1 88.9% → v2 66.7% → v3 55.6% PASS (-33.3pp)
+- **prod 출하**: llm-ai-user-prod SELF_CRITIQUE_EXTRA_CLICHES 35종 + bug fix 2건
+- **교훈 문서**: `.result/ai-user-v2/lessons.md`
+- **QLoRA 게이트**: 미발동 (PASS 달성으로 plateau 조건 불충족)
