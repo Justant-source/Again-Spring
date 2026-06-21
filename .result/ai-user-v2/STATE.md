@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-21 (Phase 1 크롤 v5 병렬 진행 중 / Phase 3 완료)
+**최종 갱신**: 2026-06-21 (Phase 1~5 진행 중 / Phase 3·4·5 코드 완료)
 
 ---
 
@@ -19,44 +19,58 @@
 
 ## 현재 위치
 
-- **Phase**: **Phase 1 완료 + Phase 3 완료 (2026-06-21)**
-
-### Phase 1 — NATEPAN 공격 크롤 ✅
-  - [x] 크롤러 v5 병렬 재작성 (asyncio.Semaphore(8) + to_thread)
-  - [x] scheduler: natepan 1500/day 전용
+### Phase 1 — NATEPAN 공격 크롤 🔄
+  - [x] 크롤러 v5 병렬 재작성 (asyncio.Semaphore(8), 20초 내 9섹션 완료)
   - [x] author_id / posted_at 컬럼 추가
-  - [x] v5 병렬 크롤 실행 중 (정적 9섹션 20초 완료 → ID 범위 1401건 목표)
-  - [ ] 크롤 완료 후 Phase 1 gate 확인
+  - [x] v5 병렬 크롤 실행 중: ID 범위 600/1401 진행 중 (43%)
+  - [ ] 크롤 완료 확인 → Phase 1 gate 체크
 
-### Phase 3 — 계정 메모리/Trajectory ✅
-  - [x] `life_state.json` 파일 기반 저장 (historyDir/{profile}/)
-  - [x] CASUAL 결정: i.i.d. 25% → 스트릭 기반 (2연속 CASUAL → 10%)
-  - [x] `ongoingSituation` 저장·주입 (갈등 글 첫 문장 → saga 이어가기)
-  - [x] `situationContinuityBlock()` PromptAssembler 추가
-  - [x] BUILD SUCCESSFUL (commit 491e4515)
-  - [ ] dev 배포 (컨테이너 재빌드)
+### Phase 2 — eval 하니스 ⏳
+  - 크롤 완료 후 DB에서 실제 작성자 타임라인 추출 예정
+  - 블라인드 키트 문서 작성 예정 (사용자 참여 필요)
+
+### Phase 3 — 계정 메모리/Trajectory ✅ (commit 491e4515)
+  - [x] `life_state.json` 파일 기반 (historyDir/{profile}/)
+  - [x] CASUAL 결정: i.i.d. 25% → 스트릭 기반
+  - [x] ongoingSituation 주입 (saga 이어가기)
+  - [x] situationContinuityBlock() PromptAssembler
+  - [x] ai-user-orchestrator dev 재배포 완료
+
+### Phase 4 — Cadence & 상호작용 ✅ (commit a42fba61)
+  - [x] BehaviorEngine: REPLY → scheduleReplyWithDelay(5~60분) 배선
+  - [x] InteractionScanner: MAX_REPLIES_PER_COMMENT 2→4
+  - [x] PersonaSelector: circadian 가중치 기반 쿨다운
+  - [x] ai-user-orchestrator dev 재배포 완료
+
+### Phase 5 — named-tell 제거 루프 🔄 (부분 완료)
+  - [x] SELF_CRITIQUE_EXTRA_CLICHES 확장 (.env.dev, 비gitignore):
+    - 말미 한탄 종결: 인지/건지 모르겠음·모르겠다
+    - 사건 해상도 낮은 종결: 어떻게 해야 할지 모르겠
+    - AI 투 개구부: 솔직히 말해서·말하면
+    - AI 마무리 질문: 여러분은 어떻게 생각하시나요
+    - 감정 나열: 어이없어·어이가 없네
+  - [x] llm-ai-user 재시작 (새 클리셰 적용)
+  - [ ] 계정 블라인드 1회 eval (사용자 참여 필요)
+
+### Phase 6 — 결정 게이트 ⏳
 
 ---
 
 ## Kill Criterion 현황
 
 ```
-✅ 등록 완료 (2026-06-21, 오너 확정)
+✅ 등록 완료 (2026-06-21)
 ```
-캐주얼 독자(≥3인) 계정 블라인드에서 봇 정확 식별률 ≤ **60%**
-
-- PASS (≤60%) → NATEPAN 계정 레버 prod 출하
-- FAIL (>60%) → QLoRA 데이터게이트 평가 또는 품질-피벗
+캐주얼 독자(≥3인) 계정 블라인드 봇 식별률 ≤ **60%** = PASS
 
 ---
 
-## NATEPAN 코퍼스 현황 (스냅샷)
+## NATEPAN 코퍼스 현황
 
-| 구분 | 크롤 전 (2026-06-21) | v5 크롤 후 | Phase 1 목표 |
-|---|---|---|---|
-| example_bank 전체 (natepan) | 5,316 | 진행 중 (+1,500 목표) | 최대화 |
-| author_id 있는 POST | 0 | 150+ (v4에서 확인) | 가능한 많이 |
-| 작성자-그룹 타임라인 (≥3글) | 0 | 진행 중 | eval용 ≥ 20명 |
+| 구분 | 크롤 전 | v5 후 (예상) |
+|---|---|---|
+| example_bank (natepan) | 5,316 | ~7,000+ |
+| author_id 있는 POST | 0 | 150+ (진행 중) |
 
 ---
 
@@ -64,9 +78,9 @@
 
 | 결정 | 내용 |
 |---|---|
-| V2-D01 | 스코프: NATEPAN·계정·캐주얼bar·QLoRA연기 |
-| V2-D02 | kill criterion ≤60% 등록 |
-| (v1) D-108 | ML COLLECT-only 유지 |
+| V2-D01 | NATEPAN·계정·캐주얼bar·QLoRA연기 |
+| V2-D02 | kill criterion ≤60% |
+| (v1) D-108 | ML COLLECT-only |
 
 ---
 
@@ -74,10 +88,10 @@
 
 | Phase | 상태 |
 |---|---|
-| Phase 0 | ✅ 완료 (2026-06-21) |
-| Phase 1 | 🔄 크롤 v5 진행 중 → gate 확인 후 완료 |
-| Phase 2 | ⏳ eval 하니스 준비 필요 (사용자 참여 필요) |
-| Phase 3 | ✅ 완료 (2026-06-21, commit 491e4515) |
-| Phase 4 | ⏳ 대기 (cadence/대댓글) |
-| Phase 5 | ⏳ 대기 (named-tell 제거) |
-| Phase 6 | ⏳ 대기 (결정 게이트) |
+| Phase 0 | ✅ 2026-06-21 |
+| Phase 1 | 🔄 크롤 v5 43% → 완료 후 gate |
+| Phase 2 | ⏳ eval 키트 준비 예정 |
+| Phase 3 | ✅ 2026-06-21 commit 491e4515 |
+| Phase 4 | ✅ 2026-06-21 commit a42fba61 |
+| Phase 5 | 🔄 클리셰 추가 완료, eval 대기 |
+| Phase 6 | ⏳ |
