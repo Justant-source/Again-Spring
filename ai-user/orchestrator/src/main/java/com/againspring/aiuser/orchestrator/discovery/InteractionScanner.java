@@ -26,7 +26,7 @@ public class InteractionScanner {
     private final JdbcTemplate jdbcTemplate;
     private static final int MAX_RESULTS = 20;
     // 댓글 1개당 최대 대댓글 수 — pile-on 방지(자연스러운 스레드 유지)
-    private static final int MAX_REPLIES_PER_COMMENT = 2;
+    private static final int MAX_REPLIES_PER_COMMENT = 4;
 
     /**
      * Find comments on synthetic posts that bots haven't replied to yet.

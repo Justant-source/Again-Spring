@@ -43,7 +43,7 @@ public class PersonaSelector {
             Persona p = candidates.get(i);
             double tierW = tierWeight(p.getTier());
             double circadianW = circadianWeight(p, hour);
-            double cooldownW = cooldownWeight(p);
+            double cooldownW = cooldownWeight(p, hour);
             scores[i] = tierW * circadianW * cooldownW;
             totalScore += scores[i];
         }
@@ -86,13 +86,16 @@ public class PersonaSelector {
         return Math.max(0.0, Math.min(1.0, curve.get(hour)));
     }
 
-    private double cooldownWeight(Persona persona) {
+    private double cooldownWeight(Persona persona, int hour) {
         return actionLogRepo.findTopByPersonaIdOrderByCreatedAtDesc(persona.getId())
             .map(log -> {
                 long minutesSince = (Instant.now().getEpochSecond() - log.getCreatedAt().getEpochSecond()) / 60;
                 if (minutesSince < MIN_COOLDOWN_MIN) return 0.0;
-                if (minutesSince >= MAX_COOLDOWN_MIN) return 1.0;
-                return (double)(minutesSince - MIN_COOLDOWN_MIN) / (MAX_COOLDOWN_MIN - MIN_COOLDOWN_MIN);
+                double base = minutesSince >= MAX_COOLDOWN_MIN ? 1.0 :
+                    (double)(minutesSince - MIN_COOLDOWN_MIN) / (MAX_COOLDOWN_MIN - MIN_COOLDOWN_MIN);
+                // circadian 가중치 적용 (time-of-day 보정)
+                double circadianMult = circadianWeight(persona, hour);
+                return Math.min(1.0, base * circadianMult);
             })
             .orElse(1.0); // no history = fresh, full weight
     }

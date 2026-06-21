@@ -219,7 +219,12 @@ public class BehaviorEngine {
             if (actionExecutor != null) {
                 final Persona finalPersona = persona;
                 final PlannedAction finalAction = actionOpt.get();
-                jitter.scheduleWithinTick(() -> actionExecutor.execute(finalPersona, finalAction));
+                // Phase 4: REPLY는 현실 지연(5~60분)으로 별도 스케줄
+                if (finalAction.type() == ActionType.REPLY) {
+                    jitter.scheduleReplyWithDelay(() -> actionExecutor.execute(finalPersona, finalAction));
+                } else {
+                    jitter.scheduleWithinTick(() -> actionExecutor.execute(finalPersona, finalAction));
+                }
             }
             remaining_type_budget.computeIfPresent(selectedType, (k, v) -> Math.max(0, v - 1));
             actionsPlanned++;
