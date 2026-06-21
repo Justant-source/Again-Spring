@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-21 (Phase 1~5 진행 중 / Phase 3·4·5 코드 완료)
+**최종 갱신**: 2026-06-21 (Phase 5 v3 eval 키트 완성 / v3 eval 사용자 평가 대기)
 
 ---
 
@@ -72,17 +72,24 @@
   - [x] **오케스트레이터 runtime 재활성화** (ai_user_runtime.enabled=true, 2026-06-21)
     - 기존 enabled=0 (2026-06-18 이후 꺼진 상태), day_bucket·actions_today 리셋
     - Phase 5b 이후 첫 tick 04:50 UTC 확인: "forceActive=true hasQuota=true" → 생성 재개
-  - [ ] **v3 eval 대기** — Phase 5b 포스트 9개 이상 확보 중 (현재 4/9, 05:22 UTC)
-    - v3 인간 풀 확보: NATEPAN id=1148·3095·4283·12724·14195·15575·15698·16566·16614
-    - Phase 5b POST 4개 확보 (05:13~05:19 UTC):
-      - post_8184604369b94ddea747 (ai-user-111, FAMILY) — 텔 없음 (단문·자연스러움)
-      - post_fd3836d031f14502ada0 (ai-user-106, CASUAL) — 텔 없음 (단문 일상 관찰)
-      - post_4d68801aab06435c8e17 (ai-user-089, WORK) — 텔 잔존: "하는 건지 지금도 모르겠네요"
-      - post_9e4beadf61c54c3b9596 (ai-user-024, FRIEND) — 텔 잔존: "어떻게 해야 하는지 모르겠어요"
-    - **Phase 5b 미스 분석**: 필터가 "는지 모르겠음/다"만 커버 → "건지 모르겠네요"·"하는지 모르겠어요" 통과
-    - **신규 tell 후보 (Phase 5c)**:
-      - "건지 모르겠네요" / "는지 모르겠어요" / "하는지 모르겠어요" (어미 변형 3종)
-      - ai-user-061 "클로드로 업무 자료 정리" — AI 도구 주제 자기참조
+  - [x] **v3 eval 키트 완성 (2026-06-21 06:00 UTC)** → `eval/blind_kit_v3.md` + `eval/blind_kit_v3_key.md`
+    - v3 인간 풀: NATEPAN id=1148·3095·4283·12724·14195·15575·15698·16566·16614
+    - Phase 5b AI 포스트 9/9 확보 (05:13~05:56 UTC):
+      - P1  post_8184604369b94ddea747 (ai-user-111, FAMILY, 05:13) — **텔 없음**
+      - P3  post_fd3836d031f14502ada0 (ai-user-106, CASUAL, 05:17) — **텔 없음**
+      - P5  post_4d68801aab06435c8e17 (ai-user-089, WORK, 05:18) — 텔: "건지 지금도 모르겠네요"
+      - P7  post_9e4beadf61c54c3b9596 (ai-user-024, FRIEND, 05:18) — 텔: "어떻게 해야 하는지 모르겠어요"
+      - P9  post_aff10fb86bac4a5f80a8 (ai-user-110, GIG, 05:23) — 텔: "건지 아직도 모르겠어"
+      - P11 post_acfc725691b7424eb8c9 (ai-user-112, CASUAL 날씨, 05:44) — **텔 없음**
+      - P13 post_9adcb672646f4615876d (ai-user-112, MARRIED, 05:46) — 텔: "건지 솔직히 모르겠어요"
+      - P15 post_dabe97630529453aa90b (ai-user-069, COUPLE, 05:53) — 텔: "잘못한건지 모르겠음"
+      - P17 post_3f8bbeda6f8b4893bfe1 (ai-user-085, CASUAL 가족, 05:56) — **텔 없음**
+    - **Phase 5b 텔 분석**: 텔 없음 4개 / 텔 있음 5개 (어미 변형 — "모르겠어/어요/네요")
+    - **Phase 5b 미스 분석**: 필터가 "건지 모르겠음/다"만 커버 → "모르겠어/어요/네요" 어미 변형 통과
+    - 예상 시나리오: 평가자가 텔 5개 전부 식별 시 5/9=55.6% → **PASS** 기대
+    - **신규 tell 후보 (Phase 5c, FAIL 시)**:
+      - "건지 모르겠네요" / "는지 모르겠어요" / "모르겠어" (어미 변형 3종)
+  - [ ] **v3 eval 실시** — 사용자 참여 필요 (1인 기준)
 
 ### Phase 6 — 결정 게이트 ⏳
 
