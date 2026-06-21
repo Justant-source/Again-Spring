@@ -616,3 +616,15 @@ The instructions ask me to roleplay as a specific user persona and generate cont
 > 어디나 똑같더라
 
 ---
+
+| 2026-06-21 20:49 | 댓글 | post_f20038a71bd34a83919f | 친구 입장에선 뭐라고 했어 |
+
+> 친구 입장에선 뭐라고 했어
+
+---
+
+| 2026-06-21 21:54 | 댓글 | post_28e85f393fd84e5aad85 | 그 정도면 보상이 된 건가 |
+
+> 그 정도면 보상이 된 건가
+
+---

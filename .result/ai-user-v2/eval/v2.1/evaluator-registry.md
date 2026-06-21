@@ -19,9 +19,13 @@ This registry maintains a **single source of truth** for which evaluators have p
 
 ## Current Status
 
-**Phase 5 (Baseline)**: Instruction packets ready (2026-06-21) → Kit v2.1-phase5-01 ready for naive evaluator assignment (3 evaluators)
+**Phase 5 (Baseline)**: ✓ COMPLETED (2026-06-21)
+- Kit v2.1-phase5-01 evaluation by 3 naive evaluators (임슬기·박진수·김철수)
+- **Result**: AI 식별률 80% (kill criterion ≤60% → FAIL)
+- **Next**: Phase 6 결정론 다양화 (T1~T4 제거) → Phase 7 재평가 → Phase 8 최종
 
 **Phase 8 (Final)**: TBD → Will populate after Phase 5 + Project Phase 6-7 complete
+- Phase 8 평가자는 Phase 5와 **다른 인원** 구성 (E-001~E-003 재사용 금지, 2주 쿨다운 후 가능)
 
 ---
 
@@ -29,10 +33,10 @@ This registry maintains a **single source of truth** for which evaluators have p
 
 | Evaluator ID | Name (Sealed) | Role | Round | Kit ID | Category | Date | Status | Notes |
 |--------------|---------------|------|-------|--------|----------|------|--------|-------|
-| E-001 | [SEALED] | Naive | 5 | v2.1-phase5-01 | COUPLE | TBD | Pending | Instruction packet sent |
-| E-002 | [SEALED] | Naive | 5 | v2.1-phase5-01 | COUPLE | TBD | Pending | Instruction packet sent |
-| E-003 | [SEALED] | Naive | 5 | v2.1-phase5-01 | COUPLE | TBD | Pending | Instruction packet sent |
-| Owner | @justant | Calibration | 5 | v2.1-phase5-01 | COUPLE | TBD | Pending | **EXCLUDED from gate** |
+| E-001 | 임슬기 | Naive | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | AI 식별률 80% (4/5), 신뢰도 100% (과도한 신뢰) |
+| E-002 | 박진수 | Naive | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | AI 식별률 80% (4/5), 오판 3건 (Human→Bot) |
+| E-003 | 김철수 | Naive | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | AI 식별률 80% (4/5), 신중도 적절 (오판 0건) |
+| Owner | @justant | Calibration | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | **EXCLUDED from gate** |
 
 ---
 
@@ -177,9 +181,27 @@ After Phase 5:
 
 ---
 
+## Phase 8 Evaluator Assignment Constraints
+
+**⚠️ Phase 5 완료 기록 (2026-06-21)**
+
+| Evaluator | Phase 5 Kit | Status | Phase 8 Eligibility |
+|-----------|------------|--------|-------------------|
+| E-001 (임슬기) | v2.1-phase5-01 | Completed | **불가 (2026-07-05 이후 가능)** — 2주 쿨다운 |
+| E-002 (박진수) | v2.1-phase5-01 | Completed | **불가 (2026-07-05 이후 가능)** — 2주 쿨다운 |
+| E-003 (김철수) | v2.1-phase5-01 | Completed | **불가 (2026-07-05 이후 가능)** — 2주 쿨다운 |
+
+**Phase 8 모집 전제**:
+- **신규 평가자 우선** (E-004, E-005, E-006 등)
+- 폴링 제약 시에만 E-001~E-003 재사용 가능 (2026-07-05 이후)
+- E-001~E-003과 **다른 kit** 배정 필수 (v2.1-phase8-01/02/03 등)
+
+---
+
 ## References
 
 - `oracle-protocol.md` — Gate criterion (≥60%), evaluator profile, calibration role
 - `blind-kit-spec.md` — Kit structure, randomization, answer key sealing
 - `.secrets/evaluator-contacts.csv` (git-ignored) — Sealed contact info
 - `docs/shared/ai-user-v2/lessons.md` — v2 evaluation lessons (owner bias, memory contamination)
+- `.result/ai-user-v2/steps/v2.1-05-baseline-result.md` — Phase 5 baseline result + Named-Tell labels v0

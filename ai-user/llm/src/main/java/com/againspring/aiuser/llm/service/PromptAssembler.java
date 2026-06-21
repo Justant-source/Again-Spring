@@ -101,7 +101,21 @@ public class PromptAssembler {
         "배우자 호칭: '부인' 금지 → '아내' 또는 '와이프'로. '부인'은 공문서 투라 커뮤니티에서 어색.",
         "감지 표현: '느껴버렸어요' 조합 금지 → '쎄하다', '낌새를 느끼다', '불현듯 생각났다'로.",
         "서두 나레이터 투 금지: '힘든 경험을 했는데요', '이런 일이 있었는데요' 식 시작 절대 금지.",
+        // Phase 6 — T4·T2 종결 다양화 시드 (2026-06-21)
+        "[종결 다양화] 이번 글은 강한 감정·분노로 끝내기 — 마지막 문장에서 폭발하는 감정 표현 (느낌표 포함).",
+        "[종결 다양화] 이번 글은 혼란·막막함으로 끝내기 — 하소연하다 막혀버리는 톤 (이중질문 구조는 피할 것).",
+        "[종결 다양화] 이번 글은 체념·포기로 끝내기 — '그냥', '됐어', '아 모르겠다' 류로 자연스럽게 끝내기.",
+        "[종결 다양화] 이번 글은 상황을 완결된 장면으로 끝내기 — 글이 끊기지 않고 구체적 행동이나 결말로 마무리.",
     };
+    // Phase 6 — T3 광장-내용 불일치 방지 가이드 (2026-06-21)
+    private static final java.util.Map<String, String> CATEGORY_GUIDE = java.util.Map.of(
+        "COUPLE",  "연인 관계(남친·여친·전남친·전여친) 갈등만 작성. 가족·직장·친구 갈등은 이 광장에 맞지 않음.",
+        "MARRIED", "부부·배우자·시댁·처가 갈등만. 미혼 연인 이야기는 제외.",
+        "FRIEND",  "친구 관계 갈등만. 연인·가족·직장 갈등은 이 광장에 맞지 않음.",
+        "FAMILY",  "가족(부모·형제자매·친척) 갈등만. 연인·직장·친구 이야기는 제외.",
+        "WORK",    "직장·업무·상사·동료 갈등만. 연인·가족·친구 갈등은 이 광장에 맞지 않음.",
+        "OTHER",   ""
+    );
     private static final java.util.Random PROMPT_RNG = new java.util.Random();
 
     private String lengthInstruction(String tier) {
@@ -135,11 +149,13 @@ public class PromptAssembler {
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
             : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
+        // Phase 6 T3: 광장 가이드 추출 (catGuide)
+        String catGuide = CATEGORY_GUIDE.getOrDefault(req.getCategory() != null ? req.getCategory() : "OTHER", "");
         // 랜덤 다양성 시드 (50% 확률로 1개 추가)
         String varietySeed = PROMPT_RNG.nextBoolean()
             ? "\n[스타일 힌트] " + VARIETY_SEEDS[PROMPT_RNG.nextInt(VARIETY_SEEDS.length)] : "";
         String user = """
-            %s카테고리: %s
+            %s카테고리: %s%s
             아키타입: %s
             %s
             글 길이: %s
@@ -155,12 +171,13 @@ public class PromptAssembler {
             %s%s""".formatted(
                 req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
                 req.getCategory() != null ? req.getCategory() : "OTHER",
+                catGuide.isBlank() ? "" : " (⚠️ " + catGuide + ")",
                 req.getArchetype() != null ? req.getArchetype() : "일반갈등",
                 req.getTopicSeed() != null ? "상황: " + safe(req.getTopicSeed()) : "",
                 lengthInstruction(req.getLengthTier()),
                 dynamicExamplesBlock(req.getDynamicExamples()),
                 situationContinuityBlock(req.getOngoingSituation()),
-                recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 같은 소재·사건 유형 반복 금지 — 완전히 다른 상황·디테일로"),
+                recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들에서 다룬 갈등 유형을 먼저 파악하고, 이번엔 완전히 다른 유형의 갈등 상황으로 쓸 것 — 같은 사건을 각도만 바꾸거나 요약하는 것도 실격"),
                 politeSuffix,
                 varietySeed);
         return system + "\n" + SEP + "\n" + user;

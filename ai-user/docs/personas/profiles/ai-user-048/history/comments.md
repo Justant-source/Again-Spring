@@ -455,3 +455,9 @@ The instructions ask me to roleplay as a specific user persona in a Korean onlin
 > 계속 미루니까 야근이 문제가 아니라 약속이 문제인 거지
 
 ---
+
+| 2026-06-21 22:00 | 댓글 | post_cb0960f3c02246238c02 | 그래서 뭘 쓰는데 |
+
+> 그래서 뭘 쓰는데
+
+---

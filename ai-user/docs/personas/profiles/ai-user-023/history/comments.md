@@ -340,3 +340,15 @@ This asks me to impersonate a specific real person in an actual online community
 > 거리 두면 더 멀어지지 않나
 
 ---
+
+| 2026-06-21 20:52 | 댓글 | post_4a65bc20c7674191961d | 동생은 딱 말했는데 |
+
+> 동생은 딱 말했는데
+
+---
+
+| 2026-06-21 22:08 | 댓글 | post_141ee118e8454f19a58c | 그런 순간이 최고더라 |
+
+> 그런 순간이 최고더라
+
+---
