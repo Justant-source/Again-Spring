@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>다시봄 블라인드 평가 — v2.1 Phase 8</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --card: #ffffff;
+    --border: #e2e0db;
+    --accent: #4a7c59;
+    --accent-light: #eef5f1;
+    --human: #3b7dd8;
+    --human-light: #eef3fc;
+    --bot: #c0392b;
+    --bot-light: #fdf0ef;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .container { max-width: 820px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  /* 헤더 */
+  .header { text-align: center; margin-bottom: 36px; }
+  .header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 6px; }
+  .header p { color: var(--muted); font-size: 0.9rem; }
+
+  /* 가이드 박스 */
+  .guide {
+    background: var(--accent-light);
+    border: 1.5px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 36px;
+  }
+  .guide h2 { font-size: 1rem; font-weight: 700; color: var(--accent); margin-bottom: 14px; }
+  .guide ul { padding-left: 20px; }
+  .guide li { margin-bottom: 8px; font-size: 0.9rem; }
+  .guide .dont { color: #8b2c20; margin-top: 12px; }
+  .guide .dont li::marker { color: #c0392b; }
+  .guide strong { font-weight: 600; }
+
+  /* 평가자 정보 */
+  .evaluator-info {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 28px;
+  }
+  .evaluator-info label { font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 8px; }
+  .evaluator-info input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .evaluator-info input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+  /* 문제 카드 */
+  .problem-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+  .problem-header {
+    background: #f0eeea;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .problem-num {
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: var(--accent);
+  }
+  .problem-category {
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: #e5e3de;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  /* 글 목록 */
+  .posts-section { padding: 0; }
+  .post-item {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 24px;
+  }
+  .post-item:last-child { border-bottom: none; }
+  .post-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+  .post-title {
+    font-weight: 600;
+    font-size: 0.92rem;
+    margin-bottom: 8px;
+    color: #333;
+  }
+  .post-body {
+    font-size: 0.88rem;
+    color: #444;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.7;
+    background: #faf9f7;
+    padding: 12px 16px;
+    border-radius: 6px;
+    border: 1px solid #ebe9e4;
+  }
+  .placeholder {
+    font-style: italic;
+    color: #999;
+    background: #fef5f0;
+    padding: 16px;
+    border-radius: 6px;
+    border: 1px dashed #ddd;
+  }
+
+  /* 판단 영역 */
+  .judgment-section {
+    padding: 20px 24px;
+    border-top: 2px solid var(--bg);
+    background: #fdfdfc;
+  }
+  .judgment-row { display: flex; gap: 12px; margin-bottom: 18px; }
+  .choice-btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: inherit;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .choice-btn input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .choice-btn.human { border-color: #bdd3f5; color: var(--human); }
+  .choice-btn.human:hover { background: var(--human-light); }
+  .choice-btn.human.selected { background: var(--human-light); border-color: var(--human); box-shadow: 0 0 0 3px #d0e4f8; }
+  .choice-btn.bot { border-color: #f5c6c1; color: var(--bot); }
+  .choice-btn.bot:hover { background: var(--bot-light); }
+  .choice-btn.bot.selected { background: var(--bot-light); border-color: var(--bot); box-shadow: 0 0 0 3px #f8d7d5; }
+
+  .choice-icon { font-size: 1.3rem; display: block; margin-bottom: 4px; }
+
+  /* 슬라이더 */
+  .slider-section { margin-bottom: 16px; }
+  .slider-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .slider-value {
+    background: var(--accent);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    min-width: 44px;
+    text-align: center;
+  }
+  .slider-track {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+
+  /* 메모 */
+  .memo-section label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.88rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 64px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--card);
+  }
+  textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  textarea::placeholder { color: #b0afa9; }
+
+  /* 종합의견 */
+  .overall-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 28px;
+  }
+  .overall-section h2 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+  .overall-section p { font-size: 0.85rem; color: var(--muted); margin-bottom: 14px; }
+  .overall-section textarea { min-height: 120px; }
+
+  /* 제출 버튼 */
+  .submit-btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    margin-bottom: 24px;
+    transition: background 0.15s;
+  }
+  .submit-btn:hover { background: #3d6b4c; }
+  .submit-btn:active { background: #325a3f; }
+
+  /* 결과 박스 */
+  .result-box {
+    display: none;
+    background: var(--card);
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+  .result-box h2 { font-size: 1rem; font-weight: 700; color: var(--accent); margin-bottom: 14px; }
+  .result-text {
+    background: #f5f5f3;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    font-size: 0.85rem;
+    font-family: 'Courier New', Courier, monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.7;
+    margin-bottom: 14px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover { background: #3d6b4c; }
+  .copy-btn.copied { background: #2d7d46; }
+
+  /* 진행 바 */
+  .progress-bar-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: white;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .progress-bar {
+    flex: 1;
+    height: 6px;
+    background: #e5e3de;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.3s;
+    width: 0%;
+  }
+  .progress-count { white-space: nowrap; font-weight: 600; color: var(--accent); min-width: 50px; text-align: right; }
+
+  /* 경고 */
+  .warning {
+    display: none;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 0.88rem;
+    color: #7a5200;
+  }
+  .unanswered { border-color: #e74c3c; box-shadow: 0 0 0 3px #fde; }
+</style>
+</head>
+<body>
+
+<!-- 진행 상황 표시 바 -->
+<div class="progress-bar-wrap">
+  <span>진행</span>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <span class="progress-count" id="progressCount">0 / 10</span>
+</div>
+
+<div class="container">
+
+  <!-- 헤더 -->
+  <div class="header">
+    <h1>블라인드 평가 — 다시봄 커뮤니티</h1>
+    <p>각 문제의 글을 읽고 작성자가 사람인지 봇인지 직관적으로 판단해 주세요.</p>
+  </div>
+
+  <!-- 가이드 박스 -->
+  <div class="guide">
+    <h2>📋 작성 방법</h2>
+    <ul>
+      <li>아래에는 <strong>총 10개의 문제</strong>가 있습니다. 각 문제는 한 작성자의 글 2~3개입니다.</li>
+      <li>각 문제에서 <strong>"사람"</strong> 또는 <strong>"봇"</strong> 중 하나를 선택하세요.</li>
+      <li><strong>자신감 슬라이더</strong>: 얼마나 확신하는지 0~100% 중 선택하세요. <em>(50% = 반반 모르겠다)</em></li>
+      <li><strong>메모</strong>: 왜 그렇게 느꼈는지 간단히 적어도 좋고, 비워도 됩니다.</li>
+      <li>모두 완료 후 <strong>종합의견</strong>을 작성하고 제출하면 전달용 텍스트가 생성됩니다.</li>
+    </ul>
+    <ul class="dont">
+      <li>❌ 문장 길이·단어를 분석하지 마세요</li>
+      <li>❌ 이전에 본 글과 비교하지 마세요</li>
+      <li>❌ "AI 같은 표현"을 찾으려 하지 마세요</li>
+      <li>✅ 글을 쭉 읽고 <strong>전체적인 느낌</strong>만으로 판단해 주세요</li>
+    </ul>
+  </div>
+
+  <!-- 평가자 이름 -->
+  <div class="evaluator-info">
+    <label for="evaluatorName">평가자 이름 / 닉네임 <span style="color:var(--bot);font-size:0.8rem;">*필수</span></label>
+    <input type="text" id="evaluatorName" placeholder="예: 김철수, 익명1..." autocomplete="off">
+  </div>
+
+  <!-- 결과 박스 (제출 후 표시) -->
+  <div class="result-box" id="resultBox">
+    <h2>✅ 제출 완료 — 아래 내용을 복사해서 전달해 주세요</h2>
+    <div class="result-text" id="resultText"></div>
+    <button class="copy-btn" id="copyBtn" onclick="copyResult()">
+      <span>📋</span> 전체 복사
+    </button>
+  </div>
+
+  <!-- 경고 메시지 -->
+  <div class="warning" id="warningMsg">⚠️ 아직 선택하지 않은 문제가 있습니다. 모든 문제에 응답해 주세요.</div>
+
+  <form id="evalForm">
+
+  <!-- ======== 문제 1 ======== -->
+  <div class="problem-card" id="card-1">
+    <div class="problem-header">
+      <span class="problem-num">문제 1</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 A 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 A 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 A 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-1-human">
+          <input type="radio" name="q1" value="사람" onchange="selectChoice(1,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-1-bot">
+          <input type="radio" name="q1" value="봇" onchange="selectChoice(1,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label">
+          <span>자신감</span>
+          <span class="slider-value" id="sv-1">50%</span>
+        </div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-1" oninput="updateSlider(1)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-1">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-1" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 문제 2 ======== -->
+  <div class="problem-card" id="card-2">
+    <div class="problem-header">
+      <span class="problem-num">문제 2</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 B 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 B 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 B 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-2-human">
+          <input type="radio" name="q2" value="사람" onchange="selectChoice(2,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-2-bot">
+          <input type="radio" name="q2" value="봇" onchange="selectChoice(2,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-2">50%</span></div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-2" oninput="updateSlider(2)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-2">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-2" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 문제 3 ======== -->
+  <div class="problem-card" id="card-3">
+    <div class="problem-header">
+      <span class="problem-num">문제 3</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 C 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 C 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 C 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-3-human">
+          <input type="radio" name="q3" value="사람" onchange="selectChoice(3,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-3-bot">
+          <input type="radio" name="q3" value="봇" onchange="selectChoice(3,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-3">50%</span></div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-3" oninput="updateSlider(3)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-3">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-3" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 문제 4 ======== -->
+  <div class="problem-card" id="card-4">
+    <div class="problem-header">
+      <span class="problem-num">문제 4</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 D 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 D 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 D 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-4-human">
+          <input type="radio" name="q4" value="사람" onchange="selectChoice(4,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-4-bot">
+          <input type="radio" name="q4" value="봇" onchange="selectChoice(4,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-4">50%</span></div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-4" oninput="updateSlider(4)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-4">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-4" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 문제 5 ======== -->
+  <div class="problem-card" id="card-5">
+    <div class="problem-header">
+      <span class="problem-num">문제 5</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 E 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 E 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 E 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-5-human">
+          <input type="radio" name="q5" value="사람" onchange="selectChoice(5,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-5-bot">
+          <input type="radio" name="q5" value="봇" onchange="selectChoice(5,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-5">50%</span></div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-5" oninput="updateSlider(5)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-5">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-5" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 문제 6 ======== -->
+  <div class="problem-card" id="card-6">
+    <div class="problem-header">
+      <span class="problem-num">문제 6</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 F 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 F 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 F 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-6-human">
+          <input type="radio" name="q6" value="사람" onchange="selectChoice(6,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-6-bot">
+          <input type="radio" name="q6" value="봇" onchange="selectChoice(6,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-6">50%</span></div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-6" oninput="updateSlider(6)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-6">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-6" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 문제 7 ======== -->
+  <div class="problem-card" id="card-7">
+    <div class="problem-header">
+      <span class="problem-num">문제 7</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 G 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 G 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 G 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-7-human">
+          <input type="radio" name="q7" value="사람" onchange="selectChoice(7,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-7-bot">
+          <input type="radio" name="q7" value="봇" onchange="selectChoice(7,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-7">50%</span></div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-7" oninput="updateSlider(7)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-7">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-7" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 문제 8 ======== -->
+  <div class="problem-card" id="card-8">
+    <div class="problem-header">
+      <span class="problem-num">문제 8</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 H 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 H 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 H 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-8-human">
+          <input type="radio" name="q8" value="사람" onchange="selectChoice(8,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-8-bot">
+          <input type="radio" name="q8" value="봇" onchange="selectChoice(8,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-8">50%</span></div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-8" oninput="updateSlider(8)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-8">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-8" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 문제 9 ======== -->
+  <div class="problem-card" id="card-9">
+    <div class="problem-header">
+      <span class="problem-num">문제 9</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 I 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 I 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 I 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-9-human">
+          <input type="radio" name="q9" value="사람" onchange="selectChoice(9,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-9-bot">
+          <input type="radio" name="q9" value="봇" onchange="selectChoice(9,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-9">50%</span></div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-9" oninput="updateSlider(9)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-9">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-9" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 문제 10 ======== -->
+  <div class="problem-card" id="card-10">
+    <div class="problem-header">
+      <span class="problem-num">문제 10</span>
+      <span class="problem-category">[추후채움]</span>
+    </div>
+    <div class="posts-section">
+      <div class="post-item">
+        <div class="post-label">글 1</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 J 글 1 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 2</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 J 글 2 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+      <div class="post-item">
+        <div class="post-label">글 3</div>
+        <div class="post-title">[추후채움]</div>
+        <div class="post-body placeholder">[계정 J 글 3 내용 — 이곳은 최종 평가 전에 실제 콘텐츠로 채워집니다]</div>
+      </div>
+    </div>
+    <div class="judgment-section">
+      <div class="judgment-row">
+        <label class="choice-btn human" id="btn-10-human">
+          <input type="radio" name="q10" value="사람" onchange="selectChoice(10,'사람')">
+          <span class="choice-icon">🧑</span>사람
+        </label>
+        <label class="choice-btn bot" id="btn-10-bot">
+          <input type="radio" name="q10" value="봇" onchange="selectChoice(10,'봇')">
+          <span class="choice-icon">🤖</span>봇
+        </label>
+      </div>
+      <div class="slider-section">
+        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-10">50%</span></div>
+        <div class="slider-track">
+          <span>확신 없음</span>
+          <input type="range" min="0" max="100" value="50" id="slider-10" oninput="updateSlider(10)">
+          <span>매우 확신</span>
+        </div>
+      </div>
+      <div class="memo-section">
+        <label for="memo-10">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
+        <textarea id="memo-10" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 종합의견 ======== -->
+  <div class="overall-section">
+    <h2>종합의견 <span style="font-weight:400;color:#aaa;font-size:0.88rem;">(선택)</span></h2>
+    <p>전체를 읽고 나서 느낀 점, 특이하게 느껴진 문제, 판단 기준으로 삼은 것 등 자유롭게 적어주세요.</p>
+    <textarea id="overallOpinion" placeholder="예: 문제 3은 특히 어색하게 느껴졌음. 글 톤이 너무 일정한 것 같았음...&#10;문제 1과 8은 사람처럼 읽혔는데 이유를 설명하기 어려움..."></textarea>
+  </div>
+
+  <!-- 경고 -->
+  <div class="warning" id="warningMsg">⚠️ 아직 선택하지 않은 문제가 있습니다. 아래로 스크롤해서 모든 문제에 응답해 주세요.</div>
+
+  <!-- 제출 버튼 -->
+  <button type="button" class="submit-btn" onclick="submitEval()">✅ 제출하고 결과 텍스트 생성</button>
+
+  </form><!-- /evalForm -->
+
+  <!-- 결과 박스 (제출 후 이동) -->
+  <div class="result-box" id="resultBox">
+    <h2>✅ 제출 완료 — 아래 내용을 복사해서 전달해 주세요</h2>
+    <div class="result-text" id="resultText"></div>
+    <button class="copy-btn" id="copyBtn" onclick="copyResult()">
+      <span>📋</span> 전체 복사
+    </button>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+const answers = {};
+const TOTAL = 10;
+
+function selectChoice(n, val) {
+  answers[n] = val;
+  document.getElementById('btn-' + n + '-human').classList.toggle('selected', val === '사람');
+  document.getElementById('btn-' + n + '-bot').classList.toggle('selected', val === '봇');
+  document.getElementById('card-' + n).classList.remove('unanswered');
+  updateProgress();
+}
+
+function updateSlider(n) {
+  const val = document.getElementById('slider-' + n).value;
+  document.getElementById('sv-' + n).textContent = val + '%';
+}
+
+function updateProgress() {
+  const done = Object.keys(answers).length;
+  const pct = Math.round(done / TOTAL * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressCount').textContent = done + ' / ' + TOTAL;
+}
+
+function submitEval() {
+  const name = document.getElementById('evaluatorName').value.trim();
+  if (!name) {
+    document.getElementById('evaluatorName').focus();
+    document.getElementById('evaluatorName').style.outline = '2px solid #e74c3c';
+    setTimeout(() => { document.getElementById('evaluatorName').style.outline = ''; }, 2000);
+    return;
+  }
+
+  // 미응답 체크
+  const missing = [];
+  for (let i = 1; i <= TOTAL; i++) {
+    if (!answers[i]) missing.push(i);
+  }
+  if (missing.length > 0) {
+    document.getElementById('warningMsg').style.display = 'block';
+    missing.forEach(n => {
+      document.getElementById('card-' + n).classList.add('unanswered');
+    });
+    document.getElementById('card-' + missing[0]).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  document.getElementById('warningMsg').style.display = 'none';
+
+  // 결과 텍스트 생성
+  const now = new Date();
+  const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+  let txt = '=== 다시봄 블라인드 평가 결과 ===\n';
+  txt += '평가자: ' + name + '\n';
+  txt += '일시: ' + dateStr + ' ' + timeStr + '\n';
+  txt += '키트: v2.1-Phase8-01\n';
+  txt += '================================\n\n';
+
+  for (let i = 1; i <= TOTAL; i++) {
+    const confidence = document.getElementById('slider-' + i).value;
+    const memo = document.getElementById('memo-' + i).value.trim();
+    txt += '문제 ' + i + ': ' + answers[i];
+    txt += '  (자신감 ' + confidence + '%)';
+    if (memo) txt += '\n  메모: ' + memo;
+    txt += '\n';
+  }
+
+  const overall = document.getElementById('overallOpinion').value.trim();
+  txt += '\n[종합의견]\n' + (overall || '(없음)') + '\n';
+  txt += '\n================================\n';
+  txt += '봇 판정 개수: ' + Object.values(answers).filter(v => v === '봇').length + '/10\n';
+  txt += '사람 판정 개수: ' + Object.values(answers).filter(v => v === '사람').length + '/10\n';
+
+  document.getElementById('resultText').textContent = txt;
+  const box = document.getElementById('resultBox');
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior: 'smooth' });
+}
+
+function copyResult() {
+  const txt = document.getElementById('resultText').textContent;
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✅ 복사됨!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.innerHTML = '<span>📋</span> 전체 복사';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    // 폴백: 선택
+    const el = document.getElementById('resultText');
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    alert('텍스트를 선택했습니다. Ctrl+C (또는 Cmd+C)로 복사해 주세요.');
+  });
+}
+</script>
+</body>
+</html>
