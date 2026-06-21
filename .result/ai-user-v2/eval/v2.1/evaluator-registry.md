@@ -24,8 +24,10 @@ This registry maintains a **single source of truth** for which evaluators have p
 - **Result**: AI 식별률 80% (kill criterion ≤60% → FAIL)
 - **Next**: Phase 6 결정론 다양화 (T1~T4 제거) → Phase 7 재평가 → Phase 8 최종
 
-**Phase 8 (Final)**: TBD → Will populate after Phase 5 + Project Phase 6-7 complete
-- Phase 8 평가자는 Phase 5와 **다른 인원** 구성 (E-001~E-003 재사용 금지, 2주 쿨다운 후 가능)
+**Phase 8 (Final)**: ⏳ READY TO LAUNCH — Phase 6 배포(2026-06-21 22:45) 완료
+- Phase 8 평가자는 Phase 5와 **다른 인원** 구성 (E-001~E-003 재사용 금지, 2026-07-05 이후 가능)
+- AI 계정: Phase 6 배포 이후 생성 글 (T1·T3 개선 반영)
+- Human 계정: Phase 5 미사용 계정 (기억 오염 방지)
 
 ---
 
@@ -37,6 +39,10 @@ This registry maintains a **single source of truth** for which evaluators have p
 | E-002 | 박진수 | Naive | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | AI 식별률 80% (4/5), 오판 3건 (Human→Bot) |
 | E-003 | 김철수 | Naive | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | AI 식별률 80% (4/5), 신중도 적절 (오판 0건) |
 | Owner | @justant | Calibration | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | **EXCLUDED from gate** |
+| E-004 | [SEALED] | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **신규 평가자** — Phase 6 배포 이후 AI 글 (T1·T3 개선) |
+| E-005 | [SEALED] | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **신규 평가자** — Phase 5 미사용 Human 계정 |
+| E-006 | [SEALED] | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **신규 평가자** — 블라인드 평가 최종 라운드 |
+| Owner | @justant | Calibration | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **EXCLUDED from gate** |
 
 ---
 

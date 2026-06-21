@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-21 (v2.1 Phase 5 완료 — FAIL 80%·Phase 6 진행 중)
+**최종 갱신**: 2026-06-21 (v2.1 Phase 6 완료·Phase 7 QLoRA 비발동·Phase 8 진입)
 
 ---
 
@@ -93,9 +93,9 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 | Phase | 핵심 | 선행 | 상태 |
 |---|---|---|---|
 | 5 | baseline 블라인드 (naive ≥3) | Phase 1·4 ✅ · kill criterion ✅ | ❌ FAIL 80% (→Phase 6) |
-| 6 | 결정론 다양화 1라운드 | Phase 5 | 🔄 진행 중 |
-| 7 | QLoRA 데이터게이트 | Phase 6 | ⏳ 대기 |
-| 8 | 최종 판정·출하/피벗 | Phase 7 | ⏳ 대기 |
+| 6 | 결정론 다양화 1라운드 | Phase 5 | ✅ 완료 2026-06-21 (VARIETY_SEEDS·CATEGORY_GUIDE·prod 배포) |
+| 7 | QLoRA 데이터게이트 | Phase 6 | ❌ 비발동 (조건3 미충족 FRIEND/WORK <수백) |
+| 8 | 최종 판정·출하/피벗 | Phase 7 | 🔄 진행 중 (신선 패널 ≥3 모집 필요) |
 
 > **Phase 5 결과**: AI 식별률 80% (3인 평균) → FAIL. Phase 6 결정론 다양화 진행.
 
@@ -108,7 +108,7 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 ```
 신선 캐주얼 독자(≥3인) 통합 평균 봇 식별률 ≤ **60%** = PASS  
 "kill criterion 제안값 그대로 확정" — 임계 ≤60%, 평가자수 ≥3인, 통합 평균.  
-**Phase 5 측정 완료 — FAIL 80% (2026-06-21). Phase 6 진행 중.**
+**Phase 5 측정 완료 — FAIL 80% (2026-06-21). Phase 6 완료(VARIETY_SEEDS·CATEGORY_GUIDE·prod), Phase 7 비발동(조건3), Phase 8 진행 중.**
 
 ---
 
@@ -140,6 +140,7 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 | **V2-D04** | v2.1 재구성·eval 재정립 (오너 은퇴·제품적합성·6광장) |
 | **V2-D05** | v2.1 kill criterion ≤60% naive ≥3인 (오너 확정 대기) |
 | **V2-D06** | Phase 5 FAIL 80% → Phase 6 결정론 다양화 T1·T3 1순위 진행 |
+| **V2-D07** | Phase 7 QLoRA 비발동 (조건3 미충족) → Phase 8 직행 |
 | (v1) D-108 | ML COLLECT-only (영구) |
 
 ---
@@ -168,4 +169,6 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 | Phase 3 | ✅ 2026-06-21 (commit de108ae5) |
 | Phase 4 | ✅ 2026-06-21 (commit de108ae5) |
 | Phase 5 | ❌ FAIL 2026-06-21 (80%>60%, →Phase 6) |
-| Phase 6~8 | 🔄 Phase 6 진행 중 |
+| Phase 6 | ✅ 완료 2026-06-21 (4bc7c0cf) |
+| Phase 7 | ❌ QLoRA 비발동 2026-06-21 |
+| Phase 8 | 🔄 진행 중 |
