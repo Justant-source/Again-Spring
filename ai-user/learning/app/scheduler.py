@@ -4,27 +4,38 @@ import logging, asyncio, random
 
 logger = logging.getLogger(__name__)
 
-# 전체 12개 소스 (기존 6 + 신규 6)
+# Phase 1 (v2): NATEPAN 전용 — 다른 소스 비활성 (변수 고정 원칙 R3)
+# NATEPAN daily cap 대폭 상향 (50 → 1500)
+# limit=0 → _do_crawl 내부에서 skip (if not limit: return)
 SOURCES = [
-    ("naver",    500), ("daum",    500),
-    ("dcinside", 100), ("natepan",  50), ("bobaedream", 100), ("blind",   50),
-    ("fmkorea",  150), ("theqoo",  120), ("clien",      100), ("ppomppu", 100),
-    ("ruliweb",  120), ("mlbpark",  80),
+    ("natepan",  1500),  # Phase 1: 전체 예산 NATEPAN 집중
+    ("naver",       0),  # 비활성
+    ("daum",        0),  # 비활성
+    ("dcinside",    0),  # 비활성
+    ("bobaedream",  0),  # 비활성
+    ("blind",       0),  # 비활성
+    ("fmkorea",     0),  # 비활성
+    ("theqoo",      0),  # 비활성
+    ("clien",       0),  # 비활성
+    ("ppomppu",     0),  # 비활성
+    ("ruliweb",     0),  # 비활성
+    ("mlbpark",     0),  # 비활성
 ]
 
 async def run_daily_crawl():
-    """매일 KST 03:00 — 12개 소스 크롤 → 완료 후 말투 강화 + 토픽 합성 자동 실행"""
+    """매일 KST 03:00 — NATEPAN 전용 크롤 → 완료 후 말투 강화 + 토픽 합성"""
     from app.main import embed_service
     from app.api.crawl import _do_crawl
-    logger.info("Daily crawl started (12 sources)")
+    logger.info("Daily crawl started (NATEPAN-only, Phase 1 v2)")
     for source, limit in SOURCES:
+        if not limit:
+            continue
         try:
             await _do_crawl(source, limit, embed_service)
             await asyncio.sleep(60 * (3 + 7 * random.random()))
         except Exception as e:
             logger.error(f"Daily crawl {source} error: {e}")
     logger.info("Daily crawl completed — triggering persona strengthen + topic synthesis")
-    # 강화 먼저(hot_topics 채움) → 토픽 합성(hot_topics 힌트 소비)
     await run_strengthen()
     await run_topic_synthesis()
 
@@ -60,7 +71,7 @@ def init_scheduler():
     # 크롤 + 강화: 매일 UTC 18:00 (KST 03:00)
     scheduler.add_job(run_daily_crawl, CronTrigger(hour=18, minute=0),
                       id="daily_crawl", name="Daily Crawl + Strengthen")
-    # 독립 강화+토픽보강: 매일 UTC 20:00 (KST 05:00) — 크롤이 늦게 끝날 경우 보완
+    # 독립 강화+토픽보강: 매일 UTC 20:00 (KST 05:00)
     async def _standalone_strengthen_and_synthesize():
         await run_strengthen()
         await run_topic_synthesis()

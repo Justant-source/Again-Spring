@@ -44,6 +44,19 @@ EXAMPLE_BANK_ADD_SOURCE_URL_SQL = """
 ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS source_url VARCHAR(1024) DEFAULT NULL COMMENT '원본 커뮤니티 글 URL'
 """
 
+# Phase 1 v2: 작성자 ID + 게시시각 (계정 타임라인 그룹핑용)
+EXAMPLE_BANK_ADD_AUTHOR_ID_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS author_id VARCHAR(100) DEFAULT NULL COMMENT '작성자 닉네임 (타임라인 그룹핑)'
+"""
+
+EXAMPLE_BANK_ADD_POSTED_AT_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS posted_at DATETIME(3) DEFAULT NULL COMMENT '원본 게시 시각'
+"""
+
+EXAMPLE_BANK_ADD_AUTHOR_INDEX_SQL = """
+ALTER TABLE example_bank ADD INDEX IF NOT EXISTS idx_author_source (author_id, source)
+"""
+
 CRAWL_LOG_DDL = """
 CREATE TABLE IF NOT EXISTS crawl_log (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -121,6 +134,24 @@ def create_tables():
                 logger.info("example_bank.source_url column ensured")
             except Exception as e:
                 logger.warning(f"source_url column alter skipped (may already exist): {e}")
+            # author_id 컬럼 추가 (Phase 1 v2 — 계정 타임라인 그룹핑)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_AUTHOR_ID_SQL)
+                logger.info("example_bank.author_id column ensured")
+            except Exception as e:
+                logger.warning(f"author_id column alter skipped: {e}")
+            # posted_at 컬럼 추가 (Phase 1 v2 — 원본 게시 시각)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_POSTED_AT_SQL)
+                logger.info("example_bank.posted_at column ensured")
+            except Exception as e:
+                logger.warning(f"posted_at column alter skipped: {e}")
+            # author_id 인덱스 추가
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_AUTHOR_INDEX_SQL)
+                logger.info("example_bank idx_author_source index ensured")
+            except Exception as e:
+                logger.warning(f"author index alter skipped: {e}")
             # VECTOR INDEX for example_bank
             cur.execute(VECTOR_INDEX_CHECK_SQL)
             row = cur.fetchone()
