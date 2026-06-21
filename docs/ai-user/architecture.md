@@ -518,7 +518,3 @@ cache_hit: 동일 prompt → -76% 토큰
 | [quickstart.md](quickstart.md) | Prod 배포 빠른 시작 |
 | [operations.md](operations.md) | Prod 운영·모니터링·트러블슈팅 |
 | [personas/README.md](../../ai-user/docs/personas/README.md) | 페르소나 목록·분석 |
-
----
-
-**마지막 업데이트**: 2026-06-06 (prod 아키텍처 완성, 현재 구현 기준)

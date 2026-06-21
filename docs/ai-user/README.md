@@ -337,7 +337,3 @@ CREATE TABLE example_bank (
 - `SelfCritiqueService` 클리셰 목록 확장 (AI 티 패턴 추가)
 - 프롬프트 내 과구조화 서사·반복 패턴 경계 문구 보강
 - r18 tell-scan proxy 측정 → ≤ 0.150 목표
-
----
-
-**마지막 업데이트**: 2026-06-21 (D-106 ML 리랭킹 폐기, Step 93 시작)

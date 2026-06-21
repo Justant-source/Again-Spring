@@ -765,7 +765,3 @@ while true; do
   sleep 60
 done
 ```
-
----
-
-**마지막 업데이트**: 2026-06-21 (ML 판별기 서비스 참조: docs/ai-user/learning.md §20) | **작성**: Claude Code (Agent)

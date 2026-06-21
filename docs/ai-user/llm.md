@@ -1243,8 +1243,3 @@ r15 tell-scan에서 관측된 AI 특유 패턴. `SelfCritiqueService` 확장 대
 
 **적용 절차**: 운영 중 발견한 상투구 목록을 environment 변수 `SELF_CRITIQUE_EXTRA_CLICHES`(쉼표 구분 리터럴)로 등록 후 
 `SelfCritiqueService`의 quickCheck 로직에 통합. 재배포 불필요 — .env 갱신만으로 적용.
-
----
-
-**마지막 업데이트**: 2026-06-21 | **버전**: SELF_CRITIQUE_EXTRA_CLICHES 문서화 + Step 93 로드맵
-**기반**: ClaudeCliInvoker, ClaudeApiInvoker, InvokerRouter, SelfCritiqueService, OutputSanitizer

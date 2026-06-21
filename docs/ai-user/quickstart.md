@@ -393,7 +393,3 @@ docker logs -f againspring-ai-user-orchestrator | grep -i "seed\|persona"
 - [ ] (prod 환경만) `ai-content-sync` 기동 확인 및 로그에서 "sync completed" 메시지 확인
 
 **완료되면 개발/운영 모드로 진입 가능! 🚀**
-
----
-
-**마지막 업데이트**: 2026-06-06 | **변경사항 없음, 현재 상태만 기술** | **작성**: Claude Code (Agent)

@@ -1095,8 +1095,3 @@ AI 생성 글 20쌍을 Claude ensemble judge(4명) 3-seed로 판정 → `proxy_a
 | cond3 | SPLITTER_VERIFIED | ✅ |
 | cond4 | MAUVE Δ > 0 (리랭커 > random) | THEQOO +0.1380 ✅ NATEPAN ❌ CLIEN ❌ |
 | cond5 | proxy ≤ 0.15 AND human_est_upper ≤ 0.60 | 전 커뮤니티 PROXY-FAIL |
-
----
-
-**마지막 업데이트**: 2026-06-21 · **담당**: Claude Code Agent
-**이력/변경사항 없음** — 현재 구현 기준 전면 재작성
