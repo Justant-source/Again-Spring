@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-21 (Phase 5 PASS / Phase 6 prod ship 진행 중)
+**최종 갱신**: 2026-06-21 (Phase 6 SHIPPED ✅ — v2 프로젝트 완료)
 
 ---
 
@@ -94,14 +94,15 @@
     - 미탐지 AI: P3(단문 자연스러움)·P5(장편흡수)·P13(장편흡수)·P15(슬랭 진정성)
     - 신규 tell: 커뮤니티 맥락 불일치(화목글), "~인지~건지" 이중질문, 감정 평탄화
 
-### Phase 6 — 결정 게이트 & prod ship 🚀
+### Phase 6 — 결정 게이트 & prod ship ✅ SHIPPED (2026-06-21)
   - [x] Kill criterion 판정: PASS (5/9=55.6% ≤60%)
   - [x] 추이: v1 88.9% → v2 66.7% → v3 55.6% (-33.3pp)
-  - [ ] e2e-realbe 전체 통과 (dev:8090) — 진행 중
-  - [ ] .env.prod SELF_CRITIQUE_EXTRA_CLICHES 추가
-  - [ ] prod 재배포 (ai-user-orchestrator + llm-ai-user)
-  - [ ] prod 검증
-  - [ ] Phase 6 교훈 문서 + STATE CLOSED/SHIPPED
+  - [x] e2e-realbe 전체 통과 (dev:8090): 142/147 PASS / 5 SKIP / 0 FAIL
+  - [x] .env.prod SELF_CRITIQUE_EXTRA_CLICHES 추가 (35종)
+  - [x] prod 재배포: llm-ai-user-prod + ai-user-orchestrator-prod Recreated
+  - [x] prod 검증: UP (8091/api/health ✅ / SELF_CRITIQUE_EXTRA_CLICHES 주입 확인)
+  - [x] Phase 6 교훈 문서 완료 → `.result/ai-user-v2/lessons.md`
+  - [x] DB 백업: /tmp/backup_prod_20260621_153100.sql.gz (65M)
 
 ---
 
@@ -144,4 +145,4 @@
 | Phase 3 | ✅ 2026-06-21 commit 491e4515 |
 | Phase 4 | ✅ 2026-06-21 commit a42fba61 |
 | Phase 5 | ✅ 2026-06-21 (PASS 5/9=55.6%) |
-| Phase 6 | 🚀 진행 중 |
+| Phase 6 | ✅ 2026-06-21 SHIPPED |
