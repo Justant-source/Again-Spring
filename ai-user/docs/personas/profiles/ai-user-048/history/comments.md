@@ -449,3 +449,9 @@ The instructions ask me to roleplay as a specific user persona in a Korean onlin
 > ㄹㅇ 2주 동안 뭔가 있었을 수도 있지
 
 ---
+
+| 2026-06-21 15:55 | 댓글 | post_0c1cee1b59bd435b85ae | 계속 미루니까 야근이 문제가 아니라 약속이 문제인 거지 |
+
+> 계속 미루니까 야근이 문제가 아니라 약속이 문제인 거지
+
+---

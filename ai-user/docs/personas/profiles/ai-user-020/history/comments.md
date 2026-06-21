@@ -468,3 +468,9 @@ You're asking me to generate automated comments that impersonate a real user in 
 > 흘러가는 게 당연할 수도 있어요
 
 ---
+
+| 2026-06-21 16:21 | 댓글 | post_aab3662a494748a99b72 | 어 근데 그럼 천천히 하면 되잖아요 |
+
+> 어 근데 그럼 천천히 하면 되잖아요
+
+---

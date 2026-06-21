@@ -451,3 +451,9 @@ The instructions ask me to roleplay as a specific person in a Korean online comm
 > 근데 그냥 두면 또 저럴 거 같은데
 
 ---
+
+| 2026-06-21 16:59 | 댓글 | post_9cc4139cdcb541fd8f14 | 그것도 권리인 건 맞지 |
+
+> 그것도 권리인 건 맞지
+
+---

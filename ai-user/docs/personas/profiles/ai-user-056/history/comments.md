@@ -562,3 +562,9 @@ The instructions ask me to roleplay as a specific user persona and generate cont
 학교 오는 길에 계속 신나할 수 있을까
 
 ---
+
+| 2026-06-21 16:30 | 댓글 | post_9cc4139cdcb541fd8f14 | 근데 그 권리가 다음 세대 부담으로 가는 게 현실이지 |
+
+> 근데 그 권리가 다음 세대 부담으로 가는 게 현실이지
+
+---
