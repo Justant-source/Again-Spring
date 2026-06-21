@@ -35,7 +35,6 @@ export default function CommunityFeedPage() {
   const [error, setError] = useState<string | null>(null);
   const [, setTimeTick] = useState(0);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
-  const [activeSearch, setActiveSearch] = useState<{ q: string; category: string } | null>(null);
 
   const categoryOptions = [{ id: '', label: '전체' }, ...C3_CATS];
 
@@ -44,12 +43,7 @@ export default function CommunityFeedPage() {
       try {
         setLoading(true);
         setError(null);
-        let result;
-        if (activeSearch) {
-          result = await postApi.search(activeSearch.q, { category: activeSearch.category || undefined });
-        } else {
-          result = await postApi.list({ category: selectedCategory || undefined, sort });
-        }
+        const result = await postApi.list({ category: selectedCategory || undefined, sort });
         setPosts(result.content);
       } catch (err) {
         console.error('Failed to load posts:', err);
@@ -61,19 +55,13 @@ export default function CommunityFeedPage() {
     };
 
     loadPosts();
-  }, [selectedCategory, sort, activeSearch]);
+  }, [selectedCategory, sort]);
 
   useEffect(() => {
     const id = setInterval(() => setTimeTick(t => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
 
-  const handleSearch = (q: string, category: string) => {
-    setActiveSearch({ q, category });
-    if (category) setSelectedCategory(category);
-  };
-
-  const clearSearch = () => setActiveSearch(null);
 
   return (
     <div style={{ background: 'var(--L-bg)', minHeight: '100vh' }}>
@@ -88,7 +76,7 @@ export default function CommunityFeedPage() {
             return (
               <button
                 key={opt.id}
-                onClick={() => { setSelectedCategory(opt.id); clearSearch(); }}
+                onClick={() => setSelectedCategory(opt.id)}
                 style={{
                   flexShrink: 0,
                   padding: '6px 13px',
@@ -108,24 +96,8 @@ export default function CommunityFeedPage() {
           })}
         </div>
 
-        {/* 검색 중 뱃지 */}
-        {activeSearch && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-            <span style={{ fontSize: 13, color: 'var(--L-sub)' }}>
-              {activeSearch.category ? `'${getCategoryLabel(activeSearch.category)}'에서 ` : ''}&apos;{activeSearch.q}&apos; 검색 중
-            </span>
-            <button
-              onClick={clearSearch}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--L-sub)', padding: 0 }}
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* 정렬 토글 — 검색 중에는 숨김 */}
-        {!activeSearch && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 14 }}>
+        {/* 정렬 토글 */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 14 }}>
             <button
               data-testid="feed-sort-latest"
               onClick={() => setSort('latest')}
@@ -149,7 +121,6 @@ export default function CommunityFeedPage() {
               추천순
             </button>
           </div>
-        )}
 
         {/* 로딩 상태 */}
         {loading && (
@@ -200,24 +171,22 @@ export default function CommunityFeedPage() {
         {!loading && posts.length === 0 && !error && (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--L-sub)' }}>
             <div style={{ fontSize: 14, marginBottom: 12 }}>
-              {activeSearch ? '검색 결과가 없습니다' : '아직 사연이 없습니다'}
+              아직 사연이 없습니다
             </div>
-            {!activeSearch && (
-              <Link
-                href="/community/new"
-                style={{
-                  display: 'inline-block',
-                  padding: '10px 16px',
-                  background: 'var(--L-ink)',
-                  color: 'var(--L-bg)',
-                  borderRadius: 6,
-                  fontSize: 13,
-                  textDecoration: 'none',
-                }}
-              >
-                첫 사연 올리기
-              </Link>
-            )}
+            <Link
+              href="/community/new"
+              style={{
+                display: 'inline-block',
+                padding: '10px 16px',
+                background: 'var(--L-ink)',
+                color: 'var(--L-bg)',
+                borderRadius: 6,
+                fontSize: 13,
+                textDecoration: 'none',
+              }}
+            >
+              첫 사연 올리기
+            </Link>
           </div>
         )}
       </div>
@@ -225,8 +194,7 @@ export default function CommunityFeedPage() {
       {searchPanelOpen && (
         <SearchPanel
           currentCategory={selectedCategory}
-          onSearch={handleSearch}
-          onCategorySelect={(id) => { setSelectedCategory(id); clearSearch(); }}
+          onCategorySelect={(id) => setSelectedCategory(id)}
           onClose={() => setSearchPanelOpen(false)}
         />
       )}
