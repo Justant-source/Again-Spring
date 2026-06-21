@@ -450,6 +450,13 @@
 
 ## Phase 8 — kill criterion 최종 판정 + 출하/피벗 + 교훈 봉인 🔄 진행 중
 
+> **현재 상태 (2026-06-21)**: 키트 구성 진행 중
+> - AI 계정 5개 확정 (COUPLE:ai-user-060·FAMILY:ai-user-032·WORK:ai-user-043·FRIEND:ai-user-057·MARRIED:ai-user-035)
+> - Human 계정 5개 확정 (dev example_bank 기반)
+> - 배치 A-A-H-A-H-H-A-H-H-A + ANSWER-KEY 생성 완료
+> - evaluator HTML 구성 중 (AI 글 삽입 완료, Human 글 삽입 중)
+> - **다음**: 신선 평가자 E-004+ ≥3인 모집 → 평가 수집 → kill criterion 판정
+
 **목표**: 새 오라클로 최종 측정 → kill criterion 판정 → 출하 or 피벗 **옵션 제시(임의 결정 금지)**. 교훈 봉인.
 
 **Gate**: 최종 판정 기록 + 출하 완료(PASS) 또는 옵션 제시(FAIL) + 교훈 문서 + `lint:docs` + 절대규칙 #4·#8
