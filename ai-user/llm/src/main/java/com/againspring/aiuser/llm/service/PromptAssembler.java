@@ -159,6 +159,7 @@ public class PromptAssembler {
                 req.getTopicSeed() != null ? "상황: " + safe(req.getTopicSeed()) : "",
                 lengthInstruction(req.getLengthTier()),
                 dynamicExamplesBlock(req.getDynamicExamples()),
+                situationContinuityBlock(req.getOngoingSituation()),
                 recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 같은 소재·사건 유형 반복 금지 — 완전히 다른 상황·디테일로"),
                 politeSuffix,
                 varietySeed);
@@ -249,6 +250,7 @@ public class PromptAssembler {
                 req.getTopicSeed() != null ? "주제: " + safe(req.getTopicSeed()) : "",
                 lengthInstruction(req.getLengthTier()),
                 dynamicExamplesBlock(req.getDynamicExamples()),
+                situationContinuityBlock(req.getOngoingSituation()),
                 recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 다른 주제·내용으로"),
                 politeSuffix,
                 varietySeed);
@@ -439,6 +441,16 @@ public class PromptAssembler {
                "───────────────────────────────────────\n" +
                safe(normalized) + "\n" +
                "───────────────────────────────────────\n";
+    }
+
+    /**
+     * Phase 3: 상황 연속성 블록 — 진행 중인 상황(ongoing_situation)을 제공해 자연스러운 saga 이어가기 유도.
+     * 호출마다 변하는 내용이므로 반드시 USER 섹션에만 주입 (캐시 prefix 보호).
+     */
+    private String situationContinuityBlock(String situation) {
+        if (situation == null || situation.isBlank()) return "";
+        return "\n[이전 사연 흐름] 최근 이런 상황을 썼음: " + safe(situation) + "\n" +
+               "→ 이번 글에서 이 상황을 자연스럽게 발전·드리프트시키거나, 새로운 각도로 이어가도 좋음\n";
     }
 
     /**

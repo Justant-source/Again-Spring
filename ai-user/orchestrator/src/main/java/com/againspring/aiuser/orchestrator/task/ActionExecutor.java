@@ -342,8 +342,12 @@ public class ActionExecutor {
     private void executePost(Persona persona, PlannedAction action, String jwt, String corrId) {
         String category = topCategory(persona);
 
-        // R9 Track B: 25% 확률 일상 글 모드 (주제 다양화, cond5 최대 레버, D-51)
-        boolean casual = RNG.nextDouble() < 0.25;
+        // R9 Track B: 스트릭 기반 일상 글 확률 (기본 25%, CASUAL 스트릭에 따라 변동)
+        double casualProb = computeCasualProb(loadCasualStreak(persona));
+        boolean casual = RNG.nextDouble() < casualProb;
+
+        // Phase 3: CASUAL이 아니면 진행 중인 상황 로드 (이어가기용)
+        String ongoingSituation = casual ? null : loadOngoingSituation(persona);
 
         // Phase 2c: archetype 기반 topic seed — 일상 모드는 갈등 seed 우회
         String topicSeed = casual ? buildCasualSeed(persona) : buildTopicSeed(persona);
@@ -412,6 +416,8 @@ public class ActionExecutor {
             .correlationId(corrId)
             .backend(backendFor("POST"))
             .recentOutputs(casual ? null : formatRecentOutputs(recentBodies, 200))
+            // Phase 3: 진행 중인 상황 (saga 이어가기용)
+            .ongoingSituation(ongoingSituation)
             // 재구성 모드 필드
             .reconstructMode(primarySource != null)
             .sourceExampleId(primarySource != null ? primarySource.getId() : null)
@@ -512,6 +518,8 @@ public class ActionExecutor {
             if (post.getId() != null) {
                 markSeen(persona, post.getId(), true);
                 writeHistory(persona, "posts", body, post.getId(), category);
+                // Phase 3: life_state 업데이트 (스트릭 + ongoing_situation 저장)
+                updateLifeState(persona, casual, firstSentence(body));
                 // AI Learning: 합격한 글 예시 뱅크에 저장
                 aiLearningClient.saveAsync(body, "POST", category, "SELF_GENERATED");
                 // AI-User ML: 게시 완료 글을 AI negative 코퍼스에 push (판별기 학습용)
@@ -1196,6 +1204,75 @@ public class ActionExecutor {
         } catch (Exception e) {
             log.debug("History write failed for persona {} type {}: {}", persona.getId(), type, e.getMessage());
         }
+    }
+
+    // ── Phase 3: 페르소나 life_state (saga trajectory) ────────────────────────
+
+    /** 페르소나 life_state JSON 경로 */
+    private java.nio.file.Path lifeStatePath(Persona persona) {
+        String email = botEmail(persona);
+        String profileName = email.contains("@") ? email.split("@")[0] : persona.getId();
+        return java.nio.file.Paths.get(historyDir, profileName, "life_state.json");
+    }
+
+    /** CASUAL 스트릭 로드 (파일 없으면 0 반환) */
+    private int loadCasualStreak(Persona persona) {
+        try {
+            java.nio.file.Path p = lifeStatePath(persona);
+            if (!java.nio.file.Files.exists(p)) return 0;
+            String json = java.nio.file.Files.readString(p);
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+            return node.path("casualStreak").asInt(0);
+        } catch (Exception e) { return 0; }
+    }
+
+    /** 스트릭 기반 CASUAL 확률 (기본 25%, ±15%) */
+    private double computeCasualProb(int casualStreak) {
+        // 2회 연속 CASUAL → 갈등글 확률 증가 (CASUAL 감소)
+        // 3회 연속 CONFLICT → 일상글 확률 증가 (CASUAL 증가)
+        if (casualStreak >= 2) return Math.max(0.05, 0.25 - 0.15);
+        return 0.25; // 기본값 유지 (conflict streak 추적은 추후)
+    }
+
+    /** life_state 저장 (postKind가 CASUAL인지 여부) */
+    private void updateLifeState(Persona persona, boolean wasCasual, String ongoingSituation) {
+        try {
+            java.nio.file.Path p = lifeStatePath(persona);
+            java.nio.file.Files.createDirectories(p.getParent());
+            int casualStreak = loadCasualStreak(persona);
+            casualStreak = wasCasual ? casualStreak + 1 : 0;
+            String situation = wasCasual ? "" : (ongoingSituation != null ? ongoingSituation : "");
+            String json = String.format(
+                "{\"casualStreak\":%d,\"ongoingSituation\":\"%s\",\"updatedAt\":\"%s\"}",
+                casualStreak,
+                situation.replace("\"", "'").replace("\n", " ").substring(0, Math.min(situation.length(), 80)),
+                java.time.Instant.now().toString()
+            );
+            java.nio.file.Files.writeString(p, json,
+                java.nio.file.StandardOpenOption.CREATE,
+                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (Exception e) {
+            log.debug("life_state update failed for persona {}: {}", persona.getId(), e.getMessage());
+        }
+    }
+
+    /** ongoing_situation 로드 */
+    private String loadOngoingSituation(Persona persona) {
+        try {
+            java.nio.file.Path p = lifeStatePath(persona);
+            if (!java.nio.file.Files.exists(p)) return null;
+            String json = java.nio.file.Files.readString(p);
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+            String s = node.path("ongoingSituation").asText("");
+            return s.isBlank() ? null : s;
+        } catch (Exception e) { return null; }
+    }
+
+    /** 첫 문장 추출 (최대 80자) */
+    private String firstSentence(String text) {
+        if (text == null || text.isBlank()) return "";
+        int end = text.indexOf('\n');
+        return (end > 0 ? text.substring(0, end) : text).substring(0, Math.min(text.length(), 80));
     }
 
     // ── 댓글 모드·길이 샘플링 (문체 현실화 S3) ───────────────────────────────
