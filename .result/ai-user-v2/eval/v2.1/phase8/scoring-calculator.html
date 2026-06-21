@@ -1090,15 +1090,32 @@ function copyResult() {
 
 최종: ${result.average}% — ${result.verdict}`;
 
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById('copy-btn');
+  const btn = document.getElementById('copy-btn');
+  const done = () => {
     btn.classList.add('copied');
     btn.textContent = '복사됨!';
-    setTimeout(() => {
-      btn.classList.remove('copied');
-      btn.textContent = '결과 복사';
-    }, 2000);
-  });
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '결과 복사'; }, 2000);
+  };
+  const legacy = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  };
+  // navigator.clipboard 는 보안 컨텍스트에서만 존재 — 가드 후 폴백
+  if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done).catch(() => {
+      if (legacy()) done(); else alert('자동 복사가 차단되었습니다. 결과를 수동으로 선택·복사해 주세요.');
+    });
+  } else {
+    if (legacy()) done(); else alert('자동 복사가 차단되었습니다. 결과를 수동으로 선택·복사해 주세요.');
+  }
 }
 </script>
 </body>
