@@ -123,9 +123,18 @@ public final class LlmErrorSignature {
         return (double) korean / significant < MIN_KOREAN_RATIO;
     }
 
+    /** JSON 분석 응답(post_analysis 등)은 한글 비율 검사 면제. */
+    private static boolean looksLikeJsonResponse(String text) {
+        String t = text.trim();
+        if (t.startsWith("```json")) t = t.substring(7).stripLeading();
+        if (t.startsWith("```")) t = t.substring(3).stripLeading();
+        return t.startsWith("{") && t.contains("\"author_sympathy\"");
+    }
+
     /** 텍스트에 제공자 오류 시그니처가 포함되면 true. */
     public static boolean looksLikeProviderError(String text) {
         if (text == null || text.isBlank()) return false;
+        if (looksLikeJsonResponse(text)) return false;
         if (hasInsufficientKorean(text)) return true;
         String t = text.toLowerCase();
         for (String s : SIGNATURES) {
