@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-21 (v2.1 Phase 0·1·2 완료 ✅ — Phase 3 대기)
+**최종 갱신**: 2026-06-21 (v2.1 Phase 0·1·2·3·4 완료 ✅ — Phase 5 대기 [kill criterion 오너 확정 필요])
 
 ---
 
@@ -67,16 +67,33 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 
 ---
 
-### Phase 3~8 — 이후 순차 (각 Phase 완료 후 STATE 갱신)
+### Phase 3 — 빈약 광장 외과적 보강 ✅ (2026-06-21, commit de108ae5)
 
-| Phase | 핵심 | 선행 |
-|---|---|---|
-| 3 | thin 광장 외과 보강 | Phase 2 |
-| 4 | 페르소나↔광장 정렬 + RAG | Phase 2·3 |
-| 5 | baseline 블라인드 (naive ≥3) | Phase 1·4 |
-| 6 | 결정론 다양화 1라운드 | Phase 5 |
-| 7 | QLoRA 데이터게이트 | Phase 6 |
-| 8 | 최종 판정·출하/피벗 | Phase 7 |
+- [x] `natepan.py`: `section_name` 파라미터 추가, 연애 섹션→COUPLE, 나머지→OTHER
+- [x] 신규 크롤 데이터가 즉시 광장 조건부 RAG에 반영
+- [x] 빌드·배포 완료
+
+---
+
+### Phase 4 — 페르소나↔광장 정렬 + CASUAL_FRAMES ✅ (2026-06-21, commit de108ae5)
+
+- [x] 10개 profile.yml interests 재배분 (WORK 편중 해소)
+  - 분포: COUPLE 33·FAMILY 21·FRIEND 17·MARRIED 17·WORK 6·OTHER 6
+- [x] CASUAL_FRAMES 전량 갈등-인접 프레임으로 교체 (P17·P11 맥락 불일치 tell 해소)
+- [x] 빌드·`lint:docs`·배포 완료
+
+---
+
+### Phase 5~8 — 이후 순차 (각 Phase 완료 후 STATE 갱신)
+
+| Phase | 핵심 | 선행 | 상태 |
+|---|---|---|---|
+| 5 | baseline 블라인드 (naive ≥3) | Phase 1·4 + kill criterion 오너 확정 | 🔴 블로커 |
+| 6 | 결정론 다양화 1라운드 | Phase 5 | ⏳ 대기 |
+| 7 | QLoRA 데이터게이트 | Phase 6 | ⏳ 대기 |
+| 8 | 최종 판정·출하/피벗 | Phase 7 | ⏳ 대기 |
+
+> 🔴 **Phase 5 블로커**: kill criterion 오너 명시 확정 + naive ≥3 평가자 모집 필요.
 
 ---
 
@@ -132,7 +149,10 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 
 | Phase | 상태 |
 |---|---|
-| Phase 0 | 🔄 2026-06-21 창립 중 |
-| Phase 1 | ⏳ 대기 |
-| Phase 2 | ⏳ 대기 (WSL) |
-| Phase 3~8 | ⏳ 순차 대기 |
+| Phase 0 | ✅ 2026-06-21 |
+| Phase 1 | ✅ 2026-06-21 |
+| Phase 2 | ✅ 2026-06-21 |
+| Phase 3 | ✅ 2026-06-21 (commit de108ae5) |
+| Phase 4 | ✅ 2026-06-21 (commit de108ae5) |
+| Phase 5 | 🔴 블로커 (kill criterion 오너 확정 대기) |
+| Phase 6~8 | ⏳ 순차 대기 |
