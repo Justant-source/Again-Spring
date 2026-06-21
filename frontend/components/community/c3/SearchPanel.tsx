@@ -98,7 +98,7 @@ export function SearchPanel({ currentCategory, onCategorySelect, onClose }: Prop
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'var(--L-bg)', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'var(--L-bg)', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
 
       {/* 상단바: ‹ + 입력칸 + ✕ */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 18px 14px', borderBottom: '1px solid var(--L-border)', flexShrink: 0 }}>
