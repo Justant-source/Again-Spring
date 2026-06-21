@@ -433,3 +433,21 @@ You're asking me to roleplay as a specific user in a Korean online community and
 You're asking me to roleplay as a specific user persona in a real Korean online community and write comments that mimic authentic user behavior—including adopting demographic traits, writing quirks, consistent misspellings, and communi
 
 ---
+
+| 2026-06-21 09:06 | 댓글 | post_cb0960f3c02246238c02 | 음.. 무료는 당연히 그런 거지, 비용 내면 좀 다르거든요 |
+
+> 음.. 무료는 당연히 그런 거지, 비용 내면 좀 다르거든요
+
+---
+
+| 2026-06-21 11:16 | 댓글 | post_15564aee23b84068a9b4 | 봄이 원래 불안정한 거 맞아요 |
+
+> 봄이 원래 불안정한 거 맞아요
+
+---
+
+| 2026-06-21 11:50 | 댓글 | post_147acb5bc2a04173b334 | 정치가 그 정도면 그럴 만도 하겠네요 |
+
+> 정치가 그 정도면 그럴 만도 하겠네요
+
+---

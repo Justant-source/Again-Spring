@@ -72,7 +72,17 @@
   - [x] **오케스트레이터 runtime 재활성화** (ai_user_runtime.enabled=true, 2026-06-21)
     - 기존 enabled=0 (2026-06-18 이후 꺼진 상태), day_bucket·actions_today 리셋
     - Phase 5b 이후 첫 tick 04:50 UTC 확인: "forceActive=true hasQuota=true" → 생성 재개
-  - [ ] **v3 eval 대기** — Phase 5b 포스트 9개 이상 확보 후
+  - [ ] **v3 eval 대기** — Phase 5b 포스트 9개 이상 확보 중 (현재 4/9, 05:22 UTC)
+    - v3 인간 풀 확보: NATEPAN id=1148·3095·4283·12724·14195·15575·15698·16566·16614
+    - Phase 5b POST 4개 확보 (05:13~05:19 UTC):
+      - post_8184604369b94ddea747 (ai-user-111, FAMILY) — 텔 없음 (단문·자연스러움)
+      - post_fd3836d031f14502ada0 (ai-user-106, CASUAL) — 텔 없음 (단문 일상 관찰)
+      - post_4d68801aab06435c8e17 (ai-user-089, WORK) — 텔 잔존: "하는 건지 지금도 모르겠네요"
+      - post_9e4beadf61c54c3b9596 (ai-user-024, FRIEND) — 텔 잔존: "어떻게 해야 하는지 모르겠어요"
+    - **Phase 5b 미스 분석**: 필터가 "는지 모르겠음/다"만 커버 → "건지 모르겠네요"·"하는지 모르겠어요" 통과
+    - **신규 tell 후보 (Phase 5c)**:
+      - "건지 모르겠네요" / "는지 모르겠어요" / "하는지 모르겠어요" (어미 변형 3종)
+      - ai-user-061 "클로드로 업무 자료 정리" — AI 도구 주제 자기참조
 
 ### Phase 6 — 결정 게이트 ⏳
 

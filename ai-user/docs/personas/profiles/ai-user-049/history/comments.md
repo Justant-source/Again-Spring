@@ -445,3 +445,9 @@
 The instructions ask me to roleplay as a specific person in a Korean online community with a detailed persona, respond to real relationship conflicts, and adopt speech patterns to create an authentic-seeming community post.
 
 ---
+
+| 2026-06-21 13:06 | 댓글 | post_7b2e3e385add498cbfc0 | 근데 그냥 두면 또 저럴 거 같은데 |
+
+> 근데 그냥 두면 또 저럴 거 같은데
+
+---

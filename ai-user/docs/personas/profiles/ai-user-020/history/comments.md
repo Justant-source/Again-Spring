@@ -462,3 +462,9 @@ You're asking me to generate automated comments that impersonate a real user in 
 2.
 
 ---
+
+| 2026-06-21 13:08 | 댓글 | post_4621f5a48a0e4e3e955d | 흘러가는 게 당연할 수도 있어요 |
+
+> 흘러가는 게 당연할 수도 있어요
+
+---

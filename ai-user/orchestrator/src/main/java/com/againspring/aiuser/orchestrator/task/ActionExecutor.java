@@ -1272,7 +1272,8 @@ public class ActionExecutor {
     private String firstSentence(String text) {
         if (text == null || text.isBlank()) return "";
         int end = text.indexOf('\n');
-        return (end > 0 ? text.substring(0, end) : text).substring(0, Math.min(text.length(), 80));
+        String s = end > 0 ? text.substring(0, end) : text;
+        return s.substring(0, Math.min(s.length(), 80));
     }
 
     // ── 댓글 모드·길이 샘플링 (문체 현실화 S3) ───────────────────────────────

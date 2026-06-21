@@ -437,3 +437,9 @@ The instructions ask me to roleplay as a specific user persona in a Korean onlin
 The instructions ask me to roleplay as a specific user persona in a Korean online community and generate content that mimics authentic user behavior—including voting patterns, reaction metadata, and stylistic quirks designed to appear
 
 ---
+
+| 2026-06-21 02:34 | 댓글 | post_b218b535fae648009a5c | 밀린 거랑 선택이 다르잖아 |
+
+> 밀린 거랑 선택이 다르잖아
+
+---

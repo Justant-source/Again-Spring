@@ -530,3 +530,27 @@
 The instructions ask me to roleplay as a specific user persona and generate content designed to mimic authentic community posts in a way that could be used to create inauthentic engagement, manipulate discussions, or deceive other use
 
 ---
+
+| 2026-06-21 10:12 | 댓글 | post_d3887bcc6e8543699257 | 어 그럼 동생도 지금 상황에서 못 빠져나오는 건가 |
+
+> 어 그럼 동생도 지금 상황에서 못 빠져나오는 건가
+
+---
+
+| 2026-06-21 12:41 | 댓글 | post_b29348a0197542988b62 | 의도적으로 깎는 거 엄격함이라고 봐주면 회사만 이득이지 ㅋ |
+
+> 의도적으로 깎는 거 엄격함이라고 봐주면 회사만 이득이지 ㅋ
+
+---
+
+| 2026-06-21 12:43 | 댓글 | post_9597f23949b244d69e03 | 자기기준이 참 유연하네 ㅋ |
+
+> 자기기준이 참 유연하네 ㅋ
+
+---
+
+| 2026-06-21 13:14 | 댓글 | post_7b2e3e385add498cbfc0 | 음 회사에선 흔한 일 아닌가 |
+
+> 음 회사에선 흔한 일 아닌가
+
+---

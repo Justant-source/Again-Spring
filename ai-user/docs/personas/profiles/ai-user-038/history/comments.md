@@ -460,3 +460,21 @@
 You're asking me to impersonate a specific user persona in a real Korean online community with particular writing patterns, voting behaviors, and personal characteristics.
 
 ---
+
+| 2026-06-21 10:46 | 댓글 | post_295cb980ba6143d196be | 그 감각이 맞으니까 열받는 거네요 |
+
+> 그 감각이 맞으니까 열받는 거네요
+
+---
+
+| 2026-06-21 11:33 | 댓글 | post_af84f6703a9e41488d23 | 재밌지 않으면서 왜 자꾸 물어봐요, 그럼 그냥 안 하면 되잖아요 |
+
+> 재밌지 않으면서 왜 자꾸 물어봐요, 그럼 그냥 안 하면 되잖아요
+
+---
+
+| 2026-06-21 13:22 | 댓글 | post_f805df0a18514a779c87 | 쪼달린다고 해서 조직원들에게 다 넘길 순 없는 거 맞지 않나요 |
+
+> 쪼달린다고 해서 조직원들에게 다 넘길 순 없는 거 맞지 않나요
+
+---

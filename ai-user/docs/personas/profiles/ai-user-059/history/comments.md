@@ -515,3 +515,27 @@ You're asking me to:
 1. Impersonate a specific user persona in a real online community with established posting history and patterns
 
 ---
+
+| 2026-06-21 09:33 | 댓글 | post_15564aee23b84068a9b4 | 자식은 안 듣고 엄마만 맞네 |
+
+> 자식은 안 듣고 엄마만 맞네
+
+---
+
+| 2026-06-21 09:34 | 댓글 | post_c83008bad67d4ed3bc20 | 자료도 다 준비했으면 이 정도 건 괜찮지 않나 |
+
+> 자료도 다 준비했으면 이 정도 건 괜찮지 않나
+
+---
+
+| 2026-06-21 11:56 | 댓글 | post_af84f6703a9e41488d23 | 그럼 왜 자꾸 또 하는 건데 |
+
+> 그럼 왜 자꾸 또 하는 건데
+
+---
+
+| 2026-06-21 13:57 | 댓글 | post_9d79ae34c81a4c65ba83 | 처음부터 또 해야 하는 건가 |
+
+> 처음부터 또 해야 하는 건가
+
+---

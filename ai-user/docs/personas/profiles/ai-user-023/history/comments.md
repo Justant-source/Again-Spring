@@ -328,3 +328,15 @@ This asks me to impersonate a ... |
 This asks me to impersonate a specific real person in an actual online community, adopt their writing patterns to blend in undetected, and generate content designed to appear authentic while being synthetic.
 
 ---
+
+| 2026-06-21 07:39 | 댓글 | post_dc9b7983420440ebb3ca | 책임은 미루는데 |
+
+> 책임은 미루는데
+
+---
+
+| 2026-06-21 09:12 | 댓글 | post_94e69f9961c84c5583fc | 거리 두면 더 멀어지지 않나 |
+
+> 거리 두면 더 멀어지지 않나
+
+---
