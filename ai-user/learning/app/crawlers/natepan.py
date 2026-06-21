@@ -36,10 +36,11 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
 ]
 
-# 포스트 ID 범위 (NATEPAN 현재 ID ≈ 375_474_000)
-# 약 1년치(2025 ~): 350_000_000 ~ 375_474_000
-ID_RANGE_START = 350_000_000
-ID_RANGE_END   = 375_474_000
+# 포스트 ID 범위
+# 실측: 현재 최신 ID ≈ 375_474_000, 1포스트당 ~200 ID 간격
+# 최신 3개월치(373M~376M) 밀집 구간 집중 → 순차(최신→과거) 크롤
+ID_RANGE_START = 370_000_000
+ID_RANGE_END   = 375_480_000
 
 # 비-사연 필터
 _DROP_KEYWORDS = ["광고", "공지", "이벤트", "혜택안내", "앱 다운", "무료체험"]
@@ -229,11 +230,11 @@ async def _fetch_static_sections(session: requests.Session, seen_ids: set,
 
 
 async def _fetch_by_id_range(session: requests.Session, seen_ids: set,
-                               remaining_limit: int, id_step: int = 1000) -> List[Dict]:
+                               remaining_limit: int, id_step: int = 150) -> List[Dict]:
     """
-    포스트 ID 직접 범위 크롤 — 역사 아카이브 대량 수집.
-    ID_RANGE_START~END를 id_step 간격으로 샘플링.
-    각 실행마다 랜덤 시작 오프셋으로 커버리지 분산.
+    포스트 ID 직접 범위 크롤 — 최신→과거 순차 밀집 샘플링.
+    실측: 1포스트 ≈ 200 ID 간격 → step=150으로 거의 모든 포스트 커버.
+    셔플 없이 최신→과거 순서(높은 ID부터) = 유효 포스트 연속 히트 보장.
     """
     if remaining_limit <= 0:
         return []
@@ -241,14 +242,12 @@ async def _fetch_by_id_range(session: requests.Session, seen_ids: set,
     results = []
     post_count = 0
     fail_streak = 0
-    MAX_FAIL_STREAK = 30  # 연속 30회 실패 시 조기 종료
+    MAX_FAIL_STREAK = 80  # 넉넉하게 (비어있는 ID 구간 80개까지 허용)
 
-    # 랜덤 시작 오프셋으로 매 실행마다 다른 구간 커버
-    start_offset = random.randint(0, id_step - 1)
-    candidate_ids = list(range(ID_RANGE_START + start_offset, ID_RANGE_END, id_step))
-    random.shuffle(candidate_ids)  # 셔플로 균등 분포
+    # 최신→과거 순서 (높은 ID부터, 유효 포스트 밀집 보장)
+    candidate_ids = list(range(ID_RANGE_END, ID_RANGE_START, -id_step))
 
-    logger.info(f"ID 범위 크롤 시작: {len(candidate_ids)}개 ID 후보, step={id_step}")
+    logger.info(f"ID 범위 크롤 시작: {len(candidate_ids)}개 ID 후보, step={id_step}, 최신→과거")
 
     for post_id in candidate_ids:
         if post_count >= remaining_limit:
@@ -325,12 +324,12 @@ async def crawl(daily_limit: int = 1500) -> List[Dict]:
     seen_ids: set = set()
 
     # ── Phase A: 정적 랭킹 섹션 (큐레이션 + lovetalk) ──────────
-    static_limit = min(daily_limit // 3, 300)  # 최대 300건 정적 섹션에 할당
+    static_limit = min(daily_limit // 5, 200)  # 최대 200건 정적 섹션에 할당
     static_results = await _fetch_static_sections(session, seen_ids, static_limit)
 
-    # ── Phase B: ID 범위 크롤 (나머지 할당량 전부) ──────────────
+    # ── Phase B: ID 범위 크롤 (나머지 할당량 전부, step=150 밀집) ──────
     remaining = daily_limit - len([r for r in static_results if r["content_type"] == "POST"])
-    id_results = await _fetch_by_id_range(session, seen_ids, remaining, id_step=800)
+    id_results = await _fetch_by_id_range(session, seen_ids, remaining, id_step=150)
 
     all_results = static_results + id_results
     posts = [r for r in all_results if r["content_type"] == "POST"]
