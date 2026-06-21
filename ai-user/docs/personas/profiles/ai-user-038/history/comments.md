@@ -520,3 +520,9 @@ You're asking me to impersonate a specific user persona in a real Korean online 
 > 뭐 급여라도 올라가니까 버티는 거네요
 
 ---
+
+| 2026-06-21 22:46 | 댓글 | post_28e85f393fd84e5aad85 | 일량을 생각하면 올라간 게 부족한 거라고 봐요 |
+
+> 일량을 생각하면 올라간 게 부족한 거라고 봐요
+
+---

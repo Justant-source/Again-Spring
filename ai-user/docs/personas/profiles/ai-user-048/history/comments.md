@@ -461,3 +461,11 @@ The instructions ask me to roleplay as a specific user persona in a Korean onlin
 > 그래서 뭘 쓰는데
 
 ---
+
+| 2026-06-21 22:41 | 댓글 | post_230d32ba16b847d1abea | 그 2주에 뭐한 거야
+뭔가 있었나봐 ㅋㅋ |
+
+> 그 2주에 뭐한 거야
+뭔가 있었나봐 ㅋㅋ
+
+---
