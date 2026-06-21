@@ -22,12 +22,14 @@ This registry maintains a **single source of truth** for which evaluators have p
 **Phase 5 (Baseline)**: ✓ COMPLETED (2026-06-21)
 - Kit v2.1-phase5-01 evaluation by 3 naive evaluators (임슬기·박진수·김철수)
 - **Result**: AI 식별률 80% (kill criterion ≤60% → FAIL)
+- **보충(E-S1 부정선거, 2026-06-22)**: 60% — Phase 8 키트 오전달로 Phase 5 평가됨(참고치, 게이트 미반영). **평가자 편차 60~80% 확인** → ≥3인 평균 필요성 강화. 상세: `phase5/v2.1-phase5-01-result-supplement.md`
 - **Next**: Phase 6 결정론 다양화 (T1~T4 제거) → Phase 7 재평가 → Phase 8 최종
 
-**Phase 8 (Final)**: 🔄 키트 구성 중 (2026-06-21)
+**Phase 8 (Final)**: 🔄 키트 완성·평가자 모집 대기 (2026-06-22)
+- 🚨 **키트 오전달 주의**: E-S1에게 Phase 5 HTML이 전달됨 → Phase 8 평가자에게는 반드시 `eval/v2.1/phase8/v2.1-phase8-01-evaluator.html`(Phase 8)을 전달할 것. Phase 5 파일과 혼동 금지.
 - 배치: A-A-H-A-H-H-A-H-H-A (AI 문제1·2·4·7·10 / Human 문제3·5·6·8·9)
 - AI 계정 5종: WORK(ai-user-043/Vibe2026)·FRIEND(ai-user-057/I1l1IiliI)·MARRIED(ai-user-035/RiderX9)·COUPLE(ai-user-060/통장이텅장)·FAMILY(ai-user-032/햇살받는햄스터)
-- Human 계정: FRIEND(천주교의민단)·MARRIED(좋은글)·COUPLE(ㅇㅇㅇ)·FAMILY(냉동딸기)·WORK(조회 중)
+- Human 계정: FRIEND(천주교의민단)·MARRIED(좋은글)·COUPLE(ㅇㅇㅇ)·FAMILY(냉동딸기)·WORK(쓰니)
 - Phase 8 평가자는 Phase 5와 **다른 인원** 구성 (E-001~E-003 재사용 금지, 2026-07-05 이후 가능)
 - 모집 가이드: `eval/v2.1/phase8/evaluator-guide.md`
 
@@ -40,6 +42,7 @@ This registry maintains a **single source of truth** for which evaluators have p
 | E-001 | 임슬기 | Naive | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | AI 식별률 80% (4/5), 신뢰도 100% (과도한 신뢰) |
 | E-002 | 박진수 | Naive | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | AI 식별률 80% (4/5), 오판 3건 (Human→Bot) |
 | E-003 | 김철수 | Naive | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | AI 식별률 80% (4/5), 신중도 적절 (오판 0건) |
+| E-S1 | 부정선거 | Naive | 5 (보충) | v2.1-phase5-01 | BASELINE | 2026-06-22 | ✓ Completed (참고) | AI 식별률 **60%** (3/5: 문제2·3·8 식별, 5·10 놓침), 오탐 2건(문제1·9 Human→Bot). ⚠️ **Phase 8 키트 오전달로 Phase 5 평가** — 게이트 미반영, 참고치 |
 | Owner | @justant | Calibration | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | **EXCLUDED from gate** |
 | E-004 | [SEALED] | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **신규 평가자** — Phase 6 배포 이후 AI 글 (T1·T3 개선) |
 | E-005 | [SEALED] | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **신규 평가자** — Phase 5 미사용 Human 계정 |
