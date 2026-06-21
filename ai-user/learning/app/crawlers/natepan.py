@@ -144,8 +144,16 @@ def _is_valid(title: str, content: str) -> bool:
     return True
 
 
-def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None) -> Optional[Dict]:
-    """HTML → 결과 딕셔너리 파싱. None = 무효(비어있거나 필터됨)."""
+def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None,
+                       section_name: Optional[str] = None) -> Optional[Dict]:
+    """HTML → 결과 딕셔너리 파싱. None = 무효(비어있거나 필터됨).
+
+    Args:
+        html: 포스트 상세 HTML
+        url: 포스트 URL
+        author_listing: listing 페이지에서 추출한 작성자 (fallback)
+        section_name: 섹션 이름 (e.g. "연애-오늘", "베스트-오늘") → category 결정
+    """
     soup = BeautifulSoup(html, "html.parser")
     content = _extract_content(soup)
     if not content:
@@ -158,11 +166,16 @@ def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None
         return None
 
     author = _extract_author_from_detail(soup) or author_listing
+
+    # section_name → category 매핑
+    # "연애-*" 섹션 → COUPLE, 나머지 → OTHER (keyword 기반 분류 대기)
+    category = "COUPLE" if section_name and "연애" in section_name else "OTHER"
+
     return {
         "content": content,
         "content_type": "POST",
         "source": "natepan",
-        "category": "talk",
+        "category": category,
         "title": title,
         "source_url": url,
         "author_id": author,
@@ -208,6 +221,7 @@ async def _fetch_static_sections_parallel(sem: asyncio.Semaphore,
                 "title": link.get("title") or link.get_text(strip=True),
                 "url": f"https://pann.nate.com/talk/{origin_id}",
                 "author_listing": _extract_author_from_li(li),
+                "section_name": sec["name"],  # 섹션 이름 전달
             })
             count += 1
         logger.info(f"Section '{sec['name']}': {count}개 신규")
@@ -224,7 +238,8 @@ async def _fetch_static_sections_parallel(sem: asyncio.Semaphore,
     for item, html in zip(post_items, detail_results):
         if not html:
             continue
-        result = _parse_post_detail(html, item["url"], item["author_listing"])
+        result = _parse_post_detail(html, item["url"], item["author_listing"],
+                                   section_name=item.get("section_name"))
         if result:
             results.append(result)
 
@@ -273,7 +288,8 @@ async def _fetch_id_range_parallel(sem: asyncio.Semaphore,
             seen_ids.add(str(pid))
             if not html:
                 continue
-            result = _parse_post_detail(html, f"https://pann.nate.com/talk/{pid}")
+            result = _parse_post_detail(html, f"https://pann.nate.com/talk/{pid}",
+                                       section_name=None)  # ID 범위 크롤은 섹션 미상
             if result:
                 results.append(result)
                 batch_found += 1

@@ -48,10 +48,10 @@ activity:
 interests:
   COUPLE: 0.6
   MARRIED: 0.5
-  FRIEND: 0.7
+  FRIEND: 0.6
   FAMILY: 0.4
-  WORK: 0.9
-  OTHER: 0.3
+  WORK: 0.3
+  OTHER: 0.8
 bias_profile:
   COUPLE: 0.0
   MARRIED: 0.0

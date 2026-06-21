@@ -49,8 +49,8 @@ interests:
   MARRIED: 0.5
   FRIEND: 0.5
   FAMILY: 0.6
-  WORK: 0.95
-  OTHER: 0.3
+  WORK: 0.3
+  OTHER: 0.7
 bias_profile:
   COUPLE: 0.0
   MARRIED: 0.0

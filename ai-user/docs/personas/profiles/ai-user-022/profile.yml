@@ -45,12 +45,12 @@ interests:
   COUPLE: 0.6
   MARRIED: 0.3
   FAMILY: 0.6
-  FRIEND: 0.3
-  WORK: 0.7
+  FRIEND: 0.8
+  WORK: 0.4
   OTHER: 0.1
 bias_profile:
   COUPLE: 0.11
-  MARRIED: -0.10
+  MARRIED: -0.1
   FAMILY: 0.14
   FRIEND: -0.11
   WORK: 0.01
