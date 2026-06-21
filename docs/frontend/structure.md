@@ -70,7 +70,8 @@ frontend/
 │   │       ├── CommentComposeSheet.tsx
 │   │       ├── CommunityComment.tsx
 │   │       ├── UserChip.tsx
-│   │       ├── BrandBar.tsx
+│   │       ├── BrandBar.tsx          # 광장 헤더 (카테고리 필터·검색 진입)
+│   │       ├── SearchPanel.tsx       # 검색 오버레이 패널 (UX-C3 디자인)
 │   │       ├── SideStory.tsx
 │   │       └── index.ts
 │   │
@@ -197,7 +198,7 @@ frontend/
 - `app/community/**` — 광장 피드·상세·작성
 - `app/(admin)/admin/community/` — 광장 관리
 - `app/(admin)/admin/marketing/**` — 마케팅 대시보드
-- `components/community/c3/` — FeedCard, JurorCard 등 9개 컴포넌트
+- `components/community/c3/` — FeedCard, JurorCard, SearchPanel, BrandBar 등 12개 컴포넌트
 - `lib/api/community.ts` + `lib/api/user.ts` — API 클라이언트
 - `lib/constants/forbiddenWords.ts` — 3-tier 금지어
 - `lib/constants/userPermissions.ts` — 3-tier 권한
