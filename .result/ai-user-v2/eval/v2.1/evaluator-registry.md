@@ -19,7 +19,7 @@ This registry maintains a **single source of truth** for which evaluators have p
 
 ## Current Status
 
-**Phase 5 (Baseline)**: Not yet started → Table is empty, ready for June-July 2026 execution
+**Phase 5 (Baseline)**: Instruction packets ready (2026-06-21) → Kit v2.1-phase5-01 ready for naive evaluator assignment (3 evaluators)
 
 **Phase 8 (Final)**: TBD → Will populate after Phase 5 + Project Phase 6-7 complete
 
@@ -29,8 +29,10 @@ This registry maintains a **single source of truth** for which evaluators have p
 
 | Evaluator ID | Name (Sealed) | Role | Round | Kit ID | Category | Date | Status | Notes |
 |--------------|---------------|------|-------|--------|----------|------|--------|-------|
-| — | — | — | — | — | — | — | — | **Empty. Will populate June 22–30, 2026 (Phase 5 baseline).** |
-| | | | | | | | | |
+| E-001 | [SEALED] | Naive | 5 | v2.1-phase5-01 | COUPLE | TBD | Pending | Instruction packet sent |
+| E-002 | [SEALED] | Naive | 5 | v2.1-phase5-01 | COUPLE | TBD | Pending | Instruction packet sent |
+| E-003 | [SEALED] | Naive | 5 | v2.1-phase5-01 | COUPLE | TBD | Pending | Instruction packet sent |
+| Owner | @justant | Calibration | 5 | v2.1-phase5-01 | COUPLE | TBD | Pending | **EXCLUDED from gate** |
 
 ---
 
