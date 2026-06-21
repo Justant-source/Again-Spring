@@ -24,10 +24,12 @@ This registry maintains a **single source of truth** for which evaluators have p
 - **Result**: AI 식별률 80% (kill criterion ≤60% → FAIL)
 - **Next**: Phase 6 결정론 다양화 (T1~T4 제거) → Phase 7 재평가 → Phase 8 최종
 
-**Phase 8 (Final)**: ⏳ READY TO LAUNCH — Phase 6 배포(2026-06-21 22:45) 완료
+**Phase 8 (Final)**: 🔄 키트 구성 중 (2026-06-21)
+- 배치: A-A-H-A-H-H-A-H-H-A (AI 문제1·2·4·7·10 / Human 문제3·5·6·8·9)
+- AI 계정 5종: WORK(ai-user-043/Vibe2026)·FRIEND(ai-user-057/I1l1IiliI)·MARRIED(ai-user-035/RiderX9)·COUPLE(ai-user-060/통장이텅장)·FAMILY(ai-user-032/햇살받는햄스터)
+- Human 계정: FRIEND(천주교의민단)·MARRIED(좋은글)·COUPLE(ㅇㅇㅇ)·FAMILY(냉동딸기)·WORK(조회 중)
 - Phase 8 평가자는 Phase 5와 **다른 인원** 구성 (E-001~E-003 재사용 금지, 2026-07-05 이후 가능)
-- AI 계정: Phase 6 배포 이후 생성 글 (T1·T3 개선 반영)
-- Human 계정: Phase 5 미사용 계정 (기억 오염 방지)
+- 모집 가이드: `eval/v2.1/phase8/evaluator-guide.md`
 
 ---
 
@@ -159,11 +161,10 @@ After owner rates same kit:
 
 After all evaluators in a round complete:
 
-| Round | Kit | Naive Avg Score | Gate Criterion (≥0.60) | Status | Next Step |
+| Round | Kit | Naive Avg Score | Gate Criterion (≤60%) | Status | Next Step |
 |-------|-----|-----------------|------------------------|--------|-----------|
-| 5 | v2.1-phase5-01 | 0.73 | Pass | ✓ PASS | Proceed to Phase 6 |
-| 5 | v2.1-phase5-02 | 0.58 | Fail | ✗ FAIL | Investigate evaluator contamination |
-| 8 | v2.1-phase8-01 | TBD | TBD | TBD | — |
+| 5 | v2.1-phase5-01 | **80%** | 80% > 60% → FAIL | ✗ FAIL | Phase 6 결정론 다양화 (T1·T3·T4) |
+| 8 | v2.1-phase8-01 | TBD | TBD | 🔄 키트 구성 중 | 신선 평가자 E-004~006 모집 후 실시 |
 
 ---
 
@@ -178,12 +179,11 @@ Before Phase 5:
 - [ ] Evaluation form template (JSON response format) prepared
 - [ ] Scoring aggregation script (`compute-naive-score.py`) tested
 
-After Phase 5:
-- [ ] All evaluator responses logged in **Registry Table** above
-- [ ] Per-kit aggregate scores computed
-- [ ] Owner calibration scores recorded (separate diagnostic section)
-- [ ] Gate decision documented (PASS/FAIL)
-- [ ] Named-tell labels extracted (blind-kit-spec.md § 8)
+After Phase 5: ✅ 완료 (2026-06-21)
+- [x] All evaluator responses logged in **Registry Table** above
+- [x] Per-kit aggregate scores computed (80%, 3인 평균)
+- [x] Gate decision documented (FAIL → Phase 6)
+- [x] Named-tell labels extracted: T1·T2·T3·T4 (steps/v2.1-05-baseline-result.md)
 
 ---
 
