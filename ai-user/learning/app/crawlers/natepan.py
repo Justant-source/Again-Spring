@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 CONCURRENCY = 8  # 동시 HTTP 연결 수 (NATEPAN 배려 + 속도 균형)
 
+# 채널별 페이지네이션 한도 (광장형 피벗 — WORK 플러스)
+MAX_PAGES_WORK = 5    # WORK 채널 (회사생활, 취업과 면접, 알바 경험담) → 페이지 1~5
+MAX_PAGES_OTHER = 2   # 나머지 채널 (MARRIED, COUPLE) → 페이지 1~2
+
 STATIC_SECTIONS = [
     {"name": "베스트-오늘",  "url": "https://pann.nate.com/talk/ranking"},
     {"name": "베스트-일간",  "url": "https://pann.nate.com/talk/ranking/d"},
@@ -337,10 +341,16 @@ async def _fetch_channels(sem: asyncio.Semaphore,
                           seen_ids: Set[str],
                           limit: int) -> List[Dict]:
     """
-    테마 채널 크롤 — 채널별 plaza 분류 (분류기 precision gate).
-    Step 1: 각 채널의 listing 페이지 fetch
-    Step 2: 고유한 post URL 추출 (dedup)
-    Step 3: post detail 병렬 fetch
+    테마 채널 크롤 — 채널별 plaza 분류 + 페이지네이션 (분류기 precision gate).
+
+    페이지네이션 규칙:
+    - WORK 채널 (plaza="WORK"): 페이지 1~MAX_PAGES_WORK
+    - 기타 채널 (MARRIED, COUPLE): 페이지 1~MAX_PAGES_OTHER
+    - 페이지 limit에 도달하거나, 신규 post id 0개면 조기 종료
+
+    Step 1: 각 채널의 listing 페이지 fetch (페이지 1..MAX_PAGES)
+    Step 2: 고유한 post URL 추출 (dedup via seen_ids)
+    Step 3: 채널 target 도달 또는 페이지 소진 시 post detail 병렬 fetch
     Step 4: 분류기로 검증 후 channel_plaza와 일치할 때만 결과 포함
     """
     if not CHANNELS or limit <= 0:
@@ -358,49 +368,70 @@ async def _fetch_channels(sem: asyncio.Semaphore,
         ch_id = channel["id"]
         ch_name = channel["name"]
         ch_plaza = channel["plaza"]
-        listing_url = f"https://pann.nate.com/talk/c{ch_id}?order=rank"
 
-        # Step 1: 채널 listing fetch
-        html = await _fetch(sem, listing_url)
-        if not html:
-            logger.warning(f"Channel '{ch_name}' ({ch_id}) listing fetch 실패")
-            continue
+        # 채널의 WORK-ness에 따라 max page 결정
+        max_pages = MAX_PAGES_WORK if ch_plaza == "WORK" else MAX_PAGES_OTHER
 
-        # Step 2: post URL 추출 & dedup
-        # 채널 listing(?order=rank)은 베스트 랭킹과 HTML 구조가 달라 CSS selector가 안 맞음.
-        # robust: 원본 HTML에서 /talk/{9자리} post id를 정규식으로 추출 (채널 id는 c20019=5자리라 미매칭).
-        soup = BeautifulSoup(html, "html.parser")
         post_items: List[Dict] = []
-        count = 0
+        page_new_count = 0  # 페이지별 신규 post 추적
 
-        # title은 anchor에서 매핑 (있으면), 없으면 detail에서 채워짐
-        title_by_id: Dict[str, str] = {}
-        for a in soup.find_all("a", href=True):
-            mm = re.search(r"/talk/(\d{6,})", a["href"])
-            if mm:
-                t = a.get("title") or a.get_text(strip=True)
-                if t and mm.group(1) not in title_by_id:
-                    title_by_id[mm.group(1)] = t[:200]
+        # Step 1~2: 페이지 루프 — 신규 post 누적
+        for page in range(1, max_pages + 1):
+            if len(post_items) >= channel_limit or len(results) >= limit:
+                break
 
-        for origin_id in re.findall(r"/talk/(\d{6,})", html):
-            if origin_id in seen_ids:
-                continue
-            seen_ids.add(origin_id)
-            post_items.append({
-                "origin_id": origin_id,
-                "title": title_by_id.get(origin_id),
-                "url": f"https://pann.nate.com/talk/{origin_id}",
-                "author_listing": None,
-            })
-            count += 1
-            if len(post_items) >= channel_limit:
+            # URL 구성: page=1 → ?order=rank, page>=2 → ?order=rank&page=N
+            if page == 1:
+                listing_url = f"https://pann.nate.com/talk/c{ch_id}?order=rank"
+            else:
+                listing_url = f"https://pann.nate.com/talk/c{ch_id}?order=rank&page={page}"
+
+            # fetch with semaphore + rate limiting
+            html = await _fetch(sem, listing_url)
+            if not html:
+                logger.warning(f"Channel '{ch_name}' page {page} fetch 실패")
+                break
+
+            # post URL 추출 & dedup
+            soup = BeautifulSoup(html, "html.parser")
+            page_new_count = 0
+
+            # title 매핑
+            title_by_id: Dict[str, str] = {}
+            for a in soup.find_all("a", href=True):
+                mm = re.search(r"/talk/(\d{6,})", a["href"])
+                if mm:
+                    t = a.get("title") or a.get_text(strip=True)
+                    if t and mm.group(1) not in title_by_id:
+                        title_by_id[mm.group(1)] = t[:200]
+
+            # post id 추출 (정규식)
+            for origin_id in re.findall(r"/talk/(\d{6,})", html):
+                if origin_id in seen_ids:
+                    continue
+                if len(post_items) >= channel_limit or len(results) >= limit:
+                    break
+                seen_ids.add(origin_id)
+                post_items.append({
+                    "origin_id": origin_id,
+                    "title": title_by_id.get(origin_id),
+                    "url": f"https://pann.nate.com/talk/{origin_id}",
+                    "author_listing": None,
+                })
+                page_new_count += 1
+
+            logger.info(f"Channel '{ch_name}' page {page}: {page_new_count}개 신규")
+
+            # 페이지에서 신규 post 0개 → 이 채널 조기 종료
+            if page_new_count == 0:
+                logger.info(f"Channel '{ch_name}': 페이지 {page}에서 신규 0개 → 조기 종료")
                 break
 
         if not post_items:
-            logger.info(f"Channel '{ch_name}': 0개 신규")
+            logger.info(f"Channel '{ch_name}': 0개 신규 (모든 페이지)")
             continue
 
-        logger.info(f"Channel '{ch_name}': {count}개 신규 포스트 → detail 병렬 fetch 시작")
+        logger.info(f"Channel '{ch_name}': {len(post_items)}개 신규 포스트 → detail 병렬 fetch 시작")
 
         # Step 3: post detail 병렬 fetch
         detail_results = await asyncio.gather(*[

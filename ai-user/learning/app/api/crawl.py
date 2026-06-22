@@ -40,12 +40,27 @@ async def _do_crawl(source, daily_limit, embed_service):
 
         items = await crawl(daily_limit=daily_limit)
         saved = 0
+        skipped_dupes = 0
 
         with get_db() as conn:
             with conn.cursor() as cur:
+                # Load existing source_urls for this source (one query, O(1) lookup)
+                cur.execute(
+                    "SELECT source_url FROM example_bank WHERE source=%s AND source_url IS NOT NULL",
+                    (source.upper(),)
+                )
+                existing_urls = {row["source_url"] for row in cur.fetchall()}  # DictCursor
+
                 for item in items:
                     if not quality.passes(item["content"]):
                         continue
+
+                    # Dedup: skip if source_url already exists in DB
+                    source_url = item.get("source_url")
+                    if source_url is not None and source_url in existing_urls:
+                        skipped_dupes += 1
+                        continue
+
                     vec = embed_service.embed(item["content"][:512])
                     vec_str = "[" + ",".join(f"{v:.8f}" for v in vec) + "]"
                     register = classify_register(item["content"])
@@ -62,12 +77,16 @@ async def _do_crawl(source, daily_limit, embed_service):
                         quality.score(item["content"]),
                         register,
                         item.get("title"),
-                        item.get("source_url"),
+                        source_url,
                         item.get("author_id"),
                         item.get("posted_at"),
                         vec_str
                     ))
                     saved += 1
+
+                    # Track newly-inserted URL to dedup within this run
+                    if source_url is not None:
+                        existing_urls.add(source_url)
 
                 # Log crawl operation
                 log_sql = """INSERT INTO crawl_log
@@ -75,7 +94,7 @@ async def _do_crawl(source, daily_limit, embed_service):
                              VALUES (%s, %s, %s, %s, NOW(3))"""
                 cur.execute(log_sql, (source, len(items), saved, "SUCCESS"))
 
-        logger.info(f"Crawl {source}: collected={len(items)} saved={saved}")
+        logger.info(f"Crawl {source}: collected={len(items)} saved={saved} skipped_dupes={skipped_dupes}")
     except Exception as e:
         with get_db() as conn:
             with conn.cursor() as cur:
