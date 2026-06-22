@@ -44,9 +44,10 @@ This registry maintains a **single source of truth** for which evaluators have p
 | E-003 | 김철수 | Naive | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | AI 식별률 80% (4/5), 신중도 적절 (오판 0건) |
 | E-S1 | 부정선거 | Naive | 5 (보충) | v2.1-phase5-01 | BASELINE | 2026-06-22 | ✓ Completed (참고) | AI 식별률 **60%** (3/5: 문제2·3·8 식별, 5·10 놓침), 오탐 2건(문제1·9 Human→Bot). ⚠️ **Phase 8 키트 오전달로 Phase 5 평가** — 게이트 미반영, 참고치 |
 | Owner | @justant | Calibration | 5 | v2.1-phase5-01 | BASELINE | 2026-06-21 | ✓ Completed | **EXCLUDED from gate** |
-| E-004 | [SEALED] | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **신규 평가자** — Phase 6 배포 이후 AI 글 (T1·T3 개선) |
-| E-005 | [SEALED] | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **신규 평가자** — Phase 5 미사용 Human 계정 |
-| E-006 | [SEALED] | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **신규 평가자** — 블라인드 평가 최종 라운드 |
+| E-004 | 최일찬 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **40%** (2/5: Q2·Q10), Human 오탐 1건(Q3) |
+| E-005 | 김태준/태추 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **0%** (0/5), Human 오탐 4건. 전 문항 확신 50%(순수 추측) |
+| E-006 | 김윤태 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **0%** (0/5), Human 오탐 3건. 확신 ~100%인데 0%(과신 오답, E-001 패턴) |
+| E-007 | 윤도현 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **40%** (2/5: Q1·Q2), Human 오탐 3건. **신규 추가**(슬롯 외) |
 | Owner | @justant | Calibration | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 대기 중 | **EXCLUDED from gate** |
 
 ---
@@ -167,7 +168,7 @@ After all evaluators in a round complete:
 | Round | Kit | Naive Avg Score | Gate Criterion (≤60%) | Status | Next Step |
 |-------|-----|-----------------|------------------------|--------|-----------|
 | 5 | v2.1-phase5-01 | **80%** | 80% > 60% → FAIL | ✗ FAIL | Phase 6 결정론 다양화 (T1·T3·T4) |
-| 8 | v2.1-phase8-01 | TBD | TBD | 🔄 응답 수집 중 | 설문 배포 완료(2026-06-22)·신선 평가자 E-004~006 응답 대기 |
+| 8 | v2.1-phase8-01 | **20%** (4인 잠정) | 20% ≤ 60% → PASS | 🔄 잠정 PASS·추가 평가자 수집 중 | E-004~007 채점 완료(40/0/0/40). 독립 재채점 일치. 추가 응답 시 재계산(강건성: +5명 만점이어야 FAIL). 상세: `phase8/v2.1-phase8-01-analysis.md` |
 
 ---
 
