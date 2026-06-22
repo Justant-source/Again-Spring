@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>다시봄 블라인드 평가 — v2.1 Phase 8</title>
+<title>AI·사람 글 구별 블라인드 테스트</title>
 <style>
   :root {
     --bg: #f7f6f3;
@@ -148,14 +148,15 @@
   .judgment-row { display: flex; gap: 12px; margin-bottom: 18px; }
   .choice-btn {
     flex: 1;
-    padding: 14px;
+    padding: 28px 14px;
     border-radius: 8px;
     border: 2px solid var(--border);
     background: var(--card);
     cursor: pointer;
     text-align: center;
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
     font-family: inherit;
     transition: all 0.15s;
     position: relative;
@@ -172,8 +173,6 @@
   .choice-btn.bot { border-color: #f5c6c1; color: var(--bot); }
   .choice-btn.bot:hover { background: var(--bot-light); }
   .choice-btn.bot.selected { background: var(--bot-light); border-color: var(--bot); box-shadow: 0 0 0 3px #f8d7d5; }
-
-  .choice-icon { font-size: 1.3rem; display: block; margin-bottom: 4px; }
 
   /* 슬라이더 */
   .slider-section { margin-bottom: 16px; }
@@ -230,13 +229,6 @@
   }
 
   /* 메모 */
-  .memo-section label {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--muted);
-    display: block;
-    margin-bottom: 6px;
-  }
   textarea {
     width: 100%;
     padding: 10px 14px;
@@ -450,8 +442,8 @@
 
   <!-- 헤더 -->
   <div class="header">
-    <h1>블라인드 평가 — 다시봄 커뮤니티</h1>
-    <p>사람이 쓴 글과 AI가 쓴 글을 구분해 주세요.</p>
+    <h1>AI·사람 글 구별 블라인드 테스트</h1>
+    <p>각각의 문제당 3개의 글을 읽고 사람이 쓴 글과 AI가 쓴 글을 구분해 주세요.</p>
   </div>
 
   <form id="evalForm" onsubmit="return false;">
@@ -459,25 +451,14 @@
   <!-- ======== STEP 0: 인트로 (목적·방법) ======== -->
   <div class="step active" id="step-intro">
     <div class="intro-card">
-      <h2>🎯 이 평가는 무엇인가요?</h2>
+      <h2>이 테스트는 무엇인가요?</h2>
       <div class="intro-purpose">
-        다시봄 커뮤니티 게시글 중에는 <strong>실제 사람이 쓴 글</strong>과
-        <strong>AI가 자동으로 만든 글</strong>이 섞여 있습니다.<br>
-        여러분이 <strong>직관만으로 둘을 구분</strong>해 주시면,
-        AI 글이 얼마나 사람처럼 자연스러운지 측정하는 데 큰 도움이 됩니다.<br>
-        <strong>정답을 맞히는 시험이 아닙니다</strong> — 편하게 느낌으로 답해 주세요.
+        <strong>AI가 쓴 글과 사람이 쓴 글</strong>을, 사람이 얼마나 잘 구별할 수 있는지 알아보는 <strong>블라인드 테스트</strong>입니다.
       </div>
-      <span class="how">📋 진행 방법</span>
+      <span class="how">진행 방법</span>
       <ul>
-        <li>총 <strong>10개 문제</strong>를 <strong>한 문제씩</strong> 보여드립니다. (위쪽에 <strong>문제 N / 10</strong> 으로 진행 상황 표시)</li>
-        <li>각 문제에서 작성자가 <strong>사람</strong>인지 <strong>봇</strong>인지 고르고, 얼마나 확신하는지 표시하세요.</li>
-        <li>약 <strong>10~15분</strong> 소요. 입력은 <strong>자동 저장</strong>되어 중간에 닫아도 이어서 할 수 있어요.</li>
-        <li>마지막에 <strong>결과를 복사해 담당자에게 전달</strong>하면 끝납니다.</li>
-      </ul>
-      <ul class="dont">
-        <li>❌ 문장 길이·단어를 분석하지 마세요</li>
-        <li>❌ "AI 같은 표현"을 일부러 찾으려 하지 마세요</li>
-        <li>✅ 글을 쭉 읽고 <strong>전체적인 느낌</strong>만으로 판단해 주세요</li>
+        <li><strong>10개 문항</strong>에 각각 <strong>사람 / AI</strong> 중 하나를 답해 주세요.</li>
+        <li>마지막에 만들어진 <strong>결과 텍스트를 복사해서 서준수에게 붙여넣어 전달</strong>하면 끝입니다.</li>
       </ul>
       <div class="evaluator-info" style="margin-top:18px;">
         <label for="evaluatorName">이름 / 닉네임 <span style="color:var(--bot);font-size:0.8rem;">*필수</span></label>
@@ -515,16 +496,16 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-1-human">
           <input type="radio" name="q1" value="사람" onchange="selectChoice(1,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-1-bot">
-          <input type="radio" name="q1" value="봇" onchange="selectChoice(1,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q1" value="AI" onchange="selectChoice(1,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
         <div class="slider-label">
-          <span>자신감</span>
+          <span>정답에 대한 확신</span>
           <span class="slider-value" id="sv-1">50%</span>
         </div>
         <div class="slider-track">
@@ -532,10 +513,6 @@
           <input type="range" min="0" max="100" value="50" id="slider-1" oninput="updateSlider(1)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-1">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-1" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -567,24 +544,20 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-2-human">
           <input type="radio" name="q2" value="사람" onchange="selectChoice(2,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-2-bot">
-          <input type="radio" name="q2" value="봇" onchange="selectChoice(2,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q2" value="AI" onchange="selectChoice(2,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
-        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-2">50%</span></div>
+        <div class="slider-label"><span>정답에 대한 확신</span><span class="slider-value" id="sv-2">50%</span></div>
         <div class="slider-track">
           <span>확신 없음</span>
           <input type="range" min="0" max="100" value="50" id="slider-2" oninput="updateSlider(2)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-2">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-2" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -616,24 +589,20 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-3-human">
           <input type="radio" name="q3" value="사람" onchange="selectChoice(3,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-3-bot">
-          <input type="radio" name="q3" value="봇" onchange="selectChoice(3,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q3" value="AI" onchange="selectChoice(3,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
-        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-3">50%</span></div>
+        <div class="slider-label"><span>정답에 대한 확신</span><span class="slider-value" id="sv-3">50%</span></div>
         <div class="slider-track">
           <span>확신 없음</span>
           <input type="range" min="0" max="100" value="50" id="slider-3" oninput="updateSlider(3)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-3">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-3" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -665,24 +634,20 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-4-human">
           <input type="radio" name="q4" value="사람" onchange="selectChoice(4,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-4-bot">
-          <input type="radio" name="q4" value="봇" onchange="selectChoice(4,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q4" value="AI" onchange="selectChoice(4,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
-        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-4">50%</span></div>
+        <div class="slider-label"><span>정답에 대한 확신</span><span class="slider-value" id="sv-4">50%</span></div>
         <div class="slider-track">
           <span>확신 없음</span>
           <input type="range" min="0" max="100" value="50" id="slider-4" oninput="updateSlider(4)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-4">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-4" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -714,24 +679,20 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-5-human">
           <input type="radio" name="q5" value="사람" onchange="selectChoice(5,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-5-bot">
-          <input type="radio" name="q5" value="봇" onchange="selectChoice(5,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q5" value="AI" onchange="selectChoice(5,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
-        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-5">50%</span></div>
+        <div class="slider-label"><span>정답에 대한 확신</span><span class="slider-value" id="sv-5">50%</span></div>
         <div class="slider-track">
           <span>확신 없음</span>
           <input type="range" min="0" max="100" value="50" id="slider-5" oninput="updateSlider(5)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-5">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-5" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -763,24 +724,20 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-6-human">
           <input type="radio" name="q6" value="사람" onchange="selectChoice(6,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-6-bot">
-          <input type="radio" name="q6" value="봇" onchange="selectChoice(6,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q6" value="AI" onchange="selectChoice(6,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
-        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-6">50%</span></div>
+        <div class="slider-label"><span>정답에 대한 확신</span><span class="slider-value" id="sv-6">50%</span></div>
         <div class="slider-track">
           <span>확신 없음</span>
           <input type="range" min="0" max="100" value="50" id="slider-6" oninput="updateSlider(6)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-6">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-6" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -812,24 +769,20 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-7-human">
           <input type="radio" name="q7" value="사람" onchange="selectChoice(7,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-7-bot">
-          <input type="radio" name="q7" value="봇" onchange="selectChoice(7,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q7" value="AI" onchange="selectChoice(7,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
-        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-7">50%</span></div>
+        <div class="slider-label"><span>정답에 대한 확신</span><span class="slider-value" id="sv-7">50%</span></div>
         <div class="slider-track">
           <span>확신 없음</span>
           <input type="range" min="0" max="100" value="50" id="slider-7" oninput="updateSlider(7)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-7">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-7" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -861,24 +814,20 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-8-human">
           <input type="radio" name="q8" value="사람" onchange="selectChoice(8,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-8-bot">
-          <input type="radio" name="q8" value="봇" onchange="selectChoice(8,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q8" value="AI" onchange="selectChoice(8,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
-        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-8">50%</span></div>
+        <div class="slider-label"><span>정답에 대한 확신</span><span class="slider-value" id="sv-8">50%</span></div>
         <div class="slider-track">
           <span>확신 없음</span>
           <input type="range" min="0" max="100" value="50" id="slider-8" oninput="updateSlider(8)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-8">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-8" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -910,24 +859,20 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-9-human">
           <input type="radio" name="q9" value="사람" onchange="selectChoice(9,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-9-bot">
-          <input type="radio" name="q9" value="봇" onchange="selectChoice(9,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q9" value="AI" onchange="selectChoice(9,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
-        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-9">50%</span></div>
+        <div class="slider-label"><span>정답에 대한 확신</span><span class="slider-value" id="sv-9">50%</span></div>
         <div class="slider-track">
           <span>확신 없음</span>
           <input type="range" min="0" max="100" value="50" id="slider-9" oninput="updateSlider(9)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-9">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-9" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -959,24 +904,20 @@
       <div class="judgment-row">
         <label class="choice-btn human" id="btn-10-human">
           <input type="radio" name="q10" value="사람" onchange="selectChoice(10,'사람')">
-          <span class="choice-icon">🧑</span>사람
+          사람
         </label>
         <label class="choice-btn bot" id="btn-10-bot">
-          <input type="radio" name="q10" value="봇" onchange="selectChoice(10,'봇')">
-          <span class="choice-icon">🤖</span>봇
+          <input type="radio" name="q10" value="AI" onchange="selectChoice(10,'AI')">
+          AI
         </label>
       </div>
       <div class="slider-section">
-        <div class="slider-label"><span>자신감</span><span class="slider-value" id="sv-10">50%</span></div>
+        <div class="slider-label"><span>정답에 대한 확신</span><span class="slider-value" id="sv-10">50%</span></div>
         <div class="slider-track">
           <span>확신 없음</span>
           <input type="range" min="0" max="100" value="50" id="slider-10" oninput="updateSlider(10)">
           <span>매우 확신</span>
         </div>
-      </div>
-      <div class="memo-section">
-        <label for="memo-10">메모 <span style="font-weight:400;color:#aaa;">(선택)</span></label>
-        <textarea id="memo-10" placeholder="왜 그렇게 느꼈는지 간단히 적어주세요..."></textarea>
       </div>
     </div>
   </div>
@@ -984,9 +925,10 @@
   <!-- ======== STEP 11: 종합의견 (마지막 입력) ======== -->
   <div class="step" id="step-final">
     <div class="overall-section">
-      <h2>거의 다 끝났어요! 종합의견 <span style="font-weight:400;color:#aaa;font-size:0.88rem;">(선택)</span></h2>
-      <p>전체를 읽고 느낀 점, 특이하게 느껴진 문제, 판단 기준 등을 자유롭게 적어주세요. 비워두셔도 됩니다.</p>
-      <textarea id="overallOpinion" placeholder="예: 문제 3은 특히 어색하게 느껴졌음. 글 톤이 너무 일정한 것 같았음...&#10;문제 1과 8은 사람처럼 읽혔는데 이유를 설명하기 어려움..."></textarea>
+      <h2>마지막! 총평 <span style="font-weight:400;color:var(--bot);font-size:0.85rem;">*필수 · 20자 이상</span></h2>
+      <p>전체적으로 어땠는지, 어떤 기준으로 <strong>사람 / AI</strong>를 판단했는지 <strong>20자 이상</strong> 적어주세요.</p>
+      <textarea id="overallOpinion" oninput="updateOverallCount()" placeholder="예: AI 글은 문장이 매끄럽지만 같은 말이 반복되는 느낌이었고, 사람 글은 오타나 흐름이 더 자연스러웠다..."></textarea>
+      <div id="overallCount" style="font-size:0.82rem;color:var(--muted);margin-top:6px;">0자 / 최소 20자</div>
     </div>
   </div>
 
@@ -997,20 +939,19 @@
 
   <!-- ======== STEP 12: 완료 (결과·복사 안내) ======== -->
   <div class="step complete-screen" id="step-complete">
-    <div class="big-check">✅</div>
+    <div class="big-check"></div>
     <h2>응답이 완료되었습니다!</h2>
     <div class="deliver-note">
       아래 회색 칸의 <strong>결과 텍스트 전체</strong>를 복사해서<br>
-      <strong>평가를 요청한 담당자에게 카카오톡(또는 문자·메일)으로 보내주세요.</strong><br>
-      📌 이 페이지는 <strong>자동으로 전송되지 않습니다</strong> — 꼭 복사해서 전달해야 결과가 반영됩니다.
+      <strong>서준수에게 카톡으로 보내주세요</strong>
     </div>
     <textarea class="result-text" id="resultText" readonly></textarea>
     <div class="result-actions">
       <button type="button" class="copy-btn" id="copyBtn" onclick="copyResult()">
-        <span>📋</span> 결과 전체 복사
+        결과 전체 복사
       </button>
       <button type="button" class="share-btn" id="shareBtn" onclick="shareResult()">
-        <span>📤</span> 공유하기 (카톡·메시지)
+        공유하기 (카톡·메시지)
       </button>
     </div>
     <div class="copy-hint">
@@ -1073,7 +1014,7 @@ function updateChrome() {
   nav.style.display = 'flex';
   prevBtn.style.visibility = (id === 'step-intro') ? 'hidden' : 'visible';
   if (id === 'step-intro') nextBtn.textContent = '평가 시작하기 →';
-  else if (id === 'step-final') nextBtn.textContent = '제출하고 결과 만들기 ✅';
+  else if (id === 'step-final') nextBtn.textContent = '제출하고 결과 만들기';
   else nextBtn.textContent = '다음 →';
 }
 
@@ -1097,7 +1038,7 @@ function nextStep() {
     const n = parseInt(m[1], 10);
     if (!answers[n]) {
       document.getElementById('card-' + n).classList.add('unanswered');
-      warn.textContent = '⚠️ 사람인지 봇인지 선택한 뒤 다음으로 넘어가 주세요.';
+      warn.textContent = '⚠️ 사람 / AI 중 하나를 선택한 뒤 다음으로 넘어가 주세요.';
       warn.style.display = 'block'; return;
     }
     showStep(stepIdx + 1); return;
@@ -1113,14 +1054,12 @@ function prevStep() {
 /* ---------- 자동 저장 / 복원 (새로고침·앱전환 방어) ---------- */
 function saveState() {
   try {
-    const state = { name: '', step: stepIdx, answers: answers, sliders: {}, memos: {}, overall: '' };
+    const state = { name: '', step: stepIdx, answers: answers, sliders: {}, overall: '' };
     const nameEl = document.getElementById('evaluatorName');
     if (nameEl) state.name = nameEl.value;
     for (let i = 1; i <= TOTAL; i++) {
       const s = document.getElementById('slider-' + i);
-      const mm = document.getElementById('memo-' + i);
       if (s) state.sliders[i] = s.value;
-      if (mm) state.memos[i] = mm.value;
     }
     const ov = document.getElementById('overallOpinion');
     if (ov) state.overall = ov.value;
@@ -1146,15 +1085,12 @@ function restoreState() {
       const h = document.getElementById('btn-' + n + '-human');
       const b = document.getElementById('btn-' + n + '-bot');
       if (h) h.classList.toggle('selected', val === '사람');
-      if (b) b.classList.toggle('selected', val === '봇');
+      if (b) b.classList.toggle('selected', val === 'AI');
     });
   }
   if (state.sliders) Object.keys(state.sliders).forEach(i => {
     const s = document.getElementById('slider-' + i);
     if (s) { s.value = state.sliders[i]; const sv = document.getElementById('sv-' + i); if (sv) sv.textContent = state.sliders[i] + '%'; }
-  });
-  if (state.memos) Object.keys(state.memos).forEach(i => {
-    const mm = document.getElementById('memo-' + i); if (mm) mm.value = state.memos[i];
   });
   if (state.overall) document.getElementById('overallOpinion').value = state.overall;
   let s = (typeof state.step === 'number') ? state.step : 0;
@@ -1168,7 +1104,7 @@ function selectChoice(n, val) {
   const h = document.getElementById('btn-' + n + '-human');
   const b = document.getElementById('btn-' + n + '-bot');
   if (h) h.classList.toggle('selected', val === '사람');
-  if (b) b.classList.toggle('selected', val === '봇');
+  if (b) b.classList.toggle('selected', val === 'AI');
   const card = document.getElementById('card-' + n);
   if (card) card.classList.remove('unanswered');
   document.getElementById('warningMsg').style.display = 'none';
@@ -1178,6 +1114,15 @@ function selectChoice(n, val) {
 
 function updateSlider(n) {
   document.getElementById('sv-' + n).textContent = document.getElementById('slider-' + n).value + '%';
+  saveState();
+}
+
+function updateOverallCount() {
+  const el = document.getElementById('overallCount');
+  if (!el) return;
+  const len = document.getElementById('overallOpinion').value.trim().length;
+  el.textContent = len + '자 / 최소 20자' + (len >= 20 ? ' (충족)' : '');
+  el.style.color = len >= 20 ? 'var(--accent)' : 'var(--muted)';
   saveState();
 }
 
@@ -1197,27 +1142,34 @@ function submitEval() {
     return;
   }
 
+  // 총평 필수 (20자 이상)
+  const overall = document.getElementById('overallOpinion').value.trim();
+  if (overall.length < 20) {
+    const warn = document.getElementById('warningMsg');
+    warn.textContent = '⚠️ 마지막 총평을 20자 이상 작성해 주세요. (현재 ' + overall.length + '자)';
+    warn.style.display = 'block';
+    if (currentId() !== 'step-final') showStep(FINAL_IDX);
+    document.getElementById('overallOpinion').focus();
+    return;
+  }
+
   const now = new Date();
   const pad = x => String(x).padStart(2, '0');
   const dateStr = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate());
   const timeStr = pad(now.getHours()) + ':' + pad(now.getMinutes());
 
-  let txt = '=== 다시봄 블라인드 평가 결과 ===\n';
+  let txt = '=== AI·사람 글 구별 블라인드 테스트 결과 ===\n';
   txt += '평가자: ' + name + '\n';
   txt += '일시: ' + dateStr + ' ' + timeStr + '\n';
   txt += '키트: v2.1-Phase8-01\n';
   txt += '================================\n\n';
   for (let i = 1; i <= TOTAL; i++) {
     const confidence = document.getElementById('slider-' + i).value;
-    const memo = document.getElementById('memo-' + i).value.trim();
-    txt += '문제 ' + i + ': ' + answers[i] + '  (자신감 ' + confidence + '%)';
-    if (memo) txt += '\n  메모: ' + memo;
-    txt += '\n';
+    txt += '문제 ' + i + ': ' + answers[i] + '  (확신 ' + confidence + '%)\n';
   }
-  const overall = document.getElementById('overallOpinion').value.trim();
-  txt += '\n[종합의견]\n' + (overall || '(없음)') + '\n';
+  txt += '\n[총평]\n' + overall + '\n';
   txt += '\n================================\n';
-  txt += '봇 판정 개수: ' + Object.values(answers).filter(v => v === '봇').length + '/10\n';
+  txt += 'AI 판정 개수: ' + Object.values(answers).filter(v => v === 'AI').length + '/10\n';
   txt += '사람 판정 개수: ' + Object.values(answers).filter(v => v === '사람').length + '/10\n';
 
   document.getElementById('resultText').value = txt;
@@ -1241,16 +1193,16 @@ function legacyCopy() {
 
 function copyDone() {
   const btn = document.getElementById('copyBtn');
-  btn.innerHTML = '<span>✅</span> 복사됨! 담당자에게 붙여넣어 전달하세요';
+  btn.innerHTML = '복사됨! 서준수에게 붙여넣어 전달하세요';
   btn.classList.add('copied');
   setTimeout(() => {
-    btn.innerHTML = '<span>📋</span> 결과 전체 복사';
+    btn.innerHTML = '결과 전체 복사';
     btn.classList.remove('copied');
   }, 3000);
 }
 
 function copyFail() {
-  alert('자동 복사가 차단되었습니다.\n회색 칸을 길게 눌러 전체 선택한 뒤 복사해서 담당자에게 전달해 주세요.');
+  alert('자동 복사가 차단되었습니다.\n회색 칸을 길게 눌러 전체 선택한 뒤 복사해서 서준수에게 전달해 주세요.');
 }
 
 function copyResult() {
@@ -1268,7 +1220,7 @@ function copyResult() {
 function shareResult() {
   const txt = document.getElementById('resultText').value;
   if (navigator.share) {
-    navigator.share({ title: '다시봄 블라인드 평가 결과', text: txt }).catch(() => {});
+    navigator.share({ title: 'AI·사람 글 구별 블라인드 테스트 결과', text: txt }).catch(() => {});
   } else {
     copyResult();
   }
@@ -1280,11 +1232,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const nm = document.getElementById('evaluatorName');
   if (nm) nm.addEventListener('input', function () { document.getElementById('introWarn').style.display = 'none'; saveState(); });
   const ov = document.getElementById('overallOpinion');
-  if (ov) ov.addEventListener('input', saveState);
-  for (let i = 1; i <= TOTAL; i++) {
-    const mm = document.getElementById('memo-' + i);
-    if (mm) mm.addEventListener('input', saveState);
-  }
+  if (ov) ov.addEventListener('input', updateOverallCount);
+  updateOverallCount();
   showStep(startStep);
 });
 </script>

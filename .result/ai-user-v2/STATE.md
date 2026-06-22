@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-21 (v2.1 Phase 6 완료·Phase 7 QLoRA 비발동·Phase 8 진입)
+**최종 갱신**: 2026-06-22 (v2.1 Phase 8 설문 평가자 배포·채점 경로 end-to-end 검증·results 스캐폴드 준비)
 
 ---
 
@@ -95,7 +95,7 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 | 5 | baseline 블라인드 (naive ≥3) | Phase 1·4 ✅ · kill criterion ✅ | ❌ FAIL 80% (→Phase 6) |
 | 6 | 결정론 다양화 1라운드 | Phase 5 | ✅ 완료 2026-06-21 (VARIETY_SEEDS·CATEGORY_GUIDE·prod 배포) |
 | 7 | QLoRA 데이터게이트 | Phase 6 | ❌ 비발동 (조건3 미충족 FRIEND/WORK <수백) |
-| 8 | 최종 판정·출하/피벗 | Phase 7 | 🔄 키트 완성+무결성·spec 검증 PASS+런북 준비 (2026-06-22). 평가자 모집 대기 |
+| 8 | 최종 판정·출하/피벗 | Phase 7 | 🔄 설문 평가자 배포 완료(2026-06-22)·채점 경로 검증·results 스캐폴드 준비. naive ≥3 응답 수집 중 |
 
 > **Phase 5 결과**: AI 식별률 80% (3인 평균) → FAIL. Phase 6 결정론 다양화 진행.
 
@@ -108,11 +108,12 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 ```
 신선 캐주얼 독자(≥3인) 통합 평균 봇 식별률 ≤ **60%** = PASS  
 "kill criterion 제안값 그대로 확정" — 임계 ≤60%, 평가자수 ≥3인, 통합 평균.  
-**Phase 5 측정 완료 — FAIL 80% (2026-06-21). Phase 6 완료(VARIETY_SEEDS·CATEGORY_GUIDE·prod), Phase 7 비발동(조건3), Phase 8 키트 완성·무결성/spec 검증 PASS·오너 런북·FAIL설계 준비 완료(2026-06-22). 평가자 모집 대기 — 측정 전 생성 코드 변경 금지(측정 대상 오염 방지).**
+**Phase 5 측정 완료 — FAIL 80% (2026-06-21). Phase 6 완료(VARIETY_SEEDS·CATEGORY_GUIDE·prod), Phase 7 비발동(조건3), Phase 8 키트 완성·무결성/spec 검증 PASS·오너 런북·FAIL설계 준비 완료(2026-06-22). 설문 평가자 배포 완료(2026-06-22) — 채점 경로(answer-key↔evaluator.html↔scoring-calculator) end-to-end 검증 + `v2.1-phase8-01-results.md` 스캐폴드 준비. naive ≥3 응답 수집 중 — 측정 전 생성 코드 변경 금지(측정 대상 오염 방지).**
 
 ### Phase 8 준비 자산 (eval/v2.1/phase8/, steps/)
-- `v2.1-phase8-01-evaluator.html` — 평가자용(자동저장·복사폴백·공유, Playwright 17/0 검증)
-- `scoring-calculator.html` — 채점 자동화(6/6 검증)
+- `v2.1-phase8-01-evaluator.html` — 평가자용(자동저장·복사폴백·공유, node --check PASS·이모지/담당자 정리 완료)
+- `scoring-calculator.html` — 채점 자동화(ANSWER_KEY=A-A-H-A-H-H-A-H-H-A·AI_QUESTIONS 1·2·4·7·10 검증)
+- `v2.1-phase8-01-results.md` — 응답 수집·채점·게이트 판정 스캐폴드(answer-key 사전 기입, PASS→08b/FAIL→08d 분기)
 - `owner-runbook.md` — 모집→판정 6단계 런북 / `evaluator-guide.md` — 모집 가이드
 - `kit-integrity-check.md` — 정합성+금지어 PASS / `spec-compliance-check.md` — spec 준수 PASS
 - `steps/v2.1-08c-...md` — Phase 6 tell 빈도 관찰(위험계정 057·035) / `08d-...md` — FAIL 3옵션 / `08b-...md` — 출하 체크리스트
