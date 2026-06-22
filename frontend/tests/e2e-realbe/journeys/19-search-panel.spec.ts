@@ -39,13 +39,11 @@ test.describe('Journey 19: 검색 패널 (SearchPanel)', () => {
     await searchInput.fill('테스트')
     await searchInput.press('Enter')
 
-    // 결과 뷰로 전환됨 (결과 헤더 또는 공결과 메시지)
-    await page.waitForTimeout(1500)
-    const resultHeader = page.locator('text=검색 결과')
-    const emptyState = page.locator('text=검색 결과가 없습니다')
-    const hasResults = await resultHeader.count().then(c => c > 0)
-    const hasEmpty = await emptyState.isVisible({ timeout: 2_000 }).catch(() => false)
-    expect(hasResults || hasEmpty).toBe(true)
+    // 결과 뷰로 전환됨 — 결과 있으면 "사연 N건"(SearchPanel.tsx:171), 없으면 "검색 결과가 없습니다"(:167)
+    // 두 상태 모두 허용(.or) + web-first 자동 재시도 → 풀스위트에서 '테스트' 매칭 글 유무에 무관하게 안정
+    const emptyMsg = page.getByText('검색 결과가 없습니다')
+    const resultCount = page.getByText(/[\d,]+건/)
+    await expect(emptyMsg.or(resultCount).first()).toBeVisible({ timeout: 8_000 })
   })
 
   test('검색 — 최근 검색 목록 표시', async ({ page }) => {
