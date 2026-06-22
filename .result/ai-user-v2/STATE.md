@@ -180,3 +180,39 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 | Phase 6 | ✅ 완료 2026-06-21 (4bc7c0cf) |
 | Phase 7 | ❌ QLoRA 비발동 2026-06-21 |
 | Phase 8 | ✅ SHIPPED 2026-06-22 (4인 20%≤60% PASS 최종) |
+
+---
+
+## v2.1 post-ship 정교화 — T5·T6·T7 레버 튜닝 ✅ (2026-06-22, commit 8c84b58f)
+
+> Phase 8 출하(20% PASS) 이후 **잔존 tell 감소** 작업. 설문 없이 스타일 분포 매칭 신호.
+
+### A. 오타·슬랭 레버 튜닝 (T6·T7) ✅
+
+| 변경 | 내용 | 대상 |
+|---|---|---|
+| THEQOO typoProb | 0.30 → 0.55 (실효율 0.18→0.385) | T6 과교정문법 |
+| BLIND typoProb | 0.45 → 0.55 | T6 과교정문법 |
+| NATEPAN chosungInject | false → true + `{ㅠㅠ,ㅋㅋ,ㄹㅇ,헐}` (fleet 16개) | T7 슬랭부재 |
+| GENERAL chosungInject | false → true + `{ㅋㅋ,ㅠㅠ,ㅇㅇ,ㄹㅇ}` | T7 슬랭부재 |
+
+### B. 어휘이질 필터 — B2 캘리브레이션 실패 + 폴백 (T5) ✅
+
+- **B2 캘리브레이션 실패**: human rare-ratio 0.441 > AI 0.282 — 인간이 AI보다 희귀어 사용 多
+- **θ=0.30 기준 human FP = 77.9%** → 빈도기반 탐지 폐기
+- **폴백**: 문어체 denylist 13종 → `SELF_CRITIQUE_EXTRA_CLICHES`: `방증,여실히,함의,귀결,개탄,단언컨대,요컨대,결론적으로,시사하는,기인하,고찰,도출,엄연한`
+- `SelfCritiqueService` rare-vocab detector #12 다크 출시 (`ENABLED=false`)
+
+### 분포 측정 기준선 (A0, measure_style_distribution.py)
+
+| 지표 | 인간 | AI | 비고 |
+|---|---|---|---|
+| 슬랭토큰 포함 비율 | 19.9% | 44.3% | DCINSIDE 등 고슬랭 voice 지배 |
+| 초성 포함 비율 | 20.2% | 33.7% | |
+| 종결어미 다양도 | 0.64 | 1.66 | AI가 과다 다양화 → 후속 모니터링 |
+
+### 현재 상태
+
+- **dev/prod 배포 완료** (commit 8c84b58f, e2e-realbe 148 PASS)
+- T6·T7은 코드 레벨에서 직접 해소됨. T5 폴백(denylist)은 recall 낮으나 즉각 효과.
+- **잔존 과제(v3)**: T8 비응집(QLoRA 영역), T5 심층 수정(re-calibration), thin plaza 보강(FRIEND/WORK).

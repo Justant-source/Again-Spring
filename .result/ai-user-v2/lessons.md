@@ -348,3 +348,51 @@ ASM·WaggleBot을 지을 때는 v2의 순서를 따르라:
 - "측정 대상 = 현 prod 상태"로 설계하면 PASS 시 출하 리스크 0(재배포 불필요, 측정==출하 보장).
 - 측정 전 생성 코드 동결이 이를 가능케 함. 측정 후 코드를 바꾸면 "측정한 것 ≠ 출하한 것"이 되어 게이트 의미 상실.
 - named-tell 이동(T1·T3 → T5 어휘이질·T6 과교정문법·T7 슬랭부재·T8 비응집)은 다음 라운드(선택) 타깃. T5~T7은 결정론 조정 가능, T8은 QLoRA 영역.
+
+---
+
+## v2.1 post-ship 정교화 (2026-06-22) — T5·T6·T7 레버 튜닝
+
+### L-PS-01: AI 슬랭 집계와 키트 특정 voice의 슬랭 분포는 다르다
+
+**발견**:
+- `measure_style_distribution.py` 측정: AI 집계 슬랭 44.3% vs 인간 19.9% (AI 2.2×).
+- 언뜻 보면 AI가 슬랭 과다인데, Phase 8 평가자는 "슬랭 없음"(T7)을 지적.
+- 원인: AI 집계는 DCINSIDE/FMKOREA 등 고슬랭 voice 지배. Phase 8 키트 voice(BLIND/THEQOO)는 chosung=false·typoProb=0.30으로 최저.
+
+**교훈**:
+- 집계 지표로 tell을 진단하면 맹점이 생긴다. **키트에 사용된 특정 voice의 파라미터를 직접 확인**해야.
+- 분포 수렴 측정 시 전체 AI 평균이 아닌 **키트 voice별 분포**로 진단.
+
+### L-PS-02: 빈도 기반 어휘 탐지는 한국어 커뮤니티 코퍼스에서 역전된다
+
+**발견**:
+- `calibrate_rare_vocab.py` 결과: human rare-ratio 중앙값 0.441, AI 0.282.
+- 인간 커뮤니티 글이 AI보다 희귀어를 더 많이 씀.
+- θ=0.30에서도 human FP = 77.9% (목표 ≤12% 달성 불가).
+
+**원인**: 한국어 커뮤니티의 지역어·신조어·타이포·특수 표현이 "희귀어" 통계를 올린다. AI는 표준어·빈도어 위주.
+
+**교훈**:
+- 세종코퍼스 등 표준 코퍼스 빈도사전은 SNS/커뮤니티에 부적합. 도메인 내 빈도사전도 역전 발생.
+- **대안**: 역방향 — "AI가 쓰지만 인간이 잘 안 쓰는 단어"를 명시 큐레이션(denylist). 오탐률 낮고 precision 높음.
+
+### L-PS-03: OutputSanitizer의 실효율은 sampleProb × typoProb 이중 게이트다
+
+**발견**:
+- THEQOO typoProb=0.30 + sampleProb=0.60 → 실효 오타율 = 0.60 × 0.30 = **0.18** (표 내 최저).
+- 단일 파라미터만 보면 "높아 보이는" THEQOO가 실제로는 가장 낮은 오타율.
+
+**교훈**:
+- VOICE_DIST 파라미터 검토 시 항상 **실효율 = 두 확률의 곱**으로 계산.
+- 새 voice 추가 또는 기존 voice 조정 시 실효율 표를 문서에 명시.
+
+### L-PS-04: pre-existing 테스트 실패는 이른 배포가 숨긴다
+
+**발견**:
+- `PromptAssemblerStyleTest.postPromptRendersRecentOutputsWithTopicBan()` — Phase 6(c0b723f8) 시점에 extraRule 문구가 변경됐으나 테스트는 갱신 안 됨.
+- 이번 세션(`./gradlew test`)에서 처음 발견. Phase 6~7~8 동안 미감지.
+
+**교훈**:
+- 빌드 성공(compile OK)과 테스트 성공은 다르다. Phase 6 배포 전에 `./gradlew test`를 실행했어야.
+- 테스트 assertion이 문구에 의존할 때, 문구 변경 커밋에 해당 테스트 수정을 반드시 포함.
