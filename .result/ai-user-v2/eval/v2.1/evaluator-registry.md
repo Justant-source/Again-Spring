@@ -25,7 +25,7 @@ This registry maintains a **single source of truth** for which evaluators have p
 - **보충(E-S1 부정선거, 2026-06-22)**: 60% — Phase 8 키트 오전달로 Phase 5 평가됨(참고치, 게이트 미반영). **평가자 편차 60~80% 확인** → ≥3인 평균 필요성 강화. 상세: `phase5/v2.1-phase5-01-result-supplement.md`
 - **Next**: Phase 6 결정론 다양화 (T1~T4 제거) → Phase 7 재평가 → Phase 8 최종
 
-**Phase 8 (Final)**: 🔄 설문 평가자 배포 완료·응답 수집 중 (2026-06-22) — 채점 경로 검증 완료, 결과는 `phase8/v2.1-phase8-01-results.md`에 집계
+**Phase 8 (Final)**: ✅ **SHIPPED** (2026-06-22) — naive 4인 평균 AI 식별률 **20% ≤ 60% → PASS 최종 확정·출하**. 결과: `phase8/v2.1-phase8-01-results.md` · 분석: `phase8/v2.1-phase8-01-analysis.md`
 - 🚨 **키트 오전달 주의**: E-S1에게 Phase 5 HTML이 전달됨 → Phase 8 평가자에게는 반드시 `eval/v2.1/phase8/v2.1-phase8-01-evaluator.html`(Phase 8)을 전달할 것. Phase 5 파일과 혼동 금지.
 - 배치: A-A-H-A-H-H-A-H-H-A (AI 문제1·2·4·7·10 / Human 문제3·5·6·8·9)
 - AI 계정 5종: WORK(ai-user-043/Vibe2026)·FRIEND(ai-user-057/I1l1IiliI)·MARRIED(ai-user-035/RiderX9)·COUPLE(ai-user-060/통장이텅장)·FAMILY(ai-user-032/햇살받는햄스터)
@@ -168,7 +168,7 @@ After all evaluators in a round complete:
 | Round | Kit | Naive Avg Score | Gate Criterion (≤60%) | Status | Next Step |
 |-------|-----|-----------------|------------------------|--------|-----------|
 | 5 | v2.1-phase5-01 | **80%** | 80% > 60% → FAIL | ✗ FAIL | Phase 6 결정론 다양화 (T1·T3·T4) |
-| 8 | v2.1-phase8-01 | **20%** (4인 잠정) | 20% ≤ 60% → PASS | 🔄 잠정 PASS·추가 평가자 수집 중 | E-004~007 채점 완료(40/0/0/40). 독립 재채점 일치. 추가 응답 시 재계산(강건성: +5명 만점이어야 FAIL). 상세: `phase8/v2.1-phase8-01-analysis.md` |
+| 8 | v2.1-phase8-01 | **20%** (4인) | 20% ≤ 60% → PASS | ✅ SHIPPED (2026-06-22) | E-004~007 채점(40/0/0/40), 독립 재채점 일치. 오너 출하 지시로 최종 확정. 강건성: +5명 만점이어야 FAIL. 상세: `phase8/v2.1-phase8-01-analysis.md` |
 
 ---
 

@@ -448,13 +448,13 @@
 
 ---
 
-## Phase 8 — kill criterion 최종 판정 + 출하/피벗 + 교훈 봉인 🔄 진행 중
+## Phase 8 — kill criterion 최종 판정 + 출하/피벗 + 교훈 봉인 ✅ SHIPPED (2026-06-22)
 
-> **현재 상태 (2026-06-22)**: 설문 배포 완료·채점 경로 검증·응답 수집 중
-> - 신선 평가자용 설문 배포 완료 (2026-06-22)
-> - 채점 경로 end-to-end 검증 (answer-key↔evaluator.html↔scoring-calculator)
-> - `v2.1-phase8-01-results.md` 스캐폴드 준비 완료 (ANSWER_KEY 사전 기입, PASS→08b/FAIL→08d 분기)
-> - **다음**: naive ≥3 응답 수집 → 채점 자동화 → kill criterion 최종 판정
+> **최종 (2026-06-22)**: naive 4인 평균 AI 식별률 **20% ≤ 60% → PASS → SHIPPED**
+> - 측정: 최일찬 40%·김태준 0%·김윤태 0%·윤도현 40% → 평균 20% (독립 재채점 일치)
+> - 출하: 생성 코드는 Phase 6 시점 이미 prod 반영 → 출하=게이트 검증(dev·e2e·build·BE test green)+결정 봉인. `AI_USER_ML_ENABLED=false` 유지
+> - 분석: `eval/v2.1/phase8/v2.1-phase8-01-analysis.md` / 교훈: `lessons.md` L-P8-02~05
+> - ⚠️ 인과 주의: Phase5→8 −60pp는 5변수 동시변화 → "Phase 6 기여" 시사·미증명. 게이트 PASS는 절대 임계라 유효
 
 **목표**: 새 오라클로 최종 측정 → kill criterion 판정 → 출하 or 피벗 **옵션 제시(임의 결정 금지)**. 교훈 봉인.
 
