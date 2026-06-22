@@ -1,4 +1,4 @@
-# Voice 카탈로그 — 한국 10대 커뮤니티 + 뉴스댓글 말투 라이브러리 (2026-06-05)
+# Voice 카탈로그 — 한국 10대 커뮤니티 + 뉴스댓글 말투 라이브러리 (2026-06-22)
 # 목적: AI 페르소나가 "진짜 그 커뮤니티 사람"처럼 쓰도록 말투·신조어·가치관·작성습관을 정의
 # 사용처: profile.yml activity.voice / voice.yml voice_type 의 값. 코드 PersonaFactory.VOICES 와 일치.
 # 주의: 예시는 "복제용"이 아니라 "패턴 참고용". 신조어는 시대를 타므로 과의존 금지.
@@ -38,9 +38,10 @@ voices:
     sample_comment: "헐 이건 진짜 아니죠 ㅠㅠ 저라도 서운했을 거예요"
     post_processing:
       target_comma_rate: 0.011
-      chosung_inject: false
-      chosung_phrases: []
+      chosung_inject: true
+      chosung_phrases: ["ㅠㅠ", "ㅋㅋ", "ㄹㅇ", "헐"]
       sample_prob: 0.70
+      typo_prob: 0.60
 
   - id: DCINSIDE
     community: "디시인사이드"
@@ -66,6 +67,7 @@ voices:
       chosung_inject: true
       chosung_phrases: ["ㄹㅇ", "ㅇㅈ", "ㄷㄷ", "ㅋㅋ"]
       sample_prob: 0.80
+      typo_prob: 0.50
 
   - id: BLIND
     community: "블라인드"
@@ -91,6 +93,7 @@ voices:
       chosung_inject: false
       chosung_phrases: []
       sample_prob: 0.60
+      typo_prob: 0.55
 
   - id: GENERAL
     community: "표준·종합"
@@ -113,9 +116,10 @@ voices:
     sample_comment: "양쪽 입장 다 있어 보여요. 일단 대화부터 해보시는 게 좋을 것 같아요"
     post_processing:
       target_comma_rate: 0.015
-      chosung_inject: false
-      chosung_phrases: []
-      sample_prob: 0.50
+      chosung_inject: true
+      chosung_phrases: ["ㅋㅋ", "ㅠㅠ", "ㅇㅇ", "ㄹㅇ"]
+      sample_prob: 0.60
+      typo_prob: 0.55
 
   # ========== 신규 8종 (10대 커뮤니티 확장) ==========
 
@@ -143,6 +147,7 @@ voices:
       chosung_inject: true
       chosung_phrases: ["ㄹㅇㅋㅋ", "ㄷㄷ", "ㅇㅈ", "후추"]
       sample_prob: 0.80
+      typo_prob: 0.50
 
   - id: RULIWEB
     community: "루리웹"
@@ -168,6 +173,7 @@ voices:
       chosung_inject: false
       chosung_phrases: []
       sample_prob: 0.60
+      typo_prob: 0.45
 
   - id: THEQOO
     community: "더쿠"
@@ -192,7 +198,8 @@ voices:
       target_comma_rate: 0.011
       chosung_inject: true
       chosung_phrases: ["ㅠㅠ", "ㄷㄷ", "그니까", "ㅇㅇ"]
-      sample_prob: 0.60
+      sample_prob: 0.70
+      typo_prob: 0.55
 
   - id: ARCALIVE
     community: "아카라이브 (아카)"
@@ -218,6 +225,7 @@ voices:
       chosung_inject: true
       chosung_phrases: ["ㄹㅇ", "ㄱㄱ", "ㅇㅇ", "어쩔"]
       sample_prob: 0.80
+      typo_prob: 0.40
 
   - id: INVEN
     community: "인벤"
@@ -243,6 +251,7 @@ voices:
       chosung_inject: false
       chosung_phrases: []
       sample_prob: 0.60
+      typo_prob: 0.45
 
   - id: MLBPARK
     community: "엠엘비파크 (엠팍)"
@@ -268,6 +277,7 @@ voices:
       chosung_inject: false
       chosung_phrases: []
       sample_prob: 0.50
+      typo_prob: 0.45
 
   - id: PPOMPPU
     community: "뽐뿌"
@@ -293,6 +303,7 @@ voices:
       chosung_inject: false
       chosung_phrases: []
       sample_prob: 0.55
+      typo_prob: 0.50
 
   - id: CLIEN
     community: "클리앙"
@@ -318,6 +329,7 @@ voices:
       chosung_inject: false
       chosung_phrases: []
       sample_prob: 0.60
+      typo_prob: 0.55
 
 # ========== 슬랭 레벨 가이드 (코드 slang_level과 정합) ==========
 # 0.0~0.2  거의 없음 (CLIEN, PPOMPPU, MLBPARK, 중장년 NATEPAN)

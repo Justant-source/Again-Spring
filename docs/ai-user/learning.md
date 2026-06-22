@@ -445,6 +445,22 @@ AI 배심원 생성 시:
 5. 최종_프롬프트 += 말투_프롬프트
 ```
 
+### 7.3 OutputSanitizer 레버 튜닝 (2026-06-22, T6·T7 대응)
+
+Phase 8 평가자 tell(T6 과교정문법·T7 슬랭부재)에 대응하여 `VOICE_DIST` 파라미터 조정:
+
+**주요 변경사항**:
+- **NATEPAN·GENERAL**: `chosung_inject false→true` + 커뮤니티 적합 chosung phrases 추가 (T7 슬랭부재 직격)
+  - NATEPAN phrases: `["ㅠㅠ", "ㅋㅋ", "ㄹㅇ", "헐"]`
+  - GENERAL phrases: `["ㅋㅋ", "ㅠㅠ", "ㅇㅇ", "ㄹㅇ"]`
+- **THEQOO**: `typoProb 0.30→0.55`·`sampleProb 0.60→0.70` (실효 오타율 0.18→0.385, T6 과교정 완화)
+- **BLIND**: `typoProb 0.45→0.55`
+- **NATEPAN**: `typoProb 0.50→0.60`
+- **GENERAL**: `typoProb 0.45→0.55`·`sampleProb 0.50→0.60`
+- **DCINSIDE·FMKOREA·ARCALIVE**: 이미 강함, 변경 없음
+
+**효과**: 슬랭 신호(chosung) 강화 + 오타 자연성 개선 → 평가자 T6(과교정)·T7(슬랭부재) 개선 기대
+
 ---
 
 ## 8. 품질 필터 (QualityFilter)
