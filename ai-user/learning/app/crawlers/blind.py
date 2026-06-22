@@ -82,39 +82,46 @@ def _extract_title(soup: BeautifulSoup) -> str | None:
     return None
 
 
+def _clean_soup(soup: BeautifulSoup) -> BeautifulSoup:
+    """nav/header/footer/script/style 노이즈 제거"""
+    for tag in soup.find_all(['nav', 'header', 'footer', 'script', 'style', 'noscript']):
+        tag.decompose()
+    return soup
+
+
+def _filter_lines(text: str, min_line_len: int = 15) -> str:
+    """짧은 UI 라벨(메뉴·버튼) 제거 후 실 본문 텍스트만 반환"""
+    lines = [ln.strip() for ln in text.split("\n") if len(ln.strip()) >= min_line_len]
+    return "\n".join(lines)
+
+
 def _extract_content(soup: BeautifulSoup) -> str | None:
-    # 1. og:description (SSR에서 본문 일부 포함)
+    # 1. og:description (SSR에서 본문 요약 포함 — 가장 깨끗)
     og = soup.find("meta", property="og:description")
     if og and og.get("content"):
         c = og["content"].strip()
         if len(c) >= MIN_CONTENT_LENGTH:
             return c
 
-    # 2. <main> 영역
-    main = soup.find("main")
+    # 2. 노이즈 제거 후 <main> 추출
+    clean = _clean_soup(soup)
+    main = clean.find("main")
     if main:
-        t = main.get_text(separator="\n", strip=True)
+        t = _filter_lines(main.get_text(separator="\n", strip=True))
         if len(t) >= MIN_CONTENT_LENGTH:
             return t
 
-    # 3. <p> 태그 전체 합산
-    paras = [p.get_text(strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True)) > 30]
+    # 3. 노이즈 제거 후 실질적인 <p> 태그 합산
+    paras = [p.get_text(strip=True) for p in clean.find_all("p") if len(p.get_text(strip=True)) > 30]
     if paras:
         t = "\n".join(paras)
         if len(t) >= MIN_CONTENT_LENGTH:
             return t
 
     # 4. <article>
-    article = soup.find("article")
+    article = clean.find("article")
     if article:
-        t = article.get_text(separator="\n", strip=True)
-        if len(t) >= MIN_CONTENT_LENGTH:
-            return t
-
-    # 5. div[class*='content']
-    div = soup.find("div", class_=lambda x: x and "content" in x)
-    if div:
-        t = div.get_text(separator="\n", strip=True)
+        t = _filter_lines(article.get_text(separator="\n", strip=True))
         if len(t) >= MIN_CONTENT_LENGTH:
             return t
 
