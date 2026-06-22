@@ -4,6 +4,7 @@
   1. 정적 랭킹 9섹션 listing → 동시 fetch
   2. post detail → 8병렬 fetch
   3. ID 범위 크롤 → 배치(32개)씩 8병렬
+  4. 테마 채널 크롤 → 채널별 plaza 분류 (분류기 precision gate)
 확인된 셀렉터: 작성자=a.writer, 본문=div.talk-content div.text 또는 div#contentArea
 """
 import asyncio
@@ -15,6 +16,8 @@ from typing import List, Dict, Optional, Set
 
 import requests
 from bs4 import BeautifulSoup
+
+from app.services.plaza_classifier import classify_plaza
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,19 @@ STATIC_SECTIONS = [
     {"name": "연애-주간",   "url": "https://pann.nate.com/talk/ranking/w?rankingType=lovetalk"},
     {"name": "연애-월간",   "url": "https://pann.nate.com/talk/ranking/m?rankingType=lovetalk"},
     {"name": "연애-연간",   "url": "https://pann.nate.com/talk/ranking/y?rankingType=lovetalk"},
+]
+
+# 테마 채널 매핑 — 채널 ID + 이름 + 목표 plaza
+CHANNELS = [
+    {"id": "20019", "name": "회사생활", "plaza": "WORK"},
+    {"id": "20054", "name": "취업과 면접", "plaza": "WORK"},
+    {"id": "20020", "name": "알바 경험담", "plaza": "WORK"},
+    {"id": "20023", "name": "남편 VS 아내", "plaza": "MARRIED"},
+    {"id": "20025", "name": "결혼/시집/친정", "plaza": "MARRIED"},
+    {"id": "20026", "name": "맞벌이 부부 이야기", "plaza": "MARRIED"},
+    {"id": "20006", "name": "사랑과 이별", "plaza": "COUPLE"},
+    {"id": "20009", "name": "지금은 연애중", "plaza": "COUPLE"},
+    {"id": "20011", "name": "헤어진 다음날", "plaza": "COUPLE"},
 ]
 
 USER_AGENTS = [
@@ -145,7 +161,7 @@ def _is_valid(title: str, content: str) -> bool:
 
 
 def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None,
-                       section_name: Optional[str] = None) -> Optional[Dict]:
+                       section_name: Optional[str] = None, channel_plaza: Optional[str] = None) -> Optional[Dict]:
     """HTML → 결과 딕셔너리 파싱. None = 무효(비어있거나 필터됨).
 
     Args:
@@ -153,6 +169,8 @@ def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None
         url: 포스트 URL
         author_listing: listing 페이지에서 추출한 작성자 (fallback)
         section_name: 섹션 이름 (e.g. "연애-오늘", "베스트-오늘") → category 결정
+        channel_plaza: 테마 채널의 목표 plaza (e.g. "WORK", "MARRIED", "COUPLE")
+                      지정 시 분류기로 검증하여 일치할 때만 이 plaza 사용
     """
     soup = BeautifulSoup(html, "html.parser")
     content = _extract_content(soup)
@@ -167,9 +185,18 @@ def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None
 
     author = _extract_author_from_detail(soup) or author_listing
 
-    # section_name → category 매핑
-    # "연애-*" 섹션 → COUPLE, 나머지 → OTHER (keyword 기반 분류 대기)
-    category = "COUPLE" if section_name and "연애" in section_name else "OTHER"
+    # category 결정 로직
+    # 1. channel_plaza 지정 → 분류기로 검증 (precision gate)
+    # 2. section_name 지정 → 섹션 기반 (정적 섹션용)
+    # 3. 기본값 → OTHER
+    if channel_plaza:
+        # 테마 채널: 채널의 목표 plaza와 분류기 결과가 일치할 때만 사용
+        classified = classify_plaza(content, title or "")
+        category = channel_plaza if classified == channel_plaza else "OTHER"
+    elif section_name and "연애" in section_name:
+        category = "COUPLE"
+    else:
+        category = "OTHER"
 
     return {
         "content": content,
@@ -306,22 +333,130 @@ async def _fetch_id_range_parallel(sem: asyncio.Semaphore,
     return results
 
 
+async def _fetch_channels(sem: asyncio.Semaphore,
+                          seen_ids: Set[str],
+                          limit: int) -> List[Dict]:
+    """
+    테마 채널 크롤 — 채널별 plaza 분류 (분류기 precision gate).
+    Step 1: 각 채널의 listing 페이지 fetch
+    Step 2: 고유한 post URL 추출 (dedup)
+    Step 3: post detail 병렬 fetch
+    Step 4: 분류기로 검증 후 channel_plaza와 일치할 때만 결과 포함
+    """
+    if not CHANNELS or limit <= 0:
+        return []
+
+    channel_limit = max(1, limit // len(CHANNELS))  # 채널당 평균 한도
+    logger.info(f"채널 크롤: {len(CHANNELS)}개 채널, 채널당 ~{channel_limit}개, 총 한도={limit}")
+
+    results: List[Dict] = []
+
+    for channel in CHANNELS:
+        if len(results) >= limit:
+            break
+
+        ch_id = channel["id"]
+        ch_name = channel["name"]
+        ch_plaza = channel["plaza"]
+        listing_url = f"https://pann.nate.com/talk/c{ch_id}?order=rank"
+
+        # Step 1: 채널 listing fetch
+        html = await _fetch(sem, listing_url)
+        if not html:
+            logger.warning(f"Channel '{ch_name}' ({ch_id}) listing fetch 실패")
+            continue
+
+        # Step 2: post URL 추출 & dedup
+        # 채널 listing(?order=rank)은 베스트 랭킹과 HTML 구조가 달라 CSS selector가 안 맞음.
+        # robust: 원본 HTML에서 /talk/{9자리} post id를 정규식으로 추출 (채널 id는 c20019=5자리라 미매칭).
+        soup = BeautifulSoup(html, "html.parser")
+        post_items: List[Dict] = []
+        count = 0
+
+        # title은 anchor에서 매핑 (있으면), 없으면 detail에서 채워짐
+        title_by_id: Dict[str, str] = {}
+        for a in soup.find_all("a", href=True):
+            mm = re.search(r"/talk/(\d{6,})", a["href"])
+            if mm:
+                t = a.get("title") or a.get_text(strip=True)
+                if t and mm.group(1) not in title_by_id:
+                    title_by_id[mm.group(1)] = t[:200]
+
+        for origin_id in re.findall(r"/talk/(\d{6,})", html):
+            if origin_id in seen_ids:
+                continue
+            seen_ids.add(origin_id)
+            post_items.append({
+                "origin_id": origin_id,
+                "title": title_by_id.get(origin_id),
+                "url": f"https://pann.nate.com/talk/{origin_id}",
+                "author_listing": None,
+            })
+            count += 1
+            if len(post_items) >= channel_limit:
+                break
+
+        if not post_items:
+            logger.info(f"Channel '{ch_name}': 0개 신규")
+            continue
+
+        logger.info(f"Channel '{ch_name}': {count}개 신규 포스트 → detail 병렬 fetch 시작")
+
+        # Step 3: post detail 병렬 fetch
+        detail_results = await asyncio.gather(*[
+            _fetch(sem, item["url"]) for item in post_items
+        ])
+
+        # Step 4: 분류기 검증 후 저장
+        channel_found = 0
+        for item, detail_html in zip(post_items, detail_results):
+            if len(results) >= limit:
+                break
+            if not detail_html:
+                continue
+            result = _parse_post_detail(detail_html, item["url"],
+                                       author_listing=item["author_listing"],
+                                       channel_plaza=ch_plaza)
+            if result:
+                results.append(result)
+                channel_found += 1
+
+        logger.info(f"Channel '{ch_name}': {channel_found}/{len(post_items)} 분류기 통과 (plaza={ch_plaza})")
+
+    logger.info(f"채널 크롤 완료: {len(results)}건")
+    return results
+
+
 async def crawl(daily_limit: int = 1500) -> List[Dict]:
     """
-    네이트판 공격 크롤 v5 — 완전 병렬.
-    정적 섹션(9개 동시) + ID 범위(8병렬 배치) = 순차 대비 5~8× 속도.
+    네이트판 공격 크롤 v5+ — 완전 병렬 with 테마 채널.
+    정적 섹션(9개 동시) + 테마 채널(9개 channels × classifier) + ID 범위(8병렬 배치)
+    = 순차 대비 5~8× 속도.
+
+    예산 배분:
+    - 정적 섹션: 250개 (상위 9개 섹션에서 고품질 COUPLE)
+    - 테마 채널: 250개 (WORK, MARRIED, COUPLE 정밀 분류)
+    - ID 범위: 나머지 (배경 채우기)
     """
     sem = asyncio.Semaphore(CONCURRENCY)
     seen_ids: Set[str] = set()
 
-    static_limit = min(daily_limit // 5, 250)
+    # Step 1: 정적 섹션
+    static_limit = 250
     static_results = await _fetch_static_sections_parallel(sem, seen_ids, static_limit)
+    static_count = len([r for r in static_results if r["content_type"] == "POST"])
 
-    post_count = len([r for r in static_results if r["content_type"] == "POST"])
+    # Step 2: 테마 채널 (분류기 precision gate)
+    channel_limit = 250
+    channel_results = await _fetch_channels(sem, seen_ids, channel_limit)
+    channel_count = len([r for r in channel_results if r["content_type"] == "POST"])
+
+    # Step 3: ID 범위 크롤 (나머지 한도)
+    post_count = static_count + channel_count
     remaining = daily_limit - post_count
     id_results = await _fetch_id_range_parallel(sem, seen_ids, remaining)
 
-    all_results = static_results + id_results
+    all_results = static_results + channel_results + id_results
     posts = [r for r in all_results if r["content_type"] == "POST"]
-    logger.info(f"NATEPAN v5 완료: posts={len(posts)}, total={len(all_results)}")
+    logger.info(f"NATEPAN v5+ 완료: static={static_count} + channel={channel_count} + id_range={len([r for r in id_results if r['content_type'] == 'POST'])} = {len(posts)} posts")
     return all_results
