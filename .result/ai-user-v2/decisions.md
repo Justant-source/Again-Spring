@@ -163,3 +163,31 @@ v1 baseline (88.9%) → v2 Ph3+4 (66.7%) → v3 Ph5b (55.6%)
 - 조건 3 (광장별 clean ≥ 임계): ❌ FRIEND 165·WORK 156 < 수백 (오너 임계 미확정)
 
 **결정**: QLoRA 비발동. 100% 프롬프트 유지 → Phase 8 최종 블라인드 직행.
+
+---
+
+## V2-D08 (🔄 진행 중) — Phase 8 최종 판정 (설문 배포 2026-06-22)
+
+**날짜**: 2026-06-22~TBD  
+**상태**: 🔄 응답 수집 중
+
+**배경**: Phase 7 QLoRA 비발동 후 100% 프롬프트 유지. Phase 8은 신선 캐주얼 평가자(naive ≥3인)로 최종 블라인드 측정하여 kill criterion 판정.
+
+**설문 배포 현황**:
+- 평가자용 `v2.1-phase8-01-evaluator.html` 배포 완료 (2026-06-22)
+- 채점 경로 검증 완료: answer-key(A-A-H-A-H-H-A-H-H-A) ↔ evaluator.html ↔ scoring-calculator
+- `v2.1-phase8-01-results.md` 스캐폴드 준비: ANSWER_KEY 사전 기입, PASS/FAIL 분기 설계 완료
+
+**판정 규칙 (kill criterion)**:
+```
+신선 캐주얼 독자(≥3인) 통합 평균 봇 식별률:
+
+≤ 60%  → ✅ PASS (출하 08b)  : NATEPAN 광장 정렬 레버 prod 배포 (절대규칙 #4)
+> 60%  → ❌ FAIL (옵션 08d) : QLoRA 데이터게이트 / 품질-피벗 (오너 결정)
+```
+
+**다음 단계**:
+1. naive ≥3 응답 수집 (회전 레지스트리 기록)
+2. 채점 자동화 (`scoring-calculator.html`)
+3. kill criterion 통합 평균 산출
+4. 판정 기록 + 출하/옵션 제시 + 교훈 봉인

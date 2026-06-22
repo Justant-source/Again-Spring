@@ -167,7 +167,7 @@ After all evaluators in a round complete:
 | Round | Kit | Naive Avg Score | Gate Criterion (≤60%) | Status | Next Step |
 |-------|-----|-----------------|------------------------|--------|-----------|
 | 5 | v2.1-phase5-01 | **80%** | 80% > 60% → FAIL | ✗ FAIL | Phase 6 결정론 다양화 (T1·T3·T4) |
-| 8 | v2.1-phase8-01 | TBD | TBD | 🔄 키트 구성 중 | 신선 평가자 E-004~006 모집 후 실시 |
+| 8 | v2.1-phase8-01 | TBD | TBD | 🔄 응답 수집 중 | 설문 배포 완료(2026-06-22)·신선 평가자 E-004~006 응답 대기 |
 
 ---
 
