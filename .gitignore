@@ -61,6 +61,7 @@ Thumbs.db
 .result/*
 !.result/ai-user/
 !.result/ai-user-v2/
+!.result/ai-user-v3/
 # ===== Editor caches =====
 .idea/
 *.iml
