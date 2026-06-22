@@ -390,15 +390,60 @@
     color: #7a5200;
   }
   .unanswered { border-color: #e74c3c; box-shadow: 0 0 0 3px #fde; }
+
+  /* ===== 스텝(페이지) 전환 ===== */
+  .step { display: none; }
+  .step.active { display: block; animation: fadeIn 0.22s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* 인트로 화면 */
+  .intro-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 26px 24px; margin-bottom: 20px;
+  }
+  .intro-card h2 { font-size: 1.12rem; margin-bottom: 14px; color: var(--accent); }
+  .intro-purpose {
+    background: var(--accent-light); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 16px 18px; margin-bottom: 20px;
+    font-size: 0.92rem; line-height: 1.75;
+  }
+  .intro-card .how { font-weight: 700; font-size: 0.92rem; display: block; margin-bottom: 8px; }
+  .intro-card ul { padding-left: 20px; margin-bottom: 16px; }
+  .intro-card li { margin-bottom: 7px; font-size: 0.9rem; }
+
+  /* 하단 네비게이션 바 */
+  .nav-bar {
+    position: sticky; bottom: 0; z-index: 50;
+    display: flex; gap: 10px; padding: 14px 0 18px;
+    background: linear-gradient(to top, var(--bg) 72%, rgba(247,246,243,0));
+  }
+  .nav-btn {
+    padding: 15px; border-radius: 8px; border: none;
+    font-size: 1rem; font-weight: 700; font-family: inherit; cursor: pointer;
+    min-height: 52px; transition: background 0.15s;
+  }
+  .nav-btn.prev { flex: 0 0 32%; background: #ece9e3; color: var(--muted); }
+  .nav-btn.prev:active { background: #ddd9d1; }
+  .nav-btn.next { flex: 1; background: var(--accent); color: #fff; }
+  .nav-btn.next:active { background: #325a3f; }
+  .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* 완료 화면 */
+  .complete-screen { text-align: center; }
+  .complete-screen .big-check { font-size: 3.2rem; line-height: 1; margin-bottom: 6px; }
+  .complete-screen h2 { font-size: 1.2rem; margin-bottom: 16px; color: var(--accent); }
+  .complete-screen .deliver-note,
+  .complete-screen .result-text,
+  .complete-screen .copy-hint { text-align: left; }
 </style>
 </head>
 <body>
 
 <!-- 진행 상황 표시 바 -->
-<div class="progress-bar-wrap">
-  <span>진행</span>
+<div class="progress-bar-wrap" id="progressBar" style="display:none;">
+  <span class="step-label" id="stepLabel">문제 1 / 10</span>
   <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-  <span class="progress-count" id="progressCount">0 / 10</span>
+  <span class="progress-count" id="progressCount">선택 0 / 10</span>
 </div>
 
 <div class="container">
@@ -406,42 +451,45 @@
   <!-- 헤더 -->
   <div class="header">
     <h1>블라인드 평가 — 다시봄 커뮤니티</h1>
-    <p>각 문제의 글을 읽고 작성자가 사람인지 봇인지 직관적으로 판단해 주세요.</p>
+    <p>사람이 쓴 글과 AI가 쓴 글을 구분해 주세요.</p>
   </div>
-
-  <!-- 가이드 박스 -->
-  <div class="guide">
-    <h2>📋 작성 방법</h2>
-    <ul>
-      <li>아래에는 <strong>총 10개의 문제</strong>가 있습니다. 각 문제는 한 작성자의 글 2~3개입니다.</li>
-      <li>각 문제에서 <strong>"사람"</strong> 또는 <strong>"봇"</strong> 중 하나를 선택하세요.</li>
-      <li><strong>자신감 슬라이더</strong>: 얼마나 확신하는지 0~100% 중 선택하세요. <em>(50% = 반반 모르겠다)</em></li>
-      <li><strong>메모</strong>: 왜 그렇게 느꼈는지 간단히 적어도 좋고, 비워도 됩니다.</li>
-      <li>모두 완료 후 <strong>종합의견</strong>을 작성하고 제출하면 전달용 텍스트가 생성됩니다.</li>
-      <li>📋 제출 후 만들어지는 <strong>결과 텍스트를 복사해서, 평가를 요청한 담당자에게 보내주세요.</strong> (이 페이지는 자동 전송되지 않습니다.)</li>
-      <li>💾 입력 내용은 <strong>자동 저장</strong>됩니다 — 실수로 창을 닫거나 새로고침해도 다시 열면 이어서 할 수 있어요.</li>
-    </ul>
-    <ul class="dont">
-      <li>❌ 문장 길이·단어를 분석하지 마세요</li>
-      <li>❌ 이전에 본 글과 비교하지 마세요</li>
-      <li>❌ "AI 같은 표현"을 찾으려 하지 마세요</li>
-      <li>✅ 글을 쭉 읽고 <strong>전체적인 느낌</strong>만으로 판단해 주세요</li>
-    </ul>
-  </div>
-
-  <!-- 평가자 이름 -->
-  <div class="evaluator-info">
-    <label for="evaluatorName">평가자 이름 / 닉네임 <span style="color:var(--bot);font-size:0.8rem;">*필수</span></label>
-    <input type="text" id="evaluatorName" placeholder="예: 김철수, 익명1..." autocomplete="off">
-  </div>
-
-  <!-- 경고 메시지 -->
-  <div class="warning" id="warningMsg">⚠️ 아직 선택하지 않은 문제가 있습니다. 모든 문제에 응답해 주세요.</div>
 
   <form id="evalForm" onsubmit="return false;">
 
+  <!-- ======== STEP 0: 인트로 (목적·방법) ======== -->
+  <div class="step active" id="step-intro">
+    <div class="intro-card">
+      <h2>🎯 이 평가는 무엇인가요?</h2>
+      <div class="intro-purpose">
+        다시봄 커뮤니티 게시글 중에는 <strong>실제 사람이 쓴 글</strong>과
+        <strong>AI가 자동으로 만든 글</strong>이 섞여 있습니다.<br>
+        여러분이 <strong>직관만으로 둘을 구분</strong>해 주시면,
+        AI 글이 얼마나 사람처럼 자연스러운지 측정하는 데 큰 도움이 됩니다.<br>
+        <strong>정답을 맞히는 시험이 아닙니다</strong> — 편하게 느낌으로 답해 주세요.
+      </div>
+      <span class="how">📋 진행 방법</span>
+      <ul>
+        <li>총 <strong>10개 문제</strong>를 <strong>한 문제씩</strong> 보여드립니다. (위쪽에 <strong>문제 N / 10</strong> 으로 진행 상황 표시)</li>
+        <li>각 문제에서 작성자가 <strong>사람</strong>인지 <strong>봇</strong>인지 고르고, 얼마나 확신하는지 표시하세요.</li>
+        <li>약 <strong>10~15분</strong> 소요. 입력은 <strong>자동 저장</strong>되어 중간에 닫아도 이어서 할 수 있어요.</li>
+        <li>마지막에 <strong>결과를 복사해 담당자에게 전달</strong>하면 끝납니다.</li>
+      </ul>
+      <ul class="dont">
+        <li>❌ 문장 길이·단어를 분석하지 마세요</li>
+        <li>❌ "AI 같은 표현"을 일부러 찾으려 하지 마세요</li>
+        <li>✅ 글을 쭉 읽고 <strong>전체적인 느낌</strong>만으로 판단해 주세요</li>
+      </ul>
+      <div class="evaluator-info" style="margin-top:18px;">
+        <label for="evaluatorName">이름 / 닉네임 <span style="color:var(--bot);font-size:0.8rem;">*필수</span></label>
+        <input type="text" id="evaluatorName" placeholder="예: 김철수, 익명1..." autocomplete="off">
+      </div>
+      <div class="warning" id="introWarn" style="margin-top:12px;">⚠️ 이름 또는 닉네임을 입력해 주세요.</div>
+    </div>
+  </div>
+
+
   <!-- ======== 문제 1 ======== -->
-  <div class="problem-card" id="card-1">
+  <div class="problem-card step" id="card-1">
     <div class="problem-header">
       <span class="problem-num">문제 1</span>
       <span class="problem-category">WORK</span>
@@ -493,7 +541,7 @@
   </div>
 
   <!-- ======== 문제 2 ======== -->
-  <div class="problem-card" id="card-2">
+  <div class="problem-card step" id="card-2">
     <div class="problem-header">
       <span class="problem-num">문제 2</span>
       <span class="problem-category">FRIEND</span>
@@ -542,7 +590,7 @@
   </div>
 
   <!-- ======== 문제 3 ======== -->
-  <div class="problem-card" id="card-3">
+  <div class="problem-card step" id="card-3">
     <div class="problem-header">
       <span class="problem-num">문제 3</span>
       <span class="problem-category">FRIEND</span>
@@ -591,7 +639,7 @@
   </div>
 
   <!-- ======== 문제 4 ======== -->
-  <div class="problem-card" id="card-4">
+  <div class="problem-card step" id="card-4">
     <div class="problem-header">
       <span class="problem-num">문제 4</span>
       <span class="problem-category">MARRIED</span>
@@ -640,7 +688,7 @@
   </div>
 
   <!-- ======== 문제 5 ======== -->
-  <div class="problem-card" id="card-5">
+  <div class="problem-card step" id="card-5">
     <div class="problem-header">
       <span class="problem-num">문제 5</span>
       <span class="problem-category">MARRIED</span>
@@ -689,7 +737,7 @@
   </div>
 
   <!-- ======== 문제 6 ======== -->
-  <div class="problem-card" id="card-6">
+  <div class="problem-card step" id="card-6">
     <div class="problem-header">
       <span class="problem-num">문제 6</span>
       <span class="problem-category">COUPLE</span>
@@ -738,7 +786,7 @@
   </div>
 
   <!-- ======== 문제 7 ======== -->
-  <div class="problem-card" id="card-7">
+  <div class="problem-card step" id="card-7">
     <div class="problem-header">
       <span class="problem-num">문제 7</span>
       <span class="problem-category">COUPLE</span>
@@ -787,7 +835,7 @@
   </div>
 
   <!-- ======== 문제 8 ======== -->
-  <div class="problem-card" id="card-8">
+  <div class="problem-card step" id="card-8">
     <div class="problem-header">
       <span class="problem-num">문제 8</span>
       <span class="problem-category">FAMILY</span>
@@ -836,7 +884,7 @@
   </div>
 
   <!-- ======== 문제 9 ======== -->
-  <div class="problem-card" id="card-9">
+  <div class="problem-card step" id="card-9">
     <div class="problem-header">
       <span class="problem-num">문제 9</span>
       <span class="problem-category">WORK</span>
@@ -885,7 +933,7 @@
   </div>
 
   <!-- ======== 문제 10 ======== -->
-  <div class="problem-card" id="card-10">
+  <div class="problem-card step" id="card-10">
     <div class="problem-header">
       <span class="problem-num">문제 10</span>
       <span class="problem-category">FAMILY</span>
@@ -933,28 +981,28 @@
     </div>
   </div>
 
-  <!-- ======== 종합의견 ======== -->
-  <div class="overall-section">
-    <h2>종합의견 <span style="font-weight:400;color:#aaa;font-size:0.88rem;">(선택)</span></h2>
-    <p>전체를 읽고 나서 느낀 점, 특이하게 느껴진 문제, 판단 기준으로 삼은 것 등 자유롭게 적어주세요.</p>
-    <textarea id="overallOpinion" placeholder="예: 문제 3은 특히 어색하게 느껴졌음. 글 톤이 너무 일정한 것 같았음...&#10;문제 1과 8은 사람처럼 읽혔는데 이유를 설명하기 어려움..."></textarea>
+  <!-- ======== STEP 11: 종합의견 (마지막 입력) ======== -->
+  <div class="step" id="step-final">
+    <div class="overall-section">
+      <h2>거의 다 끝났어요! 종합의견 <span style="font-weight:400;color:#aaa;font-size:0.88rem;">(선택)</span></h2>
+      <p>전체를 읽고 느낀 점, 특이하게 느껴진 문제, 판단 기준 등을 자유롭게 적어주세요. 비워두셔도 됩니다.</p>
+      <textarea id="overallOpinion" placeholder="예: 문제 3은 특히 어색하게 느껴졌음. 글 톤이 너무 일정한 것 같았음...&#10;문제 1과 8은 사람처럼 읽혔는데 이유를 설명하기 어려움..."></textarea>
+    </div>
   </div>
-
-  <!-- 경고 -->
-  <div class="warning" id="warningMsg">⚠️ 아직 선택하지 않은 문제가 있습니다. 아래로 스크롤해서 모든 문제에 응답해 주세요.</div>
-
-  <!-- 제출 버튼 -->
-  <button type="button" class="submit-btn" onclick="submitEval()">✅ 제출하고 결과 텍스트 생성</button>
 
   </form><!-- /evalForm -->
 
-  <!-- 결과 박스 (제출 후 이동) -->
-  <div class="result-box" id="resultBox">
-    <h2>✅ 응답이 완료되었습니다</h2>
+  <!-- 미응답 경고 (네비게이션 위에 표시) -->
+  <div class="warning" id="warningMsg" style="display:none;"></div>
+
+  <!-- ======== STEP 12: 완료 (결과·복사 안내) ======== -->
+  <div class="step complete-screen" id="step-complete">
+    <div class="big-check">✅</div>
+    <h2>응답이 완료되었습니다!</h2>
     <div class="deliver-note">
       아래 회색 칸의 <strong>결과 텍스트 전체</strong>를 복사해서<br>
       <strong>평가를 요청한 담당자에게 카카오톡(또는 문자·메일)으로 보내주세요.</strong><br>
-      이 페이지는 자동으로 전송되지 않습니다 — 직접 복사해서 전달해야 결과가 반영됩니다.
+      📌 이 페이지는 <strong>자동으로 전송되지 않습니다</strong> — 꼭 복사해서 전달해야 결과가 반영됩니다.
     </div>
     <textarea class="result-text" id="resultText" readonly></textarea>
     <div class="result-actions">
@@ -970,24 +1018,109 @@
     </div>
   </div>
 
+  <!-- ======== 하단 네비게이션 ======== -->
+  <div class="nav-bar" id="navBar">
+    <button type="button" class="nav-btn prev" id="prevBtn" onclick="prevStep()">← 이전</button>
+    <button type="button" class="nav-btn next" id="nextBtn" onclick="nextStep()">평가 시작하기</button>
+  </div>
+
 </div><!-- /container -->
 
 <script>
-const STORAGE_KEY = 'dasibom_phase8_eval_v1';
+const STORAGE_KEY = 'dasibom_phase8_eval_v2';  // step 구조 변경 → 키 갱신
 const TOTAL = 10;
 let answers = {};
+
+/* 스텝 시퀀스: intro → 문제1~10 → final(종합의견) → complete(결과) */
+const STEP_IDS = ['step-intro'];
+for (let i = 1; i <= TOTAL; i++) STEP_IDS.push('card-' + i);
+STEP_IDS.push('step-final', 'step-complete');
+const COMPLETE_IDX = STEP_IDS.indexOf('step-complete');
+const FINAL_IDX = STEP_IDS.indexOf('step-final');
+let stepIdx = 0;
+
+function currentId() { return STEP_IDS[stepIdx]; }
+
+/* ---------- 스텝 표시 ---------- */
+function showStep(idx) {
+  stepIdx = Math.max(0, Math.min(idx, STEP_IDS.length - 1));
+  STEP_IDS.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', i === stepIdx);
+  });
+  updateChrome();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  saveState();
+}
+
+/* 진행바 + 네비게이션 버튼 상태 */
+function updateChrome() {
+  const id = currentId();
+  const bar = document.getElementById('progressBar');
+  const nav = document.getElementById('navBar');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const m = id.match(/^card-(\d+)$/);
+  if (m) {
+    bar.style.display = 'flex';
+    document.getElementById('stepLabel').textContent = '문제 ' + m[1] + ' / ' + TOTAL;
+    document.getElementById('progressFill').style.width = (parseInt(m[1], 10) / TOTAL * 100) + '%';
+  } else {
+    bar.style.display = 'none';
+  }
+  updateProgressCount();
+  if (id === 'step-complete') { nav.style.display = 'none'; return; }
+  nav.style.display = 'flex';
+  prevBtn.style.visibility = (id === 'step-intro') ? 'hidden' : 'visible';
+  if (id === 'step-intro') nextBtn.textContent = '평가 시작하기 →';
+  else if (id === 'step-final') nextBtn.textContent = '제출하고 결과 만들기 ✅';
+  else nextBtn.textContent = '다음 →';
+}
+
+function updateProgressCount() {
+  document.getElementById('progressCount').textContent = '선택 ' + Object.keys(answers).length + ' / ' + TOTAL;
+}
+
+/* ---------- 네비게이션 ---------- */
+function nextStep() {
+  const id = currentId();
+  const warn = document.getElementById('warningMsg');
+  warn.style.display = 'none';
+  if (id === 'step-intro') {
+    const nameEl = document.getElementById('evaluatorName');
+    if (!nameEl.value.trim()) { document.getElementById('introWarn').style.display = 'block'; nameEl.focus(); return; }
+    document.getElementById('introWarn').style.display = 'none';
+    showStep(stepIdx + 1); return;
+  }
+  const m = id.match(/^card-(\d+)$/);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if (!answers[n]) {
+      document.getElementById('card-' + n).classList.add('unanswered');
+      warn.textContent = '⚠️ 사람인지 봇인지 선택한 뒤 다음으로 넘어가 주세요.';
+      warn.style.display = 'block'; return;
+    }
+    showStep(stepIdx + 1); return;
+  }
+  if (id === 'step-final') { submitEval(); return; }
+}
+
+function prevStep() {
+  document.getElementById('warningMsg').style.display = 'none';
+  if (stepIdx > 0) showStep(stepIdx - 1);
+}
 
 /* ---------- 자동 저장 / 복원 (새로고침·앱전환 방어) ---------- */
 function saveState() {
   try {
-    const state = { name: '', answers: answers, sliders: {}, memos: {}, overall: '' };
+    const state = { name: '', step: stepIdx, answers: answers, sliders: {}, memos: {}, overall: '' };
     const nameEl = document.getElementById('evaluatorName');
     if (nameEl) state.name = nameEl.value;
     for (let i = 1; i <= TOTAL; i++) {
       const s = document.getElementById('slider-' + i);
-      const m = document.getElementById('memo-' + i);
+      const mm = document.getElementById('memo-' + i);
       if (s) state.sliders[i] = s.value;
-      if (m) state.memos[i] = m.value;
+      if (mm) state.memos[i] = mm.value;
     }
     const ov = document.getElementById('overallOpinion');
     if (ov) state.overall = ov.value;
@@ -999,10 +1132,10 @@ function restoreState() {
   let state;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
+    if (!raw) return 0;
     state = JSON.parse(raw);
-  } catch (e) { return; }
-  if (!state) return;
+  } catch (e) { return 0; }
+  if (!state) return 0;
   if (state.name) document.getElementById('evaluatorName').value = state.name;
   if (state.answers) {
     Object.keys(state.answers).forEach(n => {
@@ -1016,24 +1149,17 @@ function restoreState() {
       if (b) b.classList.toggle('selected', val === '봇');
     });
   }
-  if (state.sliders) {
-    Object.keys(state.sliders).forEach(i => {
-      const s = document.getElementById('slider-' + i);
-      if (s) {
-        s.value = state.sliders[i];
-        const sv = document.getElementById('sv-' + i);
-        if (sv) sv.textContent = state.sliders[i] + '%';
-      }
-    });
-  }
-  if (state.memos) {
-    Object.keys(state.memos).forEach(i => {
-      const m = document.getElementById('memo-' + i);
-      if (m) m.value = state.memos[i];
-    });
-  }
+  if (state.sliders) Object.keys(state.sliders).forEach(i => {
+    const s = document.getElementById('slider-' + i);
+    if (s) { s.value = state.sliders[i]; const sv = document.getElementById('sv-' + i); if (sv) sv.textContent = state.sliders[i] + '%'; }
+  });
+  if (state.memos) Object.keys(state.memos).forEach(i => {
+    const mm = document.getElementById('memo-' + i); if (mm) mm.value = state.memos[i];
+  });
   if (state.overall) document.getElementById('overallOpinion').value = state.overall;
-  updateProgress();
+  let s = (typeof state.step === 'number') ? state.step : 0;
+  if (s >= COMPLETE_IDX) s = FINAL_IDX;  // 완료화면으로는 복원하지 않음 (결과 미생성 상태)
+  return s;
 }
 
 /* ---------- 선택 / 슬라이더 ---------- */
@@ -1045,51 +1171,32 @@ function selectChoice(n, val) {
   if (b) b.classList.toggle('selected', val === '봇');
   const card = document.getElementById('card-' + n);
   if (card) card.classList.remove('unanswered');
-  updateProgress();
+  document.getElementById('warningMsg').style.display = 'none';
+  updateProgressCount();
   saveState();
 }
 
 function updateSlider(n) {
-  const val = document.getElementById('slider-' + n).value;
-  document.getElementById('sv-' + n).textContent = val + '%';
+  document.getElementById('sv-' + n).textContent = document.getElementById('slider-' + n).value + '%';
   saveState();
 }
 
-function updateProgress() {
-  const done = Object.keys(answers).length;
-  const pct = Math.round(done / TOTAL * 100);
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressCount').textContent = done + ' / ' + TOTAL;
-}
-
-/* ---------- 제출 ---------- */
+/* ---------- 제출 → 결과 생성 + 완료 화면 ---------- */
 function submitEval() {
-  const nameEl = document.getElementById('evaluatorName');
-  const name = nameEl.value.trim();
-  if (!name) {
-    nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    nameEl.focus();
-    nameEl.style.outline = '2px solid #e74c3c';
-    setTimeout(() => { nameEl.style.outline = ''; }, 2000);
-    return;
-  }
+  const name = document.getElementById('evaluatorName').value.trim();
+  if (!name) { showStep(0); document.getElementById('introWarn').style.display = 'block'; return; }
 
-  // 미응답 체크
   const missing = [];
-  for (let i = 1; i <= TOTAL; i++) {
-    if (!answers[i]) missing.push(i);
-  }
-  const warn = document.getElementById('warningMsg');
+  for (let i = 1; i <= TOTAL; i++) if (!answers[i]) missing.push(i);
   if (missing.length > 0) {
+    const warn = document.getElementById('warningMsg');
+    warn.textContent = '⚠️ 아직 선택 안 한 문제로 이동합니다: 문제 ' + missing[0];
     warn.style.display = 'block';
-    warn.textContent = '⚠️ 아직 선택하지 않은 문제가 있습니다: ' + missing.map(x => '문제 ' + x).join(', ');
-    missing.forEach(n => { document.getElementById('card-' + n).classList.add('unanswered'); });
-    document.getElementById('card-' + missing[0]).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('card-' + missing[0]).classList.add('unanswered');
+    showStep(missing[0]);  // STEP_IDS[N] === 'card-N'
     return;
   }
-  warn.style.display = 'none';
 
-  // 결과 텍스트 생성
   const now = new Date();
   const pad = x => String(x).padStart(2, '0');
   const dateStr = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate());
@@ -1100,7 +1207,6 @@ function submitEval() {
   txt += '일시: ' + dateStr + ' ' + timeStr + '\n';
   txt += '키트: v2.1-Phase8-01\n';
   txt += '================================\n\n';
-
   for (let i = 1; i <= TOTAL; i++) {
     const confidence = document.getElementById('slider-' + i).value;
     const memo = document.getElementById('memo-' + i).value.trim();
@@ -1108,7 +1214,6 @@ function submitEval() {
     if (memo) txt += '\n  메모: ' + memo;
     txt += '\n';
   }
-
   const overall = document.getElementById('overallOpinion').value.trim();
   txt += '\n[종합의견]\n' + (overall || '(없음)') + '\n';
   txt += '\n================================\n';
@@ -1116,13 +1221,8 @@ function submitEval() {
   txt += '사람 판정 개수: ' + Object.values(answers).filter(v => v === '사람').length + '/10\n';
 
   document.getElementById('resultText').value = txt;
-  const box = document.getElementById('resultBox');
-  box.style.display = 'block';
-  // Web Share 지원 기기(주로 모바일)에서만 공유 버튼 노출
-  if (navigator.share) {
-    document.getElementById('shareBtn').style.display = 'inline-flex';
-  }
-  box.scrollIntoView({ behavior: 'smooth' });
+  if (navigator.share) document.getElementById('shareBtn').style.display = 'inline-flex';
+  showStep(COMPLETE_IDX);
 }
 
 /* ---------- 복사 (크로스 브라우저 / 비보안 컨텍스트 대응) ---------- */
@@ -1155,7 +1255,6 @@ function copyFail() {
 
 function copyResult() {
   const txt = document.getElementById('resultText').value;
-  // navigator.clipboard 는 보안 컨텍스트(https)에서만 존재 — 없으면 즉시 폴백
   if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
     navigator.clipboard.writeText(txt).then(copyDone).catch(() => {
       if (legacyCopy()) copyDone(); else copyFail();
@@ -1165,7 +1264,7 @@ function copyResult() {
   }
 }
 
-/* ---------- 공유 (모바일 Web Share — 카톡·메시지 등) ---------- */
+/* ---------- 공유 (모바일 Web Share) ---------- */
 function shareResult() {
   const txt = document.getElementById('resultText').value;
   if (navigator.share) {
@@ -1175,17 +1274,18 @@ function shareResult() {
   }
 }
 
-/* ---------- 초기화: 복원 + 입력요소 자동저장 바인딩 ---------- */
+/* ---------- 초기화: 복원 + 자동저장 바인딩 + 시작 스텝 ---------- */
 document.addEventListener('DOMContentLoaded', function () {
-  restoreState();
+  const startStep = restoreState();
   const nm = document.getElementById('evaluatorName');
-  if (nm) nm.addEventListener('input', saveState);
+  if (nm) nm.addEventListener('input', function () { document.getElementById('introWarn').style.display = 'none'; saveState(); });
   const ov = document.getElementById('overallOpinion');
   if (ov) ov.addEventListener('input', saveState);
   for (let i = 1; i <= TOTAL; i++) {
-    const m = document.getElementById('memo-' + i);
-    if (m) m.addEventListener('input', saveState);
+    const mm = document.getElementById('memo-' + i);
+    if (mm) mm.addEventListener('input', saveState);
   }
+  showStep(startStep);
 });
 </script>
 </body>
