@@ -461,6 +461,28 @@ Phase 8 평가자 tell(T6 과교정문법·T7 슬랭부재)에 대응하여 `VOI
 
 **효과**: 슬랭 신호(chosung) 강화 + 오타 자연성 개선 → 평가자 T6(과교정)·T7(슬랭부재) 개선 기대
 
+#### §7.4 스타일 분포 측정 + B2 캘리브레이션 결과 (2026-06-22)
+
+**A0 분포 측정** (`ai-user/learning/app/services/measure_style_distribution.py`):
+
+| 지표 | 인간(1000개) | AI(309개) |
+|---|---|---|
+| 슬랭토큰 포함 비율 | 19.9% | 44.3% ⬆ |
+| 초성 포함 비율 | 20.2% | 33.7% ⬆ |
+| 종결어미 다양도(종류 수 평균) | 0.64 | 1.66 ⬆ |
+| 쉼표율 | 0.0035 | 0.0030 |
+| 온점율 | 0.0113 | 0.0060 |
+
+> **집계 해석 주의**: AI 슬랭 44.3%는 DCINSIDE/FMKOREA 등 고슬랭 voice가 지배. Phase 8 kit(BLIND/THEQOO voice)는 zero/low 슬랭 → A 레버 변경(THEQOO typo↑·NATEPAN·GENERAL chosung 추가) 유효.
+
+**B2 캘리브레이션 실패**:
+- human rare-ratio 중앙값 0.441 > AI 0.282 → 인간이 AI보다 희귀어 더 사용
+- θ=0.30 기준 human FP = 77.9% (목표 ≤12% 달성 불가)
+- **원인**: 인간 커뮤니티 글의 자연스러운 어휘 다양성(지역어·신조어·타이포)이 "희귀어" 통계를 왜곡
+- **결정**: 빈도기반 접근 폐기 → B 폴백 경로(explicit 문어체 denylist) 실행
+  - `SELF_CRITIQUE_EXTRA_CLICHES`에 13개 문어체 어휘 추가: `방증,여실히,함의,귀결,개탄,단언컨대,요컨대,결론적으로,시사하는,기인하,고찰,도출,엄연한`
+  - `SelfCritiqueService` 빈도기반 detector #12는 `ENABLED=false` 유지(dark, 미래 재캘리브레이션용)
+
 ---
 
 ## 8. 품질 필터 (QualityFilter)

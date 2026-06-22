@@ -49,16 +49,23 @@ public class OutputSanitizer {
     private static final java.util.Map<String, VoiceDistribution> VOICE_DIST;
     static {
         VOICE_DIST = new java.util.HashMap<>();
-        VOICE_DIST.put("NATEPAN",  new VoiceDistribution(0.011, false, null, 0.70, true, 0.50));
+        // A1(typoProb/sampleProb 상향)·A2(chosungInject 확대) — T6 과교정문법·T7 슬랭부재 대응 (2026-06-22)
+        // NATEPAN: typoProb 0.50→0.60(A1), chosungInject false→true + 감성 phrases(A2)
+        VOICE_DIST.put("NATEPAN",  new VoiceDistribution(0.011, true,
+            new String[]{"ㅠㅠ","ㅋㅋ","ㄹㅇ","헐"}, 0.70, true, 0.60));
         VOICE_DIST.put("DCINSIDE", new VoiceDistribution(0.030, true,
             new String[]{"ㄹㅇ","ㅇㅈ","ㄷㄷ","ㅋㅋ"}, 0.80, true, 0.50));
-        VOICE_DIST.put("BLIND",    new VoiceDistribution(0.015, false, null, 0.60, true, 0.45));
-        VOICE_DIST.put("GENERAL",  new VoiceDistribution(0.015, false, null, 0.50, true, 0.45));
+        // BLIND: typoProb 0.45→0.55(A1). polite 계정이므로 chosung은 유지(false).
+        VOICE_DIST.put("BLIND",    new VoiceDistribution(0.015, false, null, 0.60, true, 0.55));
+        // GENERAL: typoProb 0.45→0.55·sampleProb 0.50→0.60(A1), chosungInject false→true + 중립 phrases(A2)
+        VOICE_DIST.put("GENERAL",  new VoiceDistribution(0.015, true,
+            new String[]{"ㅋㅋ","ㅠㅠ","ㅇㅇ","ㄹㅇ"}, 0.60, true, 0.55));
         VOICE_DIST.put("FMKOREA",  new VoiceDistribution(0.015, true,
             new String[]{"ㄹㅇㅋㅋ","ㄷㄷ","ㅇㅈ","후추"}, 0.80, true, 0.50));
         VOICE_DIST.put("RULIWEB",  new VoiceDistribution(0.018, false, null, 0.60, true, 0.45));
+        // THEQOO: typoProb 0.30→0.55·sampleProb 0.60→0.70(A1). 실효율 0.18→0.385(최저→중간). chosung 유지.
         VOICE_DIST.put("THEQOO",   new VoiceDistribution(0.011, true,
-            new String[]{"ㅠㅠ","ㄷㄷ","그니까","ㅇㅇ"}, 0.60, true, 0.30));
+            new String[]{"ㅠㅠ","ㄷㄷ","그니까","ㅇㅇ"}, 0.70, true, 0.55));
         VOICE_DIST.put("ARCALIVE", new VoiceDistribution(0.015, true,
             new String[]{"ㄹㅇ","ㄱㄱ","ㅇㅇ","어쩔"}, 0.80, true, 0.40));
         VOICE_DIST.put("INVEN",    new VoiceDistribution(0.015, false, null, 0.60, true, 0.45));

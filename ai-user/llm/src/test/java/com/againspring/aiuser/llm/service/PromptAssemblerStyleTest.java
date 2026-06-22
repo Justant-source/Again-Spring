@@ -103,6 +103,8 @@ class PromptAssemblerStyleTest {
         String user = prompt.split("<<<USER_PROMPT>>>", 2)[1];
 
         assertTrue(user.contains("[내가 최근에 쓴 글 — 반복 방지]"));
-        assertTrue(user.contains("같은 소재·사건 유형 반복 금지"), "글은 소재 반복 금지 규칙 포함");
+        // Phase 6에서 extraRule 문구 변경: "같은 소재·사건 유형 반복 금지" → "완전히 다른 유형의 갈등 상황으로 쓸 것"
+        // PromptAssembler.java:180 기준값
+        assertTrue(user.contains("완전히 다른 유형의 갈등 상황으로 쓸 것"), "글은 소재 반복 금지 규칙 포함");
     }
 }

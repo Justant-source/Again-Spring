@@ -51,6 +51,12 @@ self-critique:
   pass-threshold: ${SELF_CRITIQUE_THRESHOLD:5}
   # 추가 AI 상투구 (쉼표 구분 리터럴) — 운영 중 발견 시 재배포 없이 등록
   extra-cliches: ${SELF_CRITIQUE_EXTRA_CLICHES:}
+  rare-vocab:
+    # 어휘이질(T5) detector — 캘리브레이션 후 enabled: true 설정
+    enabled: ${SELF_CRITIQUE_RARE_VOCAB_ENABLED:false}
+    ratio-threshold: ${SELF_CRITIQUE_RARE_VOCAB_RATIO:0.18}
+    min-tokens: ${SELF_CRITIQUE_RARE_VOCAB_MIN_TOKENS:25}
+    penalty: ${SELF_CRITIQUE_RARE_VOCAB_PENALTY:1}
 
 anthropic:
   api-key: ${ANTHROPIC_API_KEY:-}
