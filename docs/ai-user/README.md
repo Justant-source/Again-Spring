@@ -312,6 +312,7 @@ CREATE TABLE example_bank (
 | [learning.md](learning.md) | RAG 서비스 상세 (임베딩, 크롤러, VECTOR INDEX) |
 | [quickstart.md](quickstart.md) | prod 배포 가이드 |
 | [operations.md](operations.md) | prod 운영·모니터링·트러블슈팅 |
+| [history.md](history.md) | **v2/v2.1 프로젝트 히스토리** (광장 정렬·블라인드 평가·Phase 8 PASS·코퍼스 정제) |
 | [personas/](personas/) | 페르소나 설정 & 가이드 |
 
 ---

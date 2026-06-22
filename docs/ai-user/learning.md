@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS example_bank (
 | `id` | BIGINT | 자동 증분 PK | 12345 |
 | `content` | LONGTEXT | 글/댓글 본문 | "남편이 내 일기장을..." |
 | `content_type` | VARCHAR(16) | 콘텐츠 종류 | "post", "comment", "reply" |
-| `category` | VARCHAR(32) | 카테고리 (크롤러 기준) | "talk", "hot", "freeboard", "workplace", ... |
+| `category` | VARCHAR(32) | 카테고리 (크롤러 또는 광장 분류기) | "talk", "hot", "freeboard", "workplace", "COUPLE", "MARRIED", "WORK", ... |
 | `topic` | VARCHAR(16) | 앱 토픽 분류 (Phase 4+) | "COUPLE", "MARRIED", "WORK", ... |
 | `source` | VARCHAR(32) | 크롤러 소스 | "naver_news", "dcinside", "blind", ... |
 | `title` | VARCHAR(512) | 원문 제목 (optional, 글만 해당) | "남편의 일기장 침해 사건" |
@@ -273,7 +273,7 @@ async def startup():
 | `naver_comments.py` | `naver_news` | `relationship_conflict` | comment | 500 | ✅ |
 | `daum_comments.py` | `daum_news` | `relationship_conflict` | comment | 500 | ✅ |
 | `dcinside.py` | `dcinside` | post.gall_id (동적) | post | 100 | ✅ |
-| `natepan.py` | `natepan` | `talk` | post | 400 | ✅ |
+| `natepan.py` | `natepan` | `talk`, `COUPLE`, `MARRIED`, `WORK` (v2.1+) | post | 400+ | ✅ |
 | `bobaedream.py` | `bobaedream` | `freeb` | post | 100+ | ✅ |
 | `blind.py` | `blind` | `workplace`, `marriage`, `romance` | post | 240 | ✅ |
 | `fmkorea.py` | `fmkorea` | `best` | post | 100+ | ✅ |
@@ -284,6 +284,78 @@ async def startup():
 | `mlbpark.py` | `mlbpark` | `bullpen` | post | 100+ | ✅ |
 
 **미참조 파일**: `dcinside_backup.py`, `natepan_backup.py` (무시)
+
+### 6.4 NatePan 테마 채널 크롤 & 광장 분류 (v2.1+)
+
+**Plaza Classifier** (`app/services/plaza_classifier.py`)
+
+광장 분류기는 6가지 범주로 갈등글을 자동 분류합니다:
+- `classify_plaza(content, title) -> "COUPLE"|"MARRIED"|"FRIEND"|"FAMILY"|"WORK"|"OTHER"`
+- 키워드 매칭 (제목 2배 가중) + 무매칭 시 OTHER
+
+**NatePan 테마 채널 수집** (`app/crawlers/natepan.py`)
+
+기존의 정적 랭킹 섹션(베스트·lovetalk)에 더하여 주제별 테마 채널을 추가합니다.
+
+채널 매핑 (인기순 `?order=rank`):
+- **WORK**: c20019 (회사생활) · c20054 (취업과면접) · c20020 (알바경험담)
+- **MARRIED**: c20023 · c20025 · c20026
+- **COUPLE**: c20006 · c20009 · c20011
+- **FRIEND**: clean 채널 부재로 제외
+
+**정밀 게이트** (채널별 카테고리 필터):
+- 채널 글의 `category` = `classify_plaza(content, title)`이 채널 목표광장과 일치 시에만 저장
+- 채널=높은 prior(주제성), 분류기=정밀도 → 오프토픽 노이즈(예: 회사생활 채널의 주식글) → OTHER로 떨어짐
+- **글로벌 분류기 아님**: 정적 베스트/ID-range는 기존대로 section_name 기반 category 사용, 채널 크롤에만 적용
+
+**Pagination** (`?order=rank&page=N`):
+- WORK 채널: `MAX_PAGES_WORK=5` (page 1~5)
+- 그 외 채널: `MAX_PAGES_OTHER=2`
+- 신규 0개 페이지는 조기 종료
+- `seen_ids` set으로 페이지 간 dedup
+
+**Cross-run Dedup Guard** (`app/api/crawl.py` 인제스트)
+
+기존: run 내 dedup만 → 일일 크롤이 인기글을 매 런 재삽입 → ~44~51% 중복 누적.
+
+개선: 인제스트 시작 시 해당 source의 기존 `source_url`을 1회 SELECT로 set 로드:
+```python
+# 기존 URL 사전 로드
+existing_urls = set()
+SELECT source_url FROM example_bank WHERE source = %s AND source_url IS NOT NULL
+for row in cursor.fetchall():
+    existing_urls.add(row["source_url"])  # pymysql DictCursor
+
+# 중복 체크
+for item in new_items:
+    if item.source_url in existing_urls:
+        continue  # 스킵
+    existing_urls.add(item.source_url)
+    INSERT INTO example_bank ...
+```
+- NULL `source_url`은 항상 삽입
+- 로그에 `skipped_dupes` 카운트 기록
+
+**기존 중복 정리** (1회성 운영 작업)
+
+누적된 exact 중복 제거. 안전 키 = `(source_url, content_type, MD5(content))`:
+```sql
+-- 1단계: 보관할 행 ID 식별
+CREATE TEMPORARY TABLE keep AS
+SELECT MIN(id) AS keep
+FROM example_bank
+WHERE source_url IS NOT NULL
+GROUP BY source_url, content_type, MD5(content);
+
+-- 2단계: 중복 행 삭제
+DELETE FROM example_bank
+WHERE id NOT IN (SELECT keep FROM keep)
+  AND source_url IS NOT NULL;
+```
+- prod 결과: −6697행 (44%) 제거, 0개 잔존
+- dev 결과: −5583행 제거
+
+---
 
 ### 6.2 일일 크롤링 산출량
 
