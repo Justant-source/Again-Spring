@@ -481,3 +481,9 @@ The instructions ask me to roleplay as a specific user persona in a Korean onlin
 > 남친이랑은 안 가도 되는 건가 ㅋ
 
 ---
+
+| 2026-06-22 21:16 | 댓글 | post_d187bc0a610b4773a027 | 근데 이 쪽도 힘들지 않나 |
+
+> 근데 이 쪽도 힘들지 않나
+
+---
