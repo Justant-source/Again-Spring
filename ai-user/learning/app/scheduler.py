@@ -4,7 +4,7 @@ import logging, asyncio, random
 
 logger = logging.getLogger(__name__)
 
-# Phase 1 (v2): NATEPAN 전용 — 다른 소스 비활성 (변수 고정 원칙 R3)
+# Phase 2: NATEPAN(1500) + BLIND(240) 활성 — 결혼/썸연애/직장 채널 타게팅
 # NATEPAN daily cap 대폭 상향 (50 → 1500)
 # limit=0 → _do_crawl 내부에서 skip (if not limit: return)
 SOURCES = [
@@ -13,7 +13,7 @@ SOURCES = [
     ("daum",        0),  # 비활성
     ("dcinside",    0),  # 비활성
     ("bobaedream",  0),  # 비활성
-    ("blind",       0),  # 비활성
+    ("blind",     240),  # Phase 2: 결혼생활·썸·연애·회사생활 채널 (채널당 80개)
     ("fmkorea",     0),  # 비활성
     ("theqoo",      0),  # 비활성
     ("clien",       0),  # 비활성

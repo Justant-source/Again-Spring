@@ -275,7 +275,7 @@ async def startup():
 | `dcinside.py` | `dcinside` | post.gall_id (동적) | post | 100 | ✅ |
 | `natepan.py` | `natepan` | `talk` | post | 400 | ✅ |
 | `bobaedream.py` | `bobaedream` | `freeb` | post | 100+ | ✅ |
-| `blind.py` | `blind` | `workplace` | post | 50+ | ✅ |
+| `blind.py` | `blind` | `workplace`, `marriage`, `romance` | post | 240 | ✅ |
 | `fmkorea.py` | `fmkorea` | `best` | post | 100+ | ✅ |
 | `theqoo.py` | `theqoo` | `hot` | post | 100+ | ✅ |
 | `clien.py` | `clien` | `freeboard` | post | 100+ | ✅ |
@@ -289,9 +289,9 @@ async def startup():
 
 ```
 Naver News (500) + Daum News (500) + DCInside (100) + NatePan (400)
-+ BobaeDream (100+) + Blind (50+) + FMKorea (100+) + Theqoo (100+)
++ BobaeDream (100+) + Blind (240) + FMKorea (100+) + Theqoo (100+)
 + Clien (100+) + Ppomppu (100+) + Ruliweb (100+) + MLBPark (100+)
-= 약 1,600~1,800개/일 추가
+= 약 2,000~2,200개/일 추가
 ```
 
 ### 6.3 Naver News 크롤러 구조
@@ -435,7 +435,15 @@ def score(text: str) -> float:
     return round(max(0.0, min(1.0, score)), 2)
 ```
 
-### 8.3 MIN_QUALITY_SCORE
+### 8.3 Blind-specific quality filtering
+
+Blind crawler applies additional filtering:
+- **Minimum length**: 100 characters (conflict keywords required)
+- **Conflict keywords**: 갈등, 싸움, 답답, 화나, 문제, 불안 등 (감정 신호)
+
+These posts pass `QualityFilter.passes()` + Blind-specific checks before insertion.
+
+### 8.4 MIN_QUALITY_SCORE
 
 ```bash
 # .env
