@@ -61,7 +61,9 @@ COUPLE (연인) · MARRIED (부부) · FRIEND (친구) · FAMILY (가족) · WOR
 → FAIL  : QLoRA 데이터게이트 평가 or 품질-피벗 (옵션 제시까지만, 오너 결정)
 ```
 
-**오너 확정 대기 항목**: 임계값(제안 ≤60% v2 승계) · 평가자수(제안 ≥3인) · 광장별 vs 통합 평균. 오너 명시 확정 전 어떤 humanness PASS/FAIL 판정도 금지.
+**Phase 0 당시 오너 확정 대기 항목**: 임계값(제안 ≤60% v2 승계) · 평가자수(제안 ≥3인) · 광장별 vs 통합 평균. 오너 명시 확정 전 어떤 humanness PASS/FAIL 판정도 금지.
+
+**연표 메모**: 위 문장은 Phase 0 작성 당시 상태 기록이다. 같은 날 `decisions.md` V2-D05에서 "제안값 그대로 확정"으로 닫혔고, 기준은 `≤60%` · `naive ≥3인` · `통합 평균`으로 고정됐다.
 
 ---
 
@@ -73,7 +75,7 @@ COUPLE (연인) · MARRIED (부부) · FRIEND (친구) · FAMILY (가족) · WOR
 | R2 | **proxy 사다리 금지** | 분포 sanity(카테고리 적합성)는 허용, humanness 판정 금지 |
 | R3 | **변수 고정** | NATEPAN 전용. 측정 1회당 변수 1개 |
 | R4 | **저빈도 고정보 eval** | baseline(Ph5) 1회 + 최종(Ph8) 1회 = 2회. named-tell 라벨셋 |
-| R5 | **kill criterion 사전 등록** | 위 등록 완료(오너 확정 대기) |
+| R5 | **kill criterion 사전 등록** | 위 등록 완료(Phase 0 사전 등록, V2-D05에서 확정) |
 | R6 | **판별기 = QA만** | rerank OFF. `AiUserMlClient.java:174` 미변경 |
 | R7 | **v1 제약 승계** | `AI_USER_ML_ENABLED=false` 영구. D-108 COLLECT-only. 레버 보존 |
 | R8 | **main 단일·docs-as-code·prod 게이트** | 절대규칙 #4·#8·#9 |

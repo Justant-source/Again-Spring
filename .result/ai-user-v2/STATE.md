@@ -2,7 +2,7 @@
 
 > 매 세션 시작 시 먼저 읽고, 끝낼 때 마지막으로 갱신.
 
-**최종 갱신**: 2026-06-22 (v2.1 Phase 8 **SHIPPED ✅** — 출하 시점 4인 평균 20%, E-008 포함 5인 평균 28% ≤ 60% PASS 강건성 유지)
+**최종 갱신**: 2026-06-22 (v2.1 Phase 8 **SHIPPED ✅** 유지 — 출하 4인 20%, 최신 6인 36.7% PASS)
 
 ---
 
@@ -27,7 +27,7 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 > - **변수 1개/측정.** kill criterion 측정 전 오너 등록 필수.
 > - **판별기 = QA 전용.** rerank OFF. `AI_USER_ML_ENABLED=false` 영구.
 > - **D-108 COLLECT-only 유지.** 출하 레버 보존.
-> - **kill criterion 사전 등록 (오너 확정 대기)**: ≤60% naive ≥3인.
+> - **kill criterion 사전 등록·확정 완료**: ≤60% naive ≥3인, 통합 평균.
 
 ---
 
@@ -40,8 +40,10 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 - [x] `decisions.md` V2-D04(재구성) + V2-D05(kill criterion 사전 등록) 추가
 - [x] `STATE.md` v2.1 라이브 포인터 초기화
 - [x] `steps/v2.1-00-charter.md` 기록
+- [x] `steps/v2.1-00-charter-reaudit.md` 기록 (2026-06-22, 연표 보존 재검증)
 - [x] `npm run lint:docs` exit 0 통과
-- [🔴] **kill criterion 오너 명시 확정 대기** (제안 ≤60% naive ≥3인 사용 중. Phase 5 측정 전 필수.)
+- [🔴] **Phase 0 당시 kill criterion 오너 명시 확정 대기** (제안 ≤60% naive ≥3인 사용 중. Phase 5 측정 전 필수.)
+- [x] 후속 정합성 메모: 위 pending 항목은 Phase 0 당시 상태이며, 같은 날 `V2-D05`/`Kill Criterion 현황`에서 확정됨
 - [x] git commit (v2.1 Phase 0·1·2)
 
 ---
@@ -95,7 +97,7 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 | 5 | baseline 블라인드 (naive ≥3) | Phase 1·4 ✅ · kill criterion ✅ | ❌ FAIL 80% (→Phase 6) |
 | 6 | 결정론 다양화 1라운드 | Phase 5 | ✅ 완료 2026-06-21 (VARIETY_SEEDS·CATEGORY_GUIDE·prod 배포) |
 | 7 | QLoRA 데이터게이트 | Phase 6 | ❌ 비발동 (조건3 미충족 FRIEND/WORK <수백) |
-| 8 | 최종 판정·출하/피벗 | Phase 7 | ✅ **SHIPPED** — 출하 시점 4인 20%, E-008 포함 5인 28% ≤ 60% PASS(2026-06-22). 생성코드는 Phase 6서 이미 prod 반영 → 출하=봉인+게이트검증. e2e/build/test green |
+| 8 | 최종 판정·출하/피벗 | Phase 7 | ✅ **SHIPPED** — 출하 시점 4인 20%, E-008·E-009 포함 최신 6인 36.7% ≤ 60% PASS(2026-06-22). 생성코드는 Phase 6서 이미 prod 반영 → 출하=봉인+게이트검증. e2e/build/test green |
 
 > **Phase 5 결과**: AI 식별률 80% (3인 평균) → FAIL. Phase 6 결정론 다양화 진행.
 
@@ -108,7 +110,7 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 ```
 신선 캐주얼 독자(≥3인) 통합 평균 봇 식별률 ≤ **60%** = PASS  
 "kill criterion 제안값 그대로 확정" — 임계 ≤60%, 평가자수 ≥3인, 통합 평균.  
-**Phase 5 측정 완료 — FAIL 80% (2026-06-21). Phase 6 완료(VARIETY_SEEDS·CATEGORY_GUIDE·prod), Phase 7 비발동(조건3). Phase 8 측정 — ✅ SHIPPED: naive 4인 평균 AI 식별률 20% ≤ 60% PASS 최종 확정·출하 (2026-06-22, 출하 결정 시점). 독립 재채점 일치(40/0/0/40). 추가 평가자 E-008(쎄오일시) 포함 5인 평균 28% — PASS 강건성 유지(≤60%). 출하 = 절대규칙 #4 게이트 검증(dev health UP·e2e-realbe·build·BE test green) + 결정 봉인. 생성 코드는 Phase 6 시점에 이미 prod 반영(orchestrator/backend Up since Phase 6) → 측정==출하, 재배포 불필요. `AI_USER_ML_ENABLED=false` 유지. 상세 분석: `eval/v2.1/phase8/v2.1-phase8-01-analysis.md`. ⚠️ 인과 주의: Phase5(80%)→Phase8(20%) −60pp는 5개 변수 동시변화로 "Phase 6 기여" 시사·미증명(L-P8-02). 게이트 PASS는 절대 임계라 유효.**
+**Phase 5 측정 완료 — FAIL 80% (2026-06-21). Phase 6 완료(VARIETY_SEEDS·CATEGORY_GUIDE·prod), Phase 7 비발동(조건3). Phase 8 측정 — ✅ SHIPPED: naive 4인 평균 AI 식별률 20% ≤ 60% PASS 최종 확정·출하 (2026-06-22, 출하 결정 시점). 독립 재채점 일치(40/0/0/40). 추가 평가자 E-008(쎄오일시)·E-009(이한별) 포함 최신 6인 평균 36.7% — PASS 유지(≤60%). 출하 = 절대규칙 #4 게이트 검증(dev health UP·e2e-realbe·build·BE test green) + 결정 봉인. 생성 코드는 Phase 6 시점에 이미 prod 반영(orchestrator/backend Up since Phase 6) → 측정==출하, 재배포 불필요. `AI_USER_ML_ENABLED=false` 유지. 상세 분석: `eval/v2.1/phase8/v2.1-phase8-01-analysis.md`. ⚠️ 인과 주의: Phase5(80%)→Phase8 최신 6인(36.7%)도 PASS지만, 변화량 해석은 5개 변수 동시변화로 "Phase 6 기여" 시사·미증명(L-P8-02). 게이트 PASS는 절대 임계라 유효.**
 
 ### Phase 8 준비 자산 (eval/v2.1/phase8/, steps/)
 - `v2.1-phase8-01-evaluator.html` — 평가자용(자동저장·복사폴백·공유, node --check PASS·이모지/담당자 정리 완료)
@@ -146,7 +148,7 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 | V2-D02 | v2 kill criterion ≤60% (오너 1인) — CLOSED |
 | V2-D03 | v2 Phase 5b PASS (55.6%) — CLOSED |
 | **V2-D04** | v2.1 재구성·eval 재정립 (오너 은퇴·제품적합성·6광장) |
-| **V2-D05** | v2.1 kill criterion ≤60% naive ≥3인 (오너 확정 대기) |
+| **V2-D05** | v2.1 kill criterion ≤60% naive ≥3인 (2026-06-21 확정) |
 | **V2-D06** | Phase 5 FAIL 80% → Phase 6 결정론 다양화 T1·T3 1순위 진행 |
 | **V2-D07** | Phase 7 QLoRA 비발동 (조건3 미충족) → Phase 8 직행 |
 | (v1) D-108 | ML COLLECT-only (영구) |
@@ -167,7 +169,7 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 | Phase 5 | ✅ 2026-06-21 (PASS 5/9=55.6%) |
 | Phase 6 | ✅ 2026-06-21 SHIPPED |
 
-### v2.1 (진행 중)
+### v2.1 (SHIPPED + post-ship tuning)
 
 | Phase | 상태 |
 |---|---|
@@ -179,7 +181,7 @@ Phase 0~6 완료. 결과: 88.9%→55.6% PASS (-33.3pp). 측정 착시 2개 확�
 | Phase 5 | ❌ FAIL 2026-06-21 (80%>60%, →Phase 6) |
 | Phase 6 | ✅ 완료 2026-06-21 (4bc7c0cf) |
 | Phase 7 | ❌ QLoRA 비발동 2026-06-21 |
-| Phase 8 | ✅ SHIPPED 2026-06-22 (4인 20%≤60% PASS 최종) |
+| Phase 8 | ✅ SHIPPED 2026-06-22 (출하 4인 20% PASS, 최신 6인 36.7% PASS 유지) |
 
 ---
 
