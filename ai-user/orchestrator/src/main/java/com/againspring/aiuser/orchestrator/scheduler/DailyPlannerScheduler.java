@@ -18,6 +18,10 @@ public class DailyPlannerScheduler {
     @Scheduled(cron = "0 0 4 * * *")  // 04:00 KST (Asia/Seoul timezone)
     public void planDaily() {
         log.info("DailyPlannerScheduler.planDaily() triggered (enabled={})", props.isEnabled());
+        if (!props.isEnabled()) {
+            log.info("DailyPlannerScheduler.planDaily() skipped: AI_USER_ENABLED=false");
+            return;
+        }
         try {
             dailyPlanner.planForToday();
         } catch (Exception e) {

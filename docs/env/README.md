@@ -7,7 +7,7 @@
 | 문서 | 내용 | 대상 |
 |---|---|---|
 | [architecture.md](./architecture.md) | 배포 아키텍처 · 컴포넌트 · 통신 흐름 | 아키텍트, 전체 팀 |
-| [docker.md](./docker.md) | 3가지 compose 구성 (local/dev/prod) | 배포 담당자 |
+| [docker.md](./docker.md) | 4가지 compose 구성 (base/dev/prod/ai-user) | 배포 담당자 |
 | [environment-variables.md](./environment-variables.md) | `.env.*` 파일 항목 및 설정 | 배포 담당자 |
 | [local-dev.md](./local-dev.md) | 로컬에서 BE · FE · DB 실행 | 개발자 |
 | [deployment.md](./deployment.md) | dev → main → prod 배포 절차 | 배포 담당자 |
@@ -38,13 +38,16 @@ cd env && docker compose up -d               # DB + 공유 LLM 워커
 cd ../backend && ./gradlew bootRun           # BE :8080
 cd ../frontend && npm run dev                # FE :3000
 
-# dev 배포 (base 스택 먼저 → dev 스택)
+# dev 배포
 cd env
-docker compose up -d --build                                            # ① base (공유 LLM 워커)
-docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build  # ② dev
+docker compose up -d --build
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 
-# prod 배포 (명시 시에만, base 스택 실행 중이어야 함)
+# prod 배포
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+# shared ai-user 배포
+docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build
 ```
 
 자세한 절차는 [deployment.md](./deployment.md)를 참조하세요.

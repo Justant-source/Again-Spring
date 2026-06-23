@@ -5,71 +5,100 @@
 - `env/docker-compose.yml`
 - `env/docker-compose.dev.yml`
 - `env/docker-compose.prod.yml`
+- `env/docker-compose.ai-user.yml`
 - `backend/Dockerfile`
 - `llm-worker/Dockerfile`
 - `frontend/Dockerfile`
 
-## 3개 스택 개요
+## 4개 스택 개요
 
-### 1. base (`docker-compose.yml`) — dev/prod 공유
+### 1. base (`docker-compose.yml`)
 
-MariaDB + **공유 LLM 워커**. dev와 prod가 동일 `againspring-llm` 컨테이너를 사용.
+dev·prod 공통 기반 스택이다.
 
 - project name: `againspring`
-- 네트워크: `againspring` (bridge, `name: againspring` explicit)
+- 네트워크: `againspring`
 
-| 서비스 | 컨테이너 | 이미지 | 포트 | 역할 |
-|---|---|---|---|---|
-| `mariadb` | `againspring-mariadb` | `mariadb:lts` | `3306:3306` | 로컬 직접 실행 전용 DB |
-| `againspring-llm` | `againspring-llm` | build `../llm-worker` | internal (8090) | dev·prod 공유 LLM 워커 |
-
-llm bind mount: `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude` (Claude CLI 세션 공유)
-
-**시작 순서**: base 스택 먼저 → dev/prod 스택. `backend-dev`·`backend-prod`가 `againspring` external network를 통해 `againspring-llm:8090`에 접근.
+| 서비스 | 컨테이너 | 포트 | 역할 |
+|---|---|---|---|
+| `mariadb` | `againspring-mariadb` | `3306:3306` | 로컬 직접 실행 전용 DB |
+| `againspring-llm` | `againspring-llm` | internal `8090` | dev·prod 공유 LLM 워커 |
 
 ### 2. dev (`docker-compose.dev.yml`)
 
-`dev.againspring.net`에서 동작하는 풀 스택. 실 사용자에게 노출되는 dev 환경.
+dev 웹/DB 스택이다. ai-user 런타임은 포함하지 않는다.
 
 - project name: `againspring-dev`
-- 네트워크: `againspring-dev` (bridge) + `againspring` (external, base 스택)
+- 네트워크: `againspring-dev` + external `againspring`
 
-| 서비스 | 컨테이너 | 이미지 | 포트 | 의존 |
-|---|---|---|---|---|
-| `mariadb-dev` | `againspring-mariadb-dev` | `mariadb:lts` | `3309:3306` (호스트 접근용) | — |
-| `llm-ai-user` | `againspring-llm-ai-user` | build `../ai-user/llm` | internal (8092) | — |
-| `ai-user-orchestrator` | `againspring-ai-user-orchestrator` | build `../ai-user/orchestrator` | internal (8096) | `mariadb-dev` (healthy), `llm-ai-user` (healthy), `backend-dev` (started) |
-| `ai-learning` | `againspring-ai-learning` | build `../ai-user/learning` | `8099:8099` | `mariadb-dev` (healthy) |
-| `backend-dev` | `againspring-backend-dev` | build `../backend` | internal | `mariadb-dev` (healthy) |
-| `frontend-dev` | `againspring-frontend-dev` | build `../frontend` | internal | `backend-dev` |
-| `nginx-dev` | `againspring-nginx-dev` | `nginx:alpine` | `8090:80` | `frontend-dev`, `backend-dev` |
+| 서비스 | 컨테이너 | 포트 | 역할 |
+|---|---|---|---|
+| `mariadb-dev` | `againspring-mariadb-dev` | `3309:3306` | dev DB |
+| `backend-dev` | `againspring-backend-dev` | internal `8080` | dev API |
+| `frontend-dev` | `againspring-frontend-dev` | internal `3000` | dev UI |
+| `nginx-dev` | `againspring-nginx-dev` | `8090:80` | dev 진입점 |
 
-`backend-dev`는 `againspring-dev`·`againspring` 두 네트워크에 연결 → `againspring-llm:8090` 접근.
+`backend-dev`는 다음 shared 서비스 URL을 기본으로 가진다.
 
-`SPRING_PROFILES_ACTIVE=dev` 활성화 → Flyway disabled, ddl-auto=update, Swagger UI on.
+- `AI_LEARNING_URL=http://againspring-ai-learning:8099`
+- `AI_USER_LLM_URL=http://againspring-llm-ai-user:8092`
+- `AI_USER_ORCHESTRATOR_URL=http://againspring-ai-user-orchestrator:8096`
 
 ### 3. prod (`docker-compose.prod.yml`)
 
-`againspring.net` / `www.againspring.net`에 노출되는 운영 환경.
+prod 웹/DB 스택이다. ai-user 런타임은 포함하지 않는다.
 
 - project name: `againspring-prod`
-- 네트워크: `againspring-prod` (bridge) + `againspring` (external, base 스택)
-- 모든 서비스 `restart: always`
+- 네트워크: `againspring-prod` + external `againspring`
 
-| 서비스 | 컨테이너 | 메모리 limit/reservation | 외부 노출 |
+| 서비스 | 컨테이너 | 포트 | 역할 |
 |---|---|---|---|
-| `mariadb-prod` | `againspring-mariadb-prod` | 2G / 1G | 없음 (internal) |
-| `backend-prod` | `againspring-backend-prod` | 3G / 1G | 없음 |
-| `frontend-prod` | `againspring-frontend-prod` | 512M / 256M | 없음 |
-| `nginx-prod` | `againspring-nginx-prod` | — | `8091:80` |
+| `mariadb-prod` | `againspring-mariadb-prod` | internal only | prod DB |
+| `backend-prod` | `againspring-backend-prod` | internal `8080` | prod API |
+| `frontend-prod` | `againspring-frontend-prod` | internal `3000` | prod UI |
+| `nginx-prod` | `againspring-nginx-prod` | `8091:80` | prod 진입점 |
 
-`backend-prod`는 `againspring-prod`·`againspring` 두 네트워크에 연결 → 공유 `againspring-llm:8090` 사용.
+`backend-prod`도 dev와 동일한 shared ai-user URL을 사용한다.
 
-`SPRING_PROFILES_ACTIVE=prod` → Flyway 활성, ddl-auto=validate, Swagger 비활성, 모든 env 필수.
+### 4. shared ai-user (`docker-compose.ai-user.yml`)
+
+공통 ai-user 런타임이다.
+
+- project name: `againspring-ai-user`
+- 네트워크:
+  - `againspring`
+  - `againspring-prod`
+  - `againspring-dev` (`prod-dev-sync`만 사용)
+
+| 서비스 | 컨테이너 | 포트 | 역할 |
+|---|---|---|---|
+| `llm-ai-user` | `againspring-llm-ai-user` | internal `8092` | AI-user 생성 워커 |
+| `ai-learning` | `againspring-ai-learning` | `8099:8099` | learning API + scheduler |
+| `ai-user-orchestrator` | `againspring-ai-user-orchestrator` | internal `8096` | prod 행동 오케스트레이션 |
+| `prod-dev-sync` | `againspring-prod-dev-sync` | none | prod→dev 일일 비식별 동기화 |
+
+운영 원칙:
+
+- orchestrator 기본 대상은 `backend-prod`와 `mariadb-prod`
+- `AI_USER_SECONDARY_BACKEND_URL`은 기본 공란
+- dev DB 직접 쓰기는 `prod-dev-sync`를 통한 동기화만 허용
+
+## 시작 순서
+
+```bash
+cd env
+docker compose up -d --build
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build
+```
+
+shared ai-user를 쓰려면 dev/prod 네트워크가 먼저 존재해야 한다.
 
 ## healthcheck
 
-MariaDB (dev/prod):
+MariaDB:
+
 ```yaml
 test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
 interval: 10s
@@ -77,65 +106,43 @@ timeout: 3s
 retries: 6
 start_period: 30s
 ```
-backend는 `depends_on.mariadb-*.condition: service_healthy`로 DB 정상화까지 대기.
+
+추가 healthcheck:
+
+- `againspring-llm` → `/actuator/health`
+- `againspring-llm-ai-user` → `/actuator/health`
+- `againspring-ai-user-orchestrator` → `/actuator/health`
+- `againspring-ai-learning` → `/health`
 
 ## Dockerfile 요약
 
 ### backend (`backend/Dockerfile`)
 
-multi-stage:
-1. **build**: `eclipse-temurin:21-jdk-alpine` → `./gradlew bootJar`
-2. **runtime**: `eclipse-temurin:21-jre-alpine` (Node.js / Claude CLI 미포함)
-3. ENTRYPOINT: `java -jar app.jar`
-
-Claude CLI는 `llm-worker`로 이동. backend는 `RemoteLlmProvider` HTTP 클라이언트만 실행. 긴급 롤백 시 `LLM_PROVIDER=claude-code`로 전환 + Dockerfile revert.
+- build: `eclipse-temurin:21-jdk-alpine`
+- runtime: `eclipse-temurin:21-jre-alpine`
+- 역할: API 서버, DB/LLM 클라이언트
 
 ### llm-worker (`llm-worker/Dockerfile`)
 
-multi-stage:
-1. **build**: `eclipse-temurin:21-jdk-alpine` → `./gradlew bootJar`
-2. **runtime**: `eclipse-temurin:21-jre-alpine` + `nodejs npm` 설치 + `npm install -g @anthropic-ai/claude-code`
-3. EXPOSE 8090, ENTRYPOINT: `java -jar app.jar`
-
-`ClaudeCliInvoker`가 `claude --print --strict-mcp-config --no-session-persistence --model ... --system-prompt ...` ProcessBuilder 호출. `~/.claude` bind mount로 OAuth 인증 공유.
+- runtime에 `nodejs`, `npm`, `@anthropic-ai/claude-code` 포함
+- `CLAUDE_HOST_CONFIG_DIR:/root/.claude` bind mount 사용
 
 ### frontend (`frontend/Dockerfile`)
 
-multi-stage:
-1. **deps**: `node:20-alpine` + `npm ci --omit=dev`
-2. **build**: `node:20-alpine` + ARG `NEXT_PUBLIC_*` (build-time injection) + `npm run build`
-3. **runtime**: `node:20-alpine`, non-root `nextjs:nextjs`, `npm start` (`NODE_ENV=production`)
-
-build-time ARG: `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_KAKAO_CLIENT_ID`, `NEXT_PUBLIC_NAVER_CLIENT_ID` (Next.js는 빌드 시 정적 인라인).
+- Next.js production build
+- `NEXT_PUBLIC_*` 값은 빌드 시 정적 인라인
 
 ## 자주 쓰는 명령
 
 ```bash
 cd env
 
-# dev 시작 (빌드 포함)
+docker compose up -d --build
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build
 
-# 상태
-docker compose -f docker-compose.dev.yml ps
-
-# 로그 (전체 스트리밍)
-docker compose -f docker-compose.dev.yml logs -f
-
-# 특정 서비스만
-docker compose -f docker-compose.dev.yml logs -f backend-dev
-
-# 정지
-docker compose -f docker-compose.dev.yml down
-
-# 정지 + 볼륨 삭제 (데이터 폐기)
-docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user ps
+docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user logs -f ai-user-orchestrator
+docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user down
 ```
-
-prod는 동일하지만 `-f docker-compose.prod.yml --env-file .env.prod`. **명시적 지시 시에만 실행**.
-
-## prod AI 유저 확장 (나중에)
-
-`ai-user-orchestrator`·`ai-learning`은 현재 dev 전용. prod에도 확장할 경우 prod 스택에 서비스 추가:
-- `ai-user-orchestrator` (prod DB 연결), `AI_USER_ENABLED=false`로 시작
-- `againspring-llm-ai-user`는 이미 base compose로 이동 가능

@@ -1,6 +1,7 @@
 package com.againspring.aiuser.orchestrator.scheduler;
 
 import com.againspring.aiuser.orchestrator.client.AiLearningClient;
+import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,7 @@ import java.util.List;
 public class CrawlerTriggerScheduler {
 
     private final AiLearningClient aiLearningClient;
+    private final OrchestratorProperties props;
 
     @Value("${ai-learning.crawl.enabled:false}")
     private boolean crawlEnabled;
@@ -40,6 +42,10 @@ public class CrawlerTriggerScheduler {
 
     @Scheduled(cron = "0 30 18 * * *")  // UTC 18:30 = KST 03:30
     public void triggerDailyCrawl() {
+        if (!props.isEnabled()) {
+            log.debug("Crawl trigger skipped: AI_USER_ENABLED=false");
+            return;
+        }
         if (!crawlEnabled) {
             log.debug("Crawl trigger disabled");
             return;

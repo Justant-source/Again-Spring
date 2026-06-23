@@ -1,7 +1,8 @@
 # 서버 dev 스택 — dev.againspring.net
-# 사용: docker compose -f docker-compose.dev.yml up -d --build
+# 사용: docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 # 환경변수: .env.dev 파일 필요 (.env.dev.example 참조)
 # 사전 조건: docker compose up -d (base 스택, againspring-llm 공유 서비스)
+# 선택 사항: docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build (공통 ai-user 스택)
 
 name: againspring-dev
 
@@ -22,7 +23,7 @@ services:
     volumes:
       - mariadb_dev_data:/var/lib/mysql
     ports:
-      - "3309:3306"    # 로컬 접근용 (3306=local-dev, 3308=greenforest-dev)
+      - "3309:3306"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
@@ -32,141 +33,6 @@ services:
       start_period: 30s
     networks:
       - againspring-dev
-
-  llm-ai-user:
-    build:
-      context: ../ai-user/llm
-      dockerfile: Dockerfile
-    image: againspring-llm-ai-user
-    container_name: againspring-llm-ai-user
-    environment:
-      CLAUDE_BIN: ${CLAUDE_BIN:-claude}
-      CLAUDE_MODEL: ${AI_USER_LLM_MODEL:-claude-haiku-4-5-20251001}
-      # 글(POST)만 Sonnet 승격 (문체 현실화 S5). 빈 값=CLAUDE_MODEL(haiku) 폴백.
-      # 2026-06-11: sonnet 절단은 OutputSanitizer "---" 삭제가 sonnet의 제목-본문 구분을 파괴한 것이 원인
-      #   (OutputSanitizerHrTest로 수정). lengthTier·MAX_POST를 backend 1000자에 맞추고 최소길이 가드 추가 후 재승격.
-      LLM_POST_MODEL: ${LLM_POST_MODEL:-claude-sonnet-4-6}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      LLM_POOL_SIZE: ${AI_USER_LLM_POOL_SIZE:-20}
-      LLM_QUEUE_CAPACITY: ${AI_USER_LLM_QUEUE_CAPACITY:-100}
-      LLM_QUEUE_WAIT_TIMEOUT_MS: ${AI_USER_LLM_QUEUE_WAIT_TIMEOUT_MS:-30000}
-      LLM_DEFAULT_TIMEOUT_MS: ${AI_USER_LLM_DEFAULT_TIMEOUT_MS:-120000}
-      SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
-      SELF_CRITIQUE_THRESHOLD: ${SELF_CRITIQUE_THRESHOLD:-5}
-      SELF_CRITIQUE_EXTRA_CLICHES: ${SELF_CRITIQUE_EXTRA_CLICHES:-}
-      LLM_API_REFUSAL_RETRIES: ${LLM_API_REFUSAL_RETRIES:-0}
-      LLM_API_REFUSAL_FALLBACK_MODEL: ${LLM_API_REFUSAL_FALLBACK_MODEL:-}
-      DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${MARIADB_DATABASE:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-      DB_USER: ${MARIADB_USER:-againspring}
-      DB_PASSWORD: ${MARIADB_PASSWORD}
-    volumes:
-      - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
-    depends_on:
-      mariadb-dev:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - againspring-dev
-    healthcheck:
-      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8092/actuator/health | grep -q UP"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-
-  ai-user-orchestrator:
-    build:
-      context: ../ai-user/orchestrator
-      dockerfile: Dockerfile
-    image: againspring-ai-user-orchestrator
-    container_name: againspring-ai-user-orchestrator
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${MARIADB_DATABASE:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-      DB_USER: ${MARIADB_USER:-againspring}
-      DB_PASSWORD: ${MARIADB_PASSWORD}
-      BACKEND_BASE_URL: ${AI_USER_BACKEND_URL:-http://againspring-backend-dev:8080}
-      LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
-      AI_USER_ENABLED: ${AI_USER_ENABLED:-false}
-      AI_USER_TICK_CRON: "${AI_USER_TICK_CRON:-0 */10 * * * *}"
-      AI_USER_DAILY_GLOBAL_CAP: ${AI_USER_DAILY_GLOBAL_CAP:-200}
-      AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-dev-pw-2026}
-      AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
-      AI_USER_REPETITION_THRESHOLD: ${AI_USER_REPETITION_THRESHOLD:-0.45}
-      AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
-      AI_LEARNING_BASE_URL: http://againspring-ai-learning:8099
-      SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
-      AI_USER_PERSONA_TARGET: ${AI_USER_PERSONA_TARGET:-50}
-      AI_USER_PERSONAS_DIR: /app/personas
-      AI_USER_FORCE_ACTIVE: ${AI_USER_FORCE_ACTIVE:-false}
-      AI_USER_SECONDARY_BACKEND_URL: ${AI_USER_SECONDARY_BACKEND_URL:-}
-      PAIRED_POST_ENABLED: ${PAIRED_POST_ENABLED:-true}
-      PAIRED_POST_CRON: "${PAIRED_POST_CRON:-0 0 */2 * * *}"
-      PAIRED_POST_PAIRS: ${PAIRED_POST_PAIRS:-3}
-      AI_USER_ML_BASE_URL: ${AI_USER_ML_BASE_URL:-http://100.115.252.61:8201}
-      AI_USER_ML_ENABLED: ${AI_USER_ML_ENABLED:-false}
-      AI_USER_ML_ENABLED_COMMUNITIES: ${AI_USER_ML_ENABLED_COMMUNITIES:-}
-      AI_USER_ML_API_TOKEN: ${AI_USER_ML_API_TOKEN:-aiuser-ml-api-token-dev-2026}
-      AI_USER_ML_COLLECT: ${AI_USER_ML_COLLECT:-false}
-      AI_USER_ML_BEST_OF_N: ${AI_USER_ML_BEST_OF_N:-4}
-      AI_USER_ML_TIMEOUT_MS: ${AI_USER_ML_TIMEOUT_MS:-500}
-    volumes:
-      - ../ai-user/docs/personas:/app/personas:rw
-    depends_on:
-      mariadb-dev:
-        condition: service_healthy
-      llm-ai-user:
-        condition: service_healthy
-      backend-dev:
-        condition: service_started
-      ai-learning:
-        condition: service_started
-    restart: unless-stopped
-    networks:
-      - againspring-dev
-    healthcheck:
-      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8096/actuator/health | grep -q UP"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
-
-  ai-learning:
-    build:
-      context: ../ai-user/learning
-      dockerfile: Dockerfile
-    image: againspring-ai-learning
-    container_name: againspring-ai-learning
-    environment:
-      DB_HOST: againspring-mariadb-dev
-      DB_PORT: "3306"
-      DB_NAME: ${MARIADB_DATABASE:-againspring_dev}
-      DB_USER: ${MARIADB_USER:-againspring}
-      DB_PASSWORD: ${MARIADB_PASSWORD}
-      AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
-      AI_LEARNING_CRAWL_ENABLED: ${AI_LEARNING_CRAWL_ENABLED:-false}
-      # persona_strengthener의 LLM 분석용 — 미설정 시 잘못된 기본값(-dev 접미사)으로 silent 실패했음
-      LLM_AI_USER_URL: http://againspring-llm-ai-user:8092
-    ports:
-      - "8099:8099"
-    depends_on:
-      mariadb-dev:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 3000m
-        reservations:
-          memory: 512m
-    networks:
-      - againspring-dev
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8099/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
 
   backend-dev:
     build:
@@ -185,7 +51,6 @@ services:
       LLM_REPORT_PROVIDER: ${LLM_REPORT_PROVIDER:-remote}
       LLM_JURY_PROVIDER: ${LLM_JURY_PROVIDER:-remote}
       LLM_WORKER_URL: ${LLM_WORKER_URL:-http://againspring-llm:8090}
-      # dev/e2e: 다회 로그인 허용 (prod는 코드 기본값 5/분 유지). e2e-realbe 로그인 429 방지.
       SECURITY_RATE_LIMIT_AUTH_PER_MINUTE: ${SECURITY_RATE_LIMIT_AUTH_PER_MINUTE:-1000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -200,8 +65,9 @@ services:
       ASM_BASE_URL: ${ASM_BASE_URL:-http://100.115.252.61:8200}
       ASM_API_TOKEN: ${ASM_API_TOKEN:-}
       ASM_ENABLED: ${ASM_ENABLED:-false}
-      AI_USER_LLM_URL: http://againspring-llm-ai-user:8092
-      AI_USER_ORCHESTRATOR_URL: http://againspring-ai-user-orchestrator:8096
+      AI_LEARNING_URL: ${AI_LEARNING_URL:-http://againspring-ai-learning:8099}
+      AI_USER_LLM_URL: ${AI_USER_LLM_URL:-http://againspring-llm-ai-user:8092}
+      AI_USER_ORCHESTRATOR_URL: ${AI_USER_ORCHESTRATOR_URL:-http://againspring-ai-user-orchestrator:8096}
     volumes:
       - ../docs/shared/prompts:/app/shared/docs/prompts:ro
       - ../docs/shared/categories.yml:/app/shared/docs/categories.yml:ro
@@ -228,7 +94,6 @@ services:
     container_name: againspring-frontend-dev
     environment:
       NODE_ENV: production
-      # 서버사이드 OG fetch 용 — Next.js 서버에서 내부 Docker 네트워크로 백엔드 직접 호출
       BACKEND_INTERNAL_URL: http://againspring-backend-dev:8080
     depends_on:
       - backend-dev
@@ -240,7 +105,7 @@ services:
     image: nginx:alpine
     container_name: againspring-nginx-dev
     ports:
-      - "8090:80"    # Cloudflare Tunnel → localhost:8090 → dev.againspring.net
+      - "8090:80"
     volumes:
       - ./nginx/dev.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
@@ -253,6 +118,7 @@ services:
 networks:
   againspring-dev:
     driver: bridge
+    name: againspring-dev
   againspring:
     external: true
     name: againspring

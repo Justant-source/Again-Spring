@@ -1,22 +1,35 @@
-from fastapi import FastAPI
+import logging
+import os
 from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.api import crawl, embed, examples, health, strengthen, topics
 from app.db.models import create_tables
 from app.services.embedding import EmbeddingService
-from app.api import embed, examples, crawl, health, strengthen, topics
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 embed_service = EmbeddingService()
 
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
 @asynccontextmanager
 async def lifespan(app):
     logger.info("Loading KURE-v1 embedding model...")
     embed_service.load()
     create_tables()
-    from app.scheduler import init_scheduler
-    _scheduler = init_scheduler()
+    if _env_flag("AI_LEARNING_ENABLED", True):
+        from app.scheduler import init_scheduler
+        init_scheduler()
+    else:
+        logger.info("AI Learning scheduler disabled via AI_LEARNING_ENABLED=false")
     logger.info("AI Learning service ready")
     yield
 

@@ -33,6 +33,7 @@ env/.env.dev
 env/.env.prod
 !env/.env.dev.example
 !env/.env.prod.example
+!env/.env.ai-user.example
 *.pem
 *.key
 *.p12

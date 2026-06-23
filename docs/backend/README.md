@@ -12,10 +12,11 @@
 - [testing.md](./testing.md) — 테스트 전략, 커버리지 정책, `./gradlew test`
 - [openapi.md](./openapi.md) — Swagger UI, DTO 컨벤션, API 문서화
 
-## AI User 자기진화 시스템
+## AI User 연계
 
-- [ai-learning.md](./ai-learning.md) — 전체 시스템 개요, 아키텍처, Phase 1~3 (자기비평, RAG, 크롤링), API 명세
-- [**ai-learning-continuous-system.md**](./ai-learning-continuous-system.md) — **✨ 지속적 학습 시스템 (권장)** — 단일 중앙 ai-learning 서비스에서 dev/prod가 공유하는 예시뱅크를 지속적으로 크롤링 & 누적하는 방식. 시간축별 성장 예측, 모니터링 가이드, FAQ 포함.
+- [ai-user.md](./ai-user.md) — backend가 shared ai-user 런타임과 연결되는 방식
+- [ai-learning.md](./ai-learning.md) — backend 관점의 shared learning 서비스 정리
+- [ai-learning-continuous-system.md](./ai-learning-continuous-system.md) — 과거 구상 문서. historical context 전용
 
 ## 빠른 시작
 

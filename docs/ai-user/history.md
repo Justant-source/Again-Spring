@@ -32,7 +32,7 @@
 | 반응 지연 | `Jitter.scheduleReplyWithDelay()` |
 | 반복 방지 | recent history 로드 + 2-gram Jaccard |
 | paired posts | `PairedPostScheduler` |
-| prod→dev 복사 | `ai-content-sync` |
+| prod→dev 복사 | `prod-dev-sync` (일일 cron) |
 
 ## 현재 운영 상태를 해석할 때 주의할 점
 

@@ -1,0 +1,166 @@
+# 공통 ai-user 스택 — dev/prod 공용
+# 사용: docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build
+# 환경변수: .env.ai-user 파일 필요 (.env.ai-user.example 참조)
+# 사전 조건:
+#   1) docker compose up -d (base 스택, againspring-llm)
+#   2) docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#   3) docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build (prod→dev sync 사용 시)
+
+name: againspring-ai-user
+
+services:
+  llm-ai-user:
+    build:
+      context: ../ai-user/llm
+      dockerfile: Dockerfile
+    image: againspring-llm-ai-user
+    container_name: againspring-llm-ai-user
+    environment:
+      CLAUDE_BIN: ${CLAUDE_BIN:-claude}
+      CLAUDE_MODEL: ${AI_USER_LLM_MODEL:-claude-haiku-4-5-20251001}
+      LLM_POST_MODEL: ${LLM_POST_MODEL:-claude-sonnet-4-6}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_POOL_SIZE: ${AI_USER_LLM_POOL_SIZE:-20}
+      LLM_QUEUE_CAPACITY: ${AI_USER_LLM_QUEUE_CAPACITY:-100}
+      LLM_QUEUE_WAIT_TIMEOUT_MS: ${AI_USER_LLM_QUEUE_WAIT_TIMEOUT_MS:-30000}
+      LLM_DEFAULT_TIMEOUT_MS: ${AI_USER_LLM_DEFAULT_TIMEOUT_MS:-120000}
+      SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
+      SELF_CRITIQUE_THRESHOLD: ${SELF_CRITIQUE_THRESHOLD:-5}
+      SELF_CRITIQUE_EXTRA_CLICHES: ${SELF_CRITIQUE_EXTRA_CLICHES:-}
+      LLM_API_REFUSAL_RETRIES: ${LLM_API_REFUSAL_RETRIES:-0}
+      LLM_API_REFUSAL_FALLBACK_MODEL: ${LLM_API_REFUSAL_FALLBACK_MODEL:-}
+      DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      DB_USER: ${MARIADB_USER:-againspring}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
+    volumes:
+      - ${CLAUDE_HOST_CONFIG_DIR:-/root/.claude}:/root/.claude
+    restart: unless-stopped
+    networks:
+      - againspring
+      - againspring-prod
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8092/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  ai-learning:
+    build:
+      context: ../ai-user/learning
+      dockerfile: Dockerfile
+    image: againspring-ai-learning
+    container_name: againspring-ai-learning
+    environment:
+      DB_HOST: againspring-mariadb-prod
+      DB_PORT: "3306"
+      DB_NAME: ${MARIADB_DATABASE:-againspring}
+      DB_USER: ${MARIADB_USER:-againspring}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
+      AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
+      AI_LEARNING_CRAWL_ENABLED: ${AI_LEARNING_CRAWL_ENABLED:-false}
+      LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
+    ports:
+      - "8099:8099"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 3000m
+        reservations:
+          memory: 512m
+    networks:
+      - againspring
+      - againspring-prod
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8099/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  ai-user-orchestrator:
+    build:
+      context: ../ai-user/orchestrator
+      dockerfile: Dockerfile
+    image: againspring-ai-user-orchestrator
+    container_name: againspring-ai-user-orchestrator
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      DB_USER: ${MARIADB_USER:-againspring}
+      DB_PASSWORD: ${MARIADB_PASSWORD}
+      BACKEND_BASE_URL: ${AI_USER_BACKEND_URL:-http://againspring-backend-prod:8080}
+      LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
+      AI_USER_ENABLED: ${AI_USER_ENABLED:-true}
+      AI_USER_TICK_CRON: "${AI_USER_TICK_CRON:-0 */10 * * * *}"
+      AI_USER_DAILY_GLOBAL_CAP: ${AI_USER_DAILY_GLOBAL_CAP:-500}
+      AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-prod-pw-2026}
+      AI_USER_SEED_ENABLED: ${AI_USER_SEED_ENABLED:-true}
+      AI_USER_REPETITION_THRESHOLD: ${AI_USER_REPETITION_THRESHOLD:-0.45}
+      AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
+      AI_LEARNING_CRAWL_ENABLED: ${AI_LEARNING_CRAWL_ENABLED:-false}
+      AI_LEARNING_BASE_URL: ${AI_LEARNING_URL:-http://againspring-ai-learning:8099}
+      SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
+      AI_USER_PERSONA_TARGET: ${AI_USER_PERSONA_TARGET:-50}
+      AI_USER_PERSONAS_DIR: /app/personas
+      AI_USER_FORCE_ACTIVE: ${AI_USER_FORCE_ACTIVE:-false}
+      AI_USER_SECONDARY_BACKEND_URL: ${AI_USER_SECONDARY_BACKEND_URL:-}
+      PAIRED_POST_ENABLED: ${PAIRED_POST_ENABLED:-true}
+      PAIRED_POST_CRON: "${PAIRED_POST_CRON:-0 0 */2 * * *}"
+      PAIRED_POST_PAIRS: ${PAIRED_POST_PAIRS:-3}
+      AI_USER_ML_BASE_URL: ${AI_USER_ML_BASE_URL:-http://100.115.252.61:8201}
+      AI_USER_ML_ENABLED: ${AI_USER_ML_ENABLED:-false}
+      AI_USER_ML_ENABLED_COMMUNITIES: ${AI_USER_ML_ENABLED_COMMUNITIES:-}
+      AI_USER_ML_API_TOKEN: ${AI_USER_ML_API_TOKEN:-aiuser-ml-api-token-dev-2026}
+      AI_USER_ML_COLLECT: ${AI_USER_ML_COLLECT:-false}
+      AI_USER_ML_BEST_OF_N: ${AI_USER_ML_BEST_OF_N:-4}
+      AI_USER_ML_TIMEOUT_MS: ${AI_USER_ML_TIMEOUT_MS:-500}
+    volumes:
+      - ../ai-user/docs/personas:/app/personas:rw
+    restart: unless-stopped
+    networks:
+      - againspring
+      - againspring-prod
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8096/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  prod-dev-sync:
+    build:
+      context: ../ai-user/sync
+      dockerfile: Dockerfile
+    image: againspring-prod-dev-sync
+    container_name: againspring-prod-dev-sync
+    environment:
+      PROD_DB_HOST: againspring-mariadb-prod
+      PROD_DB_PORT: "3306"
+      PROD_DB_USER: ${MARIADB_USER:-againspring}
+      PROD_DB_PASSWORD: ${MARIADB_PASSWORD}
+      PROD_DB_NAME: ${MARIADB_DATABASE:-againspring}
+      DEV_DB_HOST: againspring-mariadb-dev
+      DEV_DB_PORT: "3306"
+      DEV_DB_USER: ${MARIADB_USER:-againspring}
+      DEV_DB_PASSWORD: ${DEV_MARIADB_PASSWORD}
+      DEV_DB_NAME: ${DEV_DB_NAME:-againspring_dev}
+      SYNC_CRON: ${SYNC_CRON:-30 5 * * *}
+      SYNC_TIMEZONE: ${SYNC_TIMEZONE:-Asia/Seoul}
+      SYNC_BACKFILL_DAYS: ${SYNC_BACKFILL_DAYS:-7}
+    restart: unless-stopped
+    networks:
+      - againspring-prod
+      - againspring-dev
+
+networks:
+  againspring:
+    external: true
+    name: againspring
+  againspring-prod:
+    external: true
+    name: againspring-prod
+  againspring-dev:
+    external: true
+    name: againspring-dev

@@ -64,6 +64,11 @@ public class BehaviorEngine {
     private static final int ACTIONS_PER_TARGET_POST = 20;
 
     public void tick() {
+        if (!props.isEnabled()) {
+            log.debug("BehaviorEngine tick skipped: AI_USER_ENABLED=false");
+            return;
+        }
+
         // 1. Kill-switch check
         AiUserRuntime rt = runtimeRepo.findById(1).orElse(null);
         if (rt == null || !rt.isEnabled()) {

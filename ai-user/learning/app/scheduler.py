@@ -1,8 +1,13 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-import logging, asyncio, random
+import asyncio
+import logging
+import os
+import random
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
+KST = ZoneInfo("Asia/Seoul")
 
 # Phase 2: NATEPAN(1500) + BLIND(240) 활성 — 결혼/썸연애/직장 채널 타게팅
 # NATEPAN daily cap 대폭 상향 (50 → 1500)
@@ -67,16 +72,26 @@ async def run_topic_synthesis():
         logger.error(f"Topic synthesis error: {e}")
 
 def init_scheduler():
-    scheduler = AsyncIOScheduler()
-    # 크롤 + 강화: 매일 UTC 18:00 (KST 03:00)
-    scheduler.add_job(run_daily_crawl, CronTrigger(hour=18, minute=0),
+    scheduler_enabled = os.getenv("AI_LEARNING_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+    crawl_enabled = os.getenv("AI_LEARNING_CRAWL_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+    if not scheduler_enabled:
+        logger.info("Scheduler disabled via AI_LEARNING_ENABLED=false")
+        return None
+    if not crawl_enabled:
+        logger.info("Scheduler jobs disabled via AI_LEARNING_CRAWL_ENABLED=false")
+        return None
+
+    scheduler = AsyncIOScheduler(timezone=KST)
+    # 크롤 + 강화: 매일 KST 03:00
+    scheduler.add_job(run_daily_crawl, CronTrigger(hour=3, minute=0, timezone=KST),
                       id="daily_crawl", name="Daily Crawl + Strengthen")
-    # 독립 강화+토픽보강: 매일 UTC 20:00 (KST 05:00)
+    # 독립 강화+토픽보강: 매일 KST 05:00
     async def _standalone_strengthen_and_synthesize():
         await run_strengthen()
         await run_topic_synthesis()
 
-    scheduler.add_job(_standalone_strengthen_and_synthesize, CronTrigger(hour=20, minute=0),
+    scheduler.add_job(_standalone_strengthen_and_synthesize, CronTrigger(hour=5, minute=0, timezone=KST),
                       id="daily_strengthen", name="Daily Strengthen + Topic Synthesis (standalone)")
     scheduler.start()
     logger.info("Scheduler initialized — crawl 03:00 KST, strengthen 03:00+05:00 KST daily")

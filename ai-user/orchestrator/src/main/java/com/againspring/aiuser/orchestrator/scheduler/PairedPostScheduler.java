@@ -62,6 +62,10 @@ public class PairedPostScheduler {
     /** 매일 KST 14:00 (UTC 05:00) 실행 — 환경변수로 재정의 가능 */
     @Scheduled(cron = "${ai-user.paired-post.cron:0 0 5 * * *}")
     public void runPairedPosts() {
+        if (!props.isEnabled()) {
+            log.debug("[PairedPost] AI_USER_ENABLED=false — skip");
+            return;
+        }
         if (!pairedEnabled) {
             log.debug("[PairedPost] disabled — skip");
             return;

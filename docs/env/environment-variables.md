@@ -2,166 +2,173 @@
 
 ## Source of truth
 
-- `env/.env.example` (로컬용 — 최소 항목)
-- `env/.env.dev.example` (dev 서버)
-- `env/.env.prod.example` (prod 서버)
-- `backend/src/main/resources/application*.yml` (런타임 키)
+- `env/.env.example`
+- `env/.env.dev.example`
+- `env/.env.prod.example`
+- `env/.env.ai-user.example`
+- `backend/src/main/resources/application*.yml`
+- `ai-user/orchestrator/src/main/resources/application.yml`
 
-`.env.dev` / `.env.prod` 파일은 gitignored — 호스트에서 생성.
+`.env.dev`, `.env.prod`, `.env.ai-user`는 git에 커밋하지 않는다.
 
-## 분류별 항목
+## 파일별 역할
 
-### MariaDB
-
-| 변수 | 사용처 | dev 기본 | prod |
-|---|---|---|---|
-| `MARIADB_ROOT_PASSWORD` | mariadb 컨테이너 부트스트랩 | `changeme_dev` | **필수** |
-| `MARIADB_DATABASE` | DB 이름 | `againspring_dev` | `againspring` |
-| `MARIADB_USER` | 앱 접속 계정 | `againspring` | `againspring` |
-| `MARIADB_PASSWORD` | 앱 접속 비밀번호 | `changeme_dev` | **필수** |
-
-### JWT
-
-| 변수 | 사용처 | dev 기본 | prod |
-|---|---|---|---|
-| `JWT_SECRET` | `JwtService` 서명 키 (≥256bit) | placeholder | **필수** |
-
-생성 예: `openssl rand -base64 32`
-
-### LLM 워커 (`againspring-llm` 컨테이너)
-
-| 변수 | 사용처 | 기본값 |
-|---|---|---|
-| `LLM_PROVIDER` | `LLMProvider` 빈 선택 (backend) | `remote` |
-| `LLM_JURY_PROVIDER` | 배심원 생성 provider (`remote` \| `mock`) | `remote` (dev) |
-| `LLM_WORKER_URL` | backend → llm-worker 접속 URL | `http://againspring-llm:8090` |
-| `LLM_DEFAULT_TIMEOUT_MS` | LLM 호출 타임아웃 (ms) | `120000` |
-| `CLAUDE_BIN` | llm-worker Claude CLI 실행 파일명 | `claude` |
-| `CLAUDE_MODEL` | llm-worker `claude --model` 인자 (기본 모델) | `claude-haiku-4-5-20251001` |
-| `REPORT_LLM_MODEL` | llm-worker 리포트 모델 | `claude-sonnet-4-6` |
-| `CLAUDE_HOST_CONFIG_DIR` | bind mount 원본 (`→ /root/.claude`) — **llm-worker에 마운트** | dev: `/home/justant/.claude` / prod: `/root/.claude` |
-| `LLM_POOL_SIZE` | ThreadPoolExecutor 상한 | `100` |
-| `LLM_QUEUE_CAPACITY` | LinkedBlockingQueue 용량 | `500` |
-| `LLM_QUEUE_WAIT_TIMEOUT_MS` | 큐 대기 최대 시간 (ms) | `30000` |
-| `ANTHROPIC_API_KEY` | `llm-ai-user`의 `backend=API` 경로용 clcocloud API 키 | `""` |
-
-API 키 없이 동작 — 호스트의 `~/.claude` 세션을 **llm-worker** 컨테이너가 공유. backend 컨테이너에는 마운트 불필요.
-
-긴급 롤백: `LLM_PROVIDER=claude-code`로 변경 → backend에서 in-process 직접 호출 (backend Dockerfile revert 필요).
-
-### AI 유저 오케스트레이션
-
-| 변수 | 사용처 | dev 기본 | prod |
-|---|---|---|---|
-| `AI_USER_ENABLED` | 오케스트레이터 설정/로그 플래그. 실제 tick gate는 `ai_user_runtime.enabled` | `false` | **필수** |
-| `AI_USER_PERSONA_TARGET` | 🚨 **2026-06-10 변경**: 일일 총량 fallback (admin UI 목표 > 0일 때는 무시됨) | `50` | 변경 필요시 admin UI |
-
-> ⚠️ **2026-06-10 변경**: 일일 5개 타입(posts/comments/replies/votes/likes) 목표는 `admin UI(/admin/ai-user)`에서 설정합니다.
-> 총량은 **UI 목표 합 × 1.1**로 자동 계산됩니다.
-> 이 env var는 **admin UI 목표가 모두 0일 때만 fallback**으로 동작합니다.
-> 운영 중 목표 조정은 **admin UI를 사용**하세요 (재배포 불필요).
->
-> `AI_USER_HISTORY_DIR`는 현재 코드/compose에서 사용하지 않습니다. persona history와 life state는 DB `persona_history_entries`, `persona_life_state`에 저장됩니다.
-
-#### 문체·반복 가드 (orchestrator)
-
-| 변수 | 사용처 | 기본 |
-|---|---|---|
-| `AI_USER_REPETITION_THRESHOLD` | 생성문 vs 최근 출력 2-gram Jaccard 임계 — 초과 시 1회 재생성 (llm.md §15) | `0.45` |
-| `AI_USER_MIN_POST_CHARS` | 글 최소 길이 — 미달 시 1회 재생성 (제목만 남는 절단 방어, llm.md §6.3) | `50` |
-
-#### AI-User ML 서비스 연동 (Best-of-N 리랭킹, WSL 100.115.252.61:8201)
-
-| 변수 | 사용처 | 기본 |
-|---|---|---|
-| `AI_USER_ML_BASE_URL` | ML 서비스 base URL (WSL Tailscale) | `http://100.115.252.61:8201` |
-| `AI_USER_ML_API_TOKEN` | Bearer 인증 토큰 (ML → AS 단방향) | `aiuser-ml-api-token-dev-2026` |
-| `AI_USER_ML_ENABLED` | Best-of-N 리랭킹 활성화 (false=단일초안 기존 경로) — 수집은 `AI_USER_ML_COLLECT`로 별도 제어 | `false` |
-| `AI_USER_ML_ENABLED_COMMUNITIES` | 선택적 리랭킹 대상 community 목록 (쉼표 구분 `voice_type`, 비어 있으면 전역 적용). `AI_USER_ML_ENABLED=true`일 때만 의미 있음 | `""` |
-| `AI_USER_ML_COLLECT` | AI negative 코퍼스 수집 단독 활성화. `AI_USER_ML_ENABLED`(리랭킹)와 독립. 판별기 AUC가 낮을 때(0.55 미만) 수집만 켜고 리랭킹은 OFF 유지해야 출력 악화 방지 | `false` |
-| `AI_USER_ML_BEST_OF_N` | 초안 생성 수 (활성화 시) | `4` |
-| `AI_USER_ML_TIMEOUT_MS` | ML 서비스 응답 타임아웃 (ms) | `500` |
-
-### AI 유저 LLM 생성 (`againspring-llm-ai-user` 컨테이너, 8092)
-
-backend의 `againspring-llm`(8090, 채팅·배심원)과 **별개 서비스**. 글/댓글/대댓글 생성 전용.
-`backend=API` 경로는 `ANTHROPIC_API_KEY`/`ANTHROPIC_BASE_URL`(DB `system_setting` 우선)로 clcocloud 프록시 호출.
-
-| 변수 | 사용처 | dev/기본 | 비고 |
-|---|---|---|---|
-| `AI_USER_LLM_MODEL` | `CLAUDE_MODEL` — 댓글/대댓글 기본 모델 | `claude-haiku-4-5-20251001` | |
-| `LLM_POST_MODEL` | 글(POST)+partner 전용 모델 오버라이드 | `claude-sonnet-4-6` | 빈 값=`CLAUDE_MODEL` 폴백 (llm.md §6.3) |
-| `LLM_API_PROMPT_CACHING` | user-block `cache_control` 캐싱 | `true` | clcocloud 간헐 무시 — "되면 보너스" (llm.md §20) |
-| `LLM_API_CACHE_TTL` | 캐시 TTL `5m`(GA) \| `1h`(beta) | `5m` | ⚠️ `1h`은 clcocloud Kiro 오라우팅 유발 — 직접 API 전용 |
-| `LLM_API_REFUSAL_RETRIES` | 거절(PROVIDER_ERROR) 재시도 횟수 | `1` | Haiku 거절 시 재시도 최대 2회(1회 재시도) (llm.md §19) |
-| `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 시 폴백 모델 (거절 0% 실측) | `claude-sonnet-4-6` | Sonnet은 거절 0%, 프롬프트 인젝션 방어 |
-| `SELF_CRITIQUE_ENABLED` | 생성 후 자기비평 루프 | `true` | |
-| `SELF_CRITIQUE_THRESHOLD` | 비평 통과 점수 (7점 만점) | `5` | |
-| `SELF_CRITIQUE_EXTRA_CLICHES` | 추가 AI 상투구 (쉼표 구분 리터럴) — 무배포 등록 | `""` | llm.md §15 |
-
-### OAuth2
-
-| 변수 | 비고 |
+| 파일 | 대상 |
 |---|---|
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | dev: 선택 / prod: 필수 |
-| `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` | dev: 선택 / prod: 필수 |
-| `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | dev: 선택 / prod: 필수 |
+| `.env.example` | 로컬 base 스택 |
+| `.env.dev.example` | dev 웹/DB 스택 |
+| `.env.prod.example` | prod 웹/DB 스택 |
+| `.env.ai-user.example` | shared ai-user 스택 |
 
-frontend도 build-time ARG로 `NEXT_PUBLIC_{GOOGLE,KAKAO,NAVER}_CLIENT_ID`를 받아 정적 인라인.
+## 공통 DB / JWT
 
-### App URL
+| 변수 | 사용처 | 예시 |
+|---|---|---|
+| `MARIADB_ROOT_PASSWORD` | MariaDB root 부트스트랩 | dev/prod 각자 설정 |
+| `MARIADB_DATABASE` | DB 이름 | `againspring_dev`, `againspring` |
+| `MARIADB_USER` | 앱 계정 | `againspring` |
+| `MARIADB_PASSWORD` | prod 또는 현재 스택 DB 비밀번호 | 비밀값 |
+| `DEV_MARIADB_PASSWORD` | shared sync가 쓰는 dev DB 비밀번호 | 비밀값 |
+| `JWT_SECRET` | backend JWT 서명 키 | `openssl rand -base64 32` 생성 권장 |
 
-| 변수 | 사용처 | dev | prod |
-|---|---|---|---|
-| `APP_URL` | OAuth `redirect_uri` 베이스 + frontend `NEXT_PUBLIC_APP_URL` build ARG | `https://dev.againspring.net` | `https://againspring.net` |
+## Base LLM (`againspring-llm`)
 
-### Email (Spring Mail) — 발신자 `againspring2026@gmail.com` 단일화
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `LLM_PROVIDER` | backend LLM provider 선택 | `remote` |
+| `LLM_JURY_PROVIDER` | 배심원 provider | `remote` |
+| `LLM_WORKER_URL` | backend → `againspring-llm` URL | `http://againspring-llm:8090` |
+| `CLAUDE_BIN` | Claude CLI 바이너리 | `claude` |
+| `CLAUDE_MODEL` | 기본 모델 | `claude-haiku-4-5-20251001` |
+| `REPORT_LLM_MODEL` | 리포트 모델 | `claude-sonnet-4-6` |
+| `CLAUDE_HOST_CONFIG_DIR` | `/root/.claude`로 마운트할 호스트 경로 | 환경별 실제 값 |
+| `LLM_POOL_SIZE` | worker pool size | `100` |
+| `LLM_QUEUE_CAPACITY` | queue size | `500` |
+| `LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `30000` |
+| `LLM_DEFAULT_TIMEOUT_MS` | 요청 timeout | `120000` |
 
-| 변수 | 사용처 | dev | prod |
-|---|---|---|---|
-| `MAIL_HOST` | SMTP 호스트 | `smtp.gmail.com` | `smtp.gmail.com` |
-| `MAIL_PORT` | SMTP 포트 | `587` | `587` |
-| `MAIL_USERNAME` | 발신 계정 | `againspring2026@gmail.com` | `againspring2026@gmail.com` |
-| `GMAIL_APP_PASSWORD` | Gmail 앱 비밀번호 16자 | 선택 (없으면 이메일 발송 비활성) | 필수 |
+## dev/prod backend가 shared ai-user를 바라보는 변수
 
-`GMAIL_APP_PASSWORD`: againspring2026@gmail.com → Google 계정 → 2단계 인증 → 앱 비밀번호 발급.
-이메일 인증·비밀번호 재설정 모두 단일 발신자. SMTP 미설정 시 dev에서는 로그로 코드 출력.
+아래 값은 `backend-dev`, `backend-prod`에 모두 들어간다.
 
-### ASM (Again-Spring-Marketing 서비스)
+| 변수 | 기본값 | 용도 |
+|---|---|---|
+| `AI_LEARNING_URL` | `http://againspring-ai-learning:8099` | learning API |
+| `AI_USER_LLM_URL` | `http://againspring-llm-ai-user:8092` | AI-user 생성 워커 |
+| `AI_USER_ORCHESTRATOR_URL` | `http://againspring-ai-user-orchestrator:8096` | orchestrator admin trigger |
 
-| 변수 | 사용처 | dev | prod |
-|---|---|---|---|
-| `ASM_BASE_URL` | Again-Spring-Marketing 게이트웨이 (HTTP) | `http://100.115.252.61:8200` | 비워둠 |
-| `ASM_API_TOKEN` | ASM 인증 토큰 (AS → ASM) | 필요시 입력 | 비워둠 |
-| `ASM_CALLBACK_TOKEN` | ASM이 콜백 인증에 사용 (ASM → AS) | `asm-callback-token-dev` | **필수 (비밀값)** |
-| `ASM_CALLBACK_BASE_URL` | AS가 jobCreate 요청 시 포함, ASM이 콜백 URL 생성용 | `http://100.81.189.92:8090` | `http://100.81.189.92:8091` |
-| `ASM_ENABLED` | 마케팅 기능 활성화 | `false` (기본) | `false` (변경 금지) |
+## Shared ai-user 런타임 (`.env.ai-user`)
 
-마케팅 관련 환경변수는 ASM 프로젝트로 이동. ASM_BASE_URL/ASM_API_TOKEN/ASM_ENABLED 참조.
-- `ASM_CALLBACK_TOKEN`: Bearer 토큰. `POST /api/internal/marketing/callback` 인증용. dev 기본값은 `asm-callback-token-dev`.
-- `ASM_CALLBACK_BASE_URL`: AS의 외부 접근 URL. ASM이 콜백을 보낼 대상 도메인. 통상 LB/nginx 외부 IP:port.
+### 오케스트레이터
 
-### 위기 알림 (선택사항)
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `AI_USER_BACKEND_URL` | orchestrator가 write할 backend | `http://againspring-backend-prod:8080` |
+| `AI_USER_ENABLED` | **하드 게이트**. false면 스케줄러와 tick이 바로 skip | `true` |
+| `AI_USER_TICK_CRON` | 메인 tick cron | `0 */10 * * * *` |
+| `AI_USER_DAILY_GLOBAL_CAP` | 일일 상한 fallback | `500` |
+| `AI_USER_BOT_PASSWORD` | synthetic 계정 로그인용 | 비밀값 |
+| `AI_USER_SEED_ENABLED` | seed loader 활성화 | `true` |
+| `AI_USER_REPETITION_THRESHOLD` | 반복 가드 임계값 | `0.45` |
+| `AI_USER_PERSONA_TARGET` | admin 목표가 0일 때 fallback 총량 | `50` |
+| `AI_USER_FORCE_ACTIVE` | 강제 활성 모드 | `false` |
+| `AI_USER_SECONDARY_BACKEND_URL` | 보조 backend direct write | 기본 공란 |
+| `PAIRED_POST_ENABLED` | paired posts 활성화 | `true` |
+| `PAIRED_POST_CRON` | paired posts cron | `0 0 */2 * * *` |
+| `PAIRED_POST_PAIRS` | 동시 pair 수 | `3` |
 
-| 변수 | 사용처 | dev | prod |
-|---|---|---|---|
-| `CRISIS_WEBHOOK_URL` | 위기 신호 감지 시 webhook URL | 선택 | 선택 |
-| `CRISIS_EMAIL` | 위기 알림 이메일 | 선택 | 선택 |
+중요:
 
-## prod 필수 항목 체크리스트
+- `AI_USER_ENABLED`는 더 이상 단순 로그 플래그가 아니다.
+- DB `ai_user_runtime.enabled`는 2차 kill-switch로 계속 사용된다.
+- 실제 운영 목표치는 `/api/admin/ai-user/generation-config`가 우선한다.
 
-prod는 `application-prod.yml`이 모든 키에 기본값 없이 환경변수를 강제합니다. 누락 시 부팅 실패.
+### AI-user LLM
 
-- [ ] `MARIADB_ROOT_PASSWORD`, `MARIADB_PASSWORD`
-- [ ] `JWT_SECRET`
-- [ ] `GOOGLE_*`, `KAKAO_*`, `NAVER_*` (전체 OAuth)
-- [ ] `MAIL_USERNAME` (againspring2026@gmail.com), `GMAIL_APP_PASSWORD`
-- [ ] `CLAUDE_HOST_CONFIG_DIR` 디렉토리가 호스트에 존재 + `claude` 1회 로그인 완료 (llm-worker 컨테이너가 사용)
-- [ ] `LLM_WORKER_URL` (`http://againspring-llm:8090`)
-- [ ] `LLM_POOL_SIZE`, `LLM_QUEUE_CAPACITY`, `LLM_QUEUE_WAIT_TIMEOUT_MS` (기본값 사용 가능)
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `AI_USER_LLM_MODEL` | 댓글/대댓글 기본 모델 | `claude-haiku-4-5-20251001` |
+| `LLM_POST_MODEL` | 글 생성 모델 override | `claude-sonnet-4-6` |
+| `ANTHROPIC_API_KEY` | direct API 경로용 키 | 공란 |
+| `AI_USER_LLM_POOL_SIZE` | AI-user worker pool | `20` |
+| `AI_USER_LLM_QUEUE_CAPACITY` | AI-user queue | `100` |
+| `AI_USER_LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `30000` |
+| `AI_USER_LLM_DEFAULT_TIMEOUT_MS` | 생성 timeout | `120000` |
+| `SELF_CRITIQUE_ENABLED` | 자기비평 루프 | `true` |
+| `SELF_CRITIQUE_THRESHOLD` | pass 기준 | `5` |
+| `SELF_CRITIQUE_EXTRA_CLICHES` | 추가 상투구 차단 | 공란 |
+| `LLM_API_REFUSAL_RETRIES` | refusal 재시도 | `0` |
+| `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 후 fallback | 공란 |
 
-## 변경 시 절차
+### Learning
 
-1. `.env.dev.example` / `.env.prod.example` 갱신 (committed)
-2. 호스트의 `.env.dev` / `.env.prod`에 실제 값 반영
-3. `docker compose ... up -d --build`로 재기동 (env는 build/run 양쪽에 영향)
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `AI_LEARNING_ENABLED` | scheduler 전체 enable | `true` |
+| `AI_LEARNING_CRAWL_ENABLED` | crawl/strengthen/topic job 등록 여부 | `false` |
+| `AI_LEARNING_URL` | orchestrator가 learning을 호출할 주소 | `http://againspring-ai-learning:8099` |
+| `LLM_AI_USER_URL` | learning이 AI-user LLM을 호출할 주소 | `http://againspring-llm-ai-user:8092` |
+
+중요:
+
+- `AI_LEARNING_ENABLED=false`면 scheduler 자체가 올라오지 않는다.
+- `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic job이 등록되지 않는다.
+
+### prod → dev sync
+
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `SYNC_CRON` | 5-field cron | `30 5 * * *` |
+| `SYNC_TIMEZONE` | scheduler timezone | `Asia/Seoul` |
+| `SYNC_BACKFILL_DAYS` | 증분 backfill window | `7` |
+| `DEV_DB_NAME` | dev DB 이름 | `againspring_dev` |
+
+현재 sync는 다음 테이블군을 upsert한다.
+
+- `users`
+- `posts`, `vote_options`, `post_comments`, `votes`, `post_likes`
+- `personas`, `persona_relationships`, `persona_seen_posts`, `persona_action_log`
+- `persona_history_entries`, `persona_life_state`, `persona_daily_quota`
+- `ai_user_runtime`, `ai_user_generation_config`
+- `ai_content_corrections`, `ai_global_rules`, `ai_prompt_template`, `system_setting`
+
+`users`는 dev 반영 시 비식별화되고 로그인 가능한 상태를 유지하지 않는다.
+
+### AI-user ML
+
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `AI_USER_ML_BASE_URL` | ML 서비스 URL | `http://100.115.252.61:8201` |
+| `AI_USER_ML_API_TOKEN` | ML bearer token | 예시값 |
+| `AI_USER_ML_ENABLED` | Best-of-N reranking enable | `false` |
+| `AI_USER_ML_ENABLED_COMMUNITIES` | 커뮤니티 제한 | 공란 |
+| `AI_USER_ML_COLLECT` | negative corpus 수집만 enable | `false` |
+| `AI_USER_ML_BEST_OF_N` | 초안 수 | `4` |
+| `AI_USER_ML_TIMEOUT_MS` | timeout | `500` |
+
+## OAuth / App URL / Mail / ASM
+
+기존 규칙은 유지된다.
+
+- `GOOGLE_*`, `KAKAO_*`, `NAVER_*`
+- `APP_URL`
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `GMAIL_APP_PASSWORD`
+- `ASM_BASE_URL`, `ASM_API_TOKEN`, `ASM_ENABLED`, `ASM_CALLBACK_*`
+
+prod는 OAuth와 메일 관련 값을 모두 실제 값으로 채워야 한다.
+
+## prod 필수 체크리스트
+
+- `MARIADB_ROOT_PASSWORD`, `MARIADB_PASSWORD`
+- `JWT_SECRET`
+- `GOOGLE_*`, `KAKAO_*`, `NAVER_*`
+- `GMAIL_APP_PASSWORD`
+- `CLAUDE_HOST_CONFIG_DIR` 존재 + `claude` 로그인 완료
+- `LLM_WORKER_URL=http://againspring-llm:8090`
+- shared ai-user 사용 시 `.env.ai-user`의 prod/dev DB 자격 증명
+
+## 변경 절차
+
+1. `.env.*.example` 갱신
+2. 호스트의 실제 `.env.*` 반영
+3. 관련 compose 재기동

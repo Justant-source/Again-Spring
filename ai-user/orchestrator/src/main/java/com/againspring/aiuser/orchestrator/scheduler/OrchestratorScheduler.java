@@ -29,6 +29,10 @@ public class OrchestratorScheduler {
     @Scheduled(cron = "${ai-user.tick-cron:0 */10 * * * *}")
     public void tick() {
         log.debug("OrchestratorScheduler.tick() triggered (enabled={})", props.isEnabled());
+        if (!props.isEnabled()) {
+            log.debug("OrchestratorScheduler.tick() skipped: AI_USER_ENABLED=false");
+            return;
+        }
         try {
             behaviorEngine.tick();
         } catch (Exception e) {

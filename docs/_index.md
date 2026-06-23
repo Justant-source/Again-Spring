@@ -59,7 +59,7 @@
 |---|---|---|---|
 | 포트·토폴로지 | `docs/system.md`·`docs/env/architecture.md` | `README.md`·`CLAUDE.md` | `env/docker-compose*.yml`·`env/nginx/*.conf` |
 | 배포 절차 | `docs/env/deployment.md` | `CLAUDE.md` (3-step 요약) | — |
-| 환경 변수 | `docs/env/environment-variables.md` | — | `.env.dev`·`.env.prod`·`application*.yml` |
+| 환경 변수 | `docs/env/environment-variables.md` | — | `.env.dev`·`.env.prod`·`.env.ai-user`·`application*.yml` |
 
 ### 마케팅 (ASM)
 

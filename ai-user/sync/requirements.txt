@@ -1,1 +1,2 @@
+apscheduler==3.10.4
 PyMySQL==1.1.1

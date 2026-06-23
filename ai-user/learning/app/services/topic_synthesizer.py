@@ -11,7 +11,7 @@ from app.services.quality_filter import QualityFilter
 
 logger = logging.getLogger(__name__)
 
-LLM_URL = os.getenv("LLM_AI_USER_URL", "http://againspring-llm-ai-user-dev:8092")
+LLM_URL = os.getenv("LLM_AI_USER_URL", "http://againspring-llm-ai-user:8092")
 MIN_CRAWL_QUALITY = 0.6   # example_bank 조회 품질 하한
 MIN_CRAWL_POSTS = 5        # 카테고리 합성에 필요한 최소 샘플 수
 TOPICS_PER_RUN = 5         # 회당 합성 시드 수 (카테고리 무관, LLM이 카테고리 태깅)

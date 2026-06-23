@@ -11,7 +11,7 @@ from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
-LLM_URL = os.getenv("LLM_AI_USER_URL", "http://againspring-llm-ai-user-dev:8092")
+LLM_URL = os.getenv("LLM_AI_USER_URL", "http://againspring-llm-ai-user:8092")
 
 # Voice 타입 → 커뮤니티 소스 매핑
 VOICE_SOURCE_MAP = {

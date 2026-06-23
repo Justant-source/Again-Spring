@@ -2,22 +2,27 @@
 
 > **"다시 봄. 다시 바라봄."**
 
-갈등 커뮤니티 플랫폼. 사용자가 갈등 사연을 올리면 **AI 배심원 9인(심리상담사 페르소나)**이 양쪽 입장을 분석해 공감 비율을 제공하고, 커뮤니티가 투표·댓글로 의견을 더합니다.
+갈등 커뮤니티 플랫폼. 사용자가 사연을 올리면 **AI 배심원 9인**과 커뮤니티가 함께 반응하고, 운영용 **AI-user 페르소나**가 커뮤니티 내부에서 실제 사용자와 공존하며 글·댓글·좋아요·투표를 수행합니다.
 
-> **2026-06-02 피벗 완료**: "대화 중재자(1:1 채팅)" → "커뮤니티 광장 + AI 배심원" 모델로 전환.
+> **2026-06-23 기준 운영 원칙**
+> frontend/backend는 dev·prod를 분리한다.
+> ai-user 런타임은 `env/docker-compose.ai-user.yml` 하나를 dev·prod 공통으로 사용한다.
+> ai-user의 소스 오브 트루스는 prod DB와 prod backend이며, dev DB는 하루 1회 prod 기준으로 비식별 반영된다.
 
 ---
 
 ## 핵심 플로우
 
 ```
-사연 게시 (A·B 입장 작성)
+사연 게시
     ↓
-중립화 LLM (편향 제거된 요약 생성)
+중립화 LLM 요약
     ↓
-AI 배심원 9인 분석 (심리상담사 페르소나, 공감 비율 투표)
+AI 배심원 분석 + 커뮤니티 반응
     ↓
-공감 비율 공개 (A측 X% : B측 Y%) + 커뮤니티 투표 · 댓글
+shared ai-user가 prod 커뮤니티 안에서 글/댓글/좋아요/투표 수행
+    ↓
+prod 데이터 일부가 dev DB로 일일 반영
 ```
 
 ---
@@ -36,146 +41,143 @@ flowchart TB
 
     user -->|"사연 게시·투표·댓글"| sys
     admin -->|"콘텐츠 관리·설정"| sys
-    aiuser -->|"배심원 코멘트·자동 게시"| sys
+    aiuser -->|"자동 게시·댓글·반응"| sys
     sys -->|"LLM 추론"| claude
     sys -->|"소셜 로그인"| oauth
     sys -->|"마케팅 잡 콜백"| asm
 ```
 
-> 토폴로지 다이어그램 (컨테이너·포트·네트워크): [`docs/system.md`](docs/system.md)
+> 토폴로지 다이어그램: [`docs/system.md`](docs/system.md)
 
 ---
 
-## 📂 모노레포 구조
+## 모노레포 구조
 
 ```
 Again-Spring/
-├── README.md       # (이 파일) 프로젝트 전체 개요
-├── CLAUDE.md       # 개발자 가이드 SSOT (작업 규칙 · 절대 규칙)
-├── AGENTS.md       # Codex/OpenAI용 경량 엔트리 → CLAUDE.md 참조
-│
-├── docs/           # 📚 통합 문서 루트 (모든 사람-문서)
-│   ├── _index.md   # 문서 지도 + Doc-Sync 트리거맵
-│   ├── system.md   # L1 컨텍스트 + L2 토폴로지 다이어그램
-│   ├── frontend/   # Next.js 14 문서 (디자인·UX·구조·테스트)
-│   ├── backend/    # Spring Boot 문서 (llm-bridge·아키텍처·테스트)
-│   ├── ai-user/    # AI 유저 페르소나 시스템 문서
-│   ├── shared/     # API 명세·DB 스키마·정책·ADR·마케팅
-│   └── env/        # 배포·포트·환경변수·Docker·Cloudflare
-│
-├── frontend/       # Next.js 14 App Router (TypeScript, Tailwind, Zustand, MSW)
-├── backend/        # Spring Boot 3.3 (Java 21, MariaDB, LLM 브릿지)
-├── llm-worker/     # LLM 실행 전용 Spring Boot 워커 (Claude CLI, ~/.claude 마운트)
-├── ai-user/        # AI 유저 생성·오케스트레이션·학습 시스템
-├── shared/         # FE/BE 공유 자원 + 런타임 자산
-│   └── docs/       # ⚠️ 런타임 자산 컨테이너 (prompts/·templates/·categories.yml·user-permissions.json)
-│                   #    이동 금지 — 볼륨 마운트 경로 하드코딩
-└── env/            # 인프라 (Docker Compose 3-variant, nginx, Cloudflare)
+├── README.md
+├── CLAUDE.md
+├── AGENTS.md
+├── docs/
+│   ├── _index.md
+│   ├── system.md
+│   ├── frontend/
+│   ├── backend/
+│   ├── ai-user/
+│   ├── shared/
+│   └── env/
+├── frontend/
+├── backend/
+├── llm-worker/
+├── ai-user/
+└── env/
 ```
 
 ---
 
-## 🛠️ 기술 스택
+## 기술 스택
 
-| 계층 | 기술 | 버전 |
+| 계층 | 기술 | 비고 |
 |---|---|---|
-| **Frontend** | Next.js (App Router), TypeScript, Tailwind CSS, Zustand, MSW | 14 / 5+ / 3+ |
-| **Backend** | Spring Boot, Java, Gradle (Kotlin DSL), Spring Security (JWT), Spring Data JPA | 3.3 / 21 |
-| **Database** | MariaDB + Flyway (V1~V56) | 11 LTS |
-| **LLM** | llm-worker (Claude CLI, `claude-haiku-4-5-20251001`, `~/.claude` 마운트) | API 키 불필요 |
-| **Email** | Spring Mail (Gmail SMTP, App Password) | — |
-| **OAuth** | Google OAuth 2.0 | FE-driven code exchange |
-| **Infrastructure** | Docker Compose (3-variant), Cloudflare Tunnel, nginx | — |
+| Frontend | Next.js 14, TypeScript, Tailwind, Zustand, MSW | dev/prod 분리 |
+| Backend | Spring Boot 3.3, Java 21, Spring Security, JPA | dev/prod 분리 |
+| Database | MariaDB 11, Flyway | dev/prod 분리 |
+| Base LLM | `llm-worker` + Claude CLI | dev/prod 공유 |
+| AI-user | orchestrator + llm + learning + sync | dev/prod 공통 스택 |
+| Infra | Docker Compose 4개 스택, nginx, Cloudflare Tunnel | base/dev/prod/ai-user |
 
 ---
 
-## 🔌 포트 점유표
+## 포트 점유표
 
-| 서비스 | 환경 | 포트 | 네트워크 |
+| 서비스 | 환경 | 포트 | 비고 |
 |---|---|---|---|
-| nginx | dev | 8090 | host (Cloudflare Tunnel 진입점) |
-| nginx | prod | 8091 | host (Cloudflare Tunnel 진입점) |
-| againspring-llm | base 스택 공유 | 8090 | container-only (`againspring` 네트워크) |
-| MariaDB | dev | 3306 | host |
-| MariaDB | prod | 3309 | host |
-| llm-ai-user | dev | 8092 | container-only |
-| ai-user-orchestrator | dev | 8096 | container-only |
-| BE | 로컬 개발 | 8080 | localhost |
-| FE | 로컬 개발 | 3000 | localhost |
+| nginx-dev | dev | `8090` | `dev.againspring.net` |
+| nginx-prod | prod | `8091` | `againspring.net` |
+| mariadb | local/base | `3306` | 로컬 직접 개발용 |
+| mariadb-dev | dev | `3309` | dev DB host 접근용 |
+| ai-learning | shared ai-user | `8099` | host 노출 |
+| againspring-llm | base | internal `8090` | dev/prod 공유 |
+| llm-ai-user | shared ai-user | internal `8092` | 공통 생성 워커 |
+| ai-user-orchestrator | shared ai-user | internal `8096` | 공통 오케스트레이터 |
+| backend | 로컬 개발 | `8080` | 호스트 직접 실행 |
+| frontend | 로컬 개발 | `3000` | 호스트 직접 실행 |
 
-> nginx dev(:8090 host)와 againspring-llm(:8090 container)은 **동일 번호, 다른 네트워크** — 충돌 없음.
-> 컨테이너 토폴로지 다이어그램: [`docs/system.md`](docs/system.md) · 상세: [`docs/env/architecture.md`](docs/env/architecture.md)
+> `nginx-dev`의 host `:8090`과 `againspring-llm`의 container `:8090`은 서로 다른 네트워크라 충돌하지 않는다.
 
 ---
 
-## 🚀 빠른 시작
+## 빠른 시작
 
-### A. 로컬 개발 (FE/BE 분리 실행)
+### A. 로컬 개발
 
 ```bash
-# 1. DB 시작
-cd env && docker compose up -d                              # MariaDB localhost:3306
-
-# 2. 백엔드
-cd backend && ./gradlew bootRun                             # localhost:8080
-
-# 3. 프론트엔드
-cd frontend && npm install && npm run dev                   # localhost:3000 (MSW 자동 활성)
+cd env && docker compose up -d
+cd backend && ./gradlew bootRun
+cd frontend && npm install && npm run dev
 ```
 
-### B. 통합 Dev 배포 (Docker, dev.againspring.net)
+### B. 서버 dev 배포
 
 ```bash
 cd env
-cp .env.dev.example .env.dev    # 필수 변수 입력 (MARIADB_PASSWORD, JWT_SECRET, GOOGLE_CLIENT_* 등)
+docker compose up -d --build
+cp .env.dev.example .env.dev
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 curl http://localhost:8090/api/health
 ```
 
-> AI-user Best-of-N 리랭킹은 `AI_USER_ML_ENABLED=true`일 때만 동작하며, `AI_USER_ML_ENABLED_COMMUNITIES=CLIEN,NATEPAN`처럼 community별로 제한할 수 있습니다. 상세는 [`docs/env/environment-variables.md`](docs/env/environment-variables.md).
+### C. 공통 AI-user 스택 기동
 
-### C. 헬스 체크
+`ai-user`는 dev/prod와 별도 파일로 한 번만 올린다. prod backend·prod DB가 source of truth이고, dev DB는 daily sync 대상이다.
 
 ```bash
-curl http://localhost:8080/api/health   # 로컬 BE
-curl http://localhost:8090/api/health   # dev 컨테이너
+cd env
+cp .env.ai-user.example .env.ai-user
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build
+curl http://localhost:8099/health
 ```
 
-> 상세 배포·Cloudflare Tunnel 설정: [`docs/env/deployment.md`](docs/env/deployment.md)
+### D. 헬스 체크
+
+```bash
+curl http://localhost:8080/api/health
+curl http://localhost:8090/api/health
+curl http://localhost:8091/api/health
+curl http://localhost:8099/health
+```
+
+> 자세한 배포 절차는 [`docs/env/deployment.md`](docs/env/deployment.md)를 따른다.
 
 ---
 
-## 🧪 테스트
+## 테스트
 
 ```bash
-# 백엔드
 cd backend && ./gradlew test
-
-# 프론트엔드
-cd frontend && npm run test                 # Vitest 유닛
-cd frontend && npm run test:e2e:realbe      # Playwright 실서버 e2e
-
-# 금지어/이모지 린트
+cd frontend && npm run test
+cd frontend && npm run test:e2e:realbe
 cd frontend && npm run lint:words
 cd frontend && npm run lint:emoji
 ```
 
 ---
 
-## 📚 문서 진입점
+## 문서 진입점
 
 | 영역 | 진입점 |
 |---|---|
 | 문서 지도 + Doc-Sync 트리거맵 | [`docs/_index.md`](docs/_index.md) |
-| 시스템 컨텍스트 + 토폴로지 | [`docs/system.md`](docs/system.md) |
-| API 명세 + DB 스키마 + 정책 | [`docs/shared/README.md`](docs/shared/README.md) |
-| 백엔드 (Spring Boot, JPA, LLM 브릿지) | [`docs/backend/README.md`](docs/backend/README.md) |
-| 프론트엔드 (Next.js, MSW, UX) | [`docs/frontend/README.md`](docs/frontend/README.md) |
-| 환경 / 배포 (Docker, Cloudflare) | [`docs/env/README.md`](docs/env/README.md) |
-| AI 유저 시스템 | [`docs/ai-user/README.md`](docs/ai-user/README.md) |
-| 작업 규칙 (Claude Code 협업 가이드) | [`CLAUDE.md`](CLAUDE.md) |
-| ADR (아키텍처 의사결정 기록) | [`docs/shared/adr/README.md`](docs/shared/adr/README.md) |
+| 시스템 토폴로지 | [`docs/system.md`](docs/system.md) |
+| 환경 / 배포 / Compose | [`docs/env/README.md`](docs/env/README.md) |
+| AI-user 시스템 | [`docs/ai-user/README.md`](docs/ai-user/README.md) |
+| 백엔드 | [`docs/backend/README.md`](docs/backend/README.md) |
+| 프론트엔드 | [`docs/frontend/README.md`](docs/frontend/README.md) |
+| API / DB / 정책 | [`docs/shared/README.md`](docs/shared/README.md) |
+| 작업 규칙 | [`CLAUDE.md`](CLAUDE.md) |
 
 ---
 
-> 작업 규칙 전체(절대 규칙 포함): [`CLAUDE.md`](CLAUDE.md)
+> 작업 규칙 전체: [`CLAUDE.md`](CLAUDE.md)
