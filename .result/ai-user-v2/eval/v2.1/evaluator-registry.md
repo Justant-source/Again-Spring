@@ -25,7 +25,7 @@ This registry maintains a **single source of truth** for which evaluators have p
 - **보충(E-S1 부정선거, 2026-06-22)**: 60% — Phase 8 키트 오전달로 Phase 5 평가됨(참고치, 게이트 미반영). **평가자 편차 60~80% 확인** → ≥3인 평균 필요성 강화. 상세: `phase5/v2.1-phase5-01-result-supplement.md`
 - **Next**: Phase 6 결정론 다양화 (T1~T4 제거) → Phase 7 재평가 → Phase 8 최종
 
-**Phase 8 (Final)**: ✅ **SHIPPED** (2026-06-22) — 출하 시점 naive 4인 평균 **20%**, 추가 평가자 E-008·E-009·E-010 포함 **7인 평균 37.1% ≤ 60% → PASS** 유지. 결과: `phase8/v2.1-phase8-01-results.md` · 분석: `phase8/v2.1-phase8-01-analysis.md`
+**Phase 8 (Final)**: ✅ **SHIPPED** (2026-06-22) — 출하 시점 naive 4인 평균 **20%**, 추가 평가자 E-008·E-009·E-010·E-011·E-012 포함 **9인 평균 46.7% ≤ 60% → PASS** 유지. 결과: `phase8/v2.1-phase8-01-results.md` · 분석: `phase8/v2.1-phase8-01-analysis.md`
 - 🚨 **키트 오전달 주의**: E-S1에게 Phase 5 HTML이 전달됨 → Phase 8 평가자에게는 반드시 `eval/v2.1/phase8/v2.1-phase8-01-evaluator.html`(Phase 8)을 전달할 것. Phase 5 파일과 혼동 금지.
 - 배치: A-A-H-A-H-H-A-H-H-A (AI 문제1·2·4·7·10 / Human 문제3·5·6·8·9)
 - AI 계정 5종: WORK(ai-user-043/Vibe2026)·FRIEND(ai-user-057/I1l1IiliI)·MARRIED(ai-user-035/RiderX9)·COUPLE(ai-user-060/통장이텅장)·FAMILY(ai-user-032/햇살받는햄스터)
@@ -48,9 +48,11 @@ This registry maintains a **single source of truth** for which evaluators have p
 | E-005 | 김태준/태추 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **0%** (0/5), Human 오탐 4건. 전 문항 확신 50%(순수 추측) |
 | E-006 | 김윤태 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **0%** (0/5), Human 오탐 3건. 확신 ~100%인데 0%(과신 오답, E-001 패턴) |
 | E-007 | 윤도현 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **40%** (2/5: Q1·Q2), Human 오탐 3건. **신규 추가**(슬롯 외) |
-| E-008 | 쎄오일시 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **60%** (3/5: Q1·Q2·Q4), Human 오탐 4건(Q3·Q5·Q6·Q8). 투입 시점 5인 평균 28%, 최신 7인 37.1% — PASS 유지 |
-| E-009 | 이한별 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **80%** (4/5: Q1·Q2·Q4·Q7), Human 오탐 1건(Q3). 투입 시점 6인 평균 36.7%, 최신 7인 37.1% — PASS 유지 |
-| E-010 | 곽평안 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **40%** (2/5: Q7·Q10), Human 오탐 2건(Q8·Q9). 7인 평균 37.1% — PASS 유지 |
+| E-008 | 쎄오일시 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **60%** (3/5: Q1·Q2·Q4), Human 오탐 4건(Q3·Q5·Q6·Q8). 투입 시점 5인 평균 28%, 최신 9인 46.7% — PASS 유지 |
+| E-009 | 이한별 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **80%** (4/5: Q1·Q2·Q4·Q7), Human 오탐 1건(Q3). 투입 시점 6인 평균 36.7%, 최신 9인 46.7% — PASS 유지 |
+| E-010 | 곽평안 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **40%** (2/5: Q7·Q10), Human 오탐 2건(Q8·Q9). 투입 시점 7인 평균 37.1%, 최신 9인 46.7% — PASS 유지 |
+| E-011 | 이태훈 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-23 | ✓ Completed | AI 식별률 **80%** (4/5: Q1·Q2·Q4·Q7), Human 오탐 4건(Q3·Q5·Q8·Q9). 투입 시점 8인 평균 42.5%, 최신 9인 46.7% — PASS 유지 |
+| E-012 | 박진우 | Naive | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | 2026-06-22 | ✓ Completed | AI 식별률 **80%** (4/5: Q1·Q2·Q4·Q10), Human 오탐 3건(Q3·Q5·Q8). 9인 평균 46.7% — PASS 유지 |
 | Owner | @justant | Calibration | 8 | v2.1-phase8-01 | COUPLE/MARRIED/FRIEND/FAMILY/WORK | TBD | 선택(미실시 가능) | **EXCLUDED from gate** — gate 판정 비필수 |
 
 ---
@@ -173,7 +175,7 @@ After all evaluators in a round complete:
 | Round | Kit | Naive Avg Score | Gate Criterion (≤60%) | Status | Next Step |
 |-------|-----|-----------------|------------------------|--------|-----------|
 | 5 | v2.1-phase5-01 | **80%** | 80% > 60% → FAIL | ✗ FAIL | Phase 6 결정론 다양화 (T1·T3·T4) |
-| 8 | v2.1-phase8-01 | **37.1%** (7인, E-008·E-009·E-010 추가) | 37.1% ≤ 60% → PASS | ✅ SHIPPED (2026-06-22) | E-004~010 채점(40/0/0/40/60/80/40), 출하 시점 20% PASS 이후 사후 누적도 PASS 유지. 상세: `phase8/v2.1-phase8-01-analysis.md` |
+| 8 | v2.1-phase8-01 | **46.7%** (9인, E-008·E-009·E-010·E-011·E-012 추가) | 46.7% ≤ 60% → PASS | ✅ SHIPPED (2026-06-22) | E-004~012 채점(40/0/0/40/60/80/40/80/80), 출하 시점 20% PASS 이후 사후 누적도 PASS 유지. 상세: `phase8/v2.1-phase8-01-analysis.md` |
 
 ---
 
