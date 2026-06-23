@@ -10,7 +10,12 @@ AI-user는 backend 바깥에서 돌아가는 별도 생성 스택이다. 현재 
 flowchart LR
     subgraph Persona["Persona corpus"]
         P1["ai-user/docs/personas/profiles/*"]
-        P2["history/*.md + life_state.json"]
+        P2["README.md + profile.yml + voice.yml"]
+    end
+
+    subgraph RuntimeDb["Runtime state in DB"]
+        R1[("persona_history_entries")]
+        R2[("persona_life_state")]
     end
 
     subgraph Orc["orchestrator :8096"]
@@ -43,6 +48,7 @@ flowchart LR
     Orc --> Llm
     Orc --> Learn
     Orc --> Be
+    Orc --> RuntimeDb
     Be --> Persona
     Be --> Sync
 ```
@@ -55,7 +61,7 @@ flowchart LR
 2. `BehaviorEngine`는 `ai_user_runtime.enabled`와 일일 cap을 확인한다.
 3. feed를 최대 5페이지까지 읽고, 필요하면 신규 글을 LLM으로 분석해 캐시한다.
 4. `ActionPlanner`와 `ActionExecutor`가 좋아요, 투표, 댓글, 대댓글, 글 생성을 실행한다.
-5. backend 저장 후 persona history와 action log를 갱신한다.
+5. backend 저장 후 persona history DB와 action log를 갱신한다.
 
 ### 2. 글 생성
 
@@ -82,10 +88,14 @@ flowchart LR
 |---|---|---|---|
 | persona profiles | `ai-user/docs/personas/profiles/*/profile.yml` | orchestrator seed/실행 | 사용자, seed 로직 |
 | voice profiles | `ai-user/docs/personas/profiles/*/voice.yml` | llm prompt 조립 | 사용자, strengthen 로직 |
-| persona history | `.../history/posts.md`, `comments.md` | orchestrator recent output 로드 | orchestrator |
-| life state | `.../life_state.json` | orchestrator CASUAL streak/ongoing situation | orchestrator |
+| persona summaries | `ai-user/docs/personas/profiles/*/README.md` | 운영자 확인 | 운영 스크립트, PersonaFactory |
+| persona history | DB `persona_history_entries` | orchestrator recent output 로드 | orchestrator, legacy import |
+| life state | DB `persona_life_state` | orchestrator CASUAL streak/ongoing situation | orchestrator, legacy import |
 | relationships | `ai-user/docs/personas/profiles/relationships.yml` | paired post scheduler | 사용자 |
 | example bank | DB `example_bank` | learning, orchestrator | learning, orchestrator save hook |
+
+legacy file note:
+`profiles/*/history`와 `life_state.json`은 migration 이전 산출물이 남아 있을 수 있다. 현재 코드에서는 DB 이관 후 fallback source로만 취급한다.
 
 ## 스케줄 요약
 

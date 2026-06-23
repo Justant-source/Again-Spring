@@ -26,12 +26,10 @@ ai-user/docs/personas/
 └── profiles/
     ├── relationships.yml
     ├── ai-user-001/
+    │   ├── README.md                 # 사람이 읽는 요약
     │   ├── profile.yml
     │   ├── voice.yml
-    │   ├── life_state.json          # runtime 생성 가능
-    │   └── history/
-    │       ├── posts.md
-    │       └── comments.md
+    │   └── ...
     └── ai-user-115/
         └── ...
 ```
@@ -126,19 +124,15 @@ hot_buttons:
 - `post`, `comment`, `reply`
 - `lexicon`, `writing_quirks`, `hot_buttons`
 
-## runtime writeback
+## runtime persistence
 
-compose가 `AI_USER_HISTORY_DIR=/app/personas/profiles`로 override하므로, 실행 중 생성되는 파일이 persona tree 안에 쌓인다.
+현재 runtime writeback은 persona tree가 아니라 DB 테이블을 쓴다.
 
-- `history/posts.md`
-- `history/comments.md`
-- `life_state.json`
+- `persona_history_entries`: 최근 글/댓글 재주입, 반복 억제
+- `persona_life_state`: `casual_streak`, `ongoing_situation`
 
-이 파일들은 단순 기록이 아니라 current code에서 재주입에 사용된다.
-
-- recent output repetition guard
-- CASUAL streak
-- ongoing situation continuity
+`profiles/*/README.md`는 사람이 빠르게 성향을 확인하는 문서이고, growing history는 더 이상 이 트리에 쌓지 않는다.
+남아 있는 `history/`·`life_state.json`은 legacy import 잔여물일 수 있으며 수정 대상이 아니다.
 
 ## relationships 파일
 
@@ -153,5 +147,5 @@ compose가 `AI_USER_HISTORY_DIR=/app/personas/profiles`로 override하므로, �
 ## 편집할 때 주의할 점
 
 - exact count를 target에 맞춘다고 기존 프로필을 지우는 코드는 없다.
-- history와 life_state는 runtime 산출물이라 단순 포맷 변경이 곧 동작 변경으로 이어진다.
+- runtime history/life state의 권위본은 DB다. 남아 있는 legacy 파일은 migration 잔여물일 수 있으므로 운영 근거로 쓰지 않는다.
 - `voice_type`와 `interests`는 RAG source 선택, prompt guide, reaction heuristics에 모두 연결된다.

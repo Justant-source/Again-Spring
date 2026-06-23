@@ -52,7 +52,13 @@ public class AiUserSeedLoader {
         }
         try {
             Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM users WHERE email = ?", Integer.class, SENTINEL_EMAIL);
+                "SELECT COUNT(*) " +
+                    "FROM personas p " +
+                    "JOIN users u ON u.id = p.id " +
+                    "WHERE u.email = ?",
+                Integer.class,
+                SENTINEL_EMAIL
+            );
             if (count != null && count > 0) {
                 log.info("AI users already seeded. Skipping anchor seed.");
                 markSyntheticFlag();

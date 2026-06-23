@@ -19,6 +19,7 @@ import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepo
 import com.againspring.aiuser.orchestrator.repository.PersonaActionLogRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.service.PersonaHistoryStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,9 +59,7 @@ public class ActionExecutor {
     private final AiUserMlClient aiUserMlClient;
     private final AiGlobalRuleRepository aiGlobalRuleRepository;
     private final AiUserGenerationConfigRepository generationConfigRepository;
-
-    @Value("${ai-user.history-dir:/app/persona-history}")
-    private String historyDir;
+    private final PersonaHistoryStore personaHistoryStore;
 
     /** 반복 가드 임계 — 생성문 vs 최근 출력의 문자 2-gram Jaccard 최대값이 이 값을 넘으면 1회 재생성. */
     @Value("${ai-user.repetition-threshold:0.45}")
@@ -1177,30 +1176,11 @@ public class ActionExecutor {
                     return;
                 }
             }
-            String email = botEmail(persona);
-            String profileName = email.contains("@") ? email.split("@")[0] : persona.getId();
-            java.nio.file.Path dir = java.nio.file.Paths.get(historyDir, profileName, "history");
-            java.nio.file.Files.createDirectories(dir);
-            java.nio.file.Path file = dir.resolve(type + ".md");
-
-            String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                .withZone(java.time.ZoneId.of("Asia/Seoul"))
-                .format(java.time.Instant.now());
-
-            String entry;
             if ("posts".equals(type)) {
-                String titlePreview = content.length() > 40 ? content.substring(0, 40) + "..." : content;
-                entry = String.format("\n| %s | %s | %s | %s | POSTED |\n\n### %s — %s\n%s\n\n---\n",
-                    timestamp, category != null ? category : "-", postId != null ? postId : "-",
-                    titlePreview, timestamp, category != null ? category : "-", content);
+                personaHistoryStore.appendPost(persona.getId(), content, postId, category);
             } else {
-                String preview = content.length() > 60 ? content.substring(0, 60) + "..." : content;
-                entry = String.format("\n| %s | %s | %s | %s |\n\n> %s\n\n---\n",
-                    timestamp, "댓글", postId != null ? postId : "-", preview, content);
+                personaHistoryStore.appendComment(persona.getId(), content, postId);
             }
-            java.nio.file.Files.writeString(file, entry,
-                java.nio.file.StandardOpenOption.CREATE,
-                java.nio.file.StandardOpenOption.APPEND);
         } catch (Exception e) {
             log.debug("History write failed for persona {} type {}: {}", persona.getId(), type, e.getMessage());
         }
@@ -1208,22 +1188,9 @@ public class ActionExecutor {
 
     // ── Phase 3: 페르소나 life_state (saga trajectory) ────────────────────────
 
-    /** 페르소나 life_state JSON 경로 */
-    private java.nio.file.Path lifeStatePath(Persona persona) {
-        String email = botEmail(persona);
-        String profileName = email.contains("@") ? email.split("@")[0] : persona.getId();
-        return java.nio.file.Paths.get(historyDir, profileName, "life_state.json");
-    }
-
-    /** CASUAL 스트릭 로드 (파일 없으면 0 반환) */
+    /** CASUAL 스트릭 로드 (기록 없으면 0 반환) */
     private int loadCasualStreak(Persona persona) {
-        try {
-            java.nio.file.Path p = lifeStatePath(persona);
-            if (!java.nio.file.Files.exists(p)) return 0;
-            String json = java.nio.file.Files.readString(p);
-            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
-            return node.path("casualStreak").asInt(0);
-        } catch (Exception e) { return 0; }
+        return personaHistoryStore.loadCasualStreak(persona.getId());
     }
 
     /** 스트릭 기반 CASUAL 확률 (기본 25%, ±15%) */
@@ -1236,36 +1203,12 @@ public class ActionExecutor {
 
     /** life_state 저장 (postKind가 CASUAL인지 여부) */
     private void updateLifeState(Persona persona, boolean wasCasual, String ongoingSituation) {
-        try {
-            java.nio.file.Path p = lifeStatePath(persona);
-            java.nio.file.Files.createDirectories(p.getParent());
-            int casualStreak = loadCasualStreak(persona);
-            casualStreak = wasCasual ? casualStreak + 1 : 0;
-            String situation = wasCasual ? "" : (ongoingSituation != null ? ongoingSituation : "");
-            String json = String.format(
-                "{\"casualStreak\":%d,\"ongoingSituation\":\"%s\",\"updatedAt\":\"%s\"}",
-                casualStreak,
-                situation.replace("\"", "'").replace("\n", " ").substring(0, Math.min(situation.length(), 80)),
-                java.time.Instant.now().toString()
-            );
-            java.nio.file.Files.writeString(p, json,
-                java.nio.file.StandardOpenOption.CREATE,
-                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
-        } catch (Exception e) {
-            log.debug("life_state update failed for persona {}: {}", persona.getId(), e.getMessage());
-        }
+        personaHistoryStore.updateLifeState(persona.getId(), wasCasual, ongoingSituation);
     }
 
     /** ongoing_situation 로드 */
     private String loadOngoingSituation(Persona persona) {
-        try {
-            java.nio.file.Path p = lifeStatePath(persona);
-            if (!java.nio.file.Files.exists(p)) return null;
-            String json = java.nio.file.Files.readString(p);
-            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
-            String s = node.path("ongoingSituation").asText("");
-            return s.isBlank() ? null : s;
-        } catch (Exception e) { return null; }
+        return personaHistoryStore.loadOngoingSituation(persona.getId());
     }
 
     /** 첫 문장 추출 (최대 80자) */
@@ -1368,38 +1311,27 @@ public class ActionExecutor {
 
     // ── 최근 출력 히스토리 — 반복 방지 (문체 현실화 S1) ──────────────────────
 
-    /**
-     * 히스토리 파일에서 이 페르소나의 최근 본문 n개 추출 (오래된 → 최신 순).
-     * writeHistory 포맷 역파싱: 엔트리 구분 "---", comments=첫 "> " 이후, posts="### …" 헤더 다음 줄부터.
-     * 실패 시 빈 리스트 — 생성은 계속 진행.
-     */
     private java.util.List<String> loadRecentBodies(Persona persona, String type, int n) {
         try {
-            String email = botEmail(persona);
-            String profileName = email.contains("@") ? email.split("@")[0] : persona.getId();
-            java.nio.file.Path file = java.nio.file.Paths.get(historyDir, profileName, "history", type + ".md");
-            if (!java.nio.file.Files.exists(file)) return java.util.List.of();
-            String raw = java.nio.file.Files.readString(file);
+            java.util.List<String> rows = "posts".equals(type)
+                ? personaHistoryStore.loadRecentPosts(persona.getId(), n)
+                : personaHistoryStore.loadRecentComments(persona.getId(), n);
             java.util.List<String> bodies = new java.util.ArrayList<>();
-            for (String block : raw.split("\\n---")) {
-                String body = extractHistoryBody(block, type);
+            for (String body : rows) {
                 if (body == null || body.isBlank()) continue;
-                // 오염 면역(2026-06-12): 과거 시그니처 미스로 게시·기록된 LLM 거절문이
-                // recentOutputs로 재주입되며 후속 생성까지 오염시킴 → 가드 통과분만 사용
                 ContentSafetyGuard.ContentType guardType = "posts".equals(type)
                     ? ContentSafetyGuard.ContentType.POST : ContentSafetyGuard.ContentType.COMMENT;
                 if (!safetyGuard.check(body, guardType).passed()) continue;
                 bodies.add(body);
             }
-            int from = Math.max(0, bodies.size() - n);
-            return new java.util.ArrayList<>(bodies.subList(from, bodies.size()));
+            return bodies;
         } catch (Exception e) {
             log.debug("loadRecentBodies failed for persona {} type {}: {}", persona.getId(), type, e.getMessage());
             return java.util.List.of();
         }
     }
 
-    /** writeHistory 엔트리 블록에서 본문만 추출. 매칭 실패 시 null. */
+    /** legacy markdown history 엔트리 블록에서 본문만 추출. 매칭 실패 시 null. */
     static String extractHistoryBody(String block, String type) {
         if (block == null || block.isBlank()) return null;
         if ("posts".equals(type)) {

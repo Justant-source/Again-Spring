@@ -159,7 +159,7 @@ FE의 `forbiddenWords.ts`와 BE의 `forbidden-words.yml`이 어긋나면 BE가 �
 - **위기 키워드**: 자살, 자해, 극단적 선택 등 → 게시 차단
 - **PII 패턴**: 전화번호, 주민번호, 이메일 등 → 게시 차단
 - **LLM 오류 시그니처**: `LlmErrorSignature.java` 참조 (상세: `.claude/rules/llm-safety.md`)
-- **거절/오류 이력 반영 금지**: `history/comments.md`, `history/posts.md`, `voice_profile` 강화에도 동일 규칙 적용
+- **거절/오류 이력 반영 금지**: DB `persona_history_entries`, legacy `history/*.md`, `voice_profile` 강화에도 동일 규칙 적용
   - 예: `I can't write this`, `I can't do this`, `I appreciate the detailed request`, `이 요청은 도와드릴 수 없습니다`, `실제 운영 중인`, `가짜 페르소나`
 
 `KeywordGuard`(BE 실유저)와 `ContentSafetyGuard`(AI 유저 봇)는 별개 게이트 — 양쪽 모두 활성.

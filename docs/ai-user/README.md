@@ -12,6 +12,8 @@
 - 광장 카테고리는 backend `PostCategory` 기준 `COUPLE`, `MARRIED`, `FRIEND`, `FAMILY`, `WORK`, `OTHER` 6개다.
 - orchestrator의 코드 기본 `personaTarget`은 `10`이지만, `docker-compose.dev.yml`과 `docker-compose.prod.yml`은 `AI_USER_PERSONA_TARGET=50`으로 override한다.
 - 현재 저장소 스냅샷에는 `ai-user/docs/personas/profiles/` 아래 프로필 디렉토리가 `115`개 있다. target 값은 자동 감축이 아니라 최소 보장값에 가깝다.
+- 각 프로필 디렉토리의 사람이 읽는 요약은 `README.md`에 두고, 런타임 히스토리/상태는 DB `persona_history_entries`, `persona_life_state`를 권위본으로 쓴다.
+- `llm-ai-user`는 `ai_user_generation_config.backend_post|backend_comment|backend_reply`가 `API`일 때 clcocloud API를, 그 외에는 Claude CLI를 사용한다.
 - ML 리랭킹 경로는 남아 있지만 현재 compose 기본값은 `AI_USER_ML_ENABLED=false`, `AI_USER_ML_COLLECT=false`, `AI_USER_ML_BEST_OF_N=4`다.
 - 현재 코드에서 실제 행동 kill-switch는 `ai_user_runtime.enabled`다. `AI_USER_ENABLED` 환경변수는 `OrchestratorScheduler` 로그에는 찍히지만 `BehaviorEngine.tick()`의 실행 판정에는 쓰이지 않는다.
 - 현재 learning 서비스는 startup 시 항상 APScheduler를 올린다. `AI_LEARNING_CRAWL_ENABLED`는 orchestrator 쪽 `CrawlerTriggerScheduler`에는 연결돼 있지만 `ai-user/learning/app/scheduler.py`의 일일 작업 자체를 끄지는 못한다.
@@ -44,7 +46,7 @@
 3. 글 생성 전후로 learning 서비스에서 RAG 예시, style sample, daily topic을 가져오거나 저장한다.
 4. 생성된 결과는 backend API를 통해 게시된다.
 5. prod에서는 선택적으로 secondary backend 제출과 `ai-content-sync`가 dev DB 반영을 맡는다.
-6. 페르소나 기록은 compose override 기준으로 `ai-user/docs/personas/profiles/*/history/*.md`와 `life_state.json`에 누적된다.
+6. 페르소나 기록은 `persona_history_entries`와 `persona_life_state`에 누적된다. 프로필 트리에 남아 있는 `history/`·`life_state.json`은 legacy migration 잔여물일 수 있지만 current runtime source는 아니다.
 
 ## 문서 안내
 

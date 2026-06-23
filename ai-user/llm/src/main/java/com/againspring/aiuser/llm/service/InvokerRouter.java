@@ -5,8 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * backend 파라미터와 무관하게 Claude CLI만 사용한다.
- * legacy backend=API 요청은 무시한다 — clcocloud API 경로는 비활성.
+ * 생성 backend 파라미터에 따라 CLI 또는 clcocloud API 인보커를 선택한다.
  */
 @Slf4j
 @Service
@@ -14,10 +13,12 @@ import org.springframework.stereotype.Service;
 public class InvokerRouter {
 
     private final ClaudeCliInvoker cliInvoker;
+    private final ClaudeApiInvoker apiInvoker;
 
     public Invoker route(String backend) {
         if ("API".equalsIgnoreCase(backend)) {
-            log.warn("[InvokerRouter] backend=API 요청 무시 — clcocloud API는 비활성, Claude CLI만 사용");
+            log.debug("[InvokerRouter] backend={} → Claude API 선택", backend);
+            return apiInvoker;
         }
         log.debug("[InvokerRouter] backend={} → Claude CLI 선택", backend);
         return cliInvoker;

@@ -24,8 +24,8 @@ import java.nio.charset.StandardCharsets;
  *
  * 구분자: <<<USER_PROMPT>>> (다시봄 배심원 워커와 구별)
  *
- * Anthropic/clcocloud HTTP API 경로는 런타임에서 사용하지 않는다.
- * ANTHROPIC_API_KEY는 서브프로세스 env에서 제거 — CLI는 OAuth(구독) 사용.
+ * CLI 경로는 OAuth(구독) 사용을 유지한다.
+ * ANTHROPIC_API_KEY는 서브프로세스 env에서 제거 — backend=API일 때만 ClaudeApiInvoker가 사용한다.
  *
  * 거절 재시도 + 모델 폴백 래퍼 포함:
  * - refusalRetries 횟수만큼 PROVIDER_ERROR 시 augmentPromptForRetry 후 재시도

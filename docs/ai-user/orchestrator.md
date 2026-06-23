@@ -46,7 +46,7 @@
 ### CASUAL vs CONFLICT
 
 - 기본 CASUAL 확률은 `25%`
-- `life_state.json`의 `casualStreak >= 2`면 CASUAL 확률이 `10%`로 내려간다
+- `persona_life_state.casual_streak >= 2`면 CASUAL 확률이 `10%`로 내려간다
 - CASUAL 글은 `assembleCasualPostPrompt()`를 사용하고 갈등 예시 few-shot을 생략한다
 
 ### RAG와 reconstruct mode
@@ -90,15 +90,15 @@
 
 ## history와 life state
 
-compose override 기준으로 orchestrator는 persona tree에 직접 쓴다.
+현재 orchestrator는 persona tree가 아니라 DB에 직접 쓴다.
 
-| 파일 | 역할 |
+| 저장소 | 역할 |
 |---|---|
-| `history/posts.md` | 최근 글 재주입과 반복 억제 |
-| `history/comments.md` | 댓글 재주입과 스타일 유지 |
-| `life_state.json` | `casualStreak`, `ongoingSituation` |
+| `persona_history_entries` | 최근 글/댓글 재주입과 반복 억제 |
+| `persona_life_state` | `casual_streak`, `ongoing_situation` |
 
-현재 `application.yml` 기본값은 `/app/persona-history`지만 dev/prod compose는 `AI_USER_HISTORY_DIR=/app/personas/profiles`로 override한다.
+`LegacyPersonaHistoryMigrator`가 startup 시 남아 있는 `profiles/*/history/*.md`, `life_state.json`을 DB로 가져온 뒤, `ActionExecutor`는 이후 DB만 읽고 쓴다.
+host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 current runtime source는 아니다.
 
 ## 내부 API
 

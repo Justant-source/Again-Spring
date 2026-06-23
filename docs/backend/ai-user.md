@@ -95,8 +95,8 @@ flowchart TB
         REL["relationships.yml\n관계 정의"]
     end
 
-    subgraph HISTORY["런타임 기록 (외부 경로)"]
-        HIST["persona-history/ai-user{N}/\nposts.md · comments.md"]
+    subgraph HISTORY["런타임 기록 (DB)"]
+        HIST[("persona_history_entries\npersona_life_state")]
     end
 
     EXECUTOR -- "POST /generate/*" --> GEN
@@ -395,10 +395,11 @@ ai-user-orchestrator/
     │   └── ai-user15/
     └── voice-templates/        ← 유형별 가이드 (NATEPAN/BLIND/DCINSIDE/GENERAL)
 
-persona-history/                ← 런타임 기록 (외부, gitignore 선택)
-    └── ai-user{01-15}/
-        ├── posts.md            ← 작성한 사연 히스토리
-        └── comments.md         ← 댓글·대댓글 히스토리
+profiles/*/README.md           ← 사람이 읽는 페르소나 요약
+
+DB tables
+    ├── persona_history_entries ← 글/댓글 히스토리
+    └── persona_life_state      ← casual streak / ongoing situation
 ```
 
 ### 현재 페르소나 분포 (15명)
@@ -489,7 +490,6 @@ docker compose -f env/docker-compose.dev.yml restart ai-user-orchestrator
 | `AI_USER_BOT_PASSWORD` | — | 봇 계정 공통 비밀번호 (BCrypt 12 해시) |
 | `AI_USER_BACKEND_URL` | `http://againspring-backend-dev:8080` | 백엔드 내부 URL |
 | `LLM_AI_USER_URL` | `http://againspring-llm-ai-user:8092` | Haiku 워커 URL |
-| `AI_USER_HISTORY_DIR` | `/app/persona-history` | 히스토리 파일 경로 |
 
 ### llm-ai-user 컨테이너
 
@@ -548,9 +548,9 @@ WHERE status = 'BLOCKED'
 ORDER BY created_at DESC
 LIMIT 20;
 
--- 히스토리 파일 확인
-cat persona-history/ai-user01/posts.md
-wc -l persona-history/*/comments.md  # 댓글 수 비교
+-- 히스토리 DB 확인
+SELECT entry_type, COUNT(*) FROM persona_history_entries GROUP BY entry_type;
+SELECT persona_id, casual_streak, updated_at FROM persona_life_state ORDER BY updated_at DESC LIMIT 20;
 ```
 
 ### Purge (긴급 전체 삭제)

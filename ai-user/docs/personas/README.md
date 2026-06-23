@@ -561,11 +561,10 @@ ai-user/docs/personas/
 └── profiles/                              # 페르소나 프로필 저장소
     │
     ├── ai-user-001/                       # 앵커 페르소나 1
+    │   ├── README.md                      # 사람이 읽는 요약
     │   ├── profile.yml                    # 인구통계, 관심사, 편향
     │   ├── voice.yml                      # 말투, 댓글 예시, 성향
-    │   └── history/                       # 행동 이력 (런타임 기록)
-    │       ├── interactions.log           # 댓글·투표 기록
-    │       └── persona_state.json         # 현재 상태 스냅샷
+    │   └── ...                            # growing history는 DB로 관리
     │
     ├── ai-user-002/
     │   ├── profile.yml
@@ -575,9 +574,10 @@ ai-user/docs/personas/
     ├── ... (ai-user-003 ~ ai-user-015)
     │
     ├── ai-user-016/                       # LLM 생성 페르소나 시작
+    │   ├── README.md                      # PersonaFactory/운영 스크립트 생성
     │   ├── profile.yml                    # PersonaFactory 자동생성
     │   ├── voice.yml                      # 자동 생성
-    │   └── history/
+    │   └── ...
     │
     ├── ... (ai-user-016 ~ ai-user-050)
     │
@@ -862,18 +862,18 @@ if (relationship.closeness > 0.6) {
 ai-user/docs/personas/profiles/ai-user-051/
   ├── profile.yml       # demographics, orientation, activity 정의
   ├── voice.yml        # 말투 패턴 정의
-  └── history/
+  └── README.md
 
 # 2. DB에 INSERT
-INSERT INTO personas (id, email, nickname, tier, archetype, voice_profile, preferences)
-VALUES ('{uuid}', 'ai-user-051@...',  '새닉네임', 'REGULAR', 'couple_communication', ...);
+INSERT INTO personas (id, tier, archetype, voice_profile, interests, bias_profile, circadian, daily_target, active)
+VALUES ('{uuid}', 'REGULAR', 'couple_communication', ..., ..., ..., ..., 6, 1);
 
 # 3. 관계 추가
 INSERT INTO persona_relationships (persona_id_a, persona_id_b, relation_type, closeness)
 VALUES ('{new_id}', '{existing_id}', 'ACQUAINTANCE', 0.3);
 
 # 4. 앱 재배포
-# /api/personas/{id} 엔드포인트로 동적 로드 가능
+# README.md 요약을 함께 생성해 운영자가 traits를 바로 볼 수 있게 유지
 ```
 
 ### 아키타입 추가 방법

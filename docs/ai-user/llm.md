@@ -34,7 +34,8 @@
 ### backend 경로
 
 - 기본 경로는 Claude CLI bridge다.
-- `ANTHROPIC_API_KEY`가 있으면 API invoker도 사용 가능하다.
+- `backend=API`면 `ClaudeApiInvoker`가 `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL`(DB `system_setting` 우선)로 clcocloud 프록시를 직접 호출한다.
+- `backend=null|CLI|기타`는 `ClaudeCliInvoker`로 내려가며, CLI 서브프로세스 env에서는 `ANTHROPIC_API_KEY`를 제거해 OAuth 세션을 강제한다.
 - prompt caching flag는 `llm.api.prompt-caching`에 있고, compose/env로 제어할 수 있다.
 
 ## prompt 조립 모드

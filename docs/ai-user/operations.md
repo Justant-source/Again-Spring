@@ -54,6 +54,13 @@ FROM ai_user_runtime;
 
 UPDATE ai_user_runtime SET enabled = 1 WHERE id = 1;
 UPDATE ai_user_runtime SET enabled = 0 WHERE id = 1;
+
+SELECT id, backend_post, backend_comment, backend_reply
+FROM ai_user_generation_config;
+
+UPDATE ai_user_generation_config
+SET backend_post = 'API'
+WHERE id = 1;
 ```
 
 주의:
@@ -141,7 +148,8 @@ prod only `ai-content-sync`는 아래 테이블만 복사한다.
 
 - compose 설계상 정상이다. orchestrator는 외부 공개 포트가 없다.
 
-### persona history가 persona tree 안에 생길 때
+### persona tree에 `history/`나 `life_state.json`이 남아 있을 때
 
-- compose가 `AI_USER_HISTORY_DIR=/app/personas/profiles`로 override하기 때문이다.
-- app default `/app/persona-history`보다 compose override가 우선한다.
+- current runtime source는 DB `persona_history_entries`, `persona_life_state`다.
+- 남아 있는 파일은 legacy migration 잔여물일 가능성이 높다.
+- 일부 root-owned 파일은 호스트 권한 때문에 자동 삭제가 안 될 수 있다. 이 경우 DB 이관 여부를 확인한 뒤 호스트 권한 정리로 별도 제거한다.

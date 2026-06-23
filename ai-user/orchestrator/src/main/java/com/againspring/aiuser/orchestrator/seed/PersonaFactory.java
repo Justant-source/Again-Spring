@@ -395,7 +395,6 @@ JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내�
         String shortId = email.replace("@againspring.internal", "").replace("ai-user-", "ai-user-");
         File dir = new File(props.getPersonasDir() + "/profiles/" + shortId);
         dir.mkdirs();
-        new File(dir, "history").mkdirs();
 
         // profile.yml
         StringBuilder prof = new StringBuilder();
@@ -470,13 +469,107 @@ JSON 이외의 텍스트 절대 금지. 온점(.) 금지. 쌍따옴표 안 내�
             }
         }
         Files.writeString(dir.toPath().resolve("voice.yml"), voc.toString());
-
-        // history README — 실제 히스토리 파일(posts.md, comments.md)도 이 디렉토리에 저장됩니다
         Files.writeString(
-            dir.toPath().resolve("history").resolve("README.md"),
-            "# " + nickname + " 활동 이력\n\n" +
-            "- `posts.md` — 작성한 사연 히스토리\n" +
-            "- `comments.md` — 댓글/대댓글 히스토리\n"
+            dir.toPath().resolve("README.md"),
+            renderPersonaSummaryMarkdown(shortId, nickname, age, gender, region, job, politics,
+                voice, tier, slang, dailyTarget, interests, bias, archetype, voiceMap)
         );
+    }
+
+    private String renderPersonaSummaryMarkdown(
+            String shortId,
+            String nickname,
+            String age,
+            String gender,
+            String region,
+            String job,
+            String politics,
+            String voice,
+            String tier,
+            double slang,
+            int dailyTarget,
+            Map<String, Double> interests,
+            Map<String, Double> bias,
+            String archetype,
+            Map<String, Object> voiceMap) {
+        String topInterest = interests.entrySet().stream()
+            .max(Map.Entry.comparingByValue())
+            .map(e -> e.getKey() + " " + String.format("%.1f", e.getValue()))
+            .orElse("-");
+        String topBias = bias.entrySet().stream()
+            .max((a, b) -> Double.compare(Math.abs(a.getValue()), Math.abs(b.getValue())))
+            .map(e -> e.getKey() + " " + String.format("%.2f", e.getValue()))
+            .orElse("-");
+        String formality = String.valueOf(voiceMap.getOrDefault("formality", "casual"));
+        String generalStyle = String.valueOf(voiceMap.getOrDefault("general_style", "-"));
+        String signaturePhrases = summaryList(voiceMap, "lexicon", "signature_phrases");
+        String hotButtons = summaryList(voiceMap, "hot_buttons", "triggers");
+
+        return """
+# %s
+
+## Snapshot
+
+- Nickname: `%s`
+- Persona key: `%s`
+- Archetype: `%s`
+- Voice: `%s`
+- Tier: `%s`
+- Formality: `%s`
+
+## Demographics
+
+- Age band: `%s`
+- Gender: `%s`
+- Region: `%s`
+- Job: `%s`
+- Politics: `%s`
+
+## Behavior
+
+- Daily target: `%d`
+- Slang level: `%.2f`
+- Top interest: `%s`
+- Strongest bias: `%s`
+
+## Style
+
+- General style: %s
+- Signature phrases: %s
+- Hot buttons: %s
+""".formatted(
+            nickname,
+            nickname,
+            shortId,
+            archetype,
+            voice,
+            tier,
+            formality,
+            age,
+            gender,
+            region,
+            job,
+            politics,
+            dailyTarget,
+            slang,
+            topInterest,
+            topBias,
+            generalStyle,
+            signaturePhrases,
+            hotButtons
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private String summaryList(Map<String, Object> voiceMap, String outerKey, String innerKey) {
+        Object outer = voiceMap.get(outerKey);
+        if (!(outer instanceof Map<?, ?> outerMap)) {
+            return "-";
+        }
+        Object inner = ((Map<String, Object>) outerMap).get(innerKey);
+        if (!(inner instanceof List<?> list) || list.isEmpty()) {
+            return "-";
+        }
+        return list.stream().limit(3).map(String::valueOf).collect(java.util.stream.Collectors.joining(", "));
     }
 }

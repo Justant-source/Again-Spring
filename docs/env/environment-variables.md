@@ -43,7 +43,7 @@
 | `LLM_POOL_SIZE` | ThreadPoolExecutor 상한 | `100` |
 | `LLM_QUEUE_CAPACITY` | LinkedBlockingQueue 용량 | `500` |
 | `LLM_QUEUE_WAIT_TIMEOUT_MS` | 큐 대기 최대 시간 (ms) | `30000` |
-| `ANTHROPIC_API_KEY` | 레거시 clcocloud API 키 (현재 런타임 미사용) | `""` |
+| `ANTHROPIC_API_KEY` | `llm-ai-user`의 `backend=API` 경로용 clcocloud API 키 | `""` |
 
 API 키 없이 동작 — 호스트의 `~/.claude` 세션을 **llm-worker** 컨테이너가 공유. backend 컨테이너에는 마운트 불필요.
 
@@ -53,13 +53,15 @@ API 키 없이 동작 — 호스트의 `~/.claude` 세션을 **llm-worker** 컨�
 
 | 변수 | 사용처 | dev 기본 | prod |
 |---|---|---|---|
-| `AI_USER_ENABLED` | AI 유저 행동 활성화 (오케스트레이터) | `false` | **필수** |
-| `AI_USER_PERSONA_TARGET` | 🚨 **2026-06-10 변경**: 일일 총량 fallback (admin UI 목표 > 0일 때는 무시됨) | `100` | 변경 필요시 admin UI |
+| `AI_USER_ENABLED` | 오케스트레이터 설정/로그 플래그. 실제 tick gate는 `ai_user_runtime.enabled` | `false` | **필수** |
+| `AI_USER_PERSONA_TARGET` | 🚨 **2026-06-10 변경**: 일일 총량 fallback (admin UI 목표 > 0일 때는 무시됨) | `50` | 변경 필요시 admin UI |
 
 > ⚠️ **2026-06-10 변경**: 일일 5개 타입(posts/comments/replies/votes/likes) 목표는 `admin UI(/admin/ai-user)`에서 설정합니다.
 > 총량은 **UI 목표 합 × 1.1**로 자동 계산됩니다.
 > 이 env var는 **admin UI 목표가 모두 0일 때만 fallback**으로 동작합니다.
 > 운영 중 목표 조정은 **admin UI를 사용**하세요 (재배포 불필요).
+>
+> `AI_USER_HISTORY_DIR`는 현재 코드/compose에서 사용하지 않습니다. persona history와 life state는 DB `persona_history_entries`, `persona_life_state`에 저장됩니다.
 
 #### 문체·반복 가드 (orchestrator)
 

@@ -1,6 +1,6 @@
 # 데이터베이스 스키마 (MariaDB 11)
 
-> last-verified: 2026-06-14 · code-ref: `backend/src/main/resources/db/migration/V48~V84.sql` · `backend/.../domain/community/`
+> last-verified: 2026-06-23 · code-ref: `backend/src/main/resources/db/migration/V48~V86.sql` · `backend/.../domain/community/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V5.sql`
 >
 > 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
 
@@ -97,7 +97,9 @@ erDiagram
 | 항목 | 위치 |
 |---|---|
 | Flyway 마이그레이션 | `backend/src/main/resources/db/migration/V*.sql` |
+| AI-user Flyway 마이그레이션 | `ai-user/orchestrator/src/main/resources/db/migration/V*.sql` |
 | JPA 엔티티 | `backend/src/main/java/com/againspring/domain/**` |
+| AI-user JPA 엔티티 | `ai-user/orchestrator/src/main/java/com/againspring/aiuser/orchestrator/domain/**` |
 | Repository | `backend/src/main/java/com/againspring/repository/**` |
 
 코드와 문서가 충돌하면 **마이그레이션 SQL이 옳습니다**.
@@ -150,6 +152,18 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `email_verifications` | 이메일 인증 코드 | BIGINT auto |
 | `password_reset_tokens` | 비밀번호 재설정 | BIGINT auto |
 | `revoked_tokens` | JWT 블랙리스트 | BIGINT auto |
+
+### AI-user 운영 테이블
+
+| 테이블 | 역할 | PK |
+|---|---|---|
+| `personas` | AI-user 행동 주체 프로필 | VARCHAR(32) |
+| `persona_relationships` | 페르소나 관계 그래프 | BIGINT auto |
+| `persona_seen_posts` | 조회/행동 이력 캐시 | 복합 PK |
+| `persona_action_log` | 행동 실행 로그 | BIGINT auto |
+| `ai_user_runtime` | global kill-switch / cap | INT(1 row) |
+| `persona_history_entries` | 글/댓글 재주입용 history | BIGINT auto |
+| `persona_life_state` | casual streak / ongoing situation | VARCHAR(32) |
 
 ---
 
@@ -321,6 +335,28 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `created_by` | VARCHAR(32) FK | 생성한 관리자 users.id |
 | `created_at` | TIMESTAMP(3) | |
 
+### `persona_history_entries` (AI-user orchestrator V5)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `persona_id` | VARCHAR(32) FK | personas.id |
+| `entry_type` | VARCHAR(16) | `POST` \| `COMMENT` |
+| `target_post_id` | VARCHAR(32) | backend posts.id 문자열 |
+| `category` | VARCHAR(32) | 글 history일 때 광장 카테고리 |
+| `content_hash` | CHAR(64) | legacy import / 중복 방지 |
+| `content` | LONGTEXT | 실제 본문 |
+| `created_at` | DATETIME(3) | 생성 시각 |
+
+### `persona_life_state` (AI-user orchestrator V5)
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `persona_id` | VARCHAR(32) PK/FK | personas.id |
+| `casual_streak` | INT | 연속 CASUAL 글 수 |
+| `ongoing_situation` | VARCHAR(255) | 진행 중 상황 요약 |
+| `updated_at` | DATETIME(3) | 마지막 갱신 시각 |
+
 ---
 
 ### `feedbacks` (V16)
@@ -341,7 +377,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-## 마이그레이션 요약 (V1~V86)
+## 마이그레이션 요약 (V1~V86 + AI-user V1~V5)
 
 | 범위 | 설명 |
 |---|---|
@@ -356,6 +392,8 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | **V77~V84** | (마케팅/운영 기능) |
 | **V85** | posts 테이블에 원본 비교 컬럼 추가 (source_example_id, source_community, source_url, source_original_title, source_original_body) |
 | **V86** | ai_content_corrections 테이블에 source_original_text 컬럼 추가 |
+| **AI-user V1~V4** | personas / relationships / runtime / action log / seen posts |
+| **AI-user V5** | `persona_history_entries`, `persona_life_state` 추가 (legacy file history DB 이관) |
 
 ---
 

@@ -49,7 +49,6 @@ ai-user:
   bot-password: ${AI_USER_BOT_PASSWORD:ai-user-dev-pw-2026}
   backend-base-url: ${BACKEND_BASE_URL:http://againspring-backend-dev:8080}
   llm-ai-user-url: ${LLM_AI_USER_URL:http://againspring-llm-ai-user:8092}
-  history-dir: ${AI_USER_HISTORY_DIR:/app/persona-history}
   personas-dir: ${AI_USER_PERSONAS_DIR:/app/personas}
   # 반복 가드: 생성문 vs 최근 출력 2-gram Jaccard 임계 (초과 시 1회 재생성)
   repetition-threshold: ${AI_USER_REPETITION_THRESHOLD:0.45}

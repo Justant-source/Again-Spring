@@ -80,7 +80,7 @@
 | `docs/shared/templates/first_message/*.json` | 첫 메시지 템플릿 (read-only) | `/app/shared/docs/templates` | `TEMPLATES_PATH` / compose `:ro` |
 | `docs/shared/categories.yml` | 카테고리 마스터 (read-only) | `/app/shared/docs/categories.yml` | `app.categories.path` / compose `:ro` |
 | `docs/shared/policies/user-permissions.json` | 권한 설정 (read-only) | `/app/shared/docs/policies/user-permissions.json` | `UserPermissionsConfig` / compose `:ro` |
-| `ai-user/docs/personas/profiles/` | 페르소나 코퍼스 (read-write!) | `/app/personas` | `loadRecentBodies` 읽기·쓰기 |
+| `ai-user/docs/personas/profiles/` | 페르소나 코퍼스 + 요약 README (read-write!) | `/app/personas` | `AiUserSeedLoader` · `PersonaFactory` · 운영 스크립트 |
 
 ---
 
