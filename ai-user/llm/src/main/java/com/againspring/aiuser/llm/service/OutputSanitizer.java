@@ -20,6 +20,10 @@ public class OutputSanitizer {
     private static final Pattern CODE_BLOCK = Pattern.compile("```[^\n]*\n?(.*?)```", Pattern.DOTALL);
     // 수평 구분선 (--- 단독 줄) — Sonnet의 "제목\n---\n본문" 분리에 쓰임
     private static final Pattern HR_LINE = Pattern.compile("\n[ \\t]*-{3,}[ \\t]*\n");
+    // 내부 운영/첨삭 메타가 본문 뒤에 누출된 패턴 — 발견 즉시 해당 지점부터 꼬리 제거
+    private static final Pattern TRAILING_META_TABLE = Pattern.compile("(?m)^\\|\\s*항목\\s*\\|\\s*처리\\s*내용\\s*\\|");
+    private static final Pattern TRAILING_NOTE_BULLET = Pattern.compile(
+        "(?m)(?:^-\\s*(?:트리거|어미 변화|모바일 오타|페르소나 표현):|^-\\s*온점·쌍따옴표 없음\\s*$)");
     // AI 메타 응답 패턴 (앞부분에서만 제거)
     private static final Pattern LEADING_META = Pattern.compile(
         "^(?:안녕하세요[,!. ]*|물론이죠[,. ]*|물론입니다[,. ]*|네,? 저는 [^\n]*\n?|제가 도와드릴게요[,. ]*" +
@@ -360,15 +364,20 @@ public class OutputSanitizer {
              .trim();
 
         // 3.5 AI 메타 분석 섹션 제거 — 모델이 자기 분석/체크리스트를 본문 뒤에 붙이는 패턴 방어
-        // "문체 분석:", "작성 현황:", "작성 포인트:", "수정 사항 정리:", "체크:" 이후 전부 삭제
-        String[] META_SECTION_HEADERS = {"문체 분석:", "작성 현황:", "작성 포인트:", "수정 사항 정리:", "체크:"};
+        // "문체 분석:", "작성 현황:", "적용 처리 메모", "[작성 노트]" 이후 전부 삭제
+        String[] META_SECTION_HEADERS = {
+            "문체 분석:", "작성 현황:", "작성 포인트:", "수정 사항 정리:", "체크:",
+            "적용 처리 메모", "[작성 노트]", "작성 노트:", "AI agent 체크리스트", "AI Agent Checklist"
+        };
         for (String header : META_SECTION_HEADERS) {
             int idx = s.indexOf(header);
-            if (idx > 0) {
+            if (idx >= 0) {
                 s = s.substring(0, idx).stripTrailing();
                 break;
             }
         }
+        s = cutAtPattern(s, TRAILING_META_TABLE);
+        s = cutAtPattern(s, TRAILING_NOTE_BULLET);
         // 선두 작업명 에코 제거: "커뮤니티 글 창작", "일상 글 창작", "카페 경험 공유글" 등
         s = s.replaceAll("(?m)^[^\n]{1,20}글 창작[^\n]*\n?", "").stripLeading();
         s = s.replaceAll("(?m)^[^\n]{1,20} 경험 공유글[^\n]*\n?", "").stripLeading();
@@ -453,6 +462,12 @@ public class OutputSanitizer {
         String trimmed = s.stripTrailing();
         if (trimmed.isEmpty()) return false;
         return COMPLETE_ENDING.matcher(trimmed).matches();
+    }
+
+    private String cutAtPattern(String text, Pattern pattern) {
+        Matcher matcher = pattern.matcher(text);
+        if (!matcher.find()) return text;
+        return text.substring(0, matcher.start()).stripTrailing();
     }
 
     /** 멀티 옵션 텍스트에서 첫 번째 실제 내용만 추출 */

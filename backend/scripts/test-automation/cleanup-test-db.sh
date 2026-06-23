@@ -47,7 +47,21 @@ fi
 
 echo "[cleanup] 대상: $DB_CONTAINER / $DB_NAME / 패턴: test%@again.com + guest + e2e-signup%"
 
-docker exec -i "$DB_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" <<'SQL'
+run_sql() {
+  if command -v docker >/dev/null 2>&1; then
+    if docker exec -i "$DB_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" >/dev/null 2>&1 <<'SQL_PROBE'
+SELECT 1;
+SQL_PROBE
+    then
+      docker exec -i "$DB_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASS" "$DB_NAME"
+      return
+    fi
+  fi
+
+  python3 "$(dirname "$0")/dev_db_sql.py" --env-file "$ENV_FILE"
+}
+
+run_sql <<'SQL'
 -- ═══════════════════════════════════════════════════════════════════
 -- §1: 기존 세션/메시지/turn/리포트 정리 (test%@again.com 페르소나)
 -- ═══════════════════════════════════════════════════════════════════

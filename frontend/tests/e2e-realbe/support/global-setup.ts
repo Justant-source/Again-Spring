@@ -1,5 +1,4 @@
 import { chromium, request as playwrightRequest } from '@playwright/test'
-import { spawnSync } from 'child_process'
 import fs from 'fs'
 import {
   PRELOGIN_PERSONAS,
@@ -8,8 +7,9 @@ import {
   PERSONA_TESTER_B,
 } from '../fixtures/personas'
 import { saveAuthState, AUTH_STATE_DIR } from '../fixtures/auth-state'
+import { chromiumLaunchOptions } from './browser'
 import { cleanup } from '../fixtures/cleanup'
-import { readEnvVar } from './db'
+import { readEnvVar, runSqlScript } from './db'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 
@@ -32,17 +32,7 @@ function bootstrapViaSql(): void {
     return
   }
 
-  // spawnSync stdin 방식 — $를 쉘이 해석하지 않아 bcrypt 해시를 안전하게 처리
-  const runSql = (sql: string) => {
-    const result = spawnSync(
-      'docker',
-      ['exec', '-i', 'againspring-mariadb-dev', 'mariadb', '-u', user, `-p${pass}`, db],
-      { input: sql, encoding: 'utf-8' },
-    )
-    if (result.status !== 0) {
-      throw new Error(`SQL 실패: ${result.stderr}`)
-    }
-  }
+  const runSql = (sql: string) => runSqlScript(sql)
 
   // test1 비밀번호를 test123 해시로 리셋 (test2와 동일 — 동일 seed 비밀번호)
   // BCrypt $2a$12$ 해시: SeedPersonas.build()가 "test123"으로 생성한 값
@@ -98,8 +88,6 @@ export default async function globalSetup(): Promise<void> {
   // 3-1. mock_001 seed 포스트 보장 — 사연 상세/댓글/read 화면 테스트가 의존
   try {
     const pass = readEnvVar('MARIADB_PASSWORD')
-    const db = readEnvVar('MARIADB_DATABASE') || 'againspring_dev'
-    const user = readEnvVar('MARIADB_USER') || 'againspring'
     if (pass) {
       const seedMock = `
         INSERT IGNORE INTO posts (id, author_id, body_published, body_raw, category, created_at, neutralization_passed, status, title, updated_at, visibility, juror_count, publish_mode, user_title, view_count)
@@ -108,11 +96,7 @@ export default async function globalSetup(): Promise<void> {
         FROM users WHERE email='test1@again.com';
         INSERT IGNORE INTO vote_options (post_id, label, order_idx) VALUES ('mock_001', '작성자', 0), ('mock_001', '상대방', 1);
       `
-      spawnSync(
-        'docker',
-        ['exec', '-i', `againspring-mariadb-dev`, 'mariadb', '-u', user, `-p${pass}`, db],
-        { input: seedMock, encoding: 'utf-8' },
-      )
+      runSqlScript(seedMock)
       console.log('[global-setup] mock_001 seed 포스트 보장 완료')
     }
   } catch (e) {
@@ -123,7 +107,7 @@ export default async function globalSetup(): Promise<void> {
   //    Rate Limit: /api/auth/login 5회/분 → 페르소나당 13초 간격
   if (!fs.existsSync(AUTH_STATE_DIR)) fs.mkdirSync(AUTH_STATE_DIR, { recursive: true })
 
-  const browser = await chromium.launch()
+  const browser = await chromium.launch(chromiumLaunchOptions())
   for (let i = 0; i < PRELOGIN_PERSONAS.length; i++) {
     const persona = PRELOGIN_PERSONAS[i]
     if (i > 0) {

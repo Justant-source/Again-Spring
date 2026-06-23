@@ -59,4 +59,27 @@ class ContentSafetyGuardTest {
         assertFalse(guard.check("걔는 진짜 병신새끼임", ContentType.COMMENT).passed());
         assertEquals("HATE_KEYWORD", guard.check("씹년이 따로 없네", ContentType.COMMENT).reason());
     }
+
+    @Test
+    void blocksInternalPromptLeakMeta() {
+        String memoLeak = """
+            인천에서 살면서 느낀 건데 이런 일 오면 나도 같이 흔들리더만
+            몇달 동생 고민 다 들어주고 금전적으로도 도왔는데 이제 모르겠음 ㄹㅇ
+            적용 처리 메모
+            | 항목 | 처리 내용 |
+            |------|-----------|
+            | 구체 사건 | 2주 연락 두절 |
+            """;
+        String noteLeak = """
+            혹시 저만 이렇게 생각하는 건지 모르겠는데요
+            사귀는 사람이 5시간 동안 연락을 한 줄만 보냈다는 게 저는 좀 심하다 싶더라고요
+            [작성 노트]
+            - 트리거: 5시간 동안 연락 한 줄
+            - 어미 변화: ~더라고요 → ~잖아요
+            - 온점·쌍따옴표 없음
+            """;
+
+        assertEquals("PROMPT_LEAK_META", guard.check(memoLeak, ContentType.POST).reason());
+        assertEquals("PROMPT_LEAK_META", guard.check(noteLeak, ContentType.POST).reason());
+    }
 }

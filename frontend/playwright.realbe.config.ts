@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 import path from 'path'
+import { chromiumLaunchOptions } from './tests/e2e-realbe/support/browser'
 
 /**
  * 실 BE 대상 FE E2E 설정.
@@ -47,7 +48,7 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:8090',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: process.env.PW_VIDEO === '1' ? 'retain-on-failure' : 'off',
     locale: 'ko-KR',
     timezoneId: 'Asia/Seoul',
   },
@@ -57,12 +58,18 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium-realbe',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: chromiumLaunchOptions(),
+      },
       // chromium은 journeys/ 전체 실행
     },
     {
       name: 'mobile-realbe',
-      use: { ...devices['Pixel 5'] },
+      use: {
+        ...devices['Pixel 5'],
+        launchOptions: chromiumLaunchOptions(),
+      },
       // 모바일은 @mobile 태그가 붙은 스모크 케이스만 실행
       // (전체 재실행 제거: 벽시계 시간 2배, GuestSessionRateLimiter 소진 방지)
       grep: /@mobile/,

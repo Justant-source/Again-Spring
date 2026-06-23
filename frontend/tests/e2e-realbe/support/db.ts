@@ -12,6 +12,10 @@ import fs from 'fs'
 
 const ENV_FILE = path.resolve(process.cwd(), '../env/.env.dev')
 const PROD_CONTAINER_PATTERN = /prod/i
+const PYTHON_HELPER = path.resolve(
+  process.cwd(),
+  '../backend/scripts/test-automation/dev_db_sql.py',
+)
 
 export function readEnvVar(key: string): string {
   if (process.env[key]) return process.env[key]!
@@ -51,10 +55,29 @@ export function sql(query: string): string {
     ['exec', '-i', container, 'mariadb', '-u', user, `-p${pass}`, db, '-N', '-e', query],
     { encoding: 'utf-8' },
   )
-  if (result.status !== 0) {
-    throw new Error(`SQL 실행 실패: ${result.stderr}`)
+  if (result.status === 0) {
+    return result.stdout.trim()
   }
-  return result.stdout.trim()
+
+  const fallback = spawnSync(
+    'python3',
+    [PYTHON_HELPER, '--env-file', ENV_FILE, '--raw', '--query', query],
+    { encoding: 'utf-8' },
+  )
+  if (fallback.status !== 0) {
+    throw new Error(`SQL 실행 실패: ${result.stderr || fallback.stderr}`)
+  }
+  return fallback.stdout.trim()
+}
+
+export function runSqlScript(sqlText: string): void {
+  const fallback = spawnSync('python3', [PYTHON_HELPER, '--env-file', ENV_FILE], {
+    encoding: 'utf-8',
+    input: sqlText,
+  })
+  if (fallback.status !== 0) {
+    throw new Error(`SQL 스크립트 실행 실패: ${fallback.stderr}`)
+  }
 }
 
 /**

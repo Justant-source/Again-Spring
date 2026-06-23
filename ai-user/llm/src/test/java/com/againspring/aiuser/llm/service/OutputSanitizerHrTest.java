@@ -169,4 +169,41 @@ class OutputSanitizerHrTest {
         assertFalse(result.contains("1도 모르겠고"));
         assertFalse(result.contains("월·화·수"));
     }
+
+    @Test
+    void stripsTrailingOperationMemoTable() {
+        String raw = "인천에서 살면서 느낀 건데 이런 일 오면 나도 같이 흔들리더만\n"
+            + "몇달 동생 고민 다 들어주고 금전적으로도 도왔는데 이제 모르겠음 ㄹㅇ\n"
+            + "적용 처리 메모\n"
+            + "| 항목 | 처리 내용 |\n"
+            + "|------|-----------|\n"
+            + "| 구체 사건 | 2주 연락 두절 |\n"
+            + "| 페르소나 quirk | 더만 종결 |\n";
+
+        String out = sanitizer.sanitizePost(raw);
+
+        assertTrue(out.contains("인천에서 살면서 느낀 건데"));
+        assertFalse(out.contains("적용 처리 메모"));
+        assertFalse(out.contains("| 항목 | 처리 내용 |"));
+        assertFalse(out.contains("페르소나 quirk"));
+    }
+
+    @Test
+    void stripsTrailingWritingNoteChecklist() {
+        String raw = "혹시 저만 이렇게 생각하는 건지 모르겠는데요\n"
+            + "사귀는 사람이 5시간 동안 연락을 한 줄만 보냈다는 게 저는 좀 심하다 싶더라고요\n"
+            + "[작성 노트]\n"
+            + "- 트리거: 5시간 동안 연락 한 줄\n"
+            + "- 어미 변화: ~더라고요 → ~잖아요\n"
+            + "- 모바일 오타: 납들하기\n"
+            + "- 페르소나 표현: 도덕성이 중요한데 삽입\n"
+            + "- 온점·쌍따옴표 없음\n";
+
+        String out = sanitizer.sanitizePost(raw);
+
+        assertTrue(out.contains("혹시 저만 이렇게 생각하는 건지 모르겠는데요"));
+        assertFalse(out.contains("[작성 노트]"));
+        assertFalse(out.contains("- 트리거:"));
+        assertFalse(out.contains("- 온점·쌍따옴표 없음"));
+    }
 }

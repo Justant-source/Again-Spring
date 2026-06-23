@@ -46,6 +46,19 @@ public class ContentSafetyGuard {
         Pattern.compile("니거(?=들)")
     );
 
+    // 내부 프롬프트/첨삭 규칙이 콘텐츠 말미에 누출된 패턴 — 본문으로 게시 금지
+    private static final List<Pattern> PROMPT_LEAK_PATTERNS = List.of(
+        Pattern.compile("(?m)^적용 처리 메모\\s*$"),
+        Pattern.compile("(?m)^\\[작성 노트]\\s*$"),
+        Pattern.compile("(?m)^\\|\\s*항목\\s*\\|\\s*처리\\s*내용\\s*\\|"),
+        Pattern.compile("(?m)^-\\s*트리거:"),
+        Pattern.compile("(?m)^-\\s*어미 변화:"),
+        Pattern.compile("(?m)^-\\s*모바일 오타:"),
+        Pattern.compile("(?m)^-\\s*페르소나 표현:"),
+        Pattern.compile("(?m)^-\\s*온점·쌍따옴표 없음\\s*$"),
+        Pattern.compile("(?m)^\\|\\s*페르소나 quirk\\s*\\|")
+    );
+
     // 제공자(LLM) 오류 문자열 — 토큰/크레딧 소진 또는 프록시 라우팅 오류로 본문에 새는 텍스트.
     // 절대 prod에 게시 금지 (2026-06-07 인시던트 + 2026-06-10 Kiro/Claude 자기정체 인시던트). 모두 소문자.
     private static final List<String> LLM_ERROR_SIGNATURES = List.of(
@@ -133,6 +146,12 @@ public class ContentSafetyGuard {
         if (hasInsufficientKorean(text)) {
             log.error("ContentSafetyGuard: insufficient Korean content (language-guard) — BLOCKED.");
             return GuardResult.blocked("INSUFFICIENT_KOREAN");
+        }
+        for (Pattern p : PROMPT_LEAK_PATTERNS) {
+            if (p.matcher(text).find()) {
+                log.error("ContentSafetyGuard: internal prompt/correction note leaked into content — BLOCKED ({})", p.pattern());
+                return GuardResult.blocked("PROMPT_LEAK_META");
+            }
         }
         if (text.length() < MIN_LENGTH) {
             return GuardResult.blocked("TOO_SHORT");

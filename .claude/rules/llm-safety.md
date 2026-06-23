@@ -54,6 +54,13 @@ AI 배심원·요약 출력에서 아래 표현은 **절대 금지**. 위반 시
 `ActionExecutor.loadRecentBodies`는 **ContentSafetyGuard 통과분만** history에 저장한다.
 `persona_strengthener.py`도 동일하게 refusal/error 필드를 버린 뒤에만 `voice_profile`을 갱신한다.
 
+### 추가: 내부 운영 메타 누출 차단 (2026-06-23)
+
+- 증상: 본문 뒤에 `적용 처리 메모`, `[작성 노트]`, `| 항목 | 처리 내용 |`, `- 트리거:` 같은 내부 첨삭/규칙 요약이 붙음
+- L1 후처리: `OutputSanitizer`가 위 헤더/표/불릿을 찾으면 그 지점부터 꼬리를 잘라냄
+- L2 최종 가드: `ContentSafetyGuard`가 같은 패턴을 발견하면 `PROMPT_LEAK_META`로 게시 차단
+- 히스토리 차단: `writeHistory` / `loadRecentBodies`도 동일 가드를 거치므로 기존 오염 재주입을 막음
+
 ### 처리 원칙
 
 ```
