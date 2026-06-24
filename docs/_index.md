@@ -17,6 +17,7 @@
 | AI 유저 | `docs/ai-user/` | 페르소나 생성·오케스트레이션·학습·운영 |
 | 공유 (API·정책·ADR) | `docs/shared/` | REST 명세·DB 스키마·정책·마케팅·ADR |
 | 환경/인프라 | `docs/env/` | 배포·포트·환경변수·Docker·Cloudflare |
+| TODO / 작업 메모 | `docs/todo/` | 재사용할 조사 결과·실험 메모·기능 가설 |
 
 ---
 
