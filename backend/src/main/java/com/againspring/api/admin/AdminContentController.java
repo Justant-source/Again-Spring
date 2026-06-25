@@ -170,6 +170,7 @@ public class AdminContentController {
 
         if (req.getTitle() != null) {
             post.setTitle(req.getTitle());
+            post.setUserTitle(req.getTitle());
         }
         if (req.getBodyRaw() != null) {
             post.setBodyRaw(req.getBodyRaw());

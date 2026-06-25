@@ -13,27 +13,34 @@ import com.againspring.aiuser.orchestrator.domain.PersonaRelationship;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRelationshipRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
+import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 
 /**
- * AI 유저 연인·부부 양면 갈등 시나리오 스케줄러.
+ * AI 유저 양면 갈등 시나리오 스케줄러.
  *
  * 흐름:
- *  1. persona_relationships에서 COUPLE/MARRIAGE 페어 선택
+ *  1. persona_relationships에서 COUPLE/MARRIAGE/FRIEND 페어 선택
  *  2. 작성자 A → 갈등 사연 생성 + PRIVATE 게시 + WAIT_FOR_PARTNER 설정 + 초대 토큰 발급
  *  3. 파트너 B → 작성자 본문을 컨텍스트로 상대방 입장 생성 + /api/s/{token}/answer 제출
  *  4. WAIT_FOR_PARTNER → 자동 PUBLIC 전환 → 기존 BehaviorEngine tick이 댓글·투표 참여
  *
  * 스케줄 기본값: 매일 UTC 05:00 (KST 14:00)
- * 환경변수: PAIRED_POST_ENABLED, PAIRED_POST_CRON, PAIRED_POST_PAIRS
+ * 환경변수:
+ *  - PAIRED_POST_ENABLED / PAIRED_POST_CRON / PAIRED_POST_PAIRS
+ *  - PAIRED_POST_TARGET_SHARE (default 0.15)
+ *  - PAIRED_POST_ROMANTIC_SHARE (default 0.80)
  */
 @Slf4j
 @Component
@@ -49,15 +56,11 @@ public class PairedPostScheduler {
     private final JdbcTemplate jdbcTemplate;
     private final ContentSafetyGuard safetyGuard;
     private final AiUserGenerationConfigRepository generationConfigRepository;
-
-    @Value("${ai-user.paired-post.enabled:true}")
-    private boolean pairedEnabled;
-
-    @Value("${ai-user.paired-post.pairs-per-run:2}")
-    private int pairsPerRun;
+    private final DailyPostQuotaService dailyPostQuotaService;
 
     private static final Random RNG = new Random();
-    private static final List<String> PAIR_TYPES = List.of("COUPLE", "MARRIAGE");
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final List<String> PAIR_TYPES = List.of("COUPLE", "MARRIAGE", "FRIEND");
 
     /** 매일 KST 14:00 (UTC 05:00) 실행 — 환경변수로 재정의 가능 */
     @Scheduled(cron = "${ai-user.paired-post.cron:0 0 5 * * *}")
@@ -66,24 +69,59 @@ public class PairedPostScheduler {
             log.debug("[PairedPost] AI_USER_ENABLED=false — skip");
             return;
         }
-        if (!pairedEnabled) {
+        OrchestratorProperties.PairedPost config = props.getPairedPost();
+        if (config == null || !config.isEnabled()) {
             log.debug("[PairedPost] disabled — skip");
             return;
         }
         List<PersonaRelationship> all =
             relationshipRepo.findByRelationTypeInAndStatus(PAIR_TYPES, "ACTIVE");
         if (all.isEmpty()) {
-            log.warn("[PairedPost] No COUPLE/MARRIAGE relationships found. " +
+            log.warn("[PairedPost] No COUPLE/MARRIAGE/FRIEND relationships found. " +
                      "Seed ai-user/docs/personas/profiles/relationships.yml first.");
             return;
         }
+
         List<PersonaRelationship> shuffled = new ArrayList<>(all);
         Collections.shuffle(shuffled, RNG);
-        int toRun = Math.min(pairsPerRun, shuffled.size());
-        log.info("[PairedPost] Running {} pair(s) (pool={})", toRun, all.size());
+
+        int totalSyntheticToday = dailyPostQuotaService.postsCreatedToday();
+        int pairedToday = countPairedPostsToday();
+        int desiredToday = desiredPairedPostsToday(config, totalSyntheticToday);
+        int remainingTarget = Math.max(0, desiredToday - pairedToday);
+        int runCap = Math.max(0, config.getPairsPerRun());
+        int toRun = Math.min(Math.min(runCap, remainingTarget), shuffled.size());
+
+        if (toRun <= 0) {
+            log.debug("[PairedPost] target satisfied — totalToday={} pairedToday={} desiredToday={} runCap={}",
+                totalSyntheticToday, pairedToday, desiredToday, runCap);
+            return;
+        }
+
+        EnumMap<PairBucket, Integer> mixCounts = countPairedMixToday();
+        log.info("[PairedPost] Running {} pair(s) (pool={}, totalToday={}, pairedToday={}, desiredToday={}, romanticToday={}, friendToday={})",
+            toRun,
+            all.size(),
+            totalSyntheticToday,
+            pairedToday,
+            desiredToday,
+            mixCounts.get(PairBucket.ROMANTIC),
+            mixCounts.get(PairBucket.FRIEND));
+
         for (int i = 0; i < toRun; i++) {
+            PairBucket desiredBucket = chooseNextBucket(config, mixCounts);
+            Optional<PersonaRelationship> relOpt = takeCandidateForBucket(shuffled, desiredBucket);
+            if (relOpt.isEmpty()) {
+                relOpt = takeAnyCandidate(shuffled);
+            }
+            if (relOpt.isEmpty()) {
+                break;
+            }
+
             try {
-                executePair(shuffled.get(i));
+                PersonaRelationship rel = relOpt.get();
+                executePair(rel);
+                mixCounts.merge(bucketForRelationType(rel.getRelationType()), 1, Integer::sum);
             } catch (Exception e) {
                 log.error("[PairedPost] Pair {} failed: {}", i, e.getMessage(), e);
             }
@@ -115,8 +153,7 @@ public class PairedPostScheduler {
         Persona author  = authorOpt.get();
         Persona partner = partnerOpt.get();
 
-        // COUPLE → "COUPLE" 카테고리, MARRIAGE → "MARRIED" 카테고리
-        String category = "COUPLE".equals(rel.getRelationType()) ? "COUPLE" : "MARRIED";
+        String category = categoryForRelationType(rel.getRelationType());
         String corrId   = UUID.randomUUID().toString().substring(0, 8);
 
         // ── Step 1: 작성자 JWT ────────────────────────────────────────────────
@@ -324,5 +361,136 @@ public class PairedPostScheduler {
             return title;
         }
         return "갈등 사연";
+    }
+
+    private int desiredPairedPostsToday(OrchestratorProperties.PairedPost config, int totalSyntheticToday) {
+        int targetPosts = generationConfigRepository.findById(1)
+            .map(AiUserGenerationConfig::getTargetPosts)
+            .orElse(0);
+
+        int basePostCount = Math.max(targetPosts, totalSyntheticToday);
+        if (basePostCount <= 0) {
+            return 0;
+        }
+
+        double share = clampShare(config.getTargetShare());
+        return Math.max(1, (int) Math.ceil(basePostCount * share));
+    }
+
+    private int countPairedPostsToday() {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM posts p " +
+                "JOIN users u ON p.author_id = u.id " +
+                "WHERE u.synthetic = 1 " +
+                "  AND p.deleted_at IS NULL " +
+                "  AND p.created_at >= ? " +
+                "  AND p.partner_answered_at IS NOT NULL " +
+                "  AND p.partner_body_published IS NOT NULL",
+                Integer.class,
+                todayStartTimestamp());
+            return count != null ? count : 0;
+        } catch (Exception e) {
+            log.warn("[PairedPost] countPairedPostsToday failed: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    private EnumMap<PairBucket, Integer> countPairedMixToday() {
+        EnumMap<PairBucket, Integer> counts = new EnumMap<>(PairBucket.class);
+        counts.put(PairBucket.ROMANTIC, 0);
+        counts.put(PairBucket.FRIEND, 0);
+
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT p.category AS category, COUNT(*) AS cnt " +
+                "FROM posts p " +
+                "JOIN users u ON p.author_id = u.id " +
+                "WHERE u.synthetic = 1 " +
+                "  AND p.deleted_at IS NULL " +
+                "  AND p.created_at >= ? " +
+                "  AND p.partner_answered_at IS NOT NULL " +
+                "  AND p.partner_body_published IS NOT NULL " +
+                "  AND p.category IN ('COUPLE', 'MARRIED', 'FRIEND') " +
+                "GROUP BY p.category",
+                todayStartTimestamp());
+
+            for (Map<String, Object> row : rows) {
+                PairBucket bucket = bucketForCategory(Objects.toString(row.get("category"), ""));
+                int count = ((Number) row.getOrDefault("cnt", 0)).intValue();
+                counts.merge(bucket, count, Integer::sum);
+            }
+        } catch (Exception e) {
+            log.warn("[PairedPost] countPairedMixToday failed: {}", e.getMessage());
+        }
+
+        return counts;
+    }
+
+    private PairBucket chooseNextBucket(OrchestratorProperties.PairedPost config, EnumMap<PairBucket, Integer> counts) {
+        int romanticCount = counts.getOrDefault(PairBucket.ROMANTIC, 0);
+        int friendCount = counts.getOrDefault(PairBucket.FRIEND, 0);
+        int nextTotal = romanticCount + friendCount + 1;
+
+        double romanticShare = clampShare(config.getRomanticShare());
+        double friendShare = 1.0 - romanticShare;
+
+        double romanticDeficit = (nextTotal * romanticShare) - romanticCount;
+        double friendDeficit = (nextTotal * friendShare) - friendCount;
+        return friendDeficit > romanticDeficit ? PairBucket.FRIEND : PairBucket.ROMANTIC;
+    }
+
+    private Optional<PersonaRelationship> takeCandidateForBucket(
+        List<PersonaRelationship> candidates,
+        PairBucket bucket
+    ) {
+        Iterator<PersonaRelationship> iterator = candidates.iterator();
+        while (iterator.hasNext()) {
+            PersonaRelationship rel = iterator.next();
+            if (bucketForRelationType(rel.getRelationType()) == bucket) {
+                iterator.remove();
+                return Optional.of(rel);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<PersonaRelationship> takeAnyCandidate(List<PersonaRelationship> candidates) {
+        if (candidates.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(candidates.remove(0));
+    }
+
+    private PairBucket bucketForRelationType(String relationType) {
+        return "FRIEND".equalsIgnoreCase(relationType) ? PairBucket.FRIEND : PairBucket.ROMANTIC;
+    }
+
+    private PairBucket bucketForCategory(String category) {
+        return "FRIEND".equalsIgnoreCase(category) ? PairBucket.FRIEND : PairBucket.ROMANTIC;
+    }
+
+    private String categoryForRelationType(String relationType) {
+        return switch (relationType != null ? relationType.toUpperCase(Locale.ROOT) : "") {
+            case "COUPLE" -> "COUPLE";
+            case "FRIEND" -> "FRIEND";
+            case "MARRIAGE" -> "MARRIED";
+            default -> "MARRIED";
+        };
+    }
+
+    private Timestamp todayStartTimestamp() {
+        ZonedDateTime todayStart = LocalDate.now(KST).atStartOfDay(KST);
+        return Timestamp.from(todayStart.toInstant());
+    }
+
+    private double clampShare(double share) {
+        if (Double.isNaN(share)) return 0.0;
+        return Math.max(0.0, Math.min(1.0, share));
+    }
+
+    private enum PairBucket {
+        ROMANTIC,
+        FRIEND
     }
 }

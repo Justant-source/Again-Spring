@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { postApi, PostSummary } from '@/lib/api/community/postApi';
 import { FeedCard, BrandBar, SearchPanel } from '@/components/community/c3';
@@ -24,6 +24,14 @@ function getCategoryLabel(categoryId: string): string {
   return found?.label || '기타';
 }
 
+const FEED_PAGE_SIZE = 20;
+
+function mergePosts(prev: PostSummary[], next: PostSummary[]): PostSummary[] {
+  if (prev.length === 0) return next;
+  const seen = new Set(prev.map((post) => post.id));
+  return [...prev, ...next.filter((post) => !seen.has(post.id))];
+}
+
 export default function CommunityFeedPage() {
   const user = useUserStore((s) => s.user);
   useGuestInit();
@@ -32,35 +40,100 @@ export default function CommunityFeedPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [sort, setSort] = useState<'latest' | 'recommended'>('latest');
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, setTimeTick] = useState(0);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const feedRequestKeyRef = useRef(0);
 
   const categoryOptions = [{ id: '', label: '전체' }, ...C3_CATS];
 
   useEffect(() => {
+    let cancelled = false;
     const loadPosts = async () => {
       try {
+        const requestKey = ++feedRequestKeyRef.current;
         setLoading(true);
+        setLoadingMore(false);
+        setPosts([]);
+        setPage(0);
+        setHasMore(false);
         setError(null);
-        const result = await postApi.list({ category: selectedCategory || undefined, sort });
+        const result = await postApi.list({
+          category: selectedCategory || undefined,
+          sort,
+          page: 0,
+          size: FEED_PAGE_SIZE,
+        });
+        if (cancelled || requestKey !== feedRequestKeyRef.current) return;
         setPosts(result.content);
+        setPage(1);
+        setHasMore(result.totalPages > 1);
       } catch (err) {
         console.error('Failed to load posts:', err);
+        if (cancelled) return;
         setError('사연을 불러올 수 없습니다. 다시 시도해주세요.');
         setPosts([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     loadPosts();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedCategory, sort]);
 
   useEffect(() => {
     const id = setInterval(() => setTimeTick(t => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  const loadMorePosts = useCallback(async () => {
+    if (loading || loadingMore || !hasMore) return;
+    const requestKey = feedRequestKeyRef.current;
+    const nextPage = page;
+    setLoadingMore(true);
+    try {
+      const result = await postApi.list({
+        category: selectedCategory || undefined,
+        sort,
+        page: nextPage,
+        size: FEED_PAGE_SIZE,
+      });
+      if (requestKey !== feedRequestKeyRef.current) return;
+      setPosts((prev) => mergePosts(prev, result.content));
+      setPage(nextPage + 1);
+      setHasMore(nextPage + 1 < result.totalPages);
+    } catch (err) {
+      console.error('Failed to load more posts:', err);
+    } finally {
+      if (requestKey === feedRequestKeyRef.current) {
+        setLoadingMore(false);
+      }
+    }
+  }, [hasMore, loading, loadingMore, page, selectedCategory, sort]);
+
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          void loadMorePosts();
+        }
+      },
+      { rootMargin: '320px 0px', threshold: 0.01 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMorePosts]);
 
 
   return (
@@ -164,6 +237,12 @@ export default function CommunityFeedPage() {
                 voted={!!post.myVoteSide || !!voteStoreVotes[post.id]}
               />
             ))}
+            <div ref={loadMoreRef} data-testid="feed-load-more-sentinel" style={{ height: 1 }} />
+            {loadingMore && (
+              <div style={{ textAlign: 'center', padding: '10px 0 2px', color: 'var(--L-sub)', fontSize: 12.5 }}>
+                더 불러오는 중...
+              </div>
+            )}
           </div>
         )}
 

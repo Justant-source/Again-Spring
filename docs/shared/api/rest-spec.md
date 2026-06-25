@@ -213,8 +213,17 @@ flowchart LR
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | GET | `/api/admin/content/posts` | **JWT + ADMIN** | 200 | AI 게시글 목록 (`?status=VOTING&page=&size=`) — `synthetic` 필드 포함 |
+| GET | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 200 / 404 | 단일 게시글 원문 조회 |
 | GET | `/api/admin/content/posts/{postId}/source-comparison` | **JWT + ADMIN** | 200 / 404 | 원본 비교 조회. 응답: `{synthetic, hasSource, source{community,url,title,body}, generated{title,body}}` |
+| PATCH | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 200 / 404 | 게시글 수정. Body: `{title?, bodyRaw?, partnerBodyRaw?, status?, category?}`. `title` 수정 시 `title`과 `userTitle`을 함께 동기화 |
+| DELETE | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 204 / 404 | 게시글 soft delete (`deleted_at`, `deleted_by_admin_id`) |
+| POST | `/api/admin/content/posts/{postId}/block` | **JWT + ADMIN** | 200 / 404 | 게시글 상태를 `BLOCKED`로 변경 |
+| POST | `/api/admin/content/posts/{postId}/unblock` | **JWT + ADMIN** | 200 / 404 | 게시글 상태를 `VOTING`으로 복구 |
 | GET | `/api/admin/content/comments` | **JWT + ADMIN** | 200 | AI 댓글 목록 (`?status=ACTIVE&page=&size=`) — `synthetic` 필드 포함 |
+| PATCH | `/api/admin/content/comments/{commentId}` | **JWT + ADMIN** | 200 / 404 | 댓글 수정. Body: `{body}` |
+| DELETE | `/api/admin/content/comments/{commentId}` | **JWT + ADMIN** | 204 / 404 | 댓글 soft delete |
+| POST | `/api/admin/content/comments/{commentId}/block` | **JWT + ADMIN** | 200 / 404 | 댓글 상태를 `BLOCKED`로 변경 |
+| POST | `/api/admin/content/comments/{commentId}/unblock` | **JWT + ADMIN** | 200 / 404 | 댓글 상태를 `ACTIVE`로 복구 |
 | POST | `/api/admin/content/corrections/save` | **JWT + ADMIN** | 201 / 404 | LLM 없이 즉시 PENDING 저장. `applyLive=true`이면 본문도 교체. Body: `{targetType, targetId, correctedText, applyLive, adminOpinion?}` |
 | POST | `/api/admin/content/corrections/analyze` | **JWT + ADMIN** | 200 / 404 | 단건 LLM 분석 (DB 미변경). Body: `{targetType, targetId, correctedText}` |
 | POST | `/api/admin/content/corrections/commit` | **JWT + ADMIN** | 200 / 404 | 분석 결과 확정 저장. Body: `{targetType, targetId, correctedText, personaCaution?, globalRules[], applyLive}` |

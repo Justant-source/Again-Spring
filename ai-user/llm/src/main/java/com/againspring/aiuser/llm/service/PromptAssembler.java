@@ -183,6 +183,50 @@ public class PromptAssembler {
         return system + "\n" + SEP + "\n" + user;
     }
 
+    public String assemblePostRewritePrompt(PostRewriteRequest req) {
+        String guide = postGuide != null && !postGuide.isBlank() ? postGuide : "기존 갈등 사연을 자연스럽게 교정한다";
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide, req.getFormality(),
+            req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
+        String sourceCategory = req.getCategory() != null ? req.getCategory() : "OTHER";
+        String targetCategory = req.getTargetCategory() != null ? req.getTargetCategory() : sourceCategory;
+        String sourceGuide = CATEGORY_GUIDE.getOrDefault(sourceCategory, "");
+        String targetGuide = CATEGORY_GUIDE.getOrDefault(targetCategory, "");
+        String politeSuffix = isPolite(req.getFormality())
+            ? "- 자연스러운 구어 존댓말 유지 (~요, ~더라고요, ~거든요)\n"
+            : "- 반말 유지 (~임, ~함, ~거든, ~하더라)\n";
+        String user = """
+            %s[현재 제목]
+            %s
+
+            [현재 본문]
+            %s
+
+            현재 광장: %s%s
+            최종 광장: %s%s
+            %s
+            위 legacy synthetic 사연을 새 글로 갈아엎지 말고, 어색한 부분만 자연스럽게 교정해주세요.
+            - 사건·사실관계·감정 방향은 유지
+            - 중복 표현, 부자연스러운 AI 말투, placeholder/debug 흔적만 정리
+            - 최종 광장과 어긋나면 그 광장 맥락에 맞게 최소한만 재프레이밍
+            - 제목은 12~42자 권장, 본문은 180~520자 목표, 최대 900자
+            - 체크리스트, 설명문, 분석문, 코드펜스 절대 금지
+            - 결과는 JSON 1개만 출력: {"title":"...","body":"..."}
+            %s%s""".formatted(
+                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
+                safe(req.getOriginalTitle() != null ? req.getOriginalTitle() : ""),
+                safe(req.getOriginalBody() != null ? req.getOriginalBody() : ""),
+                sourceCategory,
+                sourceGuide.isBlank() ? "" : " (참고: " + sourceGuide + ")",
+                targetCategory,
+                targetGuide.isBlank() ? "" : " (참고: " + targetGuide + ")",
+                req.getRewriteInstruction() != null && !req.getRewriteInstruction().isBlank()
+                    ? "추가 지시: " + safe(req.getRewriteInstruction()) + "\n"
+                    : "",
+                politeSuffix,
+                targetCategory.equals(sourceCategory) ? "" : "- 카테고리 이동은 최소 표현 조정만 허용, 핵심 사건 변경 금지\n");
+        return system + "\n" + SEP + "\n" + user;
+    }
+
     /**
      * 재구성 프롬프트 — 단일 크롤 원본을 페르소나 보이스로 사연으로 재서사.
      * post.md 가이드의 "실제 사건 원문 복제 금지(완전 창작)" 규칙과 충돌하므로

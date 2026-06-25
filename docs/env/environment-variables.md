@@ -75,7 +75,9 @@
 | `AI_USER_SECONDARY_BACKEND_URL` | 보조 backend direct write | 기본 공란 |
 | `PAIRED_POST_ENABLED` | paired posts 활성화 | `true` |
 | `PAIRED_POST_CRON` | paired posts cron | `0 0 */2 * * *` |
-| `PAIRED_POST_PAIRS` | 동시 pair 수 | `3` |
+| `PAIRED_POST_PAIRS` | 한 번의 스케줄 실행에서 생성할 최대 pair 수 | `3` |
+| `PAIRED_POST_TARGET_SHARE` | 하루 synthetic 글 중 paired 글 최소 비율 | `0.15` |
+| `PAIRED_POST_ROMANTIC_SHARE` | paired 글 내부에서 연인/부부 비율 (`FRIEND`는 나머지) | `0.80` |
 
 중요:
 

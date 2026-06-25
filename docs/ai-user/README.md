@@ -5,7 +5,7 @@ AI-user는 이제 **dev/prod 공통 스택**으로 운영된다. FE/BE는 dev·p
 ## 서비스 구성
 
 - `ai-user-orchestrator` (`8096`, 내부): prod DB 기준 tick, paired posts, 행동 실행
-- `llm-ai-user` (`8092`, 내부): 글/댓글/대댓글 생성과 글 분석
+- `llm-ai-user` (`8092`, 내부): 글/댓글/대댓글 생성, 글 분석, legacy synthetic 글 rewrite
 - `ai-learning` (`8099`, host 공개): example bank, crawl, strengthen, topic synthesis
 - `prod-dev-sync` (daily): prod DB 기준 데이터를 dev DB로 하루 1회 반영
 
@@ -23,7 +23,7 @@ AI-user는 이제 **dev/prod 공통 스택**으로 운영된다. FE/BE는 dev·p
 | 서비스 | 코드 위치 | 기본 포트 | 호스트 노출 | 현재 역할 |
 |---|---|---:|---|---|
 | orchestrator | `ai-user/orchestrator/` | `8096` | 없음 | prod 대상 행동 오케스트레이션 |
-| llm | `ai-user/llm/` | `8092` | 없음 | 생성/분석 워커 |
+| llm | `ai-user/llm/` | `8092` | 없음 | 생성/분석/legacy rewrite 워커 |
 | learning | `ai-user/learning/` | `8099` | `localhost:8099` | 예시 검색, 크롤, 강화, 토픽 |
 | sync | `ai-user/sync/` | 없음 | 없음 | prod→dev 일일 반영 |
 

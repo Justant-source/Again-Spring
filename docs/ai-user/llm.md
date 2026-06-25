@@ -10,6 +10,7 @@
 | `POST` | `/generate/comment` | 댓글 생성 |
 | `POST` | `/generate/reply` | 대댓글 생성 |
 | `POST` | `/generate/persona` | 페르소나 JSON 생성 |
+| `POST` | `/internal/rewrite/post` | legacy synthetic 게시글 부분 교정용 내부 rewrite |
 | `POST` | `/analyze/post` | 좋아요/투표용 구조화 post 분석 |
 | `GET` | `/v1/metrics` | 워커 풀 상태 |
 | `POST` | `/internal/prompts/reload` | prompt template 재로드 |
@@ -37,6 +38,7 @@
 - `backend=API`면 `ClaudeApiInvoker`가 `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL`(DB `system_setting` 우선)로 clcocloud 프록시를 직접 호출한다.
 - `backend=null|CLI|기타`는 `ClaudeCliInvoker`로 내려가며, CLI 서브프로세스 env에서는 `ANTHROPIC_API_KEY`를 제거해 OAuth 세션을 강제한다.
 - prompt caching flag는 `llm.api.prompt-caching`에 있고, compose/env로 제어할 수 있다.
+- `/internal/rewrite/post`는 legacy 사연 큐레이션 배치용이며, backend 기본값을 `API`로 잡아 clcocloud 직접 경로를 우선 사용한다.
 
 ## prompt 조립 모드
 
@@ -62,6 +64,16 @@
 3. 글은 `OutputSanitizer.sanitizePost()`, 댓글/대댓글은 `sanitizeComment()`를 거친다.
 4. 글과 댓글은 `SelfCritiqueService`를 통해 재생성 루프를 탈 수 있다.
 5. 댓글/대댓글은 `<<<REACT>>>` sentinel 뒤 JSON을 분리해 orchestrator로 돌려준다.
+
+## legacy rewrite API
+
+- 입력: 기존 `title/body`, 현재 광장, 최종 광장, persona voice block, rewrite instruction
+- 출력: JSON `{title, body}`를 파싱한 구조 응답
+- 규칙:
+  - 새 글 재창작이 아니라 부분 교정만 허용
+  - 사건/감정 방향은 유지
+  - 결과 body는 `OutputSanitizer.sanitizePost()`를 다시 거친다
+  - title/body가 비정상적으로 짧으면 실패로 돌려 배치가 건너뛸 수 있게 한다
 
 ## self critique
 

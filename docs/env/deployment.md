@@ -58,7 +58,7 @@ shared ai-user는 dev/prod 공통 스택이다. 아래 조건이 필요하다.
 cd env
 cp .env.ai-user.example .env.ai-user
 $EDITOR .env.ai-user
-docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build
+bash ./rebuild-stacks.sh ai-user
 docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user ps
 curl http://localhost:8099/health
 ```
@@ -99,7 +99,7 @@ ai-user 관련 코드나 `.env.ai-user`가 바뀌었다면 shared 스택도 다�
 
 ```bash
 cd env
-docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build
+bash ./rebuild-stacks.sh ai-user
 ```
 
 ## prod 사전 체크리스트

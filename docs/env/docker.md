@@ -137,6 +137,10 @@ start_period: 30s
 ```bash
 cd env
 
+bash ./rebuild-stacks.sh ai-user
+bash ./rebuild-stacks.sh --build-only ai-user
+bash ./rebuild-stacks.sh base dev prod ai-user
+
 docker compose up -d --build
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
@@ -146,3 +150,9 @@ docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user ps
 docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user logs -f ai-user-orchestrator
 docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user down
 ```
+
+스크립트 규칙:
+
+- 기본 대상: `ai-user`
+- 기본 동작: `up -d --build`
+- `--build-only`는 빌드만 수행하고, real env 파일이 없으면 `*.example`을 사용한다.

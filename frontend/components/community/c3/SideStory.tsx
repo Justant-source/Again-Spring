@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+
 interface SideStoryProps {
   side: 'g' | 'r';
   label: string;
@@ -36,6 +38,40 @@ export function SideStory({
   const c = side === 'g' ? 'var(--faction-author)' : 'var(--faction-partner)';
   const cDk = side === 'g' ? 'var(--faction-author-dk)' : 'var(--faction-partner-dk)';
   const bg = side === 'g' ? 'var(--faction-author-bg)' : 'var(--faction-partner-bg)';
+  const textRef = useRef<HTMLDivElement | null>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    if (!clamp) {
+      setIsOverflowing(false);
+      return;
+    }
+
+    const el = textRef.current;
+    if (!el) return;
+
+    let frame = 0;
+    const measure = () => {
+      frame = window.requestAnimationFrame(() => {
+        const next = el.scrollHeight - el.clientHeight > 1;
+        setIsOverflowing((prev) => (prev === next ? prev : next));
+      });
+    };
+
+    measure();
+
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(measure)
+      : null;
+    observer?.observe(el);
+    window.addEventListener('resize', measure);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [body, clamp]);
 
   return (
     <div
@@ -104,21 +140,46 @@ export function SideStory({
       </div>
 
       {/* 본문 */}
-      <div
-        style={{
-          fontSize: 12.5,
-          color: 'var(--P-ink)',
-          lineHeight: 1.65,
-          fontFamily: 'var(--font-serif)',
-          ...(clamp && {
-            display: '-webkit-box',
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }),
-        }}
-      >
-        {body}
+      <div style={{ position: 'relative' }}>
+        <div
+          ref={textRef}
+          style={{
+            fontSize: 12.5,
+            color: 'var(--P-ink)',
+            lineHeight: 1.65,
+            fontFamily: 'var(--font-serif)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            ...(clamp && {
+              display: '-webkit-box',
+              WebkitLineClamp: 7,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }),
+          }}
+        >
+          {body}
+        </div>
+        {clamp && isOverflowing && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              right: 0,
+              bottom: 0,
+              paddingLeft: 18,
+              background: `linear-gradient(90deg, transparent 0%, ${bg} 28%)`,
+              color: cDk,
+              fontSize: 15,
+              lineHeight: 1,
+              letterSpacing: 1.2,
+              fontFamily: 'var(--font-serif)',
+              pointerEvents: 'none',
+            }}
+          >
+            ......
+          </span>
+        )}
       </div>
     </div>
   );

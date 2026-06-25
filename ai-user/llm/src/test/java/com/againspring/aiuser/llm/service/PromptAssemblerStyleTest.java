@@ -2,6 +2,7 @@ package com.againspring.aiuser.llm.service;
 
 import com.againspring.aiuser.llm.dto.CommentGenRequest;
 import com.againspring.aiuser.llm.dto.PostGenRequest;
+import com.againspring.aiuser.llm.dto.PostRewriteRequest;
 import com.againspring.aiuser.llm.dto.ReplyGenRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -106,5 +107,29 @@ class PromptAssemblerStyleTest {
         // Phase 6에서 extraRule 문구 변경: "같은 소재·사건 유형 반복 금지" → "완전히 다른 유형의 갈등 상황으로 쓸 것"
         // PromptAssembler.java:180 기준값
         assertTrue(user.contains("완전히 다른 유형의 갈등 상황으로 쓸 것"), "글은 소재 반복 금지 규칙 포함");
+    }
+
+    @Test
+    void rewritePromptDemandsJsonAndTargetCategory() {
+        PostRewriteRequest req = PostRewriteRequest.builder()
+            .personaId("p1")
+            .voiceProfile("v")
+            .slangLevel(0.4)
+            .formality("casual")
+            .category("WORK")
+            .targetCategory("OTHER")
+            .originalTitle("보고서 때문에 너무 짜증남")
+            .originalBody("팀장이 또 내 보고서를 자기 이름으로 올렸는데 어제도 비슷한 일이 있었음")
+            .rewriteInstruction("직장 광장 티가 너무 강하면 기타 광장처럼 완화")
+            .build();
+
+        String prompt = assembler.assemblePostRewritePrompt(req);
+        String user = prompt.split("<<<USER_PROMPT>>>", 2)[1];
+
+        assertTrue(user.contains("[현재 제목]"));
+        assertTrue(user.contains("최종 광장: OTHER"));
+        assertTrue(user.contains("결과는 JSON 1개만 출력"));
+        assertTrue(user.contains("\"title\":\"...\""));
+        assertTrue(user.contains("새 글로 갈아엎지 말고"), "부분 교정 규칙 유지");
     }
 }

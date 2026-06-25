@@ -24,6 +24,8 @@ public class OrchestratorProperties {
 
     /** 콘텐츠 인식 좋아요·투표 결정 설정. */
     private ContentAwareDecisions contentAwareDecisions = new ContentAwareDecisions();
+    /** paired post 비율/분포 설정. */
+    private PairedPost pairedPost = new PairedPost();
 
     public boolean isContentAwareEnabled() {
         return contentAwareDecisions.isEnabled();
@@ -31,6 +33,19 @@ public class OrchestratorProperties {
 
     public int getAnalysisBudgetPerTick() {
         return contentAwareDecisions.getAnalysisBudgetPerTick();
+    }
+
+    @Getter
+    @Setter
+    public static class PairedPost {
+        private boolean enabled = true;
+        private String cron = "0 0 5 * * *";
+        /** 한 번의 스케줄 실행에서 생성할 수 있는 최대 pair 수. */
+        private int pairsPerRun = 2;
+        /** 하루 전체 synthetic post 중 paired post가 최소로 차지해야 하는 비율. */
+        private double targetShare = 0.15;
+        /** paired post 내부에서 COUPLE/MARRIAGE가 차지해야 하는 비율. */
+        private double romanticShare = 0.80;
     }
 
     @Getter

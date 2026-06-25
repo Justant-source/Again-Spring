@@ -47,7 +47,7 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 
 # shared ai-user 배포
-docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build
+bash ./rebuild-stacks.sh ai-user
 ```
 
 자세한 절차는 [deployment.md](./deployment.md)를 참조하세요.

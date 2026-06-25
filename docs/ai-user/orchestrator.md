@@ -11,7 +11,7 @@
 | `ActionPlanner` | 어떤 행동을 할지 결정 |
 | `ActionExecutor` | 글/댓글/대댓글/반응 실행 |
 | `Jitter` | tick 내 분산 지연, reply 장지연 |
-| `PairedPostScheduler` | 커플/부부 양면 사연 |
+| `PairedPostScheduler` | 연인/부부/친구 양면 사연 |
 | `DailyPlannerScheduler` | 하루 계획 수립 |
 | `CrawlerTriggerScheduler` | learning crawl trigger |
 
@@ -77,7 +77,13 @@
 
 ## paired posts
 
-`PairedPostScheduler`는 `profiles/relationships.yml`의 `COUPLE`/`MARRIAGE` 관계만 사용한다.
+`PairedPostScheduler`는 `profiles/relationships.yml`의 `COUPLE`/`MARRIAGE`/`FRIEND` 관계를 사용한다.
+
+현재 기본 정책:
+
+- 하루 synthetic 글 목표(`ai_user_generation_config.target_posts`) 또는 오늘 실제 생성량을 기준으로 paired 글을 최소 `15%` 유지한다.
+- paired 글 내부 구성은 `COUPLE + MARRIAGE`가 `80%`, `FRIEND`가 `20%`를 목표로 맞춘다.
+- `PAIRED_POST_PAIRS`는 "이번 실행에서 더 만들 수 있는 최대치"이고, 실제 생성 수는 당일 부족분만큼만 나온다.
 
 흐름:
 
@@ -125,6 +131,8 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 | `AI_LEARNING_ENABLED` | `false` | `true` | `true` |
 | `AI_USER_ML_ENABLED` | `false` | `false` | `false` |
 | `PAIRED_POST_PAIRS` | `2` | `3` | `3` |
+| `PAIRED_POST_TARGET_SHARE` | `0.15` | `0.15` | `0.15` |
+| `PAIRED_POST_ROMANTIC_SHARE` | `0.80` | `0.80` | `0.80` |
 
 ## 현재 코드 기준 주의점
 

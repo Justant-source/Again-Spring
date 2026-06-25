@@ -6,6 +6,7 @@ env/
 ├── docker-compose.dev.yml      # dev 웹/DB 스택
 ├── docker-compose.prod.yml     # prod 웹/DB 스택
 ├── docker-compose.ai-user.yml  # 공통 ai-user 스택
+├── rebuild-stacks.sh           # compose 재빌드/재기동 스크립트
 │
 ├── .env.example
 ├── .env.dev.example
@@ -101,3 +102,16 @@ bind mount:
 | `againspring-prod` | prod compose | prod 전용 네트워크 |
 
 `docker-compose.ai-user.yml`은 세 네트워크를 외부 네트워크로 참조한다.
+
+## 재빌드 스크립트
+
+```bash
+cd env
+bash ./rebuild-stacks.sh ai-user
+bash ./rebuild-stacks.sh --build-only ai-user
+bash ./rebuild-stacks.sh base dev prod ai-user
+```
+
+- 기본 스택은 `ai-user`
+- 기본 모드는 `up -d --build`
+- `--build-only`일 때만 real env 파일이 없으면 `*.example`을 fallback으로 사용한다.

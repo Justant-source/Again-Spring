@@ -626,6 +626,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/gacha/secret-draw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["secretDraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/gacha/prizes": {
         parameters: {
             query?: never;
@@ -2311,6 +2327,7 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             deliveredAt?: string;
+            secretEvent?: boolean;
         };
         ChangeStatusRequest: {
             status?: string;
@@ -2387,8 +2404,8 @@ export interface components {
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
-            unpaged?: boolean;
             paged?: boolean;
+            unpaged?: boolean;
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"][];
@@ -2443,6 +2460,7 @@ export interface components {
             /** Format: int32 */
             pityStacksAtDraw?: number;
             activityBonus?: number;
+            secretEvent?: boolean;
             /** Format: date-time */
             createdAt?: string;
         };
@@ -4092,6 +4110,34 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     };
+                };
+            };
+        };
+    };
+    secretDraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: Record<string, never>;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    }[];
                 };
             };
         };
