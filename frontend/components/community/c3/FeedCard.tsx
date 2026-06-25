@@ -8,7 +8,7 @@ interface FeedCardProps {
   /** 상대 시간 ("방금" / "12분 전" / "1시간 전") */
   time: string;
   title: string;
-  /** 본문 미리보기 (7줄 clamp) */
+  /** 본문 미리보기 (2줄 clamp) */
   body?: string;
   /** 작성자(피치) 공감 비율 0~100 */
   g: number;
@@ -76,7 +76,7 @@ export function FeedCard({ cat, id, time, title, body, g, votes, c, views, href,
         {/* 제목 bold */}
         <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--L-ink)', marginTop: 12, lineHeight: 1.4 }}>{title}</div>
 
-        {/* 본문 7줄 */}
+        {/* 본문 2줄 */}
         {body && (
           <div
             style={{
@@ -85,7 +85,7 @@ export function FeedCard({ cat, id, time, title, body, g, votes, c, views, href,
               lineHeight: 1.6,
               marginTop: 6,
               display: '-webkit-box',
-              WebkitLineClamp: 7,
+              WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
               whiteSpace: 'pre-wrap',

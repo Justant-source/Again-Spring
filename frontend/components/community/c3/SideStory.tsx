@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 interface SideStoryProps {
   side: 'g' | 'r';
@@ -35,41 +35,95 @@ export function SideStory({
   voted = false,
   voteDisabled = false,
 }: SideStoryProps) {
+  const ELLIPSIS = '......';
   const c = side === 'g' ? 'var(--faction-author)' : 'var(--faction-partner)';
   const cDk = side === 'g' ? 'var(--faction-author-dk)' : 'var(--faction-partner-dk)';
   const bg = side === 'g' ? 'var(--faction-author-bg)' : 'var(--faction-partner-bg)';
   const textRef = useRef<HTMLDivElement | null>(null);
-  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [displayBody, setDisplayBody] = useState(body);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!clamp) {
-      setIsOverflowing(false);
+      setDisplayBody(body);
       return;
     }
 
-    const el = textRef.current;
-    if (!el) return;
+    const visibleEl = textRef.current;
+    if (!visibleEl) return;
 
     let frame = 0;
-    const measure = () => {
+    const measureEl = document.createElement('div');
+    measureEl.style.position = 'absolute';
+    measureEl.style.left = '-99999px';
+    measureEl.style.top = '0';
+    measureEl.style.visibility = 'hidden';
+    measureEl.style.pointerEvents = 'none';
+    measureEl.style.fontSize = '12.5px';
+    measureEl.style.color = 'var(--P-ink)';
+    measureEl.style.lineHeight = '1.65';
+    measureEl.style.fontFamily = 'var(--font-serif)';
+    measureEl.style.whiteSpace = 'pre-wrap';
+    measureEl.style.wordBreak = 'break-word';
+    document.body.appendChild(measureEl);
+
+    // Measure against the real rendered width, then replace the rendered text itself.
+    const updateTruncatedText = () => {
       frame = window.requestAnimationFrame(() => {
-        const next = el.scrollHeight - el.clientHeight > 1;
-        setIsOverflowing((prev) => (prev === next ? prev : next));
+        const width = visibleEl.clientWidth;
+        if (width === 0) return;
+
+        measureEl.style.width = `${width}px`;
+
+        const computed = window.getComputedStyle(measureEl);
+        const lineHeight = Number.parseFloat(computed.lineHeight);
+        if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+          setDisplayBody(body);
+          return;
+        }
+
+        const maxHeight = lineHeight * 7 + 1;
+        const source = body.trimEnd();
+
+        measureEl.textContent = source;
+        if (measureEl.scrollHeight <= maxHeight) {
+          setDisplayBody(body);
+          return;
+        }
+
+        let low = 0;
+        let high = source.length;
+        let bestFit = ELLIPSIS;
+
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          const candidate = `${source.slice(0, mid).trimEnd()}${ELLIPSIS}`;
+          measureEl.textContent = candidate;
+
+          if (measureEl.scrollHeight <= maxHeight) {
+            bestFit = candidate;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+
+        setDisplayBody(bestFit);
       });
     };
 
-    measure();
+    updateTruncatedText();
 
     const observer = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(measure)
+      ? new ResizeObserver(updateTruncatedText)
       : null;
-    observer?.observe(el);
-    window.addEventListener('resize', measure);
+    observer?.observe(visibleEl);
+    window.addEventListener('resize', updateTruncatedText);
 
     return () => {
       window.cancelAnimationFrame(frame);
       observer?.disconnect();
-      window.removeEventListener('resize', measure);
+      window.removeEventListener('resize', updateTruncatedText);
+      measureEl.remove();
     };
   }, [body, clamp]);
 
@@ -140,46 +194,19 @@ export function SideStory({
       </div>
 
       {/* 본문 */}
-      <div style={{ position: 'relative' }}>
-        <div
-          ref={textRef}
-          style={{
-            fontSize: 12.5,
-            color: 'var(--P-ink)',
-            lineHeight: 1.65,
-            fontFamily: 'var(--font-serif)',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            ...(clamp && {
-              display: '-webkit-box',
-              WebkitLineClamp: 7,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }),
-          }}
-        >
-          {body}
-        </div>
-        {clamp && isOverflowing && (
-          <span
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              right: 0,
-              bottom: 0,
-              paddingLeft: 18,
-              background: `linear-gradient(90deg, transparent 0%, ${bg} 28%)`,
-              color: cDk,
-              fontSize: 15,
-              lineHeight: 1,
-              letterSpacing: 1.2,
-              fontFamily: 'var(--font-serif)',
-              pointerEvents: 'none',
-            }}
-          >
-            ......
-          </span>
-        )}
+      <div
+        ref={textRef}
+        data-testid={`side-story-body-${side}`}
+        style={{
+          fontSize: 12.5,
+          color: 'var(--P-ink)',
+          lineHeight: 1.65,
+          fontFamily: 'var(--font-serif)',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}
+      >
+        {displayBody}
       </div>
     </div>
   );

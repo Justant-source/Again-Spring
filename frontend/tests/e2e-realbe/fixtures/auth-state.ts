@@ -29,12 +29,9 @@ export async function saveAuthState(
   const accessToken: string = loginData.token?.accessToken
   const user = loginData.user ?? null
 
-  const page = await context.newPage()
-  await page.goto(baseURL)
-  await page.evaluate(
+  await context.addInitScript(
     ({ t, u }: { t: string; u: unknown }) => {
       localStorage.setItem('again-spring-token', t)
-      // Zustand persist 스토어에 user 데이터 주입 — user=null이면 프로필 페이지가 login으로 redirect됨
       if (u) {
         localStorage.setItem(
           'again-spring-user',
@@ -43,6 +40,13 @@ export async function saveAuthState(
       }
     },
     { t: accessToken, u: user },
+  )
+
+  const page = await context.newPage()
+  await page.goto(baseURL, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(
+    (expectedToken: string) => localStorage.getItem('again-spring-token') === expectedToken,
+    accessToken,
   )
   await page.close()
 

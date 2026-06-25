@@ -21,6 +21,7 @@ import {
 } from '../support/api'
 import {
   INVITE,
+  STORY_BODY,
   STORY_VOTE_BTN,
   VOTE_COMPLETE_BADGE,
 } from '../support/selectors'
@@ -102,7 +103,7 @@ test.describe('Journey 06-C: 상대 초대 → 답변 → 양쪽 완성', () => 
 
     await expect(page.getByText('양쪽 완성 E2E 검증')).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText('작성자').first()).toBeVisible({ timeout: 5_000 })
-    await expect(page.getByText('상대 답변 내용입니다.')).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator(STORY_BODY('r'))).toContainText('상대 답변 내용입니다.', { timeout: 8_000 })
   })
 
   test('URL 직접 접속으로도 paired 사연 양쪽 표시', async ({ page, request }) => {
@@ -117,7 +118,7 @@ test.describe('Journey 06-C: 상대 초대 → 답변 → 양쪽 완성', () => 
     await page.waitForURL(new RegExp(`/community/${postId}$`), { timeout: 12_000 })
 
     await expect(page.getByText('URL 직접 접속 paired 확인')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByText('직접 접속 테스트 답변 내용입니다.')).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator(STORY_BODY('r'))).toContainText('직접 접속 테스트 답변 내용입니다.', { timeout: 8_000 })
   })
 })
 

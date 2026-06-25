@@ -37,6 +37,7 @@ export const NAV_NOTIFICATIONS = '[data-testid="nav-notifications"]'
 export const NAV_ACTIVITY = '[data-testid="nav-activity"]'
 // 투표 (SideStory 우측 끝 버튼 · C3StoryDetail 완료 배지)
 export const STORY_VOTE_BTN = (side: 'g' | 'r') => `[data-testid="story-vote-btn-${side}"]`
+export const STORY_BODY = (side: 'g' | 'r') => `[data-testid="side-story-body-${side}"]`
 export const VOTE_COMPLETE_BADGE = '[data-testid="vote-complete-badge"]'
 // 댓글
 export const COMMENT_BAR_PLACEHOLDER = '댓글을 남겨주세요.'
