@@ -324,11 +324,10 @@ backend/src/main/resources/
 | 새 API 추가 | `api/*Controller.java` + `api/dto/` | `docs/shared/api/rest-spec.md` |
 | 새 DB 컬럼 | `domain/*.java` + `db/migration/V{n+1}__*.sql` | `docs/shared/api/database-schema.md` |
 | Admin API | `api/admin/*Controller.java` | `docs/shared/api/admin.md` |
-| 광장 게시글 | `service/community/CommunityPostService.java` | `docs/shared/api/community.md` |
+| 광장 게시글 | `service/community/CommunityPostService.java` | `docs/shared/api/rest-spec.md` · `docs/shared/api/flows.md` |
 | 보안 정책 | `safety/*.java` + `security/*.java` | `docs/shared/policies/` |
 | 프롬프트 변경 | `docs/shared/prompts/*.md` | `docs/shared/prompts/README.md` |
-| LLM 브릿지 | `llm/remote/*.java` | `backend/docs/llm-bridge.md` |
+| LLM 브릿지 | `llm/remote/*.java` | `docs/backend/llm-bridge.md` |
 | 역할/권한 | `config/UserPermissionsConfig.java` | `docs/shared/policies/user-permissions.md` |
 
 ---
-

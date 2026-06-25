@@ -169,6 +169,7 @@ cd frontend && npm run lint:emoji
 
 | 영역 | 진입점 |
 |---|---|
+| AI agent 개발 가이드 | [`docs/agent-development.md`](docs/agent-development.md) |
 | 문서 지도 + Doc-Sync 트리거맵 | [`docs/_index.md`](docs/_index.md) |
 | 시스템 토폴로지 | [`docs/system.md`](docs/system.md) |
 | 환경 / 배포 / Compose | [`docs/env/README.md`](docs/env/README.md) |

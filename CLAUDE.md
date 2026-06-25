@@ -27,6 +27,7 @@
 
 | 작업 범위 | 코드 위치 | 진입 문서 (이것만 읽기) |
 |---|---|---|
+| AI agent 작업 루프 | — | `docs/agent-development.md` |
 | 시스템 전체 그림 파악 | — | `docs/system.md` |
 | 문서 권위/충돌 해결 | — | `docs/_index.md` |
 | FE 기능/UI | `frontend/` | `docs/frontend/README.md` |
@@ -141,4 +142,4 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build  # 
 
 ---
 
-**마지막 업데이트**: 2026-06-12 | **담당**: Claude Code (Agent)
+**마지막 업데이트**: 2026-06-25 | **담당**: Claude Code (Agent)

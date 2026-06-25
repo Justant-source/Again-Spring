@@ -3,7 +3,7 @@
 > **"다시 봄. 다시 바라봄."**  
 > 갈등 커뮤니티 플랫폼. 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공하는 웹앱입니다.
 
-본 디렉토리는 Next.js 14 기반의 **프로토타입** 프론트엔드 개발 문서입니다.
+본 디렉토리는 Next.js 14 기반 프론트엔드 개발 문서입니다.
 
 ---
 
@@ -116,7 +116,7 @@ npm run lint:words    # exit 0: 통과, exit 1: 금지어 발견
 
 ### 4. 대기관 정책
 
-모든 서비스 정책(금지어, 위기 감지, 카테고리, 온보딩 매핑, 화해 기여도 계산, ToS)의 **권위본은 `../shared/policies/` 와 `../shared/v1/`** 에 있습니다.
+모든 서비스 정책(금지어, 위기 감지, 카테고리, 권한, 약관)의 **권위본은 `../shared/policies/`** 에 있습니다.
 
 FE는 이들을 **참조하고 구현**할 뿐, 독립적으로 정의하지 않습니다.
 
@@ -135,7 +135,7 @@ FE는 이들을 **참조하고 구현**할 뿐, 독립적으로 정의하지 않
 
 - [ ] `npm run build` 성공 (no errors)
 - [ ] `npm run lint:words` 최종 확인
-- [ ] 전체 플로우 (온보딩 → 광장 게시 → 배심원 → 투표/댓글) 수동 테스트
+- [ ] 전체 플로우 (광장 게시 → 배심원 → 투표/댓글) 수동 테스트
 - [ ] 모바일 반응형 (PhoneFrame) 확인
 - [ ] 댓글 무한스크롤 테스트
 
@@ -152,23 +152,21 @@ frontend/
 ├── app/                   # Next.js App Router 페이지
 │   ├── page.tsx           # / (랜딩)
 │   ├── auth/              # 가입/로그인
-│   ├── (onboarding)/      # 온보딩 플로우
 │   ├── community/         # 광장 피드·게시·댓글
-│   ├── (dashboard)/       # 이력·프로필
+│   ├── (dashboard)/       # 프로필
 │   └── globals.css        # 공통 스타일
 │
 ├── components/            # React 컴포넌트
 │   ├── shared/            # Logo, PhoneFrame
-│   ├── onboarding/        # LikertQuestion
 │   ├── community/c3/      # 광장 컴포넌트 (FeedCard, JurorCard, VoteBar, CommentBar)
 │   └── ui/                # 기본 UI (Radix)
 │
 ├── lib/
 │   ├── api/               # axios client + interceptor
-│   ├── store/             # Zustand (user, session)
-│   ├── constants/         # 상수 (카테고리, 온보딩, 금지어)
+│   ├── store/             # Zustand UI state
+│   ├── constants/         # 상수 (카테고리, 권한, 금지어)
 │   ├── types/             # TypeScript 타입
-│   └── utils/             # 헬퍼 (keywordGuard, ratio, etc)
+│   └── utils/             # 헬퍼 (style, className, ratio 등)
 │
 ├── mocks/                 # MSW Mock API
 │   ├── handlers/          # 라우트별 핸들러
@@ -178,15 +176,6 @@ frontend/
 │   ├── handoff/           # Claude Design 원본 (참조용)
 │   └── mockups/           # Claude Design 결과 캡처 저장
 │
-├── docs/                  # ← 본 문서
-│   ├── structure.md
-│   ├── architecture.md
-│   ├── testing.md         # 테스트 전략 + Mock API 시나리오
-│   ├── design/            # 디자인 시스템 (V14)
-│   ├── ux/                # UX 원칙·체크리스트
-│   │   └── flows/         # as-is UX 흐름 문서 (9개 주제, mermaid)
-│   └── policies/          # 금지어, 위기 감지
-│
 ├── scripts/
 │   └── check-forbidden-words.js   # npm run lint:words
 │
@@ -194,11 +183,12 @@ frontend/
     └── mockServiceWorker.js       # MSW 자동 생성
 ```
 
+상세 파일 구조와 삭제된 legacy 경로는 [structure.md](./structure.md)를 기준으로 확인합니다.
+프론트엔드 문서는 `frontend/` 내부가 아니라 루트 [`docs/frontend/`](./) 아래에 있습니다.
+
 ---
 
-## 다음 단계
-
-### 프로토타입 완성도
+## 현재 완성도
 
 - ✅ Next.js 14 + TypeScript + Tailwind
 - ✅ MSW Mock API
@@ -245,4 +235,3 @@ frontend/
 ---
 
 **이제 [structure.md](./structure.md)를 읽어 폴더 구조를 파악하거나, [architecture.md](./architecture.md)로 기술 스택을 이해하세요.**
-

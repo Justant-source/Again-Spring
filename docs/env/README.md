@@ -1,4 +1,4 @@
-# env/docs — 배포 · 인프라 · 환경
+# docs/env — 배포 · 인프라 · 환경
 
 다시봄(Again Spring) 인프라 배포 관련 모든 문서의 인덱스입니다.
 
@@ -26,9 +26,9 @@
 ## 다른 문서와의 관계
 
 - **API / DB / LLM**: `docs/shared/` 참조
-- **백엔드 코드**: `backend/docs/` 참조
-- **프론트엔드 코드**: `frontend/docs/` 참조
-- **배포/환경**: 이 디렉토리 (env/docs/)
+- **백엔드 코드**: `docs/backend/` 참조
+- **프론트엔드 코드**: `docs/frontend/` 참조
+- **배포/환경**: 이 디렉토리 (`docs/env/`)
 
 ## 빠른 시작
 

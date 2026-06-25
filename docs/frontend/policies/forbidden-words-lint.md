@@ -97,7 +97,7 @@ frontend/
 아동학대: "아이를 때", "아동학대"
 ```
 
-감지 시 → `CrisisResourceModal` 즉시 표시. 위기 처리 흐름: `frontend/docs/ux/flows/08-crisis.md`
+감지 시 → `CrisisResourceModal` 즉시 표시. 위기 처리 흐름: `docs/frontend/ux/flows/08-crisis.md`
 
 ---
 
@@ -220,4 +220,3 @@ const text = "금지된 단어... (예외적으로 필요한 경우만)";
 2. `lib/constants/forbiddenWords.ts` 동기화
 3. `scripts/check-forbidden-words.js` 규칙 업데이트
 4. `npm run lint:words` 재실행
-

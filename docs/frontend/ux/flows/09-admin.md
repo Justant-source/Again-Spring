@@ -1,6 +1,6 @@
 # 관리자 흐름
 
-**위치**: `frontend/docs/ux/flows/09-admin.md`  
+**위치**: `docs/frontend/ux/flows/09-admin.md`  
 **자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [../principles.md](../principles.md)  
 **기준일**: 2026-06-03
 

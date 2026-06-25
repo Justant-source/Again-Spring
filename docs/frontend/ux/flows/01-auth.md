@@ -1,6 +1,6 @@
 # 인증 흐름
 
-**위치**: `frontend/docs/ux/flows/01-auth.md`  
+**위치**: `docs/frontend/ux/flows/01-auth.md`  
 **자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [../principles.md](../principles.md)  
 **기준일**: 2026-05-16  
 **성격**: as-is 현행 기준

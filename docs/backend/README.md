@@ -1,4 +1,4 @@
-# backend/docs — BE 특화
+# docs/backend — BE 특화
 
 다시봄 백엔드(Spring Boot 3.3 + Java 21 + MariaDB) 내부 문서. 이 디렉토리는 백엔드 구현 세부 사항을 다룹니다.
 
@@ -26,4 +26,4 @@ cd backend
 ./gradlew test           # 전체 테스트
 ```
 
-자세한 로컬 개발 환경/도커 절차는 `../../env/docs/local-dev.md` 참조.
+자세한 로컬 개발 환경/도커 절차는 [`../env/local-dev.md`](../env/local-dev.md)를 참조.

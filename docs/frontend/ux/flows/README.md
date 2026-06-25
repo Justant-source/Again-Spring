@@ -1,6 +1,6 @@
 # UX 흐름 인덱스 — 광장형
 
-**위치**: `frontend/docs/ux/flows/README.md`  
+**위치**: `docs/frontend/ux/flows/README.md`  
 **자매 문서**: [../principles.md](../principles.md) · [../../architecture.md](../../architecture.md)  
 **기준일**: 2026-06-03  
 **성격**: as-is 현행 기준 — 광장형 모델 기준으로 서술.
@@ -162,4 +162,3 @@ flowchart TD
 | **온보딩** | 10문항 + 선택 | 제거됨 |
 
 ---
-

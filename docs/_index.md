@@ -11,6 +11,7 @@
 
 | 모듈 | 경로 | 설명 |
 |---|---|---|
+| AI agent 개발 가이드 | `docs/agent-development.md` | 작업 시작 루프·legacy 금지 경로·검증 명령 |
 | 시스템 전체 | `docs/system.md` | L1 컨텍스트 + L2 토폴로지 다이어그램 (권위본) |
 | FE | `docs/frontend/` | Next.js 14 — 디자인 시스템·UX 원칙·구조·테스트 |
 | BE | `docs/backend/` | Spring Boot 3.3 — llm-bridge·아키텍처·테스트 |

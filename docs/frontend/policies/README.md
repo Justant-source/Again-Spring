@@ -90,6 +90,5 @@ KeywordGuard [서버]
 
 1. `../shared/policies/` 수정
 2. `frontend/lib/constants/` 데이터 동기화
-3. `frontend/docs/policies/` 구현 가이드 업데이트
+3. `docs/frontend/policies/` 구현 가이드 업데이트
 4. (필요 시) BE 규칙도 함께 업데이트
-

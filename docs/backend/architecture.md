@@ -172,7 +172,7 @@ flowchart LR
 | `RateLimitFilter` | bucket4j 기반 IP/유저별 제한 | [`shared/policies/auth.md`](../shared/policies/auth.md) |
 | `KeywordGuard` | 금지어 검사 (입력+응답 양방향) | [`shared/policies/forbidden-words.md`](../shared/policies/forbidden-words.md) |
 | `CrisisDetector` | 위기 키워드 감지 → 관리자 알림 | `docs/shared/policies/forbidden-words.md` |
-| `PromptSanitizer` | LLM 입력 inject 방지 | `backend/docs/llm-bridge.md` |
+| `PromptSanitizer` | LLM 입력 inject 방지 | `docs/backend/llm-bridge.md` |
 | `RatioEnforcer` | 공감 비율 범위 강제 (0~100%) | `docs/shared/policies/forbidden-words.md` |
 | `SafetyAuditLogger` | 모든 safety 이벤트 마스킹 후 DB | — |
 
