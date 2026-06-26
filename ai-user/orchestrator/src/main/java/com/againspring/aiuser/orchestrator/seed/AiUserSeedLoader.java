@@ -62,6 +62,7 @@ public class AiUserSeedLoader {
             if (count != null && count > 0) {
                 log.info("AI users already seeded. Skipping anchor seed.");
                 markSyntheticFlag();
+                repairBotUserAccounts();
                 // 앵커 시드 스킵해도 PersonaFactory는 항상 실행 (부족분 생성)
                 try {
                     personaFactory.ensureCount(props.getPersonaTarget());
@@ -174,6 +175,7 @@ public class AiUserSeedLoader {
 
         // Mark synthetic flag
         markSyntheticFlag();
+        repairBotUserAccounts();
 
         // LLM으로 부족분 페르소나 생성
         try {
@@ -347,6 +349,49 @@ public class AiUserSeedLoader {
             if (updated > 0) log.info("markSyntheticFlag: {} users marked as synthetic=1", updated);
         } catch (Exception e) {
             log.debug("synthetic column not available yet (V59 pending): {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Runtime repair for the invariant personas.id == users.id.
+     *
+     * Existing deployments may have personas without matching users, or bot users
+     * hashed with an older AI_USER_BOT_PASSWORD. Repairing on boot keeps lazy bot
+     * login deterministic after env/password rotation.
+     */
+    private void repairBotUserAccounts() {
+        String hashedPassword = PASSWORD_ENCODER.encode(props.getBotPassword());
+        try {
+            int inserted = jdbcTemplate.update(
+                "INSERT INTO users (id, email, password_hash, nickname, roles, " +
+                "is_guest, must_change_password, synthetic, status, created_at, updated_at) " +
+                "SELECT p.id, CONCAT('ai-user-recovered-', LEFT(p.id, 12), '@againspring.internal'), " +
+                "?, p.nickname, '[\"USER\"]', 0, 0, 1, 'ACTIVE', NOW(3), NOW(3) " +
+                "FROM personas p " +
+                "LEFT JOIN users u ON u.id = p.id " +
+                "WHERE u.id IS NULL",
+                hashedPassword
+            );
+
+            int updated = jdbcTemplate.update(
+                "UPDATE users u " +
+                "JOIN personas p ON p.id = u.id " +
+                "SET u.password_hash = ?, " +
+                "    u.nickname = COALESCE(NULLIF(p.nickname, ''), u.nickname), " +
+                "    u.synthetic = 1, " +
+                "    u.must_change_password = 0, " +
+                "    u.is_guest = 0, " +
+                "    u.status = 'ACTIVE', " +
+                "    u.deleted_at = NULL, " +
+                "    u.updated_at = NOW(3)",
+                hashedPassword
+            );
+
+            if (inserted > 0 || updated > 0) {
+                log.info("repairBotUserAccounts: inserted={} updated={}", inserted, updated);
+            }
+        } catch (Exception e) {
+            log.warn("repairBotUserAccounts failed: {}", e.getMessage());
         }
     }
 
