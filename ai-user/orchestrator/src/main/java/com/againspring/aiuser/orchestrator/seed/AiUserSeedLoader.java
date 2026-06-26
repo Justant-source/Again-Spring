@@ -356,42 +356,64 @@ public class AiUserSeedLoader {
      * Runtime repair for the invariant personas.id == users.id.
      *
      * Existing deployments may have personas without matching users, or bot users
-     * hashed with an older AI_USER_BOT_PASSWORD. Repairing on boot keeps lazy bot
-     * login deterministic after env/password rotation.
+     * hashed with an older AI_USER_BOT_PASSWORD. Runtime DB schema does not carry
+     * nickname/email separately on personas, so repair must source those fields from
+     * the mounted profile.yml files.
      */
     private void repairBotUserAccounts() {
+        File profilesDir = new File(props.getPersonasDir() + "/profiles");
+        File[] profileDirs = profilesDir.listFiles(
+            dir -> dir.isDirectory() && new File(dir, "profile.yml").exists()
+        );
+        if (profileDirs == null || profileDirs.length == 0) {
+            log.warn("repairBotUserAccounts skipped: no profile.yml found under {}", profilesDir.getAbsolutePath());
+            return;
+        }
+
         String hashedPassword = PASSWORD_ENCODER.encode(props.getBotPassword());
-        try {
-            int inserted = jdbcTemplate.update(
-                "INSERT INTO users (id, email, password_hash, nickname, roles, " +
-                "is_guest, must_change_password, synthetic, status, created_at, updated_at) " +
-                "SELECT p.id, CONCAT('ai-user-recovered-', LEFT(p.id, 12), '@againspring.internal'), " +
-                "?, p.nickname, '[\"USER\"]', 0, 0, 1, 'ACTIVE', NOW(3), NOW(3) " +
-                "FROM personas p " +
-                "LEFT JOIN users u ON u.id = p.id " +
-                "WHERE u.id IS NULL",
-                hashedPassword
-            );
+        Yaml yaml = new Yaml();
+        int inserted = 0;
+        int updated = 0;
 
-            int updated = jdbcTemplate.update(
-                "UPDATE users u " +
-                "JOIN personas p ON p.id = u.id " +
-                "SET u.password_hash = ?, " +
-                "    u.nickname = COALESCE(NULLIF(p.nickname, ''), u.nickname), " +
-                "    u.synthetic = 1, " +
-                "    u.must_change_password = 0, " +
-                "    u.is_guest = 0, " +
-                "    u.status = 'ACTIVE', " +
-                "    u.deleted_at = NULL, " +
-                "    u.updated_at = NOW(3)",
-                hashedPassword
-            );
-
-            if (inserted > 0 || updated > 0) {
-                log.info("repairBotUserAccounts: inserted={} updated={}", inserted, updated);
+        for (File profileDir : profileDirs) {
+            File profileFile = new File(profileDir, "profile.yml");
+            Map<String, Object> profile;
+            try (FileInputStream is = new FileInputStream(profileFile)) {
+                profile = yaml.load(is);
+            } catch (Exception e) {
+                log.warn("repairBotUserAccounts: failed to parse {}: {}", profileFile.getAbsolutePath(), e.getMessage());
+                continue;
             }
-        } catch (Exception e) {
-            log.warn("repairBotUserAccounts failed: {}", e.getMessage());
+
+            String id = str(profile.get("id"));
+            String email = str(profile.get("email"));
+            String nickname = str(profile.get("nickname"));
+            if (id == null || email == null || nickname == null) {
+                log.warn("repairBotUserAccounts: skipping incomplete profile {}", profileFile.getAbsolutePath());
+                continue;
+            }
+
+            try {
+                inserted += jdbcTemplate.update(
+                    "INSERT IGNORE INTO users (id, email, password_hash, nickname, roles, " +
+                    "is_guest, must_change_password, synthetic, status, created_at, updated_at) " +
+                    "VALUES (?, ?, ?, ?, '[\"USER\"]', 0, 0, 1, 'ACTIVE', NOW(3), NOW(3))",
+                    id, email, hashedPassword, nickname
+                );
+
+                updated += jdbcTemplate.update(
+                    "UPDATE users SET password_hash = ?, nickname = ?, synthetic = 1, " +
+                    "must_change_password = 0, is_guest = 0, status = 'ACTIVE', " +
+                    "deleted_at = NULL, updated_at = NOW(3) WHERE id = ?",
+                    hashedPassword, nickname, id
+                );
+            } catch (Exception e) {
+                log.warn("repairBotUserAccounts: failed for {}: {}", id, e.getMessage());
+            }
+        }
+
+        if (inserted > 0 || updated > 0) {
+            log.info("repairBotUserAccounts: inserted={} updated={}", inserted, updated);
         }
     }
 
