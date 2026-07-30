@@ -24,8 +24,10 @@ import {
 import { AdminTable } from '@/components/admin/AdminTable';
 import { AdminPagination } from '@/components/admin/AdminPagination';
 import { AdminSection } from '@/components/admin/AdminSection';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { SuspendUserDialog } from '@/components/admin/users/SuspendUserDialog';
 import { AnonymizeUserDialog } from '@/components/admin/users/AnonymizeUserDialog';
+import { formatDate } from '@/lib/utils/adminFormat';
 import { toast } from 'sonner';
 
 const STATUS_FILTERS = [
@@ -219,7 +221,7 @@ export default function UsersPage() {
     {
       key: 'createdAt',
       header: '가입일',
-      render: (user: AdminUserListItem) => new Date(user.createdAt).toLocaleDateString('ko-KR'),
+      render: (user: AdminUserListItem) => formatDate(user.createdAt),
     },
     {
       key: 'actions',
@@ -263,12 +265,14 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">회원 관리</h1>
-        <Button onClick={handleExport} variant="outline">
-          CSV 내보내기
-        </Button>
-      </div>
+      <AdminPageHeader
+        title="회원 관리"
+        action={
+          <Button onClick={handleExport} variant="outline">
+            CSV 내보내기
+          </Button>
+        }
+      />
 
       <AdminSection title="검색 및 필터">
         <div className="space-y-4">

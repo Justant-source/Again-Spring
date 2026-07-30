@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AdminSection } from '@/components/admin/AdminSection';
 import {
   Table,
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatDate } from '@/lib/utils/adminFormat';
 import {
   getAnnouncements,
   deleteAnnouncement,
@@ -91,18 +93,21 @@ export default function AnnouncementsPage() {
   };
 
   return (
-    <AdminSection title="공지사항 관리">
-      <div className="mb-6 flex justify-end">
-        <Link href="/admin/announcements/new">
-          <Button>새 공지 작성</Button>
-        </Link>
-      </div>
+    <>
+      <AdminPageHeader
+        title="공지사항 관리"
+        action={
+          <Link href="/admin/announcements/new">
+            <Button>새 공지 작성</Button>
+          </Link>
+        }
+      />
 
       <Card className="p-6">
         {loading ? (
-          <div className="text-center text-gray-500">로드 중...</div>
+          <div className="text-center text-gray-500">불러오는 중…</div>
         ) : announcements.length === 0 ? (
-          <div className="text-center text-gray-400">공지사항이 없습니다.</div>
+          <div className="text-center text-gray-400">데이터 없음</div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -145,27 +150,13 @@ export default function AnnouncementsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {announcement.startsAt
-                          ? new Date(
-                              announcement.startsAt
-                            ).toLocaleDateString('ko-KR')
-                          : '-'}
+                        {formatDate(announcement.startsAt) || '-'}
                       </TableCell>
                       <TableCell>
-                        {announcement.endsAt
-                          ? new Date(
-                              announcement.endsAt
-                            ).toLocaleDateString('ko-KR')
-                          : '-'}
+                        {formatDate(announcement.endsAt) || '-'}
                       </TableCell>
                       <TableCell>
-                        {new Date(announcement.createdAt).toLocaleDateString(
-                          'ko-KR',
-                          {
-                            month: 'short',
-                            day: 'numeric',
-                          }
-                        )}
+                        {formatDate(announcement.createdAt)}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
@@ -241,6 +232,6 @@ export default function AnnouncementsPage() {
           </>
         )}
       </Card>
-    </AdminSection>
+    </>
   );
 }

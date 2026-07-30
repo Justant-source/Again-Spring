@@ -20,7 +20,7 @@ flowchart TD
         C1["AuthController\nOAuth2Controller\nHealthController"]
         C2["CommunityPostController\nCommunityCommentController\nPostInviteController"]
         C3["NotificationController\nUserController\nFeedbackController"]
-        C4["admin/: AdminDashboardController\nAdminUserController\nAdminHealthController\nAdminCommunityController\nAdminFeedbackController\nAdminPromptsController"]
+        C4["admin/: AdminDashboardController\nAdminUserController\nAdminHealthController\nAdminFeedbackController\nAdminPromptsController"]
     end
 
     subgraph SVC["service/ — 비즈니스 로직"]
@@ -88,8 +88,7 @@ com.againspring/
 │   ├── admin/
 │   │   ├── AdminDashboardController    # GET /api/admin/dashboard/{summary,daily-stats,retention}
 │   │   ├── AdminHealthController       # GET /api/admin/health/system
-│   │   ├── AdminUserController         # GET/DELETE/PATCH /api/admin/users/**
-│   │   └── AdminCommunityController    # /api/admin/posts, /api/admin/comments
+│   │   └── AdminUserController         # GET/DELETE/PATCH /api/admin/users/**
 │   ├── AdminFeedbackController         # GET/PATCH /api/admin/feedbacks/**
 │   ├── AdminPromptsController          # POST /api/admin/prompts/reload (app.admin.enabled)
 │   ├── AuthController                  # /api/auth/{signup,login,guest,logout,agree,forgot-password,reset-password}

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminSection } from '@/components/admin/AdminSection';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { ActionFeed } from '@/components/admin/ai-user/ActionFeed';
 import { PersonaPerformanceTable } from '@/components/admin/ai-user/PersonaPerformanceTable';
 import { HourlyDistributionChart } from '@/components/admin/ai-user/HourlyDistributionChart';
@@ -27,7 +28,7 @@ import {
 import {
   Cpu, Zap, Power, Save, AlertTriangle, AlertCircle, Info, RefreshCw,
 } from 'lucide-react';
-import { AnthropicApiKeyPanel, AnthropicBaseUrlPanel } from '@/components/admin/ai-rules/AnthropicApiPanels';
+import { formatDate } from '@/lib/utils/adminFormat';
 
 // ── §11.5 클라이언트 측 추정 상수 ────────────────────────────────────────
 // 실측 기준 (ClaudeApiInvoker 로그 avg): input ~4600, output ~100
@@ -417,24 +418,18 @@ export default function AiUserPage() {
   return (
     <div className="space-y-6 max-w-6xl">
 
-      {/* 페이지 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Cpu className="h-6 w-6 text-blue-600" />
-            AI 생성 관제
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            일일 생성량·백엔드를 실시간 조정하고 토큰·비용 추정을 확인합니다.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge className={allOff ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}>
-            {allOff ? '전체 OFF' : '활성'}
-          </Badge>
-          <span className="text-sm text-gray-400">오늘 {est.callsPerDay} 콜 예상</span>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="AI 생성 관제"
+        description="일일 생성량·백엔드를 실시간 조정하고 토큰·비용 추정을 확인합니다."
+        action={
+          <div className="flex items-center gap-2">
+            <Badge className={allOff ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}>
+              {allOff ? '전체 OFF' : '활성'}
+            </Badge>
+            <span className="text-sm text-gray-400">오늘 {est.callsPerDay} 콜 예상</span>
+          </div>
+        }
+      />
 
       {/* 에러 / 성공 메시지 */}
       {error    && <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -445,7 +440,6 @@ export default function AiUserPage() {
         <TabsList>
           <TabsTrigger value="settings">생성 설정</TabsTrigger>
           <TabsTrigger value="monitor">실시간 관제</TabsTrigger>
-          <TabsTrigger value="api-settings">기존 API 설정</TabsTrigger>
         </TabsList>
 
         <TabsContent value="settings" className="mt-6">
@@ -813,16 +807,6 @@ export default function AiUserPage() {
             <PersonaPerformanceTable />
           </div>
           <HourlyDistributionChart />
-        </TabsContent>
-
-        <TabsContent value="api-settings" className="mt-6 space-y-4">
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 space-y-1">
-            <p className="font-semibold">기존 Claude / Anthropic API 설정</p>
-            <p>기존 수정 분석 등 API 직접 호출 기능의 호환 설정입니다. 새 계획형 AI 사용자 생성에는 사용되지 않습니다.</p>
-            <p>계획형 생성 제공자는 위의 Claude/Codex 선택과 연결된 CLI 세션으로만 관리합니다.</p>
-          </div>
-          <AnthropicBaseUrlPanel />
-          <AnthropicApiKeyPanel />
         </TabsContent>
       </Tabs>
     </div>

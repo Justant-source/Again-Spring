@@ -135,17 +135,16 @@ flowchart TD
 
 **광장형 영향**: 게시글 작성 권한 추가 (registered+)
 
-### [08-crisis.md](./08-crisis.md) — 전면 재작성 필요
+### [08-crisis.md](./08-crisis.md) — 전면 재작성 필요 (2026-07-30: 죽은 참조만 수정, 나머지 재작성 여전히 필요)
 **구 모델**: 입력 차단 → 세션 즉시 중단  
-**신 모델**: 사용자 입력 필터 미적용 → 관리자 위기 마크 설정  
+**신 모델**: 사용자 입력 필터 미적용 → 자동 위기 감지(`CrisisDetector`) + `/admin/crisis` 관제  
 재작성 예정 사항:
 - CrisisResourceModal (ESC/바깥클릭 차단 불변)
-- 관리자 admin crisis flag
 - 상시 핫라인 리소스
 
-### [09-admin.md](./09-admin.md) — 전면 재작성 필요
+### [09-admin.md](./09-admin.md) — 전면 재작성 필요 (2026-07-30: 사이드바 5그룹·`/admin/community` 삭제만 반영, 나머지 재작성 여전히 필요)
 **신 콘텐츠**: 
-- `(admin)/admin/community/` — 광장 관리 (게시글, 댓글, 위기 마크)
+- `(admin)/admin/reports/` — 신고 처리 (구 광장 관리 `/admin/community` 기능 통합, 2026-07-30 중복 삭제)
 - `(admin)/admin/marketing/**` — 마케팅 대시보드 (5섹션)
 
 ---

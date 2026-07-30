@@ -39,7 +39,9 @@ import {
   AdminComment,
 } from '@/lib/api/admin/content';
 import { AdminSection } from '@/components/admin/AdminSection';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AiImproveDialog } from '@/components/admin/content/AiImproveDialog';
+import { formatDate, formatNumber } from '@/lib/utils/adminFormat';
 import { MoreVertical, ExternalLink, Sparkles, Zap, GitCompare } from 'lucide-react';
 
 const COMMENT_STATUS_LABELS: Record<string, { label: string; variant: any }> = {
@@ -225,7 +227,9 @@ export default function AdminContentPage() {
   };
 
   return (
-    <AdminSection title="콘텐츠 관리">
+    <div className="space-y-6">
+      <AdminPageHeader title="콘텐츠 관리" />
+
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
         <TabsList>
           <TabsTrigger value="posts">게시글</TabsTrigger>
@@ -319,14 +323,14 @@ export default function AdminContentPage() {
                 {
                   key: 'viewCount',
                   header: '조회수',
-                  render: (row) => <span>{row.viewCount || 0}</span>,
+                  render: (row) => <span>{formatNumber(row.viewCount || 0)}</span>,
                 },
                 {
                   key: 'createdAt',
                   header: '등록일',
                   render: (row) => (
                     <span className="text-xs text-gray-600">
-                      {new Date(row.createdAt).toLocaleDateString('ko-KR')}
+                      {formatDate(row.createdAt)}
                     </span>
                   ),
                 },
@@ -496,7 +500,7 @@ export default function AdminContentPage() {
                   header: '등록일',
                   render: (row) => (
                     <span className="text-xs text-gray-600">
-                      {new Date(row.createdAt).toLocaleDateString('ko-KR')}
+                      {formatDate(row.createdAt)}
                     </span>
                   ),
                 },
@@ -602,6 +606,6 @@ export default function AdminContentPage() {
           alert('마케팅 제작을 요청했습니다. 마케팅 잡 관리에서 진행상황을 확인할 수 있습니다.');
         }}
       />
-    </AdminSection>
+    </div>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
-import { AdminSection } from '@/components/admin/AdminSection';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -183,20 +183,12 @@ export default function MarketingJobsPage() {
   };
 
   return (
-    <AdminSection title="마케팅">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="jobs">마케팅 잡</TabsTrigger>
-          <TabsTrigger value="credentials">플랫폼 계정</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="jobs">
-          <div className="mb-4 space-y-4">
-            <p className="text-sm text-gray-500">
-              사연을 선택하고 ASM(Again-Spring-Marketing) 서버에 콘텐츠 생성을 요청합니다.
-            </p>
-
-            <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <AdminPageHeader
+        title="마케팅"
+        action={
+          activeTab === 'jobs' && (
+            <div className="flex items-center gap-2">
               <RefreshControl
                 onRefresh={() => {
                   loadJobs(true);
@@ -209,6 +201,20 @@ export default function MarketingJobsPage() {
                 + 새 마케팅 잡
               </Button>
             </div>
+          )
+        }
+      />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="jobs">마케팅 잡</TabsTrigger>
+          <TabsTrigger value="credentials">플랫폼 계정</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="jobs">
+          <div className="mb-4">
+            <p className="text-sm text-gray-500">
+              사연을 선택하고 ASM(Again-Spring-Marketing) 서버에 콘텐츠 생성을 요청합니다.
+            </p>
           </div>
 
           {error && (
@@ -357,6 +363,6 @@ export default function MarketingJobsPage() {
         onClose={() => setPickerDialogOpen(false)}
         onSelect={handlePickPost}
       />
-    </AdminSection>
+    </div>
   );
 }

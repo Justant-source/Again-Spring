@@ -196,7 +196,6 @@ frontend/
 
 ### 실재 하는 것
 - `app/community/**` — 광장 피드·상세·작성
-- `app/(admin)/admin/community/` — 광장 관리
 - `app/(admin)/admin/marketing/**` — 마케팅 대시보드
 - `components/community/c3/` — FeedCard, JurorCard, SearchPanel, BrandBar 등 12개 컴포넌트
 - `lib/api/community.ts` + `lib/api/user.ts` — API 클라이언트

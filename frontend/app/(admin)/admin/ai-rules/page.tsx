@@ -17,6 +17,7 @@ import {
 import { AdminTable } from '@/components/admin/AdminTable';
 import { AdminPagination } from '@/components/admin/AdminPagination';
 import { AdminSection } from '@/components/admin/AdminSection';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import {
   listGlobalRules,
   createGlobalRule,
@@ -37,6 +38,7 @@ import {
   AnalyzeResponse,
 } from '@/lib/api/admin/corrections';
 import { Sparkles, Plus, Trash2, Power, BrainCircuit, CheckCheck, SkipForward, ChevronDown, ChevronUp, Zap, FileText, Save, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
+import { formatDate } from '@/lib/utils/adminFormat';
 import { BatchAnalysisReviewDialog } from '@/components/admin/ai-rules/BatchAnalysisReviewDialog';
 import { startBatchAnalysis, getBatchAnalysisJob, type BatchJobSnapshot } from '@/lib/api/admin/corrections';
 
@@ -161,7 +163,7 @@ function HistoryRow({
 
         {/* 관리자 의견 + 날짜 */}
         <div className="shrink-0 text-xs text-muted-foreground space-y-0.5">
-          <div>{new Date(row.createdAt).toLocaleDateString('ko-KR')}</div>
+          <div>{formatDate(row.createdAt)}</div>
           {row.adminOpinion && (
             <div className="flex items-start gap-1 max-w-[120px]">
               <MessageSquare className="h-3 w-3 text-purple-400 shrink-0 mt-0.5" />
@@ -392,7 +394,7 @@ function PromptTemplateEditor({
         <div className="flex items-center gap-2">
           {tpl.updatedBy && (
             <span className="text-xs text-muted-foreground">
-              마지막 수정: {tpl.updatedBy} · {tpl.updatedAt ? new Date(tpl.updatedAt).toLocaleDateString('ko-KR') : '-'}
+              마지막 수정: {tpl.updatedBy} · {formatDate(tpl.updatedAt)}
             </span>
           )}
           <Button
@@ -583,11 +585,12 @@ export default function AiRulesPage() {
       onClose={() => { setReviewOpen(false); setReviewSnapshot(null); }}
       onApplied={() => { setReviewOpen(false); setReviewSnapshot(null); loadHistory(0); loadRules(0); loadCautions(0); }}
     />
-    <AdminSection title="AI 규칙 관리">
-      <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-        <Sparkles className="h-4 w-4 text-purple-500" />
-        관리자 수정·AI 개선으로 생성된 학습 데이터를 관리합니다.
-      </div>
+    <AdminPageHeader
+      title="AI 규칙 관리"
+      description="관리자 수정·AI 개선으로 생성된 학습 데이터를 관리합니다."
+      action={<Sparkles className="h-4 w-4 text-purple-500" />}
+    />
+    <div className="space-y-6">
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">{error}</div>
@@ -756,7 +759,7 @@ export default function AiRulesPage() {
                 { key: 'scope', header: '범위', render: (row) => <Badge variant="outline">{SCOPE_LABELS[row.scope] || row.scope}</Badge> },
                 { key: 'active', header: '상태', render: (row) => <Badge variant={row.active ? 'default' : 'secondary'}>{row.active ? '활성' : '비활성'}</Badge> },
                 { key: 'sourceCorrectionId', header: '출처', render: (row) => <span className="text-xs text-muted-foreground">{row.sourceCorrectionId ? `첨삭 #${row.sourceCorrectionId}` : '수동'}</span> },
-                { key: 'createdAt', header: '생성일', render: (row) => <span className="text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleDateString('ko-KR')}</span> },
+                { key: 'createdAt', header: '생성일', render: (row) => <span className="text-xs text-muted-foreground">{formatDate(row.createdAt)}</span> },
                 {
                   key: 'actions', header: '액션',
                   render: (row) => (
@@ -794,7 +797,7 @@ export default function AiRulesPage() {
                 { key: 'personaId', header: '페르소나', render: (row) => <span className="text-xs font-mono text-muted-foreground truncate block max-w-[100px]">{row.personaId}</span> },
                 { key: 'personaCaution', header: '주의사항', render: (row) => <span className="text-sm">{row.personaCaution || '(없음)'}</span> },
                 { key: 'targetType', header: '대상', render: (row) => <Badge variant="secondary">{row.targetType}</Badge> },
-                { key: 'createdAt', header: '첨삭일', render: (row) => <span className="text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleDateString('ko-KR')}</span> },
+                { key: 'createdAt', header: '첨삭일', render: (row) => <span className="text-xs text-muted-foreground">{formatDate(row.createdAt)}</span> },
                 {
                   key: 'actions', header: '액션',
                   render: (row) => (
@@ -832,7 +835,7 @@ export default function AiRulesPage() {
         </TabsContent>
 
       </Tabs>
-    </AdminSection>
+    </div>
     </>
   );
 }

@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { listAuditLogs, type AdminAuditLogResponse, type AuditLogParams } from '@/lib/api/admin/audit';
 import { Badge } from '@/components/ui/badge';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { AdminTable } from '@/components/admin/AdminTable';
+import { AdminPagination } from '@/components/admin/AdminPagination';
+import { formatDateTime } from '@/lib/utils/adminFormat';
 import type { PageResponse } from '@/lib/api/admin';
 
 export default function AuditPage() {
@@ -39,7 +43,7 @@ export default function AuditPage() {
   }, [isAuthorizedAdmin, router, filters]);
 
   if (loading) {
-    return <div style={{ padding: 40, fontFamily: 'sans-serif' }}>로딩 중...</div>;
+    return <div style={{ padding: 40, fontFamily: 'sans-serif' }}>불러오는 중…</div>;
   }
   if (error) {
     return <div style={{ padding: 40, color: '#e55', fontFamily: 'sans-serif' }}>{error}</div>;
@@ -53,22 +57,12 @@ export default function AuditPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f7f6f2', fontFamily: 'sans-serif' }}>
-      {/* 헤더 */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          background: 'white',
-          borderBottom: '1px solid #e7e3d8',
-          padding: '12px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E' }}>감사로그</div>
-      </header>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'white', borderBottom: '1px solid #e7e3d8', padding: '12px 20px' }}>
+        <AdminPageHeader
+          title="감사로그"
+          description="시스템 작업 기록 및 사용자 활동 감사"
+        />
+      </div>
 
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 16px 60px' }}>
         {/* 필터 */}
@@ -135,101 +129,69 @@ export default function AuditPage() {
             감사 로그 목록
           </h2>
 
-          {logs && logs.content.length === 0 ? (
-            <p style={{ color: '#aaa', fontSize: 13, padding: '12px 0' }}>감사 로그가 없습니다.</p>
-          ) : (
-            <>
-              <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-                <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f5f5f5' }}>
-                      {['시각', '행위자', '액션', '대상', 'IP', ''].map((h) => (
-                        <th
-                          key={h}
-                          style={{
-                            padding: '8px 10px',
-                            textAlign: 'left',
-                            fontWeight: 600,
-                            fontSize: 11,
-                          }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs?.content.map((log) => (
-                      <tr
-                        key={log.id}
-                        style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#fafaf5')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        onClick={() => setSelectedLog(log)}
-                      >
-                        <td style={{ padding: '8px 10px', fontSize: 11, color: '#666', whiteSpace: 'nowrap' }}>
-                          {new Date(log.createdAt).toLocaleString('ko-KR')}
-                        </td>
-                        <td style={{ padding: '8px 10px', fontSize: 11, fontFamily: 'ui-monospace' }}>
-                          {log.actorUserId.slice(0, 12)}
-                        </td>
-                        <td style={{ padding: '8px 10px' }}>
-                          <Badge variant={getActionColor(log.action)}>
-                            {log.action}
-                          </Badge>
-                        </td>
-                        <td style={{ padding: '8px 10px', fontSize: 11, color: '#666' }}>
-                          {log.targetType ?? '-'} {log.targetId ? `(${log.targetId.slice(0, 8)})` : ''}
-                        </td>
-                        <td style={{ padding: '8px 10px', fontSize: 10, color: '#888' }}>
-                          {log.ip ?? '-'}
-                        </td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                          <span style={{ fontSize: 12, cursor: 'pointer' }}>→</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 페이지네이션 */}
-              {logs && logs.totalPages > 1 && (
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
-                  <button
-                    onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page ?? 0) - 1 }))}
-                    disabled={(filters.page ?? 0) === 0}
-                    style={{
-                      padding: '6px 12px',
-                      background: '#f7f6f2',
-                      border: '1px solid #ddd',
-                      borderRadius: 4,
-                      cursor: (filters.page ?? 0) === 0 ? 'default' : 'pointer',
-                      opacity: (filters.page ?? 0) === 0 ? 0.5 : 1,
-                    }}
-                  >
-                    ← 이전
-                  </button>
-                  <span style={{ fontSize: 12, color: '#666' }}>
-                    {(filters.page ?? 0) + 1} / {logs.totalPages}
+          <AdminTable
+            data={logs?.content ?? []}
+            columns={[
+              {
+                key: 'createdAt',
+                header: '시각',
+                render: (log) => formatDateTime(log.createdAt),
+              },
+              {
+                key: 'actorUserId',
+                header: '행위자',
+                render: (log) => (
+                  <span style={{ fontFamily: 'ui-monospace', fontSize: 11 }}>
+                    {log.actorUserId.slice(0, 12)}
                   </span>
-                  <button
-                    onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page ?? 0) + 1 }))}
-                    disabled={(filters.page ?? 0) >= logs.totalPages - 1}
-                    style={{
-                      padding: '6px 12px',
-                      background: '#f7f6f2',
-                      border: '1px solid #ddd',
-                      borderRadius: 4,
-                      cursor: (filters.page ?? 0) >= logs.totalPages - 1 ? 'default' : 'pointer',
-                      opacity: (filters.page ?? 0) >= logs.totalPages - 1 ? 0.5 : 1,
-                    }}
-                  >
-                    다음 →
-                  </button>
-                </div>
-              )}
-            </>
+                ),
+              },
+              {
+                key: 'action',
+                header: '액션',
+                render: (log) => (
+                  <Badge variant={getActionColor(log.action)}>
+                    {log.action}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'targetType',
+                header: '대상',
+                render: (log) => (
+                  <span style={{ fontSize: 11, color: '#666' }}>
+                    {log.targetType ?? '-'} {log.targetId ? `(${log.targetId.slice(0, 8)})` : ''}
+                  </span>
+                ),
+              },
+              {
+                key: 'ip',
+                header: 'IP',
+                render: (log) => (
+                  <span style={{ fontSize: 10, color: '#888' }}>
+                    {log.ip ?? '-'}
+                  </span>
+                ),
+              },
+              {
+                key: 'id',
+                header: '',
+                render: () => <span style={{ fontSize: 12, cursor: 'pointer' }}>→</span>,
+              },
+            ]}
+            loading={loading}
+            emptyMessage="감사 로그가 없습니다."
+            rowKey={(log) => log.id}
+            onRowClick={(log) => setSelectedLog(log)}
+          />
+
+          {logs && logs.totalPages > 1 && (
+            <AdminPagination
+              page={filters.page ?? 0}
+              totalPages={logs.totalPages}
+              onPageChange={(page) => setFilters((prev) => ({ ...prev, page }))}
+              loading={loading}
+            />
           )}
         </div>
       </div>
@@ -293,7 +255,7 @@ export default function AuditPage() {
                       <strong>시각</strong>
                     </td>
                     <td style={{ padding: '4px 8px' }}>
-                      {new Date(selectedLog.createdAt).toLocaleString('ko-KR')}
+                      {formatDateTime(selectedLog.createdAt)}
                     </td>
                   </tr>
                   <tr>

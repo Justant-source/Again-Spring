@@ -62,7 +62,6 @@ springdoc:
 | AdminDashboardController | Admin — Dashboard | bearer-jwt |
 | AdminUserController | Admin — Users | bearer-jwt |
 | AdminHealthController | Admin — Health | bearer-jwt |
-| AdminCommunityController | Admin — Community | bearer-jwt |
 | AdminFeedbackController | Admin — Feedbacks | bearer-jwt |
 | AdminPromptsController | Admin — Prompts | bearer-jwt |
 | CalendarController | Marketing — Calendar | bearer-jwt |

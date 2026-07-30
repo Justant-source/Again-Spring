@@ -13,7 +13,7 @@
 
 대신 다음 두 가지 수단으로 위기 상황에 대응합니다:
 
-1. **관리자 위기 마크** — 관리자가 위기로 판단한 게시글에 `crisisFlag`를 설정
+1. **자동 위기 감지 + 관제** — `CrisisDetector`(키워드 매칭)가 위기 신호를 감지하면 `/admin/crisis`(30초 폴링)에 노출
 2. **상시 핫라인 리소스** — `CrisisResourceModal` 언제든 접근 가능
 
 ---
@@ -25,20 +25,19 @@
 
 ---
 
-## (A) 관리자 위기 마크 흐름
+## (A) 자동 위기 감지 흐름
 
-근거: `app/(admin)/admin/community/`, `CommunityPostController`
+근거: `service/crisis/CrisisDetector.java`, `app/(admin)/admin/crisis/`
 
 ```mermaid
 flowchart TD
-    Admin(["관리자 대시보드 위기 모니터"]) --> Review["문제 게시글 검토\n(본문 내용 비노출)"]
-    Review --> Flag["PATCH /api/admin/community/posts/{id}/crisis\n{ crisisFlag: true }"]
-    Flag --> PostDetail["게시글 상세 페이지에 CrisisResourceModal 표시"]
-    PostDetail --> Hotline["핫라인 카드 목록\n(1393, 1366, 112 등)"]
+    Post(["게시글/댓글 작성"]) --> Detect["CrisisDetector.detect()\n키워드 매칭"]
+    Detect -->|"감지"| Log["감지 이벤트 기록"]
+    Log --> AdminCrisis["/admin/crisis 대시보드\n(30초 폴링, 본문 내용 비노출)"]
 ```
 
 - 위기 모니터 본문 비노출: 프라이버시 정책 준수
-- `crisisFlag = true` 설정 시 게시글 상세(`/community/[id]`)에서 CrisisResourceModal 자동 표시
+- 수동 "위기 마크" 설정 UI는 존재하지 않는다 — 감지는 전적으로 자동(키워드 매칭)이며 관리자는 `/admin/crisis`에서 조회만 한다(과거 이 문서가 서술하던 `AdminCommunityController` 기반 수동 마크 PATCH 엔드포인트는 존재한 적이 없거나 이미 삭제된 죽은 참조였음 — 2026-07-30 확인)
 
 ---
 
@@ -78,4 +77,4 @@ flowchart TD
 - `components/shared/CrisisResourceModal.tsx` — 핫라인 모달 (ESC/바깥클릭 없음)
 - `lib/constants/crisisResources.ts` — 핫라인 데이터
 - `lib/constants/forbiddenWords.ts` — CRISIS_KEYWORDS, WARNING_KEYWORDS (관리자 판단 참고용, 사용자 입력 차단 아님)
-- `app/(admin)/admin/community/` — 관리자 위기 마크 UI
+- `app/(admin)/admin/crisis/` — 위기 감지 관제 UI

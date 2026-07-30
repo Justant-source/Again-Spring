@@ -2,7 +2,7 @@
 
 **위치**: `docs/frontend/ux/flows/09-admin.md`  
 **자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [../principles.md](../principles.md)  
-**기준일**: 2026-06-03
+**기준일**: 2026-07-30 (사이드바 재편·`/admin/community` 삭제만 반영 — 그 외 섹션은 2026-06-03 기준 그대로, 전면 재작성 필요)
 
 ---
 
@@ -63,13 +63,19 @@ flowchart TD
 
 ---
 
-## 광장 관리 (`/admin/community`)
+## 사이드바 구조 (5그룹)
 
-근거: `app/(admin)/admin/community/`
+근거: `components/admin/shell/nav-config.ts` (2026-07-30 7그룹 → 5그룹 재편)
 
-- 게시글 목록 조회 + 위기 플래그(`crisisFlag`) 설정/해제
-- 게시글 숨김·삭제 (규정 위반)
-- 신고 처리: `GET /api/admin/community/reports`, `PATCH .../reports/{id}/status`
+| 그룹 | 메뉴 |
+|---|---|
+| 홈 | 대시보드 |
+| 커뮤니티 운영 | 회원관리·콘텐츠관리·신고관리·문의관리·위기모니터링 |
+| 소통·성장 | 공지관리·알림발송·통계·마케팅 |
+| AI 관리 | AI 규칙관리·AI 생성 관제 |
+| 시스템 | 시스템·감사로그 |
+
+> `/admin/community`(광장 관리)는 신고관리(`/admin/reports`)와 기능이 완전히 중복되어 2026-07-30 페이지+`AdminCommunityController` 함께 삭제됨. 신고 처리는 `/admin/reports`에서 수행(`POST /api/admin/reports/{id}/resolve`, action=BLOCK_POST/BLOCK_COMMENT/DISMISS).
 
 ---
 
@@ -108,6 +114,7 @@ flowchart TD
 ## 근거 파일
 
 - `app/(admin)/admin/page.tsx` — 대시보드 전체 (3중 가드 + 섹션)
-- `app/(admin)/admin/community/` — 광장 관리 (위기 마크, 신고 처리)
+- `app/(admin)/admin/reports/` — 신고 처리 (구 광장 관리 기능 통합)
 - `app/(admin)/admin/marketing/` — 마케팅 관리 (dev 전용)
+- `components/admin/shell/nav-config.ts` — 사이드바 5그룹 구조
 - `lib/constants/userPermissions.ts` — admin tier 권한 정의

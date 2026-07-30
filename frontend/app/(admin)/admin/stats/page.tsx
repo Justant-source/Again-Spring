@@ -15,6 +15,7 @@ import {
 } from '@/lib/api/admin/stats';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend } from 'recharts';
 import { AdminStatCard } from '@/components/admin/AdminStatCard';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { RefreshControl } from '@/components/admin/RefreshControl';
 import { EngagementFunnel } from '@/components/admin/stats/EngagementFunnel';
 import { ProductionRatioChart } from '@/components/admin/stats/ProductionRatioChart';
@@ -139,7 +140,7 @@ export default function StatsPage() {
   }
 
   if (loading) {
-    return <div style={{ padding: 40, fontFamily: 'sans-serif' }}>로딩 중...</div>;
+    return <div style={{ padding: 40, fontFamily: 'sans-serif' }}>불러오는 중…</div>;
   }
   if (error) {
     return <div style={{ padding: 40, color: '#e55', fontFamily: 'sans-serif' }}>{error}</div>;
@@ -148,25 +149,11 @@ export default function StatsPage() {
   const chartData = [...stats].reverse();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f7f6f2', fontFamily: 'sans-serif' }}>
-      {/* 헤더 */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          background: 'white',
-          borderBottom: '1px solid #e7e3d8',
-          padding: '12px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E' }}>통계</div>
-      </header>
+    <div className="space-y-6">
+      {/* 페이지 헤더 */}
+      <AdminPageHeader title="통계" />
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px 60px' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 16px 60px' }}>
         {/* 커뮤니티 인사이트 섹션 */}
         <div className="mb-6 space-y-4">
           {/* 기간 선택 및 제목 */}

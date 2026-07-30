@@ -15,12 +15,14 @@ import {
 } from '@/lib/api/admin/dashboard';
 import { getDailyStats, type DailyStatsResponse } from '@/lib/api/admin/stats';
 import { RefreshControl } from '@/components/admin/RefreshControl';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { ActionCenter } from '@/components/admin/dashboard/ActionCenter';
 import { KpiGrid } from '@/components/admin/dashboard/KpiGrid';
 import { CommunityPulseChart } from '@/components/admin/dashboard/CommunityPulseChart';
 import { HotPostsCard } from '@/components/admin/dashboard/HotPostsCard';
 import { SystemHealthPanel } from '@/components/admin/SystemHealthPanel';
 import { LlmFailureRateChart } from '@/components/admin/LlmFailureRateChart';
+import { CrawlFreshnessBadge } from '@/components/admin/CrawlFreshnessBadge';
 
 export default function AdminPage() {
   const user = useUserStore((s) => s.user);
@@ -82,15 +84,17 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       {/* Header with refresh control */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">관리자 대시보드</h1>
-        <RefreshControl
-          onRefresh={handleRefresh}
-          loading={loading}
-          autoRefreshSeconds={60}
-          data-testid="admin-page-refresh"
-        />
-      </div>
+      <AdminPageHeader
+        title="관리자 대시보드"
+        action={
+          <RefreshControl
+            onRefresh={handleRefresh}
+            loading={loading}
+            autoRefreshSeconds={60}
+            data-testid="admin-page-refresh"
+          />
+        }
+      />
 
       {/* Action Center */}
       <ActionCenter data={actionCenter} loading={loading} />
@@ -118,6 +122,11 @@ export default function AdminPage() {
           <h2 className="text-sm font-semibold text-gray-900 mb-4">LLM 호출 실패율 (최근 7일)</h2>
           <LlmFailureRateChart days={7} refreshSignal={refreshTrigger} />
         </div>
+      </div>
+
+      {/* Crawl Freshness Badge */}
+      <div className="mt-6">
+        <CrawlFreshnessBadge refreshSignal={refreshTrigger} />
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { AdminSection } from '@/components/admin/AdminSection';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { broadcastNotification } from '@/lib/api/admin/notifications';
 
 export default function NotificationsPage() {
@@ -112,7 +112,8 @@ export default function NotificationsPage() {
   };
 
   return (
-    <AdminSection title="알림 발송">
+    <>
+      <AdminPageHeader title="알림 발송" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <Card className="p-6">
@@ -219,6 +220,6 @@ export default function NotificationsPage() {
           )}
         </div>
       </div>
-    </AdminSection>
+    </>
   );
 }

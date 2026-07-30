@@ -12,10 +12,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AdminTable } from '@/components/admin/AdminTable';
 import { AdminPagination } from '@/components/admin/AdminPagination';
 import { MoreVertical, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDateTime } from '@/lib/utils/adminFormat';
 import {
   listReports,
   resolveReport,
@@ -155,17 +157,6 @@ export default function ReportsPage() {
     return <Badge variant="secondary">{action}</Badge>;
   };
 
-  // Format datetime
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   // Pending tab columns
   const pendingColumns = [
@@ -201,7 +192,7 @@ export default function ReportsPage() {
       key: 'createdAt',
       header: '신고 일시',
       render: (row: AdminReport) => (
-        <span className="text-sm text-gray-600">{formatDate(row.createdAt)}</span>
+        <span className="text-sm text-gray-600">{formatDateTime(row.createdAt)}</span>
       ),
     },
     {
@@ -244,14 +235,22 @@ export default function ReportsPage() {
               >
                 신고 무시
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  window.open(`/api/admin/community/${row.targetType.toLowerCase()}/${row.targetId}`, '_blank');
-                }}
-              >
-                <ExternalLink size={14} className="mr-2" />
-                대상 보기
-              </DropdownMenuItem>
+              {row.targetType === 'POST' && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    window.open(`/community/posts/${row.targetId}`, '_blank');
+                  }}
+                >
+                  <ExternalLink size={14} className="mr-2" />
+                  대상 보기
+                </DropdownMenuItem>
+              )}
+              {row.targetType === 'COMMENT' && (
+                <DropdownMenuItem disabled title="댓글은 콘텐츠 관리 페이지에서 확인하세요">
+                  <ExternalLink size={14} className="mr-2" />
+                  대상 보기 (미지원)
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -293,7 +292,7 @@ export default function ReportsPage() {
       key: 'createdAt',
       header: '신고 일시',
       render: (row: AdminReport) => (
-        <span className="text-sm text-gray-600">{formatDate(row.createdAt)}</span>
+        <span className="text-sm text-gray-600">{formatDateTime(row.createdAt)}</span>
       ),
     },
     {
@@ -301,7 +300,7 @@ export default function ReportsPage() {
       header: '처리 일시',
       render: (row: AdminReport) => (
         <span className="text-sm text-gray-600">
-          {row.resolvedAt ? formatDate(row.resolvedAt) : '-'}
+          {row.resolvedAt ? formatDateTime(row.resolvedAt) : '-'}
         </span>
       ),
     },
@@ -314,10 +313,10 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">신고 관리</h1>
-        <p className="mt-2 text-gray-600">부적절한 콘텐츠 신고를 검토하고 처리합니다</p>
-      </div>
+      <AdminPageHeader
+        title="신고 관리"
+        description="부적절한 콘텐츠 신고를 검토하고 처리합니다"
+      />
 
       <Card>
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">

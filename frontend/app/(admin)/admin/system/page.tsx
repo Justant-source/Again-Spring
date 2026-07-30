@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { useUserStore } from '@/lib/store/userStore';
 import { SystemHealthPanel } from '@/components/admin/SystemHealthPanel';
 import { LlmFailureRateChart } from '@/components/admin/LlmFailureRateChart';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { reloadPrompts, getSystemLogs, type SystemLogEntry } from '@/lib/api/admin/system';
+import { formatDateTime } from '@/lib/utils/adminFormat';
 
 const KNOWN_FEATURE_FLAGS = [
   { key: 'app.admin.enabled', label: 'Admin Panel', description: '관리자 패널 활성화' },
@@ -57,22 +59,12 @@ export default function SystemPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f7f6f2', fontFamily: 'sans-serif' }}>
-      {/* 헤더 */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          background: 'white',
-          borderBottom: '1px solid #e7e3d8',
-          padding: '12px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E' }}>시스템</div>
-      </header>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'white', borderBottom: '1px solid #e7e3d8', padding: '12px 20px' }}>
+        <AdminPageHeader
+          title="시스템"
+          description="시스템 상태, 기능 플래그, 프롬프트 관리"
+        />
+      </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px 60px' }}>
         {/* 시스템 헬스 */}
