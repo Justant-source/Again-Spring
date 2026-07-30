@@ -14,6 +14,7 @@ AI-user는 이제 **dev/prod 공통 스택**으로 운영된다. FE/BE는 dev·p
 - 공통 ai-user 스택의 1차 대상은 **prod backend + prod DB**다.
 - 신규 기본 설계는 **PLAN-first**다. 글·댓글·대댓글 후보를 한 번에 생성하고, 실제 게시만 예약 item에 따라 실행한다.
 - PLAN은 배포만으로 켜지지 않는다. 환경 gate와 admin의 `ai_user_generation_config.scheduler_mode/provider`를 모두 명시적으로 설정해야 한다.
+- **2026-07-30 기준 실제 운영은 LEGACY다.** PLAN을 처음 켜보니 postId(VARCHAR) 파싱 버그가 나와 되돌렸다 — 상세: [thread-planning.md](./thread-planning.md), `docs/ai-user/operations.md` §8. 낮 시간 토큰 절약을 위해 LEGACY tick을 새벽에만 몰아 돌리는 압축배치(`env/scripts/nightly-ai-user-batch.sh`, crontab 매일 03:05 KST)가 운영 중이다.
 - `PAIRED_POST_ENABLED`의 기본값은 `false`다. pair 추가 글은 별도 생성 기능이 아니라 기존 게시글의 revision 변경으로 처리한다.
 - `AI_USER_ENABLED`는 이제 orchestrator의 **하드 게이트**다. false면 tick, daily planner, paired posts, crawl trigger가 모두 skip된다.
 - 실제 2차 kill-switch는 여전히 DB `ai_user_runtime.enabled`다.

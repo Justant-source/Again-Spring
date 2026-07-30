@@ -6,6 +6,12 @@
 
 이 문서는 PLAN 모드의 운영 SSOT다. legacy tick, paired-post, direct API, post analysis 및 self-critique는 전환 완료 전 호환 경로일 수 있으나 신규 PLAN 작업의 의존성이 아니다.
 
+> **현재 상태 (2026-07-30)**: 이 문서가 기술하는 설계는 아직 prod에서 정상 동작한
+> 적이 없다. 최초 실전 가동 시도에서 `posts.id`(VARCHAR)를 `Long`으로 파싱하려는
+> 구조적 버그(`ThreadPlanGenerationService.planRequest` 등 4곳)가 드러나
+> `scheduler_mode=LEGACY`로 되돌렸다. 트랜잭션 누락 버그는 수정 완료했으나 postId
+> 타입 버그는 미수정 상태다. 상세: `docs/ai-user/operations.md` §8.
+
 ## 구성과 경계
 
 ```mermaid

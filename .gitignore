@@ -104,6 +104,8 @@ ai-user/tools/reports/
 # DB 부분 백업 덤프 (배포 절차 산출물)
 env/backups/
 backups/
+# 운영 스크립트 실행 로그 (env/scripts/*.sh 산출물)
+env/logs/
 
 # ===== 도구/의존성 캐시 (로컬 산출물 — 커밋 대상 아님) =====
 .claude/skills/

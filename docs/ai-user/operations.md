@@ -138,12 +138,46 @@ docker logs -f againspring-prod-dev-sync
 - `ai_user_runtime`, `ai_user_generation_config`
 - `ai_content_corrections`, `ai_global_rules`, `ai_prompt_template`, `system_setting`
 
-## 8. 트러블슈팅
+## 8. 새벽 압축배치 (2026-07-30~)
+
+낮 시간 토큰 소모를 막기 위해, LEGACY tick 엔진을 새벽에만 몰아서 돌리고 낮에는
+꺼둔다. `env/scripts/nightly-ai-user-batch.sh`가 호스트 crontab(`05 3 * * *`,
+서버 로컬시간이 이미 KST)으로 매일 실행된다.
+
+절차: `ai_user_runtime.enabled=1` → `generate-posts` 트리거 → `/admin/trigger/tick`
+반복 호출(daily_global_cap 도달 또는 45분 제한까지) → 3분 대기(잔여 jitter 실행
+정착) → `ai_user_runtime.enabled=0` (trap으로 스크립트가 어떻게 끝나도 보장).
+`AI_USER_FORCE_ACTIVE=true`로 새벽 시간대 circadian 저하 없이 정상 예산 적용.
+
+낮 동안 `ai_user_runtime.enabled=0`이 기본 상태다 — 트러블슈팅 시 "꺼져 있음"을
+버그로 오인하지 말 것. 스크립트 로그: `env/logs/nightly-ai-user-batch.log`
+(자체 타임스탬프 로그) / `env/logs/nightly-ai-user-batch.cron.log`(cron stdout/stderr).
+
+### PLAN 모드는 현재 비활성 — postId 파싱 버그 (2026-07-30 발견)
+
+PLAN 모드(스레드플랜 사전생성 + 낮 게시전용, §3의 "PLAN 모드 추가 제어" 참조)를
+처음 실전 가동해보니 두 가지 문제가 나왔다:
+
+1. `ThreadPlanGenerationService.generateRequestedPlans()`에 `@Transactional`이
+   빠져 있어 `lockByStatus`(PESSIMISTIC_WRITE)가 매틱 예외 — **수정 완료**
+   (같은 커밋에 포함).
+2. `ThreadPlanGenerationService.planRequest()` / `ThreadPlanPublisher.parentId()`
+   / `HumanReplyBatchService.run()` 4곳이 `posts.id`(VARCHAR "post_xxx")를
+   `Long.valueOf()`로 파싱하려다 `NumberFormatException` — **미수정**. orchestrator
+   쪽만이 아니라 llm-ai-user `/v2/generate/thread-plan`·`/v2/generate/human-replies`
+   요청 스키마도 Long postId를 기대하는지 확인해야 하는 구조적 문제라 이번엔
+   손대지 않고 `scheduler_mode=LEGACY`, `provider_*=OFF`로 되돌렸다.
+
+PLAN 모드를 다시 켜려면: 위 4곳의 ID 타입을 String으로 바꾸고, dev에서
+실제 post로 thread-plan 생성이 끝까지 되는지 검증한 뒤에 prod
+`ai_user_generation_config.scheduler_mode='PLAN'`으로 전환할 것.
+
+## 9. 트러블슈팅
 
 ### 글이 하나도 안 올라올 때
 
 - `.env.ai-user`의 `AI_USER_ENABLED=true`인지 먼저 확인
-- prod DB `ai_user_runtime.enabled = 1`인지 확인
+- prod DB `ai_user_runtime.enabled = 1`인지 확인(낮에는 압축배치 설계상 0이 정상 — §8 참조)
 - orchestrator 로그에 `Daily global cap reached`가 있는지 확인
 
 ### learning이 예상치 않게 crawl할 때

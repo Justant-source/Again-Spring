@@ -40,10 +40,12 @@ public class ThreadPlanGenerationService {
     private final OrchestratorProperties properties;
     private final AiUserGenerationConfigRepository configRepository;
 
+    @Transactional
     public void generateRequestedPlans() {
         if (!planModeEnabled()) return;
-        planRepository.lockByStatus(ThreadPlanStatus.REQUESTED, PageRequest.of(0, 5))
-                .forEach(plan -> generateOne(plan.getId()));
+        planRepository.lockByStatus(ThreadPlanStatus.REQUESTED, PageRequest.of(0, 5)).stream()
+                .map(AiThreadPlan::getId).toList()
+                .forEach(this::generateOne);
     }
 
     /** One retry only, with exactly the same provider/model snapshot. */
