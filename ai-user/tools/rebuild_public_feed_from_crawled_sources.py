@@ -21,6 +21,7 @@ import argparse
 import json
 import random
 import re
+import sys
 import time
 import uuid
 from collections import Counter, defaultdict
@@ -33,6 +34,13 @@ from zoneinfo import ZoneInfo
 
 import pymysql
 import requests
+
+ROOT = Path(__file__).resolve().parents[2]
+LEARNING_SERVICES = ROOT / "ai-user" / "learning" / "app" / "services"
+if str(LEARNING_SERVICES) not in sys.path:
+    sys.path.append(str(LEARNING_SERVICES))
+
+from ngram_guard import passes_ngram_guard  # type: ignore
 
 ROOT = Path(__file__).resolve().parents[2]
 KST = ZoneInfo("Asia/Seoul")
@@ -58,12 +66,12 @@ SOURCE_CATEGORY_MAP = {
 }
 
 CATEGORY_GUIDES = {
-    "COUPLE": "연인 관계 갈등만. 가족·직장·친구 갈등으로 새면 안 된다.",
-    "FAMILY": "가족(부모·형제·친척) 갈등만. 연애·직장 이야기로 흐리지 않는다.",
-    "FRIEND": "친구·지인 관계 갈등만. 연인·가족·직장 갈등은 제외한다.",
-    "MARRIED": "부부·배우자·시댁·처가 갈등만. 미혼 연애 서사로 쓰면 안 된다.",
-    "WORK": "직장·업무·상사·동료 갈등만. 다른 광장 이야기로 새면 안 된다.",
-    "OTHER": "기타 일상·사회생활·생활비·진로·애매한 인간관계 등으로 처리한다.",
+    "COUPLE": "연인 관계 갈등만. 가족·직장·친구 갈등으로 새면 안 된다. 갈등 구조와 감정선은 유지하되, 직업·나이·지역·구체적 사물·브랜드명·정확한 금액 등 식별 가능한 디테일은 반드시 다른 값으로 바꿔라.",
+    "FAMILY": "가족(부모·형제·친척) 갈등만. 연애·직장 이야기로 흐리지 않는다. 갈등 구조와 감정선은 유지하되, 직업·나이·지역·구체적 사물·브랜드명·정확한 금액 등 식별 가능한 디테일은 반드시 다른 값으로 바꿔라.",
+    "FRIEND": "친구·지인 관계 갈등만. 연인·가족·직장 갈등은 제외한다. 갈등 구조와 감정선은 유지하되, 직업·나이·지역·구체적 사물·브랜드명·정확한 금액 등 식별 가능한 디테일은 반드시 다른 값으로 바꿔라.",
+    "MARRIED": "부부·배우자·시댁·처가 갈등만. 미혼 연애 서사로 쓰면 안 된다. 갈등 구조와 감정선은 유지하되, 직업·나이·지역·구체적 사물·브랜드명·정확한 금액 등 식별 가능한 디테일은 반드시 다른 값으로 바꿔라.",
+    "WORK": "직장·업무·상사·동료 갈등만. 다른 광장 이야기로 새면 안 된다. 갈등 구조와 감정선은 유지하되, 직업·나이·지역·구체적 사물·브랜드명·정확한 금액 등 식별 가능한 디테일은 반드시 다른 값으로 바꿔라.",
+    "OTHER": "기타 일상·사회생활·생활비·진로·애매한 인간관계 등으로 처리한다. 갈등 구조와 감정선은 유지하되, 직업·나이·지역·구체적 사물·브랜드명·정확한 금액 등 식별 가능한 디테일은 반드시 다른 값으로 바꿔라.",
 }
 
 BLIND_STOP_PATTERNS = [
@@ -185,6 +193,7 @@ class SourceExample:
     title_key: str
     signature: str
     trigrams: set[str]
+    popularity_pct: float | None = None  # 같은 source+나이구간 내 백분위, 0~1, NULL 허용
 
     @property
     def recency_ts(self) -> datetime:
@@ -528,7 +537,8 @@ def query_source_examples(conn: pymysql.connections.Connection) -> list[SourceEx
             source_url,
             posted_at,
             created_at,
-            author_id
+            author_id,
+            COALESCE(popularity_pct, 0.5) as popularity_pct
         FROM example_bank
         WHERE content_type = 'POST'
           AND source IN ('BLIND', 'natepan')
@@ -559,6 +569,7 @@ def query_source_examples(conn: pymysql.connections.Connection) -> list[SourceEx
         title_key = normalize_key(title)
         signature = normalize_key(f"{title}\n{raw_body[:220]}")
         trigrams = make_trigrams(f"{title}\n{raw_body[:220]}")
+        popularity_pct = float_value(row["popularity_pct"], 0.5)
         example = SourceExample(
             id=int(row["id"]),
             source=source,
@@ -574,20 +585,34 @@ def query_source_examples(conn: pymysql.connections.Connection) -> list[SourceEx
             title_key=title_key,
             signature=signature,
             trigrams=trigrams,
+            popularity_pct=popularity_pct,
         )
         example.quality_score = quality_score_for_source(example, latest_ts)
         examples.append(example)
     return examples
 
 
-def select_sources_by_category(examples: list[SourceExample], per_category: int) -> dict[str, list[SourceExample]]:
+def select_sources_by_category(examples: list[SourceExample], per_category: int, conn: pymysql.connections.Connection) -> dict[str, list[SourceExample]]:
+    """선별 로직: popularity_pct 하위 30% 제외, 남은 후보 중 popularity_pct 가중치 확률 샘플링"""
+    # 이미 재가공된 원본 ID 제외
+    already_used: set[int] = set()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT source_example_id FROM posts WHERE source_example_id IS NOT NULL")
+            already_used = {int(row["source_example_id"]) for row in cur.fetchall()}
+    except Exception:
+        pass  # 테이블 없거나 에러 시 무시
+
+    # 이미 사용된 것 제외
+    examples_available = [e for e in examples if e.id not in already_used]
+
     buckets: dict[str, list[SourceExample]] = defaultdict(list)
-    for example in examples:
+    for example in examples_available:
         buckets[example.category].append(example)
-    for category in PLAZAS:
-        buckets[category].sort(key=lambda item: (item.quality_score, item.recency_ts, item.id), reverse=True)
 
     selected: dict[str, list[SourceExample]] = {}
+    rng = random.Random()  # 매번 다른 난수 시드(시간 기반)
+
     for category in PLAZAS:
         required_by_source = MIN_SOURCE_BY_CATEGORY.get(category, {})
         pool = buckets[category]
@@ -605,28 +630,40 @@ def select_sources_by_category(examples: list[SourceExample], per_category: int)
                     return False
             return True
 
+        # 1단계: MIN_SOURCE_BY_CATEGORY 최소 개수 먼저 확보 (필수 소스)
         for source_name, minimum in required_by_source.items():
-            for candidate in pool:
-                if candidate.source != source_name:
-                    continue
-                if not can_take(candidate):
-                    continue
+            source_pool = [e for e in pool if e.source == source_name]
+            # popularity_pct 하위 30% 제외
+            percentile_30 = sorted(e.popularity_pct for e in source_pool)[max(0, len(source_pool) // 3)]
+            filtered = [e for e in source_pool if e.popularity_pct >= percentile_30]
+
+            # 가중치 기반 샘플링
+            while len([e for e in chosen if e.source == source_name]) < minimum and filtered:
+                if not filtered:
+                    break
+                weights = [e.popularity_pct for e in filtered]
+                candidate = rng.choices(filtered, weights=weights, k=1)[0]
+                if can_take(candidate):
+                    chosen.append(candidate)
+                    used_titles.add(candidate.title_key)
+                    if candidate.author_key:
+                        author_counts[candidate.author_key] += 1
+                filtered.remove(candidate)
+
+        # 2단계: 나머지 필요 개수는 전체 풀(popularit_pct 필터링)에서 가중 샘플링
+        all_pool_for_extra = pool
+        percentile_30_all = sorted(e.popularity_pct for e in all_pool_for_extra)[max(0, len(all_pool_for_extra) // 3)]
+        filtered_all = [e for e in all_pool_for_extra if e.popularity_pct >= percentile_30_all]
+
+        while len(chosen) < per_category and filtered_all:
+            weights = [e.popularity_pct for e in filtered_all]
+            candidate = rng.choices(filtered_all, weights=weights, k=1)[0]
+            if can_take(candidate):
                 chosen.append(candidate)
                 used_titles.add(candidate.title_key)
                 if candidate.author_key:
                     author_counts[candidate.author_key] += 1
-                if sum(1 for row in chosen if row.source == source_name) >= minimum:
-                    break
-
-        for candidate in pool:
-            if len(chosen) >= per_category:
-                break
-            if not can_take(candidate):
-                continue
-            chosen.append(candidate)
-            used_titles.add(candidate.title_key)
-            if candidate.author_key:
-                author_counts[candidate.author_key] += 1
+            filtered_all.remove(candidate)
 
         if len(chosen) < per_category:
             raise RuntimeError(f"Could not select {per_category} diverse sources for {category}, only {len(chosen)}")
@@ -1317,6 +1354,13 @@ def generate_post_with_retry(api: ApiConfig, plan: PostPlan, global_rules: str |
         raw = call_clcocloud(api, api.post_model, prompt, max_tokens=1400, temperature=0.68)
         try:
             title, body = validate_post_json(extract_json_payload(raw))
+            # WO-CRAWL-01: 표절 방어 — 원본과 문구가 그대로 겹치면 재생성 유도
+            # (재시도 루프 재사용: 실패 사유를 feedback으로 넘겨 다음 시도에서 디테일 교체를 강제)
+            if not passes_ngram_guard(body, plan.source_example.body):
+                raise ValueError(
+                    "생성된 본문이 원본 크롤 글과 문구가 과도하게 겹칩니다. "
+                    "갈등 구조와 감정선만 유지하고 표현을 완전히 새로 써주세요."
+                )
             return title, body
         except Exception as exc:
             feedback = str(exc)
@@ -1861,7 +1905,7 @@ def main() -> None:
         global_rules = query_global_rules(conn)
         personas = query_personas(conn)
         examples = query_source_examples(conn)
-        selected = select_sources_by_category(examples, args.per_category)
+        selected = select_sources_by_category(examples, args.per_category, conn)
         planned = assign_day_slots(selected, personas, args.seed, start_day, end_day)
 
         selection_manifest = plan_manifest_dict(planned)

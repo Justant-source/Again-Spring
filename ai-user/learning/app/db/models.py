@@ -57,6 +57,31 @@ EXAMPLE_BANK_ADD_AUTHOR_INDEX_SQL = """
 ALTER TABLE example_bank ADD INDEX IF NOT EXISTS idx_author_source (author_id, source)
 """
 
+# Engagement metrics: view, like, comment counts at crawl time + engagement span
+EXAMPLE_BANK_ADD_VIEW_COUNT_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS view_count INT DEFAULT NULL COMMENT '크롤 시점 조회수 스냅샷'
+"""
+
+EXAMPLE_BANK_ADD_LIKE_COUNT_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS like_count INT DEFAULT NULL COMMENT '크롤 시점 추천/좋아요 스냅샷'
+"""
+
+EXAMPLE_BANK_ADD_COMMENT_COUNT_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS comment_count INT DEFAULT NULL COMMENT '크롤 시점 댓글수 스냅샷'
+"""
+
+EXAMPLE_BANK_ADD_ENGAGEMENT_SPAN_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS engagement_span_hours DECIMAL(6,2) DEFAULT NULL COMMENT '첫~마지막 댓글 시간폭(시간)'
+"""
+
+EXAMPLE_BANK_ADD_POPULARITY_PCT_SQL = """
+ALTER TABLE example_bank ADD COLUMN IF NOT EXISTS popularity_pct DECIMAL(4,3) DEFAULT NULL COMMENT '동일 source+나이구간 내 인기도 백분위 0~1, 클수록 인기'
+"""
+
+EXAMPLE_BANK_ADD_POPULARITY_INDEX_SQL = """
+ALTER TABLE example_bank ADD INDEX IF NOT EXISTS idx_popularity (source, popularity_pct)
+"""
+
 CRAWL_LOG_DDL = """
 CREATE TABLE IF NOT EXISTS crawl_log (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -152,6 +177,42 @@ def create_tables():
                 logger.info("example_bank idx_author_source index ensured")
             except Exception as e:
                 logger.warning(f"author index alter skipped: {e}")
+            # view_count 컬럼 추가 (참여도 지표)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_VIEW_COUNT_SQL)
+                logger.info("example_bank.view_count column ensured")
+            except Exception as e:
+                logger.warning(f"view_count column alter skipped: {e}")
+            # like_count 컬럼 추가 (참여도 지표)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_LIKE_COUNT_SQL)
+                logger.info("example_bank.like_count column ensured")
+            except Exception as e:
+                logger.warning(f"like_count column alter skipped: {e}")
+            # comment_count 컬럼 추가 (참여도 지표)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_COMMENT_COUNT_SQL)
+                logger.info("example_bank.comment_count column ensured")
+            except Exception as e:
+                logger.warning(f"comment_count column alter skipped: {e}")
+            # engagement_span_hours 컬럼 추가 (참여 시간폭)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_ENGAGEMENT_SPAN_SQL)
+                logger.info("example_bank.engagement_span_hours column ensured")
+            except Exception as e:
+                logger.warning(f"engagement_span_hours column alter skipped: {e}")
+            # popularity_pct 컬럼 추가 (인기도 백분위)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_POPULARITY_PCT_SQL)
+                logger.info("example_bank.popularity_pct column ensured")
+            except Exception as e:
+                logger.warning(f"popularity_pct column alter skipped: {e}")
+            # popularity 인덱스 추가 (재가공 선별 쿼리용)
+            try:
+                cur.execute(EXAMPLE_BANK_ADD_POPULARITY_INDEX_SQL)
+                logger.info("example_bank idx_popularity index ensured")
+            except Exception as e:
+                logger.warning(f"popularity index alter skipped: {e}")
             # VECTOR INDEX for example_bank
             cur.execute(VECTOR_INDEX_CHECK_SQL)
             row = cur.fetchone()

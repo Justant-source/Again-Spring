@@ -10,6 +10,8 @@
 | Dashboard 컨트롤러 | `backend/src/main/java/com/againspring/api/admin/AdminDashboardController.java` |
 | User 컨트롤러 | `backend/src/main/java/com/againspring/api/admin/AdminUserController.java` |
 | Health 컨트롤러 | `backend/src/main/java/com/againspring/api/admin/AdminHealthController.java` |
+| Crawl Status 컨트롤러 | `backend/src/main/java/com/againspring/api/admin/AdminCrawlStatusController.java` |
+| Crawl Status 서비스 | `backend/src/main/java/com/againspring/service/admin/AdminCrawlStatusService.java` |
 | Feedback 컨트롤러 | `backend/src/main/java/com/againspring/api/AdminFeedbackController.java` |
 | Prompts 컨트롤러 | `backend/src/main/java/com/againspring/api/AdminPromptsController.java` |
 | Test 컨트롤러 | `backend/src/main/java/com/againspring/api/AdminTestController.java` |
@@ -102,6 +104,49 @@ flowchart LR
   "timestamp": "2026-05-16T10:01:00Z"
 }
 ```
+
+## Crawl Status API — AI Learning 크롤 신선도 모니터링
+
+**Base path:** `/api/admin/crawl-status` — 인증: JWT + ADMIN
+
+| Method | Path | 설명 | 응답 |
+|---|---|---|---|
+| `GET` | `` | 최근 24시간 크롤 저장 건수·실패 건수·신선도 플래그 | `CrawlStatusResponse` |
+
+**배경:** 36일간 크롤이 침묵한 사고(2026-06-24~07-30) 재발 방지. 이 엔드포인트는 admin 대시보드에 "크롤 신선도 배지"를 표시하기 위해 설계.
+
+**응답 스키마:**
+```json
+{
+  "savedBySource24h": {
+    "natepan": 120,
+    "blind": 45,
+    "theqoo": 87
+  },
+  "lastSuccessfulAt": {
+    "natepan": "2026-07-29T14:30:00Z",
+    "blind": "2026-07-29T10:15:00Z",
+    "theqoo": "2026-07-29T18:45:00Z"
+  },
+  "failureCount24h": 2,
+  "stale": false,
+  "checkedAt": "2026-07-30T08:22:15.123Z",
+  "errorMessage": null
+}
+```
+
+**응답 필드 설명:**
+
+- `savedBySource24h` (Object<string, number>): 각 크롤 소스(natepan, blind, theqoo, clien 등)별 최근 24시간 내 저장된 항목 수 합계. 값이 없으면 (24시간 내 성공 크롤 없음) 해당 소스는 키가 없을 수 있음.
+- `lastSuccessfulAt` (Object<string, string>): 각 소스의 마지막 성공 크롤 시각 (ISO-8601 UTC). 성공 기록이 없으면 해당 소스 키가 없음.
+- `failureCount24h` (number): 최근 24시간 내 실패한 크롤 총 건수.
+- `stale` (boolean): `true`이면 24시간 내 성공 크롤이 0건 — 프론트엔드는 배지를 "신선하지 않음" 상태로 표시.
+- `checkedAt` (string, ISO-8601 UTC): 이 조회의 기준 시각. 프론트엔드는 이 값을 기준으로 "N시간 전" 표시 가능.
+- `errorMessage` (string|null): AI Learning 서비스 조회 실패 시 오류 메시지. 정상이면 `null`.
+
+**오류 케이스:**
+- AI Learning 서비스 불가 → 200 OK 반환, `errorMessage` 필드에 오류 내용, `stale=true` 표시.
+- 프론트엔드는 `errorMessage`가 존재하면 "조회 실패" 상태로 표시 가능.
 
 ## Feedback API — 피드백 목록 · 상태 관리
 

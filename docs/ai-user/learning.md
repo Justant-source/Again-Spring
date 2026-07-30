@@ -46,6 +46,11 @@ learning container가 뜨면 아래가 항상 실행된다.
 - `/examples/save`는 본문 512자까지만 임베딩한다.
 - register classifier 결과를 `casual`, `polite`, `mixed` 축으로 저장한다.
 - orchestrator 저장 훅은 `AI_LEARNING_ENABLED=true`일 때만 실행된다.
+- (WO-CRAWL-01) 크롤 시점 관심도 스냅샷을 함께 저장한다: `view_count`·`like_count`·`comment_count`·
+  `engagement_span_hours`(첫~마지막 댓글 시간폭). 매일 KST 04:00 배치잡이 같은 `source`+나이구간
+  (0~3h/3~12h/12h+) 안에서 백분위를 계산해 `popularity_pct`(0~1)로 저장한다 — 표본 30건 미만 구간은
+  NULL 유지. 재가공 원본 선별(`rebuild_public_feed_from_crawled_sources.py`)이 이 값으로 하위 30%를
+  거르고 가중 샘플링한다.
 
 ### 검색
 
@@ -75,7 +80,10 @@ learning container가 뜨면 아래가 항상 실행된다.
 
 - 품질 필터 미통과 항목은 저장하지 않는다.
 - 같은 `source_url`은 한 run 안과 기존 DB 모두에서 dedup한다.
-- 결과는 `crawl_log`에 남는다.
+- 결과는 `crawl_log`에 남는다. `GET /crawl/log`의 `at` 필드는 ISO-8601 UTC(`...Z`) 문자열이다
+  (2026-07-30 이전에는 Python `str(datetime)` 그대로라 backend의 `Instant.parse()`가 못 읽는 버그가 있었음).
+- 표절 방어: `services/ngram_guard.py`(연속 n-gram 겹침 검사, 임계값 0.20 — 소급 감사 실측 기반)와
+  `services/popularity_scorer.py`(관심도 백분위)가 이 디렉토리에 있다.
 
 ### 현재 scheduler source budget
 
@@ -84,15 +92,18 @@ learning container가 뜨면 아래가 항상 실행된다.
 | source | limit |
 |---|---:|
 | `natepan` | `1500` |
-| `blind` | `240` |
+| `blind` | `500` (WO-CRAWL-01, 2026-07-30 — 240에서 증액. "블라인드가 갈등 소재 대세" 판단, 403 차단율을 admin 배지로 관찰하며 단계 증액 예정) |
 | 나머지 (`naver`, `daum`, `dcinside`, `bobaedream`, `fmkorea`, `theqoo`, `clien`, `ppomppu`, `ruliweb`, `mlbpark`) | `0` |
 
 ### 현재 스케줄
 
 | 작업 | UTC | KST |
 |---|---|---|
-| daily crawl + strengthen + topic synthesis | `18:00` | `03:00` |
+| daily crawl | `18:00` | `03:00` |
+| popularity 재계산 (`recompute_popularity_scores`) | `19:00` | `04:00` |
 | standalone strengthen + topic synthesis | `20:00` | `05:00` |
+
+크롤 자체는 `run_daily_crawl()` 안에서 강화·토픽합성까지 이어서 호출한다 (03:00 한 번의 잡 안에서 순차 실행).
 
 ## 말투 강화
 
@@ -115,7 +126,7 @@ learning container가 뜨면 아래가 항상 실행된다.
 |---|---|---|
 | `AI_LEARNING_ENABLED` | orchestrator `AiLearningClient` | orchestrator가 search/save/topics 호출할지 결정 |
 | `AI_LEARNING_CRAWL_ENABLED` | orchestrator `CrawlerTriggerScheduler` | orchestrator가 별도 crawl trigger를 날릴지 결정 |
-| learning scheduler | learning app startup | 위 두 flag와 무관하게 현재 코드에서는 항상 등록 |
+| learning scheduler | learning app startup | `AI_LEARNING_ENABLED=true` AND `AI_LEARNING_CRAWL_ENABLED=true` 둘 다여야 크론 job이 등록됨(`init_scheduler()`가 둘 다 확인 후 return None). 2026-06-24~07-30 `AI_LEARNING_CRAWL_ENABLED=false`로 방치되어 36일간 무크롤 사고 발생(WO-CRAWL-01) — env flag 하나로 완전히 꺼질 수 있으니 admin 크롤 신선도 배지로 감시한다. |
 
 ## 운영 메모
 

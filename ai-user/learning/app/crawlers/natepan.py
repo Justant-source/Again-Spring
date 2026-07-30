@@ -156,6 +156,101 @@ def _extract_content(soup) -> Optional[str]:
     return None
 
 
+def _extract_view_count(soup) -> Optional[int]:
+    """조회수 추출. 셀렉터: span.count 내부 텍스트에서 숫자 파싱."""
+    try:
+        for el in soup.select("span.count"):
+            txt = el.get_text(strip=True)
+            # "조회 50,855" 형식에서 숫자만 추출
+            m = re.search(r"조회\s*([\d,]+)", txt)
+            if m:
+                num_str = m.group(1).replace(",", "")
+                return int(num_str)
+    except Exception:
+        pass
+    return None
+
+
+def _extract_like_count(soup) -> Optional[int]:
+    """추천수 추출. 셀렉터: span.count 또는 button span (추천)."""
+    try:
+        # 방법 1: span.count 내 추천 텍스트
+        for el in soup.select("span.count"):
+            txt = el.get_text(strip=True)
+            # "추천 343" 형식
+            m = re.search(r"추천\s*([\d,]+)", txt)
+            if m:
+                num_str = m.group(1).replace(",", "")
+                return int(num_str)
+
+        # 방법 2: 버튼 옆 span (추천수)
+        for btn_span in soup.select("button[value='R'] ~ span.count"):
+            txt = btn_span.get_text(strip=True)
+            # "<em>추천수</em><span>343</span>" 구조 → span만 추출
+            m = re.search(r"[\d,]+", txt)
+            if m:
+                num_str = m.group(0).replace(",", "")
+                return int(num_str)
+
+        # 방법 3: 직접 span 탐색
+        for sp in soup.select("button span"):
+            txt = sp.get_text(strip=True)
+            if txt and re.match(r"^[\d,]+$", txt):
+                return int(txt.replace(",", ""))
+    except Exception:
+        pass
+    return None
+
+
+def _extract_comment_count(soup) -> Optional[int]:
+    """댓글 수 추출. 셀렉터: span.num (베스트/일반 댓글 헤더) 또는 span.reple-num."""
+    try:
+        # 방법 1: "56개의 댓글"
+        el = soup.select_one("span.num")
+        if el:
+            txt = el.get_text(strip=True)
+            m = re.search(r"(\d+)", txt)
+            if m:
+                return int(m.group(1))
+
+        # 방법 2: 목록에서 (56) 형식 (fallback)
+        el = soup.select_one("span.reple-num")
+        if el:
+            txt = el.get_text(strip=True)
+            m = re.search(r"(\d+)", txt)
+            if m:
+                return int(m.group(1))
+    except Exception:
+        pass
+    return None
+
+
+def _extract_comment_timestamps(soup) -> Optional[List[str]]:
+    """댓글 작성 시각 추출. 셀렉터: dl.cmt_item > dt > i (시각)."""
+    try:
+        timestamps: List[str] = []
+        # 베스트 댓글 + 일반 댓글
+        for cmt_item in soup.select("dl.cmt_item"):
+            dt_el = cmt_item.select_one("dt")
+            if dt_el:
+                i_el = dt_el.select_one("i")
+                if i_el:
+                    time_str = i_el.get_text(strip=True)
+                    # "2026.07.30 00:30" 형식
+                    if time_str and re.search(r"\d{4}\.\d{2}\.\d{2}", time_str):
+                        # ISO 형식으로 정규화
+                        try:
+                            dt = datetime.strptime(time_str[:16], "%Y.%m.%d %H:%M")
+                            timestamps.append(dt.strftime("%Y-%m-%d %H:%M:%S"))
+                        except ValueError:
+                            # 파싱 실패 시 원본 저장
+                            timestamps.append(time_str[:32])
+        return timestamps if timestamps else None
+    except Exception:
+        pass
+    return None
+
+
 def _is_valid(title: str, content: str) -> bool:
     text = (title or "") + (content or "")
     for kw in _DROP_KEYWORDS:
@@ -211,6 +306,10 @@ def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None
         "source_url": url,
         "author_id": author,
         "posted_at": _parse_posted_at(_extract_time_from_detail(soup)),
+        "view_count": _extract_view_count(soup),
+        "like_count": _extract_like_count(soup),
+        "comment_count": _extract_comment_count(soup),
+        "comment_timestamps": _extract_comment_timestamps(soup),
     }
 
 

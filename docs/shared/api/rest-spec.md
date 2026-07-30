@@ -193,6 +193,12 @@ flowchart LR
 |---|---|---|---|---|
 | GET | `/api/admin/health/system` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 
+### 8.1. Admin — Crawl Status (크롤 신선도)
+
+| Method | Path | Auth | 상태코드 | 상세 문서 |
+|---|---|---|---|---|
+| GET | `/api/admin/crawl-status` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+
 ### 9. Admin — Feedbacks
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |

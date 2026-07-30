@@ -129,3 +129,8 @@ export const ADMIN_AI_MONITOR = {
   personaPerformance: '[data-testid="ai-persona-performance"]',
   hourlyChart:      '[data-testid="ai-hourly-chart"]',
 } as const
+
+// ── 어드민 크롤링 신선도 배지 (/admin > 크롤 신선도) ──────────────
+export const ADMIN_CRAWL = {
+  freshnessBadge:   '[data-testid="admin-crawl-freshness-badge"]',
+} as const

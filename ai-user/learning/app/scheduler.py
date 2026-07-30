@@ -9,8 +9,12 @@ from zoneinfo import ZoneInfo
 logger = logging.getLogger(__name__)
 KST = ZoneInfo("Asia/Seoul")
 
-# Phase 2: NATEPAN(1500) + BLIND(240) 활성 — 결혼/썸연애/직장 채널 타게팅
-# NATEPAN daily cap 대폭 상향 (50 → 1500)
+# init_scheduler()가 2회 호출되면 daily_crawl이 동시 실행되어 lock timeout(1205)을 유발한다
+# (2026-06-21~24 natepan FAILED 원인). 싱글턴 가드로 차단.
+_scheduler = None
+
+# WO-CRAWL-01: NATEPAN(1500) + BLIND(500) 활성 — 블라인드 최우선 강화 (240→500)
+# 403 차단율을 admin 배지로 관찰하며 단계 증액 예정
 # limit=0 → _do_crawl 내부에서 skip (if not limit: return)
 SOURCES = [
     ("natepan",  1500),  # Phase 1: 전체 예산 NATEPAN 집중
@@ -18,7 +22,7 @@ SOURCES = [
     ("daum",        0),  # 비활성
     ("dcinside",    0),  # 비활성
     ("bobaedream",  0),  # 비활성
-    ("blind",     240),  # Phase 2: 결혼생활·썸·연애·회사생활 채널 (채널당 80개)
+    ("blind",     500),  # WO-CRAWL-01: 결혼생활·썸·연애·회사생활 채널 (채널당 ~166개)
     ("fmkorea",     0),  # 비활성
     ("theqoo",      0),  # 비활성
     ("clien",       0),  # 비활성
@@ -71,7 +75,24 @@ async def run_topic_synthesis():
     except Exception as e:
         logger.error(f"Topic synthesis error: {e}")
 
+
+async def run_recompute_popularity_scores():
+    """크롤 완료 후 이용 지표 바탕으로 popularity_pct 재계산 — KST 04:00에 매일 실행"""
+    try:
+        from app.services.popularity_scorer import recompute_popularity_scores
+        import concurrent.futures, functools
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, functools.partial(recompute_popularity_scores))
+        logger.info(f"Popularity score recomputation completed: {result}")
+    except Exception as e:
+        logger.error(f"Popularity score recomputation error: {e}")
+
 def init_scheduler():
+    global _scheduler
+    if _scheduler is not None:
+        logger.warning("init_scheduler() called twice — reusing existing scheduler (duplicate crawl prevented)")
+        return _scheduler
+
     scheduler_enabled = os.getenv("AI_LEARNING_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
     crawl_enabled = os.getenv("AI_LEARNING_CRAWL_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -86,6 +107,9 @@ def init_scheduler():
     # 크롤 + 강화: 매일 KST 03:00
     scheduler.add_job(run_daily_crawl, CronTrigger(hour=3, minute=0, timezone=KST),
                       id="daily_crawl", name="Daily Crawl + Strengthen")
+    # 인기도 점수 재계산: 매일 KST 04:00 (크롤 완료 후, 강화 전)
+    scheduler.add_job(run_recompute_popularity_scores, CronTrigger(hour=4, minute=0, timezone=KST),
+                      id="daily_popularity", name="Daily Popularity Score Recomputation")
     # 독립 강화+토픽보강: 매일 KST 05:00
     async def _standalone_strengthen_and_synthesize():
         await run_strengthen()
@@ -94,5 +118,6 @@ def init_scheduler():
     scheduler.add_job(_standalone_strengthen_and_synthesize, CronTrigger(hour=5, minute=0, timezone=KST),
                       id="daily_strengthen", name="Daily Strengthen + Topic Synthesis (standalone)")
     scheduler.start()
-    logger.info("Scheduler initialized — crawl 03:00 KST, strengthen 03:00+05:00 KST daily")
+    _scheduler = scheduler
+    logger.info("Scheduler initialized — crawl 03:00 KST, popularity 04:00 KST, strengthen 03:00+05:00 KST daily")
     return scheduler
