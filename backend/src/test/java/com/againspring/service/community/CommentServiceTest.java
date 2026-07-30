@@ -1,11 +1,13 @@
 package com.againspring.service.community;
 
 import com.againspring.domain.community.PostComment;
+import com.againspring.domain.community.Post;
 import com.againspring.domain.enums.CommentStatus;
 import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.safety.KeywordGuard;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +40,7 @@ class CommentServiceTest {
     @Mock private PostLikeRepository postLikeRepository;
     @Mock private KeywordGuard keywordGuard;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private AiUserOutboxWriter aiUserOutboxWriter;
 
     @InjectMocks private CommentService commentService;
 
@@ -91,6 +94,7 @@ class CommentServiceTest {
 
         when(commentRepository.findById(commentId)).thenReturn(Optional.of(top));
         when(commentRepository.findByParentCommentIdOrderByCreatedAtAsc(commentId)).thenReturn(List.of(blockedReply));
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).build()));
 
         commentService.deleteComment(commentId, userId);
 

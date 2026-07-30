@@ -48,7 +48,6 @@ public class BehaviorEngine {
     private final Jitter jitter;
     private final ViewDispatcher viewDispatcher;
     private final OrchestratorProperties props;
-    private final com.againspring.aiuser.orchestrator.service.PostAnalysisService postAnalysisService;
     private final DailyPostQuotaService postQuotaService;
     private final AiUserGenerationConfigRepository generationConfigRepository;
     private final ActionTypeQuotaService actionTypeQuotaService;
@@ -159,23 +158,6 @@ public class BehaviorEngine {
                 .orElse(Collections.emptyList());
             feedPosts.addAll(page);
             if (page.size() < 20) break; // 마지막 페이지면 종료
-        }
-
-        // 5.5 콘텐츠 인식 결정용 지연 분석 — 틱당 budget 제한으로 토큰 통제.
-        // 신규(미분석) 글만, 최대 budget건. 캐시되면 이후 좋아요·투표는 LLM 0.
-        if (props.isContentAwareEnabled()) {
-            int budgetAnalyze = props.getAnalysisBudgetPerTick();
-            int attempts = 0;
-            for (PostDto post : feedPosts) {
-                if (attempts >= budgetAnalyze) break;            // LLM 호출 상한 (성공·실패 무관)
-                if (post.getId() == null) continue;
-                if (postAnalysisService.getCached(post.getId()) != null) continue; // 이미 분석됨
-                attempts++;
-                postAnalysisService.analyzeAndSave(post);
-            }
-            if (attempts > 0) {
-                log.info("Content analysis: {} new post(s) attempted (budget {})", attempts, budgetAnalyze);
-            }
         }
 
         // 6. Get reply targets

@@ -1,0 +1,21 @@
+{
+  "title": "Again Spring human reply batch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["replies"],
+  "properties": {
+    "replies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["humanCommentId", "personaId", "body"],
+        "properties": {
+          "humanCommentId": { "type": "integer", "minimum": 1 },
+          "personaId": { "type": "string" },
+          "body": { "type": "string" }
+        }
+      }
+    }
+  }
+}

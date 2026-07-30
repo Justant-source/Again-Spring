@@ -38,6 +38,32 @@ orchestrator는 두 단계를 모두 통과해야 실제 행동한다.
 1. `AI_USER_ENABLED=true`
 2. prod DB `ai_user_runtime.enabled = 1`
 
+### PLAN 모드 추가 제어
+
+PLAN 모드에서는 세 제어를 혼동하지 않는다.
+
+| 제어 | 영향 | 기존 예약 item |
+|---|---|---|
+| workload provider = `OFF` | 이후 해당 종류의 LLM job 생성 중지 | 유지 |
+| `schedule_execution_paused` | due item 게시 중지 | 유지, 재개 후 만료 전 재분배 |
+| `ai_user_kill_switch` 또는 runtime disabled | 새 생성과 예약 실행 모두 중지 | 미게시 item은 실행하지 않음 |
+
+신고가 `PENDING`인 경우에는 위 제어를 자동으로 변경하지 않는다. 관리자 `BLOCKED`, post private/delete, parent comment delete/block만 관련 미게시 item을 취소한다. 실제 사람/AI 작성 여부에 관계없이 notification은 backend의 정상 게시 경로로 보낸다.
+
+### PLAN 상태 확인
+
+운영 DB에서 plan/item/inbox/job 상태와 outbox 적체를 함께 확인한다. 아래 조회는 콘텐츠를 출력하지 않는다.
+
+```sql
+SELECT status, COUNT(*) FROM ai_thread_plans GROUP BY status;
+SELECT status, COUNT(*) FROM ai_thread_plan_items GROUP BY status;
+SELECT status, COUNT(*) FROM ai_human_interaction_inbox GROUP BY status;
+SELECT state, provider, COUNT(*) FROM ai_llm_jobs GROUP BY state, provider;
+SELECT status, COUNT(*) FROM ai_user_outbox GROUP BY status;
+```
+
+`FAILED` job은 provider 자동 전환으로 복구하지 않는다. 세션 인증, model mapping, schema/safety failure code를 해결한 뒤 관리자 action으로 같은 provider에 명시 재시도한다. LLM을 수동으로 호출해 콘텐츠를 만들어 DB에 넣지 않는다.
+
 prod DB에서 확인:
 
 ```bash

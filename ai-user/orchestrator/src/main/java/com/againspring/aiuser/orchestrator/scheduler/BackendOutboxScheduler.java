@@ -1,0 +1,3 @@
+package com.againspring.aiuser.orchestrator.scheduler;
+import com.againspring.aiuser.orchestrator.config.OrchestratorProperties; import com.againspring.aiuser.orchestrator.service.threadplan.BackendOutboxConsumer; import lombok.RequiredArgsConstructor; import org.springframework.scheduling.annotation.Scheduled; import org.springframework.stereotype.Component;
+@Component @RequiredArgsConstructor public class BackendOutboxScheduler { private final BackendOutboxConsumer consumer; private final OrchestratorProperties props; @Scheduled(cron = "${ai-user.thread-plan.outbox-cron:0 */1 * * * *}") public void consume() { if (props.isEnabled() && props.getThreadPlan().isEnabled()) consumer.consume(); } }

@@ -5,6 +5,7 @@ import com.againspring.repository.UserRepository;
 import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.service.ai.AiCorrectionService;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,6 +34,9 @@ class AdminContentControllerTest {
 
     @Mock
     private AiCorrectionService aiCorrectionService;
+
+    @Mock
+    private AiUserOutboxWriter aiUserOutboxWriter;
 
     @InjectMocks
     private AdminContentController controller;

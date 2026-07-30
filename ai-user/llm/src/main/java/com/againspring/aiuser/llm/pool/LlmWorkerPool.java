@@ -4,6 +4,8 @@ import com.againspring.aiuser.llm.dto.WorkerMetrics;
 import com.againspring.aiuser.llm.exception.*;
 import com.againspring.aiuser.llm.service.ClaudeCliInvoker;
 import com.againspring.aiuser.llm.service.InvokerRouter;
+import com.againspring.aiuser.llm.service.LlmProvider;
+import com.againspring.aiuser.llm.service.StructuredOutputSchema;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -153,6 +155,58 @@ public class LlmWorkerPool {
             Thread.currentThread().interrupt();
             throw new LlmTimeoutException("Sync task interrupted");
         }
+    }
+
+    /** Structured-plan path: provider is explicit and only CLI session bridges are eligible. */
+    public String executeProviderTask(String prompt, String model, long timeoutMs, String correlationId,
+                                      LlmProvider provider) throws LlmException {
+        return executeProviderTask(prompt, model, timeoutMs, correlationId, provider, null);
+    }
+
+    /** v2 structured path: schema is enforced by the selected session CLI. */
+    public String executeProviderTask(String prompt, String model, long timeoutMs, String correlationId,
+                                      LlmProvider provider, StructuredOutputSchema schema) throws LlmException {
+        long effectiveTimeout = timeoutMs > 0 ? timeoutMs : defaultTimeoutMs;
+        String resolvedModel = (model != null && !model.isBlank()) ? model : defaultModel;
+        var selectedInvoker = invokerRouter.routeProvider(provider);
+        long enqueueTime = System.currentTimeMillis();
+        CompletableFuture<String> resultFuture = new CompletableFuture<>();
+        try {
+            executor.submit(() -> {
+                if (System.currentTimeMillis() - enqueueTime > queueWaitTimeoutMs) {
+                    resultFuture.completeExceptionally(new LlmCapacityException("Queue wait timeout exceeded"));
+                    return;
+                }
+                activeCount.incrementAndGet();
+                try {
+                    // Structured endpoints retry exactly once at service level. Do not
+                    // accidentally use the legacy Claude API/CLI fallback policy here.
+                    resultFuture.complete(schema == null
+                            ? selectedInvoker.invokeSingleAttempt(prompt, resolvedModel)
+                            : selectedInvoker.invokeSingleAttempt(prompt, resolvedModel, schema));
+                    completedCount.incrementAndGet();
+                } catch (Exception e) {
+                    if (e instanceof ClaudeCodeException c && c.isThrottled()) throttledCount.incrementAndGet();
+                    resultFuture.completeExceptionally(e);
+                } finally { activeCount.decrementAndGet(); }
+            });
+        } catch (RejectedExecutionException e) {
+            rejectedCount.incrementAndGet();
+            throw new LlmCapacityException("Worker queue full (capacity=" + queueCapacity + ")");
+        }
+        ScheduledFuture<?> timeout = scheduler.schedule(() -> resultFuture.completeExceptionally(
+                new LlmTimeoutException("Provider task timed out after " + effectiveTimeout + "ms")),
+                effectiveTimeout, TimeUnit.MILLISECONDS);
+        try {
+            return resultFuture.get();
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof LlmException le) throw le;
+            throw new ClaudeCodeException("UNKNOWN_ERROR", cause == null ? "Unknown error" : cause.getMessage(), -1, null);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LlmTimeoutException("Provider task interrupted");
+        } finally { timeout.cancel(false); }
     }
 
     /**

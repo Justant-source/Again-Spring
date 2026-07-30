@@ -8,6 +8,7 @@ import com.againspring.domain.enums.PublishMode;
 import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class PostInviteService {
     private final JuryService juryService;
     private final TonalizationService tonalizationService;
     private final AnswerProcessingService answerProcessingService;
+    private final AiUserOutboxWriter aiUserOutboxWriter;
 
     @Value("${app.url:https://againspring.net}")
     private String appUrl;
@@ -132,7 +134,10 @@ public class PostInviteService {
             jurorRepository.deleteByPostId(post.getId());
         }
 
+        post.advanceContentRevision();
+        // partner 입장 추가는 게시글 수정과 동일하게 후속 계획을 무효화한다.
         postRepository.save(post);
+        aiUserOutboxWriter.postRevised(post, "PARTNER_ANSWER_ADDED");
         log.info("Partner {} submitted answer to invite {} — async processing scheduled", partnerUserId, token);
 
         // tonalization + jury 비동기 처리 — HTTP 응답을 블록하지 않음
@@ -180,12 +185,16 @@ public class PostInviteService {
             throw new IllegalArgumentException("UNAUTHORIZED");
         }
 
+        boolean becamePublic = post.getVisibility() != PostVisibility.PUBLIC;
         post.setVisibility(PostVisibility.PUBLIC);
         if (post.getVoteCloseAt() == null) {
             int hours = (post.getVoteDurationHours() != null) ? post.getVoteDurationHours() : 72;
             post.setVoteCloseAt(Instant.now().plusSeconds((long) hours * 3600));
         }
-        postRepository.save(post);
+        Post saved = postRepository.save(post);
+        if (becamePublic) {
+            aiUserOutboxWriter.postPublished(saved);
+        }
         log.info("Published post {} immediately", postId);
     }
 }

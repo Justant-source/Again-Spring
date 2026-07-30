@@ -32,9 +32,12 @@ llm:
     queue-wait-timeout-ms: ${LLM_QUEUE_WAIT_TIMEOUT_MS:30000}
     default-timeout-ms: ${LLM_DEFAULT_TIMEOUT_MS:120000}
     claude-binary-path: ${CLAUDE_BIN:claude}
-    claude-model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
+    claude-model: ${AI_INTERACTION_CLAUDE_MODEL:${CLAUDE_MODEL:claude-haiku-4-5-20251001}}
+    codex-binary-path: ${CODEX_BIN:codex}
+    codex-terra-model: ${AI_POST_CODEX_MODEL:gpt-5.6-terra}
+    codex-luna-model: ${AI_INTERACTION_CODEX_MODEL:gpt-5.6-luna}
   # 글(POST) 전용 모델 오버라이드 — 빈 값이면 claude-model 사용
-  post-model: ${LLM_POST_MODEL:}
+  post-model: ${AI_POST_CLAUDE_MODEL:${LLM_POST_MODEL:claude-sonnet-4-6}}
   api:
     prompt-caching: ${LLM_API_PROMPT_CACHING:false}
     cache-ttl: ${LLM_API_CACHE_TTL:5m}

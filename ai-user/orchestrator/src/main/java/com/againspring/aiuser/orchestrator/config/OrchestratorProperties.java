@@ -5,6 +5,9 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @Getter
 @Setter
 @Component
@@ -26,6 +29,8 @@ public class OrchestratorProperties {
     private ContentAwareDecisions contentAwareDecisions = new ContentAwareDecisions();
     /** paired post 비율/분포 설정. */
     private PairedPost pairedPost = new PairedPost();
+    /** Plan-first foundation settings. Publisher/generator wiring is intentionally separate. */
+    private ThreadPlan threadPlan = new ThreadPlan();
 
     public boolean isContentAwareEnabled() {
         return contentAwareDecisions.isEnabled();
@@ -55,5 +60,30 @@ public class OrchestratorProperties {
         private boolean enabled = true;
         /** 틱당 신규 글 분석 LLM 호출 상한 (토큰 통제). */
         private int analysisBudgetPerTick = 3;
+    }
+
+    @Getter
+    @Setter
+    public static class ThreadPlan {
+        /** Safe maintenance is opt-in until PLAN mode replaces the legacy executor. */
+        private boolean maintenanceEnabled = false;
+        /** PLAN rollout gate. Disabled by default so deployment cannot create content unexpectedly. */
+        private boolean enabled = false;
+        private boolean publisherEnabled = false;
+        private boolean humanReplyBatchEnabled = false;
+        private String aiPostProvider = "CODEX";
+        private String humanPlanProvider = "CODEX";
+        private String aiPostModel = "";
+        private String humanPlanModel = "";
+        private int publishBatchSize = 20;
+        private int humanReplyMaxPosts = 10;
+        private int humanReplyMaxComments = 50;
+        private Map<Integer, Double> kstHourlyHumanWeights = defaultKstWeights();
+
+        private static Map<Integer, Double> defaultKstWeights() {
+            Map<Integer, Double> weights = new LinkedHashMap<>();
+            for (int hour = 0; hour < 24; hour++) weights.put(hour, 1.0d);
+            return weights;
+        }
     }
 }

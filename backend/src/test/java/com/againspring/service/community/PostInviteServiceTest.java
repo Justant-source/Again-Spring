@@ -10,6 +10,7 @@ import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.service.community.AnswerProcessingService;
 import com.againspring.service.community.JuryService;
 import com.againspring.service.community.TonalizationService;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,9 @@ class PostInviteServiceTest {
 
     @Mock
     private AnswerProcessingService answerProcessingService;
+
+    @Mock
+    private AiUserOutboxWriter aiUserOutboxWriter;
 
     @InjectMocks
     private PostInviteService postInviteService;

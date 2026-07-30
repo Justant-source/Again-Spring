@@ -164,6 +164,11 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `ai_user_runtime` | global kill-switch / cap | INT(1 row) |
 | `persona_history_entries` | 글/댓글 재주입용 history | BIGINT auto |
 | `persona_life_state` | casual streak / ongoing situation | VARCHAR(32) |
+| `ai_user_outbox` | backend transaction에서 기록하는 AI-user lifecycle event | CHAR(36) UUID | V87, orchestrator 전달 보장 |
+| `ai_llm_jobs` | provider/model snapshot과 제한 재시도를 기록하는 LLM job | BIGINT auto | V87, prompt/content 원문 미저장 |
+| `ai_thread_plans` | 게시글 revision별 candidate plan | VARCHAR(36) UUID | AI-user Flyway V6가 소유 |
+| `ai_thread_plan_items` | candidate와 due/lease/idempotency 실행 상태 | VARCHAR(36) UUID | AI-user Flyway V6가 소유 |
+| `ai_human_interaction_inbox` | 사람 댓글/대댓글의 30분 batch 입력 | VARCHAR(36) UUID | source comment unique |
 
 ---
 
@@ -196,7 +201,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56, V85)
+### `posts` (V48~V56, V85, V87)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
@@ -219,10 +224,11 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `source_original_title` | VARCHAR(512) | **V85** | 원본 제목 (nullable) |
 | `source_original_body` | LONGTEXT | **V85** | 원본 본문 (nullable) |
 | `created_at`, `updated_at` | TIMESTAMP(3) | V48 | |
+| `content_revision` | INT UNSIGNED | V87 | 내용 변경마다 증가. AI thread plan이 참조한 글 revision과 비교하는 optimistic revision |
 
 ---
 
-### `post_comments` (V50)
+### `post_comments` (V50, V87)
 
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
@@ -232,6 +238,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `parent_id` | BIGINT FK | NULL이면 최상위 댓글, 값이면 대댓글 |
 | `content` | MEDIUMTEXT | **30일 후 NULL** |
 | `is_deleted` | BOOLEAN | 논리적 삭제 플래그 |
+| `content_revision` | INT UNSIGNED | 댓글/대댓글 내용 변경마다 증가. 사람 interaction inbox의 stale 처리 기준 |
 | `created_at`, `updated_at` | TIMESTAMP(3) | |
 
 ---
@@ -377,7 +384,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-## 마이그레이션 요약 (V1~V86 + AI-user V1~V5)
+## 마이그레이션 요약 (V1~V87 + AI-user V1~V6)
 
 | 범위 | 설명 |
 |---|---|
@@ -392,8 +399,10 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | **V77~V84** | (마케팅/운영 기능) |
 | **V85** | posts 테이블에 원본 비교 컬럼 추가 (source_example_id, source_community, source_url, source_original_title, source_original_body) |
 | **V86** | ai_content_corrections 테이블에 source_original_text 컬럼 추가 |
+| **V87** | `posts`/`post_comments` content revision, backend `ai_user_outbox`, `ai_llm_jobs`, PLAN 운영 config 추가 |
 | **AI-user V1~V4** | personas / relationships / runtime / action log / seen posts |
 | **AI-user V5** | `persona_history_entries`, `persona_life_state` 추가 (legacy file history DB 이관) |
+| **AI-user V6** | `ai_thread_plans`, `ai_thread_plan_items`, `ai_human_interaction_inbox` 추가 (별도 Flyway history) |
 
 ---
 

@@ -111,6 +111,25 @@ public class BackendBotClient {
         return createPost(jwt, req, null, null);
     }
 
+    /**
+     * Plan execution retry entrypoint. The plan item's key is passed unchanged
+     * to the backend so an ambiguous network timeout can be replayed safely.
+     */
+    public Optional<PostDto> createPost(String jwt, CreatePostDto req, String idempotencyKey) {
+        try {
+            var request = restClient.post()
+                    .uri("/api/community/posts")
+                    .header("Authorization", "Bearer " + jwt);
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                request.header("Idempotency-Key", idempotencyKey);
+            }
+            return Optional.ofNullable(request.body(req).retrieve().body(PostDto.class));
+        } catch (Exception e) {
+            log.error("Create post failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     public Optional<PostDto> createPost(String jwt, CreatePostDto req, String email, String password) {
         try {
             PostDto result = restClient.post()
@@ -272,6 +291,38 @@ public class BackendBotClient {
             log.warn("Comment failed on post {}: {}", postId, e.getMessage());
             return false;
         }
+    }
+
+    /** Plan publisher needs the returned id so a reserved reply can target its planned parent. */
+    public Optional<String> addCommentReturningId(String jwt, String postId, String commentBody, Long parentCommentId) {
+        return addCommentReturningId(jwt, postId, commentBody, parentCommentId, null);
+    }
+
+    /** Same-key replay support for reserved thread-plan comment items. */
+    public Optional<String> addCommentReturningId(String jwt, String postId, String commentBody,
+                                                   Long parentCommentId, String idempotencyKey) {
+        var dto = CreateCommentDto.builder().body(commentBody).parentCommentId(parentCommentId).build();
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> response = addCommentRequest(jwt, postId, dto, idempotencyKey)
+                    .retrieve()
+                    .body(new org.springframework.core.ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+            Object id = response == null ? null : response.get("id");
+            return id == null ? Optional.empty() : Optional.of(String.valueOf(id));
+        } catch (Exception e) {
+            log.warn("Planned comment failed on post {}: {}", postId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private RestClient.RequestHeadersSpec<?> addCommentRequest(String jwt, String postId,
+                                                                CreateCommentDto dto, String idempotencyKey) {
+        var request = restClient.post().uri("/api/community/posts/{postId}/comments", postId)
+                .header("Authorization", "Bearer " + jwt);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            request.header("Idempotency-Key", idempotencyKey);
+        }
+        return request.body(dto);
     }
 
     /** Create invite token for co-authored post */

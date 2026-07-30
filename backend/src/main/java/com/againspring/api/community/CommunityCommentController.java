@@ -9,6 +9,7 @@ import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.community.CommentService;
+import com.againspring.service.community.BotWriteIdempotencyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,6 +40,7 @@ public class CommunityCommentController {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final PostLikeRepository postLikeRepository;
+    private final BotWriteIdempotencyService botWriteIdempotencyService;
 
     /**
      * 댓글 목록 조회
@@ -132,20 +134,29 @@ public class CommunityCommentController {
     public ResponseEntity<CommentResponse> addComment(
             @PathVariable String postId,
             @Valid @RequestBody CommentRequest request,
-            Authentication authentication) {
+            Authentication authentication,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
         String userId = resolveUserId(authentication);
         // 미인증 사용자도 익명으로 댓글 가능
         if (userId == null) {
             userId = "anon_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         }
+        final String authorId = userId;
 
-        PostComment comment = commentService.addComment(
-                postId,
-                request.getParentCommentId(),
-                userId,
-                request.getBody()
-        );
+        boolean botIdempotent = botWriteIdempotencyService.appliesTo(authorId, idempotencyKey);
+        PostComment comment = botIdempotent
+                ? botWriteIdempotencyService.execute(
+                        authorId, idempotencyKey, BotWriteIdempotencyService.TargetType.COMMENT,
+                        () -> commentService.addComment(postId, request.getParentCommentId(), authorId, request.getBody()),
+                        existingId -> {
+                            try {
+                                return commentService.findCommentById(Long.parseLong(existingId));
+                            } catch (NumberFormatException ignored) {
+                                return null;
+                            }
+                        }).target()
+                : commentService.addComment(postId, request.getParentCommentId(), authorId, request.getBody());
 
         CommentResponse response = CommentResponse.from(comment, false);
         return ResponseEntity.ok(response);

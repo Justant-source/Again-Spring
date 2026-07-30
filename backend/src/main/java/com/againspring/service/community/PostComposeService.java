@@ -8,6 +8,7 @@ import com.againspring.domain.enums.PostVisibility;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.safety.KeywordGuard;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class PostComposeService {
     private final PostRepository postRepository;
     private final VoteOptionRepository voteOptionRepository;
     private final KeywordGuard keywordGuard;
+    private final AiUserOutboxWriter aiUserOutboxWriter;
 
     /**
      * 재구성 출처 스냅샷 — 재구성 모드 생성 시만 전달되며 posts 테이블에 저장.
@@ -110,6 +112,14 @@ public class PostComposeService {
         options.add(VoteOption.builder().postId(postId).label("상대방").orderIdx(1).build());
         voteOptionRepository.saveAll(options);
         log.info("VoteOptions saved for post {}", postId);
+
+        // 비공개 글은 계획을 만들지 않으며, 혹시 남아 있는 계획이 있다면 downstream이 취소한다.
+        // 같은 DB 트랜잭션에만 기록한다. 이 시점에는 외부 워커/LLM을 호출하지 않는다.
+        if (post.getVisibility() == PostVisibility.PUBLIC) {
+            aiUserOutboxWriter.postPublished(post);
+        } else {
+            aiUserOutboxWriter.postLifecycleChanged(post, "POST_PRIVATE", "INITIAL_PRIVATE_VISIBILITY");
+        }
 
         return post;
     }

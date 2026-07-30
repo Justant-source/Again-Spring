@@ -11,6 +11,7 @@ import com.againspring.repository.community.PostRepository;
 import com.againspring.safety.KeywordGuard;
 import com.againspring.service.notification.event.NewCommentEvent;
 import com.againspring.service.notification.event.NewReplyEvent;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,6 +35,13 @@ public class CommentService {
     private final PostLikeRepository postLikeRepository;
     private final KeywordGuard keywordGuard;
     private final ApplicationEventPublisher eventPublisher;
+    private final AiUserOutboxWriter aiUserOutboxWriter;
+
+    /** Internal idempotency replay lookup; not a public API read path. */
+    @Transactional(readOnly = true)
+    public PostComment findCommentById(Long commentId) {
+        return commentRepository.findById(commentId).orElse(null);
+    }
 
     /**
      * 댓글 작성
@@ -77,6 +85,10 @@ public class CommentService {
         PostComment saved = commentRepository.save(comment);
         log.info("Comment added for post {}: comment {}", postId, saved.getId());
 
+        // 사람/AI 여부의 판별 및 inbox 투입은 downstream worker 책임이다.
+        // 여기서는 lifecycle 사실만 원 트랜잭션에 기록한다.
+        aiUserOutboxWriter.commentCreated(post, saved);
+
         if (parent == null) {
             // 최상위 댓글: 글 작성자에게 알림 (자기 자신 제외) — refCommentId = 새 댓글 ID
             if (!authorId.equals(post.getAuthorId())) {
@@ -115,7 +127,11 @@ public class CommentService {
 
         comment.setBody(body);
         comment.setUpdatedAt(Instant.now());
+        comment.advanceContentRevision();
         PostComment saved = commentRepository.save(comment);
+        Post post = postRepository.findById(saved.getPostId())
+                .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + saved.getPostId(), 404));
+        aiUserOutboxWriter.commentUpdated(post, saved);
         log.info("Comment updated: {} by user {}", commentId, userId);
         return saved;
     }
@@ -136,15 +152,21 @@ public class CommentService {
             throw new BusinessException("ACCESS_DENIED", "본인 댓글만 삭제할 수 있습니다.", 403);
         }
 
+        Post post = postRepository.findById(comment.getPostId())
+                .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + comment.getPostId(), 404));
+
         // 최상위 댓글이면 대댓글까지 정리 (orphan 방지)
         if (comment.getParentCommentId() == null) {
             List<PostComment> replies = commentRepository.findByParentCommentIdOrderByCreatedAtAsc(commentId);
             for (PostComment reply : replies) {
+                aiUserOutboxWriter.commentLifecycleChanged(post, reply, "REPLY_DELETED", "AUTHOR_DELETED_PARENT");
                 postLikeRepository.deleteByCommentId(reply.getId());
                 commentRepository.delete(reply);
             }
         }
 
+        aiUserOutboxWriter.commentLifecycleChanged(post, comment,
+                comment.getParentCommentId() == null ? "COMMENT_DELETED" : "REPLY_DELETED", "AUTHOR_DELETED");
         postLikeRepository.deleteByCommentId(commentId);
         commentRepository.delete(comment);
         log.info("Comment deleted: {} by user {}", commentId, userId);

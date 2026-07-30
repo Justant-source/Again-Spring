@@ -18,6 +18,8 @@ import {
   getGenerationStatus,
   type GenerationConfig,
   type Backend,
+  type ThreadPlanProvider,
+  type SchedulerMode,
   type UpdateConfigRequest,
   type EstimateResult,
   type GenerationStatus,
@@ -147,6 +149,47 @@ function BackendSelector({
   );
 }
 
+// ── 계획형 생성 제공자 선택 (연결된 CLI 세션만 사용) ─────────────────────
+function ThreadPlanProviderSelector({
+  label, description, value, onChange,
+}: {
+  label: string;
+  description: string;
+  value: ThreadPlanProvider;
+  onChange: (v: ThreadPlanProvider) => void;
+}) {
+  const badge = value === 'CLAUDE' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                value === 'CODEX'  ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                     'bg-gray-100 text-gray-500 border-gray-200';
+  return (
+    <div className="py-3 border-b last:border-b-0">
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium text-gray-700">{label}</div>
+          <p className="mt-0.5 text-xs text-gray-400">{description}</p>
+        </div>
+        <span className={`text-[11px] font-medium border rounded px-2 py-0.5 ${badge}`}>{value}</span>
+      </div>
+      <div className="mt-2 flex items-center gap-5">
+        {(['CLAUDE', 'CODEX', 'OFF'] as ThreadPlanProvider[]).map(opt => (
+          <label key={opt} className="flex items-center gap-1.5 cursor-pointer text-sm">
+            <input
+              type="radio"
+              name={`thread-provider-${label}`}
+              value={opt}
+              checked={value === opt}
+              onChange={() => onChange(opt)}
+              className="accent-blue-600"
+              data-testid={`ai-thread-provider-${label}-${opt}`}
+            />
+            <span className={opt === 'OFF' ? 'text-gray-400' : ''}>{opt}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── 슬라이더 ──────────────────────────────────────────────────────────────
 function SliderRow({
   label, value, min = 0, max, step = 1, onChange, auto, onToggleAuto, badge, disabled,
@@ -223,6 +266,17 @@ export default function AiUserPage() {
   const [budget,   setBudget]   = useState<string>('');
   const [ratios,   setRatios]   = useState({ comment: 7.6, reply: 4.4, vote: 6.5, like: 15.7 });
 
+  // 계획형 실행기: API 키가 아니라 연결된 Claude Code/Codex CLI 세션을 사용한다.
+  const [schedulerMode, setSchedulerMode] = useState<SchedulerMode>('LEGACY');
+  const [providerAiPostBundle, setProviderAiPostBundle] = useState<ThreadPlanProvider>('OFF');
+  const [providerHumanPostPlan, setProviderHumanPostPlan] = useState<ThreadPlanProvider>('OFF');
+  const [providerHumanInteraction, setProviderHumanInteraction] = useState<ThreadPlanProvider>('OFF');
+  const [scheduleExecutionPaused, setScheduleExecutionPaused] = useState(false);
+  const [aiUserKillSwitch, setAiUserKillSwitch] = useState(false);
+  const [candidatePoolSize, setCandidatePoolSize] = useState(24);
+  const [humanBatchMaxPosts, setHumanBatchMaxPosts] = useState(10);
+  const [humanBatchMaxInteractions, setHumanBatchMaxInteractions] = useState(50);
+
   // ── 진행 현황 상태 ───────────────────────────────────────────────
   const [genStatus, setGenStatus] = useState<GenerationStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -253,6 +307,15 @@ export default function AiUserPage() {
     setBudget(cfg.dailyTokenBudget != null ? String(cfg.dailyTokenBudget) : '');
     setRatios({ comment: cfg.ratioComment, reply: cfg.ratioReply, vote: cfg.ratioVote, like: cfg.ratioLike });
     setServerEstimate(cfg.estimate);
+    setSchedulerMode(cfg.schedulerMode ?? 'LEGACY');
+    setProviderAiPostBundle(cfg.providerAiPostBundle ?? 'OFF');
+    setProviderHumanPostPlan(cfg.providerHumanPostPlan ?? 'OFF');
+    setProviderHumanInteraction(cfg.providerHumanInteraction ?? 'OFF');
+    setScheduleExecutionPaused(cfg.scheduleExecutionPaused ?? false);
+    setAiUserKillSwitch(cfg.aiUserKillSwitch ?? false);
+    setCandidatePoolSize(cfg.candidatePoolSize ?? 24);
+    setHumanBatchMaxPosts(cfg.humanBatchMaxPosts ?? 10);
+    setHumanBatchMaxInteractions(cfg.humanBatchMaxInteractions ?? 50);
   }
 
   // ── 자동 비율 연동 ─────────────────────────────────────────────────
@@ -278,6 +341,15 @@ export default function AiUserPage() {
       backendPost: bPost, backendComment: bComment, backendReply: bReply,
       promptCaching: caching,
       dailyTokenBudget: budget !== '' ? Number(budget) : null,
+      schedulerMode,
+      providerAiPostBundle,
+      providerHumanPostPlan,
+      providerHumanInteraction,
+      scheduleExecutionPaused,
+      aiUserKillSwitch,
+      candidatePoolSize,
+      humanBatchMaxPosts,
+      humanBatchMaxInteractions,
     };
     try {
       const cfg = await updateGenerationConfig(req);
@@ -336,7 +408,11 @@ export default function AiUserPage() {
     );
   }
 
-  const allOff = bPost === 'OFF' && bComment === 'OFF' && bReply === 'OFF';
+  const planProvidersOff = providerAiPostBundle === 'OFF'
+    && providerHumanPostPlan === 'OFF'
+    && providerHumanInteraction === 'OFF';
+  const allOff = aiUserKillSwitch || (schedulerMode === 'PLAN' ? planProvidersOff :
+    (bPost === 'OFF' && bComment === 'OFF' && bReply === 'OFF'));
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -369,7 +445,7 @@ export default function AiUserPage() {
         <TabsList>
           <TabsTrigger value="settings">생성 설정</TabsTrigger>
           <TabsTrigger value="monitor">실시간 관제</TabsTrigger>
-          <TabsTrigger value="api-settings">API 설정</TabsTrigger>
+          <TabsTrigger value="api-settings">기존 API 설정</TabsTrigger>
         </TabsList>
 
         <TabsContent value="settings" className="mt-6">
@@ -418,11 +494,88 @@ export default function AiUserPage() {
             </div>
           </AdminSection>
 
+          {/* 계획형 생성 경로 */}
+          <AdminSection title="계획형 AI 사용자 실행">
+            <div className="px-1 space-y-4">
+              <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs text-blue-800">
+                게시글 하나당 글·댓글·대댓글 후보를 한 번에 생성하고, 예약 실행기가 시간에 맞춰 게시합니다.
+                새 경로는 API 키를 사용하지 않으며 연결된 Claude Code 또는 Codex CLI 세션만 사용합니다.
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">실행 방식</Label>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="scheduler-mode" checked={schedulerMode === 'PLAN'} onChange={() => setSchedulerMode('PLAN')} className="accent-blue-600" />
+                    계획형 실행
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-gray-500">
+                    <input type="radio" name="scheduler-mode" checked={schedulerMode === 'LEGACY'} onChange={() => setSchedulerMode('LEGACY')} className="accent-blue-600" />
+                    기존 실행기 (전환 기간)
+                  </label>
+                </div>
+              </div>
+
+              <div className={schedulerMode === 'PLAN' ? '' : 'opacity-50 pointer-events-none'}>
+                <ThreadPlanProviderSelector
+                  label="AI 글 묶음 생성"
+                  description="AI가 쓴 글의 본문·댓글·대댓글 후보를 1회 생성합니다. Claude는 Sonnet, Codex는 Terra를 사용합니다."
+                  value={providerAiPostBundle}
+                  onChange={setProviderAiPostBundle}
+                />
+                <ThreadPlanProviderSelector
+                  label="사람 글 초기 계획"
+                  description="사람이 글을 쓰면 비동기로 후보와 예약 계획을 1회 생성합니다. Claude는 Haiku, Codex는 Luna를 사용합니다."
+                  value={providerHumanPostPlan}
+                  onChange={setProviderHumanPostPlan}
+                />
+                <ThreadPlanProviderSelector
+                  label="사람 댓글 일괄 답글"
+                  description="30분 주기, 최대 10개 글·50개 상호작용을 제한된 배치 호출로 처리합니다."
+                  value={providerHumanInteraction}
+                  onChange={setProviderHumanInteraction}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t pt-4">
+                <div className="space-y-1">
+                  <Label htmlFor="candidate-pool-size" className="text-xs text-gray-500">게시글당 후보 수</Label>
+                  <Input id="candidate-pool-size" type="number" min={8} max={30} value={candidatePoolSize}
+                    onChange={e => setCandidatePoolSize(Math.max(8, Math.min(30, Number(e.target.value))))} className="h-8" />
+                  <p className="text-[11px] text-gray-400">예약 후보 풀 (8–30)</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="human-batch-posts" className="text-xs text-gray-500">배치당 글 수</Label>
+                  <Input id="human-batch-posts" type="number" min={1} max={10} value={humanBatchMaxPosts}
+                    onChange={e => setHumanBatchMaxPosts(Math.max(1, Math.min(10, Number(e.target.value))))} className="h-8" />
+                  <p className="text-[11px] text-gray-400">사람 댓글 답글 배치 (최대 10)</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="human-batch-interactions" className="text-xs text-gray-500">배치당 상호작용 수</Label>
+                  <Input id="human-batch-interactions" type="number" min={1} max={50} value={humanBatchMaxInteractions}
+                    onChange={e => setHumanBatchMaxInteractions(Math.max(1, Math.min(50, Number(e.target.value))))} className="h-8" />
+                  <p className="text-[11px] text-gray-400">사람 댓글·대댓글 합계 (최대 50)</p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-3">
+                <label className="flex items-start gap-2 cursor-pointer text-sm">
+                  <Checkbox checked={scheduleExecutionPaused} onCheckedChange={v => setScheduleExecutionPaused(Boolean(v))} />
+                  <span><span className="font-medium">예약 실행 일시 정지</span><span className="block text-xs text-gray-400 mt-0.5">이미 생성된 계획은 보존하고, 게시만 멈춥니다.</span></span>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer text-sm">
+                  <Checkbox checked={aiUserKillSwitch} onCheckedChange={v => setAiUserKillSwitch(Boolean(v))} />
+                  <span><span className="font-medium text-red-700">전체 킬 스위치</span><span className="block text-xs text-gray-400 mt-0.5">새 계획 생성과 예약 실행을 모두 차단합니다. 저장 후 적용됩니다.</span></span>
+                </label>
+              </div>
+            </div>
+          </AdminSection>
+
           {/* 백엔드 라우팅 */}
-          <AdminSection title="백엔드 라우팅">
+          <AdminSection title="기존 실행기 백엔드 라우팅">
             <div className="px-1">
               <div className="text-xs text-gray-400 mb-3">
-                콘텐츠 타입별 독립 설정. CLI·API 중 하나만 선택 가능, 둘 다 해제 시 OFF.
+                계획형 전환이 완료되기 전의 기존 실행기 설정입니다. 새 계획형 생성에는 적용되지 않습니다.
               </div>
               <BackendSelector label="POST"    value={bPost}    onChange={setBPost} />
               <BackendSelector label="COMMENT" value={bComment} onChange={setBComment} />
@@ -435,9 +588,12 @@ export default function AiUserPage() {
             </div>
           </AdminSection>
 
-          {/* API 옵션 */}
-          <AdminSection title="API 옵션">
+          {/* 기존 API 옵션 — 계획형 경로에는 적용하지 않음 */}
+          <AdminSection title="기존 실행기 API 옵션">
             <div className="px-1 space-y-4">
+              <p className="text-xs text-amber-700 rounded bg-amber-50 border border-amber-100 px-3 py-2">
+                계획형 AI 사용자 실행에는 적용되지 않습니다. 계획형 경로는 API 키 없이 연결된 CLI 세션으로만 동작합니다.
+              </p>
               <div className="flex items-center gap-3">
                 <Checkbox
                   id="caching"
@@ -661,9 +817,9 @@ export default function AiUserPage() {
 
         <TabsContent value="api-settings" className="mt-6 space-y-4">
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 space-y-1">
-            <p className="font-semibold">🔑 Claude / Anthropic API 설정</p>
-            <p>Anthropic API를 직접 호출하는 기능(수정 분석, API 모드 AI 유저 등)에 사용되는 설정입니다.</p>
-            <p>키와 Base URL은 DB에 저장됩니다. Base URL 변경 시 llm-worker에 즉시 반영됩니다.</p>
+            <p className="font-semibold">기존 Claude / Anthropic API 설정</p>
+            <p>기존 수정 분석 등 API 직접 호출 기능의 호환 설정입니다. 새 계획형 AI 사용자 생성에는 사용되지 않습니다.</p>
+            <p>계획형 생성 제공자는 위의 Claude/Codex 선택과 연결된 CLI 세션으로만 관리합니다.</p>
           </div>
           <AnthropicBaseUrlPanel />
           <AnthropicApiKeyPanel />

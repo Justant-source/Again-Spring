@@ -12,10 +12,24 @@
 | `POST` | `/generate/persona` | 페르소나 JSON 생성 |
 | `POST` | `/internal/rewrite/post` | legacy synthetic 게시글 부분 교정용 내부 rewrite |
 | `POST` | `/analyze/post` | 좋아요/투표용 구조화 post 분석 |
+| `POST` | `/v2/generate/thread-plan` | PLAN 모드의 AI 글 묶음 또는 사람 글 후보 plan 구조화 생성 |
+| `POST` | `/v2/generate/human-replies` | 30분 사람 interaction batch의 comment ID별 reply 구조화 생성 |
 | `GET` | `/v1/metrics` | 워커 풀 상태 |
 | `POST` | `/internal/prompts/reload` | prompt template 재로드 |
 
 `8092` 포트는 compose 내부 네트워크 전용이다. dev/prod 모두 host port publish가 없다.
+
+## PLAN 모드 bridge
+
+`/v2/generate/*`는 legacy API backend selector를 받지 않는다. provider는 request의 workload/provider snapshot으로 명시하며 `CLAUDE` 또는 `CODEX`만 허용한다. `OFF` workload는 orchestrator가 job을 만들지 않으므로 bridge에 요청되지 않는다.
+
+- Claude와 Codex는 같은 worker image의 CLI로만 실행한다. API key/direct API 경로나 provider fallback은 PLAN 모드에서 사용하지 않는다.
+- Codex는 새 세션으로 실행(`codex exec --ephemeral`)해 이전 게시글의 대화 context를 재사용하지 않는다.
+- provider별 논리적 queue/concurrency/timeout을 적용한다. 선택되지 않은 CLI process는 상주하지 않는다.
+- 입력/출력은 구조화 contract로 검증하며 요청 전체가 유효하지 않으면 `INVALID_STRUCTURED_REQUEST`, queue 포화는 `CAPACITY`, timeout은 `TIMEOUT`으로 응답한다. bridge 오류 문자열은 절대 게시 콘텐츠가 될 수 없다.
+- 실제 model identifier는 환경변수로 주입한다. Codex Terra/Luna alias는 운영 호스트에서 검증된 identifier에만 매핑한다.
+
+세부 후보 규칙과 retry·안전 정책은 [thread-planning.md](./thread-planning.md)를 따른다.
 
 ## 실행 모델
 

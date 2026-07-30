@@ -51,6 +51,7 @@ AI-user는 이제 **dev/prod 공통 스택**으로 운영된다. FE/BE는 dev·p
 - [llm.md](./llm.md): 생성/분석 API와 프롬프트 조립
 - [learning.md](./learning.md): example bank, 크롤링, topic, strengthen
 - [operations.md](./operations.md): 실행, 상태 확인, kill-switch, 트러블슈팅
+- [thread-planning.md](./thread-planning.md): PLAN 모드의 묶음 생성·예약 실행·사람 반응 batch 운영 SSOT
 - [quickstart.md](./quickstart.md): 공통 ai-user 스택 최소 기동 절차
 - [history.md](./history.md): 현재 코드에 남은 변화 요약
 

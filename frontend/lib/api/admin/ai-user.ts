@@ -3,6 +3,9 @@ import { api } from '@/lib/api/client';
 // ── Types ─────────────────────────────────────────────────────────────────
 
 export type Backend = 'CLI' | 'API' | 'OFF';
+/** 계획형 AI 사용자 생성 경로. API 키가 아닌 연결된 CLI 세션만 사용한다. */
+export type ThreadPlanProvider = 'CLAUDE' | 'CODEX' | 'OFF';
+export type SchedulerMode = 'LEGACY' | 'PLAN';
 
 export interface EstimateResult {
   callsPerDay: number;
@@ -35,6 +38,16 @@ export interface GenerationConfig {
   ratioVote: number;
   ratioLike: number;
   estimate: EstimateResult;
+
+  schedulerMode: SchedulerMode;
+  providerAiPostBundle: ThreadPlanProvider;
+  providerHumanPostPlan: ThreadPlanProvider;
+  providerHumanInteraction: ThreadPlanProvider;
+  scheduleExecutionPaused: boolean;
+  aiUserKillSwitch: boolean;
+  candidatePoolSize: number;
+  humanBatchMaxPosts: number;
+  humanBatchMaxInteractions: number;
 }
 
 export interface UpdateConfigRequest {
@@ -50,6 +63,15 @@ export interface UpdateConfigRequest {
   backendReply: Backend;
   promptCaching: boolean;
   dailyTokenBudget: number | null;
+  schedulerMode: SchedulerMode;
+  providerAiPostBundle: ThreadPlanProvider;
+  providerHumanPostPlan: ThreadPlanProvider;
+  providerHumanInteraction: ThreadPlanProvider;
+  scheduleExecutionPaused: boolean;
+  aiUserKillSwitch: boolean;
+  candidatePoolSize: number;
+  humanBatchMaxPosts: number;
+  humanBatchMaxInteractions: number;
 }
 
 // ── API calls ────────────────────────────────────────────────────────────

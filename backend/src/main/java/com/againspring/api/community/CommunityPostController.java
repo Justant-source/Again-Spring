@@ -10,6 +10,7 @@ import com.againspring.repository.community.CommunityReportRepository;
 import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.service.community.CommentService;
+import com.againspring.service.community.BotWriteIdempotencyService;
 import com.againspring.service.community.JuryService;
 import com.againspring.service.community.PostComposeService;
 import com.againspring.service.community.PostService;
@@ -60,6 +61,7 @@ public class CommunityPostController {
     private final com.againspring.repository.community.PostCommentRepository postCommentRepository;
     private final com.againspring.repository.community.VoteRepository voteRepository;
     private final com.againspring.repository.community.PostRepository postRepository;
+    private final BotWriteIdempotencyService botWriteIdempotencyService;
 
     /**
      * 포스트 생성 — 원문 즉시 등록 + VoteOption 저장 + jurorCount > 0이면 배심원 비동기 생성
@@ -69,7 +71,8 @@ public class CommunityPostController {
     @Operation(summary = "포스트 생성")
     public ResponseEntity<PostResponse> createPost(
             @Valid @RequestBody PostCreateRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
         String userId = userDetails.getUsername();
         // 재구성 출처 스냅샷 (AI 봇 전용, 일반 사용자는 null)
@@ -83,21 +86,24 @@ public class CommunityPostController {
                 request.getSourceOriginalBody()
             );
         }
-        Post post = composeService.composeAndPublish(
-                userId,
-                request.getUserTitle(),
-                request.getBodyRaw(),
-                request.getCategory(),
-                request.getVisibility(),
-                request.getJurorCount(),
-                request.getSessionId(),
-                source
-        );
+        final com.againspring.service.community.PostComposeService.SourceSnapshot sourceSnapshot = source;
+        boolean botIdempotent = botWriteIdempotencyService.appliesTo(userId, idempotencyKey);
+        BotWriteIdempotencyService.Execution<Post> execution = botIdempotent
+                ? botWriteIdempotencyService.execute(
+                        userId, idempotencyKey, BotWriteIdempotencyService.TargetType.POST,
+                        () -> composeService.composeAndPublish(
+                                userId, request.getUserTitle(), request.getBodyRaw(), request.getCategory(),
+                                request.getVisibility(), request.getJurorCount(), request.getSessionId(), sourceSnapshot),
+                        existingId -> postRepository.findById(existingId).orElse(null))
+                : new BotWriteIdempotencyService.Execution<>(composeService.composeAndPublish(
+                        userId, request.getUserTitle(), request.getBodyRaw(), request.getCategory(),
+                        request.getVisibility(), request.getJurorCount(), request.getSessionId(), sourceSnapshot), true);
+        Post post = execution.target();
 
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
 
         // jurorCount > 0이면 visibility 무관하게 배심원 비동기 생성
-        if (request.getJurorCount() > 0 && !options.isEmpty()) {
+        if (execution.created() && request.getJurorCount() > 0 && !options.isEmpty()) {
             juryService.generateJuryAsync(post, options, request.getJurorCount());
         }
 
@@ -533,9 +539,7 @@ public class CommunityPostController {
         }
         String newBody = body.get("bodyRaw");
         if (newBody == null || newBody.isBlank()) return ResponseEntity.badRequest().build();
-        post.setBodyRaw(newBody);
-        post.setBodyPublished(newBody);
-        postRepository.save(post);
+        postService.updateAuthorBody(post, newBody);
         return ResponseEntity.ok().build();
     }
 
@@ -556,9 +560,7 @@ public class CommunityPostController {
         }
         String newBody = body.get("bodyRaw");
         if (newBody == null || newBody.isBlank()) return ResponseEntity.badRequest().build();
-        post.setPartnerBodyRaw(newBody);
-        post.setPartnerBodyPublished(newBody);
-        postRepository.save(post);
+        postService.updatePartnerBody(post, newBody);
         return ResponseEntity.ok().build();
     }
 

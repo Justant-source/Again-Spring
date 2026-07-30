@@ -109,6 +109,18 @@ public class AdminAiUserController {
         cfg.setPromptCaching(req.promptCaching);
         cfg.setDailyTokenBudget(req.dailyTokenBudget);
 
+        // 계획형 실행기의 설정은 기존 CLI/API 설정과 독립적이다. 새 경로에는
+        // API key 기반 provider나 자동 provider fallback을 허용하지 않는다.
+        cfg.setSchedulerMode(validateSchedulerMode(req.schedulerMode));
+        cfg.setProviderAiPostBundle(validatePlanProvider(req.providerAiPostBundle));
+        cfg.setProviderHumanPostPlan(validatePlanProvider(req.providerHumanPostPlan));
+        cfg.setProviderHumanInteraction(validatePlanProvider(req.providerHumanInteraction));
+        cfg.setScheduleExecutionPaused(req.scheduleExecutionPaused);
+        cfg.setAiUserKillSwitch(req.aiUserKillSwitch);
+        cfg.setCandidatePoolSize(clamp(req.candidatePoolSize, 8, 30));
+        cfg.setHumanBatchMaxPosts(clamp(req.humanBatchMaxPosts, 1, 10));
+        cfg.setHumanBatchMaxInteractions(clamp(req.humanBatchMaxInteractions, 1, 50));
+
         // ── 메타 ──────────────────────────────────────────────────────
         String actor = (auth != null) ? auth.getName() : "unknown";
         cfg.setUpdatedBy(actor);
@@ -178,6 +190,7 @@ public class AdminAiUserController {
         cfg.setBackendPost("OFF");
         cfg.setBackendComment("OFF");
         cfg.setBackendReply("OFF");
+        cfg.setAiUserKillSwitch(true);
         String actor = (auth != null) ? auth.getName() : "unknown";
         cfg.setUpdatedBy(actor);
         cfg.setUpdatedAt(Instant.now());
@@ -288,6 +301,10 @@ public class AdminAiUserController {
                 cfg.isAutoComment(), cfg.isAutoReply(),
                 cfg.getBackendPost(), cfg.getBackendComment(), cfg.getBackendReply(),
                 cfg.isPromptCaching(), cfg.getDailyTokenBudget(),
+                cfg.getSchedulerMode(), cfg.getProviderAiPostBundle(),
+                cfg.getProviderHumanPostPlan(), cfg.getProviderHumanInteraction(),
+                cfg.isScheduleExecutionPaused(), cfg.isAiUserKillSwitch(),
+                cfg.getCandidatePoolSize(), cfg.getHumanBatchMaxPosts(), cfg.getHumanBatchMaxInteractions(),
                 cfg.getUpdatedBy(), cfg.getUpdatedAt() != null ? cfg.getUpdatedAt().toString() : null,
                 RATIO_COMMENT, RATIO_REPLY, RATIO_VOTE, RATIO_LIKE,
                 est
@@ -361,6 +378,16 @@ public class AdminAiUserController {
         return "OFF";
     }
 
+    private static String validateSchedulerMode(String raw) {
+        return "PLAN".equalsIgnoreCase(raw) ? "PLAN" : "LEGACY";
+    }
+
+    private static String validatePlanProvider(String raw) {
+        if ("CLAUDE".equalsIgnoreCase(raw)) return "CLAUDE";
+        if ("CODEX".equalsIgnoreCase(raw)) return "CODEX";
+        return "OFF";
+    }
+
     private static int clamp(int v, int min, int max) {
         return Math.max(min, Math.min(max, v));
     }
@@ -383,6 +410,15 @@ public class AdminAiUserController {
         private String backendReply;
         private boolean promptCaching;
         private Long dailyTokenBudget;
+        private String schedulerMode;
+        private String providerAiPostBundle;
+        private String providerHumanPostPlan;
+        private String providerHumanInteraction;
+        private boolean scheduleExecutionPaused;
+        private boolean aiUserKillSwitch;
+        private int candidatePoolSize = 24;
+        private int humanBatchMaxPosts = 10;
+        private int humanBatchMaxInteractions = 50;
     }
 
     @Getter @AllArgsConstructor
@@ -399,6 +435,15 @@ public class AdminAiUserController {
         private final String  backendReply;
         private final boolean promptCaching;
         private final Long    dailyTokenBudget;
+        private final String schedulerMode;
+        private final String providerAiPostBundle;
+        private final String providerHumanPostPlan;
+        private final String providerHumanInteraction;
+        private final boolean scheduleExecutionPaused;
+        private final boolean aiUserKillSwitch;
+        private final int candidatePoolSize;
+        private final int humanBatchMaxPosts;
+        private final int humanBatchMaxInteractions;
         private final String  updatedBy;
         private final String  updatedAt;
         private final double  ratioComment;

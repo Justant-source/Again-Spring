@@ -26,26 +26,20 @@ export function PlatformPerformanceCards({
     return PLATFORM_LABELS[platform] || platform;
   };
 
-  if (loading) {
-    return (
-      <div className="text-center text-gray-400 text-sm py-6">로드 중...</div>
-    );
-  }
-
-  if (data.length === 0) {
-    return (
-      <Card className="p-6 text-center text-gray-400">
-        아직 플랫폼 게시 기록이 없어요.
-      </Card>
-    );
-  }
-
   return (
     <div
       className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 auto-cols-min"
       data-testid="marketing-platform-performance"
     >
-      {data.map((stat) => (
+      {loading && (
+        <div className="col-span-full text-center text-gray-400 text-sm py-6">로드 중...</div>
+      )}
+      {!loading && data.length === 0 && (
+        <Card className="col-span-full p-6 text-center text-gray-400">
+          아직 플랫폼 게시 기록이 없어요.
+        </Card>
+      )}
+      {!loading && data.map((stat) => (
         <Card key={stat.platform} className="p-4">
           <div className="space-y-3">
             <h3 className="font-semibold text-sm">

@@ -101,14 +101,14 @@ flowchart LR
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
-| POST | `/api/community/posts` | **JWT** | 201 / 422 | 게시글 작성 |
+| POST | `/api/community/posts` | **JWT** | 200 / 400 / 409 / 422 | 게시글 작성 (synthetic bot은 내부 멱등성 헤더 지원) |
 | GET | `/api/community/posts` | 공개 | 200 | 게시글 목록 |
 | GET | `/api/community/posts/search` | 공개 | 200 | 키워드 검색 (`?q=`, `category=`, `page=`, `size=`) |
 | GET | `/api/community/posts/counts` | 공개 | 200 | 광장별 글 수 (`{"":.., "COUPLE":.., ...}`) |
 | GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | 게시글 상세 |
 | PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만) |
 | DELETE | `/api/community/posts/{id}` | **JWT** | 204 / 403 / 404 | 게시글 삭제 (작성자만) |
-| POST | `/api/community/posts/{id}/comments` | **JWT** | 201 / 422 | 댓글 작성 |
+| POST | `/api/community/posts/{id}/comments` | **JWT** | 200 / 400 / 409 / 422 | 댓글 작성 (synthetic bot은 내부 멱등성 헤더 지원) |
 | GET | `/api/community/posts/{id}/comments` | 공개 | 200 | 댓글 목록 |
 | PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | 댓글 수정 (작성자만) |
 | DELETE | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 204 / 403 / 404 | 댓글 삭제 (작성자만) |
@@ -119,6 +119,15 @@ flowchart LR
 | POST | `/api/community/posts/{id}/like` | **JWT** | 201 / 204 | 게시글 좋아요 |
 | POST | `/api/community/posts/{postId}/comments/{id}/report` | **JWT** | 202 | 댓글 신고 |
 | POST | `/api/community/posts/{id}/view` | 공개 | 200 / 400 | 조회수 기록 (deviceId 기준 중복 방지) |
+
+#### 2.0.1 Internal synthetic-bot write idempotency
+
+`POST /api/community/posts` 및 `POST /api/community/posts/{postId}/comments`는 **synthetic=1 봇 계정의 인증 JWT**에 한해 `Idempotency-Key` 헤더를 해석한다. 일반 사용자·익명 요청의 같은 헤더는 무시되며, 공개 사용자 API의 멱등성 계약으로 확장하지 않는다.
+
+- 키는 오케스트레이터 plan item의 기존 `idempotency_key`를 그대로 사용한다(1~160자, `A-Za-z0-9._:-`).
+- 최초 요청은 글/댓글을 작성하고 내부 `bot_request_dedup`에 `key → target type/id, bot user`를 같은 트랜잭션으로 저장한다.
+- 같은 봇이 같은 종류의 키로 재시도하면 기존 글/댓글을 `200`으로 반환하고, 알림·outbox·배심원 생성도 다시 발생시키지 않는다.
+- 다른 봇 또는 다른 target type으로 키를 재사용하면 `409 IDEMPOTENCY_KEY_CONFLICT`; 손상된 매핑은 `409 IDEMPOTENCY_TARGET_*`로 실패한다.
 
 ### 2.1. Partner Invite API
 

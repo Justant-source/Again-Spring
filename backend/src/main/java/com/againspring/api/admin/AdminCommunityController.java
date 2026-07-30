@@ -5,6 +5,7 @@ import com.againspring.domain.community.Post;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.repository.community.CommunityReportRepository;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -19,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * DEPRECATED: 관리자 커뮤니티 운영
@@ -39,6 +41,7 @@ public class AdminCommunityController {
 
     private final CommunityReportRepository communityReportRepository;
     private final PostRepository postRepository;
+    private final AiUserOutboxWriter aiUserOutboxWriter;
 
     /**
      * GET /api/admin/community/reports?status=PENDING&page=0&size=20
@@ -68,6 +71,7 @@ public class AdminCommunityController {
      * 신고 처리 (차단/무시)
      */
     @PostMapping("/reports/{id}/resolve")
+    @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(
         summary = "신고 처리",
@@ -88,7 +92,8 @@ public class AdminCommunityController {
         if ("BLOCK_POST".equals(req.getAction())) {
             postRepository.findById(report.getTargetId()).ifPresent(post -> {
                 post.setStatus(PostStatus.BLOCKED);
-                postRepository.save(post);
+                Post saved = postRepository.save(post);
+                aiUserOutboxWriter.postLifecycleChanged(saved, "POST_BLOCKED", "REPORT_RESOLVED_BLOCK");
             });
         } else if ("BLOCK_COMMENT".equals(req.getAction())) {
             // TODO: 향후 댓글 차단 로직 추가
@@ -112,6 +117,7 @@ public class AdminCommunityController {
      * 포스트 차단 (관리자 직접 조치)
      */
     @PostMapping("/posts/{postId}/block")
+    @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(
         summary = "포스트 차단",
@@ -124,7 +130,8 @@ public class AdminCommunityController {
     public ResponseEntity<Void> blockPost(@PathVariable String postId) {
         postRepository.findById(postId).ifPresent(post -> {
             post.setStatus(PostStatus.BLOCKED);
-            postRepository.save(post);
+            Post saved = postRepository.save(post);
+            aiUserOutboxWriter.postLifecycleChanged(saved, "POST_BLOCKED", "ADMIN_BLOCKED");
         });
         return ResponseEntity.ok().build();
     }
@@ -134,6 +141,7 @@ public class AdminCommunityController {
      * 포스트 차단 해제 (관리자 직접 조치)
      */
     @PostMapping("/posts/{postId}/unblock")
+    @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(
         summary = "포스트 차단 해제",
@@ -146,7 +154,8 @@ public class AdminCommunityController {
     public ResponseEntity<Void> unblockPost(@PathVariable String postId) {
         postRepository.findById(postId).ifPresent(post -> {
             post.setStatus(PostStatus.VOTING);
-            postRepository.save(post);
+            Post saved = postRepository.save(post);
+            aiUserOutboxWriter.postLifecycleChanged(saved, "POST_UNBLOCKED", "ADMIN_UNBLOCKED");
         });
         return ResponseEntity.ok().build();
     }

@@ -34,6 +34,29 @@ public class LlmAiUserClient {
         return generate("/generate/reply", req);
     }
 
+    /** Plan-first contract. Callers persist its output before any publish attempt. */
+    public Optional<java.util.Map<String, Object>> generateThreadPlan(java.util.Map<String, Object> request) {
+        return generateStructured("/v2/generate/thread-plan", request);
+    }
+
+    /** One bounded request for the 30-minute human-comment response batch. */
+    public Optional<java.util.Map<String, Object>> generateHumanReplies(java.util.Map<String, Object> request) {
+        return generateStructured("/v2/generate/human-replies", request);
+    }
+
+    private Optional<java.util.Map<String, Object>> generateStructured(String path, Object request) {
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> response = restClient.post().uri(path).body(request).retrieve()
+                    .body(new org.springframework.core.ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+            if (response != null && !response.containsKey("errorCode")) return Optional.of(response);
+            log.warn("Structured generation failed on {}: {}", path, response == null ? "empty" : response.get("errorCode"));
+        } catch (Exception e) {
+            log.warn("Structured generation call failed on {}: {}", path, e.getMessage());
+        }
+        return Optional.empty();
+    }
+
     /** comment 생성 — 피기백 반응 JSON 포함 버전. */
     public Optional<GenResult> generateCommentR(GenDto.CommentRequest req) {
         return generateWithReactions("/generate/comment", req);

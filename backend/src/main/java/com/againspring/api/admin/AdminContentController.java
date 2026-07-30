@@ -9,6 +9,7 @@ import com.againspring.repository.UserRepository;
 import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.service.ai.AiCorrectionService;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -24,6 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import java.time.Instant;
@@ -48,6 +50,7 @@ public class AdminContentController {
     private final PostCommentRepository postCommentRepository;
     private final UserRepository userRepository;
     private final AiCorrectionService aiCorrectionService;
+    private final AiUserOutboxWriter aiUserOutboxWriter;
 
     // ===== 포스트 관리 =====
 
@@ -157,6 +160,7 @@ public class AdminContentController {
     @ApiResponse(responseCode = "200", description = "포스트 수정 완료")
     @ApiResponse(responseCode = "404", description = "포스트 없음")
     @Auditable(action = "POST_UPDATE", targetType = "POST", targetId = "#postId")
+    @Transactional
     public ResponseEntity<Post> updatePost(
             @PathVariable String postId,
             @RequestBody UpdatePostRequest req,
@@ -172,14 +176,17 @@ public class AdminContentController {
             post.setTitle(req.getTitle());
             post.setUserTitle(req.getTitle());
         }
+        boolean contentChanged = false;
         if (req.getBodyRaw() != null) {
             post.setBodyRaw(req.getBodyRaw());
             // 관리자 수정은 tonalization 없이 즉시 반영
             post.setBodyPublished(req.getBodyRaw());
+            contentChanged = !req.getBodyRaw().equals(originalBody);
         }
         if (req.getPartnerBodyRaw() != null) {
             post.setPartnerBodyRaw(req.getPartnerBodyRaw());
             post.setPartnerBodyPublished(req.getPartnerBodyRaw());
+            contentChanged = true;
         }
         if (req.getStatus() != null) {
             post.setStatus(PostStatus.valueOf(req.getStatus()));
@@ -188,7 +195,17 @@ public class AdminContentController {
             post.setCategory(com.againspring.domain.enums.PostCategory.valueOf(req.getCategory()));
         }
 
+        if (contentChanged) {
+            post.advanceContentRevision();
+        }
+
         Post updated = postRepository.save(post);
+        if (contentChanged) {
+            aiUserOutboxWriter.postRevised(updated, "ADMIN_CONTENT_UPDATED");
+        } else if (req.getStatus() != null) {
+            String eventType = updated.getStatus() == PostStatus.BLOCKED ? "POST_BLOCKED" : "POST_STATUS_CHANGED";
+            aiUserOutboxWriter.postLifecycleChanged(updated, eventType, "ADMIN_STATUS_UPDATED");
+        }
 
         // 본문(bodyRaw) 변경 시 학습 데이터 후보로 PENDING 상태 저장
         if (req.getBodyRaw() != null && !req.getBodyRaw().equals(originalBody)) {
@@ -215,6 +232,7 @@ public class AdminContentController {
     @ApiResponse(responseCode = "204", description = "포스트 삭제 완료")
     @ApiResponse(responseCode = "404", description = "포스트 없음")
     @Auditable(action = "POST_DELETE", targetType = "POST", targetId = "#postId")
+    @Transactional
     public ResponseEntity<Void> deletePost(@PathVariable String postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
@@ -224,7 +242,8 @@ public class AdminContentController {
         post.setDeletedAt(Instant.now());
         post.setDeletedByAdminId(adminId);
 
-        postRepository.save(post);
+        Post saved = postRepository.save(post);
+        aiUserOutboxWriter.postLifecycleChanged(saved, "POST_DELETED", "ADMIN_DELETED");
         return ResponseEntity.noContent().build();
     }
 
@@ -240,12 +259,14 @@ public class AdminContentController {
     @ApiResponse(responseCode = "200", description = "포스트 차단 완료")
     @ApiResponse(responseCode = "404", description = "포스트 없음")
     @Auditable(action = "POST_BLOCK", targetType = "POST", targetId = "#postId")
+    @Transactional
     public ResponseEntity<Void> blockPost(@PathVariable String postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
 
         post.setStatus(PostStatus.BLOCKED);
-        postRepository.save(post);
+        Post saved = postRepository.save(post);
+        aiUserOutboxWriter.postLifecycleChanged(saved, "POST_BLOCKED", "ADMIN_BLOCKED");
         return ResponseEntity.ok().build();
     }
 
@@ -261,12 +282,14 @@ public class AdminContentController {
     @ApiResponse(responseCode = "200", description = "포스트 차단 해제 완료")
     @ApiResponse(responseCode = "404", description = "포스트 없음")
     @Auditable(action = "POST_UNBLOCK", targetType = "POST", targetId = "#postId")
+    @Transactional
     public ResponseEntity<Void> unblockPost(@PathVariable String postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
 
         post.setStatus(PostStatus.VOTING);
-        postRepository.save(post);
+        Post saved = postRepository.save(post);
+        aiUserOutboxWriter.postLifecycleChanged(saved, "POST_UNBLOCKED", "ADMIN_UNBLOCKED");
         return ResponseEntity.ok().build();
     }
 
@@ -316,6 +339,7 @@ public class AdminContentController {
     @ApiResponse(responseCode = "200", description = "댓글 수정 완료")
     @ApiResponse(responseCode = "404", description = "댓글 없음")
     @Auditable(action = "COMMENT_UPDATE", targetType = "COMMENT", targetId = "#commentId")
+    @Transactional
     public ResponseEntity<PostComment> updateComment(
             @PathVariable Long commentId,
             @RequestBody UpdateCommentRequest req,
@@ -326,11 +350,21 @@ public class AdminContentController {
 
         String originalBody = comment.getBody();
 
+        boolean contentChanged = req.getBody() != null && !req.getBody().equals(originalBody);
         if (req.getBody() != null) {
             comment.setBody(req.getBody());
         }
 
+        if (contentChanged) {
+            comment.advanceContentRevision();
+        }
+
         PostComment updated = postCommentRepository.save(comment);
+        if (contentChanged) {
+            Post post = postRepository.findById(updated.getPostId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
+            aiUserOutboxWriter.commentUpdated(post, updated);
+        }
 
         // 본문 변경 시 학습 데이터 후보로 PENDING 상태 저장
         if (req.getBody() != null && !req.getBody().equals(originalBody)) {
@@ -358,6 +392,7 @@ public class AdminContentController {
     @ApiResponse(responseCode = "204", description = "댓글 삭제 완료")
     @ApiResponse(responseCode = "404", description = "댓글 없음")
     @Auditable(action = "COMMENT_DELETE", targetType = "COMMENT", targetId = "#commentId")
+    @Transactional
     public ResponseEntity<Void> deleteComment(@PathVariable Long commentId) {
         PostComment comment = postCommentRepository.findById(commentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND"));
@@ -366,7 +401,11 @@ public class AdminContentController {
         comment.setDeletedAt(Instant.now());
         comment.setDeletedByAdminId(adminId);
 
-        postCommentRepository.save(comment);
+        PostComment saved = postCommentRepository.save(comment);
+        Post post = postRepository.findById(saved.getPostId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
+        aiUserOutboxWriter.commentLifecycleChanged(post, saved,
+                saved.getParentCommentId() == null ? "COMMENT_DELETED" : "REPLY_DELETED", "ADMIN_DELETED");
         return ResponseEntity.noContent().build();
     }
 
@@ -382,12 +421,17 @@ public class AdminContentController {
     @ApiResponse(responseCode = "200", description = "댓글 차단 완료")
     @ApiResponse(responseCode = "404", description = "댓글 없음")
     @Auditable(action = "COMMENT_BLOCK", targetType = "COMMENT", targetId = "#commentId")
+    @Transactional
     public ResponseEntity<Void> blockComment(@PathVariable Long commentId) {
         PostComment comment = postCommentRepository.findById(commentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND"));
 
         comment.setStatus(CommentStatus.BLOCKED);
-        postCommentRepository.save(comment);
+        PostComment saved = postCommentRepository.save(comment);
+        Post post = postRepository.findById(saved.getPostId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
+        aiUserOutboxWriter.commentLifecycleChanged(post, saved,
+                saved.getParentCommentId() == null ? "COMMENT_BLOCKED" : "REPLY_BLOCKED", "ADMIN_BLOCKED");
         return ResponseEntity.ok().build();
     }
 
@@ -403,12 +447,17 @@ public class AdminContentController {
     @ApiResponse(responseCode = "200", description = "댓글 차단 해제 완료")
     @ApiResponse(responseCode = "404", description = "댓글 없음")
     @Auditable(action = "COMMENT_UNBLOCK", targetType = "COMMENT", targetId = "#commentId")
+    @Transactional
     public ResponseEntity<Void> unblockComment(@PathVariable Long commentId) {
         PostComment comment = postCommentRepository.findById(commentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND"));
 
         comment.setStatus(CommentStatus.ACTIVE);
-        postCommentRepository.save(comment);
+        PostComment saved = postCommentRepository.save(comment);
+        Post post = postRepository.findById(saved.getPostId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
+        aiUserOutboxWriter.commentLifecycleChanged(post, saved,
+                saved.getParentCommentId() == null ? "COMMENT_UNBLOCKED" : "REPLY_UNBLOCKED", "ADMIN_UNBLOCKED");
         return ResponseEntity.ok().build();
     }
 

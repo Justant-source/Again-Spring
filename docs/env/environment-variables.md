@@ -90,7 +90,11 @@
 | 변수 | 설명 | 기본값 |
 |---|---|---|
 | `AI_USER_LLM_MODEL` | 댓글/대댓글 기본 모델 | `claude-haiku-4-5-20251001` |
-| `LLM_POST_MODEL` | 글 생성 모델 override | `claude-sonnet-4-6` |
+| `AI_POST_CLAUDE_MODEL` | PLAN AI 글 묶음의 Claude(Sonnet) 모델 | `claude-sonnet-4-6` |
+| `AI_POST_CODEX_MODEL` | PLAN AI 글 묶음의 Codex(Terra) 모델 | `gpt-5.6-terra` |
+| `AI_INTERACTION_CLAUDE_MODEL` | 사람 글 계획·사람 반응 batch의 Claude(Haiku) 모델 | `claude-haiku-4-5-20251001` |
+| `AI_INTERACTION_CODEX_MODEL` | 사람 글 계획·사람 반응 batch의 Codex(Luna) 모델 | `gpt-5.6-luna` |
+| `CODEX_HOST_CONFIG_DIR` | Codex 로그인 세션을 컨테이너 `/root/.codex`로 마운트할 호스트 경로 | `/home/justant/.codex` |
 | `ANTHROPIC_API_KEY` | direct API 경로용 키 | 공란 |
 | `AI_USER_LLM_POOL_SIZE` | AI-user worker pool | `20` |
 | `AI_USER_LLM_QUEUE_CAPACITY` | AI-user queue | `100` |
@@ -101,6 +105,12 @@
 | `SELF_CRITIQUE_EXTRA_CLICHES` | 추가 상투구 차단 | 공란 |
 | `LLM_API_REFUSAL_RETRIES` | refusal 재시도 | `0` |
 | `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 후 fallback | 공란 |
+
+PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
+
+- DB `ai_user_generation_config`: `scheduler_mode`, workload provider, pause/kill switch, 후보 풀과 batch 상한. 관리자 API만 변경한다.
+- env/yml: CLI 경로, 위 모델 식별자, pool/queue/timeout, cron 및 배포 게이트.
+- yml provider 값은 DB 설정 행이 없을 때의 호환 fallback일 뿐이며, DB 값이 항상 우선한다.
 
 ### Learning
 
@@ -166,6 +176,7 @@ prod는 OAuth와 메일 관련 값을 모두 실제 값으로 채워야 한다.
 - `GOOGLE_*`, `KAKAO_*`, `NAVER_*`
 - `GMAIL_APP_PASSWORD`
 - `CLAUDE_HOST_CONFIG_DIR` 존재 + `claude` 로그인 완료
+- `CODEX_HOST_CONFIG_DIR` 존재 + `codex` 로그인 완료
 - `LLM_WORKER_URL=http://againspring-llm:8090`
 - shared ai-user 사용 시 `.env.ai-user`의 prod/dev DB 자격 증명
 

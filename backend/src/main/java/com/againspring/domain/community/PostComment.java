@@ -56,6 +56,15 @@ public class PostComment {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "content_revision", nullable = false)
+    @Builder.Default
+    private Integer contentRevision = 1;
+
+    /** 댓글 본문 변경 시 증가. 예약된 답글 후보의 무효화 기준이다. */
+    public void advanceContentRevision() {
+        contentRevision = contentRevision == null ? 1 : contentRevision + 1;
+    }
+
     @Column(name = "deleted_at")
     private Instant deletedAt;
 

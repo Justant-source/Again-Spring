@@ -2,10 +2,14 @@ package com.againspring.api.admin;
 
 import com.againspring.annotation.Auditable;
 import com.againspring.domain.community.CommunityReport;
+import com.againspring.domain.community.Post;
 import com.againspring.domain.community.PostComment;
 import com.againspring.domain.enums.CommentStatus;
+import com.againspring.domain.enums.PostStatus;
 import com.againspring.repository.community.CommunityReportRepository;
 import com.againspring.repository.community.PostCommentRepository;
+import com.againspring.repository.community.PostRepository;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -22,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
@@ -39,6 +44,8 @@ public class AdminReportController {
 
     private final CommunityReportRepository communityReportRepository;
     private final PostCommentRepository postCommentRepository;
+    private final PostRepository postRepository;
+    private final AiUserOutboxWriter aiUserOutboxWriter;
 
     /**
      * GET /api/admin/reports?status=PENDING&page=0&size=20
@@ -94,6 +101,7 @@ public class AdminReportController {
     @ApiResponse(responseCode = "401", description = "인증 필요")
     @ApiResponse(responseCode = "403", description = "ADMIN 권한 없음")
     @Auditable(action = "REPORT_RESOLVE", targetType = "REPORT", targetId = "#id")
+    @Transactional
     public ResponseEntity<Void> resolveReport(
             @PathVariable Long id,
             @RequestBody ResolveRequest req) {
@@ -103,8 +111,11 @@ public class AdminReportController {
 
         // 신고 대상 조치 처리
         if ("BLOCK_POST".equals(req.getAction())) {
-            // POST 차단 처리 — AdminContentController로 위임 가능
-            // 여기서는 단순히 상태 변경만 수행
+            Post post = postRepository.findById(report.getTargetId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
+            post.setStatus(PostStatus.BLOCKED);
+            Post saved = postRepository.save(post);
+            aiUserOutboxWriter.postLifecycleChanged(saved, "POST_BLOCKED", "REPORT_RESOLVED_BLOCK");
         } else if ("BLOCK_COMMENT".equals(req.getAction())) {
             // 댓글 차단 처리
             try {
@@ -114,7 +125,11 @@ public class AdminReportController {
                                 HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND"));
 
                 comment.setStatus(CommentStatus.BLOCKED);
-                postCommentRepository.save(comment);
+                PostComment saved = postCommentRepository.save(comment);
+                Post post = postRepository.findById(saved.getPostId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
+                aiUserOutboxWriter.commentLifecycleChanged(post, saved,
+                        saved.getParentCommentId() == null ? "COMMENT_BLOCKED" : "REPLY_BLOCKED", "REPORT_RESOLVED_BLOCK");
             } catch (NumberFormatException e) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_TARGET_ID");
             }

@@ -53,6 +53,12 @@ public class ClaudeCliInvoker implements Invoker {
     @Value("${llm.api.refusal-fallback-model:}")
     private String refusalFallbackModel;
 
+    private final StructuredSchemaCatalog schemaCatalog;
+
+    public ClaudeCliInvoker(StructuredSchemaCatalog schemaCatalog) {
+        this.schemaCatalog = schemaCatalog;
+    }
+
     public String invoke(String prompt, String model) throws ClaudeCodeException {
         ClaudeCodeException lastRefusal = null;
         for (int attempt = 0; attempt <= refusalRetries; attempt++) {
@@ -75,8 +81,22 @@ public class ClaudeCliInvoker implements Invoker {
         throw lastRefusal;
     }
 
+    @Override
+    public String invokeSingleAttempt(String prompt, String model) throws ClaudeCodeException {
+        return invokeOnce(prompt, model);
+    }
+
+    @Override
+    public String invokeSingleAttempt(String prompt, String model, StructuredOutputSchema schema) throws ClaudeCodeException {
+        return invokeOnce(prompt, model, schema);
+    }
+
     private String invokeOnce(String prompt, String model) throws ClaudeCodeException {
-        ProcessBuilder pb = buildProcessBuilder(prompt, model);
+        return invokeOnce(prompt, model, null);
+    }
+
+    private String invokeOnce(String prompt, String model, StructuredOutputSchema schema) throws ClaudeCodeException {
+        ProcessBuilder pb = buildProcessBuilder(prompt, model, schema == null ? null : schemaCatalog.json(schema));
         try {
             Process process = pb.start();
             drainStderr(process, "sync");
@@ -125,7 +145,7 @@ public class ClaudeCliInvoker implements Invoker {
 
     private String invokeWithCancelSupportOnce(String prompt, String model, CancelableInvocation inv)
             throws Exception {
-        ProcessBuilder pb = buildProcessBuilder(prompt, model);
+        ProcessBuilder pb = buildProcessBuilder(prompt, model, null);
         Process process = pb.start();
         inv.attachProcess(process);
         drainStderr(process, inv.getInvocationId());
@@ -218,7 +238,7 @@ public class ClaudeCliInvoker implements Invoker {
         t.start();
     }
 
-    private ProcessBuilder buildProcessBuilder(String prompt, String model) {
+    private ProcessBuilder buildProcessBuilder(String prompt, String model, String jsonSchema) {
         int sepIdx = prompt.indexOf(USER_PROMPT_SEP);
         String systemPart;
         String userPart;
@@ -230,21 +250,26 @@ public class ClaudeCliInvoker implements Invoker {
             userPart = prompt;
         }
 
-        ProcessBuilder pb = new ProcessBuilder(
-                claudeBinaryPath,
-                "--print",
-                "--output-format", "stream-json",
-                "--verbose",
-                "--include-partial-messages",
-                "--model", model,
-                "--strict-mcp-config",
-                "--no-session-persistence",
-                "--system-prompt", systemPart,
-                userPart
-        );
+        ProcessBuilder pb = new ProcessBuilder(buildCommand(claudeBinaryPath, model, jsonSchema, systemPart, userPart));
         // CLI 모드는 OAuth(구독) 사용 — ANTHROPIC_API_KEY가 env에 있으면 CLI가 API 크레딧으로 전환됨.
         pb.environment().remove("ANTHROPIC_API_KEY");
         return pb;
+    }
+
+    static java.util.List<String> buildCommand(String binary, String model, String jsonSchema,
+                                               String systemPart, String userPart) {
+        var command = new java.util.ArrayList<String>(java.util.List.of(
+                binary, "--print", "--output-format", "stream-json", "--verbose",
+                "--include-partial-messages", "--model", model, "--strict-mcp-config",
+                "--no-session-persistence"));
+        if (jsonSchema != null && !jsonSchema.isBlank()) {
+            command.add("--json-schema");
+            command.add(jsonSchema);
+        }
+        command.add("--system-prompt");
+        command.add(systemPart);
+        command.add(userPart);
+        return command;
     }
 
     private String augmentPromptForRetry(String prompt, int attempt) {

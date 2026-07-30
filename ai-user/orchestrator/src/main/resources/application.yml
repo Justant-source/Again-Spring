@@ -56,7 +56,7 @@ ai-user:
   min-post-chars: ${AI_USER_MIN_POST_CHARS:50}
   secondary-backend-base-url: ${AI_USER_SECONDARY_BACKEND_URL:}
   paired-post:
-    enabled: ${PAIRED_POST_ENABLED:true}
+    enabled: ${PAIRED_POST_ENABLED:false}
     cron: "${PAIRED_POST_CRON:0 0 5 * * *}"
     pairs-per-run: ${PAIRED_POST_PAIRS:2}
     target-share: ${PAIRED_POST_TARGET_SHARE:0.15}
@@ -64,6 +64,20 @@ ai-user:
   content-aware-decisions:
     enabled: ${AI_USER_CONTENT_AWARE_DECISIONS_ENABLED:true}
     analysis-budget-per-tick: ${AI_USER_ANALYSIS_BUDGET_PER_TICK:3}
+  thread-plan:
+    # Foundation maintenance is disabled until PLAN mode is explicitly rolled out.
+    maintenance-enabled: ${AI_USER_THREAD_PLAN_MAINTENANCE_ENABLED:false}
+    maintenance-cron: "${AI_USER_THREAD_PLAN_MAINTENANCE_CRON:0 */5 * * * *}"
+    enabled: ${AI_USER_THREAD_PLAN_ENABLED:false}
+    publisher-enabled: ${AI_USER_THREAD_PLAN_PUBLISHER_ENABLED:false}
+    human-reply-batch-enabled: ${AI_USER_HUMAN_REPLY_BATCH_ENABLED:false}
+    ai-post-provider: ${AI_USER_THREAD_PLAN_AI_POST_PROVIDER:CODEX}
+    human-plan-provider: ${AI_USER_THREAD_PLAN_HUMAN_PROVIDER:CODEX}
+    ai-post-model: ${AI_USER_THREAD_PLAN_AI_POST_MODEL:}
+    human-plan-model: ${AI_USER_THREAD_PLAN_HUMAN_MODEL:}
+    publish-batch-size: ${AI_USER_THREAD_PLAN_PUBLISH_BATCH_SIZE:20}
+    human-reply-max-posts: ${AI_USER_HUMAN_REPLY_MAX_POSTS:10}
+    human-reply-max-comments: ${AI_USER_HUMAN_REPLY_MAX_COMMENTS:50}
 
 ai-learning:
   base-url: ${AI_LEARNING_BASE_URL:http://againspring-ai-learning:8099}

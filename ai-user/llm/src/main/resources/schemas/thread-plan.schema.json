@@ -1,0 +1,33 @@
+{
+  "title": "Again Spring thread plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["post", "comments"],
+  "properties": {
+    "post": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" }
+      }
+    },
+    "comments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "parentRef", "personaId", "body", "stance", "priority"],
+        "properties": {
+          "ref": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$" },
+          "parentRef": { "type": ["string", "null"] },
+          "personaId": { "type": "string" },
+          "body": { "type": "string" },
+          "stance": { "type": ["string", "null"] },
+          "priority": { "type": ["integer", "null"] }
+        }
+      }
+    }
+  }
+}

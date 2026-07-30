@@ -6,6 +6,7 @@ import com.againspring.domain.enums.PostCategory;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.service.ai.AiUserOutboxWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,6 +28,7 @@ import java.util.Optional;
 public class PostService {
 
     private final PostRepository postRepository;
+    private final AiUserOutboxWriter aiUserOutboxWriter;
 
     /**
      * 공개 포스트 목록 조회 (공개된 VOTING/CLOSED 상태만)
@@ -92,6 +94,28 @@ public class PostService {
 
     public Optional<Post> findById(String postId) {
         return postRepository.findById(postId);
+    }
+
+    /**
+     * 작성자/상대방 본문 변경은 계획형 AI-user 입장에서 새 revision이다.
+     * 이미 게시된 댓글은 삭제하지 않고, downstream이 이전 revision의 미게시 항목만 취소한다.
+     */
+    public Post updateAuthorBody(Post post, String newBody) {
+        post.setBodyRaw(newBody);
+        post.setBodyPublished(newBody);
+        post.advanceContentRevision();
+        Post saved = postRepository.save(post);
+        aiUserOutboxWriter.postRevised(saved, "AUTHOR_BODY_UPDATED");
+        return saved;
+    }
+
+    public Post updatePartnerBody(Post post, String newBody) {
+        post.setPartnerBodyRaw(newBody);
+        post.setPartnerBodyPublished(newBody);
+        post.advanceContentRevision();
+        Post saved = postRepository.save(post);
+        aiUserOutboxWriter.postRevised(saved, "PARTNER_BODY_UPDATED");
+        return saved;
     }
 
     /** 제목/본문 키워드 검색 */
@@ -164,6 +188,7 @@ public class PostService {
             throw new BusinessException("ACCESS_DENIED", "Only author can delete post", 403);
         }
 
+        aiUserOutboxWriter.postLifecycleChanged(post, "POST_DELETED", "AUTHOR_DELETED");
         postRepository.deleteById(postId);
         log.info("Post deleted: {} by user {}", postId, userId);
     }
@@ -179,7 +204,8 @@ public class PostService {
                 .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
 
         post.setStatus(PostStatus.BLOCKED);
-        postRepository.save(post);
+        Post saved = postRepository.save(post);
+        aiUserOutboxWriter.postLifecycleChanged(saved, "POST_BLOCKED", "ADMIN_BLOCKED");
         log.info("Post blocked: {}", postId);
     }
 
@@ -195,7 +221,8 @@ public class PostService {
 
         // 다시 VOTING 상태로 복구
         post.setStatus(PostStatus.VOTING);
-        postRepository.save(post);
+        Post saved = postRepository.save(post);
+        aiUserOutboxWriter.postLifecycleChanged(saved, "POST_UNBLOCKED", "ADMIN_UNBLOCKED");
         log.info("Post unblocked: {}", postId);
     }
 }

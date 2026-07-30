@@ -20,6 +20,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaActionLogRepository
 import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.service.PersonaHistoryStore;
+import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +61,7 @@ public class ActionExecutor {
     private final AiGlobalRuleRepository aiGlobalRuleRepository;
     private final AiUserGenerationConfigRepository generationConfigRepository;
     private final PersonaHistoryStore personaHistoryStore;
+    private final AiPostBundleService aiPostBundleService;
 
     /** 반복 가드 임계 — 생성문 vs 최근 출력의 문자 2-gram Jaccard 최대값이 이 값을 넘으면 1회 재생성. */
     @Value("${ai-user.repetition-threshold:0.45}")
@@ -340,6 +342,21 @@ public class ActionExecutor {
 
     private void executePost(Persona persona, PlannedAction action, String jwt, String corrId) {
         String category = topCategory(persona);
+
+        // PLAN rollout replaces the legacy post-then-plan sequence.  It must not silently
+        // fall back to /generate/post, because that would turn one AI post into two LLM calls.
+        if (aiPostBundleService.ownsPostGeneration()) {
+            String topicHint = persona.getArchetype() + " 관점의 " + category + " 커뮤니티 이야기";
+            aiPostBundleService.generateAndPublish(persona, jwt, category, topicHint, corrId).ifPresentOrElse(bundle -> {
+                markSeen(persona, bundle.post().getId(), true);
+                writeHistory(persona, "posts", bundle.body(), bundle.post().getId(), category);
+                logAction(persona, action, "POSTED", corrId,
+                        java.util.Map.of("postId", bundle.post().getId(), "category", category,
+                                "usedLlm", true, "bundleMode", true));
+            }, () -> logAction(persona, action, "FAILED", corrId,
+                    java.util.Map.of("error", "ai_post_bundle_failed_or_off", "bundleMode", true)));
+            return;
+        }
 
         // R9 Track B: 스트릭 기반 일상 글 확률 (기본 25%, CASUAL 스트릭에 따라 변동)
         double casualProb = computeCasualProb(loadCasualStreak(persona));

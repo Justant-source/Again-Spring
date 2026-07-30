@@ -27,4 +27,15 @@ class InvokerRouterTest {
         assertSame(cliInvoker, router.route("CLI"));
         assertSame(cliInvoker, router.route("unknown"));
     }
+
+    @Test
+    void routeProviderSelectsCodexWithoutUsingLegacyApiRoute() {
+        ClaudeCliInvoker claudeInvoker = mock(ClaudeCliInvoker.class);
+        ClaudeApiInvoker apiInvoker = mock(ClaudeApiInvoker.class);
+        CodexCliInvoker codexInvoker = mock(CodexCliInvoker.class);
+        InvokerRouter router = new InvokerRouter(claudeInvoker, apiInvoker, codexInvoker);
+
+        assertSame(claudeInvoker, router.routeProvider(LlmProvider.CLAUDE));
+        assertSame(codexInvoker, router.routeProvider(LlmProvider.CODEX));
+    }
 }
