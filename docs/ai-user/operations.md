@@ -185,6 +185,23 @@ PLAN 모드를 다시 켜려면: 위 4곳의 ID 타입을 String으로 바꾸고
 - `AI_LEARNING_CRAWL_ENABLED=true`인지 확인
 - 수동 실행이 아니라면 scheduler 로그에 등록 시각이 찍혔는지 확인
 
+### 크롤이 조용히 멈췄을 때 (2026-06-24~07-30, 36일 무크롤 인시던트)
+
+`AI_LEARNING_CRAWL_ENABLED=false`가 실수로 켜진 채 36일간 방치된 사고가 있었다.
+`GET /crawl/log`는 능동 조회해야만 상태를 알 수 있어 아무도 눈치채지 못했다 —
+**"조용히 멈출 수 있다"는 것 자체가 이 시스템의 구조적 위험**이다.
+
+- 1차 확인: `.env.ai-user`의 `AI_LEARNING_CRAWL_ENABLED=true`인지
+- 2차 확인: admin 대시보드의 크롤 신선도 배지(`GET /api/admin/crawl-status`,
+  WO-CRAWL-01) — 24시간 내 성공 크롤이 0건이면 `stale` 경고가 뜬다. 이 배지가
+  재발 방지 장치이므로, 배지 자체가 비정상(조회 오류)이면 그것부터 조사할 것
+- natepan이 SUCCESS/FAILED를 같은 시각에 동시 기록하면 스케줄러 중복
+  초기화(`init_scheduler()` 2회 호출 → 동시 크롤 → DB lock timeout 1205)
+  의심 — `scheduler.py`의 `_scheduler` 싱글턴 가드가 이미 이를 막고 있으니,
+  재발하면 그 가드가 우회됐는지부터 본다
+- 후속 과제(WO-CRAWL-01 미착수분): 텔레그램 하트비트 알림 — 배지는 "들어가서
+  봐야" 아는 수단이라 재발 가능성이 완전히 닫히지 않았다
+
 ### host에서 `localhost:8096`이 안 열릴 때
 
 - compose 설계상 정상이다. orchestrator는 외부 공개 포트가 없다.
