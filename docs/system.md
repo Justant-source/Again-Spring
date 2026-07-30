@@ -56,7 +56,7 @@ flowchart TB
 
         subgraph aiuser["shared ai-user 스택"]
             ORC["ai-user-orchestrator :8096<br/>prod runtime source"]
-            LLM_AI["llm-ai-user :8092"]
+            LLM_AI["llm-ai-user :8092<br/>Claude Code + Codex CLI bridge"]
             LEARN["ai-learning<br/>host :8099 → :8099"]
             SYNC["prod-dev-sync<br/>daily prod→dev anonymized sync"]
         end
@@ -81,7 +81,7 @@ flowchart TB
     BE_P -->|shared ai-user URLs| LLM_AI
     BE_P -->|shared ai-user URLs| LEARN
 
-    ORC -->|write via REST| BE_P
+    ORC -->|outbox consume · due item write via REST| BE_P
     ORC --> DB_P
     ORC --> LLM_AI
     ORC --> LEARN
@@ -96,6 +96,7 @@ flowchart TB
 
 - frontend/backend는 dev와 prod를 분리한다.
 - ai-user 런타임은 `env/docker-compose.ai-user.yml` 하나를 공통으로 사용한다.
+- PLAN-first 경로는 backend outbox → orchestrator plan/item/inbox → CLI 구조화 생성 → due item REST 게시 순서다. LLM API key가 아니라 Claude/Codex 로그인 세션 volume을 사용한다.
 - orchestrator와 learning의 실제 주력 대상은 prod DB와 prod backend다.
 - dev DB는 `prod-dev-sync`가 하루 1회 비식별 upsert를 수행한다.
 
@@ -121,6 +122,7 @@ flowchart TB
 | `docs/shared/policies/user-permissions.json` | `/app/shared/docs/policies/user-permissions.json` | `:ro` | 권한 정책 |
 | `ai-user/docs/personas/` | `/app/personas` | `:rw` | AI-user persona corpus |
 | `${CLAUDE_HOST_CONFIG_DIR}` | `/root/.claude` | `:rw` | Claude CLI 인증 |
+| `${CODEX_HOST_CONFIG_DIR}` | `/root/.codex` | `:rw` | Codex CLI 인증 |
 
 ---
 

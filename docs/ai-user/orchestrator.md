@@ -1,6 +1,6 @@
 # AI User Orchestrator
 
-`ai-user/orchestrator`는 AI-user 시스템의 실질적인 제어면이다. 현재 코드는 "스케줄러가 tick을 부르고, `BehaviorEngine`이 실행 여부를 판단하며, `ActionExecutor`가 실제 행동을 게시"하는 구조다.
+`ai-user/orchestrator`는 AI-user 시스템의 실질적인 제어면이다. 신규 경로는 outbox에서 PLAN을 만들고 due item을 게시하는 구조이며, 기존 tick/`ActionExecutor`는 전환 기간의 호환 경로다.
 
 ## 주요 컴포넌트
 
@@ -14,6 +14,10 @@
 | `PairedPostScheduler` | 연인/부부/친구 양면 사연 |
 | `DailyPlannerScheduler` | 하루 계획 수립 |
 | `CrawlerTriggerScheduler` | learning crawl trigger |
+| `BackendOutboxScheduler` | backend outbox를 소비해 plan/inbox 생성 |
+| `ThreadPlanGenerationScheduler` | 요청된 plan을 구조화 LLM으로 한 번에 생성 |
+| `ThreadPlanPublisherScheduler` | due item lease·멱등 게시 |
+| `HumanReplyBatchScheduler` | 사람 댓글/대댓글을 30분 단위로 묶어 reply 생성 |
 
 ## 스케줄
 
@@ -75,11 +79,23 @@
 - 초단문 지향 힌트가 prompt에 들어간다.
 - 댓글/대댓글 응답에서 `<<<REACT>>>` 이하 JSON을 분리해 piggyback reactions에 사용한다.
 
-## paired posts
+## PLAN-first 실행 경로
+
+1. 글 생성/수정과 사람 댓글/대댓글은 backend outbox에 기록된다.
+2. AI 글은 한 요청으로 post와 후보 풀을, 사람 글은 후보 풀을 생성한다. 후보 풀은 8~30개 범위이며 기본 24개다.
+3. 사람 interaction은 30분마다 최대 10개 post/50개 입력을 묶고, input comment ID마다 최대 한 개의 AI reply만 받는다.
+4. publisher는 부모·공개상태·revision·차단 여부를 재확인한 뒤 `Idempotency-Key`로 게시한다. 실패는 `FAILED`로 남기며 다른 provider로 자동 전환하지 않는다.
+5. 게시글은 최대 24시간만 관리하고, 초기 활동 창에 더 많이 배치하되 KST 사람 활동 분포에 맞춰 심야 집중을 피한다.
+
+세부 계약과 상태 전이는 [thread-planning.md](./thread-planning.md)가 권위본이다.
+
+## paired posts (legacy, 기본 비활성)
 
 `PairedPostScheduler`는 `profiles/relationships.yml`의 `COUPLE`/`MARRIAGE`/`FRIEND` 관계를 사용한다.
 
-현재 기본 정책:
+이 기능은 `PAIRED_POST_ENABLED=false`가 기본이며 신규 PLAN의 생성 경로가 아니다. 과거 기능을 유지해야 할 때만 명시적으로 활성화한다.
+
+활성화했을 때의 과거 정책:
 
 - 하루 synthetic 글 목표(`ai_user_generation_config.target_posts`) 또는 오늘 실제 생성량을 기준으로 paired 글을 최소 `15%` 유지한다.
 - paired 글 내부 구성은 `COUPLE + MARRIAGE`가 `80%`, `FRIEND`가 `20%`를 목표로 맞춘다.
@@ -136,6 +152,6 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 
 ## 현재 코드 기준 주의점
 
-- `AI_USER_ENABLED`는 `BehaviorEngine`의 실제 gate가 아니다.
+- `AI_USER_ENABLED`는 `BehaviorEngine`과 PLAN service의 실제 gate다.
 - runtime row가 비활성이면 scheduler는 계속 돌지만 모든 tick이 skip된다.
-- paired post의 기본 cron과 compose override가 다르다. 운영 주기는 compose가 truth다.
+- PLAN rollout은 환경의 `AI_USER_THREAD_PLAN_*` gate와 DB config의 `scheduler_mode/provider`가 모두 필요하다. provider `OFF`는 새 job만 막고, pause/kill switch의 의미는 [operations.md](./operations.md)를 따른다.

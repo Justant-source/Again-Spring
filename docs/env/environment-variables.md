@@ -73,7 +73,7 @@
 | `AI_USER_PERSONA_TARGET` | admin 목표가 0일 때 fallback 총량 | `50` |
 | `AI_USER_FORCE_ACTIVE` | 강제 활성 모드 | `false` |
 | `AI_USER_SECONDARY_BACKEND_URL` | 보조 backend direct write | 기본 공란 |
-| `PAIRED_POST_ENABLED` | paired posts 활성화 | `true` |
+| `PAIRED_POST_ENABLED` | legacy paired posts 활성화. 신규 PLAN 경로에서는 사용하지 않음 | `false` |
 | `PAIRED_POST_CRON` | paired posts cron | `0 0 */2 * * *` |
 | `PAIRED_POST_PAIRS` | 한 번의 스케줄 실행에서 생성할 최대 pair 수 | `3` |
 | `PAIRED_POST_TARGET_SHARE` | 하루 synthetic 글 중 paired 글 최소 비율 | `0.15` |
@@ -111,6 +111,19 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 - DB `ai_user_generation_config`: `scheduler_mode`, workload provider, pause/kill switch, 후보 풀과 batch 상한. 관리자 API만 변경한다.
 - env/yml: CLI 경로, 위 모델 식별자, pool/queue/timeout, cron 및 배포 게이트.
 - yml provider 값은 DB 설정 행이 없을 때의 호환 fallback일 뿐이며, DB 값이 항상 우선한다.
+
+### PLAN rollout gate
+
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `AI_USER_THREAD_PLAN_ENABLED` | PLAN 생성 서비스 gate | `false` |
+| `AI_USER_THREAD_PLAN_PUBLISHER_ENABLED` | due item 게시 gate | `false` |
+| `AI_USER_HUMAN_REPLY_BATCH_ENABLED` | 30분 사람 interaction batch gate | `false` |
+| `AI_USER_THREAD_PLAN_MAINTENANCE_ENABLED` | 만료/재분배 maintenance gate | `false` |
+| `AI_USER_THREAD_PLAN_AI_POST_PROVIDER` | DB config 부재 시 AI 글 bundle provider | `CODEX` |
+| `AI_USER_THREAD_PLAN_HUMAN_PROVIDER` | DB config 부재 시 사람 글/반응 provider | `CODEX` |
+
+이 gate들은 배포만으로 콘텐츠를 만들지 않도록 모두 기본 `false`다. 실제 provider 선택·pause·kill switch·후보 수·batch 상한은 관리자 API의 DB 설정이 권위다.
 
 ### Learning
 

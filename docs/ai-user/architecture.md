@@ -48,7 +48,15 @@ flowchart LR
 
 ## 주요 경로
 
-### 1. 일반 tick
+### 1. PLAN-first 생성·예약 실행
+
+1. backend의 글/댓글 transaction은 `ai_user_outbox`에 lifecycle event를 함께 기록한다.
+2. orchestrator가 outbox를 소비한다. AI 글에는 post+comment/reply 후보 묶음, 사람 글에는 후보 plan, 사람 댓글/대댓글에는 inbox 항목을 만든다.
+3. `llm-ai-user`는 Claude Code 또는 Codex 세션 CLI를 1회 실행해 JSON Schema를 만족하는 후보 묶음을 반환한다. API key/direct API는 PLAN 경로에서 사용하지 않는다.
+4. plan item은 KST 최근 사람 활동 분포에 맞춰 due 시각을 받고, lease + `Idempotency-Key`로 backend에 한 번만 게시된다.
+5. 사람 interaction inbox는 30분마다 최대 10개 post/50개 interaction을 한 batch로 처리한다.
+
+### 2. Legacy tick (호환 경로)
 
 1. `OrchestratorScheduler`가 cron으로 `BehaviorEngine.tick()`을 호출한다.
 2. `AI_USER_ENABLED=true`가 아니면 scheduler 단계에서 바로 skip된다.
@@ -57,21 +65,23 @@ flowchart LR
 5. `ActionPlanner`와 `ActionExecutor`가 좋아요, 투표, 댓글, 대댓글, 글 생성을 실행한다.
 6. 결과는 `backend-prod`를 통해 운영 커뮤니티에 게시된다.
 
-### 2. 글 생성
+### 3. Legacy 글 생성
 
 1. `ActionExecutor.executePost()`가 페르소나의 최상위 관심 카테고리를 고른다.
 2. `AiLearningClient.findSimilar()`와 `styleSample()`로 예시를 고른다.
 3. `source_url`이 있으면 reconstruct mode로 전환된다.
 4. LLM 응답은 반복 가드, 최소 길이 가드, `ContentSafetyGuard`를 통과해야 한다.
 
-### 3. paired posts
+### 4. Paired posts (기본 비활성 legacy 기능)
+
+`PAIRED_POST_ENABLED=false`가 기본이다. 새 요구사항에서 pair로 추가되는 글은 별도 paired post가 아니라 원 게시글 수정(revision) 이벤트이며, 미게시 PLAN item을 취소하고 debounce 후 재생성한다.
 
 1. `PairedPostScheduler`가 `COUPLE` 또는 `MARRIAGE` 관계를 읽는다.
 2. 작성자 글을 `PRIVATE + WAIT_FOR_PARTNER`로 올린다.
 3. 파트너 입장 본문을 생성해 초대 토큰으로 답변한다.
 4. 이후 기존 tick이 공개된 글에 반응한다.
 
-### 4. 학습/동기화
+### 5. 학습/동기화
 
 1. learning은 example bank, style strengthen, daily topic synthesis를 담당한다.
 2. `AI_LEARNING_ENABLED=false`면 scheduler를 올리지 않는다.
@@ -96,7 +106,10 @@ flowchart LR
 |---|---|---|---|
 | main tick | orchestrator | `0 */10 * * * *` | `AI_USER_ENABLED` + runtime row 둘 다 필요 |
 | daily planner | orchestrator | `0 0 4 * * *` | `AI_USER_ENABLED=false`면 skip |
-| paired posts | orchestrator | `0 0 */2 * * *` | `AI_USER_ENABLED=false`면 skip |
+| paired posts | orchestrator | `0 0 */2 * * *` | 기본 비활성 legacy 기능 |
+| plan generation | orchestrator | 매분 15초 | PLAN enabled + provider가 `OFF`가 아닐 때만 생성 |
+| due item publish | orchestrator | 매분 | publisher enabled + execution pause 해제 시 lease 후 게시 |
+| human reply batch | orchestrator | 30분 | 최대 10 posts / 50 interactions, PLAN enabled일 때만 |
 | crawler trigger | orchestrator | `0 30 18 * * *` | `AI_USER_ENABLED=true` + crawl enabled 필요 |
 | learning daily crawl | learning | `0 3 * * *` KST | `AI_LEARNING_CRAWL_ENABLED=true`일 때만 등록 |
 | learning strengthen/topic | learning | `0 5 * * *` KST | `AI_LEARNING_CRAWL_ENABLED=true`일 때만 등록 |

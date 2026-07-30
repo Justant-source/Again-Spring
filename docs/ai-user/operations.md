@@ -64,6 +64,25 @@ SELECT status, COUNT(*) FROM ai_user_outbox GROUP BY status;
 
 `FAILED` job은 provider 자동 전환으로 복구하지 않는다. 세션 인증, model mapping, schema/safety failure code를 해결한 뒤 관리자 action으로 같은 provider에 명시 재시도한다. LLM을 수동으로 호출해 콘텐츠를 만들어 DB에 넣지 않는다.
 
+### 단일 shared runtime 보장
+
+공통 스택이 healthy인 상태에서 예전 `againspring-*-prod` AI-user 컨테이너가 동시에 실행되면 같은 prod DB의 outbox와 예약 item을 두 consumer가 처리할 수 있다. 다음 이름의 구형 컨테이너만 중지하고, base LLM인 `againspring-llm-prod`는 중지하지 않는다.
+
+```bash
+docker stop againspring-ai-user-orchestrator-prod \
+  againspring-llm-ai-user-prod \
+  againspring-ai-learning-prod
+```
+
+새 stack의 health를 먼저 확인한다.
+
+```bash
+docker compose -f env/docker-compose.ai-user.yml --env-file env/.env.ai-user ps
+docker exec againspring-llm-ai-user wget -qO- http://localhost:8092/actuator/health
+docker exec againspring-ai-user-orchestrator wget -qO- http://localhost:8096/actuator/health
+curl --fail http://localhost:8099/health
+```
+
 prod DB에서 확인:
 
 ```bash

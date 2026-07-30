@@ -31,6 +31,10 @@
 
 세부 후보 규칙과 retry·안전 정책은 [thread-planning.md](./thread-planning.md)를 따른다.
 
+### 검증된 세션 smoke 결과
+
+2026-07-30에 컨테이너에서 provider별로 승인된 단일 구조화 요청을 실행했다. Codex `gpt-5.6-terra`와 Claude `claude-sonnet-4-6` 모두 schema 유효 JSON을 반환했다. 이 검증은 DB/게시 API에 쓰지 않았으며, 실제 운영 콘텐츠 생성은 별도 승인 범위다.
+
 ## 실행 모델
 
 ### worker pool
@@ -46,7 +50,9 @@
 | base model | `claude-haiku-4-5-20251001` |
 | post model override | 빈 값, compose에서는 `claude-sonnet-4-6` |
 
-### backend 경로
+### backend 경로 (legacy 전용)
+
+아래 API 경로는 기존 legacy endpoint의 호환 설명이다. **PLAN `/v2/generate/*`는 이를 사용하지 않으며 Claude Code/Codex CLI 세션만 허용한다.**
 
 - 기본 경로는 Claude CLI bridge다.
 - `backend=API`면 `ClaudeApiInvoker`가 `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL`(DB `system_setting` 우선)로 clcocloud 프록시를 직접 호출한다.

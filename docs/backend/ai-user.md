@@ -8,6 +8,7 @@ backend가 shared ai-user 런타임과 연결되는 지점을 설명한다.
 - ai-user 런타임은 `env/docker-compose.ai-user.yml` 하나를 공통으로 사용한다.
 - orchestrator의 write target은 기본적으로 `backend-prod`다.
 - prod DB가 runtime source of truth이고, dev DB는 `prod-dev-sync`가 하루 1회 반영한다.
+- backend는 게시글·댓글의 생성/수정/삭제 lifecycle을 같은 transaction 안에서 `ai_user_outbox`에 기록한다. PLAN 모드 orchestrator는 이 outbox만 소비해 생성 및 예약 실행을 시작한다.
 
 전체 시스템 구조는 [`../ai-user/README.md`](../ai-user/README.md)를 우선한다.
 
@@ -74,6 +75,8 @@ backend 입장에서 테이블은 두 그룹으로 나뉜다.
 - `GET /api/admin/ai-user/generation-status`
   - posts/action_log를 집계해 진행률을 반환한다.
 
+PLAN 모드에서 `PUT /generation-config`는 `schedulerMode`, workload별 `CLAUDE`/`CODEX`/`OFF` provider, 실행 pause/kill switch, 후보 풀(8~30), 사람 반응 batch 상한(10 post/50 interaction)을 함께 저장한다. provider `OFF`는 새 LLM job만 막고, 이미 예약된 게시를 멈추려면 pause를 사용한다.
+
 ### `AdminAiRulesController`
 
 - 전역 금지 규칙, 첨삭 이력, 프롬프트 템플릿, 페르소나 주의사항을 관리한다.
@@ -86,7 +89,7 @@ backend 입장에서 테이블은 두 그룹으로 나뉜다.
 1. `.env.ai-user`의 `AI_USER_ENABLED=false`
 2. prod DB `ai_user_runtime.enabled=0`
 
-backend의 `kill` API는 2단계 전부를 대체하지 않는다. generation config의 backend 라우팅을 `OFF`로 만드는 소프트 스톱이다.
+backend의 `kill` API는 환경 gate를 대체하지 않는다. PLAN에서는 DB `ai_user_kill_switch`도 설정해 새 plan/job과 예약 실행을 모두 막는 소프트 스톱이다.
 
 ## 운영 시 유의점
 

@@ -63,6 +63,8 @@ docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user ps
 curl http://localhost:8099/health
 ```
 
+기존 `*-prod` 접미사의 AI-user worker/orchestrator/learning 컨테이너가 남아 있으면 새 공통 스택과 같은 prod DB를 동시에 처리할 수 있다. 새 `againspring-llm-ai-user`, `againspring-ai-user-orchestrator`, `againspring-ai-learning`이 healthy가 된 것을 확인한 뒤에만 구형 세 컨테이너를 중지한다. `againspring-llm-prod` 같은 base LLM은 대상이 아니다.
+
 shared ai-user는 다음을 수행한다.
 
 - `ai-user-orchestrator`: prod DB 기준 행동 실행
@@ -86,9 +88,11 @@ cd env
 cp .env.prod.example .env.prod
 $EDITOR .env.prod
 
-docker exec againspring-mariadb-prod \
-  mariadb-dump -uroot -p"${MARIADB_ROOT_PASSWORD}" --single-transaction --routines \
-  againspring > /backups/prod-$(date +%Y%m%d-%H%M%S).sql
+BACKUP_DIR=/home/justant/backups
+mkdir -p "$BACKUP_DIR"
+docker exec againspring-mariadb-prod sh -c \
+  'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction --routines "$MARIADB_DATABASE"' \
+  > "$BACKUP_DIR/prod-$(date +%Y%m%d-%H%M%S).sql"
 
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 docker compose -f docker-compose.prod.yml ps
@@ -110,6 +114,14 @@ bash ./rebuild-stacks.sh ai-user
 - [ ] `mariadb-prod` 백업 완료
 - [ ] 호스트 `~/.claude` 세션 유효
 - [ ] Cloudflare Tunnel 정상
+
+## 2026-07-30 PLAN-first 배포 이력
+
+- 배포 commit: `d5de80db` (`feat: add plan-first ai user generation`)
+- prod DB backup: `/home/justant/backups/againspring-prod-20260730-123713.sql`
+- prod API와 shared `llm-ai-user`/`ai-user-orchestrator`/`ai-learning` health를 확인했다.
+- 구형 `*-prod` AI-user 세 컨테이너는 중지했다. 새 공통 스택만 운영한다.
+- PLAN gate와 workload provider는 기본 비활성 상태로 유지했다. 이는 배포 과정에서 승인되지 않은 실콘텐츠 생성이 일어나지 않도록 하기 위함이다.
 
 ## 헬스 체크
 
