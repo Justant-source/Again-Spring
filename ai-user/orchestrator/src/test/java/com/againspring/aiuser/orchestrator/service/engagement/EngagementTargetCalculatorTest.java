@@ -62,4 +62,113 @@ class EngagementTargetCalculatorTest {
         int high = EngagementTargetCalculator.postLikeTarget(10_000, 50, "post_growth", 0.02, 0.6);
         assertThat(high).isGreaterThan(low);
     }
+
+    @Test
+    void voteTargetMatches15PercentBand() {
+        // views * 0.15 * jitter[0.8,1.2) -> [views*0.12, views*0.18]
+        int target139 = EngagementTargetCalculator.voteTarget(139, "post_c5e81627057f4938a216", 0.15, 80);
+        assertThat(target139).isBetween(16, 25);
+
+        int target207 = EngagementTargetCalculator.voteTarget(207, "post_cd8377c210d74ecca556", 0.15, 80);
+        assertThat(target207).isBetween(24, 38);
+    }
+
+    @Test
+    void voteTargetIsDeterministic() {
+        int first = EngagementTargetCalculator.voteTarget(139, "post_abc", 0.15, 80);
+        int second = EngagementTargetCalculator.voteTarget(139, "post_abc", 0.15, 80);
+        assertThat(first).isEqualTo(second);
+    }
+
+    @Test
+    void voteTargetRespectsCap() {
+        int target = EngagementTargetCalculator.voteTarget(1_000_000L, "post_huge", 0.15, 80);
+        assertThat(target).isEqualTo(80);
+    }
+
+    @Test
+    void voteTargetIsZeroAtZeroViews() {
+        int target = EngagementTargetCalculator.voteTarget(0, "post_zero", 0.15, 80);
+        assertThat(target).isZero();
+    }
+
+    @Test
+    void voteAShareStaysWithinConfiguredBand() {
+        for (String id : new String[]{"post_1", "post_2", "post_3", "post_4", "post_5"}) {
+            double share = EngagementTargetCalculator.voteAShare(id, 0.44, 0.80);
+            assertThat(share).isGreaterThanOrEqualTo(0.44).isLessThan(0.80 + 1e-9);
+        }
+    }
+
+    @Test
+    void voteAShareIsDeterministic() {
+        double first = EngagementTargetCalculator.voteAShare("post_xyz", 0.44, 0.80);
+        double second = EngagementTargetCalculator.voteAShare("post_xyz", 0.44, 0.80);
+        assertThat(first).isEqualTo(second);
+    }
+
+    @Test
+    void voteAShareIsDecorrelatedFromJitter() {
+        // Regression guard: voteAShare must use a differently salted hash than jitter(), or a
+        // post's vote-count target and its A-share target would be perfectly correlated (same
+        // hash, same id) -- high-vote-target posts would always skew the same direction, which
+        // does not match the observed natural distribution (share uncorrelated with volume).
+        String[] ids = {"post_a", "post_b", "post_c", "post_d", "post_e", "post_f", "post_g", "post_h"};
+        boolean sameOrder = true;
+        double[] jitters = new double[ids.length];
+        double[] shares = new double[ids.length];
+        for (int i = 0; i < ids.length; i++) {
+            jitters[i] = EngagementTargetCalculator.jitter(ids[i]);
+            shares[i] = EngagementTargetCalculator.voteAShare(ids[i], 0.44, 0.80);
+        }
+        // If every pairwise order of jitter matched the pairwise order of share, the two would be
+        // fully rank-correlated -- assert at least one inversion exists (i.e. NOT fully correlated).
+        outer:
+        for (int i = 0; i < ids.length; i++) {
+            for (int j = i + 1; j < ids.length; j++) {
+                boolean jitterOrder = jitters[i] < jitters[j];
+                boolean shareOrder = shares[i] < shares[j];
+                if (jitterOrder != shareOrder) {
+                    sameOrder = false;
+                    break outer;
+                }
+            }
+        }
+        assertThat(sameOrder).as("jitter() and voteAShare() must not be fully rank-correlated").isFalse();
+    }
+
+    @Test
+    void chooseVoteOptionConvergesToTargetShare() {
+        int a = 0;
+        int b = 0;
+        double targetAShare = 0.66;
+        for (int i = 0; i < 40; i++) {
+            if (EngagementTargetCalculator.chooseVoteOptionIndex(a, b, targetAShare) == 0) a++; else b++;
+        }
+        double finalShare = (double) a / (a + b);
+        assertThat(finalShare).isCloseTo(targetAShare, org.assertj.core.data.Offset.offset(0.05));
+    }
+
+    @Test
+    void chooseVoteOptionCorrectsForExistingHumanVotes() {
+        // Humans already voted 0:20 (all B). Target is 66% A -- every synthetic vote from here
+        // should go to A until the ratio catches up, never flipping/removing the existing B votes.
+        int currentA = 0;
+        int currentB = 20;
+        for (int i = 0; i < 5; i++) {
+            int choice = EngagementTargetCalculator.chooseVoteOptionIndex(currentA, currentB, 0.66);
+            assertThat(choice).isZero();
+            currentA++;
+        }
+    }
+
+    @Test
+    void chooseVoteOptionNeverReturnsInvalidIndex() {
+        for (int a = 0; a < 10; a++) {
+            for (int b = 0; b < 10; b++) {
+                int choice = EngagementTargetCalculator.chooseVoteOptionIndex(a, b, 0.5);
+                assertThat(choice).isIn(0, 1);
+            }
+        }
+    }
 }

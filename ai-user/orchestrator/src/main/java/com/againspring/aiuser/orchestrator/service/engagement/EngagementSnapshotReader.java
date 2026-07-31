@@ -139,6 +139,57 @@ public class EngagementSnapshotReader {
     }
 
     /**
+     * Vote options for a post, ordered by order_idx (0 = author/"A", 1 = counterpart/"B").
+     * Empty if the post has no vote (posts always have exactly 2 per V49 schema, but this
+     * defensively returns whatever exists rather than assuming exactly two).
+     */
+    public List<VoteOptionRow> voteOptions(String postId) {
+        try {
+            String sql = "SELECT id, order_idx FROM vote_options WHERE post_id = ? ORDER BY order_idx";
+            return jdbc.query(sql, (rs, rowNum) -> new VoteOptionRow(rs.getLong("id"), rs.getInt("order_idx")),
+                    postId);
+        } catch (Exception e) {
+            log.warn("voteOptions query failed for postId={}: {}", postId, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Current vote count per option_id for a post. Missing option_ids simply have no entry
+     * (treat as 0 at the call site).
+     */
+    public Map<Long, Integer> voteCountsByOption(String postId) {
+        try {
+            String sql = "SELECT option_id, COUNT(*) c FROM votes WHERE post_id = ? GROUP BY option_id";
+            List<Map<String, Object>> rows = jdbc.queryForList(sql, postId);
+            Map<Long, Integer> counts = new HashMap<>();
+            for (Map<String, Object> row : rows) {
+                counts.put(((Number) row.get("option_id")).longValue(), ((Number) row.get("c")).intValue());
+            }
+            return counts;
+        } catch (Exception e) {
+            log.warn("voteCountsByOption query failed for postId={}: {}", postId, e.getMessage());
+            return Collections.emptyMap();
+        }
+    }
+
+    /**
+     * User IDs that have already voted on a post. votes.post_id+voter_user_id is UNIQUE and
+     * the backend rejects a second vote with 409 ALREADY_VOTED — this filter is mandatory
+     * before dispatching, not just an optimization.
+     */
+    public Set<String> alreadyVotedUserIds(String postId) {
+        try {
+            String sql = "SELECT voter_user_id FROM votes WHERE post_id = ? AND voter_user_id IS NOT NULL";
+            List<String> userIds = jdbc.queryForList(sql, String.class, postId);
+            return new HashSet<>(userIds);
+        } catch (Exception e) {
+            log.warn("alreadyVotedUserIds query failed for postId={}: {}", postId, e.getMessage());
+            return Collections.emptySet();
+        }
+    }
+
+    /**
      * Snapshot of a single post with its metadata and comments/replies.
      */
     public record PostSnapshot(String postId, String authorId, long viewCount, List<CommentRow> comments) { }
@@ -148,4 +199,7 @@ public class EngagementSnapshotReader {
      * childReplyCount = number of direct child replies under this comment.
      */
     public record CommentRow(long id, String authorId, Long parentCommentId, int likeCount, int childReplyCount) { }
+
+    /** A single vote_options row. orderIdx 0 = author/"A" side, 1 = counterpart/"B" side. */
+    public record VoteOptionRow(long id, int orderIdx) { }
 }

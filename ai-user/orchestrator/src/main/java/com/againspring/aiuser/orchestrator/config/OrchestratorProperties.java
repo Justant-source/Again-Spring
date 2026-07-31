@@ -121,9 +121,35 @@ public class OrchestratorProperties {
         private int commentLikeCap = 12;
         private double replyLikePerView = 0.012;
         private int replyLikeCap = 5;
-        /** 한 실행에서 댓글 좋아요 후보로 쓸 페르소나 풀 크기 (warm 우선 + cold 예산). */
-        private int personaPoolSize = 30;
+        /**
+         * 한 실행에서 좋아요·투표 후보로 쓸 페르소나 풀 크기 (warm 우선 + cold 예산).
+         * 2026-07-31 30→60: 투표는 votes.UNIQUE(post_id,voter_user_id) 제약 때문에 한
+         * 페르소나가 한 글에 1표뿐이라, 댓글 좋아요(cap 12)와 달리 풀(30)보다 큰 투표
+         * 타깃(최대 voteCap=80, 실무 도달치 최대 ~37)에 쉽게 걸린다. warm 우선 선발이라
+         * 풀이 작으면 매 실행 거의 같은 인원이 뽑히고, 그 인원이 1회차에 전부 투표하면
+         * 2회차부터 후보가 cold 예산만큼만 남는다.
+         */
+        private int personaPoolSize = 60;
         /** 풀 구성 시 새로 로그인(cold)시킬 페르소나 상한 — 분당 5회 로그인 레이트리밋 공유 대비. */
         private int coldLoginBudget = 3;
+
+        /** 투표 리콘실 on/off (2026-07-31~, VoteLikeBatchService 대체). */
+        private boolean votesEnabled = true;
+        /**
+         * 투표는 익명이라 실사용자가 댓글보다 훨씬 활발히 참여한다 — 조회수의 15%를
+         * 타깃으로 잡는다(댓글 타깃보다 훨씬 큰 값, 사용자 확정 사양).
+         */
+        private double votePerView = 0.15;
+        private int voteCap = 80;
+        /** 댓글/대댓글 좋아요와 예산을 공유하지 않는 투표 전용 실행당 상한. */
+        private int maxVoteCallsPerRun = 40;
+        /** 한 글이 페르소나 풀을 통째로 소진해 나머지 글의 투표를 굶기는 걸 막는 상한. */
+        private int maxVotesPerPostPerRun = 8;
+        /** 글별 결정적 목표 A(작성자측) 비율의 하한 — prod 실측 자연 분포 44~80%. */
+        private double voteAShareMin = 0.44;
+        private double voteAShareMax = 0.80;
+
+        /** 글 좋아요 리콘실 on/off (2026-07-31~, VoteLikeBatchService 대체). */
+        private boolean postLikesEnabled = true;
     }
 }

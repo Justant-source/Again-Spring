@@ -100,4 +100,66 @@ public final class EngagementTargetCalculator {
     public static int deficit(int target, int current) {
         return Math.max(0, target - current);
     }
+
+    /**
+     * Target vote count for a post.
+     * Formula: round(views * perView * jitter). Clamped to [0, cap].
+     *
+     * @param views post view count
+     * @param postId string identifier of the post (jitter source)
+     * @param perView votes per view (e.g., 0.15 — votes are anonymous, so real users vote far
+     *                more readily than they comment; see docs/ai-user/thread-planning.md)
+     * @param cap maximum vote count
+     * @return target vote count in [0, cap]
+     */
+    public static int voteTarget(long views, String postId, double perView, int cap) {
+        double raw = views * perView * jitter(postId);
+        int target = Math.toIntExact(Math.round(raw));
+        return Math.max(0, Math.min(target, cap));
+    }
+
+    /**
+     * Deterministic target share of votes for option index 0 (the author's / "A" side),
+     * within {@code [min, max]}.
+     *
+     * <p><b>Uses a separately salted hash, not {@link #jitter}.</b> If this reused
+     * {@code jitter(postId)}, a post's target vote count and its target A-share would be
+     * perfectly correlated (same hash, same id) — posts with a high vote target would always
+     * skew toward the same side, which is not how the pre-engagement-dispatcher natural
+     * distribution looked (44~80% A-share, uncorrelated with volume). Salting the input
+     * ("ashare:" + postId) before hashing decorrelates the two draws while staying fully
+     * deterministic per post.
+     *
+     * @param postId string identifier of the post
+     * @param min minimum A-share (e.g., 0.44 — observed natural floor)
+     * @param max maximum A-share (e.g., 0.80 — observed natural ceiling)
+     * @return target A-share in [min, max]
+     */
+    public static double voteAShare(String postId, double min, double max) {
+        CRC32 crc = new CRC32();
+        crc.update(("ashare:" + postId).getBytes());
+        long hash = crc.getValue();
+        double fraction = (hash % 1000) / 1000.0; // [0, 1)
+        return min + fraction * (max - min);
+    }
+
+    /**
+     * Picks which vote option index (0 = author/"A", 1 = counterpart/"B") to cast the next
+     * synthetic vote for, given the current split and a target A-share.
+     *
+     * <p>Greedy proportional fill: cast for A whenever doing so would still keep A's share at
+     * or below target after the vote, otherwise cast for B. This only ever adds a vote for
+     * whichever side is currently under-represented relative to the target — it never suggests
+     * removing or flipping an existing vote, so real human votes already cast are never
+     * overridden, only diluted toward the target ratio by new synthetic votes.
+     *
+     * @param currentA current vote count for option 0 (author/A)
+     * @param currentB current vote count for option 1 (counterpart/B)
+     * @param targetAShare desired share of votes for A, in [0, 1]
+     * @return 0 to vote for A, 1 to vote for B
+     */
+    public static int chooseVoteOptionIndex(int currentA, int currentB, double targetAShare) {
+        boolean fillA = currentA < targetAShare * (currentA + currentB + 1);
+        return fillA ? 0 : 1;
+    }
 }

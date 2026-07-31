@@ -328,10 +328,10 @@ public class AdminTriggerController {
     }
 
     /**
-     * 댓글/대댓글 좋아요 + 조회수 리콘실 — PlanEngagementDispatcher.reconcile()의 유일한 진입점.
+     * 댓글/대댓글 좋아요·글 좋아요·투표·조회수 리콘실 — PlanEngagementDispatcher.reconcile()의
+     * 유일한 진입점(2026-07-31~ 투표/글좋아요 흡수, VoteLikeBatchService 삭제).
      * dryRun=true: 실제 반영 없이 부족분(deficit)만 동기 계산해서 즉시 반환(공식 검증용).
-     * dryRun=false: 비동기 실행, 즉시 202 반환(실제 좋아요 호출은 수 분 걸릴 수 있음).
-     * post 좋아요·투표는 대상 아님 — VoteLikeBatchService가 별도로 담당(provider_vote_like).
+     * dryRun=false: 비동기 실행, 즉시 202 반환(실제 좋아요/투표 호출은 수 분 걸릴 수 있음).
      */
     @PostMapping("/reconcile-engagement")
     public ResponseEntity<Map<String, Object>> reconcileEngagement(
@@ -357,8 +357,9 @@ public class AdminTriggerController {
     @Async
     void runEngagementReconcileAsync(int days, int maxPosts, int maxLikeCalls) {
         var result = engagementDispatcher.reconcile(days, maxPosts, maxLikeCalls, false);
-        log.info("[AdminTrigger] reconcile-engagement done: posts={} views={} commentLikes={} replyLikes={}",
-                result.postsScanned(), result.viewsUpdated(), result.commentLikesApplied(), result.replyLikesApplied());
+        log.info("[AdminTrigger] reconcile-engagement done: posts={} views={} commentLikes={} replyLikes={} votes={} postLikes={}",
+                result.postsScanned(), result.viewsUpdated(), result.commentLikesApplied(), result.replyLikesApplied(),
+                result.votesApplied(), result.postLikesApplied());
     }
 
     /** ActionExecutor.topCategory()와 동일한 로직 — category NOT NULL이라 반드시 채워야 한다. */

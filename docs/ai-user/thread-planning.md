@@ -129,13 +129,46 @@ flowchart LR
 - 매 실행마다 조회수(`ViewDispatcher.dispatchViews()`)를 먼저 갱신한 뒤 그 값으로
   좋아요 타깃을 계산한다 — `ViewDispatcher`가 의도적으로 좋아요를 조회수 공식에서
   빼는 것과 짝을 이뤄 순환 증폭을 막는다.
-- **post like target(`views * 0.02 + comments/replies * 0.6`)은 이 디스패처가
-  다루지 않는다.** 글 좋아요·투표는
-  `service/threadplan/VoteLikeBatchService.java`(`provider_vote_like`,
-  목표-카운트 기반)가 별도로 담당 — 두 메커니즘이 같은 post-like 카운터에
-  동시에 수렴하는 걸 막기 위한 의도적 역할 분리다.
-  `EngagementTargetCalculator.postLikeTarget()`는 공식 완전성을 위해 남아있지만
-  아무도 호출하지 않는다.
+- **post like target: `views * 0.02 + comments/replies * 0.6`.** 2026-07-31까지는
+  이 디스패처가 다루지 않고 `service/threadplan/VoteLikeBatchService.java`
+  (`provider_vote_like` 게이트, 글로벌 일일 쿼터)가 별도로 담당했으나, **그
+  서비스는 삭제됐다.** 원인: `provider_vote_like`가 prod에서 계속 `'OFF'`였고
+  — 새벽 배치 스크립트(`env/scripts/nightly-ai-user-batch.sh`)는 LLM provider
+  3종만 켜고 이 컬럼은 건드리지 않아서 — 투표·글 좋아요가 완전히 0에
+  수렴했다(실측: `persona_action_log` VOTE 7/27~29 일 14~28건 → 7/31 **2건**,
+  LIKE 동 기간 13~26건 → **0건**). 이제 `PlanEngagementDispatcher`가 흡수해
+  `postLikeTarget()`을 직접 호출한다. 좋아요는 토글이라 이미 누른 페르소나가
+  재선택되면 오히려 깎이므로, 후보에서 `alreadyLikedPostAuthorIds(postId)`와
+  글 작성자(`snapshot.authorId()`) 제외가 필수다. 예산은 댓글/대댓글 좋아요와
+  `maxLikeCallsPerRun`을 공유한다(같은 토글 성격·같은 위험).
+- **투표(vote) target: `views * 0.15`, 최대 80.** 익명 투표는 실사용자가 댓글보다
+  훨씬 활발히 참여한다는 판단(사용자 확정, 2026-07-31)으로 댓글 계수보다 훨씬
+  큰 15%를 쓴다(조회수 139 → 17~25표, 현재 댓글 6~14개의 약 1.5~2배). 이것도
+  `VoteLikeBatchService` 삭제로 흡수된 기능이다. 그 서비스의 구조적 결함
+  두 가지도 같이 해결됐다:
+  - **A:B 편향**: 옛 서비스는 항상 `voteOptions.get(0)`만 찍어 100:0으로
+    쏠렸다. 지금은 글마다 결정적 목표 A(작성자측) 비율을
+    `EngagementTargetCalculator.voteAShare(postId, min, max)`로 구하고(기본
+    `[0.44, 0.80]`, prod 자연 분포 실측치), `chooseVoteOptionIndex(currentA,
+    currentB, targetAShare)`로 그 목표에 못 미치는 쪽에만 표를 얹는다 — 표를
+    **추가만** 하므로 사람이 이미 던진 표를 뒤집지 않는다. `voteAShare`는
+    `jitter()`와 **다른 솔트**(`"ashare:"+postId`)로 해시한다 — 같은 해시를
+    쓰면 표 목표량과 A-비율이 완전히 상관돼 "표 많은 글은 항상 A 편중"이라는
+    부자연스러운 패턴이 생긴다.
+  - **중복 투표 방지**: `votes` 테이블의 `UNIQUE(post_id, voter_user_id)` 때문에
+    같은 페르소나가 같은 글에 두 번 투표하면 백엔드가 409를 던진다. 디스패치
+    전 `alreadyVotedUserIds(postId)`로 반드시 걸러낸다.
+  - **예산 분리**: 투표는 `maxVoteCallsPerRun`(기본 40)이라는 별도 카운터를
+    쓴다 — 댓글 좋아요 backfill이 `maxLikeCallsPerRun`을 다 먹으면 투표가
+    영구히 굶는 걸 막기 위함이다. `maxVotesPerPostPerRun`(기본 8)으로 한 글이
+    페르소나 풀을 통째로 소진해 나머지 글의 투표를 굶기는 것도 막는다 — 미달분은
+    다음 5분 실행이 DB에서 deficit을 다시 읽어 이어받는다.
+  - **페르소나 풀 60으로 상향**(기존 30): 투표는 UNIQUE 제약상 한 페르소나가
+    한 글에 1표뿐이라, cap 12인 댓글 좋아요와 달리 풀보다 큰 투표 타깃(최대
+    80, 실무 최대 ~37)에 쉽게 걸린다. warm 우선 선발이라 풀이 작으면 매 실행
+    거의 같은 인원이 뽑히고 그 인원이 1회차에 전부 투표하면 2회차부터 후보가
+    `coldLoginBudget`(3)만큼만 남는다. 60은 상한일 뿐이라 로그인 부하는
+    늘지 않는다.
 - `ai_thread_plan_items`(`item_type = POST_LIKE/COMMENT_LIKE/REPLY_LIKE/VIEW`)를
   쓰지 않는다 — 발행 파이프라인(`lockDueItems`/`ThreadPlanPublisher.publish()`)이
   타입 필터가 없어 핫패스를 건드려야 하고, `idempotency_key` UNIQUE 제약이

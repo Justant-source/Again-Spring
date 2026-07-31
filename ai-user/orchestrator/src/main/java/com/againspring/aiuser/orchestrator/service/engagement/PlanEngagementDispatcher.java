@@ -19,9 +19,9 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 /**
- * Converges comment/reply like counts and post view counts toward the formula targets in
- * {@code docs/ai-user/thread-planning.md} §LLM 없는 engagement, entirely independently of
- * {@code BehaviorEngine}'s (now-removed) tick loop.
+ * Converges comment/reply likes, post-level likes, votes, and post view counts toward the
+ * formula targets in {@code docs/ai-user/thread-planning.md} §LLM 없는 engagement, entirely
+ * independently of {@code BehaviorEngine}'s (now-removed) tick loop.
  *
  * <p>Deliberately re-evaluated on a timer rather than triggered at publish time: a comment's
  * correct like target depends on the post's view count and its own reply count, neither of
@@ -30,18 +30,21 @@ import java.util.*;
  * content and steady-state operation are the same call with a wider {@code lookbackDays} —
  * there is no separate backfill code path to drift out of sync with this one.
  *
- * <p><b>Scope: views + comment/reply likes only.</b> Post-level likes and votes are owned by
- * {@link com.againspring.aiuser.orchestrator.service.threadplan.VoteLikeBatchService}
- * (target-count based, via {@code provider_vote_like}) — this class deliberately does not
- * dispatch {@code PlannedAction.like(post)} to avoid two independent mechanisms converging on
- * the same post-like counter. {@link EngagementTargetCalculator#postLikeTarget} still exists
- * for completeness against the documented formula, but nothing here calls it.
+ * <p><b>Scope: views, comment/reply likes, post likes, and votes (2026-07-31~).</b> This class
+ * used to exclude post likes/votes in favor of {@code VoteLikeBatchService}, a separate
+ * global-daily-quota batch gated on the {@code provider_vote_like} DB flag. That flag defaulted
+ * to (and stayed) {@code 'OFF'} in prod because nothing ever turned it on — the nightly batch
+ * script only toggles the three LLM providers — so votes/post-likes silently went to zero once
+ * the LEGACY tick loop (which had run them unconditionally) was removed. {@code
+ * VoteLikeBatchService} and its scheduler have been deleted; this class now dispatches both,
+ * using the same per-post deficit convergence as comment/reply likes so neither depends on a
+ * DB flag nobody flips.
  *
  * <p>Does not touch {@code ai_user_runtime.daily_global_cap} — that counter is written
  * exclusively by the (now-removed) LEGACY tick loop, and sharing it would mean engagement
  * silently stops the moment that cap is reached by unrelated activity, which is exactly the
  * failure mode this class exists to fix. Volume is bounded per-run instead
- * ({@code maxPostsPerRun}, {@code maxLikeCallsPerRun}).
+ * ({@code maxPostsPerRun}, {@code maxLikeCallsPerRun}, {@code maxVoteCallsPerRun}).
  */
 @Slf4j
 @Service
@@ -68,9 +71,11 @@ public class PlanEngagementDispatcher {
         }
         OrchestratorProperties.Engagement e = properties.getThreadPlan().getEngagement();
         EngagementResult result = reconcile(e.getLookbackDays(), e.getMaxPostsPerRun(), e.getMaxLikeCallsPerRun(), false);
-        if (result.commentLikesApplied() > 0 || result.replyLikesApplied() > 0 || result.viewsUpdated() > 0) {
-            log.info("PlanEngagementDispatcher: posts={} views={} commentLikes={} replyLikes={}",
-                    result.postsScanned(), result.viewsUpdated(), result.commentLikesApplied(), result.replyLikesApplied());
+        if (result.commentLikesApplied() > 0 || result.replyLikesApplied() > 0 || result.viewsUpdated() > 0
+                || result.votesApplied() > 0 || result.postLikesApplied() > 0) {
+            log.info("PlanEngagementDispatcher: posts={} views={} commentLikes={} replyLikes={} votes={} postLikes={}",
+                    result.postsScanned(), result.viewsUpdated(), result.commentLikesApplied(), result.replyLikesApplied(),
+                    result.votesApplied(), result.postLikesApplied());
         }
     }
 
@@ -104,12 +109,127 @@ public class PlanEngagementDispatcher {
         int likeCallsUsed = 0;
         int commentLikesApplied = 0;
         int replyLikesApplied = 0;
+        int voteCallsUsed = 0;
+        int votesApplied = 0;
+        int postLikesApplied = 0;
         List<PostDeficit> deficits = dryRun ? new ArrayList<>() : null;
 
         outer:
         for (String postId : postIds) {
             PostSnapshot snapshot = reader.snapshot(postId);
             if (snapshot == null) continue;
+
+            // --- VOTE --- (own budget: maxVoteCallsPerRun, separate from maxLikeCalls so a
+            // comment-like backfill can never starve votes out entirely, or vice versa)
+            if (cfg.isVotesEnabled()) {
+                List<EngagementSnapshotReader.VoteOptionRow> options = reader.voteOptions(postId);
+                Long optionAId = options.stream().filter(o -> o.orderIdx() == 0)
+                        .findFirst().map(EngagementSnapshotReader.VoteOptionRow::id).orElse(null);
+                Long optionBId = options.stream().filter(o -> o.orderIdx() == 1)
+                        .findFirst().map(EngagementSnapshotReader.VoteOptionRow::id).orElse(null);
+                if (optionAId != null && optionBId != null) {
+                    Map<Long, Integer> voteCounts = reader.voteCountsByOption(postId);
+                    int currentA = voteCounts.getOrDefault(optionAId, 0);
+                    int currentB = voteCounts.getOrDefault(optionBId, 0);
+                    int voteTarget = EngagementTargetCalculator.voteTarget(
+                            snapshot.viewCount(), postId, cfg.getVotePerView(), cfg.getVoteCap());
+                    int voteDeficit = EngagementTargetCalculator.deficit(voteTarget, currentA + currentB);
+                    if (voteDeficit > 0) {
+                        if (dryRun) {
+                            deficits.add(new PostDeficit(postId, null, "VOTE", voteDeficit));
+                        } else if (voteCallsUsed < cfg.getMaxVoteCallsPerRun()) {
+                            double targetAShare = EngagementTargetCalculator.voteAShare(
+                                    postId, cfg.getVoteAShareMin(), cfg.getVoteAShareMax());
+                            // votes.UNIQUE(post_id, voter_user_id) — backend returns 409 on a second
+                            // vote from the same user, so this pre-filter is mandatory, not just an
+                            // optimization (see VoteService.java:61-66).
+                            Set<String> alreadyVoted = reader.alreadyVotedUserIds(postId);
+                            List<Persona> voteCandidates = new ArrayList<>();
+                            for (Persona p : personaPool) {
+                                if (alreadyVoted.contains(p.getId())) continue;
+                                voteCandidates.add(p);
+                            }
+                            Collections.shuffle(voteCandidates);
+
+                            int voteToApply = Math.min(voteDeficit, voteCandidates.size());
+                            voteToApply = Math.min(voteToApply, cfg.getMaxVoteCallsPerRun() - voteCallsUsed);
+                            voteToApply = Math.min(voteToApply, cfg.getMaxVotesPerPostPerRun());
+
+                            PostDto voteStub = new PostDto();
+                            voteStub.setId(postId);
+                            int runningA = currentA;
+                            int runningB = currentB;
+                            for (int i = 0; i < voteToApply; i++) {
+                                Persona persona = voteCandidates.get(i);
+                                int optionIdx = EngagementTargetCalculator.chooseVoteOptionIndex(runningA, runningB, targetAShare);
+                                Long optionId = optionIdx == 0 ? optionAId : optionBId;
+                                try {
+                                    actionExecutor.execute(persona, PlannedAction.vote(voteStub, optionId));
+                                } catch (Exception ex) {
+                                    log.debug("PlanEngagementDispatcher: vote failed persona={} post={}: {}",
+                                            persona.getId(), postId, ex.getMessage());
+                                    continue;
+                                }
+                                if (!botTokenCache.hasValidToken(persona.getId())) {
+                                    personaPool.remove(persona);
+                                    continue;
+                                }
+                                voteCallsUsed++;
+                                votesApplied++;
+                                if (optionIdx == 0) runningA++; else runningB++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- POST LIKE --- (shares maxLikeCalls with comment/reply likes below — same
+            // toggle-like nature and risk profile as those, no reason for a separate budget)
+            if (cfg.isPostLikesEnabled()) {
+                int postLikeTarget = EngagementTargetCalculator.postLikeTarget(
+                        snapshot.viewCount(), snapshot.comments().size(), postId,
+                        cfg.getPostLikePerView(), cfg.getPostLikePerComment());
+                int postLikeDeficit = EngagementTargetCalculator.deficit(
+                        postLikeTarget, (int) reader.currentPostLikeCount(postId));
+                if (postLikeDeficit > 0) {
+                    if (dryRun) {
+                        deficits.add(new PostDeficit(postId, null, "POST_LIKE", postLikeDeficit));
+                    } else if (likeCallsUsed < maxLikeCalls) {
+                        // likePost toggles — a persona that already liked this post must be
+                        // excluded, or re-dispatching to them would flip their like back off.
+                        Set<String> alreadyLikedPost = reader.alreadyLikedPostAuthorIds(postId);
+                        List<Persona> postLikeCandidates = new ArrayList<>();
+                        for (Persona p : personaPool) {
+                            if (p.getId().equals(snapshot.authorId())) continue; // no self-likes
+                            if (alreadyLikedPost.contains(p.getId())) continue;
+                            postLikeCandidates.add(p);
+                        }
+                        Collections.shuffle(postLikeCandidates);
+
+                        int postLikeToApply = Math.min(postLikeDeficit, postLikeCandidates.size());
+                        postLikeToApply = Math.min(postLikeToApply, maxLikeCalls - likeCallsUsed);
+
+                        PostDto postLikeStub = new PostDto();
+                        postLikeStub.setId(postId);
+                        for (int i = 0; i < postLikeToApply; i++) {
+                            Persona persona = postLikeCandidates.get(i);
+                            try {
+                                actionExecutor.execute(persona, PlannedAction.like(postLikeStub));
+                            } catch (Exception ex) {
+                                log.debug("PlanEngagementDispatcher: post-like failed persona={} post={}: {}",
+                                        persona.getId(), postId, ex.getMessage());
+                                continue;
+                            }
+                            if (!botTokenCache.hasValidToken(persona.getId())) {
+                                personaPool.remove(persona);
+                                continue;
+                            }
+                            likeCallsUsed++;
+                            postLikesApplied++;
+                        }
+                    }
+                }
+            }
 
             for (CommentRow comment : snapshot.comments()) {
                 if (likeCallsUsed >= maxLikeCalls) break outer;
@@ -125,7 +245,7 @@ public class PlanEngagementDispatcher {
                 if (deficit <= 0) continue;
 
                 if (dryRun) {
-                    deficits.add(new PostDeficit(postId, comment.id(), isReply, deficit));
+                    deficits.add(new PostDeficit(postId, comment.id(), isReply ? "REPLY" : "COMMENT", deficit));
                     continue;
                 }
 
@@ -167,7 +287,8 @@ public class PlanEngagementDispatcher {
             }
         }
 
-        return new EngagementResult(postIds.size(), viewsUpdated, commentLikesApplied, replyLikesApplied, deficits);
+        return new EngagementResult(postIds.size(), viewsUpdated, commentLikesApplied, replyLikesApplied,
+                votesApplied, postLikesApplied, deficits);
     }
 
     /**
@@ -204,8 +325,13 @@ public class PlanEngagementDispatcher {
         return pool;
     }
 
-    public record PostDeficit(String postId, long commentId, boolean isReply, int deficit) { }
+    /**
+     * @param commentId null for VOTE/POST_LIKE (post-scoped, not comment-scoped)
+     * @param kind one of {@code COMMENT}, {@code REPLY}, {@code VOTE}, {@code POST_LIKE}
+     */
+    public record PostDeficit(String postId, Long commentId, String kind, int deficit) { }
 
     public record EngagementResult(int postsScanned, int viewsUpdated, int commentLikesApplied,
-                                    int replyLikesApplied, List<PostDeficit> deficits) { }
+                                    int replyLikesApplied, int votesApplied, int postLikesApplied,
+                                    List<PostDeficit> deficits) { }
 }

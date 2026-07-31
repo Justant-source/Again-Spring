@@ -99,8 +99,16 @@ ai-user:
       comment-like-cap: ${AI_USER_ENGAGEMENT_COMMENT_LIKE_CAP:12}
       reply-like-per-view: ${AI_USER_ENGAGEMENT_REPLY_LIKE_PER_VIEW:0.012}
       reply-like-cap: ${AI_USER_ENGAGEMENT_REPLY_LIKE_CAP:5}
-      persona-pool-size: ${AI_USER_ENGAGEMENT_PERSONA_POOL_SIZE:30}
+      persona-pool-size: ${AI_USER_ENGAGEMENT_PERSONA_POOL_SIZE:60}
       cold-login-budget: ${AI_USER_ENGAGEMENT_COLD_LOGIN_BUDGET:3}
+      votes-enabled: ${AI_USER_ENGAGEMENT_VOTES_ENABLED:true}
+      vote-per-view: ${AI_USER_ENGAGEMENT_VOTE_PER_VIEW:0.15}
+      vote-cap: ${AI_USER_ENGAGEMENT_VOTE_CAP:80}
+      max-vote-calls-per-run: ${AI_USER_ENGAGEMENT_MAX_VOTE_CALLS_PER_RUN:40}
+      max-votes-per-post-per-run: ${AI_USER_ENGAGEMENT_MAX_VOTES_PER_POST_PER_RUN:8}
+      vote-a-share-min: ${AI_USER_ENGAGEMENT_VOTE_A_SHARE_MIN:0.44}
+      vote-a-share-max: ${AI_USER_ENGAGEMENT_VOTE_A_SHARE_MAX:0.80}
+      post-likes-enabled: ${AI_USER_ENGAGEMENT_POST_LIKES_ENABLED:true}
       engagement-cron: "${AI_USER_ENGAGEMENT_CRON:0 */5 * * * *}"
 
 ai-learning:
