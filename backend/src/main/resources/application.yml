@@ -140,6 +140,10 @@ asm:
   callback-token: ${ASM_CALLBACK_TOKEN:asm-callback-token-dev}
   callback-base-url: ${ASM_CALLBACK_BASE_URL:http://100.81.189.92:8090}
   x-thread-poll-interval-ms: ${ASM_X_THREAD_POLL_INTERVAL_MS:600000}
+  # 기본 false — ASM은 dev/prod 공유 단일 인스턴스(같은 실 X 계정)라, 사람 개입 없는
+  # 이 스케줄러가 켜지면 dev 재배포만으로도 실제 계정에 자동 발행된다(2026-07-31 실제 발생·수동 정리).
+  # prod에서 기능을 실제로 켤 준비가 됐을 때만 .env.prod에 ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED=true 설정.
+  x-thread-publish-trigger-enabled: ${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:false}
 
 logging:
   level:

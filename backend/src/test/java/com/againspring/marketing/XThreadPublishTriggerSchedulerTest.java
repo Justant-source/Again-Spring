@@ -2,11 +2,13 @@ package com.againspring.marketing;
 
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.repository.marketing.MarketingJobRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,6 +44,35 @@ class XThreadPublishTriggerSchedulerTest {
 
     @InjectMocks
     private XThreadPublishTriggerScheduler scheduler;
+
+    @BeforeEach
+    void enableTrigger() {
+        // triggerEnabled is @Value-injected in production (default false — see the
+        // field's javadoc for why); Mockito's @InjectMocks doesn't populate @Value
+        // fields, so it stays at Java's default (false) unless set here. Tests below
+        // exercise the scheduler's real logic, so flip it on explicitly per test run.
+        ReflectionTestUtils.setField(scheduler, "triggerEnabled", true);
+    }
+
+    // ── Test 0: triggerDisabled_shouldSkip ─────────────────────────────────
+    // The safety gate itself: default-false trigger must block everything, even
+    // if ASM is otherwise enabled and posts are eligible. Regression test for the
+    // 2026-07-31 incident (see the field's javadoc) — a dev redeploy created 10
+    // real ASM jobs with auto_publish=true against the shared X account before
+    // this flag existed.
+
+    @Test
+    void pollAndPublishToXThread_triggerDisabled_doesNotPoll() {
+        // Given — override the @BeforeEach opt-in back to the real production default
+        ReflectionTestUtils.setField(scheduler, "triggerEnabled", false);
+
+        // When
+        scheduler.pollAndPublishToXThread();
+
+        // Then
+        verify(marketingJobRepository, never()).findPostsEligibleForXThreadPublish(any(Integer.class));
+        verify(marketingJobService, never()).createJob(anyString(), any(List.class), anyBoolean(), anyString());
+    }
 
     // ── Test 1: asmDisabled_shouldSkip ─────────────────────────────────────
 
@@ -154,15 +185,15 @@ class XThreadPublishTriggerSchedulerTest {
             .thenReturn(Collections.singletonList(postId));
 
         // Double-check: post has an active x_thread job
-        when(marketingJobRepository.hasActivePlatformJob(postId, "x_thread"))
-            .thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(postId, "x_thread"))
+            .thenReturn(1L);
 
         // When
         scheduler.pollAndPublishToXThread();
 
         // Then
         verify(marketingJobRepository).findPostsEligibleForXThreadPublish(10);
-        verify(marketingJobRepository).hasActivePlatformJob(postId, "x_thread");
+        verify(marketingJobRepository).countActivePlatformJobs(postId, "x_thread");
         verify(marketingJobService, never()).createJob(anyString(), any(List.class), anyBoolean(), anyString());
     }
 
@@ -179,10 +210,10 @@ class XThreadPublishTriggerSchedulerTest {
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
             .thenReturn(postIds);
 
-        when(marketingJobRepository.hasActivePlatformJob(postId1, "x_thread"))
-            .thenReturn(false);
-        when(marketingJobRepository.hasActivePlatformJob(postId2, "x_thread"))
-            .thenReturn(false);
+        when(marketingJobRepository.countActivePlatformJobs(postId1, "x_thread"))
+            .thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(postId2, "x_thread"))
+            .thenReturn(0L);
 
         // First job creation throws exception
         when(marketingJobService.createJob(
@@ -228,10 +259,10 @@ class XThreadPublishTriggerSchedulerTest {
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
             .thenReturn(postIds);
 
-        when(marketingJobRepository.hasActivePlatformJob(postId1, "x_thread"))
-            .thenReturn(false);
-        when(marketingJobRepository.hasActivePlatformJob(postId2, "x_thread"))
-            .thenReturn(false);
+        when(marketingJobRepository.countActivePlatformJobs(postId1, "x_thread"))
+            .thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(postId2, "x_thread"))
+            .thenReturn(0L);
 
         // First job creation throws IllegalStateException (already processing)
         when(marketingJobService.createJob(
@@ -274,8 +305,8 @@ class XThreadPublishTriggerSchedulerTest {
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
             .thenReturn(Collections.singletonList(postId));
 
-        when(marketingJobRepository.hasActivePlatformJob(postId, "x_thread"))
-            .thenReturn(false);
+        when(marketingJobRepository.countActivePlatformJobs(postId, "x_thread"))
+            .thenReturn(0L);
 
         when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))
             .thenReturn(MarketingJob.builder()
@@ -305,8 +336,8 @@ class XThreadPublishTriggerSchedulerTest {
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
             .thenReturn(Collections.singletonList(postId));
 
-        when(marketingJobRepository.hasActivePlatformJob(postId, "x_thread"))
-            .thenReturn(false);
+        when(marketingJobRepository.countActivePlatformJobs(postId, "x_thread"))
+            .thenReturn(0L);
 
         when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))
             .thenReturn(MarketingJob.builder()

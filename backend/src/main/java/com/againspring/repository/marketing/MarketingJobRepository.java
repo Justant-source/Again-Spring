@@ -23,16 +23,21 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     Optional<MarketingJob> findFirstByPostIdAndStatusIn(String postId, List<String> statuses);
 
     /**
-     * Check if a post has an active marketing job with a specific platform
+     * Count active marketing jobs for a post with a specific platform.
      * Active statuses: REQUESTED, QUEUED, RUNNING, PUBLISHING, STALE
+     *
+     * Returns a count rather than a boolean — MariaDB's {@code COUNT(*) > 0} comes back
+     * as an integral JDBC type, which Hibernate's native-query scalar extraction cannot
+     * coerce into a {@code boolean} return type (throws ClassCastException at runtime;
+     * not caught by mocked-repository unit tests). Callers compare {@code > 0} themselves.
      */
     @Query(nativeQuery = true, value = """
-        SELECT COUNT(*) > 0 FROM marketing_job
+        SELECT COUNT(*) FROM marketing_job
         WHERE post_id = :postId
         AND status IN ('REQUESTED', 'QUEUED', 'RUNNING', 'PUBLISHING', 'STALE')
         AND JSON_CONTAINS(targets, :platform) = TRUE
         """)
-    boolean hasActivePlatformJob(String postId, String platform);
+    long countActivePlatformJobs(String postId, String platform);
 
     /**
      * Find posts eligible for X thread publishing:
