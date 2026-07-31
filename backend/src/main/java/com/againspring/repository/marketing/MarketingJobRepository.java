@@ -43,7 +43,16 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * Find posts eligible for X thread publishing:
      * - created_at + 24 hours <= NOW()
      * - comment count >= 6
-     * - no active x_thread job exists
+     * - no x_thread job has ever been attempted for this post (any status)
+     *
+     * The NOT EXISTS check intentionally ignores status entirely — it is NOT limited to
+     * "active" statuses. An X thread is a one-time-per-post event: once a job exists
+     * (REQUESTED..STALE, or terminal PUBLISHED/FAILED/PARTIAL/READY — see
+     * MarketingJobService's terminal-status comment), the post must never be picked up
+     * again. An earlier version filtered by active status only, which meant a post whose
+     * job reached PUBLISHED would silently become "eligible" again on the very next poll —
+     * every successful thread would have been re-published forever. Caught before this
+     * ever ran in prod with the trigger enabled (2026-08-01).
      */
     @Query(nativeQuery = true, value = """
         SELECT p.id FROM posts p
@@ -56,7 +65,6 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         AND NOT EXISTS (
             SELECT 1 FROM marketing_job mj
             WHERE mj.post_id = p.id
-            AND mj.status IN ('REQUESTED', 'QUEUED', 'RUNNING', 'PUBLISHING', 'STALE')
             AND JSON_CONTAINS(mj.targets, '"x_thread"')
         )
         LIMIT :limit
