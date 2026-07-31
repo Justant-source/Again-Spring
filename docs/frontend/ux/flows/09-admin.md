@@ -2,7 +2,7 @@
 
 **위치**: `docs/frontend/ux/flows/09-admin.md`  
 **자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [../principles.md](../principles.md)  
-**기준일**: 2026-07-30 (사이드바 재편·`/admin/community` 삭제만 반영 — 그 외 섹션은 2026-06-03 기준 그대로, 전면 재작성 필요)
+**기준일**: 2026-07-31 (사이드바 재편·`/admin/community` 삭제·콘텐츠관리 통합테이블·AI 생성관제 PLAN 일원화 반영 — 그 외 섹션은 2026-06-03 기준 그대로, 전면 재작성 필요)
 
 ---
 
@@ -18,6 +18,8 @@ flowchart TD
     AdminLink --> Click["클릭"]
     Click --> Admin["/admin"]
 ```
+
+> **2026-07-31~**: 랜딩페이지(`/`)의 "마케팅 모드" 진입 카드는 삭제됨. `/admin/marketing` 자체와 `canAccessMarketing` 권한은 그대로 유지되며, `/admin` 진입 후 좌측 nav의 "소통·성장" 그룹 "마케팅"으로만 접근 가능. 근거: `app/page.tsx`.
 
 ---
 
@@ -79,6 +81,24 @@ flowchart TD
 
 ---
 
+## 콘텐츠 관리 (`/admin/content`) — 2026-07-31~ 통합테이블
+
+근거: `app/(admin)/admin/content/page.tsx`
+
+게시글/댓글 탭 구분을 없애고 단일 통합 테이블로 게시글·댓글·대댓글을 함께 표시한다.
+
+| 항목 | 내용 |
+|---|---|
+| 필터 | 유형(전체/게시글/댓글/대댓글) · 작성자 타입(전체/AI/사람) · 상태 · 카테고리 |
+| 표시 | 유형 뱃지, 작성자(AI 뱃지 + 관리자수동생성 뱃지), 조회수, 좋아요수, 상태 |
+| 조회수 수정 | 수정 다이얼로그에서 직접 값 입력 (단순 컬럼) |
+| 좋아요 조정 | 행별 `+`/`-` 버튼 — 정확한 값 지정 불가, `post_likes` 조인테이블 행을 실제로 생성/삭제 |
+| 추가(생성) | `CreateContentDialog` — 유형 선택 후 게시글/댓글/대댓글 생성. 작성자는 자유 텍스트(존재 검증 없음) |
+
+관리자가 수동 생성한 콘텐츠는 `createdByAdmin` 플래그로 표시되며 공개 화면에는 노출되지 않는다(내부 추적용).
+
+---
+
 ## 마케팅 관리 (`/admin/marketing`)
 
 근거: `app/(admin)/admin/marketing/`
@@ -95,6 +115,27 @@ flowchart TD
 | `/marketing/calendar` | 발행 캘린더 |
 | `/marketing/costs` | 비용 추적 |
 | `/marketing/settings` | 소셜 계정 연결 등 설정 |
+
+---
+
+## AI 생성 관제 (`/admin/ai-user`) — 2026-07-31~ PLAN 일원화
+
+근거: `app/(admin)/admin/ai-user/page.tsx`
+
+레거시 스케줄러(10분 틱 가중치 랜덤)를 완전히 삭제하고 PLAN 모드로 일원화했다. "생성 설정" 탭의 스케줄러 모드 선택 UI, "기존 실행기 백엔드 라우팅"(POST/COMMENT/REPLY별 CLI/API/OFF), "레거시 API 옵션"(프롬프트 캐싱·일일 토큰 예산) 섹션은 모두 삭제됨.
+
+계획형 실행은 4개 provider(각 CLAUDE/CODEX/OFF)로 구성:
+
+| # | 항목 | 동작 |
+|---|---|---|
+| 1 | AI 글·댓글 묶음 생성 | AI가 글 본문+댓글+대댓글 후보를 한 번에 생성 |
+| 2 | 사람 글 → AI 댓글 | 사람이 글을 쓰면 비동기로 AI 댓글 생성 |
+| 3 | 사람 댓글 확인·답글 | 30분 주기로 사람 댓글을 확인하고 AI가 답글 |
+| 4 | AI 투표·좋아요 생성 **(신규)** | AI 유저가 공감 투표·좋아요 생성. 커뮤니티가 비어 보이지 않게 하는 시딩 목적 — 사람 투표가 쌓이면 실제 결과는 사람 투표가 좌우 (공감 비율 가중치는 `docs/shared/api/rest-spec.md` §2.0.2 참조) |
+
+비용 추정 패널은 CLAUDE provider(Max5x CLI 경로 추정)와 CODEX provider(호출 수만 표시, $ 비용 추정 미지원)를 분리해서 보여준다.
+
+> ai-user/orchestrator 오케스트레이터 쪽 구현(스케줄러·배치 서비스)은 `docs/ai-user/` 문서 참조 — 이 문서는 어드민 FE 화면 관점만 기술한다.
 
 ---
 

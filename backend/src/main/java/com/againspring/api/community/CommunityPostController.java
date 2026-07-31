@@ -15,6 +15,7 @@ import com.againspring.service.community.JuryService;
 import com.againspring.service.community.PostComposeService;
 import com.againspring.service.community.PostService;
 import com.againspring.service.community.ViewService;
+import com.againspring.service.community.VoteCountBreakdown;
 import com.againspring.service.community.VoteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -261,7 +262,12 @@ public class CommunityPostController {
         Post post = postService.getPost(id, userId);
 
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
-        Map<Long, Long> voteResult = voteService.getVoteResult(id);
+
+        // 투표 결과 조회 (사람/AI 분리)
+        var voteResultWithBreakdown = voteService.getVoteResultWithBreakdown(id);
+        // 가중치 적용 비율 계산
+        var weightedPercentages = voteService.calculateWeightedPercentages(voteResultWithBreakdown);
+
         Optional<Long> myVote = userId != null ? voteService.getMyVote(id, userId) : Optional.empty();
         long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(id, CommentStatus.ACTIVE);
 
@@ -275,7 +281,7 @@ public class CommunityPostController {
                 : null;
         boolean isPartner = userId != null && userId.equals(post.getPartnerUserId());
 
-        return ResponseEntity.ok(PostDetailResponse.from(post, options, voteResult, myVote, commentCount, userId, authorNickname, partnerNickname, isPartner));
+        return ResponseEntity.ok(PostDetailResponse.from(post, options, voteResultWithBreakdown, weightedPercentages, myVote, commentCount, userId, authorNickname, partnerNickname, isPartner));
     }
 
     /**
@@ -324,14 +330,22 @@ public class CommunityPostController {
         String userId = resolveUserId(authentication);
         if (userId == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        Map<Long, Long> result = voteService.castVoteAndGetResult(id, request.getOptionId(), userId);
+        voteService.castVoteAndGetResult(id, request.getOptionId(), userId);
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
-        long totalVotes = result.values().stream().mapToLong(Long::longValue).sum();
+
+        // 투표 결과 조회 (사람/AI 분리)
+        var resultWithBreakdown = voteService.getVoteResultWithBreakdown(id);
+        long totalVotes = resultWithBreakdown.values().stream()
+                .mapToLong(bd -> bd.getTotalCount())
+                .sum();
+
+        // 가중치 적용 비율 계산
+        var weightedPercentages = voteService.calculateWeightedPercentages(resultWithBreakdown);
 
         List<VoteOptionResultDto> resultDtos = options.stream()
                 .map(opt -> {
-                    long count = result.getOrDefault(opt.getId(), 0L);
-                    double percentage = totalVotes > 0 ? (count * 100.0) / totalVotes : 0.0;
+                    long count = resultWithBreakdown.getOrDefault(opt.getId(), new VoteCountBreakdown(0L, 0L)).getTotalCount();
+                    double percentage = weightedPercentages.getOrDefault(opt.getId(), 0.0);
                     return VoteOptionResultDto.builder()
                             .id(opt.getId())
                             .label(opt.getLabel())
@@ -361,14 +375,22 @@ public class CommunityPostController {
         String userId = resolveUserId(authentication);
         if (userId == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        Map<Long, Long> result = voteService.cancelVoteAndGetResult(id, userId);
+        voteService.cancelVoteAndGetResult(id, userId);
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
-        long totalVotes = result.values().stream().mapToLong(Long::longValue).sum();
+
+        // 투표 결과 조회 (사람/AI 분리)
+        var resultWithBreakdown = voteService.getVoteResultWithBreakdown(id);
+        long totalVotes = resultWithBreakdown.values().stream()
+                .mapToLong(bd -> bd.getTotalCount())
+                .sum();
+
+        // 가중치 적용 비율 계산
+        var weightedPercentages = voteService.calculateWeightedPercentages(resultWithBreakdown);
 
         List<VoteOptionResultDto> resultDtos = options.stream()
                 .map(opt -> {
-                    long count = result.getOrDefault(opt.getId(), 0L);
-                    double percentage = totalVotes > 0 ? (count * 100.0) / totalVotes : 0.0;
+                    long count = resultWithBreakdown.getOrDefault(opt.getId(), new VoteCountBreakdown(0L, 0L)).getTotalCount();
+                    double percentage = weightedPercentages.getOrDefault(opt.getId(), 0.0);
                     return VoteOptionResultDto.builder()
                             .id(opt.getId())
                             .label(opt.getLabel())

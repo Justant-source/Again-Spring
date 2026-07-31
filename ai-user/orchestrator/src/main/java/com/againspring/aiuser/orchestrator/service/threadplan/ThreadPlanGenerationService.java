@@ -129,5 +129,5 @@ public class ThreadPlanGenerationService {
     private static String text(Object value) { return value == null ? "" : String.valueOf(value).trim(); }
     private static String nullToEmpty(String value) { return value == null ? "" : value; }
     private boolean planModeEnabled() { return properties.isEnabled() && properties.getThreadPlan().isEnabled()
-            && configRepository.findById(1).map(c -> "PLAN".equalsIgnoreCase(c.getSchedulerMode()) && !c.isAiUserKillSwitch()).orElse(false); }
+            && configRepository.findById(1).map(c -> !c.isAiUserKillSwitch()).orElse(false); }
 }

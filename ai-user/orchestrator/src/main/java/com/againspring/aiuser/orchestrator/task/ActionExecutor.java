@@ -97,9 +97,8 @@ public class ActionExecutor {
     }
 
     private String backendFor(String actionType) {
-        AiUserGenerationConfig cfg = getGenConfig();
-        if (cfg == null) return "CLI";
-        return cfg.effectiveBackend(actionType);
+        // PLAN 모드에서는 항상 CLI
+        return "CLI";
     }
     private static final long GLOBAL_RULES_TTL_MS = 5 * 60 * 1000L; // 5분
 

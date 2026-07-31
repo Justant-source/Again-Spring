@@ -35,20 +35,11 @@ public class AiUserGenerationConfig {
     @Column(name = "auto_comment", nullable = false) @Builder.Default private boolean autoComment = true;
     @Column(name = "auto_reply",   nullable = false) @Builder.Default private boolean autoReply   = true;
 
-    // ── 콘텐츠 타입별 백엔드: CLI | API | OFF ─────────────────────────────
-    @Column(name = "backend_post",    nullable = false, length = 8) @Builder.Default private String backendPost    = "OFF";
-    @Column(name = "backend_comment", nullable = false, length = 8) @Builder.Default private String backendComment = "OFF";
-    @Column(name = "backend_reply",   nullable = false, length = 8) @Builder.Default private String backendReply   = "OFF";
-
-    // ── API 경로 옵션 ─────────────────────────────────────────────────────
-    @Column(name = "prompt_caching",     nullable = false) @Builder.Default private boolean promptCaching    = true;
-    @Column(name = "daily_token_budget")                              private Long    dailyTokenBudget;
-
-    // ── 계획형 실행기 설정 (legacy backend_* 설정과 병행 기간 동안 분리) ────────────
-    @Column(name = "scheduler_mode", nullable = false, length = 12) @Builder.Default private String schedulerMode = "LEGACY";
+    // ── 계획형 실행기 설정 (PLAN 모드 일원화) ────────────────────────────────
     @Column(name = "provider_ai_post_bundle", nullable = false, length = 16) @Builder.Default private String providerAiPostBundle = "OFF";
     @Column(name = "provider_human_post_plan", nullable = false, length = 16) @Builder.Default private String providerHumanPostPlan = "OFF";
     @Column(name = "provider_human_interaction", nullable = false, length = 16) @Builder.Default private String providerHumanInteraction = "OFF";
+    @Column(name = "provider_vote_like", nullable = false, length = 16) @Builder.Default private String providerVoteLike = "OFF";
     @Column(name = "schedule_execution_paused", nullable = false) @Builder.Default private boolean scheduleExecutionPaused = false;
     @Column(name = "ai_user_kill_switch", nullable = false) @Builder.Default private boolean aiUserKillSwitch = false;
     @Column(name = "candidate_pool_size", nullable = false) @Builder.Default private int candidatePoolSize = 24;

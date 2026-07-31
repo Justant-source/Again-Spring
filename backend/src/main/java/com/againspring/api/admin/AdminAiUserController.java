@@ -101,20 +101,11 @@ public class AdminAiUserController {
         cfg.setAutoComment(req.autoComment);
         cfg.setAutoReply(req.autoReply);
 
-        // ── 백엔드 유효성 + CLI/API 배타 규칙 (서버 강제) ───────────────
-        cfg.setBackendPost(validateBackend(req.backendPost));
-        cfg.setBackendComment(validateBackend(req.backendComment));
-        cfg.setBackendReply(validateBackend(req.backendReply));
-
-        cfg.setPromptCaching(req.promptCaching);
-        cfg.setDailyTokenBudget(req.dailyTokenBudget);
-
-        // 계획형 실행기의 설정은 기존 CLI/API 설정과 독립적이다. 새 경로에는
-        // API key 기반 provider나 자동 provider fallback을 허용하지 않는다.
-        cfg.setSchedulerMode(validateSchedulerMode(req.schedulerMode));
+        // ── 계획형 실행기 설정 (PLAN 모드 일원화) ────────────────────────
         cfg.setProviderAiPostBundle(validatePlanProvider(req.providerAiPostBundle));
         cfg.setProviderHumanPostPlan(validatePlanProvider(req.providerHumanPostPlan));
         cfg.setProviderHumanInteraction(validatePlanProvider(req.providerHumanInteraction));
+        cfg.setProviderVoteLike(validatePlanProvider(req.providerVoteLike));
         cfg.setScheduleExecutionPaused(req.scheduleExecutionPaused);
         cfg.setAiUserKillSwitch(req.aiUserKillSwitch);
         cfg.setCandidatePoolSize(clamp(req.candidatePoolSize, 8, 30));
@@ -127,9 +118,9 @@ public class AdminAiUserController {
         cfg.setUpdatedAt(Instant.now());
 
         configRepository.save(cfg);
-        log.info("AI 생성 정책 저장 by {}: posts={} comments={} replies={} post_backend={} comment_backend={} reply_backend={}",
-                actor, cfg.getTargetPosts(), cfg.getTargetComments(), cfg.getTargetReplies(),
-                cfg.getBackendPost(), cfg.getBackendComment(), cfg.getBackendReply());
+        log.info("AI 생성 정책 저장 by {}: posts={} comments={} replies={} votes={} likes={} post_provider={} comment_provider={} interaction_provider={} vote_like_provider={}",
+                actor, cfg.getTargetPosts(), cfg.getTargetComments(), cfg.getTargetReplies(), cfg.getTargetVotes(), cfg.getTargetLikes(),
+                cfg.getProviderAiPostBundle(), cfg.getProviderHumanPostPlan(), cfg.getProviderHumanInteraction(), cfg.getProviderVoteLike());
 
         return ResponseEntity.ok(toResponse(cfg));
     }
@@ -184,19 +175,20 @@ public class AdminAiUserController {
     // =====================================================================
 
     @PostMapping("/kill")
-    @Operation(summary = "비상 정지", description = "모든 콘텐츠 타입의 백엔드를 OFF로 설정한다. ai_user_runtime.enabled 와 별개의 소프트 스톱.")
+    @Operation(summary = "비상 정지", description = "모든 생성 타입의 provider를 OFF로 설정한다. ai_user_runtime.enabled 와 별개의 소프트 스톱.")
     public ResponseEntity<KillResponse> killAll(Authentication auth) {
         AiUserGenerationConfig cfg = loadOrInit();
-        cfg.setBackendPost("OFF");
-        cfg.setBackendComment("OFF");
-        cfg.setBackendReply("OFF");
+        cfg.setProviderAiPostBundle("OFF");
+        cfg.setProviderHumanPostPlan("OFF");
+        cfg.setProviderHumanInteraction("OFF");
+        cfg.setProviderVoteLike("OFF");
         cfg.setAiUserKillSwitch(true);
         String actor = (auth != null) ? auth.getName() : "unknown";
         cfg.setUpdatedBy(actor);
         cfg.setUpdatedAt(Instant.now());
         configRepository.save(cfg);
-        log.warn("AI 생성 비상 정지 by {}: 모든 backend → OFF", actor);
-        return ResponseEntity.ok(new KillResponse("ok", "POST/COMMENT/REPLY 모두 OFF로 설정됨", Instant.now().toString()));
+        log.warn("AI 생성 비상 정지 by {}: 모든 provider → OFF", actor);
+        return ResponseEntity.ok(new KillResponse("ok", "모든 생성 provider 오프로 설정됨", Instant.now().toString()));
     }
 
     // =====================================================================
@@ -299,10 +291,8 @@ public class AdminAiUserController {
                 cfg.getTargetPosts(), cfg.getTargetComments(), cfg.getTargetReplies(),
                 cfg.getTargetVotes(), cfg.getTargetLikes(),
                 cfg.isAutoComment(), cfg.isAutoReply(),
-                cfg.getBackendPost(), cfg.getBackendComment(), cfg.getBackendReply(),
-                cfg.isPromptCaching(), cfg.getDailyTokenBudget(),
-                cfg.getSchedulerMode(), cfg.getProviderAiPostBundle(),
-                cfg.getProviderHumanPostPlan(), cfg.getProviderHumanInteraction(),
+                cfg.getProviderAiPostBundle(),
+                cfg.getProviderHumanPostPlan(), cfg.getProviderHumanInteraction(), cfg.getProviderVoteLike(),
                 cfg.isScheduleExecutionPaused(), cfg.isAiUserKillSwitch(),
                 cfg.getCandidatePoolSize(), cfg.getHumanBatchMaxPosts(), cfg.getHumanBatchMaxInteractions(),
                 cfg.getUpdatedBy(), cfg.getUpdatedAt() != null ? cfg.getUpdatedAt().toString() : null,
@@ -311,39 +301,71 @@ public class AdminAiUserController {
         );
     }
 
-    /** §11.5 토큰·비용 추정 */
+    /** §11.5 토큰·비용 추정 (PLAN 모드 일원화, provider 기준)
+     *
+     *  CLAUDE provider: CLI 경로, Max5x 정액제 토큰 계산
+     *  CODEX provider: 호출수만 집계, $비용 추정 미정의
+     *  OFF provider: 해당 액션 타입은 추정에서 제외
+     *
+     *  참고: 이것은 "추정치"이며, 정밀도보다 management 가시성을 우선한다.
+     */
     private EstimateResult computeEstimate(AiUserGenerationConfig cfg) {
         long calls = 0;
-        long cliIn = 0, cliOut = 0, apiIn = 0, apiOut = 0;
+        long cliIn = 0, cliOut = 0;
+        long codexCalls = 0;
 
-        if (!"OFF".equals(cfg.getBackendPost()) && cfg.getTargetPosts() > 0) {
+        // AI 글 생성 (providerAiPostBundle)
+        if (!"OFF".equals(cfg.getProviderAiPostBundle()) && cfg.getTargetPosts() > 0) {
             calls += cfg.getTargetPosts();
-            if ("CLI".equals(cfg.getBackendPost())) {
+            if ("CLAUDE".equals(cfg.getProviderAiPostBundle())) {
                 cliIn += (long) cfg.getTargetPosts() * POST_IN;
                 cliOut += (long) cfg.getTargetPosts() * POST_OUT;
-            } else {
-                apiIn += (long) cfg.getTargetPosts() * POST_IN;
-                apiOut += (long) cfg.getTargetPosts() * POST_OUT;
+            } else if ("CODEX".equals(cfg.getProviderAiPostBundle())) {
+                codexCalls += cfg.getTargetPosts();
             }
         }
-        if (!"OFF".equals(cfg.getBackendComment()) && cfg.getTargetComments() > 0) {
-            calls += cfg.getTargetComments();
-            if ("CLI".equals(cfg.getBackendComment())) {
-                cliIn += (long) cfg.getTargetComments() * COMMENT_IN;
-                cliOut += (long) cfg.getTargetComments() * COMMENT_OUT;
-            } else {
-                apiIn += (long) cfg.getTargetComments() * COMMENT_IN;
-                apiOut += (long) cfg.getTargetComments() * COMMENT_OUT;
+
+        // 사람 상호작용 — 댓글·답글 (providerHumanInteraction)
+        if (!"OFF".equals(cfg.getProviderHumanInteraction())) {
+            if (cfg.getTargetComments() > 0) {
+                calls += cfg.getTargetComments();
+                if ("CLAUDE".equals(cfg.getProviderHumanInteraction())) {
+                    cliIn += (long) cfg.getTargetComments() * COMMENT_IN;
+                    cliOut += (long) cfg.getTargetComments() * COMMENT_OUT;
+                } else if ("CODEX".equals(cfg.getProviderHumanInteraction())) {
+                    codexCalls += cfg.getTargetComments();
+                }
+            }
+            if (cfg.getTargetReplies() > 0) {
+                calls += cfg.getTargetReplies();
+                if ("CLAUDE".equals(cfg.getProviderHumanInteraction())) {
+                    cliIn += (long) cfg.getTargetReplies() * REPLY_IN;
+                    cliOut += (long) cfg.getTargetReplies() * REPLY_OUT;
+                } else if ("CODEX".equals(cfg.getProviderHumanInteraction())) {
+                    codexCalls += cfg.getTargetReplies();
+                }
             }
         }
-        if (!"OFF".equals(cfg.getBackendReply()) && cfg.getTargetReplies() > 0) {
-            calls += cfg.getTargetReplies();
-            if ("CLI".equals(cfg.getBackendReply())) {
-                cliIn += (long) cfg.getTargetReplies() * REPLY_IN;
-                cliOut += (long) cfg.getTargetReplies() * REPLY_OUT;
-            } else {
-                apiIn += (long) cfg.getTargetReplies() * REPLY_IN;
-                apiOut += (long) cfg.getTargetReplies() * REPLY_OUT;
+
+        // AI 투표·좋아요 생성 (providerVoteLike) — 댓글 수준 토큰으로 간단히 추정
+        if (!"OFF".equals(cfg.getProviderVoteLike())) {
+            if (cfg.getTargetVotes() > 0) {
+                calls += cfg.getTargetVotes();
+                if ("CLAUDE".equals(cfg.getProviderVoteLike())) {
+                    cliIn += (long) cfg.getTargetVotes() * COMMENT_IN;
+                    cliOut += (long) cfg.getTargetVotes() * COMMENT_OUT;
+                } else if ("CODEX".equals(cfg.getProviderVoteLike())) {
+                    codexCalls += cfg.getTargetVotes();
+                }
+            }
+            if (cfg.getTargetLikes() > 0) {
+                calls += cfg.getTargetLikes();
+                if ("CLAUDE".equals(cfg.getProviderVoteLike())) {
+                    cliIn += (long) cfg.getTargetLikes() * COMMENT_IN;
+                    cliOut += (long) cfg.getTargetLikes() * COMMENT_OUT;
+                } else if ("CODEX".equals(cfg.getProviderVoteLike())) {
+                    codexCalls += cfg.getTargetLikes();
+                }
             }
         }
 
@@ -351,35 +373,21 @@ public class AdminAiUserController {
         double cliPct    = (double) cliTotal / MAX5X_DAILY * 100;
         double cliPeakPct = (double) cliTotal * PEAK_SHARE / MAX5X_WINDOW * 100;
 
-        double apiInEff  = cfg.isPromptCaching() ? apiIn * CACHE_FACTOR : apiIn;
-        double apiCostDay = (apiInEff / 1_000_000.0) * HAIKU_IN_PER_M
-                          + (apiOut   / 1_000_000.0) * HAIKU_OUT_PER_M;
-        double apiCostMonth = apiCostDay * 30;
-
         List<String> warnings = new ArrayList<>();
         if (calls == 0) {
-            warnings.add("INFO:생성 없음 — 모든 타입이 OFF 또는 목표량 0");
+            warnings.add("INFO:생성 없음 — 모든 provider가 OFF 또는 목표량 0");
         } else {
-            if (cliPct > 100)    warnings.add("DANGER:CLI 경로가 Max 5x 일일 한도 초과 (종일 throttle 위험)");
-            else if (cliPct > 80) warnings.add("WARN:CLI 경로가 Max 5x 한도 80% 초과 (개발 quota 공유 주의)");
+            if (cliPct > 100)    warnings.add("DANGER:CLAUDE 경로가 Max 5x 일일 한도 초과 (종일 throttle 위험)");
+            else if (cliPct > 80) warnings.add("WARN:CLAUDE 경로가 Max 5x 한도 80% 초과 (개발 quota 공유 주의)");
             if (cliPeakPct > 100) warnings.add("WARN:저녁 피크 5h 윈도우 초과 (피크 시간대 throttle 위험)");
+            if (codexCalls > 0)   warnings.add("INFO:CODEX " + codexCalls + "건 호출 예상 (비용 추정 미정의)");
         }
 
         return new EstimateResult(
                 calls, cliTotal, cliPct, cliPeakPct,
-                apiCostDay, apiCostMonth,
-                apiIn + apiOut, warnings
+                0.0, 0.0,  // CLAUDE는 Max5x 정액제, CODEX는 비용 미정의
+                cliIn + cliOut, warnings
         );
-    }
-
-    private static String validateBackend(String raw) {
-        if ("CLI".equalsIgnoreCase(raw)) return "CLI";
-        if ("API".equalsIgnoreCase(raw)) return "API";
-        return "OFF";
-    }
-
-    private static String validateSchedulerMode(String raw) {
-        return "PLAN".equalsIgnoreCase(raw) ? "PLAN" : "LEGACY";
     }
 
     private static String validatePlanProvider(String raw) {
@@ -405,15 +413,10 @@ public class AdminAiUserController {
         private int targetLikes;
         private boolean autoComment;
         private boolean autoReply;
-        private String backendPost;
-        private String backendComment;
-        private String backendReply;
-        private boolean promptCaching;
-        private Long dailyTokenBudget;
-        private String schedulerMode;
         private String providerAiPostBundle;
         private String providerHumanPostPlan;
         private String providerHumanInteraction;
+        private String providerVoteLike;
         private boolean scheduleExecutionPaused;
         private boolean aiUserKillSwitch;
         private int candidatePoolSize = 24;
@@ -430,15 +433,10 @@ public class AdminAiUserController {
         private final int    targetLikes;
         private final boolean autoComment;
         private final boolean autoReply;
-        private final String  backendPost;
-        private final String  backendComment;
-        private final String  backendReply;
-        private final boolean promptCaching;
-        private final Long    dailyTokenBudget;
-        private final String schedulerMode;
         private final String providerAiPostBundle;
         private final String providerHumanPostPlan;
         private final String providerHumanInteraction;
+        private final String providerVoteLike;
         private final boolean scheduleExecutionPaused;
         private final boolean aiUserKillSwitch;
         private final int candidatePoolSize;

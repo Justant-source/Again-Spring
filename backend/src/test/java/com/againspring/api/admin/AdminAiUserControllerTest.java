@@ -45,9 +45,6 @@ public class AdminAiUserControllerTest {
                 .targetReplies(44)
                 .targetVotes(65)
                 .targetLikes(157)
-                .backendPost("CLI")
-                .backendComment("CLI")
-                .backendReply("CLI")
                 .build();
         when(configRepository.findById(1)).thenReturn(Optional.of(mockConfig));
 

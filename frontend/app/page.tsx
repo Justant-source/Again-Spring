@@ -55,7 +55,6 @@ export default function LandingPage() {
 
   const perms = permissionsFor(user);
   const showAdminEntry = perms.ui.showAdminEntryButton;
-  const showMarketingEntry = perms.admin.canAccessMarketing;
 
   return (
     <div style={{ background: 'var(--L-bg)', minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
@@ -88,37 +87,6 @@ export default function LandingPage() {
               </div>
               <div style={{ fontSize: 11, marginTop: 3, opacity: 0.75 }}>
                 대시보드 · 의견함 · 사용자 · 위기 모니터링
-              </div>
-            </div>
-            <span style={{ fontSize: 18, opacity: 0.85 }}>›</span>
-          </button>
-        )}
-
-        {/* 마케팅 모드 진입 카드 — admin.canAccessMarketing (dev 전용) */}
-        {showMarketingEntry && (
-          <button
-            onClick={() => router.push('/admin/marketing')}
-            style={{
-              marginTop: 8,
-              width: '100%',
-              padding: '14px 18px',
-              background: '#2d4a7a',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.3 }}>
-                마케팅 모드
-              </div>
-              <div style={{ fontSize: 11, marginTop: 3, opacity: 0.75 }}>
-                사연 · 시뮬레이션 · 콘텐츠 생성 · 비용
               </div>
             </div>
             <span style={{ fontSize: 18, opacity: 0.85 }}>›</span>

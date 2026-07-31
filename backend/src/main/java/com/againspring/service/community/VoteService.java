@@ -110,6 +110,74 @@ public class VoteService {
     }
 
     /**
+     * 투표 결과 조회 (각 선택지별 투표 수, 사람/AI 분리)
+     *
+     * @param postId 포스트 ID
+     * @return {optionId: VoteCountBreakdown(humanCount, aiCount)} 맵
+     * @throws BusinessException POST_NOT_FOUND
+     */
+    public Map<Long, VoteCountBreakdown> getVoteResultWithBreakdown(String postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
+
+        List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(postId);
+
+        Map<Long, VoteCountBreakdown> result = new TreeMap<>();
+        for (VoteOption opt : options) {
+            result.put(opt.getId(), voteRepository.countByPostIdAndOptionIdWithBreakdown(postId, opt.getId()));
+        }
+
+        return result;
+    }
+
+    /**
+     * 가중치를 적용한 공감 비율 계산
+     *
+     * 공식:
+     * humanVoteCount = 전체 옵션 통틀어 사람표 총합 (해당 게시글)
+     * weight_ai = 1.0 / (1.0 + humanVoteCount)   // humanVoteCount=0이면 1, 늘어날수록 0에 수렴
+     * weight_human = 1.0 (고정)
+     *
+     * weighted_count(option) = humanCount(option) * weight_human + aiCount(option) * weight_ai
+     * weighted_total = humanVoteCount * weight_human + aiVoteCount_total * weight_ai
+     * percentage(option) = weighted_total > 0 ? weighted_count(option) / weighted_total * 100.0 : 0.0
+     *
+     * @param optionCountBreakdown 옵션별 사람/AI 카운트
+     * @return 옵션별 가중치 적용 비율 (%)
+     */
+    public Map<Long, Double> calculateWeightedPercentages(Map<Long, VoteCountBreakdown> optionCountBreakdown) {
+        // 전체 인간 투표 수 계산
+        long totalHumanVotes = optionCountBreakdown.values().stream()
+                .mapToLong(bd -> bd.humanCount)
+                .sum();
+
+        // 전체 AI 투표 수 계산
+        long totalAiVotes = optionCountBreakdown.values().stream()
+                .mapToLong(bd -> bd.aiCount)
+                .sum();
+
+        // 가중치 계산
+        double weightAi = 1.0 / (1.0 + totalHumanVotes);
+
+        // 가중치 적용 총 투표 수
+        double weightedTotal = (totalHumanVotes * 1.0) + (totalAiVotes * weightAi);
+
+        // 옵션별 가중치 적용 비율 계산
+        Map<Long, Double> result = new TreeMap<>();
+        for (Map.Entry<Long, VoteCountBreakdown> entry : optionCountBreakdown.entrySet()) {
+            Long optionId = entry.getKey();
+            VoteCountBreakdown breakdown = entry.getValue();
+
+            double weightedCount = (breakdown.humanCount * 1.0) + (breakdown.aiCount * weightAi);
+            double percentage = weightedTotal > 0 ? (weightedCount / weightedTotal) * 100.0 : 0.0;
+
+            result.put(optionId, percentage);
+        }
+
+        return result;
+    }
+
+    /**
      * 현재 사용자의 투표 선택지 ID 조회
      *
      * @param postId 포스트 ID

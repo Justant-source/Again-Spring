@@ -29,41 +29,16 @@ public class AiUserGenerationConfig {
     @Column(name = "auto_comment") private boolean autoComment;
     @Column(name = "auto_reply")   private boolean autoReply;
 
-    @Column(name = "backend_post",    length = 8) private String backendPost;
-    @Column(name = "backend_comment", length = 8) private String backendComment;
-    @Column(name = "backend_reply",   length = 8) private String backendReply;
-
-    @Column(name = "prompt_caching")      private boolean promptCaching;
-    @Column(name = "daily_token_budget")  private Long dailyTokenBudget;
-
     @Column(name = "updated_by")  private String updatedBy;
     @Column(name = "updated_at")  private Instant updatedAt;
 
-    @Column(name = "scheduler_mode") private String schedulerMode;
     @Column(name = "provider_ai_post_bundle") private String providerAiPostBundle;
     @Column(name = "provider_human_post_plan") private String providerHumanPostPlan;
     @Column(name = "provider_human_interaction") private String providerHumanInteraction;
+    @Column(name = "provider_vote_like") private String providerVoteLike;
     @Column(name = "schedule_execution_paused") private boolean scheduleExecutionPaused;
     @Column(name = "ai_user_kill_switch") private boolean aiUserKillSwitch;
     @Column(name = "candidate_pool_size") private int candidatePoolSize;
     @Column(name = "human_batch_max_posts") private int humanBatchMaxPosts;
     @Column(name = "human_batch_max_interactions") private int humanBatchMaxInteractions;
-
-    /** 타입별 effective backend. null/unknown → "CLI" 폴백 */
-    public String effectiveBackend(String actionType) {
-        return switch (actionType != null ? actionType.toUpperCase() : "") {
-            case "POST"    -> orCli(backendPost);
-            case "COMMENT" -> orCli(backendComment);
-            case "REPLY"   -> orCli(backendReply);
-            default        -> "CLI";
-        };
-    }
-
-    public boolean isOff(String actionType) {
-        return "OFF".equals(effectiveBackend(actionType));
-    }
-
-    private static String orCli(String v) {
-        return (v == null || v.isBlank()) ? "CLI" : v;
-    }
 }

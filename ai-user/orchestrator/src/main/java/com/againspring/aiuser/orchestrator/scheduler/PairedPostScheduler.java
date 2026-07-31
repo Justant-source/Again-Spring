@@ -133,11 +133,9 @@ public class PairedPostScheduler {
         runPairedPosts();
     }
 
-    /** 관리자 설정 기반 backend 조회 — AiUserGenerationConfig.backend_post 우선. */
+    /** 관리자 설정 기반 backend 조회 — PLAN 모드에서는 항상 CLI. */
     private String backendForPost() {
-        return generationConfigRepository.findById(1)
-            .map(c -> c.effectiveBackend("POST"))
-            .orElse("CLI");
+        return "CLI";
     }
 
     // ── 핵심 실행 흐름 ─────────────────────────────────────────────────────────

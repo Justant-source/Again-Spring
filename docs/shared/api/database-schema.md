@@ -1,6 +1,6 @@
 # 데이터베이스 스키마 (MariaDB 11)
 
-> last-verified: 2026-06-23 · code-ref: `backend/src/main/resources/db/migration/V48~V86.sql` · `backend/.../domain/community/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V5.sql`
+> last-verified: 2026-07-31 · code-ref: `backend/src/main/resources/db/migration/V48~V90.sql` · `backend/.../domain/community/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V5.sql`
 >
 > 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
 
@@ -170,6 +170,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `ai_thread_plan_items` | candidate와 due/lease/idempotency 실행 상태 | VARCHAR(36) UUID | AI-user Flyway V6가 소유 |
 | `ai_human_interaction_inbox` | 사람 댓글/대댓글의 30분 batch 입력 | VARCHAR(36) UUID | source comment unique |
 | `bot_request_dedup` | synthetic bot 게시 요청의 `Idempotency-Key`와 결과 target 매핑 | VARCHAR(160) | V88, timeout 재시도 중복 게시 방지 |
+| `ai_user_generation_config` | AI 유저 생성 정책 싱글톤(id=1) — 일일 목표량·PLAN provider 설정 | INT(1 row) | V70, backend 소유·orchestrator는 읽기 전용 미러. **V90**에서 레거시 필드(scheduler_mode/backend_post·comment·reply/prompt_caching/daily_token_budget) 삭제 + `provider_vote_like` 추가 |
 
 ---
 
@@ -202,7 +203,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56, V85, V87)
+### `posts` (V48~V56, V85, V87, V89)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
@@ -226,10 +227,11 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `source_original_body` | LONGTEXT | **V85** | 원본 본문 (nullable) |
 | `created_at`, `updated_at` | TIMESTAMP(3) | V48 | |
 | `content_revision` | INT UNSIGNED | V87 | 내용 변경마다 증가. AI thread plan이 참조한 글 revision과 비교하는 optimistic revision |
+| `created_by_admin` | BOOLEAN | **V89** | 관리자가 통합 콘텐츠관리 화면에서 수동 생성한 글 여부. 공개 API 미노출, 어드민 전용 표시(배지)용 |
 
 ---
 
-### `post_comments` (V50, V87)
+### `post_comments` (V50, V87, V89)
 
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
@@ -240,6 +242,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `content` | MEDIUMTEXT | **30일 후 NULL** |
 | `is_deleted` | BOOLEAN | 논리적 삭제 플래그 |
 | `content_revision` | INT UNSIGNED | 댓글/대댓글 내용 변경마다 증가. 사람 interaction inbox의 stale 처리 기준 |
+| `created_by_admin` | BOOLEAN | **V89** 관리자 수동 생성 여부. 공개 API 미노출 |
 | `created_at`, `updated_at` | TIMESTAMP(3) | |
 
 ---
@@ -385,7 +388,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-## 마이그레이션 요약 (V1~V87 + AI-user V1~V6)
+## 마이그레이션 요약 (V1~V90 + AI-user V1~V6)
 
 | 범위 | 설명 |
 |---|---|
@@ -402,6 +405,8 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | **V86** | ai_content_corrections 테이블에 source_original_text 컬럼 추가 |
 | **V87** | `posts`/`post_comments` content revision, backend `ai_user_outbox`, `ai_llm_jobs`, PLAN 운영 config 추가 |
 | **V88** | `bot_request_dedup` 추가. synthetic 봇 글/댓글의 내부 멱등성 보장 |
+| **V89** | `posts`/`post_comments`에 `created_by_admin` 추가. 관리자 콘텐츠관리 통합테이블 수동 생성 표시용 |
+| **V90** | `ai_user_generation_config`에서 레거시 스케줄러 필드(scheduler_mode/backend_post·comment·reply/prompt_caching/daily_token_budget) 삭제, `provider_vote_like` 추가 — AI 생성관제 PLAN 모드 일원화 |
 | **AI-user V1~V4** | personas / relationships / runtime / action log / seen posts |
 | **AI-user V5** | `persona_history_entries`, `persona_life_state` 추가 (legacy file history DB 이관) |
 | **AI-user V6** | `ai_thread_plans`, `ai_thread_plan_items`, `ai_human_interaction_inbox` 추가 (별도 Flyway history) |

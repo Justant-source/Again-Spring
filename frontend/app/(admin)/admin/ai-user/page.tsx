@@ -18,9 +18,7 @@ import {
   killAllBackends,
   getGenerationStatus,
   type GenerationConfig,
-  type Backend,
   type ThreadPlanProvider,
-  type SchedulerMode,
   type UpdateConfigRequest,
   type EstimateResult,
   type GenerationStatus,
@@ -30,7 +28,7 @@ import {
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/adminFormat';
 
-// ── §11.5 클라이언트 측 추정 상수 ────────────────────────────────────────
+// ── §11.5 클라이언트 측 추정 상수 (Claude provider만) ────────────────────
 // 실측 기준 (ClaudeApiInvoker 로그 avg): input ~4600, output ~100
 const PERCALL = {
   post:    { in: 4_800, out: 300  },  // self-critique 포함 약간 높음
@@ -40,45 +38,76 @@ const PERCALL = {
 const MAX5X_DAILY  = 2_100_000;  // Max 5x = Pro(420K) × 5
 const MAX5X_WINDOW = 440_000;    // Max 5x = Pro(88K) × 5
 const PEAK_SHARE   = 0.208;      // 균등분포 기준 5h/24h
-const HAIKU_IN_RATE  = 1.0;   // $/Mtok
-const HAIKU_OUT_RATE = 5.0;   // $/Mtok
-const CACHE_FACTOR   = 0.235;
+
+function computeEstimateForClaudeProviders(
+  posts: number, comments: number, replies: number,
+  pAiPostBundle: ThreadPlanProvider,
+  pHumanPostPlan: ThreadPlanProvider,
+  pHumanInteraction: ThreadPlanProvider,
+): { claudeTokens: number; claudeCalls: number; cliPct: number; cliPeakPct: number } {
+  let claudeTokens = 0, claudeCalls = 0;
+
+  // Claude provider인 경우에만 토큰 추정
+  const addIfClaude = (count: number, provider: ThreadPlanProvider, p: { in: number; out: number }) => {
+    if (provider === 'CLAUDE' && count > 0) {
+      claudeCalls += count;
+      claudeTokens += count * (p.in + p.out);
+    }
+  };
+
+  // 각 provider별 콜 수 추정 (단순화: 각 provider가 전체 목표량을 담당한다고 가정)
+  if (pAiPostBundle === 'CLAUDE') {
+    claudeCalls += posts; claudeTokens += posts * (PERCALL.post.in + PERCALL.post.out);
+    claudeCalls += comments; claudeTokens += comments * (PERCALL.comment.in + PERCALL.comment.out);
+    claudeCalls += replies; claudeTokens += replies * (PERCALL.reply.in + PERCALL.reply.out);
+  }
+  if (pHumanPostPlan === 'CLAUDE') {
+    claudeCalls += comments; claudeTokens += comments * (PERCALL.comment.in + PERCALL.comment.out);
+  }
+  if (pHumanInteraction === 'CLAUDE') {
+    claudeCalls += comments; claudeTokens += comments * (PERCALL.comment.in + PERCALL.comment.out);
+    claudeCalls += replies; claudeTokens += replies * (PERCALL.reply.in + PERCALL.reply.out);
+  }
+
+  const cliPct = (claudeTokens / MAX5X_DAILY) * 100;
+  const cliPeakPct = (claudeTokens * PEAK_SHARE / MAX5X_WINDOW) * 100;
+
+  return { claudeTokens, claudeCalls, cliPct, cliPeakPct };
+}
 
 function computeEstimate(
   posts: number, comments: number, replies: number,
-  bPost: Backend, bComment: Backend, bReply: Backend,
-  caching: boolean,
+  pAiPostBundle: ThreadPlanProvider,
+  pHumanPostPlan: ThreadPlanProvider,
+  pHumanInteraction: ThreadPlanProvider,
+  pVoteLike: ThreadPlanProvider,
 ): EstimateResult {
-  let calls = 0, cliIn = 0, cliOut = 0, apiIn = 0, apiOut = 0;
-
-  const add = (t: number, b: Backend, p: { in: number; out: number }) => {
-    if (b === 'OFF' || t <= 0) return;
-    calls += t;
-    if (b === 'CLI') { cliIn += t * p.in; cliOut += t * p.out; }
-    else             { apiIn += t * p.in; apiOut += t * p.out; }
-  };
-  add(posts, bPost, PERCALL.post);
-  add(comments, bComment, PERCALL.comment);
-  add(replies, bReply, PERCALL.reply);
-
-  const cliTokensTotal = cliIn + cliOut;
-  const cliPct      = (cliTokensTotal / MAX5X_DAILY) * 100;
-  const cliPeakPct  = (cliTokensTotal * PEAK_SHARE / MAX5X_WINDOW) * 100;
-  const apiInEff    = caching ? apiIn * CACHE_FACTOR : apiIn;
-  const apiCostDay  = (apiInEff / 1_000_000) * HAIKU_IN_RATE + (apiOut / 1_000_000) * HAIKU_OUT_RATE;
-  const apiCostMonth = apiCostDay * 30;
-  const apiTokensTotal = apiIn + apiOut;
+  const { claudeTokens, claudeCalls, cliPct, cliPeakPct } = computeEstimateForClaudeProviders(
+    posts, comments, replies,
+    pAiPostBundle, pHumanPostPlan, pHumanInteraction
+  );
 
   const warnings: string[] = [];
-  if (calls === 0) {
-    warnings.push('INFO:생성 없음 — 모든 타입이 OFF 또는 목표량 0');
+  const totalCalls = claudeCalls + (pVoteLike === 'CLAUDE' ? posts : 0); // votes+likes 무시
+
+  if (totalCalls === 0) {
+    warnings.push('INFO:생성 없음 — 모든 provider가 OFF 또는 목표량 0');
   } else {
-    if (cliPct > 100)      warnings.push('DANGER:CLI 경로가 Max 5x 일일 한도 초과 — 종일 throttle 위험');
-    else if (cliPct > 80)  warnings.push('WARN:CLI 경로가 Max 5x 한도 80% 초과 — 개발 quota 공유 주의');
+    if (cliPct > 100)      warnings.push('DANGER:Claude 경로가 Max 5x 일일 한도 초과 — 종일 throttle 위험');
+    else if (cliPct > 80)  warnings.push('WARN:Claude 경로가 Max 5x 한도 80% 초과 — 개발 quota 공유 주의');
     if (cliPeakPct > 100)  warnings.push('WARN:저녁 피크 5h 윈도우 초과 — 피크 시간대 throttle 위험');
   }
 
-  return { callsPerDay: calls, cliTokensTotal, cliPct, cliPeakPct, apiCostDay, apiCostMonth, apiTokensTotal, warnings };
+  return {
+    callsPerDay: totalCalls,
+    cliTokensTotal: claudeTokens,
+    cliPct,
+    cliPeakPct,
+    apiCostDay: 0,
+    apiCostMonth: 0,
+    apiTokensTotal: 0,
+    warnings,
+  };
 }
 
 // ── 경고 배지 ──────────────────────────────────────────────────────────────
@@ -114,38 +143,6 @@ function GaugeBar({ pct, danger = 100, warn = 80 }: { pct: number; danger?: numb
   return (
     <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
       <div className={`h-full rounded-full transition-all duration-300 ${color}`} style={{ width: `${clamped}%` }} />
-    </div>
-  );
-}
-
-// ── 백엔드 선택 (CLI / API / OFF) ─────────────────────────────────────────
-function BackendSelector({
-  label, value, onChange,
-}: { label: string; value: Backend; onChange: (v: Backend) => void }) {
-  const badge = value === 'CLI'  ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                value === 'API'  ? 'bg-violet-100 text-violet-700 border-violet-200' :
-                                   'bg-gray-100 text-gray-500 border-gray-200';
-  return (
-    <div className="flex items-center gap-4 py-2 border-b last:border-b-0">
-      <span className="w-20 text-sm font-medium text-gray-700 shrink-0">{label}</span>
-      <div className="flex items-center gap-5">
-        {(['CLI', 'API', 'OFF'] as Backend[]).map(opt => (
-          <label key={opt} className="flex items-center gap-1.5 cursor-pointer text-sm">
-            <input
-              type="radio"
-              name={`backend-${label}`}
-              value={opt}
-              checked={value === opt}
-              onChange={() => onChange(opt)}
-              className="accent-blue-600"
-            />
-            <span className={opt === 'OFF' ? 'text-gray-400' : ''}>{opt}</span>
-          </label>
-        ))}
-      </div>
-      <span className={`ml-auto text-[11px] font-medium border rounded px-2 py-0.5 ${badge}`}>
-        {value}
-      </span>
     </div>
   );
 }
@@ -260,18 +257,13 @@ export default function AiUserPage() {
   const [likes,    setLikes]    = useState(0);
   const [autoComment, setAutoComment] = useState(true);
   const [autoReply,   setAutoReply]   = useState(true);
-  const [bPost,    setBPost]    = useState<Backend>('OFF');
-  const [bComment, setBComment] = useState<Backend>('OFF');
-  const [bReply,   setBReply]   = useState<Backend>('OFF');
-  const [caching,  setCaching]  = useState(true);
-  const [budget,   setBudget]   = useState<string>('');
   const [ratios,   setRatios]   = useState({ comment: 7.6, reply: 4.4, vote: 6.5, like: 15.7 });
 
-  // 계획형 실행기: API 키가 아니라 연결된 Claude Code/Codex CLI 세션을 사용한다.
-  const [schedulerMode, setSchedulerMode] = useState<SchedulerMode>('LEGACY');
+  // 계획형 AI 사용자 실행 (PLAN 전용): 4가지 provider로 제어
   const [providerAiPostBundle, setProviderAiPostBundle] = useState<ThreadPlanProvider>('OFF');
   const [providerHumanPostPlan, setProviderHumanPostPlan] = useState<ThreadPlanProvider>('OFF');
   const [providerHumanInteraction, setProviderHumanInteraction] = useState<ThreadPlanProvider>('OFF');
+  const [providerVoteLike, setProviderVoteLike] = useState<ThreadPlanProvider>('OFF');
   const [scheduleExecutionPaused, setScheduleExecutionPaused] = useState(false);
   const [aiUserKillSwitch, setAiUserKillSwitch] = useState(false);
   const [candidatePoolSize, setCandidatePoolSize] = useState(24);
@@ -303,15 +295,12 @@ export default function AiUserPage() {
     setPosts(cfg.targetPosts); setComments(cfg.targetComments); setReplies(cfg.targetReplies);
     setVotes(cfg.targetVotes); setLikes(cfg.targetLikes);
     setAutoComment(cfg.autoComment); setAutoReply(cfg.autoReply);
-    setBPost(cfg.backendPost); setBComment(cfg.backendComment); setBReply(cfg.backendReply);
-    setCaching(cfg.promptCaching);
-    setBudget(cfg.dailyTokenBudget != null ? String(cfg.dailyTokenBudget) : '');
     setRatios({ comment: cfg.ratioComment, reply: cfg.ratioReply, vote: cfg.ratioVote, like: cfg.ratioLike });
     setServerEstimate(cfg.estimate);
-    setSchedulerMode(cfg.schedulerMode ?? 'LEGACY');
     setProviderAiPostBundle(cfg.providerAiPostBundle ?? 'OFF');
     setProviderHumanPostPlan(cfg.providerHumanPostPlan ?? 'OFF');
     setProviderHumanInteraction(cfg.providerHumanInteraction ?? 'OFF');
+    setProviderVoteLike(cfg.providerVoteLike ?? 'OFF');
     setScheduleExecutionPaused(cfg.scheduleExecutionPaused ?? false);
     setAiUserKillSwitch(cfg.aiUserKillSwitch ?? false);
     setCandidatePoolSize(cfg.candidatePoolSize ?? 24);
@@ -329,7 +318,10 @@ export default function AiUserPage() {
   };
 
   // ── 클라이언트 측 실시간 추정 ─────────────────────────────────────
-  const liveEstimate = computeEstimate(posts, comments, replies, bPost, bComment, bReply, caching);
+  const liveEstimate = computeEstimate(
+    posts, comments, replies,
+    providerAiPostBundle, providerHumanPostPlan, providerHumanInteraction, providerVoteLike
+  );
   const est = serverEstimate ?? liveEstimate;
 
   // ── 저장 ─────────────────────────────────────────────────────────
@@ -339,13 +331,10 @@ export default function AiUserPage() {
       targetPosts: posts, targetComments: comments, targetReplies: replies,
       targetVotes: votes, targetLikes: likes,
       autoComment, autoReply,
-      backendPost: bPost, backendComment: bComment, backendReply: bReply,
-      promptCaching: caching,
-      dailyTokenBudget: budget !== '' ? Number(budget) : null,
-      schedulerMode,
       providerAiPostBundle,
       providerHumanPostPlan,
       providerHumanInteraction,
+      providerVoteLike,
       scheduleExecutionPaused,
       aiUserKillSwitch,
       candidatePoolSize,
@@ -409,11 +398,12 @@ export default function AiUserPage() {
     );
   }
 
-  const planProvidersOff = providerAiPostBundle === 'OFF'
+  const allOff = aiUserKillSwitch || (
+    providerAiPostBundle === 'OFF'
     && providerHumanPostPlan === 'OFF'
-    && providerHumanInteraction === 'OFF';
-  const allOff = aiUserKillSwitch || (schedulerMode === 'PLAN' ? planProvidersOff :
-    (bPost === 'OFF' && bComment === 'OFF' && bReply === 'OFF'));
+    && providerHumanInteraction === 'OFF'
+    && providerVoteLike === 'OFF'
+  );
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -496,38 +486,30 @@ export default function AiUserPage() {
                 새 경로는 API 키를 사용하지 않으며 연결된 Claude Code 또는 Codex CLI 세션만 사용합니다.
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm">실행 방식</Label>
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="radio" name="scheduler-mode" checked={schedulerMode === 'PLAN'} onChange={() => setSchedulerMode('PLAN')} className="accent-blue-600" />
-                    계획형 실행
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer text-gray-500">
-                    <input type="radio" name="scheduler-mode" checked={schedulerMode === 'LEGACY'} onChange={() => setSchedulerMode('LEGACY')} className="accent-blue-600" />
-                    기존 실행기 (전환 기간)
-                  </label>
-                </div>
-              </div>
-
-              <div className={schedulerMode === 'PLAN' ? '' : 'opacity-50 pointer-events-none'}>
+              <div className="space-y-3">
                 <ThreadPlanProviderSelector
-                  label="AI 글 묶음 생성"
-                  description="AI가 쓴 글의 본문·댓글·대댓글 후보를 1회 생성합니다. Claude는 Sonnet, Codex는 Terra를 사용합니다."
+                  label="AI 글·댓글 묶음 생성"
+                  description="AI가 글 본문과 댓글·대댓글 후보를 한 번에 생성합니다."
                   value={providerAiPostBundle}
                   onChange={setProviderAiPostBundle}
                 />
                 <ThreadPlanProviderSelector
-                  label="사람 글 초기 계획"
-                  description="사람이 글을 쓰면 비동기로 후보와 예약 계획을 1회 생성합니다. Claude는 Haiku, Codex는 Luna를 사용합니다."
+                  label="사람 글 → AI 댓글"
+                  description="사람이 글을 쓰면 AI가 비동기로 댓글을 답니다."
                   value={providerHumanPostPlan}
                   onChange={setProviderHumanPostPlan}
                 />
                 <ThreadPlanProviderSelector
-                  label="사람 댓글 일괄 답글"
-                  description="30분 주기, 최대 10개 글·50개 상호작용을 제한된 배치 호출로 처리합니다."
+                  label="사람 댓글 확인·답글"
+                  description="30분 주기로 사람이 남긴 댓글을 확인하고 AI가 답글을 답니다."
                   value={providerHumanInteraction}
                   onChange={setProviderHumanInteraction}
+                />
+                <ThreadPlanProviderSelector
+                  label="AI 투표·좋아요 생성"
+                  description="AI가 게시글 공감 투표와 좋아요를 생성합니다. 실제 여론에 영향을 주기보다는 커뮤니티가 비어 보이지 않게 하는 역할이며, 사람 투표가 있으면 공감 비율은 사람 투표가 우선합니다."
+                  value={providerVoteLike}
+                  onChange={setProviderVoteLike}
                 />
               </div>
 
@@ -565,54 +547,6 @@ export default function AiUserPage() {
             </div>
           </AdminSection>
 
-          {/* 백엔드 라우팅 */}
-          <AdminSection title="기존 실행기 백엔드 라우팅">
-            <div className="px-1">
-              <div className="text-xs text-gray-400 mb-3">
-                계획형 전환이 완료되기 전의 기존 실행기 설정입니다. 새 계획형 생성에는 적용되지 않습니다.
-              </div>
-              <BackendSelector label="POST"    value={bPost}    onChange={setBPost} />
-              <BackendSelector label="COMMENT" value={bComment} onChange={setBComment} />
-              <BackendSelector label="REPLY"   value={bReply}   onChange={setBReply} />
-              <div className="mt-4 rounded bg-gray-50 border border-gray-200 p-3 text-xs text-gray-500 space-y-1">
-                <div><span className="font-medium text-blue-600">CLI</span> — 호스트 ~/.claude 마운트, Max 5x 구독 quota 차감 (개발 quota와 공유)</div>
-                <div><span className="font-medium text-violet-600">API</span> — Anthropic Messages API, 종량 과금 ($1/$5 per Mtok, 캐싱 시 입력 ~23.5%)</div>
-                <div><span className="font-medium text-gray-500">OFF</span> — 해당 타입 생성 없음, 토큰 0</div>
-              </div>
-            </div>
-          </AdminSection>
-
-          {/* 기존 API 옵션 — 계획형 경로에는 적용하지 않음 */}
-          <AdminSection title="기존 실행기 API 옵션">
-            <div className="px-1 space-y-4">
-              <p className="text-xs text-amber-700 rounded bg-amber-50 border border-amber-100 px-3 py-2">
-                계획형 AI 사용자 실행에는 적용되지 않습니다. 계획형 경로는 API 키 없이 연결된 CLI 세션으로만 동작합니다.
-              </p>
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  id="caching"
-                  checked={caching}
-                  onCheckedChange={v => setCaching(Boolean(v))}
-                />
-                <label htmlFor="caching" className="text-sm cursor-pointer">
-                  프롬프트 캐싱 활성화
-                  <span className="ml-2 text-xs text-gray-400">(API 경로만 적용, 시스템 프롬프트 고정 — 입력 토큰 ~76.5% 절감)</span>
-                </label>
-              </div>
-              <div className="flex items-center gap-3">
-                <Label htmlFor="budget" className="text-sm shrink-0 w-36">일일 토큰 예산</Label>
-                <Input
-                  id="budget"
-                  type="number"
-                  placeholder="없음 (무제한)"
-                  value={budget}
-                  onChange={e => setBudget(e.target.value)}
-                  className="w-40 text-sm"
-                />
-                <span className="text-xs text-gray-400">초과 시 해당 경로 자동 OFF</span>
-              </div>
-            </div>
-          </AdminSection>
 
         </div>
 
@@ -638,11 +572,11 @@ export default function AiUserPage() {
                   </div>
                 </div>
 
-                {/* CLI 경로 */}
+                {/* Claude 경로 */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-blue-600 flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full bg-blue-500 inline-block" />
-                    CLI 경로 (Max 5x)
+                  <div className="text-xs font-medium text-orange-600 flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full bg-orange-500 inline-block" />
+                    Claude 경로 (Max 5x)
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>{(liveEstimate.cliTokensTotal / 1000).toFixed(0)}K 토큰</span>
@@ -660,30 +594,19 @@ export default function AiUserPage() {
                   </div>
                 </div>
 
-                {/* API 경로 */}
-                <div className="space-y-1.5">
-                  <div className="text-xs font-medium text-violet-600 flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full bg-violet-500 inline-block" />
-                    API 경로
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 text-xs">$/일</span>
-                    <span className="font-mono font-semibold text-gray-700">
-                      ${liveEstimate.apiCostDay.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 text-xs">$/월 (×30)</span>
-                    <span className="font-mono font-semibold text-gray-700">
-                      ${liveEstimate.apiCostMonth.toFixed(2)}
-                    </span>
-                  </div>
-                  {caching && (
-                    <div className="text-[11px] text-gray-400">
-                      캐싱 적용 — 입력 × {(CACHE_FACTOR * 100).toFixed(1)}%
+                {/* Codex 경로 및 기타 */}
+                {(providerAiPostBundle === 'CODEX' || providerHumanPostPlan === 'CODEX' ||
+                  providerHumanInteraction === 'CODEX' || providerVoteLike === 'CODEX') && (
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-medium text-blue-600 flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-blue-500 inline-block" />
+                      Codex 경로
                     </div>
-                  )}
-                </div>
+                    <p className="text-[11px] text-gray-500">
+                      비용 추정 미지원 · Codex 워커 활용 (일일 호출 수는 서버 보고)
+                    </p>
+                  </div>
+                )}
 
                 {/* 경고 */}
                 <WarningBadges warnings={liveEstimate.warnings} />

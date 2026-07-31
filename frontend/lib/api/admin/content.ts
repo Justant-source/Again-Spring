@@ -11,6 +11,7 @@ export interface AdminPost {
   category: string;
   status: string;
   viewCount: number;
+  likeCount?: number;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -27,6 +28,8 @@ export interface AdminPost {
   neutralizationPassed?: boolean;
   /** AI 봇 작성 여부. ADMIN 전용 — 공개 API 미노출. */
   synthetic?: boolean;
+  /** 관리자가 수동 생성한 항목 여부. */
+  createdByAdmin?: boolean;
   /** 원본 비교 기능: 재구성 모드로 생성된 글의 크롤 원본 example_bank ID. null이면 원본 없음. */
   sourceExampleId?: number | null;
   sourceCommunity?: string | null;
@@ -48,6 +51,8 @@ export interface AdminComment {
   deletedByAdminId: string | null;
   /** AI 봇 작성 여부. ADMIN 전용 — 공개 API 미노출. */
   synthetic?: boolean;
+  /** 관리자가 수동 생성한 항목 여부. */
+  createdByAdmin?: boolean;
 }
 
 // ===== Posts API =====
@@ -87,7 +92,7 @@ export async function getAdminPost(postId: string): Promise<AdminPost> {
 
 export async function updatePost(
   postId: string,
-  data: Partial<{ title: string; bodyRaw: string; partnerBodyRaw: string; status: string; category: string }>
+  data: Partial<{ title: string; bodyRaw: string; partnerBodyRaw: string; status: string; category: string; viewCount: number }>
 ): Promise<AdminPost> {
   const res = await api.patch<AdminPost>(`/api/admin/content/posts/${postId}`, data);
   return res.data;
@@ -134,6 +139,27 @@ export async function blockPost(postId: string): Promise<void> {
 
 export async function unblockPost(postId: string): Promise<void> {
   await api.post(`/api/admin/content/posts/${postId}/unblock`);
+}
+
+export async function adjustPostLikes(
+  postId: string,
+  delta: 1 | -1
+): Promise<{ likeCount: number }> {
+  const res = await api.post<{ likeCount: number }>(
+    `/api/admin/content/posts/${postId}/likes/adjust`,
+    { delta }
+  );
+  return res.data;
+}
+
+export async function createPost(data: {
+  title: string;
+  bodyRaw: string;
+  category: string;
+  authorId: string;
+}): Promise<AdminPost> {
+  const res = await api.post<AdminPost>('/api/admin/content/posts', data);
+  return res.data;
 }
 
 // ===== Comments API =====
@@ -185,4 +211,25 @@ export async function blockComment(commentId: number): Promise<void> {
 
 export async function unblockComment(commentId: number): Promise<void> {
   await api.post(`/api/admin/content/comments/${commentId}/unblock`);
+}
+
+export async function adjustCommentLikes(
+  commentId: number,
+  delta: 1 | -1
+): Promise<{ likeCount: number }> {
+  const res = await api.post<{ likeCount: number }>(
+    `/api/admin/content/comments/${commentId}/likes/adjust`,
+    { delta }
+  );
+  return res.data;
+}
+
+export async function createComment(data: {
+  postId: string;
+  parentCommentId?: number | null;
+  body: string;
+  authorId: string;
+}): Promise<AdminComment> {
+  const res = await api.post<AdminComment>('/api/admin/content/comments', data);
+  return res.data;
 }

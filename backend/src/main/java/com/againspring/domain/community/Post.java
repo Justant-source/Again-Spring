@@ -121,6 +121,10 @@ public class Post {
     @Column(name = "deleted_by_admin_id", length = 32)
     private String deletedByAdminId;
 
+    @Column(name = "created_by_admin", nullable = false)
+    @Builder.Default
+    private Boolean createdByAdmin = false;
+
     // ── 원본 비교 기능: 재구성 출처 스냅샷 (재구성 모드 생성 시만 비-null) ─────────────────
     /** example_bank.id — 재구성 원본 크롤 행 ID. null = 일반(창작) 생성 */
     @Column(name = "source_example_id")

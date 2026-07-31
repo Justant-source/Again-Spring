@@ -50,8 +50,6 @@ class ActionTypeQuotaServiceTest {
         when(config.getTargetLikes()).thenReturn(0);
         when(config.isAutoComment()).thenReturn(true);
         when(config.isAutoReply()).thenReturn(true);
-        when(config.isOff("COMMENT")).thenReturn(false);
-        when(config.isOff("REPLY")).thenReturn(false);
         when(dailyPostQuotaService.postsCreatedToday()).thenReturn(0);
         mockQueryForList(new ArrayList<>());
 
@@ -76,8 +74,6 @@ class ActionTypeQuotaServiceTest {
         when(config.getTargetLikes()).thenReturn(0);
         when(config.isAutoComment()).thenReturn(false);
         when(config.isAutoReply()).thenReturn(false);
-        when(config.isOff("COMMENT")).thenReturn(false);
-        when(config.isOff("REPLY")).thenReturn(false);
         when(dailyPostQuotaService.postsCreatedToday()).thenReturn(5);
         mockQueryForList(new ArrayList<>());
 
@@ -101,8 +97,6 @@ class ActionTypeQuotaServiceTest {
         when(config.getTargetLikes()).thenReturn(50);
         when(config.isAutoComment()).thenReturn(false);
         when(config.isAutoReply()).thenReturn(false);
-        when(config.isOff("COMMENT")).thenReturn(false);
-        when(config.isOff("REPLY")).thenReturn(false);
         when(dailyPostQuotaService.postsCreatedToday()).thenReturn(0);
 
         // Mock query result: LIKE=30, COMMENT_LIKE=10
@@ -144,29 +138,6 @@ class ActionTypeQuotaServiceTest {
         assertEquals(ActionTypeQuotaService.TypeQuota.zero(), result.get(ActionType.COMMENT));
     }
 
-    @Test
-    void backendCommentOff_commentDeficitZero() {
-        // Arrange
-        when(config.getTargetPosts()).thenReturn(0);
-        when(config.getTargetComments()).thenReturn(150);
-        when(config.getTargetReplies()).thenReturn(0);
-        when(config.getTargetVotes()).thenReturn(0);
-        when(config.getTargetLikes()).thenReturn(0);
-        when(config.isAutoComment()).thenReturn(true);
-        when(config.isOff("COMMENT")).thenReturn(true); // backend=OFF
-        when(config.isAutoReply()).thenReturn(false);
-        when(dailyPostQuotaService.postsCreatedToday()).thenReturn(0);
-
-        List<Map<String, Object>> rows = new ArrayList<>();
-        rows.add(Map.of("action_type", "COMMENT", "cnt", 50));
-        mockQueryForList(rows);
-
-        // Act
-        Map<ActionType, ActionTypeQuotaService.TypeQuota> result = service.computeToday(config);
-
-        // Assert
-        assertEquals(ActionTypeQuotaService.TypeQuota.zero(), result.get(ActionType.COMMENT));
-    }
 
     @Test
     void commentReplyDone_deficitCorrect() {
@@ -177,9 +148,7 @@ class ActionTypeQuotaServiceTest {
         when(config.getTargetVotes()).thenReturn(0);
         when(config.getTargetLikes()).thenReturn(0);
         when(config.isAutoComment()).thenReturn(true);
-        when(config.isOff("COMMENT")).thenReturn(false); // backend != OFF
         when(config.isAutoReply()).thenReturn(true);
-        when(config.isOff("REPLY")).thenReturn(false);
         when(dailyPostQuotaService.postsCreatedToday()).thenReturn(0);
 
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -237,8 +206,6 @@ class ActionTypeQuotaServiceTest {
         when(config.getTargetLikes()).thenReturn(0);
         when(config.isAutoComment()).thenReturn(false);
         when(config.isAutoReply()).thenReturn(false);
-        when(config.isOff("COMMENT")).thenReturn(false);
-        when(config.isOff("REPLY")).thenReturn(false);
         when(dailyPostQuotaService.postsCreatedToday()).thenReturn(0);
 
         List<Map<String, Object>> rows = new ArrayList<>();

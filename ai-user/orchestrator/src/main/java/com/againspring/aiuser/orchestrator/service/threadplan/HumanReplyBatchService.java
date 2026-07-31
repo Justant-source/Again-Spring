@@ -24,7 +24,7 @@ public class HumanReplyBatchService {
     public void run() {
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
         if (!props.isEnabled() || !props.getThreadPlan().isEnabled() || !props.getThreadPlan().isHumanReplyBatchEnabled() || config == null
-                || !"PLAN".equalsIgnoreCase(config.getSchedulerMode()) || config.isAiUserKillSwitch() || "OFF".equalsIgnoreCase(config.getProviderHumanInteraction())) return;
+                || config.isAiUserKillSwitch() || "OFF".equalsIgnoreCase(config.getProviderHumanInteraction())) return;
         String worker = "human-reply-batch"; Instant now = Instant.now();
         int maxComments = config.getHumanBatchMaxInteractions() > 0 ? config.getHumanBatchMaxInteractions() : props.getThreadPlan().getHumanReplyMaxComments();
         int maxPosts = config.getHumanBatchMaxPosts() > 0 ? config.getHumanBatchMaxPosts() : props.getThreadPlan().getHumanReplyMaxPosts();

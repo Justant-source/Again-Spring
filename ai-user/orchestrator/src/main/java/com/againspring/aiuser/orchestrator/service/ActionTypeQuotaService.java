@@ -59,16 +59,16 @@ public class ActionTypeQuotaService {
             // COMMENT, REPLY, VOTE, LIKE, COMMENT_LIKE: 단일 쿼리로 GROUP BY 조회
             Map<String, Integer> actionCounts = fetchActionCounts();
 
-            // COMMENT: autoComment && backendComment != "OFF" 일 때만 적용
-            if (config.isAutoComment() && !config.isOff("COMMENT")) {
+            // COMMENT: autoComment 일 때만 적용 (provider_human_post_plan는 각 scheduler에서 확인)
+            if (config.isAutoComment()) {
                 int commentsDone = actionCounts.getOrDefault("COMMENT", 0);
                 result.put(ActionType.COMMENT, TypeQuota.of(config.getTargetComments(), commentsDone));
             } else {
                 result.put(ActionType.COMMENT, TypeQuota.zero());
             }
 
-            // REPLY: autoReply && backendReply != "OFF" 일 때만 적용
-            if (config.isAutoReply() && !config.isOff("REPLY")) {
+            // REPLY: autoReply 일 때만 적용 (provider_human_interaction는 각 scheduler에서 확인)
+            if (config.isAutoReply()) {
                 int repliesDone = actionCounts.getOrDefault("REPLY", 0);
                 result.put(ActionType.REPLY, TypeQuota.of(config.getTargetReplies(), repliesDone));
             } else {

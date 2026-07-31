@@ -44,4 +44,24 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
      * 댓글 좋아요 수
      */
     Long countByCommentId(Long commentId);
+
+    /**
+     * 포스트의 특정 유저가 소유한 좋아요 찾기
+     */
+    java.util.Optional<PostLike> findByPostIdAndUserId(String postId, String userId);
+
+    /**
+     * 댓글의 특정 유저가 소유한 좋아요 찾기
+     */
+    java.util.Optional<PostLike> findByCommentIdAndUserId(Long commentId, String userId);
+
+    /**
+     * 포스트의 모든 좋아요 중 특정 유저 목록에 속하는 것 찾기
+     */
+    java.util.List<PostLike> findByPostIdAndUserIdIn(String postId, java.util.Collection<String> userIds);
+
+    /**
+     * 댓글의 모든 좋아요 중 특정 유저 목록에 속하는 것 찾기
+     */
+    java.util.List<PostLike> findByCommentIdAndUserIdIn(Long commentId, java.util.Collection<String> userIds);
 }

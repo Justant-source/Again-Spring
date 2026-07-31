@@ -51,6 +51,7 @@ export function EditPostDialog({ post, onClose, onUpdated }: Props) {
   const [partnerBodyRaw, setPartnerBodyRaw] = useState('');
   const [status, setStatus] = useState('VOTING');
   const [category, setCategory] = useState('OTHER');
+  const [viewCount, setViewCount] = useState<number | ''>('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -61,6 +62,7 @@ export function EditPostDialog({ post, onClose, onUpdated }: Props) {
     setPartnerBodyRaw(post.partnerBodyRaw || post.partnerBodyPublished || '');
     setStatus(post.status || 'VOTING');
     setCategory(post.category || 'OTHER');
+    setViewCount(post.viewCount ?? '');
     setError('');
   }, [post]);
 
@@ -73,6 +75,7 @@ export function EditPostDialog({ post, onClose, onUpdated }: Props) {
     try {
       const payload: Parameters<typeof updatePost>[1] = { title, bodyRaw, status, category };
       if (partnerBodyRaw) payload.partnerBodyRaw = partnerBodyRaw;
+      if (viewCount !== '') payload.viewCount = Number(viewCount);
       const updated = await updatePost(post.id, payload);
       onUpdated(updated);
       onClose();
@@ -141,6 +144,19 @@ export function EditPostDialog({ post, onClose, onUpdated }: Props) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* View Count */}
+          <div>
+            <Label className="block text-sm font-medium mb-2">조회수</Label>
+            <Input
+              type="number"
+              value={viewCount}
+              onChange={(e) => setViewCount(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="조회수 입력 (선택사항)"
+              disabled={submitting}
+              min="0"
+            />
           </div>
 
           {/* 작성자 본문 */}

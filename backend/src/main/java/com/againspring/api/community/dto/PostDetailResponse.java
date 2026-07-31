@@ -2,6 +2,7 @@ package com.againspring.api.community.dto;
 
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.VoteOption;
+import com.againspring.service.community.VoteCountBreakdown;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -70,10 +71,14 @@ public class PostDetailResponse {
     private Boolean isPartner;
 
     /**
-     * Post + VoteOption + 투표 결과로부터 PostDetailResponse 생성
+     * Post + VoteOption + 투표 결과로부터 PostDetailResponse 생성 (가중치 적용)
+     * @param voteResultWithBreakdown 옵션별 사람/AI 카운트
+     * @param weightedPercentages 가중치 적용된 비율 (%)
      */
     public static PostDetailResponse from(Post post, List<VoteOption> options,
-                                         Map<Long, Long> voteResult, Optional<Long> myVote,
+                                         Map<Long, VoteCountBreakdown> voteResultWithBreakdown,
+                                         Map<Long, Double> weightedPercentages,
+                                         Optional<Long> myVote,
                                          long commentCount, String requestUserId,
                                          String authorNickname, String partnerNickname,
                                          boolean isPartner) {
@@ -85,12 +90,14 @@ public class PostDetailResponse {
                         .build())
                 .toList();
 
-        long totalVotes = voteResult.values().stream().mapToLong(Long::longValue).sum();
+        long totalVotes = voteResultWithBreakdown.values().stream()
+                .mapToLong(VoteCountBreakdown::getTotalCount)
+                .sum();
 
         List<VoteOptionResultDto> voteResultDtos = options.stream()
                 .map(opt -> {
-                    long count = voteResult.getOrDefault(opt.getId(), 0L);
-                    double percentage = totalVotes > 0 ? (count * 100.0) / totalVotes : 0.0;
+                    long count = voteResultWithBreakdown.getOrDefault(opt.getId(), new VoteCountBreakdown(0L, 0L)).getTotalCount();
+                    double percentage = weightedPercentages.getOrDefault(opt.getId(), 0.0);
                     return VoteOptionResultDto.builder()
                             .id(opt.getId())
                             .label(opt.getLabel())

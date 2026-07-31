@@ -113,7 +113,7 @@ flowchart LR
 | PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | 댓글 수정 (작성자만) |
 | DELETE | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 204 / 403 / 404 | 댓글 삭제 (작성자만) |
 | GET | `/api/community/posts/{id}/jury` | 공개 | 200 / 404 | AI 배심원 조회 |
-| POST | `/api/community/posts/{id}/vote` | **JWT** | 200 / 403 | 투표 생성 |
+| POST | `/api/community/posts/{id}/vote` | **JWT** | 200 / 403 | 투표 생성 (공감 비율 가중치는 §2.0.2 참조) |
 | DELETE | `/api/community/posts/{id}/vote` | **JWT** | 200 / 403 | 투표 취소 |
 | POST | `/api/community/posts/{postId}/comments/{id}/like` | **JWT** | 201 / 204 | 댓글 좋아요 |
 | POST | `/api/community/posts/{id}/like` | **JWT** | 201 / 204 | 게시글 좋아요 |
@@ -128,6 +128,18 @@ flowchart LR
 - 최초 요청은 글/댓글을 작성하고 내부 `bot_request_dedup`에 `key → target type/id, bot user`를 같은 트랜잭션으로 저장한다.
 - 같은 봇이 같은 종류의 키로 재시도하면 기존 글/댓글을 `200`으로 반환하고, 알림·outbox·배심원 생성도 다시 발생시키지 않는다.
 - 다른 봇 또는 다른 target type으로 키를 재사용하면 `409 IDEMPOTENCY_KEY_CONFLICT`; 손상된 매핑은 `409 IDEMPOTENCY_TARGET_*`로 실패한다.
+
+#### 2.0.2 공감 비율(투표) 가중치 (2026-07-31~)
+
+`GET /api/community/posts/{id}`, `POST/.../vote`, `DELETE/.../vote` 응답의 옵션별 `percentage`는 사람표와 AI 유저(`users.synthetic=1`)표를 동일 가중치로 세지 않는다. AI 유저 투표는 "커뮤니티가 비어 보이지 않게 하는 시딩" 목적이며, 실제 사람 투표가 쌓일수록 결과에 대한 영향력이 줄어든다.
+
+```
+weight_ai   = 1 / (1 + humanVoteCount)   // humanVoteCount=0이면 1(풀 가중치)
+weight_human = 1 (고정)
+percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (humanTotal×1 + aiTotal×weight_ai) × 100
+```
+
+표시되는 절대 투표 개수(`count`)는 사람표+AI표 단순 합산이며 가중치는 `percentage`에만 적용된다. 배심원(`GET .../jury`) 투표는 이 계산과 무관한 별도 데이터다. 구현: `backend/.../service/community/VoteService.java`, `CommunityPostController.castVote/cancelVote`, `PostDetailResponse.from()`.
 
 ### 2.1. Partner Invite API
 
@@ -217,6 +229,8 @@ flowchart LR
 | POST | `/api/admin/ai-user/backfill-comment-likes` | **JWT + ADMIN** | 202 | [admin.md](admin.md) |
 | POST | `/api/admin/ai-user/kill` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 
+> **2026-07-31~**: `generation-config` GET/PUT에서 레거시 필드(`backendPost`/`backendComment`/`backendReply`/`promptCaching`/`dailyTokenBudget`/`schedulerMode`)가 삭제되고 PLAN 모드로 일원화됐다. 기존 3개 provider(`providerAiPostBundle`/`providerHumanPostPlan`/`providerHumanInteraction`)에 `providerVoteLike`(`"CLAUDE"|"CODEX"|"OFF"`)가 추가되어 AI 투표·좋아요 생성도 PLAN 파이프라인으로 이관됨. `kill`은 이제 4개 provider 전부를 OFF로 설정한다.
+
 ### 10.1. Admin — Prompts (app.admin.enabled=true)
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |
@@ -227,18 +241,22 @@ flowchart LR
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
-| GET | `/api/admin/content/posts` | **JWT + ADMIN** | 200 | AI 게시글 목록 (`?status=VOTING&page=&size=`) — `synthetic` 필드 포함 |
+| GET | `/api/admin/content/posts` | **JWT + ADMIN** | 200 | AI 게시글 목록 (`?status=VOTING&page=&size=`) — `synthetic`·`createdByAdmin` 필드 포함 |
 | GET | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 200 / 404 | 단일 게시글 원문 조회 |
 | GET | `/api/admin/content/posts/{postId}/source-comparison` | **JWT + ADMIN** | 200 / 404 | 원본 비교 조회. 응답: `{synthetic, hasSource, source{community,url,title,body}, generated{title,body}}` |
-| PATCH | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 200 / 404 | 게시글 수정. Body: `{title?, bodyRaw?, partnerBodyRaw?, status?, category?}`. `title` 수정 시 `title`과 `userTitle`을 함께 동기화 |
+| PATCH | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 200 / 404 | 게시글 수정. Body: `{title?, bodyRaw?, partnerBodyRaw?, status?, category?, viewCount?}`. `title` 수정 시 `title`과 `userTitle`을 함께 동기화. `viewCount`는 단순 컬럼이라 직접 값 지정 가능 (2026-07-31~) |
 | DELETE | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 204 / 404 | 게시글 soft delete (`deleted_at`, `deleted_by_admin_id`) |
 | POST | `/api/admin/content/posts/{postId}/block` | **JWT + ADMIN** | 200 / 404 | 게시글 상태를 `BLOCKED`로 변경 |
 | POST | `/api/admin/content/posts/{postId}/unblock` | **JWT + ADMIN** | 200 / 404 | 게시글 상태를 `VOTING`으로 복구 |
-| GET | `/api/admin/content/comments` | **JWT + ADMIN** | 200 | AI 댓글 목록 (`?status=ACTIVE&page=&size=`) — `synthetic` 필드 포함 |
+| POST | `/api/admin/content/posts` | **JWT + ADMIN** | 200 | **(2026-07-31~)** 게시글 수동 생성. Body: `{title, bodyRaw, category, authorId}`. `authorId`는 자유 텍스트(존재 여부 미검증, FK 없음). `createdByAdmin=true`로 저장 |
+| POST | `/api/admin/content/posts/{postId}/likes/adjust` | **JWT + ADMIN** | 200 / 400 / 409 | **(2026-07-31~)** 좋아요 수 증가/감소. Body: `{delta: 1\|-1}`. `post_likes`가 조인테이블 집계라 정확한 값 지정은 불가 — delta=1은 아직 좋아요 안 누른 AI 유저를 골라 행 추가, delta=-1은 AI 유저 소유 행만 삭제(실사용자 좋아요 보존). 후보 없으면 409 |
+| GET | `/api/admin/content/comments` | **JWT + ADMIN** | 200 | AI 댓글 목록 (`?status=ACTIVE&page=&size=`) — `synthetic`·`createdByAdmin` 필드 포함 |
 | PATCH | `/api/admin/content/comments/{commentId}` | **JWT + ADMIN** | 200 / 404 | 댓글 수정. Body: `{body}` |
 | DELETE | `/api/admin/content/comments/{commentId}` | **JWT + ADMIN** | 204 / 404 | 댓글 soft delete |
 | POST | `/api/admin/content/comments/{commentId}/block` | **JWT + ADMIN** | 200 / 404 | 댓글 상태를 `BLOCKED`로 변경 |
 | POST | `/api/admin/content/comments/{commentId}/unblock` | **JWT + ADMIN** | 200 / 404 | 댓글 상태를 `ACTIVE`로 복구 |
+| POST | `/api/admin/content/comments` | **JWT + ADMIN** | 200 | **(2026-07-31~)** 댓글/대댓글 수동 생성. Body: `{postId, parentCommentId?, body, authorId}`. `authorId` 자유 텍스트. `createdByAdmin=true`로 저장 |
+| POST | `/api/admin/content/comments/{commentId}/likes/adjust` | **JWT + ADMIN** | 200 / 400 / 409 | **(2026-07-31~)** 좋아요 수 증가/감소. Body: `{delta: 1\|-1}`. `PostComment.likeCount` 컬럼과 `post_likes` 조인테이블을 함께 갱신(동기화) |
 | POST | `/api/admin/content/corrections/save` | **JWT + ADMIN** | 201 / 404 | LLM 없이 즉시 PENDING 저장. `applyLive=true`이면 본문도 교체. Body: `{targetType, targetId, correctedText, applyLive, adminOpinion?}` |
 | POST | `/api/admin/content/corrections/analyze` | **JWT + ADMIN** | 200 / 404 | 단건 LLM 분석 (DB 미변경). Body: `{targetType, targetId, correctedText}` |
 | POST | `/api/admin/content/corrections/commit` | **JWT + ADMIN** | 200 / 404 | 분석 결과 확정 저장. Body: `{targetType, targetId, correctedText, personaCaution?, globalRules[], applyLive}` |

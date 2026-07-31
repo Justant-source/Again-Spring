@@ -3,7 +3,7 @@
  *
  * - /admin/ai-rules 페이지 로드 + 페르소나 탭 전환
  * - 전역 금지 규칙 CRUD (API — create/list/toggle/delete)
- * - /admin/content 페이지 + 게시글/댓글 탭 구조
+ * - /admin/content 페이지 + 통합테이블 구조 (2026-07-31~, 게시글/댓글 탭 삭제)
  * - synthetic 필드 계약 확인 (API 레벨)
  * - 비관리자(test5) 403 — storageState 재사용, 중복 login() 제거
  * - 사이드바 "AI 규칙관리" 링크 + 이동
@@ -96,15 +96,17 @@ test.describe('Journey 11-B: 전역 금지 규칙 CRUD', () => {
 test.describe('Journey 11-C: /admin/content 페이지 + API 계약', () => {
   test.use({ storageState: ADMIN_AUTH })
 
-  test('관리자 — /admin/content 게시글 탭 로드', async ({ page }) => {
+  test('관리자 — /admin/content 통합테이블 로드 (2026-07-31~ 탭 삭제)', async ({ page }) => {
     await page.goto(`${BASE}/admin/content`)
     await page.waitForURL(/\/admin\/content/, { timeout: 10_000 })
     await expect(page.getByText('콘텐츠 관리')).toBeVisible({ timeout: 8_000 })
-    await expect(page.getByRole('tab', { name: '게시글' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: '댓글·대댓글' })).toBeVisible()
+    // 게시글/댓글 탭 구조는 2026-07-31 통합테이블로 교체됨 — 대신 유형 필터로 확인
+    // "유형" 텍스트가 필터 라벨과 테이블 컬럼헤더 양쪽에 있어 라벨로 범위 한정
+    await expect(page.locator('label').filter({ hasText: '유형' }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: '추가' })).toBeVisible()
   })
 
-  test('게시글 탭 — 액션 컬럼 존재', async ({ page }) => {
+  test('통합테이블 — 액션 컬럼 존재', async ({ page }) => {
     await page.goto(`${BASE}/admin/content`)
     await page.waitForURL(/\/admin\/content/)
     await expect(page.getByRole('columnheader', { name: '액션' }).first()).toBeVisible({ timeout: 10_000 })

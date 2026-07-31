@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -19,6 +21,31 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
     Long countByPostIdAndOptionId(String postId, Long optionId);
 
     Long countByPostId(String postId);
+
+    /**
+     * 포스트 및 선택지별 투표 수 (사람/AI 분리)
+     */
+    @Query("""
+            SELECT new com.againspring.service.community.VoteCountBreakdown(
+                COALESCE(SUM(CASE WHEN u.synthetic = false THEN 1L ELSE 0L END), 0L),
+                COALESCE(SUM(CASE WHEN u.synthetic = true THEN 1L ELSE 0L END), 0L)
+            )
+            FROM Vote v
+            LEFT JOIN User u ON v.voterUserId = u.id
+            WHERE v.postId = :postId AND v.optionId = :optionId
+            """)
+    com.againspring.service.community.VoteCountBreakdown countByPostIdAndOptionIdWithBreakdown(@Param("postId") String postId, @Param("optionId") Long optionId);
+
+    /**
+     * 포스트 전체 인간 투표 수
+     */
+    @Query("""
+            SELECT COALESCE(COUNT(v), 0)
+            FROM Vote v
+            LEFT JOIN User u ON v.voterUserId = u.id
+            WHERE v.postId = :postId AND u.synthetic = false
+            """)
+    long countHumanVotesByPostId(@Param("postId") String postId);
 
     /**
      * 포스트 및 투표자별 투표 조회

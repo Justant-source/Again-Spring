@@ -54,7 +54,7 @@ public class AiPostBundleService {
     public boolean ownsPostGeneration() {
         return properties.isEnabled() && properties.getThreadPlan().isEnabled()
                 && configRepository.findById(1)
-                .map(c -> "PLAN".equalsIgnoreCase(c.getSchedulerMode()) && !c.isAiUserKillSwitch())
+                .map(c -> !c.isAiUserKillSwitch())
                 .orElse(false);
     }
 

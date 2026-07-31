@@ -38,7 +38,7 @@ public class ThreadPlanPublisher {
 
     public void publishDue() {
         if (!properties.isEnabled() || !properties.getThreadPlan().isEnabled() || !properties.getThreadPlan().isPublisherEnabled()
-                || configRepository.findById(1).map(c -> !"PLAN".equalsIgnoreCase(c.getSchedulerMode()) || c.isAiUserKillSwitch() || c.isScheduleExecutionPaused()).orElse(true)) return;
+                || configRepository.findById(1).map(c -> c.isAiUserKillSwitch() || c.isScheduleExecutionPaused()).orElse(true)) return;
         String worker = "thread-publisher";
         Instant now = Instant.now();
         for (AiThreadPlanItem item : leases.claimDue(worker, properties.getThreadPlan().getPublishBatchSize(), Duration.ofMinutes(5), now)) {

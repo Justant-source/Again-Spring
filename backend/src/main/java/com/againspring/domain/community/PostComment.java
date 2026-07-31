@@ -70,4 +70,8 @@ public class PostComment {
 
     @Column(name = "deleted_by_admin_id", length = 32)
     private String deletedByAdminId;
+
+    @Column(name = "created_by_admin", nullable = false)
+    @Builder.Default
+    private Boolean createdByAdmin = false;
 }

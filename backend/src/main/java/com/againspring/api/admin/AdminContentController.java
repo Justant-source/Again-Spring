@@ -3,10 +3,13 @@ package com.againspring.api.admin;
 import com.againspring.annotation.Auditable;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.PostComment;
+import com.againspring.domain.community.PostLike;
 import com.againspring.domain.enums.CommentStatus;
 import com.againspring.domain.enums.PostStatus;
+import com.againspring.domain.enums.PostCategory;
 import com.againspring.repository.UserRepository;
 import com.againspring.repository.community.PostCommentRepository;
+import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.service.ai.AiCorrectionService;
 import com.againspring.service.ai.AiUserOutboxWriter;
@@ -48,6 +51,7 @@ public class AdminContentController {
 
     private final PostRepository postRepository;
     private final PostCommentRepository postCommentRepository;
+    private final PostLikeRepository postLikeRepository;
     private final UserRepository userRepository;
     private final AiCorrectionService aiCorrectionService;
     private final AiUserOutboxWriter aiUserOutboxWriter;
@@ -193,6 +197,9 @@ public class AdminContentController {
         }
         if (req.getCategory() != null) {
             post.setCategory(com.againspring.domain.enums.PostCategory.valueOf(req.getCategory()));
+        }
+        if (req.getViewCount() != null) {
+            post.setViewCount(req.getViewCount());
         }
 
         if (contentChanged) {
@@ -461,6 +468,230 @@ public class AdminContentController {
         return ResponseEntity.ok().build();
     }
 
+    // ===== 좋아요 조정 =====
+
+    /**
+     * POST /api/admin/content/posts/{postId}/likes/adjust
+     * 포스트 좋아요 개수 조정 (delta = ±1, AI 유저만)
+     */
+    @PostMapping("/posts/{postId}/likes/adjust")
+    @Operation(
+        summary = "포스트 좋아요 조정",
+        description = "AI 유저만 선택해 좋아요 +1 또는 -1 (delta 필수: 1 또는 -1)"
+    )
+    @ApiResponse(responseCode = "200", description = "좋아요 개수")
+    @ApiResponse(responseCode = "400", description = "delta 값 오류 또는 AI 유저 부족/초과")
+    @ApiResponse(responseCode = "404", description = "포스트 없음")
+    @Auditable(action = "POST_LIKE_ADJUST", targetType = "POST", targetId = "#postId")
+    @Transactional
+    public ResponseEntity<AdjustLikesResponse> adjustPostLikes(
+            @PathVariable String postId,
+            @RequestBody AdjustLikesRequest req) {
+
+        if (req.getDelta() == null || (req.getDelta() != 1 && req.getDelta() != -1)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "delta must be 1 or -1");
+        }
+
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
+
+        Set<String> syntheticIds = userRepository.findAllSyntheticIds();
+
+        if (req.getDelta() == 1) {
+            // delta=1: AI 유저 중 이 글에 아직 좋아요 안 누른 유저를 랜덤 선택
+            List<String> candidates = syntheticIds.stream()
+                    .filter(userId -> !postLikeRepository.existsByPostIdAndUserId(postId, userId))
+                    .toList();
+
+            if (candidates.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "No synthetic users available to add like");
+            }
+
+            // 랜덤 선택
+            String selectedUserId = candidates.get((int)(Math.random() * candidates.size()));
+            PostLike like = PostLike.builder()
+                    .postId(postId)
+                    .userId(selectedUserId)
+                    .build();
+            postLikeRepository.save(like);
+        } else {
+            // delta=-1: 이 글의 좋아요 중 AI 유저 소유 행을 우선 삭제
+            // 실제 사람 유저의 좋아요는 절대 삭제하지 않음
+            List<PostLike> syntheticLikes = postLikeRepository.findByPostIdAndUserIdIn(postId, syntheticIds);
+
+            if (syntheticLikes.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "No synthetic user likes available to remove");
+            }
+
+            // 첫 번째 AI 유저 좋아요 삭제
+            postLikeRepository.deleteById(syntheticLikes.get(0).getId());
+        }
+
+        Long likeCount = postLikeRepository.countByPostId(postId);
+        return ResponseEntity.ok(new AdjustLikesResponse(likeCount != null ? likeCount : 0L));
+    }
+
+    /**
+     * POST /api/admin/content/comments/{commentId}/likes/adjust
+     * 댓글 좋아요 개수 조정 (delta = ±1, AI 유저만)
+     */
+    @PostMapping("/comments/{commentId}/likes/adjust")
+    @Operation(
+        summary = "댓글 좋아요 조정",
+        description = "AI 유저만 선택해 좋아요 +1 또는 -1 (delta 필수: 1 또는 -1). likeCount 컬럼도 함께 갱신."
+    )
+    @ApiResponse(responseCode = "200", description = "좋아요 개수")
+    @ApiResponse(responseCode = "400", description = "delta 값 오류 또는 AI 유저 부족/초과")
+    @ApiResponse(responseCode = "404", description = "댓글 없음")
+    @Auditable(action = "COMMENT_LIKE_ADJUST", targetType = "COMMENT", targetId = "#commentId")
+    @Transactional
+    public ResponseEntity<AdjustLikesResponse> adjustCommentLikes(
+            @PathVariable Long commentId,
+            @RequestBody AdjustLikesRequest req) {
+
+        if (req.getDelta() == null || (req.getDelta() != 1 && req.getDelta() != -1)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "delta must be 1 or -1");
+        }
+
+        PostComment comment = postCommentRepository.findById(commentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND"));
+
+        Set<String> syntheticIds = userRepository.findAllSyntheticIds();
+        Integer newLikeCount = comment.getLikeCount() != null ? comment.getLikeCount() : 0;
+
+        if (req.getDelta() == 1) {
+            // delta=1: AI 유저 중 이 댓글에 아직 좋아요 안 누른 유저를 랜덤 선택
+            List<String> candidates = syntheticIds.stream()
+                    .filter(userId -> !postLikeRepository.existsByCommentIdAndUserId(commentId, userId))
+                    .toList();
+
+            if (candidates.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "No synthetic users available to add like");
+            }
+
+            String selectedUserId = candidates.get((int)(Math.random() * candidates.size()));
+            PostLike like = PostLike.builder()
+                    .commentId(commentId)
+                    .userId(selectedUserId)
+                    .build();
+            postLikeRepository.save(like);
+            newLikeCount++;
+        } else {
+            // delta=-1: 이 댓글의 좋아요 중 AI 유저 소유 행을 우선 삭제
+            List<PostLike> syntheticLikes = postLikeRepository.findByCommentIdAndUserIdIn(commentId, syntheticIds);
+
+            if (syntheticLikes.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "No synthetic user likes available to remove");
+            }
+
+            // 첫 번째 AI 유저 좋아요 삭제
+            postLikeRepository.deleteById(syntheticLikes.get(0).getId());
+            newLikeCount = Math.max(0, newLikeCount - 1);
+        }
+
+        // likeCount 컬럼도 함께 갱신해 동기화
+        comment.setLikeCount(newLikeCount);
+        postCommentRepository.save(comment);
+
+        return ResponseEntity.ok(new AdjustLikesResponse(newLikeCount.longValue()));
+    }
+
+    // ===== 콘텐츠 생성 =====
+
+    /**
+     * POST /api/admin/content/posts
+     * 어드민이 직접 게시글 생성
+     */
+    @PostMapping("/posts")
+    @Operation(
+        summary = "게시글 생성",
+        description = "어드민이 직접 게시글을 생성 (createdByAdmin=true로 표시)"
+    )
+    @ApiResponse(responseCode = "201", description = "생성된 게시글")
+    @ApiResponse(responseCode = "400", description = "필수 필드 누락")
+    @Auditable(action = "POST_CREATE_ADMIN", targetType = "POST", targetId = "#result.id")
+    @Transactional
+    public ResponseEntity<AdminPostView> createPost(@RequestBody CreatePostRequest req) {
+        if (req.getTitle() == null || req.getTitle().trim().isEmpty() ||
+            req.getBodyRaw() == null || req.getBodyRaw().trim().isEmpty() ||
+            req.getCategory() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "title, bodyRaw, category are required");
+        }
+
+        // ID 생성 (UUID 32자)
+        String postId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 32);
+
+        Post post = Post.builder()
+                .id(postId)
+                .authorId(req.getAuthorId() != null ? req.getAuthorId() : "admin")
+                .title(req.getTitle())
+                .userTitle(req.getTitle())
+                .bodyRaw(req.getBodyRaw())
+                .bodyPublished(req.getBodyRaw())
+                .category(PostCategory.valueOf(req.getCategory()))
+                .jurorCount(0)
+                .status(PostStatus.VOTING)
+                .visibility(com.againspring.domain.enums.PostVisibility.PUBLIC)
+                .createdByAdmin(true)
+                .build();
+
+        Post saved = postRepository.save(post);
+
+        Set<String> syntheticIds = userRepository.findSyntheticIds(java.util.List.of(saved.getAuthorId()));
+        boolean synthetic = syntheticIds.contains(saved.getAuthorId());
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new AdminPostView(saved, synthetic));
+    }
+
+    /**
+     * POST /api/admin/content/comments
+     * 어드민이 직접 댓글 생성
+     */
+    @PostMapping("/comments")
+    @Operation(
+        summary = "댓글 생성",
+        description = "어드민이 직접 댓글을 생성 (createdByAdmin=true로 표시)"
+    )
+    @ApiResponse(responseCode = "201", description = "생성된 댓글")
+    @ApiResponse(responseCode = "400", description = "필수 필드 누락 또는 포스트 없음")
+    @Auditable(action = "COMMENT_CREATE_ADMIN", targetType = "COMMENT", targetId = "#result.id")
+    @Transactional
+    public ResponseEntity<AdminCommentView> createComment(@RequestBody CreateCommentRequest req) {
+        if (req.getPostId() == null || req.getPostId().trim().isEmpty() ||
+            req.getBody() == null || req.getBody().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "postId and body are required");
+        }
+
+        // 포스트 존재 확인
+        Post post = postRepository.findById(req.getPostId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "POST_NOT_FOUND"));
+
+        PostComment comment = PostComment.builder()
+                .postId(req.getPostId())
+                .parentCommentId(req.getParentCommentId())
+                .authorId(req.getAuthorId() != null ? req.getAuthorId() : "admin")
+                .body(req.getBody())
+                .status(CommentStatus.ACTIVE)
+                .createdByAdmin(true)
+                .build();
+
+        PostComment saved = postCommentRepository.save(comment);
+
+        Set<String> syntheticIds = userRepository.findSyntheticIds(java.util.List.of(saved.getAuthorId()));
+        boolean synthetic = syntheticIds.contains(saved.getAuthorId());
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new AdminCommentView(saved, synthetic));
+    }
+
     // ===== Helper Methods =====
 
     /**
@@ -486,10 +717,13 @@ public class AdminContentController {
         private final Post post;
         /** AI 봇 작성 여부 (users.synthetic=1). ADMIN 전용. */
         private final boolean synthetic;
+        /** 어드민이 생성한 콘텐츠 여부. ADMIN 전용. */
+        private final boolean createdByAdmin;
 
         public AdminPostView(Post post, boolean synthetic) {
             this.post = post;
             this.synthetic = synthetic;
+            this.createdByAdmin = post.getCreatedByAdmin() != null && post.getCreatedByAdmin();
         }
     }
 
@@ -503,10 +737,13 @@ public class AdminContentController {
         private final PostComment comment;
         /** AI 봇 작성 여부 (users.synthetic=1). ADMIN 전용. */
         private final boolean synthetic;
+        /** 어드민이 생성한 콘텐츠 여부. ADMIN 전용. */
+        private final boolean createdByAdmin;
 
         public AdminCommentView(PostComment comment, boolean synthetic) {
             this.comment = comment;
             this.synthetic = synthetic;
+            this.createdByAdmin = comment.getCreatedByAdmin() != null && comment.getCreatedByAdmin();
         }
     }
 
@@ -566,11 +803,50 @@ public class AdminContentController {
         private String partnerBodyRaw;
         private String status;
         private String category;
+        private Integer viewCount;
     }
 
     @Getter
     @Setter
     public static class UpdateCommentRequest {
         private String body;
+    }
+
+    // ===== 좋아요 조정 DTO =====
+
+    @Getter
+    @Setter
+    public static class AdjustLikesRequest {
+        /** 좋아요 조정값 (+1 또는 -1) */
+        private Integer delta;
+    }
+
+    @Getter
+    public static class AdjustLikesResponse {
+        private final long likeCount;
+
+        public AdjustLikesResponse(long likeCount) {
+            this.likeCount = likeCount;
+        }
+    }
+
+    // ===== 콘텐츠 생성 DTO =====
+
+    @Getter
+    @Setter
+    public static class CreatePostRequest {
+        private String title;
+        private String bodyRaw;
+        private String category;
+        private String authorId; // 선택사항, null이면 "admin"
+    }
+
+    @Getter
+    @Setter
+    public static class CreateCommentRequest {
+        private String postId;
+        private String body;
+        private Long parentCommentId; // 선택사항, null이면 최상위 댓글
+        private String authorId; // 선택사항, null이면 "admin"
     }
 }
