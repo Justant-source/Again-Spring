@@ -138,38 +138,51 @@ docker logs -f againspring-prod-dev-sync
 - `ai_user_runtime`, `ai_user_generation_config`
 - `ai_content_corrections`, `ai_global_rules`, `ai_prompt_template`, `system_setting`
 
-## 8. 새벽 압축배치 (2026-07-30~)
+## 8. 새벽 배치 — PLAN 모드 (2026-07-31~)
 
-낮 시간 토큰 소모를 막기 위해, LEGACY tick 엔진을 새벽에만 몰아서 돌리고 낮에는
-꺼둔다. `env/scripts/nightly-ai-user-batch.sh`가 호스트 crontab(`05 3 * * *`,
-서버 로컬시간이 이미 KST)으로 매일 실행된다.
+낮 시간 토큰 소모를 막기 위해, PLAN 모드의 workload provider를 새벽에만 `CLAUDE`로
+켜고 낮에는 `OFF`로 끈다. `env/scripts/nightly-ai-user-batch.sh`가 호스트
+crontab(`05 3 * * *`, 서버 로컬시간이 이미 KST)으로 매일 실행된다.
 
-절차: `ai_user_runtime.enabled=1` → `generate-posts` 트리거 → `/admin/trigger/tick`
-반복 호출(daily_global_cap 도달 또는 45분 제한까지) → 3분 대기(잔여 jitter 실행
-정착) → `ai_user_runtime.enabled=0` (trap으로 스크립트가 어떻게 끝나도 보장).
-`AI_USER_FORCE_ACTIVE=true`로 새벽 시간대 circadian 저하 없이 정상 예산 적용.
+절차: provider(`provider_ai_post_bundle`/`provider_human_post_plan`/
+`provider_human_interaction`)를 `CLAUDE`로 전환 → `generate-posts` 트리거로 오늘
+AI 글 확보(각 글은 outbox를 통해 저장 즉시 글+댓글/대댓글 후보를 한 번의 구조화
+LLM 요청으로 통째 생성) → `ai_thread_plans.status='REQUESTED'` 큐가 빌 때까지
+폴링(또는 45분 제한) → provider를 다시 `OFF`로 복귀(trap으로 스크립트가 어떻게
+끝나도 보장). `schedule_execution_paused`는 항상 `false`로 둬서 이미 생성된
+item의 게시(=낮 동안 하나씩 자연스럽게 올라오는 것)는 막지 않는다.
+`ai_user_runtime.enabled`(LEGACY tick 킬스위치)는 PLAN 모드와 무관해서 건드리지
+않는다.
 
-낮 동안 `ai_user_runtime.enabled=0`이 기본 상태다 — 트러블슈팅 시 "꺼져 있음"을
-버그로 오인하지 말 것. 스크립트 로그: `env/logs/nightly-ai-user-batch.log`
-(자체 타임스탬프 로그) / `env/logs/nightly-ai-user-batch.cron.log`(cron stdout/stderr).
+스크립트 로그: `env/logs/nightly-ai-user-batch.log`(자체 타임스탬프 로그) /
+`env/logs/nightly-ai-user-batch.cron.log`(cron stdout/stderr).
 
-### PLAN 모드 postId 버그 — 수정 완료 (2026-07-31)
+### 2026-07-30 LEGACY 임시방편 → 2026-07-31 PLAN 전환 경위
 
-PLAN 모드(스레드플랜 사전생성 + 낮 게시전용, §3의 "PLAN 모드 추가 제어" 참조)는
-개발 중 두 가지 문제가 발견되었다:
+2026-07-30에는 PLAN 모드가 postId(VARCHAR) Long 파싱 버그로 깨져 있어, 대신
+LEGACY tick 엔진을 새벽 창에 몰아 압축 실행하는 임시방편을 썼다(`ai_user_runtime.enabled`를
+새벽에만 켜고 `/admin/trigger/tick`을 반복 호출). 이 방식은 **생성과 게시가
+분리되지 않아** 새 글 7개가 전부 같은 시각에 몰려 올라오고, 새로 만든 글에는
+댓글이 하나도 안 붙는 문제로 이어졌다(30여 개 댓글이 전부 기존 오래된 글에만
+붙음) — "새벽엔 준비만, 낮엔 사람처럼 하나씩" 요구사항을 LEGACY 구조로는 만족할
+수 없었다.
 
-1. `ThreadPlanGenerationService.generateRequestedPlans()`에 `@Transactional`이
-   빠져 있어 `lockByStatus`(PESSIMISTIC_WRITE)가 매틱 예외 — **수정 완료**
-   (같은 커밋에 포함).
-2. postId 파싱 버그(`posts.id` VARCHAR를 `Long.valueOf()`로 파싱) — **수정 완료**
-   (2026-07-31). 다음 4곳에서 postId 필드를 String으로 수정:
+2026-07-31에 postId 버그를 제대로 고쳤다(커밋 `1e9475cd`):
+
+1. `ThreadPlanGenerationService.generateRequestedPlans()`의 `@Transactional`
+   누락 — 2026-07-30에 이미 수정.
+2. postId 파싱 버그(`posts.id` VARCHAR를 `Long.valueOf()`로 파싱) — 2026-07-31
+   수정. **주의**: comment/reply ID(`post_comments.id`, `parent_comment_id`)는
+   실제로 BIGINT라서 그쪽의 `Long.valueOf()`는 원래도 옳다. postId만 String으로
+   고쳐야 하며, comment ID까지 String으로 바꾸면 새 버그가 생긴다. 수정 위치:
    - `ThreadPlanGenerationService.planRequest()` (orchestrator)
-   - `HumanReplyBatchService.run()` (orchestrator)
-   - `ThreadPlanRequest.java` (llm 모듈 DTO)
-   - `HumanReplyBatchRequest.java` Item 내부 클래스 (llm 모듈 DTO)
+   - `HumanReplyBatchService.run()`의 `postId` 필드만 (orchestrator)
+   - `ThreadPlanRequest.java` (llm 모듈 DTO, `postId`는 이미 String이었음)
+   - `HumanReplyBatchRequest.java` Item의 `postId`만 (llm 모듈 DTO)
 
-dev 환경에서 AI_POST 번들 생성과 낮 게시 전환까지 실증 검증 완료 (신규 글 정상
-생성, 댓글 후보 분산 스케줄 동작 확인).
+dev 검증(e2e-realbe 158 passed) + prod 실전 확인 완료 — 신규 글 생성 직후 댓글이
+한꺼번에 몰리지 않고 예약 스케줄에 따라 하루 동안 분산 게시됨을 확인했다.
+prod는 2026-07-31부터 `scheduler_mode='PLAN'`로 운영 중이다.
 
 ### 번들 생성 지연 및 구성 최적화
 
@@ -181,19 +194,15 @@ dev 환경에서 AI_POST 번들 생성과 낮 게시 전환까지 실증 검증 
 2. 후보 풀 크기: `ai_user_generation_config.candidate_pool_size`를 24보다 작게
    (16 권장: 최상위 14 + 대댓글 2)으로 설정하면 생성 속도 개선.
 
-### 다음 단계: prod 배포 대기
-
-dev 검증(e2e-realbe 158 passed) 완료. 다음 순서:
-1. main commit & push
-2. `.env.prod` 값 입력 후 prod DB 백업
-3. prod `ai_user_generation_config.scheduler_mode='PLAN'`, provider 설정 전환
-
 ## 9. 트러블슈팅
 
 ### 글이 하나도 안 올라올 때
 
 - `.env.ai-user`의 `AI_USER_ENABLED=true`인지 먼저 확인
-- prod DB `ai_user_runtime.enabled = 1`인지 확인(낮에는 압축배치 설계상 0이 정상 — §8 참조)
+- PLAN 모드라면 `ai_user_generation_config.provider_*`가 낮에는 `OFF`가 정상이다(§8) —
+  버그가 아니라 새벽 배치 설계다. 새 글이 전혀 없어야 정상인 건 아니고, 새 LLM
+  job만 안 만들 뿐 이미 예약된 item 게시는 계속된다.
+- LEGACY라면 `ai_user_runtime.enabled = 1`인지 확인
 - orchestrator 로그에 `Daily global cap reached`가 있는지 확인
 
 ### learning이 예상치 않게 crawl할 때

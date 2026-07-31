@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
-# 다시봄 AI-user 새벽 압축배치.
+# 다시봄 AI-user 새벽 배치 — PLAN 모드용 (2026-07-31~).
 #
-# PLAN 모드(스레드플랜 사전생성 + 낮 게시전용, docs/ai-user/operations.md 참조)는
-# posts.id(VARCHAR) 를 Long으로 파싱하려는 구조적 버그가 있어 2026-07-30에 다시
-# scheduler_mode=LEGACY 로 되돌렸다 — 코드 수정 전까지 비활성 상태.
+# 2026-07-30에는 PLAN 모드가 postId(VARCHAR) Long 파싱 버그로 깨져 있어 LEGACY
+# tick을 새벽에 몰아 압축 실행하는 임시방편을 썼다. 그 결과 새 글 7개가 한꺼번에
+# 같은 시각에 올라오고 댓글이 하나도 안 붙는 문제가 났다 — LEGACY는 생성=발행이
+# 분리되지 않아서 애초에 "새벽엔 준비만, 낮엔 하나씩" 요구사항을 만족할 수 없다.
 #
-# 이 스크립트는 그 대신 기존 LEGACY tick 엔진을 새벽 창에 몰아서 압축 실행한다:
-#   1) ai_user_runtime.enabled=1
-#   2) generate-posts로 오늘 글 확보
-#   3) /admin/trigger/tick 을 daily_global_cap 도달(또는 시간제한)까지 반복 호출
-#      — AI_USER_FORCE_ACTIVE=true 라서 새벽 시간대 circadian 저하 없이 정상 예산 적용
-#   4) 잔여 jitter 실행 대기 후 ai_user_runtime.enabled=0 (낮 동안 토큰 소모 차단)
+# 2026-07-31에 postId 버그가 수정되고(커밋 1e9475cd) PLAN 모드가 정상 동작함을
+# 확인했으므로, 이 스크립트는 이제 PLAN 모드를 새벽에만 켜는 것으로 바뀐다:
+#   1) ai_user_generation_config.provider_ai_post_bundle/human_post_plan/
+#      human_interaction = 'CLAUDE' (새벽에만 새 LLM job 생성 허용)
+#   2) generate-posts로 오늘 AI 글 확보 — 각 글은 저장 즉시 outbox를 통해
+#      스레드플랜(글+댓글/대댓글 후보)이 한 번의 구조화 LLM 요청으로 통째 생성됨
+#   3) ai_thread_plans.status='REQUESTED' 큐가 빌 때까지(또는 시간제한까지) 대기
+#      — 생성만 하고 게시는 하지 않는다. 게시는 scheduled_at에 따라 낮 동안
+#        ThreadPlanPublisher가 알아서 분산 실행한다(LLM 호출 없음).
+#   4) provider를 다시 'OFF'로 돌려 낮 동안 새 LLM job 생성을 막는다.
+#      schedule_execution_paused는 항상 false로 둬서 게시 자체는 하루 종일 계속된다.
+#
+# ai_user_runtime.enabled(LEGACY tick 킬스위치)는 건드리지 않는다 — PLAN 모드는
+# 이 플래그를 쓰지 않는다.
 #
 # LLM을 수동으로 호출해 콘텐츠를 만들어 DB에 넣지 않는다 — 전부 기존 orchestrator
 # admin trigger 엔드포인트(내부 도커 네트워크 전용, 외부 미노출)를 통해서만 동작한다.
@@ -26,9 +35,8 @@ ORCH_CONTAINER=againspring-ai-user-orchestrator
 DB_CONTAINER=againspring-mariadb-prod
 
 MAX_MINUTES=${NIGHTLY_BATCH_MAX_MINUTES:-45}
-TICK_INTERVAL_SECONDS=${NIGHTLY_BATCH_TICK_INTERVAL:-20}
+POLL_INTERVAL_SECONDS=${NIGHTLY_BATCH_POLL_INTERVAL:-30}
 GENERATE_POSTS_COUNT=${NIGHTLY_BATCH_POST_COUNT:-3}
-MAX_CONSECUTIVE_FAILURES=5
 
 log() { printf '[%s] %s\n' "$(date '+%F %T %Z')" "$*" | tee -a "$LOG_FILE"; }
 
@@ -44,15 +52,15 @@ db() {
   docker exec "$DB_CONTAINER" mariadb -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -N -e "$1" 2>>"$LOG_FILE"
 }
 
-trap 'log "trap: restoring ai_user_runtime.enabled=0 before exit"; db "UPDATE ai_user_runtime SET enabled=0, updated_at=UTC_TIMESTAMP() WHERE id=1;" || true' EXIT
+trap 'log "trap: restoring provider=OFF before exit"; db "UPDATE ai_user_generation_config SET provider_ai_post_bundle=\"OFF\", provider_human_post_plan=\"OFF\", provider_human_interaction=\"OFF\", updated_by=\"nightly-batch-trap\", updated_at=UTC_TIMESTAMP() WHERE id=1;" || true' EXIT
 
-log "=== nightly-ai-user-batch start (max ${MAX_MINUTES}m, tick every ${TICK_INTERVAL_SECONDS}s) ==="
+log "=== nightly-ai-user-batch (PLAN mode) start (max ${MAX_MINUTES}m) ==="
 
-if ! db "UPDATE ai_user_runtime SET enabled=1, updated_at=UTC_TIMESTAMP() WHERE id=1;"; then
-  log "ERROR: failed to enable ai_user_runtime — aborting without further action"
+if ! db "UPDATE ai_user_generation_config SET provider_ai_post_bundle='CLAUDE', provider_human_post_plan='CLAUDE', provider_human_interaction='CLAUDE', updated_by='nightly-batch', updated_at=UTC_TIMESTAMP() WHERE id=1;"; then
+  log "ERROR: failed to enable PLAN providers — aborting without further action"
   exit 1
 fi
-log "ai_user_runtime.enabled=1"
+log "provider_ai_post_bundle/human_post_plan/human_interaction=CLAUDE"
 
 GEN_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- --post-data='' \
   "http://localhost:8096/admin/trigger/generate-posts?count=${GENERATE_POSTS_COUNT}" 2>>"$LOG_FILE")
@@ -60,37 +68,18 @@ log "generate-posts result: ${GEN_RESULT:-<empty>}"
 
 START_TS=$(date +%s)
 END_TS=$((START_TS + MAX_MINUTES * 60))
-TICKS=0
-FAILURES=0
 
 while [ "$(date +%s)" -lt "$END_TS" ]; do
-  CAP_ROW=$(db "SELECT actions_today, daily_global_cap FROM ai_user_runtime WHERE id=1;")
-  ACTIONS_TODAY=$(echo "$CAP_ROW" | awk '{print $1}')
-  CAP=$(echo "$CAP_ROW" | awk '{print $2}')
-  if [ -n "${ACTIONS_TODAY:-}" ] && [ -n "${CAP:-}" ] && [ "$ACTIONS_TODAY" -ge "$CAP" ]; then
-    log "daily_global_cap reached (${ACTIONS_TODAY}/${CAP}) — stopping tick loop"
+  REQUESTED=$(db "SELECT COUNT(*) FROM ai_thread_plans WHERE status='REQUESTED';")
+  if [ "${REQUESTED:-0}" -eq 0 ]; then
+    log "ai_thread_plans REQUESTED queue drained"
     break
   fi
-
-  if docker exec "$ORCH_CONTAINER" wget -qO- --post-data='' "http://localhost:8096/admin/trigger/tick" >/dev/null 2>>"$LOG_FILE"; then
-    FAILURES=0
-  else
-    FAILURES=$((FAILURES + 1))
-    log "tick call failed (${FAILURES}/${MAX_CONSECUTIVE_FAILURES} consecutive)"
-    if [ "$FAILURES" -ge "$MAX_CONSECUTIVE_FAILURES" ]; then
-      log "ERROR: too many consecutive tick failures — stopping loop early"
-      break
-    fi
-  fi
-  TICKS=$((TICKS + 1))
-  sleep "$TICK_INTERVAL_SECONDS"
+  log "REQUESTED queue: ${REQUESTED} — waiting"
+  sleep "$POLL_INTERVAL_SECONDS"
 done
-log "tick loop done: ${TICKS} tick(s) issued"
 
-log "waiting 180s for in-flight jittered actions to settle"
-sleep 180
-
-FINAL_ROW=$(db "SELECT actions_today, daily_global_cap FROM ai_user_runtime WHERE id=1;")
-log "final actions_today/cap: ${FINAL_ROW:-<unknown>}"
+FINAL_STATUS=$(db "SELECT status, COUNT(*) FROM ai_thread_plans GROUP BY status;")
+log "final ai_thread_plans status: ${FINAL_STATUS:-<none>}"
 log "=== nightly-ai-user-batch done ==="
-# trap EXIT handles ai_user_runtime.enabled=0
+# trap EXIT handles provider=OFF

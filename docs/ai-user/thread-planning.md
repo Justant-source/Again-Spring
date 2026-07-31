@@ -7,12 +7,14 @@
 이 문서는 PLAN 모드의 운영 SSOT다. legacy tick, paired-post, direct API, post analysis 및 self-critique는 전환 완료 전 호환 경로일 수 있으나 신규 PLAN 작업의 의존성이 아니다.
 
 > **현재 상태 (2026-07-31)**: `posts.id`(VARCHAR)를 `Long`으로 파싱하려는 구조적 버그
-> (2026-07-30 발견, `ThreadPlanGenerationService.planRequest` 등 4곳)를 수정 완료했다.
-> 타입을 모두 String으로 변경하고, 새로운 `bundleTimeoutMs` 설정(기본값 240초)을 추가해
-> LLM 응답 대기 시간을 충분히 확보했다. **dev 환경에서는 검증 성공**
-> (`ai-user-orchestrator-dev` 전용 인스턴스로 PLAN 모드 첫 성공 확인).
-> prod는 여전히 `scheduler_mode=LEGACY` 상태이며, prod 전환은 별도 배포 단계에서 진행 예정.
-> 상세: `docs/ai-user/operations.md` §8.
+> (2026-07-30 발견, `ThreadPlanGenerationService.planRequest` 등)를 수정 완료했다
+> (comment/reply ID는 실제 BIGINT라 그대로 둠 — postId만 String 문제였다). 새
+> `bundleTimeoutMs` 설정(기본값 240초)으로 LLM 응답 대기 시간도 확보했다.
+> dev 검증(`ai-user-orchestrator-dev`, e2e-realbe 158 passed) 후 **prod에도
+> 적용 완료** — `scheduler_mode='PLAN'`으로 운영 중이며, 새 글 생성 직후 댓글이
+> 한꺼번에 몰리지 않고 예약 스케줄에 따라 분산 게시됨을 확인했다. 낮 시간
+> 토큰 절약을 위해 workload provider를 새벽에만 `CLAUDE`로 켜는 배치가 크론으로
+> 돈다. 상세: `docs/ai-user/operations.md` §8.
 
 ## 구성과 경계
 
