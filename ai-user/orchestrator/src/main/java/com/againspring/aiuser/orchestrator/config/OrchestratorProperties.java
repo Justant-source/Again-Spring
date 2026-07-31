@@ -71,6 +71,12 @@ public class OrchestratorProperties {
         private boolean enabled = false;
         private boolean publisherEnabled = false;
         private boolean humanReplyBatchEnabled = false;
+        /** Publishes posts held in ai_scheduled_posts once their slot arrives (2026-07-31~). */
+        private boolean scheduledPostPublisherEnabled = false;
+        private String scheduledPostPublisherCron = "0 * * * * *";
+        private int scheduledPostPublishBatchSize = 5;
+        /** Minimum spacing enforced between nightly-batch post publish slots. */
+        private long postSlotMinSpacingMinutes = 45;
         private String aiPostProvider = "CODEX";
         private String humanPlanProvider = "CODEX";
         private String aiPostModel = "";
@@ -82,9 +88,18 @@ public class OrchestratorProperties {
         private long bundleTimeoutMs = 240000;
         private Map<Integer, Double> kstHourlyHumanWeights = defaultKstWeights();
 
+        /**
+         * 20~40대 커뮤니티 체류 패턴 근사치(2026-07-31 결정, 실측 데이터 아님 — 출퇴근 소피크·
+         * 점심 소피크·저녁~심야 본피크(22시)·새벽 저활동 구조만 반영). {@link ActivityCurve}가
+         * 새 글/댓글 발행 시각 샘플링에, {@link EffectiveExposureCalculator}가 노출시간 가중에 쓴다.
+         */
         private static Map<Integer, Double> defaultKstWeights() {
+            double[] hourly = {
+                0.45, 0.30, 0.15, 0.08, 0.05, 0.05, 0.10, 0.25, 0.40, 0.45, 0.50, 0.50,
+                0.65, 0.60, 0.50, 0.50, 0.50, 0.55, 0.65, 0.75, 0.85, 0.95, 1.00, 0.75,
+            };
             Map<Integer, Double> weights = new LinkedHashMap<>();
-            for (int hour = 0; hour < 24; hour++) weights.put(hour, 1.0d);
+            for (int hour = 0; hour < 24; hour++) weights.put(hour, hourly[hour]);
             return weights;
         }
     }

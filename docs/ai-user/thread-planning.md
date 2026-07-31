@@ -12,9 +12,13 @@
 > `bundleTimeoutMs` 설정(기본값 240초)으로 LLM 응답 대기 시간도 확보했다.
 > dev 검증(`ai-user-orchestrator-dev`, e2e-realbe 158 passed) 후 **prod에도
 > 적용 완료** — `scheduler_mode='PLAN'`으로 운영 중이며, 새 글 생성 직후 댓글이
-> 한꺼번에 몰리지 않고 예약 스케줄에 따라 분산 게시됨을 확인했다. 낮 시간
-> 토큰 절약을 위해 workload provider를 새벽에만 `CLAUDE`로 켜는 배치가 크론으로
-> 돈다. 상세: `docs/ai-user/operations.md` §8.
+> 한꺼번에 몰리지 않고 예약 스케줄에 따라 분산 게시됨을 확인했다.
+>
+> **단, `AiPostBundleService.generateAndPublish()` 자체는 생성 즉시 발행이다** —
+> 글(post) 수준에서는 "새벽에 만들면 새벽에 올라옴" 문제가 여전히 남아 있었다.
+> 2026-07-31에 `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`를
+> 추가해 글 발행 자체도 생성과 분리했다. 새벽 배치는 이제 `generateAndHold`만
+> 쓴다. 상세: `docs/ai-user/operations.md` §8.
 
 ## 구성과 경계
 

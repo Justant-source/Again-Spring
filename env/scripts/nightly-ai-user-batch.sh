@@ -1,25 +1,33 @@
 #!/usr/bin/env bash
-# 다시봄 AI-user 새벽 배치 — PLAN 모드용 (2026-07-31~).
+# 다시봄 AI-user 새벽 배치 — 예약글 파이프라인 (2026-07-31~).
 #
-# 2026-07-30에는 PLAN 모드가 postId(VARCHAR) Long 파싱 버그로 깨져 있어 LEGACY
-# tick을 새벽에 몰아 압축 실행하는 임시방편을 썼다. 그 결과 새 글 7개가 한꺼번에
-# 같은 시각에 올라오고 댓글이 하나도 안 붙는 문제가 났다 — LEGACY는 생성=발행이
-# 분리되지 않아서 애초에 "새벽엔 준비만, 낮엔 하나씩" 요구사항을 만족할 수 없다.
+# 이력:
+#   2026-07-30: PLAN 모드가 postId(VARCHAR) Long 파싱 버그로 깨져 있어 LEGACY tick을
+#   새벽에 몰아 압축 실행하는 임시방편을 썼다. 생성=발행이 분리되지 않아 새 글이
+#   전부 같은 시각에 몰리고 댓글이 하나도 안 붙는 문제가 났다.
 #
-# 2026-07-31에 postId 버그가 수정되고(커밋 1e9475cd) PLAN 모드가 정상 동작함을
-# 확인했으므로, 이 스크립트는 이제 PLAN 모드를 새벽에만 켜는 것으로 바뀐다:
-#   1) ai_user_generation_config.provider_ai_post_bundle/human_post_plan/
-#      human_interaction = 'CLAUDE' (새벽에만 새 LLM job 생성 허용)
-#   2) generate-posts로 오늘 AI 글 확보 — 각 글은 저장 즉시 outbox를 통해
-#      스레드플랜(글+댓글/대댓글 후보)이 한 번의 구조화 LLM 요청으로 통째 생성됨
-#   3) ai_thread_plans.status='REQUESTED' 큐가 빌 때까지(또는 시간제한까지) 대기
-#      — 생성만 하고 게시는 하지 않는다. 게시는 scheduled_at에 따라 낮 동안
-#        ThreadPlanPublisher가 알아서 분산 실행한다(LLM 호출 없음).
-#   4) provider를 다시 'OFF'로 돌려 낮 동안 새 LLM job 생성을 막는다.
-#      schedule_execution_paused는 항상 false로 둬서 게시 자체는 하루 종일 계속된다.
+#   2026-07-31 오전: postId 버그를 고치고(커밋 1e9475cd) PLAN 모드로 전환했지만,
+#   AiPostBundleService.generateAndPublish()는 생성 즉시 글을 발행한다 — 여전히
+#   "새벽에 생성 = 새벽에 발행"이었다. 이 스크립트가 처음 그 방식으로 3개 글을
+#   만들었고, 전부 03:0x KST에 몰려 올라왔다(사용자 리포트로 발견).
 #
-# ai_user_runtime.enabled(LEGACY tick 킬스위치)는 건드리지 않는다 — PLAN 모드는
-# 이 플래그를 쓰지 않는다.
+#   2026-07-31 오후: 진짜 생성/발행 분리 파이프라인을 만들었다 —
+#   AiPostBundleService.generateAndHold()가 발행하지 않고 ai_scheduled_posts에
+#   저장하고, ScheduledPostPublisher가 슬롯 도래 시 실제로 발행한다. 이 스크립트는
+#   이제 그 파이프라인만 쓴다.
+#
+# 절차:
+#   1) provider(ai_post_bundle/human_post_plan/human_interaction) = CLAUDE
+#   2) /admin/trigger/generate-scheduled-posts — N개 글을 "생성만" 함(발행 안 함).
+#      각 글의 발행 슬롯은 ActivityCurve로 오늘 남은 활동 시간대(기본 08~22시 KST)에
+#      가중 샘플링됨 — 20~40대 커뮤니티 체류 패턴 근사치(실측 데이터 아님, 하드코딩값).
+#   3) 낮 동안 실사람이 새로 올린 글에 대한 REQUESTED 스레드플랜 백로그도 이 새벽
+#      창에서 같이 소진한다(provider가 어차피 켜져 있으므로).
+#   4) provider를 다시 OFF로 복귀. schedule_execution_paused는 항상 false로 둬서
+#      ScheduledPostPublisher/ThreadPlanPublisher의 게시 자체는 하루 종일 계속된다.
+#
+# ai_user_runtime.enabled(LEGACY tick 킬스위치)는 건드리지 않는다 — 이 파이프라인과
+# 무관하다.
 #
 # LLM을 수동으로 호출해 콘텐츠를 만들어 DB에 넣지 않는다 — 전부 기존 orchestrator
 # admin trigger 엔드포인트(내부 도커 네트워크 전용, 외부 미노출)를 통해서만 동작한다.
@@ -36,7 +44,10 @@ DB_CONTAINER=againspring-mariadb-prod
 
 MAX_MINUTES=${NIGHTLY_BATCH_MAX_MINUTES:-45}
 POLL_INTERVAL_SECONDS=${NIGHTLY_BATCH_POLL_INTERVAL:-30}
-GENERATE_POSTS_COUNT=${NIGHTLY_BATCH_POST_COUNT:-3}
+SCHEDULED_POST_COUNT=${NIGHTLY_BATCH_POST_COUNT:-5}
+SLOT_FROM_HOUR=${NIGHTLY_BATCH_SLOT_FROM_HOUR:-8}
+SLOT_TO_HOUR=${NIGHTLY_BATCH_SLOT_TO_HOUR:-22}
+SLOT_MIN_SPACING_MINUTES=${NIGHTLY_BATCH_SLOT_MIN_SPACING_MINUTES:-45}
 
 log() { printf '[%s] %s\n' "$(date '+%F %T %Z')" "$*" | tee -a "$LOG_FILE"; }
 
@@ -54,7 +65,7 @@ db() {
 
 trap 'log "trap: restoring provider=OFF before exit"; db "UPDATE ai_user_generation_config SET provider_ai_post_bundle=\"OFF\", provider_human_post_plan=\"OFF\", provider_human_interaction=\"OFF\", updated_by=\"nightly-batch-trap\", updated_at=UTC_TIMESTAMP() WHERE id=1;" || true' EXIT
 
-log "=== nightly-ai-user-batch (PLAN mode) start (max ${MAX_MINUTES}m) ==="
+log "=== nightly-ai-user-batch (scheduled-post pipeline) start (max ${MAX_MINUTES}m) ==="
 
 if ! db "UPDATE ai_user_generation_config SET provider_ai_post_bundle='CLAUDE', provider_human_post_plan='CLAUDE', provider_human_interaction='CLAUDE', updated_by='nightly-batch', updated_at=UTC_TIMESTAMP() WHERE id=1;"; then
   log "ERROR: failed to enable PLAN providers — aborting without further action"
@@ -62,24 +73,25 @@ if ! db "UPDATE ai_user_generation_config SET provider_ai_post_bundle='CLAUDE', 
 fi
 log "provider_ai_post_bundle/human_post_plan/human_interaction=CLAUDE"
 
-GEN_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- --post-data='' \
-  "http://localhost:8096/admin/trigger/generate-posts?count=${GENERATE_POSTS_COUNT}" 2>>"$LOG_FILE")
-log "generate-posts result: ${GEN_RESULT:-<empty>}"
+GEN_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- -T 1800 --post-data='' \
+  "http://localhost:8096/admin/trigger/generate-scheduled-posts?count=${SCHEDULED_POST_COUNT}&fromHour=${SLOT_FROM_HOUR}&toHour=${SLOT_TO_HOUR}&minSpacingMinutes=${SLOT_MIN_SPACING_MINUTES}" \
+  2>>"$LOG_FILE")
+log "generate-scheduled-posts result: ${GEN_RESULT:-<empty>}"
 
+# 낮 동안 밀린 REQUESTED 스레드플랜(실사람 글에 대한 AI 반응 등)도 이 창에서 소진한다.
 START_TS=$(date +%s)
 END_TS=$((START_TS + MAX_MINUTES * 60))
-
 while [ "$(date +%s)" -lt "$END_TS" ]; do
   REQUESTED=$(db "SELECT COUNT(*) FROM ai_thread_plans WHERE status='REQUESTED';")
   if [ "${REQUESTED:-0}" -eq 0 ]; then
-    log "ai_thread_plans REQUESTED queue drained"
+    log "ai_thread_plans REQUESTED backlog drained"
     break
   fi
-  log "REQUESTED queue: ${REQUESTED} — waiting"
+  log "REQUESTED backlog: ${REQUESTED} — waiting"
   sleep "$POLL_INTERVAL_SECONDS"
 done
 
-FINAL_STATUS=$(db "SELECT status, COUNT(*) FROM ai_thread_plans GROUP BY status;")
-log "final ai_thread_plans status: ${FINAL_STATUS:-<none>}"
+SCHEDULED_COUNT=$(db "SELECT COUNT(*) FROM ai_scheduled_posts WHERE status='SCHEDULED';")
+log "ai_scheduled_posts pending publish: ${SCHEDULED_COUNT:-0}"
 log "=== nightly-ai-user-batch done ==="
 # trap EXIT handles provider=OFF

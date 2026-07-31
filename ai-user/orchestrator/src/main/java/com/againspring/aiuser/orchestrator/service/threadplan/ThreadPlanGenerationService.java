@@ -118,11 +118,13 @@ public class ThreadPlanGenerationService {
         }
     }
 
-    private Instant schedule(Instant publishedAt, int index, boolean reply) {
+    Instant schedule(Instant publishedAt, int index, boolean reply) {
         // Dense early window, progressively wider later.  Publisher additionally defers generic work in quiet KST hours.
         long[] minutes = {3, 8, 14, 22, 34, 48, 65, 88, 115, 150, 195, 250, 320, 410, 520, 650, 780, 920, 1080};
         long delay = minutes[Math.min(index, minutes.length - 1)] + (reply ? 7 : 0);
-        return publishedAt.plusSeconds(delay * 60);
+        Instant candidate = publishedAt.plusSeconds(delay * 60);
+        // 2026-07-31: Avoid publishing into dead hours (03:00-07:00 KST) where community is asleep; snap forward if weight < 0.2
+        return ActivityCurve.nextActiveHour(candidate, 0.2, properties.getThreadPlan().getKstHourlyHumanWeights());
     }
     private static String text(Object value) { return value == null ? "" : String.valueOf(value).trim(); }
     private static String nullToEmpty(String value) { return value == null ? "" : value; }

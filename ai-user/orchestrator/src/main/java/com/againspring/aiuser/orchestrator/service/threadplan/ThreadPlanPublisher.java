@@ -3,8 +3,10 @@ package com.againspring.aiuser.orchestrator.service.threadplan;
 import com.againspring.aiuser.orchestrator.auth.BotTokenCache;
 import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
+import com.againspring.aiuser.orchestrator.domain.AiThreadPlan;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlanItem;
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.repository.AiThreadPlanRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.repository.AiThreadPlanItemRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
@@ -14,7 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
-import java.util.Optional;
+import java.util.*;
 
 /** Due-only publisher. It never generates text and keeps a failed backend write visible for manual retry. */
 @Slf4j @Service @RequiredArgsConstructor
@@ -22,17 +24,104 @@ public class ThreadPlanPublisher {
     private final ThreadPlanItemLeaseService leases;
     private final PersonaRepository personas;
     private final AiThreadPlanItemRepository items;
+    private final AiThreadPlanRepository plans;
     private final BotTokenCache tokens;
     private final BackendBotClient backend;
     private final JdbcTemplate jdbcTemplate;
     private final OrchestratorProperties properties;
     private final AiUserGenerationConfigRepository configRepository;
 
+    /** Threshold above which a scheduledAt offset is considered "stale" (publisher lag after restart). */
+    private static final Duration STAMPEDE_THRESHOLD = Duration.ofMinutes(30);
+    /** Minimum remaining time before expiry; if less, publish immediately instead of redistributing. */
+    private static final Duration MIN_REMAINING_FOR_REDISTRIBUTE = Duration.ofMinutes(15);
+
     public void publishDue() {
         if (!properties.isEnabled() || !properties.getThreadPlan().isEnabled() || !properties.getThreadPlan().isPublisherEnabled()
                 || configRepository.findById(1).map(c -> !"PLAN".equalsIgnoreCase(c.getSchedulerMode()) || c.isAiUserKillSwitch() || c.isScheduleExecutionPaused()).orElse(true)) return;
         String worker = "thread-publisher";
-        for (AiThreadPlanItem item : leases.claimDue(worker, properties.getThreadPlan().getPublishBatchSize(), Duration.ofMinutes(5), Instant.now())) publish(item, worker);
+        Instant now = Instant.now();
+        for (AiThreadPlanItem item : leases.claimDue(worker, properties.getThreadPlan().getPublishBatchSize(), Duration.ofMinutes(5), now)) {
+            handleStampedeRedistribution(item, worker, now);
+        }
+    }
+
+    /**
+     * Detects if an item's scheduledAt is stale (more than STAMPEDE_THRESHOLD in the past),
+     * and if so, redistributes it across the remaining time window instead of publishing immediately.
+     * Non-stale items are published normally.
+     */
+    private void handleStampedeRedistribution(AiThreadPlanItem item, String worker, Instant now) {
+        if (item.getScheduledAt() == null) {
+            publish(item, worker);
+            return;
+        }
+
+        long staleDurationSeconds = Duration.between(item.getScheduledAt(), now).getSeconds();
+        if (staleDurationSeconds <= STAMPEDE_THRESHOLD.getSeconds()) {
+            // Not stale, publish normally
+            publish(item, worker);
+            return;
+        }
+
+        // Item is stale: attempt redistribution
+        try {
+            AiThreadPlan plan = plans.findById(item.getPlanId()).orElse(null);
+            if (plan == null) {
+                log.warn("Plan not found for stale item id={} planId={}", item.getId(), item.getPlanId());
+                publish(item, worker);
+                return;
+            }
+
+            long remainingSeconds = Duration.between(now, plan.getAbsoluteExpiresAt()).getSeconds();
+            if (remainingSeconds <= 0) {
+                // Plan has already expired; publish immediately to fail/expire normally
+                publish(item, worker);
+                return;
+            }
+
+            if (remainingSeconds < MIN_REMAINING_FOR_REDISTRIBUTE.getSeconds()) {
+                // Less than 15 minutes until expiry; no point redistributing, publish now
+                log.debug("Stale item id={} has < 15 min until expiry ({}s remaining), publishing immediately",
+                        item.getId(), remainingSeconds);
+                publish(item, worker);
+                return;
+            }
+
+            // Compute a new slot via ActivityCurve within the remaining window
+            Instant redistributedAt = sampleNewSlot(now, plan.getAbsoluteExpiresAt());
+            log.info("Stampede: redistributing stale item id={} from {} to {} ({}s late, {}s remaining)",
+                    item.getId(), item.getScheduledAt(), redistributedAt, staleDurationSeconds, remainingSeconds);
+            leases.defer(item.getId(), worker, redistributedAt, "STAMPEDE_REDISTRIBUTE");
+        } catch (Exception e) {
+            log.warn("Error handling stampede redistribution for item id={}: {}", item.getId(), e.getMessage());
+            publish(item, worker);
+        }
+    }
+
+    /**
+     * Samples a single publish slot within [now, expiry), weighted by activity curve.
+     * Falls back to a simple offset if sampling fails (e.g., window too narrow).
+     */
+    private Instant sampleNewSlot(Instant now, Instant expiresAt) {
+        Duration window = Duration.between(now, expiresAt);
+        if (window.getSeconds() < 60) {
+            // Window too narrow for curve sampling; use expiry - 1 minute as a reasonable fallback
+            return expiresAt.minusSeconds(60);
+        }
+
+        try {
+            List<Instant> sampled = ActivityCurve.sampleFutureInstants(
+                    now, expiresAt, 1,
+                    properties.getThreadPlan().getKstHourlyHumanWeights(),
+                    Duration.ofMinutes(1), // minSpacing — ignored for a single sample, but must be present
+                    new Random());
+            return sampled.isEmpty() ? expiresAt.minusSeconds(60) : sampled.get(0);
+        } catch (IllegalArgumentException e) {
+            // Window is too narrow even for 1 sample at 1-minute spacing
+            log.debug("sampleNewSlot: fallback to expiry-1m due to narrow window: {}", e.getMessage());
+            return expiresAt.minusSeconds(60);
+        }
     }
     private void publish(AiThreadPlanItem item, String worker) {
         if (quietKst() && item.getParentItemId() == null) { leases.defer(item.getId(), worker, nextActiveKst(), "QUIET_HOURS"); return; }

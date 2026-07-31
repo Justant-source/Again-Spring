@@ -138,51 +138,117 @@ docker logs -f againspring-prod-dev-sync
 - `ai_user_runtime`, `ai_user_generation_config`
 - `ai_content_corrections`, `ai_global_rules`, `ai_prompt_template`, `system_setting`
 
-## 8. 새벽 배치 — PLAN 모드 (2026-07-31~)
+## 8. 새벽 배치 — 예약글 파이프라인 (2026-07-31~)
 
-낮 시간 토큰 소모를 막기 위해, PLAN 모드의 workload provider를 새벽에만 `CLAUDE`로
-켜고 낮에는 `OFF`로 끈다. `env/scripts/nightly-ai-user-batch.sh`가 호스트
-crontab(`05 3 * * *`, 서버 로컬시간이 이미 KST)으로 매일 실행된다.
+낮 시간 토큰 소모를 막으면서 "새벽엔 준비만, 낮엔 사람처럼 하나씩 올라오는" 요구를
+만족하려면 **생성 시점과 발행 시점을 분리**해야 한다. PLAN 모드의
+`AiPostBundleService.generateAndPublish()`는 생성 즉시 글을 발행하므로 이것만으로는
+부족하다 — 새벽 배치가 이걸 그대로 쓰면 그 순간 전부 발행돼 버린다.
 
-절차: provider(`provider_ai_post_bundle`/`provider_human_post_plan`/
-`provider_human_interaction`)를 `CLAUDE`로 전환 → `generate-posts` 트리거로 오늘
-AI 글 확보(각 글은 outbox를 통해 저장 즉시 글+댓글/대댓글 후보를 한 번의 구조화
-LLM 요청으로 통째 생성) → `ai_thread_plans.status='REQUESTED'` 큐가 빌 때까지
-폴링(또는 45분 제한) → provider를 다시 `OFF`로 복귀(trap으로 스크립트가 어떻게
-끝나도 보장). `schedule_execution_paused`는 항상 `false`로 둬서 이미 생성된
-item의 게시(=낮 동안 하나씩 자연스럽게 올라오는 것)는 막지 않는다.
-`ai_user_runtime.enabled`(LEGACY tick 킬스위치)는 PLAN 모드와 무관해서 건드리지
-않는다.
+그래서 별도 홀딩 테이블 `ai_scheduled_posts`를 뒀다. 새벽 배치는
+`generateAndPublish` 대신 `AiPostBundleService.generateAndHold()`를 쓴다 — 같은
+구조화 LLM 호출(글+댓글/대댓글 후보 한 번에) 뒤 backend에 보내지 않고
+`ai_scheduled_posts`에 저장만 한다. `ScheduledPostPublisher`(매 분 cron)가 슬롯
+도래 시 실제 글을 만들고, 저장해둔 후보를 `ThreadPlanGenerationService
+.persistResponse()`로 재생(replay)한다 — 발행 시점엔 LLM을 다시 부르지 않는다.
 
-스크립트 로그: `env/logs/nightly-ai-user-batch.log`(자체 타임스탬프 로그) /
+```
+env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
+  ├─ provider(ai_post_bundle/human_post_plan/human_interaction) = CLAUDE
+  ├─ POST /admin/trigger/generate-scheduled-posts?count=N&fromHour=8&toHour=22
+  │    ├─ ActivityCurve.sampleFutureInstants(count=N)로 오늘 남은 활동 시간대에
+  │    │  발행 슬롯 N개를 최소간격(기본 45분) 두고 샘플링
+  │    └─ 페르소나별로 generateAndHold() 호출 → ai_scheduled_posts에 SCHEDULED로 저장
+  ├─ 낮 동안 밀린 REQUESTED 스레드플랜(실사람 글 반응 등)도 이 창에서 같이 소진
+  └─ provider = OFF (trap으로 스크립트 종료 방식과 무관하게 항상 보장)
+
+ScheduledPostPublisher (cron AI_USER_SCHEDULED_POST_PUBLISHER_CRON, 기본 매 분)
+  ├─ ScheduledPostLeaseService.claimDue()로 due 행 lease
+  ├─ BackendBotClient.createPost — 진짜 글 생성
+  ├─ candidates_json을 persistResponse()로 재생 (LLM 재호출 없음)
+  └─ PUBLISHED로 갱신
+```
+
+`schedule_execution_paused`는 항상 `false`로 둬서 이미 만들어진 item의 게시는
+낮 동안 계속된다. `ai_user_runtime.enabled`(LEGACY tick 킬스위치)는 이 파이프라인과
+무관해서 건드리지 않는다.
+
+스크립트 로그: `env/logs/nightly-ai-user-batch.log`(자체 타임스탬프) /
 `env/logs/nightly-ai-user-batch.cron.log`(cron stdout/stderr).
 
-### 2026-07-30 LEGACY 임시방편 → 2026-07-31 PLAN 전환 경위
+### ActivityCurve — KST 시간대 활동 가중치
 
-2026-07-30에는 PLAN 모드가 postId(VARCHAR) Long 파싱 버그로 깨져 있어, 대신
-LEGACY tick 엔진을 새벽 창에 몰아 압축 실행하는 임시방편을 썼다(`ai_user_runtime.enabled`를
-새벽에만 켜고 `/admin/trigger/tick`을 반복 호출). 이 방식은 **생성과 게시가
-분리되지 않아** 새 글 7개가 전부 같은 시각에 몰려 올라오고, 새로 만든 글에는
-댓글이 하나도 안 붙는 문제로 이어졌다(30여 개 댓글이 전부 기존 오래된 글에만
-붙음) — "새벽엔 준비만, 낮엔 사람처럼 하나씩" 요구사항을 LEGACY 구조로는 만족할
-수 없었다.
+`OrchestratorProperties.ThreadPlan.kstHourlyHumanWeights`(기존 필드, 이전엔
+`EffectiveExposureCalculator`의 노출시간 가중에만 쓰이고 평평한 기본값이라 사실상
+미사용)를 재사용한다. 22:00 KST를 1.0으로, 02:00~05:00 KST를 0.05~0.08로 둔
+시간별 가중치 — 출퇴근(07~09시)·점심(12~13시) 소피크, 22시 본피크, 새벽 저활동
+구조만 반영한다.
 
-2026-07-31에 postId 버그를 제대로 고쳤다(커밋 `1e9475cd`):
+**주의: 이 곡선은 손으로 작성한 근사값이며 실측 한국 휴대폰 사용 데이터에 기반하지
+않았다.** 이 프로젝트 어디에도 그런 데이터/분석은 존재하지 않는다(2026-07-31 확인).
+나중에 실제 데이터를 확보하기 전까지는 추측치로 취급할 것.
 
-1. `ThreadPlanGenerationService.generateRequestedPlans()`의 `@Transactional`
-   누락 — 2026-07-30에 이미 수정.
-2. postId 파싱 버그(`posts.id` VARCHAR를 `Long.valueOf()`로 파싱) — 2026-07-31
-   수정. **주의**: comment/reply ID(`post_comments.id`, `parent_comment_id`)는
-   실제로 BIGINT라서 그쪽의 `Long.valueOf()`는 원래도 옳다. postId만 String으로
-   고쳐야 하며, comment ID까지 String으로 바꾸면 새 버그가 생긴다. 수정 위치:
-   - `ThreadPlanGenerationService.planRequest()` (orchestrator)
-   - `HumanReplyBatchService.run()`의 `postId` 필드만 (orchestrator)
-   - `ThreadPlanRequest.java` (llm 모듈 DTO, `postId`는 이미 String이었음)
-   - `HumanReplyBatchRequest.java` Item의 `postId`만 (llm 모듈 DTO)
+`ActivityCurve`(`ai-user/orchestrator/.../service/threadplan/ActivityCurve.java`) 제공 함수:
 
-dev 검증(e2e-realbe 158 passed) + prod 실전 확인 완료 — 신규 글 생성 직후 댓글이
-한꺼번에 몰리지 않고 예약 스케줄에 따라 하루 동안 분산 게시됨을 확인했다.
-prod는 2026-07-31부터 `scheduler_mode='PLAN'`로 운영 중이다.
+- `sampleFutureInstants(from, to, count, weights, minSpacing, rng)` — 곡선 가중
+  샘플링 + 최소 간격 보장(양방향 보정). 새벽 배치의 글 슬롯 배정에 사용.
+- `nextActiveHour(from, minWeight, weights)` — dead hour(가중치 < 임계값)에 걸리면
+  다음 활성 시간대로 스냅. `ThreadPlanGenerationService.schedule()`의 댓글/대댓글
+  경과-분 배열(기존 decay 구조 유지)이 새벽 트로프에 떨어지는 것 방지, 그리고
+  `ThreadPlanPublisher`의 stampede 재분배에도 사용.
+- `advanceByWeightedSeconds(from, targetSeconds, weights)` —
+  `EffectiveExposureCalculator.weightedSeconds`의 역함수. 노출시간 예산 재계산용,
+  dead-hour 회피와는 다른 목적(대기하며 누적 vs 즉시 건너뛰기)이라 혼동 금지.
+
+### 2026-07-30~31 LEGACY → PLAN → 예약 파이프라인 전환 경위
+
+- **2026-07-30**: PLAN 모드가 postId(VARCHAR) `Long.valueOf()` 파싱 버그로 깨져
+  있어, LEGACY tick을 새벽에 압축 실행하는 임시방편을 썼다. 생성=발행이 분리되지
+  않아 새 글 7개가 한꺼번에 몰리고 댓글이 하나도 안 붙는 문제로 이어졌다.
+- **2026-07-31 오전**: postId 버그 수정(커밋 `1e9475cd`). **주의**: comment/reply
+  ID(`post_comments.id`, `parent_comment_id`)는 실제 BIGINT라서 그쪽
+  `Long.valueOf()`는 원래도 옳다 — postId만 String으로 고쳐야 하며 comment ID까지
+  바꾸면 새 버그가 생긴다.
+- **2026-07-31 낮**: PLAN 전환 후에도 `generateAndPublish()`는 즉시 발행이라 여전히
+  "새벽에 만들면 새벽에 올라옴"이었다(사용자가 다시 발견). `generateAndHold` +
+  `ai_scheduled_posts` + `ScheduledPostPublisher`로 생성/발행을 실제로 분리.
+- **구현 중 발견한 추가 버그 2건**:
+  1. `ScheduledPostPublisher`에 `claimDue`/`completePosted`/`releaseFailed`를
+     `@Transactional`로 선언하고 같은 클래스 안에서 self-invocation으로 호출 —
+     Spring 프록시 기반 AOP는 self-invocation을 가로채지 못해 트랜잭션이 조용히
+     적용 안 됨(`lockDueItems`의 PESSIMISTIC_WRITE가 "no transaction in progress"로
+     매 분 실패). `ThreadPlanPublisher`가 이미 lease 메서드를 별도 빈
+     (`ThreadPlanItemLeaseService`)으로 분리해둔 것과 동일한 이유 — 새 코드도
+     `ScheduledPostLeaseService`로 분리해 해결.
+  2. 새벽 배치 트리거가 `category`를 빈 문자열/null로 넘겨 backend
+     `createPost`가 `VALIDATION_ERROR`로 거부 — `ActionExecutor.topCategory()`와
+     동일한 로직(persona 관심사 최고값, 없으면 "OTHER")으로 채우도록 수정.
+- 실제 스모크 테스트로 생성→홀드→(강제 due 처리)→발행→댓글 재생까지 전 구간 확인
+  완료(2026-07-31).
+
+### 기존 글 재배치 (WO-RETIME-01, 2026-07-31)
+
+전환 전 LEGACY 압축배치로 몰려 올라온 글 8개를 `env/scripts/retime-nightly-batch-posts.py`로
+재배치했다(dry-run 기본, `--apply`로 실행, SQL은 `/tmp/retime-posts.sql`에 저장 —
+`backdate-timeline.py`와 동일한 관례). 이미 지난 슬롯 배정 글은 `created_at`
+delta-shift(글 삭제 없음), 아직 안 지난 슬롯 글은 `ai_scheduled_posts`로 이관 후
+원본 삭제(발행은 `ScheduledPostPublisher`가 나중에 담당).
+
+**실사람 데이터 제약**: 8개 중 2개 글에 실사람의 좋아요 1건·투표 1건이 섞여 있었다
+(전부 봇으로 착각하면 안 됨). 이 2개는 반드시 "이미 지난 슬롯"으로만 배정해
+글을 삭제하지 않고, 좋아요/투표 행의 시각도 글과 같은 delta만큼 같이 옮겼다
+(`backdate-timeline.py`가 이미 쓰는 기법과 동일 — 콘텐츠·행위자는 그대로, 시각만
+내부 일관성을 위해 이동).
+
+**주의(재발 방지)**: 재배치 스크립트가 delta-shift한 댓글 결과를 검증할 때, 사전
+조사 리포트가 알려준 "원래 시각"을 곧이곧대로 믿지 말 것 — 한 번은 조사 에이전트가
+KST라고 보고한 시각이 실제로는 raw UTC 저장값을 그대로 옮긴 것이라(라벨링 오류)
+delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산술은 항상
+검증 가능하다(같은 delta를 post/comment에 동일 적용하면 상대 간격은 반드시
+보존된다) — 결과가 이상하면 델타 계산이 아니라 "이전 값이 무엇이었는지"에 대한
+가정을 먼저 의심할 것. 또한 `mariadb -B`(batch 모드) 출력은 백슬래시/탭/개행을
+자체적으로 이스케이프하므로, JSON 컬럼을 다시 읽어 검증할 땐 `--raw` 없이 조회한
+결과를 그대로 `json.loads`하면 가짜 파싱 실패가 난다 — 반드시 `--raw`를 붙일 것.
 
 ### 번들 생성 지연 및 구성 최적화
 
@@ -202,6 +268,11 @@ prod는 2026-07-31부터 `scheduler_mode='PLAN'`로 운영 중이다.
 - PLAN 모드라면 `ai_user_generation_config.provider_*`가 낮에는 `OFF`가 정상이다(§8) —
   버그가 아니라 새벽 배치 설계다. 새 글이 전혀 없어야 정상인 건 아니고, 새 LLM
   job만 안 만들 뿐 이미 예약된 item 게시는 계속된다.
+- `AI_USER_SCHEDULED_POST_PUBLISHER_ENABLED=true`인지 확인 — false면 `ai_scheduled_posts`에
+  생성은 계속되지만 아무것도 발행되지 않는다
+- `ai_scheduled_posts` 상태 분포 확인: `SELECT status, COUNT(*) FROM ai_scheduled_posts GROUP BY status;`
+  — `PUBLISHING` 상태가 `lease_until`을 훨씬 지나서도 남아 있으면 발행 중 예외로
+  lease가 안 풀린 것, orchestrator 로그에서 `Scheduled post publish failed` 검색
 - LEGACY라면 `ai_user_runtime.enabled = 1`인지 확인
 - orchestrator 로그에 `Daily global cap reached`가 있는지 확인
 

@@ -123,10 +123,16 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 | `AI_USER_THREAD_PLAN_AI_POST_PROVIDER` | DB config 부재 시 AI 글 bundle provider | `CODEX` |
 | `AI_USER_THREAD_PLAN_HUMAN_PROVIDER` | DB config 부재 시 사람 글/반응 provider | `CODEX` |
 | `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` | 번들형 구조화 생성(글+최대 24후보) 타임아웃 ms | `240000` |
+| `AI_USER_SCHEDULED_POST_PUBLISHER_ENABLED` | `ai_scheduled_posts` 예약글 발행 gate | `false` |
+| `AI_USER_SCHEDULED_POST_PUBLISHER_CRON` | 예약글 발행 스케줄러 cron (5-field) | `0 * * * * *` |
+| `AI_USER_SCHEDULED_POST_PUBLISH_BATCH_SIZE` | 발행 tick당 최대 처리 행 수 | `5` |
+| `AI_USER_POST_SLOT_MIN_SPACING_MINUTES` | 예약글 발행 슬롯 간 최소 간격(분) | `45` |
 
 이 gate들은 배포만으로 콘텐츠를 만들지 않도록 모두 기본 `false`다. 실제 provider 선택·pause·kill switch·후보 수·batch 상한은 관리자 API의 DB 설정이 권위다.
 
-**2026-07-30 발견 / 2026-07-31 수정**: PLAN 모드의 postId(VARCHAR) 파싱 버그로 PLAN을 `scheduler_mode=LEGACY`로 되돌렸으나, 2026-07-31 StringPostId 변경으로 수정 완료. dev 전용 `ai-user-orchestrator-dev` 인스턴스에서 이미 실증 검증됨. prod는 현재도 `scheduler_mode=LEGACY` 그대로 운영 중.
+**2026-07-30 발견 / 2026-07-31 수정**: PLAN 모드의 postId(VARCHAR) 파싱 버그로 PLAN을 `scheduler_mode=LEGACY`로 되돌렸으나, 2026-07-31 postId만 String으로 바꿔 수정 완료(comment/reply ID는 실제 BIGINT라 그대로 둠). **prod는 2026-07-31부터 `scheduler_mode='PLAN'`으로 운영 중이다.**
+
+**2026-07-31 추가**: PLAN 전환 후에도 `AiPostBundleService.generateAndPublish()`는 생성 즉시 발행이라 "새벽 배치=새벽 일괄 발행" 문제가 남아 있었다. `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`(위 4개 env var)로 생성/발행을 분리했다 — 상세: `docs/ai-user/operations.md` §8.
 
 또한 위 3개 gate(`AI_USER_THREAD_PLAN_ENABLED`/`PUBLISHER_ENABLED`/
 `AI_USER_HUMAN_REPLY_BATCH_ENABLED`)는 `env/docker-compose.ai-user.yml`의

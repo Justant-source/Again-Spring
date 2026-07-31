@@ -80,6 +80,11 @@ ai-user:
     human-reply-max-comments: ${AI_USER_HUMAN_REPLY_MAX_COMMENTS:50}
     # 글+최대 24개 후보를 한 번에 요청하는 구조화 생성은 단건 생성보다 오래 걸린다.
     bundle-timeout-ms: ${AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS:240000}
+    # ai_scheduled_posts 발행 스케줄러 (2026-07-31~, 새벽 배치가 만든 예약글을 슬롯 도래 시 발행)
+    scheduled-post-publisher-enabled: ${AI_USER_SCHEDULED_POST_PUBLISHER_ENABLED:false}
+    scheduled-post-publisher-cron: "${AI_USER_SCHEDULED_POST_PUBLISHER_CRON:0 * * * * *}"
+    scheduled-post-publish-batch-size: ${AI_USER_SCHEDULED_POST_PUBLISH_BATCH_SIZE:5}
+    post-slot-min-spacing-minutes: ${AI_USER_POST_SLOT_MIN_SPACING_MINUTES:45}
 
 ai-learning:
   base-url: ${AI_LEARNING_BASE_URL:http://againspring-ai-learning:8099}

@@ -15,7 +15,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 dev·prod를 각각 
 - 공통 ai-user 스택의 1차 대상은 **prod backend + prod DB**다.
 - 신규 기본 설계는 **PLAN-first**다. 글·댓글·대댓글 후보를 한 번에 생성하고, 실제 게시만 예약 item에 따라 실행한다.
 - PLAN은 배포만으로 켜지지 않는다. 환경 gate와 admin의 `ai_user_generation_config.scheduler_mode/provider`를 모두 명시적으로 설정해야 한다.
-- **2026-07-31 기준 실제 운영은 PLAN이다.** 2026-07-30에 PLAN을 처음 켜보니 postId(VARCHAR) 파싱 버그가 나와 LEGACY로 되돌렸었지만, 2026-07-31에 버그를 고치고 재전환했다 — 상세: [thread-planning.md](./thread-planning.md), `docs/ai-user/operations.md` §8. 낮 시간 토큰 절약을 위해 PLAN provider를 새벽에만 `CLAUDE`로 켜는 배치(`env/scripts/nightly-ai-user-batch.sh`, crontab 매일 03:05 KST)가 운영 중이다 — 낮에는 provider가 `OFF`지만 이미 생성된 item의 게시는 계속된다.
+- **2026-07-31 기준 실제 운영은 PLAN + 예약글 파이프라인이다.** 2026-07-30에 PLAN을 처음 켜보니 postId(VARCHAR) 파싱 버그가 나와 LEGACY로 되돌렸고, 2026-07-31 오전에 버그를 고치고 재전환했지만 `generateAndPublish()`는 생성 즉시 발행이라 여전히 "새벽에 만들면 새벽에 올라옴" 문제가 남아 있었다. 2026-07-31 낮에 `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`로 생성/발행을 실제로 분리했다 — 상세: [thread-planning.md](./thread-planning.md), `docs/ai-user/operations.md` §8. 새벽 배치(`env/scripts/nightly-ai-user-batch.sh`, crontab 매일 03:05 KST)는 그날 발행할 글을 `ActivityCurve` 가중 슬롯과 함께 "생성만" 하고, `ScheduledPostPublisher`가 낮 동안 슬롯 도래 시 하나씩 발행한다.
 - `PAIRED_POST_ENABLED`의 기본값은 `false`다. pair 추가 글은 별도 생성 기능이 아니라 기존 게시글의 revision 변경으로 처리한다.
 - `AI_USER_ENABLED`는 이제 orchestrator의 **하드 게이트**다. false면 tick, daily planner, paired posts, crawl trigger가 모두 skip된다.
 - 실제 2차 kill-switch는 여전히 DB `ai_user_runtime.enabled`다.

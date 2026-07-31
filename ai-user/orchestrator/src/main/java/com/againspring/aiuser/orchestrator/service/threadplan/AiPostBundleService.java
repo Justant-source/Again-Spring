@@ -5,12 +5,16 @@ import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.client.dto.CreatePostDto;
 import com.againspring.aiuser.orchestrator.client.dto.PostDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
+import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlan;
 import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.domain.enums.ScheduledPostStatus;
+import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -43,6 +47,8 @@ public class AiPostBundleService {
     private final ContentSafetyGuard safetyGuard;
     private final ThreadPlanService planService;
     private final ThreadPlanGenerationService planGenerationService;
+    private final AiScheduledPostRepository scheduledPostRepository;
+    private final ObjectMapper objectMapper;
 
     /** A PLAN rollout owns post generation even when its workload provider is OFF. */
     public boolean ownsPostGeneration() {
@@ -54,6 +60,69 @@ public class AiPostBundleService {
 
     public Optional<PublishedBundle> generateAndPublish(Persona author, String jwt, String category,
                                                          String topicHint, String correlationId) {
+        Bundle bundle = generateBundle(category, topicHint, correlationId).orElse(null);
+        if (bundle == null) return Optional.empty();
+
+        Optional<PostDto> published = backendBot.createPost(jwt, CreatePostDto.builder()
+                .userTitle(bundle.content.title()).bodyRaw(bundle.content.body()).category(category)
+                .visibility("PUBLIC").jurorCount(0).build());
+        if (published.isEmpty() || published.get().getId() == null) return Optional.empty();
+
+        PostDto post = published.get();
+        try {
+            // POST_PUBLISHED outbox delivery will find this revision and must not request another LLM plan.
+            AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, Instant.now(),
+                    bundle.content.title(), bundle.content.body(), category, bundle.provider, bundle.model);
+            planGenerationService.persistResponse(plan.getId(), bundle.response);
+            planService.markReady(plan.getId());
+            planService.activate(plan.getId());
+            return Optional.of(new PublishedBundle(post, bundle.content.body()));
+        } catch (RuntimeException persistenceFailure) {
+            // The post was accepted by backend, but it must never cause a second content call.
+            // The durable outbox creates a REQUESTED plan which can be retried manually if this write failed.
+            log.error("Published AI post {} but could not persist its pre-generated bundle corr={}",
+                    post.getId(), correlationId, persistenceFailure);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Same one-shot structured generation as {@link #generateAndPublish}, but the post is never
+     * sent to backend — it is held in {@code ai_scheduled_posts} until {@code scheduledPublishAt}.
+     * {@link ScheduledPostPublisher} creates the real post (and replays these candidates into a
+     * thread plan) when the slot arrives. Used by the nightly batch so "generate at 3am" and
+     * "appear in the feed" are no longer the same moment.
+     */
+    public Optional<AiScheduledPost> generateAndHold(Persona author, String category, String topicHint,
+                                                      String correlationId, Instant scheduledPublishAt) {
+        Bundle bundle = generateBundle(category, topicHint, correlationId).orElse(null);
+        if (bundle == null) return Optional.empty();
+
+        String candidatesJson;
+        try {
+            candidatesJson = objectMapper.writeValueAsString(bundle.response);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException serializationFailure) {
+            log.error("AI post bundle generated but candidates could not be serialized corr={}",
+                    correlationId, serializationFailure);
+            return Optional.empty();
+        }
+
+        AiScheduledPost row = AiScheduledPost.builder()
+                .personaId(author.getId())
+                .category(category)
+                .title(bundle.content.title())
+                .body(bundle.content.body())
+                .candidatesJson(candidatesJson)
+                .scheduledPublishAt(scheduledPublishAt)
+                .status(ScheduledPostStatus.SCHEDULED)
+                .provider(bundle.provider)
+                .model(bundle.model)
+                .build();
+        return Optional.of(scheduledPostRepository.save(row));
+    }
+
+    /** Shared generation step: one structured LLM call, validated post + raw response for replay. */
+    private Optional<Bundle> generateBundle(String category, String topicHint, String correlationId) {
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
         String provider = config == null ? properties.getThreadPlan().getAiPostProvider()
                 : config.getProviderAiPostBundle();
@@ -88,36 +157,16 @@ public class AiPostBundleService {
         // Do not retry here. The AI-post bundle contract is one structured invocation per post.
         Optional<Map<String, Object>> response = llmClient.generateThreadPlan(request);
         if (response.isEmpty()) return Optional.empty();
-        PostContent postContent;
         try {
-            postContent = readAndValidatePost(response.get());
+            PostContent postContent = readAndValidatePost(response.get());
+            return Optional.of(new Bundle(response.get(), postContent, provider, model));
         } catch (IllegalArgumentException invalid) {
             log.warn("AI post bundle rejected corr={}: {}", correlationId, invalid.getMessage());
             return Optional.empty();
         }
-
-        Optional<PostDto> published = backendBot.createPost(jwt, CreatePostDto.builder()
-                .userTitle(postContent.title()).bodyRaw(postContent.body()).category(category)
-                .visibility("PUBLIC").jurorCount(0).build());
-        if (published.isEmpty() || published.get().getId() == null) return Optional.empty();
-
-        PostDto post = published.get();
-        try {
-            // POST_PUBLISHED outbox delivery will find this revision and must not request another LLM plan.
-            AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, Instant.now(),
-                    postContent.title(), postContent.body(), category, provider, model);
-            planGenerationService.persistResponse(plan.getId(), response.get());
-            planService.markReady(plan.getId());
-            planService.activate(plan.getId());
-            return Optional.of(new PublishedBundle(post, postContent.body()));
-        } catch (RuntimeException persistenceFailure) {
-            // The post was accepted by backend, but it must never cause a second content call.
-            // The durable outbox creates a REQUESTED plan which can be retried manually if this write failed.
-            log.error("Published AI post {} but could not persist its pre-generated bundle corr={}",
-                    post.getId(), correlationId, persistenceFailure);
-            return Optional.empty();
-        }
     }
+
+    private record Bundle(Map<String, Object> response, PostContent content, String provider, String model) { }
 
     @SuppressWarnings("unchecked")
     private PostContent readAndValidatePost(Map<String, Object> response) {
