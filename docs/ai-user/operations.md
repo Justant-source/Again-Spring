@@ -153,24 +153,40 @@ docker logs -f againspring-prod-dev-sync
 버그로 오인하지 말 것. 스크립트 로그: `env/logs/nightly-ai-user-batch.log`
 (자체 타임스탬프 로그) / `env/logs/nightly-ai-user-batch.cron.log`(cron stdout/stderr).
 
-### PLAN 모드는 현재 비활성 — postId 파싱 버그 (2026-07-30 발견)
+### PLAN 모드 postId 버그 — 수정 완료 (2026-07-31)
 
-PLAN 모드(스레드플랜 사전생성 + 낮 게시전용, §3의 "PLAN 모드 추가 제어" 참조)를
-처음 실전 가동해보니 두 가지 문제가 나왔다:
+PLAN 모드(스레드플랜 사전생성 + 낮 게시전용, §3의 "PLAN 모드 추가 제어" 참조)는
+개발 중 두 가지 문제가 발견되었다:
 
 1. `ThreadPlanGenerationService.generateRequestedPlans()`에 `@Transactional`이
    빠져 있어 `lockByStatus`(PESSIMISTIC_WRITE)가 매틱 예외 — **수정 완료**
    (같은 커밋에 포함).
-2. `ThreadPlanGenerationService.planRequest()` / `ThreadPlanPublisher.parentId()`
-   / `HumanReplyBatchService.run()` 4곳이 `posts.id`(VARCHAR "post_xxx")를
-   `Long.valueOf()`로 파싱하려다 `NumberFormatException` — **미수정**. orchestrator
-   쪽만이 아니라 llm-ai-user `/v2/generate/thread-plan`·`/v2/generate/human-replies`
-   요청 스키마도 Long postId를 기대하는지 확인해야 하는 구조적 문제라 이번엔
-   손대지 않고 `scheduler_mode=LEGACY`, `provider_*=OFF`로 되돌렸다.
+2. postId 파싱 버그(`posts.id` VARCHAR를 `Long.valueOf()`로 파싱) — **수정 완료**
+   (2026-07-31). 다음 4곳에서 postId 필드를 String으로 수정:
+   - `ThreadPlanGenerationService.planRequest()` (orchestrator)
+   - `HumanReplyBatchService.run()` (orchestrator)
+   - `ThreadPlanRequest.java` (llm 모듈 DTO)
+   - `HumanReplyBatchRequest.java` Item 내부 클래스 (llm 모듈 DTO)
 
-PLAN 모드를 다시 켜려면: 위 4곳의 ID 타입을 String으로 바꾸고, dev에서
-실제 post로 thread-plan 생성이 끝까지 되는지 검증한 뒤에 prod
-`ai_user_generation_config.scheduler_mode='PLAN'`으로 전환할 것.
+dev 환경에서 AI_POST 번들 생성과 낮 게시 전환까지 실증 검증 완료 (신규 글 정상
+생성, 댓글 후보 분산 스케줄 동작 확인).
+
+### 번들 생성 지연 및 구성 최적화
+
+실측 결과 글+최대 24개 후보를 한 번에 LLM 요청하는 구조화 생성이 5~10분 이상 걸릴
+수 있음이 확인됐다. 대응책:
+
+1. 타임아웃: `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` (기본 240000ms=240초)로 설정.
+   `OrchestratorProperties.ThreadPlan.bundleTimeoutMs`에 대응.
+2. 후보 풀 크기: `ai_user_generation_config.candidate_pool_size`를 24보다 작게
+   (16 권장: 최상위 14 + 대댓글 2)으로 설정하면 생성 속도 개선.
+
+### 다음 단계: prod 배포 대기
+
+dev 검증(e2e-realbe 158 passed) 완료. 다음 순서:
+1. main commit & push
+2. `.env.prod` 값 입력 후 prod DB 백업
+3. prod `ai_user_generation_config.scheduler_mode='PLAN'`, provider 설정 전환
 
 ## 9. 트러블슈팅
 
@@ -209,3 +225,15 @@ PLAN 모드를 다시 켜려면: 위 4곳의 ID 타입을 String으로 바꾸고
 ### dev에서 실사용자 로그인이 안 될 때
 
 - 의도된 동작이다. prod mirrored user는 비식별화 + 비활성 상태로 저장된다.
+
+### dev에서 ai_user_outbox "Unknown column" 에러
+
+dev backend는 `ddl-auto: update` 모드이므로 JPA 엔티티에 선언되지 않은 컬럼은
+자동 생성되지 않는다. `ai_user_outbox` 테이블이 backend 쓰기 전용 컬럼만 가지고
+있으면 orchestrator(오케스트레이터)가 소비 전용 컬럼(published_at, lease_owner,
+lease_until, attempt_count, last_error_code)을 찾지 못해 오류 난다.
+
+**해결책**: prod의 `SHOW CREATE TABLE ai_user_outbox`와 비교해서 누락된 컬럼을
+dev에 수동으로 `ALTER TABLE` 추가. 또한 `ai_user_generation_config` 테이블에서
+`provider_ai_post_bundle`, `provider_human_post_plan`, `provider_human_interaction`
+값이 유효한지 확인 — 유효값은 `CLAUDE`/`CODEX`/`OFF`뿐이다(`CLI`/`API` 아님).

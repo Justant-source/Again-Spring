@@ -152,6 +152,65 @@ services:
       retries: 5
       start_period: 90s
 
+  ai-user-orchestrator-dev:
+    build:
+      context: ../ai-user/orchestrator
+      dockerfile: Dockerfile
+    image: againspring-ai-user-orchestrator-dev
+    container_name: againspring-ai-user-orchestrator-dev
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${DEV_DB_NAME:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      DB_USER: ${MARIADB_USER:-againspring}
+      DB_PASSWORD: ${DEV_MARIADB_PASSWORD}
+      BACKEND_BASE_URL: http://againspring-backend-dev:8080
+      LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
+      AI_USER_ENABLED: ${AI_USER_DEV_ENABLED:-true}
+      AI_USER_TICK_CRON: "${AI_USER_TICK_CRON:-0 */10 * * * *}"
+      AI_USER_MODE: LEGACY
+      AI_USER_HUMAN_BATCH_CRON: "${AI_USER_HUMAN_BATCH_CRON:-0 */30 * * * *}"
+      AI_USER_DUE_ITEM_CRON: "${AI_USER_DUE_ITEM_CRON:-*/30 * * * * *}"
+      AI_USER_THREAD_PLAN_ENABLED: true
+      AI_USER_THREAD_PLAN_PUBLISHER_ENABLED: true
+      AI_USER_HUMAN_REPLY_BATCH_ENABLED: true
+      AI_USER_PLAN_HARD_TTL_HOURS: ${AI_USER_PLAN_HARD_TTL_HOURS:-24}
+      AI_USER_PLAN_RETRY_MAX: ${AI_USER_PLAN_RETRY_MAX:-1}
+      AI_USER_POST_REPLAN_MAX: ${AI_USER_POST_REPLAN_MAX:-2}
+      AI_USER_POST_EDIT_DEBOUNCE_MINUTES: ${AI_USER_POST_EDIT_DEBOUNCE_MINUTES:-30}
+      AI_USER_PREGENERATE_MIN_MINUTES: ${AI_USER_PREGENERATE_MIN_MINUTES:-30}
+      AI_USER_PREGENERATE_MAX_MINUTES: ${AI_USER_PREGENERATE_MAX_MINUTES:-90}
+      AI_USER_ACTIVITY_LOOKBACK_DAYS: ${AI_USER_ACTIVITY_LOOKBACK_DAYS:-28}
+      AI_USER_DAILY_GLOBAL_CAP: ${AI_USER_DEV_DAILY_GLOBAL_CAP:-30}
+      AI_USER_BOT_PASSWORD: ${AI_USER_BOT_PASSWORD:-ai-user-prod-pw-2026}
+      AI_USER_SEED_ENABLED: true
+      AI_USER_REPETITION_THRESHOLD: ${AI_USER_REPETITION_THRESHOLD:-0.45}
+      AI_LEARNING_ENABLED: false
+      AI_LEARNING_CRAWL_ENABLED: false
+      AI_LEARNING_BASE_URL: ${AI_LEARNING_URL:-http://againspring-ai-learning:8099}
+      SELF_CRITIQUE_ENABLED: ${SELF_CRITIQUE_ENABLED:-true}
+      AI_USER_PERSONA_TARGET: ${AI_USER_PERSONA_TARGET:-50}
+      AI_USER_PERSONAS_DIR: /app/personas
+      AI_USER_FORCE_ACTIVE: true
+      AI_USER_SECONDARY_BACKEND_URL: ""
+      PAIRED_POST_ENABLED: false
+      PAIRED_POST_CRON: "${PAIRED_POST_CRON:-0 0 */2 * * *}"
+      PAIRED_POST_PAIRS: ${PAIRED_POST_PAIRS:-3}
+      PAIRED_POST_TARGET_SHARE: ${PAIRED_POST_TARGET_SHARE:-0.15}
+      PAIRED_POST_ROMANTIC_SHARE: ${PAIRED_POST_ROMANTIC_SHARE:-0.80}
+      AI_USER_ML_ENABLED: false
+    volumes:
+      - ../ai-user/docs/personas:/app/personas:rw
+    restart: unless-stopped
+    networks:
+      - againspring
+      - againspring-dev
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8096/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
   prod-dev-sync:
     build:
       context: ../ai-user/sync

@@ -77,6 +77,7 @@ public class AiPostBundleService {
         request.put("provider", provider);
         if (model != null && !model.isBlank()) request.put("model", model);
         request.put("correlationId", correlationId);
+        request.put("timeoutMs", properties.getThreadPlan().getBundleTimeoutMs());
         request.put("category", category == null ? "OTHER" : category);
         request.put("topicHint", topicHint == null ? "" : topicHint);
         request.put("personas", personas);

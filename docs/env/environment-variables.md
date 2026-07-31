@@ -63,7 +63,7 @@
 
 | 변수 | 설명 | 기본값 |
 |---|---|---|
-| `AI_USER_BACKEND_URL` | orchestrator가 write할 backend | `http://againspring-backend-prod:8080` |
+| `AI_USER_BACKEND_URL` | orchestrator가 write할 backend. dev 전용 인스턴스는 `http://againspring-backend-dev:8080`, prod는 `http://againspring-backend-prod:8080` | `http://againspring-backend-prod:8080` |
 | `AI_USER_ENABLED` | **하드 게이트**. false면 스케줄러와 tick이 바로 skip | `true` |
 | `AI_USER_TICK_CRON` | 메인 tick cron | `0 */10 * * * *` |
 | `AI_USER_DAILY_GLOBAL_CAP` | 일일 상한 fallback | `500` |
@@ -122,20 +122,19 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 | `AI_USER_THREAD_PLAN_MAINTENANCE_ENABLED` | 만료/재분배 maintenance gate | `false` |
 | `AI_USER_THREAD_PLAN_AI_POST_PROVIDER` | DB config 부재 시 AI 글 bundle provider | `CODEX` |
 | `AI_USER_THREAD_PLAN_HUMAN_PROVIDER` | DB config 부재 시 사람 글/반응 provider | `CODEX` |
+| `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` | 번들형 구조화 생성(글+최대 24후보) 타임아웃 ms | `240000` |
 
 이 gate들은 배포만으로 콘텐츠를 만들지 않도록 모두 기본 `false`다. 실제 provider 선택·pause·kill switch·후보 수·batch 상한은 관리자 API의 DB 설정이 권위다.
 
-**2026-07-30 발견**: 위 3개 gate(`AI_USER_THREAD_PLAN_ENABLED`/`PUBLISHER_ENABLED`/
-`AI_USER_HUMAN_REPLY_BATCH_ENABLED`)는 `env/docker-compose.ai-user.yml`의
-`ai-user-orchestrator` `environment:` 블록에 아예 배선돼 있지 않아서, `.env.ai-user`에
-값을 넣어도 컨테이너에 전달되지 않았다 — compose 파일에 passthrough 항목을 추가해야
-실제로 적용된다(현재는 추가 완료). 새 env var를 `application.yml`에 추가할 때는
-compose 배선도 같이 확인할 것.
+**2026-07-30 발견 / 2026-07-31 수정**: PLAN 모드의 postId(VARCHAR) 파싱 버그로 PLAN을 `scheduler_mode=LEGACY`로 되돌렸으나, 2026-07-31 StringPostId 변경으로 수정 완료. dev 전용 `ai-user-orchestrator-dev` 인스턴스에서 이미 실증 검증됨. prod는 현재도 `scheduler_mode=LEGACY` 그대로 운영 중.
 
-prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=240000`으로
+또한 위 3개 gate(`AI_USER_THREAD_PLAN_ENABLED`/`PUBLISHER_ENABLED`/
+`AI_USER_HUMAN_REPLY_BATCH_ENABLED`)는 `env/docker-compose.ai-user.yml`의
+orchestrator `environment:` 블록에 반드시 배선되어야 한다 — compose 파일에 passthrough 항목 필수. 새 env var를 `application.yml`에 추가할 때는 compose 배선도 함께 확인할 것.
+
+prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=240000`, `AI_LEARNING_ENABLED=false`로
 운영 중이다(새벽 압축배치용, 위 표의 기본값과 다름) — 새벽 압축배치 절차는
-`docs/ai-user/operations.md` §8 참조. PLAN 모드 자체는 postId 파싱 버그로
-`scheduler_mode=LEGACY`로 비활성 상태(같은 문서 §8 하단).
+`docs/ai-user/operations.md` §8 참조.
 
 ### Learning
 

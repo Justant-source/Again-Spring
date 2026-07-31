@@ -12,7 +12,7 @@ public class ThreadPlanRequest {
     private String model;
     private String correlationId;
     private Long timeoutMs;
-    private Long postId;
+    private String postId;
     private Long postRevision;
     private String existingTitle;
     private String existingBody;

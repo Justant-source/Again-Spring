@@ -78,6 +78,8 @@ ai-user:
     publish-batch-size: ${AI_USER_THREAD_PLAN_PUBLISH_BATCH_SIZE:20}
     human-reply-max-posts: ${AI_USER_HUMAN_REPLY_MAX_POSTS:10}
     human-reply-max-comments: ${AI_USER_HUMAN_REPLY_MAX_COMMENTS:50}
+    # 글+최대 24개 후보를 한 번에 요청하는 구조화 생성은 단건 생성보다 오래 걸린다.
+    bundle-timeout-ms: ${AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS:240000}
 
 ai-learning:
   base-url: ${AI_LEARNING_BASE_URL:http://againspring-ai-learning:8099}

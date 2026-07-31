@@ -1,9 +1,10 @@
 # AI User Docs
 
-AI-user는 이제 **dev/prod 공통 스택**으로 운영된다. FE/BE는 dev·prod가 분리되어 있지만, ai-user 런타임은 `env/docker-compose.ai-user.yml` 하나를 공유한다.
+AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 dev·prod를 각각 관리한다. orchestrator는 환경별 별도 인스턴스(`ai-user-orchestrator-dev`, `ai-user-orchestrator`)를 유지하고, LLM 워커(`llm-ai-user`)는 두 orchestrator가 공유한다.
 
 ## 서비스 구성
 
+- `ai-user-orchestrator-dev` (`8096`, 내부): dev DB 기준 PLAN 생성·예약 게시·사람 반응 batch 및 legacy 호환 tick
 - `ai-user-orchestrator` (`8096`, 내부): prod DB 기준 PLAN 생성·예약 게시·사람 반응 batch 및 legacy 호환 tick
 - `llm-ai-user` (`8092`, 내부): 구조화 thread plan 생성과 legacy 생성/분석을 담당하는 Claude Code·Codex CLI bridge
 - `ai-learning` (`8099`, host 공개): example bank, crawl, strengthen, topic synthesis
@@ -26,8 +27,9 @@ AI-user는 이제 **dev/prod 공통 스택**으로 운영된다. FE/BE는 dev·p
 
 | 서비스 | 코드 위치 | 기본 포트 | 호스트 노출 | 현재 역할 |
 |---|---|---:|---|---|
-| orchestrator | `ai-user/orchestrator/` | `8096` | 없음 | prod 대상 행동 오케스트레이션 |
-| llm | `ai-user/llm/` | `8092` | 없음 | 생성/분석/legacy rewrite 워커 |
+| orchestrator (dev) | `ai-user/orchestrator/` | `8096` | 없음 | dev 대상 행동 오케스트레이션 |
+| orchestrator (prod) | `ai-user/orchestrator/` | `8096` | 없음 | prod 대상 행동 오케스트레이션 |
+| llm | `ai-user/llm/` | `8092` | 없음 | 생성/분석/legacy rewrite 워커 (dev/prod 공유) |
 | learning | `ai-user/learning/` | `8099` | `localhost:8099` | 예시 검색, 크롤, 강화, 토픽 |
 | sync | `ai-user/sync/` | 없음 | 없음 | prod→dev 일일 반영 |
 
@@ -36,8 +38,9 @@ AI-user는 이제 **dev/prod 공통 스택**으로 운영된다. FE/BE는 dev·p
 | 항목 | dev | prod |
 |---|---|---|
 | backend 진입점 | `http://localhost:8090` | `http://localhost:8091` |
-| ai-user 런타임 | 공통 `againspring-ai-user-*` 컨테이너 공유 | 공통 `againspring-ai-user-*` 컨테이너 공유 |
-| orchestrator 대상 | 직접 쓰기 없음 | `backend-prod`, `mariadb-prod` |
+| orchestrator 인스턴스 | `ai-user-orchestrator-dev` | `ai-user-orchestrator` |
+| orchestrator 대상 | `backend-dev:8080`, `mariadb-dev` | `backend-prod:8080`, `mariadb-prod` |
+| LLM 워커 | `llm-ai-user` (공유) | `llm-ai-user` (공유) |
 | dev 데이터 반영 | `prod-dev-sync`가 KST 기준 하루 1회 upsert | source of truth |
 
 ## 데이터 흐름

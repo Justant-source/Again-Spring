@@ -6,11 +6,13 @@
 
 이 문서는 PLAN 모드의 운영 SSOT다. legacy tick, paired-post, direct API, post analysis 및 self-critique는 전환 완료 전 호환 경로일 수 있으나 신규 PLAN 작업의 의존성이 아니다.
 
-> **현재 상태 (2026-07-30)**: 이 문서가 기술하는 설계는 아직 prod에서 정상 동작한
-> 적이 없다. 최초 실전 가동 시도에서 `posts.id`(VARCHAR)를 `Long`으로 파싱하려는
-> 구조적 버그(`ThreadPlanGenerationService.planRequest` 등 4곳)가 드러나
-> `scheduler_mode=LEGACY`로 되돌렸다. 트랜잭션 누락 버그는 수정 완료했으나 postId
-> 타입 버그는 미수정 상태다. 상세: `docs/ai-user/operations.md` §8.
+> **현재 상태 (2026-07-31)**: `posts.id`(VARCHAR)를 `Long`으로 파싱하려는 구조적 버그
+> (2026-07-30 발견, `ThreadPlanGenerationService.planRequest` 등 4곳)를 수정 완료했다.
+> 타입을 모두 String으로 변경하고, 새로운 `bundleTimeoutMs` 설정(기본값 240초)을 추가해
+> LLM 응답 대기 시간을 충분히 확보했다. **dev 환경에서는 검증 성공**
+> (`ai-user-orchestrator-dev` 전용 인스턴스로 PLAN 모드 첫 성공 확인).
+> prod는 여전히 `scheduler_mode=LEGACY` 상태이며, prod 전환은 별도 배포 단계에서 진행 예정.
+> 상세: `docs/ai-user/operations.md` §8.
 
 ## 구성과 경계
 
@@ -27,7 +29,7 @@ flowchart LR
 ```
 
 - Backend는 게시글·댓글의 변경과 outbox event를 **같은 트랜잭션**에 기록한다. Spring in-process event만으로 외부 orchestrator 전달을 보장하지 않는다.
-- `ai-user-orchestrator`가 outbox를 소비해 plan/job/inbox를 만들고, due item을 lease해 backend API로 게시한다.
+- `ai-user-orchestrator` (prod)와 `ai-user-orchestrator-dev` (dev 전용 신설)가 각각의 backend/DB에서 outbox를 소비해 plan/job/inbox를 만들고, due item을 lease해 backend API로 게시한다. 두 인스턴스는 공유 `llm-ai-user` 워커 컨테이너를 사용한다.
 - `llm-ai-user`는 하나의 컨테이너다. Claude와 Codex CLI 바이너리를 함께 담지만 요청이 선택한 CLI 프로세스만 실행하고 매 요청 후 종료한다. 인증 디렉터리는 지속하되 대화 컨텍스트는 요청마다 격리한다.
 - 사용자 원문·완성 prompt·LLM 원문은 일반 로그나 job 상세에 저장하지 않는다. 식별자, 길이, hash, failure code, latency만 운영 진단 기본값이다.
 
@@ -45,7 +47,7 @@ flowchart LR
 
 ## 계획과 후보 풀
 
-기본 후보 풀은 최상위 댓글 14개와 대댓글 10개, 총 24개이며 운영 범위는 8~30개다. 후보 전체가 실제 게시되는 것은 아니다. 노출·사람 반응·시간대에 따라 통상 6~20개만 활성화한다.
+기본 후보 풀은 최상위 댓글 14개와 대댓글 10개, 총 24개이며 운영 범위는 8~30개다. 그러나 dev 검증 결과, 기본 24개는 구조화 생성 시 LLM 응답이 5~10분 이상 지연되는 현상이 관찰되었다. 타임아웃 설정(bundleTimeoutMs)을 240초로 확대했으나 응답 시간 개선을 위해 **prod 전환 시 `candidate_pool_size=16`(최상위 14개 + 대댓글 2개)으로 설정할 것을 권고**한다. 후보 전체가 실제 게시되는 것은 아니다. 노출·사람 반응·시간대에 따라 통상 6~20개만 활성화한다.
 
 검증 순서:
 

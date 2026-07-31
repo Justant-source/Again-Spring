@@ -14,7 +14,7 @@ public class HumanReplyBatchRequest {
 
     @Data
     public static class Item {
-        private Long postId;
+        private String postId;
         private Long humanCommentId;
         private Long parentCommentId;
         private String postTitle;

@@ -78,6 +78,8 @@ public class OrchestratorProperties {
         private int publishBatchSize = 20;
         private int humanReplyMaxPosts = 10;
         private int humanReplyMaxComments = 50;
+        /** 글+최대 24개 후보를 한 번에 요청하는 구조화 생성용 타임아웃 (단건 생성보다 오래 걸림). */
+        private long bundleTimeoutMs = 240000;
         private Map<Integer, Double> kstHourlyHumanWeights = defaultKstWeights();
 
         private static Map<Integer, Double> defaultKstWeights() {

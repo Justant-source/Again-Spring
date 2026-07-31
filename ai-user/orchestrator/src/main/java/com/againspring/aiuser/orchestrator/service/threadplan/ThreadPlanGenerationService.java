@@ -84,7 +84,8 @@ public class ThreadPlanGenerationService {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("kind", "AI_POST".equals(plan.getSourceType()) ? "AI_POST" : "HUMAN_POST");
         r.put("provider", provider); if (model != null && !model.isBlank()) r.put("model", model);
-        r.put("correlationId", "thread-plan-" + plan.getId()); r.put("postId", Long.valueOf(plan.getPostId()));
+        r.put("correlationId", "thread-plan-" + plan.getId()); r.put("postId", plan.getPostId());
+        r.put("timeoutMs", properties.getThreadPlan().getBundleTimeoutMs());
         r.put("postRevision", (long) plan.getPostRevision()); r.put("existingTitle", nullToEmpty(plan.getSourceTitle()));
         r.put("existingBody", nullToEmpty(plan.getSourceBody())); r.put("category", nullToEmpty(plan.getSourceCategory()));
         int roots = Math.min(14, pool); r.put("personas", personas); r.put("maxTopLevel", roots); r.put("maxReplies", pool - roots);

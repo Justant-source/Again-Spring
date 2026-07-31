@@ -36,7 +36,8 @@ public class HumanReplyBatchService {
         Map<String,Object> request = new LinkedHashMap<>(); request.put("provider", config.getProviderHumanInteraction());
         if (!props.getThreadPlan().getHumanPlanModel().isBlank()) request.put("model", props.getThreadPlan().getHumanPlanModel());
         request.put("correlationId", "human-replies-" + now.toEpochMilli());
-        request.put("items", selected.stream().map(e -> Map.of("postId", Long.valueOf(e.getPostId()), "humanCommentId", Long.valueOf(e.getSourceCommentId()),
+        request.put("timeoutMs", props.getThreadPlan().getBundleTimeoutMs());
+        request.put("items", selected.stream().map(e -> Map.of("postId", e.getPostId(), "humanCommentId", Long.valueOf(e.getSourceCommentId()),
                 "parentCommentId", e.getParentCommentId() == null ? 0L : Long.valueOf(e.getParentCommentId()), "postTitle", "", "postBody", "", "humanBody", "", "responder", Map.of())).toList());
         Optional<Map<String,Object>> response = llm.generateHumanReplies(request); if (response.isEmpty()) response = llm.generateHumanReplies(request);
         if (response.isEmpty()) { selected.forEach(e -> inbox.release(e.getId(), worker)); return; }
