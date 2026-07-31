@@ -102,13 +102,42 @@ flowchart LR
 
 ## LLM 없는 engagement
 
-조회수·좋아요·투표는 candidate 생성이나 post analysis를 호출하지 않는다. 기존 실제 수치를 절대 감소시키지 않고 점진적으로 목표에 접근한다.
+조회수·댓글/대댓글 좋아요는 candidate 생성이나 post analysis를 호출하지 않는다.
+현재 값보다 낮아지는 방향으로는 절대 안 움직이고(`deficit = max(0, target - current)`),
+목표에 점진적으로만 접근한다. **구현: `PlanEngagementDispatcher`**
+(`ai-user/orchestrator/.../service/engagement/`, 2026-07-31~) — LEGACY
+`BehaviorEngine.tick()`이 삭제된 뒤에도 완전히 독립적으로 5분 cron
+(`AI_USER_ENGAGEMENT_CRON`)으로 돈다. 게이트는 `ai_user_runtime.enabled`가
+**아니라** `AI_USER_ENGAGEMENT_ENABLED` + `ai_user_kill_switch`/
+`schedule_execution_paused`.
 
-- post like target: `views * 0.02 + total comments/replies * 0.6`
 - comment like target: `post views * 0.002 + child replies * 1.0`, 최대 12
 - reply like target: `post views * 0.001`, 최대 5
-- 각 목표에는 ±20% jitter를 적용하되 자기 좋아요/중복 좋아요는 금지한다.
-- view target: `12 + comments * 8 + votes * 6 + real human activity`; likes를 입력으로 쓰지 않아 순환을 막는다.
+- 지터는 **결정적**이다(대상 id의 CRC32 기반, `Math.random()` 아님) — 문서 초안 단계의
+  "±20% jitter" 표현은 부정확했다. 5분마다 재평가하는 수렴형 구조라 지터가 매번
+  달라지면 타깃이 계속 흔들려 좋아요가 무한 누적될 수 있어서, 대상마다 고정된
+  값을 쓴다(`EngagementTargetCalculator.jitter`, `ViewDispatcher`와 동일 기법).
+- 매 실행마다 조회수(`ViewDispatcher.dispatchViews()`)를 먼저 갱신한 뒤 그 값으로
+  좋아요 타깃을 계산한다 — `ViewDispatcher`가 의도적으로 좋아요를 조회수 공식에서
+  빼는 것과 짝을 이뤄 순환 증폭을 막는다.
+- **post like target(`views * 0.02 + comments/replies * 0.6`)은 이 디스패처가
+  다루지 않는다.** 글 좋아요·투표는
+  `service/threadplan/VoteLikeBatchService.java`(`provider_vote_like`,
+  목표-카운트 기반)가 별도로 담당 — 두 메커니즘이 같은 post-like 카운터에
+  동시에 수렴하는 걸 막기 위한 의도적 역할 분리다.
+  `EngagementTargetCalculator.postLikeTarget()`는 공식 완전성을 위해 남아있지만
+  아무도 호출하지 않는다.
+- `ai_thread_plan_items`(`item_type = POST_LIKE/COMMENT_LIKE/REPLY_LIKE/VIEW`)를
+  쓰지 않는다 — 발행 파이프라인(`lockDueItems`/`ThreadPlanPublisher.publish()`)이
+  타입 필터가 없어 핫패스를 건드려야 하고, `idempotency_key` UNIQUE 제약이
+  "같은 대상을 다시 좋아요"라는 수렴형 재평가와 맞지 않는다. 4개 enum 상수는
+  선언만 남아있고 아무도 만들거나 소비하지 않는다.
+- `ai_user_runtime.daily_global_cap`을 공유하지 않는다 — LEGACY tick 전용
+  카운터라 공유하면 그 캡 도달 시 engagement가 조용히 멈춘다. 대신 실행당
+  상한(`maxPostsPerRun`, `maxLikeCallsPerRun`)만 둔다.
+- 백필과 평상시 운영은 같은 코드다(`reconcile(lookbackDays, ...)`) — 차이는
+  `lookbackDays` 뿐. `POST /admin/trigger/reconcile-engagement?dryRun=true`로
+  실제 반영 없이 부족분만 먼저 확인할 수 있다.
 
 ## 장애 코드와 관측
 

@@ -317,3 +317,31 @@ lease_until, attempt_count, last_error_code)을 찾지 못해 오류 난다.
 dev에 수동으로 `ALTER TABLE` 추가. 또한 `ai_user_generation_config` 테이블에서
 `provider_ai_post_bundle`, `provider_human_post_plan`, `provider_human_interaction`
 값이 유효한지 확인 — 유효값은 `CLAUDE`/`CODEX`/`OFF`뿐이다(`CLI`/`API` 아님).
+
+### prod에서 `ai_user_generation_config` "Unknown column" 에러 (2026-07-31 실제 발생)
+
+위 dev 케이스와 같은 종류의 문제가 prod에서도 실제로 터졌다: JPA 엔티티
+(`AiUserGenerationConfig.java`)에 `provider_vote_like` 필드가 추가됐는데 대응
+마이그레이션(`V90__ai_user_config_plan_only.sql`)이 아직 적용되지 않은 상태로
+배포되면서, `ThreadPlanGenerationScheduler`를 포함해 이 테이블을 읽는 **모든**
+스케줄러가 15초마다 예외를 던지며 멈췄다(orchestrator 전체 컨텐츠 파이프라인
+정지). `V90`을 수동 적용(`docker exec ... mariadb < V90__*.sql`, idempotent라
+안전)해서 해결.
+
+**교훈**: 이 테이블은 backend가 소유하고 orchestrator는 읽기 전용으로 매핑한다
+(§3 참조). 엔티티에 컬럼을 추가하는 커밋과 그 컬럼을 만드는 마이그레이션은
+분리될 수 있지만, **마이그레이션이 실제로 적용(=backend 재시작으로 Flyway 실행,
+또는 수동 적용)되기 전까지는 새 필드를 참조하는 어떤 쿼리도 prod에서 실행하면
+안 된다.** 여러 세션이 동시에 이 저장소를 건드릴 때 특히 위험 — 한쪽이 엔티티만
+먼저 커밋하면 다른 쪽 코드(이미 배포돼 있던 스케줄러 포함)가 즉시 깨진다.
+
+### 댓글/대댓글 좋아요·조회수가 안 붙을 때
+
+`PlanEngagementDispatcher`(§8, 5분 cron) 관련. `AI_USER_ENGAGEMENT_ENABLED=true`인지,
+`ai_user_kill_switch`/`schedule_execution_paused`가 꺼져 있는지 확인.
+`POST /admin/trigger/reconcile-engagement?dryRun=true`로 부족분이 실제로
+계산되는지 먼저 확인하고, `dryRun=false`로 반영. 일부 좋아요만 반영되고 나머지가
+`persona_action_log`에 `COMMENT_LIKE FAILED`(target_id가 댓글 id가 아니라
+postId로 찍힘)로 남으면 봇 계정 JWT 발급 실패(`BotTokenCache`)가 원인인 경우가
+많다 — `Bot login failed ... 429 Too Many Requests` 로그 확인. 리콘실러는
+수렴형이라 다음 5분 주기에 저절로 재시도된다(자동 복구, 별도 조치 불필요).

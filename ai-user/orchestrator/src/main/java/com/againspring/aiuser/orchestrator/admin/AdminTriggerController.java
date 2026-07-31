@@ -3,12 +3,13 @@ package com.againspring.aiuser.orchestrator.admin;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
 import com.againspring.aiuser.orchestrator.domain.Persona;
-import com.againspring.aiuser.orchestrator.engine.BehaviorEngine;
 import com.againspring.aiuser.orchestrator.engine.PlannedAction;
+import com.againspring.aiuser.orchestrator.engine.ViewDispatcher;
 import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserRuntimeRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
+import com.againspring.aiuser.orchestrator.service.engagement.PlanEngagementDispatcher;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.againspring.aiuser.orchestrator.task.ActionExecutor;
@@ -45,7 +46,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 public class AdminTriggerController {
 
-    private final BehaviorEngine behaviorEngine;
     private final PairedPostScheduler pairedPostScheduler;
     private final AiUserRuntimeRepository runtimeRepo;
     private final PersonaRepository personaRepo;
@@ -54,6 +54,8 @@ public class AdminTriggerController {
     private final OrchestratorProperties properties;
     private final AiPostBundleService aiPostBundleService;
     private final AiScheduledPostRepository scheduledPostRepository;
+    private final PlanEngagementDispatcher engagementDispatcher;
+    private final ViewDispatcher viewDispatcher;
 
     /**
      * KST 시간대 곡선으로 발행 슬롯 N개를 샘플링만 해서 보여준다(부작용 없음).
@@ -131,20 +133,6 @@ public class AdminTriggerController {
         log.info("[generate-scheduled-posts] {} post(s) attempted (count={})", attempted, n);
         return ResponseEntity.ok(Map.of("attempted", attempted, "scheduledIds", scheduledIds,
                 "message", attempted + "개 예약글 생성 시도 완료(LLM+세이프가드 통과분만 저장됨, 미발행)."));
-    }
-
-    /** BehaviorEngine 즉시 tick — 좋아요/댓글/투표/게시 1회 실행 */
-    @PostMapping("/tick")
-    public ResponseEntity<Map<String, Object>> triggerTick() {
-        log.info("[AdminTrigger] Manual tick requested");
-        try {
-            behaviorEngine.tick();
-            return ResponseEntity.ok(Map.of("status", "ok", "action", "tick"));
-        } catch (Exception e) {
-            log.error("[AdminTrigger] tick failed: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                .body(Map.of("status", "error", "message", e.getMessage()));
-        }
     }
 
     /** PairedPostScheduler 즉시 실행 — 갈등 사연 페어 생성 */
@@ -327,6 +315,50 @@ public class AdminTriggerController {
             log.info("[AdminTrigger] daily_global_cap: {} → {}", prev, cap);
             return ResponseEntity.ok(Map.of("status", "ok", "prev", (Object) prev, "now", (Object) cap));
         }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * 조회수만 즉시 보정 (ViewDispatcher.dispatchViews() 직접 호출, LEGACY tick 무관하게 단독 실행).
+     */
+    @PostMapping("/dispatch-views")
+    public ResponseEntity<Map<String, Object>> dispatchViews() {
+        int updated = viewDispatcher.dispatchViews();
+        log.info("[AdminTrigger] dispatch-views: {} posts updated", updated);
+        return ResponseEntity.ok(Map.of("updated", updated));
+    }
+
+    /**
+     * 댓글/대댓글 좋아요 + 조회수 리콘실 — PlanEngagementDispatcher.reconcile()의 유일한 진입점.
+     * dryRun=true: 실제 반영 없이 부족분(deficit)만 동기 계산해서 즉시 반환(공식 검증용).
+     * dryRun=false: 비동기 실행, 즉시 202 반환(실제 좋아요 호출은 수 분 걸릴 수 있음).
+     * post 좋아요·투표는 대상 아님 — VoteLikeBatchService가 별도로 담당(provider_vote_like).
+     */
+    @PostMapping("/reconcile-engagement")
+    public ResponseEntity<Map<String, Object>> reconcileEngagement(
+            @RequestParam(defaultValue = "3") int days,
+            @RequestParam(defaultValue = "40") int maxPosts,
+            @RequestParam(defaultValue = "300") int maxLikeCalls,
+            @RequestParam(defaultValue = "true") boolean dryRun) {
+        if (dryRun) {
+            var result = engagementDispatcher.reconcile(days, maxPosts, maxLikeCalls, true);
+            return ResponseEntity.ok(Map.of(
+                    "dryRun", true,
+                    "postsScanned", result.postsScanned(),
+                    "deficits", result.deficits()));
+        }
+        log.info("[AdminTrigger] reconcile-engagement dispatch requested days={} maxPosts={} maxLikeCalls={}",
+                days, maxPosts, maxLikeCalls);
+        runEngagementReconcileAsync(days, maxPosts, maxLikeCalls);
+        return ResponseEntity.accepted().body(Map.of(
+                "dryRun", false,
+                "message", "백그라운드로 조회수/댓글·대댓글 좋아요 리콘실을 시작했습니다."));
+    }
+
+    @Async
+    void runEngagementReconcileAsync(int days, int maxPosts, int maxLikeCalls) {
+        var result = engagementDispatcher.reconcile(days, maxPosts, maxLikeCalls, false);
+        log.info("[AdminTrigger] reconcile-engagement done: posts={} views={} commentLikes={} replyLikes={}",
+                result.postsScanned(), result.viewsUpdated(), result.commentLikesApplied(), result.replyLikesApplied());
     }
 
     /** ActionExecutor.topCategory()와 동일한 로직 — category NOT NULL이라 반드시 채워야 한다. */

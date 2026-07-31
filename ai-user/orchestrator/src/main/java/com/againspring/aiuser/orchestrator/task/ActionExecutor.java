@@ -129,6 +129,15 @@ public class ActionExecutor {
     private void executeCommentLike(Persona persona, PlannedAction action, String jwt, String corrId) {
         if (action.targetPost() == null || action.targetPost().getId() == null) return;
         String postId = action.targetPost().getId();
+
+        // Targeted path: if parentCommentId is set, like exactly this comment without gates or caps
+        if (action.parentCommentId() != null) {
+            boolean ok = backendBot.likeComment(jwt, postId, action.parentCommentId());
+            logPiggyback(persona, corrId, "COMMENT_LIKE", postId, action.parentCommentId(), ok);
+            return;
+        }
+
+        // Untargeted path: probabilistically react to discovered comments
         CommentContext ctx = fetchReactableComments(postId);
         if (ctx.items().isEmpty()) {
             log.debug("COMMENT_LIKE skip: no comments on post {}", postId);

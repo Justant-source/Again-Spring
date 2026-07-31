@@ -45,4 +45,12 @@ public record PlannedAction(
     public static PlannedAction commentLike(PostDto post) {
         return new PlannedAction(ActionType.COMMENT_LIKE, post, null, null, null, null, null);
     }
+    /**
+     * 타깃 댓글 지정 좋아요 — LLM 0콜, fetchReactableComments의 페이지(5)/cap(8) 제한을
+     * 우회한다(엔진 스캐너 재사용, PlanEngagementDispatcher 전용). commentLike(post)와
+     * 달리 like_score 확률 게이트 없이 무조건 시도한다.
+     */
+    public static PlannedAction commentLike(PostDto post, Long commentId) {
+        return new PlannedAction(ActionType.COMMENT_LIKE, post, null, commentId, null, null, null);
+    }
 }

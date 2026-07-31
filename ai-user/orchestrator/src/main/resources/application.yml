@@ -85,6 +85,21 @@ ai-user:
     scheduled-post-publisher-cron: "${AI_USER_SCHEDULED_POST_PUBLISHER_CRON:0 * * * * *}"
     scheduled-post-publish-batch-size: ${AI_USER_SCHEDULED_POST_PUBLISH_BATCH_SIZE:5}
     post-slot-min-spacing-minutes: ${AI_USER_POST_SLOT_MIN_SPACING_MINUTES:45}
+    # 좋아요·조회수 리콘실러 (2026-07-31~, 배포 시 enabled=false로 배포 후 백필 검증 후 true 전환)
+    engagement:
+      enabled: ${AI_USER_ENGAGEMENT_ENABLED:false}
+      lookback-days: ${AI_USER_ENGAGEMENT_LOOKBACK_DAYS:3}
+      max-posts-per-run: ${AI_USER_ENGAGEMENT_MAX_POSTS_PER_RUN:40}
+      max-like-calls-per-run: ${AI_USER_ENGAGEMENT_MAX_LIKE_CALLS_PER_RUN:300}
+      views-enabled: ${AI_USER_ENGAGEMENT_VIEWS_ENABLED:true}
+      post-like-per-view: ${AI_USER_ENGAGEMENT_POST_LIKE_PER_VIEW:0.02}
+      post-like-per-comment: ${AI_USER_ENGAGEMENT_POST_LIKE_PER_COMMENT:0.6}
+      comment-like-per-view: ${AI_USER_ENGAGEMENT_COMMENT_LIKE_PER_VIEW:0.002}
+      comment-like-per-reply: ${AI_USER_ENGAGEMENT_COMMENT_LIKE_PER_REPLY:1.0}
+      comment-like-cap: ${AI_USER_ENGAGEMENT_COMMENT_LIKE_CAP:12}
+      reply-like-per-view: ${AI_USER_ENGAGEMENT_REPLY_LIKE_PER_VIEW:0.001}
+      reply-like-cap: ${AI_USER_ENGAGEMENT_REPLY_LIKE_CAP:5}
+      engagement-cron: "${AI_USER_ENGAGEMENT_CRON:0 */5 * * * *}"
 
 ai-learning:
   base-url: ${AI_LEARNING_BASE_URL:http://againspring-ai-learning:8099}

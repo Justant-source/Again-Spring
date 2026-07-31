@@ -87,6 +87,8 @@ public class OrchestratorProperties {
         /** 글+최대 24개 후보를 한 번에 요청하는 구조화 생성용 타임아웃 (단건 생성보다 오래 걸림). */
         private long bundleTimeoutMs = 240000;
         private Map<Integer, Double> kstHourlyHumanWeights = defaultKstWeights();
+        /** Engagement (likes/views) reconciler settings. */
+        private Engagement engagement = new Engagement();
 
         /**
          * 20~40대 커뮤니티 체류 패턴 근사치(2026-07-31 결정, 실측 데이터 아님 — 출퇴근 소피크·
@@ -102,5 +104,22 @@ public class OrchestratorProperties {
             for (int hour = 0; hour < 24; hour++) weights.put(hour, hourly[hour]);
             return weights;
         }
+    }
+
+    @Getter
+    @Setter
+    public static class Engagement {
+        private boolean enabled = false;
+        private int lookbackDays = 3;
+        private int maxPostsPerRun = 40;
+        private int maxLikeCallsPerRun = 300;
+        private boolean viewsEnabled = true;
+        private double postLikePerView = 0.02;
+        private double postLikePerComment = 0.6;
+        private double commentLikePerView = 0.002;
+        private double commentLikePerReply = 1.0;
+        private int commentLikeCap = 12;
+        private double replyLikePerView = 0.001;
+        private int replyLikeCap = 5;
     }
 }
