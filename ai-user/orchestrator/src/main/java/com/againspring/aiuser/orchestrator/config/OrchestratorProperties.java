@@ -112,14 +112,18 @@ public class OrchestratorProperties {
         private boolean enabled = false;
         private int lookbackDays = 3;
         private int maxPostsPerRun = 40;
-        private int maxLikeCallsPerRun = 300;
+        private int maxLikeCallsPerRun = 500;
         private boolean viewsEnabled = true;
         private double postLikePerView = 0.02;
         private double postLikePerComment = 0.6;
-        private double commentLikePerView = 0.002;
+        private double commentLikePerView = 0.025;
         private double commentLikePerReply = 1.0;
         private int commentLikeCap = 12;
-        private double replyLikePerView = 0.001;
+        private double replyLikePerView = 0.012;
         private int replyLikeCap = 5;
+        /** 한 실행에서 댓글 좋아요 후보로 쓸 페르소나 풀 크기 (warm 우선 + cold 예산). */
+        private int personaPoolSize = 30;
+        /** 풀 구성 시 새로 로그인(cold)시킬 페르소나 상한 — 분당 5회 로그인 레이트리밋 공유 대비. */
+        private int coldLoginBudget = 3;
     }
 }

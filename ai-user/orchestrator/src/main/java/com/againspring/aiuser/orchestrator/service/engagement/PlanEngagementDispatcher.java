@@ -1,5 +1,6 @@
 package com.againspring.aiuser.orchestrator.service.engagement;
 
+import com.againspring.aiuser.orchestrator.auth.BotTokenCache;
 import com.againspring.aiuser.orchestrator.client.dto.PostDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
@@ -53,6 +54,7 @@ public class PlanEngagementDispatcher {
     private final ActionExecutor actionExecutor;
     private final OrchestratorProperties properties;
     private final AiUserGenerationConfigRepository configRepository;
+    private final BotTokenCache botTokenCache;
 
     /** Called by {@code PlanEngagementScheduler} on its cron. Applies configured defaults. */
     public void reconcileDue() {
@@ -88,8 +90,16 @@ public class PlanEngagementDispatcher {
             viewsUpdated = viewDispatcher.dispatchViews();
         }
 
-        List<String> postIds = reader.planModePostIds(lookbackDays, maxPosts);
-        List<Persona> activePersonas = personaRepository.findByActiveTrue();
+        List<String> postIds = new ArrayList<>(reader.planModePostIds(lookbackDays, maxPosts));
+        // 조회수 순(=최신순) 정렬로 들어오는 목록을 섞어서, maxLikeCalls 소진으로 루프가
+        // 중간에 끊길 때 매번 같은(오래된) 글부터 영원히 처리되는 편향을 없앤다.
+        Collections.shuffle(postIds);
+        // 매 댓글마다 활성 페르소나 전체(~150명)를 다시 후보로 쓰면 이번 실행에서 처음 로그인하는
+        // 페르소나 수가 과도해져 백엔드 로그인 레이트리밋(분당 5회/IP)에 걸린다. 실행당 한 번만
+        // warm(이미 토큰 캐시됨) 우선 + cold(신규 로그인) 소량 예산으로 풀을 구성해 재사용한다.
+        List<Persona> personaPool = dryRun
+                ? List.of()
+                : buildPersonaPool(personaRepository.findByActiveTrue(), cfg);
 
         int likeCallsUsed = 0;
         int commentLikesApplied = 0;
@@ -121,7 +131,7 @@ public class PlanEngagementDispatcher {
 
                 Set<String> alreadyLiked = reader.alreadyLikedCommentAuthorIds(comment.id());
                 List<Persona> candidates = new ArrayList<>();
-                for (Persona p : activePersonas) {
+                for (Persona p : personaPool) {
                     if (p.getId().equals(comment.authorId())) continue; // no self-likes
                     if (alreadyLiked.contains(p.getId())) continue;     // avoid likeComment's toggle-off-then-on
                     candidates.add(p);
@@ -142,6 +152,15 @@ public class PlanEngagementDispatcher {
                                 persona.getId(), comment.id(), ex.getMessage());
                         continue;
                     }
+                    // ActionExecutor swallows a JWT-fetch failure (returns void, no exception) —
+                    // detect it here via the cache instead. Without this, a single rate-limited
+                    // cold persona keeps getting re-selected as a candidate for every remaining
+                    // comment in this run and re-attempts login each time, turning one 429 into
+                    // dozens. Dropping it from the pool bounds it to one failed attempt per run.
+                    if (!botTokenCache.hasValidToken(persona.getId())) {
+                        personaPool.remove(persona);
+                        continue;
+                    }
                     likeCallsUsed++;
                     if (isReply) replyLikesApplied++; else commentLikesApplied++;
                 }
@@ -149,6 +168,40 @@ public class PlanEngagementDispatcher {
         }
 
         return new EngagementResult(postIds.size(), viewsUpdated, commentLikesApplied, replyLikesApplied, deficits);
+    }
+
+    /**
+     * Builds the 댓글 좋아요 후보 풀 once per {@link #reconcile} call instead of re-shuffling the
+     * full active-persona list per comment. Warm personas (already have a cached, non-expired
+     * bot JWT — see {@link BotTokenCache#hasValidToken}) fill the pool first since dispatching a
+     * like via them costs zero logins; only the remaining slots are filled with cold personas,
+     * capped by {@code coldLoginBudget}, so a single 5-minute run never asks the shared
+     * per-IP login rate limiter (default 5/min in prod, {@code RateLimitFilter}) for more fresh
+     * logins than it can grant alongside the other publish schedulers sharing that bucket.
+     */
+    private List<Persona> buildPersonaPool(List<Persona> activePersonas, OrchestratorProperties.Engagement cfg) {
+        List<Persona> shuffled = new ArrayList<>(activePersonas);
+        Collections.shuffle(shuffled);
+
+        List<Persona> warm = new ArrayList<>();
+        List<Persona> cold = new ArrayList<>();
+        for (Persona p : shuffled) {
+            (botTokenCache.hasValidToken(p.getId()) ? warm : cold).add(p);
+        }
+
+        List<Persona> pool = new ArrayList<>();
+        for (Persona p : warm) {
+            if (pool.size() >= cfg.getPersonaPoolSize()) break;
+            pool.add(p);
+        }
+        int coldAdded = 0;
+        for (Persona p : cold) {
+            if (pool.size() >= cfg.getPersonaPoolSize() || coldAdded >= cfg.getColdLoginBudget()) break;
+            pool.add(p);
+            coldAdded++;
+        }
+        Collections.shuffle(pool);
+        return pool;
     }
 
     public record PostDeficit(String postId, long commentId, boolean isReply, int deficit) { }

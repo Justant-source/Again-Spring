@@ -111,8 +111,17 @@ flowchart LR
 **아니라** `AI_USER_ENGAGEMENT_ENABLED` + `ai_user_kill_switch`/
 `schedule_execution_paused`.
 
-- comment like target: `post views * 0.002 + child replies * 1.0`, 최대 12
-- reply like target: `post views * 0.001`, 최대 5
+- comment like target: `post views * 0.025 + child replies * 1.0`, 최대 12
+- reply like target: `post views * 0.012`, 최대 5
+- **2026-07-31 재조정**: 최초 계수(`0.002`/`0.001`)는 조회수가 수천 단위일 걸
+  가정한 값이었다. 실제 PLAN 모드 글의 조회수는 74~207(평균 ~139) 수준이라
+  이 규모에서는 지터를 최대로 잡아도(`round(views*coef*1.19)`) 대댓글은
+  거의 항상 0으로 수렴하고, 최상위 댓글도 `child replies` 항이 없으면 0에
+  머물러 "좋아요가 한두 개만 보임" 현상의 실제 원인이었다. 실측 조회수 대비
+  타깃이 1~6(댓글)/1~3(대댓글) 범위에 들어오도록 `commentLikePerView`를
+  12.5배(`0.025`), `replyLikePerView`를 12배(`0.012`)로 올렸다. 바닥값(floor)은
+  두지 않는다 — 새 댓글이 0에서 시작해 스레드가 채워지며(=조회수가 자연히
+  올라가며) 점진적으로 붙는 게 자연스럽다.
 - 지터는 **결정적**이다(대상 id의 CRC32 기반, `Math.random()` 아님) — 문서 초안 단계의
   "±20% jitter" 표현은 부정확했다. 5분마다 재평가하는 수렴형 구조라 지터가 매번
   달라지면 타깃이 계속 흔들려 좋아요가 무한 누적될 수 있어서, 대상마다 고정된
@@ -138,6 +147,33 @@ flowchart LR
 - 백필과 평상시 운영은 같은 코드다(`reconcile(lookbackDays, ...)`) — 차이는
   `lookbackDays` 뿐. `POST /admin/trigger/reconcile-engagement?dryRun=true`로
   실제 반영 없이 부족분만 먼저 확인할 수 있다.
+- **댓글/대댓글 좋아요 디스패치용 페르소나 풀은 실행(run)당 한 번만 구성한다
+  (2026-07-31~).** prod의 로그인 레이트리밋(`security.rate-limit.auth-per-minute`
+  기본값 **분당 5회/IP**, `RateLimitFilter.java`, dev만 1000으로 override)을
+  orchestrator의 모든 봇 로그인이 공유한다. 계수 재조정으로 디스패치 시도량이
+  대폭 늘면서, 매 댓글마다 활성 페르소나 전체(~150명)를 다시 섞어 후보로 쓰는
+  기존 방식은 한 번의 5분 실행 안에서 서로 다른 페르소나가 대거 처음 로그인을
+  시도하게 만들어 이 레이트리밋에 걸렸다(실측 COMMENT_LIKE 실패율 43%). 지금은
+  `reconcile()` 시작부에서 `BotTokenCache`에 유효 토큰이 이미 있는("warm")
+  페르소나를 우선 채우고, 모자란 만큼만 새로 로그인할("cold") 페르소나를
+  `coldLoginBudget`(기본 3) 한도 안에서 추가해 `personaPoolSize`(기본 30)
+  풀을 만들고, 이 풀을 실행 전체의 댓글 반복문에서 재사용한다. 자기 좋아요/
+  중복 좋아요 제외 로직은 그대로 이 풀 위에서 동작한다. 토큰 TTL이 24시간이라
+  전체 페르소나가 warm해지고 나면(수 시간 내) 실행당 로그인 0회에 수렴한다.
+- `planModePostIds`가 `created_at DESC`로 정렬해 반환하고 `maxLikeCallsPerRun`
+  소진 시 즉시 끊기던 구조는 캡을 다 채우는 실행마다 가장 오래된 글부터
+  영원히 처리되지 않는 편향을 만들었다. `reconcile()`이 매번 post 목록을
+  받은 뒤 셔플해서 이 편향을 없앤다. `maxLikeCallsPerRun`도 `300→500`으로
+  올렸다(전체 수렴에 필요한 총량보다는 낮게 유지 — 여러 회차에 걸쳐 점진적으로
+  채워지는 게 급격한 스파이크보다 자연스럽다).
+- **cold 페르소나 로그인 실패는 즉시 풀에서 제거한다.** 배포 직후 실측:
+  `ActionExecutor.execute()`는 JWT 획득 실패 시 예외 없이 조용히 no-op하는데,
+  실패한 cold 페르소나가 이 사실을 모른 채 남은 댓글들의 후보로 계속 재선택되면
+  같은 페르소나 하나가 한 실행 안에서 수십 번 다시 로그인을 시도해 429를
+  반복 유발했다(실측: 밀리초 단위로 같은 personaId 재시도). 지금은 `execute()`
+  직후 `botTokenCache.hasValidToken(persona.getId())`로 실제 로그인 성공 여부를
+  확인해 실패 시 그 실행의 `personaPool`에서 즉시 제거한다 — cold 페르소나당
+  실패는 실행마다 최대 1회로 확정 상한이 걸린다.
 
 ## 장애 코드와 관측
 

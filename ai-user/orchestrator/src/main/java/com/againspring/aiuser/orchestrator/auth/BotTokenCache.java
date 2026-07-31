@@ -50,6 +50,12 @@ public class BotTokenCache {
         return token;
     }
 
+    /** Whether personaId already has a non-expired cached token (i.e. would not trigger a login). */
+    public boolean hasValidToken(String personaId) {
+        BotToken cached = cache.get(personaId);
+        return cached != null && !cached.isExpired();
+    }
+
     public void evict(String personaId) {
         cache.remove(personaId);
     }
