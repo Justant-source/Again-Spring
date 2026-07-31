@@ -68,6 +68,7 @@
 | 토픽 | authority | derived | runtime |
 |---|---|---|---|
 | ASM 전체 | `docs/shared/marketing/README.md` | `{api,architecture,platforms,social-poster}.md` | ASM 저장소 (`~/Data/Again-Spring-Marketing`) |
+| X 스레드 전략 | `docs/shared/marketing/x-thread-strategy.md` | — | ASM `services/social-poster/src/routes/publish-x.js` |
 
 ---
 

@@ -32,7 +32,7 @@
 |---|---|---|
 | **Again-Spring (AS)** | Ubuntu 서버 | 얇은 트리거/클라이언트. 잡 생성·폴링·UI 표시만 담당 |
 | **Again-Spring-Marketing (ASM)** | WSL GPU 서버 | 콘텐츠 생성·렌더링·소셜 게시 전담 |
-| **ASM social-poster** | ASM `services/social-poster/` | X·Instagram·네이버 블로그 Playwright 자동 게시 |
+| **ASM social-poster** | ASM `services/social-poster/` | X·Instagram·네이버 블로그 Playwright 자동 게시. X는 4단 스레드 자동화(`x_thread` 플랫폼) 포함 |
 
 ---
 
@@ -46,7 +46,8 @@ docs/shared/marketing/
 ├── asm-setup.md        ← ASM 서버 설치·운영 가이드
 ├── platforms.md        ← 지원 플랫폼 및 콘텐츠 형식
 ├── credentials.md      ← 플랫폼 계정 자격증명 저장·암호화 정책
-└── social-poster.md    ← social-poster 서비스 운영 가이드
+├── social-poster.md    ← social-poster 서비스 운영 가이드
+└── x-thread-strategy.md ← X 4단 스레드 전략 (포맷·발행 트리거·구현)
 ```
 
 ---

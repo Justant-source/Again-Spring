@@ -21,4 +21,5 @@ public class AsmProperties {
     private boolean enabled;
     private String callbackToken;
     private String callbackBaseUrl;
+    private long xThreadPollIntervalMs = 600000; // 10 minutes default
 }

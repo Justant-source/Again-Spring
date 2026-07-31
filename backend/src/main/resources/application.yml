@@ -139,6 +139,7 @@ asm:
   enabled: ${ASM_ENABLED:true}
   callback-token: ${ASM_CALLBACK_TOKEN:asm-callback-token-dev}
   callback-base-url: ${ASM_CALLBACK_BASE_URL:http://100.81.189.92:8090}
+  x-thread-poll-interval-ms: ${ASM_X_THREAD_POLL_INTERVAL_MS:600000}
 
 logging:
   level:
