@@ -187,12 +187,14 @@ function C3StoryDetail({
   const existingAuthorCount = post.voteResult?.options?.[0]?.count ?? 0;
   const existingPartnerCount = post.voteResult?.options?.[1]?.count ?? 0;
   const authorPct = voteResult
-    ? Math.round(voteResult.options?.[0]?.percentage ?? post.authorPct ?? 50)
+    ? Math.round(voteResult.options?.[0]?.percentage ?? (existingTotal > 0 ? existingAuthorCount / existingTotal * 100 : 50))
     : pick === 'g'
       ? Math.round((existingAuthorCount + 1) / (existingTotal + 1) * 100)
       : pick === 'r'
       ? Math.round(existingAuthorCount / (existingTotal + 1) * 100)
-      : Math.round(post.authorPct ?? 50);
+      : existingTotal > 0
+        ? Math.round(existingAuthorCount / existingTotal * 100)
+        : 50;
   const partnerPct = 100 - authorPct;
 
   // 표 수 — 막대는 비율(%)로, 라벨은 표 수로 표시. 선택 시 내 한 표 미리 반영
@@ -511,7 +513,7 @@ function C3ResultSolo({
       {/* VoteBar */}
       {voteResult && (
         <div style={{ marginBottom: 20 }}>
-          <VoteBar authorPct={Math.round(post.authorPct || 50)} big={true} />
+          <VoteBar authorPct={Math.round(voteResult?.options?.[0]?.percentage ?? 50)} big={true} />
           <div
             style={{
               fontSize: 12,
@@ -612,7 +614,7 @@ function C3ResultPair({
       {/* VoteBar */}
       {voteResult && (
         <div style={{ marginBottom: 20 }}>
-          <VoteBar authorPct={Math.round(post.authorPct || 50)} big={true} />
+          <VoteBar authorPct={Math.round(voteResult?.options?.[0]?.percentage ?? 50)} big={true} />
         </div>
       )}
 
@@ -727,7 +729,7 @@ function C3Closed({
       {/* VoteBar */}
       {voteResult && (
         <div style={{ marginBottom: 20 }}>
-          <VoteBar authorPct={Math.round(post.authorPct || 50)} big={true} />
+          <VoteBar authorPct={Math.round(voteResult?.options?.[0]?.percentage ?? 50)} big={true} />
         </div>
       )}
 

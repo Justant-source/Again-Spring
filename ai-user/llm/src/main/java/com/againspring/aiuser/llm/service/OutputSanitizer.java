@@ -318,6 +318,10 @@ public class OutputSanitizer {
         if (raw == null || raw.isBlank()) return "";
         String s = raw;
 
+        // -1. 리터럴 이스케이프 정규화 — LLM이 실제 개행(0x0A) 대신 문자 그대로 "\n"을 출력하는 사례 방어
+        // (예: post_2b97a638711244f2a889 — 본문에 실개행 없이 백슬래시+n 텍스트가 그대로 게시됨, 2026-07-31)
+        s = s.replace("\\r\\n", "\n").replace("\\n", "\n");
+
         // 0. AI 메타 응답 감지 → 즉시 빈 문자열 (ActionExecutor FAILED → 스킵)
         if (META_RESPONSE.matcher(s).find()) return "";
 
