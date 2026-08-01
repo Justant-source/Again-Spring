@@ -70,6 +70,7 @@ services:
       ASM_BASE_URL: ${ASM_BASE_URL:-}
       ASM_API_TOKEN: ${ASM_API_TOKEN:-}
       ASM_ENABLED: ${ASM_ENABLED:-false}
+      ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED: ${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:-false}
       AI_LEARNING_URL: ${AI_LEARNING_URL:-http://againspring-ai-learning:8099}
       AI_USER_LLM_URL: ${AI_USER_LLM_URL:-http://againspring-llm-ai-user:8092}
       AI_USER_ORCHESTRATOR_URL: ${AI_USER_ORCHESTRATOR_URL:-http://againspring-ai-user-orchestrator:8096}

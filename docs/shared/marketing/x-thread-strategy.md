@@ -191,3 +191,27 @@ ASM(WSL)에서 Playwright 캡처+슬라이스 및 순차 답글 발행 구현이
 | 콘텐츠가 사실상 전부 봇 | **그대로 진행**(2026-07-31 결정). prod 기준 사연 98.6%(139/141), 댓글 98.4%(2,422/2,462), 투표 99.7%(7,319/7,344)가 `synthetic=1`. 둘째·셋째 칸이 봇 데이터 위에 선다. |
 | `paired` 사연이 141건 중 1건 | 상대방(세이지) 카드가 거의 항상 빈 칸으로 캡처된다. |
 | PLAN 아이템 실패율 19.4% | 원인 미진단. 댓글 게이트로 증상만 가린 상태. |
+| ASM 캡처 selector 안정성 | **미검증**. 2026-07-31 인시던트(§6) 때 `read`/`detail` 페이지의 "사연 본문 카드"·"공감 비율" selector가 10건 중 9건에서 실패했다. 이후 selector가 고쳐졌는지 재검증되지 않았다 — 2026-08-01 wiring 수정 후 재개 전 1건 수동 테스트로 먼저 확인한다. |
+
+---
+
+## 6. 인시던트 — wiring 누락으로 트리거가 10시간+ 조용히 꺼져 있었음 (2026-08-01)
+
+**증상**: 2026-07-31 다음날 오전, 24시간+댓글6 조건을 만족하는 사연이 9건 쌓였는데도 x_thread 잡이 하나도 생성되지 않음.
+
+**원인**: `.env.prod`에 `ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED=true`를 2026-08-01에 설정했으나,
+`env/docker-compose.prod.yml`의 `backend-prod` `environment:` 블록에 이 변수가 wiring돼 있지 않았다.
+`ASM_BASE_URL`/`ASM_API_TOKEN`/`ASM_ENABLED`는 전달되는데 이 변수만 누락되어, 컨테이너 안에서는
+Spring의 기본값(`${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:false}`)으로 조용히 `false`가 됐다.
+스케줄러의 스킵 로그가 `log.debug`라 운영 로그에도 흔적이 없었다.
+
+**수정**: `docker-compose.prod.yml`에 wiring 한 줄 추가 (`ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED: ${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:-false}`).
+
+**재개 절차** (2026-07-31 실계정 오발행 사고 재발 방지):
+1. wiring 수정만 우선 배포, `.env.prod`는 일시적으로 `false` 유지 — 스케줄러 자동 트리거는 계속 꺼둔다.
+2. `/admin/marketing`에서 사연 1건을 `autoPublish=false`로 수동 생성 → ASM 캡처/슬라이스가 `READY`까지
+   도달하는지, 캡처된 이미지가 실제로 맞는지 사람이 직접 확인한다.
+3. 확인되면 `.env.prod`를 `true`로 되돌리고 재배포 — 이때부터 나머지 8건을 포함해 이후 사연이 자동으로 처리된다.
+
+관련: `docs/env/environment-variables.md`의 `ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED` 항목,
+`XThreadPublishTriggerScheduler.java`의 opt-in 플래그 주석(2026-07-31 실계정 오발행 사고 배경 설명).
