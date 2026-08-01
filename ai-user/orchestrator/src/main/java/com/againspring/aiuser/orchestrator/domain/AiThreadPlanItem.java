@@ -48,6 +48,14 @@ public class AiThreadPlanItem {
     @Column(name = "target_comment_id", length = 64)
     private String targetCommentId;
 
+    /**
+     * Human user this reply answers ({@code users.id}, loose ref). Only set on human-reply items.
+     * The 3 personas / 5 per persona / 15 total budget is scoped to (target_post_id, human_author_id),
+     * so different humans on the same post never consume each other's budget.
+     */
+    @Column(name = "human_author_id", length = 32)
+    private String humanAuthorId;
+
     @Lob
     @Column(name = "body", columnDefinition = "LONGTEXT")
     private String body;

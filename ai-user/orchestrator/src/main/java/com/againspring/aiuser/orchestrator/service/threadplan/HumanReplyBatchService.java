@@ -82,7 +82,7 @@ public class HumanReplyBatchService {
                 inbox.markSkipped(entry.getId(), worker, FAILURE_NO_ACTIVE_PLAN);
                 continue;
             }
-            Optional<Map<String, Object>> item = buildItem(entry);
+            Optional<Map<String, Object>> item = buildItem(entry, config);
             if (item.isEmpty()) {
                 inbox.markSkipped(entry.getId(), worker, FAILURE_MISSING_CONTEXT);
                 continue;
@@ -92,7 +92,7 @@ public class HumanReplyBatchService {
         }
         if (ready.isEmpty()) return;
 
-        int chunkSize = resolvedChunkSize();
+        int chunkSize = resolvedChunkSize(config);
         List<List<Integer>> chunks = chunkIndexes(ready.size(), chunkSize);
         for (List<Integer> indexes : chunks) {
             List<AiHumanInteractionInbox> chunkEntries = new ArrayList<>(indexes.size());
@@ -126,9 +126,13 @@ public class HumanReplyBatchService {
     }
 
     Optional<Map<String, Object>> buildItem(AiHumanInteractionInbox entry) {
+        return buildItem(entry, configRepository.findById(1).orElse(null));
+    }
+
+    Optional<Map<String, Object>> buildItem(AiHumanInteractionInbox entry, AiUserGenerationConfig config) {
         CommentContext ctx = loadCommentContext(entry);
         if (ctx == null || ctx.humanBody().isBlank()) return Optional.empty();
-        List<Map<String, Object>> candidates = loadCandidateResponders(entry.getPostId());
+        List<Map<String, Object>> candidates = loadCandidateResponders(entry.getPostId(), config);
         if (candidates.isEmpty()) return Optional.empty();
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("postId", entry.getPostId());
@@ -245,7 +249,11 @@ public class HumanReplyBatchService {
      * Caps at {@code candidateRespondersMax}. voiceProfile is a structured Map (not Map.toString()).
      */
     List<Map<String, Object>> loadCandidateResponders(String postId) {
-        int max = Math.max(1, props.getHumanReply().getCandidateRespondersMax());
+        return loadCandidateResponders(postId, configRepository.findById(1).orElse(null));
+    }
+
+    List<Map<String, Object>> loadCandidateResponders(String postId, AiUserGenerationConfig config) {
+        int max = Math.max(1, candidateRespondersMax(config));
         List<String> preferred = loadInterestedPersonaIds(postId, max);
         if (preferred.isEmpty()) {
             preferred = loadPlanItemPersonaIds(postId);
@@ -346,7 +354,8 @@ public class HumanReplyBatchService {
         }
 
         Map<String, Integer> llmReplyCounts = new HashMap<>();
-        Map<String, HumanReplyBudget> budgetsByPost = new HashMap<>();
+        /** Key = postId + ' ' + humanAuthorId (both are 32-char hex ids, so no collision). */
+        Map<String, HumanReplyBudget> budgetsByConversation = new HashMap<>();
         Map<String, AiThreadPlan> plansByPost = new HashMap<>();
         Set<String> answered = new HashSet<>();
         Set<String> budgetBlocked = new HashSet<>();
@@ -370,13 +379,13 @@ public class HumanReplyBatchService {
                     postId -> findUsablePlan(postId, now).orElse(null));
             if (plan == null) continue;
 
-            HumanReplyBudget budget = budgetsByPost.computeIfAbsent(entry.getPostId(), postId -> {
-                OrchestratorProperties.HumanReply cfg = props.getHumanReply();
-                HumanReplyBudget b = new HumanReplyBudget(
-                        cfg.getRepliesPerPostHumanMax(),
-                        cfg.getRepliesPerPersonaPerPostHumanMax(),
-                        cfg.getDistinctPersonasPerPostHumanMax());
-                for (AiThreadPlanItem existing : planItems.findHumanReplyItemsForPost(postId, BUDGET_EXCLUDED)) {
+            // Budget is per conversation = (post, human author), never per post: different humans
+            // on the same post hold independent 3 personas / 5 each / 15 total budgets (§1.1-24).
+            String budgetKey = entry.getPostId() + " " + entry.getAuthorId();
+            HumanReplyBudget budget = budgetsByConversation.computeIfAbsent(budgetKey, k -> {
+                HumanReplyBudget b = newBudget(configRepository.findById(1).orElse(null));
+                for (AiThreadPlanItem existing : planItems.findHumanReplyItemsForPostAndHuman(
+                        entry.getPostId(), entry.getAuthorId(), BUDGET_EXCLUDED)) {
                     b.seed(existing.getPersonaId());
                 }
                 return b;
@@ -407,6 +416,7 @@ public class HumanReplyBatchService {
                         .personaId(persona)
                         .targetPostId(entry.getPostId())
                         .targetCommentId(entry.getSourceCommentId())
+                        .humanAuthorId(entry.getAuthorId())
                         .body(body)
                         .scheduledAt(when)
                         .notBefore(when)
@@ -443,6 +453,33 @@ public class HumanReplyBatchService {
         }
     }
 
+    // ── 댓글 생성량 설정 해석 ────────────────────────────────────────────────
+    // SSOT는 ai_user_generation_config(/admin/ai-user). 컬럼이 0(미설정)이면 application.yml 기본값.
+
+    private static int pick(int configured, int fallback) {
+        return configured > 0 ? configured : fallback;
+    }
+
+    int respondersMax(AiUserGenerationConfig config) {
+        int fallback = props.getHumanReply().getRespondersPerInteractionMax();
+        return config == null ? fallback : pick(config.getHrRespondersPerInteractionMax(), fallback);
+    }
+
+    int candidateRespondersMax(AiUserGenerationConfig config) {
+        int fallback = props.getHumanReply().getCandidateRespondersMax();
+        return config == null ? fallback : pick(config.getHrCandidateRespondersMax(), fallback);
+    }
+
+    HumanReplyBudget newBudget(AiUserGenerationConfig config) {
+        OrchestratorProperties.HumanReply cfg = props.getHumanReply();
+        int distinct = config == null ? cfg.getDistinctPersonasPerPostHumanMax()
+                : pick(config.getHrDistinctPersonasMax(), cfg.getDistinctPersonasPerPostHumanMax());
+        int perPersona = config == null ? cfg.getRepliesPerPersonaPerPostHumanMax()
+                : pick(config.getHrRepliesPerPersonaMax(), cfg.getRepliesPerPersonaPerPostHumanMax());
+        // 총상한은 파생값이라 3x5!=15 같은 불일치 상태가 존재할 수 없다.
+        return new HumanReplyBudget(distinct * perPersona, perPersona, distinct);
+    }
+
     static String humanReplyIdempotencyKey(String inboxId, String personaId) {
         return "human-reply:" + inboxId + ":" + personaId;
     }
@@ -458,8 +495,9 @@ public class HumanReplyBatchService {
         return chunks;
     }
 
-    private int resolvedChunkSize() {
-        int size = props.getHumanReply().getChunkSize();
+    int resolvedChunkSize(AiUserGenerationConfig config) {
+        int fallback = props.getHumanReply().getChunkSize();
+        int size = config == null ? fallback : pick(config.getHrChunkSize(), fallback);
         return size <= 0 ? 20 : size;
     }
 

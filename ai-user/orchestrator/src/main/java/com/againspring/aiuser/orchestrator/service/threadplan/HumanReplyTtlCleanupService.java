@@ -31,7 +31,10 @@ public class HumanReplyTtlCleanupService {
             log.debug("human-reply TTL cleanup skipped (flag off)");
             return CleanupResult.skipped();
         }
-        int reclaimed = inboxService.reclaimStuckProcessing();
+        // Lease-aware: only PROCESSING rows whose lease already expired. Reclaiming every
+        // PROCESSING row would yank in-flight work away from a live batch worker, which then
+        // fails on markResponded ("lease is not owned by worker").
+        int reclaimed = inboxService.reclaimExpiredProcessing(now);
         Instant inboxCutoff = now.minus(Math.max(1, cfg.getInboxTtlDays()), ChronoUnit.DAYS);
         int inboxCancelled = inboxService.cancelExpiredByObservedAt(inboxCutoff);
         Instant planCutoff = now.minus(Math.max(1, cfg.getPlanTtlDays()), ChronoUnit.DAYS);

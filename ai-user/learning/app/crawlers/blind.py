@@ -424,111 +424,114 @@ async def crawl(daily_limit: int = 240) -> List[Dict]:
     post_count = 0
     seen_urls: set = set()
     session = requests.Session()
+    try:
 
-    for idx, (channel_name, category, encoded) in enumerate(CHANNELS):
-        if post_count >= daily_limit:
-            break
-
-        logger.info(f"Blind: 채널 '{channel_name}' 크롤 시작")
-
-        for page in range(1, PAGES_PER_CHANNEL + 1):
+        for idx, (channel_name, category, encoded) in enumerate(CHANNELS):
             if post_count >= daily_limit:
                 break
 
-            page_url = f"{BASE_URL}/kr/topics/{encoded}?page={page}"
-            session.headers.update(random.choice(BROWSER_PROFILES))
+            logger.info(f"Blind: 채널 '{channel_name}' 크롤 시작")
 
-            try:
-                resp = session.get(page_url, timeout=15)
-                if resp.status_code == 403:
-                    logger.warning(f"Blind: 403 on {page_url}")
-                    break
-                resp.raise_for_status()
-            except Exception as e:
-                logger.warning(f"Blind: page error ({page_url}): {e}")
-                break
-
-            await asyncio.sleep(random.uniform(2, 4))
-
-            soup = BeautifulSoup(resp.text, "html.parser")
-            post_urls = []
-            for a in soup.find_all("a", href=True):
-                href = a["href"]
-                if "/kr/post/" in href or "/kr/articles/" in href:
-                    full = href if href.startswith("http") else f"{BASE_URL}{href}"
-                    if full not in seen_urls:
-                        post_urls.append(full)
-                        seen_urls.add(full)
-
-            if not post_urls:
-                logger.warning(f"Blind: 게시글 없음 ({page_url})")
-                break
-
-            for post_url in post_urls:
+            for page in range(1, PAGES_PER_CHANNEL + 1):
                 if post_count >= daily_limit:
                     break
 
+                page_url = f"{BASE_URL}/kr/topics/{encoded}?page={page}"
                 session.headers.update(random.choice(BROWSER_PROFILES))
+
                 try:
-                    post_resp = session.get(post_url, timeout=10)
-                    if post_resp.status_code == 403:
-                        continue
-                    post_resp.raise_for_status()
+                    resp = session.get(page_url, timeout=15)
+                    if resp.status_code == 403:
+                        logger.warning(f"Blind: 403 on {page_url}")
+                        break
+                    resp.raise_for_status()
                 except Exception as e:
-                    logger.debug(f"Blind: post error ({post_url}): {e}")
-                    continue
+                    logger.warning(f"Blind: page error ({page_url}): {e}")
+                    break
 
-                await asyncio.sleep(random.uniform(0.8, 1.5))
+                await asyncio.sleep(random.uniform(2, 4))
 
-                post_soup = BeautifulSoup(post_resp.text, "html.parser")
-                content = _extract_content(post_soup)
-                if not content or len(content) < MIN_CONTENT_LENGTH:
-                    continue
+                soup = BeautifulSoup(resp.text, "html.parser")
+                post_urls = []
+                for a in soup.find_all("a", href=True):
+                    href = a["href"]
+                    if "/kr/post/" in href or "/kr/articles/" in href:
+                        full = href if href.startswith("http") else f"{BASE_URL}{href}"
+                        if full not in seen_urls:
+                            post_urls.append(full)
+                            seen_urls.add(full)
 
-                title = _extract_title(post_soup) or ""
-                if not _has_conflict_keyword(content + " " + title):
-                    logger.debug(f"Blind: 갈등 키워드 없음 ({post_url})")
-                    continue
+                if not post_urls:
+                    logger.warning(f"Blind: 게시글 없음 ({page_url})")
+                    break
 
-                # 통계 정보 추출 — reference는 이 글을 긁는 시점(상대 시간 → 절대 시각 변환 기준)
-                fetch_reference = datetime.now()
-                view_count, like_count, comment_count = _extract_post_stats(post_soup)
-                comment_timestamps = _extract_comment_timestamps(post_soup, fetch_reference)
-                posted_at = _extract_post_date(post_soup, fetch_reference)
+                for post_url in post_urls:
+                    if post_count >= daily_limit:
+                        break
 
-                results.append({
-                    "content": content[:1500],
-                    "content_type": "POST",
-                    "category": category,
-                    "title": title or None,
-                    "source_url": post_url,
-                    "posted_at": posted_at,
-                    "view_count": view_count,
-                    "like_count": like_count,
-                    "comment_count": comment_count,
-                    "comment_timestamps": comment_timestamps,
-                })
-                post_count += 1
-                logger.debug(
-                    f"Blind: 저장 [{channel_name}] {post_url} "
-                    f"(조회:{view_count}, 좋아요:{like_count}, 댓글:{comment_count})"
-                )
+                    session.headers.update(random.choice(BROWSER_PROFILES))
+                    try:
+                        post_resp = session.get(post_url, timeout=10)
+                        if post_resp.status_code == 403:
+                            continue
+                        post_resp.raise_for_status()
+                    except Exception as e:
+                        logger.debug(f"Blind: post error ({post_url}): {e}")
+                        continue
 
-                # COMMENT — 이미 받은 HTML에서 본문 추출 (추가 HTTP 없음). daily_limit은 POST만 카운트.
-                comment_rows = _extract_comments(
-                    post_soup,
-                    fetch_reference,
-                    post_url=post_url,
-                    category=category,
-                )
-                results.extend(comment_rows)
-                if comment_rows:
-                    logger.debug(f"Blind: COMMENT {len(comment_rows)}건 [{channel_name}] {post_url}")
+                    await asyncio.sleep(random.uniform(0.8, 1.5))
 
-        # 채널 간 딜레이 (마지막 채널 제외)
-        if idx < len(CHANNELS) - 1:
-            await asyncio.sleep(random.uniform(3, 6))
+                    post_soup = BeautifulSoup(post_resp.text, "html.parser")
+                    content = _extract_content(post_soup)
+                    if not content or len(content) < MIN_CONTENT_LENGTH:
+                        continue
 
-    comment_total = sum(1 for r in results if r.get("content_type") == "COMMENT")
-    logger.info(f"Blind: 크롤 완료 — POST {post_count} + COMMENT {comment_total} = {len(results)}개 수집")
-    return results
+                    title = _extract_title(post_soup) or ""
+                    if not _has_conflict_keyword(content + " " + title):
+                        logger.debug(f"Blind: 갈등 키워드 없음 ({post_url})")
+                        continue
+
+                    # 통계 정보 추출 — reference는 이 글을 긁는 시점(상대 시간 → 절대 시각 변환 기준)
+                    fetch_reference = datetime.now()
+                    view_count, like_count, comment_count = _extract_post_stats(post_soup)
+                    comment_timestamps = _extract_comment_timestamps(post_soup, fetch_reference)
+                    posted_at = _extract_post_date(post_soup, fetch_reference)
+
+                    results.append({
+                        "content": content[:1500],
+                        "content_type": "POST",
+                        "category": category,
+                        "title": title or None,
+                        "source_url": post_url,
+                        "posted_at": posted_at,
+                        "view_count": view_count,
+                        "like_count": like_count,
+                        "comment_count": comment_count,
+                        "comment_timestamps": comment_timestamps,
+                    })
+                    post_count += 1
+                    logger.debug(
+                        f"Blind: 저장 [{channel_name}] {post_url} "
+                        f"(조회:{view_count}, 좋아요:{like_count}, 댓글:{comment_count})"
+                    )
+
+                    # COMMENT — 이미 받은 HTML에서 본문 추출 (추가 HTTP 없음). daily_limit은 POST만 카운트.
+                    comment_rows = _extract_comments(
+                        post_soup,
+                        fetch_reference,
+                        post_url=post_url,
+                        category=category,
+                    )
+                    results.extend(comment_rows)
+                    if comment_rows:
+                        logger.debug(f"Blind: COMMENT {len(comment_rows)}건 [{channel_name}] {post_url}")
+
+            # 채널 간 딜레이 (마지막 채널 제외)
+            if idx < len(CHANNELS) - 1:
+                await asyncio.sleep(random.uniform(3, 6))
+
+        comment_total = sum(1 for r in results if r.get("content_type") == "COMMENT")
+        logger.info(f"Blind: 크롤 완료 — POST {post_count} + COMMENT {comment_total} = {len(results)}개 수집")
+        return results
+    finally:
+        session.close()

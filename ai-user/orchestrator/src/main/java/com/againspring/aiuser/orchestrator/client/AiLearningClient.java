@@ -14,6 +14,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
@@ -30,6 +31,9 @@ import java.util.Optional;
 @Component
 public class AiLearningClient {
 
+    /** KURE-v1 output width; must match persona_semantic_capsules.embedding VECTOR(1024). */
+    private static final int EMBEDDING_DIMENSIONS = 1024;
+
     private final String baseUrl;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -41,7 +45,12 @@ public class AiLearningClient {
             @Value("${ai-learning.base-url:http://againspring-ai-learning:8099}") String baseUrl,
             ObjectMapper objectMapper) {
         this.baseUrl = baseUrl;
-        this.restTemplate = new RestTemplate();
+        // Bounded timeouts: every call here runs inside the 45-minute nightly batch window.
+        // An unbounded read timeout on a hung ai-learning would consume the whole window.
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3_000);
+        factory.setReadTimeout(15_000);
+        this.restTemplate = new RestTemplate(factory);
         this.objectMapper = objectMapper;
     }
 
@@ -245,6 +254,14 @@ public class AiLearningClient {
             if (resp.getBody() == null || resp.getBody().isBlank()) return Optional.empty();
             EmbedResponse parsed = objectMapper.readValue(resp.getBody(), EmbedResponse.class);
             if (parsed == null || parsed.embedding == null || parsed.embedding.isEmpty()) {
+                return Optional.empty();
+            }
+            // persona_semantic_capsules.embedding is VECTOR(1024); a wrong-width vector would be
+            // written anyway and only fail later inside VEC_DISTANCE_COSINE, silently corrupting
+            // search for that persona. Reject it here instead.
+            if (parsed.embedding.size() != EMBEDDING_DIMENSIONS) {
+                log.warn("AiLearning embed dimension mismatch: expected {} got {} — discarding",
+                        EMBEDDING_DIMENSIONS, parsed.embedding.size());
                 return Optional.empty();
             }
             return Optional.of(parsed.embedding);

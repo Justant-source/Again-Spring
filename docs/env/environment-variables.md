@@ -140,6 +140,7 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 | `AI_USER_HUMAN_REPLY_PER_PERSONA_MAX` | persona당 human-reply 상한 (동일 post×human) | `5` |
 | `AI_USER_HUMAN_REPLY_PER_POST_MAX` | post×human human-reply 총상한 (3×5) | `15` |
 | `AI_USER_HUMAN_REPLY_CANDIDATE_MAX` | LLM에 넘기는 candidateResponders 상한 (interested pool) | `8` |
+| `AI_USER_MATCHER_AUTHOR_THRESHOLD` | WP3 작성자 매칭 점수 하한. 미만이면 신규 persona 자동 생성 경로 | `0.35` |
 | `AI_USER_SCHEDULED_POST_PUBLISHER_ENABLED` | `ai_scheduled_posts` 예약글 발행 gate | `false` |
 | `AI_USER_SCHEDULED_POST_PUBLISHER_CRON` | 예약글 발행 스케줄러 cron (5-field) | `0 * * * * *` |
 | `AI_USER_SCHEDULED_POST_PUBLISH_BATCH_SIZE` | 발행 tick당 최대 처리 행 수 | `5` |

@@ -41,6 +41,15 @@ export interface GenerationConfig {
   candidatePoolSize: number;
   humanBatchMaxPosts: number;
   humanBatchMaxInteractions: number;
+  hrRespondersPerInteractionMax: number;
+  hrDistinctPersonasMax: number;
+  hrRepliesPerPersonaMax: number;
+  hrCandidateRespondersMax: number;
+  hrChunkSize: number;
+  hrDelayMinutesMin: number;
+  hrDelayMinutesMax: number;
+  /** 파생값 = hrDistinctPersonasMax × hrRepliesPerPersonaMax (서버 계산, 전송 불필요) */
+  hrRepliesPerPostHumanMax: number;
 }
 
 export interface UpdateConfigRequest {
@@ -60,6 +69,13 @@ export interface UpdateConfigRequest {
   candidatePoolSize: number;
   humanBatchMaxPosts: number;
   humanBatchMaxInteractions: number;
+  hrRespondersPerInteractionMax: number;
+  hrDistinctPersonasMax: number;
+  hrRepliesPerPersonaMax: number;
+  hrCandidateRespondersMax: number;
+  hrChunkSize: number;
+  hrDelayMinutesMin: number;
+  hrDelayMinutesMax: number;
 }
 
 // ── API calls ────────────────────────────────────────────────────────────

@@ -41,4 +41,18 @@ public class AiUserGenerationConfig {
     @Column(name = "candidate_pool_size") private int candidatePoolSize;
     @Column(name = "human_batch_max_posts") private int humanBatchMaxPosts;
     @Column(name = "human_batch_max_interactions") private int humanBatchMaxInteractions;
+
+    // 댓글 생성량 설정 — SSOT는 /admin/ai-user. 0이면 미설정으로 보고 properties 기본값을 쓴다.
+    @Column(name = "hr_responders_per_interaction_max") private int hrRespondersPerInteractionMax;
+    @Column(name = "hr_distinct_personas_max")         private int hrDistinctPersonasMax;
+    @Column(name = "hr_replies_per_persona_max")       private int hrRepliesPerPersonaMax;
+    @Column(name = "hr_candidate_responders_max")      private int hrCandidateRespondersMax;
+    @Column(name = "hr_chunk_size")                    private int hrChunkSize;
+    @Column(name = "hr_delay_minutes_min")             private int hrDelayMinutesMin;
+    @Column(name = "hr_delay_minutes_max")             private int hrDelayMinutesMax;
+
+    /** 대화 총상한은 저장하지 않는다 — distinct × perPersona 파생값. */
+    public int hrRepliesPerPostHumanMax() {
+        return hrDistinctPersonasMax * hrRepliesPerPersonaMax;
+    }
 }

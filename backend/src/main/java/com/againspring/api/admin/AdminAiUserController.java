@@ -112,6 +112,18 @@ public class AdminAiUserController {
         cfg.setHumanBatchMaxPosts(clamp(req.humanBatchMaxPosts, 1, 10));
         cfg.setHumanBatchMaxInteractions(clamp(req.humanBatchMaxInteractions, 1, 50));
 
+        // ── 댓글 생성량 설정 (SSOT) ────────────────────────────────────
+        cfg.setHrRespondersPerInteractionMax(clamp(req.hrRespondersPerInteractionMax, 0, 5));
+        cfg.setHrDistinctPersonasMax(clamp(req.hrDistinctPersonasMax, 1, 10));
+        cfg.setHrRepliesPerPersonaMax(clamp(req.hrRepliesPerPersonaMax, 1, 10));
+        cfg.setHrCandidateRespondersMax(clamp(req.hrCandidateRespondersMax, 1, 50));
+        cfg.setHrChunkSize(clamp(req.hrChunkSize, 1, 50));
+        int delayMin = clamp(req.hrDelayMinutesMin, 1, 720);
+        int delayMax = clamp(req.hrDelayMinutesMax, 1, 720);
+        // min>max 역전 방지: 뒤집힌 입력은 정렬해서 저장한다.
+        cfg.setHrDelayMinutesMin(Math.min(delayMin, delayMax));
+        cfg.setHrDelayMinutesMax(Math.max(delayMin, delayMax));
+
         // ── 메타 ──────────────────────────────────────────────────────
         String actor = (auth != null) ? auth.getName() : "unknown";
         cfg.setUpdatedBy(actor);
@@ -295,6 +307,10 @@ public class AdminAiUserController {
                 cfg.getProviderHumanPostPlan(), cfg.getProviderHumanInteraction(), cfg.getProviderVoteLike(),
                 cfg.isScheduleExecutionPaused(), cfg.isAiUserKillSwitch(),
                 cfg.getCandidatePoolSize(), cfg.getHumanBatchMaxPosts(), cfg.getHumanBatchMaxInteractions(),
+                cfg.getHrRespondersPerInteractionMax(), cfg.getHrDistinctPersonasMax(),
+                cfg.getHrRepliesPerPersonaMax(), cfg.getHrRepliesPerPostHumanMax(),
+                cfg.getHrCandidateRespondersMax(), cfg.getHrChunkSize(),
+                cfg.getHrDelayMinutesMin(), cfg.getHrDelayMinutesMax(),
                 cfg.getUpdatedBy(), cfg.getUpdatedAt() != null ? cfg.getUpdatedAt().toString() : null,
                 RATIO_COMMENT, RATIO_REPLY, RATIO_VOTE, RATIO_LIKE,
                 est
@@ -422,6 +438,14 @@ public class AdminAiUserController {
         private int candidatePoolSize = 24;
         private int humanBatchMaxPosts = 10;
         private int humanBatchMaxInteractions = 50;
+        // 댓글 생성량 설정 (SSOT)
+        private int hrRespondersPerInteractionMax = 3;
+        private int hrDistinctPersonasMax = 3;
+        private int hrRepliesPerPersonaMax = 5;
+        private int hrCandidateRespondersMax = 8;
+        private int hrChunkSize = 20;
+        private int hrDelayMinutesMin = 1;
+        private int hrDelayMinutesMax = 30;
     }
 
     @Getter @AllArgsConstructor
@@ -442,6 +466,15 @@ public class AdminAiUserController {
         private final int candidatePoolSize;
         private final int humanBatchMaxPosts;
         private final int humanBatchMaxInteractions;
+        private final int hrRespondersPerInteractionMax;
+        private final int hrDistinctPersonasMax;
+        private final int hrRepliesPerPersonaMax;
+        /** 파생값 = distinct × perPersona. 저장하지 않는다. */
+        private final int hrRepliesPerPostHumanMax;
+        private final int hrCandidateRespondersMax;
+        private final int hrChunkSize;
+        private final int hrDelayMinutesMin;
+        private final int hrDelayMinutesMax;
         private final String  updatedBy;
         private final String  updatedAt;
         private final double  ratioComment;

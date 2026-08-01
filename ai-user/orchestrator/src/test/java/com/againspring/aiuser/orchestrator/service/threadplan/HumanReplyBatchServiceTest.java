@@ -139,7 +139,7 @@ class HumanReplyBatchServiceTest {
         when(personaRepository.existsById("p1")).thenReturn(true);
         when(personaRepository.existsById("p2")).thenReturn(true);
         when(guard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
-        when(planItems.findHumanReplyItemsForPost(eq("post-1"), any())).thenReturn(List.of());
+        when(planItems.findHumanReplyItemsForPostAndHuman(eq("post-1"), any(), any())).thenReturn(List.of());
         when(planItems.existsByIdempotencyKey(anyString())).thenReturn(false);
         when(planItems.save(any())).thenAnswer(inv -> {
             AiThreadPlanItem item = inv.getArgument(0);
@@ -157,6 +157,60 @@ class HumanReplyBatchServiceTest {
         assertThat(captor.getAllValues()).extracting(AiThreadPlanItem::getIdempotencyKey)
                 .containsExactlyInAnyOrder("human-reply:inbox-1:p1", "human-reply:inbox-1:p2");
         verify(inbox, times(1)).markResponded(eq("inbox-1"), eq("human-reply-batch"), anyString(), eq(1));
+    }
+
+    /**
+     * Regression: the budget must be scoped to (post, human), not to the post. When it was keyed
+     * by post alone, the first human on a post consumed the shared 3x5=15 budget and every later
+     * human got zero AI replies (design 1.1-24: independent budgets per human).
+     */
+    @Test
+    void persistScopesBudgetPerHumanNotPerPost() {
+        Instant now = Instant.parse("2026-08-01T12:00:00Z");
+        AiHumanInteractionInbox alice = AiHumanInteractionInbox.builder()
+                .id("inbox-a").postId("post-1").sourceCommentId("42")
+                .authorId("alice").interactionType("COMMENT")
+                .status(HumanInteractionStatus.PROCESSING)
+                .observedAt(now).expiresAt(now.plusSeconds(3600)).leaseOwner("human-reply-batch")
+                .build();
+        AiHumanInteractionInbox bob = AiHumanInteractionInbox.builder()
+                .id("inbox-b").postId("post-1").sourceCommentId("43")
+                .authorId("bob").interactionType("COMMENT")
+                .status(HumanInteractionStatus.PROCESSING)
+                .observedAt(now).expiresAt(now.plusSeconds(3600)).leaseOwner("human-reply-batch")
+                .build();
+        when(plans.findTopByPostIdOrderByPostRevisionDesc("post-1")).thenReturn(Optional.of(
+                AiThreadPlan.builder().id("plan-1").postId("post-1")
+                        .absoluteExpiresAt(now.plusSeconds(86400)).build()));
+        when(personaRepository.existsById(anyString())).thenReturn(true);
+        when(guard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+        when(planItems.existsByIdempotencyKey(anyString())).thenReturn(false);
+        when(planItems.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Alice already used her whole budget: 3 personas x 5 replies = 15.
+        List<AiThreadPlanItem> aliceUsed = new java.util.ArrayList<>();
+        for (String persona : List.of("pa", "pb", "pc")) {
+            for (int i = 0; i < 5; i++) {
+                aliceUsed.add(AiThreadPlanItem.builder().personaId(persona).build());
+            }
+        }
+        when(planItems.findHumanReplyItemsForPostAndHuman(eq("post-1"), eq("alice"), any()))
+                .thenReturn(aliceUsed);
+        when(planItems.findHumanReplyItemsForPostAndHuman(eq("post-1"), eq("bob"), any()))
+                .thenReturn(List.of());
+
+        service.persist("human-reply-batch", List.of(alice, bob), Map.of("replies", List.of(
+                Map.of("humanCommentId", 42, "personaId", "pd", "body", "앨리스에게 답"),
+                Map.of("humanCommentId", 43, "personaId", "pd", "body", "밥에게 답"))), now);
+
+        ArgumentCaptor<AiThreadPlanItem> captor = ArgumentCaptor.forClass(AiThreadPlanItem.class);
+        verify(planItems).save(captor.capture());
+        AiThreadPlanItem saved = captor.getValue();
+        // Alice is exhausted; Bob's independent budget still allows his reply.
+        assertThat(saved.getTargetCommentId()).isEqualTo("43");
+        assertThat(saved.getHumanAuthorId()).isEqualTo("bob");
+        verify(inbox).markSkipped("inbox-a", "human-reply-batch",
+                HumanReplyBatchService.FAILURE_BUDGET_EXHAUSTED);
     }
 
     @Test
@@ -190,7 +244,7 @@ class HumanReplyBatchServiceTest {
                         .absoluteExpiresAt(now.plusSeconds(86400)).build()));
         when(personaRepository.existsById("p1")).thenReturn(true);
         when(guard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
-        when(planItems.findHumanReplyItemsForPost(eq("post-1"), any())).thenReturn(List.of());
+        when(planItems.findHumanReplyItemsForPostAndHuman(eq("post-1"), any(), any())).thenReturn(List.of());
         when(planItems.existsByIdempotencyKey(anyString())).thenReturn(false);
         when(planItems.save(any())).thenAnswer(inv -> {
             AiThreadPlanItem item = inv.getArgument(0);
@@ -224,7 +278,7 @@ class HumanReplyBatchServiceTest {
                         .absoluteExpiresAt(now.plusSeconds(86400)).build()));
         when(personaRepository.existsById("p1")).thenReturn(true);
         when(guard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
-        when(planItems.findHumanReplyItemsForPost(eq("post-1"), any())).thenReturn(List.of());
+        when(planItems.findHumanReplyItemsForPostAndHuman(eq("post-1"), any(), any())).thenReturn(List.of());
         when(planItems.existsByIdempotencyKey(anyString())).thenReturn(false);
         when(planItems.save(any())).thenAnswer(inv -> {
             AiThreadPlanItem item = inv.getArgument(0);

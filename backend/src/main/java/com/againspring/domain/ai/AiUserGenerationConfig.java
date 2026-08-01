@@ -46,6 +46,22 @@ public class AiUserGenerationConfig {
     @Column(name = "human_batch_max_posts", nullable = false) @Builder.Default private int humanBatchMaxPosts = 10;
     @Column(name = "human_batch_max_interactions", nullable = false) @Builder.Default private int humanBatchMaxInteractions = 50;
 
+    // ── 댓글 생성량 설정 (SSOT: /admin/ai-user) ──────────────────────────────
+    // 총 상한(15)은 저장하지 않는다: distinct × perPersona 로 항상 파생 → 3×5≠15 상태가 불가능.
+    @Column(name = "hr_responders_per_interaction_max", nullable = false) @Builder.Default private int hrRespondersPerInteractionMax = 3;
+    @Column(name = "hr_distinct_personas_max", nullable = false)         @Builder.Default private int hrDistinctPersonasMax = 3;
+    @Column(name = "hr_replies_per_persona_max", nullable = false)       @Builder.Default private int hrRepliesPerPersonaMax = 5;
+    @Column(name = "hr_candidate_responders_max", nullable = false)      @Builder.Default private int hrCandidateRespondersMax = 8;
+    @Column(name = "hr_chunk_size", nullable = false)                    @Builder.Default private int hrChunkSize = 20;
+    @Column(name = "hr_delay_minutes_min", nullable = false)             @Builder.Default private int hrDelayMinutesMin = 1;
+    @Column(name = "hr_delay_minutes_max", nullable = false)             @Builder.Default private int hrDelayMinutesMax = 30;
+
+    /** 한 사람×한 게시글 대화의 AI 답글 총상한. 저장값이 아니라 파생값이다. */
+    @Transient
+    public int getHrRepliesPerPostHumanMax() {
+        return hrDistinctPersonasMax * hrRepliesPerPersonaMax;
+    }
+
     // ── 메타 ──────────────────────────────────────────────────────────────
     @Column(name = "updated_by", length = 32)
     private String updatedBy;

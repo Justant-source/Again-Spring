@@ -52,10 +52,15 @@ public interface AiThreadPlanItemRepository extends JpaRepository<AiThreadPlanIt
             @Param("types") Collection<ThreadPlanItemType> types,
             @Param("statuses") Collection<ThreadPlanItemStatus> statuses);
 
-    /** Human-reply budget rows: idempotency_key {@code human-reply:…} excluding terminal failures. */
+    /**
+     * Human-reply budget rows for ONE conversation: (post, human author). Scoping by post alone
+     * would let the first human exhaust the shared 3x5=15 budget for everyone else on that post.
+     */
     @Query("select i from AiThreadPlanItem i where i.targetPostId = :postId " +
+           "and i.humanAuthorId = :humanAuthorId " +
            "and i.idempotencyKey like 'human-reply:%' and i.status not in :excluded")
-    List<AiThreadPlanItem> findHumanReplyItemsForPost(
+    List<AiThreadPlanItem> findHumanReplyItemsForPostAndHuman(
             @Param("postId") String postId,
+            @Param("humanAuthorId") String humanAuthorId,
             @Param("excluded") Collection<ThreadPlanItemStatus> excluded);
 }

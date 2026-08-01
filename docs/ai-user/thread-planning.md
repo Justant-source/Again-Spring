@@ -87,7 +87,11 @@ flowchart LR
 |---|---|---|
 | idempotency key | `human-reply:{inboxId}:{personaId}` | W6-A. 구키 `human-reply:{sourceCommentId}` 행은 in-place 마이그레이션하지 않음(충돌 시 새 키만 사용·로그) |
 | responders / interaction | **0~3** | 흥미 부족이면 0명(`NO_RESPONSE`)이 정상 |
-| 대화 예산 | distinct persona ≤**3** · persona당 ≤**5** · post×human ≤**15** (3×5) | 절대 상한. 여러 댓글 root가 동일 budget 공유 |
+| 대화 예산 | distinct persona ≤**3** · persona당 ≤**5** · post×human ≤**15** (3×5) | 절대 상한. 같은 사람의 여러 댓글 root는 budget 공유, **다른 사람은 완전 독립**(V15 `human_author_id`로 분리) |
+
+> **설정 SSOT**: 위 수치는 `ai_user_generation_config.hr_*`(backend V91)가 기준이며 `/admin/ai-user`의 **댓글 생성량 설정** 박스에서 관리한다.
+> orchestrator는 컬럼이 0(미설정)일 때만 `application.yml` 기본값으로 폴백한다.
+> 총상한은 저장하지 않고 `distinct × perPersona`로 파생하므로 `3×5≠15` 같은 불일치 상태가 존재할 수 없다.
 | chunk | **20** interactions / LLM 호출 | `AI_USER_HUMAN_REPLY_CHUNK_SIZE` |
 | 자동 재시도 | `automatic_attempts_max=2` (최초+1) | 두 번 모두 빈 응답이면 종료 |
 | delay | 1~30분 | LLM `delayMinutes` 또는 설정 범위 랜덤 |

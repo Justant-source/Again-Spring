@@ -31,12 +31,8 @@ public interface AiHumanInteractionInboxRepository extends JpaRepository<AiHuman
                              @Param("pending") HumanInteractionStatus pending,
                              @Param("now") Instant now);
 
-    /** Reclaim every stuck PROCESSING lease so rows become PENDING again (admin TTL cleanup path). */
-    @Modifying
-    @Query("update AiHumanInteractionInbox i set i.status = :pending, i.leaseOwner = null, i.leaseUntil = null " +
-           "where i.status = :processing")
-    int reclaimAllProcessing(@Param("processing") HumanInteractionStatus processing,
-                             @Param("pending") HumanInteractionStatus pending);
+    // Deliberately no unconditional "reclaim every PROCESSING row" query: it would steal rows
+    // from a live batch worker mid-flight. Use recoverExpiredLeases(now) instead.
 
     @Modifying
     @Query("update AiHumanInteractionInbox i set i.status = :expired where i.status in (:pending, :processing) and i.expiresAt <= :now")

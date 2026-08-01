@@ -105,11 +105,15 @@ public class HumanInteractionInboxService {
                 HumanInteractionStatus.PROCESSING, HumanInteractionStatus.EXPIRED, now);
     }
 
-    /** Force every PROCESSING lease back to PENDING so the batch can re-claim them. */
+    /**
+     * Reclaim only PROCESSING rows whose lease already expired. Prod's stranded rows all have a
+     * long-past {@code lease_until}, so this recovers them without stealing work from a live
+     * batch worker (which would then fail on {@code markResponded} with a lease-owner mismatch).
+     */
     @Transactional
-    public int reclaimStuckProcessing() {
-        return inboxRepository.reclaimAllProcessing(
-                HumanInteractionStatus.PROCESSING, HumanInteractionStatus.PENDING);
+    public int reclaimExpiredProcessing(Instant now) {
+        return inboxRepository.recoverExpiredLeases(
+                HumanInteractionStatus.PROCESSING, HumanInteractionStatus.PENDING, now);
     }
 
     /**

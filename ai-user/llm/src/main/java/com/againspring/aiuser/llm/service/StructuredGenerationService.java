@@ -242,7 +242,7 @@ public class StructuredGenerationService {
             grounding.append("\nAUTHOR=").append(json(req.getAuthor()));
         }
         if (req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
-            grounding.append("\nSOURCE_CONTEXT=").append(json(req.getSourceContext()));
+            grounding.append("\nSOURCE_CONTEXT=").append(json(cleanValues(req.getSourceContext())));
         }
         boolean reconstruct = Boolean.TRUE.equals(req.getReconstructMode());
         if (reconstruct) {
@@ -348,5 +348,17 @@ public class StructuredGenerationService {
     private static double koreanRatio(String v) { long k=v.chars().filter(c -> c >= 0xAC00 && c <= 0xD7A3).count(); long letters=v.chars().filter(Character::isLetter).count(); return letters == 0 ? 1 : (double) k / letters; }
     private static boolean blank(String s) { return s == null || s.isBlank(); }
     private static String clean(String s) { return s == null ? "" : s.replace('<','＜').replace('>','＞').replaceAll("[\\p{Cntrl}&&[^\\n\\t]]", "").substring(0, Math.min(s.length(), 5000)); }
+    /**
+     * Crawled third-party text reaches the prompt through sourceContext. Jackson escapes it
+     * structurally, but the project's prompt-injection defense is {@code clean()} (control-char
+     * strip + fullwidth &lt;&gt;), so apply it to every string value before serialising.
+     */
+    private static Map<String, Object> cleanValues(Map<String, Object> raw) {
+        if (raw == null || raw.isEmpty()) return raw;
+        Map<String, Object> out = new LinkedHashMap<>();
+        raw.forEach((k, v) -> out.put(k, v instanceof String str ? clean(str) : v));
+        return out;
+    }
+
     private static String json(Object value) { try { return JSON.writeValueAsString(value); } catch (Exception e) { throw new IllegalArgumentException("Cannot serialize structured prompt input", e); } }
 }

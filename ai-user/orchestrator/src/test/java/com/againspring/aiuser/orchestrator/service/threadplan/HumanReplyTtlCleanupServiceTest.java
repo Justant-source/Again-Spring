@@ -46,7 +46,7 @@ class HumanReplyTtlCleanupServiceTest {
     @Test
     void forceRunsEvenWhenFlagOff() {
         Instant now = Instant.parse("2026-08-01T12:00:00Z");
-        when(inboxService.reclaimStuckProcessing()).thenReturn(35);
+        when(inboxService.reclaimExpiredProcessing(any())).thenReturn(35);
         when(inboxService.cancelExpiredByObservedAt(any())).thenReturn(300);
         when(planRepository.expireRequestedOlderThan(any(), any(), any(), any())).thenReturn(100);
 
@@ -68,11 +68,11 @@ class HumanReplyTtlCleanupServiceTest {
     void enabledFlagRunsWithoutForce() {
         humanReply.setTtlCleanupEnabled(true);
         Instant now = Instant.parse("2026-08-01T12:00:00Z");
-        when(inboxService.reclaimStuckProcessing()).thenReturn(0);
+        when(inboxService.reclaimExpiredProcessing(any())).thenReturn(0);
         when(inboxService.cancelExpiredByObservedAt(any())).thenReturn(0);
         when(planRepository.expireRequestedOlderThan(any(), any(), any(), any())).thenReturn(0);
 
         assertThat(service.run(now, false).ran()).isTrue();
-        verify(inboxService).reclaimStuckProcessing();
+        verify(inboxService).reclaimExpiredProcessing(any());
     }
 }

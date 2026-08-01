@@ -269,6 +269,14 @@ export default function AiUserPage() {
   const [candidatePoolSize, setCandidatePoolSize] = useState(24);
   const [humanBatchMaxPosts, setHumanBatchMaxPosts] = useState(10);
   const [humanBatchMaxInteractions, setHumanBatchMaxInteractions] = useState(50);
+  // 댓글 생성량 설정 (SSOT: ai_user_generation_config)
+  const [hrRespondersPerInteractionMax, setHrRespondersPerInteractionMax] = useState(3);
+  const [hrDistinctPersonasMax, setHrDistinctPersonasMax] = useState(3);
+  const [hrRepliesPerPersonaMax, setHrRepliesPerPersonaMax] = useState(5);
+  const [hrCandidateRespondersMax, setHrCandidateRespondersMax] = useState(8);
+  const [hrChunkSize, setHrChunkSize] = useState(20);
+  const [hrDelayMinutesMin, setHrDelayMinutesMin] = useState(1);
+  const [hrDelayMinutesMax, setHrDelayMinutesMax] = useState(30);
 
   // ── 진행 현황 상태 ───────────────────────────────────────────────
   const [genStatus, setGenStatus] = useState<GenerationStatus | null>(null);
@@ -306,6 +314,13 @@ export default function AiUserPage() {
     setCandidatePoolSize(cfg.candidatePoolSize ?? 24);
     setHumanBatchMaxPosts(cfg.humanBatchMaxPosts ?? 10);
     setHumanBatchMaxInteractions(cfg.humanBatchMaxInteractions ?? 50);
+    setHrRespondersPerInteractionMax(cfg.hrRespondersPerInteractionMax ?? 3);
+    setHrDistinctPersonasMax(cfg.hrDistinctPersonasMax ?? 3);
+    setHrRepliesPerPersonaMax(cfg.hrRepliesPerPersonaMax ?? 5);
+    setHrCandidateRespondersMax(cfg.hrCandidateRespondersMax ?? 8);
+    setHrChunkSize(cfg.hrChunkSize ?? 20);
+    setHrDelayMinutesMin(cfg.hrDelayMinutesMin ?? 1);
+    setHrDelayMinutesMax(cfg.hrDelayMinutesMax ?? 30);
   }
 
   // ── 자동 비율 연동 ─────────────────────────────────────────────────
@@ -340,6 +355,13 @@ export default function AiUserPage() {
       candidatePoolSize,
       humanBatchMaxPosts,
       humanBatchMaxInteractions,
+      hrRespondersPerInteractionMax,
+      hrDistinctPersonasMax,
+      hrRepliesPerPersonaMax,
+      hrCandidateRespondersMax,
+      hrChunkSize,
+      hrDelayMinutesMin,
+      hrDelayMinutesMax,
     };
     try {
       const cfg = await updateGenerationConfig(req);
@@ -474,6 +496,84 @@ export default function AiUserPage() {
                   <div className="text-lg font-mono font-semibold text-gray-600">{likes.toLocaleString()}</div>
                   <div className="text-[11px] text-gray-400">글 × {ratios.like}</div>
                 </div>
+              </div>
+            </div>
+          </AdminSection>
+
+          {/* 댓글 생성량 설정 — human-reply 규칙의 SSOT */}
+          <AdminSection title="댓글 생성량 설정">
+            <div className="px-1 space-y-4">
+              <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs text-blue-800">
+                사람이 남긴 댓글에 AI 유저가 답글을 다는 규칙입니다. 여기 값이 유일한 기준이며,
+                30분 주기 배치가 저장 즉시 반영합니다.
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="hr-responders-max" className="text-xs text-gray-500">댓글 1건당 답글 수</Label>
+                  <Input id="hr-responders-max" type="number" min={0} max={5} value={hrRespondersPerInteractionMax}
+                    onChange={e => setHrRespondersPerInteractionMax(Math.max(0, Math.min(5, Number(e.target.value))))} className="h-8" />
+                  <div className="text-[11px] text-gray-400">사람 댓글 하나에 붙는 AI 답글 상한. 0건도 정상입니다.</div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="hr-distinct-personas" className="text-xs text-gray-500">대화 참여 AI 유저 수</Label>
+                  <Input id="hr-distinct-personas" type="number" min={1} max={10} value={hrDistinctPersonasMax}
+                    onChange={e => setHrDistinctPersonasMax(Math.max(1, Math.min(10, Number(e.target.value))))} className="h-8" />
+                  <div className="text-[11px] text-gray-400">같은 글·같은 사람과의 대화에 들어올 수 있는 서로 다른 AI 유저 수.</div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="hr-per-persona" className="text-xs text-gray-500">AI 유저 1명당 답글 수</Label>
+                  <Input id="hr-per-persona" type="number" min={1} max={10} value={hrRepliesPerPersonaMax}
+                    onChange={e => setHrRepliesPerPersonaMax(Math.max(1, Math.min(10, Number(e.target.value))))} className="h-8" />
+                  <div className="text-[11px] text-gray-400">한 AI 유저가 그 대화에서 답글을 다는 횟수 상한.</div>
+                </div>
+              </div>
+
+              <div className="rounded-md border bg-gray-50 px-3 py-2.5">
+                <div className="text-xs text-gray-500">대화 총상한 (자동 계산)</div>
+                <div className="text-lg font-mono font-semibold text-gray-700">
+                  {hrDistinctPersonasMax} × {hrRepliesPerPersonaMax} = {hrDistinctPersonasMax * hrRepliesPerPersonaMax}개
+                </div>
+                <div className="text-[11px] text-gray-400 mt-1">
+                  한 사람이 한 글에서 받는 AI 답글 총합입니다. 위 두 값에서 자동으로 계산되므로 따로 저장하지 않습니다.
+                  다른 사람과의 대화는 이 한도를 공유하지 않고 각자 새로 시작합니다.
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
+                <div className="space-y-1">
+                  <Label htmlFor="hr-candidate-max" className="text-xs text-gray-500">글당 답글 후보 AI 유저 수</Label>
+                  <Input id="hr-candidate-max" type="number" min={1} max={50} value={hrCandidateRespondersMax}
+                    onChange={e => setHrCandidateRespondersMax(Math.max(1, Math.min(50, Number(e.target.value))))} className="h-8" />
+                  <div className="text-[11px] text-gray-400">그 글에 관심 있는 AI 유저 중 몇 명까지 후보로 올릴지. 이 안에서만 답글이 나옵니다.</div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="hr-chunk-size" className="text-xs text-gray-500">호출 1회당 처리 댓글 수</Label>
+                  <Input id="hr-chunk-size" type="number" min={1} max={50} value={hrChunkSize}
+                    onChange={e => setHrChunkSize(Math.max(1, Math.min(50, Number(e.target.value))))} className="h-8" />
+                  <div className="text-[11px] text-gray-400">이 수를 넘으면 그만큼 호출을 나눠 보냅니다. 클수록 호출 수는 줄고 한 번에 오래 걸립니다.</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="hr-delay-min" className="text-xs text-gray-500">답글 게시 지연 최소(분)</Label>
+                  <Input id="hr-delay-min" type="number" min={1} max={720} value={hrDelayMinutesMin}
+                    onChange={e => setHrDelayMinutesMin(Math.max(1, Math.min(720, Number(e.target.value))))} className="h-8" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="hr-delay-max" className="text-xs text-gray-500">답글 게시 지연 최대(분)</Label>
+                  <Input id="hr-delay-max" type="number" min={1} max={720} value={hrDelayMinutesMax}
+                    onChange={e => setHrDelayMinutesMax(Math.max(1, Math.min(720, Number(e.target.value))))} className="h-8" />
+                </div>
+              </div>
+              {hrDelayMinutesMin > hrDelayMinutesMax && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  최소가 최대보다 큽니다. 저장하면 두 값을 바꿔서 기록합니다.
+                </div>
+              )}
+              <div className="text-[11px] text-gray-400">
+                답글은 배치 실행 시점에서 이 범위 안의 임의 시각에 올라갑니다. 사람 댓글 직후 동시에 몰리지 않게 하는 값입니다.
               </div>
             </div>
           </AdminSection>
