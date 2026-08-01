@@ -3,6 +3,7 @@
 인증 불필요, ?page=N 페이지네이션, 갈등 키워드 필터
 """
 import asyncio
+import hashlib
 import logging
 import random
 import re
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://www.teamblind.com"
 PAGES_PER_CHANNEL = 2   # 채널당 2페이지 × ~40개 = ~80개
 MIN_CONTENT_LENGTH = 100
+MIN_COMMENT_LENGTH = 2  # 댓글은 문체 앵커용 — 짧은 한줄도 수집
 
 # (채널 한글명, category값, URL-encoded 경로)
 CHANNELS = [
@@ -135,7 +137,6 @@ def _parse_numeric_with_unit(text: str) -> int | None:
 
     숫자가 없으면 None 반환 (예: "좋아요좋아요"는 무시)
     """
-    import re
     if not text:
         return None
     try:
@@ -155,6 +156,57 @@ def _parse_numeric_with_unit(text: str) -> int | None:
         return None
 
 
+def _visible_text(el) -> str:
+    """스크린리더 전용(.blind) 라벨을 제외한 표시 텍스트."""
+    if el is None:
+        return ""
+    parts: list[str] = []
+    for child in el.children:
+        if getattr(child, "name", None) is not None:
+            classes = child.get("class") or []
+            if "blind" in classes:
+                continue
+            parts.append(child.get_text(strip=True))
+        else:
+            text = str(child).strip()
+            if text:
+                parts.append(text)
+    return "".join(parts).strip() or el.get_text(strip=True)
+
+
+def _parse_like_element(el) -> int | None:
+    """블라인드 좋아요 엘리먼트 파싱.
+
+    SSR에서 좋아요 0은 숫자 없이 '좋아요'만 노출된다 (`좋아요좋아요` = blind라벨+표시).
+    예전 파서는 숫자를 못 찾으면 None → like 커버리지 ~18.9%. 0으로 해석하면 커버리지가 올라간다.
+    추천 글 목록의 span.like는 호출 측에서 제외해야 한다.
+    """
+    if el is None:
+        return None
+    text = _visible_text(el)
+    num = _parse_numeric_with_unit(text)
+    if num is not None:
+        return num
+    # 숫자 없는 좋아요 센티널 → 0
+    cleaned = re.sub(r"좋아요수?", "", text).strip()
+    if cleaned == "" or cleaned == "좋아요":
+        return 0
+    if text in ("좋아요", "좋아요좋아요", "좋아요수좋아요"):
+        return 0
+    return None
+
+
+def _is_recommended_or_list_like(el) -> bool:
+    """추천 글·토픽 베스트 등 사이드 목록의 like 엘리먼트인지."""
+    for parent in el.parents:
+        classes = parent.get("class") or []
+        if any(c.startswith("rcmd_") for c in classes):
+            return True
+        if "article-list" in classes or "article-list-pre" in classes:
+            return True
+    return False
+
+
 def _extract_post_stats(soup: BeautifulSoup) -> tuple[int | None, int | None, int | None]:
     """메인 게시글의 조회수, 좋아요수, 댓글수 추출
 
@@ -170,28 +222,31 @@ def _extract_post_stats(soup: BeautifulSoup) -> tuple[int | None, int | None, in
         if not main:
             return None, None, None
 
-        # 첫 번째 wrap-info에서 조회수/댓글수 추출
+        # 첫 번째 wrap-info에서 조회수/댓글수 추출 (article-view-head)
         first_wrap = main.find("div", class_="wrap-info")
         if first_wrap:
             # 조회수 (span.pv)
             pv_span = first_wrap.find("span", class_="pv")
             if pv_span:
-                pv_text = pv_span.get_text(strip=True)
-                view_count = _parse_numeric_with_unit(pv_text)
+                view_count = _parse_numeric_with_unit(_visible_text(pv_span) or pv_span.get_text(strip=True))
 
             # 댓글수 (span.cmt)
             cmt_span = first_wrap.find("span", class_="cmt")
             if cmt_span:
-                cmt_text = cmt_span.get_text(strip=True)
-                comment_count = _parse_numeric_with_unit(cmt_text)
+                comment_count = _parse_numeric_with_unit(_visible_text(cmt_span) or cmt_span.get_text(strip=True))
 
-        # 좋아요수 (첫 번째 span.like, wrap-comment 부모가 아닌 것)
-        for like_span in main.find_all("span", class_="like"):
-            # 부모가 wrap-comment가 아닌 경우 = 메인 게시글의 좋아요
-            if not like_span.find_parent("div", class_="wrap-comment"):
-                like_text = like_span.get_text(strip=True)
-                like_count = _parse_numeric_with_unit(like_text)
+        # 좋아요 — 본문 액션바(div.article-view-contents div.info span.like) 우선.
+        # 예전: 첫 span.like를 break → 0건은 None, 추천글 like를 잘못 집을 위험.
+        like_el = main.select_one("div.article-view-contents div.info span.like")
+        if like_el is None:
+            for like_span in main.find_all("span", class_="like"):
+                if like_span.find_parent("div", class_="wrap-comment"):
+                    continue
+                if _is_recommended_or_list_like(like_span):
+                    continue
+                like_el = like_span
                 break
+        like_count = _parse_like_element(like_el)
     except Exception as e:
         logger.debug(f"Blind: stats extraction error: {e}")
 
@@ -283,23 +338,101 @@ def _extract_comment_timestamps(soup: BeautifulSoup, reference: datetime) -> lis
     return timestamps if timestamps else None
 
 
+def _extract_comment_author(comment_el) -> str | None:
+    """댓글 작성자 닉네임 (마스킹된 형태 그대로)."""
+    name_el = comment_el.find("p", class_="name")
+    if not name_el:
+        return None
+    text = " ".join(name_el.get_text(" ", strip=True).split())
+    if not text:
+        return None
+    # "롯데건설 · U*****" / "비공개 · I******** 작성자" → 뒤쪽 닉네임 우선
+    if "·" in text:
+        tail = text.split("·")[-1].strip()
+        # "작성자" 배지 제거
+        tail = re.sub(r"\s*작성자\s*$", "", tail).strip()
+        return (tail or text)[:100]
+    return text[:100]
+
+
+def _extract_comments(
+    soup: BeautifulSoup,
+    reference: datetime,
+    *,
+    post_url: str,
+    category: str,
+) -> list[dict]:
+    """div.wrap-comment에서 댓글 본문을 추출해 COMMENT 행 dict 목록으로 반환.
+
+    source_url은 `{post_url}#comment-{id}`로 유니크하게 둬 crawl.py URL dedup을 통과시킨다.
+    COMMENT는 popularity 대상이 아니라 문체 앵커이므로 view/comment_count는 넣지 않는다.
+    """
+    rows: list[dict] = []
+    try:
+        main = soup.find("main")
+        if not main:
+            return rows
+
+        for comment in main.find_all("div", class_="wrap-comment"):
+            body_el = comment.find("p", class_="cmt-txt")
+            if not body_el:
+                continue
+            content = body_el.get_text(" ", strip=True)
+            if not content or len(content) < MIN_COMMENT_LENGTH:
+                continue
+
+            comment_id = comment.get("id") or ""
+            # URL fragment로 댓글 단위 dedup (동일 post_url을 POST와 공유하면 crawl.py가 스킵함)
+            if comment_id:
+                source_url = f"{post_url}#comment-{comment_id}"
+            else:
+                # id 없는 댓글: 본문 기반 안정 키
+                digest = hashlib.sha1(content.encode("utf-8")).hexdigest()[:12]
+                source_url = f"{post_url}#comment-{digest}"
+
+            posted_at = None
+            date_span = comment.find("span", class_="date")
+            if date_span:
+                date_only = date_span.get_text(strip=True).replace("작성일", "").strip()
+                posted_at = _relative_to_absolute(date_only, reference) if date_only else None
+
+            like_span = comment.find("span", class_="like")
+            like_count = _parse_like_element(like_span) if like_span else None
+
+            rows.append({
+                "content": content[:1000],
+                "content_type": "COMMENT",
+                "category": category,
+                "title": None,
+                "source_url": source_url,
+                "author_id": _extract_comment_author(comment),
+                "posted_at": posted_at,
+                "like_count": like_count,
+            })
+    except Exception as e:
+        logger.debug(f"Blind: comment extraction error: {e}")
+
+    return rows
+
+
 async def crawl(daily_limit: int = 240) -> List[Dict]:
     """블라인드 크롤링 v3 — 결혼생활/썸·연애/회사생활 채널"""
     if not daily_limit:
         return []
 
     results: List[Dict] = []
+    post_count = 0
     seen_urls: set = set()
     session = requests.Session()
 
     for idx, (channel_name, category, encoded) in enumerate(CHANNELS):
-        if len(results) >= daily_limit:
+        if post_count >= daily_limit:
             break
 
         logger.info(f"Blind: 채널 '{channel_name}' 크롤 시작")
 
         for page in range(1, PAGES_PER_CHANNEL + 1):
-            if len(results) >= daily_limit:
+            if post_count >= daily_limit:
                 break
 
             page_url = f"{BASE_URL}/kr/topics/{encoded}?page={page}"
@@ -332,7 +465,7 @@ async def crawl(daily_limit: int = 240) -> List[Dict]:
                 break
 
             for post_url in post_urls:
-                if len(results) >= daily_limit:
+                if post_count >= daily_limit:
                     break
 
                 session.headers.update(random.choice(BROWSER_PROFILES))
@@ -375,11 +508,27 @@ async def crawl(daily_limit: int = 240) -> List[Dict]:
                     "comment_count": comment_count,
                     "comment_timestamps": comment_timestamps,
                 })
-                logger.debug(f"Blind: 저장 [{channel_name}] {post_url} (조회:{view_count}, 좋아요:{like_count}, 댓글:{comment_count})")
+                post_count += 1
+                logger.debug(
+                    f"Blind: 저장 [{channel_name}] {post_url} "
+                    f"(조회:{view_count}, 좋아요:{like_count}, 댓글:{comment_count})"
+                )
+
+                # COMMENT — 이미 받은 HTML에서 본문 추출 (추가 HTTP 없음). daily_limit은 POST만 카운트.
+                comment_rows = _extract_comments(
+                    post_soup,
+                    fetch_reference,
+                    post_url=post_url,
+                    category=category,
+                )
+                results.extend(comment_rows)
+                if comment_rows:
+                    logger.debug(f"Blind: COMMENT {len(comment_rows)}건 [{channel_name}] {post_url}")
 
         # 채널 간 딜레이 (마지막 채널 제외)
         if idx < len(CHANNELS) - 1:
             await asyncio.sleep(random.uniform(3, 6))
 
-    logger.info(f"Blind: 크롤 완료 — {len(results)}개 수집")
+    comment_total = sum(1 for r in results if r.get("content_type") == "COMMENT")
+    logger.info(f"Blind: 크롤 완료 — POST {post_count} + COMMENT {comment_total} = {len(results)}개 수집")
     return results

@@ -1323,11 +1323,9 @@ public class ActionExecutor {
 
     // ── 문체 앵커 샘플링 (문체 현실화 S2) ────────────────────────────────────
 
-    /** voice_type(NATEPAN 등) → example_bank 크롤 source 매핑. 매핑 없으면 null=전체 크롤 소스. */
+    /** voice_type(NATEPAN|BLIND) → example_bank 크롤 source. 그 외는 null=허용 소스 전체. */
     private static final java.util.Map<String, String> VOICE_SOURCE = java.util.Map.of(
-        "NATEPAN", "natepan", "DCINSIDE", "dcinside", "BLIND", "blind",
-        "FMKOREA", "fmkorea", "THEQOO", "theqoo", "CLIEN", "clien",
-        "PPOMPPU", "ppomppu", "RULIWEB", "ruliweb", "MLBPARK", "mlbpark");
+        "NATEPAN", "natepan", "BLIND", "blind");
 
     /** 페르소나 voice 소스·레지스터 기반 문체 few-shot ("---" 구분). 없으면 null. */
     private String styleExamplesFor(Persona persona, String contentType, int topK, int maxLen) {

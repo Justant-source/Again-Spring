@@ -45,6 +45,8 @@ learning container가 뜨면 아래가 항상 실행된다.
 
 - `/examples/save`는 본문 512자까지만 임베딩한다.
 - register classifier 결과를 `casual`, `polite`, `mixed` 축으로 저장한다.
+  Wave1-D 이후 기준 문체는 BLIND(polite 편향)·NATEPAN(casual 편향) 두 곳이며,
+  `mixed` 과다로 `/examples/similar` 필터가 무력화되지 않도록 다수결 임계는 0.55다.
 - orchestrator 저장 훅은 `AI_LEARNING_ENABLED=true`일 때만 실행된다.
 - (WO-CRAWL-01) 크롤 시점 관심도 스냅샷을 함께 저장한다: `view_count`·`like_count`·`comment_count`·
   `engagement_span_hours`(첫~마지막 댓글 시간폭). 매일 KST 04:00 배치잡이 같은 `source`+나이구간
@@ -87,13 +89,20 @@ learning container가 뜨면 아래가 항상 실행된다.
 
 ### 현재 scheduler source budget
 
-`ai-user/learning/app/scheduler.py` 기준:
+`ai-user/learning/app/scheduler.py` 기준 (Wave1-D, 2026-08-01 — BLIND·NATEPAN 단일화):
 
 | source | limit |
 |---|---:|
 | `natepan` | `1500` |
-| `blind` | `500` (WO-CRAWL-01, 2026-07-30 — 240에서 증액. "블라인드가 갈등 소재 대세" 판단, 403 차단율을 admin 배지로 관찰하며 단계 증액 예정) |
-| 나머지 (`naver`, `daum`, `dcinside`, `bobaedream`, `fmkorea`, `theqoo`, `clien`, `ppomppu`, `ruliweb`, `mlbpark`) | `0` |
+| `blind` | `500` (WO-CRAWL-01 — 403 차단율은 admin 배지로 관찰) |
+
+활성 크롤러 모듈은 `crawlers/natepan.py` · `crawlers/blind.py` 둘뿐이다.
+`clien` · `theqoo` · `ruliweb` · `dcinside` · `fmkorea` · `mlbpark` · `ppomppu` · `bobaedream` ·
+`naver_comments` · `daum_comments` 및 `*_backup`은 코드에서 삭제했다.
+
+**2026-08-01**: prod `example_bank`에서 clien·ruliweb·theqoo·dcinside **4,346건 삭제** 완료
+(백업: `/home/justant/backups/prod-pre-corpus-unify-20260801-163820.sql`).
+`BLIND` → `blind` source 정규화. 잔여: natepan · blind · SELF_GENERATED.
 
 ### 현재 스케줄
 

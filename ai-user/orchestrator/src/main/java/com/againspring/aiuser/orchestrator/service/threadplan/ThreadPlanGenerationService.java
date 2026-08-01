@@ -41,6 +41,7 @@ public class ThreadPlanGenerationService {
     private final OrchestratorProperties properties;
     private final AiUserGenerationConfigRepository configRepository;
     private final CandidateScheduleSupport candidateScheduleSupport;
+    private final PlanPersonaMapper planPersonaMapper;
 
     @Transactional
     public void generateRequestedPlans() {
@@ -62,15 +63,15 @@ public class ThreadPlanGenerationService {
                 : properties.getThreadPlan().getHumanPlanModel();
         planService.markGenerating(planId, provider, model);
         int pool = config == null ? 24 : Math.max(1, Math.min(24, config.getCandidatePoolSize()));
-        Map<String, Object> request = planRequest(plan, provider, model, pool);
-        Optional<Map<String, Object>> response = llmClient.generateThreadPlan(request);
-        if (response.isEmpty()) response = llmClient.generateThreadPlan(request); // same provider, bounded retry
+        PlanRequestBuilt built = planRequest(plan, provider, model, pool);
+        Optional<Map<String, Object>> response = llmClient.generateThreadPlan(built.request());
+        if (response.isEmpty()) response = llmClient.generateThreadPlan(built.request()); // same provider, bounded retry
         if (response.isEmpty()) {
             planService.markFailed(planId, "GENERATION_FAILED");
             return;
         }
         try {
-            persistResponse(planId, response.get());
+            persistResponse(planId, response.get(), built.castIds());
             planService.markReady(planId);
             planService.activate(planId);
         } catch (IllegalArgumentException e) {
@@ -79,10 +80,11 @@ public class ThreadPlanGenerationService {
         }
     }
 
-    private Map<String, Object> planRequest(AiThreadPlan plan, String provider, String model, int pool) {
-        List<Map<String, Object>> personas = personaRepository.findByActiveTrue().stream().limit(24).<Map<String, Object>>map(p -> Map.of(
-                "personaId", p.getId(), "nickname", p.getId(),
-                "voiceProfile", String.valueOf(p.getVoiceProfile()), "formality", "neutral")).toList();
+    private PlanRequestBuilt planRequest(AiThreadPlan plan, String provider, String model, int pool) {
+        // Full active pool — no fixed limit(24).
+        List<Persona> active = personaRepository.findByActiveTrue();
+        List<Map<String, Object>> personas = planPersonaMapper.mapCast(active);
+        Set<String> castIds = planPersonaMapper.castIds(personas);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("kind", "AI_POST".equals(plan.getSourceType()) ? "AI_POST" : "HUMAN_POST");
         r.put("provider", provider); if (model != null && !model.isBlank()) r.put("model", model);
@@ -91,15 +93,27 @@ public class ThreadPlanGenerationService {
         r.put("postRevision", (long) plan.getPostRevision()); r.put("existingTitle", nullToEmpty(plan.getSourceTitle()));
         r.put("existingBody", nullToEmpty(plan.getSourceBody())); r.put("category", nullToEmpty(plan.getSourceCategory()));
         int roots = Math.min(14, pool); r.put("personas", personas); r.put("maxTopLevel", roots); r.put("maxReplies", pool - roots);
-        return r;
+        return new PlanRequestBuilt(r, castIds);
+    }
+
+    private record PlanRequestBuilt(Map<String, Object> request, Set<String> castIds) { }
+
+    /** Persist without an explicit cast set — uses currently active persona ids as the cast. */
+    @Transactional
+    void persistResponse(String planId, Map<String, Object> response) {
+        Set<String> castIds = personaRepository.findByActiveTrue().stream()
+                .map(Persona::getId)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        persistResponse(planId, response, castIds);
     }
 
     @Transactional
     @SuppressWarnings("unchecked")
-    void persistResponse(String planId, Map<String, Object> response) {
+    void persistResponse(String planId, Map<String, Object> response, Set<String> allowedPersonaIds) {
         AiThreadPlan plan = planRepository.findById(planId).orElseThrow();
         Object rawItems = response.get("items");
         if (!(rawItems instanceof List<?> rows) || rows.isEmpty() || rows.size() > 24) throw new IllegalArgumentException("invalid item count");
+        Set<String> cast = allowedPersonaIds == null ? Set.of() : allowedPersonaIds;
         Map<String, String> refs = new HashMap<>();
         int sequence = 0;
         for (Object raw : rows) {
@@ -107,6 +121,9 @@ public class ThreadPlanGenerationService {
             String ref = text(row.get("ref")); String parentRef = text(row.get("parentRef"));
             String body = text(row.get("body")); String personaId = text(row.get("personaId"));
             if (ref.isBlank() || body.isBlank() || personaId.isBlank() || body.length() > 2000 || refs.containsKey(ref)) throw new IllegalArgumentException("invalid candidate");
+            if (!cast.isEmpty() && !cast.contains(personaId)) {
+                throw new IllegalArgumentException("personaId not in requested cast: " + personaId);
+            }
             if (!personaRepository.existsById(personaId) || !safetyGuard.check(body, ContentSafetyGuard.ContentType.COMMENT).passed()) throw new IllegalArgumentException("unsafe candidate");
             String parentItemId = parentRef.isBlank() ? null : refs.get(parentRef);
             if (!parentRef.isBlank() && parentItemId == null) throw new IllegalArgumentException("unknown parent");
@@ -116,11 +133,32 @@ public class ThreadPlanGenerationService {
                     ? stored
                     : candidateScheduleSupport.schedule(plan.getPublishedAt(), sequence, type == ThreadPlanItemType.REPLY);
             sequence++;
-            AiThreadPlanItem item = AiThreadPlanItem.builder().planId(planId).itemType(type)
+            AiThreadPlanItem.AiThreadPlanItemBuilder itemBuilder = AiThreadPlanItem.builder().planId(planId).itemType(type)
                     .status(ThreadPlanItemStatus.SCHEDULED).sequenceNo(sequence).parentItemId(parentItemId)
                     .personaId(personaId).targetPostId(plan.getPostId()).body(body).scheduledAt(scheduled)
-                    .notBefore(scheduled).idempotencyKey(planId + ":" + ref).build();
+                    .notBefore(scheduled).idempotencyKey(planId + ":" + ref);
+            // W1-H: persist stance / source_example_id when entity already has setters.
+            applyOptionalItemFields(itemBuilder, row);
+            AiThreadPlanItem item = itemBuilder.build();
             itemRepository.save(item); refs.put(ref, item.getId());
+        }
+    }
+
+    /** Soft-set stance / sourceExampleId if W1-H entity fields exist; otherwise no-op. */
+    private static void applyOptionalItemFields(AiThreadPlanItem.AiThreadPlanItemBuilder itemBuilder, Map<?, ?> row) {
+        Object stance = row.get("stance");
+        if (stance != null && !String.valueOf(stance).isBlank()) {
+            try {
+                AiThreadPlanItem.AiThreadPlanItemBuilder.class.getMethod("stance", String.class)
+                        .invoke(itemBuilder, String.valueOf(stance).trim());
+            } catch (ReflectiveOperationException ignored) { /* W1-H pending */ }
+        }
+        Object sourceExampleId = row.get("sourceExampleId");
+        if (sourceExampleId instanceof Number n) {
+            try {
+                AiThreadPlanItem.AiThreadPlanItemBuilder.class.getMethod("sourceExampleId", Long.class)
+                        .invoke(itemBuilder, n.longValue());
+            } catch (ReflectiveOperationException ignored) { /* W1-H pending */ }
         }
     }
 

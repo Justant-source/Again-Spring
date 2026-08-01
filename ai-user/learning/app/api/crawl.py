@@ -9,35 +9,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 quality = QualityFilter()
 
+# Wave1-D: 활성 크롤러는 natepan · blind 둘뿐 (그 외 모듈 삭제됨)
+_CRAWLERS = {
+    "natepan": "app.crawlers.natepan",
+    "blind": "app.crawlers.blind",
+}
+
+
 async def _do_crawl(source, daily_limit, embed_service):
     try:
-        if source == "naver":
-            from app.crawlers.naver_comments import crawl
-        elif source == "daum":
-            from app.crawlers.daum_comments import crawl
-        elif source == "dcinside":
-            from app.crawlers.dcinside import crawl
-        elif source == "natepan":
-            from app.crawlers.natepan import crawl
-        elif source == "bobaedream":
-            from app.crawlers.bobaedream import crawl
-        elif source == "blind":
-            from app.crawlers.blind import crawl
-        elif source == "fmkorea":
-            from app.crawlers.fmkorea import crawl
-        elif source == "theqoo":
-            from app.crawlers.theqoo import crawl
-        elif source == "clien":
-            from app.crawlers.clien import crawl
-        elif source == "ppomppu":
-            from app.crawlers.ppomppu import crawl
-        elif source == "ruliweb":
-            from app.crawlers.ruliweb import crawl
-        elif source == "mlbpark":
-            from app.crawlers.mlbpark import crawl
-        else:
+        module_path = _CRAWLERS.get(source)
+        if module_path is None:
             logger.warning(f"Unknown source: {source}")
             return
+
+        import importlib
+        crawl = importlib.import_module(module_path).crawl
 
         items = await crawl(daily_limit=daily_limit)
         saved = 0

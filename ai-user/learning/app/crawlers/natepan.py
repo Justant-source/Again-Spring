@@ -67,6 +67,21 @@ _DROP_KEYWORDS = ["광고", "공지", "이벤트", "혜택안내", "앱 다운",
 MIN_CONTENT_LEN = 80
 MAX_CONTENT_LEN = 8000
 
+# 댓글 수집 (c918e6e5 이전 계약 복원 — 문체 앵커용). POST daily_limit과 별도 예산.
+COMMENTS_PER_POST = 3
+MIN_COMMENT_LEN = 10
+MAX_COMMENT_LEN = 500
+
+
+def _parse_int_with_commas(raw: str) -> Optional[int]:
+    """'44,903' / '93' → int. 실패 시 None."""
+    if not raw:
+        return None
+    try:
+        return int(raw.replace(",", "").strip())
+    except ValueError:
+        return None
+
 
 def _sync_fetch(url: str, timeout: int = 10) -> Optional[str]:
     """동기 HTTP GET — asyncio.to_thread()로 비동기 전환됨."""
@@ -157,98 +172,198 @@ def _extract_content(soup) -> Optional[str]:
 
 
 def _extract_view_count(soup) -> Optional[int]:
-    """조회수 추출. 셀렉터: span.count 내부 텍스트에서 숫자 파싱."""
+    """조회수 추출.
+
+    실측 DOM (2026-08):
+      <span class="count"><span class="tit">조회</span>44,903</span>
+    get_text(strip=True) → '조회44,903' (공백 없음).
+    """
     try:
+        # 방법 1: span.tit=조회 를 포함한 span.count
         for el in soup.select("span.count"):
-            txt = el.get_text(strip=True)
-            # "조회 50,855" 형식에서 숫자만 추출
+            tit = el.select_one("span.tit")
+            if tit and "조회" in tit.get_text(strip=True):
+                m = re.search(r"([\d,]+)", el.get_text(" ", strip=True))
+                if m:
+                    return _parse_int_with_commas(m.group(1))
+
+        # 방법 2: 텍스트 '조회' + 숫자 (공백 유무 모두)
+        for el in soup.select("span.count"):
+            txt = el.get_text(" ", strip=True)
             m = re.search(r"조회\s*([\d,]+)", txt)
             if m:
-                num_str = m.group(1).replace(",", "")
-                return int(num_str)
+                return _parse_int_with_commas(m.group(1))
+
+        # 방법 3: 페이지 전역 fallback (info 영역)
+        for el in soup.select(".info span.count, .post_info span.count, .info_area span.count"):
+            txt = el.get_text(" ", strip=True)
+            m = re.search(r"조회\s*([\d,]+)", txt)
+            if m:
+                return _parse_int_with_commas(m.group(1))
     except Exception:
         pass
     return None
 
 
 def _extract_like_count(soup) -> Optional[int]:
-    """추천수 추출. 셀렉터: span.count 또는 button span (추천)."""
+    """추천수 추출.
+
+    실측 DOM (2026-08):
+      <span class="count"><em>추천수</em><span>93</span></span>
+    get_text(strip=True) → '추천수93' — '추천\\s*(\\d+)' 단독 패턴은 실패하므로
+    '추천수?' 또는 nested span 숫자를 우선한다.
+    """
     try:
-        # 방법 1: span.count 내 추천 텍스트
+        # 방법 1: <em>추천수</em><span>N</span> nested
         for el in soup.select("span.count"):
-            txt = el.get_text(strip=True)
-            # "추천 343" 형식
-            m = re.search(r"추천\s*([\d,]+)", txt)
-            if m:
-                num_str = m.group(1).replace(",", "")
-                return int(num_str)
+            em = el.select_one("em")
+            if not em:
+                continue
+            em_txt = em.get_text(strip=True)
+            if "추천" not in em_txt or "반대" in em_txt:
+                continue
+            nested = el.select_one("span")
+            if nested:
+                n = _parse_int_with_commas(nested.get_text(strip=True))
+                if n is not None:
+                    return n
 
-        # 방법 2: 버튼 옆 span (추천수)
-        for btn_span in soup.select("button[value='R'] ~ span.count"):
-            txt = btn_span.get_text(strip=True)
-            # "<em>추천수</em><span>343</span>" 구조 → span만 추출
-            m = re.search(r"[\d,]+", txt)
+        # 방법 2: span.count 텍스트 '추천수93' / '추천 343'
+        for el in soup.select("span.count"):
+            txt = el.get_text(" ", strip=True)
+            if "반대" in txt:
+                continue
+            m = re.search(r"추천수?\s*([\d,]+)", txt)
             if m:
-                num_str = m.group(0).replace(",", "")
-                return int(num_str)
+                return _parse_int_with_commas(m.group(1))
 
-        # 방법 3: 직접 span 탐색
-        for sp in soup.select("button span"):
-            txt = sp.get_text(strip=True)
-            if txt and re.match(r"^[\d,]+$", txt):
-                return int(txt.replace(",", ""))
+        # 방법 3: 추천 버튼 옆 span.count
+        for btn_span in soup.select("button[value='R'] ~ span.count, div.btnbox.up span.count"):
+            nested = btn_span.select_one("span")
+            if nested:
+                n = _parse_int_with_commas(nested.get_text(strip=True))
+                if n is not None:
+                    return n
+            m = re.search(r"([\d,]+)", btn_span.get_text(" ", strip=True))
+            if m:
+                return _parse_int_with_commas(m.group(1))
     except Exception:
         pass
     return None
 
 
 def _extract_comment_count(soup) -> Optional[int]:
-    """댓글 수 추출. 셀렉터: span.num (베스트/일반 댓글 헤더) 또는 span.reple-num."""
+    """댓글 수 추출. 셀렉터: span.num / span.reple-num / cmt_item 개수 fallback."""
     try:
-        # 방법 1: "56개의 댓글"
-        el = soup.select_one("span.num")
+        # 방법 1: "<strong>83</strong>개의 댓글"
+        for el in soup.select("span.num, .cmt_tit span.num"):
+            txt = el.get_text(" ", strip=True)
+            if "댓글" in txt or el.select_one("strong"):
+                m = re.search(r"(\d+)", txt)
+                if m:
+                    return int(m.group(1))
+
+        # 방법 2: 목록 (56) 형식
+        el = soup.select_one("span.reple-num")
         if el:
-            txt = el.get_text(strip=True)
-            m = re.search(r"(\d+)", txt)
+            m = re.search(r"(\d+)", el.get_text(strip=True))
             if m:
                 return int(m.group(1))
 
-        # 방법 2: 목록에서 (56) 형식 (fallback)
-        el = soup.select_one("span.reple-num")
-        if el:
-            txt = el.get_text(strip=True)
-            m = re.search(r"(\d+)", txt)
-            if m:
-                return int(m.group(1))
+        # 방법 3: 페이지에 렌더된 댓글 개수 (부분 로드일 수 있어 최후 수단)
+        n = len(soup.select("dl.cmt_item"))
+        if n > 0:
+            return n
     except Exception:
         pass
     return None
+
+
+def _comment_posted_at(cmt_item) -> Optional[str]:
+    """dl.cmt_item 한 건에서 작성 시각 추출."""
+    i_el = cmt_item.select_one("dt i")
+    if not i_el:
+        return None
+    time_str = i_el.get_text(strip=True)
+    if not time_str or not re.search(r"\d{4}\.\d{2}\.\d{2}", time_str):
+        return None
+    return _parse_posted_at(time_str[:16])
 
 
 def _extract_comment_timestamps(soup) -> Optional[List[str]]:
     """댓글 작성 시각 추출. 셀렉터: dl.cmt_item > dt > i (시각)."""
     try:
         timestamps: List[str] = []
-        # 베스트 댓글 + 일반 댓글
         for cmt_item in soup.select("dl.cmt_item"):
-            dt_el = cmt_item.select_one("dt")
-            if dt_el:
-                i_el = dt_el.select_one("i")
-                if i_el:
-                    time_str = i_el.get_text(strip=True)
-                    # "2026.07.30 00:30" 형식
-                    if time_str and re.search(r"\d{4}\.\d{2}\.\d{2}", time_str):
-                        # ISO 형식으로 정규화
-                        try:
-                            dt = datetime.strptime(time_str[:16], "%Y.%m.%d %H:%M")
-                            timestamps.append(dt.strftime("%Y-%m-%d %H:%M:%S"))
-                        except ValueError:
-                            # 파싱 실패 시 원본 저장
-                            timestamps.append(time_str[:32])
+            parsed = _comment_posted_at(cmt_item)
+            if parsed:
+                timestamps.append(parsed)
         return timestamps if timestamps else None
     except Exception:
         pass
     return None
+
+
+def _extract_comment_rows(soup, url: str, category: str, limit: int) -> List[Dict]:
+    """상세 페이지에서 COMMENT 행 생성.
+
+    c918e6e5 이전: `.cmt_list dd.usertxt` 상위 N건.
+    현재 DOM도 `dl.cmt_item > dd.usertxt` — 동일 계열.
+    source_url에 `#cmtN`을 붙여 ingest(source_url dedup)가 POST와 충돌하지 않게 한다.
+    """
+    if limit <= 0:
+        return []
+
+    rows: List[Dict] = []
+    items = soup.select("dl.cmt_item")
+    if not items:
+        # 구형/축약 마크업 fallback
+        for el in soup.select(".cmt_list dd.usertxt, dd.usertxt"):
+            if len(rows) >= limit:
+                break
+            txt = el.get_text(" ", strip=True)
+            if not txt or not (MIN_COMMENT_LEN <= len(txt) <= MAX_COMMENT_LEN):
+                continue
+            idx = len(rows) + 1
+            rows.append({
+                "content": txt,
+                "content_type": "COMMENT",
+                "source": "natepan",
+                "category": category,
+                "source_url": f"{url}#cmt{idx}",
+                "author_id": None,
+                "posted_at": None,
+            })
+        return rows
+
+    for cmt_item in items:
+        if len(rows) >= limit:
+            break
+        txt_el = cmt_item.select_one("dd.usertxt")
+        if not txt_el:
+            continue
+        txt = txt_el.get_text(" ", strip=True)
+        if not txt or not (MIN_COMMENT_LEN <= len(txt) <= MAX_COMMENT_LEN):
+            continue
+
+        author = None
+        name_el = cmt_item.select_one(".nameui, a.writer, dt a")
+        if name_el:
+            name = name_el.get_text(strip=True)
+            if name and 1 <= len(name) <= 50:
+                author = name
+
+        idx = len(rows) + 1
+        rows.append({
+            "content": txt,
+            "content_type": "COMMENT",
+            "source": "natepan",
+            "category": category,
+            "source_url": f"{url}#cmt{idx}",
+            "author_id": author,
+            "posted_at": _comment_posted_at(cmt_item),
+        })
+    return rows
 
 
 def _is_valid(title: str, content: str) -> bool:
@@ -259,19 +374,10 @@ def _is_valid(title: str, content: str) -> bool:
     return True
 
 
-def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None,
-                       section_name: Optional[str] = None, channel_plaza: Optional[str] = None) -> Optional[Dict]:
-    """HTML → 결과 딕셔너리 파싱. None = 무효(비어있거나 필터됨).
-
-    Args:
-        html: 포스트 상세 HTML
-        url: 포스트 URL
-        author_listing: listing 페이지에서 추출한 작성자 (fallback)
-        section_name: 섹션 이름 (e.g. "연애-오늘", "베스트-오늘") → category 결정
-        channel_plaza: 테마 채널의 목표 plaza (e.g. "WORK", "MARRIED", "COUPLE")
-                      지정 시 분류기로 검증하여 일치할 때만 이 plaza 사용
-    """
-    soup = BeautifulSoup(html, "html.parser")
+def _parse_post_soup(soup, url: str, author_listing: Optional[str] = None,
+                     section_name: Optional[str] = None,
+                     channel_plaza: Optional[str] = None) -> Optional[Dict]:
+    """이미 파싱된 soup → POST dict. None = 무효."""
     content = _extract_content(soup)
     if not content:
         return None
@@ -289,7 +395,6 @@ def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None
     # 2. section_name 지정 → 섹션 기반 (정적 섹션용)
     # 3. 기본값 → OTHER
     if channel_plaza:
-        # 테마 채널: 채널의 목표 plaza와 분류기 결과가 일치할 때만 사용
         classified = classify_plaza(content, title or "")
         category = channel_plaza if classified == channel_plaza else "OTHER"
     elif section_name and "연애" in section_name:
@@ -313,13 +418,39 @@ def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None
     }
 
 
+def _parse_post_detail(html: str, url: str, author_listing: Optional[str] = None,
+                       section_name: Optional[str] = None, channel_plaza: Optional[str] = None) -> Optional[Dict]:
+    """HTML → POST 딕셔너리 파싱. None = 무효(비어있거나 필터됨)."""
+    soup = BeautifulSoup(html, "html.parser")
+    return _parse_post_soup(soup, url, author_listing, section_name, channel_plaza)
+
+
+def _parse_detail_bundle(html: str, url: str, author_listing: Optional[str] = None,
+                         section_name: Optional[str] = None, channel_plaza: Optional[str] = None,
+                         max_comments: int = 0) -> List[Dict]:
+    """POST(+선택적 COMMENT) 행 리스트. POST가 무효면 빈 리스트."""
+    soup = BeautifulSoup(html, "html.parser")
+    post = _parse_post_soup(soup, url, author_listing, section_name, channel_plaza)
+    if not post:
+        return []
+    rows: List[Dict] = [post]
+    if max_comments > 0:
+        rows.extend(_extract_comment_rows(
+            soup, url, post["category"],
+            limit=min(COMMENTS_PER_POST, max_comments),
+        ))
+    return rows
+
+
 async def _fetch_static_sections_parallel(sem: asyncio.Semaphore,
                                            seen_ids: Set[str],
-                                           limit: int) -> List[Dict]:
+                                           limit: int,
+                                           comment_budget: List[int]) -> List[Dict]:
     """
     9개 랭킹 섹션 병렬 처리.
     Step 1: 9개 listing 동시 fetch
-    Step 2: 모든 post detail 8병렬 fetch
+    Step 2: 모든 post detail 8병렬 fetch (+ COMMENT)
+    comment_budget: 길이 1 리스트 — 남은 COMMENT 예산 (mutable).
     """
     # Step 1: 9섹션 동시 fetch
     listing_htmls = await asyncio.gather(*[
@@ -365,24 +496,36 @@ async def _fetch_static_sections_parallel(sem: asyncio.Semaphore,
     ])
 
     results: List[Dict] = []
+    comment_count = 0
     for item, html in zip(post_items, detail_results):
         if not html:
             continue
-        result = _parse_post_detail(html, item["url"], item["author_listing"],
-                                   section_name=item.get("section_name"))
-        if result:
-            results.append(result)
+        max_comments = min(COMMENTS_PER_POST, comment_budget[0])
+        rows = _parse_detail_bundle(
+            html, item["url"], item["author_listing"],
+            section_name=item.get("section_name"),
+            max_comments=max_comments,
+        )
+        if not rows:
+            continue
+        results.extend(rows)
+        n_comments = sum(1 for r in rows if r["content_type"] == "COMMENT")
+        comment_budget[0] -= n_comments
+        comment_count += n_comments
 
-    logger.info(f"정적 섹션 완료: {len(results)} posts")
+    post_n = sum(1 for r in results if r["content_type"] == "POST")
+    logger.info(f"정적 섹션 완료: {post_n} posts + {comment_count} comments")
     return results
 
 
 async def _fetch_id_range_parallel(sem: asyncio.Semaphore,
                                     seen_ids: Set[str],
-                                    remaining: int) -> List[Dict]:
+                                    remaining: int,
+                                    comment_budget: List[int]) -> List[Dict]:
     """
     ID 범위 크롤 — 배치(32개)씩 8병렬 fetch.
     최신→과거 순서(높은 ID부터), 빈 구간 허용폭 80배치.
+    remaining / 조기종료 기준은 POST 건수만 센다 (COMMENT는 별도 예산).
     """
     if remaining <= 0:
         return []
@@ -393,11 +536,12 @@ async def _fetch_id_range_parallel(sem: asyncio.Semaphore,
     logger.info(f"ID 범위 크롤: {total_candidates}개 후보, 목표={remaining}, 배치={BATCH}")
 
     results: List[Dict] = []
+    post_found = 0
     empty_batches = 0
     MAX_EMPTY_BATCHES = 80
 
     for i in range(0, total_candidates, BATCH):
-        if len(results) >= remaining:
+        if post_found >= remaining:
             break
         if empty_batches >= MAX_EMPTY_BATCHES:
             logger.info(f"ID 크롤: 빈 배치 {MAX_EMPTY_BATCHES}회 연속 → 조기 종료")
@@ -413,32 +557,42 @@ async def _fetch_id_range_parallel(sem: asyncio.Semaphore,
 
         batch_found = 0
         for pid, html in zip(batch_ids, htmls):
-            if len(results) >= remaining:
+            if post_found >= remaining:
                 break
             seen_ids.add(str(pid))
             if not html:
                 continue
-            result = _parse_post_detail(html, f"https://pann.nate.com/talk/{pid}",
-                                       section_name=None)  # ID 범위 크롤은 섹션 미상
-            if result:
-                results.append(result)
-                batch_found += 1
+            max_comments = min(COMMENTS_PER_POST, comment_budget[0])
+            rows = _parse_detail_bundle(
+                html, f"https://pann.nate.com/talk/{pid}",
+                section_name=None,
+                max_comments=max_comments,
+            )
+            if not rows:
+                continue
+            results.extend(rows)
+            n_posts = sum(1 for r in rows if r["content_type"] == "POST")
+            n_comments = sum(1 for r in rows if r["content_type"] == "COMMENT")
+            post_found += n_posts
+            comment_budget[0] -= n_comments
+            batch_found += n_posts
 
         if batch_found == 0:
             empty_batches += 1
         else:
             empty_batches = 0
 
-        if len(results) % 200 == 0 and len(results) > 0:
-            logger.info(f"ID 크롤 진행: {len(results)}/{remaining}")
+        if post_found % 200 == 0 and post_found > 0:
+            logger.info(f"ID 크롤 진행: {post_found}/{remaining}")
 
-    logger.info(f"ID 범위 크롤 완료: {len(results)}건")
+    logger.info(f"ID 범위 크롤 완료: posts={post_found}, total_rows={len(results)}")
     return results
 
 
 async def _fetch_channels(sem: asyncio.Semaphore,
                           seen_ids: Set[str],
-                          limit: int) -> List[Dict]:
+                          limit: int,
+                          comment_budget: List[int]) -> List[Dict]:
     """
     테마 채널 크롤 — 채널별 plaza 분류 + 페이지네이션 (분류기 precision gate).
 
@@ -450,7 +604,7 @@ async def _fetch_channels(sem: asyncio.Semaphore,
     Step 1: 각 채널의 listing 페이지 fetch (페이지 1..MAX_PAGES)
     Step 2: 고유한 post URL 추출 (dedup via seen_ids)
     Step 3: 채널 target 도달 또는 페이지 소진 시 post detail 병렬 fetch
-    Step 4: 분류기로 검증 후 channel_plaza와 일치할 때만 결과 포함
+    Step 4: 분류기로 검증 후 channel_plaza와 일치할 때만 결과 포함 (+ COMMENT)
     """
     if not CHANNELS or limit <= 0:
         return []
@@ -459,9 +613,10 @@ async def _fetch_channels(sem: asyncio.Semaphore,
     logger.info(f"채널 크롤: {len(CHANNELS)}개 채널, 채널당 ~{channel_limit}개, 총 한도={limit}")
 
     results: List[Dict] = []
+    post_found = 0
 
     for channel in CHANNELS:
-        if len(results) >= limit:
+        if post_found >= limit:
             break
 
         ch_id = channel["id"]
@@ -476,7 +631,7 @@ async def _fetch_channels(sem: asyncio.Semaphore,
 
         # Step 1~2: 페이지 루프 — 신규 post 누적
         for page in range(1, max_pages + 1):
-            if len(post_items) >= channel_limit or len(results) >= limit:
+            if len(post_items) >= channel_limit or post_found >= limit:
                 break
 
             # URL 구성: page=1 → ?order=rank, page>=2 → ?order=rank&page=N
@@ -508,7 +663,7 @@ async def _fetch_channels(sem: asyncio.Semaphore,
             for origin_id in re.findall(r"/talk/(\d{6,})", html):
                 if origin_id in seen_ids:
                     continue
-                if len(post_items) >= channel_limit or len(results) >= limit:
+                if len(post_items) >= channel_limit or post_found >= limit:
                     break
                 seen_ids.add(origin_id)
                 post_items.append({
@@ -537,56 +692,76 @@ async def _fetch_channels(sem: asyncio.Semaphore,
             _fetch(sem, item["url"]) for item in post_items
         ])
 
-        # Step 4: 분류기 검증 후 저장
+        # Step 4: 분류기 검증 후 저장 (+ COMMENT)
         channel_found = 0
         for item, detail_html in zip(post_items, detail_results):
-            if len(results) >= limit:
+            if post_found >= limit:
                 break
             if not detail_html:
                 continue
-            result = _parse_post_detail(detail_html, item["url"],
-                                       author_listing=item["author_listing"],
-                                       channel_plaza=ch_plaza)
-            if result:
-                results.append(result)
-                channel_found += 1
+            max_comments = min(COMMENTS_PER_POST, comment_budget[0])
+            rows = _parse_detail_bundle(
+                detail_html, item["url"],
+                author_listing=item["author_listing"],
+                channel_plaza=ch_plaza,
+                max_comments=max_comments,
+            )
+            if not rows:
+                continue
+            results.extend(rows)
+            n_posts = sum(1 for r in rows if r["content_type"] == "POST")
+            n_comments = sum(1 for r in rows if r["content_type"] == "COMMENT")
+            post_found += n_posts
+            comment_budget[0] -= n_comments
+            channel_found += n_posts
 
         logger.info(f"Channel '{ch_name}': {channel_found}/{len(post_items)} 분류기 통과 (plaza={ch_plaza})")
 
-    logger.info(f"채널 크롤 완료: {len(results)}건")
+    logger.info(f"채널 크롤 완료: posts={post_found}, total_rows={len(results)}")
     return results
 
 
 async def crawl(daily_limit: int = 1500) -> List[Dict]:
     """
-    네이트판 공격 크롤 v5+ — 완전 병렬 with 테마 채널.
+    네이트판 공격 크롤 v5+ — 완전 병렬 with 테마 채널 + COMMENT.
     정적 섹션(9개 동시) + 테마 채널(9개 channels × classifier) + ID 범위(8병렬 배치)
     = 순차 대비 5~8× 속도.
 
     예산 배분:
-    - 정적 섹션: 250개 (상위 9개 섹션에서 고품질 COUPLE)
-    - 테마 채널: 250개 (WORK, MARRIED, COUPLE 정밀 분류)
-    - ID 범위: 나머지 (배경 채우기)
+    - 정적 섹션: 250개 POST (상위 9개 섹션에서 고품질 COUPLE)
+    - 테마 채널: 250개 POST (WORK, MARRIED, COUPLE 정밀 분류)
+    - ID 범위: 나머지 POST (배경 채우기)
+    - COMMENT: daily_limit // 10 (c918e6e5 이전 계약), POST 한도와 독립
     """
     sem = asyncio.Semaphore(CONCURRENCY)
     seen_ids: Set[str] = set()
+    comment_budget = [max(0, daily_limit // 10)]
 
     # Step 1: 정적 섹션
     static_limit = 250
-    static_results = await _fetch_static_sections_parallel(sem, seen_ids, static_limit)
+    static_results = await _fetch_static_sections_parallel(
+        sem, seen_ids, static_limit, comment_budget)
     static_count = len([r for r in static_results if r["content_type"] == "POST"])
 
     # Step 2: 테마 채널 (분류기 precision gate)
     channel_limit = 250
-    channel_results = await _fetch_channels(sem, seen_ids, channel_limit)
+    channel_results = await _fetch_channels(
+        sem, seen_ids, channel_limit, comment_budget)
     channel_count = len([r for r in channel_results if r["content_type"] == "POST"])
 
-    # Step 3: ID 범위 크롤 (나머지 한도)
+    # Step 3: ID 범위 크롤 (나머지 POST 한도)
     post_count = static_count + channel_count
     remaining = daily_limit - post_count
-    id_results = await _fetch_id_range_parallel(sem, seen_ids, remaining)
+    id_results = await _fetch_id_range_parallel(
+        sem, seen_ids, remaining, comment_budget)
 
     all_results = static_results + channel_results + id_results
     posts = [r for r in all_results if r["content_type"] == "POST"]
-    logger.info(f"NATEPAN v5+ 완료: static={static_count} + channel={channel_count} + id_range={len([r for r in id_results if r['content_type'] == 'POST'])} = {len(posts)} posts")
+    comments = [r for r in all_results if r["content_type"] == "COMMENT"]
+    id_posts = len([r for r in id_results if r["content_type"] == "POST"])
+    logger.info(
+        f"NATEPAN v5+ 완료: static={static_count} + channel={channel_count} "
+        f"+ id_range={id_posts} = {len(posts)} posts, comments={len(comments)}, "
+        f"total={len(all_results)}"
+    )
     return all_results

@@ -21,6 +21,7 @@ public class StructuredGenerationService {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern META = Pattern.compile("(?i)(적용 처리 메모|작성 노트|<<<|```|i can't help|i am (claude|codex))");
     private final LlmWorkerPool pool;
+    private final SelfCritiqueService selfCritique;
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}") private String claudeDefault;
     @Value("${llm.post-model:claude-sonnet-4-6}") private String claudePostModel;
@@ -32,9 +33,11 @@ public class StructuredGenerationService {
         LlmProvider provider = LlmProvider.parse(req.getProvider());
         String model = resolvePlanModel(req, provider);
         long started = System.currentTimeMillis();
-        return withOneRetry(() -> pool.executeProviderTask(planPrompt(req), model, timeout(req.getTimeoutMs()), correlationId, provider,
+        String prompt = planPrompt(req);
+        return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
                         StructuredOutputSchema.THREAD_PLAN),
-                raw -> parsePlan(raw, req, provider, model, correlationId, started));
+                raw -> applySelfCritique(parsePlan(raw, req, provider, model, correlationId, started),
+                        req, prompt, model, correlationId));
     }
 
     public HumanReplyBatchResponse createHumanReplies(HumanReplyBatchRequest req, String correlationId) {
@@ -83,6 +86,109 @@ public class StructuredGenerationService {
                 .post(post).items(items).elapsedMs(System.currentTimeMillis() - started).build();
     }
 
+    /**
+     * Same SelfCritique gate as legacy {@code GenerationController}: post + top-level comments.
+     * Replies are skipped (short text). Failed refine keeps the original body.
+     */
+    private ThreadPlanResponse applySelfCritique(ThreadPlanResponse parsed, ThreadPlanRequest req, String prompt,
+                                                 String model, String correlationId) {
+        if (selfCritique == null || parsed == null) return parsed;
+        // Critique refine uses session CLI (same as legacy GenerationController), independent of PLAN provider.
+        String backend = "CLI";
+        Map<String, ThreadPlanRequest.Persona> byId = new HashMap<>();
+        for (ThreadPlanRequest.Persona p : req.getPersonas()) {
+            if (p != null && !blank(p.getPersonaId())) byId.put(p.getPersonaId(), p);
+        }
+
+        ThreadPlanResponse.Post post = parsed.getPost();
+        if (post != null) {
+            ThreadPlanRequest.Persona author = resolveAuthorPersona(req);
+            String refined = selfCritique.critiqueAndRefine(
+                    post.getBody(), "post", prompt, correlationId, backend,
+                    resolveFormality(author), model, resolveVoiceType(author));
+            post = replacePostBodyIfValid(post, refined);
+        }
+
+        List<ThreadPlanResponse.Item> items = new ArrayList<>(parsed.getItems().size());
+        for (ThreadPlanResponse.Item item : parsed.getItems()) {
+            if (item.getParentRef() != null) {
+                items.add(item);
+                continue;
+            }
+            ThreadPlanRequest.Persona persona = byId.get(item.getPersonaId());
+            String refined = selfCritique.critiqueAndRefine(
+                    item.getBody(), "comment", prompt, correlationId + "-" + item.getRef(), backend,
+                    resolveFormality(persona), model, resolveVoiceType(persona));
+            items.add(replaceCommentBodyIfValid(item, refined));
+        }
+
+        return ThreadPlanResponse.builder()
+                .provider(parsed.getProvider()).model(parsed.getModel()).correlationId(parsed.getCorrelationId())
+                .post(post).items(items).elapsedMs(parsed.getElapsedMs()).build();
+    }
+
+    private static ThreadPlanResponse.Post replacePostBodyIfValid(ThreadPlanResponse.Post post, String refined) {
+        if (refined == null || refined.equals(post.getBody())) return post;
+        try {
+            validText(refined, "post.body", 20, 6000);
+            return ThreadPlanResponse.Post.builder().title(post.getTitle()).body(refined).build();
+        } catch (StructuredGenerationException ignored) {
+            return post;
+        }
+    }
+
+    private static ThreadPlanResponse.Item replaceCommentBodyIfValid(ThreadPlanResponse.Item item, String refined) {
+        if (refined == null || refined.equals(item.getBody())) return item;
+        try {
+            validText(refined, "comment.body", 2, 1000);
+            return ThreadPlanResponse.Item.builder()
+                    .ref(item.getRef()).parentRef(item.getParentRef()).personaId(item.getPersonaId())
+                    .body(refined).stance(item.getStance()).priority(item.getPriority()).build();
+        } catch (StructuredGenerationException ignored) {
+            return item;
+        }
+    }
+
+    /**
+     * Prefer explicit {@code author.personaId} match in the cast; else personas[0].
+     * Orchestrator should put the AI_POST author first, but this keeps SelfCritique aligned
+     * when the author Map is sent separately.
+     */
+    static ThreadPlanRequest.Persona resolveAuthorPersona(ThreadPlanRequest req) {
+        if (req == null || req.getPersonas() == null || req.getPersonas().isEmpty()) return null;
+        String authorId = null;
+        if (req.getAuthor() != null && req.getAuthor().get("personaId") != null) {
+            authorId = String.valueOf(req.getAuthor().get("personaId")).trim();
+        }
+        if (!blank(authorId)) {
+            for (ThreadPlanRequest.Persona p : req.getPersonas()) {
+                if (p != null && authorId.equals(p.getPersonaId())) return p;
+            }
+        }
+        return req.getPersonas().get(0);
+    }
+
+    /** Prefer top-level formality; fall back to voiceProfile.formality. */
+    static String resolveFormality(ThreadPlanRequest.Persona persona) {
+        if (persona == null) return null;
+        if (!blank(persona.getFormality())) return persona.getFormality().trim();
+        Object fromMap = voiceField(persona.getVoiceProfile(), "formality");
+        return fromMap == null ? null : String.valueOf(fromMap).trim();
+    }
+
+    static String resolveVoiceType(ThreadPlanRequest.Persona persona) {
+        if (persona == null) return null;
+        Object fromMap = voiceField(persona.getVoiceProfile(), "voice_type");
+        if (fromMap == null) fromMap = voiceField(persona.getVoiceProfile(), "voiceType");
+        return fromMap == null ? null : String.valueOf(fromMap).trim();
+    }
+
+    private static Object voiceField(Map<String, Object> voice, String key) {
+        if (voice == null || key == null) return null;
+        Object v = voice.get(key);
+        return v == null || String.valueOf(v).isBlank() ? null : v;
+    }
+
     private HumanReplyBatchResponse parseReplies(String raw, HumanReplyBatchRequest req, LlmProvider provider,
                                                   String model, String correlationId, long started) {
         JsonNode replies = parseObject(raw).path("replies");
@@ -105,18 +211,52 @@ public class StructuredGenerationService {
     private String planPrompt(ThreadPlanRequest req) {
         String existing = req.getKind() == ThreadPlanRequest.Kind.HUMAN_POST
                 ? "EXISTING_POST=" + json(Map.of("title", clean(req.getExistingTitle()), "body", clean(req.getExistingBody()))) : "";
+        StringBuilder grounding = new StringBuilder();
+        if (req.getAuthor() != null && !req.getAuthor().isEmpty()) {
+            grounding.append("\nAUTHOR=").append(json(req.getAuthor()));
+        }
+        if (req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
+            grounding.append("\nSOURCE_CONTEXT=").append(json(req.getSourceContext()));
+        }
+        boolean reconstruct = Boolean.TRUE.equals(req.getReconstructMode());
+        if (reconstruct) {
+            grounding.append("\nRECONSTRUCT_MODE=true");
+            if (req.getSourceExampleId() != null) grounding.append("\nSOURCE_EXAMPLE_ID=").append(req.getSourceExampleId());
+            if (!blank(req.getSourceBody())) {
+                grounding.append("\nSOURCE_BODY=").append(clean(req.getSourceBody()));
+                grounding.append("\nRECONSTRUCT_RULE=Re-narrate the SOURCE_BODY as the author's lived conflict story in their voice. Keep concrete facts/relationships; do not copy sentences verbatim; do not invent a different incident.");
+            }
+        }
+        if (!blank(req.getDynamicExamples())) {
+            grounding.append("\nSTYLE_EXAMPLES=").append(clean(req.getDynamicExamples()));
+        }
+        if (req.getRecentOutputs() != null && !req.getRecentOutputs().isEmpty()) {
+            grounding.append("\nRECENT_OUTPUTS=").append(json(req.getRecentOutputs()));
+            grounding.append("\nANTI_COPY_RULE=Do not reuse the same incident type, punchline, or closing advice pattern as RECENT_OUTPUTS.");
+        }
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Create Korean community conversation candidates.
                 The JSON schema is {"post":{"title":"...","body":"..."},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI.
+                When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed, not the whole story.
                 """ + "\nKIND=" + req.getKind() + "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) + "\n" + existing +
+                grounding +
                 "\nPERSONAS=" + json(req.getPersonas()) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20)));
     }
 
     private String replyPrompt(HumanReplyBatchRequest req) {
         return """
                 Return ONLY {"replies":[{"humanCommentId":1,"personaId":"...","body":"..."}]}. Write one short natural Korean reply for each supplied human comment. Use exactly its assigned responder personaId. Do not use internal notes, legal verdicts, diagnoses, personal data, or claims of being an AI.
-                INPUT=""" + json(req.getItems().stream().map(i -> Map.of("humanCommentId", i.getHumanCommentId(), "postTitle", clean(i.getPostTitle()), "postBody", clean(i.getPostBody()), "humanBody", clean(i.getHumanBody()), "responder", i.getResponder())).toList());
+                INPUT=""" + json(req.getItems().stream().map(i -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("humanCommentId", i.getHumanCommentId());
+                    row.put("postTitle", clean(i.getPostTitle()));
+                    row.put("postBody", clean(i.getPostBody()));
+                    row.put("humanBody", clean(i.getHumanBody()));
+                    if (!blank(i.getParentBody())) row.put("parentBody", clean(i.getParentBody()));
+                    row.put("responder", i.getResponder());
+                    return row;
+                }).toList());
     }
 
     private JsonNode parseObject(String raw) {

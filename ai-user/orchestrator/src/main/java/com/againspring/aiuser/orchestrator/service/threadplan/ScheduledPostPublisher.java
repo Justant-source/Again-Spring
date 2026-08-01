@@ -63,11 +63,13 @@ public class ScheduledPostPublisher {
             Optional<String> jwt = tokens.getToken(author.getId(), email, properties.getBotPassword());
             if (jwt.isEmpty()) { leases.releaseFailed(row.getId(), WORKER, "AUTH_FAILED", true); return; }
 
-            Optional<PostDto> published = backend.createPost(jwt.get(), CreatePostDto.builder()
+            CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
                     .userTitle(row.getTitle())
                     .bodyRaw(LiteralNewlineNormalizer.normalize(row.getBody()))
                     .category(row.getCategory())
-                    .visibility("PUBLIC").jurorCount(0).build());
+                    .visibility("PUBLIC").jurorCount(0);
+            applyProvenanceFromCandidates(postBuilder, row.getCandidatesJson());
+            Optional<PostDto> published = backend.createPost(jwt.get(), postBuilder.build());
             if (published.isEmpty() || published.get().getId() == null) {
                 leases.releaseFailed(row.getId(), WORKER, "BACKEND_WRITE_FAILED", true);
                 return;
@@ -87,6 +89,7 @@ public class ScheduledPostPublisher {
         if (row.getCandidatesJson() == null || row.getCandidatesJson().isBlank()) return;
         try {
             Map<String, Object> response = objectMapper.readValue(row.getCandidatesJson(), new TypeReference<>() { });
+            response.remove(AiPostBundleService.SOURCE_PROVENANCE_KEY);
             AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, Instant.now(),
                     row.getTitle(), row.getBody(), row.getCategory(), row.getProvider(), row.getModel());
             planGenerationService.persistResponse(plan.getId(), response);
@@ -97,6 +100,27 @@ public class ScheduledPostPublisher {
             // The durable outbox still fires POST_PUBLISHED, which creates a REQUESTED plan as a fallback.
             log.error("Published scheduled post {} but could not replay its candidates id={}",
                     post.getId(), row.getId(), replayFailure);
+        }
+    }
+
+    /** Replays Wave1-F provenance embedded under {@link AiPostBundleService#SOURCE_PROVENANCE_KEY}. */
+    @SuppressWarnings("unchecked")
+    private void applyProvenanceFromCandidates(CreatePostDto.CreatePostDtoBuilder postBuilder, String candidatesJson) {
+        if (candidatesJson == null || candidatesJson.isBlank()) return;
+        try {
+            Map<String, Object> response = objectMapper.readValue(candidatesJson, new TypeReference<>() { });
+            Object raw = response.get(AiPostBundleService.SOURCE_PROVENANCE_KEY);
+            if (!(raw instanceof Map<?, ?> prov)) return;
+            Object reconstruct = prov.get("reconstructMode");
+            if (!Boolean.TRUE.equals(reconstruct) && !"true".equalsIgnoreCase(String.valueOf(reconstruct))) return;
+            Object id = prov.get("sourceExampleId");
+            if (id instanceof Number n) postBuilder.sourceExampleId(n.longValue());
+            if (prov.get("sourceCommunity") != null) postBuilder.sourceCommunity(String.valueOf(prov.get("sourceCommunity")));
+            if (prov.get("sourceUrl") != null) postBuilder.sourceUrl(String.valueOf(prov.get("sourceUrl")));
+            if (prov.get("sourceOriginalTitle") != null) postBuilder.sourceOriginalTitle(String.valueOf(prov.get("sourceOriginalTitle")));
+            if (prov.get("sourceOriginalBody") != null) postBuilder.sourceOriginalBody(String.valueOf(prov.get("sourceOriginalBody")));
+        } catch (Exception e) {
+            log.debug("Could not read source provenance from candidates: {}", e.getMessage());
         }
     }
 

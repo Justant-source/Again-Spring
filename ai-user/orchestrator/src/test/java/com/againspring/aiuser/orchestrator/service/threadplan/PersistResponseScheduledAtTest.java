@@ -20,8 +20,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +40,7 @@ class PersistResponseScheduledAtTest {
     @Mock private OrchestratorProperties properties;
     @Mock private AiUserGenerationConfigRepository configRepository;
     @Mock private OrchestratorProperties.ThreadPlan threadPlanConfig;
+    @Mock private PlanPersonaMapper planPersonaMapper;
 
     private ThreadPlanGenerationService service;
     private CandidateScheduleSupport scheduleSupport;
@@ -48,7 +51,7 @@ class PersistResponseScheduledAtTest {
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
                 planService, llmClient, safetyGuard, properties, configRepository,
-                scheduleSupport);
+                scheduleSupport, planPersonaMapper);
     }
 
     @Test
@@ -62,6 +65,7 @@ class PersistResponseScheduledAtTest {
                 .build();
         when(planRepository.findById("plan-1")).thenReturn(Optional.of(plan));
         when(personaRepository.existsById("p1")).thenReturn(true);
+        when(personaRepository.findByActiveTrue()).thenReturn(List.of());
         when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
         when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -78,5 +82,26 @@ class PersistResponseScheduledAtTest {
         ArgumentCaptor<AiThreadPlanItem> captor = ArgumentCaptor.forClass(AiThreadPlanItem.class);
         verify(itemRepository).save(captor.capture());
         assertThat(captor.getValue().getScheduledAt()).isEqualTo(stored);
+    }
+
+    @Test
+    void persistResponseRejectsPersonaOutsideCast() {
+        AiThreadPlan plan = AiThreadPlan.builder()
+                .id("plan-2")
+                .postId("post-2")
+                .publishedAt(Instant.parse("2026-08-01T11:00:00Z"))
+                .build();
+        when(planRepository.findById("plan-2")).thenReturn(Optional.of(plan));
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("ref", "c1");
+        item.put("personaId", "outsider");
+        item.put("body", "캐스트 밖 페르소나");
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("items", List.of(item));
+
+        assertThatThrownBy(() -> service.persistResponse("plan-2", response, Set.of("p1", "p2")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not in requested cast");
     }
 }

@@ -42,6 +42,9 @@ class ThreadPlanGenerationServiceTest {
     @Mock
     private OrchestratorProperties.ThreadPlan threadPlanConfig;
 
+    @Mock
+    private PlanPersonaMapper planPersonaMapper;
+
     private ThreadPlanGenerationService service;
 
     @BeforeEach
@@ -50,7 +53,7 @@ class ThreadPlanGenerationServiceTest {
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
                 planService, llmClient, safetyGuard, properties, configRepository,
-                scheduleSupport
+                scheduleSupport, planPersonaMapper
         );
     }
 

@@ -123,6 +123,11 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 | `AI_USER_THREAD_PLAN_AI_POST_PROVIDER` | DB config 부재 시 AI 글 bundle provider | `CODEX` |
 | `AI_USER_THREAD_PLAN_HUMAN_PROVIDER` | DB config 부재 시 사람 글/반응 provider | `CODEX` |
 | `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` | 번들형 구조화 생성(글+최대 24후보) 타임아웃 ms | `240000` |
+| `AI_USER_HUMAN_REPLY_DELAY_MINUTES_MIN` | human reply 게시 지연 하한(분) | `1` |
+| `AI_USER_HUMAN_REPLY_DELAY_MINUTES_MAX` | human reply 게시 지연 상한(분) | `30` |
+| `AI_USER_HUMAN_REPLY_INBOX_TTL_DAYS` | inbox `observed_at` TTL(일). 초과 시 `CANCELLED`+`EXPIRED_TTL` | `7` |
+| `AI_USER_HUMAN_REPLY_PLAN_TTL_DAYS` | `REQUESTED` plan `created_at` TTL(일). 초과 시 `EXPIRED`+`EXPIRED_TTL` | `7` |
+| `AI_USER_HUMAN_REPLY_TTL_CLEANUP_ENABLED` | TTL 정리 cron 실행 gate (**기본 OFF**, admin force 가능) | `false` |
 | `AI_USER_SCHEDULED_POST_PUBLISHER_ENABLED` | `ai_scheduled_posts` 예약글 발행 gate | `false` |
 | `AI_USER_SCHEDULED_POST_PUBLISHER_CRON` | 예약글 발행 스케줄러 cron (5-field) | `0 * * * * *` |
 | `AI_USER_SCHEDULED_POST_PUBLISH_BATCH_SIZE` | 발행 tick당 최대 처리 행 수 | `5` |

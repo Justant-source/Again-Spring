@@ -31,6 +31,11 @@ public class OrchestratorProperties {
     private PairedPost pairedPost = new PairedPost();
     /** Plan-first foundation settings. Publisher/generator wiring is intentionally separate. */
     private ThreadPlan threadPlan = new ThreadPlan();
+    /**
+     * Human-reply batch timing and backlog TTL (§2.9 / Wave1-I).
+     * Destructive TTL cleanup stays off until an admin trigger or explicit flag flip.
+     */
+    private HumanReply humanReply = new HumanReply();
 
     public boolean isContentAwareEnabled() {
         return contentAwareDecisions.isEnabled();
@@ -60,6 +65,23 @@ public class OrchestratorProperties {
         private boolean enabled = true;
         /** 틱당 신규 글 분석 LLM 호출 상한 (토큰 통제). */
         private int analysisBudgetPerTick = 3;
+    }
+
+    @Getter
+    @Setter
+    public static class HumanReply {
+        /** Publish delay after batch success — inclusive minutes. */
+        private int delayMinutesMin = 1;
+        private int delayMinutesMax = 30;
+        /** Inbox rows older than this (by observed_at / detected_at) → CANCELLED + EXPIRED_TTL. */
+        private int inboxTtlDays = 7;
+        /** REQUESTED ai_thread_plans older than this (by created_at) → EXPIRED + EXPIRED_TTL. */
+        private int planTtlDays = 7;
+        /**
+         * When false (default), scheduled/auto TTL wipe is a no-op.
+         * Admin {@code /admin/trigger/human-reply-ttl-cleanup} may still run with force=true.
+         */
+        private boolean ttlCleanupEnabled = false;
     }
 
     @Getter

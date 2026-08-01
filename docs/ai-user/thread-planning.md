@@ -78,6 +78,10 @@ flowchart LR
 
 사람이 작성한 댓글/대댓글은 outbox를 통해 `ai_human_interaction_inbox`에 한 번만 들어간다. 30분 batch는 만료 전 `PENDING` 항목을 최대 10개 게시글 또는 50개 interaction으로 lease한다.
 
+- batch 요청에는 **실제** `humanBody`·`postTitle`/`postBody`·`parentBody`(있을 때)·`responder` persona를 넣는다. 빈 값/`Map.of()`는 LLM 400을 유발하므로 금지.
+- persist 시 `personaRepository.existsById`로 persona를 검증하고, 게시 지연은 설정 범위(기본 1~30분)에서 LLM `delayMinutes`(있으면) 또는 랜덤으로 잡는다.
+- inbox `observed_at` TTL 기본 7일(`ai-user.human-reply.inbox-ttl-days`). 초과분은 삭제하지 않고 `CANCELLED` + `failure_code=EXPIRED_TTL`로 전이한다. `REQUESTED` plan도 `plan-ttl-days`(기본 7)로 동일 사유 만료.
+- TTL 정리 cron/플래그(`ttl-cleanup-enabled`)는 **기본 OFF**. 운영 정리는 `POST /admin/trigger/human-reply-ttl-cleanup?force=true`로만 수행한다.
 - 한 입력 comment ID는 하나의 reply 대상이다. 응답은 input comment ID와 1:1로 매핑한다.
 - 일부 응답이 누락/실패하면 나머지는 저장하고 누락분만 다음 batch 후보로 남긴다.
 - AI가 쓴 댓글·대댓글은 inbox에 넣지 않으므로 AI-to-AI 루프가 생기지 않는다.

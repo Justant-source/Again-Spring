@@ -1,5 +1,6 @@
 package com.againspring.aiuser.orchestrator.api;
 
+import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.service.threadplan.HumanInteractionInboxService;
 import com.againspring.aiuser.orchestrator.service.threadplan.ThreadPlanService;
 import com.againspring.aiuser.orchestrator.client.BackendBotClient;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 /** Backend outbox delivery adapter. Duplicate delivery is harmless at both plan and inbox boundaries. */
@@ -22,6 +24,7 @@ public class ThreadPlanOutboxController {
     private final ThreadPlanService planService;
     private final HumanInteractionInboxService inboxService;
     private final BackendBotClient backend;
+    private final OrchestratorProperties properties;
 
     @PostMapping
     public ResponseEntity<Void> accept(@RequestBody Event event) {
@@ -36,8 +39,10 @@ public class ThreadPlanOutboxController {
         } else if (type.equals("COMMENT_CREATED") || type.equals("COMMENT") || type.equals("REPLY_CREATED") || type.equals("REPLY")) {
             // Backend must mark synthetic authors. Missing/true means never treat the action as human input.
             if (!event.syntheticAuthor && event.commentId != null) {
+                int ttlDays = Math.max(1, properties.getHumanReply().getInboxTtlDays());
                 inboxService.observe(event.postId, event.commentId, event.parentCommentId, safe(event.authorId),
-                        (type.equals("REPLY_CREATED") || type.equals("REPLY")) ? "REPLY" : "COMMENT", occurred, occurred.plusSeconds(24 * 3600));
+                        (type.equals("REPLY_CREATED") || type.equals("REPLY")) ? "REPLY" : "COMMENT",
+                        occurred, occurred.plus(ttlDays, ChronoUnit.DAYS));
             }
         } else if (type.equals("POST_BLOCKED") || type.equals("POST_DELETED") || type.equals("POST_PRIVATE")) {
             planService.cancelPlanAndUnpublishedItemsForPost(event.postId);

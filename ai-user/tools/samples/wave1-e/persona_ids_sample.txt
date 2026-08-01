@@ -1,0 +1,11 @@
+# Sample persona id list for Wave1-E baseline tools (not prod).
+# Mix of IDs that exist in local YAML + synthetic missing IDs.
+a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5
+c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6
+b6ce1ca573604028aeee848760d5b3d5
+c6da64a654e44889b0258e54f8b39667
+# synthetic — expected YAML-missing
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+cccccccccccccccccccccccccccccccc

@@ -18,6 +18,7 @@
 | `ThreadPlanGenerationScheduler` | 요청된 plan을 구조화 LLM으로 한 번에 생성 |
 | `ThreadPlanPublisherScheduler` | due item lease·멱등 게시 |
 | `HumanReplyBatchScheduler` | 사람 댓글/대댓글을 30분 단위로 묶어 reply 생성 |
+| `HumanReplyTtlCleanupScheduler` | inbox/REQUESTED plan TTL 정리 (플래그 기본 OFF, no-op) |
 
 ## 스케줄
 

@@ -64,6 +64,13 @@ ai-user:
   content-aware-decisions:
     enabled: ${AI_USER_CONTENT_AWARE_DECISIONS_ENABLED:true}
     analysis-budget-per-tick: ${AI_USER_ANALYSIS_BUDGET_PER_TICK:3}
+  human-reply:
+    delay-minutes-min: ${AI_USER_HUMAN_REPLY_DELAY_MINUTES_MIN:1}
+    delay-minutes-max: ${AI_USER_HUMAN_REPLY_DELAY_MINUTES_MAX:30}
+    inbox-ttl-days: ${AI_USER_HUMAN_REPLY_INBOX_TTL_DAYS:7}
+    plan-ttl-days: ${AI_USER_HUMAN_REPLY_PLAN_TTL_DAYS:7}
+    # Destructive backlog expiry — default OFF; admin trigger can force a one-shot run.
+    ttl-cleanup-enabled: ${AI_USER_HUMAN_REPLY_TTL_CLEANUP_ENABLED:false}
   thread-plan:
     # Foundation maintenance is disabled until PLAN mode is explicitly rolled out.
     maintenance-enabled: ${AI_USER_THREAD_PLAN_MAINTENANCE_ENABLED:false}

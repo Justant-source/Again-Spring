@@ -1,14 +1,21 @@
 package com.againspring.aiuser.llm.service;
 
 import com.againspring.aiuser.llm.dto.ThreadPlanRequest;
+import com.againspring.aiuser.llm.dto.ThreadPlanResponse;
 import com.againspring.aiuser.llm.pool.LlmWorkerPool;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,10 +24,12 @@ import static org.mockito.Mockito.*;
 
 class StructuredGenerationServiceTest {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     @Test
     void rejectsEnglishRefusalInsideJsonEnvelopeAtItemLevel() throws Exception {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);
-        StructuredGenerationService service = configuredService(pool);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
         ThreadPlanRequest request = planRequest();
         String unsafeJson = validPlanJson("I can't help with this request");
         when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
@@ -34,7 +43,7 @@ class StructuredGenerationServiceTest {
     @Test
     void passesSharedThreadPlanSchemaToProviderTask() throws Exception {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);
-        StructuredGenerationService service = configuredService(pool);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
         when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
                 eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(validPlanJson("한국어 댓글입니다"));
 
@@ -47,7 +56,7 @@ class StructuredGenerationServiceTest {
     @Test
     void convertsLiteralBackslashNInStructuredPostBody() throws Exception {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);
-        StructuredGenerationService service = configuredService(pool);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
         // JSON에 리터럴 백슬래시+n을 넣으려면 JSON 텍스트에 \\n → Java 문자열에는 \\\\n
         String json = validPlanJsonWithPostBody("첫 줄입니다.\\\\n둘째 줄입니다. 충분히 자연스러운 본문입니다.");
         when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
@@ -61,13 +70,159 @@ class StructuredGenerationServiceTest {
         assertTrue(response.getPost().getBody().contains("\n"), "실제 개행으로 변환돼야 함");
     }
 
-    private static StructuredGenerationService configuredService(LlmWorkerPool pool) {
-        StructuredGenerationService service = new StructuredGenerationService(pool);
+    @Test
+    void personaVoiceProfileRoundTripsAsStructuredMapWithoutLosingNicknameOrFormality() throws Exception {
+        ThreadPlanRequest.Persona persona = new ThreadPlanRequest.Persona();
+        persona.setPersonaId("u_author");
+        persona.setNickname("봄이네");
+        persona.setFormality("casual");
+        Map<String, Object> voice = new LinkedHashMap<>();
+        voice.put("formality", "casual");
+        voice.put("voice_type", "NATEPAN");
+        voice.put("age", "30대");
+        voice.put("gender", "F");
+        voice.put("general_style", "담백한 반말");
+        persona.setVoiceProfile(voice);
+
+        String encoded = JSON.writeValueAsString(persona);
+        assertTrue(encoded.contains("\"nickname\":\"봄이네\""));
+        assertTrue(encoded.contains("\"formality\":\"casual\""));
+        assertTrue(encoded.contains("\"voice_type\":\"NATEPAN\""));
+        assertFalse(encoded.contains("formality=casual"), "must not be Map.toString()");
+
+        ThreadPlanRequest.Persona decoded = JSON.readValue(encoded, ThreadPlanRequest.Persona.class);
+        assertEquals("봄이네", decoded.getNickname());
+        assertEquals("casual", decoded.getFormality());
+        assertInstanceOf(Map.class, decoded.getVoiceProfile());
+        assertEquals("NATEPAN", decoded.getVoiceProfile().get("voice_type"));
+        assertEquals("casual", decoded.getVoiceProfile().get("formality"));
+
+        // Orchestrator-style envelope: voiceProfile as nested JSON object
+        String requestJson = """
+                {"kind":"AI_POST","provider":"CODEX","personas":[{
+                  "personaId":"u_author","nickname":"봄이네","formality":"polite",
+                  "voiceProfile":{"formality":"polite","voice_type":"BLIND","age":"40대"}
+                }]}
+                """;
+        ThreadPlanRequest req = JSON.readValue(requestJson, ThreadPlanRequest.class);
+        assertEquals("봄이네", req.getPersonas().get(0).getNickname());
+        assertEquals("polite", req.getPersonas().get(0).getFormality());
+        assertEquals("BLIND", req.getPersonas().get(0).getVoiceProfile().get("voice_type"));
+        assertEquals("polite", StructuredGenerationService.resolveFormality(req.getPersonas().get(0)));
+    }
+
+    @Test
+    void planPromptSerializesVoiceProfileAsJsonObjectNotMapToString() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(validPlanJson("한국어 댓글입니다"));
+
+        ThreadPlanRequest request = planRequest();
+        ThreadPlanRequest.Persona author = request.getPersonas().get(0);
+        author.setNickname("닉네임실명");
+        author.setFormality("casual");
+        author.setVoiceProfile(Map.of("formality", "casual", "voice_type", "NATEPAN", "age", "20대"));
+
+        service.createThreadPlan(request, "corr-voice");
+
+        var promptCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(pool).executeProviderTask(promptCaptor.capture(), anyString(), anyLong(), anyString(),
+                eq(LlmProvider.CODEX), eq(StructuredOutputSchema.THREAD_PLAN));
+        String prompt = promptCaptor.getValue();
+        assertTrue(prompt.contains("PERSONAS="));
+        assertTrue(prompt.contains("\"nickname\":\"닉네임실명\""));
+        assertTrue(prompt.contains("\"formality\":\"casual\""));
+        assertTrue(prompt.contains("\"voice_type\":\"NATEPAN\""));
+        assertFalse(prompt.contains("voiceProfile={"), "Map.toString() must not appear in prompt");
+
+        int personasIdx = prompt.indexOf("PERSONAS=");
+        String personasJson = prompt.substring(personasIdx + "PERSONAS=".length(), prompt.indexOf("\nLIMITS="));
+        List<Map<String, Object>> personas = JSON.readValue(personasJson, new TypeReference<>() {});
+        assertEquals("닉네임실명", personas.get(0).get("nickname"));
+        assertInstanceOf(Map.class, personas.get(0).get("voiceProfile"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> vp = (Map<String, Object>) personas.get(0).get("voiceProfile");
+        assertEquals("NATEPAN", vp.get("voice_type"));
+    }
+
+    @Test
+    void planPromptIncludesSourceGroundingFields() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(validPlanJson("한국어 댓글입니다"));
+
+        ThreadPlanRequest request = planRequest();
+        request.setSourceContext(Map.of("source", "natepan", "register", "NATEPAN"));
+        request.setReconstructMode(true);
+        request.setSourceExampleId(42L);
+        request.setSourceBody("원본 사연 본문입니다. 친구에게 돈을 빌려줬는데 연락이 두절됐어요.");
+        request.setDynamicExamples("문체 앵커 예시");
+        request.setRecentOutputs(List.of("최근 글 요약"));
+        request.setAuthor(Map.of("personaId", "p1", "nickname", "작성자닉"));
+
+        service.createThreadPlan(request, "corr-ground");
+
+        var promptCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(pool).executeProviderTask(promptCaptor.capture(), anyString(), anyLong(), anyString(),
+                eq(LlmProvider.CODEX), eq(StructuredOutputSchema.THREAD_PLAN));
+        String prompt = promptCaptor.getValue();
+        assertTrue(prompt.contains("SOURCE_CONTEXT="));
+        assertTrue(prompt.contains("RECONSTRUCT_MODE=true"));
+        assertTrue(prompt.contains("SOURCE_BODY="));
+        assertTrue(prompt.contains("STYLE_EXAMPLES="));
+        assertTrue(prompt.contains("RECENT_OUTPUTS="));
+        assertTrue(prompt.contains("AUTHOR="));
+        assertTrue(prompt.contains("원본 사연 본문"));
+    }
+
+    @Test
+    void createThreadPlanInvokesSelfCritiqueOnPostAndTopLevelComments() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        SelfCritiqueService critique = mock(SelfCritiqueService.class);
+        when(critique.critiqueAndRefine(anyString(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
+                .thenAnswer(inv -> inv.getArgument(0));
+        StructuredGenerationService service = configuredService(pool, critique);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(validPlanJson("한국어 댓글입니다"));
+
+        ThreadPlanResponse response = service.createThreadPlan(planRequest(), "corr-sc");
+        assertNotNull(response.getPost());
+
+        // post once + 6 top-level comments (replies skipped)
+        verify(critique, times(1)).critiqueAndRefine(
+                eq(response.getPost().getBody()), eq("post"), anyString(), eq("corr-sc"),
+                eq("CLI"), any(), eq("gpt-5.6-terra"), any());
+        verify(critique, times(6)).critiqueAndRefine(
+                anyString(), eq("comment"), anyString(), startsWith("corr-sc-"),
+                eq("CLI"), any(), eq("gpt-5.6-terra"), any());
+        verify(critique, never()).critiqueAndRefine(
+                anyString(), eq("reply"), anyString(), anyString(), any(), any(), any(), any());
+    }
+
+    @Test
+    void resolveFormalityPrefersTopLevelThenVoiceProfile() {
+        ThreadPlanRequest.Persona p = new ThreadPlanRequest.Persona();
+        p.setVoiceProfile(Map.of("formality", "polite"));
+        assertEquals("polite", StructuredGenerationService.resolveFormality(p));
+        p.setFormality("casual");
+        assertEquals("casual", StructuredGenerationService.resolveFormality(p));
+    }
+
+    private static StructuredGenerationService configuredService(LlmWorkerPool pool, SelfCritiqueService critique) {
+        StructuredGenerationService service = new StructuredGenerationService(pool, critique);
         ReflectionTestUtils.setField(service, "codexTerra", "gpt-5.6-terra");
         ReflectionTestUtils.setField(service, "codexLuna", "gpt-5.6-luna");
         ReflectionTestUtils.setField(service, "claudeDefault", "claude-haiku-4-5-20251001");
         ReflectionTestUtils.setField(service, "claudePostModel", "claude-sonnet-4-6");
         return service;
+    }
+
+    private static SelfCritiqueService disabledCritique() {
+        SelfCritiqueService svc = new SelfCritiqueService(null, null, null);
+        ReflectionTestUtils.setField(svc, "enabled", false);
+        return svc;
     }
 
     private static ThreadPlanRequest planRequest() {
@@ -81,6 +236,9 @@ class StructuredGenerationServiceTest {
     private static ThreadPlanRequest.Persona persona(String id) {
         ThreadPlanRequest.Persona persona = new ThreadPlanRequest.Persona();
         persona.setPersonaId(id);
+        persona.setNickname("nick-" + id);
+        persona.setFormality("casual");
+        persona.setVoiceProfile(Map.of("formality", "casual", "voice_type", "NATEPAN"));
         return persona;
     }
 

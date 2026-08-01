@@ -34,6 +34,35 @@
 | paired posts | `PairedPostScheduler` |
 | prod→dev 복사 | `prod-dev-sync` (일일 cron) |
 
+## Wave1-D (2026-08-01) — 크롤 소스 BLIND·NATEPAN 단일화 (코드)
+
+오너 결정(§2.6): 다시봄이 쓰는 커뮤니티 근거는 BLIND·NATEPAN 둘뿐.
+
+| 변경 | 내용 |
+|---|---|
+| `scheduler.py` `SOURCES` | natepan 1500 · blind 500 만 남김 (limit=0 항목 제거) |
+| 삭제된 크롤러 모듈 | `clien` `theqoo` `ruliweb` `dcinside` `fmkorea` `mlbpark` `ppomppu` `bobaedream` `naver_comments` `daum_comments` + `natepan_backup` `dcinside_backup` |
+| 유지 | `natepan.py` · `blind.py` (본문 로직은 다른 슬라이스 소유) |
+| `crawl.py` registry | 위 두 source만 import |
+| `register_classifier.py` | BLIND(polite)·NATEPAN(casual) 문체 패턴 보강, 다수결 임계 0.55 |
+
+**DB `example_bank` 행 삭제는 하지 않았다.** clien 등 4,346건 삭제는 prod 백업 + 명시 승인 후 별도 작업.
+
+## Wave1 운영 적용 (2026-08-01) — 코퍼스 DB 단일화 + TTL
+
+오너 승인 후 prod에 적용:
+
+| 항목 | 결과 |
+|---|---|
+| 백업 | `/home/justant/backups/prod-pre-corpus-unify-20260801-163820.sql` (112MB) |
+| 삭제 | clien 2626 · ruliweb 1078 · theqoo 568 · dcinside 74 = **4346건** |
+| source 정규화 | `BLIND` → `blind` (592건) |
+| 잔여 | natepan 5509 · blind 592 · SELF_GENERATED 510 |
+| inbox TTL | PROCESSING 35건 → PENDING 회수. 7일 초과분 0건(전원 7일 이내) |
+| plan TTL | REQUESTED 133건은 전원 당일 생성분 → 미만료 |
+
+WP1B 119명 voice 재생성은 댓글 크롤 축적 후 별도 진행.
+
 ## 현재 운영 상태를 해석할 때 주의할 점
 
 - `.result/ai-user-v2/` 문서는 historical artifact다. 현재 런타임 truth는 `ai-user/*` 코드와 compose 파일이다.

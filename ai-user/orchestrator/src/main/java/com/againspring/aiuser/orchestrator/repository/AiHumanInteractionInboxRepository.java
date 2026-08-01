@@ -31,10 +31,31 @@ public interface AiHumanInteractionInboxRepository extends JpaRepository<AiHuman
                              @Param("pending") HumanInteractionStatus pending,
                              @Param("now") Instant now);
 
+    /** Reclaim every stuck PROCESSING lease so rows become PENDING again (admin TTL cleanup path). */
+    @Modifying
+    @Query("update AiHumanInteractionInbox i set i.status = :pending, i.leaseOwner = null, i.leaseUntil = null " +
+           "where i.status = :processing")
+    int reclaimAllProcessing(@Param("processing") HumanInteractionStatus processing,
+                             @Param("pending") HumanInteractionStatus pending);
+
     @Modifying
     @Query("update AiHumanInteractionInbox i set i.status = :expired where i.status in (:pending, :processing) and i.expiresAt <= :now")
     int expirePastDue(@Param("pending") HumanInteractionStatus pending,
                       @Param("processing") HumanInteractionStatus processing,
                       @Param("expired") HumanInteractionStatus expired,
                       @Param("now") Instant now);
+
+    /**
+     * 7-day backlog policy: observed_at (detected_at) older than cutoff → CANCELLED + reason,
+     * never delete.
+     */
+    @Modifying
+    @Query("update AiHumanInteractionInbox i set i.status = :cancelled, i.failureCode = :reason, " +
+           "i.leaseOwner = null, i.leaseUntil = null " +
+           "where i.status in (:pending, :processing) and i.observedAt < :cutoff")
+    int cancelOlderThan(@Param("pending") HumanInteractionStatus pending,
+                        @Param("processing") HumanInteractionStatus processing,
+                        @Param("cancelled") HumanInteractionStatus cancelled,
+                        @Param("reason") String reason,
+                        @Param("cutoff") Instant cutoff);
 }

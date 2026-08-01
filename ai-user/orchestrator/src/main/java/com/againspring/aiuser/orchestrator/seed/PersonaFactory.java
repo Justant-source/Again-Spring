@@ -37,7 +37,9 @@ public class PersonaFactory {
     // 다양성 매트릭스 — 부족분 생성에 사용
     private static final String[] AGES      = {"10s","20s_early","20s_late","30s_early","30s_late","40s","50s","60s"};
     private static final String[] GENDERS   = {"M","F"};
-    private static final String[] VOICES    = {"NATEPAN","BLIND","DCINSIDE","GENERAL","FMKOREA","RULIWEB","THEQOO","ARCALIVE","INVEN","MLBPARK","PPOMPPU","CLIEN"};
+    // WP1B: register 단일화 — 허용 voice_type = NATEPAN · BLIND 뿐 (§16.1B / §16.7)
+    // Soft target ratio 3:1 (crawl budget). Hard quota 아님.
+    private static final String[] VOICES = {"NATEPAN", "NATEPAN", "NATEPAN", "BLIND"};
     private static final String[] POLITICS  = {"progressive","moderate","conservative"};
     private static final String[] REGIONS   = {"서울","경기","부산","대구","인천","광주","대전","기타"};
     private static final String[] JOBS      = {"직장인","주부","학생","자영업자","프리랜서","무직"};
@@ -98,18 +100,9 @@ public class PersonaFactory {
             log.debug("PersonaFactory HEAVY check failed, using random tier: {}", e.getMessage());
         }
         double slang    = switch (voice) {
-            case "DCINSIDE"  -> 0.7 + RNG.nextDouble() * 0.2;
-            case "FMKOREA"   -> 0.65 + RNG.nextDouble() * 0.2;
-            case "ARCALIVE"  -> 0.65 + RNG.nextDouble() * 0.2;
-            case "THEQOO"    -> 0.5 + RNG.nextDouble() * 0.25;  // 혼용 스타일 — slang 범위 상향
-            case "INVEN"     -> 0.5 + RNG.nextDouble() * 0.25;  // 혼용 스타일 — slang 범위 상향
-            case "BLIND"     -> 0.2 + RNG.nextDouble() * 0.2;
-            case "NATEPAN"   -> 0.4 + RNG.nextDouble() * 0.25;  // 사연=존댓말, 댓글=혼용 — slang 범위 상향
-            case "RULIWEB"   -> 0.45 + RNG.nextDouble() * 0.25; // 혼용 스타일 — slang 범위 상향
-            case "MLBPARK"   -> 0.2 + RNG.nextDouble() * 0.15;
-            case "PPOMPPU"   -> 0.25 + RNG.nextDouble() * 0.2;  // 혼용으로 분류 — slang 범위 상향
-            case "CLIEN"     -> 0.1 + RNG.nextDouble() * 0.15;
-            default          -> 0.3 + RNG.nextDouble() * 0.3;
+            case "BLIND"   -> 0.2 + RNG.nextDouble() * 0.2;
+            case "NATEPAN" -> 0.4 + RNG.nextDouble() * 0.25;  // 사연=존댓말, 댓글=혼용
+            default        -> 0.3 + RNG.nextDouble() * 0.25;
         };
 
         // LLM으로 voice 블록 생성

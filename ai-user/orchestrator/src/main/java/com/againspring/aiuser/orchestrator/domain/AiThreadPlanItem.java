@@ -52,6 +52,14 @@ public class AiThreadPlanItem {
     @Column(name = "body", columnDefinition = "LONGTEXT")
     private String body;
 
+    /** Perspective label for 80% stance-cap measurement (AUTHOR|COUNTERPART|NEUTRAL|CONTRARIAN). */
+    @Column(name = "stance", length = 16)
+    private String stance;
+
+    /** Optional crawled/source example provenance; no hard FK to backend tables. */
+    @Column(name = "source_example_id")
+    private Long sourceExampleId;
+
     @Column(name = "scheduled_at")
     private Instant scheduledAt;
 

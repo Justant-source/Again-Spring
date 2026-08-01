@@ -120,6 +120,10 @@ docker logs -f againspring-prod-dev-sync
 - `AI_LEARNING_ENABLED=false`면 scheduler가 시작되지 않는다.
 - `AI_LEARNING_CRAWL_ENABLED=false`면 자체 일일 crawl/strengthen/topic 작업이 등록되지 않는다.
 - API 엔드포인트(`/crawl/*`, `/strengthen/*`, `/topics/*`)는 컨테이너가 떠 있는 한 계속 응답한다.
+- **크롤 소스 (Wave1-D)**: 일일 예산·수동 트리거 모두 `natepan`(1500) · `blind`(500) 둘뿐.
+  `POST /crawl/{source}`에 그 외 이름을 넣으면 unknown source로 스킵된다.
+  비활성 커뮤니티 크롤러 모듈은 코드베이스에서 제거됨.
+  prod `example_bank` 비-natepan/blind 4,346건 삭제 완료 (2026-08-01, 백업 선행).
 
 ## 7. sync 운영 주의점
 

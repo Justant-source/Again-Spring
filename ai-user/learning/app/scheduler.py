@@ -13,29 +13,18 @@ KST = ZoneInfo("Asia/Seoul")
 # (2026-06-21~24 natepan FAILED 원인). 싱글턴 가드로 차단.
 _scheduler = None
 
-# WO-CRAWL-01: NATEPAN(1500) + BLIND(500) 활성 — 블라인드 최우선 강화 (240→500)
-# 403 차단율을 admin 배지로 관찰하며 단계 증액 예정
-# limit=0 → _do_crawl 내부에서 skip (if not limit: return)
+# Wave1-D (2026-08-01): 커뮤니티 소스 BLIND·NATEPAN 단일화 — SOURCES는 활성 2개만
+# 예산 유지: NATEPAN 1500 / BLIND 500 (WO-CRAWL-01). 403 차단율은 admin 배지로 관찰.
 SOURCES = [
-    ("natepan",  1500),  # Phase 1: 전체 예산 NATEPAN 집중
-    ("naver",       0),  # 비활성
-    ("daum",        0),  # 비활성
-    ("dcinside",    0),  # 비활성
-    ("bobaedream",  0),  # 비활성
-    ("blind",     500),  # WO-CRAWL-01: 결혼생활·썸·연애·회사생활 채널 (채널당 ~166개)
-    ("fmkorea",     0),  # 비활성
-    ("theqoo",      0),  # 비활성
-    ("clien",       0),  # 비활성
-    ("ppomppu",     0),  # 비활성
-    ("ruliweb",     0),  # 비활성
-    ("mlbpark",     0),  # 비활성
+    ("natepan", 1500),
+    ("blind",    500),  # 결혼생활·썸·연애·회사생활 채널
 ]
 
 async def run_daily_crawl():
-    """매일 KST 03:00 — NATEPAN 전용 크롤 → 완료 후 말투 강화 + 토픽 합성"""
+    """매일 KST 03:00 — natepan·blind 크롤 → 완료 후 말투 강화 + 토픽 합성"""
     from app.main import embed_service
     from app.api.crawl import _do_crawl
-    logger.info("Daily crawl started (NATEPAN-only, Phase 1 v2)")
+    logger.info("Daily crawl started (natepan + blind)")
     for source, limit in SOURCES:
         if not limit:
             continue

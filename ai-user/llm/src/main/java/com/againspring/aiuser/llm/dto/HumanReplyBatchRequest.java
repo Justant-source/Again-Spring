@@ -20,6 +20,8 @@ public class HumanReplyBatchRequest {
         private String postTitle;
         private String postBody;
         private String humanBody;
+        /** Optional parent comment body when the human message is a reply. */
+        private String parentBody;
         private ThreadPlanRequest.Persona responder;
     }
 }

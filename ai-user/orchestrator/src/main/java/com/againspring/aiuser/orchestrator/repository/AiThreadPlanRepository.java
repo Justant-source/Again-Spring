@@ -39,4 +39,13 @@ public interface AiThreadPlanRepository extends JpaRepository<AiThreadPlan, Stri
                                @Param("revision") int revision,
                                @Param("cancelled") ThreadPlanStatus cancelled,
                                @Param("activeStatuses") Collection<ThreadPlanStatus> activeStatuses);
+
+    /** REQUESTED plans stuck past the backlog TTL (created_at older than cutoff). */
+    @Modifying
+    @Query("update AiThreadPlan p set p.status = :expired, p.failureCode = :reason " +
+           "where p.status = :requested and p.createdAt < :cutoff")
+    int expireRequestedOlderThan(@Param("requested") ThreadPlanStatus requested,
+                                 @Param("expired") ThreadPlanStatus expired,
+                                 @Param("reason") String reason,
+                                 @Param("cutoff") Instant cutoff);
 }

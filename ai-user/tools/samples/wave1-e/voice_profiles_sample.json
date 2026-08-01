@@ -1,0 +1,54 @@
+{
+  "personas": [
+    {
+      "id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      "nickname": "꿀강아지98",
+      "voice_profile": {
+        "voice_type": "NATEPAN",
+        "general_style": "NATEPAN의 따뜻하고 감정적인 스타일. 가족 중심 조언.",
+        "example_comments": [
+          "비슷한 일 겪어봤어요. 천천히 이야기해보세요"
+        ]
+      }
+    },
+    {
+      "id": "sample-contaminated-001",
+      "nickname": "오염샘플1",
+      "voice_profile": {
+        "voice_type": "THEQOO",
+        "general_style": "정치·사회 이슈에 강한 의견을 드러내는 직설적인 스타일, 보수 성향의 목소리",
+        "example_comments": [
+          "결혼을 하려는 이유가.. ? 남친 착하고 님밖에모르죠?",
+          "확실히 관리가 중요한가봐. 살쪗을때 나왔던 텐션 ... 아이브 리즈도 ...",
+          "네덜란드가 스웨덴을 5:1 로 처바른 방종송 제목 보소 ㅎ / 티배깅까지 완-벽",
+          "니달리 창 같은 경우에는 Q스킬 갈라지는 것 조차도 ... 벨코즈 q스킬이랑 달리 ..."
+        ]
+      }
+    },
+    {
+      "id": "sample-contaminated-002",
+      "nickname": "오염샘플2",
+      "voice_profile": {
+        "voice_type": "INVEN",
+        "general_style": "인벤 스타일. 부부 소통을 게임 공략처럼 접근.",
+        "comment": {
+          "example_comments": [
+            "이 관계는 공략 순서가 틀린 듯함",
+            "시술 받기 전에 피부과 상담부터"
+          ]
+        }
+      }
+    },
+    {
+      "id": "sample-ok-blind-001",
+      "nickname": "클린블라인드",
+      "voice_profile": {
+        "voice_type": "BLIND",
+        "general_style": "직장 갈등 경험을 바탕으로 한 현실 조언.",
+        "example_comments": [
+          "증거 남겨두고 HR에 문의하는 게 낫습니다"
+        ]
+      }
+    }
+  ]
+}

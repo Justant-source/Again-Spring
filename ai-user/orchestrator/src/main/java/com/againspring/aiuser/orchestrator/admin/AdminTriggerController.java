@@ -12,6 +12,7 @@ import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
 import com.againspring.aiuser.orchestrator.service.engagement.PlanEngagementDispatcher;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
+import com.againspring.aiuser.orchestrator.service.threadplan.HumanReplyTtlCleanupService;
 import com.againspring.aiuser.orchestrator.task.ActionExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,6 +57,7 @@ public class AdminTriggerController {
     private final AiScheduledPostRepository scheduledPostRepository;
     private final PlanEngagementDispatcher engagementDispatcher;
     private final ViewDispatcher viewDispatcher;
+    private final HumanReplyTtlCleanupService humanReplyTtlCleanupService;
 
     /**
      * KST 시간대 곡선으로 발행 슬롯 N개를 샘플링만 해서 보여준다(부작용 없음).
@@ -122,8 +124,10 @@ public class AdminTriggerController {
             Persona persona = pool.get(i);
             String corrId = "nightly-hold-" + persona.getId() + "-" + i;
             try {
+                // topicHint null → AiPostBundleService resolves example_bank source via findSimilar
+                // (never an empty-topic-only path).
                 Optional<AiScheduledPost> held = aiPostBundleService.generateAndHold(
-                        persona, topCategory(persona), "", corrId, slots.get(i));
+                        persona, topCategory(persona), null, corrId, slots.get(i));
                 held.ifPresent(row -> scheduledIds.add(row.getId()));
                 attempted++;
             } catch (Exception e) {
@@ -360,6 +364,25 @@ public class AdminTriggerController {
         log.info("[AdminTrigger] reconcile-engagement done: posts={} views={} commentLikes={} replyLikes={} votes={} postLikes={}",
                 result.postsScanned(), result.viewsUpdated(), result.commentLikesApplied(), result.replyLikesApplied(),
                 result.votesApplied(), result.postLikesApplied());
+    }
+
+    /**
+     * Human-reply backlog TTL cleanup (Wave1-I / §2.9).
+     * Default flag is OFF — pass force=true for a one-shot admin run against the bound DB
+     * (does not auto-wipe on startup). Cancels inbox rows older than inbox_ttl_days with
+     * EXPIRED_TTL and expires stuck REQUESTED plans the same way.
+     */
+    @PostMapping("/human-reply-ttl-cleanup")
+    public ResponseEntity<Map<String, Object>> humanReplyTtlCleanup(
+            @RequestParam(defaultValue = "false") boolean force) {
+        var result = humanReplyTtlCleanupService.run(Instant.now(), force);
+        return ResponseEntity.ok(Map.of(
+                "ran", result.ran(),
+                "force", force,
+                "reclaimedProcessing", result.reclaimedProcessing(),
+                "inboxCancelled", result.inboxCancelled(),
+                "plansExpired", result.plansExpired(),
+                "flagEnabled", properties.getHumanReply().isTtlCleanupEnabled()));
     }
 
     /** ActionExecutor.topCategory()와 동일한 로직 — category NOT NULL이라 반드시 채워야 한다. */

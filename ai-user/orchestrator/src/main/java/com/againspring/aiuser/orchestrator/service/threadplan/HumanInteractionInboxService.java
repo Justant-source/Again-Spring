@@ -17,6 +17,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class HumanInteractionInboxService {
+    public static final String REASON_EXPIRED_TTL = "EXPIRED_TTL";
+
     private final AiHumanInteractionInboxRepository inboxRepository;
 
     @Transactional
@@ -59,18 +61,49 @@ public class HumanInteractionInboxService {
     }
 
     @Transactional
+    public void markSkipped(String inboxId, String workerId, String failureCode) {
+        AiHumanInteractionInbox entry = owned(inboxId, workerId);
+        entry.setStatus(HumanInteractionStatus.SKIPPED);
+        entry.setFailureCode(failureCode);
+        entry.setLeaseOwner(null);
+        entry.setLeaseUntil(null);
+    }
+
+    @Transactional
     public void release(String inboxId, String workerId) {
         AiHumanInteractionInbox entry = owned(inboxId, workerId);
         entry.setStatus(HumanInteractionStatus.PENDING);
         entry.setLeaseOwner(null); entry.setLeaseUntil(null);
     }
 
+    /** Recover lease-expired PROCESSING rows and expire rows past expires_at. */
     @Transactional
     public int recoverAndExpire(Instant now) {
         int recovered = inboxRepository.recoverExpiredLeases(HumanInteractionStatus.PROCESSING,
                 HumanInteractionStatus.PENDING, now);
         return recovered + inboxRepository.expirePastDue(HumanInteractionStatus.PENDING,
                 HumanInteractionStatus.PROCESSING, HumanInteractionStatus.EXPIRED, now);
+    }
+
+    /** Force every PROCESSING lease back to PENDING so the batch can re-claim them. */
+    @Transactional
+    public int reclaimStuckProcessing() {
+        return inboxRepository.reclaimAllProcessing(
+                HumanInteractionStatus.PROCESSING, HumanInteractionStatus.PENDING);
+    }
+
+    /**
+     * State-transition cancel for rows whose observed_at (detected_at) is older than {@code cutoff}.
+     * Does not delete rows; records {@link #REASON_EXPIRED_TTL}.
+     */
+    @Transactional
+    public int cancelExpiredByObservedAt(Instant cutoff) {
+        return inboxRepository.cancelOlderThan(
+                HumanInteractionStatus.PENDING,
+                HumanInteractionStatus.PROCESSING,
+                HumanInteractionStatus.CANCELLED,
+                REASON_EXPIRED_TTL,
+                cutoff);
     }
 
     private AiHumanInteractionInbox owned(String inboxId, String workerId) {
