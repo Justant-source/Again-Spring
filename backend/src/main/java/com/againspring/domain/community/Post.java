@@ -99,7 +99,7 @@ public class Post {
     private Instant voteCloseAt;
 
     @CreatedDate
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false)
     private Instant createdAt;
 
     @LastModifiedDate

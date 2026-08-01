@@ -113,7 +113,7 @@ E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 | 08 | `08-email-verification-signup.spec.ts` | send-verification 200·DB 코드 읽기·실제 가입 완주 |
 | 09 | `09-permissions-guards.spec.ts` | 미인증/게스트/등록 회원 라우트 가드·하단 탭 시트·로그인 정리 |
 | 10 | `10-landing.spec.ts` | 방금 올라온 사연·오늘의 사연·CTA (@mobile) |
-| 11 | `11-admin-ai-rules.spec.ts` | AI 규칙관리·콘텐츠 공개됨/예약 홀딩 탭·CRUD API·비admin 403·비-LLM 경로 |
+| 11 | `11-admin-ai-rules.spec.ts` | AI 규칙관리·콘텐츠 공개됨(스레드)/예약 홀딩·CRUD API·비admin 403·비-LLM 경로 |
 
 #### ⚠️ LLM 절대 호출 금지 규칙
 

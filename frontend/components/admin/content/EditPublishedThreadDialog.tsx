@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import {
-  getScheduledHolding,
-  updateScheduledHolding,
-  cancelScheduledHolding,
+  getPublishedThread,
+  updatePublishedThread,
+  deletePost,
 } from '@/lib/api/admin/content';
 import { Button } from '@/components/ui/button';
 import { ThreadEditorDialog } from './thread-editor/ThreadEditorDialog';
@@ -12,10 +12,10 @@ import { fromDatetimeLocalKst, toDatetimeLocalKst } from './thread-editor/dateti
 import type { ThreadEditorValue } from './thread-editor/types';
 
 interface Props {
-  holdingId: string | null;
+  postId: string | null;
   onClose: () => void;
   onSaved: () => void;
-  onCancelled: () => void;
+  onDeleted: () => void;
 }
 
 const EMPTY: ThreadEditorValue = {
@@ -26,65 +26,60 @@ const EMPTY: ThreadEditorValue = {
   items: [],
 };
 
-export function EditScheduledPostDialog({ holdingId, onClose, onSaved, onCancelled }: Props) {
+export function EditPublishedThreadDialog({ postId, onClose, onSaved, onDeleted }: Props) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState<string | null>(null);
   const [value, setValue] = useState<ThreadEditorValue>(EMPTY);
 
   useEffect(() => {
-    if (!holdingId) {
-      setStatus(null);
+    if (!postId) {
       setValue(EMPTY);
       return;
     }
     setLoading(true);
     setError('');
-    getScheduledHolding(holdingId)
+    getPublishedThread(postId)
       .then((d) => {
-        setStatus(d.status);
         setValue({
           title: d.title || '',
           body: d.body || '',
           category: d.category || 'OTHER',
-          postAtLocal: toDatetimeLocalKst(d.scheduledPublishAt),
+          postAtLocal: toDatetimeLocalKst(d.createdAt),
           items: (d.items || []).map((it) => ({
-            key: it.ref,
-            parentKey: it.parentRef || null,
-            authorId: it.personaId,
-            body: it.body,
+            key: String(it.id),
+            parentKey: it.parentCommentId != null ? String(it.parentCommentId) : null,
+            authorId: it.authorId || '',
+            body: it.body || '',
             type: it.type,
-            atLocal: toDatetimeLocalKst(it.scheduledAt),
+            atLocal: toDatetimeLocalKst(it.createdAt),
+            status: it.status || undefined,
           })),
         });
       })
       .catch((err: any) => {
-        setError(err?.response?.data?.message || '홀딩 글을 불러오지 못했어요.');
+        setError(err?.response?.data?.message || '공개 글을 불러오지 못했어요.');
       })
       .finally(() => setLoading(false));
-  }, [holdingId]);
+  }, [postId]);
 
-  if (!holdingId) return null;
-
-  const editable = status === 'SCHEDULED';
+  if (!postId) return null;
 
   async function handleSave() {
-    if (!holdingId || !editable) return;
+    if (!postId) return;
     setSubmitting(true);
     setError('');
     try {
-      await updateScheduledHolding(holdingId, {
+      await updatePublishedThread(postId, {
         title: value.title,
         body: value.body,
         category: value.category,
-        scheduledPublishAt: fromDatetimeLocalKst(value.postAtLocal),
+        createdAt: fromDatetimeLocalKst(value.postAtLocal),
         items: value.items.map((it) => ({
-          ref: it.key,
-          parentRef: it.parentKey || null,
-          personaId: it.authorId,
+          id: Number(it.key),
           body: it.body,
-          scheduledAt: fromDatetimeLocalKst(it.atLocal),
+          authorId: it.authorId,
+          createdAt: fromDatetimeLocalKst(it.atLocal),
         })),
       });
       onSaved();
@@ -96,17 +91,17 @@ export function EditScheduledPostDialog({ holdingId, onClose, onSaved, onCancell
     }
   }
 
-  async function handleCancel() {
-    if (!holdingId || !editable) return;
-    if (!window.confirm('이 예약 홀딩을 취소할까요? 발행되지 않습니다.')) return;
+  async function handleDelete() {
+    if (!postId) return;
+    if (!window.confirm('이 공개 글을 삭제할까요? (소프트 삭제)')) return;
     setSubmitting(true);
     setError('');
     try {
-      await cancelScheduledHolding(holdingId);
-      onCancelled();
+      await deletePost(postId);
+      onDeleted();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.message || '취소에 실패했어요.');
+      setError(err?.response?.data?.message || '삭제에 실패했어요.');
     } finally {
       setSubmitting(false);
     }
@@ -114,35 +109,30 @@ export function EditScheduledPostDialog({ holdingId, onClose, onSaved, onCancell
 
   return (
     <ThreadEditorDialog
-      open={!!holdingId}
-      title="예약 홀딩 수정"
+      open={!!postId}
+      title="공개 글 · 댓글 수정"
       value={value}
       onChange={setValue}
       loading={loading}
       submitting={submitting}
-      editable={editable}
+      editable
       error={error}
-      readOnlyHint={
-        !editable && status
-          ? `상태가 ${status}이라 수정할 수 없습니다. 조회만 가능합니다.`
-          : undefined
-      }
-      postAtLabel="글 발행 예정 (KST)"
-      itemsLabel="댓글 · 대댓글 릴리스 일정"
-      emptyItemsLabel="후보가 없습니다."
-      authorPlaceholder="personaId"
+      postAtLabel="글 작성 시각 (KST)"
+      itemsLabel="댓글 · 대댓글 타임라인"
+      emptyItemsLabel="댓글이 없습니다."
+      authorPlaceholder="authorId"
       onClose={onClose}
       onSave={handleSave}
-      testId="admin-scheduled-edit-dialog"
+      testId="admin-published-edit-dialog"
       destructiveAction={
         <Button
           type="button"
           variant="destructive"
-          onClick={handleCancel}
+          onClick={handleDelete}
           disabled={submitting || loading}
-          data-testid="admin-scheduled-cancel"
+          data-testid="admin-published-delete"
         >
-          홀딩 취소
+          글 삭제
         </Button>
       }
     />

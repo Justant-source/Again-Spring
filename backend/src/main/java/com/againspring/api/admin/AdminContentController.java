@@ -13,6 +13,8 @@ import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.service.ai.AiCorrectionService;
 import com.againspring.service.ai.AiUserOutboxWriter;
+import com.againspring.service.admin.AdminPublishedThreadService;
+import com.againspring.service.admin.AdminPublishedThreadService.UpdateThreadRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -34,6 +36,7 @@ import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -55,6 +58,7 @@ public class AdminContentController {
     private final UserRepository userRepository;
     private final AiCorrectionService aiCorrectionService;
     private final AiUserOutboxWriter aiUserOutboxWriter;
+    private final AdminPublishedThreadService publishedThreadService;
 
     // ===== 포스트 관리 =====
 
@@ -98,8 +102,41 @@ public class AdminContentController {
                 ? Set.of()
                 : userRepository.findSyntheticIds(authorIds);
 
+        List<String> postIds = posts.getContent().stream().map(Post::getId).toList();
+        Map<String, Long> commentCounts = publishedThreadService.commentCountsFor(postIds);
+
         return ResponseEntity.ok(posts.map(p ->
-                new AdminPostView(p, syntheticIds.contains(p.getAuthorId()))));
+                new AdminPostView(p, syntheticIds.contains(p.getAuthorId()),
+                        commentCounts.getOrDefault(p.getId(), 0L))));
+    }
+
+    /**
+     * GET /api/admin/content/posts/{postId}/thread
+     * 글 + 댓글/대댓글 타임라인 (관리자 스레드 편집기)
+     */
+    @GetMapping("/posts/{postId}/thread")
+    @Operation(summary = "게시글 스레드 조회", description = "글과 미삭제 댓글/대댓글을 타임라인으로 반환 (ADMIN 전용).")
+    @ApiResponse(responseCode = "200", description = "스레드")
+    @ApiResponse(responseCode = "404", description = "포스트 없음")
+    public ResponseEntity<Map<String, Object>> getThread(@PathVariable String postId) {
+        return ResponseEntity.ok(publishedThreadService.getThread(postId));
+    }
+
+    /**
+     * PATCH /api/admin/content/posts/{postId}/thread
+     * 글·댓글 본문/작성자/createdAt 일괄 수정. items에서 빠진 댓글은 soft-delete.
+     */
+    @PatchMapping("/posts/{postId}/thread")
+    @Operation(summary = "게시글 스레드 수정", description = "예약 홀딩과 동일한 프레임용 일괄 저장.")
+    @ApiResponse(responseCode = "200", description = "수정 완료")
+    @ApiResponse(responseCode = "404", description = "포스트 없음")
+    @Auditable(action = "POST_THREAD_UPDATE", targetType = "POST", targetId = "#postId")
+    public ResponseEntity<Map<String, Object>> patchThread(
+            @PathVariable String postId,
+            @RequestBody UpdateThreadRequest req,
+            org.springframework.security.core.Authentication auth) {
+        String adminId = auth != null ? auth.getName() : getAdminId();
+        return ResponseEntity.ok(publishedThreadService.patchThread(postId, req == null ? new UpdateThreadRequest() : req, adminId));
     }
 
     /**
@@ -719,11 +756,18 @@ public class AdminContentController {
         private final boolean synthetic;
         /** 어드민이 생성한 콘텐츠 여부. ADMIN 전용. */
         private final boolean createdByAdmin;
+        /** 미삭제 댓글·대댓글 수. ADMIN 목록용. */
+        private final long commentCount;
 
         public AdminPostView(Post post, boolean synthetic) {
+            this(post, synthetic, 0L);
+        }
+
+        public AdminPostView(Post post, boolean synthetic, long commentCount) {
             this.post = post;
             this.synthetic = synthetic;
             this.createdByAdmin = post.getCreatedByAdmin() != null && post.getCreatedByAdmin();
+            this.commentCount = commentCount;
         }
     }
 

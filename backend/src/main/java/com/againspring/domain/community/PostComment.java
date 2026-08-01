@@ -49,7 +49,7 @@ public class PostComment {
     private Integer likeCount = 0;
 
     @CreatedDate
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false)
     private Instant createdAt;
 
     @LastModifiedDate

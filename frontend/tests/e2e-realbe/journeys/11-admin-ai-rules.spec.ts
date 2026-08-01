@@ -3,7 +3,7 @@
  *
  * - /admin/ai-rules 페이지 로드 + 페르소나 탭 전환
  * - 전역 금지 규칙 CRUD (API — create/list/toggle/delete)
- * - /admin/content 페이지 + 공개됨/예약 홀딩 탭 (2026-08-01~, 통합테이블 + 홀딩 큐)
+ * - /admin/content 페이지 + 공개됨(글 중심 스레드)/예약 홀딩 탭 (공용 ThreadEditorDialog)
  * - synthetic 필드 계약 확인 (API 레벨)
  * - 비관리자(test5) 403 — storageState 재사용, 중복 login() 제거
  * - 사이드바 "AI 규칙관리" 링크 + 이동
@@ -97,16 +97,16 @@ test.describe('Journey 11-B: 전역 금지 규칙 CRUD', () => {
 test.describe('Journey 11-C: /admin/content 페이지 + API 계약', () => {
   test.use({ storageState: ADMIN_AUTH })
 
-  test('관리자 — /admin/content 공개됨 탭 + 통합테이블 로드', async ({ page }) => {
+  test('관리자 — /admin/content 공개됨 글 목록 + 작성 시각 컬럼', async ({ page }) => {
     await page.goto(`${BASE}/admin/content`)
     await page.waitForURL(/\/admin\/content/, { timeout: 10_000 })
     await expect(page.getByText('콘텐츠 관리')).toBeVisible({ timeout: 8_000 })
     await expect(page.locator(ADMIN_CONTENT.tabs)).toBeVisible()
     await expect(page.locator(ADMIN_CONTENT.tabPublished)).toBeVisible()
     await expect(page.locator(ADMIN_CONTENT.tabHolding)).toBeVisible()
-    // 공개됨 탭: 유형 필터 + 추가 버튼
-    await expect(page.locator('label').filter({ hasText: '유형' }).first()).toBeVisible()
-    await expect(page.getByRole('button', { name: '추가' })).toBeVisible()
+    await expect(page.locator(ADMIN_CONTENT.publishedPanel)).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: '작성 시각 (KST)' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '추가', exact: true })).toBeVisible()
   })
 
   test('관리자 — 예약 홀딩 탭 진입 (empty state 허용)', async ({ page }) => {
@@ -131,7 +131,28 @@ test.describe('Journey 11-C: /admin/content 페이지 + API 계약', () => {
     }
   })
 
-  test('통합테이블 — 액션 컬럼 존재', async ({ page }) => {
+  test('/api/admin/content/posts/{id}/thread — 스레드 계약', async ({ request }) => {
+    const accessToken = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(accessToken).toBeTruthy()
+    const list = await request.get(`${BASE}/api/admin/content/posts?page=0&size=1`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    expect(list.ok()).toBeTruthy()
+    const page = await list.json()
+    if (!page.content?.length) return
+    const postId = page.content[0].id
+    expect(typeof page.content[0].commentCount).toBe('number')
+    const resp = await request.get(`${BASE}/api/admin/content/posts/${postId}/thread`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    expect(resp.ok()).toBeTruthy()
+    const thread = await resp.json()
+    expect(thread.id).toBe(postId)
+    expect(Array.isArray(thread.items)).toBeTruthy()
+    expect(typeof thread.commentCount).toBe('number')
+  })
+
+  test('공개됨 목록 — 액션 컬럼 존재', async ({ page }) => {
     await page.goto(`${BASE}/admin/content`)
     await page.waitForURL(/\/admin\/content/)
     await expect(page.getByRole('columnheader', { name: '액션' }).first()).toBeVisible({ timeout: 10_000 })

@@ -87,30 +87,30 @@ flowchart TD
 
 상단 탭: **공개됨** | **예약 홀딩**.
 
-### 공개됨 (2026-07-31~ 통합테이블)
+### 공개됨 (2026-08-01~ 글 중심 + 공용 스레드 프레임)
 
-게시글·댓글·대댓글을 단일 테이블로 표시한다.
+예약 홀딩과 **같은** `ThreadEditorDialog`로 글·댓글 타임라인을 보고 수정한다.
 
 | 항목 | 내용 |
 |---|---|
-| 필터 | 유형(전체/게시글/댓글/대댓글) · 작성자 타입(전체/AI/사람) · 상태 · 카테고리 |
-| 표시 | 유형 뱃지, 작성자(AI 뱃지 + 관리자수동생성 뱃지), 조회수, 좋아요수, 상태 |
-| 조회수 수정 | 수정 다이얼로그에서 직접 값 입력 (단순 컬럼) |
-| 좋아요 조정 | 행별 `+`/`-` 버튼 — 정확한 값 지정 불가, `post_likes` 조인테이블 행을 실제로 생성/삭제 |
-| 추가(생성) | `CreateContentDialog` — 유형 선택 후 게시글/댓글/대댓글 생성. 작성자는 자유 텍스트(존재 검증 없음) |
-
-관리자가 수동 생성한 콘텐츠는 `createdByAdmin` 플래그로 표시되며 공개 화면에는 노출되지 않는다(내부 추적용).
+| 목록 | 글만 — 제목 · 작성자 · 카테고리 · **작성 시각(KST)** · 댓글 수 · 좋아요 · 상태 |
+| 필터 | 작성자 타입(AI/사람) · 카테고리 · 검색 (유형 필터 제거) |
+| 상세 | `EditPublishedThreadDialog` → 공용 `ThreadEditorDialog` — 제목/본문/카테고리/`createdAt` + 댓글·대댓글 본문·작성자·`createdAt` |
+| 저장 | `PATCH /api/admin/content/posts/{id}/thread` (일괄). 타임라인에서 뺀 댓글은 soft-delete |
+| 부가 액션 | 목록 메뉴: 공개 보기 · AI 개선 · 원본 비교 · 마케팅 · 차단 · 삭제 |
 
 ### 예약 홀딩 (2026-08-01~)
 
-새벽 배치가 `ai_scheduled_posts`에 넣어 둔, 아직 피드에 공개되지 않은 글·댓글/대댓글 후보.
+새벽 배치가 `ai_scheduled_posts`에 넣어 둔, 아직 피드에 공개되지 않은 글·댓글/대댓글 후보. **동일** `ThreadEditorDialog` (`EditScheduledPostDialog` 래퍼).
 
 | 항목 | 내용 |
 |---|---|
 | 목록 | 제목 · 페르소나 · 카테고리 · 글 발행 예정(KST) · 댓글 후보 수 · 상태 |
-| 수정 | `EditScheduledPostDialog` — 제목/본문/카테고리/슬롯 + 각 댓글·대댓글 본문·페르소나·릴리스 시각. `SCHEDULED`만 |
+| 수정 | 제목/본문/카테고리/슬롯 + 각 댓글·대댓글 본문·페르소나·릴리스 시각. `SCHEDULED`만 |
 | 취소 | 홀딩 취소 → `CANCELLED` (발행 안 함) |
 | API | `GET/PATCH/DELETE /api/admin/content/scheduled-posts` (BE → orchestrator 프록시) |
+
+공용 코드: `frontend/components/admin/content/thread-editor/` (`ThreadEditorDialog`, `datetimeKst`, `types`).
 
 ---
 

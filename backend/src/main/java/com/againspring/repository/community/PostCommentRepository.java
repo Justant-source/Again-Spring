@@ -2,6 +2,7 @@ package com.againspring.repository.community;
 
 import com.againspring.domain.community.PostComment;
 import com.againspring.domain.enums.CommentStatus;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -68,4 +69,11 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
      * 관리자용: 포스트의 모든 댓글 (상태 무관, 삭제 포함)
      */
     Page<PostComment> findByPostIdOrderByCreatedAtDesc(String postId, Pageable pageable);
+
+    /** 관리자 스레드 편집: 미삭제 댓글·대댓글 (작성 시각 ASC) */
+    List<PostComment> findByPostIdAndDeletedAtIsNullOrderByCreatedAtAsc(String postId);
+
+    /** 목록용: 포스트별 미삭제 댓글 수 */
+    @Query("SELECT pc.postId, COUNT(pc) FROM PostComment pc WHERE pc.postId IN :postIds AND pc.deletedAt IS NULL GROUP BY pc.postId")
+    List<Object[]> countUndeletedByPostIds(@Param("postIds") Collection<String> postIds);
 }

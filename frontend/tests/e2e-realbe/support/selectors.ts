@@ -109,8 +109,11 @@ export const ADMIN_CONTENT = {
   tabs: '[data-testid="admin-content-tabs"]',
   tabPublished: '[data-testid="admin-content-tab-published"]',
   tabHolding: '[data-testid="admin-content-tab-holding"]',
+  publishedPanel: '[data-testid="admin-published-panel"]',
   holdingPanel: '[data-testid="admin-scheduled-holding-panel"]',
   editDialog: '[data-testid="admin-scheduled-edit-dialog"]',
+  publishedEditDialog: '[data-testid="admin-published-edit-dialog"]',
+  threadEditorDialog: '[data-testid="admin-thread-editor-dialog"]',
 } as const
 
 export const ADMIN_CONTENT_COMPARE = {

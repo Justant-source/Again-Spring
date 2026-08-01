@@ -30,6 +30,8 @@ export interface AdminPost {
   synthetic?: boolean;
   /** 관리자가 수동 생성한 항목 여부. */
   createdByAdmin?: boolean;
+  /** 미삭제 댓글·대댓글 수 (목록용). */
+  commentCount?: number;
   /** 원본 비교 기능: 재구성 모드로 생성된 글의 크롤 원본 example_bank ID. null이면 원본 없음. */
   sourceExampleId?: number | null;
   sourceCommunity?: string | null;
@@ -307,5 +309,62 @@ export async function updateScheduledHolding(
 
 export async function cancelScheduledHolding(id: string): Promise<ScheduledHoldingSummary> {
   const res = await api.delete<ScheduledHoldingSummary>(`/api/admin/content/scheduled-posts/${id}`);
+  return res.data;
+}
+
+// ===== Published thread (same frame as scheduled holdings) =====
+
+export interface PublishedThreadItem {
+  id: number;
+  parentCommentId?: number | null;
+  authorId: string;
+  body: string;
+  type: 'COMMENT' | 'REPLY';
+  createdAt: string | null;
+  status?: string | null;
+  synthetic?: boolean;
+  likeCount?: number;
+}
+
+export interface PublishedThreadDetail {
+  id: string;
+  title: string;
+  body: string;
+  category: string | null;
+  status: string | null;
+  createdAt: string | null;
+  viewCount?: number;
+  authorId?: string;
+  synthetic?: boolean;
+  commentCount: number;
+  items: PublishedThreadItem[];
+}
+
+export async function getPublishedThread(postId: string): Promise<PublishedThreadDetail> {
+  const res = await api.get<PublishedThreadDetail>(`/api/admin/content/posts/${postId}/thread`);
+  return res.data;
+}
+
+export async function updatePublishedThread(
+  postId: string,
+  data: Partial<{
+    title: string;
+    body: string;
+    category: string;
+    status: string;
+    viewCount: number;
+    createdAt: string;
+    items: Array<{
+      id: number;
+      body?: string;
+      authorId?: string;
+      createdAt?: string;
+    }>;
+  }>
+): Promise<PublishedThreadDetail> {
+  const res = await api.patch<PublishedThreadDetail>(
+    `/api/admin/content/posts/${postId}/thread`,
+    data
+  );
   return res.data;
 }
