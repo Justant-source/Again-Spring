@@ -1,27 +1,27 @@
 /**
- * Journey 22: 시드 배심원 UI (LLM 미호출)
+ * Journey 22: 시드 배심원 (LLM 미호출)
  *
- * createPost(jurorCount=0) 후 SQL로 juror_count·jurors 삽입.
- * 작성자(test1) 세션에서만 JurySection이 로드됨.
+ * 광장 C3StoryDetail에는 JurySection이 아직 미연결 — UI 대신
+ * 작성자 GET /jury + juror_count 시드 계약을 검증한다.
+ * JurySection 컴포넌트는 vitest(component)에서 커버.
  */
 import { test, expect } from '../support/no-llm-fixture'
 import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1 } from '../fixtures/personas'
 import { createPost, tokenFromStorageState } from '../support/api'
 import { runSqlScript, sql } from '../support/db'
-import { JURY } from '../support/selectors'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
-test.describe('Journey 22: 시드 배심원 UI', () => {
+test.describe('Journey 22: 시드 배심원 API', () => {
   test.use({ storageState: authStatePath(PERSONA_TEST1.email) })
 
-  test('작성자 — AI 배심원 섹션·카드·법적 고지 표시', async ({ page, request }) => {
+  test('SQL 시드 → 작성자 GET /jury 에 AI 의견·법적 고지', async ({ request }) => {
     const token = tokenFromStorageState(PERSONA_TEST1.email)
     const postId = await createPost(request, {
       token,
-      title: 'E2E 시드 배심원 UI',
-      body: '배심원 UI e2e용 사연 본문입니다. LLM을 호출하지 않습니다.',
+      title: 'E2E 시드 배심원 API',
+      body: '배심원 API e2e용 사연 본문입니다. LLM을 호출하지 않습니다.',
     })
 
     const optionId = sql(
@@ -41,14 +41,25 @@ test.describe('Journey 22: 시드 배심원 UI', () => {
        ${optionId}, 'e2e 시드 직관 의견입니다. 대화의 장을 다시 여는 편이 나아 보여요.', NOW());
     `)
 
-    await page.goto(`${BASE}/community/${postId}`)
-    await page.waitForURL(new RegExp(`/community/${postId}$`), { timeout: 12_000 })
+    const count = sql(`SELECT juror_count FROM posts WHERE id='${postId}'`)
+    expect(Number(count)).toBe(3)
 
-    await expect(page.locator(JURY.section)).toBeVisible({ timeout: 12_000 })
-    await expect(page.getByText(/AI 배심원/)).toBeVisible({ timeout: 5_000 })
-    await expect(page.locator(JURY.card).first()).toBeVisible({ timeout: 8_000 })
-    await expect(page.locator(JURY.card).first()).toContainText('AI')
-    await expect(page.locator(JURY.legalNotice)).toBeVisible({ timeout: 5_000 })
-    await expect(page.locator(JURY.legalNotice)).toContainText(/공감|법적|과실|판결/)
+    const detail = await request.get(`${BASE}/api/community/posts/${postId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(detail.ok()).toBeTruthy()
+    const post = await detail.json()
+    expect(post.jurorCount).toBe(3)
+    expect(post.isAuthor).toBe(true)
+
+    const juryRes = await request.get(`${BASE}/api/community/posts/${postId}/jury`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(juryRes.ok()).toBeTruthy()
+    const jury = await juryRes.json()
+    expect(Array.isArray(jury.jurors)).toBeTruthy()
+    expect(jury.jurors.length).toBeGreaterThanOrEqual(3)
+    expect(String(jury.legalNotice || '')).toMatch(/공감|법적|과실|판결/)
+    expect(String(jury.jurors[0].empathyComment || jury.jurors[0].comment || '')).toContain('e2e 시드')
   })
 })

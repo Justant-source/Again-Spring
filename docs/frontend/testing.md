@@ -127,7 +127,7 @@ E2E_BASE_URL=http://localhost:8091 npm run test:e2e:realbe
 | 19 | `19-search-panel.spec.ts` | SearchPanel 열기/검색/최근/닫기 |
 | 20 | `20-notifications.spec.ts` | 시드 알림·모두 읽음 |
 | 21 | `21-password-reset.spec.ts` | forgot UI·토큰 재설정→로그인 |
-| 22 | `22-jury-seeded-ui.spec.ts` | SQL 시드 배심원 UI (LLM 미호출) |
+| 22 | `22-jury-seeded-ui.spec.ts` | SQL 시드 배심원 → 작성자 GET /jury (광장 UI는 JurySection 미연결) |
 
 API 계약(대시보드·크롤·visit validation)은 BE 유닛으로 이관: `AdminDashboardControllerTest`, `AdminCrawlStatusControllerTest`, `PublicVisitControllerTest`.
 
@@ -344,7 +344,13 @@ export const communityHandlers = [
 
 - 유닛 테스트 커버리지 아직 낮음 (점진적 보강 예정)
 - Playwright e2e-realbe는 **prod(:8091)** 실서버 필요 (미공개 기간). workers=1 직렬.
-- 2026-08 스위트 슬림화: 중복·고정 sleep·API-only→BE 이관 + corner case(20–22) 보강. 벽시계 목표 25–40% 단축 — 실행 후 `playwright-report` / wall clock을 이 절에 갱신.
+- 2026-08 스위트 슬림화: 중복·고정 sleep·API-only→BE 이관 + corner case(20–22) 보강.
+  - 케이스 수: ~161 → ~97 (`test()` 기준, **-40%**).
+  - 벽시계 측정(2026-08-01, `localhost:8091`, workers=1, retries=1):
+    - 슬림 직후(CORS 깨진 `127.0.0.1`): ~**9.4–11분** (다수 실패·retry)
+    - CORS 수정 후: **102 passed / 0 failed / 0 skipped — 1.5분**
+  - `E2E_BASE_URL`에 `127.0.0.1`을 넣어도 Playwright config가 `localhost`로 정규화한다.
+  - cleanup: 포스트/댓글/투표 + marketing_job·notifications·community_reports·게스트 users 행까지 teardown에서 삭제.
 - 성능 모니터링 자동화 미구현
 - FE KeywordGuard는 스텁(서버 KeywordGuard만) — 위기 키워드 e2e 없음
 

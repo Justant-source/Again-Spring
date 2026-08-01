@@ -71,6 +71,16 @@ flowchart TD
 
 JaCoCo로 측정 (현재 build.gradle.kts에 미포함 — 필요 시 추가).
 
+## e2e에서 이관한 API 계약 (2026-08)
+
+Playwright e2e-realbe는 UI 통합에 집중. 아래 계약은 BE 유닛이 권위:
+
+| 영역 | 테스트 |
+|---|---|
+| Admin dashboard action-center/kpis/hot-posts/pulse/insights/traffic | `AdminDashboardControllerTest` (+ `DashboardOpsServiceTest`) |
+| Crawl status schema | `AdminCrawlStatusControllerTest` |
+| Public visit validation | `PublicVisitControllerTest` |
+
 ## 테스트 분류
 
 ### 단위 테스트 (`@ExtendWith(MockitoExtension.class)`)

@@ -14,8 +14,10 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        // localhost + 127.0.0.1 모두 허용 — e2e/로컬이 Origin을 둘 중 하나로 보낼 수 있음
         configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:*",
+                "http://127.0.0.1:*",
                 "https://dev.againspring.net",
                 "https://againspring.net",
                 "https://www.againspring.net"

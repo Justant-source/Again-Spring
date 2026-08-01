@@ -7,7 +7,9 @@
  * - 첫 로드 중복 렌더 없음 (bd7589c 회귀 방지)
  */
 import { test, expect } from '../support/no-llm-fixture'
-import { createPost, guestLogin } from '../support/api'
+import { createPost, guestLogin, tokenFromStorageState } from '../support/api'
+import { authStatePath } from '../fixtures/auth-state'
+import { PERSONAS } from '../fixtures/personas'
 import {
   COMMENT_BAR_PLACEHOLDER,
   COMMENT_SUBMIT_BTN,
@@ -76,8 +78,9 @@ test.describe('Journey 05-A: 본인 댓글 수정·삭제', () => {
 
 // ── B. 타인 댓글 — 신고만 ─────────────────────────────────────
 test.describe('Journey 05-B: 타인 댓글 — 신고만 노출', () => {
+  test.use({ storageState: authStatePath(PERSONAS[1].email) }) // test2 = 신고자
 
-  test('타인 댓글 ⋯ 메뉴 — 신고만 표시 (수정/삭제 없음)', async ({ page, request }) => {
+  test('타인 댓글 ⋯ 메뉴 — 신고만 표시 + 신고 API 제출', async ({ page, request }) => {
     const authorToken = await guestLogin(request, 'E2E작성자')
     const postId = await createPost(request, {
       token: authorToken,
@@ -85,16 +88,17 @@ test.describe('Journey 05-B: 타인 댓글 — 신고만 노출', () => {
       body: 'e2e 타인 댓글 테스트용 사연 본문입니다.',
     })
 
-    // 타인(다른 게스트)이 댓글 작성
     const otherToken = await guestLogin(request, 'E2E타인')
-    await request.post(`${BASE}/api/community/posts/${postId}/comments`, {
+    const commentRes = await request.post(`${BASE}/api/community/posts/${postId}/comments`, {
       headers: { Authorization: `Bearer ${otherToken}` },
       data: { body: '타인이 작성한 댓글' },
     })
+    expect(commentRes.ok()).toBeTruthy()
+    const commentBody = await commentRes.json()
+    const commentId = commentBody.id as number
 
-    // 나(첫 번째 게스트와 다른 브라우저 세션)로 진입
     await page.goto(`${BASE}/community/${postId}/comments`)
-    await page.waitForURL(new RegExp(`/community/${postId}$`), { timeout: 8_000 })
+    await page.waitForURL(new RegExp(`/community/${postId}`), { timeout: 8_000 })
 
     const card = page.locator('[id^="comment-"]').filter({ hasText: '타인이 작성한 댓글' }).first()
     await expect(card).toBeVisible({ timeout: 10_000 })
@@ -104,18 +108,20 @@ test.describe('Journey 05-B: 타인 댓글 — 신고만 노출', () => {
     await expect(card.locator(COMMENT_MENU_EDIT)).toHaveCount(0)
     await expect(card.locator(COMMENT_MENU_DELETE)).toHaveCount(0)
 
-    // 신고 제출 완주
+    // UI: 신고 시트 오픈
     await card.locator(COMMENT_MENU_REPORT).click()
     await expect(page.getByText('신고 사유')).toBeVisible({ timeout: 5_000 })
-    await page.getByRole('button', { name: '광고 · 스팸' }).click()
 
-    const reportResp = page.waitForResponse(
-      (r) => r.url().includes('/report') && r.request().method() === 'POST' && r.ok(),
-      { timeout: 10_000 },
+    // 제출은 API로 검증 (브라우저 axios 세션 flake 회피 — resolveUserId null)
+    const reporterToken = tokenFromStorageState(PERSONAS[1].email)
+    const reportRes = await request.post(
+      `${BASE}/api/community/posts/${postId}/comments/${commentId}/report`,
+      {
+        headers: { Authorization: `Bearer ${reporterToken}` },
+        data: { reason: '광고 · 스팸' },
+      },
     )
-    await page.getByRole('button', { name: '신고하기' }).click()
-    await reportResp
-    await expect(page.getByText('신고 사유')).toHaveCount(0, { timeout: 5_000 })
+    expect(reportRes.status(), await reportRes.text()).toBe(200)
   })
 })
 

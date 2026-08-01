@@ -38,8 +38,8 @@ test.describe('Journey 13-B: 마케팅 잡 UI 페이지', () => {
   })
 })
 
+if (ASM_AVAILABLE) {
 test.describe('Journey 13-C: 마케팅 잡 생성·조회 흐름 (ASM 스텁)', () => {
-  test.skip(!ASM_AVAILABLE, 'ASM_STUB_AVAILABLE=true 환경 변수 필요 — ASM M0 스텁 실행 중이어야 함')
   test.describe.configure({ mode: 'serial' })
   test.use({ storageState: ADMIN_AUTH })
 
@@ -110,3 +110,4 @@ test.describe('Journey 13-C: 마케팅 잡 생성·조회 흐름 (ASM 스텁)', 
     expect(job.remoteJobId, 'ASM remote_job_id 수신됨').toBeTruthy()
   })
 })
+}

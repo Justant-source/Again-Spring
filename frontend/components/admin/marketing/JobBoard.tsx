@@ -74,7 +74,11 @@ export function JobBoard({ jobs, onPublish, onRepublish }: JobBoardProps) {
             <p className="font-mono text-sm text-gray-600">Job {job.id}</p>
             <p className="font-mono text-xs text-gray-500 mt-1">{job.postId}</p>
           </div>
-          <Badge className={STATUS_COLORS[job.status] || 'bg-gray-200'}>
+          <Badge
+            data-testid="job-status-badge"
+            data-status={job.status}
+            className={STATUS_COLORS[job.status] || 'bg-gray-200'}
+          >
             {job.status}
           </Badge>
         </div>

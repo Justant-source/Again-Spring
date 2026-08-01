@@ -26,11 +26,11 @@ export const PERSONAS: Persona[] = [
   { email: 'test10@again.com', password: 'test123', nickname: '태우', age: 38, gender: '남', roles: ['USER'] },
 ]
 
-/** 기본 Solo 테스트 페르소나 */
+/** 기본 테스트 페르소나 (test1) */
 export const PERSONA_TEST1 = PERSONAS[0]
-/** Duo 테스트용 A (globalSetup이 TESTER 부여) */
+/** 페어 테스트용 A (globalSetup이 TESTER 부여) */
 export const PERSONA_TESTER_A = PERSONAS[1]
-/** Duo 테스트용 B (globalSetup이 TESTER 부여) */
+/** 페어 테스트용 B (globalSetup이 TESTER 부여) */
 export const PERSONA_TESTER_B = PERSONAS[2]
 
 export const PERSONA_MAP = Object.fromEntries(PERSONAS.map((p) => [p.email, p]))

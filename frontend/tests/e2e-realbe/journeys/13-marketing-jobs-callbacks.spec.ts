@@ -14,6 +14,7 @@ import { test, expect } from '../support/no-llm-fixture'
 import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1, PERSONAS } from '../fixtures/personas'
 import { tokenFromStorageState, createPost } from '../support/api'
+import { sql } from '../support/db'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)  // test1 = ADMIN
@@ -22,37 +23,39 @@ const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)  // test1 = ADMIN
 test.describe('Journey 13-D: PARTIAL 상태 배지 표시', () => {
   test.use({ storageState: ADMIN_AUTH })
 
-  test('PARTIAL 배지 — 노란색 스타일링 확인', async ({ page }) => {
-    // 어드민 페이지에서 마케팅 잡 목록 로드
+  test('PARTIAL 배지 — 노란색 스타일링 확인', async ({ page, request }) => {
+    const token = tokenFromStorageState(PERSONA_TEST1.email)
+    const postId = await createPost(request, {
+      token,
+      title: 'E2E PARTIAL 배지 시드 사연',
+      body: 'e2e marketing PARTIAL badge seed post body — cleanup targets this author.',
+    })
+
+    // marketing_job 행 직접 시드 (ASM 불필요). teardown cleanup이 테스트 포스트와 함께 삭제.
+    sql(`
+      INSERT INTO marketing_job (
+        remote_job_id, post_id, status, phase, progress, targets, auto_publish,
+        requested_by, poll_fail_count, created_at, updated_at, idempotency_key
+      ) VALUES (
+        'e2e-partial-${Date.now()}', '${postId}', 'PARTIAL', 'PUBLISH', 1.0,
+        '["x"]', 0, 'e2epersona01', 0, NOW(), NOW(), 'e2e-partial-${Date.now()}'
+      );
+    `)
+
     await page.goto(`${BASE}/admin/marketing`)
     await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
 
-    // PARTIAL 상태를 가진 배지 찾기 (data-testid 또는 text로 찾음)
-    const partialBadges = page.locator('[data-testid="job-status-badge"]:has-text("PARTIAL")')
+    const partialBadge = page
+      .locator('[data-testid="job-status-badge"][data-status="PARTIAL"], .bg-yellow-500')
+      .filter({ hasText: 'PARTIAL' })
+      .first()
+    await expect(partialBadge).toBeVisible({ timeout: 10_000 })
 
-    // 존재하는 경우 스타일 검증
-    if ((await partialBadges.count()) > 0) {
-      const firstBadge = partialBadges.first()
-
-      // 배지의 배경색이 노란색 계열인지 확인
-      // (CSS class 또는 style 속성으로 yellow/amber 색상 확인)
-      const className = await firstBadge.getAttribute('class')
-      const style = await firstBadge.getAttribute('style')
-
-      expect(
-        className?.includes('yellow') ||
-        className?.includes('amber') ||
-        className?.includes('warn') ||
-        style?.includes('yellow') ||
-        style?.includes('amber') ||
-        style?.includes('#f59e0b') || // amber-500 hex
-        style?.includes('rgb(245, 158, 11)'), // amber-500 rgb
-        'PARTIAL 배지가 노란색 스타일링을 가져야 함'
-      ).toBe(true)
-    } else {
-      // PARTIAL 상태 잡이 없으면 테스트 스킵
-      test.skip(true, 'PARTIAL 상태 잡이 없음 — 테스트 스킵')
-    }
+    const className = (await partialBadge.getAttribute('class')) ?? ''
+    expect(
+      className.includes('yellow') || className.includes('amber'),
+      `PARTIAL 배지 노란색 클래스 필요, got: ${className}`,
+    ).toBe(true)
   })
 })
 

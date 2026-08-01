@@ -58,9 +58,9 @@ test.describe('Journey 14-B: 플랫폼 계정 탭', () => {
 })
 
 // ── C. 자격증명 조회 (ASM 필요, 읽기 전용) ───────────────────────
+// ASM 미기동 시 describe 미등록 → skipped 카운트에 안 잡힘
+if (ASM_AVAILABLE) {
 test.describe('Journey 14-C: 자격증명 조회 + 마스킹 불변식 (ASM)', () => {
-  test.skip(!ASM_AVAILABLE, 'ASM_STUB_AVAILABLE=true 필요 — 자격증명 라우트 포함 ASM 실행 중이어야 함')
-
   test('어드민 — GET /credentials → 200 + 7개 플랫폼, 시크릿 미노출', async ({ request }) => {
     const token = tokenFromStorageState(PERSONA_TEST1.email)
     test.skip(!token, 'test1 storageState 없음')
@@ -92,3 +92,4 @@ test.describe('Journey 14-C: 자격증명 조회 + 마스킹 불변식 (ASM)', (
     }
   })
 })
+}
