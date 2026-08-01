@@ -10,6 +10,7 @@ import com.againspring.aiuser.orchestrator.repository.AiThreadPlanRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.repository.AiThreadPlanItemRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
+import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -133,7 +134,9 @@ public class ThreadPlanPublisher {
             Optional<String> jwt = tokens.getToken(persona.getId(), email, properties.getBotPassword());
             if (jwt.isEmpty()) { leases.releaseFailed(item.getId(), worker, "AUTH_FAILED", false); return; }
             Optional<String> posted = backend.addCommentReturningId(
-                    jwt.get(), item.getTargetPostId(), item.getBody(), parent, item.getIdempotencyKey());
+                    jwt.get(), item.getTargetPostId(),
+                    LiteralNewlineNormalizer.normalize(item.getBody()),
+                    parent, item.getIdempotencyKey());
             if (posted.isPresent()) leases.completePosted(item.getId(), worker, posted.get());
             else leases.releaseFailed(item.getId(), worker, "BACKEND_WRITE_FAILED", false);
         } catch (Exception e) {

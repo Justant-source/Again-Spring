@@ -14,6 +14,7 @@ import com.againspring.aiuser.orchestrator.repository.AiThreadPlanRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -126,7 +127,10 @@ public class ThreadPlanGenerationService {
         // 2026-07-31: Avoid publishing into dead hours (03:00-07:00 KST) where community is asleep; snap forward if weight < 0.2
         return ActivityCurve.nextActiveHour(candidate, 0.2, properties.getThreadPlan().getKstHourlyHumanWeights());
     }
-    private static String text(Object value) { return value == null ? "" : String.valueOf(value).trim(); }
+    private static String text(Object value) {
+        if (value == null) return "";
+        return LiteralNewlineNormalizer.normalize(String.valueOf(value)).trim();
+    }
     private static String nullToEmpty(String value) { return value == null ? "" : value; }
     private boolean planModeEnabled() { return properties.isEnabled() && properties.getThreadPlan().isEnabled()
             && configRepository.findById(1).map(c -> !c.isAiUserKillSwitch()).orElse(false); }

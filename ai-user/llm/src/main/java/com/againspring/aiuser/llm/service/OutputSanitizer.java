@@ -314,13 +314,19 @@ public class OutputSanitizer {
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
+    /**
+     * LLM이 실제 개행(0x0A) 대신 문자 그대로 "\n" / "\r\n"을 넣는 사례를 실개행으로 바꾼다.
+     * legacy {@code /generate/*}와 PLAN {@code /v2/generate/*} 양쪽에서 공유한다.
+     * (예: post_b0d71de4da9648608d52 — structured AI_POST가 sanitizer를 우회해 리터럴이 게시됨)
+     */
+    public static String normalizeLiteralNewlines(String raw) {
+        if (raw == null || raw.isEmpty()) return raw;
+        return raw.replace("\\r\\n", "\n").replace("\\n", "\n");
+    }
+
     private String sanitize(String raw, int maxLen) {
         if (raw == null || raw.isBlank()) return "";
-        String s = raw;
-
-        // -1. 리터럴 이스케이프 정규화 — LLM이 실제 개행(0x0A) 대신 문자 그대로 "\n"을 출력하는 사례 방어
-        // (예: post_2b97a638711244f2a889 — 본문에 실개행 없이 백슬래시+n 텍스트가 그대로 게시됨, 2026-07-31)
-        s = s.replace("\\r\\n", "\n").replace("\\n", "\n");
+        String s = normalizeLiteralNewlines(raw);
 
         // 0. AI 메타 응답 감지 → 즉시 빈 문자열 (ActionExecutor FAILED → 스킵)
         if (META_RESPONSE.matcher(s).find()) return "";

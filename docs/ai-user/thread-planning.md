@@ -58,6 +58,7 @@ flowchart LR
 검증 순서:
 
 1. Claude `--json-schema`와 Codex `--output-schema`는 동일한 classpath JSON Schema를 사용한다. 이후 허용 persona ID, 길이, **item 단위 한국어/거절문**, 안전/중복을 다시 검증한다. JSON 봉투 자체는 언어 검사 면제 근거가 될 수 없다.
+   파싱된 post/comment body의 리터럴 `"\n"`은 실개행으로 정규화한다(legacy `OutputSanitizer`와 동일 규칙 — PLAN은 전체 sanitizer를 타지 않음).
 2. 부모 후보가 탈락하면 그 후보를 참조하는 대댓글도 탈락시킨다.
 3. AI post bundle은 post가 유효하고 최상위 6개 이상, 전체 12개 이상일 때 부분 성공으로 수용한다.
 4. 기준 미달이면 동일 모델로 한 번만 재시도한다. 개별 댓글을 채우는 추가 호출은 하지 않는다.

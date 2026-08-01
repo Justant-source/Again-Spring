@@ -159,7 +159,11 @@ public class StructuredGenerationService {
     private static long timeout(Long v) { return v == null ? 120_000L : Math.max(1_000L, Math.min(v, 300_000L)); }
     private static int safe(Integer v, int d, int min, int max) { return Math.max(min, Math.min(v == null ? d : v, max)); }
     private static String text(JsonNode n, String name) { String v = nullableText(n, name); if (v == null) throw new StructuredGenerationException(name + " is required"); return v; }
-    private static String nullableText(JsonNode n, String name) { return n.hasNonNull(name) ? n.path(name).asText().trim() : null; }
+    /** body/title 추출 시 리터럴 "\n" → 실개행 (PLAN 경로는 OutputSanitizer를 거치지 않음). */
+    private static String nullableText(JsonNode n, String name) {
+        if (!n.hasNonNull(name)) return null;
+        return OutputSanitizer.normalizeLiteralNewlines(n.path(name).asText()).trim();
+    }
     private static void validRef(String v) { if (!v.matches("[A-Za-z][A-Za-z0-9_-]{0,63}")) throw new StructuredGenerationException("invalid ref"); }
     private static void validText(String v, String field, int min, int max) { if (v.length() < min || v.length() > max || LlmErrorSignature.looksLikeProviderError(v) || META.matcher(v).find() || koreanRatio(v) < .10) throw new StructuredGenerationException("invalid " + field); }
     private static double koreanRatio(String v) { long k=v.chars().filter(c -> c >= 0xAC00 && c <= 0xD7A3).count(); long letters=v.chars().filter(Character::isLetter).count(); return letters == 0 ? 1 : (double) k / letters; }

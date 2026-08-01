@@ -9,6 +9,7 @@ import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlan;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
+import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -63,7 +64,9 @@ public class ScheduledPostPublisher {
             if (jwt.isEmpty()) { leases.releaseFailed(row.getId(), WORKER, "AUTH_FAILED", true); return; }
 
             Optional<PostDto> published = backend.createPost(jwt.get(), CreatePostDto.builder()
-                    .userTitle(row.getTitle()).bodyRaw(row.getBody()).category(row.getCategory())
+                    .userTitle(row.getTitle())
+                    .bodyRaw(LiteralNewlineNormalizer.normalize(row.getBody()))
+                    .category(row.getCategory())
                     .visibility("PUBLIC").jurorCount(0).build());
             if (published.isEmpty() || published.get().getId() == null) {
                 leases.releaseFailed(row.getId(), WORKER, "BACKEND_WRITE_FAILED", true);

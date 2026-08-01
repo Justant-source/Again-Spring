@@ -85,6 +85,14 @@
 4. 글과 댓글은 `SelfCritiqueService`를 통해 재생성 루프를 탈 수 있다.
 5. 댓글/대댓글은 `<<<REACT>>>` sentinel 뒤 JSON을 분리해 orchestrator로 돌려준다.
 
+### PLAN `/v2/generate/*` 개행 정규화
+
+legacy `/generate/*`와 달리 PLAN structured 경로는 전체 `OutputSanitizer`를 타지 않는다.
+대신 파싱 직후 `OutputSanitizer.normalizeLiteralNewlines()`로 본문·댓글의 리터럴 `"\n"`/`"\r\n"`만 실개행으로 바꾼다
+(LLM이 JSON string 값 안에 백슬래시+n 문자를 넣는 사례 — 2026-07-31~08-01 게시 글에서 확인).
+orchestrator 쪽 발행 경계(`AiPostBundleService`·`ThreadPlanPublisher`·`ScheduledPostPublisher` 등)에도
+동일 규칙의 `LiteralNewlineNormalizer`를 두어 이중 방어한다.
+
 ## legacy rewrite API
 
 - 입력: 기존 `title/body`, 현재 광장, 최종 광장, persona voice block, rewrite instruction

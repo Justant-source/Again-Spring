@@ -14,6 +14,7 @@ import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -179,7 +180,11 @@ public class AiPostBundleService {
         return new PostContent(title, body);
     }
 
-    private static String text(Object value) { return value == null ? "" : String.valueOf(value).trim(); }
+    /** PLAN JSON body에 리터럴 "\n"이 남아 있으면 실개행으로 바꾼다 (llm StructuredGeneration과 동일 방어). */
+    private static String text(Object value) {
+        if (value == null) return "";
+        return LiteralNewlineNormalizer.normalize(String.valueOf(value)).trim();
+    }
 
     private record PostContent(String title, String body) { }
     public record PublishedBundle(PostDto post, String body) { }

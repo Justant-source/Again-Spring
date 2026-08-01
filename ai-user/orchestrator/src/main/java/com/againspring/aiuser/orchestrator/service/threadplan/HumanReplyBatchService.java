@@ -7,6 +7,7 @@ import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemStatus;
 import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemType;
 import com.againspring.aiuser.orchestrator.repository.*;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor; import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional;
 import java.time.*; import java.util.*;
@@ -50,7 +51,9 @@ public class HumanReplyBatchService {
         Set<String> answered = new HashSet<>();
         for (Object value : replies) if (value instanceof Map<?,?> row) {
             String comment = String.valueOf(row.get("humanCommentId")); AiHumanInteractionInbox entry = byComment.get(comment);
-            String body = row.get("body") == null ? "" : String.valueOf(row.get("body")).trim(); String persona = row.get("personaId") == null ? "" : String.valueOf(row.get("personaId"));
+            String body = LiteralNewlineNormalizer.normalize(
+                    row.get("body") == null ? "" : String.valueOf(row.get("body"))).trim();
+            String persona = row.get("personaId") == null ? "" : String.valueOf(row.get("personaId"));
             if (entry == null || body.isBlank() || persona.isBlank() || !guard.check(body, ContentSafetyGuard.ContentType.COMMENT).passed()) continue;
             AiThreadPlan plan = plans.findTopByPostIdOrderByPostRevisionDesc(entry.getPostId()).orElse(null); if (plan == null || now.isAfter(plan.getAbsoluteExpiresAt())) continue;
             AiThreadPlanItem item = planItems.save(AiThreadPlanItem.builder().planId(plan.getId()).itemType(ThreadPlanItemType.REPLY).status(ThreadPlanItemStatus.SCHEDULED)
