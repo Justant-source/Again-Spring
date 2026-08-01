@@ -36,6 +36,7 @@ class AdminPublishedThreadServiceTest {
     @Mock UserRepository userRepository;
     @Mock AiCorrectionService aiCorrectionService;
     @Mock AiUserOutboxWriter aiUserOutboxWriter;
+    @Mock ThreadPlanItemProxyService threadPlanItemProxy;
     @InjectMocks AdminPublishedThreadService service;
 
     @Test
@@ -72,6 +73,7 @@ class AdminPublishedThreadServiceTest {
         when(postCommentRepository.findByPostIdAndDeletedAtIsNullOrderByCreatedAtAsc("p1"))
                 .thenReturn(List.of(comment, reply));
         when(userRepository.findSyntheticIds(any())).thenReturn(Set.of("c1"));
+        when(threadPlanItemProxy.listPending("p1")).thenReturn(List.of());
 
         Map<String, Object> view = service.getThread("p1");
 
@@ -113,6 +115,7 @@ class AdminPublishedThreadServiceTest {
                 .thenReturn(List.of(keep));
         when(postCommentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.findSyntheticIds(any())).thenReturn(Set.of());
+        when(threadPlanItemProxy.listPending("p1")).thenReturn(List.of());
 
         AdminPublishedThreadService.UpdateThreadRequest req = new AdminPublishedThreadService.UpdateThreadRequest();
         req.setCreatedAt("2026-08-01T04:00:00Z");
@@ -130,5 +133,42 @@ class AdminPublishedThreadServiceTest {
         assertThat(drop.getDeletedAt()).isNotNull();
         verify(aiUserOutboxWriter).commentLifecycleChanged(eq(post), eq(drop), eq("COMMENT_DELETED"), eq("ADMIN_THREAD_EDIT"));
         assertThat(view.get("commentCount")).isEqualTo(1);
+    }
+
+    @Test
+    void getThreadMergesPendingPlanItems() {
+        Post post = Post.builder()
+                .id("p1")
+                .title("제목")
+                .bodyRaw("본문")
+                .bodyPublished("본문")
+                .category(PostCategory.COUPLE)
+                .status(PostStatus.VOTING)
+                .authorId("author-a")
+                .createdAt(Instant.parse("2026-08-01T01:00:00Z"))
+                .build();
+        when(postRepository.findById("p1")).thenReturn(Optional.of(post));
+        when(postCommentRepository.findByPostIdAndDeletedAtIsNullOrderByCreatedAtAsc("p1"))
+                .thenReturn(List.of());
+        when(userRepository.findSyntheticIds(any())).thenReturn(Set.of("persona-1"));
+        when(threadPlanItemProxy.listPending("p1")).thenReturn(List.of(Map.of(
+                "planItemId", "plan-1",
+                "personaId", "persona-1",
+                "body", "예약 댓글",
+                "type", "COMMENT",
+                "status", "SCHEDULED",
+                "scheduledAt", "2026-08-01T05:00:00Z",
+                "pending", true
+        )));
+
+        Map<String, Object> view = service.getThread("p1");
+
+        assertThat(view.get("pendingCount")).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) view.get("items");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).get("pending")).isEqualTo(true);
+        assertThat(items.get(0).get("planItemId")).isEqualTo("plan-1");
+        assertThat(items.get(0).get("body")).isEqualTo("예약 댓글");
     }
 }

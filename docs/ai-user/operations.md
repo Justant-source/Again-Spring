@@ -163,6 +163,11 @@ docker logs -f againspring-prod-dev-sync
 어드민 `ThreadEditorDialog`는 저장 시점에 로드 기준 글 발행 예정 시각 대비
 delta를 계산해 댓글·대댓글 `atLocal`에 일괄 적용한다 (키보드·피커 공통).
 
+공개된 글의 미게시 COMMENT/REPLY는 orchestrator `ai_thread_plan_items`에 남는다.
+`GET/PATCH /api/admin/content/posts/{id}/thread`가 게시 댓글과 예약 후보를 병합해
+보여 주고, `pendingItems`로 본문·페르소나·`scheduledAt` 수정·취소를 프록시한다
+(`/admin/thread-plan-items`).
+
 ```
 env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
   ├─ provider(ai_post_bundle/human_post_plan/human_interaction) = CLAUDE

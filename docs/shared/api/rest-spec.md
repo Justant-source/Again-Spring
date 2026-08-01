@@ -243,8 +243,8 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 |---|---|---|---|---|
 | GET | `/api/admin/content/posts` | **JWT + ADMIN** | 200 | AI 게시글 목록 (`?status=VOTING&page=&size=`) — `synthetic`·`createdByAdmin`·`commentCount` 필드 포함 |
 | GET | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 200 / 404 | 단일 게시글 원문 조회 |
-| GET | `/api/admin/content/posts/{postId}/thread` | **JWT + ADMIN** | 200 / 404 | **(2026-08-01~)** 글+댓글/대댓글 타임라인. 응답: `{id,title,body,category,status,createdAt,commentCount,items[{id,parentCommentId,authorId,body,type,createdAt,status,synthetic}]}` |
-| PATCH | `/api/admin/content/posts/{postId}/thread` | **JWT + ADMIN** | 200 / 400 / 404 | **(2026-08-01~)** 스레드 일괄 수정. Body: `{title?,body?,category?,status?,viewCount?,createdAt?,items?[{id,body?,authorId?,createdAt?}]}`. items에 없는 기존 댓글은 soft-delete. `createdAt` 수정 가능 |
+| GET | `/api/admin/content/posts/{postId}/thread` | **JWT + ADMIN** | 200 / 404 | **(2026-08-01~)** 글+댓글/대댓글 타임라인 + **미게시 AI 예약 댓글**. 응답 items: 게시됨 `{id,pending:false,createdAt,…}` · 예약 `{planItemId,pending:true,scheduledAt,status,parentPlanItemId,…}`. `pendingCount` 포함 |
+| PATCH | `/api/admin/content/posts/{postId}/thread` | **JWT + ADMIN** | 200 / 400 / 404 / 502 | **(2026-08-01~)** 스레드 일괄 수정. Body: `{title?,body?,category?,status?,viewCount?,createdAt?,items?[{id,body?,authorId?,createdAt?}],pendingItems?[{planItemId,body?,personaId?,scheduledAt?,cancel?}]}`. items에 없는 기존 댓글 soft-delete. pendingItems에 없는 예약 후보 CANCELLED |
 | GET | `/api/admin/content/posts/{postId}/source-comparison` | **JWT + ADMIN** | 200 / 404 | 원본 비교 조회. 응답: `{synthetic, hasSource, source{community,url,title,body}, generated{title,body}}` |
 | PATCH | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 200 / 404 | 게시글 수정. Body: `{title?, bodyRaw?, partnerBodyRaw?, status?, category?, viewCount?}`. `title` 수정 시 `title`과 `userTitle`을 함께 동기화. `viewCount`는 단순 컬럼이라 직접 값 지정 가능 (2026-07-31~) |
 | DELETE | `/api/admin/content/posts/{postId}` | **JWT + ADMIN** | 204 / 404 | 게시글 soft delete (`deleted_at`, `deleted_by_admin_id`) |

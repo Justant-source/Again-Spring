@@ -315,12 +315,16 @@ export async function cancelScheduledHolding(id: string): Promise<ScheduledHoldi
 // ===== Published thread (same frame as scheduled holdings) =====
 
 export interface PublishedThreadItem {
-  id: number;
+  id?: number | null;
+  planItemId?: string | null;
+  pending?: boolean;
   parentCommentId?: number | null;
+  parentPlanItemId?: string | null;
   authorId: string;
   body: string;
   type: 'COMMENT' | 'REPLY';
-  createdAt: string | null;
+  createdAt?: string | null;
+  scheduledAt?: string | null;
   status?: string | null;
   synthetic?: boolean;
   likeCount?: number;
@@ -337,6 +341,7 @@ export interface PublishedThreadDetail {
   authorId?: string;
   synthetic?: boolean;
   commentCount: number;
+  pendingCount?: number;
   items: PublishedThreadItem[];
 }
 
@@ -359,6 +364,13 @@ export async function updatePublishedThread(
       body?: string;
       authorId?: string;
       createdAt?: string;
+    }>;
+    pendingItems: Array<{
+      planItemId: string;
+      body?: string;
+      personaId?: string;
+      scheduledAt?: string;
+      cancel?: boolean;
     }>;
   }>
 ): Promise<PublishedThreadDetail> {

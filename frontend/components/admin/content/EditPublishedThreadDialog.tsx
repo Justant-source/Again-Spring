@@ -26,6 +26,16 @@ const EMPTY: ThreadEditorValue = {
   items: [],
 };
 
+const PLAN_KEY_PREFIX = 'plan:';
+
+function isPendingKey(key: string): boolean {
+  return key.startsWith(PLAN_KEY_PREFIX);
+}
+
+function planItemIdFromKey(key: string): string {
+  return key.slice(PLAN_KEY_PREFIX.length);
+}
+
 export function EditPublishedThreadDialog({ postId, onClose, onSaved, onDeleted }: Props) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -46,15 +56,24 @@ export function EditPublishedThreadDialog({ postId, onClose, onSaved, onDeleted 
           body: d.body || '',
           category: d.category || 'OTHER',
           postAtLocal: toDatetimeLocalKst(d.createdAt),
-          items: (d.items || []).map((it) => ({
-            key: String(it.id),
-            parentKey: it.parentCommentId != null ? String(it.parentCommentId) : null,
-            authorId: it.authorId || '',
-            body: it.body || '',
-            type: it.type,
-            atLocal: toDatetimeLocalKst(it.createdAt),
-            status: it.status || undefined,
-          })),
+          items: (d.items || []).map((it) => {
+            const pending = !!it.pending || !!it.planItemId;
+            return {
+              key: pending ? `${PLAN_KEY_PREFIX}${it.planItemId}` : String(it.id),
+              parentKey: pending
+                ? it.parentPlanItemId
+                  ? `${PLAN_KEY_PREFIX}${it.parentPlanItemId}`
+                  : null
+                : it.parentCommentId != null
+                  ? String(it.parentCommentId)
+                  : null,
+              authorId: it.authorId || '',
+              body: it.body || '',
+              type: it.type,
+              atLocal: toDatetimeLocalKst(pending ? it.scheduledAt : it.createdAt),
+              status: it.status || (pending ? 'SCHEDULED' : undefined),
+            };
+          }),
         });
       })
       .catch((err: any) => {
@@ -70,16 +89,24 @@ export function EditPublishedThreadDialog({ postId, onClose, onSaved, onDeleted 
     setSubmitting(true);
     setError('');
     try {
+      const posted = next.items.filter((it) => !isPendingKey(it.key));
+      const pending = next.items.filter((it) => isPendingKey(it.key));
       await updatePublishedThread(postId, {
         title: next.title,
         body: next.body,
         category: next.category,
         createdAt: fromDatetimeLocalKst(next.postAtLocal),
-        items: next.items.map((it) => ({
+        items: posted.map((it) => ({
           id: Number(it.key),
           body: it.body,
           authorId: it.authorId,
           createdAt: fromDatetimeLocalKst(it.atLocal),
+        })),
+        pendingItems: pending.map((it) => ({
+          planItemId: planItemIdFromKey(it.key),
+          body: it.body,
+          personaId: it.authorId,
+          scheduledAt: fromDatetimeLocalKst(it.atLocal),
         })),
       });
       onSaved();
@@ -118,9 +145,9 @@ export function EditPublishedThreadDialog({ postId, onClose, onSaved, onDeleted 
       editable
       error={error}
       postAtLabel="글 작성 시각 (KST)"
-      itemsLabel="댓글 · 대댓글 타임라인"
-      emptyItemsLabel="댓글이 없습니다."
-      authorPlaceholder="authorId"
+      itemsLabel="댓글 · 대댓글 타임라인 (게시됨 + 예약)"
+      emptyItemsLabel="댓글·예약 후보가 없습니다."
+      authorPlaceholder="authorId / personaId"
       onClose={onClose}
       onSave={handleSave}
       testId="admin-published-edit-dialog"

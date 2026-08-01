@@ -2,6 +2,7 @@ package com.againspring.aiuser.orchestrator.repository;
 
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlanItem;
 import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemStatus;
+import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -40,4 +41,12 @@ public interface AiThreadPlanItemRepository extends JpaRepository<AiThreadPlanIt
     int recoverExpiredLeases(@Param("processing") ThreadPlanItemStatus processing,
                              @Param("scheduled") ThreadPlanItemStatus scheduled,
                              @Param("now") Instant now);
+
+    @Query("select i from AiThreadPlanItem i where i.targetPostId = :postId " +
+           "and i.itemType in :types and i.status in :statuses " +
+           "order by i.scheduledAt asc, i.sequenceNo asc")
+    List<AiThreadPlanItem> findByPostAndTypesAndStatuses(
+            @Param("postId") String postId,
+            @Param("types") Collection<ThreadPlanItemType> types,
+            @Param("statuses") Collection<ThreadPlanItemStatus> statuses);
 }

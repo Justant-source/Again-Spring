@@ -2,7 +2,6 @@ package com.againspring.service.admin;
 
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.PostComment;
-import com.againspring.domain.enums.CommentStatus;
 import com.againspring.domain.enums.PostCategory;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.repository.UserRepository;
@@ -20,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -31,7 +31,8 @@ import java.util.stream.Collectors;
 
 /**
  * Admin thread editor for already-published posts — same shape as scheduled-holding detail
- * (post fields + comment/reply timeline with editable timestamps).
+ * (post fields + comment/reply timeline with editable timestamps), plus pending AI plan items
+ * that have not posted yet.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,13 +43,15 @@ public class AdminPublishedThreadService {
     private final UserRepository userRepository;
     private final AiCorrectionService aiCorrectionService;
     private final AiUserOutboxWriter aiUserOutboxWriter;
+    private final ThreadPlanItemProxyService threadPlanItemProxy;
 
     @Transactional(readOnly = true)
     public Map<String, Object> getThread(String postId) {
         Post post = requirePost(postId);
         List<PostComment> comments = postCommentRepository
                 .findByPostIdAndDeletedAtIsNullOrderByCreatedAtAsc(postId);
-        return toThreadView(post, comments);
+        List<Map<String, Object>> pending = threadPlanItemProxy.listPending(postId);
+        return toThreadView(post, comments, pending);
     }
 
     @Transactional
@@ -103,10 +106,33 @@ public class AdminPublishedThreadService {
         if (req.getItems() != null) {
             applyItems(postId, req.getItems(), adminId);
         }
+        if (req.getPendingItems() != null) {
+            applyPendingItems(postId, req.getPendingItems());
+        }
 
         List<PostComment> comments = postCommentRepository
                 .findByPostIdAndDeletedAtIsNullOrderByCreatedAtAsc(postId);
-        return toThreadView(postRepository.findById(postId).orElse(updated), comments);
+        List<Map<String, Object>> pending = threadPlanItemProxy.listPending(postId);
+        return toThreadView(postRepository.findById(postId).orElse(updated), comments, pending);
+    }
+
+    /** Keep/update listed pending items; cancel any currently pending plan item not listed. */
+    private void applyPendingItems(String postId, List<PendingItemRequest> items) {
+        List<Map<String, Object>> current = threadPlanItemProxy.listPending(postId);
+        Set<String> keep = items.stream()
+                .map(PendingItemRequest::getPlanItemId)
+                .filter(Objects::nonNull)
+                .filter(id -> !id.isBlank())
+                .collect(Collectors.toSet());
+
+        List<Map<String, Object>> payload = new ArrayList<>(toPendingPayload(items));
+        for (Map<String, Object> row : current) {
+            String id = row.get("planItemId") != null ? String.valueOf(row.get("planItemId")) : "";
+            if (!id.isBlank() && !keep.contains(id)) {
+                payload.add(Map.of("planItemId", id, "cancel", true));
+            }
+        }
+        threadPlanItemProxy.patchPending(postId, payload);
     }
 
     private void applyItems(String postId, List<ThreadItemRequest> items, String adminId) {
@@ -174,12 +200,34 @@ public class AdminPublishedThreadService {
         }
     }
 
-    private Map<String, Object> toThreadView(Post post, List<PostComment> comments) {
+    private static List<Map<String, Object>> toPendingPayload(List<PendingItemRequest> items) {
+        List<Map<String, Object>> out = new ArrayList<>(items.size());
+        for (PendingItemRequest item : items) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("planItemId", item.getPlanItemId());
+            if (Boolean.TRUE.equals(item.getCancel())) {
+                row.put("cancel", true);
+            } else {
+                if (item.getBody() != null) row.put("body", item.getBody());
+                if (item.getPersonaId() != null) row.put("personaId", item.getPersonaId());
+                if (item.getScheduledAt() != null) row.put("scheduledAt", item.getScheduledAt());
+            }
+            out.add(row);
+        }
+        return out;
+    }
+
+    private Map<String, Object> toThreadView(Post post, List<PostComment> comments,
+                                             List<Map<String, Object>> pending) {
         Set<String> authorIds = comments.stream()
                 .map(PostComment::getAuthorId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         if (post.getAuthorId() != null) authorIds.add(post.getAuthorId());
+        for (Map<String, Object> p : pending) {
+            Object persona = p.get("personaId");
+            if (persona != null) authorIds.add(String.valueOf(persona));
+        }
         Set<String> syntheticIds = authorIds.isEmpty()
                 ? Set.of()
                 : userRepository.findSyntheticIds(authorIds);
@@ -188,16 +236,41 @@ public class AdminPublishedThreadService {
         for (PostComment c : comments) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", c.getId());
+            item.put("planItemId", null);
+            item.put("pending", false);
             item.put("parentCommentId", c.getParentCommentId());
+            item.put("parentPlanItemId", null);
             item.put("authorId", c.getAuthorId());
             item.put("body", c.getBody());
             item.put("type", c.getParentCommentId() == null ? "COMMENT" : "REPLY");
             item.put("createdAt", c.getCreatedAt() != null ? c.getCreatedAt().toString() : null);
+            item.put("scheduledAt", null);
             item.put("status", c.getStatus() != null ? c.getStatus().name() : null);
             item.put("synthetic", syntheticIds.contains(c.getAuthorId()));
             item.put("likeCount", c.getLikeCount());
             items.add(item);
         }
+        for (Map<String, Object> p : pending) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            String personaId = p.get("personaId") != null ? String.valueOf(p.get("personaId")) : null;
+            item.put("id", null);
+            item.put("planItemId", p.get("planItemId"));
+            item.put("pending", true);
+            item.put("parentCommentId", null);
+            item.put("parentPlanItemId", p.get("parentPlanItemId"));
+            item.put("authorId", personaId);
+            item.put("body", p.get("body"));
+            item.put("type", p.get("type"));
+            item.put("createdAt", null);
+            item.put("scheduledAt", p.get("scheduledAt"));
+            item.put("status", p.get("status"));
+            item.put("synthetic", personaId != null && syntheticIds.contains(personaId));
+            item.put("likeCount", 0);
+            items.add(item);
+        }
+
+        items.sort(Comparator.comparing(AdminPublishedThreadService::itemSortKey,
+                Comparator.nullsLast(Comparator.naturalOrder())));
 
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("id", post.getId());
@@ -210,8 +283,20 @@ public class AdminPublishedThreadService {
         view.put("authorId", post.getAuthorId());
         view.put("synthetic", syntheticIds.contains(post.getAuthorId()));
         view.put("commentCount", comments.size());
+        view.put("pendingCount", pending.size());
         view.put("items", items);
         return view;
+    }
+
+    private static Instant itemSortKey(Map<String, Object> item) {
+        Object at = item.get("createdAt");
+        if (at == null) at = item.get("scheduledAt");
+        if (at == null) return null;
+        try {
+            return Instant.parse(String.valueOf(at));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private Post requirePost(String postId) {
@@ -251,6 +336,7 @@ public class AdminPublishedThreadService {
         private Integer viewCount;
         private String createdAt;
         private List<ThreadItemRequest> items;
+        private List<PendingItemRequest> pendingItems;
     }
 
     @Getter
@@ -260,5 +346,15 @@ public class AdminPublishedThreadService {
         private String body;
         private String authorId;
         private String createdAt;
+    }
+
+    @Getter
+    @Setter
+    public static class PendingItemRequest {
+        private String planItemId;
+        private String body;
+        private String personaId;
+        private String scheduledAt;
+        private Boolean cancel;
     }
 }
