@@ -153,6 +153,7 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=2400
 |---|---|---|
 | `AI_LEARNING_ENABLED` | scheduler 전체 enable | `true` |
 | `AI_LEARNING_CRAWL_ENABLED` | crawl/strengthen/topic job 등록 여부 | `false` |
+| `CRAWL_MIN_POPULARITY_PCT` | 크롤 ingest 시 배치 내 상대 popularity 하한 (0~1). 미만 POST·그 자식 COMMENT 폐기 | `0.50` |
 | `AI_LEARNING_URL` | orchestrator가 learning을 호출할 주소 | `http://againspring-ai-learning:8099` |
 | `LLM_AI_USER_URL` | learning이 AI-user LLM을 호출할 주소 | `http://againspring-llm-ai-user:8092` |
 
@@ -160,6 +161,7 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=2400
 
 - `AI_LEARNING_ENABLED=false`면 scheduler 자체가 올라오지 않는다.
 - `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic job이 등록되지 않는다.
+- 크롤 저장 전 `popularity_gate`가 지표·절대하한·상대 percentile을 검사한다. UNRANKED는 넣지 않는다.
 
 ### prod → dev sync
 

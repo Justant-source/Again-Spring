@@ -2,8 +2,14 @@ from fastapi import APIRouter, BackgroundTasks
 from app.db.session import get_db
 from app.services.quality_filter import QualityFilter
 from app.services.register_classifier import classify as classify_register
+from app.services.popularity_gate import (
+    MIN_POPULARITY_PCT,
+    filter_comments_for_parents,
+    load_ranked_parent_urls,
+    select_popular_posts,
+)
 from datetime import datetime
-import logging, asyncio
+import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -14,6 +20,21 @@ _CRAWLERS = {
     "natepan": "app.crawlers.natepan",
     "blind": "app.crawlers.blind",
 }
+
+
+def _gate_items(source: str, items: list, existing_ranked_parents: set[str]) -> tuple[list, int]:
+    """Apply popularity gate. Returns (accepted_items, skipped_unpopular_count)."""
+    posts = [i for i in items if (i.get("content_type") or "COMMENT") == "POST"]
+    comments = [i for i in items if (i.get("content_type") or "COMMENT") != "POST"]
+
+    accepted_posts, _url_pct = select_popular_posts(posts, source=source)
+    accepted_urls = {p.get("source_url") for p in accepted_posts if p.get("source_url")}
+    # Comments may attach to newly accepted posts OR already-ranked parents in DB
+    allow_parents = accepted_urls | existing_ranked_parents
+    accepted_comments = filter_comments_for_parents(comments, allow_parents)
+
+    skipped = (len(posts) - len(accepted_posts)) + (len(comments) - len(accepted_comments))
+    return list(accepted_posts) + list(accepted_comments), skipped
 
 
 async def _do_crawl(source, daily_limit, embed_service):
@@ -29,24 +50,30 @@ async def _do_crawl(source, daily_limit, embed_service):
         items = await crawl(daily_limit=daily_limit)
         saved = 0
         skipped_dupes = 0
+        skipped_unpopular = 0
+        source_key = source.lower()
 
-        # 기존 URL 조회는 짧은 커넥션으로 분리 — SELECT~INSERT를 한 트랜잭션에 묶으면
-        # 임베딩(건당 100~500ms) 동안 lock을 점유해 동시 크롤 시 1205가 난다 (2026-06 인시던트)
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT source_url FROM example_bank WHERE source=%s AND source_url IS NOT NULL",
-                    (source.upper(),)
+                    "SELECT source_url FROM example_bank WHERE LOWER(source)=%s AND source_url IS NOT NULL",
+                    (source_key,)
                 )
-                existing_urls = {row["source_url"] for row in cur.fetchall()}  # DictCursor
+                existing_urls = {row["source_url"] for row in cur.fetchall()}
+                ranked_parents = load_ranked_parent_urls(cur, source_key, MIN_POPULARITY_PCT)
 
-        # 임베딩·문체 분류는 DB 커넥션 밖에서 선계산
+        # Popularity gate BEFORE embed — do not waste embeddings on low-engagement posts.
+        gated_items, skipped_unpopular = _gate_items(source_key, items, ranked_parents)
+        logger.info(
+            "Crawl %s popularity gate: collected=%s gated=%s skipped_unpopular=%s min_pct=%.2f",
+            source_key, len(items), len(gated_items), skipped_unpopular, MIN_POPULARITY_PCT,
+        )
+
         rows = []
-        for item in items:
+        for item in gated_items:
             if not quality.passes(item["content"]):
                 continue
 
-            # Dedup: skip if source_url already exists in DB
             source_url = item.get("source_url")
             if source_url is not None and source_url in existing_urls:
                 skipped_dupes += 1
@@ -56,8 +83,6 @@ async def _do_crawl(source, daily_limit, embed_service):
             vec_str = "[" + ",".join(f"{v:.8f}" for v in vec) + "]"
             register = classify_register(item["content"])
 
-            # engagement_span_hours 계산: comment_timestamps 리스트 기반
-            # 크롤러마다 datetime 객체 또는 "YYYY-MM-DD HH:MM:SS" 문자열을 섞어 반환할 수 있어 여기서 정규화
             comment_timestamps = item.get("comment_timestamps")
             engagement_span_hours = None
             if comment_timestamps:
@@ -74,11 +99,15 @@ async def _do_crawl(source, daily_limit, embed_service):
                     span_seconds = (max(parsed_ts) - min(parsed_ts)).total_seconds()
                     engagement_span_hours = span_seconds / 3600
 
+            popularity_pct = item.get("popularity_pct")  # set for accepted POSTs in-batch
+            if (item.get("content_type") or "COMMENT") != "POST":
+                popularity_pct = None  # COMMENT: style anchor only
+
             rows.append((
                 item["content"],
                 item.get("content_type", "COMMENT"),
                 item.get("category", "OTHER"),
-                item.get("source", source.upper()),
+                item.get("source", source_key).lower() if item.get("source") else source_key,
                 quality.score(item["content"]),
                 register,
                 item.get("title"),
@@ -89,18 +118,18 @@ async def _do_crawl(source, daily_limit, embed_service):
                 item.get("like_count"),
                 item.get("comment_count"),
                 engagement_span_hours,
+                popularity_pct,
                 vec_str
             ))
 
-            # Track newly-inserted URL to dedup within this run
             if source_url is not None:
                 existing_urls.add(source_url)
 
         sql = """INSERT INTO example_bank
                  (content, content_type, category, source, quality_score, register,
                   title, source_url, author_id, posted_at, view_count, like_count,
-                  comment_count, engagement_span_hours, embedding, created_at)
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                  comment_count, engagement_span_hours, popularity_pct, embedding, created_at)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                          VEC_FromText(%s), NOW(3))"""
         BATCH_COMMIT = 50
         with get_db() as conn:
@@ -111,13 +140,15 @@ async def _do_crawl(source, daily_limit, embed_service):
                     if saved % BATCH_COMMIT == 0:
                         conn.commit()
 
-                # Log crawl operation
                 log_sql = """INSERT INTO crawl_log
                              (source, items_collected, items_saved, status, created_at)
                              VALUES (%s, %s, %s, %s, NOW(3))"""
                 cur.execute(log_sql, (source, len(items), saved, "SUCCESS"))
 
-        logger.info(f"Crawl {source}: collected={len(items)} saved={saved} skipped_dupes={skipped_dupes}")
+        logger.info(
+            f"Crawl {source}: collected={len(items)} saved={saved} "
+            f"skipped_dupes={skipped_dupes} skipped_unpopular={skipped_unpopular}"
+        )
     except Exception as e:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -132,7 +163,8 @@ async def _do_crawl(source, daily_limit, embed_service):
 async def trigger_crawl(source: str, background_tasks: BackgroundTasks, limit: int = 100):
     from app.main import embed_service
     background_tasks.add_task(_do_crawl, source, limit, embed_service)
-    return {"status": "started", "source": source, "limit": limit}
+    return {"status": "started", "source": source, "limit": limit,
+            "min_popularity_pct": MIN_POPULARITY_PCT}
 
 
 @router.get("/log")
@@ -144,7 +176,4 @@ def get_crawl_log():
                           ORDER BY created_at DESC
                           LIMIT 50""")
             rows = cur.fetchall()
-    # DB는 UTC 저장(naive datetime) — str()은 "YYYY-MM-DD HH:MM:SS.ffffff" 형식이라
-    # 표준 ISO-8601이 아니고, 소비 측(backend AdminCrawlStatusService)의 Instant.parse()가 못 읽는다.
-    # isoformat() + "Z"로 명시적 UTC ISO-8601을 내려준다.
     return [{"source": r["source"], "status": r["status"], "saved": r["items_saved"], "at": r["created_at"].isoformat() + "Z"} for r in rows]

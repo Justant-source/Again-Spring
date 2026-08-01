@@ -114,6 +114,19 @@ learning container가 뜨면 아래가 항상 실행된다.
 
 크롤 자체는 `run_daily_crawl()` 안에서 강화·토픽합성까지 이어서 호출한다 (03:00 한 번의 잡 안에서 순차 실행).
 
+### Popularity 게이트 (2026-08-01)
+
+크롤 결과는 **무차별 저장하지 않는다.** `popularity_gate`가 임베딩·INSERT 전에 걸러낸다.
+
+| 규칙 | 내용 |
+|---|---|
+| POST 지표 | view/like/comment 중 ≥1개 필수 |
+| 절대 하한 | source별 floor (natepan: view≥50 ∨ like≥3 ∨ comment≥5 등) |
+| 상대 순위 | 배치 내 per-source relative percentile ≥ `CRAWL_MIN_POPULARITY_PCT`(기본 **0.50**) |
+| COMMENT | 인기 POST(이번에 통과했거나 DB에 `popularity_pct≥threshold`)의 자식만 저장 |
+
+`UNRANKED`(지표 없음) 글은 코퍼스에 넣지 않는다. 사연 선별도 인기 보장 코퍼스를 전제로 한다.
+
 ## 말투 강화
 
 `/strengthen/*`는 DB의 예시를 source별로 모아 voice profile을 갱신한다.
