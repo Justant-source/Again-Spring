@@ -6,10 +6,13 @@ import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
 import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.domain.StoryProfile;
 import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
+import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +32,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,6 +54,8 @@ class AiPostBundleServiceTest {
     @Mock private AiScheduledPostRepository scheduledPostRepository;
     @Mock private PlanPersonaMapper planPersonaMapper;
     @Mock private PlanSourceStoryResolver sourceStoryResolver;
+    @Mock private StoryProfileAnalyzer storyProfileAnalyzer;
+    @Mock private PersonaMatcherService personaMatcherService;
 
     private AiPostBundleService service;
     private CandidateScheduleSupport scheduleSupport;
@@ -59,10 +67,17 @@ class AiPostBundleServiceTest {
         when(threadPlan.getAiPostModel()).thenReturn("claude-sonnet-4-6");
         when(threadPlan.getBundleTimeoutMs()).thenReturn(240_000L);
         scheduleSupport = new CandidateScheduleSupport(properties);
+        when(storyProfileAnalyzer.analyze(any(), any(), any(), any(), any())).thenReturn(
+                new StoryProfile("갈등", "OTHER",
+                        List.of(), Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                        "NATEPAN", List.of(), "", ""));
+        when(personaMatcherService.matchCommenters(any(), any(Integer.class), anyLong(), anyString()))
+                .thenReturn(List.of());
         service = new AiPostBundleService(
                 configRepository, properties, personaRepository, llmClient, backendBot,
                 safetyGuard, planService, planGenerationService, scheduledPostRepository,
-                scheduleSupport, new ObjectMapper(), planPersonaMapper, sourceStoryResolver);
+                scheduleSupport, new ObjectMapper(), planPersonaMapper, sourceStoryResolver,
+                storyProfileAnalyzer, personaMatcherService);
     }
 
     @Test
@@ -116,6 +131,8 @@ class AiPostBundleServiceTest {
         assertThat(req.get("reconstructMode")).isEqualTo(true);
         assertThat(req.get("sourceExampleId")).isEqualTo(99L);
         assertThat(req.get("recentOutputs")).isInstanceOf(List.class);
+        assertThat(req.get("storySearchDoc")).isInstanceOf(String.class);
+        assertThat(req.get("storyProfile")).isInstanceOf(Map.class);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> personas = (List<Map<String, Object>>) req.get("personas");
@@ -148,7 +165,7 @@ class AiPostBundleServiceTest {
                         "voiceProfile", Map.of("formality", "casual")))
                 .toList();
         when(planPersonaMapper.mapCast(pool)).thenReturn(cast);
-        when(planPersonaMapper.castIds(cast)).thenReturn(
+        when(planPersonaMapper.castIds(any())).thenReturn(
                 pool.stream().map(Persona::getId).collect(java.util.stream.Collectors.toSet()));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(cast.get(0));
         when(sourceStoryResolver.resolve(any(), any(), any())).thenReturn(

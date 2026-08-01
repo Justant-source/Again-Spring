@@ -11,6 +11,10 @@ import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
 import com.againspring.aiuser.orchestrator.service.capsule.PersonaCapsuleService;
 import com.againspring.aiuser.orchestrator.service.engagement.PlanEngagementDispatcher;
+import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaAutoProvisionService;
+import com.againspring.aiuser.orchestrator.domain.StoryProfile;
+import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.againspring.aiuser.orchestrator.service.threadplan.HumanReplyTtlCleanupService;
@@ -60,6 +64,9 @@ public class AdminTriggerController {
     private final ViewDispatcher viewDispatcher;
     private final HumanReplyTtlCleanupService humanReplyTtlCleanupService;
     private final PersonaCapsuleService personaCapsuleService;
+    private final PersonaMatcherService personaMatcherService;
+    private final PersonaAutoProvisionService personaAutoProvisionService;
+    private final StoryProfileAnalyzer storyProfileAnalyzer;
 
     /**
      * KST 시간대 곡선으로 발행 슬롯 N개를 샘플링만 해서 보여준다(부작용 없음).
@@ -425,6 +432,84 @@ public class AdminTriggerController {
         log.info("[backfill-persona-capsules] done personas={} upserted={} skipped={} facts={} errors={}",
                 result.personasProcessed(), result.capsulesUpserted(), result.capsulesSkipped(),
                 result.factsUpserted(), result.errors());
+    }
+
+    /**
+     * WP3 W4-C: analyze story → matcher {@code bestAuthorAbove}; on miss, auto-create minimal persona.
+     * Query params only (no admin UI). Optional identity query overrides merge into explicitIdentity.
+     */
+    @PostMapping("/auto-persona-for-story")
+    public ResponseEntity<Map<String, Object>> autoPersonaForStory(
+            @RequestParam String category,
+            @RequestParam(defaultValue = "NATEPAN") String register,
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String body,
+            @RequestParam(defaultValue = "0.35") double threshold,
+            @RequestParam(required = false) String age,
+            @RequestParam(required = false) String gender,
+            @RequestParam(required = false) String job,
+            @RequestParam(required = false) Long sourceExampleId) {
+        long exampleId = sourceExampleId != null ? sourceExampleId : 0L;
+        String corr = "admin-auto-persona";
+
+        // Heuristic analyzer → domain StoryProfile (override identity from query params)
+        var analyzed = storyProfileAnalyzer.analyze(title, body, category, register, sourceExampleId);
+        Map<String, String> identity = new java.util.LinkedHashMap<>(analyzed.explicitIdentity());
+        if (age != null && !age.isBlank()) identity.put("age", age.trim());
+        if (gender != null && !gender.isBlank()) identity.put("gender", gender.trim());
+        if (job != null && !job.isBlank()) identity.put("job", job.trim());
+
+        String cat = analyzed.category().isBlank() ? category : analyzed.category();
+        String reg = analyzed.sourceRegister().isBlank() ? register : analyzed.sourceRegister();
+        StoryProfile profile = new StoryProfile(
+                analyzed.centralConflict(),
+                cat,
+                analyzed.topics(),
+                identity,
+                analyzed.lifeContext(),
+                analyzed.valueAxis(),
+                analyzed.timeline(),
+                analyzed.specificDetails(),
+                analyzed.authorKnownFacts(),
+                analyzed.unknowns(),
+                reg,
+                analyzed.replyAffordances(),
+                analyzed.authorBlindSpot(),
+                analyzed.counterpartReasonablePoint());
+
+        var ranked = personaMatcherService.matchAuthors(profile, 1, exampleId, corr);
+        double bestScore = ranked.isEmpty() ? 0.0 : ranked.get(0).score();
+        String bestPersonaId = ranked.isEmpty() ? null : ranked.get(0).personaId();
+
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("threshold", threshold);
+        out.put("category", profile.category());
+        out.put("register", profile.sourceRegister());
+        out.put("searchDoc", profile.toSearchDocument());
+        out.put("bestScore", bestScore);
+        out.put("bestPersonaId", bestPersonaId);
+
+        if (bestScore >= threshold && bestPersonaId != null) {
+            out.put("action", "MATCHED");
+            out.put("created", false);
+            out.put("message", "기존 페르소나 매칭 점수 ≥ threshold — 생성 생략");
+            return ResponseEntity.ok(out);
+        }
+
+        var result = personaAutoProvisionService.provision(profile, sourceExampleId, corr);
+        out.put("action", result.created() ? "CREATED" : "SKIPPED");
+        out.put("created", result.created());
+        out.put("failureReason", result.failureReason());
+        out.put("personaId", result.persona().map(Persona::getId).orElse(null));
+        if (result.conflicting().isPresent()) {
+            var c = result.conflicting().get();
+            out.put("conflict", Map.of(
+                    "age", c.age(),
+                    "gender", c.gender(),
+                    "job", c.job(),
+                    "voiceType", c.voiceType()));
+        }
+        return ResponseEntity.ok(out);
     }
 
     /** ActionExecutor.topCategory()와 동일한 로직 — category NOT NULL이라 반드시 채워야 한다. */

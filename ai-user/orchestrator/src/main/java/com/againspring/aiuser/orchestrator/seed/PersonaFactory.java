@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.*;
+import java.util.Locale;
 
 /**
  * LLM으로 다양한 페르소나를 생성해 DB에 저장.
@@ -47,6 +48,10 @@ public class PersonaFactory {
 
     private static final Random RNG = new Random();
 
+    private static final Set<String> ALLOWED_STORY_VOICES = Set.of("NATEPAN", "BLIND");
+    private static final Set<String> CATEGORIES = Set.of(
+            "COUPLE", "MARRIED", "FRIEND", "FAMILY", "WORK", "OTHER");
+
     /**
      * 현재 페르소나 수가 target 미만이면 부족분 생성.
      * @param target 목표 페르소나 수
@@ -67,8 +72,8 @@ public class PersonaFactory {
         while (created < needed && attempts < maxAttempts) {
             attempts++;
             try {
-                boolean ok = generateOne();
-                if (ok) created++;
+                Optional<Persona> ok = generateOne(null, null, Map.of());
+                if (ok.isPresent()) created++;
             } catch (Exception e) {
                 log.warn("PersonaFactory attempt {} failed: {}", attempts, e.getMessage());
             }
@@ -76,14 +81,43 @@ public class PersonaFactory {
         log.info("PersonaFactory: created {} personas in {} attempts", created, attempts);
     }
 
-    private boolean generateOne() throws Exception {
-        // 랜덤 조합 선택
-        String age      = pick(AGES);
-        String gender   = pick(GENDERS);
-        String voice    = pick(VOICES);
-        String politics = pick(POLITICS);
-        String region   = pick(REGIONS);
-        String job      = pick(JOBS);
+    /**
+     * WP3 minimal auto-persona: create one active persona for a story match miss.
+     * voice_type is forced to NATEPAN|BLIND; interests biased toward {@code category}.
+     *
+     * @param register NATEPAN|BLIND (invalid → soft 3:1 pick)
+     * @param category 6광장 category (COUPLE/…/OTHER)
+     * @param identityHints optional age/gender/job/region/politics keys (string values)
+     */
+    public Optional<Persona> createForStory(
+            String register, String category, Map<String, String> identityHints) {
+        try {
+            return generateOne(register, category, identityHints != null ? identityHints : Map.of());
+        } catch (Exception e) {
+            log.warn("PersonaFactory.createForStory failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * @param forcedRegister null → random NATEPAN/BLIND mix; else clamped to allowed set
+     * @param categoryBias null → default interest distribution; else boost that category
+     * @param hints age/gender/job/region/politics overrides when non-blank
+     */
+    private Optional<Persona> generateOne(
+            String forcedRegister, String categoryBias, Map<String, String> hints) throws Exception {
+        String age = firstNonBlank(hints.get("age"), pick(AGES));
+        String gender = firstNonBlank(hints.get("gender"), pick(GENDERS));
+        if ("male".equalsIgnoreCase(gender) || "남".equals(gender) || "남성".equals(gender)) gender = "M";
+        if ("female".equalsIgnoreCase(gender) || "여".equals(gender) || "여성".equals(gender)) gender = "F";
+        if (!gender.equals("M") && !gender.equals("F")) gender = pick(GENDERS);
+
+        String voice = normalizeStoryVoice(forcedRegister);
+        if (voice == null) voice = pick(VOICES);
+
+        String politics = firstNonBlank(hints.get("politics"), pick(POLITICS));
+        String region = firstNonBlank(hints.get("region"), pick(REGIONS));
+        String job = firstNonBlank(hints.get("job"), pick(JOBS));
         job = coerceJobToAge(age, job);
 
         // voice별 HEAVY≥1 보장: 이 voice에 HEAVY가 없으면 tier=HEAVY로 강제
@@ -108,11 +142,11 @@ public class PersonaFactory {
         // LLM으로 voice 블록 생성
         String prompt = buildPersonaPrompt(age, gender, voice, politics, region, job);
         Optional<String> result = llmClient.generatePersonaVoice(prompt);
-        if (result.isEmpty() || result.get().isBlank()) return false;
+        if (result.isEmpty() || result.get().isBlank()) return Optional.empty();
 
         // JSON 파싱
         Map<String, Object> voiceMap = parseVoiceJson(result.get());
-        if (voiceMap == null) return false;
+        if (voiceMap == null) return Optional.empty();
 
         // 닉네임 생성 (LLM 응답에 있으면 사용, 없으면 fallback)
         String nickname = extractNickname(voiceMap, age, gender);
@@ -156,10 +190,11 @@ public class PersonaFactory {
                 } catch (Exception e2) { log.warn("PersonaFactory insert failed: {}", e2.getMessage()); break; }
             }
         }
-        if (!inserted) { log.error("PersonaFactory: failed to insert user after 5 attempts"); return false; }
+        if (!inserted) { log.error("PersonaFactory: failed to insert user after 5 attempts"); return Optional.empty(); }
 
         // interests, bias, circadian 생성
         Map<String, Double> interests = buildInterests(age, politics, job);
+        biasInterestsToCategory(interests, categoryBias);
         Map<String, Double> bias      = buildBias(politics);
         List<Double> circadian        = buildCircadian(job, age);
 
@@ -209,7 +244,27 @@ public class PersonaFactory {
         }
 
         log.info("PersonaFactory: created persona id={} age={} gender={} voice={} politics={}", id.substring(0,8), age, gender, voice, politics);
-        return true;
+        return Optional.of(persona);
+    }
+
+    /** NATEPAN|BLIND only; blank/invalid → null (caller picks soft mix). */
+    public static String normalizeStoryVoice(String register) {
+        if (register == null || register.isBlank()) return null;
+        String v = register.trim().toUpperCase(Locale.ROOT);
+        return ALLOWED_STORY_VOICES.contains(v) ? v : null;
+    }
+
+    static void biasInterestsToCategory(Map<String, Double> interests, String category) {
+        if (interests == null || category == null || category.isBlank()) return;
+        String cat = category.trim().toUpperCase(Locale.ROOT);
+        if (!CATEGORIES.contains(cat)) return;
+        double boosted = Math.max(interests.getOrDefault(cat, 0.0), 0.75 + RNG.nextDouble() * 0.2);
+        interests.put(cat, Math.min(1.0, boosted));
+    }
+
+    private static String firstNonBlank(String preferred, String fallback) {
+        if (preferred != null && !preferred.isBlank()) return preferred.trim();
+        return fallback;
     }
 
     private String buildPersonaPrompt(String age, String gender, String voice, String politics, String region, String job) {

@@ -176,6 +176,7 @@ delta를 계산해 댓글·대댓글 `atLocal`에 일괄 적용한다 (키보드
 env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
   ├─ provider(ai_post_bundle/human_post_plan/human_interaction) = CLAUDE
   ├─ POST /admin/trigger/backfill-persona-capsules?batchSize=20  (WP2 capsule/fact; sync=true 가능)
+  ├─ POST /admin/trigger/auto-persona-for-story?category=&register=NATEPAN&title=&body=&threshold=0.35  (WP3 matcher miss → auto-create)
   ├─ POST /admin/trigger/generate-scheduled-posts?count=N&fromHour=8&toHour=22
   │    ├─ ActivityCurve.sampleFutureInstants(count=N)로 오늘 남은 활동 시간대에
   │    │  발행 슬롯 N개를 최소간격(기본 45분) 두고 샘플링

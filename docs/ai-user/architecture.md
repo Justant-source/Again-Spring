@@ -111,6 +111,7 @@ LLM 없이 사연 검색 문서 → 페르소나 top-K:
 3. persona 단위 집계: score = max(similarity × weight), matched capsule types 수집.
 4. **Degrade**: embed 실패·capsule 없음·히트 0 → 활성 페르소나를 `interests[category]` 내림차순 (category는 인자 또는 검색문 선두 토큰).
 5. `purpose=AUTHOR_CANDIDATE|COMMENT_CANDIDATE`면 `persona_match_audits`에 best-effort 기록.
+6. **Matcher (WP3)**: `PersonaMatcherService`가 capsule pool 위 hard filter + 가중합 score를 적용하고 audits를 기록한다 (capsule search는 purpose 없이 호출).
 
 ## 스케줄 요약
 

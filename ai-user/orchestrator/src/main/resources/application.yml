@@ -42,6 +42,8 @@ management:
 
 ai-user:
   enabled: ${AI_USER_ENABLED:false}
+  matcher:
+    author-threshold: ${AI_USER_MATCHER_AUTHOR_THRESHOLD:0.35}
   seed:
     enabled: ${AI_USER_SEED_ENABLED:true}
   tick-cron: ${AI_USER_TICK_CRON:"0 */10 * * * *"}

@@ -9,11 +9,15 @@ import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlan;
 import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.domain.StoryProfile;
 import com.againspring.aiuser.orchestrator.domain.enums.ScheduledPostStatus;
 import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
+import com.againspring.aiuser.orchestrator.service.match.RankedPersona;
+import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +27,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +60,8 @@ public class AiPostBundleService {
     private final ObjectMapper objectMapper;
     private final PlanPersonaMapper planPersonaMapper;
     private final PlanSourceStoryResolver sourceStoryResolver;
+    private final StoryProfileAnalyzer storyProfileAnalyzer;
+    private final PersonaMatcherService personaMatcherService;
 
     /** A PLAN rollout owns post generation even when its workload provider is OFF. */
     public boolean ownsPostGeneration() {
@@ -150,19 +157,26 @@ public class AiPostBundleService {
         String model = properties.getThreadPlan().getAiPostModel();
         int pool = config == null ? 24 : Math.max(1, Math.min(24, config.getCandidatePoolSize()));
 
-        // Full active pool — no fixed limit(24) on cast. Author is always personas[0].
+        PlanSourceStoryResolver.ResolvedSource source = sourceStoryResolver.resolve(author, category, topicHint);
+
+        // WP3: StoryProfile once per source; reorder comment cast by matcher (author stays personas[0]).
+        StoryProfile storyProfile = storyProfileAnalyzer.analyze(
+                source.sourceTitle(),
+                source.sourceBody(),
+                category,
+                registerHint(author, source),
+                source.sourceExampleId());
+        long exampleId = source.sourceExampleId() == null ? 0L : source.sourceExampleId();
+        String corr = correlationId == null ? "ai-post-bundle" : correlationId;
+
         List<Persona> active = personaRepository.findByActiveTrue();
-        List<Map<String, Object>> personas = new ArrayList<>(planPersonaMapper.mapCast(active));
-        Map<String, Object> authorEntry = planPersonaMapper.mapAuthor(author);
-        personas.removeIf(m -> author.getId().equals(String.valueOf(m.getOrDefault("personaId", ""))));
-        personas.add(0, authorEntry);
+        List<Map<String, Object>> personas = reorderCastByMatcher(
+                planPersonaMapper.mapCast(active), author, storyProfile, exampleId, corr);
         if (personas.isEmpty()) {
             log.warn("AI post bundle skipped: no active personas corr={}", correlationId);
             return Optional.empty();
         }
         Set<String> castIds = planPersonaMapper.castIds(personas);
-
-        PlanSourceStoryResolver.ResolvedSource source = sourceStoryResolver.resolve(author, category, topicHint);
 
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("kind", "AI_POST");
@@ -182,6 +196,8 @@ public class AiPostBundleService {
         }
         List<String> recent = PlanSourceStoryResolver.recentOutputsForRequest(source.recentBodies(), 200);
         if (!recent.isEmpty()) request.put("recentOutputs", recent);
+        request.put("storyProfile", storyProfileToMap(storyProfile));
+        request.put("storySearchDoc", storyProfile.toSearchDocument());
         request.put("author", planPersonaMapper.mapAuthor(author));
         request.put("personas", personas);
         int roots = Math.min(14, pool);
@@ -238,6 +254,83 @@ public class AiPostBundleService {
         } catch (ReflectiveOperationException ignored) {
             // Column not yet present (W1-H). Provenance is in candidates JSON.
         }
+    }
+
+    /**
+     * Author first, then matcher-ranked commenters, then remaining cast (stable).
+     * Matcher failures degrade to author-first original order.
+     */
+    List<Map<String, Object>> reorderCastByMatcher(
+            List<Map<String, Object>> cast,
+            Persona author,
+            StoryProfile profile,
+            long sourceExampleId,
+            String correlationId) {
+        List<Map<String, Object>> base = cast == null ? List.of() : new ArrayList<>(cast);
+        Map<String, Object> authorEntry = planPersonaMapper.mapAuthor(author);
+        base.removeIf(m -> author.getId().equals(String.valueOf(m.getOrDefault("personaId", ""))));
+
+        List<String> rankedIds = List.of();
+        try {
+            List<RankedPersona> ranked = personaMatcherService.matchCommenters(
+                    profile, Math.min(60, Math.max(1, base.size())), sourceExampleId, correlationId + "-cast");
+            rankedIds = ranked.stream().map(RankedPersona::personaId).toList();
+        } catch (Exception e) {
+            log.debug("cast matcher skipped corr={}: {}", correlationId, e.getMessage());
+        }
+
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        List<Map<String, Object>> out = new ArrayList<>(base.size() + 1);
+        out.add(authorEntry);
+        seen.add(author.getId());
+
+        Map<String, Map<String, Object>> byId = new LinkedHashMap<>();
+        for (Map<String, Object> m : base) {
+            String id = String.valueOf(m.getOrDefault("personaId", ""));
+            if (!id.isBlank()) byId.put(id, m);
+        }
+        for (String id : rankedIds) {
+            if (seen.contains(id)) continue;
+            Map<String, Object> row = byId.get(id);
+            if (row != null) {
+                out.add(row);
+                seen.add(id);
+            }
+        }
+        for (Map<String, Object> m : base) {
+            String id = String.valueOf(m.getOrDefault("personaId", ""));
+            if (id.isBlank() || seen.contains(id)) continue;
+            out.add(m);
+            seen.add(id);
+        }
+        return out;
+    }
+
+    static Map<String, Object> storyProfileToMap(StoryProfile p) {
+        if (p == null) return Map.of();
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("centralConflict", p.centralConflict());
+        m.put("category", p.category());
+        m.put("topics", p.topics());
+        m.put("explicitIdentity", p.explicitIdentity());
+        m.put("lifeContext", p.lifeContext());
+        m.put("valueAxis", p.valueAxis());
+        m.put("sourceRegister", p.sourceRegister());
+        m.put("replyAffordances", p.replyAffordances());
+        m.put("searchDoc", p.toSearchDocument());
+        return m;
+    }
+
+    /** Prefer example source community; else persona voice_type (NATEPAN|BLIND). */
+    static String registerHint(Persona author, PlanSourceStoryResolver.ResolvedSource source) {
+        if (source != null && source.sourceCommunity() != null && !source.sourceCommunity().isBlank()) {
+            return source.sourceCommunity();
+        }
+        if (author != null && author.getVoiceProfile() != null) {
+            Object vt = author.getVoiceProfile().get("voice_type");
+            if (vt != null && !String.valueOf(vt).isBlank()) return String.valueOf(vt);
+        }
+        return "NATEPAN";
     }
 
     private record Bundle(Map<String, Object> response, PostContent content, String provider, String model,

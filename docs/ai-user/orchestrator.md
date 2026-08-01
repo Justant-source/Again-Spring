@@ -20,6 +20,7 @@
 | `HumanReplyBatchScheduler` | 사람 댓글/대댓글을 30분 단위로 묶어 reply 생성 |
 | `HumanReplyTtlCleanupScheduler` | inbox/REQUESTED plan TTL 정리 (플래그 기본 OFF, no-op) |
 | `PersonaCapsuleSearchService` | story→persona top-K (capsule vector + interests fallback, LLM 없음) |
+| `PersonaMatcherService` | StoryProfile → hard filter + capsule search + author/comment score + match audits (WP3) |
 
 ## Capsule search (WP2)
 
@@ -28,6 +29,17 @@
 - fallback: 활성 페르소나 `interests` (COUPLE/MARRIED/FRIEND/FAMILY/WORK/OTHER)
 - optional audit: `persona_match_audits` (`AUTHOR_CANDIDATE` / `COMMENT_CANDIDATE`)
 - 상세 토폴로지: [architecture.md](./architecture.md) § Capsule persona search
+
+## Persona matcher (WP3 / W4-B)
+
+- 입력: `StoryProfile` (`toSearchDocument()` ≤512) + topK + sourceExampleId/correlationId
+- 경로: capsule pool (author≈20 / comment≈60) → `PersonaHardFilter` (active·register·age·gender·job·region만; marriage/parenting/cannot_claim은 `UNEVALUATED`) → score
+- score: `0.45*semantic + 0.25*register + 0.15*fact_ratio + 0.15*interest[category]`
+- API: `matchAuthors` / `matchCommenters` / `bestAuthorAbove` (threshold default `ai-user.matcher.author-threshold=0.35`)
+- audits: purpose `AUTHOR_CANDIDATE`|`COMMENT_CANDIDATE`, reasons에 UNEVALUATED 축·점수 기록 (capsule search purpose 미설정 → 이중 기록 방지)
+- PLAN 연동: `AiPostBundleService`가 source 사연을 `StoryProfileAnalyzer`로 1회 구조화하고, `matchCommenters`로 cast를 재정렬(author=`personas[0]` 유지). 요청에 `storyProfile`/`storySearchDoc` 포함.
+- 매칭 실패 시: `PersonaAutoProvisionService` + `POST /admin/trigger/auto-persona-for-story`
+- SSOT: `python3 ai-user/tools/wp3_persona_ssot_report.py`
 
 ## 스케줄
 
