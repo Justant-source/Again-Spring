@@ -77,12 +77,37 @@ export function sql(query: string): string {
 }
 
 export function runSqlScript(sqlText: string): void {
+  const container = process.env.DB_CONTAINER ?? 'againspring-mariadb-prod'
+  if (!ALLOWED_CONTAINERS.has(container)) {
+    throw new Error(`DB 접근 거부: 허용되지 않은 컨테이너 (${container})`)
+  }
+
+  const pass = readEnvVar('MARIADB_PASSWORD')
+  const db = readEnvVar('MARIADB_DATABASE') || 'againspring'
+  const user = readEnvVar('MARIADB_USER') || 'againspring'
+
+  if (!pass) {
+    throw new Error('[db.ts] MARIADB_PASSWORD를 찾을 수 없습니다. env/.env.prod를 확인하세요.')
+  }
+
+  // Prefer docker exec (prod mariadb has no host port). Python helper is localhost fallback only.
+  const viaDocker = spawnSync(
+    'docker',
+    ['exec', '-i', container, 'mariadb', '-u', user, `-p${pass}`, db],
+    { encoding: 'utf-8', input: sqlText },
+  )
+  if (viaDocker.status === 0) {
+    return
+  }
+
   const fallback = spawnSync('python3', [PYTHON_HELPER, '--env-file', ENV_FILE], {
     encoding: 'utf-8',
     input: sqlText,
   })
   if (fallback.status !== 0) {
-    throw new Error(`SQL 스크립트 실행 실패: ${fallback.stderr}`)
+    throw new Error(
+      `SQL 스크립트 실행 실패: ${viaDocker.stderr || fallback.stderr}`,
+    )
   }
 }
 

@@ -120,9 +120,9 @@ public class TonalizationService {
 
     private TonalizationResult parseResult(String originalTitle, String originalBody, String jsonResult) {
         try {
-            JsonNode root = objectMapper.readTree(jsonResult);
-            String titleNorm = root.get("title_normalized").asText(originalTitle);
-            String bodyNorm = root.get("body_normalized").asText(originalBody);
+            JsonNode root = objectMapper.readTree(extractJsonObject(jsonResult));
+            String titleNorm = root.path("title_normalized").asText(originalTitle);
+            String bodyNorm = root.path("body_normalized").asText(originalBody);
 
             log.info("Tonalization success: title={}c → {}c, body={}c → {}c",
                     originalTitle != null ? originalTitle.length() : 0, titleNorm.length(),
@@ -130,8 +130,21 @@ public class TonalizationService {
 
             return new TonalizationResult(titleNorm, bodyNorm, true);
         } catch (Exception e) {
-            log.warn("Failed to parse tonalization result, using originals: {}", e.getMessage());
+            log.debug("Failed to parse tonalization result, using originals: {}", e.getMessage());
             return new TonalizationResult(originalTitle, originalBody, false);
         }
+    }
+
+    /** LLM이 prose를 섞어 반환해도 첫 JSON object만 추출. */
+    static String extractJsonObject(String raw) {
+        if (raw == null) return "{}";
+        String trimmed = raw.trim();
+        if (trimmed.startsWith("{")) return trimmed;
+        int start = trimmed.indexOf('{');
+        int end = trimmed.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return trimmed.substring(start, end + 1);
+        }
+        return trimmed;
     }
 }

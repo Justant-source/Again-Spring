@@ -1,5 +1,6 @@
 package com.againspring.service.community;
 
+import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
@@ -137,12 +138,12 @@ class PostInviteServiceTest {
 
         when(postRepository.findByInviteToken(INVITE_TOKEN)).thenReturn(Optional.of(post));
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
+        BusinessException exception = assertThrows(
+                BusinessException.class,
                 () -> postInviteService.submitPartnerAnswer(INVITE_TOKEN, PARTNER_ID, partnerBodyRaw, null)
         );
 
-        assertEquals("PARTNER_ALREADY_ANSWERED", exception.getMessage());
+        assertEquals("PARTNER_ALREADY_ANSWERED", exception.getCode());
         verifyNoMoreInteractions(postRepository);
     }
 
@@ -182,12 +183,12 @@ class PostInviteServiceTest {
     void submitPartnerAnswer_invalidToken_throws() {
         when(postRepository.findByInviteToken("invalid_token")).thenReturn(Optional.empty());
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
+        BusinessException exception = assertThrows(
+                BusinessException.class,
                 () -> postInviteService.submitPartnerAnswer("invalid_token", PARTNER_ID, "답변", null)
         );
 
-        assertEquals("INVALID_INVITE_TOKEN", exception.getMessage());
+        assertEquals("INVALID_INVITE_TOKEN", exception.getCode());
         verify(postRepository).findByInviteToken("invalid_token");
         verify(postRepository, never()).save(any(Post.class));
     }
@@ -231,12 +232,12 @@ class PostInviteServiceTest {
     void publishNow_unauthorizedUser_throws() {
         when(postRepository.findById(POST_ID)).thenReturn(Optional.of(post));
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
+        BusinessException exception = assertThrows(
+                BusinessException.class,
                 () -> postInviteService.publishNow(POST_ID, "other-user")
         );
 
-        assertEquals("UNAUTHORIZED", exception.getMessage());
+        assertEquals("UNAUTHORIZED", exception.getCode());
         verifyNoMoreInteractions(postRepository);
     }
 
@@ -245,12 +246,12 @@ class PostInviteServiceTest {
     void publishNow_postNotFound_throws() {
         when(postRepository.findById("nonexistent")).thenReturn(Optional.empty());
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
+        BusinessException exception = assertThrows(
+                BusinessException.class,
                 () -> postInviteService.publishNow("nonexistent", AUTHOR_ID)
         );
 
-        assertEquals("POST_NOT_FOUND", exception.getMessage());
+        assertEquals("POST_NOT_FOUND", exception.getCode());
         verify(postRepository).findById("nonexistent");
         verify(postRepository, never()).save(any(Post.class));
     }

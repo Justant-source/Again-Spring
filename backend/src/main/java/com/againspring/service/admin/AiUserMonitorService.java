@@ -38,13 +38,14 @@ public class AiUserMonitorService {
         // Clamp limit to max
         limit = Math.min(limit, MAX_LIMIT);
 
-        // Build query for feed
+        // nickname lives on users (personas.id = users.id); personas has no nickname column
         StringBuilder feedQuery = new StringBuilder(
-            "SELECT pal.id, pal.persona_id, p.nickname, p.tier, " +
+            "SELECT pal.id, pal.persona_id, u.nickname, p.tier, " +
             "       pal.action_type, pal.status, pal.target_type, pal.target_id, " +
             "       pal.detail, pal.created_at " +
             "FROM persona_action_log pal " +
             "LEFT JOIN personas p ON pal.persona_id = p.id " +
+            "LEFT JOIN users u ON pal.persona_id = u.id " +
             "WHERE 1=1"
         );
 
@@ -121,15 +122,17 @@ public class AiUserMonitorService {
         java.sql.Timestamp sinceTs = new java.sql.Timestamp(since.toEpochMilli());
 
         // Query for action statistics grouped by persona
+        // nickname from users; personas has tier/active only
         List<Map<String, Object>> stats = jdbcTemplate.queryForList(
-            "SELECT pal.persona_id, p.nickname, p.tier, p.active, " +
+            "SELECT pal.persona_id, u.nickname, p.tier, p.active, " +
             "       SUM(CASE WHEN pal.status='POSTED' THEN 1 ELSE 0 END) as completed, " +
             "       SUM(CASE WHEN pal.status='FAILED' THEN 1 ELSE 0 END) as failed, " +
             "       SUM(CASE WHEN pal.status='BLOCKED' THEN 1 ELSE 0 END) as blocked " +
             "FROM persona_action_log pal " +
             "LEFT JOIN personas p ON pal.persona_id = p.id " +
+            "LEFT JOIN users u ON pal.persona_id = u.id " +
             "WHERE pal.created_at >= ? " +
-            "GROUP BY pal.persona_id, p.nickname, p.tier, p.active " +
+            "GROUP BY pal.persona_id, u.nickname, p.tier, p.active " +
             "ORDER BY completed DESC",
             sinceTs
         );

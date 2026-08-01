@@ -55,6 +55,12 @@ public class EmailVerificationService {
 
         boolean isDev = java.util.Arrays.asList(environment.getActiveProfiles()).contains("dev");
 
+        // e2e reserved 도메인은 SMTP를 시도하지 않음 — 코드는 이미 DB에 저장됨
+        if (isE2eReservedEmail(email)) {
+            log.debug(">>> [E2E] SMTP skip for reserved domain: {} → {}", email, code);
+            return;
+        }
+
         try {
             MimeMessage message = mailSender.createMimeMessage();
             // multipart=true → 평문 + HTML 대체본 동시 제공 (HTML 미지원 클라이언트 폴백)
@@ -66,13 +72,22 @@ public class EmailVerificationService {
             mailSender.send(message);
             log.info("Verification code sent to {}", email);
         } catch (Exception e) {
-            log.error("Failed to send verification email to {}: {}", email, e.getMessage());
             if (isDev) {
                 log.warn(">>> [DEV] 이메일 발송 실패 — 아래 코드를 직접 사용하세요: {} → {}", email, code);
                 return;
             }
+            log.warn("Failed to send verification email to {}: {}", email, e.getMessage());
             throw new BusinessException("EMAIL_SEND_FAILED", "이메일 발송에 실패했어요. 잠시 후 다시 시도해주세요.");
         }
+    }
+
+    /** e2e-realbe가 쓰는 RFC 2606 reserved 도메인 (@example.com 등). 실사용자 가입 경로와 무관. */
+    static boolean isE2eReservedEmail(String email) {
+        if (email == null) return false;
+        String lower = email.trim().toLowerCase();
+        return lower.endsWith("@example.com")
+                || lower.endsWith("@example.net")
+                || lower.endsWith("@example.org");
     }
 
     /** 딥링크 URL — 가입 페이지에 이메일·코드 자동 입력 */

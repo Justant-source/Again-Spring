@@ -37,10 +37,11 @@ export const PERSONA_MAP = Object.fromEntries(PERSONAS.map((p) => [p.email, p]))
 
 /**
  * globalSetup이 storageState를 저장하는 페르소나만 선별.
- * - test1: Solo 불변 spec (crisis-modal, crisis-dual-defense, contribution-ratio)
- * - test2 (TESTER_A), test3 (TESTER_B): Duo 격리 spec
- * - test5: flows/02-permissions (/admin 접근 registered user 테스트)
- * Rate Limit(5/min): 4개 × 13s 간격 → 안전
+ * - test1: ADMIN (ai-rules, dashboard, content)
+ * - test2/test3: TESTER
+ * - test4: /profile/info 닉네임 변경 격리
+ * - test5: USER only (/admin 거부·API 403)
+ * Rate Limit: 5개 × 13s 간격
  */
 export const PRELOGIN_PERSONAS: Persona[] = [
   PERSONAS[0], // test1 (ADMIN)

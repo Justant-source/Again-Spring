@@ -23,11 +23,15 @@ set -euo pipefail
 
 ENV_FILE="${E2E_ENV_FILE:-$(dirname "$0")/../../../env/.env.prod}"
 
-# env 파일에서 MARIADB_PASSWORD 읽기 (git에 평문 비밀 커밋 금지)
+# env 파일에서 MARIADB_* 읽기 (git에 평문 비밀 커밋 금지)
 if [[ -f "$ENV_FILE" ]]; then
   DB_PASS="${MARIADB_PASSWORD:-$(grep -E '^MARIADB_PASSWORD=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")}"
+  DB_NAME="${MARIADB_DATABASE:-$(grep -E '^MARIADB_DATABASE=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")}"
+  DB_USER="${MARIADB_USER:-$(grep -E '^MARIADB_USER=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")}"
 else
   DB_PASS="${MARIADB_PASSWORD:-}"
+  DB_NAME="${MARIADB_DATABASE:-}"
+  DB_USER="${MARIADB_USER:-}"
 fi
 
 if [[ -z "$DB_PASS" ]]; then
@@ -36,8 +40,8 @@ if [[ -z "$DB_PASS" ]]; then
 fi
 
 DB_CONTAINER="${DB_CONTAINER:-againspring-mariadb-prod}"
-DB_NAME="${MARIADB_DATABASE:-againspring}"
-DB_USER="${MARIADB_USER:-againspring}"
+DB_NAME="${DB_NAME:-againspring}"
+DB_USER="${DB_USER:-againspring}"
 
 # 허용: localhost 대상 로컬 docker 컨테이너만.
 # 미공개(prelaunch): againspring-mariadb-prod 허용. 그 외 *prod* 이름은 거부.
@@ -66,34 +70,48 @@ SQL_PROBE
 
 run_sql <<'SQL'
 -- ═══════════════════════════════════════════════════════════════════
--- §1: 기존 세션/메시지/turn/리포트 정리 (test%@again.com 페르소나)
+-- §1: legacy 중재 테이블 정리 (V56에서 DROP됨 — 남아 있을 때만)
 -- ═══════════════════════════════════════════════════════════════════
 SET SESSION foreign_key_checks = 0;
 
-DELETE FROM messages
-WHERE session_id IN (
-  SELECT id FROM sessions
-  WHERE created_by_user_id IN (SELECT id FROM users WHERE email LIKE 'test%@again.com')
-     OR invitee_user_id    IN (SELECT id FROM users WHERE email LIKE 'test%@again.com')
-);
+SET @has_messages = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'messages');
+SET @sql = IF(@has_messages > 0,
+  'DELETE FROM messages WHERE session_id IN (
+     SELECT id FROM sessions
+     WHERE created_by_user_id IN (SELECT id FROM users WHERE email LIKE ''test%@again.com'')
+        OR invitee_user_id    IN (SELECT id FROM users WHERE email LIKE ''test%@again.com'')
+   )', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-DELETE FROM turns
-WHERE session_id IN (
-  SELECT id FROM sessions
-  WHERE created_by_user_id IN (SELECT id FROM users WHERE email LIKE 'test%@again.com')
-     OR invitee_user_id    IN (SELECT id FROM users WHERE email LIKE 'test%@again.com')
-);
+SET @has_turns = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'turns');
+SET @sql = IF(@has_turns > 0,
+  'DELETE FROM turns WHERE session_id IN (
+     SELECT id FROM sessions
+     WHERE created_by_user_id IN (SELECT id FROM users WHERE email LIKE ''test%@again.com'')
+        OR invitee_user_id    IN (SELECT id FROM users WHERE email LIKE ''test%@again.com'')
+   )', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-DELETE FROM reports
-WHERE session_id IN (
-  SELECT id FROM sessions
-  WHERE created_by_user_id IN (SELECT id FROM users WHERE email LIKE 'test%@again.com')
-     OR invitee_user_id    IN (SELECT id FROM users WHERE email LIKE 'test%@again.com')
-);
+SET @has_reports = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'reports');
+SET @sql = IF(@has_reports > 0,
+  'DELETE FROM reports WHERE session_id IN (
+     SELECT id FROM sessions
+     WHERE created_by_user_id IN (SELECT id FROM users WHERE email LIKE ''test%@again.com'')
+        OR invitee_user_id    IN (SELECT id FROM users WHERE email LIKE ''test%@again.com'')
+   )', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-DELETE FROM sessions
-WHERE created_by_user_id IN (SELECT id FROM users WHERE email LIKE 'test%@again.com')
-   OR invitee_user_id    IN (SELECT id FROM users WHERE email LIKE 'test%@again.com');
+SET @has_sessions = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sessions');
+SET @sql = IF(@has_sessions > 0,
+  'DELETE FROM sessions
+   WHERE created_by_user_id IN (SELECT id FROM users WHERE email LIKE ''test%@again.com'')
+      OR invitee_user_id    IN (SELECT id FROM users WHERE email LIKE ''test%@again.com'')',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ═══════════════════════════════════════════════════════════════════
 -- §2: 커뮤니티 산출물 정리

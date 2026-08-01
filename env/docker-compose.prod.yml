@@ -73,6 +73,8 @@ services:
       AI_LEARNING_URL: ${AI_LEARNING_URL:-http://againspring-ai-learning:8099}
       AI_USER_LLM_URL: ${AI_USER_LLM_URL:-http://againspring-llm-ai-user:8092}
       AI_USER_ORCHESTRATOR_URL: ${AI_USER_ORCHESTRATOR_URL:-http://againspring-ai-user-orchestrator:8096}
+      # 미공개 e2e-realbe(:8091)용 — 기본 5/min이면 prelogin 5계정+스모크가 429. 정식 공개 전 재검토.
+      SECURITY_RATE_LIMIT_AUTH_PER_MINUTE: ${SECURITY_RATE_LIMIT_AUTH_PER_MINUTE:-60}
     volumes:
       - ../docs/shared/prompts:/app/shared/docs/prompts:ro
       - ../docs/shared/categories.yml:/app/shared/docs/categories.yml:ro

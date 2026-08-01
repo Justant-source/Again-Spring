@@ -2,8 +2,10 @@
  * Journey 09: 권한 및 라우트 가드
  *
  * - 미인증 /admin → /login?next=/admin
+ * - 미인증 admin 하위 경로 (/admin/ai-user) → /login
  * - 게스트 /profile → /login
  * - 등록 회원(USER only) /admin → / 리다이렉트
+ * - admin API 403 스모크 (test5) — 11/13/14에서 통합
  * - 게스트 하단 탭 → 게스트 안내 시트 (라우팅 없음)
  * - 로그인 페이지 정리: "게스트로 둘러보기" 버튼·"계정이 없으신가요?" 없음
  * - GuestInfoSheet 로그인 버튼 → /login 이동
@@ -11,6 +13,7 @@
 import { test, expect } from '../support/no-llm-fixture'
 import { authStatePath } from '../fixtures/auth-state'
 import { PERSONAS } from '../fixtures/personas'
+import { tokenFromStorageState } from '../support/api'
 import {
   USER_CHIP,
   GUEST_INFO_SHEET,
@@ -38,6 +41,12 @@ test.describe('Journey 09-A: 미인증 라우트 가드', () => {
     await page.waitForURL(/\/login/, { timeout: 10_000 })
     expect(page.url()).toContain('/login')
   })
+
+  test('미인증 — /admin/ai-user → /login 리다이렉트', async ({ page }) => {
+    await page.goto(`${BASE}/admin/ai-user`)
+    await page.waitForURL(/\/login/, { timeout: 10_000 })
+    expect(page.url()).toContain('/login')
+  })
 })
 
 // ── B. 등록 회원 /admin 가드 ─────────────────────────────────────
@@ -55,6 +64,27 @@ test.describe('Journey 09-B: 등록 회원 /admin 가드', () => {
     await pg.close()
     await ctx.close()
   })
+})
+
+// ── B2. admin API 403 스모크 (11/13/14에서 통합) ─────────────────
+test.describe('Journey 09-B2: admin API 403 스모크 (USER only)', () => {
+  const endpoints = [
+    '/api/admin/ai-rules/global',
+    '/api/admin/marketing/jobs',
+    '/api/admin/marketing/credentials',
+  ] as const
+
+  for (const path of endpoints) {
+    test(`비-어드민(test5) — GET ${path} → 403`, async ({ request }) => {
+      const token = tokenFromStorageState(PERSONA_TEST5.email)
+      test.skip(!token, 'test5 storageState 없음 — global-setup 먼저 실행')
+
+      const res = await request.get(`${BASE}${path}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      expect([403, 401]).toContain(res.status())
+    })
+  }
 })
 
 // ── C. 게스트 하단 네비게이션 → 안내 시트 ────────────────────────

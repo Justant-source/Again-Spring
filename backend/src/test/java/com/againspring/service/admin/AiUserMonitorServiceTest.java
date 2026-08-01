@@ -13,8 +13,11 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
 
+import org.mockito.ArgumentCaptor;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,6 +69,14 @@ class AiUserMonitorServiceTest {
         assertEquals(1, result.getTotal());
         assertEquals("COMMENT", result.getFeeds().get(0).getAction());
         assertFalse(result.getFeeds().get(0).isFailed());
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).queryForList(sqlCaptor.capture(), any(Object[].class));
+        String sql = sqlCaptor.getValue();
+        assertTrue(sql.contains("LEFT JOIN users u ON pal.persona_id = u.id"),
+            "nickname must come from users, not personas");
+        assertTrue(sql.contains("u.nickname"));
+        assertFalse(sql.contains("p.nickname"));
     }
 
     @Test
@@ -153,6 +164,13 @@ class AiUserMonitorServiceTest {
         assertEquals(5, perf.getBlocked());
         // failureRate should be 10 / 60 * 100 ≈ 16.67%
         assertEquals(16.666666666666664, perf.getFailureRate(), 0.01);
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).queryForList(sqlCaptor.capture(), any(Object.class));
+        String sql = sqlCaptor.getValue();
+        assertTrue(sql.contains("LEFT JOIN users u ON pal.persona_id = u.id"));
+        assertTrue(sql.contains("u.nickname"));
+        assertFalse(sql.contains("p.nickname"));
     }
 
     @Test

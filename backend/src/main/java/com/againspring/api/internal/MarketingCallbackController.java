@@ -37,7 +37,7 @@ public class MarketingCallbackController {
         if (authHeader == null || !constantTimeEqual(
                 expected.getBytes(StandardCharsets.UTF_8),
                 authHeader.getBytes(StandardCharsets.UTF_8))) {
-            log.warn("Marketing callback rejected: invalid or missing token (job={})", payload.getJobId());
+            log.debug("Marketing callback rejected: invalid or missing token (job={})", payload.getJobId());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         try {

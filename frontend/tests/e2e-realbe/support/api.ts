@@ -19,6 +19,7 @@ const LLM_DANGEROUS_PATHS = [
   /\/api\/admin\/content\/corrections\/analyze/,
   /\/api\/admin\/ai-rules\/history\/[^/]+\/analyze/,
   /\/api\/admin\/ai-rules\/history\/analyze-batch/,
+  /\/api\/admin\/marketing\/[^/]+\/(generate|simulation|story)/,
 ]
 
 export function assertNoLlmRequest(url: string, method: string, body?: string): void {
@@ -166,6 +167,33 @@ export async function waitForPaired(
     await new Promise(r => setTimeout(r, 500))
   }
   return false
+}
+
+/** PATCH publish-mode (WAIT_FOR_PARTNER | PUBLISH_NOW). LLM 미호출. */
+export async function setPublishMode(
+  request: APIRequestContext,
+  token: string,
+  postId: string,
+  mode: 'PUBLISH_NOW' | 'WAIT_FOR_PARTNER',
+  voteDurationHours = 72,
+): Promise<void> {
+  const resp = await request.patch(`${BASE}/api/community/posts/${postId}/publish-mode`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { mode, voteDurationHours },
+  })
+  if (!resp.ok()) throw new Error(`publish-mode 실패: ${resp.status()} — ${await resp.text()}`)
+}
+
+/** POST publish-now — WAIT_FOR_PARTNER 사연을 즉시 공개. LLM 미호출. */
+export async function publishNow(
+  request: APIRequestContext,
+  token: string,
+  postId: string,
+): Promise<void> {
+  const resp = await request.post(`${BASE}/api/community/posts/${postId}/publish-now`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!resp.ok()) throw new Error(`publish-now 실패: ${resp.status()} — ${await resp.text()}`)
 }
 
 // ── 관리자 ────────────────────────────────────────────────────────

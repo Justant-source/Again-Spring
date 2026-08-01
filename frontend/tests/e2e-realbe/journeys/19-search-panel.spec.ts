@@ -16,12 +16,10 @@ test.describe('Journey 19: 검색 패널 (SearchPanel)', () => {
     await page.goto(`${BASE}/community`)
     await expect(page.getByText('다시봄 광장')).toBeVisible({ timeout: 8_000 })
 
-    // 검색 버튼 클릭 (aria-label="검색")
     const searchBtn = page.locator('button[aria-label="검색"]')
     await expect(searchBtn).toBeVisible()
     await searchBtn.click()
 
-    // 검색 입력창이 보임
     const searchInput = page.locator('input[placeholder*="검색"]')
     await expect(searchInput).toBeVisible({ timeout: 3_000 })
   })
@@ -30,17 +28,13 @@ test.describe('Journey 19: 검색 패널 (SearchPanel)', () => {
     await page.goto(`${BASE}/community`)
     await expect(page.getByText('다시봄 광장')).toBeVisible({ timeout: 8_000 })
 
-    // 검색 열기
     await page.locator('button[aria-label="검색"]').click()
     const searchInput = page.locator('input[placeholder*="검색"]')
     await expect(searchInput).toBeVisible()
 
-    // 검색어 입력 및 엔터
     await searchInput.fill('테스트')
     await searchInput.press('Enter')
 
-    // 결과 뷰로 전환됨 — 결과 있으면 "사연 N건"(SearchPanel.tsx:171), 없으면 "검색 결과가 없습니다"(:167)
-    // 두 상태 모두 허용(.or) + web-first 자동 재시도 → 풀스위트에서 '테스트' 매칭 글 유무에 무관하게 안정
     const emptyMsg = page.getByText('검색 결과가 없습니다')
     const resultCount = page.getByText(/[\d,]+건/)
     await expect(emptyMsg.or(resultCount).first()).toBeVisible({ timeout: 8_000 })
@@ -50,37 +44,30 @@ test.describe('Journey 19: 검색 패널 (SearchPanel)', () => {
     await page.goto(`${BASE}/community`)
     await expect(page.getByText('다시봄 광장')).toBeVisible({ timeout: 8_000 })
 
-    // 첫 번째 검색
     await page.locator('button[aria-label="검색"]').click()
     const searchInput = page.locator('input[placeholder*="검색"]')
     await searchInput.fill('첫번째')
     await searchInput.press('Enter')
-    await page.waitForTimeout(1500)
 
-    // 뒤로 가기 (결과 뷰 → 진입 뷰)
+    await expect(
+      page.getByText('검색 결과가 없습니다').or(page.getByText(/[\d,]+건/)).first(),
+    ).toBeVisible({ timeout: 8_000 })
+
     const backBtn = page.locator('span:has-text("‹")').first()
     await backBtn.click()
-    await page.waitForTimeout(500)
-
-    // 최근 검색 헤더 표시됨 (localStorage 저장됨)
-    await expect(page.locator('text=최근 검색')).toBeVisible()
+    await expect(page.locator('text=최근 검색')).toBeVisible({ timeout: 5_000 })
   })
 
   test('검색 — 뒤로 가기 버튼으로 닫기', async ({ page }) => {
     await page.goto(`${BASE}/community`)
     await expect(page.getByText('다시봄 광장')).toBeVisible({ timeout: 8_000 })
 
-    // 검색 열기
     await page.locator('button[aria-label="검색"]').click()
     const searchInput = page.locator('input[placeholder*="검색"]')
     await expect(searchInput).toBeVisible()
 
-    // 진입 뷰에서 뒤로 버튼 → 닫기
     const backBtn = page.locator('span:has-text("‹")').first()
     await backBtn.click()
-    await page.waitForTimeout(500)
-
-    // 오버레이가 닫혀야 함
     await expect(searchInput).not.toBeVisible({ timeout: 3_000 })
   })
 
@@ -88,21 +75,14 @@ test.describe('Journey 19: 검색 패널 (SearchPanel)', () => {
     await page.goto(`${BASE}/community`)
     await expect(page.getByText('다시봄 광장')).toBeVisible({ timeout: 8_000 })
 
-    // 검색 열기
     await page.locator('button[aria-label="검색"]').click()
     const searchInput = page.locator('input[placeholder*="검색"]')
     await expect(searchInput).toBeVisible()
 
-    // 검색어 입력
     await searchInput.fill('테스트입력')
-    await page.waitForTimeout(300)
-
-    // X 버튼 찾기 및 클릭 (✕ 스팬)
     const clearBtn = page.locator('span:has-text("✕")').last()
-    await expect(clearBtn).toBeVisible()
+    await expect(clearBtn).toBeVisible({ timeout: 3_000 })
     await clearBtn.click()
-
-    // 입력창이 비워짐
     await expect(searchInput).toHaveValue('')
   })
 
@@ -110,16 +90,13 @@ test.describe('Journey 19: 검색 패널 (SearchPanel)', () => {
     await page.goto(`${BASE}/community`)
     await expect(page.getByText('다시봄 광장')).toBeVisible({ timeout: 8_000 })
 
-    // 연인 카테고리 선택
     await page.getByRole('button', { name: '연인' }).click()
-    await page.waitForTimeout(500)
+    await expect(page.getByRole('button', { name: '연인' })).toBeVisible()
 
-    // 검색 열기
     await page.locator('button[aria-label="검색"]').click()
     const searchInput = page.locator('input[placeholder*="검색"]')
     await expect(searchInput).toBeVisible()
 
-    // 입력창 플레이스홀더에 "연인 광장에서 검색" 포함
     const placeholder = await searchInput.getAttribute('placeholder')
     expect(placeholder).toContain('연인')
     expect(placeholder).toContain('광장')

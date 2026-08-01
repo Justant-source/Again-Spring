@@ -1,6 +1,7 @@
 import { chromium, request as playwrightRequest } from '@playwright/test'
 import fs from 'fs'
 import {
+  PERSONAS,
   PRELOGIN_PERSONAS,
   PERSONA_TEST1,
   PERSONA_TESTER_A,
@@ -34,9 +35,30 @@ function bootstrapViaSql(): void {
 
   const runSql = (sql: string) => runSqlScript(sql)
 
-  // test1 비밀번호를 test123 해시로 리셋 (test2와 동일 — 동일 seed 비밀번호)
   // BCrypt $2a$12$ 해시: SeedPersonas.build()가 "test123"으로 생성한 값
   const TEST123_HASH = '$2a$12$9EFz.LWcKCU9N/UEPETS7OwIRVslpITrtGseQe1GiqZOMgQ9gCic6'
+
+  // prod에는 SeedDataLoader(@Profile("dev"))가 없어 페르소나가 없을 수 있음.
+  // INSERT IGNORE로 최소 행을 보장한 뒤 역할·비밀번호를 맞춘다.
+  for (let i = 0; i < PERSONAS.length; i++) {
+    const p = PERSONAS[i]
+    const id = `e2epersona${String(i + 1).padStart(2, '0')}`.slice(0, 32)
+    runSql(`
+      INSERT IGNORE INTO users (
+        id, email, password_hash, nickname, roles, status,
+        is_guest, synthetic, must_change_password,
+        onboarding_completed_at, tutorial_completed_at, created_at, updated_at
+      ) VALUES (
+        '${id}', '${p.email}', '${TEST123_HASH}', '${p.nickname}',
+        JSON_ARRAY('USER'), 'ACTIVE',
+        0, 0, 0,
+        NOW(3), NOW(3), NOW(3), NOW(3)
+      );
+    `)
+  }
+  console.log(`[global-setup] e2e 페르소나 보장: ${PERSONAS.length}명`)
+
+  // test1 비밀번호를 test123 해시로 리셋 (test2와 동일 — 동일 seed 비밀번호)
   runSql(
     `UPDATE users SET password_hash='${TEST123_HASH}', roles=JSON_ARRAY('USER','ADMIN') WHERE email='${PERSONA_TEST1.email}';`,
   )
@@ -94,7 +116,9 @@ export default async function globalSetup(): Promise<void> {
         SELECT 'mock_001', id, '저는 직장인인데 주말에도 집안일을 다 도맡아 하고 있어요. 상대방은 이게 당연하다고 생각하는 것 같아요. 저만 쉬는 날이 없는 것 같아서 힘드네요.',
                '저는 직장인인데 주말에도 집안일을 다 도맡아 하고 있어요.', 'WORK', NOW(), 0, 'VOTING', '주말에도 저만 쉬는 날이 없어요', NOW(), 'PUBLIC', 0, 'PUBLISH_NOW', '주말에도 저만 쉬는 날이 없어요', 0
         FROM users WHERE email='test1@again.com';
-        INSERT IGNORE INTO vote_options (post_id, label, order_idx) VALUES ('mock_001', '작성자', 0), ('mock_001', '상대방', 1);
+        -- e2e 반복 시 vote_options 중복 누적 방지 (voteOptions[0]/[1] 계약 깨짐)
+        DELETE FROM vote_options WHERE post_id = 'mock_001';
+        INSERT INTO vote_options (post_id, label, order_idx) VALUES ('mock_001', '작성자', 0), ('mock_001', '상대방', 1);
       `
       runSqlScript(seedMock)
       console.log('[global-setup] mock_001 seed 포스트 보장 완료')
@@ -104,16 +128,16 @@ export default async function globalSetup(): Promise<void> {
   }
 
   // 4. 페르소나 prelogin — storageState 저장 (.auth/<email>.json)
-  //    Rate Limit: /api/auth/login 5회/분 → 페르소나당 13초 간격
+  //    prod auth rate-limit 기본 5/min/IP → 페르소나당 13초 간격 필수.
+  //    (dev compose만 SECURITY_RATE_LIMIT_AUTH_PER_MINUTE=1000)
   if (!fs.existsSync(AUTH_STATE_DIR)) fs.mkdirSync(AUTH_STATE_DIR, { recursive: true })
 
+  const authGapMs = Number(process.env.E2E_AUTH_GAP_MS || '13000')
   const browser = await chromium.launch(chromiumLaunchOptions())
   for (let i = 0; i < PRELOGIN_PERSONAS.length; i++) {
     const persona = PRELOGIN_PERSONAS[i]
     if (i > 0) {
-      // dev 환경: SECURITY_RATE_LIMIT_AUTH_PER_MINUTE=1000 (docker-compose.dev.yml)
-      // 안전용 1초 간격만 유지 (13초 고정 sleep 제거)
-      await sleep(1_000)
+      await sleep(authGapMs)
     }
     const context = await browser.newContext()
     try {

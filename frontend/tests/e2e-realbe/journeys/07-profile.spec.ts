@@ -2,9 +2,9 @@
  * Journey 07: 프로필 페이지 + 정보 수정
  *
  * - 마이페이지 헤더·닉네임 표시
- * - 3탭 (내 사연/투표한 글/저장)
+ * - 3탭 (내 사연/투표한 글/저장) — 단일 goto로 통합
  * - 탭 전환 시 닉네임 유지 (7e72d05 회귀)
- * - 게스트 → /login 리다이렉트
+ * - 게스트 /profile 가드는 Journey 09에 위임
  * - /profile/info — 닉네임 변경, 비밀번호 변경 (LLM 미호출)
  */
 import { test, expect } from '../support/no-llm-fixture'
@@ -16,67 +16,32 @@ const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 // test4는 닉네임 변경 테스트 전용 페르소나 (test1 admin 보호)
 const PERSONA_TEST4 = PERSONAS[3]
 
-// ── A. 회원 프로필 ───────────────────────────────────────────────
+// ── A. 회원 프로필 (단일 goto) ───────────────────────────────────
 test.describe('Journey 07-A: 회원 프로필 페이지', () => {
   test.use({ storageState: authStatePath(PERSONA_TEST1.email) })
 
-  test('마이페이지 헤더 + 닉네임 표시', async ({ page }) => {
+  test('헤더·3탭·탭 전환·투표/저장 콘텐츠', async ({ page }) => {
     await page.goto(`${BASE}/profile`)
     await expect(page.getByText('마이페이지')).toBeVisible({ timeout: 10_000 })
-    // 닉네임(어떤 값이든)이 표시되어야 함
-    const nickEl = page.locator('div').filter({ hasText: /^.+$/ }).first()
-    await expect(nickEl).toBeVisible({ timeout: 5_000 })
-  })
-
-  test('3탭 표시 — 내 사연 / 투표한 글 / 저장', async ({ page }) => {
-    await page.goto(`${BASE}/profile`)
     await expect(page.getByText('내 사연')).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText('투표한 글')).toBeVisible()
     await expect(page.getByText('저장')).toBeVisible()
-  })
 
-  test('탭 전환 시 닉네임 유지 (7e72d05 회귀 방지)', async ({ page }) => {
-    await page.goto(`${BASE}/profile`)
-    await expect(page.getByText('내 사연')).toBeVisible({ timeout: 10_000 })
-
-    // 투표한 글 탭 클릭 — 빈 상태 또는 목록 (test1은 다른 테스트 순서에 따라 투표 상태 다를 수 있음)
+    // 탭 전환 시 닉네임/탭 행 유지 (7e72d05)
     await page.getByText('투표한 글').click()
-    // 탭 행이 사라지지 않는지 확인 (닉네임 유지 핵심 검증)
     await expect(page.getByText('내 사연')).toBeVisible({ timeout: 5_000 })
     await expect(page.getByText('저장')).toBeVisible()
+    await expect(
+      page.getByText('아직 투표한 글이 없습니다')
+        .or(page.locator('[data-testid="feed-post-list"]'))
+        .or(page.locator('a[href*="/community/"]').first()),
+    ).toBeVisible({ timeout: 8_000 })
 
-    // 내 사연으로 복귀 → 탭 행 계속 표시
     await page.getByText('내 사연').click()
     await expect(page.getByText('투표한 글')).toBeVisible({ timeout: 5_000 })
-    await expect(page.getByText('저장')).toBeVisible()
-  })
 
-  test('투표한 글 탭 → 탭 전환 + 콘텐츠 로드', async ({ page }) => {
-    await page.goto(`${BASE}/profile`)
-    await expect(page.getByText('내 사연')).toBeVisible({ timeout: 10_000 })
-    await page.getByText('투표한 글').click()
-    // 빈 상태 또는 투표한 글 목록 — 둘 다 정상 (이전 테스트에서 test1이 투표할 수 있음)
-    await expect(
-      page.getByText('아직 투표한 글이 없습니다').or(page.locator('[data-testid="feed-post-list"]')).or(page.locator('a[href*="/community/"]').first())
-    ).toBeVisible({ timeout: 8_000 })
-  })
-
-  test('저장 탭 → "준비 중입니다"', async ({ page }) => {
-    await page.goto(`${BASE}/profile`)
-    await expect(page.getByText('내 사연')).toBeVisible({ timeout: 10_000 })
     await page.getByText('저장').click()
     await expect(page.getByText('준비 중입니다')).toBeVisible({ timeout: 5_000 })
-  })
-})
-
-// ── B. 게스트 가드 ───────────────────────────────────────────────
-test.describe('Journey 07-B: 게스트 → /profile 가드', () => {
-  // storageState 없음 = 비인증
-
-  test('게스트 — /profile 접근 → /login 리다이렉트', async ({ page }) => {
-    await page.goto(`${BASE}/profile`)
-    await page.waitForURL(/\/login/, { timeout: 10_000 })
-    expect(page.url()).toContain('/login')
   })
 })
 
@@ -89,11 +54,8 @@ test.describe('Journey 07-C: /profile/info 정보 수정', () => {
     await page.goto(`${BASE}/profile/info`)
     await page.waitForURL(/\/profile\/info/, { timeout: 10_000 })
 
-    // 닉네임 변경 섹션 표시
     await expect(page.getByText('닉네임 변경')).toBeVisible({ timeout: 8_000 })
-    // 비밀번호 변경 섹션 (ChangePasswordSection 컴포넌트) 표시
     await expect(page.getByText('비밀번호 변경').first()).toBeVisible({ timeout: 8_000 })
-    // 로그아웃 버튼
     await expect(page.getByRole('button', { name: /로그아웃/i })).toBeVisible()
   })
 
@@ -101,7 +63,6 @@ test.describe('Journey 07-C: /profile/info 정보 수정', () => {
     await page.goto(`${BASE}/profile/info`)
     await page.waitForURL(/\/profile\/info/, { timeout: 10_000 })
 
-    // 닉네임 입력란 (placeholder = 현재 닉네임)
     const nicknameInput = page.locator('input:not([type="password"])').first()
     await expect(nicknameInput).toBeVisible({ timeout: 8_000 })
     const originalNickname = await nicknameInput.inputValue()
@@ -112,14 +73,12 @@ test.describe('Journey 07-C: /profile/info 정보 수정', () => {
     const saveBtn = page.getByRole('button', { name: '저장' })
     if (await saveBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await saveBtn.click()
-      await page.waitForTimeout(1_000)
-      // 복원
+      await expect(page.getByText(/저장|변경|완료|성공/).first()).toBeVisible({ timeout: 5_000 }).catch(() => {})
       const nicknameInput2 = page.locator('input:not([type="password"])').first()
       await nicknameInput2.fill(originalNickname || PERSONA_TEST4.nickname)
       if (await saveBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
         await saveBtn.click()
       }
     }
-    // LLM 미호출 = 가드레일 통과 확인
   })
 })

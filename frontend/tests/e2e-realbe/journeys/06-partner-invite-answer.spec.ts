@@ -18,6 +18,8 @@ import {
   createInviteToken,
   submitPartnerAnswer,
   waitForPaired,
+  setPublishMode,
+  publishNow,
 } from '../support/api'
 import {
   INVITE,
@@ -25,6 +27,7 @@ import {
   STORY_VOTE_BTN,
   VOTE_COMPLETE_BADGE,
 } from '../support/selectors'
+import { sql } from '../support/db'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
@@ -187,5 +190,44 @@ test.describe('Journey 06-E: 상대방 답변 화면', () => {
       ).toBeVisible({ timeout: 8_000 })
     }
     // 이미 답변된 상태면 textarea가 없을 수 있음 — 둘 다 정상
+  })
+})
+
+// ── F. publish-mode / publish-now (API — UI 피커 없음) ─────────────
+test.describe('Journey 06-F: publish-mode · publish-now', () => {
+
+  test('WAIT_FOR_PARTNER → 상대 답변 후 PUBLIC + publish-now 경로', async ({ request }) => {
+    const token = tokenFromStorageState(PERSONA_TEST1.email)
+    expect(token).toBeTruthy()
+
+    const postId = await createPost(request, {
+      token,
+      title: 'E2E WAIT_FOR_PARTNER 테스트',
+      body: 'publish-mode e2e 테스트용 본문입니다. 충분한 길이.',
+    })
+
+    await setPublishMode(request, token, postId, 'WAIT_FOR_PARTNER')
+    const modeInDb = sql(`SELECT publish_mode FROM posts WHERE id='${postId}'`)
+    expect(modeInDb).toMatch(/WAIT_FOR_PARTNER/i)
+
+    const inviteToken = await createInviteToken(request, token, postId)
+    await submitPartnerAnswer(request, inviteToken, 'WAIT_FOR_PARTNER 상대 답변입니다.')
+    const paired = await waitForPaired(request, postId)
+    expect(paired).toBe(true)
+
+    const beforePublish = await request.get(`${BASE}/api/community/posts/${postId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const before = await beforePublish.json()
+    if ((before.visibility || '').toUpperCase() !== 'PUBLIC') {
+      await publishNow(request, token, postId)
+    }
+
+    const finalRes = await request.get(`${BASE}/api/community/posts/${postId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(finalRes.ok()).toBeTruthy()
+    const final = await finalRes.json()
+    expect((final.visibility || '').toUpperCase()).toBe('PUBLIC')
   })
 })

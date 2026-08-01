@@ -103,6 +103,19 @@ test.describe('Journey 05-B: 타인 댓글 — 신고만 노출', () => {
     await expect(card.locator(COMMENT_MENU_REPORT)).toBeVisible({ timeout: 3_000 })
     await expect(card.locator(COMMENT_MENU_EDIT)).toHaveCount(0)
     await expect(card.locator(COMMENT_MENU_DELETE)).toHaveCount(0)
+
+    // 신고 제출 완주
+    await card.locator(COMMENT_MENU_REPORT).click()
+    await expect(page.getByText('신고 사유')).toBeVisible({ timeout: 5_000 })
+    await page.getByRole('button', { name: '광고 · 스팸' }).click()
+
+    const reportResp = page.waitForResponse(
+      (r) => r.url().includes('/report') && r.request().method() === 'POST' && r.ok(),
+      { timeout: 10_000 },
+    )
+    await page.getByRole('button', { name: '신고하기' }).click()
+    await reportResp
+    await expect(page.getByText('신고 사유')).toHaveCount(0, { timeout: 5_000 })
   })
 })
 

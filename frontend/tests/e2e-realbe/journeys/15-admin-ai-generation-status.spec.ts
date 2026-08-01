@@ -78,10 +78,12 @@ test.describe('Journey 15-A: AI 유저 생성 현황 패널 기본', () => {
     // 새로고침 버튼 클릭
     const refreshBtn = page.locator('[data-testid="ai-gen-status-refresh-btn"]')
     await expect(refreshBtn).toBeVisible({ timeout: 8_000 })
+    const refreshed = page.waitForResponse(
+      (r) => r.url().includes('/api/admin/ai-user/generation-status') && r.ok(),
+      { timeout: 8_000 },
+    )
     await refreshBtn.click()
-
-    // 응답 대기 후 버튼이 다시 활성화됨을 확인
-    await page.waitForTimeout(500) // 요청 처리 대기
+    await refreshed
     await expect(refreshBtn).toBeEnabled({ timeout: 5_000 })
   })
 
@@ -191,16 +193,6 @@ test.describe('Journey 15-B: 진행 현황 데이터 표시', () => {
       '[data-testid="ai-gen-status-empty"], [data-testid="ai-gen-status-panel"]'
     )
     await expect(emptyOrPanel).toBeVisible({ timeout: 8_000 })
-  })
-})
-
-// ── C. 비관리자 접근 차단 ──────────────────────────────────────────
-test.describe('Journey 15-C: 비관리자 접근 차단', () => {
-
-  test('미로그인 — /admin/ai-user → /login 리다이렉트', async ({ page }) => {
-    await page.goto(`${BASE}/admin/ai-user`)
-    await page.waitForURL(/\/login/, { timeout: 10_000 })
-    expect(page.url()).toContain('/login')
   })
 })
 

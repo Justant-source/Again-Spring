@@ -1,6 +1,7 @@
 package com.againspring.api;
 
 import com.againspring.api.visits.PublicVisitController;
+import com.againspring.domain.VisitEvent;
 import com.againspring.repository.VisitEventRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -8,9 +9,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PublicVisitController Unit Tests")
@@ -25,48 +34,69 @@ class PublicVisitControllerTest {
     @Test
     @DisplayName("VisitRequest_validPath_acceptable")
     void testVisitRequestValidPath() {
-        // Arrange & Act
         PublicVisitController.VisitRequest req = PublicVisitController.VisitRequest.builder()
                 .path("/home")
                 .utmSource("google")
                 .build();
 
-        // Assert
         assertNotNull(req);
         assertEquals("/home", req.getPath());
         assertEquals("google", req.getUtmSource());
     }
 
     @Test
-    @DisplayName("VisitRequest_invalidPath_noLeadingSlash")
-    void testVisitRequestInvalidPath() {
-        // Arrange & Act
+    @DisplayName("recordVisit_valid → 200 recorded")
+    void recordVisit_valid_returnsRecorded() {
+        when(visitEventRepository.save(any(VisitEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+        MockHttpServletRequest http = new MockHttpServletRequest();
+        http.setRemoteAddr("127.0.0.1");
+
         PublicVisitController.VisitRequest req = PublicVisitController.VisitRequest.builder()
-                .path("home")  // Missing leading /
+                .path("/community")
+                .utmSource("instagram")
+                .sessionKey("sess-1")
                 .build();
 
-        // Assert
-        assertNotNull(req);
-        assertEquals("home", req.getPath());
+        ResponseEntity<Map<String, String>> res = controller.recordVisit(req, http);
+
+        assertEquals(HttpStatus.OK, res.getStatusCode());
+        assertEquals("recorded", res.getBody().get("status"));
+        verify(visitEventRepository).save(any(VisitEvent.class));
     }
 
     @Test
-    @DisplayName("VisitRequest_adminPath_flagged")
-    void testVisitRequestAdminPath() {
-        // Arrange & Act
+    @DisplayName("recordVisit_adminPath → 400")
+    void recordVisit_adminPath_badRequest() {
+        MockHttpServletRequest http = new MockHttpServletRequest();
         PublicVisitController.VisitRequest req = PublicVisitController.VisitRequest.builder()
                 .path("/admin/dashboard")
+                .sessionKey("sess")
                 .build();
 
-        // Assert
-        assertNotNull(req);
-        assertTrue(req.getPath().startsWith("/admin"));
+        ResponseEntity<Map<String, String>> res = controller.recordVisit(req, http);
+
+        assertEquals(HttpStatus.BAD_REQUEST, res.getStatusCode());
+        verify(visitEventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("recordVisit_pathWithoutSlash → 400")
+    void recordVisit_invalidPath_badRequest() {
+        MockHttpServletRequest http = new MockHttpServletRequest();
+        PublicVisitController.VisitRequest req = PublicVisitController.VisitRequest.builder()
+                .path("invalid-path")
+                .sessionKey("sess")
+                .build();
+
+        ResponseEntity<Map<String, String>> res = controller.recordVisit(req, http);
+
+        assertEquals(HttpStatus.BAD_REQUEST, res.getStatusCode());
+        verify(visitEventRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("VisitRequest_nullableFields_allowed")
     void testVisitRequestNullableFields() {
-        // Arrange & Act
         PublicVisitController.VisitRequest req = PublicVisitController.VisitRequest.builder()
                 .path("/page")
                 .utmSource(null)
@@ -75,7 +105,6 @@ class PublicVisitControllerTest {
                 .sessionKey(null)
                 .build();
 
-        // Assert
         assertNotNull(req);
         assertEquals("/page", req.getPath());
         assertNull(req.getUtmSource());
@@ -83,25 +112,8 @@ class PublicVisitControllerTest {
     }
 
     @Test
-    @DisplayName("VisitRequest_maxLengthPath_accepted")
-    void testVisitRequestMaxLengthPath() {
-        // Arrange
-        String maxPath = "/" + "a".repeat(499);  // Exactly 500 chars
-
-        // Act
-        PublicVisitController.VisitRequest req = PublicVisitController.VisitRequest.builder()
-                .path(maxPath)
-                .build();
-
-        // Assert
-        assertNotNull(req);
-        assertEquals(500, req.getPath().length());
-    }
-
-    @Test
     @DisplayName("VisitRequest_withUtmParams_accepted")
     void testVisitRequestWithUtmParams() {
-        // Arrange & Act
         PublicVisitController.VisitRequest req = PublicVisitController.VisitRequest.builder()
                 .path("/product")
                 .utmSource("facebook")
@@ -110,7 +122,6 @@ class PublicVisitControllerTest {
                 .utmContent("post_id_123")
                 .build();
 
-        // Assert
         assertNotNull(req);
         assertEquals("facebook", req.getUtmSource());
         assertEquals("social", req.getUtmMedium());

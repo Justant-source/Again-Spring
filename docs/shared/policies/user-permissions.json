@@ -58,7 +58,7 @@
         "canModifyFeedback": false,
         "canAnonymizeUser": false,
         "canViewCrisisMonitor": false,
-        "canViewSystemHealth": false,
+        "canViewSystemHealth": false
       }
     },
     "registered": {
@@ -115,7 +115,7 @@
         "canModifyFeedback": false,
         "canAnonymizeUser": false,
         "canViewCrisisMonitor": false,
-        "canViewSystemHealth": false,
+        "canViewSystemHealth": false
       }
     },
     "admin": {

@@ -89,7 +89,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // 토큰 소비 시도
         if (!bucket.tryConsume(1)) {
-            log.warn("Rate limit exceeded for IP: {}, endpoint: {}", clientIp, getEndpointCategory(requestPath));
+            log.debug("Rate limit exceeded for IP: {}, endpoint: {}", clientIp, getEndpointCategory(requestPath));
             response.setStatus(429); // Too Many Requests
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 

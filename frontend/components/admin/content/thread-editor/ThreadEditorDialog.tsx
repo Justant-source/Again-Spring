@@ -21,7 +21,12 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, Trash2 } from 'lucide-react';
-import { fromDatetimeLocalKst, formatKstLabel } from './datetimeKst';
+import {
+  datetimeLocalKstDeltaMs,
+  fromDatetimeLocalKst,
+  formatKstLabel,
+  shiftDatetimeLocalKst,
+} from './datetimeKst';
 import { THREAD_CATEGORY_OPTIONS, type ThreadEditorItem, type ThreadEditorValue } from './types';
 
 export interface ThreadEditorDialogProps {
@@ -66,6 +71,22 @@ export function ThreadEditorDialog({
 }: ThreadEditorDialogProps) {
   function patch(partial: Partial<ThreadEditorValue>) {
     onChange({ ...value, ...partial });
+  }
+
+  /** 글 발행 시각이 바뀌면 댓글·대댓글 시각도 같은 delta만큼 이동. */
+  function onPostAtChange(nextLocal: string) {
+    const deltaMs = datetimeLocalKstDeltaMs(value.postAtLocal, nextLocal);
+    if (!deltaMs) {
+      patch({ postAtLocal: nextLocal });
+      return;
+    }
+    patch({
+      postAtLocal: nextLocal,
+      items: value.items.map((it) => ({
+        ...it,
+        atLocal: shiftDatetimeLocalKst(it.atLocal, deltaMs),
+      })),
+    });
   }
 
   function updateItem(index: number, itemPatch: Partial<ThreadEditorItem>) {
@@ -155,7 +176,7 @@ export function ThreadEditorDialog({
                 <Input
                   type="datetime-local"
                   value={value.postAtLocal}
-                  onChange={(e) => patch({ postAtLocal: e.target.value })}
+                  onChange={(e) => onPostAtChange(e.target.value)}
                   disabled={!editable || submitting}
                   data-testid="admin-thread-post-at"
                 />

@@ -1,6 +1,7 @@
 package com.againspring.service.community;
 
 import com.againspring.api.community.dto.PostInviteDto;
+import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
@@ -48,11 +49,11 @@ public class PostInviteService {
      */
     public PostInviteDto.InviteResponse createInvite(String postId, String userId) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("POST_NOT_FOUND"));
+                .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "게시글을 찾을 수 없어요.", 404));
 
         // 작성자 권한 확인
         if (!post.getAuthorId().equals(userId)) {
-            throw new IllegalArgumentException("UNAUTHORIZED");
+            throw new BusinessException("UNAUTHORIZED", "권한이 없어요.", 403);
         }
 
         // 이미 초대 토큰이 있으면 재사용
@@ -84,7 +85,8 @@ public class PostInviteService {
      */
     public PostInviteDto.PostByTokenResponse getPostByToken(String token) {
         Post post = postRepository.findByInviteToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("INVALID_INVITE_TOKEN"));
+                .orElseThrow(() -> new BusinessException(
+                        "INVALID_INVITE_TOKEN", "유효하지 않은 초대 링크예요.", 404));
 
         return PostInviteDto.PostByTokenResponse.builder()
                 .postId(post.getId())
@@ -104,11 +106,13 @@ public class PostInviteService {
      */
     public void submitPartnerAnswer(String token, String partnerUserId, String bodyRaw, String userTitle) {
         Post post = postRepository.findByInviteToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("INVALID_INVITE_TOKEN"));
+                .orElseThrow(() -> new BusinessException(
+                        "INVALID_INVITE_TOKEN", "유효하지 않은 초대 링크예요.", 404));
 
         // 이미 파트너 답변이 있으면 거절 (1 answer per invite)
         if (post.getPartnerAnsweredAt() != null) {
-            throw new IllegalArgumentException("PARTNER_ALREADY_ANSWERED");
+            throw new BusinessException(
+                    "PARTNER_ALREADY_ANSWERED", "이미 답변이 등록된 초대예요.", 409);
         }
 
         post.setPartnerUserId(partnerUserId);
@@ -154,10 +158,10 @@ public class PostInviteService {
      */
     public void setPublishMode(String postId, String userId, String mode, Integer voteDurationHours) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("POST_NOT_FOUND"));
+                .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "게시글을 찾을 수 없어요.", 404));
 
         if (!post.getAuthorId().equals(userId)) {
-            throw new IllegalArgumentException("UNAUTHORIZED");
+            throw new BusinessException("UNAUTHORIZED", "권한이 없어요.", 403);
         }
 
         try {
@@ -167,7 +171,7 @@ public class PostInviteService {
             postRepository.save(post);
             log.info("Set publish mode for post {}: {}", postId, mode);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("INVALID_PUBLISH_MODE");
+            throw new BusinessException("INVALID_PUBLISH_MODE", "지원하지 않는 발행 모드예요.", 400);
         }
     }
 
@@ -179,10 +183,10 @@ public class PostInviteService {
      */
     public void publishNow(String postId, String userId) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("POST_NOT_FOUND"));
+                .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "게시글을 찾을 수 없어요.", 404));
 
         if (!post.getAuthorId().equals(userId)) {
-            throw new IllegalArgumentException("UNAUTHORIZED");
+            throw new BusinessException("UNAUTHORIZED", "권한이 없어요.", 403);
         }
 
         boolean becamePublic = post.getVisibility() != PostVisibility.PUBLIC;

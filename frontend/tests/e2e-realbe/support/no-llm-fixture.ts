@@ -24,6 +24,7 @@ const LLM_PATH_PATTERNS = [
   /\/api\/admin\/content\/corrections\/analyze/,
   /\/api\/admin\/ai-rules\/history\/[^?/]+\/analyze/,
   /\/api\/admin\/ai-rules\/history\/analyze-batch/,
+  /\/api\/admin\/marketing\/[^?/]+\/(generate|simulation|story)/,
 ]
 
 type NoLlmFixtures = {

@@ -93,6 +93,10 @@ E2E_BASE_URL=http://localhost:8091 npm run test:e2e:realbe
 
 > **prod 배포 게이트**: 백업 → prod 배포 → e2e-realbe(`:8091`) 전체 통과 (`CLAUDE.md` 절대 규칙 #4).
 > **미공개**: 실서버 e2e = **prod(8091)만**. dev(8090) 대상 실행·배포 금지.
+> `global-setup`이 prod에도 `test%@again.com` 페르소나를 `INSERT IGNORE`로 보장한다 (`SeedDataLoader`는 `@Profile("dev")`만).
+> `cleanup-test-db.sh`는 V56에서 삭제된 legacy `messages`/`sessions`/`turns`/`reports`가 없으면 해당 DELETE를 건너뛴다.
+> Journey 08은 `@example.com`(RFC 2606)으로만 인증 메일을 보낸다 — prod SMTP 실패 시에도 코드는 DB에 저장되고 200을 반환한다.
+> prod auth rate-limit은 미공개 기간 `SECURITY_RATE_LIMIT_AUTH_PER_MINUTE` 기본 60 (compose.prod). prelogin 간격 기본 13s.
 
 **설정 파일**: `playwright.realbe.config.ts`
 
@@ -102,17 +106,30 @@ E2E_BASE_URL=http://localhost:8091 npm run test:e2e:realbe
 
 | Journey | 파일 | 시나리오 |
 |---|---|---|
-| 01 | `01-guest-golden-path.spec.ts` | 게스트 진입→피드→투표→댓글 (@mobile) |
+| 01 | `01-guest-golden-path.spec.ts` | 게스트 진입·피드·상세 (@mobile). 투표/댓글은 04/05에 위임 |
 | 02 | `02-member-auth-session.spec.ts` | 이메일 로그인·로그아웃·storageState 재사용 |
-| 03 | `03-community-feed-compose.spec.ts` | 피드 로드·정렬·카테고리·작성 폼·게스트 올리기·회원 작성 |
-| 04 | `04-voting.spec.ts` | 게스트 투표 지속성·회원 투표·soft-delete 복구 회귀 |
-| 05 | `05-comments-lifecycle.spec.ts` | 댓글 추가·수정·삭제·타인=신고만·중복 렌더 방지 |
-| 06 | `06-partner-invite-answer.spec.ts` | 초대 버튼·InviteSheet·URL·paired·관람자 투표·답변 화면 |
-| 07 | `07-profile.spec.ts` | 마이페이지·3탭·닉네임 유지·게스트 가드·profile/info |
-| 08 | `08-email-verification-signup.spec.ts` | send-verification 200·DB 코드 읽기·실제 가입 완주 |
-| 09 | `09-permissions-guards.spec.ts` | 미인증/게스트/등록 회원 라우트 가드·하단 탭 시트·로그인 정리 |
+| 03 | `03-community-feed-compose.spec.ts` | 피드·정렬·카테고리·작성 폼·게스트/회원 올리기 |
+| 04 | `04-voting.spec.ts` | 게스트 투표 지속성·회원 투표·soft-delete 복구 |
+| 05 | `05-comments-lifecycle.spec.ts` | 댓글 CRUD·신고 제출·중복 id 회귀 |
+| 06 | `06-partner-invite-answer.spec.ts` | 초대·paired·답변 화면·publish-mode/publish-now |
+| 07 | `07-profile.spec.ts` | 마이페이지 탭·profile/info (게스트 가드는 09) |
+| 08 | `08-email-verification-signup.spec.ts` | send-verification·DB 코드·가입 완주 |
+| 09 | `09-permissions-guards.spec.ts` | 라우트 가드·admin API 403 스모크·하단 시트·로그인 정리 |
 | 10 | `10-landing.spec.ts` | 방금 올라온 사연·오늘의 사연·CTA (@mobile) |
-| 11 | `11-admin-ai-rules.spec.ts` | AI 규칙관리·콘텐츠 공개됨(스레드)/예약 홀딩·CRUD API·비admin 403·비-LLM 경로 |
+| 11 | `11-admin-ai-rules.spec.ts` | AI 규칙 UI·전역 CRUD 1경로·content UI·prompts slash-key·voice 회귀 |
+| 12 | `12-og-card.spec.ts` | OG 메타·opengraph-image |
+| 13 | `13-marketing-jobs.spec.ts` (+ callbacks) | 마케팅 UI·콜백 토큰 (ASM create는 stub 환경만) |
+| 14 | `14-marketing-credentials.spec.ts` | 플랫폼 계정 탭·마스킹 (ASM read-only) |
+| 15 | `15-admin-ai-generation-status.spec.ts` | AI 생성 관제 패널 (route mock) |
+| 16 | `16-admin-dashboard-home.spec.ts` | 대시보드 ActionCenter·KPI·Cmd+K |
+| 17 | `17-admin-crawl-freshness.spec.ts` · `17-admin-community-insights.spec.ts` | 크롤 배지·stats 인사이트 UI |
+| 18 | `18-visit-tracking.spec.ts` | UTM POST·재방문 dedupe·/admin 제외 |
+| 19 | `19-search-panel.spec.ts` | SearchPanel 열기/검색/최근/닫기 |
+| 20 | `20-notifications.spec.ts` | 시드 알림·모두 읽음 |
+| 21 | `21-password-reset.spec.ts` | forgot UI·토큰 재설정→로그인 |
+| 22 | `22-jury-seeded-ui.spec.ts` | SQL 시드 배심원 UI (LLM 미호출) |
+
+API 계약(대시보드·크롤·visit validation)은 BE 유닛으로 이관: `AdminDashboardControllerTest`, `AdminCrawlStatusControllerTest`, `PublicVisitControllerTest`.
 
 #### ⚠️ LLM 절대 호출 금지 규칙
 
@@ -326,7 +343,9 @@ export const communityHandlers = [
 ## 알려진 이슈 & 향후 과제
 
 - 유닛 테스트 커버리지 아직 낮음 (점진적 보강 예정)
-- Playwright e2e-realbe 실행 시 실서버 필요 (dev 또는 prod)
+- Playwright e2e-realbe는 **prod(:8091)** 실서버 필요 (미공개 기간). workers=1 직렬.
+- 2026-08 스위트 슬림화: 중복·고정 sleep·API-only→BE 이관 + corner case(20–22) 보강. 벽시계 목표 25–40% 단축 — 실행 후 `playwright-report` / wall clock을 이 절에 갱신.
 - 성능 모니터링 자동화 미구현
+- FE KeywordGuard는 스텁(서버 KeywordGuard만) — 위기 키워드 e2e 없음
 
 ---
