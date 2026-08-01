@@ -11,6 +11,11 @@
 #   - e2e-signup%@example.com 일회용 가입 유저 + 산출물
 #   - 제목 패턴 E2E / e2e / REPRO / [e2e] 포스트 안전망
 #   - marketing_job / notifications / community_reports / password_reset_tokens
+#   - ai_thread_plans/_items · ai_human_interaction_inbox · ai_post_interested_personas ·
+#     ai_user_outbox 중 위 e2e post를 가리키는 행 (§2b) — posts를 raw SQL로 지우면
+#     POST_DELETED outbox가 안 나가 orchestrator가 모르고 고아 REQUESTED 플랜을 만들고,
+#     나중에 provider가 켜지면 존재하지 않는 글에 실제 LLM 토큰을 써서 생성을 시도한다.
+#     e2e는 절대 LLM 토큰을 소비해서는 안 되므로 posts와 함께 반드시 지운다.
 # 보존:
 #   - mock_001 포스트 (global-setup이 INSERT IGNORE로 재시드)
 #   - test%@again.com users 행 (페르소나 재시드 guard)
@@ -232,6 +237,54 @@ SET @has_post_analysis = (SELECT COUNT(*) FROM information_schema.TABLES
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'post_analysis');
 SET @sql = IF(@has_post_analysis > 0,
   'DELETE FROM post_analysis WHERE CAST(post_id AS BINARY) IN (SELECT CAST(id AS BINARY) FROM _e2e_posts)',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ═══════════════════════════════════════════════════════════════════
+-- §2b: AI-user 파생 데이터 정리 (2026-08-01)
+--   posts 삭제는 raw SQL이라 POST_DELETED outbox가 발행되지 않는다 → 백엔드가
+--   정상적으로 처리했다면 호출됐을 planService.cancelPlanAndUnpublishedItemsForPost가
+--   건너뛰어져서 ai_thread_plans/inbox/interested/outbox에 죽은 post_id를 가리키는
+--   고아 행이 그대로 남는다. e2e-realbe를 돌릴 때마다(prod 배포 전 필수 게이트) 쌓여서,
+--   나중에 provider가 켜지는 순간(새벽 배치 등) 존재하지 않는 글에 대한 LLM 생성을
+--   실제로 시도해 토큰을 낭비하고 100% 실패한다(2026-08-01 인시던트: 172건).
+--   e2e는 절대 LLM 토큰을 써서는 안 된다 — posts를 지우는 이 시점에 함께 지운다.
+-- ═══════════════════════════════════════════════════════════════════
+
+SET @has_plan_items = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_thread_plan_items');
+SET @has_plans = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_thread_plans');
+SET @sql = IF(@has_plan_items > 0 AND @has_plans > 0,
+  'DELETE FROM ai_thread_plan_items WHERE plan_id IN (
+     SELECT id FROM ai_thread_plans WHERE CAST(post_id AS BINARY) IN (SELECT CAST(id AS BINARY) FROM _e2e_posts)
+   )', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(@has_plans > 0,
+  'DELETE FROM ai_thread_plans WHERE CAST(post_id AS BINARY) IN (SELECT CAST(id AS BINARY) FROM _e2e_posts)',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has_inbox = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_human_interaction_inbox');
+SET @sql = IF(@has_inbox > 0,
+  'DELETE FROM ai_human_interaction_inbox WHERE CAST(post_id AS BINARY) IN (SELECT CAST(id AS BINARY) FROM _e2e_posts)',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has_interested = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_post_interested_personas');
+SET @sql = IF(@has_interested > 0,
+  'DELETE FROM ai_post_interested_personas WHERE CAST(post_id AS BINARY) IN (SELECT CAST(id AS BINARY) FROM _e2e_posts)',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has_outbox = (SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_user_outbox');
+SET @sql = IF(@has_outbox > 0,
+  'DELETE FROM ai_user_outbox WHERE aggregate_type = ''POST''
+     AND CAST(aggregate_id AS BINARY) IN (SELECT CAST(id AS BINARY) FROM _e2e_posts)',
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
