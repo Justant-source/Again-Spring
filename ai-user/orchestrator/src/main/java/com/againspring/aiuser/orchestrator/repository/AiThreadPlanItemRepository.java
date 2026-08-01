@@ -18,6 +18,8 @@ import java.util.List;
 
 @Repository
 public interface AiThreadPlanItemRepository extends JpaRepository<AiThreadPlanItem, String> {
+    boolean existsByIdempotencyKey(String idempotencyKey);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from AiThreadPlanItem i where i.status = :status and i.scheduledAt <= :now " +
            "and (i.notBefore is null or i.notBefore <= :now) order by i.scheduledAt asc, i.sequenceNo asc")
@@ -49,4 +51,11 @@ public interface AiThreadPlanItemRepository extends JpaRepository<AiThreadPlanIt
             @Param("postId") String postId,
             @Param("types") Collection<ThreadPlanItemType> types,
             @Param("statuses") Collection<ThreadPlanItemStatus> statuses);
+
+    /** Human-reply budget rows: idempotency_key {@code human-reply:…} excluding terminal failures. */
+    @Query("select i from AiThreadPlanItem i where i.targetPostId = :postId " +
+           "and i.idempotencyKey like 'human-reply:%' and i.status not in :excluded")
+    List<AiThreadPlanItem> findHumanReplyItemsForPost(
+            @Param("postId") String postId,
+            @Param("excluded") Collection<ThreadPlanItemStatus> excluded);
 }

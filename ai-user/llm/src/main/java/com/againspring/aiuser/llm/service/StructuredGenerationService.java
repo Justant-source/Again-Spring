@@ -201,13 +201,32 @@ public class StructuredGenerationService {
         JsonNode replies = parseObject(raw).path("replies");
         if (!replies.isArray()) throw new StructuredGenerationException("replies must be an array");
         Map<Long, HumanReplyBatchRequest.Item> expected = new HashMap<>();
-        for (var item : req.getItems()) expected.put(item.getHumanCommentId(), item);
-        Set<Long> seen = new HashSet<>(); List<HumanReplyBatchResponse.Reply> parsed = new ArrayList<>();
+        Map<Long, Set<String>> allowedPersonas = new HashMap<>();
+        for (var item : req.getItems()) {
+            expected.put(item.getHumanCommentId(), item);
+            Set<String> ids = new HashSet<>();
+            if (item.getCandidateResponders() != null) {
+                for (var p : item.getCandidateResponders()) {
+                    if (p != null && !blank(p.getPersonaId())) ids.add(p.getPersonaId());
+                }
+            }
+            allowedPersonas.put(item.getHumanCommentId(), ids);
+        }
+        Map<Long, Integer> counts = new HashMap<>();
+        Set<String> seenPairs = new HashSet<>();
+        List<HumanReplyBatchResponse.Reply> parsed = new ArrayList<>();
         for (JsonNode n : replies) {
-            long humanId = n.path("humanCommentId").asLong(-1); String persona = text(n, "personaId"); String body = text(n, "body");
-            var input = expected.get(humanId);
-            if (input == null || !seen.add(humanId)) throw new StructuredGenerationException("unknown or duplicate humanCommentId");
-            if (!persona.equals(input.getResponder().getPersonaId())) throw new StructuredGenerationException("reply persona mismatch");
+            long humanId = n.path("humanCommentId").asLong(-1);
+            String persona = text(n, "personaId");
+            String body = text(n, "body");
+            if (!expected.containsKey(humanId)) throw new StructuredGenerationException("unknown humanCommentId");
+            int next = counts.getOrDefault(humanId, 0) + 1;
+            if (next > 3) throw new StructuredGenerationException("more than 3 replies for humanCommentId");
+            counts.put(humanId, next);
+            String pair = humanId + ":" + persona;
+            if (!seenPairs.add(pair)) throw new StructuredGenerationException("duplicate persona for humanCommentId");
+            Set<String> allowed = allowedPersonas.getOrDefault(humanId, Set.of());
+            if (!allowed.contains(persona)) throw new StructuredGenerationException("reply persona not in candidateResponders");
             validText(body, "reply.body", 2, 1000);
             parsed.add(HumanReplyBatchResponse.Reply.builder().humanCommentId(humanId).personaId(persona).body(body).build());
         }
@@ -253,7 +272,10 @@ public class StructuredGenerationService {
 
     private String replyPrompt(HumanReplyBatchRequest req) {
         return """
-                Return ONLY {"replies":[{"humanCommentId":1,"personaId":"...","body":"..."}]}. Write one short natural Korean reply for each supplied human comment. Use exactly its assigned responder personaId. Do not use internal notes, legal verdicts, diagnoses, personal data, or claims of being an AI.
+                Return ONLY {"replies":[{"humanCommentId":1,"personaId":"...","body":"..."}]}.
+                For each INPUT human comment, emit 0 to 3 replies. Multiple replies for the same humanCommentId must use different personaIds drawn only from that item's candidateResponders.
+                Omitting an interaction (zero rows) is allowed and means no response. Never emit more than 3 rows for one humanCommentId.
+                Write short natural Korean. Do not use internal notes, legal verdicts, diagnoses, personal data, or claims of being an AI.
                 INPUT=""" + json(req.getItems().stream().map(i -> {
                     Map<String, Object> row = new LinkedHashMap<>();
                     row.put("humanCommentId", i.getHumanCommentId());
@@ -261,7 +283,7 @@ public class StructuredGenerationService {
                     row.put("postBody", clean(i.getPostBody()));
                     row.put("humanBody", clean(i.getHumanBody()));
                     if (!blank(i.getParentBody())) row.put("parentBody", clean(i.getParentBody()));
-                    row.put("responder", i.getResponder());
+                    row.put("candidateResponders", i.getCandidateResponders());
                     return row;
                 }).toList());
     }
@@ -281,7 +303,17 @@ public class StructuredGenerationService {
     }
     private void validateReplyRequest(HumanReplyBatchRequest r) {
         if (r == null || r.getItems() == null || r.getItems().isEmpty() || r.getItems().size() > 50) throw new IllegalArgumentException("1..50 reply items required");
-        for (var i : r.getItems()) if (i == null || i.getHumanCommentId() == null || i.getResponder() == null || blank(i.getResponder().getPersonaId()) || blank(i.getHumanBody())) throw new IllegalArgumentException("humanCommentId, responder and humanBody are required");
+        for (var i : r.getItems()) {
+            if (i == null || i.getHumanCommentId() == null || blank(i.getHumanBody())) {
+                throw new IllegalArgumentException("humanCommentId and humanBody are required");
+            }
+            if (i.getCandidateResponders() == null || i.getCandidateResponders().isEmpty()) {
+                throw new IllegalArgumentException("candidateResponders are required");
+            }
+            for (var p : i.getCandidateResponders()) {
+                if (p == null || blank(p.getPersonaId())) throw new IllegalArgumentException("candidate personaId is required");
+            }
+        }
     }
     private String resolvePlanModel(ThreadPlanRequest r, LlmProvider p) {
         String configured = p == LlmProvider.CODEX ? (r.getKind() == ThreadPlanRequest.Kind.AI_POST ? codexTerra : codexLuna) : (r.getKind() == ThreadPlanRequest.Kind.AI_POST ? claudePostModel : claudeDefault);

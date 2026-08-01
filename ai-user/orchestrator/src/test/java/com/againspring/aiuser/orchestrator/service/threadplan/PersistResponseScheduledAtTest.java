@@ -24,6 +24,8 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,6 +43,7 @@ class PersistResponseScheduledAtTest {
     @Mock private AiUserGenerationConfigRepository configRepository;
     @Mock private OrchestratorProperties.ThreadPlan threadPlanConfig;
     @Mock private PlanPersonaMapper planPersonaMapper;
+    @Mock private InterestedPersonaSeeder interestedPersonaSeeder;
 
     private ThreadPlanGenerationService service;
     private CandidateScheduleSupport scheduleSupport;
@@ -52,7 +55,7 @@ class PersistResponseScheduledAtTest {
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
                 planService, llmClient, qualityGate, properties, configRepository,
-                scheduleSupport, planPersonaMapper);
+                scheduleSupport, planPersonaMapper, interestedPersonaSeeder);
         when(properties.getThreadPlan()).thenReturn(threadPlanConfig);
         when(threadPlanConfig.getReadyMinTopLevel()).thenReturn(1);
         when(threadPlanConfig.getReadyMinItems()).thenReturn(1);
@@ -142,5 +145,35 @@ class PersistResponseScheduledAtTest {
         verify(planService).markFailed("plan-3", ThreadQualityGate.FAILURE_QUALITY_BELOW_MIN);
         verify(planService, never()).markReady(any());
         verify(itemRepository, never()).save(any());
+        verify(interestedPersonaSeeder, never()).seedFromPlanCast(any(), any());
+    }
+
+    @Test
+    void persistAndFinalizeSeedsInterestedPersonasOnReady() {
+        AiThreadPlan plan = AiThreadPlan.builder()
+                .id("plan-4")
+                .postId("post-4")
+                .publishedAt(Instant.parse("2026-08-01T11:00:00Z"))
+                .build();
+        when(planRepository.findById("plan-4")).thenReturn(Optional.of(plan));
+        when(personaRepository.existsById("p1")).thenReturn(true);
+        when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+        when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("ref", "c1");
+        item.put("personaId", "p1");
+        item.put("body", "READY 하한을 넘는 충분한 댓글 본문");
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("items", List.of(item));
+
+        ThreadQualityGate.QualityResult result =
+                service.persistAndFinalize("plan-4", response, Set.of("p1"));
+
+        assertThat(result.passedOperationalMin()).isTrue();
+        verify(planService).markReady("plan-4");
+        verify(planService).activate("plan-4");
+        verify(interestedPersonaSeeder).seedFromPlanCast(eq("post-4"), argThat(ids ->
+                ids != null && ids.contains("p1")));
     }
 }

@@ -44,6 +44,8 @@ class ThreadPlanGenerationServiceTest {
 
     @Mock
     private PlanPersonaMapper planPersonaMapper;
+    @Mock
+    private InterestedPersonaSeeder interestedPersonaSeeder;
 
     private ThreadPlanGenerationService service;
 
@@ -54,7 +56,7 @@ class ThreadPlanGenerationServiceTest {
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
                 planService, llmClient, qualityGate, properties, configRepository,
-                scheduleSupport, planPersonaMapper
+                scheduleSupport, planPersonaMapper, interestedPersonaSeeder
         );
     }
 

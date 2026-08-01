@@ -53,18 +53,38 @@ public class HumanInteractionInboxService {
 
     @Transactional
     public void markResponded(String inboxId, String workerId, String responseItemId) {
+        markResponded(inboxId, workerId, responseItemId, null);
+    }
+
+    /** Success path: clear last_error_code; optionally record automatic attempt_count. */
+    @Transactional
+    public void markResponded(String inboxId, String workerId, String responseItemId, Integer attemptCount) {
         AiHumanInteractionInbox entry = owned(inboxId, workerId);
         entry.setStatus(HumanInteractionStatus.RESPONDED);
         entry.setResponseItemId(responseItemId);
+        entry.setFailureCode(null);
+        entry.setLastErrorCode(null);
+        if (attemptCount != null) entry.setAttemptCount(Math.max(0, attemptCount));
         entry.setLeaseOwner(null);
         entry.setLeaseUntil(null);
     }
 
     @Transactional
     public void markSkipped(String inboxId, String workerId, String failureCode) {
+        markSkipped(inboxId, workerId, failureCode, null);
+    }
+
+    /**
+     * Terminal skip/fail with a safe failure code (never LLM error text).
+     * When {@code attemptCount} is set, persists the automatic retry ledger.
+     */
+    @Transactional
+    public void markSkipped(String inboxId, String workerId, String failureCode, Integer attemptCount) {
         AiHumanInteractionInbox entry = owned(inboxId, workerId);
         entry.setStatus(HumanInteractionStatus.SKIPPED);
         entry.setFailureCode(failureCode);
+        entry.setLastErrorCode(failureCode);
+        if (attemptCount != null) entry.setAttemptCount(Math.max(0, attemptCount));
         entry.setLeaseOwner(null);
         entry.setLeaseUntil(null);
     }

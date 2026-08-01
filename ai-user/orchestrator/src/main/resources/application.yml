@@ -73,6 +73,14 @@ ai-user:
     plan-ttl-days: ${AI_USER_HUMAN_REPLY_PLAN_TTL_DAYS:7}
     # Destructive backlog expiry — default OFF; admin trigger can force a one-shot run.
     ttl-cleanup-enabled: ${AI_USER_HUMAN_REPLY_TTL_CLEANUP_ENABLED:false}
+    # §16.7 / WP5 W6-B hard invariants (3×5=15, chunk 20, 0~3 responders)
+    chunk-size: ${AI_USER_HUMAN_REPLY_CHUNK_SIZE:20}
+    responders-per-interaction-min: ${AI_USER_HUMAN_REPLY_RESPONDERS_MIN:0}
+    responders-per-interaction-max: ${AI_USER_HUMAN_REPLY_RESPONDERS_MAX:3}
+    distinct-personas-per-post-human-max: ${AI_USER_HUMAN_REPLY_DISTINCT_PERSONAS_MAX:3}
+    replies-per-persona-per-post-human-max: ${AI_USER_HUMAN_REPLY_PER_PERSONA_MAX:5}
+    replies-per-post-human-max: ${AI_USER_HUMAN_REPLY_PER_POST_MAX:15}
+    candidate-responders-max: ${AI_USER_HUMAN_REPLY_CANDIDATE_MAX:8}
   thread-plan:
     # Foundation maintenance is disabled until PLAN mode is explicitly rolled out.
     maintenance-enabled: ${AI_USER_THREAD_PLAN_MAINTENANCE_ENABLED:false}

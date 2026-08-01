@@ -79,16 +79,48 @@ flowchart LR
 
 ## 사람 상호작용
 
-사람이 작성한 댓글/대댓글은 outbox를 통해 `ai_human_interaction_inbox`에 한 번만 들어간다. 30분 batch는 만료 전 `PENDING` 항목을 최대 10개 게시글 또는 50개 interaction으로 lease한다.
+사람이 작성한 댓글/대댓글은 outbox를 통해 `ai_human_interaction_inbox`에 한 번만 들어간다. 30분 batch는 만료 전 `PENDING` 항목을 lease한 뒤 **post별 grouping + chunk(기본 20)** 로 LLM에 보낸다(구 lease 상한 10 post / 50 interaction은 W6-B chunk·예산으로 교체 중).
 
-- batch 요청에는 **실제** `humanBody`·`postTitle`/`postBody`·`parentBody`(있을 때)·`responder` persona를 넣는다. 빈 값/`Map.of()`는 LLM 400을 유발하므로 금지.
-- persist 시 `personaRepository.existsById`로 persona를 검증하고, 게시 지연은 설정 범위(기본 1~30분)에서 LLM `delayMinutes`(있으면) 또는 랜덤으로 잡는다.
-- inbox `observed_at` TTL 기본 7일(`ai-user.human-reply.inbox-ttl-days`). 초과분은 삭제하지 않고 `CANCELLED` + `failure_code=EXPIRED_TTL`로 전이한다. `REQUESTED` plan도 `plan-ttl-days`(기본 7)로 동일 사유 만료.
+### Wave6 계약 (WP5 / §16.7)
+
+| 항목 | 값 | 비고 |
+|---|---|---|
+| idempotency key | `human-reply:{inboxId}:{personaId}` | W6-A. 구키 `human-reply:{sourceCommentId}` 행은 in-place 마이그레이션하지 않음(충돌 시 새 키만 사용·로그) |
+| responders / interaction | **0~3** | 흥미 부족이면 0명(`NO_RESPONSE`)이 정상 |
+| 대화 예산 | distinct persona ≤**3** · persona당 ≤**5** · post×human ≤**15** (3×5) | 절대 상한. 여러 댓글 root가 동일 budget 공유 |
+| chunk | **20** interactions / LLM 호출 | `AI_USER_HUMAN_REPLY_CHUNK_SIZE` |
+| 자동 재시도 | `automatic_attempts_max=2` (최초+1) | 두 번 모두 빈 응답이면 종료 |
+| delay | 1~30분 | LLM `delayMinutes` 또는 설정 범위 랜덤 |
+| inbox TTL | 7일 (`observed_at`) | `CANCELLED` + `EXPIRED_TTL` |
+
+### 실패·종료 코드 (본문 게시 금지 — safe code만)
+
+| code | 의미 | inbox 결과 |
+|---|---|---|
+| `NO_RESPONSE` | LLM이 의도적으로 0명 응답 | 종료(재 lease 없음). W6-B |
+| `NO_ACTIVE_PLAN` | ACTIVE/유효 plan 없음 · plan-less 정책에 따른 skip | `SKIPPED` 등. W6-B |
+| `GENERATION_FAILED` | 동일 chunk LLM 빈 응답을 2회 | `SKIPPED` + `attempt_count=2` + `last_error_code` (W6-C / V14) |
+| `MISSING_CONTEXT` | humanBody/responder 등 컨텍스트 부재 | `SKIPPED` |
+| `EXPIRED_TTL` | inbox/plan TTL 초과 | `CANCELLED` / plan `EXPIRED` |
+
+실패·거절·크레딧 소진 문자열은 **댓글 본문으로 저장하지 않는다.** `attempt_count` / `last_error_code` / `schema_version`은 inbox 원장 컬럼(AI-user Flyway **V14**). 전체 `ai_human_reply_batches` 테이블·WP6 admin UI는 후속.
+
+### 처리 메모
+
+- batch 요청에는 **실제** `humanBody`·`postTitle`/`postBody`·`parentBody`(있을 때)·`candidateResponders`(interested pool 최대 ~8, `voiceProfile`은 structured Map)를 넣는다. 빈 값/`Map.of()`는 LLM 400을 유발하므로 금지.
+- LLM은 interaction당 **0~3** reply(`candidateResponders`에서만 선택). 0건 → `NO_RESPONSE`. persist 전 예산(3×5·15) 원자 검사; 초과분 skip/`BUDGET_EXHAUSTED`.
+- ready inbox는 **chunk_size=20**으로 나눠 순차 LLM 호출(호출당 자동 최대 2 attempts — W6-C).
+- **Plan-less (0b)**: 최신 plan이 비만료면(ACTIVE/READY 아니어도) 그 plan에 REPLY attach. 부재·만료 → `NO_ACTIVE_PLAN`(무한 release 금지).
 - TTL 정리 cron/플래그(`ttl-cleanup-enabled`)는 **기본 OFF**. 운영 정리는 `POST /admin/trigger/human-reply-ttl-cleanup?force=true`로만 수행한다.
-- 한 입력 comment ID는 하나의 reply 대상이다. 응답은 input comment ID와 1:1로 매핑한다.
-- 일부 응답이 누락/실패하면 나머지는 저장하고 누락분만 다음 batch 후보로 남긴다.
+- human-reply plan item `idempotency_key` = `human-reply:{inboxId}:{personaId}` (W6-A). 같은 human comment에 persona별 복수 AI 답변이 가능. 기존 `human-reply:{sourceCommentId}` 행은 그대로 두고 마이그레이션하지 않음(UNIQUE mid-flight 충돌 방지). 새 키 insert 충돌 시 해당 responder만 skip·로그.
+- plan READY 시 출연진(kept items의 personaId)을 `ai_post_interested_personas`(source=`PLAN_CAST`)에 best-effort seed. human-reply는 score 순 pool → plan-item personas → active 순으로 degrade.
+- 성공 persist 시 `last_error_code`를 지우고 `attempt_count`를 기록한다. LLM 2회 실패 시 `GENERATION_FAILED`로 skip(재 lease 없음).
 - AI가 쓴 댓글·대댓글은 inbox에 넣지 않으므로 AI-to-AI 루프가 생기지 않는다.
-- 사람이 AI 댓글에 답하면 해당 AI persona가 우선 답한다. AI 글의 사람 최상위 댓글은 post author persona가 우선이며, 사람 글에서는 후보 pool의 적합 persona를 선택한다.
+- 사람이 AI 댓글에 답하면 해당 AI persona가 우선 답한다. AI 글의 사람 최상위 댓글은 post author persona가 우선이며, 사람 글에서는 관심 pool(`ai_post_interested_personas`, V13) 기반 후보를 쓴다.
+
+### WP6 admin UI (defer)
+
+전용 `/admin/content?tab=ai-comments` batch·실패 원장 탭은 **이번 wave에서 만들지 않는다.** 예약 AI 댓글 편집은 기존 공개 글 **스레드 에디터**(`ThreadEditorDialog` · `GET/PATCH /api/admin/content/posts/{id}/thread`)와 **예약 홀딩** 탭으로 연결한다 — 상세: [`operations.md`](./operations.md) §8.
 
 ## 수정, 신고, 삭제
 

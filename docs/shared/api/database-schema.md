@@ -1,6 +1,6 @@
 # 데이터베이스 스키마 (MariaDB 11)
 
-> last-verified: 2026-07-31 · code-ref: `backend/src/main/resources/db/migration/V48~V90.sql` · `backend/.../domain/community/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V5.sql`
+> last-verified: 2026-08-01 · code-ref: `backend/src/main/resources/db/migration/V48~V90.sql` · `backend/.../domain/community/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
 >
 > 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
 
@@ -168,7 +168,8 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `ai_llm_jobs` | provider/model snapshot과 제한 재시도를 기록하는 LLM job | BIGINT auto | V87, prompt/content 원문 미저장 |
 | `ai_thread_plans` | 게시글 revision별 candidate plan | VARCHAR(36) UUID | AI-user Flyway V6가 소유 |
 | `ai_thread_plan_items` | candidate와 due/lease/idempotency 실행 상태 | VARCHAR(36) UUID | AI-user Flyway V6가 소유 |
-| `ai_human_interaction_inbox` | 사람 댓글/대댓글의 30분 batch 입력 | VARCHAR(36) UUID | source comment unique |
+| `ai_human_interaction_inbox` | 사람 댓글/대댓글의 30분 batch 입력 · attempt/error ledger | VARCHAR(36) UUID | source comment unique; V14 attempt_count/last_error_code/schema_version |
+| `ai_post_interested_personas` | post별 human-reply 관심 persona pool | BIGINT auto | AI-user Flyway V13. loose refs, UNIQUE(post_id, persona_id) |
 | `bot_request_dedup` | synthetic bot 게시 요청의 `Idempotency-Key`와 결과 target 매핑 | VARCHAR(160) | V88, timeout 재시도 중복 게시 방지 |
 | `ai_user_generation_config` | AI 유저 생성 정책 싱글톤(id=1) — 일일 목표량·PLAN provider 설정 | INT(1 row) | V70, backend 소유·orchestrator는 읽기 전용 미러. **V90**에서 레거시 필드(scheduler_mode/backend_post·comment·reply/prompt_caching/daily_token_budget) 삭제 + `provider_vote_like` 추가 |
 
@@ -388,7 +389,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-## 마이그레이션 요약 (V1~V90 + AI-user V1~V6)
+## 마이그레이션 요약 (V1~V90 + AI-user V1~V14)
 
 | 범위 | 설명 |
 |---|---|
@@ -410,6 +411,9 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | **AI-user V1~V4** | personas / relationships / runtime / action log / seen posts |
 | **AI-user V5** | `persona_history_entries`, `persona_life_state` 추가 (legacy file history DB 이관) |
 | **AI-user V6** | `ai_thread_plans`, `ai_thread_plan_items`, `ai_human_interaction_inbox` 추가 (별도 Flyway history) |
+| **AI-user V7~V12** | scheduled posts · stance · persona history/facts/capsules · match audits |
+| **AI-user V13** | `ai_post_interested_personas` — post별 관심 persona pool (PLAN_CAST seed at READY; MATCHER/MANUAL later) |
+| **AI-user V14** | `ai_human_interaction_inbox`에 `attempt_count` · `last_error_code` · `schema_version` (자동 재시도 원장) |
 
 ---
 

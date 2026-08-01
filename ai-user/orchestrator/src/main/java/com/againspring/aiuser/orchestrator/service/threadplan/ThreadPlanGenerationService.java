@@ -41,6 +41,7 @@ public class ThreadPlanGenerationService {
     private final AiUserGenerationConfigRepository configRepository;
     private final CandidateScheduleSupport candidateScheduleSupport;
     private final PlanPersonaMapper planPersonaMapper;
+    private final InterestedPersonaSeeder interestedPersonaSeeder;
 
     @Transactional
     public void generateRequestedPlans() {
@@ -113,12 +114,29 @@ public class ThreadPlanGenerationService {
         if (quality.passedOperationalMin()) {
             planService.markReady(planId);
             planService.activate(planId);
+            seedInterestedPersonasBestEffort(planId, quality);
         } else {
             log.warn("Plan {} below READY mins (kept={}, dropped={}): {}",
                     planId, quality.keptItems().size(), quality.dropped(), quality.reasons());
             planService.markFailed(planId, ThreadQualityGate.FAILURE_QUALITY_BELOW_MIN);
         }
         return quality;
+    }
+
+    /** Best-effort PLAN_CAST seed into ai_post_interested_personas; never fails READY. */
+    private void seedInterestedPersonasBestEffort(String planId, ThreadQualityGate.QualityResult quality) {
+        try {
+            AiThreadPlan plan = planRepository.findById(planId).orElse(null);
+            if (plan == null || plan.getPostId() == null || plan.getPostId().isBlank()) return;
+            Set<String> cast = new LinkedHashSet<>();
+            for (Map<String, Object> row : quality.keptItems()) {
+                String personaId = text(row.get("personaId"));
+                if (!personaId.isBlank()) cast.add(personaId);
+            }
+            interestedPersonaSeeder.seedFromPlanCast(plan.getPostId(), cast);
+        } catch (Exception e) {
+            log.warn("interested persona seed failed for plan {}: {}", planId, e.getMessage());
+        }
     }
 
     /** Persist without an explicit cast set — uses currently active persona ids as the cast. */

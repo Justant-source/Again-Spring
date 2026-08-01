@@ -82,6 +82,19 @@ public class OrchestratorProperties {
          * Admin {@code /admin/trigger/human-reply-ttl-cleanup} may still run with force=true.
          */
         private boolean ttlCleanupEnabled = false;
+        /** Interactions per LLM call (§16.7 chunk_size). */
+        private int chunkSize = 20;
+        /** LLM may return 0..N replies per human comment (§16.7). */
+        private int respondersPerInteractionMin = 0;
+        private int respondersPerInteractionMax = 3;
+        /** Distinct AI personas that may answer humans on one post. */
+        private int distinctPersonasPerPostHumanMax = 3;
+        /** Max human-reply items per persona per post. */
+        private int repliesPerPersonaPerPostHumanMax = 5;
+        /** Max human-reply items per post (3×5). */
+        private int repliesPerPostHumanMax = 15;
+        /** Candidate personas sent to the LLM per interaction (interested pool / degrade). */
+        private int candidateRespondersMax = 8;
     }
 
     @Getter

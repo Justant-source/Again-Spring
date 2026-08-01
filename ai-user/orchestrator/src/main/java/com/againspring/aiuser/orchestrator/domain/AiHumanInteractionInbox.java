@@ -59,6 +59,19 @@ public class AiHumanInteractionInbox {
     @Column(name = "failure_code", length = 64)
     private String failureCode;
 
+    /** Automatic LLM generation attempts consumed for this inbox row (max 2). */
+    @Column(name = "attempt_count", nullable = false)
+    @Builder.Default
+    private int attemptCount = 0;
+
+    /** Last safe failure code from generation (never LLM error body text). */
+    @Column(name = "last_error_code", length = 64)
+    private String lastErrorCode;
+
+    @Column(name = "schema_version", nullable = false)
+    @Builder.Default
+    private short schemaVersion = 1;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();

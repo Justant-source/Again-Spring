@@ -133,6 +133,13 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 | `AI_USER_HUMAN_REPLY_INBOX_TTL_DAYS` | inbox `observed_at` TTL(일). 초과 시 `CANCELLED`+`EXPIRED_TTL` | `7` |
 | `AI_USER_HUMAN_REPLY_PLAN_TTL_DAYS` | `REQUESTED` plan `created_at` TTL(일). 초과 시 `EXPIRED`+`EXPIRED_TTL` | `7` |
 | `AI_USER_HUMAN_REPLY_TTL_CLEANUP_ENABLED` | TTL 정리 cron 실행 gate (**기본 OFF**, admin force 가능) | `false` |
+| `AI_USER_HUMAN_REPLY_CHUNK_SIZE` | human-reply LLM 호출당 interaction chunk (§16.7 / W6-B) | `20` |
+| `AI_USER_HUMAN_REPLY_RESPONDERS_MIN` | interaction당 최소 AI 응답 수 (0=무응답 허용) | `0` |
+| `AI_USER_HUMAN_REPLY_RESPONDERS_MAX` | interaction당 최대 AI 응답 수 | `3` |
+| `AI_USER_HUMAN_REPLY_DISTINCT_PERSONAS_MAX` | post×human 대화에 참여 가능한 distinct persona 상한 | `3` |
+| `AI_USER_HUMAN_REPLY_PER_PERSONA_MAX` | persona당 human-reply 상한 (동일 post×human) | `5` |
+| `AI_USER_HUMAN_REPLY_PER_POST_MAX` | post×human human-reply 총상한 (3×5) | `15` |
+| `AI_USER_HUMAN_REPLY_CANDIDATE_MAX` | LLM에 넘기는 candidateResponders 상한 (interested pool) | `8` |
 | `AI_USER_SCHEDULED_POST_PUBLISHER_ENABLED` | `ai_scheduled_posts` 예약글 발행 gate | `false` |
 | `AI_USER_SCHEDULED_POST_PUBLISHER_CRON` | 예약글 발행 스케줄러 cron (5-field) | `0 * * * * *` |
 | `AI_USER_SCHEDULED_POST_PUBLISH_BATCH_SIZE` | 발행 tick당 최대 처리 행 수 | `5` |

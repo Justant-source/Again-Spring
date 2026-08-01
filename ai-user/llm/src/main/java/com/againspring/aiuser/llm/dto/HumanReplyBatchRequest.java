@@ -22,6 +22,10 @@ public class HumanReplyBatchRequest {
         private String humanBody;
         /** Optional parent comment body when the human message is a reply. */
         private String parentBody;
-        private ThreadPlanRequest.Persona responder;
+        /**
+         * Shortlisted personas (interested pool / degrade). LLM picks 0..3 distinct
+         * personaIds from this list; empty replies for an item means NO_RESPONSE.
+         */
+        private List<ThreadPlanRequest.Persona> candidateResponders;
     }
 }

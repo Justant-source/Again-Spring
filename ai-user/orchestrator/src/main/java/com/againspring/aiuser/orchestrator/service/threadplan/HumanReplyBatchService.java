@@ -12,6 +12,7 @@ import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,17 +23,30 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Bounded 30-minute human interaction batch: up to N comments across at most M posts, one retry only.
- * Injects real post/comment/responder payloads so the structured LLM endpoint does not 400.
+ * Bounded 30-minute human interaction batch (§16.7 / W6-B+C):
+ * chunk ≤20, 0~3 responders/interaction, 3×5·15 budgets, interested-pool candidates.
+ * automatic_attempts_max=2 with durable GENERATION_FAILED on empty LLM (W6-C).
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class HumanReplyBatchService {
+    /** Hard invariant (§16.7): initial call + one automatic retry. */
+    static final int AUTOMATIC_ATTEMPTS_MAX = 2;
+    static final String FAILURE_GENERATION_FAILED = "GENERATION_FAILED";
+    static final String FAILURE_NO_RESPONSE = "NO_RESPONSE";
+    static final String FAILURE_NO_ACTIVE_PLAN = "NO_ACTIVE_PLAN";
+    static final String FAILURE_BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED";
+    static final String FAILURE_MISSING_CONTEXT = "MISSING_CONTEXT";
+
+    private static final EnumSet<ThreadPlanItemStatus> BUDGET_EXCLUDED = EnumSet.of(
+            ThreadPlanItemStatus.CANCELLED, ThreadPlanItemStatus.FAILED, ThreadPlanItemStatus.EXPIRED);
+
     private final HumanInteractionInboxService inbox;
     private final AiThreadPlanRepository plans;
     private final AiThreadPlanItemRepository planItems;
     private final PersonaRepository personaRepository;
+    private final AiPostInterestedPersonaRepository interestedPersonas;
     private final LlmAiUserClient llm;
     private final ContentSafetyGuard guard;
     private final OrchestratorProperties props;
@@ -63,9 +77,14 @@ public class HumanReplyBatchService {
         List<Map<String, Object>> items = new ArrayList<>();
         List<AiHumanInteractionInbox> ready = new ArrayList<>();
         for (AiHumanInteractionInbox entry : selected) {
+            if (findUsablePlan(entry.getPostId(), now).isEmpty()) {
+                log.info("human-reply skip NO_ACTIVE_PLAN inbox={} post={}", entry.getId(), entry.getPostId());
+                inbox.markSkipped(entry.getId(), worker, FAILURE_NO_ACTIVE_PLAN);
+                continue;
+            }
             Optional<Map<String, Object>> item = buildItem(entry);
             if (item.isEmpty()) {
-                inbox.markSkipped(entry.getId(), worker, "MISSING_CONTEXT");
+                inbox.markSkipped(entry.getId(), worker, FAILURE_MISSING_CONTEXT);
                 continue;
             }
             items.add(item.get());
@@ -73,26 +92,44 @@ public class HumanReplyBatchService {
         }
         if (ready.isEmpty()) return;
 
-        Map<String, Object> request = new LinkedHashMap<>();
-        request.put("provider", config.getProviderHumanInteraction());
-        if (!props.getThreadPlan().getHumanPlanModel().isBlank()) request.put("model", props.getThreadPlan().getHumanPlanModel());
-        request.put("correlationId", "human-replies-" + now.toEpochMilli());
-        request.put("timeoutMs", props.getThreadPlan().getBundleTimeoutMs());
-        request.put("items", items);
-        Optional<Map<String, Object>> response = llm.generateHumanReplies(request);
-        if (response.isEmpty()) response = llm.generateHumanReplies(request);
-        if (response.isEmpty()) {
-            ready.forEach(e -> inbox.release(e.getId(), worker));
-            return;
+        int chunkSize = resolvedChunkSize();
+        List<List<Integer>> chunks = chunkIndexes(ready.size(), chunkSize);
+        for (List<Integer> indexes : chunks) {
+            List<AiHumanInteractionInbox> chunkEntries = new ArrayList<>(indexes.size());
+            List<Map<String, Object>> chunkItems = new ArrayList<>(indexes.size());
+            for (int idx : indexes) {
+                chunkEntries.add(ready.get(idx));
+                chunkItems.add(items.get(idx));
+            }
+            Map<String, Object> request = new LinkedHashMap<>();
+            request.put("provider", config.getProviderHumanInteraction());
+            if (!props.getThreadPlan().getHumanPlanModel().isBlank()) request.put("model", props.getThreadPlan().getHumanPlanModel());
+            request.put("correlationId", "human-replies-" + now.toEpochMilli() + "-c" + indexes.get(0));
+            request.put("timeoutMs", props.getThreadPlan().getBundleTimeoutMs());
+            request.put("items", chunkItems);
+            int attempts = 0;
+            Optional<Map<String, Object>> response = Optional.empty();
+            while (attempts < AUTOMATIC_ATTEMPTS_MAX && response.isEmpty()) {
+                attempts++;
+                response = llm.generateHumanReplies(request);
+            }
+            if (response.isEmpty()) {
+                final int failedAttempts = attempts;
+                chunkEntries.forEach(e ->
+                        inbox.markSkipped(e.getId(), worker, FAILURE_GENERATION_FAILED, failedAttempts));
+                log.warn("human reply chunk GENERATION_FAILED after {} attempts (n={})",
+                        failedAttempts, chunkEntries.size());
+                continue;
+            }
+            persist(worker, chunkEntries, response.get(), now, attempts);
         }
-        persist(worker, ready, response.get(), now);
     }
 
     Optional<Map<String, Object>> buildItem(AiHumanInteractionInbox entry) {
         CommentContext ctx = loadCommentContext(entry);
         if (ctx == null || ctx.humanBody().isBlank()) return Optional.empty();
-        Map<String, Object> responder = pickResponder(entry.getPostId());
-        if (responder.isEmpty()) return Optional.empty();
+        List<Map<String, Object>> candidates = loadCandidateResponders(entry.getPostId());
+        if (candidates.isEmpty()) return Optional.empty();
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("postId", entry.getPostId());
         long humanCommentId;
@@ -113,7 +150,7 @@ public class HumanReplyBatchService {
         item.put("postBody", ctx.postBody());
         item.put("humanBody", ctx.humanBody());
         if (ctx.parentBody() != null && !ctx.parentBody().isBlank()) item.put("parentBody", ctx.parentBody());
-        item.put("responder", responder);
+        item.put("candidateResponders", candidates);
         return Optional.of(item);
     }
 
@@ -203,10 +240,56 @@ public class HumanReplyBatchService {
         return null;
     }
 
-    private Map<String, Object> pickResponder(String postId) {
-        List<String> preferred = List.of();
+    /**
+     * Prefer {@code ai_post_interested_personas} (W6-A); degrade to plan-item personas then active.
+     * Caps at {@code candidateRespondersMax}. voiceProfile is a structured Map (not Map.toString()).
+     */
+    List<Map<String, Object>> loadCandidateResponders(String postId) {
+        int max = Math.max(1, props.getHumanReply().getCandidateRespondersMax());
+        List<String> preferred = loadInterestedPersonaIds(postId, max);
+        if (preferred.isEmpty()) {
+            preferred = loadPlanItemPersonaIds(postId);
+        }
+        List<Persona> active = personaRepository.findByActiveTrue();
+        if (active.isEmpty()) return List.of();
+        Map<String, Persona> byId = new LinkedHashMap<>();
+        for (Persona p : active) byId.put(p.getId(), p);
+        List<Persona> pool = new ArrayList<>();
+        for (String id : preferred) {
+            Persona p = byId.get(id);
+            if (p != null) pool.add(p);
+            if (pool.size() >= max) break;
+        }
+        if (pool.isEmpty()) {
+            List<Persona> shuffled = new ArrayList<>(active);
+            Collections.shuffle(shuffled, ThreadLocalRandom.current());
+            pool = shuffled.subList(0, Math.min(max, shuffled.size()));
+        }
+        List<Map<String, Object>> out = new ArrayList<>(pool.size());
+        for (Persona chosen : pool) {
+            out.add(toResponderMap(chosen));
+        }
+        return out;
+    }
+
+    private List<String> loadInterestedPersonaIds(String postId, int max) {
         try {
-            preferred = planItems.findByPostAndTypesAndStatuses(
+            return interestedPersonas.findByPostIdOrderByScoreDesc(postId).stream()
+                    .map(AiPostInterestedPersona::getPersonaId)
+                    .filter(Objects::nonNull)
+                    .filter(id -> !id.isBlank())
+                    .distinct()
+                    .limit(Math.max(1, max))
+                    .toList();
+        } catch (Exception e) {
+            log.debug("interested pool unavailable for {} (degrade): {}", postId, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<String> loadPlanItemPersonaIds(String postId) {
+        try {
+            return planItems.findByPostAndTypesAndStatuses(
                             postId,
                             EnumSet.of(ThreadPlanItemType.COMMENT, ThreadPlanItemType.REPLY),
                             EnumSet.of(ThreadPlanItemStatus.SCHEDULED, ThreadPlanItemStatus.POSTED,
@@ -218,26 +301,42 @@ public class HumanReplyBatchService {
                     .distinct()
                     .toList();
         } catch (Exception e) {
-            log.debug("responder preferred pool failed for {}: {}", postId, e.getMessage());
+            log.debug("plan-item persona pool failed for {}: {}", postId, e.getMessage());
+            return List.of();
         }
-        List<Persona> active = personaRepository.findByActiveTrue();
-        if (active.isEmpty()) return Map.of();
-        final List<String> preferredIds = preferred;
-        List<Persona> pool = preferredIds.isEmpty() ? active
-                : active.stream().filter(p -> preferredIds.contains(p.getId())).toList();
-        if (pool.isEmpty()) pool = active;
-        Persona chosen = pool.get(ThreadLocalRandom.current().nextInt(pool.size()));
+    }
+
+    static Map<String, Object> toResponderMap(Persona chosen) {
         Map<String, Object> responder = new LinkedHashMap<>();
         responder.put("personaId", chosen.getId());
         responder.put("nickname", nicknameOf(chosen));
-        responder.put("voiceProfile", String.valueOf(chosen.getVoiceProfile()));
+        Map<String, Object> voice = chosen.getVoiceProfile();
+        responder.put("voiceProfile", voice == null ? Map.of() : voice);
         responder.put("formality", formalityOf(chosen));
         return responder;
     }
 
+    /**
+     * Plan-less policy (0b): attach REPLY items to the latest non-expired plan (any status).
+     * If none → caller marks {@link #FAILURE_NO_ACTIVE_PLAN}. No synthetic plan is created.
+     */
+    Optional<AiThreadPlan> findUsablePlan(String postId, Instant now) {
+        AiThreadPlan plan = plans.findTopByPostIdOrderByPostRevisionDesc(postId).orElse(null);
+        if (plan == null || plan.getAbsoluteExpiresAt() == null || now.isAfter(plan.getAbsoluteExpiresAt())) {
+            return Optional.empty();
+        }
+        return Optional.of(plan);
+    }
+
+    @Transactional
+    void persist(String worker, List<AiHumanInteractionInbox> selected, Map<String, Object> response, Instant now) {
+        persist(worker, selected, response, now, 1);
+    }
+
     @Transactional
     @SuppressWarnings("unchecked")
-    void persist(String worker, List<AiHumanInteractionInbox> selected, Map<String, Object> response, Instant now) {
+    void persist(String worker, List<AiHumanInteractionInbox> selected, Map<String, Object> response,
+                 Instant now, int attemptCount) {
         Map<String, AiHumanInteractionInbox> byComment = new HashMap<>();
         selected.forEach(e -> byComment.put(e.getSourceCommentId(), e));
         Object raw = response.get("replies");
@@ -245,38 +344,123 @@ public class HumanReplyBatchService {
             selected.forEach(e -> inbox.release(e.getId(), worker));
             return;
         }
+
+        Map<String, Integer> llmReplyCounts = new HashMap<>();
+        Map<String, HumanReplyBudget> budgetsByPost = new HashMap<>();
+        Map<String, AiThreadPlan> plansByPost = new HashMap<>();
         Set<String> answered = new HashSet<>();
+        Set<String> budgetBlocked = new HashSet<>();
+        int seqBase = 10000;
+
         for (Object value : replies) {
             if (!(value instanceof Map<?, ?> row)) continue;
             String comment = String.valueOf(row.get("humanCommentId"));
             AiHumanInteractionInbox entry = byComment.get(comment);
+            if (entry == null) continue;
+            llmReplyCounts.merge(comment, 1, Integer::sum);
+
             String body = LiteralNewlineNormalizer.normalize(
                     row.get("body") == null ? "" : String.valueOf(row.get("body"))).trim();
             String persona = row.get("personaId") == null ? "" : String.valueOf(row.get("personaId"));
-            if (entry == null || body.isBlank() || persona.isBlank()
+            if (body.isBlank() || persona.isBlank()
                     || !personaRepository.existsById(persona)
                     || !guard.check(body, ContentSafetyGuard.ContentType.COMMENT).passed()) continue;
-            AiThreadPlan plan = plans.findTopByPostIdOrderByPostRevisionDesc(entry.getPostId()).orElse(null);
-            if (plan == null || now.isAfter(plan.getAbsoluteExpiresAt())) continue;
+
+            AiThreadPlan plan = plansByPost.computeIfAbsent(entry.getPostId(),
+                    postId -> findUsablePlan(postId, now).orElse(null));
+            if (plan == null) continue;
+
+            HumanReplyBudget budget = budgetsByPost.computeIfAbsent(entry.getPostId(), postId -> {
+                OrchestratorProperties.HumanReply cfg = props.getHumanReply();
+                HumanReplyBudget b = new HumanReplyBudget(
+                        cfg.getRepliesPerPostHumanMax(),
+                        cfg.getRepliesPerPersonaPerPostHumanMax(),
+                        cfg.getDistinctPersonasPerPostHumanMax());
+                for (AiThreadPlanItem existing : planItems.findHumanReplyItemsForPost(postId, BUDGET_EXCLUDED)) {
+                    b.seed(existing.getPersonaId());
+                }
+                return b;
+            });
+
+            String idempotencyKey = humanReplyIdempotencyKey(entry.getId(), persona);
+            if (planItems.existsByIdempotencyKey(idempotencyKey)) {
+                if (!answered.contains(comment)) {
+                    answered.add(comment);
+                    inbox.markResponded(entry.getId(), worker, idempotencyKey, attemptCount);
+                }
+                continue;
+            }
+            if (!budget.tryAccept(persona)) {
+                budgetBlocked.add(comment);
+                continue;
+            }
+
             Duration delay = resolveDelay(row.get("delayMinutes"));
             Instant when = now.plus(delay);
-            AiThreadPlanItem item = planItems.save(AiThreadPlanItem.builder()
-                    .planId(plan.getId())
-                    .itemType(ThreadPlanItemType.REPLY)
-                    .status(ThreadPlanItemStatus.SCHEDULED)
-                    .sequenceNo(10000 + answered.size())
-                    .personaId(persona)
-                    .targetPostId(entry.getPostId())
-                    .targetCommentId(entry.getSourceCommentId())
-                    .body(body)
-                    .scheduledAt(when)
-                    .notBefore(when)
-                    .idempotencyKey("human-reply:" + entry.getSourceCommentId())
-                    .build());
-            inbox.markResponded(entry.getId(), worker, item.getId());
-            answered.add(comment);
+            AiThreadPlanItem item;
+            try {
+                item = planItems.save(AiThreadPlanItem.builder()
+                        .planId(plan.getId())
+                        .itemType(ThreadPlanItemType.REPLY)
+                        .status(ThreadPlanItemStatus.SCHEDULED)
+                        .sequenceNo(seqBase++)
+                        .personaId(persona)
+                        .targetPostId(entry.getPostId())
+                        .targetCommentId(entry.getSourceCommentId())
+                        .body(body)
+                        .scheduledAt(when)
+                        .notBefore(when)
+                        .idempotencyKey(idempotencyKey)
+                        .build());
+            } catch (DataIntegrityViolationException duplicate) {
+                log.info("human-reply idempotency collision skip key={}", idempotencyKey);
+                if (!answered.contains(comment)) {
+                    answered.add(comment);
+                    inbox.markResponded(entry.getId(), worker, idempotencyKey, attemptCount);
+                }
+                continue;
+            }
+            if (!answered.contains(comment)) {
+                inbox.markResponded(entry.getId(), worker, item.getId(), attemptCount);
+                answered.add(comment);
+            }
         }
-        selected.stream().filter(e -> !answered.contains(e.getSourceCommentId())).forEach(e -> inbox.release(e.getId(), worker));
+
+        for (AiHumanInteractionInbox entry : selected) {
+            String comment = entry.getSourceCommentId();
+            if (answered.contains(comment)) continue;
+            int llmCount = llmReplyCounts.getOrDefault(comment, 0);
+            if (llmCount == 0) {
+                inbox.markSkipped(entry.getId(), worker, FAILURE_NO_RESPONSE);
+            } else if (budgetBlocked.contains(comment)) {
+                inbox.markSkipped(entry.getId(), worker, FAILURE_BUDGET_EXHAUSTED);
+            } else if (findUsablePlan(entry.getPostId(), now).isEmpty()) {
+                log.info("human-reply skip NO_ACTIVE_PLAN at persist inbox={} post={}", entry.getId(), entry.getPostId());
+                inbox.markSkipped(entry.getId(), worker, FAILURE_NO_ACTIVE_PLAN);
+            } else {
+                inbox.release(entry.getId(), worker);
+            }
+        }
+    }
+
+    static String humanReplyIdempotencyKey(String inboxId, String personaId) {
+        return "human-reply:" + inboxId + ":" + personaId;
+    }
+
+    static List<List<Integer>> chunkIndexes(int size, int chunkSize) {
+        int cs = Math.max(1, chunkSize);
+        List<List<Integer>> chunks = new ArrayList<>();
+        for (int start = 0; start < size; start += cs) {
+            List<Integer> chunk = new ArrayList<>();
+            for (int i = start; i < Math.min(size, start + cs); i++) chunk.add(i);
+            chunks.add(chunk);
+        }
+        return chunks;
+    }
+
+    private int resolvedChunkSize() {
+        int size = props.getHumanReply().getChunkSize();
+        return size <= 0 ? 20 : size;
     }
 
     /** Prefer LLM delayMinutes when present and in range; otherwise random in configured [min, max]. */
