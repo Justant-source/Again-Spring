@@ -1,0 +1,28 @@
+# Dependencies & build outputs
+**/node_modules/
+**/.next/
+**/out/
+**/build/
+**/.gradle/
+**/dist/
+**/coverage/
+**/.turbo/
+**/*.tsbuildinfo
+
+# Secrets (never index)
+.env
+.env.*
+!.env*.example
+env/.env.dev
+env/.env.prod
+!**/.env*.example
+
+# Logs & locks
+**/*.log
+.claude/scheduled_tasks.lock
+
+# Large binary / media caches (if present)
+**/*.mp4
+**/*.webm
+**/playwright-report/
+**/test-results/

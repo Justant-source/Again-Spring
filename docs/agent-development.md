@@ -2,6 +2,14 @@
 
 AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세 규칙은 `CLAUDE.md`가 라우팅하고, 문서 권위와 Doc-Sync 판단은 [`docs/_index.md`](./_index.md)를 따른다.
 
+## 에이전트 엔트리
+
+| 도구 | 엔트리 | 권한/규칙 |
+|---|---|---|
+| 공통 | [`AGENTS.md`](../AGENTS.md) → [`CLAUDE.md`](../CLAUDE.md) | 권위본은 항상 `CLAUDE.md` |
+| Cursor | `.cursor/rules/*.mdc`, `.cursor/cli.json`, `.cursorignore` | 유저 `~/.cursor/cli-config.json`의 `approvalMode: unrestricted`(= `--yolo`). allow/deny는 Claude settings와 동기 |
+| Codex / Claude Code | `.claude/settings.local.json`, `.claude/rules/` | 동일 절대 규칙 |
+
 ## 시작 루프
 
 1. `CLAUDE.md`의 라우팅 표에서 작업 범위에 맞는 진입 문서만 읽는다.

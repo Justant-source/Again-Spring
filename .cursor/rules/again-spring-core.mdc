@@ -1,0 +1,28 @@
+---
+description: 다시봄 핵심 — 권위본·라우팅·절대 규칙 (AGENTS.md/CLAUDE.md 동기)
+alwaysApply: true
+---
+
+# 다시봄 · Cursor 코어
+
+- **권위본**: `CLAUDE.md`. `AGENTS.md`는 경량 엔트리(중복 금지).
+- **충돌 우선순위**: 코드(runtime) > `docs/_index.md` authority > `CLAUDE.md` > `AGENTS.md`
+- **컨텍스트**: `CLAUDE.md` 라우팅 표의 **진입 문서만** 읽는다. `docs/` 전체 스캔 금지.
+- **부재 확인**: 각 `docs/<module>/structure.md`의 "부재하는 것" — 삭제된 경로 import 금지.
+- **문서에 없는 사실**은 추측하지 말고 코드에서 `rg`로 확인.
+
+## 절대 규칙 (요약)
+
+1. FE → LLM 직접 호출 금지 (BE REST만)
+2. BE → `RemoteLlmProvider`만 (`againspring-llm:8090/v1/invoke`)
+3. AI 출력 판결/처방/승패 금지 → 공감/관점/작성자/상대방 (`.claude/rules/llm-safety.md`)
+4. **prod 배포**는 명시 지시 없으면 금지. 순서: dev → e2e-realbe(dev:8090) → main push → 백업 → prod
+5. `.env.prod` git 커밋 금지
+6. 상세 문서는 `docs/`만 (루트는 README/CLAUDE/AGENTS만)
+7. LLM 오류·크레딧 소진 문자열 = 콘텐츠 아님 → 게시 금지
+8. Doc-Sync: staged 변경 → `docs/_index.md` 트리거맵 → 같은 커밋에서 문서 갱신. 없으면 `Doc-Sync: 없음`
+9. **main 단일 브랜치** — feature 브랜치 생성 금지
+
+## 작업 시작
+
+진입: `docs/agent-development.md` → 범위별 진입 문서 → 코드 확인 → 수정 → Doc-Sync → 최소 검증.

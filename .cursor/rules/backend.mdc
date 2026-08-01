@@ -1,0 +1,23 @@
+---
+description: BE·API — RemoteLlmProvider, REST/Doc-Sync, 테스트
+globs: backend/**/*
+alwaysApply: false
+---
+
+# Backend
+
+진입: `docs/backend/README.md` · LLM `docs/backend/llm-bridge.md` · API `docs/shared/api/`
+
+## 불변
+
+- LLM: `RemoteLlmProvider`만 → HTTP POST `againspring-llm:8090/v1/invoke`
+- 사용자 입력은 `PromptSanitizer` 경유 필수
+- API/DTO/migration 변경 시 `docs/shared/api/rest-spec.md` · `database-schema.md` Doc-Sync
+
+## 검증
+
+```bash
+cd backend && ./gradlew test
+```
+
+기능 변경 시 journeys e2e 동기화 (`docs/frontend/testing.md`).

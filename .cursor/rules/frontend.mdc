@@ -1,0 +1,23 @@
+---
+description: FE 불변 규칙 — 진영색, AI 표시, lint/e2e 동기화
+globs: frontend/**/*
+alwaysApply: false
+---
+
+# Frontend
+
+진입: `docs/frontend/README.md` · 디자인 `docs/frontend/design/system.md` · UX `docs/frontend/ux/principles.md`
+
+## 불변
+
+- 진영색: 작성자(A)=피치 `#C9785A` / 상대방(B)=세이지 `#5F8F76`
+- AI 배심원·요약은 AI임을 명확히 표시, 사용자 글과 시각 구분
+- LLM은 BE REST만 — FE 직접 호출 금지
+- 금지어 필터는 AI 출력에만 (사용자 입력 미적용)
+
+## 수정 시
+
+- `npm run lint:words` · `lint:docs` · `build` 통과
+- `data-testid` 변경 → `tests/e2e-realbe/support/selectors.ts` 동기화
+- 기능 추가/수정/삭제 → `tests/e2e-realbe/journeys/` 대응 spec 동기화
+- e2e는 `support/no-llm-fixture.ts` import (LLM 호출 금지)
