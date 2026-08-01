@@ -233,3 +233,79 @@ export async function createComment(data: {
   const res = await api.post<AdminComment>('/api/admin/content/comments', data);
   return res.data;
 }
+
+// ===== Scheduled holdings (ai_scheduled_posts via orchestrator proxy) =====
+
+export interface ScheduledHoldingSummary {
+  id: string;
+  personaId: string;
+  title: string;
+  category: string | null;
+  status: string;
+  scheduledPublishAt: string | null;
+  itemCount: number;
+  origin?: string;
+  createdAt?: string | null;
+  failureCode?: string | null;
+}
+
+export interface ScheduledHoldingItem {
+  ref: string;
+  parentRef?: string | null;
+  personaId: string;
+  body: string;
+  type: 'COMMENT' | 'REPLY';
+  scheduledAt: string | null;
+  stance?: string;
+  priority?: number;
+}
+
+export interface ScheduledHoldingDetail extends ScheduledHoldingSummary {
+  body: string;
+  provider?: string | null;
+  model?: string | null;
+  publishedPostId?: string | null;
+  items: ScheduledHoldingItem[];
+}
+
+export async function listScheduledHoldings(status?: string): Promise<ScheduledHoldingSummary[]> {
+  const res = await api.get<ScheduledHoldingSummary[]>('/api/admin/content/scheduled-posts', {
+    params: status ? { status } : undefined,
+  });
+  return res.data ?? [];
+}
+
+export async function getScheduledHolding(id: string): Promise<ScheduledHoldingDetail> {
+  const res = await api.get<ScheduledHoldingDetail>(`/api/admin/content/scheduled-posts/${id}`);
+  return res.data;
+}
+
+export async function updateScheduledHolding(
+  id: string,
+  data: Partial<{
+    title: string;
+    body: string;
+    category: string;
+    scheduledPublishAt: string;
+    items: Array<{
+      ref: string;
+      parentRef?: string | null;
+      personaId: string;
+      body: string;
+      scheduledAt: string;
+      stance?: string;
+      priority?: number;
+    }>;
+  }>
+): Promise<ScheduledHoldingDetail> {
+  const res = await api.patch<ScheduledHoldingDetail>(
+    `/api/admin/content/scheduled-posts/${id}`,
+    data
+  );
+  return res.data;
+}
+
+export async function cancelScheduledHolding(id: string): Promise<ScheduledHoldingSummary> {
+  const res = await api.delete<ScheduledHoldingSummary>(`/api/admin/content/scheduled-posts/${id}`);
+  return res.data;
+}

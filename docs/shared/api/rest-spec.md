@@ -257,6 +257,10 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 | POST | `/api/admin/content/comments/{commentId}/unblock` | **JWT + ADMIN** | 200 / 404 | 댓글 상태를 `ACTIVE`로 복구 |
 | POST | `/api/admin/content/comments` | **JWT + ADMIN** | 200 | **(2026-07-31~)** 댓글/대댓글 수동 생성. Body: `{postId, parentCommentId?, body, authorId}`. `authorId` 자유 텍스트. `createdByAdmin=true`로 저장 |
 | POST | `/api/admin/content/comments/{commentId}/likes/adjust` | **JWT + ADMIN** | 200 / 400 / 409 | **(2026-07-31~)** 좋아요 수 증가/감소. Body: `{delta: 1\|-1}`. `PostComment.likeCount` 컬럼과 `post_likes` 조인테이블을 함께 갱신(동기화) |
+| GET | `/api/admin/content/scheduled-posts` | **JWT + ADMIN** | 200 / 502 | **(2026-08-01~)** AI 예약 홀딩 목록. Query: `status` 기본 `SCHEDULED` (`ALL_PENDING`=`SCHEDULED,FAILED,PUBLISHING`). orchestrator `ai_scheduled_posts` 프록시 |
+| GET | `/api/admin/content/scheduled-posts/{id}` | **JWT + ADMIN** | 200 / 404 / 502 | 홀딩 상세 — title/body/slot + items(`ref`,`parentRef`,`personaId`,`body`,`type`,`scheduledAt`) |
+| PATCH | `/api/admin/content/scheduled-posts/{id}` | **JWT + ADMIN** | 200 / 400 / 409 / 502 | `SCHEDULED`만 수정. Body: `{title?, body?, category?, scheduledPublishAt?, items?}`. items 미포함 시 슬롯 변경은 후보 시각 delta-shift |
+| DELETE | `/api/admin/content/scheduled-posts/{id}` | **JWT + ADMIN** | 200 / 409 / 502 | `SCHEDULED` → `CANCELLED` |
 | POST | `/api/admin/content/corrections/save` | **JWT + ADMIN** | 201 / 404 | LLM 없이 즉시 PENDING 저장. `applyLive=true`이면 본문도 교체. Body: `{targetType, targetId, correctedText, applyLive, adminOpinion?}` |
 | POST | `/api/admin/content/corrections/analyze` | **JWT + ADMIN** | 200 / 404 | 단건 LLM 분석 (DB 미변경). Body: `{targetType, targetId, correctedText}` |
 | POST | `/api/admin/content/corrections/commit` | **JWT + ADMIN** | 200 / 404 | 분석 결과 확정 저장. Body: `{targetType, targetId, correctedText, personaCaution?, globalRules[], applyLive}` |

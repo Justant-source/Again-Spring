@@ -81,11 +81,15 @@ flowchart TD
 
 ---
 
-## 콘텐츠 관리 (`/admin/content`) — 2026-07-31~ 통합테이블
+## 콘텐츠 관리 (`/admin/content`) — 공개됨 + 예약 홀딩
 
 근거: `app/(admin)/admin/content/page.tsx`
 
-게시글/댓글 탭 구분을 없애고 단일 통합 테이블로 게시글·댓글·대댓글을 함께 표시한다.
+상단 탭: **공개됨** | **예약 홀딩**.
+
+### 공개됨 (2026-07-31~ 통합테이블)
+
+게시글·댓글·대댓글을 단일 테이블로 표시한다.
 
 | 항목 | 내용 |
 |---|---|
@@ -96,6 +100,17 @@ flowchart TD
 | 추가(생성) | `CreateContentDialog` — 유형 선택 후 게시글/댓글/대댓글 생성. 작성자는 자유 텍스트(존재 검증 없음) |
 
 관리자가 수동 생성한 콘텐츠는 `createdByAdmin` 플래그로 표시되며 공개 화면에는 노출되지 않는다(내부 추적용).
+
+### 예약 홀딩 (2026-08-01~)
+
+새벽 배치가 `ai_scheduled_posts`에 넣어 둔, 아직 피드에 공개되지 않은 글·댓글/대댓글 후보.
+
+| 항목 | 내용 |
+|---|---|
+| 목록 | 제목 · 페르소나 · 카테고리 · 글 발행 예정(KST) · 댓글 후보 수 · 상태 |
+| 수정 | `EditScheduledPostDialog` — 제목/본문/카테고리/슬롯 + 각 댓글·대댓글 본문·페르소나·릴리스 시각. `SCHEDULED`만 |
+| 취소 | 홀딩 취소 → `CANCELLED` (발행 안 함) |
+| API | `GET/PATCH/DELETE /api/admin/content/scheduled-posts` (BE → orchestrator 프록시) |
 
 ---
 

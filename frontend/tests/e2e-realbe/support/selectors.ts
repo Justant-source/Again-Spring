@@ -105,6 +105,14 @@ export const ADMIN_MARKETING = {
 } as const
 
 // ── 어드민 원본 비교 (/admin/content/[postId]/compare) ───────────
+export const ADMIN_CONTENT = {
+  tabs: '[data-testid="admin-content-tabs"]',
+  tabPublished: '[data-testid="admin-content-tab-published"]',
+  tabHolding: '[data-testid="admin-content-tab-holding"]',
+  holdingPanel: '[data-testid="admin-scheduled-holding-panel"]',
+  editDialog: '[data-testid="admin-scheduled-edit-dialog"]',
+} as const
+
 export const ADMIN_CONTENT_COMPARE = {
   /** 왼쪽 패널: 크롤 원본 정보 */
   sourcePanel:          '[data-testid="compare-source-panel"]',

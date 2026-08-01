@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,7 @@ import {
 import { AdminTable } from '@/components/admin/AdminTable';
 import { EditPostDialog } from '@/components/admin/content/EditPostDialog';
 import { EditCommentDialog } from '@/components/admin/content/EditCommentDialog';
+import { EditScheduledPostDialog } from '@/components/admin/content/EditScheduledPostDialog';
 import { CreateMarketingJobDialog } from '@/components/admin/content/CreateMarketingJobDialog';
 import { CreateContentDialog } from '@/components/admin/content/CreateContentDialog';
 import {
@@ -36,10 +38,12 @@ import {
   unblockComment,
   adjustPostLikes,
   adjustCommentLikes,
+  listScheduledHoldings,
+  cancelScheduledHolding,
   AdminPost,
   AdminComment,
+  ScheduledHoldingSummary,
 } from '@/lib/api/admin/content';
-import { AdminSection } from '@/components/admin/AdminSection';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AiImproveDialog } from '@/components/admin/content/AiImproveDialog';
 import { formatDate, formatNumber } from '@/lib/utils/adminFormat';
@@ -91,6 +95,11 @@ export default function AdminContentPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [likeAdjustLoading, setLikeAdjustLoading] = useState<string | null>(null);
 
+  const [mainTab, setMainTab] = useState<'published' | 'holding'>('published');
+  const [holdings, setHoldings] = useState<ScheduledHoldingSummary[]>([]);
+  const [holdingsLoading, setHoldingsLoading] = useState(false);
+  const [editHoldingId, setEditHoldingId] = useState<string | null>(null);
+
   // Load posts
   const loadPosts = useCallback(async () => {
     setPostsLoading(true);
@@ -133,6 +142,19 @@ export default function AdminContentPage() {
     }
   }, [statusFilter, searchQuery]);
 
+  const loadHoldings = useCallback(async () => {
+    setHoldingsLoading(true);
+    try {
+      const rows = await listScheduledHoldings('ALL_PENDING');
+      setHoldings(rows);
+    } catch (error) {
+      console.error('Failed to load scheduled holdings:', error);
+      setHoldings([]);
+    } finally {
+      setHoldingsLoading(false);
+    }
+  }, []);
+
   // Handle openImprove query param
   useEffect(() => {
     const improveId = searchParams.get('openImprove');
@@ -149,7 +171,12 @@ export default function AdminContentPage() {
   useEffect(() => {
     loadPosts();
     loadComments();
-  }, [loadPosts, loadComments]);
+    loadHoldings();
+  }, [loadPosts, loadComments, loadHoldings]);
+
+  useEffect(() => {
+    if (mainTab === 'holding') loadHoldings();
+  }, [mainTab, loadHoldings]);
 
   // Merge and filter unified content
   const unifiedContent = useMemo((): UnifiedContent[] => {
@@ -291,15 +318,37 @@ export default function AdminContentPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <AdminPageHeader title="콘텐츠 관리" />
-        <Button
-          onClick={() => setCreateDialogOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          추가
-        </Button>
+        {mainTab === 'published' && (
+          <Button
+            onClick={() => setCreateDialogOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            추가
+          </Button>
+        )}
       </div>
 
+      <Tabs
+        value={mainTab}
+        onValueChange={(v) => setMainTab(v as 'published' | 'holding')}
+        data-testid="admin-content-tabs"
+      >
+        <TabsList>
+          <TabsTrigger value="published" data-testid="admin-content-tab-published">
+            공개됨
+          </TabsTrigger>
+          <TabsTrigger value="holding" data-testid="admin-content-tab-holding">
+            예약 홀딩
+            {holdings.length > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {holdings.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="published" className="space-y-6 mt-4">
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-[200px]">
@@ -644,8 +693,118 @@ export default function AdminContentPage() {
           rowKey={(row) => `${row.type}-${row.id}`}
         />
       </div>
+        </TabsContent>
+
+        <TabsContent value="holding" className="space-y-4 mt-4" data-testid="admin-scheduled-holding-panel">
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={loadHoldings} disabled={holdingsLoading}>
+              새로고침
+            </Button>
+          </div>
+          <div className="bg-white rounded-lg border">
+            <AdminTable<ScheduledHoldingSummary>
+              data={holdings}
+              loading={holdingsLoading}
+              emptyMessage="예약 홀딩된 글이 없습니다. 새벽 배치가 생성하면 여기에 표시됩니다."
+              columns={[
+                {
+                  key: 'title',
+                  header: '제목',
+                  render: (row) => (
+                    <button
+                      type="button"
+                      className="text-left font-medium text-blue-700 hover:underline"
+                      onClick={() => setEditHoldingId(row.id)}
+                      data-testid={`admin-scheduled-row-${row.id}`}
+                    >
+                      {row.title}
+                    </button>
+                  ),
+                },
+                {
+                  key: 'personaId',
+                  header: '페르소나',
+                  render: (row) => <span className="font-mono text-xs">{row.personaId}</span>,
+                },
+                {
+                  key: 'category',
+                  header: '카테고리',
+                  render: (row) => CATEGORY_LABELS[row.category || ''] || row.category || '—',
+                },
+                {
+                  key: 'scheduledPublishAt',
+                  header: '글 발행 예정 (KST)',
+                  render: (row) =>
+                    row.scheduledPublishAt
+                      ? new Date(row.scheduledPublishAt).toLocaleString('ko-KR', {
+                          timeZone: 'Asia/Seoul',
+                          hour12: false,
+                        })
+                      : '—',
+                },
+                {
+                  key: 'itemCount',
+                  header: '댓글 후보',
+                  render: (row) => row.itemCount,
+                },
+                {
+                  key: 'status',
+                  header: '상태',
+                  render: (row) => (
+                    <Badge variant={row.status === 'FAILED' ? 'destructive' : 'secondary'}>
+                      {row.status}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  header: '액션',
+                  render: (row) => (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditHoldingId(row.id)}>
+                          {row.status === 'SCHEDULED' ? '수정' : '보기'}
+                        </DropdownMenuItem>
+                        {row.status === 'SCHEDULED' && (
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={async () => {
+                              if (!window.confirm(`「${row.title}」홀딩을 취소할까요?`)) return;
+                              try {
+                                await cancelScheduledHolding(row.id);
+                                loadHoldings();
+                              } catch (e) {
+                                console.error(e);
+                                alert('취소에 실패했습니다.');
+                              }
+                            }}
+                          >
+                            홀딩 취소
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ),
+                },
+              ]}
+              rowKey={(row) => row.id}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Dialogs */}
+      <EditScheduledPostDialog
+        holdingId={editHoldingId}
+        onClose={() => setEditHoldingId(null)}
+        onSaved={loadHoldings}
+        onCancelled={loadHoldings}
+      />
       <EditPostDialog
         post={selectedPost}
         onClose={() => setSelectedPost(null)}

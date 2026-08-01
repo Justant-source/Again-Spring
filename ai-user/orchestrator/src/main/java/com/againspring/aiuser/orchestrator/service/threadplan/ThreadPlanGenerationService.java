@@ -40,6 +40,7 @@ public class ThreadPlanGenerationService {
     private final ContentSafetyGuard safetyGuard;
     private final OrchestratorProperties properties;
     private final AiUserGenerationConfigRepository configRepository;
+    private final CandidateScheduleSupport candidateScheduleSupport;
 
     @Transactional
     public void generateRequestedPlans() {
@@ -110,7 +111,11 @@ public class ThreadPlanGenerationService {
             String parentItemId = parentRef.isBlank() ? null : refs.get(parentRef);
             if (!parentRef.isBlank() && parentItemId == null) throw new IllegalArgumentException("unknown parent");
             ThreadPlanItemType type = parentItemId == null ? ThreadPlanItemType.COMMENT : ThreadPlanItemType.REPLY;
-            Instant scheduled = schedule(plan.getPublishedAt(), sequence++, type == ThreadPlanItemType.REPLY);
+            Instant stored = candidateScheduleSupport.parseScheduledAt(row.get("scheduledAt"));
+            Instant scheduled = stored != null
+                    ? stored
+                    : candidateScheduleSupport.schedule(plan.getPublishedAt(), sequence, type == ThreadPlanItemType.REPLY);
+            sequence++;
             AiThreadPlanItem item = AiThreadPlanItem.builder().planId(planId).itemType(type)
                     .status(ThreadPlanItemStatus.SCHEDULED).sequenceNo(sequence).parentItemId(parentItemId)
                     .personaId(personaId).targetPostId(plan.getPostId()).body(body).scheduledAt(scheduled)
@@ -119,13 +124,9 @@ public class ThreadPlanGenerationService {
         }
     }
 
+    /** Package-visible for unit tests; delegates to {@link CandidateScheduleSupport}. */
     Instant schedule(Instant publishedAt, int index, boolean reply) {
-        // Dense early window, progressively wider later.  Publisher additionally defers generic work in quiet KST hours.
-        long[] minutes = {3, 8, 14, 22, 34, 48, 65, 88, 115, 150, 195, 250, 320, 410, 520, 650, 780, 920, 1080};
-        long delay = minutes[Math.min(index, minutes.length - 1)] + (reply ? 7 : 0);
-        Instant candidate = publishedAt.plusSeconds(delay * 60);
-        // 2026-07-31: Avoid publishing into dead hours (03:00-07:00 KST) where community is asleep; snap forward if weight < 0.2
-        return ActivityCurve.nextActiveHour(candidate, 0.2, properties.getThreadPlan().getKstHourlyHumanWeights());
+        return candidateScheduleSupport.schedule(publishedAt, index, reply);
     }
     private static String text(Object value) {
         if (value == null) return "";

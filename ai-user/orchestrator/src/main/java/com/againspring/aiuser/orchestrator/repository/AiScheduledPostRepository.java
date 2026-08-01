@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -24,4 +25,6 @@ public interface AiScheduledPostRepository extends JpaRepository<AiScheduledPost
     long countByStatus(ScheduledPostStatus status);
 
     List<AiScheduledPost> findByStatusOrderByScheduledPublishAtAsc(ScheduledPostStatus status);
+
+    List<AiScheduledPost> findByStatusInOrderByScheduledPublishAtAsc(Collection<ScheduledPostStatus> statuses);
 }

@@ -46,9 +46,11 @@ class ThreadPlanGenerationServiceTest {
 
     @BeforeEach
     void setUp() {
+        CandidateScheduleSupport scheduleSupport = new CandidateScheduleSupport(properties);
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
-                planService, llmClient, safetyGuard, properties, configRepository
+                planService, llmClient, safetyGuard, properties, configRepository,
+                scheduleSupport
         );
     }
 

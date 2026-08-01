@@ -148,9 +148,18 @@ docker logs -f againspring-prod-dev-sync
 그래서 별도 홀딩 테이블 `ai_scheduled_posts`를 뒀다. 새벽 배치는
 `generateAndPublish` 대신 `AiPostBundleService.generateAndHold()`를 쓴다 — 같은
 구조화 LLM 호출(글+댓글/대댓글 후보 한 번에) 뒤 backend에 보내지 않고
-`ai_scheduled_posts`에 저장만 한다. `ScheduledPostPublisher`(매 분 cron)가 슬롯
-도래 시 실제 글을 만들고, 저장해둔 후보를 `ThreadPlanGenerationService
-.persistResponse()`로 재생(replay)한다 — 발행 시점엔 LLM을 다시 부르지 않는다.
+`ai_scheduled_posts`에 저장만 한다. `generateAndHold` 시점에 각 댓글/대댓글
+후보 item에 `scheduledAt`(ISO Instant)을 `CandidateScheduleSupport.schedule`로
+심어 두어, 관리자가 발행 전 릴리스 시각을 보고 수정할 수 있다.
+`ScheduledPostPublisher`(매 분 cron)가 슬롯 도래 시 실제 글을 만들고, 저장해둔
+후보를 `ThreadPlanGenerationService.persistResponse()`로 재생(replay)한다 —
+`persistResponse`는 item에 `scheduledAt`이 있으면 그걸 쓰고, 없으면 기존
+`schedule()` fallback. 발행 시점엔 LLM을 다시 부르지 않는다.
+
+관리자 UI: `/admin/content` → **예약 홀딩** 탭. BE
+`/api/admin/content/scheduled-posts`가 orchestrator `/admin/scheduled-posts`를
+프록시한다. `SCHEDULED`만 PATCH(제목·본문·슬롯·후보)/DELETE(`CANCELLED`).
+슬롯만 바꾸고 items를 안 보내면 후보 시각은 delta-shift.
 
 ```
 env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)

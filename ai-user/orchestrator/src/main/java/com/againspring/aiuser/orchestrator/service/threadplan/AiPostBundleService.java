@@ -49,6 +49,7 @@ public class AiPostBundleService {
     private final ThreadPlanService planService;
     private final ThreadPlanGenerationService planGenerationService;
     private final AiScheduledPostRepository scheduledPostRepository;
+    private final CandidateScheduleSupport candidateScheduleSupport;
     private final ObjectMapper objectMapper;
 
     /** A PLAN rollout owns post generation even when its workload provider is OFF. */
@@ -98,6 +99,9 @@ public class AiPostBundleService {
                                                       String correlationId, Instant scheduledPublishAt) {
         Bundle bundle = generateBundle(category, topicHint, correlationId).orElse(null);
         if (bundle == null) return Optional.empty();
+
+        // Bake absolute comment/reply release times so admins can preview/edit before publish.
+        candidateScheduleSupport.enrichMissingScheduledAts(bundle.response, scheduledPublishAt);
 
         String candidatesJson;
         try {

@@ -18,7 +18,8 @@
 > 글(post) 수준에서는 "새벽에 만들면 새벽에 올라옴" 문제가 여전히 남아 있었다.
 > 2026-07-31에 `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`를
 > 추가해 글 발행 자체도 생성과 분리했다. 새벽 배치는 이제 `generateAndHold`만
-> 쓴다. 상세: `docs/ai-user/operations.md` §8.
+> 쓴다. 홀딩 시 후보 item에 `scheduledAt`을 심고, `persistResponse`는 저장된
+> 시각을 우선한다(관리자 예약 홀딩 편집용). 상세: `docs/ai-user/operations.md` §8.
 
 ## 구성과 경계
 
