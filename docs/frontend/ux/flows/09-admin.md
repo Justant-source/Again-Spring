@@ -95,7 +95,7 @@ flowchart TD
 |---|---|
 | 목록 | 글만 — 제목 · 작성자 · 카테고리 · **작성 시각(KST)** · 댓글 수 · 좋아요 · 상태 |
 | 필터 | 작성자 타입(AI/사람) · 카테고리 · 검색 (유형 필터 제거) |
-| 상세 | `EditPublishedThreadDialog` → 공용 `ThreadEditorDialog` — 제목/본문/카테고리/`createdAt` + 댓글·대댓글 본문·작성자·`createdAt`. 글 작성 시각을 바꾸면 댓글·대댓글 시각도 같은 delta만큼 함께 이동 |
+| 상세 | `EditPublishedThreadDialog` → 공용 `ThreadEditorDialog` — 제목/본문/카테고리/`createdAt` + 댓글·대댓글 본문·작성자·`createdAt`. **저장 시** 글 작성 시각의 로드 대비 delta를 댓글·대댓글에 일괄 적용 |
 | 저장 | `PATCH /api/admin/content/posts/{id}/thread` (일괄). 타임라인에서 뺀 댓글은 soft-delete |
 | 부가 액션 | 목록 메뉴: 공개 보기 · AI 개선 · 원본 비교 · 마케팅 · 차단 · 삭제 |
 
@@ -106,7 +106,7 @@ flowchart TD
 | 항목 | 내용 |
 |---|---|
 | 목록 | 제목 · 페르소나 · 카테고리 · 글 발행 예정(KST) · 댓글 후보 수 · 상태 |
-| 수정 | 제목/본문/카테고리/슬롯 + 각 댓글·대댓글 본문·페르소나·릴리스 시각. `SCHEDULED`만. **글 발행 예정 시각을 바꾸면 댓글·대댓글 릴리스 시각도 같은 delta만큼 함께 이동** (개별 시각은 이후 따로 조정 가능) |
+| 수정 | 제목/본문/카테고리/슬롯 + 각 댓글·대댓글 본문·페르소나·릴리스 시각. `SCHEDULED`만. **저장 시** 글 발행 예정 시각의 로드 대비 delta를 댓글·대댓글에 일괄 적용 (키보드·피커 공통; 개별 시각 수동 수정도 그 위에 delta 유지) |
 | 취소 | 홀딩 취소 → `CANCELLED` (발행 안 함) |
 | API | `GET/PATCH/DELETE /api/admin/content/scheduled-posts` (BE → orchestrator 프록시) |
 

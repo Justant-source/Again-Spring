@@ -69,17 +69,17 @@ export function EditScheduledPostDialog({ holdingId, onClose, onSaved, onCancell
 
   const editable = status === 'SCHEDULED';
 
-  async function handleSave() {
+  async function handleSave(next: ThreadEditorValue) {
     if (!holdingId || !editable) return;
     setSubmitting(true);
     setError('');
     try {
       await updateScheduledHolding(holdingId, {
-        title: value.title,
-        body: value.body,
-        category: value.category,
-        scheduledPublishAt: fromDatetimeLocalKst(value.postAtLocal),
-        items: value.items.map((it) => ({
+        title: next.title,
+        body: next.body,
+        category: next.category,
+        scheduledPublishAt: fromDatetimeLocalKst(next.postAtLocal),
+        items: next.items.map((it) => ({
           ref: it.key,
           parentRef: it.parentKey || null,
           personaId: it.authorId,

@@ -160,8 +160,8 @@ docker logs -f againspring-prod-dev-sync
 `/api/admin/content/scheduled-posts`가 orchestrator `/admin/scheduled-posts`를
 프록시한다. `SCHEDULED`만 PATCH(제목·본문·슬롯·후보)/DELETE(`CANCELLED`).
 슬롯만 바꾸고 items를 안 보내면 후보 시각은 delta-shift.
-어드민 `ThreadEditorDialog`에서도 글 발행 예정 시각을 바꾸면 댓글·대댓글
-`atLocal`을 같은 delta만큼 즉시 이동한 뒤 저장 시 items에 포함해 보낸다.
+어드민 `ThreadEditorDialog`는 저장 시점에 로드 기준 글 발행 예정 시각 대비
+delta를 계산해 댓글·대댓글 `atLocal`에 일괄 적용한다 (키보드·피커 공통).
 
 ```
 env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)

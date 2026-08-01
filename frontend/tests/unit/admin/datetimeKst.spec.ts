@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyPostAtDeltaToItems,
   datetimeLocalKstDeltaMs,
   fromDatetimeLocalKst,
   shiftDatetimeLocalKst,
@@ -24,11 +25,26 @@ describe('datetimeKst', () => {
     expect(datetimeLocalKstDeltaMs('', '2026-08-01T12:40')).toBe(0);
   });
 
-  it('shifting post slot by 10m keeps comment offset', () => {
-    const postPrev = '2026-08-01T20:00';
-    const postNext = '2026-08-01T20:10';
-    const commentAt = '2026-08-01T20:03';
-    const delta = datetimeLocalKstDeltaMs(postPrev, postNext);
-    expect(shiftDatetimeLocalKst(commentAt, delta)).toBe('2026-08-01T20:13');
+  it('applyPostAtDeltaToItems shifts all item times from baseline→final postAt', () => {
+    const baseline = '2026-08-01T20:00';
+    const value = {
+      postAtLocal: '2026-08-01T20:10',
+      items: [
+        { key: 'c1', atLocal: '2026-08-01T20:03' },
+        { key: 'c2', atLocal: '2026-08-01T20:08' },
+      ],
+    };
+    const next = applyPostAtDeltaToItems(value, baseline);
+    expect(next.items[0].atLocal).toBe('2026-08-01T20:13');
+    expect(next.items[1].atLocal).toBe('2026-08-01T20:18');
+    expect(next.postAtLocal).toBe('2026-08-01T20:10');
+  });
+
+  it('applyPostAtDeltaToItems is no-op when postAt unchanged', () => {
+    const value = {
+      postAtLocal: '2026-08-01T20:00',
+      items: [{ key: 'c1', atLocal: '2026-08-01T20:03' }],
+    };
+    expect(applyPostAtDeltaToItems(value, '2026-08-01T20:00')).toBe(value);
   });
 });

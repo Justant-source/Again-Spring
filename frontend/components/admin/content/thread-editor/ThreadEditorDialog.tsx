@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,10 +22,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, Trash2 } from 'lucide-react';
 import {
-  datetimeLocalKstDeltaMs,
+  applyPostAtDeltaToItems,
   fromDatetimeLocalKst,
   formatKstLabel,
-  shiftDatetimeLocalKst,
 } from './datetimeKst';
 import { THREAD_CATEGORY_OPTIONS, type ThreadEditorItem, type ThreadEditorValue } from './types';
 
@@ -44,7 +43,8 @@ export interface ThreadEditorDialogProps {
   emptyItemsLabel?: string;
   authorPlaceholder?: string;
   onClose: () => void;
-  onSave: () => void;
+  /** 저장 직전 postAt delta가 반영된 최종 value를 넘긴다. */
+  onSave: (next: ThreadEditorValue) => void;
   /** Left-side destructive action (홀딩 취소 / 글 삭제 등) */
   destructiveAction?: ReactNode;
   testId?: string;
@@ -69,24 +69,24 @@ export function ThreadEditorDialog({
   destructiveAction,
   testId = 'admin-thread-editor-dialog',
 }: ThreadEditorDialogProps) {
-  function patch(partial: Partial<ThreadEditorValue>) {
-    onChange({ ...value, ...partial });
-  }
+  /** 다이얼로그 로드 시점의 글 시각 — 저장 시 delta 기준. */
+  const baselinePostAtRef = useRef('');
+  const baselineCapturedRef = useRef(false);
 
-  /** 글 발행 시각이 바뀌면 댓글·대댓글 시각도 같은 delta만큼 이동. */
-  function onPostAtChange(nextLocal: string) {
-    const deltaMs = datetimeLocalKstDeltaMs(value.postAtLocal, nextLocal);
-    if (!deltaMs) {
-      patch({ postAtLocal: nextLocal });
+  useEffect(() => {
+    if (!open) {
+      baselinePostAtRef.current = '';
+      baselineCapturedRef.current = false;
       return;
     }
-    patch({
-      postAtLocal: nextLocal,
-      items: value.items.map((it) => ({
-        ...it,
-        atLocal: shiftDatetimeLocalKst(it.atLocal, deltaMs),
-      })),
-    });
+    if (!loading && !baselineCapturedRef.current && value.postAtLocal) {
+      baselinePostAtRef.current = value.postAtLocal;
+      baselineCapturedRef.current = true;
+    }
+  }, [open, loading, value.postAtLocal]);
+
+  function patch(partial: Partial<ThreadEditorValue>) {
+    onChange({ ...value, ...partial });
   }
 
   function updateItem(index: number, itemPatch: Partial<ThreadEditorItem>) {
@@ -104,6 +104,14 @@ export function ThreadEditorDialog({
         return true;
       }),
     });
+  }
+
+  /** 저장 시 baseline→최종 postAt delta를 댓글에 일괄 적용 (키보드/피커 공통). */
+  function handleSaveClick() {
+    const baseline = baselinePostAtRef.current || value.postAtLocal;
+    const next = applyPostAtDeltaToItems(value, baseline);
+    if (next !== value) onChange(next);
+    onSave(next);
   }
 
   return (
@@ -176,7 +184,7 @@ export function ThreadEditorDialog({
                 <Input
                   type="datetime-local"
                   value={value.postAtLocal}
-                  onChange={(e) => onPostAtChange(e.target.value)}
+                  onChange={(e) => patch({ postAtLocal: e.target.value })}
                   disabled={!editable || submitting}
                   data-testid="admin-thread-post-at"
                 />
@@ -255,7 +263,7 @@ export function ThreadEditorDialog({
           {editable && (
             <Button
               type="button"
-              onClick={onSave}
+              onClick={handleSaveClick}
               disabled={submitting || loading}
               data-testid="admin-thread-save"
             >

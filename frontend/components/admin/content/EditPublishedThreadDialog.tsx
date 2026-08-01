@@ -65,17 +65,17 @@ export function EditPublishedThreadDialog({ postId, onClose, onSaved, onDeleted 
 
   if (!postId) return null;
 
-  async function handleSave() {
+  async function handleSave(next: ThreadEditorValue) {
     if (!postId) return;
     setSubmitting(true);
     setError('');
     try {
       await updatePublishedThread(postId, {
-        title: value.title,
-        body: value.body,
-        category: value.category,
-        createdAt: fromDatetimeLocalKst(value.postAtLocal),
-        items: value.items.map((it) => ({
+        title: next.title,
+        body: next.body,
+        category: next.category,
+        createdAt: fromDatetimeLocalKst(next.postAtLocal),
+        items: next.items.map((it) => ({
           id: Number(it.key),
           body: it.body,
           authorId: it.authorId,

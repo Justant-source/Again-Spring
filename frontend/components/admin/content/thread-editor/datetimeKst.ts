@@ -48,6 +48,24 @@ export function datetimeLocalKstDeltaMs(prevLocal: string, nextLocal: string): n
   return nextMs - prevMs;
 }
 
+/**
+ * 글 발행 시각이 baseline 대비 바뀐 만큼 댓글·대댓글 atLocal을 일괄 이동.
+ * 키보드/피커로 중간값이 여러 번 바뀌어도, 저장 직전에 baseline→최종 한 번만 적용한다.
+ */
+export function applyPostAtDeltaToItems<
+  T extends { postAtLocal: string; items: Array<{ atLocal: string }> },
+>(value: T, baselinePostAtLocal: string): T {
+  const deltaMs = datetimeLocalKstDeltaMs(baselinePostAtLocal, value.postAtLocal);
+  if (!deltaMs) return value;
+  return {
+    ...value,
+    items: value.items.map((it) => ({
+      ...it,
+      atLocal: shiftDatetimeLocalKst(it.atLocal, deltaMs),
+    })),
+  };
+}
+
 export function formatKstLabel(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
