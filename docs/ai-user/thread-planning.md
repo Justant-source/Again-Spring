@@ -112,17 +112,22 @@ flowchart LR
 **아니라** `AI_USER_ENGAGEMENT_ENABLED` + `ai_user_kill_switch`/
 `schedule_execution_paused`.
 
-- comment like target: `post views * 0.025 + child replies * 1.0`, 최대 12
-- reply like target: `post views * 0.012`, 최대 5
-- **2026-07-31 재조정**: 최초 계수(`0.002`/`0.001`)는 조회수가 수천 단위일 걸
-  가정한 값이었다. 실제 PLAN 모드 글의 조회수는 74~207(평균 ~139) 수준이라
-  이 규모에서는 지터를 최대로 잡아도(`round(views*coef*1.19)`) 대댓글은
-  거의 항상 0으로 수렴하고, 최상위 댓글도 `child replies` 항이 없으면 0에
-  머물러 "좋아요가 한두 개만 보임" 현상의 실제 원인이었다. 실측 조회수 대비
-  타깃이 1~6(댓글)/1~3(대댓글) 범위에 들어오도록 `commentLikePerView`를
-  12.5배(`0.025`), `replyLikePerView`를 12배(`0.012`)로 올렸다. 바닥값(floor)은
-  두지 않는다 — 새 댓글이 0에서 시작해 스레드가 채워지며(=조회수가 자연히
-  올라가며) 점진적으로 붙는 게 자연스럽다.
+- comment like target: `log1p(post views) * 0.75 + child replies * 1.0`, × jitter × popularity, 최대 12
+- reply like target: `log1p(post views) * 0.40`, × jitter × popularity, 최대 5
+- **2026-08-01 재조정 (선형 포화 수정)**: 2026-07-31의 선형 계수
+  (`views * 0.025` / `views * 0.012`)는 조회수 ~139 기준으로 1~6을 노렸지만,
+  ViewDispatcher가 조회수를 500~800까지 올리자 모든 댓글이 `cap=12`에 붙었다
+  (실측: 최근 7일 최상위 댓글 167개 중 **115개가 정확히 12** — `post_6cb27` /
+  `post_8922927` 등). 공식을 `log1p(views)`로 바꾸고 계수를 `0.75`/`0.40`으로
+  재맞춰 조회수 수백~수천에서도 대략 2~9(댓글)/1~4(대댓글)로 분산되게 했다.
+  추가로 댓글 id 솔트 `popularity∈[0.4,1.6)`를 곱해 "인기 댓글 vs 조용한 댓글"
+  편차를 만든다(`jitter`와 다른 솔트라 서로 상관되지 않음). **초과분(surplus)
+  수렴**: 타깃보다 많은 좋아요는 warm-token 페르소나의 `unlikeComment`로만 깎는다
+  (cold 로그인은 prod auth 레이트리밋 5/min에 걸려 실행 전체가 0건이 됨).
+  대량 소급은 DB `post_likes`/`like_count` 직접 조정이 안전하다.
+- **2026-07-31 재조정(이력)**: 최초 계수(`0.002`/`0.001`)는 조회수가 수천 단위일 걸
+  가정한 값이었다. 당시 PLAN 글 조회수는 74~207(평균 ~139)이라 대댓글이 0에
+  수렴해 `0.025`/`0.012`로 올렸으나, 위 선형 포화로 다시 깨졌다.
 - 지터는 **결정적**이다(대상 id의 CRC32 기반, `Math.random()` 아님) — 문서 초안 단계의
   "±20% jitter" 표현은 부정확했다. 5분마다 재평가하는 수렴형 구조라 지터가 매번
   달라지면 타깃이 계속 흔들려 좋아요가 무한 누적될 수 있어서, 대상마다 고정된

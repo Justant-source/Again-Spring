@@ -31,22 +31,22 @@ class EngagementTargetCalculatorTest {
     @Test
     void commentLikeTargetNeverExceedsCap() {
         int target = EngagementTargetCalculator.commentLikeTarget(
-                1_000_000L, 500, 42L, 0.002, 1.0, 12);
+                1_000_000L, 500, 42L, 0.75, 1.0, 12);
         assertThat(target).isLessThanOrEqualTo(12).isGreaterThanOrEqualTo(0);
     }
 
     @Test
     void replyLikeTargetNeverExceedsCap() {
         int target = EngagementTargetCalculator.replyLikeTarget(
-                1_000_000L, 99L, 0.001, 5);
+                1_000_000L, 99L, 0.40, 5);
         assertThat(target).isLessThanOrEqualTo(5).isGreaterThanOrEqualTo(0);
     }
 
     @Test
     void targetsAreNeverNegativeAtZeroInputs() {
         assertThat(EngagementTargetCalculator.postLikeTarget(0, 0, "post_zero", 0.02, 0.6)).isGreaterThanOrEqualTo(0);
-        assertThat(EngagementTargetCalculator.commentLikeTarget(0, 0, 1L, 0.002, 1.0, 12)).isGreaterThanOrEqualTo(0);
-        assertThat(EngagementTargetCalculator.replyLikeTarget(0, 1L, 0.001, 5)).isGreaterThanOrEqualTo(0);
+        assertThat(EngagementTargetCalculator.commentLikeTarget(0, 0, 1L, 0.75, 1.0, 12)).isGreaterThanOrEqualTo(0);
+        assertThat(EngagementTargetCalculator.replyLikeTarget(0, 1L, 0.40, 5)).isGreaterThanOrEqualTo(0);
     }
 
     @Test
@@ -61,6 +61,31 @@ class EngagementTargetCalculatorTest {
         int low = EngagementTargetCalculator.postLikeTarget(100, 5, "post_growth", 0.02, 0.6);
         int high = EngagementTargetCalculator.postLikeTarget(10_000, 50, "post_growth", 0.02, 0.6);
         assertThat(high).isGreaterThan(low);
+    }
+
+    @Test
+    void commentLikeTargetsDivergeAtHighViewsInsteadOfAllHittingCap() {
+        // Regression: linear views*0.025 parked every comment at cap 12 once views ≥ ~480
+        // (prod 2026-08-01 — post_6cb27 / post_8922927 all showed identical likes).
+        java.util.Set<Integer> targets = new java.util.TreeSet<>();
+        int atCap = 0;
+        for (long id = 3000; id < 3100; id++) {
+            int t = EngagementTargetCalculator.commentLikeTarget(625L, 0, id, 0.75, 1.0, 12);
+            targets.add(t);
+            if (t == 12) atCap++;
+        }
+        assertThat(targets.size()).isGreaterThanOrEqualTo(4);
+        assertThat(atCap).isLessThan(20);
+        assertThat(targets.stream().mapToInt(Integer::intValue).max().orElse(0)).isLessThanOrEqualTo(12);
+        assertThat(targets.stream().mapToInt(Integer::intValue).min().orElse(0)).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void popularityIsDeterministicAndDecorrelatedFromJitterSalt() {
+        double a = EngagementTargetCalculator.popularity("42");
+        double b = EngagementTargetCalculator.popularity("42");
+        assertThat(a).isEqualTo(b);
+        assertThat(a).isGreaterThanOrEqualTo(0.4).isLessThan(1.6);
     }
 
     @Test

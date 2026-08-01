@@ -238,6 +238,34 @@ public class BackendBotClient {
         }
     }
 
+    /**
+     * Unlike a comment (toggle once). Opposite of {@link #likeComment}: if the toggle
+     * accidentally <em>adds</em> a like (persona had not liked), immediately toggles back
+     * and returns false. Used by engagement surplus convergence.
+     */
+    public boolean unlikeComment(String jwt, String postId, Long commentId) {
+        try {
+            String body = restClient.post()
+                .uri("/api/community/posts/{postId}/comments/{commentId}/like", postId, commentId)
+                .header("Authorization", "Bearer " + jwt)
+                .retrieve()
+                .body(String.class);
+            if (body != null && body.contains("\"liked\":true")) {
+                restClient.post()
+                    .uri("/api/community/posts/{postId}/comments/{commentId}/like", postId, commentId)
+                    .header("Authorization", "Bearer " + jwt)
+                    .retrieve()
+                    .toBodilessEntity();
+                log.debug("Unlike aborted on comment {} post {} (was not liked)", commentId, postId);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("Unlike comment failed on post {} comment {}: {}", postId, commentId, e.getMessage());
+            return false;
+        }
+    }
+
     /** Record a view (POST /view with deviceId — auth 불필요, deviceId로 중복 방지) */
     public boolean viewPost(String postId, String deviceId) {
         try {

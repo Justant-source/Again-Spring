@@ -52,40 +52,60 @@ public final class EngagementTargetCalculator {
 
     /**
      * Target like count for a comment (top-level).
-     * Formula: round((views * perView + childReplies * perReply) * jitter)
+     * Formula: round((log1p(views) * perLogView + childReplies * perReply) * jitter * popularity)
      * Clamped to [0, cap].
+     *
+     * <p><b>Uses {@code log1p(views)}, not raw views.</b> Linear {@code views * 0.025} saturated
+     * every comment at the cap once views crossed ~480 (prod 2026-08-01: 115/167 recent
+     * top-level comments stuck at exactly 12). Log keeps typical bands in ~2–9 across
+     * hundreds→thousands of views; {@link #popularity} spreads comments so they do not
+     * all land on the same count.
      *
      * @param views post view count (context for the comment)
      * @param childReplies count of direct replies to this comment
      * @param commentId ID of the comment
-     * @param perView likes per post view (e.g., 0.002 per thread-planning.md)
-     * @param perReply likes per direct reply (e.g., 1.0 per thread-planning.md)
-     * @param cap maximum like count (e.g., 12 per thread-planning.md)
+     * @param perLogView likes per {@code log1p(views)} (e.g., 0.75)
+     * @param perReply likes per direct reply (e.g., 1.0)
+     * @param cap maximum like count (e.g., 12)
      * @return target like count in [0, cap]
      */
     public static int commentLikeTarget(long views, int childReplies, long commentId,
-                                        double perView, double perReply, int cap) {
-        double raw = (views * perView + childReplies * perReply) * jitter(String.valueOf(commentId));
+                                        double perLogView, double perReply, int cap) {
+        String id = String.valueOf(commentId);
+        double raw = (Math.log1p(views) * perLogView + childReplies * perReply)
+                * jitter(id) * popularity(id);
         int target = Math.toIntExact(Math.round(raw));
         return Math.max(0, Math.min(target, cap));
     }
 
     /**
      * Target like count for a reply (direct child of a comment).
-     * Formula: round(views * perView * jitter)
+     * Formula: round(log1p(views) * perLogView * jitter * popularity)
      * Clamped to [0, cap].
      *
      * @param views post view count (context for the reply)
-     * @param commentId ID of the parent comment (used for jitter derivation)
-     * @param perView likes per post view (e.g., 0.001 per thread-planning.md)
-     * @param cap maximum like count (e.g., 5 per thread-planning.md)
+     * @param commentId ID of the reply itself (used for jitter/popularity)
+     * @param perLogView likes per {@code log1p(views)} (e.g., 0.40)
+     * @param cap maximum like count (e.g., 5)
      * @return target like count in [0, cap]
      */
     public static int replyLikeTarget(long views, long commentId,
-                                      double perView, int cap) {
-        double raw = views * perView * jitter(String.valueOf(commentId));
+                                      double perLogView, int cap) {
+        String id = String.valueOf(commentId);
+        double raw = Math.log1p(views) * perLogView * jitter(id) * popularity(id);
         int target = Math.toIntExact(Math.round(raw));
         return Math.max(0, Math.min(target, cap));
+    }
+
+    /**
+     * Per-comment popularity multiplier in [0.4, 1.6), salted separately from {@link #jitter}
+     * so volume jitter and "hot vs quiet comment" draws are uncorrelated.
+     */
+    public static double popularity(String id) {
+        CRC32 crc = new CRC32();
+        crc.update(("pop:" + id).getBytes());
+        long hash = crc.getValue();
+        return 0.4 + (hash % 120) / 100.0;
     }
 
     /**

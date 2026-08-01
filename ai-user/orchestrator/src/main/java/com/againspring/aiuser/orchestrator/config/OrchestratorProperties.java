@@ -116,10 +116,10 @@ public class OrchestratorProperties {
         private boolean viewsEnabled = true;
         private double postLikePerView = 0.02;
         private double postLikePerComment = 0.6;
-        private double commentLikePerView = 0.025;
+        private double commentLikePerView = 0.75;
         private double commentLikePerReply = 1.0;
         private int commentLikeCap = 12;
-        private double replyLikePerView = 0.012;
+        private double replyLikePerView = 0.40;
         private int replyLikeCap = 5;
         /**
          * 한 실행에서 좋아요·투표 후보로 쓸 페르소나 풀 크기 (warm 우선 + cold 예산).

@@ -94,10 +94,11 @@ ai-user:
       views-enabled: ${AI_USER_ENGAGEMENT_VIEWS_ENABLED:true}
       post-like-per-view: ${AI_USER_ENGAGEMENT_POST_LIKE_PER_VIEW:0.02}
       post-like-per-comment: ${AI_USER_ENGAGEMENT_POST_LIKE_PER_COMMENT:0.6}
-      comment-like-per-view: ${AI_USER_ENGAGEMENT_COMMENT_LIKE_PER_VIEW:0.025}
+      # comment/reply like: log1p(views)*coef (선형 views*0.025는 조회수 500+에서 전부 cap=12로 고정됨, 2026-08-01)
+      comment-like-per-view: ${AI_USER_ENGAGEMENT_COMMENT_LIKE_PER_VIEW:0.75}
       comment-like-per-reply: ${AI_USER_ENGAGEMENT_COMMENT_LIKE_PER_REPLY:1.0}
       comment-like-cap: ${AI_USER_ENGAGEMENT_COMMENT_LIKE_CAP:12}
-      reply-like-per-view: ${AI_USER_ENGAGEMENT_REPLY_LIKE_PER_VIEW:0.012}
+      reply-like-per-view: ${AI_USER_ENGAGEMENT_REPLY_LIKE_PER_VIEW:0.40}
       reply-like-cap: ${AI_USER_ENGAGEMENT_REPLY_LIKE_CAP:5}
       persona-pool-size: ${AI_USER_ENGAGEMENT_PERSONA_POOL_SIZE:60}
       cold-login-budget: ${AI_USER_ENGAGEMENT_COLD_LOGIN_BUDGET:3}

@@ -45,6 +45,11 @@ import java.util.*;
  * silently stops the moment that cap is reached by unrelated activity, which is exactly the
  * failure mode this class exists to fix. Volume is bounded per-run instead
  * ({@code maxPostsPerRun}, {@code maxLikeCallsPerRun}, {@code maxVoteCallsPerRun}).
+ *
+ * <p><b>Surplus convergence (2026-08-01~).</b> Targets can fall when the formula is retuned
+ * (linear→{@code log1p}). Because likes are toggles, surplus is removed via
+ * {@link ActionExecutor#unlikeComment} — never {@code likeComment}, which would re-apply
+ * an accidental unlike.
  */
 @Slf4j
 @Service
@@ -242,12 +247,52 @@ public class PlanEngagementDispatcher {
                                 snapshot.viewCount(), comment.childReplyCount(), comment.id(),
                                 cfg.getCommentLikePerView(), cfg.getCommentLikePerReply(), cfg.getCommentLikeCap());
                 int deficit = EngagementTargetCalculator.deficit(target, comment.likeCount());
-                if (deficit <= 0) continue;
+                int surplus = EngagementTargetCalculator.deficit(comment.likeCount(), target);
+
+                if (deficit <= 0 && surplus <= 0) continue;
 
                 if (dryRun) {
-                    deficits.add(new PostDeficit(postId, comment.id(), isReply ? "REPLY" : "COMMENT", deficit));
+                    if (deficit > 0) {
+                        deficits.add(new PostDeficit(postId, comment.id(), isReply ? "REPLY" : "COMMENT", deficit));
+                    } else {
+                        deficits.add(new PostDeficit(postId, comment.id(), isReply ? "REPLY_SURPLUS" : "COMMENT_SURPLUS", surplus));
+                    }
                     continue;
                 }
+
+                // Surplus first: previously linear formula parked every comment at the cap;
+                // toggle-off until the new (log1p) target so visible counts diverge again.
+                // Warm-token likers only — cold logins hit prod auth rate-limit (5/min/IP) and
+                // stall the whole run at 0 applied (2026-08-01). Remaining surplus converges
+                // across later cron ticks as more personas stay warm, or via admin SQL adjust.
+                if (surplus > 0 && likeCallsUsed < maxLikeCalls) {
+                    Set<String> alreadyLiked = reader.alreadyLikedCommentAuthorIds(comment.id());
+                    List<Persona> unlikeCandidates = new ArrayList<>();
+                    for (Persona p : personaRepository.findByActiveTrue()) {
+                        if (!alreadyLiked.contains(p.getId())) continue;
+                        if (p.getId().equals(comment.authorId())) continue;
+                        if (!botTokenCache.hasValidToken(p.getId())) continue;
+                        unlikeCandidates.add(p);
+                    }
+                    Collections.shuffle(unlikeCandidates);
+                    int toUnlike = Math.min(surplus, unlikeCandidates.size());
+                    toUnlike = Math.min(toUnlike, maxLikeCalls - likeCallsUsed);
+                    for (int i = 0; i < toUnlike; i++) {
+                        Persona persona = unlikeCandidates.get(i);
+                        try {
+                            if (!actionExecutor.unlikeComment(persona, postId, comment.id())) continue;
+                        } catch (Exception ex) {
+                            log.debug("PlanEngagementDispatcher: unlike failed persona={} comment={}: {}",
+                                    persona.getId(), comment.id(), ex.getMessage());
+                            continue;
+                        }
+                        likeCallsUsed++;
+                        if (isReply) replyLikesApplied++; else commentLikesApplied++;
+                    }
+                    continue; // do not also add likes in the same pass for this comment
+                }
+
+                if (deficit <= 0) continue;
 
                 Set<String> alreadyLiked = reader.alreadyLikedCommentAuthorIds(comment.id());
                 List<Persona> candidates = new ArrayList<>();

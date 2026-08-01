@@ -125,6 +125,18 @@ public class ActionExecutor {
         }
     }
 
+    /**
+     * Engagement surplus path: toggle-off a like that {@link BackendBotClient#likeComment}
+     * would otherwise re-apply. Returns whether the unlike landed.
+     */
+    public boolean unlikeComment(Persona persona, String postId, Long commentId) {
+        if (persona == null || postId == null || commentId == null) return false;
+        String email = botEmail(persona);
+        java.util.Optional<String> jwtOpt = tokenCache.getToken(persona.getId(), email, props.getBotPassword());
+        if (jwtOpt.isEmpty()) return false;
+        return backendBot.unlikeComment(jwtOpt.get(), postId, commentId);
+    }
+
     private void executeCommentLike(Persona persona, PlannedAction action, String jwt, String corrId) {
         if (action.targetPost() == null || action.targetPost().getId() == null) return;
         String postId = action.targetPost().getId();
