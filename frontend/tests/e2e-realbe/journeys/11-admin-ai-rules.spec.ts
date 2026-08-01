@@ -90,7 +90,11 @@ test.describe('Journey 11-C: /admin/content UI', () => {
 
     await page.locator(ADMIN_CONTENT.tabHolding).click()
     await expect(page.locator(ADMIN_CONTENT.holdingPanel)).toBeVisible({ timeout: 8_000 })
-    await expect(page.getByRole('columnheader', { name: '글 발행 예정 (KST)' })).toBeVisible()
+    // 예약 홀딩 큐는 새벽 배치가 발행을 끝내면 자연스럽게 0건이 된다 — 그때는 테이블 대신
+    // emptyMessage가 렌더된다(page.tsx:413). 두 상태 모두 "정상 렌더"이므로 둘 중 하나만 확인한다.
+    const columnHeader = page.getByRole('columnheader', { name: '글 발행 예정 (KST)' })
+    const emptyState = page.getByText('예약 홀딩된 글이 없습니다')
+    await expect(columnHeader.or(emptyState)).toBeVisible({ timeout: 8_000 })
   })
 })
 

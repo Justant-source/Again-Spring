@@ -55,6 +55,23 @@
 | popularity 게이트 | `popularity_gate.py` — 지표·절대하한·상대 pct≥0.50 · COMMENT는 인기 부모만 (영구) |
 | WP1B | 전원 `voice_type` ∈ {NATEPAN:113, BLIND:37} · 인기 앵커로 example 재생성 · strengthener 재오염 차단 |
 
+## 인시던트 — HUMAN_POST 플랜 생성 100% 실패 (2026-08-01, 당일 원인·수정·복구)
+
+`ThreadPlanGenerationService`(사람 글 → AI 댓글 반응 경로)가 REQUESTED 백로그 173건을 처리하며
+**173/173 전부 FAILED**. 두 단계 원인이 겹쳤다.
+
+| 단계 | 원인 | 증상 |
+|---|---|---|
+| 1 | `ClaudeCliInvoker`가 프롬프트 전체(persona cast JSON 포함, 실측 685KB)를 `claude` CLI의 **명령줄 인자**로 넘김 | OS `E2BIG`("Argument list too long") — 프로세스 생성 자체가 실패 |
+| 2 | (1) 수정 후 재현: WP1(`limit(24)` 제거)이 활성 페르소나 **전체(150명)**를 매 요청마다 통째로 넣도록 바뀌었는데, WP1B 정화로 페르소나당 voice_profile이 커져 실측 **~2,000 tokens/persona** → 150명 ≈ **306K tokens** | Claude API "Prompt is too long (limit 200000)" |
+
+수정:
+
+- `ClaudeCliInvoker`: userPart를 CLI 인자가 아니라 **stdin**으로 전달 (`claude --print`가 인자 없으면 stdin을 읽음, 실측 확인). `CodexCliInvoker`는 애초에 stdin 방식이라 영향 없었음.
+- `PlanPersonaMapper.capCastPool` / `AiPostBundleService.capMegaCallCast`: 요청 1건에 넣는 persona cast를 셔플 후 **`AI_USER_THREAD_PLAN_PLAN_PERSONA_CAST_MAX`(기본 40)**로 상한. WP1의 "회전"(항상 같은 24명 고정 방지) 의도는 유지하면서 토큰 예산 안에 들어오게 함. micro-batch(4~6명)로 이미 쪼개는 AI_POST 경로는 원래 영향 없었음.
+- 검증: 실패한 plan 1건을 REQUESTED로 되돌리고 provider를 잠깐 켜서 실제 스케줄러 tick으로 재생성 → `ACTIVE`, 댓글 14 + 대댓글 2 정상 생성 확인 후 provider 원복.
+- **남은 172건은 FAILED 상태로 그대로 둠** — 일괄 재시도는 콘텐츠 생성 결정이라 별도 지시 없이는 하지 않음.
+
 ## 현재 운영 상태를 해석할 때 주의할 점
 
 - `.result/ai-user-v2/` 문서는 historical artifact다. 현재 런타임 truth는 `ai-user/*` 코드와 compose 파일이다.

@@ -79,9 +79,12 @@ public class ThreadPlanGenerationService {
     }
 
     private PlanRequestBuilt planRequest(AiThreadPlan plan, String provider, String model, int pool) {
-        // Full active pool — no fixed limit(24).
+        // Full active pool for rotation (no fixed limit(24)) — but a single request's cast is
+        // capped+shuffled so the prompt stays under Claude's 200K-token budget (2026-08-01 outage:
+        // sending all 150 personas' voice_profile ≈ 306K tokens, 173/173 REQUESTED plans FAILED).
         List<Persona> active = personaRepository.findByActiveTrue();
-        List<Map<String, Object>> personas = planPersonaMapper.mapCast(active);
+        List<Persona> cast = PlanPersonaMapper.capCastPool(active, properties.getThreadPlan().getPlanPersonaCastMax());
+        List<Map<String, Object>> personas = planPersonaMapper.mapCast(cast);
         Set<String> castIds = planPersonaMapper.castIds(personas);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("kind", "AI_POST".equals(plan.getSourceType()) ? "AI_POST" : "HUMAN_POST");

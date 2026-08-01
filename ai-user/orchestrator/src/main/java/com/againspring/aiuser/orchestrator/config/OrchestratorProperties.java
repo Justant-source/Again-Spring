@@ -130,6 +130,14 @@ public class OrchestratorProperties {
         /** Personas per micro-batch (clamped to 4..6 at use via {@link #resolvedMicroBatchSize()}). */
         private int microBatchSize = 5;
         /**
+         * 2026-08-01: HUMAN_POST 반응 plan(ThreadPlanGenerationService)이 전체 활성 페르소나(150명)를
+         * voice_profile 통째로 프롬프트에 넣다가 Claude 200K 토큰 한도를 넘겨 REQUESTED 백로그
+         * 173건이 전부 FAILED로 소진됐다(실측 150명≈306K 토큰). 이 값은 한 번의 LLM 요청에
+         * 후보로 넣는 페르소나 cast 상한이며, 매 호출마다 셔플해 뽑으므로 회전(WP1의 원래 의도)은
+         * 유지된다. micro-batch(4~6명)로 이미 쪼개는 AI_POST 경로에는 영향 없음.
+         */
+        private int planPersonaCastMax = 40;
+        /**
          * After {@code ThreadQualityGate}, plan is READY only if kept top-level ≥ this
          * and kept items ≥ {@link #readyMinItems}. Below → {@code QUALITY_BELOW_MIN_ITEMS}.
          */

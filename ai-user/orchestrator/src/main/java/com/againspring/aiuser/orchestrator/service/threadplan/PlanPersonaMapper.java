@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -24,6 +25,21 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PlanPersonaMapper {
     private final JdbcTemplate jdbcTemplate;
+
+    /**
+     * Shuffled, bounded subset of the active pool for embedding in ONE LLM request.
+     * WP1 removed the old fixed limit(24) so different personas rotate through over time instead
+     * of always the same 24 — but sending literally everyone's full voice_profile blows past
+     * Claude's 200K-token context (measured ~2000 tokens/persona post-WP1B → 150 personas ≈ 306K
+     * tokens, which is exactly what took down the HUMAN_POST reactive path on 2026-08-01).
+     * Shuffling per call keeps the rotation WP1 wanted while staying well under budget.
+     */
+    public static List<Persona> capCastPool(List<Persona> active, int max) {
+        if (active == null || active.size() <= Math.max(1, max)) return active;
+        List<Persona> shuffled = new ArrayList<>(active);
+        Collections.shuffle(shuffled, ThreadLocalRandom.current());
+        return new ArrayList<>(shuffled.subList(0, Math.max(1, max)));
+    }
 
     /** Full active cast for an AI_POST / HUMAN_POST plan request. */
     public List<Map<String, Object>> mapCast(List<Persona> active) {

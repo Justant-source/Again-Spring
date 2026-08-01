@@ -96,10 +96,12 @@ public class ClaudeCliInvoker implements Invoker {
     }
 
     private String invokeOnce(String prompt, String model, StructuredOutputSchema schema) throws ClaudeCodeException {
-        ProcessBuilder pb = buildProcessBuilder(prompt, model, schema == null ? null : schemaCatalog.json(schema));
+        SplitPrompt split = splitPrompt(prompt);
+        ProcessBuilder pb = buildProcessBuilder(split.systemPart(), model, schema == null ? null : schemaCatalog.json(schema));
         try {
             Process process = pb.start();
             drainStderr(process, "sync");
+            writeUserPromptToStdin(process, split.userPart());
             String result = readStreamingOutput(process, null);
             int exitCode = process.waitFor();
             if (exitCode != 0 && !result.isBlank()) {
@@ -145,10 +147,12 @@ public class ClaudeCliInvoker implements Invoker {
 
     private String invokeWithCancelSupportOnce(String prompt, String model, CancelableInvocation inv)
             throws Exception {
-        ProcessBuilder pb = buildProcessBuilder(prompt, model, null);
+        SplitPrompt split = splitPrompt(prompt);
+        ProcessBuilder pb = buildProcessBuilder(split.systemPart(), model, null);
         Process process = pb.start();
         inv.attachProcess(process);
         drainStderr(process, inv.getInvocationId());
+        writeUserPromptToStdin(process, split.userPart());
 
         String result = readStreamingOutput(process, inv);
         int exitCode = process.waitFor();
@@ -238,26 +242,31 @@ public class ClaudeCliInvoker implements Invoker {
         t.start();
     }
 
-    private ProcessBuilder buildProcessBuilder(String prompt, String model, String jsonSchema) {
-        int sepIdx = prompt.indexOf(USER_PROMPT_SEP);
-        String systemPart;
-        String userPart;
-        if (sepIdx >= 0) {
-            systemPart = prompt.substring(0, sepIdx).trim();
-            userPart = prompt.substring(sepIdx + USER_PROMPT_SEP.length()).trim();
-        } else {
-            systemPart = DEFAULT_SYSTEM;
-            userPart = prompt;
-        }
+    private record SplitPrompt(String systemPart, String userPart) { }
 
-        ProcessBuilder pb = new ProcessBuilder(buildCommand(claudeBinaryPath, model, jsonSchema, systemPart, userPart));
+    private static SplitPrompt splitPrompt(String prompt) {
+        int sepIdx = prompt.indexOf(USER_PROMPT_SEP);
+        if (sepIdx >= 0) {
+            return new SplitPrompt(prompt.substring(0, sepIdx).trim(),
+                    prompt.substring(sepIdx + USER_PROMPT_SEP.length()).trim());
+        }
+        return new SplitPrompt(DEFAULT_SYSTEM, prompt);
+    }
+
+    private ProcessBuilder buildProcessBuilder(String systemPart, String model, String jsonSchema) {
+        ProcessBuilder pb = new ProcessBuilder(buildCommand(claudeBinaryPath, model, jsonSchema, systemPart));
         // CLI 모드는 OAuth(구독) 사용 — ANTHROPIC_API_KEY가 env에 있으면 CLI가 API 크레딧으로 전환됨.
         pb.environment().remove("ANTHROPIC_API_KEY");
         return pb;
     }
 
-    static java.util.List<String> buildCommand(String binary, String model, String jsonSchema,
-                                               String systemPart, String userPart) {
+    /**
+     * 2026-08-01: userPart(전체 활성 페르소나 캐스트 JSON 포함)를 CLI 인자로 넘기다가
+     * "Exec failed, error: 7 (Argument list too long)"(E2BIG)로 REQUESTED 플랜 173건이
+     * 전부 실패했다. stdin에는 인자 길이 한도가 없으므로 여기서만 넘긴다.
+     * (CodexCliInvoker는 애초에 stdin 방식이라 이 문제가 없었다.)
+     */
+    static java.util.List<String> buildCommand(String binary, String model, String jsonSchema, String systemPart) {
         var command = new java.util.ArrayList<String>(java.util.List.of(
                 binary, "--print", "--output-format", "stream-json", "--verbose",
                 "--include-partial-messages", "--model", model, "--strict-mcp-config",
@@ -268,8 +277,15 @@ public class ClaudeCliInvoker implements Invoker {
         }
         command.add("--system-prompt");
         command.add(systemPart);
-        command.add(userPart);
         return command;
+    }
+
+    /** stderr는 별도 스레드로 이미 drain 중이므로, 여기서 동기 write해도 파이프 데드락이 없다 (CodexCliInvoker와 동일 순서). */
+    private void writeUserPromptToStdin(Process process, String userPart) throws java.io.IOException {
+        try (OutputStream stdin = process.getOutputStream()) {
+            stdin.write(userPart.getBytes(StandardCharsets.UTF_8));
+            stdin.flush();
+        }
     }
 
     private String augmentPromptForRetry(String prompt, int attempt) {

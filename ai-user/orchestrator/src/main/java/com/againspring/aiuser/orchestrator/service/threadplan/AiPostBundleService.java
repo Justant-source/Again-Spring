@@ -199,7 +199,12 @@ public class AiPostBundleService {
             List<Map<String, Object>> personas, Set<String> castIds) {
         Map<String, Object> request = baseAiPostRequest(
                 author, category, correlationId, provider, model, source, storyProfile);
-        request.put("personas", personas);
+        // Same 2026-08-01 outage fix as ThreadPlanGenerationService: cap the cast so this
+        // single-call fallback can't blow past Claude's token budget if micro-batch is ever
+        // disabled. Index 0 stays put — reorderCastByMatcher already placed the matched author
+        // there. Sending fewer candidates never invalidates validateCast(), which only checks
+        // returned IDs are a subset of the original castIds.
+        request.put("personas", capMegaCallCast(personas, properties.getThreadPlan().getPlanPersonaCastMax()));
         int roots = Math.min(14, pool);
         request.put("maxTopLevel", roots);
         request.put("maxReplies", pool - roots);
@@ -470,6 +475,18 @@ public class AiPostBundleService {
     /** Soft alias — logs nothing; {@link ThreadQualityGate} enforces cast at persist. */
     static void validateCast(Map<String, Object> response, Set<String> castIds) {
         countOutOfCast(response, castIds);
+    }
+
+    /** Cap a single mega-call's persona payload, keeping index 0 (the reordered author) fixed. */
+    static List<Map<String, Object>> capMegaCallCast(List<Map<String, Object>> personas, int max) {
+        int effectiveMax = Math.max(1, max);
+        if (personas == null || personas.size() <= effectiveMax) return personas;
+        List<Map<String, Object>> rest = new ArrayList<>(personas.subList(1, personas.size()));
+        java.util.Collections.shuffle(rest, java.util.concurrent.ThreadLocalRandom.current());
+        List<Map<String, Object>> capped = new ArrayList<>(effectiveMax);
+        capped.add(personas.get(0));
+        capped.addAll(rest.subList(0, Math.min(effectiveMax - 1, rest.size())));
+        return capped;
     }
 
     private static void applyProvenance(CreatePostDto.CreatePostDtoBuilder b,

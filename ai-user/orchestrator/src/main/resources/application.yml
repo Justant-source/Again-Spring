@@ -100,6 +100,7 @@ ai-user:
     # WP4: 4~6 persona micro-batch (default ON). false = legacy mega-call.
     micro-batch-enabled: ${AI_USER_THREAD_PLAN_MICRO_BATCH_ENABLED:true}
     micro-batch-size: ${AI_USER_THREAD_PLAN_MICRO_BATCH_SIZE:5}
+    plan-persona-cast-max: ${AI_USER_THREAD_PLAN_PLAN_PERSONA_CAST_MAX:40}
     # WP4: ThreadQualityGate 통과 후 READY 운영 하한 (미달 → QUALITY_BELOW_MIN_ITEMS)
     ready-min-top-level: ${AI_USER_THREAD_PLAN_READY_MIN_TOP_LEVEL:3}
     ready-min-items: ${AI_USER_THREAD_PLAN_READY_MIN_ITEMS:6}

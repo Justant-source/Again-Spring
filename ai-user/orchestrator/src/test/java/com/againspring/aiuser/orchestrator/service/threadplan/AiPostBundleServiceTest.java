@@ -73,6 +73,10 @@ class AiPostBundleServiceTest {
         when(threadPlan.getBundleTimeoutMs()).thenReturn(240_000L);
         when(threadPlan.isMicroBatchEnabled()).thenReturn(true);
         when(threadPlan.resolvedMicroBatchSize()).thenReturn(5);
+        // Matches the real application.yml default; an unstubbed int mock returns 0, which would
+        // wrongly cap every mega-call test down to 1 persona (see capMegaCallCastBoundsSize* below
+        // for the dedicated cap-behavior tests instead).
+        when(threadPlan.getPlanPersonaCastMax()).thenReturn(40);
         scheduleSupport = new CandidateScheduleSupport(properties);
         when(storyProfileAnalyzer.analyze(any(), any(), any(), any(), any())).thenReturn(
                 new StoryProfile("갈등", "OTHER",
@@ -334,5 +338,28 @@ class AiPostBundleServiceTest {
         var f = AiUserGenerationConfig.class.getDeclaredField(name);
         f.setAccessible(true);
         f.set(target, value);
+    }
+
+    /**
+     * 2026-08-01 회귀 방지: micro-batch가 비활성일 때 쓰이는 fallback 경로도
+     * 전체 cast를 그대로 보내면 같은 토큰 초과를 재현한다. author(index 0)는 유지돼야 한다.
+     */
+    @Test
+    void capMegaCallCastBoundsSizeAndKeepsAuthorFirst() {
+        List<Map<String, Object>> personas = new java.util.ArrayList<>();
+        Map<String, Object> author = Map.of("personaId", "author-1");
+        personas.add(author);
+        for (int i = 0; i < 149; i++) personas.add(Map.of("personaId", "p" + i));
+
+        List<Map<String, Object>> capped = AiPostBundleService.capMegaCallCast(personas, 40);
+
+        assertThat(capped).hasSize(40);
+        assertThat(capped.get(0)).isEqualTo(author);
+    }
+
+    @Test
+    void capMegaCallCastReturnsUnchangedWhenAlreadyWithinBound() {
+        List<Map<String, Object>> personas = List.of(Map.of("personaId", "a"), Map.of("personaId", "b"));
+        assertThat(AiPostBundleService.capMegaCallCast(personas, 40)).hasSize(2);
     }
 }

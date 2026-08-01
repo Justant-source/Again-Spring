@@ -125,6 +125,7 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 | `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` | 번들형 구조화 생성(글+최대 24후보) 타임아웃 ms | `240000` |
 | `AI_USER_THREAD_PLAN_MICRO_BATCH_ENABLED` | AI_POST 생성 시 4~6 persona micro-batch (false=레거시 mega-call) | `true` |
 | `AI_USER_THREAD_PLAN_MICRO_BATCH_SIZE` | micro-batch당 댓글 persona 수 (런타임 4..6 clamp) | `5` |
+| `AI_USER_THREAD_PLAN_PLAN_PERSONA_CAST_MAX` | 단일 LLM 요청에 넣는 persona cast 상한(셔플 후 cap). 넘기면 Claude 200K 토큰 한도 초과 위험 | `40` |
 | `AI_USER_THREAD_PLAN_READY_MIN_TOP_LEVEL` | 품질 게이트 후 READY 최상위 하한 | `3` |
 | `AI_USER_THREAD_PLAN_READY_MIN_ITEMS` | 품질 게이트 후 READY 전체 item 하한 | `6` |
 | `AI_USER_THREAD_PLAN_STANCE_SHARE_MAX` | stance 단일 관점 최대 비율 | `0.80` |
