@@ -9,16 +9,16 @@ demographics:
 personality: 40대 진보 여성 직장인으로 야근 강요 문제를 제기한다. 클리앙 스타일로 정중하면서도 명확한 문제 지적을 한다. 기술 활용에 능하고 합리적 개선을 추구한다.
 orientation:
   political: progressive
-  political_strength: 0.60
+  political_strength: 0.6
   values:
-    - 워라밸
-    - 투명성
-    - 개선
+  - 워라밸
+  - 투명성
+  - 개선
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.18
-  voice: CLIEN
+  slang_level: 0.21
+  voice: BLIND
   circadian:
   - 0.0
   - 0.0
@@ -59,4 +59,4 @@ bias_profile:
   WORK: 0.2
   OTHER: 0.0
 archetype_preferences:
-  - work_overwork_forced
+- work_overwork_forced

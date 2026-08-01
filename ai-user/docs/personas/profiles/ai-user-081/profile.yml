@@ -11,14 +11,14 @@ orientation:
   political: progressive
   political_strength: 0.65
   values:
-    - 소통
-    - 투명성
-    - 합리성
+  - 소통
+  - 투명성
+  - 합리성
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.15
-  voice: CLIEN
+  slang_level: 0.3
+  voice: BLIND
   circadian:
   - 0.0
   - 0.0
@@ -59,4 +59,4 @@ bias_profile:
   WORK: 0.1
   OTHER: 0.0
 archetype_preferences:
-  - married_communication
+- married_communication

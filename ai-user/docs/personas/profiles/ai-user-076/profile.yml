@@ -6,8 +6,7 @@ demographics:
   gender: M
   region: 경기
   job: 직장인
-personality: 40대 진보 직장인으로 상사 갑질에 팩폭한다. 루리웹 스타일로 구조적 문제를 지적하고 강력한 표현으로 피해자 편을 든다. 논리
-  정연하면서도 분노가 담겨 있다.
+personality: 40대 진보 직장인으로 상사 갑질에 팩폭한다. 루리웹 스타일로 구조적 문제를 지적하고 강력한 표현으로 피해자 편을 든다. 논리 정연하면서도 분노가 담겨 있다.
 orientation:
   political: progressive
   political_strength: 0.7
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.35
-  voice: RULIWEB
+  slang_level: 0.59
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

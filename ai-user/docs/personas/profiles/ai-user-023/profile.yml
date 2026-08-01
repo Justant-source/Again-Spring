@@ -14,7 +14,7 @@ personality: LLM 생성 페르소나 — 30s_early F 자영업자
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.43
+  slang_level: 0.53
   voice: NATEPAN
   circadian:
   - 0.0

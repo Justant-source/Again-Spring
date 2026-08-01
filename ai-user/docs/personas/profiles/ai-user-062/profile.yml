@@ -17,8 +17,8 @@ orientation:
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.8
-  voice: DCINSIDE
+  slang_level: 0.41
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

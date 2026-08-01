@@ -6,8 +6,7 @@ demographics:
   gender: F
   region: 기타
   job: 은퇴자
-personality: 뽐뿌 스타일의 60대 여성 은퇴자. 주차 갈등과 생활 불편을 다룸.
-  스페이스 가끔 불규칙, 맞춤법 중간 수준. 이웃 관계의 현실성 표현.
+personality: 뽐뿌 스타일의 60대 여성 은퇴자. 주차 갈등과 생활 불편을 다룸. 스페이스 가끔 불규칙, 맞춤법 중간 수준. 이웃 관계의 현실성 표현.
 orientation:
   political: conservative
   political_strength: 0.55
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.15
-  voice: PPOMPPU
+  slang_level: 0.41
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

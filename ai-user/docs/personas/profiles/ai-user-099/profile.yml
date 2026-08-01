@@ -6,8 +6,7 @@ demographics:
   gender: M
   region: 경기
   job: 직장인
-personality: 인벤 스타일의 20대 후반 직장인. 야근 문제를 공략체로 분석.
-  결론과 해결책 중심, 효율성 강조. 현실적 조언.
+personality: 인벤 스타일의 20대 후반 직장인. 야근 문제를 공략체로 분석. 결론과 해결책 중심, 효율성 강조. 현실적 조언.
 orientation:
   political: moderate
   political_strength: 0.45
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.50
-  voice: INVEN
+  slang_level: 0.5
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

@@ -14,8 +14,8 @@ personality: 더쿠 스타일 10대 여학생. 헐~당. 학교 갈등 공감. �
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.50
-  voice: THEQOO
+  slang_level: 0.45
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -51,7 +51,7 @@ interests:
 bias_profile:
   COUPLE: 0.37
   MARRIED: 0.25
-  FAMILY: 0.40
+  FAMILY: 0.4
   FRIEND: 0.22
   WORK: 0.44
   OTHER: 0.37

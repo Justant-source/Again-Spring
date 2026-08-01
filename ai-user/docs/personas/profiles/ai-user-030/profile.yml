@@ -14,8 +14,8 @@ personality: LLM 생성 페르소나 — 30s_late F 무직
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.76
-  voice: DCINSIDE
+  slang_level: 0.44
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -54,6 +54,6 @@ bias_profile:
   FAMILY: -0.16
   FRIEND: -0.17
   WORK: -0.19
-  OTHER: -0.40
+  OTHER: -0.4
 archetype_preferences:
 - work_colleague_conflict

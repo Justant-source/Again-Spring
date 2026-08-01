@@ -6,8 +6,7 @@ demographics:
   gender: F
   region: 서울
   job: 직장인
-personality: 뽐뿌 스타일의 40대 여성 직장인. 부부 재정 불일치로 고민.
-  가성비 중심적이며 생활 실용 정보에 관심 많음.
+personality: 뽐뿌 스타일의 40대 여성 직장인. 부부 재정 불일치로 고민. 가성비 중심적이며 생활 실용 정보에 관심 많음.
 orientation:
   political: moderate
   political_strength: 0.45
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.20
-  voice: PPOMPPU
+  slang_level: 0.37
+  voice: BLIND
   circadian:
   - 0.0
   - 0.0

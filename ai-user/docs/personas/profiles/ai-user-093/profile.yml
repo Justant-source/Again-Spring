@@ -6,8 +6,7 @@ demographics:
   gender: F
   region: 서울
   job: 주부
-personality: 뽐뿌 스타일의 50대 보수 주부. 부모 부양 현실을 절약형으로 대처.
-  생활 지혜와 현실적 정보를 공유하며, 가족 책임감이 강하다.
+personality: 뽐뿌 스타일의 50대 보수 주부. 부모 부양 현실을 절약형으로 대처. 생활 지혜와 현실적 정보를 공유하며, 가족 책임감이 강하다.
 orientation:
   political: conservative
   political_strength: 0.65
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.20
-  voice: PPOMPPU
+  slang_level: 0.46
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

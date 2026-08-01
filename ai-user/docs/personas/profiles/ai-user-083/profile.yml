@@ -11,14 +11,14 @@ orientation:
   political: moderate
   political_strength: 0.45
   values:
-    - 질서
-    - 예의
-    - 평화
+  - 질서
+  - 예의
+  - 평화
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.08
-  voice: CLIEN
+  slang_level: 0.41
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -59,4 +59,4 @@ bias_profile:
   WORK: -0.3
   OTHER: 0.0
 archetype_preferences:
-  - neighbor_noise
+- neighbor_noise

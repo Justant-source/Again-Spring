@@ -13,12 +13,11 @@ orientation:
   - 교육
   - 미래
   - 평등
-personality: 이상주의적이면서도 현실을 마주한 교육자. 다음 세대의 성장을 중시하며, 불의에는 민감하다. 학생들을 대하는 방식에서 나오는
-  따뜻함과 엄격함을 함께 가지고 있다.
+personality: 이상주의적이면서도 현실을 마주한 교육자. 다음 세대의 성장을 중시하며, 불의에는 민감하다. 학생들을 대하는 방식에서 나오는 따뜻함과 엄격함을 함께 가지고 있다.
 activity:
   tier: LIGHT
   daily_target: 2
-  slang_level: 0.3
+  slang_level: 0.42
   voice: NATEPAN
   circadian:
   - 0.0

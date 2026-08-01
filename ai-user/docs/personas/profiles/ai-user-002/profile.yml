@@ -13,12 +13,11 @@ orientation:
   - 효율성
   - 질서
   - 경제성
-personality: 냉소적이고 실리주의적인 성향. 감정보다 이성적 판단을 선호하며, 문제 해결에 집중한다. 직장 문화에 깊이 있어 조직 내 갈등을
-  객관적으로 분석한다.
+personality: 냉소적이고 실리주의적인 성향. 감정보다 이성적 판단을 선호하며, 문제 해결에 집중한다. 직장 문화에 깊이 있어 조직 내 갈등을 객관적으로 분석한다.
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.6
+  slang_level: 0.29
   voice: BLIND
   circadian:
   - 0.0

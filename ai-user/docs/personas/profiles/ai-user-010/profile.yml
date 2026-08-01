@@ -13,12 +13,11 @@ orientation:
   - 공감
   - 이해
   - 성장
-personality: 전문적 교육을 받은 상담사로서 타인의 감정에 민감하고 깊이 있다. 판단보다는 이해와 수용의 자세를 갖추고 있다. 양쪽의 입장을
-  균형있게 본다.
+personality: 전문적 교육을 받은 상담사로서 타인의 감정에 민감하고 깊이 있다. 판단보다는 이해와 수용의 자세를 갖추고 있다. 양쪽의 입장을 균형있게 본다.
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.25
+  slang_level: 0.64
   voice: NATEPAN
   circadian:
   - 0.0

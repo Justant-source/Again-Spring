@@ -14,8 +14,8 @@ personality: 펨코 스타일 30대 초반 진보 자영업자. ㄹㅇ 빠른 �
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.70
-  voice: FMKOREA
+  slang_level: 0.57
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -50,8 +50,8 @@ interests:
   OTHER: 0.3
 bias_profile:
   COUPLE: 0.44
-  MARRIED: 0.30
-  FAMILY: 0.30
+  MARRIED: 0.3
+  FAMILY: 0.3
   FRIEND: 0.29
   WORK: 0.22
   OTHER: 0.33

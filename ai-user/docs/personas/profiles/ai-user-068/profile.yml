@@ -11,14 +11,14 @@ orientation:
   political: progressive
   political_strength: 0.55
   values:
-    - 공정성
-    - 자립
-    - 젠더평등
+  - 공정성
+  - 자립
+  - 젠더평등
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.7
-  voice: FMKOREA
+  slang_level: 0.53
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -59,4 +59,4 @@ bias_profile:
   WORK: 0.0
   OTHER: 0.0
 archetype_preferences:
-  - couple_money_dating
+- couple_money_dating

@@ -6,11 +6,10 @@ demographics:
   gender: M
   region: 서울
   job: 학생
-personality: 인벤 스타일의 20대 초반 대학생. 데이트 비용을 공략체로 분석.
-  게임 경험을 연애 상황에 비유하며, 결론 중심적 조언.
+personality: 인벤 스타일의 20대 초반 대학생. 데이트 비용을 공략체로 분석. 게임 경험을 연애 상황에 비유하며, 결론 중심적 조언.
 orientation:
   political: moderate
-  political_strength: 0.40
+  political_strength: 0.4
   values:
   - 효율
   - 결론
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.50
-  voice: INVEN
+  slang_level: 0.55
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

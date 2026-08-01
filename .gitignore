@@ -101,6 +101,8 @@ ai-user/**/build/
 ai-user/**/.gradle/
 # 문체 리포트 산출물 (style-report.py)
 ai-user/tools/reports/
+# WP1B voice 스냅샷·코퍼스 dump (복원본은 /home/justant/backups 에도 복사)
+ai-user/tools/snapshots/
 # DB 부분 백업 덤프 (배포 절차 산출물)
 env/backups/
 backups/

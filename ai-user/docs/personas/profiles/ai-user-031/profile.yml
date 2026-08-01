@@ -14,8 +14,8 @@ personality: LLM 생성 페르소나 — 60s M 은퇴자
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.25
-  voice: MLBPARK
+  slang_level: 0.46
+  voice: NATEPAN
   circadian:
   - 0.7
   - 0.0
@@ -51,7 +51,7 @@ interests:
 bias_profile:
   COUPLE: -0.14
   MARRIED: -0.08
-  FAMILY: -0.10
+  FAMILY: -0.1
   FRIEND: -0.01
   WORK: -0.14
   OTHER: 0.09

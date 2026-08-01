@@ -14,8 +14,8 @@ personality: LLM 생성 페르소나 — 10s F 학생
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.45
-  voice: THEQOO
+  slang_level: 0.42
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -53,7 +53,7 @@ bias_profile:
   MARRIED: -0.32
   FAMILY: -0.19
   FRIEND: -0.21
-  WORK: -0.30
+  WORK: -0.3
   OTHER: -0.16
 archetype_preferences:
 - couple_money_dating

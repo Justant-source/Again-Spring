@@ -13,13 +13,12 @@ orientation:
   - 개인자유
   - 능력주의
   - 경쟁
-personality: 직설적이고 감정 표현이 거친 20대 남성. 온라인 커뮤니티 문화에 깊이 있으며, 자신의 의견을 적극적으로 표현한다. 유머감각이
-  뛰어나다.
+personality: 직설적이고 감정 표현이 거친 20대 남성. 온라인 커뮤니티 문화에 깊이 있으며, 자신의 의견을 적극적으로 표현한다. 유머감각이 뛰어나다.
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.85
-  voice: DCINSIDE
+  slang_level: 0.41
+  voice: NATEPAN
   circadian:
   - 0.2
   - 0.3

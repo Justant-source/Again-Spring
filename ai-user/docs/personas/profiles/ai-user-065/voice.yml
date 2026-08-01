@@ -3,7 +3,7 @@ nickname: 웃긴 오리
 formality: casual
 like_score: 0.65
 vote_score: 0.7
-voice_type: FMKOREA
+voice_type: NATEPAN
 age: 30s_early
 political_orientation: moderate
 political_strength: 0.45
@@ -11,24 +11,36 @@ general_style: 펨코의 30대 초반 직장인 톤. 야근 강요에 체념과 
 post:
   style: 야근의 부당함을 체념 섞인 톤으로 표현.
   length_guide: 100~500자
-  example_post_openers:
+  example_post_openers: &id003
   - 야근이 일상화돼 있어 ㅋㅋ 진짜 미칠 지경
-  - 남은 인생을 회사에만 쏟을 순 없을 것 같아
-  - 이게 일인가 싶고.. ~노? 이게 정상인가
+  - 오늘 무슨 한일드라마 바캉스의 법칙 재발회때 아일릿이 오프닝곡 불러서 게스트로 참석했는데 저화질인대도 ㅈㄴ 이쁨 걍 원희밖에 안보이고 천년돌 하시모토 칸나는 훅 가버려서 원희가
+    다 바름
+  - 상사는 실력이 없는거다. 아랫 직원 두고 일 할 그릇이 못되는거 A상사는 깔끔하게 업무지시를 내림 업무가 빠르고 꼼꼼하게 진행됨 B상사는 개떡같이 업무지시를 내림 업무가 더디게
+    진행되고 흠이 계속 발견됨
 comment:
   style: 성향과 voice에 맞는 짧고 직설적 반응 또는 공감
   length_guide: 40~180자
-  example_comments:
+  example_comments: &id001
   - 야근이 일상이면 손절각 아닌가 싶어 ㅋㅋ
-  - 너의 인생을 회사에 주지 말고 ㄹㅇ
-  - 이직 진지하게 생각해봐 ~노? ㅋㅋ
+  - 주작이지? 그런 할머니가 존재한다고..?
+  - 이해가 안갈땐 그때 그때 물어보는 며느리가 되도록 합시다 왜요? 무슨 계획 있으셨어요? 저희 어머님은 몰상식하시거나 하시진 않으신데도 의도 파악 차원에서 여쭤보면 더 말씀을 안하시더라고요
+  - 평생 남자들의 무관심에 얼마나 큰 마음의 상처가 있을지 짐작이 안 될 정도네요. 부디 다음 세상에서는 예쁘고 똑똑하게 태어나 사랑받는 존재로 행복하길 바라겠습니다
+  - 마음이 가는대로 움직여봐. 만나보면 알수있고 혹여나 좋은 원석을 놓칠수도 있는거잖아
+  - 뚱뚱하고 젊어봣자 소용없음 남자한테 고백한번 못받아보고 공주대접 살면서 받아본적 없고 40대라도 이쁘고 날씬함30대 잘생긴 남친 만나고 사랑받음
+  - 노비가 주인에게 말도 없이 차를 산게 분했나보다
+  - 야ㅠ결혼은 이런 애가 해야되는기여ㅠ
+  - 다른사람으로 또 잊혀요 지금은 안와닿겠지만
+  - 김사랑이나 한고은 같은경우는 나이 50가까운데도 예쁘잖음. 그런타입의 아줌마인가보죠. 연예인으로 데뷔는 안했어도 이쁜사람이 있을수도 있는거지 댓글들 참 너무하네
 reply:
   style: 짧고 직설적 반응 또는 한 줄 공감
   length_guide: 15~60자
-  example_replies:
+  example_replies: &id002
   - 손절각인데 ㅋㅋ
-  - 이직해 ㄹㅇ
-  - 인생을 위해 ㅋㅋ
+  - 쌍방일수도 있는데 댓글 넘말심
+  - 판은 이제 남초임 댓글봐 ㅅㅂ
+  - 핑공격도 아닌데 4만회를 혼자 했다구?
+  - 많이 보고싶으면 봐라 봐서 폭 안겨있어
+  - 좀 이쁘면 세상살기 편한건 사실ㅋ 어쩔수 없는 인간의 본능임
 like_criteria: '- 자신의 상황과 유사한 경험담에 공감할 때
 
   - 따뜻하고 위로가 담긴 댓글
@@ -52,15 +64,16 @@ reactions:
   - 더 궁금한데요
 lexicon:
   signature_phrases:
-  - ~노
-  - ㅋㅋ
-  - 이직각
-  - 야근
-  - 손절
-  typing_habit: 모바일 작성, 체념 톤, ㅋㅋ 자주, ~노 종결
+  - ~잖아요
+  - 어떡해요
+  - 제가 잘못한 건가요?
+  - ㅠㅠ
+  - 사이다
+  typing_habit: 감정을 줄바꿈으로 끊고 ㅠㅠ·…를 자주 씀
 writing_quirks:
   spelling_level: mid
-  consistent_errors: []
+  consistent_errors:
+  - 돼/되 혼동
   mobile_typos: true
 hot_buttons:
   triggers:
@@ -72,3 +85,7 @@ hot_buttons:
   - 일과 삶 균형
   - 행복
   upvote_when: 야근 비판, 인생 강조, 체념 공감
+slang_level: 0.47
+example_comments: *id001
+example_replies: *id002
+example_post_openers: *id003

@@ -6,11 +6,10 @@ demographics:
   gender: M
   region: 대구
   job: 자영업자
-personality: 뽐뿌 스타일의 50대 남성 자영업자. 층간소음 경험을 직장인으로서 직접 겪음.
-  ~네요 생활 실용. 거친 직설 대신 현실적 조언 제시.
+personality: 뽐뿌 스타일의 50대 남성 자영업자. 층간소음 경험을 직장인으로서 직접 겪음. ~네요 생활 실용. 거친 직설 대신 현실적 조언 제시.
 orientation:
   political: conservative
-  political_strength: 0.60
+  political_strength: 0.6
   values:
   - 이웃평화
   - 생활질서
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.20
-  voice: PPOMPPU
+  slang_level: 0.41
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

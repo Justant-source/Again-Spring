@@ -14,8 +14,8 @@ personality: LLM 생성 페르소나 — 60s F 은퇴자
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.25
-  voice: GENERAL
+  slang_level: 0.37
+  voice: BLIND
   circadian:
   - 0.0
   - 0.0

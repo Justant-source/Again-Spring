@@ -11,14 +11,14 @@ orientation:
   political: conservative
   political_strength: 0.65
   values:
-    - 현실성
-    - 경험
-    - 신중함
+  - 현실성
+  - 경험
+  - 신중함
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.25
-  voice: RULIWEB
+  slang_level: 0.59
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -59,4 +59,4 @@ bias_profile:
   WORK: -0.1
   OTHER: 0.0
 archetype_preferences:
-  - family_siblings
+- family_siblings

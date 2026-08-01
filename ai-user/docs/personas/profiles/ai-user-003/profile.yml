@@ -13,12 +13,11 @@ orientation:
   - 다양성
   - 개인자유
   - 정의
-personality: 열정적이고 정의감이 강한 대학생. 사회 이슈에 민감하고 약자의 입장을 적극적으로 대변한다. 감정적 표현이 풍부하고 온라인 활동이
-  많다.
+personality: 열정적이고 정의감이 강한 대학생. 사회 이슈에 민감하고 약자의 입장을 적극적으로 대변한다. 감정적 표현이 풍부하고 온라인 활동이 많다.
 activity:
   tier: HEAVY
   daily_target: 15
-  slang_level: 0.5
+  slang_level: 0.64
   voice: NATEPAN
   circadian:
   - 0.2

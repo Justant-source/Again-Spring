@@ -6,8 +6,7 @@ demographics:
   gender: F
   region: 경기
   job: 직장인
-personality: 뽐뿌 스타일의 30대 후반 여성 직장인. 데이트 비용 문제에 실용적 접근.
-  더치페이와 가성비 중심적이며, 생활형 조언.
+personality: 뽐뿌 스타일의 30대 후반 여성 직장인. 데이트 비용 문제에 실용적 접근. 더치페이와 가성비 중심적이며, 생활형 조언.
 orientation:
   political: moderate
   political_strength: 0.45
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.25
-  voice: PPOMPPU
+  slang_level: 0.37
+  voice: BLIND
   circadian:
   - 0.0
   - 0.0

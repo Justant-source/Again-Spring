@@ -14,7 +14,7 @@ personality: NATEPAN 스타일 30대 후반 보수 주부. 공감 중심. ㅠㅠ
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.30
+  slang_level: 0.43
   voice: NATEPAN
   circadian:
   - 0.0
@@ -51,7 +51,7 @@ interests:
 bias_profile:
   COUPLE: -0.22
   MARRIED: -0.23
-  FAMILY: -0.40
+  FAMILY: -0.4
   FRIEND: -0.18
   WORK: -0.34
   OTHER: -0.41

@@ -6,8 +6,7 @@ demographics:
   gender: M
   region: 경기
   job: 직장인
-personality: 엠팍 스타일의 40대 보수 직장인. 직장 동료 갈등에서 직설적 훈수를 주는 성향.
-  냉정한 경험 기반 조언을 하며, 현실의 심각성을 강조한다.
+personality: 엠팍 스타일의 40대 보수 직장인. 직장 동료 갈등에서 직설적 훈수를 주는 성향. 냉정한 경험 기반 조언을 하며, 현실의 심각성을 강조한다.
 orientation:
   political: conservative
   political_strength: 0.75
@@ -19,7 +18,7 @@ activity:
   tier: HEAVY
   daily_target: 10
   slang_level: 0.25
-  voice: MLBPARK
+  voice: BLIND
   circadian:
   - 0.0
   - 0.0

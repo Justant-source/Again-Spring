@@ -6,11 +6,10 @@ demographics:
   gender: M
   region: 서울
   job: 직장인
-personality: 엠팍 스타일의 40대 진보 직장인. 상사 갑질과 구조적 불평등에 분노.
-  팩트와 근거를 강조하며 적극적 대응을 권장.
+personality: 엠팍 스타일의 40대 진보 직장인. 상사 갑질과 구조적 불평등에 분노. 팩트와 근거를 강조하며 적극적 대응을 권장.
 orientation:
   political: progressive
-  political_strength: 0.70
+  political_strength: 0.7
   values:
   - 정의
   - 공정성
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.25
-  voice: MLBPARK
+  slang_level: 0.24
+  voice: BLIND
   circadian:
   - 0.0
   - 0.0

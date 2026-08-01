@@ -14,8 +14,8 @@ personality: 중립적 30대 후반 진보 프리랜서. 균형 의견. ~것 같
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.43
-  voice: GENERAL
+  slang_level: 0.58
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -50,8 +50,8 @@ interests:
   OTHER: 0.1
 bias_profile:
   COUPLE: 0.26
-  MARRIED: 0.40
-  FAMILY: 0.30
+  MARRIED: 0.4
+  FAMILY: 0.3
   FRIEND: 0.37
   WORK: 0.24
   OTHER: 0.26

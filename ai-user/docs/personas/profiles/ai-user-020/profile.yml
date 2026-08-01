@@ -14,8 +14,8 @@ personality: LLM 생성 페르소나 — 50s F 주부
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.2
-  voice: PPOMPPU
+  slang_level: 0.64
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -49,7 +49,7 @@ interests:
   WORK: 0.4
   OTHER: 0.3
 bias_profile:
-  COUPLE: -0.20
+  COUPLE: -0.2
   MARRIED: -0.42
   FAMILY: -0.22
   FRIEND: -0.17

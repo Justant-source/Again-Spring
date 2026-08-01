@@ -6,19 +6,20 @@ demographics:
   gender: M
   region: 경기
   job: 학생
-personality: 10대 중학생으로 인터넷 초기 경험 중. 사이버 폭력을 경험하고 온라인 갈등에 민감하다. 아카 스타일의 신조어와 드립으로 상처를 표현하되, 또래 문화에 깊이 빠져 있다.
+personality: 10대 중학생으로 인터넷 초기 경험 중. 사이버 폭력을 경험하고 온라인 갈등에 민감하다. 아카 스타일의 신조어와 드립으로 상처를 표현하되, 또래 문화에 깊이 빠져
+  있다.
 orientation:
   political: moderate
   political_strength: 0.35
   values:
-    - 또래인정
-    - 자유
-    - 온라인정의
+  - 또래인정
+  - 자유
+  - 온라인정의
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.85
-  voice: ARCALIVE
+  slang_level: 0.41
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -59,4 +60,4 @@ bias_profile:
   WORK: -0.3
   OTHER: 0.1
 archetype_preferences:
-  - online_cyberbullying
+- online_cyberbullying

@@ -14,19 +14,11 @@ logger = logging.getLogger(__name__)
 LLM_URL = os.getenv("LLM_AI_USER_URL", "http://againspring-llm-ai-user:8092")
 
 # Voice 타입 → 커뮤니티 소스 매핑
+# WP1B (§16.1B): register 단일화 — NATEPAN·BLIND만. 그 외 소스 앵커 금지(재오염 방지).
+ALLOWED_SOURCES = frozenset({"natepan", "blind"})
 VOICE_SOURCE_MAP = {
-    "NATEPAN":  "natepan",
-    "DCINSIDE": "dcinside",
-    "BLIND":    "blind",
-    "FMKOREA":  "fmkorea",
-    "THEQOO":   "theqoo",
-    "CLIEN":    "clien",
-    "PPOMPPU":  "ppomppu",
-    "RULIWEB":  "ruliweb",
-    "MLBPARK":  "mlbpark",
-    "GENERAL":  None,   # 여러 소스 혼합
-    "ARCALIVE": None,   # 전용 크롤러 없음 — 혼합 소스 풀만
-    "INVEN":    None,   # 전용 크롤러 없음 — 혼합 소스 풀만
+    "NATEPAN": "natepan",
+    "BLIND": "blind",
 }
 
 # 예시 풀 목표 크기 (문체 현실화 S5) — 고정 3~4개 → 풀 확장 후 생성 시 랜덤 서브셋 주입
@@ -111,16 +103,41 @@ def _sanitize_patterns(patterns: dict) -> dict:
 
 
 def get_examples_by_source(source: str, limit: int = 30) -> list[str]:
-    """example_bank에서 source별 고품질 예시 조회"""
+    """example_bank 고품질 예시 — natepan|blind only, popularity 게이트 통과분만.
+
+    POST: popularity_pct >= 0.50
+    COMMENT: 부모 POST가 popularity_pct >= 0.50
+    """
+    if source not in ALLOWED_SOURCES:
+        logger.warning(f"refuse non-allowed strengthen source={source!r}")
+        return []
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT content FROM example_bank
-                WHERE source = %s AND quality_score >= 0.6
-                  AND LENGTH(content) BETWEEN 30 AND 1500
+                SELECT content FROM (
+                  SELECT e.content, e.quality_score, e.created_at
+                  FROM example_bank e
+                  WHERE e.source = %s
+                    AND e.content_type = 'POST'
+                    AND e.popularity_pct IS NOT NULL AND e.popularity_pct >= 0.50
+                    AND e.quality_score >= 0.6
+                    AND LENGTH(e.content) BETWEEN 30 AND 1500
+                  UNION ALL
+                  SELECT c.content, c.quality_score, c.created_at
+                  FROM example_bank c
+                  JOIN example_bank p
+                    ON p.content_type = 'POST'
+                   AND p.source_url = SUBSTRING_INDEX(c.source_url, '#', 1)
+                   AND LOWER(p.source) = LOWER(c.source)
+                  WHERE c.source = %s
+                    AND c.content_type = 'COMMENT'
+                    AND p.popularity_pct IS NOT NULL AND p.popularity_pct >= 0.50
+                    AND c.quality_score >= 0.6
+                    AND LENGTH(c.content) BETWEEN 30 AND 1500
+                ) t
                 ORDER BY quality_score DESC, created_at DESC
                 LIMIT %s
-            """, (source, limit))
+            """, (source, source, limit))
             rows = cur.fetchall()
     return [r["content"] if isinstance(r, dict) else r[0] for r in rows]
 
@@ -239,19 +256,79 @@ def _clean_example(text: str) -> str:
 
 def get_example_pool(source: str | None, content_type: str, limit: int,
                      min_len: int, max_len: int) -> list[str]:
-    """크롤 코퍼스에서 예시 후보 랜덤 추출. SELF_GENERATED 제외 — AI투 증폭 루프 방지."""
-    conds = ["source != 'SELF_GENERATED'", "content_type = %s",
-             "quality_score >= 0.6", "CHAR_LENGTH(content) BETWEEN %s AND %s"]
-    params: list = [content_type, min_len, max_len]
-    if source:
-        conds.append("source = %s")
-        params.append(source)
-    sql = f"""SELECT DISTINCT content FROM example_bank
-              WHERE {' AND '.join(conds)}
-              ORDER BY RAND() LIMIT %s"""
+    """크롤 코퍼스 예시 후보 — SELF_GENERATED 제외, natepan|blind, popularity 게이트.
+
+    POST: popularity_pct >= 0.50
+    COMMENT: 부모 POST popularity_pct >= 0.50
+    """
+    if source is not None and source not in ALLOWED_SOURCES:
+        logger.warning(f"refuse non-allowed pool source={source!r}")
+        return []
+
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, params + [limit])
+            if content_type == "POST":
+                if source:
+                    cur.execute(
+                        """
+                        SELECT DISTINCT e.content FROM example_bank e
+                        WHERE e.source = %s
+                          AND e.content_type = 'POST'
+                          AND e.popularity_pct IS NOT NULL AND e.popularity_pct >= 0.50
+                          AND e.quality_score >= 0.6
+                          AND CHAR_LENGTH(e.content) BETWEEN %s AND %s
+                        ORDER BY RAND() LIMIT %s
+                        """,
+                        (source, min_len, max_len, limit),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT DISTINCT e.content FROM example_bank e
+                        WHERE LOWER(e.source) IN ('natepan', 'blind')
+                          AND e.content_type = 'POST'
+                          AND e.popularity_pct IS NOT NULL AND e.popularity_pct >= 0.50
+                          AND e.quality_score >= 0.6
+                          AND CHAR_LENGTH(e.content) BETWEEN %s AND %s
+                        ORDER BY RAND() LIMIT %s
+                        """,
+                        (min_len, max_len, limit),
+                    )
+            else:
+                if source:
+                    cur.execute(
+                        """
+                        SELECT DISTINCT c.content FROM example_bank c
+                        JOIN example_bank p
+                          ON p.content_type = 'POST'
+                         AND p.source_url = SUBSTRING_INDEX(c.source_url, '#', 1)
+                         AND LOWER(p.source) = LOWER(c.source)
+                        WHERE c.source = %s
+                          AND c.content_type = %s
+                          AND p.popularity_pct IS NOT NULL AND p.popularity_pct >= 0.50
+                          AND c.quality_score >= 0.6
+                          AND CHAR_LENGTH(c.content) BETWEEN %s AND %s
+                        ORDER BY RAND() LIMIT %s
+                        """,
+                        (source, content_type, min_len, max_len, limit),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT DISTINCT c.content FROM example_bank c
+                        JOIN example_bank p
+                          ON p.content_type = 'POST'
+                         AND p.source_url = SUBSTRING_INDEX(c.source_url, '#', 1)
+                         AND LOWER(p.source) = LOWER(c.source)
+                        WHERE LOWER(c.source) IN ('natepan', 'blind')
+                          AND c.content_type = %s
+                          AND p.popularity_pct IS NOT NULL AND p.popularity_pct >= 0.50
+                          AND c.quality_score >= 0.6
+                          AND CHAR_LENGTH(c.content) BETWEEN %s AND %s
+                        ORDER BY RAND() LIMIT %s
+                        """,
+                        (content_type, min_len, max_len, limit),
+                    )
             rows = cur.fetchall()
     return [_clean_example(r["content"] if isinstance(r, dict) else r[0]) for r in rows]
 
@@ -321,18 +398,15 @@ def expand_persona_example_pools(voice_type: str, source: str | None) -> int:
 
 
 def strengthen_all(min_examples: int = 10) -> dict:
-    """전체 Voice 타입 강화 실행 (말투 분석 + 예시 풀 확장)"""
+    """전체 Voice 타입 강화 실행 (말투 분석 + 예시 풀 확장).
+
+    WP1B: NATEPAN·BLIND만 순회. 레거시 voice_type 페르소나는 재배정 전에는 건드리지 않는다.
+    """
     results = {}
     for voice_type, source in VOICE_SOURCE_MAP.items():
-        if source is None:
-            # 전용 크롤러 없는 voice — 분석은 스킵, 예시 풀만 혼합 소스로 확장
-            pool_n = expand_persona_example_pools(voice_type, None)
-            results[voice_type] = {"status": "pool-only", "pool_updated": pool_n}
-            continue
         examples = get_examples_by_source(source, limit=30)
         if len(examples) < min_examples:
             logger.info(f"[{voice_type}] analysis skip — only {len(examples)} examples (need {min_examples})")
-            # 분석은 스킵해도 예시 풀은 확장 (혼합 소스 폴백 포함)
             pool_n = expand_persona_example_pools(voice_type, source)
             results[voice_type] = {"status": "skip", "examples": len(examples), "pool_updated": pool_n}
             continue

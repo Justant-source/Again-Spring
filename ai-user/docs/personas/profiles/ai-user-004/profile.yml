@@ -17,8 +17,8 @@ personality: 현실적이고 경험이 많은 사업가. 어려운 환경에서 
 activity:
   tier: LIGHT
   daily_target: 2
-  slang_level: 0.4
-  voice: GENERAL
+  slang_level: 0.44
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

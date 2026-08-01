@@ -14,8 +14,8 @@ personality: 중립적 40대 자영업자 남성. 차분한 표준 한국어. �
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.44
-  voice: GENERAL
+  slang_level: 0.62
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

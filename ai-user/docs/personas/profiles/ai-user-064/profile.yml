@@ -17,8 +17,8 @@ orientation:
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.8
-  voice: FMKOREA
+  slang_level: 0.46
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

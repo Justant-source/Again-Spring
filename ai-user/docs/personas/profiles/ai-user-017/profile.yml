@@ -14,8 +14,8 @@ personality: LLM 생성 페르소나 — 30s_late M 자영업자
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.84
-  voice: DCINSIDE
+  slang_level: 0.51
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -52,7 +52,7 @@ bias_profile:
   COUPLE: -0.01
   MARRIED: 0.04
   FAMILY: -0.05
-  FRIEND: 0.10
+  FRIEND: 0.1
   WORK: -0.06
   OTHER: -0.02
 archetype_preferences:

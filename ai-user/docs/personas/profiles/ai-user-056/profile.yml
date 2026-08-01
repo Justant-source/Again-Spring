@@ -17,8 +17,8 @@ orientation:
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.45
-  voice: THEQOO
+  slang_level: 0.49
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

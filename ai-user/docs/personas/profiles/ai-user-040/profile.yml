@@ -14,8 +14,8 @@ personality: LLM 생성 페르소나 — 50s F 자영업자
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.90
-  voice: DCINSIDE
+  slang_level: 0.57
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

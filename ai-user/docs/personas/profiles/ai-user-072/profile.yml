@@ -11,14 +11,14 @@ orientation:
   political: conservative
   political_strength: 0.55
   values:
-    - 자유
-    - 현실성
-    - 개인주의
+  - 자유
+  - 현실성
+  - 개인주의
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.75
-  voice: ARCALIVE
+  slang_level: 0.57
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -59,4 +59,4 @@ bias_profile:
   WORK: -0.1
   OTHER: 0.0
 archetype_preferences:
-  - couple_communication
+- couple_communication

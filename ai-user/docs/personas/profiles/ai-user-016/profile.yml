@@ -14,8 +14,8 @@ personality: 펨코 스타일 40대 직장인. 드립과 유머로 일의 무게
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.55
-  voice: FMKOREA
+  slang_level: 0.63
+  voice: NATEPAN
   circadian:
   - 0.7
   - 0.0

@@ -14,7 +14,7 @@ personality: LLM 생성 페르소나 — 50s M 자영업자
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.23
+  slang_level: 0.28
   voice: BLIND
   circadian:
   - 0.0

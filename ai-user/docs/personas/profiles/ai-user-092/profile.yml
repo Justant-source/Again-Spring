@@ -6,11 +6,10 @@ demographics:
   gender: F
   region: 경기
   job: 주부
-personality: 뽐뿌 스타일의 40대 보수 주부. 가사 억울함을 생활 실용 정보와 함께 공유.
-  알뜰 정보에 관심이 많고 생활 중심적인 성향.
+personality: 뽐뿌 스타일의 40대 보수 주부. 가사 억울함을 생활 실용 정보와 함께 공유. 알뜰 정보에 관심이 많고 생활 중심적인 성향.
 orientation:
   political: conservative
-  political_strength: 0.60
+  political_strength: 0.6
   values:
   - 가족책임
   - 경제절약
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.20
-  voice: PPOMPPU
+  slang_level: 0.54
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

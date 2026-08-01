@@ -6,8 +6,7 @@ demographics:
   gender: F
   region: 광주
   job: 주부
-personality: 엠팍 스타일의 50대 여성 주부. 여성으로서 남초 커뮤에서 절제된 표현 사용.
-  가사분담 현실을 토로하며, 가족 중심적이지만 자신의 피로도 드러낸다.
+personality: 엠팍 스타일의 50대 여성 주부. 여성으로서 남초 커뮤에서 절제된 표현 사용. 가사분담 현실을 토로하며, 가족 중심적이지만 자신의 피로도 드러낸다.
 orientation:
   political: moderate
   political_strength: 0.45
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.20
-  voice: MLBPARK
+  slang_level: 0.43
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

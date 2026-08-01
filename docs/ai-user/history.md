@@ -46,22 +46,14 @@
 | `crawl.py` registry | 위 두 source만 import |
 | `register_classifier.py` | BLIND(polite)·NATEPAN(casual) 문체 패턴 보강, 다수결 임계 0.55 |
 
-**DB `example_bank` 행 삭제는 하지 않았다.** clien 등 4,346건 삭제는 prod 백업 + 명시 승인 후 별도 작업.
-
-## Wave1 운영 적용 (2026-08-01) — 코퍼스 DB 단일화 + TTL
-
-오너 승인 후 prod에 적용:
+## Wave1 운영 적용 (2026-08-01) — 코퍼스 DB 단일화 + TTL + popularity 게이트 + WP1B
 
 | 항목 | 결과 |
 |---|---|
-| 백업 | `/home/justant/backups/prod-pre-corpus-unify-20260801-163820.sql` (112MB) |
-| 삭제 | clien 2626 · ruliweb 1078 · theqoo 568 · dcinside 74 = **4346건** |
-| source 정규화 | `BLIND` → `blind` (592건) |
-| 잔여 | natepan 5509 · blind 592 · SELF_GENERATED 510 |
-| inbox TTL | PROCESSING 35건 → PENDING 회수. 7일 초과분 0건(전원 7일 이내) |
-| plan TTL | REQUESTED 133건은 전원 당일 생성분 → 미만료 |
-
-WP1B 119명 voice 재생성은 댓글 크롤 축적 후 별도 진행.
+| 백업 | `/home/justant/backups/prod-pre-corpus-unify-20260801-163820.sql` |
+| 삭제 | clien·ruliweb·theqoo·dcinside **4346건** · `BLIND`→`blind` 정규화 |
+| popularity 게이트 | `popularity_gate.py` — 지표·절대하한·상대 pct≥0.50 · COMMENT는 인기 부모만 (영구) |
+| WP1B | 전원 `voice_type` ∈ {NATEPAN:113, BLIND:37} · 인기 앵커로 example 재생성 · strengthener 재오염 차단 |
 
 ## 현재 운영 상태를 해석할 때 주의할 점
 

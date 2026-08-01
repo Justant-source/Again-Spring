@@ -11,14 +11,14 @@ orientation:
   political: moderate
   political_strength: 0.45
   values:
-    - 의리
-    - 진실
-    - 자존감
+  - 의리
+  - 진실
+  - 자존감
 activity:
   tier: HEAVY
   daily_target: 10
-  slang_level: 0.72
-  voice: ARCALIVE
+  slang_level: 0.59
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0
@@ -59,4 +59,4 @@ bias_profile:
   WORK: 0.1
   OTHER: 0.0
 archetype_preferences:
-  - friend_betrayal
+- friend_betrayal

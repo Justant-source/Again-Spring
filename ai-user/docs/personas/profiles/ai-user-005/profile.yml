@@ -17,7 +17,7 @@ personality: 감성적이고 창의적인 예술가. 개인의 정서 표현을 
 activity:
   tier: HEAVY
   daily_target: 12
-  slang_level: 0.7
+  slang_level: 0.62
   voice: NATEPAN
   circadian:
   - 0.3

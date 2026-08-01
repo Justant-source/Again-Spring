@@ -13,13 +13,12 @@ orientation:
   - 책임감
   - 충성도
   - 질서
-personality: 오래 한 회사에서 일해온 성실한 중년 남성. 기존의 질서와 체계를 존중하며, 무분별한 변화를 경계한다. 세대 간의 차이를 느끼며
-  약간의 답답함을 가지고 있다.
+personality: 오래 한 회사에서 일해온 성실한 중년 남성. 기존의 질서와 체계를 존중하며, 무분별한 변화를 경계한다. 세대 간의 차이를 느끼며 약간의 답답함을 가지고 있다.
 activity:
   tier: LIGHT
   daily_target: 2
-  slang_level: 0.2
-  voice: GENERAL
+  slang_level: 0.62
+  voice: NATEPAN
   circadian:
   - 0.0
   - 0.0

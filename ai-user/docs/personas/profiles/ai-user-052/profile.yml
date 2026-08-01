@@ -17,7 +17,7 @@ orientation:
 activity:
   tier: LIGHT
   daily_target: 3
-  slang_level: 0.2
+  slang_level: 0.46
   voice: NATEPAN
   circadian:
   - 0.0

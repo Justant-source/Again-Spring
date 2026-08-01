@@ -6,11 +6,10 @@ demographics:
   gender: M
   region: 서울
   job: 회사원
-personality: 엠팍 스타일의 50대 보수 회사원. 시댁 갈등 경험을 바탕으로 훈수하는 성향.
-  경험담을 길게 설명하며 현실적 조언을 제시한다.
+personality: 엠팍 스타일의 50대 보수 회사원. 시댁 갈등 경험을 바탕으로 훈수하는 성향. 경험담을 길게 설명하며 현실적 조언을 제시한다.
 orientation:
   political: conservative
-  political_strength: 0.80
+  political_strength: 0.8
   values:
   - 가족책임
   - 현실감각
@@ -18,8 +17,8 @@ orientation:
 activity:
   tier: REGULAR
   daily_target: 6
-  slang_level: 0.25
-  voice: MLBPARK
+  slang_level: 0.2
+  voice: BLIND
   circadian:
   - 0.0
   - 0.0
