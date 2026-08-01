@@ -17,7 +17,7 @@ import {
   COMMENT_SUBMIT_BTN,
 } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 // ── A. 게스트 진입 ────────────────────────────────────────────────
 test.describe('Journey 01-A: 게스트 /guest 진입', () => {

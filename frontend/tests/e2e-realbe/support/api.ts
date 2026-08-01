@@ -9,7 +9,7 @@ import type { APIRequestContext } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 // ── LLM 안전 검사 ─────────────────────────────────────────────────
 

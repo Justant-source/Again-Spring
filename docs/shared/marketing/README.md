@@ -32,9 +32,9 @@
 |---|---|---|
 | **Again-Spring (AS)** | Ubuntu 서버 | 얇은 트리거/클라이언트. 잡 생성·폴링·UI 표시만 담당 |
 | **Again-Spring-Marketing (ASM)** | WSL GPU 서버 | 콘텐츠 생성·렌더링·소셜 게시 전담 |
-| **ASM social-poster** | ASM `services/social-poster/` | X·Instagram·네이버 블로그 Playwright 자동 게시. X는 4단 스레드 자동화(`x_thread` 플랫폼) 포함 |
+| **ASM social-poster** | ASM `services/social-poster/` | Playwright 자동 게시. **미공개 초점 = X / `x_thread`만** (IG·네이버 등은 보류) |
 
----
+**접속**: AS 호스트 Tailscale `100.81.189.92`에서 `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
 
 ## 파일 구조
 
@@ -54,10 +54,12 @@ docs/shared/marketing/
 
 ## 빠른 시작
 
+> **미공개**: 타겟은 **X / `x_thread`만** 선택. 다른 채널은 보류.
+
 ### 어드민 사용법
 
 1. `https://againspring.net/admin/content` → 사연 행 우측 메뉴 → **마케팅 제작 요청**
-2. 타겟 플랫폼 선택 (네이버 블로그, X, 인스타그램 등)
+2. 타겟 플랫폼 선택 (**X 또는 X 스레드**)
 3. 자동 게시 여부 토글
 4. **마케팅 제작 요청** 클릭 → ASM에 잡 생성
 5. `https://againspring.net/admin/marketing` → 잡 목록에서 진행 상황 모니터링

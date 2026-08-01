@@ -8,7 +8,7 @@
 **프로젝트**: 다시봄 · Again Spring — 갈등 커뮤니티 플랫폼.
 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공.
 **스택**: FE Next.js 14 · BE Spring Boot 3.3 + MariaDB 11 · LLM = Claude CLI 브릿지 (remote only)
-**도메인**: `dev.againspring.net`(dev) / `againspring.net`(prod) · **상태**: 광장형 피벗 완료 (2026-06-02, defc742)
+**도메인**: `againspring.net`(prod) · **상태**: 미공개(prelaunch) — 실서버 검증은 prod만. `dev.againspring.net` 스택은 휴면.
 
 **도메인 용어**: 사연=갈등 게시글 · 배심원=AI 심리상담사 페르소나 9인 · 공감 비율=A:B %(판결 아님) · 진영=작성자(A)/상대방(B) · 광장=공개 피드
 
@@ -42,9 +42,9 @@
 | LLM 프롬프트 (런타임 자산) | `docs/shared/prompts/` | 同 위치 |
 | 환경/인프라/배포 | `env/` | `docs/env/deployment.md` · `docs/env/architecture.md` |
 | 환경 변수 사전 | — | `docs/env/environment-variables.md` |
-| **마케팅 (ASM — 별도 서버)** | SSH `justant@100.115.252.61`<br>`~/Data/Again-Spring-Marketing` | ASM 저장소의 `CLAUDE.md` |
+| **마케팅 (ASM)** | AS `100.81.189.92` → `ssh justant@100.115.252.61`<br>`~/Data/Again-Spring-Marketing` | ASM `CLAUDE.md` · `docs/shared/marketing/x-thread-strategy.md` |
 
-**ASM**: Python 3.12 + FastAPI, 포트 8200, 수정·commit·push 허용(명시적 지시 기준). Again-Spring 쪽은 thin client만.
+**ASM**: Python 3.12 + FastAPI, 포트 8200. AS 호스트에서 `ssh justant@100.115.252.61` **암호 없이** 접속. **당분간 X / `x_thread`만** (IG·네이버·YouTube·Threads 보류). Again-Spring 쪽은 thin client만.
 
 ---
 
@@ -53,8 +53,9 @@
 1. **FE는 LLM 직접 호출 금지** — 모든 LLM 요청은 BE 경유 (REST API)
 2. **BE는 RemoteLlmProvider만 사용** — HTTP POST → `againspring-llm:8090/v1/invoke` (base 스택 공유)
 3. **LLM 프롬프트/출력 수정 시** `docs/shared/policies/forbidden-words.md` 확인. AI 출력에 판결/처방/승패 표현 금지 → "공감/관점/작성자/상대방" (상세: `.claude/rules/llm-safety.md`)
-4. **🚨 prod 배포** — 명시적 "prod에 배포해줘" 지시 없으면 금지. **필수 순서**:
-   ① dev 배포 → ② e2e-realbe 전체 통과 (**dev:8090 대상만** — prod 대상 실행 절대 금지) → ③ main commit & push → ④ prod 배포 (main 기준, `.env.prod` 전 값 입력, DB 백업 후)
+4. **🚨 prod 배포** — 명시적 "prod에 배포해줘" 지시 없으면 금지. **미공개 기간 필수 순서**:
+   ① local unit/build → ② DB 백업 → ③ prod(:8091) 배포 → ④ e2e-realbe (`E2E_BASE_URL=http://localhost:8091`) 전체 통과 → ⑤ main commit & push
+   **dev 스택(:8090) 배포·e2e·동기화 금지** (명시 요청 전). compose.dev는 휴면 보관.
 5. **`.env.prod` git 커밋 절대 금지**
 6. **문서 위치** — 루트는 `README.md`·`CLAUDE.md`·`AGENTS.md`만. 모든 상세 문서는 `docs/` 하위만.
 7. **🚨 LLM 토큰/크레딧 소진 = 오류, 콘텐츠 아님** — 오류 문자열을 글·댓글 본문으로 절대 게시 금지. 방어 2계층: `LlmErrorSignature` + `ContentSafetyGuard`. 시그니처 추가 시 **두 곳 모두** 갱신. (상세: `.claude/rules/llm-safety.md`)
@@ -80,7 +81,7 @@
 
 ## 🧠 LLM 브릿지 (요약 — 상세: `docs/backend/llm-bridge.md`)
 
-- `backend` → HTTP → `againspring-llm:8090/v1/invoke` (**base 스택**, dev·prod 공유) · 모델 `claude-haiku-4-5-20251001` · 인증 = 호스트 `~/.claude` 마운트
+- `backend` → HTTP → `againspring-llm:8090/v1/invoke` (**base 스택**) · 모델 `claude-haiku-4-5-20251001` · 인증 = 호스트 `~/.claude` 마운트
 - **보안**: 사용자 입력은 반드시 `PromptSanitizer` 경유 후 `<user_input>` 태그로 삽입
 - 세션 만료 시: 호스트 `claude` 재로그인 → `cd env && docker compose restart againspring-llm`
 
@@ -97,39 +98,37 @@ cd frontend && npm run dev                # :3000
 # 검증 — FE
 cd frontend && npm run lint:words && npm run lint:docs && npm run build
 npm run test                              # vitest
-E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe   # prod 게이트
+E2E_BASE_URL=http://localhost:8091 npm run test:e2e:realbe   # 실서버 = prod만
 
 # 검증 — BE
 cd backend && ./gradlew test
 
 # 헬스
 curl localhost:8080/api/health            # 로컬 BE
-curl localhost:8090/api/health            # dev
-curl localhost:8091/api/health            # prod
+curl localhost:8091/api/health            # prod (유일한 실서버 검증면)
 ```
 
 ---
 
 ## 🧪 테스트 핵심
 
-- **e2e ↔ 기능 동기화 (prod 게이트)**: 기능 추가/수정/삭제 시 `frontend/tests/e2e-realbe/journeys/`의 대응 spec을 추가/갱신/제거. e2e-realbe 전체 통과 = prod 배포 필수 게이트 (절대 규칙 #4).
-- e2e는 실 BE(8090) 사용하되 **LLM 절대 호출 금지** — 모든 spec은 `support/no-llm-fixture.ts`를 import (jurorCount>0·분석 엔드포인트 자동 차단).
+- **e2e ↔ 기능 동기화 (prod 게이트)**: 기능 추가/수정/삭제 시 `frontend/tests/e2e-realbe/journeys/`의 대응 spec을 추가/갱신/제거. e2e-realbe(`:8091`) 전체 통과 = prod 배포 게이트 (절대 규칙 #4).
+- e2e는 실 BE(**prod:8091**) 사용하되 **LLM 절대 호출 금지** — 모든 spec은 `support/no-llm-fixture.ts`를 import (jurorCount>0·분석 엔드포인트 자동 차단).
 - 계층별 커버리지 목표·상세 전략: `docs/frontend/testing.md` · `docs/backend/testing.md`
 
 ---
 
 ## 🚀 배포 (요약 — 절차 권위본: `docs/env/deployment.md`)
 
-| 환경 | 도메인 | compose | nginx |
-|---|---|---|---|
-| dev | dev.againspring.net | `docker-compose.dev.yml` + `.env.dev` | :8090 |
-| prod | againspring.net | `docker-compose.prod.yml` + `.env.prod` | :8091 |
+| 환경 | 도메인 | compose | nginx | 상태 |
+|---|---|---|---|---|
+| prod | againspring.net | `docker-compose.prod.yml` + `.env.prod` | :8091 | **활성** |
+| dev | dev.againspring.net | `docker-compose.dev.yml` + `.env.dev` | :8090 | **휴면** (명시 요청 전 배포 금지) |
 
 ```bash
 cd env
-docker compose up -d --build                                                  # ① base (공유 LLM 워커 — 먼저)
-docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build    # ② dev
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build  # ③ prod (절대 규칙 #4 충족 시)
+docker compose up -d --build                                                  # ① base (공유 LLM)
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build  # ② prod (절대 규칙 #4)
 ```
 
 ---
@@ -138,8 +137,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build  # 
 
 - **FE**: `lint:words` · `lint:docs` · `build` 통과 / `data-testid` 변경 → `tests/e2e-realbe/support/selectors.ts` 동기화 / journeys e2e 동기화 / pre-commit vitest (긴급 우회 `SKIP_TESTS=1`)
 - **BE**: `docs/shared/api/rest-spec.md` 일치 / LLM 호출은 `PromptSanitizer` 경유 / 커버리지 80%+ / journeys e2e 동기화
-- **prod 배포 전**: 절대 규칙 #4 순서 그대로 (dev 배포 → e2e dev:8090 전체 통과 → main push → 백업 → prod)
+- **prod 배포 전**: 절대 규칙 #4 (백업 → prod:8091 → e2e `localhost:8091` → push)
 
 ---
 
-**마지막 업데이트**: 2026-06-25 | **담당**: Claude Code (Agent)
+**마지막 업데이트**: 2026-08-01 | **담당**: Claude Code (Agent)

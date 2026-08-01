@@ -11,7 +11,7 @@
 import { test, expect } from '../support/no-llm-fixture'
 import { LANDING } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 // ── 랜딩 페이지 ──────────────────────────────────────────────────
 test.describe('Journey 10: 랜딩 페이지', () => {

@@ -18,7 +18,7 @@ import {
   NAV_ACTIVITY,
 } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 // test5 = USER only (globalSetup이 ADMIN/TESTER 미부여)
 const PERSONA_TEST5 = PERSONAS[4]
 

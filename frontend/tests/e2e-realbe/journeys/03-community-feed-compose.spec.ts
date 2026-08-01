@@ -19,7 +19,7 @@ import {
   GUEST_NOTICE_CONTINUE,
 } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 // ── A. 피드 공개 열람 (비인증 포함) ──────────────────────────────
 test.describe('Journey 03-A: 광장 피드 공개 열람', () => {

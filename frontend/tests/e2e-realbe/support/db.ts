@@ -4,14 +4,21 @@
  * 모든 SQL 접근을 한 곳에서 관리. 비밀번호는 env에서만 읽음 (평문 인라인 금지).
  * cleanup-test-db.sh와 동일한 readEnvVar 로직을 공유한다.
  *
- * global-setup.ts에서 이 모듈의 readEnvVar를 import해 사용한다.
+ * 미공개(prelaunch): 기본 대상 = localhost prod 컨테이너 (`againspring-mariadb-prod` + `.env.prod`).
+ * 공개 URL 대상 cleanup/접근은 상위에서 거부. 정식 공개 후 재검토.
  */
 import { spawnSync } from 'child_process'
 import path from 'path'
 import fs from 'fs'
 
-const ENV_FILE = path.resolve(process.cwd(), '../env/.env.dev')
-const PROD_CONTAINER_PATTERN = /prod/i
+const ENV_FILE =
+  process.env.E2E_ENV_FILE ||
+  path.resolve(process.cwd(), '../env/.env.prod')
+const ALLOWED_CONTAINERS = new Set([
+  'againspring-mariadb-prod',
+  'againspring-mariadb-dev',
+  'againspring-mariadb',
+])
 const PYTHON_HELPER = path.resolve(
   process.cwd(),
   '../backend/scripts/test-automation/dev_db_sql.py',
@@ -33,21 +40,20 @@ export function readEnvVar(key: string): string {
 }
 
 /**
- * SQL 쿼리를 dev MariaDB 컨테이너에서 실행하고 stdout 문자열을 반환.
- * prod 컨테이너 이름이 감지되면 즉시 throw.
+ * SQL 쿼리를 허용된 로컬 MariaDB 컨테이너에서 실행하고 stdout 문자열을 반환.
  */
 export function sql(query: string): string {
-  const container = process.env.DB_CONTAINER ?? 'againspring-mariadb-dev'
-  if (PROD_CONTAINER_PATTERN.test(container) && container.includes('prod')) {
-    throw new Error(`DB 접근 거부: prod 컨테이너 감지 (${container})`)
+  const container = process.env.DB_CONTAINER ?? 'againspring-mariadb-prod'
+  if (!ALLOWED_CONTAINERS.has(container)) {
+    throw new Error(`DB 접근 거부: 허용되지 않은 컨테이너 (${container})`)
   }
 
   const pass = readEnvVar('MARIADB_PASSWORD')
-  const db = readEnvVar('MARIADB_DATABASE') || 'againspring_dev'
+  const db = readEnvVar('MARIADB_DATABASE') || 'againspring'
   const user = readEnvVar('MARIADB_USER') || 'againspring'
 
   if (!pass) {
-    throw new Error('[db.ts] MARIADB_PASSWORD를 찾을 수 없습니다. env/.env.dev를 확인하세요.')
+    throw new Error('[db.ts] MARIADB_PASSWORD를 찾을 수 없습니다. env/.env.prod를 확인하세요.')
   }
 
   const result = spawnSync(

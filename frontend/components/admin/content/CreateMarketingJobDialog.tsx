@@ -21,17 +21,18 @@ interface Props {
 }
 
 const PLATFORM_OPTIONS = [
+  { value: 'x_thread', label: 'X 스레드' },
+  { value: 'x', label: 'X (Twitter)' },
   { value: 'youtube_shorts', label: 'YouTube Shorts' },
   { value: 'naver_clip', label: '네이버 클립' },
   { value: 'instagram_reels', label: 'Instagram Reels' },
   { value: 'instagram_feed', label: 'Instagram 피드' },
   { value: 'naver_blog', label: '네이버 블로그' },
-  { value: 'x', label: 'X (Twitter)' },
   { value: 'threads', label: 'Threads' },
 ];
 
 export function CreateMarketingJobDialog({ postId, onClose, onCreated }: Props) {
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set());
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set(['x_thread']));
   const [autoPublish, setAutoPublish] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');

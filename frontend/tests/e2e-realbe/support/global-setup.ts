@@ -11,7 +11,7 @@ import { chromiumLaunchOptions } from './browser'
 import { cleanup } from '../fixtures/cleanup'
 import { readEnvVar, runSqlScript } from './db'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 /**
  * SQL로 직접 처리:
@@ -24,11 +24,11 @@ const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
  */
 function bootstrapViaSql(): void {
   const pass = readEnvVar('MARIADB_PASSWORD')
-  const db = readEnvVar('MARIADB_DATABASE') || 'againspring_dev'
+  const db = readEnvVar('MARIADB_DATABASE') || 'againspring'
   const user = readEnvVar('MARIADB_USER') || 'againspring'
   if (!pass) {
     console.warn('[global-setup] MARIADB_PASSWORD 미확인 — SQL 부트스트랩 건너뜀')
-    console.warn('[global-setup] env/.env.dev 파일을 확인하세요 (db.ts readEnvVar 경유)')
+    console.warn('[global-setup] env/.env.prod 파일을 확인하세요 (db.ts readEnvVar 경유)')
     return
   }
 

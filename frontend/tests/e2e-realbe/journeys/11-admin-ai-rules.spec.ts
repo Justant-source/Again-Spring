@@ -22,7 +22,7 @@ import { PERSONA_TEST1, PERSONAS } from '../fixtures/personas'
 import { tokenFromStorageState } from '../support/api'
 import { ADMIN_CONTENT } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)
 // test5 storageState (global-setup이 저장)
 const TEST5_AUTH = authStatePath(PERSONAS[4].email)

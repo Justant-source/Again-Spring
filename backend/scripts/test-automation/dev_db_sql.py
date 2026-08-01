@@ -16,7 +16,7 @@ from pathlib import Path
 import pymysql
 
 
-DEFAULT_ENV_FILE = Path(__file__).resolve().parents[3] / "env" / ".env.dev"
+DEFAULT_ENV_FILE = Path(__file__).resolve().parents[3] / "env" / ".env.prod"
 
 
 def read_env_file(path: Path) -> dict[str, str]:
@@ -43,7 +43,7 @@ def resolve_config(env_file: Path) -> dict[str, str | int]:
         "port": int(os.environ.get("DB_PORT", "3309")),
         "user": pick("MARIADB_USER", "againspring"),
         "password": pick("MARIADB_PASSWORD", ""),
-        "database": pick("MARIADB_DATABASE", "againspring_dev"),
+        "database": pick("MARIADB_DATABASE", "againspring"),
     }
 
 

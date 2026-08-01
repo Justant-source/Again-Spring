@@ -15,7 +15,7 @@ import {
   VOTE_COMPLETE_BADGE,
 } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 // ── A. 게스트 투표 지속성 ─────────────────────────────────────────
 test.describe('Journey 04-A: 게스트 투표 지속성', () => {

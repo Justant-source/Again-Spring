@@ -18,7 +18,7 @@ import { guestLogin, createPost } from '../support/api'
 import { PERSONA_TEST1 } from '../fixtures/personas'
 import { authStatePath } from '../fixtures/auth-state'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 // ── A / B / C: 공개 게시글 OG 메타 + 이미지 라우트 ─────────────────
 test.describe('Journey 12-A: 공개 글 OG 메타', () => {

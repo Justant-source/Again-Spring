@@ -1,0 +1,21 @@
+---
+description: 미공개 선택·집중 — prod 검증만, 마케팅 X만, 휴면 환경 건드리지 않음
+alwaysApply: true
+---
+
+# Prelaunch focus
+
+정식 공개 전. 속도 = 선택과 집중.
+
+## 실환경
+
+- 검증·실서버 e2e·배포 대상 = **prod `:8091`만**
+- **dev `:8090` / `docker-compose.dev.yml` / `prod-dev-sync`**: 명시 요청 전 배포·테스트·디버그 금지 (파일은 휴면 보관)
+- 로컬 FE `:3000` / BE `:8080` + base LLM은 편집 루프로 유지
+
+## 마케팅
+
+- 활성 채널 = **X / `x_thread`만**
+- IG·네이버·YouTube·Threads·Clip: 구현·디버그·배포 금지 (명시 요청 전)
+- ASM 접속: AS 호스트(`100.81.189.92`) → `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
+- 진입: ASM `CLAUDE.md` · AS `docs/shared/marketing/x-thread-strategy.md`

@@ -26,7 +26,7 @@ import {
   VOTE_COMPLETE_BADGE,
 } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 // ── A. 작성자 뷰 — 초대 버튼 표시 ────────────────────────────────
 test.describe('Journey 06-A: 작성자 뷰 — 초대 버튼', () => {

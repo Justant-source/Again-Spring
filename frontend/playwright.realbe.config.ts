@@ -6,11 +6,11 @@ import { chromiumLaunchOptions } from './tests/e2e-realbe/support/browser'
  * 실 BE 대상 FE E2E 설정.
  *
  * 사전 조건:
- *   cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d
- *   → curl http://localhost:8090/api/health (UP 확인)
+ *   cd env && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+ *   → curl http://localhost:8091/api/health (UP 확인)
  *
  * 구조:
- *   Docker nginx(8090) → /api/* → BE 컨테이너  (CORS: same-origin, MSW: 비활성)
+ *   Docker nginx(8091) → /api/* → BE 컨테이너  (CORS: same-origin, MSW: 비활성)
  *                      → /*    → FE 컨테이너  (NODE_ENV=production, MSW 비활성)
  *
  * 실행: npm run test:e2e:realbe
@@ -45,7 +45,7 @@ export default defineConfig({
   globalSetup: path.resolve('./tests/e2e-realbe/support/global-setup.ts'),
   globalTeardown: path.resolve('./tests/e2e-realbe/support/global-teardown.ts'),
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:8090',
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:8091',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: process.env.PW_VIDEO === '1' ? 'retain-on-failure' : 'off',

@@ -83,17 +83,16 @@ MSW는 dev 모드에서 자동 활성화됩니다. 실제 페이지 플로우를
 #### 사전 조건 및 실행
 
 ```bash
-# 1. dev 스택 기동 (8090)
-cd env && docker compose -f docker-compose.dev.yml --env-file .env.dev up -d
-curl http://localhost:8090/api/health  # UP 확인
+# 1. prod 스택 기동·헬스 (8091) — 미공개 기간 유일한 실서버 대상
+curl http://localhost:8091/api/health  # UP 확인
 
 # 2. e2e 실행 (prod 게이트)
 cd frontend
-E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
+E2E_BASE_URL=http://localhost:8091 npm run test:e2e:realbe
 ```
 
-> **prod 배포 게이트**: e2e-realbe 전체 통과 후에만 prod 배포 진행 (`CLAUDE.md` 절대 규칙 #4).
-> **dev(8090)에서만 실행. prod(8091) 대상 실행 절대 금지.**
+> **prod 배포 게이트**: 백업 → prod 배포 → e2e-realbe(`:8091`) 전체 통과 (`CLAUDE.md` 절대 규칙 #4).
+> **미공개**: 실서버 e2e = **prod(8091)만**. dev(8090) 대상 실행·배포 금지.
 
 **설정 파일**: `playwright.realbe.config.ts`
 
@@ -147,7 +146,7 @@ import { test, expect } from '../support/no-llm-fixture'
 
 - **storageState**: `global-setup.ts`가 test1(ADMIN)/test2(TESTER)/test3(TESTER)/test5(USER) 로그인을 1회 실행해 `.auth/<email>.json`에 저장. 이후 spec은 `test.use({ storageState })` 또는 `tokenFromStorageState(email)`로 재사용.
 - **DB 정리**: `cleanup-test-db.sh`를 `global-setup`(실행 전)과 `global-teardown`(실행 후) 양쪽에서 실행. `test%@again.com` 페르소나 + 게스트 + `e2e-signup%` 일회용 유저의 모든 커뮤니티 산출물 삭제. `mock_001`과 `users` 행은 보존.
-- **dev DB는 폐기 가능**: prod-like 컨테이너명 가드(`prod` 포함 시 즉시 abort).
+- **미공개 cleanup**: `localhost:8091` + `againspring-mariadb-prod` 허용(`test%@again.com` 등 테스트 페르소나만). 공개 URL(`againspring.net` 등) cleanup은 계속 거부. 정식 공개 후 재검토.
 
 #### Selector 관리
 

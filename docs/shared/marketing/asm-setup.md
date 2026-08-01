@@ -10,6 +10,17 @@
 | 프로젝트 경로 | `/home/justant/Data/Again-Spring-Marketing/` |
 | GPU | NVIDIA RTX 3090 24GB |
 
+## SSH 접속 (AS → ASM)
+
+AS 호스트(Tailscale `100.81.189.92`)에서 **암호 없이**:
+
+```bash
+ssh justant@100.115.252.61
+cd ~/Data/Again-Spring-Marketing
+```
+
+마케팅 작업 초점(미공개): **X / `x_thread`만**. 상세: ASM `CLAUDE.md` · AS `docs/shared/marketing/x-thread-strategy.md`.
+
 ---
 
 ## 초기 설치

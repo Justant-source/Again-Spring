@@ -48,8 +48,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const TARGET_PLATFORMS = [
-  { value: 'naver_blog', label: '네이버 블로그' },
+  { value: 'x_thread', label: 'X 스레드' },
   { value: 'x', label: 'X (트위터)' },
+  { value: 'naver_blog', label: '네이버 블로그' },
   { value: 'instagram_feed', label: '인스타그램 피드' },
   { value: 'instagram_reels', label: '인스타그램 릴스' },
   { value: 'youtube_shorts', label: 'YouTube Shorts' },
@@ -68,7 +69,7 @@ export default function MarketingJobsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pickerDialogOpen, setPickerDialogOpen] = useState(false);
   const [postId, setPostId] = useState('');
-  const [targets, setTargets] = useState<string[]>(['naver_blog']);
+  const [targets, setTargets] = useState<string[]>(['x_thread']);
   const [autoPublish, setAutoPublish] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -165,7 +166,7 @@ export default function MarketingJobsPage() {
       await createMarketingJob(postId.trim(), targets, autoPublish);
       setDialogOpen(false);
       setPostId('');
-      setTargets(['naver_blog']);
+      setTargets(['x_thread']);
       setAutoPublish(false);
       setPickerDialogOpen(false);
       await loadJobs();

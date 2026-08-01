@@ -4,24 +4,24 @@
 # 커뮤니티 산출물(게시글·댓글·투표·좋아요·조회)도 삭제한다 (2026-06-07 추가).
 # (SeedDataLoader idempotent guard: test1@again.com 존재하는 한 재시드 없음)
 #
-# 권위본: backend/docs/test-automation.md §4
+# 권위본: docs/frontend/testing.md (e2e-realbe)
 #
 # 삭제 대상:
 #   - test%@again.com 페르소나가 생성한 모든 데이터
-#   - is_guest=1 게스트가 생성한 커뮤니티 데이터 (dev DB에서 안전)
+#   - is_guest=1 게스트가 생성한 커뮤니티 데이터
 #   - e2e-signup%@example.com 이메일로 가입한 일회용 테스트 유저와 그 산출물
 #   - mock_001 포스트는 보존 (global-setup이 INSERT IGNORE로 재시드함)
 #   - users 행은 보존 (페르소나 재시드 guard 유지)
 #
-# 사용:
-#   bash cleanup-test-db.sh
-#   E2E_ENV_FILE=/path/.env.dev bash cleanup-test-db.sh
+# 사용 (미공개: prod:8091 기본):
+#   DB_CONTAINER=againspring-mariadb-prod E2E_ENV_FILE=env/.env.prod bash cleanup-test-db.sh
+#   bash cleanup-test-db.sh   # 기본 = mariadb-prod + .env.prod
 #
-# 환경변수 우선순위: 명시 env > E2E_ENV_FILE > 기본값(env/.env.dev)
+# 환경변수 우선순위: 명시 env > E2E_ENV_FILE > 기본값(env/.env.prod)
 
 set -euo pipefail
 
-ENV_FILE="${E2E_ENV_FILE:-$(dirname "$0")/../../../env/.env.dev}"
+ENV_FILE="${E2E_ENV_FILE:-$(dirname "$0")/../../../env/.env.prod}"
 
 # env 파일에서 MARIADB_PASSWORD 읽기 (git에 평문 비밀 커밋 금지)
 if [[ -f "$ENV_FILE" ]]; then
@@ -31,17 +31,20 @@ else
 fi
 
 if [[ -z "$DB_PASS" ]]; then
-  echo "ERROR: MARIADB_PASSWORD를 찾을 수 없습니다. env/.env.dev 파일을 확인하세요." >&2
+  echo "ERROR: MARIADB_PASSWORD를 찾을 수 없습니다. env/.env.prod 파일을 확인하세요." >&2
   exit 1
 fi
 
-DB_CONTAINER="${DB_CONTAINER:-againspring-mariadb-dev}"
-DB_NAME="${MARIADB_DATABASE:-againspring_dev}"
+DB_CONTAINER="${DB_CONTAINER:-againspring-mariadb-prod}"
+DB_NAME="${MARIADB_DATABASE:-againspring}"
 DB_USER="${MARIADB_USER:-againspring}"
 
-# prod-like 컨테이너 이름 안전 가드
-if [[ "$DB_CONTAINER" == *prod* ]]; then
-  echo "ERROR: prod 컨테이너 감지 ($DB_CONTAINER). 클린업 거부." >&2
+# 허용: localhost 대상 로컬 docker 컨테이너만.
+# 미공개(prelaunch): againspring-mariadb-prod 허용. 그 외 *prod* 이름은 거부.
+# 정식 공개 후: prod cleanup 재검토·강화 필요.
+ALLOWED_CONTAINERS="againspring-mariadb-prod|againspring-mariadb-dev|againspring-mariadb"
+if [[ ! "$DB_CONTAINER" =~ ^($ALLOWED_CONTAINERS)$ ]]; then
+  echo "ERROR: 허용되지 않은 DB 컨테이너 ($DB_CONTAINER). 허용: $ALLOWED_CONTAINERS" >&2
   exit 1
 fi
 

@@ -8,7 +8,7 @@
  */
 import { test, expect } from '../support/no-llm-fixture'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 test.describe('Journey 19: 검색 패널 (SearchPanel)', () => {
 

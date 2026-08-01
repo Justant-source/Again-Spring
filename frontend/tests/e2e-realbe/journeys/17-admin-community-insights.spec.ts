@@ -14,7 +14,7 @@ import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1 } from '../fixtures/personas'
 import { ADMIN_STATS } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)
 
 // ── A·B. 기본 렌더링 ─────────────────────────────────────────────

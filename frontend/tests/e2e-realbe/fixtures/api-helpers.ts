@@ -1,6 +1,6 @@
 import type { APIRequestContext } from '@playwright/test'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 
 /** 인증 헬퍼 */
 export async function login(

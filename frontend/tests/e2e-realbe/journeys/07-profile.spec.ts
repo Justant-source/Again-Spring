@@ -12,7 +12,7 @@ import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1, PERSONAS } from '../fixtures/personas'
 
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 // test4는 닉네임 변경 테스트 전용 페르소나 (test1 admin 보호)
 const PERSONA_TEST4 = PERSONAS[3]
 

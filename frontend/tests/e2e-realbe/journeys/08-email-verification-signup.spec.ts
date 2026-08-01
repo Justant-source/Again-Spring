@@ -13,7 +13,7 @@
 import { test, expect } from '../support/no-llm-fixture'
 import { latestVerificationCode } from '../support/db'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
 // 일회용 가입 이메일 — teardown이 'e2e-signup%@example.com' 패턴으로 정리
 const SIGNUP_EMAIL = `e2e-signup-${Date.now()}@example.com`
 const SIGNUP_PASSWORD = 'E2Etest123!'
