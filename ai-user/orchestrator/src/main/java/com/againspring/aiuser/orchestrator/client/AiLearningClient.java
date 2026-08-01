@@ -18,6 +18,8 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * AI Learning 서비스 클라이언트.
@@ -224,5 +226,37 @@ public class AiLearningClient {
         } catch (Exception e) {
             log.debug("Crawl trigger failed: {}", e.getMessage());
         }
+    }
+
+    /**
+     * KURE-v1 embedding via learning {@code POST /embed}. Input truncated to 512 chars
+     * (server also truncates). On any failure returns empty — never throws (degrade path).
+     */
+    public List<Double> embed(String text) {
+        return embedOptional(text).orElse(Collections.emptyList());
+    }
+
+    /** Same as {@link #embed} but distinguishes "disabled/blank" from "call failed". */
+    public Optional<List<Double>> embedOptional(String text) {
+        if (!enabled || text == null || text.isBlank()) return Optional.empty();
+        try {
+            String clipped = text.length() > 512 ? text.substring(0, 512) : text;
+            ResponseEntity<String> resp = postJson("/embed", Map.of("text", clipped));
+            if (resp.getBody() == null || resp.getBody().isBlank()) return Optional.empty();
+            EmbedResponse parsed = objectMapper.readValue(resp.getBody(), EmbedResponse.class);
+            if (parsed == null || parsed.embedding == null || parsed.embedding.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(parsed.embedding);
+        } catch (Exception e) {
+            log.debug("AiLearning embed failed (non-critical): {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EmbedResponse {
+        private List<Double> embedding;
     }
 }

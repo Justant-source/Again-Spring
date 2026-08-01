@@ -99,6 +99,18 @@ flowchart LR
 | life state | DB `persona_life_state` | orchestrator | orchestrator |
 | relationships | `ai-user/docs/personas/profiles/relationships.yml` | paired posts | 사용자 |
 | example bank | DB `example_bank` | learning, orchestrator | learning, backend bridge |
+| semantic capsules | DB `persona_semantic_capsules` (≤3/persona, VECTOR 1024) | `PersonaCapsuleSearchService` | W3-B `PersonaCapsuleService` backfill |
+| match audits | DB `persona_match_audits` | 운영·캘리브레이션 | search path (best-effort) |
+
+## Capsule persona search (WP2 / W3-C)
+
+LLM 없이 사연 검색 문서 → 페르소나 top-K:
+
+1. `AiLearningClient.embedOptional()` → learning `POST /embed` (KURE 1024-dim, 512자 절단).
+2. JDBC `VEC_DISTANCE_COSINE` on active `persona_semantic_capsules` (optional `voice_type` register = NATEPAN|BLIND).
+3. persona 단위 집계: score = max(similarity × weight), matched capsule types 수집.
+4. **Degrade**: embed 실패·capsule 없음·히트 0 → 활성 페르소나를 `interests[category]` 내림차순 (category는 인자 또는 검색문 선두 토큰).
+5. `purpose=AUTHOR_CANDIDATE|COMMENT_CANDIDATE`면 `persona_match_audits`에 best-effort 기록.
 
 ## 스케줄 요약
 

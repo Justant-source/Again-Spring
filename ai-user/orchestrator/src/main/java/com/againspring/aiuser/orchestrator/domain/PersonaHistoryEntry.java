@@ -47,6 +47,14 @@ public class PersonaHistoryEntry {
     @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
+    /** example_bank.id provenance (loose, no hard FK) — WP2 V9 */
+    @Column(name = "source_example_id")
+    private Long sourceExampleId;
+
+    /** ai_thread_plans.id provenance (loose, no hard FK) — WP2 V9 */
+    @Column(name = "plan_id", length = 36)
+    private String planId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();

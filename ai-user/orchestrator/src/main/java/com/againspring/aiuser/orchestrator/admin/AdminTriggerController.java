@@ -9,6 +9,7 @@ import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserRuntimeRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
+import com.againspring.aiuser.orchestrator.service.capsule.PersonaCapsuleService;
 import com.againspring.aiuser.orchestrator.service.engagement.PlanEngagementDispatcher;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
@@ -58,6 +59,7 @@ public class AdminTriggerController {
     private final PlanEngagementDispatcher engagementDispatcher;
     private final ViewDispatcher viewDispatcher;
     private final HumanReplyTtlCleanupService humanReplyTtlCleanupService;
+    private final PersonaCapsuleService personaCapsuleService;
 
     /**
      * KST 시간대 곡선으로 발행 슬롯 N개를 샘플링만 해서 보여준다(부작용 없음).
@@ -383,6 +385,46 @@ public class AdminTriggerController {
                 "inboxCancelled", result.inboxCancelled(),
                 "plansExpired", result.plansExpired(),
                 "flagEnabled", properties.getHumanReply().isTtlCleanupEnabled()));
+    }
+
+    /**
+     * WP2: backfill persona_semantic_capsules (≤3) + slim fact assertions for all active personas.
+     * Requires ai-learning {@code POST /embed}. Async — returns 202 immediately.
+     * sync=true runs inline (small envs / debug).
+     */
+    @PostMapping("/backfill-persona-capsules")
+    public ResponseEntity<Map<String, Object>> backfillPersonaCapsules(
+            @RequestParam(defaultValue = "20") int batchSize,
+            @RequestParam(defaultValue = "false") boolean sync) {
+        int size = Math.max(1, Math.min(batchSize, 50));
+        int activeCount = personaRepo.findByActiveTrue().size();
+        if (activeCount == 0) {
+            return ResponseEntity.ok(Map.of("queued", 0, "message", "활성 페르소나 없음"));
+        }
+        if (sync) {
+            var result = personaCapsuleService.backfillAllActive(size);
+            return ResponseEntity.ok(Map.of(
+                    "sync", true,
+                    "personasProcessed", result.personasProcessed(),
+                    "capsulesUpserted", result.capsulesUpserted(),
+                    "capsulesSkipped", result.capsulesSkipped(),
+                    "factsUpserted", result.factsUpserted(),
+                    "errors", result.errors()));
+        }
+        log.info("[backfill-persona-capsules] async start active={} batchSize={}", activeCount, size);
+        runCapsuleBackfillAsync(size);
+        return ResponseEntity.accepted().body(Map.of(
+                "queued", activeCount,
+                "batchSize", size,
+                "message", "백그라운드 capsule/fact backfill 시작. ai-learning /embed 필요."));
+    }
+
+    @Async
+    void runCapsuleBackfillAsync(int batchSize) {
+        var result = personaCapsuleService.backfillAllActive(batchSize);
+        log.info("[backfill-persona-capsules] done personas={} upserted={} skipped={} facts={} errors={}",
+                result.personasProcessed(), result.capsulesUpserted(), result.capsulesSkipped(),
+                result.factsUpserted(), result.errors());
     }
 
     /** ActionExecutor.topCategory()와 동일한 로직 — category NOT NULL이라 반드시 채워야 한다. */

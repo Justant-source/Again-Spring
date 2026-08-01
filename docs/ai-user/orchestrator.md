@@ -19,6 +19,15 @@
 | `ThreadPlanPublisherScheduler` | due item lease·멱등 게시 |
 | `HumanReplyBatchScheduler` | 사람 댓글/대댓글을 30분 단위로 묶어 reply 생성 |
 | `HumanReplyTtlCleanupScheduler` | inbox/REQUESTED plan TTL 정리 (플래그 기본 OFF, no-op) |
+| `PersonaCapsuleSearchService` | story→persona top-K (capsule vector + interests fallback, LLM 없음) |
+
+## Capsule search (WP2)
+
+- 입력: 검색 텍스트(또는 category+topics), `topK`, optional register(`NATEPAN`|`BLIND`)
+- 경로: learning embed → `persona_semantic_capsules` cosine top rows → persona 집계
+- fallback: 활성 페르소나 `interests` (COUPLE/MARRIED/FRIEND/FAMILY/WORK/OTHER)
+- optional audit: `persona_match_audits` (`AUTHOR_CANDIDATE` / `COMMENT_CANDIDATE`)
+- 상세 토폴로지: [architecture.md](./architecture.md) § Capsule persona search
 
 ## 스케줄
 
