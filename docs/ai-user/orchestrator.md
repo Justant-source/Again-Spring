@@ -16,6 +16,7 @@
 | `CrawlerTriggerScheduler` | learning crawl trigger |
 | `BackendOutboxScheduler` | backend outbox를 소비해 plan/inbox 생성 |
 | `ThreadPlanGenerationScheduler` | 요청된 plan을 구조화 LLM으로 한 번에 생성 |
+| `ThreadQualityGate` | LLM 응답(및 micro-batch merge) 후 cast·parent·safety·stance≤80% 검사; READY 하한 미달 시 `QUALITY_BELOW_MIN_ITEMS` |
 | `ThreadPlanPublisherScheduler` | due item lease·멱등 게시 |
 | `HumanReplyBatchScheduler` | 사람 댓글/대댓글을 30분 단위로 묶어 reply 생성 |
 | `HumanReplyTtlCleanupScheduler` | inbox/REQUESTED plan TTL 정리 (플래그 기본 OFF, no-op) |
@@ -37,7 +38,7 @@
 - score: `0.45*semantic + 0.25*register + 0.15*fact_ratio + 0.15*interest[category]`
 - API: `matchAuthors` / `matchCommenters` / `bestAuthorAbove` (threshold default `ai-user.matcher.author-threshold=0.35`)
 - audits: purpose `AUTHOR_CANDIDATE`|`COMMENT_CANDIDATE`, reasons에 UNEVALUATED 축·점수 기록 (capsule search purpose 미설정 → 이중 기록 방지)
-- PLAN 연동: `AiPostBundleService`가 source 사연을 `StoryProfileAnalyzer`로 1회 구조화하고, `matchCommenters`로 cast를 재정렬(author=`personas[0]` 유지). 요청에 `storyProfile`/`storySearchDoc` 포함.
+- PLAN 연동: `AiPostBundleService`가 source 사연을 `StoryProfileAnalyzer`로 1회 구조화하고, `matchCommenters`로 cast를 재정렬(author=`personas[0]` 유지). 요청에 `storyProfile`/`storySearchDoc` 포함. 기본 생성은 **micro-batch**(4~6 persona/call, `ai-user.thread-plan.micro-batch-enabled`, 기본 ON)이며 publisher는 저장된 텍스트만 게시한다.
 - 매칭 실패 시: `PersonaAutoProvisionService` + `POST /admin/trigger/auto-persona-for-story`
 - SSOT: `python3 ai-user/tools/wp3_persona_ssot_report.py`
 

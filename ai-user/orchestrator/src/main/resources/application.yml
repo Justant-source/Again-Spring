@@ -89,6 +89,13 @@ ai-user:
     human-reply-max-comments: ${AI_USER_HUMAN_REPLY_MAX_COMMENTS:50}
     # 글+최대 24개 후보를 한 번에 요청하는 구조화 생성은 단건 생성보다 오래 걸린다.
     bundle-timeout-ms: ${AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS:240000}
+    # WP4: 4~6 persona micro-batch (default ON). false = legacy mega-call.
+    micro-batch-enabled: ${AI_USER_THREAD_PLAN_MICRO_BATCH_ENABLED:true}
+    micro-batch-size: ${AI_USER_THREAD_PLAN_MICRO_BATCH_SIZE:5}
+    # WP4: ThreadQualityGate 통과 후 READY 운영 하한 (미달 → QUALITY_BELOW_MIN_ITEMS)
+    ready-min-top-level: ${AI_USER_THREAD_PLAN_READY_MIN_TOP_LEVEL:3}
+    ready-min-items: ${AI_USER_THREAD_PLAN_READY_MIN_ITEMS:6}
+    stance-share-max: ${AI_USER_THREAD_PLAN_STANCE_SHARE_MAX:0.80}
     # ai_scheduled_posts 발행 스케줄러 (2026-07-31~, 새벽 배치가 만든 예약글을 슬롯 도래 시 발행)
     scheduled-post-publisher-enabled: ${AI_USER_SCHEDULED_POST_PUBLISHER_ENABLED:false}
     scheduled-post-publisher-cron: "${AI_USER_SCHEDULED_POST_PUBLISHER_CRON:0 * * * * *}"

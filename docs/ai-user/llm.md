@@ -27,6 +27,7 @@
 - Codex는 새 세션으로 실행(`codex exec --ephemeral`)해 이전 게시글의 대화 context를 재사용하지 않는다.
 - provider별 논리적 queue/concurrency/timeout을 적용한다. 선택되지 않은 CLI process는 상주하지 않는다.
 - 입력/출력은 구조화 contract로 검증하며 요청 전체가 유효하지 않으면 `INVALID_STRUCTURED_REQUEST`, queue 포화는 `CAPACITY`, timeout은 `TIMEOUT`으로 응답한다. bridge 오류 문자열은 절대 게시 콘텐츠가 될 수 없다.
+- `ThreadPlanRequest.minTopLevel` / `minItems`: null이면 `parsePlan`이 레거시 하한(최상위 min(6,maxTopLevel) · 전체 min(12,max))을 적용한다. 명시 값(1 포함)은 `1..max`로 clamp해 존중한다. 품질 드롭 가능 plan을 원하는 orchestrator는 `minTopLevel=1`, `minItems=1`을 보낸다.
 - 실제 model identifier는 환경변수로 주입한다. Codex Terra/Luna alias는 운영 호스트에서 검증된 identifier에만 매핑한다.
 
 세부 후보 규칙과 retry·안전 정책은 [thread-planning.md](./thread-planning.md)를 따른다.

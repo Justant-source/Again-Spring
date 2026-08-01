@@ -92,9 +92,8 @@ public class ScheduledPostPublisher {
             response.remove(AiPostBundleService.SOURCE_PROVENANCE_KEY);
             AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, Instant.now(),
                     row.getTitle(), row.getBody(), row.getCategory(), row.getProvider(), row.getModel());
-            planGenerationService.persistResponse(plan.getId(), response);
-            planService.markReady(plan.getId());
-            planService.activate(plan.getId());
+            // Quality gate + READY / QUALITY_BELOW_MIN_ITEMS (same path as live publish).
+            planGenerationService.persistAndFinalize(plan.getId(), response);
         } catch (Exception replayFailure) {
             // The post is already live — losing its comment plan must never roll back the post itself.
             // The durable outbox still fires POST_PUBLISHED, which creates a REQUESTED plan as a fallback.

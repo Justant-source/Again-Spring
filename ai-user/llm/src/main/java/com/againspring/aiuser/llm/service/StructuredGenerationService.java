@@ -79,8 +79,15 @@ public class StructuredGenerationService {
             items.add(ThreadPlanResponse.Item.builder().ref(ref).parentRef(parent).personaId(persona).body(body)
                     .stance(nullableText(n, "stance")).priority(n.path("priority").asInt(0)).build());
         }
-        int minTop = Math.min(6, safe(req.getMaxTopLevel(), 14, 1, 20));
-        if (topLevel.size() < minTop || items.size() < Math.min(12, max))
+        int maxTop = safe(req.getMaxTopLevel(), 14, 1, 20);
+        // null → legacy floors (6 top / 12 items); explicit values (incl. 1) honored for quality-droppable plans
+        int minTop = req.getMinTopLevel() != null
+                ? Math.max(1, Math.min(req.getMinTopLevel(), maxTop))
+                : Math.min(6, maxTop);
+        int minItems = req.getMinItems() != null
+                ? Math.max(1, Math.min(req.getMinItems(), max))
+                : Math.min(12, max);
+        if (topLevel.size() < minTop || items.size() < minItems)
             throw new StructuredGenerationException("thread plan does not meet minimum candidate count");
         return ThreadPlanResponse.builder().provider(provider.name()).model(model).correlationId(correlationId)
                 .post(post).items(items).elapsedMs(System.currentTimeMillis() - started).build();

@@ -43,6 +43,20 @@ public class ThreadPlanRequest {
     private List<Persona> personas;
     private Integer maxTopLevel = 14;
     private Integer maxReplies = 10;
+    /**
+     * Minimum top-level comment candidates accepted by {@code parsePlan}.
+     * Null → legacy floor {@code min(6, maxTopLevel)}.
+     * Explicit value (including 1) is honored, clamped to {@code 1..maxTopLevel}.
+     * Orchestrators that defer quality to a later gate should send {@code 1}.
+     */
+    private Integer minTopLevel;
+    /**
+     * Minimum total comment candidates accepted by {@code parsePlan}.
+     * Null → legacy floor {@code min(12, maxTopLevel+maxReplies)}.
+     * Explicit value (including 1) is honored, clamped to {@code 1..max}.
+     * Orchestrators that defer quality to a later gate should send {@code 1}.
+     */
+    private Integer minItems;
 
     public enum Kind { AI_POST, HUMAN_POST }
 

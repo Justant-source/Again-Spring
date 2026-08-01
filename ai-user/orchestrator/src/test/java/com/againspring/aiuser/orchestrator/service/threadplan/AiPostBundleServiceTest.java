@@ -23,18 +23,21 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,7 +68,11 @@ class AiPostBundleServiceTest {
         when(properties.getThreadPlan()).thenReturn(threadPlan);
         when(threadPlan.getAiPostProvider()).thenReturn("CLAUDE");
         when(threadPlan.getAiPostModel()).thenReturn("claude-sonnet-4-6");
+        when(threadPlan.getHumanPlanProvider()).thenReturn("CLAUDE");
+        when(threadPlan.getHumanPlanModel()).thenReturn("");
         when(threadPlan.getBundleTimeoutMs()).thenReturn(240_000L);
+        when(threadPlan.isMicroBatchEnabled()).thenReturn(true);
+        when(threadPlan.resolvedMicroBatchSize()).thenReturn(5);
         scheduleSupport = new CandidateScheduleSupport(properties);
         when(storyProfileAnalyzer.analyze(any(), any(), any(), any(), any())).thenReturn(
                 new StoryProfile("갈등", "OTHER",
@@ -82,6 +89,7 @@ class AiPostBundleServiceTest {
 
     @Test
     void generateAndHoldSendsAuthorVoiceAndSourceContextNotEmptyTopicOnly() {
+        when(threadPlan.isMicroBatchEnabled()).thenReturn(false);
         Persona author = persona("ai-user-1", "polite", "실닉네임아님");
         Persona other = persona("ai-user-2", "casual", null);
         AiUserGenerationConfig cfg = config("CLAUDE", 16);
@@ -133,6 +141,8 @@ class AiPostBundleServiceTest {
         assertThat(req.get("recentOutputs")).isInstanceOf(List.class);
         assertThat(req.get("storySearchDoc")).isInstanceOf(String.class);
         assertThat(req.get("storyProfile")).isInstanceOf(Map.class);
+        assertThat(req.get("minTopLevel")).isEqualTo(1);
+        assertThat(req.get("minItems")).isEqualTo(1);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> personas = (List<Map<String, Object>>) req.get("personas");
@@ -147,9 +157,10 @@ class AiPostBundleServiceTest {
     }
 
     @Test
-    void generateBundleIncludesFullActivePoolWithoutLimit24() {
+    void generateBundleIncludesFullActivePoolWithoutLimit24WhenMicroBatchDisabled() {
+        when(threadPlan.isMicroBatchEnabled()).thenReturn(false);
         Persona author = persona("ai-user-1", "casual", null);
-        List<Persona> pool = new java.util.ArrayList<>();
+        List<Persona> pool = new ArrayList<>();
         pool.add(author);
         for (int i = 2; i <= 30; i++) pool.add(persona("ai-user-" + i, "casual", null));
 
@@ -166,7 +177,7 @@ class AiPostBundleServiceTest {
                 .toList();
         when(planPersonaMapper.mapCast(pool)).thenReturn(cast);
         when(planPersonaMapper.castIds(any())).thenReturn(
-                pool.stream().map(Persona::getId).collect(java.util.stream.Collectors.toSet()));
+                pool.stream().map(Persona::getId).collect(Collectors.toSet()));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(cast.get(0));
         when(sourceStoryResolver.resolve(any(), any(), any())).thenReturn(
                 new PlanSourceStoryResolver.ResolvedSource("seed", Map.of("body", "s"), false,
@@ -189,12 +200,105 @@ class AiPostBundleServiceTest {
     }
 
     @Test
-    void validateCastRejectsPersonaOutsideRequestedCast() {
+    void microBatchIssuesAtLeastTwoLlmCallsWhenCastIsLarge() {
+        Persona author = persona("ai-user-1", "casual", null);
+        List<Persona> pool = new ArrayList<>();
+        pool.add(author);
+        for (int i = 2; i <= 12; i++) pool.add(persona("ai-user-" + i, "casual", null));
+
+        AiUserGenerationConfig cfg = config("CLAUDE", 16);
+        when(configRepository.findById(1)).thenReturn(Optional.of(cfg));
+        when(personaRepository.findByActiveTrue()).thenReturn(pool);
+
+        List<Map<String, Object>> cast = pool.stream()
+                .<Map<String, Object>>map(p -> Map.of(
+                        "personaId", p.getId(),
+                        "nickname", "nick-" + p.getId(),
+                        "formality", "casual",
+                        "voiceProfile", Map.of("formality", "casual")))
+                .toList();
+        when(planPersonaMapper.mapCast(pool)).thenReturn(cast);
+        when(planPersonaMapper.castIds(any())).thenReturn(
+                pool.stream().map(Persona::getId).collect(Collectors.toSet()));
+        when(planPersonaMapper.mapAuthor(author)).thenReturn(cast.get(0));
+        when(sourceStoryResolver.resolve(any(), any(), any())).thenReturn(
+                new PlanSourceStoryResolver.ResolvedSource("seed", Map.of("body", "s"), false,
+                        1L, "본문", null, null, null, "", List.of()));
+
+        AtomicInteger call = new AtomicInteger();
+        when(llmClient.generateThreadPlan(any())).thenAnswer(inv -> {
+            int n = call.getAndIncrement();
+            Map<String, Object> resp = new LinkedHashMap<>();
+            if (n == 0) {
+                resp.put("post", Map.of("title", "제목입니다", "body", "본문입니다. 충분히 길게 작성."));
+                resp.put("items", List.of(
+                        Map.of("ref", "c1", "personaId", "ai-user-2", "body", "첫 배치 댓글"),
+                        Map.of("ref", "c2", "personaId", "ai-user-3", "body", "첫 배치 댓글2")));
+            } else {
+                resp.put("post", null);
+                resp.put("items", List.of(
+                        Map.of("ref", "c1", "personaId", "ai-user-7", "body", "둘째 배치 댓글")));
+            }
+            return Optional.of(resp);
+        });
+        when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+        when(scheduledPostRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Optional<AiScheduledPost> held = service.generateAndHold(
+                author, "WORK", null, "corr-micro", Instant.now());
+
+        assertThat(held).isPresent();
+        ArgumentCaptor<Map<String, Object>> reqCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(llmClient, atLeast(2)).generateThreadPlan(reqCaptor.capture());
+        List<Map<String, Object>> requests = reqCaptor.getAllValues();
+        assertThat(requests.size()).isGreaterThanOrEqualTo(2);
+
+        Map<String, Object> first = requests.get(0);
+        assertThat(first.get("kind")).isEqualTo("AI_POST");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> firstPersonas = (List<Map<String, Object>>) first.get("personas");
+        // author + first micro-batch (5)
+        assertThat(firstPersonas).hasSize(6);
+        assertThat(first.get("minTopLevel")).isEqualTo(1);
+        assertThat(first.get("minItems")).isEqualTo(1);
+
+        Map<String, Object> second = requests.get(1);
+        assertThat(second.get("kind")).isEqualTo("HUMAN_POST");
+        assertThat(second.get("existingTitle")).isEqualTo("제목입니다");
+        assertThat(second.get("existingBody")).isEqualTo("본문입니다. 충분히 길게 작성.");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> secondPersonas = (List<Map<String, Object>>) second.get("personas");
+        assertThat(secondPersonas).isNotEmpty();
+        assertThat(secondPersonas.size()).isLessThanOrEqualTo(5);
+        assertThat(secondPersonas.get(0).get("personaId")).isNotEqualTo("ai-user-1");
+
+        assertThat(held.get().getCandidatesJson()).contains("b0_c1");
+        assertThat(held.get().getCandidatesJson()).contains("b1_c1");
+        verify(llmClient, times(requests.size())).generateThreadPlan(any());
+    }
+
+    @Test
+    void countOutOfCastReportsPersonaOutsideRequestedCast() {
         Map<String, Object> response = Map.of("items", List.of(
-                Map.of("ref", "c1", "personaId", "outsider", "body", "x")));
-        assertThatThrownBy(() -> AiPostBundleService.validateCast(response, Set.of("ai-user-1", "ai-user-2")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("not in requested cast");
+                Map.of("ref", "c1", "personaId", "outsider", "body", "x"),
+                Map.of("ref", "c2", "personaId", "ai-user-1", "body", "y")));
+        assertThat(AiPostBundleService.countOutOfCast(response, Set.of("ai-user-1", "ai-user-2")))
+                .isEqualTo(1);
+        // Soft validateCast must not reject the whole bundle (quality gate drops later).
+        AiPostBundleService.validateCast(response, Set.of("ai-user-1", "ai-user-2"));
+    }
+
+    @Test
+    void sliceCommentersRespectsBatchSizeClamp() {
+        List<Map<String, Object>> commenters = new ArrayList<>();
+        for (int i = 0; i < 11; i++) {
+            commenters.add(Map.of("personaId", "p" + i));
+        }
+        List<List<Map<String, Object>>> slices = AiPostBundleService.sliceCommenters(commenters, 5);
+        assertThat(slices).hasSize(3);
+        assertThat(slices.get(0)).hasSize(5);
+        assertThat(slices.get(1)).hasSize(5);
+        assertThat(slices.get(2)).hasSize(1);
     }
 
     private static Persona persona(String id, String formality, String ignored) {

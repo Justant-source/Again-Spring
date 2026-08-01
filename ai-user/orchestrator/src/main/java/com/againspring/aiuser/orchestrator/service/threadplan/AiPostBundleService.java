@@ -36,8 +36,12 @@ import java.util.Set;
 /**
  * PLAN-mode AI post creation boundary.
  *
- * <p>One structured request yields the post and all candidate conversation items.
- * Source-story grounding (example_bank via findSimilar), author voice, reconstruct mode,
+ * <p>Default path (micro-batch ON): author+post in call 1 with the first 4~6 comment
+ * personas, then HUMAN_POST follow-ups for remaining slices — all inside the initial
+ * generation job. Mega-call (full cast, one LLM request) remains when
+ * {@code ai-user.thread-plan.micro-batch-enabled=false}.</p>
+ *
+ * <p>Source-story grounding (example_bank via findSimilar), author voice, reconstruct mode,
  * and anti-self-copy recent bodies are injected here — not empty topicHint alone.</p>
  */
 @Slf4j
@@ -88,9 +92,8 @@ public class AiPostBundleService {
             // POST_PUBLISHED outbox delivery will find this revision and must not request another LLM plan.
             AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, Instant.now(),
                     bundle.content.title(), bundle.content.body(), category, bundle.provider, bundle.model);
-            planGenerationService.persistResponse(plan.getId(), bundle.response, bundle.castIds);
-            planService.markReady(plan.getId());
-            planService.activate(plan.getId());
+            // Quality gate + READY policy (shared with ScheduledPostPublisher replay).
+            planGenerationService.persistAndFinalize(plan.getId(), bundle.response, bundle.castIds);
             return Optional.of(new PublishedBundle(post, bundle.content.body(),
                     bundle.source != null ? bundle.source.sourceExampleId() : null));
         } catch (RuntimeException persistenceFailure) {
@@ -141,7 +144,7 @@ public class AiPostBundleService {
         return Optional.of(scheduledPostRepository.save(rowBuilder.build()));
     }
 
-    /** Shared generation step: grounded structured LLM call, validated post + raw response for replay. */
+    /** Shared generation step: grounded structured LLM call(s), validated post + raw response for replay. */
     private Optional<Bundle> generateBundle(Persona author, String category, String topicHint, String correlationId) {
         if (author == null) {
             log.warn("AI post bundle skipped: author is null corr={}", correlationId);
@@ -178,31 +181,29 @@ public class AiPostBundleService {
         }
         Set<String> castIds = planPersonaMapper.castIds(personas);
 
-        Map<String, Object> request = new LinkedHashMap<>();
-        request.put("kind", "AI_POST");
-        request.put("provider", provider);
-        if (model != null && !model.isBlank()) request.put("model", model);
-        request.put("correlationId", correlationId);
-        request.put("timeoutMs", properties.getThreadPlan().getBundleTimeoutMs());
-        request.put("category", category == null ? "OTHER" : category);
-        // Structured source context is the grounding; topicHint is only the derived seed (never empty-only path).
-        request.put("topicHint", source.topicSeed());
-        request.put("sourceContext", source.sourceContext());
-        request.put("reconstructMode", source.reconstructMode());
-        if (source.sourceExampleId() != null) request.put("sourceExampleId", source.sourceExampleId());
-        if (source.sourceBody() != null) request.put("sourceBody", source.sourceBody());
-        if (source.dynamicExamples() != null && !source.dynamicExamples().isBlank()) {
-            request.put("dynamicExamples", source.dynamicExamples());
+        OrchestratorProperties.ThreadPlan tp = properties.getThreadPlan();
+        if (tp.isMicroBatchEnabled()) {
+            return generateBundleMicroBatch(
+                    author, category, correlationId, corr,
+                    provider, model, pool, source, storyProfile, personas, castIds);
         }
-        List<String> recent = PlanSourceStoryResolver.recentOutputsForRequest(source.recentBodies(), 200);
-        if (!recent.isEmpty()) request.put("recentOutputs", recent);
-        request.put("storyProfile", storyProfileToMap(storyProfile));
-        request.put("storySearchDoc", storyProfile.toSearchDocument());
-        request.put("author", planPersonaMapper.mapAuthor(author));
+        return generateBundleMegaCall(
+                author, category, correlationId, provider, model, pool, source, storyProfile, personas, castIds);
+    }
+
+    /** Legacy single-call path: full cast in one AI_POST request. */
+    private Optional<Bundle> generateBundleMegaCall(
+            Persona author, String category, String correlationId,
+            String provider, String model, int pool,
+            PlanSourceStoryResolver.ResolvedSource source, StoryProfile storyProfile,
+            List<Map<String, Object>> personas, Set<String> castIds) {
+        Map<String, Object> request = baseAiPostRequest(
+                author, category, correlationId, provider, model, source, storyProfile);
         request.put("personas", personas);
         int roots = Math.min(14, pool);
         request.put("maxTopLevel", roots);
         request.put("maxReplies", pool - roots);
+        putParsePlanFloors(request);
 
         Optional<Map<String, Object>> response = llmClient.generateThreadPlan(request);
         if (response.isEmpty()) return Optional.empty();
@@ -216,19 +217,259 @@ public class AiPostBundleService {
         }
     }
 
+    /**
+     * Micro-batch path (§7.7 / WP4): call 1 = AI_POST with author + first slice;
+     * calls 2..N = HUMAN_POST comment-only with existingTitle/Body from call 1.
+     * All batches finish inside this generation job.
+     */
     @SuppressWarnings("unchecked")
-    static void validateCast(Map<String, Object> response, Set<String> castIds) {
+    private Optional<Bundle> generateBundleMicroBatch(
+            Persona author, String category, String correlationId, String corr,
+            String provider, String model, int pool,
+            PlanSourceStoryResolver.ResolvedSource source, StoryProfile storyProfile,
+            List<Map<String, Object>> personas, Set<String> castIds) {
+        int batchSize = properties.getThreadPlan().resolvedMicroBatchSize();
+        Map<String, Object> authorEntry = personas.get(0);
+        List<Map<String, Object>> commenters = personas.size() <= 1
+                ? List.of()
+                : personas.subList(1, personas.size());
+
+        List<List<Map<String, Object>>> slices = sliceCommenters(commenters, batchSize);
+        if (slices.isEmpty()) {
+            // Author-only cast: still need a post — one AI_POST with author alone.
+            slices = List.of(List.of());
+        }
+
+        List<Map<String, Object>> firstSlice = slices.get(0);
+        List<Map<String, Object>> firstPersonas = new ArrayList<>(1 + firstSlice.size());
+        firstPersonas.add(authorEntry);
+        firstPersonas.addAll(firstSlice);
+
+        int remaining = pool;
+        int firstTop = Math.max(1, Math.min(firstSlice.isEmpty() ? 1 : firstSlice.size(), remaining));
+        int firstReplies = Math.max(0, Math.min(firstSlice.size(), remaining - firstTop));
+
+        Map<String, Object> firstReq = baseAiPostRequest(
+                author, category, corr + "-b0", provider, model, source, storyProfile);
+        firstReq.put("personas", firstPersonas);
+        firstReq.put("maxTopLevel", firstTop);
+        firstReq.put("maxReplies", firstReplies);
+        putParsePlanFloors(firstReq);
+
+        Optional<Map<String, Object>> firstOpt = llmClient.generateThreadPlan(firstReq);
+        if (firstOpt.isEmpty()) return Optional.empty();
+
+        PostContent postContent;
+        Map<String, Object> merged;
+        try {
+            postContent = readAndValidatePost(firstOpt.get());
+            validateCast(firstOpt.get(), castIds);
+            merged = new LinkedHashMap<>(firstOpt.get());
+        } catch (IllegalArgumentException invalid) {
+            log.warn("AI post micro-batch[0] rejected corr={}: {}", correlationId, invalid.getMessage());
+            return Optional.empty();
+        }
+
+        List<Map<String, Object>> mergedItems = new ArrayList<>();
+        Set<String> usedRefs = new LinkedHashSet<>();
+        appendRemappedItems(mergedItems, usedRefs, firstOpt.get(), "b0", remaining);
+        remaining = pool - mergedItems.size();
+
+        for (int i = 1; i < slices.size() && remaining > 0; i++) {
+            List<Map<String, Object>> slice = slices.get(i);
+            if (slice.isEmpty()) continue;
+            int top = Math.max(1, Math.min(slice.size(), remaining));
+            int replies = Math.max(0, Math.min(slice.size(), remaining - top));
+
+            Map<String, Object> follow = new LinkedHashMap<>();
+            follow.put("kind", "HUMAN_POST");
+            String humanProvider = properties.getThreadPlan().getHumanPlanProvider();
+            follow.put("provider", (humanProvider != null && !humanProvider.isBlank()) ? humanProvider : provider);
+            String humanModel = properties.getThreadPlan().getHumanPlanModel();
+            if (humanModel != null && !humanModel.isBlank()) follow.put("model", humanModel);
+            follow.put("correlationId", corr + "-b" + i);
+            follow.put("timeoutMs", properties.getThreadPlan().getBundleTimeoutMs());
+            follow.put("category", category == null ? "OTHER" : category);
+            follow.put("topicHint", source.topicSeed());
+            follow.put("existingTitle", postContent.title());
+            follow.put("existingBody", postContent.body());
+            follow.put("personas", slice);
+            follow.put("maxTopLevel", top);
+            follow.put("maxReplies", replies);
+            putParsePlanFloors(follow);
+
+            Optional<Map<String, Object>> followOpt = llmClient.generateThreadPlan(follow);
+            if (followOpt.isEmpty()) {
+                log.warn("AI post micro-batch[{}] empty corr={} — keeping {} items so far",
+                        i, correlationId, mergedItems.size());
+                break;
+            }
+            try {
+                validateCast(followOpt.get(), castIds);
+            } catch (IllegalArgumentException invalid) {
+                log.warn("AI post micro-batch[{}] cast rejected corr={}: {} — keeping {} items",
+                        i, correlationId, invalid.getMessage(), mergedItems.size());
+                break;
+            }
+            appendRemappedItems(mergedItems, usedRefs, followOpt.get(), "b" + i, remaining);
+            remaining = pool - mergedItems.size();
+        }
+
+        merged.put("items", mergedItems);
+        // Drop follow-up post payloads if any slipped through; keep call-1 post only.
+        if (merged.get("post") == null && postContent != null) {
+            merged.put("post", Map.of("title", postContent.title(), "body", postContent.body()));
+        }
+        log.info("AI post micro-batch done corr={} batches={} items={}/{} size={}",
+                correlationId, slices.size(), mergedItems.size(), pool,
+                properties.getThreadPlan().resolvedMicroBatchSize());
+        return Optional.of(new Bundle(merged, postContent, provider, model, castIds, source));
+    }
+
+    private Map<String, Object> baseAiPostRequest(
+            Persona author, String category, String correlationId,
+            String provider, String model,
+            PlanSourceStoryResolver.ResolvedSource source, StoryProfile storyProfile) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("kind", "AI_POST");
+        request.put("provider", provider);
+        if (model != null && !model.isBlank()) request.put("model", model);
+        request.put("correlationId", correlationId);
+        request.put("timeoutMs", properties.getThreadPlan().getBundleTimeoutMs());
+        request.put("category", category == null ? "OTHER" : category);
+        request.put("topicHint", source.topicSeed());
+        request.put("sourceContext", source.sourceContext());
+        request.put("reconstructMode", source.reconstructMode());
+        if (source.sourceExampleId() != null) request.put("sourceExampleId", source.sourceExampleId());
+        if (source.sourceBody() != null) request.put("sourceBody", source.sourceBody());
+        if (source.dynamicExamples() != null && !source.dynamicExamples().isBlank()) {
+            request.put("dynamicExamples", source.dynamicExamples());
+        }
+        List<String> recent = PlanSourceStoryResolver.recentOutputsForRequest(source.recentBodies(), 200);
+        if (!recent.isEmpty()) request.put("recentOutputs", recent);
+        request.put("storyProfile", storyProfileToMap(storyProfile));
+        request.put("storySearchDoc", storyProfile.toSearchDocument());
+        request.put("author", planPersonaMapper.mapAuthor(author));
+        return request;
+    }
+
+    /** W5-A floors: sparse batches OK; quality gate drops later. */
+    static void putParsePlanFloors(Map<String, Object> request) {
+        request.put("minTopLevel", 1);
+        request.put("minItems", 1);
+    }
+
+    static List<List<Map<String, Object>>> sliceCommenters(List<Map<String, Object>> commenters, int batchSize) {
+        if (commenters == null || commenters.isEmpty()) return List.of();
+        int size = Math.max(4, Math.min(6, batchSize <= 0 ? 5 : batchSize));
+        List<List<Map<String, Object>>> out = new ArrayList<>();
+        for (int i = 0; i < commenters.size(); i += size) {
+            out.add(List.copyOf(commenters.subList(i, Math.min(i + size, commenters.size()))));
+        }
+        return out;
+    }
+
+    /**
+     * Remap refs with a batch prefix so merged trees never collide; drop items past {@code remainingCap}.
+     * Top-level first, then replies whose parentRef remaps within the same batch.
+     */
+    static void appendRemappedItems(
+            List<Map<String, Object>> dest, Set<String> usedRefs,
+            Map<String, Object> response, String batchPrefix, int remainingCap) {
+        if (remainingCap <= 0) return;
         Object rawItems = response.get("items");
-        if (!(rawItems instanceof List<?> rows)) return;
+        if (!(rawItems instanceof List<?> rows) || rows.isEmpty()) return;
+
+        Map<String, String> refMap = new LinkedHashMap<>();
+        List<Map<String, Object>> staged = new ArrayList<>();
+
+        for (Object raw : rows) {
+            if (!(raw instanceof Map<?, ?> row)) continue;
+            Object parent = row.get("parentRef");
+            if (parent != null && !String.valueOf(parent).isBlank()) continue;
+            String ref = textStatic(row.get("ref"));
+            if (ref.isBlank()) continue;
+            String mapped = uniqueRef(batchPrefix, ref, usedRefs);
+            usedRefs.add(mapped);
+            refMap.put(ref, mapped);
+            Map<String, Object> copy = copyItemRow(row);
+            copy.put("ref", mapped);
+            copy.put("parentRef", null);
+            staged.add(copy);
+        }
+        for (Object raw : rows) {
+            if (!(raw instanceof Map<?, ?> row)) continue;
+            Object parent = row.get("parentRef");
+            if (parent == null || String.valueOf(parent).isBlank()) continue;
+            String mappedParent = refMap.get(String.valueOf(parent).trim());
+            if (mappedParent == null) continue;
+            String ref = textStatic(row.get("ref"));
+            if (ref.isBlank()) continue;
+            String mapped = uniqueRef(batchPrefix, ref, usedRefs);
+            usedRefs.add(mapped);
+            refMap.put(ref, mapped);
+            Map<String, Object> copy = copyItemRow(row);
+            copy.put("ref", mapped);
+            copy.put("parentRef", mappedParent);
+            staged.add(copy);
+        }
+
+        int left = remainingCap;
+        for (Map<String, Object> item : staged) {
+            if (left <= 0) break;
+            dest.add(item);
+            left--;
+        }
+    }
+
+    static Map<String, Object> copyItemRow(Map<?, ?> row) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : row.entrySet()) {
+            copy.put(String.valueOf(e.getKey()), e.getValue());
+        }
+        return copy;
+    }
+
+    static String uniqueRef(String batchPrefix, String original, Set<String> used) {
+        String base = (batchPrefix + "_" + original).replaceAll("[^A-Za-z0-9_-]", "_");
+        if (base.isEmpty() || !Character.isLetter(base.charAt(0))) base = "r" + base;
+        if (base.length() > 64) base = base.substring(0, 64);
+        String candidate = base;
+        int n = 2;
+        while (used.contains(candidate)) {
+            String suffix = "_" + n++;
+            candidate = base.substring(0, Math.min(base.length(), 64 - suffix.length())) + suffix;
+        }
+        return candidate;
+    }
+
+    private static String textStatic(Object value) {
+        if (value == null) return "";
+        return LiteralNewlineNormalizer.normalize(String.valueOf(value)).trim();
+    }
+
+    /**
+     * Soft cast check at generation time. Out-of-cast items are dropped later by
+     * {@link ThreadQualityGate} — do not reject the whole bundle here.
+     */
+    static int countOutOfCast(Map<String, Object> response, Set<String> castIds) {
+        if (castIds == null || castIds.isEmpty()) return 0;
+        Object rawItems = response.get("items");
+        if (!(rawItems instanceof List<?> rows)) return 0;
+        int bad = 0;
         for (Object raw : rows) {
             if (!(raw instanceof Map<?, ?> row)) continue;
             Object pid = row.get("personaId");
             if (pid == null) continue;
             String id = String.valueOf(pid).trim();
-            if (!id.isEmpty() && !castIds.contains(id)) {
-                throw new IllegalArgumentException("personaId not in requested cast: " + id);
-            }
+            if (!id.isEmpty() && !castIds.contains(id)) bad++;
         }
+        return bad;
+    }
+
+    /** Soft alias — logs nothing; {@link ThreadQualityGate} enforces cast at persist. */
+    static void validateCast(Map<String, Object> response, Set<String> castIds) {
+        countOutOfCast(response, castIds);
     }
 
     private static void applyProvenance(CreatePostDto.CreatePostDtoBuilder b,

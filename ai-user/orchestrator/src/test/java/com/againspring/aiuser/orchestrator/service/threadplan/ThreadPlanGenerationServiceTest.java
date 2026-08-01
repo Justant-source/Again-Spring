@@ -50,9 +50,10 @@ class ThreadPlanGenerationServiceTest {
     @BeforeEach
     void setUp() {
         CandidateScheduleSupport scheduleSupport = new CandidateScheduleSupport(properties);
+        ThreadQualityGate qualityGate = new ThreadQualityGate(safetyGuard);
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
-                planService, llmClient, safetyGuard, properties, configRepository,
+                planService, llmClient, qualityGate, properties, configRepository,
                 scheduleSupport, planPersonaMapper
         );
     }

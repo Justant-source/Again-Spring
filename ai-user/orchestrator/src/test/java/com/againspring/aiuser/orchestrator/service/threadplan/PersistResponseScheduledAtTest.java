@@ -23,8 +23,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,10 +48,15 @@ class PersistResponseScheduledAtTest {
     @BeforeEach
     void setUp() {
         scheduleSupport = new CandidateScheduleSupport(properties);
+        ThreadQualityGate qualityGate = new ThreadQualityGate(safetyGuard);
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
-                planService, llmClient, safetyGuard, properties, configRepository,
+                planService, llmClient, qualityGate, properties, configRepository,
                 scheduleSupport, planPersonaMapper);
+        when(properties.getThreadPlan()).thenReturn(threadPlanConfig);
+        when(threadPlanConfig.getReadyMinTopLevel()).thenReturn(1);
+        when(threadPlanConfig.getReadyMinItems()).thenReturn(1);
+        when(threadPlanConfig.getStanceShareMax()).thenReturn(0.80);
     }
 
     @Test
@@ -65,27 +70,27 @@ class PersistResponseScheduledAtTest {
                 .build();
         when(planRepository.findById("plan-1")).thenReturn(Optional.of(plan));
         when(personaRepository.existsById("p1")).thenReturn(true);
-        when(personaRepository.findByActiveTrue()).thenReturn(List.of());
         when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
         when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("ref", "c1");
         item.put("personaId", "p1");
-        item.put("body", "미리 지정된 시각 댓글");
+        item.put("body", "미리 지정된 시각 댓글입니다 충분");
         item.put("scheduledAt", stored.toString());
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("items", List.of(item));
 
-        service.persistResponse("plan-1", response);
+        ThreadQualityGate.QualityResult result = service.persistResponse("plan-1", response, Set.of("p1"));
 
+        assertThat(result.passedOperationalMin()).isTrue();
         ArgumentCaptor<AiThreadPlanItem> captor = ArgumentCaptor.forClass(AiThreadPlanItem.class);
         verify(itemRepository).save(captor.capture());
         assertThat(captor.getValue().getScheduledAt()).isEqualTo(stored);
     }
 
     @Test
-    void persistResponseRejectsPersonaOutsideCast() {
+    void persistResponseDropsPersonaOutsideCast() {
         AiThreadPlan plan = AiThreadPlan.builder()
                 .id("plan-2")
                 .postId("post-2")
@@ -96,12 +101,46 @@ class PersistResponseScheduledAtTest {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("ref", "c1");
         item.put("personaId", "outsider");
-        item.put("body", "캐스트 밖 페르소나");
+        item.put("body", "캐스트 밖 페르소나 댓글입니다");
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("items", List.of(item));
 
-        assertThatThrownBy(() -> service.persistResponse("plan-2", response, Set.of("p1", "p2")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("not in requested cast");
+        ThreadQualityGate.QualityResult result =
+                service.persistResponse("plan-2", response, Set.of("p1", "p2"));
+
+        assertThat(result.passedOperationalMin()).isFalse();
+        assertThat(result.keptItems()).isEmpty();
+        assertThat(result.reasons()).anyMatch(r -> r.startsWith("CAST:"));
+        verify(itemRepository, never()).save(any());
+    }
+
+    @Test
+    void persistAndFinalizeMarksFailedWhenBelowReadyMin() {
+        when(threadPlanConfig.getReadyMinTopLevel()).thenReturn(3);
+        when(threadPlanConfig.getReadyMinItems()).thenReturn(6);
+
+        AiThreadPlan plan = AiThreadPlan.builder()
+                .id("plan-3")
+                .postId("post-3")
+                .publishedAt(Instant.parse("2026-08-01T11:00:00Z"))
+                .build();
+        when(planRepository.findById("plan-3")).thenReturn(Optional.of(plan));
+        when(personaRepository.existsById("p1")).thenReturn(true);
+        when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("ref", "c1");
+        item.put("personaId", "p1");
+        item.put("body", "하나뿐인 댓글이라 운영 하한 미달");
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("items", List.of(item));
+
+        ThreadQualityGate.QualityResult result =
+                service.persistAndFinalize("plan-3", response, Set.of("p1"));
+
+        assertThat(result.passedOperationalMin()).isFalse();
+        verify(planService).markFailed("plan-3", ThreadQualityGate.FAILURE_QUALITY_BELOW_MIN);
+        verify(planService, never()).markReady(any());
+        verify(itemRepository, never()).save(any());
     }
 }

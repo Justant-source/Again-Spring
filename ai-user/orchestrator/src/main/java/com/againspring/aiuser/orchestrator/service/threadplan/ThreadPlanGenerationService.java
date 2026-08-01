@@ -13,7 +13,6 @@ import com.againspring.aiuser.orchestrator.repository.AiThreadPlanItemRepository
 import com.againspring.aiuser.orchestrator.repository.AiThreadPlanRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
-import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +36,7 @@ public class ThreadPlanGenerationService {
     private final PersonaRepository personaRepository;
     private final ThreadPlanService planService;
     private final LlmAiUserClient llmClient;
-    private final ContentSafetyGuard safetyGuard;
+    private final ThreadQualityGate qualityGate;
     private final OrchestratorProperties properties;
     private final AiUserGenerationConfigRepository configRepository;
     private final CandidateScheduleSupport candidateScheduleSupport;
@@ -71,9 +70,7 @@ public class ThreadPlanGenerationService {
             return;
         }
         try {
-            persistResponse(planId, response.get(), built.castIds());
-            planService.markReady(planId);
-            planService.activate(planId);
+            persistAndFinalize(planId, response.get(), built.castIds());
         } catch (IllegalArgumentException e) {
             log.warn("Plan {} rejected: {}", planId, e.getMessage());
             planService.markFailed(planId, "INVALID_STRUCTURED_OUTPUT");
@@ -93,40 +90,85 @@ public class ThreadPlanGenerationService {
         r.put("postRevision", (long) plan.getPostRevision()); r.put("existingTitle", nullToEmpty(plan.getSourceTitle()));
         r.put("existingBody", nullToEmpty(plan.getSourceBody())); r.put("category", nullToEmpty(plan.getSourceCategory()));
         int roots = Math.min(14, pool); r.put("personas", personas); r.put("maxTopLevel", roots); r.put("maxReplies", pool - roots);
+        // Floor=1 so LLM parsePlan accepts sparse plans; quality gate (WP4) drops later.
+        r.put("minTopLevel", 1); r.put("minItems", 1);
         return new PlanRequestBuilt(r, castIds);
     }
 
     private record PlanRequestBuilt(Map<String, Object> request, Set<String> castIds) { }
 
-    /** Persist without an explicit cast set — uses currently active persona ids as the cast. */
+    /**
+     * Single insertion point for hold replay and live publish: quality-gate → persist kept
+     * → READY+ACTIVE or FAILED({@link ThreadQualityGate#FAILURE_QUALITY_BELOW_MIN}).
+     */
     @Transactional
-    void persistResponse(String planId, Map<String, Object> response) {
-        Set<String> castIds = personaRepository.findByActiveTrue().stream()
-                .map(Persona::getId)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        persistResponse(planId, response, castIds);
+    public ThreadQualityGate.QualityResult persistAndFinalize(String planId, Map<String, Object> response) {
+        return persistAndFinalize(planId, response, null);
     }
 
     @Transactional
+    public ThreadQualityGate.QualityResult persistAndFinalize(String planId, Map<String, Object> response,
+                                                               Set<String> allowedPersonaIds) {
+        ThreadQualityGate.QualityResult quality = persistResponse(planId, response, allowedPersonaIds);
+        if (quality.passedOperationalMin()) {
+            planService.markReady(planId);
+            planService.activate(planId);
+        } else {
+            log.warn("Plan {} below READY mins (kept={}, dropped={}): {}",
+                    planId, quality.keptItems().size(), quality.dropped(), quality.reasons());
+            planService.markFailed(planId, ThreadQualityGate.FAILURE_QUALITY_BELOW_MIN);
+        }
+        return quality;
+    }
+
+    /** Persist without an explicit cast set — uses currently active persona ids as the cast. */
+    @Transactional
+    ThreadQualityGate.QualityResult persistResponse(String planId, Map<String, Object> response) {
+        return persistResponse(planId, response, null);
+    }
+
+    /**
+     * Runs {@link ThreadQualityGate}, then persists only kept items when operational mins pass.
+     * Does not invent filler. Callers that need READY/FAILED should use {@link #persistAndFinalize}.
+     *
+     * @param allowedPersonaIds {@code null} → active personas; empty set → skip cast check
+     */
+    @Transactional
     @SuppressWarnings("unchecked")
-    void persistResponse(String planId, Map<String, Object> response, Set<String> allowedPersonaIds) {
+    ThreadQualityGate.QualityResult persistResponse(String planId, Map<String, Object> response,
+                                                     Set<String> allowedPersonaIds) {
         AiThreadPlan plan = planRepository.findById(planId).orElseThrow();
         Object rawItems = response.get("items");
-        if (!(rawItems instanceof List<?> rows) || rows.isEmpty() || rows.size() > 24) throw new IllegalArgumentException("invalid item count");
-        Set<String> cast = allowedPersonaIds == null ? Set.of() : allowedPersonaIds;
+        if (!(rawItems instanceof List<?> rows) || rows.isEmpty() || rows.size() > 24) {
+            throw new IllegalArgumentException("invalid item count");
+        }
+        Set<String> cast = allowedPersonaIds != null
+                ? allowedPersonaIds
+                : personaRepository.findByActiveTrue().stream()
+                        .map(Persona::getId)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        OrchestratorProperties.ThreadPlan cfg = properties.getThreadPlan();
+        ThreadQualityGate.QualityResult quality = qualityGate.evaluate(
+                rows,
+                cast,
+                personaRepository::existsById,
+                cfg.getReadyMinTopLevel(),
+                cfg.getReadyMinItems(),
+                cfg.getStanceShareMax());
+
+        if (!quality.passedOperationalMin()) {
+            // Do not store a thin tree that will never go READY — avoids orphan SCHEDULED rows.
+            return quality;
+        }
+
         Map<String, String> refs = new HashMap<>();
         int sequence = 0;
-        for (Object raw : rows) {
-            if (!(raw instanceof Map<?, ?> row)) throw new IllegalArgumentException("invalid item");
-            String ref = text(row.get("ref")); String parentRef = text(row.get("parentRef"));
-            String body = text(row.get("body")); String personaId = text(row.get("personaId"));
-            if (ref.isBlank() || body.isBlank() || personaId.isBlank() || body.length() > 2000 || refs.containsKey(ref)) throw new IllegalArgumentException("invalid candidate");
-            if (!cast.isEmpty() && !cast.contains(personaId)) {
-                throw new IllegalArgumentException("personaId not in requested cast: " + personaId);
-            }
-            if (!personaRepository.existsById(personaId) || !safetyGuard.check(body, ContentSafetyGuard.ContentType.COMMENT).passed()) throw new IllegalArgumentException("unsafe candidate");
+        for (Map<String, Object> row : quality.keptItems()) {
+            String ref = text(row.get("ref"));
+            String parentRef = text(row.get("parentRef"));
+            String body = text(row.get("body"));
+            String personaId = text(row.get("personaId"));
             String parentItemId = parentRef.isBlank() ? null : refs.get(parentRef);
-            if (!parentRef.isBlank() && parentItemId == null) throw new IllegalArgumentException("unknown parent");
             ThreadPlanItemType type = parentItemId == null ? ThreadPlanItemType.COMMENT : ThreadPlanItemType.REPLY;
             Instant stored = candidateScheduleSupport.parseScheduledAt(row.get("scheduledAt"));
             Instant scheduled = stored != null
@@ -137,11 +179,12 @@ public class ThreadPlanGenerationService {
                     .status(ThreadPlanItemStatus.SCHEDULED).sequenceNo(sequence).parentItemId(parentItemId)
                     .personaId(personaId).targetPostId(plan.getPostId()).body(body).scheduledAt(scheduled)
                     .notBefore(scheduled).idempotencyKey(planId + ":" + ref);
-            // W1-H: persist stance / source_example_id when entity already has setters.
             applyOptionalItemFields(itemBuilder, row);
             AiThreadPlanItem item = itemBuilder.build();
-            itemRepository.save(item); refs.put(ref, item.getId());
+            itemRepository.save(item);
+            refs.put(ref, item.getId());
         }
+        return quality;
     }
 
     /** Soft-set stance / sourceExampleId if W1-H entity fields exist; otherwise no-op. */

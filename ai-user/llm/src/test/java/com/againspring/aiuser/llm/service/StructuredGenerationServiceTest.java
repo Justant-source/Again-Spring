@@ -210,6 +210,47 @@ class StructuredGenerationServiceTest {
         assertEquals("casual", StructuredGenerationService.resolveFormality(p));
     }
 
+    @Test
+    void parsePlanRejectsSparsePlanWhenMinsUnspecifiedLegacyFloor() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(sparsePlanJson(1));
+
+        ThreadPlanRequest request = planRequest(); // minTopLevel/minItems null → legacy 6/12
+        assertThrows(StructuredGenerationException.class, () -> service.createThreadPlan(request, "corr-legacy-floor"));
+    }
+
+    @Test
+    void parsePlanAcceptsSparsePlanWhenExplicitMinOne() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(sparsePlanJson(1));
+
+        ThreadPlanRequest request = planRequest();
+        request.setMinTopLevel(1);
+        request.setMinItems(1);
+
+        ThreadPlanResponse response = service.createThreadPlan(request, "corr-min-one");
+        assertNotNull(response.getPost());
+        assertEquals(1, response.getItems().size());
+    }
+
+    @Test
+    void parsePlanHonorsExplicitMinsAboveOne() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(sparsePlanJson(2));
+
+        ThreadPlanRequest request = planRequest();
+        request.setMinTopLevel(3);
+        request.setMinItems(3);
+
+        assertThrows(StructuredGenerationException.class, () -> service.createThreadPlan(request, "corr-min-three"));
+    }
+
     private static StructuredGenerationService configuredService(LlmWorkerPool pool, SelfCritiqueService critique) {
         StructuredGenerationService service = new StructuredGenerationService(pool, critique);
         ReflectionTestUtils.setField(service, "codexTerra", "gpt-5.6-terra");
@@ -259,5 +300,17 @@ class StructuredGenerationServiceTest {
             items.add("{\"ref\":\"c" + i + "\",\"parentRef\":" + parent + ",\"personaId\":\"" + persona + "\",\"body\":\"" + body + "\"}");
         }
         return "{\"post\":{\"title\":\"한국어 제목입니다\",\"body\":\"" + postBody + "\"},\"comments\":[" + String.join(",", items) + "]}";
+    }
+
+    /** Sparse plan with {@code topCount} top-level comments only (no replies). */
+    private static String sparsePlanJson(int topCount) {
+        List<String> items = new ArrayList<>();
+        for (int i = 1; i <= topCount; i++) {
+            String persona = "p" + ((i - 1) % 6 + 1);
+            items.add("{\"ref\":\"c" + i + "\",\"parentRef\":null,\"personaId\":\"" + persona
+                    + "\",\"body\":\"한국어 댓글 " + i + "입니다\"}");
+        }
+        return "{\"post\":{\"title\":\"한국어 제목입니다\",\"body\":\"한국어 게시글 본문입니다. 충분히 자연스러운 내용입니다.\"},\"comments\":["
+                + String.join(",", items) + "]}";
     }
 }

@@ -108,9 +108,31 @@ public class OrchestratorProperties {
         private int humanReplyMaxComments = 50;
         /** 글+최대 24개 후보를 한 번에 요청하는 구조화 생성용 타임아웃 (단건 생성보다 오래 걸림). */
         private long bundleTimeoutMs = 240000;
+        /**
+         * When true (default), AI_POST bundle generation splits comment personas into
+         * 4~6-sized micro-batches inside the initial job (no publish-time LLM).
+         * When false, keeps the legacy single mega-call with the full cast.
+         */
+        private boolean microBatchEnabled = true;
+        /** Personas per micro-batch (clamped to 4..6 at use via {@link #resolvedMicroBatchSize()}). */
+        private int microBatchSize = 5;
+        /**
+         * After {@code ThreadQualityGate}, plan is READY only if kept top-level ≥ this
+         * and kept items ≥ {@link #readyMinItems}. Below → {@code QUALITY_BELOW_MIN_ITEMS}.
+         */
+        private int readyMinTopLevel = 3;
+        private int readyMinItems = 6;
+        /** Max share of any single stance among stance-bearing kept items (WP4 hard invariant). */
+        private double stanceShareMax = 0.80;
         private Map<Integer, Double> kstHourlyHumanWeights = defaultKstWeights();
         /** Engagement (likes/views) reconciler settings. */
         private Engagement engagement = new Engagement();
+
+        /** Effective micro-batch size clamped to the plan contract (4..6). */
+        public int resolvedMicroBatchSize() {
+            int size = microBatchSize <= 0 ? 5 : microBatchSize;
+            return Math.max(4, Math.min(6, size));
+        }
 
         /**
          * 20~40대 커뮤니티 체류 패턴 근사치(2026-07-31 결정, 실측 데이터 아님 — 출퇴근 소피크·

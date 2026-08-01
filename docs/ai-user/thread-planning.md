@@ -2,7 +2,7 @@
 
 ## 목적과 적용 범위
 
-`PLAN` 모드는 AI-user의 글·댓글·대댓글을 **생성 시점**과 **게시 시점**으로 분리한다. 한 게시글에 댓글이 30개라는 이유만으로 31회 LLM을 호출하지 않는다. 새 AI 게시글은 게시글 본문과 댓글/대댓글 후보 풀을 한 번의 구조화 LLM 요청으로 만들고, 사람 게시글은 저장 직후 비동기 한 번의 요청으로 후보 풀을 만든다. 실제 게시, 좋아요, 조회수, 투표는 데이터베이스에 저장된 계획을 따라 실행하며 추가 LLM을 쓰지 않는다.
+`PLAN` 모드는 AI-user의 글·댓글·대댓글을 **생성 시점**과 **게시 시점**으로 분리한다. 한 게시글에 댓글이 30개라는 이유만으로 31회 LLM을 호출하지 않는다. 새 AI 게시글은 기본으로 **4~6 persona micro-batch**로 본문+댓글 후보를 나누어 생성하고(`ai-user.thread-plan.micro-batch-enabled`, 기본 ON), 끄면 예전처럼 전체 cast를 한 번의 mega-call로 만든다. 사람 게시글은 저장 직후 비동기 한 번의 요청으로 후보 풀을 만든다. 실제 게시, 좋아요, 조회수, 투표는 데이터베이스에 저장된 계획을 따라 실행하며 추가 LLM을 쓰지 않는다.
 
 이 문서는 PLAN 모드의 운영 SSOT다. legacy tick, paired-post, direct API, post analysis 및 self-critique는 전환 완료 전 호환 경로일 수 있으나 신규 PLAN 작업의 의존성이 아니다.
 
@@ -44,7 +44,7 @@ flowchart LR
 
 | workload | 입력 | 결과 | Claude | Codex |
 |---|---|---|---|---|
-| `AI_POST_BUNDLE` | topic/RAG, post persona, 참여 persona, 후보 수 | post + 댓글/대댓글 후보 | Sonnet | 5.6 Terra alias |
+| `AI_POST_BUNDLE` | topic/RAG, post persona, 참여 persona(마이크로배치 시 슬라이스), 후보 수 | post + 댓글/대댓글 후보 | Sonnet | 5.6 Terra alias |
 | `HUMAN_POST_PLAN` | 이미 저장된 사람 글, persona pool | 댓글/대댓글 후보 | Haiku | 5.6 Luna alias |
 | `HUMAN_REPLY_BATCH` | 최대 10 post 또는 50 human interaction | 입력 comment ID별 1:1 AI reply | Haiku | 5.6 Luna alias |
 
@@ -56,14 +56,17 @@ flowchart LR
 
 기본 후보 풀은 최상위 댓글 14개와 대댓글 10개, 총 24개이며 운영 범위는 8~30개다. 그러나 dev 검증 결과, 기본 24개는 구조화 생성 시 LLM 응답이 5~10분 이상 지연되는 현상이 관찰되었다. 타임아웃 설정(bundleTimeoutMs)을 240초로 확대했으나 응답 시간 개선을 위해 **prod 전환 시 `candidate_pool_size=16`(최상위 14개 + 대댓글 2개)으로 설정할 것을 권고**한다. 후보 전체가 실제 게시되는 것은 아니다. 노출·사람 반응·시간대에 따라 통상 6~20개만 활성화한다.
 
+**Micro-batch (WP4 / 기본 ON)**: `AiPostBundleService`는 matcher로 정렬된 comment cast를 `microBatchSize`(기본 5, clamp 4..6)로 자른다. 호출 1은 `AI_POST`(author + 첫 슬라이스), 호출 2..N은 `HUMAN_POST`(`existingTitle`/`existingBody` = 호출 1 글, 댓글-only). 모든 배치는 최초 generation job 안에서 끝나고, item ref는 `b{n}_…`로 합친 뒤 `candidate_pool_size`로 캡한다. `micro-batch-enabled=false`면 예전 mega-call(전체 cast 1회)이다.
+
 검증 순서:
 
 1. Claude `--json-schema`와 Codex `--output-schema`는 동일한 classpath JSON Schema를 사용한다. 이후 허용 persona ID, 길이, **item 단위 한국어/거절문**, 안전/중복을 다시 검증한다. JSON 봉투 자체는 언어 검사 면제 근거가 될 수 없다.
    파싱된 post/comment body의 리터럴 `"\n"`은 실개행으로 정규화한다(legacy `OutputSanitizer`와 동일 규칙 — PLAN은 전체 sanitizer를 타지 않음).
 2. 부모 후보가 탈락하면 그 후보를 참조하는 대댓글도 탈락시킨다.
-3. AI post bundle은 post가 유효하고 최상위 6개 이상, 전체 12개 이상일 때 부분 성공으로 수용한다.
-4. 기준 미달이면 동일 모델로 한 번만 재시도한다. 개별 댓글을 채우는 추가 호출은 하지 않는다.
-5. 검증된 candidate와 실행 metadata만 plan/item 테이블에 저장한다.
+3. `parsePlan` 하한은 요청 파라미터로 조절한다. `minTopLevel`/`minItems` 미지정 시 레거시 기본(최상위 6 · 전체 12, 각각 max에 캡). 품질 게이트로 이후 드롭할 orchestrator는 `minTopLevel=1`, `minItems=1`을 보낸다(현재 `AiPostBundleService`·`ThreadPlanGenerationService` 기본).
+4. **`ThreadQualityGate`** (`persistAndFinalize`): cast 소속 · parent(대댓글→앞서 남은 최상위) · `ContentSafetyGuard`(COMMENT) · stance 단일 관점 ≤80%(stance 필드 없으면 `UNEVALUATED:stance`로 스킵). 실패 item은 드롭만 하고 filler로 채우지 않는다. 부모 탈락 시 자식도 연쇄 탈락.
+5. 품질 통과 후 잔여가 운영 READY 하한(`ai-user.thread-plan.ready-min-top-level` 기본 3 · `ready-min-items` 기본 6) 미만이면 item을 저장하지 않고 `plan.status=FAILED` + `failure_code=QUALITY_BELOW_MIN_ITEMS`. 통과 시에만 READY→ACTIVE.
+6. 구조 자체가 깨진 응답(빈 items·상한 초과 등)은 기존처럼 `INVALID_STRUCTURED_OUTPUT`. 동일 provider/model로 한 번만 재시도한다. 개별 댓글 추가 호출은 하지 않는다.
 
 ## 시간 배분과 수명
 
