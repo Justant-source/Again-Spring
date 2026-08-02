@@ -82,7 +82,8 @@ public class AiPostBundleService {
 
         CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
                 .userTitle(bundle.content.title()).bodyRaw(bundle.content.body()).category(category)
-                .visibility("PUBLIC").jurorCount(0);
+                .visibility("PUBLIC").jurorCount(0)
+                .captureSplitAfterLine(bundle.content.captureSplitAfterLine());
         applyProvenance(postBuilder, bundle.source);
         Optional<PostDto> published = backendBot.createPost(jwt, postBuilder.build());
         if (published.isEmpty() || published.get().getId() == null) return Optional.empty();
@@ -322,9 +323,11 @@ public class AiPostBundleService {
 
         merged.put("items", mergedItems);
         // Drop follow-up post payloads if any slipped through; keep call-1 post only.
-        if (merged.get("post") == null && postContent != null) {
-            merged.put("post", Map.of("title", postContent.title(), "body", postContent.body()));
-        }
+        Map<String, Object> postMap = new LinkedHashMap<>();
+        postMap.put("title", postContent.title());
+        postMap.put("body", postContent.body());
+        postMap.put("capture_split_after_line", postContent.captureSplitAfterLine());
+        merged.put("post", postMap);
         log.info("AI post micro-batch done corr={} batches={} items={}/{} size={}",
                 correlationId, slices.size(), mergedItems.size(), pool,
                 properties.getThreadPlan().resolvedMicroBatchSize());
@@ -605,7 +608,41 @@ public class AiPostBundleService {
         if (titleNorm.equals(bodyNorm)) throw new IllegalArgumentException("title must differ from body");
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(body, ContentSafetyGuard.ContentType.POST);
         if (!guard.passed()) throw new IllegalArgumentException("unsafe post: " + guard.reason());
-        return new PostContent(title, body);
+        Integer split = resolveCaptureSplit(body, readCaptureSplit(raw));
+        return new PostContent(title, body, split);
+    }
+
+    private static Integer readCaptureSplit(Map<?, ?> post) {
+        Object v = post.get("capture_split_after_line");
+        if (v == null) v = post.get("captureSplitAfterLine");
+        if (v instanceof Number n) return n.intValue();
+        if (v instanceof String s && !s.isBlank()) {
+            try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ignored) { return null; }
+        }
+        return null;
+    }
+
+    /**
+     * Prefer a valid LLM split; else heuristic when body has more than 12 non-empty newline blocks.
+     * Mirrors backend {@code CaptureSplitSupport} (SHORT_POST_MAX_BLOCKS=12).
+     */
+    static Integer resolveCaptureSplit(String body, Integer proposed) {
+        int n = countNonEmptyBlocks(body);
+        if (n <= 12) return null;
+        if (proposed != null && proposed >= 1 && proposed < n) return proposed;
+        int split = (int) Math.round(n * 0.6);
+        if (split < 1) split = 1;
+        if (split >= n) split = n - 1;
+        return split;
+    }
+
+    static int countNonEmptyBlocks(String body) {
+        if (body == null || body.isBlank()) return 0;
+        int c = 0;
+        for (String line : body.split("\\R", -1)) {
+            if (!line.isBlank()) c++;
+        }
+        return c;
     }
 
     private static String text(Object value) {
@@ -613,7 +650,7 @@ public class AiPostBundleService {
         return LiteralNewlineNormalizer.normalize(String.valueOf(value)).trim();
     }
 
-    private record PostContent(String title, String body) { }
+    private record PostContent(String title, String body, Integer captureSplitAfterLine) { }
 
     public record PublishedBundle(PostDto post, String body, Long sourceExampleId) {
         public PublishedBundle(PostDto post, String body) {

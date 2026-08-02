@@ -73,6 +73,20 @@ public class CreateJobRequest {
         private List<String> tags;
 
         private PolicyDto policy;
+
+        /**
+         * 1-based last front-half newline block for story capture split.
+         * null → short post (no part2) or ASM falls back to visual-line cut.
+         */
+        @JsonProperty("capture_split_after_line")
+        private Integer captureSplitAfterLine;
+
+        /**
+         * Candidate CSS Y for part1 crop (verification + ASM fallback).
+         * Authoritative cut is DOM measurement at the split block boundary.
+         */
+        @JsonProperty("part1_height_css")
+        private Double part1HeightCss;
     }
 
     @Getter

@@ -29,4 +29,9 @@ public class CreatePostDto {
     private String sourceOriginalTitle;
     /** 크롤 원본 본문 스냅샷 (최대 2000자) */
     private String sourceOriginalBody;
+    /**
+     * X/IG 캡쳐 전반부 끝 개행 블록(1-based). PLAN LLM이 고른 값.
+     * null이면 backend가 본문으로 휴리스틱 채움.
+     */
+    private Integer captureSplitAfterLine;
 }

@@ -10,7 +10,11 @@
       "required": ["title", "body"],
       "properties": {
         "title": { "type": "string" },
-        "body": { "type": "string" }
+        "body": { "type": "string" },
+        "capture_split_after_line": {
+          "type": ["integer", "null"],
+          "description": "1-based index of the last non-empty newline block in the front half when body has more than 12 such blocks; null otherwise"
+        }
       }
     },
     "comments": {

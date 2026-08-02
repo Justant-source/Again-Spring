@@ -67,7 +67,8 @@ public class ScheduledPostPublisher {
                     .userTitle(row.getTitle())
                     .bodyRaw(LiteralNewlineNormalizer.normalize(row.getBody()))
                     .category(row.getCategory())
-                    .visibility("PUBLIC").jurorCount(0);
+                    .visibility("PUBLIC").jurorCount(0)
+                    .captureSplitAfterLine(readCaptureSplitFromCandidates(row.getCandidatesJson(), row.getBody()));
             applyProvenanceFromCandidates(postBuilder, row.getCandidatesJson());
             Optional<PostDto> published = backend.createPost(jwt.get(), postBuilder.build());
             if (published.isEmpty() || published.get().getId() == null) {
@@ -121,6 +122,27 @@ public class ScheduledPostPublisher {
         } catch (Exception e) {
             log.debug("Could not read source provenance from candidates: {}", e.getMessage());
         }
+    }
+
+    /** Reads capture_split_after_line from held PLAN JSON; falls back to body heuristic. */
+    @SuppressWarnings("unchecked")
+    private Integer readCaptureSplitFromCandidates(String candidatesJson, String body) {
+        Integer proposed = null;
+        if (candidatesJson != null && !candidatesJson.isBlank()) {
+            try {
+                Map<String, Object> response = objectMapper.readValue(candidatesJson, new TypeReference<>() { });
+                Object postRaw = response.get("post");
+                if (postRaw instanceof Map<?, ?> post) {
+                    Object v = post.get("capture_split_after_line");
+                    if (v == null) v = post.get("captureSplitAfterLine");
+                    if (v instanceof Number n) proposed = n.intValue();
+                }
+            } catch (Exception e) {
+                log.debug("Could not read capture_split_after_line from candidates: {}", e.getMessage());
+            }
+        }
+        return AiPostBundleService.resolveCaptureSplit(
+                LiteralNewlineNormalizer.normalize(body), proposed);
     }
 
 }

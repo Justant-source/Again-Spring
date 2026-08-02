@@ -46,6 +46,13 @@ public class Post {
     @Column(name = "promo_title", length = 20)
     private String promoTitle;
 
+    /**
+     * X/IG 캡쳐 전반부 마지막 개행 블록(1-based).
+     * 본문 비어 있지 않은 줄이 13개 이상일 때만 설정. null = 분할 없음.
+     */
+    @Column(name = "capture_split_after_line")
+    private Integer captureSplitAfterLine;
+
     @Column(nullable = false)
     @Builder.Default
     private Integer jurorCount = 3;

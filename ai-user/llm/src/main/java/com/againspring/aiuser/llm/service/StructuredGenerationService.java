@@ -7,6 +7,7 @@ import com.againspring.aiuser.llm.pool.LlmWorkerPool;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,11 +16,14 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /** Builds isolated JSON-only prompts and rejects malformed or unsafe model output locally. */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StructuredGenerationService {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern META = Pattern.compile("(?i)(적용 처리 메모|작성 노트|<<<|```|i can't help|i am (claude|codex))");
+    /** Marketing X/IG capture: bodies with more than this many non-empty newline blocks need a split. */
+    public static final int SHORT_POST_MAX_BLOCKS = 12;
     private final LlmWorkerPool pool;
     private final SelfCritiqueService selfCritique;
 
@@ -60,7 +64,8 @@ public class StructuredGenerationService {
             // 제목 ≤40자(공백 포함)·제목≠본문 — 2026-08 prod 동일 제목/본문 회귀 방어
             validText(title, "post.title", 4, 40); validText(body, "post.body", 20, 6000);
             rejectIdenticalTitleBody(title, body);
-            post = ThreadPlanResponse.Post.builder().title(title).body(body).build();
+            Integer split = sanitizeCaptureSplit(body, readCaptureSplit(p));
+            post = ThreadPlanResponse.Post.builder().title(title).body(body).captureSplitAfterLine(split).build();
         }
         JsonNode comments = root.path("comments");
         if (!comments.isArray()) throw new StructuredGenerationException("comments must be an array");
@@ -140,7 +145,9 @@ public class StructuredGenerationService {
         if (refined == null || refined.equals(post.getBody())) return post;
         try {
             validText(refined, "post.body", 20, 6000);
-            return ThreadPlanResponse.Post.builder().title(post.getTitle()).body(refined).build();
+            Integer split = sanitizeCaptureSplit(refined, post.getCaptureSplitAfterLine());
+            return ThreadPlanResponse.Post.builder()
+                    .title(post.getTitle()).body(refined).captureSplitAfterLine(split).build();
         } catch (StructuredGenerationException ignored) {
             return post;
         }
@@ -264,10 +271,11 @@ public class StructuredGenerationService {
         }
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Create Korean community conversation candidates.
-                The JSON schema is {"post":{"title":"...","body":"..."},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                The JSON schema is {"post":{"title":"...","body":"...","capture_split_after_line":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed, not the whole story.
                 AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only teases the conflict.
+                AI_POST body line rules (hard): write body as one Korean sentence (or short sense unit) per newline — no blank lines; each non-empty line is a capture block. If the body has more than 12 non-empty lines, set capture_split_after_line to the 1-based index of the last front-half line (a natural pause: after setup/incident, before emotion/aftermath). Both halves must keep at least a few lines. If body has 12 or fewer non-empty lines, set capture_split_after_line to null.
                 """ + "\nKIND=" + req.getKind() + "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) + "\n" + existing +
                 grounding +
                 "\nPERSONAS=" + json(req.getPersonas()) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20)));
@@ -354,6 +362,44 @@ public class StructuredGenerationService {
         String b = collapseWs(body);
         if (t.isEmpty() || b.isEmpty()) return;
         if (t.equals(b)) throw new StructuredGenerationException("invalid post.title/body: title must differ from body");
+    }
+
+    /** Non-empty newline blocks in body (marketing capture unit). */
+    static int countNonEmptyBlocks(String body) {
+        if (body == null || body.isBlank()) return 0;
+        int n = 0;
+        for (String line : body.split("\\R", -1)) {
+            if (!line.isBlank()) n++;
+        }
+        return n;
+    }
+
+    /**
+     * Accept LLM split only when body has more than {@link #SHORT_POST_MAX_BLOCKS} blocks and
+     * {@code 1 ≤ split < blockCount}. Otherwise demote to null (do not fail the whole plan).
+     */
+    static Integer sanitizeCaptureSplit(String body, Integer proposed) {
+        int blocks = countNonEmptyBlocks(body);
+        if (blocks <= SHORT_POST_MAX_BLOCKS) {
+            if (proposed != null) {
+                log.debug("Demoting capture_split_after_line={} — body has {} blocks (≤{})",
+                        proposed, blocks, SHORT_POST_MAX_BLOCKS);
+            }
+            return null;
+        }
+        if (proposed == null) return null;
+        if (proposed < 1 || proposed >= blocks) {
+            log.warn("Demoting capture_split_after_line={} — out of range for {} blocks", proposed, blocks);
+            return null;
+        }
+        return proposed;
+    }
+
+    private static Integer readCaptureSplit(JsonNode postNode) {
+        JsonNode n = postNode.get("capture_split_after_line");
+        if (n == null || n.isNull()) n = postNode.get("captureSplitAfterLine");
+        if (n == null || n.isNull() || !n.isNumber()) return null;
+        return n.asInt();
     }
     private static String collapseWs(String s) {
         return s == null ? "" : s.replaceAll("\\s+", " ").trim();

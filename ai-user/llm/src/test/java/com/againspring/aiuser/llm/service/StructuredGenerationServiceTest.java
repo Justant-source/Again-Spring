@@ -52,6 +52,71 @@ class StructuredGenerationServiceTest {
     }
 
     @Test
+    void planPromptIncludesCaptureSplitRules() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(validPlanJson("한국어 댓글입니다"));
+
+        service.createThreadPlan(planRequest(), "corr-prompt-split");
+
+        var promptCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(pool).executeProviderTask(promptCaptor.capture(), anyString(), anyLong(), anyString(),
+                eq(LlmProvider.CODEX), eq(StructuredOutputSchema.THREAD_PLAN));
+        String prompt = promptCaptor.getValue();
+        assertTrue(prompt.contains("capture_split_after_line"), "split field in schema");
+        assertTrue(prompt.contains("more than 12 non-empty lines"), "12-block threshold");
+    }
+
+    @Test
+    void acceptsValidCaptureSplitForLongBody() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        String body = longBodyWithBlocks(15);
+        String json = planJsonWithTitleBodyAndSplit("한국어 제목입니다", body, 9, "한국어 댓글입니다");
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(json);
+
+        ThreadPlanResponse response = service.createThreadPlan(planRequest(), "corr-split-ok");
+        assertEquals(9, response.getPost().getCaptureSplitAfterLine());
+    }
+
+    @Test
+    void demotesCaptureSplitWhenBodyIsShort() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        String body = "한국어 게시글 본문입니다. 충분히 자연스러운 내용입니다.";
+        String json = planJsonWithTitleBodyAndSplit("한국어 제목입니다", body, 3, "한국어 댓글입니다");
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(json);
+
+        ThreadPlanResponse response = service.createThreadPlan(planRequest(), "corr-split-short");
+        assertEquals(null, response.getPost().getCaptureSplitAfterLine());
+    }
+
+    @Test
+    void demotesCaptureSplitOutOfRange() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        String body = longBodyWithBlocks(15);
+        String json = planJsonWithTitleBodyAndSplit("한국어 제목입니다", body, 15, "한국어 댓글입니다");
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(json);
+
+        ThreadPlanResponse response = service.createThreadPlan(planRequest(), "corr-split-oor");
+        assertEquals(null, response.getPost().getCaptureSplitAfterLine());
+    }
+
+    @Test
+    void sanitizeCaptureSplitHelpers() {
+        String longBody = longBodyWithBlocks(14);
+        assertEquals(14, StructuredGenerationService.countNonEmptyBlocks(longBody));
+        assertEquals(8, StructuredGenerationService.sanitizeCaptureSplit(longBody, 8));
+        assertEquals(null, StructuredGenerationService.sanitizeCaptureSplit(longBody, 14));
+        assertEquals(null, StructuredGenerationService.sanitizeCaptureSplit("한 줄만", 1));
+    }
+
+    @Test
     void planPromptIncludesTitleBodySeparationRules() throws Exception {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);
         StructuredGenerationService service = configuredService(pool, disabledCritique());
@@ -335,6 +400,10 @@ class StructuredGenerationServiceTest {
     }
 
     private static String planJsonWithTitleBody(String title, String postBody, String firstBody) {
+        return planJsonWithTitleBodyAndSplit(title, postBody, null, firstBody);
+    }
+
+    private static String planJsonWithTitleBodyAndSplit(String title, String postBody, Integer split, String firstBody) {
         List<String> items = new ArrayList<>();
         for (int i = 1; i <= 12; i++) {
             String body = i == 1 ? firstBody : "한국어 댓글 " + i + "입니다";
@@ -342,7 +411,20 @@ class StructuredGenerationServiceTest {
             String persona = "p" + ((i - 1) % 6 + 1);
             items.add("{\"ref\":\"c" + i + "\",\"parentRef\":" + parent + ",\"personaId\":\"" + persona + "\",\"body\":\"" + body + "\"}");
         }
-        return "{\"post\":{\"title\":\"" + title + "\",\"body\":\"" + postBody + "\"},\"comments\":[" + String.join(",", items) + "]}";
+        String splitJson = split == null ? "null" : String.valueOf(split);
+        String escapedBody = postBody.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
+        return "{\"post\":{\"title\":\"" + title + "\",\"body\":\"" + escapedBody
+                + "\",\"capture_split_after_line\":" + splitJson + "},\"comments\":["
+                + String.join(",", items) + "]}";
+    }
+
+    private static String longBodyWithBlocks(int blocks) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i <= blocks; i++) {
+            if (i > 1) sb.append('\n');
+            sb.append("한국어 사연 문장 ").append(i).append(" 번째입니다.");
+        }
+        return sb.toString();
     }
 
     /** Sparse plan with {@code topCount} top-level comments only (no replies). */

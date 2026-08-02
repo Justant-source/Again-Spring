@@ -76,18 +76,27 @@ X는 비로그인 접근이 402로 차단되어, nitter 미러(`nitter.privacyre
 모바일 뷰포트 `430×932`, `deviceScaleFactor: 3`, 로케일 `ko-KR`.
 캡처 전 상단 베타 배너(`베타 서비스 —`로 시작하고 높이 80px 미만인 요소)를 `display:none` 처리한다.
 
-**컷 지점은 브라우저가 계산한 실제 줄(wrap 포함) 경계로 잡는다**(`Range.getClientRects()`,
-2026-08-02 이전의 픽셀 빈 줄 탐지 방식에서 교체). 본문 `<p>`의 각 시각적 줄 rect를 구해
-`LINE_TARGET_FRACTION`(전체 줄 수의 60%) 지점에 가장 가까운 줄 경계에서 자른다 — 줄과 줄
-사이 여백만 컷 후보가 되므로 글자 중간을 자르는 사고가 구조적으로 불가능하다.
-(이전 방식은 빈 줄 탐지가 실패하면 이미지 정중앙으로 폴백해 글자를 반으로 자르는 사고가
-실제 게시 트윗에서 발생했다 — `job153`/`post_d21666606f7747528fed` 등, 2026-08-02 수정.)
+**컷 지점 (2026-08-03~)** — 의미 단락(개행 블록) 우선:
+
+1. 본문의 **비어 있지 않은 개행 블록** 수가 `SHORT_POST_MAX_LINES`(12) 이하면 미분할
+   (`storyPart2 = null`, 3단 스레드).
+2. 그보다 길면 AS brief의 `capture_split_after_line`(1-based 전반부 마지막 블록)에서
+   DOM `Range`로 블록 N 끝 ↔ N+1 시작 중점을 잰다 — **문장(블록) 중간을 자르지 않음**.
+3. PLAN LLM이 사연 생성 시 이 인덱스를 고르고 `posts.capture_split_after_line`에 저장한다.
+   없거나 범위 밖이면 BE가 `round(blockCount * 0.6)` 휴리스틱으로 채운다.
+4. BE `CaptureHeightCalculator`가 같은 상수로 `part1_height_css` 후보를 계산해 brief에 실어
+   ASM이 DOM Y와 비교·로그하고, DOM 실패 시 폴백으로 쓴다.
+5. 둘 다 실패하면 레거시 `LINE_TARGET_FRACTION`(시각 줄 60%) 컷.
+
+(2026-08-02: 시각 줄 `getClientRects`로 글자 중간 컷을 막았으나, wrap된 **문장 중간 줄**에서
+끊기는 문제는 남았다 — 개행 블록 분할로 보완.)
 
 공감 비율 막대는 좌우에 `RATIO_SIDE_PADDING_CSS`(32px, deviceScaleFactor 반영) 여백을 추가한 뒤
 상하 패딩으로 `RATIO_SAFE_ASPECT`(1.91:1)를 맞춘다 — 여백이 없으면 "작성자"/"상대방" 라벨이
 X 미리보기(축소 썸네일)에서 카드 가장자리에 붙어 잘려 보인다(2026-08-02 수정).
 
-구현 위치: `services/social-poster/src/routes/capture-x-thread.js` (ASM 리포).
+구현 위치: `services/social-poster/src/routes/capture-x-thread.js` (ASM 리포) ·
+AS `CaptureHeightCalculator` / `MarketingJobService` brief 필드.
 
 ### 2.2 계정 포지션
 

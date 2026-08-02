@@ -161,6 +161,12 @@ public class MarketingJobService {
 
         String postUrl = "https://againspring.net/community/" + postId;
 
+        Integer captureSplit = CaptureSplitSupport.resolveSplit(
+                post.getBodyPublished(), post.getCaptureSplitAfterLine());
+        boolean paired = post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null;
+        Double part1Height = CaptureHeightCalculator.part1HeightCss(
+                post.getTitle(), post.getBodyPublished(), captureSplit, paired);
+
         BriefDto brief = BriefDto.builder()
             .title(post.getTitle())
             .promoTitle(PromoTitleService.resolveOrFallback(post))
@@ -174,6 +180,8 @@ public class MarketingJobService {
             .voteLabels(voteLabels)
             .postUrl(postUrl)
             .tags(tags)
+            .captureSplitAfterLine(captureSplit)
+            .part1HeightCss(part1Height)
             .policy(PolicyDto.builder()
                 .noEmoji(true)
                 .forbiddenTerms(Arrays.asList("판결", "처방", "승패", "승자", "패자", "가해자", "피해자"))

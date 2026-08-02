@@ -48,4 +48,10 @@ public class PostCreateRequest {
     private String sourceUrl;
     private String sourceOriginalTitle;
     private String sourceOriginalBody;
+
+    /**
+     * X/IG 캡쳐 전반부 끝 개행 블록(1-based). AI 봇이 PLAN에서 전달.
+     * null이면 게시 시/마케팅 잡 생성 시 본문에서 휴리스틱 계산 가능.
+     */
+    private Integer captureSplitAfterLine;
 }

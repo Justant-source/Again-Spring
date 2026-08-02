@@ -96,11 +96,13 @@ public class CommunityPostController {
                         userId, idempotencyKey, BotWriteIdempotencyService.TargetType.POST,
                         () -> composeService.composeAndPublish(
                                 userId, request.getUserTitle(), request.getBodyRaw(), request.getCategory(),
-                                request.getVisibility(), request.getJurorCount(), request.getSessionId(), sourceSnapshot),
+                                request.getVisibility(), request.getJurorCount(), request.getSessionId(), sourceSnapshot,
+                                request.getCaptureSplitAfterLine()),
                         existingId -> postRepository.findById(existingId).orElse(null))
                 : new BotWriteIdempotencyService.Execution<>(composeService.composeAndPublish(
                         userId, request.getUserTitle(), request.getBodyRaw(), request.getCategory(),
-                        request.getVisibility(), request.getJurorCount(), request.getSessionId(), sourceSnapshot), true);
+                        request.getVisibility(), request.getJurorCount(), request.getSessionId(), sourceSnapshot,
+                        request.getCaptureSplitAfterLine()), true);
         Post post = execution.target();
 
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());

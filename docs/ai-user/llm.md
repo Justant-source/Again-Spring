@@ -12,7 +12,7 @@
 | `POST` | `/generate/persona` | 페르소나 JSON 생성 |
 | `POST` | `/internal/rewrite/post` | legacy synthetic 게시글 부분 교정용 내부 rewrite |
 | `POST` | `/analyze/post` | 좋아요/투표용 구조화 post 분석 |
-| `POST` | `/v2/generate/thread-plan` | PLAN 모드의 AI 글 묶음 또는 사람 글 후보 plan 구조화 생성 |
+| `POST` | `/v2/generate/thread-plan` | PLAN 모드의 AI 글 묶음 또는 사람 글 후보 plan 구조화 생성. AI_POST `post`에 optional `capture_split_after_line`(개행 블록 전반부 컷) |
 | `POST` | `/v2/generate/human-replies` | 30분 사람 interaction batch — comment당 0~3 reply(`candidateResponders`에서 선택) |
 | `GET` | `/v1/metrics` | 워커 풀 상태 |
 | `POST` | `/internal/prompts/reload` | prompt template 재로드 |

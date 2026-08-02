@@ -204,7 +204,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56, V85, V87, V89, V92; 검색 인덱스 → V93 `post_search_ngrams`)
+### `posts` (V48~V56, V85, V87, V89, V92, V94; 검색 인덱스 → V93 `post_search_ngrams`)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
@@ -212,6 +212,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `author_id` | VARCHAR(32) FK | V48 | 작성자 |
 | `title` | VARCHAR(255) | V48 | 제목 |
 | `promo_title` | VARCHAR(20) | **V92** | 마케팅 훅 제목 (IG 등). 생성 시 1회 LLM, 없으면 원제 폴백 |
+| `capture_split_after_line` | INT | **V94** | X/IG 캡쳐 전반부 끝 개행 블록(1-based). 비어 있지 않은 줄이 13+일 때. NULL=미분할 |
 | `content` | MEDIUMTEXT | V48 | 본문 (**30일 후 NULL**) |
 | `relationship_type` | VARCHAR(32) | V48 | RelationType enum (couple/marriage/friend/family/parent_child) |
 | `category` | JSON | V48 | `{major, middle, minor, customMinor?}` |
@@ -429,6 +430,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **AI-user V15** | `ai_thread_plan_items.human_author_id` — human-reply 예산을 (post, human) 대화 단위로 분리. 없으면 한 게시글의 첫 사용자가 3×5=15 예산을 독점 |
 | **V91** | `ai_user_generation_config`에 `hr_*` 7컬럼 — 댓글 생성량 설정(SSOT: `/admin/ai-user`). 대화 총상한은 저장하지 않고 `hr_distinct_personas_max × hr_replies_per_persona_max` 파생 |
 | **V93** | `post_search_ngrams` — 광장 검색용 문자 바이그램 (MariaDB ngram FULLTEXT 대체) |
+| **V94** | `posts.capture_split_after_line` — X/IG 캡쳐 전반부 끝 개행 블록(1-based) |
 
 ---
 
