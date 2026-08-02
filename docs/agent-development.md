@@ -70,8 +70,8 @@ cd frontend && npm run build
 # BE
 cd backend && ./gradlew test
 
-# 실서버 e2e — 미공개 기간 prod:8091만
-cd frontend && E2E_BASE_URL=http://localhost:8091 npm run test:e2e:realbe
+# 실서버 e2e — dev:8090만 (prod에서 e2e 금지)
+cd frontend && E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 ```
 
-prod 배포는 명시적 요청이 있을 때만 진행하며, `CLAUDE.md`의 순서(백업 → prod:8091 배포 → e2e `localhost:8091` → push)를 따른다. **dev:8090 배포·e2e는 금지.**
+prod 배포는 명시적 요청이 있을 때만 진행하며, `CLAUDE.md`의 순서(dev 배포·수동·e2e → 명시 지시 → 백업 → prod:8091 → push)를 따른다. **prod:8091에서 e2e·직접 반영 금지.** `prod-dev-sync`는 일일 활성.

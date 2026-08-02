@@ -39,7 +39,7 @@ import java.util.*;
  * 스케줄 기본값: 매일 UTC 05:00 (KST 14:00)
  * 환경변수:
  *  - PAIRED_POST_ENABLED / PAIRED_POST_CRON / PAIRED_POST_PAIRS
- *  - PAIRED_POST_TARGET_SHARE (default 0.15)
+ *  - PAIRED_POST_TARGET_SHARE (default 0.20) — 하루 AI 글 중 양면 사연 비율
  *  - PAIRED_POST_ROMANTIC_SHARE (default 0.80)
  */
 @Slf4j
@@ -65,37 +65,66 @@ public class PairedPostScheduler {
     /** 매일 KST 14:00 (UTC 05:00) 실행 — 환경변수로 재정의 가능 */
     @Scheduled(cron = "${ai-user.paired-post.cron:0 0 5 * * *}")
     public void runPairedPosts() {
+        runPairedPosts(null);
+    }
+
+    /** 수동 즉시 실행 (테스트·어드민·야간 배치용). pairsPerRun 상한. */
+    public int triggerNow() {
+        return runPairedPosts(null);
+    }
+
+    /** 야간 배치 등에서 최대 N쌍만 생성. */
+    public int triggerNow(int maxPairs) {
+        return runPairedPosts(Math.max(0, maxPairs));
+    }
+
+    /**
+     * @param maxPairsOverride null이면 config.pairsPerRun, 아니면 그 값으로 상한
+     * @return 이번 실행에서 시도한 pair 수
+     */
+    public int runPairedPosts(Integer maxPairsOverride) {
         if (!props.isEnabled()) {
             log.debug("[PairedPost] AI_USER_ENABLED=false — skip");
-            return;
+            return 0;
         }
         OrchestratorProperties.PairedPost config = props.getPairedPost();
         if (config == null || !config.isEnabled()) {
             log.debug("[PairedPost] disabled — skip");
-            return;
+            return 0;
         }
         List<PersonaRelationship> all =
             relationshipRepo.findByRelationTypeInAndStatus(PAIR_TYPES, "ACTIVE");
         if (all.isEmpty()) {
             log.warn("[PairedPost] No COUPLE/MARRIAGE/FRIEND relationships found. " +
                      "Seed ai-user/docs/personas/profiles/relationships.yml first.");
-            return;
+            return 0;
         }
 
         List<PersonaRelationship> shuffled = new ArrayList<>(all);
         Collections.shuffle(shuffled, RNG);
 
+        int targetPosts = generationConfigRepository.findById(1)
+            .map(AiUserGenerationConfig::getTargetPosts)
+            .orElse(0);
         int totalSyntheticToday = dailyPostQuotaService.postsCreatedToday();
         int pairedToday = countPairedPostsToday();
-        int desiredToday = desiredPairedPostsToday(config, totalSyntheticToday);
+        int desiredToday = desiredPairedPostsToday(config, targetPosts, totalSyntheticToday);
         int remainingTarget = Math.max(0, desiredToday - pairedToday);
-        int runCap = Math.max(0, config.getPairsPerRun());
+        int quotaRemaining = targetPosts > 0
+            ? dailyPostQuotaService.remaining(targetPosts)
+            : remainingTarget;
+        int runCap = maxPairsOverride != null
+            ? Math.max(0, maxPairsOverride)
+            : Math.max(0, config.getPairsPerRun());
         int toRun = Math.min(Math.min(runCap, remainingTarget), shuffled.size());
+        if (quotaRemaining >= 0 && targetPosts > 0) {
+            toRun = Math.min(toRun, quotaRemaining);
+        }
 
         if (toRun <= 0) {
-            log.debug("[PairedPost] target satisfied — totalToday={} pairedToday={} desiredToday={} runCap={}",
-                totalSyntheticToday, pairedToday, desiredToday, runCap);
-            return;
+            log.debug("[PairedPost] target satisfied — totalToday={} pairedToday={} desiredToday={} runCap={} quotaRemaining={}",
+                totalSyntheticToday, pairedToday, desiredToday, runCap, quotaRemaining);
+            return 0;
         }
 
         EnumMap<PairBucket, Integer> mixCounts = countPairedMixToday();
@@ -108,6 +137,7 @@ public class PairedPostScheduler {
             mixCounts.get(PairBucket.ROMANTIC),
             mixCounts.get(PairBucket.FRIEND));
 
+        int attempted = 0;
         for (int i = 0; i < toRun; i++) {
             PairBucket desiredBucket = chooseNextBucket(config, mixCounts);
             Optional<PersonaRelationship> relOpt = takeCandidateForBucket(shuffled, desiredBucket);
@@ -121,16 +151,13 @@ public class PairedPostScheduler {
             try {
                 PersonaRelationship rel = relOpt.get();
                 executePair(rel);
+                attempted++;
                 mixCounts.merge(bucketForRelationType(rel.getRelationType()), 1, Integer::sum);
             } catch (Exception e) {
                 log.error("[PairedPost] Pair {} failed: {}", i, e.getMessage(), e);
             }
         }
-    }
-
-    /** 수동 즉시 실행 (테스트·어드민용) */
-    public void triggerNow() {
-        runPairedPosts();
+        return attempted;
     }
 
     /** 관리자 설정 기반 backend 조회 — PLAN 모드에서는 항상 CLI. */
@@ -361,17 +388,25 @@ public class PairedPostScheduler {
         return "갈등 사연";
     }
 
-    private int desiredPairedPostsToday(OrchestratorProperties.PairedPost config, int totalSyntheticToday) {
-        int targetPosts = generationConfigRepository.findById(1)
-            .map(AiUserGenerationConfig::getTargetPosts)
-            .orElse(0);
-
-        int basePostCount = Math.max(targetPosts, totalSyntheticToday);
+    /**
+     * 하루 목표 양면 사연 수 = ceil(일일 글 목표 × targetShare).
+     * target_posts가 있으면 그것을 기준으로 하고, 없으면 오늘 실제 생성량 기준으로 비율을 맞춘다.
+     * 예: target=10, share=0.20 → 2개 (전체의 20%).
+     */
+    private int desiredPairedPostsToday(
+        OrchestratorProperties.PairedPost config,
+        int targetPosts,
+        int totalSyntheticToday
+    ) {
+        int basePostCount = targetPosts > 0 ? targetPosts : totalSyntheticToday;
         if (basePostCount <= 0) {
             return 0;
         }
 
         double share = clampShare(config.getTargetShare());
+        if (share <= 0.0) {
+            return 0;
+        }
         return Math.max(1, (int) Math.ceil(basePostCount * share));
     }
 

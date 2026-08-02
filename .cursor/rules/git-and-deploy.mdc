@@ -1,5 +1,5 @@
 ---
-description: Git·배포 안전 — 파괴적 git 금지, prod 게이트
+description: Git·배포 안전 — 파괴적 git 금지, dev-first / prod 명시 게이트
 alwaysApply: true
 ---
 
@@ -11,20 +11,21 @@ alwaysApply: true
 - `git stash drop` / `git branch -d|-D` / `git checkout -B`
 - `git push --force` / `git push -f`
 - feature/topic 브랜치 생성 (worktree 임시 브랜치는 작업 후 즉시 삭제)
-- prod 배포
-- **dev 스택(:8090) 배포·e2e·prod-dev-sync 유지보수** (미공개 기간 휴면)
+- **prod 배포** (`.env.prod` 반영·`docker-compose.prod.yml` up)
+- **prod에서 e2e·직접 코드 반영**
 
 ## 허용 기본
 
 - `main`에서 직접 작업·commit (commit은 사용자 요청 시에만)
 - push는 사용자 명시 요청 시에만
 - 비파괴적 조사·수정·테스트는 확인 없이 진행
-- 실서버 e2e는 **prod:8091만** (`E2E_BASE_URL=http://localhost:8091`)
+- **dev 스택(:8090) 배포·수동 검증·e2e** (`E2E_BASE_URL=http://localhost:8090`)
+- `prod-dev-sync` 유지보수 (5분 콘텐츠 + 24h full)
+- **dev에서 LLM/orchestrator-dev 기동 금지** (L3)
 
-## prod 배포 필수 순서 (명시 지시 시에만)
+## 표준 순서
 
 1. local unit / `lint` / `build` (필요 범위)
-2. DB 백업
-3. prod 배포 (`.env.prod` 전 값 입력, git 커밋 금지)
-4. `E2E_BASE_URL=http://localhost:8091 npm run test:e2e:realbe` 전체 통과
-5. main commit & push
+2. **dev(:8090) 배포** + 수동 테스트
+3. `E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe` 전체 통과
+4. **prod 배포는 명시 지시("prod에 배포해줘") 시에만** — DB 백업 → prod(:8091) → main commit & push

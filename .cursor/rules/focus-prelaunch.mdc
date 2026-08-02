@@ -1,21 +1,20 @@
 ---
-description: 미공개 선택·집중 — prod 검증만, 마케팅 X만, 휴면 환경 건드리지 않음
+description: 운영 격리 — 검증·e2e는 dev, LLM은 prod만, sync 5분+24h
 alwaysApply: true
 ---
 
-# Prelaunch focus
-
-정식 공개 전. 속도 = 선택과 집중.
+# Dev / Prod 격리
 
 ## 실환경
 
-- 검증·실서버 e2e·배포 대상 = **prod `:8091`만**
-- **dev `:8090` / `docker-compose.dev.yml` / `prod-dev-sync`**: 명시 요청 전 배포·테스트·디버그 금지 (파일은 휴면 보관)
-- 로컬 FE `:3000` / BE `:8080` + base LLM은 편집 루프로 유지
+- **검증·수동·e2e** = **dev `:8090`만** (`E2E_BASE_URL=http://localhost:8090`)
+- **prod `:8091`**: 명시 "prod에 배포해줘" 전에 배포·e2e·직접 반영 금지
+- **dev LLM 금지 (L3)**: backend-dev는 LLM 네트워크 미연결 · `LLM_ENABLED=false` · orchestrator-dev 기본 미기동
+- **`prod-dev-sync`**: **5분 콘텐츠** + **24h full** (prod→dev 비식별). AI 생성은 prod만 → sync로 dev 반영
+- 로컬 FE `:3000` / BE `:8080` + base LLM은 편집 루프용 (server-dev와 별개)
 
 ## 마케팅
 
 - 활성 채널 = **X / `x_thread` + Instagram / `instagram_feed`** (게시 후 24h 자동)
-- IG·네이버·YouTube·Threads·Clip 중 **네이버·YouTube·Threads·Clip**: 구현·디버그·배포 금지 (명시 요청 전)
-- ASM 접속: AS 호스트(`100.81.189.92`) → `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
-- 진입: ASM `CLAUDE.md` · AS `docs/shared/marketing/x-thread-strategy.md`
+- **네이버·YouTube·Threads·Clip**: 명시 요청 전 구현·디버그·배포 금지
+- ASM: AS(`100.81.189.92`) → `ssh justant@100.115.252.61` → `~/Data/Again-Spring-Marketing`

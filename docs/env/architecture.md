@@ -150,6 +150,7 @@ flowchart LR
 - `AI_LEARNING_ENABLED=false`면 learning scheduler가 올라오지 않는다.
 - `AI_LEARNING_CRAWL_ENABLED=false`면 learning의 일일 crawl/strengthen/topic 작업이 등록되지 않는다.
 - `SYNC_CRON` 기본값은 `30 5 * * *`, timezone 기본값은 `Asia/Seoul`이다.
+- `prod-dev-sync`는 기동 시 1회 동기화 후 cron으로 매일 반복한다. dev에 없는 테이블은 prod DDL로 생성한다.
 
 ## 기동 순서
 

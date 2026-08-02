@@ -9,24 +9,27 @@
 import type { APIRequestContext } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import { E2E_DEFAULT_BASE_URL } from './env'
+import { forceDeletePostById } from './db'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+/** 호출 시점의 E2E_BASE_URL — 모듈 로드 시점 캡처 금지 */
+function e2eBase(): string {
+  return process.env.E2E_BASE_URL ?? E2E_DEFAULT_BASE_URL
+}
+
+/** request 객체에 붙이는 추적 키 — 모듈 싱글톤 불일치 방지 */
+export const E2E_CREATED_POSTS = Symbol.for('againspring.e2e.createdPosts')
 
 /** 테스트 중 createPost로 생성된 사연 — fixture afterEach가 비운다 */
-type TrackedPost = { id: string; token: string }
-let postCleanupBucket: TrackedPost[] | null = null
+export type TrackedPost = { id: string; token: string }
 
-/** no-llm-fixture가 테스트 시작/종료 시 호출. 버킷에 쌓인 글을 afterEach에서 삭제한다. */
-export function beginCreatedPostTracking(bucket: TrackedPost[]): void {
-  postCleanupBucket = bucket
-}
-
-export function endCreatedPostTracking(): void {
-  postCleanupBucket = null
-}
-
-function trackCreatedPost(id: string, token: string): void {
-  if (postCleanupBucket) postCleanupBucket.push({ id, token })
+function trackCreatedPost(
+  request: APIRequestContext,
+  id: string,
+  token: string,
+): void {
+  const bag = (request as unknown as Record<symbol, TrackedPost[]>)[E2E_CREATED_POSTS]
+  if (bag) bag.push({ id, token })
 }
 
 // ── LLM 안전 검사 ─────────────────────────────────────────────────
@@ -70,7 +73,7 @@ export async function login(
   email: string,
   password: string,
 ): Promise<string> {
-  const resp = await request.post(`${BASE}/api/auth/login`, {
+  const resp = await request.post(`${e2eBase()}/api/auth/login`, {
     data: { email, password },
   })
   if (!resp.ok()) throw new Error(`Login 실패: ${resp.status()} — ${await resp.text()}`)
@@ -79,7 +82,7 @@ export async function login(
 }
 
 export async function guestLogin(request: APIRequestContext, nickname?: string): Promise<string> {
-  const resp = await request.post(`${BASE}/api/auth/guest`, {
+  const resp = await request.post(`${e2eBase()}/api/auth/guest`, {
     data: { nickname: nickname ?? 'E2E게스트' },
   })
   if (!resp.ok()) throw new Error(`Guest login 실패: ${resp.status()}`)
@@ -120,7 +123,7 @@ export async function createPost(
   },
 ): Promise<string> {
   const { token, title = 'E2E 테스트 사연', body = 'e2e 테스트용 사연 본문입니다. 충분한 길이를 확보합니다.', category = 'OTHER' } = opts
-  const url = `${BASE}/api/community/posts`
+  const url = `${e2eBase()}/api/community/posts`
   const data = {
     bodyRaw: body,
     category,
@@ -137,7 +140,7 @@ export async function createPost(
   })
   if (!resp.ok()) throw new Error(`포스트 생성 실패: ${resp.status()} — ${await resp.text()}`)
   const id = (await resp.json()).id as string
-  trackCreatedPost(id, token)
+  trackCreatedPost(request, id, token)
   return id
 }
 
@@ -150,7 +153,7 @@ export async function deletePost(
   token: string,
   postId: string,
 ): Promise<void> {
-  const resp = await request.delete(`${BASE}/api/community/posts/${postId}`, {
+  const resp = await request.delete(`${e2eBase()}/api/community/posts/${postId}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (resp.ok() || resp.status() === 204 || resp.status() === 404) return
@@ -158,21 +161,70 @@ export async function deletePost(
 }
 
 /**
- * 추적된(또는 인자로 받은) 사연을 역순 삭제.
- * 개별 실패는 경고만 — 이후 글 정리·global teardown이 이어서 처리.
+ * 추적된 사연을 반드시 삭제한다.
+ *
+ * fixture teardown 중의 `request`는 불안정할 수 있어 **새 APIRequestContext**로
+ * DELETE/GET 검증한다. (이전: 삭제 확인 OK인데 prod에 동일 ID가 남는 사고)
  */
 export async function deleteTrackedPosts(
-  request: APIRequestContext,
+  _request: APIRequestContext,
   posts: TrackedPost[],
 ): Promise<void> {
-  for (const { id, token } of [...posts].reverse()) {
-    try {
-      await deletePost(request, token, id)
-    } catch (e) {
-      console.warn(`[e2e-cleanup] post ${id} 삭제 실패:`, (e as Error).message)
+  const { request: freshRequest } = await import('@playwright/test')
+  const ctx = await freshRequest.newContext({ baseURL: e2eBase() })
+  const errors: string[] = []
+  try {
+    for (const { id, token } of [...posts].reverse()) {
+      try {
+        await deletePost(ctx, token, id)
+      } catch (e) {
+        console.warn(`[e2e-cleanup] API 삭제 실패 ${id}:`, (e as Error).message)
+      }
+
+      try {
+        forceDeletePostById(id)
+      } catch (e) {
+        console.warn(`[e2e-cleanup] SQL 강제 삭제 실패 ${id}:`, (e as Error).message)
+      }
+
+      if (await postStillExists(ctx, id)) {
+        try {
+          await deletePost(ctx, token, id)
+        } catch { /* ignore */ }
+        try {
+          forceDeletePostById(id)
+        } catch { /* ignore */ }
+        if (await postStillExists(ctx, id)) {
+          errors.push(`삭제 후에도 API로 조회됨: ${id}`)
+          continue
+        }
+        console.log(`[e2e-cleanup] 삭제 확인 OK (2차): ${id}`)
+      } else {
+        console.log(`[e2e-cleanup] 삭제 확인 OK: ${id}`)
+      }
     }
+  } finally {
+    await ctx.dispose()
   }
   posts.length = 0
+  if (errors.length > 0) {
+    throw new Error(`[e2e-cleanup] 사연 삭제 실패:\n${errors.join('\n')}`)
+  }
+}
+
+/** create와 동일 채널로 잔존 여부 확인. 404/410 = 없음. */
+async function postStillExists(
+  request: APIRequestContext,
+  postId: string,
+): Promise<boolean> {
+  const resp = await request.get(`${e2eBase()}/api/community/posts/${postId}`)
+  if (resp.status() === 404 || resp.status() === 410) return false
+  if (!resp.ok()) {
+    // 5xx 등은 잔존으로 간주해 재삭제 유도
+    console.warn(`[e2e-cleanup] GET ${postId} status=${resp.status()}`)
+    return true
+  }
+  return true
 }
 
 // ── 초대 ──────────────────────────────────────────────────────────
@@ -182,7 +234,7 @@ export async function createInviteToken(
   token: string,
   postId: string,
 ): Promise<string> {
-  const resp = await request.post(`${BASE}/api/community/posts/${postId}/invite`, {
+  const resp = await request.post(`${e2eBase()}/api/community/posts/${postId}/invite`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!resp.ok()) throw new Error(`초대 토큰 생성 실패: ${resp.status()} — ${await resp.text()}`)
@@ -200,7 +252,7 @@ export async function submitPartnerAnswer(
   body = '상대방 답변입니다. e2e 테스트에 의해 자동 생성됩니다.',
   title = '상대방 입장 제목',
 ): Promise<void> {
-  const resp = await request.post(`${BASE}/api/s/${inviteToken}/answer`, {
+  const resp = await request.post(`${e2eBase()}/api/s/${inviteToken}/answer`, {
     data: { bodyRaw: body, userTitle: title },
   })
   if (!resp.ok()) throw new Error(`상대 답변 제출 실패: ${resp.status()} — ${await resp.text()}`)
@@ -213,7 +265,7 @@ export async function waitForPaired(
   maxRetries = 10,
 ): Promise<boolean> {
   for (let i = 0; i < maxRetries; i++) {
-    const resp = await request.get(`${BASE}/api/community/posts/${postId}`)
+    const resp = await request.get(`${e2eBase()}/api/community/posts/${postId}`)
     if (resp.ok()) {
       const data = await resp.json()
       if (data.paired || data.partnerBodyPublished) return true
@@ -231,7 +283,7 @@ export async function setPublishMode(
   mode: 'PUBLISH_NOW' | 'WAIT_FOR_PARTNER',
   voteDurationHours = 72,
 ): Promise<void> {
-  const resp = await request.patch(`${BASE}/api/community/posts/${postId}/publish-mode`, {
+  const resp = await request.patch(`${e2eBase()}/api/community/posts/${postId}/publish-mode`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { mode, voteDurationHours },
   })
@@ -244,7 +296,7 @@ export async function publishNow(
   token: string,
   postId: string,
 ): Promise<void> {
-  const resp = await request.post(`${BASE}/api/community/posts/${postId}/publish-now`, {
+  const resp = await request.post(`${e2eBase()}/api/community/posts/${postId}/publish-now`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!resp.ok()) throw new Error(`publish-now 실패: ${resp.status()} — ${await resp.text()}`)
@@ -258,7 +310,7 @@ export async function findUserId(
   email: string,
 ): Promise<string | null> {
   const resp = await request.get(
-    `${BASE}/api/admin/users/search?q=${encodeURIComponent(email)}`,
+    `${e2eBase()}/api/admin/users/search?q=${encodeURIComponent(email)}`,
     { headers: { Authorization: `Bearer ${adminToken}` } },
   )
   if (!resp.ok()) return null
@@ -274,7 +326,7 @@ export async function patchUserRoles(
   userId: string,
   roles: string[],
 ): Promise<void> {
-  const resp = await request.patch(`${BASE}/api/admin/users/${userId}/roles`, {
+  const resp = await request.patch(`${e2eBase()}/api/admin/users/${userId}/roles`, {
     headers: { Authorization: `Bearer ${adminToken}` },
     data: { roles },
   })

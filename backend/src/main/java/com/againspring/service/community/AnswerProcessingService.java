@@ -35,15 +35,20 @@ public class AnswerProcessingService {
 
             TonalizationService.TonalizationResult tone = tonalizationService.normalize(userTitle, bodyRaw);
             if (tone.success()) {
-                post.setPartnerBodyPublished(tone.bodyNormalized());
-                if (userTitle != null && !userTitle.isBlank()) {
-                    post.setUserTitle(tone.titleNormalized());
+                // UPDATE만 — save()/merge는 동시 DELETE 이후 동일 PK로 행을 되살릴 수 있음
+                String normalizedTitle =
+                        (userTitle != null && !userTitle.isBlank()) ? tone.titleNormalized() : null;
+                int updated = postRepository.updatePartnerTonalization(
+                        postId, tone.bodyNormalized(), normalizedTitle);
+                if (updated == 0) {
+                    log.info("Async tonalization skip (post gone): {}", postId);
+                    return;
                 }
-                postRepository.save(post);
                 log.info("Async tonalization applied for post {}", postId);
             }
 
             if (jurorCount > 0) {
+                if (!postRepository.existsById(postId)) return;
                 List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(postId);
                 if (!options.isEmpty()) {
                     juryService.generateJuryAsync(post, options, jurorCount);

@@ -83,20 +83,20 @@ MSW는 dev 모드에서 자동 활성화됩니다. 실제 페이지 플로우를
 #### 사전 조건 및 실행
 
 ```bash
-# 1. prod 스택 기동·헬스 (8091) — 미공개 기간 유일한 실서버 대상
-curl http://localhost:8091/api/health  # UP 확인
+# 1. dev 스택 기동·헬스 (8090) — 검증·e2e 면
+curl http://localhost:8090/api/health  # UP 확인
 
-# 2. e2e 실행 (prod 게이트)
+# 2. e2e 실행 (dev 게이트)
 cd frontend
-E2E_BASE_URL=http://localhost:8091 npm run test:e2e:realbe
+E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 ```
 
-> **prod 배포 게이트**: 백업 → prod 배포 → e2e-realbe(`:8091`) 전체 통과 (`CLAUDE.md` 절대 규칙 #4).
-> **미공개**: 실서버 e2e = **prod(8091)만**. dev(8090) 대상 실행·배포 금지.
-> `global-setup`이 prod에도 `test%@again.com` 페르소나를 `INSERT IGNORE`로 보장한다 (`SeedDataLoader`는 `@Profile("dev")`만).
+> **prod 배포 전제**: dev 배포·수동 검증 → e2e-realbe(`:8090`) 전체 통과 → 명시적 prod 지시 → 백업 → prod 배포 (`CLAUDE.md` 절대 규칙 #4).
+> **prod에서 e2e·직접 반영 금지.** 기본 대상 = localhost:8090 + `againspring-mariadb-dev` + `.env.dev`.
+> `global-setup`이 `test%@again.com` 페르소나를 `INSERT IGNORE`로 보장한다.
 > `cleanup-test-db.sh`는 V56에서 삭제된 legacy `messages`/`sessions`/`turns`/`reports`가 없으면 해당 DELETE를 건너뛴다.
-> Journey 08은 `@example.com`(RFC 2606)으로만 인증 메일을 보낸다 — prod SMTP 실패 시에도 코드는 DB에 저장되고 200을 반환한다.
-> prod auth rate-limit은 미공개 기간 `SECURITY_RATE_LIMIT_AUTH_PER_MINUTE` 기본 60 (compose.prod). prelogin 간격 기본 13s.
+> Journey 08은 `@example.com`(RFC 2606)으로만 인증 메일을 보낸다 — SMTP 실패 시에도 코드는 DB에 저장되고 200을 반환한다.
+> dev auth rate-limit 기본 `SECURITY_RATE_LIMIT_AUTH_PER_MINUTE=1000` (compose.dev).
 
 **설정 파일**: `playwright.realbe.config.ts`
 
@@ -162,10 +162,11 @@ import { test, expect } from '../support/no-llm-fixture'
 #### storageState 및 DB 관리
 
 - **storageState**: `global-setup.ts`가 test1(ADMIN)/test2(TESTER)/test3(TESTER)/test5(USER) 로그인을 1회 실행해 `.auth/<email>.json`에 저장. 이후 spec은 `test.use({ storageState })` 또는 `tokenFromStorageState(email)`로 재사용.
-- **사연 삭제 (필수)**: `support/api.ts`의 `createPost`는 생성과 동시에 추적 레지스트리에 등록한다. `no-llm-fixture` auto fixture가 **매 테스트 종료 시** `DELETE /api/community/posts/{id}`로 제거한다. retries·단일 spec·중도 실패에도 광장에 E2E 글이 남지 않게 한다. UI로만 올린 글(게스트 compose 등)은 아래 DB cleanup 안전망이 처리.
-- **DB 정리 (안전망)**: `cleanup-test-db.sh`를 `global-setup`(실행 전)과 `global-teardown`(실행 후) 양쪽에서 실행. `test%@again.com` 페르소나 + 게스트 + `e2e-signup%` 일회용 유저의 모든 커뮤니티 산출물 삭제. `mock_001`과 `users` 행은 보존. teardown 후 E2E 제목 잔존 여부를 한 번 더 로그로 확인한다.
-- **AI-user 고아 정리 (§2b, 2026-08-01)**: posts를 raw SQL로 지우면 `POST_DELETED` outbox가 안 나가 orchestrator가 모르는 `ai_thread_plans`/`_items` · `ai_human_interaction_inbox` · `ai_post_interested_personas` · `ai_user_outbox` 행이 남는다. provider가 켜지면 죽은 post_id에 **실제 LLM**을 호출한다(2026-08-01 인시던트: FAILED 172건). cleanup은 e2e post 목록으로 위 5개 테이블을 **posts 삭제와 같은 시점**에 함께 지운다. e2e는 LLM 토큰을 쓰면 안 된다. (API `deletePost`는 outbox를 정상 발행하므로 테스트별 삭제가 1순위.)
-- **미공개 cleanup**: `localhost:8091` + `againspring-mariadb-prod` 허용(`test%@again.com` 등 테스트 페르소나만). 공개 URL(`againspring.net` 등) cleanup은 계속 거부. 정식 공개 후 재검토.
+- **사연 삭제 (필수)**: `createPost` → afterEach가 API DELETE + **SQL 강제 삭제** + 잔존 시 throw.
+  ⚠️ prod(`mariadb-prod`)는 호스트 포트 없음. `dev_db_sql.py`(localhost:3309)는 **dev DB**. prod SQL은 docker exec만 — python 폴백 금지(폴백 시 삭제된 척하고 prod에 E2E 글이 남음).
+- **DB 정리 (안전망)**: `cleanup-test-db.sh`를 setup/teardown에서 실행. 대상은 `E2E_BASE_URL` 파생 (`:8091`→prod, `:8090`→dev). ambient `DB_CONTAINER`/`MARIADB_*` 무시. teardown 잔존 시 **실패(throw)**.
+- **AI-user 고아 정리 (§2b, 2026-08-01)**: posts raw SQL 삭제 시 outbox 미발행 → cleanup이 ai_* 를 posts와 함께 지운다. API `deletePost`는 outbox 정상 발행(1순위).
+- **미공개 cleanup**: 기본 `localhost:8091` + `againspring-mariadb-prod`. 공개 URL cleanup 거부.
 
 #### Selector 관리
 

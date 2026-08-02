@@ -8,7 +8,7 @@ import { test, expect } from '../support/no-llm-fixture'
 import { PERSONAS } from '../fixtures/personas'
 import { runSqlScript } from '../support/db'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const PERSONA = PERSONAS[5] // test6 — PRELOGIN 외 격리
 const NEW_PASSWORD = 'e2eReset99!'
 const TEST123_HASH = '$2a$12$9EFz.LWcKCU9N/UEPETS7OwIRVslpITrtGseQe1GiqZOMgQ9gCic6'

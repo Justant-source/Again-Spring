@@ -20,21 +20,27 @@
 #   - mock_001 포스트 (global-setup이 INSERT IGNORE로 재시드)
 #   - test%@again.com users 행 (페르소나 재시드 guard)
 #
-# 사용 (미공개: prod:8091 기본):
-#   DB_CONTAINER=againspring-mariadb-prod E2E_ENV_FILE=env/.env.prod bash cleanup-test-db.sh
-#   bash cleanup-test-db.sh   # 기본 = mariadb-prod + .env.prod
+# 사용 (기본: dev:8090):
+#   DB_CONTAINER=againspring-mariadb-dev E2E_ENV_FILE=env/.env.dev bash cleanup-test-db.sh
+#   bash cleanup-test-db.sh   # 기본 = mariadb-dev + .env.dev
 #
-# 환경변수 우선순위: 명시 env > E2E_ENV_FILE > 기본값(env/.env.prod)
-
+# 환경변수: E2E_ENV_FILE의 MARIADB_*가 권위본.
+# ambient MARIADB_*는 BE와 다른 스택을 가리킬 수 있어 env 파일 값을 우선한다.
 set -euo pipefail
 
-ENV_FILE="${E2E_ENV_FILE:-$(dirname "$0")/../../../env/.env.prod}"
+ENV_FILE="${E2E_ENV_FILE:-$(dirname "$0")/../../../env/.env.dev}"
 
-# env 파일에서 MARIADB_* 읽기 (git에 평문 비밀 커밋 금지)
+read_env() {
+  local key="$1"
+  if [[ -f "$ENV_FILE" ]]; then
+    grep -E "^${key}=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'"
+  fi
+}
+
 if [[ -f "$ENV_FILE" ]]; then
-  DB_PASS="${MARIADB_PASSWORD:-$(grep -E '^MARIADB_PASSWORD=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")}"
-  DB_NAME="${MARIADB_DATABASE:-$(grep -E '^MARIADB_DATABASE=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")}"
-  DB_USER="${MARIADB_USER:-$(grep -E '^MARIADB_USER=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")}"
+  DB_PASS="$(read_env MARIADB_PASSWORD)"
+  DB_NAME="$(read_env MARIADB_DATABASE)"
+  DB_USER="$(read_env MARIADB_USER)"
 else
   DB_PASS="${MARIADB_PASSWORD:-}"
   DB_NAME="${MARIADB_DATABASE:-}"
@@ -42,18 +48,20 @@ else
 fi
 
 if [[ -z "$DB_PASS" ]]; then
-  echo "ERROR: MARIADB_PASSWORD를 찾을 수 없습니다. env/.env.prod 파일을 확인하세요." >&2
+  echo "ERROR: MARIADB_PASSWORD를 찾을 수 없습니다. $ENV_FILE 확인." >&2
   exit 1
 fi
 
-DB_CONTAINER="${DB_CONTAINER:-againspring-mariadb-prod}"
+DB_CONTAINER="${DB_CONTAINER:-againspring-mariadb-dev}"
 DB_NAME="${DB_NAME:-againspring}"
 DB_USER="${DB_USER:-againspring}"
 
-# 허용: localhost 대상 로컬 docker 컨테이너만.
-# 미공개(prelaunch): againspring-mariadb-prod 허용. 그 외 *prod* 이름은 거부.
-# 정식 공개 후: prod cleanup 재검토·강화 필요.
-ALLOWED_CONTAINERS="againspring-mariadb-prod|againspring-mariadb-dev|againspring-mariadb"
+# E3: e2e cleanup은 dev만. prod 컨테이너 하드 거부.
+if [[ "$DB_CONTAINER" == *prod* ]]; then
+  echo "ERROR: prod DB cleanup 거부 ($DB_CONTAINER). e2e는 againspring-mariadb-dev만." >&2
+  exit 1
+fi
+ALLOWED_CONTAINERS="againspring-mariadb-dev|againspring-mariadb"
 if [[ ! "$DB_CONTAINER" =~ ^($ALLOWED_CONTAINERS)$ ]]; then
   echo "ERROR: 허용되지 않은 DB 컨테이너 ($DB_CONTAINER). 허용: $ALLOWED_CONTAINERS" >&2
   exit 1
@@ -67,7 +75,8 @@ run_sql() {
 SELECT 1;
 SQL_PROBE
     then
-      docker exec -i "$DB_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASS" "$DB_NAME"
+      # abort-source-on-error: 중간 DELETE 실패 시 조용히 "완료"로 끝나지 않게
+      docker exec -i "$DB_CONTAINER" mariadb --abort-source-on-error -u "$DB_USER" -p"$DB_PASS" "$DB_NAME"
       return
     fi
   fi

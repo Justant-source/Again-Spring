@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,12 +45,17 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
 
     /**
      * Find posts eligible for automatic X thread publishing:
+     * - created_at >= :since (operator cutoff — only posts created after this instant)
      * - created_at + 24 hours <= NOW()
      * - no soft-delete
      * - no x_thread job has ever been attempted for this post (any status)
      *
      * Comment-count gate removed 2026-08-02 — product rule is unconditional 24h after
      * publish for both human and PLAN posts (X + Instagram).
+     *
+     * {@code since} cutoff added 2026-08-02 after a pre-existing backlog flooded live
+     * X/IG once the 24h gate alone was enabled. Fail-closed callers pass a required
+     * Instant; without it the scheduler skips.
      *
      * The NOT EXISTS check intentionally ignores status entirely — it is NOT limited to
      * "active" statuses. An X thread is a one-time-per-post event: once a job exists
@@ -62,7 +68,8 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      */
     @Query(nativeQuery = true, value = """
         SELECT p.id FROM posts p
-        WHERE p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        WHERE p.created_at >= :since
+        AND p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         AND p.deleted_at IS NULL
         AND NOT EXISTS (
             SELECT 1 FROM marketing_job mj
@@ -71,7 +78,7 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         )
         LIMIT :limit
         """)
-    List<String> findPostsEligibleForXThreadPublish(int limit);
+    List<String> findPostsEligibleForXThreadPublish(Instant since, int limit);
 
     /**
      * Same 24h one-shot gate as {@link #findPostsEligibleForXThreadPublish}, for
@@ -80,7 +87,8 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      */
     @Query(nativeQuery = true, value = """
         SELECT p.id FROM posts p
-        WHERE p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        WHERE p.created_at >= :since
+        AND p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         AND p.deleted_at IS NULL
         AND NOT EXISTS (
             SELECT 1 FROM marketing_job mj
@@ -89,5 +97,5 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         )
         LIMIT :limit
         """)
-    List<String> findPostsEligibleForInstagramFeedPublish(int limit);
+    List<String> findPostsEligibleForInstagramFeedPublish(Instant since, int limit);
 }

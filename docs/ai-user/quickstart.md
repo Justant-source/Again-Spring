@@ -75,6 +75,6 @@ docker logs -f againspring-prod-dev-sync
 - `AI_USER_ENABLED=false`면 scheduler 자체가 skip된다.
 - PLAN은 `AI_USER_THREAD_PLAN_ENABLED`, publisher/batch gate 및 admin provider가 함께 켜져야 동작한다.
 - Codex/Claude는 API key가 아니라 호스트 로그인 세션 mount를 사용한다. 실제 생성 smoke test는 운영 승인된 1회 요청으로만 수행한다.
-- `PAIRED_POST_ENABLED=false`가 기본이다.
+- `PAIRED_POST_ENABLED=true`가 prod 기본이다(양면 사연 20%).
 - `AI_LEARNING_CRAWL_ENABLED=false`면 learning의 일일 작업이 등록되지 않는다.
 - learning API만 host에서 직접 테스트 가능하다.

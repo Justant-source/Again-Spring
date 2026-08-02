@@ -103,12 +103,17 @@ X 미리보기(축소 썸네일)에서 카드 가장자리에 붙어 잘려 보�
 ### 3.1 조건 (2026-08-02~)
 
 ```
-post.createdAt + 24시간 경과
+post.createdAt >= ASM_AUTO_PUBLISH_SINCE   (컷오프 — 이 시각 이후 생성분만)
+AND  post.createdAt + 24시간 경과
 AND  해당 post에 x_thread 타깃 marketing_job이 한 번도 없음 (status 무관)
 ```
 
-사람·PLAN 구분 없이 **무조건** 24시간 후 X 스레드를 1회 자동 생성·발행한다.
+사람·PLAN 구분 없이 **컷오프 이후 생성된 글만** 24시간 후 X 스레드를 1회 자동 생성·발행한다.
 같은 스케줄러가 `instagram_feed`도 동일 규칙으로 별도 잡을 만든다(ASM alone 제약).
+
+**컷오프 (`ASM_AUTO_PUBLISH_SINCE`, 2026-08-02)**: 24h 게이트만 켜면 기존 사연 백로그가
+실계정에 연속 발행된다. ISO-8601 Instant(예: `2026-08-02T08:43:52Z`) 이후 생성분만
+eligible. 트리거 ON인데 값이 비어 있으면 **fail-closed**(스킵).
 
 **24시간의 근거**: `ThreadPlanService`가 PLAN 수명을 `publishedAt + 24h`로 잡는다.
 "24시간 경과 = PLAN 슬롯 소진"이 성립하고, `createdAt`만으로 계산한다.

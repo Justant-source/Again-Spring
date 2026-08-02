@@ -294,4 +294,27 @@ public interface PostRepository extends JpaRepository<Post, String> {
            "AND p.status IN (com.againspring.domain.enums.PostStatus.VOTING, com.againspring.domain.enums.PostStatus.CLOSED) " +
            "AND p.deletedAt IS NULL AND (p.title LIKE :q OR p.bodyPublished LIKE :q) ORDER BY p.createdAt DESC")
     Page<Post> findPublicByKeywordForMarketing(@Param("q") String q, Pageable pageable);
+
+    /**
+     * promo_title만 조건부 갱신. 행이 없거나 이미 값이 있으면 0.
+     * save()/merge로 삭제된 행을 되살리지 않기 위함.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("UPDATE Post p SET p.promoTitle = :promoTitle " +
+           "WHERE p.id = :postId AND (p.promoTitle IS NULL OR p.promoTitle = '')")
+    int updatePromoTitleIfAbsent(@Param("postId") String postId, @Param("promoTitle") String promoTitle);
+
+    /**
+     * 파트너 톤 정규화 결과만 UPDATE. 행이 없으면 0 (삭제 후 save()/merge 부활 방지).
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("UPDATE Post p SET p.partnerBodyPublished = :partnerBody, " +
+           "p.userTitle = CASE WHEN :userTitle IS NULL OR :userTitle = '' THEN p.userTitle ELSE :userTitle END " +
+           "WHERE p.id = :postId")
+    int updatePartnerTonalization(
+            @Param("postId") String postId,
+            @Param("partnerBody") String partnerBody,
+            @Param("userTitle") String userTitle);
 }

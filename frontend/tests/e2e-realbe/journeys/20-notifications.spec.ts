@@ -11,7 +11,7 @@ import { PERSONA_TEST1 } from '../fixtures/personas'
 import { tokenFromStorageState } from '../support/api'
 import { sql, runSqlScript } from '../support/db'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const NOTI_ID = 'noti_e2e_journey20'
 
 test.describe('Journey 20: 알림', () => {

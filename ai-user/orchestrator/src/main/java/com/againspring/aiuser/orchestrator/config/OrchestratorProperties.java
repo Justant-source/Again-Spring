@@ -52,8 +52,8 @@ public class OrchestratorProperties {
         private String cron = "0 0 5 * * *";
         /** 한 번의 스케줄 실행에서 생성할 수 있는 최대 pair 수. */
         private int pairsPerRun = 2;
-        /** 하루 전체 synthetic post 중 paired post가 최소로 차지해야 하는 비율. */
-        private double targetShare = 0.15;
+        /** 하루 전체 synthetic post 중 paired post가 차지해야 하는 비율 (기본 20%). */
+        private double targetShare = 0.20;
         /** paired post 내부에서 COUPLE/MARRIAGE가 차지해야 하는 비율. */
         private double romanticShare = 0.80;
     }

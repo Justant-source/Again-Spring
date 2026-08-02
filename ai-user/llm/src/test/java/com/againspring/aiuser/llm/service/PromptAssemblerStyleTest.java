@@ -112,6 +112,41 @@ class PromptAssemblerStyleTest {
     }
 
     @Test
+    void authorPairedPromptLeavesCounterpartAnchors() {
+        PostGenRequest req = PostGenRequest.builder()
+            .personaId("p1").voiceProfile("v").slangLevel(0.3)
+            .category("COUPLE").archetype("couple_communication").formality("casual")
+            .lengthTier("MEDIUM")
+            .stance("AUTHOR")
+            .build();
+        String prompt = assembler.assemblePostPrompt(req);
+        String user = prompt.split("<<<USER_PROMPT>>>", 2)[1];
+
+        assertTrue(user.contains("양면 사연의 작성자"), "AUTHOR stance → 양면 작성자 프롬프트");
+        assertTrue(user.contains("상대 속마음") || user.contains("단정하지"), "상대 의도 단정 금지");
+        assertTrue(user.contains("앵커") || user.contains("재해석"), "상대가 받을 사건 앵커 지시");
+        assertFalse(user.contains("[작성자가 쓴 원글]"), "AUTHOR는 파트너 프롬프트가 아님");
+    }
+
+    @Test
+    void partnerPromptDemandsPeerWeightBody() {
+        PostGenRequest req = PostGenRequest.builder()
+            .personaId("p2").voiceProfile("v").slangLevel(0.3)
+            .category("COUPLE").archetype("couple_communication").formality("casual")
+            .lengthTier("MEDIUM")
+            .stance("PARTNER")
+            .counterpartBody("어제 남친이 또 늦게 와서 밥도 같이 못 먹었어")
+            .build();
+        String prompt = assembler.assemblePostPrompt(req);
+        String user = prompt.split("<<<USER_PROMPT>>>", 2)[1];
+
+        assertTrue(user.contains("[작성자가 쓴 원글]"));
+        assertTrue(user.contains("상대방(B)") || user.contains("같은 무게"), "동등 분량 지시");
+        assertTrue(user.contains("제목 줄 없이") || user.contains("본문만"), "파트너는 본문만");
+        assertTrue(user.contains("새 사건 추가 금지") || user.contains("재참조"));
+    }
+
+    @Test
     void rewritePromptDemandsJsonAndTargetCategory() {
         PostRewriteRequest req = PostRewriteRequest.builder()
             .personaId("p1")

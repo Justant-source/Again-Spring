@@ -10,12 +10,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -28,6 +30,8 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class XThreadPublishTriggerSchedulerTest {
+
+    private static final Instant SINCE = Instant.parse("2026-08-02T08:43:52Z");
 
     @Mock
     private MarketingJobRepository marketingJobRepository;
@@ -52,8 +56,8 @@ class XThreadPublishTriggerSchedulerTest {
 
         scheduler.pollAndPublishToXThread();
 
-        verify(marketingJobRepository, never()).findPostsEligibleForXThreadPublish(any(Integer.class));
-        verify(marketingJobRepository, never()).findPostsEligibleForInstagramFeedPublish(any(Integer.class));
+        verify(marketingJobRepository, never()).findPostsEligibleForXThreadPublish(any(Instant.class), anyInt());
+        verify(marketingJobRepository, never()).findPostsEligibleForInstagramFeedPublish(any(Instant.class), anyInt());
         verify(marketingJobService, never()).createJob(anyString(), any(List.class), anyBoolean(), anyString());
     }
 
@@ -63,22 +67,46 @@ class XThreadPublishTriggerSchedulerTest {
 
         scheduler.pollAndPublishToXThread();
 
-        verify(marketingJobRepository, never()).findPostsEligibleForXThreadPublish(any(Integer.class));
-        verify(marketingJobRepository, never()).findPostsEligibleForInstagramFeedPublish(any(Integer.class));
+        verify(marketingJobRepository, never()).findPostsEligibleForXThreadPublish(any(Instant.class), anyInt());
+        verify(marketingJobRepository, never()).findPostsEligibleForInstagramFeedPublish(any(Instant.class), anyInt());
+    }
+
+    @Test
+    void pollAndPublishToXThread_sinceUnset_failClosed_doesNotPoll() {
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(asmProperties.getAutoPublishSince()).thenReturn(null);
+
+        scheduler.pollAndPublishToXThread();
+
+        verify(marketingJobRepository, never()).findPostsEligibleForXThreadPublish(any(Instant.class), anyInt());
+        verify(marketingJobRepository, never()).findPostsEligibleForInstagramFeedPublish(any(Instant.class), anyInt());
+        verify(marketingJobService, never()).createJob(anyString(), any(List.class), anyBoolean(), anyString());
+    }
+
+    @Test
+    void pollAndPublishToXThread_sinceInvalid_failClosed_doesNotPoll() {
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(asmProperties.getAutoPublishSince()).thenReturn("not-an-instant");
+
+        scheduler.pollAndPublishToXThread();
+
+        verify(marketingJobRepository, never()).findPostsEligibleForXThreadPublish(any(Instant.class), anyInt());
+        verify(marketingJobService, never()).createJob(anyString(), any(List.class), anyBoolean(), anyString());
     }
 
     @Test
     void pollAndPublishToXThread_noEligiblePosts_doesNotCreateJobs() {
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
-        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(10))
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
 
         scheduler.pollAndPublishToXThread();
 
-        verify(marketingJobRepository).findPostsEligibleForXThreadPublish(10);
-        verify(marketingJobRepository).findPostsEligibleForInstagramFeedPublish(10);
+        verify(marketingJobRepository).findPostsEligibleForXThreadPublish(SINCE, 10);
+        verify(marketingJobRepository).findPostsEligibleForInstagramFeedPublish(SINCE, 10);
         verify(marketingJobService, never()).createJob(anyString(), any(List.class), anyBoolean(), anyString());
     }
 
@@ -86,9 +114,10 @@ class XThreadPublishTriggerSchedulerTest {
     void pollAndPublishToXThread_singleEligiblePost_createsXAndIgJobs() {
         String postId = "post_123";
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Collections.singletonList(postId));
-        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(10))
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.singletonList(postId));
         when(marketingJobRepository.countActivePlatformJobs(postId, "x_thread")).thenReturn(0L);
         when(marketingJobRepository.countActivePlatformJobs(postId, "instagram_feed")).thenReturn(0L);
@@ -109,8 +138,9 @@ class XThreadPublishTriggerSchedulerTest {
     void pollAndPublishToXThread_multipleEligiblePosts_createsJobsForEach() {
         List<String> postIds = Arrays.asList("post_123", "post_456", "post_789");
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.findPostsEligibleForXThreadPublish(10)).thenReturn(postIds);
-        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(10))
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10)).thenReturn(postIds);
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
         when(marketingJobRepository.countActivePlatformJobs(anyString(), eq("x_thread"))).thenReturn(0L);
         when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))
@@ -126,9 +156,10 @@ class XThreadPublishTriggerSchedulerTest {
     void pollAndPublishToXThread_alreadyHasActiveXThreadJob_skipsPost() {
         String postId = "post_123";
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Collections.singletonList(postId));
-        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(10))
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
         when(marketingJobRepository.countActivePlatformJobs(postId, "x_thread")).thenReturn(1L);
 
@@ -143,9 +174,10 @@ class XThreadPublishTriggerSchedulerTest {
         String postId1 = "post_123";
         String postId2 = "post_456";
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Arrays.asList(postId1, postId2));
-        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(10))
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
         when(marketingJobRepository.countActivePlatformJobs(postId1, "x_thread")).thenReturn(0L);
         when(marketingJobRepository.countActivePlatformJobs(postId2, "x_thread")).thenReturn(0L);
@@ -164,9 +196,10 @@ class XThreadPublishTriggerSchedulerTest {
     void pollAndPublishToXThread_createsJobWithAutoPublishTrue() {
         String postId = "post_123";
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Collections.singletonList(postId));
-        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(10))
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
         when(marketingJobRepository.countActivePlatformJobs(postId, "x_thread")).thenReturn(0L);
         when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))
@@ -181,9 +214,10 @@ class XThreadPublishTriggerSchedulerTest {
     void pollAndPublish_instagramOnlyEligible_createsIgJob() {
         String postId = "post_ig_only";
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.findPostsEligibleForXThreadPublish(10))
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
-        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(10))
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.singletonList(postId));
         when(marketingJobRepository.countActivePlatformJobs(postId, "instagram_feed")).thenReturn(0L);
         when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))

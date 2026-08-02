@@ -21,6 +21,8 @@ public class PromptAssembler {
     private volatile String commentGuide = "";
     private volatile String replyGuide = "";
     private volatile String partnerGuide = "";
+    /** 양면 사연 작성자(A) 가이드 — stance=AUTHOR일 때 사용. */
+    private volatile String pairedAuthorGuide = "";
     /** R9 Track B: 일상 글 모드 가이드 (voice/post_casual.md). 빈 문자열이면 인라인 기본값 사용. */
     private volatile String casualPostGuide = "";
 
@@ -39,11 +41,13 @@ public class PromptAssembler {
         commentGuide    = loadGuide("voice/comment",     "voice/comment.md").replace("%", "%%");
         replyGuide      = loadGuide("voice/reply",       "voice/reply.md").replace("%", "%%");
         partnerGuide    = loadGuide("voice/partner",     "voice/partner.md").replace("%", "%%");
+        pairedAuthorGuide = loadGuide("voice/post_paired_author", "voice/post_paired_author.md").replace("%", "%%");
         // R9 Track B: 일상 글 모드 가이드 (D-51) — 없으면 "" (assembleCasualPostPrompt 인라인 폴백)
         String rawCasual = loadGuide("voice/post_casual", "voice/post_casual.md");
         casualPostGuide = rawCasual != null ? rawCasual.replace("%", "%%") : "";
-        log.info("Voice guides loaded: post={}c comment={}c reply={}c partner={}c casual={}c",
-            postGuide.length(), commentGuide.length(), replyGuide.length(), partnerGuide.length(), casualPostGuide.length());
+        log.info("Voice guides loaded: post={}c comment={}c reply={}c partner={}c pairedAuthor={}c casual={}c",
+            postGuide.length(), commentGuide.length(), replyGuide.length(), partnerGuide.length(),
+            pairedAuthorGuide.length(), casualPostGuide.length());
     }
 
     private String loadGuide(String dbKey, String classpathPath) {
@@ -135,6 +139,10 @@ public class PromptAssembler {
         if ("PARTNER".equalsIgnoreCase(req.getStance()) && req.getCounterpartBody() != null && !req.getCounterpartBody().isBlank()) {
             return assemblePartnerPrompt(req);
         }
+        // AUTHOR stance = 양면 사연의 작성자(A) — 상대방(B)이 곧 답할 전제
+        if ("AUTHOR".equalsIgnoreCase(req.getStance())) {
+            return assembleAuthorPairedPrompt(req);
+        }
         // 재구성 모드: 단일 크롤 원본을 페르소나 보이스로 사연화
         if (req.isReconstructMode() && req.getSourceBody() != null && !req.getSourceBody().isBlank()) {
             return assembleReconstructPrompt(req);
@@ -143,7 +151,7 @@ public class PromptAssembler {
         if ("CASUAL".equalsIgnoreCase(req.getPostKind())) {
             return assembleCasualPostPrompt(req);
         }
-        // 기존 로직 유지
+        // 기존 로직 유지 (단독 사연 — stance 미지정)
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), postGuide, req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), req.getReconstructionRules());
         String politeSuffix = isPolite(req.getFormality())
@@ -322,6 +330,53 @@ public class PromptAssembler {
         return system + "\n" + SEP + "\n" + user;
     }
 
+    /**
+     * 양면 사연 작성자(A) — stance=AUTHOR.
+     * 상대방(B)이 같은 사건을 다른 시각으로 받아칠 앵커를 남긴다.
+     */
+    private String assembleAuthorPairedPrompt(PostGenRequest req) {
+        String guide = (pairedAuthorGuide != null && !pairedAuthorGuide.isBlank())
+            ? pairedAuthorGuide : postGuide;
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide, req.getFormality(),
+                req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
+        String politeSuffix = isPolite(req.getFormality())
+            ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
+            : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
+        String catGuide = CATEGORY_GUIDE.getOrDefault(req.getCategory() != null ? req.getCategory() : "OTHER", "");
+        String varietySeed = PROMPT_RNG.nextBoolean()
+            ? "\n[스타일 힌트] " + VARIETY_SEEDS[PROMPT_RNG.nextInt(VARIETY_SEEDS.length)] : "";
+        String user = """
+            %s카테고리: %s%s
+            아키타입: %s
+            %s
+            글 길이: %s
+            %s
+            %s
+            위 카테고리와 말투로 **양면 사연의 작성자(A)** 입장을 1인칭으로 완전 창작해주세요.
+            곧 상대방(B)도 같은 사건에 대해 자기 입장을 따로 씁니다.
+            - 출력 형식: 첫 줄=제목(공백 포함 12~40자), 빈 줄, 그다음 본문. 제목≠본문
+            - 🚨 구체 사건 필수: 상대가 재해석할 수 있는 행동·말·날짜 앵커 포함
+            - 🚨 상대 속마음·의도를 단정하지 말 것 — 보이는 사실 + 내 감정만
+            - 상대를 대신해 변명하거나 상대 입장을 요약하지 말 것
+            - 실제 인물 실명·연락처·주소·개인정보 절대 포함 금지
+            - 판결·처방·승패 표현 금지
+            - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지
+            - ⚠️ 단어: '부인' 금지(→ 아내/와이프) · 나레이터 투 도입부 금지
+            %s%s""".formatted(
+                req.getDemographic() != null && !req.getDemographic().isBlank() ? "사용자 프로필: " + safe(req.getDemographic()) + "\n" : "",
+                req.getCategory() != null ? req.getCategory() : "OTHER",
+                catGuide.isBlank() ? "" : " (⚠️ " + catGuide + ")",
+                req.getArchetype() != null ? req.getArchetype() : "일반갈등",
+                req.getTopicSeed() != null ? "상황: " + safe(req.getTopicSeed()) : "",
+                lengthInstruction(req.getLengthTier()),
+                dynamicExamplesBlock(req.getDynamicExamples()),
+                situationContinuityBlock(req.getOngoingSituation()),
+                recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 같은 갈등 유형·사건 반복 금지"),
+                politeSuffix,
+                varietySeed);
+        return system + "\n" + SEP + "\n" + user;
+    }
+
     private String assemblePartnerPrompt(PostGenRequest req) {
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), partnerGuide, req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
@@ -339,11 +394,15 @@ public class PromptAssembler {
             글 길이: %s
             %s
             %s
-            위 원글에서 상대방(파트너) 입장의 내부 synthetic 페르소나용 서술을 1인칭으로 작성해주세요.
-            - 원글에서 언급된 구체 사건을 반드시 참조하되 해석은 자기 시각으로
-            - 방어적 해명보다 내가 느끼고 있는 것 중심
-            - 판결·처방·사과 표현 금지
+            위 원글의 **상대방(B)** 으로서, 작성자와 같은 무게의 사연 본문을 1인칭으로 작성해주세요.
+            - 제목 줄 없이 본문만 출력
+            - 원글에 나온 구체 사건을 반드시 재참조하되, 해석·감정은 내 시각으로
+            - 작성자 본문과 비슷한 밀도 — 한 줄 반박·해명으로 끝내지 말 것
+            - 방어적 해명보다 내가 느끼고 있는 것(피로·억울함·혼란·서운함) 중심
+            - 원글에 없는 새 사건 추가 금지
+            - 판결·처방·사과·승패 표현 금지
             - 실제 인물 실명·개인정보 절대 포함 금지
+            - 작성자 글을 요약·평가하는 메타 발화 금지
             ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지
             %s%s""".formatted(
                 safe(req.getCounterpartBody()),

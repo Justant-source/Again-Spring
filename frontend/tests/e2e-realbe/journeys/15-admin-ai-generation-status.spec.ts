@@ -15,7 +15,7 @@ import { test, expect } from '../support/no-llm-fixture'
 import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1 } from '../fixtures/personas'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)
 
 // ── A. 진행 현황 섹션 기본 렌더링 ──────────────────────────────────

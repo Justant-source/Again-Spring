@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -17,6 +18,10 @@ import java.util.List;
  * prior job exists for that platform, creates one alone ASM job per channel with
  * {@code autoPublish=true}. Comment-count gates are intentionally not applied —
  * product rule (2026-08-02): always publish after 24h.
+ *
+ * <p>Only posts with {@code createdAt >= asm.auto-publish-since} are eligible.
+ * The cutoff is fail-closed: if unset while the trigger is on, the scheduler
+ * skips (2026-08-02 backlog flood).
  *
  * <p>Opt-in via {@code asm.x-thread-publish-trigger-enabled} (shared gate for both
  * channels — historical name kept so existing .env.prod keeps working). Defaults
@@ -65,10 +70,18 @@ public class XThreadPublishTriggerScheduler {
             return;
         }
 
+        Instant since = parseAutoPublishSince(asmProperties.getAutoPublishSince());
+        if (since == null) {
+            log.warn("Marketing auto-publish trigger is on but asm.auto-publish-since is unset/invalid — fail-closed, skipping");
+            return;
+        }
+
         try {
-            enqueueEligible(X_THREAD, marketingJobRepository.findPostsEligibleForXThreadPublish(BATCH_LIMIT),
+            enqueueEligible(X_THREAD,
+                marketingJobRepository.findPostsEligibleForXThreadPublish(since, BATCH_LIMIT),
                 "system:x-thread-trigger");
-            enqueueEligible(INSTAGRAM_FEED, marketingJobRepository.findPostsEligibleForInstagramFeedPublish(BATCH_LIMIT),
+            enqueueEligible(INSTAGRAM_FEED,
+                marketingJobRepository.findPostsEligibleForInstagramFeedPublish(since, BATCH_LIMIT),
                 "system:instagram-feed-trigger");
         } catch (Exception e) {
             log.error("Error in marketing auto-publish trigger scheduler", e);
@@ -103,9 +116,21 @@ public class XThreadPublishTriggerScheduler {
                 postId, List.of(platform), true, requestedBy);
             log.info("Created {} marketing job {} for post {}", platform, job.getId(), postId);
         } catch (IllegalStateException e) {
-            log.warn("Post {} already has an active {} marketing job: {}", postId, platform, e.getMessage());
+            log.warn("Post {} already has an active {} marketing job: {}", platform, postId, e.getMessage());
         } catch (IllegalArgumentException e) {
             log.warn("Post not found for {} auto-publish: {}", platform, postId);
+        }
+    }
+
+    /** Blank/null/unparseable → null (caller fail-closes). Accepts ISO-8601 Instant. */
+    static Instant parseAutoPublishSince(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.parse(raw.trim());
+        } catch (Exception e) {
+            return null;
         }
     }
 }

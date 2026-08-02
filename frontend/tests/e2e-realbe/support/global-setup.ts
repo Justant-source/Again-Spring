@@ -11,8 +11,9 @@ import { saveAuthState, AUTH_STATE_DIR } from '../fixtures/auth-state'
 import { chromiumLaunchOptions } from './browser'
 import { cleanup } from '../fixtures/cleanup'
 import { readEnvVar, runSqlScript } from './db'
+import { resolveE2ETarget } from './env'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 
 /**
  * SQL로 직접 처리:
@@ -82,6 +83,11 @@ function sleep(ms: number): Promise<void> {
 }
 
 export default async function globalSetup(): Promise<void> {
+  const target = resolveE2ETarget(BASE)
+  console.log(
+    `[global-setup] target=${target.label} url=${target.baseURL} db=${target.dbContainer}`,
+  )
+
   // 1. BE 헬스 확인
   const apiCtx = await playwrightRequest.newContext()
   try {

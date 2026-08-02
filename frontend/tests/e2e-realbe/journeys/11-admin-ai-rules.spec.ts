@@ -18,7 +18,7 @@ import { PERSONA_TEST1 } from '../fixtures/personas'
 import { tokenFromStorageState } from '../support/api'
 import { ADMIN_CONTENT } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)
 
 test.describe('Journey 11-A: /admin/ai-rules 페이지', () => {

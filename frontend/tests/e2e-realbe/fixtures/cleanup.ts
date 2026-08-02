@@ -1,5 +1,6 @@
 import { execSync } from 'child_process'
 import path from 'path'
+import { resolveE2ETarget } from '../support/env'
 
 const SCRIPT = path.resolve(__dirname, '../../../../backend/scripts/test-automation/cleanup-test-db.sh')
 
@@ -13,30 +14,36 @@ const SCRIPT = path.resolve(__dirname, '../../../../backend/scripts/test-automat
  * 보존: mock_001, test%@again.com users 행
  *
  * 1차 삭제는 no-llm-fixture afterEach(createPost 추적). 이 스크립트는 setup/teardown 안전망.
- * 미공개(prelaunch): localhost:8091 + againspring-mariadb-prod 허용.
- * 공개 URL(againspring.net 등) cleanup은 계속 거부. 정식 공개 후 재검토.
+ *
+ * 중요: DB 대상은 E2E_BASE_URL에서 파생한다 (resolveE2ETarget).
+ * ambient DB_CONTAINER / MARIADB_* 가 BE와 다른 스택을 가리키면 광장에 E2E 글이 남는다.
+ * 공개 URL(againspring.net 등) cleanup은 거부.
  */
 export function cleanup(baseURL?: string): void {
-  const url = baseURL ?? process.env.E2E_BASE_URL ?? 'http://localhost:8091'
-  const isLocalhost = url.includes('localhost') || url.includes('127.0.0.1')
+  const target = resolveE2ETarget(baseURL)
+  const isLocalhost =
+    target.baseURL.includes('localhost') || target.baseURL.includes('127.0.0.1')
   if (!isLocalhost) {
-    throw new Error(`Cleanup refused: non-localhost URL detected: ${url}`)
+    throw new Error(`Cleanup refused: non-localhost URL detected: ${target.baseURL}`)
   }
 
-  const container = process.env.DB_CONTAINER ?? 'againspring-mariadb-prod'
-  // Refuse accidental remote-looking container names that aren't our local prod/dev containers
-  if (/prod/i.test(container) && container !== 'againspring-mariadb-prod') {
-    throw new Error(`Cleanup refused: unexpected prod-like DB container: ${container}`)
-  }
+  // ambient MARIADB_* 제거 → 스크립트가 E2E_ENV_FILE만 읽게 강제 (스택 불일치 방지)
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  delete env.MARIADB_DATABASE
+  delete env.MARIADB_PASSWORD
+  delete env.MARIADB_USER
+  delete env.DB_CONTAINER
+
+  console.log(
+    `[cleanup] E2E target=${target.label} url=${target.baseURL} db=${target.dbContainer} env=${path.basename(target.envFile)}`,
+  )
 
   execSync(`bash "${SCRIPT}"`, {
     stdio: 'inherit',
     env: {
-      ...process.env,
-      DB_CONTAINER: container,
-      E2E_ENV_FILE:
-        process.env.E2E_ENV_FILE ??
-        path.resolve(__dirname, '../../../../env/.env.prod'),
+      ...env,
+      DB_CONTAINER: target.dbContainer,
+      E2E_ENV_FILE: target.envFile,
     },
   })
 }

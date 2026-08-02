@@ -11,7 +11,7 @@ import { PERSONA_TEST1 } from '../fixtures/personas'
 import { createPost, tokenFromStorageState } from '../support/api'
 import { runSqlScript, sql } from '../support/db'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 
 test.describe('Journey 22: 시드 배심원 API', () => {
   test.use({ storageState: authStatePath(PERSONA_TEST1.email) })

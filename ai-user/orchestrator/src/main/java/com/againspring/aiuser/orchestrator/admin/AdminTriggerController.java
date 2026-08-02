@@ -148,13 +148,20 @@ public class AdminTriggerController {
                 "message", attempted + "개 예약글 생성 시도 완료(LLM+세이프가드 통과분만 저장됨, 미발행)."));
     }
 
-    /** PairedPostScheduler 즉시 실행 — 갈등 사연 페어 생성 */
+    /** PairedPostScheduler 즉시 실행 — 양면 사연(작성자+상대방) 생성. count>0이면 최대 N쌍. */
     @PostMapping("/paired-posts")
-    public ResponseEntity<Map<String, Object>> triggerPairedPosts() {
-        log.info("[AdminTrigger] Manual paired-posts requested");
+    public ResponseEntity<Map<String, Object>> triggerPairedPosts(
+            @RequestParam(required = false) Integer count) {
+        log.info("[AdminTrigger] Manual paired-posts requested count={}", count);
         try {
-            pairedPostScheduler.triggerNow();
-            return ResponseEntity.ok(Map.of("status", "ok", "action", "paired-posts"));
+            int attempted = (count != null && count > 0)
+                ? pairedPostScheduler.triggerNow(count)
+                : pairedPostScheduler.triggerNow();
+            return ResponseEntity.ok(Map.of(
+                "status", "ok",
+                "action", "paired-posts",
+                "attempted", attempted,
+                "requested", count != null ? count : 0));
         } catch (Exception e) {
             log.error("[AdminTrigger] paired-posts failed: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError()

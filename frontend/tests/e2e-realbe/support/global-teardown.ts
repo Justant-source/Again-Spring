@@ -1,40 +1,71 @@
 /**
  * globalTeardown — 전체 e2e 실행 완료 후 DB 정리.
  *
- * global-setup에서 "실행 전 정리"를 하고, 여기서 "실행 후 정리"를 한다.
- * 두 겹 정리로 테스트 DB가 매 실행마다 누적되는 문제를 방지.
- * (1차 삭제는 no-llm-fixture의 createPost afterEach — 여기 cleanup은 안전망.)
- *
- * 미공개: localhost:8091 + againspring-mariadb-prod. 공개 URL cleanup은 거부.
+ * 잔존 검증은 SQL + 공개 피드 API 둘 다 사용 (한쪽만 보면 놓침).
  */
+import { request as playwrightRequest } from '@playwright/test'
 import { cleanup } from '../fixtures/cleanup'
 import { sql } from './db'
+import { resolveE2ETarget } from './env'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+function listE2ELeftoversSql(): string {
+  return sql(
+    `SELECT CONCAT(id, ':', IFNULL(title,'')) FROM posts
+     WHERE id <> 'mock_001'
+       AND (title LIKE '%E2E%' OR title LIKE '%e2e%'
+            OR user_title LIKE '%E2E%' OR user_title LIKE '%e2e%'
+            OR title LIKE 'REPRO%' OR title LIKE '[e2e]%')`,
+  )
+}
+
+async function listE2ELeftoversFeed(baseURL: string): Promise<string[]> {
+  const ctx = await playwrightRequest.newContext()
+  try {
+    const resp = await ctx.get(`${baseURL}/api/community/posts?page=0&size=50&sort=latest`)
+    if (!resp.ok()) return [`feed HTTP ${resp.status()}`]
+    const data = await resp.json()
+    const items = Array.isArray(data) ? data : (data.content ?? [])
+    return items
+      .filter((p: { title?: string }) => {
+        const t = p.title ?? ''
+        return /E2E|e2e|REPRO|\[e2e\]/.test(t)
+      })
+      .map((p: { id?: string; title?: string }) => `${p.id}:${p.title}`)
+  } finally {
+    await ctx.dispose()
+  }
+}
 
 export default async function globalTeardown(): Promise<void> {
-  try {
-    cleanup(BASE)
-    console.log('[global-teardown] DB cleanup 완료')
-  } catch (e) {
-    // teardown 실패가 테스트 결과를 바꾸지 않도록 경고만
-    console.warn('[global-teardown] cleanup 건너뜀:', (e as Error).message)
+  const target = resolveE2ETarget(process.env.E2E_BASE_URL)
+  console.log(
+    `[global-teardown] target=${target.label} url=${target.baseURL} db=${target.dbContainer}`,
+  )
+
+  cleanup(target.baseURL)
+  console.log('[global-teardown] DB cleanup 완료')
+
+  // PromoTitle/AnswerProcessing async가 DELETE 직후 save()/merge로 행을 되살리던
+  // 사고 대비: 짧게 대기 후 한 번 더 정리·검증
+  await new Promise((r) => setTimeout(r, 15_000))
+  cleanup(target.baseURL)
+  console.log('[global-teardown] delayed cleanup 완료')
+
+  let sqlLeft = listE2ELeftoversSql()
+  if (sqlLeft) {
+    console.warn('[global-teardown] SQL 잔존 — cleanup 재시도:\n' + sqlLeft)
+    cleanup(target.baseURL)
+    sqlLeft = listE2ELeftoversSql()
   }
 
-  // 안전망 검증 — E2E 제목 사연이 남았으면 경고 (광장 오염 조기 발견)
-  try {
-    const leftover = sql(
-      `SELECT CONCAT(id, ':', IFNULL(title,'')) FROM posts
-       WHERE id <> 'mock_001'
-         AND (title LIKE '%E2E%' OR title LIKE '%e2e%'
-              OR user_title LIKE '%E2E%' OR user_title LIKE '%e2e%')`,
+  const feedLeft = await listE2ELeftoversFeed(target.baseURL)
+
+  if (sqlLeft || feedLeft.length > 0) {
+    throw new Error(
+      `[global-teardown] E2E 사연이 ${target.label}에 남아 있음\n` +
+        `SQL:\n${sqlLeft || '(없음)'}\n` +
+        `FEED:\n${feedLeft.join('\n') || '(없음)'}`,
     )
-    if (leftover) {
-      console.warn('[global-teardown] E2E 사연이 아직 남아 있음:\n' + leftover)
-    } else {
-      console.log('[global-teardown] E2E 사연 잔존 없음 확인')
-    }
-  } catch (e) {
-    console.warn('[global-teardown] 잔존 검증 건너뜀:', (e as Error).message)
   }
+  console.log(`[global-teardown] E2E 사연 잔존 없음 확인 (${target.label})`)
 }

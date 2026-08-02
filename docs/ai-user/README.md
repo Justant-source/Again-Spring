@@ -2,7 +2,7 @@
 
 AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orchestrator는 환경별 인스턴스(`ai-user-orchestrator`, `ai-user-orchestrator-dev`)를 둘 수 있고, LLM 워커(`llm-ai-user`)는 공유한다.
 
-> **미공개(prelaunch) 초점**: 실서버 검증·운영 대상은 **prod(:8091) + prod DB**다. `ai-user-orchestrator-dev`·`prod-dev-sync`·dev(:8090) 배포/디버그는 명시 요청 전 휴면.
+> **운영 격리**: 검증·e2e는 **dev(:8090)**. prod 런타임 SoT는 **prod DB**. `prod-dev-sync`가 매일 prod→dev 비식별 반영(활성).
 
 ## 서비스 구성
 
@@ -10,7 +10,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - `ai-user-orchestrator-dev` (`8096`, 내부): dev DB용 (휴면 가능)
 - `llm-ai-user` (`8092`, 내부): 구조화 thread plan 생성과 legacy 생성/분석을 담당하는 Claude Code·Codex CLI bridge
 - `ai-learning` (`8099`, host 공개): example bank, crawl(popularity gate), strengthen, topic synthesis
-- `prod-dev-sync` (daily): prod→dev 비식별 sync (**미공개 기간 휴면**)
+- `prod-dev-sync` (daily): prod→dev 비식별 sync (**활성** — KST 일 1회)
 
 ## 현재 코드 기준 핵심 사실
 
@@ -19,7 +19,8 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - PLAN은 배포만으로 켜지지 않는다. 환경 gate와 admin의 `ai_user_generation_config.scheduler_mode/provider`를 모두 명시적으로 설정해야 한다.
 - **운영 경로 (2026-07-31~)**: `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`. 새벽 배치(`env/scripts/nightly-ai-user-batch.sh`, 03:05 KST)는 생성만 하고, 낮 동안 슬롯 도래 시 발행한다. 상세: [thread-planning.md](./thread-planning.md), [operations.md](./operations.md) §8.
 - **AI_POST 생성 가드 (2026-08-02)**: 제목 공백 포함 **4~40자**, 제목≠본문(공백 정규화 후). 프롬프트 + `StructuredGenerationService` + orchestrator 이중 가드.
-- `PAIRED_POST_ENABLED`의 기본값은 `false`다. pair 추가 글은 별도 생성 기능이 아니라 기존 게시글의 revision 변경으로 처리한다.
+- **양면 사연 20% (2026-08-02)**: 하루 AI 글의 20%는 작성자+상대방이 각자 입장을 쓰는 paired post. `PAIRED_POST_ENABLED=true`(prod), `PAIRED_POST_TARGET_SHARE=0.20`. 새벽 배치가 solo/paired를 나눠 생성. 프롬프트: `stance=AUTHOR`·`PARTNER`.
+- 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 paired 생성과 별개다.
 - `AI_USER_ENABLED`는 orchestrator의 **하드 게이트**다. false면 tick, daily planner, paired posts, crawl trigger가 모두 skip된다.
 - 실제 2차 kill-switch는 여전히 DB `ai_user_runtime.enabled`다.
 - `ai-learning`은 `AI_LEARNING_ENABLED=false`면 scheduler를 올리지 않고, `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic 작업을 등록하지 않는다. 크롤 ingest 전 **popularity gate**가 UNRANKED를 차단한다.
@@ -45,17 +46,17 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 | orchestrator (prod) | `ai-user/orchestrator/` | `8096` | 없음 | prod 대상 행동 오케스트레이션 |
 | llm | `ai-user/llm/` | `8092` | 없음 | 생성/분석/legacy rewrite 워커 (dev/prod 공유) |
 | learning | `ai-user/learning/` | `8099` | `localhost:8099` | 예시 검색, 크롤, 강화, 토픽 |
-| sync | `ai-user/sync/` | 없음 | 없음 | prod→dev 일일 반영 (**미공개 휴면**) |
+| sync | `ai-user/sync/` | 없음 | 없음 | prod→dev 일일 비식별 반영 (**활성**) |
 
 ## 환경별 동작
 
-| 항목 | prod (주력) | dev (휴면 가능) |
+| 항목 | prod (운영 SoT) | dev (검증·e2e) |
 |---|---|---|
 | backend 진입점 | `http://localhost:8091` | `http://localhost:8090` |
 | orchestrator 인스턴스 | `ai-user-orchestrator` | `ai-user-orchestrator-dev` |
 | orchestrator 대상 | `backend-prod:8080`, `mariadb-prod` | `backend-dev:8080`, `mariadb-dev` |
 | LLM 워커 | `llm-ai-user` (공유) | `llm-ai-user` (공유) |
-| 데이터 | source of truth | `prod-dev-sync` 일일 upsert (미공개 기간 비활성) |
+| 데이터 | source of truth | `prod-dev-sync` 일일 upsert (**활성**) |
 
 ## 데이터 흐름
 
@@ -75,7 +76,7 @@ flowchart LR
 2. AI 글은 **micro-batch**로 후보를 만들고 `generateAndHold`로 홀딩한 뒤, 슬롯 도래 시만 게시한다.
 3. 사람 상호작용은 inbox → 30분 batch(chunk) → 0~3 responders로 `llm-ai-user`에 요청한다.
 4. learning은 popularity-gated crawl, RAG 예시, strengthen, daily topic을 제공한다.
-5. (휴면) `prod-dev-sync`가 prod 기준 테이블을 dev로 하루 1회 비식별 반영할 수 있다.
+5. `prod-dev-sync`가 prod 기준 테이블을 dev로 하루 1회 비식별 반영한다.
 
 ## 문서 안내
 

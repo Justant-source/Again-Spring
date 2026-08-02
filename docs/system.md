@@ -3,7 +3,7 @@
 > last-verified: 2026-08-02 · code-ref: `env/docker-compose*.yml` · `env/nginx/*.conf`
 >
 > 권위본: 이 파일과 `docs/env/architecture.md`. 포트·서비스 목록이 문서와 다르면 compose가 우선이다.
-> **미공개**: 실서버 검증·배포면은 **prod(:8091)만**. dev(:8090)·`prod-dev-sync`는 휴면(명시 요청 전).
+> **운영 격리**: 검증·e2e·일상 배포면 = **dev(:8090)**. prod(:8091)는 명시 배포만. `prod-dev-sync` = 일일 prod→dev 비식별 동기화(활성).
 
 ---
 
@@ -95,11 +95,12 @@ flowchart TB
 
 ### 운영 원칙
 
-- frontend/backend는 dev와 prod를 분리한다. **미공개 기간 실검증면은 prod(:8091)만.**
+- frontend/backend는 dev와 prod를 **완전 분리**한다. 검증·수동 테스트·e2e는 **dev(:8090)만**.
+- prod(:8091) 배포·반영은 명시적 "prod에 배포해줘" 지시 시에만. **prod에서 e2e 금지.**
 - ai-user 런타임은 `env/docker-compose.ai-user.yml` 하나를 공통으로 사용한다.
 - PLAN-first 경로: outbox → orchestrator(plan/hold/inbox) → CLI 구조화 생성 → `ai_scheduled_posts` 홀딩 → 슬롯 도래 시 REST 게시 → due item 댓글. LLM API key가 아니라 Claude/Codex 로그인 세션 volume을 사용한다.
 - orchestrator와 learning의 실제 주력 대상은 prod DB와 prod backend다.
-- `prod-dev-sync`·dev orchestrator는 미공개 기간 **휴면**(파일·compose는 보관).
+- `prod-dev-sync`는 **매일** prod→dev 비식별 upsert로 dev를 prod-like 데이터로 유지한다.
 
 ### 포트 표
 

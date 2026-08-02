@@ -11,12 +11,12 @@
 
 | 항목 | 값 |
 |---|---|
-| 자동/스케줄 활성 | **활성** — `post.createdAt + 24h` 후 one-shot (`XThreadPublishTriggerScheduler`) |
+| 자동/스케줄 활성 | **활성** — `createdAt >= ASM_AUTO_PUBLISH_SINCE` 이고 `+24h` 후 one-shot (`XThreadPublishTriggerScheduler`) |
 | 파이프 구현 | **허용** (하이브리드 캐러셀) |
 | 실발행 | 자동(24h) + 관리자 단건 수동 |
 
-사람·PLAN 구분 없이 사연 공개 24시간 뒤 `instagram_feed` 잡을 1회 생성·`autoPublish`한다.
-X(`x_thread`)와 동일 스케줄러·동일 게이트(댓글 수 조건 없음). ASM alone 제약으로 **별도 잡**.
+컷오프 이후 생성된 사연만 공개 24시간 뒤 `instagram_feed` 잡을 1회 생성·`autoPublish`한다.
+X(`x_thread`)와 동일 스케줄러·동일 게이트(댓글 수 조건 없음, `ASM_AUTO_PUBLISH_SINCE` 공유). ASM alone 제약으로 **별도 잡**.
 
 ---
 

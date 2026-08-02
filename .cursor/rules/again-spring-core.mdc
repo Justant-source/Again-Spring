@@ -16,7 +16,7 @@ alwaysApply: true
 1. FE → LLM 직접 호출 금지 (BE REST만)
 2. BE → `RemoteLlmProvider`만 (`againspring-llm:8090/v1/invoke`)
 3. AI 출력 판결/처방/승패 금지 → 공감/관점/작성자/상대방 (`.claude/rules/llm-safety.md`)
-4. **prod 배포**는 명시 지시 없으면 금지. 미공개: 백업 → prod(:8091) → e2e-realbe(`localhost:8091`) → push. **dev(:8090) 배포·e2e 금지**
+4. **prod 배포**는 명시 지시 없으면 금지. **dev/prod 격리**: dev(:8090) 배포·수동·e2e → (명시 시) 백업·prod(:8091). **prod e2e 금지(E3)**. **dev LLM 금지(L3)**. sync=5분+24h
 5. `.env.prod` git 커밋 금지
 6. 상세 문서는 `docs/`만 (루트는 README/CLAUDE/AGENTS만)
 7. LLM 오류·크레딧 소진 문자열 = 콘텐츠 아님 → 게시 금지

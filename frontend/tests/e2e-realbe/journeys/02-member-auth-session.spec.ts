@@ -14,7 +14,7 @@ import {
   LOGIN_BUTTON,
 } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const TOKEN_KEY = 'again-spring-token'
 
 // ── A. 이메일 로그인 (UI) ─────────────────────────────────────────

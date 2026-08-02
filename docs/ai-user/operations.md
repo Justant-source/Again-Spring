@@ -127,12 +127,15 @@ docker logs -f againspring-prod-dev-sync
 
 ## 7. sync 운영 주의점
 
-`prod-dev-sync`는 KST cron(`SYNC_CRON`) 기준 하루 1회 실행된다.
+`prod-dev-sync`는 **5분 콘텐츠 증분** + **KST 일 1회 full**을 실행하며, 컨테이너 기동 시에도 full→content 순으로 1회 동기화한다.
 
-- 기본 cron: `30 5 * * *`
-- 기본 timezone: `Asia/Seoul`
-- 기본 backfill 창: `7일`
+- full cron: `SYNC_CRON` 기본 `30 5 * * *` / timezone `Asia/Seoul`
+- content cron: `SYNC_CONTENT_CRON` 기본 `*/5 * * * *` / lookback `SYNC_CONTENT_LOOKBACK_MINUTES` 기본 15
 - 실사용자 계정은 dev에서 비식별화되고 로그인 불가 상태로 반영된다.
+- 5분 잡은 posts/comments/votes/likes(+vote_options)와 참조 users·personas만 (T1+U1).
+- full 잡은 아래 전체 표.
+- D1: prod 우선 upsert. e2e 잔여는 cleanup.
+- L3: `ai-user-orchestrator-dev`는 compose profile `ai-user-dev` + `AI_USER_DEV_ENABLED=false` (기본 미기동). dev backend는 LLM 네트워크 미연결.
 
 현재 반영 범위:
 
@@ -175,12 +178,12 @@ delta를 계산해 댓글·대댓글 `atLocal`에 일괄 적용한다 (키보드
 ```
 env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
   ├─ provider(ai_post_bundle/human_post_plan/human_interaction) = CLAUDE
-  ├─ POST /admin/trigger/backfill-persona-capsules?batchSize=20  (WP2 capsule/fact; sync=true 가능)
-  ├─ POST /admin/trigger/auto-persona-for-story?category=&register=NATEPAN&title=&body=&threshold=0.35  (WP3 matcher miss → auto-create)
-  ├─ POST /admin/trigger/generate-scheduled-posts?count=N&fromHour=8&toHour=22
-  │    ├─ ActivityCurve.sampleFutureInstants(count=N)로 오늘 남은 활동 시간대에
-  │    │  발행 슬롯 N개를 최소간격(기본 45분) 두고 샘플링
-  │    └─ 페르소나별로 generateAndHold() 호출 → ai_scheduled_posts에 SCHEDULED로 저장
+  ├─ 할당: paired=ceil(N×0.20), solo=N−paired  (NIGHTLY_BATCH_PAIRED_SHARE, 기본 0.20)
+  ├─ POST /admin/trigger/generate-scheduled-posts?count=solo&fromHour=8&toHour=22
+  │    ├─ ActivityCurve.sampleFutureInstants 로 발행 슬롯 샘플링
+  │    └─ generateAndHold() → ai_scheduled_posts SCHEDULED
+  ├─ POST /admin/trigger/paired-posts?count=paired
+  │    └─ PairedPostScheduler: AUTHOR→PRIVATE/WAIT_FOR_PARTNER→PARTNER answer→PUBLIC
   ├─ 낮 동안 밀린 REQUESTED 스레드플랜(실사람 글 반응 등)도 이 창에서 같이 소진
   └─ provider = OFF (trap으로 스크립트 종료 방식과 무관하게 항상 보장)
 
@@ -189,6 +192,8 @@ ScheduledPostPublisher (cron AI_USER_SCHEDULED_POST_PUBLISHER_CRON, 기본 매 �
   ├─ BackendBotClient.createPost — 진짜 글 생성
   ├─ candidates_json을 persistResponse()로 재생 (LLM 재호출 없음)
   └─ PUBLISHED로 갱신
+
+PairedPostScheduler cron (PAIRED_POST_CRON, 기본 2시간) — 당일 양면 사연 부족분 보충
 ```
 
 `schedule_execution_paused`는 항상 `false`로 둬서 이미 만들어진 item의 게시는

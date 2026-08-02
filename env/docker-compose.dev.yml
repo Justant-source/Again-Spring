@@ -42,15 +42,20 @@ services:
     container_name: againspring-backend-dev
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      # server-dev는 prod와 동일하게 Flyway로 스키마 정렬 (local bootRun은 application-dev.yml 그대로)
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
       DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${MARIADB_DATABASE:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
-      LLM_PROVIDER: ${LLM_PROVIDER:-remote}
-      LLM_CHAT_PROVIDER: ${LLM_CHAT_PROVIDER:-remote}
-      LLM_REPORT_PROVIDER: ${LLM_REPORT_PROVIDER:-remote}
-      LLM_JURY_PROVIDER: ${LLM_JURY_PROVIDER:-remote}
-      LLM_WORKER_URL: ${LLM_WORKER_URL:-http://againspring-llm:8090}
+      LLM_PROVIDER: deny
+      LLM_CHAT_PROVIDER: deny
+      LLM_REPORT_PROVIDER: deny
+      LLM_JURY_PROVIDER: deny
+      LLM_ENABLED: "false"
+      # L3: LLM 워커에 도달 불가한 placeholder (네트워크에서도 againspring 미연결)
+      LLM_WORKER_URL: http://127.0.0.1:1
       SECURITY_RATE_LIMIT_AUTH_PER_MINUTE: ${SECURITY_RATE_LIMIT_AUTH_PER_MINUTE:-1000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -65,9 +70,10 @@ services:
       ASM_BASE_URL: ${ASM_BASE_URL:-http://100.115.252.61:8200}
       ASM_API_TOKEN: ${ASM_API_TOKEN:-}
       ASM_ENABLED: ${ASM_ENABLED:-false}
-      AI_LEARNING_URL: ${AI_LEARNING_URL:-http://againspring-ai-learning:8099}
-      AI_USER_LLM_URL: ${AI_USER_LLM_URL:-http://againspring-llm-ai-user:8092}
-      AI_USER_ORCHESTRATOR_URL: ${AI_USER_ORCHESTRATOR_URL:-http://againspring-ai-user-orchestrator:8096}
+      # L3: shared LLM/ai-user 호스트명 해석 자체를 막음 (againspring 네트워크 미연결)
+      AI_LEARNING_URL: http://127.0.0.1:1
+      AI_USER_LLM_URL: http://127.0.0.1:1
+      AI_USER_ORCHESTRATOR_URL: http://127.0.0.1:1
     volumes:
       - ../docs/shared/prompts:/app/shared/docs/prompts:ro
       - ../docs/shared/categories.yml:/app/shared/docs/categories.yml:ro
@@ -79,7 +85,6 @@ services:
     restart: unless-stopped
     networks:
       - againspring-dev
-      - againspring
 
   frontend-dev:
     build:
@@ -119,9 +124,6 @@ networks:
   againspring-dev:
     driver: bridge
     name: againspring-dev
-  againspring:
-    external: true
-    name: againspring
 
 volumes:
   mariadb_dev_data:

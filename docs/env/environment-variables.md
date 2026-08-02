@@ -38,6 +38,7 @@
 | `LLM_PROVIDER` | backend LLM provider 선택 | `remote` |
 | `LLM_JURY_PROVIDER` | 배심원 provider | `remote` |
 | `LLM_WORKER_URL` | backend → `againspring-llm` URL | `http://againspring-llm:8090` |
+| `LLM_ENABLED` | `false`면 RemoteLlmProvider가 501 거절 (server-dev L3) | `true` |
 | `CLAUDE_BIN` | Claude CLI 바이너리 | `claude` |
 | `CLAUDE_MODEL` | 기본 모델 | `claude-haiku-4-5-20251001` |
 | `REPORT_LLM_MODEL` | 리포트 모델 | `claude-sonnet-4-6` |
@@ -73,10 +74,10 @@
 | `AI_USER_PERSONA_TARGET` | admin 목표가 0일 때 fallback 총량 | `50` |
 | `AI_USER_FORCE_ACTIVE` | 강제 활성 모드 | `false` |
 | `AI_USER_SECONDARY_BACKEND_URL` | 보조 backend direct write | 기본 공란 |
-| `PAIRED_POST_ENABLED` | legacy paired posts 활성화. 신규 PLAN 경로에서는 사용하지 않음 | `false` |
-| `PAIRED_POST_CRON` | paired posts cron | `0 0 */2 * * *` |
+| `PAIRED_POST_ENABLED` | 양면 사연(작성자+상대방) 생성. prod 기본 true | `true`(prod) / `false`(dev 휴면) |
+| `PAIRED_POST_CRON` | paired posts cron (당일 부족분 보충) | `0 0 */2 * * *` |
 | `PAIRED_POST_PAIRS` | 한 번의 스케줄 실행에서 생성할 최대 pair 수 | `3` |
-| `PAIRED_POST_TARGET_SHARE` | 하루 synthetic 글 중 paired 글 최소 비율 | `0.15` |
+| `PAIRED_POST_TARGET_SHARE` | 하루 AI 글 중 양면 사연 비율 | `0.20` |
 | `PAIRED_POST_ROMANTIC_SHARE` | paired 글 내부에서 연인/부부 비율 (`FRIEND`는 나머지) | `0.80` |
 
 중요:
@@ -181,12 +182,19 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=2400
 
 | 변수 | 설명 | 기본값 |
 |---|---|---|
-| `SYNC_CRON` | 5-field cron | `30 5 * * *` |
+| `SYNC_CRON` | 24h full cron (5-field) | `30 5 * * *` |
+| `SYNC_CONTENT_CRON` | 5분 콘텐츠 증분 cron | `*/5 * * * *` |
 | `SYNC_TIMEZONE` | scheduler timezone | `Asia/Seoul` |
-| `SYNC_BACKFILL_DAYS` | 증분 backfill window | `7` |
+| `SYNC_BACKFILL_DAYS` | full 잡 증분 backfill window | `7` |
+| `SYNC_CONTENT_LOOKBACK_MINUTES` | 콘텐츠 잡 lookback (겹침 허용) | `15` |
 | `DEV_DB_NAME` | dev DB 이름 | `againspring_dev` |
+| `AI_USER_DEV_ENABLED` | orchestrator-dev 하드 게이트 (기본 off, L3) | `false` |
 
-현재 sync는 다음 테이블군을 upsert한다.
+- **5분 콘텐츠(T1+U1)**: `posts`, `vote_options`, `post_comments`, `votes`, `post_likes` + 참조 `users`(비식별)·`personas`
+- **24h full**: 아래 전체 표
+- D1: prod 우선 upsert (dev-only 행 삭제 안 함)
+
+현재 sync(full) 테이블군:
 
 - `users`
 - `posts`, `vote_options`, `post_comments`, `votes`, `post_likes`
@@ -223,6 +231,9 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=2400
   실계정에 자동 발행됨, 2026-07-31 사고). `docker-compose.prod.yml`의 `backend-prod` `environment:` 블록에
   반드시 wiring돼 있어야 한다 — 2026-08-01, `.env.prod`엔 `true`로 설정했지만 compose에 안 걸려 있어
   10시간+ 동안 조용히 `false`로 동작한 인시던트 발생(상세: `docs/shared/marketing/x-thread-strategy.md` §6).
+- `ASM_AUTO_PUBLISH_SINCE` — ISO-8601 Instant. 트리거 ON일 때 **이 시각 이후 생성된 글만** 24h 후
+  자동 발행. 비어 있으면 fail-closed(스킵). 2026-08-02 백로그 폭주 이후 필수.
+  예: `2026-08-02T08:43:52Z`. compose `backend-prod`에 wiring 필요.
 
 prod는 OAuth와 메일 관련 값을 모두 실제 값으로 채워야 한다.
 

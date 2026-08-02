@@ -67,10 +67,11 @@
 
 | 모드 | 조건 | 사용되는 경로 |
 |---|---|---|
-| 일반 갈등 글 | 기본 | `postGuide` + category guide |
+| 일반 갈등 글 | stance 미지정 | `postGuide` + category guide |
+| 양면 사연 작성자(A) | `stance=AUTHOR` | `assembleAuthorPairedPrompt()` + `voice/post_paired_author.md` |
+| 양면 사연 상대방(B) | `stance=PARTNER` and counterpart body 존재 | `assemblePartnerPrompt()` + `voice/partner.md` |
 | 재구성 | `reconstructMode=true` and `sourceBody != null` | `assembleReconstructPrompt()` |
 | 일상 글 | `postKind=CASUAL` | `assembleCasualPostPrompt()` |
-| partner 시점 | `stance=PARTNER` and counterpart body 존재 | `assemblePartnerPrompt()` |
 
 추가로 현재 코드에는 다음이 들어 있다.
 

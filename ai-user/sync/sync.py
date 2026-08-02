@@ -1,9 +1,10 @@
 """
-Prod DB -> dev DB 일일 동기화 서비스.
+Prod DB -> dev DB 동기화 서비스.
 
-- 실행 주기: SYNC_CRON (기본 KST 05:30, 하루 1회)
-- 방식: prod를 기준으로 최근 N일 창을 읽어 dev에 upsert
+- 5분 콘텐츠 증분 (T1+U1): posts/comments/votes/likes + 참조 users(비식별)·personas
+- 24h full (SYNC_CRON, 기본 KST 05:30): 전체 SYNC_TABLES
 - 실사용자 계정은 dev에서 로그인 불가하도록 비식별화
+- D1: prod 우선 upsert (dev-only 행 삭제 안 함)
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Callable
+from typing import Callable, Iterable
 from zoneinfo import ZoneInfo
 
 import pymysql
@@ -56,9 +57,13 @@ DEV = dict(
     autocommit=False,
 )
 
+# 24h full
 SYNC_CRON = _env("SYNC_CRON", "30 5 * * *")
+# 5분 콘텐츠 증분
+SYNC_CONTENT_CRON = _env("SYNC_CONTENT_CRON", "*/5 * * * *")
 SYNC_TIMEZONE = ZoneInfo(_env("SYNC_TIMEZONE", "Asia/Seoul"))
 BACKFILL_DAYS = int(_env("SYNC_BACKFILL_DAYS", "7"))
+CONTENT_LOOKBACK_MINUTES = int(_env("SYNC_CONTENT_LOOKBACK_MINUTES", "15"))
 
 
 @dataclass(frozen=True)
@@ -122,9 +127,15 @@ def _mask_real_user(row: dict, now: datetime) -> dict:
     return masked
 
 
+USERS_SPEC = TableSpec(
+    "users", ("id",), time_columns=("updated_at", "created_at"), transform=_mask_real_user
+)
+PERSONAS_SPEC = TableSpec("personas", ("id",), mode="full")
+
+# 24h full 대상
 SYNC_TABLES: tuple[TableSpec, ...] = (
-    TableSpec("users", ("id",), time_columns=("updated_at", "created_at"), transform=_mask_real_user),
-    TableSpec("personas", ("id",), mode="full"),
+    USERS_SPEC,
+    PERSONAS_SPEC,
     TableSpec("persona_relationships", ("id",), mode="full"),
     TableSpec("persona_seen_posts", ("persona_id", "post_id"), time_columns=("seen_at",)),
     TableSpec("persona_action_log", ("id",), time_columns=("created_at",)),
@@ -144,6 +155,22 @@ SYNC_TABLES: tuple[TableSpec, ...] = (
     TableSpec("post_likes", ("id",), time_columns=("created_at",)),
 )
 
+# 5분 콘텐츠 (T1) — users/personas는 U1 동반으로만
+CONTENT_TABLES: tuple[TableSpec, ...] = (
+    TableSpec("posts", ("id",), time_columns=("updated_at", "created_at")),
+    TableSpec("vote_options", ("id",), mode="full"),
+    TableSpec("post_comments", ("id",), time_columns=("updated_at", "created_at")),
+    TableSpec("votes", ("id",), time_columns=("created_at",)),
+    TableSpec("post_likes", ("id",), time_columns=("created_at",)),
+)
+
+USER_ID_COLUMNS = (
+    "author_id",
+    "partner_user_id",
+    "user_id",
+    "voter_user_id",
+)
+
 
 def conn(cfg: dict) -> pymysql.Connection:
     return pymysql.connect(**cfg)
@@ -153,6 +180,40 @@ def get_columns(cursor, table: str) -> list[str]:
     cursor.execute(f"SHOW COLUMNS FROM `{table}`")
     rows = cursor.fetchall()
     return [row["Field"] for row in rows]
+
+
+def table_exists(cursor, table: str) -> bool:
+    cursor.execute(
+        "SELECT 1 FROM information_schema.tables "
+        "WHERE table_schema = DATABASE() AND table_name = %s LIMIT 1",
+        (table,),
+    )
+    return cursor.fetchone() is not None
+
+
+def ensure_dev_table(prod_cur, dev_cur, table: str) -> bool:
+    """dev에 테이블이 없으면 prod DDL로 생성. prod에도 없으면 False."""
+    if table_exists(dev_cur, table):
+        return True
+    if not table_exists(prod_cur, table):
+        log.warning("Skipping %s: missing on prod", table)
+        return False
+    prod_cur.execute(f"SHOW CREATE TABLE `{table}`")
+    row = prod_cur.fetchone()
+    create_sql = None
+    if row:
+        create_sql = row.get("Create Table")
+        if not create_sql:
+            for key, value in row.items():
+                if key.lower() == "create table":
+                    create_sql = value
+                    break
+    if not create_sql:
+        log.error("Could not read CREATE TABLE for %s", table)
+        return False
+    log.info("Creating missing dev table from prod DDL: %s", table)
+    dev_cur.execute(create_sql)
+    return True
 
 
 def build_select_sql(table: str, columns: list[str], spec: TableSpec, since: datetime) -> tuple[str, list]:
@@ -187,18 +248,23 @@ def build_upsert_sql(table: str, columns: list[str], primary_keys: tuple[str, ..
     )
 
 
-def sync_table(prod_cur, dev_cur, spec: TableSpec, since: datetime, now: datetime) -> int:
+def upsert_rows(
+    prod_cur,
+    dev_cur,
+    spec: TableSpec,
+    rows: list[dict],
+    now: datetime,
+) -> int:
+    if not rows:
+        return 0
+    if not ensure_dev_table(prod_cur, dev_cur, spec.name):
+        return 0
+
     prod_columns = get_columns(prod_cur, spec.name)
     dev_columns = set(get_columns(dev_cur, spec.name))
     common_columns = [col for col in prod_columns if col in dev_columns]
     if not common_columns:
         log.warning("Skipping %s: no common columns", spec.name)
-        return 0
-
-    select_sql, params = build_select_sql(spec.name, common_columns, spec, since)
-    prod_cur.execute(select_sql, params)
-    rows = prod_cur.fetchall()
-    if not rows:
         return 0
 
     upsert_sql = build_upsert_sql(spec.name, common_columns, spec.primary_keys)
@@ -213,15 +279,85 @@ def sync_table(prod_cur, dev_cur, spec: TableSpec, since: datetime, now: datetim
     return synced
 
 
-def run_sync_cycle() -> None:
+def sync_table(prod_cur, dev_cur, spec: TableSpec, since: datetime, now: datetime) -> tuple[int, list[dict]]:
+    if not ensure_dev_table(prod_cur, dev_cur, spec.name):
+        return 0, []
+
+    prod_columns = get_columns(prod_cur, spec.name)
+    dev_columns = set(get_columns(dev_cur, spec.name))
+    common_columns = [col for col in prod_columns if col in dev_columns]
+    if not common_columns:
+        log.warning("Skipping %s: no common columns", spec.name)
+        return 0, []
+
+    select_sql, params = build_select_sql(spec.name, common_columns, spec, since)
+    prod_cur.execute(select_sql, params)
+    rows = prod_cur.fetchall()
+    if not rows:
+        return 0, []
+
+    count = upsert_rows(prod_cur, dev_cur, spec, rows, now)
+    return count, [dict(r) for r in rows]
+
+
+def _collect_ids(rows: Iterable[dict], columns: Iterable[str]) -> set[str]:
+    ids: set[str] = set()
+    for row in rows:
+        for col in columns:
+            value = row.get(col)
+            if value is not None and str(value).strip():
+                ids.add(str(value))
+    return ids
+
+
+def sync_rows_by_ids(
+    prod_cur,
+    dev_cur,
+    spec: TableSpec,
+    ids: set[str],
+    now: datetime,
+) -> int:
+    if not ids:
+        return 0
+    if not ensure_dev_table(prod_cur, dev_cur, spec.name):
+        return 0
+
+    prod_columns = get_columns(prod_cur, spec.name)
+    dev_columns = set(get_columns(dev_cur, spec.name))
+    common_columns = [col for col in prod_columns if col in dev_columns]
+    if not common_columns:
+        return 0
+
+    quoted_cols = ", ".join(f"`{col}`" for col in common_columns)
+    id_list = sorted(ids)
+    # chunk IN lists
+    synced = 0
+    chunk_size = 200
+    for i in range(0, len(id_list), chunk_size):
+        chunk = id_list[i : i + chunk_size]
+        placeholders = ", ".join(["%s"] * len(chunk))
+        prod_cur.execute(
+            f"SELECT {quoted_cols} FROM `{spec.name}` WHERE `id` IN ({placeholders})",
+            chunk,
+        )
+        rows = prod_cur.fetchall()
+        synced += upsert_rows(prod_cur, dev_cur, spec, rows, now)
+    return synced
+
+
+def _run_tables(
+    label: str,
+    specs: tuple[TableSpec, ...],
+    since: datetime,
+    *,
+    companion_authors: bool,
+) -> None:
     now = datetime.now(timezone.utc)
-    since = now - timedelta(days=BACKFILL_DAYS)
     log.info(
-        "Daily sync start | cron='%s' tz=%s | backfill=%sd | window_since=%s",
-        SYNC_CRON,
-        SYNC_TIMEZONE.key,
-        BACKFILL_DAYS,
+        "%s sync start | since=%s | companion_authors=%s",
+        label,
         since.isoformat(),
+        companion_authors,
     )
 
     try:
@@ -232,19 +368,36 @@ def run_sync_cycle() -> None:
         return
 
     counts: dict[str, int] = {}
+    collected_rows: list[dict] = []
     try:
         with prod.cursor() as prod_cur, dev.cursor() as dev_cur:
             dev_cur.execute("SET FOREIGN_KEY_CHECKS = 0")
-            for spec in SYNC_TABLES:
+            for spec in specs:
                 try:
-                    counts[spec.name] = sync_table(prod_cur, dev_cur, spec, since, now)
+                    count, rows = sync_table(prod_cur, dev_cur, spec, since, now)
+                    counts[spec.name] = count
+                    if companion_authors:
+                        collected_rows.extend(rows)
                 except Exception as exc:
                     log.error("Table sync failed [%s]: %s", spec.name, exc, exc_info=True)
                     raise
+
+            if companion_authors:
+                user_ids = _collect_ids(collected_rows, USER_ID_COLUMNS)
+                # personas.id == users.id for AI personas
+                persona_ids = set(user_ids)
+                counts["users(companion)"] = sync_rows_by_ids(
+                    prod_cur, dev_cur, USERS_SPEC, user_ids, now
+                )
+                counts["personas(companion)"] = sync_rows_by_ids(
+                    prod_cur, dev_cur, PERSONAS_SPEC, persona_ids, now
+                )
+
             dev_cur.execute("SET FOREIGN_KEY_CHECKS = 1")
         dev.commit()
         log.info(
-            "Daily sync complete | %s",
+            "%s sync complete | %s",
+            label,
             ", ".join(f"{table}={count}" for table, count in counts.items()),
         )
     except Exception:
@@ -255,16 +408,64 @@ def run_sync_cycle() -> None:
         dev.close()
 
 
-def main() -> None:
+def run_full_sync_cycle() -> None:
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=BACKFILL_DAYS)
     log.info(
-        "Prod->dev sync scheduler starting | cron='%s' tz=%s | backfill=%sd",
+        "Daily full sync | cron='%s' tz=%s | backfill=%sd",
         SYNC_CRON,
         SYNC_TIMEZONE.key,
         BACKFILL_DAYS,
     )
+    _run_tables("full", SYNC_TABLES, since, companion_authors=False)
+
+
+def run_content_sync_cycle() -> None:
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(minutes=CONTENT_LOOKBACK_MINUTES)
+    log.info(
+        "Content sync | cron='%s' tz=%s | lookback=%sm",
+        SYNC_CONTENT_CRON,
+        SYNC_TIMEZONE.key,
+        CONTENT_LOOKBACK_MINUTES,
+    )
+    _run_tables("content", CONTENT_TABLES, since, companion_authors=True)
+
+
+def main() -> None:
+    log.info(
+        "Prod->dev sync starting | full_cron='%s' content_cron='%s' tz=%s | backfill=%sd | content_lookback=%sm",
+        SYNC_CRON,
+        SYNC_CONTENT_CRON,
+        SYNC_TIMEZONE.key,
+        BACKFILL_DAYS,
+        CONTENT_LOOKBACK_MINUTES,
+    )
+    # 기동 시 full 1회 → content도 이어서 (재기동 직후 정합)
+    try:
+        run_full_sync_cycle()
+    except Exception as exc:
+        log.error("Startup full sync failed (scheduler continues): %s", exc, exc_info=True)
+    try:
+        run_content_sync_cycle()
+    except Exception as exc:
+        log.error("Startup content sync failed (scheduler continues): %s", exc, exc_info=True)
+
     scheduler = BlockingScheduler(timezone=SYNC_TIMEZONE)
-    trigger = CronTrigger.from_crontab(SYNC_CRON, timezone=SYNC_TIMEZONE)
-    scheduler.add_job(run_sync_cycle, trigger, id="prod-dev-sync", replace_existing=True, max_instances=1)
+    scheduler.add_job(
+        run_full_sync_cycle,
+        CronTrigger.from_crontab(SYNC_CRON, timezone=SYNC_TIMEZONE),
+        id="prod-dev-sync-full",
+        replace_existing=True,
+        max_instances=1,
+    )
+    scheduler.add_job(
+        run_content_sync_cycle,
+        CronTrigger.from_crontab(SYNC_CONTENT_CRON, timezone=SYNC_TIMEZONE),
+        id="prod-dev-sync-content",
+        replace_existing=True,
+        max_instances=1,
+    )
     scheduler.start()
 
 

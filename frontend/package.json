@@ -22,7 +22,7 @@
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
     "test:a11y": "playwright test --grep @a11y",
-    "test:e2e:realbe": "playwright test --config=playwright.realbe.config.ts",
+    "test:e2e:realbe": "E2E_BASE_URL=$(node scripts/assert-e2e-dev.mjs) playwright test --config=playwright.realbe.config.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit"
   },

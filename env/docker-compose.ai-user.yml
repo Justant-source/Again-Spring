@@ -171,10 +171,10 @@ services:
       AI_USER_PERSONAS_DIR: /app/personas
       AI_USER_FORCE_ACTIVE: ${AI_USER_FORCE_ACTIVE:-false}
       AI_USER_SECONDARY_BACKEND_URL: ${AI_USER_SECONDARY_BACKEND_URL:-}
-      PAIRED_POST_ENABLED: ${PAIRED_POST_ENABLED:-false}
+      PAIRED_POST_ENABLED: ${PAIRED_POST_ENABLED:-true}
       PAIRED_POST_CRON: "${PAIRED_POST_CRON:-0 0 */2 * * *}"
       PAIRED_POST_PAIRS: ${PAIRED_POST_PAIRS:-3}
-      PAIRED_POST_TARGET_SHARE: ${PAIRED_POST_TARGET_SHARE:-0.15}
+      PAIRED_POST_TARGET_SHARE: ${PAIRED_POST_TARGET_SHARE:-0.20}
       PAIRED_POST_ROMANTIC_SHARE: ${PAIRED_POST_ROMANTIC_SHARE:-0.80}
       AI_USER_ML_BASE_URL: ${AI_USER_ML_BASE_URL:-http://100.115.252.61:8201}
       AI_USER_ML_ENABLED: ${AI_USER_ML_ENABLED:-false}
@@ -197,6 +197,8 @@ services:
       start_period: 90s
 
   ai-user-orchestrator-dev:
+    # L3: 기본 기동 금지. 명시 시에만: --profile ai-user-dev
+    profiles: ["ai-user-dev"]
     build:
       context: ../ai-user/orchestrator
       dockerfile: Dockerfile
@@ -209,7 +211,7 @@ services:
       DB_PASSWORD: ${DEV_MARIADB_PASSWORD}
       BACKEND_BASE_URL: http://againspring-backend-dev:8080
       LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
-      AI_USER_ENABLED: ${AI_USER_DEV_ENABLED:-true}
+      AI_USER_ENABLED: ${AI_USER_DEV_ENABLED:-false}
       AI_USER_TICK_CRON: "${AI_USER_TICK_CRON:-0 */10 * * * *}"
       AI_USER_MODE: LEGACY
       AI_USER_HUMAN_BATCH_CRON: "${AI_USER_HUMAN_BATCH_CRON:-0 */30 * * * *}"
@@ -282,7 +284,7 @@ services:
       PAIRED_POST_ENABLED: false
       PAIRED_POST_CRON: "${PAIRED_POST_CRON:-0 0 */2 * * *}"
       PAIRED_POST_PAIRS: ${PAIRED_POST_PAIRS:-3}
-      PAIRED_POST_TARGET_SHARE: ${PAIRED_POST_TARGET_SHARE:-0.15}
+      PAIRED_POST_TARGET_SHARE: ${PAIRED_POST_TARGET_SHARE:-0.20}
       PAIRED_POST_ROMANTIC_SHARE: ${PAIRED_POST_ROMANTIC_SHARE:-0.80}
       AI_USER_ML_ENABLED: false
     volumes:
@@ -316,8 +318,10 @@ services:
       DEV_DB_PASSWORD: ${DEV_MARIADB_PASSWORD}
       DEV_DB_NAME: ${DEV_DB_NAME:-againspring_dev}
       SYNC_CRON: ${SYNC_CRON:-30 5 * * *}
+      SYNC_CONTENT_CRON: ${SYNC_CONTENT_CRON:-*/5 * * * *}
       SYNC_TIMEZONE: ${SYNC_TIMEZONE:-Asia/Seoul}
       SYNC_BACKFILL_DAYS: ${SYNC_BACKFILL_DAYS:-7}
+      SYNC_CONTENT_LOOKBACK_MINUTES: ${SYNC_CONTENT_LOOKBACK_MINUTES:-15}
     restart: unless-stopped
     networks:
       - againspring-prod

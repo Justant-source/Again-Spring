@@ -74,7 +74,7 @@ flowchart LR
 
 ### 4. Paired posts (기본 비활성 legacy 기능)
 
-`PAIRED_POST_ENABLED=false`가 기본이다. 새 요구사항에서 pair로 추가되는 글은 별도 paired post가 아니라 원 게시글 수정(revision) 이벤트이며, 미게시 PLAN item을 취소하고 debounce 후 재생성한다.
+`PAIRED_POST_ENABLED`는 **prod에서 true**(양면 사연 20%). 작성자+상대방 AI가 각자 입장을 쓰는 글은 `PairedPostScheduler`가 담당한다. 이와 별개로, 이미 공개된 글에 파트너 답이 **나중에** 붙어 revision이 생기면 미게시 PLAN item을 취소하고 debounce 후 재생성한다.
 
 1. `PairedPostScheduler`가 `COUPLE` 또는 `MARRIAGE` 관계를 읽는다.
 2. 작성자 글을 `PRIVATE + WAIT_FOR_PARTNER`로 올린다.
@@ -119,7 +119,7 @@ LLM 없이 사연 검색 문서 → 페르소나 top-K:
 |---|---|---|---|
 | main tick | orchestrator | `0 */10 * * * *` | `AI_USER_ENABLED` + runtime row 둘 다 필요 |
 | daily planner | orchestrator | `0 0 4 * * *` | `AI_USER_ENABLED=false`면 skip |
-| paired posts | orchestrator | `0 0 */2 * * *` | 기본 비활성 legacy 기능 |
+| paired posts | orchestrator | `0 0 */2 * * *` | prod 활성 — 하루 AI 글 20% 양면 사연 |
 | plan generation | orchestrator | 매분 15초 | PLAN enabled + provider가 `OFF`가 아닐 때만 생성 |
 | due item publish | orchestrator | 매분 | publisher enabled + execution pause 해제 시 lease 후 게시 |
 | human reply batch | orchestrator | 30분 | 최대 10 posts / 50 interactions, PLAN enabled일 때만 |

@@ -109,6 +109,7 @@ app:
     support-email: againspring2026@gmail.com
 
 llm:
+  enabled: ${LLM_ENABLED:true}
   jury:
     provider: ${LLM_JURY_PROVIDER:remote}     # CLI 브릿지(remote) 사용
     model: ${JURY_LLM_MODEL:claude-haiku-4-5-20251001}
@@ -149,6 +150,9 @@ asm:
   # prod에서 기능을 켤 때만 .env.prod에 ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED=true.
   # true면 x_thread + instagram_feed 둘 다 post.createdAt+24h one-shot 자동 발행.
   x-thread-publish-trigger-enabled: ${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:false}
+  # 자동 발행 하한 (ISO-8601 Instant). 트리거 ON이어도 이 시각 이후 생성된 글만 24h 후 발행.
+  # 비어 있으면 fail-closed(스킵) — 과거 백로그 폭주 방지 (2026-08-02).
+  auto-publish-since: ${ASM_AUTO_PUBLISH_SINCE:}
 
 logging:
   level:

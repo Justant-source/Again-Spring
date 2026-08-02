@@ -12,7 +12,7 @@ import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1 } from '../fixtures/personas'
 import { tokenFromStorageState, createPost } from '../support/api'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)
 const ASM_AVAILABLE = process.env.ASM_STUB_AVAILABLE === 'true'
 

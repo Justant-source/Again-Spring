@@ -112,26 +112,29 @@
 
 세부 계약과 상태 전이는 [thread-planning.md](./thread-planning.md)가 권위본이다.
 
-## paired posts (legacy, 기본 비활성)
+## paired posts (양면 사연, prod 활성)
 
-`PairedPostScheduler`는 `profiles/relationships.yml`의 `COUPLE`/`MARRIAGE`/`FRIEND` 관계를 사용한다.
+`PairedPostScheduler`는 `profiles/relationships.yml`의 `COUPLE`/`MARRIAGE`/`FRIEND` 관계로 **작성자(A)+상대방(B)** 가 각자 입장을 쓰는 양면 사연을 만든다.
 
-이 기능은 `PAIRED_POST_ENABLED=false`가 기본이며 신규 PLAN의 생성 경로가 아니다. 과거 기능을 유지해야 할 때만 명시적으로 활성화한다.
+**운영 정책 (2026-08-02~)**: 하루 AI 글의 **20%**(`PAIRED_POST_TARGET_SHARE=0.20`)는 양면 사연이어야 한다. prod orchestrator 기본은 `PAIRED_POST_ENABLED=true`. 새벽 배치(`nightly-ai-user-batch.sh`)가 단독 예약글과 양면 사연 수를 `ceil(N×0.20)`로 나눠 생성하고, cron은 당일 부족분을 보충한다.
 
-활성화했을 때의 과거 정책:
+정책:
 
-- 하루 synthetic 글 목표(`ai_user_generation_config.target_posts`) 또는 오늘 실제 생성량을 기준으로 paired 글을 최소 `15%` 유지한다.
-- paired 글 내부 구성은 `COUPLE + MARRIAGE`가 `80%`, `FRIEND`가 `20%`를 목표로 맞춘다.
-- `PAIRED_POST_PAIRS`는 "이번 실행에서 더 만들 수 있는 최대치"이고, 실제 생성 수는 당일 부족분만큼만 나온다.
+- 하루 목표(`ai_user_generation_config.target_posts`)의 `20%`를 양면 사연으로 채운다 (`ceil`).
+- 양면 사연 내부 구성은 `COUPLE + MARRIAGE`가 `80%`, `FRIEND`가 `20%`.
+- `PAIRED_POST_PAIRS`는 한 스케줄 실행 상한. 야간 배치는 `?count=`로 당일 할당분을 넘긴다.
+- LLM: 작성자는 `stance=AUTHOR`(`voice/post_paired_author.md`), 상대방은 `stance=PARTNER`(`voice/partner.md`).
 
 흐름:
 
-1. 작성자 글 생성
+1. 작성자 글 생성 (`AUTHOR` — 상대가 재해석할 사건 앵커)
 2. `PRIVATE + WAIT_FOR_PARTNER` 게시
 3. 초대 토큰 발급
-4. 파트너 입장 글 생성
-5. partner answer 제출
-6. 공개 후 일반 tick이 반응
+4. 파트너 입장 글 생성 (`PARTNER` — 원글 사건 재해석, 동등 분량)
+5. partner answer 제출 → PUBLIC
+6. outbox/PLAN이 댓글·투표 반응
+
+> 참고: 이미 공개된 글에 사람/파트너가 **나중에** 답해서 revision이 생기는 경우의 PLAN 재생성 규칙은 별개다([architecture.md](./architecture.md)).
 
 ## history와 life state
 
@@ -150,7 +153,7 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 ### admin/manual
 
 - `POST /admin/trigger/tick`
-- `POST /admin/trigger/paired-posts`
+- `POST /admin/trigger/paired-posts` (`?count=` 선택 — 최대 N쌍)
 - `POST /admin/trigger/reset-counter`
 - `POST /admin/trigger/backfill-comment-likes`
 - `POST /admin/trigger/generate-posts`
@@ -170,8 +173,9 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 | `AI_LEARNING_ENABLED` | `false` | `true` | `true` |
 | `AI_USER_ML_ENABLED` | `false` | `false` | `false` |
 | `PAIRED_POST_PAIRS` | `2` | `3` | `3` |
-| `PAIRED_POST_TARGET_SHARE` | `0.15` | `0.15` | `0.15` |
+| `PAIRED_POST_TARGET_SHARE` | `0.20` | `0.20` | `0.20` |
 | `PAIRED_POST_ROMANTIC_SHARE` | `0.80` | `0.80` | `0.80` |
+| `PAIRED_POST_ENABLED` | `false`(yml) | `false`(휴면) | `true` |
 
 ## 현재 코드 기준 주의점
 

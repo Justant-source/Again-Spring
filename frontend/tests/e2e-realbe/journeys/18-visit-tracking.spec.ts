@@ -9,7 +9,7 @@
  */
 import { test, expect } from '../support/no-llm-fixture'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 
 test.describe('Journey 18-A: UTM 방문 추적', () => {
 

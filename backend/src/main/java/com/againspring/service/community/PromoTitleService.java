@@ -76,9 +76,16 @@ public class PromoTitleService {
         if (generated == null || generated.isBlank()) {
             generated = resolveOrFallback(post);
         }
-        post.setPromoTitle(truncate(generated, MAX_LEN));
-        postRepository.save(post);
-        log.info("PromoTitle saved for {}: '{}'", postId, post.getPromoTitle());
+        String promo = truncate(generated, MAX_LEN);
+
+        // UPDATE만 사용 — save()/merge는 동시 DELETE 이후 동일 PK로 행을 되살릴 수 있음
+        // (e2e: create → 즉시 삭제 → async promo가 광장에 E2E 글을 부활시키던 사고)
+        int updated = postRepository.updatePromoTitleIfAbsent(postId, promo);
+        if (updated == 0) {
+            log.info("PromoTitle skip (post gone or already set): {}", postId);
+            return;
+        }
+        log.info("PromoTitle saved for {}: '{}'", postId, promo);
     }
 
     /**

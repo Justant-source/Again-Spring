@@ -45,9 +45,27 @@ DB_CONTAINER=againspring-mariadb-prod
 MAX_MINUTES=${NIGHTLY_BATCH_MAX_MINUTES:-45}
 POLL_INTERVAL_SECONDS=${NIGHTLY_BATCH_POLL_INTERVAL:-30}
 SCHEDULED_POST_COUNT=${NIGHTLY_BATCH_POST_COUNT:-5}
+# 하루 AI 글 중 양면 사연(작성자+상대방) 비율 — PAIRED_POST_TARGET_SHARE와 맞춤
+PAIRED_SHARE=${NIGHTLY_BATCH_PAIRED_SHARE:-0.20}
 SLOT_FROM_HOUR=${NIGHTLY_BATCH_SLOT_FROM_HOUR:-8}
 SLOT_TO_HOUR=${NIGHTLY_BATCH_SLOT_TO_HOUR:-22}
 SLOT_MIN_SPACING_MINUTES=${NIGHTLY_BATCH_SLOT_MIN_SPACING_MINUTES:-45}
+
+# ceil(N * share); N>=1이면 최소 1 (비율>0일 때)
+paired_count_for() {
+  local n=$1
+  local share=$2
+  if [ "$n" -le 0 ]; then echo 0; return; fi
+  # awk ceil
+  local p
+  p=$(awk -v n="$n" -v s="$share" 'BEGIN { x=n*s; if (x<=0) print 0; else print int(x)==x ? x : int(x)+1 }')
+  if [ "$p" -lt 1 ] && awk -v s="$share" 'BEGIN { exit !(s>0) }'; then p=1; fi
+  if [ "$p" -gt "$n" ]; then p=$n; fi
+  echo "$p"
+}
+
+PAIRED_COUNT=$(paired_count_for "$SCHEDULED_POST_COUNT" "$PAIRED_SHARE")
+SOLO_COUNT=$(( SCHEDULED_POST_COUNT - PAIRED_COUNT ))
 
 log() { printf '[%s] %s\n' "$(date '+%F %T %Z')" "$*" | tee -a "$LOG_FILE"; }
 
@@ -72,11 +90,25 @@ if ! db "UPDATE ai_user_generation_config SET provider_ai_post_bundle='CLAUDE', 
   exit 1
 fi
 log "provider_ai_post_bundle/human_post_plan/human_interaction=CLAUDE"
+log "nightly allocation: total=${SCHEDULED_POST_COUNT} solo=${SOLO_COUNT} paired=${PAIRED_COUNT} (share=${PAIRED_SHARE})"
 
-GEN_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- -T 1800 --post-data='' \
-  "http://localhost:8096/admin/trigger/generate-scheduled-posts?count=${SCHEDULED_POST_COUNT}&fromHour=${SLOT_FROM_HOUR}&toHour=${SLOT_TO_HOUR}&minSpacingMinutes=${SLOT_MIN_SPACING_MINUTES}" \
-  2>>"$LOG_FILE")
-log "generate-scheduled-posts result: ${GEN_RESULT:-<empty>}"
+if [ "$SOLO_COUNT" -gt 0 ]; then
+  GEN_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- -T 1800 --post-data='' \
+    "http://localhost:8096/admin/trigger/generate-scheduled-posts?count=${SOLO_COUNT}&fromHour=${SLOT_FROM_HOUR}&toHour=${SLOT_TO_HOUR}&minSpacingMinutes=${SLOT_MIN_SPACING_MINUTES}" \
+    2>>"$LOG_FILE")
+  log "generate-scheduled-posts result: ${GEN_RESULT:-<empty>}"
+else
+  log "solo count=0 — skip generate-scheduled-posts"
+fi
+
+if [ "$PAIRED_COUNT" -gt 0 ]; then
+  PAIRED_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- -T 1800 --post-data='' \
+    "http://localhost:8096/admin/trigger/paired-posts?count=${PAIRED_COUNT}" \
+    2>>"$LOG_FILE")
+  log "paired-posts result: ${PAIRED_RESULT:-<empty>}"
+else
+  log "paired count=0 — skip paired-posts"
+fi
 
 # 낮 동안 밀린 REQUESTED 스레드플랜(실사람 글에 대한 AI 반응 등)도 이 창에서 소진한다.
 START_TS=$(date +%s)

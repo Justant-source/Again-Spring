@@ -61,7 +61,7 @@ ai-user:
     enabled: ${PAIRED_POST_ENABLED:false}
     cron: "${PAIRED_POST_CRON:0 0 5 * * *}"
     pairs-per-run: ${PAIRED_POST_PAIRS:2}
-    target-share: ${PAIRED_POST_TARGET_SHARE:0.15}
+    target-share: ${PAIRED_POST_TARGET_SHARE:0.20}
     romantic-share: ${PAIRED_POST_ROMANTIC_SHARE:0.80}
   content-aware-decisions:
     enabled: ${AI_USER_CONTENT_AWARE_DECISIONS_ENABLED:true}

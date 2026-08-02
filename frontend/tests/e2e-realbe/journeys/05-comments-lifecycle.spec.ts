@@ -19,7 +19,7 @@ import {
   COMMENT_MENU_REPORT,
 } from '../support/selectors'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 
 // ── A. 댓글 추가 + 수정 + 삭제 ─────────────────────────────────
 test.describe('Journey 05-A: 본인 댓글 수정·삭제', () => {
