@@ -32,7 +32,7 @@
 |---|---|---|
 | **Again-Spring (AS)** | Ubuntu 서버 | 얇은 트리거/클라이언트. 잡 생성·폴링·UI 표시만 담당 |
 | **Again-Spring-Marketing (ASM)** | WSL GPU 서버 | 콘텐츠 생성·렌더링·소셜 게시 전담 |
-| **ASM social-poster** | ASM `services/social-poster/` | Playwright 자동 게시. **미공개 초점 = X / `x_thread`만** (IG·네이버 등은 보류) |
+| **ASM social-poster** | ASM `services/social-poster/` | Playwright 자동 게시. **미공개 초점 = X / `x_thread` + Instagram / `instagram_feed`** (24h 자동) |
 
 **접속**: AS 호스트 Tailscale `100.81.189.92`에서 `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
 
@@ -48,15 +48,15 @@ docs/shared/marketing/
 ├── credentials.md      ← 플랫폼 계정 자격증명 저장·암호화 정책
 ├── social-poster.md            ← social-poster 서비스 운영 가이드
 ├── x-thread-strategy.md        ← X 4단 스레드 전략 (포맷·발행 트리거·구현)
-└── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (보류·단건 수동)
+└── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (24h 자동 + 단건 수동)
 ```
 
 ---
 
 ## 빠른 시작
 
-> **미공개**: 타겟은 기본 **X / `x_thread`**. `instagram_feed`는 보류이나 **단건 수동 검증**만 허용
-> ([`instagram-feed-strategy.md`](instagram-feed-strategy.md)).
+> **미공개**: 타겟 기본 = **X / `x_thread` + Instagram / `instagram_feed`** (게시 후 24h one-shot 자동).
+> ([`x-thread-strategy.md`](x-thread-strategy.md) · [`instagram-feed-strategy.md`](instagram-feed-strategy.md)).
 
 ### 어드민 사용법
 

@@ -217,7 +217,8 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=2400
 - `APP_URL`
 - `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `GMAIL_APP_PASSWORD`
 - `ASM_BASE_URL`, `ASM_API_TOKEN`, `ASM_ENABLED`, `ASM_CALLBACK_*`
-- `ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED` — `XThreadPublishTriggerScheduler`의 opt-in 게이트. 기본 `false`.
+- `ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED` — `XThreadPublishTriggerScheduler` opt-in 게이트(기본 `false`).
+  **X(`x_thread`)와 Instagram(`instagram_feed`) 24h 자동 발행을 함께 켠다.** prod만 `true`.
   `.env.prod`에만 `true`로 설정한다(dev는 절대 금지 — ASM이 dev/prod 공유 단일 인스턴스라 dev에서 켜면
   실계정에 자동 발행됨, 2026-07-31 사고). `docker-compose.prod.yml`의 `backend-prod` `environment:` 블록에
   반드시 wiring돼 있어야 한다 — 2026-08-01, `.env.prod`엔 `true`로 설정했지만 compose에 안 걸려 있어

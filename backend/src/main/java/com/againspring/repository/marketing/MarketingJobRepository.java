@@ -26,6 +26,9 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * Count active marketing jobs for a post with a specific platform.
      * Active statuses: REQUESTED, QUEUED, RUNNING, PUBLISHING, STALE
      *
+     * {@code platform} is the bare target id (e.g. {@code x_thread}); the query wraps it
+     * as a JSON string literal for {@code JSON_CONTAINS}.
+     *
      * Returns a count rather than a boolean — MariaDB's {@code COUNT(*) > 0} comes back
      * as an integral JDBC type, which Hibernate's native-query scalar extraction cannot
      * coerce into a {@code boolean} return type (throws ClassCastException at runtime;
@@ -35,15 +38,18 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         SELECT COUNT(*) FROM marketing_job
         WHERE post_id = :postId
         AND status IN ('REQUESTED', 'QUEUED', 'RUNNING', 'PUBLISHING', 'STALE')
-        AND JSON_CONTAINS(targets, :platform) = TRUE
+        AND JSON_CONTAINS(targets, JSON_QUOTE(:platform)) = TRUE
         """)
     long countActivePlatformJobs(String postId, String platform);
 
     /**
-     * Find posts eligible for X thread publishing:
+     * Find posts eligible for automatic X thread publishing:
      * - created_at + 24 hours <= NOW()
-     * - comment count >= 6
+     * - no soft-delete
      * - no x_thread job has ever been attempted for this post (any status)
+     *
+     * Comment-count gate removed 2026-08-02 — product rule is unconditional 24h after
+     * publish for both human and PLAN posts (X + Instagram).
      *
      * The NOT EXISTS check intentionally ignores status entirely — it is NOT limited to
      * "active" statuses. An X thread is a one-time-per-post event: once a job exists
@@ -58,10 +64,6 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         SELECT p.id FROM posts p
         WHERE p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         AND p.deleted_at IS NULL
-        AND (
-            SELECT COUNT(*) FROM post_comments pc
-            WHERE pc.post_id = p.id AND pc.deleted_at IS NULL
-        ) >= 6
         AND NOT EXISTS (
             SELECT 1 FROM marketing_job mj
             WHERE mj.post_id = p.id
@@ -70,4 +72,22 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         LIMIT :limit
         """)
     List<String> findPostsEligibleForXThreadPublish(int limit);
+
+    /**
+     * Same 24h one-shot gate as {@link #findPostsEligibleForXThreadPublish}, for
+     * {@code instagram_feed}. Separate query because ASM requires each alone target
+     * as its own job.
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT p.id FROM posts p
+        WHERE p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        AND p.deleted_at IS NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"instagram_feed"')
+        )
+        LIMIT :limit
+        """)
+    List<String> findPostsEligibleForInstagramFeedPublish(int limit);
 }

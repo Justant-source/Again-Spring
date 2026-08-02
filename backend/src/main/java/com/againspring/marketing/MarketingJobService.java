@@ -60,15 +60,17 @@ public class MarketingJobService {
         if (!asmProperties.isEnabled()) {
             throw new AsmUnavailableException("ASM is disabled (ASM_ENABLED=false)");
         }
-        // Idempotency check: reject if a job is actively being processed
-        // READY/PUBLISHED/FAILED/PARTIAL are terminal — new generation is allowed over them
-        List<String> activeStatuses = Arrays.asList("REQUESTED", "QUEUED", "RUNNING", "PUBLISHING", "STALE");
-        marketingJobRepository.findFirstByPostIdAndStatusIn(postId, activeStatuses)
-            .ifPresent(existing -> {
+        // Per-platform idempotency: x_thread and instagram_feed each require alone jobs,
+        // so concurrent active jobs on *different* platforms for the same post are allowed.
+        // Reject only when an active job already covers one of the requested targets.
+        for (String target : targets) {
+            if (marketingJobRepository.countActivePlatformJobs(postId, target) > 0) {
                 throw new IllegalStateException(
-                    "이미 처리 중인 마케팅 잡이 있습니다 (id=" + existing.getId() + ", 상태=" + existing.getStatus() + "). 완료 후 다시 시도해주세요."
+                    "이미 처리 중인 마케팅 잡이 있습니다 (postId=" + postId
+                        + ", platform=" + target + "). 완료 후 다시 시도해주세요."
                 );
-            });
+            }
+        }
 
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new IllegalArgumentException("Post not found: " + postId));

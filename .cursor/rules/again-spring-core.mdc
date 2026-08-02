@@ -22,7 +22,7 @@ alwaysApply: true
 7. LLM 오류·크레딧 소진 문자열 = 콘텐츠 아님 → 게시 금지
 8. Doc-Sync: staged 변경 → `docs/_index.md` 트리거맵 → 같은 커밋에서 문서 갱신. 없으면 `Doc-Sync: 없음`
 9. **main 단일 브랜치** — feature 브랜치 생성 금지
-10. **마케팅** = X / `x_thread`만 (IG·네이버·YouTube 보류). ASM: `ssh justant@100.115.252.61` (AS `100.81.189.92`, 암호 없음)
+10. **마케팅** = X / `x_thread` + Instagram / `instagram_feed` (게시 후 24h 자동). 네이버·YouTube·Threads 보류. ASM: `ssh justant@100.115.252.61` (AS `100.81.189.92`, 암호 없음)
 
 ## 작업 시작
 

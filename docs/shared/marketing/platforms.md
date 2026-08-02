@@ -4,12 +4,12 @@
 
 | 상태 | 플랫폼 |
 |---|---|
-| **활성** | `x`, `x_thread` |
-| **보류 (deferred)** | `naver_blog`, `instagram_feed`, `instagram_reels`, `youtube_shorts`, `naver_clip`, `threads` |
+| **활성** | `x`, `x_thread`, `instagram_feed` |
+| **보류 (deferred)** | `naver_blog`, `instagram_reels`, `youtube_shorts`, `naver_clip`, `threads` |
 
 에이전트·신규 작업은 활성 채널만. 보류 채널은 사용자 명시 요청 전 구현·디버그·배포 금지.
-예외: `instagram_feed`는 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) 범위의 **파이프 구현**과
-**명시 요청 시 단건 수동 발행**만 허용한다. 대량 자동 발행·스케줄 활성화는 금지.
+`instagram_feed`는 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) — **게시 후 24h 자동 one-shot**
+(+ 관리자 단건 수동). X와 동일 스케줄러(`XThreadPublishTriggerScheduler`).
 
 ## 플랫폼 목록
 
@@ -20,7 +20,7 @@
 | X (트위터) | `x` | 텍스트 + 이미지 | Playwright 자동 로그인 | **활성** |
 | X 4단 스레드 | `x_thread` | 텍스트 스레드 | Playwright (`x-thread-strategy.md`) | **활성** |
 | 네이버 블로그 | `naver_blog` | 마크다운 → HTML | Playwright 자동 로그인 | 보류 |
-| 인스타그램 피드 | `instagram_feed` | 하이브리드 캐러셀 (훅+캡처+비율) | Playwright (`instagram-feed-strategy.md`) | 보류·단건 수동 |
+| 인스타그램 피드 | `instagram_feed` | 하이브리드 캐러셀 (훅+캡처+비율) | Playwright (`instagram-feed-strategy.md`) | **활성 (24h 자동)** |
 | 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Playwright 자동 로그인 | 보류 |
 | YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | API (OAuth 2.0) | 보류 |
 | 네이버 클립 | `naver_clip` | 세로형 영상 (9:16) | Playwright (미구현) | 보류 |

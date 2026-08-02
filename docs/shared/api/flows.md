@@ -166,19 +166,21 @@ stateDiagram-v2
     note right of READY: 이 상태에서만 수동 publish 가능
 ```
 
-### X 스레드 자격 (one-shot)
+### X / Instagram 자동 발행 자격 (one-shot, 24h)
 
 ```mermaid
 flowchart TD
-    P[posts] --> G{createdAt+24h<br/>AND comments≥6?}
+    P[posts] --> G{createdAt+24h?}
     G -->|no| SKIP[스킵]
-    G -->|yes| E{"x_thread 잡이<br/>한 번이라도 존재?"}
-    E -->|yes 아무 status| SKIP2[영구 제외]
-    E -->|no| CREATE[marketing_job 생성]
-    Note1["2026-08-01: 활성 status만 제외하면<br/>PUBLISHED 후 다음 폴링에서 무한 재발행"]
+    G -->|yes| EX{"x_thread 잡이<br/>한 번이라도 존재?"}
+    EX -->|no| CREATEX[x_thread marketing_job]
+    EX -->|yes| SKIPX[X 제외]
+    G -->|yes| EI{"instagram_feed 잡이<br/>한 번이라도 존재?"}
+    EI -->|no| CREATEIG[instagram_feed marketing_job]
+    EI -->|yes| SKIPIG[IG 제외]
 ```
 
-조건·인시던트: `docs/shared/marketing/x-thread-strategy.md` §3·§6.
+댓글 수 게이트 없음(2026-08-02~). 조건·인시던트: `x-thread-strategy.md` §3 · `instagram-feed-strategy.md` §1.
 
 ---
 

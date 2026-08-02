@@ -15,7 +15,7 @@ alwaysApply: true
 
 ## 마케팅
 
-- 활성 채널 = **X / `x_thread`만**
-- IG·네이버·YouTube·Threads·Clip: 구현·디버그·배포 금지 (명시 요청 전)
+- 활성 채널 = **X / `x_thread` + Instagram / `instagram_feed`** (게시 후 24h 자동)
+- IG·네이버·YouTube·Threads·Clip 중 **네이버·YouTube·Threads·Clip**: 구현·디버그·배포 금지 (명시 요청 전)
 - ASM 접속: AS 호스트(`100.81.189.92`) → `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
 - 진입: ASM `CLAUDE.md` · AS `docs/shared/marketing/x-thread-strategy.md`

@@ -92,10 +92,11 @@ class MarketingJobServiceTest {
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
 
-        // Idempotency check: no active job exists
-        when(marketingJobRepository.findFirstByPostIdAndStatusIn(
-            eq(TEST_POST_ID), any(List.class)
-        )).thenReturn(Optional.empty());
+        // Idempotency check: no active job for requested platforms
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter")))
+            .thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("threads")))
+            .thenReturn(0L);
 
         // Mock community data services
         when(jurorRepository.findByPostId(any())).thenReturn(List.of());
@@ -141,7 +142,8 @@ class MarketingJobServiceTest {
         assertThat(result.getStatus()).isEqualTo("QUEUED");
 
         verify(postRepository).findById(TEST_POST_ID);
-        verify(marketingJobRepository).findFirstByPostIdAndStatusIn(eq(TEST_POST_ID), any(List.class));
+        verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "twitter");
+        verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "threads");
         verify(asmClient).createJob(any(CreateJobRequest.class), any(String.class));
         verify(marketingJobRepository).save(any(MarketingJob.class));
     }
@@ -151,18 +153,9 @@ class MarketingJobServiceTest {
     @Test
     void createJob_duplicateActiveJob_throwsIllegalStateException() {
         // Given
-        // An active job already exists for this post
-        MarketingJob existingJob = MarketingJob.builder()
-            .id(1L)
-            .remoteJobId("existing-job-789")
-            .postId(TEST_POST_ID)
-            .status("RUNNING") // non-terminal status
-            .build();
-
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.findFirstByPostIdAndStatusIn(
-            eq(TEST_POST_ID), any(List.class)
-        )).thenReturn(Optional.of(existingJob));
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter")))
+            .thenReturn(1L);
 
         // When / Then
         assertThatThrownBy(() -> marketingJobService.createJob(
@@ -174,7 +167,7 @@ class MarketingJobServiceTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("이미 처리 중인");
 
-        verify(marketingJobRepository).findFirstByPostIdAndStatusIn(eq(TEST_POST_ID), any(List.class));
+        verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "twitter");
     }
 
     // ── Test 3: createJob_allowsNewJobAfterTerminal ─────────────────────────
@@ -191,18 +184,11 @@ class MarketingJobServiceTest {
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
 
-        // Only a terminal (PUBLISHED) job exists
-        MarketingJob terminalJob = MarketingJob.builder()
-            .id(1L)
-            .remoteJobId("old-job-111")
-            .postId(TEST_POST_ID)
-            .status("PUBLISHED") // terminal status
-            .build();
-
-        // findFirstByPostIdAndStatusIn filters out terminal statuses (returns empty)
-        when(marketingJobRepository.findFirstByPostIdAndStatusIn(
-            eq(TEST_POST_ID), any(List.class)
-        )).thenReturn(Optional.empty());
+        // Terminal jobs are not counted as active
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter")))
+            .thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("threads")))
+            .thenReturn(0L);
 
         // Mock community data services
         when(jurorRepository.findByPostId(any())).thenReturn(List.of());

@@ -11,11 +11,12 @@
 
 | 항목 | 값 |
 |---|---|
-| 자동/스케줄 활성 | **보류 (deferred)** — 대량 자동 발행 금지 |
-| 파이프 구현 | **허용** (이 문서 범위) |
-| 실발행 | 사용자 **명시 요청 시 단건**만 (`targets=["instagram_feed"]` 1잡) |
+| 자동/스케줄 활성 | **활성** — `post.createdAt + 24h` 후 one-shot (`XThreadPublishTriggerScheduler`) |
+| 파이프 구현 | **허용** (하이브리드 캐러셀) |
+| 실발행 | 자동(24h) + 관리자 단건 수동 |
 
-미공개 초점의 활성 채널은 여전히 `x` / `x_thread`다. IG는 검증 루프용으로만 수동 올린다.
+사람·PLAN 구분 없이 사연 공개 24시간 뒤 `instagram_feed` 잡을 1회 생성·`autoPublish`한다.
+X(`x_thread`)와 동일 스케줄러·동일 게이트(댓글 수 조건 없음). ASM alone 제약으로 **별도 잡**.
 
 ---
 
