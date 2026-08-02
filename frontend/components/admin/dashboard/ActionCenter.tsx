@@ -74,7 +74,10 @@ export function ActionCenter({ data, loading }: ActionCenterProps) {
 
   if (allZero) {
     return (
-      <div className="p-6 bg-green-50 rounded-lg border border-green-200 text-center">
+      <div
+        className="p-6 bg-green-50 rounded-lg border border-green-200 text-center"
+        data-testid="admin-action-center"
+      >
         <p className="text-sm font-medium text-green-700">모두 처리됨 ✓</p>
       </div>
     );
