@@ -1526,7 +1526,7 @@ public class ActionExecutor {
             if (!trimmed.isEmpty() && !trimmed.matches("^\\[.*\\]\\s*$") &&
                 !trimmed.startsWith("수정본:") && !trimmed.startsWith("원문:") &&
                 !trimmed.startsWith("제목:") && !trimmed.startsWith("본문:")) {
-                return trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed;
+                return trimmed.length() > 40 ? trimmed.substring(0, 40) : trimmed;
             }
         }
 

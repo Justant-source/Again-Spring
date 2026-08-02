@@ -107,6 +107,8 @@ class PromptAssemblerStyleTest {
         // Phase 6에서 extraRule 문구 변경: "같은 소재·사건 유형 반복 금지" → "완전히 다른 유형의 갈등 상황으로 쓸 것"
         // PromptAssembler.java:180 기준값
         assertTrue(user.contains("완전히 다른 유형의 갈등 상황으로 쓸 것"), "글은 소재 반복 금지 규칙 포함");
+        assertTrue(user.contains("첫 줄=제목"), "제목/본문 분리 출력 형식");
+        assertTrue(user.contains("12~40자"), "제목 글자수 상한");
     }
 
     @Test
@@ -131,5 +133,7 @@ class PromptAssemblerStyleTest {
         assertTrue(user.contains("결과는 JSON 1개만 출력"));
         assertTrue(user.contains("\"title\":\"...\""));
         assertTrue(user.contains("새 글로 갈아엎지 말고"), "부분 교정 규칙 유지");
+        assertTrue(user.contains("12~40자"), "제목 글자수");
+        assertTrue(user.contains("제목=본문 동일 문자열 금지"));
     }
 }

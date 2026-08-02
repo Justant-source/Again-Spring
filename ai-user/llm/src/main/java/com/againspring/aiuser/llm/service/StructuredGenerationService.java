@@ -57,7 +57,9 @@ public class StructuredGenerationService {
         if (req.getKind() == ThreadPlanRequest.Kind.AI_POST) {
             JsonNode p = root.path("post");
             String title = text(p, "title"); String body = text(p, "body");
-            validText(title, "post.title", 4, 160); validText(body, "post.body", 20, 6000);
+            // 제목 ≤40자(공백 포함)·제목≠본문 — 2026-08 prod 동일 제목/본문 회귀 방어
+            validText(title, "post.title", 4, 40); validText(body, "post.body", 20, 6000);
+            rejectIdenticalTitleBody(title, body);
             post = ThreadPlanResponse.Post.builder().title(title).body(body).build();
         }
         JsonNode comments = root.path("comments");
@@ -265,6 +267,7 @@ public class StructuredGenerationService {
                 The JSON schema is {"post":{"title":"...","body":"..."},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed, not the whole story.
+                AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only teases the conflict.
                 """ + "\nKIND=" + req.getKind() + "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) + "\n" + existing +
                 grounding +
                 "\nPERSONAS=" + json(req.getPersonas()) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20)));
@@ -345,6 +348,16 @@ public class StructuredGenerationService {
     }
     private static void validRef(String v) { if (!v.matches("[A-Za-z][A-Za-z0-9_-]{0,63}")) throw new StructuredGenerationException("invalid ref"); }
     private static void validText(String v, String field, int min, int max) { if (v.length() < min || v.length() > max || LlmErrorSignature.looksLikeProviderError(v) || META.matcher(v).find() || koreanRatio(v) < .10) throw new StructuredGenerationException("invalid " + field); }
+    /** Reject title==body (whitespace-normalized). Prevents one-liner posts used as both fields. */
+    static void rejectIdenticalTitleBody(String title, String body) {
+        String t = collapseWs(title);
+        String b = collapseWs(body);
+        if (t.isEmpty() || b.isEmpty()) return;
+        if (t.equals(b)) throw new StructuredGenerationException("invalid post.title/body: title must differ from body");
+    }
+    private static String collapseWs(String s) {
+        return s == null ? "" : s.replaceAll("\\s+", " ").trim();
+    }
     private static double koreanRatio(String v) { long k=v.chars().filter(c -> c >= 0xAC00 && c <= 0xD7A3).count(); long letters=v.chars().filter(Character::isLetter).count(); return letters == 0 ? 1 : (double) k / letters; }
     private static boolean blank(String s) { return s == null || s.isBlank(); }
     private static String clean(String s) { return s == null ? "" : s.replace('<','＜').replace('>','＞').replaceAll("[\\p{Cntrl}&&[^\\n\\t]]", "").substring(0, Math.min(s.length(), 5000)); }

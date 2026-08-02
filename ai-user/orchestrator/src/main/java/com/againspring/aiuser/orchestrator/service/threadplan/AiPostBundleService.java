@@ -599,7 +599,10 @@ public class AiPostBundleService {
         if (!(response.get("post") instanceof Map<?, ?> raw)) throw new IllegalArgumentException("missing post");
         String title = text(raw.get("title"));
         String body = text(raw.get("body"));
-        if (title.isBlank() || title.length() > 200 || body.isBlank()) throw new IllegalArgumentException("invalid post fields");
+        if (title.isBlank() || title.length() > 40 || body.isBlank()) throw new IllegalArgumentException("invalid post fields");
+        String titleNorm = title.replaceAll("\\s+", " ").trim();
+        String bodyNorm = body.replaceAll("\\s+", " ").trim();
+        if (titleNorm.equals(bodyNorm)) throw new IllegalArgumentException("title must differ from body");
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(body, ContentSafetyGuard.ContentType.POST);
         if (!guard.passed()) throw new IllegalArgumentException("unsafe post: " + guard.reason());
         return new PostContent(title, body);

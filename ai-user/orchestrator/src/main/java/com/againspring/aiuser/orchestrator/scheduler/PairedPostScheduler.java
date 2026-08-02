@@ -355,7 +355,7 @@ public class PairedPostScheduler {
             // 선두 메타 라인([원문 수정본] 등) 스킵
             if (trimmed.startsWith("[") && trimmed.endsWith("]")) continue;
             if (trimmed.matches("^\\[.{1,20}].*")) continue;
-            String title = trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed;
+            String title = trimmed.length() > 40 ? trimmed.substring(0, 40) : trimmed;
             return title;
         }
         return "갈등 사연";

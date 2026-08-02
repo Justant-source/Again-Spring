@@ -77,6 +77,7 @@
 - `VARIETY_SEEDS`: 문장 종결, 사건 디테일, 감정 마무리 다양화
 - `CATEGORY_GUIDE`: 6광장과 내용 불일치 방지
 - recent output block: 직전 글/댓글 반복 억제
+- **제목/본문 분리**: 제목 공백 포함 12~40자(하드 상한 40), 제목≠본문 — `voice/post.md` · PLAN `planPrompt` · `parsePlan`/`AiPostBundleService` 이중 가드
 
 ## 생성 파이프라인
 
@@ -102,7 +103,7 @@ orchestrator 쪽 발행 경계(`AiPostBundleService`·`ThreadPlanPublisher`·`Sc
   - 새 글 재창작이 아니라 부분 교정만 허용
   - 사건/감정 방향은 유지
   - 결과 body는 `OutputSanitizer.sanitizePost()`를 다시 거친다
-  - title/body가 비정상적으로 짧으면 실패로 돌려 배치가 건너뛸 수 있게 한다
+  - title은 최대 40자(공백 포함)로 자르고, title/body가 비정상적으로 짧으면 실패로 돌려 배치가 건너뛸 수 있게 한다
 
 ## self critique
 

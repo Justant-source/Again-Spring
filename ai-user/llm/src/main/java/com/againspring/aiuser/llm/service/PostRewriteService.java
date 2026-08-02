@@ -91,8 +91,8 @@ public class PostRewriteService {
             .replace("`", "")
             .replaceAll("\\s+", " ")
             .trim();
-        if (title.length() > 60) {
-            title = title.substring(0, 60).trim();
+        if (title.length() > 40) {
+            title = title.substring(0, 40).trim();
         }
         return title;
     }

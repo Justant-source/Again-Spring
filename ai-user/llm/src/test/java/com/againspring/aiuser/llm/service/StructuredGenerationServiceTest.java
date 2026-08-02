@@ -27,17 +27,52 @@ class StructuredGenerationServiceTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @Test
-    void rejectsEnglishRefusalInsideJsonEnvelopeAtItemLevel() throws Exception {
+    void rejectsTitleLongerThanFortyChars() throws Exception {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);
         StructuredGenerationService service = configuredService(pool, disabledCritique());
-        ThreadPlanRequest request = planRequest();
-        String unsafeJson = validPlanJson("I can't help with this request");
+        String longTitle = "남친이 오늘도 퇴근 통화 시작하자마자 내일 장 전망부터 꺼냄 앱 지웠다더니";
+        assertTrue(longTitle.length() > 40);
+        String json = planJsonWithTitleBody(longTitle, "어제 통화했는데 또 주식 얘기만 하더라 나는 그냥 듣는 기계 된 느낌");
         when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
-                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(unsafeJson);
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(json);
 
-        assertThrows(StructuredGenerationException.class, () -> service.createThreadPlan(request, "corr-1"));
-        verify(pool, times(2)).executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
-                eq(StructuredOutputSchema.THREAD_PLAN));
+        assertThrows(StructuredGenerationException.class, () -> service.createThreadPlan(planRequest(), "corr-title-len"));
+    }
+
+    @Test
+    void rejectsIdenticalTitleAndBody() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        String same = "남친이 또 회사 스트레스로 나한테 욱했음";
+        String json = planJsonWithTitleBody(same, same);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(json);
+
+        assertThrows(StructuredGenerationException.class, () -> service.createThreadPlan(planRequest(), "corr-title-eq"));
+    }
+
+    @Test
+    void planPromptIncludesTitleBodySeparationRules() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(validPlanJson("한국어 댓글입니다"));
+
+        service.createThreadPlan(planRequest(), "corr-prompt-rules");
+
+        var promptCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(pool).executeProviderTask(promptCaptor.capture(), anyString(), anyLong(), anyString(),
+                eq(LlmProvider.CODEX), eq(StructuredOutputSchema.THREAD_PLAN));
+        String prompt = promptCaptor.getValue();
+        assertTrue(prompt.contains("12~40 characters"), "title length rule");
+        assertTrue(prompt.contains("never set title equal to body"), "title≠body rule");
+    }
+
+    @Test
+    void rejectIdenticalTitleBodyHelperIgnoresWhitespace() {
+        assertThrows(StructuredGenerationException.class,
+                () -> StructuredGenerationService.rejectIdenticalTitleBody("남친이 욱함", "남친이   욱함"));
+        StructuredGenerationService.rejectIdenticalTitleBody("남친이 욱함", "어제 또 회사 일로 나한테 소리질렀음");
     }
 
     @Test
@@ -292,6 +327,14 @@ class StructuredGenerationServiceTest {
     }
 
     private static String validPlanJsonWithPostBody(String postBody, String firstBody) {
+        return planJsonWithTitleBody("한국어 제목입니다", postBody, firstBody);
+    }
+
+    private static String planJsonWithTitleBody(String title, String postBody) {
+        return planJsonWithTitleBody(title, postBody, "한국어 댓글입니다");
+    }
+
+    private static String planJsonWithTitleBody(String title, String postBody, String firstBody) {
         List<String> items = new ArrayList<>();
         for (int i = 1; i <= 12; i++) {
             String body = i == 1 ? firstBody : "한국어 댓글 " + i + "입니다";
@@ -299,7 +342,7 @@ class StructuredGenerationServiceTest {
             String persona = "p" + ((i - 1) % 6 + 1);
             items.add("{\"ref\":\"c" + i + "\",\"parentRef\":" + parent + ",\"personaId\":\"" + persona + "\",\"body\":\"" + body + "\"}");
         }
-        return "{\"post\":{\"title\":\"한국어 제목입니다\",\"body\":\"" + postBody + "\"},\"comments\":[" + String.join(",", items) + "]}";
+        return "{\"post\":{\"title\":\"" + title + "\",\"body\":\"" + postBody + "\"},\"comments\":[" + String.join(",", items) + "]}";
     }
 
     /** Sparse plan with {@code topCount} top-level comments only (no replies). */
