@@ -5,7 +5,7 @@
 다시봄 백엔드는 LLM 추론을 직접 수행하지 않습니다.
 별도의 `llm-worker` 컨테이너(Claude CLI 기반)에 HTTP로 요청합니다.
 
-**흐름**: `BE (RemoteLlmProvider)` → HTTP POST → `againspring-llm:8090/v1/invoke` (dev·prod 공유)
+**흐름**: `BE (RemoteLlmProvider)` → HTTP POST → `againspring-llm:8090/v1/invoke` (base·prod 공유; server-dev는 `LLM_ENABLED=false`로 호출 차단)
 
 ---
 
@@ -30,8 +30,8 @@ backend/src/main/java/com/againspring/
 `llm/remote/RemoteLlmProvider.java`
 
 - HTTP POST `{llm.remote.base-url}/v1/invoke`
-- dev: `http://againspring-llm:8090`
-- prod: `http://againspring-llm:8090`
+- `llm.enabled=false`(env `LLM_ENABLED`)이면 워커 호출 없이 `501 LLM_DISABLED` (server-dev L3)
+- 로컬/prod 기본 base-url: `http://againspring-llm:8090` (server-dev는 compose에서 더미 URL + 네트워크 격리)
 - 타임아웃: `llm.remote.default-timeout-ms` (기본 120,000ms)
 - 인증: 없음 (내부 네트워크, 컨테이너 간)
 
@@ -41,6 +41,7 @@ backend/src/main/java/com/againspring/
 
 | 키 | 설명 |
 |---|---|
+| `llm.enabled` / `LLM_ENABLED` | false면 RemoteLlmProvider가 501 거절 (server-dev) |
 | `llm.remote.base-url` | llm-worker 엔드포인트 |
 | `llm.remote.default-timeout-ms` | 기본 타임아웃 (ms) |
 | `llm.jury.provider` | 배심원 생성 provider 선택 (`remote` \| `mock`) |
