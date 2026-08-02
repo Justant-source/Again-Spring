@@ -21,8 +21,9 @@
 | [`auth.md`](auth.md) | 인증·소셜 로그인 | `AuthController`, `OAuth2Controller` |
 | [`user.md`](user.md) | 사용자 프로필·비밀번호·탈퇴 | `UserController` |
 | [`feedback.md`](feedback.md) | 피드백 제출 | `FeedbackController` |
-| [`admin.md`](admin.md) | 관리자 전용 API | `AdminDashboardController`, `AdminUserController`, `AdminHealthController`, `AdminFeedbackController`, `AdminPromptsController` + 마케팅 (Story/Simulation/Content/Template/Hashtag/Calendar 등) |
-| [`database-schema.md`](database-schema.md) | MariaDB 테이블 스키마 · Flyway 마이그레이션 (V1~V56) | — |
+| [`admin.md`](admin.md) | 관리자 전용 API (대시보드·유저·AI-user·**콘텐츠 홀딩/스레드**) | `Admin*Controller` |
+| [`flows.md`](flows.md) | 시나리오별 시퀀스 (PLAN 홀딩·human reply·X 스레드·admin 편집) | — |
+| [`database-schema.md`](database-schema.md) | MariaDB 테이블 스키마 · Flyway 마이그레이션 | — |
 
 ## 공통 규약
 

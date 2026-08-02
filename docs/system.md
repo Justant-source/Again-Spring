@@ -1,8 +1,9 @@
 # 다시봄 — 시스템 아키텍처
 
-> last-verified: 2026-06-23 · code-ref: `env/docker-compose*.yml` · `env/nginx/*.conf`
+> last-verified: 2026-08-02 · code-ref: `env/docker-compose*.yml` · `env/nginx/*.conf`
 >
 > 권위본: 이 파일과 `docs/env/architecture.md`. 포트·서비스 목록이 문서와 다르면 compose가 우선이다.
+> **미공개**: 실서버 검증·배포면은 **prod(:8091)만**. dev(:8090)·`prod-dev-sync`는 휴면(명시 요청 전).
 
 ---
 
@@ -94,11 +95,11 @@ flowchart TB
 
 ### 운영 원칙
 
-- frontend/backend는 dev와 prod를 분리한다.
+- frontend/backend는 dev와 prod를 분리한다. **미공개 기간 실검증면은 prod(:8091)만.**
 - ai-user 런타임은 `env/docker-compose.ai-user.yml` 하나를 공통으로 사용한다.
-- PLAN-first 경로는 backend outbox → orchestrator plan/item/inbox → CLI 구조화 생성 → due item REST 게시 순서다. LLM API key가 아니라 Claude/Codex 로그인 세션 volume을 사용한다.
+- PLAN-first 경로: outbox → orchestrator(plan/hold/inbox) → CLI 구조화 생성 → `ai_scheduled_posts` 홀딩 → 슬롯 도래 시 REST 게시 → due item 댓글. LLM API key가 아니라 Claude/Codex 로그인 세션 volume을 사용한다.
 - orchestrator와 learning의 실제 주력 대상은 prod DB와 prod backend다.
-- dev DB는 `prod-dev-sync`가 하루 1회 비식별 upsert를 수행한다.
+- `prod-dev-sync`·dev orchestrator는 미공개 기간 **휴면**(파일·compose는 보관).
 
 ### 포트 표
 
@@ -145,7 +146,7 @@ sequenceDiagram
     BE-->>FE: rendered result
 ```
 
-### AI-user 행동 실행
+### AI-user PLAN 홀딩·발행
 
 ```mermaid
 sequenceDiagram
@@ -153,13 +154,15 @@ sequenceDiagram
     participant DB as mariadb-prod
     participant LLM as llm-ai-user
     participant BE as backend-prod
-    participant SYNC as prod-dev-sync
-    participant DEVDB as mariadb-dev
 
-    ORC->>DB: load runtime/persona/feed
-    ORC->>LLM: generate post/comment/reply
-    ORC->>BE: post via REST API
-    BE->>DB: persist prod community state
-    SYNC->>DB: read prod delta
-    SYNC->>DEVDB: anonymized upsert
+    ORC->>DB: load runtime / persona / outbox
+    ORC->>LLM: micro-batch structured generate
+    LLM-->>ORC: post + comment candidates
+    ORC->>DB: hold ai_scheduled_posts + plan items
+    Note over ORC,DB: 새벽 생성 · 낮 슬롯 발행
+    ORC->>BE: publish held post / due comments
+    BE->>DB: persist community state
+    BE-->>ORC: outbox events (human reply path)
 ```
+
+상세 시퀀스: `docs/shared/api/flows.md` §3–5 · `docs/ai-user/thread-planning.md`.

@@ -103,7 +103,9 @@ X 미리보기(축소 썸네일)에서 카드 가장자리에 붙어 잘려 보�
 ### 3.1 조건
 
 ```
-post.createdAt + 24시간 경과  AND  댓글 수 >= 6
+post.createdAt + 24시간 경과
+AND  댓글 수 >= 6
+AND  해당 post에 x_thread 타깃 marketing_job이 한 번도 없음 (status 무관)
 ```
 
 **24시간의 근거**: `ThreadPlanService.java:63`이 `absoluteExpiresAt = publishedAt + 24 * 3600`으로
@@ -113,6 +115,11 @@ PLAN 수명을 정한다. 모든 아이템 슬롯이 그 안에 배치되므로(
 PLAN 만료를 계산할 수 있다**(어긋나는 2건은 백데이트된 과거 글이라 즉시 조건 충족 → 무해).
 
 **댓글 6개의 근거**: 캡처 한 화면에 댓글 4~5개가 들어간다. 6개면 화면을 채우고도 여유가 있다.
+
+**one-shot (2026-08-01)**: X 스레드는 사연당 **1회**다. `MarketingJobRepository.findPostsEligibleForXThreadPublish`의
+`NOT EXISTS`는 status를 보지 않는다. 예전에는 활성 상태(`REQUESTED`…`STALE`)만 제외해서,
+잡이 `PUBLISHED`/`FAILED`/`PARTIAL`로 끝나면 다음 10분 폴링에서 같은 사연이 다시 잡혀
+영원히 재발행될 뻔했다. 트리거 활성화 전 점검에서 발견·수정.
 
 | 게이트 | 통과 사연 | 통과율 |
 |---|---|---|
@@ -221,6 +228,18 @@ Spring의 기본값(`${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:false}`)으로 조�
 
 관련: `docs/env/environment-variables.md`의 `ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED` 항목,
 `XThreadPublishTriggerScheduler.java`의 opt-in 플래그 주석(2026-07-31 실계정 오발행 사고 배경 설명).
+
+---
+
+## 6.1 인시던트 — 발행 완료 사연 무한 재발행 방지 (2026-08-01)
+
+**증상(잠재)**: `findPostsEligibleForXThreadPublish`가 "활성 잡만" 제외하면, 성공적으로
+`PUBLISHED`된 사연도 다음 폴링에서 다시 eligible이 되어 10분마다 새 x_thread 잡이 생긴다.
+
+**수정**: status 조건 제거 — `JSON_CONTAINS(targets, '"x_thread"')`인 잡이 **한 건이라도**
+있으면 영구 제외. 코드 주석에 terminal-status 배경을 남김 (`MarketingJobRepository`).
+
+**관련 흐름도**: `docs/shared/api/flows.md` §6.
 
 ---
 

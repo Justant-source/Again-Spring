@@ -190,10 +190,24 @@ flowchart LR
 - strict runtime h2h는 이 API가 아니라 dev docker network 안에서 기존 harness를 돌려야 한다.
 - PLAN 필드: `schedulerMode`(`LEGACY`/`PLAN`), `providerAiPostBundle`, `providerHumanPostPlan`, `providerHumanInteraction`(`CLAUDE`/`CODEX`/`OFF`), `scheduleExecutionPaused`, `aiUserKillSwitch`, `candidatePoolSize`(8~30), `humanBatchMaxPosts`(1~10), `humanBatchMaxInteractions`(1~50).
 - `OFF`는 이후 해당 workload의 새 job만 차단한다. 이미 생성한 item의 게시 중지는 `scheduleExecutionPaused`, 전체 생성·게시 정지는 `aiUserKillSwitch`/runtime kill-switch를 사용한다.
+- **댓글 생성량 SSOT (2026-08-01, V91)**: `hr_*` 컬럼 — `/admin/ai-user` UI. orchestrator는 0(미설정)일 때만 yml 폴백.
+
+## Content API — 공개 스레드 · 예약 홀딩 (2026-08-01~)
+
+**Base path:** `/api/admin/content` — 인증: JWT + ADMIN  
+**권위 표:** [`rest-spec.md`](rest-spec.md) §Admin Content. 흐름: [`flows.md`](flows.md) §5 · UX: `docs/frontend/ux/flows/09-admin.md`.
+
+| Method | Path | 설명 |
+|---|---|---|
+| `GET`/`PATCH` | `/posts/{postId}/thread` | 공개 글 타임라인 + **미게시 AI 예약 댓글** (`pending`/`pendingItems`) |
+| `GET` | `/scheduled-posts` | AI 예약 홀딩 목록 (`status` 기본 `SCHEDULED`) |
+| `GET`/`PATCH`/`DELETE` | `/scheduled-posts/{id}` | 홀딩 상세·수정(`SCHEDULED`만)·취소 |
+
+`PATCH` 시 글 `createdAt` delta는 댓글·예약 시각에 일괄 적용된다. orchestrator `ai_scheduled_posts`는 BE가 프록시한다.
 
 ## Social Publishing API
 
-소셜 게시 API는 ASM 서비스로 이전됨. Again-Spring-Marketing 프로젝트 문서 참조.
+소셜 게시 API는 ASM 서비스로 이전됨. Again-Spring-Marketing 프로젝트 문서 참조. X/`x_thread`만 활성(미공개 초점).
 
 ## 전체 Admin 엔드포인트 수
 

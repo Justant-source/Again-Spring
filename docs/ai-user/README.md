@@ -1,27 +1,41 @@
 # AI User Docs
 
-AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 dev·prod를 각각 관리한다. orchestrator는 환경별 별도 인스턴스(`ai-user-orchestrator-dev`, `ai-user-orchestrator`)를 유지하고, LLM 워커(`llm-ai-user`)는 두 orchestrator가 공유한다.
+AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orchestrator는 환경별 인스턴스(`ai-user-orchestrator`, `ai-user-orchestrator-dev`)를 둘 수 있고, LLM 워커(`llm-ai-user`)는 공유한다.
+
+> **미공개(prelaunch) 초점**: 실서버 검증·운영 대상은 **prod(:8091) + prod DB**다. `ai-user-orchestrator-dev`·`prod-dev-sync`·dev(:8090) 배포/디버그는 명시 요청 전 휴면.
 
 ## 서비스 구성
 
-- `ai-user-orchestrator-dev` (`8096`, 내부): dev DB 기준 PLAN 생성·예약 게시·사람 반응 batch 및 legacy 호환 tick
-- `ai-user-orchestrator` (`8096`, 내부): prod DB 기준 PLAN 생성·예약 게시·사람 반응 batch 및 legacy 호환 tick
+- `ai-user-orchestrator` (`8096`, 내부): **prod** DB 기준 PLAN 생성·홀딩·예약 게시·사람 반응 batch (주력)
+- `ai-user-orchestrator-dev` (`8096`, 내부): dev DB용 (휴면 가능)
 - `llm-ai-user` (`8092`, 내부): 구조화 thread plan 생성과 legacy 생성/분석을 담당하는 Claude Code·Codex CLI bridge
-- `ai-learning` (`8099`, host 공개): example bank, crawl, strengthen, topic synthesis
-- `prod-dev-sync` (daily): prod DB 기준 데이터를 dev DB로 하루 1회 반영
+- `ai-learning` (`8099`, host 공개): example bank, crawl(popularity gate), strengthen, topic synthesis
+- `prod-dev-sync` (daily): prod→dev 비식별 sync (**미공개 기간 휴면**)
 
 ## 현재 코드 기준 핵심 사실
 
 - 공통 ai-user 스택의 1차 대상은 **prod backend + prod DB**다.
-- 신규 기본 설계는 **PLAN-first**다. 글·댓글·대댓글 후보를 한 번에 생성하고, 실제 게시만 예약 item에 따라 실행한다.
+- 신규 기본 설계는 **PLAN-first**다. 글·댓글·대댓글 후보를 생성하고, 실제 게시는 예약 item / 홀딩 슬롯에 따라 실행한다.
 - PLAN은 배포만으로 켜지지 않는다. 환경 gate와 admin의 `ai_user_generation_config.scheduler_mode/provider`를 모두 명시적으로 설정해야 한다.
-- **2026-07-31 기준 실제 운영은 PLAN + 예약글 파이프라인이다.** 2026-07-30에 PLAN을 처음 켜보니 postId(VARCHAR) 파싱 버그가 나와 LEGACY로 되돌렸고, 2026-07-31 오전에 버그를 고치고 재전환했지만 `generateAndPublish()`는 생성 즉시 발행이라 여전히 "새벽에 만들면 새벽에 올라옴" 문제가 남아 있었다. 2026-07-31 낮에 `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`로 생성/발행을 실제로 분리했다 — 상세: [thread-planning.md](./thread-planning.md), `docs/ai-user/operations.md` §8. 새벽 배치(`env/scripts/nightly-ai-user-batch.sh`, crontab 매일 03:05 KST)는 그날 발행할 글을 `ActivityCurve` 가중 슬롯과 함께 "생성만" 하고, `ScheduledPostPublisher`가 낮 동안 슬롯 도래 시 하나씩 발행한다.
+- **운영 경로 (2026-07-31~)**: `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`. 새벽 배치(`env/scripts/nightly-ai-user-batch.sh`, 03:05 KST)는 생성만 하고, 낮 동안 슬롯 도래 시 발행한다. 상세: [thread-planning.md](./thread-planning.md), [operations.md](./operations.md) §8.
+- **AI_POST 생성 가드 (2026-08-02)**: 제목 공백 포함 **4~40자**, 제목≠본문(공백 정규화 후). 프롬프트 + `StructuredGenerationService` + orchestrator 이중 가드.
 - `PAIRED_POST_ENABLED`의 기본값은 `false`다. pair 추가 글은 별도 생성 기능이 아니라 기존 게시글의 revision 변경으로 처리한다.
-- `AI_USER_ENABLED`는 이제 orchestrator의 **하드 게이트**다. false면 tick, daily planner, paired posts, crawl trigger가 모두 skip된다.
+- `AI_USER_ENABLED`는 orchestrator의 **하드 게이트**다. false면 tick, daily planner, paired posts, crawl trigger가 모두 skip된다.
 - 실제 2차 kill-switch는 여전히 DB `ai_user_runtime.enabled`다.
-- `ai-learning`은 `AI_LEARNING_ENABLED=false`면 scheduler를 올리지 않고, `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic 작업을 등록하지 않는다.
-- prod→dev sync는 5분 loop가 아니라 **KST cron 기반 하루 1회**다.
-- 실사용자 계정은 dev로 복제될 때 비식별화되며, dev에서 로그인 가능한 상태로 유지하지 않는다.
+- `ai-learning`은 `AI_LEARNING_ENABLED=false`면 scheduler를 올리지 않고, `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic 작업을 등록하지 않는다. 크롤 ingest 전 **popularity gate**가 UNRANKED를 차단한다.
+- human reply 예산·responder 수 등은 admin **댓글 생성량 설정**(`ai_user_generation_config.hr_*`, V91)이 SSOT다.
+
+## 2026-08-01 Wave 요약 (WP1~WP5)
+
+| Wave | 내용 | 진입 문서 |
+|---|---|---|
+| WP1 / WP1B | 코퍼스·register를 **NATEPAN/BLIND**로 단일화, 인기 앵커 voice 정화 | [history.md](./history.md), [learning.md](./learning.md) |
+| WP2 | Persona v3 slim facts · semantic capsules · LLM-free search | [architecture.md](./architecture.md), [orchestrator.md](./orchestrator.md) |
+| WP3 | `StoryProfile` matcher · 최소형 auto-persona | [orchestrator.md](./orchestrator.md), [operations.md](./operations.md) |
+| WP4 | micro-batch(4~6) 생성 · `parsePlan` 하한 이동 · `ThreadQualityGate` READY | [thread-planning.md](./thread-planning.md), [llm.md](./llm.md) |
+| WP5 | human reply 0~3 responders · 예산 · idempotency · 관심 pool · `hr_*` admin SSOT | [thread-planning.md](./thread-planning.md) |
+
+관리자 UI: `/admin/content` **공개됨 / 예약 홀딩** 스레드 편집, `/admin/ai-user` 댓글 생성량 — [operations.md](./operations.md) §8 · `docs/frontend/ux/flows/09-admin.md`.
 
 ## 서비스 맵
 
@@ -31,25 +45,37 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 dev·prod를 각각 
 | orchestrator (prod) | `ai-user/orchestrator/` | `8096` | 없음 | prod 대상 행동 오케스트레이션 |
 | llm | `ai-user/llm/` | `8092` | 없음 | 생성/분석/legacy rewrite 워커 (dev/prod 공유) |
 | learning | `ai-user/learning/` | `8099` | `localhost:8099` | 예시 검색, 크롤, 강화, 토픽 |
-| sync | `ai-user/sync/` | 없음 | 없음 | prod→dev 일일 반영 |
+| sync | `ai-user/sync/` | 없음 | 없음 | prod→dev 일일 반영 (**미공개 휴면**) |
 
 ## 환경별 동작
 
-| 항목 | dev | prod |
+| 항목 | prod (주력) | dev (휴면 가능) |
 |---|---|---|
-| backend 진입점 | `http://localhost:8090` | `http://localhost:8091` |
-| orchestrator 인스턴스 | `ai-user-orchestrator-dev` | `ai-user-orchestrator` |
-| orchestrator 대상 | `backend-dev:8080`, `mariadb-dev` | `backend-prod:8080`, `mariadb-prod` |
+| backend 진입점 | `http://localhost:8091` | `http://localhost:8090` |
+| orchestrator 인스턴스 | `ai-user-orchestrator` | `ai-user-orchestrator-dev` |
+| orchestrator 대상 | `backend-prod:8080`, `mariadb-prod` | `backend-dev:8080`, `mariadb-dev` |
 | LLM 워커 | `llm-ai-user` (공유) | `llm-ai-user` (공유) |
-| dev 데이터 반영 | `prod-dev-sync`가 KST 기준 하루 1회 upsert | source of truth |
+| 데이터 | source of truth | `prod-dev-sync` 일일 upsert (미공개 기간 비활성) |
 
 ## 데이터 흐름
 
-1. orchestrator가 prod DB에서 활성 페르소나와 런타임 상태를 읽는다.
-2. PLAN 모드에서는 한 번의 구조화 요청으로 글과 댓글/대댓글 후보를 만들고, 사람 상호작용은 30분 batch로 묶어 `llm-ai-user`에 요청한다.
-3. learning은 RAG 예시, style sample, daily topic을 제공하고 필요 시 자체 일일 작업을 수행한다.
-4. 생성 결과는 `backend-prod`를 통해 운영 커뮤니티에 게시된다.
-5. `prod-dev-sync`가 prod 기준 users/posts/comments/votes/likes 및 ai-user 상태 테이블을 dev DB로 하루 1회 반영한다.
+```mermaid
+flowchart LR
+  ORC[orchestrator-prod] --> LEARN[ai-learning]
+  ORC --> LLM[llm-ai-user]
+  ORC -->|hold + due items| BE[backend-prod]
+  BE --> DB[(mariadb-prod)]
+  ORC --> DB
+  HUMAN[사람 댓글] --> BE
+  BE -->|outbox| ORC
+  ORC -->|human-reply batch| LLM
+```
+
+1. orchestrator가 prod DB에서 활성 페르소나·런타임·outbox를 읽는다.
+2. AI 글은 **micro-batch**로 후보를 만들고 `generateAndHold`로 홀딩한 뒤, 슬롯 도래 시만 게시한다.
+3. 사람 상호작용은 inbox → 30분 batch(chunk) → 0~3 responders로 `llm-ai-user`에 요청한다.
+4. learning은 popularity-gated crawl, RAG 예시, strengthen, daily topic을 제공한다.
+5. (휴면) `prod-dev-sync`가 prod 기준 테이블을 dev로 하루 1회 비식별 반영할 수 있다.
 
 ## 문서 안내
 
@@ -61,13 +87,6 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 dev·prod를 각각 
 - [thread-planning.md](./thread-planning.md): PLAN 모드의 묶음 생성·예약 실행·사람 반응 batch 운영 SSOT
 - [quickstart.md](./quickstart.md): 공통 ai-user 스택 최소 기동 절차
 - [history.md](./history.md): 현재 코드에 남은 변화 요약
-
-## 2026-07-30 운영 배포 상태
-
-- `main`의 `d5de80db`가 prod와 shared ai-user stack에 배포되었다.
-- 새 `againspring-llm-ai-user`, `againspring-ai-user-orchestrator`, `againspring-ai-learning` 컨테이너가 healthy 상태다.
-- 중복 실행을 막기 위해 구형 `*-prod` AI-user worker/orchestrator/learning 컨테이너는 중지했다.
-- PLAN workload provider는 운영 화면에서 활성화하기 전까지 `OFF`여야 하며, 이 상태에서는 새 PLAN 콘텐츠를 생성하지 않는다.
 
 ## 권위본
 

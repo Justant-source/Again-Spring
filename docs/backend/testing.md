@@ -81,6 +81,17 @@ Playwright e2e-realbe는 UI 통합에 집중. 아래 계약은 BE 유닛이 권�
 | Crawl status schema | `AdminCrawlStatusControllerTest` |
 | Public visit validation | `PublicVisitControllerTest` |
 
+## e2e DB cleanup (`backend/scripts/test-automation/cleanup-test-db.sh`)
+
+prod:8091 e2e 게이트가 이 스크립트를 setup/teardown에서 호출한다.
+
+- 테스트 페르소나·게스트·`e2e-signup%` 커뮤니티 산출물 삭제 (`mock_001`·users 행 보존).
+- **§2b (2026-08-01)**: 삭제 대상 post에 걸린 AI-user 파생 행을 같이 제거한다 —
+  `ai_thread_plan_items` → `ai_thread_plans` → `ai_human_interaction_inbox` →
+  `ai_post_interested_personas` → `ai_user_outbox`(POST aggregate).
+  raw DELETE는 outbox를 발행하지 않으므로, 고아 plan이 남으면 이후 provider ON 시
+  존재하지 않는 글에 LLM을 소모한다. 상세: `docs/frontend/testing.md` storageState/DB 관리.
+
 ## 테스트 분류
 
 ### 단위 테스트 (`@ExtendWith(MockitoExtension.class)`)
