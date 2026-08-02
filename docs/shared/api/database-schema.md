@@ -204,13 +204,14 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56, V85, V87, V89)
+### `posts` (V48~V56, V85, V87, V89, V92)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
 | `id` | BIGINT auto PK | V48 | |
 | `author_id` | VARCHAR(32) FK | V48 | 작성자 |
 | `title` | VARCHAR(255) | V48 | 제목 |
+| `promo_title` | VARCHAR(20) | **V92** | 마케팅 훅 제목 (IG 등). 생성 시 1회 LLM, 없으면 원제 폴백 |
 | `content` | MEDIUMTEXT | V48 | 본문 (**30일 후 NULL**) |
 | `relationship_type` | VARCHAR(32) | V48 | RelationType enum (couple/marriage/friend/family/parent_child) |
 | `category` | JSON | V48 | `{major, middle, minor, customMinor?}` |

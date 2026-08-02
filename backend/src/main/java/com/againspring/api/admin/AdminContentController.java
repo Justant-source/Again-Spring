@@ -59,6 +59,7 @@ public class AdminContentController {
     private final AiCorrectionService aiCorrectionService;
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final AdminPublishedThreadService publishedThreadService;
+    private final com.againspring.service.community.PromoTitleService promoTitleService;
 
     // ===== 포스트 관리 =====
 
@@ -678,6 +679,8 @@ public class AdminContentController {
                 .build();
 
         Post saved = postRepository.save(post);
+
+        promoTitleService.generateAsync(saved.getId());
 
         Set<String> syntheticIds = userRepository.findSyntheticIds(java.util.List.of(saved.getAuthorId()));
         boolean synthetic = syntheticIds.contains(saved.getAuthorId());

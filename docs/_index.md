@@ -65,13 +65,15 @@
 
 ### 마케팅 (ASM)
 
-> **미공개 초점**: 활성 채널 = **X / `x_thread`만**. IG·네이버·YouTube·Threads 보류.
+> **미공개 초점**: 활성 채널 = **X / `x_thread`만**. IG·네이버·YouTube·Threads 보류
+> (`instagram_feed`는 파이프·단건 수동만 — `instagram-feed-strategy.md`).
 > **접속**: AS(`100.81.189.92`) → `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
 
 | 토픽 | authority | derived | runtime |
 |---|---|---|---|
 | ASM 전체 | `docs/shared/marketing/README.md` | `{api,architecture,platforms,social-poster,asm-setup}.md` | ASM 저장소 (`~/Data/Again-Spring-Marketing`) |
 | X 스레드 전략 (활성) | `docs/shared/marketing/x-thread-strategy.md` | — | ASM `services/social-poster/src/routes/publish-x.js` |
+| IG 피드 전략 (보류·단건) | `docs/shared/marketing/instagram-feed-strategy.md` | — | ASM `app/worker/pipeline.py` `_run_instagram_feed_pipeline` |
 
 ---
 

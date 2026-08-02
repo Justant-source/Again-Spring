@@ -14,6 +14,7 @@ import com.againspring.service.community.BotWriteIdempotencyService;
 import com.againspring.service.community.JuryService;
 import com.againspring.service.community.PostComposeService;
 import com.againspring.service.community.PostService;
+import com.againspring.service.community.PromoTitleService;
 import com.againspring.service.community.ViewService;
 import com.againspring.service.community.VoteCountBreakdown;
 import com.againspring.service.community.VoteService;
@@ -63,6 +64,7 @@ public class CommunityPostController {
     private final com.againspring.repository.community.VoteRepository voteRepository;
     private final com.againspring.repository.community.PostRepository postRepository;
     private final BotWriteIdempotencyService botWriteIdempotencyService;
+    private final PromoTitleService promoTitleService;
 
     /**
      * 포스트 생성 — 원문 즉시 등록 + VoteOption 저장 + jurorCount > 0이면 배심원 비동기 생성
@@ -106,6 +108,11 @@ public class CommunityPostController {
         // jurorCount > 0이면 visibility 무관하게 배심원 비동기 생성
         if (execution.created() && request.getJurorCount() > 0 && !options.isEmpty()) {
             juryService.generateJuryAsync(post, options, request.getJurorCount());
+        }
+
+        // 마케팅 훅 제목 — 모든 신규 사연 1회 생성 (발행 시 LLM 없음)
+        if (execution.created()) {
+            promoTitleService.generateAsync(post.getId());
         }
 
         return ResponseEntity.ok(PostResponse.from(post, options));

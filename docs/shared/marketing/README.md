@@ -46,24 +46,33 @@ docs/shared/marketing/
 ├── asm-setup.md        ← ASM 서버 설치·운영 가이드
 ├── platforms.md        ← 지원 플랫폼 및 콘텐츠 형식
 ├── credentials.md      ← 플랫폼 계정 자격증명 저장·암호화 정책
-├── social-poster.md    ← social-poster 서비스 운영 가이드
-└── x-thread-strategy.md ← X 4단 스레드 전략 (포맷·발행 트리거·구현)
+├── social-poster.md            ← social-poster 서비스 운영 가이드
+├── x-thread-strategy.md        ← X 4단 스레드 전략 (포맷·발행 트리거·구현)
+└── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (보류·단건 수동)
 ```
 
 ---
 
 ## 빠른 시작
 
-> **미공개**: 타겟은 **X / `x_thread`만** 선택. 다른 채널은 보류.
+> **미공개**: 타겟은 기본 **X / `x_thread`**. `instagram_feed`는 보류이나 **단건 수동 검증**만 허용
+> ([`instagram-feed-strategy.md`](instagram-feed-strategy.md)).
 
 ### 어드민 사용법
 
 1. `https://againspring.net/admin/content` → 사연 행 우측 메뉴 → **마케팅 제작 요청**
-2. 타겟 플랫폼 선택 (**X 또는 X 스레드**)
-3. 자동 게시 여부 토글
+2. 타겟 플랫폼 선택 (**X 또는 X 스레드**; IG 검증 시 **인스타그램 피드만** 단독 선택)
+3. 자동 게시 여부 토글 (IG 검증은 OFF 권장 → READY 후 수동 승인)
 4. **마케팅 제작 요청** 클릭 → ASM에 잡 생성
 5. `https://againspring.net/admin/marketing` → 잡 목록에서 진행 상황 모니터링
 6. 상태가 `READY`이고 자동 게시 OFF 시 → 잡 상세 → **게시 승인** 클릭
+
+### IG 단건 검증 (요청 시 1사연)
+
+1. 어드민에서 해당 사연 → 타겟 **`instagram_feed`만** (다른 타겟과 혼합 불가)
+2. 빌드 완료 후 아티팩트: `card_01` 훅(4:5) · 중간 X캡처 · 마지막 비율카드 · `upload.json` 캡션
+3. 게시 승인 → 인스타 앱에서 캐러셀·캡션·링크 확인 → 피드백
+4. 대량 자동·스케줄 활성화는 하지 않음
 
 ### 잡 상태 흐름
 

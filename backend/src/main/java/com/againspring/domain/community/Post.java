@@ -42,6 +42,10 @@ public class Post {
     @Column(length = 200)
     private String userTitle;
 
+    /** 마케팅 훅 제목 (IG 등). 생성 시 1회 LLM, ≤20자. */
+    @Column(name = "promo_title", length = 20)
+    private String promoTitle;
+
     @Column(nullable = false)
     @Builder.Default
     private Integer jurorCount = 3;

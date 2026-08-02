@@ -8,6 +8,8 @@
 | **보류 (deferred)** | `naver_blog`, `instagram_feed`, `instagram_reels`, `youtube_shorts`, `naver_clip`, `threads` |
 
 에이전트·신규 작업은 활성 채널만. 보류 채널은 사용자 명시 요청 전 구현·디버그·배포 금지.
+예외: `instagram_feed`는 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) 범위의 **파이프 구현**과
+**명시 요청 시 단건 수동 발행**만 허용한다. 대량 자동 발행·스케줄 활성화는 금지.
 
 ## 플랫폼 목록
 
@@ -18,7 +20,7 @@
 | X (트위터) | `x` | 텍스트 + 이미지 | Playwright 자동 로그인 | **활성** |
 | X 4단 스레드 | `x_thread` | 텍스트 스레드 | Playwright (`x-thread-strategy.md`) | **활성** |
 | 네이버 블로그 | `naver_blog` | 마크다운 → HTML | Playwright 자동 로그인 | 보류 |
-| 인스타그램 피드 | `instagram_feed` | 이미지 + 캡션 | Playwright 자동 로그인 | 보류 |
+| 인스타그램 피드 | `instagram_feed` | 하이브리드 캐러셀 (훅+캡처+비율) | Playwright (`instagram-feed-strategy.md`) | 보류·단건 수동 |
 | 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Playwright 자동 로그인 | 보류 |
 | YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | API (OAuth 2.0) | 보류 |
 | 네이버 클립 | `naver_clip` | 세로형 영상 (9:16) | Playwright (미구현) | 보류 |
@@ -36,7 +38,7 @@
 |---|---|
 | `naver_blog` | `blog_md` (마크다운), `images[]` (인용 이미지) |
 | `x` | `images[0]` (카드 이미지), 텍스트 |
-| `instagram_feed` | `images[]` (카드뉴스 1~10장) |
+| `instagram_feed` | `images[]` (훅 4:5 + X캡처 원본비율 + 비율카드 4:5, 4~5장) · caption |
 | `instagram_reels` | `video_mp4`, `thumbnail` |
 | `youtube_shorts` | `video_mp4`, `thumbnail` |
 
@@ -70,4 +72,5 @@ AI가 생성하는 모든 텍스트에 적용:
 플랫폼별 기본 해시태그 (M1 카피라이팅 단계에서 추가):
 
 - 네이버 블로그: `#다시봄`, `#AI배심원`, `#[카테고리]`, `#[주요키워드]`
-- X / 인스타그램: `#againspring`, `#AI배심원`, `#갈등`, `#[카테고리]`
+- X: `#againspring`, `#AI배심원`, `#갈등`, `#[카테고리]`
+- 인스타그램 피드: `#다시봄`, `#공감비율`, `#[카테고리]` (상세: `instagram-feed-strategy.md`)

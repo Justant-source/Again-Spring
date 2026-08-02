@@ -156,6 +156,9 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 - `partnerAnsweredAt` (String, nullable): 파트너 답변 도착 시각 (ISO-8601 UTC)
 - `partnerBodyPublished` (String, nullable): 파트너 본문
 - `inviteToken` (String, nullable): 초대 토큰 (작성자 본인만 조회 가능)
+- `promoTitle` (String, nullable, **2026-08-02~**): 마케팅 훅 제목 ≤20자. 생성 직후 비동기 LLM으로 채워짐. 목록/상세 공통.
+
+`POST /api/community/posts` 성공 시(신규 생성만) `PromoTitleService.generateAsync`가 1회 실행된다. 마케팅 brief(`promo_title`)는 비어 있으면 원제 20자 폴백.
 
 ### 3. User
 

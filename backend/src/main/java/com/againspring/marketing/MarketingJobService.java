@@ -17,6 +17,7 @@ import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.community.CommentService;
+import com.againspring.service.community.PromoTitleService;
 import com.againspring.service.community.VoteService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -156,10 +157,11 @@ public class MarketingJobService {
             tags.add(post.getCategory().getDisplayName());
         }
 
-        String postUrl = "https://againspring.net/community/posts/" + postId;
+        String postUrl = "https://againspring.net/community/" + postId;
 
         BriefDto brief = BriefDto.builder()
             .title(post.getTitle())
+            .promoTitle(PromoTitleService.resolveOrFallback(post))
             .neutralSummary(summary)
             .sideA(sideAText)
             .sideB(sideBText)

@@ -28,6 +28,8 @@ public class PostDetailResponse {
 
     private String title;
 
+    private String promoTitle;
+
     private String bodyPublished;
 
     private String category;
@@ -116,6 +118,7 @@ public class PostDetailResponse {
         return PostDetailResponse.builder()
                 .id(post.getId())
                 .title(post.getTitle())
+                .promoTitle(post.getPromoTitle())
                 .bodyPublished(post.getBodyPublished())
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())

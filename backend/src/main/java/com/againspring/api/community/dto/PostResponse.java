@@ -21,6 +21,8 @@ public class PostResponse {
     private String id;
     private String title;
     private String userTitle;
+    /** 마케팅 훅 제목 (≤20자). 생성 전이면 null — resolveOrFallback 사용. */
+    private String promoTitle;
     private String bodyPublished;
     private String category;
     private String visibility;
@@ -65,6 +67,7 @@ public class PostResponse {
                 .id(post.getId())
                 .title(post.getTitle())
                 .userTitle(post.getUserTitle())
+                .promoTitle(post.getPromoTitle())
                 .bodyPublished(post.getBodyPublished())
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())
