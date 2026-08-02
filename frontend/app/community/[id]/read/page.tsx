@@ -96,7 +96,7 @@ export default function C3StoryRead({ params }: PageProps) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--L-bg)', padding: '14px 20px 28px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--L-bg)', padding: '16px 24px 32px' }}>
       {/* 헤더: ‹ 제목 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <button
@@ -155,7 +155,7 @@ export default function C3StoryRead({ params }: PageProps) {
       )}
 
       {/* 전문 카드 + 우측 하단 ⋯ */}
-      <div style={{ position: 'relative', background: bg, borderRadius: 12, padding: '18px 16px 40px' }}>
+      <div style={{ position: 'relative', background: bg, borderRadius: 12, padding: '22px 22px 44px' }}>
         <p style={{ margin: 0, fontSize: 15, fontFamily: 'var(--font-serif)', lineHeight: 1.85, color: 'var(--P-ink)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
           {body}
         </p>
