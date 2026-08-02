@@ -162,8 +162,9 @@ import { test, expect } from '../support/no-llm-fixture'
 #### storageState 및 DB 관리
 
 - **storageState**: `global-setup.ts`가 test1(ADMIN)/test2(TESTER)/test3(TESTER)/test5(USER) 로그인을 1회 실행해 `.auth/<email>.json`에 저장. 이후 spec은 `test.use({ storageState })` 또는 `tokenFromStorageState(email)`로 재사용.
-- **DB 정리**: `cleanup-test-db.sh`를 `global-setup`(실행 전)과 `global-teardown`(실행 후) 양쪽에서 실행. `test%@again.com` 페르소나 + 게스트 + `e2e-signup%` 일회용 유저의 모든 커뮤니티 산출물 삭제. `mock_001`과 `users` 행은 보존.
-- **AI-user 고아 정리 (§2b, 2026-08-01)**: posts를 raw SQL로 지우면 `POST_DELETED` outbox가 안 나가 orchestrator가 모르는 `ai_thread_plans`/`_items` · `ai_human_interaction_inbox` · `ai_post_interested_personas` · `ai_user_outbox` 행이 남는다. provider가 켜지면 죽은 post_id에 **실제 LLM**을 호출한다(2026-08-01 인시던트: FAILED 172건). cleanup은 e2e post 목록으로 위 5개 테이블을 **posts 삭제와 같은 시점**에 함께 지운다. e2e는 LLM 토큰을 쓰면 안 된다.
+- **사연 삭제 (필수)**: `support/api.ts`의 `createPost`는 생성과 동시에 추적 레지스트리에 등록한다. `no-llm-fixture` auto fixture가 **매 테스트 종료 시** `DELETE /api/community/posts/{id}`로 제거한다. retries·단일 spec·중도 실패에도 광장에 E2E 글이 남지 않게 한다. UI로만 올린 글(게스트 compose 등)은 아래 DB cleanup 안전망이 처리.
+- **DB 정리 (안전망)**: `cleanup-test-db.sh`를 `global-setup`(실행 전)과 `global-teardown`(실행 후) 양쪽에서 실행. `test%@again.com` 페르소나 + 게스트 + `e2e-signup%` 일회용 유저의 모든 커뮤니티 산출물 삭제. `mock_001`과 `users` 행은 보존. teardown 후 E2E 제목 잔존 여부를 한 번 더 로그로 확인한다.
+- **AI-user 고아 정리 (§2b, 2026-08-01)**: posts를 raw SQL로 지우면 `POST_DELETED` outbox가 안 나가 orchestrator가 모르는 `ai_thread_plans`/`_items` · `ai_human_interaction_inbox` · `ai_post_interested_personas` · `ai_user_outbox` 행이 남는다. provider가 켜지면 죽은 post_id에 **실제 LLM**을 호출한다(2026-08-01 인시던트: FAILED 172건). cleanup은 e2e post 목록으로 위 5개 테이블을 **posts 삭제와 같은 시점**에 함께 지운다. e2e는 LLM 토큰을 쓰면 안 된다. (API `deletePost`는 outbox를 정상 발행하므로 테스트별 삭제가 1순위.)
 - **미공개 cleanup**: `localhost:8091` + `againspring-mariadb-prod` 허용(`test%@again.com` 등 테스트 페르소나만). 공개 URL(`againspring.net` 등) cleanup은 계속 거부. 정식 공개 후 재검토.
 
 #### Selector 관리

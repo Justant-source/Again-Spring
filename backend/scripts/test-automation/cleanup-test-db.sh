@@ -141,6 +141,8 @@ WHERE id <> 'mock_001'
     )
     OR title LIKE '%E2E%'
     OR title LIKE '%e2e%'
+    OR user_title LIKE '%E2E%'
+    OR user_title LIKE '%e2e%'
     OR title LIKE 'REPRO%'
     OR title LIKE '[e2e]%'
   );

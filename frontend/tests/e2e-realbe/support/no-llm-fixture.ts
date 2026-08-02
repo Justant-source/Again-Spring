@@ -1,9 +1,13 @@
 /**
- * LLM 가드레일 픽스처.
+ * LLM 가드레일 + createPost 자동 삭제 픽스처.
  *
  * 모든 journey spec은 @playwright/test 대신 이 파일을 import한다.
  * page.on('request') 리스너가 LLM을 트리거하는 브라우저 요청을 감시해
  * 발견 즉시 테스트를 실패시킨다.
+ *
+ * createPost로 만든 사연은 테스트 종료(afterEach) 시 DELETE로 반드시 제거한다.
+ * (retries·단일 spec 실행·중도 실패 시에도 광장에 E2E 글이 남지 않게).
+ * global-teardown cleanup-test-db.sh는 안전망이다.
  *
  * 배경:
  *   - 러닝 중인 BE에는 LLM 비활성화 스위치가 없다
@@ -15,8 +19,14 @@
  *   ① page.on('request') → 브라우저가 보내는 모든 HTTP 요청
  *   ② support/api.ts의 assertNoLlmRequest → APIRequestContext 경유 요청
  *      (page.on은 request fixture 트래픽을 보지 못하므로 api.ts로 보완)
+ *   ③ createPost 추적 → 테스트 종료 시 deletePost
  */
 import { test as base, expect } from '@playwright/test'
+import {
+  beginCreatedPostTracking,
+  deleteTrackedPosts,
+  endCreatedPostTracking,
+} from './api'
 
 /** LLM을 트리거하는 경로 패턴 */
 const LLM_PATH_PATTERNS = [
@@ -24,12 +34,14 @@ const LLM_PATH_PATTERNS = [
   /\/api\/admin\/content\/corrections\/analyze/,
   /\/api\/admin\/ai-rules\/history\/[^?/]+\/analyze/,
   /\/api\/admin\/ai-rules\/history\/analyze-batch/,
-  /\/api\/admin\/marketing\/[^?/]+\/(generate|simulation|story)/,
+  /\/api\/admin\/marketing\/[^/]+\/(generate|simulation|story)/,
 ]
 
 type NoLlmFixtures = {
   /** violations 배열 — afterEach에서 비어있어야 통과 */
   _llmViolations: string[]
+  /** createPost 추적 버킷 — 테스트 종료 시 API 삭제 */
+  _createdPostsCleanup: { id: string; token: string }[]
 }
 
 export const test = base.extend<NoLlmFixtures>({
@@ -37,6 +49,20 @@ export const test = base.extend<NoLlmFixtures>({
     async ({}, use) => {
       const violations: string[] = []
       await use(violations)
+    },
+    { auto: true },
+  ],
+
+  _createdPostsCleanup: [
+    async ({ request }, use) => {
+      const created: { id: string; token: string }[] = []
+      beginCreatedPostTracking(created)
+      await use(created)
+      endCreatedPostTracking()
+      if (created.length > 0) {
+        console.log(`[e2e-cleanup] createPost ${created.length}건 삭제`)
+        await deleteTrackedPosts(request, created)
+      }
     },
     { auto: true },
   ],

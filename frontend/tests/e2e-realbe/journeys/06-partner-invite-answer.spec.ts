@@ -111,7 +111,7 @@ test.describe('Journey 06-C: 상대 초대 → 답변 → 양쪽 완성', () => 
 
   test('URL 직접 접속으로도 paired 사연 양쪽 표시', async ({ page, request }) => {
     const token = tokenFromStorageState(PERSONA_TEST1.email)
-    const postId = await createPost(request, { token, title: 'URL 직접 접속 paired 확인' })
+    const postId = await createPost(request, { token, title: 'E2E URL 직접 접속 paired 확인' })
     const inviteToken = await createInviteToken(request, token, postId)
     await submitPartnerAnswer(request, inviteToken, '직접 접속 테스트 답변 내용입니다.')
     await waitForPaired(request, postId)
@@ -120,7 +120,7 @@ test.describe('Journey 06-C: 상대 초대 → 답변 → 양쪽 완성', () => 
     await page.goto(`${BASE}/community/${postId}`)
     await page.waitForURL(new RegExp(`/community/${postId}$`), { timeout: 12_000 })
 
-    await expect(page.getByText('URL 직접 접속 paired 확인')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('E2E URL 직접 접속 paired 확인')).toBeVisible({ timeout: 10_000 })
     await expect(page.locator(STORY_BODY('r'))).toContainText('직접 접속 테스트 답변 내용입니다.', { timeout: 8_000 })
   })
 })
@@ -174,7 +174,7 @@ test.describe('Journey 06-E: 상대방 답변 화면', () => {
 
   test('이미 답변된 초대 링크 → 재제출 시 오류 메시지', async ({ page, request }) => {
     const token = tokenFromStorageState(PERSONA_TEST1.email)
-    const postId = await createPost(request, { token, title: '중복 제출 방지 테스트' })
+    const postId = await createPost(request, { token, title: 'E2E 중복 제출 방지 테스트' })
     const inviteToken = await createInviteToken(request, token, postId)
     await submitPartnerAnswer(request, inviteToken, '첫 번째 답변입니다.')
 

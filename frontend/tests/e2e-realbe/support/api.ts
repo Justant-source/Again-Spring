@@ -2,6 +2,7 @@
  * BE 셋업 호출 단일 출처.
  *
  * - createPost: 항상 jurorCount=0 강제 → LLM 미호출 보장
+ * - createPost로 만든 글은 레지스트리에 등록 → no-llm-fixture afterEach에서 삭제
  * - 모든 spec은 인라인 fetch 대신 이 모듈을 사용한다.
  * - 기존 fixtures/api-helpers.ts를 통합; api-helpers.ts는 여기로 포인터만 남김.
  */
@@ -10,6 +11,23 @@ import fs from 'fs'
 import path from 'path'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8091'
+
+/** 테스트 중 createPost로 생성된 사연 — fixture afterEach가 비운다 */
+type TrackedPost = { id: string; token: string }
+let postCleanupBucket: TrackedPost[] | null = null
+
+/** no-llm-fixture가 테스트 시작/종료 시 호출. 버킷에 쌓인 글을 afterEach에서 삭제한다. */
+export function beginCreatedPostTracking(bucket: TrackedPost[]): void {
+  postCleanupBucket = bucket
+}
+
+export function endCreatedPostTracking(): void {
+  postCleanupBucket = null
+}
+
+function trackCreatedPost(id: string, token: string): void {
+  if (postCleanupBucket) postCleanupBucket.push({ id, token })
+}
 
 // ── LLM 안전 검사 ─────────────────────────────────────────────────
 
@@ -118,7 +136,43 @@ export async function createPost(
     data,
   })
   if (!resp.ok()) throw new Error(`포스트 생성 실패: ${resp.status()} — ${await resp.text()}`)
-  return (await resp.json()).id as string
+  const id = (await resp.json()).id as string
+  trackCreatedPost(id, token)
+  return id
+}
+
+/**
+ * 작성자 JWT로 사연 삭제 (DELETE /api/community/posts/{id}).
+ * createPost 추적 정리·명시적 teardown에서 사용. 이미 없으면(404) 성공으로 본다.
+ */
+export async function deletePost(
+  request: APIRequestContext,
+  token: string,
+  postId: string,
+): Promise<void> {
+  const resp = await request.delete(`${BASE}/api/community/posts/${postId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (resp.ok() || resp.status() === 204 || resp.status() === 404) return
+  throw new Error(`포스트 삭제 실패: ${resp.status()} — ${await resp.text()}`)
+}
+
+/**
+ * 추적된(또는 인자로 받은) 사연을 역순 삭제.
+ * 개별 실패는 경고만 — 이후 글 정리·global teardown이 이어서 처리.
+ */
+export async function deleteTrackedPosts(
+  request: APIRequestContext,
+  posts: TrackedPost[],
+): Promise<void> {
+  for (const { id, token } of [...posts].reverse()) {
+    try {
+      await deletePost(request, token, id)
+    } catch (e) {
+      console.warn(`[e2e-cleanup] post ${id} 삭제 실패:`, (e as Error).message)
+    }
+  }
+  posts.length = 0
 }
 
 // ── 초대 ──────────────────────────────────────────────────────────
