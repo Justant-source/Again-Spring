@@ -59,7 +59,10 @@ export function ActionCenter({ data, loading }: ActionCenterProps) {
 
   if (loading || !data) {
     return (
-      <div className="p-6 bg-white rounded-lg border animate-pulse">
+      <div
+        className="p-6 bg-white rounded-lg border animate-pulse"
+        data-testid="admin-action-center"
+      >
         <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (

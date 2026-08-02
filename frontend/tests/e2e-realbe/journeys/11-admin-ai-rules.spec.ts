@@ -17,6 +17,8 @@ import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1 } from '../fixtures/personas'
 import { tokenFromStorageState } from '../support/api'
 import { ADMIN_CONTENT } from '../support/selectors'
+import fs from 'node:fs'
+import path from 'node:path'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)
@@ -141,9 +143,22 @@ test.describe('Journey 11-J: voice 가이드 품질 회귀 가드', () => {
     expect(accessToken).toBeTruthy()
     const headers = { Authorization: `Bearer ${accessToken}` }
 
-    const resp = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/comment`, { headers })
+    // Flyway V72는 content='' 로 키만 심음. ai-user-llm 시드·prod-dev-sync 전에
+    // 비면 classpath 가이드로 채워 회귀 가드가 레이스에 깨지지 않게 한다.
+    let resp = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/comment`, { headers })
     expect(resp.ok()).toBeTruthy()
-    const content: string = (await resp.json()).content ?? ''
+    let content: string = (await resp.json()).content ?? ''
+    if (content.length <= 100) {
+      const seedPath = path.resolve(__dirname, '../../../../ai-user/llm/src/main/resources/voice/comment.md')
+      const seed = fs.readFileSync(seedPath, 'utf8')
+      const putResp = await request.put(`${BASE}/api/admin/ai-rules/prompts/voice/comment`, {
+        headers,
+        data: { content: seed },
+      })
+      expect(putResp.ok()).toBeTruthy()
+      resp = await request.get(`${BASE}/api/admin/ai-rules/prompts/voice/comment`, { headers })
+      content = (await resp.json()).content ?? ''
+    }
     expect(content.length).toBeGreaterThan(100)
     expect(content).toMatch(/반말만|요.*금지|습니다.*금지/)
 

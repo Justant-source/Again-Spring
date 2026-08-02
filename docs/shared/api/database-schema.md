@@ -204,7 +204,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56, V85, V87, V89, V92)
+### `posts` (V48~V56, V85, V87, V89, V92; 검색 인덱스 → V93 `post_search_ngrams`)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
@@ -230,6 +230,17 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `created_at`, `updated_at` | TIMESTAMP(3) | V48 | |
 | `content_revision` | INT UNSIGNED | V87 | 내용 변경마다 증가. AI thread plan이 참조한 글 revision과 비교하는 optimistic revision |
 | `created_by_admin` | BOOLEAN | **V89** | 관리자가 통합 콘텐츠관리 화면에서 수동 생성한 글 여부. 공개 API 미노출, 어드민 전용 표시(배지)용 |
+
+### `post_search_ngrams` (**V93**)
+
+MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 문자 바이그램을 BTREE로 유지.
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `post_id` | VARCHAR(32) PK | posts.id |
+| `gram` | VARCHAR(8) PK | utf8mb4_bin 바이그램 (제목+본문≤4k자에서 추출) |
+
+인덱스: `PRIMARY(post_id, gram)`, `idx_post_search_ngrams_gram(gram)`. 게시/본문수정 시 재색인, 기동 시 미적재분 백필(`againspring.search.ngram-backfill-on-startup`).
 
 ---
 
@@ -417,6 +428,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | **AI-user V14** | `ai_human_interaction_inbox`에 `attempt_count` · `last_error_code` · `schema_version` (자동 재시도 원장) |
 | **AI-user V15** | `ai_thread_plan_items.human_author_id` — human-reply 예산을 (post, human) 대화 단위로 분리. 없으면 한 게시글의 첫 사용자가 3×5=15 예산을 독점 |
 | **V91** | `ai_user_generation_config`에 `hr_*` 7컬럼 — 댓글 생성량 설정(SSOT: `/admin/ai-user`). 대화 총상한은 저장하지 않고 `hr_distinct_personas_max × hr_replies_per_persona_max` 파생 |
+| **V93** | `post_search_ngrams` — 광장 검색용 문자 바이그램 (MariaDB ngram FULLTEXT 대체) |
 
 ---
 

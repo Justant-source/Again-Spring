@@ -7,6 +7,9 @@ import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.service.ai.AiUserOutboxWriter;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +32,10 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final AiUserOutboxWriter aiUserOutboxWriter;
+    private final PostSearchNgramIndexer postSearchNgramIndexer;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     /**
      * 공개 포스트 목록 조회 (공개된 VOTING/CLOSED 상태만)
@@ -105,6 +112,7 @@ public class PostService {
         post.setBodyPublished(newBody);
         post.advanceContentRevision();
         Post saved = postRepository.save(post);
+        postSearchNgramIndexer.reindex(saved);
         aiUserOutboxWriter.postRevised(saved, "AUTHOR_BODY_UPDATED");
         return saved;
     }
@@ -114,22 +122,161 @@ public class PostService {
         post.setPartnerBodyPublished(newBody);
         post.advanceContentRevision();
         Post saved = postRepository.save(post);
+        // partner 본문은 검색 코퍼스 제외 (슬라이스 합의) — ngram 재색인 불필요
         aiUserOutboxWriter.postRevised(saved, "PARTNER_BODY_UPDATED");
         return saved;
     }
 
-    /** 제목/본문 키워드 검색 */
+    /**
+     * 제목/본문 키워드 검색 (V1 슬라이스 ①+②).
+     * <p>
+     * 매칭: {@code post_search_ngrams} 바이그램 AND (미색인 글은 LIKE 폴백).
+     * Exact 티어: 제목 연속 포함 → 티어 안
+     * {@code (2*votes + comments + 1) × max(0.05, 0.5^(age/14d))}.
+     */
+    @Transactional(readOnly = true)
     public Page<Post> searchPosts(String q, String category, Pageable pageable) {
-        String like = "%" + q + "%";
+        String normalized = PostSearchQuery.normalize(q);
+        if (PostSearchQuery.isTooShort(normalized)) {
+            return Page.empty(pageable);
+        }
+        List<String> tokens = PostSearchQuery.tokens(normalized);
+        if (tokens.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        List<String> grams = PostSearchNgrams.extractForQuery(normalized);
+
         PostCategory cat = null;
         if (category != null && !category.isEmpty()) {
-            try { cat = PostCategory.valueOf(category.toUpperCase()); }
-            catch (IllegalArgumentException e) { log.warn("Invalid category for search: {}", category); }
+            try {
+                cat = PostCategory.valueOf(category.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid category for search: {}", category);
+            }
+        }
+
+        boolean useNgram = !grams.isEmpty();
+        String where = useNgram
+                ? buildNgramSearchWhere(grams.size(), tokens.size(), cat != null)
+                : buildLikeSearchWhere(tokens.size(), cat != null);
+
+        String orderBy = """
+                ORDER BY
+                  CASE WHEN p.title LIKE :exactTitle ESCAPE '!' THEN 0 ELSE 1 END ASC,
+                  (2.0 * COALESCE(v.cnt, 0) + COALESCE(pc.cnt, 0) + 1.0)
+                    * GREATEST(
+                        0.05,
+                        POWER(0.5, TIMESTAMPDIFF(SECOND, p.created_at, NOW()) / (14.0 * 86400.0))
+                      )
+                    DESC,
+                  p.created_at DESC
+                """;
+
+        String fromJoins = """
+                FROM posts p
+                LEFT JOIN (
+                  SELECT post_id, COUNT(*) cnt FROM votes GROUP BY post_id
+                ) v ON v.post_id = p.id
+                LEFT JOIN (
+                  SELECT post_id, COUNT(*) cnt FROM post_comments
+                  WHERE status = 'ACTIVE' AND deleted_at IS NULL
+                  GROUP BY post_id
+                ) pc ON pc.post_id = p.id
+                """;
+
+        Query countQuery = entityManager.createNativeQuery("SELECT COUNT(*) " + fromJoins + where);
+        bindSearchParams(countQuery, tokens, grams, cat, useNgram);
+        long total = ((Number) countQuery.getSingleResult()).longValue();
+        if (total == 0) {
+            return Page.empty(pageable);
+        }
+
+        Query dataQuery = entityManager.createNativeQuery(
+                "SELECT p.* " + fromJoins + where + orderBy + " LIMIT :limit OFFSET :offset",
+                Post.class);
+        bindSearchParams(dataQuery, tokens, grams, cat, useNgram);
+        dataQuery.setParameter("exactTitle", PostSearchQuery.containsPattern(normalized));
+        dataQuery.setParameter("limit", pageable.getPageSize());
+        dataQuery.setParameter("offset", (int) pageable.getOffset());
+
+        @SuppressWarnings("unchecked")
+        List<Post> posts = dataQuery.getResultList();
+        log.info("Search {} → {}/{} hits (ngram={})",
+                PostSearchQuery.describeForLog(normalized, category), posts.size(), total, useNgram);
+        return new PageImpl<>(posts, pageable, total);
+    }
+
+    private static String buildLikeSearchWhere(int tokenCount, boolean hasCategory) {
+        StringBuilder where = new StringBuilder("""
+                WHERE p.visibility = 'PUBLIC'
+                  AND p.status IN ('VOTING', 'CLOSED')
+                  AND p.deleted_at IS NULL
+                """);
+        if (hasCategory) {
+            where.append(" AND p.category = :category ");
+        }
+        for (int i = 0; i < tokenCount; i++) {
+            where.append(" AND (p.title LIKE :tok").append(i)
+                    .append(" ESCAPE '!' OR p.body_published LIKE :tok").append(i)
+                    .append(" ESCAPE '!') ");
+        }
+        return where.toString();
+    }
+
+    /**
+     * ngram AND + 미색인 글 LIKE 폴백.
+     */
+    private static String buildNgramSearchWhere(int gramCount, int tokenCount, boolean hasCategory) {
+        StringBuilder where = new StringBuilder("""
+                WHERE p.visibility = 'PUBLIC'
+                  AND p.status IN ('VOTING', 'CLOSED')
+                  AND p.deleted_at IS NULL
+                """);
+        if (hasCategory) {
+            where.append(" AND p.category = :category ");
+        }
+        where.append(" AND ( ");
+        where.append(" p.id IN ( ");
+        where.append("   SELECT n.post_id FROM post_search_ngrams n ");
+        where.append("   WHERE n.gram IN (");
+        for (int i = 0; i < gramCount; i++) {
+            if (i > 0) where.append(", ");
+            where.append(":g").append(i);
+        }
+        where.append(") ");
+        where.append("   GROUP BY n.post_id ");
+        where.append("   HAVING COUNT(DISTINCT n.gram) >= :gramNeed ");
+        where.append(" ) ");
+        where.append(" OR ( ");
+        where.append("   NOT EXISTS (SELECT 1 FROM post_search_ngrams nx WHERE nx.post_id = p.id) ");
+        for (int i = 0; i < tokenCount; i++) {
+            where.append(" AND (p.title LIKE :tok").append(i)
+                    .append(" ESCAPE '!' OR p.body_published LIKE :tok").append(i)
+                    .append(" ESCAPE '!') ");
+        }
+        where.append(" ) ");
+        where.append(" ) ");
+        return where.toString();
+    }
+
+    private static void bindSearchParams(
+            Query query,
+            List<String> tokens,
+            List<String> grams,
+            PostCategory cat,
+            boolean useNgram) {
+        for (int i = 0; i < tokens.size(); i++) {
+            query.setParameter("tok" + i, PostSearchQuery.containsPattern(tokens.get(i)));
+        }
+        if (useNgram) {
+            for (int i = 0; i < grams.size(); i++) {
+                query.setParameter("g" + i, grams.get(i));
+            }
+            query.setParameter("gramNeed", grams.size());
         }
         if (cat != null) {
-            return postRepository.searchPublicByCategory(like, cat, pageable);
+            query.setParameter("category", cat.name());
         }
-        return postRepository.searchPublic(like, pageable);
     }
 
     /** 광장별 글 수 (다른 광장 패널용) */

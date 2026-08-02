@@ -34,6 +34,7 @@ public class PostComposeService {
     private final VoteOptionRepository voteOptionRepository;
     private final KeywordGuard keywordGuard;
     private final AiUserOutboxWriter aiUserOutboxWriter;
+    private final PostSearchNgramIndexer postSearchNgramIndexer;
 
     /**
      * 재구성 출처 스냅샷 — 재구성 모드 생성 시만 전달되며 posts 테이블에 저장.
@@ -104,6 +105,7 @@ public class PostComposeService {
         Post post = postBuilder.build();
 
         postRepository.save(post);
+        postSearchNgramIndexer.reindex(post);
         log.info("Post published immediately: {}", postId);
 
         // VoteOption 저장 — 2개 고정: "작성자"(0) vs "상대방"(1)

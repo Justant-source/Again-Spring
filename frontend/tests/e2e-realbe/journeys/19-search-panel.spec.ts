@@ -86,6 +86,21 @@ test.describe('Journey 19: 검색 패널 (SearchPanel)', () => {
     await expect(searchInput).toHaveValue('')
   })
 
+  test('검색 — 한 글자는 검색하지 않고 안내', async ({ page }) => {
+    await page.goto(`${BASE}/community`)
+    await expect(page.getByText('다시봄 광장')).toBeVisible({ timeout: 8_000 })
+
+    await page.locator('button[aria-label="검색"]').click()
+    const searchInput = page.locator('input[placeholder*="검색"]')
+    await expect(searchInput).toBeVisible()
+
+    await searchInput.fill('가')
+    await searchInput.press('Enter')
+
+    await expect(page.getByText('검색어는 두 글자 이상 입력해 주세요')).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByText(/[\d,]+건/)).not.toBeVisible()
+  })
+
   test('검색 — 카테고리별 검색 범위', async ({ page }) => {
     await page.goto(`${BASE}/community`)
     await expect(page.getByText('다시봄 광장')).toBeVisible({ timeout: 8_000 })

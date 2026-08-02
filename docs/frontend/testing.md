@@ -124,7 +124,7 @@ E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 | 16 | `16-admin-dashboard-home.spec.ts` | 대시보드 ActionCenter·KPI·Cmd+K |
 | 17 | `17-admin-crawl-freshness.spec.ts` · `17-admin-community-insights.spec.ts` | 크롤 배지·stats 인사이트 UI |
 | 18 | `18-visit-tracking.spec.ts` | UTM POST·재방문 dedupe·/admin 제외 |
-| 19 | `19-search-panel.spec.ts` | SearchPanel 열기/검색/최근/닫기 |
+| 19 | `19-search-panel.spec.ts` | SearchPanel 열기/검색/최근/닫기/최소2자 |
 | 20 | `20-notifications.spec.ts` | 시드 알림·모두 읽음 |
 | 21 | `21-password-reset.spec.ts` | forgot UI·토큰 재설정→로그인 |
 | 22 | `22-jury-seeded-ui.spec.ts` | SQL 시드 배심원 → 작성자 GET /jury (광장 UI는 JurySection 미연결) |

@@ -45,6 +45,7 @@ export function SearchPanel({ currentCategory, onCategorySelect, onClose }: Prop
   const [results, setResults] = useState<PostSummary[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [searching, setSearching] = useState(false);
+  const [tooShort, setTooShort] = useState(false);
   const [recents, setRecents] = useState<string[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,16 +61,23 @@ export function SearchPanel({ currentCategory, onCategorySelect, onClose }: Prop
   const otherPlazas = currentCategory ? PLAZAS.filter(p => p.id !== currentCategory) : PLAZAS;
 
   const submitSearch = async (q: string) => {
-    if (!q.trim()) return;
-    const updated = [q, ...recents.filter(r => r !== q)];
+    const normalized = q.trim().replace(/\s+/g, ' ');
+    if (!normalized) return;
+    // BE PostSearchQuery.MIN_QUERY_LENGTH = 2 (코드포인트)
+    if ([...normalized].length < 2) {
+      setTooShort(true);
+      return;
+    }
+    setTooShort(false);
+    const updated = [normalized, ...recents.filter(r => r !== normalized)];
     saveRecent(updated);
     setRecents(updated);
-    setQuery(q);
+    setQuery(normalized);
     setView('results');
     setSearching(true);
     scrollRef.current?.scrollTo({ top: 0 });
     try {
-      const res = await postApi.search(q, { category: currentCategory || undefined, size: 50 });
+      const res = await postApi.search(normalized, { category: currentCategory || undefined, size: 50 });
       setResults(res.content);
       setTotalCount(res.totalElements);
     } catch {
@@ -81,12 +89,13 @@ export function SearchPanel({ currentCategory, onCategorySelect, onClose }: Prop
   };
 
   const handleBack = () => {
-    if (view === 'results') { setView('entry'); setQuery(''); }
+    if (view === 'results') { setView('entry'); setQuery(''); setTooShort(false); }
     else onClose();
   };
 
   const clearQuery = () => {
     setQuery('');
+    setTooShort(false);
     if (view === 'results') setView('entry');
     inputRef.current?.focus();
   };
@@ -106,13 +115,18 @@ export function SearchPanel({ currentCategory, onCategorySelect, onClose }: Prop
         <input
           ref={inputRef}
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => { setQuery(e.target.value); setTooShort(false); }}
           onKeyDown={e => { if (e.key === 'Enter') submitSearch(query); }}
           placeholder={currentPlaza ? `${currentPlaza.label} 광장에서 검색` : '전체에서 사연 검색'}
           style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 15.5, color: 'var(--L-ink)', fontFamily: 'var(--font-sans)' }}
         />
         {query && <span onClick={clearQuery} style={{ fontSize: 16, color: 'var(--L-sub)', cursor: 'pointer', lineHeight: 1 }}>✕</span>}
       </div>
+      {tooShort && (
+        <div style={{ padding: '8px 18px', fontSize: 12.5, color: 'var(--L-sub)', borderBottom: '1px solid var(--L-border)', flexShrink: 0 }}>
+          검색어는 두 글자 이상 입력해 주세요
+        </div>
+      )}
 
       {/* 스크롤 영역 */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>

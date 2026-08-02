@@ -10,15 +10,24 @@ interface HotPostsCardProps {
 }
 
 export function HotPostsCard({ posts, loading }: HotPostsCardProps) {
-  if (loading || posts.length === 0) {
+  if (loading) {
     return (
-      <div className="p-6 bg-white rounded-lg border">
+      <div className="p-6 bg-white rounded-lg border" data-testid="admin-hot-posts">
         <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (posts.length === 0) {
+    return (
+      <div className="p-6 bg-white rounded-lg border" data-testid="admin-hot-posts">
+        <h2 className="text-sm font-semibold text-gray-900 mb-4">핫 게시글</h2>
+        <p className="text-sm text-gray-500">최근 핫 게시글이 없어요.</p>
       </div>
     );
   }

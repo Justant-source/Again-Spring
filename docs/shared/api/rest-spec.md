@@ -103,7 +103,7 @@ flowchart LR
 |---|---|---|---|---|
 | POST | `/api/community/posts` | **JWT** | 200 / 400 / 409 / 422 | 게시글 작성 (synthetic bot은 내부 멱등성 헤더 지원) |
 | GET | `/api/community/posts` | 공개 | 200 | 게시글 목록 |
-| GET | `/api/community/posts/search` | 공개 | 200 | 키워드 검색 (`?q=`, `category=`, `page=`, `size=`) |
+| GET | `/api/community/posts/search` | 공개 | 200 | 키워드 검색 (`?q=`, `category=`, `page=`, `size≤50`). `q` 정규화 후 2글자 미만이면 빈 페이지. 매칭=`post_search_ngrams` 문자 바이그램 AND(미색인 글은 LIKE 폴백). 정렬=제목 exact 티어 → `(2×votes+comments)×반감기14일`(바닥 0.05). MariaDB는 MySQL ngram FULLTEXT 미지원 → BTREE 바이그램 테이블로 대체 |
 | GET | `/api/community/posts/counts` | 공개 | 200 | 광장별 글 수 (`{"":.., "COUPLE":.., ...}`) |
 | GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | 게시글 상세 |
 | PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만) |

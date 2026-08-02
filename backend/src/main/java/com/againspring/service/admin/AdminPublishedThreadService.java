@@ -9,6 +9,7 @@ import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.service.ai.AiCorrectionService;
 import com.againspring.service.ai.AiUserOutboxWriter;
+import com.againspring.service.community.PostSearchNgramIndexer;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -44,6 +45,7 @@ public class AdminPublishedThreadService {
     private final AiCorrectionService aiCorrectionService;
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final ThreadPlanItemProxyService threadPlanItemProxy;
+    private final PostSearchNgramIndexer postSearchNgramIndexer;
 
     @Transactional(readOnly = true)
     public Map<String, Object> getThread(String postId) {
@@ -91,6 +93,9 @@ public class AdminPublishedThreadService {
         }
 
         Post updated = postRepository.save(post);
+        if (req.getTitle() != null || req.getBody() != null) {
+            postSearchNgramIndexer.reindex(updated);
+        }
         if (contentChanged) {
             aiUserOutboxWriter.postRevised(updated, "ADMIN_CONTENT_UPDATED");
             try {

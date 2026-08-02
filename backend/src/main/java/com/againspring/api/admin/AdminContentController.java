@@ -15,6 +15,7 @@ import com.againspring.service.ai.AiCorrectionService;
 import com.againspring.service.ai.AiUserOutboxWriter;
 import com.againspring.service.admin.AdminPublishedThreadService;
 import com.againspring.service.admin.AdminPublishedThreadService.UpdateThreadRequest;
+import com.againspring.service.community.PostSearchNgramIndexer;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -60,6 +61,7 @@ public class AdminContentController {
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final AdminPublishedThreadService publishedThreadService;
     private final com.againspring.service.community.PromoTitleService promoTitleService;
+    private final PostSearchNgramIndexer postSearchNgramIndexer;
 
     // ===== 포스트 관리 =====
 
@@ -245,6 +247,9 @@ public class AdminContentController {
         }
 
         Post updated = postRepository.save(post);
+        if (req.getTitle() != null || req.getBodyRaw() != null) {
+            postSearchNgramIndexer.reindex(updated);
+        }
         if (contentChanged) {
             aiUserOutboxWriter.postRevised(updated, "ADMIN_CONTENT_UPDATED");
         } else if (req.getStatus() != null) {
@@ -679,6 +684,7 @@ public class AdminContentController {
                 .build();
 
         Post saved = postRepository.save(post);
+        postSearchNgramIndexer.reindex(saved);
 
         promoTitleService.generateAsync(saved.getId());
 

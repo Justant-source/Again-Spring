@@ -30,6 +30,7 @@
 | `MARIADB_PASSWORD` | prod 또는 현재 스택 DB 비밀번호 | 비밀값 |
 | `DEV_MARIADB_PASSWORD` | shared sync가 쓰는 dev DB 비밀번호 | 비밀값 |
 | `JWT_SECRET` | backend JWT 서명 키 | `openssl rand -base64 32` 생성 권장 |
+| `SEARCH_NGRAM_BACKFILL_ON_STARTUP` | 기동 시 `post_search_ngrams` 미적재 백필 (`againspring.search.ngram-backfill-on-startup`) | `true` |
 
 ## Base LLM (`againspring-llm`)
 

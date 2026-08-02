@@ -119,10 +119,10 @@ public class CommunityPostController {
     }
 
     /**
-     * 포스트 검색 — 제목/본문 키워드 LIKE 검색
+     * 포스트 검색 — 바이그램 ngram + 제목 exact 티어 + 인기×감쇠.
      */
     @GetMapping("/search")
-    @Operation(summary = "포스트 검색 (제목/본문 키워드)")
+    @Operation(summary = "포스트 검색 (바이그램 ngram, exact 티어 + 인기×감쇠)")
     public ResponseEntity<Page<PostResponse>> searchPosts(
             @RequestParam String q,
             @RequestParam(required = false) String category,
@@ -131,7 +131,10 @@ public class CommunityPostController {
             Authentication authentication) {
 
         if (q == null || q.isBlank()) return ResponseEntity.ok(Page.empty());
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        int safePage = Math.max(page, 0);
+        // 정렬은 PostService 네이티브 ORDER BY (Pageable Sort 무시)
+        Pageable pageable = PageRequest.of(safePage, safeSize);
         Page<Post> posts = postService.searchPosts(q, category, pageable);
 
         String userId = resolveUserId(authentication);

@@ -169,15 +169,15 @@ public interface PostRepository extends JpaRepository<Post, String> {
     /** 관리자용: 지정된 기간에 생성된 게시글 건수 */
     long countByDeletedAtIsNullAndCreatedAtBetween(java.time.Instant from, java.time.Instant to);
 
-    // ── 검색 쿼리 ────────────────────────────────────────────────────────
+    // ── 검색 쿼리 (레거시 JPQL — 공개 검색은 PostService native 경로 사용) ──
 
-    /** 제목/본문 키워드 검색 — 전체 (PUBLIC, VOTING+CLOSED, 삭제 안됨) */
+    /** 레거시. 공개 검색은 PostService#searchPosts native 랭킹 사용. */
     @Query("SELECT p FROM Post p WHERE p.visibility = com.againspring.domain.enums.PostVisibility.PUBLIC " +
            "AND p.status IN (com.againspring.domain.enums.PostStatus.VOTING, com.againspring.domain.enums.PostStatus.CLOSED) " +
            "AND p.deletedAt IS NULL AND (p.title LIKE :q OR p.bodyPublished LIKE :q) ORDER BY p.createdAt DESC")
     Page<Post> searchPublic(@Param("q") String q, Pageable pageable);
 
-    /** 제목/본문 키워드 검색 — 카테고리 필터 */
+    /** 레거시. 공개 검색은 PostService#searchPosts native 랭킹 사용. */
     @Query("SELECT p FROM Post p WHERE p.visibility = com.againspring.domain.enums.PostVisibility.PUBLIC " +
            "AND p.status IN (com.againspring.domain.enums.PostStatus.VOTING, com.againspring.domain.enums.PostStatus.CLOSED) " +
            "AND p.category = :category AND p.deletedAt IS NULL AND (p.title LIKE :q OR p.bodyPublished LIKE :q) ORDER BY p.createdAt DESC")

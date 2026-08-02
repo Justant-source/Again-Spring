@@ -12,6 +12,7 @@ import com.againspring.repository.ai.AiGlobalRuleRepository;
 import com.againspring.repository.ai.PersonaVoiceRefRepository;
 import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.service.community.PostSearchNgramIndexer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -48,6 +49,7 @@ public class AiCorrectionService {
     private final AiGlobalRuleRepository globalRuleRepository;
     private final PersonaVoiceRefRepository personaVoiceRefRepository;
     private final AiLearningBridge aiLearningBridge;
+    private final PostSearchNgramIndexer postSearchNgramIndexer;
     private final PromptSanitizer promptSanitizer;
     private final ObjectMapper objectMapper;
 
@@ -651,6 +653,7 @@ public class AiCorrectionService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POST_NOT_FOUND"));
             post.setBodyPublished(correctedText);
             postRepository.save(post);
+            postSearchNgramIndexer.reindex(post);
         } else {
             PostComment comment = postCommentRepository.findById(Long.parseLong(targetId))
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND"));
