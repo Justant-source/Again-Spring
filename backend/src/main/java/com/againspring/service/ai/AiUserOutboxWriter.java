@@ -1,8 +1,10 @@
 package com.againspring.service.ai;
 
+import com.againspring.domain.User;
 import com.againspring.domain.ai.AiUserOutboxEvent;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.PostComment;
+import com.againspring.repository.UserRepository;
 import com.againspring.repository.ai.AiUserOutboxEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +27,7 @@ import java.util.UUID;
 public class AiUserOutboxWriter {
 
     private final AiUserOutboxEventRepository outboxRepository;
+    private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     public void postPublished(Post post) {
@@ -95,8 +98,15 @@ public class AiUserOutboxWriter {
         payload.put("visibility", post.getVisibility() == null ? null : post.getVisibility().name());
         payload.put("status", post.getStatus() == null ? null : post.getStatus().name());
         payload.put("partnerAnswered", post.getPartnerAnsweredAt() != null);
+        // Orchestrator classifies AI_POST vs HUMAN_POST from this flag. Missing → false → HUMAN_POST.
+        payload.put("syntheticPost", isSyntheticAuthor(post.getAuthorId()));
         payload.put("occurredAt", Instant.now());
         return payload;
+    }
+
+    private boolean isSyntheticAuthor(String authorId) {
+        if (authorId == null || authorId.isBlank()) return false;
+        return userRepository.findById(authorId).map(User::isSynthetic).orElse(false);
     }
 
     private void write(String aggregateType, String aggregateId, String eventType,

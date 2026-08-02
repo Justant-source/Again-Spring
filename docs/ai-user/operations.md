@@ -184,6 +184,7 @@ env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
   │    └─ generateAndHold() → ai_scheduled_posts SCHEDULED
   ├─ POST /admin/trigger/paired-posts?count=paired
   │    └─ PairedPostScheduler: AUTHOR→PRIVATE/WAIT_FOR_PARTNER→PARTNER answer→PUBLIC
+  │       → ensureCommentPlanForPairedPost (댓글 PLAN 즉시; provider OFF여도 yml fallback)
   ├─ 낮 동안 밀린 REQUESTED 스레드플랜(실사람 글 반응 등)도 이 창에서 같이 소진
   └─ provider = OFF (trap으로 스크립트 종료 방식과 무관하게 항상 보장)
 

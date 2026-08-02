@@ -18,6 +18,7 @@ import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnal
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.againspring.aiuser.orchestrator.service.threadplan.HumanReplyTtlCleanupService;
+import com.againspring.aiuser.orchestrator.service.threadplan.ThreadPlanGenerationService;
 import com.againspring.aiuser.orchestrator.task.ActionExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +68,7 @@ public class AdminTriggerController {
     private final PersonaMatcherService personaMatcherService;
     private final PersonaAutoProvisionService personaAutoProvisionService;
     private final StoryProfileAnalyzer storyProfileAnalyzer;
+    private final ThreadPlanGenerationService threadPlanGenerationService;
 
     /**
      * KST 시간대 곡선으로 발행 슬롯 N개를 샘플링만 해서 보여준다(부작용 없음).
@@ -167,6 +169,41 @@ public class AdminTriggerController {
             return ResponseEntity.internalServerError()
                 .body(Map.of("status", "error", "message", e.getMessage()));
         }
+    }
+
+    /**
+     * 이미 공개된 양면 사연에 댓글 PLAN이 비어 있을 때 강제 생성.
+     * provider DB gate가 OFF여도 yml fallback으로 생성한다.
+     */
+    @PostMapping("/ensure-paired-comment-plan")
+    public ResponseEntity<Map<String, Object>> ensurePairedCommentPlan(@RequestParam String postId) {
+        log.info("[AdminTrigger] ensure-paired-comment-plan postId={}", postId);
+        try {
+            Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT title, body_published, partner_body_published, category, content_revision " +
+                "FROM posts WHERE id = ? AND partner_answered_at IS NOT NULL",
+                postId);
+            String title = stringVal(row.get("title"));
+            String authorBody = stringVal(row.get("body_published"));
+            String partnerBody = stringVal(row.get("partner_body_published"));
+            String category = stringVal(row.get("category"));
+            int revision = ((Number) row.get("content_revision")).intValue();
+            boolean ok = threadPlanGenerationService.ensureCommentPlanForPairedPost(
+                postId, revision, title, authorBody, partnerBody, category);
+            return ResponseEntity.ok(Map.of(
+                "status", ok ? "ok" : "incomplete",
+                "action", "ensure-paired-comment-plan",
+                "postId", postId,
+                "revision", revision));
+        } catch (Exception e) {
+            log.error("[AdminTrigger] ensure-paired-comment-plan failed: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    private static String stringVal(Object value) {
+        return value == null ? "" : String.valueOf(value);
     }
 
     /** actions_today 카운터 리셋 — daily cap 초과 시 당일 재활성화 */

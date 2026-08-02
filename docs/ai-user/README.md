@@ -20,6 +20,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - **운영 경로 (2026-07-31~)**: `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`. 새벽 배치(`env/scripts/nightly-ai-user-batch.sh`, 03:05 KST)는 생성만 하고, 낮 동안 슬롯 도래 시 발행한다. 상세: [thread-planning.md](./thread-planning.md), [operations.md](./operations.md) §8.
 - **AI_POST 생성 가드 (2026-08-02)**: 제목 공백 포함 **4~40자**, 제목≠본문(공백 정규화 후). 프롬프트 + `StructuredGenerationService` + orchestrator 이중 가드.
 - **양면 사연 20% (2026-08-02)**: 하루 AI 글의 20%는 작성자+상대방이 각자 입장을 쓰는 paired post. `PAIRED_POST_ENABLED=true`(prod), `PAIRED_POST_TARGET_SHARE=0.20`. 새벽 배치가 solo/paired를 나눠 생성. 프롬프트: `stance=AUTHOR`·`PARTNER`.
+- **양면 사연 댓글 PLAN (2026-08-03)**: paired 공개 직후 `ensureCommentPlanForPairedPost`가 댓글 후보를 즉시 생성·스케줄한다 (solo `generateAndHold`와 대칭). outbox REQUESTED만 믿으면 `provider_*=OFF`에서 댓글 0건으로 남는다.
 - 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 paired 생성과 별개다.
 - `AI_USER_ENABLED`는 orchestrator의 **하드 게이트**다. false면 tick, daily planner, paired posts, crawl trigger가 모두 skip된다.
 - 실제 2차 kill-switch는 여전히 DB `ai_user_runtime.enabled`다.

@@ -131,8 +131,14 @@
 2. `PRIVATE + WAIT_FOR_PARTNER` 게시
 3. 초대 토큰 발급
 4. 파트너 입장 글 생성 (`PARTNER` — 원글 사건 재해석, 동등 분량)
-5. partner answer 제출 → PUBLIC
-6. outbox/PLAN이 댓글·투표 반응
+5. partner answer 제출 → PUBLIC (+ outbox `PARTNER_ANSWER_ADDED` / `POST_PUBLISHED`)
+6. **즉시** `ThreadPlanGenerationService.ensureCommentPlanForPairedPost`로 댓글 후보 PLAN 생성·스케줄
+   (solo `generateAndHold`와 동일하게 발행 시점에 댓글이 이미 잡혀 있어야 함.
+   DB `provider_*=OFF`여도 yml provider로 fallback — daytime cron / nightly EXIT trap에서도 멈추지 않음)
+
+> **버그 수정 (2026-08-03)**: 예전에는 step 6을 outbox→REQUESTED(`HUMAN_POST`)에만 맡겼다.
+> `provider_human_post_plan=OFF`면 generation이 스킵되어 양면 사연에 댓글 스케줄이 0건으로 남았다
+> (예: `post_a1fd41b3c5584c8e99f7`). 백필: `POST /admin/trigger/ensure-paired-comment-plan?postId=…`.
 
 > 참고: 이미 공개된 글에 사람/파트너가 **나중에** 답해서 revision이 생기는 경우의 PLAN 재생성 규칙은 별개다([architecture.md](./architecture.md)).
 
@@ -154,6 +160,7 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 
 - `POST /admin/trigger/tick`
 - `POST /admin/trigger/paired-posts` (`?count=` 선택 — 최대 N쌍)
+- `POST /admin/trigger/ensure-paired-comment-plan?postId=` — 공개 양면 사연 댓글 PLAN 강제 생성
 - `POST /admin/trigger/reset-counter`
 - `POST /admin/trigger/backfill-comment-likes`
 - `POST /admin/trigger/generate-posts`

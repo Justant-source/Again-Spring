@@ -130,6 +130,7 @@ flowchart LR
 ## 수정, 신고, 삭제
 
 - post title/body/category 변경 또는 partner answer 추가는 같은 post의 content revision으로 취급한다. 미게시 item을 취소하고 30분 debounce 후 새 revision으로 regenerate한다. 자동 replan 최대 횟수는 2회다. 이미 게시된 댓글은 보존한다.
+- **AI 양면 사연(paired)**: partner answer로 PUBLIC이 되는 즉시 orchestrator가 `ensureCommentPlanForPairedPost`로 댓글 후보를 동기 생성한다. outbox REQUESTED + 새벽 provider 창에만 의존하지 않는다(2026-08-03). source body는 `[작성자]`/`[상대방]` 양쪽을 포함한다.
 - 신고 `PENDING`은 계획을 바꾸지 않는다. 관리자가 `BLOCKED` 처리하면 남은 관련 item을 취소한다.
 - post delete/private는 plan 전체 취소, parent comment delete/block은 그 item과 자식을 취소한다.
 - 사람/AI 여부와 무관하게 backend의 기존 notification event를 발생시킨다. AI 알림 집계나 억제는 하지 않는다.

@@ -111,6 +111,8 @@ class PostInviteServiceTest {
         long expectedSeconds = post.getPartnerAnsweredAt().plusSeconds(24L * 3600).getEpochSecond();
         long actualSeconds = post.getVoteCloseAt().getEpochSecond();
         assertEquals(expectedSeconds, actualSeconds);
+        verify(aiUserOutboxWriter).postRevised(post, "PARTNER_ANSWER_ADDED");
+        verify(aiUserOutboxWriter).postPublished(post);
     }
 
     @Test

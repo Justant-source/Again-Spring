@@ -2,6 +2,7 @@ package com.againspring.aiuser.orchestrator.api;
 
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.service.threadplan.HumanInteractionInboxService;
+import com.againspring.aiuser.orchestrator.service.threadplan.ThreadPlanGenerationService;
 import com.againspring.aiuser.orchestrator.service.threadplan.ThreadPlanService;
 import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import lombok.Data;
@@ -51,10 +52,20 @@ public class ThreadPlanOutboxController {
     }
     private static String safe(String value) { return value == null ? "unknown" : value; }
     private void enrichPostSnapshot(Event event) {
-        if (event.body != null && !event.body.isBlank()) return;
         backend.getPost(event.postId).ifPresent(post -> {
             event.title = string(post.get("userTitle"), string(post.get("title"), event.title));
-            event.body = string(post.get("bodyPublished"), string(post.get("body"), event.body));
+            String authorBody = string(post.get("bodyPublished"), string(post.get("body"), event.body));
+            String partnerBody = string(post.get("partnerBodyPublished"), "");
+            if (event.body == null || event.body.isBlank()) {
+                event.body = authorBody;
+            }
+            // Paired posts: ground comment plans on both sides.
+            if (partnerBody != null && !partnerBody.isBlank()) {
+                String author = event.body == null || event.body.isBlank() ? authorBody : event.body;
+                if (author == null || author.isBlank() || !author.contains(partnerBody)) {
+                    event.body = ThreadPlanGenerationService.combinePairedSourceBody(author, partnerBody);
+                }
+            }
             event.category = string(post.get("category"), event.category);
         });
     }

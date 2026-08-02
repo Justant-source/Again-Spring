@@ -126,7 +126,9 @@ public class PostInviteService {
         post.setPartnerAnsweredAt(Instant.now());
 
         // WAIT_FOR_PARTNER 모드일 때 공개 및 투표 마감시간 설정
+        boolean becamePublic = false;
         if (PublishMode.WAIT_FOR_PARTNER.equals(post.getPublishMode())) {
+            becamePublic = post.getVisibility() != PostVisibility.PUBLIC;
             post.setVisibility(PostVisibility.PUBLIC);
             int hours = (post.getVoteDurationHours() != null) ? post.getVoteDurationHours() : 72;
             post.setVoteCloseAt(post.getPartnerAnsweredAt().plusSeconds((long) hours * 3600));
@@ -142,6 +144,10 @@ public class PostInviteService {
         // partner 입장 추가는 게시글 수정과 동일하게 후속 계획을 무효화한다.
         postRepository.save(post);
         aiUserOutboxWriter.postRevised(post, "PARTNER_ANSWER_ADDED");
+        // PRIVATE→PUBLIC 전환은 수정 이벤트만으로는 불명확하니 공개 이벤트도 남긴다.
+        if (becamePublic) {
+            aiUserOutboxWriter.postPublished(post);
+        }
         log.info("Partner {} submitted answer to invite {} — async processing scheduled", partnerUserId, token);
 
         // tonalization + jury 비동기 처리 — HTTP 응답을 블록하지 않음

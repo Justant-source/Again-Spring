@@ -74,7 +74,7 @@ flowchart LR
 
 ### 4. Paired posts (기본 비활성 legacy 기능)
 
-`PAIRED_POST_ENABLED`는 **prod에서 true**(양면 사연 20%). 작성자+상대방 AI가 각자 입장을 쓰는 글은 `PairedPostScheduler`가 담당한다. 이와 별개로, 이미 공개된 글에 파트너 답이 **나중에** 붙어 revision이 생기면 미게시 PLAN item을 취소하고 debounce 후 재생성한다.
+`PAIRED_POST_ENABLED`는 **prod에서 true**(양면 사연 20%). 작성자+상대방 AI가 각자 입장을 쓰는 글은 `PairedPostScheduler`가 담당하며, 공개 직후 `ensureCommentPlanForPairedPost`로 댓글 PLAN을 즉시 심는다. 이와 별개로, 이미 공개된 글에 파트너 답이 **나중에** 붙어 revision이 생기면 미게시 PLAN item을 취소하고 debounce 후 재생성한다.
 
 1. `PairedPostScheduler`가 `COUPLE` 또는 `MARRIAGE` 관계를 읽는다.
 2. 작성자 글을 `PRIVATE + WAIT_FOR_PARTNER`로 올린다.

@@ -14,6 +14,7 @@ import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepo
 import com.againspring.aiuser.orchestrator.repository.PersonaRelationshipRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
+import com.againspring.aiuser.orchestrator.service.threadplan.ThreadPlanGenerationService;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,8 @@ import java.util.*;
  *  1. persona_relationships에서 COUPLE/MARRIAGE/FRIEND 페어 선택
  *  2. 작성자 A → 갈등 사연 생성 + PRIVATE 게시 + WAIT_FOR_PARTNER 설정 + 초대 토큰 발급
  *  3. 파트너 B → 작성자 본문을 컨텍스트로 상대방 입장 생성 + /api/s/{token}/answer 제출
- *  4. WAIT_FOR_PARTNER → 자동 PUBLIC 전환 → 기존 BehaviorEngine tick이 댓글·투표 참여
+ *  4. WAIT_FOR_PARTNER → 자동 PUBLIC 전환
+ *  5. 댓글 PLAN을 즉시 생성·스케줄 (solo generateAndHold와 동일하게 발행 전 후보 확보)
  *
  * 스케줄 기본값: 매일 UTC 05:00 (KST 14:00)
  * 환경변수:
@@ -57,6 +59,7 @@ public class PairedPostScheduler {
     private final ContentSafetyGuard safetyGuard;
     private final AiUserGenerationConfigRepository generationConfigRepository;
     private final DailyPostQuotaService dailyPostQuotaService;
+    private final ThreadPlanGenerationService threadPlanGenerationService;
 
     private static final Random RNG = new Random();
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -279,14 +282,35 @@ public class PairedPostScheduler {
 
         // ── Step 8: 파트너 답변 제출 → 자동 PUBLIC 전환 ─────────────────────
         boolean ok = backendBot.submitPartnerAnswer(inviteToken, null, partnerBody);
-        if (ok) {
-            log.info("[PairedPost] ✅ corrId={} post={} author={} partner={} cat={}",
-                corrId, postId,
-                author.getId().substring(0, 8),
-                partner.getId().substring(0, 8),
-                category);
-        } else {
+        if (!ok) {
             log.warn("[PairedPost] Partner answer submission failed for post={}", postId);
+            return;
+        }
+        log.info("[PairedPost] ✅ corrId={} post={} author={} partner={} cat={}",
+            corrId, postId,
+            author.getId().substring(0, 8),
+            partner.getId().substring(0, 8),
+            category);
+
+        // ── Step 9: 댓글 PLAN 즉시 생성 (provider OFF여도 yml fallback) ──────
+        // solo generateAndHold는 홀딩 시점에 후보를 심는다. paired는 즉시 공개되므로
+        // 여기서 같은 역할을 한다. outbox REQUESTED 경로만 믿으면 daytime/trap OFF에 멈춘다.
+        int revision = lookupContentRevision(postId);
+        boolean planned = threadPlanGenerationService.ensureCommentPlanForPairedPost(
+            postId, revision, title, authorBodyPublished, partnerBody, category);
+        if (!planned) {
+            log.warn("[PairedPost] Comment plan not ready for post={} revision={}", postId, revision);
+        }
+    }
+
+    /** Partner answer advances content_revision; default 2 when lookup fails. */
+    private int lookupContentRevision(String postId) {
+        try {
+            Integer revision = jdbcTemplate.queryForObject(
+                "SELECT content_revision FROM posts WHERE id = ?", Integer.class, postId);
+            return revision != null ? Math.max(1, revision) : 2;
+        } catch (Exception e) {
+            return 2;
         }
     }
 

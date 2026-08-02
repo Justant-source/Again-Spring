@@ -51,13 +51,76 @@ public class ThreadPlanGenerationService {
                 .forEach(this::generateOne);
     }
 
+    /**
+     * Solo AI posts pre-bake comment candidates in {@code generateAndHold}. Paired posts go live
+     * via the invite flow and previously only left a REQUESTED plan that stalls while DB
+     * {@code provider_*} is OFF (daytime + nightly EXIT trap). Generate comments immediately
+     * after the pair is public, falling back to yml providers when the DB gate is OFF.
+     *
+     * @return true when the plan is READY/ACTIVE (or already was)
+     */
+    @Transactional
+    public boolean ensureCommentPlanForPairedPost(String postId, int revision, String title,
+                                                   String authorBody, String partnerBody, String category) {
+        if (!planModeEnabled() || postId == null || postId.isBlank()) {
+            return false;
+        }
+        Instant now = Instant.now();
+        String sourceBody = combinePairedSourceBody(authorBody, partnerBody);
+        AiThreadPlan plan = planService.requestPlan(
+                postId, Math.max(1, revision), "AI_POST", now, title, sourceBody, category);
+        // Outbox may have created this revision first with author-only body / HUMAN_POST.
+        // Re-ground to the paired snapshot before generating.
+        if (sourceBody != null && !sourceBody.isBlank()) {
+            plan.setSourceTitle(title);
+            plan.setSourceBody(sourceBody);
+            plan.setSourceCategory(category);
+            if (!"AI_POST".equals(plan.getSourceType())) {
+                plan.setSourceType("AI_POST");
+            }
+            planRepository.save(plan);
+        }
+        if (plan.getStatus() == ThreadPlanStatus.READY || plan.getStatus() == ThreadPlanStatus.ACTIVE) {
+            return true;
+        }
+        if (plan.getStatus() != ThreadPlanStatus.REQUESTED) {
+            log.warn("Paired comment plan {} for post {} is {} — skip force generate",
+                    plan.getId(), postId, plan.getStatus());
+            return false;
+        }
+        generateOne(plan.getId(), true);
+        AiThreadPlan after = planRepository.findById(plan.getId()).orElse(plan);
+        boolean ok = after.getStatus() == ThreadPlanStatus.READY || after.getStatus() == ThreadPlanStatus.ACTIVE;
+        if (!ok) {
+            log.warn("Paired comment plan {} for post {} ended as {} failure={}",
+                    after.getId(), postId, after.getStatus(), after.getFailureCode());
+        }
+        return ok;
+    }
+
+    /** Author + partner bodies for comment-plan grounding (paired posts only). */
+    public static String combinePairedSourceBody(String authorBody, String partnerBody) {
+        String author = authorBody == null ? "" : authorBody.strip();
+        String partner = partnerBody == null ? "" : partnerBody.strip();
+        if (partner.isEmpty()) return author;
+        if (author.isEmpty()) return partner;
+        return "[작성자]\n" + author + "\n\n[상대방]\n" + partner;
+    }
+
     /** One retry only, with exactly the same provider/model snapshot. */
     public void generateOne(String planId) {
+        generateOne(planId, false);
+    }
+
+    /**
+     * @param fallbackToYmlWhenOff when true, use application.yml providers if DB config is OFF
+     *        (paired AI posts must ship with scheduled comments even outside the nightly window)
+     */
+    public void generateOne(String planId, boolean fallbackToYmlWhenOff) {
         AiThreadPlan plan = planRepository.findById(planId).orElse(null);
         if (plan == null || plan.getStatus() != ThreadPlanStatus.REQUESTED || Instant.now().isAfter(plan.getAbsoluteExpiresAt())) return;
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
-        String provider = config == null ? ("AI_POST".equals(plan.getSourceType()) ? properties.getThreadPlan().getAiPostProvider() : properties.getThreadPlan().getHumanPlanProvider())
-                : ("AI_POST".equals(plan.getSourceType()) ? config.getProviderAiPostBundle() : config.getProviderHumanPostPlan());
+        String provider = resolveProvider(plan.getSourceType(), config, fallbackToYmlWhenOff);
         if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) return;
         String model = "AI_POST".equals(plan.getSourceType()) ? properties.getThreadPlan().getAiPostModel()
                 : properties.getThreadPlan().getHumanPlanModel();
@@ -76,6 +139,23 @@ public class ThreadPlanGenerationService {
             log.warn("Plan {} rejected: {}", planId, e.getMessage());
             planService.markFailed(planId, "INVALID_STRUCTURED_OUTPUT");
         }
+    }
+
+    private String resolveProvider(String sourceType, AiUserGenerationConfig config, boolean fallbackToYmlWhenOff) {
+        boolean aiPost = "AI_POST".equals(sourceType);
+        String yml = aiPost ? properties.getThreadPlan().getAiPostProvider()
+                : properties.getThreadPlan().getHumanPlanProvider();
+        if (config == null) {
+            return yml;
+        }
+        String fromDb = aiPost ? config.getProviderAiPostBundle() : config.getProviderHumanPostPlan();
+        if (fromDb != null && !fromDb.isBlank() && !"OFF".equalsIgnoreCase(fromDb)) {
+            return fromDb;
+        }
+        if (fallbackToYmlWhenOff) {
+            return yml;
+        }
+        return fromDb;
     }
 
     private PlanRequestBuilt planRequest(AiThreadPlan plan, String provider, String model, int pool) {
