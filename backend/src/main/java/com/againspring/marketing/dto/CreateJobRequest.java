@@ -87,6 +87,26 @@ public class CreateJobRequest {
          */
         @JsonProperty("part1_height_css")
         private Double part1HeightCss;
+
+        /**
+         * When true, ASM also captures partner body ({@code /read?side=r}) as
+         * partnerPart1[/2] and inserts them after author story parts in X/IG.
+         */
+        @JsonProperty("has_partner_story")
+        private Boolean hasPartnerStory;
+
+        /**
+         * Partner body split (same semantics as {@link #captureSplitAfterLine}).
+         * null when short partner body or no partner story.
+         */
+        @JsonProperty("partner_capture_split_after_line")
+        private Integer partnerCaptureSplitAfterLine;
+
+        /**
+         * Candidate CSS Y for partner part1 crop on {@code /read?side=r}.
+         */
+        @JsonProperty("partner_part1_height_css")
+        private Double partnerPart1HeightCss;
     }
 
     @Getter

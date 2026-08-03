@@ -163,9 +163,20 @@ public class MarketingJobService {
 
         Integer captureSplit = CaptureSplitSupport.resolveSplit(
                 post.getBodyPublished(), post.getCaptureSplitAfterLine());
-        boolean paired = post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null;
+        boolean paired = post.getPartnerAnsweredAt() != null
+                && post.getPartnerBodyPublished() != null
+                && !post.getPartnerBodyPublished().isBlank();
         Double part1Height = CaptureHeightCalculator.part1HeightCss(
                 post.getTitle(), post.getBodyPublished(), captureSplit, paired);
+
+        Integer partnerCaptureSplit = null;
+        Double partnerPart1Height = null;
+        if (paired) {
+            // Partner has no stored LLM split yet — heuristic only (same SHORT_POST_MAX_BLOCKS).
+            partnerCaptureSplit = CaptureSplitSupport.resolveSplit(post.getPartnerBodyPublished(), null);
+            partnerPart1Height = CaptureHeightCalculator.part1HeightCss(
+                    post.getTitle(), post.getPartnerBodyPublished(), partnerCaptureSplit, true);
+        }
 
         String storyTitle = post.getTitle();
         if (storyTitle == null || storyTitle.isBlank()) {
@@ -187,6 +198,9 @@ public class MarketingJobService {
             .tags(tags)
             .captureSplitAfterLine(captureSplit)
             .part1HeightCss(part1Height)
+            .hasPartnerStory(paired)
+            .partnerCaptureSplitAfterLine(partnerCaptureSplit)
+            .partnerPart1HeightCss(partnerPart1Height)
             .policy(PolicyDto.builder()
                 .noEmoji(true)
                 .forbiddenTerms(Arrays.asList("판결", "처방", "승패", "승자", "패자", "가해자", "피해자"))
