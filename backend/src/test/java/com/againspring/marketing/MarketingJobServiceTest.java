@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.time.Instant;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -148,7 +149,90 @@ class MarketingJobServiceTest {
         verify(marketingJobRepository).save(any(MarketingJob.class));
     }
 
-    // ── Test 2: createJob_duplicateActiveJob_throws ─────────────────────────
+    @Test
+    void createJob_pairedPost_includesPartnerCaptureHints() throws JsonProcessingException {
+        Instant answered = Instant.parse("2026-08-04T10:00:00Z");
+        String partnerBody = String.join("\n",
+                "상대 문장1", "상대 문장2", "상대 문장3", "상대 문장4",
+                "상대 문장5", "상대 문장6", "상대 문장7", "상대 문장8",
+                "상대 문장9", "상대 문장10", "상대 문장11", "상대 문장12",
+                "상대 문장13", "상대 문장14", "상대 문장15");
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("양면 사연")
+            .bodyPublished("작성자 짧은 본문입니다.")
+            .partnerBodyPublished(partnerBody)
+            .partnerAnsweredAt(answered)
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+            .thenReturn(0L);
+        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+
+        CreateJobResponse response = CreateJobResponse.builder()
+            .jobId(TEST_JOB_ID)
+            .status("QUEUED")
+            .build();
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(response);
+        when(marketingJobRepository.save(any(MarketingJob.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest.BriefDto brief = captor.getValue().getBrief();
+        assertThat(brief.getHasPartnerStory()).isTrue();
+        assertThat(brief.getPartnerCaptureSplitAfterLine()).isEqualTo(9); // round(15*0.6)
+        assertThat(brief.getPartnerPart1HeightCss()).isNotNull();
+        assertThat(brief.getPartnerPart1HeightCss()).isGreaterThan(100.0);
+    }
+
+    @Test
+    void createJob_soloPost_hasPartnerStoryFalse() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("솔로")
+            .bodyPublished("작성자만")
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+            .thenReturn(0L);
+        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+
+        CreateJobResponse response = CreateJobResponse.builder()
+            .jobId(TEST_JOB_ID)
+            .status("QUEUED")
+            .build();
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(response);
+        when(marketingJobRepository.save(any(MarketingJob.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        assertThat(captor.getValue().getBrief().getHasPartnerStory()).isFalse();
+        assertThat(captor.getValue().getBrief().getPartnerCaptureSplitAfterLine()).isNull();
+        assertThat(captor.getValue().getBrief().getPartnerPart1HeightCss()).isNull();
+    }
+
 
     @Test
     void createJob_duplicateActiveJob_throwsIllegalStateException() {

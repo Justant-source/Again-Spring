@@ -53,21 +53,26 @@ X는 비로그인 접근이 402로 차단되어, nitter 미러(`nitter.privacyre
 
 ---
 
-## 2. 확정 사양 — 3~4단 체인 (2026-08-02 갱신)
+## 2. 확정 사양 — 가변 체인 (솔로 3~4단 / 양면 최대 6단, 2026-08-04 갱신)
 
 메인 트윗에는 **사연 제목을 텍스트로 넣는다**(2026-08-02 결정 — 그 전까지는 이미지 단독이었다).
 그 외 트윗(reply)은 여전히 텍스트 없이 이미지 단독. 이미지는 다시봄 실제 화면의 무보정 캡처.
 
-본문이 **12줄 이하**(`SHORT_POST_MAX_LINES`)면 나누지 않고 **3단**, 그보다 길면 기존 **4단**으로 발행한다.
+본문이 **12줄 이하**(`SHORT_POST_MAX_LINES`)면 나누지 않고, 그보다 길면 전반/후반으로 나눈다.
+**양면 사연**(상대방 본문 있음)이면 작성자 본문 뒤에 상대방 본문도 같은 규칙으로 1~2장 이어 붙인다.
 어느 쪽이든 각 잡의 `x_thread__upload.json`에 실제 스텝 목록(`steps`)이 기록되고, 발행측(`dispatcher.py`)은
 이 목록을 그대로 따른다 — 문서의 표는 설명용이고 실제 동작의 SSOT는 코드다.
 
-| 순서 | 짧은 사연(≤12줄, 3단) | 긴 사연(4단) | 소스 |
-|---|---|---|---|
-| 메인 트윗 | 본문 전체 (제목 텍스트 + 캡처 이미지) | 사연 앞부분 (제목 텍스트 + 캡처 이미지) | `/community/{id}/read?side=g` |
-| 첫 댓글 | 광장 댓글창 | 사연 뒷부분 | 긴 사연만 같은 페이지 스크롤 연속분, 짧은 사연은 `/community/{id}` |
-| 둘째 댓글 | 공감 비율 막대 + 사연 링크 | 광장 댓글창 | `/community/{id}` |
-| 셋째 댓글 | (없음) | 공감 비율 막대 + 사연 링크 | `/community/{id}` |
+| 순서 | 솔로 짧은(≤12줄) | 솔로 긴 | 양면 (작성자+상대, 예시: 둘 다 짧음) | 소스 |
+|---|---|---|---|---|
+| 메인 트윗 | 작성자 본문 전체 | 작성자 앞부분 | 작성자 본문 | `/community/{id}/read?side=g` |
+| 댓글… | 광장 댓글창 | 작성자 뒷부분 | 상대방 본문 | 상대: `/read?side=r` |
+| … | 공감 비율 + 링크 | 광장 댓글창 | 광장 댓글창 | `/community/{id}` |
+| … | (없음) | 공감 비율 + 링크 | 공감 비율 + 링크 | `/community/{id}` |
+
+양면에서 작성자·상대 중 긴 쪽은 각각 part2가 끼어든다. 최대 체인 길이 예:
+`작성자1 → 작성자2 → 상대1 → 상대2 → 댓글 → 비율` (6단).
+솔로만 있을 때는 기존 3~4단과 동일.
 
 비율 막대가 들어가는 마지막 댓글에는 좋아요·댓글·공유 줄을 **넣지 않는다** — 시선이 숫자에서 분산된다.
 
@@ -76,20 +81,19 @@ X는 비로그인 접근이 402로 차단되어, nitter 미러(`nitter.privacyre
 모바일 뷰포트 `430×932`, `deviceScaleFactor: 3`, 로케일 `ko-KR`.
 캡처 전 상단 베타 배너(`베타 서비스 —`로 시작하고 높이 80px 미만인 요소)를 `display:none` 처리한다.
 
-**컷 지점 (2026-08-03~)** — 의미 단락(개행 블록) 우선:
+**컷 지점 (2026-08-03~)** — 의미 단락(개행 블록) 우선 (작성자·상대방 각각 동일):
 
-1. 본문의 **비어 있지 않은 개행 블록** 수가 `SHORT_POST_MAX_LINES`(12) 이하면 미분할
-   (`storyPart2 = null`, 3단 스레드).
-2. 그보다 길면 AS brief의 `capture_split_after_line`(1-based 전반부 마지막 블록)에서
-   DOM `Range`로 블록 N 끝 ↔ N+1 시작 중점을 잰다 — **문장(블록) 중간을 자르지 않음**.
-3. PLAN LLM이 사연 생성 시 이 인덱스를 고르고 `posts.capture_split_after_line`에 저장한다.
-   없거나 범위 밖이면 BE가 `round(blockCount * 0.6)` 휴리스틱으로 채운다.
-4. BE `CaptureHeightCalculator`가 같은 상수로 `part1_height_css` 후보를 계산해 brief에 실어
-   ASM이 DOM Y와 비교·로그하고, DOM 실패 시 폴백으로 쓴다.
-5. 둘 다 실패하면 레거시 `LINE_TARGET_FRACTION`(시각 줄 60%) 컷.
+1. 해당 본문의 **비어 있지 않은 개행 블록** 수가 `SHORT_POST_MAX_LINES`(12) 이하면 미분할
+   (`*Part2 = null`).
+2. 그보다 길면 AS brief의 `capture_split_after_line` / `partner_capture_split_after_line`
+   (1-based 전반부 마지막 블록)에서 DOM `Range`로 블록 N 끝 ↔ N+1 시작 중점을 잰다.
+3. 작성자 분할은 PLAN LLM이 `posts.capture_split_after_line`에 저장. 상대방은 아직 저장 필드가
+   없어 BE가 `round(blockCount * 0.6)` 휴리스틱만 보낸다.
+4. BE `CaptureHeightCalculator`가 `part1_height_css` / `partner_part1_height_css` 후보를 계산.
+5. DOM·후보 모두 실패 시 레거시 `LINE_TARGET_FRACTION`(시각 줄 60%) 컷.
 
-(2026-08-02: 시각 줄 `getClientRects`로 글자 중간 컷을 막았으나, wrap된 **문장 중간 줄**에서
-끊기는 문제는 남았다 — 개행 블록 분할로 보완.)
+양면 여부: brief `has_partner_story=true`이면 social-poster가 `/read?side=r`도 캡처해
+`partnerPart1`[/`partnerPart2`]를 반환하고, 파이프라인이 작성자 본문 뒤에 삽입한다.
 
 공감 비율 막대는 좌우에 `RATIO_SIDE_PADDING_CSS`(32px, deviceScaleFactor 반영) 여백을 추가한 뒤
 상하 패딩으로 `RATIO_SAFE_ASPECT`(1.91:1)를 맞춘다 — 여백이 없으면 "작성자"/"상대방" 라벨이
