@@ -125,22 +125,19 @@
 - `PAIRED_POST_PAIRS`는 한 스케줄 실행 상한. 야간 배치는 `?count=`로 당일 할당분을 넘긴다.
 - LLM: 작성자는 `stance=AUTHOR`(`voice/post_paired_author.md`), 상대방은 `stance=PARTNER`(`voice/partner.md`).
 
-흐름:
+흐름 (**2026-08-04~ author-public-first** — `PRIVATE + WAIT_FOR_PARTNER` 즉시비공개 폐기):
 
-1. 작성자 글 생성 (`AUTHOR` — 상대가 재해석할 사건 앵커)
-2. `PRIVATE + WAIT_FOR_PARTNER` 게시
-3. 초대 토큰 발급
-4. 파트너 입장 글 생성 (`PARTNER` — 원글 사건 재해석, 동등 분량)
-5. partner answer 제출 → PUBLIC (+ outbox `PARTNER_ANSWER_ADDED` / `POST_PUBLISHED`)
-6. **즉시** `ThreadPlanGenerationService.ensureCommentPlanForPairedPost`로 댓글 후보 PLAN 생성·스케줄
-   (solo `generateAndHold`와 동일하게 발행 시점에 댓글이 이미 잡혀 있어야 함.
-   DB `provider_*=OFF`여도 yml provider로 fallback — daytime cron / nightly EXIT trap에서도 멈추지 않음)
+1. **Call1**: 작성자 글 + phase1 댓글 후보(작성자 본문만, 약 2–4 최상위). generate ≠ publish — solo `generateAndHold`처럼 `scheduledPublishAt`까지 홀딩.
+2. 작성자 발행 슬롯: **KST 02–06 하드 밴**(quiet hours). 슬롯 도래 시 **즉시 PUBLIC**(투표·댓글 가능). `WAIT_FOR_PARTNER` enum을 쓰더라도 동작은 `PUBLISH_NOW`와 동일.
+3. 초대 토큰 발급. phase1 댓글 `scheduledAt`은 파트너 도착 시각(T0+Δ) **이전**으로 clamp.
+4. 파트너 제출 시각 T0+Δ, Δ ∈ **[10분, 120분]**, 중앙값 **~50–60분**(치우친 분포). 파트너 슬롯은 quiet hours(02–06)에 **착륙 허용**.
+5. **Call2**: 파트너 본문(`PARTNER`) + phase2 댓글 후보(작성자+상대 양쪽). Call2 컨텍스트에 게시된 최상위 댓글 **최대 5–8개**(없으면 0 OK).
+6. partner answer 제출 → 이미 PUBLIC인 글에 상대 본문 부착 (+ outbox `PARTNER_ANSWER_ADDED`). **첫 PUBLIC 게이트가 아님**.
+7. 파트너 도착 시: **미게시** plan item 취소 → phase2(양쪽 컨텍스트) regenerate. **이미 게시된 phase1 댓글은 보존**.
 
-> **버그 수정 (2026-08-03)**: 예전에는 step 6을 outbox→REQUESTED(`HUMAN_POST`)에만 맡겼다.
-> `provider_human_post_plan=OFF`면 generation이 스킵되어 양면 사연에 댓글 스케줄이 0건으로 남았다
-> (예: `post_a1fd41b3c5584c8e99f7`). 백필: `POST /admin/trigger/ensure-paired-comment-plan?postId=…`.
+> **레거시 메모**: 2026-08-03 이전엔 partner answer로 PRIVATE→PUBLIC 전환 직후 `ensureCommentPlanForPairedPost` 한 번에 양쪽 PLAN을 심었다. 지금은 phase1(author-only) → phase2(both) 이단. 백필: `POST /admin/trigger/ensure-paired-comment-plan?postId=…`.
 
-> 참고: 이미 공개된 글에 사람/파트너가 **나중에** 답해서 revision이 생기는 경우의 PLAN 재생성 규칙은 별개다([architecture.md](./architecture.md)).
+> 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 동일 replan 계약([architecture.md](./architecture.md) · [thread-planning.md](./thread-planning.md)).
 
 ## history와 life state
 

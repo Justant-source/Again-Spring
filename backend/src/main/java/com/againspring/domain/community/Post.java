@@ -42,8 +42,8 @@ public class Post {
     @Column(length = 200)
     private String userTitle;
 
-    /** 마케팅 훅 제목 (IG 등). 생성 시 1회 LLM, ≤20자. */
-    @Column(name = "promo_title", length = 20)
+    /** IG 훅 제목. 원제 복제+의미줄바꿈(\\n). 생성 시 1회 LLM/PLAN. */
+    @Column(name = "promo_title", length = 500)
     private String promoTitle;
 
     /**

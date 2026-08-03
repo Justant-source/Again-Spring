@@ -39,6 +39,22 @@ public class LlmAiUserClient {
         return generateStructured("/v2/generate/thread-plan", request);
     }
 
+    /**
+     * Paired Call1 ({@code PAIRED_PHASE1}): author post + phase1 comments.
+     * Orchestrator scheduling/hold owns when this is invoked.
+     */
+    public Optional<java.util.Map<String, Object>> generatePairedCall1(java.util.Map<String, Object> request) {
+        return generateStructured("/v2/generate/paired-phase1", request);
+    }
+
+    /**
+     * Paired Call2 ({@code PAIRED_PHASE2}): partner body + phase2 comments.
+     * Request should include author body and up to 5–8 published top-level comments.
+     */
+    public Optional<java.util.Map<String, Object>> generatePairedCall2(java.util.Map<String, Object> request) {
+        return generateStructured("/v2/generate/paired-phase2", request);
+    }
+
     /** One bounded request for the 30-minute human-comment response batch. */
     public Optional<java.util.Map<String, Object>> generateHumanReplies(java.util.Map<String, Object> request) {
         return generateStructured("/v2/generate/human-replies", request);

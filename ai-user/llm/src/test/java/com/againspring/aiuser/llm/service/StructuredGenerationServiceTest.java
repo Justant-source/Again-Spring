@@ -131,6 +131,32 @@ class StructuredGenerationServiceTest {
         String prompt = promptCaptor.getValue();
         assertTrue(prompt.contains("12~40 characters"), "title length rule");
         assertTrue(prompt.contains("never set title equal to body"), "title≠body rule");
+        assertTrue(prompt.contains("promo_title"), "promo_title in schema");
+        assertTrue(prompt.contains("Never put a single syllable") || prompt.contains("4~10"), "promo line packing rule");
+    }
+
+    @Test
+    void sanitizePromoTitleHelpers() {
+        String title = "도와줬더니 모든 걸 저한테";
+        String ok = "도와줬더니\n모든 걸\n저한테";
+        assertEquals(ok, StructuredGenerationService.sanitizePromoTitle(title, ok));
+        String wrapped = StructuredGenerationService.sanitizePromoTitle(title, "다른훅");
+        assertEquals(title.replaceAll("\\s+", ""), wrapped.replace("\n", "").replaceAll("\\s+", ""));
+        for (String line : wrapped.split("\n")) {
+            assertTrue(line.length() <= 10, line);
+            assertTrue(line.length() >= 2 || wrapped.split("\n").length == 1, line);
+        }
+        // orphan-heavy → repack
+        String bad = "도\n와\n줬\n더\n니\n모\n든\n걸\n저\n한\n테";
+        // character mismatch will repack; use spaced orphans matching title chars
+        String orphan = "도\n와줬더니\n모든\n걸\n저\n한테";
+        // may mismatch — use equal chars
+        orphan = "도와줬더니\n모든\n걸\n저\n한테";
+        String fixed = StructuredGenerationService.sanitizePromoTitle(title, orphan);
+        // "걸" and possibly short lines — if orphan ratio high, wrapPromoLines
+        for (String line : fixed.split("\n")) {
+            assertTrue(line.length() <= 10, line);
+        }
     }
 
     @Test
@@ -413,7 +439,10 @@ class StructuredGenerationServiceTest {
         }
         String splitJson = split == null ? "null" : String.valueOf(split);
         String escapedBody = postBody.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
+        String promo = StructuredGenerationService.wrapPromoLines(title);
+        String escapedPromo = promo == null ? "" : promo.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
         return "{\"post\":{\"title\":\"" + title + "\",\"body\":\"" + escapedBody
+                + "\",\"promo_title\":\"" + escapedPromo
                 + "\",\"capture_split_after_line\":" + splitJson + "},\"comments\":["
                 + String.join(",", items) + "]}";
     }

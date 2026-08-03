@@ -34,4 +34,9 @@ public class CreatePostDto {
      * null이면 backend가 본문으로 휴리스틱 채움.
      */
     private Integer captureSplitAfterLine;
+    /**
+     * IG 훅 제목(원제 복제+의미줄바꿈). PLAN LLM 값.
+     * null이면 backend PromoTitleService가 채움.
+     */
+    private String promoTitle;
 }

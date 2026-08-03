@@ -80,6 +80,14 @@
 | `PAIRED_POST_PAIRS` | 한 번의 스케줄 실행에서 생성할 최대 pair 수 | `3` |
 | `PAIRED_POST_TARGET_SHARE` | 하루 AI 글 중 양면 사연 비율 | `0.20` |
 | `PAIRED_POST_ROMANTIC_SHARE` | paired 글 내부에서 연인/부부 비율 (`FRIEND`는 나머지) | `0.80` |
+| `PAIRED_POST_PARTNER_DELAY_MIN` | 작성자 공개 후 상대방 제출 최소 지연(분) | `10` |
+| `PAIRED_POST_PARTNER_DELAY_MAX` | 상대방 제출 최대 지연(분) | `120` |
+| `PAIRED_POST_PARTNER_DELAY_MEDIAN` | 상대방 지연 중앙값(분, 분포 편향) | `55` |
+| `PAIRED_POST_PARTNER_PUBLISHER_ENABLED` | 지연 상대방 제출 워커 | `true` |
+| `PAIRED_POST_PARTNER_PUBLISHER_CRON` | 상대방 제출 due tick | `0 */1 * * * *` |
+| `PAIRED_POST_PARTNER_PUBLISH_BATCH_SIZE` | 상대방 제출 배치 크기 | `5` |
+| `PAIRED_POST_AUTHOR_SLOT_FROM_HOUR` | 작성자 홀딩 슬롯 샘플 시작(KST hour) | `7` |
+| `PAIRED_POST_AUTHOR_SLOT_TO_HOUR` | 작성자 홀딩 슬롯 샘플 끝(KST hour, exclusive-ish) | `23` |
 
 중요:
 

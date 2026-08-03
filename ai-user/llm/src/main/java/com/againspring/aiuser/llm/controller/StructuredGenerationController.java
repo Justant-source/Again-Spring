@@ -1,9 +1,9 @@
 package com.againspring.aiuser.llm.controller;
 
 import com.againspring.aiuser.llm.dto.HumanReplyBatchRequest;
-import com.againspring.aiuser.llm.dto.HumanReplyBatchResponse;
+import com.againspring.aiuser.llm.dto.PairedPhase1Request;
+import com.againspring.aiuser.llm.dto.PairedPhase2Request;
 import com.againspring.aiuser.llm.dto.ThreadPlanRequest;
-import com.againspring.aiuser.llm.dto.ThreadPlanResponse;
 import com.againspring.aiuser.llm.exception.LlmCapacityException;
 import com.againspring.aiuser.llm.exception.LlmTimeoutException;
 import com.againspring.aiuser.llm.service.StructuredGenerationException;
@@ -55,6 +55,42 @@ public class StructuredGenerationController {
             return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(error("TIMEOUT", e.getMessage(), corr));
         } catch (Exception e) {
             log.error("Human-reply generation failed: corr={}", corr, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error("GENERATION_FAILED", "generation failed", corr));
+        }
+    }
+
+    /** Logical Call1 — 작성자 post + phase1 comments (author-only). Workload {@code PAIRED_PHASE1}. */
+    @PostMapping("/paired-phase1")
+    public ResponseEntity<?> pairedPhase1(@RequestBody PairedPhase1Request request) {
+        String corr = correlation(request == null ? null : request.getCorrelationId());
+        try {
+            return ResponseEntity.ok(structuredGeneration.createPairedPhase1(request, corr));
+        } catch (IllegalArgumentException | StructuredGenerationException e) {
+            return ResponseEntity.badRequest().body(error("INVALID_STRUCTURED_REQUEST", e.getMessage(), corr));
+        } catch (LlmCapacityException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error("CAPACITY", e.getMessage(), corr));
+        } catch (LlmTimeoutException e) {
+            return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(error("TIMEOUT", e.getMessage(), corr));
+        } catch (Exception e) {
+            log.error("Paired phase1 generation failed: corr={}", corr, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error("GENERATION_FAILED", "generation failed", corr));
+        }
+    }
+
+    /** Logical Call2 — 상대방 body + phase2 comments. Workload {@code PAIRED_PHASE2}. */
+    @PostMapping("/paired-phase2")
+    public ResponseEntity<?> pairedPhase2(@RequestBody PairedPhase2Request request) {
+        String corr = correlation(request == null ? null : request.getCorrelationId());
+        try {
+            return ResponseEntity.ok(structuredGeneration.createPairedPhase2(request, corr));
+        } catch (IllegalArgumentException | StructuredGenerationException e) {
+            return ResponseEntity.badRequest().body(error("INVALID_STRUCTURED_REQUEST", e.getMessage(), corr));
+        } catch (LlmCapacityException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error("CAPACITY", e.getMessage(), corr));
+        } catch (LlmTimeoutException e) {
+            return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(error("TIMEOUT", e.getMessage(), corr));
+        } catch (Exception e) {
+            log.error("Paired phase2 generation failed: corr={}", corr, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error("GENERATION_FAILED", "generation failed", corr));
         }
     }

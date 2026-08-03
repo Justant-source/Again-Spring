@@ -11,6 +11,10 @@
       "properties": {
         "title": { "type": "string" },
         "body": { "type": "string" },
+        "promo_title": {
+          "type": ["string", "null"],
+          "description": "IG hook: same characters as title with semantic newlines; each line ≤10 chars including spaces"
+        },
         "capture_split_after_line": {
           "type": ["integer", "null"],
           "description": "1-based index of the last non-empty newline block in the front half when body has more than 12 such blocks; null otherwise"

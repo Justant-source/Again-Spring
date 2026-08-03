@@ -39,7 +39,7 @@ public class CreateJobRequest {
     public static class BriefDto {
         private String title;
 
-        /** 마케팅 훅 제목 (≤20자). 없으면 ASM이 title 폴백. */
+        /** 마케팅/IG 훅 제목 (원제 복제+\\n, 줄≤10). 없으면 ASM이 title 폴백. */
         @JsonProperty("promo_title")
         private String promoTitle;
 

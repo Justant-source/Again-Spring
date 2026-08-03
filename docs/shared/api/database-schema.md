@@ -204,14 +204,14 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56, V85, V87, V89, V92, V94; 검색 인덱스 → V93 `post_search_ngrams`)
+### `posts` (V48~V56, V85, V87, V89, V92, V94, **V97**; 검색 인덱스 → V93 `post_search_ngrams`)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
 | `id` | BIGINT auto PK | V48 | |
 | `author_id` | VARCHAR(32) FK | V48 | 작성자 |
 | `title` | VARCHAR(255) | V48 | 제목 |
-| `promo_title` | VARCHAR(20) | **V92** | 마케팅 훅 제목 (IG 등). 생성 시 1회 LLM, 없으면 원제 폴백 |
+| `promo_title` | VARCHAR(500) | **V92**, 상한 **V96** | IG 훅 제목. 원제 복제+의미줄바꿈(`\n`). PLAN/`PromoTitleService` |
 | `capture_split_after_line` | INT | **V94** | X/IG 캡쳐 전반부 끝 개행 블록(1-based). 비어 있지 않은 줄이 13+일 때. NULL=미분할 |
 | `content` | MEDIUMTEXT | V48 | 본문 (**30일 후 NULL**) |
 | `relationship_type` | VARCHAR(32) | V48 | RelationType enum (couple/marriage/friend/family/parent_child) |
@@ -220,7 +220,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `partner_token` | VARCHAR(64) | V54 | 투표 초대 링크 토큰 |
 | `partner_user_id` | VARCHAR(32) FK | V54 | 초대 수락 사용자 |
 | `three_way_partner_id` | VARCHAR(32) FK | V54 | 3자 중재 파트너 |
-| `publish_mode` | VARCHAR(32) | V54 | one_way / two_way / three_way |
+| `publish_mode` | VARCHAR(32) | V54 | runtime: `PUBLISH_NOW` \| `WAIT_FOR_PARTNER` (후자는 API 호환·동작=즉시 PUBLIC). **V97** 데이터 정리 |
 | `expires_at` | TIMESTAMP(3) | V48 | 게시글 만료 시각 (선택) |
 | `empathy_ratio` | DECIMAL(5,2) | V48 | 공감 비율 (0.0~1.0, 동적 계산) |
 | `source_example_id` | BIGINT | **V85** | 원본 사례 예제 ID (nullable) |
@@ -431,6 +431,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V91** | `ai_user_generation_config`에 `hr_*` 7컬럼 — 댓글 생성량 설정(SSOT: `/admin/ai-user`). 대화 총상한은 저장하지 않고 `hr_distinct_personas_max × hr_replies_per_persona_max` 파생 |
 | **V93** | `post_search_ngrams` — 광장 검색용 문자 바이그램 (MariaDB ngram FULLTEXT 대체) |
 | **V94** | `posts.capture_split_after_line` — X/IG 캡쳐 전반부 끝 개행 블록(1-based) |
+| **V97** | `WAIT_FOR_PARTNER` private-until-partner 폐기 데이터 정리: `PRIVATE + WAIT_FOR_PARTNER` 중 `created_at` >30일 → `deleted_at` soft-delete; 나머지 → `PUBLIC` + `vote_close_at`(없으면 `COALESCE(vote_duration_hours,72)`h) |
 
 ---
 

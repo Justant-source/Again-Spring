@@ -83,7 +83,8 @@ public class AiPostBundleService {
         CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
                 .userTitle(bundle.content.title()).bodyRaw(bundle.content.body()).category(category)
                 .visibility("PUBLIC").jurorCount(0)
-                .captureSplitAfterLine(bundle.content.captureSplitAfterLine());
+                .captureSplitAfterLine(bundle.content.captureSplitAfterLine())
+                .promoTitle(bundle.content.promoTitle());
         applyProvenance(postBuilder, bundle.source);
         Optional<PostDto> published = backendBot.createPost(jwt, postBuilder.build());
         if (published.isEmpty() || published.get().getId() == null) return Optional.empty();
@@ -326,6 +327,7 @@ public class AiPostBundleService {
         Map<String, Object> postMap = new LinkedHashMap<>();
         postMap.put("title", postContent.title());
         postMap.put("body", postContent.body());
+        postMap.put("promo_title", postContent.promoTitle());
         postMap.put("capture_split_after_line", postContent.captureSplitAfterLine());
         merged.put("post", postMap);
         log.info("AI post micro-batch done corr={} batches={} items={}/{} size={}",
@@ -609,7 +611,72 @@ public class AiPostBundleService {
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(body, ContentSafetyGuard.ContentType.POST);
         if (!guard.passed()) throw new IllegalArgumentException("unsafe post: " + guard.reason());
         Integer split = resolveCaptureSplit(body, readCaptureSplit(raw));
-        return new PostContent(title, body, split);
+        String promoTitle = readAndNormalizePromoTitle(title, raw);
+        return new PostContent(title, body, split, promoTitle);
+    }
+
+    private static String readAndNormalizePromoTitle(String title, Map<?, ?> post) {
+        Object v = post.get("promo_title");
+        if (v == null) v = post.get("promoTitle");
+        String proposed = v == null ? null : String.valueOf(v);
+        if (proposed != null) {
+            proposed = proposed.replace("\\n", "\n").trim();
+        }
+        String collapsedTitle = title.replaceAll("\\s+", "");
+        if (proposed != null && !proposed.isBlank()) {
+            String collapsedPromo = proposed.replace("\n", "").replaceAll("\\s+", "");
+            if (collapsedPromo.equals(collapsedTitle)) {
+                java.util.List<String> lines = new java.util.ArrayList<>();
+                boolean ok = true;
+                int orphans = 0;
+                for (String line : proposed.replace("\r\n", "\n").split("\n", -1)) {
+                    String t = line.trim();
+                    if (t.isEmpty()) continue;
+                    if (t.length() > 10) { ok = false; break; }
+                    if (t.length() < 2) orphans++;
+                    lines.add(t);
+                }
+                if (ok && !lines.isEmpty() && !(orphans > 0 && orphans * 4 >= lines.size())) {
+                    return String.join("\n", lines);
+                }
+            }
+        }
+        return packPromoLines(title);
+    }
+
+    /** Pack eojeol into ≤10 char lines; avoid 1-char orphans. */
+    static String packPromoLines(String title) {
+        if (title == null || title.isBlank()) return title;
+        String t = title.trim();
+        if (t.length() <= 10) return t;
+        String[] parts = t.split("\\s+");
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        for (String part : parts) {
+            if (part.isBlank()) continue;
+            if (cur.length() == 0) {
+                cur.append(part.length() <= 10 ? part : part.substring(0, 10));
+                if (part.length() > 10) {
+                    lines.add(cur.toString());
+                    cur.setLength(0);
+                    for (int i = 10; i < part.length(); i += 10) {
+                        lines.add(part.substring(i, Math.min(i + 10, part.length())));
+                    }
+                }
+                continue;
+            }
+            String cand = cur + " " + part;
+            if (cand.length() <= 10) {
+                cur.setLength(0);
+                cur.append(cand);
+            } else {
+                lines.add(cur.toString());
+                cur.setLength(0);
+                cur.append(part.length() <= 10 ? part : part.substring(0, Math.min(10, part.length())));
+            }
+        }
+        if (!cur.isEmpty()) lines.add(cur.toString());
+        return String.join("\n", lines);
     }
 
     private static Integer readCaptureSplit(Map<?, ?> post) {
@@ -650,7 +717,7 @@ public class AiPostBundleService {
         return LiteralNewlineNormalizer.normalize(String.valueOf(value)).trim();
     }
 
-    private record PostContent(String title, String body, Integer captureSplitAfterLine) { }
+    private record PostContent(String title, String body, Integer captureSplitAfterLine, String promoTitle) { }
 
     public record PublishedBundle(PostDto post, String body, Long sourceExampleId) {
         public PublishedBundle(PostDto post, String body) {

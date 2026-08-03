@@ -9,8 +9,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -54,6 +56,42 @@ public class StructuredGenerationService {
                 raw -> parseReplies(raw, req, provider, model, correlationId, started));
     }
 
+    /**
+     * Logical Call1 — 작성자 post + phase1 comments (author-only grounding).
+     * Workload id: {@link StructuredOutputSchema#WORKLOAD_PAIRED_PHASE1}.
+     */
+    public PairedPhase1Response createPairedPhase1(PairedPhase1Request req, String correlationId) {
+        validatePairedPhase1Request(req);
+        LlmProvider provider = LlmProvider.parse(req.getProvider());
+        String model = resolvePairedPostModel(req.getModel(), provider);
+        long started = System.currentTimeMillis();
+        String prompt = pairedPhase1Prompt(req);
+        return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
+                        StructuredOutputSchema.PAIRED_PHASE1),
+                raw -> applyPairedPhase1Critique(
+                        parsePairedPhase1(raw, req, provider, model, correlationId, started),
+                        req, prompt, model, correlationId));
+    }
+
+    /**
+     * Logical Call2 — 상대방 body + phase2 comments.
+     * Workload id: {@link StructuredOutputSchema#WORKLOAD_PAIRED_PHASE2}.
+     * When cast is large, orchestrator may follow with {@code includePartnerPost=false}
+     * comment-only calls — still the same logical Call2.
+     */
+    public PairedPhase2Response createPairedPhase2(PairedPhase2Request req, String correlationId) {
+        validatePairedPhase2Request(req);
+        LlmProvider provider = LlmProvider.parse(req.getProvider());
+        String model = resolvePairedPostModel(req.getModel(), provider);
+        long started = System.currentTimeMillis();
+        String prompt = pairedPhase2Prompt(req);
+        return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
+                        StructuredOutputSchema.PAIRED_PHASE2),
+                raw -> applyPairedPhase2Critique(
+                        parsePairedPhase2(raw, req, provider, model, correlationId, started),
+                        req, prompt, model, correlationId));
+    }
+
     private ThreadPlanResponse parsePlan(String raw, ThreadPlanRequest req, LlmProvider provider, String model,
                                          String correlationId, long started) {
         JsonNode root = parseObject(raw);
@@ -65,7 +103,9 @@ public class StructuredGenerationService {
             validText(title, "post.title", 4, 40); validText(body, "post.body", 20, 6000);
             rejectIdenticalTitleBody(title, body);
             Integer split = sanitizeCaptureSplit(body, readCaptureSplit(p));
-            post = ThreadPlanResponse.Post.builder().title(title).body(body).captureSplitAfterLine(split).build();
+            String promoTitle = sanitizePromoTitle(title, nullableText(p, "promo_title"));
+            post = ThreadPlanResponse.Post.builder()
+                    .title(title).body(body).promoTitle(promoTitle).captureSplitAfterLine(split).build();
         }
         JsonNode comments = root.path("comments");
         if (!comments.isArray()) throw new StructuredGenerationException("comments must be an array");
@@ -147,7 +187,9 @@ public class StructuredGenerationService {
             validText(refined, "post.body", 20, 6000);
             Integer split = sanitizeCaptureSplit(refined, post.getCaptureSplitAfterLine());
             return ThreadPlanResponse.Post.builder()
-                    .title(post.getTitle()).body(refined).captureSplitAfterLine(split).build();
+                    .title(post.getTitle()).body(refined)
+                    .promoTitle(post.getPromoTitle())
+                    .captureSplitAfterLine(split).build();
         } catch (StructuredGenerationException ignored) {
             return post;
         }
@@ -243,6 +285,265 @@ public class StructuredGenerationService {
                 .replies(parsed).elapsedMs(System.currentTimeMillis() - started).build();
     }
 
+    private PairedPhase1Response parsePairedPhase1(String raw, PairedPhase1Request req, LlmProvider provider,
+                                                   String model, String correlationId, long started) {
+        JsonNode root = parseObject(raw);
+        JsonNode p = root.path("post");
+        String title = text(p, "title");
+        String body = text(p, "body");
+        validText(title, "post.title", 4, 40);
+        validText(body, "post.body", 20, 6000);
+        rejectIdenticalTitleBody(title, body);
+        Integer split = sanitizeCaptureSplit(body, readCaptureSplit(p));
+        String promoTitle = sanitizePromoTitle(title, nullableText(p, "promo_title"));
+        ThreadPlanResponse.Post post = ThreadPlanResponse.Post.builder()
+                .title(title).body(body).promoTitle(promoTitle).captureSplitAfterLine(split).build();
+
+        int maxTop = safe(req.getMaxTopLevel(), 4, 1, 6);
+        int maxReplies = safe(req.getMaxReplies(), 2, 0, 6);
+        int max = maxTop + maxReplies;
+        int minTop = req.getMinTopLevel() != null
+                ? Math.max(1, Math.min(req.getMinTopLevel(), maxTop))
+                : Math.min(2, maxTop);
+        int minItems = req.getMinItems() != null
+                ? Math.max(1, Math.min(req.getMinItems(), max))
+                : minTop;
+        List<ThreadPlanResponse.Item> items = parseCommentItems(root.path("comments"), req.getPersonas(), max, minTop, minItems);
+        return PairedPhase1Response.builder()
+                .provider(provider.name()).model(model).correlationId(correlationId)
+                .workload(StructuredOutputSchema.WORKLOAD_PAIRED_PHASE1)
+                .post(post).items(items).elapsedMs(System.currentTimeMillis() - started).build();
+    }
+
+    private PairedPhase2Response parsePairedPhase2(String raw, PairedPhase2Request req, LlmProvider provider,
+                                                   String model, String correlationId, long started) {
+        JsonNode root = parseObject(raw);
+        boolean wantPartner = req.getIncludePartnerPost() == null || Boolean.TRUE.equals(req.getIncludePartnerPost());
+        PairedPhase2Response.PartnerPost partnerPost = null;
+        JsonNode pp = root.get("partner_post");
+        if (pp == null) pp = root.get("partnerPost");
+        if (wantPartner) {
+            if (pp == null || pp.isNull() || !pp.isObject()) {
+                throw new StructuredGenerationException("partner_post is required");
+            }
+            String body = text(pp, "body");
+            validText(body, "partner_post.body", 20, 6000);
+            partnerPost = PairedPhase2Response.PartnerPost.builder().body(body).build();
+        } else if (pp != null && !pp.isNull()) {
+            throw new StructuredGenerationException("partner_post must be null for comment-only Call2 continuation");
+        }
+
+        int maxTop = safe(req.getMaxTopLevel(), 14, 1, 20);
+        int maxReplies = safe(req.getMaxReplies(), 10, 0, 20);
+        int max = maxTop + maxReplies;
+        int minTop = req.getMinTopLevel() != null
+                ? Math.max(1, Math.min(req.getMinTopLevel(), maxTop))
+                : Math.min(4, maxTop);
+        int minItems = req.getMinItems() != null
+                ? Math.max(1, Math.min(req.getMinItems(), max))
+                : Math.min(6, max);
+        List<ThreadPlanResponse.Item> items = parseCommentItems(root.path("comments"), req.getPersonas(), max, minTop, minItems);
+        return PairedPhase2Response.builder()
+                .provider(provider.name()).model(model).correlationId(correlationId)
+                .workload(StructuredOutputSchema.WORKLOAD_PAIRED_PHASE2)
+                .partnerPost(partnerPost).items(items).elapsedMs(System.currentTimeMillis() - started).build();
+    }
+
+    private List<ThreadPlanResponse.Item> parseCommentItems(JsonNode comments, List<ThreadPlanRequest.Persona> personas,
+                                                            int max, int minTop, int minItems) {
+        if (!comments.isArray()) throw new StructuredGenerationException("comments must be an array");
+        if (comments.size() > max) throw new StructuredGenerationException("comment candidate limit exceeded");
+        Set<String> personaIds = new HashSet<>();
+        for (var p : personas) personaIds.add(p.getPersonaId());
+        Set<String> refs = new HashSet<>();
+        Set<String> topLevel = new HashSet<>();
+        List<ThreadPlanResponse.Item> items = new ArrayList<>();
+        for (JsonNode n : comments) {
+            String ref = text(n, "ref");
+            String parent = nullableText(n, "parentRef");
+            String persona = text(n, "personaId");
+            String body = text(n, "body");
+            validRef(ref);
+            validText(body, "comment.body", 2, 1000);
+            if (!refs.add(ref)) throw new StructuredGenerationException("duplicate comment ref");
+            if (!personaIds.contains(persona)) throw new StructuredGenerationException("unknown personaId: " + persona);
+            if (parent == null) topLevel.add(ref);
+            else if (!topLevel.contains(parent)) throw new StructuredGenerationException("reply parent must be an earlier top-level ref");
+            items.add(ThreadPlanResponse.Item.builder().ref(ref).parentRef(parent).personaId(persona).body(body)
+                    .stance(nullableText(n, "stance")).priority(n.path("priority").asInt(0)).build());
+        }
+        if (topLevel.size() < minTop || items.size() < minItems) {
+            throw new StructuredGenerationException("thread plan does not meet minimum candidate count");
+        }
+        return items;
+    }
+
+    private PairedPhase1Response applyPairedPhase1Critique(PairedPhase1Response parsed, PairedPhase1Request req,
+                                                           String prompt, String model, String correlationId) {
+        if (selfCritique == null || parsed == null) return parsed;
+        ThreadPlanRequest bridge = new ThreadPlanRequest();
+        bridge.setAuthor(req.getAuthor());
+        bridge.setPersonas(req.getPersonas());
+        ThreadPlanResponse critiqued = applySelfCritique(
+                ThreadPlanResponse.builder()
+                        .provider(parsed.getProvider()).model(parsed.getModel()).correlationId(parsed.getCorrelationId())
+                        .post(parsed.getPost()).items(parsed.getItems()).elapsedMs(parsed.getElapsedMs()).build(),
+                bridge, prompt, model, correlationId);
+        return PairedPhase1Response.builder()
+                .provider(critiqued.getProvider()).model(critiqued.getModel()).correlationId(critiqued.getCorrelationId())
+                .workload(parsed.getWorkload())
+                .post(critiqued.getPost()).items(critiqued.getItems()).elapsedMs(critiqued.getElapsedMs()).build();
+    }
+
+    private PairedPhase2Response applyPairedPhase2Critique(PairedPhase2Response parsed, PairedPhase2Request req,
+                                                           String prompt, String model, String correlationId) {
+        if (selfCritique == null || parsed == null) return parsed;
+        String backend = "CLI";
+        Map<String, ThreadPlanRequest.Persona> byId = new HashMap<>();
+        for (ThreadPlanRequest.Persona p : req.getPersonas()) {
+            if (p != null && !blank(p.getPersonaId())) byId.put(p.getPersonaId(), p);
+        }
+
+        PairedPhase2Response.PartnerPost partnerPost = parsed.getPartnerPost();
+        if (partnerPost != null) {
+            ThreadPlanRequest.Persona partnerPersona = resolvePartnerPersona(req);
+            String refined = selfCritique.critiqueAndRefine(
+                    partnerPost.getBody(), "post", prompt, correlationId, backend,
+                    resolveFormality(partnerPersona), model, resolveVoiceType(partnerPersona));
+            if (refined != null && !refined.equals(partnerPost.getBody())) {
+                try {
+                    validText(refined, "partner_post.body", 20, 6000);
+                    partnerPost = PairedPhase2Response.PartnerPost.builder().body(refined).build();
+                } catch (StructuredGenerationException ignored) {
+                    // keep original
+                }
+            }
+        }
+
+        List<ThreadPlanResponse.Item> items = new ArrayList<>(parsed.getItems().size());
+        for (ThreadPlanResponse.Item item : parsed.getItems()) {
+            if (item.getParentRef() != null) {
+                items.add(item);
+                continue;
+            }
+            ThreadPlanRequest.Persona persona = byId.get(item.getPersonaId());
+            String refined = selfCritique.critiqueAndRefine(
+                    item.getBody(), "comment", prompt, correlationId + "-" + item.getRef(), backend,
+                    resolveFormality(persona), model, resolveVoiceType(persona));
+            items.add(replaceCommentBodyIfValid(item, refined));
+        }
+        return PairedPhase2Response.builder()
+                .provider(parsed.getProvider()).model(parsed.getModel()).correlationId(parsed.getCorrelationId())
+                .workload(parsed.getWorkload())
+                .partnerPost(partnerPost).items(items).elapsedMs(parsed.getElapsedMs()).build();
+    }
+
+    static ThreadPlanRequest.Persona resolvePartnerPersona(PairedPhase2Request req) {
+        if (req == null || req.getPersonas() == null || req.getPersonas().isEmpty()) return null;
+        String partnerId = null;
+        if (req.getPartner() != null && req.getPartner().get("personaId") != null) {
+            partnerId = String.valueOf(req.getPartner().get("personaId")).trim();
+        }
+        if (!blank(partnerId)) {
+            for (ThreadPlanRequest.Persona p : req.getPersonas()) {
+                if (p != null && partnerId.equals(p.getPersonaId())) return p;
+            }
+        }
+        return req.getPersonas().get(0);
+    }
+
+    private String pairedPhase1Prompt(PairedPhase1Request req) {
+        StringBuilder grounding = new StringBuilder();
+        if (req.getAuthor() != null && !req.getAuthor().isEmpty()) {
+            grounding.append("\nAUTHOR=").append(json(req.getAuthor()));
+        }
+        if (req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
+            grounding.append("\nSOURCE_CONTEXT=").append(json(cleanValues(req.getSourceContext())));
+        }
+        if (Boolean.TRUE.equals(req.getReconstructMode())) {
+            grounding.append("\nRECONSTRUCT_MODE=true");
+            if (req.getSourceExampleId() != null) grounding.append("\nSOURCE_EXAMPLE_ID=").append(req.getSourceExampleId());
+            if (!blank(req.getSourceBody())) {
+                grounding.append("\nSOURCE_BODY=").append(clean(req.getSourceBody()));
+                grounding.append("\nRECONSTRUCT_RULE=Re-narrate the SOURCE_BODY as the author's lived conflict story in their voice. Keep concrete facts/relationships; do not copy sentences verbatim; do not invent a different incident.");
+            }
+        }
+        if (!blank(req.getDynamicExamples())) {
+            grounding.append("\nSTYLE_EXAMPLES=").append(clean(req.getDynamicExamples()));
+        }
+        if (req.getRecentOutputs() != null && !req.getRecentOutputs().isEmpty()) {
+            grounding.append("\nRECENT_OUTPUTS=").append(json(req.getRecentOutputs()));
+            grounding.append("\nANTI_COPY_RULE=Do not reuse the same incident type, punchline, or closing advice pattern as RECENT_OUTPUTS.");
+        }
+        int maxTop = safe(req.getMaxTopLevel(), 4, 1, 6);
+        int maxReplies = safe(req.getMaxReplies(), 2, 0, 6);
+        return """
+                Return ONLY a JSON object, with no Markdown or explanation. Workload=PAIRED_PHASE1 (logical Call1).
+                Schema: {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_line":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                This is a 양면 사연: write the 작성자(A) post now. The 상대방(B) has NOT written yet — phase1 comments must NOT assume a partner reply exists, quote a partner body, or say both sides already posted.
+                Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI. Prefer Korean product terms 작성자/상대방 — never 가해자/피해자/승패.
+                When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed.
+                AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
+                AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line. Required (IG hook card).
+                AI_POST body line rules (hard): one Korean sentence (or short sense unit) per newline — no blank lines. If more than 12 non-empty lines, set capture_split_after_line to the 1-based last front-half line; else null.
+                Phase1 comment count: about 2~4 top-level (respect LIMITS). Keep them light reactions to the 작성자 story only.
+                """ + "\nGUIDE=\n" + clean(classpathText("voice/paired_phase1.md")) +
+                "\nAUTHOR_VOICE=\n" + clean(classpathText("voice/post_paired_author.md")) +
+                "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) +
+                grounding +
+                "\nPERSONAS=" + json(req.getPersonas()) +
+                "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies));
+    }
+
+    private String pairedPhase2Prompt(PairedPhase2Request req) {
+        boolean wantPartner = req.getIncludePartnerPost() == null || Boolean.TRUE.equals(req.getIncludePartnerPost());
+        List<PairedPhase2Request.PublishedComment> published = req.getPublishedTopLevelComments() == null
+                ? List.of()
+                : req.getPublishedTopLevelComments();
+        if (published.size() > 8) published = published.subList(0, 8);
+        List<Map<String, Object>> publishedRows = new ArrayList<>();
+        for (PairedPhase2Request.PublishedComment c : published) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("body", clean(c.getBody()));
+            if (!blank(c.getNickname())) row.put("nickname", clean(c.getNickname()));
+            if (!blank(c.getCreatedAt())) row.put("createdAt", clean(c.getCreatedAt()));
+            publishedRows.add(row);
+        }
+        int maxTop = safe(req.getMaxTopLevel(), 14, 1, 20);
+        int maxReplies = safe(req.getMaxReplies(), 10, 0, 20);
+        String partnerBlock = wantPartner
+                ? "Include partner_post with body only (no title). Stance=PARTNER."
+                : "Set partner_post to null — this is a comment-only micro-batch continuation of logical Call2; do not regenerate the 상대방 body.";
+        return """
+                Return ONLY a JSON object, with no Markdown or explanation. Workload=PAIRED_PHASE2 (logical Call2).
+                Schema: {"partner_post":{"body":"..."}|null,"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                """ + partnerBlock + "\n" + """
+                Phase2 comments are the bulk reactions after both 작성자 and 상대방 bodies are visible.
+                Ground comments on AUTHOR_POST + partner body (when being written or already known via partner voice) + PUBLISHED_TOP_LEVEL_COMMENTS.
+                If PUBLISHED_TOP_LEVEL_COMMENTS is empty, use author (+ partner) bodies only — do not invent prior comments.
+                Do not use published comment ids as parentRef; replies may only parent earlier top-level refs from this response.
+                Use only supplied personaIds. No legal verdicts, diagnoses, personal data, internal notes, or AI identity claims. Use 작성자/상대방 — never 가해자/피해자/승패.
+                """ + "\nGUIDE=\n" + clean(classpathText("voice/paired_phase2.md")) +
+                "\nPARTNER_VOICE=\n" + clean(classpathText("voice/partner.md")) +
+                "\nCATEGORY=" + clean(req.getCategory()) +
+                "\nAUTHOR_POST=" + json(Map.of(
+                        "title", clean(req.getAuthorPost().getTitle()),
+                        "body", clean(req.getAuthorPost().getBody()))) +
+                "\nPARTNER=" + json(req.getPartner() == null ? Map.of() : req.getPartner()) +
+                "\nPUBLISHED_TOP_LEVEL_COMMENTS=" + json(publishedRows) +
+                "\nINCLUDE_PARTNER_POST=" + wantPartner +
+                "\nPERSONAS=" + json(req.getPersonas()) +
+                "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies));
+    }
+
+    private static String classpathText(String path) {
+        try {
+            return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     private String planPrompt(ThreadPlanRequest req) {
         String existing = req.getKind() == ThreadPlanRequest.Kind.HUMAN_POST
                 ? "EXISTING_POST=" + json(Map.of("title", clean(req.getExistingTitle()), "body", clean(req.getExistingBody()))) : "";
@@ -271,10 +572,11 @@ public class StructuredGenerationService {
         }
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Create Korean community conversation candidates.
-                The JSON schema is {"post":{"title":"...","body":"...","capture_split_after_line":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_line":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed, not the whole story.
                 AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only teases the conflict.
+                AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line — pack 1~3 eojeol into a readable phrase. Do not break on every space. No rewrite/omit/add. Required for AI_POST (IG hook card).
                 AI_POST body line rules (hard): write body as one Korean sentence (or short sense unit) per newline — no blank lines; each non-empty line is a capture block. If the body has more than 12 non-empty lines, set capture_split_after_line to the 1-based index of the last front-half line (a natural pause: after setup/incident, before emotion/aftermath). Both halves must keep at least a few lines. If body has 12 or fewer non-empty lines, set capture_split_after_line to null.
                 """ + "\nKIND=" + req.getKind() + "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) + "\n" + existing +
                 grounding +
@@ -326,11 +628,43 @@ public class StructuredGenerationService {
             }
         }
     }
+
+    private void validatePairedPhase1Request(PairedPhase1Request r) {
+        if (r == null || r.getPersonas() == null || r.getPersonas().isEmpty()) {
+            throw new IllegalArgumentException("personas are required");
+        }
+        for (var p : r.getPersonas()) if (p == null || blank(p.getPersonaId())) throw new IllegalArgumentException("personaId is required");
+    }
+
+    private void validatePairedPhase2Request(PairedPhase2Request r) {
+        if (r == null || r.getPersonas() == null || r.getPersonas().isEmpty()) {
+            throw new IllegalArgumentException("personas are required");
+        }
+        for (var p : r.getPersonas()) if (p == null || blank(p.getPersonaId())) throw new IllegalArgumentException("personaId is required");
+        if (r.getAuthorPost() == null || blank(r.getAuthorPost().getBody())) {
+            throw new IllegalArgumentException("authorPost.body is required");
+        }
+        if (r.getPublishedTopLevelComments() != null && r.getPublishedTopLevelComments().size() > 8) {
+            throw new IllegalArgumentException("publishedTopLevelComments max is 8");
+        }
+        if (r.getPublishedTopLevelComments() != null) {
+            for (var c : r.getPublishedTopLevelComments()) {
+                if (c == null || blank(c.getBody())) throw new IllegalArgumentException("published comment body is required");
+            }
+        }
+    }
+
     private String resolvePlanModel(ThreadPlanRequest r, LlmProvider p) {
         String configured = p == LlmProvider.CODEX ? (r.getKind() == ThreadPlanRequest.Kind.AI_POST ? codexTerra : codexLuna) : (r.getKind() == ThreadPlanRequest.Kind.AI_POST ? claudePostModel : claudeDefault);
         return configuredModel(r.getModel(), configured);
     }
     private String resolveReplyModel(HumanReplyBatchRequest r, LlmProvider p) { return configuredModel(r.getModel(), p == LlmProvider.CODEX ? codexLuna : claudeDefault); }
+
+    /** Paired Call1/Call2 both produce post-grade bodies → stronger post model. */
+    private String resolvePairedPostModel(String requested, LlmProvider p) {
+        String configured = p == LlmProvider.CODEX ? codexTerra : claudePostModel;
+        return configuredModel(requested, configured);
+    }
     private static String configuredModel(String requested, String configured) {
         if (blank(configured)) throw new IllegalStateException("No model configured for selected provider/workload");
         if (!blank(requested) && !requested.trim().equals(configured)) throw new IllegalArgumentException("model override is not allowed for structured generation");
@@ -401,6 +735,107 @@ public class StructuredGenerationService {
         if (n == null || n.isNull() || !n.isNumber()) return null;
         return n.asInt();
     }
+
+    /**
+     * promo_title must match title when newlines stripped; each non-empty line ≤10;
+     * reject orphan-heavy breaks (too many 1-char lines).
+     */
+    static String sanitizePromoTitle(String title, String proposed) {
+        String base = title != null ? title.trim() : "";
+        if (base.isEmpty()) return null;
+        if (proposed == null || proposed.isBlank()) {
+            return wrapPromoLines(base);
+        }
+        String promo = proposed.replace("\\n", "\n").trim();
+        String promoFlat = promo.replace("\n", "").replaceAll("\\s+", "");
+        String titleFlat = base.replaceAll("\\s+", "");
+        if (!promoFlat.equals(titleFlat)) {
+            log.debug("Demoting promo_title — character mismatch with title");
+            return wrapPromoLines(base);
+        }
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        for (String line : promo.replace("\r\n", "\n").split("\n", -1)) {
+            String t = line.trim();
+            if (t.isEmpty()) continue;
+            if (t.length() > 10) {
+                log.debug("Demoting promo_title — line longer than 10");
+                return wrapPromoLines(base);
+            }
+            lines.add(t);
+        }
+        if (lines.isEmpty()) return wrapPromoLines(base);
+        int orphans = 0;
+        for (String line : lines) {
+            if (line.length() < 2) orphans++;
+        }
+        if (orphans > 0 && orphans * 4 >= lines.size()) {
+            log.debug("Demoting promo_title — too many 1-char lines");
+            return wrapPromoLines(base);
+        }
+        return String.join("\n", lines);
+    }
+
+    /**
+     * Pack eojeol into ~4–10 char lines (max 10). Avoids 1-char orphan lines.
+     */
+    static String wrapPromoLines(String title) {
+        if (title == null || title.isBlank()) return null;
+        String t = title.trim();
+        if (t.length() <= 10) return t;
+        String[] parts = t.split("\\s+");
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        for (String part : parts) {
+            if (part.isBlank()) continue;
+            if (cur.length() == 0) {
+                if (part.length() <= 10) cur.append(part);
+                else {
+                    for (int i = 0; i < part.length(); i += 10) {
+                        lines.add(part.substring(i, Math.min(i + 10, part.length())));
+                    }
+                }
+                continue;
+            }
+            String cand = cur + " " + part;
+            if (cand.length() <= 10) {
+                cur.setLength(0);
+                cur.append(cand);
+            } else {
+                lines.add(cur.toString());
+                cur.setLength(0);
+                if (part.length() <= 10) cur.append(part);
+                else {
+                    for (int i = 0; i < part.length(); i += 10) {
+                        lines.add(part.substring(i, Math.min(i + 10, part.length())));
+                    }
+                }
+            }
+        }
+        if (!cur.isEmpty()) lines.add(cur.toString());
+        // merge leading/trailing 1-char orphans
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).length() >= 2) continue;
+            if (i > 0) {
+                String merged = lines.get(i - 1) + " " + lines.get(i);
+                if (merged.length() <= 10) {
+                    lines.set(i - 1, merged);
+                    lines.remove(i);
+                    i--;
+                    continue;
+                }
+            }
+            if (i + 1 < lines.size()) {
+                String merged = lines.get(i) + " " + lines.get(i + 1);
+                if (merged.length() <= 10) {
+                    lines.set(i + 1, merged);
+                    lines.remove(i);
+                    i--;
+                }
+            }
+        }
+        return String.join("\n", lines);
+    }
+
     private static String collapseWs(String s) {
         return s == null ? "" : s.replaceAll("\\s+", " ").trim();
     }

@@ -1,6 +1,8 @@
 package com.againspring.aiuser.orchestrator.service.threadplan;
 
+import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
+import com.againspring.aiuser.orchestrator.client.dto.CommentThreadDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlan;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlanItem;
@@ -26,11 +28,30 @@ import java.util.*;
 /**
  * Generates a whole candidate tree before any item becomes publishable.  This is deliberately
  * separate from the publisher: an HTTP failure or malformed result never turns into community text.
+ *
+ * <p>Paired posts use a two-phase comment lifecycle (scheduler hooks):
+ * <ul>
+ *   <li>{@link #ensureAuthorPhase1CommentPlan} — author PUBLIC at T0, author-body only,
+ *       {@code scheduledAt} strictly before partnerAt (T0+Δ)</li>
+ *   <li>{@link #ensureCommentPlanForPairedPost} / {@link #attachPhase2FromCall2Response} —
+ *       partner arrival: unpublished items cancelled via revision bump; phase2 grounded on both
+ *       bodies; already-POSTED phase1 comments kept</li>
+ *   <li>{@link #loadLatestPublishedTopLevelComments} — Call2 context (5–8 latest top-level)</li>
+ * </ul>
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ThreadPlanGenerationService {
+    /** Phase1 top-level volume (grilled: few, 2–4). */
+    public static final int PHASE1_MAX_TOP_LEVEL = 4;
+    public static final int PHASE1_MAX_REPLIES = 0;
+    public static final int PHASE1_READY_MIN_TOP_LEVEL = 1;
+    public static final int PHASE1_READY_MIN_ITEMS = 2;
+    /** Call2 context window for published top-level comments. */
+    public static final int CALL2_COMMENT_CONTEXT_DEFAULT = 8;
+    public static final int CALL2_COMMENT_CONTEXT_MAX = 8;
+
     private final AiThreadPlanRepository planRepository;
     private final AiThreadPlanItemRepository itemRepository;
     private final PersonaRepository personaRepository;
@@ -42,6 +63,7 @@ public class ThreadPlanGenerationService {
     private final CandidateScheduleSupport candidateScheduleSupport;
     private final PlanPersonaMapper planPersonaMapper;
     private final InterestedPersonaSeeder interestedPersonaSeeder;
+    private final BackendBotClient backendBotClient;
 
     @Transactional
     public void generateRequestedPlans() {
@@ -52,34 +74,71 @@ public class ThreadPlanGenerationService {
     }
 
     /**
-     * Solo AI posts pre-bake comment candidates in {@code generateAndHold}. Paired posts go live
-     * via the invite flow and previously only left a REQUESTED plan that stalls while DB
-     * {@code provider_*} is OFF (daytime + nightly EXIT trap). Generate comments immediately
-     * after the pair is public, falling back to yml providers when the DB gate is OFF.
+     * Phase1 (scheduler hook at author PUBLIC / T0): author-body-only comment plan.
+     * All item {@code scheduledAt} values are clamped strictly before {@code partnerAt} (T0+Δ).
+     * Volume is small (≤ {@link #PHASE1_MAX_TOP_LEVEL} top-level).
+     *
+     * @param partnerAt partner arrival instant; must be after {@code publishedAt}
+     * @return true when the plan is READY/ACTIVE (or already was)
+     */
+    @Transactional
+    public boolean ensureAuthorPhase1CommentPlan(String postId, int revision, String title,
+                                                  String authorBody, String category,
+                                                  Instant publishedAt, Instant partnerAt) {
+        if (!planModeEnabled() || postId == null || postId.isBlank()) {
+            return false;
+        }
+        Instant t0 = publishedAt != null ? publishedAt : Instant.now();
+        if (partnerAt == null || !partnerAt.isAfter(t0)) {
+            log.warn("Phase1 skipped for post {}: partnerAt must be after publishedAt", postId);
+            return false;
+        }
+        String sourceBody = combinePairedSourceBody(authorBody, null);
+        AiThreadPlan plan = planService.requestPlan(
+                postId, Math.max(1, revision), "AI_POST", t0, title, sourceBody, category);
+        reGroundPlanSource(plan, title, sourceBody, category);
+        if (plan.getStatus() == ThreadPlanStatus.READY || plan.getStatus() == ThreadPlanStatus.ACTIVE) {
+            return true;
+        }
+        if (plan.getStatus() != ThreadPlanStatus.REQUESTED) {
+            log.warn("Phase1 plan {} for post {} is {} — skip", plan.getId(), postId, plan.getStatus());
+            return false;
+        }
+        generatePhase(plan.getId(), true, PHASE1_MAX_TOP_LEVEL, PHASE1_MAX_REPLIES,
+                PHASE1_READY_MIN_TOP_LEVEL, PHASE1_READY_MIN_ITEMS, t0, partnerAt, false);
+        return planReadyOrActive(plan.getId(), postId, "Phase1");
+    }
+
+    /**
+     * Phase2 (partner arrival): both-body grounding. {@link ThreadPlanService#requestPlan} with a
+     * bumped revision cancels unfinished items from older revisions; already-POSTED phase1 comments
+     * stay. Falls back to yml providers when DB gates are OFF.
      *
      * @return true when the plan is READY/ACTIVE (or already was)
      */
     @Transactional
     public boolean ensureCommentPlanForPairedPost(String postId, int revision, String title,
                                                    String authorBody, String partnerBody, String category) {
+        return ensureCommentPlanForPairedPost(postId, revision, title, authorBody, partnerBody,
+                category, Instant.now());
+    }
+
+    /**
+     * Phase2 with explicit partner-publish clock for schedule clamping (items on/after partnerAt).
+     */
+    @Transactional
+    public boolean ensureCommentPlanForPairedPost(String postId, int revision, String title,
+                                                   String authorBody, String partnerBody, String category,
+                                                   Instant partnerPublishedAt) {
         if (!planModeEnabled() || postId == null || postId.isBlank()) {
             return false;
         }
-        Instant now = Instant.now();
+        Instant origin = partnerPublishedAt != null ? partnerPublishedAt : Instant.now();
         String sourceBody = combinePairedSourceBody(authorBody, partnerBody);
         AiThreadPlan plan = planService.requestPlan(
-                postId, Math.max(1, revision), "AI_POST", now, title, sourceBody, category);
+                postId, Math.max(1, revision), "AI_POST", origin, title, sourceBody, category);
         // Outbox may have created this revision first with author-only body / HUMAN_POST.
-        // Re-ground to the paired snapshot before generating.
-        if (sourceBody != null && !sourceBody.isBlank()) {
-            plan.setSourceTitle(title);
-            plan.setSourceBody(sourceBody);
-            plan.setSourceCategory(category);
-            if (!"AI_POST".equals(plan.getSourceType())) {
-                plan.setSourceType("AI_POST");
-            }
-            planRepository.save(plan);
-        }
+        reGroundPlanSource(plan, title, sourceBody, category);
         if (plan.getStatus() == ThreadPlanStatus.READY || plan.getStatus() == ThreadPlanStatus.ACTIVE) {
             return true;
         }
@@ -88,14 +147,88 @@ public class ThreadPlanGenerationService {
                     plan.getId(), postId, plan.getStatus());
             return false;
         }
-        generateOne(plan.getId(), true);
-        AiThreadPlan after = planRepository.findById(plan.getId()).orElse(plan);
-        boolean ok = after.getStatus() == ThreadPlanStatus.READY || after.getStatus() == ThreadPlanStatus.ACTIVE;
-        if (!ok) {
-            log.warn("Paired comment plan {} for post {} ended as {} failure={}",
-                    after.getId(), postId, after.getStatus(), after.getFailureCode());
+        AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
+        int pool = config == null ? 24 : Math.max(1, Math.min(24, config.getCandidatePoolSize()));
+        int roots = Math.min(14, pool);
+        generatePhase(plan.getId(), true, roots, pool - roots,
+                properties.getThreadPlan().getReadyMinTopLevel(),
+                properties.getThreadPlan().getReadyMinItems(),
+                origin, null, true);
+        return planReadyOrActive(plan.getId(), postId, "Phase2");
+    }
+
+    /**
+     * Partner-arrival path when Call2 already returned structured comment candidates
+     * (same response as partner body). Cancels unpublished via revision bump, then persists
+     * phase2 items with {@code scheduledAt} on/after {@code partnerPublishedAt}.
+     */
+    @Transactional
+    public boolean attachPhase2FromCall2Response(String postId, int revision, String title,
+                                                  String authorBody, String partnerBody, String category,
+                                                  Instant partnerPublishedAt,
+                                                  Map<String, Object> call2Response) {
+        if (!planModeEnabled() || postId == null || postId.isBlank() || call2Response == null) {
+            return false;
         }
-        return ok;
+        Instant origin = partnerPublishedAt != null ? partnerPublishedAt : Instant.now();
+        String sourceBody = combinePairedSourceBody(authorBody, partnerBody);
+        AiThreadPlan plan = planService.requestPlan(
+                postId, Math.max(1, revision), "AI_POST", origin, title, sourceBody, category);
+        reGroundPlanSource(plan, title, sourceBody, category);
+        if (plan.getStatus() == ThreadPlanStatus.READY || plan.getStatus() == ThreadPlanStatus.ACTIVE) {
+            return true;
+        }
+        if (plan.getStatus() != ThreadPlanStatus.REQUESTED
+                && plan.getStatus() != ThreadPlanStatus.GENERATING) {
+            log.warn("Phase2 Call2 attach skipped plan {} status={}", plan.getId(), plan.getStatus());
+            return false;
+        }
+        if (plan.getStatus() == ThreadPlanStatus.REQUESTED) {
+            planService.markGenerating(plan.getId(),
+                    properties.getThreadPlan().getAiPostProvider(),
+                    properties.getThreadPlan().getAiPostModel());
+        }
+        Map<String, Object> response = new LinkedHashMap<>(call2Response);
+        // Call2 may nest comments under "items" or "comments" — prefer items.
+        if (!(response.get("items") instanceof List<?>) && response.get("comments") instanceof List<?> comments) {
+            response.put("items", comments);
+        }
+        candidateScheduleSupport.clampScheduledAtsOnOrAfter(response, origin);
+        try {
+            persistAndFinalize(plan.getId(), response, null);
+        } catch (IllegalArgumentException e) {
+            log.warn("Phase2 Call2 attach rejected for plan {}: {}", plan.getId(), e.getMessage());
+            planService.markFailed(plan.getId(), "INVALID_STRUCTURED_OUTPUT");
+            return false;
+        }
+        return planReadyOrActive(plan.getId(), postId, "Phase2-Call2");
+    }
+
+    /**
+     * Call2 context helper: up to {@code limit} (clamped 1..{@link #CALL2_COMMENT_CONTEXT_MAX})
+     * latest published top-level comments. Fewer than requested is OK (including 0).
+     */
+    public List<Map<String, Object>> loadLatestPublishedTopLevelComments(String postId, int limit) {
+        if (postId == null || postId.isBlank()) return List.of();
+        int size = limit <= 0 ? CALL2_COMMENT_CONTEXT_DEFAULT
+                : Math.min(CALL2_COMMENT_CONTEXT_MAX, Math.max(1, limit));
+        List<CommentThreadDto> raw = backendBotClient.getComments(postId, 0, size);
+        if (raw == null || raw.isEmpty()) return List.of();
+        List<Map<String, Object>> out = new ArrayList<>(Math.min(size, raw.size()));
+        for (CommentThreadDto c : raw) {
+            if (c == null) continue;
+            // API returns top-level threads; nested replies live under replies — skip empty bodies.
+            String body = c.getBody();
+            if (body == null || body.isBlank()) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            if (c.getId() != null) row.put("id", c.getId());
+            row.put("body", body.strip());
+            if (c.getAuthorNickname() != null) row.put("authorNickname", c.getAuthorNickname());
+            if (c.getAuthorId() != null) row.put("authorId", c.getAuthorId());
+            out.add(row);
+            if (out.size() >= size) break;
+        }
+        return out;
     }
 
     /** Author + partner bodies for comment-plan grounding (paired posts only). */
@@ -105,6 +238,28 @@ public class ThreadPlanGenerationService {
         if (partner.isEmpty()) return author;
         if (author.isEmpty()) return partner;
         return "[작성자]\n" + author + "\n\n[상대방]\n" + partner;
+    }
+
+    private void reGroundPlanSource(AiThreadPlan plan, String title, String sourceBody, String category) {
+        if (sourceBody == null || sourceBody.isBlank()) return;
+        plan.setSourceTitle(title);
+        plan.setSourceBody(sourceBody);
+        plan.setSourceCategory(category);
+        if (!"AI_POST".equals(plan.getSourceType())) {
+            plan.setSourceType("AI_POST");
+        }
+        planRepository.save(plan);
+    }
+
+    private boolean planReadyOrActive(String planId, String postId, String label) {
+        AiThreadPlan after = planRepository.findById(planId).orElse(null);
+        if (after == null) return false;
+        boolean ok = after.getStatus() == ThreadPlanStatus.READY || after.getStatus() == ThreadPlanStatus.ACTIVE;
+        if (!ok) {
+            log.warn("{} comment plan {} for post {} ended as {} failure={}",
+                    label, after.getId(), postId, after.getStatus(), after.getFailureCode());
+        }
+        return ok;
     }
 
     /** One retry only, with exactly the same provider/model snapshot. */
@@ -117,24 +272,54 @@ public class ThreadPlanGenerationService {
      *        (paired AI posts must ship with scheduled comments even outside the nightly window)
      */
     public void generateOne(String planId, boolean fallbackToYmlWhenOff) {
+        AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
+        int pool = config == null ? 24 : Math.max(1, Math.min(24, config.getCandidatePoolSize()));
+        int roots = Math.min(14, pool);
+        generatePhase(planId, fallbackToYmlWhenOff, roots, pool - roots,
+                properties.getThreadPlan().getReadyMinTopLevel(),
+                properties.getThreadPlan().getReadyMinItems(),
+                null, null, false);
+    }
+
+    /**
+     * Shared generation path for default, phase1, and phase2 plans.
+     *
+     * @param partnerAtExclusive when non-null, clamp all scheduledAt strictly before this (phase1)
+     * @param clampOnOrAfterOrigin when true and origin non-null, clamp scheduledAt on/after origin (phase2)
+     */
+    private void generatePhase(String planId, boolean fallbackToYmlWhenOff,
+                               int maxTopLevel, int maxReplies,
+                               int readyMinTopLevel, int readyMinItems,
+                               Instant scheduleOrigin,
+                               Instant partnerAtExclusive,
+                               boolean clampOnOrAfterOrigin) {
         AiThreadPlan plan = planRepository.findById(planId).orElse(null);
-        if (plan == null || plan.getStatus() != ThreadPlanStatus.REQUESTED || Instant.now().isAfter(plan.getAbsoluteExpiresAt())) return;
+        if (plan == null || plan.getStatus() != ThreadPlanStatus.REQUESTED
+                || Instant.now().isAfter(plan.getAbsoluteExpiresAt())) {
+            return;
+        }
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
         String provider = resolveProvider(plan.getSourceType(), config, fallbackToYmlWhenOff);
         if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) return;
         String model = "AI_POST".equals(plan.getSourceType()) ? properties.getThreadPlan().getAiPostModel()
                 : properties.getThreadPlan().getHumanPlanModel();
         planService.markGenerating(planId, provider, model);
-        int pool = config == null ? 24 : Math.max(1, Math.min(24, config.getCandidatePoolSize()));
-        PlanRequestBuilt built = planRequest(plan, provider, model, pool);
+        PlanRequestBuilt built = planRequest(plan, provider, model, maxTopLevel, maxReplies);
         Optional<Map<String, Object>> response = llmClient.generateThreadPlan(built.request());
-        if (response.isEmpty()) response = llmClient.generateThreadPlan(built.request()); // same provider, bounded retry
+        if (response.isEmpty()) response = llmClient.generateThreadPlan(built.request());
         if (response.isEmpty()) {
             planService.markFailed(planId, "GENERATION_FAILED");
             return;
         }
+        Map<String, Object> body = new LinkedHashMap<>(response.get());
+        Instant origin = scheduleOrigin != null ? scheduleOrigin : plan.getPublishedAt();
+        if (partnerAtExclusive != null) {
+            candidateScheduleSupport.clampScheduledAtsBefore(body, origin, partnerAtExclusive);
+        } else if (clampOnOrAfterOrigin && origin != null) {
+            candidateScheduleSupport.clampScheduledAtsOnOrAfter(body, origin);
+        }
         try {
-            persistAndFinalize(planId, response.get(), built.castIds());
+            persistAndFinalize(planId, body, built.castIds(), readyMinTopLevel, readyMinItems);
         } catch (IllegalArgumentException e) {
             log.warn("Plan {} rejected: {}", planId, e.getMessage());
             planService.markFailed(planId, "INVALID_STRUCTURED_OUTPUT");
@@ -158,7 +343,7 @@ public class ThreadPlanGenerationService {
         return fromDb;
     }
 
-    private PlanRequestBuilt planRequest(AiThreadPlan plan, String provider, String model, int pool) {
+    private PlanRequestBuilt planRequest(AiThreadPlan plan, String provider, String model, int maxTopLevel, int maxReplies) {
         // Full active pool for rotation (no fixed limit(24)) — but a single request's cast is
         // capped+shuffled so the prompt stays under Claude's 200K-token budget (2026-08-01 outage:
         // sending all 150 personas' voice_profile ≈ 306K tokens, 173/173 REQUESTED plans FAILED).
@@ -173,7 +358,9 @@ public class ThreadPlanGenerationService {
         r.put("timeoutMs", properties.getThreadPlan().getBundleTimeoutMs());
         r.put("postRevision", (long) plan.getPostRevision()); r.put("existingTitle", nullToEmpty(plan.getSourceTitle()));
         r.put("existingBody", nullToEmpty(plan.getSourceBody())); r.put("category", nullToEmpty(plan.getSourceCategory()));
-        int roots = Math.min(14, pool); r.put("personas", personas); r.put("maxTopLevel", roots); r.put("maxReplies", pool - roots);
+        r.put("personas", personas);
+        r.put("maxTopLevel", Math.max(0, maxTopLevel));
+        r.put("maxReplies", Math.max(0, maxReplies));
         // Floor=1 so LLM parsePlan accepts sparse plans; quality gate (WP4) drops later.
         r.put("minTopLevel", 1); r.put("minItems", 1);
         return new PlanRequestBuilt(r, castIds);
@@ -193,7 +380,17 @@ public class ThreadPlanGenerationService {
     @Transactional
     public ThreadQualityGate.QualityResult persistAndFinalize(String planId, Map<String, Object> response,
                                                                Set<String> allowedPersonaIds) {
-        ThreadQualityGate.QualityResult quality = persistResponse(planId, response, allowedPersonaIds);
+        OrchestratorProperties.ThreadPlan cfg = properties.getThreadPlan();
+        return persistAndFinalize(planId, response, allowedPersonaIds,
+                cfg.getReadyMinTopLevel(), cfg.getReadyMinItems());
+    }
+
+    @Transactional
+    public ThreadQualityGate.QualityResult persistAndFinalize(String planId, Map<String, Object> response,
+                                                               Set<String> allowedPersonaIds,
+                                                               int readyMinTopLevel, int readyMinItems) {
+        ThreadQualityGate.QualityResult quality =
+                persistResponse(planId, response, allowedPersonaIds, readyMinTopLevel, readyMinItems);
         if (quality.passedOperationalMin()) {
             planService.markReady(planId);
             planService.activate(planId);
@@ -238,6 +435,16 @@ public class ThreadPlanGenerationService {
     @SuppressWarnings("unchecked")
     ThreadQualityGate.QualityResult persistResponse(String planId, Map<String, Object> response,
                                                      Set<String> allowedPersonaIds) {
+        OrchestratorProperties.ThreadPlan cfg = properties.getThreadPlan();
+        return persistResponse(planId, response, allowedPersonaIds,
+                cfg.getReadyMinTopLevel(), cfg.getReadyMinItems());
+    }
+
+    @Transactional
+    @SuppressWarnings("unchecked")
+    ThreadQualityGate.QualityResult persistResponse(String planId, Map<String, Object> response,
+                                                     Set<String> allowedPersonaIds,
+                                                     int readyMinTopLevel, int readyMinItems) {
         AiThreadPlan plan = planRepository.findById(planId).orElseThrow();
         Object rawItems = response.get("items");
         if (!(rawItems instanceof List<?> rows) || rows.isEmpty() || rows.size() > 24) {
@@ -253,8 +460,8 @@ public class ThreadPlanGenerationService {
                 rows,
                 cast,
                 personaRepository::existsById,
-                cfg.getReadyMinTopLevel(),
-                cfg.getReadyMinItems(),
+                readyMinTopLevel,
+                readyMinItems,
                 cfg.getStanceShareMax());
 
         if (!quality.passedOperationalMin()) {

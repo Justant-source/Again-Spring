@@ -1,0 +1,34 @@
+{
+  "title": "Again Spring paired Call2 (partner body + phase2 comments)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["partner_post", "comments"],
+  "properties": {
+    "partner_post": {
+      "type": ["object", "null"],
+      "description": "상대방(PARTNER) 본문. Comment-only micro-batch continuation sets this to null.",
+      "additionalProperties": false,
+      "required": ["body"],
+      "properties": {
+        "body": { "type": "string" }
+      }
+    },
+    "comments": {
+      "type": "array",
+      "description": "Phase2 comment candidates grounded on author + partner (+ published top-level comments when present)",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "parentRef", "personaId", "body", "stance", "priority"],
+        "properties": {
+          "ref": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$" },
+          "parentRef": { "type": ["string", "null"] },
+          "personaId": { "type": "string" },
+          "body": { "type": "string" },
+          "stance": { "type": ["string", "null"] },
+          "priority": { "type": ["integer", "null"] }
+        }
+      }
+    }
+  }
+}

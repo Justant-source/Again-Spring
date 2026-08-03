@@ -183,8 +183,9 @@ env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
   │    ├─ ActivityCurve.sampleFutureInstants 로 발행 슬롯 샘플링
   │    └─ generateAndHold() → ai_scheduled_posts SCHEDULED
   ├─ POST /admin/trigger/paired-posts?count=paired
-  │    └─ PairedPostScheduler: AUTHOR→PRIVATE/WAIT_FOR_PARTNER→PARTNER answer→PUBLIC
-  │       → ensureCommentPlanForPairedPost (댓글 PLAN 즉시; provider OFF여도 yml fallback)
+  │    └─ PairedPostScheduler: Call1 hold(AUTHOR+phase1)→PUBLIC(T0, KST 02–06 밴)
+  │       → Δ(10m–2h, median~50–60m) 후 Call2(PARTNER+phase2)→invite answer
+  │       → partner 도착 시 미게시 cancel + phase2 both-context (phase1 게시분 보존)
   ├─ 낮 동안 밀린 REQUESTED 스레드플랜(실사람 글 반응 등)도 이 창에서 같이 소진
   └─ provider = OFF (trap으로 스크립트 종료 방식과 무관하게 항상 보장)
 

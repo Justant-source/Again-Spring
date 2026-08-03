@@ -1,21 +1,24 @@
 package com.againspring.aiuser.orchestrator.scheduler;
 
-import com.againspring.aiuser.orchestrator.auth.BotTokenCache;
-import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
-import com.againspring.aiuser.orchestrator.client.dto.CreatePostDto;
-import com.againspring.aiuser.orchestrator.client.dto.GenDto;
-import com.againspring.aiuser.orchestrator.client.dto.PostDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
+import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
 import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.domain.PersonaRelationship;
+import com.againspring.aiuser.orchestrator.domain.enums.ScheduledPostStatus;
+import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRelationshipRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
-import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
-import com.againspring.aiuser.orchestrator.service.threadplan.ThreadPlanGenerationService;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
+import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
+import com.againspring.aiuser.orchestrator.service.threadplan.CandidateScheduleSupport;
+import com.againspring.aiuser.orchestrator.service.threadplan.PairedHoldMeta;
+import com.againspring.aiuser.orchestrator.service.threadplan.PlanPersonaMapper;
+import com.againspring.aiuser.orchestrator.service.threadplan.QuietHours;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,6 +26,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -31,18 +36,16 @@ import java.util.*;
 /**
  * AI 유저 양면 갈등 시나리오 스케줄러.
  *
- * 흐름:
- *  1. persona_relationships에서 COUPLE/MARRIAGE/FRIEND 페어 선택
- *  2. 작성자 A → 갈등 사연 생성 + PRIVATE 게시 + WAIT_FOR_PARTNER 설정 + 초대 토큰 발급
- *  3. 파트너 B → 작성자 본문을 컨텍스트로 상대방 입장 생성 + /api/s/{token}/answer 제출
- *  4. WAIT_FOR_PARTNER → 자동 PUBLIC 전환
- *  5. 댓글 PLAN을 즉시 생성·스케줄 (solo generateAndHold와 동일하게 발행 전 후보 확보)
+ * <p>생성 ≠ 발행 (solo {@code generateAndHold}와 동일):</p>
+ * <ol>
+ *   <li>persona_relationships에서 COUPLE/MARRIAGE/FRIEND 페어 선택</li>
+ *   <li>Call1 ({@code PAIRED_PHASE1}): 작성자 본문 + phase1 댓글 → {@code ai_scheduled_posts} 홀딩
+ *       (scheduledPublishAt은 KST 02–06 quiet hours 하드 밴)</li>
+ *   <li>{@code ScheduledPostPublisher}가 슬롯 도래 시 author PUBLIC + invite 발급</li>
+ *   <li>partner는 T0+Δ({@code PartnerDelaySampler})에 {@code ai_scheduled_partner_answers}로 제출</li>
+ * </ol>
  *
- * 스케줄 기본값: 매일 UTC 05:00 (KST 14:00)
- * 환경변수:
- *  - PAIRED_POST_ENABLED / PAIRED_POST_CRON / PAIRED_POST_PAIRS
- *  - PAIRED_POST_TARGET_SHARE (default 0.20) — 하루 AI 글 중 양면 사연 비율
- *  - PAIRED_POST_ROMANTIC_SHARE (default 0.80)
+ * <p>환경변수: PAIRED_POST_* (delay/publisher/slot 포함)</p>
  */
 @Slf4j
 @Component
@@ -51,39 +54,40 @@ public class PairedPostScheduler {
 
     private final PersonaRelationshipRepository relationshipRepo;
     private final PersonaRepository personaRepo;
-    private final BackendBotClient backendBot;
     private final LlmAiUserClient llmClient;
-    private final BotTokenCache tokenCache;
     private final OrchestratorProperties props;
     private final JdbcTemplate jdbcTemplate;
     private final ContentSafetyGuard safetyGuard;
     private final AiUserGenerationConfigRepository generationConfigRepository;
     private final DailyPostQuotaService dailyPostQuotaService;
-    private final ThreadPlanGenerationService threadPlanGenerationService;
+    private final AiScheduledPostRepository scheduledPostRepository;
+    private final ObjectMapper objectMapper;
+    private final PlanPersonaMapper planPersonaMapper;
+    private final CandidateScheduleSupport candidateScheduleSupport;
+
+    /** Phase1 cast stays small (author + commenters for ~2–4 top-level). */
+    private static final int CALL1_CAST_MAX = 12;
 
     private static final Random RNG = new Random();
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final List<String> PAIR_TYPES = List.of("COUPLE", "MARRIAGE", "FRIEND");
 
-    /** 매일 KST 14:00 (UTC 05:00) 실행 — 환경변수로 재정의 가능 */
     @Scheduled(cron = "${ai-user.paired-post.cron:0 0 5 * * *}")
     public void runPairedPosts() {
         runPairedPosts(null);
     }
 
-    /** 수동 즉시 실행 (테스트·어드민·야간 배치용). pairsPerRun 상한. */
     public int triggerNow() {
         return runPairedPosts(null);
     }
 
-    /** 야간 배치 등에서 최대 N쌍만 생성. */
     public int triggerNow(int maxPairs) {
         return runPairedPosts(Math.max(0, maxPairs));
     }
 
     /**
      * @param maxPairsOverride null이면 config.pairsPerRun, 아니면 그 값으로 상한
-     * @return 이번 실행에서 시도한 pair 수
+     * @return 이번 실행에서 홀딩에 성공한 pair 수
      */
     public int runPairedPosts(Integer maxPairsOverride) {
         if (!props.isEnabled()) {
@@ -131,7 +135,8 @@ public class PairedPostScheduler {
         }
 
         EnumMap<PairBucket, Integer> mixCounts = countPairedMixToday();
-        log.info("[PairedPost] Running {} pair(s) (pool={}, totalToday={}, pairedToday={}, desiredToday={}, romanticToday={}, friendToday={})",
+        List<Instant> slots = sampleAuthorSlots(toRun, config);
+        log.info("[PairedPost] Holding {} pair(s) (pool={}, totalToday={}, pairedToday={}, desiredToday={}, romanticToday={}, friendToday={})",
             toRun,
             all.size(),
             totalSyntheticToday,
@@ -153,9 +158,11 @@ public class PairedPostScheduler {
 
             try {
                 PersonaRelationship rel = relOpt.get();
-                executePair(rel);
-                attempted++;
-                mixCounts.merge(bucketForRelationType(rel.getRelationType()), 1, Integer::sum);
+                Instant slot = i < slots.size() ? slots.get(i) : QuietHours.enforceAuthorSlot(Instant.now().plus(Duration.ofHours(1)));
+                if (holdPair(rel, slot)) {
+                    attempted++;
+                    mixCounts.merge(bucketForRelationType(rel.getRelationType()), 1, Integer::sum);
+                }
             } catch (Exception e) {
                 log.error("[PairedPost] Pair {} failed: {}", i, e.getMessage(), e);
             }
@@ -163,260 +170,191 @@ public class PairedPostScheduler {
         return attempted;
     }
 
-    /** 관리자 설정 기반 backend 조회 — PLAN 모드에서는 항상 CLI. */
-    private String backendForPost() {
-        return "CLI";
-    }
-
-    // ── 핵심 실행 흐름 ─────────────────────────────────────────────────────────
-
-    private void executePair(PersonaRelationship rel) {
+    /**
+     * Call1 ({@code PAIRED_PHASE1}) → hold in {@code ai_scheduled_posts}. No backend write until
+     * {@code ScheduledPostPublisher} fires the non-quiet slot.
+     */
+    private boolean holdPair(PersonaRelationship rel, Instant scheduledPublishAt) {
         Optional<Persona> authorOpt = personaRepo.findById(rel.getPersonaId());
         Optional<Persona> partnerOpt = personaRepo.findById(rel.getOtherId());
         if (authorOpt.isEmpty() || partnerOpt.isEmpty()) {
             log.warn("[PairedPost] Persona not found — personaId={} otherId={}",
                 rel.getPersonaId(), rel.getOtherId());
-            return;
+            return false;
         }
-        Persona author  = authorOpt.get();
+        Persona author = authorOpt.get();
         Persona partner = partnerOpt.get();
 
         String category = categoryForRelationType(rel.getRelationType());
-        String corrId   = UUID.randomUUID().toString().substring(0, 8);
-
-        // ── Step 1: 작성자 JWT ────────────────────────────────────────────────
-        String authorEmail = lookupEmail(author.getId());
-        Optional<String> jwtOpt = tokenCache.getToken(author.getId(), authorEmail, props.getBotPassword());
-        if (jwtOpt.isEmpty()) {
-            log.warn("[PairedPost] No JWT for author {}", author.getId());
-            return;
+        String corrId = UUID.randomUUID().toString().substring(0, 8);
+        Instant slot = QuietHours.enforceAuthorSlot(scheduledPublishAt);
+        if (QuietHours.isQuiet(slot)) {
+            log.warn("[PairedPost] Author slot still quiet after enforce — skip corrId={}", corrId);
+            return false;
         }
-        String jwt = jwtOpt.get();
 
-        // ── Step 2: 작성자 본문 생성 (AUTHOR stance) ──────────────────────────
-        String lengthTier = RNG.nextDouble() < 0.55 ? "MEDIUM" : "LONG";
-        String backend = backendForPost();
-        log.info("[PairedPost] backend={} corrId={}", backend, corrId);
-        Optional<String> bodyOpt = llmClient.generatePost(GenDto.PostRequest.builder()
-            .personaId(author.getId())
-            .voiceProfile(buildVoiceBlock(author))
-            .slangLevel(author.getSlangLevel().doubleValue())
-            .category(category)
-            .archetype(author.getArchetype())
-            .formality(getFormality(author))
-            .demographic(buildDemographic(author))
-            .lengthTier(lengthTier)
-            .stance("AUTHOR")
-            .correlationId(corrId + "-A")
-            .backend(backend)
-            .build());
-        if (bodyOpt.isEmpty()) {
-            log.warn("[PairedPost] Author body gen failed corrId={}", corrId);
-            return;
+        Optional<Call1Hold> call1 = generateCall1(author, category, corrId, slot);
+        if (call1.isEmpty()) {
+            log.warn("[PairedPost] Call1 failed corrId={}", corrId);
+            return false;
         }
-        String authorBody = bodyOpt.get();
-        ContentSafetyGuard.GuardResult authorGuard = safetyGuard.check(authorBody, ContentSafetyGuard.ContentType.POST);
+        Call1Hold heldContent = call1.get();
+        ContentSafetyGuard.GuardResult authorGuard =
+                safetyGuard.check(heldContent.body(), ContentSafetyGuard.ContentType.POST);
         if (!authorGuard.passed()) {
             log.warn("[PairedPost] Author body blocked: {}", authorGuard.reason());
-            return;
+            return false;
         }
 
-        // ── Step 3: 글 작성 (PRIVATE + jurorCount=3) ──────────────────────────
-        String title = extractTitle(authorBody);
-        Optional<PostDto> postOpt = backendBot.createPost(jwt, CreatePostDto.builder()
-            .userTitle(title)
-            .bodyRaw(authorBody)
-            .category(category)
-            .visibility("PRIVATE")
-            .jurorCount(3)
-            .build());
-        if (postOpt.isEmpty()) {
-            log.warn("[PairedPost] Post creation failed corrId={}", corrId);
-            return;
-        }
-        String postId = postOpt.get().getId();
-
-        // ── Step 4: WAIT_FOR_PARTNER 모드 설정 ────────────────────────────────
-        backendBot.setPublishMode(jwt, postId, "WAIT_FOR_PARTNER", 72);
-
-        // ── Step 5: 초대 토큰 발급 ────────────────────────────────────────────
-        Optional<String> inviteTokenOpt = backendBot.createInviteToken(jwt, postId);
-        if (inviteTokenOpt.isEmpty()) {
-            log.warn("[PairedPost] Invite token failed for post={}", postId);
-            return;
-        }
-        String inviteToken = inviteTokenOpt.get();
-
-        // ── Step 6: 작성자 발행 본문 조회 (상대방 프롬프트 컨텍스트) ──────────
-        Optional<Map<String, Object>> postDetailOpt = backendBot.getPost(postId);
-        String authorBodyPublished = postDetailOpt
-            .map(d -> (String) d.get("bodyPublished"))
-            .filter(b -> b != null && !b.isBlank())
-            .orElse(authorBody);
-
-        // ── Step 7: 파트너 본문 생성 (PARTNER stance + 원글 컨텍스트) ──────────
-        Optional<String> partnerBodyOpt = llmClient.generatePost(GenDto.PostRequest.builder()
-            .personaId(partner.getId())
-            .voiceProfile(buildVoiceBlock(partner))
-            .slangLevel(partner.getSlangLevel().doubleValue())
-            .category(category)
-            .archetype(partner.getArchetype())
-            .formality(getFormality(partner))
-            .demographic(buildDemographic(partner))
-            .lengthTier("MEDIUM")
-            .stance("PARTNER")
-            .counterpartBody(authorBodyPublished)
-            .correlationId(corrId + "-P")
-            .backend(backend)
-            .build());
-        if (partnerBodyOpt.isEmpty()) {
-            log.warn("[PairedPost] Partner body gen failed for post={}", postId);
-            return;
-        }
-        String partnerBody = partnerBodyOpt.get();
-        ContentSafetyGuard.GuardResult partnerGuard = safetyGuard.check(partnerBody, ContentSafetyGuard.ContentType.POST);
-        if (!partnerGuard.passed()) {
-            log.warn("[PairedPost] Partner body blocked: {}", partnerGuard.reason());
-            return;
-        }
-
-        // ── Step 8: 파트너 답변 제출 → 자동 PUBLIC 전환 ─────────────────────
-        boolean ok = backendBot.submitPartnerAnswer(inviteToken, null, partnerBody);
-        if (!ok) {
-            log.warn("[PairedPost] Partner answer submission failed for post={}", postId);
-            return;
-        }
-        log.info("[PairedPost] ✅ corrId={} post={} author={} partner={} cat={}",
-            corrId, postId,
-            author.getId().substring(0, 8),
-            partner.getId().substring(0, 8),
-            category);
-
-        // ── Step 9: 댓글 PLAN 즉시 생성 (provider OFF여도 yml fallback) ──────
-        // solo generateAndHold는 홀딩 시점에 후보를 심는다. paired는 즉시 공개되므로
-        // 여기서 같은 역할을 한다. outbox REQUESTED 경로만 믿으면 daytime/trap OFF에 멈춘다.
-        int revision = lookupContentRevision(postId);
-        boolean planned = threadPlanGenerationService.ensureCommentPlanForPairedPost(
-            postId, revision, title, authorBodyPublished, partnerBody, category);
-        if (!planned) {
-            log.warn("[PairedPost] Comment plan not ready for post={} revision={}", postId, revision);
-        }
-    }
-
-    /** Partner answer advances content_revision; default 2 when lookup fails. */
-    private int lookupContentRevision(String postId) {
+        String candidatesJson;
         try {
-            Integer revision = jdbcTemplate.queryForObject(
-                "SELECT content_revision FROM posts WHERE id = ?", Integer.class, postId);
-            return revision != null ? Math.max(1, revision) : 2;
+            Map<String, Object> payload = new LinkedHashMap<>(heldContent.response());
+            payload.put(PairedHoldMeta.KEY,
+                    PairedHoldMeta.wrap(partner.getId(), rel.getRelationType(), corrId, 3)
+                            .get(PairedHoldMeta.KEY));
+            candidatesJson = objectMapper.writeValueAsString(payload);
         } catch (Exception e) {
-            return 2;
+            log.error("[PairedPost] Could not serialize Call1 hold corrId={}", corrId, e);
+            return false;
         }
+
+        AiScheduledPost held = AiScheduledPost.builder()
+                .personaId(author.getId())
+                .category(category)
+                .title(heldContent.title())
+                .body(heldContent.body())
+                .candidatesJson(candidatesJson)
+                .scheduledPublishAt(slot)
+                .status(ScheduledPostStatus.SCHEDULED)
+                .provider(heldContent.provider())
+                .model(heldContent.model())
+                .origin(PairedHoldMeta.ORIGIN_PAIRED)
+                .build();
+        scheduledPostRepository.save(held);
+
+        log.info("[PairedPost] ⏳ held corrId={} scheduledId={} author={} partner={} cat={} slot={} phase1Items={}",
+                corrId, held.getId(),
+                author.getId().substring(0, Math.min(8, author.getId().length())),
+                partner.getId().substring(0, Math.min(8, partner.getId().length())),
+                category, slot, heldContent.itemCount());
+        return true;
     }
 
-    // ── 유틸리티 ──────────────────────────────────────────────────────────────
+    private Optional<Call1Hold> generateCall1(Persona author, String category, String corrId, Instant slot) {
+        AiUserGenerationConfig config = generationConfigRepository.findById(1).orElse(null);
+        String provider = config == null ? props.getThreadPlan().getAiPostProvider()
+                : config.getProviderAiPostBundle();
+        if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) {
+            provider = props.getThreadPlan().getAiPostProvider();
+        }
+        if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) {
+            log.info("[PairedPost] Call1 skipped: provider OFF corrId={}", corrId);
+            return Optional.empty();
+        }
+        String model = props.getThreadPlan().getAiPostModel();
 
-    /** voice_profile에서 LLM 주입용 voice 블록 조립 */
-    @SuppressWarnings("unchecked")
-    private String buildVoiceBlock(Persona persona) {
-        Map<String, Object> vp = persona.getVoiceProfile();
-        if (vp == null) return "일반 커뮤니티 사용자";
-        StringBuilder sb = new StringBuilder();
-
-        Object style = vp.get("general_style");
-        if (style != null && !style.toString().isBlank()) sb.append(style.toString().trim());
-
-        // 자주 쓰는 표현 (lexicon.signature_phrases)
-        Object lexicon = vp.get("lexicon");
-        if (lexicon instanceof Map<?, ?> lex) {
-            Object phrases = lex.get("signature_phrases");
-            if (phrases instanceof List<?> list && !list.isEmpty()) {
-                sb.append("\n[자주 쓰는 표현] ");
-                sb.append(list.subList(0, Math.min(3, list.size())).stream()
-                    .map(Object::toString).reduce((a, b) -> a + " / " + b).orElse(""));
-            }
+        List<Persona> pool = PlanPersonaMapper.capCastPool(personaRepo.findByActiveTrue(), CALL1_CAST_MAX);
+        List<Map<String, Object>> cast = planPersonaMapper.mapCast(pool);
+        // Keep author first for voice grounding.
+        Map<String, Object> authorMap = planPersonaMapper.mapAuthor(author);
+        List<Map<String, Object>> personas = new ArrayList<>();
+        personas.add(authorMap);
+        for (Map<String, Object> p : cast) {
+            if (author.getId().equals(String.valueOf(p.getOrDefault("personaId", "")))) continue;
+            personas.add(p);
+            if (personas.size() >= CALL1_CAST_MAX) break;
         }
 
-        // 맞춤법·오타 패턴 (writing_quirks.consistent_errors)
-        Object quirks = vp.get("writing_quirks");
-        if (quirks instanceof Map<?, ?> q) {
-            Object errs = q.get("consistent_errors");
-            if (errs instanceof List<?> elist && !elist.isEmpty()) {
-                sb.append("\n[맞춤법·오타] ").append(elist.get(0));
-            }
-        }
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("provider", provider);
+        request.put("model", model);
+        request.put("correlationId", corrId);
+        request.put("category", category);
+        request.put("author", authorMap);
+        request.put("personas", personas);
+        request.put("maxTopLevel", 4);
+        request.put("maxReplies", 0);
+        request.put("minTopLevel", 2);
+        request.put("minItems", 2);
 
-        String result = sb.toString().trim();
-        return result.isEmpty() ? "일반 커뮤니티 사용자" : result;
+        Optional<Map<String, Object>> responseOpt = llmClient.generatePairedCall1(request);
+        if (responseOpt.isEmpty()) return Optional.empty();
+        Map<String, Object> response = new LinkedHashMap<>(responseOpt.get());
+        if (!(response.get("items") instanceof List<?>) && response.get("comments") instanceof List<?> comments) {
+            response.put("items", comments);
+        }
+        candidateScheduleSupport.enrichMissingScheduledAts(response, slot);
+
+        Object postRaw = response.get("post");
+        if (!(postRaw instanceof Map<?, ?> post)) {
+            log.warn("[PairedPost] Call1 missing post corrId={}", corrId);
+            return Optional.empty();
+        }
+        String title = stringVal(post.get("title"));
+        String body = stringVal(post.get("body"));
+        if (title == null || title.isBlank() || body == null || body.isBlank()) {
+            log.warn("[PairedPost] Call1 empty title/body corrId={}", corrId);
+            return Optional.empty();
+        }
+        int items = response.get("items") instanceof List<?> list ? list.size() : 0;
+        return Optional.of(new Call1Hold(title.strip(), body.strip(), response, provider, model, items));
     }
 
-    /** voice_profile.formality 조회 (없으면 "casual") */
-    private String getFormality(Persona persona) {
-        Map<String, Object> vp = persona.getVoiceProfile();
-        if (vp == null) return "casual";
-        Object f = vp.get("formality");
-        return (f != null && !f.toString().isBlank()) ? f.toString() : "casual";
+    private static String stringVal(Object v) {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        return s.isEmpty() || "null".equalsIgnoreCase(s) ? null : s;
     }
 
-    /** voice_profile.age/gender → 한국어 demographic 문자열 */
-    private String buildDemographic(Persona persona) {
-        Map<String, Object> vp = persona.getVoiceProfile();
-        if (vp == null) return null;
-        List<String> parts = new ArrayList<>();
-        Object age = vp.get("age");
-        if (age != null && !age.toString().isBlank()) {
-            String kr = switch (age.toString()) {
-                case "10s"       -> "10대";
-                case "20s_early" -> "20대 초반";
-                case "20s_late"  -> "20대 후반";
-                case "30s_early" -> "30대 초반";
-                case "30s_late"  -> "30대 후반";
-                case "30s"       -> "30대";
-                case "40s"       -> "40대";
-                case "50s"       -> "50대";
-                case "60s"       -> "60대";
-                default          -> age.toString();
-            };
-            parts.add(kr);
-        }
-        Object gender = vp.get("gender");
-        if (gender != null && !gender.toString().isBlank()) {
-            parts.add("M".equalsIgnoreCase(gender.toString()) ? "남성" : "여성");
-        }
-        return parts.isEmpty() ? null : String.join(", ", parts);
-    }
-
-    /** users 테이블에서 이메일 조회 (JdbcTemplate — 오케스트레이터 DB와 동일 스키마) */
-    private String lookupEmail(String personaId) {
-        try {
-            String email = jdbcTemplate.queryForObject(
-                "SELECT email FROM users WHERE id = ?", String.class, personaId);
-            return email != null ? email : "unknown@againspring.com";
-        } catch (Exception e) {
-            return "unknown@againspring.com";
-        }
-    }
-
-    /** 본문 첫 줄에서 제목 추출 (메타 텍스트 제거) */
-    private String extractTitle(String body) {
-        if (body == null || body.isBlank()) return "갈등 사연";
-        for (String line : body.strip().split("[\\n\\r]+")) {
-            String trimmed = line.trim();
-            if (trimmed.isBlank()) continue;
-            // 선두 메타 라인([원문 수정본] 등) 스킵
-            if (trimmed.startsWith("[") && trimmed.endsWith("]")) continue;
-            if (trimmed.matches("^\\[.{1,20}].*")) continue;
-            String title = trimmed.length() > 40 ? trimmed.substring(0, 40) : trimmed;
-            return title;
-        }
-        return "갈등 사연";
-    }
+    private record Call1Hold(String title, String body, Map<String, Object> response,
+                             String provider, String model, int itemCount) { }
 
     /**
-     * 하루 목표 양면 사연 수 = ceil(일일 글 목표 × targetShare).
-     * target_posts가 있으면 그것을 기준으로 하고, 없으면 오늘 실제 생성량 기준으로 비율을 맞춘다.
-     * 예: target=10, share=0.20 → 2개 (전체의 20%).
+     * Samples author publish slots via ActivityCurve, then hard-bans KST 02–06.
+     * Window: max(now, today@fromHour) → today@toHour (extends +1 day if needed).
      */
+    List<Instant> sampleAuthorSlots(int count, OrchestratorProperties.PairedPost config) {
+        if (count <= 0) return List.of();
+        int fromHour = config.getAuthorSlotFromHour();
+        int toHour = config.getAuthorSlotToHour();
+        LocalDate today = LocalDate.now(KST);
+        Instant now = Instant.now();
+        Instant from = today.atStartOfDay(KST).plusHours(fromHour).toInstant();
+        if (now.isAfter(from)) from = now;
+        Instant to = today.atStartOfDay(KST).plusHours(toHour).toInstant();
+        if (!to.isAfter(from)) {
+            to = from.plus(Duration.ofHours(Math.max(4, toHour - fromHour)));
+        }
+
+        long minSpacing = Math.max(15, props.getThreadPlan().getPostSlotMinSpacingMinutes());
+        List<Instant> raw;
+        try {
+            raw = ActivityCurve.sampleFutureInstants(
+                    from, to, count,
+                    props.getThreadPlan().getKstHourlyHumanWeights(),
+                    Duration.ofMinutes(minSpacing),
+                    RNG);
+        } catch (IllegalArgumentException e) {
+            log.warn("[PairedPost] slot sampling failed ({}), using sequential offsets", e.getMessage());
+            raw = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                raw.add(from.plus(Duration.ofMinutes(minSpacing * (long) i)));
+            }
+        }
+
+        List<Instant> out = new ArrayList<>(raw.size());
+        for (Instant slot : raw) {
+            Instant enforced = QuietHours.enforceAuthorSlot(slot);
+            // Reject if still quiet (misconfig) — bump further with nextResume.
+            if (QuietHours.isQuiet(enforced)) {
+                enforced = QuietHours.nextResumeAfter(enforced);
+            }
+            out.add(enforced);
+        }
+        out.sort(Instant::compareTo);
+        return out;
+    }
+
     private int desiredPairedPostsToday(
         OrchestratorProperties.PairedPost config,
         int targetPosts,
@@ -434,7 +372,34 @@ public class PairedPostScheduler {
         return Math.max(1, (int) Math.ceil(basePostCount * share));
     }
 
+    /**
+     * Counts held PAIRED rows created today (generate≠publish) plus legacy completed
+     * partner-answered posts that may not have gone through the hold table.
+     */
     private int countPairedPostsToday() {
+        int held = countHeldPairedToday();
+        int answered = countAnsweredPairedToday();
+        return Math.max(held, answered);
+    }
+
+    private int countHeldPairedToday() {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_scheduled_posts " +
+                "WHERE origin = ? " +
+                "  AND status <> 'CANCELLED' " +
+                "  AND created_at >= ?",
+                Integer.class,
+                PairedHoldMeta.ORIGIN_PAIRED,
+                todayStartTimestamp());
+            return count != null ? count : 0;
+        } catch (Exception e) {
+            log.warn("[PairedPost] countHeldPairedToday failed: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    private int countAnsweredPairedToday() {
         try {
             Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM posts p " +
@@ -448,7 +413,7 @@ public class PairedPostScheduler {
                 todayStartTimestamp());
             return count != null ? count : 0;
         } catch (Exception e) {
-            log.warn("[PairedPost] countPairedPostsToday failed: {}", e.getMessage());
+            log.warn("[PairedPost] countAnsweredPairedToday failed: {}", e.getMessage());
             return 0;
         }
     }
@@ -457,6 +422,30 @@ public class PairedPostScheduler {
         EnumMap<PairBucket, Integer> counts = new EnumMap<>(PairBucket.class);
         counts.put(PairBucket.ROMANTIC, 0);
         counts.put(PairBucket.FRIEND, 0);
+
+        try {
+            List<Map<String, Object>> heldRows = jdbcTemplate.queryForList(
+                "SELECT category AS category, COUNT(*) AS cnt " +
+                "FROM ai_scheduled_posts " +
+                "WHERE origin = ? " +
+                "  AND status <> 'CANCELLED' " +
+                "  AND created_at >= ? " +
+                "  AND category IN ('COUPLE', 'MARRIED', 'FRIEND') " +
+                "GROUP BY category",
+                PairedHoldMeta.ORIGIN_PAIRED,
+                todayStartTimestamp());
+            for (Map<String, Object> row : heldRows) {
+                PairBucket bucket = bucketForCategory(Objects.toString(row.get("category"), ""));
+                int count = ((Number) row.getOrDefault("cnt", 0)).intValue();
+                counts.merge(bucket, count, Integer::sum);
+            }
+        } catch (Exception e) {
+            log.warn("[PairedPost] countPairedMixToday(held) failed: {}", e.getMessage());
+        }
+
+        if (counts.get(PairBucket.ROMANTIC) + counts.get(PairBucket.FRIEND) > 0) {
+            return counts;
+        }
 
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
@@ -478,7 +467,7 @@ public class PairedPostScheduler {
                 counts.merge(bucket, count, Integer::sum);
             }
         } catch (Exception e) {
-            log.warn("[PairedPost] countPairedMixToday failed: {}", e.getMessage());
+            log.warn("[PairedPost] countPairedMixToday(answered) failed: {}", e.getMessage());
         }
 
         return counts;

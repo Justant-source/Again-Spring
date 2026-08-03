@@ -19,6 +19,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class ThreadPlanGenerationServiceTest {
@@ -56,7 +57,8 @@ class ThreadPlanGenerationServiceTest {
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
                 planService, llmClient, qualityGate, properties, configRepository,
-                scheduleSupport, planPersonaMapper, interestedPersonaSeeder
+                scheduleSupport, planPersonaMapper, interestedPersonaSeeder,
+                mock(com.againspring.aiuser.orchestrator.client.BackendBotClient.class)
         );
     }
 

@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class PersistResponseScheduledAtTest {
@@ -55,7 +56,8 @@ class PersistResponseScheduledAtTest {
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
                 planService, llmClient, qualityGate, properties, configRepository,
-                scheduleSupport, planPersonaMapper, interestedPersonaSeeder);
+                scheduleSupport, planPersonaMapper, interestedPersonaSeeder,
+                mock(com.againspring.aiuser.orchestrator.client.BackendBotClient.class));
         when(properties.getThreadPlan()).thenReturn(threadPlanConfig);
         when(threadPlanConfig.getReadyMinTopLevel()).thenReturn(1);
         when(threadPlanConfig.getReadyMinItems()).thenReturn(1);

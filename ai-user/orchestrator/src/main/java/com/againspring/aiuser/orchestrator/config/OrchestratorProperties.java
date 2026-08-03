@@ -56,6 +56,24 @@ public class OrchestratorProperties {
         private double targetShare = 0.20;
         /** paired post 내부에서 COUPLE/MARRIAGE가 차지해야 하는 비율. */
         private double romanticShare = 0.80;
+        /**
+         * Partner answer delay Δ after author PUBLIC (minutes). Skewed sample in
+         * [min, max] with median ≈ {@link #partnerDelayMedianMinutes} — see
+         * {@link com.againspring.aiuser.orchestrator.service.threadplan.PartnerDelaySampler}.
+         */
+        private int partnerDelayMinutesMin = 10;
+        private int partnerDelayMinutesMax = 120;
+        private int partnerDelayMedianMinutes = 55;
+        /** Publishes due rows in {@code ai_scheduled_partner_answers}. */
+        private boolean partnerPublisherEnabled = true;
+        private String partnerPublisherCron = "0 * * * * *";
+        private int partnerPublishBatchSize = 5;
+        /**
+         * Author hold window for ActivityCurve sampling (KST hours, inclusive start /
+         * exclusive-ish end via end-of-hour). Quiet 02–06 is hard-banned after sampling.
+         */
+        private int authorSlotFromHour = 8;
+        private int authorSlotToHour = 23;
     }
 
     @Getter

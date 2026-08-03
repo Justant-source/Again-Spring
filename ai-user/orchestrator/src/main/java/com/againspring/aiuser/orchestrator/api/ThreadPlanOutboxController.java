@@ -26,6 +26,7 @@ public class ThreadPlanOutboxController {
     private final HumanInteractionInboxService inboxService;
     private final BackendBotClient backend;
     private final OrchestratorProperties properties;
+    private final ThreadPlanGenerationService threadPlanGenerationService;
 
     @PostMapping
     public ResponseEntity<Void> accept(@RequestBody Event event) {
@@ -33,7 +34,17 @@ public class ThreadPlanOutboxController {
         Instant occurred = event.occurredAt == null ? Instant.now() : event.occurredAt;
         int revision = event.postRevision == null ? 1 : Math.max(1, event.postRevision);
         String type = event.type.trim().toUpperCase();
-        if (type.equals("POST_PUBLISHED") || type.equals("PUBLISHED") || type.equals("POST_REVISED") || type.equals("POST_UPDATED") || type.equals("REVISED") || type.equals("PARTNER_ANSWER_ADDED")) {
+        if (type.equals("PARTNER_ANSWER_ADDED")) {
+            // Revision bump via requestPlan cancels unfinished phase1 items; POSTED phase1 stays.
+            enrichPostSnapshot(event);
+            String authorBody = authorBodyFromCombined(event.body);
+            String partnerBody = partnerBodyFromCombinedOrPayload(event);
+            planService.requestPlan(event.postId, revision, event.syntheticPost ? "AI_POST" : "HUMAN_POST",
+                    occurred, event.title, event.body, event.category);
+            threadPlanGenerationService.ensureCommentPlanForPairedPost(
+                    event.postId, revision, event.title, authorBody, partnerBody, event.category, occurred);
+        } else if (type.equals("POST_PUBLISHED") || type.equals("PUBLISHED") || type.equals("POST_REVISED")
+                || type.equals("POST_UPDATED") || type.equals("REVISED")) {
             enrichPostSnapshot(event);
             planService.requestPlan(event.postId, revision, event.syntheticPost ? "AI_POST" : "HUMAN_POST", occurred,
                     event.title, event.body, event.category);
@@ -69,6 +80,33 @@ public class ThreadPlanOutboxController {
             event.category = string(post.get("category"), event.category);
         });
     }
+
+    /** Prefer payload.partnerBody; else split combined [작성자]/[상대방] snapshot. */
+    private static String partnerBodyFromCombinedOrPayload(Event event) {
+        if (event.payload != null) {
+            Object p = event.payload.get("partnerBody");
+            if (p == null) p = event.payload.get("partnerBodyPublished");
+            if (p != null && !String.valueOf(p).isBlank()) return String.valueOf(p).strip();
+        }
+        String combined = event.body == null ? "" : event.body;
+        int idx = combined.indexOf("[상대방]");
+        if (idx >= 0) {
+            return combined.substring(idx + "[상대방]".length()).strip();
+        }
+        return "";
+    }
+
+    private static String authorBodyFromCombined(String combined) {
+        if (combined == null || combined.isBlank()) return "";
+        int partnerIdx = combined.indexOf("[상대방]");
+        String authorSection = partnerIdx >= 0 ? combined.substring(0, partnerIdx) : combined;
+        int authorIdx = authorSection.indexOf("[작성자]");
+        if (authorIdx >= 0) {
+            return authorSection.substring(authorIdx + "[작성자]".length()).strip();
+        }
+        return authorSection.strip();
+    }
+
     private static String string(Object value, String fallback) { return value == null ? fallback : String.valueOf(value); }
 
     @Data

@@ -76,6 +76,16 @@ public class PostComposeService {
                                   int jurorCount, String sessionId,
                                   SourceSnapshot source,
                                   Integer captureSplitAfterLine) {
+        return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
+                jurorCount, sessionId, source, captureSplitAfterLine, null);
+    }
+
+    public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
+                                  PostCategory category, String visibility,
+                                  int jurorCount, String sessionId,
+                                  SourceSnapshot source,
+                                  Integer captureSplitAfterLine,
+                                  String promoTitle) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
         // 위기 감지 (이중방어 — FE에서도 감지)
@@ -85,6 +95,11 @@ public class PostComposeService {
         }
 
         String postId = "post_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+
+        String normalizedPromo = null;
+        if (promoTitle != null && !promoTitle.isBlank()) {
+            normalizedPromo = PromoTitleService.normalizeAgainstTitle(promoTitle, userTitle);
+        }
 
         Post.PostBuilder postBuilder = Post.builder()
                 .id(postId)
@@ -101,6 +116,7 @@ public class PostComposeService {
                 .status(PostStatus.VOTING)
                 .neutralizationPassed(true)   // 항상 통과로 간주 (컬럼 잔존)
                 .captureSplitAfterLine(captureSplitAfterLine)
+                .promoTitle(normalizedPromo)
                 .voteCloseAt(Instant.now().plusSeconds(7L * 24 * 3600))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now());

@@ -3,7 +3,6 @@ package com.againspring.service.community;
 import com.againspring.api.community.dto.PostInviteDto;
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.community.Post;
-import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.domain.enums.PublishMode;
 import com.againspring.repository.community.JurorRepository;
@@ -97,7 +96,8 @@ public class PostInviteService {
     }
 
     /**
-     * 파트너가 답변 제출
+     * 파트너가 답변 제출.
+     * 이미 공개된 글에 partner body만 부착한다 (공개 게이트 아님).
      *
      * @param token 초대 토큰
      * @param partnerUserId 파트너 사용자 ID
@@ -125,15 +125,6 @@ public class PostInviteService {
 
         post.setPartnerAnsweredAt(Instant.now());
 
-        // WAIT_FOR_PARTNER 모드일 때 공개 및 투표 마감시간 설정
-        boolean becamePublic = false;
-        if (PublishMode.WAIT_FOR_PARTNER.equals(post.getPublishMode())) {
-            becamePublic = post.getVisibility() != PostVisibility.PUBLIC;
-            post.setVisibility(PostVisibility.PUBLIC);
-            int hours = (post.getVoteDurationHours() != null) ? post.getVoteDurationHours() : 72;
-            post.setVoteCloseAt(post.getPartnerAnsweredAt().plusSeconds((long) hours * 3600));
-        }
-
         // 기존 배심원 삭제 (재생성 준비)
         int jurorCount = post.getJurorCount();
         if (jurorCount > 0) {
@@ -144,10 +135,6 @@ public class PostInviteService {
         // partner 입장 추가는 게시글 수정과 동일하게 후속 계획을 무효화한다.
         postRepository.save(post);
         aiUserOutboxWriter.postRevised(post, "PARTNER_ANSWER_ADDED");
-        // PRIVATE→PUBLIC 전환은 수정 이벤트만으로는 불명확하니 공개 이벤트도 남긴다.
-        if (becamePublic) {
-            aiUserOutboxWriter.postPublished(post);
-        }
         log.info("Partner {} submitted answer to invite {} — async processing scheduled", partnerUserId, token);
 
         // tonalization + jury 비동기 처리 — HTTP 응답을 블록하지 않음
@@ -155,7 +142,7 @@ public class PostInviteService {
     }
 
     /**
-     * 발행 모드 설정 (발행 시점 및 투표 기간)
+     * 발행 모드 설정. WAIT_FOR_PARTNER ≈ PUBLISH_NOW (즉시 PUBLIC + voteCloseAt).
      *
      * @param postId 포스트 ID
      * @param userId 사용자 ID (권한 확인)
@@ -174,7 +161,11 @@ public class PostInviteService {
             PublishMode publishMode = PublishMode.valueOf(mode);
             post.setPublishMode(publishMode);
             post.setVoteDurationHours(voteDurationHours);
-            postRepository.save(post);
+            boolean becamePublic = applyImmediatePublic(post);
+            Post saved = postRepository.save(post);
+            if (becamePublic) {
+                aiUserOutboxWriter.postPublished(saved);
+            }
             log.info("Set publish mode for post {}: {}", postId, mode);
         } catch (IllegalArgumentException e) {
             throw new BusinessException("INVALID_PUBLISH_MODE", "지원하지 않는 발행 모드예요.", 400);
@@ -195,16 +186,25 @@ public class PostInviteService {
             throw new BusinessException("UNAUTHORIZED", "권한이 없어요.", 403);
         }
 
+        boolean becamePublic = applyImmediatePublic(post);
+        Post saved = postRepository.save(post);
+        if (becamePublic) {
+            aiUserOutboxWriter.postPublished(saved);
+        }
+        log.info("Published post {} immediately", postId);
+    }
+
+    /**
+     * visibility=PUBLIC + voteCloseAt 설정 (없으면 voteDurationHours 또는 72h).
+     * @return true if visibility changed to PUBLIC
+     */
+    private boolean applyImmediatePublic(Post post) {
         boolean becamePublic = post.getVisibility() != PostVisibility.PUBLIC;
         post.setVisibility(PostVisibility.PUBLIC);
         if (post.getVoteCloseAt() == null) {
             int hours = (post.getVoteDurationHours() != null) ? post.getVoteDurationHours() : 72;
             post.setVoteCloseAt(Instant.now().plusSeconds((long) hours * 3600));
         }
-        Post saved = postRepository.save(post);
-        if (becamePublic) {
-            aiUserOutboxWriter.postPublished(saved);
-        }
-        log.info("Published post {} immediately", postId);
+        return becamePublic;
     }
 }

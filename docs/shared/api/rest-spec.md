@@ -143,22 +143,27 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 
 ### 2.1. Partner Invite API
 
+> **계약 (2026-08-04~)**: 작성자 글은 **항상 즉시 PUBLIC**(투표·댓글 가능). `private-until-partner`는 폐기.
+> `PublishMode.WAIT_FOR_PARTNER` enum은 API 호환용으로 유지하되 동작은 `PUBLISH_NOW`와 동일(즉시 PUBLIC + vote 창).
+> 파트너 답변은 이미 공개된 글에 상대 본문만 붙인다 — **첫 PUBLIC 게이트가 아니다**.
+> 마이그레이션 **V97**: 잔존 `PRIVATE + WAIT_FOR_PARTNER` 중 비공개 **>30일** → soft-delete(`deleted_at`), 그 외 → PUBLIC(+ voteCloseAt).
+
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | POST | `/api/community/posts/{id}/invite` | **JWT** | 201 / 403 / 404 | 초대 토큰 생성. 응답: {inviteToken, inviteUrl} |
 | GET | `/api/s/{token}` | 공개 | 200 / 400 / 404 | 토큰으로 포스트 프리뷰 조회. 응답: {postId, userTitle, authorBodyPublished, category} |
-| POST | `/api/s/{token}/answer` | 공개 | 201 / 400 / 404 | 파트너 답변 제출. 본문: {userTitle?, bodyRaw}. WAIT_FOR_PARTNER 모드면 자동 PUBLIC 발행 |
-| PATCH | `/api/community/posts/{id}/publish-mode` | **JWT(author)** | 200 / 403 / 404 | 발행 모드 설정. 본문: {mode: PUBLISH_NOW\|WAIT_FOR_PARTNER, voteDurationHours: 24\|72\|168\|null} |
-| POST | `/api/community/posts/{id}/publish-now` | **JWT(author)** | 200 / 403 / 404 | 즉시 광장 공개(visibility=PUBLIC, voteCloseAt 설정) |
+| POST | `/api/s/{token}/answer` | 공개 | 201 / 400 / 404 | 파트너 답변 제출. 본문: {userTitle?, bodyRaw}. 이미 PUBLIC인 글에 partner body 부착(`paired=true`). 공개 전환 게이트 아님 |
+| PATCH | `/api/community/posts/{id}/publish-mode` | **JWT(author)** | 200 / 403 / 404 | 발행 모드 설정. 본문: {mode: PUBLISH_NOW\|WAIT_FOR_PARTNER, voteDurationHours: 24\|72\|168\|null}. `WAIT_FOR_PARTNER`도 즉시 PUBLIC(+ vote 창) — `PUBLISH_NOW`와 동등 |
+| POST | `/api/community/posts/{id}/publish-now` | **JWT(author)** | 200 / 403 / 404 | 즉시 광장 공개(visibility=PUBLIC, voteCloseAt 설정). 이미 PUBLIC이면 voteCloseAt 보정용(파트너 대기 해제가 아님) |
 
 **GET /api/community/posts/{id} 응답에 추가된 필드:**
 - `paired` (Boolean): 파트너 답변 도착 여부
 - `partnerAnsweredAt` (String, nullable): 파트너 답변 도착 시각 (ISO-8601 UTC)
 - `partnerBodyPublished` (String, nullable): 파트너 본문
 - `inviteToken` (String, nullable): 초대 토큰 (작성자 본인만 조회 가능)
-- `promoTitle` (String, nullable, **2026-08-02~**): 마케팅 훅 제목 ≤20자. 생성 직후 비동기 LLM으로 채워짐. 목록/상세 공통.
+- `promoTitle` (String, nullable, **2026-08-02~**, **V96→VARCHAR(500)·개행**): IG 훅용. 원제 복제+의미줄바꿈(줄≤10). 생성 시 PLAN 전달 또는 `PromoTitleService` 비동기. 목록/상세 공통.
 
-`POST /api/community/posts` 성공 시(신규 생성만) `PromoTitleService.generateAsync`가 1회 실행된다. 마케팅 brief(`promo_title`)는 비어 있으면 원제 20자 폴백.
+`POST /api/community/posts` 성공 시(신규 생성만) optional `promoTitle`이 있으면 저장하고, 없으면 `PromoTitleService.generateAsync`가 1회 실행된다. 마케팅 brief는 개행 포함 `promo_title`을 전달한다.
 봇(AI-user) 생성 요청은 optional `captureSplitAfterLine`(1-based 개행 블록)을 보낼 수 있다 — X/IG 캡쳐 전반부 컷. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완.
 
 ### 3. User

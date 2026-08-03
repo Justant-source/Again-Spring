@@ -68,6 +68,90 @@ public class CandidateScheduleSupport {
         response.put("items", items);
     }
 
+    /**
+     * Phase1 invariant: every item {@code scheduledAt} must be strictly before {@code partnerAt}
+     * (T0+Δ). Missing values are filled then clamped. Items already before the deadline are kept.
+     * When the (publishedAt, partnerAt) window is too short, times pack into the open interval.
+     */
+    @SuppressWarnings("unchecked")
+    public void clampScheduledAtsBefore(Map<String, Object> response, Instant publishedAt, Instant partnerAt) {
+        if (response == null || partnerAt == null) return;
+        Instant origin = publishedAt != null ? publishedAt : partnerAt.minusSeconds(600);
+        Instant lastAllowed = partnerAt.minusSeconds(1);
+        if (!lastAllowed.isAfter(origin)) {
+            // Degenerate window — pin everything one second before partner.
+            List<Map<String, Object>> items = mutableItems(response);
+            for (Map<String, Object> item : items) {
+                item.put("scheduledAt", lastAllowed.toString());
+            }
+            response.put("items", items);
+            return;
+        }
+        enrichMissingScheduledAts(response, origin);
+        List<Map<String, Object>> items = mutableItems(response);
+        int n = items.size();
+        List<Integer> overflowIdx = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            Instant at = parseScheduledAt(items.get(i).get("scheduledAt"));
+            if (at == null || !at.isBefore(partnerAt) || !at.isAfter(origin)) {
+                overflowIdx.add(i);
+            }
+        }
+        if (!overflowIdx.isEmpty()) {
+            long spanMs = Math.max(1L, lastAllowed.toEpochMilli() - origin.toEpochMilli());
+            int count = overflowIdx.size();
+            for (int k = 0; k < count; k++) {
+                // Spread strictly inside (origin, lastAllowed] — never equal partnerAt.
+                long offset = spanMs * (k + 1L) / (count + 1L);
+                Instant slot = Instant.ofEpochMilli(origin.toEpochMilli() + offset);
+                if (!slot.isBefore(partnerAt)) {
+                    slot = lastAllowed;
+                }
+                if (!slot.isAfter(origin)) {
+                    slot = origin.plusSeconds(1);
+                    if (!slot.isBefore(partnerAt)) slot = lastAllowed;
+                }
+                items.get(overflowIdx.get(k)).put("scheduledAt", slot.toString());
+            }
+        }
+        response.put("items", items);
+    }
+
+    /**
+     * Phase2 invariant: every item {@code scheduledAt} is at or after {@code partnerPublishedAt}.
+     * Missing values are filled from that origin; early times are pushed forward.
+     */
+    @SuppressWarnings("unchecked")
+    public void clampScheduledAtsOnOrAfter(Map<String, Object> response, Instant partnerPublishedAt) {
+        if (response == null || partnerPublishedAt == null) return;
+        enrichMissingScheduledAts(response, partnerPublishedAt);
+        List<Map<String, Object>> items = mutableItems(response);
+        int sequence = 0;
+        for (Map<String, Object> item : items) {
+            Instant at = parseScheduledAt(item.get("scheduledAt"));
+            if (at == null || at.isBefore(partnerPublishedAt)) {
+                boolean reply = hasParent(item);
+                item.put("scheduledAt", schedule(partnerPublishedAt, sequence, reply).toString());
+            }
+            sequence++;
+        }
+        response.put("items", items);
+    }
+
+    /** Single-value clamp used when persisting without a full response rewrite. */
+    public Instant clampBefore(Instant scheduledAt, Instant partnerAt) {
+        if (partnerAt == null) return scheduledAt;
+        Instant lastAllowed = partnerAt.minusSeconds(1);
+        if (scheduledAt == null) return lastAllowed;
+        return scheduledAt.isBefore(partnerAt) ? scheduledAt : lastAllowed;
+    }
+
+    public Instant clampOnOrAfter(Instant scheduledAt, Instant notBefore) {
+        if (notBefore == null) return scheduledAt;
+        if (scheduledAt == null) return notBefore;
+        return scheduledAt.isBefore(notBefore) ? notBefore : scheduledAt;
+    }
+
     public Instant parseScheduledAt(Object value) {
         if (value == null) return null;
         String text = String.valueOf(value).trim();

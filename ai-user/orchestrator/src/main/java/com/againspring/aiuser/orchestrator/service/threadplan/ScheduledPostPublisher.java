@@ -5,9 +5,12 @@ import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.dto.CreatePostDto;
 import com.againspring.aiuser.orchestrator.client.dto.PostDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
+import com.againspring.aiuser.orchestrator.domain.AiScheduledPartnerAnswer;
 import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlan;
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.domain.enums.ScheduledPartnerAnswerStatus;
+import com.againspring.aiuser.orchestrator.repository.AiScheduledPartnerAnswerRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -22,6 +25,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 
 /**
  * Creates the real post when a held {@link AiScheduledPost}'s slot arrives, then replays its
@@ -29,12 +33,17 @@ import java.util.Optional;
  * {@code AiPostBundleService.generateAndPublish} — no second LLM call). This is what turns
  * "generated at 3am" into "appeared in the feed at whatever hour the curve picked," which the
  * nightly batch alone cannot do since it only writes the {@code ai_scheduled_posts} row.
+ *
+ * <p>Paired authors ({@link PairedHoldMeta#ORIGIN_PAIRED}): PUBLIC first (no WAIT_FOR_PARTNER),
+ * invite token, then enqueue {@link AiScheduledPartnerAnswer} at T0+Δ. Partner may land in
+ * quiet hours; author slots never do (hard ban enforced here too).</p>
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ScheduledPostPublisher {
     private static final String WORKER = "scheduled-post-publisher";
+    private static final Random RNG = new Random();
 
     private final ScheduledPostLeaseService leases;
     private final PersonaRepository personas;
@@ -45,6 +54,8 @@ public class ScheduledPostPublisher {
     private final ThreadPlanService planService;
     private final ThreadPlanGenerationService planGenerationService;
     private final ObjectMapper objectMapper;
+    private final AiScheduledPartnerAnswerRepository partnerAnswerRepository;
+    private final CandidateScheduleSupport candidateScheduleSupport;
 
     public void publishDue() {
         if (!properties.isEnabled() || !properties.getThreadPlan().isEnabled()
@@ -57,19 +68,36 @@ public class ScheduledPostPublisher {
 
     private void publish(AiScheduledPost row) {
         try {
+            // Author publish hard ban KST 02:00–06:00 (solo + paired).
+            if (QuietHours.isQuietNow()) {
+                Instant resume = QuietHours.nextResumeAfter(Instant.now());
+                log.info("Scheduled post deferred for quiet hours id={} until {}", row.getId(), resume);
+                leases.defer(row.getId(), WORKER, resume, "QUIET_HOURS");
+                return;
+            }
+
             Persona author = personas.findById(row.getPersonaId()).orElse(null);
             if (author == null) { leases.releaseFailed(row.getId(), WORKER, "PERSONA_NOT_FOUND", false); return; }
             String email = jdbcTemplate.queryForObject("select email from users where id = ?", String.class, author.getId());
             Optional<String> jwt = tokens.getToken(author.getId(), email, properties.getBotPassword());
             if (jwt.isEmpty()) { leases.releaseFailed(row.getId(), WORKER, "AUTH_FAILED", true); return; }
 
+            boolean paired = PairedHoldMeta.ORIGIN_PAIRED.equalsIgnoreCase(row.getOrigin());
+            Map<String, Object> pairedMeta = paired
+                    ? PairedHoldMeta.read(objectMapper, row.getCandidatesJson()).orElse(Map.of())
+                    : Map.of();
+            int jurorCount = paired ? PairedHoldMeta.jurorCount(pairedMeta, 3) : 0;
+
             CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
                     .userTitle(row.getTitle())
                     .bodyRaw(LiteralNewlineNormalizer.normalize(row.getBody()))
                     .category(row.getCategory())
-                    .visibility("PUBLIC").jurorCount(0)
-                    .captureSplitAfterLine(readCaptureSplitFromCandidates(row.getCandidatesJson(), row.getBody()));
-            applyProvenanceFromCandidates(postBuilder, row.getCandidatesJson());
+                    .visibility("PUBLIC").jurorCount(jurorCount)
+                    .captureSplitAfterLine(readCaptureSplitFromCandidates(row.getCandidatesJson(), row.getBody()))
+                    .promoTitle(readPromoTitleFromCandidates(row.getCandidatesJson(), row.getTitle()));
+            if (!paired) {
+                applyProvenanceFromCandidates(postBuilder, row.getCandidatesJson());
+            }
             Optional<PostDto> published = backend.createPost(jwt.get(), postBuilder.build());
             if (published.isEmpty() || published.get().getId() == null) {
                 leases.releaseFailed(row.getId(), WORKER, "BACKEND_WRITE_FAILED", true);
@@ -77,11 +105,97 @@ public class ScheduledPostPublisher {
             }
 
             PostDto post = published.get();
-            replayCandidates(row, post);
+            if (paired) {
+                Instant partnerAt = schedulePartnerAfterAuthorPublic(row, post, jwt.get(), pairedMeta);
+                attachPhase1FromHold(row, post, partnerAt);
+            } else {
+                replayCandidates(row, post);
+            }
             leases.completePosted(row.getId(), WORKER, post.getId());
         } catch (Exception e) {
             log.warn("Scheduled post publish failed id={}: {}", row.getId(), e.getMessage());
             leases.releaseFailed(row.getId(), WORKER, "PUBLISH_EXCEPTION", row.getAttemptCount() < 3);
+        }
+    }
+
+    /**
+     * Author is already PUBLIC. Always schedule a partner (AI paired contract).
+     * Does <strong>not</strong> call setPublishMode / WAIT_FOR_PARTNER — PublishMode is owned elsewhere.
+     *
+     * @return partnerAt (T0+Δ), or null when partner could not be scheduled
+     */
+    private Instant schedulePartnerAfterAuthorPublic(AiScheduledPost row, PostDto post, String jwt,
+                                                   Map<String, Object> pairedMeta) {
+        String partnerPersonaId = PairedHoldMeta.text(pairedMeta, "partnerPersonaId");
+        if (partnerPersonaId == null || partnerPersonaId.isBlank()) {
+            log.error("Paired scheduled post {} published as {} but missing partnerPersonaId — no partner job",
+                    row.getId(), post.getId());
+            return null;
+        }
+
+        Optional<String> inviteTokenOpt = backend.createInviteToken(jwt, post.getId());
+        if (inviteTokenOpt.isEmpty()) {
+            log.error("Paired post {} invite token failed — partner cannot be scheduled", post.getId());
+            return null;
+        }
+
+        OrchestratorProperties.PairedPost config = properties.getPairedPost();
+        Duration delta = PartnerDelaySampler.sample(
+                RNG,
+                config.getPartnerDelayMinutesMin(),
+                config.getPartnerDelayMinutesMax(),
+                config.getPartnerDelayMedianMinutes());
+        Instant partnerAt = Instant.now().plus(delta);
+        // Partner MAY land in 02–06 — no QuietHours.enforce here.
+
+        String corrId = PairedHoldMeta.text(pairedMeta, "correlationId");
+        AiScheduledPartnerAnswer answer = AiScheduledPartnerAnswer.builder()
+                .postId(post.getId())
+                .inviteToken(inviteTokenOpt.get())
+                .authorPersonaId(row.getPersonaId())
+                .partnerPersonaId(partnerPersonaId)
+                .category(row.getCategory())
+                .authorTitle(row.getTitle())
+                .authorBody(row.getBody())
+                .correlationId(corrId)
+                .scheduledPostId(row.getId())
+                .scheduledPartnerAt(partnerAt)
+                .status(ScheduledPartnerAnswerStatus.SCHEDULED)
+                .build();
+        partnerAnswerRepository.save(answer);
+        log.info("Paired author PUBLIC post={} scheduled partner at {} (Δ={}m) corrId={}",
+                post.getId(), partnerAt, delta.toMinutes(), corrId);
+        return partnerAt;
+    }
+
+    /**
+     * Replay Call1 phase1 candidates clamped strictly before partnerAt.
+     * Falls back to {@link ThreadPlanGenerationService#ensureAuthorPhase1CommentPlan} when hold has no items.
+     */
+    private void attachPhase1FromHold(AiScheduledPost row, PostDto post, Instant partnerAt) {
+        Instant t0 = Instant.now();
+        Instant deadline = partnerAt != null ? partnerAt : t0.plus(Duration.ofMinutes(55));
+        if (row.getCandidatesJson() != null && !row.getCandidatesJson().isBlank()) {
+            try {
+                Map<String, Object> response = objectMapper.readValue(
+                        row.getCandidatesJson(), new TypeReference<>() { });
+                response.remove(PairedHoldMeta.KEY);
+                if (response.get("items") instanceof List<?> items && !items.isEmpty()) {
+                    candidateScheduleSupport.clampScheduledAtsBefore(response, t0, deadline);
+                    AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, t0,
+                            row.getTitle(), row.getBody(), row.getCategory(), row.getProvider(), row.getModel());
+                    planGenerationService.persistAndFinalize(plan.getId(), response);
+                    return;
+                }
+            } catch (Exception e) {
+                log.warn("Paired phase1 replay failed post={} — falling back to ensureAuthorPhase1: {}",
+                        post.getId(), e.getMessage());
+            }
+        }
+        boolean ok = planGenerationService.ensureAuthorPhase1CommentPlan(
+                post.getId(), 1, row.getTitle(), row.getBody(), row.getCategory(), t0, deadline);
+        if (!ok) {
+            log.warn("Paired phase1 plan not ready for post={}", post.getId());
         }
     }
 
@@ -91,19 +205,20 @@ public class ScheduledPostPublisher {
         try {
             Map<String, Object> response = objectMapper.readValue(row.getCandidatesJson(), new TypeReference<>() { });
             response.remove(AiPostBundleService.SOURCE_PROVENANCE_KEY);
+            response.remove(PairedHoldMeta.KEY);
+            // Paired holds only store meta — no comment candidates to replay.
+            if (!(response.get("items") instanceof List<?> items) || items.isEmpty()) {
+                if (response.get("post") == null) return;
+            }
             AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, Instant.now(),
                     row.getTitle(), row.getBody(), row.getCategory(), row.getProvider(), row.getModel());
-            // Quality gate + READY / QUALITY_BELOW_MIN_ITEMS (same path as live publish).
             planGenerationService.persistAndFinalize(plan.getId(), response);
         } catch (Exception replayFailure) {
-            // The post is already live — losing its comment plan must never roll back the post itself.
-            // The durable outbox still fires POST_PUBLISHED, which creates a REQUESTED plan as a fallback.
             log.error("Published scheduled post {} but could not replay its candidates id={}",
                     post.getId(), row.getId(), replayFailure);
         }
     }
 
-    /** Replays Wave1-F provenance embedded under {@link AiPostBundleService#SOURCE_PROVENANCE_KEY}. */
     @SuppressWarnings("unchecked")
     private void applyProvenanceFromCandidates(CreatePostDto.CreatePostDtoBuilder postBuilder, String candidatesJson) {
         if (candidatesJson == null || candidatesJson.isBlank()) return;
@@ -124,7 +239,6 @@ public class ScheduledPostPublisher {
         }
     }
 
-    /** Reads capture_split_after_line from held PLAN JSON; falls back to body heuristic. */
     @SuppressWarnings("unchecked")
     private Integer readCaptureSplitFromCandidates(String candidatesJson, String body) {
         Integer proposed = null;
@@ -143,6 +257,26 @@ public class ScheduledPostPublisher {
         }
         return AiPostBundleService.resolveCaptureSplit(
                 LiteralNewlineNormalizer.normalize(body), proposed);
+    }
+
+    @SuppressWarnings("unchecked")
+    private String readPromoTitleFromCandidates(String candidatesJson, String title) {
+        if (candidatesJson == null || candidatesJson.isBlank()) return null;
+        try {
+            Map<String, Object> response = objectMapper.readValue(candidatesJson, new TypeReference<>() { });
+            Object postRaw = response.get("post");
+            if (postRaw instanceof Map<?, ?> post) {
+                Object v = post.get("promo_title");
+                if (v == null) v = post.get("promoTitle");
+                if (v != null) {
+                    String promo = String.valueOf(v).replace("\\n", "\n").trim();
+                    if (!promo.isBlank()) return promo;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not read promo_title from candidates: {}", e.getMessage());
+        }
+        return null;
     }
 
 }

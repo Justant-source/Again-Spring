@@ -167,8 +167,13 @@ public class MarketingJobService {
         Double part1Height = CaptureHeightCalculator.part1HeightCss(
                 post.getTitle(), post.getBodyPublished(), captureSplit, paired);
 
+        String storyTitle = post.getTitle();
+        if (storyTitle == null || storyTitle.isBlank()) {
+            storyTitle = post.getUserTitle();
+        }
+
         BriefDto brief = BriefDto.builder()
-            .title(post.getTitle())
+            .title(storyTitle)
             .promoTitle(PromoTitleService.resolveOrFallback(post))
             .neutralSummary(summary)
             .sideA(sideAText)

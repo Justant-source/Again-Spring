@@ -54,4 +54,11 @@ public class PostCreateRequest {
      * null이면 게시 시/마케팅 잡 생성 시 본문에서 휴리스틱 계산 가능.
      */
     private Integer captureSplitAfterLine;
+
+    /**
+     * IG 훅 제목(원제 복제+의미줄바꿈). AI PLAN이 전달하면 저장 후 PromoTitleService skip.
+     */
+    @com.fasterxml.jackson.annotation.JsonAlias({"promo_title"})
+    @Size(max = 500, message = "promoTitle은 500자 이하여야 합니다")
+    private String promoTitle;
 }

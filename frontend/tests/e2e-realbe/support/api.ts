@@ -275,7 +275,7 @@ export async function waitForPaired(
   return false
 }
 
-/** PATCH publish-mode (WAIT_FOR_PARTNER | PUBLISH_NOW). LLM 미호출. */
+/** PATCH publish-mode (WAIT_FOR_PARTNER | PUBLISH_NOW). WAIT ≡ PUBLISH_NOW(즉시 PUBLIC). LLM 미호출. */
 export async function setPublishMode(
   request: APIRequestContext,
   token: string,
@@ -290,7 +290,7 @@ export async function setPublishMode(
   if (!resp.ok()) throw new Error(`publish-mode 실패: ${resp.status()} — ${await resp.text()}`)
 }
 
-/** POST publish-now — WAIT_FOR_PARTNER 사연을 즉시 공개. LLM 미호출. */
+/** POST publish-now — visibility=PUBLIC + voteCloseAt. 이미 PUBLIC이면 보정용(파트너 대기 해제 아님). LLM 미호출. */
 export async function publishNow(
   request: APIRequestContext,
   token: string,

@@ -63,6 +63,15 @@ ai-user:
     pairs-per-run: ${PAIRED_POST_PAIRS:2}
     target-share: ${PAIRED_POST_TARGET_SHARE:0.20}
     romantic-share: ${PAIRED_POST_ROMANTIC_SHARE:0.80}
+    # Partner Δ after author PUBLIC: skewed [min,max] with median ≈ 55m (not uniform)
+    partner-delay-minutes-min: ${PAIRED_POST_PARTNER_DELAY_MIN:10}
+    partner-delay-minutes-max: ${PAIRED_POST_PARTNER_DELAY_MAX:120}
+    partner-delay-median-minutes: ${PAIRED_POST_PARTNER_DELAY_MEDIAN:55}
+    partner-publisher-enabled: ${PAIRED_POST_PARTNER_PUBLISHER_ENABLED:true}
+    partner-publisher-cron: "${PAIRED_POST_PARTNER_PUBLISHER_CRON:0 * * * * *}"
+    partner-publish-batch-size: ${PAIRED_POST_PARTNER_PUBLISH_BATCH_SIZE:5}
+    author-slot-from-hour: ${PAIRED_POST_AUTHOR_SLOT_FROM_HOUR:8}
+    author-slot-to-hour: ${PAIRED_POST_AUTHOR_SLOT_TO_HOUR:23}
   content-aware-decisions:
     enabled: ${AI_USER_CONTENT_AWARE_DECISIONS_ENABLED:true}
     analysis-budget-per-tick: ${AI_USER_ANALYSIS_BUDGET_PER_TICK:3}

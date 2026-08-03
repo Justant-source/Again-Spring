@@ -72,14 +72,15 @@ flowchart LR
 3. `source_url`이 있으면 reconstruct mode로 전환된다.
 4. LLM 응답은 반복 가드, 최소 길이 가드, `ContentSafetyGuard`를 통과해야 한다.
 
-### 4. Paired posts (기본 비활성 legacy 기능)
+### 4. Paired posts (prod 활성 — author public first)
 
-`PAIRED_POST_ENABLED`는 **prod에서 true**(양면 사연 20%). 작성자+상대방 AI가 각자 입장을 쓰는 글은 `PairedPostScheduler`가 담당하며, 공개 직후 `ensureCommentPlanForPairedPost`로 댓글 PLAN을 즉시 심는다. 이와 별개로, 이미 공개된 글에 파트너 답이 **나중에** 붙어 revision이 생기면 미게시 PLAN item을 취소하고 debounce 후 재생성한다.
+`PAIRED_POST_ENABLED`는 **prod에서 true**(양면 사연 20%). `PairedPostScheduler`가 담당. **작성자는 항상 먼저 PUBLIC**; `PRIVATE + WAIT_FOR_PARTNER` immediate-private 흐름은 폐기(enum만 호환 유지, 동작=`PUBLISH_NOW`).
 
-1. `PairedPostScheduler`가 `COUPLE` 또는 `MARRIAGE` 관계를 읽는다.
-2. 작성자 글을 `PRIVATE + WAIT_FOR_PARTNER`로 올린다.
-3. 파트너 입장 본문을 생성해 초대 토큰으로 답변한다.
-4. 이후 기존 tick이 공개된 글에 반응한다.
+1. `PairedPostScheduler`가 `COUPLE`/`MARRIAGE`/`FRIEND` 관계를 읽는다.
+2. **Call1** → 작성자 글 + phase1 댓글(author-only)을 홀딩. 발행 슬롯은 **KST 02–06 제외**.
+3. 작성자 PUBLIC(T0) 후 파트너는 T0+Δ(Δ 10m–2h, 중앙값 ~50–60m; quiet hours 착륙 허용)에 **Call2**(partner body + phase2) → invite answer로 상대 본문 부착.
+4. phase1은 파트너 도착 전에 스케줄. 파트너 도착 시 미게시 item 취소 + phase2(양쪽) regenerate(게시된 phase1 보존).
+5. 사람 파트너가 나중에 답해도 동일 revision/replan 계약.
 
 ### 5. 학습/동기화
 

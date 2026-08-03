@@ -14,6 +14,8 @@
 | `POST` | `/analyze/post` | 좋아요/투표용 구조화 post 분석 |
 | `POST` | `/v2/generate/thread-plan` | PLAN 모드의 AI 글 묶음 또는 사람 글 후보 plan 구조화 생성. AI_POST `post`에 optional `capture_split_after_line`(개행 블록 전반부 컷) |
 | `POST` | `/v2/generate/human-replies` | 30분 사람 interaction batch — comment당 0~3 reply(`candidateResponders`에서 선택) |
+| `POST` | `/v2/generate/paired-phase1` | 양면 사연 **logical Call1** (`PAIRED_PHASE1`): 작성자(A) post + phase1 댓글(작성자만 그라운딩, ~2–4 최상위) |
+| `POST` | `/v2/generate/paired-phase2` | 양면 사연 **logical Call2** (`PAIRED_PHASE2`): 상대방(B) body + phase2 댓글(작성자+상대+공개 최상위 댓글 최대 5–8) |
 | `GET` | `/v1/metrics` | 워커 풀 상태 |
 | `POST` | `/internal/prompts/reload` | prompt template 재로드 |
 
@@ -29,6 +31,20 @@
 - 입력/출력은 구조화 contract로 검증하며 요청 전체가 유효하지 않으면 `INVALID_STRUCTURED_REQUEST`, queue 포화는 `CAPACITY`, timeout은 `TIMEOUT`으로 응답한다. bridge 오류 문자열은 절대 게시 콘텐츠가 될 수 없다.
 - `ThreadPlanRequest.minTopLevel` / `minItems`: null이면 `parsePlan`이 레거시 하한(최상위 min(6,maxTopLevel) · 전체 min(12,max))을 적용한다. 명시 값(1 포함)은 `1..max`로 clamp해 존중한다. 품질 드롭 가능 plan을 원하는 orchestrator는 `minTopLevel=1`, `minItems=1`을 보낸다.
 - 실제 model identifier는 환경변수로 주입한다. Codex Terra/Luna alias는 운영 호스트에서 검증된 identifier에만 매핑한다.
+
+### 양면 사연 Call1 / Call2 (`PAIRED_PHASE1` · `PAIRED_PHASE2`)
+
+solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워크로드다. 스키마: `schemas/paired-phase1.schema.json`, `schemas/paired-phase2.schema.json`. 프롬프트 가이드: `voice/paired_phase1.md`, `voice/paired_phase2.md` (+ 작성자 `post_paired_author.md` / 상대 `partner.md`).
+
+| Workload | 경로 | 요청 핵심 | 응답 핵심 |
+|---|---|---|---|
+| `PAIRED_PHASE1` | `POST /v2/generate/paired-phase1` | `author`, `personas`, `category`/`topicHint`, optional reconstruct/source, `maxTopLevel`≈4 | `workload`, `post`{title,body,promo_title,capture_split_after_line}, `items`[] |
+| `PAIRED_PHASE2` | `POST /v2/generate/paired-phase2` | `authorPost`{title,body}, `partner`, `personas`, `publishedTopLevelComments`[0..8], `includePartnerPost` | `workload`, `partner_post`{body}\|null, `items`[] |
+
+- **phase1**: 상대방 본문 없음. 댓글은 작성자만 본 것처럼. 기본 min top-level=2.
+- **phase2**: 공개 최상위 댓글 0개면 본문만으로 댓글 생성. `includePartnerPost=false`면 `partner_post=null` (logical Call2의 댓글-only 마이크로배치 후속).
+- 파싱 가드: AI_POST와 동일(제목 4~40·제목≠본문·promo/capture sanitize·`LlmErrorSignature`/META). 모델은 post-grade(Claude Sonnet / Codex Terra).
+- **마이크로배치**: 논리 단계는 항상 Call1/Call2 두 번. cast가 크면 Call2만 `includePartnerPost=false` 후속으로 쪼갠다(또는 orchestrator가 기존 `thread-plan` HUMAN_POST 후속을 써도 됨).
 
 세부 후보 규칙과 retry·안전 정책은 [thread-planning.md](./thread-planning.md)를 따른다.
 

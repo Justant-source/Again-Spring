@@ -7,7 +7,7 @@
  * - Full flow: 초대 → 상대 답변 → paired 확인 (jurorCount=0 강제)
  * - 관람자 — paired 사연 양쪽 투표 버튼
  * - 상대방 답변 화면 (/s/[token]): 유효하지 않은 토큰 오류, 중복 제출 오류
- * - 답변 폼 UI 확인 (이전 spec에서 strict-mode 위반으로 제거됐던 케이스 수정)
+ * - publish-mode: WAIT_FOR_PARTNER여도 작성자 글 즉시 PUBLIC (private-until-partner 폐기)
  */
 import { test, expect } from '../support/no-llm-fixture'
 import { authStatePath } from '../fixtures/auth-state'
@@ -19,7 +19,6 @@ import {
   submitPartnerAnswer,
   waitForPaired,
   setPublishMode,
-  publishNow,
 } from '../support/api'
 import {
   INVITE,
@@ -193,10 +192,10 @@ test.describe('Journey 06-E: 상대방 답변 화면', () => {
   })
 })
 
-// ── F. publish-mode / publish-now (API — UI 피커 없음) ─────────────
-test.describe('Journey 06-F: publish-mode · publish-now', () => {
+// ── F. publish-mode (API — UI 피커 없음; WAIT_FOR_PARTNER ≡ PUBLISH_NOW) ─
+test.describe('Journey 06-F: publish-mode · author public-first', () => {
 
-  test('WAIT_FOR_PARTNER → 상대 답변 후 PUBLIC + publish-now 경로', async ({ request }) => {
+  test('WAIT_FOR_PARTNER여도 작성자 글은 즉시 PUBLIC — 파트너 답변은 paired만', async ({ request }) => {
     const token = tokenFromStorageState(PERSONA_TEST1.email)
     expect(token).toBeTruthy()
 
@@ -210,18 +209,18 @@ test.describe('Journey 06-F: publish-mode · publish-now', () => {
     const modeInDb = sql(`SELECT publish_mode FROM posts WHERE id='${postId}'`)
     expect(modeInDb).toMatch(/WAIT_FOR_PARTNER/i)
 
+    // private-until-partner 폐기: 모드만 WAIT여도 visibility는 즉시 PUBLIC
+    const beforePartner = await request.get(`${BASE}/api/community/posts/${postId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(beforePartner.ok()).toBeTruthy()
+    const before = await beforePartner.json()
+    expect((before.visibility || '').toUpperCase()).toBe('PUBLIC')
+
     const inviteToken = await createInviteToken(request, token, postId)
     await submitPartnerAnswer(request, inviteToken, 'WAIT_FOR_PARTNER 상대 답변입니다.')
     const paired = await waitForPaired(request, postId)
     expect(paired).toBe(true)
-
-    const beforePublish = await request.get(`${BASE}/api/community/posts/${postId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const before = await beforePublish.json()
-    if ((before.visibility || '').toUpperCase() !== 'PUBLIC') {
-      await publishNow(request, token, postId)
-    }
 
     const finalRes = await request.get(`${BASE}/api/community/posts/${postId}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -229,5 +228,6 @@ test.describe('Journey 06-F: publish-mode · publish-now', () => {
     expect(finalRes.ok()).toBeTruthy()
     const final = await finalRes.json()
     expect((final.visibility || '').toUpperCase()).toBe('PUBLIC')
+    expect(final.paired || final.partnerBodyPublished).toBeTruthy()
   })
 })

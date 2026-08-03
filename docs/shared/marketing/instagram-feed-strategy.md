@@ -39,24 +39,27 @@ X `/capture/x-thread` 산출물 기준 (X의 `ratio` 스크린샷은 **폐기**)
 
 실측 장수 = **4 또는 5**. 6장은 댓글 캡처가 늘어날 때 예약.
 
-중간 장(X 캡처)은 원본을 그대로 올리지 않고 `#FAF7F4` 4:5 캔버스 중앙에 두고 **상하좌우 여백**을 둔다.
-(인스타 그리드 1:1·피드 4:5 크롭에서 글자가 잘리지 않게.)
+중간 장(X 캡처)은 원본을 `#FAF7F4` 4:5 캔버스에 두고 **여백(~40px) + `object-fit: contain`** 으로 올린다.
+**사연 전반/후반의 분홍(또는 캡처) 레이아웃은 절대 크롭하지 않는다** — 본문 UI 전체가 보여야 한다.
 
 ### 2.2 훅 카드
 
 - 크기: `1080×1350` (4:5)
-- 내용: **홍보 제목(`promoTitle`)만**. 로고·배지·부가문구 없음
-- 여백: 가로·세로 넉넉히 (1:1 썸네일 세이프존 안쪽에 제목)
-- 배경: 카테고리 → 5색 매핑
+- 내용: **`promo_title` (원제 복제 + 의미단위 `\n`)**. 로고·배지·부가문구 없음. 없으면 `title` 폴백
+- 타이포: 줄 수에 따라 큰 글씨 (`Noto Sans KR`). `white-space: pre-line`
+- 한 줄 **목표 4~10자**(최대 10). **1음절 단독 줄 금지** — 어절을 모아 의미 구로 패킹
+- 중간 장(사연/댓글 캡처): **전체 레이아웃 보존** (`object-fit: contain`). 분홍 본문 UI 크롭 금지. 여백 ~40px
 
-| `PostCategory` | 색 | Hex | 글자색 |
+| `PostCategory` | 톤 | Hex | 글자색 |
 |---|---|---|---|
-| COUPLE | 피치 | `#C9785A` | `#1A1A1A` |
-| MARRIED | 세이지 | `#5F8F76` | `#1A1A1A` |
-| FAMILY | 슬레이트 블루 | `#2C4A6E` | `#FFFFFF` |
-| WORK | 차콜 | `#222222` | `#FFFFFF` |
-| FRIEND | 머스타드 | `#C9A227` | `#1A1A1A` |
-| OTHER | 머스타드 | `#C9A227` | `#1A1A1A` |
+| COUPLE | 핑크 파스텔 (plaza `#E0879A`) | `#F7D0DB` | `#2E3A2E` (`--L-ink`) |
+| MARRIED | 코랄 피치 (plaza `#D67E5E`) | `#F4D0BC` | `#2E3A2E` |
+| FRIEND | 머스타드 옐로 (plaza `#D6A646`) | `#F8E08C` | `#2E3A2E` |
+| FAMILY | 잎 그린 (plaza `#B39A56` → 녹색 쪽) | `#C9DDB8` | `#2E3A2E` |
+| WORK | 파우더 블루 (plaza `#6E90B8`) | `#C8D6EC` | `#2E3A2E` |
+| OTHER | 세이지 민트 (plaza `#7BA68E`) | `#C9DDD4` | `#2E3A2E` |
+
+> 대분류는 제품 기준 **6개**(연인·부부·친구·가족·직장·기타). 크림끼리 겹치지 않게 hue를 벌린다.
 
 ### 2.3 공감비율 피니시 카드
 
@@ -64,14 +67,14 @@ X `/capture/x-thread` 산출물 기준 (X의 `ratio` 스크린샷은 **폐기**)
 - 내용:
   - 상단 라벨: 왼쪽 `작성자` / 오른쪽 `상대방`
   - 막대 + `A% : B%` 숫자
-  - 하단 가운데: `어느쪽에 더 공감하세요?`
+  - 하단 가운데: `어느쪽에 더 공감하세요?` (**CTA만 ~1.5배**, 60px)
 - 진영색: 작성자 `#C9785A` / 상대방 `#5F8F76`
 - 판결·승패·처방·로고 금지 (유도 문구는 위 CTA만 허용; 링크 CTA는 캡션 URL)
 
 ### 2.4 캡션 (발행 시 LLM 없음)
 
 ```
-{promoTitle}
+{promo_title flattened}
 https://againspring.net/community/{postId}
 
 당신은 어느 쪽에 공감하나요?
@@ -79,17 +82,17 @@ https://againspring.net/community/{postId}
 #다시봄 #공감비율 #[카테고리한글]
 ```
 
-- 1행 = `promoTitle` (없으면 원제 20자 폴백)
+- 1행 = `promo_title`에서 **개행→공백** 한 줄 (없으면 `title`)
 - 2행 = 사연 URL
 - 3행 공백 후 고정 유도 문구
 - 해시태그 3~5개, `#다시봄` 필수. `platform_specs` hashtag_cap으로 clamp
 
 ### 2.5 `promoTitle` (AS SSOT)
 
-- 컬럼: `posts.promo_title` `VARCHAR(20)` nullable
-- **모든 사연** 생성 시 1회 LLM 생성·저장 (사람·AI 不分). 발행 파이프에서 추가 LLM 호출 없음
-- 규칙: ≤20자, 질문·긴장형, 판결/처방/승패 금지
-- 폴백: 비어 있으면 `title`/`userTitle`를 20자로 자름
+- 컬럼: `posts.promo_title` `VARCHAR(500)` nullable (**V96**, 개행 허용)
+- **모든 사연** 생성 시 1회: AI PLAN `promo_title` 전달 또는 `PromoTitleService` LLM. 발행 파이프 추가 LLM 없음
+- 규칙: **원제 글자 복제** + 의미 구 `\n`. 각 줄 목표 4~10자(최대 10). 1음절 단독 줄 금지. 재작성·생략 금지
+- 폴백: 어절 패킹 휴리스틱(고아 1자 줄 병합)
 - 기존 글 배치 백필 LLM 없음
 
 ---

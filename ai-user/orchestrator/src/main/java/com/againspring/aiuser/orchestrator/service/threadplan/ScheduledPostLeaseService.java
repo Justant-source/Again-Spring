@@ -51,6 +51,22 @@ public class ScheduledPostLeaseService {
         row.setLeaseUntil(null);
     }
 
+    /**
+     * Returns a claimed row to SCHEDULED with a later slot (e.g. quiet-hour defer).
+     * Does not increment attempt_count again on the next claim.
+     */
+    @Transactional
+    public void defer(String id, String workerId, Instant newScheduledAt, String reason) {
+        AiScheduledPost row = owned(id, workerId);
+        row.setStatus(ScheduledPostStatus.SCHEDULED);
+        row.setScheduledPublishAt(newScheduledAt);
+        row.setFailureCode(reason);
+        row.setLeaseOwner(null);
+        row.setLeaseUntil(null);
+        // Undo the claim's attempt bump so quiet-hour deferrals don't burn retries.
+        row.setAttemptCount(Math.max(0, row.getAttemptCount() - 1));
+    }
+
     @Transactional
     public void releaseFailed(String id, String workerId, String failureCode, boolean retryable) {
         AiScheduledPost row = owned(id, workerId);

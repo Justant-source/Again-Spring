@@ -8,9 +8,6 @@ import com.againspring.domain.enums.PublishMode;
 import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
-import com.againspring.service.community.AnswerProcessingService;
-import com.againspring.service.community.JuryService;
-import com.againspring.service.community.TonalizationService;
 import com.againspring.service.ai.AiUserOutboxWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -92,9 +89,11 @@ class PostInviteServiceTest {
     }
 
     @Test
-    @DisplayName("submitPartnerAnswer - WAIT_FOR_PARTNER 모드: 파트너 답변 시 자동 공개 (visibility=PUBLIC, voteCloseAt != null)")
-    void submitPartnerAnswer_waitForPartner_autoPublishes() {
+    @DisplayName("submitPartnerAnswer - WAIT_FOR_PARTNER여도 visibility/voteCloseAt 변경 없음 (공개 게이트 아님)")
+    void submitPartnerAnswer_waitForPartner_doesNotGatePublic() {
         post.setPublishMode(PublishMode.WAIT_FOR_PARTNER);
+        post.setVisibility(PostVisibility.PRIVATE);
+        post.setVoteCloseAt(null);
         post.setVoteDurationHours(24);
         String partnerBodyRaw = "파트너의 답변";
 
@@ -104,15 +103,11 @@ class PostInviteServiceTest {
         postInviteService.submitPartnerAnswer(INVITE_TOKEN, PARTNER_ID, partnerBodyRaw, null);
 
         verify(postRepository).save(any(Post.class));
-        // WAIT_FOR_PARTNER 모드일 때 자동 공개: visibility=PUBLIC, voteCloseAt 설정
-        assertEquals(PostVisibility.PUBLIC, post.getVisibility());
-        assertNotNull(post.getVoteCloseAt());
-        // voteCloseAt은 partnerAnsweredAt + voteDurationHours (24h)
-        long expectedSeconds = post.getPartnerAnsweredAt().plusSeconds(24L * 3600).getEpochSecond();
-        long actualSeconds = post.getVoteCloseAt().getEpochSecond();
-        assertEquals(expectedSeconds, actualSeconds);
+        assertEquals(PostVisibility.PRIVATE, post.getVisibility());
+        assertNull(post.getVoteCloseAt());
+        assertEquals(partnerBodyRaw, post.getPartnerBodyPublished());
         verify(aiUserOutboxWriter).postRevised(post, "PARTNER_ANSWER_ADDED");
-        verify(aiUserOutboxWriter).postPublished(post);
+        verify(aiUserOutboxWriter, never()).postPublished(any());
     }
 
     @Test
@@ -128,8 +123,27 @@ class PostInviteServiceTest {
         postInviteService.submitPartnerAnswer(INVITE_TOKEN, PARTNER_ID, partnerBodyRaw, null);
 
         verify(postRepository).save(any(Post.class));
-        // PUBLISH_NOW 모드에서는 visibility가 변경되지 않음
         assertEquals(PostVisibility.PRIVATE, post.getVisibility());
+    }
+
+    @Test
+    @DisplayName("submitPartnerAnswer - 이미 PUBLIC인 글에 partner body만 부착")
+    void submitPartnerAnswer_alreadyPublic_attachesBodyOnly() {
+        Instant existingClose = Instant.now().plusSeconds(72L * 3600);
+        post.setPublishMode(PublishMode.WAIT_FOR_PARTNER);
+        post.setVisibility(PostVisibility.PUBLIC);
+        post.setVoteCloseAt(existingClose);
+        String partnerBodyRaw = "파트너의 답변";
+
+        when(postRepository.findByInviteToken(INVITE_TOKEN)).thenReturn(Optional.of(post));
+        when(postRepository.save(any(Post.class))).thenReturn(post);
+
+        postInviteService.submitPartnerAnswer(INVITE_TOKEN, PARTNER_ID, partnerBodyRaw, null);
+
+        assertEquals(PostVisibility.PUBLIC, post.getVisibility());
+        assertEquals(existingClose, post.getVoteCloseAt());
+        assertEquals(partnerBodyRaw, post.getPartnerBodyPublished());
+        verify(aiUserOutboxWriter, never()).postPublished(any());
     }
 
     @Test
@@ -196,6 +210,67 @@ class PostInviteServiceTest {
     }
 
     @Test
+    @DisplayName("setPublishMode - WAIT_FOR_PARTNER ≈ PUBLISH_NOW: 즉시 PUBLIC + voteCloseAt")
+    void setPublishMode_waitForPartner_appliesImmediatePublic() {
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+        when(postRepository.save(any(Post.class))).thenReturn(post);
+
+        Instant before = Instant.now();
+        postInviteService.setPublishMode(POST_ID, AUTHOR_ID, "WAIT_FOR_PARTNER", 24);
+
+        assertEquals(PublishMode.WAIT_FOR_PARTNER, post.getPublishMode());
+        assertEquals(24, post.getVoteDurationHours());
+        assertEquals(PostVisibility.PUBLIC, post.getVisibility());
+        assertNotNull(post.getVoteCloseAt());
+        long expected = before.plusSeconds(24L * 3600).getEpochSecond();
+        assertTrue(Math.abs(post.getVoteCloseAt().getEpochSecond() - expected) <= 1);
+        verify(aiUserOutboxWriter).postPublished(post);
+    }
+
+    @Test
+    @DisplayName("setPublishMode - PUBLISH_NOW도 즉시 PUBLIC + voteCloseAt")
+    void setPublishMode_publishNow_appliesImmediatePublic() {
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+        when(postRepository.save(any(Post.class))).thenReturn(post);
+
+        postInviteService.setPublishMode(POST_ID, AUTHOR_ID, "PUBLISH_NOW", 72);
+
+        assertEquals(PublishMode.PUBLISH_NOW, post.getPublishMode());
+        assertEquals(PostVisibility.PUBLIC, post.getVisibility());
+        assertNotNull(post.getVoteCloseAt());
+        verify(aiUserOutboxWriter).postPublished(post);
+    }
+
+    @Test
+    @DisplayName("setPublishMode - 이미 PUBLIC이면 postPublished 미호출, voteCloseAt 유지")
+    void setPublishMode_alreadyPublic_noRepublishEvent() {
+        Instant existingClose = Instant.now().plusSeconds(48L * 3600);
+        post.setVisibility(PostVisibility.PUBLIC);
+        post.setVoteCloseAt(existingClose);
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+        when(postRepository.save(any(Post.class))).thenReturn(post);
+
+        postInviteService.setPublishMode(POST_ID, AUTHOR_ID, "WAIT_FOR_PARTNER", 24);
+
+        assertEquals(PostVisibility.PUBLIC, post.getVisibility());
+        assertEquals(existingClose, post.getVoteCloseAt());
+        verify(aiUserOutboxWriter, never()).postPublished(any());
+    }
+
+    @Test
+    @DisplayName("setPublishMode - 잘못된 모드면 INVALID_PUBLISH_MODE")
+    void setPublishMode_invalidMode_throws() {
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> postInviteService.setPublishMode(POST_ID, AUTHOR_ID, "NOPE", null)
+        );
+        assertEquals("INVALID_PUBLISH_MODE", ex.getCode());
+        verify(postRepository, never()).save(any(Post.class));
+    }
+
+    @Test
     @DisplayName("publishNow - visibility=PUBLIC, voteCloseAt 설정")
     void publishNow_setsVisibilityPublic() {
         post.setStatus(PostStatus.DRAFT);
@@ -222,7 +297,6 @@ class PostInviteServiceTest {
 
         verify(postRepository).save(any(Post.class));
         assertNotNull(post.getVoteCloseAt());
-        // voteCloseAt은 대략 now + 24시간이어야 함 (오차 범위: 1초)
         long expectedSeconds = beforePublish.plusSeconds(24L * 3600).getEpochSecond();
         long actualSeconds = post.getVoteCloseAt().getEpochSecond();
         assertTrue(Math.abs(actualSeconds - expectedSeconds) <= 1,
@@ -267,7 +341,6 @@ class PostInviteServiceTest {
 
         postInviteService.publishNow(POST_ID, AUTHOR_ID);
 
-        // publishNow는 항상 visibility를 PUBLIC으로 설정하고 save 호출
         verify(postRepository).save(any(Post.class));
         assertEquals(PostVisibility.PUBLIC, post.getVisibility());
         assertNotNull(post.getVoteCloseAt());

@@ -19,6 +19,9 @@ public class ThreadPlanResponse {
     public static class Post {
         String title;
         String body;
+        /** IG hook: title chars + semantic \\n; each line ≤10. */
+        @JsonProperty("promo_title")
+        String promoTitle;
         /** 1-based last front-half newline block; null when body has ≤12 blocks. */
         @JsonProperty("capture_split_after_line")
         Integer captureSplitAfterLine;
