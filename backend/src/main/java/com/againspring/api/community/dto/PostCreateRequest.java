@@ -68,4 +68,11 @@ public class PostCreateRequest {
     @com.fasterxml.jackson.annotation.JsonAlias({"promo_title"})
     @Size(max = 500, message = "promoTitle은 500자 이하여야 합니다")
     private String promoTitle;
+
+    /**
+     * 메타포 일러스트 ID (60종). AI PLAN 매칭값. 일반 사용자는 null.
+     */
+    @com.fasterxml.jackson.annotation.JsonAlias({"metaphor_id"})
+    @Size(max = 64, message = "metaphorId는 64자 이하여야 합니다")
+    private String metaphorId;
 }

@@ -50,6 +50,13 @@ public class Post {
     private String promoTitle;
 
     /**
+     * 메타포 일러스트 ID (60종 카탈로그). AI PLAN이 사연 생성 시 매칭.
+     * 예: empty-chair, tangled-thread. Shorts intro / FE 카드용.
+     */
+    @Column(name = "metaphor_id", length = 64)
+    private String metaphorId;
+
+    /**
      * X/IG 캡쳐 전반부 마지막 개행 블록(1-based).
      * @deprecated use {@link #captureSplitAfterLines}; kept for read fallback.
      */

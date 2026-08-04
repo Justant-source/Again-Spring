@@ -94,7 +94,8 @@ public class ScheduledPostPublisher {
                     .category(row.getCategory())
                     .visibility("PUBLIC").jurorCount(jurorCount)
                     .captureSplitAfterLines(readCaptureSplitsFromCandidates(row.getCandidatesJson(), row.getBody()))
-                    .promoTitle(readPromoTitleFromCandidates(row.getCandidatesJson(), row.getTitle()));
+                    .promoTitle(readPromoTitleFromCandidates(row.getCandidatesJson(), row.getTitle()))
+                    .metaphorId(readMetaphorIdFromCandidates(row.getCandidatesJson()));
             if (!paired) {
                 applyProvenanceFromCandidates(postBuilder, row.getCandidatesJson());
             }
@@ -294,6 +295,26 @@ public class ScheduledPostPublisher {
             }
         } catch (Exception e) {
             log.debug("Could not read promo_title from candidates: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String readMetaphorIdFromCandidates(String candidatesJson) {
+        if (candidatesJson == null || candidatesJson.isBlank()) return null;
+        try {
+            Map<String, Object> response = objectMapper.readValue(candidatesJson, new TypeReference<>() { });
+            Object postRaw = response.get("post");
+            if (postRaw instanceof Map<?, ?> post) {
+                Object v = post.get("metaphor_id");
+                if (v == null) v = post.get("metaphorId");
+                if (v != null) {
+                    String id = String.valueOf(v).trim().toLowerCase(java.util.Locale.ROOT);
+                    if (!id.isBlank()) return id;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not read metaphor_id from candidates: {}", e.getMessage());
         }
         return null;
     }

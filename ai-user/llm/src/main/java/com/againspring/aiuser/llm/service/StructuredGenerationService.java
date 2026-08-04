@@ -106,10 +106,12 @@ public class StructuredGenerationService {
             List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
             Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
             String promoTitle = sanitizePromoTitle(title, nullableText(p, "promo_title"));
+            String metaphorId = MetaphorCatalog.sanitize(nullableText(p, "metaphor_id"), req.getCategory());
             post = ThreadPlanResponse.Post.builder()
                     .title(title).body(body).promoTitle(promoTitle)
                     .captureSplitAfterLines(splits)
                     .captureSplitAfterLine(legacy)
+                    .metaphorId(metaphorId)
                     .build();
         }
         JsonNode comments = root.path("comments");
@@ -197,6 +199,7 @@ public class StructuredGenerationService {
                     .promoTitle(post.getPromoTitle())
                     .captureSplitAfterLines(splits)
                     .captureSplitAfterLine(legacy)
+                    .metaphorId(post.getMetaphorId())
                     .build();
         } catch (StructuredGenerationException ignored) {
             return post;
@@ -305,10 +308,12 @@ public class StructuredGenerationService {
         List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
         Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
         String promoTitle = sanitizePromoTitle(title, nullableText(p, "promo_title"));
+        String metaphorId = MetaphorCatalog.sanitize(nullableText(p, "metaphor_id"), req.getCategory());
         ThreadPlanResponse.Post post = ThreadPlanResponse.Post.builder()
                 .title(title).body(body).promoTitle(promoTitle)
                 .captureSplitAfterLines(splits)
                 .captureSplitAfterLine(legacy)
+                .metaphorId(metaphorId)
                 .build();
 
         int maxTop = safe(req.getMaxTopLevel(), 4, 1, 6);
@@ -499,18 +504,20 @@ public class StructuredGenerationService {
         int maxReplies = safe(req.getMaxReplies(), 2, 0, 6);
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Workload=PAIRED_PHASE1 (logical Call1).
-                Schema: {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                Schema: {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null,"metaphor_id":"empty-chair"},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 This is a 양면 사연: write the 작성자(A) post now. The 상대방(B) has NOT written yet — phase1 comments must NOT assume a partner reply exists, quote a partner body, or say both sides already posted.
                 Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI. Prefer Korean product terms 작성자/상대방 — never 가해자/피해자/승패.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed.
                 AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
                 AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line. Required (IG hook card).
                 AI_POST body line rules (hard): one Korean sentence (or short sense unit) per newline — no blank lines; keep each block short (about 1~2 visual lines). If more than 8 non-empty lines, set capture_split_after_lines to 1-based last-block indices of each part except the final (semantic pauses; each part 1~8 blocks; max 4 parts / at most 3 cuts). Prefer even-ish meaningful chunks (e.g. 20 lines → [7,14]). If ≤8 lines, set capture_split_after_lines to null.
+                AI_POST metaphor_id rules (hard): pick exactly one id from METAPHOR_CATALOG that best matches the emotional core of the story (object-as-feeling metaphor). Prefer group/tone fit over category label. Required for AI_POST.
                 Phase1 comment count: about 2~4 top-level (respect LIMITS). Keep them light reactions to the 작성자 story only.
                 """ + "\nGUIDE=\n" + clean(classpathText("voice/paired_phase1.md")) +
                 "\nAUTHOR_VOICE=\n" + clean(classpathText("voice/post_paired_author.md")) +
                 "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) +
                 grounding +
+                "\nMETAPHOR_CATALOG=\n" + MetaphorCatalog.compactCatalog() +
                 "\nPERSONAS=" + json(req.getPersonas()) +
                 "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies));
     }
@@ -593,14 +600,16 @@ public class StructuredGenerationService {
         }
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Create Korean community conversation candidates.
-                The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null,"metaphor_id":"empty-chair"},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed, not the whole story.
                 AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only teases the conflict.
                 AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line — pack 1~3 eojeol into a readable phrase. Do not break on every space. No rewrite/omit/add. Required for AI_POST (IG hook card).
                 AI_POST body line rules (hard): write body as one Korean sentence (or short sense unit) per newline — no blank lines; each non-empty line is a capture block; keep blocks short (~1–2 visual lines). If more than 8 non-empty lines, set capture_split_after_lines to 1-based last-block indices of each part except the final (semantic pauses; each part 1~8 blocks; max 4 parts / ≤3 cuts; e.g. 20 lines → [7,14]). If ≤8 lines, null.
+                AI_POST metaphor_id rules (hard): pick exactly one id from METAPHOR_CATALOG that best matches the emotional core of the story (object-as-feeling metaphor). Prefer group/tone fit over category label. Required for AI_POST; for HUMAN_POST leave post null (no metaphor).
                 """ + "\nKIND=" + req.getKind() + "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) + "\n" + existing +
                 grounding +
+                "\nMETAPHOR_CATALOG=\n" + MetaphorCatalog.compactCatalog() +
                 "\nPERSONAS=" + json(req.getPersonas()) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20)));
     }
 

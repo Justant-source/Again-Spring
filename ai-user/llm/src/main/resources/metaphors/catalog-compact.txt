@@ -1,0 +1,60 @@
+locked-mailbox|avoidance|neutral|마음을 받았는데 열어보지 않은 채 쌓여있는 상태
+boiling-kettle|tension|heavy|작은 일에도 곧 터질 것 같이 끓고 있는 상태
+locked-door|avoidance|heavy|더 이상 들어올 수 없게 마음의 빗장을 채운 상태
+too-big-umbrella|protection|neutral|상대를 지키려다 오히려 거리감을 만든 상태
+person-in-rain|loneliness|heavy|누군가 알아봐주길 기다리며 그대로 서있는 상태
+frozen-pond|avoidance|heavy|흐르지 못하고 멈춰버린 감정
+cracked-window|tension|heavy|깨지지는 않았지만 작은 충격에도 흔들리는 상태
+empty-chair|avoidance|heavy|함께 있어도 마음은 없는 자리
+overflowing-cup|tension|neutral|더 이상 받아들일 수 없을 만큼 가득 찬 상태
+rope-bridge|hesitation|neutral|건너고 싶지만 무서워서 머뭇거리는 관계
+half-open-letter|hesitation|warm|말하고 싶은데 끝까지 못 한 마음
+two-trees-roots|recovery|warm|떨어져 보여도 깊은 곳은 연결되어 있음
+two-compasses-apart|avoidance|neutral|원하는 미래의 방향이 달라진 상태
+melting-candle|tension|heavy|열정·온기가 소진되어가는 상태
+parallel-rails|avoidance|neutral|같은 방향이지만 영원히 만나지 않는 두 레일
+half-erased-note|hesitation|neutral|썼다가 지운 흔적이 남은 메모 — 말하다 멈춘 마음
+tangled-thread|tension|neutral|복잡하게 얽힌 관계
+dying-stove|avoidance|heavy|오래된 관계의 온기가 식어가는 상태
+one-candle-out|loneliness|heavy|불균등한 노력
+empty-photo-frame|loneliness|heavy|함께였던 순간이 지워진 자리
+pendulum|tension|neutral|감정의 극과 극
+back-to-back-umbrellas|avoidance|neutral|서로 등을 지고 각자 우산을 쓴 상태
+crumbling-sandcastle|tension|heavy|함께 쌓아온 것이 흔들리는 상태
+empty-nest|loneliness|warm|역할이 끝난 후의 공허함
+dried-bouquet|avoidance|neutral|식어버린 우정
+emptying-hourglass|avoidance|heavy|서서히 멀어지는 관계
+one-lit-bulb|loneliness|heavy|일방적인 노력
+broken-thread|avoidance|heavy|단절된 연결
+wrongly-folded-letter|hesitation|neutral|오해·전달 실패
+string-telephone|hesitation|warm|거리가 있어도 닿으려는 시도
+inside-out-umbrella|tension|heavy|믿었던 것이 배신당한 상태
+one-seedling|loneliness|neutral|불균형한 투자
+tilted-scale|tension|heavy|인정·보상의 불균형
+overflowing-papers|tension|heavy|과도한 요구·소진
+empty-trophy|loneliness|neutral|인정받지 못한 노력
+light-under-door|loneliness|heavy|배제·소외
+chained-anchor|avoidance|heavy|벗어나고 싶지만 묶인 상태
+too-many-keys|tension|neutral|과중한 책임·역할
+gears-not-meshing|tension|neutral|팀워크·협력 단절
+small-birdcage|tension|heavy|통제·과잉보호로 숨막히는 상태
+tall-fence|protection|heavy|보호가 감금으로 변한 상태
+trees-growing-apart|avoidance|neutral|같은 뿌리에서 서로 다른 방향으로 자란
+cracked-bowl|tension|heavy|상처난 관계
+empty-dining-table|loneliness|heavy|함께하지 못하는 시간
+wilting-plant|avoidance|neutral|방치된 관계
+closed-diary|hesitation|neutral|세대 간 말하지 못하는 속마음
+long-shadow|protection|heavy|부모의 영향력 아래
+foggy-path|hesitation|neutral|관계의 모호함
+half-open-window|hesitation|warm|조심스럽게 열어두는 마음
+oil-on-water|avoidance|neutral|섞이지 않는 관계
+crossing-paths|hesitation|neutral|스쳐 지나가는 관계
+shallow-well|loneliness|neutral|깊어지지 않는 관계
+first-footstep|recovery|warm|용기 내어 내딛은 시작
+seed-in-palm|recovery|warm|새 관계의 가능성
+open-window|recovery|warm|마음을 열어두는 상태
+cups-finally-touching|recovery|warm|화해의 첫 접촉
+melting-ice|recovery|neutral|차가움이 녹는 과정
+crack-with-light|recovery|warm|상처가 빛의 통로
+two-compasses-aligned|recovery|warm|같은 미래를 바라보는 마음
+raft-together|recovery|neutral|어려움 속 동행

@@ -88,7 +88,8 @@ public class AiPostBundleService {
                         bundle.content.captureSplitAfterLines() != null
                                 && !bundle.content.captureSplitAfterLines().isEmpty()
                                 ? bundle.content.captureSplitAfterLines().get(0) : null)
-                .promoTitle(bundle.content.promoTitle());
+                .promoTitle(bundle.content.promoTitle())
+                .metaphorId(bundle.content.metaphorId());
         applyProvenance(postBuilder, bundle.source);
         Optional<PostDto> published = backendBot.createPost(jwt, postBuilder.build());
         if (published.isEmpty() || published.get().getId() == null) return Optional.empty();
@@ -332,6 +333,7 @@ public class AiPostBundleService {
         postMap.put("title", postContent.title());
         postMap.put("body", postContent.body());
         postMap.put("promo_title", postContent.promoTitle());
+        postMap.put("metaphor_id", postContent.metaphorId());
         postMap.put("capture_split_after_lines", postContent.captureSplitAfterLines());
         if (postContent.captureSplitAfterLines() != null && !postContent.captureSplitAfterLines().isEmpty()) {
             postMap.put("capture_split_after_line", postContent.captureSplitAfterLines().get(0));
@@ -619,7 +621,16 @@ public class AiPostBundleService {
         if (!guard.passed()) throw new IllegalArgumentException("unsafe post: " + guard.reason());
         List<Integer> splits = resolveCaptureSplits(body, readCaptureSplits(raw));
         String promoTitle = readAndNormalizePromoTitle(title, raw);
-        return new PostContent(title, body, splits, promoTitle);
+        String metaphorId = readMetaphorId(raw);
+        return new PostContent(title, body, splits, promoTitle, metaphorId);
+    }
+
+    private static String readMetaphorId(Map<?, ?> post) {
+        Object v = post.get("metaphor_id");
+        if (v == null) v = post.get("metaphorId");
+        if (v == null) return null;
+        String id = String.valueOf(v).trim().toLowerCase(java.util.Locale.ROOT);
+        return id.isBlank() ? null : id;
     }
 
     private static String readAndNormalizePromoTitle(String title, Map<?, ?> post) {
@@ -770,7 +781,8 @@ public class AiPostBundleService {
         return LiteralNewlineNormalizer.normalize(String.valueOf(value)).trim();
     }
 
-    private record PostContent(String title, String body, List<Integer> captureSplitAfterLines, String promoTitle) { }
+    private record PostContent(String title, String body, List<Integer> captureSplitAfterLines, String promoTitle,
+                               String metaphorId) { }
 
     public record PublishedBundle(PostDto post, String body, Long sourceExampleId) {
         public PublishedBundle(PostDto post, String body) {

@@ -241,6 +241,11 @@ xmlns="http://www.w3.org/2000/svg"
 - [ ] 중심 오브젝트가 너무 작지 않은지 (40% 이상)
 - [ ] `frontend/public/illustrations/metaphors/` 에 저장
 - [ ] `frontend/lib/constants/metaphors.ts` METAPHORS 배열에 등록 (모든 필드 필수)
+- [ ] `ai-user/llm/src/main/resources/metaphors/catalog.json` (+ `catalog-compact.txt`) 동기화 — PLAN이 `metaphor_id`를 고를 때 사용
 - [ ] 이 문서 §5 목록 테이블 업데이트
 - [ ] `npm run build` 통과
 - [ ] `npm run lint:emoji` 통과
+
+### 런타임 매칭
+
+AI 사연 생성(PLAN / PAIRED_PHASE1) 시 LLM이 `METAPHOR_CATALOG`에서 감정에 맞는 `metaphor_id` 1개를 고르고, `posts.metaphor_id`(V99)에 저장한다. Shorts intro는 이 ID의 PNG(`WaggleBot/assets/metaphors/{id}.png`)를 표지로 쓴다.

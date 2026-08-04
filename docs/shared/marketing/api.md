@@ -99,6 +99,19 @@ Authorization: Bearer <admin-jwt>
 **GET Response 200** — `CredentialStatus[]` (아래 ASM 2.5 형식과 동일)
 **PUT**: 성공 시 단일 `CredentialStatus`. **오류**: 400 (미지원 platform / 필수 누락)
 
+### 1.5.1 WaggleBot TTS 음성 (플랫폼 계정 편집)
+
+> ASM `/api/v1/waggle/*` → WaggleBot. 어드민 JWT로 미리듣기·선택. `tts_voice`는 `youtube_shorts` 자격증명 public 필드.
+
+```
+GET /api/admin/marketing/tts/voices
+GET /api/admin/marketing/tts/voice-sample?path=/api/tts/voices/{key}/sample
+Authorization: Bearer <admin-jwt>
+```
+
+**voices 200** — `{ defaultVoice, voices:[{ key, label, gender?, sampleUrl, hasSample, ... }] }`  
+`sampleUrl` = WaggleBot 키 기반 경로(`/api/tts/voices/{key}/sample`). 미리듣기는 `voice-sample`로 스트리밍 (path는 `/api/tts/voices/*/sample` 또는 `/api/media/voices/` 접두만 허용).
+
 ---
 
 ## 2. ASM (Again-Spring-Marketing) API
@@ -124,6 +137,7 @@ Idempotency-Key: <uuid>
   "callback_base_url": "http://100.81.189.92:8090",  // AS가 포함 — ASM이 콜백 URL 생성 시 사용
   "brief": {
     "title": "사연 제목",
+    "metaphor_id": "empty-chair",
     "neutral_summary": "중립 요약 (최대 500자)",
     "side_a": "작성자 관점",
     "side_b": "상대방 관점",
@@ -216,6 +230,9 @@ Authorization: Bearer <asm-token>
 GET    /api/v1/credentials             # 7개 플랫폼 전체 상태
 PUT    /api/v1/credentials/{platform}  # 저장/수정 (병합)  body: {"values": {...}}
 DELETE /api/v1/credentials/{platform}  # 삭제 (204)
+
+GET    /api/v1/waggle/voices                         # WaggleBot TTS 카탈로그
+GET    /api/v1/waggle/voice-sample?path=/api/tts/…/sample # 샘플 오디오 프록시
 Authorization: Bearer <asm-token>
 ```
 

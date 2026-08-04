@@ -3,6 +3,7 @@ package com.againspring.api.admin;
 import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
 import com.againspring.repository.marketing.MarketingJobRepository;
+import com.againspring.service.admin.MarketingStatsService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -11,10 +12,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -34,6 +38,8 @@ class AdminMarketingCredentialControllerTest {
     MarketingJobRepository marketingJobRepository;
     @Mock
     AsmClient asmClient;
+    @Mock
+    MarketingStatsService marketingStatsService;
 
     @InjectMocks
     AdminMarketingController controller;
@@ -72,5 +78,49 @@ class AdminMarketingCredentialControllerTest {
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         verify(asmClient).deleteCredential("threads");
+    }
+
+    @Test
+    void listTtsVoices_delegatesToAsm() {
+        ObjectNode catalog = om.createObjectNode();
+        catalog.put("defaultVoice", "yohan");
+        catalog.set("voices", om.createArrayNode());
+        when(asmClient.listWaggleVoices()).thenReturn(catalog);
+
+        ResponseEntity<JsonNode> resp = controller.listTtsVoices();
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).isSameAs(catalog);
+        verify(asmClient).listWaggleVoices();
+    }
+
+    @Test
+    void getTtsVoiceSample_rejectsUnsafePath() {
+        assertThatThrownBy(() -> controller.getTtsVoiceSample("../etc/passwd"))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void getTtsVoiceSample_forwardsSafeKeyPath() {
+        ResponseEntity<Resource> sample = ResponseEntity.ok().build();
+        when(asmClient.getWaggleVoiceSample("/api/tts/voices/yohan/sample")).thenReturn(sample);
+
+        ResponseEntity<Resource> resp = controller.getTtsVoiceSample("/api/tts/voices/yohan/sample");
+
+        assertThat(resp).isSameAs(sample);
+        verify(asmClient).getWaggleVoiceSample("/api/tts/voices/yohan/sample");
+    }
+
+    @Test
+    void getTtsVoiceSample_forwardsSafeMediaPath() {
+        ResponseEntity<Resource> sample = ResponseEntity.ok().build();
+        when(asmClient.getWaggleVoiceSample("/api/media/voices/manbo/01.wav")).thenReturn(sample);
+
+        ResponseEntity<Resource> resp = controller.getTtsVoiceSample("/api/media/voices/manbo/01.wav");
+
+        assertThat(resp).isSameAs(sample);
+        verify(asmClient).getWaggleVoiceSample("/api/media/voices/manbo/01.wav");
     }
 }

@@ -1,0 +1,422 @@
+[
+  {
+    "id": "locked-mailbox",
+    "file": "01-locked-mailbox.svg",
+    "group": "avoidance",
+    "tone": "neutral",
+    "meaning": "마음을 받았는데 열어보지 않은 채 쌓여있는 상태"
+  },
+  {
+    "id": "boiling-kettle",
+    "file": "02-boiling-kettle.svg",
+    "group": "tension",
+    "tone": "heavy",
+    "meaning": "작은 일에도 곧 터질 것 같이 끓고 있는 상태"
+  },
+  {
+    "id": "locked-door",
+    "file": "03-locked-door.svg",
+    "group": "avoidance",
+    "tone": "heavy",
+    "meaning": "더 이상 들어올 수 없게 마음의 빗장을 채운 상태"
+  },
+  {
+    "id": "too-big-umbrella",
+    "file": "04-too-big-umbrella.svg",
+    "group": "protection",
+    "tone": "neutral",
+    "meaning": "상대를 지키려다 오히려 거리감을 만든 상태"
+  },
+  {
+    "id": "person-in-rain",
+    "file": "05-person-in-rain.svg",
+    "group": "loneliness",
+    "tone": "heavy",
+    "meaning": "누군가 알아봐주길 기다리며 그대로 서있는 상태"
+  },
+  {
+    "id": "frozen-pond",
+    "file": "06-frozen-pond.svg",
+    "group": "avoidance",
+    "tone": "heavy",
+    "meaning": "흐르지 못하고 멈춰버린 감정"
+  },
+  {
+    "id": "cracked-window",
+    "file": "07-cracked-window.svg",
+    "group": "tension",
+    "tone": "heavy",
+    "meaning": "깨지지는 않았지만 작은 충격에도 흔들리는 상태"
+  },
+  {
+    "id": "empty-chair",
+    "file": "08-empty-chair.svg",
+    "group": "avoidance",
+    "tone": "heavy",
+    "meaning": "함께 있어도 마음은 없는 자리"
+  },
+  {
+    "id": "overflowing-cup",
+    "file": "09-overflowing-cup.svg",
+    "group": "tension",
+    "tone": "neutral",
+    "meaning": "더 이상 받아들일 수 없을 만큼 가득 찬 상태"
+  },
+  {
+    "id": "rope-bridge",
+    "file": "10-rope-bridge.svg",
+    "group": "hesitation",
+    "tone": "neutral",
+    "meaning": "건너고 싶지만 무서워서 머뭇거리는 관계"
+  },
+  {
+    "id": "half-open-letter",
+    "file": "11-half-open-letter.svg",
+    "group": "hesitation",
+    "tone": "warm",
+    "meaning": "말하고 싶은데 끝까지 못 한 마음"
+  },
+  {
+    "id": "two-trees-roots",
+    "file": "12-two-trees-roots.svg",
+    "group": "recovery",
+    "tone": "warm",
+    "meaning": "떨어져 보여도 깊은 곳은 연결되어 있음"
+  },
+  {
+    "id": "two-compasses-apart",
+    "file": "13-two-compasses-apart.svg",
+    "group": "avoidance",
+    "tone": "neutral",
+    "meaning": "원하는 미래의 방향이 달라진 상태"
+  },
+  {
+    "id": "melting-candle",
+    "file": "14-melting-candle.svg",
+    "group": "tension",
+    "tone": "heavy",
+    "meaning": "열정·온기가 소진되어가는 상태"
+  },
+  {
+    "id": "parallel-rails",
+    "file": "15-parallel-rails.svg",
+    "group": "avoidance",
+    "tone": "neutral",
+    "meaning": "같은 방향이지만 영원히 만나지 않는 두 레일"
+  },
+  {
+    "id": "half-erased-note",
+    "file": "16-half-erased-note.svg",
+    "group": "hesitation",
+    "tone": "neutral",
+    "meaning": "썼다가 지운 흔적이 남은 메모 — 말하다 멈춘 마음"
+  },
+  {
+    "id": "tangled-thread",
+    "file": "17-tangled-thread.svg",
+    "group": "tension",
+    "tone": "neutral",
+    "meaning": "복잡하게 얽힌 관계"
+  },
+  {
+    "id": "dying-stove",
+    "file": "18-dying-stove.svg",
+    "group": "avoidance",
+    "tone": "heavy",
+    "meaning": "오래된 관계의 온기가 식어가는 상태"
+  },
+  {
+    "id": "one-candle-out",
+    "file": "19-one-candle-out.svg",
+    "group": "loneliness",
+    "tone": "heavy",
+    "meaning": "불균등한 노력"
+  },
+  {
+    "id": "empty-photo-frame",
+    "file": "20-empty-photo-frame.svg",
+    "group": "loneliness",
+    "tone": "heavy",
+    "meaning": "함께였던 순간이 지워진 자리"
+  },
+  {
+    "id": "pendulum",
+    "file": "21-pendulum.svg",
+    "group": "tension",
+    "tone": "neutral",
+    "meaning": "감정의 극과 극"
+  },
+  {
+    "id": "back-to-back-umbrellas",
+    "file": "22-back-to-back-umbrellas.svg",
+    "group": "avoidance",
+    "tone": "neutral",
+    "meaning": "서로 등을 지고 각자 우산을 쓴 상태"
+  },
+  {
+    "id": "crumbling-sandcastle",
+    "file": "23-crumbling-sandcastle.svg",
+    "group": "tension",
+    "tone": "heavy",
+    "meaning": "함께 쌓아온 것이 흔들리는 상태"
+  },
+  {
+    "id": "empty-nest",
+    "file": "24-empty-nest.svg",
+    "group": "loneliness",
+    "tone": "warm",
+    "meaning": "역할이 끝난 후의 공허함"
+  },
+  {
+    "id": "dried-bouquet",
+    "file": "25-dried-bouquet.svg",
+    "group": "avoidance",
+    "tone": "neutral",
+    "meaning": "식어버린 우정"
+  },
+  {
+    "id": "emptying-hourglass",
+    "file": "26-emptying-hourglass.svg",
+    "group": "avoidance",
+    "tone": "heavy",
+    "meaning": "서서히 멀어지는 관계"
+  },
+  {
+    "id": "one-lit-bulb",
+    "file": "27-one-lit-bulb.svg",
+    "group": "loneliness",
+    "tone": "heavy",
+    "meaning": "일방적인 노력"
+  },
+  {
+    "id": "broken-thread",
+    "file": "28-broken-thread.svg",
+    "group": "avoidance",
+    "tone": "heavy",
+    "meaning": "단절된 연결"
+  },
+  {
+    "id": "wrongly-folded-letter",
+    "file": "29-wrongly-folded-letter.svg",
+    "group": "hesitation",
+    "tone": "neutral",
+    "meaning": "오해·전달 실패"
+  },
+  {
+    "id": "string-telephone",
+    "file": "30-string-telephone.svg",
+    "group": "hesitation",
+    "tone": "warm",
+    "meaning": "거리가 있어도 닿으려는 시도"
+  },
+  {
+    "id": "inside-out-umbrella",
+    "file": "31-inside-out-umbrella.svg",
+    "group": "tension",
+    "tone": "heavy",
+    "meaning": "믿었던 것이 배신당한 상태"
+  },
+  {
+    "id": "one-seedling",
+    "file": "32-one-seedling.svg",
+    "group": "loneliness",
+    "tone": "neutral",
+    "meaning": "불균형한 투자"
+  },
+  {
+    "id": "tilted-scale",
+    "file": "33-tilted-scale.svg",
+    "group": "tension",
+    "tone": "heavy",
+    "meaning": "인정·보상의 불균형"
+  },
+  {
+    "id": "overflowing-papers",
+    "file": "34-overflowing-papers.svg",
+    "group": "tension",
+    "tone": "heavy",
+    "meaning": "과도한 요구·소진"
+  },
+  {
+    "id": "empty-trophy",
+    "file": "35-empty-trophy.svg",
+    "group": "loneliness",
+    "tone": "neutral",
+    "meaning": "인정받지 못한 노력"
+  },
+  {
+    "id": "light-under-door",
+    "file": "36-light-under-door.svg",
+    "group": "loneliness",
+    "tone": "heavy",
+    "meaning": "배제·소외"
+  },
+  {
+    "id": "chained-anchor",
+    "file": "37-chained-anchor.svg",
+    "group": "avoidance",
+    "tone": "heavy",
+    "meaning": "벗어나고 싶지만 묶인 상태"
+  },
+  {
+    "id": "too-many-keys",
+    "file": "38-too-many-keys.svg",
+    "group": "tension",
+    "tone": "neutral",
+    "meaning": "과중한 책임·역할"
+  },
+  {
+    "id": "gears-not-meshing",
+    "file": "39-gears-not-meshing.svg",
+    "group": "tension",
+    "tone": "neutral",
+    "meaning": "팀워크·협력 단절"
+  },
+  {
+    "id": "small-birdcage",
+    "file": "40-small-birdcage.svg",
+    "group": "tension",
+    "tone": "heavy",
+    "meaning": "통제·과잉보호로 숨막히는 상태"
+  },
+  {
+    "id": "tall-fence",
+    "file": "41-tall-fence.svg",
+    "group": "protection",
+    "tone": "heavy",
+    "meaning": "보호가 감금으로 변한 상태"
+  },
+  {
+    "id": "trees-growing-apart",
+    "file": "42-trees-growing-apart.svg",
+    "group": "avoidance",
+    "tone": "neutral",
+    "meaning": "같은 뿌리에서 서로 다른 방향으로 자란"
+  },
+  {
+    "id": "cracked-bowl",
+    "file": "43-cracked-bowl.svg",
+    "group": "tension",
+    "tone": "heavy",
+    "meaning": "상처난 관계"
+  },
+  {
+    "id": "empty-dining-table",
+    "file": "44-empty-dining-table.svg",
+    "group": "loneliness",
+    "tone": "heavy",
+    "meaning": "함께하지 못하는 시간"
+  },
+  {
+    "id": "wilting-plant",
+    "file": "45-wilting-plant.svg",
+    "group": "avoidance",
+    "tone": "neutral",
+    "meaning": "방치된 관계"
+  },
+  {
+    "id": "closed-diary",
+    "file": "46-closed-diary.svg",
+    "group": "hesitation",
+    "tone": "neutral",
+    "meaning": "세대 간 말하지 못하는 속마음"
+  },
+  {
+    "id": "long-shadow",
+    "file": "47-long-shadow.svg",
+    "group": "protection",
+    "tone": "heavy",
+    "meaning": "부모의 영향력 아래"
+  },
+  {
+    "id": "foggy-path",
+    "file": "48-foggy-path.svg",
+    "group": "hesitation",
+    "tone": "neutral",
+    "meaning": "관계의 모호함"
+  },
+  {
+    "id": "half-open-window",
+    "file": "49-half-open-window.svg",
+    "group": "hesitation",
+    "tone": "warm",
+    "meaning": "조심스럽게 열어두는 마음"
+  },
+  {
+    "id": "oil-on-water",
+    "file": "50-oil-on-water.svg",
+    "group": "avoidance",
+    "tone": "neutral",
+    "meaning": "섞이지 않는 관계"
+  },
+  {
+    "id": "crossing-paths",
+    "file": "51-crossing-paths.svg",
+    "group": "hesitation",
+    "tone": "neutral",
+    "meaning": "스쳐 지나가는 관계"
+  },
+  {
+    "id": "shallow-well",
+    "file": "52-shallow-well.svg",
+    "group": "loneliness",
+    "tone": "neutral",
+    "meaning": "깊어지지 않는 관계"
+  },
+  {
+    "id": "first-footstep",
+    "file": "53-first-footstep.svg",
+    "group": "recovery",
+    "tone": "warm",
+    "meaning": "용기 내어 내딛은 시작"
+  },
+  {
+    "id": "seed-in-palm",
+    "file": "54-seed-in-palm.svg",
+    "group": "recovery",
+    "tone": "warm",
+    "meaning": "새 관계의 가능성"
+  },
+  {
+    "id": "open-window",
+    "file": "55-open-window.svg",
+    "group": "recovery",
+    "tone": "warm",
+    "meaning": "마음을 열어두는 상태"
+  },
+  {
+    "id": "cups-finally-touching",
+    "file": "56-cups-finally-touching.svg",
+    "group": "recovery",
+    "tone": "warm",
+    "meaning": "화해의 첫 접촉"
+  },
+  {
+    "id": "melting-ice",
+    "file": "57-melting-ice.svg",
+    "group": "recovery",
+    "tone": "neutral",
+    "meaning": "차가움이 녹는 과정"
+  },
+  {
+    "id": "crack-with-light",
+    "file": "58-crack-with-light.svg",
+    "group": "recovery",
+    "tone": "warm",
+    "meaning": "상처가 빛의 통로"
+  },
+  {
+    "id": "two-compasses-aligned",
+    "file": "59-two-compasses-aligned.svg",
+    "group": "recovery",
+    "tone": "warm",
+    "meaning": "같은 미래를 바라보는 마음"
+  },
+  {
+    "id": "raft-together",
+    "file": "60-raft-together.svg",
+    "group": "recovery",
+    "tone": "neutral",
+    "meaning": "어려움 속 동행"
+  }
+]

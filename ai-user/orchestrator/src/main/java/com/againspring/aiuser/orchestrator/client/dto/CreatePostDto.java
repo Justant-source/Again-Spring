@@ -43,4 +43,8 @@ public class CreatePostDto {
      * null이면 backend PromoTitleService가 채움.
      */
     private String promoTitle;
+    /**
+     * 메타포 일러스트 ID (60종 카탈로그). PLAN LLM {@code metaphor_id}.
+     */
+    private String metaphorId;
 }

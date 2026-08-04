@@ -34,6 +34,11 @@ public class ThreadPlanResponse {
         @Deprecated
         @JsonProperty("capture_split_after_line")
         Integer captureSplitAfterLine;
+        /**
+         * Best-fit metaphor illustration id (60-card catalog). Matched at AI_POST creation.
+         */
+        @JsonProperty("metaphor_id")
+        String metaphorId;
     }
     @Value @Builder
     public static class Item {

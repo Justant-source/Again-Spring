@@ -57,6 +57,7 @@ AS 트리거/brief → ASM 잡(youtube_shorts alone) → WaggleBot ingest+render
 | 필드 | 설명 |
 |---|---|
 | `title` / `promo_title` | 훅·제목 |
+| `metaphor_id` | 사연 생성 시 매칭된 메타포 일러스트 ID (60종). Shorts intro에 사용. 없으면 크림 빈화면 |
 | `side_a` 또는 `author_body` | 작성자 본문 **전문** |
 | `partner_body` | paired일 때만 상대 본문 **전문** |
 | `top_comments` | `{ author?, body, likeCount }[]` **최대 2, body 전문** |
@@ -69,6 +70,10 @@ AS 트리거/brief → ASM 잡(youtube_shorts alone) → WaggleBot ingest+render
 
 - 잡 상세: **인라인 mp4 재생** + 썸네일 + 사용 댓글 2 + (paired) 예정 첫 댓글
 - `READY && !autoPublish` → **게시 승인** 시에만 업로드
+- **플랫폼 계정 → YouTube Shorts / Instagram 릴스**: WaggleBot TTS 음성 목록을 미리듣고 `tts_voice`로 저장 (빈값=파이프 기본). Shorts 렌더 시 brief·WaggleBot `options.ttsVoice` → `contents.variant_config.tts_voice`에 주입.
+- **단일 보이스 계약 (Again Spring)**: 사연·댓글·outro 전 구간이 어드민이 고른 음성 하나만 사용한다. WaggleBot은 `variant_config.tts_voice`를 SSOT로 읽고(컬럼이 pipeline 기본값으로 덮여도 복구), `again_spring` 잡에서는 `comment_voices` 다중 배정을 끈다. 참조 샘플이 없는 키(예: `yohan`)로 떨어지면 Fish Speech가 청크마다 불안정한 기본 음색을 써서 “여러 사람 목소리”처럼 들릴 수 있다.
+- **Intro**: again_spring은 mood 스톡/회색 플레이스홀더를 쓰지 않는다. `metaphor_id` PNG가 있으면 표지로, 없으면 크림 빈화면+제목만.
+- **TTS 음량**: 청크별 loudnorm 후 **병합 파일에 한 번 더** global loudnorm (`I=-16`) 적용해 씬 간 볼륨 점프를 줄인다.
 
 ---
 

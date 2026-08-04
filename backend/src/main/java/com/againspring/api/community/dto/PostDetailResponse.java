@@ -30,6 +30,8 @@ public class PostDetailResponse {
 
     private String promoTitle;
 
+    private String metaphorId;
+
     private String bodyPublished;
 
     private String category;
@@ -119,6 +121,7 @@ public class PostDetailResponse {
                 .id(post.getId())
                 .title(post.getTitle())
                 .promoTitle(post.getPromoTitle())
+                .metaphorId(post.getMetaphorId())
                 .bodyPublished(post.getBodyPublished())
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())

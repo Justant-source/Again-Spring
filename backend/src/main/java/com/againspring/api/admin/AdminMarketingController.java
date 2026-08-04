@@ -179,6 +179,47 @@ public class AdminMarketingController {
         return ResponseEntity.noContent().build();
     }
 
+    // ===== WaggleBot TTS voices (for platform account editor) =====
+
+    /**
+     * List TTS voices registered in WaggleBot (via ASM).
+     * {@code sampleUrl} stays as WB media path ({@code /api/media/voices/...});
+     * preview goes through {@link #getTtsVoiceSample}.
+     */
+    @GetMapping("/tts/voices")
+    @Operation(summary = "List WaggleBot TTS voices", description = "와글봇 등록 TTS 음성 목록")
+    @ApiResponse(responseCode = "200", description = "Voice catalog returned")
+    public ResponseEntity<JsonNode> listTtsVoices() {
+        return ResponseEntity.ok(asmClient.listWaggleVoices());
+    }
+
+    /**
+     * Stream a WaggleBot voice sample (wav/mp3) for admin preview.
+     * {@code path} must be a WB sample path:
+     * {@code /api/tts/voices/{key}/sample} or {@code /api/media/voices/...}.
+     */
+    @GetMapping("/tts/voice-sample")
+    @Operation(summary = "Preview WaggleBot TTS sample", description = "TTS 음성 샘플 스트리밍")
+    public ResponseEntity<Resource> getTtsVoiceSample(@RequestParam("path") String path) {
+        if (!isAllowedWaggleSamplePath(path)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sample path");
+        }
+        return asmClient.getWaggleVoiceSample(path);
+    }
+
+    private static boolean isAllowedWaggleSamplePath(String path) {
+        if (path == null || path.contains("..")) {
+            return false;
+        }
+        if (path.startsWith("/api/media/voices/") && path.chars().filter(ch -> ch == '/').count() >= 4) {
+            return true;
+        }
+        // /api/tts/voices/{key}/sample
+        return path.startsWith("/api/tts/voices/")
+                && path.endsWith("/sample")
+                && path.chars().filter(ch -> ch == '/').count() == 5;
+    }
+
     // ===== YouTube Shorts OAuth 2.0 authorization-code flow =====
 
     /**

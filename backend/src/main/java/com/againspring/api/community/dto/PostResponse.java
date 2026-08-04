@@ -23,6 +23,8 @@ public class PostResponse {
     private String userTitle;
     /** 마케팅 훅 제목 (≤20자). 생성 전이면 null — resolveOrFallback 사용. */
     private String promoTitle;
+    /** 메타포 일러스트 ID (60종). 없으면 null. */
+    private String metaphorId;
     private String bodyPublished;
     private String category;
     private String visibility;
@@ -68,6 +70,7 @@ public class PostResponse {
                 .title(post.getTitle())
                 .userTitle(post.getUserTitle())
                 .promoTitle(post.getPromoTitle())
+                .metaphorId(post.getMetaphorId())
                 .bodyPublished(post.getBodyPublished())
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())

@@ -68,7 +68,7 @@ public class PostComposeService {
                                   int jurorCount, String sessionId,
                                   SourceSnapshot source) {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                jurorCount, sessionId, source, (java.util.List<Integer>) null, null);
+                jurorCount, sessionId, source, (java.util.List<Integer>) null, null, null);
     }
 
     /** @deprecated prefer list overload */
@@ -81,7 +81,7 @@ public class PostComposeService {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
                 jurorCount, sessionId, source,
                 captureSplitAfterLine == null ? null : java.util.List.of(captureSplitAfterLine),
-                null);
+                null, null);
     }
 
     /** @deprecated prefer list overload */
@@ -95,7 +95,7 @@ public class PostComposeService {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
                 jurorCount, sessionId, source,
                 captureSplitAfterLine == null ? null : java.util.List.of(captureSplitAfterLine),
-                promoTitle);
+                promoTitle, null);
     }
 
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
@@ -104,6 +104,17 @@ public class PostComposeService {
                                   SourceSnapshot source,
                                   java.util.List<Integer> captureSplitAfterLines,
                                   String promoTitle) {
+        return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
+                jurorCount, sessionId, source, captureSplitAfterLines, promoTitle, null);
+    }
+
+    public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
+                                  PostCategory category, String visibility,
+                                  int jurorCount, String sessionId,
+                                  SourceSnapshot source,
+                                  java.util.List<Integer> captureSplitAfterLines,
+                                  String promoTitle,
+                                  String metaphorId) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
         // 위기 감지 (이중방어 — FE에서도 감지)
@@ -117,6 +128,14 @@ public class PostComposeService {
         String normalizedPromo = null;
         if (promoTitle != null && !promoTitle.isBlank()) {
             normalizedPromo = PromoTitleService.normalizeAgainstTitle(promoTitle, userTitle);
+        }
+
+        String normalizedMetaphor = null;
+        if (metaphorId != null && !metaphorId.isBlank()) {
+            normalizedMetaphor = metaphorId.trim().toLowerCase(java.util.Locale.ROOT);
+            if (normalizedMetaphor.length() > 64) {
+                normalizedMetaphor = normalizedMetaphor.substring(0, 64);
+            }
         }
 
         Integer legacyFirst = (captureSplitAfterLines != null && !captureSplitAfterLines.isEmpty())
@@ -139,6 +158,7 @@ public class PostComposeService {
                 .captureSplitAfterLine(legacyFirst)
                 .captureSplitAfterLines(captureSplitAfterLines)
                 .promoTitle(normalizedPromo)
+                .metaphorId(normalizedMetaphor)
                 .voteCloseAt(Instant.now().plusSeconds(7L * 24 * 3600))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now());

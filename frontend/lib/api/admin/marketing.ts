@@ -130,6 +130,39 @@ export async function exchangeYoutubeOauth(
   return res.data;
 }
 
+// ===== WaggleBot TTS voices (platform account editor) =====
+
+export interface TtsVoice {
+  key: string;
+  label: string;
+  gender?: string;
+  age_range?: number[];
+  sampleUrl?: string | null;
+  hasSample?: boolean;
+}
+
+export interface TtsVoiceCatalog {
+  defaultVoice: string;
+  voices: TtsVoice[];
+}
+
+export async function listTtsVoices(): Promise<TtsVoiceCatalog> {
+  const res = await api.get<TtsVoiceCatalog>('/api/admin/marketing/tts/voices');
+  return res.data;
+}
+
+/**
+ * Fetch sample audio bytes with admin auth (for audio preview via blob URL).
+ * {@code samplePath} is the WaggleBot media path from the catalog (`/api/media/voices/...`).
+ */
+export async function fetchTtsVoiceSampleBlob(samplePath: string): Promise<Blob> {
+  const res = await api.get<Blob>('/api/admin/marketing/tts/voice-sample', {
+    params: { path: samplePath },
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
 // ===== Marketing Analytics =====
 
 export interface PlatformStatsDto {

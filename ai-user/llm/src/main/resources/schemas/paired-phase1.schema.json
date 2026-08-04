@@ -24,6 +24,10 @@
         "capture_split_after_line": {
           "type": ["integer", "null"],
           "description": "Deprecated single cut"
+        },
+        "metaphor_id": {
+          "type": ["string", "null"],
+          "description": "Best-fit metaphor illustration id from the 60-card catalog (e.g. empty-chair)"
         }
       }
     },

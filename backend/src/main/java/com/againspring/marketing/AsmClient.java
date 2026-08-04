@@ -183,6 +183,45 @@ public class AsmClient {
     }
 
     /**
+     * WaggleBot TTS voice catalog (via ASM proxy).
+     * Returns {@code { defaultVoice, voices:[{key,label,gender,sampleUrl,hasSample,...}] }}.
+     */
+    public JsonNode listWaggleVoices() {
+        try {
+            return restClient
+                .get()
+                .uri("/api/v1/waggle/voices")
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (Exception e) {
+            log.error("Failed to list WaggleBot voices via ASM", e);
+            throw new AsmUnavailableException("Failed to list WaggleBot voices: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Stream a WaggleBot voice sample file through ASM.
+     * {@code path} must be a WB media path like {@code /api/media/voices/...}.
+     */
+    public ResponseEntity<Resource> getWaggleVoiceSample(String path) {
+        try {
+            return restClient
+                .get()
+                .uri(uriBuilder -> uriBuilder
+                    .path("/api/v1/waggle/voice-sample")
+                    .queryParam("path", path)
+                    .build())
+                .retrieve()
+                .toEntity(Resource.class);
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to fetch WaggleBot voice sample {}", path, e);
+            throw new AsmUnavailableException("Failed to fetch voice sample: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * YouTube OAuth — /start: Google 인증 URL 생성.
      * body: {"redirect_uri": "..."}
      * 반환: {"auth_url": "..."}

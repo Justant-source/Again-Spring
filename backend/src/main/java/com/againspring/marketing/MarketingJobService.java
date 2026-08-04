@@ -223,6 +223,7 @@ public class MarketingJobService {
         BriefDto brief = BriefDto.builder()
             .title(storyTitle)
             .promoTitle(PromoTitleService.resolveOrFallback(post))
+            .metaphorId(post.getMetaphorId())
             .neutralSummary(summary)
             .sideA(sideAText)
             .sideB(sideBText)

@@ -43,6 +43,10 @@ public class CreateJobRequest {
         @JsonProperty("promo_title")
         private String promoTitle;
 
+        /** Metaphor illustration id (60-card catalog). Shorts intro / cards. */
+        @JsonProperty("metaphor_id")
+        private String metaphorId;
+
         @JsonProperty("neutral_summary")
         private String neutralSummary;
 

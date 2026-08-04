@@ -44,6 +44,7 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 |                   | `password`      | 🔒     | ✓ |
 |                   | `totp_secret`   | 🔒     |   |
 |                   | `storage_state` | 🔒     |   |
+|                   | `tts_voice`     |        |   |
 | `naver_blog`      | `naver_id`      |        | ✓ |
 |                   | `password`      | 🔒     | ✓ |
 |                   | `storage_state` | 🔒     |   |
@@ -52,16 +53,18 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 |                   | `storage_state` | 🔒     |   |
 | `youtube_shorts`  | `client_id`     |        | ✓ |
 |                   | `client_secret` | 🔒     | ✓ |
-|                   | `refresh_token` | 🔒     | ✓ |
-| `threads`         | `access_token`  | 🔒     | ✓ |
-|                   | `user_id`       |        | ✓ |
-|                   | `storage_state` | 🔒     |   |
+|                   | `refresh_token` | 🔒     |   |
+|                   | `channel_id`    |        |   |
+|                   | `tts_voice`     |        |   |
+| `threads`         | `storage_state` | 🔒     |   |
 
 > FE는 이 스키마를 **GET 응답의 `fields` 배열**로 받아 폼을 동적 렌더한다(드리프트 없음).
 > 한국어 라벨만 FE(`PlatformCredentialsSection.tsx`)의 라벨 사전에서 보강.
 >
 > **`storage_state`** = social-poster(Playwright)가 사용하는 로그인 세션(쿠키/스토리지) 직렬화 값. secret으로 암호화 저장하며, 보통 어드민 폼이 아니라 세션 시딩 경로(ASM `/api/v1/sessions/{platform}`)로 주입된다. API 기반인 `youtube_shorts`에는 없음.
 > **로그인 식별자**: `x`·`instagram_*`는 `email`(과거 문서의 `handle`/`username` 아님), `naver_*`는 `naver_id`. 권위본은 항상 ASM `app/domain/credentials.py`의 `PLATFORM_CREDENTIALS`.
+> **`youtube_shorts.refresh_token`**: OAuth로 자동 획득(폼 숨김). **`tts_voice`**: WaggleBot voice key(비시크릿); 빈값=파이프 기본. 어드민에서 미리듣기 후 선택. `instagram_reels`에도 동일 필드(릴스 렌더 파이프 연결 시 사용).
+> **`threads`**: 로그인 자격은 `instagram_feed`에서 런타임 상속 — 어드민 입력 불필요.
 
 ---
 
@@ -111,8 +114,8 @@ TOTP 등 secret 값을 완전히 비우려면 해당 플랫폼을 **삭제 후 �
 |---|---|
 | ASM 암호화 | `app/core/crypto.py` |
 | ASM 스키마·병합·마스킹 | `app/domain/credentials.py` |
-| ASM API | `app/api/routes_credentials.py` |
-| AS BE 프록시 | `backend/.../marketing/AsmClient.java` (`listCredentials`/`upsertCredential`/`deleteCredential`) |
+| ASM API | `app/api/routes_credentials.py` · `app/api/routes_waggle_voices.py` |
+| AS BE 프록시 | `backend/.../marketing/AsmClient.java` (`listCredentials`/`upsertCredential`/`deleteCredential`/`listWaggleVoices`/`getWaggleVoiceSample`) |
 | AS BE 엔드포인트 | `backend/.../api/admin/AdminMarketingController.java` |
 | FE API | `frontend/lib/api/admin/marketing.ts` |
 | FE UI | `frontend/components/admin/marketing/PlatformCredentialsSection.tsx` |
