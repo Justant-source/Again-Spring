@@ -70,9 +70,11 @@ docs/shared/marketing/
 ### IG 단건 검증 (요청 시 1사연)
 
 1. 어드민에서 해당 사연 → 타겟 **`instagram_feed`만** (다른 타겟과 혼합 불가)
-2. 빌드 완료 후 아티팩트: `card_01` 훅(4:5) · 중간 X캡처 · 마지막 비율카드 · `upload.json` 캡션
+2. 빌드 완료 후 아티팩트: `card_01` 훅(4:5) · 중간 장(사연=중앙 1:1 contain, 댓글=높이 버짓 N≤4) · 마지막 비율카드 · `upload.json` 캡션
 3. 게시 승인 → 인스타 앱에서 캐러셀·캡션·링크 확인 → 피드백
 4. 대량 자동·스케줄 활성화는 하지 않음
+
+> 중간 장·댓글 글자 크기 규칙: [`instagram-feed-strategy.md`](instagram-feed-strategy.md) §2.1.1–2.1.2 (`commentsReadableBudget`은 IG만, X는 최대 4장 고정).
 
 ### 잡 상태 흐름
 

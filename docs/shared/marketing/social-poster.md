@@ -33,6 +33,7 @@ services/social-poster/
 │   │   ├── ig-selectors.js   # Instagram CSS 셀렉터
 │   │   └── naver-selectors.js # 네이버 블로그 CSS 셀렉터
 │   └── routes/
+│       ├── capture-x-thread.js   # 광장 캡처 (X·IG 공유, IG만 commentsReadableBudget)
 │       ├── publish-x.js          # X 게시 엔드포인트
 │       ├── publish-instagram.js  # Instagram 게시 엔드포인트
 │       ├── publish-naver-blog.js # 네이버 블로그 게시 엔드포인트
@@ -43,6 +44,21 @@ services/social-poster/
 ---
 
 ## API 엔드포인트
+
+### POST /capture/x-thread
+
+광장 사연·댓글·비율을 JPEG로 캡처한다. X·IG 파이프가 공유한다.
+
+```json
+{
+  "postId": "post_…",
+  "hasPartnerStory": false,
+  "commentsReadableBudget": true
+}
+```
+
+- 기본(X): 댓글 **최대 4장 고정**.
+- `commentsReadableBudget: true`(IG만): 누적 crop 높이 ≤530 CSS가 되도록 상위 N(1~4)만 자름 — 상세 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) §2.1.2.
 
 ### POST /publish/x
 
