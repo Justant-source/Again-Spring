@@ -4,8 +4,8 @@
 
 | 상태 | 플랫폼 |
 |---|---|
-| **활성** | `x`, `x_thread`, `instagram_feed` |
-| **보류 (deferred)** | `naver_blog`, `instagram_reels`, `youtube_shorts`, `naver_clip`, `threads` |
+| **활성** | `x`, `x_thread`, `instagram_feed`, `youtube_shorts` (렌더+검수; **자동 게시 없음**) |
+| **보류 (deferred)** | `naver_blog`, `instagram_reels`, `naver_clip`, `threads` |
 
 에이전트·신규 작업은 활성 채널만. 보류 채널은 사용자 명시 요청 전 구현·디버그·배포 금지.
 `instagram_feed`는 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) — **게시 후 24h 자동 one-shot**
@@ -22,7 +22,7 @@
 | 네이버 블로그 | `naver_blog` | 마크다운 → HTML | Playwright 자동 로그인 | 보류 |
 | 인스타그램 피드 | `instagram_feed` | 하이브리드 캐러셀 (훅+캡처+비율) | Playwright (`instagram-feed-strategy.md`) | **활성 (24h 자동)** |
 | 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Playwright 자동 로그인 | 보류 |
-| YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | API (OAuth 2.0) | 보류 |
+| YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | WaggleBot 렌더 → API 업로드(수동 승인) | **활성 (렌더)** — [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) |
 | 네이버 클립 | `naver_clip` | 세로형 영상 (9:16) | Playwright (미구현) | 보류 |
 | Threads | `threads` | 텍스트 + 이미지 | Playwright 자동 로그인 (인스타 계정 상속) | 보류 |
 
@@ -44,15 +44,17 @@
 
 ---
 
-## 영상 스펙 (M3~M4)
+## 영상 스펙 (Shorts / Reels)
 
-| 항목 | 값 |
-|---|---|
-| 해상도 | 1080×1920 (9:16) |
-| 코덱 | H.264 (FFmpeg NVENC) |
-| 프레임률 | 30fps |
-| 오디오 | TTS (Fish Speech) AAC 44.1kHz |
-| 최대 길이 | 60초 (YouTube Shorts 기준) |
+| 항목 | YouTube Shorts | Instagram Reels (예정) |
+|---|---|---|
+| 해상도 | 1080×1920 (9:16) | 1080×1920 (9:16) |
+| 분류(공식) | 정방 **또는** 세로 ≤3분 | 권장 9:16 (허용 1.91:1~9:16) |
+| 코덱 | H.264 | H.264 |
+| 프레임률 | ≥30fps | ≥30fps |
+| 오디오 | TTS (Fish Speech) | 동일 |
+| 렌더 | WaggleBot (LTX off) | 동일 복제 예정 |
+| 상세 | [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) | — |
 
 ---
 

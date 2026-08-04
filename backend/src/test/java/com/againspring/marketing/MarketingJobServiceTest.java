@@ -35,6 +35,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -195,6 +197,8 @@ class MarketingJobServiceTest {
         assertThat(brief.getPartnerCaptureSplitAfterLines()).isNotEmpty();
         assertThat(brief.getPartnerPartHeightsCss()).isNotNull();
         assertThat(brief.getPartnerCaptureBlockCount()).isGreaterThan(0);
+        assertThat(brief.getAuthorBody()).isEqualTo("작성자 짧은 본문입니다.");
+        assertThat(brief.getPartnerBody()).isEqualTo(partnerBody);
     }
 
     @Test
@@ -232,6 +236,55 @@ class MarketingJobServiceTest {
         assertThat(captor.getValue().getBrief().getHasPartnerStory()).isFalse();
         assertThat(captor.getValue().getBrief().getPartnerCaptureSplitAfterLines()).isNull();
         assertThat(captor.getValue().getBrief().getPartnerPartHeightsCss()).isNull();
+        assertThat(captor.getValue().getBrief().getAuthorBody()).isEqualTo("작성자만");
+        assertThat(captor.getValue().getBrief().getPartnerBody()).isNull();
+    }
+
+    @Test
+    void createJob_enrichesTopCommentsWithFullBodyTop2ByLikeCount() throws JsonProcessingException {
+        String longPostBody = "가".repeat(400); // longer than side_a's 300-char cap
+        String longCommentBody = "나".repeat(150); // longer than the old 100-char comment cap
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("Test Conflict")
+            .bodyPublished(longPostBody)
+            .build();
+
+        PostComment low = PostComment.builder().authorId("user-low").body("낮은 좋아요 댓글").likeCount(1).build();
+        PostComment high = PostComment.builder().authorId("user-high").body(longCommentBody).likeCount(10).build();
+        PostComment mid = PostComment.builder().authorId("user-mid").body("중간 좋아요 댓글").likeCount(5).build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+            .thenReturn(0L);
+        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(low, high, mid));
+
+        CreateJobResponse response = CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build();
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class))).thenReturn(response);
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest.BriefDto brief = captor.getValue().getBrief();
+
+        // authorBody must not be truncated (unlike side_a's 300-char cap)
+        assertThat(brief.getAuthorBody()).isEqualTo(longPostBody);
+        assertThat(brief.getSideA()).hasSize(300);
+
+        // top 2 by likeCount desc, full body (no 100-char truncation)
+        assertThat(brief.getTopComments()).hasSize(2);
+        assertThat(brief.getTopComments().get(0).getBody()).isEqualTo(longCommentBody);
+        assertThat(brief.getTopComments().get(0).getLikeCount()).isEqualTo(10);
+        assertThat(brief.getTopComments().get(0).getAuthor()).isEqualTo("user-high");
+        assertThat(brief.getTopComments().get(1).getLikeCount()).isEqualTo(5);
     }
 
 
@@ -412,5 +465,196 @@ class MarketingJobServiceTest {
         verify(marketingJobRepository).findByRemoteJobId("unknown-job-999");
         // No save should occur
         verify(marketingJobRepository, org.mockito.Mockito.never()).save(any(MarketingJob.class));
+    }
+
+    // ── youtube_shorts PUBLISHED trigger ────────────────────────────────────
+
+    private void stubShortsCreateJobDependencies(String remoteShortsJobId) throws JsonProcessingException {
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("youtube_shorts")))
+            .thenReturn(0L);
+        Post post = Post.builder().id(TEST_POST_ID).title("Title").bodyPublished("Body").build();
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(remoteShortsJobId).status("QUEUED").build());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+    }
+
+    @Test
+    void applyCallback_publishedXThread_enoughCommentsNoExistingShortsJob_triggersYoutubeShorts()
+            throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(1L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("PUBLISHING")
+            .targets("[\"x_thread\"]")
+            .build();
+
+        JobCallbackPayload payload = JobCallbackPayload.builder()
+            .jobId(TEST_JOB_ID)
+            .status("PUBLISHED")
+            .event("PUBLISHED")
+            .build();
+
+        when(marketingJobRepository.findByRemoteJobId(TEST_JOB_ID)).thenReturn(Optional.of(job));
+        when(objectMapper.readValue(eq("[\"x_thread\"]"), eq(String[].class)))
+            .thenReturn(new String[]{"x_thread"});
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PostComment c1 = PostComment.builder().authorId("u1").body("댓글1").likeCount(3).build();
+        PostComment c2 = PostComment.builder().authorId("u2").body("댓글2").likeCount(1).build();
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(c1, c2));
+
+        when(marketingJobRepository.countAnyPlatformJobs(TEST_POST_ID, "youtube_shorts")).thenReturn(0L);
+        stubShortsCreateJobDependencies("shorts-job-1");
+
+        marketingJobService.applyCallback(payload);
+
+        ArgumentCaptor<CreateJobRequest> reqCaptor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(reqCaptor.capture(), any(String.class));
+        assertThat(reqCaptor.getValue().getTargets()).containsExactly("youtube_shorts");
+
+        ArgumentCaptor<MarketingJob> saveCaptor = ArgumentCaptor.forClass(MarketingJob.class);
+        verify(marketingJobRepository, times(2)).save(saveCaptor.capture());
+        MarketingJob shortsJob = saveCaptor.getAllValues().stream()
+            .filter(j -> "shorts-job-1".equals(j.getRemoteJobId()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(shortsJob.getRequestedBy()).isEqualTo("system:youtube-shorts-trigger");
+        assertThat(shortsJob.getAutoPublish()).isFalse();
+    }
+
+    @Test
+    void applyCallback_publishedInstagramFeed_existingShortsJob_skipsTrigger() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(1L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("PUBLISHING")
+            .targets("[\"instagram_feed\"]")
+            .build();
+
+        JobCallbackPayload payload = JobCallbackPayload.builder()
+            .jobId(TEST_JOB_ID)
+            .status("PUBLISHED")
+            .event("PUBLISHED")
+            .build();
+
+        when(marketingJobRepository.findByRemoteJobId(TEST_JOB_ID)).thenReturn(Optional.of(job));
+        when(objectMapper.readValue(eq("[\"instagram_feed\"]"), eq(String[].class)))
+            .thenReturn(new String[]{"instagram_feed"});
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PostComment c1 = PostComment.builder().authorId("u1").body("댓글1").likeCount(3).build();
+        PostComment c2 = PostComment.builder().authorId("u2").body("댓글2").likeCount(1).build();
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(c1, c2));
+
+        // A youtube_shorts job already exists (any status) — idempotent skip
+        when(marketingJobRepository.countAnyPlatformJobs(TEST_POST_ID, "youtube_shorts")).thenReturn(1L);
+
+        marketingJobService.applyCallback(payload);
+
+        verify(asmClient, never()).createJob(any(CreateJobRequest.class), any(String.class));
+        verify(marketingJobRepository, times(1)).save(any(MarketingJob.class));
+    }
+
+    @Test
+    void applyCallback_publishedXThread_fewerThanTwoComments_skipsTrigger() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(1L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("PUBLISHING")
+            .targets("[\"x_thread\"]")
+            .build();
+
+        JobCallbackPayload payload = JobCallbackPayload.builder()
+            .jobId(TEST_JOB_ID)
+            .status("PUBLISHED")
+            .event("PUBLISHED")
+            .build();
+
+        when(marketingJobRepository.findByRemoteJobId(TEST_JOB_ID)).thenReturn(Optional.of(job));
+        when(objectMapper.readValue(eq("[\"x_thread\"]"), eq(String[].class)))
+            .thenReturn(new String[]{"x_thread"});
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Only 1 non-blank top-level comment — below the 2-comment gate
+        PostComment onlyComment = PostComment.builder().authorId("u1").body("댓글1").likeCount(3).build();
+        PostComment blankComment = PostComment.builder().authorId("u2").body("   ").likeCount(1).build();
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(onlyComment, blankComment));
+
+        marketingJobService.applyCallback(payload);
+
+        verify(asmClient, never()).createJob(any(CreateJobRequest.class), any(String.class));
+        verify(marketingJobRepository, never()).countAnyPlatformJobs(any(), any());
+        verify(marketingJobRepository, times(1)).save(any(MarketingJob.class));
+    }
+
+    @Test
+    void applyCallback_publishedYoutubeShorts_doesNotSelfTrigger() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(1L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("READY")
+            .targets("[\"youtube_shorts\"]")
+            .build();
+
+        JobCallbackPayload payload = JobCallbackPayload.builder()
+            .jobId(TEST_JOB_ID)
+            .status("PUBLISHED")
+            .event("PUBLISHED")
+            .build();
+
+        when(marketingJobRepository.findByRemoteJobId(TEST_JOB_ID)).thenReturn(Optional.of(job));
+        when(objectMapper.readValue(eq("[\"youtube_shorts\"]"), eq(String[].class)))
+            .thenReturn(new String[]{"youtube_shorts"});
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        marketingJobService.applyCallback(payload);
+
+        verify(asmClient, never()).createJob(any(CreateJobRequest.class), any(String.class));
+        verify(commentService, never()).getTopLevelComments(any());
+        verify(marketingJobRepository, times(1)).save(any(MarketingJob.class));
+    }
+
+    @Test
+    void applyPoll_toPublishedOnXThread_triggersYoutubeShorts() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(1L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("PUBLISHING")
+            .targets("[\"x_thread\"]")
+            .build();
+
+        AsmJobView view = AsmJobView.builder()
+            .status("PUBLISHED")
+            .phase("done")
+            .progress(100.0)
+            .artifacts(Map.of())
+            .publications(List.of())
+            .build();
+
+        when(objectMapper.readValue(eq("[\"x_thread\"]"), eq(String[].class)))
+            .thenReturn(new String[]{"x_thread"});
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PostComment c1 = PostComment.builder().authorId("u1").body("댓글1").likeCount(3).build();
+        PostComment c2 = PostComment.builder().authorId("u2").body("댓글2").likeCount(1).build();
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(c1, c2));
+        when(marketingJobRepository.countAnyPlatformJobs(TEST_POST_ID, "youtube_shorts")).thenReturn(0L);
+        stubShortsCreateJobDependencies("shorts-job-2");
+
+        marketingJobService.applyPoll(job, view);
+
+        verify(asmClient).createJob(any(CreateJobRequest.class), any(String.class));
     }
 }

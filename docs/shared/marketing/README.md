@@ -48,7 +48,8 @@ docs/shared/marketing/
 ├── credentials.md      ← 플랫폼 계정 자격증명 저장·암호화 정책
 ├── social-poster.md            ← social-poster 서비스 운영 가이드
 ├── x-thread-strategy.md        ← X 스레드 전략 (솔로 3~4 / 양면 최대 6단)
-└── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (24h 자동 + 단건 수동)
+├── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (24h 자동 + 단건 수동)
+└── youtube-shorts-strategy.md  ← Shorts (WaggleBot 렌더 · 수동 승인 게시)
 ```
 
 ---

@@ -10,6 +10,7 @@ import com.againspring.marketing.dto.CreateJobRequest.BriefDto;
 import com.againspring.marketing.dto.CreateJobRequest.EmpathyRatioDto;
 import com.againspring.marketing.dto.CreateJobRequest.OptionsDto;
 import com.againspring.marketing.dto.CreateJobRequest.PolicyDto;
+import com.againspring.marketing.dto.CreateJobRequest.TopCommentDto;
 import com.againspring.marketing.dto.CreateJobResponse;
 import com.againspring.marketing.dto.JobCallbackPayload;
 import com.againspring.repository.community.JurorRepository;
@@ -42,6 +43,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class MarketingJobService {
+
+    private static final String YOUTUBE_SHORTS = "youtube_shorts";
+
+    /** Platforms whose first PUBLISHED auto-enqueues a youtube_shorts job (see maybeTriggerYoutubeShorts). */
+    private static final List<String> YOUTUBE_SHORTS_TRIGGER_PLATFORMS = List.of("x_thread", "instagram_feed");
 
     private final AsmClient asmClient;
     private final AsmProperties asmProperties;
@@ -91,6 +97,11 @@ public class MarketingJobService {
         if (sideBText != null && sideBText.length() > 300) sideBText = sideBText.substring(0, 300);
         if (sideBText == null || sideBText.isBlank()) sideBText = "상대방 입장은 아직 등록되지 않았어요";
 
+        // Full (untruncated) author body — always enriched for channels that need the
+        // whole story (e.g. youtube_shorts narration). side_a/side_b above stay
+        // 300-char-capped for X/IG capture and are unaffected.
+        String authorBodyFull = post.getBodyPublished() != null ? post.getBodyPublished() : post.getBodyRaw();
+
         // Vote results → empathy ratio
         int empathyA = 50, empathyB = 50;
         Map<String, Integer> voteLabels = new LinkedHashMap<>();
@@ -135,8 +146,10 @@ public class MarketingJobService {
             log.warn("Failed to load juror data for post {}: {}", postId, e.getMessage());
         }
 
-        // Top comments by likeCount (descending), each max 100 chars
-        List<String> topComments = new ArrayList<>();
+        // Top comments by likeCount (descending) — top 2, full body (no truncation).
+        // Always enriched (not gated by target) for consistency across platforms;
+        // youtube_shorts narration needs the full text, others simply ignore extra fields.
+        List<TopCommentDto> topComments = new ArrayList<>();
         try {
             List<PostComment> comments = commentService.getTopLevelComments(postId);
             topComments = comments.stream()
@@ -146,8 +159,12 @@ public class MarketingJobService {
                     int lb = b.getLikeCount() != null ? b.getLikeCount() : 0;
                     return Integer.compare(lb, la);
                 })
-                .limit(3)
-                .map(c -> c.getBody().length() > 100 ? c.getBody().substring(0, 100) : c.getBody())
+                .limit(2)
+                .map(c -> TopCommentDto.builder()
+                    .author(c.getAuthorId())
+                    .body(c.getBody())
+                    .likeCount(c.getLikeCount() != null ? c.getLikeCount() : 0)
+                    .build())
                 .collect(Collectors.toList());
         } catch (Exception e) {
             log.warn("Failed to load comments for post {}: {}", postId, e.getMessage());
@@ -165,6 +182,9 @@ public class MarketingJobService {
         boolean paired = post.getPartnerAnsweredAt() != null
                 && post.getPartnerBodyPublished() != null
                 && !post.getPartnerBodyPublished().isBlank();
+
+        // Full (untruncated) partner body, only when actually paired.
+        String partnerBodyFull = paired ? post.getPartnerBodyPublished() : null;
 
         List<Integer> authorProposed = CaptureSplitSupport.coalesceProposed(
                 post.getCaptureSplitAfterLines(), post.getCaptureSplitAfterLine());
@@ -206,6 +226,8 @@ public class MarketingJobService {
             .neutralSummary(summary)
             .sideA(sideAText)
             .sideB(sideBText)
+            .authorBody(authorBodyFull)
+            .partnerBody(partnerBodyFull)
             .empathyRatio(EmpathyRatioDto.builder().a(empathyA).b(empathyB).build())
             .juryGist(juryGist)
             .juryOpinions(juryOpinions)
@@ -290,6 +312,7 @@ public class MarketingJobService {
             );
             marketingJobRepository.save(job);
             log.info("Callback applied for remote job {}: status={}", payload.getJobId(), payload.getStatus());
+            maybeTriggerYoutubeShorts(job);
         });
     }
 
@@ -305,6 +328,61 @@ public class MarketingJobService {
             serializeJson(view.getPublications())
         );
         marketingJobRepository.save(job);
+        maybeTriggerYoutubeShorts(job);
+    }
+
+    /**
+     * After a {@code x_thread} or {@code instagram_feed} job reaches PUBLISHED, auto-enqueue
+     * a one-time {@code youtube_shorts} render job (manual-publish only — see
+     * docs/shared/marketing/youtube-shorts-strategy.md). Idempotent: skipped if a
+     * youtube_shorts job already exists for the post (any status) or the post doesn't yet
+     * have 2 non-blank top-level comments (Shorts needs 2 commenter voices).
+     */
+    private void maybeTriggerYoutubeShorts(MarketingJob job) {
+        if (!"PUBLISHED".equals(job.getStatus())) {
+            return;
+        }
+        List<String> targets = deserializeTargets(job.getTargets());
+        boolean publishedOnTriggerPlatform = targets.stream().anyMatch(YOUTUBE_SHORTS_TRIGGER_PLATFORMS::contains);
+        if (!publishedOnTriggerPlatform) {
+            return;
+        }
+
+        String postId = job.getPostId();
+        try {
+            long qualifyingComments = commentService.getTopLevelComments(postId).stream()
+                .filter(c -> c.getBody() != null && !c.getBody().isBlank())
+                .count();
+            if (qualifyingComments < 2) {
+                log.debug("Skipping youtube_shorts trigger for post {} — fewer than 2 top-level comments", postId);
+                return;
+            }
+
+            if (marketingJobRepository.countAnyPlatformJobs(postId, YOUTUBE_SHORTS) > 0) {
+                log.debug("Skipping youtube_shorts trigger for post {} — job already exists", postId);
+                return;
+            }
+
+            MarketingJob shortsJob = createJob(
+                postId, List.of(YOUTUBE_SHORTS), false, "system:youtube-shorts-trigger");
+            log.info("Auto-created youtube_shorts marketing job {} for post {} (triggered by remote job {})",
+                shortsJob.getId(), postId, job.getRemoteJobId());
+        } catch (Exception e) {
+            log.warn("Failed to auto-trigger youtube_shorts job for post {}: {}", postId, e.getMessage());
+        }
+    }
+
+    private List<String> deserializeTargets(String targetsJson) {
+        if (targetsJson == null || targetsJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            String[] parsed = objectMapper.readValue(targetsJson, String[].class);
+            return parsed != null ? Arrays.asList(parsed) : List.of();
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to deserialize marketing job targets JSON '{}': {}", targetsJson, e.getMessage());
+            return List.of();
+        }
     }
 
     /**

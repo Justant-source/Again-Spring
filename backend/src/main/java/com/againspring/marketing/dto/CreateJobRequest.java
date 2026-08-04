@@ -52,6 +52,19 @@ public class CreateJobRequest {
         @JsonProperty("side_b")
         private String sideB;
 
+        /**
+         * 작성자 본문 전문 (미절단). {@code side_a}는 X/IG 캡처용 300자 절단이라
+         * youtube_shorts 낭독처럼 전문이 필요한 채널을 위해 별도 필드로 둔다.
+         */
+        @JsonProperty("author_body")
+        private String authorBody;
+
+        /**
+         * 상대방 본문 전문 (미절단, paired일 때만). {@code side_b}는 300자 절단본.
+         */
+        @JsonProperty("partner_body")
+        private String partnerBody;
+
         @JsonProperty("empathy_ratio")
         private EmpathyRatioDto empathyRatio;
 
@@ -61,8 +74,9 @@ public class CreateJobRequest {
         @JsonProperty("jury_opinions")
         private List<String> juryOpinions;
 
+        /** 좋아요 순 상위 2, 본문 전문(미절단). */
         @JsonProperty("top_comments")
-        private List<String> topComments;
+        private List<TopCommentDto> topComments;
 
         @JsonProperty("vote_labels")
         private Map<String, Integer> voteLabels;
@@ -141,6 +155,23 @@ public class CreateJobRequest {
         @Deprecated
         @JsonProperty("partner_part1_height_css")
         private Double partnerPart1HeightCss;
+    }
+
+    /**
+     * Top comment for enriched briefs (e.g. youtube_shorts narration). {@code author}
+     * is best-effort (raw authorId — no nickname join) and may be null.
+     */
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TopCommentDto {
+        private String author;
+
+        private String body;
+
+        @JsonProperty("like_count")
+        private Integer likeCount;
     }
 
     @Getter

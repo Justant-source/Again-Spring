@@ -186,7 +186,9 @@ function UploadJsonPreview({ url, filename }: { url: string; filename: string })
   );
 }
 
-function MediaFile({ url, kind, label, filename }: { url: string; kind: 'image' | 'video'; label: string; filename: string }) {
+function MediaFile({ url, kind, label, filename, tallVideo = false }: {
+  url: string; kind: 'image' | 'video'; label: string; filename: string; tallVideo?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -232,7 +234,14 @@ function MediaFile({ url, kind, label, filename }: { url: string; kind: 'image' 
         <img src={blobUrl} alt={label} className="mt-2 max-w-xs rounded border" />
       )}
       {open && blobUrl && kind === 'video' && (
-        <video controls className="mt-2 max-w-xs rounded border">
+        <video
+          controls
+          className={
+            tallVideo
+              ? 'mt-2 w-full max-w-[240px] aspect-[9/16] rounded border object-cover'
+              : 'mt-2 max-w-xs rounded border'
+          }
+        >
           <source src={blobUrl} />
         </video>
       )}
@@ -534,6 +543,7 @@ function PlatformCard({ platform, pkg, jobId }: { platform: string; pkg: Platfor
               kind={kind}
               label={fileLabel(key)}
               filename={`${platform}_${key}.${kind === 'video' ? 'mp4' : 'png'}`}
+              tallVideo={platform === 'youtube_shorts' && kind === 'video'}
             />
           );
         })}

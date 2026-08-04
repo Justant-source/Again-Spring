@@ -44,6 +44,20 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     long countActivePlatformJobs(String postId, String platform);
 
     /**
+     * Count marketing jobs for a post with a specific platform, regardless of status.
+     * Used for one-time-per-post trigger idempotency (e.g. youtube_shorts auto-enqueued
+     * once after x_thread/instagram_feed first PUBLISHED — see MarketingJobService).
+     * Unlike {@link #countActivePlatformJobs}, this deliberately includes terminal
+     * statuses so a completed/failed job still blocks re-creation.
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT COUNT(*) FROM marketing_job
+        WHERE post_id = :postId
+        AND JSON_CONTAINS(targets, JSON_QUOTE(:platform)) = TRUE
+        """)
+    long countAnyPlatformJobs(String postId, String platform);
+
+    /**
      * Find posts eligible for automatic X thread publishing:
      * - created_at >= :since (operator cutoff — only posts created after this instant)
      * - created_at + 24 hours <= NOW()

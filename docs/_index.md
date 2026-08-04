@@ -74,6 +74,7 @@
 | ASM 전체 | `docs/shared/marketing/README.md` | `{api,architecture,platforms,social-poster,asm-setup}.md` | ASM 저장소 (`~/Data/Again-Spring-Marketing`) |
 | X 스레드 전략 (활성) | `docs/shared/marketing/x-thread-strategy.md` | — | ASM `services/social-poster/src/routes/publish-x.js` |
 | IG 피드 전략 (24h 자동) | `docs/shared/marketing/instagram-feed-strategy.md` | — | ASM `app/worker/ig_feed_pipeline.py` |
+| YouTube Shorts 전략 (조건부 자동 생성 + 수동 게시) | `docs/shared/marketing/youtube-shorts-strategy.md` | — | `MarketingJobService.maybeTriggerYoutubeShorts` · ASM `youtube_shorts` 파이프 · WaggleBot |
 
 ---
 
