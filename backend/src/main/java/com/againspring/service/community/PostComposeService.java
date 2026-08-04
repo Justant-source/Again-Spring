@@ -60,7 +60,7 @@ public class PostComposeService {
      * @param jurorCount AI 배심원 인원 (0-9)
      * @param sessionId  관련 세션 ID (nullable)
      * @param source     크롤 원본 스냅샷 — 재구성 모드 시만 비-null
-     * @param captureSplitAfterLine X/IG 캡쳐 전반부 끝 개행 블록(1-based), nullable
+     * @param captureSplitAfterLines X/IG 캡쳐 컷(1-based), nullable
      * @return 등록된 Post 객체 (status=VOTING)
      */
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
@@ -68,23 +68,41 @@ public class PostComposeService {
                                   int jurorCount, String sessionId,
                                   SourceSnapshot source) {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                jurorCount, sessionId, source, null);
+                jurorCount, sessionId, source, (java.util.List<Integer>) null, null);
     }
 
+    /** @deprecated prefer list overload */
+    @Deprecated
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
                                   int jurorCount, String sessionId,
                                   SourceSnapshot source,
                                   Integer captureSplitAfterLine) {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                jurorCount, sessionId, source, captureSplitAfterLine, null);
+                jurorCount, sessionId, source,
+                captureSplitAfterLine == null ? null : java.util.List.of(captureSplitAfterLine),
+                null);
+    }
+
+    /** @deprecated prefer list overload */
+    @Deprecated
+    public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
+                                  PostCategory category, String visibility,
+                                  int jurorCount, String sessionId,
+                                  SourceSnapshot source,
+                                  Integer captureSplitAfterLine,
+                                  String promoTitle) {
+        return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
+                jurorCount, sessionId, source,
+                captureSplitAfterLine == null ? null : java.util.List.of(captureSplitAfterLine),
+                promoTitle);
     }
 
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
                                   int jurorCount, String sessionId,
                                   SourceSnapshot source,
-                                  Integer captureSplitAfterLine,
+                                  java.util.List<Integer> captureSplitAfterLines,
                                   String promoTitle) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
@@ -101,6 +119,9 @@ public class PostComposeService {
             normalizedPromo = PromoTitleService.normalizeAgainstTitle(promoTitle, userTitle);
         }
 
+        Integer legacyFirst = (captureSplitAfterLines != null && !captureSplitAfterLines.isEmpty())
+                ? captureSplitAfterLines.get(0) : null;
+
         Post.PostBuilder postBuilder = Post.builder()
                 .id(postId)
                 .authorId(authorId)
@@ -115,7 +136,8 @@ public class PostComposeService {
                 .visibility(PostVisibility.valueOf(visibility.toUpperCase()))
                 .status(PostStatus.VOTING)
                 .neutralizationPassed(true)   // 항상 통과로 간주 (컬럼 잔존)
-                .captureSplitAfterLine(captureSplitAfterLine)
+                .captureSplitAfterLine(legacyFirst)
+                .captureSplitAfterLines(captureSplitAfterLines)
                 .promoTitle(normalizedPromo)
                 .voteCloseAt(Instant.now().plusSeconds(7L * 24 * 3600))
                 .createdAt(Instant.now())

@@ -24,5 +24,7 @@ public class PairedPhase2Response {
     @Builder
     public static class PartnerPost {
         String body;
+        @JsonProperty("capture_split_after_lines")
+        List<Integer> captureSplitAfterLines;
     }
 }

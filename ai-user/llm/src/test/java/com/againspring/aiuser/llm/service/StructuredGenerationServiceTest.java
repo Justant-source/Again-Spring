@@ -64,8 +64,8 @@ class StructuredGenerationServiceTest {
         verify(pool).executeProviderTask(promptCaptor.capture(), anyString(), anyLong(), anyString(),
                 eq(LlmProvider.CODEX), eq(StructuredOutputSchema.THREAD_PLAN));
         String prompt = promptCaptor.getValue();
-        assertTrue(prompt.contains("capture_split_after_line"), "split field in schema");
-        assertTrue(prompt.contains("more than 12 non-empty lines"), "12-block threshold");
+        assertTrue(prompt.contains("capture_split_after_lines"), "split field in schema");
+        assertTrue(prompt.contains("more than 8 non-empty lines"), "8-block threshold");
     }
 
     @Test
@@ -73,12 +73,13 @@ class StructuredGenerationServiceTest {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);
         StructuredGenerationService service = configuredService(pool, disabledCritique());
         String body = longBodyWithBlocks(15);
-        String json = planJsonWithTitleBodyAndSplit("한국어 제목입니다", body, 9, "한국어 댓글입니다");
+        String json = planJsonWithTitleBodyAndSplit("한국어 제목입니다", body, 8, "한국어 댓글입니다");
         when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
                 eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(json);
 
         ThreadPlanResponse response = service.createThreadPlan(planRequest(), "corr-split-ok");
-        assertEquals(9, response.getPost().getCaptureSplitAfterLine());
+        assertEquals(List.of(8), response.getPost().getCaptureSplitAfterLines());
+        assertEquals(8, response.getPost().getCaptureSplitAfterLine());
     }
 
     @Test
@@ -437,13 +438,13 @@ class StructuredGenerationServiceTest {
             String persona = "p" + ((i - 1) % 6 + 1);
             items.add("{\"ref\":\"c" + i + "\",\"parentRef\":" + parent + ",\"personaId\":\"" + persona + "\",\"body\":\"" + body + "\"}");
         }
-        String splitJson = split == null ? "null" : String.valueOf(split);
+        String splitJson = split == null ? "null" : ("[" + split + "]");
         String escapedBody = postBody.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
         String promo = StructuredGenerationService.wrapPromoLines(title);
         String escapedPromo = promo == null ? "" : promo.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
         return "{\"post\":{\"title\":\"" + title + "\",\"body\":\"" + escapedBody
                 + "\",\"promo_title\":\"" + escapedPromo
-                + "\",\"capture_split_after_line\":" + splitJson + "},\"comments\":["
+                + "\",\"capture_split_after_lines\":" + splitJson + "},\"comments\":["
                 + String.join(",", items) + "]}";
     }
 

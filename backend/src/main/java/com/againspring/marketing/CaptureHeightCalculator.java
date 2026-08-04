@@ -1,14 +1,13 @@
 package com.againspring.marketing;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Candidate CSS Y for X-thread story part1 crop on {@code /community/{id}/read?side=g}.
- * Authoritative cut is still ASM DOM measurement; this formula is verification + fallback.
+ * Candidate CSS Y values for X-thread story part crops on {@code /community/{id}/read}.
+ * Authoritative cuts are still ASM DOM measurements; these are verification + fallback.
  *
  * <p>Layout constants mirror {@code frontend/app/community/[id]/read/page.tsx} at viewport 430.
- * Header title uses ellipsis ({@code nowrap}) so title <em>length</em> does not change height —
- * callers may still pass title for API symmetry / future layout changes.
  */
 public final class CaptureHeightCalculator {
 
@@ -36,27 +35,50 @@ public final class CaptureHeightCalculator {
 
     /**
      * @param title ignored for height (ellipsis); retained for call-site clarity
-     * @param body  published author body
-     * @param splitAfterLine 1-based last front-half block; if null, resolved via {@link CaptureSplitSupport}
-     * @param paired whether faction tabs are shown (slightly taller chrome)
-     * @return CSS Y of the cut (from page top), or null when no split
+     * @param body  published body
+     * @param resolved capture cuts + block budget
+     * @param paired whether faction tabs are shown
+     * @return CSS Y of each cut (from page top), same length as {@code resolved.splits()}; empty when no splits
      */
-    public static Double part1HeightCss(String title, String body, Integer splitAfterLine, boolean paired) {
-        Integer split = CaptureSplitSupport.resolveSplit(body, splitAfterLine);
-        if (split == null) return null;
+    public static List<Double> partHeightsCss(
+            String title, String body, CaptureSplitSupport.ResolvedCapture resolved, boolean paired) {
+        if (resolved == null || resolved.splits().isEmpty()) return List.of();
 
         List<String> blocks = CaptureSplitSupport.nonEmptyBlocks(body);
+        int usable = Math.min(resolved.captureBlockCount(), blocks.size());
+        double chrome = PAGE_PAD_TOP + HEADER_H + (paired ? tabChrome() : FACTION_LABEL_H) + CARD_PAD_TOP;
+
+        List<Double> heights = new ArrayList<>();
+        for (int cut : resolved.splits()) {
+            int end = Math.min(cut, usable);
+            heights.add(chrome + bodyLinesThrough(blocks, end) * LINE_H);
+        }
+        return heights;
+    }
+
+    /**
+     * Legacy single-cut height.
+     * @deprecated use {@link #partHeightsCss}
+     */
+    @Deprecated
+    public static Double part1HeightCss(String title, String body, Integer splitAfterLine, boolean paired) {
+        List<Integer> prop = splitAfterLine == null ? null : List.of(splitAfterLine);
+        CaptureSplitSupport.ResolvedCapture r = CaptureSplitSupport.resolveSolo(body, prop);
+        List<Double> hs = partHeightsCss(title, body, r, paired);
+        return hs.isEmpty() ? null : hs.get(0);
+    }
+
+    private static double bodyLinesThrough(List<String> blocks, int endExclusive1Based) {
+        int end = Math.min(endExclusive1Based, blocks.size());
+        if (end <= 0) return 0;
         double bodyLines = 0;
-        for (int i = 0; i < split; i++) {
+        for (int i = 0; i < end; i++) {
             bodyLines += visualLines(blocks.get(i));
         }
-        // pre-wrap: one newline between consecutive non-empty blocks
-        if (split > 1) {
-            bodyLines += (split - 1);
+        if (end > 1) {
+            bodyLines += (end - 1); // pre-wrap newlines between blocks
         }
-
-        double chrome = PAGE_PAD_TOP + HEADER_H + (paired ? tabChrome() : FACTION_LABEL_H) + CARD_PAD_TOP;
-        return chrome + bodyLines * LINE_H;
+        return bodyLines;
     }
 
     /** Faction tab row height approximation when paired. */

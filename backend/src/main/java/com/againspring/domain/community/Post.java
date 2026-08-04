@@ -6,11 +6,14 @@ import com.againspring.domain.enums.PostCategory;
 import com.againspring.domain.enums.PublishMode;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Type;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * 커뮤니티 포스트 (V17 커뮤니티)
@@ -48,10 +51,19 @@ public class Post {
 
     /**
      * X/IG 캡쳐 전반부 마지막 개행 블록(1-based).
-     * 본문 비어 있지 않은 줄이 13개 이상일 때만 설정. null = 분할 없음.
+     * @deprecated use {@link #captureSplitAfterLines}; kept for read fallback.
      */
+    @Deprecated
     @Column(name = "capture_split_after_line")
-    private Integer captureSplitAfterLine;
+    private Integer captureSplitAfterLine; // prefer captureSplitAfterLines; kept for DB/API fallback
+
+    /**
+     * X/IG 캡쳐 컷 목록(1-based). 각 원소 = 해당 장(마지막 장 제외)의 마지막 개행 블록.
+     * null/empty = 1장(미분할) 또는 마케팅 잡 시 휴리스틱.
+     */
+    @Type(JsonType.class)
+    @Column(name = "capture_split_after_lines", columnDefinition = "JSON")
+    private List<Integer> captureSplitAfterLines;
 
     @Column(nullable = false)
     @Builder.Default
@@ -78,6 +90,13 @@ public class Post {
 
     @Column(columnDefinition = "LONGTEXT")
     private String partnerBodyPublished;
+
+    /**
+     * Partner body capture cuts (same semantics as {@link #captureSplitAfterLines}).
+     */
+    @Type(JsonType.class)
+    @Column(name = "partner_capture_split_after_lines", columnDefinition = "JSON")
+    private List<Integer> partnerCaptureSplitAfterLines;
 
     private Instant partnerAnsweredAt;
 

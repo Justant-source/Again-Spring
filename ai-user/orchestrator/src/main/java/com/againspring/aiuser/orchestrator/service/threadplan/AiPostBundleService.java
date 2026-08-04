@@ -83,7 +83,11 @@ public class AiPostBundleService {
         CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
                 .userTitle(bundle.content.title()).bodyRaw(bundle.content.body()).category(category)
                 .visibility("PUBLIC").jurorCount(0)
-                .captureSplitAfterLine(bundle.content.captureSplitAfterLine())
+                .captureSplitAfterLines(bundle.content.captureSplitAfterLines())
+                .captureSplitAfterLine(
+                        bundle.content.captureSplitAfterLines() != null
+                                && !bundle.content.captureSplitAfterLines().isEmpty()
+                                ? bundle.content.captureSplitAfterLines().get(0) : null)
                 .promoTitle(bundle.content.promoTitle());
         applyProvenance(postBuilder, bundle.source);
         Optional<PostDto> published = backendBot.createPost(jwt, postBuilder.build());
@@ -328,7 +332,10 @@ public class AiPostBundleService {
         postMap.put("title", postContent.title());
         postMap.put("body", postContent.body());
         postMap.put("promo_title", postContent.promoTitle());
-        postMap.put("capture_split_after_line", postContent.captureSplitAfterLine());
+        postMap.put("capture_split_after_lines", postContent.captureSplitAfterLines());
+        if (postContent.captureSplitAfterLines() != null && !postContent.captureSplitAfterLines().isEmpty()) {
+            postMap.put("capture_split_after_line", postContent.captureSplitAfterLines().get(0));
+        }
         merged.put("post", postMap);
         log.info("AI post micro-batch done corr={} batches={} items={}/{} size={}",
                 correlationId, slices.size(), mergedItems.size(), pool,
@@ -610,9 +617,9 @@ public class AiPostBundleService {
         if (titleNorm.equals(bodyNorm)) throw new IllegalArgumentException("title must differ from body");
         ContentSafetyGuard.GuardResult guard = safetyGuard.check(body, ContentSafetyGuard.ContentType.POST);
         if (!guard.passed()) throw new IllegalArgumentException("unsafe post: " + guard.reason());
-        Integer split = resolveCaptureSplit(body, readCaptureSplit(raw));
+        List<Integer> splits = resolveCaptureSplits(body, readCaptureSplits(raw));
         String promoTitle = readAndNormalizePromoTitle(title, raw);
-        return new PostContent(title, body, split, promoTitle);
+        return new PostContent(title, body, splits, promoTitle);
     }
 
     private static String readAndNormalizePromoTitle(String title, Map<?, ?> post) {
@@ -679,6 +686,20 @@ public class AiPostBundleService {
         return String.join("\n", lines);
     }
 
+    private static List<Integer> readCaptureSplits(Map<?, ?> post) {
+        Object v = post.get("capture_split_after_lines");
+        if (v == null) v = post.get("captureSplitAfterLines");
+        if (v instanceof List<?> list && !list.isEmpty()) {
+            List<Integer> out = new ArrayList<>();
+            for (Object o : list) {
+                if (o instanceof Number n) out.add(n.intValue());
+            }
+            if (!out.isEmpty()) return out;
+        }
+        Integer legacy = readCaptureSplit(post);
+        return legacy == null ? null : List.of(legacy);
+    }
+
     private static Integer readCaptureSplit(Map<?, ?> post) {
         Object v = post.get("capture_split_after_line");
         if (v == null) v = post.get("captureSplitAfterLine");
@@ -690,17 +711,49 @@ public class AiPostBundleService {
     }
 
     /**
-     * Prefer a valid LLM split; else heuristic when body has more than 12 non-empty newline blocks.
-     * Mirrors backend {@code CaptureSplitSupport} (SHORT_POST_MAX_BLOCKS=12).
+     * Prefer a valid LLM multi-cut; else heuristic when body has more than 8 non-empty newline blocks.
+     * Mirrors backend {@code CaptureSplitSupport} (SHORT_POST_MAX_BLOCKS=8, max 4 parts).
      */
-    static Integer resolveCaptureSplit(String body, Integer proposed) {
+    static List<Integer> resolveCaptureSplits(String body, List<Integer> proposed) {
         int n = countNonEmptyBlocks(body);
-        if (n <= 12) return null;
-        if (proposed != null && proposed >= 1 && proposed < n) return proposed;
-        int split = (int) Math.round(n * 0.6);
-        if (split < 1) split = 1;
-        if (split >= n) split = n - 1;
-        return split;
+        if (n <= 8) return null;
+        if (proposed != null && !proposed.isEmpty()) {
+            List<Integer> cuts = new ArrayList<>();
+            int prev = 0;
+            boolean ok = true;
+            for (Integer p : proposed) {
+                if (p == null || p <= prev || p >= n || (p - prev) > 8 || cuts.size() >= 3) {
+                    ok = false;
+                    break;
+                }
+                cuts.add(p);
+                prev = p;
+            }
+            if (ok && !cuts.isEmpty()) {
+                int last = n - cuts.get(cuts.size() - 1);
+                if (last >= 1 && last <= 8) return List.copyOf(cuts);
+            }
+        }
+        // Heuristic: chunk by 8
+        List<Integer> cuts = new ArrayList<>();
+        int end = 8;
+        while (end < n && cuts.size() < 3) {
+            int remaining = n - end;
+            if (remaining <= 8) {
+                cuts.add(end);
+                break;
+            }
+            cuts.add(end);
+            end += 8;
+        }
+        return cuts.isEmpty() ? null : cuts;
+    }
+
+    /** @deprecated use {@link #resolveCaptureSplits} */
+    @Deprecated
+    static Integer resolveCaptureSplit(String body, Integer proposed) {
+        List<Integer> list = resolveCaptureSplits(body, proposed == null ? null : List.of(proposed));
+        return (list == null || list.isEmpty()) ? null : list.get(0);
     }
 
     static int countNonEmptyBlocks(String body) {
@@ -717,7 +770,7 @@ public class AiPostBundleService {
         return LiteralNewlineNormalizer.normalize(String.valueOf(value)).trim();
     }
 
-    private record PostContent(String title, String body, Integer captureSplitAfterLine, String promoTitle) { }
+    private record PostContent(String title, String body, List<Integer> captureSplitAfterLines, String promoTitle) { }
 
     public record PublishedBundle(PostDto post, String body, Long sourceExampleId) {
         public PublishedBundle(PostDto post, String body) {

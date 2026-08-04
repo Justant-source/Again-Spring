@@ -75,36 +75,70 @@ public class CreateJobRequest {
         private PolicyDto policy;
 
         /**
-         * 1-based last front-half newline block for story capture split.
-         * null → short post (no part2) or ASM falls back to visual-line cut.
+         * 1-based last-block indices for each story part except the final
+         * ({@code capture_split_after_lines}). Empty/null → short single-part (or ASM heuristic).
          */
-        @JsonProperty("capture_split_after_line")
-        private Integer captureSplitAfterLine;
+        @JsonProperty("capture_split_after_lines")
+        private List<Integer> captureSplitAfterLines;
 
         /**
-         * Candidate CSS Y for part1 crop (verification + ASM fallback).
-         * Authoritative cut is DOM measurement at the split block boundary.
+         * Candidate CSS Y for each cut (same order as {@link #captureSplitAfterLines}).
          */
-        @JsonProperty("part1_height_css")
-        private Double part1HeightCss;
+        @JsonProperty("part_heights_css")
+        private List<Double> partHeightsCss;
 
         /**
          * When true, ASM also captures partner body ({@code /read?side=r}) as
-         * partnerPart1[/2] and inserts them after author story parts in X/IG.
+         * partnerPart1..N and inserts them after author story parts in X/IG.
          */
         @JsonProperty("has_partner_story")
         private Boolean hasPartnerStory;
 
         /**
-         * Partner body split (same semantics as {@link #captureSplitAfterLine}).
-         * null when short partner body or no partner story.
+         * Partner body cuts (same semantics as {@link #captureSplitAfterLines}).
          */
+        @JsonProperty("partner_capture_split_after_lines")
+        private List<Integer> partnerCaptureSplitAfterLines;
+
+        /**
+         * Candidate CSS Y for partner cuts on {@code /read?side=r}.
+         */
+        @JsonProperty("partner_part_heights_css")
+        private List<Double> partnerPartHeightsCss;
+
+        /** Blocks from start of author body included in marketing capture (may truncate). */
+        @JsonProperty("capture_block_count")
+        private Integer captureBlockCount;
+
+        /** Blocks from start of partner body included in marketing capture. */
+        @JsonProperty("partner_capture_block_count")
+        private Integer partnerCaptureBlockCount;
+
+        /**
+         * @deprecated first cut only — prefer {@link #captureSplitAfterLines}
+         */
+        @Deprecated
+        @JsonProperty("capture_split_after_line")
+        private Integer captureSplitAfterLine;
+
+        /**
+         * @deprecated prefer {@link #partHeightsCss}
+         */
+        @Deprecated
+        @JsonProperty("part1_height_css")
+        private Double part1HeightCss;
+
+        /**
+         * @deprecated prefer {@link #partnerCaptureSplitAfterLines}
+         */
+        @Deprecated
         @JsonProperty("partner_capture_split_after_line")
         private Integer partnerCaptureSplitAfterLine;
 
         /**
-         * Candidate CSS Y for partner part1 crop on {@code /read?side=r}.
+         * @deprecated prefer {@link #partnerPartHeightsCss}
          */
+        @Deprecated
         @JsonProperty("partner_part1_height_css")
         private Double partnerPart1HeightCss;
     }

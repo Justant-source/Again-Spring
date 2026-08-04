@@ -12,7 +12,7 @@
 | `POST` | `/generate/persona` | 페르소나 JSON 생성 |
 | `POST` | `/internal/rewrite/post` | legacy synthetic 게시글 부분 교정용 내부 rewrite |
 | `POST` | `/analyze/post` | 좋아요/투표용 구조화 post 분석 |
-| `POST` | `/v2/generate/thread-plan` | PLAN 모드의 AI 글 묶음 또는 사람 글 후보 plan 구조화 생성. AI_POST `post`에 optional `capture_split_after_line`(개행 블록 전반부 컷) |
+| `POST` | `/v2/generate/thread-plan` | PLAN 모드의 AI 글 묶음 또는 사람 글 후보 plan 구조화 생성. AI_POST `post`에 optional `capture_split_after_lines`(개행 블록 N장 컷) |
 | `POST` | `/v2/generate/human-replies` | 30분 사람 interaction batch — comment당 0~3 reply(`candidateResponders`에서 선택) |
 | `POST` | `/v2/generate/paired-phase1` | 양면 사연 **logical Call1** (`PAIRED_PHASE1`): 작성자(A) post + phase1 댓글(작성자만 그라운딩, ~2–4 최상위) |
 | `POST` | `/v2/generate/paired-phase2` | 양면 사연 **logical Call2** (`PAIRED_PHASE2`): 상대방(B) body + phase2 댓글(작성자+상대+공개 최상위 댓글 최대 5–8) |
@@ -38,8 +38,8 @@ solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워
 
 | Workload | 경로 | 요청 핵심 | 응답 핵심 |
 |---|---|---|---|
-| `PAIRED_PHASE1` | `POST /v2/generate/paired-phase1` | `author`, `personas`, `category`/`topicHint`, optional reconstruct/source, `maxTopLevel`≈4 | `workload`, `post`{title,body,promo_title,capture_split_after_line}, `items`[] |
-| `PAIRED_PHASE2` | `POST /v2/generate/paired-phase2` | `authorPost`{title,body}, `partner`, `personas`, `publishedTopLevelComments`[0..8], `includePartnerPost` | `workload`, `partner_post`{body}\|null, `items`[] |
+| `PAIRED_PHASE1` | `POST /v2/generate/paired-phase1` | `author`, `personas`, `category`/`topicHint`, optional reconstruct/source, `maxTopLevel`≈4 | `workload`, `post`{title,body,promo_title,capture_split_after_lines}, `items`[] |
+| `PAIRED_PHASE2` | `POST /v2/generate/paired-phase2` | `authorPost`{title,body}, `partner`, `personas`, `publishedTopLevelComments`[0..8], `includePartnerPost` | `workload`, `partner_post`{body,capture_split_after_lines}\|null, `items`[] |
 
 - **phase1**: 상대방 본문 없음. 댓글은 작성자만 본 것처럼. 기본 min top-level=2.
 - **phase2**: 공개 최상위 댓글 0개면 본문만으로 댓글 생성. `includePartnerPost=false`면 `partner_post=null` (logical Call2의 댓글-only 마이크로배치 후속).

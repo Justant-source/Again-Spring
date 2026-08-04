@@ -68,7 +68,9 @@ public class PostInviteController {
         String partnerUserId = (userDetails != null)
                 ? userDetails.getUsername()
                 : "partner_" + System.nanoTime();
-        postInviteService.submitPartnerAnswer(token, partnerUserId, request.getBodyRaw(), request.getUserTitle());
+        postInviteService.submitPartnerAnswer(
+                token, partnerUserId, request.getBodyRaw(), request.getUserTitle(),
+                request.getCaptureSplitAfterLines());
         return ResponseEntity.ok().build();
     }
 

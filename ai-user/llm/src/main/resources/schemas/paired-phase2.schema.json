@@ -10,7 +10,13 @@
       "additionalProperties": false,
       "required": ["body"],
       "properties": {
-        "body": { "type": "string" }
+        "body": { "type": "string" },
+        "capture_split_after_lines": {
+          "type": ["array", "null"],
+          "description": "Partner capture cuts (1-based last block of each part except final); each part ≤8; max 4 parts",
+          "items": { "type": "integer", "minimum": 1 },
+          "maxItems": 3
+        }
       }
     },
     "comments": {

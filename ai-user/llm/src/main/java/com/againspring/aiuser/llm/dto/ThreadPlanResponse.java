@@ -22,7 +22,16 @@ public class ThreadPlanResponse {
         /** IG hook: title chars + semantic \\n; each line ≤10. */
         @JsonProperty("promo_title")
         String promoTitle;
-        /** 1-based last front-half newline block; null when body has ≤12 blocks. */
+        /**
+         * 1-based last block of each part except the final.
+         * null/empty when body has ≤8 non-empty newline blocks (single card).
+         */
+        @JsonProperty("capture_split_after_lines")
+        List<Integer> captureSplitAfterLines;
+        /**
+         * @deprecated prefer {@link #captureSplitAfterLines}
+         */
+        @Deprecated
         @JsonProperty("capture_split_after_line")
         Integer captureSplitAfterLine;
     }

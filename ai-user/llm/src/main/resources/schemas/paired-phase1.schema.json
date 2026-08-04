@@ -15,9 +15,15 @@
           "type": ["string", "null"],
           "description": "IG hook: same characters as title with semantic newlines; each line ≤10 chars including spaces"
         },
+        "capture_split_after_lines": {
+          "type": ["array", "null"],
+          "description": "1-based last block index of each part except the final; each part ≤8 blocks; max 4 parts (paired body sum with partner ≤6 enforced downstream)",
+          "items": { "type": "integer", "minimum": 1 },
+          "maxItems": 3
+        },
         "capture_split_after_line": {
           "type": ["integer", "null"],
-          "description": "1-based index of the last non-empty newline block in the front half when body has more than 12 such blocks; null otherwise"
+          "description": "Deprecated single cut"
         }
       }
     },

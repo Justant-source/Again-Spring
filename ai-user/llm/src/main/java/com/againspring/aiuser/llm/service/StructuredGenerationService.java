@@ -25,7 +25,8 @@ public class StructuredGenerationService {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern META = Pattern.compile("(?i)(적용 처리 메모|작성 노트|<<<|```|i can't help|i am (claude|codex))");
     /** Marketing X/IG capture: bodies with more than this many non-empty newline blocks need a split. */
-    public static final int SHORT_POST_MAX_BLOCKS = 12;
+    public static final int SHORT_POST_MAX_BLOCKS = 8;
+    public static final int MAX_PARTS_PER_SIDE = 4;
     private final LlmWorkerPool pool;
     private final SelfCritiqueService selfCritique;
 
@@ -102,10 +103,14 @@ public class StructuredGenerationService {
             // 제목 ≤40자(공백 포함)·제목≠본문 — 2026-08 prod 동일 제목/본문 회귀 방어
             validText(title, "post.title", 4, 40); validText(body, "post.body", 20, 6000);
             rejectIdenticalTitleBody(title, body);
-            Integer split = sanitizeCaptureSplit(body, readCaptureSplit(p));
+            List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
+            Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
             String promoTitle = sanitizePromoTitle(title, nullableText(p, "promo_title"));
             post = ThreadPlanResponse.Post.builder()
-                    .title(title).body(body).promoTitle(promoTitle).captureSplitAfterLine(split).build();
+                    .title(title).body(body).promoTitle(promoTitle)
+                    .captureSplitAfterLines(splits)
+                    .captureSplitAfterLine(legacy)
+                    .build();
         }
         JsonNode comments = root.path("comments");
         if (!comments.isArray()) throw new StructuredGenerationException("comments must be an array");
@@ -185,11 +190,14 @@ public class StructuredGenerationService {
         if (refined == null || refined.equals(post.getBody())) return post;
         try {
             validText(refined, "post.body", 20, 6000);
-            Integer split = sanitizeCaptureSplit(refined, post.getCaptureSplitAfterLine());
+            List<Integer> splits = sanitizeCaptureSplits(refined, post.getCaptureSplitAfterLines());
+            Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
             return ThreadPlanResponse.Post.builder()
                     .title(post.getTitle()).body(refined)
                     .promoTitle(post.getPromoTitle())
-                    .captureSplitAfterLine(split).build();
+                    .captureSplitAfterLines(splits)
+                    .captureSplitAfterLine(legacy)
+                    .build();
         } catch (StructuredGenerationException ignored) {
             return post;
         }
@@ -294,10 +302,14 @@ public class StructuredGenerationService {
         validText(title, "post.title", 4, 40);
         validText(body, "post.body", 20, 6000);
         rejectIdenticalTitleBody(title, body);
-        Integer split = sanitizeCaptureSplit(body, readCaptureSplit(p));
+        List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
+        Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
         String promoTitle = sanitizePromoTitle(title, nullableText(p, "promo_title"));
         ThreadPlanResponse.Post post = ThreadPlanResponse.Post.builder()
-                .title(title).body(body).promoTitle(promoTitle).captureSplitAfterLine(split).build();
+                .title(title).body(body).promoTitle(promoTitle)
+                .captureSplitAfterLines(splits)
+                .captureSplitAfterLine(legacy)
+                .build();
 
         int maxTop = safe(req.getMaxTopLevel(), 4, 1, 6);
         int maxReplies = safe(req.getMaxReplies(), 2, 0, 6);
@@ -328,7 +340,11 @@ public class StructuredGenerationService {
             }
             String body = text(pp, "body");
             validText(body, "partner_post.body", 20, 6000);
-            partnerPost = PairedPhase2Response.PartnerPost.builder().body(body).build();
+            List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(pp));
+            partnerPost = PairedPhase2Response.PartnerPost.builder()
+                    .body(body)
+                    .captureSplitAfterLines(splits)
+                    .build();
         } else if (pp != null && !pp.isNull()) {
             throw new StructuredGenerationException("partner_post must be null for comment-only Call2 continuation");
         }
@@ -413,7 +429,11 @@ public class StructuredGenerationService {
             if (refined != null && !refined.equals(partnerPost.getBody())) {
                 try {
                     validText(refined, "partner_post.body", 20, 6000);
-                    partnerPost = PairedPhase2Response.PartnerPost.builder().body(refined).build();
+                    List<Integer> splits = sanitizeCaptureSplits(refined, partnerPost.getCaptureSplitAfterLines());
+                    partnerPost = PairedPhase2Response.PartnerPost.builder()
+                            .body(refined)
+                            .captureSplitAfterLines(splits)
+                            .build();
                 } catch (StructuredGenerationException ignored) {
                     // keep original
                 }
@@ -479,13 +499,13 @@ public class StructuredGenerationService {
         int maxReplies = safe(req.getMaxReplies(), 2, 0, 6);
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Workload=PAIRED_PHASE1 (logical Call1).
-                Schema: {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_line":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                Schema: {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 This is a 양면 사연: write the 작성자(A) post now. The 상대방(B) has NOT written yet — phase1 comments must NOT assume a partner reply exists, quote a partner body, or say both sides already posted.
                 Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI. Prefer Korean product terms 작성자/상대방 — never 가해자/피해자/승패.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed.
                 AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
                 AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line. Required (IG hook card).
-                AI_POST body line rules (hard): one Korean sentence (or short sense unit) per newline — no blank lines. If more than 12 non-empty lines, set capture_split_after_line to the 1-based last front-half line; else null.
+                AI_POST body line rules (hard): one Korean sentence (or short sense unit) per newline — no blank lines; keep each block short (about 1~2 visual lines). If more than 8 non-empty lines, set capture_split_after_lines to 1-based last-block indices of each part except the final (semantic pauses; each part 1~8 blocks; max 4 parts / at most 3 cuts). Prefer even-ish meaningful chunks (e.g. 20 lines → [7,14]). If ≤8 lines, set capture_split_after_lines to null.
                 Phase1 comment count: about 2~4 top-level (respect LIMITS). Keep them light reactions to the 작성자 story only.
                 """ + "\nGUIDE=\n" + clean(classpathText("voice/paired_phase1.md")) +
                 "\nAUTHOR_VOICE=\n" + clean(classpathText("voice/post_paired_author.md")) +
@@ -512,17 +532,18 @@ public class StructuredGenerationService {
         int maxTop = safe(req.getMaxTopLevel(), 14, 1, 20);
         int maxReplies = safe(req.getMaxReplies(), 10, 0, 20);
         String partnerBlock = wantPartner
-                ? "Include partner_post with body only (no title). Stance=PARTNER."
+                ? "Include partner_post with body + optional capture_split_after_lines (same rules as author: ≤8 blocks/part, max 4 parts). Stance=PARTNER."
                 : "Set partner_post to null — this is a comment-only micro-batch continuation of logical Call2; do not regenerate the 상대방 body.";
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Workload=PAIRED_PHASE2 (logical Call2).
-                Schema: {"partner_post":{"body":"..."}|null,"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                Schema: {"partner_post":{"body":"...","capture_split_after_lines":null}|null,"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 """ + partnerBlock + "\n" + """
                 Phase2 comments are the bulk reactions after both 작성자 and 상대방 bodies are visible.
                 Ground comments on AUTHOR_POST + partner body (when being written or already known via partner voice) + PUBLISHED_TOP_LEVEL_COMMENTS.
                 If PUBLISHED_TOP_LEVEL_COMMENTS is empty, use author (+ partner) bodies only — do not invent prior comments.
                 Do not use published comment ids as parentRef; replies may only parent earlier top-level refs from this response.
                 Use only supplied personaIds. No legal verdicts, diagnoses, personal data, internal notes, or AI identity claims. Use 작성자/상대방 — never 가해자/피해자/승패.
+                Partner body line rules: one Korean sentence per newline; short blocks. If >8 non-empty lines, set capture_split_after_lines (semantic cuts, each part ≤8, max 4 parts); else null.
                 """ + "\nGUIDE=\n" + clean(classpathText("voice/paired_phase2.md")) +
                 "\nPARTNER_VOICE=\n" + clean(classpathText("voice/partner.md")) +
                 "\nCATEGORY=" + clean(req.getCategory()) +
@@ -572,12 +593,12 @@ public class StructuredGenerationService {
         }
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Create Korean community conversation candidates.
-                The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_line":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed, not the whole story.
                 AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only teases the conflict.
                 AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line — pack 1~3 eojeol into a readable phrase. Do not break on every space. No rewrite/omit/add. Required for AI_POST (IG hook card).
-                AI_POST body line rules (hard): write body as one Korean sentence (or short sense unit) per newline — no blank lines; each non-empty line is a capture block. If the body has more than 12 non-empty lines, set capture_split_after_line to the 1-based index of the last front-half line (a natural pause: after setup/incident, before emotion/aftermath). Both halves must keep at least a few lines. If body has 12 or fewer non-empty lines, set capture_split_after_line to null.
+                AI_POST body line rules (hard): write body as one Korean sentence (or short sense unit) per newline — no blank lines; each non-empty line is a capture block; keep blocks short (~1–2 visual lines). If more than 8 non-empty lines, set capture_split_after_lines to 1-based last-block indices of each part except the final (semantic pauses; each part 1~8 blocks; max 4 parts / ≤3 cuts; e.g. 20 lines → [7,14]). If ≤8 lines, null.
                 """ + "\nKIND=" + req.getKind() + "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) + "\n" + existing +
                 grounding +
                 "\nPERSONAS=" + json(req.getPersonas()) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20)));
@@ -709,24 +730,70 @@ public class StructuredGenerationService {
     }
 
     /**
-     * Accept LLM split only when body has more than {@link #SHORT_POST_MAX_BLOCKS} blocks and
-     * {@code 1 ≤ split < blockCount}. Otherwise demote to null (do not fail the whole plan).
+     * Accept LLM multi-cut list when body has more than {@link #SHORT_POST_MAX_BLOCKS} blocks.
+     * Each part ≤8 blocks; at most {@link #MAX_PARTS_PER_SIDE} parts (≤3 cuts).
+     * Legacy single {@code capture_split_after_line} is promoted to a one-element list.
+     * Invalid proposals demote to null (do not fail the whole plan).
      */
-    static Integer sanitizeCaptureSplit(String body, Integer proposed) {
+    static List<Integer> sanitizeCaptureSplits(String body, List<Integer> proposed) {
         int blocks = countNonEmptyBlocks(body);
         if (blocks <= SHORT_POST_MAX_BLOCKS) {
-            if (proposed != null) {
-                log.debug("Demoting capture_split_after_line={} — body has {} blocks (≤{})",
+            if (proposed != null && !proposed.isEmpty()) {
+                log.debug("Demoting capture_split_after_lines={} — body has {} blocks (≤{})",
                         proposed, blocks, SHORT_POST_MAX_BLOCKS);
             }
             return null;
         }
-        if (proposed == null) return null;
-        if (proposed < 1 || proposed >= blocks) {
-            log.warn("Demoting capture_split_after_line={} — out of range for {} blocks", proposed, blocks);
+        if (proposed == null || proposed.isEmpty()) return null;
+
+        List<Integer> cuts = new ArrayList<>();
+        int prev = 0;
+        for (Integer p : proposed) {
+            if (p == null) continue;
+            if (cuts.size() >= MAX_PARTS_PER_SIDE - 1) break;
+            if (p <= prev || p >= blocks) {
+                log.warn("Demoting capture_split_after_lines — cut {} out of range for {} blocks", p, blocks);
+                return null;
+            }
+            int size = p - prev;
+            if (size < 1 || size > SHORT_POST_MAX_BLOCKS) {
+                log.warn("Demoting capture_split_after_lines — part size {} invalid at cut {}", size, p);
+                return null;
+            }
+            cuts.add(p);
+            prev = p;
+        }
+        if (cuts.isEmpty()) return null;
+        int lastSize = blocks - cuts.get(cuts.size() - 1);
+        if (lastSize < 1 || lastSize > SHORT_POST_MAX_BLOCKS) {
+            // Too many trailing blocks for one last card — keep cuts that fit budget; BE truncates for marketing.
+            // If last part alone would exceed 8, demote entirely so BE heuristic applies.
+            log.warn("Demoting capture_split_after_lines={} — last part size {} for {} blocks",
+                    cuts, lastSize, blocks);
             return null;
         }
-        return proposed;
+        return List.copyOf(cuts);
+    }
+
+    /** @deprecated use {@link #sanitizeCaptureSplits} */
+    @Deprecated
+    static Integer sanitizeCaptureSplit(String body, Integer proposed) {
+        List<Integer> list = sanitizeCaptureSplits(body, proposed == null ? null : List.of(proposed));
+        return (list == null || list.isEmpty()) ? null : list.get(0);
+    }
+
+    private static List<Integer> readCaptureSplits(JsonNode postNode) {
+        JsonNode arr = postNode.get("capture_split_after_lines");
+        if (arr == null || arr.isNull()) arr = postNode.get("captureSplitAfterLines");
+        if (arr != null && arr.isArray()) {
+            List<Integer> out = new ArrayList<>();
+            for (JsonNode n : arr) {
+                if (n != null && n.isNumber()) out.add(n.asInt());
+            }
+            if (!out.isEmpty()) return out;
+        }
+        Integer legacy = readCaptureSplit(postNode);
+        return legacy == null ? null : List.of(legacy);
     }
 
     private static Integer readCaptureSplit(JsonNode postNode) {

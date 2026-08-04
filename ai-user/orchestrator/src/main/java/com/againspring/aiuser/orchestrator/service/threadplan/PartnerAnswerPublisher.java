@@ -78,7 +78,8 @@ public class PartnerAnswerPublisher {
                 return;
             }
 
-            boolean ok = backend.submitPartnerAnswer(row.getInviteToken(), null, result.partnerBody());
+            boolean ok = backend.submitPartnerAnswer(
+                    row.getInviteToken(), null, result.partnerBody(), result.captureSplits());
             if (!ok) {
                 leases.releaseFailed(row.getId(), WORKER, "PARTNER_SUBMIT_FAILED", row.getAttemptCount() < 3);
                 return;
@@ -177,7 +178,7 @@ public class PartnerAnswerPublisher {
             return Optional.empty();
         }
         int items = response.get("items") instanceof List<?> list ? list.size() : 0;
-        return Optional.of(new Call2Result(partnerBody.strip(), response, items));
+        return Optional.of(new Call2Result(partnerBody.strip(), extractPartnerSplits(response), response, items));
     }
 
     private static String extractPartnerBody(Map<String, Object> response) {
@@ -194,6 +195,24 @@ public class PartnerAnswerPublisher {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
+    private static List<Integer> extractPartnerSplits(Map<String, Object> response) {
+        Object raw = response.get("partner_post");
+        if (raw == null) raw = response.get("partnerPost");
+        if (!(raw instanceof Map<?, ?> post)) return null;
+        Object v = post.get("capture_split_after_lines");
+        if (v == null) v = post.get("captureSplitAfterLines");
+        if (!(v instanceof List<?> list) || list.isEmpty()) return null;
+        List<Integer> out = new ArrayList<>();
+        for (Object o : list) {
+            if (o instanceof Number n) out.add(n.intValue());
+            else if (o instanceof String s) {
+                try { out.add(Integer.parseInt(s.trim())); } catch (NumberFormatException ignored) { }
+            }
+        }
+        return out.isEmpty() ? null : out;
+    }
+
     private int lookupContentRevision(String postId) {
         try {
             Integer revision = jdbcTemplate.queryForObject(
@@ -204,5 +223,6 @@ public class PartnerAnswerPublisher {
         }
     }
 
-    private record Call2Result(String partnerBody, Map<String, Object> response, int itemCount) { }
+    private record Call2Result(String partnerBody, List<Integer> captureSplits,
+                               Map<String, Object> response, int itemCount) { }
 }

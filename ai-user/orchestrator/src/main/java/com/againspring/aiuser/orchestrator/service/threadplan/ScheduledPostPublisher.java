@@ -93,7 +93,7 @@ public class ScheduledPostPublisher {
                     .bodyRaw(LiteralNewlineNormalizer.normalize(row.getBody()))
                     .category(row.getCategory())
                     .visibility("PUBLIC").jurorCount(jurorCount)
-                    .captureSplitAfterLine(readCaptureSplitFromCandidates(row.getCandidatesJson(), row.getBody()))
+                    .captureSplitAfterLines(readCaptureSplitsFromCandidates(row.getCandidatesJson(), row.getBody()))
                     .promoTitle(readPromoTitleFromCandidates(row.getCandidatesJson(), row.getTitle()));
             if (!paired) {
                 applyProvenanceFromCandidates(postBuilder, row.getCandidatesJson());
@@ -240,23 +240,42 @@ public class ScheduledPostPublisher {
     }
 
     @SuppressWarnings("unchecked")
-    private Integer readCaptureSplitFromCandidates(String candidatesJson, String body) {
-        Integer proposed = null;
+    private List<Integer> readCaptureSplitsFromCandidates(String candidatesJson, String body) {
+        List<Integer> proposed = null;
         if (candidatesJson != null && !candidatesJson.isBlank()) {
             try {
                 Map<String, Object> response = objectMapper.readValue(candidatesJson, new TypeReference<>() { });
                 Object postRaw = response.get("post");
                 if (postRaw instanceof Map<?, ?> post) {
-                    Object v = post.get("capture_split_after_line");
-                    if (v == null) v = post.get("captureSplitAfterLine");
-                    if (v instanceof Number n) proposed = n.intValue();
+                    Object v = post.get("capture_split_after_lines");
+                    if (v == null) v = post.get("captureSplitAfterLines");
+                    if (v instanceof List<?> list && !list.isEmpty()) {
+                        proposed = new java.util.ArrayList<>();
+                        for (Object o : list) {
+                            if (o instanceof Number n) proposed.add(n.intValue());
+                        }
+                        if (proposed.isEmpty()) proposed = null;
+                    }
+                    if (proposed == null) {
+                        Object one = post.get("capture_split_after_line");
+                        if (one == null) one = post.get("captureSplitAfterLine");
+                        if (one instanceof Number n) proposed = List.of(n.intValue());
+                    }
                 }
             } catch (Exception e) {
-                log.debug("Could not read capture_split_after_line from candidates: {}", e.getMessage());
+                log.debug("Could not read capture_split_after_lines from candidates: {}", e.getMessage());
             }
         }
-        return AiPostBundleService.resolveCaptureSplit(
+        return AiPostBundleService.resolveCaptureSplits(
                 LiteralNewlineNormalizer.normalize(body), proposed);
+    }
+
+    /** @deprecated */
+    @Deprecated
+    @SuppressWarnings("unchecked")
+    private Integer readCaptureSplitFromCandidates(String candidatesJson, String body) {
+        List<Integer> list = readCaptureSplitsFromCandidates(candidatesJson, body);
+        return (list == null || list.isEmpty()) ? null : list.get(0);
     }
 
     @SuppressWarnings("unchecked")

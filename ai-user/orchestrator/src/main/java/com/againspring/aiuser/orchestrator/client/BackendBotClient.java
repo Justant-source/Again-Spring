@@ -370,10 +370,19 @@ public class BackendBotClient {
 
     /** Submit partner answer via invite token (anonymous — no JWT needed per SecurityConfig) */
     public boolean submitPartnerAnswer(String token, String userTitle, String bodyRaw) {
+        return submitPartnerAnswer(token, userTitle, bodyRaw, null);
+    }
+
+    public boolean submitPartnerAnswer(String token, String userTitle, String bodyRaw,
+                                       java.util.List<Integer> captureSplitAfterLines) {
         try {
             restClient.post()
                 .uri("/api/s/{token}/answer", token)
-                .body(InviteDto.AnswerRequest.builder().userTitle(userTitle).bodyRaw(bodyRaw).build())
+                .body(InviteDto.AnswerRequest.builder()
+                        .userTitle(userTitle)
+                        .bodyRaw(bodyRaw)
+                        .captureSplitAfterLines(captureSplitAfterLines)
+                        .build())
                 .retrieve()
                 .toBodilessEntity();
             return true;

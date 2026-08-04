@@ -204,7 +204,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56, V85, V87, V89, V92, V94, **V97**; 검색 인덱스 → V93 `post_search_ngrams`)
+### `posts` (V48~V56, V85, V87, V89, V92, V94, **V97**, **V98**; 검색 인덱스 → V93 `post_search_ngrams`)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
@@ -212,7 +212,9 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `author_id` | VARCHAR(32) FK | V48 | 작성자 |
 | `title` | VARCHAR(255) | V48 | 제목 |
 | `promo_title` | VARCHAR(500) | **V92**, 상한 **V96** | IG 훅 제목. 원제 복제+의미줄바꿈(`\n`). PLAN/`PromoTitleService` |
-| `capture_split_after_line` | INT | **V94** | X/IG 캡쳐 전반부 끝 개행 블록(1-based). 비어 있지 않은 줄이 13+일 때. NULL=미분할 |
+| `capture_split_after_line` | INT | **V94** (deprecated) | 구 단일 컷. 읽기 폴백만 |
+| `capture_split_after_lines` | JSON | **V98** | X/IG 캡쳐 컷 배열(1-based, 각 장 마지막 블록; 마지막 장 제외). null=1장/휴리스틱 |
+| `partner_capture_split_after_lines` | JSON | **V98** | 상대 본문 캡쳐 컷(동일 의미) |
 | `content` | MEDIUMTEXT | V48 | 본문 (**30일 후 NULL**) |
 | `relationship_type` | VARCHAR(32) | V48 | RelationType enum (couple/marriage/friend/family/parent_child) |
 | `category` | JSON | V48 | `{major, middle, minor, customMinor?}` |
@@ -432,6 +434,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V93** | `post_search_ngrams` — 광장 검색용 문자 바이그램 (MariaDB ngram FULLTEXT 대체) |
 | **V94** | `posts.capture_split_after_line` — X/IG 캡쳐 전반부 끝 개행 블록(1-based) |
 | **V97** | `WAIT_FOR_PARTNER` private-until-partner 폐기 데이터 정리: `PRIVATE + WAIT_FOR_PARTNER` 중 `created_at` >30일 → `deleted_at` soft-delete; 나머지 → `PUBLIC` + `vote_close_at`(없으면 `COALESCE(vote_duration_hours,72)`h) |
+| **V98** | `posts.capture_split_after_lines` / `partner_capture_split_after_lines` JSON — N장 캡쳐 컷 |
 
 ---
 

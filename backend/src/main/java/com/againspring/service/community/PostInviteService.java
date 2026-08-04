@@ -105,6 +105,11 @@ public class PostInviteService {
      * @param userTitle 파트너 제목 (선택사항)
      */
     public void submitPartnerAnswer(String token, String partnerUserId, String bodyRaw, String userTitle) {
+        submitPartnerAnswer(token, partnerUserId, bodyRaw, userTitle, null);
+    }
+
+    public void submitPartnerAnswer(String token, String partnerUserId, String bodyRaw, String userTitle,
+                                    java.util.List<Integer> captureSplitAfterLines) {
         Post post = postRepository.findByInviteToken(token)
                 .orElseThrow(() -> new BusinessException(
                         "INVALID_INVITE_TOKEN", "유효하지 않은 초대 링크예요.", 404));
@@ -121,6 +126,9 @@ public class PostInviteService {
         post.setPartnerBodyPublished(bodyRaw);
         if (userTitle != null && !userTitle.isBlank()) {
             post.setUserTitle(userTitle);
+        }
+        if (captureSplitAfterLines != null && !captureSplitAfterLines.isEmpty()) {
+            post.setPartnerCaptureSplitAfterLines(captureSplitAfterLines);
         }
 
         post.setPartnerAnsweredAt(Instant.now());

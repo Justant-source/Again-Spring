@@ -46,6 +46,9 @@ public class PostInviteDto {
     public static class PartnerAnswerRequest {
         private String userTitle;
         private String bodyRaw;
+        /** Partner capture cuts (1-based); optional from AI Call2. */
+        @com.fasterxml.jackson.annotation.JsonAlias({"capture_split_after_lines", "partner_capture_split_after_lines"})
+        private java.util.List<Integer> captureSplitAfterLines;
     }
 
     /**

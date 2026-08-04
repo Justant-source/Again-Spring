@@ -50,9 +50,16 @@ public class PostCreateRequest {
     private String sourceOriginalBody;
 
     /**
-     * X/IG 캡쳐 전반부 끝 개행 블록(1-based). AI 봇이 PLAN에서 전달.
-     * null이면 게시 시/마케팅 잡 생성 시 본문에서 휴리스틱 계산 가능.
+     * X/IG 캡쳐 컷 목록(1-based). AI PLAN {@code capture_split_after_lines}.
+     * null이면 마케팅 잡 생성 시 휴리스틱.
      */
+    @com.fasterxml.jackson.annotation.JsonAlias({"capture_split_after_lines"})
+    private java.util.List<Integer> captureSplitAfterLines;
+
+    /**
+     * @deprecated prefer {@link #captureSplitAfterLines}; single cut promoted to one-element list.
+     */
+    @Deprecated
     private Integer captureSplitAfterLine;
 
     /**

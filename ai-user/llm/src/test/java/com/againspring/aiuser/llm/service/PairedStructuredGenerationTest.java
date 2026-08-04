@@ -69,7 +69,7 @@ class PairedStructuredGenerationTest {
         StructuredGenerationService service = configured(pool);
         String same = "남친이 또 회사 스트레스로 나한테 욱했음";
         String json = "{\"post\":{\"title\":\"" + same + "\",\"body\":\"" + same
-                + "\",\"promo_title\":null,\"capture_split_after_line\":null},\"comments\":["
+                + "\",\"promo_title\":null,\"capture_split_after_lines\":null},\"comments\":["
                 + comment("c1", null, "p1") + "," + comment("c2", null, "p2") + "]}";
         when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
                 eq(StructuredOutputSchema.PAIRED_PHASE1))).thenReturn(json);
@@ -237,7 +237,7 @@ class PairedStructuredGenerationTest {
         }
         return "{\"post\":{\"title\":\"" + title + "\",\"body\":\"" + body
                 + "\",\"promo_title\":\"" + promo.replace("\n", "\\n")
-                + "\",\"capture_split_after_line\":null},\"comments\":["
+                + "\",\"capture_split_after_lines\":null},\"comments\":["
                 + String.join(",", items) + "]}";
     }
 

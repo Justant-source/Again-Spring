@@ -27,5 +27,7 @@ public class InviteDto {
     public static class AnswerRequest {
         private String userTitle;
         private String bodyRaw;
+        @com.fasterxml.jackson.annotation.JsonProperty("capture_split_after_lines")
+        private java.util.List<Integer> captureSplitAfterLines;
     }
 }

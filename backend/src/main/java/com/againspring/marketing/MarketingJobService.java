@@ -161,21 +161,38 @@ public class MarketingJobService {
 
         String postUrl = "https://againspring.net/community/" + postId;
 
-        Integer captureSplit = CaptureSplitSupport.resolveSplit(
-                post.getBodyPublished(), post.getCaptureSplitAfterLine());
+        Integer captureSplit = null;
         boolean paired = post.getPartnerAnsweredAt() != null
                 && post.getPartnerBodyPublished() != null
                 && !post.getPartnerBodyPublished().isBlank();
-        Double part1Height = CaptureHeightCalculator.part1HeightCss(
-                post.getTitle(), post.getBodyPublished(), captureSplit, paired);
 
-        Integer partnerCaptureSplit = null;
-        Double partnerPart1Height = null;
+        List<Integer> authorProposed = CaptureSplitSupport.coalesceProposed(
+                post.getCaptureSplitAfterLines(), post.getCaptureSplitAfterLine());
+        List<Integer> partnerProposed = CaptureSplitSupport.coalesceProposed(
+                post.getPartnerCaptureSplitAfterLines(), null);
+
+        CaptureSplitSupport.ResolvedCapture authorCap;
+        CaptureSplitSupport.ResolvedCapture partnerCap;
         if (paired) {
-            // Partner has no stored LLM split yet — heuristic only (same SHORT_POST_MAX_BLOCKS).
-            partnerCaptureSplit = CaptureSplitSupport.resolveSplit(post.getPartnerBodyPublished(), null);
-            partnerPart1Height = CaptureHeightCalculator.part1HeightCss(
-                    post.getTitle(), post.getPartnerBodyPublished(), partnerCaptureSplit, true);
+            CaptureSplitSupport.PairedCapture both = CaptureSplitSupport.resolvePaired(
+                    post.getBodyPublished(), authorProposed,
+                    post.getPartnerBodyPublished(), partnerProposed);
+            authorCap = both.author();
+            partnerCap = both.partner();
+        } else {
+            authorCap = CaptureSplitSupport.resolveSolo(post.getBodyPublished(), authorProposed);
+            partnerCap = CaptureSplitSupport.ResolvedCapture.empty();
+        }
+
+        List<Double> partHeights = CaptureHeightCalculator.partHeightsCss(
+                post.getTitle(), post.getBodyPublished(), authorCap, paired);
+        List<Double> partnerHeights = paired
+                ? CaptureHeightCalculator.partHeightsCss(
+                        post.getTitle(), post.getPartnerBodyPublished(), partnerCap, true)
+                : List.of();
+
+        if (!authorCap.splits().isEmpty()) {
+            captureSplit = authorCap.splits().get(0);
         }
 
         String storyTitle = post.getTitle();
@@ -196,11 +213,17 @@ public class MarketingJobService {
             .voteLabels(voteLabels)
             .postUrl(postUrl)
             .tags(tags)
-            .captureSplitAfterLine(captureSplit)
-            .part1HeightCss(part1Height)
+            .captureSplitAfterLines(authorCap.splits().isEmpty() ? null : authorCap.splits())
+            .partHeightsCss(partHeights.isEmpty() ? null : partHeights)
+            .captureBlockCount(authorCap.captureBlockCount() > 0 ? authorCap.captureBlockCount() : null)
             .hasPartnerStory(paired)
-            .partnerCaptureSplitAfterLine(partnerCaptureSplit)
-            .partnerPart1HeightCss(partnerPart1Height)
+            .partnerCaptureSplitAfterLines(partnerCap.splits().isEmpty() ? null : partnerCap.splits())
+            .partnerPartHeightsCss(partnerHeights.isEmpty() ? null : partnerHeights)
+            .partnerCaptureBlockCount(partnerCap.captureBlockCount() > 0 ? partnerCap.captureBlockCount() : null)
+            .captureSplitAfterLine(captureSplit)
+            .part1HeightCss(partHeights.isEmpty() ? null : partHeights.get(0))
+            .partnerCaptureSplitAfterLine(partnerCap.splits().isEmpty() ? null : partnerCap.splits().get(0))
+            .partnerPart1HeightCss(partnerHeights.isEmpty() ? null : partnerHeights.get(0))
             .policy(PolicyDto.builder()
                 .noEmoji(true)
                 .forbiddenTerms(Arrays.asList("판결", "처방", "승패", "승자", "패자", "가해자", "피해자"))

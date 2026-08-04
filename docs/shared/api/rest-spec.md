@@ -164,7 +164,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 - `promoTitle` (String, nullable, **2026-08-02~**, **V96→VARCHAR(500)·개행**): IG 훅용. 원제 복제+의미줄바꿈(줄≤10). 생성 시 PLAN 전달 또는 `PromoTitleService` 비동기. 목록/상세 공통.
 
 `POST /api/community/posts` 성공 시(신규 생성만) optional `promoTitle`이 있으면 저장하고, 없으면 `PromoTitleService.generateAsync`가 1회 실행된다. 마케팅 brief는 개행 포함 `promo_title`을 전달한다.
-봇(AI-user) 생성 요청은 optional `captureSplitAfterLine`(1-based 개행 블록)을 보낼 수 있다 — X/IG 캡쳐 전반부 컷. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완.
+봇(AI-user) 생성 요청은 optional `captureSplitAfterLines`(1-based 개행 블록 컷 배열)을 보낼 수 있다 — X/IG 캡쳐 N장 분할(장당 ≤8, 진영당 ≤4). 구 `captureSplitAfterLine` 단일 값은 길이1 배열로 승격. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완. 파트너 답변(`POST /api/s/{token}/answer`)도 optional `captureSplitAfterLines`를 `partner_capture_split_after_lines`에 저장한다.
 
 ### 3. User
 

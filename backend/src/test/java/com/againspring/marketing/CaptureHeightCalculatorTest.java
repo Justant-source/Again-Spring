@@ -2,6 +2,8 @@ package com.againspring.marketing;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,48 +13,50 @@ class CaptureHeightCalculatorTest {
     @Test
     void shortBodyHasNoSplitOrHeight() {
         String body = "한 줄만 있는 짧은 사연입니다.";
-        assertNull(CaptureSplitSupport.resolveSplit(body, null));
+        CaptureSplitSupport.ResolvedCapture r = CaptureSplitSupport.resolveSolo(body, null);
+        assertTrue(r.splits().isEmpty());
+        assertTrue(CaptureHeightCalculator.partHeightsCss("짧은 제목", body, r, false).isEmpty());
         assertNull(CaptureHeightCalculator.part1HeightCss("짧은 제목", body, null, false));
     }
 
     @Test
     void longBodyUsesHeuristicWhenSplitMissing() {
         String body = blocks(15);
-        Integer split = CaptureSplitSupport.resolveSplit(body, null);
-        assertEquals(9, split); // round(15 * 0.6)
-        Double h = CaptureHeightCalculator.part1HeightCss("아무 제목", body, null, false);
-        assertTrue(h != null && h > 100);
+        CaptureSplitSupport.ResolvedCapture r = CaptureSplitSupport.resolveSolo(body, null);
+        assertTrue(!r.splits().isEmpty());
+        List<Double> hs = CaptureHeightCalculator.partHeightsCss("아무 제목", body, r, false);
+        assertEquals(r.splits().size(), hs.size());
+        assertTrue(hs.get(0) > 100);
     }
 
     @Test
     void prefersValidProposedSplit() {
         String body = blocks(20);
-        assertEquals(7, CaptureSplitSupport.resolveSplit(body, 7));
-        assertEquals(12, CaptureSplitSupport.resolveSplit(body, 12));
-        // out of range → heuristic
-        assertEquals(12, CaptureSplitSupport.resolveSplit(body, 20)); // round(20*0.6)=12
+        assertEquals(List.of(7, 14), CaptureSplitSupport.resolveSolo(body, List.of(7, 14)).splits());
     }
 
     @Test
     void titleLengthDoesNotChangeHeight() {
         String body = blocks(15);
-        Double shortTitle = CaptureHeightCalculator.part1HeightCss("짧", body, 8, false);
-        Double longTitle = CaptureHeightCalculator.part1HeightCss(
-                "아주아주아주 긴 제목이지만 헤더는 말줄임이라 높이 불변", body, 8, false);
+        CaptureSplitSupport.ResolvedCapture r = CaptureSplitSupport.resolveSolo(body, List.of(8));
+        Double shortTitle = CaptureHeightCalculator.partHeightsCss("짧", body, r, false).get(0);
+        Double longTitle = CaptureHeightCalculator.partHeightsCss(
+                "아주아주아주 긴 제목이지만 헤더는 말줄임이라 높이 불변", body, r, false).get(0);
         assertEquals(shortTitle, longTitle);
     }
 
     @Test
     void moreFrontBlocksIncreaseHeight() {
         String body = blocks(16);
-        Double h6 = CaptureHeightCalculator.part1HeightCss("t", body, 6, false);
-        Double h10 = CaptureHeightCalculator.part1HeightCss("t", body, 10, false);
-        assertTrue(h10 > h6);
+        Double h6 = CaptureHeightCalculator.partHeightsCss(
+                "t", body, new CaptureSplitSupport.ResolvedCapture(List.of(6), 16), false).get(0);
+        Double h8 = CaptureHeightCalculator.partHeightsCss(
+                "t", body, new CaptureSplitSupport.ResolvedCapture(List.of(8), 16), false).get(0);
+        assertTrue(h8 > h6);
     }
 
     @Test
     void visualLinesWrapEstimate() {
-        // CHARS_PER_LINE=22 → 45 chars ≈ 3 visual lines
         assertEquals(3, CaptureHeightCalculator.visualLines("가".repeat(45)));
         assertEquals(1, CaptureHeightCalculator.visualLines("짧음"));
     }

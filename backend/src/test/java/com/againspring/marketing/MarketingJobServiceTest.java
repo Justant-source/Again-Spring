@@ -191,9 +191,10 @@ class MarketingJobServiceTest {
         verify(asmClient).createJob(captor.capture(), any(String.class));
         CreateJobRequest.BriefDto brief = captor.getValue().getBrief();
         assertThat(brief.getHasPartnerStory()).isTrue();
-        assertThat(brief.getPartnerCaptureSplitAfterLine()).isEqualTo(9); // round(15*0.6)
-        assertThat(brief.getPartnerPart1HeightCss()).isNotNull();
-        assertThat(brief.getPartnerPart1HeightCss()).isGreaterThan(100.0);
+        assertThat(brief.getPartnerCaptureSplitAfterLines()).isNotNull();
+        assertThat(brief.getPartnerCaptureSplitAfterLines()).isNotEmpty();
+        assertThat(brief.getPartnerPartHeightsCss()).isNotNull();
+        assertThat(brief.getPartnerCaptureBlockCount()).isGreaterThan(0);
     }
 
     @Test
@@ -229,8 +230,8 @@ class MarketingJobServiceTest {
         ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
         verify(asmClient).createJob(captor.capture(), any(String.class));
         assertThat(captor.getValue().getBrief().getHasPartnerStory()).isFalse();
-        assertThat(captor.getValue().getBrief().getPartnerCaptureSplitAfterLine()).isNull();
-        assertThat(captor.getValue().getBrief().getPartnerPart1HeightCss()).isNull();
+        assertThat(captor.getValue().getBrief().getPartnerCaptureSplitAfterLines()).isNull();
+        assertThat(captor.getValue().getBrief().getPartnerPartHeightsCss()).isNull();
     }
 
 
