@@ -12,7 +12,7 @@
 |---|---|
 | 자동 생성 | **활성 (조건부)** — `x_thread` 또는 `instagram_feed`가 사연당 최초 `PUBLISHED`될 때 Shorts 렌더 잡 1회 |
 | 자동 게시 | **비활성** — 관리자 마케팅 탭에서 mp4 검수 후 수동 승인 시에만 업로드 |
-| 렌더 | WaggleBot 블랙박스 (`POST /api/external/jobs`) |
+| 렌더 | WaggleBot 블랙박스 (`POST /api/external/jobs`) — LLM은 **Claude CLI 브릿지** (`llm_backend=cli`, 호스트 `~/.claude` = Again Spring과 동일 세션). Anthropic API 직접 호출 금지. |
 | 게시 계정 | 다시봄 전용 YouTube (ASM `youtube_shorts` OAuth) |
 
 `instagram_reels`는 동일 9:16·복제 예정. 1차는 Shorts만.
