@@ -173,30 +173,30 @@ public class CommentService {
     }
 
     /**
-     * 최상위 댓글 목록 조회 (부모 댓글 없는 댓글들)
+     * 최상위 댓글 목록 조회 (부모 댓글 없는 댓글들, 최신순)
      *
      * @param postId 포스트 ID
-     * @return 최상위 댓글 목록
+     * @return 최상위 댓글 목록 (createdAt DESC)
      */
     public List<PostComment> getTopLevelComments(String postId) {
-        // 공개 피드: 차단(BLOCKED)·삭제(deletedAt)된 댓글은 제외 — ACTIVE & deletedAt IS NULL만
+        // 공개 피드: 차단(BLOCKED)·삭제(deletedAt)된 댓글은 제외 — ACTIVE & deletedAt IS NULL만, 최신순
         List<PostComment> comments = commentRepository
-                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
+                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
                         postId, CommentStatus.ACTIVE);
         log.info("Listed {} top-level comments for post {}", comments.size(), postId);
         return comments;
     }
 
     /**
-     * 특정 댓글의 대댓글 조회
+     * 특정 댓글의 대댓글 조회 (최신순)
      *
      * @param parentCommentId 부모 댓글 ID
-     * @return 대댓글 목록
+     * @return 대댓글 목록 (createdAt DESC)
      */
     public List<PostComment> getReplies(Long parentCommentId) {
-        // 공개 피드: 차단(BLOCKED)·삭제(deletedAt)된 답글은 제외 — ACTIVE & deletedAt IS NULL만
+        // 공개 피드: 차단(BLOCKED)·삭제(deletedAt)된 답글은 제외 — ACTIVE & deletedAt IS NULL만, 최신순
         List<PostComment> replies = commentRepository
-                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
+                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
                         parentCommentId, CommentStatus.ACTIVE);
         log.info("Listed {} replies for comment {}", replies.size(), parentCommentId);
         return replies;

@@ -18,12 +18,12 @@ import org.springframework.stereotype.Repository;
 public interface PostCommentRepository extends JpaRepository<PostComment, Long> {
 
     /**
-     * 포스트의 최상위 댓글 조회 (생성순)
+     * 포스트의 최상위 댓글 조회 (레거시·무필터, 생성 오름차순)
      */
     List<PostComment> findByPostIdAndParentCommentIdIsNullOrderByCreatedAtAsc(String postId);
 
     /**
-     * 댓글의 답글 조회 (생성순)
+     * 댓글의 답글 조회 (무필터 — 삭제 cascade용, 순서 무관)
      */
     List<PostComment> findByParentCommentIdOrderByCreatedAtAsc(Long parentCommentId);
 
@@ -54,15 +54,15 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
             @Param("statuses") List<CommentStatus> statuses, Pageable pageable);
 
     /**
-     * 공개 피드: 최상위 댓글 — 차단/삭제 제외 (status=ACTIVE, deletedAt IS NULL)
+     * 공개 피드: 최상위 댓글 — 차단/삭제 제외, 최신순 (status=ACTIVE, deletedAt IS NULL)
      */
-    List<PostComment> findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
+    List<PostComment> findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
             String postId, CommentStatus status);
 
     /**
-     * 공개 피드: 답글 — 차단/삭제 제외 (status=ACTIVE, deletedAt IS NULL)
+     * 공개 피드: 답글 — 차단/삭제 제외, 최신순 (status=ACTIVE, deletedAt IS NULL)
      */
-    List<PostComment> findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
+    List<PostComment> findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
             Long parentCommentId, CommentStatus status);
 
     /**

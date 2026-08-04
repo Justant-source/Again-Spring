@@ -88,7 +88,7 @@ class PostCommentRepositoryTest {
     @DisplayName("최상위 필터 쿼리 — ACTIVE & deletedAt IS NULL만 반환 (BLOCKED·삭제 제외)")
     void topLevelFiltered_returnsOnlyVisible() {
         List<PostComment> result = repo
-                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(POST_ID, CommentStatus.ACTIVE);
+                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(POST_ID, CommentStatus.ACTIVE);
         assertThat(result).extracting(PostComment::getBody).containsExactly("ACTIVE 최상위");
     }
 
@@ -96,8 +96,28 @@ class PostCommentRepositoryTest {
     @DisplayName("답글 필터 쿼리 — ACTIVE & deletedAt IS NULL만 반환 (BLOCKED·삭제 제외)")
     void repliesFiltered_returnsOnlyVisible() {
         List<PostComment> result = repo
-                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(activeTopId, CommentStatus.ACTIVE);
+                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(activeTopId, CommentStatus.ACTIVE);
         assertThat(result).extracting(PostComment::getBody).containsExactly("ACTIVE 답글");
+    }
+
+    @Test
+    @DisplayName("공개 피드 정렬 — 최상위·답글 모두 createdAt DESC(최신순)")
+    void publicFeed_ordersNewestFirst() {
+        Instant t = Instant.parse("2026-06-07T01:00:00Z");
+        save(null, "오래된 최상위", CommentStatus.ACTIVE, null, t);
+        save(null, "최신 최상위", CommentStatus.ACTIVE, null, t.plusSeconds(10));
+        Long parent = save(null, "부모", CommentStatus.ACTIVE, null, t.plusSeconds(20)).getId();
+        save(parent, "오래된 답글", CommentStatus.ACTIVE, null, t.plusSeconds(21));
+        save(parent, "최신 답글", CommentStatus.ACTIVE, null, t.plusSeconds(22));
+
+        assertThat(repo.findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                        POST_ID, CommentStatus.ACTIVE))
+                .extracting(PostComment::getBody)
+                .startsWith("부모", "최신 최상위", "오래된 최상위");
+        assertThat(repo.findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                        parent, CommentStatus.ACTIVE))
+                .extracting(PostComment::getBody)
+                .containsExactly("최신 답글", "오래된 답글");
     }
 
     @Test

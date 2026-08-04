@@ -47,7 +47,7 @@ public class CommunityCommentController {
      * GET /api/community/posts/{postId}/comments
      */
     @GetMapping
-    @Operation(summary = "댓글 목록 조회", description = "최상위 댓글과 각 대댓글 포함 (페이지네이션)")
+    @Operation(summary = "댓글 목록 조회", description = "최상위 댓글과 각 대댓글 포함 (페이지네이션). 최상위·대댓글 모두 createdAt DESC(최신순)")
     public ResponseEntity<List<CommentWithRepliesResponse>> getComments(
             @PathVariable String postId,
             @RequestParam(defaultValue = "0") int page,

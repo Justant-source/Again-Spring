@@ -52,14 +52,14 @@ class CommentServiceTest {
         PostComment visible = PostComment.builder()
                 .id(1L).postId(POST_ID).body("보임").status(CommentStatus.ACTIVE).build();
         when(commentRepository
-                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(POST_ID, CommentStatus.ACTIVE))
+                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(POST_ID, CommentStatus.ACTIVE))
                 .thenReturn(List.of(visible));
 
         List<PostComment> result = commentService.getTopLevelComments(POST_ID);
 
         assertThat(result).containsExactly(visible);
         verify(commentRepository)
-                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(POST_ID, CommentStatus.ACTIVE);
+                .findByPostIdAndParentCommentIdIsNullAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(POST_ID, CommentStatus.ACTIVE);
         // 무필터(레거시) 쿼리는 더 이상 호출되면 안 됨
         verify(commentRepository, never()).findByPostIdAndParentCommentIdIsNullOrderByCreatedAtAsc(anyString());
     }
@@ -71,14 +71,14 @@ class CommentServiceTest {
         PostComment reply = PostComment.builder()
                 .id(11L).postId(POST_ID).parentCommentId(parentId).body("답글").status(CommentStatus.ACTIVE).build();
         when(commentRepository
-                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(parentId, CommentStatus.ACTIVE))
+                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(parentId, CommentStatus.ACTIVE))
                 .thenReturn(List.of(reply));
 
         List<PostComment> result = commentService.getReplies(parentId);
 
         assertThat(result).containsExactly(reply);
         verify(commentRepository)
-                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(parentId, CommentStatus.ACTIVE);
+                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(parentId, CommentStatus.ACTIVE);
         verify(commentRepository, never()).findByParentCommentIdOrderByCreatedAtAsc(anyLong());
     }
 
@@ -101,7 +101,7 @@ class CommentServiceTest {
         // cascade는 무필터 쿼리로 (차단·삭제된 답글도 함께 제거되어야 함)
         verify(commentRepository).findByParentCommentIdOrderByCreatedAtAsc(commentId);
         verify(commentRepository, never())
-                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtAsc(anyLong(), any());
+                .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(anyLong(), any());
         verify(commentRepository).delete(blockedReply);
         verify(commentRepository).delete(top);
         verify(postLikeRepository).deleteByCommentId(101L);

@@ -109,7 +109,7 @@ flowchart LR
 | PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만) |
 | DELETE | `/api/community/posts/{id}` | **JWT** | 204 / 403 / 404 | 게시글 삭제 (작성자만) |
 | POST | `/api/community/posts/{id}/comments` | **JWT** | 200 / 400 / 409 / 422 | 댓글 작성 (synthetic bot은 내부 멱등성 헤더 지원) |
-| GET | `/api/community/posts/{id}/comments` | 공개 | 200 | 댓글 목록 |
+| GET | `/api/community/posts/{id}/comments` | 공개 | 200 | 댓글 목록. 최상위·대댓글 모두 `createdAt DESC`(최신순). `?page=&size=`는 최상위만 페이지네이션 |
 | PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | 댓글 수정 (작성자만) |
 | DELETE | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 204 / 403 / 404 | 댓글 삭제 (작성자만) |
 | GET | `/api/community/posts/{id}/jury` | 공개 | 200 / 404 | AI 배심원 조회 |
