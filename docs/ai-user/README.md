@@ -28,6 +28,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - 실제 2차 kill-switch는 여전히 DB `ai_user_runtime.enabled`다.
 - `ai-learning`은 `AI_LEARNING_ENABLED=false`면 scheduler를 올리지 않고, `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic 작업을 등록하지 않는다. 크롤 ingest 전 **popularity gate**가 UNRANKED를 차단한다.
 - human reply 예산·responder 수 등은 admin **댓글 생성량 설정**(`ai_user_generation_config.hr_*`, V91)이 SSOT다.
+- **Source dedup (2026-08-05)**: AI_POST primary = popular crawl claim(Blind70/Natepan30, soft-reserve, `posts.source_example_id` 영구 제외). `StoryTwinGuard`로 최근 14일 AI 글 twin 차단. crawl budget 불변.
 
 ## 2026-08-01 Wave 요약 (WP1~WP5)
 

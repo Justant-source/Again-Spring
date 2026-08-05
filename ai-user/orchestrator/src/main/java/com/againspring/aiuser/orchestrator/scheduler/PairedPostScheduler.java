@@ -18,6 +18,7 @@ import com.againspring.aiuser.orchestrator.service.threadplan.CandidateScheduleS
 import com.againspring.aiuser.orchestrator.service.threadplan.PairedHoldMeta;
 import com.againspring.aiuser.orchestrator.service.threadplan.PlanPersonaMapper;
 import com.againspring.aiuser.orchestrator.service.threadplan.QuietHours;
+import com.againspring.aiuser.orchestrator.service.threadplan.SourceMixPlanner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -136,35 +137,44 @@ public class PairedPostScheduler {
 
         EnumMap<PairBucket, Integer> mixCounts = countPairedMixToday();
         List<Instant> slots = sampleAuthorSlots(toRun, config);
-        log.info("[PairedPost] Holding {} pair(s) (pool={}, totalToday={}, pairedToday={}, desiredToday={}, romanticToday={}, friendToday={})",
+        List<String> sources = SourceMixPlanner.planSources(toRun, RNG);
+        SourceMixPlanner.MixCounts sourceMix = SourceMixPlanner.planCounts(toRun);
+        Map<String, Persona> personasById = loadPersonasById(shuffled);
+        log.info("[PairedPost] Holding {} pair(s) (pool={}, totalToday={}, pairedToday={}, desiredToday={}, romanticToday={}, friendToday={}, sourceMix blind={}/natepan={})",
             toRun,
             all.size(),
             totalSyntheticToday,
             pairedToday,
             desiredToday,
             mixCounts.get(PairBucket.ROMANTIC),
-            mixCounts.get(PairBucket.FRIEND));
+            mixCounts.get(PairBucket.FRIEND),
+            sourceMix.blind(),
+            sourceMix.natepan());
 
         int attempted = 0;
         for (int i = 0; i < toRun; i++) {
+            String preferredSource = sources.get(i);
             PairBucket desiredBucket = chooseNextBucket(config, mixCounts);
-            Optional<PersonaRelationship> relOpt = takeCandidateForBucket(shuffled, desiredBucket);
+            Optional<PersonaRelationship> relOpt = takeCandidateForSourceAndBucket(
+                    shuffled, personasById, preferredSource, desiredBucket);
             if (relOpt.isEmpty()) {
-                relOpt = takeAnyCandidate(shuffled);
+                relOpt = takeCandidateForSource(shuffled, personasById, preferredSource);
             }
             if (relOpt.isEmpty()) {
-                break;
+                log.warn("[PairedPost] No relationship author with voice_type for source={} — skip slot {}",
+                        preferredSource, i);
+                continue;
             }
 
             try {
                 PersonaRelationship rel = relOpt.get();
                 Instant slot = i < slots.size() ? slots.get(i) : QuietHours.enforceAuthorSlot(Instant.now().plus(Duration.ofHours(1)));
-                if (holdPair(rel, slot)) {
+                if (holdPair(rel, slot, preferredSource)) {
                     attempted++;
                     mixCounts.merge(bucketForRelationType(rel.getRelationType()), 1, Integer::sum);
                 }
             } catch (Exception e) {
-                log.error("[PairedPost] Pair {} failed: {}", i, e.getMessage(), e);
+                log.error("[PairedPost] Pair {} source={} failed: {}", i, preferredSource, e.getMessage(), e);
             }
         }
         return attempted;
@@ -174,7 +184,7 @@ public class PairedPostScheduler {
      * Call1 ({@code PAIRED_PHASE1}) → hold in {@code ai_scheduled_posts}. No backend write until
      * {@code ScheduledPostPublisher} fires the non-quiet slot.
      */
-    private boolean holdPair(PersonaRelationship rel, Instant scheduledPublishAt) {
+    private boolean holdPair(PersonaRelationship rel, Instant scheduledPublishAt, String preferredSource) {
         Optional<Persona> authorOpt = personaRepo.findById(rel.getPersonaId());
         Optional<Persona> partnerOpt = personaRepo.findById(rel.getOtherId());
         if (authorOpt.isEmpty() || partnerOpt.isEmpty()) {
@@ -193,7 +203,7 @@ public class PairedPostScheduler {
             return false;
         }
 
-        Optional<Call1Hold> call1 = generateCall1(author, category, corrId, slot);
+        Optional<Call1Hold> call1 = generateCall1(author, category, corrId, slot, preferredSource);
         if (call1.isEmpty()) {
             log.warn("[PairedPost] Call1 failed corrId={}", corrId);
             return false;
@@ -240,7 +250,8 @@ public class PairedPostScheduler {
         return true;
     }
 
-    private Optional<Call1Hold> generateCall1(Persona author, String category, String corrId, Instant slot) {
+    private Optional<Call1Hold> generateCall1(Persona author, String category, String corrId, Instant slot,
+                                              String preferredSource) {
         AiUserGenerationConfig config = generationConfigRepository.findById(1).orElse(null);
         String provider = config == null ? props.getThreadPlan().getAiPostProvider()
                 : config.getProviderAiPostBundle();
@@ -276,6 +287,9 @@ public class PairedPostScheduler {
         request.put("maxReplies", 0);
         request.put("minTopLevel", 2);
         request.put("minItems", 2);
+        if (preferredSource != null && !preferredSource.isBlank()) {
+            request.put("preferredSource", preferredSource);
+        }
 
         Optional<Map<String, Object>> responseOpt = llmClient.generatePairedCall1(request);
         if (responseOpt.isEmpty()) return Optional.empty();
@@ -486,26 +500,67 @@ public class PairedPostScheduler {
         return friendDeficit > romanticDeficit ? PairBucket.FRIEND : PairBucket.ROMANTIC;
     }
 
-    private Optional<PersonaRelationship> takeCandidateForBucket(
-        List<PersonaRelationship> candidates,
-        PairBucket bucket
-    ) {
+    private Map<String, Persona> loadPersonasById(List<PersonaRelationship> relationships) {
+        Set<String> ids = new LinkedHashSet<>();
+        for (PersonaRelationship rel : relationships) {
+            if (rel.getPersonaId() != null) ids.add(rel.getPersonaId());
+            if (rel.getOtherId() != null) ids.add(rel.getOtherId());
+        }
+        Map<String, Persona> byId = new HashMap<>();
+        for (String id : ids) {
+            personaRepo.findById(id).ifPresent(p -> byId.put(id, p));
+        }
+        return byId;
+    }
+
+    /**
+     * Prefer HEAVY author with matching voice_type in the desired romantic/friend bucket.
+     * Never returns a wrong voice_type.
+     */
+    private Optional<PersonaRelationship> takeCandidateForSourceAndBucket(
+            List<PersonaRelationship> candidates,
+            Map<String, Persona> personasById,
+            String preferredSource,
+            PairBucket bucket) {
+        return takeMatchingAuthor(candidates, personasById, preferredSource, bucket, true)
+                .or(() -> takeMatchingAuthor(candidates, personasById, preferredSource, bucket, false));
+    }
+
+    private Optional<PersonaRelationship> takeCandidateForSource(
+            List<PersonaRelationship> candidates,
+            Map<String, Persona> personasById,
+            String preferredSource) {
+        return takeMatchingAuthor(candidates, personasById, preferredSource, null, true)
+                .or(() -> takeMatchingAuthor(candidates, personasById, preferredSource, null, false));
+    }
+
+    private Optional<PersonaRelationship> takeMatchingAuthor(
+            List<PersonaRelationship> candidates,
+            Map<String, Persona> personasById,
+            String preferredSource,
+            PairBucket bucketOrNull,
+            boolean heavyOnly) {
+        Optional<String> voiceOpt = SourceMixPlanner.voiceTypeForSource(preferredSource);
+        if (voiceOpt.isEmpty()) return Optional.empty();
+        String voice = voiceOpt.get();
+
         Iterator<PersonaRelationship> iterator = candidates.iterator();
         while (iterator.hasNext()) {
             PersonaRelationship rel = iterator.next();
-            if (bucketForRelationType(rel.getRelationType()) == bucket) {
-                iterator.remove();
-                return Optional.of(rel);
+            if (bucketOrNull != null && bucketForRelationType(rel.getRelationType()) != bucketOrNull) {
+                continue;
             }
+            Persona author = personasById.get(rel.getPersonaId());
+            if (author == null || !SourceMixPlanner.matchesVoice(author, voice)) {
+                continue;
+            }
+            if (heavyOnly && !"HEAVY".equals(author.getTier())) {
+                continue;
+            }
+            iterator.remove();
+            return Optional.of(rel);
         }
         return Optional.empty();
-    }
-
-    private Optional<PersonaRelationship> takeAnyCandidate(List<PersonaRelationship> candidates) {
-        if (candidates.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(candidates.remove(0));
     }
 
     private PairBucket bucketForRelationType(String relationType) {

@@ -7,16 +7,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
- * Resolves example_bank grounding for PLAN AI_POST generation — port of legacy
- * {@code ActionExecutor.executePost} RAG / reconstruct / anti-self-copy ideas.
- * Always excludes {@code SELF_GENERATED} (via {@link AiLearningClient#findSimilar} register overload).
+ * Resolves example_bank grounding for PLAN AI_POST generation via popularity claim
+ * ({@link AiLearningClient#claimPopularSource}) — no findSimilar primary selection,
+ * no archetype freestyle fallback when the claim pool is empty.
  */
 @Slf4j
 @Component
@@ -49,83 +52,119 @@ public class PlanSourceStoryResolver {
         }
     }
 
-    public ResolvedSource resolve(Persona author, String category, String topicHint) {
-        String cat = category == null || category.isBlank() ? "OTHER" : category;
-        String topicSeed = resolveTopicSeed(author, cat, topicHint);
-        String register = resolveRegister(author);
-
-        List<AiLearningClient.ExampleItem> examples = topicSeed == null || topicSeed.isBlank()
-                ? List.of()
-                : aiLearningClient.findSimilar(topicSeed, "POST", cat, 3, register);
-
-        AiLearningClient.ExampleItem primary = null;
-        if (!examples.isEmpty() && examples.get(0).hasSourceProvenance()) {
-            primary = examples.get(0);
-            topicSeed = truncate(primary.getContent(), 200);
+    /**
+     * Claim a popular crawl source and build reconstruct grounding.
+     * Empty claim → {@link Optional#empty()} (caller must skip the slot; no freestyle).
+     *
+     * @param author          may be null (persona chosen after claim); recentBodies empty then
+     * @param preferredSource {@code "blind"} or {@code "natepan"} (required)
+     * @param categoryHint    optional; ignored for selection (reserved for callers/logging)
+     */
+    public Optional<ResolvedSource> claimAndResolve(
+            Persona author,
+            String preferredSource,
+            String reservationKey,
+            Instant reserveUntil,
+            String categoryHint) {
+        String source = normalizePreferredSource(preferredSource);
+        if (source == null || reservationKey == null || reservationKey.isBlank() || reserveUntil == null) {
+            log.debug("claimAndResolve skipped: invalid args source={} key={} until={} categoryHint={}",
+                    preferredSource, reservationKey, reserveUntil, categoryHint);
+            return Optional.empty();
         }
 
-        String dynamicExamples = "";
-        if (!examples.isEmpty()) {
-            List<AiLearningClient.ExampleItem> style = primary != null
-                    ? examples.subList(1, examples.size())
-                    : examples;
-            if (!style.isEmpty()) {
-                StringBuilder sb = new StringBuilder();
-                for (AiLearningClient.ExampleItem e : style) {
-                    if (!sb.isEmpty()) sb.append("\n---\n");
-                    sb.append(truncate(e.getContent(), 350));
-                }
-                dynamicExamples = sb.toString();
-            }
+        Optional<AiLearningClient.ExampleItem> claimed =
+                aiLearningClient.claimPopularSource(source, reservationKey, reserveUntil);
+        if (claimed.isEmpty()) {
+            log.info("claimAndResolve empty: no popular source for preferredSource={} reservationKey={}",
+                    source, reservationKey);
+            return Optional.empty();
         }
 
+        AiLearningClient.ExampleItem primary = claimed.get();
+        String topicSeed = truncate(primary.getContent(), 200);
+        if (topicSeed == null) topicSeed = "";
+
+        String dynamicExamples = optionalStyleExamples(author, source);
         List<String> recent = loadRecentPostBodies(author, 3);
 
         Map<String, Object> ctx = new LinkedHashMap<>();
-        ctx.put("topicSeed", topicSeed == null ? "" : topicSeed);
-        ctx.put("reconstructMode", primary != null);
-        if (primary != null) {
-            ctx.put("exampleId", primary.getId());
-            ctx.put("title", primary.getTitle() == null ? "" : primary.getTitle());
-            ctx.put("body", truncate(primary.getContent(), 2000));
-            ctx.put("source", primary.getSource());
-            ctx.put("sourceUrl", primary.getSourceUrl());
-        } else if (!examples.isEmpty()) {
-            AiLearningClient.ExampleItem first = examples.get(0);
-            ctx.put("exampleId", first.getId());
-            ctx.put("title", first.getTitle() == null ? "" : first.getTitle());
-            ctx.put("body", truncate(first.getContent(), 1200));
-            ctx.put("source", first.getSource());
-            ctx.put("sourceUrl", first.getSourceUrl());
-        }
+        ctx.put("topicSeed", topicSeed);
+        ctx.put("reconstructMode", true);
+        ctx.put("exampleId", primary.getId());
+        ctx.put("title", primary.getTitle() == null ? "" : primary.getTitle());
+        ctx.put("body", truncate(primary.getContent(), 2000));
+        ctx.put("source", primary.getSource() != null ? primary.getSource() : source);
+        ctx.put("sourceUrl", primary.getSourceUrl());
 
-        return new ResolvedSource(
-                topicSeed == null ? "" : topicSeed,
+        return Optional.of(new ResolvedSource(
+                topicSeed,
                 ctx,
-                primary != null,
-                primary != null ? primary.getId() : (!examples.isEmpty() ? examples.get(0).getId() : null),
-                primary != null ? primary.getContent() : null,
-                primary != null ? primary.getSource() : null,
-                primary != null ? primary.getSourceUrl() : null,
-                primary != null ? primary.getTitle() : null,
+                true,
+                primary.getId(),
+                primary.getContent(),
+                primary.getSource() != null ? primary.getSource() : source,
+                primary.getSourceUrl(),
+                primary.getTitle(),
                 dynamicExamples,
                 recent
-        );
+        ));
     }
 
-    private String resolveTopicSeed(Persona author, String category, String topicHint) {
-        if (topicHint != null && !topicHint.isBlank()) return topicHint.trim();
+    /**
+     * Legacy entry: maps persona {@code voice_type} → preferredSource and claims with a
+     * short-lived reservation. Does not freestyle when the pool is empty — throws instead.
+     * Prefer {@link #claimAndResolve} for new callers.
+     */
+    public ResolvedSource resolve(Persona author, String category, String topicHint) {
+        String preferred = preferredSourceFromVoice(author);
+        String reservationKey = "legacy-" + UUID.randomUUID();
+        Instant reserveUntil = Instant.now().plus(24, ChronoUnit.HOURS);
+        // topicHint unused for selection (popularity claim replaces topicSeed/findSimilar)
+        return claimAndResolve(author, preferred, reservationKey, reserveUntil, category)
+                .orElseThrow(() -> new IllegalStateException(
+                        "No popular source available for preferredSource=" + preferred
+                                + " category=" + category
+                                + (topicHint == null || topicHint.isBlank() ? "" : " topicHint=" + topicHint.trim())));
+    }
 
-        List<AiLearningClient.DailyTopicItem> daily = aiLearningClient.fetchDailyTopics(category, 5);
-        if (!daily.isEmpty()) {
-            int pick = ThreadLocalRandom.current().nextInt(Math.min(2, daily.size()));
-            AiLearningClient.DailyTopicItem chosen = daily.get(pick);
-            aiLearningClient.markTopicUsed(chosen.getId());
-            return chosen.getText();
+    /** BLIND → blind; everything else (incl. null) → natepan. */
+    static String preferredSourceFromVoice(Persona author) {
+        if (author != null && author.getVoiceProfile() != null) {
+            Object vt = author.getVoiceProfile().get("voice_type");
+            if (vt != null && "BLIND".equalsIgnoreCase(String.valueOf(vt).trim())) {
+                return "blind";
+            }
         }
+        return "natepan";
+    }
 
-        String archetype = author != null && author.getArchetype() != null ? author.getArchetype() : "일반";
-        return archetype + " 관점의 " + category + " 갈등 사연";
+    /** Accept blind|natepan (any case); null/blank/other → null. */
+    static String normalizePreferredSource(String preferredSource) {
+        if (preferredSource == null || preferredSource.isBlank()) return null;
+        String s = preferredSource.trim().toLowerCase();
+        if ("blind".equals(s) || "natepan".equals(s)) return s;
+        return null;
+    }
+
+    /** Best-effort style anchors; never blocks claim path. */
+    private String optionalStyleExamples(Persona author, String source) {
+        try {
+            String register = resolveRegister(author);
+            List<AiLearningClient.ExampleItem> style =
+                    aiLearningClient.styleSample(source, "POST", register, 2, 350);
+            if (style == null || style.isEmpty()) return "";
+            StringBuilder sb = new StringBuilder();
+            for (AiLearningClient.ExampleItem e : style) {
+                if (e == null || e.getContent() == null || e.getContent().isBlank()) continue;
+                if (!sb.isEmpty()) sb.append("\n---\n");
+                sb.append(truncate(e.getContent(), 350));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.debug("optional styleSample failed source={}: {}", source, e.getMessage());
+            return "";
+        }
     }
 
     private static String resolveRegister(Persona persona) {

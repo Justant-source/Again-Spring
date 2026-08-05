@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -59,6 +60,8 @@ class AiPostBundleServiceTest {
     @Mock private PlanSourceStoryResolver sourceStoryResolver;
     @Mock private StoryProfileAnalyzer storyProfileAnalyzer;
     @Mock private PersonaMatcherService personaMatcherService;
+    @Mock private StoryTwinGuard storyTwinGuard;
+    @Mock private SourceReservationSupport sourceReservationSupport;
 
     private AiPostBundleService service;
     private CandidateScheduleSupport scheduleSupport;
@@ -84,11 +87,20 @@ class AiPostBundleServiceTest {
                         "NATEPAN", List.of(), "", ""));
         when(personaMatcherService.matchCommenters(any(), any(Integer.class), anyLong(), anyString()))
                 .thenReturn(List.of());
+        when(storyTwinGuard.loadRecentAiPosts()).thenReturn(List.of());
+        when(storyTwinGuard.twinReason(anyString(), anyString(), any())).thenReturn(Optional.empty());
+        when(sourceReservationSupport.provenanceWithReservation(any(), anyString())).thenAnswer(inv -> {
+            PlanSourceStoryResolver.ResolvedSource src = inv.getArgument(0);
+            String key = inv.getArgument(1);
+            Map<String, Object> m = src == null ? new LinkedHashMap<>() : new LinkedHashMap<>(src.provenanceForTrace());
+            m.put(SourceReservationSupport.RESERVATION_KEY, key);
+            return m;
+        });
         service = new AiPostBundleService(
                 configRepository, properties, personaRepository, llmClient, backendBot,
                 safetyGuard, planService, planGenerationService, scheduledPostRepository,
                 scheduleSupport, new ObjectMapper(), planPersonaMapper, sourceStoryResolver,
-                storyProfileAnalyzer, personaMatcherService);
+                storyProfileAnalyzer, personaMatcherService, storyTwinGuard, sourceReservationSupport);
     }
 
     @Test
@@ -119,7 +131,8 @@ class AiPostBundleServiceTest {
                 Map.of("exampleId", 99L, "body", "원본 사연", "reconstructMode", true, "sourceUrl", "https://nate.example/1"),
                 true, 99L, "원본 사연 본문", "natepan", "https://nate.example/1", "원제목",
                 "문체앵커", List.of("내가 예전에 쓴 글"));
-        when(sourceStoryResolver.resolve(author, "FAMILY", null)).thenReturn(source);
+        when(sourceStoryResolver.claimAndResolve(eq(author), eq("natepan"), anyString(), any(Instant.class), eq("FAMILY")))
+                .thenReturn(Optional.of(source));
 
         Map<String, Object> llmResponse = new LinkedHashMap<>();
         llmResponse.put("post", Map.of("title", "시어머니 간섭", "body", "육아 갈등 본문입니다. 충분히 길게."));
@@ -128,10 +141,15 @@ class AiPostBundleServiceTest {
         when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
         when(scheduledPostRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
+        Instant slot = Instant.parse("2026-08-01T01:00:00Z");
         Optional<AiScheduledPost> held = service.generateAndHold(
-                author, "FAMILY", null, "corr-test", Instant.parse("2026-08-01T01:00:00Z"));
+                author, "FAMILY", null, "corr-test", slot);
 
         assertThat(held).isPresent();
+        assertThat(held.get().getId()).isNotBlank();
+        verify(sourceStoryResolver).claimAndResolve(
+                eq(author), eq("natepan"), eq(held.get().getId()),
+                eq(slot.plusSeconds(24 * 3600)), eq("FAMILY"));
         ArgumentCaptor<Map<String, Object>> reqCaptor = ArgumentCaptor.forClass(Map.class);
         verify(llmClient).generateThreadPlan(reqCaptor.capture());
         Map<String, Object> req = reqCaptor.getValue();
@@ -158,6 +176,8 @@ class AiPostBundleServiceTest {
 
         assertThat(held.get().getCandidatesJson()).contains("sourceExampleId");
         assertThat(held.get().getCandidatesJson()).contains("99");
+        assertThat(held.get().getCandidatesJson()).contains("reservationKey");
+        assertThat(held.get().getCandidatesJson()).contains(held.get().getId());
     }
 
     @Test
@@ -183,9 +203,10 @@ class AiPostBundleServiceTest {
         when(planPersonaMapper.castIds(any())).thenReturn(
                 pool.stream().map(Persona::getId).collect(Collectors.toSet()));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(cast.get(0));
-        when(sourceStoryResolver.resolve(any(), any(), any())).thenReturn(
-                new PlanSourceStoryResolver.ResolvedSource("seed", Map.of("body", "s"), false,
-                        1L, null, null, null, null, "", List.of()));
+        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any()))
+                .thenReturn(Optional.of(new PlanSourceStoryResolver.ResolvedSource(
+                        "seed", Map.of("body", "s"), false,
+                        1L, null, null, null, null, "", List.of())));
 
         Map<String, Object> llmResponse = new LinkedHashMap<>();
         llmResponse.put("post", Map.of("title", "제목입니다", "body", "본문입니다. 충분히 길게 작성."));
@@ -225,9 +246,10 @@ class AiPostBundleServiceTest {
         when(planPersonaMapper.castIds(any())).thenReturn(
                 pool.stream().map(Persona::getId).collect(Collectors.toSet()));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(cast.get(0));
-        when(sourceStoryResolver.resolve(any(), any(), any())).thenReturn(
-                new PlanSourceStoryResolver.ResolvedSource("seed", Map.of("body", "s"), false,
-                        1L, "본문", null, null, null, "", List.of()));
+        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any()))
+                .thenReturn(Optional.of(new PlanSourceStoryResolver.ResolvedSource(
+                        "seed", Map.of("body", "s"), false,
+                        1L, "본문", null, null, null, "", List.of())));
 
         AtomicInteger call = new AtomicInteger();
         when(llmClient.generateThreadPlan(any())).thenAnswer(inv -> {

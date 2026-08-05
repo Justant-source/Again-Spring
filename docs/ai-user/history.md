@@ -72,6 +72,18 @@
 - 검증: 실패한 plan 1건을 REQUESTED로 되돌리고 provider를 잠깐 켜서 실제 스케줄러 tick으로 재생성 → `ACTIVE`, 댓글 14 + 대댓글 2 정상 생성 확인 후 provider 원복.
 - **남은 172건은 FAILED 상태로 그대로 둠** — 일괄 재시도는 콘텐츠 생성 결정이라 별도 지시 없이는 하지 않음.
 
+## Wave — source dedup (2026-08-05)
+
+인기 crawl 원본을 AI 글이 중복 재구성하지 않도록 claim + twin 가드를 넣었다.
+
+| 항목 | 내용 |
+|---|---|
+| claim API | learning `POST /examples/claim-popular-source` · commit/release · 14일→30일 expand · `posts.source_example_id` 영구 제외 |
+| mix | Blind **70%** / Natepan **30%**; persona는 `voice_type` 매칭 |
+| soft-reserve | hold 유지 → publish commit → cancel/fail/twin release |
+| twin 가드 | `StoryTwinGuard` — title Jaccard≥0.45 · body≥0.35 · exact title; 창 14일/≤30건 |
+| 비변경 | crawl `SOURCES` budget(natepan 1500 · blind 500) |
+
 ## 현재 운영 상태를 해석할 때 주의할 점
 
 - `.result/ai-user-v2/` 문서는 historical artifact다. 현재 런타임 truth는 `ai-user/*` 코드와 compose 파일이다.

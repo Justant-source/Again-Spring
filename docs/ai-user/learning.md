@@ -38,6 +38,10 @@ learning container가 뜨면 아래가 항상 실행된다.
 | `POST` | `/topics/{id}/use` | used_count 증가 |
 | `GET` | `/topics/stats` | 최근 topic 상태 |
 | `POST` | `/topics/synthesize` | 수동 합성 |
+| `POST` | `/examples/claim-popular-source` | 인기 crawl POST soft-claim (재구성 원본) |
+| `POST` | `/examples/commit-source` | soft → COMMITTED (영구 사용) |
+| `POST` | `/examples/release-source` | soft 예약 해제 |
+| `POST` | `/examples/expire-source-reservations` | 만료 soft 행 정리 (optional) |
 
 ## example_bank 동작
 
@@ -126,6 +130,36 @@ learning container가 뜨면 아래가 항상 실행된다.
 | COMMENT | 인기 POST(이번에 통과했거나 DB에 `popularity_pct≥threshold`)의 자식만 저장 |
 
 `UNRANKED`(지표 없음) 글은 코퍼스에 넣지 않는다. 사연 선별도 인기 보장 코퍼스를 전제로 한다.
+
+## Popular source claim (2026-08-05)
+
+AI 예약 글의 **primary reconstruct source**는 topic RAG(`findSimilar`)가 아니라
+인기 crawl POST를 soft-claim한다. 구현: `ai-user/learning/app/services/source_claim.py`,
+orchestrator 클라이언트 `AiLearningClient.claimPopularSource` /
+`commitSource` / `releaseSource`.
+
+### `POST /examples/claim-popular-source`
+
+Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, windowDays?: 14, expandDays?: 30 }`
+
+| 규칙 | 내용 |
+|---|---|
+| 후보 | `content_type=POST`, `source_url IS NOT NULL`, `popularity_pct IS NOT NULL`, source ∈ {blind,natepan} |
+| 순위 | `popularity_pct DESC` (NULL last) |
+| 창 | `created_at` 기준 **14일**. 없으면 **한 번** 30일로 확장. 그래도 없으면 empty (다른 source로 폴백 금지) |
+| 영구 제외 | `posts.source_example_id = example_bank.id` (같은 MariaDB) · `example_source_reservations.status='COMMITTED'` |
+| soft 제외 | `status='SOFT'` AND `reserve_until > NOW(3)` |
+| 응답 | ExampleItem-like `{id, content, source, title, sourceUrl, score≈popularity_pct}` 또는 `{"status":"empty"}` / null |
+
+### 예약 생명주기
+
+| 단계 | 엔드포인트 | 효과 |
+|---|---|---|
+| claim | `/examples/claim-popular-source` | `example_source_reservations`에 SOFT 행 |
+| commit | `/examples/commit-source` `{exampleId, reservationKey}` | SOFT→COMMITTED (영구) |
+| release | `/examples/release-source` | SOFT 행 삭제 (COMMITTED/missing은 no-op) |
+
+크롤 `SOURCES` budget(natepan 1500 · blind 500)은 **변경하지 않는다**.
 
 ## 말투 강화
 

@@ -22,6 +22,8 @@
 | `HumanReplyTtlCleanupScheduler` | inbox/REQUESTED plan TTL 정리 (플래그 기본 OFF, no-op) |
 | `PersonaCapsuleSearchService` | story→persona top-K (capsule vector + interests fallback, LLM 없음) |
 | `PersonaMatcherService` | StoryProfile → hard filter + capsule search + author/comment score + match audits (WP3) |
+| `StoryTwinGuard` | 최근 14일 published AI 글(≤30) 대비 title/body bigram twin 가드 (`AiPostBundleService`) |
+| `PlanSourceStoryResolver` | AI_POST primary source = `claimPopularSource` (findSimilar 아님) |
 
 ## Capsule search (WP2)
 
@@ -76,15 +78,40 @@
 - `persona_life_state.casual_streak >= 2`면 CASUAL 확률이 `10%`로 내려간다
 - CASUAL 글은 `assembleCasualPostPrompt()`를 사용하고 갈등 예시 few-shot을 생략한다
 
-### RAG와 reconstruct mode
+### AI_POST source (2026-08-05 — popularity claim)
 
-1. `AiLearningClient.findSimilar(topicSeed, "POST", category, 3, register)` 호출
-2. 1순위 예시에 `source_url`이 있으면 그 예시를 원본으로 간주
-3. 그 경우 `reconstructMode=true`, `sourceBody`, `sourceExampleId`를 llm에 전달
-4. 나머지 예시는 style anchor로만 사용
-5. 아무 예시도 없으면 `styleSample()`로 말투 샘플을 보충
+예약/배치 AI 글의 **primary reconstruct source**는 `findSimilar`를 쓰지 않는다.
 
-### 반복/길이 가드
+1. 배치가 source community를 먼저 고른다: **Blind 70% / Natepan 30%**
+   (`SourceMixPlanner` / nightly·paired 슬롯 — remainder는 blind 우선).
+2. author persona는 `voice_profile.voice_type`이 그 community와 맞는 계정
+   (BLIND→blind, NATEPAN→natepan).
+3. `PlanSourceStoryResolver.claimAndResolve` →
+   `AiLearningClient.claimPopularSource(source, reservationKey, reserveUntil)`.
+4. claim hit → `reconstructMode=true` + sourceExampleId/body/url/title.
+   empty → **슬롯 skip** (archetype freestyle 폴백 없음). Blind 풀이 비면 그 Blind
+   슬롯만 skip — Natepan으로 바꾸지 않음.
+5. soft-reserve lifecycle: hold 성공 시 reserve 유지 → publish 시 `commitSource` →
+   cancel/fail/twin-reject 시 `releaseSource` (lifecycle 경로 소유).
+6. legacy tick `ActionExecutor`의 findSimilar RAG는 **호환 경로**로만 남는다.
+
+코드: `PlanSourceStoryResolver`, `AiLearningClient`, learning
+`/examples/claim-popular-source` ([learning.md](./learning.md)).
+
+### Story twin 가드 (2026-08-05)
+
+`StoryTwinGuard` — LLM이 title/body를 반환한 직후 `AiPostBundleService`가 검사.
+최근 **14일** published AI 글(`users.synthetic=1`, ≤30건)과 비교.
+
+| 조건 | 임계 |
+|---|---|
+| 정규화 제목 완전 일치 | twin |
+| title char-bigram Jaccard | ≥ **0.45** |
+| body char-bigram Jaccard | ≥ **0.35** |
+
+twin이면 bundle 실패(hold skip). soft-reserve release는 lifecycle 경로.
+
+### 반복/길이 가드 (legacy tick)
 
 - 최근 글 history에서 본문 3개를 읽어 2-gram Jaccard를 계산한다.
 - `AI_USER_REPETITION_THRESHOLD=0.45` 초과 시 1회 재생성

@@ -56,6 +56,7 @@ public class ScheduledPostPublisher {
     private final ObjectMapper objectMapper;
     private final AiScheduledPartnerAnswerRepository partnerAnswerRepository;
     private final CandidateScheduleSupport candidateScheduleSupport;
+    private final SourceReservationSupport sourceReservationSupport;
 
     public void publishDue() {
         if (!properties.isEnabled() || !properties.getThreadPlan().isEnabled()
@@ -77,10 +78,17 @@ public class ScheduledPostPublisher {
             }
 
             Persona author = personas.findById(row.getPersonaId()).orElse(null);
-            if (author == null) { leases.releaseFailed(row.getId(), WORKER, "PERSONA_NOT_FOUND", false); return; }
+            if (author == null) {
+                failAndRelease(row, "PERSONA_NOT_FOUND", false);
+                return;
+            }
             String email = jdbcTemplate.queryForObject("select email from users where id = ?", String.class, author.getId());
             Optional<String> jwt = tokens.getToken(author.getId(), email, properties.getBotPassword());
-            if (jwt.isEmpty()) { leases.releaseFailed(row.getId(), WORKER, "AUTH_FAILED", true); return; }
+            if (jwt.isEmpty()) {
+                // Keep soft-reserve across retryable auth failures.
+                leases.releaseFailed(row.getId(), WORKER, "AUTH_FAILED", true);
+                return;
+            }
 
             boolean paired = PairedHoldMeta.ORIGIN_PAIRED.equalsIgnoreCase(row.getOrigin());
             Map<String, Object> pairedMeta = paired
@@ -101,6 +109,7 @@ public class ScheduledPostPublisher {
             }
             Optional<PostDto> published = backend.createPost(jwt.get(), postBuilder.build());
             if (published.isEmpty() || published.get().getId() == null) {
+                // Transient backend write — keep soft-reserve for retry.
                 leases.releaseFailed(row.getId(), WORKER, "BACKEND_WRITE_FAILED", true);
                 return;
             }
@@ -112,11 +121,24 @@ public class ScheduledPostPublisher {
             } else {
                 replayCandidates(row, post);
             }
+            // Hard-commit popular source once the post is live.
+            sourceReservationSupport.commitFromCandidatesJson(row.getCandidatesJson());
             leases.completePosted(row.getId(), WORKER, post.getId());
         } catch (Exception e) {
             log.warn("Scheduled post publish failed id={}: {}", row.getId(), e.getMessage());
-            leases.releaseFailed(row.getId(), WORKER, "PUBLISH_EXCEPTION", row.getAttemptCount() < 3);
+            boolean retryable = row.getAttemptCount() < 3;
+            if (retryable) {
+                leases.releaseFailed(row.getId(), WORKER, "PUBLISH_EXCEPTION", true);
+            } else {
+                failAndRelease(row, "PUBLISH_EXCEPTION", false);
+            }
         }
+    }
+
+    /** Terminal publish failure: release soft-reserve then mark FAILED. */
+    private void failAndRelease(AiScheduledPost row, String failureCode, boolean retryable) {
+        sourceReservationSupport.releaseFromCandidatesJson(row.getCandidatesJson());
+        leases.releaseFailed(row.getId(), WORKER, failureCode, retryable);
     }
 
     /**

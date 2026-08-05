@@ -310,6 +310,13 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
 - `AI_LEARNING_CRAWL_ENABLED=true`인지 확인
 - 수동 실행이 아니라면 scheduler 로그에 등록 시각이 찍혔는지 확인
 
+### source claim / Blind 풀 고갈 (2026-08-05)
+
+- 일일 crawl **budget은 그대로**(natepan 1500 · blind 500). claim API가 budget을 바꾸지 않는다.
+- Blind 슬롯에서 `claim-popular-source`가 empty면 **그 슬롯만 skip** — Natepan으로 대체하지 않는다.
+- 원인 후보: 14→30일 창에 미사용 `popularity_pct` POST 부족 · `posts.source_example_id`로 이미 소진 · soft/COMMITTED 예약 과다.
+- twin 거절(`StoryTwinGuard`) 로그: `AI post rejected as story twin` — soft-reserve는 lifecycle release 경로가 회수해야 한다.
+
 ### 크롤이 조용히 멈췄을 때 (2026-06-24~07-30, 36일 무크롤 인시던트)
 
 `AI_LEARNING_CRAWL_ENABLED=false`가 실수로 켜진 채 36일간 방치된 사고가 있었다.

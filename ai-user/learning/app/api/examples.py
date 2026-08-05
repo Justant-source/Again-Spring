@@ -60,6 +60,19 @@ class ExampleItem(BaseModel):
     source_url: Optional[str] = None
 
 
+class ClaimPopularSourceRequest(CamelCompatModel):
+    source: str  # blind | natepan
+    reservation_key: str
+    reserve_until: str  # ISO-8601
+    window_days: Optional[int] = 14
+    expand_days: Optional[int] = 30
+
+
+class SourceReservationKeyRequest(CamelCompatModel):
+    example_id: int
+    reservation_key: str
+
+
 @router.post("/save")
 def save_example(req: SaveRequest, request: Request):
     from app.services.register_classifier import classify as classify_register
@@ -324,6 +337,84 @@ def export_examples(
     except Exception as e:
         logger.error(f"export_examples error: {e}")
         return {"items": [], "total": 0, "offset": int(offset), "limit": int(limit), "error": str(e)}
+
+
+@router.post("/claim-popular-source")
+def claim_popular_source(req: ClaimPopularSourceRequest):
+    """Pick unused high-popularity crawl POST and soft-reserve it for reconstruction.
+
+    Window: created_at last windowDays (default 14), expand once to expandDays (30).
+    Sources: blind | natepan only. Empty → {"status":"empty"} (caller skips slot).
+    """
+    from fastapi import HTTPException
+    from app.services import source_claim
+
+    try:
+        item = source_claim.claim_popular_source(
+            source=req.source,
+            reservation_key=req.reservation_key,
+            reserve_until=req.reserve_until,
+            window_days=req.window_days if req.window_days is not None else 14,
+            expand_days=req.expand_days if req.expand_days is not None else 30,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"claim_popular_source error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    if item is None:
+        return {"status": "empty"}
+    return item
+
+
+@router.post("/commit-source")
+def commit_source(req: SourceReservationKeyRequest):
+    """Permanently mark a soft reservation as COMMITTED (key must match)."""
+    from fastapi import HTTPException
+    from app.services import source_claim
+
+    try:
+        result = source_claim.commit_source(
+            example_id=req.example_id,
+            reservation_key=req.reservation_key,
+        )
+    except Exception as e:
+        logger.error(f"commit_source error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    if result.get("status") == "key_mismatch":
+        raise HTTPException(status_code=403, detail="reservation key mismatch")
+    if result.get("status") == "missing":
+        raise HTTPException(status_code=404, detail="reservation not found")
+    return result
+
+
+@router.post("/release-source")
+def release_source(req: SourceReservationKeyRequest):
+    """Release SOFT reservation if key matches. No-op if COMMITTED or missing."""
+    from fastapi import HTTPException
+    from app.services import source_claim
+
+    try:
+        return source_claim.release_source(
+            example_id=req.example_id,
+            reservation_key=req.reservation_key,
+        )
+    except Exception as e:
+        logger.error(f"release_source error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/expire-source-reservations")
+def expire_source_reservations():
+    """Delete SOFT reservations past reserve_until."""
+    from fastapi import HTTPException
+    from app.services import source_claim
+
+    try:
+        return source_claim.expire_source_reservations()
+    except Exception as e:
+        logger.error(f"expire_source_reservations error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{example_id}", response_model=ExampleItem)

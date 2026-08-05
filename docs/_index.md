@@ -103,7 +103,8 @@
 | `backend/.../db/migration/V*.sql` | `docs/shared/api/database-schema.md` (ER 다이어그램 포함) |
 | `backend/.../domain/**/*.java` | `docs/shared/api/database-schema.md` |
 | `backend/.../api/**/*Controller.java` | `docs/shared/api/rest-spec.md` · `docs/shared/api/flows.md` |
-| `ai-user/orchestrator/**/threadplan/**` · `ai-user/llm/**/Structured*` | `docs/ai-user/thread-planning.md` · `docs/ai-user/llm.md` · `docs/ai-user/operations.md` |
+| `ai-user/orchestrator/**/threadplan/**` · `ai-user/llm/**/Structured*` | `docs/ai-user/thread-planning.md` · `docs/ai-user/llm.md` · `docs/ai-user/operations.md` · `docs/ai-user/orchestrator.md` |
+| `ai-user/learning/**` · `AiLearningClient*` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
 | `env/docker-compose*` · `env/nginx/*` | `docs/system.md` · `docs/env/architecture.md` · README 포트표 |
 | `domain/enums/*Status*.java` · `MarketingJob*.java` · orchestrator `ActionStatus*.java` | 해당 모듈의 stateDiagram (`docs/ai-user/orchestrator.md` 등) |
 | `backend/.../safety/**` · `llm/PromptSanitizer*` · `LlmErrorSignature*` · `ContentSafetyGuard*` | `docs/shared/policies/forbidden-words.md` · `.claude/rules/llm-safety.md` |

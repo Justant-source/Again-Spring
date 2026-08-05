@@ -34,6 +34,7 @@ public class AdminScheduledPostService {
     private final ContentSafetyGuard safetyGuard;
     private final CandidateScheduleSupport scheduleSupport;
     private final ObjectMapper objectMapper;
+    private final SourceReservationSupport sourceReservationSupport;
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> list(List<ScheduledPostStatus> statuses) {
@@ -119,6 +120,7 @@ public class AdminScheduledPostService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "only SCHEDULED holdings can be cancelled (status=" + row.getStatus() + ")");
         }
+        sourceReservationSupport.releaseFromCandidatesJson(row.getCandidatesJson());
         row.setStatus(ScheduledPostStatus.CANCELLED);
         return toSummary(repository.save(row));
     }

@@ -36,6 +36,7 @@ class AdminScheduledPostServiceTest {
     @Mock private ContentSafetyGuard safetyGuard;
     @Mock private OrchestratorProperties properties;
     @Mock private OrchestratorProperties.ThreadPlan threadPlanConfig;
+    @Mock private SourceReservationSupport sourceReservationSupport;
 
     private CandidateScheduleSupport scheduleSupport;
     private AdminScheduledPostService service;
@@ -45,7 +46,8 @@ class AdminScheduledPostServiceTest {
     void setUp() {
         scheduleSupport = new CandidateScheduleSupport(properties);
         service = new AdminScheduledPostService(
-                repository, personaRepository, safetyGuard, scheduleSupport, objectMapper);
+                repository, personaRepository, safetyGuard, scheduleSupport, objectMapper,
+                sourceReservationSupport);
     }
 
     private Map<Integer, Double> flatWeights() {
@@ -123,6 +125,7 @@ class AdminScheduledPostServiceTest {
         Map<String, Object> result = service.cancel("hold-1");
 
         assertThat(result.get("status")).isEqualTo("CANCELLED");
+        verify(sourceReservationSupport).releaseFromCandidatesJson("{}");
         ArgumentCaptor<AiScheduledPost> captor = ArgumentCaptor.forClass(AiScheduledPost.class);
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ScheduledPostStatus.CANCELLED);

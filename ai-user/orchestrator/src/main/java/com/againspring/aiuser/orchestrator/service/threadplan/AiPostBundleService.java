@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * PLAN-mode AI post creation boundary.
@@ -41,8 +43,9 @@ import java.util.Set;
  * generation job. Mega-call (full cast, one LLM request) remains when
  * {@code ai-user.thread-plan.micro-batch-enabled=false}.</p>
  *
- * <p>Source-story grounding (example_bank via findSimilar), author voice, reconstruct mode,
- * and anti-self-copy recent bodies are injected here — not empty topicHint alone.</p>
+ * <p>Source-story grounding (popular crawl claim via {@link PlanSourceStoryResolver},
+ * author voice, reconstruct mode, anti-self-copy recent bodies, and
+ * {@link StoryTwinGuard}) are injected here — not empty topicHint alone.</p>
  */
 @Slf4j
 @Service
@@ -66,6 +69,8 @@ public class AiPostBundleService {
     private final PlanSourceStoryResolver sourceStoryResolver;
     private final StoryProfileAnalyzer storyProfileAnalyzer;
     private final PersonaMatcherService personaMatcherService;
+    private final StoryTwinGuard storyTwinGuard;
+    private final SourceReservationSupport sourceReservationSupport;
 
     /** A PLAN rollout owns post generation even when its workload provider is OFF. */
     public boolean ownsPostGeneration() {
@@ -77,8 +82,36 @@ public class AiPostBundleService {
 
     public Optional<PublishedBundle> generateAndPublish(Persona author, String jwt, String category,
                                                          String topicHint, String correlationId) {
-        Bundle bundle = generateBundle(author, category, topicHint, correlationId).orElse(null);
-        if (bundle == null) return Optional.empty();
+        return generateAndPublish(author, jwt, category, topicHint, correlationId, null);
+    }
+
+    /**
+     * Claim popular source → LLM → backend publish. Commits on createPost OK;
+     * releases on empty claim, LLM/safety failure, or backend write failure.
+     */
+    public Optional<PublishedBundle> generateAndPublish(Persona author, String jwt, String category,
+                                                         String topicHint, String correlationId,
+                                                         String preferredSource) {
+        String reservationKey = (correlationId != null && !correlationId.isBlank())
+                ? correlationId
+                : UUID.randomUUID().toString();
+        Instant reserveUntil = Instant.now().plus(Duration.ofHours(24));
+        String sourceName = SourceReservationSupport.resolvePreferredSource(preferredSource, author);
+
+        Optional<PlanSourceStoryResolver.ResolvedSource> claimed = sourceStoryResolver.claimAndResolve(
+                author, sourceName, reservationKey, reserveUntil, category);
+        if (claimed.isEmpty()) {
+            log.info("AI post publish skipped: no claimed source preferred={} corr={}",
+                    sourceName, correlationId);
+            return Optional.empty();
+        }
+        Long exampleId = claimed.get().sourceExampleId();
+
+        Bundle bundle = generateBundleWithSource(author, category, correlationId, claimed.get()).orElse(null);
+        if (bundle == null) {
+            sourceReservationSupport.release(exampleId, reservationKey);
+            return Optional.empty();
+        }
 
         CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
                 .userTitle(bundle.content.title()).bodyRaw(bundle.content.body()).category(category)
@@ -92,7 +125,13 @@ public class AiPostBundleService {
                 .metaphorId(bundle.content.metaphorId());
         applyProvenance(postBuilder, bundle.source);
         Optional<PostDto> published = backendBot.createPost(jwt, postBuilder.build());
-        if (published.isEmpty() || published.get().getId() == null) return Optional.empty();
+        if (published.isEmpty() || published.get().getId() == null) {
+            sourceReservationSupport.release(exampleId, reservationKey);
+            return Optional.empty();
+        }
+
+        // Post is live — hard-commit even if plan persistence fails below.
+        sourceReservationSupport.commit(exampleId, reservationKey);
 
         PostDto post = published.get();
         try {
@@ -117,15 +156,46 @@ public class AiPostBundleService {
      */
     public Optional<AiScheduledPost> generateAndHold(Persona author, String category, String topicHint,
                                                       String correlationId, Instant scheduledPublishAt) {
-        Bundle bundle = generateBundle(author, category, topicHint, correlationId).orElse(null);
-        if (bundle == null) return Optional.empty();
+        return generateAndHold(author, category, topicHint, correlationId, scheduledPublishAt, null);
+    }
+
+    /**
+     * Soft-reserve under the scheduled-post id ({@code reserveUntil = scheduledPublishAt + 24h}),
+     * generate, and hold. Empty claim → skip (no freestyle). LLM/safety/serialize failure → release.
+     *
+     * @param preferredSource {@code "blind"}|{@code "natepan"} or null (derive from voice_type)
+     */
+    public Optional<AiScheduledPost> generateAndHold(Persona author, String category, String topicHint,
+                                                      String correlationId, Instant scheduledPublishAt,
+                                                      String preferredSource) {
+        if (scheduledPublishAt == null) {
+            log.warn("AI post hold skipped: scheduledPublishAt is null corr={}", correlationId);
+            return Optional.empty();
+        }
+        String holdId = UUID.randomUUID().toString();
+        Instant reserveUntil = scheduledPublishAt.plus(Duration.ofHours(24));
+        String sourceName = SourceReservationSupport.resolvePreferredSource(preferredSource, author);
+
+        Optional<PlanSourceStoryResolver.ResolvedSource> claimed = sourceStoryResolver.claimAndResolve(
+                author, sourceName, holdId, reserveUntil, category);
+        if (claimed.isEmpty()) {
+            log.info("AI post hold skipped: no claimed source preferred={} holdId={} corr={}",
+                    sourceName, holdId, correlationId);
+            return Optional.empty();
+        }
+        Long exampleId = claimed.get().sourceExampleId();
+
+        Bundle bundle = generateBundleWithSource(author, category, correlationId, claimed.get()).orElse(null);
+        if (bundle == null) {
+            sourceReservationSupport.release(exampleId, holdId);
+            return Optional.empty();
+        }
 
         candidateScheduleSupport.enrichMissingScheduledAts(bundle.response, scheduledPublishAt);
 
-        // Trace hook for W1-H: embed provenance in candidates JSON until a dedicated column lands.
-        if (bundle.source != null && bundle.source.sourceExampleId() != null) {
-            bundle.response.put(SOURCE_PROVENANCE_KEY, bundle.source.provenanceForTrace());
-        }
+        // Soft-reserve refs for publisher commit / admin cancel·fail release.
+        bundle.response.put(SOURCE_PROVENANCE_KEY,
+                sourceReservationSupport.provenanceWithReservation(bundle.source, holdId));
 
         String candidatesJson;
         try {
@@ -133,10 +203,12 @@ public class AiPostBundleService {
         } catch (com.fasterxml.jackson.core.JsonProcessingException serializationFailure) {
             log.error("AI post bundle generated but candidates could not be serialized corr={}",
                     correlationId, serializationFailure);
+            sourceReservationSupport.release(exampleId, holdId);
             return Optional.empty();
         }
 
         AiScheduledPost.AiScheduledPostBuilder rowBuilder = AiScheduledPost.builder()
+                .id(holdId)
                 .personaId(author.getId())
                 .category(category)
                 .title(bundle.content.title())
@@ -148,13 +220,27 @@ public class AiPostBundleService {
                 .model(bundle.model);
         // W1-H may add sourceExampleId on the entity — set when present without owning the migration.
         applyScheduledSourceHook(rowBuilder, bundle.source);
-        return Optional.of(scheduledPostRepository.save(rowBuilder.build()));
+        try {
+            return Optional.of(scheduledPostRepository.save(rowBuilder.build()));
+        } catch (RuntimeException persistFailure) {
+            log.error("AI post hold persist failed holdId={} corr={}", holdId, correlationId, persistFailure);
+            sourceReservationSupport.release(exampleId, holdId);
+            return Optional.empty();
+        }
     }
 
-    /** Shared generation step: grounded structured LLM call(s), validated post + raw response for replay. */
-    private Optional<Bundle> generateBundle(Persona author, String category, String topicHint, String correlationId) {
+    /**
+     * Shared generation step given an already-claimed source. Callers own claim / release / commit.
+     */
+    private Optional<Bundle> generateBundleWithSource(
+            Persona author, String category, String correlationId,
+            PlanSourceStoryResolver.ResolvedSource source) {
         if (author == null) {
             log.warn("AI post bundle skipped: author is null corr={}", correlationId);
+            return Optional.empty();
+        }
+        if (source == null) {
+            log.warn("AI post bundle skipped: source is null corr={}", correlationId);
             return Optional.empty();
         }
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
@@ -166,8 +252,6 @@ public class AiPostBundleService {
         }
         String model = properties.getThreadPlan().getAiPostModel();
         int pool = config == null ? 24 : Math.max(1, Math.min(24, config.getCandidatePoolSize()));
-
-        PlanSourceStoryResolver.ResolvedSource source = sourceStoryResolver.resolve(author, category, topicHint);
 
         // WP3: StoryProfile once per source; reorder comment cast by matcher (author stays personas[0]).
         StoryProfile storyProfile = storyProfileAnalyzer.analyze(
@@ -221,6 +305,7 @@ public class AiPostBundleService {
         if (response.isEmpty()) return Optional.empty();
         try {
             PostContent postContent = readAndValidatePost(response.get());
+            rejectIfStoryTwin(postContent, correlationId);
             validateCast(response.get(), castIds);
             return Optional.of(new Bundle(response.get(), postContent, provider, model, castIds, source));
         } catch (IllegalArgumentException invalid) {
@@ -275,6 +360,7 @@ public class AiPostBundleService {
         Map<String, Object> merged;
         try {
             postContent = readAndValidatePost(firstOpt.get());
+            rejectIfStoryTwin(postContent, correlationId);
             validateCast(firstOpt.get(), castIds);
             merged = new LinkedHashMap<>(firstOpt.get());
         } catch (IllegalArgumentException invalid) {
@@ -607,6 +693,21 @@ public class AiPostBundleService {
 
     private record Bundle(Map<String, Object> response, PostContent content, String provider, String model,
                           Set<String> castIds, PlanSourceStoryResolver.ResolvedSource source) { }
+
+    /**
+     * After LLM returns title/body: reject obvious twins of recent published AI posts.
+     * Throws so mega-call / micro-batch paths return empty and skip hold
+     * (soft-reserve release is owned by the lifecycle path).
+     */
+    private void rejectIfStoryTwin(PostContent content, String correlationId) {
+        if (content == null || storyTwinGuard == null) return;
+        Optional<String> reason = storyTwinGuard.twinReason(
+                content.title(), content.body(), storyTwinGuard.loadRecentAiPosts());
+        if (reason.isPresent()) {
+            log.warn("AI post rejected as story twin corr={} reason={}", correlationId, reason.get());
+            throw new IllegalArgumentException("story twin of recent AI post: " + reason.get());
+        }
+    }
 
     @SuppressWarnings("unchecked")
     private PostContent readAndValidatePost(Map<String, Object> response) {

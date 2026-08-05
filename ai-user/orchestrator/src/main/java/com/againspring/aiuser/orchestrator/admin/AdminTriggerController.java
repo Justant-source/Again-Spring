@@ -18,6 +18,7 @@ import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnal
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.againspring.aiuser.orchestrator.service.threadplan.HumanReplyTtlCleanupService;
+import com.againspring.aiuser.orchestrator.service.threadplan.SourceMixPlanner;
 import com.againspring.aiuser.orchestrator.service.threadplan.ThreadPlanGenerationService;
 import com.againspring.aiuser.orchestrator.task.ActionExecutor;
 import lombok.RequiredArgsConstructor;
@@ -110,10 +111,11 @@ public class AdminTriggerController {
         int n = Math.max(1, Math.min(count, 10));
         var active = new ArrayList<>(personaRepo.findByActiveTrue());
         if (active.isEmpty()) return ResponseEntity.ok(Map.of("attempted", 0, "message", "활성 페르소나 없음"));
-        var heavy = active.stream().filter(p -> "HEAVY".equals(p.getTier()))
-                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        List<Persona> pool = heavy.size() >= n ? heavy : active;
-        Collections.shuffle(pool);
+
+        Random rng = new Random();
+        // Source first (Blind 70% / Natepan 30%), then author by matching voice_type.
+        List<String> sources = SourceMixPlanner.planSources(n, rng);
+        SourceMixPlanner.MixCounts mix = SourceMixPlanner.planCounts(n);
 
         ZoneId kst = ActivityCurve.KST;
         LocalDate today = LocalDate.now(kst);
@@ -124,29 +126,41 @@ public class AdminTriggerController {
         try {
             slots = ActivityCurve.sampleFutureInstants(from, to, n,
                     properties.getThreadPlan().getKstHourlyHumanWeights(),
-                    Duration.ofMinutes(minSpacingMinutes), new Random());
+                    Duration.ofMinutes(minSpacingMinutes), rng);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "슬롯 샘플링 실패: " + e.getMessage()));
         }
 
+        List<Persona> pool = new ArrayList<>(active);
         int attempted = 0;
+        int skippedNoPersona = 0;
         List<String> scheduledIds = new ArrayList<>();
-        for (int i = 0; i < n && i < pool.size(); i++) {
-            Persona persona = pool.get(i);
+        for (int i = 0; i < n; i++) {
+            String preferredSource = sources.get(i);
+            Optional<Persona> personaOpt = SourceMixPlanner.pickAuthor(pool, preferredSource, rng);
+            if (personaOpt.isEmpty()) {
+                skippedNoPersona++;
+                log.warn("[generate-scheduled-posts] No active persona with voice_type for source={} — skip slot {}",
+                        preferredSource, i);
+                continue;
+            }
+            Persona persona = personaOpt.get();
             String corrId = "nightly-hold-" + persona.getId() + "-" + i;
             try {
-                // topicHint null → AiPostBundleService resolves example_bank source via findSimilar
-                // (never an empty-topic-only path).
                 Optional<AiScheduledPost> held = aiPostBundleService.generateAndHold(
-                        persona, topCategory(persona), null, corrId, slots.get(i));
+                        persona, topCategory(persona), null, corrId, slots.get(i), preferredSource);
                 held.ifPresent(row -> scheduledIds.add(row.getId()));
                 attempted++;
             } catch (Exception e) {
-                log.warn("[generate-scheduled-posts] persona={} error={}", persona.getId(), e.getMessage());
+                log.warn("[generate-scheduled-posts] persona={} source={} error={}",
+                        persona.getId(), preferredSource, e.getMessage());
             }
         }
-        log.info("[generate-scheduled-posts] {} post(s) attempted (count={})", attempted, n);
+        log.info("[generate-scheduled-posts] {} post(s) attempted (count={}, mix blind={}/natepan={}, skippedNoPersona={})",
+                attempted, n, mix.blind(), mix.natepan(), skippedNoPersona);
         return ResponseEntity.ok(Map.of("attempted", attempted, "scheduledIds", scheduledIds,
+                "blindSlots", mix.blind(), "natepanSlots", mix.natepan(),
+                "skippedNoPersona", skippedNoPersona,
                 "message", attempted + "개 예약글 생성 시도 완료(LLM+세이프가드 통과분만 저장됨, 미발행)."));
     }
 

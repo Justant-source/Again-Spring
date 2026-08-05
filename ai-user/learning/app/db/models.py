@@ -128,6 +128,20 @@ WHERE table_schema = DATABASE()
 
 VECTOR_INDEX_DDL = "ALTER TABLE example_bank ADD VECTOR INDEX idx_emb (embedding)"
 
+EXAMPLE_SOURCE_RESERVATIONS_DDL = """
+CREATE TABLE IF NOT EXISTS example_source_reservations (
+    example_id BIGINT NOT NULL,
+    reservation_key VARCHAR(128) NOT NULL,
+    status VARCHAR(16) NOT NULL COMMENT 'SOFT|COMMITTED',
+    reserve_until DATETIME(3) NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (example_id),
+    KEY idx_esr_key (reservation_key),
+    KEY idx_esr_status_until (status, reserve_until)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+"""
+
 
 def create_tables():
     with get_db() as conn:
@@ -135,6 +149,7 @@ def create_tables():
             cur.execute(EXAMPLE_BANK_DDL)
             cur.execute(CRAWL_LOG_DDL)
             cur.execute(DAILY_TOPIC_DDL)
+            cur.execute(EXAMPLE_SOURCE_RESERVATIONS_DDL)
             # topic 컬럼 추가 (기존 테이블에도 idempotent — ADD COLUMN IF NOT EXISTS, MariaDB 10.0.2+)
             try:
                 cur.execute(EXAMPLE_BANK_ADD_TOPIC_SQL)
@@ -232,4 +247,4 @@ def create_tables():
                 except Exception as e:
                     logger.warning(f"VECTOR INDEX for daily_topic skipped: {e}")
         conn.commit()
-    logger.info("example_bank, crawl_log, daily_topic tables ready")
+    logger.info("example_bank, crawl_log, daily_topic, example_source_reservations tables ready")
