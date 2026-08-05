@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -124,6 +125,8 @@ public class AiLearningClient {
         private String content;
         private String source;
         private Double score;
+        /** Relative popularity 0~1 from example_bank.popularity_pct (claim-popular-source). */
+        private Double popularityPct;
         /** 원본 비교 기능: 크롤 원본 제목 (신규 크롤부터, 기존 행은 null) */
         private String title;
         /** 원본 비교 기능: 크롤 원본 URL */
@@ -133,6 +136,34 @@ public class AiLearningClient {
         /** 이 항목이 단일 원본 재구성 소스로 사용 가능한지 — source_url 보유 여부로 판단 */
         public boolean hasSourceProvenance() {
             return sourceUrl != null && !sourceUrl.isBlank();
+        }
+    }
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ClaimPopularSourceRequest {
+        private String source;           // "blind" | "natepan"
+        private String reservationKey;
+        private Instant reserveUntil;    // ISO-8601 via Spring ObjectMapper
+        private int windowDays = 14;
+        private int expandDays = 30;
+
+        public ClaimPopularSourceRequest(String source, String reservationKey, Instant reserveUntil) {
+            this.source = source;
+            this.reservationKey = reservationKey;
+            this.reserveUntil = reserveUntil;
+        }
+    }
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class SourceReservationRequest {
+        private long exampleId;
+        private String reservationKey;
+
+        public SourceReservationRequest(long exampleId, String reservationKey) {
+            this.exampleId = exampleId;
+            this.reservationKey = reservationKey;
         }
     }
 
@@ -275,5 +306,74 @@ public class AiLearningClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class EmbedResponse {
         private List<Double> embedding;
+    }
+
+    /**
+     * Claim one popular crawl POST (source=blind|natepan) under {@code reservationKey} until
+     * {@code reserveUntil}. Empty pool / {@code {"status":"empty"}} / failure → Optional.empty().
+     */
+    public Optional<ExampleItem> claimPopularSource(String source, String reservationKey, Instant reserveUntil) {
+        if (!enabled || source == null || source.isBlank()
+                || reservationKey == null || reservationKey.isBlank()
+                || reserveUntil == null) {
+            return Optional.empty();
+        }
+        try {
+            ResponseEntity<String> resp = postJson("/examples/claim-popular-source",
+                    new ClaimPopularSourceRequest(source, reservationKey, reserveUntil));
+            return parseClaimedExample(resp != null ? resp.getBody() : null);
+        } catch (Exception e) {
+            log.debug("AiLearning claimPopularSource failed (non-critical): {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /** Commit a previously claimed popular source. Failure / disabled → false. */
+    public boolean commitSource(long exampleId, String reservationKey) {
+        if (!enabled || reservationKey == null || reservationKey.isBlank()) return false;
+        try {
+            postJson("/examples/commit-source",
+                    new SourceReservationRequest(exampleId, reservationKey));
+            return true;
+        } catch (Exception e) {
+            log.debug("AiLearning commitSource failed (non-critical): {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /** Release a previously claimed popular source. Failure / disabled → false. */
+    public boolean releaseSource(long exampleId, String reservationKey) {
+        if (!enabled || reservationKey == null || reservationKey.isBlank()) return false;
+        try {
+            postJson("/examples/release-source",
+                    new SourceReservationRequest(exampleId, reservationKey));
+            return true;
+        } catch (Exception e) {
+            log.debug("AiLearning releaseSource failed (non-critical): {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Accept a claimed ExampleItem JSON; treat null/blank/`{"status":"empty"}`/missing id as empty.
+     */
+    private Optional<ExampleItem> parseClaimedExample(String body) {
+        if (body == null || body.isBlank()) return Optional.empty();
+        try {
+            var node = objectMapper.readTree(body);
+            if (node == null || node.isNull() || node.isMissingNode()
+                    || (node.isObject() && node.size() == 0)) {
+                return Optional.empty();
+            }
+            if (node.has("status") && "empty".equalsIgnoreCase(node.get("status").asText())) {
+                return Optional.empty();
+            }
+            ExampleItem item = objectMapper.treeToValue(node, ExampleItem.class);
+            if (item == null || item.getId() == null) return Optional.empty();
+            return Optional.of(item);
+        } catch (Exception e) {
+            log.debug("AiLearning claimPopularSource parse failed (non-critical): {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 }
