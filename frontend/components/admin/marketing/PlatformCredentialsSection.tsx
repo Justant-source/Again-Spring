@@ -48,7 +48,8 @@ const FIELD_LABELS: Record<string, string> = {
   channel_id: '채널 ID',
   access_token: 'Access Token',
   user_id: '사용자 ID',
-  tts_voice: 'TTS 음성',
+  tts_voice: '본문 TTS 음성',
+  comment_tts_voices: '댓글 TTS 음성',
 };
 
 const platformLabel = (p: string) => PLATFORM_LABELS[p] ?? p;
@@ -287,7 +288,7 @@ export function PlatformCredentialsSection() {
                       // YouTube Shorts: refresh_token은 OAuth로 자동 획득 — 입력 숨김
                       if (editing.platform === 'youtube_shorts' && f.key === 'refresh_token') return false;
                       // TTS 음성은 전용 피커로 렌더 (스키마에 있을 때)
-                      if (f.key === 'tts_voice') return false;
+                      if (f.key === 'tts_voice' || f.key === 'comment_tts_voices') return false;
                       return true;
                     })
                     .map((f) => {
@@ -314,12 +315,23 @@ export function PlatformCredentialsSection() {
                       );
                     })}
 
-                  {/* 스키마에 tts_voice가 있으면 WaggleBot TTS 음성 선택 + 미리듣기 */}
+                  {/* 스키마에 tts_voice가 있으면 본문 TTS 선택 + 미리듣기 */}
                   {editing.fields.some((f) => f.key === 'tts_voice') && (
                     <TtsVoicePicker
                       value={formValues['tts_voice'] ?? ''}
                       onChange={(key) =>
                         setFormValues((prev) => ({ ...prev, tts_voice: key }))
+                      }
+                    />
+                  )}
+
+                  {/* 댓글 TTS 풀 (최대 5) — youtube_shorts 등 스키마에 comment_tts_voices가 있을 때 */}
+                  {editing.fields.some((f) => f.key === 'comment_tts_voices') && (
+                    <CommentTtsVoicePicker
+                      value={formValues['comment_tts_voices'] ?? ''}
+                      narratorVoice={formValues['tts_voice'] ?? ''}
+                      onChange={(csv) =>
+                        setFormValues((prev) => ({ ...prev, comment_tts_voices: csv }))
                       }
                     />
                   )}
@@ -469,11 +481,11 @@ function TtsVoicePicker({ value, onChange }: TtsVoicePickerProps) {
   return (
     <div className="rounded border border-gray-200 bg-gray-50 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700">TTS 음성 (WaggleBot)</span>
+        <span className="text-sm font-medium text-gray-700">본문 TTS 음성</span>
         <span className="text-xs text-gray-400">기본: {defaultVoice}</span>
       </div>
       <p className="mb-3 text-xs text-gray-500">
-        사연·댓글 낭독에 사용할 음성을 고릅니다. 미리듣기로 확인한 뒤 선택하세요.
+        사연 본문·클로징 낭독에 사용할 음성을 고릅니다. 미리듣기로 확인한 뒤 선택하세요.
       </p>
       {loading ? (
         <div className="py-3 text-center text-xs text-gray-400">음성 목록 로드 중…</div>
@@ -502,6 +514,192 @@ function TtsVoicePicker({ value, onChange }: TtsVoicePickerProps) {
                 />
                 <label htmlFor={`tts-${v.key}`} className="min-w-0 flex-1 cursor-pointer">
                   <div className="truncate text-sm text-gray-800">{v.label || v.key}</div>
+                  <div className="truncate font-mono text-[10px] text-gray-400">
+                    {v.key}
+                    {v.gender ? ` · ${v.gender}` : ''}
+                  </div>
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 shrink-0 px-2 text-xs"
+                  disabled={!v.sampleUrl && !v.hasSample}
+                  onClick={() => handlePreview(v)}
+                >
+                  {playing === v.key ? '정지' : '미리듣기'}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {previewError && (
+        <div className="mt-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {previewError}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Comment TTS pool — max 5 voices, stored as comma-separated keys
+// ---------------------------------------------------------------------------
+const COMMENT_TTS_MAX = 5;
+
+function parseCommentVoiceCsv(csv: string): string[] {
+  return csv
+    .split(/[,;]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, COMMENT_TTS_MAX);
+}
+
+interface CommentTtsVoicePickerProps {
+  value: string;
+  narratorVoice: string;
+  onChange: (csv: string) => void;
+}
+
+function CommentTtsVoicePicker({ value, narratorVoice, onChange }: CommentTtsVoicePickerProps) {
+  const [voices, setVoices] = useState<TtsVoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  const selected = parseCommentVoiceCsv(value);
+
+  useEffect(() => {
+    if (typeof Audio !== 'undefined') {
+      audioRef.current = new Audio();
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const catalog = await listTtsVoices();
+        if (cancelled) return;
+        setVoices(catalog.voices ?? []);
+      } catch (err: unknown) {
+        if (!cancelled) setError(`음성 목록을 불러오지 못했습니다: ${extractError(err)}`);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute('src');
+      }
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const toggle = (key: string) => {
+    const set = new Set(selected);
+    if (set.has(key)) {
+      set.delete(key);
+    } else if (set.size >= COMMENT_TTS_MAX) {
+      return;
+    } else {
+      set.add(key);
+    }
+    onChange([...set].join(','));
+  };
+
+  const handlePreview = async (voice: TtsVoice) => {
+    const audio = audioRef.current;
+    const samplePath = voice.sampleUrl;
+    if (!audio || !samplePath) {
+      setPreviewError('이 음성은 미리듣기 샘플이 없습니다.');
+      return;
+    }
+    setPreviewError(null);
+    try {
+      if (playing === voice.key) {
+        audio.pause();
+        setPlaying(null);
+        return;
+      }
+      audio.pause();
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+      const blob = await fetchTtsVoiceSampleBlob(samplePath);
+      const url = URL.createObjectURL(blob);
+      objectUrlRef.current = url;
+      audio.onended = () => {
+        setPlaying(null);
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+          objectUrlRef.current = null;
+        }
+      };
+      audio.src = url;
+      await audio.play();
+      setPlaying(voice.key);
+    } catch (err: unknown) {
+      setPlaying(null);
+      setPreviewError(`미리듣기 실패: ${extractError(err)}`);
+    }
+  };
+
+  return (
+    <div className="rounded border border-gray-200 bg-gray-50 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-700">댓글 TTS 음성 (최대 {COMMENT_TTS_MAX})</span>
+        <span className="text-xs text-gray-400">
+          {selected.length}/{COMMENT_TTS_MAX} 선택
+        </span>
+      </div>
+      <p className="mb-3 text-xs text-gray-500">
+        댓글마다 아래 풀에서 랜덤으로 배정합니다. 본문 음성({narratorVoice || '미선택'})과 겹치지
+        않는 목소리를 고르면 더 자연스럽습니다.
+      </p>
+      {loading ? (
+        <div className="py-3 text-center text-xs text-gray-400">음성 목록 로드 중…</div>
+      ) : error ? (
+        <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {error}
+        </div>
+      ) : (
+        <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+          {voices.map((v) => {
+            const isSelected = selected.includes(v.key);
+            const atCap = !isSelected && selected.length >= COMMENT_TTS_MAX;
+            const isNarrator = narratorVoice !== '' && v.key === narratorVoice;
+            return (
+              <div
+                key={v.key}
+                className={`flex items-center gap-2 rounded border px-2 py-1.5 ${
+                  isSelected ? 'border-[#5F8F76] bg-white' : 'border-transparent hover:bg-white/70'
+                } ${atCap ? 'opacity-50' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  id={`comment-tts-${v.key}`}
+                  className="accent-[#5F8F76]"
+                  checked={isSelected}
+                  disabled={atCap}
+                  onChange={() => toggle(v.key)}
+                />
+                <label htmlFor={`comment-tts-${v.key}`} className="min-w-0 flex-1 cursor-pointer">
+                  <div className="truncate text-sm text-gray-800">
+                    {v.label || v.key}
+                    {isNarrator ? (
+                      <span className="ml-1 text-[10px] text-amber-700">(본문과 동일)</span>
+                    ) : null}
+                  </div>
                   <div className="truncate font-mono text-[10px] text-gray-400">
                     {v.key}
                     {v.gender ? ` · ${v.gender}` : ''}

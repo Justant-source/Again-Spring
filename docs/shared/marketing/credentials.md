@@ -56,6 +56,7 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 |                   | `refresh_token` | 🔒     |   |
 |                   | `channel_id`    |        |   |
 |                   | `tts_voice`     |        |   |
+|                   | `comment_tts_voices` |   |   |
 | `threads`         | `storage_state` | 🔒     |   |
 
 > FE는 이 스키마를 **GET 응답의 `fields` 배열**로 받아 폼을 동적 렌더한다(드리프트 없음).
@@ -63,7 +64,7 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 >
 > **`storage_state`** = social-poster(Playwright)가 사용하는 로그인 세션(쿠키/스토리지) 직렬화 값. secret으로 암호화 저장하며, 보통 어드민 폼이 아니라 세션 시딩 경로(ASM `/api/v1/sessions/{platform}`)로 주입된다. API 기반인 `youtube_shorts`에는 없음.
 > **로그인 식별자**: `x`·`instagram_*`는 `email`(과거 문서의 `handle`/`username` 아님), `naver_*`는 `naver_id`. 권위본은 항상 ASM `app/domain/credentials.py`의 `PLATFORM_CREDENTIALS`.
-> **`youtube_shorts.refresh_token`**: OAuth로 자동 획득(폼 숨김). **`tts_voice`**: WaggleBot voice key(비시크릿); 빈값=파이프 기본. 어드민에서 미리듣기 후 선택. `instagram_reels`에도 동일 필드(릴스 렌더 파이프 연결 시 사용).
+> **`youtube_shorts.refresh_token`**: OAuth로 자동 획득(폼 숨김). **`tts_voice`**: 본문·클로징 낭독 voice key(비시크릿). **`comment_tts_voices`**: 댓글 낭독 풀(콤마구분, 최대 5); 렌더 시 댓글마다 랜덤 배정(본문 보이스와 겹치지 않는 키 우선). `instagram_reels`에도 `tts_voice` 동일.
 > **`threads`**: 로그인 자격은 `instagram_feed`에서 런타임 상속 — 어드민 입력 불필요.
 
 ---

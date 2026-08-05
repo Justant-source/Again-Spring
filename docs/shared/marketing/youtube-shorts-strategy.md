@@ -70,10 +70,12 @@ AS 트리거/brief → ASM 잡(youtube_shorts alone) → WaggleBot ingest+render
 
 - 잡 상세: **인라인 mp4 재생** + 썸네일 + 사용 댓글 2 + (paired) 예정 첫 댓글
 - `READY && !autoPublish` → **게시 승인** 시에만 업로드
-- **플랫폼 계정 → YouTube Shorts / Instagram 릴스**: WaggleBot TTS 음성 목록을 미리듣고 `tts_voice`로 저장 (빈값=파이프 기본). Shorts 렌더 시 brief·WaggleBot `options.ttsVoice` → `contents.variant_config.tts_voice`에 주입.
-- **단일 보이스 계약 (Again Spring)**: 사연·댓글·outro 전 구간이 어드민이 고른 음성 하나만 사용한다. WaggleBot은 `variant_config.tts_voice`를 SSOT로 읽고(컬럼이 pipeline 기본값으로 덮여도 복구), `again_spring` 잡에서는 `comment_voices` 다중 배정을 끈다. 참조 샘플이 없는 키(예: `yohan`)로 떨어지면 Fish Speech가 청크마다 불안정한 기본 음색을 써서 “여러 사람 목소리”처럼 들릴 수 있다.
+- **플랫폼 계정 → YouTube Shorts**: 본문 `tts_voice` + 댓글 풀 `comment_tts_voices`(최대 5, 콤마구분)를 미리듣고 저장. Shorts 렌더 시 `options.ttsVoice` / `options.commentVoices` → `variant_config`.
+- **보이스 계약**: 본문·intro·클로징 = `tts_voice`. 댓글 = `comment_tts_voices` 풀에서 작성자별 랜덤(본문 보이스 제외 우선). 풀이 비면 pipeline `comment_voices` 또는 본문 보이스 폴백. 참조 샘플 없는 키는 쓰지 말 것.
+- **클로징**: again_spring 고정 문구는 voice+text 키로 디스크 캐시·loudnorm 후 재사용 (전역 loudnorm이 끝을 눌러 작아지지 않게, 통합 낭독 경로에서는 전역 loudnorm 생략).
+- **AV 동기**: 각 낭독 청크 앞에 0.1s 무음(`adelay`) — 텍스트가 음성보다 먼저 보이게.
 - **Intro**: again_spring은 mood 스톡/회색 플레이스홀더를 쓰지 않는다. `metaphor_id` PNG가 있으면 표지로, 없으면 크림 빈화면+제목만.
-- **TTS 음량**: 청크별 loudnorm 후 **병합 파일에 한 번 더** global loudnorm (`I=-16`) 적용해 씬 간 볼륨 점프를 줄인다.
+- **TTS 음량**: 통합 낭독 wav를 장면 분할해 재사용. 댓글/클로징은 개별 loudnorm(`I=-16`) 후 concat.
 
 ---
 
