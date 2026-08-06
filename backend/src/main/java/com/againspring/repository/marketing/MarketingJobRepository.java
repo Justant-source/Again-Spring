@@ -98,6 +98,9 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * Same 24h one-shot gate as {@link #findPostsEligibleForXThreadPublish}, for
      * {@code instagram_feed}. Separate query because ASM requires each alone target
      * as its own job.
+     *
+     * <p>Excludes posts that already have {@code instagram_reels} or {@code youtube_shorts}
+     * (any status). Video (Reels+Shorts) and feed news-cards are mutually exclusive.
      */
     @Query(nativeQuery = true, value = """
         SELECT p.id FROM posts p
@@ -109,7 +112,73 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
             WHERE mj.post_id = p.id
             AND JSON_CONTAINS(mj.targets, '"instagram_feed"')
         )
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"instagram_reels"')
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"youtube_shorts"')
+        )
         LIMIT :limit
         """)
     List<String> findPostsEligibleForInstagramFeedPublish(Instant since, int limit);
+
+    /**
+     * Posts past 24h with no IG feed / Reels / Shorts job yet, ranked by popularity:
+     * view_count DESC → top-level comments → votes → created_at DESC.
+     * Used to pick the daily top-3 video cohort (Reels + YouTube Shorts).
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT p.id FROM posts p
+        WHERE p.created_at >= :since
+        AND p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        AND p.deleted_at IS NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"instagram_feed"')
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"instagram_reels"')
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"youtube_shorts"')
+        )
+        ORDER BY
+            COALESCE(p.view_count, 0) DESC,
+            (
+                SELECT COUNT(*) FROM post_comments c
+                WHERE c.post_id = p.id
+                AND c.parent_comment_id IS NULL
+                AND c.deleted_at IS NULL
+            ) DESC,
+            (
+                SELECT COUNT(*) FROM votes v
+                WHERE v.post_id = p.id
+            ) DESC,
+            p.created_at DESC
+        LIMIT :limit
+        """)
+    List<String> findPostsEligibleForVideoMarketing(Instant since, int limit);
+
+    /**
+     * Count distinct posts that already received a Reels and/or Shorts marketing job
+     * since {@code since} (caller passes start-of-day KST as Instant). Caps daily videos at 3.
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT COUNT(DISTINCT mj.post_id) FROM marketing_job mj
+        WHERE mj.created_at >= :since
+        AND (
+            JSON_CONTAINS(mj.targets, '"instagram_reels"') = TRUE
+            OR JSON_CONTAINS(mj.targets, '"youtube_shorts"') = TRUE
+        )
+        """)
+    long countVideoJobsCreatedSince(Instant since);
 }

@@ -40,8 +40,11 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 |                   | `password`      | 🔒     | ✓ |
 |                   | `totp_secret`   | 🔒     |   |
 |                   | `storage_state` | 🔒     |   |
-| `instagram_reels` | `email`         |        | ✓ |
-|                   | `password`      | 🔒     | ✓ |
+| `instagram_reels` | `ig_user_id`    |        |   |
+|                   | `access_token`  | 🔒     |   |
+|                   | `graph_host`    |        |   |
+|                   | `email`         |        |   |
+|                   | `password`      | 🔒     |   |
 |                   | `totp_secret`   | 🔒     |   |
 |                   | `storage_state` | 🔒     |   |
 |                   | `tts_voice`     |        |   |
@@ -65,6 +68,7 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 > **`storage_state`** = social-poster(Playwright)가 사용하는 로그인 세션(쿠키/스토리지) 직렬화 값. secret으로 암호화 저장하며, 보통 어드민 폼이 아니라 세션 시딩 경로(ASM `/api/v1/sessions/{platform}`)로 주입된다. API 기반인 `youtube_shorts`에는 없음.
 > **로그인 식별자**: `x`·`instagram_*`는 `email`(과거 문서의 `handle`/`username` 아님), `naver_*`는 `naver_id`. 권위본은 항상 ASM `app/domain/credentials.py`의 `PLATFORM_CREDENTIALS`.
 > **`youtube_shorts.refresh_token`**: OAuth로 자동 획득(폼 숨김). **`tts_voice`**: 본문·클로징 낭독 voice key(비시크릿). **`comment_tts_voices`**: 댓글 낭독 풀(콤마구분, 최대 5); 렌더 시 댓글마다 랜덤 배정(본문 보이스와 겹치지 않는 키 우선). `instagram_reels`에도 `tts_voice` 동일.
+> **`instagram_reels` Graph API**: `ig_user_id` + `access_token`(장기 토큰, `instagram_content_publish`)이 있으면 Meta Content Publishing API(resumable)로 게시. 없으면 Playwright 폴백(anti-bot로 사실상 불가). `graph_host` 기본=`graph.facebook.com`(Instagram Login이면 `graph.instagram.com`).
 > **`threads`**: 로그인 자격은 `instagram_feed`에서 런타임 상속 — 어드민 입력 불필요.
 
 ---

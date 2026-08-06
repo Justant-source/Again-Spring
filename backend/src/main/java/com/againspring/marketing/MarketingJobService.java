@@ -45,11 +45,6 @@ import java.util.stream.Collectors;
 @Transactional
 public class MarketingJobService {
 
-    private static final String YOUTUBE_SHORTS = "youtube_shorts";
-
-    /** Platforms whose first PUBLISHED auto-enqueues a youtube_shorts job (see maybeTriggerYoutubeShorts). */
-    private static final List<String> YOUTUBE_SHORTS_TRIGGER_PLATFORMS = List.of("x_thread", "instagram_feed");
-
     private final AsmClient asmClient;
     private final AsmProperties asmProperties;
     private final PostRepository postRepository;
@@ -318,7 +313,6 @@ public class MarketingJobService {
             );
             marketingJobRepository.save(job);
             log.info("Callback applied for remote job {}: status={}", payload.getJobId(), payload.getStatus());
-            maybeTriggerYoutubeShorts(job);
         });
     }
 
@@ -334,61 +328,6 @@ public class MarketingJobService {
             serializeJson(view.getPublications())
         );
         marketingJobRepository.save(job);
-        maybeTriggerYoutubeShorts(job);
-    }
-
-    /**
-     * After a {@code x_thread} or {@code instagram_feed} job reaches PUBLISHED, auto-enqueue
-     * a one-time {@code youtube_shorts} render job (manual-publish only — see
-     * docs/shared/marketing/youtube-shorts-strategy.md). Idempotent: skipped if a
-     * youtube_shorts job already exists for the post (any status) or the post doesn't yet
-     * have 2 non-blank top-level comments (Shorts needs 2 commenter voices).
-     */
-    private void maybeTriggerYoutubeShorts(MarketingJob job) {
-        if (!"PUBLISHED".equals(job.getStatus())) {
-            return;
-        }
-        List<String> targets = deserializeTargets(job.getTargets());
-        boolean publishedOnTriggerPlatform = targets.stream().anyMatch(YOUTUBE_SHORTS_TRIGGER_PLATFORMS::contains);
-        if (!publishedOnTriggerPlatform) {
-            return;
-        }
-
-        String postId = job.getPostId();
-        try {
-            long qualifyingComments = commentService.getTopLevelComments(postId).stream()
-                .filter(c -> c.getBody() != null && !c.getBody().isBlank())
-                .count();
-            if (qualifyingComments < 2) {
-                log.debug("Skipping youtube_shorts trigger for post {} — fewer than 2 top-level comments", postId);
-                return;
-            }
-
-            if (marketingJobRepository.countAnyPlatformJobs(postId, YOUTUBE_SHORTS) > 0) {
-                log.debug("Skipping youtube_shorts trigger for post {} — job already exists", postId);
-                return;
-            }
-
-            MarketingJob shortsJob = createJob(
-                postId, List.of(YOUTUBE_SHORTS), false, "system:youtube-shorts-trigger");
-            log.info("Auto-created youtube_shorts marketing job {} for post {} (triggered by remote job {})",
-                shortsJob.getId(), postId, job.getRemoteJobId());
-        } catch (Exception e) {
-            log.warn("Failed to auto-trigger youtube_shorts job for post {}: {}", postId, e.getMessage());
-        }
-    }
-
-    private List<String> deserializeTargets(String targetsJson) {
-        if (targetsJson == null || targetsJson.isBlank()) {
-            return List.of();
-        }
-        try {
-            String[] parsed = objectMapper.readValue(targetsJson, String[].class);
-            return parsed != null ? Arrays.asList(parsed) : List.of();
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to deserialize marketing job targets JSON '{}': {}", targetsJson, e.getMessage());
-            return List.of();
-        }
     }
 
     /**

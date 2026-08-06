@@ -11,12 +11,12 @@
 
 | 항목 | 값 |
 |---|---|
-| 자동/스케줄 활성 | **활성** — `createdAt >= ASM_AUTO_PUBLISH_SINCE` 이고 `+24h` 후 one-shot (`XThreadPublishTriggerScheduler`) |
+| 자동/스케줄 활성 | **활성** — `createdAt >= ASM_AUTO_PUBLISH_SINCE` 이고 `+24h` 후, **영상(인기 상위 3) 미선정** 사연만 (`XThreadPublishTriggerScheduler`) |
 | 파이프 구현 | **허용** (하이브리드 캐러셀) |
-| 실발행 | 자동(24h) + 관리자 단건 수동 |
+| 실발행 | 자동(24h · 나머지) + 관리자 단건 수동 |
 
-컷오프 이후 생성된 사연만 공개 24시간 뒤 `instagram_feed` 잡을 1회 생성·`autoPublish`한다.
-X(`x_thread`)와 동일 스케줄러·동일 게이트(댓글 수 조건 없음, `ASM_AUTO_PUBLISH_SINCE` 공유). ASM alone 제약으로 **별도 잡**.
+컷오프 이후 생성된 사연은 공개 24시간 뒤 분배된다: **X 전체** · **인기 상위 3 → Reels+Shorts** · **나머지 → 피드**.  
+피드는 영상 잡(`instagram_reels`/`youtube_shorts`)이 없는 사연만. X와 동일 스케줄러·게이트(댓글 수 조건 없음). ASM alone 제약으로 **별도 잡**.
 
 ---
 
@@ -133,12 +133,17 @@ https://againspring.net/community/{postId}
 
 ---
 
-## 5. 비범위
+## 5. 비범위 / 관련
 
-- `instagram_reels` / Threads
-- 대량 자동 발행·스케줄러
+- Threads
+- 대량 자동 발행·스케줄러 변경 (피드 24h 자동은 유지)
 - 기존 사연 홍보 제목 배치 백필
 - X 캡처 파이프 재발명
 - prod 배포 (별도 명시 전)
+
+### 영상(릴스/쇼츠)과의 상호배타 (2026-08-06)
+
+같은 사연에 `instagram_reels` 또는 `youtube_shorts` 잡이 한 번이라도 있으면 `instagram_feed` 자동 발행 대상에서 제외한다.
+24h 분배에서 인기 상위(일 3캡)로 영상에 가면 피드는 만들지 않는다 (`NOT EXISTS` reels/shorts).
 
 ---

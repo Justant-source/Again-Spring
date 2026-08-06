@@ -26,12 +26,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link XThreadPublishTriggerScheduler} (X + Instagram 24h auto-publish).
+ * Unit tests for {@link XThreadPublishTriggerScheduler}
+ * (X all / top-3 video Reels+Shorts / remaining Instagram feed).
  */
 @ExtendWith(MockitoExtension.class)
 class XThreadPublishTriggerSchedulerTest {
 
     private static final Instant SINCE = Instant.parse("2026-08-02T08:43:52Z");
+    private static final List<String> VIDEO_TARGETS = List.of("instagram_reels", "youtube_shorts");
 
     @Mock
     private MarketingJobRepository marketingJobRepository;
@@ -58,6 +60,7 @@ class XThreadPublishTriggerSchedulerTest {
 
         verify(marketingJobRepository, never()).findPostsEligibleForXThreadPublish(any(Instant.class), anyInt());
         verify(marketingJobRepository, never()).findPostsEligibleForInstagramFeedPublish(any(Instant.class), anyInt());
+        verify(marketingJobRepository, never()).findPostsEligibleForVideoMarketing(any(Instant.class), anyInt());
         verify(marketingJobService, never()).createJob(anyString(), any(List.class), anyBoolean(), anyString());
     }
 
@@ -100,27 +103,36 @@ class XThreadPublishTriggerSchedulerTest {
         when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
+        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(0L);
+        when(marketingJobRepository.findPostsEligibleForVideoMarketing(eq(SINCE), anyInt()))
+            .thenReturn(Collections.emptyList());
         when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
 
         scheduler.pollAndPublishToXThread();
 
         verify(marketingJobRepository).findPostsEligibleForXThreadPublish(SINCE, 10);
+        verify(marketingJobRepository).findPostsEligibleForVideoMarketing(eq(SINCE), anyInt());
         verify(marketingJobRepository).findPostsEligibleForInstagramFeedPublish(SINCE, 10);
         verify(marketingJobService, never()).createJob(anyString(), any(List.class), anyBoolean(), anyString());
     }
 
     @Test
-    void pollAndPublishToXThread_singleEligiblePost_createsXAndIgJobs() {
+    void pollAndPublish_singleEligible_createsXAndVideoNotFeed() {
         String postId = "post_123";
         when(asmProperties.isEnabled()).thenReturn(true);
         when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Collections.singletonList(postId));
-        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
+        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(0L);
+        when(marketingJobRepository.findPostsEligibleForVideoMarketing(eq(SINCE), anyInt()))
             .thenReturn(Collections.singletonList(postId));
+        // After video selection, feed pool excludes this post
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
+            .thenReturn(Collections.emptyList());
         when(marketingJobRepository.countActivePlatformJobs(postId, "x_thread")).thenReturn(0L);
-        when(marketingJobRepository.countActivePlatformJobs(postId, "instagram_feed")).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(postId, "instagram_reels")).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(postId, "youtube_shorts")).thenReturn(0L);
 
         when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))
             .thenReturn(MarketingJob.builder().id(1L).status("REQUESTED").build());
@@ -130,8 +142,86 @@ class XThreadPublishTriggerSchedulerTest {
         verify(marketingJobService).createJob(
             eq(postId), eq(Collections.singletonList("x_thread")), eq(true), eq("system:x-thread-trigger"));
         verify(marketingJobService).createJob(
+            eq(postId), eq(VIDEO_TARGETS), eq(true), eq("system:video-marketing-trigger"));
+        verify(marketingJobService, never()).createJob(
+            anyString(), eq(Collections.singletonList("instagram_feed")), anyBoolean(), anyString());
+    }
+
+    @Test
+    void pollAndPublish_top3Video_restGoesToFeed() {
+        List<String> ranked = Arrays.asList("v1", "v2", "v3", "f1", "f2");
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
+            .thenReturn(Collections.emptyList());
+        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(0L);
+        when(marketingJobRepository.findPostsEligibleForVideoMarketing(eq(SINCE), anyInt()))
+            .thenReturn(ranked);
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
+            .thenReturn(Arrays.asList("f1", "f2"));
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), eq("instagram_reels"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), eq("youtube_shorts"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), eq("instagram_feed"))).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))
+            .thenReturn(MarketingJob.builder().id(1L).status("REQUESTED").build());
+
+        scheduler.pollAndPublishToXThread();
+
+        verify(marketingJobService).createJob(eq("v1"), eq(VIDEO_TARGETS), eq(true), eq("system:video-marketing-trigger"));
+        verify(marketingJobService).createJob(eq("v2"), eq(VIDEO_TARGETS), eq(true), eq("system:video-marketing-trigger"));
+        verify(marketingJobService).createJob(eq("v3"), eq(VIDEO_TARGETS), eq(true), eq("system:video-marketing-trigger"));
+        verify(marketingJobService, never()).createJob(eq("f1"), eq(VIDEO_TARGETS), anyBoolean(), anyString());
+        verify(marketingJobService).createJob(
+            eq("f1"), eq(Collections.singletonList("instagram_feed")), eq(true), eq("system:instagram-feed-trigger"));
+        verify(marketingJobService).createJob(
+            eq("f2"), eq(Collections.singletonList("instagram_feed")), eq(true), eq("system:instagram-feed-trigger"));
+    }
+
+    @Test
+    void pollAndPublish_dailyVideoCapReached_skipsVideo_enqueuesFeed() {
+        String postId = "post_cap";
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
+            .thenReturn(Collections.emptyList());
+        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(3L);
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
+            .thenReturn(Collections.singletonList(postId));
+        when(marketingJobRepository.countActivePlatformJobs(postId, "instagram_feed")).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))
+            .thenReturn(MarketingJob.builder().id(1L).status("REQUESTED").build());
+
+        scheduler.pollAndPublishToXThread();
+
+        verify(marketingJobRepository, never()).findPostsEligibleForVideoMarketing(any(Instant.class), anyInt());
+        verify(marketingJobService, never()).createJob(anyString(), eq(VIDEO_TARGETS), anyBoolean(), anyString());
+        verify(marketingJobService).createJob(
             eq(postId), eq(Collections.singletonList("instagram_feed")), eq(true),
             eq("system:instagram-feed-trigger"));
+    }
+
+    @Test
+    void pollAndPublish_dailyVideoCapPartial_enqueuesOnlyRemainingSlots() {
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
+        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
+            .thenReturn(Collections.emptyList());
+        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(2L);
+        when(marketingJobRepository.findPostsEligibleForVideoMarketing(eq(SINCE), anyInt()))
+            .thenReturn(Arrays.asList("a", "b", "c"));
+        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
+            .thenReturn(Collections.emptyList());
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), eq("instagram_reels"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), eq("youtube_shorts"))).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))
+            .thenReturn(MarketingJob.builder().id(1L).status("REQUESTED").build());
+
+        scheduler.pollAndPublishToXThread();
+
+        verify(marketingJobService, times(1)).createJob(
+            anyString(), eq(VIDEO_TARGETS), eq(true), eq("system:video-marketing-trigger"));
+        verify(marketingJobService).createJob(eq("a"), eq(VIDEO_TARGETS), eq(true), eq("system:video-marketing-trigger"));
+        verify(marketingJobService, never()).createJob(eq("b"), eq(VIDEO_TARGETS), anyBoolean(), anyString());
     }
 
     @Test
@@ -140,6 +230,9 @@ class XThreadPublishTriggerSchedulerTest {
         when(asmProperties.isEnabled()).thenReturn(true);
         when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10)).thenReturn(postIds);
+        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(0L);
+        when(marketingJobRepository.findPostsEligibleForVideoMarketing(eq(SINCE), anyInt()))
+            .thenReturn(Collections.emptyList());
         when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
         when(marketingJobRepository.countActivePlatformJobs(anyString(), eq("x_thread"))).thenReturn(0L);
@@ -159,6 +252,9 @@ class XThreadPublishTriggerSchedulerTest {
         when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Collections.singletonList(postId));
+        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(0L);
+        when(marketingJobRepository.findPostsEligibleForVideoMarketing(eq(SINCE), anyInt()))
+            .thenReturn(Collections.emptyList());
         when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
         when(marketingJobRepository.countActivePlatformJobs(postId, "x_thread")).thenReturn(1L);
@@ -177,6 +273,9 @@ class XThreadPublishTriggerSchedulerTest {
         when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
             .thenReturn(Arrays.asList(postId1, postId2));
+        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(0L);
+        when(marketingJobRepository.findPostsEligibleForVideoMarketing(eq(SINCE), anyInt()))
+            .thenReturn(Collections.emptyList());
         when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.emptyList());
         when(marketingJobRepository.countActivePlatformJobs(postId1, "x_thread")).thenReturn(0L);
@@ -193,29 +292,14 @@ class XThreadPublishTriggerSchedulerTest {
     }
 
     @Test
-    void pollAndPublishToXThread_createsJobWithAutoPublishTrue() {
-        String postId = "post_123";
-        when(asmProperties.isEnabled()).thenReturn(true);
-        when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
-        when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
-            .thenReturn(Collections.singletonList(postId));
-        when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
-            .thenReturn(Collections.emptyList());
-        when(marketingJobRepository.countActivePlatformJobs(postId, "x_thread")).thenReturn(0L);
-        when(marketingJobService.createJob(anyString(), any(List.class), anyBoolean(), anyString()))
-            .thenReturn(MarketingJob.builder().id(1L).status("REQUESTED").build());
-
-        scheduler.pollAndPublishToXThread();
-
-        verify(marketingJobService).createJob(eq(postId), any(List.class), eq(true), anyString());
-    }
-
-    @Test
     void pollAndPublish_instagramOnlyEligible_createsIgJob() {
         String postId = "post_ig_only";
         when(asmProperties.isEnabled()).thenReturn(true);
         when(asmProperties.getAutoPublishSince()).thenReturn(SINCE.toString());
         when(marketingJobRepository.findPostsEligibleForXThreadPublish(SINCE, 10))
+            .thenReturn(Collections.emptyList());
+        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(0L);
+        when(marketingJobRepository.findPostsEligibleForVideoMarketing(eq(SINCE), anyInt()))
             .thenReturn(Collections.emptyList());
         when(marketingJobRepository.findPostsEligibleForInstagramFeedPublish(SINCE, 10))
             .thenReturn(Collections.singletonList(postId));

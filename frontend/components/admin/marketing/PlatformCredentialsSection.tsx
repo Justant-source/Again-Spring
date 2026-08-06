@@ -38,6 +38,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 const FIELD_LABELS: Record<string, string> = {
   handle: '핸들 / 이메일',
   username: '사용자명',
+  email: '이메일',
   password: '비밀번호',
   totp_secret: '2FA TOTP 시크릿',
   naver_id: '네이버 아이디',
@@ -48,6 +49,8 @@ const FIELD_LABELS: Record<string, string> = {
   channel_id: '채널 ID',
   access_token: 'Access Token',
   user_id: '사용자 ID',
+  ig_user_id: 'Instagram 계정 ID (ig-user-id)',
+  graph_host: 'Graph Host (선택)',
   tts_voice: '본문 TTS 음성',
   comment_tts_voices: '댓글 TTS 음성',
 };

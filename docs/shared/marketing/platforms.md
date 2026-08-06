@@ -4,12 +4,24 @@
 
 | 상태 | 플랫폼 |
 |---|---|
-| **활성** | `x`, `x_thread`, `instagram_feed`, `youtube_shorts` (렌더+검수; **자동 게시 없음**) |
-| **보류 (deferred)** | `naver_blog`, `instagram_reels`, `naver_clip`, `threads` |
+| **활성** | `x`, `x_thread`, `instagram_feed`, `instagram_reels` + `youtube_shorts` (24h 분배 · 동일 영상 듀얼) |
+| **보류 (deferred)** | `naver_blog`, `naver_clip`, `threads` |
 
 에이전트·신규 작업은 활성 채널만. 보류 채널은 사용자 명시 요청 전 구현·디버그·배포 금지.
-`instagram_feed`는 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) — **게시 후 24h 자동 one-shot**
-(+ 관리자 단건 수동). X와 동일 스케줄러(`XThreadPublishTriggerScheduler`).
+
+### 24h 자동 분배 (`XThreadPublishTriggerScheduler`)
+
+사연 `created_at` 기준 **+24h** 후 (`createdAt >= ASM_AUTO_PUBLISH_SINCE`):
+
+| 채널 | 대상 | 동작 |
+|---|---|---|
+| `x_thread` | **모든** 적격 사연 | alone 잡 · `autoPublish=true` |
+| `instagram_reels` + `youtube_shorts` | 인기 **상위 3**/KST 일 | **한 잡·한 번 렌더** → 동일 mp4를 릴스·쇼츠에 `autoPublish=true` |
+| `instagram_feed` | 영상으로 안 간 **나머지** | alone 잡 · `autoPublish=true` |
+
+**인기 점수**: `view_count` DESC → 최상위 댓글 수 → 투표 수 → `created_at` 최신.  
+**일일 영상 상한**: KST 달력일 기준 릴스/쇼츠 잡 **최대 3건** (이미 3이면 이후 적격은 피드만).  
+**상호배타**: 같은 사연에 릴스/쇼츠 ↔ 피드 동시 금지. ASM은 `instagram_reels`+`youtube_shorts` 듀얼만 허용(다른 타겟과 혼합 금지).
 
 ## 플랫폼 목록
 
@@ -18,11 +30,11 @@
 | 플랫폼 | value | 콘텐츠 형식 | M6 게시 방법 | 미공개 |
 |---|---|---|---|---|
 | X (트위터) | `x` | 텍스트 + 이미지 | Playwright 자동 로그인 | **활성** |
-| X 4단 스레드 | `x_thread` | 텍스트 스레드 | Playwright (`x-thread-strategy.md`) | **활성** |
+| X 4단 스레드 | `x_thread` | 텍스트 스레드 | Playwright (`x-thread-strategy.md`) | **활성 (24h 전체)** |
 | 네이버 블로그 | `naver_blog` | 마크다운 → HTML | Playwright 자동 로그인 | 보류 |
-| 인스타그램 피드 | `instagram_feed` | 하이브리드 캐러셀 (훅+캡처+비율) | Playwright (`instagram-feed-strategy.md`) | **활성 (24h 자동)** |
-| 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Playwright 자동 로그인 | 보류 |
-| YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | WaggleBot 렌더 → API 업로드(수동 승인) | **활성 (렌더)** — [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) |
+| 인스타그램 피드 | `instagram_feed` | 하이브리드 캐러셀 (훅+캡처+비율) | Playwright (`instagram-feed-strategy.md`) | **활성 (24h · 영상 미선정분)** |
+| 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Meta Graph / 세션 · 캡션=제목+사연URL+해시태그 | **활성 (24h 인기 3 · Shorts 듀얼)** — 피드와 상호배타 · Graph 자격 권장 |
+| YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | WaggleBot 렌더 → API 업로드 | **활성 (24h 인기 3 · Reels 듀얼)** — [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) |
 | 네이버 클립 | `naver_clip` | 세로형 영상 (9:16) | Playwright (미구현) | 보류 |
 | Threads | `threads` | 텍스트 + 이미지 | Playwright 자동 로그인 (인스타 계정 상속) | 보류 |
 
@@ -46,15 +58,15 @@
 
 ## 영상 스펙 (Shorts / Reels)
 
-| 항목 | YouTube Shorts | Instagram Reels (예정) |
+| 항목 | YouTube Shorts | Instagram Reels |
 |---|---|---|
 | 해상도 | 1080×1920 (9:16) | 1080×1920 (9:16) |
 | 분류(공식) | 정방 **또는** 세로 ≤3분 | 권장 9:16 (허용 1.91:1~9:16) |
 | 코덱 | H.264 | H.264 |
 | 프레임률 | ≥30fps | ≥30fps |
 | 오디오 | TTS (Fish Speech) | 동일 |
-| 렌더 | WaggleBot (LTX off) | 동일 복제 예정 |
-| 상세 | [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) | — |
+| 렌더 | WaggleBot (LTX off) | **동일 mp4** (듀얼 타겟 잡 1회 렌더) |
+| 상세 | [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) | 同 |
 
 ---
 
