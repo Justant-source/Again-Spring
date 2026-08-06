@@ -710,7 +710,8 @@ public class StructuredGenerationService {
         }
         throw last;
     }
-    private static long timeout(Long v) { return v == null ? 120_000L : Math.max(1_000L, Math.min(v, 300_000L)); }
+    /** Cap matches orchestrator bundle timeout (600s). Raising without env bump is a no-op. */
+    private static long timeout(Long v) { return v == null ? 120_000L : Math.max(1_000L, Math.min(v, 600_000L)); }
     private static int safe(Integer v, int d, int min, int max) { return Math.max(min, Math.min(v == null ? d : v, max)); }
     private static String text(JsonNode n, String name) { String v = nullableText(n, name); if (v == null) throw new StructuredGenerationException(name + " is required"); return v; }
     /** body/title 추출 시 리터럴 "\n" → 실개행 (PLAN 경로는 OutputSanitizer를 거치지 않음). */

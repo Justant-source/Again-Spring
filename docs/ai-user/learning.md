@@ -112,11 +112,12 @@ learning container가 뜨면 아래가 항상 실행된다.
 
 | 작업 | UTC | KST |
 |---|---|---|
-| daily crawl | `18:00` | `03:00` |
+| daily crawl | `17:00` | `02:00` |
 | popularity 재계산 (`recompute_popularity_scores`) | `19:00` | `04:00` |
 | standalone strengthen + topic synthesis | `20:00` | `05:00` |
 
-크롤 자체는 `run_daily_crawl()` 안에서 강화·토픽합성까지 이어서 호출한다 (03:00 한 번의 잡 안에서 순차 실행).
+크롤 자체는 `run_daily_crawl()` 안에서 강화·토픽합성까지 이어서 호출한다 (02:00 한 번의 잡 안에서 순차 실행).
+사연 생성 배치(`nightly-ai-user-batch.sh`, **03:05 KST**)와 겹치지 않도록 크롤만 1시간 앞당긴다.
 
 ### Popularity 게이트 (2026-08-01)
 
@@ -181,7 +182,7 @@ Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, wi
 | 설정 | 어디서 쓰나 | 실제 의미 |
 |---|---|---|
 | `AI_LEARNING_ENABLED` | orchestrator `AiLearningClient` | orchestrator가 search/save/topics 호출할지 결정 |
-| `AI_LEARNING_CRAWL_ENABLED` | orchestrator `CrawlerTriggerScheduler` | orchestrator가 별도 crawl trigger를 날릴지 결정 |
+| `AI_LEARNING_CRAWL_ENABLED` | learning APScheduler 일일 crawl | `true`면 learning이 **02:00 KST**에 natepan/blind 크롤. orchestrator 컨테이너는 compose에서 `false` 고정(중복 트리거 방지) |
 | learning scheduler | learning app startup | `AI_LEARNING_ENABLED=true` AND `AI_LEARNING_CRAWL_ENABLED=true` 둘 다여야 크론 job이 등록됨(`init_scheduler()`가 둘 다 확인 후 return None). 2026-06-24~07-30 `AI_LEARNING_CRAWL_ENABLED=false`로 방치되어 36일간 무크롤 사고 발생(WO-CRAWL-01) — env flag 하나로 완전히 꺼질 수 있으니 admin 크롤 신선도 배지로 감시한다. |
 
 ## 운영 메모

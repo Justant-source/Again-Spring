@@ -284,7 +284,7 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
 실측 결과 글+최대 24개 후보를 한 번에 LLM 요청하는 구조화 생성이 5~10분 이상 걸릴
 수 있음이 확인됐다. 대응책:
 
-1. 타임아웃: `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` (기본 240000ms=240초)로 설정.
+1. 타임아웃: `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` (기본 600000ms=600초)로 설정.
    `OrchestratorProperties.ThreadPlan.bundleTimeoutMs`에 대응.
 2. 후보 풀 크기: `ai_user_generation_config.candidate_pool_size`를 24보다 작게
    (16 권장: 최상위 14 + 대댓글 2)으로 설정하면 생성 속도 개선.

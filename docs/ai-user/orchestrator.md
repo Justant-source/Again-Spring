@@ -51,7 +51,7 @@
 | main tick | `0 */10 * * * *` | 동일 |
 | paired posts | `0 0 5 * * *` | dev/prod 모두 `0 0 */2 * * *` |
 | daily planner | `0 0 4 * * *` | 없음 |
-| crawler trigger | `0 30 18 * * *` | `AI_LEARNING_CRAWL_ENABLED`로 on/off |
+| crawler trigger | retired (learning 02:00 KST) | orchestrator `AI_LEARNING_CRAWL_ENABLED=false`; learning APScheduler SSOT |
 
 ## tick 흐름
 

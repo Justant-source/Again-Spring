@@ -109,7 +109,7 @@
 | `AI_USER_LLM_POOL_SIZE` | AI-user worker pool | `20` |
 | `AI_USER_LLM_QUEUE_CAPACITY` | AI-user queue | `100` |
 | `AI_USER_LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `30000` |
-| `AI_USER_LLM_DEFAULT_TIMEOUT_MS` | 생성 timeout | `120000` |
+| `AI_USER_LLM_DEFAULT_TIMEOUT_MS` | 생성 timeout | `600000` |
 | `SELF_CRITIQUE_ENABLED` | 자기비평 루프 | `true` |
 | `SELF_CRITIQUE_THRESHOLD` | pass 기준 | `5` |
 | `SELF_CRITIQUE_EXTRA_CLICHES` | 추가 상투구 차단 | 공란 |
@@ -132,7 +132,7 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 | `AI_USER_THREAD_PLAN_MAINTENANCE_ENABLED` | 만료/재분배 maintenance gate | `false` |
 | `AI_USER_THREAD_PLAN_AI_POST_PROVIDER` | DB config 부재 시 AI 글 bundle provider | `CODEX` |
 | `AI_USER_THREAD_PLAN_HUMAN_PROVIDER` | DB config 부재 시 사람 글/반응 provider | `CODEX` |
-| `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` | 번들형 구조화 생성(글+최대 24후보) 타임아웃 ms | `240000` |
+| `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` | 번들형 구조화 생성(글+최대 24후보) 타임아웃 ms | `600000` |
 | `AI_USER_THREAD_PLAN_MICRO_BATCH_ENABLED` | AI_POST 생성 시 4~6 persona micro-batch (false=레거시 mega-call) | `true` |
 | `AI_USER_THREAD_PLAN_MICRO_BATCH_SIZE` | micro-batch당 댓글 persona 수 (런타임 4..6 clamp) | `5` |
 | `AI_USER_THREAD_PLAN_PLAN_PERSONA_CAST_MAX` | 단일 LLM 요청에 넣는 persona cast 상한(셔플 후 cap). 넘기면 Claude 200K 토큰 한도 초과 위험 | `40` |
@@ -167,7 +167,7 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 `AI_USER_HUMAN_REPLY_BATCH_ENABLED`)는 `env/docker-compose.ai-user.yml`의
 orchestrator `environment:` 블록에 반드시 배선되어야 한다 — compose 파일에 passthrough 항목 필수. 새 env var를 `application.yml`에 추가할 때는 compose 배선도 함께 확인할 것.
 
-prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=240000`, `AI_LEARNING_ENABLED=false`로
+prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=600000`, `AI_LEARNING_ENABLED=false`로
 운영 중이다(새벽 압축배치용, 위 표의 기본값과 다름) — 새벽 압축배치 절차는
 `docs/ai-user/operations.md` §8 참조.
 

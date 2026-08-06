@@ -138,7 +138,7 @@ public class OrchestratorProperties {
         private int humanReplyMaxPosts = 10;
         private int humanReplyMaxComments = 50;
         /** 글+최대 24개 후보를 한 번에 요청하는 구조화 생성용 타임아웃 (단건 생성보다 오래 걸림). */
-        private long bundleTimeoutMs = 240000;
+        private long bundleTimeoutMs = 600000;
         /**
          * When true (default), AI_POST bundle generation splits comment personas into
          * 4~6-sized micro-batches inside the initial job (no publish-time LLM).

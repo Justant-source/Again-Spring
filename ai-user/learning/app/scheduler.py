@@ -21,7 +21,10 @@ SOURCES = [
 ]
 
 async def run_daily_crawl():
-    """매일 KST 03:00 — natepan·blind 크롤 → 완료 후 말투 강화 + 토픽 합성"""
+    """매일 KST 02:00 — natepan·blind 크롤 → 완료 후 말투 강화 + 토픽 합성.
+
+    사연 생성 배치(nightly-ai-user-batch, 03:05 KST)와 겹치지 않도록 1시간 앞당긴다.
+    """
     from app.main import embed_service
     from app.api.crawl import _do_crawl
     logger.info("Daily crawl started (natepan + blind)")
@@ -93,10 +96,10 @@ def init_scheduler():
         return None
 
     scheduler = AsyncIOScheduler(timezone=KST)
-    # 크롤 + 강화: 매일 KST 03:00
-    scheduler.add_job(run_daily_crawl, CronTrigger(hour=3, minute=0, timezone=KST),
+    # 크롤 + 강화: 매일 KST 02:00 (사연 생성 03:05와 분리)
+    scheduler.add_job(run_daily_crawl, CronTrigger(hour=2, minute=0, timezone=KST),
                       id="daily_crawl", name="Daily Crawl + Strengthen")
-    # 인기도 점수 재계산: 매일 KST 04:00 (크롤 완료 후, 강화 전)
+    # 인기도 점수 재계산: 매일 KST 04:00 (크롤 완료 후)
     scheduler.add_job(run_recompute_popularity_scores, CronTrigger(hour=4, minute=0, timezone=KST),
                       id="daily_popularity", name="Daily Popularity Score Recomputation")
     # 독립 강화+토픽보강: 매일 KST 05:00
@@ -108,5 +111,5 @@ def init_scheduler():
                       id="daily_strengthen", name="Daily Strengthen + Topic Synthesis (standalone)")
     scheduler.start()
     _scheduler = scheduler
-    logger.info("Scheduler initialized — crawl 03:00 KST, popularity 04:00 KST, strengthen 03:00+05:00 KST daily")
+    logger.info("Scheduler initialized — crawl 02:00 KST, popularity 04:00 KST, strengthen 02:00+05:00 KST daily")
     return scheduler

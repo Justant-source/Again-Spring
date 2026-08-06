@@ -11,8 +11,12 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * ai-learning 서비스의 크롤러를 orchestrator 측에서 트리거.
- * 매일 새벽 3시 30분 KST.
+ * Legacy orchestrator→learning crawl kick (pre-Wave1-D multi-source).
+ *
+ * <p><b>Retired for daily schedule</b>: {@code ai-learning} APScheduler owns
+ * natepan/blind crawl (KST 02:00). Keep this class off via
+ * {@code AI_LEARNING_CRAWL_ENABLED=false} on the orchestrator container so it
+ * does not race the 03:05 nightly generation batch.
  */
 @Slf4j
 @Component
@@ -26,28 +30,19 @@ public class CrawlerTriggerScheduler {
     private boolean crawlEnabled;
 
     private static final List<String[]> SOURCES = List.of(
-        new String[]{"naver", "500"},
-        new String[]{"daum", "500"},
-        new String[]{"dcinside", "100"},
-        new String[]{"natepan", "50"},
-        new String[]{"bobaedream", "100"},
-        new String[]{"blind", "50"},
-        new String[]{"fmkorea", "150"},
-        new String[]{"theqoo", "120"},
-        new String[]{"clien", "100"},
-        new String[]{"ppomppu", "100"},
-        new String[]{"ruliweb", "120"},
-        new String[]{"mlbpark", "80"}
+        new String[]{"natepan", "1500"},
+        new String[]{"blind", "500"}
     );
 
-    @Scheduled(cron = "0 30 18 * * *")  // UTC 18:30 = KST 03:30
+    /** KST 02:00 — only if explicitly re-enabled; learning scheduler is SSOT. */
+    @Scheduled(cron = "0 0 17 * * *")  // UTC 17:00 = KST 02:00
     public void triggerDailyCrawl() {
         if (!props.isEnabled()) {
             log.debug("Crawl trigger skipped: AI_USER_ENABLED=false");
             return;
         }
         if (!crawlEnabled) {
-            log.debug("Crawl trigger disabled");
+            log.debug("Crawl trigger disabled (ai-learning scheduler owns daily crawl at 02:00 KST)");
             return;
         }
         log.info("Triggering daily crawl for {} sources", SOURCES.size());
