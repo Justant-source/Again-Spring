@@ -9,6 +9,8 @@ import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.marketing.dto.CreateJobRequest;
 import com.againspring.marketing.dto.CreateJobResponse;
 import com.againspring.marketing.dto.JobCallbackPayload;
+import com.againspring.domain.User;
+import com.againspring.repository.UserRepository;
 import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
@@ -73,6 +75,9 @@ class MarketingJobServiceTest {
 
     @Mock
     VoteOptionRepository voteOptionRepository;
+
+    @Mock
+    UserRepository userRepository;
 
     @InjectMocks
     MarketingJobService marketingJobService;
@@ -241,18 +246,23 @@ class MarketingJobServiceTest {
     }
 
     @Test
-    void createJob_enrichesTopCommentsWithFullBodyTop2ByLikeCount() throws JsonProcessingException {
+    void createJob_enrichesTopCommentsWithFullBodyTop3ByLikeCount() throws JsonProcessingException {
         String longPostBody = "가".repeat(400); // longer than side_a's 300-char cap
         String longCommentBody = "나".repeat(150); // longer than the old 100-char comment cap
+        Instant commentCreatedAt = Instant.parse("2026-08-05T09:00:00Z");
         Post post = Post.builder()
             .id(TEST_POST_ID)
             .title("Test Conflict")
             .bodyPublished(longPostBody)
+            .authorId("post-author")
+            .partnerUserId("post-partner")
             .build();
 
         PostComment low = PostComment.builder().authorId("user-low").body("낮은 좋아요 댓글").likeCount(1).build();
-        PostComment high = PostComment.builder().authorId("user-high").body(longCommentBody).likeCount(10).build();
-        PostComment mid = PostComment.builder().authorId("user-mid").body("중간 좋아요 댓글").likeCount(5).build();
+        PostComment high = PostComment.builder().authorId("post-author").body(longCommentBody).likeCount(10)
+            .createdAt(commentCreatedAt).build();
+        PostComment mid = PostComment.builder().authorId("post-partner").body("중간 좋아요 댓글").likeCount(5).build();
+        PostComment lowest = PostComment.builder().authorId("user-lowest").body("최하위 댓글").likeCount(0).build();
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
@@ -261,7 +271,11 @@ class MarketingJobServiceTest {
         when(jurorRepository.findByPostId(any())).thenReturn(List.of());
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
-        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(low, high, mid));
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(low, high, mid, lowest));
+        when(userRepository.findById("post-author"))
+            .thenReturn(Optional.of(User.builder().id("post-author").nickname("작성자닉").build()));
+        when(userRepository.findById("post-partner"))
+            .thenReturn(Optional.of(User.builder().id("post-partner").nickname("상대방닉").build()));
 
         CreateJobResponse response = CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build();
         when(asmClient.createJob(any(CreateJobRequest.class), any(String.class))).thenReturn(response);
@@ -279,12 +293,27 @@ class MarketingJobServiceTest {
         assertThat(brief.getAuthorBody()).isEqualTo(longPostBody);
         assertThat(brief.getSideA()).hasSize(300);
 
-        // top 2 by likeCount desc, full body (no 100-char truncation)
-        assertThat(brief.getTopComments()).hasSize(2);
-        assertThat(brief.getTopComments().get(0).getBody()).isEqualTo(longCommentBody);
-        assertThat(brief.getTopComments().get(0).getLikeCount()).isEqualTo(10);
-        assertThat(brief.getTopComments().get(0).getAuthor()).isEqualTo("user-high");
-        assertThat(brief.getTopComments().get(1).getLikeCount()).isEqualTo(5);
+        // top 3 by likeCount desc, full body (no 100-char truncation)
+        assertThat(brief.getTopComments()).hasSize(3);
+
+        CreateJobRequest.TopCommentDto topComment = brief.getTopComments().get(0);
+        assertThat(topComment.getBody()).isEqualTo(longCommentBody);
+        assertThat(topComment.getLikeCount()).isEqualTo(10);
+        // author = resolved nickname, not raw authorId
+        assertThat(topComment.getAuthor()).isEqualTo("작성자닉");
+        assertThat(topComment.getAuthorId()).isEqualTo("post-author");
+        assertThat(topComment.getCreatedAt()).isEqualTo(commentCreatedAt);
+        assertThat(topComment.getSide()).isEqualTo("author");
+
+        CreateJobRequest.TopCommentDto secondComment = brief.getTopComments().get(1);
+        assertThat(secondComment.getLikeCount()).isEqualTo(5);
+        assertThat(secondComment.getAuthor()).isEqualTo("상대방닉");
+        assertThat(secondComment.getSide()).isEqualTo("partner");
+
+        // unresolved nickname (mock returns empty) falls back to "익명", side is neutral
+        CreateJobRequest.TopCommentDto thirdComment = brief.getTopComments().get(2);
+        assertThat(thirdComment.getAuthor()).isEqualTo("익명");
+        assertThat(thirdComment.getSide()).isEqualTo("neutral");
     }
 
 

@@ -13,6 +13,7 @@ import com.againspring.marketing.dto.CreateJobRequest.PolicyDto;
 import com.againspring.marketing.dto.CreateJobRequest.TopCommentDto;
 import com.againspring.marketing.dto.CreateJobResponse;
 import com.againspring.marketing.dto.JobCallbackPayload;
+import com.againspring.repository.UserRepository;
 import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
@@ -58,6 +59,7 @@ public class MarketingJobService {
     private final VoteService voteService;
     private final CommentService commentService;
     private final VoteOptionRepository voteOptionRepository;
+    private final UserRepository userRepository;
 
     /**
      * Create a new marketing job for a post
@@ -146,7 +148,7 @@ public class MarketingJobService {
             log.warn("Failed to load juror data for post {}: {}", postId, e.getMessage());
         }
 
-        // Top comments by likeCount (descending) — top 2, full body (no truncation).
+        // Top comments by likeCount (descending) — top 3, full body (no truncation).
         // Always enriched (not gated by target) for consistency across platforms;
         // youtube_shorts narration needs the full text, others simply ignore extra fields.
         List<TopCommentDto> topComments = new ArrayList<>();
@@ -159,11 +161,14 @@ public class MarketingJobService {
                     int lb = b.getLikeCount() != null ? b.getLikeCount() : 0;
                     return Integer.compare(lb, la);
                 })
-                .limit(2)
+                .limit(3)
                 .map(c -> TopCommentDto.builder()
-                    .author(c.getAuthorId())
+                    .author(resolveNickname(c.getAuthorId()))
+                    .authorId(c.getAuthorId())
                     .body(c.getBody())
                     .likeCount(c.getLikeCount() != null ? c.getLikeCount() : 0)
+                    .createdAt(c.getCreatedAt())
+                    .side(resolveSide(c.getAuthorId(), post.getAuthorId(), post.getPartnerUserId()))
                     .build())
                 .collect(Collectors.toList());
         } catch (Exception e) {
@@ -400,6 +405,22 @@ public class MarketingJobService {
         AsmJobView view = asmClient.publish(job.getRemoteJobId());
         applyPoll(job, view);
         return job;
+    }
+
+    /** 사용자 ID → 닉네임 변환 (없으면 익명 반환). CommunityCommentController#resolveNickname과 동일 패턴. */
+    private String resolveNickname(String userId) {
+        if (userId == null || userId.startsWith("anon_")) return "익명";
+        return userRepository.findById(userId)
+            .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+            .orElse("익명");
+    }
+
+    /** 댓글 작성자를 사연 작성자(author)/상대방(partner)/그 외(neutral)로 구분 (Shorts 진영색 스타일용). */
+    private String resolveSide(String commentAuthorId, String postAuthorId, String postPartnerUserId) {
+        if (commentAuthorId == null) return "neutral";
+        if (postAuthorId != null && postAuthorId.equals(commentAuthorId)) return "author";
+        if (postPartnerUserId != null && postPartnerUserId.equals(commentAuthorId)) return "partner";
+        return "neutral";
     }
 
     private String serializeJson(Object obj) {

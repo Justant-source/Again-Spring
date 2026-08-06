@@ -78,7 +78,7 @@ public class CreateJobRequest {
         @JsonProperty("jury_opinions")
         private List<String> juryOpinions;
 
-        /** 좋아요 순 상위 2, 본문 전문(미절단). */
+        /** 좋아요 순 상위 3, 본문 전문(미절단). */
         @JsonProperty("top_comments")
         private List<TopCommentDto> topComments;
 
@@ -163,19 +163,31 @@ public class CreateJobRequest {
 
     /**
      * Top comment for enriched briefs (e.g. youtube_shorts narration). {@code author}
-     * is best-effort (raw authorId — no nickname join) and may be null.
+     * is the display nickname (resolved via {@code UserRepository}, "익명" fallback) so
+     * Shorts renders a real name instead of a raw authorId hash.
      */
     @Getter
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class TopCommentDto {
+        /** Display nickname (never raw authorId). */
         private String author;
+
+        /** Raw user id, kept for faction/analytics — optional, may be null for anon. */
+        @JsonProperty("author_id")
+        private String authorId;
 
         private String body;
 
         @JsonProperty("like_count")
         private Integer likeCount;
+
+        @JsonProperty("created_at")
+        private java.time.Instant createdAt;
+
+        /** {@code "author"} | {@code "partner"} | {@code "neutral"} — for faction-color styling. */
+        private String side;
     }
 
     @Getter
