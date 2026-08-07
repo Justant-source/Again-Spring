@@ -69,6 +69,24 @@ public class CandidateScheduleSupport {
     }
 
     /**
+     * Recomputes every item {@code scheduledAt} from {@code publishAt} using {@link #schedule}.
+     * Used at auto-publish so comment release stays dense after the real post time even when
+     * the hold slot was moved without shifting baked candidate times (ops SQL / partial PATCH).
+     */
+    @SuppressWarnings("unchecked")
+    public void rescheduleFromPublishAt(Map<String, Object> response, Instant publishAt) {
+        if (response == null || publishAt == null) return;
+        List<Map<String, Object>> items = mutableItems(response);
+        int sequence = 0;
+        for (Map<String, Object> item : items) {
+            boolean reply = hasParent(item);
+            item.put("scheduledAt", schedule(publishAt, sequence, reply).toString());
+            sequence++;
+        }
+        response.put("items", items);
+    }
+
+    /**
      * Phase1 invariant: every item {@code scheduledAt} must be strictly before {@code partnerAt}
      * (T0+Δ). Missing values are filled then clamped. Items already before the deadline are kept.
      * When the (publishedAt, partnerAt) window is too short, times pack into the open interval.

@@ -204,10 +204,16 @@ public class ScheduledPostPublisher {
                         row.getCandidatesJson(), new TypeReference<>() { });
                 response.remove(PairedHoldMeta.KEY);
                 if (response.get("items") instanceof List<?> items && !items.isEmpty()) {
+                    // Phase1 volume is small (≤4 top-level) — use PHASE1 ready mins, not full-plan 6.
                     candidateScheduleSupport.clampScheduledAtsBefore(response, t0, deadline);
                     AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, t0,
                             row.getTitle(), row.getBody(), row.getCategory(), row.getProvider(), row.getModel());
-                    planGenerationService.persistAndFinalize(plan.getId(), response);
+                    planGenerationService.persistAndFinalize(
+                            plan.getId(),
+                            response,
+                            null,
+                            ThreadPlanGenerationService.PHASE1_READY_MIN_TOP_LEVEL,
+                            ThreadPlanGenerationService.PHASE1_READY_MIN_ITEMS);
                     return;
                 }
             } catch (Exception e) {
@@ -233,7 +239,11 @@ public class ScheduledPostPublisher {
             if (!(response.get("items") instanceof List<?> items) || items.isEmpty()) {
                 if (response.get("post") == null) return;
             }
-            AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, Instant.now(),
+            Instant publishedAt = Instant.now();
+            // Hold slot may have moved without shifting baked candidate times — always rebase
+            // comment release to the actual publish clock (dense early window).
+            candidateScheduleSupport.rescheduleFromPublishAt(response, publishedAt);
+            AiThreadPlan plan = planService.reservePreGeneratedBundle(post.getId(), 1, publishedAt,
                     row.getTitle(), row.getBody(), row.getCategory(), row.getProvider(), row.getModel());
             planGenerationService.persistAndFinalize(plan.getId(), response);
         } catch (Exception replayFailure) {

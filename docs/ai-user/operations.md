@@ -192,11 +192,18 @@ env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
 ScheduledPostPublisher (cron AI_USER_SCHEDULED_POST_PUBLISHER_CRON, 기본 매 분)
   ├─ ScheduledPostLeaseService.claimDue()로 due 행 lease
   ├─ BackendBotClient.createPost — 진짜 글 생성
-  ├─ candidates_json을 persistResponse()로 재생 (LLM 재호출 없음)
+  ├─ candidates_json 재생 직전 `CandidateScheduleSupport.rescheduleFromPublishAt`
+  │    (실제 발행 시각 기준 조밀한 early-window으로 재계산 — 홀드 슬롯만
+  │     옮기고 `scheduledAt`을 안 옮긴 ops/SQL 드리프트 방어)
+  ├─ solo: persistAndFinalize(full mins) / paired phase1: PHASE1_READY_MIN_* (2/1)
   └─ PUBLISHED로 갱신
 
 PairedPostScheduler cron (PAIRED_POST_CRON, 기본 2시간) — 당일 양면 사연 부족분 보충
 ```
+
+어드민 PATCH로 `scheduled_publish_at`을 옮기면 `shiftScheduledAts`로
+`candidates_json`도 같이 밀린다. raw SQL로 슬롯만 바꾸면 댓글이 수 시간 뒤
+슬롯에 남는 버그가 난다 — 발행 시 `rescheduleFromPublishAt`이 안전망이다.
 
 `schedule_execution_paused`는 항상 `false`로 둬서 이미 만들어진 item의 게시는
 낮 동안 계속된다. `ai_user_runtime.enabled`(LEGACY tick 킬스위치)는 이 파이프라인과

@@ -92,6 +92,30 @@ class AdminScheduledPostServiceTest {
     }
 
     @Test
+    void rescheduleFromPublishAtOverwritesStaleBakedTimes() {
+        when(properties.getThreadPlan()).thenReturn(threadPlanConfig);
+        when(threadPlanConfig.getKstHourlyHumanWeights()).thenReturn(flatWeights());
+
+        Instant publishAt = Instant.parse("2026-08-07T01:15:00Z"); // 10:15 KST
+        Instant staleEvening = Instant.parse("2026-08-07T07:43:00Z"); // 16:43 KST
+        Map<String, Object> response = new LinkedHashMap<>();
+        Map<String, Object> item0 = new LinkedHashMap<>();
+        item0.put("ref", "c1");
+        item0.put("personaId", "p1");
+        item0.put("body", "댓글");
+        item0.put("scheduledAt", staleEvening.toString());
+        response.put("items", List.of(item0));
+
+        scheduleSupport.rescheduleFromPublishAt(response, publishAt);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> item = ((List<Map<String, Object>>) response.get("items")).get(0);
+        Instant at = Instant.parse(String.valueOf(item.get("scheduledAt")));
+        assertThat(at).isEqualTo(scheduleSupport.schedule(publishAt, 0, false));
+        assertThat(at).isBefore(staleEvening);
+    }
+
+    @Test
     void patchShiftsItemTimesWhenSlotMovesWithoutItems() throws Exception {
         Instant oldSlot = Instant.parse("2026-08-01T11:00:00Z");
         Instant newSlot = Instant.parse("2026-08-01T12:00:00Z");
