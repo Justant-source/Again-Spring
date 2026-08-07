@@ -205,9 +205,15 @@ flowchart LR
 
 `PATCH` 시 글 `createdAt` delta는 댓글·예약 시각에 일괄 적용된다. orchestrator `ai_scheduled_posts`는 BE가 프록시한다.
 
-## Social Publishing API
+## Social Publishing / Marketing API
 
-소셜 게시 API는 ASM 서비스로 이전됨. Again-Spring-Marketing 프로젝트 문서 참조. X/`x_thread`만 활성(미공개 초점).
+| Method | Path | 설명 |
+|---|---|---|
+| `GET` | `/api/admin/marketing/quota` | 24h 자동 분배 일일 상한·오늘 KST 사용량 |
+| `PUT` | `/api/admin/marketing/quota` | 글/영상 상한 저장 (`system_setting`) |
+| 잡·자격증명·통계 | `/api/admin/marketing/jobs*` 등 | ASM 프록시 — [`platforms.md`](../marketing/platforms.md) |
+
+24h 배분: 공유 풀(`dailyTextCap` 기본 6) · 영상 우선(`dailyVideoCap` 기본 3, X 없음) · 잔여 글 슬롯 = X+IG 피드.
 
 ## 전체 Admin 엔드포인트 수
 

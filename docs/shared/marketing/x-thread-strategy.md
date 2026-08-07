@@ -118,8 +118,10 @@ AND  post.createdAt + 24시간 경과
 AND  해당 post에 x_thread 타깃 marketing_job이 한 번도 없음 (status 무관)
 ```
 
-사람·PLAN 구분 없이 **컷오프 이후 생성된 글만** 24시간 후 X 스레드를 1회 자동 생성·발행한다.
-같은 스케줄러가 `instagram_feed`도 동일 규칙으로 별도 잡을 만든다(ASM alone 제약).
+사람·PLAN 구분 없이 **컷오프 이후 생성된 글만** 24시간 후, **공유 일일 풀의 글 슬롯**에
+선정되면 X 스레드를 1회 자동 생성·발행한다(영상 슬롯 사연에는 X 없음).
+같은 틱에서 `instagram_feed`도 함께 별도 잡을 만든다(ASM alone 제약).
+상한·배분: [`platforms.md`](platforms.md) · Admin `/admin/marketing → 일일 상한`.
 
 **컷오프 (`ASM_AUTO_PUBLISH_SINCE`, 2026-08-02)**: 24h 게이트만 켜면 기존 사연 백로그가
 실계정에 연속 발행된다. ISO-8601 Instant(예: `2026-08-02T08:43:52Z`) 이후 생성분만
@@ -130,9 +132,10 @@ eligible. 트리거 ON인데 값이 비어 있으면 **fail-closed**(스킵).
 
 **댓글 수 게이트 폐지 (2026-08-02)**: 이전에는 캡처 품질을 위해 `comments >= 6`을 요구했으나,
 제품 정책이 "게시 후 24시간이면 무조건 X·IG 발행"으로 확정되어 제거했다.
+이후 일일 상한(공유 풀)이 추가되어 **무제한 전체 발행은 하지 않는다**.
 댓글이 적어도 빈 댓글창/짧은 캡처로 올린다.
 
-**one-shot (2026-08-01)**: X 스레드는 사연당 **1회**다. `findPostsEligibleForXThreadPublish`의
+**one-shot (2026-08-01)**: X 스레드는 사연당 **1회**다. 글 슬롯 선정의
 `NOT EXISTS`는 status를 보지 않는다.
 
 ### 3.2 상태값(`ThreadPlanStatus`)을 트리거로 쓰지 않는 이유

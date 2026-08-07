@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlatformCredentialsSection } from '@/components/admin/marketing/PlatformCredentialsSection';
+import { MarketingQuotaSection } from '@/components/admin/marketing/MarketingQuotaSection';
 import { JobBoard } from '@/components/admin/marketing/JobBoard';
 import { PlatformPerformanceCards } from '@/components/admin/marketing/PlatformPerformanceCards';
 import { PublicationTimeline } from '@/components/admin/marketing/PublicationTimeline';
@@ -208,6 +209,7 @@ export default function MarketingJobsPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="jobs">마케팅 잡</TabsTrigger>
+          <TabsTrigger value="settings">일일 상한</TabsTrigger>
           <TabsTrigger value="credentials">플랫폼 계정</TabsTrigger>
         </TabsList>
 
@@ -253,6 +255,10 @@ export default function MarketingJobsPage() {
               </div>
             </>
           )}
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <MarketingQuotaSection />
         </TabsContent>
 
         <TabsContent value="credentials">

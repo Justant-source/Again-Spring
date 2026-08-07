@@ -346,9 +346,15 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 |---|---|---|---|---|
 | POST | `/api/admin/test/reset` | JWT | 200 | [admin.md](admin.md) |
 
-### Marketing API
+### Marketing API (Admin — AS thin client)
 
-마케팅 API는 ASM 서비스(`/api/v1/jobs`)로 이전됨. Again-Spring-Marketing 프로젝트 문서 참조.
+| Method | Path | Auth | 상태코드 | 설명 |
+|---|---|---|---|---|
+| GET | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 | 일일 글/영상 상한 + 오늘(KST) 사용량. 응답: `{dailyTextCap, dailyVideoCap, videosToday, textsToday, remainingPool}` |
+| PUT | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 / 400 | 상한 저장. Body: `{dailyTextCap(1–50), dailyVideoCap(0–textCap)}`. `system_setting` 키 `marketing.daily_text_cap` / `marketing.daily_video_cap` |
+| GET/POST/… | `/api/admin/marketing/jobs*` · `/credentials*` · `/performance` · `/timeline` | **JWT + ADMIN** | — | 잡·자격증명·통계 (ASM 프록시). 상세: [platforms.md](../marketing/platforms.md) |
+
+24h 자동 분배 규칙(공유 풀·영상 우선·글=X+피드): [`platforms.md`](../marketing/platforms.md). ASM 잡 API는 Again-Spring-Marketing 문서 참조.
 
 ---
 

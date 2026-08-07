@@ -32,7 +32,7 @@
 |---|---|---|
 | **Again-Spring (AS)** | Ubuntu 서버 | 얇은 트리거/클라이언트. 잡 생성·폴링·UI 표시만 담당 |
 | **Again-Spring-Marketing (ASM)** | WSL GPU 서버 | 콘텐츠 생성·렌더링·소셜 게시 전담 |
-| **ASM social-poster** | ASM `services/social-poster/` | Playwright 자동 게시. **24h 분배 = X 전체 / 인기 3 영상(Reels+Shorts) / 나머지 피드** |
+| **ASM social-poster** | ASM `services/social-poster/` | Playwright 자동 게시. **24h 분배 = 공유 풀(기본 6) · 영상 우선(기본 3, 릴스+쇼츠) · 잔여 글(X+피드)** |
 
 **접속**: AS 호스트 Tailscale `100.81.189.92`에서 `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
 
@@ -48,15 +48,15 @@ docs/shared/marketing/
 ├── credentials.md      ← 플랫폼 계정 자격증명 저장·암호화 정책
 ├── social-poster.md            ← social-poster 서비스 운영 가이드
 ├── x-thread-strategy.md        ← X 스레드 전략 (솔로 3~4 / 양면 최대 6단)
-├── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (24h · 영상 미선정분)
-└── youtube-shorts-strategy.md  ← Shorts/Reels (WaggleBot · 24h 인기 3 듀얼 자동 게시)
+├── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (24h · 글 슬롯)
+└── youtube-shorts-strategy.md  ← Shorts/Reels (WaggleBot · 24h 영상 슬롯 듀얼 자동 게시)
 ```
 
 ---
 
 ## 빠른 시작
 
-> **24h 자동 분배**: `x_thread` 전체 · 인기 상위 3 → `instagram_reels`+`youtube_shorts`(일 3캡) · 나머지 → `instagram_feed`.
+> **24h 자동 분배**: 공유 일일 풀(기본 글 상한 6) · 영상 우선(기본 3 → 릴스+쇼츠, X 없음) · 잔여 → `x_thread`+`instagram_feed`. 상한은 Admin `/admin/marketing → 일일 상한`.
 > 상세 [`platforms.md`](platforms.md).
 
 ### 어드민 사용법

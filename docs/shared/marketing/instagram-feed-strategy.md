@@ -11,12 +11,12 @@
 
 | 항목 | 값 |
 |---|---|
-| 자동/스케줄 활성 | **활성** — `createdAt >= ASM_AUTO_PUBLISH_SINCE` 이고 `+24h` 후, **영상(인기 상위 3) 미선정** 사연만 (`XThreadPublishTriggerScheduler`) |
+| 자동/스케줄 활성 | **활성** — `createdAt >= ASM_AUTO_PUBLISH_SINCE` 이고 `+24h` 후, **공유 풀 글 슬롯**에 선정된 사연만 (`XThreadPublishTriggerScheduler`) |
 | 파이프 구현 | **허용** (하이브리드 캐러셀) |
-| 실발행 | 자동(24h · 나머지) + 관리자 단건 수동 |
+| 실발행 | 자동(24h · 글 슬롯) + 관리자 단건 수동 |
 
-컷오프 이후 생성된 사연은 공개 24시간 뒤 분배된다: **X 전체** · **인기 상위 3 → Reels+Shorts** · **나머지 → 피드**.  
-피드는 영상 잡(`instagram_reels`/`youtube_shorts`)이 없는 사연만. X와 동일 스케줄러·게이트(댓글 수 조건 없음). ASM alone 제약으로 **별도 잡**.
+컷오프 이후 생성된 사연은 공개 24시간 뒤 **공유 일일 풀** 안에서 분배된다: **영상 우선(릴스+쇼츠, X 없음)** · **잔여 글 슬롯 → X+피드**.  
+피드는 영상 잡이 없는 글 슬롯 사연만. X와 동일 틱에서 함께 enqueue. ASM alone 제약으로 **별도 잡**. 상한·배분 상세는 [`platforms.md`](platforms.md).
 
 ---
 
@@ -144,6 +144,6 @@ https://againspring.net/community/{postId}
 ### 영상(릴스/쇼츠)과의 상호배타 (2026-08-06)
 
 같은 사연에 `instagram_reels` 또는 `youtube_shorts` 잡이 한 번이라도 있으면 `instagram_feed` 자동 발행 대상에서 제외한다.
-24h 분배에서 인기 상위(일 3캡)로 영상에 가면 피드는 만들지 않는다 (`NOT EXISTS` reels/shorts).
+24h 분배에서 **영상 슬롯**으로 선정되면 피드는 만들지 않는다 (`NOT EXISTS` reels/shorts). 글 슬롯만 X+피드를 만든다.
 
 ---

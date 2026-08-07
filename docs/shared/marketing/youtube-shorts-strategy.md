@@ -10,7 +10,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 자동 생성 | **활성** — 사연 `+24h` 후 인기 상위(일 3캡)에 선정되면 `instagram_reels`+`youtube_shorts` **듀얼 잡** 1회 (`XThreadPublishTriggerScheduler`) |
+| 자동 생성 | **활성** — 사연 `+24h` 후 공유 풀·영상 상한 안에서 인기 순 선정 시 `instagram_reels`+`youtube_shorts` **듀얼 잡** 1회 (`XThreadPublishTriggerScheduler`) |
 | 자동 게시 | **활성** — 듀얼 잡 `autoPublish=true` → READY 후 YT API + Reels Graph/세션 모두 게시 |
 | 렌더 | WaggleBot 블랙박스 (`POST /api/external/jobs`) — LLM은 **Claude CLI 브릿지** (`llm_backend=cli`, 호스트 `~/.claude` = Again Spring과 동일 세션). Anthropic API 직접 호출 금지. **듀얼 타겟은 1회 렌더** |
 | 게시 계정 | 다시봄 전용 YouTube (ASM `youtube_shorts` OAuth) |
@@ -43,7 +43,7 @@ AS 24h 분배 → ASM 잡(targets=[instagram_reels, youtube_shorts], auto_publis
 | LTX / ComfyUI | **off** (`videoGen: false`) |
 | 프레임 | Waggle 기존 `text_only` / `comments` / `outro` 재활용 |
 | 본문 | 작성자 사연 **거의 전문** 낭독 (원문 유지 + 청킹·금지어만) |
-| 댓글 | 광장 **좋아요 순 상위 3**(§4.3/§4.5) — 화자별 TTS. (24h 영상 선정은 조회수 인기·일 3캡 — 댓글 수 게이트 없음) |
+| 댓글 | 광장 **좋아요 순 상위 3**(§4.3/§4.5) — 화자별 TTS. (24h 영상 선정은 조회수 인기·공유 풀 영상 상한 — 댓글 수 게이트 없음) |
 | 양면(paired) | 영상에는 작성자만. 클로징·첫 댓글만 상대 처리 |
 | 클로징 TTS | 솔로: `여러분의 의견을 댓글로 남겨주세요` / paired: `상대방의 사연이 궁금하면 댓글을 확인해주세요` |
 | 썸네일 | Waggle 산출 + YT 권장 16:9 커버는 후속 가능 |
@@ -153,7 +153,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 
 1. WaggleBot `POST/GET /api/external/jobs` (ingest→APPROVED, outro/videoGen per-job) — **완료**
 2. ASM Waggle 파이프 (alone + **Reels+Shorts 듀얼·1회 렌더**) — **완료**
-3. AS brief 보강 + **24h 인기 상위 3 / 일 3캡** 스케줄러 + 어드민 미리보기 — **완료**
+3. AS brief 보강 + **24h 공유 풀·영상 상한** 스케줄러 + 어드민 미리보기 — **완료**
 4. `auto_publish` → YouTube 업로드(+ paired 첫 댓글) + Reels 게시 — **활성**
 
 ### 7.1 레이아웃 리디자인 (§4 — 반영 완료)

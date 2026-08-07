@@ -127,15 +127,21 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     List<String> findPostsEligibleForInstagramFeedPublish(Instant since, int limit);
 
     /**
-     * Posts past 24h with no IG feed / Reels / Shorts job yet, ranked by popularity:
+     * Posts past 24h with no IG feed / Reels / Shorts / X-thread job yet, ranked by popularity:
      * view_count DESC → top-level comments → votes → created_at DESC.
-     * Used to pick the daily top-3 video cohort (Reels + YouTube Shorts).
+     * Used to pick the daily video cohort (Reels + YouTube Shorts) under the shared quota pool.
+     * Excludes {@code x_thread} so text-path posts are not also selected for video.
      */
     @Query(nativeQuery = true, value = """
         SELECT p.id FROM posts p
         WHERE p.created_at >= :since
         AND p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         AND p.deleted_at IS NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"x_thread"')
+        )
         AND NOT EXISTS (
             SELECT 1 FROM marketing_job mj
             WHERE mj.post_id = p.id
@@ -169,8 +175,54 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     List<String> findPostsEligibleForVideoMarketing(Instant since, int limit);
 
     /**
+     * Posts past 24h with no X / feed / Reels / Shorts job yet, ranked by the same popularity
+     * score as video. Used for daily text slots (x_thread + instagram_feed).
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT p.id FROM posts p
+        WHERE p.created_at >= :since
+        AND p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        AND p.deleted_at IS NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"x_thread"')
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"instagram_feed"')
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"instagram_reels"')
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = p.id
+            AND JSON_CONTAINS(mj.targets, '"youtube_shorts"')
+        )
+        ORDER BY
+            COALESCE(p.view_count, 0) DESC,
+            (
+                SELECT COUNT(*) FROM post_comments c
+                WHERE c.post_id = p.id
+                AND c.parent_comment_id IS NULL
+                AND c.deleted_at IS NULL
+            ) DESC,
+            (
+                SELECT COUNT(*) FROM votes v
+                WHERE v.post_id = p.id
+            ) DESC,
+            p.created_at DESC
+        LIMIT :limit
+        """)
+    List<String> findPostsEligibleForTextMarketing(Instant since, int limit);
+
+    /**
      * Count distinct posts that already received a Reels and/or Shorts marketing job
-     * since {@code since} (caller passes start-of-day KST as Instant). Caps daily videos at 3.
+     * since {@code since} (caller passes start-of-day KST as Instant).
      */
     @Query(nativeQuery = true, value = """
         SELECT COUNT(DISTINCT mj.post_id) FROM marketing_job mj
@@ -181,4 +233,15 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         )
         """)
     long countVideoJobsCreatedSince(Instant since);
+
+    /**
+     * Count distinct posts that received an {@code x_thread} job since {@code since}.
+     * One text marketing slot = one x_thread job (instagram_feed is created alongside).
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT COUNT(DISTINCT mj.post_id) FROM marketing_job mj
+        WHERE mj.created_at >= :since
+        AND JSON_CONTAINS(mj.targets, '"x_thread"') = TRUE
+        """)
+    long countTextSlotsCreatedSince(Instant since);
 }

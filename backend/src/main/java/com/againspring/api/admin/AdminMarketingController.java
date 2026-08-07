@@ -3,9 +3,12 @@ package com.againspring.api.admin;
 import com.againspring.annotation.Auditable;
 import com.againspring.api.admin.dto.JobResponse;
 import com.againspring.api.admin.dto.CreateJobRequest;
+import com.againspring.api.admin.dto.MarketingQuotaResponse;
+import com.againspring.api.admin.dto.UpdateMarketingQuotaRequest;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
+import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.admin.MarketingStatsService;
@@ -19,14 +22,13 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.validation.annotation.Validated;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -45,6 +47,29 @@ public class AdminMarketingController {
     private final MarketingJobRepository marketingJobRepository;
     private final AsmClient asmClient;
     private final MarketingStatsService marketingStatsService;
+    private final MarketingQuotaService marketingQuotaService;
+
+    // ===== Daily auto-publish quota =====
+
+    @GetMapping("/quota")
+    @Operation(summary = "Marketing daily quota", description = "24h 자동 분배 일일 상한·오늘 KST 사용량")
+    @ApiResponse(responseCode = "200", description = "Quota returned")
+    public ResponseEntity<MarketingQuotaResponse> getQuota() {
+        return ResponseEntity.ok(MarketingQuotaResponse.from(marketingQuotaService.getStatus()));
+    }
+
+    @PutMapping("/quota")
+    @Operation(summary = "Update marketing daily quota", description = "일일 글/영상 상한 저장")
+    @ApiResponse(responseCode = "200", description = "Quota updated")
+    @ApiResponse(responseCode = "400", description = "Invalid caps")
+    @Auditable(action = "UPDATE_MARKETING_QUOTA")
+    public ResponseEntity<MarketingQuotaResponse> updateQuota(
+            @Valid @RequestBody UpdateMarketingQuotaRequest req,
+            Authentication auth) {
+        String updatedBy = auth != null ? auth.getName() : "admin";
+        return ResponseEntity.ok(MarketingQuotaResponse.from(
+            marketingQuotaService.updateCaps(req.getDailyTextCap(), req.getDailyVideoCap(), updatedBy)));
+    }
 
     /**
      * Create a new marketing job for a post

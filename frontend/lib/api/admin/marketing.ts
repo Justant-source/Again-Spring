@@ -218,6 +218,32 @@ export async function getJobTraffic(id: number): Promise<JobTrafficDto> {
   return res.data;
 }
 
+// ===== Daily auto-publish quota =====
+
+export interface MarketingQuota {
+  dailyTextCap: number;
+  dailyVideoCap: number;
+  videosToday: number;
+  textsToday: number;
+  remainingPool: number;
+}
+
+export async function getMarketingQuota(): Promise<MarketingQuota> {
+  const res = await api.get<MarketingQuota>('/api/admin/marketing/quota');
+  return res.data;
+}
+
+export async function updateMarketingQuota(
+  dailyTextCap: number,
+  dailyVideoCap: number
+): Promise<MarketingQuota> {
+  const res = await api.put<MarketingQuota>('/api/admin/marketing/quota', {
+    dailyTextCap,
+    dailyVideoCap,
+  });
+  return res.data;
+}
+
 // ===== Admin Posts for Picker (별도 타입 — content.ts의 AdminPost와 구분) =====
 
 export interface PickerPost {
