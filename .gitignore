@@ -105,6 +105,8 @@ env/backups/
 backups/
 # 운영 스크립트 실행 로그 (env/scripts/*.sh 산출물)
 env/logs/
+# Watchdog 상태 파일 (자동 생성, git 무시)
+env/watchdog-state/
 
 # ===== 도구/의존성 캐시 (로컬 산출물 — 커밋 대상 아님) =====
 .claude/skills/
