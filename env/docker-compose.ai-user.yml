@@ -329,7 +329,7 @@ services:
       SYNC_CONTENT_LOOKBACK_MINUTES: ${SYNC_CONTENT_LOOKBACK_MINUTES:-15}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "ps", "aux", "|", "grep", "-q", "python.*sync"]
+      test: ["CMD", "pidof", "python"]
       interval: 30s
       timeout: 10s
       retries: 3
