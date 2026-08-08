@@ -15,6 +15,7 @@ services:
       dockerfile: Dockerfile
     image: againspring-llm-ai-user
     container_name: againspring-llm-ai-user
+    user: "1000:1000"
     environment:
       CLAUDE_BIN: ${CLAUDE_BIN:-claude}
       CODEX_BIN: ${CODEX_BIN:-codex}
@@ -39,9 +40,10 @@ services:
       DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}
+      HOME: /home/justant
     volumes:
-      - ${CLAUDE_HOST_CONFIG_DIR:-/root/.claude}:/root/.claude
-      - ${CODEX_HOST_CONFIG_DIR:-/home/justant/.codex}:/root/.codex
+      - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/home/justant/.claude
+      - ${CODEX_HOST_CONFIG_DIR:-/home/justant/.codex}:/home/justant/.codex
     restart: unless-stopped
     networks:
       - againspring
@@ -326,6 +328,12 @@ services:
       SYNC_BACKFILL_DAYS: ${SYNC_BACKFILL_DAYS:-7}
       SYNC_CONTENT_LOOKBACK_MINUTES: ${SYNC_CONTENT_LOOKBACK_MINUTES:-15}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ps", "aux", "|", "grep", "-q", "python.*sync"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       - againspring-prod
       - againspring-dev

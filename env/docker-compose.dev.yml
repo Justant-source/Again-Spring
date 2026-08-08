@@ -79,6 +79,12 @@ services:
       mariadb-dev:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8080/api/health 2>/dev/null | grep -q 'OK\\|UP' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
     networks:
       - againspring-dev
 
@@ -99,6 +105,12 @@ services:
     depends_on:
       - backend-dev
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - againspring-dev
 
@@ -113,6 +125,12 @@ services:
       - frontend-dev
       - backend-dev
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - againspring-dev
 

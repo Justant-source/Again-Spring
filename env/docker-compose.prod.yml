@@ -89,6 +89,12 @@ services:
           memory: 3G
         reservations:
           memory: 1G
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8080/api/health 2>/dev/null | grep -q 'OK\\|UP' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
     networks:
       - againspring-prod
       - againspring
@@ -116,6 +122,12 @@ services:
           memory: 512M
         reservations:
           memory: 256M
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - againspring-prod
 
@@ -130,6 +142,12 @@ services:
       - frontend-prod
       - backend-prod
     restart: always
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - againspring-prod
 

@@ -34,6 +34,7 @@ services:
       dockerfile: Dockerfile
     image: againspring-llm
     container_name: againspring-llm
+    user: "1000:1000"
     environment:
       CLAUDE_BIN: ${CLAUDE_BIN:-claude}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5-20251001}
@@ -42,8 +43,9 @@ services:
       LLM_QUEUE_CAPACITY: ${LLM_QUEUE_CAPACITY:-500}
       LLM_QUEUE_WAIT_TIMEOUT_MS: ${LLM_QUEUE_WAIT_TIMEOUT_MS:-30000}
       LLM_DEFAULT_TIMEOUT_MS: ${LLM_DEFAULT_TIMEOUT_MS:-120000}
+      HOME: /home/justant
     volumes:
-      - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/root/.claude
+      - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/home/justant/.claude
     restart: unless-stopped
     networks:
       - againspring
