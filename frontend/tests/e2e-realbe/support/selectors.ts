@@ -105,16 +105,47 @@ export const ADMIN_STATS = {
 
 // ── 어드민 마케팅 허브 (/admin/marketing) ───────────────────────
 // 탭: 대기(holding) / 완료(completed) / 설정(settings)
+//
+// 완료 탭 재설계 (2026-08, HoldingBoard 담당 에이전트 작업 — 이 파일 작성 시점 FE 미병합):
+//   - platformPerformance / timeline / jobBoard 박스 제거 → published/dropped 보드 2개로 대체
+//   - 아래 completed* 3개는 "합의된 testid" 가정(assumption). 실제 컴포넌트 부착명이 다르면
+//     여기부터 갱신하고 journeys/13-marketing-jobs.spec.ts를 동기화할 것.
 export const ADMIN_MARKETING = {
   holdingBoard:        '[data-testid="marketing-holding-board"]',
   holdingControls:     '[data-testid="marketing-holding-controls"]',
+  /** @deprecated 완료 탭 재설계로 제거됨. 존재하면 안 됨(toHaveCount(0) 가드). 다른 화면에서 재사용 시에만 유지. */
   jobBoard:            '[data-testid="marketing-job-board"]',
   pendingApproval:     '[data-testid="marketing-pending-approval"]',
+  /** @deprecated 완료 탭 재설계로 제거됨. 존재하면 안 됨(toHaveCount(0) 가드). */
   platformPerformance: '[data-testid="marketing-platform-performance"]',
+  /** @deprecated 완료 탭 재설계로 제거됨. 존재하면 안 됨(toHaveCount(0) 가드). */
   timeline:            '[data-testid="marketing-timeline"]',
   platformAutoSection: '[data-testid="marketing-platform-auto-section"]',
   holdingDraftDialog:  '[data-testid="marketing-holding-draft-dialog"]',
+  // ⚠️ 가정(assumption) — 완료 탭 재설계: 확정(게시) / 탈락 보드 분리.
+  completedPublishedBoard:    '[data-testid="marketing-completed-published-board"]',
+  completedDroppedBoard:      '[data-testid="marketing-completed-dropped-board"]',
+  completedPublicationDialog: '[data-testid="marketing-completed-publication-dialog"]',
 } as const
+
+// ── 대기 보드 — 행 단위 액션 (postId 파라미터화) ─────────────────
+// holding-edit-*/holding-pin-*/holding-unpin-* 는 HoldingBoard.tsx에 이미 부착된 testid.
+export const holdingEditBtn = (postId: string) => `[data-testid="holding-edit-${postId}"]`
+export const holdingPinBtn = (postId: string) => `[data-testid="holding-pin-${postId}"]`
+export const holdingUnpinBtn = (postId: string) => `[data-testid="holding-unpin-${postId}"]`
+export const holdingPinFormatSelect = (postId: string) =>
+  `[data-testid="holding-pin-format-select-${postId}"]`
+/** 핀 포맷 선택 즉시 적용 — 별도 confirm 버튼 없음 (Select onValueChange → onPin). */
+export const holdingPinCancelBtn = (postId: string) =>
+  `[data-testid="holding-pin-cancel-${postId}"]`
+
+// ── 완료 탭 — 강제 배포 (postId 파라미터화) ───────────────────────
+/** 강제 배포 컨트롤 래퍼(div). 모드 셀렉트·실행 버튼이 항상 노출. */
+export const completedForceBtn = (postId: string) => `[data-testid="completed-force-${postId}"]`
+export const completedForceModeSelect = (postId: string) =>
+  `[data-testid="completed-force-mode-${postId}"]`
+export const completedForceExecuteBtn = (postId: string) =>
+  `[data-testid="completed-force-execute-${postId}"]`
 
 // ── 어드민 원본 비교 (/admin/content/[postId]/compare) ───────────
 export const ADMIN_CONTENT = {

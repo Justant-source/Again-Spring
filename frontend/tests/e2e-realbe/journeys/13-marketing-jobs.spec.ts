@@ -13,7 +13,15 @@ import { test, expect } from '../support/no-llm-fixture'
 import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1 } from '../fixtures/personas'
 import { tokenFromStorageState, createPost } from '../support/api'
-import { ADMIN_MARKETING } from '../support/selectors'
+import { sql } from '../support/db'
+import {
+  ADMIN_MARKETING,
+  holdingPinBtn,
+  holdingUnpinBtn,
+  holdingPinFormatSelect,
+  completedForceModeSelect,
+  completedForceExecuteBtn,
+} from '../support/selectors'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)
@@ -39,10 +47,14 @@ test.describe('Journey 13-B: 마케팅 허브 UI 페이지', () => {
     await expect(page.locator(ADMIN_MARKETING.holdingBoard)).toBeVisible({ timeout: 10_000 })
     await expect(page.getByRole('button', { name: /새 마케팅 잡/ })).toHaveCount(0)
 
-    // 완료 탭 — 잡 보드·플랫폼 성과
+    // 완료 탭 재설계 — published/dropped 보드로 대체, 잡보드·플랫폼성과·타임라인 제거.
+    // (아래 completed* testid는 assumption — HoldingBoard 담당 에이전트와 미합의, selectors.ts 참조)
     await completedTab.click()
-    await expect(page.locator(ADMIN_MARKETING.jobBoard)).toBeVisible({ timeout: 10_000 })
-    await expect(page.locator(ADMIN_MARKETING.platformPerformance)).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator(ADMIN_MARKETING.completedPublishedBoard), '완료 탭 — 게시 보드(assumption testid)').toBeVisible({ timeout: 10_000 })
+    await expect(page.locator(ADMIN_MARKETING.completedDroppedBoard), '완료 탭 — 탈락 보드(assumption testid)').toBeVisible({ timeout: 10_000 })
+    await expect(page.locator(ADMIN_MARKETING.jobBoard), '완료 탭에 구 잡보드 없음').toHaveCount(0)
+    await expect(page.locator(ADMIN_MARKETING.platformPerformance), '완료 탭에 플랫폼 성과 없음').toHaveCount(0)
+    await expect(page.locator(ADMIN_MARKETING.timeline), '완료 탭에 구 타임라인 없음').toHaveCount(0)
 
     await page.goto(`${BASE}/admin`)
     await page.waitForURL(/\/admin/, { timeout: 10_000 })
@@ -53,6 +65,171 @@ test.describe('Journey 13-B: 마케팅 허브 UI 페이지', () => {
     await page.goto(`${BASE}/admin/marketing/jobs/99999`)
     await page.waitForLoadState('domcontentloaded')
     expect(page.url()).toBeTruthy()
+  })
+})
+
+// ── Journey 13-F: 대기 탭 — 핀 인라인 셀렉트 (window.prompt 제거) ──────
+// ASM 불필요 — pin/unpin은 marketing_holding 직접 조작(BE 내부 API), ASM 미의존.
+// 핀: 「핀」클릭 → 인라인 Select(영상|글) → 선택 즉시 onPin (confirm 버튼 없음).
+test.describe('Journey 13-F: 대기 탭 — 핀 인라인 셀렉트 (window.prompt 제거)', () => {
+  test.use({ storageState: ADMIN_AUTH })
+
+  test('핀 — VIDEO/TEXT 인라인 선택으로 확정, window.prompt/confirm 미사용', async ({ page, request }) => {
+    const token = tokenFromStorageState(PERSONA_TEST1.email)
+    test.skip(!token, 'test1 storageState 없음')
+
+    const postId = await createPost(request, {
+      token,
+      title: 'E2E 핀 인라인 셀렉트 시드 사연',
+      body: 'e2e marketing pin inline-select seed post body — cleanup targets this author.',
+    })
+
+    sql(`
+      INSERT INTO marketing_holding (post_id, status, score_snapshot, rank_snapshot, created_at, updated_at)
+      VALUES ('${postId}', 'IN_POOL', 10.0, 1, NOW(), NOW());
+    `)
+
+    const dialogMessages: string[] = []
+    page.on('dialog', (dialog) => {
+      dialogMessages.push(dialog.message())
+      dialog.dismiss().catch(() => {})
+    })
+
+    try {
+      await page.goto(`${BASE}/admin/marketing`)
+      await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
+      await expect(page.locator(ADMIN_MARKETING.holdingBoard)).toBeVisible({ timeout: 10_000 })
+
+      const row = page.locator('tr', { hasText: postId })
+      await expect(row, '대기 보드에 시드 행 노출').toBeVisible({ timeout: 10_000 })
+
+      await page.locator(holdingPinBtn(postId)).click()
+
+      const formatSelect = page.locator(holdingPinFormatSelect(postId))
+      await expect(formatSelect, 'PIN 인라인 포맷 셀렉트 노출').toBeVisible({ timeout: 8_000 })
+
+      await formatSelect.click()
+      await page.getByRole('option', { name: /영상/ }).click()
+
+      // 선택 즉시 PINNED — confirm 버튼 없음. 「핀 해제」로 검증.
+      await expect(
+        page.locator(holdingUnpinBtn(postId)),
+        '핀 확정 후 핀 해제 버튼 노출(PINNED 전환)',
+      ).toBeVisible({ timeout: 8_000 })
+
+      expect(dialogMessages, '핀 흐름에서 window.prompt/confirm이 호출되면 안 됨').toEqual([])
+    } finally {
+      sql(`DELETE FROM marketing_holding WHERE post_id='${postId}'`)
+    }
+  })
+})
+
+// ── Journey 13-G: 완료 탭 — 강제 배포 모드 셀렉트 (window.prompt 제거) ──
+// 모드 셀렉트 + 「강제 배포」실행 버튼이 행에 상시 노출. window.prompt/confirm 없음.
+test.describe('Journey 13-G: 완료 탭 — 강제 배포 모드 셀렉트 (window.prompt 제거)', () => {
+  test.use({ storageState: ADMIN_AUTH })
+
+  test('강제 배포 — 모드 셀렉트 + 실행, window.prompt/confirm 미사용', async ({ page, request }) => {
+    const token = tokenFromStorageState(PERSONA_TEST1.email)
+    test.skip(!token, 'test1 storageState 없음')
+
+    const postId = await createPost(request, {
+      token,
+      title: 'E2E 강제 배포 모드 셀렉트 시드 사연',
+      body: 'e2e marketing force-deploy mode-select seed post body — cleanup targets this author.',
+    })
+
+    sql(`
+      INSERT INTO marketing_holding (post_id, status, score_snapshot, rank_snapshot, locked_at, created_at, updated_at)
+      VALUES ('${postId}', 'DROPPED', 5.0, 99, NOW(), NOW(), NOW());
+    `)
+
+    const dialogMessages: string[] = []
+    page.on('dialog', (dialog) => {
+      dialogMessages.push(dialog.message())
+      dialog.dismiss().catch(() => {})
+    })
+
+    // 실 ASM 강제 배포는 이 스펙 범위 밖 — API만 stub하고 UI/다이얼로그 불변식 검증.
+    await page.route(`**/api/admin/marketing/completed/${postId}/force`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          postId,
+          status: 'COMMITTED',
+          format: 'TEXT',
+          jobIds: [],
+          targets: [],
+        }),
+      })
+    })
+
+    try {
+      await page.goto(`${BASE}/admin/marketing?tab=completed`)
+      await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
+      await expect(
+        page.locator(ADMIN_MARKETING.completedDroppedBoard),
+        '완료 탭 — 탈락 보드',
+      ).toBeVisible({ timeout: 10_000 })
+
+      const row = page.locator(ADMIN_MARKETING.completedDroppedBoard).locator('tr', { hasText: postId })
+      await expect(row, '탈락 보드에 시드 행 노출').toBeVisible({ timeout: 10_000 })
+
+      const modeSelect = row.locator(completedForceModeSelect(postId))
+      await expect(modeSelect, '강제 배포 모드 셀렉트 노출').toBeVisible({ timeout: 8_000 })
+      await modeSelect.selectOption('TEXT_ONLY')
+
+      const executeBtn = row.locator(completedForceExecuteBtn(postId))
+      await executeBtn.click()
+
+      expect(dialogMessages, '강제 배포 흐름에서 window.prompt/confirm이 호출되면 안 됨').toEqual([])
+    } finally {
+      sql(`DELETE FROM marketing_holding WHERE post_id='${postId}'`)
+    }
+  })
+})
+
+// ── Journey 13-H: 완료 탭 — 게시 상세 다이얼로그 ───────────────────────
+// ⚠️ FE 미병합 시점 작성: completedPublicationDialog 오픈 트리거는 unknown — 행 클릭으로 가정.
+// 실제 트리거가 별도 버튼이면 이 테스트의 클릭 대상만 교체하면 됨(testid는 selectors.ts 그대로 사용).
+test.describe('Journey 13-H: 완료 탭 — 게시 상세 다이얼로그', () => {
+  test.use({ storageState: ADMIN_AUTH })
+
+  test('확정(게시) 보드 항목 클릭 → 게시 상세 다이얼로그 노출', async ({ page, request }) => {
+    const token = tokenFromStorageState(PERSONA_TEST1.email)
+    test.skip(!token, 'test1 storageState 없음')
+
+    const postId = await createPost(request, {
+      token,
+      title: 'E2E 게시 상세 다이얼로그 시드 사연',
+      body: 'e2e marketing publication dialog seed post body — cleanup targets this author.',
+    })
+
+    sql(`
+      INSERT INTO marketing_holding (post_id, status, score_snapshot, rank_snapshot, locked_at, created_at, updated_at)
+      VALUES ('${postId}', 'COMMITTED', 20.0, 1, NOW(), NOW(), NOW());
+    `)
+
+    try {
+      await page.goto(`${BASE}/admin/marketing?tab=completed`)
+      await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
+      await expect(
+        page.locator(ADMIN_MARKETING.completedPublishedBoard),
+        '완료 탭 — 게시 보드(assumption testid)',
+      ).toBeVisible({ timeout: 10_000 })
+
+      const row = page.locator(ADMIN_MARKETING.completedPublishedBoard).locator('tr', { hasText: postId })
+      await expect(row, '게시 보드에 시드 행 노출').toBeVisible({ timeout: 10_000 })
+      await row.click()
+
+      await expect(
+        page.locator(ADMIN_MARKETING.completedPublicationDialog),
+        `게시 상세 다이얼로그 노출 필요 (assumption testid: ${ADMIN_MARKETING.completedPublicationDialog})`,
+      ).toBeVisible({ timeout: 8_000 })
+    } finally {
+      sql(`DELETE FROM marketing_holding WHERE post_id='${postId}'`)
+    }
   })
 })
 

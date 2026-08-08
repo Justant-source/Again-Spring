@@ -2,40 +2,30 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Card } from '@/components/ui/card';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlatformCredentialsSection } from '@/components/admin/marketing/PlatformCredentialsSection';
 import { PlatformAutoSection } from '@/components/admin/marketing/PlatformAutoSection';
-import { JobBoard } from '@/components/admin/marketing/JobBoard';
-import { PlatformPerformanceCards } from '@/components/admin/marketing/PlatformPerformanceCards';
-import { PublicationTimeline } from '@/components/admin/marketing/PublicationTimeline';
 import { HoldingControlsBar } from '@/components/admin/marketing/HoldingControlsBar';
 import { HoldingBoard } from '@/components/admin/marketing/HoldingBoard';
 import { HoldingDraftDialog } from '@/components/admin/marketing/HoldingDraftDialog';
-import { RefreshControl } from '@/components/admin/RefreshControl';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { AdminTable } from '@/components/admin/AdminTable';
 import {
-  listMarketingJobs,
-  publishMarketingJob,
-  republishMarketingJob,
-  getMarketingPerformance,
-  getPublicationTimeline,
+  CompletedHoldingsBoard,
+  type CompletedHoldingView,
+} from '@/components/admin/marketing/CompletedHoldingsBoard';
+import { CompletedPublicationDialog } from '@/components/admin/marketing/CompletedPublicationDialog';
+import { RefreshControl } from '@/components/admin/RefreshControl';
+import {
   getMarketingHoldingBoard,
   updateMarketingHoldingDraft,
   pinMarketingHolding,
   unpinMarketingHolding,
   listMarketingCompleted,
   forceMarketingCompleted,
-  MarketingJob,
   MarketingHoldingBoard,
   MarketingHoldingRow,
-  MarketingCompletedItem,
+  MarketingPinFormat,
   MarketingForceMode,
-  PlatformStatsDto,
-  TimelineEventDto,
 } from '@/lib/api/admin/marketing';
 
 type MainTab = 'holding' | 'completed' | 'settings';
@@ -60,21 +50,13 @@ export default function MarketingJobsPage() {
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
 
-  // Completed tab (holdings + jobs + analytics)
-  const [completedItems, setCompletedItems] = useState<MarketingCompletedItem[]>(
-    []
-  );
+  // Completed tab (게시 이력 + 탈락 홀딩)
+  const [completedItems, setCompletedItems] = useState<CompletedHoldingView[]>([]);
   const [completedLoading, setCompletedLoading] = useState(false);
   const [completedError, setCompletedError] = useState<string | null>(null);
   const [forceBusyId, setForceBusyId] = useState<string | null>(null);
-  const [jobs, setJobs] = useState<MarketingJob[]>([]);
-  const [jobsLoading, setJobsLoading] = useState(true);
-  const [jobsError, setJobsError] = useState<string | null>(null);
-  const [performance, setPerformance] = useState<PlatformStatsDto[]>([]);
-  const [timeline, setTimeline] = useState<TimelineEventDto[]>([]);
-  const [perfLoading, setPerfLoading] = useState(false);
-
-  const ACTIVE_STATUSES = ['QUEUED', 'RUNNING', 'READY', 'PUBLISHING'];
+  const [selectedCompletedItem, setSelectedCompletedItem] =
+    useState<CompletedHoldingView | null>(null);
 
   const loadHolding = useCallback(async (showLoader = true) => {
     if (showLoader) setHoldingLoading(true);
@@ -90,36 +72,6 @@ export default function MarketingJobsPage() {
     }
   }, []);
 
-  const loadJobs = useCallback(async (showLoader = true) => {
-    if (showLoader) setJobsLoading(true);
-    setJobsError(null);
-    try {
-      const data = await listMarketingJobs();
-      setJobs(data);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setJobsError(`마케팅 잡 목록을 불러오지 못했습니다: ${msg}`);
-    } finally {
-      if (showLoader) setJobsLoading(false);
-    }
-  }, []);
-
-  const loadAnalytics = useCallback(async () => {
-    setPerfLoading(true);
-    try {
-      const [perf, tl] = await Promise.all([
-        getMarketingPerformance(30),
-        getPublicationTimeline(20),
-      ]);
-      setPerformance(perf);
-      setTimeline(tl);
-    } catch {
-      // silently fail
-    } finally {
-      setPerfLoading(false);
-    }
-  }, []);
-
   const loadCompleted = useCallback(async () => {
     setCompletedLoading(true);
     setCompletedError(null);
@@ -128,7 +80,7 @@ export default function MarketingJobsPage() {
       setCompletedItems(items);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setCompletedError(`완료/탈락 목록을 불러오지 못했습니다: ${msg}`);
+      setCompletedError(`확정/탈락 목록을 불러오지 못했습니다: ${msg}`);
     } finally {
       setCompletedLoading(false);
     }
@@ -141,20 +93,8 @@ export default function MarketingJobsPage() {
   useEffect(() => {
     if (activeTab === 'completed') {
       loadCompleted();
-      loadJobs();
-      loadAnalytics();
     }
-  }, [activeTab, loadCompleted, loadJobs, loadAnalytics]);
-
-  useEffect(() => {
-    if (activeTab !== 'completed') return;
-    const hasActiveJobs = jobs.some((j) => ACTIVE_STATUSES.includes(j.status));
-    if (!hasActiveJobs) return;
-    const intervalId = setInterval(() => {
-      loadJobs(false);
-    }, 5000);
-    return () => clearInterval(intervalId);
-  }, [activeTab, jobs, loadJobs]);
+  }, [activeTab, loadCompleted]);
 
   useEffect(() => {
     if (activeTab !== 'holding') return;
@@ -164,37 +104,7 @@ export default function MarketingJobsPage() {
     return () => clearInterval(intervalId);
   }, [activeTab, loadHolding]);
 
-  const handlePublish = async (id: number) => {
-    try {
-      const updated = await publishMarketingJob(id);
-      setJobs((prev) => prev.map((j) => (j.id === id ? updated : j)));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      alert(`게시 요청에 실패했습니다: ${msg}`);
-    }
-  };
-
-  const handleRepublish = async (id: number) => {
-    try {
-      const updated = await republishMarketingJob(id);
-      setJobs((prev) => prev.map((j) => (j.id === id ? updated : j)));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      alert(`게시 재시도에 실패했습니다: ${msg}`);
-    }
-  };
-
-  const handlePin = async (row: MarketingHoldingRow) => {
-    const raw = window.prompt(
-      '핀 포맷을 입력하세요 (VIDEO 또는 TEXT).\n빈 값/취소 = 중단',
-      row.projectedFormat === 'VIDEO' ? 'VIDEO' : 'TEXT'
-    );
-    if (raw == null) return;
-    const format = raw.trim().toUpperCase();
-    if (format !== 'VIDEO' && format !== 'TEXT') {
-      alert('VIDEO 또는 TEXT만 가능합니다.');
-      return;
-    }
+  const handlePin = async (row: MarketingHoldingRow, format: MarketingPinFormat) => {
     try {
       await pinMarketingHolding(row.postId, format);
       await loadHolding(false);
@@ -214,32 +124,12 @@ export default function MarketingJobsPage() {
     }
   };
 
-  const handleForce = async (item: MarketingCompletedItem) => {
-    if (item.status !== 'DROPPED') {
-      alert('강제 배포는 탈락(DROPPED) 건만 가능합니다.');
-      return;
-    }
-    const raw = window.prompt(
-      '강제 배포 모드 (일일 상한 무시)\nVIDEO_AND_TEXT 또는 TEXT_ONLY',
-      'TEXT_ONLY'
-    );
-    if (raw == null) return;
-    const mode = raw.trim().toUpperCase() as MarketingForceMode;
-    if (mode !== 'VIDEO_AND_TEXT' && mode !== 'TEXT_ONLY') {
-      alert('VIDEO_AND_TEXT 또는 TEXT_ONLY만 가능합니다.');
-      return;
-    }
-    if (
-      !window.confirm(
-        `사연 ${item.postId}를 ${mode}로 강제 배포할까요?\n일일 상한을 무시합니다.`
-      )
-    ) {
-      return;
-    }
-    setForceBusyId(item.postId);
+  const handleForce = async (postId: string, mode: MarketingForceMode) => {
+    // Confirm is the board's explicit 「강제 배포」 button (no window.prompt/confirm).
+    setForceBusyId(postId);
     try {
-      await forceMarketingCompleted(item.postId, mode);
-      await Promise.all([loadCompleted(), loadJobs(false)]);
+      await forceMarketingCompleted(postId, mode);
+      await loadCompleted();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       alert(`강제 배포 실패: ${msg}`);
@@ -261,12 +151,8 @@ export default function MarketingJobsPage() {
             />
           ) : activeTab === 'completed' ? (
             <RefreshControl
-              onRefresh={() => {
-                loadCompleted();
-                loadJobs(true);
-                loadAnalytics();
-              }}
-              loading={jobsLoading || completedLoading}
+              onRefresh={() => loadCompleted()}
+              loading={completedLoading}
               autoRefreshSeconds={0}
             />
           ) : undefined
@@ -345,8 +231,8 @@ export default function MarketingJobsPage() {
         <TabsContent value="completed">
           <div className="mb-4">
             <p className="text-sm text-gray-500">
-              확정·탈락 홀딩과 잡·게시 상태입니다. 탈락 건은 상한을 무시하고 강제
-              배포할 수 있습니다. 실패 잡 재시도는 일일 풀을 다시 쓰지 않습니다.
+              확정(게시 이력)·탈락 홀딩입니다. 게시 이력 행을 클릭하면 플랫폼별 게시
+              상세를 볼 수 있습니다. 탈락 건은 상한을 무시하고 강제 배포할 수 있습니다.
             </p>
           </div>
 
@@ -355,117 +241,20 @@ export default function MarketingJobsPage() {
               {completedError}
             </div>
           )}
-          {jobsError && (
-            <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {jobsError}
-            </div>
-          )}
 
-          <div className="mb-8" data-testid="marketing-completed-holdings">
-            <h3 className="font-semibold text-gray-800 mb-4">홀딩 확정·탈락</h3>
-            <div className="bg-white rounded-lg border">
-              <AdminTable<MarketingCompletedItem>
-                data={completedItems}
-                loading={completedLoading}
-                emptyMessage="확정/탈락 홀딩이 없습니다."
-                rowKey={(row) => row.postId}
-                columns={[
-                  {
-                    key: 'postId',
-                    header: '사연',
-                    render: (row) => (
-                      <span className="font-mono text-xs">{row.postId}</span>
-                    ),
-                  },
-                  {
-                    key: 'status',
-                    header: '상태',
-                    render: (row) => (
-                      <Badge
-                        className={
-                          row.status === 'DROPPED'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-green-100 text-green-800'
-                        }
-                      >
-                        {row.status}
-                      </Badge>
-                    ),
-                  },
-                  {
-                    key: 'score',
-                    header: '점수',
-                    render: (row) => (
-                      <span className="font-mono text-sm">
-                        {row.scoreSnapshot != null
-                          ? Number(row.scoreSnapshot).toFixed(1)
-                          : '—'}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: 'jobs',
-                    header: '잡',
-                    render: (row) =>
-                      row.jobs?.length
-                        ? row.jobs
-                            .map((j) => `#${j.id}:${j.status}`)
-                            .join(', ')
-                        : '—',
-                  },
-                  {
-                    key: 'actions',
-                    header: '액션',
-                    render: (row) =>
-                      row.status === 'DROPPED' ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={forceBusyId === row.postId}
-                          onClick={() => handleForce(row)}
-                          data-testid={`completed-force-${row.postId}`}
-                        >
-                          강제 배포
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      ),
-                  },
-                ]}
-              />
-            </div>
-          </div>
+          <CompletedHoldingsBoard
+            items={completedItems}
+            loading={completedLoading}
+            onRowClick={setSelectedCompletedItem}
+            onForce={handleForce}
+            forceBusyPostId={forceBusyId}
+          />
 
-          {jobsLoading ? (
-            <Card className="p-6">
-              <div className="py-8 text-center text-gray-400">로드 중…</div>
-            </Card>
-          ) : (
-            <>
-              <div className="mb-8">
-                <h3 className="font-semibold text-gray-800 mb-4">플랫폼 성과</h3>
-                <PlatformPerformanceCards
-                  data={performance}
-                  loading={perfLoading}
-                />
-              </div>
-
-              <div className="mb-8">
-                <h3 className="font-semibold text-gray-800 mb-4">게시 이력</h3>
-                <PublicationTimeline
-                  events={timeline}
-                  loading={perfLoading}
-                />
-              </div>
-
-              <JobBoard
-                jobs={jobs}
-                onPublish={handlePublish}
-                onRepublish={handleRepublish}
-              />
-            </>
-          )}
+          <CompletedPublicationDialog
+            open={!!selectedCompletedItem}
+            item={selectedCompletedItem}
+            onClose={() => setSelectedCompletedItem(null)}
+          />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-8">

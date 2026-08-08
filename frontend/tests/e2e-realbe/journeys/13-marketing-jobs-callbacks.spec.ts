@@ -15,6 +15,7 @@ import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1, PERSONAS } from '../fixtures/personas'
 import { tokenFromStorageState, createPost } from '../support/api'
 import { sql } from '../support/db'
+import { ADMIN_MARKETING } from '../support/selectors'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)  // test1 = ADMIN
@@ -42,23 +43,51 @@ test.describe('Journey 13-D: PARTIAL 상태 배지 표시', () => {
       );
     `)
 
-    await page.goto(`${BASE}/admin/marketing`)
-    await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
+    // 완료 탭 재설계로 구 JobBoard(잡 목록 그리드)는 제거되고 확정(게시)/탈락 보드로 대체됨
+    // (assumption — HoldingBoard 담당 에이전트와 미합의). PARTIAL 잡이 완료 탭에 노출되려면
+    // marketing_holding COMMITTED 행이 있어야 completedItems.jobs에 잡혀 게시 보드에 나타남.
+    // marketing_holding은 forceDeletePostById가 정리하지 않으므로 finally에서 직접 삭제.
+    sql(`
+      INSERT INTO marketing_holding (post_id, status, score_snapshot, rank_snapshot, locked_at, created_at, updated_at)
+      VALUES ('${postId}', 'COMMITTED', 1.0, 1, NOW(), NOW(), NOW());
+    `)
 
-    // JobBoard는 완료 탭에 있음 (기본 탭=대기)
-    await page.getByRole('tab', { name: '완료' }).click()
+    try {
+      await page.goto(`${BASE}/admin/marketing?tab=completed`)
+      await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
 
-    const partialBadge = page
-      .locator('[data-testid="job-status-badge"][data-status="PARTIAL"], .bg-yellow-500')
-      .filter({ hasText: 'PARTIAL' })
-      .first()
-    await expect(partialBadge).toBeVisible({ timeout: 10_000 })
+      await expect(
+        page.locator(ADMIN_MARKETING.completedPublishedBoard),
+        '완료 탭 — 게시 이력 보드',
+      ).toBeVisible({ timeout: 10_000 })
 
-    const className = (await partialBadge.getAttribute('class')) ?? ''
-    expect(
-      className.includes('yellow') || className.includes('amber'),
-      `PARTIAL 배지 노란색 클래스 필요, got: ${className}`,
-    ).toBe(true)
+      // 잡 상태 배지는 행 클릭 → 게시 상세 다이얼로그에 표시
+      const row = page
+        .locator(ADMIN_MARKETING.completedPublishedBoard)
+        .locator('tr', { hasText: postId })
+      await expect(row, '게시 이력에 PARTIAL 잡 시드 행').toBeVisible({ timeout: 10_000 })
+      await row.click()
+
+      await expect(
+        page.locator(ADMIN_MARKETING.completedPublicationDialog),
+        '게시 상세 다이얼로그',
+      ).toBeVisible({ timeout: 8_000 })
+
+      const partialBadge = page
+        .locator(ADMIN_MARKETING.completedPublicationDialog)
+        .locator('[data-testid="job-status-badge"][data-status="PARTIAL"]')
+        .filter({ hasText: 'PARTIAL' })
+        .first()
+      await expect(partialBadge, 'PARTIAL 배지 노출').toBeVisible({ timeout: 8_000 })
+
+      const className = (await partialBadge.getAttribute('class')) ?? ''
+      expect(
+        className.includes('yellow') || className.includes('amber'),
+        `PARTIAL 배지 노란색 클래스 필요, got: ${className}`,
+      ).toBe(true)
+    } finally {
+      sql(`DELETE FROM marketing_holding WHERE post_id='${postId}'`)
+    }
   })
 })
 

@@ -220,7 +220,7 @@ flowchart LR
 | `PATCH` | `/api/admin/marketing/holding/{postId}/draft` | `draft_json` 교체 (`locked_at` 있으면 400) |
 | `POST` | `/api/admin/marketing/holding/{postId}/pin` | Body `{format: VIDEO\|TEXT}` — soft-reserve 핀 |
 | `DELETE` | `/api/admin/marketing/holding/{postId}/pin` | 핀 해제 |
-| `GET` | `/api/admin/marketing/completed` | COMMITTED·DROPPED + 잡 요약 (`status`, `limit`) |
+| `GET` | `/api/admin/marketing/completed` | COMMITTED·DROPPED + 잡 요약 (`status`, `limit`). Item: `title`, `committedFormat`, `jobs[].publications[{platform,state,url}]` |
 | `POST` | `/api/admin/marketing/completed/{postId}/force` | Body `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}` — 상한 무시 강제 확정 |
 | 잡·자격증명·통계 | `/api/admin/marketing/jobs*` 등 | ASM 프록시 — [`platforms.md`](../marketing/platforms.md) |
 

@@ -533,11 +533,23 @@ export async function updateMarketingPlatformAuto(
 
 export type MarketingForceMode = 'VIDEO_AND_TEXT' | 'TEXT_ONLY';
 
+/** Per-platform publication outcome for a job (완료 탭 redesign — additive, optional). */
+export interface MarketingCompletedPublication {
+  platform: string;
+  state: string;
+  url?: string | null;
+}
+
 export interface MarketingCompletedJobSummary {
   id: number;
   status: string;
   targets: string[];
   createdAt: string | null;
+  /**
+   * Additive (완료 탭 redesign): per-platform publication states/urls for this job.
+   * Optional — BE may not populate yet; UI must handle undefined/empty.
+   */
+  publications?: MarketingCompletedPublication[];
 }
 
 export interface MarketingCompletedItem {
@@ -549,6 +561,34 @@ export interface MarketingCompletedItem {
   createdAt: string;
   updatedAt: string;
   jobs: MarketingCompletedJobSummary[];
+  /**
+   * Additive (완료 탭 redesign): sourced from the holding row's draft title.
+   * Optional — BE may not populate yet; UI must fall back to postId.
+   */
+  title?: string | null;
+  /**
+   * Additive (완료 탭 redesign): actual committed/forced format ('VIDEO' | 'TEXT'),
+   * distinct from `pinFormat` (which only reflects an explicit pin, not the projected
+   * or force-deployed format). Optional — UI should fall back to `pinFormat` if absent.
+   * BE JSON field name is `committedFormat`; normalized to `format` below.
+   */
+  format?: string | null;
+}
+
+type MarketingCompletedItemRaw = Omit<MarketingCompletedItem, 'format'> & {
+  committedFormat?: string | null;
+  format?: string | null;
+};
+
+function normalizeCompletedItem(raw: MarketingCompletedItemRaw): MarketingCompletedItem {
+  return {
+    ...raw,
+    format: raw.format ?? raw.committedFormat ?? null,
+    jobs: (raw.jobs ?? []).map((job) => ({
+      ...job,
+      publications: job.publications ?? [],
+    })),
+  };
 }
 
 export async function listMarketingCompleted(params?: {
@@ -558,10 +598,10 @@ export async function listMarketingCompleted(params?: {
   const q = new URLSearchParams();
   if (params?.status) q.append('status', params.status);
   if (params?.limit != null) q.append('limit', String(params.limit));
-  const res = await api.get<{ items: MarketingCompletedItem[] }>(
+  const res = await api.get<{ items: MarketingCompletedItemRaw[] }>(
     `/api/admin/marketing/completed${q.size > 0 ? `?${q}` : ''}`
   );
-  return res.data.items ?? [];
+  return (res.data.items ?? []).map(normalizeCompletedItem);
 }
 
 export async function forceMarketingCompleted(

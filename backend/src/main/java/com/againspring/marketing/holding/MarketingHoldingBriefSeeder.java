@@ -129,8 +129,10 @@ public class MarketingHoldingBriefSeeder {
         }
 
         List<String> tags = new ArrayList<>();
+        tags.add("#다시봄");
+        tags.add("#공감비율");
         if (post.getCategory() != null) {
-            tags.add(post.getCategory().getDisplayName());
+            tags.add("#" + post.getCategory().getDisplayName());
         }
 
         String storyTitle = post.getTitle();

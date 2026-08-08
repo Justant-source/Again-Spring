@@ -135,6 +135,8 @@ Idempotency-Key: <uuid>
 **Request Header**
 - `Idempotency-Key`: UUID 형식. AS가 생성 시도마다 새로운 UUID를 보냄. ASM은 동일 key로 오는 중복 요청을 감지해 같은 응답 반환 (멱등성).
 
+> `brief.tags`: 24h 홀딩 커밋 경로는 신규 홀딩 시드 `#다시봄` `#공감비율` `#[카테고리]`(어드민 대기 탭에서 편집 가능, 기존 홀딩 백필 없음)를 그대로 사용. 수동 잡 생성(`/api/admin/marketing/jobs`)은 카테고리명만 채움.
+
 **Request Body (StoryBrief)**
 ```json
 {
@@ -148,7 +150,7 @@ Idempotency-Key: <uuid>
     "side_b": "상대방 관점",
     "empathy_ratio": { "a": 50, "b": 50 },
     "jury_gist": "",
-    "tags": [],
+    "tags": ["#다시봄", "#공감비율", "#이별"],
     "policy": {
       "no_emoji": true,
       "forbidden_terms": ["판결", "처방", "승패", "승자", "패자"]

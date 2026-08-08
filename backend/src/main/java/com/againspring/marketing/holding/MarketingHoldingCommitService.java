@@ -1,5 +1,6 @@
 package com.againspring.marketing.holding;
 
+import com.againspring.domain.community.Post;
 import com.againspring.domain.marketing.MarketingHolding;
 import com.againspring.domain.marketing.MarketingHoldingStatus;
 import com.againspring.domain.marketing.MarketingJob;
@@ -105,8 +106,10 @@ public class MarketingHoldingCommitService {
 
     public record CompletedItem(
         String postId,
+        String title,
         MarketingHoldingStatus status,
         String pinFormat,
+        String committedFormat,
         Double scoreSnapshot,
         Instant lockedAt,
         Instant createdAt,
@@ -116,17 +119,29 @@ public class MarketingHoldingCommitService {
 
     /**
      * Summary of a marketing job for admin display.
-     * Includes reschedule tracking to show when/why jobs were deferred.
+     * Includes reschedule tracking to show when/why jobs were deferred,
+     * and per-platform publish results parsed from {@link MarketingJob#getPublications()}.
      */
     public record JobSummary(
         Long id,
         String status,
         List<String> targets,
+        List<PublicationSummary> publications,
         Instant createdAt,
         Instant scheduledPublishAt,
         Integer rescheduledCount,
         String rescheduledReason,
         Instant originalScheduledAt
+    ) {}
+
+    /**
+     * One entry from {@link MarketingJob#getPublications()} JSON — a single platform's
+     * publish outcome (state e.g. "published"/"failed", and resulting URL when available).
+     */
+    public record PublicationSummary(
+        String platform,
+        String state,
+        String url
     ) {}
 
     /**
@@ -342,16 +357,22 @@ public class MarketingHoldingCommitService {
             ? Map.of()
             : marketingJobRepository.findByPostIdIn(postIds).stream()
                 .collect(Collectors.groupingBy(MarketingJob::getPostId, LinkedHashMap::new, Collectors.toList()));
+        Map<String, Post> postsById = postIds.isEmpty()
+            ? Map.of()
+            : postRepository.findAllById(postIds).stream()
+                .collect(Collectors.toMap(Post::getId, p -> p, (a, b) -> a));
 
         List<CompletedItem> out = new ArrayList<>(holdings.size());
         for (MarketingHolding h : holdings) {
-            List<JobSummary> jobs = jobsByPost.getOrDefault(h.getPostId(), List.of()).stream()
+            List<MarketingJob> holdingJobs = jobsByPost.getOrDefault(h.getPostId(), List.of());
+            List<JobSummary> jobs = holdingJobs.stream()
                 .sorted(Comparator.comparing(MarketingJob::getCreatedAt,
                     Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(j -> new JobSummary(
                     j.getId(),
                     j.getStatus(),
                     parseTargets(j.getTargets()),
+                    parsePublications(j.getPublications()),
                     j.getCreatedAt(),
                     j.getScheduledPublishAt(),
                     j.getRescheduledCount(),
@@ -360,8 +381,10 @@ public class MarketingHoldingCommitService {
                 .toList();
             out.add(new CompletedItem(
                 h.getPostId(),
+                resolveTitle(h, postsById.get(h.getPostId())),
                 h.getStatus(),
                 h.getPinFormat() != null ? h.getPinFormat().name() : null,
+                resolveCommittedFormat(h, holdingJobs),
                 h.getScoreSnapshot(),
                 h.getLockedAt(),
                 h.getCreatedAt(),
@@ -528,6 +551,86 @@ public class MarketingHoldingCommitService {
         } catch (Exception e) {
             return List.of();
         }
+    }
+
+    /**
+     * Parse {@link MarketingJob#getPublications()} JSON into per-platform summaries.
+     * Same tolerant Map-based parsing pattern as {@code MarketingStatsService}.
+     */
+    private List<PublicationSummary> parsePublications(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<Map<String, Object>> raw = objectMapper.readValue(json, new TypeReference<>() {});
+            List<PublicationSummary> out = new ArrayList<>(raw.size());
+            for (Map<String, Object> pub : raw) {
+                Object platform = pub.get("platform");
+                Object state = pub.get("state");
+                Object url = pub.get("url");
+                out.add(new PublicationSummary(
+                    platform != null ? platform.toString() : null,
+                    state != null ? state.toString() : null,
+                    url != null ? url.toString() : null));
+            }
+            return out;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /** Story title: draft_json title first (may be edited post-seed), else live Post title/userTitle. */
+    private String resolveTitle(MarketingHolding h, Post post) {
+        String draftTitle = parseDraftTitle(h.getDraftJson());
+        if (draftTitle != null && !draftTitle.isBlank()) {
+            return draftTitle;
+        }
+        if (post == null) {
+            return null;
+        }
+        String title = post.getTitle();
+        if (title != null && !title.isBlank()) {
+            return title;
+        }
+        return post.getUserTitle();
+    }
+
+    private String parseDraftTitle(String draftJson) {
+        if (draftJson == null || draftJson.isBlank()) {
+            return null;
+        }
+        try {
+            Map<String, Object> draft = objectMapper.readValue(draftJson, new TypeReference<>() {});
+            Object title = draft.get("title");
+            return title != null ? title.toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Display format for a completed row: VIDEO if the holding was pinned VIDEO or any
+     * enqueued job targets a video platform; else TEXT if a text pin/job exists; else null
+     * (e.g. dropped before any pin/job — no format was ever projected).
+     */
+    private String resolveCommittedFormat(MarketingHolding h, List<MarketingJob> jobs) {
+        boolean hasVideoTarget = false;
+        boolean hasAnyTarget = false;
+        for (MarketingJob j : jobs) {
+            for (String target : parseTargets(j.getTargets())) {
+                hasAnyTarget = true;
+                if (VIDEO_PLATFORM_IDS.contains(target.trim().toLowerCase(Locale.ROOT))) {
+                    hasVideoTarget = true;
+                }
+            }
+        }
+        if (h.getPinFormat() == MarketingPinFormat.VIDEO || hasVideoTarget) {
+            return MarketingPublishFormat.VIDEO.name();
+        }
+        if (h.getPinFormat() == MarketingPinFormat.TEXT || hasAnyTarget) {
+            return MarketingPublishFormat.TEXT.name();
+        }
+        return null;
     }
 
     private record ScoredDue(

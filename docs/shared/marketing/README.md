@@ -56,15 +56,18 @@ docs/shared/marketing/
 
 | 탭 | 역할 |
 |---|---|
-| **대기** | 24h N-top 홀딩 보드 · 초안 편집 · 핀(VIDEO/TEXT soft-reserve) · 일일 상한·점수 가중치 |
-| **완료** | COMMITTED/DROPPED 홀딩 · **강제 배포**(DROPPED, 상한 무시) · 잡 보드 · 성과/타임라인 |
-| **설정** | 플랫폼 자동 on/off · 플랫폼 계정 자격증명 |
+| **대기** | 24h N-top 홀딩 보드 · 카드 라벨 = 포맷(VIDEO/TEXT) + 상태(후보/후보 외) · 핀 = 인라인 포맷 select(`VIDEO\|TEXT`, soft-reserve) · 초안 다이얼로그 = 게시글 제목 + 작성자/상대방 본문 read-only 표시, `promoTitle` 숨김, `tags`·`topComments`만 편집 가능 · 일일 상한·점수 가중치 |
+| **완료** | 사연(story) 단위 리스트 · 상단 **게시 이력**(COMMITTED) — 클릭 시 플랫폼별 상태+URL+잡 상세 링크(다이얼로그 내 승인/재시도 없음) · 하단 **탈락**(DROPPED) — 강제 배포(인라인 모드 선택 + 확인) · 플랫폼 성과 카드·잡 보드 박스·구 타임라인 UI는 이 탭에서 제거됨 |
+| **설정** | 플랫폼 자동 on/off · 플랫폼 계정 자격증명 (변경 없음) |
+
+> **신규 홀딩 기본 태그 시드**: `#다시봄` `#공감비율` `#[카테고리]` — 신규 홀딩 생성 시에만 적용, 기존 홀딩 백필 없음 (`MarketingHoldingBriefSeeder`).
+> **긴급 재게시**: 완료 탭 다이얼로그에는 승인/재시도가 없다 — 잡 상세 페이지(`/admin/marketing/jobs/[id]`)의 게시/재게시 버튼으로 처리.
 
 1. `https://againspring.net/admin/marketing` (기본 탭 = **대기**)
 2. 상한·가중치 조정 → 순위/컷라인 즉시 반영
-3. 필요 시 핀으로 soft-reserve · 초안 PATCH
+3. 필요 시 핀으로 soft-reserve · 초안 PATCH (tags·topComments)
 4. T+24h에 스케줄러가 핀→자동 영상→자동 글 순으로 COMMITTED, 미선정 DROPPED
-5. **완료** 탭에서 잡 진행·게시 승인/재시도 · 탈락 건 강제 배포
+5. **완료** 탭에서 게시 이력(플랫폼별 상태·URL) 확인 · 탈락 건 강제 배포 · 긴급 시 잡 상세에서 직접 게시/재게시
 6. **설정**에서 채널 auto on/off · 계정 자격증명
 
 > 수동 `POST /api/admin/marketing/jobs`는 BE에 남아 있으나(스케줄러·force·e2e), Admin UI의 주 경로는 **대기 보드 → 자동/강제 확정**이다.

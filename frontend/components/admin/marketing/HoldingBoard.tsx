@@ -1,13 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AdminTable } from '@/components/admin/AdminTable';
 import type {
   MarketingHoldingRow,
   MarketingProjectedFormat,
   MarketingHoldingStatus,
+  MarketingPinFormat,
 } from '@/lib/api/admin/marketing';
 
 export interface HoldingBoardProps {
@@ -18,7 +27,7 @@ export interface HoldingBoardProps {
   /** Max rows to render (board displays up to 20). */
   maxRows?: number;
   onEdit?: (row: MarketingHoldingRow) => void;
-  onPin?: (row: MarketingHoldingRow) => void;
+  onPin?: (row: MarketingHoldingRow, format: MarketingPinFormat) => void;
   onUnpin?: (row: MarketingHoldingRow) => void;
   className?: string;
 }
@@ -30,9 +39,9 @@ const FORMAT_LABEL: Record<MarketingProjectedFormat, string> = {
 };
 
 const STATUS_LABEL: Record<MarketingHoldingStatus, string> = {
-  IN_POOL: '풀내',
+  IN_POOL: '후보',
   PINNED: '핀',
-  OUT_OF_CUT: '후보외',
+  OUT_OF_CUT: '후보 외',
   COMMITTED: '확정',
   DROPPED: '탈락',
 };
@@ -93,6 +102,12 @@ export function HoldingBoard({
   const canEdit = typeof onEdit === 'function';
   const canPin = typeof onPin === 'function';
   const canUnpin = typeof onUnpin === 'function';
+  const [pinPickerRowId, setPinPickerRowId] = useState<string | null>(null);
+
+  const handlePinFormatSelect = (row: MarketingHoldingRow, format: MarketingPinFormat) => {
+    setPinPickerRowId(null);
+    onPin?.(row, format);
+  };
 
   return (
     <div className={className} data-testid="marketing-holding-board">
@@ -170,7 +185,7 @@ export function HoldingBoard({
             },
             {
               key: 'projectedFormat',
-              header: '투영 포맷',
+              header: '포맷',
               render: (row) => (
                 <Badge className={formatBadgeClass(row.projectedFormat)}>
                   {FORMAT_LABEL[row.projectedFormat] ?? row.projectedFormat}
@@ -205,8 +220,13 @@ export function HoldingBoard({
                   row.status === 'IN_POOL' ||
                   row.status === 'PINNED' ||
                   row.status === 'OUT_OF_CUT';
+                const pickingFormat = pinPickerRowId === row.postId;
+                const defaultFormat: MarketingPinFormat =
+                  row.projectedFormat === 'VIDEO' || row.projectedFormat === 'TEXT'
+                    ? row.projectedFormat
+                    : 'VIDEO';
                 return (
-                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button
                       type="button"
                       size="sm"
@@ -228,13 +248,42 @@ export function HoldingBoard({
                       >
                         핀 해제
                       </Button>
+                    ) : pickingFormat ? (
+                      <div className="flex items-center gap-1">
+                        <Select
+                          defaultValue={defaultFormat}
+                          onValueChange={(value) =>
+                            handlePinFormatSelect(row, value as MarketingPinFormat)
+                          }
+                        >
+                          <SelectTrigger
+                            className="h-8 w-24 text-sm"
+                            data-testid={`holding-pin-format-select-${row.postId}`}
+                          >
+                            <SelectValue placeholder="포맷" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="VIDEO">영상</SelectItem>
+                            <SelectItem value="TEXT">글</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setPinPickerRowId(null)}
+                          data-testid={`holding-pin-cancel-${row.postId}`}
+                        >
+                          취소
+                        </Button>
+                      </div>
                     ) : (
                       <Button
                         type="button"
                         size="sm"
                         variant="ghost"
                         disabled={!canPin || !actionable}
-                        onClick={() => onPin?.(row)}
+                        onClick={() => setPinPickerRowId(row.postId)}
                         data-testid={`holding-pin-${row.postId}`}
                       >
                         핀

@@ -116,20 +116,18 @@ flowchart TD
 
 ## 마케팅 관리 (`/admin/marketing`)
 
-근거: `app/(admin)/admin/marketing/`
+근거: `app/(admin)/admin/marketing/page.tsx`
 
-> dev 전용 (prod 미지원). `MARKETING_ENABLED` 환경변수로 활성화.
+> dev 전용 (prod 미지원). `app.features.marketing.enabled`로 활성화.
+> **권위본(탭 상세·API)**: [`docs/shared/marketing/README.md`](../../../shared/marketing/README.md) §어드민 탭.
 
-| 서브경로 | 기능 |
+| 탭 | 역할 |
 |---|---|
-| `/marketing/stories` | SNS 스토리 생성·관리 |
-| `/marketing/contents` | 마케팅 콘텐츠 관리 |
-| `/marketing/templates` | 콘텐츠 템플릿 관리 |
-| `/marketing/simulations` | 마케팅 시뮬레이션 |
-| `/marketing/hashtags` | 해시태그 라이브러리 |
-| `/marketing/calendar` | 발행 캘린더 |
-| `/marketing/costs` | 비용 추적 |
-| `/marketing/settings` | 소셜 계정 연결 등 설정 |
+| **대기** | 24h 홀딩 보드. 카드 라벨 = 포맷(VIDEO/TEXT) + 상태(후보/후보 외). 핀 = 인라인 포맷 select. 초안 다이얼로그 = 게시글 제목+작성자/상대방 본문 read-only, `promoTitle` 숨김, `tags`·`topComments`만 편집 |
+| **완료** | 사연 단위 리스트. 상단 게시 이력(COMMITTED, 클릭 시 플랫폼별 상태+URL+잡 상세 링크) · 하단 탈락(DROPPED, 강제 배포) |
+| **설정** | 플랫폼 자동 on/off · 계정 자격증명 |
+
+긴급 재게시는 완료 탭 다이얼로그가 아니라 잡 상세 페이지(`/admin/marketing/jobs/[id]`)의 게시/재게시로 처리한다.
 
 ---
 

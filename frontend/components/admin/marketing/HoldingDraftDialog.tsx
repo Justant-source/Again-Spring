@@ -12,14 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import type { MarketingHoldingDraft } from '@/lib/api/admin/marketing';
+import { getAdminPost, type AdminPost } from '@/lib/api/admin/content';
+import { AUTHOR, PARTNER } from '@/lib/constants/factionColors';
 
-/** Flattened skeleton fields for the holding draft editor. */
+/** Flattened editable fields for the holding draft editor. title/promoTitle/body are read-only, sourced live. */
 export interface HoldingDraftFormValues {
-  title: string;
-  promoTitle: string;
-  /** Comma-separated tags, or JSON array string. */
-  tags: string;
+  tags: string[];
   /** JSON textarea for topComments[]. */
   topCommentsJson: string;
 }
@@ -46,18 +46,14 @@ export interface HoldingDraftDialogProps {
   }) => void | Promise<void>;
 }
 
-function tagsToForm(tags: string[] | null | undefined): string {
-  if (!tags || tags.length === 0) return '';
-  return tags.join(', ');
-}
-
+/** Accepts comma-separated text or a JSON array string; always returns a flat string[]. */
 function parseTags(raw: string): string[] {
   const trimmed = raw.trim();
   if (!trimmed) return [];
   if (trimmed.startsWith('[')) {
     const parsed = JSON.parse(trimmed) as unknown;
     if (!Array.isArray(parsed)) throw new Error('tags JSON must be an array');
-    return parsed.map((t) => String(t));
+    return parsed.map((t) => String(t).trim()).filter(Boolean);
   }
   return trimmed
     .split(',')
@@ -74,9 +70,7 @@ function topCommentsToForm(
 
 function draftToForm(draft: MarketingHoldingDraft | null | undefined): HoldingDraftFormValues {
   return {
-    title: draft?.title ?? '',
-    promoTitle: draft?.promoTitle ?? '',
-    tags: tagsToForm(draft?.tags),
+    tags: draft?.tags ? [...draft.tags] : [],
     topCommentsJson: topCommentsToForm(draft?.topComments),
   };
 }
@@ -85,20 +79,18 @@ function formToDraft(
   form: HoldingDraftFormValues,
   base?: MarketingHoldingDraft | null
 ): MarketingHoldingDraft {
-  const tags = parseTags(form.tags);
-  let topComments: MarketingHoldingDraft['topComments'] = [];
   const raw = form.topCommentsJson.trim() || '[]';
   const parsed = JSON.parse(raw) as unknown;
   if (!Array.isArray(parsed)) {
     throw new Error('topComments must be a JSON array');
   }
-  topComments = parsed as NonNullable<MarketingHoldingDraft['topComments']>;
+  const topComments = parsed as NonNullable<MarketingHoldingDraft['topComments']>;
 
+  // Spread base first so title/promoTitle/authorBody/partnerBody (read-only in this
+  // dialog) are preserved untouched — only tags/topComments are ever overwritten here.
   return {
     ...(base ?? {}),
-    title: form.title,
-    promoTitle: form.promoTitle,
-    tags,
+    tags: form.tags,
     topComments,
   };
 }
@@ -114,16 +106,68 @@ export function HoldingDraftDialog({
   onSave,
 }: HoldingDraftDialogProps) {
   const [form, setForm] = useState<HoldingDraftFormValues>(() => draftToForm(draft));
+  const [tagInput, setTagInput] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const [livePost, setLivePost] = useState<AdminPost | null>(null);
+  const [postLoading, setPostLoading] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setForm(draftToForm(draft));
+    setTagInput('');
     setLocalError(null);
   }, [open, postId, draft]);
 
+  useEffect(() => {
+    if (!open || !postId) {
+      setLivePost(null);
+      setPostError(null);
+      setPostLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setPostLoading(true);
+    setPostError(null);
+    getAdminPost(postId)
+      .then((post) => {
+        if (!cancelled) setLivePost(post);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setLivePost(null);
+          setPostError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPostLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, postId]);
+
   const displayError = localError || error;
   const canSave = !!postId && !readOnly && typeof onSave === 'function';
+
+  const addTagsFromInput = () => {
+    if (!tagInput.trim()) return;
+    try {
+      const parsed = parseTags(tagInput);
+      if (parsed.length === 0) return;
+      setForm((f) => ({ ...f, tags: Array.from(new Set([...f.tags, ...parsed])) }));
+      setTagInput('');
+      setLocalError(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setLocalError(`태그 입력 형식 오류: ${msg}`);
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setForm((f) => ({ ...f, tags: f.tags.filter((t) => t !== tag) }));
+  };
 
   const handleSave = async () => {
     if (!postId || !onSave || readOnly) return;
@@ -133,11 +177,17 @@ export function HoldingDraftDialog({
       await onSave({ postId, form, draft: nextDraft });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setLocalError(msg.startsWith('tags') || msg.includes('JSON') || msg.includes('topComments')
-        ? `입력 형식 오류: ${msg}`
-        : msg);
+      setLocalError(
+        msg.includes('JSON') || msg.includes('topComments')
+          ? `입력 형식 오류: ${msg}`
+          : msg
+      );
     }
   };
+
+  const displayTitle = livePost?.title || livePost?.userTitle || '';
+  const authorBody = livePost?.bodyPublished || livePost?.bodyRaw || '';
+  const partnerBody = livePost?.partnerBodyPublished || livePost?.partnerBodyRaw || '';
 
   return (
     <Dialog
@@ -163,45 +213,122 @@ export function HoldingDraftDialog({
               잠금·확정된 초안은 조회만 가능합니다. 광장 원본은 변경되지 않습니다.
             </div>
           )}
-          <p className="text-xs text-gray-500">
-            플랫폼 탭 없음 — 공통 파라미터만 편집합니다. 저장 시 draft만 갱신됩니다.
-          </p>
 
-          <div className="space-y-1">
-            <Label htmlFor="holding-draft-title">title</Label>
-            <Input
-              id="holding-draft-title"
-              value={form.title}
-              disabled={readOnly || saving}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              data-testid="holding-draft-title"
-            />
-            <p className="text-xs text-gray-400">릴스·쇼츠·피드 공통</p>
+          <div
+            className="space-y-2 rounded border border-gray-200 bg-gray-50 px-3 py-2"
+            data-testid="holding-draft-live-post"
+          >
+            <p className="text-xs font-medium text-gray-500">
+              원본 사연 (광장 실시간 · 읽기 전용)
+            </p>
+            {postLoading && (
+              <p className="text-sm text-gray-400" data-testid="holding-draft-live-post-loading">
+                불러오는 중…
+              </p>
+            )}
+            {postError && (
+              <p className="text-sm text-red-600" data-testid="holding-draft-live-post-error">
+                원본을 불러오지 못했습니다: {postError}
+              </p>
+            )}
+            {!postLoading && !postError && livePost && (
+              <>
+                <p className="text-sm font-semibold" data-testid="holding-draft-live-title">
+                  {displayTitle || '(제목 없음)'}
+                </p>
+                <div className="space-y-1">
+                  <span
+                    className="text-xs font-semibold"
+                    style={{ color: AUTHOR }}
+                  >
+                    작성자
+                  </span>
+                  <p
+                    className="whitespace-pre-wrap text-sm text-gray-700"
+                    data-testid="holding-draft-live-author-body"
+                  >
+                    {authorBody || '(본문 없음)'}
+                  </p>
+                </div>
+                {partnerBody && (
+                  <div className="space-y-1">
+                    <span
+                      className="text-xs font-semibold"
+                      style={{ color: PARTNER }}
+                    >
+                      상대방
+                    </span>
+                    <p
+                      className="whitespace-pre-wrap text-sm text-gray-700"
+                      data-testid="holding-draft-live-partner-body"
+                    >
+                      {partnerBody}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="holding-draft-promoTitle">promoTitle</Label>
-            <Input
-              id="holding-draft-promoTitle"
-              value={form.promoTitle}
-              disabled={readOnly || saving}
-              onChange={(e) => setForm((f) => ({ ...f, promoTitle: e.target.value }))}
-              data-testid="holding-draft-promo-title"
-            />
-            <p className="text-xs text-gray-400">IG 훅 제목 · 릴스 미적용 가능</p>
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="holding-draft-tags">tags</Label>
-            <Input
-              id="holding-draft-tags"
-              value={form.tags}
-              disabled={readOnly || saving}
-              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-              placeholder="comma,separated 또는 JSON 배열"
-              data-testid="holding-draft-tags"
-            />
-            <p className="text-xs text-gray-400">쉼표 구분 또는 JSON 배열</p>
+          <div className="space-y-1.5">
+            <Label htmlFor="holding-draft-tags-input">tags</Label>
+            <div
+              className="flex flex-wrap gap-1.5"
+              data-testid="holding-draft-tags-list"
+            >
+              {form.tags.length === 0 && (
+                <span className="text-xs text-gray-400">태그 없음</span>
+              )}
+              {form.tags.map((tag, idx) => (
+                <Badge
+                  key={`${tag}-${idx}`}
+                  variant="secondary"
+                  className="gap-1 py-1 pl-2.5 pr-1.5"
+                  data-testid={`holding-draft-tag-${idx}`}
+                >
+                  {tag}
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      aria-label={`${tag} 태그 삭제`}
+                      className="ml-0.5 rounded-full px-1 leading-none hover:bg-black/10"
+                      disabled={saving}
+                      onClick={() => removeTag(tag)}
+                      data-testid={`holding-draft-tag-remove-${idx}`}
+                    >
+                      ×
+                    </button>
+                  )}
+                </Badge>
+              ))}
+            </div>
+            {!readOnly && (
+              <div className="flex gap-2">
+                <Input
+                  id="holding-draft-tags-input"
+                  value={tagInput}
+                  disabled={saving}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      addTagsFromInput();
+                    }
+                  }}
+                  placeholder="태그 입력 후 Enter · 쉼표/JSON 배열 붙여넣기 가능"
+                  data-testid="holding-draft-tags-input"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={saving || !tagInput.trim()}
+                  onClick={addTagsFromInput}
+                  data-testid="holding-draft-tags-add"
+                >
+                  추가
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1">

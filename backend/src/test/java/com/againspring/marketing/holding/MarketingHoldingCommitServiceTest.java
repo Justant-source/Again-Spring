@@ -1,5 +1,6 @@
 package com.againspring.marketing.holding;
 
+import com.againspring.domain.community.Post;
 import com.againspring.domain.marketing.MarketingHolding;
 import com.againspring.domain.marketing.MarketingHoldingStatus;
 import com.againspring.domain.marketing.MarketingJob;
@@ -34,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -73,6 +75,8 @@ class MarketingHoldingCommitServiceTest {
             holdings.put(h.getPostId(), h);
             return h;
         });
+        lenient().when(postRepository.findAllById(any())).thenReturn(List.of());
+        lenient().when(marketingJobRepository.findByPostIdIn(any())).thenReturn(List.of());
     }
 
     @Test
@@ -249,6 +253,85 @@ class MarketingHoldingCommitServiceTest {
         assertThat(result.dropped()).isEqualTo(1);
         assertThat(holdings.get("pin").getStatus()).isEqualTo(MarketingHoldingStatus.PINNED);
         verify(marketingJobService, never()).createJob(anyString(), any(), anyBoolean(), anyString());
+    }
+
+    @Test
+    void listCompleted_titleFromDraftJson_andPublicationsParsed() {
+        MarketingHolding h = MarketingHolding.builder()
+            .postId("s1")
+            .status(MarketingHoldingStatus.COMMITTED)
+            .draftJson("{\"title\":\"Draft Title\"}")
+            .lockedAt(T0)
+            .build();
+        when(holdingRepository.findByStatusIn(
+            EnumSet.of(MarketingHoldingStatus.COMMITTED, MarketingHoldingStatus.DROPPED)))
+            .thenReturn(List.of(h));
+
+        MarketingJob job = MarketingJob.builder()
+            .id(1L).postId("s1").status("PUBLISHED")
+            .targets("[\"instagram_reels\",\"youtube_shorts\"]")
+            .publications("[{\"platform\":\"instagram_reels\",\"state\":\"published\","
+                + "\"url\":\"https://instagram.com/p/abc\"},"
+                + "{\"platform\":\"youtube_shorts\",\"state\":\"failed\",\"url\":null}]")
+            .createdAt(T0)
+            .build();
+        when(marketingJobRepository.findByPostIdIn(anySet())).thenReturn(List.of(job));
+
+        List<MarketingHoldingCommitService.CompletedItem> items =
+            service.listCompleted(null, 50);
+
+        assertThat(items).hasSize(1);
+        MarketingHoldingCommitService.CompletedItem item = items.get(0);
+        assertThat(item.title()).isEqualTo("Draft Title");
+        assertThat(item.committedFormat()).isEqualTo("VIDEO");
+        assertThat(item.jobs()).hasSize(1);
+        List<MarketingHoldingCommitService.PublicationSummary> pubs = item.jobs().get(0).publications();
+        assertThat(pubs).hasSize(2);
+        assertThat(pubs.get(0).platform()).isEqualTo("instagram_reels");
+        assertThat(pubs.get(0).state()).isEqualTo("published");
+        assertThat(pubs.get(0).url()).isEqualTo("https://instagram.com/p/abc");
+        assertThat(pubs.get(1).platform()).isEqualTo("youtube_shorts");
+        assertThat(pubs.get(1).state()).isEqualTo("failed");
+        assertThat(pubs.get(1).url()).isNull();
+    }
+
+    @Test
+    void listCompleted_titleFallsBackToPostWhenDraftMissingTitle() {
+        MarketingHolding h = MarketingHolding.builder()
+            .postId("s2")
+            .status(MarketingHoldingStatus.DROPPED)
+            .draftJson("{}")
+            .build();
+        when(holdingRepository.findByStatusIn(
+            EnumSet.of(MarketingHoldingStatus.COMMITTED, MarketingHoldingStatus.DROPPED)))
+            .thenReturn(List.of(h));
+        when(postRepository.findAllById(anySet())).thenReturn(List.of(
+            Post.builder().id("s2").title("Live Post Title").build()));
+
+        List<MarketingHoldingCommitService.CompletedItem> items =
+            service.listCompleted(null, 50);
+
+        assertThat(items.get(0).title()).isEqualTo("Live Post Title");
+        assertThat(items.get(0).committedFormat()).isNull();
+    }
+
+    @Test
+    void listCompleted_committedFormat_fallsBackToPinFormatWhenNoJobs() {
+        MarketingHolding h = MarketingHolding.builder()
+            .postId("s3")
+            .status(MarketingHoldingStatus.DROPPED)
+            .pinFormat(MarketingPinFormat.TEXT)
+            .draftJson("{}")
+            .build();
+        when(holdingRepository.findByStatusIn(
+            EnumSet.of(MarketingHoldingStatus.COMMITTED, MarketingHoldingStatus.DROPPED)))
+            .thenReturn(List.of(h));
+
+        List<MarketingHoldingCommitService.CompletedItem> items =
+            service.listCompleted(null, 50);
+
+        assertThat(items.get(0).committedFormat()).isEqualTo("TEXT");
+        assertThat(items.get(0).pinFormat()).isEqualTo("TEXT");
     }
 
     private void putHolding(String postId, MarketingHoldingStatus status, MarketingPinFormat pin) {
