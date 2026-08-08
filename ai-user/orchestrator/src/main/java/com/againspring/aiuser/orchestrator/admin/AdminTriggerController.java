@@ -584,12 +584,13 @@ public class AdminTriggerController {
         llmGenerationGateService.hold(finalReason);
         LlmGenerationGate gate = llmGenerationGateService.getCurrentState();
         log.info("[AdminTrigger] llm-generation-hold: reason={}", finalReason);
-        return ResponseEntity.ok(Map.of(
-                "status", "ok",
-                "action", "llm-generation-hold",
-                "state", gate.getState(),
-                "lastHeldAt", gate.getLastHeldAt(),
-                "reason", gate.getReason()));
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("status", "ok");
+        body.put("action", "llm-generation-hold");
+        body.put("state", gate.getState());
+        body.put("lastHeldAt", gate.getLastHeldAt());
+        body.put("reason", gate.getReason());
+        return ResponseEntity.ok(body);
     }
 
     /**
@@ -600,12 +601,13 @@ public class AdminTriggerController {
         llmGenerationGateService.resume();
         LlmGenerationGate gate = llmGenerationGateService.getCurrentState();
         log.info("[AdminTrigger] llm-generation-resume");
-        return ResponseEntity.ok(Map.of(
-                "status", "ok",
-                "action", "llm-generation-resume",
-                "state", gate.getState(),
-                "updatedAt", gate.getUpdatedAt(),
-                "message", "LLM generation gate resumed"));
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("status", "ok");
+        body.put("action", "llm-generation-resume");
+        body.put("state", gate.getState());
+        body.put("updatedAt", gate.getUpdatedAt());
+        body.put("message", "LLM generation gate resumed");
+        return ResponseEntity.ok(body);
     }
 
     /**
@@ -615,12 +617,13 @@ public class AdminTriggerController {
     public ResponseEntity<Map<String, Object>> llmGenerationStatus() {
         LlmGenerationGate gate = llmGenerationGateService.getCurrentState();
         boolean isHeld = llmGenerationGateService.isHeld();
-        return ResponseEntity.ok(Map.of(
-                "state", gate.getState(),
-                "isHeld", isHeld,
-                "lastHeldAt", gate.getLastHeldAt(),
-                "reason", gate.getReason(),
-                "updatedAt", gate.getUpdatedAt()));
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("state", gate.getState());
+        body.put("isHeld", isHeld);
+        body.put("lastHeldAt", gate.getLastHeldAt());
+        body.put("reason", gate.getReason());
+        body.put("updatedAt", gate.getUpdatedAt());
+        return ResponseEntity.ok(body);
     }
 
     /** ActionExecutor.topCategory()와 동일한 로직 — category NOT NULL이라 반드시 채워야 한다. */
