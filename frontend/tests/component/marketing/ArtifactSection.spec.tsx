@@ -54,14 +54,14 @@ describe('ArtifactSection', () => {
     });
   });
 
-  it('renders x tweet mockup when x has card_ keys', async () => {
+  it('renders x_thread tweet mockup when x_thread has card_ keys', async () => {
     (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { text: '테스트 트윗', hashtags: ['#다시봄'] },
     });
     global.URL.createObjectURL = vi.fn().mockReturnValue('blob:test');
-    const artifacts = makeArtifacts('x', {
-      card_01: '/api/v1/jobs/1/artifacts/x__card_01.png',
-      card_02: '/api/v1/jobs/1/artifacts/x__card_02.png',
+    const artifacts = makeArtifacts('x_thread', {
+      card_01: '/api/v1/jobs/1/artifacts/x_thread__card_01.png',
+      card_02: '/api/v1/jobs/1/artifacts/x_thread__card_02.png',
     });
     render(<ArtifactSection jobId={1} artifacts={artifacts} />);
     await waitFor(() => {

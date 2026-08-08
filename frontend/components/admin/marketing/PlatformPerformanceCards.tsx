@@ -10,7 +10,7 @@ interface PlatformPerformanceCardsProps {
 
 const PLATFORM_LABELS: Record<string, string> = {
   naver_blog: '네이버 블로그',
-  x: 'X (트위터)',
+  x_thread: 'X 4단 스레드',
   instagram_feed: '인스타그램 피드',
   instagram_reels: '인스타그램 릴스',
   youtube_shorts: 'YouTube Shorts',

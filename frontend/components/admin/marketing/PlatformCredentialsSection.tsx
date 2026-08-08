@@ -26,7 +26,9 @@ import {
 
 // Korean display labels — presentation lives in the FE; field *structure* comes from ASM.
 const PLATFORM_LABELS: Record<string, string> = {
-  x: 'X (트위터)',
+  // ASM credential PK remains `x` (login session); display as the only X product.
+  x: 'X 4단 스레드',
+  x_thread: 'X 4단 스레드',
   instagram_feed: 'Instagram 피드',
   instagram_reels: 'Instagram 릴스',
   naver_blog: '네이버 블로그',

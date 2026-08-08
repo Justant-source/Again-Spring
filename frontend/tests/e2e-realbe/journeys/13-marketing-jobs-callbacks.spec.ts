@@ -38,7 +38,7 @@ test.describe('Journey 13-D: PARTIAL 상태 배지 표시', () => {
         requested_by, poll_fail_count, created_at, updated_at, idempotency_key
       ) VALUES (
         'e2e-partial-${Date.now()}', '${postId}', 'PARTIAL', 'PUBLISH', 1.0,
-        '["x"]', 0, 'e2epersona01', 0, NOW(), NOW(), 'e2e-partial-${Date.now()}'
+        '["x_thread"]', 0, 'e2epersona01', 0, NOW(), NOW(), 'e2e-partial-${Date.now()}'
       );
     `)
 

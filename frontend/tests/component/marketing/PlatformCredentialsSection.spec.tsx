@@ -50,7 +50,7 @@ describe('PlatformCredentialsSection', () => {
 
   it('renders a card per platform with configured/unconfigured status and account', async () => {
     render(<PlatformCredentialsSection />);
-    expect(await screen.findByText('X (트위터)')).toBeInTheDocument();
+    expect(await screen.findByText('X 4단 스레드')).toBeInTheDocument();
     expect(screen.getByText('네이버 블로그')).toBeInTheDocument();
     expect(screen.getByText('미설정')).toBeInTheDocument();
     expect(screen.getByText('설정됨')).toBeInTheDocument();
@@ -59,7 +59,7 @@ describe('PlatformCredentialsSection', () => {
 
   it('opens the edit dialog with fields rendered dynamically from the schema', async () => {
     render(<PlatformCredentialsSection />);
-    await screen.findByText('X (트위터)');
+    await screen.findByText('X 4단 스레드');
     fireEvent.click(screen.getByRole('button', { name: '계정 연결' })); // unconfigured X
     expect(await screen.findByText('핸들 / 이메일')).toBeInTheDocument();
     expect(screen.getByText('비밀번호')).toBeInTheDocument();
@@ -68,7 +68,7 @@ describe('PlatformCredentialsSection', () => {
 
   it('blocks save when required fields are empty', async () => {
     render(<PlatformCredentialsSection />);
-    await screen.findByText('X (트위터)');
+    await screen.findByText('X 4단 스레드');
     fireEvent.click(screen.getByRole('button', { name: '계정 연결' }));
     await screen.findByText('핸들 / 이메일');
     fireEvent.click(screen.getByRole('button', { name: '저장' }));

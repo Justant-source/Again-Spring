@@ -42,9 +42,8 @@ public class MarketingPlatformAutoService {
     public static final String KEY_PREFIX = "marketing.platform.";
     public static final String KEY_SUFFIX = ".auto_enabled";
 
-    /** Display / admin order — all known platforms (Q11). */
+    /** Display / admin order — all known platforms (Q11). Single-tweet {@code x} removed — X = {@code x_thread} only. */
     public static final List<String> ALL_PLATFORMS = List.of(
-        "x",
         "x_thread",
         "naver_blog",
         "instagram_feed",
@@ -56,11 +55,11 @@ public class MarketingPlatformAutoService {
 
     /**
      * Runtime publish set (code constant). Matches active channels in
-     * {@code docs/shared/marketing/platforms.md} (x + 24h auto channels).
+     * {@code docs/shared/marketing/platforms.md}.
      * Unimplemented: naver_blog, naver_clip, threads.
+     * Legacy single-tweet {@code x} is not a publish target.
      */
     public static final Set<String> RUNTIME_SUPPORTED = Set.of(
-        "x",
         "x_thread",
         "instagram_feed",
         "instagram_reels",
@@ -74,7 +73,6 @@ public class MarketingPlatformAutoService {
     );
 
     private static final List<String> TEXT_PLATFORMS = List.of(
-        "x",
         "x_thread",
         "instagram_feed",
         "naver_blog",

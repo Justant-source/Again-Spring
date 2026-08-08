@@ -21,7 +21,7 @@ interface Props {
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
-  x: 'X (트위터)',
+  x_thread: 'X 4단 스레드',
   naver_blog: '네이버 블로그',
   instagram_feed: '인스타그램 피드',
   instagram_reels: '인스타그램 릴스',
@@ -31,7 +31,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
-  x: 'bg-black text-white',
+  x_thread: 'bg-black text-white',
   naver_blog: 'bg-green-600 text-white',
   instagram_feed: 'bg-pink-600 text-white',
   instagram_reels: 'bg-purple-600 text-white',
@@ -553,7 +553,7 @@ function PlatformCard({ platform, pkg, jobId }: { platform: string; pkg: Platfor
       {platform === 'instagram_feed' && hasCards && (
         <CarouselPreview pkg={pkg} jobId={jobId} uploadData={uploadData} />
       )}
-      {platform === 'x' && hasCards && (
+      {(platform === 'x_thread' || platform === 'x') && hasCards && (
         <XTweetMockup pkg={pkg} jobId={jobId} uploadData={uploadData} />
       )}
       {platform === 'naver_blog' && (hasImgs || (uploadData?.sections !== undefined)) && (

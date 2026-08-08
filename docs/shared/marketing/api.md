@@ -14,7 +14,7 @@ Content-Type: application/json
 ```json
 {
   "postId": "abc123def456",              // posts.id (VARCHAR(32))
-  "targets": ["naver_blog", "x", "x_thread"], // 지원 플랫폼 목록 참조
+  "targets": ["naver_blog", "x_thread"], // 지원 플랫폼 목록 참조
   "autoPublish": false                   // true 시 READY 도달 즉시 자동 게시
 }
 ```
@@ -28,7 +28,7 @@ Content-Type: application/json
   "status": "REQUESTED",
   "phase": null,
   "progress": 0,
-  "targets": ["naver_blog", "x"],
+  "targets": ["naver_blog", "x_thread"],
   "auto_publish": false,
   "artifacts": null,
   "publications": null,
@@ -154,7 +154,7 @@ Idempotency-Key: <uuid>
       "forbidden_terms": ["판결", "처방", "승패", "승자", "패자"]
     }
   },
-  "targets": ["naver_blog", "x", "x_thread"],
+  "targets": ["naver_blog", "x_thread"],
   "options": {
     "voice_id": null,
     "tone": null,

@@ -4,7 +4,7 @@
 
 | 상태 | 플랫폼 |
 |---|---|
-| **활성** | `x`, `x_thread`, `instagram_feed`, `instagram_reels` + `youtube_shorts` (24h 분배 · 동일 영상 듀얼) |
+| **활성** | `x_thread`, `instagram_feed`, `instagram_reels` + `youtube_shorts` (24h 분배 · 동일 영상 듀얼) |
 | **보류 (deferred)** | `naver_blog`, `naver_clip`, `threads` |
 
 에이전트·신규 작업은 활성 채널만. 보류 채널은 사용자 명시 요청 전 구현·디버그·배포 금지.
@@ -14,7 +14,7 @@
 - API: `GET /api/admin/marketing/platforms` · `PUT /api/admin/marketing/platforms/{platform}/auto` (`AdminMarketingPlatformController`)
 - 저장: `system_setting` 키 `marketing.platform.{id}.auto_enabled`
 - **전체 플랫폼 표시** (준비중 배지 없음). 관리자 자유 on/off — 미구현도 on 가능
-- 런타임 지원 상수 (`MarketingPlatformAutoService.RUNTIME_SUPPORTED`): `x`, `x_thread`, `instagram_feed`, `instagram_reels`, `youtube_shorts`
+- 런타임 지원 상수 (`MarketingPlatformAutoService.RUNTIME_SUPPORTED`): `x_thread`, `instagram_feed`, `instagram_reels`, `youtube_shorts`
 - 기본값: 지원 채널 ON / 미지원 OFF. 미지원+on 저장은 200 + `warning`; 발행 시 `resolveTargets(format, enabled)` = enabled ∩ supported (미지원 스킵·로그). VIDEO일 때 릴스 포함 시 `instagram_feed` 제외
 
 ### 24h 대기 보드 (`AdminMarketingHoldingController` · `marketing_holding`)
@@ -52,7 +52,7 @@ API: `GET`/`PUT /api/admin/marketing/score-weights` · 키 `marketing.score.weig
 | TEXT | 글 채널만 |
 | 영상 채널 전원 off | `effectiveVideoCap=0`, 잔여 풀 전부 글 |
 
-잡 그룹: Reels+Shorts는 **듀얼 1잡**, `x_thread`/`instagram_feed`/`x` 등은 **alone**.  
+잡 그룹: Reels+Shorts는 **듀얼 1잡**, `x_thread`/`instagram_feed` 등은 **alone**.  
 **강제(완료 탭)**: `POST /api/admin/marketing/completed/{postId}/force` — 상한 무시 (`VIDEO_AND_TEXT` \| `TEXT_ONLY`). 주로 `DROPPED` 재진입.  
 목록: `GET /api/admin/marketing/completed?status=&limit=50`.  
 **공유 풀**: `dailyTextCap`(기본 6) = KST 하루 **마케팅 사연 수**. 영상 상한 `dailyVideoCap`. 멀티 플랫폼 잡은 추가 칸 아님.  
@@ -64,7 +64,6 @@ API: `GET`/`PUT /api/admin/marketing/score-weights` · 키 `marketing.score.weig
 
 | 플랫폼 | value | 콘텐츠 형식 | M6 게시 방법 | 미공개 |
 |---|---|---|---|---|
-| X (트위터) | `x` | 텍스트 + 이미지 | Playwright 자동 로그인 | **활성** |
 | X 4단 스레드 | `x_thread` | 텍스트 스레드 | Playwright (`x-thread-strategy.md`) | **활성 (24h · 글 슬롯)** |
 | 네이버 블로그 | `naver_blog` | 마크다운 → HTML | Playwright 자동 로그인 | 보류 |
 | 인스타그램 피드 | `instagram_feed` | 하이브리드 캐러셀 (훅+캡처+비율) | Playwright (`instagram-feed-strategy.md`) | **활성 (24h · 글 슬롯)** |
@@ -74,7 +73,7 @@ API: `GET`/`PUT /api/admin/marketing/score-weights` · 키 `marketing.score.weig
 | Threads | `threads` | 텍스트 + 이미지 | Playwright 자동 로그인 (인스타 계정 상속) | 보류 |
 
 > **게시 계정 자격증명**: 어드민 `/admin/marketing` → **설정** 탭(플랫폼 auto + 계정). ASM이 암호화 저장.
-> 필드 스키마·암호화: [`credentials.md`](credentials.md). 미공개 기간에는 **X 계정만** 시딩·유지.
+> 필드 스키마·암호화: [`credentials.md`](credentials.md). X 로그인 세션은 ASM credential PK `x`(UI 라벨 「X 4단 스레드」)로 유지.
 
 ---
 
@@ -82,8 +81,8 @@ API: `GET`/`PUT /api/admin/marketing/score-weights` · 키 `marketing.score.weig
 
 | 플랫폼 | 필요 아티팩트 |
 |---|---|
+| `x_thread` | (스레드 스텝 이미지·upload.json) · Playwright |
 | `naver_blog` | `blog_md` (마크다운), `images[]` (인용 이미지) |
-| `x` | `images[0]` (카드 이미지), 텍스트 |
 | `instagram_feed` | `images[]` (훅 4:5 + X캡처 원본비율 + 비율카드 4:5, 4~5장) · caption |
 | `instagram_reels` | `video_mp4`, `thumbnail` |
 | `youtube_shorts` | `video_mp4`, `thumbnail` |

@@ -103,13 +103,13 @@ class MarketingPlatformAutoServiceTest {
     @Test
     void resolveTargets_video_excludesFeedWhenReelsIncluded() {
         List<String> enabled = List.of(
-            "x_thread", "instagram_feed", "instagram_reels", "youtube_shorts", "x", "naver_clip");
+            "x_thread", "instagram_feed", "instagram_reels", "youtube_shorts", "naver_clip");
 
         List<String> targets = service.resolveTargets(MarketingPublishFormat.VIDEO, enabled);
 
         assertThat(targets).containsExactly(
-            "instagram_reels", "youtube_shorts", "x", "x_thread");
-        assertThat(targets).doesNotContain("instagram_feed", "naver_clip");
+            "instagram_reels", "youtube_shorts", "x_thread");
+        assertThat(targets).doesNotContain("instagram_feed", "naver_clip", "x");
     }
 
     @Test

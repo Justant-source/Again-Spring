@@ -95,7 +95,7 @@ test.describe('Journey 13-C: 마케팅 잡 생성·조회 흐름 (ASM 스텁)', 
       headers: { Authorization: `Bearer ${adminToken}` },
       data: {
         postId: testPostId,
-        targets: ['naver_blog', 'x'],
+        targets: ['naver_blog', 'x_thread'],
         autoPublish: false,
       },
     })

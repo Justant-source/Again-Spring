@@ -11,7 +11,6 @@ import {
 } from '@/lib/api/admin/marketing';
 
 const PLATFORM_LABELS: Record<string, string> = {
-  x: 'X (트위터)',
   x_thread: 'X 4단 스레드',
   instagram_feed: 'Instagram 피드',
   instagram_reels: 'Instagram 릴스',
