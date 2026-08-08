@@ -52,7 +52,7 @@
 
 ---
 
-## 완료 기록 (Claude Haiku 4.5가 작성)
+## 완료 기록
 
 - [x] 작업 A 완료: ASM→AS 콜백 401 수정 완료 · 커밋 **801a30f** (ASM 메인)
   - **내용**: AS dev/prod의 callback_token 값을 안전하게 확인 후 ASM과 동기화
@@ -71,4 +71,7 @@
     - 유실된 잡 2건(01KZFZSM2J9RH0NNRA37NE9E0J, 01KZFZSM3XSTNS3JD2YBSZZQ2S) 콜백 수동 재발송 204 수령 ✓
     - AS dev 로그 확인: 08:24:40 두 콜백 모두 수신됨 ✓
   - **보안**: 평문 토큰을 로그/커밋/대화에 노출하지 않음. 복호화 시 마스킹 + 별도 파일(깃 무시) 저장.
-- [ ] 작업 B 완료: (요약, 커밋 해시, 검증 결과)
+- [x] 작업 B 완료: human-replies 프롬프트 폭주 수정 · 커밋 **ac71aa48** (main)
+  - `StructuredGenerationService.replyPrompt()` candidateResponders 슬림 직렬화, `AdminAiUserController.hrCandidateRespondersMax` 1~8 clamp, `HumanReplyBatchService.toResponderMap` 정리
+  - dev(:8090) e2e-realbe 103/103 통과 → prod(:8091) 배포 완료 (2026-08-08)
+  - human-replies 배치는 30분 크론 — 다음 자연 실행에서 "Prompt is too long" 재현 여부 최종 확인 예정 (모니터링 중)
