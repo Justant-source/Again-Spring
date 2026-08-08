@@ -47,6 +47,7 @@ public class TelegramNotifier {
                     .body(Map.of("chat_id", chatId, "text", text))
                     .retrieve()
                     .toBodilessEntity();
+            log.info("[telegram] alert sent");
         } catch (Exception e) {
             log.warn("[telegram] failed to send alert: {}", e.getMessage());
         }
