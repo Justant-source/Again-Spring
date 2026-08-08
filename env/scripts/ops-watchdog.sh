@@ -53,16 +53,26 @@ log() {
 
 send_telegram() {
     local text="$1"
-    local emoji_msg="${text}"
 
-    # URL 인코딩 (공백, 개행 등)
-    local encoded_msg=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''${emoji_msg}'''))")
+    # 같은 메시지는 1시간 내 재전송하지 않음 (스팸 방지)
+    local stamp="${WATCHDOG_STATE_DIR}/msg-$(printf '%s' "$text" | md5sum | cut -d' ' -f1)"
+    local now_ts=$(date +%s)
+    local last_ts=$(stat -c %Y "$stamp" 2>/dev/null || echo 0)
+    if [[ $((now_ts - last_ts)) -lt 3600 ]]; then
+        return 0
+    fi
 
-    curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    # URL 인코딩 (공백, 개행 등). parse_mode 미지정 — 백틱 불균형으로 인한 400 방지.
+    local encoded_msg=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$text")
+
+    if curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         -d "chat_id=${TELEGRAM_CHAT_ID}" \
         -d "text=${encoded_msg}" \
-        -d "parse_mode=Markdown" \
-        > /dev/null 2>&1 || log "WARN" "Failed to send telegram message"
+        > /dev/null 2>&1; then
+        touch "$stamp"
+    else
+        log "WARN" "Failed to send telegram message"
+    fi
 }
 
 # JSON 형식의 retry state 파일 다루기
@@ -160,14 +170,13 @@ check_claude_session() {
         local retry_count=$(get_retry_count "claude_session")
         log "INFO" "Claude session retry count: $retry_count / 3"
 
-        send_telegram "⚠️ [Again-Spring] Claude 세션 만료 감지"
-
+        # 재로그인은 자동화할 수 없음 (headless OAuth 불가) — 감지 즉시 수동 조치 안내.
+        # 3회(각 1시간 간격)까지만 반복 알림, 그 후엔 send_telegram의 1시간 dedup에 맡김.
         if [[ $retry_count -lt 3 ]]; then
-            send_telegram "🔧 자동 복구 시도 중... ($(($retry_count + 1))/3)"
+            send_telegram "⚠️ [Again-Spring] Claude 세션 만료 감지 ($(($retry_count + 1))/3). 수동 조치: 로컬 터미널에서 'claude' 실행 후 브라우저 로그인"
             increment_retry_count "claude_session"
-            send_telegram "❌ Claude 세션 재시작 실패 (3회 초과)\\n\\n수동 조치 필요:\\n\\\`claude login\\\` 또는 WSL 터미널에서 \\\`claude\\\` 실행 후 브라우저 로그인"
         else
-            send_telegram "❌ Claude 세션 재시작 실패 (3회 초과)\\n\\n수동 조치 필요:\\nWSL 또는 로컬 터미널에서 \\\`claude login\\\` 또는 \\\`claude\\\` 실행"
+            send_telegram "❌ [Again-Spring] Claude 세션 만료 지속 중 (3회 초과). 수동 조치 필요: 로컬 터미널에서 'claude' 실행 후 브라우저 로그인"
         fi
 
         return 1
@@ -205,7 +214,7 @@ check_credentials_ownership() {
             fi
         else
             log "ERROR" "Credentials chown failed 3 times, manual action required"
-            send_telegram "❌ 자격증명 소유권 복구 실패 (3회 초과)\\n\\n수동 조치:\\n\\\`sudo chown justant:justant ~/.claude/.credentials.json\\\`"
+            send_telegram "❌ 자격증명 소유권 복구 실패 (3회 초과). 수동 조치: sudo chown justant:justant ~/.claude/.credentials.json"
         fi
 
         return 1
@@ -276,7 +285,7 @@ EOF
             fi
         else
             log "ERROR" "Container $container restart failed 3 times, manual action required"
-            send_telegram "❌ 컨테이너 \`$container\` 재시작 실패 (3회 초과)\\n\\n수동 조치:\\n\\\`docker restart $container\\\`"
+            send_telegram "❌ 컨테이너 $container 재시작 실패 (3회 초과). 수동 조치: docker restart $container"
         fi
     done <<< "$unhealthy_containers"
 }

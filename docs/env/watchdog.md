@@ -56,9 +56,9 @@ loginctl enable-linger justant
 **파일**: `env/scripts/ops-watchdog.sh`
 
 **상태 추적**:
-- `env/watchdog-state/claude-canary.timestamp` — 마지막 canary 실행 시각
-- `env/watchdog-state/retry-state.json` — 각 항목별 재시도 횟수 + 실패 경험
-- `env/watchdog-state/watchdog.log` — 실행 로그
+- `watchdog-state/claude-canary.timestamp` — 마지막 canary 실행 시각
+- `watchdog-state/retry-state.json` — 각 항목별 재시도 횟수 + 실패 경험
+- `watchdog-state/watchdog.log` — 실행 로그
 
 **금지 사항**:
 - 재로그인 자동화 (사용자 수동 필요)
@@ -111,7 +111,7 @@ sudo chown justant:justant ~/.claude/.credentials.json
 sudo chown justant:justant ~/.claude/.credentials.json
 
 # 상태 파일 수동 리셋 (선택)
-rm -f env/watchdog-state/retry-state.json
+rm -f watchdog-state/retry-state.json
 ```
 
 ---

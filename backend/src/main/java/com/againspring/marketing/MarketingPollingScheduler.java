@@ -2,6 +2,7 @@ package com.againspring.marketing;
 
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.dto.AsmJobView;
+import com.againspring.notification.TelegramNotifier;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,11 @@ public class MarketingPollingScheduler {
     private final MarketingJobRepository marketingJobRepository;
     private final MarketingJobService marketingJobService;
     private final AsmProperties asmProperties;
+    private final TelegramNotifier telegramNotifier;
+
+    private static final java.time.format.DateTimeFormatter KST_FORMAT =
+            java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")
+                    .withZone(java.time.ZoneId.of("Asia/Seoul"));
 
     private static final List<String> POLLING_STATUSES = Arrays.asList(
         "QUEUED", "RUNNING", "READY", "PUBLISHING", "STALE"
@@ -133,7 +139,13 @@ public class MarketingPollingScheduler {
             job.getId(), originalScheduledAt, newScheduledTime, job.getRescheduledCount(),
             job.getRescheduledReason());
 
-        // TODO: Watchdog telegram notification integration
+        telegramNotifier.send(String.format(
+            "⚠️ [Again-Spring] 마케팅 예약 발행 이월%n잡 #%d — %s → %s (원 예약 %s, %d회째 이월)",
+            job.getId(),
+            KST_FORMAT.format(originalScheduledAt),
+            KST_FORMAT.format(newScheduledTime),
+            KST_FORMAT.format(job.getOriginalScheduledAt()),
+            job.getRescheduledCount()));
     }
 
     /**
