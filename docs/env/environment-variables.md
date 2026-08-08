@@ -109,7 +109,7 @@
 | `AI_USER_LLM_POOL_SIZE` | AI-user worker pool | `20` |
 | `AI_USER_LLM_QUEUE_CAPACITY` | AI-user queue | `100` |
 | `AI_USER_LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `30000` |
-| `AI_USER_LLM_DEFAULT_TIMEOUT_MS` | 생성 timeout | `600000` |
+| `AI_USER_LLM_DEFAULT_TIMEOUT_MS` | llm-ai-user worker 기본 timeout (`timeoutMs` 미전달 시). compose→`LLM_DEFAULT_TIMEOUT_MS`. 운영 SSOT는 `/admin/ai-user` `bundle_timeout_ms` | `600000` |
 | `SELF_CRITIQUE_ENABLED` | 자기비평 루프 | `true` |
 | `SELF_CRITIQUE_THRESHOLD` | pass 기준 | `5` |
 | `SELF_CRITIQUE_EXTRA_CLICHES` | 추가 상투구 차단 | 공란 |
@@ -118,8 +118,8 @@
 
 PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 
-- DB `ai_user_generation_config`: `scheduler_mode`, workload provider, pause/kill switch, 후보 풀과 batch 상한. 관리자 API만 변경한다.
-- env/yml: CLI 경로, 위 모델 식별자, pool/queue/timeout, cron 및 배포 게이트.
+- DB `ai_user_generation_config`: workload provider, pause/kill, 후보 풀·batch 상한·`hr_*`·**`bundle_timeout_ms`·`nightly_*`**. `/admin/ai-user` 저장 즉시 반영(캐시 없음).
+- env/yml: CLI 경로, 위 모델 식별자, pool/queue, cron 및 배포 스위치. timeout env는 DB 부재 시 fallback.
 - yml provider 값은 DB 설정 행이 없을 때의 호환 fallback일 뿐이며, DB 값이 항상 우선한다.
 
 ### PLAN rollout gate
@@ -132,7 +132,7 @@ PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 | `AI_USER_THREAD_PLAN_MAINTENANCE_ENABLED` | 만료/재분배 maintenance gate | `false` |
 | `AI_USER_THREAD_PLAN_AI_POST_PROVIDER` | DB config 부재 시 AI 글 bundle provider | `CODEX` |
 | `AI_USER_THREAD_PLAN_HUMAN_PROVIDER` | DB config 부재 시 사람 글/반응 provider | `CODEX` |
-| `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` | 번들형 구조화 생성(글+최대 24후보) 타임아웃 ms | `600000` |
+| `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` | 번들형 구조화 생성 타임아웃 ms — **DB `bundle_timeout_ms` 부재/비정상 시만 fallback**. 운영 SSOT는 `/admin/ai-user` | `600000` |
 | `AI_USER_THREAD_PLAN_MICRO_BATCH_ENABLED` | AI_POST 생성 시 4~6 persona micro-batch (false=레거시 mega-call) | `true` |
 | `AI_USER_THREAD_PLAN_MICRO_BATCH_SIZE` | micro-batch당 댓글 persona 수 (런타임 4..6 clamp) | `5` |
 | `AI_USER_THREAD_PLAN_PLAN_PERSONA_CAST_MAX` | 단일 LLM 요청에 넣는 persona cast 상한(셔플 후 cap). 넘기면 Claude 200K 토큰 한도 초과 위험 | `40` |

@@ -48,6 +48,13 @@ export interface GenerationConfig {
   hrChunkSize: number;
   hrDelayMinutesMin: number;
   hrDelayMinutesMax: number;
+  /** 구조화 LLM 타임아웃(ms). 저장 즉시 반영. 60000~900000 */
+  bundleTimeoutMs: number;
+  /** 새벽 배치 양면 비율 0~1 */
+  nightlyPairedShare: number;
+  nightlySlotFromHour: number;
+  nightlySlotToHour: number;
+  nightlySlotMinSpacingMinutes: number;
   /** 파생값 = hrDistinctPersonasMax × hrRepliesPerPersonaMax (서버 계산, 전송 불필요) */
   hrRepliesPerPostHumanMax: number;
 }
@@ -76,6 +83,11 @@ export interface UpdateConfigRequest {
   hrChunkSize: number;
   hrDelayMinutesMin: number;
   hrDelayMinutesMax: number;
+  bundleTimeoutMs: number;
+  nightlyPairedShare: number;
+  nightlySlotFromHour: number;
+  nightlySlotToHour: number;
+  nightlySlotMinSpacingMinutes: number;
 }
 
 // ── API calls ────────────────────────────────────────────────────────────

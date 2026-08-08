@@ -9,7 +9,7 @@
 > **현재 상태 (2026-07-31)**: `posts.id`(VARCHAR)를 `Long`으로 파싱하려는 구조적 버그
 > (2026-07-30 발견, `ThreadPlanGenerationService.planRequest` 등)를 수정 완료했다
 > (comment/reply ID는 실제 BIGINT라 그대로 둠 — postId만 String 문제였다). 새
-> `bundleTimeoutMs` 설정(기본값 240초)으로 LLM 응답 대기 시간도 확보했다.
+> `bundleTimeoutMs`는 `/admin/ai-user` → `ai_user_generation_config.bundle_timeout_ms`(기본 600초)가 SSOT다. 저장 즉시 반영.
 > dev 검증(`ai-user-orchestrator-dev`, e2e-realbe 158 passed) 후 **prod에도
 > 적용 완료** — `scheduler_mode='PLAN'`으로 운영 중이며, 새 글 생성 직후 댓글이
 > 한꺼번에 몰리지 않고 예약 스케줄에 따라 분산 게시됨을 확인했다.

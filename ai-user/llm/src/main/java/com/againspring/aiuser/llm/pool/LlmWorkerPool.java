@@ -39,7 +39,7 @@ public class LlmWorkerPool {
     @Value("${llm.worker.queue-wait-timeout-ms:30000}")
     private long queueWaitTimeoutMs;
 
-    @Value("${llm.worker.default-timeout-ms:120000}")
+    @Value("${llm.worker.default-timeout-ms:600000}")
     private long defaultTimeoutMs;
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}")

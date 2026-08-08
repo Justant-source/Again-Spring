@@ -62,7 +62,8 @@ class PairedPostCommentPlanTest {
         service = new ThreadPlanGenerationService(
                 planRepository, itemRepository, personaRepository,
                 planService, llmClient, qualityGate, properties, configRepository,
-                scheduleSupport, planPersonaMapper, interestedPersonaSeeder, backendBotClient
+                scheduleSupport, planPersonaMapper, interestedPersonaSeeder, backendBotClient,
+                new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties)
         );
         lenient().when(properties.isEnabled()).thenReturn(true);
         lenient().when(properties.getThreadPlan()).thenReturn(threadPlanConfig);

@@ -171,7 +171,8 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `ai_human_interaction_inbox` | 사람 댓글/대댓글의 30분 batch 입력 · attempt/error ledger | VARCHAR(36) UUID | source comment unique; V14 attempt_count/last_error_code/schema_version |
 | `ai_post_interested_personas` | post별 human-reply 관심 persona pool | BIGINT auto | AI-user Flyway V13. loose refs, UNIQUE(post_id, persona_id) |
 | `bot_request_dedup` | synthetic bot 게시 요청의 `Idempotency-Key`와 결과 target 매핑 | VARCHAR(160) | V88, timeout 재시도 중복 게시 방지 |
-| `ai_user_generation_config` | AI 유저 생성 정책 싱글톤(id=1) — 일일 목표량·PLAN provider 설정 | INT(1 row) | V70, backend 소유·orchestrator는 읽기 전용 미러. **V90**에서 레거시 필드(scheduler_mode/backend_post·comment·reply/prompt_caching/daily_token_budget) 삭제 + `provider_vote_like` 추가 |
+| `ai_user_generation_config` | AI 유저 생성 정책 싱글톤(id=1) — 일일 목표량·PLAN provider·**bundle_timeout_ms·nightly_*** | INT(1 row) | V70, backend 소유·orchestrator는 읽기 전용 미러. **V90** 레거시 삭제 + `provider_vote_like`. **V91** `hr_*`. **V100** 타임아웃·새벽 배치 슬롯 |
+
 
 ---
 
@@ -435,6 +436,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V94** | `posts.capture_split_after_line` — X/IG 캡쳐 전반부 끝 개행 블록(1-based) |
 | **V97** | `WAIT_FOR_PARTNER` private-until-partner 폐기 데이터 정리: `PRIVATE + WAIT_FOR_PARTNER` 중 `created_at` >30일 → `deleted_at` soft-delete; 나머지 → `PUBLIC` + `vote_close_at`(없으면 `COALESCE(vote_duration_hours,72)`h) |
 | **V98** | `posts.capture_split_after_lines` / `partner_capture_split_after_lines` JSON — N장 캡쳐 컷 |
+| **V100** | `ai_user_generation_config`에 `bundle_timeout_ms`·`nightly_paired_share`·`nightly_slot_*` — 구조화 LLM 타임아웃·새벽 배치 슬롯/양면 비율 (SSOT: `/admin/ai-user`, 저장 즉시 반영) |
 
 ---
 

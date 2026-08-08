@@ -43,6 +43,7 @@ class HumanReplyBatchServiceTest {
     @Mock private LlmAiUserClient llm;
     @Mock private ContentSafetyGuard guard;
     @Mock private OrchestratorProperties props;
+    @Mock private com.againspring.aiuser.orchestrator.service.GenerationConfigSupport generationConfigSupport;
     @Mock private AiUserGenerationConfigRepository configRepository;
     @Mock private BackendBotClient backend;
     @Mock private JdbcTemplate jdbc;
@@ -63,9 +64,10 @@ class HumanReplyBatchServiceTest {
         humanReply.setCandidateRespondersMax(8);
         lenient().when(props.getHumanReply()).thenReturn(humanReply);
         lenient().when(interestedPersonas.findByPostIdOrderByScoreDesc(anyString())).thenReturn(List.of());
+        lenient().when(generationConfigSupport.bundleTimeoutMs()).thenReturn(600_000L);
         service = new HumanReplyBatchService(
                 inbox, plans, planItems, personaRepository, interestedPersonas, llm, guard, props,
-                configRepository, backend, jdbc);
+                generationConfigSupport, configRepository, backend, jdbc);
     }
 
     @Test

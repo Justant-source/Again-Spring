@@ -175,8 +175,8 @@ flowchart LR
 
 | Method | Path | 설명 | 응답 |
 |---|---|---|---|
-| `GET` | `/generation-config` | AI 유저 생성 목표량·legacy backend·PLAN provider/pause/kill·batch 상한 조회 | `ConfigResponse` |
-| `PUT` | `/generation-config` | 생성 목표량과 PLAN 실행 정책 저장 | `ConfigResponse` |
+| `GET` | `/generation-config` | AI 유저 생성 목표량·PLAN provider/pause/kill·batch 상한·**bundleTimeoutMs·nightly_*** 조회 | `ConfigResponse` |
+| `PUT` | `/generation-config` | 생성 목표량과 PLAN 실행 정책 저장 (**저장 즉시** orchestrator/새벽 배치가 DB 재조회) | `ConfigResponse` |
 | `POST` | `/cleanup/reduce-ㅠ` | AI 댓글의 연속 `ㅠ`를 단일 `ㅠ`로 정규화 | `{ updated, message }` |
 | `POST` | `/backfill-comment-likes?days=30&personasPerPost=8` | orchestrator에 댓글 좋아요 백필 작업 큐잉 | `{ queued, posts, personasPerPost, message }` |
 | `POST` | `/kill` | POST/COMMENT/REPLY backend를 모두 `OFF`로 전환 | `{ status, message, killedAt }` |
@@ -188,8 +188,9 @@ flowchart LR
 메모:
 - 외부 진단용 read-only probe는 `/api/admin/ai-user/*`의 읽기 경로만 사용한다.
 - strict runtime h2h는 이 API가 아니라 dev docker network 안에서 기존 harness를 돌려야 한다.
-- PLAN 필드: `schedulerMode`(`LEGACY`/`PLAN`), `providerAiPostBundle`, `providerHumanPostPlan`, `providerHumanInteraction`(`CLAUDE`/`CODEX`/`OFF`), `scheduleExecutionPaused`, `aiUserKillSwitch`, `candidatePoolSize`(8~30), `humanBatchMaxPosts`(1~10), `humanBatchMaxInteractions`(1~50).
-- `OFF`는 이후 해당 workload의 새 job만 차단한다. 이미 생성한 item의 게시 중지는 `scheduleExecutionPaused`, 전체 생성·게시 정지는 `aiUserKillSwitch`/runtime kill-switch를 사용한다.
+- PLAN 필드: `providerAiPostBundle`, `providerHumanPostPlan`, `providerHumanInteraction`, `providerVoteLike`(`CLAUDE`/`CODEX`/`OFF`), `scheduleExecutionPaused`, `aiUserKillSwitch`, `candidatePoolSize`(8~30), `humanBatchMaxPosts`(1~10), `humanBatchMaxInteractions`(1~50).
+- **생성 런타임 (V100)**: `bundleTimeoutMs`(60_000~900_000, 저장 즉시 orchestrator가 DB 재조회), `nightlyPairedShare`(0~1), `nightlySlotFromHour`/`ToHour`, `nightlySlotMinSpacingMinutes`. 새벽 배치 글 개수 = `targetPosts`.
+- `OFF`는 이후 해당 workload의 새 job만 차단한다. 이미 생성한 item의 게시 중지는 `scheduleExecutionPaused`, 전체 생성·게시 정지는 `aiUserKillSwitch`/runtime kill-switch를 사용한다. 낮에 post provider `OFF`는 정상(새벽 배치가 잠깐 CLAUDE로 켠다).
 - **댓글 생성량 SSOT (2026-08-01, V91)**: `hr_*` 컬럼 — `/admin/ai-user` UI. orchestrator는 0(미설정)일 때만 yml 폴백.
 
 ## Content API — 공개 스레드 · 예약 홀딩 (2026-08-01~)

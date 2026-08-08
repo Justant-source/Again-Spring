@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -100,7 +101,8 @@ class AiPostBundleServiceTest {
                 configRepository, properties, personaRepository, llmClient, backendBot,
                 safetyGuard, planService, planGenerationService, scheduledPostRepository,
                 scheduleSupport, new ObjectMapper(), planPersonaMapper, sourceStoryResolver,
-                storyProfileAnalyzer, personaMatcherService, storyTwinGuard, sourceReservationSupport);
+                storyProfileAnalyzer, personaMatcherService, storyTwinGuard, sourceReservationSupport,
+                new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties));
     }
 
     @Test

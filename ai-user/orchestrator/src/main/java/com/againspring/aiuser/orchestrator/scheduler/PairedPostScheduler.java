@@ -13,6 +13,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaRelationshipReposit
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
+import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.CandidateScheduleSupport;
 import com.againspring.aiuser.orchestrator.service.threadplan.PairedHoldMeta;
@@ -65,6 +66,7 @@ public class PairedPostScheduler {
     private final ObjectMapper objectMapper;
     private final PlanPersonaMapper planPersonaMapper;
     private final CandidateScheduleSupport candidateScheduleSupport;
+    private final GenerationConfigSupport generationConfigSupport;
 
     /** Phase1 cast stays small (author + commenters for ~2–4 top-level). */
     private static final int CALL1_CAST_MAX = 12;
@@ -280,6 +282,7 @@ public class PairedPostScheduler {
         request.put("provider", provider);
         request.put("model", model);
         request.put("correlationId", corrId);
+        request.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
         request.put("category", category);
         request.put("author", authorMap);
         request.put("personas", personas);

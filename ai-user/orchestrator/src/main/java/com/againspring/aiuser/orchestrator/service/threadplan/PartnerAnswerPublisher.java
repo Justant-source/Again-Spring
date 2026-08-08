@@ -9,6 +9,7 @@ import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -45,6 +46,7 @@ public class PartnerAnswerPublisher {
     private final AiUserGenerationConfigRepository generationConfigRepository;
     private final PlanPersonaMapper planPersonaMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final GenerationConfigSupport generationConfigSupport;
 
     public void publishDue() {
         if (!properties.isEnabled()) return;
@@ -154,6 +156,7 @@ public class PartnerAnswerPublisher {
         request.put("provider", provider);
         request.put("model", model);
         request.put("correlationId", corr + "-P2");
+        request.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
         request.put("category", row.getCategory());
         request.put("authorPost", authorPost);
         request.put("partner", partnerMap);

@@ -18,6 +18,7 @@ import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
 import com.againspring.aiuser.orchestrator.service.match.RankedPersona;
 import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
+import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +72,7 @@ public class AiPostBundleService {
     private final PersonaMatcherService personaMatcherService;
     private final StoryTwinGuard storyTwinGuard;
     private final SourceReservationSupport sourceReservationSupport;
+    private final GenerationConfigSupport generationConfigSupport;
 
     /** A PLAN rollout owns post generation even when its workload provider is OFF. */
     public boolean ownsPostGeneration() {
@@ -251,7 +253,7 @@ public class AiPostBundleService {
             return Optional.empty();
         }
         String model = properties.getThreadPlan().getAiPostModel();
-        int pool = config == null ? 24 : Math.max(1, Math.min(24, config.getCandidatePoolSize()));
+        int pool = config == null ? 24 : Math.max(8, Math.min(30, config.getCandidatePoolSize()));
 
         // WP3: StoryProfile once per source; reorder comment cast by matcher (author stays personas[0]).
         StoryProfile storyProfile = storyProfileAnalyzer.analyze(
@@ -386,7 +388,7 @@ public class AiPostBundleService {
             String humanModel = properties.getThreadPlan().getHumanPlanModel();
             if (humanModel != null && !humanModel.isBlank()) follow.put("model", humanModel);
             follow.put("correlationId", corr + "-b" + i);
-            follow.put("timeoutMs", properties.getThreadPlan().getBundleTimeoutMs());
+            follow.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
             follow.put("category", category == null ? "OTHER" : category);
             follow.put("topicHint", source.topicSeed());
             follow.put("existingTitle", postContent.title());
@@ -440,7 +442,7 @@ public class AiPostBundleService {
         request.put("provider", provider);
         if (model != null && !model.isBlank()) request.put("model", model);
         request.put("correlationId", correlationId);
-        request.put("timeoutMs", properties.getThreadPlan().getBundleTimeoutMs());
+        request.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
         request.put("category", category == null ? "OTHER" : category);
         request.put("topicHint", source.topicSeed());
         request.put("sourceContext", source.sourceContext());

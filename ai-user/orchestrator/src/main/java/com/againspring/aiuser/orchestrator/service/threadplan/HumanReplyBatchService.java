@@ -4,6 +4,7 @@ import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.client.dto.CommentThreadDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
+import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.domain.*;
 import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemStatus;
 import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemType;
@@ -50,6 +51,7 @@ public class HumanReplyBatchService {
     private final LlmAiUserClient llm;
     private final ContentSafetyGuard guard;
     private final OrchestratorProperties props;
+    private final GenerationConfigSupport generationConfigSupport;
     private final AiUserGenerationConfigRepository configRepository;
     private final BackendBotClient backend;
     private final JdbcTemplate jdbc;
@@ -105,7 +107,7 @@ public class HumanReplyBatchService {
             request.put("provider", config.getProviderHumanInteraction());
             if (!props.getThreadPlan().getHumanPlanModel().isBlank()) request.put("model", props.getThreadPlan().getHumanPlanModel());
             request.put("correlationId", "human-replies-" + now.toEpochMilli() + "-c" + indexes.get(0));
-            request.put("timeoutMs", props.getThreadPlan().getBundleTimeoutMs());
+            request.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
             request.put("items", chunkItems);
             int attempts = 0;
             Optional<Map<String, Object>> response = Optional.empty();
@@ -381,7 +383,7 @@ public class HumanReplyBatchService {
 
             // Budget is per conversation = (post, human author), never per post: different humans
             // on the same post hold independent 3 personas / 5 each / 15 total budgets (§1.1-24).
-            String budgetKey = entry.getPostId() + " " + entry.getAuthorId();
+            String budgetKey = entry.getPostId() + "" + entry.getAuthorId();
             HumanReplyBudget budget = budgetsByConversation.computeIfAbsent(budgetKey, k -> {
                 HumanReplyBudget b = newBudget(configRepository.findById(1).orElse(null));
                 for (AiThreadPlanItem existing : planItems.findHumanReplyItemsForPostAndHuman(

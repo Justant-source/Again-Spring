@@ -178,8 +178,11 @@ delta를 계산해 댓글·대댓글 `atLocal`에 일괄 적용한다 (키보드
 ```
 env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
   ├─ provider(ai_post_bundle/human_post_plan/human_interaction) = CLAUDE
-  ├─ 할당: paired=ceil(N×0.20), solo=N−paired  (NIGHTLY_BATCH_PAIRED_SHARE, 기본 0.20)
-  ├─ POST /admin/trigger/generate-scheduled-posts?count=solo&fromHour=8&toHour=22
+  ├─ SSOT: ai_user_generation_config ( /admin/ai-user 저장값 )
+  │    N=target_posts, paired=ceil(N×nightly_paired_share), solo=N−paired
+  │    slots=nightly_slot_from_hour~to_hour, spacing=nightly_slot_min_spacing_minutes
+  │    (DB 조회 실패 시에만 NIGHTLY_BATCH_* env fallback)
+  ├─ POST /admin/trigger/generate-scheduled-posts?count=solo&fromHour&toHour&minSpacingMinutes
   │    ├─ ActivityCurve.sampleFutureInstants 로 발행 슬롯 샘플링
   │    └─ generateAndHold() → ai_scheduled_posts SCHEDULED
   ├─ POST /admin/trigger/paired-posts?count=paired
@@ -291,10 +294,12 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
 실측 결과 글+최대 24개 후보를 한 번에 LLM 요청하는 구조화 생성이 5~10분 이상 걸릴
 수 있음이 확인됐다. 대응책:
 
-1. 타임아웃: `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` (기본 600000ms=600초)로 설정.
-   `OrchestratorProperties.ThreadPlan.bundleTimeoutMs`에 대응.
+1. 타임아웃 SSOT: `/admin/ai-user` → `ai_user_generation_config.bundle_timeout_ms`
+   (기본 600000ms=600초, 60~900초). **설정 저장 즉시** orchestrator `GenerationConfigSupport`가
+   DB를 재조회해 solo/paired/human-reply 구조화 호출의 `timeoutMs`에 넣는다.
+   env `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` / `AI_USER_LLM_DEFAULT_TIMEOUT_MS`는 DB 부재·비정상 시 fallback.
 2. 후보 풀 크기: `ai_user_generation_config.candidate_pool_size`를 24보다 작게
-   (16 권장: 최상위 14 + 대댓글 2)으로 설정하면 생성 속도 개선.
+   (16 권장: 최상위 14 + 대댓글 2)으로 설정하면 생성 속도 개선. 허용 범위 8~30.
 
 ## 9. 트러블슈팅
 

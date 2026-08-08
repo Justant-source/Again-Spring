@@ -51,7 +51,19 @@ public class AiUserGenerationConfig {
     @Column(name = "hr_delay_minutes_min")             private int hrDelayMinutesMin;
     @Column(name = "hr_delay_minutes_max")             private int hrDelayMinutesMax;
 
+    @Column(name = "bundle_timeout_ms")                 private int bundleTimeoutMs;
+    @Column(name = "nightly_paired_share")              private double nightlyPairedShare;
+    @Column(name = "nightly_slot_from_hour")            private int nightlySlotFromHour;
+    @Column(name = "nightly_slot_to_hour")              private int nightlySlotToHour;
+    @Column(name = "nightly_slot_min_spacing_minutes")  private int nightlySlotMinSpacingMinutes;
+
     /** 대화 총상한은 저장하지 않는다 — distinct × perPersona 파생값. */
+
+    /** DB 값 우선, 미설정/비정상이면 fallbackMs (보통 env bundleTimeoutMs). */
+    public long resolveBundleTimeoutMs(long fallbackMs) {
+        if (bundleTimeoutMs >= 60_000 && bundleTimeoutMs <= 900_000) return bundleTimeoutMs;
+        return fallbackMs > 0 ? fallbackMs : 600_000L;
+    }
     public int hrRepliesPerPostHumanMax() {
         return hrDistinctPersonasMax * hrRepliesPerPersonaMax;
     }

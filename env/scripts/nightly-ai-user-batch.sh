@@ -44,12 +44,13 @@ DB_CONTAINER=againspring-mariadb-prod
 
 MAX_MINUTES=${NIGHTLY_BATCH_MAX_MINUTES:-45}
 POLL_INTERVAL_SECONDS=${NIGHTLY_BATCH_POLL_INTERVAL:-30}
-SCHEDULED_POST_COUNT=${NIGHTLY_BATCH_POST_COUNT:-5}
-# 하루 AI 글 중 양면 사연(작성자+상대방) 비율 — PAIRED_POST_TARGET_SHARE와 맞춤
-PAIRED_SHARE=${NIGHTLY_BATCH_PAIRED_SHARE:-0.20}
-SLOT_FROM_HOUR=${NIGHTLY_BATCH_SLOT_FROM_HOUR:-8}
-SLOT_TO_HOUR=${NIGHTLY_BATCH_SLOT_TO_HOUR:-22}
-SLOT_MIN_SPACING_MINUTES=${NIGHTLY_BATCH_SLOT_MIN_SPACING_MINUTES:-45}
+# 아래 값은 /admin/ai-user → ai_user_generation_config 가 SSOT.
+# env NIGHTLY_BATCH_* 는 DB 조회 실패 시에만 fallback.
+SCHEDULED_POST_COUNT_FALLBACK=${NIGHTLY_BATCH_POST_COUNT:-5}
+PAIRED_SHARE_FALLBACK=${NIGHTLY_BATCH_PAIRED_SHARE:-0.20}
+SLOT_FROM_HOUR_FALLBACK=${NIGHTLY_BATCH_SLOT_FROM_HOUR:-8}
+SLOT_TO_HOUR_FALLBACK=${NIGHTLY_BATCH_SLOT_TO_HOUR:-22}
+SLOT_MIN_SPACING_MINUTES_FALLBACK=${NIGHTLY_BATCH_SLOT_MIN_SPACING_MINUTES:-45}
 
 # ceil(N * share); N>=1이면 최소 1 (비율>0일 때)
 paired_count_for() {
@@ -63,9 +64,6 @@ paired_count_for() {
   if [ "$p" -gt "$n" ]; then p=$n; fi
   echo "$p"
 }
-
-PAIRED_COUNT=$(paired_count_for "$SCHEDULED_POST_COUNT" "$PAIRED_SHARE")
-SOLO_COUNT=$(( SCHEDULED_POST_COUNT - PAIRED_COUNT ))
 
 log() { printf '[%s] %s\n' "$(date '+%F %T %Z')" "$*" | tee -a "$LOG_FILE"; }
 
@@ -81,6 +79,29 @@ db() {
   docker exec "$DB_CONTAINER" mariadb -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -N -e "$1" 2>>"$LOG_FILE"
 }
 
+# /admin/ai-user 저장값 로드 (target_posts = 새벽 생성 개수)
+load_generation_config() {
+  local row
+  row=$(db "SELECT target_posts, COALESCE(nightly_paired_share,0.20), COALESCE(nightly_slot_from_hour,8), COALESCE(nightly_slot_to_hour,22), COALESCE(nightly_slot_min_spacing_minutes,45) FROM ai_user_generation_config WHERE id=1" || true)
+  if [ -z "${row:-}" ]; then
+    SCHEDULED_POST_COUNT=$SCHEDULED_POST_COUNT_FALLBACK
+    PAIRED_SHARE=$PAIRED_SHARE_FALLBACK
+    SLOT_FROM_HOUR=$SLOT_FROM_HOUR_FALLBACK
+    SLOT_TO_HOUR=$SLOT_TO_HOUR_FALLBACK
+    SLOT_MIN_SPACING_MINUTES=$SLOT_MIN_SPACING_MINUTES_FALLBACK
+    log "WARN: ai_user_generation_config 조회 실패 — env fallback count=${SCHEDULED_POST_COUNT}"
+    return
+  fi
+  SCHEDULED_POST_COUNT=$(printf '%s' "$row" | awk '{print $1}')
+  PAIRED_SHARE=$(printf '%s' "$row" | awk '{print $2}')
+  SLOT_FROM_HOUR=$(printf '%s' "$row" | awk '{print $3}')
+  SLOT_TO_HOUR=$(printf '%s' "$row" | awk '{print $4}')
+  SLOT_MIN_SPACING_MINUTES=$(printf '%s' "$row" | awk '{print $5}')
+  # sanitize
+  if ! [ "${SCHEDULED_POST_COUNT}" -ge 0 ] 2>/dev/null; then SCHEDULED_POST_COUNT=$SCHEDULED_POST_COUNT_FALLBACK; fi
+  if [ "${SCHEDULED_POST_COUNT}" -gt 100 ]; then SCHEDULED_POST_COUNT=100; fi
+}
+
 trap 'log "trap: restoring provider=OFF before exit"; db "UPDATE ai_user_generation_config SET provider_ai_post_bundle=\"OFF\", provider_human_post_plan=\"OFF\", provider_human_interaction=\"OFF\", updated_by=\"nightly-batch-trap\", updated_at=UTC_TIMESTAMP() WHERE id=1;" || true' EXIT
 
 log "=== nightly-ai-user-batch (scheduled-post pipeline) start (max ${MAX_MINUTES}m) ==="
@@ -90,7 +111,10 @@ if ! db "UPDATE ai_user_generation_config SET provider_ai_post_bundle='CLAUDE', 
   exit 1
 fi
 log "provider_ai_post_bundle/human_post_plan/human_interaction=CLAUDE"
-log "nightly allocation: total=${SCHEDULED_POST_COUNT} solo=${SOLO_COUNT} paired=${PAIRED_COUNT} (share=${PAIRED_SHARE})"
+load_generation_config
+PAIRED_COUNT=$(paired_count_for "$SCHEDULED_POST_COUNT" "$PAIRED_SHARE")
+SOLO_COUNT=$(( SCHEDULED_POST_COUNT - PAIRED_COUNT ))
+log "nightly allocation: total=${SCHEDULED_POST_COUNT} solo=${SOLO_COUNT} paired=${PAIRED_COUNT} (share=${PAIRED_SHARE} slots=${SLOT_FROM_HOUR}-${SLOT_TO_HOUR} spacing=${SLOT_MIN_SPACING_MINUTES}m) [from ai_user_generation_config]"
 
 if [ "$SOLO_COUNT" -gt 0 ]; then
   GEN_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- -T 1800 --post-data='' \

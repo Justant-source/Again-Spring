@@ -23,6 +23,9 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class StructuredGenerationService {
     private static final ObjectMapper JSON = new ObjectMapper();
+    @Value("${llm.worker.default-timeout-ms:600000}")
+    private long defaultTimeoutMs;
+
     private static final Pattern META = Pattern.compile("(?i)(적용 처리 메모|작성 노트|<<<|```|i can't help|i am (claude|codex))");
     /** Marketing X/IG capture: bodies with more than this many non-empty newline blocks need a split. */
     public static final int SHORT_POST_MAX_BLOCKS = 8;
@@ -711,7 +714,11 @@ public class StructuredGenerationService {
         throw last;
     }
     /** Cap matches orchestrator bundle timeout (600s). Raising without env bump is a no-op. */
-    private static long timeout(Long v) { return v == null ? 120_000L : Math.max(1_000L, Math.min(v, 600_000L)); }
+    private long timeout(Long v) {
+        long fallback = defaultTimeoutMs > 0 ? defaultTimeoutMs : 600_000L;
+        if (v == null) return fallback;
+        return Math.max(1_000L, Math.min(v, 900_000L));
+    }
     private static int safe(Integer v, int d, int min, int max) { return Math.max(min, Math.min(v == null ? d : v, max)); }
     private static String text(JsonNode n, String name) { String v = nullableText(n, name); if (v == null) throw new StructuredGenerationException(name + " is required"); return v; }
     /** body/title 추출 시 리터럴 "\n" → 실개행 (PLAN 경로는 OutputSanitizer를 거치지 않음). */

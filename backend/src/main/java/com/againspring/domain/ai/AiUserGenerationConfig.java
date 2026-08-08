@@ -56,6 +56,15 @@ public class AiUserGenerationConfig {
     @Column(name = "hr_delay_minutes_min", nullable = false)             @Builder.Default private int hrDelayMinutesMin = 1;
     @Column(name = "hr_delay_minutes_max", nullable = false)             @Builder.Default private int hrDelayMinutesMax = 30;
 
+    // ── 생성 런타임 (타임아웃·새벽 배치) — 저장 즉시 반영 ───────────────────
+    /** 구조화 LLM 호출 타임아웃(ms). solo/paired/human-reply. 60_000~900_000. */
+    @Column(name = "bundle_timeout_ms", nullable = false) @Builder.Default private int bundleTimeoutMs = 600_000;
+    /** 새벽 배치 양면 비율 (0~1). ceil(target_posts × share). */
+    @Column(name = "nightly_paired_share", nullable = false) @Builder.Default private double nightlyPairedShare = 0.20;
+    @Column(name = "nightly_slot_from_hour", nullable = false) @Builder.Default private int nightlySlotFromHour = 8;
+    @Column(name = "nightly_slot_to_hour", nullable = false) @Builder.Default private int nightlySlotToHour = 22;
+    @Column(name = "nightly_slot_min_spacing_minutes", nullable = false) @Builder.Default private int nightlySlotMinSpacingMinutes = 45;
+
     /** 한 사람×한 게시글 대화의 AI 답글 총상한. 저장값이 아니라 파생값이다. */
     @Transient
     public int getHrRepliesPerPostHumanMax() {

@@ -124,14 +124,28 @@ public class AdminAiUserController {
         cfg.setHrDelayMinutesMin(Math.min(delayMin, delayMax));
         cfg.setHrDelayMinutesMax(Math.max(delayMin, delayMax));
 
+        // ── 생성 런타임 (타임아웃·새벽 배치) ───────────────────────────
+        cfg.setBundleTimeoutMs(clamp(req.bundleTimeoutMs > 0 ? req.bundleTimeoutMs : 600_000, 60_000, 900_000));
+        double share = req.nightlyPairedShare;
+        if (Double.isNaN(share) || share < 0) share = 0.20;
+        cfg.setNightlyPairedShare(Math.min(1.0, share));
+        int fromH = clamp(req.nightlySlotFromHour, 0, 23);
+        int toH = clamp(req.nightlySlotToHour, 1, 24);
+        if (toH <= fromH) toH = Math.min(24, fromH + 1);
+        cfg.setNightlySlotFromHour(fromH);
+        cfg.setNightlySlotToHour(toH);
+        cfg.setNightlySlotMinSpacingMinutes(clamp(req.nightlySlotMinSpacingMinutes > 0
+                ? req.nightlySlotMinSpacingMinutes : 45, 15, 180));
+
         // ── 메타 ──────────────────────────────────────────────────────
         String actor = (auth != null) ? auth.getName() : "unknown";
         cfg.setUpdatedBy(actor);
         cfg.setUpdatedAt(Instant.now());
 
         configRepository.save(cfg);
-        log.info("AI 생성 정책 저장 by {}: posts={} comments={} replies={} votes={} likes={} post_provider={} comment_provider={} interaction_provider={} vote_like_provider={}",
+        log.info("AI 생성 정책 저장 by {}: posts={} comments={} replies={} votes={} likes={} timeoutMs={} pairedShare={} post_provider={} comment_provider={} interaction_provider={} vote_like_provider={}",
                 actor, cfg.getTargetPosts(), cfg.getTargetComments(), cfg.getTargetReplies(), cfg.getTargetVotes(), cfg.getTargetLikes(),
+                cfg.getBundleTimeoutMs(), cfg.getNightlyPairedShare(),
                 cfg.getProviderAiPostBundle(), cfg.getProviderHumanPostPlan(), cfg.getProviderHumanInteraction(), cfg.getProviderVoteLike());
 
         return ResponseEntity.ok(toResponse(cfg));
@@ -311,6 +325,9 @@ public class AdminAiUserController {
                 cfg.getHrRepliesPerPersonaMax(), cfg.getHrRepliesPerPostHumanMax(),
                 cfg.getHrCandidateRespondersMax(), cfg.getHrChunkSize(),
                 cfg.getHrDelayMinutesMin(), cfg.getHrDelayMinutesMax(),
+                cfg.getBundleTimeoutMs(), cfg.getNightlyPairedShare(),
+                cfg.getNightlySlotFromHour(), cfg.getNightlySlotToHour(),
+                cfg.getNightlySlotMinSpacingMinutes(),
                 cfg.getUpdatedBy(), cfg.getUpdatedAt() != null ? cfg.getUpdatedAt().toString() : null,
                 RATIO_COMMENT, RATIO_REPLY, RATIO_VOTE, RATIO_LIKE,
                 est
@@ -330,13 +347,18 @@ public class AdminAiUserController {
         long cliIn = 0, cliOut = 0;
         long codexCalls = 0;
 
-        // AI 글 생성 (providerAiPostBundle)
-        if (!"OFF".equals(cfg.getProviderAiPostBundle()) && cfg.getTargetPosts() > 0) {
+        // AI 글 생성 — 새벽 배치가 target_posts만큼 생성 (주간 provider OFF여도 새벽 창에서 실행)
+        if (cfg.getTargetPosts() > 0) {
             calls += cfg.getTargetPosts();
-            if ("CLAUDE".equals(cfg.getProviderAiPostBundle())) {
+            String postProvider = cfg.getProviderAiPostBundle();
+            if ("OFF".equals(postProvider) || postProvider == null || postProvider.isBlank()) {
+                // 낮 OFF + 새벽 배치 경로: CLAUDE 비용으로 추정
                 cliIn += (long) cfg.getTargetPosts() * POST_IN;
                 cliOut += (long) cfg.getTargetPosts() * POST_OUT;
-            } else if ("CODEX".equals(cfg.getProviderAiPostBundle())) {
+            } else if ("CLAUDE".equals(postProvider)) {
+                cliIn += (long) cfg.getTargetPosts() * POST_IN;
+                cliOut += (long) cfg.getTargetPosts() * POST_OUT;
+            } else if ("CODEX".equals(postProvider)) {
                 codexCalls += cfg.getTargetPosts();
             }
         }
@@ -446,6 +468,11 @@ public class AdminAiUserController {
         private int hrChunkSize = 20;
         private int hrDelayMinutesMin = 1;
         private int hrDelayMinutesMax = 30;
+        private int bundleTimeoutMs = 600_000;
+        private double nightlyPairedShare = 0.20;
+        private int nightlySlotFromHour = 8;
+        private int nightlySlotToHour = 22;
+        private int nightlySlotMinSpacingMinutes = 45;
     }
 
     @Getter @AllArgsConstructor
@@ -475,6 +502,11 @@ public class AdminAiUserController {
         private final int hrChunkSize;
         private final int hrDelayMinutesMin;
         private final int hrDelayMinutesMax;
+        private final int bundleTimeoutMs;
+        private final double nightlyPairedShare;
+        private final int nightlySlotFromHour;
+        private final int nightlySlotToHour;
+        private final int nightlySlotMinSpacingMinutes;
         private final String  updatedBy;
         private final String  updatedAt;
         private final double  ratioComment;

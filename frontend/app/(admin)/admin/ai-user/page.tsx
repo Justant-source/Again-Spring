@@ -47,26 +47,25 @@ function computeEstimateForClaudeProviders(
 ): { claudeTokens: number; claudeCalls: number; cliPct: number; cliPeakPct: number } {
   let claudeTokens = 0, claudeCalls = 0;
 
-  // Claude provider인 경우에만 토큰 추정
-  const addIfClaude = (count: number, provider: ThreadPlanProvider, p: { in: number; out: number }) => {
-    if (provider === 'CLAUDE' && count > 0) {
-      claudeCalls += count;
-      claudeTokens += count * (p.in + p.out);
-    }
-  };
-
-  // 각 provider별 콜 수 추정 (단순화: 각 provider가 전체 목표량을 담당한다고 가정)
-  if (pAiPostBundle === 'CLAUDE') {
-    claudeCalls += posts; claudeTokens += posts * (PERCALL.post.in + PERCALL.post.out);
-    claudeCalls += comments; claudeTokens += comments * (PERCALL.comment.in + PERCALL.comment.out);
-    claudeCalls += replies; claudeTokens += replies * (PERCALL.reply.in + PERCALL.reply.out);
+  // 글: 새벽 배치가 target_posts만큼 생성 (주간 provider OFF여도 CLAUDE 경로로 추정)
+  if (posts > 0 && (pAiPostBundle === 'CLAUDE' || pAiPostBundle === 'OFF' || !pAiPostBundle)) {
+    claudeCalls += posts;
+    claudeTokens += posts * (PERCALL.post.in + PERCALL.post.out);
   }
-  if (pHumanPostPlan === 'CLAUDE') {
-    claudeCalls += comments; claudeTokens += comments * (PERCALL.comment.in + PERCALL.comment.out);
+  // 사람 글→AI 댓글 / 사람 댓글 답글은 해당 provider가 CLAUDE일 때만
+  if (pHumanPostPlan === 'CLAUDE' && comments > 0) {
+    claudeCalls += comments;
+    claudeTokens += comments * (PERCALL.comment.in + PERCALL.comment.out);
   }
   if (pHumanInteraction === 'CLAUDE') {
-    claudeCalls += comments; claudeTokens += comments * (PERCALL.comment.in + PERCALL.comment.out);
-    claudeCalls += replies; claudeTokens += replies * (PERCALL.reply.in + PERCALL.reply.out);
+    if (comments > 0) {
+      claudeCalls += comments;
+      claudeTokens += comments * (PERCALL.comment.in + PERCALL.comment.out);
+    }
+    if (replies > 0) {
+      claudeCalls += replies;
+      claudeTokens += replies * (PERCALL.reply.in + PERCALL.reply.out);
+    }
   }
 
   const cliPct = (claudeTokens / MAX5X_DAILY) * 100;
@@ -277,6 +276,11 @@ export default function AiUserPage() {
   const [hrChunkSize, setHrChunkSize] = useState(20);
   const [hrDelayMinutesMin, setHrDelayMinutesMin] = useState(1);
   const [hrDelayMinutesMax, setHrDelayMinutesMax] = useState(30);
+  const [bundleTimeoutMs, setBundleTimeoutMs] = useState(600_000);
+  const [nightlyPairedShare, setNightlyPairedShare] = useState(0.2);
+  const [nightlySlotFromHour, setNightlySlotFromHour] = useState(8);
+  const [nightlySlotToHour, setNightlySlotToHour] = useState(22);
+  const [nightlySlotMinSpacingMinutes, setNightlySlotMinSpacingMinutes] = useState(45);
 
   // ── 진행 현황 상태 ───────────────────────────────────────────────
   const [genStatus, setGenStatus] = useState<GenerationStatus | null>(null);
@@ -321,6 +325,11 @@ export default function AiUserPage() {
     setHrChunkSize(cfg.hrChunkSize ?? 20);
     setHrDelayMinutesMin(cfg.hrDelayMinutesMin ?? 1);
     setHrDelayMinutesMax(cfg.hrDelayMinutesMax ?? 30);
+    setBundleTimeoutMs(cfg.bundleTimeoutMs ?? 600_000);
+    setNightlyPairedShare(cfg.nightlyPairedShare ?? 0.2);
+    setNightlySlotFromHour(cfg.nightlySlotFromHour ?? 8);
+    setNightlySlotToHour(cfg.nightlySlotToHour ?? 22);
+    setNightlySlotMinSpacingMinutes(cfg.nightlySlotMinSpacingMinutes ?? 45);
   }
 
   // ── 자동 비율 연동 ─────────────────────────────────────────────────
@@ -362,6 +371,11 @@ export default function AiUserPage() {
       hrChunkSize,
       hrDelayMinutesMin,
       hrDelayMinutesMax,
+      bundleTimeoutMs,
+      nightlyPairedShare,
+      nightlySlotFromHour,
+      nightlySlotToHour,
+      nightlySlotMinSpacingMinutes,
     };
     try {
       const cfg = await updateGenerationConfig(req);
@@ -463,11 +477,15 @@ export default function AiUserPage() {
           {/* 일일 생성 목표량 */}
           <AdminSection title="일일 생성 목표량">
             <div className="space-y-5 px-1">
+              <div className="rounded-md border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+                <strong>글 (POST)</strong> 목표량은 새벽 배치(03:05 KST)가 실제로 생성하는 개수입니다.
+                저장 즉시 DB에 반영되며, 다음 새벽 배치부터 적용됩니다.
+              </div>
               <SliderRow
                 label="글 (POST)"
                 value={posts} min={0} max={100}
                 onChange={handlePostsChange}
-                badge="기준 슬라이더 — 댓글·대댓글 자동 연동"
+                badge="새벽 배치 생성 개수 = 이 값"
               />
               <SliderRow
                 label="댓글 (COMMENT)"
@@ -581,15 +599,21 @@ export default function AiUserPage() {
           {/* 계획형 생성 경로 */}
           <AdminSection title="계획형 AI 사용자 실행">
             <div className="px-1 space-y-4">
-              <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs text-blue-800">
-                게시글 하나당 글·댓글·대댓글 후보를 한 번에 생성하고, 예약 실행기가 시간에 맞춰 게시합니다.
-                새 경로는 API 키를 사용하지 않으며 연결된 Claude Code 또는 Codex CLI 세션만 사용합니다.
+              <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs text-blue-800 space-y-1.5">
+                <p>
+                  게시글 하나당 글·댓글·대댓글 후보를 한 번에 생성하고, 예약 실행기가 시간에 맞춰 게시합니다.
+                  API 키 없이 연결된 Claude Code / Codex CLI 세션만 사용합니다.
+                </p>
+                <p>
+                  <strong>낮에 OFF인 것이 정상</strong>입니다. 새벽 배치가 잠깐 CLAUDE로 켠 뒤 다시 OFF로 되돌립니다.
+                  사람 댓글 반응·투표 등 낮 시간 LLM job만 이 스위치로 막습니다.
+                </p>
               </div>
 
               <div className="space-y-3">
                 <ThreadPlanProviderSelector
                   label="AI 글·댓글 묶음 생성"
-                  description="AI가 글 본문과 댓글·대댓글 후보를 한 번에 생성합니다."
+                  description="낮 시간 AI 글 LLM job. 새벽 배치 글 개수는 위 일일 목표량(POST)입니다."
                   value={providerAiPostBundle}
                   onChange={setProviderAiPostBundle}
                 />
@@ -631,6 +655,63 @@ export default function AiUserPage() {
                   <Input id="human-batch-interactions" type="number" min={1} max={50} value={humanBatchMaxInteractions}
                     onChange={e => setHumanBatchMaxInteractions(Math.max(1, Math.min(50, Number(e.target.value))))} className="h-8" />
                   <p className="text-[11px] text-gray-400">사람 댓글·대댓글 합계 (최대 50)</p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-4">
+                <div className="text-sm font-medium text-gray-700">LLM 타임아웃 · 새벽 배치</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="bundle-timeout" className="text-xs text-gray-500">구조화 생성 타임아웃(초)</Label>
+                    <Input
+                      id="bundle-timeout"
+                      type="number"
+                      min={60}
+                      max={900}
+                      value={Math.round(bundleTimeoutMs / 1000)}
+                      onChange={e => {
+                        const sec = Math.max(60, Math.min(900, Number(e.target.value) || 600));
+                        setBundleTimeoutMs(sec * 1000);
+                      }}
+                      className="h-8"
+                    />
+                    <p className="text-[11px] text-gray-400">
+                      solo / paired / 사람답글 LLM 공통. 저장 즉시 다음 호출부터 적용 (60–900초).
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="nightly-paired-share" className="text-xs text-gray-500">양면(paired) 비율</Label>
+                    <Input
+                      id="nightly-paired-share"
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={nightlyPairedShare}
+                      onChange={e => setNightlyPairedShare(Math.max(0, Math.min(1, Number(e.target.value) || 0)))}
+                      className="h-8"
+                    />
+                    <p className="text-[11px] text-gray-400">
+                      ceil(글목표 × 비율). 예: 10×0.2 → paired 2 + solo 8
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="slot-from" className="text-xs text-gray-500">슬롯 시작(KST시)</Label>
+                    <Input id="slot-from" type="number" min={0} max={23} value={nightlySlotFromHour}
+                      onChange={e => setNightlySlotFromHour(Math.max(0, Math.min(23, Number(e.target.value) || 0)))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="slot-to" className="text-xs text-gray-500">슬롯 끝(KST시)</Label>
+                    <Input id="slot-to" type="number" min={1} max={24} value={nightlySlotToHour}
+                      onChange={e => setNightlySlotToHour(Math.max(1, Math.min(24, Number(e.target.value) || 22)))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="slot-spacing" className="text-xs text-gray-500">슬롯 최소 간격(분)</Label>
+                    <Input id="slot-spacing" type="number" min={15} max={180} value={nightlySlotMinSpacingMinutes}
+                      onChange={e => setNightlySlotMinSpacingMinutes(Math.max(15, Math.min(180, Number(e.target.value) || 45)))} className="h-8" />
+                  </div>
                 </div>
               </div>
 

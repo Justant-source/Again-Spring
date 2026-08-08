@@ -108,7 +108,7 @@ public class AdminTriggerController {
             @RequestParam(defaultValue = "8") int fromHour,
             @RequestParam(defaultValue = "22") int toHour,
             @RequestParam(defaultValue = "45") long minSpacingMinutes) {
-        int n = Math.max(1, Math.min(count, 10));
+        int n = Math.max(1, Math.min(count, 100));
         var active = new ArrayList<>(personaRepo.findByActiveTrue());
         if (active.isEmpty()) return ResponseEntity.ok(Map.of("attempted", 0, "message", "활성 페르소나 없음"));
 

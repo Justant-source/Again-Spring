@@ -15,6 +15,7 @@ import com.againspring.aiuser.orchestrator.repository.AiThreadPlanItemRepository
 import com.againspring.aiuser.orchestrator.repository.AiThreadPlanRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
+import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,7 @@ public class ThreadPlanGenerationService {
     private final PlanPersonaMapper planPersonaMapper;
     private final InterestedPersonaSeeder interestedPersonaSeeder;
     private final BackendBotClient backendBotClient;
+    private final GenerationConfigSupport generationConfigSupport;
 
     @Transactional
     public void generateRequestedPlans() {
@@ -148,7 +150,7 @@ public class ThreadPlanGenerationService {
             return false;
         }
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
-        int pool = config == null ? 24 : Math.max(1, Math.min(24, config.getCandidatePoolSize()));
+        int pool = config == null ? 24 : Math.max(8, Math.min(30, config.getCandidatePoolSize()));
         int roots = Math.min(14, pool);
         generatePhase(plan.getId(), true, roots, pool - roots,
                 properties.getThreadPlan().getReadyMinTopLevel(),
@@ -273,7 +275,7 @@ public class ThreadPlanGenerationService {
      */
     public void generateOne(String planId, boolean fallbackToYmlWhenOff) {
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
-        int pool = config == null ? 24 : Math.max(1, Math.min(24, config.getCandidatePoolSize()));
+        int pool = config == null ? 24 : Math.max(8, Math.min(30, config.getCandidatePoolSize()));
         int roots = Math.min(14, pool);
         generatePhase(planId, fallbackToYmlWhenOff, roots, pool - roots,
                 properties.getThreadPlan().getReadyMinTopLevel(),
@@ -355,7 +357,7 @@ public class ThreadPlanGenerationService {
         r.put("kind", "AI_POST".equals(plan.getSourceType()) ? "AI_POST" : "HUMAN_POST");
         r.put("provider", provider); if (model != null && !model.isBlank()) r.put("model", model);
         r.put("correlationId", "thread-plan-" + plan.getId()); r.put("postId", plan.getPostId());
-        r.put("timeoutMs", properties.getThreadPlan().getBundleTimeoutMs());
+        r.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
         r.put("postRevision", (long) plan.getPostRevision()); r.put("existingTitle", nullToEmpty(plan.getSourceTitle()));
         r.put("existingBody", nullToEmpty(plan.getSourceBody())); r.put("category", nullToEmpty(plan.getSourceCategory()));
         r.put("personas", personas);

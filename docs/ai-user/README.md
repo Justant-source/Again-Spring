@@ -16,10 +16,10 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 
 - 공통 ai-user 스택의 1차 대상은 **prod backend + prod DB**다.
 - 신규 기본 설계는 **PLAN-first**다. 글·댓글·대댓글 후보를 생성하고, 실제 게시는 예약 item / 홀딩 슬롯에 따라 실행한다.
-- PLAN은 배포만으로 켜지지 않는다. 환경 gate와 admin의 `ai_user_generation_config.scheduler_mode/provider`를 모두 명시적으로 설정해야 한다.
-- **운영 경로 (2026-07-31~)**: `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`. 새벽 배치(`env/scripts/nightly-ai-user-batch.sh`, 03:05 KST)는 생성만 하고, 낮 동안 슬롯 도래 시 발행한다. 상세: [thread-planning.md](./thread-planning.md), [operations.md](./operations.md) §8.
+- PLAN은 배포만으로 켜지지 않는다. 환경 gate와 admin의 `ai_user_generation_config.provider_*`를 모두 명시적으로 설정해야 한다. 낮에 provider `OFF`는 정상(새벽 배치가 잠깐 CLAUDE로 켠다).
+- **운영 경로 (2026-07-31~)**: `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`. 새벽 배치(`env/scripts/nightly-ai-user-batch.sh`, 03:05 KST)는 생성만 하고, 낮 동안 슬롯 도래 시 발행한다. 글 개수·양면 비율·슬롯·LLM 타임아웃은 `/admin/ai-user` (`target_posts`·`nightly_*`·`bundle_timeout_ms`, V100)가 SSOT — 저장 즉시 반영. 상세: [thread-planning.md](./thread-planning.md), [operations.md](./operations.md) §8.
 - **AI_POST 생성 가드 (2026-08-02)**: 제목 공백 포함 **4~40자**, 제목≠본문(공백 정규화 후). 프롬프트 + `StructuredGenerationService` + orchestrator 이중 가드.
-- **양면 사연 20% (2026-08-02)**: 하루 AI 글의 20%는 작성자+상대방이 각자 입장을 쓰는 paired post. `PAIRED_POST_ENABLED=true`(prod), `PAIRED_POST_TARGET_SHARE=0.20`. 새벽 배치가 solo/paired를 나눠 생성. 프롬프트: `stance=AUTHOR`·`PARTNER`.
+- **양면 사연 (2026-08-02~)**: 새벽 배치 양면 비율은 `/admin/ai-user` `nightly_paired_share`(기본 0.20). 낮 PairedPostScheduler 부족분 보충은 env `PAIRED_POST_TARGET_SHARE` fallback. 프롬프트: `stance=AUTHOR`·`PARTNER`.
 - **양면 Call1/Call2 (2026-08-04)**: llm-ai-user `POST /v2/generate/paired-phase1`(`PAIRED_PHASE1`) = 작성자 본문+phase1 댓글(작성자만), `paired-phase2`(`PAIRED_PHASE2`) = 상대 본문+phase2 댓글(작성자+상대+공개 최상위 댓글≤8). 상세: [llm.md](./llm.md).
 - **양면 author-public-first (2026-08-04)**: 작성자는 홀딩 후 **즉시 PUBLIC**(KST 02–06 밴). 파트너는 Δ 10m–2h(median ~50–60m) 뒤. `WAIT_FOR_PARTNER` private-until-partner 폐기(enum 호환만). LLM Call1=author+phase1, Call2=partner+phase2(+ live top-level 5–8).
 - **양면 댓글 phase1/phase2**: phase1은 파트너 전(author-only). 파트너 도착 시 미게시 cancel + phase2 both-context(게시된 phase1 보존). outbox REQUESTED만 믿으면 `provider_*=OFF`에서 댓글 0건 — yml fallback 유지.
