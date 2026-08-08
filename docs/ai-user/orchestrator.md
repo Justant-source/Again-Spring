@@ -12,7 +12,8 @@
 | `ActionExecutor` | 글/댓글/대댓글/반응 실행 |
 | `Jitter` | tick 내 분산 지연, reply 장지연 |
 | `PairedPostScheduler` | 연인/부부/친구 양면 사연 |
-| `DailyPlannerScheduler` | 하루 계획 수립 |
+| `DailyPlannerScheduler` | 하루 계획 수립 (04:00 KST) |
+| `DailyPlannerRetryScheduler` | 플래너 실패 복구 (04:30 KST, 최대 1회) |
 | `CrawlerTriggerScheduler` | learning crawl trigger |
 | `BackendOutboxScheduler` | backend outbox를 소비해 plan/inbox 생성 |
 | `ThreadPlanGenerationScheduler` | 요청된 plan을 구조화 LLM으로 한 번에 생성 |
@@ -51,7 +52,41 @@
 | main tick | `0 */10 * * * *` | 동일 |
 | paired posts | `0 0 5 * * *` | dev/prod 모두 `0 0 */2 * * *` |
 | daily planner | `0 0 4 * * *` | 없음 |
+| planner retry | `0 30 4 * * *` (실패 30분 후, 최대 1회) | 없음 |
 | crawler trigger | retired (learning 02:00 KST) | orchestrator `AI_LEARNING_CRAWL_ENABLED=false`; learning APScheduler SSOT |
+
+## Daily Planner 실패 복구
+
+`DailyPlannerScheduler`가 04:00에 실패하면 다음과 같이 자동으로 복구된다:
+
+1. **1차 실패 기록 (04:00)**: `DailyPlannerScheduler.planDaily()`가 예외를 던지면, `DailyPlannerRetryService.recordInitialFailure()`가 `daily_planner_retry_log` 테이블에 FAILED 상태로 기록한다.
+   - status=FAILED, attempt_count=1, error_message/class/stacktrace 저장
+   - 무한 재시도 방지: 이미 기록된 날짜에는 중복 기록하지 않음
+
+2. **자동 재시도 (04:30)**: `DailyPlannerRetryScheduler.retryFailedPlanDaily()`가 30분 뒤 자동으로 실행되어, 어제 실패한 쿼터 계획을 한 번 더 수행한다.
+   - `DailyPlanner.planForToday()` 재호출
+   - attempt_count=2로 갱신
+   - status를 SUCCESS 또는 최종 FAILED로 기록
+
+3. **2회차 이상 금지**: attempt_count≥2인 항목은 재시도 스케줄러가 스킵한다.
+
+4. **리밸런싱 (단조성)**: `DailyPlanner`의 `targetViews` 업데이트는 이미 진행 중인 쿼터를 절대 감소시키지 않는다.
+   - 재계산한 targetViews가 기존 targetViews보다 작으면, 기존값을 유지한다.
+   - doneViews > 0이면 새로운 target = max(신규, 기존)으로 조정한다.
+   - 이를 통해 재시도 시 이미 배치된 생성 작업이 줄어들지 않는다.
+
+**관찰 포인트**:
+
+```sql
+-- 재시도 로그 확인
+SELECT day_bucket, attempt_count, status, error_class, created_at, retry_attempted_at
+FROM daily_planner_retry_log
+WHERE day_bucket >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+ORDER BY created_at DESC;
+
+-- 성공률 분석
+SELECT status, COUNT(*) as count FROM daily_planner_retry_log GROUP BY status;
+```
 
 ## tick 흐름
 

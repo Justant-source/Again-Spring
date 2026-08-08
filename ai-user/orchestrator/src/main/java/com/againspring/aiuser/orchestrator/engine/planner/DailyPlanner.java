@@ -110,11 +110,24 @@ public class DailyPlanner {
                     .doneViews(0)
                     .build());
 
-            quota.setTargetViews(personaViewTarget);
+            // Rebalancing logic: never decrease target if already started
+            // (replanning after failure should only append, not reduce)
+            int oldTarget = quota.getTargetViews();
+            int newTarget = personaViewTarget;
+            if (quota.getDoneViews() > 0) {
+                // 이미 수행 중인 쿼터가 있으면 절대 줄이지 말고, 증가분만 추가
+                newTarget = Math.max(personaViewTarget, oldTarget);
+                if (newTarget > oldTarget) {
+                    log.debug("DailyPlanner: {} rebalance {} → {} views (已完成 {})",
+                        persona.getId(), oldTarget, newTarget, quota.getDoneViews());
+                }
+            }
+
+            quota.setTargetViews(newTarget);
             quotaRepository.save(quota);
 
-            if (personaViewTarget > 0) {
-                log.debug("DailyPlanner: persona {} -> {} views", persona.getId(), personaViewTarget);
+            if (newTarget > 0) {
+                log.debug("DailyPlanner: persona {} -> {} views", persona.getId(), newTarget);
             }
         }
 
