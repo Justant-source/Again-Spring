@@ -10,6 +10,7 @@ import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepo
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
+import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -47,6 +48,7 @@ public class PartnerAnswerPublisher {
     private final PlanPersonaMapper planPersonaMapper;
     private final JdbcTemplate jdbcTemplate;
     private final GenerationConfigSupport generationConfigSupport;
+    private final LlmGenerationGateService llmGenerationGateService;
 
     public void publishDue() {
         if (!properties.isEnabled()) return;
@@ -167,6 +169,12 @@ public class PartnerAnswerPublisher {
         request.put("maxReplies", 10);
         request.put("minTopLevel", 1);
         request.put("minItems", 1);
+
+        // LLM Generation Gate check: skip generation if held
+        if (llmGenerationGateService.isHeld()) {
+            log.info("[PartnerAnswer] Call2 generation held (LLM gate) corrId={}", corr);
+            return Optional.empty();
+        }
 
         Optional<Map<String, Object>> responseOpt = llmClient.generatePairedCall2(request);
         if (responseOpt.isEmpty()) return Optional.empty();

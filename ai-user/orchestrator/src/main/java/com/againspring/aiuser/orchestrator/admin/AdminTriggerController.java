@@ -2,6 +2,7 @@ package com.againspring.aiuser.orchestrator.admin;
 
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
+import com.againspring.aiuser.orchestrator.domain.LlmGenerationGate;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.engine.PlannedAction;
 import com.againspring.aiuser.orchestrator.engine.ViewDispatcher;
@@ -11,6 +12,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
 import com.againspring.aiuser.orchestrator.service.capsule.PersonaCapsuleService;
 import com.againspring.aiuser.orchestrator.service.engagement.PlanEngagementDispatcher;
+import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaAutoProvisionService;
 import com.againspring.aiuser.orchestrator.domain.StoryProfile;
@@ -70,6 +72,7 @@ public class AdminTriggerController {
     private final PersonaAutoProvisionService personaAutoProvisionService;
     private final StoryProfileAnalyzer storyProfileAnalyzer;
     private final ThreadPlanGenerationService threadPlanGenerationService;
+    private final LlmGenerationGateService llmGenerationGateService;
 
     /**
      * KST 시간대 곡선으로 발행 슬롯 N개를 샘플링만 해서 보여준다(부작용 없음).
@@ -568,6 +571,56 @@ public class AdminTriggerController {
                     "voiceType", c.voiceType()));
         }
         return ResponseEntity.ok(out);
+    }
+
+    /**
+     * LLM 생성 게이트 HOLD (LLM 장애 시 GENERATION만 차단 — PUBLISHING은 계속).
+     * @param reason 홀딩 사유 (optional)
+     */
+    @PostMapping("/llm-generation-hold")
+    public ResponseEntity<Map<String, Object>> llmGenerationHold(
+            @RequestParam(required = false) String reason) {
+        String finalReason = reason != null && !reason.isBlank() ? reason : "Manual admin hold";
+        llmGenerationGateService.hold(finalReason);
+        LlmGenerationGate gate = llmGenerationGateService.getCurrentState();
+        log.info("[AdminTrigger] llm-generation-hold: reason={}", finalReason);
+        return ResponseEntity.ok(Map.of(
+                "status", "ok",
+                "action", "llm-generation-hold",
+                "state", gate.getState(),
+                "lastHeldAt", gate.getLastHeldAt(),
+                "reason", gate.getReason()));
+    }
+
+    /**
+     * LLM 생성 게이트 RESUME (정상화).
+     */
+    @PostMapping("/llm-generation-resume")
+    public ResponseEntity<Map<String, Object>> llmGenerationResume() {
+        llmGenerationGateService.resume();
+        LlmGenerationGate gate = llmGenerationGateService.getCurrentState();
+        log.info("[AdminTrigger] llm-generation-resume");
+        return ResponseEntity.ok(Map.of(
+                "status", "ok",
+                "action", "llm-generation-resume",
+                "state", gate.getState(),
+                "updatedAt", gate.getUpdatedAt(),
+                "message", "LLM generation gate resumed"));
+    }
+
+    /**
+     * LLM 생성 게이트 상태 조회 (모니터링용).
+     */
+    @GetMapping("/llm-generation-status")
+    public ResponseEntity<Map<String, Object>> llmGenerationStatus() {
+        LlmGenerationGate gate = llmGenerationGateService.getCurrentState();
+        boolean isHeld = llmGenerationGateService.isHeld();
+        return ResponseEntity.ok(Map.of(
+                "state", gate.getState(),
+                "isHeld", isHeld,
+                "lastHeldAt", gate.getLastHeldAt(),
+                "reason", gate.getReason(),
+                "updatedAt", gate.getUpdatedAt()));
     }
 
     /** ActionExecutor.topCategory()와 동일한 로직 — category NOT NULL이라 반드시 채워야 한다. */

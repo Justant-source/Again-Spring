@@ -14,6 +14,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
+import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.CandidateScheduleSupport;
 import com.againspring.aiuser.orchestrator.service.threadplan.PairedHoldMeta;
@@ -67,6 +68,7 @@ public class PairedPostScheduler {
     private final PlanPersonaMapper planPersonaMapper;
     private final CandidateScheduleSupport candidateScheduleSupport;
     private final GenerationConfigSupport generationConfigSupport;
+    private final LlmGenerationGateService llmGenerationGateService;
 
     /** Phase1 cast stays small (author + commenters for ~2–4 top-level). */
     private static final int CALL1_CAST_MAX = 12;
@@ -292,6 +294,12 @@ public class PairedPostScheduler {
         request.put("minItems", 2);
         if (preferredSource != null && !preferredSource.isBlank()) {
             request.put("preferredSource", preferredSource);
+        }
+
+        // LLM Generation Gate check: skip generation if held
+        if (llmGenerationGateService.isHeld()) {
+            log.info("[PairedPost] Call1 generation held (LLM gate) corrId={}", corrId);
+            return Optional.empty();
         }
 
         Optional<Map<String, Object>> responseOpt = llmClient.generatePairedCall1(request);

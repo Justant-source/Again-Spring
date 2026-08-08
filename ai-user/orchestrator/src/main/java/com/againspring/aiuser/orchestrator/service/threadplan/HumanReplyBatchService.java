@@ -5,6 +5,7 @@ import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.client.dto.CommentThreadDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
+import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.domain.*;
 import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemStatus;
 import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemType;
@@ -55,6 +56,7 @@ public class HumanReplyBatchService {
     private final AiUserGenerationConfigRepository configRepository;
     private final BackendBotClient backend;
     private final JdbcTemplate jdbc;
+    private final LlmGenerationGateService llmGenerationGateService;
 
     public void run() {
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
@@ -109,6 +111,16 @@ public class HumanReplyBatchService {
             request.put("correlationId", "human-replies-" + now.toEpochMilli() + "-c" + indexes.get(0));
             request.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
             request.put("items", chunkItems);
+
+            // LLM Generation Gate check: skip generation if held
+            if (llmGenerationGateService.isHeld()) {
+                log.info("[HumanReplyBatch] generation held (LLM gate) for {} inbox entries",
+                        chunkEntries.size());
+                chunkEntries.forEach(e ->
+                        inbox.markSkipped(e.getId(), worker, "GENERATION_HELD_BY_GATE", 0));
+                continue;
+            }
+
             int attempts = 0;
             Optional<Map<String, Object>> response = Optional.empty();
             while (attempts < AUTOMATIC_ATTEMPTS_MAX && response.isEmpty()) {

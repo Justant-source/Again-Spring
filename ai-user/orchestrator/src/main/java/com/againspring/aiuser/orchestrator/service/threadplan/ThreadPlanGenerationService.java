@@ -16,6 +16,7 @@ import com.againspring.aiuser.orchestrator.repository.AiThreadPlanRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
+import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +67,7 @@ public class ThreadPlanGenerationService {
     private final InterestedPersonaSeeder interestedPersonaSeeder;
     private final BackendBotClient backendBotClient;
     private final GenerationConfigSupport generationConfigSupport;
+    private final LlmGenerationGateService llmGenerationGateService;
 
     @Transactional
     public void generateRequestedPlans() {
@@ -306,6 +308,14 @@ public class ThreadPlanGenerationService {
         String model = "AI_POST".equals(plan.getSourceType()) ? properties.getThreadPlan().getAiPostModel()
                 : properties.getThreadPlan().getHumanPlanModel();
         planService.markGenerating(planId, provider, model);
+
+        // LLM Generation Gate check: skip generation if held
+        if (llmGenerationGateService.isHeld()) {
+            log.info("[ThreadPlanGeneration] generation held (LLM gate) planId={}", planId);
+            planService.markFailed(planId, "GENERATION_HELD_BY_GATE");
+            return;
+        }
+
         PlanRequestBuilt built = planRequest(plan, provider, model, maxTopLevel, maxReplies);
         Optional<Map<String, Object>> response = llmClient.generateThreadPlan(built.request());
         if (response.isEmpty()) response = llmClient.generateThreadPlan(built.request());
