@@ -81,15 +81,15 @@ flowchart TD
 
 ---
 
-## 콘텐츠 관리 (`/admin/content`) — 공개됨 + 예약 홀딩
+## 콘텐츠 관리 (`/admin/content`) — 대기 + 완료
 
 근거: `app/(admin)/admin/content/page.tsx`
 
-상단 탭: **공개됨** | **예약 홀딩**.
+상단 탭: **대기** | **완료** (마케팅 `/admin/marketing`과 동일 명칭).
 
-### 공개됨 (2026-08-01~ 글 중심 + 공용 스레드 프레임)
+### 완료 (공개된 글 · 구 「공개됨」)
 
-예약 홀딩과 **같은** `ThreadEditorDialog`로 글·댓글 타임라인을 보고 수정한다.
+대기(예약)와 **같은** `ThreadEditorDialog`로 글·댓글 타임라인을 보고 수정한다.
 
 | 항목 | 내용 |
 |---|---|
@@ -99,7 +99,7 @@ flowchart TD
 | 저장 | `PATCH /api/admin/content/posts/{id}/thread` (일괄). 타임라인에서 뺀 댓글은 soft-delete |
 | 부가 액션 | 목록 메뉴: 공개 보기 · AI 개선 · 원본 비교 · 마케팅 · 차단 · 삭제 |
 
-### 예약 홀딩 (2026-08-01~)
+### 대기 (구 「예약 홀딩」)
 
 새벽 배치가 `ai_scheduled_posts`에 넣어 둔, 아직 피드에 공개되지 않은 글·댓글/대댓글 후보. **동일** `ThreadEditorDialog` (`EditScheduledPostDialog` 래퍼).
 

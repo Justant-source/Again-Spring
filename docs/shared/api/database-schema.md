@@ -1,6 +1,6 @@
 # 데이터베이스 스키마 (MariaDB 11)
 
-> last-verified: 2026-08-01 · code-ref: `backend/src/main/resources/db/migration/V48~V90.sql` · `backend/.../domain/community/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
+> last-verified: 2026-08-08 · code-ref: `backend/src/main/resources/db/migration/V48~V102.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
 >
 > 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
 
@@ -153,6 +153,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `password_reset_tokens` | 비밀번호 재설정 | BIGINT auto |
 | `revoked_tokens` | JWT 블랙리스트 | BIGINT auto |
 | `encrypted_secret` | 앱 시크릿 AES-GCM vault (마케팅 제외) | `secret_key` VARCHAR(128) **V101** |
+| `marketing_holding` | 마케팅 대기 보드 (초안·순위 스냅샷) | `post_id` VARCHAR(32) PK **V102** |
 
 ### AI-user 운영 테이블
 
@@ -400,6 +401,22 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 
 기동 로더: `EncryptedSecretEnvironmentPostProcessor`. 시딩: `scripts/seed_encrypted_secrets_from_env.py`. GitHub PAT는 `scripts/git-credential-as-vault`.
 
+### `marketing_holding` (**V102**)
+
+사연당 1행 대기 보드. T+24h 전 초안·점수/순위 스냅샷 · soft-reserve 핀 · 확정(`COMMITTED`)/탈락(`DROPPED`).  
+런타임: `MarketingHoldingService` · `MarketingHoldingCommitService` · Admin `/api/admin/marketing/holding*` · `/completed*`.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `post_id` | VARCHAR(32) PK FK→posts | 사연 |
+| `status` | VARCHAR(20) | `IN_POOL` \| `PINNED` \| `OUT_OF_CUT` \| `COMMITTED` \| `DROPPED` |
+| `pin_format` | VARCHAR(10) NULL | `VIDEO` \| `TEXT` (PINNED일 때 soft-reserve 포맷) |
+| `draft_json` | JSON NULL | BriefDto형 마케팅 초안 |
+| `score_snapshot` | DOUBLE NULL | 마지막 가중 점수 |
+| `rank_snapshot` | INT NULL | 마지막 투영 순위 |
+| `locked_at` | TIMESTAMP(3) NULL | COMMITTED 시 잠금 (이후 draft 읽기 전용) |
+| `created_at` / `updated_at` | TIMESTAMP(3) | |
+
 ### `feedbacks` (V16)
 
 | 컬럼 | 타입 | 비고 |
@@ -450,6 +467,8 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V97** | `WAIT_FOR_PARTNER` private-until-partner 폐기 데이터 정리: `PRIVATE + WAIT_FOR_PARTNER` 중 `created_at` >30일 → `deleted_at` soft-delete; 나머지 → `PUBLIC` + `vote_close_at`(없으면 `COALESCE(vote_duration_hours,72)`h) |
 | **V98** | `posts.capture_split_after_lines` / `partner_capture_split_after_lines` JSON — N장 캡쳐 컷 |
 | **V100** | `ai_user_generation_config`에 `bundle_timeout_ms`·`nightly_paired_share`·`nightly_slot_*` — 구조화 LLM 타임아웃·새벽 배치 슬롯/양면 비율 (SSOT: `/admin/ai-user`, 저장 즉시 반영) |
+| **V101** | `encrypted_secret` — 앱 시크릿 AES-GCM vault (마케팅 자격증명 제외) |
+| **V102** | `marketing_holding` — 24h 대기 보드 (초안·핀 soft-reserve·점수/순위 스냅샷·COMMITTED/DROPPED) |
 
 ---
 

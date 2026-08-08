@@ -4,11 +4,14 @@ import com.againspring.annotation.Auditable;
 import com.againspring.api.admin.dto.JobResponse;
 import com.againspring.api.admin.dto.CreateJobRequest;
 import com.againspring.api.admin.dto.MarketingQuotaResponse;
+import com.againspring.api.admin.dto.MarketingScoreWeightsResponse;
 import com.againspring.api.admin.dto.UpdateMarketingQuotaRequest;
+import com.againspring.api.admin.dto.UpdateMarketingScoreWeightsRequest;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
 import com.againspring.marketing.MarketingQuotaService;
+import com.againspring.marketing.MarketingScoreWeightService;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.admin.MarketingStatsService;
@@ -48,6 +51,7 @@ public class AdminMarketingController {
     private final AsmClient asmClient;
     private final MarketingStatsService marketingStatsService;
     private final MarketingQuotaService marketingQuotaService;
+    private final MarketingScoreWeightService marketingScoreWeightService;
 
     // ===== Daily auto-publish quota =====
 
@@ -69,6 +73,29 @@ public class AdminMarketingController {
         String updatedBy = auth != null ? auth.getName() : "admin";
         return ResponseEntity.ok(MarketingQuotaResponse.from(
             marketingQuotaService.updateCaps(req.getDailyTextCap(), req.getDailyVideoCap(), updatedBy)));
+    }
+
+    // ===== Popularity score weights =====
+
+    @GetMapping("/score-weights")
+    @Operation(summary = "Marketing score weights", description = "24h 자동 분배 인기 점수 가중치")
+    @ApiResponse(responseCode = "200", description = "Weights returned")
+    public ResponseEntity<MarketingScoreWeightsResponse> getScoreWeights() {
+        return ResponseEntity.ok(MarketingScoreWeightsResponse.from(marketingScoreWeightService.getWeights()));
+    }
+
+    @PutMapping("/score-weights")
+    @Operation(summary = "Update marketing score weights", description = "인기 점수 가중치 저장 (0–100)")
+    @ApiResponse(responseCode = "200", description = "Weights updated")
+    @ApiResponse(responseCode = "400", description = "Invalid weights")
+    @Auditable(action = "UPDATE_MARKETING_SCORE_WEIGHTS")
+    public ResponseEntity<MarketingScoreWeightsResponse> updateScoreWeights(
+            @Valid @RequestBody UpdateMarketingScoreWeightsRequest req,
+            Authentication auth) {
+        String updatedBy = auth != null ? auth.getName() : "admin";
+        return ResponseEntity.ok(MarketingScoreWeightsResponse.from(
+            marketingScoreWeightService.updateWeights(
+                req.getWeightViews(), req.getWeightComments(), req.getWeightVotes(), updatedBy)));
     }
 
     /**

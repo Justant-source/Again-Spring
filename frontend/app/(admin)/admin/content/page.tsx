@@ -23,7 +23,6 @@ import {
 import { AdminTable } from '@/components/admin/AdminTable';
 import { EditScheduledPostDialog } from '@/components/admin/content/EditScheduledPostDialog';
 import { EditPublishedThreadDialog } from '@/components/admin/content/EditPublishedThreadDialog';
-import { CreateMarketingJobDialog } from '@/components/admin/content/CreateMarketingJobDialog';
 import { CreateContentDialog } from '@/components/admin/content/CreateContentDialog';
 import {
   listAdminPosts,
@@ -40,7 +39,7 @@ import {
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AiImproveDialog } from '@/components/admin/content/AiImproveDialog';
 import { formatNumber } from '@/lib/utils/adminFormat';
-import { MoreVertical, ExternalLink, Sparkles, Zap, GitCompare, Plus, Minus } from 'lucide-react';
+import { MoreVertical, ExternalLink, Sparkles, GitCompare, Plus, Minus } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<string, string> = {
   COUPLE: '연인',
@@ -70,7 +69,6 @@ export default function AdminContentPage() {
   const [postsLoading, setPostsLoading] = useState(false);
 
   const [improvePost, setImprovePost] = useState<AdminPost | null>(null);
-  const [marketingPostId, setMarketingPostId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [likeAdjustLoading, setLikeAdjustLoading] = useState<string | null>(null);
   const [editPublishedId, setEditPublishedId] = useState<string | null>(null);
@@ -200,16 +198,16 @@ export default function AdminContentPage() {
         data-testid="admin-content-tabs"
       >
         <TabsList>
-          <TabsTrigger value="published" data-testid="admin-content-tab-published">
-            공개됨
-          </TabsTrigger>
           <TabsTrigger value="holding" data-testid="admin-content-tab-holding">
-            예약 홀딩
+            대기
             {holdings.length > 0 && (
               <Badge variant="secondary" className="ml-2">
                 {holdings.length}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="published" data-testid="admin-content-tab-published">
+            완료
           </TabsTrigger>
         </TabsList>
 
@@ -372,10 +370,6 @@ export default function AdminContentPage() {
                             원본 비교
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setMarketingPostId(row.id)}>
-                          <Zap className="h-4 w-4 mr-2" />
-                          마케팅
-                        </DropdownMenuItem>
                         {row.status !== 'BLOCKED' && (
                           <DropdownMenuItem onClick={() => handleBlockPost(row)}>차단</DropdownMenuItem>
                         )}
@@ -410,7 +404,7 @@ export default function AdminContentPage() {
             <AdminTable<ScheduledHoldingSummary>
               data={holdings}
               loading={holdingsLoading}
-              emptyMessage="예약 홀딩된 글이 없습니다. 새벽 배치가 생성하면 여기에 표시됩니다."
+              emptyMessage="대기 중인 글이 없습니다. 새벽 배치가 생성하면 여기에 표시됩니다."
               columns={[
                 {
                   key: 'title',
@@ -516,15 +510,6 @@ export default function AdminContentPage() {
         onCommitted={() => {
           setImprovePost(null);
           loadPosts();
-        }}
-      />
-
-      <CreateMarketingJobDialog
-        postId={marketingPostId}
-        onClose={() => setMarketingPostId(null)}
-        onCreated={() => {
-          setMarketingPostId(null);
-          alert('마케팅 제작을 요청했습니다.');
         }}
       />
 

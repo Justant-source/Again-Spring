@@ -352,9 +352,19 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 |---|---|---|---|---|
 | GET | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 | 일일 글/영상 상한 + 오늘(KST) 사용량. 응답: `{dailyTextCap, dailyVideoCap, videosToday, textsToday, remainingPool}` |
 | PUT | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 / 400 | 상한 저장. Body: `{dailyTextCap(1–50), dailyVideoCap(0–textCap)}`. `system_setting` 키 `marketing.daily_text_cap` / `marketing.daily_video_cap` |
+| GET | `/api/admin/marketing/score-weights` | **JWT + ADMIN** | 200 | 인기 점수 가중치. 응답: `{weightViews, weightComments, weightVotes}` (기본 0.1 / 1.0 / 0.5) |
+| PUT | `/api/admin/marketing/score-weights` | **JWT + ADMIN** | 200 / 400 | 가중치 저장. Body: `{weightViews, weightComments, weightVotes}` 각 0–100. 키 `marketing.score.weight_views` / `weight_comments` / `weight_votes` |
+| GET | `/api/admin/marketing/platforms` | **JWT + ADMIN** | 200 | 전체 플랫폼 auto on/off. 응답: `[{platform, autoEnabled, runtimeSupported, warning?}]`. `system_setting` 키 `marketing.platform.{id}.auto_enabled`. 기본: 런타임 지원 ON / 미지원 OFF |
+| PUT | `/api/admin/marketing/platforms/{platform}/auto` | **JWT + ADMIN** | 200 / 400 | Body: `{enabled: boolean}`. 미지원+enabled=true도 저장 성공, 응답에 `warning` (발행 시 `resolveTargets`가 제외). 준비중 배지 없음 |
+| GET | `/api/admin/marketing/holding` | **JWT + ADMIN** | 200 | 대기 보드 최대 20 + 메타. 24h 미만·미삭제·비 COMMITTED/DROPPED 사연을 가중 점수로 정렬·seed. 컷라인 N=`remainingPool - softReservedPool`(핀 예약). 응답: `{items[{postId,status,pinFormat,projectedFormat,…}], meta{remainingPool, cutlineN, dailyTextCap, dailyVideoCap, videosToday, textsToday, weightViews, weightComments, weightVotes}}` |
+| PATCH | `/api/admin/marketing/holding/{postId}/draft` | **JWT + ADMIN** | 200 / 400 / 404 | Body: `{draft: object}` → `draft_json` 교체. `locked_at != null`이면 400 |
+| POST | `/api/admin/marketing/holding/{postId}/pin` | **JWT + ADMIN** | 200 / 400 / 404 | Body: `{format: VIDEO\|TEXT}`. 핀+soft reserve. 잔여 풀/영상 슬롯이 다른 핀·커밋으로 소진되면 400. 컷라인 축소 시 최하위 비핀 자동 후보 `OUT_OF_CUT`(Q8) |
+| DELETE | `/api/admin/marketing/holding/{postId}/pin` | **JWT + ADMIN** | 200 / 400 / 404 | 핀 해제·예약 반환. 새 컷라인 기준 `IN_POOL` 또는 `OUT_OF_CUT` |
+| GET | `/api/admin/marketing/completed` | **JWT + ADMIN** | 200 | COMMITTED·DROPPED 홀딩 + 잡 요약. Query: `status`, `limit`(기본 50) |
+| POST | `/api/admin/marketing/completed/{postId}/force` | **JWT + ADMIN** | 200 / 400 / 404 | Body: `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}`. 상한 무시 강제 COMMITTED + 잡 생성·초안 잠금 |
 | GET/POST/… | `/api/admin/marketing/jobs*` · `/credentials*` · `/performance` · `/timeline` | **JWT + ADMIN** | — | 잡·자격증명·통계 (ASM 프록시). 상세: [platforms.md](../marketing/platforms.md) |
 
-24h 자동 분배 규칙(공유 풀·영상 우선·글=X+피드): [`platforms.md`](../marketing/platforms.md). ASM 잡 API는 Again-Spring-Marketing 문서 참조.
+24h 자동 분배 규칙(홀딩 확정·배분 C·1사연=1칸·피드⊥릴스): [`platforms.md`](../marketing/platforms.md). ASM 잡 API는 Again-Spring-Marketing 문서 참조.
 
 ---
 

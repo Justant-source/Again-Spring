@@ -40,7 +40,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 | WP4 | micro-batch(4~6) 생성 · `parsePlan` 하한 이동 · `ThreadQualityGate` READY | [thread-planning.md](./thread-planning.md), [llm.md](./llm.md) |
 | WP5 | human reply 0~3 responders · 예산 · idempotency · 관심 pool · `hr_*` admin SSOT | [thread-planning.md](./thread-planning.md) |
 
-관리자 UI: `/admin/content` **공개됨 / 예약 홀딩** 스레드 편집, `/admin/ai-user` 댓글 생성량 — [operations.md](./operations.md) §8 · `docs/frontend/ux/flows/09-admin.md`.
+관리자 UI: `/admin/content` **대기 / 완료** 스레드 편집, `/admin/ai-user` 댓글 생성량 — [operations.md](./operations.md) §8 · `docs/frontend/ux/flows/09-admin.md`.
 
 ## 서비스 맵
 

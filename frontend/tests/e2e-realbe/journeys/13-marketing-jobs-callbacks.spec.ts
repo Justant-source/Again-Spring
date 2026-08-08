@@ -45,6 +45,9 @@ test.describe('Journey 13-D: PARTIAL 상태 배지 표시', () => {
     await page.goto(`${BASE}/admin/marketing`)
     await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
 
+    // JobBoard는 완료 탭에 있음 (기본 탭=대기)
+    await page.getByRole('tab', { name: '완료' }).click()
+
     const partialBadge = page
       .locator('[data-testid="job-status-badge"][data-status="PARTIAL"], .bg-yellow-500')
       .filter({ hasText: 'PARTIAL' })

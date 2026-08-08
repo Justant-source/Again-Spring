@@ -9,19 +9,54 @@
 
 에이전트·신규 작업은 활성 채널만. 보류 채널은 사용자 명시 요청 전 구현·디버그·배포 금지.
 
-### 24h 자동 분배 (`XThreadPublishTriggerScheduler`)
+### 플랫폼 자동 on/off (관리자)
 
-사연 `created_at` 기준 **+24h** 후 (`createdAt >= ASM_AUTO_PUBLISH_SINCE`), **공유 일일 풀** 안에서만 자동 게시:
+- API: `GET /api/admin/marketing/platforms` · `PUT /api/admin/marketing/platforms/{platform}/auto` (`AdminMarketingPlatformController`)
+- 저장: `system_setting` 키 `marketing.platform.{id}.auto_enabled`
+- **전체 플랫폼 표시** (준비중 배지 없음). 관리자 자유 on/off — 미구현도 on 가능
+- 런타임 지원 상수 (`MarketingPlatformAutoService.RUNTIME_SUPPORTED`): `x`, `x_thread`, `instagram_feed`, `instagram_reels`, `youtube_shorts`
+- 기본값: 지원 채널 ON / 미지원 OFF. 미지원+on 저장은 200 + `warning`; 발행 시 `resolveTargets(format, enabled)` = enabled ∩ supported (미지원 스킵·로그). VIDEO일 때 릴스 포함 시 `instagram_feed` 제외
 
-| 채널 | 대상 | 동작 |
-|---|---|---|
-| `instagram_reels` + `youtube_shorts` | 인기 상위 · **영상 상한** 내 (기본 3) | **한 잡·한 번 렌더** → 동일 mp4를 릴스·쇼츠에 `autoPublish=true` · **X 없음** |
-| `x_thread` + `instagram_feed` | 잔여 풀 · 인기 순 (글 슬롯) | 각 alone 잡 · `autoPublish=true` |
+### 24h 대기 보드 (`AdminMarketingHoldingController` · `marketing_holding`)
 
-**공유 풀**: `dailyTextCap`(기본 6) = KST 하루 마케팅 사연 총 상한. 영상이 먼저 소비 → 글 슬롯 = `dailyTextCap − videosToday`. 예: 영상 2 → 글 4.  
-**상한 저장**: `system_setting` 키 `marketing.daily_text_cap` / `marketing.daily_video_cap`. 관리자 `/admin/marketing → 일일 상한` 또는 `GET|PUT /api/admin/marketing/quota`. 수동 잡도 같은 날 카운트 포함.  
-**인기 점수**: `view_count` DESC → 최상위 댓글 수 → 투표 수 → `created_at` 최신.  
-**상호배타**: 같은 사연에 릴스/쇼츠 ↔ (X+피드) 동시 금지. ASM은 `instagram_reels`+`youtube_shorts` 듀얼만 허용(다른 타겟과 혼합 금지).
+T+24h 전 사연을 seed·순위 스냅샷하는 **대기 보드** (`GET /api/admin/marketing/holding`, 최대 20행 + meta).
+
+| API | 동작 |
+|---|---|
+| `GET …/holding` | 보드 + meta. 컷라인 N = `remainingPool - softReservedPool`(핀 soft-reserve) |
+| `PATCH …/holding/{postId}/draft` | `draft_json` 교체. `locked_at != null` → 400 |
+| `POST …/holding/{postId}/pin` | Body `{format: VIDEO\|TEXT}`. 핀 + soft-reserve. 풀/영상 슬롯 부족·전부 핀 점유 시 400. 컷라인 축소 시 최하위 비핀 → `OUT_OF_CUT` |
+| `DELETE …/holding/{postId}/pin` | 핀 해제·예약 반환 → `IN_POOL` 또는 `OUT_OF_CUT` |
+
+상태: `IN_POOL` \| `PINNED` \| `OUT_OF_CUT` \| `COMMITTED` \| `DROPPED`.
+
+### 인기 점수 가중치
+
+`score = wViews*views + wComments*top_level_comments + wVotes*votes` DESC, tie-break `created_at` DESC.  
+기본 `0.1` / `1.0` / `0.5`.  
+API: `GET`/`PUT /api/admin/marketing/score-weights` · 키 `marketing.score.weight_views` / `weight_comments` / `weight_votes` (각 0–100).
+
+### 24h 자동 분배 (`XThreadPublishTriggerScheduler` → `MarketingHoldingCommitService`)
+
+사연 `created_at` 기준 **+24h** 후 (`createdAt >= ASM_AUTO_PUBLISH_SINCE`), **홀딩 확정 파이프라인(배분 C)**:
+
+| 단계 | 동작 |
+|---|---|
+| 핀(PINNED) | soft-reserve 우선 COMMITTED. 잔여 부족 시 PINNED 유지(다음 틱) |
+| 자동 | 점수 DESC → 잔여 **영상** 슬롯 → **글** 슬롯. **1사연 = 공유 풀 1칸** |
+| 그 외 | T+24h 도달·미선정 → DROPPED. COMMITTED 시 초안 `locked_at` |
+
+| 포맷 | 타겟 (`resolveTargets`) |
+|---|---|
+| VIDEO | 영상 채널(on∩supported) + 글 채널(**video+text companion**). **릴스 포함 시 `instagram_feed` 제외**(IG feed⊥reels). X 등 동반 가능 |
+| TEXT | 글 채널만 |
+| 영상 채널 전원 off | `effectiveVideoCap=0`, 잔여 풀 전부 글 |
+
+잡 그룹: Reels+Shorts는 **듀얼 1잡**, `x_thread`/`instagram_feed`/`x` 등은 **alone**.  
+**강제(완료 탭)**: `POST /api/admin/marketing/completed/{postId}/force` — 상한 무시 (`VIDEO_AND_TEXT` \| `TEXT_ONLY`). 주로 `DROPPED` 재진입.  
+목록: `GET /api/admin/marketing/completed?status=&limit=50`.  
+**공유 풀**: `dailyTextCap`(기본 6) = KST 하루 **마케팅 사연 수**. 영상 상한 `dailyVideoCap`. 멀티 플랫폼 잡은 추가 칸 아님.  
+**상한 저장**: `system_setting` 키 `marketing.daily_text_cap` / `marketing.daily_video_cap` · API `GET`/`PUT /api/admin/marketing/quota`.
 
 ## 플랫폼 목록
 
@@ -33,14 +68,13 @@
 | X 4단 스레드 | `x_thread` | 텍스트 스레드 | Playwright (`x-thread-strategy.md`) | **활성 (24h · 글 슬롯)** |
 | 네이버 블로그 | `naver_blog` | 마크다운 → HTML | Playwright 자동 로그인 | 보류 |
 | 인스타그램 피드 | `instagram_feed` | 하이브리드 캐러셀 (훅+캡처+비율) | Playwright (`instagram-feed-strategy.md`) | **활성 (24h · 글 슬롯)** |
-| 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Meta Graph / 세션 · 캡션=제목+사연URL+해시태그 | **활성 (24h · 영상 슬롯 · Shorts 듀얼)** — 글 슬롯과 상호배타 · Graph 자격 권장 |
+| 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Meta Graph / 세션 · 캡션=제목+사연URL+해시태그 | **활성 (24h · 영상)** — **피드와만 배타**(릴스 포함 시 feed 스킵). X 동반 가능 · Graph 자격 권장 |
 | YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | WaggleBot 렌더 → API 업로드 | **활성 (24h · 영상 슬롯 · Reels 듀얼)** — [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) |
 | 네이버 클립 | `naver_clip` | 세로형 영상 (9:16) | Playwright (미구현) | 보류 |
 | Threads | `threads` | 텍스트 + 이미지 | Playwright 자동 로그인 (인스타 계정 상속) | 보류 |
 
-> **게시 계정 자격증명**: 각 플랫폼의 로그인/API 계정 정보는 어드민 `/admin/marketing → 플랫폼 계정`
-> 탭에서 입력하며 ASM이 암호화 저장한다. 플랫폼별 필드 스키마·암호화 정책은 [`credentials.md`](credentials.md) 참조.
-> 미공개 기간에는 **X 계정만** 시딩·유지한다.
+> **게시 계정 자격증명**: 어드민 `/admin/marketing` → **설정** 탭(플랫폼 auto + 계정). ASM이 암호화 저장.
+> 필드 스키마·암호화: [`credentials.md`](credentials.md). 미공개 기간에는 **X 계정만** 시딩·유지.
 
 ---
 

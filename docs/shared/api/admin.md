@@ -212,9 +212,20 @@ flowchart LR
 |---|---|---|
 | `GET` | `/api/admin/marketing/quota` | 24h 자동 분배 일일 상한·오늘 KST 사용량 |
 | `PUT` | `/api/admin/marketing/quota` | 글/영상 상한 저장 (`system_setting`) |
+| `GET` | `/api/admin/marketing/score-weights` | 인기 점수 가중치 (views/comments/votes) |
+| `PUT` | `/api/admin/marketing/score-weights` | 가중치 저장 (`system_setting`, 0–100) |
+| `GET` | `/api/admin/marketing/platforms` | 전체 플랫폼 auto on/off (`autoEnabled`, `runtimeSupported`, 선택 `warning`) |
+| `PUT` | `/api/admin/marketing/platforms/{platform}/auto` | Body `{enabled}` — 미지원 on도 허용·경고 반환 |
+| `GET` | `/api/admin/marketing/holding` | 대기 보드(최대 20) + meta. 컷라인 N=`remainingPool - softReservedPool` |
+| `PATCH` | `/api/admin/marketing/holding/{postId}/draft` | `draft_json` 교체 (`locked_at` 있으면 400) |
+| `POST` | `/api/admin/marketing/holding/{postId}/pin` | Body `{format: VIDEO\|TEXT}` — soft-reserve 핀 |
+| `DELETE` | `/api/admin/marketing/holding/{postId}/pin` | 핀 해제 |
+| `GET` | `/api/admin/marketing/completed` | COMMITTED·DROPPED + 잡 요약 (`status`, `limit`) |
+| `POST` | `/api/admin/marketing/completed/{postId}/force` | Body `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}` — 상한 무시 강제 확정 |
 | 잡·자격증명·통계 | `/api/admin/marketing/jobs*` 등 | ASM 프록시 — [`platforms.md`](../marketing/platforms.md) |
 
-24h 배분: 공유 풀(`dailyTextCap` 기본 6) · 영상 우선(`dailyVideoCap` 기본 3, X 없음) · 잔여 글 슬롯 = X+IG 피드.
+24h 배분 C: 홀딩 확정 · 공유 풀(`dailyTextCap` 기본 6) · 영상 우선 · **1사연=1칸** · VIDEO=video+text companion(IG feed⊥reels).
+점수 = `0.1*views + 1.0*top_level_comments + 0.5*votes` (가중치 설정 가능) · tie-break `created_at` DESC. Admin UI 탭: **대기 / 완료 / 설정**.
 
 ## 전체 Admin 엔드포인트 수
 

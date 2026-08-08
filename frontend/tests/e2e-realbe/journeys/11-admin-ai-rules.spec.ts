@@ -78,13 +78,17 @@ test.describe('Journey 11-B: 전역 금지 규칙 CRUD', () => {
 test.describe('Journey 11-C: /admin/content UI', () => {
   test.use({ storageState: ADMIN_AUTH })
 
-  test('공개됨·예약 홀딩·액션 컬럼', async ({ page }) => {
+  test('대기·완료 탭·액션 컬럼', async ({ page }) => {
     await page.goto(`${BASE}/admin/content`)
     await page.waitForURL(/\/admin\/content/, { timeout: 10_000 })
     await expect(page.getByText('콘텐츠 관리')).toBeVisible({ timeout: 8_000 })
     await expect(page.locator(ADMIN_CONTENT.tabs)).toBeVisible()
-    await expect(page.locator(ADMIN_CONTENT.tabPublished)).toBeVisible()
     await expect(page.locator(ADMIN_CONTENT.tabHolding)).toBeVisible()
+    await expect(page.locator(ADMIN_CONTENT.tabPublished)).toBeVisible()
+    await expect(page.getByRole('tab', { name: '대기' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: '완료' })).toBeVisible()
+
+    // 기본 탭 = 완료(공개됨)
     await expect(page.locator(ADMIN_CONTENT.publishedPanel)).toBeVisible()
     await expect(page.getByRole('columnheader', { name: '작성 시각 (KST)' })).toBeVisible()
     await expect(page.getByRole('button', { name: '추가', exact: true })).toBeVisible()
@@ -92,10 +96,10 @@ test.describe('Journey 11-C: /admin/content UI', () => {
 
     await page.locator(ADMIN_CONTENT.tabHolding).click()
     await expect(page.locator(ADMIN_CONTENT.holdingPanel)).toBeVisible({ timeout: 8_000 })
-    // 예약 홀딩 큐는 새벽 배치가 발행을 끝내면 자연스럽게 0건이 된다 — 그때는 테이블 대신
-    // emptyMessage가 렌더된다(page.tsx:413). 두 상태 모두 "정상 렌더"이므로 둘 중 하나만 확인한다.
+    // 대기 큐는 새벽 배치가 발행을 끝내면 자연스럽게 0건이 된다 — 그때는 테이블 대신
+    // emptyMessage가 렌더된다. 두 상태 모두 "정상 렌더"이므로 둘 중 하나만 확인한다.
     const columnHeader = page.getByRole('columnheader', { name: '글 발행 예정 (KST)' })
-    const emptyState = page.getByText('예약 홀딩된 글이 없습니다')
+    const emptyState = page.getByText('대기 중인 글이 없습니다')
     await expect(columnHeader.or(emptyState)).toBeVisible({ timeout: 8_000 })
   })
 })

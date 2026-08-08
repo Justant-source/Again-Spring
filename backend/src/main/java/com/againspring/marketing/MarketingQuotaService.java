@@ -17,8 +17,8 @@ import java.time.ZoneId;
  * Daily marketing auto-publish caps (shared post pool).
  *
  * <p>{@code dailyTextCap} is the shared KST-day ceiling for marketed posts.
- * Videos consume the pool first (hard-capped by {@code dailyVideoCap}); remaining
- * slots become text (X thread + Instagram feed).
+ * S4: one COMMITTED story = one pool slot (multi-platform jobs do not add extra).
+ * Videos are a subset hard-capped by {@code dailyVideoCap}; remaining slots are text.
  */
 @Service
 @RequiredArgsConstructor
@@ -58,8 +58,11 @@ public class MarketingQuotaService {
         Caps caps = getCaps();
         Instant start = startOfTodayKst();
         long videosToday = marketingJobRepository.countVideoJobsCreatedSince(start);
-        long textsToday = marketingJobRepository.countTextSlotsCreatedSince(start);
-        long remainingPool = Math.max(0, caps.dailyTextCap() - videosToday - textsToday);
+        long marketedToday = marketingJobRepository.countDistinctMarketedPostsSince(start);
+        // Prefer story-based texts (= marketed − video). Fall back to text-only job count
+        // when marketed < videos (shouldn't happen) so remaining stays non-negative.
+        long textsToday = Math.max(0, marketedToday - videosToday);
+        long remainingPool = Math.max(0, caps.dailyTextCap() - marketedToday);
         return new QuotaStatus(
             caps.dailyTextCap(),
             caps.dailyVideoCap(),

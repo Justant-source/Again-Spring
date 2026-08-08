@@ -1,116 +1,110 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlatformCredentialsSection } from '@/components/admin/marketing/PlatformCredentialsSection';
-import { MarketingQuotaSection } from '@/components/admin/marketing/MarketingQuotaSection';
+import { PlatformAutoSection } from '@/components/admin/marketing/PlatformAutoSection';
 import { JobBoard } from '@/components/admin/marketing/JobBoard';
 import { PlatformPerformanceCards } from '@/components/admin/marketing/PlatformPerformanceCards';
 import { PublicationTimeline } from '@/components/admin/marketing/PublicationTimeline';
-import { PostPickerDialog } from '@/components/admin/marketing/PostPickerDialog';
+import { HoldingControlsBar } from '@/components/admin/marketing/HoldingControlsBar';
+import { HoldingBoard } from '@/components/admin/marketing/HoldingBoard';
+import { HoldingDraftDialog } from '@/components/admin/marketing/HoldingDraftDialog';
 import { RefreshControl } from '@/components/admin/RefreshControl';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { AdminTable } from '@/components/admin/AdminTable';
 import {
   listMarketingJobs,
-  createMarketingJob,
   publishMarketingJob,
   republishMarketingJob,
   getMarketingPerformance,
   getPublicationTimeline,
+  getMarketingHoldingBoard,
+  updateMarketingHoldingDraft,
+  pinMarketingHolding,
+  unpinMarketingHolding,
+  listMarketingCompleted,
+  forceMarketingCompleted,
   MarketingJob,
+  MarketingHoldingBoard,
+  MarketingHoldingRow,
+  MarketingCompletedItem,
+  MarketingForceMode,
   PlatformStatsDto,
   TimelineEventDto,
 } from '@/lib/api/admin/marketing';
 
-const STATUS_COLORS: Record<string, string> = {
-  REQUESTED: 'bg-gray-200 text-gray-800',
-  QUEUED: 'bg-blue-200 text-blue-800',
-  RUNNING: 'bg-yellow-200 text-yellow-800',
-  READY: 'bg-green-200 text-green-800',
-  PUBLISHING: 'bg-orange-200 text-orange-800',
-  PUBLISHED: 'bg-green-600 text-white',
-  FAILED: 'bg-red-200 text-red-800',
-  STALE: 'bg-gray-400 text-white',
-  PARTIAL: 'bg-yellow-500 text-white',
-};
+type MainTab = 'holding' | 'completed' | 'settings';
 
-const TARGET_PLATFORMS = [
-  { value: 'x_thread', label: 'X 스레드' },
-  { value: 'x', label: 'X (트위터)' },
-  { value: 'naver_blog', label: '네이버 블로그' },
-  { value: 'instagram_feed', label: '인스타그램 피드' },
-  { value: 'instagram_reels', label: '인스타그램 릴스' },
-  { value: 'youtube_shorts', label: 'YouTube Shorts' },
-  { value: 'naver_clip', label: '네이버 클립' },
-  { value: 'threads', label: 'Threads' },
-];
+function resolveTab(raw: string | null): MainTab {
+  if (raw === 'completed' || raw === 'jobs') return 'completed';
+  if (raw === 'settings' || raw === 'credentials' || raw === 'quota') return 'settings';
+  return 'holding';
+}
 
 export default function MarketingJobsPage() {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') ?? 'jobs');
+  const [activeTab, setActiveTab] = useState<MainTab>(() =>
+    resolveTab(searchParams.get('tab'))
+  );
+
+  // Holding tab
+  const [board, setBoard] = useState<MarketingHoldingBoard | null>(null);
+  const [holdingLoading, setHoldingLoading] = useState(true);
+  const [holdingError, setHoldingError] = useState<string | null>(null);
+  const [editRow, setEditRow] = useState<MarketingHoldingRow | null>(null);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  // Completed tab (holdings + jobs + analytics)
+  const [completedItems, setCompletedItems] = useState<MarketingCompletedItem[]>(
+    []
+  );
+  const [completedLoading, setCompletedLoading] = useState(false);
+  const [completedError, setCompletedError] = useState<string | null>(null);
+  const [forceBusyId, setForceBusyId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<MarketingJob[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Create dialog state
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [pickerDialogOpen, setPickerDialogOpen] = useState(false);
-  const [postId, setPostId] = useState('');
-  const [targets, setTargets] = useState<string[]>(['x_thread']);
-  const [autoPublish, setAutoPublish] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-
-  // Analytics state
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState<string | null>(null);
   const [performance, setPerformance] = useState<PlatformStatsDto[]>([]);
   const [timeline, setTimeline] = useState<TimelineEventDto[]>([]);
   const [perfLoading, setPerfLoading] = useState(false);
 
   const ACTIVE_STATUSES = ['QUEUED', 'RUNNING', 'READY', 'PUBLISHING'];
 
-  useEffect(() => {
-    loadJobs();
-    loadAnalytics();
+  const loadHolding = useCallback(async (showLoader = true) => {
+    if (showLoader) setHoldingLoading(true);
+    setHoldingError(null);
+    try {
+      const data = await getMarketingHoldingBoard();
+      setBoard(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setHoldingError(`대기 보드를 불러오지 못했습니다: ${msg}`);
+    } finally {
+      if (showLoader) setHoldingLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
-    const hasActiveJobs = jobs.some(j => ACTIVE_STATUSES.includes(j.status));
-    if (!hasActiveJobs) return;
-    const intervalId = setInterval(() => {
-      loadJobs(false);
-    }, 5000);
-    return () => clearInterval(intervalId);
-  }, [jobs]);
-
-  const loadJobs = async (showLoader = true) => {
-    if (showLoader) setLoading(true);
-    setError(null);
+  const loadJobs = useCallback(async (showLoader = true) => {
+    if (showLoader) setJobsLoading(true);
+    setJobsError(null);
     try {
       const data = await listMarketingJobs();
       setJobs(data);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setError(`마케팅 잡 목록을 불러오지 못했습니다: ${msg}`);
+      setJobsError(`마케팅 잡 목록을 불러오지 못했습니다: ${msg}`);
     } finally {
-      if (showLoader) setLoading(false);
+      if (showLoader) setJobsLoading(false);
     }
-  };
+  }, []);
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     setPerfLoading(true);
     try {
       const [perf, tl] = await Promise.all([
@@ -124,13 +118,51 @@ export default function MarketingJobsPage() {
     } finally {
       setPerfLoading(false);
     }
-  };
+  }, []);
 
-  const toggleTarget = (value: string) => {
-    setTargets((prev) =>
-      prev.includes(value) ? prev.filter((t) => t !== value) : [...prev, value]
-    );
-  };
+  const loadCompleted = useCallback(async () => {
+    setCompletedLoading(true);
+    setCompletedError(null);
+    try {
+      const items = await listMarketingCompleted({ limit: 50 });
+      setCompletedItems(items);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setCompletedError(`완료/탈락 목록을 불러오지 못했습니다: ${msg}`);
+    } finally {
+      setCompletedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHolding();
+  }, [loadHolding]);
+
+  useEffect(() => {
+    if (activeTab === 'completed') {
+      loadCompleted();
+      loadJobs();
+      loadAnalytics();
+    }
+  }, [activeTab, loadCompleted, loadJobs, loadAnalytics]);
+
+  useEffect(() => {
+    if (activeTab !== 'completed') return;
+    const hasActiveJobs = jobs.some((j) => ACTIVE_STATUSES.includes(j.status));
+    if (!hasActiveJobs) return;
+    const intervalId = setInterval(() => {
+      loadJobs(false);
+    }, 5000);
+    return () => clearInterval(intervalId);
+  }, [activeTab, jobs, loadJobs]);
+
+  useEffect(() => {
+    if (activeTab !== 'holding') return;
+    const intervalId = setInterval(() => {
+      loadHolding(false);
+    }, 45000);
+    return () => clearInterval(intervalId);
+  }, [activeTab, loadHolding]);
 
   const handlePublish = async (id: number) => {
     try {
@@ -152,36 +184,68 @@ export default function MarketingJobsPage() {
     }
   };
 
-  const handleCreate = async () => {
-    if (!postId.trim()) {
-      setCreateError('사연 ID를 입력해주세요.');
+  const handlePin = async (row: MarketingHoldingRow) => {
+    const raw = window.prompt(
+      '핀 포맷을 입력하세요 (VIDEO 또는 TEXT).\n빈 값/취소 = 중단',
+      row.projectedFormat === 'VIDEO' ? 'VIDEO' : 'TEXT'
+    );
+    if (raw == null) return;
+    const format = raw.trim().toUpperCase();
+    if (format !== 'VIDEO' && format !== 'TEXT') {
+      alert('VIDEO 또는 TEXT만 가능합니다.');
       return;
     }
-    if (targets.length === 0) {
-      setCreateError('타겟 플랫폼을 최소 1개 선택해주세요.');
-      return;
-    }
-    setCreating(true);
-    setCreateError(null);
     try {
-      await createMarketingJob(postId.trim(), targets, autoPublish);
-      setDialogOpen(false);
-      setPostId('');
-      setTargets(['x_thread']);
-      setAutoPublish(false);
-      setPickerDialogOpen(false);
-      await loadJobs();
+      await pinMarketingHolding(row.postId, format);
+      await loadHolding(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setCreateError(`잡 생성에 실패했습니다: ${msg}`);
-    } finally {
-      setCreating(false);
+      alert(`핀 실패: ${msg}`);
     }
   };
 
-  const handlePickPost = (pickedPostId: string) => {
-    setPostId(pickedPostId);
-    setPickerDialogOpen(false);
+  const handleUnpin = async (row: MarketingHoldingRow) => {
+    try {
+      await unpinMarketingHolding(row.postId);
+      await loadHolding(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`핀 해제 실패: ${msg}`);
+    }
+  };
+
+  const handleForce = async (item: MarketingCompletedItem) => {
+    if (item.status !== 'DROPPED') {
+      alert('강제 배포는 탈락(DROPPED) 건만 가능합니다.');
+      return;
+    }
+    const raw = window.prompt(
+      '강제 배포 모드 (일일 상한 무시)\nVIDEO_AND_TEXT 또는 TEXT_ONLY',
+      'TEXT_ONLY'
+    );
+    if (raw == null) return;
+    const mode = raw.trim().toUpperCase() as MarketingForceMode;
+    if (mode !== 'VIDEO_AND_TEXT' && mode !== 'TEXT_ONLY') {
+      alert('VIDEO_AND_TEXT 또는 TEXT_ONLY만 가능합니다.');
+      return;
+    }
+    if (
+      !window.confirm(
+        `사연 ${item.postId}를 ${mode}로 강제 배포할까요?\n일일 상한을 무시합니다.`
+      )
+    ) {
+      return;
+    }
+    setForceBusyId(item.postId);
+    try {
+      await forceMarketingCompleted(item.postId, mode);
+      await Promise.all([loadCompleted(), loadJobs(false)]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`강제 배포 실패: ${msg}`);
+    } finally {
+      setForceBusyId(null);
+    }
   };
 
   return (
@@ -189,56 +253,197 @@ export default function MarketingJobsPage() {
       <AdminPageHeader
         title="마케팅"
         action={
-          activeTab === 'jobs' && (
-            <div className="flex items-center gap-2">
-              <RefreshControl
-                onRefresh={() => {
-                  loadJobs(true);
-                  loadAnalytics();
-                }}
-                loading={loading}
-                autoRefreshSeconds={0}
-              />
-              <Button size="sm" onClick={() => { setCreateError(null); setDialogOpen(true); }}>
-                + 새 마케팅 잡
-              </Button>
-            </div>
-          )
+          activeTab === 'holding' ? (
+            <RefreshControl
+              onRefresh={() => loadHolding(true)}
+              loading={holdingLoading}
+              autoRefreshSeconds={0}
+            />
+          ) : activeTab === 'completed' ? (
+            <RefreshControl
+              onRefresh={() => {
+                loadCompleted();
+                loadJobs(true);
+                loadAnalytics();
+              }}
+              loading={jobsLoading || completedLoading}
+              autoRefreshSeconds={0}
+            />
+          ) : undefined
         }
       />
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(resolveTab(v))}
+      >
         <TabsList className="mb-4">
-          <TabsTrigger value="jobs">마케팅 잡</TabsTrigger>
-          <TabsTrigger value="settings">일일 상한</TabsTrigger>
-          <TabsTrigger value="credentials">플랫폼 계정</TabsTrigger>
+          <TabsTrigger value="holding">대기</TabsTrigger>
+          <TabsTrigger value="completed">완료</TabsTrigger>
+          <TabsTrigger value="settings">설정</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="jobs">
-          <div className="mb-4">
-            <p className="text-sm text-gray-500">
-              사연을 선택하고 ASM(Again-Spring-Marketing) 서버에 콘텐츠 생성을 요청합니다.
-            </p>
-          </div>
+        <TabsContent value="holding" className="space-y-4">
+          <p className="text-sm text-gray-500">
+            24h 대기 N-top 보드입니다. 상한·가중치 저장 시 순위가 바로 다시 계산됩니다.
+            핀은 상한 안에서 최우선이며, T+24h에 자동 확정됩니다.
+          </p>
 
-          {error && (
-            <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
+          <HoldingControlsBar onSaved={() => loadHolding(false)} />
+
+          {holdingError && (
+            <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {holdingError}
             </div>
           )}
 
-          {loading ? (
+          {board && (
+            <p className="text-xs text-gray-500">
+              컷라인 N={board.meta.cutline} · 잔여 풀 {board.meta.remainingPool}
+              {' · '}오늘 영상 {board.meta.videosToday ?? '—'} / 글{' '}
+              {board.meta.textsToday ?? '—'}
+            </p>
+          )}
+
+          <HoldingBoard
+            rows={board?.items ?? []}
+            loading={holdingLoading}
+            cutline={board?.meta.cutline}
+            onEdit={setEditRow}
+            onPin={handlePin}
+            onUnpin={handleUnpin}
+          />
+
+          <HoldingDraftDialog
+            open={!!editRow}
+            postId={editRow?.postId ?? null}
+            draft={editRow?.draft}
+            readOnly={!!editRow?.lockedAt}
+            saving={draftSaving}
+            error={draftError}
+            onClose={() => {
+              setEditRow(null);
+              setDraftError(null);
+            }}
+            onSave={async ({ postId, draft }) => {
+              setDraftSaving(true);
+              setDraftError(null);
+              try {
+                await updateMarketingHoldingDraft(postId, draft);
+                setEditRow(null);
+                await loadHolding(false);
+              } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : String(err);
+                setDraftError(msg);
+              } finally {
+                setDraftSaving(false);
+              }
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="completed">
+          <div className="mb-4">
+            <p className="text-sm text-gray-500">
+              확정·탈락 홀딩과 잡·게시 상태입니다. 탈락 건은 상한을 무시하고 강제
+              배포할 수 있습니다. 실패 잡 재시도는 일일 풀을 다시 쓰지 않습니다.
+            </p>
+          </div>
+
+          {completedError && (
+            <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {completedError}
+            </div>
+          )}
+          {jobsError && (
+            <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {jobsError}
+            </div>
+          )}
+
+          <div className="mb-8" data-testid="marketing-completed-holdings">
+            <h3 className="font-semibold text-gray-800 mb-4">홀딩 확정·탈락</h3>
+            <div className="bg-white rounded-lg border">
+              <AdminTable<MarketingCompletedItem>
+                data={completedItems}
+                loading={completedLoading}
+                emptyMessage="확정/탈락 홀딩이 없습니다."
+                rowKey={(row) => row.postId}
+                columns={[
+                  {
+                    key: 'postId',
+                    header: '사연',
+                    render: (row) => (
+                      <span className="font-mono text-xs">{row.postId}</span>
+                    ),
+                  },
+                  {
+                    key: 'status',
+                    header: '상태',
+                    render: (row) => (
+                      <Badge
+                        className={
+                          row.status === 'DROPPED'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-green-100 text-green-800'
+                        }
+                      >
+                        {row.status}
+                      </Badge>
+                    ),
+                  },
+                  {
+                    key: 'score',
+                    header: '점수',
+                    render: (row) => (
+                      <span className="font-mono text-sm">
+                        {row.scoreSnapshot != null
+                          ? Number(row.scoreSnapshot).toFixed(1)
+                          : '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'jobs',
+                    header: '잡',
+                    render: (row) =>
+                      row.jobs?.length
+                        ? row.jobs
+                            .map((j) => `#${j.id}:${j.status}`)
+                            .join(', ')
+                        : '—',
+                  },
+                  {
+                    key: 'actions',
+                    header: '액션',
+                    render: (row) =>
+                      row.status === 'DROPPED' ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={forceBusyId === row.postId}
+                          onClick={() => handleForce(row)}
+                          data-testid={`completed-force-${row.postId}`}
+                        >
+                          강제 배포
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      ),
+                  },
+                ]}
+              />
+            </div>
+          </div>
+
+          {jobsLoading ? (
             <Card className="p-6">
               <div className="py-8 text-center text-gray-400">로드 중…</div>
             </Card>
           ) : (
             <>
-              <JobBoard
-                jobs={jobs}
-                onPublish={handlePublish}
-                onRepublish={handleRepublish}
-              />
-
-              <div className="mt-8 pt-6 border-t">
+              <div className="mb-8">
                 <h3 className="font-semibold text-gray-800 mb-4">플랫폼 성과</h3>
                 <PlatformPerformanceCards
                   data={performance}
@@ -246,130 +451,30 @@ export default function MarketingJobsPage() {
                 />
               </div>
 
-              <div className="mt-8 pt-6 border-t">
+              <div className="mb-8">
                 <h3 className="font-semibold text-gray-800 mb-4">게시 이력</h3>
                 <PublicationTimeline
                   events={timeline}
                   loading={perfLoading}
                 />
               </div>
+
+              <JobBoard
+                jobs={jobs}
+                onPublish={handlePublish}
+                onRepublish={handleRepublish}
+              />
             </>
           )}
         </TabsContent>
 
-        <TabsContent value="settings">
-          <MarketingQuotaSection />
-        </TabsContent>
-
-        <TabsContent value="credentials">
-          <PlatformCredentialsSection />
+        <TabsContent value="settings" className="space-y-8">
+          <PlatformAutoSection />
+          <div className="border-t pt-6">
+            <PlatformCredentialsSection />
+          </div>
         </TabsContent>
       </Tabs>
-
-      {/* 새 마케팅 잡 생성 다이얼로그 */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>새 마케팅 잡 만들기</DialogTitle>
-          </DialogHeader>
-
-          <Tabs defaultValue="picker" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="picker">사연 선택</TabsTrigger>
-              <TabsTrigger value="direct">직접 입력</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="picker" className="space-y-4 py-2">
-              <div>
-                <Label className="block mb-2 text-sm font-medium">
-                  게시글 검색
-                </Label>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left"
-                  onClick={() => setPickerDialogOpen(true)}
-                >
-                  {postId ? `선택됨: ${postId.substring(0, 20)}...` : '게시글 선택'}
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="direct" className="space-y-4 py-2">
-              <div className="space-y-1">
-                <Label htmlFor="postId">사연 ID</Label>
-                <Input
-                  id="postId"
-                  value={postId}
-                  onChange={(e) => setPostId(e.target.value)}
-                  placeholder="예: abc123def456"
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-gray-400">
-                  사연 상세 페이지 URL의 마지막 경로 또는 DB의 post.id 값
-                </p>
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          <div className="space-y-4 py-2">
-
-            <div className="space-y-2">
-              <Label>타겟 플랫폼</Label>
-              <div className="space-y-1">
-                {TARGET_PLATFORMS.map((p) => (
-                  <label key={p.value} className="flex cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={targets.includes(p.value)}
-                      onChange={() => toggleTarget(p.value)}
-                    />
-                    <span className="text-sm">{p.label}</span>
-                    <span className="text-xs text-gray-400">({p.value})</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={autoPublish}
-                  onChange={(e) => setAutoPublish(e.target.checked)}
-                />
-                <span className="text-sm font-medium">자동 게시</span>
-                <span className="text-xs text-gray-400">
-                  (콘텐츠 생성 완료 시 자동으로 각 플랫폼에 게시)
-                </span>
-              </label>
-            </div>
-
-            {createError && (
-              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {createError}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={creating}>
-              취소
-            </Button>
-            <Button onClick={handleCreate} disabled={creating || targets.length === 0}>
-              {creating ? '요청 중…' : 'ASM에 요청'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 사연 선택 다이얼로그 */}
-      <PostPickerDialog
-        open={pickerDialogOpen}
-        onClose={() => setPickerDialogOpen(false)}
-        onSelect={handlePickPost}
-      />
     </div>
   );
 }

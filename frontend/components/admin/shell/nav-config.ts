@@ -37,7 +37,7 @@ export const NAV_GROUPS: AdminNavGroup[] = [
       { label: '공지관리', href: '/admin/announcements', icon: 'Megaphone' },
       { label: '알림발송', href: '/admin/notifications', icon: 'Bell' },
       { label: '통계', href: '/admin/stats', icon: 'BarChart3' },
-      { label: '마케팅 잡', href: '/admin/marketing', icon: 'Zap', badge: 'marketing' },
+      { label: '마케팅', href: '/admin/marketing', icon: 'Zap', badge: 'marketing' },
     ],
   },
   {

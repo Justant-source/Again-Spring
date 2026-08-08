@@ -3,9 +3,11 @@ package com.againspring.repository.marketing;
 import com.againspring.domain.marketing.MarketingJob;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -99,8 +101,8 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * {@code instagram_feed}. Separate query because ASM requires each alone target
      * as its own job.
      *
-     * <p>Excludes posts that already have {@code instagram_reels} or {@code youtube_shorts}
-     * (any status). Video (Reels+Shorts) and feed news-cards are mutually exclusive.
+     * <p>S4 distribution C: feed may coexist with Shorts; feed ⊥ Reels is enforced
+     * at target-build time ({@code resolveTargets}), not by excluding video posts here.
      */
     @Query(nativeQuery = true, value = """
         SELECT p.id FROM posts p
@@ -111,26 +113,15 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
             SELECT 1 FROM marketing_job mj
             WHERE mj.post_id = p.id
             AND JSON_CONTAINS(mj.targets, '"instagram_feed"')
-        )
-        AND NOT EXISTS (
-            SELECT 1 FROM marketing_job mj
-            WHERE mj.post_id = p.id
-            AND JSON_CONTAINS(mj.targets, '"instagram_reels"')
-        )
-        AND NOT EXISTS (
-            SELECT 1 FROM marketing_job mj
-            WHERE mj.post_id = p.id
-            AND JSON_CONTAINS(mj.targets, '"youtube_shorts"')
         )
         LIMIT :limit
         """)
     List<String> findPostsEligibleForInstagramFeedPublish(Instant since, int limit);
 
     /**
-     * Posts past 24h with no IG feed / Reels / Shorts / X-thread job yet, ranked by popularity:
-     * view_count DESC → top-level comments → votes → created_at DESC.
-     * Used to pick the daily video cohort (Reels + YouTube Shorts) under the shared quota pool.
-     * Excludes {@code x_thread} so text-path posts are not also selected for video.
+     * Legacy ranking helper: posts past 24h with no Reels/Shorts job yet, weighted score.
+     * S4 commit path uses holdings instead; kept for diagnostics / fallback.
+     * Text platforms (x_thread etc.) may already exist — VIDEO stories can accompany text.
      */
     @Query(nativeQuery = true, value = """
         SELECT p.id FROM posts p
@@ -138,14 +129,9 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         AND p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         AND p.deleted_at IS NULL
         AND NOT EXISTS (
-            SELECT 1 FROM marketing_job mj
-            WHERE mj.post_id = p.id
-            AND JSON_CONTAINS(mj.targets, '"x_thread"')
-        )
-        AND NOT EXISTS (
-            SELECT 1 FROM marketing_job mj
-            WHERE mj.post_id = p.id
-            AND JSON_CONTAINS(mj.targets, '"instagram_feed"')
+            SELECT 1 FROM marketing_holding mh
+            WHERE mh.post_id = p.id
+            AND mh.status IN ('COMMITTED', 'DROPPED')
         )
         AND NOT EXISTS (
             SELECT 1 FROM marketing_job mj
@@ -157,26 +143,32 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
             WHERE mj.post_id = p.id
             AND JSON_CONTAINS(mj.targets, '"youtube_shorts"')
         )
-        ORDER BY
-            COALESCE(p.view_count, 0) DESC,
-            (
+        ORDER BY (
+            :wViews * COALESCE(p.view_count, 0)
+            + :wComments * (
                 SELECT COUNT(*) FROM post_comments c
                 WHERE c.post_id = p.id
                 AND c.parent_comment_id IS NULL
                 AND c.deleted_at IS NULL
-            ) DESC,
-            (
+            )
+            + :wVotes * (
                 SELECT COUNT(*) FROM votes v
                 WHERE v.post_id = p.id
-            ) DESC,
-            p.created_at DESC
+            )
+        ) DESC,
+        p.created_at DESC
         LIMIT :limit
         """)
-    List<String> findPostsEligibleForVideoMarketing(Instant since, int limit);
+    List<String> findPostsEligibleForVideoMarketing(
+        @Param("since") Instant since,
+        @Param("limit") int limit,
+        @Param("wViews") double wViews,
+        @Param("wComments") double wComments,
+        @Param("wVotes") double wVotes);
 
     /**
-     * Posts past 24h with no X / feed / Reels / Shorts job yet, ranked by the same popularity
-     * score as video. Used for daily text slots (x_thread + instagram_feed).
+     * Legacy ranking helper: posts past 24h not yet COMMITTED/DROPPED and without
+     * a prior text-slot job, for text-only auto slots.
      */
     @Query(nativeQuery = true, value = """
         SELECT p.id FROM posts p
@@ -184,41 +176,41 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         AND p.created_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         AND p.deleted_at IS NULL
         AND NOT EXISTS (
-            SELECT 1 FROM marketing_job mj
-            WHERE mj.post_id = p.id
-            AND JSON_CONTAINS(mj.targets, '"x_thread"')
+            SELECT 1 FROM marketing_holding mh
+            WHERE mh.post_id = p.id
+            AND mh.status IN ('COMMITTED', 'DROPPED')
         )
         AND NOT EXISTS (
             SELECT 1 FROM marketing_job mj
             WHERE mj.post_id = p.id
-            AND JSON_CONTAINS(mj.targets, '"instagram_feed"')
+            AND (
+                JSON_CONTAINS(mj.targets, '"x_thread"')
+                OR JSON_CONTAINS(mj.targets, '"instagram_reels"')
+                OR JSON_CONTAINS(mj.targets, '"youtube_shorts"')
+            )
         )
-        AND NOT EXISTS (
-            SELECT 1 FROM marketing_job mj
-            WHERE mj.post_id = p.id
-            AND JSON_CONTAINS(mj.targets, '"instagram_reels"')
-        )
-        AND NOT EXISTS (
-            SELECT 1 FROM marketing_job mj
-            WHERE mj.post_id = p.id
-            AND JSON_CONTAINS(mj.targets, '"youtube_shorts"')
-        )
-        ORDER BY
-            COALESCE(p.view_count, 0) DESC,
-            (
+        ORDER BY (
+            :wViews * COALESCE(p.view_count, 0)
+            + :wComments * (
                 SELECT COUNT(*) FROM post_comments c
                 WHERE c.post_id = p.id
                 AND c.parent_comment_id IS NULL
                 AND c.deleted_at IS NULL
-            ) DESC,
-            (
+            )
+            + :wVotes * (
                 SELECT COUNT(*) FROM votes v
                 WHERE v.post_id = p.id
-            ) DESC,
-            p.created_at DESC
+            )
+        ) DESC,
+        p.created_at DESC
         LIMIT :limit
         """)
-    List<String> findPostsEligibleForTextMarketing(Instant since, int limit);
+    List<String> findPostsEligibleForTextMarketing(
+        @Param("since") Instant since,
+        @Param("limit") int limit,
+        @Param("wViews") double wViews,
+        @Param("wComments") double wComments,
+        @Param("wVotes") double wVotes);
 
     /**
      * Count distinct posts that already received a Reels and/or Shorts marketing job
@@ -235,13 +227,35 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     long countVideoJobsCreatedSince(Instant since);
 
     /**
-     * Count distinct posts that received an {@code x_thread} job since {@code since}.
-     * One text marketing slot = one x_thread job (instagram_feed is created alongside).
+     * Distinct posts that received any marketing job since {@code since}.
+     * S4: one COMMITTED story = one shared-pool slot (multi-platform jobs do not add extra).
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT COUNT(DISTINCT mj.post_id) FROM marketing_job mj
+        WHERE mj.created_at >= :since
+        """)
+    long countDistinctMarketedPostsSince(Instant since);
+
+    /**
+     * Distinct posts that got a text-path job ({@code x_thread}) since {@code since}
+     * and did <em>not</em> also get a video job the same day — used for textsToday display.
+     * Prefer {@link #countDistinctMarketedPostsSince} for remaining-pool math (S4).
      */
     @Query(nativeQuery = true, value = """
         SELECT COUNT(DISTINCT mj.post_id) FROM marketing_job mj
         WHERE mj.created_at >= :since
         AND JSON_CONTAINS(mj.targets, '"x_thread"') = TRUE
+        AND NOT EXISTS (
+            SELECT 1 FROM marketing_job v
+            WHERE v.post_id = mj.post_id
+            AND v.created_at >= :since
+            AND (
+                JSON_CONTAINS(v.targets, '"instagram_reels"') = TRUE
+                OR JSON_CONTAINS(v.targets, '"youtube_shorts"') = TRUE
+            )
+        )
         """)
     long countTextSlotsCreatedSince(Instant since);
+
+    List<MarketingJob> findByPostIdIn(Collection<String> postIds);
 }

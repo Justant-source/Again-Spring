@@ -7,32 +7,26 @@
 ## 아키텍처 개요
 
 ```
-[다시봄 어드민]  →  POST /api/admin/marketing/jobs  →  [Again-Spring BE]
-                                                               │
-                                                       AsmClient (REST)
-                                                               │
-                                                    POST /api/v1/jobs ↓
-                                          [Again-Spring-Marketing (ASM)]
-                                           WSL GPU 서버 100.115.252.61:8200
-                                                               │
-                                                    ┌──────────┴──────────┐
-                                                    │    M0: 스텁 파이프라인 │
-                                                    │    M1: Claude 카피  │
-                                                    │    M2: TTS (Fish)  │
-                                                    │    M3: 영상 (LTX-2)  │
-                                                    │    M4: 렌더링 (FFmpeg)│
-                                                    │    M5: 이미지 카드    │
-                                                    │    M6: 소셜 게시     │
-                                                    └─────────────────────┘
+[다시봄 어드민 /admin/marketing]
+        │  대기 보드 · 핀 · 초안 · 상한/가중치
+        │  T+24h 스케줄러 / 완료탭 강제
+        ▼
+[Again-Spring BE]  MarketingHoldingCommitService → MarketingJobService
+        │
+        │  AsmClient (REST)
+        ▼
+POST /api/v1/jobs → [Again-Spring-Marketing (ASM)]
+                     WSL GPU 서버 100.115.252.61:8200
+                     M0~M6 파이프라인 → 소셜 게시
 ```
 
 ### 컴포넌트 역할
 
 | 컴포넌트 | 위치 | 역할 |
 |---|---|---|
-| **Again-Spring (AS)** | Ubuntu 서버 | 얇은 트리거/클라이언트. 잡 생성·폴링·UI 표시만 담당 |
+| **Again-Spring (AS)** | Ubuntu 서버 | 홀딩 보드·24h 확정·잡 폴링·Admin UI. 얇은 ASM 클라이언트 |
 | **Again-Spring-Marketing (ASM)** | WSL GPU 서버 | 콘텐츠 생성·렌더링·소셜 게시 전담 |
-| **ASM social-poster** | ASM `services/social-poster/` | Playwright 자동 게시. **24h 분배 = 공유 풀(기본 6) · 영상 우선(기본 3, 릴스+쇼츠) · 잔여 글(X+피드)** |
+| **ASM social-poster** | ASM `services/social-poster/` | Playwright 자동 게시. **24h 분배 = 공유 풀 · 영상 우선 · 잔여 글 · 1사연=1칸** |
 
 **접속**: AS 호스트 Tailscale `100.81.189.92`에서 `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
 
@@ -44,7 +38,7 @@ docs/shared/marketing/
 ├── api.md              ← AS ↔ ASM REST API 명세
 ├── architecture.md     ← 시스템 설계 결정 및 데이터 흐름
 ├── asm-setup.md        ← ASM 서버 설치·운영 가이드
-├── platforms.md        ← 지원 플랫폼 및 콘텐츠 형식
+├── platforms.md        ← 지원 플랫폼 · 24h 홀딩/배분 C · auto on/off
 ├── credentials.md      ← 플랫폼 계정 자격증명 저장·암호화 정책
 ├── social-poster.md            ← social-poster 서비스 운영 가이드
 ├── x-thread-strategy.md        ← X 스레드 전략 (솔로 3~4 / 양면 최대 6단)
@@ -56,24 +50,30 @@ docs/shared/marketing/
 
 ## 빠른 시작
 
-> **24h 자동 분배**: 공유 일일 풀(기본 글 상한 6) · 영상 우선(기본 3 → 릴스+쇼츠, X 없음) · 잔여 → `x_thread`+`instagram_feed`. 상한은 Admin `/admin/marketing → 일일 상한`.
-> 상세 [`platforms.md`](platforms.md).
+> **24h 자동 분배 (배분 C)**: 대기 보드 → T+24h 확정. 공유 풀(`dailyTextCap` 기본 6) · 영상 우선 · VIDEO는 video+text companion(IG feed⊥reels) · **1사연=1칸**. 상세 [`platforms.md`](platforms.md).
 
-### 어드민 사용법
+### 어드민 `/admin/marketing` 탭
 
-1. `https://againspring.net/admin/content` → 사연 행 우측 메뉴 → **마케팅 제작 요청**
-2. 타겟 플랫폼 선택 (**X 또는 X 스레드**; IG 검증 시 **인스타그램 피드만** 단독 선택)
-3. 자동 게시 여부 토글 (IG 검증은 OFF 권장 → READY 후 수동 승인)
-4. **마케팅 제작 요청** 클릭 → ASM에 잡 생성
-5. `https://againspring.net/admin/marketing` → 잡 목록에서 진행 상황 모니터링
-6. 상태가 `READY`이고 자동 게시 OFF 시 → 잡 상세 → **게시 승인** 클릭
+| 탭 | 역할 |
+|---|---|
+| **대기** | 24h N-top 홀딩 보드 · 초안 편집 · 핀(VIDEO/TEXT soft-reserve) · 일일 상한·점수 가중치 |
+| **완료** | COMMITTED/DROPPED 홀딩 · **강제 배포**(DROPPED, 상한 무시) · 잡 보드 · 성과/타임라인 |
+| **설정** | 플랫폼 자동 on/off · 플랫폼 계정 자격증명 |
+
+1. `https://againspring.net/admin/marketing` (기본 탭 = **대기**)
+2. 상한·가중치 조정 → 순위/컷라인 즉시 반영
+3. 필요 시 핀으로 soft-reserve · 초안 PATCH
+4. T+24h에 스케줄러가 핀→자동 영상→자동 글 순으로 COMMITTED, 미선정 DROPPED
+5. **완료** 탭에서 잡 진행·게시 승인/재시도 · 탈락 건 강제 배포
+6. **설정**에서 채널 auto on/off · 계정 자격증명
+
+> 수동 `POST /api/admin/marketing/jobs`는 BE에 남아 있으나(스케줄러·force·e2e), Admin UI의 주 경로는 **대기 보드 → 자동/강제 확정**이다.
 
 ### IG 단건 검증 (요청 시 1사연)
 
-1. 어드민에서 해당 사연 → 타겟 **`instagram_feed`만** (다른 타겟과 혼합 불가)
-2. 빌드 완료 후 아티팩트: `card_01` 훅(4:5) · 중간 장(사연=중앙 1:1 contain, 댓글=높이 버짓 N≤4) · 마지막 비율카드 · `upload.json` 캡션
-3. 게시 승인 → 인스타 앱에서 캐러셀·캡션·링크 확인 → 피드백
-4. 대량 자동·스케줄 활성화는 하지 않음
+1. 설정에서 대상 채널만 on · 또는 강제/`TEXT` 핀으로 피드 슬롯 확보
+2. 빌드 완료 후 아티팩트: `card_01` 훅(4:5) · 중간 장 · 비율카드 · `upload.json` 캡션
+3. 완료 탭에서 잡 상세 → 게시 승인 → 인스타 앱에서 확인
 
 > 중간 장·댓글 글자 크기 규칙: [`instagram-feed-strategy.md`](instagram-feed-strategy.md) §2.1.1–2.1.2 (`commentsReadableBudget`은 IG만, X는 최대 4장 고정).
 
@@ -81,8 +81,8 @@ docs/shared/marketing/
 
 ```
 REQUESTED → QUEUED → RUNNING → READY → PUBLISHING → PUBLISHED
-                                  ↓                      
-                               (수동 승인 시 PUBLISHING)   
+                                  ↓
+                               (수동 승인 시 PUBLISHING)
                 ↓
              FAILED / STALE (폴링 5회 연속 실패)
 ```
@@ -109,14 +109,15 @@ REQUESTED → QUEUED → RUNNING → READY → PUBLISHING → PUBLISHED
 | 영역 | 경로 |
 |---|---|
 | BE 얇은 클라이언트 | `backend/.../marketing/AsmClient.java` |
-| BE 서비스 | `backend/.../marketing/MarketingJobService.java` |
-| BE 폴링 스케줄러 | `backend/.../marketing/MarketingPollingScheduler.java` |
-| BE 어드민 API | `backend/.../api/admin/AdminMarketingController.java` |
-| FE 잡 목록 | `frontend/app/(admin)/admin/marketing/page.tsx` |
+| BE 홀딩·확정 | `backend/.../marketing/holding/MarketingHoldingService.java` · `MarketingHoldingCommitService.java` |
+| BE 플랫폼 auto / 점수 / 상한 | `MarketingPlatformAutoService` · `MarketingScoreWeightService` · `MarketingQuotaService` |
+| BE 잡·폴링 | `MarketingJobService.java` · `MarketingPollingScheduler.java` |
+| BE Admin API | `AdminMarketingController` · `AdminMarketingHoldingController` · `AdminMarketingCompletedController` · `AdminMarketingPlatformController` |
+| FE 마케팅 허브 | `frontend/app/(admin)/admin/marketing/page.tsx` (탭: 대기/완료/설정) |
+| FE 홀딩 UI | `frontend/components/admin/marketing/HoldingBoard.tsx` · `HoldingControlsBar.tsx` · `HoldingDraftDialog.tsx` |
 | FE 잡 상세 | `frontend/app/(admin)/admin/marketing/jobs/[id]/page.tsx` |
-| FE 생성 다이얼로그 | `frontend/components/admin/content/CreateMarketingJobDialog.tsx` |
 | FE API 클라이언트 | `frontend/lib/api/admin/marketing.ts` |
-| FE 플랫폼 계정 UI | `frontend/components/admin/marketing/PlatformCredentialsSection.tsx` |
+| FE 플랫폼 계정 UI | `frontend/components/admin/marketing/PlatformCredentialsSection.tsx` · `PlatformAutoSection.tsx` |
 | ASM 자격증명 (crypto/스키마/API) | `app/core/crypto.py` · `app/domain/credentials.py` · `app/api/routes_credentials.py` |
 | ASM 프로젝트 | `/home/justant/Data/Again-Spring-Marketing/` (WSL) |
 | ASM social-poster | `ASM/services/social-poster/` (WSL) |

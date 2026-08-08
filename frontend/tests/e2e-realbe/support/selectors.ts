@@ -104,12 +104,16 @@ export const ADMIN_STATS = {
 } as const
 
 // ── 어드민 마케팅 허브 (/admin/marketing) ───────────────────────
+// 탭: 대기(holding) / 완료(completed) / 설정(settings)
 export const ADMIN_MARKETING = {
-  jobBoard:          '[data-testid="marketing-job-board"]',
-  pendingApproval:   '[data-testid="marketing-pending-approval"]',
+  holdingBoard:        '[data-testid="marketing-holding-board"]',
+  holdingControls:     '[data-testid="marketing-holding-controls"]',
+  jobBoard:            '[data-testid="marketing-job-board"]',
+  pendingApproval:     '[data-testid="marketing-pending-approval"]',
   platformPerformance: '[data-testid="marketing-platform-performance"]',
-  timeline:          '[data-testid="marketing-timeline"]',
-  postPickerDialog:  '[data-testid="post-picker-dialog"]',
+  timeline:            '[data-testid="marketing-timeline"]',
+  platformAutoSection: '[data-testid="marketing-platform-auto-section"]',
+  holdingDraftDialog:  '[data-testid="marketing-holding-draft-dialog"]',
 } as const
 
 // ── 어드민 원본 비교 (/admin/content/[postId]/compare) ───────────

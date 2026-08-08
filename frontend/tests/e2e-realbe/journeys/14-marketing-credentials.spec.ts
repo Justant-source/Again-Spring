@@ -4,8 +4,8 @@
  * A. 인증 가드 (ASM 불필요) — 항상 실행
  *    - 미인증 GET /credentials → 401/403 (비-어드민 403은 Journey 09-B2)
  *
- * B. UI 탭 (ASM 불필요) — 항상 실행
- *    - /admin/marketing 에 "플랫폼 계정" 탭 존재 + 전환 가능
+ * B. UI 설정 탭 (ASM 불필요) — 항상 실행
+ *    - /admin/marketing 「설정」탭 — 자격증명 + 플랫폼 자동 게시 섹션
  *
  * C. 자격증명 조회 (ASM 필요) — ASM_STUB_AVAILABLE=true 시 실행 / **읽기 전용**
  *    - 어드민 GET /credentials → 200 + 7개 플랫폼
@@ -18,6 +18,7 @@ import { test, expect } from '../support/no-llm-fixture'
 import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1 } from '../fixtures/personas'
 import { tokenFromStorageState } from '../support/api'
+import { ADMIN_MARKETING } from '../support/selectors'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email) // test1 = ADMIN
@@ -41,18 +42,23 @@ test.describe('Journey 14-A: 자격증명 API 인증 가드', () => {
   })
 })
 
-// ── B. UI 탭 (ASM 불필요) ────────────────────────────────────────
-test.describe('Journey 14-B: 플랫폼 계정 탭', () => {
+// ── B. UI 설정 탭 (ASM 불필요) ───────────────────────────────────
+test.describe('Journey 14-B: 설정 탭 (자격증명·자동 게시)', () => {
   test.use({ storageState: ADMIN_AUTH })
 
-  test('어드민 — /admin/marketing 에 "플랫폼 계정" 탭 존재 + 전환', async ({ page }) => {
+  test('어드민 — /admin/marketing 「설정」탭에 자격증명·자동 게시', async ({ page }) => {
     await page.goto(`${BASE}/admin/marketing`)
     await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
 
-    const credTab = page.getByRole('tab', { name: '플랫폼 계정' })
-    await expect(credTab).toBeVisible({ timeout: 8_000 })
-    await credTab.click()
-    // 탭 전환 후 안내 문구가 보여야 함 (카드 렌더는 ASM 필요 → 여기선 미검증)
+    const settingsTab = page.getByRole('tab', { name: '설정' })
+    await expect(settingsTab).toBeVisible({ timeout: 8_000 })
+    await settingsTab.click()
+
+    // 플랫폼 자동 게시 섹션 (ASM 없이도 섹션 셸 노출; 목록 로드는 ASM 의존 가능)
+    await expect(page.locator(ADMIN_MARKETING.platformAutoSection)).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByText('자동 게시 대상')).toBeVisible()
+
+    // 자격증명 안내 — 카드 렌더는 ASM 필요 → 문구만 검증
     await expect(page.getByText(/계정 정보를 입력|암호화되어 저장/)).toBeVisible({ timeout: 8_000 })
   })
 })

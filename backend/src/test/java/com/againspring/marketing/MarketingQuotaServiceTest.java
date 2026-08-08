@@ -53,7 +53,8 @@ class MarketingQuotaServiceTest {
             .thenReturn(Optional.of(SystemSetting.builder()
                 .settingKey(MarketingQuotaService.KEY_VIDEO_CAP).settingValue("3").build()));
         when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(2L);
-        when(marketingJobRepository.countTextSlotsCreatedSince(any(Instant.class))).thenReturn(1L);
+        // S4: story-based pool — 3 distinct posts marketed (2 video + 1 text-only)
+        when(marketingJobRepository.countDistinctMarketedPostsSince(any(Instant.class))).thenReturn(3L);
 
         MarketingQuotaService.QuotaStatus status = service.getStatus();
 
@@ -66,7 +67,7 @@ class MarketingQuotaServiceTest {
     void updateCaps_persistsBothKeys() {
         when(systemSettingRepository.findById(any())).thenReturn(Optional.empty());
         when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(0L);
-        when(marketingJobRepository.countTextSlotsCreatedSince(any(Instant.class))).thenReturn(0L);
+        when(marketingJobRepository.countDistinctMarketedPostsSince(any(Instant.class))).thenReturn(0L);
 
         service.updateCaps(8, 2, "admin@test");
 

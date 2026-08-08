@@ -28,6 +28,10 @@ export interface CreateMarketingJobRequest {
 
 // ===== API Functions =====
 
+/**
+ * @deprecated Manual admin job creation is being removed (holding board + scheduler).
+ * Keep the client until another agent removes remaining UI callers; do not use in new UI.
+ */
 export async function createMarketingJob(
   postId: string,
   targets: string[],
@@ -264,3 +268,319 @@ export async function listAdminPostsForPicker(page?: number): Promise<PickerPost
   );
   return res.data;
 }
+
+// ===== Score weights (marketing redesign) =====
+
+export interface MarketingScoreWeights {
+  weightViews: number;
+  weightComments: number;
+  weightVotes: number;
+}
+
+export async function getMarketingScoreWeights(): Promise<MarketingScoreWeights> {
+  const res = await api.get<MarketingScoreWeights>('/api/admin/marketing/score-weights');
+  return res.data;
+}
+
+export async function updateMarketingScoreWeights(
+  weights: MarketingScoreWeights
+): Promise<MarketingScoreWeights> {
+  const res = await api.put<MarketingScoreWeights>('/api/admin/marketing/score-weights', weights);
+  return res.data;
+}
+
+// ===== Holding board (marketing redesign) =====
+
+export type MarketingHoldingStatus =
+  | 'IN_POOL'
+  | 'PINNED'
+  | 'OUT_OF_CUT'
+  | 'COMMITTED'
+  | 'DROPPED';
+
+export type MarketingPinFormat = 'VIDEO' | 'TEXT';
+
+/** Projected slot format for display (cutline-relative). */
+export type MarketingProjectedFormat = 'VIDEO' | 'TEXT' | 'OUT_OF_CUT';
+
+export interface MarketingHoldingTopComment {
+  author?: string | null;
+  authorId?: string | null;
+  body?: string | null;
+  likeCount?: number | null;
+  createdAt?: string | null;
+  side?: string | null;
+}
+
+/**
+ * Unified marketing draft (BriefDto superspace). Stored as draft_json on BE;
+ * admin API uses camelCase like other Marketing* DTOs.
+ */
+export interface MarketingHoldingDraft {
+  title?: string | null;
+  promoTitle?: string | null;
+  neutralSummary?: string | null;
+  authorBody?: string | null;
+  partnerBody?: string | null;
+  sideA?: string | null;
+  sideB?: string | null;
+  tags?: string[] | null;
+  topComments?: MarketingHoldingTopComment[] | null;
+  firstComment?: string | null;
+  juryGist?: string | null;
+  juryOpinions?: string[] | null;
+  empathyRatio?: { a: number; b: number } | null;
+  metaphorId?: string | null;
+  postUrl?: string | null;
+  voteLabels?: Record<string, number> | null;
+}
+
+export interface MarketingHoldingRow {
+  postId: string;
+  title: string | null;
+  status: MarketingHoldingStatus;
+  pinFormat: MarketingPinFormat | null;
+  /** Live / last projected weighted score. */
+  scoreSnapshot: number;
+  /** 1-based projected rank on the board (null if unranked). */
+  rankSnapshot: number | null;
+  viewCount: number;
+  commentCount: number;
+  voteCount: number;
+  projectedFormat: MarketingProjectedFormat;
+  draft: MarketingHoldingDraft | null;
+  lockedAt: string | null;
+  postCreatedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarketingHoldingMeta {
+  remainingPool: number;
+  /** Auto cutline N (= remaining shared pool). */
+  cutline: number;
+  dailyTextCap: number;
+  dailyVideoCap: number;
+  videosToday?: number;
+  textsToday?: number;
+  weights: MarketingScoreWeights;
+}
+
+export interface MarketingHoldingBoard {
+  items: MarketingHoldingRow[];
+  meta: MarketingHoldingMeta;
+}
+
+/** Raw BE board payload (cutlineN + flat weights; item counts optional). */
+type MarketingHoldingRowRaw = Partial<MarketingHoldingRow> & {
+  postId: string;
+  draft?: MarketingHoldingDraft | Record<string, unknown> | null;
+};
+
+interface MarketingHoldingBoardRaw {
+  items?: MarketingHoldingRowRaw[];
+  meta?: {
+    remainingPool?: number;
+    cutline?: number;
+    cutlineN?: number;
+    dailyTextCap?: number;
+    dailyVideoCap?: number;
+    videosToday?: number;
+    textsToday?: number;
+    weightViews?: number;
+    weightComments?: number;
+    weightVotes?: number;
+    weights?: MarketingScoreWeights;
+  };
+}
+
+function normalizeHoldingDraft(
+  draft: MarketingHoldingDraft | Record<string, unknown> | null | undefined
+): MarketingHoldingDraft | null {
+  if (!draft || typeof draft !== 'object') return null;
+  const d = draft as Record<string, unknown>;
+  // Accept snake_case brief fields from draft_json.
+  return {
+    title: (d.title as string) ?? null,
+    promoTitle: (d.promoTitle as string) ?? (d.promo_title as string) ?? null,
+    neutralSummary:
+      (d.neutralSummary as string) ?? (d.neutral_summary as string) ?? null,
+    authorBody: (d.authorBody as string) ?? (d.author_body as string) ?? null,
+    partnerBody: (d.partnerBody as string) ?? (d.partner_body as string) ?? null,
+    sideA: (d.sideA as string) ?? (d.side_a as string) ?? null,
+    sideB: (d.sideB as string) ?? (d.side_b as string) ?? null,
+    tags: (d.tags as string[]) ?? null,
+    topComments:
+      (d.topComments as MarketingHoldingTopComment[]) ??
+      (d.top_comments as MarketingHoldingTopComment[]) ??
+      null,
+    firstComment:
+      (d.firstComment as string) ?? (d.first_comment as string) ?? null,
+    juryGist: (d.juryGist as string) ?? (d.jury_gist as string) ?? null,
+    juryOpinions:
+      (d.juryOpinions as string[]) ?? (d.jury_opinions as string[]) ?? null,
+    metaphorId: (d.metaphorId as string) ?? (d.metaphor_id as string) ?? null,
+    postUrl: (d.postUrl as string) ?? (d.post_url as string) ?? null,
+    voteLabels:
+      (d.voteLabels as Record<string, number>) ??
+      (d.vote_labels as Record<string, number>) ??
+      null,
+  };
+}
+
+function normalizeHoldingRow(raw: MarketingHoldingRowRaw): MarketingHoldingRow {
+  const projected = (raw.projectedFormat ?? 'OUT_OF_CUT') as MarketingProjectedFormat;
+  return {
+    postId: raw.postId,
+    title: raw.title ?? null,
+    status: (raw.status ?? 'IN_POOL') as MarketingHoldingStatus,
+    pinFormat: (raw.pinFormat as MarketingPinFormat | null) ?? null,
+    scoreSnapshot: Number(raw.scoreSnapshot ?? 0),
+    rankSnapshot: raw.rankSnapshot ?? null,
+    viewCount: Number(raw.viewCount ?? 0),
+    commentCount: Number(raw.commentCount ?? 0),
+    voteCount: Number(raw.voteCount ?? 0),
+    projectedFormat: projected,
+    draft: normalizeHoldingDraft(raw.draft),
+    lockedAt: raw.lockedAt ?? null,
+    postCreatedAt: String(raw.postCreatedAt ?? ''),
+    createdAt: String(raw.createdAt ?? ''),
+    updatedAt: String(raw.updatedAt ?? ''),
+  };
+}
+
+export async function getMarketingHoldingBoard(): Promise<MarketingHoldingBoard> {
+  const res = await api.get<MarketingHoldingBoardRaw>('/api/admin/marketing/holding');
+  const raw = res.data;
+  const meta = raw.meta ?? {};
+  const weights = meta.weights ?? {
+    weightViews: meta.weightViews ?? 0.1,
+    weightComments: meta.weightComments ?? 1,
+    weightVotes: meta.weightVotes ?? 0.5,
+  };
+  return {
+    items: (raw.items ?? []).map(normalizeHoldingRow),
+    meta: {
+      remainingPool: meta.remainingPool ?? 0,
+      cutline: meta.cutline ?? meta.cutlineN ?? 0,
+      dailyTextCap: meta.dailyTextCap ?? 6,
+      dailyVideoCap: meta.dailyVideoCap ?? 3,
+      videosToday: meta.videosToday,
+      textsToday: meta.textsToday,
+      weights,
+    },
+  };
+}
+
+export async function updateMarketingHoldingDraft(
+  postId: string,
+  draft: MarketingHoldingDraft
+): Promise<MarketingHoldingRow> {
+  const res = await api.patch<MarketingHoldingRowRaw>(
+    `/api/admin/marketing/holding/${postId}/draft`,
+    { draft }
+  );
+  return normalizeHoldingRow(res.data);
+}
+
+export async function pinMarketingHolding(
+  postId: string,
+  format: MarketingPinFormat
+): Promise<MarketingHoldingRow> {
+  const res = await api.post<MarketingHoldingRowRaw>(
+    `/api/admin/marketing/holding/${postId}/pin`,
+    { format }
+  );
+  return normalizeHoldingRow(res.data);
+}
+
+export async function unpinMarketingHolding(
+  postId: string
+): Promise<MarketingHoldingRow> {
+  const res = await api.delete<MarketingHoldingRowRaw>(
+    `/api/admin/marketing/holding/${postId}/pin`
+  );
+  return normalizeHoldingRow(res.data);
+}
+
+// ===== Platform auto on/off (marketing redesign) =====
+
+export interface MarketingPlatformAuto {
+  platform: string;
+  autoEnabled: boolean;
+  runtimeSupported: boolean;
+  /** Set when enabling an unsupported platform (PUT may still succeed). */
+  warning?: string | null;
+}
+
+export async function listMarketingPlatforms(): Promise<MarketingPlatformAuto[]> {
+  const res = await api.get<MarketingPlatformAuto[]>('/api/admin/marketing/platforms');
+  return res.data;
+}
+
+export async function updateMarketingPlatformAuto(
+  platform: string,
+  enabled: boolean
+): Promise<MarketingPlatformAuto> {
+  const res = await api.put<MarketingPlatformAuto>(
+    `/api/admin/marketing/platforms/${platform}/auto`,
+    { enabled }
+  );
+  return res.data;
+}
+
+// ===== Completed holdings + force (S4) =====
+
+export type MarketingForceMode = 'VIDEO_AND_TEXT' | 'TEXT_ONLY';
+
+export interface MarketingCompletedJobSummary {
+  id: number;
+  status: string;
+  targets: string[];
+  createdAt: string | null;
+}
+
+export interface MarketingCompletedItem {
+  postId: string;
+  status: MarketingHoldingStatus;
+  pinFormat: MarketingPinFormat | null;
+  scoreSnapshot: number | null;
+  lockedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  jobs: MarketingCompletedJobSummary[];
+}
+
+export async function listMarketingCompleted(params?: {
+  status?: MarketingHoldingStatus;
+  limit?: number;
+}): Promise<MarketingCompletedItem[]> {
+  const q = new URLSearchParams();
+  if (params?.status) q.append('status', params.status);
+  if (params?.limit != null) q.append('limit', String(params.limit));
+  const res = await api.get<{ items: MarketingCompletedItem[] }>(
+    `/api/admin/marketing/completed${q.size > 0 ? `?${q}` : ''}`
+  );
+  return res.data.items ?? [];
+}
+
+export async function forceMarketingCompleted(
+  postId: string,
+  mode: MarketingForceMode
+): Promise<{
+  postId: string;
+  status: MarketingHoldingStatus;
+  format: string;
+  jobIds: number[];
+  targets: string[];
+}> {
+  const res = await api.post(`/api/admin/marketing/completed/${postId}/force`, {
+    mode,
+  });
+  return res.data;
+}
+
+/** Redesign note aliases (S6 wiring). Prefer the Marketing* names above. */
+export const getScoreWeights = getMarketingScoreWeights;
+export const updateScoreWeights = updateMarketingScoreWeights;
+export const listMarketingHoldings = getMarketingHoldingBoard;

@@ -163,7 +163,7 @@ docker logs -f againspring-prod-dev-sync
 `persistResponse`는 item에 `scheduledAt`이 있으면 그걸 쓰고, 없으면 기존
 `schedule()` fallback. 발행 시점엔 LLM을 다시 부르지 않는다.
 
-관리자 UI: `/admin/content` → **예약 홀딩** 탭. BE
+관리자 UI: `/admin/content` → **대기** 탭. BE
 `/api/admin/content/scheduled-posts`가 orchestrator `/admin/scheduled-posts`를
 프록시한다. `SCHEDULED`만 PATCH(제목·본문·슬롯·후보)/DELETE(`CANCELLED`).
 슬롯만 바꾸고 items를 안 보내면 후보 시각은 delta-shift.
