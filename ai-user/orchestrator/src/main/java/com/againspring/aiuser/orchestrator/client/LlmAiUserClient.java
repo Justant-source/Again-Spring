@@ -61,16 +61,85 @@ public class LlmAiUserClient {
     }
 
     private Optional<java.util.Map<String, Object>> generateStructured(String path, Object request) {
-        try {
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> response = restClient.post().uri(path).body(request).retrieve()
-                    .body(new org.springframework.core.ParameterizedTypeReference<java.util.Map<String, Object>>() {});
-            if (response != null && !response.containsKey("errorCode")) return Optional.of(response);
-            log.warn("Structured generation failed on {}: {}", path, response == null ? "empty" : response.get("errorCode"));
-        } catch (Exception e) {
-            log.warn("Structured generation call failed on {}: {}", path, e.getMessage());
+        String correlationId = extractCorrelationId(request);
+        int maxAttempts = 3;
+        long delayMs = 1000;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> response = restClient.post().uri(path).body(request).retrieve()
+                        .body(new org.springframework.core.ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+                if (response != null && !response.containsKey("errorCode")) {
+                    if (attempt > 1) {
+                        log.info("[{}] Structured generation succeeded on attempt {}/{} for {}",
+                                 correlationId, attempt, maxAttempts, path);
+                    }
+                    return Optional.of(response);
+                }
+
+                String errorCode = response == null ? "empty" : (String) response.get("errorCode");
+                log.warn("[{}] Attempt {}/{}: Structured generation failed on {}: {}",
+                         correlationId, attempt, maxAttempts, path, errorCode);
+
+                if (attempt < maxAttempts) {
+                    Thread.sleep(delayMs);
+                    delayMs *= 2; // exponential backoff: 1s -> 2s -> 4s
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("[{}] Attempt {}/{}: Retry sleep interrupted for {}",
+                         correlationId, attempt, maxAttempts, path);
+                if (attempt >= maxAttempts) break;
+            } catch (Exception e) {
+                String msg = e.getMessage();
+                log.warn("[{}] Attempt {}/{}: Structured generation call failed on {}: {}",
+                         correlationId, attempt, maxAttempts, path, msg);
+
+                // Check if this error is non-retryable (auth, 404, etc)
+                if (shouldNotRetry(e, msg)) {
+                    log.warn("[{}] Non-retryable error detected ({}), failing immediately", correlationId, msg);
+                    break;
+                }
+
+                if (attempt < maxAttempts) {
+                    try {
+                        Thread.sleep(delayMs);
+                        delayMs *= 2; // exponential backoff
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.warn("[{}] Attempt {}/{}: Retry sleep interrupted",
+                                 correlationId, attempt, maxAttempts);
+                        break;
+                    }
+                }
+            }
         }
+
+        log.error("[{}] Structured generation failed after {} attempts on {} — returning empty",
+                  correlationId, maxAttempts, path);
         return Optional.empty();
+    }
+
+    /** Non-retryable errors: auth, 4xx client errors. Retryable: transient, 5xx, timeout. */
+    private boolean shouldNotRetry(Exception e, String msg) {
+        if (msg == null) return false;
+        String lowerMsg = msg.toLowerCase();
+        // Authentication, authorization, not found → don't waste retries
+        return lowerMsg.contains("authentication")
+            || lowerMsg.contains("unauthorized")
+            || lowerMsg.contains("forbidden")
+            || lowerMsg.contains("404")
+            || lowerMsg.contains("not found");
+    }
+
+    /** Extract correlationId from request map if present, otherwise generate one. */
+    private String extractCorrelationId(Object request) {
+        if (request instanceof java.util.Map) {
+            Object cid = ((java.util.Map<?, ?>) request).get("correlationId");
+            if (cid != null) return cid.toString();
+        }
+        return "struct-" + System.nanoTime();
     }
 
     /** comment 생성 — 피기백 반응 JSON 포함 버전. */
