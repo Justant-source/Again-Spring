@@ -59,11 +59,7 @@ Thumbs.db
 .history/
 .claude/worktrees/
 .request/
-.result/*
-!.result/ai-user/
-!.result/ai-user-v2/
-!.result/ai-user-v3/
-!.result/marketing-shorts/
+.result/
 # ===== Editor caches =====
 .idea/
 *.iml
