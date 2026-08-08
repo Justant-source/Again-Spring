@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +26,8 @@ export interface HoldingBoardProps {
   /** Max rows to render (board displays up to 20). */
   maxRows?: number;
   onEdit?: (row: MarketingHoldingRow) => void;
+  /** Open content-management style story dialog for this post. */
+  onOpenPost?: (row: MarketingHoldingRow) => void;
   onPin?: (row: MarketingHoldingRow, format: MarketingPinFormat) => void;
   onUnpin?: (row: MarketingHoldingRow) => void;
   className?: string;
@@ -94,12 +95,14 @@ export function HoldingBoard({
   cutline,
   maxRows = 20,
   onEdit,
+  onOpenPost,
   onPin,
   onUnpin,
   className,
 }: HoldingBoardProps) {
   const visible = rows.slice(0, maxRows);
   const canEdit = typeof onEdit === 'function';
+  const canOpenPost = typeof onOpenPost === 'function';
   const canPin = typeof onPin === 'function';
   const canUnpin = typeof onUnpin === 'function';
   const [pinPickerRowId, setPinPickerRowId] = useState<string | null>(null);
@@ -117,6 +120,7 @@ export function HoldingBoard({
           loading={loading}
           emptyMessage="대기 홀딩이 없습니다. 표시 보드(최대 20)에 진입하면 여기에 나타납니다."
           rowKey={(row) => row.postId}
+          rowTestId={(row) => `holding-row-${row.postId}`}
           columns={[
             {
               key: 'rank',
@@ -158,18 +162,29 @@ export function HoldingBoard({
                   cutline != null &&
                   row.rankSnapshot != null &&
                   row.rankSnapshot > cutline;
+                const title = row.title || '(제목 없음)';
                 return (
                   <div className={belowCut ? 'opacity-60' : ''}>
-                    <Link
-                      href={`/admin/content?postId=${encodeURIComponent(row.postId)}`}
-                      className="font-medium text-blue-700 hover:underline"
-                      data-testid={`holding-row-title-${row.postId}`}
-                    >
-                      {row.title || '(제목 없음)'}
-                    </Link>
-                    <div className="font-mono text-xs text-gray-400 mt-0.5">
-                      {row.postId}
-                    </div>
+                    {canOpenPost ? (
+                      <button
+                        type="button"
+                        className="font-medium text-blue-700 hover:underline text-left"
+                        data-testid={`holding-row-title-${row.postId}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenPost(row);
+                        }}
+                      >
+                        {title}
+                      </button>
+                    ) : (
+                      <span
+                        className="font-medium text-gray-800"
+                        data-testid={`holding-row-title-${row.postId}`}
+                      >
+                        {title}
+                      </span>
+                    )}
                   </div>
                 );
               },

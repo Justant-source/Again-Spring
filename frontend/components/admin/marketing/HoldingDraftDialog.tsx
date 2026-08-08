@@ -206,7 +206,9 @@ export function HoldingDraftDialog({
 
         <div className="space-y-4 py-1">
           {postId && (
-            <p className="text-xs font-mono text-gray-500">{postId}</p>
+            <p className="sr-only" data-testid="holding-draft-post-id">
+              {postId}
+            </p>
           )}
           {readOnly && (
             <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

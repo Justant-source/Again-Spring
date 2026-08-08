@@ -221,6 +221,33 @@ class MarketingHoldingCommitServiceTest {
     }
 
     @Test
+    void force_requestedBy_keepsAdminForcePrefixPlusJwtSubjectUuid() {
+        // Prod 500: VARCHAR(32) could not store "admin:force:"(12) + UUID(36) = 48.
+        String jwtSubject = "01234567-89ab-cdef-0123-456789abcdef";
+        String expectedRequestedBy =
+            MarketingHoldingCommitService.REQUESTED_BY_FORCE_PREFIX + jwtSubject;
+        assertThat(expectedRequestedBy.length()).isGreaterThan(32);
+
+        putHolding("drop-uuid", MarketingHoldingStatus.DROPPED, null);
+        when(postRepository.existsById("drop-uuid")).thenReturn(true);
+        when(platformAutoService.resolveTargets(MarketingPublishFormat.TEXT))
+            .thenReturn(List.of("x_thread"));
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
+            .thenReturn(MarketingJob.builder().id(99L).status("REQUESTED").build());
+
+        service.forceCommit(
+            "drop-uuid",
+            MarketingHoldingCommitService.ForceMode.TEXT_ONLY,
+            jwtSubject);
+
+        verify(marketingJobService).createJob(
+            eq("drop-uuid"), any(), eq(true), eq(expectedRequestedBy));
+        assertThat(expectedRequestedBy.length()).isLessThanOrEqualTo(128);
+    }
+
+    @Test
     void force_alreadyCommitted_rejects() {
         putHolding("c1", MarketingHoldingStatus.COMMITTED, null);
         holdings.get("c1").setLockedAt(Instant.now());

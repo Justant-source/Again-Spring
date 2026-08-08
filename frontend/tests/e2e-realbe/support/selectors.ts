@@ -130,6 +130,7 @@ export const ADMIN_MARKETING = {
 
 // ── 대기 보드 — 행 단위 액션 (postId 파라미터화) ─────────────────
 // holding-edit-*/holding-pin-*/holding-unpin-* 는 HoldingBoard.tsx에 이미 부착된 testid.
+export const holdingRow = (postId: string) => `[data-testid="holding-row-${postId}"]`
 export const holdingEditBtn = (postId: string) => `[data-testid="holding-edit-${postId}"]`
 export const holdingPinBtn = (postId: string) => `[data-testid="holding-pin-${postId}"]`
 export const holdingUnpinBtn = (postId: string) => `[data-testid="holding-unpin-${postId}"]`
@@ -146,6 +147,10 @@ export const completedForceModeSelect = (postId: string) =>
   `[data-testid="completed-force-mode-${postId}"]`
 export const completedForceExecuteBtn = (postId: string) =>
   `[data-testid="completed-force-execute-${postId}"]`
+export const completedPublishedRow = (postId: string) =>
+  `[data-testid="completed-published-row-${postId}"]`
+export const completedDroppedRow = (postId: string) =>
+  `[data-testid="completed-dropped-row-${postId}"]`
 
 // ── 어드민 원본 비교 (/admin/content/[postId]/compare) ───────────
 export const ADMIN_CONTENT = {

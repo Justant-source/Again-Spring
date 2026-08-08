@@ -23,6 +23,8 @@ export interface CompletedHoldingsBoardProps {
   loading?: boolean;
   /** Fired on row click for a COMMITTED (게시 이력) row — opens the read-only publication dialog. */
   onRowClick?: (item: CompletedHoldingView) => void;
+  /** Fired on DROPPED row click / title — opens content story dialog. */
+  onOpenDroppedPost?: (item: CompletedHoldingView) => void;
   /** Executes a force-deploy for a DROPPED item once the operator confirms a mode. */
   onForce?: (postId: string, mode: MarketingForceMode) => void | Promise<void>;
   /** postId currently executing a force-deploy request (disables its row controls). */
@@ -168,6 +170,7 @@ export function CompletedHoldingsBoard({
   items,
   loading = false,
   onRowClick,
+  onOpenDroppedPost,
   onForce,
   forceBusyPostId = null,
   className,
@@ -185,19 +188,15 @@ export function CompletedHoldingsBoard({
             loading={loading}
             emptyMessage="확정된 게시 이력이 없습니다."
             rowKey={(row) => row.postId}
+            rowTestId={(row) => `completed-published-row-${row.postId}`}
             onRowClick={onRowClick}
             columns={[
               {
                 key: 'title',
                 header: '사연',
                 render: (row) => (
-                  <div>
-                    <div className="font-medium text-gray-800">
-                      {row.title || '(제목 없음)'}
-                    </div>
-                    <div className="font-mono text-xs text-gray-400 mt-0.5">
-                      {row.postId}
-                    </div>
+                  <div className="font-medium text-gray-800">
+                    {row.title || '(제목 없음)'}
                   </div>
                 ),
               },
@@ -240,19 +239,24 @@ export function CompletedHoldingsBoard({
             loading={loading}
             emptyMessage="탈락한 홀딩이 없습니다."
             rowKey={(row) => row.postId}
+            rowTestId={(row) => `completed-dropped-row-${row.postId}`}
+            onRowClick={onOpenDroppedPost}
             columns={[
               {
                 key: 'title',
                 header: '사연',
                 render: (row) => (
-                  <div>
-                    <div className="font-medium text-gray-800">
-                      {row.title || '(제목 없음)'}
-                    </div>
-                    <div className="font-mono text-xs text-gray-400 mt-0.5">
-                      {row.postId}
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    className="font-medium text-blue-700 hover:underline text-left"
+                    data-testid={`completed-dropped-title-${row.postId}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenDroppedPost?.(row);
+                    }}
+                  >
+                    {row.title || '(제목 없음)'}
+                  </button>
                 ),
               },
               {

@@ -62,7 +62,8 @@ public class MarketingJob {
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
-    @Column(length = 32)
+    /** Actor id; force path uses {@code admin:force:} + JWT subject (UUID → up to ~48). */
+    @Column(length = 128)
     private String requestedBy;
 
     @Column

@@ -150,7 +150,7 @@ AS 어드민: 폴링 재조정 (15초, STALE 상태 지수 백오프)
 
 ---
 
-## DB 스키마 (V103)
+## DB 스키마 (V104)
 
 ```sql
 CREATE TABLE marketing_job (
@@ -165,7 +165,7 @@ CREATE TABLE marketing_job (
   artifacts               JSON,                              -- ASM 생성 결과물 경로
   publications            JSON,                              -- 게시 기록 [{platform, state, url}]
   error_message           TEXT,
-  requested_by            VARCHAR(32),
+  requested_by            VARCHAR(128),                      -- V104: force=`admin:force:`+JWT subject(UUID)
   poll_fail_count         INT DEFAULT 0,
   last_polled_at          TIMESTAMP NULL,
   scheduled_publish_at    DATETIME(6) NULL,                  -- 예약된 발행 시각 (이월 정책)
@@ -178,6 +178,8 @@ CREATE TABLE marketing_job (
   CONSTRAINT fk_mj_post FOREIGN KEY (post_id) REFERENCES posts(id)
 );
 ```
+
+**V104**: `requested_by` VARCHAR(32)→128 — `admin:force:`(12)+JWT UUID(36)=48이 32를 넘겨 강제 배포 500 발생.
 
 **이월 정책 필드 (V103 추가)**:
 - `scheduled_publish_at`: 현재 예약된 발행 시각 (이월 시 갱신됨)

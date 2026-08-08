@@ -14,6 +14,7 @@ import {
   type CompletedHoldingView,
 } from '@/components/admin/marketing/CompletedHoldingsBoard';
 import { CompletedPublicationDialog } from '@/components/admin/marketing/CompletedPublicationDialog';
+import { EditPublishedThreadDialog } from '@/components/admin/content/EditPublishedThreadDialog';
 import { RefreshControl } from '@/components/admin/RefreshControl';
 import {
   getMarketingHoldingBoard,
@@ -57,6 +58,7 @@ export default function MarketingJobsPage() {
   const [forceBusyId, setForceBusyId] = useState<string | null>(null);
   const [selectedCompletedItem, setSelectedCompletedItem] =
     useState<CompletedHoldingView | null>(null);
+  const [viewPostId, setViewPostId] = useState<string | null>(null);
 
   const loadHolding = useCallback(async (showLoader = true) => {
     if (showLoader) setHoldingLoading(true);
@@ -196,6 +198,7 @@ export default function MarketingJobsPage() {
             loading={holdingLoading}
             cutline={board?.meta.cutline}
             onEdit={setEditRow}
+            onOpenPost={(row) => setViewPostId(row.postId)}
             onPin={handlePin}
             onUnpin={handleUnpin}
           />
@@ -246,6 +249,7 @@ export default function MarketingJobsPage() {
             items={completedItems}
             loading={completedLoading}
             onRowClick={setSelectedCompletedItem}
+            onOpenDroppedPost={(item) => setViewPostId(item.postId)}
             onForce={handleForce}
             forceBusyPostId={forceBusyId}
           />
@@ -264,6 +268,21 @@ export default function MarketingJobsPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <EditPublishedThreadDialog
+        postId={viewPostId}
+        onClose={() => setViewPostId(null)}
+        onSaved={() => {
+          setViewPostId(null);
+          if (activeTab === 'holding') void loadHolding(false);
+          if (activeTab === 'completed') void loadCompleted();
+        }}
+        onDeleted={() => {
+          setViewPostId(null);
+          if (activeTab === 'holding') void loadHolding(false);
+          if (activeTab === 'completed') void loadCompleted();
+        }}
+      />
     </div>
   );
 }

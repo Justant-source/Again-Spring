@@ -15,6 +15,7 @@ interface AdminTableProps<T> {
   emptyMessage?: string;
   className?: string;
   rowKey?: (row: T) => string | number;
+  rowTestId?: (row: T) => string | undefined;
   onRowClick?: (row: T) => void;
 }
 
@@ -25,6 +26,7 @@ export function AdminTable<T>({
   emptyMessage = '데이터 없음',
   className,
   rowKey,
+  rowTestId,
   onRowClick,
 }: AdminTableProps<T>) {
   if (loading) {
@@ -53,6 +55,7 @@ export function AdminTable<T>({
             return (
               <TableRow
                 key={key}
+                data-testid={rowTestId?.(row)}
                 onClick={() => onRowClick?.(row)}
                 className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
               >

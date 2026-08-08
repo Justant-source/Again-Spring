@@ -16,9 +16,12 @@ import { tokenFromStorageState, createPost } from '../support/api'
 import { sql } from '../support/db'
 import {
   ADMIN_MARKETING,
+  holdingRow,
   holdingPinBtn,
   holdingUnpinBtn,
   holdingPinFormatSelect,
+  completedDroppedRow,
+  completedPublishedRow,
   completedForceModeSelect,
   completedForceExecuteBtn,
 } from '../support/selectors'
@@ -100,7 +103,7 @@ test.describe('Journey 13-F: 대기 탭 — 핀 인라인 셀렉트 (window.prom
       await page.waitForURL(/\/admin\/marketing/, { timeout: 10_000 })
       await expect(page.locator(ADMIN_MARKETING.holdingBoard)).toBeVisible({ timeout: 10_000 })
 
-      const row = page.locator('tr', { hasText: postId })
+      const row = page.locator(holdingRow(postId))
       await expect(row, '대기 보드에 시드 행 노출').toBeVisible({ timeout: 10_000 })
 
       await page.locator(holdingPinBtn(postId)).click()
@@ -173,7 +176,7 @@ test.describe('Journey 13-G: 완료 탭 — 강제 배포 모드 셀렉트 (wind
         '완료 탭 — 탈락 보드',
       ).toBeVisible({ timeout: 10_000 })
 
-      const row = page.locator(ADMIN_MARKETING.completedDroppedBoard).locator('tr', { hasText: postId })
+      const row = page.locator(completedDroppedRow(postId))
       await expect(row, '탈락 보드에 시드 행 노출').toBeVisible({ timeout: 10_000 })
 
       const modeSelect = row.locator(completedForceModeSelect(postId))
@@ -219,7 +222,7 @@ test.describe('Journey 13-H: 완료 탭 — 게시 상세 다이얼로그', () =
         '완료 탭 — 게시 보드(assumption testid)',
       ).toBeVisible({ timeout: 10_000 })
 
-      const row = page.locator(ADMIN_MARKETING.completedPublishedBoard).locator('tr', { hasText: postId })
+      const row = page.locator(completedPublishedRow(postId))
       await expect(row, '게시 보드에 시드 행 노출').toBeVisible({ timeout: 10_000 })
       await row.click()
 

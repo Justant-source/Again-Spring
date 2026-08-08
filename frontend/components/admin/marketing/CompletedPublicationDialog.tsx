@@ -91,8 +91,18 @@ export function CompletedPublicationDialog({
           <div className="space-y-4 py-1">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-xs text-gray-500">사연 ID</p>
-                <p className="font-mono">{item.postId}</p>
+                <p className="text-xs text-gray-500">상태</p>
+                <p>
+                  <Badge
+                    className={
+                      item.status === 'DROPPED'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-green-100 text-green-800'
+                    }
+                  >
+                    {item.status === 'DROPPED' ? '탈락' : '확정'}
+                  </Badge>
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">포맷</p>

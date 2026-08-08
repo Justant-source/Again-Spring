@@ -15,7 +15,7 @@ import { authStatePath } from '../fixtures/auth-state'
 import { PERSONA_TEST1, PERSONAS } from '../fixtures/personas'
 import { tokenFromStorageState, createPost } from '../support/api'
 import { sql } from '../support/db'
-import { ADMIN_MARKETING } from '../support/selectors'
+import { ADMIN_MARKETING, completedPublishedRow } from '../support/selectors'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
 const ADMIN_AUTH = authStatePath(PERSONA_TEST1.email)  // test1 = ADMIN
@@ -62,9 +62,7 @@ test.describe('Journey 13-D: PARTIAL 상태 배지 표시', () => {
       ).toBeVisible({ timeout: 10_000 })
 
       // 잡 상태 배지는 행 클릭 → 게시 상세 다이얼로그에 표시
-      const row = page
-        .locator(ADMIN_MARKETING.completedPublishedBoard)
-        .locator('tr', { hasText: postId })
+      const row = page.locator(completedPublishedRow(postId))
       await expect(row, '게시 이력에 PARTIAL 잡 시드 행').toBeVisible({ timeout: 10_000 })
       await row.click()
 
