@@ -116,7 +116,7 @@ public class AdminAiUserController {
         cfg.setHrRespondersPerInteractionMax(clamp(req.hrRespondersPerInteractionMax, 0, 5));
         cfg.setHrDistinctPersonasMax(clamp(req.hrDistinctPersonasMax, 1, 10));
         cfg.setHrRepliesPerPersonaMax(clamp(req.hrRepliesPerPersonaMax, 1, 10));
-        cfg.setHrCandidateRespondersMax(clamp(req.hrCandidateRespondersMax, 1, 50));
+        cfg.setHrCandidateRespondersMax(clamp(req.hrCandidateRespondersMax, 1, 8));
         cfg.setHrChunkSize(clamp(req.hrChunkSize, 1, 50));
         int delayMin = clamp(req.hrDelayMinutesMin, 1, 720);
         int delayMax = clamp(req.hrDelayMinutesMax, 1, 720);

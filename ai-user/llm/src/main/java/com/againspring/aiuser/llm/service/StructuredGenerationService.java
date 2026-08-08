@@ -629,7 +629,7 @@ public class StructuredGenerationService {
                     row.put("postBody", clean(i.getPostBody()));
                     row.put("humanBody", clean(i.getHumanBody()));
                     if (!blank(i.getParentBody())) row.put("parentBody", clean(i.getParentBody()));
-                    row.put("candidateResponders", i.getCandidateResponders());
+                    row.put("candidateResponders", slimResponders(i.getCandidateResponders()));
                     return row;
                 }).toList());
     }
@@ -936,6 +936,45 @@ public class StructuredGenerationService {
         Map<String, Object> out = new LinkedHashMap<>();
         raw.forEach((k, v) -> out.put(k, v instanceof String str ? clean(str) : v));
         return out;
+    }
+
+    /**
+     * Slim persona serialization for human-reply prompts to prevent token overflow.
+     * Include only essential fields for reply generation:
+     * - personaId (required for LLM to select)
+     * - nickname (helps LLM understand persona)
+     * - formality (response style)
+     * - voice_type (for community matching)
+     * Exclude large fields: example_comments, example_replies, lexicon, writing_quirks, hot_buttons.
+     */
+    private static List<Map<String, Object>> slimResponders(List<ThreadPlanRequest.Persona> personas) {
+        if (personas == null || personas.isEmpty()) return List.of();
+        List<Map<String, Object>> slim = new ArrayList<>(personas.size());
+        for (ThreadPlanRequest.Persona p : personas) {
+            if (p == null || blank(p.getPersonaId())) continue;
+            Map<String, Object> responder = new LinkedHashMap<>();
+            responder.put("personaId", p.getPersonaId());
+            if (!blank(p.getNickname())) responder.put("nickname", p.getNickname());
+            if (!blank(p.getFormality())) responder.put("formality", p.getFormality());
+            // Include only essential voiceProfile fields, not the full structure
+            Map<String, Object> voice = p.getVoiceProfile();
+            if (voice != null && !voice.isEmpty()) {
+                Map<String, Object> slimVoice = new LinkedHashMap<>();
+                // Whitelist essential fields only
+                String[] essentialFields = {"voice_type", "age", "gender", "slang_level", "tone", "formality"};
+                for (String field : essentialFields) {
+                    Object value = voice.get(field);
+                    if (value != null && !String.valueOf(value).isBlank()) {
+                        slimVoice.put(field, value);
+                    }
+                }
+                if (!slimVoice.isEmpty()) {
+                    responder.put("voiceProfile", slimVoice);
+                }
+            }
+            slim.add(responder);
+        }
+        return slim;
     }
 
     private static String json(Object value) { try { return JSON.writeValueAsString(value); } catch (Exception e) { throw new IllegalArgumentException("Cannot serialize structured prompt input", e); } }

@@ -320,8 +320,23 @@ public class HumanReplyBatchService {
         Map<String, Object> responder = new LinkedHashMap<>();
         responder.put("personaId", chosen.getId());
         responder.put("nickname", nicknameOf(chosen));
+        // Slim voiceProfile: include only essential fields to prevent token overflow
+        // (exclude example_comments, example_replies, lexicon, writing_quirks, hot_buttons)
         Map<String, Object> voice = chosen.getVoiceProfile();
-        responder.put("voiceProfile", voice == null ? Map.of() : voice);
+        if (voice != null && !voice.isEmpty()) {
+            Map<String, Object> slimVoice = new LinkedHashMap<>();
+            // Whitelist essential fields only
+            String[] essentialFields = {"voice_type", "age", "gender", "slang_level", "tone", "formality"};
+            for (String field : essentialFields) {
+                Object value = voice.get(field);
+                if (value != null && !String.valueOf(value).isBlank()) {
+                    slimVoice.put(field, value);
+                }
+            }
+            responder.put("voiceProfile", slimVoice);
+        } else {
+            responder.put("voiceProfile", Map.of());
+        }
         responder.put("formality", formalityOf(chosen));
         return responder;
     }
