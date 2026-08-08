@@ -248,13 +248,50 @@ class MarketingHoldingCommitServiceTest {
     }
 
     @Test
-    void force_alreadyCommitted_rejects() {
+    void force_alreadyCommitted_enqueuesMissingVideoTargets() {
         putHolding("c1", MarketingHoldingStatus.COMMITTED, null);
         holdings.get("c1").setLockedAt(Instant.now());
+        when(postRepository.existsById("c1")).thenReturn(true);
+        when(platformAutoService.resolveTargets(MarketingPublishFormat.VIDEO))
+            .thenReturn(List.of("instagram_reels", "youtube_shorts", "x_thread", "instagram_feed"));
+        // Text platforms already attempted; video platforms not yet.
+        when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("x_thread"))).thenReturn(1L);
+        when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("instagram_feed"))).thenReturn(1L);
+        when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("instagram_reels"))).thenReturn(0L);
+        when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("youtube_shorts"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobService.createJob(eq("c1"), any(), eq(true), anyString()))
+            .thenReturn(MarketingJob.builder().id(77L).status("REQUESTED").build());
+
+        MarketingHoldingCommitService.ForceResult result = service.forceCommit(
+            "c1",
+            MarketingHoldingCommitService.ForceMode.VIDEO_AND_TEXT,
+            "admin");
+
+        assertThat(result.jobIds()).containsExactly(77L);
+        verify(marketingJobService).createJob(
+            eq("c1"),
+            eq(List.of("instagram_reels", "youtube_shorts")),
+            eq(true),
+            anyString());
+        verify(marketingJobService, never()).createJob(eq("c1"), eq(List.of("x_thread")), anyBoolean(), anyString());
+        verify(marketingJobService, never()).createJob(eq("c1"), eq(List.of("instagram_feed")), anyBoolean(), anyString());
+    }
+
+    @Test
+    void force_alreadyCommitted_allTargetsExist_rejects() {
+        putHolding("c2", MarketingHoldingStatus.COMMITTED, null);
+        holdings.get("c2").setLockedAt(Instant.now());
+        when(postRepository.existsById("c2")).thenReturn(true);
+        when(platformAutoService.resolveTargets(MarketingPublishFormat.TEXT))
+            .thenReturn(List.of("x_thread"));
+        when(marketingJobRepository.countAnyPlatformJobs(eq("c2"), eq("x_thread"))).thenReturn(1L);
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
 
         assertThatThrownBy(() -> service.forceCommit(
-            "c1", MarketingHoldingCommitService.ForceMode.TEXT_ONLY, "admin"))
-            .isInstanceOf(ResponseStatusException.class);
+            "c2", MarketingHoldingCommitService.ForceMode.TEXT_ONLY, "admin"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("No new jobs");
     }
 
     @Test

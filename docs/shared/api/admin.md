@@ -221,7 +221,7 @@ flowchart LR
 | `POST` | `/api/admin/marketing/holding/{postId}/pin` | Body `{format: VIDEO\|TEXT}` — soft-reserve 핀 |
 | `DELETE` | `/api/admin/marketing/holding/{postId}/pin` | 핀 해제 |
 | `GET` | `/api/admin/marketing/completed` | COMMITTED·DROPPED + 잡 요약 (`status`, `limit`). Item: `title`, `committedFormat`, `jobs[].publications[{platform,state,url}]` |
-| `POST` | `/api/admin/marketing/completed/{postId}/force` | Body `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}` — 상한 무시 강제 확정 |
+| `POST` | `/api/admin/marketing/completed/{postId}/force` | Body `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}` — 상한 무시 강제 확정. **COMMITTED 재호출 허용**(아직 잡 없는 채널만 추가). 이미 전 채널 존재 시 400 |
 | 잡·자격증명·통계 | `/api/admin/marketing/jobs*` 등 | ASM 프록시 — [`platforms.md`](../marketing/platforms.md) |
 
 24h 배분 C: 홀딩 확정 · 공유 풀(`dailyTextCap` 기본 6) · 영상 우선 · **1사연=1칸** · VIDEO=video+text companion(IG feed⊥reels).

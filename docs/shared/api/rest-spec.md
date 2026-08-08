@@ -361,7 +361,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 | POST | `/api/admin/marketing/holding/{postId}/pin` | **JWT + ADMIN** | 200 / 400 / 404 | Body: `{format: VIDEO\|TEXT}`. 핀+soft reserve. 잔여 풀/영상 슬롯이 다른 핀·커밋으로 소진되면 400. 컷라인 축소 시 최하위 비핀 자동 후보 `OUT_OF_CUT`(Q8) |
 | DELETE | `/api/admin/marketing/holding/{postId}/pin` | **JWT + ADMIN** | 200 / 400 / 404 | 핀 해제·예약 반환. 새 컷라인 기준 `IN_POOL` 또는 `OUT_OF_CUT` |
 | GET | `/api/admin/marketing/completed` | **JWT + ADMIN** | 200 | COMMITTED·DROPPED 홀딩 + 잡 요약. Query: `status`, `limit`(기본 50). Item: `title`, `committedFormat`(VIDEO\|TEXT), `jobs[].publications[{platform,state,url}]` |
-| POST | `/api/admin/marketing/completed/{postId}/force` | **JWT + ADMIN** | 200 / 400 / 404 | Body: `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}`. 상한 무시 강제 COMMITTED + 잡 생성·초안 잠금 |
+| POST | `/api/admin/marketing/completed/{postId}/force` | **JWT + ADMIN** | 200 / 400 / 404 | Body: `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}`. 상한 무시 강제 COMMITTED + 잡 생성. COMMITTED 재호출 시 미생성 채널만 추가(전부 있으면 400) |
 | GET/POST/… | `/api/admin/marketing/jobs*` · `/credentials*` · `/performance` · `/timeline` | **JWT + ADMIN** | — | 잡·자격증명·통계 (ASM 프록시). 상세: [platforms.md](../marketing/platforms.md) |
 | GET | `/api/admin/secrets` | **JWT + ADMIN** | 200 | `encrypted_secret` vault 키 존재 여부만 반환 (평문 없음) |
 | POST | `/api/admin/secrets/{key}` | **JWT + ADMIN** | 200 | Body: `{value: string}`. AES-GCM 암호화해 vault에 저장/갱신. 응답에 평문 미포함 |

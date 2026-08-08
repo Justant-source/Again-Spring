@@ -53,7 +53,7 @@ API: `GET`/`PUT /api/admin/marketing/score-weights` · 키 `marketing.score.weig
 | 영상 채널 전원 off | `effectiveVideoCap=0`, 잔여 풀 전부 글 |
 
 잡 그룹: Reels+Shorts는 **듀얼 1잡**, `x_thread`/`instagram_feed` 등은 **alone**.  
-**강제(완료 탭)**: `POST /api/admin/marketing/completed/{postId}/force` — 상한 무시 (`VIDEO_AND_TEXT` \| `TEXT_ONLY`). 주로 `DROPPED` 재진입.  
+**강제(완료 탭)**: `POST /api/admin/marketing/completed/{postId}/force` — 상한 무시 (`VIDEO_AND_TEXT` \| `TEXT_ONLY`). 탈락 재진입뿐 아니라 **COMMITTED에 빠진 채널(예: 영상) 추가**도 가능. 이미 잡이 있는 플랫폼은 건너뜀. UI 기본 모드 = 영상+글.  
 목록: `GET /api/admin/marketing/completed?status=&limit=50`.  
 **공유 풀**: `dailyTextCap`(기본 6) = KST 하루 **마케팅 사연 수**. 영상 상한 `dailyVideoCap`. 멀티 플랫폼 잡은 추가 칸 아님.  
 **상한 저장**: `system_setting` 키 `marketing.daily_text_cap` / `marketing.daily_video_cap` · API `GET`/`PUT /api/admin/marketing/quota`.

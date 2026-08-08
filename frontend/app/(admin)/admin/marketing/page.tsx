@@ -235,7 +235,8 @@ export default function MarketingJobsPage() {
           <div className="mb-4">
             <p className="text-sm text-gray-500">
               확정(게시 이력)·탈락 홀딩입니다. 게시 이력 행을 클릭하면 플랫폼별 게시
-              상세를 볼 수 있습니다. 탈락 건은 상한을 무시하고 강제 배포할 수 있습니다.
+              상세를 볼 수 있습니다. 탈락·확정 건 모두 강제 배포로 빠진 채널(예: 영상)을
+              추가할 수 있습니다. 기본 모드는 영상+글입니다.
             </p>
           </div>
 

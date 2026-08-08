@@ -295,14 +295,11 @@ public class MarketingHoldingCommitService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Holding not found: " + postId));
 
-        if (holding.getStatus() == MarketingHoldingStatus.COMMITTED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Holding already COMMITTED");
-        }
         if (holding.getStatus() != MarketingHoldingStatus.DROPPED
             && holding.getStatus() != MarketingHoldingStatus.OUT_OF_CUT
             && holding.getStatus() != MarketingHoldingStatus.IN_POOL
-            && holding.getStatus() != MarketingHoldingStatus.PINNED) {
+            && holding.getStatus() != MarketingHoldingStatus.PINNED
+            && holding.getStatus() != MarketingHoldingStatus.COMMITTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Cannot force holding in status " + holding.getStatus());
         }
@@ -323,6 +320,10 @@ public class MarketingHoldingCommitService {
         }
 
         List<MarketingJob> jobs = enqueueJobs(postId, targets, by);
+        if (jobs.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "No new jobs to enqueue — all target platforms already have marketing jobs for this post");
+        }
         lockCommitted(holding);
         holdingRepository.save(holding);
 

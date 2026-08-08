@@ -121,7 +121,7 @@ function ForceDeployControl({
   busy: boolean;
   onForce?: (postId: string, mode: MarketingForceMode) => void | Promise<void>;
 }) {
-  const [mode, setMode] = useState<MarketingForceMode>('TEXT_ONLY');
+  const [mode, setMode] = useState<MarketingForceMode>('VIDEO_AND_TEXT');
   const [executing, setExecuting] = useState(false);
   const disabled = !onForce || busy || executing;
 
@@ -225,6 +225,17 @@ export function CompletedHoldingsBoard({
                 key: 'platforms',
                 header: '플랫폼 요약',
                 render: (row) => <PlatformSummary item={row} />,
+              },
+              {
+                key: 'actions',
+                header: '강제 배포',
+                render: (row) => (
+                  <ForceDeployControl
+                    item={row}
+                    busy={forceBusyPostId === row.postId}
+                    onForce={onForce}
+                  />
+                ),
               },
             ]}
           />
