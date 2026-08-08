@@ -152,6 +152,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `email_verifications` | 이메일 인증 코드 | BIGINT auto |
 | `password_reset_tokens` | 비밀번호 재설정 | BIGINT auto |
 | `revoked_tokens` | JWT 블랙리스트 | BIGINT auto |
+| `encrypted_secret` | 앱 시크릿 AES-GCM vault (마케팅 제외) | `secret_key` VARCHAR(128) **V101** |
 
 ### AI-user 운영 테이블
 
@@ -386,6 +387,18 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | `updated_at` | DATETIME(3) | 마지막 갱신 시각 |
 
 ---
+
+### `encrypted_secret` (**V101**)
+
+비마케팅 앱 시크릿 보관. 마스터키는 env `AS_SECRET_MASTER_KEY`만 (DB에 저장 금지).
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `secret_key` | VARCHAR(128) PK | 논리 키 (`jwt.secret`, `github.pat.<user>` 등) |
+| `enc_blob` | TEXT | Base64(`iv \|\| ciphertext \|\| gcm_tag`) — `AesGcmCipher` |
+| `updated_at` | TIMESTAMP(3) | 자동 갱신 |
+
+기동 로더: `EncryptedSecretEnvironmentPostProcessor`. 시딩: `scripts/seed_encrypted_secrets_from_env.py`. GitHub PAT는 `scripts/git-credential-as-vault`.
 
 ### `feedbacks` (V16)
 

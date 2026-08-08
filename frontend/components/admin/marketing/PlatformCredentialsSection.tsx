@@ -49,6 +49,8 @@ const FIELD_LABELS: Record<string, string> = {
   channel_id: '채널 ID',
   access_token: 'Access Token',
   user_id: '사용자 ID',
+  app_id: 'Meta App ID',
+  app_secret: 'Meta App Secret',
   ig_user_id: 'Instagram 계정 ID (ig-user-id)',
   graph_host: 'Graph Host (선택)',
   tts_voice: '본문 TTS 음성',

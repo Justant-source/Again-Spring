@@ -51,24 +51,20 @@ services:
       DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER}
       DB_PASSWORD: ${MARIADB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
+      AS_SECRET_MASTER_KEY: ${AS_SECRET_MASTER_KEY}
+      # App secrets (JWT/OAuth/mail/ASM tokens) → encrypted_secret vault only (do not inject empty env)
       LLM_PROVIDER: ${LLM_PROVIDER:-remote}
       LLM_CHAT_PROVIDER: ${LLM_CHAT_PROVIDER:-remote}
       LLM_REPORT_PROVIDER: ${LLM_REPORT_PROVIDER:-remote}
       LLM_JURY_PROVIDER: ${LLM_JURY_PROVIDER:-remote}
       LLM_WORKER_URL: ${LLM_WORKER_URL:-http://againspring-llm:8090}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
-      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
       NAVER_CLIENT_ID: ${NAVER_CLIENT_ID}
-      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-againspring2026@gmail.com}
-      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       ASM_BASE_URL: ${ASM_BASE_URL:-}
-      ASM_API_TOKEN: ${ASM_API_TOKEN:-}
       ASM_ENABLED: ${ASM_ENABLED:-false}
       ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED: ${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:-false}
       # ISO-8601 Instant. Required when trigger is on — only posts created at/after this get 24h auto-publish.

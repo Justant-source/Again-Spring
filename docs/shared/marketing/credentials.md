@@ -40,7 +40,9 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 |                   | `password`      | 🔒     | ✓ |
 |                   | `totp_secret`   | 🔒     |   |
 |                   | `storage_state` | 🔒     |   |
-| `instagram_reels` | `ig_user_id`    |        |   |
+| `instagram_reels` | `app_id`        |        |   |
+|                   | `app_secret`    | 🔒     |   |
+|                   | `ig_user_id`    |        |   |
 |                   | `access_token`  | 🔒     |   |
 |                   | `graph_host`    |        |   |
 |                   | `email`         |        |   |
@@ -68,7 +70,7 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 > **`storage_state`** = social-poster(Playwright)가 사용하는 로그인 세션(쿠키/스토리지) 직렬화 값. secret으로 암호화 저장하며, 보통 어드민 폼이 아니라 세션 시딩 경로(ASM `/api/v1/sessions/{platform}`)로 주입된다. API 기반인 `youtube_shorts`에는 없음.
 > **로그인 식별자**: `x`·`instagram_*`는 `email`(과거 문서의 `handle`/`username` 아님), `naver_*`는 `naver_id`. 권위본은 항상 ASM `app/domain/credentials.py`의 `PLATFORM_CREDENTIALS`.
 > **`youtube_shorts.refresh_token`**: OAuth로 자동 획득(폼 숨김). **`tts_voice`**: 본문·클로징 낭독 voice key(비시크릿). **`comment_tts_voices`**: 댓글 낭독 풀(콤마구분, 최대 5); 렌더 시 댓글마다 랜덤 배정(본문 보이스와 겹치지 않는 키 우선). `instagram_reels`에도 `tts_voice` 동일.
-> **`instagram_reels` Graph API**: `ig_user_id` + `access_token`(장기 토큰, `instagram_content_publish`)이 있으면 Meta Content Publishing API(resumable)로 게시. 없으면 Playwright 폴백(anti-bot로 사실상 불가). `graph_host` 기본=`graph.facebook.com`(Instagram Login이면 `graph.instagram.com`).
+> **`instagram_reels` Graph API**: `app_id`/`app_secret`(Meta 앱) + `ig_user_id` + `access_token`(Instagram User/Page 토큰)은 **ASM credential AES-256-GCM만** SSOT. `.env`에 토큰·App Secret을 두지 않는다(YouTube `client_secret`/`refresh_token`과 동일). `graph_host` 기본=`graph.facebook.com`(Instagram Login이면 `graph.instagram.com`). Instagram Login은 공개 `video_url` 게시.
 > **`threads`**: 로그인 자격은 `instagram_feed`에서 런타임 상속 — 어드민 입력 불필요.
 
 ---
@@ -105,6 +107,25 @@ TOTP 등 secret 값을 완전히 비우려면 해당 플랫폼을 **삭제 후 �
 
 ---
 
+## 시스템 시크릿 (`system_secret`)
+
+플랫폼 계정 UI와 분리된 **마케팅 런타임 키** 테이블. 동일 `ASM_CREDENTIAL_KEY`로 AES-256-GCM.
+
+| vault key | env (기동 주입) | 비고 |
+|---|---|---|
+| `asm.bearer_token` | `ASM_BEARER_TOKEN` | ASM API Bearer 권위본 |
+| `asm.callback_token` | `ASM_CALLBACK_TOKEN` | AS↔ASM 콜백 |
+| `wagglebot.api_key` | `WAGGLEBOT_API_KEY` | WaggleBot `EXTERNAL_API_KEY`와 맞춤 |
+| `llm.anthropic_api_key` | `ANTHROPIC_API_KEY` | ASM 쪽 LLM |
+
+- 스키마: `secret_key` PK, `enc_blob`, `nonce`(12B), `updated_at`.
+- 기동: `app.main` lifespan → `load_into_environ()` → `get_settings.cache_clear()`.
+- 시딩(1회): `scripts/seed_system_secrets_from_env.py` 후 ASM `.env`에서 해당 키 삭제.
+- ASM `.env` 부트스트랩만: `ASM_DATABASE_URL`, `ASM_CREDENTIAL_KEY` (+ 비시크릿 URL/포트).
+- AS가 호출할 때 쓰는 `ASM_API_TOKEN` 복사본은 AS `encrypted_secret` (`asm.api_token`) — 권위본은 위 Bearer.
+
+---
+
 ## 보안 주의
 
 - secret 값은 GET 응답·로그·**감사로그** 어디에도 평문 노출 금지. `@Auditable`은 action·targetType·`targetId(=platform)`만 기록(요청 본문 미기록).
@@ -118,6 +139,7 @@ TOTP 등 secret 값을 완전히 비우려면 해당 플랫폼을 **삭제 후 �
 | 영역 | 경로 |
 |---|---|
 | ASM 암호화 | `app/core/crypto.py` |
+| ASM system_secret | `app/core/system_secrets.py` · `system_secret` 테이블 |
 | ASM 스키마·병합·마스킹 | `app/domain/credentials.py` |
 | ASM API | `app/api/routes_credentials.py` · `app/api/routes_waggle_voices.py` |
 | AS BE 프록시 | `backend/.../marketing/AsmClient.java` (`listCredentials`/`upsertCredential`/`deleteCredential`/`listWaggleVoices`/`getWaggleVoiceSample`) |

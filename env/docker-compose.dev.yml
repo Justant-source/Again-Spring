@@ -48,7 +48,8 @@ services:
       DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${MARIADB_DATABASE:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
+      AS_SECRET_MASTER_KEY: ${AS_SECRET_MASTER_KEY}
+      # App secrets (JWT/OAuth/mail/ASM tokens) → encrypted_secret vault only (do not inject empty env)
       LLM_PROVIDER: deny
       LLM_CHAT_PROVIDER: deny
       LLM_REPORT_PROVIDER: deny
@@ -58,17 +59,12 @@ services:
       LLM_WORKER_URL: http://127.0.0.1:1
       SECURITY_RATE_LIMIT_AUTH_PER_MINUTE: ${SECURITY_RATE_LIMIT_AUTH_PER_MINUTE:-1000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
-      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
       NAVER_CLIENT_ID: ${NAVER_CLIENT_ID:-}
-      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:-}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-againspring2026@gmail.com}
-      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
       ASM_BASE_URL: ${ASM_BASE_URL:-http://100.115.252.61:8200}
-      ASM_API_TOKEN: ${ASM_API_TOKEN:-}
       ASM_ENABLED: ${ASM_ENABLED:-false}
       # L3: shared LLM/ai-user 호스트명 해석 자체를 막음 (againspring 네트워크 미연결)
       AI_LEARNING_URL: http://127.0.0.1:1

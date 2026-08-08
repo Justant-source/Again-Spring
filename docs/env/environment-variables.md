@@ -20,17 +20,39 @@
 | `.env.prod.example` | prod 웹/DB 스택 |
 | `.env.ai-user.example` | shared ai-user 스택 |
 
-## 공통 DB / JWT
+## 시크릿 보관 원칙 (범위 B)
+
+- **env 부트스트랩만**: DB 접속 + vault 마스터키.
+- **AS MariaDB `encrypted_secret`**: 마케팅과 무관한 앱 시크릿 (JWT/OAuth secret/메일/ASM 클라이언트 토큰 복사본/GitHub PAT 등). 마스터키=`AS_SECRET_MASTER_KEY`. 기동 시 `EncryptedSecretEnvironmentPostProcessor`가 Spring Environment에 주입.
+- **ASM `credential` + `system_secret`**: 마케팅 플랫폼 계정·ASM 런타임 키. 마스터키=`ASM_CREDENTIAL_KEY`.
+- 시딩: `scripts/seed_encrypted_secrets_from_env.py` (AS), ASM `scripts/seed_system_secrets_from_env.py`. 시딩 후 env에서 해당 키 **삭제**.
+- GitHub PAT SSOT = AS `github.pat.<username>`. 평문 `.git-credentials` 금지 — `scripts/git-credential-as-vault` credential helper.
+
+## 공통 DB / vault 부트스트랩
 
 | 변수 | 사용처 | 예시 |
 |---|---|---|
 | `MARIADB_ROOT_PASSWORD` | MariaDB root 부트스트랩 | dev/prod 각자 설정 |
 | `MARIADB_DATABASE` | DB 이름 | `againspring_dev`, `againspring` |
 | `MARIADB_USER` | 앱 계정 | `againspring` |
-| `MARIADB_PASSWORD` | prod 또는 현재 스택 DB 비밀번호 | 비밀값 |
-| `DEV_MARIADB_PASSWORD` | shared sync가 쓰는 dev DB 비밀번호 | 비밀값 |
-| `JWT_SECRET` | backend JWT 서명 키 | `openssl rand -base64 32` 생성 권장 |
+| `MARIADB_PASSWORD` | prod 또는 현재 스택 DB 비밀번호 | 비밀값 (env에만) |
+| `AS_SECRET_MASTER_KEY` | `encrypted_secret` AES-256-GCM 마스터키 | `openssl rand -base64 32` (32바이트) |
 | `SEARCH_NGRAM_BACKFILL_ON_STARTUP` | 기동 시 `post_search_ngrams` 미적재 백필 (`againspring.search.ngram-backfill-on-startup`) | `true` |
+
+### AS `encrypted_secret` vault 키 (env에 두지 않음)
+
+| vault key | 주입 alias (예) |
+|---|---|
+| `jwt.secret` | `jwt.secret` / `JWT_SECRET` |
+| `oauth.google.client_secret` | `oauth2.google.client-secret` |
+| `oauth.kakao.client_secret` | `oauth2.kakao.client-secret` |
+| `oauth.naver.client_secret` | `oauth2.naver.client-secret` |
+| `mail.gmail_app_password` | `spring.mail.password` |
+| `llm.anthropic_api_key` | `ANTHROPIC_API_KEY` (BE; LLM 컨테이너는 `.env.ai-user` 별도) |
+| `ai_user.bot_password` | `AI_USER_BOT_PASSWORD` (dev) |
+| `sync.dev_mariadb_password` | `DEV_MARIADB_PASSWORD` (prod sync) |
+| `asm.api_token` / `asm.callback_token` | `ASM_API_TOKEN` / `ASM_CALLBACK_TOKEN` (AS→ASM 클라이언트 복사본; 권위본은 ASM `system_secret`) |
+| `github.pat.<username>` | git credential helper only |
 
 ## Base LLM (`againspring-llm`)
 
@@ -69,7 +91,7 @@
 | `AI_USER_ENABLED` | **하드 게이트**. false면 스케줄러와 tick이 바로 skip | `true` |
 | `AI_USER_TICK_CRON` | 메인 tick cron | `0 */10 * * * *` |
 | `AI_USER_DAILY_GLOBAL_CAP` | 일일 상한 fallback | `500` |
-| `AI_USER_BOT_PASSWORD` | synthetic 계정 로그인용 | 비밀값 |
+| `AI_USER_BOT_PASSWORD` | synthetic 계정 로그인용 | **vault** `ai_user.bot_password` (env 비권장) |
 | `AI_USER_SEED_ENABLED` | seed loader 활성화 | `true` |
 | `AI_USER_REPETITION_THRESHOLD` | 반복 가드 임계값 | `0.45` |
 | `AI_USER_PERSONA_TARGET` | admin 목표가 0일 때 fallback 총량 | `50` |
@@ -105,7 +127,7 @@
 | `AI_INTERACTION_CLAUDE_MODEL` | 사람 글 계획·사람 반응 batch의 Claude(Haiku) 모델 | `claude-haiku-4-5-20251001` |
 | `AI_INTERACTION_CODEX_MODEL` | 사람 글 계획·사람 반응 batch의 Codex(Luna) 모델 | `gpt-5.6-luna` |
 | `CODEX_HOST_CONFIG_DIR` | Codex 로그인 세션을 컨테이너 `/root/.codex`로 마운트할 호스트 경로 | `/home/justant/.codex` |
-| `ANTHROPIC_API_KEY` | direct API 경로용 키 | 공란 |
+| `ANTHROPIC_API_KEY` | direct API 경로용 키 (LLM 컨테이너 `.env.ai-user`) | 공란; BE는 vault `llm.anthropic_api_key` |
 | `AI_USER_LLM_POOL_SIZE` | AI-user worker pool | `20` |
 | `AI_USER_LLM_QUEUE_CAPACITY` | AI-user queue | `100` |
 | `AI_USER_LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `30000` |
@@ -228,12 +250,11 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=6000
 
 ## OAuth / App URL / Mail / ASM
 
-기존 규칙은 유지된다.
-
-- `GOOGLE_*`, `KAKAO_*`, `NAVER_*`
-- `APP_URL`
-- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `GMAIL_APP_PASSWORD`
-- `ASM_BASE_URL`, `ASM_API_TOKEN`, `ASM_ENABLED`, `ASM_CALLBACK_*`
+- OAuth **client ID**는 env에 둘 수 있음. **client secret**은 AS `encrypted_secret`만.
+- `APP_URL`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME` — 비시크릿/식별자. `GMAIL_APP_PASSWORD` → vault `mail.gmail_app_password`.
+- `ASM_BASE_URL`, `ASM_ENABLED`, `ASM_CALLBACK_*` 비시크릿 설정은 env. `ASM_API_TOKEN` / callback token → vault (ASM 권위본=`system_secret`).
+- Instagram/Meta `app_id`·`app_secret`·`access_token`은 **env에 두지 않음** — ASM `instagram_reels` credential(AES-256-GCM)만. 상세 [`docs/shared/marketing/credentials.md`](../shared/marketing/credentials.md)
+- ASM 런타임 (`ASM_BEARER_TOKEN`, `ASM_CALLBACK_TOKEN`, `WAGGLEBOT_API_KEY`, ASM `ANTHROPIC_API_KEY`) → ASM `system_secret`. ASM `.env`에는 `ASM_DATABASE_URL` + `ASM_CREDENTIAL_KEY`만.
 - `ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED` — `XThreadPublishTriggerScheduler` opt-in 게이트(기본 `false`).
   **X(`x_thread`)와 Instagram(`instagram_feed`) 24h 자동 발행을 함께 켠다.** prod만 `true`.
   `.env.prod`에만 `true`로 설정한다(dev는 절대 금지 — ASM이 dev/prod 공유 단일 인스턴스라 dev에서 켜면
@@ -248,14 +269,14 @@ prod는 OAuth와 메일 관련 값을 모두 실제 값으로 채워야 한다.
 
 ## prod 필수 체크리스트
 
-- `MARIADB_ROOT_PASSWORD`, `MARIADB_PASSWORD`
-- `JWT_SECRET`
-- `GOOGLE_*`, `KAKAO_*`, `NAVER_*`
-- `GMAIL_APP_PASSWORD`
+- `MARIADB_ROOT_PASSWORD`, `MARIADB_PASSWORD`, `AS_SECRET_MASTER_KEY`
+- `encrypted_secret` 시딩 완료 (jwt/oauth secrets/mail/asm tokens/github.pat.*)
+- OAuth client ID env + secrets in vault
 - `CLAUDE_HOST_CONFIG_DIR` 존재 + `claude` 로그인 완료
 - `CODEX_HOST_CONFIG_DIR` 존재 + `codex` 로그인 완료
 - `LLM_WORKER_URL=http://againspring-llm:8090`
 - shared ai-user 사용 시 `.env.ai-user`의 prod/dev DB 자격 증명
+- Git: `credential.helper` = `scripts/git-credential-as-vault` (평문 `.git-credentials` 없음)
 
 ## 변경 절차
 
