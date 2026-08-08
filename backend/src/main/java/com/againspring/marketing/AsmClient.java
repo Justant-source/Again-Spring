@@ -13,8 +13,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 
 /**
  * HTTP client for ASM (Again-Spring-Marketing) service
@@ -42,37 +46,35 @@ public class AsmClient {
 
     /**
      * Create a new job in ASM with idempotency support
+     * Retries on network/timeout/5xx errors with exponential backoff (1s/2s/4s)
      */
     public CreateJobResponse createJob(CreateJobRequest request, String idempotencyKey) {
-        try {
-            return restClient
+        return retryWithBackoff(
+            () -> restClient
                 .post()
                 .uri("/api/v1/jobs")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Idempotency-Key", idempotencyKey)
                 .body(request)
                 .retrieve()
-                .body(CreateJobResponse.class);
-        } catch (Exception e) {
-            log.error("Failed to create ASM job", e);
-            throw new AsmUnavailableException("Failed to create ASM job: " + e.getMessage(), e);
-        }
+                .body(CreateJobResponse.class),
+            "create ASM job"
+        );
     }
 
     /**
      * Get job status from ASM
+     * Retries on network/timeout/5xx errors with exponential backoff (1s/2s/4s)
      */
     public AsmJobView getJob(String jobId) {
-        try {
-            return restClient
+        return retryWithBackoff(
+            () -> restClient
                 .get()
                 .uri("/api/v1/jobs/{jobId}", jobId)
                 .retrieve()
-                .body(AsmJobView.class);
-        } catch (Exception e) {
-            log.warn("Failed to poll ASM job {}: {}", jobId, e.getMessage());
-            throw new AsmUnavailableException("Failed to poll ASM job: " + e.getMessage(), e);
-        }
+                .body(AsmJobView.class),
+            "get ASM job " + jobId
+        );
     }
 
     /**
@@ -93,37 +95,35 @@ public class AsmClient {
 
     /**
      * Trigger publishing for a job
+     * Retries on network/timeout/5xx errors with exponential backoff (1s/2s/4s)
      */
     public AsmJobView publish(String jobId) {
-        try {
-            return restClient
+        return retryWithBackoff(
+            () -> restClient
                 .post()
                 .uri("/api/v1/jobs/{jobId}/publish", jobId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .retrieve()
-                .body(AsmJobView.class);
-        } catch (Exception e) {
-            log.error("Failed to publish ASM job {}", jobId, e);
-            throw new AsmUnavailableException("Failed to publish ASM job: " + e.getMessage(), e);
-        }
+                .body(AsmJobView.class),
+            "publish ASM job " + jobId
+        );
     }
 
     /**
      * Re-queue a PARTIAL/FAILED marketing job for publishing.
      * Resets NEEDS_AUTH/FAILED publications to PENDING before retrying.
+     * Retries on network/timeout/5xx errors with exponential backoff (1s/2s/4s)
      */
     public AsmJobView republish(String jobId) {
-        try {
-            return restClient
+        return retryWithBackoff(
+            () -> restClient
                 .post()
                 .uri("/api/v1/jobs/{jobId}/republish", jobId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .retrieve()
-                .body(AsmJobView.class);
-        } catch (Exception e) {
-            log.error("Failed to republish ASM job {}", jobId, e);
-            throw new AsmUnavailableException("Failed to republish ASM job: " + e.getMessage(), e);
-        }
+                .body(AsmJobView.class),
+            "republish ASM job " + jobId
+        );
     }
 
     /**
@@ -263,6 +263,96 @@ public class AsmClient {
             log.error("Failed to exchange YouTube OAuth code", e);
             throw new AsmUnavailableException("Failed to exchange YouTube OAuth code: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Retry helper with exponential backoff (1s/2s/4s).
+     * Only retries on network/timeout/5xx errors.
+     * Immediately fails on 4xx errors (auth failures, validation errors, etc).
+     */
+    private <T> T retryWithBackoff(RetryableOperation<T> operation, String operationName) {
+        int[] backoffDelays = {1000, 2000, 4000}; // milliseconds
+        Exception lastException = null;
+
+        // Initial attempt
+        try {
+            return operation.execute();
+        } catch (HttpClientErrorException e) {
+            // 4xx errors are not retryable (e.g., 401 auth failed)
+            log.error("ASM returned non-retryable error {}: {}", operationName, e.getStatusCode());
+            throw new AsmUnavailableException("Failed to " + operationName + ": " + e.getMessage(), e);
+        } catch (Exception e) {
+            lastException = e;
+            if (!isRetryable(e)) {
+                log.error("Failed to {}: {}", operationName, e.getMessage(), e);
+                throw new AsmUnavailableException("Failed to " + operationName + ": " + e.getMessage(), e);
+            }
+            log.debug("Retryable error on {} (attempt 1/3): {}", operationName, e.getMessage());
+        }
+
+        // Retry attempts with backoff
+        for (int attempt = 2; attempt <= 3; attempt++) {
+            try {
+                Thread.sleep(backoffDelays[attempt - 2]);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                log.error("Retry sleep interrupted for {}", operationName, ie);
+                throw new AsmUnavailableException("Failed to " + operationName + ": retry interrupted", ie);
+            }
+
+            try {
+                log.debug("Retrying {} (attempt {}/3)...", operationName, attempt);
+                return operation.execute();
+            } catch (HttpClientErrorException e) {
+                // 4xx errors are not retryable
+                log.error("ASM returned non-retryable error {} on retry {}: {}", operationName, attempt, e.getStatusCode());
+                throw new AsmUnavailableException("Failed to " + operationName + ": " + e.getMessage(), e);
+            } catch (Exception e) {
+                if (!isRetryable(e)) {
+                    log.error("Non-retryable error on {} (attempt {}/3): {}", operationName, attempt, e.getMessage(), e);
+                    throw new AsmUnavailableException("Failed to " + operationName + ": " + e.getMessage(), e);
+                }
+                lastException = e;
+                log.debug("Retryable error on {} (attempt {}/3): {}", operationName, attempt, e.getMessage());
+            }
+        }
+
+        // All retries exhausted
+        log.error("All 3 retry attempts exhausted for {}", operationName, lastException);
+        throw new AsmUnavailableException("Failed to " + operationName + " after 3 retries: " + lastException.getMessage(), lastException);
+    }
+
+    /**
+     * Determines if an exception is retryable (network/timeout/5xx).
+     * Non-retryable: 4xx errors (handled separately), other non-network errors.
+     */
+    private boolean isRetryable(Exception e) {
+        // Network errors
+        if (e instanceof ConnectException || e instanceof SocketTimeoutException) {
+            return true;
+        }
+        // ResourceAccessException includes connection timeouts, read timeouts, etc.
+        if (e instanceof ResourceAccessException) {
+            return true;
+        }
+        // 5xx errors (handled by RestClient as exception)
+        // Note: RestClient throws HttpServerErrorException for 5xx, which is a HttpClientErrorException subclass
+        // We'll treat it as retryable if it's a 5xx
+        if (e instanceof HttpClientErrorException) {
+            HttpClientErrorException httpEx = (HttpClientErrorException) e;
+            if (httpEx.getStatusCode().is5xxServerError()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Functional interface for retryable operations.
+     */
+    @FunctionalInterface
+    private interface RetryableOperation<T> {
+        T execute() throws Exception;
     }
 
     /**

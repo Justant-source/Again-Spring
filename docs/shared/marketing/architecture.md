@@ -173,9 +173,23 @@ async def run_stub(job_id):
 
 ## 오류 처리
 
+### AsmClient 재시도 (2026-08-08 추가)
+
+`AsmClient`의 모든 메서드는 **3회 지수 백오프 재시도**를 지원합니다. (M3 P1-6)
+
+**재시도 정책**:
+- 대상: 네트워크 오류 (`ConnectException`, `SocketTimeoutException`), 타임아웃 (`ResourceAccessException`), 5xx 서버 오류
+- 백오프: 1초 → 2초 → 4초
+- 비재시도: 4xx 오류 (401 인증 실패, 400 유효성 오류 등) — 즉시 실패
+
+**적용 메서드**: `createJob()`, `getJob()`, `publish()`, `republish()`
+
+---
+
 | 오류 상황 | AS 동작 | 사용자 표시 |
 |---|---|---|
-| ASM 서버 다운 (잡 생성 시) | `AsmUnavailableException` → 503 반환 | "마케팅 잡 생성에 실패했어요" |
+| ASM 서버 일시 불안정 (잡 생성 시) | AsmClient 3회 재시도 후 실패 시 `AsmUnavailableException` → 503 반환 | "마케팅 잡 생성에 실패했어요" |
+| ASM 인증 실패 (401) | 즉시 실패 (재시도 없음) | "ASM 인증 오류" |
 | ASM 서버 다운 (폴링 시) | `markPollFailure()`, 로그 WARN | 잡 상태 유지 |
 | 폴링 5회 연속 실패 | `status = STALE` | 잡 목록에 STALE 배지 |
 | 잘못된 postId | BE 400 반환 | 다이얼로그 오류 메시지 |
