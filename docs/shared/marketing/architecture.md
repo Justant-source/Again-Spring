@@ -88,6 +88,36 @@ MarketingJobService.triggerPublish(id)
                     └── ASM: status = PUBLISHING → 소셜 게시 → PUBLISHED (콜백)
 ```
 
+### 5. 이월 정책 (P3-10) — 예약 시각 경과 자동 재예약
+
+```
+MarketingPollingScheduler (15초마다)
+    │
+    ├─ 예약된 미발행 잡 감지: scheduledPublishAt < NOW() - 5분
+    │  (status ∉ PUBLISHED, FAILED, PARTIAL)
+    │
+    └─ rescheduleExpiredJob() 실행
+        ├─ originalScheduledAt 기록 (첫 이월 시)
+        ├─ 다음날 동일 시간대로 재예약
+        │  예: 14:30 → 다음날 14:30
+        │
+        └─ 충돌 감지 (동일 시간대에 다른 미발행 잡 있음)
+           └─ 충돌 시 다음 빈 슬롯으로 이동
+              (±5분 범위에서 충돌 없을 때까지)
+              └─ 슬롯 단위: 원본 예약 시각 기준
+                 정각(00분) → 1시간 단위
+                 30분(30분) → 30분 단위
+```
+
+**상태 업데이트**:
+- `scheduledPublishAt`: 새 예약 시각
+- `rescheduledCount`: +1
+- `lastRescheduledAt`: 현재 시각
+- `rescheduledReason`: "예약 시각 경과 (원 예약: {원래시간})"
+- `originalScheduledAt`: 첫 이월 시에만 저장
+
+**로깅**: INFO 레벨로 상세 기록. TODO: watchdog 텔레그램 알림 연동 (향후)
+
 ### 데이터 흐름 다이어그램
 
 ```
@@ -120,29 +150,41 @@ AS 어드민: 폴링 재조정 (15초, STALE 상태 지수 백오프)
 
 ---
 
-## DB 스키마 (V80)
+## DB 스키마 (V103)
 
 ```sql
 CREATE TABLE marketing_job (
-  id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-  remote_job_id   VARCHAR(64) UNIQUE,         -- ASM ULID
-  post_id         VARCHAR(32) NOT NULL,        -- posts.id FK
-  status          VARCHAR(20) NOT NULL,        -- 잡 상태
-  phase           VARCHAR(20),                 -- 현재 파이프라인 단계
-  progress        DOUBLE DEFAULT 0,            -- 0.0~1.0
-  targets         JSON,                        -- ["naver_blog", "x"]
-  auto_publish    BOOLEAN DEFAULT FALSE,
-  artifacts       JSON,                        -- ASM 생성 결과물 경로
-  publications    JSON,                        -- 게시 기록 [{platform, state, url}]
-  error_message   TEXT,
-  requested_by    VARCHAR(32),
-  poll_fail_count INT DEFAULT 0,
-  last_polled_at  TIMESTAMP NULL,
-  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id                      BIGINT AUTO_INCREMENT PRIMARY KEY,
+  remote_job_id           VARCHAR(64) UNIQUE,               -- ASM ULID
+  post_id                 VARCHAR(32) NOT NULL,              -- posts.id FK
+  status                  VARCHAR(20) NOT NULL,              -- 잡 상태
+  phase                   VARCHAR(20),                       -- 현재 파이프라인 단계
+  progress                DOUBLE DEFAULT 0,                  -- 0.0~1.0
+  targets                 JSON,                              -- ["naver_blog", "x"]
+  auto_publish            BOOLEAN DEFAULT FALSE,
+  artifacts               JSON,                              -- ASM 생성 결과물 경로
+  publications            JSON,                              -- 게시 기록 [{platform, state, url}]
+  error_message           TEXT,
+  requested_by            VARCHAR(32),
+  poll_fail_count         INT DEFAULT 0,
+  last_polled_at          TIMESTAMP NULL,
+  scheduled_publish_at    DATETIME(6) NULL,                  -- 예약된 발행 시각 (이월 정책)
+  rescheduled_count       INT DEFAULT 0,                     -- 이월된 횟수
+  rescheduled_reason      VARCHAR(255) NULL,                 -- 이월 사유
+  original_scheduled_at   DATETIME(6) NULL,                  -- 원래 예약 시각 (첫 이월 시 기록)
+  last_rescheduled_at     DATETIME(6) NULL,                  -- 마지막 이월 시각
+  created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_mj_post FOREIGN KEY (post_id) REFERENCES posts(id)
 );
 ```
+
+**이월 정책 필드 (V103 추가)**:
+- `scheduled_publish_at`: 현재 예약된 발행 시각 (이월 시 갱신됨)
+- `rescheduled_count`: 총 이월 횟수 (0 = 원래 예약시각, 1+ = 이월됨)
+- `rescheduled_reason`: 이월 사유 예: "예약 시각 경과 (원 예약: 2026-08-08T14:00:00Z)"
+- `original_scheduled_at`: 첫 이월 시 저장, 변경되지 않음 (감사 추적용)
+- `last_rescheduled_at`: 마지막 이월 시각
 
 ---
 

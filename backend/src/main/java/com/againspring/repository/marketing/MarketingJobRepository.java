@@ -258,4 +258,91 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     long countTextSlotsCreatedSince(Instant since);
 
     List<MarketingJob> findByPostIdIn(Collection<String> postIds);
+
+    /**
+     * Find jobs with expired scheduled publish time.
+     * Used for reschedule detection in polling scheduler.
+     *
+     * Conditions:
+     * - scheduled_publish_at is not null
+     * - scheduled_publish_at < now - 5 minutes (tolerance)
+     * - status is one of: QUEUED, RUNNING, READY, STALE (not yet terminal)
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT * FROM marketing_job
+        WHERE scheduled_publish_at IS NOT NULL
+        AND scheduled_publish_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+        AND status IN ('QUEUED', 'RUNNING', 'READY', 'STALE')
+        """)
+    List<MarketingJob> findExpiredScheduledJobs();
+
+    /**
+     * Find jobs with scheduled times in the given range (±5 minutes around target time).
+     * Used for collision detection when rescheduling.
+     *
+     * Excludes the given job ID (self) and terminal statuses.
+     * {@code excludeJobId} can be null to skip self-exclusion.
+     *
+     * @param targetTime the center time
+     * @param excludeJobId job ID to exclude (nullable)
+     * @return jobs scheduled within ±5 minutes of targetTime, excluding self and terminal statuses
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT * FROM marketing_job
+        WHERE scheduled_publish_at IS NOT NULL
+        AND scheduled_publish_at >= DATE_SUB(:targetTime, INTERVAL 5 MINUTE)
+        AND scheduled_publish_at <= DATE_ADD(:targetTime, INTERVAL 5 MINUTE)
+        AND status NOT IN ('PUBLISHED', 'FAILED', 'PARTIAL')
+        AND (:excludeJobId IS NULL OR id != :excludeJobId)
+        """)
+    List<MarketingJob> findJobsByScheduledTimeRange(
+        @Param("targetTime") Instant targetTime,
+        @Param("excludeJobId") Long excludeJobId);
+
+    /**
+     * Find all marketing jobs with a scheduled publish time set.
+     * Used in carry-over logic to identify jobs that have been scheduled for deferred publishing.
+     *
+     * @return List of marketing jobs with non-null scheduledPublishAt
+     */
+    List<MarketingJob> findByScheduledPublishAtNotNull();
+
+    /**
+     * Find all marketing jobs scheduled to publish within a specific time range.
+     * Used to detect scheduling collisions and batch-publish multiple jobs within a window.
+     *
+     * @param start the start time (inclusive)
+     * @param end the end time (inclusive)
+     * @return List of marketing jobs scheduled between start and end times (inclusive)
+     */
+    List<MarketingJob> findByScheduledPublishAtBetween(Instant start, Instant end);
+
+    /**
+     * Count marketing jobs scheduled for a specific time that are not yet in terminal status.
+     * Used for carry-over collision detection to ensure multiple jobs don't publish
+     * at the exact same instant, raising a scheduling conflict for manual resolution.
+     *
+     * <p>Terminal statuses (PUBLISHED, FAILED, PARTIAL) are intentionally excluded to detect
+     * only <em>active</em> jobs that may still conflict.
+     *
+     * @param time the scheduled publish time to check
+     * @param excludeStatuses terminal statuses to exclude (typically PUBLISHED, FAILED, PARTIAL)
+     * @return count of non-terminal jobs scheduled for the given time
+     */
+    long countByScheduledPublishAtAndStatusNotIn(Instant time, List<String> excludeStatuses);
+
+    /**
+     * Find all unpublished jobs whose scheduled publish time has expired.
+     * Used in carry-over logic to detect stale scheduled jobs that never published,
+     * allowing the scheduler to decide whether to reschedule, discard, or escalate.
+     *
+     * @param cutoffTime jobs with scheduledPublishAt before (strictly less than) this time
+     *                   are considered expired
+     * @return List of expired unpublished marketing jobs
+     *         (status NOT IN PUBLISHED, FAILED, PARTIAL)
+     */
+    @Query("SELECT mj FROM MarketingJob mj " +
+           "WHERE mj.scheduledPublishAt < :cutoffTime " +
+           "AND mj.status NOT IN ('PUBLISHED', 'FAILED', 'PARTIAL')")
+    List<MarketingJob> findExpiredUnpublishedJobs(@Param("cutoffTime") Instant cutoffTime);
 }

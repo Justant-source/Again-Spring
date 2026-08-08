@@ -72,6 +72,47 @@ public class MarketingJob {
     @Column
     private Instant lastPolledAt;
 
+    /**
+     * Scheduled publish time for this job.
+     * If null, the job has no specific publish schedule.
+     * Updated when the job is deferred to a later time.
+     */
+    @Column
+    private Instant scheduledPublishAt;
+
+    /**
+     * Number of times this job was rescheduled (count of deferrals).
+     * Default = 0 (published at original scheduled time or immediately).
+     * Incremented each time the job is deferred due to capacity constraints.
+     */
+    @Column
+    @Builder.Default
+    private Integer rescheduledCount = 0;
+
+    /**
+     * Reason for the most recent reschedule.
+     * Examples: "scheduled_time_passed", "capacity_exhausted", "daily_quota_exceeded".
+     * Nullable; populated only if rescheduledCount > 0.
+     */
+    @Column(length = 255)
+    private String rescheduledReason;
+
+    /**
+     * The original scheduled publish time before any reschedules.
+     * Nullable; set at job creation if scheduledPublishAt is planned.
+     * Used to track when the job was originally supposed to be published,
+     * regardless of how many times it was rescheduled.
+     */
+    @Column
+    private Instant originalScheduledAt;
+
+    /**
+     * The timestamp of the most recent reschedule event.
+     * Nullable; updated whenever the job is deferred.
+     */
+    @Column
+    private Instant lastRescheduledAt;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

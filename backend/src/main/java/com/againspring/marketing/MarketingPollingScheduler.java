@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 
@@ -50,6 +51,16 @@ public class MarketingPollingScheduler {
         log.debug("Polling {} marketing jobs", jobsToPoll.size());
 
         Instant now = Instant.now();
+
+        // Detect and reschedule jobs with expired scheduled publish time
+        List<MarketingJob> expiredJobs = marketingJobRepository.findExpiredScheduledJobs();
+        if (!expiredJobs.isEmpty()) {
+            log.info("Found {} expired scheduled jobs, rescheduling...", expiredJobs.size());
+            for (MarketingJob expiredJob : expiredJobs) {
+                rescheduleExpiredJob(expiredJob, now);
+            }
+        }
+
         for (MarketingJob job : jobsToPoll) {
             if ("STALE".equals(job.getStatus())) {
                 // 24h expiry → permanent FAILED
@@ -81,5 +92,96 @@ public class MarketingPollingScheduler {
                 marketingJobRepository.save(job);
             }
         }
+    }
+
+    /**
+     * Reschedule an expired scheduled job to the next day at the same time.
+     * If collision detected (another job scheduled within ±5 minutes), find next available slot.
+     *
+     * Slot logic:
+     * - 30-minute slot: increments by 30 minutes on collision
+     * - On-the-hour slot: increments by 1 hour on collision
+     *
+     * @param job the expired job to reschedule
+     * @param now current time
+     */
+    private void rescheduleExpiredJob(MarketingJob job, Instant now) {
+        Instant originalScheduledAt = job.getScheduledPublishAt();
+        if (originalScheduledAt == null) {
+            log.warn("Expired job {} has null scheduledPublishAt, skipping reschedule", job.getId());
+            return;
+        }
+
+        // Calculate next day at same time
+        Instant nextDayTime = originalScheduledAt.plus(1, ChronoUnit.DAYS);
+        Instant newScheduledTime = findAvailableSlot(nextDayTime, job.getId());
+
+        // Set original scheduled time on first reschedule
+        if (job.getOriginalScheduledAt() == null) {
+            job.setOriginalScheduledAt(originalScheduledAt);
+        }
+
+        // Update job with new schedule
+        job.setScheduledPublishAt(newScheduledTime);
+        job.setRescheduledCount(job.getRescheduledCount() + 1);
+        job.setLastRescheduledAt(now);
+        job.setRescheduledReason("예약 시각 경과 (원 예약: " + originalScheduledAt + ")");
+
+        marketingJobRepository.save(job);
+
+        log.info("Rescheduled expired marketing job {} from {} to {} (reschedule #{}, reason: {})",
+            job.getId(), originalScheduledAt, newScheduledTime, job.getRescheduledCount(),
+            job.getRescheduledReason());
+
+        // TODO: Watchdog telegram notification integration
+    }
+
+    /**
+     * Find available time slot, incrementing from the target time if collision detected.
+     *
+     * @param targetTime the target scheduled time
+     * @param excludeJobId the job ID to exclude from collision check (self)
+     * @return the first available slot (no collision)
+     */
+    private Instant findAvailableSlot(Instant targetTime, Long excludeJobId) {
+        List<MarketingJob> conflicting = marketingJobRepository.findJobsByScheduledTimeRange(
+            targetTime, excludeJobId);
+
+        // No collision, return target time
+        if (conflicting.isEmpty()) {
+            return targetTime;
+        }
+
+        // Detect slot increment (30-min or 1-hour)
+        int minute = extractMinute(targetTime);
+        long incrementMs;
+
+        if (minute == 0) {
+            // On-the-hour slot: increment by 1 hour
+            incrementMs = 60 * 60 * 1000L;
+        } else if (minute == 30) {
+            // 30-minute slot: increment by 30 minutes
+            incrementMs = 30 * 60 * 1000L;
+        } else {
+            // Arbitrary minute: default to 30-minute increment
+            incrementMs = 30 * 60 * 1000L;
+        }
+
+        // Recursively find next slot
+        Instant nextSlot = targetTime.plusMillis(incrementMs);
+        return findAvailableSlot(nextSlot, excludeJobId);
+    }
+
+    /**
+     * Extract minute component from an Instant (UTC-based).
+     * Used to determine slot type (on-the-hour vs 30-min).
+     *
+     * @param time the instant
+     * @return minute (0-59)
+     */
+    private int extractMinute(Instant time) {
+        long epochMilli = time.toEpochMilli();
+        long minutesInDay = (epochMilli / (60 * 1000L)) % (24 * 60);
+        return (int) (minutesInDay % 60);
     }
 }

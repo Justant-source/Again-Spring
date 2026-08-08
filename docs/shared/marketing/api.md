@@ -36,6 +36,11 @@ Content-Type: application/json
   "requested_by": null,
   "poll_fail_count": 0,
   "last_polled_at": null,
+  "scheduled_publish_at": null,
+  "rescheduled_count": 0,
+  "rescheduled_reason": null,
+  "original_scheduled_at": null,
+  "last_rescheduled_at": null,
   "created_at": "2026-06-09T05:00:00Z",
   "updated_at": "2026-06-09T05:00:00Z"
 }

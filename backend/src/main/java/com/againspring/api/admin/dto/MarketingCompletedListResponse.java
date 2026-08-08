@@ -53,10 +53,51 @@ public class MarketingCompletedListResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class JobItem {
+        /**
+         * Unique job identifier
+         */
         private Long id;
+
+        /**
+         * Job status (REQUESTED, IN_PROGRESS, COMPLETED, FAILED, etc.)
+         */
         private String status;
+
+        /**
+         * Target platforms for this job (e.g., instagram_reels, youtube_shorts)
+         */
         private List<String> targets;
+
+        /**
+         * Job creation timestamp
+         */
         private Instant createdAt;
+
+        /**
+         * Scheduled publish time for this job (if applicable)
+         */
+        private Instant scheduledPublishAt;
+
+        /**
+         * Number of times this job was rescheduled (deferred).
+         * 0 = published at originally scheduled time or immediately.
+         * Used in UI to show "이월 1회" (rescheduled once), etc.
+         */
+        private Integer rescheduledCount;
+
+        /**
+         * Reason for the most recent reschedule.
+         * Examples: "scheduled_time_passed", "capacity_exhausted", "daily_quota_exceeded".
+         * Nullable; only populated if rescheduledCount > 0.
+         */
+        private String rescheduledReason;
+
+        /**
+         * The original scheduled publish time before any reschedules.
+         * Used to show when the job was originally supposed to be published.
+         * Nullable; set at job creation if scheduledPublishAt was planned.
+         */
+        private Instant originalScheduledAt;
 
         public static JobItem from(JobSummary j) {
             return JobItem.builder()
@@ -64,6 +105,10 @@ public class MarketingCompletedListResponse {
                 .status(j.status())
                 .targets(j.targets())
                 .createdAt(j.createdAt())
+                .scheduledPublishAt(j.scheduledPublishAt())
+                .rescheduledCount(j.rescheduledCount())
+                .rescheduledReason(j.rescheduledReason())
+                .originalScheduledAt(j.originalScheduledAt())
                 .build();
         }
     }

@@ -114,11 +114,19 @@ public class MarketingHoldingCommitService {
         List<JobSummary> jobs
     ) {}
 
+    /**
+     * Summary of a marketing job for admin display.
+     * Includes reschedule tracking to show when/why jobs were deferred.
+     */
     public record JobSummary(
         Long id,
         String status,
         List<String> targets,
-        Instant createdAt
+        Instant createdAt,
+        Instant scheduledPublishAt,
+        Integer rescheduledCount,
+        String rescheduledReason,
+        Instant originalScheduledAt
     ) {}
 
     /**
@@ -344,7 +352,11 @@ public class MarketingHoldingCommitService {
                     j.getId(),
                     j.getStatus(),
                     parseTargets(j.getTargets()),
-                    j.getCreatedAt()))
+                    j.getCreatedAt(),
+                    j.getScheduledPublishAt(),
+                    j.getRescheduledCount(),
+                    j.getRescheduledReason(),
+                    j.getOriginalScheduledAt()))
                 .toList();
             out.add(new CompletedItem(
                 h.getPostId(),
