@@ -58,7 +58,7 @@ services:
 
 networks:
   againspring:
-    driver: bridge
+    external: true
     name: againspring
 
 volumes:

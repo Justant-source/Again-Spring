@@ -126,7 +126,7 @@ services:
       - backend-dev
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:80/ || exit 1"]
+      test: ["CMD", "sh", "-c", "wget -qO- http://127.0.0.1:80/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
