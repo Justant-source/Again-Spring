@@ -98,6 +98,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/{eventId}/photo-exhibition/votes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["vote"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/photo-exhibition/images/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["orderImages"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events/{eventId}/photo-bingo/cells/{cellIndex}/image": {
         parameters: {
             query?: never;
@@ -125,6 +157,22 @@ export interface paths {
         put: operations["updateUser"];
         post?: never;
         delete: operations["deleteUser"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/registration-open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getRegistrationOpen"];
+        put: operations["setRegistrationOpen"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -299,7 +347,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["vote"];
+        post: operations["vote_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -347,7 +395,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["vote_1"];
+        post: operations["vote_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -428,6 +476,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["draw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/photo-exhibition/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["upload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -668,6 +732,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/events/{eventId}/photo-exhibition/finalize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["finalize"];
         delete?: never;
         options?: never;
         head?: never;
@@ -930,6 +1010,22 @@ export interface paths {
         patch: operations["updatePostStatus"];
         trace?: never;
     };
+    "/api/events/{eventId}/photo-exhibition/my-submission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update"];
+        trace?: never;
+    };
     "/api/events/{eventId}/photo-bingo/my-submission": {
         parameters: {
             query?: never;
@@ -1008,6 +1104,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["extend"];
+        trace?: never;
+    };
+    "/api/admin/events/{eventId}/photo-exhibition/submissions/{submissionId}/exclude": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["exclude"];
         trace?: never;
     };
     "/api/admin/drop-transactions/{id}": {
@@ -1538,6 +1650,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/{eventId}/photo-exhibition/my-votes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["myVotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/photo-exhibition/gallery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["gallery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events/{eventId}/photo-bingo/activity": {
         parameters: {
             query?: never;
@@ -1626,6 +1770,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["broadcastReminder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/registration-open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["registrationOpen"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/find-id": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["findId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1858,6 +2034,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/events/{eventId}/photo-exhibition/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["submissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/events/{eventId}/photo-exhibition/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/events/{eventId}/photo-exhibition/audit-voters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/events/{eventId}/photo-bingo/submissions": {
         parameters: {
             query?: never;
@@ -2018,6 +2242,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/{eventId}/photo-exhibition/images/{imageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/categories/{id}": {
         parameters: {
             query?: never;
@@ -2116,6 +2356,30 @@ export interface components {
             /** Format: int32 */
             dropsAwarded?: number;
             taggedNicknames?: string[];
+            /** Format: int64 */
+            photoExhibitionSubmissionId?: number;
+            /** Format: int64 */
+            photoExhibitionEventId?: number;
+        };
+        ImageResponse: {
+            /** Format: int64 */
+            id?: number;
+            imageUrl?: string;
+            /** Format: int32 */
+            sortOrder?: number;
+            representative?: boolean;
+        };
+        PhotoExhibitionSubmissionResponse: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            introduction?: string;
+            images?: components["schemas"]["ImageResponse"][];
+            mine?: boolean;
+            authorNickname?: string;
+            /** Format: int32 */
+            finalVotes?: number;
+            resultTier?: string;
         };
         PhotoBingoCellResponse: {
             /** Format: int64 */
@@ -2214,6 +2478,10 @@ export interface components {
             password?: string;
             nickname?: string;
             name?: string;
+            /** Format: int32 */
+            birthMonth?: number;
+            /** Format: int32 */
+            birthDay?: number;
         };
         AttendanceCheckinRequest: {
             message?: string;
@@ -2229,10 +2497,53 @@ export interface components {
             /** Format: date-time */
             endAt?: string;
             config?: components["schemas"]["PhotoBingoConfig"];
+            photoExhibitionConfig?: components["schemas"]["PhotoExhibitionConfig"];
+        };
+        Event: {
+            /** Format: int64 */
+            id?: number;
+            /** @enum {string} */
+            type?: "PHOTO_BINGO" | "PHOTO_EXHIBITION";
+            title?: string;
+            description?: string;
+            /** Format: date-time */
+            startAt?: string;
+            /** Format: date-time */
+            endAt?: string;
+            /** @enum {string} */
+            status?: "DRAFT" | "SCHEDULED" | "ACTIVE" | "ENDED" | "SCORED";
+            configJson?: components["schemas"]["PhotoBingoConfig"];
+            createdBy?: components["schemas"]["User"];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        Party: {
+            /** Format: int64 */
+            id?: number;
+            name?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         PhotoBingoConfig: {
             themes?: string[];
             rewards?: components["schemas"]["Rewards"];
+        };
+        PhotoExhibitionConfig: {
+            /** Format: int64 */
+            id?: number;
+            event?: components["schemas"]["Event"];
+            /** Format: date-time */
+            submissionStart?: string;
+            /** Format: date-time */
+            submissionEnd?: string;
+            /** Format: date-time */
+            reviewEnd?: string;
+            /** Format: date-time */
+            votingEnd?: string;
         };
         Rewards: {
             /** Format: int32 */
@@ -2241,6 +2552,43 @@ export interface components {
             line5?: number;
             /** Format: int32 */
             blackout?: number;
+        };
+        User: {
+            /** Format: int64 */
+            id?: number;
+            email?: string;
+            password?: string;
+            nickname?: string;
+            name?: string;
+            role?: string;
+            /** @enum {string} */
+            plantType?: "TABLE_PALM" | "SPATHIPHYLLUM" | "HONG_KONG_PALM" | "ORANGE_JASMINE";
+            plantName?: string;
+            plantLocked?: boolean;
+            /** @enum {string} */
+            jobClass?: "TANKER" | "HEALER" | "BUFFER" | "DEALER";
+            /** @enum {string} */
+            element?: "EARTH" | "WATER" | "WIND" | "FIRE";
+            /** @enum {string} */
+            difficulty?: "EASY" | "NORMAL" | "HARD";
+            expMultiplier?: number;
+            party?: components["schemas"]["Party"];
+            /** Format: int32 */
+            totalDrops?: number;
+            /** Format: int32 */
+            earnedDrops?: number;
+            /** Format: int32 */
+            birthMonth?: number;
+            /** Format: int32 */
+            birthDay?: number;
+            zipcode?: string;
+            addressMain?: string;
+            addressDetail?: string;
+            phone?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            passwordChangedAt?: string;
         };
         EventResponse: {
             /** Format: int64 */
@@ -2254,12 +2602,26 @@ export interface components {
             endAt?: string;
             status?: string;
             config?: components["schemas"]["PhotoBingoConfig"];
+            photoExhibitionConfig?: components["schemas"]["PhotoExhibitionConfigResponse"];
+            phase?: string;
+            /** Format: date-time */
+            serverNow?: string;
             /** Format: int64 */
             createdBy?: number;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        PhotoExhibitionConfigResponse: {
+            /** Format: date-time */
+            submissionStart?: string;
+            /** Format: date-time */
+            submissionEnd?: string;
+            /** Format: date-time */
+            reviewEnd?: string;
+            /** Format: date-time */
+            votingEnd?: string;
         };
         CategoryResponse: {
             /** Format: int64 */
@@ -2270,14 +2632,25 @@ export interface components {
             hasStatus?: boolean;
             adminOnly?: boolean;
         };
-        Announcement: {
+        AdminAnnouncementRequest: {
+            title?: string;
+            content?: string;
+            type?: string;
+            relatedUrl?: string;
+            relatedLabel?: string;
+            expiresAt?: string;
+        };
+        AnnouncementResponse: {
             /** Format: int64 */
             id?: number;
             title?: string;
             content?: string;
-            /** @enum {string} */
-            type?: "MANUAL" | "BIRTHDAY";
+            type?: string;
             active?: boolean;
+            relatedUrl?: string;
+            relatedLabel?: string;
+            /** Format: date-time */
+            expiresAt?: string;
             /** Format: date-time */
             createdAt?: string;
         };
@@ -2335,6 +2708,19 @@ export interface components {
         ExtendEventRequest: {
             /** Format: int32 */
             additionalMinutes?: number;
+        };
+        PhotoExhibitionAdminSubmissionResponse: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            introduction?: string;
+            authorNickname?: string;
+            excluded?: boolean;
+            exclusionReason?: string;
+            /** Format: int32 */
+            voteCount?: number;
+            resultTier?: string;
+            images?: components["schemas"]["ImageResponse"][];
         };
         AdjustRequest: {
             /** Format: int32 */
@@ -2482,50 +2868,6 @@ export interface components {
             numberOfElements?: number;
             empty?: boolean;
         };
-        Party: {
-            /** Format: int64 */
-            id?: number;
-            name?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        User: {
-            /** Format: int64 */
-            id?: number;
-            email?: string;
-            password?: string;
-            nickname?: string;
-            name?: string;
-            role?: string;
-            /** @enum {string} */
-            plantType?: "TABLE_PALM" | "SPATHIPHYLLUM" | "HONG_KONG_PALM" | "ORANGE_JASMINE";
-            plantName?: string;
-            plantLocked?: boolean;
-            /** @enum {string} */
-            jobClass?: "TANKER" | "HEALER" | "BUFFER" | "DEALER";
-            /** @enum {string} */
-            element?: "EARTH" | "WATER" | "WIND" | "FIRE";
-            /** @enum {string} */
-            difficulty?: "EASY" | "NORMAL" | "HARD";
-            expMultiplier?: number;
-            party?: components["schemas"]["Party"];
-            /** Format: int32 */
-            totalDrops?: number;
-            /** Format: int32 */
-            earnedDrops?: number;
-            /** Format: date */
-            birthDate?: string;
-            zipcode?: string;
-            addressMain?: string;
-            addressDetail?: string;
-            phone?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            passwordChangedAt?: string;
-        };
         PhotoBingoActivityResponse: {
             /** Format: int64 */
             userId?: number;
@@ -2552,6 +2894,40 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
             otherLeft?: boolean;
+        };
+        Candidate: {
+            /** Format: int64 */
+            submissionId?: number;
+            authorNickname?: string;
+            title?: string;
+            /** Format: int32 */
+            voteCount?: number;
+            proposedTier?: string;
+            /** Format: int32 */
+            reward?: number;
+        };
+        PhotoExhibitionPreviewResponse: {
+            /** Format: int32 */
+            validParticipantCount?: number;
+            /** Format: int32 */
+            uniqueVoterCount?: number;
+            /** Format: int32 */
+            selectionCount?: number;
+            /** Format: int32 */
+            participantRewardTotal?: number;
+            /** Format: int32 */
+            voterRewardTotal?: number;
+            /** Format: int32 */
+            rankRewardTotal?: number;
+            /** Format: int32 */
+            grandTotal?: number;
+            candidates?: components["schemas"]["Candidate"][];
+        };
+        PhotoExhibitionVoterAuditResponse: {
+            /** Format: int64 */
+            submissionId?: number;
+            voterNickname?: string;
+            workTitle?: string;
         };
         PageAdminDropTransactionResponse: {
             /** Format: int64 */
@@ -2807,6 +3183,62 @@ export interface operations {
             };
         };
     };
+    vote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": number[];
+                };
+            };
+        };
+    };
+    orderImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionSubmissionResponse"];
+                };
+            };
+        };
+    };
     uploadCellImage: {
         parameters: {
             query?: never;
@@ -2909,6 +3341,56 @@ export interface operations {
                 content: {
                     "*/*": {
                         [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    getRegistrationOpen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+        };
+    };
+    setRegistrationOpen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: Record<string, never>;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: boolean;
                     };
                 };
             };
@@ -3349,7 +3831,7 @@ export interface operations {
             };
         };
     };
-    vote: {
+    vote_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -3438,7 +3920,7 @@ export interface operations {
             };
         };
     };
-    vote_1: {
+    vote_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -3688,6 +4170,35 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     };
+                };
+            };
+        };
+    };
+    upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    image: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionSubmissionResponse"];
                 };
             };
         };
@@ -4223,6 +4734,26 @@ export interface operations {
             };
         };
     };
+    finalize: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     finalizeEvent: {
         parameters: {
             query?: never;
@@ -4532,7 +5063,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Announcement"][];
+                    "*/*": components["schemas"]["AnnouncementResponse"][];
                 };
             };
         };
@@ -4546,9 +5077,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: string;
-                };
+                "application/json": components["schemas"]["AdminAnnouncementRequest"];
             };
         };
         responses: {
@@ -4558,7 +5087,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Announcement"];
+                    "*/*": components["schemas"]["AnnouncementResponse"];
                 };
             };
         };
@@ -4708,6 +5237,56 @@ export interface operations {
             };
         };
     };
+    mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionSubmissionResponse"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionSubmissionResponse"];
+                };
+            };
+        };
+    };
     getMySubmission: {
         parameters: {
             query?: never;
@@ -4852,6 +5431,29 @@ export interface operations {
             };
         };
     };
+    exclude: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+                submissionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionAdminSubmissionResponse"];
+                };
+            };
+        };
+    };
     adjust: {
         parameters: {
             query?: never;
@@ -4917,7 +5519,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Announcement"];
+                    "*/*": components["schemas"]["AnnouncementResponse"];
                 };
             };
         };
@@ -5619,6 +6221,50 @@ export interface operations {
             };
         };
     };
+    myVotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": number[];
+                };
+            };
+        };
+    };
+    gallery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionSubmissionResponse"][];
+                };
+            };
+        };
+    };
     getActivity: {
         parameters: {
             query?: {
@@ -5747,6 +6393,50 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     }[];
+                };
+            };
+        };
+    };
+    registrationOpen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+        };
+    };
+    findId: {
+        parameters: {
+            query: {
+                name: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
                 };
             };
         };
@@ -5880,7 +6570,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Announcement"];
+                    "*/*": components["schemas"]["AnnouncementResponse"];
                 };
             };
         };
@@ -5900,7 +6590,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Announcement"][];
+                    "*/*": components["schemas"]["AnnouncementResponse"][];
                 };
             };
         };
@@ -6067,6 +6757,72 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AdminDeliveryDto"][];
+                };
+            };
+        };
+    };
+    submissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionAdminSubmissionResponse"][];
+                };
+            };
+        };
+    };
+    preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionPreviewResponse"];
+                };
+            };
+        };
+    };
+    audit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionVoterAuditResponse"][];
                 };
             };
         };
@@ -6299,6 +7055,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AdminAttendanceDeliveryDto"][];
+                };
+            };
+        };
+    };
+    deleteImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+                imageId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoExhibitionSubmissionResponse"];
                 };
             };
         };

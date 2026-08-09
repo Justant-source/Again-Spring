@@ -229,6 +229,28 @@ Authorization: Bearer <asm-token>
 
 ---
 
+### 2.4.1 커스텀 썸네일 업로드 (쇼츠/릴스)
+
+```
+PUT /api/v1/jobs/{job_id}/artifacts/{name}
+Authorization: Bearer <asm-token>
+Content-Type: image/png | image/jpeg
+<raw image bytes>
+```
+
+**`name` 화이트리스트**: `{platform}__customcover.{png,jpg,jpeg}` (`platform` = `youtube_shorts` | `instagram_reels`) 만 허용 — `video.mp4` 등 렌더 파이프라인 산출물은 이 경로로 덮어쓸 수 없음. **최대 2MB**(YouTube `thumbnails.set` 상한과 동일). 같은 `(job_id, name)`으로 재업로드하면 upsert(기존 row 삭제 후 insert) — 중복 row 없음.
+
+**Response 200** — `{ "name": "...", "size_bytes": N }`
+**오류**: 400(이름/타입/크기 불일치), 401, 404(job 없음)
+
+업로드된 커스텀 커버는 다음 발행 시 자동 반영된다:
+- **YouTube Shorts**: 영상 업로드 성공 후 `thumbnails.set` API 호출(실패해도 게시 자체는 성공 처리 — non-fatal). 커스텀 커버가 없으면 호출 자체를 생략하고 YouTube 자동 프레임(항상 인트로 씬=대표 메타포+제목 레이아웃) 사용.
+- **Instagram Reels**: Graph API `cover_url`(공개 HTTPS 필요, ASM은 현재 Tailscale 내부망 전용이라 **미동작**)은 보류 상태. 대신 API 경로 실패 시 폴백되는 Playwright 자동화 경로의 로컬 파일 첨부(`coverPath`)에는 반영됨.
+
+Again-Spring 측 관리자 UI 경로: `PUT /api/admin/marketing/jobs/{id}/artifacts/{platform}/thumbnail` (멀티파트, `AdminMarketingController` → `AsmClient.putArtifact` 프록시).
+
+---
+
 ### 2.5 자격증명 (credentials)
 
 > AES-256-GCM 암호화 저장. 시크릿은 평문 미반환. 필드 스키마·병합 규칙: [`credentials.md`](credentials.md)

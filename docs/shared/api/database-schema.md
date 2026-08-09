@@ -237,6 +237,19 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `created_at`, `updated_at` | TIMESTAMP(3) | V48 | |
 | `content_revision` | INT UNSIGNED | V87 | 내용 변경마다 증가. AI thread plan이 참조한 글 revision과 비교하는 optimistic revision |
 | `created_by_admin` | BOOLEAN | **V89** | 관리자가 통합 콘텐츠관리 화면에서 수동 생성한 글 여부. 공개 API 미노출, 어드민 전용 표시(배지)용 |
+| `metaphor_id` | VARCHAR(64) | **V99** | 대표(1순위) 메타포 일러스트 ID. `post_metaphors`에 랭크 0으로 중복 저장(하위호환) |
+
+### `post_metaphors` (**V105**)
+
+사연당 3~5개 메타포 랭크 목록(적합도 순). WaggleBot Shorts 렌더링에서 인트로(랭크 0)+본문 낭독 중간 삽입(랭크 1+)용.
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `post_id` | VARCHAR(32) FK, PK | `posts.id`, `ON DELETE CASCADE` |
+| `metaphor_id` | VARCHAR(64), PK | 메타포 일러스트 ID (예: `empty-chair`) |
+| `rank` | INT | 0=대표(=`posts.metaphor_id`와 동기화), 1+ = 본문 삽입 순 |
+
+인덱스: `PRIMARY(post_id, metaphor_id)`, `idx_pm_rank(rank)`. `Post.metaphorIds`(`@ElementCollection`, `@OrderColumn(name="rank")`)로 매핑, `MetaphorCatalog.sanitizeList`가 카탈로그 검증+dedup+최소 3개 패딩+최대 5개 cap 후 저장.
 
 ### `post_search_ngrams` (**V93**)
 

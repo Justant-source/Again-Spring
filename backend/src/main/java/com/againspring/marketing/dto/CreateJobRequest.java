@@ -47,6 +47,17 @@ public class CreateJobRequest {
         @JsonProperty("metaphor_id")
         private String metaphorId;
 
+        /** Metaphor illustration ids (3-5, first = representative). For ASM video renderer. */
+        @JsonProperty("metaphor_ids")
+        private List<String> metaphorIds;
+
+        /** Post category enum name (e.g. "COUPLE"). Stable key for ASM chip color. */
+        private String category;
+
+        /** Post view count. For ASM analytics/filtering. */
+        @JsonProperty("view_count")
+        private Integer viewCount;
+
         @JsonProperty("neutral_summary")
         private String neutralSummary;
 

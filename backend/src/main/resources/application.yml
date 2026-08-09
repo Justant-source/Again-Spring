@@ -45,6 +45,12 @@ spring:
           connectiontimeout: 10000
           timeout: 10000
           writetimeout: 10000
+  servlet:
+    multipart:
+      # 관리자 마케팅 썸네일 업로드용 — 앱 레벨 검증은 2MB(YouTube thumbnails.set 상한)이므로
+      # 여기는 그 요청 오버헤드를 감안한 여유치.
+      max-file-size: 3MB
+      max-request-size: 3MB
 
 server:
   port: 8080

@@ -162,10 +162,11 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 - `partnerBodyPublished` (String, nullable): 파트너 본문
 - `inviteToken` (String, nullable): 초대 토큰 (작성자 본인만 조회 가능)
 - `promoTitle` (String, nullable, **2026-08-02~**, **V96→VARCHAR(500)·개행**): IG 훅용. 원제 복제+의미줄바꿈(줄≤10). 생성 시 PLAN 전달 또는 `PromoTitleService` 비동기. 목록/상세 공통.
-- `metaphorId` (String, nullable, **2026-08-05~**, **V99**): 메타포 일러스트 ID (60종 카탈로그). AI PLAN이 사연 생성 시 감정에 맞는 카드를 매칭. Shorts intro / FE 카드용.
+- `metaphorId` (String, nullable, **2026-08-05~**, **V99**): 메타포 일러스트 ID (60종 카탈로그). AI PLAN이 사연 생성 시 감정에 맞는 카드를 매칭. Shorts intro / FE 카드용. **대표(1순위) 메타포 — 하위호환 유지, `metaphorIds[0]`와 동일**.
+- `metaphorIds` (String[], nullable, **2026-08-09~**, **V105 `post_metaphors` 테이블**): 사연당 3~5개, 적합도 순 랭크. `metaphorId`(대표)는 `metaphorIds[0]`의 중복 저장. WaggleBot Shorts 렌더링에서 1번째=인트로 대표 이미지, 나머지는 본문 낭독 중간중간 균등 분산 삽입(앞쪽 몰림 방지). `MetaphorCatalog.sanitizeList`가 카탈로그 검증+dedup+최소 3개 미달 시 카테고리 fallback 패딩+최대 5개 cap.
 
 `POST /api/community/posts` 성공 시(신규 생성만) optional `promoTitle`이 있으면 저장하고, 없으면 `PromoTitleService.generateAsync`가 1회 실행된다. 마케팅 brief는 개행 포함 `promo_title`을 전달한다.
-봇(AI-user) 생성 요청은 optional `captureSplitAfterLines`(1-based 개행 블록 컷 배열)과 optional `metaphorId`를 보낼 수 있다 — X/IG 캡쳐 N장 분할(장당 ≤8, 진영당 ≤4). 구 `captureSplitAfterLine` 단일 값은 길이1 배열로 승격. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완. 파트너 답변(`POST /api/s/{token}/answer`)도 optional `captureSplitAfterLines`를 `partner_capture_split_after_lines`에 저장한다.
+봇(AI-user) 생성 요청은 optional `captureSplitAfterLines`(1-based 개행 블록 컷 배열)과 optional `metaphorId`/`metaphorIds`(배열, 최대 5개)를 보낼 수 있다 — X/IG 캡쳐 N장 분할(장당 ≤8, 진영당 ≤4). 구 `captureSplitAfterLine` 단일 값은 길이1 배열로 승격. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완. 파트너 답변(`POST /api/s/{token}/answer`)도 optional `captureSplitAfterLines`를 `partner_capture_split_after_lines`에 저장한다.
 
 ### 3. User
 
@@ -363,6 +364,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 | GET | `/api/admin/marketing/completed` | **JWT + ADMIN** | 200 | COMMITTED·DROPPED 홀딩 + 잡 요약. Query: `status`, `limit`(기본 50). Item: `title`, `committedFormat`(VIDEO\|TEXT), `jobs[].publications[{platform,state,url}]` |
 | POST | `/api/admin/marketing/completed/{postId}/force` | **JWT + ADMIN** | 200 / 400 / 404 | Body: `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}`. 상한 무시 강제 COMMITTED + 잡 생성. COMMITTED 재호출 시 미생성 채널만 추가(전부 있으면 400) |
 | GET/POST/… | `/api/admin/marketing/jobs*` · `/credentials*` · `/performance` · `/timeline` | **JWT + ADMIN** | — | 잡·자격증명·통계 (ASM 프록시). 상세: [platforms.md](../marketing/platforms.md) |
+| PUT | `/api/admin/marketing/jobs/{id}/artifacts/{platform}/thumbnail` | **JWT + ADMIN** | 204 / 400 / 404 | 멀티파트 `file`(image/png\|jpeg, ≤2MB). `platform`=`youtube_shorts`\|`instagram_reels`. ASM `PUT /api/v1/jobs/{jobId}/artifacts/{name}` 프록시. 상세: [marketing/api.md §2.4.1](../marketing/api.md) |
 | GET | `/api/admin/secrets` | **JWT + ADMIN** | 200 | `encrypted_secret` vault 키 존재 여부만 반환 (평문 없음) |
 | POST | `/api/admin/secrets/{key}` | **JWT + ADMIN** | 200 | Body: `{value: string}`. AES-GCM 암호화해 vault에 저장/갱신. 응답에 평문 미포함 |
 

@@ -47,4 +47,9 @@ public class CreatePostDto {
      * 메타포 일러스트 ID (60종 카탈로그). PLAN LLM {@code metaphor_id}.
      */
     private String metaphorId;
+
+    /**
+     * 메타포 일러스트 ID 목록 (3-5개, 첫번째 = 대표). PLAN LLM {@code metaphor_ids}.
+     */
+    private java.util.List<String> metaphorIds;
 }

@@ -94,6 +94,31 @@ public class AsmClient {
     }
 
     /**
+     * Upload/replace an artifact on ASM (currently used only for operator-set
+     * custom thumbnails — ASM restricts the writable name pattern to
+     * {@code {platform}__customcover.{png,jpg,jpeg}}). Not retried: the byte
+     * body is safely re-sendable, but a partial write on the ASM side plus a
+     * blind retry isn't worth the complexity for a small, rarely-called
+     * upload — same non-retried precedent as {@link #getArtifact}.
+     */
+    public void putArtifact(String jobId, String name, byte[] bytes, String contentType) {
+        try {
+            restClient
+                .put()
+                .uri("/api/v1/jobs/{jobId}/artifacts/{name}", jobId, name)
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(bytes)
+                .retrieve()
+                .toBodilessEntity();
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to upload ASM artifact {}/{}", jobId, name, e);
+            throw new AsmUnavailableException("Failed to upload artifact: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Trigger publishing for a job
      * Retries on network/timeout/5xx errors with exponential backoff (1s/2s/4s)
      */

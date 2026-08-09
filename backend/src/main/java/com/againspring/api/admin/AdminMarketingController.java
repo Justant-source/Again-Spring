@@ -157,6 +157,54 @@ public class AdminMarketingController {
         return asmClient.getArtifact(job.getRemoteJobId(), name);
     }
 
+    private static final java.util.Set<String> THUMBNAIL_PLATFORMS =
+        java.util.Set.of("youtube_shorts", "instagram_reels");
+    private static final long MAX_THUMBNAIL_BYTES = 2L * 1024 * 1024; // matches YouTube thumbnails.set hard cap
+
+    /**
+     * Upload/replace a custom thumbnail for a job's YouTube Shorts / Instagram
+     * Reels artifact. Stored on ASM as {@code {platform}__customcover.{ext}} —
+     * picked up automatically by the publishers (YouTube via thumbnails.set,
+     * Reels via the Playwright automation fallback's coverPath) on next publish.
+     */
+    @PutMapping(value = "/jobs/{id}/artifacts/{platform}/thumbnail",
+        consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Set custom thumbnail", description = "쇼츠/릴스 커스텀 썸네일 업로드 (YouTube/Instagram Reels)")
+    @Auditable(action = "SET_MARKETING_THUMBNAIL")
+    public ResponseEntity<Void> setThumbnail(
+            @PathVariable Long id,
+            @PathVariable String platform,
+            @RequestPart("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        if (!THUMBNAIL_PLATFORMS.contains(platform)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "platform must be one of " + THUMBNAIL_PLATFORMS);
+        }
+        String contentType = file.getContentType();
+        String ext = switch (contentType == null ? "" : contentType) {
+            case "image/png" -> "png";
+            case "image/jpeg", "image/jpg" -> "jpg";
+            default -> null;
+        };
+        if (ext == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "file must be image/png or image/jpeg");
+        }
+        if (file.isEmpty() || file.getSize() > MAX_THUMBNAIL_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "file must be non-empty and at most " + MAX_THUMBNAIL_BYTES + " bytes");
+        }
+
+        MarketingJob job = marketingJobRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        if (job.getRemoteJobId() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Job has no remote ID");
+        }
+
+        String name = platform + "__customcover." + ext;
+        asmClient.putArtifact(job.getRemoteJobId(), name, file.getBytes(), contentType);
+        return ResponseEntity.noContent().build();
+    }
+
     /**
      * Publish a ready marketing job
      */

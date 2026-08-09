@@ -65,6 +65,25 @@ export async function republishMarketingJob(id: number): Promise<MarketingJob> {
   return res.data;
 }
 
+/**
+ * Upload/replace a custom thumbnail for a job's YouTube Shorts / Instagram
+ * Reels artifact. `platform` must be 'youtube_shorts' or 'instagram_reels'.
+ */
+export async function uploadJobThumbnail(
+  id: number,
+  platform: string,
+  file: File
+): Promise<void> {
+  const form = new FormData();
+  form.append('file', file);
+  // The shared `api` client hardcodes Content-Type: application/json — must
+  // override here or the multipart boundary never gets attached and the
+  // backend rejects the request.
+  await api.put(`/api/admin/marketing/jobs/${id}/artifacts/${platform}/thumbnail`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
 // ===== Platform credentials =====
 // NOTE: this payload is proxied verbatim from ASM (FastAPI) → snake_case keys,
 // unlike the camelCase MarketingJob above. ASM is the single source of truth for

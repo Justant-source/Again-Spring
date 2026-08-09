@@ -84,8 +84,8 @@ API: `GET`/`PUT /api/admin/marketing/score-weights` · 키 `marketing.score.weig
 | `x_thread` | (스레드 스텝 이미지·upload.json) · Playwright |
 | `naver_blog` | `blog_md` (마크다운), `images[]` (인용 이미지) |
 | `instagram_feed` | `images[]` (훅 4:5 + X캡처 원본비율 + 비율카드 4:5, 4~5장) · caption |
-| `instagram_reels` | `video_mp4`, `thumbnail` |
-| `youtube_shorts` | `video_mp4`, `thumbnail` |
+| `instagram_reels` | `video_mp4`, `thumbnail`, `customcover`(선택, 관리자 업로드) |
+| `youtube_shorts` | `video_mp4`, `thumbnail`, `customcover`(선택, 관리자 업로드) |
 
 ---
 

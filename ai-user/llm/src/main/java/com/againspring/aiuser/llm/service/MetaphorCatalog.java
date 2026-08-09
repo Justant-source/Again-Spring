@@ -6,8 +6,10 @@ import org.springframework.core.io.ClassPathResource;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -84,5 +86,62 @@ public final class MetaphorCatalog {
         String key = category.trim().toUpperCase(Locale.ROOT);
         String fb = CATEGORY_FALLBACK.get(key);
         return isKnown(fb) ? fb : null;
+    }
+
+    /**
+     * Normalize LLM metaphor_ids (ranked list). Returns 3-5 unique ids:
+     * 1. Validate & normalize each proposed id (lowercase).
+     * 2. Dedup while preserving first-seen order (LLM ranking).
+     * 3. If < 3 valid ids, pad deterministically: use category fallback, then sequentially add catalog ids (in order) until size 3.
+     * 4. Cap at 5 entries.
+     * @param proposed list of metaphor ids from LLM (may be null, empty, or contain invalid/duplicate ids).
+     * @param category story category (COUPLE, MARRIED, FRIEND, FAMILY, WORK, OTHER) for fallback logic.
+     * @return list of 3-5 unique valid ids, or empty list if catalog is empty.
+     */
+    public static List<String> sanitizeList(List<String> proposed, String category) {
+        if (IDS.isEmpty()) return Collections.emptyList();
+
+        // 1. Validate & normalize proposed ids, preserving order & deduping
+        LinkedHashSet<String> valid = new LinkedHashSet<>();
+        if (proposed != null) {
+            for (String id : proposed) {
+                if (id != null) {
+                    String normalized = id.trim().toLowerCase(Locale.ROOT);
+                    if (isKnown(normalized)) {
+                        valid.add(normalized);
+                    }
+                }
+            }
+        }
+
+        // 2. If we already have 3-5, cap at 5 and return
+        if (valid.size() >= 3) {
+            List<String> result = new ArrayList<>(valid);
+            if (result.size() > 5) result = result.subList(0, 5);
+            return Collections.unmodifiableList(result);
+        }
+
+        // 3. Pad: add category fallback if available, then sequentially fill from catalog
+        String fallbackId = null;
+        if (category != null && !category.isBlank()) {
+            String key = category.trim().toUpperCase(Locale.ROOT);
+            fallbackId = CATEGORY_FALLBACK.get(key);
+            if (isKnown(fallbackId)) {
+                valid.add(fallbackId);
+            }
+        }
+
+        // 4. If still < 3, sequentially add ids from catalog (in iteration order) until we reach 3
+        if (valid.size() < 3) {
+            for (String id : IDS) {
+                if (!valid.contains(id)) {
+                    valid.add(id);
+                    if (valid.size() >= 3) break;
+                }
+            }
+        }
+
+        List<String> result = new ArrayList<>(valid);
+        return Collections.unmodifiableList(result);
     }
 }

@@ -75,4 +75,11 @@ public class PostCreateRequest {
     @com.fasterxml.jackson.annotation.JsonAlias({"metaphor_id"})
     @Size(max = 64, message = "metaphorId는 64자 이하여야 합니다")
     private String metaphorId;
+
+    /**
+     * 메타포 일러스트 ID 목록 (3-5개, 첫번째 = 대표). AI PLAN 매칭값.
+     */
+    @com.fasterxml.jackson.annotation.JsonAlias({"metaphor_ids"})
+    @Size(max = 5, message = "metaphorIds는 5개 이하여야 합니다")
+    private java.util.List<@Size(max = 64, message = "각 metaphor_id는 64자 이하여야 합니다") String> metaphorIds;
 }

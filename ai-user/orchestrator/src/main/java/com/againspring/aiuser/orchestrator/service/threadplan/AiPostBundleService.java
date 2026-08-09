@@ -23,6 +23,7 @@ import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -73,6 +74,20 @@ public class AiPostBundleService {
     private final StoryTwinGuard storyTwinGuard;
     private final SourceReservationSupport sourceReservationSupport;
     private final GenerationConfigSupport generationConfigSupport;
+    private final JdbcTemplate jdbcTemplate;
+
+    /** 최근 과다 사용된 메타포 top-10 (post_metaphors 집계) — LLM 프롬프트에 다양성 힌트로 전달. */
+    private List<String> fetchOverusedMetaphorIds() {
+        try {
+            return jdbcTemplate.queryForList(
+                    "SELECT metaphor_id FROM post_metaphors GROUP BY metaphor_id "
+                            + "ORDER BY COUNT(*) DESC LIMIT 10",
+                    String.class);
+        } catch (Exception e) {
+            log.warn("fetchOverusedMetaphorIds failed — proceeding without variety hint: {}", e.getMessage());
+            return List.of();
+        }
+    }
 
     /** A PLAN rollout owns post generation even when its workload provider is OFF. */
     public boolean ownsPostGeneration() {
@@ -124,7 +139,8 @@ public class AiPostBundleService {
                                 && !bundle.content.captureSplitAfterLines().isEmpty()
                                 ? bundle.content.captureSplitAfterLines().get(0) : null)
                 .promoTitle(bundle.content.promoTitle())
-                .metaphorId(bundle.content.metaphorId());
+                .metaphorId(bundle.content.metaphorId())
+                .metaphorIds(bundle.content.metaphorIds());
         applyProvenance(postBuilder, bundle.source);
         Optional<PostDto> published = backendBot.createPost(jwt, postBuilder.build());
         if (published.isEmpty() || published.get().getId() == null) {
@@ -426,6 +442,7 @@ public class AiPostBundleService {
         if (postContent.captureSplitAfterLines() != null && !postContent.captureSplitAfterLines().isEmpty()) {
             postMap.put("capture_split_after_line", postContent.captureSplitAfterLines().get(0));
         }
+        postMap.put("metaphor_ids", postContent.metaphorIds());
         merged.put("post", postMap);
         log.info("AI post micro-batch done corr={} batches={} items={}/{} size={}",
                 correlationId, slices.size(), mergedItems.size(), pool,
@@ -454,6 +471,8 @@ public class AiPostBundleService {
         }
         List<String> recent = PlanSourceStoryResolver.recentOutputsForRequest(source.recentBodies(), 200);
         if (!recent.isEmpty()) request.put("recentOutputs", recent);
+        List<String> overusedMetaphors = fetchOverusedMetaphorIds();
+        if (!overusedMetaphors.isEmpty()) request.put("overusedMetaphorIds", overusedMetaphors);
         request.put("storyProfile", storyProfileToMap(storyProfile));
         request.put("storySearchDoc", storyProfile.toSearchDocument());
         request.put("author", planPersonaMapper.mapAuthor(author));
@@ -725,7 +744,8 @@ public class AiPostBundleService {
         List<Integer> splits = resolveCaptureSplits(body, readCaptureSplits(raw));
         String promoTitle = readAndNormalizePromoTitle(title, raw);
         String metaphorId = readMetaphorId(raw);
-        return new PostContent(title, body, splits, promoTitle, metaphorId);
+        List<String> metaphorIds = readMetaphorIds(raw);
+        return new PostContent(title, body, splits, promoTitle, metaphorId, metaphorIds);
     }
 
     private static String readMetaphorId(Map<?, ?> post) {
@@ -734,6 +754,22 @@ public class AiPostBundleService {
         if (v == null) return null;
         String id = String.valueOf(v).trim().toLowerCase(java.util.Locale.ROOT);
         return id.isBlank() ? null : id;
+    }
+
+    private static List<String> readMetaphorIds(Map<?, ?> post) {
+        Object v = post.get("metaphor_ids");
+        if (v == null) v = post.get("metaphorIds");
+        if (v == null || !(v instanceof List<?>)) return null;
+        List<?> raw = (List<?>) v;
+        if (raw.isEmpty()) return null;
+        List<String> ids = new ArrayList<>();
+        for (Object o : raw) {
+            if (o != null) {
+                String id = String.valueOf(o).trim().toLowerCase(java.util.Locale.ROOT);
+                if (!id.isBlank()) ids.add(id);
+            }
+        }
+        return ids.isEmpty() ? null : ids;
     }
 
     private static String readAndNormalizePromoTitle(String title, Map<?, ?> post) {
@@ -885,7 +921,7 @@ public class AiPostBundleService {
     }
 
     private record PostContent(String title, String body, List<Integer> captureSplitAfterLines, String promoTitle,
-                               String metaphorId) { }
+                               String metaphorId, List<String> metaphorIds) { }
 
     public record PublishedBundle(PostDto post, String body, Long sourceExampleId) {
         public PublishedBundle(PostDto post, String body) {

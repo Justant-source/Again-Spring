@@ -36,9 +36,18 @@ public class ThreadPlanResponse {
         Integer captureSplitAfterLine;
         /**
          * Best-fit metaphor illustration id (60-card catalog). Matched at AI_POST creation.
+         * @deprecated prefer {@link #metaphorIds} (ranked list)
          */
+        @Deprecated
         @JsonProperty("metaphor_id")
         String metaphorId;
+        /**
+         * Ranked list of 3-5 metaphor illustration ids (60-card catalog), ordered from best-fit to weakest-fit.
+         * The first id is the representative/primary metaphor for video intro; remaining ids illustrate story body beats.
+         * Matched at AI_POST creation.
+         */
+        @JsonProperty("metaphor_ids")
+        List<String> metaphorIds;
     }
     @Value @Builder
     public static class Item {

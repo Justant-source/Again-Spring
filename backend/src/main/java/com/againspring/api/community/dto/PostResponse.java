@@ -25,6 +25,8 @@ public class PostResponse {
     private String promoTitle;
     /** 메타포 일러스트 ID (60종). 없으면 null. */
     private String metaphorId;
+    /** 메타포 일러스트 ID 목록 (3-5개, 첫번째 = 대표). 없으면 null. */
+    private List<String> metaphorIds;
     private String bodyPublished;
     private String category;
     private String visibility;
@@ -71,6 +73,7 @@ public class PostResponse {
                 .userTitle(post.getUserTitle())
                 .promoTitle(post.getPromoTitle())
                 .metaphorId(post.getMetaphorId())
+                .metaphorIds(post.getMetaphorIds())
                 .bodyPublished(post.getBodyPublished())
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())

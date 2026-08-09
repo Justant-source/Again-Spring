@@ -35,6 +35,8 @@ public class ThreadPlanRequest {
     private String dynamicExamples;
     /** Recent post bodies for anti-self-copy (list of short strings). */
     private List<String> recentOutputs;
+    /** Metaphor ids used too often recently (orchestrator-computed) — LLM should avoid repeating these. */
+    private List<String> overusedMetaphorIds;
     /**
      * Explicit AI_POST author profile. Prefer this over assuming {@code personas[0]}.
      * Same shape as {@link Persona} plus optional slangLevel/interests.

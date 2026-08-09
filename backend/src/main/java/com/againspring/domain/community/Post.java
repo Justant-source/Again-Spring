@@ -13,6 +13,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -55,6 +56,16 @@ public class Post {
      */
     @Column(name = "metaphor_id", length = 64)
     private String metaphorId;
+
+    /**
+     * 메타포 일러스트 ID 순위 목록 (3-5개, 첫번째 = 대표).
+     * AI PLAN이 사연 생성 시 매칭. 마케팅 렌더러용.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "post_metaphors", joinColumns = @JoinColumn(name = "post_id"))
+    @Column(name = "metaphor_id")
+    @OrderColumn(name = "rank")
+    private List<String> metaphorIds = new ArrayList<>();
 
     /**
      * X/IG 캡쳐 전반부 마지막 개행 블록(1-based).

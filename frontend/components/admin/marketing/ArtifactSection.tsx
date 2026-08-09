@@ -2,23 +2,30 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api/client';
+import { uploadJobThumbnail } from '@/lib/api/admin/marketing';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, Image as ImageIcon, Video, ChevronDown, ChevronUp } from 'lucide-react';
+import { Download, FileText, Image as ImageIcon, Video, ChevronDown, ChevronUp, Upload } from 'lucide-react';
 
 interface PlatformPackage {
   upload?: string;
   card?: string;
   video?: string;
   thumbnail?: string;
+  customcover?: string;
   [key: string]: string | undefined;
 }
 
 interface Props {
   jobId: number;
   artifacts: Record<string, unknown>;
+  /** Called after a custom thumbnail upload succeeds, so the parent can refetch the job. */
+  onArtifactsChanged?: () => void;
 }
+
+const THUMBNAIL_PLATFORMS = new Set(['youtube_shorts', 'instagram_reels']);
+const MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024; // matches YouTube thumbnails.set hard cap
 
 const PLATFORM_LABELS: Record<string, string> = {
   x_thread: 'X 4단 스레드',
@@ -43,7 +50,7 @@ const PLATFORM_COLORS: Record<string, string> = {
 function fileKind(key: string): 'video' | 'image' | 'json' {
   if (key === 'video' || key.startsWith('video')) return 'video';
   if (
-    key === 'card' || key === 'thumbnail' ||
+    key === 'card' || key === 'thumbnail' || key === 'customcover' ||
     key.startsWith('card_') || key.startsWith('img_')
   ) return 'image';
   return 'json';
@@ -53,7 +60,8 @@ function fileLabel(key: string): string {
   const labels: Record<string, string> = {
     upload: '업로드 패키지 (JSON)',
     card: '카드 이미지',
-    thumbnail: '썸네일',
+    thumbnail: '썸네일 (자동)',
+    customcover: '커스텀 썸네일',
     video: '영상',
   };
   return labels[key] ?? key;
@@ -495,7 +503,58 @@ function BlogPreview({ pkg, jobId, uploadData }: {
   );
 }
 
-function PlatformCard({ platform, pkg, jobId }: { platform: string; pkg: PlatformPackage; jobId: number }) {
+function ThumbnailUploader({
+  jobId, platform, onUploaded,
+}: { jobId: number; platform: string; onUploaded?: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      setError('PNG 또는 JPEG 파일만 업로드할 수 있습니다.');
+      return;
+    }
+    if (file.size > MAX_THUMBNAIL_BYTES) {
+      setError('파일 크기는 2MB 이하여야 합니다.');
+      return;
+    }
+    setUploading(true);
+    try {
+      await uploadJobThumbnail(jobId, platform, file);
+      onUploaded?.();
+    } catch {
+      setError('썸네일 업로드에 실패했습니다.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="mt-1">
+      <label className="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+        <Upload className="w-4 h-4 text-gray-400" />
+        <span>{uploading ? '업로드 중…' : '커스텀 썸네일 업로드 (PNG/JPEG, ≤2MB)'}</span>
+        <input
+          type="file"
+          accept="image/png,image/jpeg"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => {
+            void handleFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+      </label>
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+function PlatformCard({
+  platform, pkg, jobId, onArtifactsChanged,
+}: { platform: string; pkg: PlatformPackage; jobId: number; onArtifactsChanged?: () => void }) {
   const label = PLATFORM_LABELS[platform] ?? platform;
   const colorClass = PLATFORM_COLORS[platform] ?? 'bg-gray-600 text-white';
   const [uploadData, setUploadData] = useState<Record<string, unknown> | undefined>(undefined);
@@ -547,6 +606,9 @@ function PlatformCard({ platform, pkg, jobId }: { platform: string; pkg: Platfor
             />
           );
         })}
+        {THUMBNAIL_PLATFORMS.has(platform) && (
+          <ThumbnailUploader jobId={jobId} platform={platform} onUploaded={onArtifactsChanged} />
+        )}
       </div>
 
       {/* Platform-specific rich preview below generic items */}
@@ -563,7 +625,7 @@ function PlatformCard({ platform, pkg, jobId }: { platform: string; pkg: Platfor
   );
 }
 
-export function ArtifactSection({ jobId, artifacts }: Props) {
+export function ArtifactSection({ jobId, artifacts, onArtifactsChanged }: Props) {
   // Detect per-platform structure (values are objects) vs old flat structure
   const entries = Object.entries(artifacts).filter(([, v]) => v != null && typeof v === 'object');
 
@@ -597,6 +659,7 @@ export function ArtifactSection({ jobId, artifacts }: Props) {
             platform={platform}
             pkg={pkg as PlatformPackage}
             jobId={jobId}
+            onArtifactsChanged={onArtifactsChanged}
           />
         ))}
       </div>

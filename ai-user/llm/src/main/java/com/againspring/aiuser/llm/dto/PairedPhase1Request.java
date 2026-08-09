@@ -23,6 +23,8 @@ public class PairedPhase1Request {
     private String sourceBody;
     private String dynamicExamples;
     private List<String> recentOutputs;
+    /** Metaphor ids used too often recently (orchestrator-computed) — LLM should avoid repeating these. */
+    private List<String> overusedMetaphorIds;
     /** Explicit 작성자 profile; prefer over assuming personas[0]. */
     private Map<String, Object> author;
     /** Comment cast (and optionally the author persona for voice grounding). */

@@ -115,6 +115,18 @@ public class PostComposeService {
                                   java.util.List<Integer> captureSplitAfterLines,
                                   String promoTitle,
                                   String metaphorId) {
+        return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
+                jurorCount, sessionId, source, captureSplitAfterLines, promoTitle, metaphorId, null);
+    }
+
+    public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
+                                  PostCategory category, String visibility,
+                                  int jurorCount, String sessionId,
+                                  SourceSnapshot source,
+                                  java.util.List<Integer> captureSplitAfterLines,
+                                  String promoTitle,
+                                  String metaphorId,
+                                  java.util.List<String> metaphorIds) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
         // 위기 감지 (이중방어 — FE에서도 감지)
@@ -135,6 +147,27 @@ public class PostComposeService {
             normalizedMetaphor = metaphorId.trim().toLowerCase(java.util.Locale.ROOT);
             if (normalizedMetaphor.length() > 64) {
                 normalizedMetaphor = normalizedMetaphor.substring(0, 64);
+            }
+        }
+
+        // Process metaphorIds: trim/lowercase, dedupe, cap at 5
+        java.util.List<String> normalizedMetaphorIds = null;
+        if (metaphorIds != null && !metaphorIds.isEmpty()) {
+            java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+            for (String id : metaphorIds) {
+                if (id != null && !id.isBlank()) {
+                    String normalized = id.trim().toLowerCase(java.util.Locale.ROOT);
+                    if (normalized.length() > 64) {
+                        normalized = normalized.substring(0, 64);
+                    }
+                    if (!seen.contains(normalized)) {
+                        seen.add(normalized);
+                        if (seen.size() >= 5) break;
+                    }
+                }
+            }
+            if (!seen.isEmpty()) {
+                normalizedMetaphorIds = new ArrayList<>(seen);
             }
         }
 
@@ -159,6 +192,7 @@ public class PostComposeService {
                 .captureSplitAfterLines(captureSplitAfterLines)
                 .promoTitle(normalizedPromo)
                 .metaphorId(normalizedMetaphor)
+                .metaphorIds(normalizedMetaphorIds)
                 .voteCloseAt(Instant.now().plusSeconds(7L * 24 * 3600))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now());

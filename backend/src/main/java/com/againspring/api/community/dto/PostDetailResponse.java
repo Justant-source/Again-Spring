@@ -32,6 +32,8 @@ public class PostDetailResponse {
 
     private String metaphorId;
 
+    private List<String> metaphorIds;
+
     private String bodyPublished;
 
     private String category;
@@ -122,6 +124,7 @@ public class PostDetailResponse {
                 .title(post.getTitle())
                 .promoTitle(post.getPromoTitle())
                 .metaphorId(post.getMetaphorId())
+                .metaphorIds(post.getMetaphorIds())
                 .bodyPublished(post.getBodyPublished())
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())

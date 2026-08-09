@@ -271,7 +271,7 @@ export default function MarketingJobDetailPage() {
 
         {/* 아티팩트 */}
         {job.artifacts && Object.keys(job.artifacts).length > 0 && (
-          <ArtifactSection jobId={job.id} artifacts={job.artifacts} />
+          <ArtifactSection jobId={job.id} artifacts={job.artifacts} onArtifactsChanged={loadJob} />
         )}
 
         {/* 게시 기록 */}

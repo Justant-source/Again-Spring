@@ -103,7 +103,8 @@ public class ScheduledPostPublisher {
                     .visibility("PUBLIC").jurorCount(jurorCount)
                     .captureSplitAfterLines(readCaptureSplitsFromCandidates(row.getCandidatesJson(), row.getBody()))
                     .promoTitle(readPromoTitleFromCandidates(row.getCandidatesJson(), row.getTitle()))
-                    .metaphorId(readMetaphorIdFromCandidates(row.getCandidatesJson()));
+                    .metaphorId(readMetaphorIdFromCandidates(row.getCandidatesJson()))
+                    .metaphorIds(readMetaphorIdsFromCandidates(row.getCandidatesJson()));
             if (!paired) {
                 applyProvenanceFromCandidates(postBuilder, row.getCandidatesJson());
             }
@@ -347,6 +348,32 @@ public class ScheduledPostPublisher {
             }
         } catch (Exception e) {
             log.debug("Could not read metaphor_id from candidates: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> readMetaphorIdsFromCandidates(String candidatesJson) {
+        if (candidatesJson == null || candidatesJson.isBlank()) return null;
+        try {
+            Map<String, Object> response = objectMapper.readValue(candidatesJson, new TypeReference<>() { });
+            Object postRaw = response.get("post");
+            if (postRaw instanceof Map<?, ?> post) {
+                Object v = post.get("metaphor_ids");
+                if (v == null) v = post.get("metaphorIds");
+                if (v instanceof List<?> raw && !raw.isEmpty()) {
+                    List<String> ids = new java.util.ArrayList<>();
+                    for (Object o : raw) {
+                        if (o != null) {
+                            String id = String.valueOf(o).trim().toLowerCase(java.util.Locale.ROOT);
+                            if (!id.isBlank()) ids.add(id);
+                        }
+                    }
+                    if (!ids.isEmpty()) return ids;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not read metaphor_ids from candidates: {}", e.getMessage());
         }
         return null;
     }
