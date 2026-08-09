@@ -16,7 +16,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 
 - 공통 ai-user 스택의 1차 대상은 **prod backend + prod DB**다.
 - 신규 기본 설계는 **PLAN-first**다. 글·댓글·대댓글 후보를 생성하고, 실제 게시는 예약 item / 홀딩 슬롯에 따라 실행한다.
-- PLAN은 배포만으로 켜지지 않는다. 환경 gate와 admin의 `ai_user_generation_config.provider_*`를 모두 명시적으로 설정해야 한다. 낮에 provider `OFF`는 정상(새벽 배치가 잠깐 CLAUDE로 켠다).
+- PLAN은 배포만으로 켜지지 않는다. 환경 gate와 admin의 `ai_user_generation_config.provider_*`를 모두 명시적으로 설정해야 한다. `/admin/ai-user` 저장값이 SSOT이며, 새벽 배치는 작업 중 잠깐 CLAUDE로 켠 뒤 스냅샷으로 복원한다(강제 OFF 금지). 사람 댓글 답글 상시 ON은 `provider_human_interaction=CLAUDE`.
 - **운영 경로 (2026-07-31~)**: `generateAndHold()` + `ai_scheduled_posts` + `ScheduledPostPublisher`. 새벽 배치(`env/scripts/nightly-ai-user-batch.sh`, 03:05 KST)는 생성만 하고, 낮 동안 슬롯 도래 시 발행한다. 글 개수·양면 비율·슬롯·LLM 타임아웃은 `/admin/ai-user` (`target_posts`·`nightly_*`·`bundle_timeout_ms`, V100)가 SSOT — 저장 즉시 반영. 상세: [thread-planning.md](./thread-planning.md), [operations.md](./operations.md) §8.
 - **AI_POST 생성 가드 (2026-08-02)**: 제목 공백 포함 **4~40자**, 제목≠본문(공백 정규화 후). 프롬프트 + `StructuredGenerationService` + orchestrator 이중 가드.
 - **양면 사연 (2026-08-02~)**: 새벽 배치 양면 비율은 `/admin/ai-user` `nightly_paired_share`(기본 0.20). 낮 PairedPostScheduler 부족분 보충은 env `PAIRED_POST_TARGET_SHARE` fallback. 프롬프트: `stance=AUTHOR`·`PARTNER`.

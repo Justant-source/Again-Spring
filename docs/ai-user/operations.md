@@ -177,7 +177,8 @@ delta를 계산해 댓글·대댓글 `atLocal`에 일괄 적용한다 (키보드
 
 ```
 env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
-  ├─ provider(ai_post_bundle/human_post_plan/human_interaction) = CLAUDE
+  ├─ provider_* 스냅샷 (/admin/ai-user SSOT)
+  ├─ provider(ai_post_bundle/human_post_plan/human_interaction) = CLAUDE (임시)
   ├─ SSOT: ai_user_generation_config ( /admin/ai-user 저장값 )
   │    N=target_posts, paired=ceil(N×nightly_paired_share), solo=N−paired
   │    slots=nightly_slot_from_hour~to_hour, spacing=nightly_slot_min_spacing_minutes
@@ -190,7 +191,7 @@ env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
   │       → Δ(10m–2h, median~50–60m) 후 Call2(PARTNER+phase2)→invite answer
   │       → partner 도착 시 미게시 cancel + phase2 both-context (phase1 게시분 보존)
   ├─ 낮 동안 밀린 REQUESTED 스레드플랜(실사람 글 반응 등)도 이 창에서 같이 소진
-  └─ provider = OFF (trap으로 스크립트 종료 방식과 무관하게 항상 보장)
+  └─ provider = 스냅샷 복원 (강제 OFF 금지 — 관리자가 CLAUDE로 둔 값 유지)
 
 ScheduledPostPublisher (cron AI_USER_SCHEDULED_POST_PUBLISHER_CRON, 기본 매 분)
   ├─ ScheduledPostLeaseService.claimDue()로 due 행 lease

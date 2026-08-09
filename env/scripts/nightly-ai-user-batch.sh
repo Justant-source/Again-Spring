@@ -17,14 +17,16 @@
 #   이제 그 파이프라인만 쓴다.
 #
 # 절차:
-#   1) provider(ai_post_bundle/human_post_plan/human_interaction) = CLAUDE
+#   1) /admin/ai-user 의 provider_* 값을 스냅샷한 뒤, 배치에 필요한
+#      provider(ai_post_bundle/human_post_plan/human_interaction)만 잠깐 CLAUDE로 켠다.
 #   2) /admin/trigger/generate-scheduled-posts — N개 글을 "생성만" 함(발행 안 함).
 #      각 글의 발행 슬롯은 ActivityCurve로 오늘 남은 활동 시간대(기본 08~22시 KST)에
 #      가중 샘플링됨 — 20~40대 커뮤니티 체류 패턴 근사치(실측 데이터 아님, 하드코딩값).
 #   3) 낮 동안 실사람이 새로 올린 글에 대한 REQUESTED 스레드플랜 백로그도 이 새벽
 #      창에서 같이 소진한다(provider가 어차피 켜져 있으므로).
-#   4) provider를 다시 OFF로 복귀. schedule_execution_paused는 항상 false로 둬서
-#      ScheduledPostPublisher/ThreadPlanPublisher의 게시 자체는 하루 종일 계속된다.
+#   4) provider를 **스냅샷 값으로 복원**한다(강제 OFF 금지). 관리자가 CLAUDE로
+#      둔 사람 댓글 답글 등은 낮에도 그대로 유지된다.
+#      schedule_execution_paused는 건드리지 않는다 — 게시 자체는 하루 종일 계속.
 #
 # ai_user_runtime.enabled(LEGACY tick 킬스위치)는 건드리지 않는다 — 이 파이프라인과
 # 무관하다.
@@ -102,15 +104,59 @@ load_generation_config() {
   if [ "${SCHEDULED_POST_COUNT}" -gt 100 ]; then SCHEDULED_POST_COUNT=100; fi
 }
 
-trap 'log "trap: restoring provider=OFF before exit"; db "UPDATE ai_user_generation_config SET provider_ai_post_bundle=\"OFF\", provider_human_post_plan=\"OFF\", provider_human_interaction=\"OFF\", updated_by=\"nightly-batch-trap\", updated_at=UTC_TIMESTAMP() WHERE id=1;" || true' EXIT
+# Admin SSOT: CLAUDE|CODEX|OFF only. Unknown/empty → OFF (safe default for restore).
+sanitize_provider() {
+  case "${1:-}" in
+    CLAUDE|CODEX|OFF) printf '%s' "$1" ;;
+    *) printf 'OFF' ;;
+  esac
+}
+
+# Snapshot current admin values BEFORE temporarily enabling providers for the batch.
+# On EXIT we restore this snapshot — never force OFF over an admin CLAUDE/CODEX choice.
+# PROVIDERS_SNAPSHOTTED=0 → restore is a no-op (must not clobber admin values if snapshot failed).
+SNAP_AI_POST=OFF
+SNAP_HUMAN_POST=OFF
+SNAP_HUMAN_INTERACTION=OFF
+PROVIDERS_SNAPSHOTTED=0
+snapshot_providers() {
+  local row
+  row=$(db "SELECT provider_ai_post_bundle, provider_human_post_plan, provider_human_interaction FROM ai_user_generation_config WHERE id=1;" || true)
+  if [ -z "${row:-}" ]; then
+    log "WARN: provider snapshot empty"
+    return 1
+  fi
+  SNAP_AI_POST=$(sanitize_provider "$(printf '%s' "$row" | awk '{print $1}')")
+  SNAP_HUMAN_POST=$(sanitize_provider "$(printf '%s' "$row" | awk '{print $2}')")
+  SNAP_HUMAN_INTERACTION=$(sanitize_provider "$(printf '%s' "$row" | awk '{print $3}')")
+  PROVIDERS_SNAPSHOTTED=1
+  log "provider snapshot: ai_post=${SNAP_AI_POST} human_post=${SNAP_HUMAN_POST} human_interaction=${SNAP_HUMAN_INTERACTION}"
+  return 0
+}
+
+restore_providers() {
+  if [ "${PROVIDERS_SNAPSHOTTED}" != 1 ]; then
+    log "trap: skip provider restore (no snapshot taken)"
+    return 0
+  fi
+  log "trap: restoring providers to snapshot ai_post=${SNAP_AI_POST} human_post=${SNAP_HUMAN_POST} human_interaction=${SNAP_HUMAN_INTERACTION}"
+  db "UPDATE ai_user_generation_config SET provider_ai_post_bundle=\"${SNAP_AI_POST}\", provider_human_post_plan=\"${SNAP_HUMAN_POST}\", provider_human_interaction=\"${SNAP_HUMAN_INTERACTION}\", updated_by=\"nightly-batch-restore\", updated_at=UTC_TIMESTAMP() WHERE id=1;" || true
+}
+
+trap restore_providers EXIT
 
 log "=== nightly-ai-user-batch (scheduled-post pipeline) start (max ${MAX_MINUTES}m) ==="
 
-if ! db "UPDATE ai_user_generation_config SET provider_ai_post_bundle='CLAUDE', provider_human_post_plan='CLAUDE', provider_human_interaction='CLAUDE', updated_by='nightly-batch', updated_at=UTC_TIMESTAMP() WHERE id=1;"; then
-  log "ERROR: failed to enable PLAN providers — aborting without further action"
+if ! snapshot_providers; then
+  log "ERROR: failed to snapshot PLAN providers — aborting without mutate"
   exit 1
 fi
-log "provider_ai_post_bundle/human_post_plan/human_interaction=CLAUDE"
+
+if ! db "UPDATE ai_user_generation_config SET provider_ai_post_bundle='CLAUDE', provider_human_post_plan='CLAUDE', provider_human_interaction='CLAUDE', updated_by='nightly-batch', updated_at=UTC_TIMESTAMP() WHERE id=1;"; then
+  log "ERROR: failed to enable PLAN providers — aborting (trap will restore snapshot)"
+  exit 1
+fi
+log "provider_ai_post_bundle/human_post_plan/human_interaction temporarily=CLAUDE (will restore snapshot on exit)"
 load_generation_config
 PAIRED_COUNT=$(paired_count_for "$SCHEDULED_POST_COUNT" "$PAIRED_SHARE")
 SOLO_COUNT=$(( SCHEDULED_POST_COUNT - PAIRED_COUNT ))
@@ -150,4 +196,4 @@ done
 SCHEDULED_COUNT=$(db "SELECT COUNT(*) FROM ai_scheduled_posts WHERE status='SCHEDULED';")
 log "ai_scheduled_posts pending publish: ${SCHEDULED_COUNT:-0}"
 log "=== nightly-ai-user-batch done ==="
-# trap EXIT handles provider=OFF
+# trap EXIT restores the admin snapshot (not hard-coded OFF)

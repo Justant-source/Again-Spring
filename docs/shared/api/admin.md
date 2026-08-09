@@ -190,7 +190,7 @@ flowchart LR
 - strict runtime h2h는 이 API가 아니라 dev docker network 안에서 기존 harness를 돌려야 한다.
 - PLAN 필드: `providerAiPostBundle`, `providerHumanPostPlan`, `providerHumanInteraction`, `providerVoteLike`(`CLAUDE`/`CODEX`/`OFF`), `scheduleExecutionPaused`, `aiUserKillSwitch`, `candidatePoolSize`(8~30), `humanBatchMaxPosts`(1~10), `humanBatchMaxInteractions`(1~50).
 - **생성 런타임 (V100)**: `bundleTimeoutMs`(60_000~900_000, 저장 즉시 orchestrator가 DB 재조회), `nightlyPairedShare`(0~1), `nightlySlotFromHour`/`ToHour`, `nightlySlotMinSpacingMinutes`. 새벽 배치 글 개수 = `targetPosts`.
-- `OFF`는 이후 해당 workload의 새 job만 차단한다. 이미 생성한 item의 게시 중지는 `scheduleExecutionPaused`, 전체 생성·게시 정지는 `aiUserKillSwitch`/runtime kill-switch를 사용한다. 낮에 post provider `OFF`는 정상(새벽 배치가 잠깐 CLAUDE로 켠다).
+- `OFF`는 이후 해당 workload의 새 job만 차단한다. 이미 생성한 item의 게시 중지는 `scheduleExecutionPaused`, 전체 생성·게시 정지는 `aiUserKillSwitch`/runtime kill-switch를 사용한다. `/admin/ai-user` 저장값이 SSOT다. 새벽 배치(`nightly-ai-user-batch.sh`)는 작업 중에만 잠깐 CLAUDE로 켠 뒤 **스냅샷으로 복원**하며, 관리자 값을 OFF로 강제하지 않는다. 사람 댓글 답글(`providerHumanInteraction=CLAUDE`)은 낮에도 30분 batch가 상시 동작한다.
 - **댓글 생성량 SSOT (2026-08-01, V91)**: `hr_*` 컬럼 — `/admin/ai-user` UI. orchestrator는 0(미설정)일 때만 yml 폴백.
 
 ## Content API — 공개 스레드 · 예약 홀딩 (2026-08-01~)

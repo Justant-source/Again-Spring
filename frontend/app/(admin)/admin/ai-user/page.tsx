@@ -605,27 +605,27 @@ export default function AiUserPage() {
                   API 키 없이 연결된 Claude Code / Codex CLI 세션만 사용합니다.
                 </p>
                 <p>
-                  <strong>낮에 OFF인 것이 정상</strong>입니다. 새벽 배치가 잠깐 CLAUDE로 켠 뒤 다시 OFF로 되돌립니다.
-                  사람 댓글 반응·투표 등 낮 시간 LLM job만 이 스위치로 막습니다.
+                  아래 값은 <strong>관리자 저장값이 SSOT</strong>입니다. 새벽 배치는 작업 중에만 잠깐 CLAUDE로
+                  켠 뒤 <strong>저장해 둔 값으로 복원</strong>하며, OFF로 강제하지 않습니다.
                 </p>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3" data-testid="ai-plan-provider-controls">
                 <ThreadPlanProviderSelector
                   label="AI 글·댓글 묶음 생성"
-                  description="낮 시간 AI 글 LLM job. 새벽 배치 글 개수는 위 일일 목표량(POST)입니다."
+                  description="새 AI 글·댓글 묶음 LLM job. OFF면 낮에는 생성하지 않고, 새벽 배치가 잠깐 켠 뒤 이 값으로 돌아갑니다."
                   value={providerAiPostBundle}
                   onChange={setProviderAiPostBundle}
                 />
                 <ThreadPlanProviderSelector
                   label="사람 글 → AI 댓글"
-                  description="사람이 글을 쓰면 AI가 비동기로 댓글을 답니다."
+                  description="사람이 글을 쓰면 AI가 비동기로 댓글 후보를 만듭니다. CLAUDE/CODEX로 두면 상시 동작합니다."
                   value={providerHumanPostPlan}
                   onChange={setProviderHumanPostPlan}
                 />
                 <ThreadPlanProviderSelector
                   label="사람 댓글 확인·답글"
-                  description="30분 주기로 사람이 남긴 댓글을 확인하고 AI가 답글을 답니다."
+                  description="30분마다 사람 댓글·대댓글을 묶어 AI 답글을 만듭니다(최대 20개/호출). CLAUDE로 두면 하루 종일 상시 ON입니다."
                   value={providerHumanInteraction}
                   onChange={setProviderHumanInteraction}
                 />

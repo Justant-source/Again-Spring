@@ -216,6 +216,15 @@ test.describe('Journey 15-D: Tabs 구조 및 AI 관제 탭', () => {
     await expect(page.getByRole('heading', { name: 'AI 생성 관제' })).toBeVisible({ timeout: 8_000 })
   })
 
+  test('계획형 provider 컨트롤(사람 댓글 답글 포함)이 표시됨', async ({ page }) => {
+    await page.goto(`${BASE}/admin/ai-user`)
+    await page.waitForURL(/\/admin\/ai-user/)
+
+    await expect(page.getByText('계획형 AI 사용자 실행')).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator('[data-testid="ai-plan-provider-controls"]')).toBeVisible()
+    await expect(page.getByText('사람 댓글 확인·답글')).toBeVisible()
+  })
+
   test('"생성 설정" 탭이 표시됨', async ({ page }) => {
     await page.goto(`${BASE}/admin/ai-user`)
     await page.waitForURL(/\/admin\/ai-user/)
