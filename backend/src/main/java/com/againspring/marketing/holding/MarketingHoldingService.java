@@ -16,10 +16,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -42,6 +46,7 @@ import java.util.stream.Collectors;
 public class MarketingHoldingService {
 
     public static final int BOARD_DISPLAY_LIMIT = 20;
+    private static final int BOARD_REFRESH_MAX_ATTEMPTS = 3;
 
     private final MarketingHoldingRepository holdingRepository;
     private final PostRepository postRepository;
@@ -49,6 +54,10 @@ public class MarketingHoldingService {
     private final MarketingScoreWeightService scoreWeightService;
     private final MarketingHoldingBriefSeeder briefSeeder;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
+
+    /** Serializes board refresh so concurrent admin polls cannot trip MariaDB 1020. */
+    private final Object boardRefreshLock = new Object();
 
     public record RankedCandidate(
         String postId,
@@ -97,8 +106,33 @@ public class MarketingHoldingService {
         BoardMeta meta
     ) {}
 
-    @Transactional
+    /**
+     * Waiting-board snapshot. Concurrent GET /holding (page load + 45s poll / Strict Mode)
+     * previously raced on {@code saveAll} and raised MariaDB 1020
+     * ("Record has changed since last read"), which surfaced as a board load failure.
+     * Refresh is single-flight + retried inside a transaction that commits under the lock.
+     */
     public HoldingBoard getBoard() {
+        synchronized (boardRefreshLock) {
+            TransactionTemplate tx = new TransactionTemplate(transactionManager);
+            RuntimeException last = null;
+            for (int attempt = 1; attempt <= BOARD_REFRESH_MAX_ATTEMPTS; attempt++) {
+                try {
+                    return tx.execute(status -> refreshBoard());
+                } catch (RuntimeException ex) {
+                    last = ex;
+                    if (!isMariaRecordChanged(ex) || attempt >= BOARD_REFRESH_MAX_ATTEMPTS) {
+                        throw ex;
+                    }
+                    log.warn("Holding board refresh conflict (attempt {}/{}): {}",
+                        attempt, BOARD_REFRESH_MAX_ATTEMPTS, rootMessage(ex));
+                }
+            }
+            throw last != null ? last : new IllegalStateException("holding board refresh failed");
+        }
+    }
+
+    private HoldingBoard refreshBoard() {
         MarketingQuotaService.QuotaStatus quota = quotaService.getStatus();
         MarketingScoreWeightService.Weights weights = scoreWeightService.getWeights();
 
@@ -138,6 +172,7 @@ public class MarketingHoldingService {
             Post post = postsById.get(c.postId());
             MarketingHolding holding = existingById.get(c.postId());
             boolean isNew = holding == null;
+            boolean dirty = isNew;
 
             if (isNew) {
                 holding = MarketingHolding.builder()
@@ -148,23 +183,35 @@ public class MarketingHoldingService {
                     .build();
             }
 
-            holding.setScoreSnapshot(c.score());
-            holding.setRankSnapshot(c.rank());
+            if (!Objects.equals(holding.getScoreSnapshot(), c.score())) {
+                holding.setScoreSnapshot(c.score());
+                dirty = true;
+            }
+            if (!Objects.equals(holding.getRankSnapshot(), c.rank())) {
+                holding.setRankSnapshot(c.rank());
+                dirty = true;
+            }
 
             if (holding.getStatus() != MarketingHoldingStatus.PINNED
                 && holding.getStatus() != MarketingHoldingStatus.COMMITTED
                 && holding.getStatus() != MarketingHoldingStatus.DROPPED) {
                 int autoRank = autoRanks.getOrDefault(c.postId(), Integer.MAX_VALUE);
-                if (autoRank <= cutlineN) {
-                    holding.setStatus(MarketingHoldingStatus.IN_POOL);
-                } else if (holding.getStatus() == MarketingHoldingStatus.IN_POOL || isNew) {
-                    // First seed is IN_POOL then demote when outside cutline; also demote prior IN_POOL.
-                    holding.setStatus(MarketingHoldingStatus.OUT_OF_CUT);
-                }
+                MarketingHoldingStatus next = autoRank <= cutlineN
+                    ? MarketingHoldingStatus.IN_POOL
+                    : (holding.getStatus() == MarketingHoldingStatus.IN_POOL || isNew
+                        ? MarketingHoldingStatus.OUT_OF_CUT
+                        : holding.getStatus());
+                // First seed is IN_POOL then demote when outside cutline; also demote prior IN_POOL.
                 // OUT_OF_CUT outside cutline stays OUT_OF_CUT (draft kept)
+                if (holding.getStatus() != next) {
+                    holding.setStatus(next);
+                    dirty = true;
+                }
             }
 
-            toSave.add(holding);
+            if (dirty) {
+                toSave.add(holding);
+            }
 
             String projected;
             if (holding.getStatus() == MarketingHoldingStatus.PINNED
@@ -173,7 +220,7 @@ public class MarketingHoldingService {
             } else {
                 int autoRank = autoRanks.getOrDefault(c.postId(), Integer.MAX_VALUE);
                 if (autoRank > cutlineN || cutlineN <= 0) {
-                    projected = "OUT";
+                    projected = "OUT_OF_CUT";
                 } else {
                     autoInCut++;
                     projected = projectedFormat(autoInCut, cutlineN, videoSlots);
@@ -183,7 +230,9 @@ public class MarketingHoldingService {
         }
 
         demoteOutsideDisplay(displayIds, toSave);
-        holdingRepository.saveAll(toSave);
+        if (!toSave.isEmpty()) {
+            holdingRepository.saveAll(toSave);
+        }
 
         BoardMeta meta = new BoardMeta(
             quota.remainingPool(),
@@ -197,6 +246,33 @@ public class MarketingHoldingService {
             weights.weightVotes()
         );
         return new HoldingBoard(items, meta);
+    }
+
+    static boolean isMariaRecordChanged(Throwable ex) {
+        Throwable cur = ex;
+        while (cur != null) {
+            if (cur instanceof SQLException sql && sql.getErrorCode() == 1020) {
+                return true;
+            }
+            String msg = cur.getMessage();
+            if (msg != null && msg.contains("Record has changed since last read")) {
+                return true;
+            }
+            if (cur instanceof JpaSystemException && msg != null
+                && msg.contains("marketing_holding")) {
+                // Fall through — still check nested causes for 1020 specifically
+            }
+            cur = cur.getCause();
+        }
+        return false;
+    }
+
+    private static String rootMessage(Throwable ex) {
+        Throwable cur = ex;
+        while (cur.getCause() != null) {
+            cur = cur.getCause();
+        }
+        return cur.getMessage();
     }
 
     /**
@@ -314,7 +390,7 @@ public class MarketingHoldingService {
             String postId, Map<String, Integer> autoRanks, int cutlineN, long videoSlots) {
         int autoRank = autoRanks.getOrDefault(postId, Integer.MAX_VALUE);
         if (autoRank > cutlineN || cutlineN <= 0) {
-            return "OUT";
+            return "OUT_OF_CUT";
         }
         return projectedFormat(autoRank, cutlineN, videoSlots);
     }
@@ -461,8 +537,8 @@ public class MarketingHoldingService {
             }
             if (h.getStatus() == MarketingHoldingStatus.IN_POOL) {
                 h.setStatus(MarketingHoldingStatus.OUT_OF_CUT);
+                pendingSaves.add(h);
             }
-            pendingSaves.add(h);
         }
     }
 
@@ -472,7 +548,7 @@ public class MarketingHoldingService {
      */
     static String projectedFormat(int slotOrRank, int cutlineN, long videoSlots) {
         if (slotOrRank > cutlineN || cutlineN <= 0) {
-            return "OUT";
+            return "OUT_OF_CUT";
         }
         if (slotOrRank <= videoSlots) {
             return "VIDEO";

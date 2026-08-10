@@ -38,6 +38,25 @@ function resolveTab(raw: string | null): MainTab {
   return 'holding';
 }
 
+function formatApiError(err: unknown): string {
+  if (typeof err === 'object' && err !== null) {
+    const anyErr = err as {
+      response?: { status?: number; data?: { error?: { message?: string }; message?: string; detail?: string } };
+      message?: string;
+      code?: string;
+    };
+    const data = anyErr.response?.data;
+    const serverMsg =
+      data?.error?.message || data?.message || data?.detail;
+    if (serverMsg) return serverMsg;
+    if (anyErr.response?.status) {
+      return `HTTP ${anyErr.response.status}${anyErr.message ? ` (${anyErr.message})` : ''}`;
+    }
+    if (anyErr.message) return anyErr.message;
+  }
+  return String(err);
+}
+
 export default function MarketingJobsPage() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<MainTab>(() =>
@@ -68,8 +87,7 @@ export default function MarketingJobsPage() {
       const data = await getMarketingHoldingBoard();
       setBoard(data);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setHoldingError(`대기 보드를 불러오지 못했습니다: ${msg}`);
+      setHoldingError(`대기 보드를 불러오지 못했습니다: ${formatApiError(err)}`);
     } finally {
       if (showLoader) setHoldingLoading(false);
     }
@@ -82,8 +100,7 @@ export default function MarketingJobsPage() {
       const items = await listMarketingCompleted({ limit: 50 });
       setCompletedItems(items);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setCompletedError(`확정/탈락 목록을 불러오지 못했습니다: ${msg}`);
+      setCompletedError(`확정/탈락 목록을 불러오지 못했습니다: ${formatApiError(err)}`);
     } finally {
       setCompletedLoading(false);
     }

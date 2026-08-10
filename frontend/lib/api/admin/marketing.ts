@@ -447,8 +447,15 @@ function normalizeHoldingDraft(
   };
 }
 
+function normalizeProjectedFormat(
+  raw: string | null | undefined
+): MarketingProjectedFormat {
+  if (raw === 'VIDEO' || raw === 'TEXT' || raw === 'OUT_OF_CUT') return raw;
+  if (raw === 'OUT') return 'OUT_OF_CUT';
+  return 'OUT_OF_CUT';
+}
+
 function normalizeHoldingRow(raw: MarketingHoldingRowRaw): MarketingHoldingRow {
-  const projected = (raw.projectedFormat ?? 'OUT_OF_CUT') as MarketingProjectedFormat;
   return {
     postId: raw.postId,
     title: raw.title ?? null,
@@ -459,7 +466,7 @@ function normalizeHoldingRow(raw: MarketingHoldingRowRaw): MarketingHoldingRow {
     viewCount: Number(raw.viewCount ?? 0),
     commentCount: Number(raw.commentCount ?? 0),
     voteCount: Number(raw.voteCount ?? 0),
-    projectedFormat: projected,
+    projectedFormat: normalizeProjectedFormat(raw.projectedFormat),
     draft: normalizeHoldingDraft(raw.draft),
     lockedAt: raw.lockedAt ?? null,
     postCreatedAt: String(raw.postCreatedAt ?? ''),

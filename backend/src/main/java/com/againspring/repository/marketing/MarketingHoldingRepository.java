@@ -19,6 +19,39 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
     List<MarketingHolding> findByPostIdIn(Collection<String> postIds);
 
     /**
+     * S4 daily pool: one COMMITTED story = one shared-pool slot (locked today KST).
+     * Manual/test jobs that never commit must not consume the pool.
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT COUNT(*) FROM marketing_holding mh
+        WHERE mh.status = 'COMMITTED'
+        AND mh.locked_at >= :since
+        """)
+    long countCommittedSince(@Param("since") Instant since);
+
+    /**
+     * S4 daily video subset among COMMITTED stories locked since {@code since}.
+     * Auto commits leave {@code pin_format} null — detect video via Reels/Shorts jobs.
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT COUNT(*) FROM marketing_holding mh
+        WHERE mh.status = 'COMMITTED'
+        AND mh.locked_at >= :since
+        AND (
+            mh.pin_format = 'VIDEO'
+            OR EXISTS (
+                SELECT 1 FROM marketing_job mj
+                WHERE mj.post_id = mh.post_id
+                AND (
+                    JSON_CONTAINS(mj.targets, '"instagram_reels"') = TRUE
+                    OR JSON_CONTAINS(mj.targets, '"youtube_shorts"') = TRUE
+                )
+            )
+        )
+        """)
+    long countCommittedVideosSince(@Param("since") Instant since);
+
+    /**
      * Active waiting-board candidates: still inside the 24h window, not soft-deleted,
      * and not already COMMITTED/DROPPED on the holding table.
      *

@@ -2,7 +2,7 @@ package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
 import com.againspring.repository.ai.SystemSettingRepository;
-import com.againspring.repository.marketing.MarketingJobRepository;
+import com.againspring.repository.marketing.MarketingHoldingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,7 +28,7 @@ class MarketingQuotaServiceTest {
     private SystemSettingRepository systemSettingRepository;
 
     @Mock
-    private MarketingJobRepository marketingJobRepository;
+    private MarketingHoldingRepository holdingRepository;
 
     @InjectMocks
     private MarketingQuotaService service;
@@ -45,16 +45,16 @@ class MarketingQuotaServiceTest {
     }
 
     @Test
-    void getStatus_computesRemainingPool() {
+    void getStatus_computesRemainingPoolFromCommittedHoldings() {
         when(systemSettingRepository.findById(MarketingQuotaService.KEY_TEXT_CAP))
             .thenReturn(Optional.of(SystemSetting.builder()
                 .settingKey(MarketingQuotaService.KEY_TEXT_CAP).settingValue("6").build()));
         when(systemSettingRepository.findById(MarketingQuotaService.KEY_VIDEO_CAP))
             .thenReturn(Optional.of(SystemSetting.builder()
                 .settingKey(MarketingQuotaService.KEY_VIDEO_CAP).settingValue("3").build()));
-        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(2L);
-        // S4: story-based pool — 3 distinct posts marketed (2 video + 1 text-only)
-        when(marketingJobRepository.countDistinctMarketedPostsSince(any(Instant.class))).thenReturn(3L);
+        // S4: story-based pool — 3 COMMITTED (2 video + 1 text); stray test jobs ignored
+        when(holdingRepository.countCommittedVideosSince(any(Instant.class))).thenReturn(2L);
+        when(holdingRepository.countCommittedSince(any(Instant.class))).thenReturn(3L);
 
         MarketingQuotaService.QuotaStatus status = service.getStatus();
 
@@ -64,10 +64,31 @@ class MarketingQuotaServiceTest {
     }
 
     @Test
+    void getStatus_ignoresUncommittedVideoJobs_keepsVideoSlots() {
+        when(systemSettingRepository.findById(MarketingQuotaService.KEY_TEXT_CAP))
+            .thenReturn(Optional.of(SystemSetting.builder()
+                .settingKey(MarketingQuotaService.KEY_TEXT_CAP).settingValue("6").build()));
+        when(systemSettingRepository.findById(MarketingQuotaService.KEY_VIDEO_CAP))
+            .thenReturn(Optional.of(SystemSetting.builder()
+                .settingKey(MarketingQuotaService.KEY_VIDEO_CAP).settingValue("3").build()));
+        // Only 1 real COMMITTED video today; 3 test youtube_shorts jobs must not count
+        when(holdingRepository.countCommittedVideosSince(any(Instant.class))).thenReturn(1L);
+        when(holdingRepository.countCommittedSince(any(Instant.class))).thenReturn(1L);
+
+        MarketingQuotaService.QuotaStatus status = service.getStatus();
+
+        assertThat(status.videosToday()).isEqualTo(1L);
+        assertThat(status.textsToday()).isEqualTo(0L);
+        assertThat(status.remainingPool()).isEqualTo(5L);
+        // Effective video slots for board = cap - videosToday = 2 (> 0)
+        assertThat(status.dailyVideoCap() - status.videosToday()).isEqualTo(2L);
+    }
+
+    @Test
     void updateCaps_persistsBothKeys() {
         when(systemSettingRepository.findById(any())).thenReturn(Optional.empty());
-        when(marketingJobRepository.countVideoJobsCreatedSince(any(Instant.class))).thenReturn(0L);
-        when(marketingJobRepository.countDistinctMarketedPostsSince(any(Instant.class))).thenReturn(0L);
+        when(holdingRepository.countCommittedVideosSince(any(Instant.class))).thenReturn(0L);
+        when(holdingRepository.countCommittedSince(any(Instant.class))).thenReturn(0L);
 
         service.updateCaps(8, 2, "admin@test");
 

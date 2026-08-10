@@ -236,10 +236,6 @@ export function HoldingBoard({
                   row.status === 'PINNED' ||
                   row.status === 'OUT_OF_CUT';
                 const pickingFormat = pinPickerRowId === row.postId;
-                const defaultFormat: MarketingPinFormat =
-                  row.projectedFormat === 'VIDEO' || row.projectedFormat === 'TEXT'
-                    ? row.projectedFormat
-                    : 'VIDEO';
                 return (
                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button
@@ -265,8 +261,13 @@ export function HoldingBoard({
                       </Button>
                     ) : pickingFormat ? (
                       <div className="flex items-center gap-1">
+                        {/*
+                          No defaultValue: Radix skips onValueChange when the clicked
+                          option equals the current value. After VIDEO slots appear on
+                          the board, defaulting to VIDEO made 「영상」 a no-op and the
+                          pin never stuck (e2e 13-F).
+                        */}
                         <Select
-                          defaultValue={defaultFormat}
                           onValueChange={(value) =>
                             handlePinFormatSelect(row, value as MarketingPinFormat)
                           }

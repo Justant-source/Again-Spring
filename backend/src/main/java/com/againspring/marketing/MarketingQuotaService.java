@@ -2,7 +2,7 @@ package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
 import com.againspring.repository.ai.SystemSettingRepository;
-import com.againspring.repository.marketing.MarketingJobRepository;
+import com.againspring.repository.marketing.MarketingHoldingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,6 +19,10 @@ import java.time.ZoneId;
  * <p>{@code dailyTextCap} is the shared KST-day ceiling for marketed posts.
  * S4: one COMMITTED story = one pool slot (multi-platform jobs do not add extra).
  * Videos are a subset hard-capped by {@code dailyVideoCap}; remaining slots are text.
+ *
+ * <p>Usage counts come from {@code marketing_holding} COMMITTED rows locked today (KST),
+ * not raw {@code marketing_job} rows — manual/test jobs must not exhaust the waiting-board
+ * video band.
  */
 @Service
 @RequiredArgsConstructor
@@ -34,7 +38,7 @@ public class MarketingQuotaService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final SystemSettingRepository systemSettingRepository;
-    private final MarketingJobRepository marketingJobRepository;
+    private final MarketingHoldingRepository holdingRepository;
 
     public record Caps(int dailyTextCap, int dailyVideoCap) {}
 
@@ -57,10 +61,9 @@ public class MarketingQuotaService {
     public QuotaStatus getStatus() {
         Caps caps = getCaps();
         Instant start = startOfTodayKst();
-        long videosToday = marketingJobRepository.countVideoJobsCreatedSince(start);
-        long marketedToday = marketingJobRepository.countDistinctMarketedPostsSince(start);
-        // Prefer story-based texts (= marketed − video). Fall back to text-only job count
-        // when marketed < videos (shouldn't happen) so remaining stays non-negative.
+        long marketedToday = holdingRepository.countCommittedSince(start);
+        long videosToday = holdingRepository.countCommittedVideosSince(start);
+        // Prefer story-based texts (= marketed − video). Fall back so remaining stays non-negative.
         long textsToday = Math.max(0, marketedToday - videosToday);
         long remainingPool = Math.max(0, caps.dailyTextCap() - marketedToday);
         return new QuotaStatus(

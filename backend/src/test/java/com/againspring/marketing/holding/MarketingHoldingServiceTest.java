@@ -18,8 +18,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.jpa.JpaSystemException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -60,19 +66,28 @@ class MarketingHoldingServiceTest {
     @Mock
     private MarketingHoldingBriefSeeder briefSeeder;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private MarketingHoldingService service;
 
     @BeforeEach
     void setUp() {
+        // Run TransactionTemplate callbacks inline (no real DB transaction).
+        lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+            .thenReturn(new SimpleTransactionStatus());
+        lenient().doNothing().when(transactionManager).commit(any());
+        lenient().doNothing().when(transactionManager).rollback(any());
         service = new MarketingHoldingService(
             holdingRepository,
             postRepository,
             quotaService,
             scoreWeightService,
             briefSeeder,
-            objectMapper
+            objectMapper,
+            transactionManager
         );
     }
 
@@ -276,7 +291,7 @@ class MarketingHoldingServiceTest {
         assertThat(byId.get("a2").status()).isEqualTo(MarketingHoldingStatus.IN_POOL);
         assertThat(byId.get("a2").projectedFormat()).isEqualTo("TEXT");
         assertThat(byId.get("a3").status()).isEqualTo(MarketingHoldingStatus.OUT_OF_CUT);
-        assertThat(byId.get("a3").projectedFormat()).isEqualTo("OUT");
+        assertThat(byId.get("a3").projectedFormat()).isEqualTo("OUT_OF_CUT");
     }
 
     @Test
@@ -469,7 +484,7 @@ class MarketingHoldingServiceTest {
         MarketingHoldingService.BoardItem item = service.unpin("p2");
 
         assertThat(item.status()).isEqualTo(MarketingHoldingStatus.OUT_OF_CUT);
-        assertThat(item.projectedFormat()).isEqualTo("OUT");
+        assertThat(item.projectedFormat()).isEqualTo("OUT_OF_CUT");
         assertThat(item.pinFormat()).isNull();
     }
 
@@ -492,6 +507,56 @@ class MarketingHoldingServiceTest {
         assertThat(MarketingHoldingService.effectiveCutline(6, 2)).isEqualTo(4);
         assertThat(MarketingHoldingService.effectiveCutline(2, 2)).isEqualTo(0);
         assertThat(MarketingHoldingService.effectiveCutline(1, 3)).isEqualTo(0);
+    }
+
+    @Test
+    void isMariaRecordChanged_detectsError1020() {
+        SQLException sql = new SQLException(
+            "Record has changed since last read in table 'marketing_holding'", "HY000", 1020);
+        assertThat(MarketingHoldingService.isMariaRecordChanged(new RuntimeException(sql))).isTrue();
+        assertThat(MarketingHoldingService.isMariaRecordChanged(
+            new JpaSystemException(new RuntimeException(sql)))).isTrue();
+        assertThat(MarketingHoldingService.isMariaRecordChanged(new RuntimeException("other"))).isFalse();
+    }
+
+    @Test
+    void getBoard_withVideoSlotsRemaining_projectsVideoOnTopAutos() {
+        // dailyVideoCap=3, videosToday=1 (COMMITTED only) → raw video slots=2, cutline=5
+        when(quotaService.getStatus()).thenReturn(new MarketingQuotaService.QuotaStatus(
+            6, 3, 1, 0, 5L));
+        when(scoreWeightService.getWeights()).thenReturn(new MarketingScoreWeightService.Weights(
+            0.1, 1.0, 0.5));
+
+        Instant t0 = Instant.parse("2026-08-08T10:00:00Z");
+        List<HoldingCandidateProjection> candidates = List.of(
+            candidate("v1", 300, 0, 0, t0.plusSeconds(5)),
+            candidate("v2", 200, 0, 0, t0.plusSeconds(4)),
+            candidate("t1", 100, 0, 0, t0.plusSeconds(3)),
+            candidate("o1", 50, 0, 0, t0.plusSeconds(2))
+        );
+        when(holdingRepository.findActiveCandidates()).thenReturn(candidates);
+        when(holdingRepository.findByPostIdIn(anyCollection())).thenReturn(List.of());
+        stubStatusQueries(List.of(), List.of());
+        when(holdingRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(postRepository.findAllById(any())).thenReturn(List.of(
+            post("v1", "V1", t0.plusSeconds(5)),
+            post("v2", "V2", t0.plusSeconds(4)),
+            post("t1", "T1", t0.plusSeconds(3)),
+            post("o1", "O1", t0.plusSeconds(2))
+        ));
+        when(briefSeeder.seedFromPost(any(Post.class))).thenAnswer(inv -> {
+            Post p = inv.getArgument(0);
+            return BriefDto.builder().title(p.getTitle()).build();
+        });
+
+        MarketingHoldingService.HoldingBoard board = service.getBoard();
+        Map<String, MarketingHoldingService.BoardItem> byId = board.items().stream()
+            .collect(Collectors.toMap(MarketingHoldingService.BoardItem::postId, i -> i));
+
+        assertThat(byId.get("v1").projectedFormat()).isEqualTo("VIDEO");
+        assertThat(byId.get("v2").projectedFormat()).isEqualTo("VIDEO");
+        assertThat(byId.get("t1").projectedFormat()).isEqualTo("TEXT");
+        assertThat(byId.get("o1").projectedFormat()).isEqualTo("TEXT");
     }
 
     private void stubStatusQueries(
