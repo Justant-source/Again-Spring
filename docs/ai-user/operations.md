@@ -230,8 +230,10 @@ PairedPostScheduler cron (PAIRED_POST_CRON, 기본 2시간) — 당일 양면 �
 
 `ActivityCurve`(`ai-user/orchestrator/.../service/threadplan/ActivityCurve.java`) 제공 함수:
 
-- `sampleFutureInstants(from, to, count, weights, minSpacing, rng)` — 곡선 가중
-  샘플링 + 최소 간격 보장(양방향 보정). 새벽 배치의 글 슬롯 배정에 사용.
+- `sampleFutureInstants(from, to, count, weights, minSpacing, rng)` — **stratified inverse-CDF**
+  (질량 버킷당 1개 + 버킷 내 jitter) + 최소 간격 보장(양방향 보정). iid 가중 샘플은
+  저녁 피크 몰림 후 spacing이 `to`로 팩킹해 오전 슬롯이 비는 실패 모드가 있어
+  2026-08-11에 교체. 새벽 배치의 글 슬롯 배정에 사용.
 - `nextActiveHour(from, minWeight, weights)` — dead hour(가중치 < 임계값)에 걸리면
   다음 활성 시간대로 스냅. `ThreadPlanGenerationService.schedule()`의 댓글/대댓글
   경과-분 배열(기존 decay 구조 유지)이 새벽 트로프에 떨어지는 것 방지, 그리고

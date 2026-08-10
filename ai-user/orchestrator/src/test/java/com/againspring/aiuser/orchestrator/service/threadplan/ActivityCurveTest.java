@@ -39,7 +39,29 @@ class ActivityCurveTest {
                 .filter(i -> i.atZone(ActivityCurve.KST).getHour() == 22)
                 .count();
         assertThat(picks).hasSize(50);
-        assertThat(inPeakHour).isGreaterThan(40); // overwhelming majority land in the peak hour
+        // Stratified mass ≈ 81% in peak hour → expect ~40+, still majority in peak.
+        assertThat(inPeakHour).isGreaterThan(35);
+    }
+
+    @Test
+    void stratifiedSpreadCoversMorningUnderDefaultCurve() {
+        // Regression for 2026-08-11: iid sampling + spacing packed all 8–10 nightly slots
+        // into ~15:00–22:00. Stratified inverse-CDF must keep the first slot in the morning
+        // half of the 08–22 KST window across many seeds.
+        Instant from = Instant.parse("2026-08-10T23:00:00Z"); // 08:00 KST 2026-08-11
+        Instant to = Instant.parse("2026-08-11T13:00:00Z");   // 22:00 KST
+        Map<Integer, Double> weights = defaultKstWeights();
+
+        int firstGe15 = 0;
+        for (int seed = 0; seed < 100; seed++) {
+            List<Instant> picks = ActivityCurve.sampleFutureInstants(
+                    from, to, 8, weights, Duration.ofMinutes(45), new Random(seed));
+            assertThat(picks).hasSize(8);
+            int firstHour = picks.get(0).atZone(ActivityCurve.KST).getHour();
+            if (firstHour >= 15) firstGe15++;
+            assertThat(firstHour).isLessThan(15);
+        }
+        assertThat(firstGe15).isZero();
     }
 
     @Test
@@ -60,6 +82,16 @@ class ActivityCurveTest {
             Duration gap = Duration.between(picks.get(i - 1), picks.get(i));
             assertThat(gap.toSeconds()).isGreaterThanOrEqualTo(Duration.ofMinutes(30).toSeconds());
         }
+    }
+
+    private static Map<Integer, Double> defaultKstWeights() {
+        double[] hourly = {
+                0.45, 0.30, 0.15, 0.08, 0.05, 0.05, 0.10, 0.25, 0.40, 0.45, 0.50, 0.50,
+                0.65, 0.60, 0.50, 0.50, 0.50, 0.55, 0.65, 0.75, 0.85, 0.95, 1.00, 0.75,
+        };
+        Map<Integer, Double> weights = new java.util.LinkedHashMap<>();
+        for (int hour = 0; hour < 24; hour++) weights.put(hour, hourly[hour]);
+        return weights;
     }
 
     @Test

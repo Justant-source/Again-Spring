@@ -9,18 +9,20 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Picks publish times inside a future window so they cluster where the KST hourly weight map
+ * Picks publish times inside a future window so density follows the KST hourly weight map
  * (see {@link com.againspring.aiuser.orchestrator.config.OrchestratorProperties.ThreadPlan
- * #getKstHourlyHumanWeights()}) says a Korean 20s/30s/40s community audience is actually reading —
- * not a fixed "N minutes after publish" offset that ignores the clock (2026-07-31: that gap made
- * every comment on a 03:00 batch land inside the same dead 03:00-06:00 window).
+ * #getKstHourlyHumanWeights()}) — more slots where a Korean 20s/30s/40s community audience is
+ * reading, without i.i.d. clustering that collapses onto the evening peak after min-spacing
+ * enforcement (2026-08-11). Also not a fixed "N minutes after publish" offset that ignores the
+ * clock (2026-07-31: that gap made every comment on a 03:00 batch land inside the same dead
+ * 03:00-06:00 window).
  *
  * <p>Two operations, both driven by the same weight map so a post's exposure accounting
  * ({@link EffectiveExposureCalculator}) and its actual publish schedule agree on what "active hours"
  * means:</p>
  * <ul>
- *   <li>{@link #sampleFutureInstants} — spread N new items across a window (used for the nightly
- *       post batch and, per item, its early comment/reply candidates).</li>
+ *   <li>{@link #sampleFutureInstants} — stratified inverse-CDF spread of N items across a window
+ *       (nightly post batch and early comment/reply candidates).</li>
  *   <li>{@link #advanceByWeightedSeconds} — the inverse of {@link EffectiveExposureCalculator
  *       #weightedSeconds}: "walk forward from this instant until this much human-weighted exposure
  *       has accumulated," used to re-slot an overdue item instead of publishing it immediately.</li>
@@ -32,9 +34,14 @@ public final class ActivityCurve {
     private ActivityCurve() { }
 
     /**
-     * Samples {@code count} distinct instants in {@code [from, to)}, weighted so hours with a
-     * higher {@code kstHourlyHumanWeights} value get proportionally more picks, then enforces
+     * Samples {@code count} distinct instants in {@code [from, to)} along the activity-mass
+     * curve (higher {@code kstHourlyHumanWeights} ⇒ denser coverage), then enforces
      * {@code minSpacing} between consecutive results (bidirectional nudge — see push-pass below).
+     *
+     * <p>Uses <strong>stratified inverse-CDF</strong> quantiles — one draw per equal-mass bucket
+     * {@code [i/count, (i+1)/count)} with in-bucket jitter — so N posts spread across the day's
+     * activity mass instead of i.i.d. clustering on the evening peak (which, after spacing
+     * enforcement against {@code to}, packed everything into the last ~7h; 2026-08-11 incident).
      *
      * @throws IllegalArgumentException if the window cannot fit {@code count} slots at
      *         {@code minSpacing} apart (caller should widen the window or shrink minSpacing).
@@ -61,8 +68,11 @@ public final class ActivityCurve {
 
         List<Instant> picks = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            double target = rng.nextDouble() * totalMass;
-            picks.add(pointAtMass(segments, target));
+            // One sample per equal-mass stratum; jitter stays inside the bucket so order is stable.
+            double lo = (double) i / count;
+            double hi = (double) (i + 1) / count;
+            double u = lo + rng.nextDouble() * (hi - lo);
+            picks.add(pointAtMass(segments, u * totalMass));
         }
         picks.sort(Instant::compareTo);
         return enforceSpacing(picks, minSpacing, from, to);
