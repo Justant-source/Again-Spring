@@ -78,6 +78,8 @@ X는 비로그인 접근이 402로 차단되어, nitter 미러(`nitter.privacyre
 모바일 뷰포트 `430×932`, `deviceScaleFactor: 3`, 로케일 `ko-KR`.
 캡처 전 상단 베타 배너(`베타 서비스 —`로 시작하고 높이 80px 미만인 요소)를 `display:none` 처리한다.
 
+**동시성 (2026-08-10)**: 작성자 본문 · 상대방 본문 · 상세(댓글/비율) 캡처는 **각각 별도 Playwright browser context**에서 **직렬** 실행한다. 동일 context에서 `Promise.all` 병렬 + `deviceScaleFactor:3`이면 파트너 본문 JPEG가 가로로 같은 띠가 반복되는(세로 3등분) 깨짐이 간헐 재현됐다. 본문 JPEG는 가로 self-similarity 가드로 한 번 재시도한다.
+
 **컷 지점 (2026-08-04~)** — 의미 단락(개행 블록) · 장당 최대 8:
 
 1. 해당 본문의 **비어 있지 않은 개행 블록** 수가 `SHORT_POST_MAX_LINES`(8) 이하면 미분할(1장).
