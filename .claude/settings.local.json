@@ -1,4 +1,29 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Edit(*)",
+      "Write(*)",
+      "Read(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "Skill(update-config)",
+      "mcp__claude-design__render_preview"
+    ],
+    "deny": [
+      "Bash(git merge*)",
+      "Bash(git rebase*)",
+      "Bash(git reset*)",
+      "Bash(git revert*)",
+      "Bash(git tag*)",
+      "Bash(git stash drop*)",
+      "Bash(git branch -d*)",
+      "Bash(git branch -D*)",
+      "Bash(git checkout -B*)"
+    ]
+  },
   "codex": {
     "policy": {
       "mode": "apply-claude-local-permissions-intent",
@@ -31,29 +56,5 @@
         "Reuse approved prefix rules whenever possible instead of asking again."
       ]
     }
-  },
-  "permissions": {
-    "allow": [
-      "Bash(*)",
-      "Edit(*)",
-      "Write(*)",
-      "Read(*)",
-      "WebFetch(*)",
-      "WebSearch(*)",
-      "Glob(*)",
-      "Grep(*)",
-      "Skill(update-config)"
-    ],
-    "deny": [
-      "Bash(git merge*)",
-      "Bash(git rebase*)",
-      "Bash(git reset*)",
-      "Bash(git revert*)",
-      "Bash(git tag*)",
-      "Bash(git stash drop*)",
-      "Bash(git branch -d*)",
-      "Bash(git branch -D*)",
-      "Bash(git checkout -B*)"
-    ]
   }
 }
