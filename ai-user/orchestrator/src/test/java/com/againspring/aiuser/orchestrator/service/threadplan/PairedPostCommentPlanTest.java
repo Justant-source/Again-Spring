@@ -63,7 +63,9 @@ class PairedPostCommentPlanTest {
                 planRepository, itemRepository, personaRepository,
                 planService, llmClient, qualityGate, properties, configRepository,
                 scheduleSupport, planPersonaMapper, interestedPersonaSeeder, backendBotClient,
-                new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties)
+                new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
+                mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class),
+                mock(org.springframework.jdbc.core.JdbcTemplate.class)
         );
         lenient().when(properties.isEnabled()).thenReturn(true);
         lenient().when(properties.getThreadPlan()).thenReturn(threadPlanConfig);

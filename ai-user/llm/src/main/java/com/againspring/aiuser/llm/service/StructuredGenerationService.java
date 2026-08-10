@@ -125,7 +125,9 @@ public class StructuredGenerationService {
         if (comments.size() > max) throw new StructuredGenerationException("comment candidate limit exceeded");
         Set<String> personaIds = new HashSet<>();
         for (var p : req.getPersonas()) personaIds.add(p.getPersonaId());
+        Set<String> storyPersonas = storySidePersonaIds(req.getAuthor(), null);
         Set<String> refs = new HashSet<>(); Set<String> topLevel = new HashSet<>();
+        Set<String> droppedRefs = new HashSet<>();
         List<ThreadPlanResponse.Item> items = new ArrayList<>();
         for (JsonNode n : comments) {
             String ref = text(n, "ref"); String parent = nullableText(n, "parentRef");
@@ -133,8 +135,18 @@ public class StructuredGenerationService {
             validRef(ref); validText(body, "comment.body", 2, 1000);
             if (!refs.add(ref)) throw new StructuredGenerationException("duplicate comment ref");
             if (!personaIds.contains(persona)) throw new StructuredGenerationException("unknown personaId: " + persona);
+            if (storyPersonas.contains(persona)) {
+                droppedRefs.add(ref);
+                continue;
+            }
             if (parent == null) topLevel.add(ref);
-            else if (!topLevel.contains(parent)) throw new StructuredGenerationException("reply parent must be an earlier top-level ref");
+            else if (!topLevel.contains(parent)) {
+                if (droppedRefs.contains(parent)) {
+                    droppedRefs.add(ref);
+                    continue;
+                }
+                throw new StructuredGenerationException("reply parent must be an earlier top-level ref");
+            }
             items.add(ThreadPlanResponse.Item.builder().ref(ref).parentRef(parent).personaId(persona).body(body)
                     .stance(nullableText(n, "stance")).priority(n.path("priority").asInt(0)).build());
         }
@@ -333,7 +345,9 @@ public class StructuredGenerationService {
         int minItems = req.getMinItems() != null
                 ? Math.max(1, Math.min(req.getMinItems(), max))
                 : minTop;
-        List<ThreadPlanResponse.Item> items = parseCommentItems(root.path("comments"), req.getPersonas(), max, minTop, minItems);
+        List<ThreadPlanResponse.Item> items = parseCommentItems(
+                root.path("comments"), req.getPersonas(), max, minTop, minItems,
+                storySidePersonaIds(req.getAuthor(), null));
         return PairedPhase1Response.builder()
                 .provider(provider.name()).model(model).correlationId(correlationId)
                 .workload(StructuredOutputSchema.WORKLOAD_PAIRED_PHASE1)
@@ -371,7 +385,9 @@ public class StructuredGenerationService {
         int minItems = req.getMinItems() != null
                 ? Math.max(1, Math.min(req.getMinItems(), max))
                 : Math.min(6, max);
-        List<ThreadPlanResponse.Item> items = parseCommentItems(root.path("comments"), req.getPersonas(), max, minTop, minItems);
+        List<ThreadPlanResponse.Item> items = parseCommentItems(
+                root.path("comments"), req.getPersonas(), max, minTop, minItems,
+                storySidePersonaIdsForPhase2(req));
         return PairedPhase2Response.builder()
                 .provider(provider.name()).model(model).correlationId(correlationId)
                 .workload(StructuredOutputSchema.WORKLOAD_PAIRED_PHASE2)
@@ -380,12 +396,20 @@ public class StructuredGenerationService {
 
     private List<ThreadPlanResponse.Item> parseCommentItems(JsonNode comments, List<ThreadPlanRequest.Persona> personas,
                                                             int max, int minTop, int minItems) {
+        return parseCommentItems(comments, personas, max, minTop, minItems, Set.of());
+    }
+
+    private List<ThreadPlanResponse.Item> parseCommentItems(JsonNode comments, List<ThreadPlanRequest.Persona> personas,
+                                                            int max, int minTop, int minItems,
+                                                            Set<String> excludedStoryPersonas) {
         if (!comments.isArray()) throw new StructuredGenerationException("comments must be an array");
         if (comments.size() > max) throw new StructuredGenerationException("comment candidate limit exceeded");
         Set<String> personaIds = new HashSet<>();
         for (var p : personas) personaIds.add(p.getPersonaId());
+        Set<String> excluded = excludedStoryPersonas == null ? Set.of() : excludedStoryPersonas;
         Set<String> refs = new HashSet<>();
         Set<String> topLevel = new HashSet<>();
+        Set<String> droppedRefs = new HashSet<>();
         List<ThreadPlanResponse.Item> items = new ArrayList<>();
         for (JsonNode n : comments) {
             String ref = text(n, "ref");
@@ -396,8 +420,18 @@ public class StructuredGenerationService {
             validText(body, "comment.body", 2, 1000);
             if (!refs.add(ref)) throw new StructuredGenerationException("duplicate comment ref");
             if (!personaIds.contains(persona)) throw new StructuredGenerationException("unknown personaId: " + persona);
+            if (excluded.contains(persona)) {
+                droppedRefs.add(ref);
+                continue;
+            }
             if (parent == null) topLevel.add(ref);
-            else if (!topLevel.contains(parent)) throw new StructuredGenerationException("reply parent must be an earlier top-level ref");
+            else if (!topLevel.contains(parent)) {
+                if (droppedRefs.contains(parent)) {
+                    droppedRefs.add(ref);
+                    continue;
+                }
+                throw new StructuredGenerationException("reply parent must be an earlier top-level ref");
+            }
             items.add(ThreadPlanResponse.Item.builder().ref(ref).parentRef(parent).personaId(persona).body(body)
                     .stance(nullableText(n, "stance")).priority(n.path("priority").asInt(0)).build());
         }
@@ -405,6 +439,34 @@ public class StructuredGenerationService {
             throw new StructuredGenerationException("thread plan does not meet minimum candidate count");
         }
         return items;
+    }
+
+    /** Author / partner ids that must never own bystander comments. */
+    static Set<String> storySidePersonaIds(Map<String, Object> author, Map<String, Object> partner) {
+        Set<String> out = new LinkedHashSet<>();
+        addPersonaId(out, author);
+        addPersonaId(out, partner);
+        return out;
+    }
+
+    static Set<String> storySidePersonaIdsForPhase2(PairedPhase2Request req) {
+        Set<String> out = new LinkedHashSet<>();
+        if (req != null) {
+            if (req.getAuthorPost() != null && !blank(req.getAuthorPost().getPersonaId())) {
+                out.add(req.getAuthorPost().getPersonaId().trim());
+            }
+            addPersonaId(out, req.getPartner());
+        }
+        return out;
+    }
+
+    private static void addPersonaId(Set<String> out, Map<String, Object> row) {
+        if (row == null || row.isEmpty()) return;
+        Object raw = row.get("personaId");
+        if (raw == null) raw = row.get("persona_id");
+        if (raw == null) return;
+        String id = String.valueOf(raw).trim();
+        if (!id.isBlank() && !"null".equalsIgnoreCase(id)) out.add(id);
     }
 
     private PairedPhase1Response applyPairedPhase1Critique(PairedPhase1Response parsed, PairedPhase1Request req,
@@ -515,6 +577,7 @@ public class StructuredGenerationService {
                 Schema: {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null,"metaphor_ids":["empty-chair","tangled-thread","cracked-window"]},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 This is a 양면 사연: write the 작성자(A) post now. The 상대방(B) has NOT written yet — phase1 comments must NOT assume a partner reply exists, quote a partner body, or say both sides already posted.
                 Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI. Prefer Korean product terms 작성자/상대방 — never 가해자/피해자/승패.
+                STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId to any comment or reply. Phase1 comments are community bystanders only.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed.
                 AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
                 AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line. Required (IG hook card).
@@ -559,6 +622,7 @@ public class StructuredGenerationService {
                 If PUBLISHED_TOP_LEVEL_COMMENTS is empty, use author (+ partner) bodies only — do not invent prior comments.
                 Do not use published comment ids as parentRef; replies may only parent earlier top-level refs from this response.
                 Use only supplied personaIds. No legal verdicts, diagnoses, personal data, internal notes, or AI identity claims. Use 작성자/상대방 — never 가해자/피해자/승패.
+                STORY_PERSONA_RULE (hard): never assign the 작성자 or 상대방 personaId to any comment or reply. Those accounts already wrote the story sides; comments are other community members only.
                 Partner body line rules: one Korean sentence per newline; short blocks. If >8 non-empty lines, set capture_split_after_lines (semantic cuts, each part ≤8, max 4 parts); else null.
                 """ + "\nGUIDE=\n" + clean(classpathText("voice/paired_phase2.md")) +
                 "\nPARTNER_VOICE=\n" + clean(classpathText("voice/partner.md")) +
@@ -611,6 +675,7 @@ public class StructuredGenerationService {
                 Return ONLY a JSON object, with no Markdown or explanation. Create Korean community conversation candidates.
                 The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null,"metaphor_ids":["empty-chair","tangled-thread","cracked-window"]},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI.
+                STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId (or the AI_POST author) to any comment or reply. Comments are bystanders only — the story author must not appear as a community commenter.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed, not the whole story.
                 AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only teases the conflict.
                 AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line — pack 1~3 eojeol into a readable phrase. Do not break on every space. No rewrite/omit/add. Required for AI_POST (IG hook card).

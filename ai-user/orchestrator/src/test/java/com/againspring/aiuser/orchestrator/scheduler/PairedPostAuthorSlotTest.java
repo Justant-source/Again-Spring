@@ -45,7 +45,8 @@ class PairedPostAuthorSlotTest {
                 new com.fasterxml.jackson.databind.ObjectMapper(),
                 mock(com.againspring.aiuser.orchestrator.service.threadplan.PlanPersonaMapper.class),
                 mock(com.againspring.aiuser.orchestrator.service.threadplan.CandidateScheduleSupport.class),
-                mock(com.againspring.aiuser.orchestrator.service.GenerationConfigSupport.class));
+                mock(com.againspring.aiuser.orchestrator.service.GenerationConfigSupport.class),
+                mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class));
     }
 
     @Test

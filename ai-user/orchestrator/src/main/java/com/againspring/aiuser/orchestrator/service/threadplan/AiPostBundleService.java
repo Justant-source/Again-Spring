@@ -291,13 +291,22 @@ public class AiPostBundleService {
         Set<String> castIds = planPersonaMapper.castIds(personas);
 
         OrchestratorProperties.ThreadPlan tp = properties.getThreadPlan();
+        Optional<Bundle> bundle;
         if (tp.isMicroBatchEnabled()) {
-            return generateBundleMicroBatch(
+            bundle = generateBundleMicroBatch(
                     author, category, correlationId, corr,
                     provider, model, pool, source, storyProfile, personas, castIds);
+        } else {
+            bundle = generateBundleMegaCall(
+                    author, category, correlationId, provider, model, pool, source, storyProfile, personas, castIds);
         }
-        return generateBundleMegaCall(
-                author, category, correlationId, provider, model, pool, source, storyProfile, personas, castIds);
+        bundle.ifPresent(b -> {
+            int stripped = StoryPersonaCommentFilter.stripFromResponse(b.response(), Set.of(author.getId()));
+            if (stripped > 0) {
+                log.info("AI post bundle stripped {} story-persona comment(s) corr={}", stripped, correlationId);
+            }
+        });
+        return bundle;
     }
 
     /** Legacy single-call path: full cast in one AI_POST request. */

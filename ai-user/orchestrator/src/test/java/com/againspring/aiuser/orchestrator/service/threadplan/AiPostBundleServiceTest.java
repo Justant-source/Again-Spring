@@ -102,7 +102,8 @@ class AiPostBundleServiceTest {
                 safetyGuard, planService, planGenerationService, scheduledPostRepository,
                 scheduleSupport, new ObjectMapper(), planPersonaMapper, sourceStoryResolver,
                 storyProfileAnalyzer, personaMatcherService, storyTwinGuard, sourceReservationSupport,
-                new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties));
+                new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
+                mock(org.springframework.jdbc.core.JdbcTemplate.class));
     }
 
     @Test

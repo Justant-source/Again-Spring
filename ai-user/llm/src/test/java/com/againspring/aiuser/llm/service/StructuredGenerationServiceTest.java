@@ -134,6 +134,27 @@ class StructuredGenerationServiceTest {
         assertTrue(prompt.contains("never set title equal to body"), "title≠body rule");
         assertTrue(prompt.contains("promo_title"), "promo_title in schema");
         assertTrue(prompt.contains("Never put a single syllable") || prompt.contains("4~10"), "promo line packing rule");
+        assertTrue(prompt.contains("STORY_PERSONA_RULE"), "author must not own bystander comments");
+    }
+
+    @Test
+    void dropsAuthorPersonaCommentsFromThreadPlan() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        // Sparse plan: c1 uses author p1, c2..c6 use other personas — enough after drop for min=1.
+        String json = sparsePlanJson(6);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(json);
+
+        ThreadPlanRequest request = planRequest();
+        request.setAuthor(Map.of("personaId", "p1", "nickname", "글쓴이"));
+        request.setMinTopLevel(1);
+        request.setMinItems(1);
+
+        ThreadPlanResponse response = service.createThreadPlan(request, "corr-no-author-comment");
+
+        assertTrue(response.getItems().stream().noneMatch(i -> "p1".equals(i.getPersonaId())));
+        assertTrue(response.getItems().size() >= 5);
     }
 
     @Test
@@ -288,6 +309,9 @@ class StructuredGenerationServiceTest {
         request.setDynamicExamples("문체 앵커 예시");
         request.setRecentOutputs(List.of("최근 글 요약"));
         request.setAuthor(Map.of("personaId", "p1", "nickname", "작성자닉"));
+        // Author p1 is stripped from comments; keep floors low so remaining cast still passes.
+        request.setMinTopLevel(1);
+        request.setMinItems(1);
 
         service.createThreadPlan(request, "corr-ground");
 

@@ -38,6 +38,8 @@ public class PairedPhase2Request {
 
     @Data
     public static class AuthorPost {
+        /** Optional — when present, must not be used as a comment personaId. */
+        private String personaId;
         private String title;
         private String body;
     }

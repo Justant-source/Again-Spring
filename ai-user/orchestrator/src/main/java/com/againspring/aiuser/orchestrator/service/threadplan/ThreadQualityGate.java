@@ -32,8 +32,9 @@ public class ThreadQualityGate {
     private final ContentSafetyGuard safetyGuard;
 
     /**
-     * Validate candidates: cast membership, parent graph (reply → earlier kept top-level),
-     * body safety, then stance share cap among items that declare stance.
+     * Validate candidates: cast membership, story-side exclusion (post author / partner),
+     * parent graph (reply → earlier kept top-level), body safety, then stance share cap
+     * among items that declare stance.
      */
     public QualityResult evaluate(List<?> rawItems,
                                   Set<String> requestedCast,
@@ -41,7 +42,7 @@ public class ThreadQualityGate {
                                   int readyMinTopLevel,
                                   int readyMinItems) {
         return evaluate(rawItems, requestedCast, personaExists, readyMinTopLevel, readyMinItems,
-                DEFAULT_STANCE_SHARE_MAX);
+                DEFAULT_STANCE_SHARE_MAX, Set.of());
     }
 
     public QualityResult evaluate(List<?> rawItems,
@@ -50,11 +51,27 @@ public class ThreadQualityGate {
                                   int readyMinTopLevel,
                                   int readyMinItems,
                                   double stanceShareMax) {
+        return evaluate(rawItems, requestedCast, personaExists, readyMinTopLevel, readyMinItems,
+                stanceShareMax, Set.of());
+    }
+
+    /**
+     * @param excludedStoryPersonaIds post author and/or partner user ids — must never appear as
+     *        bystander comment/reply personas in a generated plan (human-reply batch bypasses this gate).
+     */
+    public QualityResult evaluate(List<?> rawItems,
+                                  Set<String> requestedCast,
+                                  Predicate<String> personaExists,
+                                  int readyMinTopLevel,
+                                  int readyMinItems,
+                                  double stanceShareMax,
+                                  Set<String> excludedStoryPersonaIds) {
         List<String> reasons = new ArrayList<>();
         List<Candidate> provisional = new ArrayList<>();
         Set<String> seenRefs = new HashSet<>();
         Set<String> keptTopLevelRefs = new HashSet<>();
         Set<String> cast = requestedCast == null ? Set.of() : requestedCast;
+        Set<String> excluded = excludedStoryPersonaIds == null ? Set.of() : excludedStoryPersonaIds;
         Predicate<String> exists = personaExists == null ? id -> true : personaExists;
         int dropped = 0;
         double cap = stanceShareMax <= 0 ? DEFAULT_STANCE_SHARE_MAX : stanceShareMax;
@@ -74,6 +91,11 @@ public class ThreadQualityGate {
             if (ref.isBlank() || body.isBlank() || personaId.isBlank() || !seenRefs.add(ref)) {
                 dropped++;
                 reasons.add("INVALID_CANDIDATE:" + (ref.isBlank() ? "?" : ref));
+                continue;
+            }
+            if (!excluded.isEmpty() && excluded.contains(personaId)) {
+                dropped++;
+                reasons.add("STORY_PERSONA:" + ref);
                 continue;
             }
             if (!cast.isEmpty() && !cast.contains(personaId)) {

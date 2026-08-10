@@ -17,7 +17,7 @@
 | `CrawlerTriggerScheduler` | learning crawl trigger |
 | `BackendOutboxScheduler` | backend outbox를 소비해 plan/inbox 생성 |
 | `ThreadPlanGenerationScheduler` | 요청된 plan을 구조화 LLM으로 한 번에 생성 |
-| `ThreadQualityGate` | LLM 응답(및 micro-batch merge) 후 cast·parent·safety·stance≤80% 검사; READY 하한 미달 시 `QUALITY_BELOW_MIN_ITEMS` |
+| `ThreadQualityGate` | LLM 응답(및 micro-batch merge) 후 cast·**story-side 제외(작성자/상대방 자작 댓글 금지)**·parent·safety·stance≤80% 검사; READY 하한 미달 시 `QUALITY_BELOW_MIN_ITEMS`. 퍼블리셔도 `STORY_PERSONA_COMMENT`로 최종 차단 |
 | `ThreadPlanPublisherScheduler` | due item lease·멱등 게시 |
 | `HumanReplyBatchScheduler` | 사람 댓글/대댓글을 30분 단위로 묶어 reply 생성 |
 | `HumanReplyTtlCleanupScheduler` | inbox/REQUESTED plan TTL 정리 (플래그 기본 OFF, no-op) |

@@ -21,6 +21,7 @@ import com.againspring.aiuser.orchestrator.service.threadplan.PairedHoldMeta;
 import com.againspring.aiuser.orchestrator.service.threadplan.PlanPersonaMapper;
 import com.againspring.aiuser.orchestrator.service.threadplan.QuietHours;
 import com.againspring.aiuser.orchestrator.service.threadplan.SourceMixPlanner;
+import com.againspring.aiuser.orchestrator.service.threadplan.StoryPersonaCommentFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -322,6 +323,11 @@ public class PairedPostScheduler {
             return Optional.empty();
         }
         int items = response.get("items") instanceof List<?> list ? list.size() : 0;
+        int stripped = StoryPersonaCommentFilter.stripFromResponse(response, Set.of(author.getId()));
+        if (stripped > 0) {
+            log.info("[PairedPost] Call1 stripped {} author self-comment(s) corrId={}", stripped, corrId);
+            items = response.get("items") instanceof List<?> list ? list.size() : 0;
+        }
         return Optional.of(new Call1Hold(title.strip(), body.strip(), response, provider, model, items));
     }
 

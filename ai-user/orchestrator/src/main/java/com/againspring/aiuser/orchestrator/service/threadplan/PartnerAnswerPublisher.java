@@ -20,9 +20,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Fires delayed partner answers for AI paired posts at {@code scheduledPartnerAt}.
@@ -151,6 +153,9 @@ public class PartnerAnswerPublisher {
         }
 
         Map<String, Object> authorPost = new LinkedHashMap<>();
+        if (row.getAuthorPersonaId() != null && !row.getAuthorPersonaId().isBlank()) {
+            authorPost.put("personaId", row.getAuthorPersonaId());
+        }
         authorPost.put("title", row.getAuthorTitle() != null ? row.getAuthorTitle() : "");
         authorPost.put("body", row.getAuthorBody() != null ? row.getAuthorBody() : "");
 
@@ -187,6 +192,15 @@ public class PartnerAnswerPublisher {
         if (partnerBody == null || partnerBody.isBlank()) {
             log.warn("[PartnerAnswer] Call2 missing partner_post corrId={}", corr);
             return Optional.empty();
+        }
+        Set<String> storySides = new LinkedHashSet<>();
+        if (row.getAuthorPersonaId() != null && !row.getAuthorPersonaId().isBlank()) {
+            storySides.add(row.getAuthorPersonaId());
+        }
+        storySides.add(partner.getId());
+        int stripped = StoryPersonaCommentFilter.stripFromResponse(response, storySides);
+        if (stripped > 0) {
+            log.info("[PartnerAnswer] Call2 stripped {} story-persona comment(s) corrId={}", stripped, corr);
         }
         int items = response.get("items") instanceof List<?> list ? list.size() : 0;
         return Optional.of(new Call2Result(partnerBody.strip(), extractPartnerSplits(response), response, items));

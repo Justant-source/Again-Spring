@@ -119,6 +119,33 @@ class ThreadQualityGateTest {
         assertThat(result.reasons()).anyMatch(r -> r.startsWith(ThreadQualityGate.FAILURE_QUALITY_BELOW_MIN));
     }
 
+    @Test
+    void dropsPostAuthorAndPartnerCommentsAndCascadesReplies() {
+        // Author/partner assigned as bystanders must never reach SCHEDULED (prod post_37613 regression).
+        List<Map<String, Object>> items = List.of(
+                item("c1", null, "author-1", "아기없을때 얼른 정리해 식은마음 다시 안살아남", "AUTHOR"),
+                item("r1", "c1", "p2", "이거 진짜 맞는 말ㅠ", "NEUTRAL"),
+                item("c2", null, "partner-1", "상대방인 척 남 댓글", "COUNTERPART"),
+                item("c3", null, "p3", "정상 최상위 댓글입니다", "NEUTRAL"),
+                item("c4", null, "p4", "또 다른 정상 최상위", "CONTRARIAN"),
+                item("c5", null, "p5", "세 번째 정상 최상위", "AUTHOR"));
+
+        ThreadQualityGate.QualityResult result = gate.evaluate(
+                items,
+                Set.of("author-1", "partner-1", "p2", "p3", "p4", "p5"),
+                id -> true,
+                3, 3,
+                ThreadQualityGate.DEFAULT_STANCE_SHARE_MAX,
+                Set.of("author-1", "partner-1"));
+
+        assertThat(result.keptItems()).extracting(m -> m.get("ref"))
+                .containsExactly("c3", "c4", "c5");
+        assertThat(result.reasons()).anyMatch(r -> r.startsWith("STORY_PERSONA:c1"));
+        assertThat(result.reasons()).anyMatch(r -> r.startsWith("STORY_PERSONA:c2"));
+        assertThat(result.reasons()).anyMatch(r -> r.startsWith("PARENT:r1"));
+        assertThat(result.passedOperationalMin()).isTrue();
+    }
+
     private static Map<String, Object> item(String ref, String parentRef, String personaId,
                                             String body, String stance) {
         Map<String, Object> m = new LinkedHashMap<>();

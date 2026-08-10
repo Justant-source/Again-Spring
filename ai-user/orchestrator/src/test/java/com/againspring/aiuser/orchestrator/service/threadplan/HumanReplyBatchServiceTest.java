@@ -65,9 +65,11 @@ class HumanReplyBatchServiceTest {
         lenient().when(props.getHumanReply()).thenReturn(humanReply);
         lenient().when(interestedPersonas.findByPostIdOrderByScoreDesc(anyString())).thenReturn(List.of());
         lenient().when(generationConfigSupport.bundleTimeoutMs()).thenReturn(600_000L);
+        var llmGate = mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class);
+        lenient().when(llmGate.isHeld()).thenReturn(false);
         service = new HumanReplyBatchService(
                 inbox, plans, planItems, personaRepository, interestedPersonas, llm, guard, props,
-                generationConfigSupport, configRepository, backend, jdbc);
+                generationConfigSupport, configRepository, backend, jdbc, llmGate);
     }
 
     @Test
@@ -100,8 +102,12 @@ class HumanReplyBatchServiceTest {
         assertThat(candidates).hasSize(1);
         assertThat(candidates.get(0).get("personaId")).isEqualTo("p-active");
         assertThat(candidates.get(0).get("formality")).isEqualTo("casual");
+        assertThat(candidates.get(0).get("nickname")).isEqualTo("봄이");
         assertThat(candidates.get(0).get("voiceProfile")).isInstanceOf(Map.class);
-        assertThat(candidates.get(0).get("voiceProfile")).isEqualTo(voice);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> slimVoice = (Map<String, Object>) candidates.get(0).get("voiceProfile");
+        assertThat(slimVoice).containsEntry("formality", "casual").containsEntry("voice_type", "NATEPAN");
+        assertThat(slimVoice).doesNotContainKey("nickname");
         assertThat(candidates.get(0).get("voiceProfile")).isNotInstanceOf(String.class);
     }
 

@@ -67,7 +67,7 @@ flowchart LR
    **AI_POST 캡쳐 분할**: 본문은 문장(짧은 의미 단위)마다 개행. 비어 있지 않은 줄이 **9개 이상**이면 `post.capture_split_after_lines`(1-based, 각 장 마지막 블록; 장당 ≤8·최대 4장)을 넣고, 8 이하면 `null`. 범위 밖 값은 parse 시 null로 강등(PLAN 전체 실패 아님). 게시 시 `posts.capture_split_after_lines`에 저장되고 마케팅 brief → ASM 캡쳐 컷에 쓰인다. 양면 Call2 `partner_post.capture_split_after_lines` → `partner_capture_split_after_lines`.
 2. 부모 후보가 탈락하면 그 후보를 참조하는 대댓글도 탈락시킨다.
 3. `parsePlan` 하한은 요청 파라미터로 조절한다. `minTopLevel`/`minItems` 미지정 시 레거시 기본(최상위 6 · 전체 12, 각각 max에 캡). 품질 게이트로 이후 드롭할 orchestrator는 `minTopLevel=1`, `minItems=1`을 보낸다(현재 `AiPostBundleService`·`ThreadPlanGenerationService` 기본).
-4. **`ThreadQualityGate`** (`persistAndFinalize`): cast 소속 · parent(대댓글→앞서 남은 최상위) · `ContentSafetyGuard`(COMMENT) · stance 단일 관점 ≤80%(stance 필드 없으면 `UNEVALUATED:stance`로 스킵). 실패 item은 드롭만 하고 filler로 채우지 않는다. 부모 탈락 시 자식도 연쇄 탈락.
+4. **`ThreadQualityGate`** (`persistAndFinalize`): cast 소속 · **story-side 제외(글 작성자·상대방 persona는 댓글/대댓글 불가 — `STORY_PERSONA`)** · parent(대댓글→앞서 남은 최상위) · `ContentSafetyGuard`(COMMENT) · stance 단일 관점 ≤80%(stance 필드 없으면 `UNEVALUATED:stance`로 스킵). 실패 item은 드롭만 하고 filler로 채우지 않는다. 부모 탈락 시 자식도 연쇄 탈락. 사람 댓글에 대한 author 답글(`humanAuthorId` 있는 human-reply batch)은 이 게이트를 타지 않는다.
 5. 품질 통과 후 잔여가 운영 READY 하한(`ai-user.thread-plan.ready-min-top-level` 기본 3 · `ready-min-items` 기본 6) 미만이면 item을 저장하지 않고 `plan.status=FAILED` + `failure_code=QUALITY_BELOW_MIN_ITEMS`. 통과 시에만 READY→ACTIVE.
 6. 구조 자체가 깨진 응답(빈 items·상한 초과 등)은 기존처럼 `INVALID_STRUCTURED_OUTPUT`. 동일 provider/model로 한 번만 재시도한다. 개별 댓글 추가 호출은 하지 않는다.
 

@@ -21,6 +21,7 @@ import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +69,7 @@ public class ThreadPlanGenerationService {
     private final BackendBotClient backendBotClient;
     private final GenerationConfigSupport generationConfigSupport;
     private final LlmGenerationGateService llmGenerationGateService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Transactional
     public void generateRequestedPlans() {
@@ -467,6 +469,7 @@ public class ThreadPlanGenerationService {
                 : personaRepository.findByActiveTrue().stream()
                         .map(Persona::getId)
                         .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        Set<String> excludedStory = loadStorySidePersonaIds(plan.getPostId());
         OrchestratorProperties.ThreadPlan cfg = properties.getThreadPlan();
         ThreadQualityGate.QualityResult quality = qualityGate.evaluate(
                 rows,
@@ -474,7 +477,8 @@ public class ThreadPlanGenerationService {
                 personaRepository::existsById,
                 readyMinTopLevel,
                 readyMinItems,
-                cfg.getStanceShareMax());
+                cfg.getStanceShareMax(),
+                excludedStory);
 
         if (!quality.passedOperationalMin()) {
             // Do not store a thin tree that will never go READY — avoids orphan SCHEDULED rows.
@@ -505,6 +509,32 @@ public class ThreadPlanGenerationService {
             refs.put(ref, item.getId());
         }
         return quality;
+    }
+
+    /**
+     * Post author + partner must never be scheduled as bystander comment personas.
+     * Missing/unknown post → empty set (gate skips exclusion).
+     */
+    Set<String> loadStorySidePersonaIds(String postId) {
+        if (postId == null || postId.isBlank() || jdbcTemplate == null) return Set.of();
+        try {
+            return jdbcTemplate.query(
+                    "SELECT author_id, partner_user_id FROM posts WHERE id = ? AND deleted_at IS NULL",
+                    rs -> {
+                        Set<String> out = new LinkedHashSet<>();
+                        if (rs.next()) {
+                            String author = rs.getString(1);
+                            String partner = rs.getString(2);
+                            if (author != null && !author.isBlank()) out.add(author);
+                            if (partner != null && !partner.isBlank()) out.add(partner);
+                        }
+                        return out;
+                    },
+                    postId);
+        } catch (Exception e) {
+            log.warn("story-side persona lookup failed post={}: {}", postId, e.getMessage());
+            return Set.of();
+        }
     }
 
     /** Soft-set stance / sourceExampleId if W1-H entity fields exist; otherwise no-op. */
