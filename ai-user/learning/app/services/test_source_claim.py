@@ -201,6 +201,61 @@ def test_filter_excludes_used_and_active_reservations():
     assert [r["id"] for r in got3] == [1]
 
 
+def test_filter_excludes_sibling_rows_sharing_source_url():
+    """Duplicate crawl rows (same URL, different ids) must collapse to one claim."""
+    now = datetime(2026, 8, 9, 18, 37, 0)
+    window_start = now - timedelta(days=14)
+    url = "https://www.teamblind.com/kr/post/결혼-후회-5g7f5qlk"
+    rows = [
+        {
+            "id": 20417,
+            "content": "body",
+            "content_type": "POST",
+            "source": "blind",
+            "source_url": url,
+            "popularity_pct": 0.972,
+            "created_at": now - timedelta(days=7),
+            "title": "결혼 후회",
+        },
+        {
+            "id": 19916,
+            "content": "body",
+            "content_type": "POST",
+            "source": "blind",
+            "source_url": url,
+            "popularity_pct": 0.972,
+            "created_at": now - timedelta(days=7),
+            "title": "결혼 후회",
+        },
+    ]
+
+    # Soft-reserve on one sibling blocks the other
+    got = filter_claim_candidates(
+        rows,
+        source="blind",
+        used_example_ids=set(),
+        reservations={
+            20417: {"status": "SOFT", "reserve_until": now + timedelta(hours=20)},
+        },
+        window_start=window_start,
+        now=now,
+    )
+    assert got == []
+
+    # Published via example_id still blocks the unused sibling URL
+    got2 = filter_claim_candidates(
+        rows,
+        source="blind",
+        used_example_ids={20417},
+        reservations={
+            20417: {"status": "COMMITTED", "reserve_until": now},
+        },
+        window_start=window_start,
+        now=now,
+    )
+    assert got2 == []
+
+
 def test_row_to_claimed_item_camel_case():
     item = row_to_claimed_item({
         "id": 9,
@@ -252,7 +307,8 @@ def test_commit_source_key_mismatch_and_success():
         gd.return_value.__enter__.return_value = mock_conn
         gd.return_value.__exit__.return_value = False
         assert commit_source(example_id=10, reservation_key="abc") == {"status": "committed"}
-        assert any("UPDATE" in str(c.args[0]) for c in mock_cur.execute.call_args_list)
+        update_sqls = [str(c.args[0]) for c in mock_cur.execute.call_args_list if c.args]
+        assert any("UPDATE" in s and "reservation_key" in s for s in update_sqls)
 
 
 def test_release_source_soft_vs_noop():
@@ -261,14 +317,51 @@ def test_release_source_soft_vs_noop():
     mock_conn.cursor.return_value.__enter__.return_value = mock_cur
     mock_conn.cursor.return_value.__exit__.return_value = False
 
-    mock_cur.rowcount = 1
+    mock_cur.fetchone.return_value = {
+        "example_id": 1,
+        "reservation_key": "k",
+        "status": "SOFT",
+    }
+    mock_cur.rowcount = 2  # family of duplicate crawl rows
     with patch("app.services.source_claim.get_db") as gd:
         gd.return_value.__enter__.return_value = mock_conn
         gd.return_value.__exit__.return_value = False
         assert release_source(example_id=1, reservation_key="k") == {"status": "released"}
+        delete_sqls = [str(c.args[0]) for c in mock_cur.execute.call_args_list if c.args]
+        assert any("DELETE" in s and "reservation_key" in s for s in delete_sqls)
 
+    mock_cur.reset_mock()
+    mock_cur.fetchone.return_value = {
+        "example_id": 1,
+        "reservation_key": "other",
+        "status": "SOFT",
+    }
     mock_cur.rowcount = 0
     with patch("app.services.source_claim.get_db") as gd:
         gd.return_value.__enter__.return_value = mock_conn
         gd.return_value.__exit__.return_value = False
         assert release_source(example_id=1, reservation_key="k") == {"status": "noop"}
+
+
+def test_soft_reserve_locks_url_family():
+    """Concurrent claimants on duplicate crawl rows share one reservation_key family."""
+    from app.services.source_claim import _soft_reserve
+
+    mock_cur = MagicMock()
+    # source_url lookup, then sibling ids FOR UPDATE, then family_is_blocked checks
+    mock_cur.fetchone.side_effect = [
+        {"source_url": "https://blind/same"},  # _sibling_ids_for_url
+        None,  # posts check
+        None,  # reservation check
+    ]
+    mock_cur.fetchall.return_value = [{"id": 10}, {"id": 20}]
+
+    until = datetime(2026, 8, 11, 12, 0, 0)
+    assert _soft_reserve(mock_cur, 10, "res-key", until) is True
+
+    sqls = [str(c.args[0]) for c in mock_cur.execute.call_args_list if c.args]
+    assert any("FOR UPDATE" in s and "source_url" in s for s in sqls)
+    inserts = [c for c in mock_cur.execute.call_args_list if c.args and "INSERT" in str(c.args[0])]
+    assert len(inserts) == 2
+    inserted_ids = {c.args[1][0] for c in inserts}
+    assert inserted_ids == {10, 20}

@@ -78,11 +78,22 @@
 
 | 항목 | 내용 |
 |---|---|
-| claim API | learning `POST /examples/claim-popular-source` · commit/release · 14일→30일 expand · `posts.source_example_id` 영구 제외 |
+| claim API | learning `POST /examples/claim-popular-source` · commit/release · 14일→30일 expand · **`source_url` 가족** 영구 제외 (example_id만이 아님) |
 | mix | Blind **70%** / Natepan **30%**; persona는 `voice_type` 매칭 |
-| soft-reserve | hold 유지 → publish commit → cancel/fail/twin release |
+| soft-reserve | hold 유지 → publish commit → cancel/fail/twin release · **동일 URL 형제 row도 같은 key로 SOFT** |
 | twin 가드 | `StoryTwinGuard` — title Jaccard≥0.45 · body≥0.35 · exact title; 창 14일/≤30건 |
 | 비변경 | crawl `SOURCES` budget(natepan 1500 · blind 500) |
+
+## Wave — source_url concurrency guard (2026-08-10)
+
+크롤 동시 실행이 같은 Blind URL을 `example_bank`에 이중 INSERT → claim이 example_id만
+막아 사연이 두 번 재구성되던 사고를 막는다.
+
+| 항목 | 내용 |
+|---|---|
+| crawl ingest | `GET_LOCK(ai_learning_crawl_ingest:{source})` + lock 하 URL 재스냅샷 후 INSERT |
+| claim SELECT | 형제 `source_url`이 posts/예약에 있으면 후보 제외 |
+| claim reserve | 형제 id 전부 `FOR UPDATE` + 동일 `reservationKey` SOFT · commit/release도 key 가족 |
 
 ## 현재 운영 상태를 해석할 때 주의할 점
 

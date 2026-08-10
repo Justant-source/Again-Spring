@@ -126,7 +126,8 @@ SELECT status, COUNT(*) as count FROM daily_planner_retry_log GROUP BY status;
 4. claim hit → `reconstructMode=true` + sourceExampleId/body/url/title.
    empty → **슬롯 skip** (archetype freestyle 폴백 없음). Blind 풀이 비면 그 Blind
    슬롯만 skip — Natepan으로 바꾸지 않음.
-5. soft-reserve lifecycle: hold 성공 시 reserve 유지 → publish 시 `commitSource` →
+5. soft-reserve lifecycle: hold 성공 시 **같은 source_url 형제 row까지** 같은 key로
+   reserve 유지 → publish 시 `commitSource`(key 가족 COMMITTED) →
    cancel/fail/twin-reject 시 `releaseSource` (lifecycle 경로 소유).
 6. legacy tick `ActionExecutor`의 findSimilar RAG는 **호환 경로**로만 남는다.
 

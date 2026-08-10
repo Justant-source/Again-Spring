@@ -60,6 +60,39 @@ def is_reservation_blocking(
     return False
 
 
+def blocked_source_urls(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    used_example_ids: set[int],
+    reservations: Mapping[int, Mapping[str, Any]],
+    now: datetime,
+) -> set[str]:
+    """URLs already used or actively reserved — blocks all sibling example_bank rows."""
+    id_to_url: dict[int, str] = {}
+    for row in rows:
+        try:
+            eid = int(row["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        url = row.get("source_url")
+        if url:
+            id_to_url[eid] = str(url)
+
+    blocked: set[str] = set()
+    for eid in used_example_ids:
+        url = id_to_url.get(int(eid))
+        if url:
+            blocked.add(url)
+    for eid, res in reservations.items():
+        if not res:
+            continue
+        if is_reservation_blocking(res.get("status"), res.get("reserve_until"), now):
+            url = id_to_url.get(int(eid))
+            if url:
+                blocked.add(url)
+    return blocked
+
+
 def filter_claim_candidates(
     rows: Sequence[Mapping[str, Any]],
     *,
@@ -69,8 +102,18 @@ def filter_claim_candidates(
     window_start: datetime,
     now: datetime,
 ) -> list[Mapping[str, Any]]:
-    """Pure filter mirroring claim SQL (for unit tests). Rank preserved."""
+    """Pure filter mirroring claim SQL (for unit tests). Rank preserved.
+
+    Exclusion is by example_id **and** source_url: if any sibling row with the same
+    source_url is used in posts or has an active reservation, all siblings are blocked.
+    """
     src = normalize_source(source)
+    blocked_urls = blocked_source_urls(
+        rows,
+        used_example_ids=used_example_ids,
+        reservations=reservations,
+        now=now,
+    )
     out: list[Mapping[str, Any]] = []
     for row in rows:
         if normalize_source(str(row.get("source") or "")) != src:
@@ -86,6 +129,9 @@ def filter_claim_candidates(
             continue
         eid = int(row["id"])
         if eid in used_example_ids:
+            continue
+        url = str(row["source_url"])
+        if url in blocked_urls:
             continue
         res = reservations.get(eid)
         if res and is_reservation_blocking(res.get("status"), res.get("reserve_until"), now):
@@ -133,6 +179,8 @@ def row_to_claimed_item(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+# Exclude by example_id and by source_url siblings: duplicate crawl rows with the
+# same URL must not be claimable once any sibling is used or soft/COMMITTED reserved.
 _SELECT_CANDIDATE_SQL = """
 SELECT eb.id, eb.content, eb.source, eb.title, eb.source_url, eb.popularity_pct
 FROM example_bank eb
@@ -142,13 +190,14 @@ WHERE eb.content_type = 'POST'
   AND eb.popularity_pct IS NOT NULL
   AND eb.created_at >= DATE_SUB(NOW(3), INTERVAL %s DAY)
   AND NOT EXISTS (
-      SELECT 1 FROM posts p WHERE p.source_example_id = eb.id
-  )
-  AND NOT EXISTS (
-      SELECT 1 FROM example_source_reservations r
-      WHERE r.example_id = eb.id
+      SELECT 1
+      FROM example_bank sib
+      LEFT JOIN posts p ON p.source_example_id = sib.id
+      LEFT JOIN example_source_reservations r ON r.example_id = sib.id
+      WHERE sib.source_url = eb.source_url
         AND (
-            r.status = 'COMMITTED'
+            p.id IS NOT NULL
+            OR r.status = 'COMMITTED'
             OR (r.status = 'SOFT' AND r.reserve_until > NOW(3))
         )
   )
@@ -178,8 +227,8 @@ def _select_candidate(
     return cur.fetchone()
 
 
-def _soft_reserve(cur, example_id: int, reservation_key: str, reserve_until: datetime) -> bool:
-    """Insert SOFT reservation. Reclaim expired SOFT via delete-then-insert. False on race."""
+def _soft_reserve_one(cur, example_id: int, reservation_key: str, reserve_until: datetime) -> bool:
+    """Insert SOFT reservation for one example_id. False on PK race."""
     cur.execute(
         """
         DELETE FROM example_source_reservations
@@ -206,6 +255,83 @@ def _soft_reserve(cur, example_id: int, reservation_key: str, reserve_until: dat
         return False
 
 
+def _sibling_ids_for_url(cur, example_id: int) -> list[int]:
+    """Lock and return all example_bank ids sharing this row's source_url (incl. self)."""
+    cur.execute(
+        "SELECT source_url FROM example_bank WHERE id = %s",
+        (example_id,),
+    )
+    row = cur.fetchone()
+    if not row or not row.get("source_url"):
+        return [example_id]
+    cur.execute(
+        """
+        SELECT id FROM example_bank
+        WHERE source_url = %s
+        ORDER BY id
+        FOR UPDATE
+        """,
+        (row["source_url"],),
+    )
+    ids = [int(r["id"]) for r in cur.fetchall()]
+    return ids or [example_id]
+
+
+def _family_is_blocked(cur, sibling_ids: Sequence[int]) -> bool:
+    """True if any sibling is already used in posts or has a blocking reservation."""
+    if not sibling_ids:
+        return False
+    placeholders = ",".join(["%s"] * len(sibling_ids))
+    params = list(sibling_ids)
+    cur.execute(
+        f"SELECT 1 FROM posts WHERE source_example_id IN ({placeholders}) LIMIT 1",
+        params,
+    )
+    if cur.fetchone():
+        return True
+    cur.execute(
+        f"""
+        SELECT 1 FROM example_source_reservations
+        WHERE example_id IN ({placeholders})
+          AND (
+              status = %s
+              OR (status = %s AND reserve_until > NOW(3))
+          )
+        LIMIT 1
+        """,
+        [*params, STATUS_COMMITTED, STATUS_SOFT],
+    )
+    return cur.fetchone() is not None
+
+
+def _soft_reserve(cur, example_id: int, reservation_key: str, reserve_until: datetime) -> bool:
+    """SOFT-reserve the claimed id and all same-source_url siblings (concurrency guard).
+
+    Locks the URL family with FOR UPDATE so two claimants cannot soft-reserve
+    different duplicate crawl rows of the same story in parallel.
+    """
+    sibling_ids = _sibling_ids_for_url(cur, example_id)
+    if _family_is_blocked(cur, sibling_ids):
+        logger.info(
+            "soft_reserve family blocked example_id=%s siblings=%s key=%s",
+            example_id,
+            sibling_ids,
+            reservation_key,
+        )
+        return False
+    for sid in sibling_ids:
+        if not _soft_reserve_one(cur, sid, reservation_key, reserve_until):
+            return False
+    if len(sibling_ids) > 1:
+        logger.info(
+            "soft_reserve family example_id=%s siblings=%s key=%s",
+            example_id,
+            sibling_ids,
+            reservation_key,
+        )
+    return True
+
+
 def claim_popular_source(
     *,
     source: str,
@@ -217,6 +343,9 @@ def claim_popular_source(
     """
     Transactionally pick top unused POST by popularity_pct and soft-reserve it.
     Tries window_days, then expand_days once. Returns claimed item dict or None.
+
+    Dedup key is source_url (not only example_bank.id): duplicate crawl rows and
+    concurrent claimants are blocked as one family.
     """
     if not is_allowed_source(source):
         raise ValueError(f"source must be one of {sorted(ALLOWED_SOURCES)}")
@@ -250,7 +379,7 @@ def claim_popular_source(
 
 
 def commit_source(*, example_id: int, reservation_key: str) -> dict[str, Any]:
-    """Set reservation status to COMMITTED (permanent). Verifies key."""
+    """Set reservation status to COMMITTED for the claim family (same reservation_key)."""
     key = str(reservation_key).strip()
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -269,34 +398,58 @@ def commit_source(*, example_id: int, reservation_key: str) -> dict[str, Any]:
             if row["reservation_key"] != key:
                 return {"status": "key_mismatch"}
             if row["status"] == STATUS_COMMITTED:
+                # Still promote any leftover SOFT siblings with this key.
+                cur.execute(
+                    """
+                    UPDATE example_source_reservations
+                    SET status = %s, updated_at = NOW(3)
+                    WHERE reservation_key = %s AND status = %s
+                    """,
+                    (STATUS_COMMITTED, key, STATUS_SOFT),
+                )
                 return {"status": "committed"}
             cur.execute(
                 """
                 UPDATE example_source_reservations
                 SET status = %s, updated_at = NOW(3)
-                WHERE example_id = %s AND reservation_key = %s
+                WHERE reservation_key = %s AND status = %s
                 """,
-                (STATUS_COMMITTED, int(example_id), key),
+                (STATUS_COMMITTED, key, STATUS_SOFT),
             )
             return {"status": "committed"}
 
 
 def release_source(*, example_id: int, reservation_key: str) -> dict[str, Any]:
-    """Delete SOFT reservation if key matches. No-op if COMMITTED or missing."""
+    """Delete SOFT reservations for the claim family if key matches. COMMITTED stays."""
     key = str(reservation_key).strip()
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                DELETE FROM example_source_reservations
-                WHERE example_id = %s AND reservation_key = %s AND status = %s
+                SELECT example_id, reservation_key, status
+                FROM example_source_reservations
+                WHERE example_id = %s
+                FOR UPDATE
                 """,
-                (int(example_id), key, STATUS_SOFT),
+                (int(example_id),),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"status": "noop"}
+            if row["reservation_key"] != key:
+                return {"status": "noop"}
+            if row["status"] != STATUS_SOFT:
+                return {"status": "noop"}
+            cur.execute(
+                """
+                DELETE FROM example_source_reservations
+                WHERE reservation_key = %s AND status = %s
+                """,
+                (key, STATUS_SOFT),
             )
             if cur.rowcount > 0:
                 return {"status": "released"}
             return {"status": "noop"}
-
 
 def expire_source_reservations() -> dict[str, Any]:
     """Delete expired SOFT reservations (reserve_until < NOW)."""

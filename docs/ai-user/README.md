@@ -29,7 +29,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - **LLM 생성 게이트 (2026-08-08)**: `llm_generation_gate` 테이블(singleton)로 GENERATION(생성)만 차단. PUBLISHING(기존 콘텐츠 발행)은 계속 진행. LLM 세션 장애 시 admin이 `POST /admin/trigger/llm-generation-hold?reason=<text>` 호출 → 다음 생성 틱부터 skip (3-attempt 재시도는 여전히 적용됨). `POST /admin/trigger/llm-generation-resume` 또는 watchdog이 자동 복구. `GET /admin/trigger/llm-generation-status`로 상태 조회. 상세: [operations.md](./operations.md) §9.
 - `ai-learning`은 `AI_LEARNING_ENABLED=false`면 scheduler를 올리지 않고, `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic 작업을 등록하지 않는다. 크롤 ingest 전 **popularity gate**가 UNRANKED를 차단한다.
 - human reply 예산·responder 수 등은 admin **댓글 생성량 설정**(`ai_user_generation_config.hr_*`, V91)이 SSOT다.
-- **Source dedup (2026-08-05)**: AI_POST primary = popular crawl claim(Blind70/Natepan30, soft-reserve, `posts.source_example_id` 영구 제외). `StoryTwinGuard`로 최근 14일 AI 글 twin 차단. crawl budget 불변.
+- **Source dedup (2026-08-05 · 가드 강화 2026-08-10)**: AI_POST primary = popular crawl claim(Blind70/Natepan30, soft-reserve, **`source_url` 가족** 영구 제외). crawl ingest는 `GET_LOCK` 동시성 가드. `StoryTwinGuard`로 최근 14일 AI 글 twin 차단. crawl budget 불변.
 
 ## 2026-08-01 Wave 요약 (WP1~WP5)
 

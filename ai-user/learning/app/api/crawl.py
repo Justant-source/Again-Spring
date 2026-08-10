@@ -21,6 +21,14 @@ _CRAWLERS = {
     "blind": "app.crawlers.blind",
 }
 
+# Named lock so concurrent crawl runs for the same source cannot both INSERT
+# a URL that was absent when each run snapshot existing_urls (pre-embed).
+_CRAWL_INGEST_LOCK_TIMEOUT_SEC = 120
+
+
+def _crawl_ingest_lock_name(source: str) -> str:
+    return f"ai_learning_crawl_ingest:{source.lower()}"
+
 
 def _gate_items(source: str, items: list, existing_ranked_parents: set[str]) -> tuple[list, int]:
     """Apply popularity gate. Returns (accepted_items, skipped_unpopular_count)."""
@@ -132,18 +140,50 @@ async def _do_crawl(source, daily_limit, embed_service):
                  VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                          VEC_FromText(%s), NOW(3))"""
         BATCH_COMMIT = 50
+        # source_url is column index 7 in the insert tuple (0-based).
+        _URL_IDX = 7
+        lock_name = _crawl_ingest_lock_name(source_key)
         with get_db() as conn:
             with conn.cursor() as cur:
-                for params in rows:
-                    cur.execute(sql, params)
-                    saved += 1
-                    if saved % BATCH_COMMIT == 0:
-                        conn.commit()
+                cur.execute(
+                    "SELECT GET_LOCK(%s, %s) AS acquired",
+                    (lock_name, _CRAWL_INGEST_LOCK_TIMEOUT_SEC),
+                )
+                lock_row = cur.fetchone() or {}
+                acquired = lock_row.get("acquired")
+                if acquired != 1:
+                    raise RuntimeError(
+                        f"crawl ingest lock not acquired source={source_key} "
+                        f"lock={lock_name} acquired={acquired}"
+                    )
+                try:
+                    # Re-load under lock — closes the race between pre-embed snapshot
+                    # and insert when two crawl runs overlap.
+                    cur.execute(
+                        "SELECT source_url FROM example_bank "
+                        "WHERE LOWER(source)=%s AND source_url IS NOT NULL",
+                        (source_key,),
+                    )
+                    locked_urls = {row["source_url"] for row in cur.fetchall()}
 
-                log_sql = """INSERT INTO crawl_log
-                             (source, items_collected, items_saved, status, created_at)
-                             VALUES (%s, %s, %s, %s, NOW(3))"""
-                cur.execute(log_sql, (source, len(items), saved, "SUCCESS"))
+                    for params in rows:
+                        source_url = params[_URL_IDX]
+                        if source_url is not None and source_url in locked_urls:
+                            skipped_dupes += 1
+                            continue
+                        cur.execute(sql, params)
+                        saved += 1
+                        if source_url is not None:
+                            locked_urls.add(source_url)
+                        if saved % BATCH_COMMIT == 0:
+                            conn.commit()
+
+                    log_sql = """INSERT INTO crawl_log
+                                 (source, items_collected, items_saved, status, created_at)
+                                 VALUES (%s, %s, %s, %s, NOW(3))"""
+                    cur.execute(log_sql, (source, len(items), saved, "SUCCESS"))
+                finally:
+                    cur.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
 
         logger.info(
             f"Crawl {source}: collected={len(items)} saved={saved} "

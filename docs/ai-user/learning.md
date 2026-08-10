@@ -86,6 +86,9 @@ learning container가 뜨면 아래가 항상 실행된다.
 
 - 품질 필터 미통과 항목은 저장하지 않는다.
 - 같은 `source_url`은 한 run 안과 기존 DB 모두에서 dedup한다.
+- **동시성 가드 (2026-08-10)**: ingest 직전에 MariaDB `GET_LOCK(ai_learning_crawl_ingest:{source})`를
+  잡고 URL 스냅샷을 **다시** 읽은 뒤 INSERT한다. embed 전 스냅샷만 쓰면 겹친 crawl 두 건이
+  같은 Blind/Natepan URL을 `example_bank`에 이중 INSERT하던 레이스가 있었다.
 - 결과는 `crawl_log`에 남는다. `GET /crawl/log`의 `at` 필드는 ISO-8601 UTC(`...Z`) 문자열이다
   (2026-07-30 이전에는 Python `str(datetime)` 그대로라 backend의 `Instant.parse()`가 못 읽는 버그가 있었음).
 - 표절 방어: `services/ngram_guard.py`(연속 n-gram 겹침 검사, 임계값 0.20 — 소급 감사 실측 기반)와
@@ -148,8 +151,9 @@ Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, wi
 | 후보 | `content_type=POST`, `source_url IS NOT NULL`, `popularity_pct IS NOT NULL`, source ∈ {blind,natepan} |
 | 순위 | `popularity_pct DESC` (NULL last) |
 | 창 | `created_at` 기준 **14일**. 없으면 **한 번** 30일로 확장. 그래도 없으면 empty (다른 source로 폴백 금지) |
-| 영구 제외 | `posts.source_example_id = example_bank.id` (같은 MariaDB) · `example_source_reservations.status='COMMITTED'` |
-| soft 제외 | `status='SOFT'` AND `reserve_until > NOW(3)` |
+| 영구 제외 | 같은 `source_url`을 가진 **형제** `example_bank` 행이 `posts.source_example_id`로 쓰였거나 `example_source_reservations.status='COMMITTED'` |
+| soft 제외 | 형제 행 중 `status='SOFT'` AND `reserve_until > NOW(3)` |
+| 동시성 | claim 시 동일 `source_url` 가족 전체를 `FOR UPDATE`로 잠그고 같은 `reservationKey`로 SOFT 예약. commit/release도 key 가족 단위 |
 | 응답 | ExampleItem-like `{id, content, source, title, sourceUrl, score≈popularity_pct}` 또는 `{"status":"empty"}` / null |
 
 ### 예약 생명주기

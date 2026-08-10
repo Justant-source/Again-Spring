@@ -331,7 +331,11 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
 
 - 일일 crawl **budget은 그대로**(natepan 1500 · blind 500). claim API가 budget을 바꾸지 않는다.
 - Blind 슬롯에서 `claim-popular-source`가 empty면 **그 슬롯만 skip** — Natepan으로 대체하지 않는다.
-- 원인 후보: 14→30일 창에 미사용 `popularity_pct` POST 부족 · `posts.source_example_id`로 이미 소진 · soft/COMMITTED 예약 과다.
+- 원인 후보: 14→30일 창에 미사용 `popularity_pct` POST 부족 · 같은 `source_url`이
+  이미 posts/예약에 소진 · soft/COMMITTED 예약 과다.
+- 2026-08-10: claim/crawl은 **source_url 동시성 가드**를 쓴다. 과거 이중 INSERT된
+  형제 row가 남아 있어도 claim 가족이 한 번만 잡힌다. 신규 이중 INSERT는
+  `GET_LOCK(ai_learning_crawl_ingest:*)`로 막는다.
 - twin 거절(`StoryTwinGuard`) 로그: `AI post rejected as story twin` — soft-reserve는 lifecycle release 경로가 회수해야 한다.
 
 ### 크롤이 조용히 멈췄을 때 (2026-06-24~07-30, 36일 무크롤 인시던트)
