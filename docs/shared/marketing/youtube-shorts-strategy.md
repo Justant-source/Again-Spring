@@ -140,7 +140,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 
 - 잡 상세: **인라인 mp4 재생** + 썸네일 + 사용 댓글 최대 3(§4.5) + (paired) 예정 첫 댓글
 - `READY && !autoPublish` → **게시 승인** 시에만 업로드
-- **플랫폼 계정 → YouTube Shorts**: 본문 `tts_voice` + 댓글 풀 `comment_tts_voices`(최대 5, 콤마구분)를 미리듣고 저장. Shorts 렌더 시 `options.ttsVoice` / `options.commentVoices` → `variant_config`.
+- **설정 탭 → 숏폼영상**(공용, 2026-08-10~): 본문 `tts_voice` + 댓글 풀 `comment_tts_voices`(최대 5, 콤마구분)를 미리듣고 저장. Instagram 릴스와 설정을 공유(같은 영상을 한 번만 렌더링). Shorts 렌더 시 `options.ttsVoice` / `options.commentVoices` → `variant_config`.
 - **보이스 계약**: 본문·intro·클로징 = `tts_voice`. 댓글 = `comment_tts_voices` 풀에서 작성자별 랜덤(본문 보이스 제외 우선). 풀이 비면 pipeline `comment_voices` 또는 본문 보이스 폴백. 참조 샘플 없는 키는 쓰지 말 것.
 - **클로징**: again_spring 고정 문구는 voice+text 키로 디스크 캐시·loudnorm 후 재사용 (전역 loudnorm이 끝을 눌러 작아지지 않게, 통합 낭독 경로에서는 전역 loudnorm 생략).
 - **AV 동기**: 오디오 타임라인 고정. 화면만 `TTS_TEXT_LEAD_SEC=0.10`(100ms) 앞서 전환 — 텍스트가 아주 조금 먼저 보이고 바로 TTS.

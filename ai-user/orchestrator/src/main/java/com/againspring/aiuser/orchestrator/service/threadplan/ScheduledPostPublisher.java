@@ -110,8 +110,14 @@ public class ScheduledPostPublisher {
             }
             Optional<PostDto> published = backend.createPost(jwt.get(), postBuilder.build());
             if (published.isEmpty() || published.get().getId() == null) {
-                // Transient backend write — keep soft-reserve for retry.
-                leases.releaseFailed(row.getId(), WORKER, "BACKEND_WRITE_FAILED", true);
+                // Cap retries: a permanent reject must not monopolize the due queue.
+                // claimDue already bumped attempt_count.
+                boolean retryable = row.getAttemptCount() < 3;
+                if (retryable) {
+                    leases.releaseFailed(row.getId(), WORKER, "BACKEND_WRITE_FAILED", true);
+                } else {
+                    failAndRelease(row, "BACKEND_WRITE_FAILED", false);
+                }
                 return;
             }
 

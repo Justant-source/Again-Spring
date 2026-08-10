@@ -8,7 +8,7 @@
  *    - /admin/marketing 「설정」탭 — 자격증명 + 플랫폼 자동 게시 섹션
  *
  * C. 자격증명 조회 (ASM 필요) — ASM_STUB_AVAILABLE=true 시 실행 / **읽기 전용**
- *    - 어드민 GET /credentials → 200 + 7개 플랫폼
+ *    - 어드민 GET /credentials → 200 + 8개 플랫폼(숏폼영상 공용 설정 포함)
  *    - 마스킹 불변식: secret 필드 값이 `values`에 절대 노출되지 않음
  *
  * 가드레일: LLM 미호출. ASM 자격증명 저장소는 dev·prod 공유 단일 인스턴스이므로
@@ -32,6 +32,9 @@ const EXPECTED_PLATFORMS = [
   'naver_clip',
   'youtube_shorts',
   'threads',
+  // 릴스·쇼츠가 WaggleBot에서 같은 영상을 공유하므로 나레이션(tts_voice/comment_tts_voices)은
+  // 설정 전용 pseudo-platform으로 분리됨(2026-08-10, 로그인/게시 기능 없음).
+  'shortform_video',
 ]
 
 // ── A. 인증 가드 (ASM 불필요) ────────────────────────────────────
@@ -58,6 +61,10 @@ test.describe('Journey 14-B: 설정 탭 (자격증명·자동 게시)', () => {
     await expect(page.locator(ADMIN_MARKETING.platformAutoSection)).toBeVisible({ timeout: 8_000 })
     await expect(page.getByText('자동 게시 대상')).toBeVisible()
 
+    // 숏폼영상 섹션 — 릴스·쇼츠 공용 나레이션 설정 박스 (ASM 없이도 셸 노출)
+    await expect(page.locator(ADMIN_MARKETING.shortformVideoSection)).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByText('숏폼영상')).toBeVisible()
+
     // 자격증명 안내 — 카드 렌더는 ASM 필요 → 문구만 검증
     await expect(page.getByText(/계정 정보를 입력|암호화되어 저장/)).toBeVisible({ timeout: 8_000 })
   })
@@ -67,7 +74,7 @@ test.describe('Journey 14-B: 설정 탭 (자격증명·자동 게시)', () => {
 // ASM 미기동 시 describe 미등록 → skipped 카운트에 안 잡힘
 if (ASM_AVAILABLE) {
 test.describe('Journey 14-C: 자격증명 조회 + 마스킹 불변식 (ASM)', () => {
-  test('어드민 — GET /credentials → 200 + 7개 플랫폼, 시크릿 미노출', async ({ request }) => {
+  test('어드민 — GET /credentials → 200 + 8개 플랫폼, 시크릿 미노출', async ({ request }) => {
     const token = tokenFromStorageState(PERSONA_TEST1.email)
     test.skip(!token, 'test1 storageState 없음')
 

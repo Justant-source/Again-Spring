@@ -121,6 +121,7 @@ export const ADMIN_MARKETING = {
   /** @deprecated 완료 탭 재설계로 제거됨. 존재하면 안 됨(toHaveCount(0) 가드). */
   timeline:            '[data-testid="marketing-timeline"]',
   platformAutoSection: '[data-testid="marketing-platform-auto-section"]',
+  shortformVideoSection: '[data-testid="marketing-shortform-video-section"]',
   holdingDraftDialog:  '[data-testid="marketing-holding-draft-dialog"]',
   // ⚠️ 가정(assumption) — 완료 탭 재설계: 확정(게시) / 탈락 보드 분리.
   completedPublishedBoard:    '[data-testid="marketing-completed-published-board"]',

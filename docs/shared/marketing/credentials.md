@@ -49,7 +49,6 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 |                   | `password`      | 🔒     |   |
 |                   | `totp_secret`   | 🔒     |   |
 |                   | `storage_state` | 🔒     |   |
-|                   | `tts_voice`     |        |   |
 | `naver_blog`      | `naver_id`      |        | ✓ |
 |                   | `password`      | 🔒     | ✓ |
 |                   | `storage_state` | 🔒     |   |
@@ -60,7 +59,7 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 |                   | `client_secret` | 🔒     | ✓ |
 |                   | `refresh_token` | 🔒     |   |
 |                   | `channel_id`    |        |   |
-|                   | `tts_voice`     |        |   |
+| `shortform_video` | `tts_voice`     |        |   |
 |                   | `comment_tts_voices` |   |   |
 | `threads`         | `storage_state` | 🔒     |   |
 
@@ -69,7 +68,8 @@ ASM(Again-Spring-Marketing) 서버가 **AES-256-GCM으로 암호화**하여 `cre
 >
 > **`storage_state`** = social-poster(Playwright)가 사용하는 로그인 세션(쿠키/스토리지) 직렬화 값. secret으로 암호화 저장하며, 보통 어드민 폼이 아니라 세션 시딩 경로(ASM `/api/v1/sessions/{platform}`)로 주입된다. API 기반인 `youtube_shorts`에는 없음.
 > **로그인 식별자**: X 게시는 타겟 `x_thread`이며, ASM 자격증명 PK는 로그인 세션용으로 여전히 `x`다(어드민 라벨은 「X 4단 스레드」). `instagram_*`는 `email`, `naver_*`는 `naver_id`. 권위본은 항상 ASM `app/domain/credentials.py`의 `PLATFORM_CREDENTIALS`.
-> **`youtube_shorts.refresh_token`**: OAuth로 자동 획득(폼 숨김). **`tts_voice`**: 본문·클로징 낭독 voice key(비시크릿). **`comment_tts_voices`**: 댓글 낭독 풀(콤마구분, 최대 5); 렌더 시 댓글마다 랜덤 배정(본문 보이스와 겹치지 않는 키 우선). `instagram_reels`에도 `tts_voice` 동일.
+> **`youtube_shorts.refresh_token`**: OAuth로 자동 획득(폼 숨김).
+> **`shortform_video`**: 로그인·게시 기능이 없는 **설정 전용 pseudo-platform**(2026-08-10 도입). `instagram_reels`/`youtube_shorts`는 WaggleBot에서 같은 영상을 한 번만 렌더링해 재사용(paired render)하므로, 나레이션(`tts_voice`=본문·클로징 낭독 voice key, `comment_tts_voices`=댓글 낭독 풀 콤마구분 최대5·렌더 시 댓글마다 랜덤 배정)은 플랫폼별이 아니라 여기 한 곳에서만 설정한다. 어드민 UI는 「설정」탭의 「숏폼영상」 박스(`ShortformVideoSection.tsx`). 소비처는 ASM `app/worker/youtube_shorts_pipeline.py`의 `_apply_tts_credentials()`.
 > **`instagram_reels` Graph API**: `app_id`/`app_secret`(Meta 앱) + `ig_user_id` + `access_token`(Instagram User/Page 토큰)은 **ASM credential AES-256-GCM만** SSOT. `.env`에 토큰·App Secret을 두지 않는다(YouTube `client_secret`/`refresh_token`과 동일). `graph_host` 기본=`graph.facebook.com`(Instagram Login이면 `graph.instagram.com`). Instagram Login은 공개 `video_url` 게시.
 > **`threads`**: 로그인 자격은 `instagram_feed`에서 런타임 상속 — 어드민 입력 불필요.
 

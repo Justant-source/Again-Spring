@@ -7,10 +7,12 @@ import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
+import com.againspring.safety.CrisisDetectedEvent;
 import com.againspring.safety.KeywordGuard;
 import com.againspring.service.ai.AiUserOutboxWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * PostComposeService - 커뮤니티 사연 등록 서비스
@@ -35,6 +38,7 @@ public class PostComposeService {
     private final KeywordGuard keywordGuard;
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final PostSearchNgramIndexer postSearchNgramIndexer;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 재구성 출처 스냅샷 — 재구성 모드 생성 시만 전달되며 posts 테이블에 저장.
@@ -50,7 +54,7 @@ public class PostComposeService {
 
     /**
      * 사연을 원문 그대로 즉시 등록.
-     * 위기 감지 시 IllegalArgumentException("CRISIS_DETECTED") 발생.
+     * 광장형: 본문 위기/LEVEL1 키워드는 게시 차단하지 않는다(감지·관제만).
      *
      * @param authorId   작성자 ID
      * @param userTitle  사용자가 입력한 제목
@@ -129,10 +133,17 @@ public class PostComposeService {
                                   java.util.List<String> metaphorIds) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
-        // 위기 감지 (이중방어 — FE에서도 감지)
+        // 광장형 정책(docs/frontend/ux/flows/08-crisis.md): 사연·댓글 입력은 차단하지 않는다.
+        // KeywordGuard LEVEL1(피해자·소송 등)은 AI 출력 금지어이며 커뮤니티 본문 차단 사유가 아니다.
+        // CRISIS 키워드만 관제 이벤트(감사 로그)로 남기고 게시는 계속한다.
         var scanResult = keywordGuard.scanUserInput(bodyRaw, authorId);
-        if (scanResult.isCrisis() || scanResult.isBlocked()) {
-            throw new IllegalArgumentException("CRISIS_DETECTED");
+        if (scanResult.isCrisis()) {
+            List<String> patterns = scanResult.getMatches().stream()
+                    .map(m -> m.getPattern())
+                    .collect(Collectors.toList());
+            log.warn("Crisis keyword detected on post compose author={} patterns={} — publishing anyway (plaza policy)",
+                    authorId, patterns);
+            eventPublisher.publishEvent(new CrisisDetectedEvent(this, authorId, sessionId, patterns));
         }
 
         String postId = "post_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);

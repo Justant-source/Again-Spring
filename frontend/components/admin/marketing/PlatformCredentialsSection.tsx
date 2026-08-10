@@ -35,6 +35,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   naver_clip: '네이버 클립',
   youtube_shorts: 'YouTube Shorts',
   threads: 'Threads',
+  shortform_video: '숏폼영상 (릴스·쇼츠 공용)',
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -220,7 +221,9 @@ export function PlatformCredentialsSection() {
         <div className="py-8 text-center text-gray-400">로드 중…</div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {creds.map((cred) => {
+          {creds
+            .filter((cred) => cred.platform !== 'shortform_video')
+            .map((cred) => {
             const account = primaryAccount(cred);
             return (
               <Card key={cred.platform} className="flex flex-col p-4">
@@ -294,8 +297,6 @@ export function PlatformCredentialsSection() {
                     .filter((f) => {
                       // YouTube Shorts: refresh_token은 OAuth로 자동 획득 — 입력 숨김
                       if (editing.platform === 'youtube_shorts' && f.key === 'refresh_token') return false;
-                      // TTS 음성은 전용 피커로 렌더 (스키마에 있을 때)
-                      if (f.key === 'tts_voice' || f.key === 'comment_tts_voices') return false;
                       return true;
                     })
                     .map((f) => {
@@ -321,27 +322,6 @@ export function PlatformCredentialsSection() {
                         </div>
                       );
                     })}
-
-                  {/* 스키마에 tts_voice가 있으면 본문 TTS 선택 + 미리듣기 */}
-                  {editing.fields.some((f) => f.key === 'tts_voice') && (
-                    <TtsVoicePicker
-                      value={formValues['tts_voice'] ?? ''}
-                      onChange={(key) =>
-                        setFormValues((prev) => ({ ...prev, tts_voice: key }))
-                      }
-                    />
-                  )}
-
-                  {/* 댓글 TTS 풀 (최대 5) — youtube_shorts 등 스키마에 comment_tts_voices가 있을 때 */}
-                  {editing.fields.some((f) => f.key === 'comment_tts_voices') && (
-                    <CommentTtsVoicePicker
-                      value={formValues['comment_tts_voices'] ?? ''}
-                      narratorVoice={formValues['tts_voice'] ?? ''}
-                      onChange={(csv) =>
-                        setFormValues((prev) => ({ ...prev, comment_tts_voices: csv }))
-                      }
-                    />
-                  )}
 
                   {/* YouTube Shorts: Google 계정 연결 섹션 */}
                   {editing.platform === 'youtube_shorts' && (
@@ -378,7 +358,7 @@ export function PlatformCredentialsSection() {
   );
 }
 
-function extractError(err: unknown): string {
+export function extractError(err: unknown): string {
   // axios error: prefer the server's message (BE passes through ASM's {"detail": ...})
   if (typeof err === 'object' && err !== null) {
     const anyErr = err as { response?: { data?: { message?: string; detail?: string } }; message?: string };
@@ -391,16 +371,19 @@ function extractError(err: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
-// WaggleBot TTS voice picker + preview (shown when schema has tts_voice)
+// WaggleBot TTS voice picker + preview.
+// Exported for reuse by ShortformVideoSection (숏폼영상 설정 박스) — 릴스·쇼츠가
+// WaggleBot에서 같은 영상을 공유하므로 나레이션은 여기서만 렌더, 개별 플랫폼
+// 편집 다이얼로그에는 더 이상 노출하지 않는다.
 // ---------------------------------------------------------------------------
-interface TtsVoicePickerProps {
+export interface TtsVoicePickerProps {
   value: string;
   onChange: (key: string) => void;
 }
 
-function TtsVoicePicker({ value, onChange }: TtsVoicePickerProps) {
+export function TtsVoicePicker({ value, onChange }: TtsVoicePickerProps) {
   const [voices, setVoices] = useState<TtsVoice[]>([]);
-  const [defaultVoice, setDefaultVoice] = useState('yohan');
+  const [defaultVoice, setDefaultVoice] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -420,7 +403,7 @@ function TtsVoicePicker({ value, onChange }: TtsVoicePickerProps) {
         const catalog = await listTtsVoices();
         if (cancelled) return;
         setVoices(catalog.voices ?? []);
-        const def = catalog.defaultVoice || 'yohan';
+        const def = catalog.defaultVoice || '';
         setDefaultVoice(def);
         // Persist default into the form when nothing is stored yet
         if (!value && def) onChange(def);
@@ -563,13 +546,13 @@ function parseCommentVoiceCsv(csv: string): string[] {
     .slice(0, COMMENT_TTS_MAX);
 }
 
-interface CommentTtsVoicePickerProps {
+export interface CommentTtsVoicePickerProps {
   value: string;
   narratorVoice: string;
   onChange: (csv: string) => void;
 }
 
-function CommentTtsVoicePicker({ value, narratorVoice, onChange }: CommentTtsVoicePickerProps) {
+export function CommentTtsVoicePicker({ value, narratorVoice, onChange }: CommentTtsVoicePickerProps) {
   const [voices, setVoices] = useState<TtsVoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

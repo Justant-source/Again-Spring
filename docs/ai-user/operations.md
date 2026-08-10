@@ -315,6 +315,10 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
 - `ai_scheduled_posts` 상태 분포 확인: `SELECT status, COUNT(*) FROM ai_scheduled_posts GROUP BY status;`
   — `PUBLISHING` 상태가 `lease_until`을 훨씬 지나서도 남아 있으면 발행 중 예외로
   lease가 안 풀린 것, orchestrator 로그에서 `Scheduled post publish failed` 검색
+- orchestrator 로그에 매분 `Create post failed: ... CRISIS_DETECTED`가 찍히면
+  **구버전 BE**가 사연 본문 LEVEL1(피해자·소송 등)을 차단하던 회귀다.
+  광장형 정책상 차단하면 안 된다 — `PostComposeService`는 감지·관제만 하고 게시한다.
+  (BACKEND_WRITE_FAILED 재시도는 3회로 캡; 그 이상이면 `FAILED`로 내려 큐를 막지 않는다)
 - LEGACY라면 `ai_user_runtime.enabled = 1`인지 확인
 - orchestrator 로그에 `Daily global cap reached`가 있는지 확인
 

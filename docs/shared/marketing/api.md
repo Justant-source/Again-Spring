@@ -104,9 +104,9 @@ Authorization: Bearer <admin-jwt>
 **GET Response 200** — `CredentialStatus[]` (아래 ASM 2.5 형식과 동일)
 **PUT**: 성공 시 단일 `CredentialStatus`. **오류**: 400 (미지원 platform / 필수 누락)
 
-### 1.5.1 WaggleBot TTS 음성 (플랫폼 계정 편집)
+### 1.5.1 WaggleBot TTS 음성 (숏폼영상 설정)
 
-> ASM `/api/v1/waggle/*` → WaggleBot. 어드민 JWT로 미리듣기·선택. `tts_voice`는 `youtube_shorts` 자격증명 public 필드.
+> ASM `/api/v1/waggle/*` → WaggleBot. 어드민 JWT로 미리듣기·선택. `tts_voice`/`comment_tts_voices`는 `shortform_video` pseudo-platform(설정 전용, 로그인 없음) 자격증명 public 필드 — `instagram_reels`/`youtube_shorts`가 WaggleBot에서 같은 영상을 공유하므로 나레이션 설정도 공유(2026-08-10, 상세: `credentials.md`).
 
 ```
 GET /api/admin/marketing/tts/voices

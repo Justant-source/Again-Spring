@@ -738,6 +738,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/events/{eventId}/photo-exhibition/start-voting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["startVoting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/events/{eventId}/photo-exhibition/finalize": {
         parameters: {
             query?: never;
@@ -1020,7 +1036,7 @@ export interface paths {
         get: operations["mine"];
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["deleteMine"];
         options?: never;
         head?: never;
         patch: operations["update"];
@@ -2544,6 +2560,8 @@ export interface components {
             reviewEnd?: string;
             /** Format: date-time */
             votingEnd?: string;
+            /** Format: date-time */
+            votingStartedAt?: string;
         };
         Rewards: {
             /** Format: int32 */
@@ -2622,6 +2640,8 @@ export interface components {
             reviewEnd?: string;
             /** Format: date-time */
             votingEnd?: string;
+            /** Format: date-time */
+            votingStartedAt?: string;
         };
         CategoryResponse: {
             /** Format: int64 */
@@ -4734,6 +4754,26 @@ export interface operations {
             };
         };
     };
+    startVoting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     finalize: {
         parameters: {
             query?: never;
@@ -5256,6 +5296,28 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["PhotoExhibitionSubmissionResponse"];
                 };
+            };
+        };
+    };
+    deleteMine: {
+        parameters: {
+            query?: {
+                submissionId?: number;
+            };
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
