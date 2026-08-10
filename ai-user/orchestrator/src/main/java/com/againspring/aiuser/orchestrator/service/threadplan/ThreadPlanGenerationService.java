@@ -383,8 +383,10 @@ public class ThreadPlanGenerationService {
     private record PlanRequestBuilt(Map<String, Object> request, Set<String> castIds) { }
 
     /**
-     * Single insertion point for hold replay and live publish: quality-gate → persist kept
-     * → READY+ACTIVE or FAILED({@link ThreadQualityGate#FAILURE_QUALITY_BELOW_MIN}).
+     * Quality-gate → persist kept → READY+ACTIVE.
+     * <p>If operational READY mins fail: regenerate comment candidates via LLM once
+     * ({@code HUMAN_POST}). If still below mins (or regen fails), persist whatever kept
+     * items remain and activate as a thin READY — never discard a usable partial thread.
      */
     @Transactional
     public ThreadQualityGate.QualityResult persistAndFinalize(String planId, Map<String, Object> response) {
@@ -403,18 +405,148 @@ public class ThreadPlanGenerationService {
     public ThreadQualityGate.QualityResult persistAndFinalize(String planId, Map<String, Object> response,
                                                                Set<String> allowedPersonaIds,
                                                                int readyMinTopLevel, int readyMinItems) {
-        ThreadQualityGate.QualityResult quality =
-                persistResponse(planId, response, allowedPersonaIds, readyMinTopLevel, readyMinItems);
-        if (quality.passedOperationalMin()) {
-            planService.markReady(planId);
-            planService.activate(planId);
-            seedInterestedPersonasBestEffort(planId, quality);
-        } else {
-            log.warn("Plan {} below READY mins (kept={}, dropped={}): {}",
-                    planId, quality.keptItems().size(), quality.dropped(), quality.reasons());
-            planService.markFailed(planId, ThreadQualityGate.FAILURE_QUALITY_BELOW_MIN);
+        ThreadQualityGate.QualityResult first =
+                evaluateResponse(planId, response, allowedPersonaIds, readyMinTopLevel, readyMinItems);
+        ThreadQualityGate.QualityResult chosen = first;
+
+        if (!first.passedOperationalMin()) {
+            log.warn("Plan {} below READY mins (kept={}, dropped={}): {} — attempting 1 quality regen",
+                    planId, first.keptItems().size(), first.dropped(), first.reasons());
+            Optional<Map<String, Object>> retryBody = regenerateCommentsForQuality(planId, allowedPersonaIds);
+            if (retryBody.isPresent()) {
+                try {
+                    ThreadQualityGate.QualityResult second = evaluateResponse(
+                            planId, retryBody.get(), allowedPersonaIds, readyMinTopLevel, readyMinItems);
+                    if (second.passedOperationalMin()) {
+                        persistKeptItems(planId, second);
+                        activateReady(planId, second);
+                        return second;
+                    }
+                    // Prefer the retry's kept set when non-empty; else fall back to first.
+                    chosen = second.keptItems().isEmpty() && !first.keptItems().isEmpty() ? first : second;
+                    log.warn("Plan {} quality regen still below READY mins (kept={}, dropped={}): {} — thin READY",
+                            planId, chosen.keptItems().size(), chosen.dropped(), chosen.reasons());
+                } catch (IllegalArgumentException invalid) {
+                    log.warn("Plan {} quality regen rejected: {} — thin READY from first pass",
+                            planId, invalid.getMessage());
+                }
+            } else {
+                log.warn("Plan {} quality regen unavailable — thin READY from first pass (kept={})",
+                        planId, first.keptItems().size());
+            }
+            persistKeptItems(planId, chosen);
+            activateReady(planId, chosen);
+            return chosen;
         }
-        return quality;
+
+        persistKeptItems(planId, first);
+        activateReady(planId, first);
+        return first;
+    }
+
+    private void activateReady(String planId, ThreadQualityGate.QualityResult quality) {
+        planService.markReady(planId);
+        planService.activate(planId);
+        seedInterestedPersonasBestEffort(planId, quality);
+    }
+
+    /**
+     * Comment-only LLM regen after a READY-min miss. Always {@code HUMAN_POST}.
+     * Returns empty when gate is held, provider OFF, or source body missing.
+     */
+    Optional<Map<String, Object>> regenerateCommentsForQuality(String planId, Set<String> allowedPersonaIds) {
+        AiThreadPlan plan = planRepository.findById(planId).orElse(null);
+        if (plan == null) return Optional.empty();
+        String title = nullToEmpty(plan.getSourceTitle());
+        String body = nullToEmpty(plan.getSourceBody());
+        if (title.isBlank() || body.isBlank()) {
+            log.warn("Plan {} quality regen skipped: missing source title/body", planId);
+            return Optional.empty();
+        }
+        if (llmGenerationGateService != null && llmGenerationGateService.isHeld()) {
+            log.info("Plan {} quality regen skipped: LLM gate held", planId);
+            return Optional.empty();
+        }
+        AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
+        // Daytime hold replay may have DB provider OFF — fall back to yml like paired paths.
+        String provider = resolveProvider("HUMAN_POST", config, true);
+        if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) {
+            log.warn("Plan {} quality regen skipped: HUMAN_POST provider OFF", planId);
+            return Optional.empty();
+        }
+        String model = properties.getThreadPlan().getHumanPlanModel();
+        int pool = config == null ? 24 : Math.max(8, Math.min(30, config.getCandidatePoolSize()));
+        int roots = Math.min(14, pool);
+        int replies = Math.max(0, pool - roots);
+
+        Set<String> excluded = loadStorySidePersonaIds(plan.getPostId());
+        List<Persona> poolPersonas;
+        if (allowedPersonaIds != null && !allowedPersonaIds.isEmpty()) {
+            poolPersonas = new ArrayList<>();
+            for (String id : allowedPersonaIds) {
+                if (id == null || id.isBlank() || excluded.contains(id)) continue;
+                personaRepository.findById(id).ifPresent(p -> {
+                    if (p.isActive()) poolPersonas.add(p);
+                });
+            }
+        } else {
+            poolPersonas = new ArrayList<>();
+            for (Persona p : PlanPersonaMapper.capCastPool(
+                    personaRepository.findByActiveTrue(), properties.getThreadPlan().getPlanPersonaCastMax())) {
+                if (p != null && !excluded.contains(p.getId())) poolPersonas.add(p);
+            }
+        }
+        if (poolPersonas.isEmpty()) {
+            log.warn("Plan {} quality regen skipped: empty comment cast", planId);
+            return Optional.empty();
+        }
+        List<Map<String, Object>> personas = planPersonaMapper.mapCast(poolPersonas);
+        Set<String> castIds = planPersonaMapper.castIds(personas);
+
+        Map<String, Object> req = new LinkedHashMap<>();
+        req.put("kind", "HUMAN_POST");
+        req.put("provider", provider);
+        if (model != null && !model.isBlank()) req.put("model", model);
+        req.put("correlationId", "thread-plan-quality-regen-" + plan.getId());
+        req.put("postId", plan.getPostId());
+        req.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
+        req.put("postRevision", (long) plan.getPostRevision());
+        req.put("existingTitle", title);
+        req.put("existingBody", body);
+        req.put("category", nullToEmpty(plan.getSourceCategory()));
+        req.put("personas", personas);
+        req.put("maxTopLevel", roots);
+        req.put("maxReplies", replies);
+        req.put("minTopLevel", 1);
+        req.put("minItems", 1);
+        return invokeCommentRegen(plan, req, excluded);
+    }
+
+    private Optional<Map<String, Object>> invokeCommentRegen(AiThreadPlan plan, Map<String, Object> req,
+                                                             Set<String> excludedStory) {
+        plan.setGenerationAttempts(plan.getGenerationAttempts() + 1);
+        planRepository.save(plan);
+        Optional<Map<String, Object>> response = llmClient.generateThreadPlan(req);
+        if (response.isEmpty()) {
+            response = llmClient.generateThreadPlan(req);
+        }
+        if (response.isEmpty()) {
+            log.warn("Plan {} quality regen LLM empty", plan.getId());
+            return Optional.empty();
+        }
+        Map<String, Object> body = new LinkedHashMap<>(response.get());
+        if (!(body.get("items") instanceof List<?>) && body.get("comments") instanceof List<?> comments) {
+            body.put("items", comments);
+        }
+        if (excludedStory != null && !excludedStory.isEmpty()) {
+            int stripped = StoryPersonaCommentFilter.stripFromResponse(body, excludedStory);
+            if (stripped > 0) {
+                log.info("Plan {} quality regen stripped {} story-persona comment(s)", plan.getId(), stripped);
+            }
+        }
+        Instant origin = plan.getPublishedAt() != null ? plan.getPublishedAt() : Instant.now();
+        candidateScheduleSupport.rescheduleFromPublishAt(body, origin);
+        return Optional.of(body);
     }
 
     /** Best-effort PLAN_CAST seed into ai_post_interested_personas; never fails READY. */
@@ -440,13 +572,12 @@ public class ThreadPlanGenerationService {
     }
 
     /**
-     * Runs {@link ThreadQualityGate}, then persists only kept items when operational mins pass.
-     * Does not invent filler. Callers that need READY/FAILED should use {@link #persistAndFinalize}.
+     * Runs {@link ThreadQualityGate}, then persists kept items when operational mins pass.
+     * Callers that need READY/FAILED/thin-READY should use {@link #persistAndFinalize}.
      *
      * @param allowedPersonaIds {@code null} → active personas; empty set → skip cast check
      */
     @Transactional
-    @SuppressWarnings("unchecked")
     ThreadQualityGate.QualityResult persistResponse(String planId, Map<String, Object> response,
                                                      Set<String> allowedPersonaIds) {
         OrchestratorProperties.ThreadPlan cfg = properties.getThreadPlan();
@@ -455,8 +586,19 @@ public class ThreadPlanGenerationService {
     }
 
     @Transactional
-    @SuppressWarnings("unchecked")
     ThreadQualityGate.QualityResult persistResponse(String planId, Map<String, Object> response,
+                                                     Set<String> allowedPersonaIds,
+                                                     int readyMinTopLevel, int readyMinItems) {
+        ThreadQualityGate.QualityResult quality =
+                evaluateResponse(planId, response, allowedPersonaIds, readyMinTopLevel, readyMinItems);
+        if (!quality.passedOperationalMin()) {
+            return quality;
+        }
+        persistKeptItems(planId, quality);
+        return quality;
+    }
+
+    ThreadQualityGate.QualityResult evaluateResponse(String planId, Map<String, Object> response,
                                                      Set<String> allowedPersonaIds,
                                                      int readyMinTopLevel, int readyMinItems) {
         AiThreadPlan plan = planRepository.findById(planId).orElseThrow();
@@ -471,7 +613,7 @@ public class ThreadPlanGenerationService {
                         .collect(java.util.stream.Collectors.toUnmodifiableSet());
         Set<String> excludedStory = loadStorySidePersonaIds(plan.getPostId());
         OrchestratorProperties.ThreadPlan cfg = properties.getThreadPlan();
-        ThreadQualityGate.QualityResult quality = qualityGate.evaluate(
+        return qualityGate.evaluate(
                 rows,
                 cast,
                 personaRepository::existsById,
@@ -479,12 +621,13 @@ public class ThreadPlanGenerationService {
                 readyMinItems,
                 cfg.getStanceShareMax(),
                 excludedStory);
+    }
 
-        if (!quality.passedOperationalMin()) {
-            // Do not store a thin tree that will never go READY — avoids orphan SCHEDULED rows.
-            return quality;
+    void persistKeptItems(String planId, ThreadQualityGate.QualityResult quality) {
+        if (quality == null || quality.keptItems() == null || quality.keptItems().isEmpty()) {
+            return;
         }
-
+        AiThreadPlan plan = planRepository.findById(planId).orElseThrow();
         Map<String, String> refs = new HashMap<>();
         int sequence = 0;
         for (Map<String, Object> row : quality.keptItems()) {
@@ -508,7 +651,6 @@ public class ThreadPlanGenerationService {
             itemRepository.save(item);
             refs.put(ref, item.getId());
         }
-        return quality;
     }
 
     /**
@@ -518,7 +660,7 @@ public class ThreadPlanGenerationService {
     Set<String> loadStorySidePersonaIds(String postId) {
         if (postId == null || postId.isBlank() || jdbcTemplate == null) return Set.of();
         try {
-            return jdbcTemplate.query(
+            Set<String> ids = jdbcTemplate.query(
                     "SELECT author_id, partner_user_id FROM posts WHERE id = ? AND deleted_at IS NULL",
                     rs -> {
                         Set<String> out = new LinkedHashSet<>();
@@ -531,6 +673,7 @@ public class ThreadPlanGenerationService {
                         return out;
                     },
                     postId);
+            return ids == null ? Set.of() : ids;
         } catch (Exception e) {
             log.warn("story-side persona lookup failed post={}: {}", postId, e.getMessage());
             return Set.of();

@@ -68,8 +68,8 @@ flowchart LR
 2. 부모 후보가 탈락하면 그 후보를 참조하는 대댓글도 탈락시킨다.
 3. `parsePlan` 하한은 요청 파라미터로 조절한다. `minTopLevel`/`minItems` 미지정 시 레거시 기본(최상위 6 · 전체 12, 각각 max에 캡). 품질 게이트로 이후 드롭할 orchestrator는 `minTopLevel=1`, `minItems=1`을 보낸다(현재 `AiPostBundleService`·`ThreadPlanGenerationService` 기본).
 4. **`ThreadQualityGate`** (`persistAndFinalize`): cast 소속 · **story-side 제외(글 작성자·상대방 persona는 댓글/대댓글 불가 — `STORY_PERSONA`)** · parent(대댓글→앞서 남은 최상위) · `ContentSafetyGuard`(COMMENT) · stance 단일 관점 ≤80%(stance 필드 없으면 `UNEVALUATED:stance`로 스킵). 실패 item은 드롭만 하고 filler로 채우지 않는다. 부모 탈락 시 자식도 연쇄 탈락. 사람 댓글에 대한 author 답글(`humanAuthorId` 있는 human-reply batch)은 이 게이트를 타지 않는다.
-5. 품질 통과 후 잔여가 운영 READY 하한(`ai-user.thread-plan.ready-min-top-level` 기본 3 · `ready-min-items` 기본 6) 미만이면 item을 저장하지 않고 `plan.status=FAILED` + `failure_code=QUALITY_BELOW_MIN_ITEMS`. 통과 시에만 READY→ACTIVE.
-6. 구조 자체가 깨진 응답(빈 items·상한 초과 등)은 기존처럼 `INVALID_STRUCTURED_OUTPUT`. 동일 provider/model로 한 번만 재시도한다. 개별 댓글 추가 호출은 하지 않는다.
+5. 품질 게이트 후 잔여가 운영 READY 하한(`ai-user.thread-plan.ready-min-top-level` 기본 3 · `ready-min-items` 기본 6) 미만이면 **댓글만** `HUMAN_POST`로 LLM **1회** 재생성한다. 재생성 후에도 하한 미달(또는 재생성 불가)이면 kept item을 **버리지 않고** 개수와 무관하게 얇은 READY→ACTIVE로 진행한다(구 `QUALITY_BELOW_MIN_ITEMS` 전량 discard 폐지). 하한 통과 시에도 READY→ACTIVE.
+6. 구조 자체가 깨진 응답(빈 items·상한 초과 등)은 기존처럼 `INVALID_STRUCTURED_OUTPUT`. 동일 provider/model로 한 번만 재시도한다.
 
 ## 시간 배분과 수명
 

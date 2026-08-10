@@ -18,8 +18,9 @@ import java.util.function.Predicate;
 
 /**
  * Post-LLM thread candidate filter before plan READY.
- * Drops bad items (never pads with filler); operational mins decide READY vs
- * {@link #FAILURE_QUALITY_BELOW_MIN}.
+ * Drops bad items (never pads with filler). Operational mins set
+ * {@link QualityResult#passedOperationalMin()}; {@link #FAILURE_QUALITY_BELOW_MIN} is a reason
+ * code only — {@code persistAndFinalize} may regen once then thin-READY rather than fail.
  */
 @Slf4j
 @Service

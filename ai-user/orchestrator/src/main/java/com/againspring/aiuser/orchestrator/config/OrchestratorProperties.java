@@ -156,8 +156,9 @@ public class OrchestratorProperties {
          */
         private int planPersonaCastMax = 40;
         /**
-         * After {@code ThreadQualityGate}, plan is READY only if kept top-level ≥ this
-         * and kept items ≥ {@link #readyMinItems}. Below → {@code QUALITY_BELOW_MIN_ITEMS}.
+         * Target after {@code ThreadQualityGate}: kept top-level ≥ this and kept items ≥
+         * {@link #readyMinItems}. Miss → one comment LLM regen; still miss → thin READY
+         * with whatever kept (no {@code QUALITY_BELOW_MIN_ITEMS} discard).
          */
         private int readyMinTopLevel = 3;
         private int readyMinItems = 6;

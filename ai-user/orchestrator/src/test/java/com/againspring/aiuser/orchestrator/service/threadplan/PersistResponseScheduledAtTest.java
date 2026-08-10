@@ -3,6 +3,7 @@ package com.againspring.aiuser.orchestrator.service.threadplan;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlan;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlanItem;
+import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.repository.AiThreadPlanItemRepository;
 import com.againspring.aiuser.orchestrator.repository.AiThreadPlanRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
@@ -16,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
@@ -123,7 +126,7 @@ class PersistResponseScheduledAtTest {
     }
 
     @Test
-    void persistAndFinalizeMarksFailedWhenBelowReadyMin() {
+    void persistAndFinalizeThinReadyWhenBelowReadyMinAndRegenUnavailable() {
         when(threadPlanConfig.getReadyMinTopLevel()).thenReturn(3);
         when(threadPlanConfig.getReadyMinItems()).thenReturn(6);
 
@@ -135,6 +138,7 @@ class PersistResponseScheduledAtTest {
         when(planRepository.findById("plan-3")).thenReturn(Optional.of(plan));
         when(personaRepository.existsById("p1")).thenReturn(true);
         when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+        when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("ref", "c1");
@@ -147,10 +151,110 @@ class PersistResponseScheduledAtTest {
                 service.persistAndFinalize("plan-3", response, Set.of("p1"));
 
         assertThat(result.passedOperationalMin()).isFalse();
-        verify(planService).markFailed("plan-3", ThreadQualityGate.FAILURE_QUALITY_BELOW_MIN);
-        verify(planService, never()).markReady(any());
-        verify(itemRepository, never()).save(any());
-        verify(interestedPersonaSeeder, never()).seedFromPlanCast(any(), any());
+        assertThat(result.keptItems()).hasSize(1);
+        verify(planService, never()).markFailed(any(), any());
+        verify(planService).markReady("plan-3");
+        verify(planService).activate("plan-3");
+        verify(itemRepository).save(any());
+        verify(llmClient, never()).generateThreadPlan(any());
+        verify(interestedPersonaSeeder).seedFromPlanCast(eq("post-3"), argThat(ids ->
+                ids != null && ids.contains("p1")));
+    }
+
+    @Test
+    void persistAndFinalizeRegensOnceAndReadyWhenSecondPassMeetsMin() {
+        when(threadPlanConfig.getReadyMinTopLevel()).thenReturn(3);
+        when(threadPlanConfig.getReadyMinItems()).thenReturn(6);
+        when(threadPlanConfig.getHumanPlanProvider()).thenReturn("CLAUDE");
+        when(threadPlanConfig.getHumanPlanModel()).thenReturn("claude-haiku");
+        when(threadPlanConfig.getBundleTimeoutMs()).thenReturn(60_000L);
+
+        AiThreadPlan plan = AiThreadPlan.builder()
+                .id("plan-5")
+                .postId("post-5")
+                .publishedAt(Instant.parse("2026-08-01T11:00:00Z"))
+                .sourceTitle("제목입니다")
+                .sourceBody("본문이 충분히 길어서 재생성이 가능합니다")
+                .build();
+        when(planRepository.findById("plan-5")).thenReturn(Optional.of(plan));
+        when(planRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(configRepository.findById(1)).thenReturn(Optional.empty());
+        when(personaRepository.existsById("p1")).thenReturn(true);
+        when(personaRepository.findById("p1")).thenReturn(Optional.of(Persona.builder()
+                .id("p1").active(true).build()));
+        when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+        when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(planPersonaMapper.mapCast(any())).thenReturn(List.of(Map.of("id", "p1")));
+        when(planPersonaMapper.castIds(any())).thenReturn(Set.of("p1"));
+
+        Map<String, Object> thin = new LinkedHashMap<>();
+        thin.put("items", List.of(commentRow("c1", "첫 패스 하한 미달 댓글")));
+
+        List<Map<String, Object>> richItems = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            richItems.add(commentRow("r" + i, "재생성 후 충분한 댓글 본문 " + i));
+        }
+        Map<String, Object> rich = new LinkedHashMap<>();
+        rich.put("items", richItems);
+        when(llmClient.generateThreadPlan(any())).thenReturn(Optional.of(rich));
+
+        ThreadQualityGate.QualityResult result =
+                service.persistAndFinalize("plan-5", thin, Set.of("p1"));
+
+        assertThat(result.passedOperationalMin()).isTrue();
+        assertThat(result.keptItems()).hasSize(6);
+        verify(llmClient, times(1)).generateThreadPlan(any());
+        verify(planService, never()).markFailed(any(), any());
+        verify(planService).markReady("plan-5");
+        verify(planService).activate("plan-5");
+        verify(itemRepository, times(6)).save(any());
+    }
+
+    @Test
+    void persistAndFinalizeThinReadyAfterRegenStillBelowMin() {
+        when(threadPlanConfig.getReadyMinTopLevel()).thenReturn(3);
+        when(threadPlanConfig.getReadyMinItems()).thenReturn(6);
+        when(threadPlanConfig.getHumanPlanProvider()).thenReturn("CLAUDE");
+        when(threadPlanConfig.getHumanPlanModel()).thenReturn("claude-haiku");
+        when(threadPlanConfig.getBundleTimeoutMs()).thenReturn(60_000L);
+
+        AiThreadPlan plan = AiThreadPlan.builder()
+                .id("plan-6")
+                .postId("post-6")
+                .publishedAt(Instant.parse("2026-08-01T11:00:00Z"))
+                .sourceTitle("제목입니다")
+                .sourceBody("본문이 충분히 길어서 재생성이 가능합니다")
+                .build();
+        when(planRepository.findById("plan-6")).thenReturn(Optional.of(plan));
+        when(planRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(configRepository.findById(1)).thenReturn(Optional.empty());
+        when(personaRepository.existsById("p1")).thenReturn(true);
+        when(personaRepository.findById("p1")).thenReturn(Optional.of(Persona.builder()
+                .id("p1").active(true).build()));
+        when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+        when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(planPersonaMapper.mapCast(any())).thenReturn(List.of(Map.of("id", "p1")));
+        when(planPersonaMapper.castIds(any())).thenReturn(Set.of("p1"));
+
+        Map<String, Object> first = new LinkedHashMap<>();
+        first.put("items", List.of(commentRow("c1", "첫 패스 하한 미달 댓글")));
+
+        Map<String, Object> second = new LinkedHashMap<>();
+        second.put("items", List.of(
+                commentRow("r1", "재생성도 여전히 부족한 댓글 하나"),
+                commentRow("r2", "재생성도 여전히 부족한 댓글 둘")));
+        when(llmClient.generateThreadPlan(any())).thenReturn(Optional.of(second));
+
+        ThreadQualityGate.QualityResult result =
+                service.persistAndFinalize("plan-6", first, Set.of("p1"));
+
+        assertThat(result.passedOperationalMin()).isFalse();
+        assertThat(result.keptItems()).hasSize(2);
+        verify(llmClient, times(1)).generateThreadPlan(any());
+        verify(planService, never()).markFailed(any(), any());
+        verify(planService).markReady("plan-6");
+        verify(planService).activate("plan-6");
+        verify(itemRepository, times(2)).save(any());
     }
 
     @Test
@@ -180,5 +284,13 @@ class PersistResponseScheduledAtTest {
         verify(planService).activate("plan-4");
         verify(interestedPersonaSeeder).seedFromPlanCast(eq("post-4"), argThat(ids ->
                 ids != null && ids.contains("p1")));
+    }
+
+    private static Map<String, Object> commentRow(String ref, String body) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("ref", ref);
+        item.put("personaId", "p1");
+        item.put("body", body);
+        return item;
     }
 }

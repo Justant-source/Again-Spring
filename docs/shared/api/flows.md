@@ -62,7 +62,9 @@ flowchart TB
         MB --> LLM[llm-ai-user structured]
         LLM --> QG[ThreadQualityGate]
         QG -->|READY 하한 통과| HOLD[(ai_scheduled_posts<br/>+ plan items scheduledAt)]
-        QG -->|미만| FAIL[plan FAILED<br/>QUALITY_BELOW_MIN_ITEMS]
+        QG -->|미만| REGEN[댓글 LLM 1회 재생성]
+        REGEN -->|통과| HOLD
+        REGEN -->|재미달/불가| THIN[얇은 READY<br/>kept 보존] --> HOLD
     end
 
     subgraph pub["발행 (LLM 없음)"]
