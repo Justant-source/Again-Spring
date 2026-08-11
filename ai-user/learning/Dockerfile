@@ -26,4 +26,6 @@ EXPOSE 8099
 HEALTHCHECK --interval=30s --timeout=15s --start-period=180s \
   CMD curl -f http://localhost:8099/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8099", "--workers", "2"]
+# workers=1 필수: worker마다 lifespan→init_scheduler()가 떠서 daily crawl이 이중 실행되고
+# (2026-08-11) 크롤 중 CPU 포화로 healthcheck 실패→ops-watchdog restart가 잡히던 원인.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8099", "--workers", "1"]

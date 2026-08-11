@@ -122,6 +122,17 @@ learning container가 뜨면 아래가 항상 실행된다.
 크롤 자체는 `run_daily_crawl()` 안에서 강화·토픽합성까지 이어서 호출한다 (02:00 한 번의 잡 안에서 순차 실행).
 사연 생성 배치(`nightly-ai-user-batch.sh`, **03:05 KST**)와 겹치지 않도록 크롤만 1시간 앞당긴다.
 
+### 런타임 가드 (2026-08-11)
+
+- **uvicorn `--workers 1` 고정** (`ai-user/learning/Dockerfile`). worker마다 `lifespan`→`init_scheduler()`가
+  떠서 daily crawl이 이중 실행되던 문제를 막는다.
+- **크롤 진행 마커** `/tmp/ai_learning_crawl_in_progress` (`app/crawl_guard.py`). `_do_crawl` /
+  `run_daily_crawl`이 쓰는 동안 `ops-watchdog`는 `againspring-ai-learning`을 **재시작하지 않는다**
+  (알림만). KST 02–03시도 동일 보호(스케줄 윈도우).
+- 크롤 중 health 지연은 임베딩 CPU 포화 때문에 날 수 있다. compose healthcheck는 timeout 30s /
+  retries 5로 여유를 둔다.
+- 유실 분 수동 보충은 `POST /crawl/{natepan|blind}` (+ 필요 시 strengthen/topic)로 한다.
+
 ### Popularity 게이트 (2026-08-01)
 
 크롤 결과는 **무차별 저장하지 않는다.** `popularity_gate`가 임베딩·INSERT 전에 걸러낸다.

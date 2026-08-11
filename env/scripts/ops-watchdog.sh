@@ -242,6 +242,15 @@ check_container_health() {
         fi
 
         log "WARN" "Unhealthy container: $container"
+
+        # ai-learning: 크롤/임베딩 중 health 지연은 정상 — 재시작하면 크롤이 유실됨
+        # (2026-08-11 02:15: 크롤 중 restart → crawl_log SUCCESS 없음 → admin stale 배지)
+        if should_skip_ai_learning_restart "$container"; then
+            log "WARN" "Skip restart for $container (crawl in progress or KST 02–03 crawl window)"
+            send_telegram "⚠️ [Again-Spring] Unhealthy \`$container\` — 크롤 구간이라 재시작 생략 (알림만)"
+            continue
+        fi
+
         send_telegram "⚠️ [Again-Spring] Unhealthy container detected: \`$container\`"
 
         local retry_count=$(get_retry_count "container_restart")
@@ -288,6 +297,28 @@ EOF
             send_telegram "❌ 컨테이너 $container 재시작 실패 (3회 초과). 수동 조치: docker restart $container"
         fi
     done <<< "$unhealthy_containers"
+}
+
+# ai-learning 크롤 보호: 마커 파일 또는 일일 크롤 시간대(KST 02–03시)
+should_skip_ai_learning_restart() {
+    local container="$1"
+    if [[ "$container" != "againspring-ai-learning" ]]; then
+        return 1
+    fi
+
+    # 수동/스케줄 크롤이 남긴 진행 중 마커
+    if docker exec "$container" test -f /tmp/ai_learning_crawl_in_progress 2>/dev/null; then
+        return 0
+    fi
+
+    # 스케줄 윈도우 (cron 02:00 → strengthen까지 보통 ~1–2h). 마커가 없어도 보호.
+    local kst_hour
+    kst_hour=$(TZ=Asia/Seoul date +%H)
+    if [[ "$kst_hour" == "02" || "$kst_hour" == "03" ]]; then
+        return 0
+    fi
+
+    return 1
 }
 
 # ============================================================================

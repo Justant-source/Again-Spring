@@ -124,6 +124,12 @@ rm -f watchdog-state/retry-state.json
 | 자격증명 소유권 | `stat -c '%U' ~/.claude/.credentials.json` | `chown justant:justant` | 3회 후 중단 |
 | Unhealthy 컨테이너 | `docker ps --filter health=unhealthy` | `docker restart <container>` | 컨테이너당 3회 |
 
+**예외 — `againspring-ai-learning` 크롤 보호 (2026-08-11)**:
+- 컨테이너 안 `/tmp/ai_learning_crawl_in_progress` 마커가 있거나
+- KST 시각이 **02시 또는 03시**(일일 크롤·강화 윈도우)
+이면 unhealthy여도 **재시작하지 않고 Telegram 알림만** 보낸다.
+(이전: 크롤 중 restart → `crawl_log` SUCCESS 유실 → admin 신선도 stale)
+
 ---
 
 ## 알림 프로토콜
@@ -188,4 +194,4 @@ stat ~/.claude/.credentials.json
 
 ---
 
-**마지막 업데이트**: 2026-08-08 | **형태**: systemd user timer + bash script
+**마지막 업데이트**: 2026-08-11 | **형태**: systemd user timer + bash script

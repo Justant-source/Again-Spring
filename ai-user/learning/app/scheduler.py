@@ -27,18 +27,22 @@ async def run_daily_crawl():
     """
     from app.main import embed_service
     from app.api.crawl import _do_crawl
-    logger.info("Daily crawl started (natepan + blind)")
-    for source, limit in SOURCES:
-        if not limit:
-            continue
-        try:
-            await _do_crawl(source, limit, embed_service)
-            await asyncio.sleep(60 * (3 + 7 * random.random()))
-        except Exception as e:
-            logger.error(f"Daily crawl {source} error: {e}")
-    logger.info("Daily crawl completed — triggering persona strengthen + topic synthesis")
-    await run_strengthen()
-    await run_topic_synthesis()
+    from app.crawl_guard import crawl_guard
+
+    # 크롤+강화+토픽 전체 구간 마커 — ops-watchdog가 이 동안 ai-learning을 재시작하지 않음
+    with crawl_guard("daily_crawl"):
+        logger.info("Daily crawl started (natepan + blind)")
+        for source, limit in SOURCES:
+            if not limit:
+                continue
+            try:
+                await _do_crawl(source, limit, embed_service)
+                await asyncio.sleep(60 * (3 + 7 * random.random()))
+            except Exception as e:
+                logger.error(f"Daily crawl {source} error: {e}")
+        logger.info("Daily crawl completed — triggering persona strengthen + topic synthesis")
+        await run_strengthen()
+        await run_topic_synthesis()
 
 async def run_strengthen():
     """크롤 완료 후 또는 독립 스케줄로 실행 — 누적 데이터로 페르소나 말투 강화"""

@@ -354,6 +354,11 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
   초기화(`init_scheduler()` 2회 호출 → 동시 크롤 → DB lock timeout 1205)
   의심 — `scheduler.py`의 `_scheduler` 싱글턴 가드가 이미 이를 막고 있으니,
   재발하면 그 가드가 우회됐는지부터 본다
+- **2026-08-11**: uvicorn `--workers 2`면 worker마다 lifespan이 떠 스케줄러가 이중
+  등록되고, 크롤 중 health 지연 → `ops-watchdog` restart → 그날 SUCCESS 유실.
+  대응: `--workers 1` + 크롤 마커/`KST 02–03` 동안 ai-learning 재시작 생략
+  (`docs/env/watchdog.md`, `app/crawl_guard.py`). 유실 시 수동 보충은
+  `POST /crawl/natepan?limit=1500` · `POST /crawl/blind?limit=500`
 - 후속 과제(WO-CRAWL-01 미착수분): 텔레그램 하트비트 알림 — 배지는 "들어가서
   봐야" 아는 수단이라 재발 가능성이 완전히 닫히지 않았다
 

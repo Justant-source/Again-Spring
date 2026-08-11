@@ -84,11 +84,13 @@ services:
       - againspring
       - againspring-prod
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8099/health')"]
+      # 크롤/임베딩 중 GIL·CPU 포화로 응답이 밀릴 수 있음 — timeout/retries 여유.
+      # ops-watchdog는 크롤 중(마커·KST 02–03시) ai-learning 재시작을 건너뛴다.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8099/health', timeout=25)"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
+      timeout: 30s
+      retries: 5
+      start_period: 180s
 
   ai-user-orchestrator:
     build:

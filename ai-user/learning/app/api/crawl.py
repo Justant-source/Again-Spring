@@ -46,6 +46,13 @@ def _gate_items(source: str, items: list, existing_ranked_parents: set[str]) -> 
 
 
 async def _do_crawl(source, daily_limit, embed_service):
+    from app.crawl_guard import crawl_guard
+
+    with crawl_guard(f"crawl:{source}"):
+        await _do_crawl_inner(source, daily_limit, embed_service)
+
+
+async def _do_crawl_inner(source, daily_limit, embed_service):
     try:
         module_path = _CRAWLERS.get(source)
         if module_path is None:
