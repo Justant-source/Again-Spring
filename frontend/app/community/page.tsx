@@ -8,6 +8,7 @@ import { useUserStore } from '@/lib/store/userStore';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { useVoteStore } from '@/lib/store/voteStore';
 import { timeAgo } from '@/lib/utils/timeAgo';
+import { resolveAuthorPct } from '@/lib/utils/empathyPct';
 
 // id = BE PostCategory enum, label = 표시 한글
 const C3_CATS = [
@@ -229,7 +230,7 @@ export default function CommunityFeedPage() {
                 time={timeAgo(post.createdAt)}
                 title={post.title}
                 body={post.bodyPublished}
-                g={post.authorPct ?? 50}
+                g={resolveAuthorPct({ authorPct: post.authorPct, voteCount: post.voteCount })}
                 votes={post.voteCount || 0}
                 c={post.commentCount || 0}
                 views={post.viewCount || 0}

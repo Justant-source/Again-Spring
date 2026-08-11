@@ -60,6 +60,8 @@ class PairedStructuredGenerationTest {
         assertTrue(prompt.contains("PAIRED_PHASE1"));
         assertTrue(prompt.contains("has NOT written yet") || prompt.contains("상대방(B) has NOT"));
         assertTrue(prompt.contains("12~40 characters"));
+        assertTrue(prompt.contains("hook_emotion"));
+        assertTrue(prompt.contains("MASTER SNS") || prompt.contains("scroll-stop"));
         assertTrue(prompt.contains("작성자"));
     }
 
@@ -237,7 +239,7 @@ class PairedStructuredGenerationTest {
         }
         return "{\"post\":{\"title\":\"" + title + "\",\"body\":\"" + body
                 + "\",\"promo_title\":\"" + promo.replace("\n", "\\n")
-                + "\",\"capture_split_after_lines\":null},\"comments\":["
+                + "\",\"hook_emotion\":\"anger\",\"capture_split_after_lines\":null},\"comments\":["
                 + String.join(",", items) + "]}";
     }
 

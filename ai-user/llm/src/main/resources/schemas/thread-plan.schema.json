@@ -13,7 +13,11 @@
         "body": { "type": "string" },
         "promo_title": {
           "type": ["string", "null"],
-          "description": "IG hook: same characters as title with semantic newlines; each line ≤10 chars including spaces"
+          "description": "Master SNS scroll-stop hook, independent of plaza title; optional semantic newlines; 4~80 chars flattened"
+        },
+        "hook_emotion": {
+          "type": ["string", "null"],
+          "description": "Dominant SNS hook emotion: shock|anger|tension|sad|hype"
         },
         "capture_split_after_lines": {
           "type": ["array", "null"],

@@ -16,12 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * IG 훅 제목 생성 — 원제 복제 + 의미단위 줄바꿈(\\n).
+ * SNS 마스터 훅(+감정) 생성 — 제목·본문에서 도발적 훅을 새로 쓴다.
  * 사연 생성 시 1회만 호출 — 발행 파이프에서 추가 LLM 없음.
  * PLAN이 promo_title을 이미 넣으면 skip.
+ * IG 훅 카드용 의미줄바꿈(\\n) 패킹 헬퍼는 유지(원제 글자 동일성 강제 없음).
  */
 @Slf4j
 @Service
@@ -37,7 +40,15 @@ public class PromoTitleService {
     /** 패킹 시 줄바꿈을 고려하는 목표 길이. */
     public static final int TARGET_LINE_LEN = 7;
 
+    /** 허용 hook_emotion 값. */
+    public static final Set<String> HOOK_EMOTIONS = Set.of(
+            "shock", "anger", "tension", "sad", "hype");
+
     private static final Pattern WS = Pattern.compile("\\s+");
+    private static final int BODY_PROMPT_MAX = 800;
+
+    /** LLM/정규화 결과. emotion은 검증 실패 시 null. */
+    public record HookResult(String promoTitle, String hookEmotion) {}
 
     @Qualifier("remoteLlmProvider")
     private final LLMProvider llmProvider;
@@ -67,6 +78,15 @@ public class PromoTitleService {
         return wrapSemantic(base != null ? base.trim() : "");
     }
 
+    /**
+     * emotion 정규화. 허용 집합 밖·blank → null.
+     */
+    public static String validateEmotion(String emotion) {
+        if (emotion == null || emotion.isBlank()) return null;
+        String e = emotion.trim().toLowerCase(Locale.ROOT);
+        return HOOK_EMOTIONS.contains(e) ? e : null;
+    }
+
     @Async("taskExecutor")
     public void generateAsync(String postId) {
         if (!enabled || postId == null || postId.isBlank()) return;
@@ -89,77 +109,104 @@ public class PromoTitleService {
                 ? post.getTitle()
                 : post.getUserTitle();
         if (title == null) title = "";
-        String generated = generate(title);
-        if (generated == null || generated.isBlank()) {
-            generated = wrapSemantic(title);
-        }
-        String promo = normalizeAgainstTitle(generated, title);
+        String body = post.getBodyPublished() != null && !post.getBodyPublished().isBlank()
+                ? post.getBodyPublished()
+                : post.getBodyRaw();
+        if (body == null) body = "";
 
-        int updated = postRepository.updatePromoTitleIfAbsent(postId, promo);
+        HookResult generated = generate(title, body);
+        String promo;
+        String emotion;
+        if (generated == null || generated.promoTitle() == null || generated.promoTitle().isBlank()) {
+            promo = wrapSemantic(title);
+            emotion = null;
+        } else {
+            promo = normalizeHook(generated.promoTitle());
+            if (promo == null || promo.isBlank()) {
+                promo = wrapSemantic(title);
+            }
+            emotion = validateEmotion(generated.hookEmotion());
+        }
+
+        int updated = postRepository.updatePromoTitleIfAbsent(postId, promo, emotion);
         if (updated == 0) {
             log.info("PromoTitle skip (post gone or already set): {}", postId);
             return;
         }
-        log.info("PromoTitle saved for {}: '{}'", postId, promo.replace("\n", "\\n"));
+        log.info("PromoTitle saved for {}: '{}' emotion={}",
+                postId, promo.replace("\n", "\\n"), emotion);
     }
 
     /**
-     * LLM으로 원제 복제 + 의미 줄바꿈. 실패 시 null.
+     * LLM으로 마스터 훅+감정 생성. 실패 시 null.
      */
-    public String generate(String title) {
+    public HookResult generate(String title, String body) {
         if (!enabled) return null;
         try {
-            String prompt = buildPrompt(title);
+            String prompt = buildPrompt(title, body);
             String result = llmProvider.invoke(prompt, model);
-            return parseResult(result, title);
+            return parseResult(result);
         } catch (Exception e) {
             log.warn("PromoTitle LLM failed: {}", e.getMessage());
             return null;
         }
     }
 
-    /** @deprecated body unused — kept for any leftover callers */
+    /** @deprecated prefer {@link #generate(String, String)} */
     @Deprecated
-    public String generate(String title, String body) {
-        return generate(title);
+    public String generate(String title) {
+        HookResult r = generate(title, "");
+        return r != null ? r.promoTitle() : null;
     }
 
-    private String buildPrompt(String title) {
+    private String buildPrompt(String title, String body) {
         String safeTitle = promptSanitizer.sanitize(title != null ? title : "");
+        String rawBody = body != null ? body : "";
+        if (rawBody.length() > BODY_PROMPT_MAX) {
+            rawBody = rawBody.substring(0, BODY_PROMPT_MAX);
+        }
+        String safeBody = promptSanitizer.sanitize(rawBody);
 
         return """
-            당신은 인스타그램 피드 1장(훅 카드)용 줄바꿈 편집자입니다.
-            사연 **원제 글자를 그대로** 두고, 의미 있는 구 단위로만 줄바꿈(\\n)을 넣으세요.
+            당신은 SNS(인스타·X)용 **마스터 훅** 카피라이터입니다.
+            사연 제목·본문을 보고, 클릭을 유도하는 **도발적·호기심 자극** 훅을 새로 작성하세요.
+            원제 글자를 복제하지 마세요. 재작성·압축·비틀기가 핵심입니다.
 
             ## 규칙
-            - 원제와 **글자 내용 동일** (개행·공백 정규화 후 비교). 글자 생략·추가·재작성 금지.
-            - 각 줄은 공백 포함 **4~10자**가 이상적. **최대 10자**. 1음절(한 글자)만 단독 줄로 두지 말 것.
-            - 공백마다 끊지 말 것. 어절 1~3개를 모아 **보기 좋은 짧은 구**로 한 줄을 만들 것.
-              예) "왜 / 말 / 안" (X) → "왜 만나자는 말" / "안 하냐고" (O)
-            - 줄바꿈은 의미 단위(구·절·조사 묶음). 단어를 어중간히 쪼개지 말 것.
-            - 줄 수 제한 없음. 원제 전부 포함.
-            - 이모지·해시태그·따옴표 추가 금지. 판결/처방/승패 표현 추가 금지.
+            - 훅은 한국어. 짧고 강렬하게. 필요 시 의미 단위 줄바꿈(\\n) — IG 훅 카드용.
+            - 각 줄은 공백 포함 **4~10자**가 이상적. **최대 10자**. 1음절만 단독 줄로 두지 말 것.
+            - 이모지·해시태그·따옴표 장식 금지.
+            - 판결/처방/승패/유무죄 표현 금지. 가해자·피해자 단정 금지.
+            - 「배심원」 단어 사용 금지.
+            - hook_emotion은 다음 중 **정확히 하나**: shock | anger | tension | sad | hype
 
             <user_input>
-            원제: %s
+            제목: %s
+            본문: %s
             </user_input>
 
             ## 출력 (JSON only)
-            {"promo_title": "의미구\\\\n줄바꿈\\\\n원제"}
-            """.formatted(safeTitle);
+            {"promo_title": "도발적\\\\n마스터\\\\n훅", "hook_emotion": "shock"}
+            """.formatted(safeTitle, safeBody);
     }
 
-    private String parseResult(String jsonResult, String originalTitle) {
+    private HookResult parseResult(String jsonResult) {
         try {
             String json = TonalizationService.extractJsonObject(jsonResult);
             JsonNode root = objectMapper.readTree(json);
             String promo = root.path("promo_title").asText(null);
+            if (promo == null || promo.isBlank()) {
+                promo = root.path("promoTitle").asText(null);
+            }
             if (promo == null || promo.isBlank()) return null;
-            // JSON may contain literal \n sequences
             promo = promo.trim()
                     .replace("\\n", "\n")
                     .replaceAll("^[\"']+|[\"']+$", "");
-            return normalizeAgainstTitle(promo, originalTitle);
+            String emotion = root.path("hook_emotion").asText(null);
+            if (emotion == null || emotion.isBlank()) {
+                emotion = root.path("hookEmotion").asText(null);
+            }
+            return new HookResult(normalizeHook(promo), validateEmotion(emotion));
         } catch (Exception e) {
             log.debug("PromoTitle parse failed: {}", e.getMessage());
             return null;
@@ -167,18 +214,10 @@ public class PromoTitleService {
     }
 
     /**
-     * 개행 제거 후 원제와 같으면 줄별 ≤10 검증. 1음절 단독 줄이 많으면 휴리스틱으로 재포장.
+     * 훅 텍스트 IG 패킹 — 줄별 ≤10, orphan 병합. **원제 글자 동일성 강제 없음.**
      */
-    static String normalizeAgainstTitle(String promo, String title) {
-        String base = title != null ? title.trim() : "";
-        if (base.isEmpty()) return "";
-        if (promo == null || promo.isBlank()) return wrapSemantic(base);
-
-        String collapsedPromo = collapseWs(promo.replace("\n", ""));
-        String collapsedTitle = collapseWs(base);
-        if (!collapsedPromo.equals(collapsedTitle)) {
-            return wrapSemantic(base);
-        }
+    static String normalizeHook(String promo) {
+        if (promo == null || promo.isBlank()) return "";
 
         String[] rawLines = promo.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1);
         List<String> lines = new ArrayList<>();
@@ -191,15 +230,25 @@ public class PromoTitleService {
                 lines.addAll(hardWrap(t, MAX_LINE_LEN));
             }
         }
-        if (lines.isEmpty()) return wrapSemantic(base);
+        if (lines.isEmpty()) return "";
         if (hasTooManyOrphans(lines)) {
-            return wrapSemantic(base);
+            // re-pack from collapsed text (no title equality)
+            return wrapSemantic(String.join(" ", lines));
         }
-        String joined = String.join("\n", lines);
-        if (!collapseWs(joined.replace("\n", "")).equals(collapsedTitle)) {
-            return wrapSemantic(base);
+        lines = mergeOrphans(lines);
+        return clampStore(String.join("\n", lines));
+    }
+
+    /**
+     * @deprecated use {@link #normalizeHook(String)}; title equality no longer enforced.
+     * blank promo → wrapSemantic(title) fallback for compose callers.
+     */
+    @Deprecated
+    static String normalizeAgainstTitle(String promo, String title) {
+        if (promo == null || promo.isBlank()) {
+            return wrapSemantic(title != null ? title : "");
         }
-        return clampStore(joined);
+        return normalizeHook(promo);
     }
 
     /** 1자 줄이 전체의 25% 이상이면 나쁜 줄바꿈으로 본다. */

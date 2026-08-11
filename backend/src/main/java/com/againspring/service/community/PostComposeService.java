@@ -129,6 +129,19 @@ public class PostComposeService {
                                   String promoTitle,
                                   String metaphorId,
                                   java.util.List<String> metaphorIds) {
+        return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
+                sessionId, source, captureSplitAfterLines, promoTitle, metaphorId, metaphorIds, null);
+    }
+
+    public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
+                                  PostCategory category, String visibility,
+                                  String sessionId,
+                                  SourceSnapshot source,
+                                  java.util.List<Integer> captureSplitAfterLines,
+                                  String promoTitle,
+                                  String metaphorId,
+                                  java.util.List<String> metaphorIds,
+                                  String hookEmotion) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
         // 광장형 정책(docs/frontend/ux/flows/08-crisis.md): 사연·댓글 입력은 차단하지 않는다.
@@ -148,8 +161,10 @@ public class PostComposeService {
 
         String normalizedPromo = null;
         if (promoTitle != null && !promoTitle.isBlank()) {
-            normalizedPromo = PromoTitleService.normalizeAgainstTitle(promoTitle, userTitle);
+            // 마스터 훅 — IG 패킹만 (원제 글자 동일성 강제 없음)
+            normalizedPromo = PromoTitleService.normalizeHook(promoTitle);
         }
+        String normalizedEmotion = PromoTitleService.validateEmotion(hookEmotion);
 
         String normalizedMetaphor = null;
         if (metaphorId != null && !metaphorId.isBlank()) {
@@ -199,6 +214,7 @@ public class PostComposeService {
                 .captureSplitAfterLine(legacyFirst)
                 .captureSplitAfterLines(captureSplitAfterLines)
                 .promoTitle(normalizedPromo)
+                .hookEmotion(normalizedEmotion)
                 .metaphorId(normalizedMetaphor)
                 .metaphorIds(normalizedMetaphorIds)
                 .createdAt(Instant.now())

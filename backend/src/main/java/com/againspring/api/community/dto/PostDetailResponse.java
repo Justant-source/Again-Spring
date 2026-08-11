@@ -30,6 +30,9 @@ public class PostDetailResponse {
 
     private String promoTitle;
 
+    /** 마스터 훅 감정: shock|anger|tension|sad|hype */
+    private String hookEmotion;
+
     private String metaphorId;
 
     private List<String> metaphorIds;
@@ -146,6 +149,7 @@ public class PostDetailResponse {
                 .id(post.getId())
                 .title(post.getTitle())
                 .promoTitle(post.getPromoTitle())
+                .hookEmotion(post.getHookEmotion())
                 .metaphorId(post.getMetaphorId())
                 .metaphorIds(post.getMetaphorIds())
                 .bodyPublished(bodyPublished)

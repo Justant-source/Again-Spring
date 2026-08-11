@@ -139,6 +139,7 @@ public class AiPostBundleService {
                                 && !bundle.content.captureSplitAfterLines().isEmpty()
                                 ? bundle.content.captureSplitAfterLines().get(0) : null)
                 .promoTitle(bundle.content.promoTitle())
+                .hookEmotion(bundle.content.hookEmotion())
                 .metaphorId(bundle.content.metaphorId())
                 .metaphorIds(bundle.content.metaphorIds());
         applyProvenance(postBuilder, bundle.source);
@@ -446,6 +447,7 @@ public class AiPostBundleService {
         postMap.put("title", postContent.title());
         postMap.put("body", postContent.body());
         postMap.put("promo_title", postContent.promoTitle());
+        postMap.put("hook_emotion", postContent.hookEmotion());
         postMap.put("metaphor_id", postContent.metaphorId());
         postMap.put("capture_split_after_lines", postContent.captureSplitAfterLines());
         if (postContent.captureSplitAfterLines() != null && !postContent.captureSplitAfterLines().isEmpty()) {
@@ -752,9 +754,10 @@ public class AiPostBundleService {
         if (!guard.passed()) throw new IllegalArgumentException("unsafe post: " + guard.reason());
         List<Integer> splits = resolveCaptureSplits(body, readCaptureSplits(raw));
         String promoTitle = readAndNormalizePromoTitle(title, raw);
+        String hookEmotion = readAndNormalizeHookEmotion(raw);
         String metaphorId = readMetaphorId(raw);
         List<String> metaphorIds = readMetaphorIds(raw);
-        return new PostContent(title, body, splits, promoTitle, metaphorId, metaphorIds);
+        return new PostContent(title, body, splits, promoTitle, hookEmotion, metaphorId, metaphorIds);
     }
 
     private static String readMetaphorId(Map<?, ?> post) {
@@ -788,26 +791,35 @@ public class AiPostBundleService {
         if (proposed != null) {
             proposed = proposed.replace("\\n", "\n").trim();
         }
-        String collapsedTitle = title.replaceAll("\\s+", "");
+        // Master SNS hook — independent of plaza title. Length/safety only.
         if (proposed != null && !proposed.isBlank()) {
-            String collapsedPromo = proposed.replace("\n", "").replaceAll("\\s+", "");
-            if (collapsedPromo.equals(collapsedTitle)) {
-                java.util.List<String> lines = new java.util.ArrayList<>();
-                boolean ok = true;
-                int orphans = 0;
-                for (String line : proposed.replace("\r\n", "\n").split("\n", -1)) {
-                    String t = line.trim();
-                    if (t.isEmpty()) continue;
-                    if (t.length() > 10) { ok = false; break; }
-                    if (t.length() < 2) orphans++;
-                    lines.add(t);
-                }
-                if (ok && !lines.isEmpty() && !(orphans > 0 && orphans * 4 >= lines.size())) {
-                    return String.join("\n", lines);
+            java.util.List<String> lines = new java.util.ArrayList<>();
+            boolean ok = true;
+            for (String line : proposed.replace("\r\n", "\n").split("\n", -1)) {
+                String t = line.trim();
+                if (t.isEmpty()) continue;
+                if (t.length() > 20) { ok = false; break; }
+                lines.add(t);
+            }
+            if (ok && !lines.isEmpty()) {
+                String joined = String.join("\n", lines);
+                String flat = joined.replace("\n", "").replaceAll("\\s+", "");
+                if (flat.length() >= 4 && flat.length() <= 80) {
+                    return joined;
                 }
             }
         }
         return packPromoLines(title);
+    }
+
+    private static final Set<String> HOOK_EMOTIONS = Set.of("shock", "anger", "tension", "sad", "hype");
+
+    private static String readAndNormalizeHookEmotion(Map<?, ?> post) {
+        Object v = post.get("hook_emotion");
+        if (v == null) v = post.get("hookEmotion");
+        if (v == null) return "tension";
+        String emotion = String.valueOf(v).trim().toLowerCase(java.util.Locale.ROOT);
+        return HOOK_EMOTIONS.contains(emotion) ? emotion : "tension";
     }
 
     /** Pack eojeol into ≤10 char lines; avoid 1-char orphans. */
@@ -930,7 +942,7 @@ public class AiPostBundleService {
     }
 
     private record PostContent(String title, String body, List<Integer> captureSplitAfterLines, String promoTitle,
-                               String metaphorId, List<String> metaphorIds) { }
+                               String hookEmotion, String metaphorId, List<String> metaphorIds) { }
 
     public record PublishedBundle(PostDto post, String body, Long sourceExampleId) {
         public PublishedBundle(PostDto post, String body) {

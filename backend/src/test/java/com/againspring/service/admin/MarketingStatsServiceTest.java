@@ -17,6 +17,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -258,6 +259,8 @@ class MarketingStatsServiceTest {
         assertEquals(0, result.getVisits());
         assertEquals(0, result.getUniqueSessions());
         assertTrue(result.getBySources().isEmpty());
+        verify(jdbcTemplate).queryForObject(
+            contains("COUNT(*)"), eq(Integer.class), eq("story_1"));
     }
 
     @Test

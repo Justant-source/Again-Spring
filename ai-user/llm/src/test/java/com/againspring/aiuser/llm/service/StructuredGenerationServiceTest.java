@@ -133,7 +133,11 @@ class StructuredGenerationServiceTest {
         assertTrue(prompt.contains("12~40 characters"), "title length rule");
         assertTrue(prompt.contains("never set title equal to body"), "title≠body rule");
         assertTrue(prompt.contains("promo_title"), "promo_title in schema");
-        assertTrue(prompt.contains("Never put a single syllable") || prompt.contains("4~10"), "promo line packing rule");
+        assertTrue(prompt.contains("hook_emotion"), "hook_emotion in schema");
+        assertTrue(prompt.contains("MASTER SNS") || prompt.contains("scroll-stop"), "promo as SNS hook");
+        assertTrue(prompt.contains("shock|anger|tension|sad|hype"), "hook_emotion enum");
+        assertTrue(prompt.contains("informational Korean plaza") || prompt.contains("plaza headline"),
+                "title is plaza informational, not SNS rewrite");
         assertTrue(prompt.contains("STORY_PERSONA_RULE"), "author must not own bystander comments");
     }
 
@@ -160,25 +164,37 @@ class StructuredGenerationServiceTest {
     @Test
     void sanitizePromoTitleHelpers() {
         String title = "도와줬더니 모든 걸 저한테";
-        String ok = "도와줬더니\n모든 걸\n저한테";
-        assertEquals(ok, StructuredGenerationService.sanitizePromoTitle(title, ok));
-        String wrapped = StructuredGenerationService.sanitizePromoTitle(title, "다른훅");
+        // Independent SNS hook (different from title) must be kept
+        String snappy = "도와줬더니\n배신당함";
+        assertEquals(snappy, StructuredGenerationService.sanitizePromoTitle(title, snappy));
+        // Same-as-title with newlines still ok
+        String mirrored = "도와줬더니\n모든 걸\n저한테";
+        assertEquals(mirrored, StructuredGenerationService.sanitizePromoTitle(title, mirrored));
+        // Blank → wrap title fallback
+        String wrapped = StructuredGenerationService.sanitizePromoTitle(title, "   ");
         assertEquals(title.replaceAll("\\s+", ""), wrapped.replace("\n", "").replaceAll("\\s+", ""));
         for (String line : wrapped.split("\n")) {
             assertTrue(line.length() <= 10, line);
-            assertTrue(line.length() >= 2 || wrapped.split("\n").length == 1, line);
         }
-        // orphan-heavy → repack
-        String bad = "도\n와\n줬\n더\n니\n모\n든\n걸\n저\n한\n테";
-        // character mismatch will repack; use spaced orphans matching title chars
-        String orphan = "도\n와줬더니\n모든\n걸\n저\n한테";
-        // may mismatch — use equal chars
-        orphan = "도와줬더니\n모든\n걸\n저\n한테";
-        String fixed = StructuredGenerationService.sanitizePromoTitle(title, orphan);
-        // "걸" and possibly short lines — if orphan ratio high, wrapPromoLines
-        for (String line : fixed.split("\n")) {
-            assertTrue(line.length() <= 10, line);
-        }
+        // Overlong flattened → fallback
+        String tooLong = "가".repeat(81);
+        String demoted = StructuredGenerationService.sanitizePromoTitle(title, tooLong);
+        assertEquals(wrapped, demoted);
+        // Line >20 → fallback
+        String longLine = "가나다라마바사아자차카타파하가나다가나다라";
+        assertTrue(longLine.length() > 20);
+        assertEquals(wrapped, StructuredGenerationService.sanitizePromoTitle(title, longLine));
+    }
+
+    @Test
+    void sanitizeHookEmotionHelpers() {
+        assertEquals("shock", StructuredGenerationService.sanitizeHookEmotion("shock"));
+        assertEquals("anger", StructuredGenerationService.sanitizeHookEmotion("ANGER"));
+        assertEquals("tension", StructuredGenerationService.sanitizeHookEmotion(null));
+        assertEquals("tension", StructuredGenerationService.sanitizeHookEmotion(""));
+        assertEquals("tension", StructuredGenerationService.sanitizeHookEmotion("joy"));
+        assertEquals("hype", StructuredGenerationService.sanitizeHookEmotion("hype"));
+        assertEquals("sad", StructuredGenerationService.sanitizeHookEmotion("sad"));
     }
 
     @Test
@@ -468,7 +484,7 @@ class StructuredGenerationServiceTest {
         String escapedPromo = promo == null ? "" : promo.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
         return "{\"post\":{\"title\":\"" + title + "\",\"body\":\"" + escapedBody
                 + "\",\"promo_title\":\"" + escapedPromo
-                + "\",\"capture_split_after_lines\":" + splitJson + "},\"comments\":["
+                + "\",\"hook_emotion\":\"tension\",\"capture_split_after_lines\":" + splitJson + "},\"comments\":["
                 + String.join(",", items) + "]}";
     }
 

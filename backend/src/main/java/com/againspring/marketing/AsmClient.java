@@ -247,6 +247,28 @@ public class AsmClient {
     }
 
     /**
+     * Best-effort platform stats collect (Phase 2.6).
+     * Body: {@code {"job_ids":[...], "lookback_days":14, "limit":40}}.
+     * Returns {@code {"results":[...], "count":N}} — partial failures included per row.
+     */
+    public JsonNode collectStats(JsonNode body) {
+        try {
+            return restClient
+                .post()
+                .uri("/api/v1/stats/collect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to collect ASM platform stats", e);
+            throw new AsmUnavailableException("Failed to collect platform stats: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * YouTube OAuth — /start: Google 인증 URL 생성.
      * body: {"redirect_uri": "..."}
      * 반환: {"auth_url": "..."}

@@ -19,6 +19,7 @@ import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.community.CommentService;
 import com.againspring.service.community.PromoTitleService;
+import com.againspring.service.community.VideoVariantService;
 import com.againspring.service.community.VoteService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,11 +28,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -53,9 +56,17 @@ public class MarketingJobService {
     private final CommentService commentService;
     private final VoteOptionRepository voteOptionRepository;
     private final UserRepository userRepository;
+    private final MarketingPublishSlotService publishSlotService;
+    private final VideoVariantService videoVariantService;
 
     /**
-     * Create a new marketing job for a post
+     * Create a new marketing job for a post.
+     *
+     * <p>When {@code autoPublish} is true and targets have a KST evening slot
+     * ({@link MarketingPublishSlotService}), sets {@code scheduledPublishAt} to the next
+     * occurrence and sends {@code auto_publish=false} to ASM so generation stops at READY;
+     * {@link MarketingPollingScheduler} triggers publish when the slot arrives.
+     * Holding COMMIT ≠ social publish (commit selects; slot schedules).
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
         if (!asmProperties.isEnabled()) {
@@ -151,8 +162,6 @@ public class MarketingJobService {
             tags.add(post.getCategory().getDisplayName());
         }
 
-        String postUrl = "https://againspring.net/community/" + postId;
-
         Integer captureSplit = null;
         boolean paired = post.getPartnerAnsweredAt() != null
                 && post.getPartnerBodyPublished() != null
@@ -195,9 +204,75 @@ public class MarketingJobService {
             storyTitle = post.getUserTitle();
         }
 
+        // Evening slot: COMMIT/create may be any time of day; social publish waits for KST slot.
+        Instant scheduledPublishAt = null;
+        boolean asmAutoPublish = autoPublish;
+        if (autoPublish) {
+            Optional<Instant> slot = publishSlotService.nextSlotForTargets(targets, Instant.now());
+            if (slot.isPresent()) {
+                scheduledPublishAt = slot.get();
+                // Defer ASM auto-publish until AS triggers at scheduledPublishAt.
+                asmAutoPublish = false;
+            }
+        }
+
+        // Persist first so utm_campaign / post_url can use local job id (story_{id}).
+        String idempotencyKey = UUID.randomUUID().toString();
+        MarketingJob.MarketingJobBuilder pendingBuilder = MarketingJob.builder()
+            .postId(post.getId())
+            .status("REQUESTED")
+            .autoPublish(autoPublish)
+            .requestedBy(requestedBy)
+            .targets(serializeJson(targets))
+            .idempotencyKey(idempotencyKey);
+        if (scheduledPublishAt != null) {
+            pendingBuilder.scheduledPublishAt(scheduledPublishAt)
+                .originalScheduledAt(scheduledPublishAt);
+        }
+        MarketingJob savedJob = marketingJobRepository.save(pendingBuilder.build());
+
+        String campaign = MarketingUtmUrls.campaignForJob(savedJob.getId());
+        Map<String, String> postUrls = MarketingUtmUrls.buildPostUrls(postId, targets, campaign);
+        String postUrl = MarketingUtmUrls.primaryPostUrl(postId, postUrls);
+
+        String masterHook = PromoTitleService.resolveOrFallback(post);
+        String hookEmotion = post.getHookEmotion() != null && !post.getHookEmotion().isBlank()
+            ? post.getHookEmotion().trim() : null;
+
+        // Stage-2 variants (H3): only when committing to video platforms.
+        boolean needReels = containsTarget(targets, "instagram_reels");
+        boolean needShorts = containsTarget(targets, "youtube_shorts");
+        VideoVariantService.Variants variants = VideoVariantService.Variants.empty();
+        if (needReels || needShorts) {
+            variants = videoVariantService.generate(
+                masterHook,
+                hookEmotion,
+                storyTitle,
+                authorBodyFull,
+                needReels,
+                needShorts
+            );
+        }
+        Integer maxDurationSec = null;
+        if (needReels && !needShorts) {
+            maxDurationSec = variants.maxDurationReelsSec() != null
+                ? variants.maxDurationReelsSec() : VideoVariantService.MAX_DURATION_REELS_SEC;
+        } else if (needShorts && !needReels) {
+            maxDurationSec = variants.maxDurationShortsSec() != null
+                ? variants.maxDurationShortsSec() : VideoVariantService.MAX_DURATION_SHORTS_SEC;
+        }
+
         BriefDto brief = BriefDto.builder()
             .title(storyTitle)
-            .promoTitle(PromoTitleService.resolveOrFallback(post))
+            .promoTitle(masterHook)
+            .hookEmotion(hookEmotion)
+            .hookReels(variants.hookReels())
+            .hookShorts(variants.hookShorts())
+            .scriptReels(variants.scriptReels())
+            .scriptShorts(variants.scriptShorts())
+            .maxDurationReelsSec(variants.maxDurationReelsSec())
+            .maxDurationShortsSec(variants.maxDurationShortsSec())
+            .maxDurationSec(maxDurationSec)
             .metaphorId(post.getMetaphorId())
             .metaphorIds(post.getMetaphorIds())
             .category(post.getCategory() != null ? post.getCategory().name() : null)
@@ -229,15 +304,12 @@ public class MarketingJobService {
                 .build())
             .build();
 
-        // Generate idempotency key
-        String idempotencyKey = UUID.randomUUID().toString();
-
-        // Call ASM to get job ID for utm_campaign
-        // Note: We'll set utm_campaign after job is saved and has an ID
         OptionsDto options = OptionsDto.builder()
             .voiceId("default")
             .tone("warm")
-            .autoPublish(autoPublish)
+            .autoPublish(asmAutoPublish)
+            .utmCampaign(campaign)
+            .postUrls(postUrls.isEmpty() ? null : postUrls)
             .build();
 
         CreateJobRequest request = CreateJobRequest.builder()
@@ -247,31 +319,20 @@ public class MarketingJobService {
             .options(options)
             .build();
 
-        // Add callback URL to request
         String callbackUrl = asmProperties.getCallbackBaseUrl() + "/api/internal/marketing/callback";
         request.setCallbackUrl(callbackUrl);
 
-        // Call ASM
-        CreateJobResponse response = asmClient.createJob(request, idempotencyKey);
-
-        // Save marketing job
-        MarketingJob job = MarketingJob.builder()
-            .remoteJobId(response.getJobId())
-            .postId(post.getId())
-            .status(response.getStatus())
-            .autoPublish(autoPublish)
-            .requestedBy(requestedBy)
-            .targets(serializeJson(targets))
-            .idempotencyKey(idempotencyKey)
-            .build();
-
-        MarketingJob savedJob = marketingJobRepository.save(job);
-
-        // Now update options with utm_campaign based on job ID and re-call ASM
-        // Actually, ASM already has the job, so we just need to add utm_campaign for tracking
-        // This will be used when visit_events are recorded
-        // For now, we simply return the saved job
-        return savedJob;
+        try {
+            CreateJobResponse response = asmClient.createJob(request, idempotencyKey);
+            savedJob.setRemoteJobId(response.getJobId());
+            savedJob.setStatus(response.getStatus());
+            return marketingJobRepository.save(savedJob);
+        } catch (RuntimeException e) {
+            savedJob.setStatus("FAILED");
+            savedJob.setErrorMessage(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            marketingJobRepository.save(savedJob);
+            throw e;
+        }
     }
 
     /**
@@ -320,6 +381,14 @@ public class MarketingJobService {
         AsmJobView view = asmClient.publish(job.getRemoteJobId());
         applyPoll(job, view);
         return job;
+    }
+
+    private static boolean containsTarget(List<String> targets, String platform) {
+        if (targets == null || platform == null) return false;
+        for (String t : targets) {
+            if (t != null && platform.equalsIgnoreCase(t.trim())) return true;
+        }
+        return false;
     }
 
     /** 사용자 ID → 닉네임 변환 (없으면 익명 반환). CommunityCommentController#resolveNickname과 동일 패턴. */

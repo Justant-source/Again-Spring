@@ -39,7 +39,7 @@ class MarketingHoldingBriefSeederTest {
     }
 
     @Test
-    void seedFromPost_withCategory_seedsThreeTagsInOrder() {
+    void seedFromPost_withCategory_seedsFourTagsInOrder() {
         stubEmptyCollaborators();
         Post post = Post.builder()
             .id("post1")
@@ -51,11 +51,13 @@ class MarketingHoldingBriefSeederTest {
 
         BriefDto brief = seeder.seedFromPost(post);
 
-        assertThat(brief.getTags()).containsExactly("#다시봄", "#공감비율", "#연인");
+        assertThat(brief.getTags()).containsExactly(
+            "#다시봄", "#againspring", "#공감비율", "#연인");
+        assertThat(brief.getHookEmotion()).isNull();
     }
 
     @Test
-    void seedFromPost_withoutCategory_seedsOnlyFirstTwoTags() {
+    void seedFromPost_withoutCategory_seedsBrandPairAndEmpathyTag() {
         stubEmptyCollaborators();
         Post post = Post.builder()
             .id("post2")
@@ -67,7 +69,7 @@ class MarketingHoldingBriefSeederTest {
 
         BriefDto brief = seeder.seedFromPost(post);
 
-        assertThat(brief.getTags()).containsExactly("#다시봄", "#공감비율");
+        assertThat(brief.getTags()).containsExactly("#다시봄", "#againspring", "#공감비율");
     }
 
     @Test
@@ -85,7 +87,8 @@ class MarketingHoldingBriefSeederTest {
             BriefDto brief = seeder.seedFromPost(post);
 
             assertThat(brief.getTags()).containsExactly(
-                "#다시봄", "#공감비율", "#" + category.getDisplayName());
+                "#다시봄", "#againspring", "#공감비율", "#" + category.getDisplayName());
+            assertThat(brief.getTags()).hasSizeLessThanOrEqualTo(5);
         }
     }
 
@@ -105,5 +108,39 @@ class MarketingHoldingBriefSeederTest {
             String.valueOf(seeder.seedFromPost(post).getPostUrl()));
 
         assertThat(otherFieldsSnapshot).containsExactly("제목", "https://againspring.net/community/post3");
+    }
+
+    @Test
+    void seedFromPost_withHookEmotion_passesThrough() {
+        stubEmptyCollaborators();
+        Post post = Post.builder()
+            .id("post-hook")
+            .authorId("author1")
+            .title("제목")
+            .bodyRaw("본문")
+            .category(PostCategory.COUPLE)
+            .hookEmotion("tension")
+            .build();
+
+        BriefDto brief = seeder.seedFromPost(post);
+
+        assertThat(brief.getHookEmotion()).isEqualTo("tension");
+        assertThat(brief.getPromoTitle()).isNotBlank();
+    }
+
+    @Test
+    void seedFromPost_blankHookEmotion_becomesNull() {
+        stubEmptyCollaborators();
+        Post post = Post.builder()
+            .id("post-blank")
+            .authorId("author1")
+            .title("제목")
+            .bodyRaw("본문")
+            .hookEmotion("   ")
+            .build();
+
+        BriefDto brief = seeder.seedFromPost(post);
+
+        assertThat(brief.getHookEmotion()).isNull();
     }
 }

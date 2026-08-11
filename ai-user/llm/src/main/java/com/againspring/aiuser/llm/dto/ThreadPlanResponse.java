@@ -19,9 +19,18 @@ public class ThreadPlanResponse {
     public static class Post {
         String title;
         String body;
-        /** IG hook: title chars + semantic \\n; each line ≤10. */
+        /**
+         * Master SNS scroll-stop hook (independent of plaza {@code title}).
+         * May include semantic newlines for IG card layout.
+         */
         @JsonProperty("promo_title")
         String promoTitle;
+        /**
+         * Dominant scroll-stop emotion for the SNS hook.
+         * One of {@code shock|anger|tension|sad|hype}.
+         */
+        @JsonProperty("hook_emotion")
+        String hookEmotion;
         /**
          * 1-based last block of each part except the final.
          * null/empty when body has ≤8 non-empty newline blocks (single card).

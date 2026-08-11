@@ -3,15 +3,21 @@ package com.againspring.api.admin;
 import com.againspring.annotation.Auditable;
 import com.againspring.api.admin.dto.JobResponse;
 import com.againspring.api.admin.dto.CreateJobRequest;
+import com.againspring.api.admin.dto.MarketingPublishSlotsResponse;
 import com.againspring.api.admin.dto.MarketingQuotaResponse;
 import com.againspring.api.admin.dto.MarketingScoreWeightsResponse;
+import com.againspring.api.admin.dto.UpdateMarketingPublishSlotsRequest;
 import com.againspring.api.admin.dto.UpdateMarketingQuotaRequest;
 import com.againspring.api.admin.dto.UpdateMarketingScoreWeightsRequest;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
+import com.againspring.marketing.MarketingPlatformStatsCollector;
+import com.againspring.marketing.MarketingPublishSlotService;
 import com.againspring.marketing.MarketingQuotaService;
+import com.againspring.marketing.MarketingScoreAutoAdjustService;
 import com.againspring.marketing.MarketingScoreWeightService;
+import com.againspring.marketing.MarketingWeeklyReportService;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.admin.MarketingStatsService;
@@ -52,18 +58,25 @@ public class AdminMarketingController {
     private final MarketingStatsService marketingStatsService;
     private final MarketingQuotaService marketingQuotaService;
     private final MarketingScoreWeightService marketingScoreWeightService;
+    private final MarketingPublishSlotService marketingPublishSlotService;
+    private final MarketingPlatformStatsCollector marketingPlatformStatsCollector;
+    private final MarketingWeeklyReportService marketingWeeklyReportService;
+    private final MarketingScoreAutoAdjustService marketingScoreAutoAdjustService;
 
-    // ===== Daily auto-publish quota =====
+    // ===== Daily auto-publish quota (Phase 2 per-platform) =====
 
     @GetMapping("/quota")
-    @Operation(summary = "Marketing daily quota", description = "24h 자동 분배 일일 상한·오늘 KST 사용량")
+    @Operation(summary = "Marketing daily quota",
+        description = "플랫폼별 일일 cap·오늘 KST 사용량 (Phase 2). legacy dailyTextCap/dailyVideoCap은 합산 파생")
     @ApiResponse(responseCode = "200", description = "Quota returned")
     public ResponseEntity<MarketingQuotaResponse> getQuota() {
         return ResponseEntity.ok(MarketingQuotaResponse.from(marketingQuotaService.getStatus()));
     }
 
     @PutMapping("/quota")
-    @Operation(summary = "Update marketing daily quota", description = "일일 글/영상 상한 저장")
+    @Operation(summary = "Update marketing daily quota",
+        description = "플랫폼별 cap 저장 (xThread/instagramFeed/instagramReels/youtubeShorts). "
+            + "legacy dailyTextCap+dailyVideoCap도 허용(분배 저장)")
     @ApiResponse(responseCode = "200", description = "Quota updated")
     @ApiResponse(responseCode = "400", description = "Invalid caps")
     @Auditable(action = "UPDATE_MARKETING_QUOTA")
@@ -71,21 +84,38 @@ public class AdminMarketingController {
             @Valid @RequestBody UpdateMarketingQuotaRequest req,
             Authentication auth) {
         String updatedBy = auth != null ? auth.getName() : "admin";
+        if (req.hasPlatformCaps()) {
+            var current = marketingQuotaService.getPlatformCaps();
+            var caps = new MarketingQuotaService.PlatformCaps(
+                req.getXThread() != null ? req.getXThread() : current.xThread(),
+                req.getInstagramFeed() != null ? req.getInstagramFeed() : current.instagramFeed(),
+                req.getInstagramReels() != null ? req.getInstagramReels() : current.instagramReels(),
+                req.getYoutubeShorts() != null ? req.getYoutubeShorts() : current.youtubeShorts());
+            return ResponseEntity.ok(MarketingQuotaResponse.from(
+                marketingQuotaService.updatePlatformCaps(caps, updatedBy)));
+        }
+        if (!req.hasLegacyCaps()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Provide platform caps or dailyTextCap+dailyVideoCap");
+        }
         return ResponseEntity.ok(MarketingQuotaResponse.from(
             marketingQuotaService.updateCaps(req.getDailyTextCap(), req.getDailyVideoCap(), updatedBy)));
     }
 
-    // ===== Popularity score weights =====
+    // ===== Popularity score weights (Phase 2 per-platform) =====
 
     @GetMapping("/score-weights")
-    @Operation(summary = "Marketing score weights", description = "24h 자동 분배 인기 점수 가중치")
+    @Operation(summary = "Marketing score weights",
+        description = "플랫폼별 인기 점수 가중치 (Phase 2). legacy weightViews/Comments/Votes 포함")
     @ApiResponse(responseCode = "200", description = "Weights returned")
     public ResponseEntity<MarketingScoreWeightsResponse> getScoreWeights() {
-        return ResponseEntity.ok(MarketingScoreWeightsResponse.from(marketingScoreWeightService.getWeights()));
+        return ResponseEntity.ok(MarketingScoreWeightsResponse.fromPlatform(
+            marketingScoreWeightService, marketingScoreWeightService.getPlatformWeights()));
     }
 
     @PutMapping("/score-weights")
-    @Operation(summary = "Update marketing score weights", description = "인기 점수 가중치 저장 (0–100)")
+    @Operation(summary = "Update marketing score weights",
+        description = "platforms 맵 또는 legacy flat weights 저장 (각 0–100)")
     @ApiResponse(responseCode = "200", description = "Weights updated")
     @ApiResponse(responseCode = "400", description = "Invalid weights")
     @Auditable(action = "UPDATE_MARKETING_SCORE_WEIGHTS")
@@ -93,9 +123,63 @@ public class AdminMarketingController {
             @Valid @RequestBody UpdateMarketingScoreWeightsRequest req,
             Authentication auth) {
         String updatedBy = auth != null ? auth.getName() : "admin";
-        return ResponseEntity.ok(MarketingScoreWeightsResponse.from(
+        if (req.hasAutoAdjust()) {
+            marketingScoreWeightService.updateAutoAdjust(Boolean.TRUE.equals(req.getAutoAdjust()), updatedBy);
+        }
+        if (req.hasPlatformWeights()) {
+            java.util.Map<String, com.againspring.marketing.MarketingPopularityScorer.PlatformWeights> partial =
+                new java.util.LinkedHashMap<>();
+            for (var e : req.getPlatforms().entrySet()) {
+                partial.put(e.getKey(), MarketingScoreWeightService.fromSignalMap(e.getValue()));
+            }
+            var all = marketingScoreWeightService.updatePlatformWeightsPartial(partial, updatedBy);
+            if (req.hasLegacyWeights()) {
+                marketingScoreWeightService.updateWeights(
+                    req.getWeightViews(), req.getWeightComments(), req.getWeightVotes(), updatedBy);
+            }
+            return ResponseEntity.ok(MarketingScoreWeightsResponse.fromPlatform(
+                marketingScoreWeightService, all));
+        }
+        if (req.hasLegacyWeights()) {
             marketingScoreWeightService.updateWeights(
-                req.getWeightViews(), req.getWeightComments(), req.getWeightVotes(), updatedBy)));
+                req.getWeightViews(), req.getWeightComments(), req.getWeightVotes(), updatedBy);
+            return ResponseEntity.ok(MarketingScoreWeightsResponse.fromPlatform(
+                marketingScoreWeightService, marketingScoreWeightService.getPlatformWeights()));
+        }
+        if (req.hasAutoAdjust()) {
+            return ResponseEntity.ok(MarketingScoreWeightsResponse.fromPlatform(
+                marketingScoreWeightService, marketingScoreWeightService.getPlatformWeights()));
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "Provide platforms map, legacy weights, and/or autoAdjust");
+    }
+
+    // ===== KST evening publish slots =====
+
+    @GetMapping("/publish-slots")
+    @Operation(summary = "Marketing publish slots", description = "플랫폼별 KST 저녁 발행 슬롯 (HH:mm)")
+    @ApiResponse(responseCode = "200", description = "Slots returned")
+    public ResponseEntity<MarketingPublishSlotsResponse> getPublishSlots() {
+        return ResponseEntity.ok(MarketingPublishSlotsResponse.from(marketingPublishSlotService.getSlots()));
+    }
+
+    @PutMapping("/publish-slots")
+    @Operation(summary = "Update marketing publish slots", description = "KST 저녁 발행 슬롯 저장 (HH:mm)")
+    @ApiResponse(responseCode = "200", description = "Slots updated")
+    @ApiResponse(responseCode = "400", description = "Invalid HH:mm")
+    @Auditable(action = "UPDATE_MARKETING_PUBLISH_SLOTS")
+    public ResponseEntity<MarketingPublishSlotsResponse> updatePublishSlots(
+            @Valid @RequestBody UpdateMarketingPublishSlotsRequest req,
+            Authentication auth) {
+        String updatedBy = auth != null ? auth.getName() : "admin";
+        MarketingPublishSlotService.Slots updated = marketingPublishSlotService.updateSlots(
+            new MarketingPublishSlotService.Slots(
+                req.getInstagramFeed(),
+                req.getInstagramReels(),
+                req.getYoutubeShorts(),
+                req.getXThread()),
+            updatedBy);
+        return ResponseEntity.ok(MarketingPublishSlotsResponse.from(updated));
     }
 
     /**
@@ -385,5 +469,40 @@ public class AdminMarketingController {
     public ResponseEntity<MarketingStatsService.JobTrafficDto> getJobTraffic(@PathVariable long id) {
         MarketingStatsService.JobTrafficDto traffic = marketingStatsService.getJobTraffic(id);
         return ResponseEntity.ok(traffic);
+    }
+
+    // ===== Phase 2.6–2.7 platform stats + weekly report =====
+
+    @PostMapping("/stats/collect")
+    @Operation(summary = "Collect platform stats",
+        description = "ASM best-effort X/IG/YT 통계 수집 후 marketing_publication_stats 저장")
+    @ApiResponse(responseCode = "200", description = "Collect summary")
+    @Auditable(action = "COLLECT_MARKETING_PLATFORM_STATS")
+    public ResponseEntity<MarketingPlatformStatsCollector.CollectSummary> collectPlatformStats(
+            @RequestParam(required = false) List<Long> jobIds,
+            @RequestParam(defaultValue = "14") int lookbackDays,
+            @RequestParam(defaultValue = "40") int limit) {
+        if (jobIds != null && !jobIds.isEmpty()) {
+            return ResponseEntity.ok(marketingPlatformStatsCollector.collectForJobs(jobIds));
+        }
+        return ResponseEntity.ok(marketingPlatformStatsCollector.collectRecent(lookbackDays, limit));
+    }
+
+    @GetMapping("/weekly-report")
+    @Operation(summary = "Marketing weekly report",
+        description = "상위/하위 사연 · 감정·카테고리 · UTM 유입 (Phase 2.7)")
+    @ApiResponse(responseCode = "200", description = "Weekly report")
+    public ResponseEntity<MarketingWeeklyReportService.WeeklyReportDto> weeklyReport(
+            @RequestParam(defaultValue = "0") int weeksAgo) {
+        return ResponseEntity.ok(marketingWeeklyReportService.buildReport(weeksAgo));
+    }
+
+    @PostMapping("/score-weights/auto-adjust/run")
+    @Operation(summary = "Run score auto-adjust once",
+        description = "auto_adjust=false면 적용 없이 report-only 결과 반환")
+    @ApiResponse(responseCode = "200", description = "Adjust result")
+    @Auditable(action = "RUN_MARKETING_SCORE_AUTO_ADJUST")
+    public ResponseEntity<MarketingScoreAutoAdjustService.AdjustResult> runAutoAdjust() {
+        return ResponseEntity.ok(marketingScoreAutoAdjustService.runWeeklyAdjust());
     }
 }

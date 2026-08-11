@@ -9,6 +9,7 @@ import { getOrCreateDeviceId } from '@/lib/utils/deviceId';
 import { VoteBar, SideStory, CommunityComment } from '@/components/community/c3';
 import { AUTHOR, PARTNER } from '@/lib/constants/factionColors';
 import { timeAgo } from '@/lib/utils/timeAgo';
+import { resolveAuthorPct } from '@/lib/utils/empathyPct';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { useVoteStore } from '@/lib/store/voteStore';
 import { CommentBar } from '@/components/community/c3/CommentBar';
@@ -297,18 +298,17 @@ function C3StoryDetail({
   };
 
   // 투표 완료 후 실제 BE 비율 사용, 투표 전 선택 시 내 한 표를 더한 예상 비율로 미리보기
-  const existingTotal = post.voteResult?.totalVotes ?? 0;
-  const existingAuthorCount = post.voteResult?.options?.[0]?.count ?? 0;
-  const existingPartnerCount = post.voteResult?.options?.[1]?.count ?? 0;
+  const liveResult = voteResult ?? post.voteResult ?? null;
+  const existingTotal = liveResult?.totalVotes ?? post.voteResult?.totalVotes ?? 0;
+  const existingAuthorCount = liveResult?.options?.[0]?.count ?? post.voteResult?.options?.[0]?.count ?? 0;
+  const existingPartnerCount = liveResult?.options?.[1]?.count ?? post.voteResult?.options?.[1]?.count ?? 0;
   const authorPct = voteResult
-    ? Math.round(voteResult.options?.[0]?.percentage ?? (existingTotal > 0 ? existingAuthorCount / existingTotal * 100 : 50))
+    ? resolveAuthorPct({ voteResult, authorPct: post.authorPct })
     : pick === 'g'
       ? Math.round((existingAuthorCount + 1) / (existingTotal + 1) * 100)
       : pick === 'r'
       ? Math.round(existingAuthorCount / (existingTotal + 1) * 100)
-      : existingTotal > 0
-        ? Math.round(existingAuthorCount / existingTotal * 100)
-        : 50;
+      : resolveAuthorPct({ voteResult: post.voteResult, authorPct: post.authorPct });
   const partnerPct = 100 - authorPct;
 
   // 표 수 — 막대는 비율(%)로, 라벨은 표 수로 표시. 선택 시 내 한 표 미리 반영
@@ -652,9 +652,12 @@ function C3ResultSolo({
       </div>
 
       {/* VoteBar */}
-      {voteResult && (
+      {(voteResult ?? post.voteResult) && (
         <div style={{ marginBottom: 20 }}>
-          <VoteBar authorPct={Math.round(voteResult?.options?.[0]?.percentage ?? 50)} big={true} />
+          <VoteBar
+            authorPct={resolveAuthorPct({ voteResult: voteResult ?? post.voteResult, authorPct: post.authorPct })}
+            big={true}
+          />
           <div
             style={{
               fontSize: 12,
@@ -740,9 +743,12 @@ function C3ResultPair({
       </div>
 
       {/* VoteBar */}
-      {voteResult && (
+      {(voteResult ?? post.voteResult) && (
         <div style={{ marginBottom: 20 }}>
-          <VoteBar authorPct={Math.round(voteResult?.options?.[0]?.percentage ?? 50)} big={true} />
+          <VoteBar
+            authorPct={resolveAuthorPct({ voteResult: voteResult ?? post.voteResult, authorPct: post.authorPct })}
+            big={true}
+          />
         </div>
       )}
 
@@ -815,6 +821,8 @@ export default function PostDetailClient({ params }: PageProps) {
         setLoading(true);
         const postData = await postApi.get(params.id);
         setPost(postData);
+        // 상세 응답의 voteResult를 로컬 상태에 올려 비율 막대가 percentage를 쓰게 함
+        if (postData.voteResult) setVoteResult(postData.voteResult);
 
         // 댓글 첫 페이지 (10개)
         const commentsData = await commentApi.list(params.id, 0, COMMENT_PAGE_SIZE);
@@ -1012,6 +1020,7 @@ export default function PostDetailClient({ params }: PageProps) {
         const data = await postApi.get(params.id);
         if (data.paired || data.partnerBodyPublished || data.partnerBodyDeleted || data.deleted) {
           setPost(data);
+          if (data.voteResult) setVoteResult(data.voteResult);
           clearInterval(timer);
         }
       } catch { /* ignore */ }

@@ -94,12 +94,14 @@ public class CommunityPostController {
                         () -> composeService.composeAndPublish(
                                 userId, request.getUserTitle(), request.getBodyRaw(), request.getCategory(),
                                 request.getVisibility(), request.getSessionId(), sourceSnapshot,
-                                splits, request.getPromoTitle(), request.getMetaphorId(), request.getMetaphorIds()),
+                                splits, request.getPromoTitle(), request.getMetaphorId(), request.getMetaphorIds(),
+                                request.getHookEmotion()),
                         existingId -> postRepository.findById(existingId).orElse(null))
                 : new BotWriteIdempotencyService.Execution<>(composeService.composeAndPublish(
                         userId, request.getUserTitle(), request.getBodyRaw(), request.getCategory(),
                         request.getVisibility(), request.getSessionId(), sourceSnapshot,
-                        splits, request.getPromoTitle(), request.getMetaphorId(), request.getMetaphorIds()), true);
+                        splits, request.getPromoTitle(), request.getMetaphorId(), request.getMetaphorIds(),
+                        request.getHookEmotion()), true);
         Post post = execution.target();
 
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
@@ -140,14 +142,8 @@ public class CommunityPostController {
         }
 
         Page<PostResponse> responses = posts.map(post -> {
-            List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
-            long voteCount = voteRepository.countByPostId(post.getId());
-            long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
-            String authorNickname = userRepository.findById(post.getAuthorId())
-                    .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
-                    .orElse("익명");
             Long votedOptionId = myVoteMap.get(post.getId());
-            return PostResponse.from(post, options, voteCount, commentCount, authorNickname, votedOptionId);
+            return toPostResponse(post, votedOptionId);
         });
         return ResponseEntity.ok(responses);
     }
@@ -187,14 +183,8 @@ public class CommunityPostController {
         }
 
         Page<PostResponse> responses = posts.map(post -> {
-            List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
-            long voteCount = voteRepository.countByPostId(post.getId());
-            long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
-            String authorNickname = userRepository.findById(post.getAuthorId())
-                    .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
-                    .orElse("익명");
             Long votedOptionId = myVoteMap.get(post.getId());
-            return PostResponse.from(post, options, voteCount, commentCount, authorNickname, votedOptionId);
+            return toPostResponse(post, votedOptionId);
         });
         return ResponseEntity.ok(responses);
     }
@@ -216,15 +206,7 @@ public class CommunityPostController {
                 .map(v -> postService.findById(v.getPostId()))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
-                .map(post -> {
-                    List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
-                    long voteCount = voteRepository.countByPostId(post.getId());
-                    long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
-                    String authorNickname = userRepository.findById(post.getAuthorId())
-                            .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
-                            .orElse("익명");
-                    return PostResponse.from(post, options, voteCount, commentCount, authorNickname);
-                })
+                .map(post -> toPostResponse(post, null))
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(responses);
@@ -241,15 +223,9 @@ public class CommunityPostController {
 
         String userId = userDetails.getUsername();
         List<Post> posts = postService.listMyPosts(userId);
-        List<PostResponse> responses = posts.stream().map(post -> {
-            List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
-            long voteCount = voteRepository.countByPostId(post.getId());
-            long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
-            String authorNickname = userRepository.findById(post.getAuthorId())
-                    .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
-                    .orElse("익명");
-            return PostResponse.from(post, options, voteCount, commentCount, authorNickname);
-        }).collect(Collectors.toList());
+        List<PostResponse> responses = posts.stream()
+                .map(post -> toPostResponse(post, null))
+                .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
 
@@ -526,5 +502,20 @@ public class CommunityPostController {
         if (authentication == null || !authentication.isAuthenticated()) return null;
         String name = authentication.getName();
         return "anonymousUser".equals(name) ? null : name;
+    }
+
+    /** 목록 카드용 PostResponse — 표가 있으면 authorPct/partnerPct 포함 (작성자=orderIdx 0). */
+    private PostResponse toPostResponse(Post post, Long votedOptionId) {
+        List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
+        long voteCount = voteRepository.countByPostId(post.getId());
+        long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
+        String authorNickname = userRepository.findById(post.getAuthorId())
+                .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                .orElse("익명");
+        Long authorOptionVoteCount = null;
+        if (voteCount > 0 && !options.isEmpty()) {
+            authorOptionVoteCount = voteRepository.countByPostIdAndOptionId(post.getId(), options.get(0).getId());
+        }
+        return PostResponse.from(post, options, voteCount, commentCount, authorNickname, votedOptionId, authorOptionVoteCount);
     }
 }

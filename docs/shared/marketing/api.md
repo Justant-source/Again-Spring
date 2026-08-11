@@ -106,7 +106,7 @@ Authorization: Bearer <admin-jwt>
 
 ### 1.5.1 WaggleBot TTS 음성 (숏폼영상 설정)
 
-> ASM `/api/v1/waggle/*` → WaggleBot. 어드민 JWT로 미리듣기·선택. `tts_voice`/`comment_tts_voices`는 `shortform_video` pseudo-platform(설정 전용, 로그인 없음) 자격증명 public 필드 — `instagram_reels`/`youtube_shorts`가 WaggleBot에서 같은 영상을 공유하므로 나레이션 설정도 공유(2026-08-10, 상세: `credentials.md`).
+> ASM `/api/v1/waggle/*` → WaggleBot. 어드민 JWT로 미리듣기·선택. `tts_voice`/`comment_tts_voices`는 `shortform_video` pseudo-platform(설정 전용) 자격증명 public 필드 — Reels/Shorts **유니크 mp4**여도 보이스 풀은 공유 가능. Phase 2: `hook_emotion` → S2 Pro. 상세: `credentials.md`.
 
 ```
 GET /api/admin/marketing/tts/voices
@@ -135,34 +135,69 @@ Idempotency-Key: <uuid>
 **Request Header**
 - `Idempotency-Key`: UUID 형식. AS가 생성 시도마다 새로운 UUID를 보냄. ASM은 동일 key로 오는 중복 요청을 감지해 같은 응답 반환 (멱등성).
 
-> `brief.tags`: 24h 홀딩 커밋 경로는 신규 홀딩 시드 `#다시봄` `#공감비율` `#[카테고리]`(어드민 대기 탭에서 편집 가능, 기존 홀딩 백필 없음)를 그대로 사용. 수동 잡 생성(`/api/admin/marketing/jobs`)은 카테고리명만 채움.
+> `brief.tags`: 브랜드 `#다시봄` + `#againspring` 필수. 24h 홀딩 신규 시드(IG feed용) = `#다시봄` `#againspring` `#공감비율` `#[카테고리]`(≤5, 어드민 대기 탭에서 편집 가능, 기존 홀딩 백필 없음). X = 브랜드 2개만(카테고리 없음). 수동 잡 생성(`/api/admin/marketing/jobs`)은 카테고리명만 채움. 상세 [`platforms.md`](platforms.md).
+>
+> `brief.promo_title`: **마스터 훅** (광장 `title`과 분리). AS `PromoTitleService`/훅 필드.
+> `brief.hook_emotion`: `shock|anger|tension|sad|hype` → **WaggleBot S2 Pro TTS** (Phase 2 SSOT).
+> 영상 슬롯 확정 시: `hook_reels`/`hook_shorts` · `script_reels`/`script_shorts` ·
+> `max_duration_reels_sec`(30) / `max_duration_shorts_sec`(45) · alone 시 `max_duration_sec`.
+>
+> UTM (Phase 1 유지): AS가 잡 생성 시 `brief.post_url`(+ `options.post_urls`/`utm_campaign`)에 부착.
+> `utm_source`=`x`|`instagram`|`youtube`, `utm_medium=organic`, `utm_campaign=story_{localJobId}`,
+> `utm_content={postId}_{hookType}` (`master`|`reels`|`shorts`|`feed` …). 랜딩 = 사연 상세. **IG 캡션에는 URL/UTM 없음**.
 
-**Request Body (StoryBrief)**
+**Request Body (StoryBrief)** — Phase 1 유지 + Phase 2 영상 필드
 ```json
 {
   "source_id": "abc123def456",
-  "callback_base_url": "http://100.81.189.92:8090",  // AS가 포함 — ASM이 콜백 URL 생성 시 사용
+  "callback_base_url": "http://100.81.189.92:8090",
   "brief": {
-    "title": "사연 제목",
+    "title": "광장 사연 제목",
+    "promo_title": "자극\n마스터\n훅",
+    "hook_emotion": "tension",
+    "hook_reels": "릴스용 변형 훅",
+    "hook_shorts": "쇼츠용 변형 훅",
+    "script_reels": "훅 → 요약 → 클리프행어 대본",
+    "script_shorts": "훅 → 요약 → 클리프행어 대본",
+    "max_duration_sec": 45,
     "metaphor_id": "empty-chair",
     "neutral_summary": "중립 요약 (최대 500자)",
-    "side_a": "작성자 관점",
+    "side_a": "작성자 관점(또는 요약 스크립트)",
     "side_b": "상대방 관점",
-    "empathy_ratio": { "a": 50, "b": 50 },
-    "tags": ["#다시봄", "#공감비율", "#이별"],
+    "empathy_ratio": { "a": 62, "b": 38 },
+    "tags": ["#다시봄", "#againspring", "#공감비율", "#이별"],
+    "post_url": "https://againspring.net/community/abc123def456?utm_source=youtube&utm_medium=organic&utm_campaign=story_42&utm_content=abc123def456_shorts",
     "policy": {
       "no_emoji": true,
       "forbidden_terms": ["판결", "처방", "승패", "승자", "패자"]
     }
   },
-  "targets": ["naver_blog", "x_thread"],
+  "targets": ["youtube_shorts"],
   "options": {
     "voice_id": null,
     "tone": null,
-    "auto_publish": false
+    "auto_publish": false,
+    "hook_emotion": "tension",
+    "utm_campaign": "story_42",
+    "post_urls": {
+      "youtube_shorts": "https://againspring.net/community/abc123def456?utm_source=youtube&utm_medium=organic&utm_campaign=story_42&utm_content=abc123def456_shorts"
+    }
   }
 }
 ```
+
+| brief 필드 | 페이즈 | 설명 |
+|---|---|---|
+| `title` | 1 유지 | 광장용. SNS 훅과 분리 |
+| `promo_title` / `hook_text` | 1 유지 | 마스터 훅 |
+| `hook_emotion` | 1+2 | enum 5종. **Phase 2: TTS에 전달** |
+| `hook_reels` / `hook_shorts` | **2 SSOT** | 영상 슬롯 확정 시 변형 훅 (`VideoVariantService`) |
+| `script_reels` / `script_shorts` | **2 SSOT** | 요약 대본 (전문 낭독 금지) |
+| `max_duration_reels_sec` / `max_duration_shorts_sec` | **2 SSOT** | 30 / 45 |
+| `max_duration_sec` | **2 SSOT** | alone 잡 활성 캡 |
+| `tags` | 1 유지 | 플랫폼 clamp. 브랜드 2 항상 |
+| `post_url` + UTM | 1 유지 | X·YT 출구. `utm_content`의 hookType 구분 |
+| `empathy_ratio` | 1 유지 | **실투표 %** |
 
 **Response 202**
 ```json
@@ -355,3 +390,79 @@ AS polling → GET /api/v1/jobs/{remote_job_id} → ASM
 | `PUBLISHED` | 게시 성공 (모든 플랫폼) | O |
 | `PARTIAL` | 혼합 결과 (일부 플랫폼 성공, 일부 실패) | O |
 | `FAILED` | 최종 실패 또는 STALE 24h 초과 | O |
+
+---
+
+## 4. Phase 2 어드민 — cap · 점수 · 통계 (타깃 SSOT)
+
+> 경로·DTO 이름은 구현 PR에서 Flyway/컨트롤러와 맞출 수 있다. **의미·기본값**이 계약이다. 상세 식·키: [`platforms.md`](platforms.md).
+
+### 4.1 채널별 일일 cap
+
+```
+GET  /api/admin/marketing/quota
+PUT  /api/admin/marketing/quota
+Authorization: Bearer <admin-jwt>
+```
+
+**타깃 body (PUT)**
+```json
+{
+  "x_thread": 3,
+  "instagram_feed": 3,
+  "instagram_reels": 3,
+  "youtube_shorts": 3
+}
+```
+
+저장 키: `marketing.cap.{platform}` (기본 **각 3**).  
+레거시 `marketing.daily_text_cap` / `daily_video_cap`는 마이그레이션 후 폐기.
+
+### 4.2 플랫폼별 점수 가중치 · auto_adjust
+
+```
+GET  /api/admin/marketing/score-weights
+PUT  /api/admin/marketing/score-weights          // platforms map and/or legacy + optional autoAdjust
+POST /api/admin/marketing/score-weights/auto-adjust/run   // 1회 실행 (cron도 Mon 09:00 KST)
+```
+
+가중치 심볼: `hook`, `vote_skew`, `comments`, `votes`, `views`, `has_partner` — 플랫폼마다 독립. 기본 계수는 [`platforms.md`](platforms.md) §popularity 식.  
+`marketing.score.auto_adjust` 기본 **`false`**. on이면 주간 통계로 **소폭**(상대 ±5% · 절대 ±0.05) 보정만. **프롬프트 자동 패치 없음(M4)**.
+
+### 4.2.1 플랫폼 통계 수집 · 주간 리포트 (Phase 2.6–2.7)
+
+**저장 선택**: 수집기는 **ASM**(자격증명·`publication.remote_id`). 캐논 스냅샷은 **AS** `marketing_publication_stats` (V110) — 주간 리포트·`auto_adjust`가 AS에 있음. ASM에도 `publication_stat` 로컬 캐시.
+
+```
+POST /api/admin/marketing/stats/collect?lookbackDays=14&limit=40
+GET  /api/admin/marketing/weekly-report?weeksAgo=0
+```
+
+ASM: `POST /api/v1/stats/collect` · social-poster `POST /stats/x`.
+
+| 플랫폼 | 지금 수집 가능 | 비고 |
+|---|---|---|
+| X | impressions≈views, likes, replies, reposts | 세션 Playwright scrape (`/stats/x`). API 키 없음 |
+| IG Reels/Feed | reach, plays/views, saves, shares, comments | Graph insights + media fields. numeric media id + token 필요. 권한 부족 시 partial + 로그 |
+| YT Shorts | views, likes, comments | Data API `videos.list`. **avgViewDuration** → Analytics + `yt-analytics.readonly` 재동의 필요(없으면 partial) |
+
+일 06:30 KST 스케줄 수집. 실패는 배치 전체를 막지 않음.
+
+### 4.3 저녁 슬롯 · 댓글 노티 창 (Phase 1 유지)
+
+```
+GET /api/admin/marketing/publish-slots
+PUT /api/admin/marketing/publish-slots
+```
+
+키 `marketing.publish_slot.{platform}` · `marketing.comment_notify_hours`(기본 24).
+
+### 4.4 플랫폼 통계 수집 · 주간 리포트
+
+상세는 §4.2.1. 엔드포인트:
+
+- `POST /api/admin/marketing/stats/collect`
+- `GET /api/admin/marketing/weekly-report?weeksAgo=0`
+- `POST /api/admin/marketing/score-weights/auto-adjust/run`
+
+채널×훅유형→가입 대시보드는 **후속** (UTM 축적 후).

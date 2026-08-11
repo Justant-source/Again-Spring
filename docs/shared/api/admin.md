@@ -214,6 +214,8 @@ flowchart LR
 | `PUT` | `/api/admin/marketing/quota` | 글/영상 상한 저장 (`system_setting`) |
 | `GET` | `/api/admin/marketing/score-weights` | 인기 점수 가중치 (views/comments/votes) |
 | `PUT` | `/api/admin/marketing/score-weights` | 가중치 저장 (`system_setting`, 0–100) |
+| `GET` | `/api/admin/marketing/publish-slots` | KST 저녁 발행 슬롯 (HH:mm, 기본 20:00/20:30/20:30/21:30) |
+| `PUT` | `/api/admin/marketing/publish-slots` | 슬롯 저장 (`marketing.publish_slot.*`) |
 | `GET` | `/api/admin/marketing/platforms` | 전체 플랫폼 auto on/off (`autoEnabled`, `runtimeSupported`, 선택 `warning`) |
 | `PUT` | `/api/admin/marketing/platforms/{platform}/auto` | Body `{enabled}` — 미지원 on도 허용·경고 반환 |
 | `GET` | `/api/admin/marketing/holding` | 대기 보드(최대 20) + meta. 컷라인 N=`remainingPool - softReservedPool` |
@@ -224,7 +226,7 @@ flowchart LR
 | `POST` | `/api/admin/marketing/completed/{postId}/force` | Body `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}` — 상한 무시 강제 확정. **COMMITTED 재호출 허용**(아직 잡 없는 채널만 추가). 이미 전 채널 존재 시 400 |
 | 잡·자격증명·통계 | `/api/admin/marketing/jobs*` 등 | ASM 프록시 — [`platforms.md`](../marketing/platforms.md) |
 
-24h 배분 C: 홀딩 확정 · 공유 풀(`dailyTextCap` 기본 6) · 영상 우선 · **1사연=1칸** · VIDEO=video+text companion(IG feed⊥reels).
+24h 분배 Phase 2: 홀딩 확정 · 플랫폼별 popularity + 일일 cap(기본 각 3) · 같은 사연 멀티 플랫폼 허용 · IG feed⊥reels 배타 · Reels/Shorts 별도 잡.
 점수 = `0.1*views + 1.0*top_level_comments + 0.5*votes` (가중치 설정 가능) · tie-break `created_at` DESC. Admin UI 탭: **대기 / 완료 / 설정**.
 
 ## 전체 Admin 엔드포인트 수

@@ -55,11 +55,19 @@ public class PostCreateRequest {
     private Integer captureSplitAfterLine;
 
     /**
-     * IG 훅 제목(원제 복제+의미줄바꿈). AI PLAN이 전달하면 저장 후 PromoTitleService skip.
+     * SNS 마스터 훅(도발적). AI PLAN이 전달하면 저장 후 PromoTitleService skip.
+     * 개행은 IG 패킹용. 원제 복제 아님.
      */
     @com.fasterxml.jackson.annotation.JsonAlias({"promo_title"})
     @Size(max = 500, message = "promoTitle은 500자 이하여야 합니다")
     private String promoTitle;
+
+    /**
+     * 마스터 훅 감정. {@code shock|anger|tension|sad|hype}. PLAN 전달 또는 비동기 생성.
+     */
+    @com.fasterxml.jackson.annotation.JsonAlias({"hook_emotion"})
+    @Size(max = 16, message = "hookEmotion은 16자 이하여야 합니다")
+    private String hookEmotion;
 
     /**
      * 메타포 일러스트 ID (60종). AI PLAN 매칭값. 일반 사용자는 null.

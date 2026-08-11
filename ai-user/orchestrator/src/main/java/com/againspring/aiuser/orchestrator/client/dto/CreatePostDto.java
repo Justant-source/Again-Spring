@@ -37,10 +37,15 @@ public class CreatePostDto {
     @Deprecated
     private Integer captureSplitAfterLine;
     /**
-     * IG 훅 제목(원제 복제+의미줄바꿈). PLAN LLM 값.
-     * null이면 backend PromoTitleService가 채움.
+     * Master SNS scroll-stop hook ({@code promo_title}). PLAN LLM 값 — plaza {@code userTitle}과 독립.
+     * null이면 backend PromoTitleService가 채움(레거시 폴백).
      */
     private String promoTitle;
+    /**
+     * SNS 훅 감정 ({@code hook_emotion}): shock|anger|tension|sad|hype.
+     * BE V108+ 가 수락하면 저장; 미지원이면 무시된다.
+     */
+    private String hookEmotion;
     /**
      * 메타포 일러스트 ID (60종 카탈로그). PLAN LLM {@code metaphor_id}.
      */

@@ -7,6 +7,8 @@ import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.domain.marketing.MarketingPinFormat;
 import com.againspring.marketing.MarketingJobService;
 import com.againspring.marketing.MarketingPlatformAutoService;
+import com.againspring.marketing.MarketingPlatformSelector;
+import com.againspring.marketing.MarketingPopularityScorer;
 import com.againspring.marketing.MarketingPublishFormat;
 import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.MarketingScoreWeightService;
@@ -28,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,12 +41,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * T+24h holding commit pipeline (distribution rule C / S4).
+ * T+24h holding commit pipeline (Phase 2.1–2.2).
  *
- * <p>One COMMITTED story = one shared-pool slot. VIDEO commits get video + text
- * platforms (IG feed excluded when reels are included). TEXT commits get text only.
- * Pins soft-reserved first; autos by score into remaining video then text slots;
- * other due holdings → DROPPED. Force ignores daily caps.
+ * <p>Per-platform popularity scores + per-platform daily caps. Same story may win
+ * multiple platforms the same day. Instagram feed ⊥ Reels exclusivity
+ * (higher score wins; tie → Reels). Reels and Shorts enqueue as <b>separate</b> jobs.
  */
 @Slf4j
 @Service
@@ -90,11 +92,34 @@ public class MarketingHoldingCommitService {
 
     public record CommitTickResult(
         int pinnedCommitted,
-        int autoVideoCommitted,
-        int autoTextCommitted,
+        int autoCommitted,
         int dropped,
-        int pinnedDeferred
-    ) {}
+        int pinnedDeferred,
+        Map<String, Integer> selectedByPlatform
+    ) {
+        /** Phase 1 field aliases for older callers/tests. */
+        public int autoVideoCommitted() {
+            int n = 0;
+            if (selectedByPlatform != null) {
+                n += selectedByPlatform.getOrDefault(
+                    MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS, 0);
+                n += selectedByPlatform.getOrDefault(
+                    MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS, 0);
+            }
+            return n;
+        }
+
+        public int autoTextCommitted() {
+            int n = 0;
+            if (selectedByPlatform != null) {
+                n += selectedByPlatform.getOrDefault(
+                    MarketingPopularityScorer.PLATFORM_X_THREAD, 0);
+                n += selectedByPlatform.getOrDefault(
+                    MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED, 0);
+            }
+            return n;
+        }
+    }
 
     public record ForceResult(
         String postId,
@@ -117,11 +142,6 @@ public class MarketingHoldingCommitService {
         List<JobSummary> jobs
     ) {}
 
-    /**
-     * Summary of a marketing job for admin display.
-     * Includes reschedule tracking to show when/why jobs were deferred,
-     * and per-platform publish results parsed from {@link MarketingJob#getPublications()}.
-     */
     public record JobSummary(
         Long id,
         String status,
@@ -134,10 +154,6 @@ public class MarketingHoldingCommitService {
         Instant originalScheduledAt
     ) {}
 
-    /**
-     * One entry from {@link MarketingJob#getPublications()} JSON — a single platform's
-     * publish outcome (state e.g. "published"/"failed", and resulting URL when available).
-     */
     public record PublicationSummary(
         String platform,
         String state,
@@ -145,27 +161,31 @@ public class MarketingHoldingCommitService {
     ) {}
 
     /**
-     * Scheduler entry: commit due pins, fill remaining slots by score, drop the rest.
+     * Scheduler entry: pins first, then independent per-platform auto fill, drop rest.
      */
     @Transactional
     public CommitTickResult runCommitTick(Instant since) {
         Objects.requireNonNull(since, "since");
 
-        MarketingQuotaService.QuotaStatus quota = quotaService.getStatus();
-        MarketingScoreWeightService.Weights weights = scoreWeightService.getWeights();
+        MarketingScoreWeightService.AllPlatformWeights weights = scoreWeightService.getPlatformWeights();
+        List<String> enabled = platformAutoService.listEnabledPlatforms().stream()
+            .map(MarketingPopularityScorer::normalizePlatform)
+            .filter(MarketingPopularityScorer::isRankedPlatform)
+            .filter(id -> MarketingPlatformAutoService.RUNTIME_SUPPORTED.contains(id))
+            .toList();
+
+        Map<String, Integer> remaining = quotaService.remainingCapsMutable();
+        for (String platform : MarketingPopularityScorer.RANKED_PLATFORMS) {
+            if (!enabled.contains(platform)) {
+                remaining.put(platform, 0);
+            }
+        }
+
         List<DueHoldingProjection> due = holdingRepository.findDueHoldings(since);
         if (due.isEmpty()) {
             log.debug("Holding commit tick: no due holdings since={}", since);
-            return new CommitTickResult(0, 0, 0, 0, 0);
+            return new CommitTickResult(0, 0, 0, 0, Map.of());
         }
-
-        long remainingPool = quota.remainingPool();
-        long effectiveVideoCap = computeEffectiveVideoCap(quota);
-        int pinnedCommitted = 0;
-        int pinnedDeferred = 0;
-        int autoVideoCommitted = 0;
-        int autoTextCommitted = 0;
-        int dropped = 0;
 
         List<ScoredDue> pins = new ArrayList<>();
         List<ScoredDue> autos = new ArrayList<>();
@@ -178,12 +198,21 @@ public class MarketingHoldingCommitService {
             }
         }
         pins.sort(scoreThenCreatedDesc());
-        autos.sort(scoreThenCreatedDesc());
 
         Set<String> handled = new HashSet<>();
-        Set<String> selected = new HashSet<>();
+        Set<String> selectedStories = new HashSet<>();
+        Map<String, List<String>> assignedByPost = new LinkedHashMap<>();
+        Map<String, Integer> selectedCounts = new LinkedHashMap<>();
+        for (String p : MarketingPopularityScorer.RANKED_PLATFORMS) {
+            selectedCounts.put(p, 0);
+        }
 
-        // 1) Pins first (soft-reserved). Cap short → keep PINNED for next tick.
+        int pinnedCommitted = 0;
+        int pinnedDeferred = 0;
+        int dropped = 0;
+
+        // Soft-reserve still-PINNED so autos do not steal (after this tick's pin pass).
+        // 1) Pins first
         for (ScoredDue pin : pins) {
             MarketingPinFormat pinFormat = parsePinFormat(pin.pinFormat());
             if (pinFormat == null) {
@@ -194,77 +223,100 @@ public class MarketingHoldingCommitService {
                 }
                 continue;
             }
-            MarketingPublishFormat format = MarketingPublishFormat.fromPin(pinFormat);
-            boolean needsVideo = format == MarketingPublishFormat.VIDEO;
-            if (remainingPool < 1 || (needsVideo && effectiveVideoCap < 1)) {
-                log.info("Deferring pin {} format={} (remainingPool={}, effectiveVideoCap={})",
-                    pin.postId(), format, remainingPool, effectiveVideoCap);
+            List<String> want = resolvePinPlatforms(pinFormat, enabled, pin.scores());
+            List<String> available = want.stream()
+                .filter(p -> remaining.getOrDefault(p, 0) > 0)
+                .toList();
+            if (available.isEmpty()) {
+                log.info("Deferring pin {} — no remaining caps among {}", pin.postId(), want);
                 pinnedDeferred++;
                 continue;
             }
-            selected.add(pin.postId());
-            if (commitHolding(pin.postId(), format, REQUESTED_BY_SCHEDULER, false)) {
+            for (String platform : available) {
+                remaining.put(platform, remaining.get(platform) - 1);
+                selectedCounts.merge(platform, 1, Integer::sum);
+            }
+            assignedByPost.put(pin.postId(), available);
+            selectedStories.add(pin.postId());
+            if (commitHolding(pin.postId(), available, REQUESTED_BY_SCHEDULER)) {
                 pinnedCommitted++;
-                remainingPool--;
-                if (needsVideo) {
-                    effectiveVideoCap--;
-                }
                 handled.add(pin.postId());
             } else {
+                // roll back remaining so autos can use slots
+                for (String platform : available) {
+                    remaining.merge(platform, 1, Integer::sum);
+                    selectedCounts.merge(platform, -1, Integer::sum);
+                }
+                assignedByPost.remove(pin.postId());
+                selectedStories.remove(pin.postId());
                 pinnedDeferred++;
             }
         }
 
-        // Soft-reserve still-PINNED rows so autos do not steal their slots.
-        MarketingHoldingService.SoftReserve stillReserved = MarketingHoldingService.softReserveFrom(
-            holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED)), null);
-        long autoPool = Math.max(0, remainingPool - stillReserved.reservedPool());
-        long autoVideo = Math.max(0, effectiveVideoCap - stillReserved.reservedVideos());
-        autoVideo = Math.min(autoVideo, autoPool);
-
-        // 2) Autos: video slots by score, then text slots.
-        for (ScoredDue auto : autos) {
-            if (handled.contains(auto.postId()) || selected.contains(auto.postId())) {
+        // Soft-reserve remaining pins (deferred) from auto pool
+        List<MarketingHolding> stillPinned = holdingRepository.findByStatusIn(
+            EnumSet.of(MarketingHoldingStatus.PINNED));
+        for (MarketingHolding h : stillPinned) {
+            if (handled.contains(h.getPostId()) || selectedStories.contains(h.getPostId())) {
                 continue;
             }
-            if (auto.status() == MarketingHoldingStatus.OUT_OF_CUT) {
-                continue; // dropped in pass 3
+            MarketingPinFormat pf = h.getPinFormat();
+            if (pf == null) {
+                continue;
             }
-            if (autoVideo > 0 && autoPool > 0) {
-                selected.add(auto.postId());
-                if (commitHolding(auto.postId(), MarketingPublishFormat.VIDEO,
-                        REQUESTED_BY_SCHEDULER, false)) {
-                    autoVideoCommitted++;
-                    autoVideo--;
-                    autoPool--;
-                    remainingPool--;
-                    handled.add(auto.postId());
+            // Build zero scores for exclusivity on reserved pins — use pin format only
+            List<String> reserved = resolvePinPlatforms(pf, enabled, Map.of(
+                MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED, 0.0,
+                MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS, 1.0));
+            for (String platform : reserved) {
+                int rem = remaining.getOrDefault(platform, 0);
+                if (rem > 0) {
+                    remaining.put(platform, rem - 1);
                 }
             }
         }
+
+        // 2) Autos — independent per-platform ranking + IG exclusivity
+        List<MarketingPlatformSelector.Candidate> autoCandidates = new ArrayList<>();
         for (ScoredDue auto : autos) {
-            if (handled.contains(auto.postId()) || selected.contains(auto.postId())) {
+            if (handled.contains(auto.postId()) || selectedStories.contains(auto.postId())) {
                 continue;
             }
-            if (auto.status() == MarketingHoldingStatus.OUT_OF_CUT) {
+            autoCandidates.add(new MarketingPlatformSelector.Candidate(
+                auto.postId(), auto.postCreatedAt(), auto.scores()));
+        }
+
+        Map<String, List<String>> autoByPlatform =
+            MarketingPlatformSelector.selectAutos(autoCandidates, remaining);
+        Map<String, List<String>> autoByPost = MarketingPlatformSelector.invertSelections(autoByPlatform);
+
+        int autoCommitted = 0;
+        for (Map.Entry<String, List<String>> e : autoByPost.entrySet()) {
+            String postId = e.getKey();
+            List<String> platforms = e.getValue();
+            if (platforms.isEmpty()) {
                 continue;
             }
-            if (autoPool > 0) {
-                selected.add(auto.postId());
-                if (commitHolding(auto.postId(), MarketingPublishFormat.TEXT,
-                        REQUESTED_BY_SCHEDULER, false)) {
-                    autoTextCommitted++;
-                    autoPool--;
-                    remainingPool--;
-                    handled.add(auto.postId());
+            selectedStories.add(postId);
+            assignedByPost.put(postId, platforms);
+            for (String platform : platforms) {
+                selectedCounts.merge(platform, 1, Integer::sum);
+            }
+            if (commitHolding(postId, platforms, REQUESTED_BY_SCHEDULER)) {
+                autoCommitted++;
+                handled.add(postId);
+            } else {
+                selectedStories.remove(postId);
+                assignedByPost.remove(postId);
+                for (String platform : platforms) {
+                    selectedCounts.merge(platform, -1, Integer::sum);
                 }
             }
         }
 
         // 3) Remaining due non-pinned / non-selected → DROPPED
-        // (pins waiting on cap, and selected-but-failed commits, stay for next tick).
         for (ScoredDue dueRow : due.stream().map(r -> toScored(r, weights)).toList()) {
-            if (handled.contains(dueRow.postId()) || selected.contains(dueRow.postId())) {
+            if (handled.contains(dueRow.postId()) || selectedStories.contains(dueRow.postId())) {
                 continue;
             }
             if (dueRow.status() == MarketingHoldingStatus.PINNED) {
@@ -275,14 +327,15 @@ public class MarketingHoldingCommitService {
             }
         }
 
-        log.info("Holding commit tick: pinned={} autoVideo={} autoText={} dropped={} deferredPins={}",
-            pinnedCommitted, autoVideoCommitted, autoTextCommitted, dropped, pinnedDeferred);
+        log.info("Holding commit tick: pinned={} auto={} dropped={} deferredPins={} byPlatform={}",
+            pinnedCommitted, autoCommitted, dropped, pinnedDeferred, selectedCounts);
         return new CommitTickResult(
-            pinnedCommitted, autoVideoCommitted, autoTextCommitted, dropped, pinnedDeferred);
+            pinnedCommitted, autoCommitted, dropped, pinnedDeferred, Map.copyOf(selectedCounts));
     }
 
     /**
-     * Completed-tab force: ignore daily caps; same target rules as auto commit.
+     * Completed-tab force: ignore daily caps; same target rules as Phase 1 resolveTargets.
+     * Jobs are created per-platform (Reels/Shorts separate).
      */
     @Transactional
     public ForceResult forceCommit(String postId, ForceMode mode, String requestedBy) {
@@ -396,38 +449,73 @@ public class MarketingHoldingCommitService {
         return out;
     }
 
-    /** Package-visible for tests: ASM job grouping (video dual + alone text). */
+    /**
+     * Phase 2: each platform is its own job (Reels ≠ Shorts) for unique renders later.
+     */
     static List<List<String>> groupTargetsIntoJobs(List<String> targets) {
-        List<String> video = new ArrayList<>();
-        List<List<String>> alone = new ArrayList<>();
+        List<List<String>> jobs = new ArrayList<>();
         for (String raw : targets) {
             if (raw == null || raw.isBlank()) {
                 continue;
             }
             String id = raw.trim().toLowerCase(Locale.ROOT);
-            if (VIDEO_PLATFORM_IDS.contains(id)) {
-                video.add(id);
-            } else {
-                alone.add(List.of(id));
-            }
+            jobs.add(List.of(id));
         }
-        List<List<String>> jobs = new ArrayList<>(alone.size() + 1);
-        if (!video.isEmpty()) {
-            jobs.add(List.copyOf(video));
-        }
-        jobs.addAll(alone);
         return jobs;
     }
 
-    long computeEffectiveVideoCap(MarketingQuotaService.QuotaStatus quota) {
-        if (!platformAutoService.hasEffectiveVideoPlatforms()) {
-            return 0L;
+    /**
+     * Platforms a pin should consume. VIDEO → enabled video + text with IG exclusivity
+     * for this story (reels preferred on tie / when VIDEO pin). TEXT → text only.
+     */
+    static List<String> resolvePinPlatforms(
+            MarketingPinFormat pinFormat,
+            List<String> enabled,
+            Map<String, Double> scores) {
+        Set<String> enabledSet = new HashSet<>(enabled);
+        List<String> out = new ArrayList<>();
+        if (pinFormat == MarketingPinFormat.VIDEO) {
+            for (String v : List.of(
+                MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS,
+                MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS)) {
+                if (enabledSet.contains(v)) {
+                    out.add(v);
+                }
+            }
+            for (String t : List.of(
+                MarketingPopularityScorer.PLATFORM_X_THREAD,
+                MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED)) {
+                if (enabledSet.contains(t)) {
+                    out.add(t);
+                }
+            }
+        } else {
+            for (String t : List.of(
+                MarketingPopularityScorer.PLATFORM_X_THREAD,
+                MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED)) {
+                if (enabledSet.contains(t)) {
+                    out.add(t);
+                }
+            }
         }
-        return Math.max(0, quota.dailyVideoCap() - quota.videosToday());
+        // IG exclusivity for this single story
+        boolean hasFeed = out.contains(MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED);
+        boolean hasReels = out.contains(MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS);
+        if (hasFeed && hasReels) {
+            double sf = scores.getOrDefault(MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED, 0.0);
+            double sr = scores.getOrDefault(MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS, 0.0);
+            // VIDEO pin: prefer reels on tie (same as global rule)
+            String winner = MarketingPopularityScorer.resolveIgExclusiveWinner(sf, sr);
+            if (MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS.equals(winner)) {
+                out.remove(MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED);
+            } else {
+                out.remove(MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS);
+            }
+        }
+        return List.copyOf(out);
     }
 
-    private boolean commitHolding(
-            String postId, MarketingPublishFormat format, String requestedBy, boolean ignoreCap) {
+    private boolean commitHolding(String postId, List<String> targets, String requestedBy) {
         MarketingHolding holding = holdingRepository.findById(postId).orElse(null);
         if (holding == null) {
             log.warn("Commit skipped — holding missing for {}", postId);
@@ -437,10 +525,8 @@ public class MarketingHoldingCommitService {
             || holding.getStatus() == MarketingHoldingStatus.DROPPED) {
             return false;
         }
-
-        List<String> targets = platformAutoService.resolveTargets(format);
-        if (targets.isEmpty()) {
-            log.warn("Commit skipped — empty targets for {} format={}", postId, format);
+        if (targets == null || targets.isEmpty()) {
+            log.warn("Commit skipped — empty targets for {}", postId);
             return false;
         }
 
@@ -453,8 +539,7 @@ public class MarketingHoldingCommitService {
 
         lockCommitted(holding);
         holdingRepository.save(holding);
-        log.info("COMMITTED holding {} format={} targets={} ignoreCap={}",
-            postId, format, targets, ignoreCap);
+        log.info("COMMITTED holding {} targets={}", postId, targets);
         return true;
     }
 
@@ -478,7 +563,6 @@ public class MarketingHoldingCommitService {
             created.add(job);
         }
         if (created.isEmpty() && !groups.isEmpty()) {
-            // All platforms already had jobs (retry path / partial) — still allow lock if any job exists
             long any = groups.stream()
                 .flatMap(List::stream)
                 .mapToLong(p -> marketingJobRepository.countAnyPlatformJobs(postId, p))
@@ -511,19 +595,34 @@ public class MarketingHoldingCommitService {
         return true;
     }
 
-    private static ScoredDue toScored(DueHoldingProjection row, MarketingScoreWeightService.Weights w) {
-        int views = row.getViewCount() == null ? 0 : row.getViewCount().intValue();
-        long comments = row.getCommentCount() == null ? 0L : row.getCommentCount().longValue();
-        long votes = row.getVoteCount() == null ? 0L : row.getVoteCount().longValue();
-        double score = w.weightViews() * views + w.weightComments() * comments + w.weightVotes() * votes;
+    static ScoredDue toScored(
+            DueHoldingProjection row, MarketingScoreWeightService.AllPlatformWeights weights) {
+        MarketingPopularityScorer.Signals signals = signalsFrom(row);
+        Map<String, Double> scores = new HashMap<>();
+        for (String platform : MarketingPopularityScorer.RANKED_PLATFORMS) {
+            scores.put(platform, MarketingPopularityScorer.score(signals, weights.forPlatform(platform)));
+        }
         MarketingHoldingStatus status;
         try {
             status = MarketingHoldingStatus.valueOf(row.getStatus());
         } catch (Exception e) {
             status = MarketingHoldingStatus.OUT_OF_CUT;
         }
+        // Board-facing snapshot = max platform score
+        double snapshot = scores.values().stream().mapToDouble(Double::doubleValue).max().orElse(0.0);
         return new ScoredDue(
-            row.getPostId(), status, row.getPinFormat(), score, row.getPostCreatedAt());
+            row.getPostId(), status, row.getPinFormat(), snapshot, scores, row.getPostCreatedAt());
+    }
+
+    static MarketingPopularityScorer.Signals signalsFrom(DueHoldingProjection row) {
+        long views = row.getViewCount() == null ? 0L : row.getViewCount().longValue();
+        long comments = row.getCommentCount() == null ? 0L : row.getCommentCount().longValue();
+        long votes = row.getVoteCount() == null ? 0L : row.getVoteCount().longValue();
+        long authorVotes = row.getAuthorVoteCount() == null ? 0L : row.getAuthorVoteCount().longValue();
+        double hasPartner = row.getHasPartner() != null && row.getHasPartner().intValue() != 0 ? 1.0 : 0.0;
+        double hook = MarketingPopularityScorer.hookStrength(row.getHookText());
+        double skew = MarketingPopularityScorer.voteSkew(authorVotes, votes);
+        return new MarketingPopularityScorer.Signals(views, comments, votes, skew, hasPartner, hook);
     }
 
     private static Comparator<ScoredDue> scoreThenCreatedDesc() {
@@ -554,10 +653,6 @@ public class MarketingHoldingCommitService {
         }
     }
 
-    /**
-     * Parse {@link MarketingJob#getPublications()} JSON into per-platform summaries.
-     * Same tolerant Map-based parsing pattern as {@code MarketingStatsService}.
-     */
     private List<PublicationSummary> parsePublications(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
@@ -580,7 +675,6 @@ public class MarketingHoldingCommitService {
         }
     }
 
-    /** Story title: draft_json title first (may be edited post-seed), else live Post title/userTitle. */
     private String resolveTitle(MarketingHolding h, Post post) {
         String draftTitle = parseDraftTitle(h.getDraftJson());
         if (draftTitle != null && !draftTitle.isBlank()) {
@@ -609,11 +703,6 @@ public class MarketingHoldingCommitService {
         }
     }
 
-    /**
-     * Display format for a completed row: VIDEO if the holding was pinned VIDEO or any
-     * enqueued job targets a video platform; else TEXT if a text pin/job exists; else null
-     * (e.g. dropped before any pin/job — no format was ever projected).
-     */
     private String resolveCommittedFormat(MarketingHolding h, List<MarketingJob> jobs) {
         boolean hasVideoTarget = false;
         boolean hasAnyTarget = false;
@@ -634,11 +723,12 @@ public class MarketingHoldingCommitService {
         return null;
     }
 
-    private record ScoredDue(
+    record ScoredDue(
         String postId,
         MarketingHoldingStatus status,
         String pinFormat,
         double score,
+        Map<String, Double> scores,
         Instant postCreatedAt
     ) {}
 }

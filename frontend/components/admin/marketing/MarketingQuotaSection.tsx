@@ -7,27 +7,42 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   getMarketingQuota,
-  updateMarketingQuota,
+  updateMarketingPlatformQuota,
   MarketingQuota,
 } from '@/lib/api/admin/marketing';
 
+const PLATFORM_LABELS: Record<string, string> = {
+  x_thread: 'X 스레드',
+  instagram_feed: 'IG 피드',
+  instagram_reels: 'IG 릴스',
+  youtube_shorts: 'YT Shorts',
+};
+
 export function MarketingQuotaSection() {
   const [quota, setQuota] = useState<MarketingQuota | null>(null);
-  const [textCap, setTextCap] = useState('6');
-  const [videoCap, setVideoCap] = useState('3');
+  const [xThread, setXThread] = useState('3');
+  const [instagramFeed, setInstagramFeed] = useState('3');
+  const [instagramReels, setInstagramReels] = useState('3');
+  const [youtubeShorts, setYoutubeShorts] = useState('3');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
+  const applyQuota = (data: MarketingQuota) => {
+    setQuota(data);
+    const p = data.platforms;
+    setXThread(String(p?.x_thread?.cap ?? 3));
+    setInstagramFeed(String(p?.instagram_feed?.cap ?? 3));
+    setInstagramReels(String(p?.instagram_reels?.cap ?? 3));
+    setYoutubeShorts(String(p?.youtube_shorts?.cap ?? 3));
+  };
+
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getMarketingQuota();
-      setQuota(data);
-      setTextCap(String(data.dailyTextCap));
-      setVideoCap(String(data.dailyVideoCap));
+      applyQuota(await getMarketingQuota());
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(`일일 상한을 불러오지 못했습니다: ${msg}`);
@@ -41,9 +56,13 @@ export function MarketingQuotaSection() {
   }, []);
 
   const handleSave = async () => {
-    const dailyTextCap = Number(textCap);
-    const dailyVideoCap = Number(videoCap);
-    if (!Number.isInteger(dailyTextCap) || !Number.isInteger(dailyVideoCap)) {
+    const caps = {
+      xThread: Number(xThread),
+      instagramFeed: Number(instagramFeed),
+      instagramReels: Number(instagramReels),
+      youtubeShorts: Number(youtubeShorts),
+    };
+    if (!Object.values(caps).every((n) => Number.isInteger(n))) {
       setError('상한은 정수여야 합니다.');
       return;
     }
@@ -51,10 +70,7 @@ export function MarketingQuotaSection() {
     setError(null);
     setSavedMsg(null);
     try {
-      const data = await updateMarketingQuota(dailyTextCap, dailyVideoCap);
-      setQuota(data);
-      setTextCap(String(data.dailyTextCap));
-      setVideoCap(String(data.dailyVideoCap));
+      applyQuota(await updateMarketingPlatformQuota(caps));
       setSavedMsg('저장했습니다.');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -73,45 +89,46 @@ export function MarketingQuotaSection() {
   }
 
   return (
-    <div className="space-y-4 max-w-lg">
+    <div className="space-y-4 max-w-2xl">
       <Card className="p-6 space-y-4">
         <div>
-          <h3 className="font-semibold text-gray-800">24h 자동 분배 일일 상한</h3>
+          <h3 className="font-semibold text-gray-800">플랫폼별 일일 상한</h3>
           <p className="mt-1 text-sm text-gray-500">
-            영상 우선. 글 슬롯 = 글 상한 − 오늘 영상. 글 = X 스레드 + IG 피드, 영상 = 릴스 + 쇼츠(X 없음).
-            수동 잡도 같은 날 카운트에 포함됩니다.
+            Phase 2: 채널마다 독립 cap(기본 3). 같은 사연이 여러 플랫폼에 올라갈 수 있습니다.
+            IG 피드와 릴스만 배타입니다.
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label htmlFor="dailyTextCap">일일 글 상한 (공유 풀)</Label>
-            <Input
-              id="dailyTextCap"
-              type="number"
-              min={1}
-              max={50}
-              value={textCap}
-              onChange={(e) => setTextCap(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="dailyVideoCap">일일 영상 상한</Label>
-            <Input
-              id="dailyVideoCap"
-              type="number"
-              min={0}
-              max={50}
-              value={videoCap}
-              onChange={(e) => setVideoCap(e.target.value)}
-            />
-          </div>
+          {(
+            [
+              ['x_thread', xThread, setXThread],
+              ['instagram_feed', instagramFeed, setInstagramFeed],
+              ['instagram_reels', instagramReels, setInstagramReels],
+              ['youtube_shorts', youtubeShorts, setYoutubeShorts],
+            ] as const
+          ).map(([id, value, setValue]) => (
+            <div key={id} className="space-y-1">
+              <Label htmlFor={`cap-${id}`}>{PLATFORM_LABELS[id]}</Label>
+              <Input
+                id={`cap-${id}`}
+                type="number"
+                min={0}
+                max={50}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+              />
+            </div>
+          ))}
         </div>
 
-        {quota && (
-          <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-            오늘(KST): 영상 {quota.videosToday} · 글 {quota.textsToday} · 잔여 풀{' '}
-            {quota.remainingPool}
+        {quota?.platforms && (
+          <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 space-y-1">
+            {Object.entries(quota.platforms).map(([id, p]) => (
+              <div key={id}>
+                {PLATFORM_LABELS[id] ?? id}: 오늘 {p.usedToday} / {p.cap} (잔여 {p.remaining})
+              </div>
+            ))}
           </div>
         )}
 

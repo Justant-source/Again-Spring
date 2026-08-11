@@ -43,6 +43,48 @@ public class CreateJobRequest {
         @JsonProperty("promo_title")
         private String promoTitle;
 
+        /**
+         * IG 훅 감정 키 (nullable). {@code Post.getHookEmotion()}이 있으면 전달;
+         * 컬럼/게터가 아직 없으면 null.
+         */
+        @JsonProperty("hook_emotion")
+        private String hookEmotion;
+
+        /**
+         * Instagram Reels variant hook (stage-2 of H3). Set at video job create only.
+         */
+        @JsonProperty("hook_reels")
+        private String hookReels;
+
+        /** YouTube Shorts variant hook (stage-2). */
+        @JsonProperty("hook_shorts")
+        private String hookShorts;
+
+        /**
+         * Reels summary narration + cliffhanger CTA (not full-story read). ≤~30s spoken.
+         */
+        @JsonProperty("script_reels")
+        private String scriptReels;
+
+        /** Shorts summary narration + cliffhanger CTA. ≤~45s spoken. */
+        @JsonProperty("script_shorts")
+        private String scriptShorts;
+
+        /** Reels hard cap seconds (default 30). */
+        @JsonProperty("max_duration_reels_sec")
+        private Integer maxDurationReelsSec;
+
+        /** Shorts hard cap seconds (default 45). */
+        @JsonProperty("max_duration_shorts_sec")
+        private Integer maxDurationShortsSec;
+
+        /**
+         * When the job targets a single video platform, the active cap (30 or 45).
+         * Dual-target jobs prefer {@link #maxDurationReelsSec}/{@link #maxDurationShortsSec}.
+         */
+        @JsonProperty("max_duration_sec")
+        private Integer maxDurationSec;
+
         /** Metaphor illustration id (60-card catalog). Shorts intro / cards. */
         @JsonProperty("metaphor_id")
         private String metaphorId;
@@ -229,7 +271,16 @@ public class CreateJobRequest {
         @JsonProperty("auto_publish")
         private boolean autoPublish;
 
+        /** {@code story_{localJobId}} — same value embedded in post_url query. */
         @JsonProperty("utm_campaign")
         private String utmCampaign;
+
+        /**
+         * Per-target landing URLs (ASM platform id → full community URL with UTM).
+         * Multi-target jobs (e.g. reels+shorts) send each platform's {@code utm_source};
+         * {@link BriefDto#postUrl} remains the primary/fallback for current ASM pipelines.
+         */
+        @JsonProperty("post_urls")
+        private Map<String, String> postUrls;
     }
 }

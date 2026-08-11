@@ -15,6 +15,7 @@ import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.community.CommentService;
+import com.againspring.service.community.VideoVariantService;
 import com.againspring.service.community.VoteService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -75,12 +76,29 @@ class MarketingJobServiceTest {
     @Mock
     UserRepository userRepository;
 
+    @Mock
+    MarketingPublishSlotService publishSlotService;
+
+    @Mock
+    VideoVariantService videoVariantService;
+
     @InjectMocks
     MarketingJobService marketingJobService;
 
     private static final String TEST_POST_ID = "post-123";
     private static final String TEST_JOB_ID = "remote-job-456";
     private static final List<String> TEST_TARGETS = Arrays.asList("twitter", "threads");
+
+    /** Assigns a local id on first save so utm_campaign=story_{id} can be built. */
+    private void stubSaveAssignsId(long id) {
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> {
+            MarketingJob job = inv.getArgument(0);
+            if (job.getId() == null) {
+                job.setId(id);
+            }
+            return job;
+        });
+    }
 
     // ── Test 1: createJob_success ───────────────────────────────────────────
 
@@ -115,17 +133,7 @@ class MarketingJobServiceTest {
         when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
             .thenReturn(response);
 
-        MarketingJob savedJob = MarketingJob.builder()
-            .id(1L)
-            .remoteJobId(TEST_JOB_ID)
-            .postId(TEST_POST_ID)
-            .status("QUEUED")
-            .autoPublish(false)
-            .requestedBy("admin")
-            .build();
-
-        when(marketingJobRepository.save(any(MarketingJob.class)))
-            .thenReturn(savedJob);
+        stubSaveAssignsId(1L);
 
         doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
@@ -148,7 +156,45 @@ class MarketingJobServiceTest {
         verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "twitter");
         verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "threads");
         verify(asmClient).createJob(any(CreateJobRequest.class), any(String.class));
-        verify(marketingJobRepository).save(any(MarketingJob.class));
+        verify(marketingJobRepository, times(2)).save(any(MarketingJob.class));
+    }
+
+    @Test
+    void createJob_autoPublish_setsEveningSlotAndDefersAsmAutoPublish() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("Evening slot")
+            .bodyPublished("body")
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+            .thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+
+        Instant slot = Instant.parse("2026-08-11T12:30:00Z"); // 21:30 KST
+        when(publishSlotService.nextSlotForTargets(eq(List.of("x_thread")), any(Instant.class)))
+            .thenReturn(Optional.of(slot));
+
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(10L);
+
+        MarketingJob result = marketingJobService.createJob(
+            TEST_POST_ID, List.of("x_thread"), true, "system:holding-commit-trigger");
+
+        assertThat(result.getAutoPublish()).isTrue();
+        assertThat(result.getScheduledPublishAt()).isEqualTo(slot);
+        assertThat(result.getOriginalScheduledAt()).isEqualTo(slot);
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        assertThat(captor.getValue().getOptions().isAutoPublish()).isFalse();
     }
 
     @Test
@@ -181,8 +227,7 @@ class MarketingJobServiceTest {
             .build();
         when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
             .thenReturn(response);
-        when(marketingJobRepository.save(any(MarketingJob.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+        stubSaveAssignsId(7L);
         doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
 
@@ -222,8 +267,7 @@ class MarketingJobServiceTest {
             .build();
         when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
             .thenReturn(response);
-        when(marketingJobRepository.save(any(MarketingJob.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+        stubSaveAssignsId(8L);
         doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
 
@@ -271,7 +315,7 @@ class MarketingJobServiceTest {
 
         CreateJobResponse response = CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build();
         when(asmClient.createJob(any(CreateJobRequest.class), any(String.class))).thenReturn(response);
-        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubSaveAssignsId(9L);
         doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
 
@@ -308,6 +352,118 @@ class MarketingJobServiceTest {
         assertThat(thirdComment.getSide()).isEqualTo("neutral");
     }
 
+
+    @Test
+    void createJob_xThread_attachesUtmToPostUrlAndOptions() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("UTM")
+            .bodyPublished("body")
+            .build();
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+            .thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(42L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest req = captor.getValue();
+        String expected = MarketingUtmUrls.buildUrl(TEST_POST_ID, "x", "story_42");
+        assertThat(req.getBrief().getPostUrl()).isEqualTo(expected);
+        assertThat(req.getOptions().getUtmCampaign()).isEqualTo("story_42");
+        assertThat(req.getOptions().getPostUrls()).containsEntry("x_thread", expected);
+    }
+
+    @Test
+    void createJob_multiTargetVideo_setsPerPlatformPostUrls_primaryYoutube() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("dual")
+            .bodyPublished("body")
+            .build();
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("instagram_reels")))
+            .thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("youtube_shorts")))
+            .thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(11L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+        when(videoVariantService.generate(any(), any(), any(), any(), eq(true), eq(true)))
+            .thenReturn(new VideoVariantService.Variants(
+                "릴스훅", "릴스대본 공감 비율은?", 30,
+                "쇼츠훅", "쇼츠대본 댓글로", 45
+            ));
+
+        marketingJobService.createJob(
+            TEST_POST_ID,
+            List.of("instagram_reels", "youtube_shorts"),
+            false,
+            "admin"
+        );
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest req = captor.getValue();
+        Map<String, String> urls = req.getOptions().getPostUrls();
+        assertThat(urls.get("youtube_shorts")).contains("utm_source=youtube");
+        assertThat(urls.get("instagram_reels")).contains("utm_source=instagram");
+        assertThat(req.getBrief().getPostUrl()).isEqualTo(urls.get("youtube_shorts"));
+        assertThat(req.getOptions().getUtmCampaign()).isEqualTo("story_11");
+        assertThat(req.getBrief().getHookReels()).isEqualTo("릴스훅");
+        assertThat(req.getBrief().getHookShorts()).isEqualTo("쇼츠훅");
+        assertThat(req.getBrief().getScriptReels()).contains("공감");
+        assertThat(req.getBrief().getScriptShorts()).contains("댓글");
+        assertThat(req.getBrief().getMaxDurationReelsSec()).isEqualTo(30);
+        assertThat(req.getBrief().getMaxDurationShortsSec()).isEqualTo(45);
+        assertThat(req.getBrief().getMaxDurationSec()).isNull(); // dual → per-platform fields
+        verify(videoVariantService).generate(any(), any(), any(), any(), eq(true), eq(true));
+    }
+
+    @Test
+    void createJob_xThread_skipsVideoVariants() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("text only")
+            .bodyPublished("body")
+            .build();
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+            .thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(12L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        verify(videoVariantService, never()).generate(any(), any(), any(), any(), any(Boolean.class), any(Boolean.class));
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        assertThat(captor.getValue().getBrief().getHookReels()).isNull();
+        assertThat(captor.getValue().getBrief().getScriptShorts()).isNull();
+    }
 
     @Test
     void createJob_duplicateActiveJob_throwsIllegalStateException() {
@@ -362,15 +518,7 @@ class MarketingJobServiceTest {
         when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
             .thenReturn(response);
 
-        MarketingJob savedJob = MarketingJob.builder()
-            .id(2L)
-            .remoteJobId("new-job-222")
-            .postId(TEST_POST_ID)
-            .status("QUEUED")
-            .build();
-
-        when(marketingJobRepository.save(any(MarketingJob.class)))
-            .thenReturn(savedJob);
+        stubSaveAssignsId(2L);
 
         doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
@@ -387,7 +535,7 @@ class MarketingJobServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getRemoteJobId()).isEqualTo("new-job-222");
 
-        verify(marketingJobRepository).save(any(MarketingJob.class));
+        verify(marketingJobRepository, times(2)).save(any(MarketingJob.class));
     }
 
     // ── Test 4: applyPoll_updatesStatus ────────────────────────────────────
@@ -434,7 +582,7 @@ class MarketingJobServiceTest {
     // ── Test 5: applyCallback_updatesJobFromRemote ──────────────────────────
 
     @Test
-    void applyCallback_updatesJobFromRemoteJobId() {
+    void applyCallback_updatesJobFromRemoteJobId() throws JsonProcessingException {
         // Given
         MarketingJob job = MarketingJob.builder()
             .id(1L)
@@ -443,10 +591,16 @@ class MarketingJobServiceTest {
             .status("PUBLISHING")
             .build();
 
+        Map<String, Object> pub = new java.util.LinkedHashMap<>();
+        pub.put("platform", "x_thread");
+        pub.put("state", "published");
+        pub.put("url", "https://x.com/againspring/status/123");
+
         JobCallbackPayload payload = JobCallbackPayload.builder()
             .jobId(TEST_JOB_ID)
             .status("PUBLISHED")
             .event("PUBLISHED")
+            .publications(List.of(pub))
             .build();
 
         when(marketingJobRepository.findByRemoteJobId(TEST_JOB_ID))
@@ -454,12 +608,15 @@ class MarketingJobServiceTest {
 
         when(marketingJobRepository.save(any(MarketingJob.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
+        doReturn("[{\"platform\":\"x_thread\",\"state\":\"published\",\"url\":\"https://x.com/againspring/status/123\"}]")
+            .when(objectMapper).writeValueAsString(any());
 
         // When
         marketingJobService.applyCallback(payload);
 
         // Then
         assertThat(job.getStatus()).isEqualTo("PUBLISHED");
+        assertThat(job.getPublications()).contains("https://x.com/againspring/status/123");
 
         verify(marketingJobRepository).findByRemoteJobId(TEST_JOB_ID);
         verify(marketingJobRepository).save(job);

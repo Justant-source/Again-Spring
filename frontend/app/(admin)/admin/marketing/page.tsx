@@ -10,6 +10,7 @@ import { PlatformAutoSection } from '@/components/admin/marketing/PlatformAutoSe
 import { HoldingControlsBar } from '@/components/admin/marketing/HoldingControlsBar';
 import { HoldingBoard } from '@/components/admin/marketing/HoldingBoard';
 import { HoldingDraftDialog } from '@/components/admin/marketing/HoldingDraftDialog';
+import { MarketingWeeklyReportSection } from '@/components/admin/marketing/MarketingWeeklyReportSection';
 import {
   CompletedHoldingsBoard,
   type CompletedHoldingView,
@@ -281,7 +282,10 @@ export default function MarketingJobsPage() {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-8">
-          <PlatformAutoSection />
+          <MarketingWeeklyReportSection />
+          <div className="border-t pt-6">
+            <PlatformAutoSection />
+          </div>
           <div className="border-t pt-6">
             <ShortformVideoSection />
           </div>

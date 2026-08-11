@@ -102,8 +102,8 @@ flowchart LR
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | POST | `/api/community/posts` | **JWT** | 200 / 400 / 409 / 422 | 게시글 작성 (synthetic bot은 내부 멱등성 헤더 지원) |
-| GET | `/api/community/posts` | 공개 | 200 | 게시글 목록 |
-| GET | `/api/community/posts/search` | 공개 | 200 | 키워드 검색 (`?q=`, `category=`, `page=`, `size≤50`). `q` 정규화 후 2글자 미만이면 빈 페이지. 매칭=`post_search_ngrams` 문자 바이그램 AND(미색인 글은 LIKE 폴백). 정렬=제목 exact 티어 → `(2×votes+comments)×반감기14일`(바닥 0.05). MariaDB는 MySQL ngram FULLTEXT 미지원 → BTREE 바이그램 테이블로 대체 |
+| GET | `/api/community/posts` | 공개 | 200 | 게시글 목록. 항목에 `authorPct`/`partnerPct`(Integer, nullable) — 표>0이면 작성자(orderIdx=0) raw 비율, 표 없으면 null |
+| GET | `/api/community/posts/search` | 공개 | 200 | 키워드 검색 (`?q=`, `category=`, `page=`, `size≤50`). `q` 정규화 후 2글자 미만이면 빈 페이지. 매칭=`post_search_ngrams` 문자 바이그램 AND(미색인 글은 LIKE 폴백). 정렬=제목 exact 티어 → `(2×votes+comments)×반감기14일`(바닥 0.05). MariaDB는 MySQL ngram FULLTEXT 미지원 → BTREE 바이그램 테이블로 대체. 목록과 동일하게 `authorPct`/`partnerPct` |
 | GET | `/api/community/posts/counts` | 공개 | 200 | 광장별 글 수 (`{"":.., "COUPLE":.., ...}`) |
 | GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | 게시글 상세. soft-delete면 **200 + `{ deleted: true }`**(본문 생략 가능) 또는 기존 404 — FE는 deleted 플래그 우선. 응답에 `authorBodyDeleted` / `partnerBodyDeleted` boolean |
 | PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만; 작성자 본문 tombstone 후 재작성 경로 포함) |
@@ -171,14 +171,18 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 - `authorBodyDeleted` / `partnerBodyDeleted` (Boolean, **2026-08-11~**): 쪽별 tombstone
 - `deleted` (Boolean, optional): 포스트 soft-delete 시 true (`deletedAt != null` — 이 경우 본문 필드 생략)
 - `inviteToken` (String, nullable): 초대 토큰 (작성자 본인만 조회 가능)
-- `promoTitle` (String, nullable, **2026-08-02~**, **V96→VARCHAR(500)·개행**): IG 훅용. 원제 복제+의미줄바꿈(줄≤10). 생성 시 PLAN 전달 또는 `PromoTitleService` 비동기. 목록/상세 공통.
+- `promoTitle` (String, nullable, **2026-08-02~**, **V96→VARCHAR(500)·개행**, **의미 변경 2026-08-11~**): SNS **마스터 훅**(도발적). 원제 복제 아님. IG 패킹용 `\n`(줄≤10). 생성 시 PLAN 전달 또는 `PromoTitleService` 비동기(제목+본문). 목록/상세 공통.
+- `hookEmotion` (String, nullable, **2026-08-11~**, **V108**): 마스터 훅 감정. `shock` \| `anger` \| `tension` \| `sad` \| `hype` only. PLAN 전달 또는 `PromoTitleService`와 동시 생성. 무효값·폴백 시 null.
 - `metaphorId` (String, nullable, **2026-08-05~**, **V99**): 메타포 일러스트 ID (60종 카탈로그). AI PLAN이 사연 생성 시 감정에 맞는 카드를 매칭. Shorts intro / FE 카드용. **대표(1순위) 메타포 — 하위호환 유지, `metaphorIds[0]`와 동일**.
 - `metaphorIds` (String[], nullable, **2026-08-09~**, **V105 `post_metaphors` 테이블**): 사연당 3~5개, 적합도 순 랭크. `metaphorId`(대표)는 `metaphorIds[0]`의 중복 저장. WaggleBot Shorts 렌더링에서 1번째=인트로 대표 이미지, 나머지는 본문 낭독 중간중간 균등 분산 삽입(앞쪽 몰림 방지). `MetaphorCatalog.sanitizeList`가 카탈로그 검증+dedup+최소 3개 미달 시 카테고리 fallback 패딩+최대 5개 cap.
 - `voteCloseAt` / `voteDurationHours` (**legacy, 미사용**): 응답에 남을 수 있으나 FE는 투표 마감 UI에 쓰지 않음
 
+**목록(`GET /posts`, `/search`, `/mine`, `/voted`) 응답 필드 (`PostResponse`):**
+- `authorPct` / `partnerPct` (Integer, nullable, **2026-08-11~**): 표가 1표 이상일 때 작성자(orderIdx=0) raw 투표 비율과 `100-authorPct`. 표 없으면 null — FE는 `resolveAuthorPct`로 중립 50만 적용. 상세의 가중 `voteResult.options[].percentage`와는 별개(목록은 raw).
+
 소유권·tombstone UX SSOT: `docs/frontend/ux/flows/09-partner-invite-ownership.md`
 
-`POST /api/community/posts` 성공 시(신규 생성만) optional `promoTitle`이 있으면 저장하고, 없으면 `PromoTitleService.generateAsync`가 1회 실행된다. 마케팅 brief는 개행 포함 `promo_title`을 전달한다.
+`POST /api/community/posts` 성공 시(신규 생성만) optional `promoTitle`(+optional `hookEmotion`)이 있으면 저장하고, `promoTitle`이 없으면 `PromoTitleService.generateAsync`가 훅+감정을 1회 생성한다. 마케팅 brief는 개행 포함 `promo_title`을 전달한다.
 봇(AI-user) 생성 요청은 optional `captureSplitAfterLines`(1-based 개행 블록 컷 배열)과 optional `metaphorId`/`metaphorIds`(배열, 최대 5개)를 보낼 수 있다 — X/IG 캡쳐 N장 분할(장당 ≤8, 진영당 ≤4). 구 `captureSplitAfterLine` 단일 값은 길이1 배열로 승격. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완. 파트너 답변(`POST /api/s/{token}/answer`)도 optional `captureSplitAfterLines`를 `partner_capture_split_after_lines`에 저장한다.
 ### 3. User
 
@@ -363,10 +367,12 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
-| GET | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 | 일일 글/영상 상한 + 오늘(KST) 사용량. 응답: `{dailyTextCap, dailyVideoCap, videosToday, textsToday, remainingPool}`. 사용량 = 오늘(KST) `marketing_holding` **COMMITTED** 건수(영상=핀 VIDEO 또는 Reels/Shorts 잡 존재). 수동/테스트 `marketing_job`만 있는 건은 카운트하지 않음 |
-| PUT | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 / 400 | 상한 저장. Body: `{dailyTextCap(1–50), dailyVideoCap(0–textCap)}`. `system_setting` 키 `marketing.daily_text_cap` / `marketing.daily_video_cap` |
-| GET | `/api/admin/marketing/score-weights` | **JWT + ADMIN** | 200 | 인기 점수 가중치. 응답: `{weightViews, weightComments, weightVotes}` (기본 0.1 / 1.0 / 0.5) |
-| PUT | `/api/admin/marketing/score-weights` | **JWT + ADMIN** | 200 / 400 | 가중치 저장. Body: `{weightViews, weightComments, weightVotes}` 각 0–100. 키 `marketing.score.weight_views` / `weight_comments` / `weight_votes` |
+| GET | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 | Phase 2 플랫폼별 일일 cap + 오늘(KST) 사용량. 응답: `{platforms:{x_thread:{cap,usedToday,remaining},…}, dailyTextCap, dailyVideoCap, videosToday, textsToday, remainingPool}`. `dailyTextCap`/`dailyVideoCap`은 텍스트/영상 플랫폼 cap **합**(deprecated 파생). 사용량 = COMMITTED + 해당 플랫폼 job targets |
+| PUT | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 / 400 | Body: `{xThread,instagramFeed,instagramReels,youtubeShorts}` (각 0–50) 또는 legacy `{dailyTextCap,dailyVideoCap}`(분배 저장). 키 `marketing.cap.{platform}`. legacy `marketing.daily_text_cap`/`daily_video_cap`은 플랫폼 키 없을 때 fallback |
+| GET | `/api/admin/marketing/score-weights` | **JWT + ADMIN** | 200 | 인기 점수 가중치. 응답: `{weightViews, weightComments, weightVotes, platforms?, autoAdjust}` (Phase 2 platforms + Phase 2.7 autoAdjust 기본 false) |
+| PUT | `/api/admin/marketing/score-weights` | **JWT + ADMIN** | 200 / 400 | 가중치 저장. Body: `platforms` 맵 및/또는 legacy flat + optional `autoAdjust`. 키 `marketing.score.weights.{platform}.*` · `marketing.score.auto_adjust` |
+| GET | `/api/admin/marketing/publish-slots` | **JWT + ADMIN** | 200 | KST 저녁 발행 슬롯. 응답: `{instagramFeed, instagramReels, youtubeShorts, xThread}` (기본 `20:00` / `20:30` / `20:30` / `21:30`) |
+| PUT | `/api/admin/marketing/publish-slots` | **JWT + ADMIN** | 200 / 400 | 슬롯 저장. Body: 동일 필드, 각 `HH:mm`(24h). `system_setting` 키 `marketing.publish_slot.{instagram_feed\|instagram_reels\|youtube_shorts\|x_thread}` |
 | GET | `/api/admin/marketing/platforms` | **JWT + ADMIN** | 200 | 전체 플랫폼 auto on/off. 응답: `[{platform, autoEnabled, runtimeSupported, warning?}]`. `system_setting` 키 `marketing.platform.{id}.auto_enabled`. 기본: 런타임 지원 ON / 미지원 OFF |
 | PUT | `/api/admin/marketing/platforms/{platform}/auto` | **JWT + ADMIN** | 200 / 400 | Body: `{enabled: boolean}`. 미지원+enabled=true도 저장 성공, 응답에 `warning` (발행 시 `resolveTargets`가 제외). 준비중 배지 없음 |
 | GET | `/api/admin/marketing/holding` | **JWT + ADMIN** | 200 | 대기 보드 최대 20 + 메타. 24h 미만·미삭제·비 COMMITTED/DROPPED 사연을 가중 점수로 정렬·seed. 컷라인 N=`remainingPool - softReservedPool`(핀 예약). 영상 밴드=`min(dailyVideoCap - videosToday - pinnedVideos, N)`. `projectedFormat`=`VIDEO\|TEXT\|OUT_OF_CUT`. 동시 새로고침은 서버에서 single-flight(+1020 재시도). 응답: `{items[{postId,status,pinFormat,projectedFormat,…}], meta{remainingPool, cutlineN, dailyTextCap, dailyVideoCap, videosToday, textsToday, weightViews, weightComments, weightVotes}}` |
@@ -375,6 +381,9 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 | DELETE | `/api/admin/marketing/holding/{postId}/pin` | **JWT + ADMIN** | 200 / 400 / 404 | 핀 해제·예약 반환. 새 컷라인 기준 `IN_POOL` 또는 `OUT_OF_CUT` |
 | GET | `/api/admin/marketing/completed` | **JWT + ADMIN** | 200 | COMMITTED·DROPPED 홀딩 + 잡 요약. Query: `status`, `limit`(기본 50). Item: `title`, `committedFormat`(VIDEO\|TEXT), `jobs[].publications[{platform,state,url}]` |
 | POST | `/api/admin/marketing/completed/{postId}/force` | **JWT + ADMIN** | 200 / 400 / 404 | Body: `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}`. 상한 무시 강제 COMMITTED + 잡 생성. COMMITTED 재호출 시 미생성 채널만 추가(전부 있으면 400) |
+| POST | `/api/admin/marketing/stats/collect` | **JWT + ADMIN** | 200 | Phase 2.6: ASM best-effort 수집 → `marketing_publication_stats`(V110). Query: `jobIds?`, `lookbackDays`(기본14), `limit`(기본40). 응답 `{requested,stored,partial,errors}` |
+| GET | `/api/admin/marketing/weekly-report` | **JWT + ADMIN** | 200 | Phase 2.7: 주간 리포트. Query `weeksAgo`(기본0). top/bottom 사연 · byEmotion · byCategory · utmInflow(`visit_events` utm_campaign=`story_%`) |
+| POST | `/api/admin/marketing/score-weights/auto-adjust/run` | **JWT + ADMIN** | 200 | Phase 2.7: 주간 가중치 보정 1회. `auto_adjust=false`면 applied=false(report-only). 델타 캡 ±5%/±0.05. 프롬프트 패치 없음(M4) |
 | GET/POST/… | `/api/admin/marketing/jobs*` · `/credentials*` · `/performance` · `/timeline` | **JWT + ADMIN** | — | 잡·자격증명·통계 (ASM 프록시). 상세: [platforms.md](../marketing/platforms.md) |
 | PUT | `/api/admin/marketing/jobs/{id}/artifacts/{platform}/thumbnail` | **JWT + ADMIN** | 204 / 400 / 404 | 멀티파트 `file`(image/png\|jpeg, ≤2MB). `platform`=`youtube_shorts`\|`instagram_reels`. ASM `PUT /api/v1/jobs/{jobId}/artifacts/{name}` 프록시. 상세: [marketing/api.md §2.4.1](../marketing/api.md) |
 | GET | `/api/admin/secrets` | **JWT + ADMIN** | 200 | `encrypted_secret` vault 키 존재 여부만 반환 (평문 없음) |

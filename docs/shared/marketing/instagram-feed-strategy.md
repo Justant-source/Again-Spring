@@ -56,8 +56,8 @@ X `/capture/x-thread` 산출물 기준 (X의 `ratio` 스크린샷은 **폐기**)
 ### 2.2 훅 카드
 
 - 크기: `1080×1350` (4:5)
-- 내용: **`promo_title` (원제 복제 + 의미단위 `\n`)**. 로고·배지·부가문구 없음. 없으면 `title` 폴백
-- 타이포: 줄 수에 따라 큰 글씨 (`Noto Sans KR`). `white-space: pre-line`
+- 내용: **마스터 훅** (`hook_text` 또는 재정의된 `promo_title`). 광장 `title`과 **완전 분리** — 원제 낭독·복제 금지. 로고·배지·부가문구 없음. 훅 없으면 `title` 폴백(레거시)
+- 타이포: 줄 수에 따라 큰 글씨 (`Noto Sans KR`). `white-space: pre-line`. IG 카드용 줄바꿈 패킹(`hook_packed` 또는 발행 시 패킹)
 - 한 줄 **목표 4~10자**(최대 10). **1음절 단독 줄 금지** — 어절을 모아 의미 구로 패킹
 - 중간 장(사연): 4:5 출력 + 중앙 1:1에 분홍 박스 contain(가로·세로 중 먼저 닿을 때까지). 글자 크롭 금지
 
@@ -77,35 +77,37 @@ X `/capture/x-thread` 산출물 기준 (X의 `ratio` 스크린샷은 **폐기**)
 - 크기: `1080×1350` (4:5)
 - 내용:
   - 상단 라벨: 왼쪽 `작성자` / 오른쪽 `상대방`
-  - 막대 + `A% : B%` 숫자
+  - 막대 + `A% : B%` 숫자 (**실투표 %** — Phase 1에서 50:50 폴백 버그 수정)
   - 하단 가운데: `어느쪽에 더 공감하세요?` (**CTA만 ~1.5배**, 60px)
 - 진영색: 작성자 `#C9785A` / 상대방 `#5F8F76`
-- 판결·승패·처방·로고 금지 (유도 문구는 위 CTA만 허용; 링크 CTA는 캡션 URL)
+- 판결·승패·처방·로고 금지 (유도 문구는 위 CTA만 허용)
+- **링크 CTA는 캡션에 raw URL을 넣지 않음** — 유입은 프로필(±스토리). 사연 단위 UTM은 X/YT 등
 
-### 2.4 캡션 (발행 시 LLM 없음)
+### 2.4 캡션 (발행 시 LLM 없음 · Phase 1 계약)
 
 ```
-{promo_title flattened}
-https://againspring.net/community/{postId}
+{hook flattened}
 
 당신은 어느 쪽에 공감하나요?
 
-#다시봄 #공감비율 #[카테고리한글]
+#다시봄 #againspring #공감비율 #[카테고리한글]
 ```
 
-- 1행 = `promo_title`에서 **개행→공백** 한 줄 (없으면 `title`)
-- 2행 = 사연 URL
-- 3행 공백 후 고정 유도 문구
-- 해시태그 3~5개, `#다시봄` 필수. `platform_specs` hashtag_cap으로 clamp
+- 1행 = 마스터 훅에서 **개행→공백** 한 줄 (없으면 `title` 폴백)
+- **raw URL 금지** — `https://againspring.net/community/{postId}` 를 캡션에 넣지 않음. 링크 = 프로필(±스토리)
+- 공백 후 고정 유도 문구
+- 해시태그: 브랜드 2(`#다시봄` `#againspring`) + `#공감비율` + `#[카테고리]` 등 **≤5**. `platform_specs` hashtag_cap으로 clamp
 
-### 2.5 `promoTitle` (AS SSOT)
+### 2.5 마스터 훅 (`promoTitle` / `hook*` · AS SSOT)
 
-- 컬럼: `posts.promo_title` `VARCHAR(500)` nullable (**V96**, 개행 허용)
-- **모든 사연** 생성 시 1회: AI PLAN `promo_title` 전달 또는 `PromoTitleService` LLM. 발행 파이프 추가 LLM 없음
-- 규칙: **원제 글자 복제** + 의미 구 `\n`. 각 줄 목표 4~10자(최대 10). 1음절 단독 줄 금지. 재작성·생략 금지
-- 폴백: 어절 패킹 휴리스틱(고아 1자 줄 병합)
+- 컬럼: `posts.promo_title` 또는 `hook_text` (+ `hook_emotion`, optional `hook_packed`). 스키마는 구현 PR에서 Flyway와 맞춤
+- **광장 `title` ≠ SNS 마스터 훅** (완전 분리)
+- **모든 사연** 생성 시 1회: PLAN/LLM이 **자극 훅** 생성. 구 「원제 복제·재작성 금지」 규칙 **폐기**
+- 패킹: 의미 구 `\n`, 각 줄 목표 4~10자(최대 10). 1음절 단독 줄 금지
+- `hook_emotion` enum (Phase 1 필드): `shock` \| `anger` \| `tension` \| `sad` \| `hype` — brief에 전달(영상 TTS 연결은 Phase 2)
+- 폴백: 훅 없을 때만 `title` / 어절 패킹 휴리스틱
 - 기존 글 배치 백필 LLM 없음
-
+- 발행 파이프 추가 LLM 없음
 ---
 
 ## 3. 구현 위치
@@ -113,7 +115,7 @@ https://againspring.net/community/{postId}
 | 계층 | 위치 |
 |---|---|
 | 전략 문서 | 이 파일 |
-| AS 필드·생성 | `Post.promoTitle`, `PromoTitleService`, compose/답변 파이프 |
+| AS 필드·생성 | `Post` 훅 필드(`promoTitle`/`hook*`) · `PromoTitleService` 또는 동등 · compose/PLAN |
 | ASM 빌더 | `app/worker/pipeline.py` → `_run_instagram_feed_pipeline` |
 | 캡처 소스 | ASM `services/social-poster` `POST /capture/x-thread` (X와 공유) |
 | 발행 | ASM social-poster `POST /publish/instagram` (단건 수동) |

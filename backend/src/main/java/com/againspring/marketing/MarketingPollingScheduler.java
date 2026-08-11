@@ -58,7 +58,23 @@ public class MarketingPollingScheduler {
 
         Instant now = Instant.now();
 
-        // Detect and reschedule jobs with expired scheduled publish time
+        // Evening-slot auto-publish: READY + autoPublish + scheduledPublishAt <= now
+        List<MarketingJob> duePublish = marketingJobRepository.findDueAutoPublishJobs(now);
+        if (!duePublish.isEmpty()) {
+            log.info("Found {} marketing jobs due for evening-slot publish", duePublish.size());
+            for (MarketingJob due : duePublish) {
+                try {
+                    marketingJobService.triggerPublish(due.getId());
+                    log.info("Triggered scheduled publish for marketing job {} (slot={})",
+                        due.getId(), due.getScheduledPublishAt());
+                } catch (Exception e) {
+                    log.warn("Failed to trigger scheduled publish for job {}: {}",
+                        due.getId(), e.getMessage());
+                }
+            }
+        }
+
+        // Detect and reschedule jobs that missed the slot while still generating (not READY)
         List<MarketingJob> expiredJobs = marketingJobRepository.findExpiredScheduledJobs();
         if (!expiredJobs.isEmpty()) {
             log.info("Found {} expired scheduled jobs, rescheduling...", expiredJobs.size());

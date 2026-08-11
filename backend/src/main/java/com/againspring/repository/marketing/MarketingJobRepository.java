@@ -263,18 +263,35 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * Find jobs with expired scheduled publish time.
      * Used for reschedule detection in polling scheduler.
      *
+     * <p>READY is excluded: auto-publish jobs due at {@code scheduled_publish_at} are
+     * triggered by {@link com.againspring.marketing.MarketingPollingScheduler}, not carried over.
+     * QUEUED/RUNNING/STALE past the grace window are carried to the next-day slot
+     * (content was not ready in time).
+     *
      * Conditions:
      * - scheduled_publish_at is not null
      * - scheduled_publish_at < now - 5 minutes (tolerance)
-     * - status is one of: QUEUED, RUNNING, READY, STALE (not yet terminal)
+     * - status is one of: QUEUED, RUNNING, STALE (not yet READY/terminal)
      */
     @Query(nativeQuery = true, value = """
         SELECT * FROM marketing_job
         WHERE scheduled_publish_at IS NOT NULL
         AND scheduled_publish_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
-        AND status IN ('QUEUED', 'RUNNING', 'READY', 'STALE')
+        AND status IN ('QUEUED', 'RUNNING', 'STALE')
         """)
     List<MarketingJob> findExpiredScheduledJobs();
+
+    /**
+     * READY auto-publish jobs whose evening slot has arrived (scheduled_publish_at &lt;= now).
+     */
+    @Query("""
+        SELECT mj FROM MarketingJob mj
+        WHERE mj.status = 'READY'
+        AND mj.autoPublish = true
+        AND mj.scheduledPublishAt IS NOT NULL
+        AND mj.scheduledPublishAt <= :now
+        """)
+    List<MarketingJob> findDueAutoPublishJobs(@Param("now") Instant now);
 
     /**
      * Find jobs with scheduled times in the given range (±5 minutes around target time).

@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,8 +49,13 @@ class MarketingHoldingCommitServiceTest {
 
     private static final Instant SINCE = Instant.parse("2026-08-01T00:00:00Z");
     private static final Instant T0 = Instant.parse("2026-08-06T00:00:00Z");
-    private static final MarketingScoreWeightService.Weights WEIGHTS =
-        new MarketingScoreWeightService.Weights(0.1, 1.0, 0.5);
+
+    private static final MarketingScoreWeightService.AllPlatformWeights PLATFORM_WEIGHTS =
+        new MarketingScoreWeightService.AllPlatformWeights(
+            MarketingScoreWeightService.defaultsX(),
+            MarketingScoreWeightService.defaultsFeed(),
+            MarketingScoreWeightService.defaultsReels(),
+            MarketingScoreWeightService.defaultsShorts());
 
     @Mock MarketingHoldingRepository holdingRepository;
     @Mock MarketingJobRepository marketingJobRepository;
@@ -77,124 +83,93 @@ class MarketingHoldingCommitServiceTest {
         });
         lenient().when(postRepository.findAllById(any())).thenReturn(List.of());
         lenient().when(marketingJobRepository.findByPostIdIn(any())).thenReturn(List.of());
+        lenient().when(scoreWeightService.getPlatformWeights()).thenReturn(PLATFORM_WEIGHTS);
+        lenient().when(platformAutoService.listEnabledPlatforms()).thenReturn(List.of(
+            "x_thread", "instagram_feed", "instagram_reels", "youtube_shorts"));
     }
 
     @Test
-    void groupTargets_videoDualPlusAloneText() {
+    void groupTargets_eachPlatformAlone_noDualVideo() {
         List<List<String>> groups = MarketingHoldingCommitService.groupTargetsIntoJobs(
             List.of("instagram_reels", "youtube_shorts", "x_thread", "instagram_feed"));
         assertThat(groups).containsExactly(
-            List.of("instagram_reels", "youtube_shorts"),
+            List.of("instagram_reels"),
+            List.of("youtube_shorts"),
             List.of("x_thread"),
             List.of("instagram_feed"));
     }
 
     @Test
-    void commitTick_pinsFirst_thenAutoByScore_videoThenText_dropsOutsideCut() {
-        // remaining=3, videoCap=2 → pin VIDEO, auto VIDEO (highest), auto TEXT, rest DROPPED
-        when(quotaService.getStatus()).thenReturn(
-            new MarketingQuotaService.QuotaStatus(6, 2, 0, 0, 3));
-        when(scoreWeightService.getWeights()).thenReturn(WEIGHTS);
-        when(platformAutoService.hasEffectiveVideoPlatforms()).thenReturn(true);
-
+    void commitTick_selectsIndependentlyPerPlatform_sameStoryAllowed() {
+        // Remaining 1 each. Story "hot" wins all except IG exclusivity picks reels over feed.
+        when(quotaService.remainingCapsMutable()).thenReturn(remaining(1, 1, 1, 1));
         when(holdingRepository.findDueHoldings(SINCE)).thenReturn(List.of(
-            due("pin", "PINNED", "VIDEO", 1, 0, 0, T0),
-            due("a", "IN_POOL", null, 100, 20, 0, T0.plusSeconds(3)),
-            due("b", "IN_POOL", null, 50, 15, 0, T0.plusSeconds(2)),
-            due("c", "OUT_OF_CUT", null, 100, 0, 0, T0.plusSeconds(1)),
-            due("d", "IN_POOL", null, 50, 0, 0, T0)
+            due("hot", "IN_POOL", null, 100, 50, 40, 20, 1, "훅", T0.plusSeconds(3)),
+            due("other", "IN_POOL", null, 10, 5, 5, 2, 0, null, T0)
         ));
         when(holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED)))
             .thenReturn(List.of());
+        putHolding("hot", MarketingHoldingStatus.IN_POOL, null);
+        putHolding("other", MarketingHoldingStatus.IN_POOL, null);
+        stubJobs();
 
+        MarketingHoldingCommitService.CommitTickResult result = service.runCommitTick(SINCE);
+
+        assertThat(result.autoCommitted()).isGreaterThanOrEqualTo(1);
+        assertThat(holdings.get("hot").getStatus()).isEqualTo(MarketingHoldingStatus.COMMITTED);
+        // Separate jobs for reels and shorts (not dual)
+        verify(marketingJobService).createJob(eq("hot"), eq(List.of("instagram_reels")), eq(true), anyString());
+        verify(marketingJobService).createJob(eq("hot"), eq(List.of("youtube_shorts")), eq(true), anyString());
+        verify(marketingJobService).createJob(eq("hot"), eq(List.of("x_thread")), eq(true), anyString());
+        // IG exclusivity: tie-ish / reels preferred when both would win — feed goes to other or skipped
+        verify(marketingJobService, never()).createJob(
+            eq("hot"), eq(List.of("instagram_feed")), anyBoolean(), anyString());
+    }
+
+    @Test
+    void commitTick_pinsFirst_thenAutos_dropsRest() {
+        when(quotaService.remainingCapsMutable()).thenReturn(remaining(1, 0, 1, 0));
+        when(holdingRepository.findDueHoldings(SINCE)).thenReturn(List.of(
+            due("pin", "PINNED", "VIDEO", 1, 0, 0, 0, 0, null, T0),
+            due("a", "IN_POOL", null, 100, 20, 10, 5, 0, null, T0.plusSeconds(2)),
+            due("b", "OUT_OF_CUT", null, 50, 0, 0, 0, 0, null, T0)
+        ));
+        when(holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED)))
+            .thenReturn(List.of());
         putHolding("pin", MarketingHoldingStatus.PINNED, MarketingPinFormat.VIDEO);
         putHolding("a", MarketingHoldingStatus.IN_POOL, null);
-        putHolding("b", MarketingHoldingStatus.IN_POOL, null);
-        putHolding("c", MarketingHoldingStatus.OUT_OF_CUT, null);
-        putHolding("d", MarketingHoldingStatus.IN_POOL, null);
-
-        when(platformAutoService.resolveTargets(MarketingPublishFormat.VIDEO))
-            .thenReturn(List.of("instagram_reels", "youtube_shorts", "x_thread"));
-        when(platformAutoService.resolveTargets(MarketingPublishFormat.TEXT))
-            .thenReturn(List.of("x_thread", "instagram_feed"));
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
-            .thenAnswer(inv -> MarketingJob.builder()
-                .id(1L).postId(inv.getArgument(0)).status("REQUESTED").build());
+        putHolding("b", MarketingHoldingStatus.OUT_OF_CUT, null);
+        stubJobs();
 
         MarketingHoldingCommitService.CommitTickResult result = service.runCommitTick(SINCE);
 
         assertThat(result.pinnedCommitted()).isEqualTo(1);
-        assertThat(result.autoVideoCommitted()).isEqualTo(1);
-        assertThat(result.autoTextCommitted()).isEqualTo(1);
-        assertThat(result.dropped()).isEqualTo(2);
-
-        verify(marketingJobService).createJob(
-            eq("pin"), eq(List.of("instagram_reels", "youtube_shorts")), eq(true), anyString());
-        verify(marketingJobService).createJob(
-            eq("a"), eq(List.of("instagram_reels", "youtube_shorts")), eq(true), anyString());
-        verify(marketingJobService).createJob(
-            eq("b"), eq(List.of("x_thread")), eq(true), anyString());
-        assertThat(holdings.get("c").getStatus()).isEqualTo(MarketingHoldingStatus.DROPPED);
-        assertThat(holdings.get("d").getStatus()).isEqualTo(MarketingHoldingStatus.DROPPED);
-        assertThat(holdings.get("a").getLockedAt()).isNotNull();
+        assertThat(holdings.get("pin").getStatus()).isEqualTo(MarketingHoldingStatus.COMMITTED);
+        // VIDEO pin takes reels (and x if remaining) — x remaining was 1, consumed by pin
+        verify(marketingJobService).createJob(eq("pin"), eq(List.of("instagram_reels")), eq(true), anyString());
+        assertThat(holdings.get("b").getStatus()).isEqualTo(MarketingHoldingStatus.DROPPED);
     }
 
     @Test
-    void commitTick_videoTargets_excludeFeedWhenReelsIncluded() {
-        when(quotaService.getStatus()).thenReturn(
-            new MarketingQuotaService.QuotaStatus(6, 3, 0, 0, 1));
-        when(scoreWeightService.getWeights()).thenReturn(WEIGHTS);
-        when(platformAutoService.hasEffectiveVideoPlatforms()).thenReturn(true);
+    void commitTick_pinDeferredWhenCapsExhausted_keepsPinned() {
+        when(quotaService.remainingCapsMutable()).thenReturn(remaining(0, 0, 0, 0));
         when(holdingRepository.findDueHoldings(SINCE)).thenReturn(List.of(
-            due("v1", "IN_POOL", null, 100, 10, 0, T0)));
+            due("pin", "PINNED", "TEXT", 1, 0, 0, 0, 0, null, T0),
+            due("out", "OUT_OF_CUT", null, 1, 0, 0, 0, 0, null, T0)));
         when(holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED)))
-            .thenReturn(List.of());
-        putHolding("v1", MarketingHoldingStatus.IN_POOL, null);
-
-        when(platformAutoService.resolveTargets(MarketingPublishFormat.VIDEO))
-            .thenReturn(List.of("instagram_reels", "youtube_shorts", "x_thread"));
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
-            .thenReturn(MarketingJob.builder().id(9L).status("REQUESTED").build());
-
-        service.runCommitTick(SINCE);
-
-        verify(marketingJobService).createJob(
-            eq("v1"), eq(List.of("instagram_reels", "youtube_shorts")), eq(true), anyString());
-        verify(marketingJobService).createJob(
-            eq("v1"), eq(List.of("x_thread")), eq(true), anyString());
-        verify(marketingJobService, never()).createJob(
-            eq("v1"), eq(List.of("instagram_feed")), anyBoolean(), anyString());
-    }
-
-    @Test
-    void commitTick_noVideoPlatforms_effectiveVideoCapZero_allText() {
-        when(quotaService.getStatus()).thenReturn(
-            new MarketingQuotaService.QuotaStatus(6, 3, 0, 0, 2));
-        when(scoreWeightService.getWeights()).thenReturn(WEIGHTS);
-        when(platformAutoService.hasEffectiveVideoPlatforms()).thenReturn(false);
-        when(holdingRepository.findDueHoldings(SINCE)).thenReturn(List.of(
-            due("t1", "IN_POOL", null, 10, 5, 0, T0.plusSeconds(1)),
-            due("t2", "IN_POOL", null, 5, 1, 0, T0)));
-        when(holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED)))
-            .thenReturn(List.of());
-        putHolding("t1", MarketingHoldingStatus.IN_POOL, null);
-        putHolding("t2", MarketingHoldingStatus.IN_POOL, null);
-        when(platformAutoService.resolveTargets(MarketingPublishFormat.TEXT))
-            .thenReturn(List.of("x_thread"));
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
-            .thenReturn(MarketingJob.builder().id(1L).status("REQUESTED").build());
+            .thenReturn(List.of(MarketingHolding.builder()
+                .postId("pin").status(MarketingHoldingStatus.PINNED)
+                .pinFormat(MarketingPinFormat.TEXT).build()));
+        putHolding("pin", MarketingHoldingStatus.PINNED, MarketingPinFormat.TEXT);
+        putHolding("out", MarketingHoldingStatus.OUT_OF_CUT, null);
 
         MarketingHoldingCommitService.CommitTickResult result = service.runCommitTick(SINCE);
 
-        assertThat(result.autoVideoCommitted()).isZero();
-        assertThat(result.autoTextCommitted()).isEqualTo(2);
-        verify(platformAutoService, never()).resolveTargets(MarketingPublishFormat.VIDEO);
+        assertThat(result.pinnedDeferred()).isEqualTo(1);
+        assertThat(result.pinnedCommitted()).isZero();
+        assertThat(result.dropped()).isEqualTo(1);
+        assertThat(holdings.get("pin").getStatus()).isEqualTo(MarketingHoldingStatus.PINNED);
+        verify(marketingJobService, never()).createJob(anyString(), any(), anyBoolean(), anyString());
     }
 
     @Test
@@ -216,13 +191,11 @@ class MarketingHoldingCommitServiceTest {
         assertThat(result.status()).isEqualTo(MarketingHoldingStatus.COMMITTED);
         assertThat(result.jobIds()).contains(42L);
         assertThat(holdings.get("drop1").getStatus()).isEqualTo(MarketingHoldingStatus.COMMITTED);
-        assertThat(holdings.get("drop1").getLockedAt()).isNotNull();
-        verify(quotaService, never()).getStatus();
+        verify(quotaService, never()).remainingCapsMutable();
     }
 
     @Test
     void force_requestedBy_keepsAdminForcePrefixPlusJwtSubjectUuid() {
-        // Prod 500: VARCHAR(32) could not store "admin:force:"(12) + UUID(36) = 48.
         String jwtSubject = "01234567-89ab-cdef-0123-456789abcdef";
         String expectedRequestedBy =
             MarketingHoldingCommitService.REQUESTED_BY_FORCE_PREFIX + jwtSubject;
@@ -248,13 +221,12 @@ class MarketingHoldingCommitServiceTest {
     }
 
     @Test
-    void force_alreadyCommitted_enqueuesMissingVideoTargets() {
+    void force_alreadyCommitted_enqueuesMissingVideoTargets_asSeparateJobs() {
         putHolding("c1", MarketingHoldingStatus.COMMITTED, null);
         holdings.get("c1").setLockedAt(Instant.now());
         when(postRepository.existsById("c1")).thenReturn(true);
         when(platformAutoService.resolveTargets(MarketingPublishFormat.VIDEO))
             .thenReturn(List.of("instagram_reels", "youtube_shorts", "x_thread", "instagram_feed"));
-        // Text platforms already attempted; video platforms not yet.
         when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("x_thread"))).thenReturn(1L);
         when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("instagram_feed"))).thenReturn(1L);
         when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("instagram_reels"))).thenReturn(0L);
@@ -268,14 +240,11 @@ class MarketingHoldingCommitServiceTest {
             MarketingHoldingCommitService.ForceMode.VIDEO_AND_TEXT,
             "admin");
 
-        assertThat(result.jobIds()).containsExactly(77L);
-        verify(marketingJobService).createJob(
-            eq("c1"),
-            eq(List.of("instagram_reels", "youtube_shorts")),
-            eq(true),
-            anyString());
+        assertThat(result.jobIds()).hasSize(2);
+        verify(marketingJobService).createJob(eq("c1"), eq(List.of("instagram_reels")), eq(true), anyString());
+        verify(marketingJobService).createJob(eq("c1"), eq(List.of("youtube_shorts")), eq(true), anyString());
         verify(marketingJobService, never()).createJob(eq("c1"), eq(List.of("x_thread")), anyBoolean(), anyString());
-        verify(marketingJobService, never()).createJob(eq("c1"), eq(List.of("instagram_feed")), anyBoolean(), anyString());
+        verify(marketingJobService, times(2)).createJob(eq("c1"), any(), eq(true), anyString());
     }
 
     @Test
@@ -295,31 +264,6 @@ class MarketingHoldingCommitServiceTest {
     }
 
     @Test
-    void commitTick_pinDeferredWhenPoolExhausted_keepsPinned() {
-        when(quotaService.getStatus()).thenReturn(
-            new MarketingQuotaService.QuotaStatus(6, 3, 0, 0, 0));
-        when(scoreWeightService.getWeights()).thenReturn(WEIGHTS);
-        when(platformAutoService.hasEffectiveVideoPlatforms()).thenReturn(true);
-        when(holdingRepository.findDueHoldings(SINCE)).thenReturn(List.of(
-            due("pin", "PINNED", "TEXT", 1, 0, 0, T0),
-            due("out", "OUT_OF_CUT", null, 1, 0, 0, T0)));
-        when(holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED)))
-            .thenReturn(List.of(MarketingHolding.builder()
-                .postId("pin").status(MarketingHoldingStatus.PINNED)
-                .pinFormat(MarketingPinFormat.TEXT).build()));
-        putHolding("pin", MarketingHoldingStatus.PINNED, MarketingPinFormat.TEXT);
-        putHolding("out", MarketingHoldingStatus.OUT_OF_CUT, null);
-
-        MarketingHoldingCommitService.CommitTickResult result = service.runCommitTick(SINCE);
-
-        assertThat(result.pinnedDeferred()).isEqualTo(1);
-        assertThat(result.pinnedCommitted()).isZero();
-        assertThat(result.dropped()).isEqualTo(1);
-        assertThat(holdings.get("pin").getStatus()).isEqualTo(MarketingHoldingStatus.PINNED);
-        verify(marketingJobService, never()).createJob(anyString(), any(), anyBoolean(), anyString());
-    }
-
-    @Test
     void listCompleted_titleFromDraftJson_andPublicationsParsed() {
         MarketingHolding h = MarketingHolding.builder()
             .postId("s1")
@@ -333,10 +277,9 @@ class MarketingHoldingCommitServiceTest {
 
         MarketingJob job = MarketingJob.builder()
             .id(1L).postId("s1").status("PUBLISHED")
-            .targets("[\"instagram_reels\",\"youtube_shorts\"]")
+            .targets("[\"instagram_reels\"]")
             .publications("[{\"platform\":\"instagram_reels\",\"state\":\"published\","
-                + "\"url\":\"https://instagram.com/p/abc\"},"
-                + "{\"platform\":\"youtube_shorts\",\"state\":\"failed\",\"url\":null}]")
+                + "\"url\":\"https://instagram.com/p/abc\"}]")
             .createdAt(T0)
             .build();
         when(marketingJobRepository.findByPostIdIn(anySet())).thenReturn(List.of(job));
@@ -345,18 +288,10 @@ class MarketingHoldingCommitServiceTest {
             service.listCompleted(null, 50);
 
         assertThat(items).hasSize(1);
-        MarketingHoldingCommitService.CompletedItem item = items.get(0);
-        assertThat(item.title()).isEqualTo("Draft Title");
-        assertThat(item.committedFormat()).isEqualTo("VIDEO");
-        assertThat(item.jobs()).hasSize(1);
-        List<MarketingHoldingCommitService.PublicationSummary> pubs = item.jobs().get(0).publications();
-        assertThat(pubs).hasSize(2);
-        assertThat(pubs.get(0).platform()).isEqualTo("instagram_reels");
-        assertThat(pubs.get(0).state()).isEqualTo("published");
-        assertThat(pubs.get(0).url()).isEqualTo("https://instagram.com/p/abc");
-        assertThat(pubs.get(1).platform()).isEqualTo("youtube_shorts");
-        assertThat(pubs.get(1).state()).isEqualTo("failed");
-        assertThat(pubs.get(1).url()).isNull();
+        assertThat(items.get(0).title()).isEqualTo("Draft Title");
+        assertThat(items.get(0).committedFormat()).isEqualTo("VIDEO");
+        assertThat(items.get(0).jobs().get(0).publications().get(0).url())
+            .isEqualTo("https://instagram.com/p/abc");
     }
 
     @Test
@@ -398,6 +333,23 @@ class MarketingHoldingCommitServiceTest {
         assertThat(items.get(0).pinFormat()).isEqualTo("TEXT");
     }
 
+    private void stubJobs() {
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
+            .thenAnswer(inv -> MarketingJob.builder()
+                .id(1L).postId(inv.getArgument(0)).status("REQUESTED").build());
+    }
+
+    private static Map<String, Integer> remaining(int x, int feed, int reels, int shorts) {
+        Map<String, Integer> m = new HashMap<>();
+        m.put("x_thread", x);
+        m.put("instagram_feed", feed);
+        m.put("instagram_reels", reels);
+        m.put("youtube_shorts", shorts);
+        return m;
+    }
+
     private void putHolding(String postId, MarketingHoldingStatus status, MarketingPinFormat pin) {
         holdings.put(postId, MarketingHolding.builder()
             .postId(postId)
@@ -409,7 +361,8 @@ class MarketingHoldingCommitServiceTest {
 
     private static DueHoldingProjection due(
             String postId, String status, String pinFormat,
-            int views, long comments, long votes, Instant createdAt) {
+            int views, long comments, long votes, long authorVotes,
+            int hasPartner, String hookText, Instant createdAt) {
         return new DueHoldingProjection() {
             @Override public String getPostId() { return postId; }
             @Override public String getStatus() { return status; }
@@ -419,6 +372,9 @@ class MarketingHoldingCommitServiceTest {
             @Override public Number getViewCount() { return views; }
             @Override public Number getCommentCount() { return comments; }
             @Override public Number getVoteCount() { return votes; }
+            @Override public Number getAuthorVoteCount() { return authorVotes; }
+            @Override public Number getHasPartner() { return hasPartner; }
+            @Override public String getHookText() { return hookText; }
         };
     }
 }

@@ -1,8 +1,8 @@
 # YouTube Shorts 전략 — Again Spring × WaggleBot
 
-> **권위본**: 이 문서. `youtube_shorts` 채널의 생성·검수·게시 계약을 담는다.
-> 플랫폼 표는 [`platforms.md`](platforms.md), 캡처/피드는 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) · [`x-thread-strategy.md`](x-thread-strategy.md).
-> **작성**: 2026-08-04 · 그릴링 확정
+> **권위본**: 이 문서. `youtube_shorts` / `instagram_reels` 영상 채널의 생성·검수·게시 계약.
+> 플랫폼 표·분배는 [`platforms.md`](platforms.md), 캡처/피드는 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) · [`x-thread-strategy.md`](x-thread-strategy.md).
+> **작성**: 2026-08-04 · **Phase 2 타깃 SSOT**: 2026-08-11
 
 ---
 
@@ -10,41 +10,48 @@
 
 | 항목 | 값 |
 |---|---|
-| 자동 생성 | **활성** — 사연 `+24h` 후 공유 풀·영상 상한 안에서 인기 순 선정 시 `instagram_reels`+`youtube_shorts` **듀얼 잡** 1회 (`XThreadPublishTriggerScheduler`) |
-| 자동 게시 | **활성** — 듀얼 잡 `autoPublish=true` → READY 후 YT API + Reels Graph/세션 모두 게시 |
-| 렌더 | WaggleBot 블랙박스 (`POST /api/external/jobs`) — LLM은 **Claude CLI 브릿지** (`llm_backend=cli`, 호스트 `~/.claude` = Again Spring과 동일 세션). Anthropic API 직접 호출 금지. **듀얼 타겟은 1회 렌더** |
-| 게시 계정 | 다시봄 전용 YouTube (ASM `youtube_shorts` OAuth) |
+| 자동 생성 | **활성** — 사연 `+24h` 후 **채널별 popularity·cap**으로 독립 선정 (`MarketingHoldingCommitService`) |
+| 자동 게시 | **활성** — READY 후 저녁 슬롯에 YT API / Reels Graph·세션 게시 |
+| 렌더 | WaggleBot (`POST /api/external/jobs`) — LLM은 **Claude CLI 브릿지** (`llm_backend=cli`). **채널별 유니크 렌더** (동일 mp4 공유 금지) |
+| 게시 계정 | 다시봄 전용 YouTube (ASM `youtube_shorts` OAuth) · IG Reels 세션/Graph |
 
-`instagram_reels`는 동일 9:16·**같은 mp4**. 피드(`instagram_feed`)와 상호배타.  
-구(舊) “X/피드 PUBLISHED 후 Shorts만 렌더·수동 승인” 트리거(`maybeTriggerYoutubeShorts`)는 **제거**됨.
+`instagram_reels`와 `youtube_shorts`는 **독립 선정**. 같은 사연이 양쪽에 가도 **레이아웃·대사·mp4가 다름**.  
+피드(`instagram_feed`)와 Reels는 **상호배타** (`score_feed` vs `score_reels`, 동점→Reels) — [`platforms.md`](platforms.md).  
+구(舊) “X/피드 PUBLISHED 후 Shorts만 렌더” 트리거·**1회 렌더 공유 듀얼**은 Phase 2에서 **폐기**.
+
+> 런타임 전환 중일 수 있음. **문서·신규 코드는 본 Phase 2 계약이 SSOT**.
 
 ---
 
 ## 2. 경계
 
 ```
-AS 24h 분배 → ASM 잡(targets=[instagram_reels, youtube_shorts], auto_publish)
-  → WaggleBot ingest+render (1회)
-  → 아티팩트: 플랫폼별 upload.json + 동일 video/thumbnail 복제 → READY
-  → auto_publish: YouTube API + Instagram Reels 게시
+AS 24h 분배 (채널별 score·cap)
+  → Reels 확정 시: 변형 훅·스크립트 → ASM 잡(targets=[instagram_reels]) → WaggleBot 유니크 렌더 ≤30s
+  → Shorts 확정 시: 변형 훅·스크립트 → ASM 잡(targets=[youtube_shorts]) → WaggleBot 유니크 렌더 ≤45s
+  → 아티팩트: 플랫폼별 upload.json + **각자** video/thumbnail → READY
+  → 저녁 슬롯 publish: YouTube API / Instagram Reels
 ```
 
 - ASM `app/media` 로컬 GPU 파이프는 Shorts에 사용하지 않는다.
 - WaggleBot 크롤 채널·자체 YT 업로드는 사용하지 않는다.
-- alone `youtube_shorts` / alone `instagram_reels` 관리자 단건도 동일 파이프 유지.
+- alone / 양 채널 동시 선정 모두 **렌더는 분리**.
 
 ---
 
-## 3. 콘텐츠 스펙
+## 3. 콘텐츠 스펙 — Phase 2 SSOT
 
 | 항목 | 값 |
 |---|---|
 | 해상도 | **1080×1920 (9:16)** |
+| 길이 | **Reels ≤30s** · **Shorts ≤45s** |
 | LTX / ComfyUI | **off** (`videoGen: false`) |
-| 프레임 | Waggle 기존 `text_only` / `comments` / `outro` 재활용 |
-| 본문 | 작성자 사연 **거의 전문** 낭독 (원문 유지 + 청킹·금지어만) |
-| 댓글 | 광장 **좋아요 순 상위 3**(§4.3/§4.5) — 화자별 TTS. (24h 영상 선정은 조회수 인기·공유 풀 영상 상한 — 댓글 수 게이트 없음) |
-| 양면(paired) | 영상에는 작성자만. 클로징·첫 댓글만 상대 처리 |
+| 프레임 | Waggle `text_only` / `comments` / `outro` 재활용 |
+| 본문 비트 | **자극 훅 → 요약 → 비율/클리프행어**. **전문 낭독 금지** |
+| 훅 | 사연 생성 = 마스터 훅+`hook_emotion` / **영상 슬롯 확정 시** = `hook_reels` 또는 `hook_shorts` + `script_*` |
+| 감정 → TTS | `hook_emotion` → ASM→WaggleBot `options.mood`/`ttsEmotion` (Fish Speech markers; plan S2 Pro path) |
+| 댓글 | 광장 **좋아요 순 상위 3**(§4.3/§4.5) — 화자별 TTS |
+| 양면(paired) | 영상에는 작성자 중심. 클로징·첫 댓글만 상대 처리 |
 | 클로징 TTS | 솔로: `여러분의 의견을 댓글로 남겨주세요` / paired: `상대방의 사연이 궁금하면 댓글을 확인해주세요` |
 | 썸네일 | Waggle 산출 + YT 권장 16:9 커버는 후속 가능 |
 
@@ -110,28 +117,34 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 
 ---
 
-## 5. AS brief 필드 (Shorts)
+## 5. AS brief 필드 (Shorts / Reels)
 
 | 필드 | 설명 |
 |---|---|
-| `title` / `promo_title` | 훅·제목 |
-| `metaphor_id` | 사연 생성 시 매칭된 메타포 일러스트 ID (60종). Shorts intro에 사용. 없으면 크림 빈화면 |
-| `side_a` 또는 `author_body` | 작성자 본문 **전문** |
-| `partner_body` | paired일 때만 상대 본문 **전문** |
-| `top_comments` | `{ author, author_id?, body, like_count, created_at, side }[]` 최대 3, body 전문. `author`=닉네임(익명 fallback), `side`=`author`/`partner`/`neutral` (§4.5) |
+| `title` | 광장 제목 (훅과 불일치 허용) |
+| `promo_title` / `hook_text` | **마스터 훅** (사연 생성 시) |
+| `hook_emotion` | `shock`\|`anger`\|`tension`\|`sad`\|`hype` → **TTS S2 Pro** |
+| `hook_reels` / `hook_shorts` | **영상 슬롯 확정 시** 변형 훅 (`VideoVariantService`) |
+| `script_reels` / `script_shorts` | 요약 낭독 대본 + CTA (전문 아님) |
+| `max_duration_reels_sec` / `max_duration_shorts_sec` | 30 / 45 (듀얼·분리 잡) |
+| `max_duration_sec` | alone 잡의 활성 캡 (30 또는 45) |
+| `metaphor_id` | 사연 생성 시 매칭된 메타포 일러스트 ID (60종). intro에 사용. 없으면 크림 빈화면 |
+| `side_a` / `author_body` | 폴백 본문. 렌더 body는 `script_*` 우선 |
+| `partner_body` | paired일 때 상대 — 클로징/첫 댓글용 |
+| `top_comments` | `{ author, author_id?, body, like_count, created_at, side }[]` 최대 3 (§4.5) |
 | `paired` | boolean |
-| `post_url` | 광장 URL |
+| `post_url` | 광장 URL + UTM (`utm_source=youtube`\|`instagram` 등) — Phase 1 유지 |
 
-### 5.1 게시 카피 (Reels / Shorts 공통)
+### 5.1 게시 카피
 
 `upload.json` + 게시 본문 계약 (`ASM app/publishers/video_copy.py`):
 
 | 항목 | 규칙 |
 |---|---|
-| 제목 | `promo_title` → `title` (YT `snippet.title` / 캡션 첫 줄) |
-| 링크 | 실제 광장 URL `https://againspring.net/community/{postId}` — 본문에 필수 |
+| 제목 | 변형 훅(`hook_reels`/`hook_shorts`) → 마스터 훅 → `title` 폴백 |
+| 링크 | 광장 URL + **UTM** — 랜딩 = 사연 상세. IG Reels 캡션 URL 정책은 피드와 동일 계열(프로필 중심) 가능 |
 | CTA | `당신은 어느 쪽에 공감하나요?` |
-| 해시태그 | 카테고리별 실검색 태그 (`#다시봄` 필수 + `#가족`/`#직장`/`#연애` + `#빡침` 등). IG ≤5, YT ≤15. **본문 텍스트에도 포함** (YT는 `snippet.tags`에도 중복) |
+| 해시태그 | `#Shorts`(YT) + 브랜드 2(`#다시봄` `#againspring`) + 니치. IG ≤5, YT ≤15 |
 | YT description | 위 블록 + `#Shorts` |
 
 ---
@@ -139,22 +152,25 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 ## 6. 어드민 UX
 
 - 잡 상세: **인라인 mp4 재생** + 썸네일 + 사용 댓글 최대 3(§4.5) + (paired) 예정 첫 댓글
-- `READY && !autoPublish` → **게시 승인** 시에만 업로드
-- **설정 탭 → 숏폼영상**(공용, 2026-08-10~): 본문 `tts_voice` + 댓글 풀 `comment_tts_voices`(최대 5, 콤마구분)를 미리듣고 저장. Instagram 릴스와 설정을 공유(같은 영상을 한 번만 렌더링). Shorts 렌더 시 `options.ttsVoice` / `options.commentVoices` → `variant_config`.
-- **보이스 계약**: 본문·intro·클로징 = `tts_voice`. 댓글 = `comment_tts_voices` 풀에서 작성자별 랜덤(본문 보이스 제외 우선). 풀이 비면 pipeline `comment_voices` 또는 본문 보이스 폴백. 참조 샘플 없는 키는 쓰지 말 것.
-- **클로징**: again_spring 고정 문구는 voice+text 키로 디스크 캐시·loudnorm 후 재사용 (전역 loudnorm이 끝을 눌러 작아지지 않게, 통합 낭독 경로에서는 전역 loudnorm 생략).
-- **AV 동기**: 오디오 타임라인 고정. 화면만 `TTS_TEXT_LEAD_SEC=0.10`(100ms) 앞서 전환 — 텍스트가 아주 조금 먼저 보이고 바로 TTS.
-- **Intro**: again_spring은 mood 스톡/회색 플레이스홀더를 쓰지 않는다. `metaphor_id` PNG가 있으면 표지로, 없으면 크림 빈화면+제목만.
-- **TTS 음량**: 통합 낭독 wav를 장면 분할해 재사용. 댓글/클로징은 개별 loudnorm(`I=-16`) 후 concat.
+- `READY && !autoPublish` → **게시 승인** 또는 저녁 슬롯 자동
+- **설정 탭 → 숏폼영상**: 본문 `tts_voice` + 댓글 풀 `comment_tts_voices`(최대 5). Reels/Shorts가 **파일은 분리**해도 보이스 풀은 공유 가능
+- **보이스 계약**: 본문·intro·클로징 = `tts_voice`. 댓글 = `comment_tts_voices` 풀에서 작성자별 랜덤. **감정** = `hook_emotion` → S2 Pro
+- **클로징**: again_spring 고정 문구는 voice+text 키로 디스크 캐시·loudnorm 후 재사용
+- **AV 동기**: 오디오 타임라인 고정. 화면만 `TTS_TEXT_LEAD_SEC=0.10`(100ms) 앞서 전환
+- **Intro**: `metaphor_id` PNG가 있으면 표지로, 없으면 크림 빈화면+**훅**만 (원제 낭독 intro 폐기)
+- **TTS 음량**: 통합 낭독 wav를 장면 분할해 재사용. 댓글/클로징은 개별 loudnorm(`I=-16`) 후 concat
 
 ---
 
 ## 7. 구현 순서
 
-1. WaggleBot `POST/GET /api/external/jobs` (ingest→APPROVED, outro/videoGen per-job) — **완료**
-2. ASM Waggle 파이프 (alone + **Reels+Shorts 듀얼·1회 렌더**) — **완료**
-3. AS brief 보강 + **24h 공유 풀·영상 상한** 스케줄러 + 어드민 미리보기 — **완료**
-4. `auto_publish` → YouTube 업로드(+ paired 첫 댓글) + Reels 게시 — **활성**
+1. WaggleBot `POST/GET /api/external/jobs` — **완료**
+2. ASM Waggle 파이프 — **유니크 듀얼 렌더**(플랫폼별 Waggle 호출) — **완료** (2.4)
+3. AS brief + 24h 스케줄러 + 어드민 미리보기 — **완료** → Phase 2 **채널별 score·cap**(2.1)
+4. `auto_publish` / 저녁 슬롯 → YouTube + Reels — **활성** (Phase 1 슬롯 유지)
+5. **Phase 1 유지**: UTM · 태그 · 마스터 훅 · `hook_emotion` 필드 · 텔레그램 댓글 노티
+6. **Phase 2.3–2.5 완료**: `VideoVariantService` 변형 훅·`script_*` · ≤30/≤45s · 유니크 렌더 · `hook_emotion`→WaggleBot TTS mood
+7. **잔여 Phase 2**: 통계·주간리포트·`auto_adjust`(2.6+)
 
 ### 7.1 레이아웃 리디자인 (§4 — 반영 완료)
 

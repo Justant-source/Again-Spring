@@ -7,27 +7,31 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   getMarketingQuota,
-  updateMarketingQuota,
+  updateMarketingPlatformQuota,
   getMarketingScoreWeights,
   updateMarketingScoreWeights,
   type MarketingQuota,
   type MarketingScoreWeights,
 } from '@/lib/api/admin/marketing';
 
-/** Aliases expected by redesign notes (S6). */
-const getScoreWeights = getMarketingScoreWeights;
-const updateScoreWeights = updateMarketingScoreWeights;
+const PLATFORM_LABELS: Record<string, string> = {
+  x_thread: 'X',
+  instagram_feed: 'IG 피드',
+  instagram_reels: '릴스',
+  youtube_shorts: 'Shorts',
+};
 
 export interface HoldingControlsBarProps {
-  /** Called after a successful save so the parent can reload the holding board. */
   onSaved?: () => void;
   className?: string;
 }
 
 export function HoldingControlsBar({ onSaved, className }: HoldingControlsBarProps) {
   const [quota, setQuota] = useState<MarketingQuota | null>(null);
-  const [textCap, setTextCap] = useState('6');
-  const [videoCap, setVideoCap] = useState('3');
+  const [xThread, setXThread] = useState('3');
+  const [instagramFeed, setInstagramFeed] = useState('3');
+  const [instagramReels, setInstagramReels] = useState('3');
+  const [youtubeShorts, setYoutubeShorts] = useState('3');
   const [weightViews, setWeightViews] = useState('0.1');
   const [weightComments, setWeightComments] = useState('1');
   const [weightVotes, setWeightVotes] = useState('0.5');
@@ -38,8 +42,11 @@ export function HoldingControlsBar({ onSaved, className }: HoldingControlsBarPro
 
   const applyQuota = (data: MarketingQuota) => {
     setQuota(data);
-    setTextCap(String(data.dailyTextCap));
-    setVideoCap(String(data.dailyVideoCap));
+    const p = data.platforms;
+    setXThread(String(p?.x_thread?.cap ?? 3));
+    setInstagramFeed(String(p?.instagram_feed?.cap ?? 3));
+    setInstagramReels(String(p?.instagram_reels?.cap ?? 3));
+    setYoutubeShorts(String(p?.youtube_shorts?.cap ?? 3));
   };
 
   const applyWeights = (data: MarketingScoreWeights) => {
@@ -54,7 +61,7 @@ export function HoldingControlsBar({ onSaved, className }: HoldingControlsBarPro
     try {
       const [quotaData, weightsData] = await Promise.all([
         getMarketingQuota(),
-        getScoreWeights(),
+        getMarketingScoreWeights(),
       ]);
       applyQuota(quotaData);
       applyWeights(weightsData);
@@ -71,13 +78,17 @@ export function HoldingControlsBar({ onSaved, className }: HoldingControlsBarPro
   }, []);
 
   const handleSave = async () => {
-    const dailyTextCap = Number(textCap);
-    const dailyVideoCap = Number(videoCap);
+    const caps = {
+      xThread: Number(xThread),
+      instagramFeed: Number(instagramFeed),
+      instagramReels: Number(instagramReels),
+      youtubeShorts: Number(youtubeShorts),
+    };
     const wViews = Number(weightViews);
     const wComments = Number(weightComments);
     const wVotes = Number(weightVotes);
 
-    if (!Number.isInteger(dailyTextCap) || !Number.isInteger(dailyVideoCap)) {
+    if (!Object.values(caps).every((n) => Number.isInteger(n))) {
       setError('상한은 정수여야 합니다.');
       return;
     }
@@ -91,8 +102,8 @@ export function HoldingControlsBar({ onSaved, className }: HoldingControlsBarPro
     setSavedMsg(null);
     try {
       const [quotaData, weightsData] = await Promise.all([
-        updateMarketingQuota(dailyTextCap, dailyVideoCap),
-        updateScoreWeights({
+        updateMarketingPlatformQuota(caps),
+        updateMarketingScoreWeights({
           weightViews: wViews,
           weightComments: wComments,
           weightVotes: wVotes,
@@ -123,49 +134,52 @@ export function HoldingControlsBar({ onSaved, className }: HoldingControlsBarPro
       <div>
         <h3 className="font-semibold text-gray-800">대기 보드 설정</h3>
         <p className="mt-1 text-sm text-gray-500">
-          자동 N위까지 · 표시 최대 20 · 핀은 상한 내 우선. 가중치·상한 저장 시 보드가 즉시 재정렬됩니다.
+          Phase 2: 플랫폼별 일일 cap. 보드 미리보기는 조회·댓글·투표 가중치로 정렬합니다.
+          커밋 선정은 플랫폼별 점수를 씁니다.
         </p>
       </div>
 
       <div className="space-y-3">
-        <h4 className="text-sm font-medium text-gray-700">일일 상한</h4>
-        <div className="grid grid-cols-2 gap-4 max-w-lg">
-          <div className="space-y-1">
-            <Label htmlFor="holding-dailyTextCap">공유 풀 (글 상한)</Label>
-            <Input
-              id="holding-dailyTextCap"
-              type="number"
-              min={1}
-              max={50}
-              value={textCap}
-              onChange={(e) => setTextCap(e.target.value)}
-              data-testid="holding-daily-text-cap"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="holding-dailyVideoCap">영상 상한</Label>
-            <Input
-              id="holding-dailyVideoCap"
-              type="number"
-              min={0}
-              max={50}
-              value={videoCap}
-              onChange={(e) => setVideoCap(e.target.value)}
-              data-testid="holding-daily-video-cap"
-            />
-          </div>
+        <h4 className="text-sm font-medium text-gray-700">플랫폼별 일일 상한</h4>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl">
+          {(
+            [
+              ['x_thread', xThread, setXThread, 'holding-cap-x'],
+              ['instagram_feed', instagramFeed, setInstagramFeed, 'holding-cap-feed'],
+              ['instagram_reels', instagramReels, setInstagramReels, 'holding-cap-reels'],
+              ['youtube_shorts', youtubeShorts, setYoutubeShorts, 'holding-cap-shorts'],
+            ] as const
+          ).map(([id, value, setValue, testId]) => (
+            <div key={id} className="space-y-1">
+              <Label htmlFor={testId}>{PLATFORM_LABELS[id]}</Label>
+              <Input
+                id={testId}
+                type="number"
+                min={0}
+                max={50}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                data-testid={testId}
+              />
+            </div>
+          ))}
         </div>
-        {quota && (
-          <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 max-w-lg">
-            오늘(KST): 영상 {quota.videosToday} · 글 {quota.textsToday} · 잔여 풀{' '}
-            {quota.remainingPool} (컷라인 N≈{quota.remainingPool})
+        {quota?.platforms && (
+          <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 max-w-3xl">
+            오늘(KST):{' '}
+            {Object.entries(quota.platforms)
+              .map(([id, p]) => `${PLATFORM_LABELS[id] ?? id} ${p.usedToday}/${p.cap}`)
+              .join(' · ')}
           </div>
         )}
       </div>
 
       <div className="space-y-3">
-        <h4 className="text-sm font-medium text-gray-700">점수 가중치</h4>
-        <p className="text-xs text-gray-500">점수 = 조회×w + 댓글×w + 투표×w (동점 → 최신)</p>
+        <h4 className="text-sm font-medium text-gray-700">보드 미리보기 가중치</h4>
+        <p className="text-xs text-gray-500">
+          대기 보드 정렬용(legacy). 커밋 점수 가중치는 API{' '}
+          <code className="text-xs">/score-weights</code> platforms 맵으로 조정합니다.
+        </p>
         <div className="grid grid-cols-3 gap-4 max-w-xl">
           <div className="space-y-1">
             <Label htmlFor="holding-weightViews">조회</Label>

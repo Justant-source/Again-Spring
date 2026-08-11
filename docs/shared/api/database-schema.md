@@ -146,6 +146,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `encrypted_secret` | 앱 시크릿 AES-GCM vault (마케팅 제외) | `secret_key` VARCHAR(128) **V101** |
 | `marketing_holding` | 마케팅 대기 보드 (초안·순위 스냅샷) | `post_id` VARCHAR(32) PK **V102** |
 | `marketing_job` | ASM 마케팅 잡 | BIGINT auto · `requested_by` VARCHAR(128) **V104** |
+| `marketing_publication_stats` | 플랫폼 참여 스냅샷 (X/IG/YT best-effort) | BIGINT auto **V110** |
 
 ### AI-user 운영 테이블
 
@@ -199,14 +200,15 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56, V85, V87, V89, V92, V94, **V97**, **V98**, **V99**, **V105**, **V106**, **V107**; 검색 인덱스 → V93 `post_search_ngrams`)
+### `posts` (V48~V56, V85, V87, V89, V92, V94, **V97**, **V98**, **V99**, **V105**, **V106**, **V107**, **V108**; 검색 인덱스 → V93 `post_search_ngrams`)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
 | `id` | BIGINT auto PK | V48 | |
 | `author_id` | VARCHAR(32) FK | V48 | 작성자 |
 | `title` | VARCHAR(255) | V48 | 제목 |
-| `promo_title` | VARCHAR(500) | **V92**, 상한 **V96** | IG 훅 제목. 원제 복제+의미줄바꿈(`\n`). PLAN/`PromoTitleService` |
+| `promo_title` | VARCHAR(500) | **V92**, 상한 **V96** | **SNS 마스터 훅**(도발적). IG 패킹용 `\n` 허용. 원제 복제 아님. PLAN/`PromoTitleService` |
+| `hook_emotion` | VARCHAR(16) | **V108** | 마스터 훅 감정. `shock\|anger\|tension\|sad\|hype` only. null=미생성/폴백 |
 | `capture_split_after_line` | INT | **V94** (deprecated) | 구 단일 컷. 읽기 폴백만 |
 | `capture_split_after_lines` | JSON | **V98** | X/IG 캡쳐 컷 배열(1-based, 각 장 마지막 블록; 마지막 장 제외). null=1장/휴리스틱 |
 | `partner_capture_split_after_lines` | JSON | **V98** | 상대 본문 캡쳐 컷(동일 의미) |
@@ -466,6 +468,9 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V104** | `marketing_job.requested_by` VARCHAR(32)→128 — 강제 배포 `admin:force:`+JWT UUID(≈48) 저장 |
 | **V106** | AI jury 제거 — `DROP TABLE jurors`, `posts.juror_count` 컬럼 삭제 |
 | **V107** | `posts.author_body_deleted_at` / `partner_body_deleted_at` — 쪽별 본문 tombstone (상대 초대 소유권·삭제) |
+| **V108** | `posts.hook_emotion` VARCHAR(16) — SNS 마스터 훅 감정(`shock\|anger\|tension\|sad\|hype`). `promo_title`=도발적 마스터 훅(원제 복제 아님) |
+| **V109** | `system_setting` 시드 — Phase 2 플랫폼별 cap(`marketing.cap.*` 기본 3) + score weights(`marketing.score.weights.{platform}.*`, plan §3). legacy text/video cap은 fallback |
+| **V110** | `marketing_publication_stats` — 발행 후 플랫폼 통계 스냅샷(`job_id`,`post_id`,`platform`,`metrics_json`,partial). SSOT=AS; 수집기는 ASM. `system_setting` `marketing.score.auto_adjust` 기본 `false` |
 
 ---
 

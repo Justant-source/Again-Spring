@@ -63,7 +63,8 @@ flowchart LR
 1. Claude `--json-schema`와 Codex `--output-schema`는 동일한 classpath JSON Schema를 사용한다. 이후 허용 persona ID, 길이, **item 단위 한국어/거절문**, 안전/중복을 다시 검증한다. JSON 봉투 자체는 언어 검사 면제 근거가 될 수 없다.
    파싱된 post/comment body의 리터럴 `"\n"`은 실개행으로 정규화한다(legacy `OutputSanitizer`와 동일 규칙 — PLAN은 전체 sanitizer를 타지 않음).
    **AI_POST 제목/본문**: 제목은 공백 포함 **4~40자**(프롬프트 권장 12~40), 본문과 **동일 문자열 금지**(공백 정규화 후 비교). 위반 시 `INVALID_STRUCTURED_OUTPUT`으로 재시도. orchestrator `AiPostBundleService`도 동일 가드를 한 번 더 적용한다.
-   **AI_POST `promo_title`**: 원제(`title`) 글자 복제 + 의미단위 `\n`만. 각 줄 공백 포함 **≤10자**. 재작성·생략 금지. 게시 시 `posts.promo_title`에 저장되며 IG 훅 1장에 사용(캡션은 개행 제거). 없거나 무효면 하드랩 폴백 후, 미전달 시 AS `PromoTitleService`가 채움.
+   **AI_POST `promo_title`**: 광장 `title`과 **독립**인 **master SNS scroll-stop 훅**. 도발적·호기심 유발 한 줄(개행 허용, 줄≤20·평탄화 4~80자). 원제 글자 복제 금지. 없거나 무효면 title 하드랩 폴백. 게시 시 `posts.promo_title`에 저장(미전달 시 AS `PromoTitleService` 폴백).
+   **AI_POST `hook_emotion`**: 필수 enum `shock|anger|tension|sad|hype` (훅이 겨냥하는 감정). sanitize 시 누락/무효 → `tension`. BE `hookEmotion`(V108+) 전달 — 엔드포인트 미수락이면 JSON/DTO에만 유지.
    **AI_POST 캡쳐 분할**: 본문은 문장(짧은 의미 단위)마다 개행. 비어 있지 않은 줄이 **9개 이상**이면 `post.capture_split_after_lines`(1-based, 각 장 마지막 블록; 장당 ≤8·최대 4장)을 넣고, 8 이하면 `null`. 범위 밖 값은 parse 시 null로 강등(PLAN 전체 실패 아님). 게시 시 `posts.capture_split_after_lines`에 저장되고 마케팅 brief → ASM 캡쳐 컷에 쓰인다. 양면 Call2 `partner_post.capture_split_after_lines` → `partner_capture_split_after_lines`.
 2. 부모 후보가 탈락하면 그 후보를 참조하는 대댓글도 탈락시킨다.
 3. `parsePlan` 하한은 요청 파라미터로 조절한다. `minTopLevel`/`minItems` 미지정 시 레거시 기본(최상위 6 · 전체 12, 각각 max에 캡). 품질 게이트로 이후 드롭할 orchestrator는 `minTopLevel=1`, `minItems=1`을 보낸다(현재 `AiPostBundleService`·`ThreadPlanGenerationService` 기본).

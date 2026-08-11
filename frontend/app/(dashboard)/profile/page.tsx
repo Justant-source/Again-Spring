@@ -6,6 +6,7 @@ import { useUserStore, useHasHydrated } from '@/lib/store/userStore';
 import { postApi, PostSummary } from '@/lib/api/community/postApi';
 import { FeedCard } from '@/components/community/c3/FeedCard';
 import { timeAgo } from '@/lib/utils/timeAgo';
+import { resolveAuthorPct } from '@/lib/utils/empathyPct';
 
 type Tab = 'mine' | 'voted' | 'saved';
 
@@ -149,7 +150,7 @@ export default function ProfilePage() {
                       time={timeAgo(post.createdAt)}
                       title={post.title}
                       body={post.bodyPublished}
-                      g={post.authorPct ?? 50}
+                      g={resolveAuthorPct({ authorPct: post.authorPct, voteCount: post.voteCount })}
                       votes={post.voteCount || 0}
                       c={post.commentCount || 0}
                       views={post.viewCount || 0}
@@ -186,7 +187,7 @@ export default function ProfilePage() {
                     time={timeAgo(post.createdAt)}
                     title={post.title}
                     body={post.bodyPublished}
-                    g={post.authorPct ?? 50}
+                    g={resolveAuthorPct({ authorPct: post.authorPct, voteCount: post.voteCount })}
                     votes={post.voteCount || 0}
                     c={post.commentCount || 0}
                     views={post.viewCount || 0}

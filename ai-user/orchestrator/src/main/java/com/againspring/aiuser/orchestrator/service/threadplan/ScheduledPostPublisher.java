@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Creates the real post when a held {@link AiScheduledPost}'s slot arrives, then replays its
@@ -102,6 +103,7 @@ public class ScheduledPostPublisher {
                     .visibility("PUBLIC")
                     .captureSplitAfterLines(readCaptureSplitsFromCandidates(row.getCandidatesJson(), row.getBody()))
                     .promoTitle(readPromoTitleFromCandidates(row.getCandidatesJson(), row.getTitle()))
+                    .hookEmotion(readHookEmotionFromCandidates(row.getCandidatesJson()))
                     .metaphorId(readMetaphorIdFromCandidates(row.getCandidatesJson()))
                     .metaphorIds(readMetaphorIdsFromCandidates(row.getCandidatesJson()));
             if (!paired) {
@@ -333,6 +335,28 @@ public class ScheduledPostPublisher {
             }
         } catch (Exception e) {
             log.debug("Could not read promo_title from candidates: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    private static final Set<String> HOOK_EMOTIONS = Set.of("shock", "anger", "tension", "sad", "hype");
+
+    @SuppressWarnings("unchecked")
+    private String readHookEmotionFromCandidates(String candidatesJson) {
+        if (candidatesJson == null || candidatesJson.isBlank()) return null;
+        try {
+            Map<String, Object> response = objectMapper.readValue(candidatesJson, new TypeReference<>() { });
+            Object postRaw = response.get("post");
+            if (postRaw instanceof Map<?, ?> post) {
+                Object v = post.get("hook_emotion");
+                if (v == null) v = post.get("hookEmotion");
+                if (v != null) {
+                    String emotion = String.valueOf(v).trim().toLowerCase(java.util.Locale.ROOT);
+                    if (HOOK_EMOTIONS.contains(emotion)) return emotion;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not read hook_emotion from candidates: {}", e.getMessage());
         }
         return null;
     }

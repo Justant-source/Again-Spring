@@ -1,6 +1,7 @@
 package com.againspring.service.admin;
 
 import com.againspring.domain.marketing.MarketingJob;
+import com.againspring.marketing.MarketingUtmUrls;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -170,10 +171,10 @@ public class MarketingStatsService {
 
     /**
      * Get traffic metrics for a specific marketing job.
-     * Queries visit_events with utm_campaign = "asm-job-{jobId}".
+     * Queries visit_events with utm_campaign = "story_{jobId}".
      */
     public JobTrafficDto getJobTraffic(long jobId) {
-        String utmCampaign = "asm-job-" + jobId;
+        String utmCampaign = MarketingUtmUrls.campaignForJob(jobId);
 
         // Query total visits and unique sessions
         Integer visits = jdbcTemplate.queryForObject(

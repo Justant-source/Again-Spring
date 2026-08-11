@@ -12,26 +12,44 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
- * Daily marketing auto-publish caps (shared post pool).
+ * Daily marketing auto-publish caps.
  *
- * <p>{@code dailyTextCap} is the shared KST-day ceiling for marketed posts.
- * S4: one COMMITTED story = one pool slot (multi-platform jobs do not add extra).
- * Videos are a subset hard-capped by {@code dailyVideoCap}; remaining slots are text.
+ * <p><b>Phase 2</b>: per-platform caps {@code marketing.cap.{platform}} (default 3 each).
+ * Commit selection consumes one slot per story×platform.
  *
- * <p>Usage counts come from {@code marketing_holding} COMMITTED rows locked today (KST),
- * not raw {@code marketing_job} rows — manual/test jobs must not exhaust the waiting-board
- * video band.
+ * <p><b>Deprecated (Phase 1)</b>: {@code marketing.daily_text_cap} / {@code marketing.daily_video_cap}
+ * remain as fallbacks when a platform key is unset:
+ * <ul>
+ *   <li>text platforms ({@code x_thread}, {@code instagram_feed}) →
+ *       {@code max(1, daily_text_cap / 2)}</li>
+ *   <li>video platforms ({@code instagram_reels}, {@code youtube_shorts}) →
+ *       {@code daily_video_cap} (each; not split) when that legacy key exists and platform key does not</li>
+ * </ul>
+ * Waiting-board meta still exposes derived {@code dailyTextCap}/{@code dailyVideoCap}
+ * (= sum of text / video platform caps) for UI compatibility.
  */
 @Service
 @RequiredArgsConstructor
 public class MarketingQuotaService {
 
+    /** @deprecated Phase 1 shared pool — fallback only. */
+    @Deprecated
     public static final String KEY_TEXT_CAP = "marketing.daily_text_cap";
+    /** @deprecated Phase 1 shared pool — fallback only. */
+    @Deprecated
     public static final String KEY_VIDEO_CAP = "marketing.daily_video_cap";
+
+    public static final String KEY_CAP_PREFIX = "marketing.cap.";
+
+    public static final int DEFAULT_PLATFORM_CAP = 3;
     public static final int DEFAULT_TEXT_CAP = 6;
     public static final int DEFAULT_VIDEO_CAP = 3;
+    public static final int MIN_PLATFORM_CAP = 0;
+    public static final int MAX_PLATFORM_CAP = 50;
     public static final int MIN_TEXT_CAP = 1;
     public static final int MAX_TEXT_CAP = 50;
 
@@ -40,18 +58,89 @@ public class MarketingQuotaService {
     private final SystemSettingRepository systemSettingRepository;
     private final MarketingHoldingRepository holdingRepository;
 
+    /** @deprecated Phase 1 shape. */
+    @Deprecated
     public record Caps(int dailyTextCap, int dailyVideoCap) {}
 
+    public record PlatformCap(String platform, int cap, long usedToday, long remaining) {}
+
+    public record PlatformCaps(
+        int xThread,
+        int instagramFeed,
+        int instagramReels,
+        int youtubeShorts
+    ) {
+        public int forPlatform(String platform) {
+            return switch (MarketingPopularityScorer.normalizePlatform(platform)) {
+                case MarketingPopularityScorer.PLATFORM_X_THREAD -> xThread;
+                case MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED -> instagramFeed;
+                case MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS -> instagramReels;
+                case MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS -> youtubeShorts;
+                default -> 0;
+            };
+        }
+
+        public Map<String, Integer> asMap() {
+            Map<String, Integer> m = new LinkedHashMap<>();
+            m.put(MarketingPopularityScorer.PLATFORM_X_THREAD, xThread);
+            m.put(MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED, instagramFeed);
+            m.put(MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS, instagramReels);
+            m.put(MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS, youtubeShorts);
+            return m;
+        }
+    }
+
+    /**
+     * Status for admin + board. Legacy fields are derived from platform caps/usage.
+     */
     public record QuotaStatus(
         int dailyTextCap,
         int dailyVideoCap,
         long videosToday,
         long textsToday,
-        long remainingPool
-    ) {}
+        long remainingPool,
+        PlatformCaps platformCaps,
+        Map<String, Long> usedTodayByPlatform,
+        Map<String, Long> remainingByPlatform
+    ) {
+        /** Phase 1 ctor compatibility for tests that omit platform maps. */
+        public QuotaStatus(
+                int dailyTextCap,
+                int dailyVideoCap,
+                long videosToday,
+                long textsToday,
+                long remainingPool) {
+            this(
+                dailyTextCap,
+                dailyVideoCap,
+                videosToday,
+                textsToday,
+                remainingPool,
+                new PlatformCaps(
+                    Math.max(0, dailyTextCap / 2),
+                    Math.max(0, dailyTextCap - dailyTextCap / 2),
+                    dailyVideoCap,
+                    dailyVideoCap),
+                Map.of(),
+                Map.of());
+        }
+    }
 
     public Caps getCaps() {
-        return new Caps(readInt(KEY_TEXT_CAP, DEFAULT_TEXT_CAP), readInt(KEY_VIDEO_CAP, DEFAULT_VIDEO_CAP));
+        PlatformCaps p = getPlatformCaps();
+        return new Caps(p.xThread() + p.instagramFeed(), p.instagramReels() + p.youtubeShorts());
+    }
+
+    public PlatformCaps getPlatformCaps() {
+        int legacyText = readIntOptional(KEY_TEXT_CAP).orElse(DEFAULT_TEXT_CAP);
+        int legacyVideo = readIntOptional(KEY_VIDEO_CAP).orElse(DEFAULT_VIDEO_CAP);
+        int textFallback = Math.max(1, legacyText / 2);
+        return new PlatformCaps(
+            readPlatformCap(MarketingPopularityScorer.PLATFORM_X_THREAD, textFallback),
+            readPlatformCap(MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED, textFallback),
+            readPlatformCap(MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS, legacyVideo),
+            readPlatformCap(MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS, legacyVideo)
+        );
     }
 
     public Instant startOfTodayKst() {
@@ -59,28 +148,77 @@ public class MarketingQuotaService {
     }
 
     public QuotaStatus getStatus() {
-        Caps caps = getCaps();
+        PlatformCaps caps = getPlatformCaps();
         Instant start = startOfTodayKst();
-        long marketedToday = holdingRepository.countCommittedSince(start);
-        long videosToday = holdingRepository.countCommittedVideosSince(start);
-        // Prefer story-based texts (= marketed − video). Fall back so remaining stays non-negative.
-        long textsToday = Math.max(0, marketedToday - videosToday);
-        long remainingPool = Math.max(0, caps.dailyTextCap() - marketedToday);
+
+        Map<String, Long> used = new LinkedHashMap<>();
+        Map<String, Long> remaining = new LinkedHashMap<>();
+        long remainingSum = 0;
+        for (String platform : MarketingPopularityScorer.RANKED_PLATFORMS) {
+            long u = holdingRepository.countCommittedForPlatformSince(platform, start);
+            int cap = caps.forPlatform(platform);
+            long rem = Math.max(0, cap - u);
+            used.put(platform, u);
+            remaining.put(platform, rem);
+            remainingSum += rem;
+        }
+
+        long videosToday = used.getOrDefault(MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS, 0L)
+            + used.getOrDefault(MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS, 0L);
+        long textsToday = used.getOrDefault(MarketingPopularityScorer.PLATFORM_X_THREAD, 0L)
+            + used.getOrDefault(MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED, 0L);
+        int dailyTextCap = caps.xThread() + caps.instagramFeed();
+        int dailyVideoCap = caps.instagramReels() + caps.youtubeShorts();
+
         return new QuotaStatus(
-            caps.dailyTextCap(),
-            caps.dailyVideoCap(),
+            dailyTextCap,
+            dailyVideoCap,
             videosToday,
             textsToday,
-            remainingPool
+            remainingSum,
+            caps,
+            Map.copyOf(used),
+            Map.copyOf(remaining)
         );
+    }
+
+    /** Mutable remaining map for the commit tick (enabled platforms only filled by caller). */
+    public Map<String, Integer> remainingCapsMutable() {
+        QuotaStatus status = getStatus();
+        Map<String, Integer> m = new LinkedHashMap<>();
+        for (String platform : MarketingPopularityScorer.RANKED_PLATFORMS) {
+            m.put(platform, status.remainingByPlatform().getOrDefault(platform, 0L).intValue());
+        }
+        return m;
     }
 
     @Transactional
     public QuotaStatus updateCaps(int dailyTextCap, int dailyVideoCap, String updatedBy) {
         validate(dailyTextCap, dailyVideoCap);
         Instant now = Instant.now();
+        // Persist legacy keys (deprecated) and distribute into platform caps.
         saveSetting(KEY_TEXT_CAP, String.valueOf(dailyTextCap), now, updatedBy);
         saveSetting(KEY_VIDEO_CAP, String.valueOf(dailyVideoCap), now, updatedBy);
+        int textEach = Math.max(1, dailyTextCap / 2);
+        int textFeed = Math.max(0, dailyTextCap - textEach);
+        saveSetting(capKey(MarketingPopularityScorer.PLATFORM_X_THREAD), String.valueOf(textEach), now, updatedBy);
+        saveSetting(capKey(MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED), String.valueOf(textFeed), now, updatedBy);
+        saveSetting(capKey(MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS), String.valueOf(dailyVideoCap), now, updatedBy);
+        saveSetting(capKey(MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS), String.valueOf(dailyVideoCap), now, updatedBy);
+        return getStatus();
+    }
+
+    @Transactional
+    public QuotaStatus updatePlatformCaps(PlatformCaps caps, String updatedBy) {
+        validatePlatformCaps(caps);
+        Instant now = Instant.now();
+        saveSetting(capKey(MarketingPopularityScorer.PLATFORM_X_THREAD), String.valueOf(caps.xThread()), now, updatedBy);
+        saveSetting(capKey(MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED), String.valueOf(caps.instagramFeed()), now, updatedBy);
+        saveSetting(capKey(MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS), String.valueOf(caps.instagramReels()), now, updatedBy);
+        saveSetting(capKey(MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS), String.valueOf(caps.youtubeShorts()), now, updatedBy);
+        // Keep legacy keys as derived sums for older readers.
+        saveSetting(KEY_TEXT_CAP, String.valueOf(caps.xThread() + caps.instagramFeed()), now, updatedBy);
+        saveSetting(KEY_VIDEO_CAP, String.valueOf(caps.instagramReels() + caps.youtubeShorts()), now, updatedBy);
         return getStatus();
     }
 
@@ -89,23 +227,65 @@ public class MarketingQuotaService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "dailyTextCap must be between " + MIN_TEXT_CAP + " and " + MAX_TEXT_CAP);
         }
-        if (dailyVideoCap < 0 || dailyVideoCap > dailyTextCap) {
+        if (dailyVideoCap < 0 || dailyVideoCap > MAX_PLATFORM_CAP) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "dailyVideoCap must be between 0 and dailyTextCap");
+                "dailyVideoCap must be between 0 and " + MAX_PLATFORM_CAP);
         }
     }
 
-    private int readInt(String key, int defaultValue) {
+    static void validatePlatformCaps(PlatformCaps caps) {
+        if (caps == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "platformCaps is required");
+        }
+        requireCap("x_thread", caps.xThread());
+        requireCap("instagram_feed", caps.instagramFeed());
+        requireCap("instagram_reels", caps.instagramReels());
+        requireCap("youtube_shorts", caps.youtubeShorts());
+    }
+
+    private static void requireCap(String name, int value) {
+        if (value < MIN_PLATFORM_CAP || value > MAX_PLATFORM_CAP) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                name + " cap must be between " + MIN_PLATFORM_CAP + " and " + MAX_PLATFORM_CAP);
+        }
+    }
+
+    public static String capKey(String platform) {
+        return KEY_CAP_PREFIX + platform;
+    }
+
+    private int readPlatformCap(String platform, int fallbackWhenUnset) {
+        return systemSettingRepository.findById(capKey(platform))
+            .map(SystemSetting::getSettingValue)
+            .map(raw -> {
+                try {
+                    int parsed = Integer.parseInt(raw.trim());
+                    if (parsed < MIN_PLATFORM_CAP || parsed > MAX_PLATFORM_CAP) {
+                        return DEFAULT_PLATFORM_CAP;
+                    }
+                    return parsed;
+                } catch (Exception e) {
+                    return DEFAULT_PLATFORM_CAP;
+                }
+            })
+            .orElse(fallbackWhenUnset >= 0 ? fallbackWhenUnset : DEFAULT_PLATFORM_CAP);
+    }
+
+    private java.util.OptionalInt readIntOptional(String key) {
         return systemSettingRepository.findById(key)
             .map(SystemSetting::getSettingValue)
             .map(raw -> {
                 try {
-                    return Integer.parseInt(raw.trim());
+                    return java.util.OptionalInt.of(Integer.parseInt(raw.trim()));
                 } catch (Exception e) {
-                    return defaultValue;
+                    return java.util.OptionalInt.empty();
                 }
             })
-            .orElse(defaultValue);
+            .orElse(java.util.OptionalInt.empty());
+    }
+
+    private int readInt(String key, int defaultValue) {
+        return readIntOptional(key).orElse(defaultValue);
     }
 
     private void saveSetting(String key, String value, Instant now, String updatedBy) {

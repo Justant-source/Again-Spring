@@ -27,6 +27,12 @@ public class StructuredGenerationService {
     private long defaultTimeoutMs;
 
     private static final Pattern META = Pattern.compile("(?i)(적용 처리 메모|작성 노트|<<<|```|i can't help|i am (claude|codex))");
+    /** SNS hook emotion enum (PLAN {@code hook_emotion}). */
+    static final Set<String> HOOK_EMOTIONS = Set.of("shock", "anger", "tension", "sad", "hype");
+    /** Flattened promo_title length bounds (independent of plaza title). */
+    private static final int PROMO_TITLE_MIN = 4;
+    private static final int PROMO_TITLE_MAX = 80;
+    private static final int PROMO_LINE_MAX = 20;
     /** Marketing X/IG capture: bodies with more than this many non-empty newline blocks need a split. */
     public static final int SHORT_POST_MAX_BLOCKS = 8;
     public static final int MAX_PARTS_PER_SIDE = 4;
@@ -108,11 +114,14 @@ public class StructuredGenerationService {
             rejectIdenticalTitleBody(title, body);
             List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
             Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
-            String promoTitle = sanitizePromoTitle(title, nullableText(p, "promo_title"));
+            String promoTitle = sanitizePromoTitle(title,
+                    firstNonBlank(nullableText(p, "promo_title"), nullableText(p, "promoTitle")));
+            String hookEmotion = sanitizeHookEmotion(
+                    firstNonBlank(nullableText(p, "hook_emotion"), nullableText(p, "hookEmotion")));
             List<String> metaphorIds = MetaphorCatalog.sanitizeList(readMetaphorIds(p), req.getCategory());
             String metaphorId = metaphorIds.isEmpty() ? null : metaphorIds.get(0);
             post = ThreadPlanResponse.Post.builder()
-                    .title(title).body(body).promoTitle(promoTitle)
+                    .title(title).body(body).promoTitle(promoTitle).hookEmotion(hookEmotion)
                     .captureSplitAfterLines(splits)
                     .captureSplitAfterLine(legacy)
                     .metaphorId(metaphorId)
@@ -214,6 +223,7 @@ public class StructuredGenerationService {
             return ThreadPlanResponse.Post.builder()
                     .title(post.getTitle()).body(refined)
                     .promoTitle(post.getPromoTitle())
+                    .hookEmotion(post.getHookEmotion())
                     .captureSplitAfterLines(splits)
                     .captureSplitAfterLine(legacy)
                     .metaphorId(post.getMetaphorId())
@@ -325,11 +335,14 @@ public class StructuredGenerationService {
         rejectIdenticalTitleBody(title, body);
         List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
         Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
-        String promoTitle = sanitizePromoTitle(title, nullableText(p, "promo_title"));
+        String promoTitle = sanitizePromoTitle(title,
+                firstNonBlank(nullableText(p, "promo_title"), nullableText(p, "promoTitle")));
+        String hookEmotion = sanitizeHookEmotion(
+                firstNonBlank(nullableText(p, "hook_emotion"), nullableText(p, "hookEmotion")));
         List<String> metaphorIds = MetaphorCatalog.sanitizeList(readMetaphorIds(p), req.getCategory());
         String metaphorId = metaphorIds.isEmpty() ? null : metaphorIds.get(0);
         ThreadPlanResponse.Post post = ThreadPlanResponse.Post.builder()
-                .title(title).body(body).promoTitle(promoTitle)
+                .title(title).body(body).promoTitle(promoTitle).hookEmotion(hookEmotion)
                 .captureSplitAfterLines(splits)
                 .captureSplitAfterLine(legacy)
                 .metaphorId(metaphorId)
@@ -574,13 +587,14 @@ public class StructuredGenerationService {
         int maxReplies = safe(req.getMaxReplies(), 2, 0, 6);
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Workload=PAIRED_PHASE1 (logical Call1).
-                Schema: {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null,"metaphor_ids":["empty-chair","tangled-thread","cracked-window"]},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                Schema: {"post":{"title":"...","body":"...","promo_title":"...\\n...","hook_emotion":"tension","capture_split_after_lines":null,"metaphor_ids":["empty-chair","tangled-thread","cracked-window"]},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 This is a 양면 사연: write the 작성자(A) post now. The 상대방(B) has NOT written yet — phase1 comments must NOT assume a partner reply exists, quote a partner body, or say both sides already posted.
-                Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI. Prefer Korean product terms 작성자/상대방 — never 가해자/피해자/승패.
+                Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI. Prefer Korean product terms 작성자/상대방 — never 가해자/피해자/승패. Product framing = plaza empathy votes (공감) — never AI 배심원, 판결, 처방, or 승패.
                 STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId to any comment or reply. Phase1 comments are community bystanders only.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed.
-                AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
-                AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line. Required (IG hook card).
+                AI_POST title/body rules (hard): title is a short informational Korean plaza headline of 12~40 characters including spaces (max 40) — clear enough for community feed scanning, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
+                AI_POST promo_title rules (hard): promo_title is the MASTER SNS scroll-stop hook — independent of title (do NOT copy title characters). Write a provocative Korean line that stops the thumb in a feed (curiosity/conflict/emotional punch). Optional semantic \\n for card layout; each line ≤20 chars; flattened length 4~80. Required. Never verdict/prescription/win-lose framing.
+                AI_POST hook_emotion rules (hard): required enum exactly one of shock|anger|tension|sad|hype — the dominant emotion the SNS hook is meant to trigger.
                 AI_POST body line rules (hard): one Korean sentence (or short sense unit) per newline — no blank lines; keep each block short (about 1~2 visual lines). If more than 8 non-empty lines, set capture_split_after_lines to 1-based last-block indices of each part except the final (semantic pauses; each part 1~8 blocks; max 4 parts / at most 3 cuts). Prefer even-ish meaningful chunks (e.g. 20 lines → [7,14]). If ≤8 lines, set capture_split_after_lines to null.
                 AI_POST metaphor_ids rules (hard): pick 3 to 5 ids from METAPHOR_CATALOG, ordered from best-fit to weakest-fit, that match the emotional core of the story (object-as-feeling metaphor). The FIRST id is the representative/primary metaphor and will be used as the video's opening image — it must be the single best match. The remaining ids will illustrate different beats of the story body, so prefer some variety in mood/tone across the list rather than 5 near-duplicates. Prefer group/tone fit over category label. Required for AI_POST.
                 Phase1 comment count: about 2~4 top-level (respect LIMITS). Keep them light reactions to the 작성자 story only.
@@ -673,12 +687,13 @@ public class StructuredGenerationService {
         }
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Create Korean community conversation candidates.
-                The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","capture_split_after_lines":null,"metaphor_ids":["empty-chair","tangled-thread","cracked-window"]},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
-                For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI.
+                The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","hook_emotion":"tension","capture_split_after_lines":null,"metaphor_ids":["empty-chair","tangled-thread","cracked-window"]},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
+                For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use legal verdicts, diagnoses, personal data, internal notes, or claims of being an AI. Product framing = plaza empathy votes (공감) — never AI 배심원, 판결, 처방, or 승패.
                 STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId (or the AI_POST author) to any comment or reply. Comments are bystanders only — the story author must not appear as a community commenter.
                 When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed, not the whole story.
-                AI_POST title/body rules (hard): title is a short Korean hook of 12~40 characters including spaces (max 40). body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only teases the conflict.
-                AI_POST promo_title rules (hard): copy title characters exactly; insert semantic newlines only. Each line ideally 4~10 characters (max 10). Never put a single syllable/character alone on a line — pack 1~3 eojeol into a readable phrase. Do not break on every space. No rewrite/omit/add. Required for AI_POST (IG hook card).
+                AI_POST title/body rules (hard): title is a short informational Korean plaza headline of 12~40 characters including spaces (max 40) — clear for community feed scanning, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only names the conflict.
+                AI_POST promo_title rules (hard): promo_title is the MASTER SNS scroll-stop hook — independent of title (do NOT copy title characters). Write a provocative Korean line that stops the thumb in a feed (curiosity/conflict/emotional punch). Optional semantic \\n for card layout; each line ≤20 chars; flattened length 4~80. Required for AI_POST. Never verdict/prescription/win-lose framing.
+                AI_POST hook_emotion rules (hard): required enum exactly one of shock|anger|tension|sad|hype — the dominant emotion the SNS hook is meant to trigger.
                 AI_POST body line rules (hard): write body as one Korean sentence (or short sense unit) per newline — no blank lines; each non-empty line is a capture block; keep blocks short (~1–2 visual lines). If more than 8 non-empty lines, set capture_split_after_lines to 1-based last-block indices of each part except the final (semantic pauses; each part 1~8 blocks; max 4 parts / ≤3 cuts; e.g. 20 lines → [7,14]). If ≤8 lines, null.
                 AI_POST metaphor_ids rules (hard): pick 3 to 5 ids from METAPHOR_CATALOG, ordered from best-fit to weakest-fit, that match the emotional core of the story (object-as-feeling metaphor). The FIRST id is the representative/primary metaphor and will be used as the video's opening image — it must be the single best match. The remaining ids will illustrate different beats of the story body, so prefer some variety in mood/tone across the list rather than 5 near-duplicates. Prefer group/tone fit over category label. Required for AI_POST; for HUMAN_POST leave post null (no metaphor).
                 """ + "\nKIND=" + req.getKind() + "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) + "\n" + existing +
@@ -807,6 +822,11 @@ public class StructuredGenerationService {
     private static String nullableText(JsonNode n, String name) {
         if (!n.hasNonNull(name)) return null;
         return OutputSanitizer.normalizeLiteralNewlines(n.path(name).asText()).trim();
+    }
+    private static String firstNonBlank(String a, String b) {
+        if (a != null && !a.isBlank()) return a;
+        if (b != null && !b.isBlank()) return b;
+        return null;
     }
     private static void validRef(String v) { if (!v.matches("[A-Za-z][A-Za-z0-9_-]{0,63}")) throw new StructuredGenerationException("invalid ref"); }
     private static void validText(String v, String field, int min, int max) {
@@ -948,42 +968,54 @@ public class StructuredGenerationService {
     }
 
     /**
-     * promo_title must match title when newlines stripped; each non-empty line ≤10;
-     * reject orphan-heavy breaks (too many 1-char lines).
+     * {@code promo_title} is the master SNS hook — independent of plaza {@code title}.
+     * Sanitizes length/safety; blank/unsafe/overlong proposals fall back to wrapped title.
      */
     static String sanitizePromoTitle(String title, String proposed) {
         String base = title != null ? title.trim() : "";
-        if (base.isEmpty()) return null;
-        if (proposed == null || proposed.isBlank()) {
-            return wrapPromoLines(base);
-        }
-        String promo = proposed.replace("\\n", "\n").trim();
-        String promoFlat = promo.replace("\n", "").replaceAll("\\s+", "");
-        String titleFlat = base.replaceAll("\\s+", "");
-        if (!promoFlat.equals(titleFlat)) {
-            log.debug("Demoting promo_title — character mismatch with title");
-            return wrapPromoLines(base);
-        }
-        java.util.List<String> lines = new java.util.ArrayList<>();
-        for (String line : promo.replace("\r\n", "\n").split("\n", -1)) {
-            String t = line.trim();
-            if (t.isEmpty()) continue;
-            if (t.length() > 10) {
-                log.debug("Demoting promo_title — line longer than 10");
-                return wrapPromoLines(base);
+        if (proposed != null && !proposed.isBlank()) {
+            String promo = proposed.replace("\\n", "\n").trim();
+            if (LlmErrorSignature.looksLikeProviderError(promo) || META.matcher(promo).find()
+                    || looksLikeStructuredSchemaLeak(promo)) {
+                log.debug("Demoting promo_title — unsafe/error signature");
+            } else {
+                java.util.List<String> lines = new java.util.ArrayList<>();
+                boolean ok = true;
+                for (String line : promo.replace("\r\n", "\n").split("\n", -1)) {
+                    String t = line.trim();
+                    if (t.isEmpty()) continue;
+                    if (t.length() > PROMO_LINE_MAX) {
+                        ok = false;
+                        break;
+                    }
+                    lines.add(t);
+                }
+                if (ok && !lines.isEmpty()) {
+                    String joined = String.join("\n", lines);
+                    String flat = joined.replace("\n", "").replaceAll("\\s+", "");
+                    if (flat.length() >= PROMO_TITLE_MIN && flat.length() <= PROMO_TITLE_MAX) {
+                        return joined;
+                    }
+                    log.debug("Demoting promo_title — flattened length out of bounds ({})", flat.length());
+                } else {
+                    log.debug("Demoting promo_title — empty or line too long");
+                }
             }
-            lines.add(t);
         }
-        if (lines.isEmpty()) return wrapPromoLines(base);
-        int orphans = 0;
-        for (String line : lines) {
-            if (line.length() < 2) orphans++;
-        }
-        if (orphans > 0 && orphans * 4 >= lines.size()) {
-            log.debug("Demoting promo_title — too many 1-char lines");
-            return wrapPromoLines(base);
-        }
-        return String.join("\n", lines);
+        if (base.isEmpty()) return null;
+        return wrapPromoLines(base);
+    }
+
+    /**
+     * Validates {@code hook_emotion} against {@link #HOOK_EMOTIONS}.
+     * Missing/invalid → {@code tension} default so AI_POST always carries an emotion.
+     */
+    static String sanitizeHookEmotion(String proposed) {
+        if (proposed == null || proposed.isBlank()) return "tension";
+        String v = proposed.trim().toLowerCase(Locale.ROOT);
+        if (HOOK_EMOTIONS.contains(v)) return v;
+        log.debug("Demoting hook_emotion — invalid value '{}'", proposed);
+        return "tension";
     }
 
     /**

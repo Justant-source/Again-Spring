@@ -19,9 +19,9 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
     List<MarketingHolding> findByPostIdIn(Collection<String> postIds);
 
     /**
-     * S4 daily pool: one COMMITTED story = one shared-pool slot (locked today KST).
-     * Manual/test jobs that never commit must not consume the pool.
+     * @deprecated Phase 1 shared-pool count. Prefer {@link #countCommittedForPlatformSince}.
      */
+    @Deprecated
     @Query(nativeQuery = true, value = """
         SELECT COUNT(*) FROM marketing_holding mh
         WHERE mh.status = 'COMMITTED'
@@ -30,9 +30,9 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
     long countCommittedSince(@Param("since") Instant since);
 
     /**
-     * S4 daily video subset among COMMITTED stories locked since {@code since}.
-     * Auto commits leave {@code pin_format} null — detect video via Reels/Shorts jobs.
+     * @deprecated Phase 1 video subset. Prefer {@link #countCommittedForPlatformSince}.
      */
+    @Deprecated
     @Query(nativeQuery = true, value = """
         SELECT COUNT(*) FROM marketing_holding mh
         WHERE mh.status = 'COMMITTED'
@@ -52,11 +52,26 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
     long countCommittedVideosSince(@Param("since") Instant since);
 
     /**
+     * Phase 2: stories COMMITTED today (KST window via {@code since}) that have a job
+     * targeting {@code platform}. One story counts once per platform.
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT COUNT(*) FROM marketing_holding mh
+        WHERE mh.status = 'COMMITTED'
+        AND mh.locked_at >= :since
+        AND EXISTS (
+            SELECT 1 FROM marketing_job mj
+            WHERE mj.post_id = mh.post_id
+            AND JSON_CONTAINS(mj.targets, CONCAT('"', :platform, '"')) = TRUE
+        )
+        """)
+    long countCommittedForPlatformSince(
+        @Param("platform") String platform,
+        @Param("since") Instant since);
+
+    /**
      * Active waiting-board candidates: still inside the 24h window, not soft-deleted,
      * and not already COMMITTED/DROPPED on the holding table.
-     *
-     * <p>Ranking (weighted score) is applied in Java so S1-owned eligible ORDER BY
-     * queries on {@code MarketingJobRepository} stay untouched.
      */
     @Query(nativeQuery = true, value = """
         SELECT
@@ -72,6 +87,19 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
                 SELECT COUNT(*) FROM votes v
                 WHERE v.post_id = p.id
             ) AS voteCount,
+            (
+                SELECT COUNT(*) FROM votes v
+                INNER JOIN vote_options vo ON vo.id = v.option_id
+                WHERE v.post_id = p.id
+                AND vo.order_idx = 0
+            ) AS authorVoteCount,
+            CASE
+                WHEN p.partner_answered_at IS NOT NULL
+                 AND p.partner_body_published IS NOT NULL
+                 AND TRIM(p.partner_body_published) <> ''
+                THEN 1 ELSE 0
+            END AS hasPartner,
+            COALESCE(NULLIF(TRIM(p.promo_title), ''), p.title, p.user_title, '') AS hookText,
             p.created_at AS createdAt
         FROM posts p
         WHERE p.created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
@@ -89,6 +117,9 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
         Number getViewCount();
         Number getCommentCount();
         Number getVoteCount();
+        Number getAuthorVoteCount();
+        Number getHasPartner();
+        String getHookText();
         java.time.Instant getCreatedAt();
     }
 
@@ -113,7 +144,20 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
             (
                 SELECT COUNT(*) FROM votes v
                 WHERE v.post_id = p.id
-            ) AS voteCount
+            ) AS voteCount,
+            (
+                SELECT COUNT(*) FROM votes v
+                INNER JOIN vote_options vo ON vo.id = v.option_id
+                WHERE v.post_id = p.id
+                AND vo.order_idx = 0
+            ) AS authorVoteCount,
+            CASE
+                WHEN p.partner_answered_at IS NOT NULL
+                 AND p.partner_body_published IS NOT NULL
+                 AND TRIM(p.partner_body_published) <> ''
+                THEN 1 ELSE 0
+            END AS hasPartner,
+            COALESCE(NULLIF(TRIM(p.promo_title), ''), p.title, p.user_title, '') AS hookText
         FROM marketing_holding mh
         INNER JOIN posts p ON p.id = mh.post_id
         WHERE mh.status IN ('IN_POOL', 'PINNED', 'OUT_OF_CUT')
@@ -132,5 +176,8 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
         Number getViewCount();
         Number getCommentCount();
         Number getVoteCount();
+        Number getAuthorVoteCount();
+        Number getHasPartner();
+        String getHookText();
     }
 }

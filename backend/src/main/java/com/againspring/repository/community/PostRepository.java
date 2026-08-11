@@ -286,14 +286,16 @@ public interface PostRepository extends JpaRepository<Post, String> {
     Page<Post> findPublicByKeywordForMarketing(@Param("q") String q, Pageable pageable);
 
     /**
-     * promo_title만 조건부 갱신. 행이 없거나 이미 값이 있으면 0.
+     * promo_title(+hook_emotion) 조건부 갱신. 행이 없거나 promo_title이 이미 있으면 0.
      * save()/merge로 삭제된 행을 되살리지 않기 위함.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
-    @Query("UPDATE Post p SET p.promoTitle = :promoTitle " +
+    @Query("UPDATE Post p SET p.promoTitle = :promoTitle, p.hookEmotion = :hookEmotion " +
            "WHERE p.id = :postId AND (p.promoTitle IS NULL OR p.promoTitle = '')")
-    int updatePromoTitleIfAbsent(@Param("postId") String postId, @Param("promoTitle") String promoTitle);
+    int updatePromoTitleIfAbsent(@Param("postId") String postId,
+                                 @Param("promoTitle") String promoTitle,
+                                 @Param("hookEmotion") String hookEmotion);
 
     /**
      * 파트너 톤 정규화 결과만 UPDATE. 행이 없으면 0 (삭제 후 save()/merge 부활 방지).

@@ -107,8 +107,11 @@ public class MarketingHoldingBriefSeeder {
             log.warn("Holding brief: comments load failed for {}: {}", postId, e.getMessage());
         }
 
+        // IG holding seed (≤5): brand pair + 공감비율 + optional category.
+        // X text strategy uses brand pair only (#다시봄 #againspring) — no category.
         List<String> tags = new ArrayList<>();
         tags.add("#다시봄");
+        tags.add("#againspring");
         tags.add("#공감비율");
         if (post.getCategory() != null) {
             tags.add("#" + post.getCategory().getDisplayName());
@@ -122,6 +125,7 @@ public class MarketingHoldingBriefSeeder {
         return BriefDto.builder()
             .title(storyTitle)
             .promoTitle(PromoTitleService.resolveOrFallback(post))
+            .hookEmotion(blankToNull(post.getHookEmotion()))
             .metaphorId(post.getMetaphorId())
             .neutralSummary(summary)
             .sideA(sideAText)
@@ -139,6 +143,12 @@ public class MarketingHoldingBriefSeeder {
                 .forbiddenTerms(Arrays.asList("판결", "처방", "승패", "승자", "패자", "가해자", "피해자"))
                 .build())
             .build();
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private String resolveNickname(String userId) {

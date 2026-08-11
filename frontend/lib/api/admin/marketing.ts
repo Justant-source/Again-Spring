@@ -241,14 +241,23 @@ export async function getJobTraffic(id: number): Promise<JobTrafficDto> {
   return res.data;
 }
 
-// ===== Daily auto-publish quota =====
+// ===== Daily auto-publish quota (Phase 2 per-platform) =====
+
+export interface PlatformQuota {
+  cap: number;
+  usedToday: number;
+  remaining: number;
+}
 
 export interface MarketingQuota {
+  /** @deprecated Phase 1 — sum of text platform caps */
   dailyTextCap: number;
+  /** @deprecated Phase 1 — sum of video platform caps */
   dailyVideoCap: number;
   videosToday: number;
   textsToday: number;
   remainingPool: number;
+  platforms?: Record<string, PlatformQuota>;
 }
 
 export async function getMarketingQuota(): Promise<MarketingQuota> {
@@ -264,6 +273,16 @@ export async function updateMarketingQuota(
     dailyTextCap,
     dailyVideoCap,
   });
+  return res.data;
+}
+
+export async function updateMarketingPlatformQuota(caps: {
+  xThread?: number;
+  instagramFeed?: number;
+  instagramReels?: number;
+  youtubeShorts?: number;
+}): Promise<MarketingQuota> {
+  const res = await api.put<MarketingQuota>('/api/admin/marketing/quota', caps);
   return res.data;
 }
 
@@ -294,6 +313,9 @@ export interface MarketingScoreWeights {
   weightViews: number;
   weightComments: number;
   weightVotes: number;
+  platforms?: Record<string, Record<string, number>>;
+  /** Phase 2.7 — weekly nudge from platform stats. Default false. */
+  autoAdjust?: boolean;
 }
 
 export async function getMarketingScoreWeights(): Promise<MarketingScoreWeights> {
@@ -302,9 +324,97 @@ export async function getMarketingScoreWeights(): Promise<MarketingScoreWeights>
 }
 
 export async function updateMarketingScoreWeights(
-  weights: MarketingScoreWeights
+  weights: Partial<MarketingScoreWeights> & {
+    weightViews?: number;
+    weightComments?: number;
+    weightVotes?: number;
+  }
 ): Promise<MarketingScoreWeights> {
   const res = await api.put<MarketingScoreWeights>('/api/admin/marketing/score-weights', weights);
+  return res.data;
+}
+
+// ===== Phase 2.6–2.7 platform stats + weekly report =====
+
+export interface MarketingStatsCollectSummary {
+  requested: number;
+  stored: number;
+  partial: number;
+  errors: number;
+}
+
+export async function collectMarketingPlatformStats(opts?: {
+  jobIds?: number[];
+  lookbackDays?: number;
+  limit?: number;
+}): Promise<MarketingStatsCollectSummary> {
+  const params = new URLSearchParams();
+  if (opts?.lookbackDays != null) params.set('lookbackDays', String(opts.lookbackDays));
+  if (opts?.limit != null) params.set('limit', String(opts.limit));
+  if (opts?.jobIds?.length) {
+    for (const id of opts.jobIds) params.append('jobIds', String(id));
+  }
+  const qs = params.size > 0 ? `?${params}` : '';
+  const res = await api.post<MarketingStatsCollectSummary>(
+    `/api/admin/marketing/stats/collect${qs}`
+  );
+  return res.data;
+}
+
+export interface MarketingWeeklyReport {
+  weekStart: string;
+  weekEnd: string;
+  topStories: Array<{
+    postId: string;
+    title: string | null;
+    hookEmotion: string | null;
+    category: string | null;
+    score: number;
+    views: number;
+    likes: number;
+    comments: number;
+    utmVisits: number;
+    platforms: string[];
+  }>;
+  bottomStories: Array<{
+    postId: string;
+    title: string | null;
+    hookEmotion: string | null;
+    category: string | null;
+    score: number;
+    views: number;
+    likes: number;
+    comments: number;
+    utmVisits: number;
+    platforms: string[];
+  }>;
+  byEmotion: Array<{
+    emotion: string;
+    stories: number;
+    views: number;
+    comments: number;
+    avgScore: number;
+  }>;
+  byCategory: Array<{
+    category: string;
+    stories: number;
+    views: number;
+    utmVisits: number;
+    avgScore: number;
+  }>;
+  utmInflow: {
+    visits: number;
+    uniqueSessions: number;
+    bySource: Array<{ source: string; visits: number }>;
+  };
+  snapshotRows: number;
+  storyCount: number;
+}
+
+export async function getMarketingWeeklyReport(weeksAgo = 0): Promise<MarketingWeeklyReport> {
+  const res = await api.get<MarketingWeeklyReport>(
+    `/api/admin/marketing/weekly-report?weeksAgo=${weeksAgo}`
+  );
   return res.data;
 }
 

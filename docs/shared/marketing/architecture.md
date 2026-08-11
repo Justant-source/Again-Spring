@@ -1,12 +1,16 @@
 # 마케팅 시스템 아키텍처
 
+> **Phase 2 = 타깃 SSOT** (코드 병렬 착수). 분배·영상·통계는 [`platforms.md`](platforms.md) · [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) · [`api.md`](api.md).  
+> Phase 1 유지: UTM · 저녁 슬롯 · 텔레그램 댓글 노티 · 태그 · 배심원 없음 · 2027-01 고지.
+
 ## 설계 원칙
 
-1. **AS = 얇은 트리거** — Again-Spring은 잡 생성·콜백 수신·폴링·상태 표시만 담당. 콘텐츠 생성 로직 없음.
+1. **AS = 얇은 트리거** — Again-Spring은 홀딩·24h 확정·잡 생성·콜백 수신·폴링·상태 표시·통계/리포트. 콘텐츠 생성 로직 없음.
 2. **ASM = 콘텐츠 공장** — 카피라이팅·음성·영상·이미지·게시 전담. GPU 서버(WSL RTX 3090).
 3. **이중 동기화** — 푸시(콜백) + 풀(폴링). ASM이 종료 상태 도달 시 AS 콜백 엔드포인트로 즉시 전송, 폴링은 콜백 미수신 시 재조정용.
 4. **멱등성** — AS가 각 잡 생성 시도마다 Idempotency-Key(UUID)를 발송. ASM이 중복 감지 후 같은 응답 반환.
 5. **단방향 초기 요청** — 잡 생성은 AS → ASM. 이후 ASM → AS 콜백 + AS 폴링으로 동기화.
+6. **Phase 2 분배** — 플랫폼별 popularity·일일 cap(기본 3). 같은 사연 멀티 플랫폼 허용. IG feed⊥Reels만 점수 배타(동점→Reels).
 
 ---
 
@@ -93,13 +97,16 @@ MarketingJobService.triggerPublish(id)
 ```
 MarketingPollingScheduler (15초마다)
     │
-    ├─ 예약된 미발행 잡 감지: scheduledPublishAt < NOW() - 5분
-    │  (status ∉ PUBLISHED, FAILED, PARTIAL)
+    ├─ 저녁 슬롯 도래: READY && autoPublish && scheduledPublishAt <= NOW()
+    │  → triggerPublish() (ASM에 생성 시 auto_publish=false로 보냈던 잡)
+    │
+    ├─ 생성 중 슬롯 경과: scheduledPublishAt < NOW() - 5분
+    │  (status ∈ QUEUED, RUNNING, STALE — READY 제외)
     │
     └─ rescheduleExpiredJob() 실행
         ├─ originalScheduledAt 기록 (첫 이월 시)
         ├─ 다음날 동일 시간대로 재예약
-        │  예: 14:30 → 다음날 14:30
+        │  예: 20:30 → 다음날 20:30
         │
         └─ 충돌 감지 (동일 시간대에 다른 미발행 잡 있음)
            └─ 충돌 시 다음 빈 슬롯으로 이동
@@ -109,6 +116,8 @@ MarketingPollingScheduler (15초마다)
                  30분(30분) → 30분 단위
 ```
 
+**저녁 슬롯 (Phase 1 유지)**: 커밋/잡 생성 시 `MarketingPublishSlotService`가 KST 다음 발생을 `scheduledPublishAt`에 기록. 기본 `instagram_feed` 20:00 · reels/shorts 20:30 · `x_thread` 21:30. 설정 키 `marketing.publish_slot.*`.
+
 **상태 업데이트**:
 - `scheduledPublishAt`: 새 예약 시각
 - `rescheduledCount`: +1
@@ -116,7 +125,33 @@ MarketingPollingScheduler (15초마다)
 - `rescheduledReason`: "예약 시각 경과 (원 예약: {원래시간})"
 - `originalScheduledAt`: 첫 이월 시에만 저장
 
-**로깅**: INFO 레벨로 상세 기록 + `TelegramNotifier`로 @WaggleBot_bot 채팅방에 이월 발생 시마다 알림 (잡 ID·원 예약/새 예약 시각·이월 횟수 포함). 봇 토큰/chat id는 `encrypted_secret` vault(`telegram.bot_token`/`telegram.chat_id`)에서 주입.
+**로깅**: INFO 레벨로 상세 기록 + `TelegramNotifier`로 @WaggleBot_bot 채팅방에 이월 발생 시마다 알림 (잡 ID·원 예약/새 예약 시각·이월 횟수 포함). 봇 토큰/chat id는 `encrypted_secret` vault(`telegram.bot_token`/`telegram.chat_id`)에서 주입. 워치독과 동일 계열(`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`).
+
+### 6. Phase 2 분배 · 영상 · 통계 루프
+
+```
+T+24h MarketingHoldingCommitService
+    │
+    ├─ 채널별 score (platforms.md §식) DESC
+    ├─ 채널별 cap (기본 3) 잔여까지 COMMIT
+    ├─ 같은 사연 → 멀티 플랫폼 허용
+    ├─ IG: score_feed vs score_reels (동점→Reels) 만 배타
+    │
+    ├─ Reels/Shorts 확정 시
+    │     ├─ 변형 훅·스크립트 생성 (2단)
+    │     ├─ hook_emotion → brief → WaggleBot S2 Pro TTS
+    │     └─ 유니크 렌더 (Reels≤30s / Shorts≤45s · 전문 낭독 금지)
+    │
+    └─ 저녁 슬롯 publish (Phase 1)
+            │
+            ▼
+        [발행 성공] → 댓글 감시 창 (published_at + N h, 기본 24)
+            → 신규 댓글 → WaggleBot 텔레그램 → 운영자 수동 답글
+            → 플랫폼 통계 수집 (X/IG/YT)
+            → 주간 리포트 + (auto_adjust on 시) 가중치 소폭 보정
+```
+
+자동 답글·페르소나·프롬프트 자동 패치는 **후속/금지**. AI 고지는 **2027-01**.
 
 ### 데이터 흐름 다이어그램
 
@@ -258,3 +293,4 @@ async def run_stub(job_id):
 | 2026-06-09 | V15 마케팅 전면 제거(Phase R), ASM 분리(Phase I) |
 | 2026-06-09 | V79 FK 오류 수정, V80 marketing_job 테이블 추가 |
 | 2026-06-09 | ASM social-poster 복원·이관, ASM 서버 기동 |
+| 2026-08-11 | Doc-Sync Phase 2 타깃 SSOT: 채널별 score·cap · 유니크 영상 · 통계/`auto_adjust` · `hook_emotion`→TTS |

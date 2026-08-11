@@ -21,8 +21,10 @@ public class PostResponse {
     private String id;
     private String title;
     private String userTitle;
-    /** 마케팅 훅 제목 (≤20자). 생성 전이면 null — resolveOrFallback 사용. */
+    /** SNS 마스터 훅 (도발적, IG 개행 허용). 생성 전이면 null — resolveOrFallback 사용. */
     private String promoTitle;
+    /** 마스터 훅 감정: shock|anger|tension|sad|hype. 없으면 null. */
+    private String hookEmotion;
     /** 메타포 일러스트 ID (60종). 없으면 null. */
     private String metaphorId;
     /** 메타포 일러스트 ID 목록 (3-5개, 첫번째 = 대표). 없으면 null. */
@@ -40,19 +42,31 @@ public class PostResponse {
     private Boolean paired;
     /** 현재 사용자가 투표한 진영: "g"=작성자, "r"=상대방, null=미투표 */
     private String myVoteSide;
+    /** 작성자(orderIdx=0) 공감 비율 0–100. 표 없으면 null(FE는 중립 50). */
+    private Integer authorPct;
+    /** 상대방 공감 비율 = 100 - authorPct. 표 없으면 null. */
+    private Integer partnerPct;
     private Boolean deleted;
     private Boolean authorBodyDeleted;
     private Boolean partnerBodyDeleted;
 
     public static PostResponse from(Post post, List<VoteOption> options) {
-        return from(post, options, 0L, 0L, null, null);
+        return from(post, options, 0L, 0L, null, null, null);
     }
 
     public static PostResponse from(Post post, List<VoteOption> options, Long voteCount, Long commentCount, String authorNickname) {
-        return from(post, options, voteCount, commentCount, authorNickname, null);
+        return from(post, options, voteCount, commentCount, authorNickname, null, null);
     }
 
     public static PostResponse from(Post post, List<VoteOption> options, Long voteCount, Long commentCount, String authorNickname, Long votedOptionId) {
+        return from(post, options, voteCount, commentCount, authorNickname, votedOptionId, null);
+    }
+
+    /**
+     * @param authorOptionVoteCount orderIdx=0(작성자) 표 수. null이면 authorPct 미계산.
+     */
+    public static PostResponse from(Post post, List<VoteOption> options, Long voteCount, Long commentCount,
+                                    String authorNickname, Long votedOptionId, Long authorOptionVoteCount) {
         if (post.getDeletedAt() != null) {
             return PostResponse.builder()
                     .id(post.getId())
@@ -81,11 +95,19 @@ public class PostResponse {
                     .orElse(null);
         }
 
+        Integer authorPct = null;
+        Integer partnerPct = null;
+        if (voteCount != null && voteCount > 0 && authorOptionVoteCount != null) {
+            authorPct = (int) Math.round(authorOptionVoteCount * 100.0 / voteCount);
+            partnerPct = 100 - authorPct;
+        }
+
         return PostResponse.builder()
                 .id(post.getId())
                 .title(post.getTitle())
                 .userTitle(post.getUserTitle())
                 .promoTitle(post.getPromoTitle())
+                .hookEmotion(post.getHookEmotion())
                 .metaphorId(post.getMetaphorId())
                 .metaphorIds(post.getMetaphorIds())
                 .bodyPublished(bodyPublished)
@@ -100,6 +122,8 @@ public class PostResponse {
                 .authorNickname(authorNickname)
                 .paired(!partnerBodyDeleted && post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null)
                 .myVoteSide(myVoteSide)
+                .authorPct(authorPct)
+                .partnerPct(partnerPct)
                 .deleted(false)
                 .authorBodyDeleted(authorBodyDeleted)
                 .partnerBodyDeleted(partnerBodyDeleted)

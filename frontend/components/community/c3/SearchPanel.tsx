@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { postApi, PostSummary } from '@/lib/api/community/postApi';
 import { FeedCard } from './FeedCard';
 import { timeAgo } from '@/lib/utils/timeAgo';
+import { resolveAuthorPct } from '@/lib/utils/empathyPct';
 
 const STORAGE_KEY = 'as_recent_searches';
 const MAX_RECENT = 10;
@@ -194,7 +195,7 @@ export function SearchPanel({ currentCategory, onCategorySelect, onClose }: Prop
                       time={timeAgo(post.createdAt)}
                       title={post.title}
                       body={post.bodyPublished}
-                      g={post.authorPct ?? 50}
+                      g={resolveAuthorPct({ authorPct: post.authorPct, voteCount: post.voteCount })}
                       votes={post.voteCount ?? 0}
                       c={post.commentCount ?? 0}
                       views={post.viewCount ?? 0}

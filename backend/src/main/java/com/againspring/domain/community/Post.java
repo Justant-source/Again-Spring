@@ -46,9 +46,19 @@ public class Post {
     @Column(length = 200)
     private String userTitle;
 
-    /** IG 훅 제목. 원제 복제+의미줄바꿈(\\n). 생성 시 1회 LLM/PLAN. */
+    /**
+     * SNS 마스터 훅 (도발적). IG 패킹용 개행(\\n) 허용.
+     * 원제 복제가 아님 — PLAN 또는 PromoTitleService가 생성.
+     */
     @Column(name = "promo_title", length = 500)
     private String promoTitle;
+
+    /**
+     * 마스터 훅 감정 태그. {@code shock|anger|tension|sad|hype} only.
+     * null = 미생성 또는 폴백.
+     */
+    @Column(name = "hook_emotion", length = 16)
+    private String hookEmotion;
 
     /**
      * 메타포 일러스트 ID (60종 카탈로그). AI PLAN이 사연 생성 시 매칭.

@@ -8,6 +8,7 @@ import { postApi, PostSummary } from '@/lib/api/community/postApi';
 import { useUserStore } from '@/lib/store/userStore';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { permissionsFor } from '@/lib/constants/userPermissions';
+import { resolveAuthorPct } from '@/lib/utils/empathyPct';
 
 // BE PostCategory → 한글 라벨
 const CAT_LABEL: Record<string, string> = {
@@ -168,7 +169,7 @@ export default function LandingPage() {
                   </div>
                 )}
                 <div style={{ display: 'flex', height: 9, borderRadius: 999, overflow: 'hidden', marginTop: 16 }}>
-                  <div style={{ width: (todayPost.authorPct ?? 50) + '%', background: 'var(--faction-author)' }} />
+                  <div style={{ width: resolveAuthorPct({ authorPct: todayPost.authorPct, voteCount: todayPost.voteCount }) + '%', background: 'var(--faction-author)' }} />
                   <div style={{ flex: 1, background: 'var(--faction-partner)' }} />
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--L-sub)', marginTop: 10 }}>

@@ -39,7 +39,7 @@ solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워
 
 | Workload | 경로 | 요청 핵심 | 응답 핵심 |
 |---|---|---|---|
-| `PAIRED_PHASE1` | `POST /v2/generate/paired-phase1` | `author`, `personas`, `category`/`topicHint`, optional reconstruct/source, `maxTopLevel`≈4, optional `overused_metaphor_ids` | `workload`, `post`{title,body,promo_title,capture_split_after_lines,metaphor_id,metaphor_ids}, `items`[] |
+| `PAIRED_PHASE1` | `POST /v2/generate/paired-phase1` | `author`, `personas`, `category`/`topicHint`, optional reconstruct/source, `maxTopLevel`≈4, optional `overused_metaphor_ids` | `workload`, `post`{title,body,promo_title,hook_emotion,capture_split_after_lines,metaphor_id,metaphor_ids}, `items`[] |
 | `PAIRED_PHASE2` | `POST /v2/generate/paired-phase2` | `authorPost`{title,body}, `partner`, `personas`, `publishedTopLevelComments`[0..8], `includePartnerPost` | `workload`, `partner_post`{body,capture_split_after_lines}\|null, `items`[] |
 
 - **phase1**: 상대방 본문 없음. 댓글은 작성자만 본 것처럼. 기본 min top-level=2.

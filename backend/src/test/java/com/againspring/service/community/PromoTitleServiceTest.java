@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PromoTitleServiceTest {
@@ -31,34 +32,56 @@ class PromoTitleServiceTest {
     }
 
     @Test
-    void normalizeAgainstTitle_repacksOrphanHeavyBreaks() {
-        String title = "왜 만나자는 말 안 하냐고";
-        String bad = "왜\n만나자는\n말\n안\n하냐고";
-        String got = PromoTitleService.normalizeAgainstTitle(bad, title);
-        assertEquals(PromoTitleService.collapseWs(title),
-                PromoTitleService.collapseWs(got.replace("\n", "")));
+    void normalizeHook_repacksOrphanHeavyBreaks() {
+        String bad = "왜\n만\n나\n자";
+        String got = PromoTitleService.normalizeHook(bad);
         for (String line : got.split("\n")) {
             assertTrue(line.length() >= PromoTitleService.MIN_LINE_LEN || got.split("\n").length == 1, line);
         }
     }
 
     @Test
-    void normalizeAgainstTitle_keepsValidBreaks() {
-        String title = "도와줬더니 모든 걸 저한테 의존하는 동료";
-        String promo = "도와줬더니\n모든 걸\n저한테\n의존하는 동료";
-        String got = PromoTitleService.normalizeAgainstTitle(promo, title);
+    void normalizeHook_keepsValidBreaks_withoutTitleEquality() {
+        String promo = "그 말\n진짜야?\n충격";
+        String got = PromoTitleService.normalizeHook(promo);
         assertTrue(got.contains("\n"));
+        assertEquals("그 말\n진짜야?\n충격", got);
+    }
+
+    @Test
+    void normalizeHook_allowsRewriteDifferentFromTitle() {
+        // master hook may diverge from original title — must not be rewritten back
+        String promo = "완전히\n다른\n훅이다";
+        String got = PromoTitleService.normalizeHook(promo);
+        assertEquals(PromoTitleService.collapseWs("완전히다른훅이다"),
+                PromoTitleService.collapseWs(got.replace("\n", "")));
+    }
+
+    @Test
+    void normalizeAgainstTitle_blankFallsBackToWrap() {
+        String title = "원제입니다 그대로";
+        String got = PromoTitleService.normalizeAgainstTitle(null, title);
         assertEquals(PromoTitleService.collapseWs(title),
                 PromoTitleService.collapseWs(got.replace("\n", "")));
     }
 
     @Test
-    void normalizeAgainstTitle_rejectsRewrite() {
-        String title = "원제입니다 그대로";
-        String promo = "완전히\n다른\n훅";
-        String got = PromoTitleService.normalizeAgainstTitle(promo, title);
-        assertEquals(PromoTitleService.collapseWs(title),
-                PromoTitleService.collapseWs(got.replace("\n", "")));
+    void validateEmotion_acceptsAllowedValues() {
+        for (String e : PromoTitleService.HOOK_EMOTIONS) {
+            assertEquals(e, PromoTitleService.validateEmotion(e));
+            assertEquals(e, PromoTitleService.validateEmotion(e.toUpperCase()));
+            assertEquals(e, PromoTitleService.validateEmotion("  " + e + "  "));
+        }
+    }
+
+    @Test
+    void validateEmotion_rejectsUnknownAndBlank() {
+        assertNull(PromoTitleService.validateEmotion(null));
+        assertNull(PromoTitleService.validateEmotion(""));
+        assertNull(PromoTitleService.validateEmotion("   "));
+        assertNull(PromoTitleService.validateEmotion("joy"));
+        assertNull(PromoTitleService.validateEmotion("shocking"));
+        assertNull(PromoTitleService.validateEmotion("판정"));
     }
 
     @Test
@@ -68,8 +91,10 @@ class PromoTitleServiceTest {
                 .authorId("a1")
                 .title("원제목이 아주 긴 제목입니다")
                 .promoTitle("원제목이\n아주 긴\n제목입니다")
+                .hookEmotion("tension")
                 .build();
         assertEquals("원제목이\n아주 긴\n제목입니다", PromoTitleService.resolveOrFallback(post));
+        assertEquals("tension", post.getHookEmotion());
     }
 
     @Test
@@ -84,5 +109,6 @@ class PromoTitleServiceTest {
         assertTrue(got.contains("\n"));
         assertEquals(PromoTitleService.collapseWs(title),
                 PromoTitleService.collapseWs(got.replace("\n", "")));
+        assertNull(post.getHookEmotion());
     }
 }
