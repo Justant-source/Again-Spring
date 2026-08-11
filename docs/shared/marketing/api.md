@@ -434,11 +434,14 @@ POST /api/admin/marketing/score-weights/auto-adjust/run   // 1회 실행 (cron�
 **저장 선택**: 수집기는 **ASM**(자격증명·`publication.remote_id`). 캐논 스냅샷은 **AS** `marketing_publication_stats` (V110) — 주간 리포트·`auto_adjust`가 AS에 있음. ASM에도 `publication_stat` 로컬 캐시.
 
 ```
-POST /api/admin/marketing/stats/collect?lookbackDays=14&limit=40
+POST /api/admin/marketing/stats/collect?lookbackDays=14&limit=40  → 202 {runId,status}
+GET  /api/admin/marketing/stats/collect/{runId}                   → {status,summary?}
 GET  /api/admin/marketing/weekly-report?weeksAgo=0
 ```
 
-ASM: `POST /api/v1/stats/collect` · social-poster `POST /stats/x`.
+수동 수집은 **비동기**(CF/nginx 60s 타임아웃 회피). FE가 `runId`를 폴링. AS→ASM body에 `skip_slow=true`(X Playwright 생략, IG/YT만).
+
+ASM: `POST /api/v1/stats/collect` (`skip_slow`) · social-poster `POST /stats/x`.
 
 | 플랫폼 | 지금 수집 가능 | 비고 |
 |---|---|---|
@@ -461,8 +464,40 @@ PUT /api/admin/marketing/publish-slots
 
 상세는 §4.2.1. 엔드포인트:
 
-- `POST /api/admin/marketing/stats/collect`
+- `POST /api/admin/marketing/stats/collect` (202 async) · `GET .../stats/collect/{runId}`
 - `GET /api/admin/marketing/weekly-report?weeksAgo=0`
 - `POST /api/admin/marketing/score-weights/auto-adjust/run`
 
 채널×훅유형→가입 대시보드는 **후속** (UTM 축적 후).
+
+### 4.5 통계 탭 · 테마 배수 (Phase 3)
+
+어드민 **「통계」** 탭용. 컨트롤러: `AdminMarketingStatsController` (`/api/admin/marketing/stats`).  
+수집(`collect`)은 기존 `AdminMarketingController` 경로 유지.
+
+```
+GET  /api/admin/marketing/stats/dashboard
+     ?platform=&weeksAgo=0&rangeDays=7&primaryMetric=
+     → { weekStart, weekEnd, prevWeek*, platforms[{platform,primaryMetric,value,prevValue,deltaPct,series}],
+         utm, health, unknownCounts, todoHints }
+
+GET  /api/admin/marketing/stats/theme-matrix?platform=&weeksAgo=0
+     → { platform, emotions[], categories[], cells[{emotion,category,n,score,delta,boost,locked}],
+         proposals[], rolledProposals[], unknownHints }
+
+POST /api/admin/marketing/stats/theme-matrix/propose?platform=&weeksAgo=0
+     → Proposal[] (저장 안 함 · PROPOSE 이벤트)
+
+POST /api/admin/marketing/stats/theme-matrix/apply
+     Body: { platform, changes:[{emotion,category,boost}], confirm:true }
+     → { applied, before, after, cooldownUntil } | 400
+
+GET  /api/admin/marketing/stats/theme-boosts?platform=
+     → { platform, matrix, shadow, cooldownUntil, canApplyNow }
+
+GET  /api/admin/marketing/stats/events?limit=50
+     → [{ id, eventType, platform, payloadJson, createdAt }]
+```
+
+**설정 키**: `marketing.theme.boost.{platform}.{emotion}.{category}` · `marketing.theme.shadow`(기본 true) · `last_apply_at` · `min_n=3` · `boost_min/max=0.7/1.3` · `delta_cap=0.05`.  
+**이벤트 테이블**: `marketing_stats_event` (V111) — `COLLECT_*` · `PROPOSE` · `APPLY` · `SHADOW_TOGGLE`.

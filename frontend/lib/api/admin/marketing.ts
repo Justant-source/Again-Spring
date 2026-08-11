@@ -343,10 +343,21 @@ export interface MarketingStatsCollectSummary {
   errors: number;
 }
 
+export interface MarketingStatsCollectRun {
+  runId: string;
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED';
+  startedAt?: string;
+  finishedAt?: string;
+  error?: string;
+  summary?: MarketingStatsCollectSummary;
+}
+
+/** Start async collect and poll until done (avoids CF/nginx 60s proxy kill). */
 export async function collectMarketingPlatformStats(opts?: {
   jobIds?: number[];
   lookbackDays?: number;
   limit?: number;
+  onTick?: (elapsedSec: number, status: string) => void;
 }): Promise<MarketingStatsCollectSummary> {
   const params = new URLSearchParams();
   if (opts?.lookbackDays != null) params.set('lookbackDays', String(opts.lookbackDays));
@@ -355,12 +366,38 @@ export async function collectMarketingPlatformStats(opts?: {
     for (const id of opts.jobIds) params.append('jobIds', String(id));
   }
   const qs = params.size > 0 ? `?${params}` : '';
-  const res = await api.post<MarketingStatsCollectSummary>(
+  const started = await api.post<MarketingStatsCollectRun>(
     `/api/admin/marketing/stats/collect${qs}`,
     null,
-    { timeout: 320_000 } // ASM X scrape / YT can exceed default; BE read timeout 300s
+    { timeout: 30_000 }
   );
-  return res.data;
+  const runId = started.data.runId;
+  if (!runId) {
+    throw new Error('collect runId missing');
+  }
+  const t0 = Date.now();
+  const deadline = t0 + 300_000;
+  while (Date.now() < deadline) {
+    const elapsedSec = Math.floor((Date.now() - t0) / 1000);
+    opts?.onTick?.(elapsedSec, 'RUNNING');
+    await new Promise((r) => setTimeout(r, 2000));
+    const poll = await api.get<MarketingStatsCollectRun>(
+      `/api/admin/marketing/stats/collect/${runId}`,
+      { timeout: 15_000 }
+    );
+    const data = poll.data;
+    opts?.onTick?.(Math.floor((Date.now() - t0) / 1000), data.status);
+    if (data.status === 'COMPLETED') {
+      if (!data.summary) {
+        throw new Error('collect completed without summary');
+      }
+      return data.summary;
+    }
+    if (data.status === 'FAILED') {
+      throw new Error(data.error || 'collect failed');
+    }
+  }
+  throw new Error('collect timed out (5분). 잠시 후 다시 시도하세요.');
 }
 
 export interface MarketingWeeklyReport {
@@ -418,6 +455,592 @@ export async function getMarketingWeeklyReport(weeksAgo = 0): Promise<MarketingW
     `/api/admin/marketing/weekly-report?weeksAgo=${weeksAgo}`
   );
   return res.data;
+}
+
+// ===== Phase 3 stats dashboard (Sprint 3.1) =====
+
+export const MARKETING_STATS_PLATFORMS = [
+  'x_thread',
+  'instagram_feed',
+  'instagram_reels',
+  'youtube_shorts',
+] as const;
+
+export type MarketingStatsPlatform = (typeof MARKETING_STATS_PLATFORMS)[number];
+
+export const MARKETING_STATS_PLATFORM_LABELS: Record<MarketingStatsPlatform, string> = {
+  x_thread: 'X 스레드',
+  instagram_feed: '인스타 피드',
+  instagram_reels: '인스타 릴스',
+  youtube_shorts: 'YouTube Shorts',
+};
+
+/** Default primary metric per platform (plan S5). */
+export const MARKETING_STATS_DEFAULT_METRICS: Record<MarketingStatsPlatform, string> = {
+  x_thread: 'impressions',
+  instagram_feed: 'reach',
+  instagram_reels: 'plays',
+  youtube_shorts: 'views',
+};
+
+export type MarketingStatsChannelStatus = 'ok' | 'partial' | 'error' | 'unknown' | string;
+
+export interface MarketingStatsSeriesPoint {
+  day: string;
+  value: number;
+}
+
+export interface MarketingStatsPlatformKpi {
+  platform: string;
+  /** Selected / default primary metric key. */
+  primaryMetric: string;
+  /** Current-window aggregate for primary metric. */
+  value: number;
+  /** Previous-window aggregate. */
+  prevValue: number;
+  /** Week-over-week % change (null if prev is 0 / undefined). */
+  deltaPct: number | null;
+  series: MarketingStatsSeriesPoint[];
+  /** Optional alias fields some BE drafts may use. */
+  kpi?: number;
+  delta?: number | null;
+}
+
+export interface MarketingStatsUtmSummary {
+  visits: number;
+  uniqueSessions: number;
+  bySource: Array<{ source: string; visits: number }>;
+}
+
+export interface MarketingStatsChannelHealth {
+  platform: string;
+  status: MarketingStatsChannelStatus;
+  message?: string | null;
+}
+
+export interface MarketingStatsHealth {
+  lastCollectAt: string | null;
+  partialCount: number;
+  errorCount: number;
+  channels: MarketingStatsChannelHealth[];
+}
+
+export interface MarketingStatsUnknownCounts {
+  missingEmotion: number;
+  missingCategory: number;
+}
+
+export interface MarketingStatsDashboard {
+  weekStart: string;
+  weekEnd: string;
+  prevWeekStart: string;
+  prevWeekEnd: string;
+  platforms: MarketingStatsPlatformKpi[];
+  utm: MarketingStatsUtmSummary;
+  health: MarketingStatsHealth;
+  unknownCounts: MarketingStatsUnknownCounts;
+  /** Soft hints for todo strip (sibling may enrich). */
+  todoHints: string[];
+  todoStrip?: unknown;
+}
+
+export interface MarketingStatsDashboardParams {
+  platform?: string;
+  weeksAgo?: number;
+  rangeDays?: number;
+  primaryMetric?: string;
+}
+
+function emptyStatsDashboard(): MarketingStatsDashboard {
+  return {
+    weekStart: '',
+    weekEnd: '',
+    prevWeekStart: '',
+    prevWeekEnd: '',
+    platforms: MARKETING_STATS_PLATFORMS.map((platform) => ({
+      platform,
+      primaryMetric: MARKETING_STATS_DEFAULT_METRICS[platform],
+      value: 0,
+      prevValue: 0,
+      deltaPct: null,
+      series: [],
+    })),
+    utm: { visits: 0, uniqueSessions: 0, bySource: [] },
+    health: {
+      lastCollectAt: null,
+      partialCount: 0,
+      errorCount: 0,
+      channels: MARKETING_STATS_PLATFORMS.map((platform) => ({
+        platform,
+        status: 'unknown',
+        message: null,
+      })),
+    },
+    unknownCounts: { missingEmotion: 0, missingCategory: 0 },
+    todoHints: [],
+  };
+}
+
+type MarketingStatsDashboardRaw = Partial<MarketingStatsDashboard> & {
+  week?: { start?: string; end?: string };
+  prevWeek?: { start?: string; end?: string };
+  platforms?: Array<Partial<MarketingStatsPlatformKpi> & { platform?: string }>;
+  utm?: Partial<MarketingStatsUtmSummary>;
+  health?: Partial<MarketingStatsHealth>;
+  unknownCounts?: Partial<MarketingStatsUnknownCounts>;
+  todoHints?: string[];
+};
+
+function normalizeStatsDashboard(raw: MarketingStatsDashboardRaw | null | undefined): MarketingStatsDashboard {
+  if (!raw || typeof raw !== 'object') return emptyStatsDashboard();
+
+  const weekStart = raw.weekStart ?? raw.week?.start ?? '';
+  const weekEnd = raw.weekEnd ?? raw.week?.end ?? '';
+  const prevWeekStart = raw.prevWeekStart ?? raw.prevWeek?.start ?? '';
+  const prevWeekEnd = raw.prevWeekEnd ?? raw.prevWeek?.end ?? '';
+
+  type PlatformRow = Partial<MarketingStatsPlatformKpi> & { platform?: string };
+  const platformsRaw: PlatformRow[] = Array.isArray(raw.platforms) ? raw.platforms : [];
+  const byPlatform = new Map<string, PlatformRow>();
+  for (const p of platformsRaw) {
+    if (p?.platform) byPlatform.set(p.platform, p);
+  }
+
+  const platforms: MarketingStatsPlatformKpi[] = MARKETING_STATS_PLATFORMS.map((platform) => {
+    const row = byPlatform.get(platform);
+    const primaryMetric =
+      row?.primaryMetric ?? MARKETING_STATS_DEFAULT_METRICS[platform];
+    const value = Number(row?.value ?? row?.kpi ?? 0);
+    const prevValue = Number(row?.prevValue ?? 0);
+    let deltaPct: number | null =
+      row?.deltaPct != null
+        ? Number(row.deltaPct)
+        : row?.delta != null
+          ? Number(row.delta)
+          : null;
+    if (deltaPct == null && prevValue > 0) {
+      deltaPct = ((value - prevValue) / prevValue) * 100;
+    }
+    return {
+      platform,
+      primaryMetric,
+      value,
+      prevValue,
+      deltaPct: Number.isFinite(deltaPct as number) ? deltaPct : null,
+      series: Array.isArray(row?.series)
+        ? row.series.map((s) => ({
+            day: String(s.day ?? ''),
+            value: Number(s.value ?? 0),
+          }))
+        : [],
+    };
+  });
+
+  const utmRaw: Partial<MarketingStatsUtmSummary> = raw.utm ?? {};
+  const healthRaw: Partial<MarketingStatsHealth> = raw.health ?? {};
+  const channelsRaw: MarketingStatsChannelHealth[] = Array.isArray(healthRaw.channels)
+    ? healthRaw.channels
+    : [];
+  const channelMap = new Map<string, MarketingStatsChannelHealth>();
+  for (const c of channelsRaw) {
+    if (c?.platform) channelMap.set(c.platform, c);
+  }
+
+  return {
+    weekStart,
+    weekEnd,
+    prevWeekStart,
+    prevWeekEnd,
+    platforms,
+    utm: {
+      visits: Number(utmRaw.visits ?? 0),
+      uniqueSessions: Number(utmRaw.uniqueSessions ?? 0),
+      bySource: Array.isArray(utmRaw.bySource)
+        ? utmRaw.bySource.map((s) => ({
+            source: String(s.source ?? ''),
+            visits: Number(s.visits ?? 0),
+          }))
+        : [],
+    },
+    health: {
+      lastCollectAt: healthRaw.lastCollectAt ?? null,
+      partialCount: Number(healthRaw.partialCount ?? 0),
+      errorCount: Number(healthRaw.errorCount ?? 0),
+      channels: MARKETING_STATS_PLATFORMS.map((platform) => {
+        const ch = channelMap.get(platform);
+        return {
+          platform,
+          status: ch?.status ?? 'unknown',
+          message: ch?.message ?? null,
+        };
+      }),
+    },
+    unknownCounts: {
+      missingEmotion: Number(raw.unknownCounts?.missingEmotion ?? 0),
+      missingCategory: Number(raw.unknownCounts?.missingCategory ?? 0),
+    },
+    todoHints: Array.isArray(raw.todoHints) ? raw.todoHints.map(String) : [],
+    todoStrip: raw.todoStrip,
+  };
+}
+
+/**
+ * Phase 3 stats dashboard. Returns an empty shell on 404 so the UI can render
+ * before the BE endpoint ships.
+ */
+export async function getMarketingStatsDashboard(
+  params?: MarketingStatsDashboardParams
+): Promise<MarketingStatsDashboard> {
+  const q = new URLSearchParams();
+  if (params?.platform) q.set('platform', params.platform);
+  if (params?.weeksAgo != null) q.set('weeksAgo', String(params.weeksAgo));
+  if (params?.rangeDays != null) q.set('rangeDays', String(params.rangeDays));
+  if (params?.primaryMetric) q.set('primaryMetric', params.primaryMetric);
+  const qs = q.size > 0 ? `?${q}` : '';
+  try {
+    const res = await api.get<MarketingStatsDashboardRaw>(
+      `/api/admin/marketing/stats/dashboard${qs}`
+    );
+    return normalizeStatsDashboard(res.data);
+  } catch (err: unknown) {
+    const status =
+      typeof err === 'object' && err !== null && 'response' in err
+        ? (err as { response?: { status?: number } }).response?.status
+        : undefined;
+    if (status === 404) {
+      return emptyStatsDashboard();
+    }
+    throw err;
+  }
+}
+
+// ===== Phase 3 theme matrix / boosts / events =====
+
+export const MARKETING_THEME_EMOTIONS = [
+  'shock',
+  'anger',
+  'tension',
+  'sad',
+  'hype',
+] as const;
+
+export const MARKETING_THEME_CATEGORIES = [
+  'COUPLE',
+  'MARRIED',
+  'FRIEND',
+  'FAMILY',
+  'WORK',
+  'OTHER',
+] as const;
+
+export const MARKETING_THEME_EMOTION_LABELS: Record<string, string> = {
+  shock: '충격',
+  anger: '분노',
+  tension: '긴장',
+  sad: '슬픔',
+  hype: '하이프',
+};
+
+export const MARKETING_THEME_CATEGORY_LABELS: Record<string, string> = {
+  COUPLE: '연인',
+  MARRIED: '부부',
+  FRIEND: '친구',
+  FAMILY: '가족',
+  WORK: '직장',
+  OTHER: '기타',
+};
+
+export interface MarketingThemeMatrixCell {
+  emotion: string;
+  category: string;
+  n: number;
+  score: number;
+  /** Week-over-week delta (absolute or ratio — display as-is). */
+  delta: number | null;
+  /** Current stored boost. */
+  boost: number;
+  locked: boolean;
+}
+
+export interface MarketingThemeProposal {
+  emotion?: string | null;
+  category?: string | null;
+  n?: number;
+  score?: number;
+  prevScore?: number;
+  delta?: number | null;
+  proposalScore?: number;
+  currentBoost?: number;
+  /** Suggested boost (preferred). */
+  suggestedBoost?: number;
+  /** Alias some BE drafts may use instead of suggestedBoost. */
+  boost?: number;
+  reason?: string | null;
+  axis?: 'cell' | 'emotion' | 'category' | string;
+  direction?: 'up' | 'down' | 'flat' | string;
+  rolled?: boolean;
+}
+
+export interface MarketingThemeMatrix {
+  platform: string;
+  emotions: string[];
+  categories: string[];
+  cells: MarketingThemeMatrixCell[];
+  proposals: MarketingThemeProposal[];
+  rolledProposals: MarketingThemeProposal[];
+  unknownHints?: MarketingStatsUnknownCounts | null;
+  cooldownUntil?: string | null;
+  canApply?: boolean;
+  shadow?: boolean;
+}
+
+export interface MarketingThemeBoostChange {
+  emotion?: string | null;
+  category?: string | null;
+  boost: number;
+}
+
+export interface MarketingThemeApplyRequest {
+  platform: string;
+  changes: MarketingThemeBoostChange[];
+  confirm: true;
+}
+
+export interface MarketingThemeApplyResult {
+  applied: number;
+  before: Record<string, Record<string, number>>;
+  after: Record<string, Record<string, number>>;
+  cooldownUntil: string | null;
+}
+
+/** Nested emotion → category → boost. */
+export type MarketingThemeBoostsMap = Record<string, Record<string, number>>;
+
+export interface MarketingStatsEventDto {
+  id: number;
+  eventType: string;
+  platform: string | null;
+  payloadJson: string | null;
+  createdAt: string;
+}
+
+function isNotFound(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'response' in err &&
+    (err as { response?: { status?: number } }).response?.status === 404
+  );
+}
+
+function emptyThemeMatrix(platform: string): MarketingThemeMatrix {
+  return {
+    platform,
+    emotions: [...MARKETING_THEME_EMOTIONS],
+    categories: [...MARKETING_THEME_CATEGORIES],
+    cells: [],
+    proposals: [],
+    rolledProposals: [],
+    unknownHints: null,
+    cooldownUntil: null,
+    canApply: true,
+    shadow: true,
+  };
+}
+
+function normalizeProposal(raw: Partial<MarketingThemeProposal> | null | undefined): MarketingThemeProposal {
+  if (!raw || typeof raw !== 'object') return {};
+  const suggested =
+    raw.suggestedBoost != null
+      ? Number(raw.suggestedBoost)
+      : raw.boost != null
+        ? Number(raw.boost)
+        : undefined;
+  return {
+    emotion: raw.emotion ?? null,
+    category: raw.category ?? null,
+    n: raw.n != null ? Number(raw.n) : undefined,
+    score: raw.score != null ? Number(raw.score) : undefined,
+    prevScore: raw.prevScore != null ? Number(raw.prevScore) : undefined,
+    delta: raw.delta != null ? Number(raw.delta) : null,
+    proposalScore: raw.proposalScore != null ? Number(raw.proposalScore) : undefined,
+    currentBoost: raw.currentBoost != null ? Number(raw.currentBoost) : undefined,
+    suggestedBoost: suggested != null && Number.isFinite(suggested) ? suggested : undefined,
+    boost: suggested != null && Number.isFinite(suggested) ? suggested : undefined,
+    reason: raw.reason ?? null,
+    axis: raw.axis,
+    direction: raw.direction,
+    rolled: raw.rolled,
+  };
+}
+
+function normalizeThemeMatrix(
+  raw: Partial<MarketingThemeMatrix> | null | undefined,
+  fallbackPlatform: string
+): MarketingThemeMatrix {
+  const platform = raw?.platform || fallbackPlatform;
+  if (!raw || typeof raw !== 'object') return emptyThemeMatrix(platform);
+  return {
+    platform,
+    emotions:
+      Array.isArray(raw.emotions) && raw.emotions.length > 0
+        ? raw.emotions.map(String)
+        : [...MARKETING_THEME_EMOTIONS],
+    categories:
+      Array.isArray(raw.categories) && raw.categories.length > 0
+        ? raw.categories.map(String)
+        : [...MARKETING_THEME_CATEGORIES],
+    cells: Array.isArray(raw.cells)
+      ? raw.cells.map((c) => ({
+          emotion: String(c.emotion ?? ''),
+          category: String(c.category ?? ''),
+          n: Number(c.n ?? 0),
+          score: Number(c.score ?? 0),
+          delta: c.delta != null ? Number(c.delta) : null,
+          boost: Number(c.boost ?? 1),
+          locked: Boolean(c.locked),
+        }))
+      : [],
+    proposals: Array.isArray(raw.proposals) ? raw.proposals.map(normalizeProposal) : [],
+    rolledProposals: Array.isArray(raw.rolledProposals)
+      ? raw.rolledProposals.map(normalizeProposal)
+      : [],
+    unknownHints: raw.unknownHints ?? null,
+    cooldownUntil: raw.cooldownUntil ?? null,
+    canApply: raw.canApply ?? true,
+    shadow: raw.shadow ?? true,
+  };
+}
+
+/** GET emotion×category heatmap + proposals. Empty shell on 404. */
+export async function getMarketingThemeMatrix(opts?: {
+  platform?: string;
+  weeksAgo?: number;
+}): Promise<MarketingThemeMatrix> {
+  const platform = opts?.platform || 'x_thread';
+  const q = new URLSearchParams();
+  q.set('platform', platform);
+  if (opts?.weeksAgo != null) q.set('weeksAgo', String(opts.weeksAgo));
+  try {
+    const res = await api.get<Partial<MarketingThemeMatrix>>(
+      `/api/admin/marketing/stats/theme-matrix?${q}`
+    );
+    return normalizeThemeMatrix(res.data, platform);
+  } catch (err: unknown) {
+    if (isNotFound(err)) return emptyThemeMatrix(platform);
+    throw err;
+  }
+}
+
+/** POST propose — recalculate suggestions (no persist). */
+export async function proposeMarketingThemeMatrix(opts?: {
+  platform?: string;
+  weeksAgo?: number;
+}): Promise<MarketingThemeMatrix | MarketingThemeProposal[]> {
+  const platform = opts?.platform || 'x_thread';
+  const q = new URLSearchParams();
+  q.set('platform', platform);
+  if (opts?.weeksAgo != null) q.set('weeksAgo', String(opts.weeksAgo));
+  const res = await api.post<MarketingThemeMatrix | MarketingThemeProposal[]>(
+    `/api/admin/marketing/stats/theme-matrix/propose?${q}`,
+    null
+  );
+  const data = res.data;
+  if (Array.isArray(data)) {
+    return data.map(normalizeProposal);
+  }
+  return normalizeThemeMatrix(data, platform);
+}
+
+/** POST apply confirmed boost changes. */
+export async function applyMarketingThemeMatrix(
+  body: MarketingThemeApplyRequest
+): Promise<MarketingThemeApplyResult> {
+  const res = await api.post<MarketingThemeApplyResult>(
+    '/api/admin/marketing/stats/theme-matrix/apply',
+    body
+  );
+  const data = res.data;
+  return {
+    applied: Number(data?.applied ?? 0),
+    before: data?.before ?? {},
+    after: data?.after ?? {},
+    cooldownUntil: data?.cooldownUntil ?? null,
+  };
+}
+
+/** GET stored boost matrix for a platform. */
+export async function getMarketingThemeBoosts(
+  platform?: string
+): Promise<MarketingThemeBoostsMap> {
+  const q = new URLSearchParams();
+  if (platform) q.set('platform', platform);
+  const qs = q.size > 0 ? `?${q}` : '';
+  try {
+    const res = await api.get<MarketingThemeBoostsMap | { matrix?: MarketingThemeBoostsMap }>(
+      `/api/admin/marketing/stats/theme-boosts${qs}`
+    );
+    const data = res.data;
+    if (data && typeof data === 'object' && 'matrix' in data && data.matrix) {
+      return data.matrix as MarketingThemeBoostsMap;
+    }
+    return (data as MarketingThemeBoostsMap) ?? {};
+  } catch (err: unknown) {
+    if (isNotFound(err)) return {};
+    throw err;
+  }
+}
+
+/** GET marketing stats activity timeline. */
+export async function getMarketingStatsEvents(limit = 50): Promise<MarketingStatsEventDto[]> {
+  const q = new URLSearchParams();
+  q.set('limit', String(limit));
+  try {
+    const res = await api.get<
+      MarketingStatsEventDto[] | { items?: MarketingStatsEventDto[]; events?: MarketingStatsEventDto[] }
+    >(`/api/admin/marketing/stats/events?${q}`);
+    const data = res.data;
+    if (Array.isArray(data)) return data.map(normalizeStatsEvent);
+    if (data && typeof data === 'object') {
+      const list = data.items ?? data.events ?? [];
+      return list.map(normalizeStatsEvent);
+    }
+    return [];
+  } catch (err: unknown) {
+    if (isNotFound(err)) return [];
+    throw err;
+  }
+}
+
+function normalizeStatsEvent(
+  raw: Partial<MarketingStatsEventDto> & {
+    event_type?: string;
+    payload_json?: string;
+    created_at?: string;
+  }
+): MarketingStatsEventDto {
+  return {
+    id: Number(raw.id ?? 0),
+    eventType: String(raw.eventType ?? raw.event_type ?? ''),
+    platform: raw.platform ?? null,
+    payloadJson: raw.payloadJson ?? raw.payload_json ?? null,
+    createdAt: String(raw.createdAt ?? raw.created_at ?? ''),
+  };
+}
+
+/** Holding-tab deep link for a theme cell (pin recommendation v1). */
+export function marketingHoldingThemeDeepLink(emotion?: string | null, category?: string | null): string {
+  const q = new URLSearchParams();
+  q.set('tab', 'holding');
+  if (emotion) q.set('emotion', emotion);
+  if (category) q.set('category', category);
+  return `/admin/marketing?${q}`;
+}
+
+/** Resolve suggested boost from a proposal row. */
+export function themeProposalSuggestedBoost(p: MarketingThemeProposal): number | null {
+  const v = p.suggestedBoost ?? p.boost;
+  return v != null && Number.isFinite(v) ? Number(v) : null;
 }
 
 // ===== Holding board (marketing redesign) =====

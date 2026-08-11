@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -33,19 +33,30 @@ public class MarketingPlatformStatsCollector {
     private final MarketingJobRepository marketingJobRepository;
     private final MarketingPublicationStatsRepository statsRepository;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     public record CollectSummary(int requested, int stored, int partial, int errors) {}
 
-    @Transactional
     public CollectSummary collectRecent(int lookbackDays, int limit) {
+        return collectRecent(lookbackDays, limit, true);
+    }
+
+    public CollectSummary collectRecent(int lookbackDays, int limit, boolean skipSlow) {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("lookback_days", Math.max(1, lookbackDays));
         body.put("limit", Math.max(1, Math.min(limit, 100)));
-        return persistAsmResponse(asmClient.collectStats(body));
+        // Manual UI: skip_slow omits X Playwright so collect finishes under CF/nginx windows
+        body.put("skip_slow", skipSlow);
+        JsonNode response = asmClient.collectStats(body);
+        CollectSummary summary = transactionTemplate.execute(status -> persistAsmResponse(response));
+        return summary != null ? summary : new CollectSummary(0, 0, 0, 1);
     }
 
-    @Transactional
     public CollectSummary collectForJobs(List<Long> jobIds) {
+        return collectForJobs(jobIds, true);
+    }
+
+    public CollectSummary collectForJobs(List<Long> jobIds, boolean skipSlow) {
         List<String> remoteIds = new ArrayList<>();
         for (Long id : jobIds) {
             marketingJobRepository.findById(id).ifPresent(job -> {
@@ -59,16 +70,18 @@ public class MarketingPlatformStatsCollector {
         remoteIds.forEach(arr::add);
         body.put("lookback_days", 14);
         body.put("limit", 100);
-        return persistAsmResponse(asmClient.collectStats(body));
+        body.put("skip_slow", skipSlow);
+        JsonNode response = asmClient.collectStats(body);
+        CollectSummary summary = transactionTemplate.execute(status -> persistAsmResponse(response));
+        return summary != null ? summary : new CollectSummary(0, 0, 0, 1);
     }
 
     /**
-     * Daily/scheduled: collect last 14d published jobs from ASM.
+     * Daily/scheduled: collect last 14d published jobs from ASM (includes X scrape).
      */
-    @Transactional
     public CollectSummary collectScheduled() {
         try {
-            return collectRecent(14, 40);
+            return collectRecent(14, 40, false);
         } catch (Exception e) {
             log.warn("Scheduled platform stats collect failed (best-effort): {}", e.getMessage());
             return new CollectSummary(0, 0, 0, 1);

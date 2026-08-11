@@ -12,7 +12,7 @@ import com.againspring.api.admin.dto.UpdateMarketingScoreWeightsRequest;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
-import com.againspring.marketing.MarketingPlatformStatsCollector;
+import com.againspring.marketing.MarketingPlatformStatsCollectRunner;
 import com.againspring.marketing.MarketingPublishSlotService;
 import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.MarketingScoreAutoAdjustService;
@@ -38,6 +38,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -59,7 +60,7 @@ public class AdminMarketingController {
     private final MarketingQuotaService marketingQuotaService;
     private final MarketingScoreWeightService marketingScoreWeightService;
     private final MarketingPublishSlotService marketingPublishSlotService;
-    private final MarketingPlatformStatsCollector marketingPlatformStatsCollector;
+    private final MarketingPlatformStatsCollectRunner marketingPlatformStatsCollectRunner;
     private final MarketingWeeklyReportService marketingWeeklyReportService;
     private final MarketingScoreAutoAdjustService marketingScoreAutoAdjustService;
 
@@ -474,18 +475,49 @@ public class AdminMarketingController {
     // ===== Phase 2.6–2.7 platform stats + weekly report =====
 
     @PostMapping("/stats/collect")
-    @Operation(summary = "Collect platform stats",
-        description = "ASM best-effort X/IG/YT 통계 수집 후 marketing_publication_stats 저장")
-    @ApiResponse(responseCode = "200", description = "Collect summary")
+    @Operation(summary = "Start platform stats collect (async)",
+        description = "백그라운드 수집 시작. Cloudflare/nginx 타임아웃 회피. GET /stats/collect/{runId}로 폴링")
+    @ApiResponse(responseCode = "202", description = "Collect started")
     @Auditable(action = "COLLECT_MARKETING_PLATFORM_STATS")
-    public ResponseEntity<MarketingPlatformStatsCollector.CollectSummary> collectPlatformStats(
+    public ResponseEntity<Map<String, Object>> collectPlatformStats(
             @RequestParam(required = false) List<Long> jobIds,
             @RequestParam(defaultValue = "14") int lookbackDays,
             @RequestParam(defaultValue = "40") int limit) {
-        if (jobIds != null && !jobIds.isEmpty()) {
-            return ResponseEntity.ok(marketingPlatformStatsCollector.collectForJobs(jobIds));
+        MarketingPlatformStatsCollectRunner.RunView run =
+                marketingPlatformStatsCollectRunner.start(jobIds, lookbackDays, limit);
+        return ResponseEntity.accepted().body(Map.of(
+                "runId", run.runId(),
+                "status", run.status().name(),
+                "startedAt", run.startedAt() != null ? run.startedAt().toString() : ""
+        ));
+    }
+
+    @GetMapping("/stats/collect/{runId}")
+    @Operation(summary = "Poll platform stats collect status")
+    @ApiResponse(responseCode = "200", description = "Collect run status")
+    public ResponseEntity<Map<String, Object>> collectPlatformStatsStatus(@PathVariable String runId) {
+        MarketingPlatformStatsCollectRunner.RunView run = marketingPlatformStatsCollectRunner.status(runId);
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("runId", run.runId());
+        body.put("status", run.status().name());
+        if (run.startedAt() != null) {
+            body.put("startedAt", run.startedAt().toString());
         }
-        return ResponseEntity.ok(marketingPlatformStatsCollector.collectRecent(lookbackDays, limit));
+        if (run.finishedAt() != null) {
+            body.put("finishedAt", run.finishedAt().toString());
+        }
+        if (run.error() != null) {
+            body.put("error", run.error());
+        }
+        if (run.summary() != null) {
+            body.put("summary", Map.of(
+                    "requested", run.summary().requested(),
+                    "stored", run.summary().stored(),
+                    "partial", run.summary().partial(),
+                    "errors", run.summary().errors()
+            ));
+        }
+        return ResponseEntity.ok(body);
     }
 
     @GetMapping("/weekly-report")

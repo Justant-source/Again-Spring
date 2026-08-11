@@ -10,11 +10,19 @@ import {
   type MarketingStatsCollectSummary,
 } from '@/lib/api/admin/marketing';
 
-/** Minimal Phase 2.7 weekly report + manual collect hook. */
-export function MarketingWeeklyReportSection() {
+interface MarketingWeeklyReportSectionProps {
+  /** When true (default on 통계 tab), hide collect — HealthBar owns it. */
+  hideCollect?: boolean;
+}
+
+/** Minimal Phase 2.7 weekly report + optional manual collect hook. */
+export function MarketingWeeklyReportSection({
+  hideCollect = false,
+}: MarketingWeeklyReportSectionProps = {}) {
   const [report, setReport] = useState<MarketingWeeklyReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
+  const [collectElapsed, setCollectElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [collectMsg, setCollectMsg] = useState<string | null>(null);
 
@@ -36,12 +44,14 @@ export function MarketingWeeklyReportSection() {
 
   const handleCollect = async () => {
     setCollecting(true);
+    setCollectElapsed(0);
     setCollectMsg(null);
     setError(null);
     try {
       const summary: MarketingStatsCollectSummary = await collectMarketingPlatformStats({
         lookbackDays: 14,
         limit: 20,
+        onTick: (sec) => setCollectElapsed(sec),
       });
       setCollectMsg(
         `수집 완료: stored ${summary.stored} · partial ${summary.partial} · errors ${summary.errors}`
@@ -51,6 +61,7 @@ export function MarketingWeeklyReportSection() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setCollecting(false);
+      setCollectElapsed(0);
     }
   };
 
@@ -73,9 +84,15 @@ export function MarketingWeeklyReportSection() {
           <Button variant="outline" onClick={load} disabled={loading || collecting}>
             새로고침
           </Button>
-          <Button onClick={handleCollect} disabled={collecting} data-testid="marketing-stats-collect">
-            {collecting ? '수집 중…' : '통계 수집'}
-          </Button>
+          {!hideCollect && (
+            <Button
+              onClick={handleCollect}
+              disabled={collecting}
+              data-testid="marketing-stats-collect-weekly"
+            >
+              {collecting ? `수집 중… ${collectElapsed}s` : '통계 수집'}
+            </Button>
+          )}
         </div>
       </div>
 

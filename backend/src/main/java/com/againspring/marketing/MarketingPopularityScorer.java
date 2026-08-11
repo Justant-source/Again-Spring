@@ -78,6 +78,22 @@ public final class MarketingPopularityScorer {
     }
 
     /**
+     * Phase 3: {@code finalScore = featureScore × themeBoost}.
+     * Non-finite or non-positive boost is treated as {@code 1.0} (no change).
+     */
+    public static double applyThemeBoost(double featureScore, double themeBoost) {
+        if (Double.isNaN(themeBoost) || Double.isInfinite(themeBoost) || themeBoost <= 0.0) {
+            return featureScore;
+        }
+        return featureScore * themeBoost;
+    }
+
+    /** Convenience: {@link #score(Signals, PlatformWeights)} then {@link #applyThemeBoost}. */
+    public static double score(Signals signals, PlatformWeights weights, double themeBoost) {
+        return applyThemeBoost(score(signals, weights), themeBoost);
+    }
+
+    /**
      * {@code vote_skew = |authorPct − 50| / 50}. Returns 0 when there are no votes.
      */
     public static double voteSkew(long authorVotes, long totalVotes) {

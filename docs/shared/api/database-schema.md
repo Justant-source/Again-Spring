@@ -147,6 +147,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `marketing_holding` | 마케팅 대기 보드 (초안·순위 스냅샷) | `post_id` VARCHAR(32) PK **V102** |
 | `marketing_job` | ASM 마케팅 잡 | BIGINT auto · `requested_by` VARCHAR(128) **V104** |
 | `marketing_publication_stats` | 플랫폼 참여 스냅샷 (X/IG/YT best-effort) | BIGINT auto **V110** |
+| `marketing_stats_event` | 통계 탭 활동 타임라인 (수집·제안·확정) | BIGINT auto **V111** |
 
 ### AI-user 운영 테이블
 
@@ -471,6 +472,20 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V108** | `posts.hook_emotion` VARCHAR(16) — SNS 마스터 훅 감정(`shock\|anger\|tension\|sad\|hype`). `promo_title`=도발적 마스터 훅(원제 복제 아님) |
 | **V109** | `system_setting` 시드 — Phase 2 플랫폼별 cap(`marketing.cap.*` 기본 3) + score weights(`marketing.score.weights.{platform}.*`, plan §3). legacy text/video cap은 fallback |
 | **V110** | `marketing_publication_stats` — 발행 후 플랫폼 통계 스냅샷(`job_id`,`post_id`,`platform`,`metrics_json`,partial). SSOT=AS; 수집기는 ASM. `system_setting` `marketing.score.auto_adjust` 기본 `false` |
+| **V111** | `marketing_stats_event` — 통계 탭 append-only 이벤트(`event_type`,`platform`,`payload_json`,`created_at`). 타입: `COLLECT_*` · `PROPOSE` · `APPLY` · `SHADOW_TOGGLE` |
+
+### `marketing_stats_event` (**V111**)
+
+통계 탭 타임라인. 수집·테마 제안/확정·shadow 토글 이력을 append-only로 저장.  
+런타임: `MarketingStatsEventService` · Admin `GET /api/admin/marketing/stats/events`.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `event_type` | VARCHAR(32) NOT NULL | `COLLECT_STARTED` \| `COLLECT_COMPLETED` \| `COLLECT_FAILED` \| `PROPOSE` \| `APPLY` \| `SHADOW_TOGGLE` |
+| `platform` | VARCHAR(32) NULL | 관련 채널 (`x_thread` 등) |
+| `payload_json` | TEXT NULL | 요약 페이로드 |
+| `created_at` | TIMESTAMP(3) | 인덱스 `idx_mse_created_at` |
 
 ---
 

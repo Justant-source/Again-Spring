@@ -64,4 +64,26 @@ class MarketingPopularityScorerTest {
         assertThat(MarketingPopularityScorer.resolveIgExclusiveWinner(7, 7))
             .isEqualTo(MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS);
     }
+
+    @Test
+    void applyThemeBoost_multipliesFeatureScore() {
+        assertThat(MarketingPopularityScorer.applyThemeBoost(10.0, 1.2)).isEqualTo(12.0);
+        assertThat(MarketingPopularityScorer.applyThemeBoost(10.0, 1.0)).isEqualTo(10.0);
+    }
+
+    @Test
+    void applyThemeBoost_nonPositiveOrNonFinite_isIdentity() {
+        assertThat(MarketingPopularityScorer.applyThemeBoost(10.0, 0.0)).isEqualTo(10.0);
+        assertThat(MarketingPopularityScorer.applyThemeBoost(10.0, -1.0)).isEqualTo(10.0);
+        assertThat(MarketingPopularityScorer.applyThemeBoost(10.0, Double.NaN)).isEqualTo(10.0);
+    }
+
+    @Test
+    void score_withThemeBoost_matchesApplyHelper() {
+        var signals = new MarketingPopularityScorer.Signals(0, 0, 0, 1.0, 0, 1.0);
+        var weights = MarketingScoreWeightService.defaultsReels();
+        double feature = MarketingPopularityScorer.score(signals, weights);
+        assertThat(MarketingPopularityScorer.score(signals, weights, 1.1))
+            .isEqualTo(MarketingPopularityScorer.applyThemeBoost(feature, 1.1));
+    }
 }

@@ -12,6 +12,7 @@ import com.againspring.marketing.MarketingPopularityScorer;
 import com.againspring.marketing.MarketingPublishFormat;
 import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.MarketingScoreWeightService;
+import com.againspring.marketing.MarketingThemeBoostService;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository.DueHoldingProjection;
@@ -63,6 +64,7 @@ public class MarketingHoldingCommitService {
     private final MarketingJobService marketingJobService;
     private final MarketingQuotaService quotaService;
     private final MarketingScoreWeightService scoreWeightService;
+    private final MarketingThemeBoostService themeBoostService;
     private final MarketingPlatformAutoService platformAutoService;
     private final PostRepository postRepository;
     private final ObjectMapper objectMapper;
@@ -187,10 +189,17 @@ public class MarketingHoldingCommitService {
             return new CommitTickResult(0, 0, 0, 0, Map.of());
         }
 
+        Map<String, Post> postsById = postRepository.findAllById(
+                due.stream().map(DueHoldingProjection::getPostId).toList()).stream()
+            .collect(Collectors.toMap(Post::getId, p -> p, (a, b) -> a));
+        // Shadow = store boosts but do not apply to allocation (plan §4.3 Sprint 3.2).
+        boolean themeShadow = themeBoostService.isShadow();
+
         List<ScoredDue> pins = new ArrayList<>();
         List<ScoredDue> autos = new ArrayList<>();
         for (DueHoldingProjection row : due) {
-            ScoredDue scored = toScored(row, weights);
+            Post post = postsById.get(row.getPostId());
+            ScoredDue scored = toScored(row, weights, themeKeys(post), themeShadow);
             if (MarketingHoldingStatus.PINNED.name().equals(row.getStatus())) {
                 pins.add(scored);
             } else {
@@ -315,7 +324,10 @@ public class MarketingHoldingCommitService {
         }
 
         // 3) Remaining due non-pinned / non-selected → DROPPED
-        for (ScoredDue dueRow : due.stream().map(r -> toScored(r, weights)).toList()) {
+        List<ScoredDue> allScored = new ArrayList<>(pins.size() + autos.size());
+        allScored.addAll(pins);
+        allScored.addAll(autos);
+        for (ScoredDue dueRow : allScored) {
             if (handled.contains(dueRow.postId()) || selectedStories.contains(dueRow.postId())) {
                 continue;
             }
@@ -595,12 +607,25 @@ public class MarketingHoldingCommitService {
         return true;
     }
 
-    static ScoredDue toScored(
-            DueHoldingProjection row, MarketingScoreWeightService.AllPlatformWeights weights) {
+    /**
+     * Per-platform {@code finalScore = featureScore × themeBoost}.
+     * When {@code themeShadow} is true, boost is forced to 1.0 (allocation unchanged).
+     */
+    ScoredDue toScored(
+            DueHoldingProjection row,
+            MarketingScoreWeightService.AllPlatformWeights weights,
+            ThemeKeys themeKeys,
+            boolean themeShadow) {
         MarketingPopularityScorer.Signals signals = signalsFrom(row);
+        String emotion = themeKeys != null ? themeKeys.hookEmotion() : null;
+        String category = themeKeys != null ? themeKeys.category() : null;
         Map<String, Double> scores = new HashMap<>();
         for (String platform : MarketingPopularityScorer.RANKED_PLATFORMS) {
-            scores.put(platform, MarketingPopularityScorer.score(signals, weights.forPlatform(platform)));
+            double feature = MarketingPopularityScorer.score(signals, weights.forPlatform(platform));
+            double boost = themeShadow
+                ? 1.0
+                : themeBoostService.getBoost(platform, emotion, category);
+            scores.put(platform, MarketingPopularityScorer.applyThemeBoost(feature, boost));
         }
         MarketingHoldingStatus status;
         try {
@@ -612,6 +637,17 @@ public class MarketingHoldingCommitService {
         double snapshot = scores.values().stream().mapToDouble(Double::doubleValue).max().orElse(0.0);
         return new ScoredDue(
             row.getPostId(), status, row.getPinFormat(), snapshot, scores, row.getPostCreatedAt());
+    }
+
+    /** Emotion/category pair for theme boost lookup (nulls → boost 1.0 via service). */
+    record ThemeKeys(String hookEmotion, String category) {}
+
+    static ThemeKeys themeKeys(Post post) {
+        if (post == null) {
+            return new ThemeKeys(null, null);
+        }
+        String category = post.getCategory() != null ? post.getCategory().name() : null;
+        return new ThemeKeys(post.getHookEmotion(), category);
     }
 
     static MarketingPopularityScorer.Signals signalsFrom(DueHoldingProjection row) {

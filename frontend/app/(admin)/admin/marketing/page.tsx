@@ -10,7 +10,7 @@ import { PlatformAutoSection } from '@/components/admin/marketing/PlatformAutoSe
 import { HoldingControlsBar } from '@/components/admin/marketing/HoldingControlsBar';
 import { HoldingBoard } from '@/components/admin/marketing/HoldingBoard';
 import { HoldingDraftDialog } from '@/components/admin/marketing/HoldingDraftDialog';
-import { MarketingWeeklyReportSection } from '@/components/admin/marketing/MarketingWeeklyReportSection';
+import { MarketingStatsTab } from '@/components/admin/marketing/MarketingStatsTab';
 import {
   CompletedHoldingsBoard,
   type CompletedHoldingView,
@@ -31,11 +31,12 @@ import {
   MarketingForceMode,
 } from '@/lib/api/admin/marketing';
 
-type MainTab = 'holding' | 'completed' | 'settings';
+type MainTab = 'holding' | 'completed' | 'settings' | 'stats';
 
 function resolveTab(raw: string | null): MainTab {
   if (raw === 'completed' || raw === 'jobs') return 'completed';
   if (raw === 'settings' || raw === 'credentials' || raw === 'quota') return 'settings';
+  if (raw === 'stats' || raw === 'report') return 'stats';
   return 'holding';
 }
 
@@ -187,6 +188,7 @@ export default function MarketingJobsPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="holding">대기</TabsTrigger>
           <TabsTrigger value="completed">완료</TabsTrigger>
+          <TabsTrigger value="stats">통계</TabsTrigger>
           <TabsTrigger value="settings">설정</TabsTrigger>
         </TabsList>
 
@@ -281,11 +283,12 @@ export default function MarketingJobsPage() {
           />
         </TabsContent>
 
+        <TabsContent value="stats" className="space-y-4">
+          <MarketingStatsTab />
+        </TabsContent>
+
         <TabsContent value="settings" className="space-y-8">
-          <MarketingWeeklyReportSection />
-          <div className="border-t pt-6">
-            <PlatformAutoSection />
-          </div>
+          <PlatformAutoSection />
           <div className="border-t pt-6">
             <ShortformVideoSection />
           </div>

@@ -10,6 +10,7 @@ import com.againspring.marketing.MarketingPlatformAutoService;
 import com.againspring.marketing.MarketingPublishFormat;
 import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.MarketingScoreWeightService;
+import com.againspring.marketing.MarketingThemeBoostService;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository.DueHoldingProjection;
@@ -62,6 +63,7 @@ class MarketingHoldingCommitServiceTest {
     @Mock MarketingJobService marketingJobService;
     @Mock MarketingQuotaService quotaService;
     @Mock MarketingScoreWeightService scoreWeightService;
+    @Mock MarketingThemeBoostService themeBoostService;
     @Mock MarketingPlatformAutoService platformAutoService;
     @Mock PostRepository postRepository;
 
@@ -84,6 +86,9 @@ class MarketingHoldingCommitServiceTest {
         lenient().when(postRepository.findAllById(any())).thenReturn(List.of());
         lenient().when(marketingJobRepository.findByPostIdIn(any())).thenReturn(List.of());
         lenient().when(scoreWeightService.getPlatformWeights()).thenReturn(PLATFORM_WEIGHTS);
+        // Default shadow on → theme boost not applied (allocation identical to pre-Phase-3).
+        lenient().when(themeBoostService.isShadow()).thenReturn(true);
+        lenient().when(themeBoostService.getBoost(any(), any(), any())).thenReturn(1.0);
         lenient().when(platformAutoService.listEnabledPlatforms()).thenReturn(List.of(
             "x_thread", "instagram_feed", "instagram_reels", "youtube_shorts"));
     }
