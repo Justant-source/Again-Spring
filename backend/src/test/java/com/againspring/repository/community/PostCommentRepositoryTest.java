@@ -125,7 +125,25 @@ class PostCommentRepositoryTest {
     void countFiltered_excludesBlockedAndDeleted() {
         assertThat(repo.countByPostIdAndStatusAndDeletedAtIsNull(POST_ID, CommentStatus.ACTIVE))
                 .as("공개(ACTIVE & not-deleted) 댓글 수").isEqualTo(2);
+        assertThat(repo.countVisibleByPostId(POST_ID, CommentStatus.ACTIVE))
+                .as("목록 노출 가능 댓글 수(최상위+visible parent 답글)").isEqualTo(2);
         assertThat(repo.countByPostId(POST_ID))
                 .as("전체 댓글 수(상태 무관)").isEqualTo(6);
+    }
+
+    @Test
+    @DisplayName("visible count — soft-deleted/BLOCKED 부모 아래 ACTIVE 고아 대댓글 제외")
+    void countVisible_excludesOrphanRepliesUnderHiddenParents() {
+        Instant t = Instant.parse("2026-06-07T02:00:00Z");
+        Long softDeletedParent = save(null, "soft-deleted 부모", CommentStatus.ACTIVE, t, t).getId();
+        save(softDeletedParent, "고아 ACTIVE 답글(삭제부모)", CommentStatus.ACTIVE, null, t.plusSeconds(1));
+        Long blockedParent = save(null, "BLOCKED 부모", CommentStatus.BLOCKED, null, t.plusSeconds(2)).getId();
+        save(blockedParent, "고아 ACTIVE 답글(차단부모)", CommentStatus.ACTIVE, null, t.plusSeconds(3));
+
+        // setUp 기본 visible 2 + 고아 답글 2 = status-only count 4, visible count는 여전히 2
+        assertThat(repo.countByPostIdAndStatusAndDeletedAtIsNull(POST_ID, CommentStatus.ACTIVE))
+                .as("status-only는 고아 ACTIVE 답글 포함").isEqualTo(4);
+        assertThat(repo.countVisibleByPostId(POST_ID, CommentStatus.ACTIVE))
+                .as("목록에 안 보이는 고아 답글 제외").isEqualTo(2);
     }
 }

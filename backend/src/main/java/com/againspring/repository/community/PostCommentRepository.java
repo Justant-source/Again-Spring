@@ -37,8 +37,30 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
 
     /**
      * 공개용 댓글 수: 차단/삭제 제외 (status=ACTIVE, deletedAt IS NULL)
+     * — 관리/통계·레거시용. 목록과 맞추려면 {@link #countVisibleByPostId} 사용.
      */
     long countByPostIdAndStatusAndDeletedAtIsNull(String postId, CommentStatus status);
+
+    /**
+     * 공개 목록에 노출 가능한 댓글 수 (최상위 + visible parent 아래 대댓글).
+     * 부모 soft-delete/BLOCKED 로 목록에 안 나오는 ACTIVE 고아 대댓글은 제외.
+     */
+    @Query("""
+            SELECT COUNT(pc) FROM PostComment pc
+            WHERE pc.postId = :postId
+              AND pc.status = :status
+              AND pc.deletedAt IS NULL
+              AND (
+                pc.parentCommentId IS NULL
+                OR EXISTS (
+                  SELECT 1 FROM PostComment parent
+                  WHERE parent.id = pc.parentCommentId
+                    AND parent.status = :status
+                    AND parent.deletedAt IS NULL
+                )
+              )
+            """)
+    long countVisibleByPostId(@Param("postId") String postId, @Param("status") CommentStatus status);
 
     /**
      * 관리자용: 상태별 댓글 조회 (삭제되지 않은 댓글만)

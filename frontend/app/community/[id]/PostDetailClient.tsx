@@ -163,6 +163,7 @@ function C3StoryDetail({
   post,
   voteResult,
   comments,
+  commentCount,
   onVote,
   onCancelVote,
   onLike,
@@ -194,6 +195,7 @@ function C3StoryDetail({
   post: PostDetail;
   voteResult: VoteResult | null;
   comments: Comment[];
+  commentCount: number;
   onVote: (optionId: number) => Promise<void>;
   onCancelVote: () => Promise<void>;
   onLike: (commentId: number) => void;
@@ -525,7 +527,7 @@ function C3StoryDetail({
           </span>
           <span style={ACTION_COL}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 15a2 2 0 01-2 2H8l-4 4V5a2 2 0 012-2h13a2 2 0 012 2z" strokeLinejoin="round" /></svg>
-            {post.commentCount ?? comments.length}
+            {commentCount}
           </span>
           <button onClick={handleShare} style={{ ...ACTION_COL, background: 'none', border: 'none', color: 'var(--L-sub)', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 3v13M12 3L8 7M12 3l4 4M5 14v5a2 2 0 002 2h10a2 2 0 002-2v-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -591,11 +593,11 @@ function C3StoryDetail({
 function C3ResultSolo({
   post,
   voteResult,
-  comments,
+  commentCount,
 }: {
   post: PostDetail;
   voteResult: VoteResult | null;
-  comments: Comment[];
+  commentCount: number;
 }) {
   const router = useRouter();
 
@@ -612,7 +614,7 @@ function C3ResultSolo({
         }}
       >
         <span>{post.category}</span>
-        <span>{voteResult?.totalVotes || 0}표 · 댓글 {comments.length}</span>
+        <span>{voteResult?.totalVotes || 0}표 · 댓글 {commentCount}</span>
       </div>
 
       {/* 제목 */}
@@ -787,6 +789,7 @@ export default function PostDetailClient({ params }: PageProps) {
 
   // Comment state
   const [comments, setComments] = useState<Comment[]>([]);
+  const [localCommentCount, setLocalCommentCount] = useState(0);
   const [commentPage, setCommentPage] = useState(0);
   const [hasMoreComments, setHasMoreComments] = useState(true);
   const [loadingMoreComments, setLoadingMoreComments] = useState(false);
@@ -821,6 +824,7 @@ export default function PostDetailClient({ params }: PageProps) {
         setLoading(true);
         const postData = await postApi.get(params.id);
         setPost(postData);
+        setLocalCommentCount(postData.commentCount ?? 0);
         // 상세 응답의 voteResult를 로컬 상태에 올려 비율 막대가 percentage를 쓰게 함
         if (postData.voteResult) setVoteResult(postData.voteResult);
 
@@ -935,6 +939,14 @@ export default function PostDetailClient({ params }: PageProps) {
     );
   };
 
+  /** 삭제 시 배지에서 뺄 개수 — 최상위면 본인+대댓글(작성자 삭제 cascade), 답글이면 1 */
+  const deletedCommentDelta = (commentId: number): number => {
+    const top = comments.find((c) => c.id === commentId);
+    if (top) return 1 + (top.replies?.length ?? 0);
+    if (comments.some((c) => c.replies?.some((r) => r.id === commentId))) return 1;
+    return 1;
+  };
+
   const handleCommentSubmit = async () => {
     if (!commentText.trim()) return;
     setSubmitError(null);
@@ -950,6 +962,7 @@ export default function PostDetailClient({ params }: PageProps) {
       await commentApi.add(params.id, body, parentCommentId || undefined);
       setCommentText('');
       closeCompose();
+      setLocalCommentCount((prev) => prev + 1);
       const fresh = await commentApi.list(params.id, 0, COMMENT_PAGE_SIZE);
       setComments(fresh);
       setHasMoreComments(fresh.length === COMMENT_PAGE_SIZE);
@@ -968,10 +981,12 @@ export default function PostDetailClient({ params }: PageProps) {
   const confirmDelete = async () => {
     if (deleteTarget == null) return;
     const id = deleteTarget;
+    const delta = deletedCommentDelta(id);
     setDeleteTarget(null);
     try {
       await commentApi.remove(params.id, id);
       removeFromState(id);
+      setLocalCommentCount((prev) => Math.max(0, prev - delta));
     } catch {
       setDeleteErrorToast(true);
       setTimeout(() => setDeleteErrorToast(false), 2500);
@@ -1100,6 +1115,7 @@ export default function PostDetailClient({ params }: PageProps) {
         post={post}
         voteResult={voteResult}
         comments={comments}
+        commentCount={localCommentCount}
         onVote={handleVote}
         onCancelVote={handleCancelVote}
         onLike={handleLike}

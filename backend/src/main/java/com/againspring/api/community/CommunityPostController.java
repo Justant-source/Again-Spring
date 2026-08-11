@@ -253,7 +253,7 @@ public class CommunityPostController {
         var weightedPercentages = voteService.calculateWeightedPercentages(voteResultWithBreakdown);
 
         Optional<Long> myVote = userId != null ? voteService.getMyVote(id, userId) : Optional.empty();
-        long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(id, CommentStatus.ACTIVE);
+        long commentCount = postCommentRepository.countVisibleByPostId(id, CommentStatus.ACTIVE);
 
         String authorNickname = userRepository.findById(post.getAuthorId())
                 .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
@@ -308,7 +308,7 @@ public class CommunityPostController {
         var voteResultWithBreakdown = voteService.getVoteResultWithBreakdown(id);
         var weightedPercentages = voteService.calculateWeightedPercentages(voteResultWithBreakdown);
         Optional<Long> myVote = voteService.getMyVote(id, userId);
-        long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(id, CommentStatus.ACTIVE);
+        long commentCount = postCommentRepository.countVisibleByPostId(id, CommentStatus.ACTIVE);
         String authorNickname = userRepository.findById(post.getAuthorId())
                 .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
                 .orElse("익명");
@@ -508,7 +508,7 @@ public class CommunityPostController {
     private PostResponse toPostResponse(Post post, Long votedOptionId) {
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
         long voteCount = voteRepository.countByPostId(post.getId());
-        long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(post.getId(), CommentStatus.ACTIVE);
+        long commentCount = postCommentRepository.countVisibleByPostId(post.getId(), CommentStatus.ACTIVE);
         String authorNickname = userRepository.findById(post.getAuthorId())
                 .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
                 .orElse("익명");
