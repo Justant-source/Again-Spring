@@ -56,9 +56,6 @@ public class PostDetailResponse {
 
     private Long viewCount;
 
-    /** FE 배심원 폴링 종료 조건: 기대 배심원 수 */
-    private Integer jurorCount;
-
     private Boolean paired;
 
     private String partnerBodyPublished;
@@ -67,7 +64,7 @@ public class PostDetailResponse {
 
     private String inviteToken;
 
-    /** 요청자가 작성자이면 true — 배심원 폴링·작성자 전용 UI 노출 여부 결정 */
+    /** 요청자가 작성자이면 true — 작성자 전용 UI 노출 여부 결정 */
     private Boolean isAuthor;
 
     private String authorNickname;
@@ -136,7 +133,6 @@ public class PostDetailResponse {
                 .createdAt(post.getCreatedAt())
                 .commentCount(commentCount)
                 .viewCount(post.getViewCount() != null ? post.getViewCount().longValue() : 0L)
-                .jurorCount(post.getJurorCount())
                 .paired(post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null)
                 .partnerBodyPublished(post.getPartnerBodyPublished())
                 .partnerAnsweredAt(post.getPartnerAnsweredAt())

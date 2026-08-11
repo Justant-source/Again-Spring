@@ -16,8 +16,6 @@ public class CreatePostDto {
     private String bodyRaw;
     private String category;   // PostCategory enum name: COUPLE/MARRIED/FRIEND/FAMILY/WORK/OTHER
     private String visibility; // "PUBLIC"
-    @Builder.Default
-    private int jurorCount = 0;  // AI 배심원 모드 숨김 처리 — 0으로 고정
     // ── 원본 비교 기능: 재구성 출처 스냅샷 ───────────────────────────────────────
     /** example_bank.id (재구성 모드 시). null = 일반 생성 */
     private Long sourceExampleId;

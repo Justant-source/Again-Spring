@@ -238,9 +238,6 @@ WHERE CAST(author_id AS BINARY) IN (
 )
 OR CAST(post_id AS BINARY) IN (SELECT CAST(id AS BINARY) FROM _e2e_posts);
 
-DELETE FROM jurors
-WHERE CAST(post_id AS BINARY) IN (SELECT CAST(id AS BINARY) FROM _e2e_posts);
-
 DELETE FROM vote_options
 WHERE CAST(post_id AS BINARY) IN (SELECT CAST(id AS BINARY) FROM _e2e_posts);
 

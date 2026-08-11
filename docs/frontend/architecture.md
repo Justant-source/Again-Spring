@@ -20,18 +20,16 @@
 ### 광장형 사연 발행 흐름
 
 ```
-[사용자] → /community/new (작성) → POST /api/posts
+[사용자] → /community/new (작성) → POST /api/community/posts
   ↓
-[Backend] → LLM Worker 호출 (Claude Haiku)
+[Backend] Post + VoteOption(작성자/상대방) 저장 (원문 그대로, 게시 시 LLM 미호출)
   ↓
-배심원 9명 의견 생성 (각 페르소나별 공감 비율 분석)
-  ↓
-[Frontend] 게시글 상세 페이지 진입
-  ├─ FeedCard: 배심원 의견 미리보기
-  ├─ JurorCard: 각 배심원 상세 의견 (AI 레이블 명시)
-  ├─ VoteBar: 커뮤니티 투표 (도움됨/안 됨)
-  └─ CommentBar: 댓글 무한스크롤
+[Frontend] 게시글 상세
+  ├─ VoteBar: 작성자 vs 상대방 공감 투표
+  └─ CommunityComment: 댓글
 ```
+
+사람 글 게시 후 커뮤니티 공감 투표·댓글이 제품 핵심이다. AI 반응은 AI-user가 이어간다.
 
 ### HTTP 요청 흐름
 
@@ -91,7 +89,6 @@ export const communityApi = {
   getPosts(filters?: { category?: string }),
   getPost(postId: string),
   createPost(body: { ... }),
-  getJuryOpinions(postId: string),
   voteCommunity(postId: string, vote: 'A' | 'B'),
 }
 ```
@@ -184,7 +181,6 @@ export const communityHandlers = [
   http.get('/api/posts', () => json([...])),
   http.get('/api/posts/:id', () => json({...})),
   http.post('/api/posts', () => json({...})),
-  http.get('/api/posts/:id/jury-opinions', () => json([...])),
 ]
 
 // mocks/handlers/notifications.ts
@@ -231,66 +227,39 @@ Page → api.getPosts()
   ↓
 [무한스크롤] Intersection Observer
   ↓
-각 카드 → api.getPost(id) & api.getJuryOpinions(id)
-  ↓
 FeedCard 렌더링
 ```
 
 ### 2. 게시글 작성 (`/community/new`)
 
 ```
-Form → [제목, A입장, B입장 입력]
+Form → [제목, 본문, 카테고리]
   ↓
-POST /api/posts { title, categoryId, positionA, positionB }
+POST /api/community/posts { userTitle, bodyRaw, category }
   ↓
-[Backend] LLM Worker 호출
-  ├─ 각 배심원 페르소나별 공감 분석
-  ├─ 투표 리소스 생성
-  └─ 댓글 초기화
+[Backend] Post + VoteOption(작성자/상대방) 저장 (LLM 미호출)
   ↓
 [Frontend] 상세 페이지 자동 진입
 ```
 
-### 3. 배심원 의견 조회
+### 3. 투표 (`/community/[id]`)
 
 ```
-GET /api/posts/{id}/jury-opinions
+VoteBar [작성자 / 상대방]
   ↓
-[응답]
-{
-  juryOpinions: [
-    {
-      jurorId: "jur_001",
-      jurorName: "심리상담사 이소윤",
-      bias: "A" | "B" | "NEUTRAL",
-      empathyRatio: 0.65,
-      opinion: "..."
-    },
-    ...
-  ]
-}
+POST /api/community/posts/{id}/vote { optionId }
   ↓
-JurorCard 렌더링
-```
-
-### 4. 투표 (`/community/[id]`)
-
-```
-VoteBar [버튼 A측/B측]
-  ↓
-POST /api/posts/{id}/votes { vote: "A" | "B" }
-  ↓
-[응답] { updatedRatio: { A: 0.55, B: 0.45 } }
+[응답] percentage (작성자 vs 상대방)
   ↓
 VoteBar UI 업데이트
 ```
 
-### 5. 댓글 (`CommentBar`)
+### 4. 댓글 (`CommentBar`)
 
 ```
 CommentComposeSheet [로그인 필수]
   ↓
-POST /api/posts/{id}/comments { content: "..." }
+POST /api/community/posts/{id}/comments { content: "..." }
   ↓
 [응답] { commentId, author, createdAt, ... }
   ↓
@@ -305,7 +274,7 @@ CommentBar 무한스크롤 목록 prepend
 
 - **온보딩 (MBTI 테스트)** — 더 이상 필요 없음
 - **세션 기반 상태** — 광장형에서 중앙화된 피드로 변경
-- **서로 다른 페르소나 간 컨텍스트** — 9인 배심원 중 병렬 분석으로 변경
+- **1:1 중재 채팅** — 공개 사연 + 커뮤니티 공감 투표로 대체
 - **클라이언트 사이드 키워드 필터** — 서버에서만 검사 (위기 감지)
 
 ---
@@ -315,10 +284,9 @@ CommentBar 무한스크롤 목록 prepend
 | 구 모델 (V1.5) | 신 모델 (광장형) | 상태 |
 |---|---|---|
 | 세션 기반 채팅 | 광장 피드 기반 | ✅ 완료 |
-| 6턴 중재 | 배심원 9인 병렬 분석 | ✅ 완료 |
+| 6턴 중재 | 커뮤니티 공감 투표(작성자 vs 상대방) | ✅ 완료 |
 | Solo/Duo 모드 | 단일 광장 (비공개/공개) | ✅ 완료 |
-| MediatorMessage | JuryOpinion | ✅ 완료 |
-| ContributionRatio | EmpathyRatio | ✅ 완료 |
+| ContributionRatio | EmpathyRatio (작성자/상대방 %) | ✅ 완료 |
 
 ---
 

@@ -4,7 +4,6 @@
 -- =============================================
 
 SET FOREIGN_KEY_CHECKS = 0;
-DELETE FROM jurors WHERE post_id LIKE 'mock%';
 DELETE FROM votes WHERE post_id LIKE 'mock%';
 DELETE FROM vote_options WHERE post_id LIKE 'mock%';
 DELETE FROM post_comments WHERE post_id LIKE 'mock%';
@@ -25,125 +24,125 @@ INSERT INTO posts (
   id, author_id, user_title, title,
   body_raw, body_published,
   category, visibility, status,
-  juror_count, neutralization_passed,
+  neutralization_passed,
   partner_user_id, partner_body_raw, partner_body_published, partner_answered_at,
   publish_mode, vote_close_at, created_at, updated_at
 ) VALUES
 
--- [1] 부부·육아분담 — paired + 배심원3 (VOTING)
+-- [1] 부부·육아분담 — paired (VOTING)
 ('mock_001', @u1, '주말에도 저만 쉬는 날이 없어요', '주말에도 저만 쉬는 날이 없어요',
  '맞벌이인데 주말에도 저 혼자 아이 보고 집안일 다 해요. 남편은 누워서 유튜브만 봐요. 서운하다고 하면 평일에 자기가 얼마나 힘든지 아냐고 해요. 저도 평일에 일하는데 왜 저만 주말에 일해야 하나요. 이제 지쳐서 더 이상 못 참겠어요.',
  '맞벌이 부부 상황에서 주말 가사·육아 분담에 대한 갈등입니다. 한쪽이 주말에도 가사와 육아를 도맡아 하며 지침을 느끼고, 상대는 평일 업무로 인한 피로를 이유로 들고 있습니다.',
- 'MARRIED', 'PUBLIC', 'VOTING', 3, 1,
+ 'MARRIED', 'PUBLIC', 'VOTING', 1,
  @u2, '평일에 야근이 많아 주말엔 좀 쉬어야 다음 주를 버텨요. 돕고 싶은 마음은 있는데 몸이 안 따라줘요. 그리고 제가 아이랑 논다고 하면 아내가 마음에 안 든다고 해서 차라리 눕게 됐어요.',
  '평일 야근으로 인한 피로 누적과 육아 방식에 대한 갈등을 호소하고 있습니다. 상대방도 돕고 싶으나 피로와 의사소통 문제가 복합적으로 작용하고 있습니다.',
  NOW() - INTERVAL 2 HOUR,
  'PUBLISH_NOW', NOW() + INTERVAL 3 DAY,
  NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY),
 
--- [2] 직장·상사가 보고서 가로챔 — solo + 배심원5 (VOTING)
+-- [2] 직장·상사가 보고서 가로챔 — solo (VOTING)
 ('mock_002', @u3, '제가 3주 걸려 만든 보고서를 팀장이 자기 거로 올렸어요', '제가 3주 걸려 만든 보고서를 팀장이 자기 거로 올렸어요',
  '입사 2년차입니다. 팀장이 신사업 기획 보고서 만들어 보라고 해서 3주 동안 주말도 반납하고 만들었어요. 근데 임원 보고에서 팀장이 "제가 기획했습니다"라고 하더라고요. 나중에 물어보니 "팀 성과는 팀장 성과"라고 했어요. 이게 맞는 건가요?',
  '입사 2년차 직원이 3주간 작성한 신사업 기획 보고서를 팀장이 임원 보고에서 자신의 것으로 발표한 상황입니다. 팀장은 팀 성과는 팀장의 성과라는 입장을 취하고 있습니다.',
- 'WORK', 'PUBLIC', 'VOTING', 5, 1,
+ 'WORK', 'PUBLIC', 'VOTING', 1,
  NULL, NULL, NULL, NULL,
  'PUBLISH_NOW', NOW() + INTERVAL 7 DAY,
  NOW() - INTERVAL 5 DAY, NOW() - INTERVAL 5 DAY),
 
--- [3] 연인·데이트 비용 — paired + 배심원0 (VOTING)
+-- [3] 연인·데이트 비용 — paired (VOTING)
 ('mock_003', @u4, '1년 사귀었는데 데이트 비용을 항상 제가 냈어요', '1년 사귀었는데 데이트 비용을 항상 제가 냈어요',
  '남자친구가 저보다 연봉이 낮은 건 아는데 1년 동안 거의 제가 다 냈어요. 밥도 저, 영화도 저, 숙박도 저. 한번은 괜찮냐고 물어봤더니 자기가 나중에 다 갚겠다고 했는데 그게 8개월째예요. 이제 돈보다 성의가 없어 보여서 더 서운해요.',
  '연애 1년 동안 데이트 비용 대부분을 부담한 상황에 대한 갈등입니다. 상대방은 나중에 갚겠다는 약속을 했으나 이행되지 않고 있어 금전적 문제보다 상대에 대한 서운함이 생겼습니다.',
- 'COUPLE', 'PUBLIC', 'VOTING', 0, 1,
+ 'COUPLE', 'PUBLIC', 'VOTING', 1,
  @u5, '제가 연봉이 적은 건 맞는데 최대한 맞추려고 노력했어요. 큰 데이트는 상대가 냈지만 소소한 건 제가 많이 냈거든요. 근데 그게 전혀 카운트가 안 되는 것 같아서 억울해요.',
  '데이트 비용에 관한 인식 차이를 호소합니다. 소소한 지출은 자신이 부담했으나 상대방이 이를 인정하지 않는다고 느끼고 있습니다.',
  NOW() - INTERVAL 1 DAY,
  'PUBLISH_NOW', NOW() + INTERVAL 5 DAY,
  NOW() - INTERVAL 4 DAY, NOW() - INTERVAL 4 DAY),
 
--- [4] 친구·빌려준 돈 — solo + 배심원3 (CLOSED)
+-- [4] 친구·빌려준 돈 — solo (CLOSED)
 ('mock_004', @u1, '친한 친구에게 빌려준 300만원, 2년째 소식 없어요', '친한 친구에게 빌려준 300만원, 2년째 소식 없어요',
  '10년 넘게 친한 친구가 급하다고 해서 300만원 빌려줬어요. 처음엔 3개월 안에 갚겠다고 했는데 2년이 됐어요. 처음엔 가끔 연락이 왔는데 요즘은 카톡도 읽씹이에요. 직접 찾아가야 하나요? 아니면 그냥 포기해야 하나요?',
  '10년 지기 친구에게 빌려준 300만원이 2년째 상환되지 않고 있는 상황입니다. 처음의 약속과 달리 현재는 연락마저 끊긴 상태로, 상황 해결 방법에 대한 고민을 토로하고 있습니다.',
- 'FRIEND', 'PUBLIC', 'CLOSED', 3, 1,
+ 'FRIEND', 'PUBLIC', 'CLOSED', 1,
  NULL, NULL, NULL, NULL,
  'PUBLISH_NOW', NOW() - INTERVAL 1 DAY,
  NOW() - INTERVAL 14 DAY, NOW() - INTERVAL 14 DAY),
 
--- [5] 가족·명절 음식 준비 — solo + 배심원2 (VOTING)
+-- [5] 가족·명절 음식 준비 — solo (VOTING)
 ('mock_005', @u2, '명절마다 처가에서 아내 혼자 음식 준비, 저는 어떡해야 하나요', '명절마다 처가에서 아내 혼자 음식 준비, 저는 어떡해야 하나요',
  '결혼 5년차인데 명절마다 처가에 가면 장모님이랑 아내가 둘이서 음식을 다 준비해요. 저는 거실에서 처남들이랑 티비 보게 되는데 이게 맞는 건지 모르겠어요. 도와드리겠다고 해도 괜찮다고 하시는데 그냥 있으면 아내 눈치가 보여요.',
  '명절 시댁 방문 시 음식 준비에 참여하고 싶으나 장모님의 거절과 처남들의 시선 사이에서 어떻게 행동해야 할지 고민하는 상황입니다.',
- 'FAMILY', 'PUBLIC', 'VOTING', 2, 1,
+ 'FAMILY', 'PUBLIC', 'VOTING', 1,
  NULL, NULL, NULL, NULL,
  'PUBLISH_NOW', NOW() + INTERVAL 5 DAY,
  NOW() - INTERVAL 2 DAY, NOW() - INTERVAL 2 DAY),
 
--- [6] 직장·야근 강요 — paired + 배심원0 (VOTING)
+-- [6] 직장·야근 강요 — paired (VOTING)
 ('mock_006', @u3, '매주 금요일 칼퇴하면 팀장이 눈치를 줘요', '매주 금요일 칼퇴하면 팀장이 눈치를 줘요',
  '저는 계약서에 명시된 퇴근시간에 나가는데 팀장이 항상 한마디 해요. "요즘 일이 적나봐요?" 이런 식으로요. 야근 수당도 없고 자발적으로 하는 야근인데 저는 이 문화가 납득이 안 가요. 팀장한테 직접 말해야 할까요?',
  '계약서 상 퇴근 시간에 퇴근하는 직원에게 팀장이 부정적인 반응을 보이는 상황입니다. 야근 수당 없이 야근 문화를 당연시하는 팀 분위기에 대한 갈등을 토로하고 있습니다.',
- 'WORK', 'PUBLIC', 'VOTING', 0, 1,
+ 'WORK', 'PUBLIC', 'VOTING', 1,
  @u4, '팀장 입장에서 생각해봐도 이해가 안 가요. 다들 바쁜데 혼자 나가면 팀 분위기가 어수선해지긴 해요. 그래도 계약대로 나가는 게 잘못은 아닌데 표현 방식이 잘못된 것 같아요.',
  '팀 전체의 업무량과 분위기를 고려했을 때 개인의 정시 퇴근이 미치는 영향에 대해 복잡한 감정을 가지고 있습니다.',
  NOW() - INTERVAL 3 HOUR,
  'PUBLISH_NOW', NOW() + INTERVAL 7 DAY,
  NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 1 DAY),
 
--- [7] 연인·전 남자친구와 연락 — solo + 배심원9 (VOTING)
+-- [7] 연인·전 남자친구와 연락 — solo (VOTING)
 ('mock_007', @u5, '여자친구가 전 남자친구랑 아직도 연락해요', '여자친구가 전 남자친구랑 아직도 연락해요',
  '사귄 지 8개월 됐는데 여자친구가 전 남자친구랑 계속 연락하더라고요. 친구로 지낸다고 하는데 이해하려고 노력하는데 솔직히 불편해요. 직접 그만 연락하라고 하면 제가 너무 좁은 사람이 되는 건가요? 어떻게 하는 게 맞는 건지 모르겠어요.',
  '교제 8개월째 파트너가 전 교제 상대와 연락을 유지하는 상황에 대한 갈등입니다. 상대를 신뢰하면서도 불편함을 느끼는 복잡한 감정을 호소하고 있습니다.',
- 'COUPLE', 'PUBLIC', 'VOTING', 9, 1,
+ 'COUPLE', 'PUBLIC', 'VOTING', 1,
  NULL, NULL, NULL, NULL,
  'PUBLISH_NOW', NOW() + INTERVAL 7 DAY,
  NOW() - INTERVAL 6 DAY, NOW() - INTERVAL 6 DAY),
 
--- [8] 친구·결혼식 사진 SNS 무단 공유 — paired + 배심원3 (VOTING)
+-- [8] 친구·결혼식 사진 SNS 무단 공유 — paired (VOTING)
 ('mock_008', @u1, '친구가 제 결혼식 사진을 허락도 없이 인스타에 올렸어요', '친구가 제 결혼식 사진을 허락도 없이 인스타에 올렸어요',
  '결혼식 사진을 SNS에 공유하지 않기로 했는데 친한 친구가 제 드레스 입은 사진을 자기 인스타에 올렸어요. 팔로워가 2000명이 넘는데 그중엔 제가 모르는 사람도 많아요. 내려달라고 했더니 "예쁜데 왜요" 하더라고요. 화가 나는 게 당연한 거 맞죠?',
  '결혼식 사진을 SNS에 게시하지 않기로 한 약속에도 불구하고 친구가 무단으로 공유한 상황입니다. 당사자의 동의 없이 개인 사진이 공개된 것에 대한 불쾌함을 호소하고 있습니다.',
- 'FRIEND', 'PUBLIC', 'VOTING', 3, 1,
+ 'FRIEND', 'PUBLIC', 'VOTING', 1,
  @u3, '결혼식이 너무 예쁘고 축하하고 싶어서 올렸는데 이렇게까지 화낼 줄 몰랐어요. 좋은 마음으로 한 건데 서운해요. 바로 내렸는데 이미 사이가 어색해진 것 같아서 저도 속상해요.',
  '축하하는 마음으로 사진을 공유했으나 상대방이 강하게 반응한 것에 당혹감을 느끼고 있습니다. 이미 사진은 삭제했으나 관계가 어색해진 것을 걱정하고 있습니다.',
  NOW() - INTERVAL 5 HOUR,
  'PUBLISH_NOW', NOW() + INTERVAL 4 DAY,
  NOW() - INTERVAL 2 DAY, NOW() - INTERVAL 2 DAY),
 
--- [9] 가족·부모님 용돈 형제 갈등 — solo + 배심원0 (CLOSED)
+-- [9] 가족·부모님 용돈 형제 갈등 — solo (CLOSED)
 ('mock_009', @u4, '형은 부모님 용돈 안 드리고 저만 드리는데 이게 맞나요', '형은 부모님 용돈 안 드리고 저만 드리는데 이게 맞나요',
  '부모님이 경제적으로 어려우셔서 매달 30만원씩 드리고 있는데 형은 한 푼도 안 드려요. 형이 저보다 연봉도 높은데 "나는 부모님이랑 따로 사니까"라고 해요. 부모님도 형한테는 말을 못 꺼내세요. 제가 이상한 건가요?',
  '부모님에 대한 경제적 지원을 형제 중 한쪽만 부담하는 상황입니다. 형제 간 소득 차이가 있음에도 부담이 한쪽에 집중되는 것에 대한 불만을 토로하고 있습니다.',
- 'FAMILY', 'PUBLIC', 'CLOSED', 0, 1,
+ 'FAMILY', 'PUBLIC', 'CLOSED', 1,
  NULL, NULL, NULL, NULL,
  'PUBLISH_NOW', NOW() - INTERVAL 2 DAY,
  NOW() - INTERVAL 20 DAY, NOW() - INTERVAL 20 DAY),
 
--- [10] 직장·아이디어 도용 — solo + 배심원1 (VOTING)
+-- [10] 직장·아이디어 도용 — solo (VOTING)
 ('mock_010', @u2, '회의에서 제 아이디어가 동료 거로 채택됐어요', '회의에서 제 아이디어가 동료 거로 채택됐어요',
  '팀 회의에서 제가 새 마케팅 안을 말했는데 팀장이 크게 반응 안 했어요. 근데 10분 뒤에 옆자리 동료가 거의 똑같은 아이디어를 말하니까 팀장이 "오 좋은데요!"라고 했어요. 나중에 그 동료 아이디어가 공식 채택됐고 저는 아무 말도 못 했어요.',
  '팀 회의에서 자신이 먼저 제안한 아이디어가 주목받지 못하다가 동료가 유사한 내용을 말했을 때 채택된 상황입니다. 아이디어 도용 여부와 대응 방법에 대해 고민하고 있습니다.',
- 'WORK', 'PUBLIC', 'VOTING', 1, 1,
+ 'WORK', 'PUBLIC', 'VOTING', 1,
  NULL, NULL, NULL, NULL,
  'PUBLISH_NOW', NOW() + INTERVAL 6 DAY,
  NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 1 DAY),
 
--- [11] 연인·과거 이야기 숨김 — paired + 배심원3 (VOTING)
+-- [11] 연인·과거 이야기 숨김 — paired (VOTING)
 ('mock_011', @u5, '남자친구가 전 여자친구 얘기를 완전히 숨기고 있어요', '남자친구가 전 여자친구 얘기를 완전히 숨기고 있어요',
  '사귄 지 1년이 됐는데 남자친구가 전 여자친구 얘기를 철저히 숨겨요. 이름도, 언제 헤어졌는지도요. 저는 그냥 궁금한 거고 숨긴다는 게 더 찜찜해요. 물어보면 "왜 그런 거 궁금해"하고 화를 내요. 이게 이상한 건지 모르겠어요.',
  '교제 1년이 되었으나 파트너가 전 교제 상대에 대한 정보를 전혀 공유하지 않는 상황입니다. 정보를 숨기는 행동 자체가 불안감을 유발하고 있습니다.',
- 'COUPLE', 'PUBLIC', 'VOTING', 3, 1,
+ 'COUPLE', 'PUBLIC', 'VOTING', 1,
  @u1, '전 연애 얘기를 굳이 꺼내야 하나 싶었어요. 현재 사귀는 사람한테 집중하고 싶었던 거고 숨긴다기보다 중요하지 않다고 생각했어요. 근데 이게 상대를 불안하게 한다는 걸 몰랐네요.',
  '전 교제에 대해 공유하지 않은 것이 현재 교제 상대에게 불안감을 줄 것이라 예상하지 못했습니다. 현재 관계에 집중하려는 의도였음을 설명하고 있습니다.',
  NOW() - INTERVAL 4 HOUR,
  'PUBLISH_NOW', NOW() + INTERVAL 5 DAY,
  NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 3 DAY),
 
--- [12] 친구·단체 여행 비용 분쟁 — solo + 배심원5 (VOTING)
+-- [12] 친구·단체 여행 비용 분쟁 — solo (VOTING)
 ('mock_012', @u3, '친구들이랑 여행 갔다가 돈 계산 때문에 사이가 틀어졌어요', '친구들이랑 여행 갔다가 돈 계산 때문에 사이가 틀어졌어요',
  '5명이서 제주도 여행을 갔는데 제가 거의 다 카드로 결제했어요. 나중에 정산할 때 한 명이 "나는 그 식당 안 먹었잖아"하면서 자기가 먹은 것만 내겠다고 했어요. 다들 각자 결제하기 귀찮아서 제가 한 거였는데 이런 식으로 나올 줄 몰랐어요.',
  '5인 여행에서 편의를 위해 한 명이 대표로 결제했으나, 정산 시 일부 인원이 자신이 직접 소비한 금액만 지불하겠다고 주장하는 상황입니다. 여행 비용 정산 방식에 대한 갈등이 발생했습니다.',
- 'FRIEND', 'PUBLIC', 'VOTING', 5, 1,
+ 'FRIEND', 'PUBLIC', 'VOTING', 1,
  NULL, NULL, NULL, NULL,
  'PUBLISH_NOW', NOW() + INTERVAL 4 DAY,
  NOW() - INTERVAL 8 DAY, NOW() - INTERVAL 8 DAY);
@@ -231,102 +230,6 @@ INSERT INTO votes (post_id, option_id, voter_user_id, created_at) VALUES
 -- mock_012: 작성자=수민
 ('mock_012', @vo_012_a, @u1, NOW()), ('mock_012', @vo_012_a, @u2, NOW()), ('mock_012', @vo_012_a, @u4, NOW()),
 ('mock_012', @vo_012_b, @u5, NOW());
-
--- ============================================================
--- JURORS (배심원 있는 게시글만)
--- ============================================================
-INSERT INTO jurors (post_id, persona, chosen_option_id, empathy_comment, created_at) VALUES
--- mock_001 (배심원3)
-('mock_001', '{"ageGroup":"30대","gender":"여성","disposition":"공감형","valueOrientation":"관계중시"}',
- @vo_001_a, '맞벌이 상황에서 주말 육아와 가사를 혼자 감당하는 것은 분명히 불균형합니다. 평일 피로는 양쪽 다 있을 텐데 주말 분담이 한쪽에 집중되는 건 논의가 필요해 보여요.', NOW()),
-('mock_001', '{"ageGroup":"40대","gender":"남성","disposition":"분석형","valueOrientation":"균형중시"}',
- @vo_001_b, '평일 야근이 많으면 주말에 체력적으로 한계가 올 수 있어요. 다만 배우자의 소진 신호를 너무 오래 무시한 건 문제입니다. 서로의 피로를 인정하는 대화가 먼저 필요해 보입니다.', NOW()),
-('mock_001', '{"ageGroup":"20대","gender":"여성","disposition":"직관형","valueOrientation":"자기표현중시"}',
- @vo_001_a, '육아와 가사의 총량 자체를 함께 계산해봐야 해요. 말로만 도와주고 싶다고 하는 게 아니라 구체적인 역할 분담표를 만들어보는 것도 방법입니다.', NOW()),
-
--- mock_002 (배심원5)
-('mock_002', '{"ageGroup":"30대","gender":"여성","disposition":"공감형","valueOrientation":"공정중시"}',
- @vo_002_a, '3주를 투자한 보고서를 자신의 것으로 발표한 건 명백히 잘못된 행동입니다. 팀 성과가 팀장의 성과라는 논리도 그 아이디어를 만든 사람에 대한 인정이 있어야 성립합니다.', NOW()),
-('mock_002', '{"ageGroup":"40대","gender":"남성","disposition":"경험형","valueOrientation":"조직이해"}',
- @vo_002_b, '조직 논리상 팀장이 발표하는 건 일반적이지만, 내부에서 기여자를 언급하지 않은 건 별개 문제입니다. 직접 대화로 크레딧을 요청해볼 수 있어요.', NOW()),
-('mock_002', '{"ageGroup":"30대","gender":"남성","disposition":"분석형","valueOrientation":"성과중시"}',
- @vo_002_a, '이런 상황은 서면 기록을 남기는 것이 중요합니다. 앞으로 기획안을 제출할 때 날짜를 남기고, HR이나 임원에게 직접 어필하는 방법도 있습니다.', NOW()),
-('mock_002', '{"ageGroup":"20대","gender":"여성","disposition":"공감형","valueOrientation":"자존감중시"}',
- @vo_002_a, '이건 단순한 오해가 아닌 명백한 크레딧 도용입니다. 당신이 화가 나는 건 지극히 정상적인 반응이에요.', NOW()),
-('mock_002', '{"ageGroup":"50대","gender":"남성","disposition":"경험형","valueOrientation":"실용중시"}',
- @vo_002_b, '조직에서 비슷한 일이 반복될 수 있습니다. 억울함을 참기보다는 이번 기회에 팀장과 명확한 업무 크레딧 기준을 이야기해보는 것이 장기적으로 낫습니다.', NOW()),
-
--- mock_003 없음 (배심원0)
-
--- mock_004 (배심원3)
-('mock_004', '{"ageGroup":"30대","gender":"여성","disposition":"현실형","valueOrientation":"관계중시"}',
- @vo_004_a, '10년 우정에 금이 가는 건 슬프지만, 300만원을 2년 넘게 갚지 않고 연락까지 끊은 건 이미 그 친구가 관계를 등진 것입니다.', NOW()),
-('mock_004', '{"ageGroup":"40대","gender":"남성","disposition":"분석형","valueOrientation":"공정중시"}',
- @vo_004_a, '법적 절차(소액재판)나 내용증명 발송을 고려해볼 시점입니다. 관계가 중요하다면 마지막으로 만남을 시도해보고, 거절당하면 법적 절차를 밟는 것이 현실적입니다.', NOW()),
-('mock_004', '{"ageGroup":"20대","gender":"여성","disposition":"공감형","valueOrientation":"감정우선"}',
- @vo_004_a, '돈보다 배신감이 더 클 것 같아요. 10년 친구라면 최소한 "지금 어렵다"는 말이라도 했어야 했는데 그게 없다는 게 슬픕니다.', NOW()),
-
--- mock_005 (배심원2)
-('mock_005', '{"ageGroup":"30대","gender":"여성","disposition":"공감형","valueOrientation":"관계중시"}',
- @vo_005_a, '도와드리겠다고 했는데 괜찮다고 하셔서 자리를 피한 건 맞는 행동입니다. 억지로 들어가면 오히려 부담이 될 수 있어요.', NOW()),
-('mock_005', '{"ageGroup":"40대","gender":"남성","disposition":"균형형","valueOrientation":"공정중시"}',
- @vo_005_b, '처가 명절 문화를 이해하면서도 아내와 사전에 "내가 어떻게 하면 좋겠어?"라고 물어보는 방법이 있습니다. 아내도 불편함을 느끼고 있을 수 있어요.', NOW()),
-
--- mock_006 없음 (배심원0)
-
--- mock_007 (배심원9)
-('mock_007', '{"ageGroup":"20대","gender":"여성","disposition":"공감형","valueOrientation":"신뢰중시"}',
- @vo_007_a, '연락 자체보다 그 연락을 숨기거나 불투명하게 하는 게 더 문제입니다. 솔직하게 "불편하다"고 이야기할 권리가 있어요.', NOW()),
-('mock_007', '{"ageGroup":"30대","gender":"남성","disposition":"이성형","valueOrientation":"자유존중"}',
- @vo_007_b, '전 연인과 친구로 지내는 건 개인의 자유입니다. 다만 현재 파트너가 불편하다면 서로의 감정을 조율할 필요가 있어요.', NOW()),
-('mock_007', '{"ageGroup":"30대","gender":"여성","disposition":"분석형","valueOrientation":"균형중시"}',
- @vo_007_a, '불편함을 표현하지 않고 혼자 참으면 갈등이 더 커질 수 있습니다. 비난 없이 자신의 감정을 전달하는 대화가 필요합니다.', NOW()),
-('mock_007', '{"ageGroup":"40대","gender":"남성","disposition":"경험형","valueOrientation":"실용중시"}',
- @vo_007_b, '전 연애가 끝났다면 연락 자체는 문제가 아닐 수 있지만, 현재 연인이 불편하다고 표현했을 때 어떻게 반응하는지가 더 중요합니다.', NOW()),
-('mock_007', '{"ageGroup":"20대","gender":"남성","disposition":"공감형","valueOrientation":"감정우선"}',
- @vo_007_a, '8개월이 됐는데 이런 부분에서 불편함을 느끼는 건 자연스러운 감정이에요. 좁은 사람이 아닌 솔직한 사람인 겁니다.', NOW()),
-('mock_007', '{"ageGroup":"30대","gender":"여성","disposition":"직관형","valueOrientation":"신뢰중시"}',
- @vo_007_a, '연락 금지를 요구하기보다 어떤 형태의 연락인지, 상대가 어떻게 반응하는지를 파악하는 게 먼저입니다. 투명성이 핵심이에요.', NOW()),
-('mock_007', '{"ageGroup":"40대","gender":"여성","disposition":"균형형","valueOrientation":"관계중시"}',
- @vo_007_b, '현재 관계에 집중하는 모습을 보여달라는 방식으로 접근하는 게 나을 수 있어요. "그 사람과 연락하지 마"보다는 "우리에게 더 집중해줬으면 해"가 더 전달이 잘 됩니다.', NOW()),
-('mock_007', '{"ageGroup":"20대","gender":"여성","disposition":"직설형","valueOrientation":"공정중시"}',
- @vo_007_a, '파트너가 불편하다고 하면 배려해주는 게 관계에서 기본 아닐까요? 이건 과도한 요구가 아닙니다.', NOW()),
-('mock_007', '{"ageGroup":"50대","gender":"남성","disposition":"경험형","valueOrientation":"실용중시"}',
- @vo_007_b, '이 문제를 계속 덮어두면 결국 더 큰 갈등이 됩니다. 서로 편하게 이야기할 수 있는 환경을 먼저 만드세요.', NOW()),
-
--- mock_008 (배심원3)
-('mock_008', '{"ageGroup":"30대","gender":"여성","disposition":"공감형","valueOrientation":"동의중심"}',
- @vo_008_a, '결혼식 사진 공유는 당사자의 동의가 필수입니다. 예쁘다는 이유로 허락 없이 올리는 건 상대의 의사를 무시한 것입니다.', NOW()),
-('mock_008', '{"ageGroup":"20대","gender":"여성","disposition":"공감형","valueOrientation":"친밀감중시"}',
- @vo_008_b, '친구는 축하하는 마음으로 한 행동이었을 거예요. 다만 내려달라는 요청을 받고 바로 내린 건 나쁘지 않은 반응입니다. 사과를 구체적으로 받는 게 남은 과제예요.', NOW()),
-('mock_008', '{"ageGroup":"30대","gender":"남성","disposition":"법적사고형","valueOrientation":"권리중시"}',
- @vo_008_a, '초상권은 개인의 기본 권리입니다. 공개 계정에 동의 없이 타인의 사진을 올리는 것은 명백히 잘못된 행동이고, 화가 나는 건 당연합니다.', NOW()),
-
--- mock_009 없음 (배심원0)
-
--- mock_010 (배심원1)
-('mock_010', '{"ageGroup":"30대","gender":"남성","disposition":"분석형","valueOrientation":"공정중시"}',
- @vo_010_a, '회의에서 비슷한 아이디어가 연이어 나왔다면 팀장이 구별하지 못했을 수도 있습니다. 하지만 침묵했다면 다음번엔 적극적으로 "저도 비슷한 방향으로 생각했는데요"라고 말하세요.', NOW()),
-
--- mock_011 (배심원3)
-('mock_011', '{"ageGroup":"30대","gender":"여성","disposition":"공감형","valueOrientation":"신뢰중시"}',
- @vo_011_a, '과거 연애를 숨기는 것보다 그 이유를 말해주지 않는 것이 더 불안하게 만듭니다. 투명성이 관계의 안정감을 만들어요.', NOW()),
-('mock_011', '{"ageGroup":"40대","gender":"남성","disposition":"경험형","valueOrientation":"현재중시"}',
- @vo_011_b, '과거 연애 정보를 공유해야 할 의무는 없습니다. 현재에 집중하려는 의도는 이해할 수 있어요. 다만 파트너가 불안해한다면 안심시켜주는 노력이 필요합니다.', NOW()),
-('mock_011', '{"ageGroup":"20대","gender":"여성","disposition":"직관형","valueOrientation":"관계중시"}',
- @vo_011_a, '화를 내며 회피하는 건 오히려 더 큰 의심을 불러일으킵니다. 단순하게라도 "끝난 관계야, 신경 안 써도 돼"라고 말해줬으면 좋았을 거예요.', NOW()),
-
--- mock_012 (배심원5)
-('mock_012', '{"ageGroup":"30대","gender":"여성","disposition":"공감형","valueOrientation":"공정중시"}',
- @vo_012_a, '다 같이 먹고 대표로 결제했으면 N분의 1이 기본입니다. 그 자리에서 항의하지 않으면 나중에 혼자 억울함을 감당해야 해요.', NOW()),
-('mock_012', '{"ageGroup":"30대","gender":"남성","disposition":"분석형","valueOrientation":"개인권리"}',
- @vo_012_b, '각자 먹은 것만 내겠다는 주장도 이해할 수 있지만, 그랬다면 처음부터 각자 결제해야 했어요. 편의를 위해 한 명에게 결제를 맡겨놓고 나중에 분리 정산은 앞뒤가 안 맞습니다.', NOW()),
-('mock_012', '{"ageGroup":"20대","gender":"여성","disposition":"공감형","valueOrientation":"관계중시"}',
- @vo_012_a, '여행을 준비하고 결제까지 도맡아 한 사람에게 이런 식으로 나오는 건 피로감을 유발합니다. 단순히 돈 문제가 아닌 배려의 문제예요.', NOW()),
-('mock_012', '{"ageGroup":"40대","gender":"남성","disposition":"경험형","valueOrientation":"갈등회피"}',
- @vo_012_a, '다음 여행부터는 정산 방식을 미리 합의하세요. 이번 건은 아쉽지만 관계가 더 중요하다면 절충안을 찾는 게 나을 수도 있습니다.', NOW()),
-('mock_012', '{"ageGroup":"30대","gender":"여성","disposition":"직설형","valueOrientation":"공정중시"}',
- @vo_012_a, '5명 중 한 명이 이런 식으로 나오면 다음 여행에서 그 사람과 가기 싫어지죠. 명확하게 왜 N분의 1이 공평한지 설명해보세요.', NOW());
 
 -- ============================================================
 -- COMMENTS (각 게시글 3~5개 댓글 + 대댓글)
@@ -455,4 +358,3 @@ SELECT 'Mock 시드 데이터 삽입 완료!' AS result;
 SELECT COUNT(*) AS total_posts FROM posts WHERE id LIKE 'mock%';
 SELECT COUNT(*) AS total_comments FROM post_comments WHERE post_id LIKE 'mock%';
 SELECT COUNT(*) AS total_votes FROM votes WHERE post_id LIKE 'mock%';
-SELECT COUNT(*) AS total_jurors FROM jurors WHERE post_id LIKE 'mock%';

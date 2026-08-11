@@ -83,10 +83,6 @@ public class Post {
     @Column(name = "capture_split_after_lines", columnDefinition = "JSON")
     private List<Integer> captureSplitAfterLines;
 
-    @Column(nullable = false)
-    @Builder.Default
-    private Integer jurorCount = 3;
-
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private PostCategory category;

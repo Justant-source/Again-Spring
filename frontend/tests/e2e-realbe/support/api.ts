@@ -1,7 +1,6 @@
 /**
  * BE 셋업 호출 단일 출처.
  *
- * - createPost: 항상 jurorCount=0 강제 → LLM 미호출 보장
  * - createPost로 만든 글은 레지스트리에 등록 → no-llm-fixture afterEach에서 삭제
  * - 모든 spec은 인라인 fetch 대신 이 모듈을 사용한다.
  * - 기존 fixtures/api-helpers.ts를 통합; api-helpers.ts는 여기로 포인터만 남김.
@@ -36,34 +35,18 @@ function trackCreatedPost(
 
 /** LLM을 트리거하는 것으로 알려진 엔드포인트 패턴 */
 const LLM_DANGEROUS_PATHS = [
-  /\/api\/community\/posts\/[^/]+\/jury\/retry/,
   /\/api\/admin\/content\/corrections\/analyze/,
   /\/api\/admin\/ai-rules\/history\/[^/]+\/analyze/,
   /\/api\/admin\/ai-rules\/history\/analyze-batch/,
   /\/api\/admin\/marketing\/[^/]+\/(generate|simulation|story)/,
 ]
 
-export function assertNoLlmRequest(url: string, method: string, body?: string): void {
+export function assertNoLlmRequest(url: string, method: string, _body?: string): void {
   for (const pattern of LLM_DANGEROUS_PATHS) {
     if (pattern.test(url)) {
       throw new Error(`[no-llm-guardrail] LLM을 트리거하는 엔드포인트 호출 감지: ${method} ${url}`)
     }
   }
-  // POST /api/community/posts — jurorCount > 0 확인
-  if (method === 'POST' && /\/api\/community\/posts$/.test(url) && body) {
-    try {
-      const parsed = JSON.parse(body)
-      if (parsed.jurorCount && parsed.jurorCount > 0) {
-        throw new Error(
-          `[no-llm-guardrail] POST /api/community/posts에 jurorCount=${parsed.jurorCount} 감지. LLM 호출을 방지하려면 jurorCount=0을 사용하세요.`,
-        )
-      }
-    } catch (e) {
-      if ((e as Error).message.includes('no-llm-guardrail')) throw e
-    }
-  }
-  // POST /api/s/{token}/answer — 부모 post의 jurorCount는 런타임에 확인할 수 없으므로
-  // createPost가 항상 jurorCount=0을 강제하는 것으로 보장
 }
 
 // ── 인증 ──────────────────────────────────────────────────────────
@@ -110,8 +93,7 @@ export function tokenFromStorageState(email: string): string {
 // ── 커뮤니티 게시글 ────────────────────────────────────────────────
 
 /**
- * 사연 생성. 항상 jurorCount=0을 강제해 LLM 미호출을 보장.
- * 어떤 spec도 jurorCount를 인라인으로 설정하지 말 것.
+ * 사연 생성.
  */
 export async function createPost(
   request: APIRequestContext,
@@ -128,7 +110,6 @@ export async function createPost(
     bodyRaw: body,
     category,
     visibility: 'PUBLIC',
-    jurorCount: 0, // 항상 0 — 절대 변경 금지
     userTitle: title,
   }
   // API 경로 LLM 안전 검사
@@ -243,8 +224,6 @@ export async function createInviteToken(
 
 /**
  * 상대방 답변 제출.
- * 이 함수를 호출하기 전에 반드시 createPost로 jurorCount=0인 포스트를 생성해야 함.
- * jurorCount>0인 포스트에 이 함수를 쓰면 LLM이 호출된다 (AnswerProcessingService).
  */
 export async function submitPartnerAnswer(
   request: APIRequestContext,

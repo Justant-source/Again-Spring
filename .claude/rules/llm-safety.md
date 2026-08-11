@@ -9,7 +9,7 @@
 
 **권위본**: `docs/shared/policies/forbidden-words.md`
 
-AI 배심원·요약 출력에서 아래 표현은 **절대 금지**. 위반 시 미게시·ERROR 처리.
+AI 생성 출력(AI-user 글·댓글 등)에서 아래 표현은 **절대 금지**. 위반 시 미게시·ERROR 처리.
 
 | 금지 | 대체 |
 |---|---|

@@ -14,7 +14,6 @@ import com.againspring.marketing.dto.CreateJobRequest.TopCommentDto;
 import com.againspring.marketing.dto.CreateJobResponse;
 import com.againspring.marketing.dto.JobCallbackPayload;
 import com.againspring.repository.UserRepository;
-import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
@@ -50,7 +49,6 @@ public class MarketingJobService {
     private final PostRepository postRepository;
     private final MarketingJobRepository marketingJobRepository;
     private final ObjectMapper objectMapper;
-    private final JurorRepository jurorRepository;
     private final VoteService voteService;
     private final CommentService commentService;
     private final VoteOptionRepository voteOptionRepository;
@@ -118,29 +116,6 @@ public class MarketingJobService {
             }
         } catch (Exception e) {
             log.warn("Failed to load vote data for post {}: {}", postId, e.getMessage());
-        }
-
-        // Juror opinions
-        String juryGist = "";
-        List<String> juryOpinions = new ArrayList<>();
-        try {
-            List<com.againspring.domain.community.Juror> jurors = jurorRepository.findByPostId(postId);
-            List<String> comments = jurors.stream()
-                .map(j -> j.getEmpathyComment())
-                .filter(c -> c != null && !c.isBlank())
-                .collect(Collectors.toList());
-            // juryOpinions: top 3, each max 100 chars
-            juryOpinions = comments.stream()
-                .limit(3)
-                .map(c -> c.length() > 100 ? c.substring(0, 100) : c)
-                .collect(Collectors.toList());
-            // juryGist: combine into 200-char summary
-            if (!comments.isEmpty()) {
-                String combined = String.join(" / ", comments);
-                juryGist = combined.length() > 200 ? combined.substring(0, 200) : combined;
-            }
-        } catch (Exception e) {
-            log.warn("Failed to load juror data for post {}: {}", postId, e.getMessage());
         }
 
         // Top comments by likeCount (descending) — top 3, full body (no truncation).
@@ -233,8 +208,6 @@ public class MarketingJobService {
             .authorBody(authorBodyFull)
             .partnerBody(partnerBodyFull)
             .empathyRatio(EmpathyRatioDto.builder().a(empathyA).b(empathyB).build())
-            .juryGist(juryGist)
-            .juryOpinions(juryOpinions)
             .topComments(topComments)
             .voteLabels(voteLabels)
             .postUrl(postUrl)

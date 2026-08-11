@@ -4,7 +4,6 @@ import com.againspring.domain.community.Post;
 import com.againspring.domain.enums.PostCategory;
 import com.againspring.marketing.dto.CreateJobRequest.BriefDto;
 import com.againspring.repository.UserRepository;
-import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.service.community.CommentService;
 import com.againspring.service.community.VoteService;
@@ -26,7 +25,6 @@ class MarketingHoldingBriefSeederTest {
 
     @Mock VoteOptionRepository voteOptionRepository;
     @Mock VoteService voteService;
-    @Mock JurorRepository jurorRepository;
     @Mock CommentService commentService;
     @Mock UserRepository userRepository;
 
@@ -37,7 +35,6 @@ class MarketingHoldingBriefSeederTest {
         lenient().when(voteOptionRepository.findByPostIdOrderByOrderIdx(anyString()))
             .thenReturn(Collections.emptyList());
         lenient().when(voteService.getVoteResult(anyString())).thenReturn(Collections.emptyMap());
-        lenient().when(jurorRepository.findByPostId(anyString())).thenReturn(Collections.emptyList());
         lenient().when(commentService.getTopLevelComments(anyString())).thenReturn(Collections.emptyList());
     }
 

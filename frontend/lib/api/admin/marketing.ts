@@ -346,8 +346,6 @@ export interface MarketingHoldingDraft {
   tags?: string[] | null;
   topComments?: MarketingHoldingTopComment[] | null;
   firstComment?: string | null;
-  juryGist?: string | null;
-  juryOpinions?: string[] | null;
   empathyRatio?: { a: number; b: number } | null;
   metaphorId?: string | null;
   postUrl?: string | null;
@@ -435,9 +433,6 @@ function normalizeHoldingDraft(
       null,
     firstComment:
       (d.firstComment as string) ?? (d.first_comment as string) ?? null,
-    juryGist: (d.juryGist as string) ?? (d.jury_gist as string) ?? null,
-    juryOpinions:
-      (d.juryOpinions as string[]) ?? (d.jury_opinions as string[]) ?? null,
     metaphorId: (d.metaphorId as string) ?? (d.metaphor_id as string) ?? null,
     postUrl: (d.postUrl as string) ?? (d.post_url as string) ?? null,
     voteLabels:

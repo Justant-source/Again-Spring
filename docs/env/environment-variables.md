@@ -59,7 +59,6 @@
 | 변수 | 설명 | 기본값 |
 |---|---|---|
 | `LLM_PROVIDER` | backend LLM provider 선택 | `remote` |
-| `LLM_JURY_PROVIDER` | 배심원 provider | `remote` |
 | `LLM_WORKER_URL` | backend → `againspring-llm` URL | `http://againspring-llm:8090` |
 | `LLM_ENABLED` | `false`면 RemoteLlmProvider가 501 거절 (server-dev L3) | `true` |
 | `CLAUDE_BIN` | Claude CLI 바이너리 | `claude` |

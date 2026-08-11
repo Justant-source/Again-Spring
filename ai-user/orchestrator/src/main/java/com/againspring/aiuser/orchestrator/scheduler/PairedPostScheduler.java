@@ -225,7 +225,7 @@ public class PairedPostScheduler {
         try {
             Map<String, Object> payload = new LinkedHashMap<>(heldContent.response());
             payload.put(PairedHoldMeta.KEY,
-                    PairedHoldMeta.wrap(partner.getId(), rel.getRelationType(), corrId, 3)
+                    PairedHoldMeta.wrap(partner.getId(), rel.getRelationType(), corrId)
                             .get(PairedHoldMeta.KEY));
             candidatesJson = objectMapper.writeValueAsString(payload);
         } catch (Exception e) {

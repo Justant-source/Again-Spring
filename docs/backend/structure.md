@@ -25,13 +25,13 @@ flowchart TD
 
     subgraph SVC["service/ — 비즈니스 로직"]
         direction LR
-        S1["community/:\nCommunityPostService\nCommunityCommentService\nJuryService"]
+        S1["community/:\nPostComposeService\nCommunityCommentService\nVoteService"]
         S2["admin/, category/,\ncrisis/, marketing/,\nnotification/, notify/,\noauth/, retention/, util/"]
     end
 
     subgraph DOM["domain/ — JPA 엔티티"]
         direction LR
-        D1["User · Post · PostComment\nVote · Juror · PostLike\nCommunityReport"]
+        D1["User · Post · PostComment\nVote · PostLike\nCommunityReport"]
         D2["Notification · Marketing\nFeedback · GuestSession\nRevokedToken"]
     end
 
@@ -54,18 +54,18 @@ flowchart TD
 | `api/admin/` | 관리자 컨트롤러 (Dashboard · User · Health · Community) |
 | `service/` | 비즈니스 로직, 트랜잭션 경계 |
 | `service/admin/` | 관리자 기능 (통계 · 사용자 · 모니터링) |
-| `service/community/` | 광장 서비스 (Post · Comment · Vote · Jury) |
+| `service/community/` | 광장 서비스 (Post · Comment · Vote · Invite · Tonalization) |
 | `service/marketing/` | 마케팅 자동화 (dev 전용) |
 | `service/notification/` | 알림 서비스 |
 | `service/notify/` | 위기 알림 이메일 · 피드백 이메일 발신 |
 | `service/crisis/` | 위기 감지 (CrisisDetector 위임) |
 | `service/retention/` | 30일 보존 스케줄러 · 일일 통계 집계 |
 | `domain/` | JPA 엔티티 + Enum |
-| `domain/community/` | Post · PostComment · Vote · Juror · PostLike |
+| `domain/community/` | Post · PostComment · Vote · PostLike |
 | `domain/marketing/` | Marketing 엔티티 |
 | `domain/notification/` | Notification 엔티티 |
 | `repository/` | Spring Data JPA 인터페이스 |
-| `repository/community/` | PostRepository · PostCommentRepository · VoteRepository · JurorRepository |
+| `repository/community/` | PostRepository · PostCommentRepository · VoteRepository |
 | `llm/` | `LLMProvider` 인터페이스 + RemoteLlmProvider (기본) |
 | `llm/remote/` | HTTP 클라이언트 → againspring-llm 워커 |
 | `llm/config/` | LLM 설정 |
@@ -92,7 +92,7 @@ com.againspring/
 │   ├── AdminFeedbackController         # GET/PATCH /api/admin/feedbacks/**
 │   ├── AdminPromptsController          # POST /api/admin/prompts/reload (app.admin.enabled)
 │   ├── AuthController                  # /api/auth/{signup,login,guest,logout,agree,forgot-password,reset-password}
-│   ├── CommunityPostController         # /api/posts (CRUD, jury, voting)
+│   ├── CommunityPostController         # /api/community/posts (CRUD, voting)
 │   ├── CommunityCommentController      # /api/posts/{id}/comments
 │   ├── PostInviteController            # /api/posts/{id}/invite
 │   ├── NotificationController          # /api/notifications
@@ -122,7 +122,6 @@ com.againspring/
 │   │   │   └── ... (다른 request DTOs)
 │   │   └── response/
 │   │       ├── PostResponse
-│   │       ├── JurorResponse
 │   │       ├── AuthResponse
 │   │       └── ... (다른 response DTOs)
 │
@@ -142,8 +141,10 @@ com.againspring/
 │   ├── community/
 │   │   ├── CommunityPostService
 │   │   ├── CommunityCommentService
-│   │   ├── JuryService
+│   │   ├── AnswerProcessingService
+│   │   ├── TonalizationService
 │   │   ├── PostComposeService
+│   │   ├── PostInviteService
 │   │   └── VoteService
 │   ├── notification/
 │   │   └── (알림 관련 서비스들)
@@ -189,7 +190,6 @@ com.againspring/
 │   │   ├── PostLike
 │   │   ├── Vote
 │   │   ├── VoteOption
-│   │   ├── Juror
 │   │   └── CommunityReport
 │   ├── marketing/
 │   │   └── (마케팅 엔티티들)
@@ -219,7 +219,6 @@ com.againspring/
 │       ├── PostLikeRepository
 │       ├── VoteRepository
 │       ├── VoteOptionRepository
-│       ├── JurorRepository
 │       └── CommunityReportRepository
 │
 ├── llm/
@@ -293,8 +292,9 @@ backend/src/main/resources/
 │   ├── V1__init.sql                    # 기본 테이블 (users, posts, comments 등)
 │   ├── V2~V47.sql                      # 레거시 마이그레이션
 │   ├── V48__community_posts.sql        # 광장형 posts 테이블 (new)
-│   ├── V49~V55.sql                     # 광장형 확장 (voting, jurors, etc)
+│   ├── V49~V55.sql                     # 광장형 확장 (voting, notifications, etc)
 │   ├── V56__drop_legacy_mediation_tables.sql  # 레거시 테이블 제거
+│   ├── V106__drop_ai_jury.sql          # jurors 테이블·juror_count 제거
 │   └── (other migrations)
 ├── safety/forbidden-words.yml          # KeywordGuard 단어 목록
 ├── permissions.yml                     # UserPermissionsConfig 로드
@@ -309,12 +309,13 @@ backend/src/main/resources/
 | V48 | posts 테이블 생성 | 광장형 NEW |
 | V49 | post_comments, post_likes 생성 | 광장형 NEW |
 | V50 | votes, vote_options 생성 | 광장형 NEW |
-| V51 | jurors 테이블 생성 | 광장형 NEW |
+| V51 | (역사) jurors 테이블 생성 — **V106에서 DROP** | 광장형 NEW |
 | V52 | community_reports 생성 | 광장형 NEW |
 | V53 | notifications 테이블 | 광장형 NEW |
 | V54 | marketing 테이블 확장 | 광장형 NEW |
 | V55 | community3 추가 컬럼 | 광장형 NEW |
 | V56 | drop_legacy_mediation_tables | 정리 (세션, 메시지 등 삭제) |
+| V106 | drop_ai_jury | jurors 테이블·posts.juror_count 삭제 |
 
 ## 코드 위치 → 문서 매핑
 

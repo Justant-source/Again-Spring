@@ -97,7 +97,7 @@ flowchart LR
 | POST | `/api/auth/agree` | **JWT** | 200 / 400 | [auth.md](auth.md) |
 | POST | `/api/auth/oauth2/{provider}` | 공개 | 200 / 400 / 401 | [auth.md](auth.md) |
 
-### 2. Community — Posts · Comments · Voting · Jury
+### 2. Community — Posts · Comments · Voting
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
@@ -112,8 +112,7 @@ flowchart LR
 | GET | `/api/community/posts/{id}/comments` | 공개 | 200 | 댓글 목록. 최상위·대댓글 모두 `createdAt DESC`(최신순). `?page=&size=`는 최상위만 페이지네이션 |
 | PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | 댓글 수정 (작성자만) |
 | DELETE | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 204 / 403 / 404 | 댓글 삭제 (작성자만) |
-| GET | `/api/community/posts/{id}/jury` | 공개 | 200 / 404 | AI 배심원 조회 |
-| POST | `/api/community/posts/{id}/vote` | **JWT** | 200 / 403 | 투표 생성 (공감 비율 가중치는 §2.0.2 참조) |
+| POST | `/api/community/posts/{id}/vote` | **JWT** | 200 / 403 | 투표 생성 (작성자 vs 상대방, 가중치는 §2.0.2) |
 | DELETE | `/api/community/posts/{id}/vote` | **JWT** | 200 / 403 | 투표 취소 |
 | POST | `/api/community/posts/{postId}/comments/{id}/like` | **JWT** | 201 / 204 | 댓글 좋아요 |
 | POST | `/api/community/posts/{id}/like` | **JWT** | 201 / 204 | 게시글 좋아요 |
@@ -126,7 +125,7 @@ flowchart LR
 
 - 키는 오케스트레이터 plan item의 기존 `idempotency_key`를 그대로 사용한다(1~160자, `A-Za-z0-9._:-`).
 - 최초 요청은 글/댓글을 작성하고 내부 `bot_request_dedup`에 `key → target type/id, bot user`를 같은 트랜잭션으로 저장한다.
-- 같은 봇이 같은 종류의 키로 재시도하면 기존 글/댓글을 `200`으로 반환하고, 알림·outbox·배심원 생성도 다시 발생시키지 않는다.
+- 같은 봇이 같은 종류의 키로 재시도하면 기존 글/댓글을 `200`으로 반환하고, 알림·outbox도 다시 발생시키지 않는다.
 - 다른 봇 또는 다른 target type으로 키를 재사용하면 `409 IDEMPOTENCY_KEY_CONFLICT`; 손상된 매핑은 `409 IDEMPOTENCY_TARGET_*`로 실패한다.
 
 #### 2.0.2 공감 비율(투표) 가중치 (2026-07-31~)
@@ -139,7 +138,7 @@ weight_human = 1 (고정)
 percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (humanTotal×1 + aiTotal×weight_ai) × 100
 ```
 
-표시되는 절대 투표 개수(`count`)는 사람표+AI표 단순 합산이며 가중치는 `percentage`에만 적용된다. 배심원(`GET .../jury`) 투표는 이 계산과 무관한 별도 데이터다. 구현: `backend/.../service/community/VoteService.java`, `CommunityPostController.castVote/cancelVote`, `PostDetailResponse.from()`.
+표시되는 절대 투표 개수(`count`)는 사람표+AI표 단순 합산이며 가중치는 `percentage`에만 적용된다. 구현: `backend/.../service/community/VoteService.java`, `CommunityPostController.castVote/cancelVote`, `PostDetailResponse.from()`.
 
 ### 2.1. Partner Invite API
 

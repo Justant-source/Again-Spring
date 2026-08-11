@@ -31,7 +31,6 @@ erDiagram
         varchar20 visibility
         longtext bodyRaw
         longtext bodyPublished
-        int jurorCount
         int viewCount
         timestamp deletedAt
     }
@@ -48,14 +47,6 @@ erDiagram
         varchar32 postId FK
         bigint optionId FK
         varchar32 voterUserId FK
-    }
-
-    jurors {
-        bigint id PK
-        varchar32 postId FK
-        bigint chosenOptionId FK
-        json persona
-        text empathyComment
     }
 
     post_comments {
@@ -82,10 +73,8 @@ erDiagram
     users ||--o{ post_likes : "gives"
     posts ||--o{ vote_options : "has"
     posts ||--o{ votes : "receives"
-    posts ||--o{ jurors : "generates"
     posts ||--o{ post_comments : "has"
     vote_options ||--o{ votes : "receives"
-    vote_options ||--o{ jurors : "chosen by"
     post_comments ||--o{ post_comments : "replies"
     post_comments ||--o{ post_likes : "liked by"
 ```
@@ -122,12 +111,11 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | 테이블 | 역할 | PK | 추가 정보 |
 |---|---|---|---|
 | `users` | 회원/게스트 계정 | VARCHAR(32) | V1~V24, ULID-style |
-| `posts` | 커뮤니티 광장 게시글 | BIGINT auto | **V48** 신규, 배심원/투표 기반 |
-| `vote_options` | 투표 선택지 | BIGINT auto | **V49** 신규 (배심원 공감도) |
+| `posts` | 커뮤니티 광장 게시글 | BIGINT auto | **V48** 신규 |
+| `vote_options` | 투표 선택지 (작성자/상대방) | BIGINT auto | **V49** 신규 |
 | `votes` | 사용자 투표 기록 | BIGINT auto | **V49** 신규 |
 | `post_comments` | 게시글 댓글 | BIGINT auto | **V50** 신규 |
 | `post_likes` | 좋아요 | BIGINT auto | **V50** 신규 |
-| `jurors` | AI 배심원 (9명) | BIGINT auto | **V51** 신규, persona_name / opinion_text |
 | `community_reports` | 신고 | BIGINT auto | **V52** 신규, 게시글/댓글 신고 |
 | `notifications` | 알림 | BIGINT auto | **V53** 신규, 댓글/좋아요 알림 |
 
@@ -303,21 +291,6 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 
 ---
 
-### `jurors` (V51 — AI 배심원)
-
-| 컬럼 | 타입 | 비고 |
-|---|---|---|
-| `id` | BIGINT auto PK | |
-| `post_id` | BIGINT FK | posts |
-| `persona_name` | VARCHAR(100) | 심리상담사, 경계 전문가 등 (9개) |
-| `opinion_text` | MEDIUMTEXT | AI 생성 배심원 의견 |
-| `vote_option_id` | BIGINT FK | 배심원 투표 선택 (vote_options) |
-| `model` | VARCHAR(100) | claude-haiku-4-5-20251001 |
-| `generation_status` | VARCHAR(32) | pending / completed / failed |
-| `created_at` | TIMESTAMP(3) | |
-
----
-
 ### `community_reports` (V52)
 
 | 컬럼 | 타입 | 비고 |
@@ -343,7 +316,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | `is_read` | BOOLEAN | 읽음 여부 |
 | `created_at` | TIMESTAMP(3) | |
 
-읽은 알림은 30일 후 자동 삭제 (RetentionScheduler).
+읽은 알림은 30일 후 자동 삭제 (retention).
 
 ---
 
@@ -456,7 +429,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V1~V27** | 구 중재 모델 (sessions, turns, messages, reports) |
 | **V28~V39** | 마케팅 테이블 (V15+ dev 전용) |
 | **V40~V47** | (미사용) |
-| **V48~V55** | 광장형 신규 (posts, votes, comments, jurors, notifications 등) |
+| **V48~V55** | 광장형 신규 (posts, votes, comments, notifications 등) |
 | **V56** | **DROP TABLE sessions, turns, messages, reports** |
 | **V57~V67** | 마케팅 기능 확장 (ASM 이관 관련) |
 | **V68~V74** | AI 첨삭 학습 시스템 (corrections, global_rules) |
@@ -484,6 +457,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V101** | `encrypted_secret` — 앱 시크릿 AES-GCM vault (마케팅 자격증명 제외) |
 | **V102** | `marketing_holding` — 24h 대기 보드 (초안·핀 soft-reserve·점수/순위 스냅샷·COMMITTED/DROPPED) |
 | **V104** | `marketing_job.requested_by` VARCHAR(32)→128 — 강제 배포 `admin:force:`+JWT UUID(≈48) 저장 |
+| **V106** | AI jury 제거 — `DROP TABLE jurors`, `posts.juror_count` 컬럼 삭제 |
 
 ---
 
@@ -491,11 +465,10 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 
 | 대상 | 보존 기간 | 책임 |
 |---|---|---|
-| `posts.content` | 30일 후 NULL | RetentionScheduler |
-| `post_comments.content` | 30일 후 NULL | RetentionScheduler |
-| `post_comments` (is_deleted=true) | 30일 후 NULL | RetentionScheduler |
-| `jurors` | 60일 후 DELETE | RetentionScheduler |
-| `notifications` (읽음) | 30일 후 DELETE | RetentionScheduler |
+| `posts.content` | 30일 후 NULL | retention |
+| `post_comments.content` | 30일 후 NULL | retention |
+| `post_comments` (is_deleted=true) | 30일 후 NULL | retention |
+| `notifications` (읽음) | 30일 후 DELETE | retention |
 | `notifications` (미읽) | 영구 보관 | — |
 | `users` (탈퇴) | 소프트 삭제 (deleted_at 설정) | 사용자 요청 |
 | 마케팅 테이블 | 별도 정책 | — |

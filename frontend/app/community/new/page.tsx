@@ -31,7 +31,6 @@ export default function CommunityNewPage() {
   const [title, setTitle] = useState('');
   const [bodyRaw, setBodyRaw] = useState('');
   const [category, setCategory] = useState(C3_CATEGORIES[0].id);
-  const jurorCount = 0; // AI 중재자 모드 숨김 처리 중
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showGuestNotice, setShowGuestNotice] = useState(false);
@@ -73,7 +72,6 @@ export default function CommunityNewPage() {
         category,
         visibility: 'PUBLIC',
         userTitle: title.trim(),
-        jurorCount,
       };
 
       const [result] = await Promise.all([

@@ -6,7 +6,7 @@
 
 | 파일 | 설명 |
 |---|---|
-| `psychology-model.md` | Gottman + NVC 모델 배심원 페르소나 근거 |
+| `psychology-model.md` | Gottman + NVC + EFT — AI 출력 가이드 (역사적 매핑은 ADR-0002) |
 | `auth.md` | 인증·인가 정책 (회원가입, OAuth, 게스트, JWT) |
 | `categories.md` | 갈등·관계 카테고리 정의 (6개 메이저) |
 | `forbidden-words.md` | AI 출력 금지어·규칙 및 검증 방법 |

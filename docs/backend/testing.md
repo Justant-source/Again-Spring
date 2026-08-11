@@ -47,7 +47,7 @@ flowchart TD
         L2["PromptSanitizer\nInjection 방지"]
     end
     subgraph SVC["Service — 80%"]
-        V1["JuryService\nPostComposeService"]
+        V1["PostComposeService\nVoteService"]
         V2["CommunityPostService\nCommunityCommentService"]
     end
     subgraph CTRL["Controller — 70%"]

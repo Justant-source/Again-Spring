@@ -83,12 +83,6 @@ public class CreateJobRequest {
         @JsonProperty("empathy_ratio")
         private EmpathyRatioDto empathyRatio;
 
-        @JsonProperty("jury_gist")
-        private String juryGist;
-
-        @JsonProperty("jury_opinions")
-        private List<String> juryOpinions;
-
         /** 좋아요 순 상위 3, 본문 전문(미절단). */
         @JsonProperty("top_comments")
         private List<TopCommentDto> topComments;

@@ -4,22 +4,20 @@
 
 ## 📋 아키텍처 결정 기록 (ADR)
 
-2026-06-02 커뮤니티 광장 피벗 관련 주요 결정사항:
-
 - [**ADR/README.md**](./adr/README.md) — ADR 인덱스 및 작성법
-- [**ADR-0001**](./adr/0001-pivot-to-community-plaza.md) — 🟥 **커뮤니티 광장 피벗** (1:1 중재 채팅 → 공개 게시글 + AI 배심원)
-- [ADR-0002](./adr/0002-psychology-model-repurposed-for-jurors.md) — 심리학 모델 배심원 페르소나화 (Gottman/NVC/EFT)
+- [**ADR-0001**](./adr/0001-pivot-to-community-plaza.md) — 커뮤니티 광장 피벗 (역사)
+- [ADR-0002](./adr/0002-psychology-model-repurposed-for-jurors.md) — 심리학 모델 결정 (역사)
 - [ADR-0003](./adr/0003-llm-consolidated-to-claude-code-cli.md) — LLM 통합 (Claude Code CLI 단일 경로)
 - [ADR-0004](./adr/0004-onboarding-mbti-hidden-not-removed.md) — 온보딩/MBTI 숨김 (삭제 아님)
 - [ADR-0005](./adr/0005-marketing-automation-retained-unchanged.md) — 마케팅 자동화 → Again-Spring-Marketing(ASM) 분리 (2026-06-09 superseded)
-- [ADR-0006](./adr/0006-legacy-deletion-and-git-recovery.md) — 🔴 **삭제 원장 및 복구 경로** (60+ 파일, 8 테이블)
+- [ADR-0006](./adr/0006-legacy-deletion-and-git-recovery.md) — 삭제 원장 및 복구 경로
 
 ## 문서 인덱스
 
 ### 입문
-- [docs/_index.md](../../docs/_index.md) — **문서 권위 그래프 SSOT + Doc-Sync 트리거맵** (구 manifest.yaml 흡수)
-- [structure.md](./structure.md) — 모노레포 4-분할 구조 (env/ backend/ frontend/ shared/)
-- [architecture.md](./architecture.md) — 시스템 전체 아키텍처 (브라우저↔Tunnel↔Nginx↔FE↔BE↔DB↔LLM, 커뮤니티 광장 기준)
+- [docs/_index.md](../../docs/_index.md) — **문서 권위 그래프 SSOT + Doc-Sync 트리거맵**
+- [structure.md](./structure.md) — 모노레포 구조
+- [architecture.md](./architecture.md) — 시스템 아키텍처 (광장 사연 + 공감 투표 + AI-user)
 
 ### 운영
 
@@ -30,20 +28,20 @@
 - 주요: [psychology-model.md](./policies/psychology-model.md), [forbidden-words.md](./policies/forbidden-words.md)
 
 ### [api/](./api/)
-FE↔BE 간의 계약 (커뮤니티 광장 기준). 변경 시 양쪽 모두 영향.
+FE↔BE 간의 계약. 변경 시 양쪽 모두 영향.
 
-- [api/README.md](./api/README.md) — API 문서 인덱스 (도메인별 파일 링크)
+- [api/README.md](./api/README.md) — API 문서 인덱스
 - [api/rest-spec.md](./api/rest-spec.md) — 공통 규약·에러코드·전체 엔드포인트 마스터 표
-- [api/auth.md](./api/auth.md) — 인증 API (AuthController + OAuth2Controller)
-- [api/user.md](./api/user.md) — 사용자 API (프로필·비밀번호·탈퇴)
+- [api/auth.md](./api/auth.md) — 인증 API
+- [api/user.md](./api/user.md) — 사용자 API
 - [api/feedback.md](./api/feedback.md) — 피드백 API
-- [api/admin.md](./api/admin.md) — 관리자 API (대시보드, 모니터링, 마케팅)
-- [api/database-schema.md](./api/database-schema.md) — MariaDB 11 스키마 (Flyway V1~V56)
+- [api/admin.md](./api/admin.md) — 관리자 API
+- [api/database-schema.md](./api/database-schema.md) — MariaDB 스키마
 
 ### [prompts/](./prompts/)
-LLM 배심원 프롬프트 (커뮤니티 광장).
+BE 런타임에 마운트되는 프롬프트 자산.
 
-- [prompts/community/](./prompts/community/) — **배심원 페르소나** (jury_persona.md), **중립화** (neutralize.md)
+- [prompts/community/](./prompts/community/) — `post_tonalization.md` (`TonalizationService` / 파트너 초대 답변)
 
 ## 런타임 자산
 
@@ -52,7 +50,7 @@ LLM 배심원 프롬프트 (커뮤니티 광장).
 
 | 파일 | 용도 | 참조 키 |
 |---|---|---|
-| `prompts/community/` | LLM 배심원 프롬프트 | `app.prompts.path` |
+| `prompts/community/` | 톤 정규화 등 community 프롬프트 | `app.prompts.path` |
 | `templates/first_message/*.json` | 첫 메시지 템플릿 | `TEMPLATES_PATH` |
 | `categories.yml` | 카테고리 마스터 | `app.categories.path` |
 | `policies/user-permissions.json` | 사용자 권한 설정 | `UserPermissionsConfig` |

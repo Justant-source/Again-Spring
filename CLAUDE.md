@@ -5,12 +5,12 @@
 
 > ⚠️ **이 파일은 180줄 미만 유지.** 역할 = 라우터 + 절대 규칙. 상세는 `docs/` 디렉토리에 위임.
 
-**프로젝트**: 다시봄 · Again Spring — 갈등 커뮤니티 플랫폼.
-갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공.
-**스택**: FE Next.js 14 · BE Spring Boot 3.3 + MariaDB 11 · LLM = Claude CLI 브릿지 (remote only)
+**프로젝트**: 다시봄 · Again Spring — 갈등 사연 커뮤니티.
+사연 게시 → 커뮤니티가 작성자 vs 상대방 공감 투표·댓글 → 운영용 AI-user 페르소나가 실제 사용자와 공존하며 글·댓글·투표를 수행.
+**스택**: FE Next.js 14 · BE Spring Boot 3.3 + MariaDB 11 · LLM = Claude CLI 브릿지 (remote only; 주로 AI-user)
 **도메인**: `againspring.net`(prod) · `dev.againspring.net`(dev) · **상태**: 운영 중 — **dev/prod 완전 격리**. 검증·e2e는 **dev만**, prod 배포는 명시 지시 시에만.
 
-**도메인 용어**: 사연=갈등 게시글 · 배심원=AI 심리상담사 페르소나 9인 · 공감 비율=A:B %(판결 아님) · 진영=작성자(A)/상대방(B) · 광장=공개 피드
+**도메인 용어**: 사연=갈등 게시글 · 공감 비율=작성자(A):상대방(B) %(판결 아님) · 진영=작성자(A)/상대방(B) · 광장=공개 피드 · AI-user=운영용 페르소나 봇
 
 ---
 
@@ -75,7 +75,7 @@
 > 권위본: `docs/frontend/ux/principles.md` · `docs/frontend/design/system.md`
 
 - **진영색**: 작성자=피치 `#C9785A` / 상대방=세이지 `#5F8F76` — 앱 전체 일관
-- AI 배심원·요약은 AI임을 명확히 표시, 사용자 글과 시각 구분
+- AI-user·AI 생성 콘텐츠는 AI임을 명확히 구분, 사용자 글과 시각 구분
 - **사용자 입력에 금지어 필터 미적용** (책임은 사용자) — 필터는 AI 출력에만 적용
 
 ---
@@ -115,7 +115,7 @@ curl localhost:8091/api/health            # prod (명시 배포 후만)
 ## 🧪 테스트 핵심
 
 - **e2e ↔ 기능 동기화 (dev 게이트)**: 기능 추가/수정/삭제 시 `frontend/tests/e2e-realbe/journeys/`의 대응 spec을 추가/갱신/제거. e2e-realbe(`:8090`) 전체 통과 = prod 배포 전제 (절대 규칙 #4).
-- e2e는 실 BE(**dev:8090**) 사용하되 **LLM 절대 호출 금지** — 모든 spec은 `support/no-llm-fixture.ts`를 import (jurorCount>0·분석 엔드포인트 자동 차단).
+- e2e는 실 BE(**dev:8090**) 사용하되 **LLM 절대 호출 금지** — 모든 spec은 `support/no-llm-fixture.ts`를 import (분석 엔드포인트 자동 차단).
 - 계층별 커버리지 목표·상세 전략: `docs/frontend/testing.md` · `docs/backend/testing.md`
 
 ---

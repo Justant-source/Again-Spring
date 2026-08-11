@@ -5,7 +5,6 @@ export interface PostCreateRequest {
   category: string;
   visibility: 'PUBLIC' | 'PRIVATE';
   userTitle?: string;
-  jurorCount?: number;
   sessionId?: string;
 }
 
@@ -29,7 +28,6 @@ export interface PostDetail {
   viewCount?: number;
   voteResult?: VoteResult;
   userTitle?: string;
-  jurorCount?: number;
   authorPct?: number;
   partnerPct?: number;
   paired?: boolean;
@@ -69,18 +67,6 @@ export interface VoteResult {
   myVotedOptionId?: number;
 }
 
-export interface JuryResult {
-  jurors: Array<{
-    ageGroup: string;
-    gender: string;
-    chosenOptionLabel: string;
-    empathyComment: string;
-  }>;
-  distribution: Array<{ label: string; count: number; percentage: number }>;
-  legalNotice: string;
-  summaryLine?: string;
-}
-
 export const postApi = {
   create: (req: PostCreateRequest) =>
     api.post<PostDetail>('/api/community/posts', req).then(r => r.data),
@@ -104,9 +90,6 @@ export const postApi = {
   cancelVote: (postId: string) =>
     api.delete<VoteResult>(`/api/community/posts/${postId}/vote`).then(r => r.data),
 
-  getJury: (postId: string) =>
-    api.get<JuryResult>(`/api/community/posts/${postId}/jury`).then(r => r.data),
-
   report: (postId: string, reason: string) =>
     api.post(`/api/community/posts/${postId}/report`, { reason }),
 
@@ -121,9 +104,6 @@ export const postApi = {
 
   voted: () =>
     api.get<PostSummary[]>('/api/community/posts/voted').then(r => r.data),
-
-  retryJury: (postId: string) =>
-    api.post(`/api/community/posts/${postId}/jury/retry`),
 
   editAuthorBody: (postId: string, bodyRaw: string) =>
     api.patch(`/api/community/posts/${postId}/body`, { bodyRaw }),

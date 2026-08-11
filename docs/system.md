@@ -130,22 +130,23 @@ flowchart TB
 
 ## L3 — 대표 흐름
 
-### 배심원/중립화 LLM
+### 광장 사연 · 공감 투표
 
 ```mermaid
 sequenceDiagram
     participant FE as Frontend
     participant BE as Backend
-    participant LW as againspring-llm
-    participant Claude as Claude API
+    participant DB as MariaDB
 
-    FE->>BE: community request
-    BE->>LW: POST /v1/invoke
-    LW->>Claude: Claude CLI call
-    Claude-->>LW: response
-    LW-->>BE: normalized output
-    BE-->>FE: rendered result
+    FE->>BE: POST /api/community/posts
+    BE->>DB: Post + VoteOption(작성자/상대방) 저장
+    BE-->>FE: 201 postId
+    FE->>BE: POST /api/community/posts/{id}/vote
+    BE->>DB: Vote 저장
+    BE-->>FE: percentage (작성자 vs 상대방)
 ```
+
+사람 글은 원문 그대로 게시한다 (`PostComposeService`). 커뮤니티 공감 투표(작성자 vs 상대방)가 제품 핵심이며, AI 생성 콘텐츠는 AI-user 스택(`llm-ai-user`)이 담당한다.
 
 ### AI-user PLAN 홀딩·발행
 

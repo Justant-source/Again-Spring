@@ -126,7 +126,7 @@ flowchart LR
 
 - `againspring-llm`
 - 내부 포트 `8090`
-- 배심원/중립화/기타 base LLM 요청 처리
+- base LLM 요청 처리 (`RemoteLlmProvider` 경로; 제품 사람글 경로에서는 미사용)
 
 ### Shared AI-user
 

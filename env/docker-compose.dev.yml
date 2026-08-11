@@ -53,7 +53,6 @@ services:
       LLM_PROVIDER: deny
       LLM_CHAT_PROVIDER: deny
       LLM_REPORT_PROVIDER: deny
-      LLM_JURY_PROVIDER: deny
       LLM_ENABLED: "false"
       # L3: LLM 워커에 도달 불가한 placeholder (네트워크에서도 againspring 미연결)
       LLM_WORKER_URL: http://127.0.0.1:1

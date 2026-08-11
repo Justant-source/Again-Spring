@@ -13,7 +13,6 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 /**
  * V17 커뮤니티 기능 KeywordGuard 확장 테스트.
  * - 공개 reframe 치환 (applyCommunityPublicReframe)
- * - 배심원 출력 검증 (scanJuryOutput)
  */
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = {KeywordGuard.class})
@@ -66,51 +65,5 @@ class KeywordGuardCommunityTest {
     void applyCommunityPublicReframe_handlesNull() {
         String result = guard.applyCommunityPublicReframe(null);
         assertThat(result).isNull();
-    }
-
-    // ── 배심원 출력 검증 ──────────────────────────────────────────
-
-    @Test
-    @DisplayName("배심원 출력: 부드러운 과실 표현은 허용")
-    void scanJuryOutput_allowsMildFaultExpression() {
-        ScanResult result = guard.scanJuryOutput("A님의 행동이 더 책임이 있어 보입니다");
-        assertThat(result.isCrisis()).isFalse();
-        assertThat(result.isBlocked()).isFalse();
-    }
-
-    @Test
-    @DisplayName("배심원 출력: 유죄 금지 어휘 감지")
-    void scanJuryOutput_detectsBannedTerm_guilty() {
-        ScanResult result = guard.scanJuryOutput("A님이 유죄입니다");
-        assertThat(result.getMatches()).isNotEmpty();
-    }
-
-    @Test
-    @DisplayName("배심원 출력: 무죄 금지 어휘 감지")
-    void scanJuryOutput_detectsBannedTerm_notGuilty() {
-        ScanResult result = guard.scanJuryOutput("상대방은 무죄입니다");
-        assertThat(result.getMatches()).isNotEmpty();
-    }
-
-    @Test
-    @DisplayName("배심원 출력: 판결한다 금지 어휘 감지")
-    void scanJuryOutput_detectsBannedTerm_verdict() {
-        ScanResult result = guard.scanJuryOutput("이 사건을 판결한다");
-        assertThat(result.getMatches()).isNotEmpty();
-    }
-
-    @Test
-    @DisplayName("배심원 출력: crisis 키워드는 여전히 감지")
-    void scanJuryOutput_detectsCrisisKeywords() {
-        ScanResult result = guard.scanJuryOutput("상대방을 폭행했습니다");
-        assertThat(result.isCrisis()).isTrue();
-    }
-
-    @Test
-    @DisplayName("배심원 출력: 정상 출력은 통과")
-    void scanJuryOutput_normalOutputPasses() {
-        ScanResult result = guard.scanJuryOutput("양쪽 모두 관점이 다르며 이해할 필요가 있습니다");
-        assertThat(result.isCrisis()).isFalse();
-        assertThat(result.isBlocked()).isFalse();
     }
 }

@@ -118,9 +118,9 @@ export default async function globalSetup(): Promise<void> {
     const pass = readEnvVar('MARIADB_PASSWORD')
     if (pass) {
       const seedMock = `
-        INSERT IGNORE INTO posts (id, author_id, body_published, body_raw, category, created_at, neutralization_passed, status, title, updated_at, visibility, juror_count, publish_mode, user_title, view_count)
+        INSERT IGNORE INTO posts (id, author_id, body_published, body_raw, category, created_at, neutralization_passed, status, title, updated_at, visibility, publish_mode, user_title, view_count)
         SELECT 'mock_001', id, '저는 직장인인데 주말에도 집안일을 다 도맡아 하고 있어요. 상대방은 이게 당연하다고 생각하는 것 같아요. 저만 쉬는 날이 없는 것 같아서 힘드네요.',
-               '저는 직장인인데 주말에도 집안일을 다 도맡아 하고 있어요.', 'WORK', NOW(), 0, 'VOTING', '주말에도 저만 쉬는 날이 없어요', NOW(), 'PUBLIC', 0, 'PUBLISH_NOW', '주말에도 저만 쉬는 날이 없어요', 0
+               '저는 직장인인데 주말에도 집안일을 다 도맡아 하고 있어요.', 'WORK', NOW(), 0, 'VOTING', '주말에도 저만 쉬는 날이 없어요', NOW(), 'PUBLIC', 'PUBLISH_NOW', '주말에도 저만 쉬는 날이 없어요', 0
         FROM users WHERE email='test1@again.com';
         -- e2e 반복 시 vote_options 중복 누적 방지 (voteOptions[0]/[1] 계약 깨짐)
         DELETE FROM vote_options WHERE post_id = 'mock_001';

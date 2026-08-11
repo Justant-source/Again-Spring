@@ -1,7 +1,7 @@
 # 다시봄 (Again Spring) 프론트엔드 문서
 
 > **"다시 봄. 다시 바라봄."**  
-> 갈등 커뮤니티 플랫폼. 갈등을 게시하면 AI 배심원(심리상담사 페르소나)과 커뮤니티가 양쪽 입장을 분석하고 공감 비율을 제공하는 웹앱입니다.
+> 갈등 사연 커뮤니티. 사연을 게시하면 커뮤니티가 작성자 vs 상대방 공감 투표·댓글로 반응하고, 운영용 AI-user 페르소나가 실제 사용자와 공존하는 웹앱입니다.
 
 본 디렉토리는 Next.js 14 기반 프론트엔드 개발 문서입니다.
 
@@ -135,7 +135,7 @@ FE는 이들을 **참조하고 구현**할 뿐, 독립적으로 정의하지 않
 
 - [ ] `npm run build` 성공 (no errors)
 - [ ] `npm run lint:words` 최종 확인
-- [ ] 전체 플로우 (광장 게시 → 배심원 → 투표/댓글) 수동 테스트
+- [ ] 전체 플로우 (광장 게시 → 투표/댓글) 수동 테스트
 - [ ] 모바일 반응형 (PhoneFrame) 확인
 - [ ] 댓글 무한스크롤 테스트
 
@@ -158,7 +158,7 @@ frontend/
 │
 ├── components/            # React 컴포넌트
 │   ├── shared/            # Logo, PhoneFrame
-│   ├── community/c3/      # 광장 컴포넌트 (FeedCard, JurorCard, VoteBar, CommentBar)
+│   ├── community/c3/      # 광장 컴포넌트 (FeedCard, VoteBar, CommentBar)
 │   └── ui/                # 기본 UI (Radix)
 │
 ├── lib/
@@ -192,7 +192,7 @@ frontend/
 
 - ✅ Next.js 14 + TypeScript + Tailwind
 - ✅ MSW Mock API
-- ✅ 광장형 UX (게시 → 배심원 → 투표/댓글)
+- ✅ 광장형 UX (게시 → 공감 투표/댓글)
 - ✅ 금지어 검사
 - ✅ 3-Tone 디자인 시스템
 - ✅ 댓글 무한스크롤

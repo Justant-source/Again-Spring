@@ -14,7 +14,6 @@ import {
 
 /** LLM을 트리거하는 경로 패턴 */
 const LLM_PATH_PATTERNS = [
-  /\/api\/community\/posts\/[^?/]+\/jury\/retry/,
   /\/api\/admin\/content\/corrections\/analyze/,
   /\/api\/admin\/ai-rules\/history\/[^?/]+\/analyze/,
   /\/api\/admin\/ai-rules\/history\/analyze-batch/,
@@ -67,20 +66,6 @@ export const test = base.extend<NoLlmFixtures>({
             `[no-llm-guardrail] LLM 트리거 엔드포인트 호출 감지: ${method} ${url}`,
           )
           return
-        }
-      }
-
-      if (method === 'POST' && /\/api\/community\/posts$/.test(url)) {
-        const raw = req.postData()
-        if (raw) {
-          try {
-            const body = JSON.parse(raw)
-            if (body.jurorCount && body.jurorCount > 0) {
-              _llmViolations.push(
-                `[no-llm-guardrail] POST /api/community/posts에 jurorCount=${body.jurorCount} 감지 — LLM이 호출됩니다`,
-              )
-            }
-          } catch { /* ignore */ }
         }
       }
     })

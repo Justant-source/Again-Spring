@@ -537,8 +537,7 @@ public class ActionExecutor {
             .userTitle(title)
             .bodyRaw(body)
             .category(category)
-            .visibility("PUBLIC")
-            .jurorCount(0);
+            .visibility("PUBLIC");
         // 재구성 모드: 출처 스냅샷을 BE로 전달 → posts 테이블에 source_* 컬럼 저장
         if (primarySource != null) {
             postBuilder

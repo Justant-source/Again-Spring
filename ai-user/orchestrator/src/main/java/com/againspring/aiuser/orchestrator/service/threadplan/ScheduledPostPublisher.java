@@ -94,13 +94,12 @@ public class ScheduledPostPublisher {
             Map<String, Object> pairedMeta = paired
                     ? PairedHoldMeta.read(objectMapper, row.getCandidatesJson()).orElse(Map.of())
                     : Map.of();
-            int jurorCount = paired ? PairedHoldMeta.jurorCount(pairedMeta, 3) : 0;
 
             CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
                     .userTitle(row.getTitle())
                     .bodyRaw(LiteralNewlineNormalizer.normalize(row.getBody()))
                     .category(row.getCategory())
-                    .visibility("PUBLIC").jurorCount(jurorCount)
+                    .visibility("PUBLIC")
                     .captureSplitAfterLines(readCaptureSplitsFromCandidates(row.getCandidatesJson(), row.getBody()))
                     .promoTitle(readPromoTitleFromCandidates(row.getCandidatesJson(), row.getTitle()))
                     .metaphorId(readMetaphorIdFromCandidates(row.getCandidatesJson()))

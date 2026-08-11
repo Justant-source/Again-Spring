@@ -18,12 +18,11 @@ public final class PairedHoldMeta {
     private PairedHoldMeta() { }
 
     public static Map<String, Object> wrap(String partnerPersonaId, String relationType,
-                                           String correlationId, int jurorCount) {
+                                           String correlationId) {
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("partnerPersonaId", partnerPersonaId);
         meta.put("relationType", relationType);
         meta.put("correlationId", correlationId);
-        meta.put("jurorCount", jurorCount);
         Map<String, Object> root = new LinkedHashMap<>();
         root.put(KEY, meta);
         return root;
@@ -53,15 +52,5 @@ public final class PairedHoldMeta {
         if (v == null) return null;
         String s = String.valueOf(v).trim();
         return s.isEmpty() || "null".equalsIgnoreCase(s) ? null : s;
-    }
-
-    public static int jurorCount(Map<String, Object> meta, int defaultValue) {
-        if (meta == null) return defaultValue;
-        Object v = meta.get("jurorCount");
-        if (v instanceof Number n) return n.intValue();
-        if (v instanceof String s && !s.isBlank()) {
-            try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ignored) { }
-        }
-        return defaultValue;
     }
 }

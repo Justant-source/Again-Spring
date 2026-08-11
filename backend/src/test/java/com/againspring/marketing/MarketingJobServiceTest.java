@@ -11,7 +11,6 @@ import com.againspring.marketing.dto.CreateJobResponse;
 import com.againspring.marketing.dto.JobCallbackPayload;
 import com.againspring.domain.User;
 import com.againspring.repository.UserRepository;
-import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
@@ -65,9 +64,6 @@ class MarketingJobServiceTest {
     AsmProperties asmProperties;
 
     @Mock
-    JurorRepository jurorRepository;
-
-    @Mock
     VoteService voteService;
 
     @Mock
@@ -107,7 +103,6 @@ class MarketingJobServiceTest {
             .thenReturn(0L);
 
         // Mock community data services
-        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(any())).thenReturn(List.of());
@@ -176,7 +171,6 @@ class MarketingJobServiceTest {
         when(asmProperties.isEnabled()).thenReturn(true);
         when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
             .thenReturn(0L);
-        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(any())).thenReturn(List.of());
@@ -218,7 +212,6 @@ class MarketingJobServiceTest {
         when(asmProperties.isEnabled()).thenReturn(true);
         when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
             .thenReturn(0L);
-        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(any())).thenReturn(List.of());
@@ -268,7 +261,6 @@ class MarketingJobServiceTest {
         when(asmProperties.isEnabled()).thenReturn(true);
         when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
             .thenReturn(0L);
-        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(low, high, mid, lowest));
@@ -358,7 +350,6 @@ class MarketingJobServiceTest {
             .thenReturn(0L);
 
         // Mock community data services
-        when(jurorRepository.findByPostId(any())).thenReturn(List.of());
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(any())).thenReturn(List.of());

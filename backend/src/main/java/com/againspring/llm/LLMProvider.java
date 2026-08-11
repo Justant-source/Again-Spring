@@ -1,7 +1,7 @@
 package com.againspring.llm;
 
 /**
- * LLM Provider interface — Community (jury, neutralize) 전용.
+ * LLM Provider interface — Community (tonalization 등) 전용.
  * 구현체: RemoteLlmProvider (llm-worker HTTP 브릿지), MockLLMProvider (테스트)
  */
 public interface LLMProvider {

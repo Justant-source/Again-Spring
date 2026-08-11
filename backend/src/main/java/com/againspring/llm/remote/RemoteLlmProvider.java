@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * LLM Provider — againspring-llm 워커 HTTP 브릿지.
- * 커뮤니티 배심원(JuryService) + 사연 중립화(PostComposeService) 전용.
+ * 사연 톤 정규화(TonalizationService) 등 커뮤니티 LLM 호출용.
  *
  * {@code llm.enabled=false} (server-dev L3)이면 워커 호출 없이 명시 거절(X1).
  */

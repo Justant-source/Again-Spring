@@ -1,7 +1,7 @@
 # Post 톤 정규화 프롬프트 (2026-06-04)
 
 > **목적**: 사용자가 입력한 제목/본문을 한국 갈등 커뮤니티 톤(구어체·반말·감정)에 맞게 정규화
-> **위치**: `JuryService` 호출 전, `PostInviteService.publishAnswer()` 호출 전
+> **호출 위치**: `AnswerProcessingService.processAsync()` / `PostInviteService` 파트너 답변 경로 (`TonalizationService`)
 > **모델**: Claude Haiku (빠른 처리)
 > **타임아웃**: 30초
 
@@ -144,58 +144,34 @@ After:
 
 ## 구현 위치 (Java)
 
-### JuryService.java (배심원 생성 직전)
+### AnswerProcessingService.java (파트너 답변 비동기 후처리)
 ```java
-public void generateJuryAsync(Post post, List<VoteOption> options, int jurorCount) {
-    // ✨ 톤 정규화 추가 (2026-06-04)
-    String normalizedBody = tonalizationService.normalize(
-        post.getUserTitle(),
-        post.getBodyRaw()
-    );
-    post.setBodyPublished(normalizedBody);
-    
-    // 이후 배심원 생성...
-    jitter.execute(() -> {
-        // 기존 로직...
-    });
+@Async("taskExecutor")
+@Transactional
+public void processAsync(String postId, String bodyRaw, String userTitle) {
+    TonalizationService.TonalizationResult tone =
+        tonalizationService.normalize(userTitle, bodyRaw);
+    if (tone.success()) {
+        postRepository.updatePartnerTonalization(
+            postId, tone.bodyNormalized(), tone.titleNormalized());
+    }
 }
 ```
 
-### PostInviteService.java (답변 발행 직전)
-```java
-public Post publishAnswer(Post post) {
-    // ✨ 톤 정규화 추가 (2026-06-04)
-    String normalizedBody = tonalizationService.normalize(
-        post.getUserTitle(),
-        post.getBodyRaw()
-    );
-    post.setBodyPublished(normalizedBody);
-    
-    post.setVisibility(PostVisibility.PUBLIC);
-    // 이후 저장...
-}
-```
+### PostInviteService.java (파트너 답변 발행)
+파트너 답변 제출 후 `AnswerProcessingService.processAsync()`를 호출한다.
+사람글 최초 게시(`PostComposeService`)는 원문 그대로 저장하며 톤 정규화를 호출하지 않는다.
 
-### TonalizationService.java (신규)
+### TonalizationService.java
 ```java
 @Service
 @RequiredArgsConstructor
 public class TonalizationService {
     private final RemoteLlmProvider llmProvider;
-    
-    public String normalize(String title, String body) {
-        String prompt = """
-            [톤 정규화 프롬프트]
-            제목: %s
-            본문: %s
-            
-            규칙: [위 규칙 8가지 삽입]
-            
-            정규화된 본문만 JSON "body_normalized" 필드로 반환.
-            """.formatted(title, body);
-        
-        String result = llmProvider.invoke(prompt, "claude-haiku-4-5-20251001", 30);
-        return parseNormalizedBody(result);
+
+    public TonalizationResult normalize(String title, String body) {
+        // docs/shared/prompts/community/post_tonalization.md 로드
+        // RemoteLlmProvider → JSON title_normalized / body_normalized
     }
 }
 ```
@@ -219,10 +195,10 @@ public class TonalizationService {
 
 - **2026-06-04**: 프롬프트 작성 완료 ✅
 - **2026-06-05**: `TonalizationService` 구현
-- **2026-06-05**: `JuryService`, `PostInviteService` 통합
-- **2026-06-06**: e2e 테스트 (72개 아이템)
+- **2026-06-05**: `AnswerProcessingService` / `PostInviteService` 통합
+- **2026-06-06**: e2e 테스트
 
 ---
 
 **담당자**: Claude Code (Agent)  
-**버전**: 1.0
+**버전**: 1.1

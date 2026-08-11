@@ -1662,8 +1662,6 @@ def backup_existing_public_feed(conn: pymysql.connections.Connection, output_dir
         backup["vote_options"] = cur.fetchall()
         cur.execute(f"SELECT * FROM votes WHERE post_id IN ({id_list}) ORDER BY id ASC", post_ids)
         backup["votes"] = cur.fetchall()
-        cur.execute(f"SELECT * FROM jurors WHERE post_id IN ({id_list}) ORDER BY id ASC", post_ids)
-        backup["jurors"] = cur.fetchall()
         cur.execute(f"SELECT * FROM post_analysis WHERE post_id IN ({id_list}) ORDER BY post_id ASC", post_ids)
         backup["post_analysis"] = cur.fetchall()
         cur.execute(f"SELECT * FROM post_views WHERE post_id IN ({id_list}) ORDER BY id ASC", post_ids)
@@ -1746,7 +1744,6 @@ def delete_existing_public_feed(conn: pymysql.connections.Connection, post_ids: 
             )
         cur.execute(f"DELETE FROM post_likes WHERE post_id IN ({id_list})", post_ids)
         cur.execute(f"DELETE FROM votes WHERE post_id IN ({id_list})", post_ids)
-        cur.execute(f"DELETE FROM jurors WHERE post_id IN ({id_list})", post_ids)
         cur.execute(f"DELETE FROM post_analysis WHERE post_id IN ({id_list})", post_ids)
         cur.execute(f"DELETE FROM post_views WHERE post_id IN ({id_list})", post_ids)
         cur.execute(f"DELETE FROM marketing_job WHERE post_id IN ({id_list})", post_ids)
@@ -1772,14 +1769,14 @@ def insert_rebuilt_feed(conn: pymysql.connections.Connection, plans: list[PostPl
             cur.execute(
                 """
                 INSERT INTO posts (
-                    id, author_id, session_id, title, user_title, juror_count, invite_token,
+                    id, author_id, session_id, title, user_title, invite_token,
                     partner_user_id, partner_body_raw, partner_body_published, partner_answered_at,
                     publish_mode, vote_duration_hours, body_raw, body_published, category,
                     visibility, status, neutralization_passed, vote_close_at, created_at,
                     updated_at, view_count, deleted_at, deleted_by_admin_id, source_community,
                     source_example_id, source_original_body, source_original_title, source_url
                 ) VALUES (
-                    %s, %s, NULL, %s, %s, 0, NULL,
+                    %s, %s, NULL, %s, %s, NULL,
                     NULL, NULL, NULL, NULL,
                     'PUBLISH_NOW', NULL, %s, %s, %s,
                     'PUBLIC', 'VOTING', 1, %s, %s,

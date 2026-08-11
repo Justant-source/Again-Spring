@@ -83,44 +83,38 @@ MariaDB (Flyway V1~V56 관리 스키마)
   LLMResponse response = remoteLlmProvider.invoke(request);
   
   @Transactional
-  public Juror saveJuryOpinion(...) { /* 결과 저장 */ }
+  public void persistNormalized(...) { /* 결과 저장 */ }
   ```
 
 ## 커뮤니티 광장 흐름
 
-`CommunityPostController`와 `JuryService`가 핵심. 광장형 UX로 피벗(2026-06-02).
+`CommunityPostController` + `PostComposeService` + `VoteService`가 제품 경로의 핵심이다.
 
 ```mermaid
 flowchart LR
     Client["사용자"]
-    Post["POST /api/posts<br/>(게시글 작성)"]
-    Save["PostService<br/>(DB 저장)"]
-    LLM["JuryService<br/>(LLM 배심원 호출)"]
-    Jury["POST /api/posts/{id}/jury<br/>(배심원 의견 저장)"]
-    Vote["POST /api/posts/{id}/votes<br/>(투표)"]
-    Comment["POST /api/posts/{id}/comments<br/>(댓글)"]
-    
+    Post["POST /api/community/posts"]
+    Save["PostComposeService<br/>(원문 저장 + VoteOption)"]
+    Vote["POST .../vote<br/>(작성자 vs 상대방)"]
+    Comment["POST .../comments"]
+
     Client --> Post --> Save
-    Save --> LLM
-    LLM --> Jury
     Client --> Vote
     Client --> Comment
 ```
 
 **핵심 엔티티**:
-- `Post` — 사연 게시글 (title, content, category, author)
-- `PostComment` — 댓글 (post_id, author, content)
-- `Vote` — 배심원 의견에 대한 투표 (helpful/unhelpful)
-- `Juror` — AI 배심원 (post_id, jury_opinion, neutral_summary)
+- `Post` — 사연 게시글 (title/userTitle, bodyRaw/bodyPublished, category, author)
+- `PostComment` — 댓글
+- `Vote` / `VoteOption` — 작성자 vs 상대방 공감 투표
 
 **흐름**:
-1. 사용자가 갈등 사연 작성 → `POST /api/posts`
-2. PostService가 DB에 저장
-3. JuryService가 비동기로 LLM 호출 (Claude Haiku 4.5)
-   - 중립화된 요약 + AI 배심원 의견 생성
-   - `RemoteLlmProvider` (againspring-llm 워커 CLI)
-4. 배심원 결과 DB 저장 → `POST /api/posts/{id}/jury`
-5. 커뮤니티가 투표/댓글 → `POST /api/posts/{id}/votes`, `POST /api/posts/{id}/comments`
+1. 사용자가 갈등 사연 작성 → `POST /api/community/posts`
+2. `PostComposeService`가 원문 그대로 DB 저장 + VoteOption(작성자/상대방) 생성 (게시 시 LLM 미호출)
+3. 커뮤니티가 투표/댓글 → `POST .../vote`, `POST .../comments`
+4. 공개 글은 `ai_user_outbox`로 AI-user 반응이 이어질 수 있음
+
+역사적 피벗 결정은 ADR-0001·0002 참고.
 
 ## 이벤트 흐름
 
@@ -152,7 +146,6 @@ flowchart LR
 | `springdoc.swagger-ui.enabled` | `true` | `false` | (N/A) |
 | `management.endpoints.web.exposure.include` | `health,info,metrics` | `health` only | (N/A) |
 | `logging.level.com.againspring` | `DEBUG` | `WARN` | `DEBUG` |
-| `llm.jury.provider` | `remote` (CLI) | `remote` (CLI) | `mock` |
 | `llm.compose.provider` | `remote` (CLI) | `remote` (CLI) | `mock` |
 | `llm.remote.base-url` | `http://againspring-llm:8090` | `http://againspring-llm:8090` | (N/A) |
 | DB | MariaDB 3306 (host) / 컨테이너 | MariaDB internal | H2 in-memory (MariaDB mode) |

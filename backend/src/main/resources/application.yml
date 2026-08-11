@@ -121,9 +121,6 @@ app:
 
 llm:
   enabled: ${LLM_ENABLED:true}
-  jury:
-    provider: ${LLM_JURY_PROVIDER:remote}     # CLI 브릿지(remote) 사용
-    model: ${JURY_LLM_MODEL:claude-haiku-4-5-20251001}
   compose:
     model: ${COMPOSE_LLM_MODEL:claude-haiku-4-5-20251001}
   correction:

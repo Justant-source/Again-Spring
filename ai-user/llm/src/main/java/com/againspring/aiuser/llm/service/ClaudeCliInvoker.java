@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets;
  * 주의: --bare 금지 — OAuth 파괴.
  * stderr는 별도 스레드로 drain — 파이프 버퍼 데드락 방지.
  *
- * 구분자: <<<USER_PROMPT>>> (다시봄 배심원 워커와 구별)
+ * 구분자: <<<USER_PROMPT>>> (다시봄 LLM 워커와 구별)
  *
  * CLI 경로는 OAuth(구독) 사용을 유지한다.
  * ANTHROPIC_API_KEY는 서브프로세스 env에서 제거 — backend=API일 때만 ClaudeApiInvoker가 사용한다.

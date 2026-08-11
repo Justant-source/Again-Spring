@@ -1,7 +1,7 @@
 # 다시봄 — Frontend
 
-> Next.js 14 (App Router) 기반 갈등 커뮤니티 + AI 배심원 플랫폼 프론트엔드.
-> 사용자가 사연(갈등 게시글)을 올리면 AI 배심원 9인이 공감 비율을 분석하고, 커뮤니티 투표/댓글로 의견을 모읍니다.
+> Next.js 14 (App Router) 기반 갈등 사연 커뮤니티 프론트엔드.
+> 사용자가 사연을 올리면 커뮤니티가 작성자 vs 상대방 공감 투표·댓글로 반응합니다.
 
 ---
 
@@ -48,7 +48,7 @@ frontend/
 │   └── {privacy,terms}/
 ├── components/
 │   ├── community/c3/             # 광장 핵심 컴포넌트
-│   │   └── FeedCard, JurorCard, JurorPicker, VoteBar, CommentBar,
+│   │   └── FeedCard, VoteBar, CommentBar,
 │   │       CommentComposeSheet, CommunityComment, UserChip, BrandBar, SideStory
 │   ├── admin/, auth/, feedback/, icons/, legal/, profile/, shared/, ui/
 ├── lib/
@@ -99,7 +99,7 @@ npm run test:e2e:realbe  # 실서버 e2e (Playwright)
 
 > 권위본: [`docs/ux/principles.md`](docs/ux/principles.md)
 
-- **AI 신뢰성 최우선**: 배심원·요약은 AI임을 명확히 표시, 사용자 글과 시각 구분
+- **AI 신뢰성 최우선**: AI-user·AI 생성 콘텐츠는 AI임을 명확히 표시, 사용자 글과 시각 구분
 - **작성자=피치(peach #C9785A), 상대방=세이지(sage #5F8F76)** — 앱 전체 일관 유지. 상세: [docs/design/system.md](docs/design/system.md)
 - **사용자 입력에 금지어 필터 미적용** — 사용자가 쓴 텍스트의 책임은 사용자에게 있음
 - **위기 모달**: ESC·바깥클릭 차단 (명시적 버튼으로만 닫힘)

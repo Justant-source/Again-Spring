@@ -5,9 +5,7 @@ import com.againspring.domain.community.Post;
 import com.againspring.domain.enums.PostStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.domain.enums.PublishMode;
-import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.PostRepository;
-import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.service.ai.AiUserOutboxWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,15 +28,6 @@ class PostInviteServiceTest {
 
     @Mock
     private PostRepository postRepository;
-
-    @Mock
-    private JurorRepository jurorRepository;
-
-    @Mock
-    private VoteOptionRepository voteOptionRepository;
-
-    @Mock
-    private JuryService juryService;
 
     @Mock
     private TonalizationService tonalizationService;

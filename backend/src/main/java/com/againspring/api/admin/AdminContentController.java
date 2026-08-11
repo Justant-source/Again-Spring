@@ -677,7 +677,6 @@ public class AdminContentController {
                 .bodyRaw(req.getBodyRaw())
                 .bodyPublished(req.getBodyRaw())
                 .category(PostCategory.valueOf(req.getCategory()))
-                .jurorCount(0)
                 .status(PostStatus.VOTING)
                 .visibility(com.againspring.domain.enums.PostVisibility.PUBLIC)
                 .createdByAdmin(true)

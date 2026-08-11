@@ -1,17 +1,14 @@
 package com.againspring.api.community;
 
 import com.againspring.api.community.dto.*;
-import com.againspring.domain.community.Juror;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.VoteOption;
 import com.againspring.domain.enums.CommentStatus;
 import com.againspring.domain.enums.PostVisibility;
 import com.againspring.repository.community.CommunityReportRepository;
-import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.service.community.CommentService;
 import com.againspring.service.community.BotWriteIdempotencyService;
-import com.againspring.service.community.JuryService;
 import com.againspring.service.community.PostComposeService;
 import com.againspring.service.community.PostService;
 import com.againspring.service.community.PromoTitleService;
@@ -47,16 +44,14 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/community/posts")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Community", description = "커뮤니티 포스트·투표·배심원")
+@Tag(name = "Community", description = "커뮤니티 포스트·투표")
 public class CommunityPostController {
 
     private final PostComposeService composeService;
     private final PostService postService;
     private final VoteService voteService;
-    private final JuryService juryService;
     private final ViewService viewService;
     private final VoteOptionRepository voteOptionRepository;
-    private final JurorRepository jurorRepository;
     private final CommunityReportRepository communityReportRepository;
     private final CommentService commentService;
     private final com.againspring.repository.UserRepository userRepository;
@@ -67,7 +62,7 @@ public class CommunityPostController {
     private final PromoTitleService promoTitleService;
 
     /**
-     * 포스트 생성 — 원문 즉시 등록 + VoteOption 저장 + jurorCount > 0이면 배심원 비동기 생성
+     * 포스트 생성 — 원문 즉시 등록 + VoteOption 저장
      */
     @PostMapping
     @SecurityRequirement(name = "bearer-jwt")
@@ -98,21 +93,16 @@ public class CommunityPostController {
                         userId, idempotencyKey, BotWriteIdempotencyService.TargetType.POST,
                         () -> composeService.composeAndPublish(
                                 userId, request.getUserTitle(), request.getBodyRaw(), request.getCategory(),
-                                request.getVisibility(), request.getJurorCount(), request.getSessionId(), sourceSnapshot,
+                                request.getVisibility(), request.getSessionId(), sourceSnapshot,
                                 splits, request.getPromoTitle(), request.getMetaphorId(), request.getMetaphorIds()),
                         existingId -> postRepository.findById(existingId).orElse(null))
                 : new BotWriteIdempotencyService.Execution<>(composeService.composeAndPublish(
                         userId, request.getUserTitle(), request.getBodyRaw(), request.getCategory(),
-                        request.getVisibility(), request.getJurorCount(), request.getSessionId(), sourceSnapshot,
+                        request.getVisibility(), request.getSessionId(), sourceSnapshot,
                         splits, request.getPromoTitle(), request.getMetaphorId(), request.getMetaphorIds()), true);
         Post post = execution.target();
 
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(post.getId());
-
-        // jurorCount > 0이면 visibility 무관하게 배심원 비동기 생성
-        if (execution.created() && request.getJurorCount() > 0 && !options.isEmpty()) {
-            juryService.generateJuryAsync(post, options, request.getJurorCount());
-        }
 
         // 마케팅 훅 제목 — 모든 신규 사연 1회 생성 (발행 시 LLM 없음)
         if (execution.created()) {
@@ -419,102 +409,6 @@ public class CommunityPostController {
                 .totalVotes(totalVotes)
                 .myVotedOptionId(null)
                 .build());
-    }
-
-    /**
-     * 배심원 결과 조회 (작성자만)
-     */
-    @GetMapping("/{id}/jury")
-    @SecurityRequirement(name = "bearer-jwt")
-    @Operation(summary = "배심원 투표 결과")
-    public ResponseEntity<JuryResultResponse> getJuryResult(
-            @PathVariable String id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-
-        String userId = userDetails.getUsername();
-        // 작성자 권한 확인
-        Post post = postService.getPost(id, userId);
-        if (!userId.equals(post.getAuthorId())) {
-            throw new com.againspring.common.exception.BusinessException("ACCESS_DENIED", "작성자만 배심원 결과를 조회할 수 있습니다.", 403);
-        }
-        List<Juror> jurors = jurorRepository.findByPostId(id);
-        List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
-
-        // 옵션 label 조회용 map
-        Map<Long, String> optionLabels = options.stream()
-                .collect(Collectors.toMap(VoteOption::getId, VoteOption::getLabel));
-
-        // 배심원 DTO
-        List<JuryResultResponse.JurorDto> jurorDtos = jurors.stream()
-                .map(j -> {
-                    String label = j.getChosenOptionId() != null
-                            ? optionLabels.getOrDefault(j.getChosenOptionId(), "")
-                            : "";
-                    String ageGroup = j.getPersona() != null ? j.getPersona().getAgeGroup() : "";
-                    String gender = j.getPersona() != null ? j.getPersona().getGender() : "";
-                    return JuryResultResponse.JurorDto.builder()
-                            .ageGroup(ageGroup)
-                            .gender(gender)
-                            .chosenOptionLabel(label)
-                            .empathyComment(j.getEmpathyComment())
-                            .build();
-                })
-                .toList();
-
-        // 분포 계산
-        long total = jurors.size();
-        Map<Long, Long> countByOption = jurors.stream()
-                .filter(j -> j.getChosenOptionId() != null)
-                .collect(Collectors.groupingBy(Juror::getChosenOptionId, Collectors.counting()));
-
-        List<JuryResultResponse.DistributionDto> distribution = options.stream()
-                .map(opt -> {
-                    long count = countByOption.getOrDefault(opt.getId(), 0L);
-                    double pct = total > 0 ? (count * 100.0) / total : 0.0;
-                    return JuryResultResponse.DistributionDto.builder()
-                            .label(opt.getLabel())
-                            .count(count)
-                            .percentage(pct)
-                            .build();
-                })
-                .toList();
-
-        return ResponseEntity.ok(JuryResultResponse.builder()
-                .jurors(jurorDtos)
-                .distribution(distribution)
-                .legalNotice("이 결과는 공감 분포일 뿐 법적 책임이나 과실 비율과 무관합니다.")
-                .build());
-    }
-
-    /**
-     * 배심원 생성 재시도 — 작성자 전용, jurors < jurorCount일 때만 허용
-     */
-    @PostMapping("/{id}/jury/retry")
-    @SecurityRequirement(name = "bearer-jwt")
-    @Operation(summary = "배심원 생성 재시도")
-    public ResponseEntity<Void> retryJury(
-            @PathVariable String id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-
-        String userId = userDetails.getUsername();
-        Post post = postService.getPost(id, userId);
-        if (!userId.equals(post.getAuthorId())) {
-            throw new com.againspring.common.exception.BusinessException("ACCESS_DENIED", "작성자만 재시도할 수 있습니다.", 403);
-        }
-
-        int target = post.getJurorCount() != null ? post.getJurorCount() : 0;
-        long existing = jurorRepository.countByPostId(id);
-
-        if (existing >= target) {
-            throw new com.againspring.common.exception.BusinessException("JURY_COMPLETE", "배심원이 이미 완료되었습니다.", 409);
-        }
-
-        List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
-        if (!options.isEmpty() && target > 0) {
-            juryService.generateJuryAsync(post, options, target);
-        }
-
-        return ResponseEntity.accepted().build();
     }
 
     /**

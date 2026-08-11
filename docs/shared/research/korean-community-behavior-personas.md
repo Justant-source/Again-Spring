@@ -3,7 +3,7 @@
 
 **Research Date**: 2026-06-04
 **Platforms Analyzed**: Nate판 (나이트판), 오늘의 유머, General Korean Communities
-**Purpose**: Building realistic AI jury/mediator personas with authentic Korean community voice
+**Purpose**: Building realistic AI-user community personas with authentic Korean community voice
 
 ---
 
@@ -273,7 +273,7 @@ Example emotional markers:
 
 ---
 
-## 6. Persona Building Recommendations for AI Jury
+## 6. Persona Building Recommendations for AI-user
 
 ### Authentic Nate판 Empathizer Persona
 
@@ -394,7 +394,7 @@ Based on forbidden-words policy and platform research:
 
 **Document Status**: Ready for AI Persona Development
 **Next Steps**: 
-1. Integrate into `docs/shared/prompts/` for jury persona
+1. Integrate into AI-user persona / voice prompts
 2. Test responses against authentic community scenarios
 3. Monitor for bias/overgeneralization
 4. Update quarterly with new community behavior patterns

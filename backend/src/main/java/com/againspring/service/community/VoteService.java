@@ -204,25 +204,4 @@ public class VoteService {
         log.info("Vote cancelled for post {} by user {}", postId, userId);
         return getVoteResult(postId);
     }
-
-    /**
-     * 배심원 투표 결과 조회 (포스트 작성자만)
-     *
-     * @param postId 포스트 ID
-     * @param requestUserId 요청 사용자 ID
-     * @return 배심원 목록
-     * @throws BusinessException POST_NOT_FOUND 또는 ACCESS_DENIED
-     */
-    public List<Map<String, Object>> getJuryResult(String postId, String requestUserId) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
-
-        // 작성자만 조회 가능
-        if (!post.getAuthorId().equals(requestUserId)) {
-            throw new BusinessException("ACCESS_DENIED", "Only author can view jury results", 403);
-        }
-
-        // TODO: JurorRepository 조회 및 결과 집계
-        return new ArrayList<>();
-    }
 }

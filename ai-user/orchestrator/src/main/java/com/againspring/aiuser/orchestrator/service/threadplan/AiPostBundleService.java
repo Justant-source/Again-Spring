@@ -132,7 +132,7 @@ public class AiPostBundleService {
 
         CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
                 .userTitle(bundle.content.title()).bodyRaw(bundle.content.body()).category(category)
-                .visibility("PUBLIC").jurorCount(0)
+                .visibility("PUBLIC")
                 .captureSplitAfterLines(bundle.content.captureSplitAfterLines())
                 .captureSplitAfterLine(
                         bundle.content.captureSplitAfterLines() != null

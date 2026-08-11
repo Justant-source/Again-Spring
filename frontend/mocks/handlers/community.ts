@@ -47,7 +47,6 @@ export const communityHandlers = [
       paired: true,
       isAuthor: false,
       hasVoted: false,
-      jurorCount: 3,
     });
   }),
 
@@ -77,23 +76,6 @@ export const communityHandlers = [
       ],
       totalVotes: 15,
       myVotedOptionId: 1,
-    });
-  }),
-
-  http.get('/api/community/posts/:id/jury', () => {
-    return HttpResponse.json({
-      jurors: Array.from({ length: 3 }, (_, i) => ({
-        ageGroup: i < 1 ? '20대' : i < 2 ? '30대' : '40대',
-        gender: i % 2 === 0 ? '여성' : '남성',
-        chosenOptionLabel: 'A님 입장이 더 이해됩니다',
-        empathyComment: 'A님 상황에 더 공감이 갑니다. 다만 B님도 자신의 감정을 표현한 것이므로 이해할 수 있습니다.',
-      })),
-      distribution: [
-        { label: 'A님 입장이 더 이해됩니다', count: 2, percentage: 67 },
-        { label: 'B님 입장이 더 이해됩니다', count: 1, percentage: 33 },
-      ],
-      legalNotice: '이 결과는 공감 분포일 뿐 법적 책임이나 과실 비율과 무관합니다.',
-      summaryLine: 'AI 배심원 3인 중 2인이 작성자에 공감했어요',
     });
   }),
 

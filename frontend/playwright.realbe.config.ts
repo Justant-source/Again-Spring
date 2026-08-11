@@ -19,7 +19,7 @@
  * ⚠️ prod(:8091)에서 e2e 실행 금지 — E3.
  *
  * spec 위치: tests/e2e-realbe/journeys/*.spec.ts
- *   01–22 journeys (LLM 절대 호출 금지: no-llm-fixture + createPost(jurorCount:0))
+ *   01–21 journeys (LLM 절대 호출 금지: no-llm-fixture)
  */
 import { defineConfig, devices } from '@playwright/test'
 import path from 'path'

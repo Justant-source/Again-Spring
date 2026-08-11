@@ -8,7 +8,6 @@ import com.againspring.marketing.dto.CreateJobRequest.EmpathyRatioDto;
 import com.againspring.marketing.dto.CreateJobRequest.PolicyDto;
 import com.againspring.marketing.dto.CreateJobRequest.TopCommentDto;
 import com.againspring.repository.UserRepository;
-import com.againspring.repository.community.JurorRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.service.community.CommentService;
 import com.againspring.service.community.PromoTitleService;
@@ -36,7 +35,6 @@ public class MarketingHoldingBriefSeeder {
 
     private final VoteOptionRepository voteOptionRepository;
     private final VoteService voteService;
-    private final JurorRepository jurorRepository;
     private final CommentService commentService;
     private final UserRepository userRepository;
 
@@ -84,26 +82,7 @@ public class MarketingHoldingBriefSeeder {
             log.warn("Holding brief: vote load failed for {}: {}", postId, e.getMessage());
         }
 
-        String juryGist = "";
-        List<String> juryOpinions = new ArrayList<>();
-        try {
-            List<com.againspring.domain.community.Juror> jurors = jurorRepository.findByPostId(postId);
-            List<String> comments = jurors.stream()
-                .map(j -> j.getEmpathyComment())
-                .filter(c -> c != null && !c.isBlank())
-                .collect(Collectors.toList());
-            juryOpinions = comments.stream()
-                .limit(3)
-                .map(c -> c.length() > 100 ? c.substring(0, 100) : c)
-                .collect(Collectors.toList());
-            if (!comments.isEmpty()) {
-                String combined = String.join(" / ", comments);
-                juryGist = combined.length() > 200 ? combined.substring(0, 200) : combined;
-            }
-        } catch (Exception e) {
-            log.warn("Holding brief: juror load failed for {}: {}", postId, e.getMessage());
-        }
-
+        // Top comments by likeCount
         List<TopCommentDto> topComments = new ArrayList<>();
         try {
             List<PostComment> comments = commentService.getTopLevelComments(postId);
@@ -150,8 +129,6 @@ public class MarketingHoldingBriefSeeder {
             .authorBody(authorBodyFull)
             .partnerBody(partnerBodyFull)
             .empathyRatio(EmpathyRatioDto.builder().a(empathyA).b(empathyB).build())
-            .juryGist(juryGist)
-            .juryOpinions(juryOpinions)
             .topComments(topComments)
             .voteLabels(voteLabels)
             .postUrl("https://againspring.net/community/" + postId)

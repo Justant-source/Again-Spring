@@ -43,7 +43,7 @@ frontend/
 │   │
 │   ├── community/              # 광장형 메인 흐름
 │   │   ├── page.tsx            # 피드 (무한스크롤)
-│   │   ├── [id]/page.tsx       # 게시글 상세 + 배심원 + 투표 + 댓글
+│   │   ├── [id]/page.tsx       # 게시글 상세 + 투표 + 댓글
 │   │   ├── [id]/comments/page.tsx
 │   │   ├── [id]/invite/page.tsx
 │   │   ├── [id]/read/page.tsx
@@ -63,8 +63,6 @@ frontend/
 │   ├── community/
 │   │   └── c3/                 # 광장 핵심 컴포넌트
 │   │       ├── FeedCard.tsx
-│   │       ├── JurorCard.tsx
-│   │       ├── JurorPicker.tsx
 │   │       ├── VoteBar.tsx
 │   │       ├── CommentBar.tsx
 │   │       ├── CommentComposeSheet.tsx
@@ -197,7 +195,7 @@ frontend/
 ### 실재 하는 것
 - `app/community/**` — 광장 피드·상세·작성
 - `app/(admin)/admin/marketing/**` — 마케팅 대시보드
-- `components/community/c3/` — FeedCard, JurorCard, SearchPanel, BrandBar 등 12개 컴포넌트
+- `components/community/c3/` — FeedCard, VoteBar, CommentBar, SearchPanel, BrandBar 등
 - `lib/api/community.ts` + `lib/api/user.ts` — API 클라이언트
 - `lib/constants/forbiddenWords.ts` — 3-tier 금지어
 - `lib/constants/userPermissions.ts` — 3-tier 권한

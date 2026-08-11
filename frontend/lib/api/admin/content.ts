@@ -16,7 +16,6 @@ export interface AdminPost {
   updatedAt: string;
   deletedAt: string | null;
   deletedByAdminId: string | null;
-  jurorCount?: number;
   userTitle?: string;
   bodyRaw?: string;
   bodyPublished?: string;

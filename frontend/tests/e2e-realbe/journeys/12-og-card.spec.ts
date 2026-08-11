@@ -10,8 +10,8 @@
  *   D. 비공개(PRIVATE) 글 → 메타 제너릭, 이미지 라우트는 여전히 200/png(fallback)
  *
  * no-llm 가드레일 호환:
- *   - OG 경로는 GET /api/community/posts/{id} (공개, jurorCount 무관) 만 호출
- *   - jurorCount>0 / jury/retry / 마케팅 엔드포인트 미접촉 → 가드레일 안전
+ *   - OG 경로는 GET /api/community/posts/{id} (공개) 만 호출
+ *   - 마케팅·분석 LLM 엔드포인트 미접촉 → 가드레일 안전
  */
 import { test, expect } from '../support/no-llm-fixture'
 import { guestLogin, createPost } from '../support/api'
@@ -27,7 +27,7 @@ test.describe('Journey 12-A: 공개 글 OG 메타', () => {
   test('공개 글 페이지에 og:title · og:description · og:image · og:url 존재, url이 절대 https', async ({
     request,
   }) => {
-    // 글 생성 (jurorCount=0 강제)
+    // 글 생성
     const token = (await import('../support/api')).tokenFromStorageState(PERSONA_TEST1.email)
     const postId = await createPost(request, {
       token,

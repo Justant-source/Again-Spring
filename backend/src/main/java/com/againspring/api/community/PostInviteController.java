@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Community", description = "커뮤니티 포스트·투표·배심원")
+@Tag(name = "Community", description = "커뮤니티 포스트·투표·초대")
 public class PostInviteController {
 
     private final PostInviteService postInviteService;

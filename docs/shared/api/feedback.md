@@ -26,7 +26,7 @@
 {
   "postId": "123",                   // nullable — 게시글 연동 시
   "category": "praise",              // praise | bug | suggestion | other | crisis
-  "content": "배심원 의견이 도움이 됐어요.",  // 최소 10자
+  "content": "공감 투표 결과가 도움이 됐어요.",  // 최소 10자
   "contactConsent": true,            // 연락 동의 여부
   "contactEmail": "user@example.com",// contactConsent=true 일 때만 저장
   "pageUrl": "/community/posts/123",      // nullable

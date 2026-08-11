@@ -127,7 +127,6 @@ DELETE FROM \`${db}\`.notifications WHERE ref_post_id='${postId}';
 DELETE FROM \`${db}\`.votes WHERE post_id='${postId}';
 DELETE FROM \`${db}\`.post_views WHERE post_id='${postId}';
 DELETE FROM \`${db}\`.post_comments WHERE post_id='${postId}';
-DELETE FROM \`${db}\`.jurors WHERE post_id='${postId}';
 DELETE FROM \`${db}\`.vote_options WHERE post_id='${postId}';
 DELETE FROM \`${db}\`.posts WHERE id='${postId}';
 SET SESSION foreign_key_checks = 1;

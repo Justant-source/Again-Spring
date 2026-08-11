@@ -70,8 +70,8 @@ MSW는 dev 모드에서 자동 활성화됩니다. 실제 페이지 플로우를
 **수동 테스트 체크리스트**:
 
 ```
-[ ] 로그인 → 피드 열람 → 게시글 작성 → 배심원 의견 조회
-[ ] 투표 (A측/B측)
+[ ] 로그인 → 피드 열람 → 게시글 작성 → 투표 → 댓글
+[ ] 투표 (작성자/상대방)
 [ ] 댓글 작성 및 무한스크롤
 [ ] 금지어 입력 시 검증
 [ ] 위기 키워드 입력 시 모달 표시
@@ -127,7 +127,6 @@ E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 | 19 | `19-search-panel.spec.ts` | SearchPanel 열기/검색/최근/닫기/최소2자 |
 | 20 | `20-notifications.spec.ts` | 시드 알림·모두 읽음 |
 | 21 | `21-password-reset.spec.ts` | forgot UI·토큰 재설정→로그인 |
-| 22 | `22-jury-seeded-ui.spec.ts` | SQL 시드 배심원 → 작성자 GET /jury (광장 UI는 JurySection 미연결) |
 
 API 계약(대시보드·크롤·visit validation)은 BE 유닛으로 이관: `AdminDashboardControllerTest`, `AdminCrawlStatusControllerTest`, `PublicVisitControllerTest`.
 
@@ -140,15 +139,13 @@ import { test, expect } from '../support/no-llm-fixture'
 ```
 
 가드레일이 자동 차단하는 엔드포인트:
-- `POST /api/community/posts/{id}/jury/retry`
 - `POST /api/admin/content/corrections/analyze`
 - `POST /api/admin/ai-rules/history/*/analyze`, `/analyze-batch`
 - `POST /api/admin/marketing/*/(generate|simulation|story)`
-- `POST /api/community/posts` — `jurorCount > 0`인 경우
 
-**왜 필요한가**: BE의 `RemoteLlmProvider`가 `@Primary` 무조건 → `application-test.yml`의 `llm.provider:mock`은 실행 중인 BE에 무효. `jurorCount=0` 하드코딩(`app/community/new/page.tsx`)과 이 가드레일이 두 겹으로 보호.
+**왜 필요한가**: BE의 `RemoteLlmProvider`가 `@Primary` 무조건 → `application-test.yml`의 `llm.provider:mock`은 실행 중인 BE에 무효. 이 가드레일이 실서버 e2e에서 LLM 호출을 차단한다.
 
-게시글 셋업은 반드시 `support/api.ts`의 `createPost`를 사용한다(항상 `jurorCount:0` 강제).
+게시글 셋업은 반드시 `support/api.ts`의 `createPost`를 사용한다.
 
 #### 기능↔e2e 동기화 규칙
 
@@ -276,7 +273,7 @@ jobs:
 [ ] npm run test 통과 (또는 생략 사유 명시)
 [ ] npm run build 성공 (no errors/warnings)
 [ ] 전체 플로우 수동 테스트
-  [ ] 로그인 → 피드 열람 → 게시글 작성 → 배심원 조회 → 투표 → 댓글
+  [ ] 로그인 → 피드 열람 → 게시글 작성 → 투표 → 댓글
   [ ] 위기 모달 팝업 테스트
 [ ] 모바일 반응형 확인
 [ ] 실서버 e2e 테스트 (prod 배포 시 필수)
@@ -313,7 +310,6 @@ export default function RootLayout({ children }) {
 export const communityHandlers = [
   http.get('/api/posts', () => json([...])),
   http.post('/api/posts', () => json({...})),
-  http.get('/api/posts/:id/jury-opinions', () => json([...])),
 ]
 
 // mocks/handlers/notifications.ts

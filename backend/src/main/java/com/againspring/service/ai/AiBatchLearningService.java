@@ -549,7 +549,7 @@ public class AiBatchLearningService {
         }
     }
 
-    /** JuryService 동일 패턴 — JSON 추출 */
+    /** JSON extract pattern */
     private JsonNode parseJsonFromLlm(String response) throws Exception {
         String json = response;
         if (json.contains("```json")) {

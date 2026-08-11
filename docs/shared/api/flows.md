@@ -7,30 +7,22 @@
 
 ---
 
-## 1. 사연 게시 + 배심원 생성 흐름
+## 1. 사연 게시 + 공감 투표 준비
 
 ```mermaid
 sequenceDiagram
     participant FE as Frontend
     participant BE as Backend (8080)
-    participant PS as PromptSanitizer
-    participant LW as llm-worker (8090)
-    participant Claude as Claude API
+    participant DB as MariaDB
 
-    FE->>BE: POST /api/community/posts<br/>{title, bodyRaw, category, ...}
-    BE->>PS: sanitize(userInput)
-    Note over PS: 제어문자 제거 · <> 전각 변환 · 5000자 캡
-    PS-->>BE: 정제된 입력
-    BE->>BE: Post 저장 (status=DRAFT)
-    BE->>LW: POST /v1/invoke<br/>{prompt: jury_persona.md + <user_input>, model: haiku}
-    LW->>Claude: Claude CLI/API 호출
-    Claude-->>LW: 배심원 코멘트 (공감·관점)
-    LW-->>BE: WorkerInvokeResponse
-    Note over BE: forbidden-words 검사<br/>판결·처방·승패 표현 금지
-    BE->>BE: Juror 저장 · Post status=VOTING
-    BE-->>FE: PostResponse {id, jurors, voteOptions}
+    FE->>BE: POST /api/community/posts<br/>{title, bodyRaw, category}
+    BE->>DB: Post 저장 (bodyPublished=원문, status=VOTING)
+    BE->>DB: VoteOption 작성자/상대방
+    Note over BE: 사람글 게시 시 LLM 미호출
+    BE-->>FE: PostResponse {id, voteOptions}
 ```
 
+사람 글은 원문 게시 후 커뮤니티 공감 투표(작성자 vs 상대방)가 핵심이다. AI 생성·반응은 AI-user 스택이 담당한다.
 ---
 
 ## 2. 투표 흐름

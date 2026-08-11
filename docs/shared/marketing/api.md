@@ -149,7 +149,6 @@ Idempotency-Key: <uuid>
     "side_a": "작성자 관점",
     "side_b": "상대방 관점",
     "empathy_ratio": { "a": 50, "b": 50 },
-    "jury_gist": "",
     "tags": ["#다시봄", "#공감비율", "#이별"],
     "policy": {
       "no_emoji": true,

@@ -8,7 +8,7 @@
 
 1. **인라인 투표(사연 상세).** 진영 박스 탭 = 그 진영 선택(짙은 `_dk` 테두리 2.5px + "· 선택됨"), 하단 비율 막대가 부드럽게 갱신. **"투표 완료하기" 버튼으로 확정.** 언제든 다른 박스 탭으로 변경 가능. 박스 안의 **"더 보기 ›"는 투표와 분리**(stopPropagation → 전문 읽기로 이동).
 2. **투표 완료 표식.** 우상단 기표 도장 SVG + "투표함". 별도 결과 페이지로 이동하지 않는다.
-3. **AI 배심원 인원.** 게시 방식 화면 공통 스테퍼(0~9, 기본 3). **0이면 AI 분석 전체 스킵**(배심원 요약·카드 미표시, 투표만).
+3. **게시.** `/community/new`에서 원문 게시 후 투표·댓글이 핵심 상호작용이다.
 4. **상대 초대 자동 합류.** "먼저 올리기" 시 단독 공개 후, 상대 답변 도착하면 오른쪽(세이지)에 자동 추가.
 5. **미응답 단독 게시.** 대기 화면에서 "지금 혼자 올리기" 가능.
 6. **댓글 진영 표시.** 작성자/상대방 댓글은 `* 닉네임` + 진영색(피치/세이지). 일반 유저는 검정 닉네임, 별표 없음. BEST 댓글은 상단 고정.
@@ -30,7 +30,6 @@
 | `UxBtn` | 메인 버튼 (`tone`·`ghost`·`disabled`) |
 | `UxFoot` | 하단 고정 버튼 영역(페이드) |
 | `UxVote` | 결과지용 양면 투표 게이지 |
-| `UxJuror` | AI 배심원 카드 |
 | `UxStat` | 통계 표시(값 + 라벨) |
 
 ### 광장형 전용 컴포넌트 (`ux-c3.jsx`)
@@ -44,8 +43,6 @@
 | `FeedCard` | 피드 카드 (카테고리·닉·시간 / 제목 / 본문 2줄 / 투표·댓글·조회 / 하단 색 비율) |
 | `SideStory` | 진영 사연 박스(`clamp`·`selected`·`onSelect`·`onMore`) |
 | `Comment` / `CommentBar` | 댓글·대댓글(작성자/상대방 `*`·BEST) + 하단 입력 |
-| `JurorPicker` | AI 배심원 인원 스테퍼(0~9) |
-| `JurorSummary` | 배심원 한 줄 요약 + 펼치기/접기 |
 
 ---
 
@@ -54,7 +51,7 @@
 | 화면 | 경로 | 주요 컴포넌트 |
 |---|---|---|
 | 커뮤니티 피드 | `app/community/page.tsx` | FeedCard, BrandBar |
-| 사연 상세 | `app/community/[id]/page.tsx` | JurorCard, JurorPicker, VoteBar, SideStory |
+| 사연 상세 | `app/community/[id]/page.tsx` | VoteBar, SideStory, CommunityComment |
 | 댓글 | `app/community/[id]/comments/page.tsx` | CommentBar, CommunityComment, CommentComposeSheet |
 | 사연 작성 | `app/community/new/page.tsx` | — |
 | 파트너 초대 | `app/community/[id]/invite/page.tsx` | — |
@@ -120,11 +117,6 @@
 - **역할**: 피치:세이지 양면 비율 막대 (합 100)
 - big 모드: `%` 표기 / 미니(카드 하단): 숫자 없이 색 비율만
 - 실제 집계값 표시 (임의값·추정값 금지)
-
-### JurorCard (UxJuror)
-- **역할**: AI 배심원 카드 — 마스코트 없음
-- `AI` 점 + 이름(마음/균형/매듭 등) + 렌즈(감정/양쪽/해결) + 세리프 한마디
-- 기본 접힘 상태
 
 ### CommunityComment
 - **진영 댓글**: 작성자 닉네임 앞 `*` + 피치색 / 상대방 `*` + 세이지색

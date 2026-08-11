@@ -44,10 +44,8 @@ backend/src/main/java/com/againspring/
 | `llm.enabled` / `LLM_ENABLED` | false면 RemoteLlmProvider가 501 거절 (server-dev) |
 | `llm.remote.base-url` | llm-worker 엔드포인트 |
 | `llm.remote.default-timeout-ms` | 기본 타임아웃 (ms) |
-| `llm.jury.provider` | 배심원 생성 provider 선택 (`remote` \| `mock`) |
-| `llm.jury.model` | 배심원 모델 (`claude-haiku-4-5-20251001`) |
-| `llm.compose.provider` | 사연 중립화 provider 선택 |
-| `llm.compose.model` | 중립화 모델 |
+| `llm.compose.provider` | (선택) compose provider |
+| `llm.compose.model` | (선택) compose 모델 |
 
 ---
 
@@ -71,10 +69,13 @@ String sanitized = promptSanitizer.sanitize(userInput);
 
 ## 프롬프트 파일
 
+사람글 최초 게시(`PostComposeService`)는 원문을 그대로 저장한다. 톤 정규화는 파트너 초대 답변 경로에서만 사용한다.
+
 | 용도 | 파일 | 로드 서비스 |
 |---|---|---|
-| 배심원 생성 | `docs/shared/prompts/community/jury_persona.md` | `JuryService` |
-| 사연 중립화 | `docs/shared/prompts/community/neutralize.md` | `PostComposeService` |
+| 톤 정규화 | `docs/shared/prompts/community/post_tonalization.md` | `TonalizationService` (`AnswerProcessingService` / 파트너 초대) |
+
+주력 LLM 생성은 AI-user 스택(`llm-ai-user`)이 담당한다.
 
 ---
 

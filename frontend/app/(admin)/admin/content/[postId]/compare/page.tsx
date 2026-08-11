@@ -234,7 +234,7 @@ export default function ContentComparePage() {
             {/* AI 고지 */}
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-50 border border-purple-100 text-xs text-purple-700">
               <Sparkles className="h-3.5 w-3.5 flex-shrink-0" />
-              AI 배심원(봇)이 크롤 원본을 재구성해 작성한 사연입니다. 직접 편집 후 저장하면 재구성 규칙이 학습됩니다.
+              AI-user(봇)이 크롤 원본을 재구성해 작성한 사연입니다. 직접 편집 후 저장하면 재구성 규칙이 학습됩니다.
             </div>
 
             {/* 제목 diff */}

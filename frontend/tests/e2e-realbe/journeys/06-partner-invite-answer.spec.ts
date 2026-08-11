@@ -4,7 +4,7 @@
  * - 작성자 뷰 — 초대 버튼 표시
  * - InviteSheet 열림 + 초대 URL /s/tok_
  * - 복사 클릭 → 시트 닫힘 + 대기 상태
- * - Full flow: 초대 → 상대 답변 → paired 확인 (jurorCount=0 강제)
+ * - Full flow: 초대 → 상대 답변 → paired 확인
  * - 관람자 — paired 사연 양쪽 투표 버튼
  * - 상대방 답변 화면 (/s/[token]): 유효하지 않은 토큰 오류, 중복 제출 오류
  * - publish-mode: WAIT_FOR_PARTNER여도 작성자 글 즉시 PUBLIC (private-until-partner 폐기)

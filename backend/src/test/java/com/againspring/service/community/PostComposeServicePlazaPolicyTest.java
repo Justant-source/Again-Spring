@@ -59,7 +59,7 @@ class PostComposeServicePlazaPolicyTest {
 
         assertThatCode(() -> composeService.composeAndPublish(
                 "user_bot", "딸이 꺼낸 말 한마디에 세상이 무너졌습니다", body,
-                PostCategory.FAMILY, "PUBLIC", 0, null, null, null, null, null, null))
+                PostCategory.FAMILY, "PUBLIC", null, null, null, null, null, null))
                 .doesNotThrowAnyException();
 
         ArgumentCaptor<Post> captor = ArgumentCaptor.forClass(Post.class);

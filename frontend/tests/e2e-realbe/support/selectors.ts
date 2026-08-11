@@ -7,7 +7,7 @@
  *   2. getByTestId (data-testid 박힌 경우)
  *   3. getByText  (한국어 리터럴 — i18n 위험, 최후 수단)
  *
- * ✋ 죽은 항목(MODE_*, JURY.*) 제거 완료 (2026-06-07 재편 기준).
+ * ✋ 죽은 항목(MODE_* · JURY) 제거 완료.
  *    컴포넌트에 testid가 없으면 getByRole을 우선 사용한다.
  */
 
@@ -48,14 +48,6 @@ export const COMMENT_MENU_TOGGLE = '[data-testid="comment-menu-toggle"]'
 export const COMMENT_MENU_EDIT = '[data-testid="comment-menu-edit"]'
 export const COMMENT_MENU_DELETE = '[data-testid="comment-menu-delete"]'
 export const COMMENT_MENU_REPORT = '[data-testid="comment-menu-report"]'
-
-// ── 시드 배심원 UI ──────────────────────────────────────────────
-export const JURY = {
-  section: '[data-testid="jury-section"]',
-  card: '[data-testid="juror-card"]',
-  legalNotice: '[data-testid="jury-legal-notice"]',
-  distributionBar: '[data-testid="jury-distribution-bar"]',
-} as const
 
 // ── Invite 흐름 ──────────────────────────────────────────────────
 // 실제 컴포넌트 testid와 일치하는 항목 (2026-06-07 교정)

@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
 /**
  * PostComposeService - 커뮤니티 사연 등록 서비스
  * 중립화 없이 원문 그대로 즉시 VOTING 상태로 등록.
- * AI 기능은 배심원 평가만 존재 (JuryService, 비동기).
  */
 @Slf4j
 @Service
@@ -61,7 +60,6 @@ public class PostComposeService {
      * @param bodyRaw    원본 사연 텍스트
      * @param category   관계 카테고리
      * @param visibility 공개/비공개 설정
-     * @param jurorCount AI 배심원 인원 (0-9)
      * @param sessionId  관련 세션 ID (nullable)
      * @param source     크롤 원본 스냅샷 — 재구성 모드 시만 비-null
      * @param captureSplitAfterLines X/IG 캡쳐 컷(1-based), nullable
@@ -69,21 +67,21 @@ public class PostComposeService {
      */
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
-                                  int jurorCount, String sessionId,
+                                  String sessionId,
                                   SourceSnapshot source) {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                jurorCount, sessionId, source, (java.util.List<Integer>) null, null, null);
+                sessionId, source, (java.util.List<Integer>) null, null, null);
     }
 
     /** @deprecated prefer list overload */
     @Deprecated
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
-                                  int jurorCount, String sessionId,
+                                  String sessionId,
                                   SourceSnapshot source,
                                   Integer captureSplitAfterLine) {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                jurorCount, sessionId, source,
+                sessionId, source,
                 captureSplitAfterLine == null ? null : java.util.List.of(captureSplitAfterLine),
                 null, null);
     }
@@ -92,40 +90,40 @@ public class PostComposeService {
     @Deprecated
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
-                                  int jurorCount, String sessionId,
+                                  String sessionId,
                                   SourceSnapshot source,
                                   Integer captureSplitAfterLine,
                                   String promoTitle) {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                jurorCount, sessionId, source,
+                sessionId, source,
                 captureSplitAfterLine == null ? null : java.util.List.of(captureSplitAfterLine),
                 promoTitle, null);
     }
 
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
-                                  int jurorCount, String sessionId,
+                                  String sessionId,
                                   SourceSnapshot source,
                                   java.util.List<Integer> captureSplitAfterLines,
                                   String promoTitle) {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                jurorCount, sessionId, source, captureSplitAfterLines, promoTitle, null);
+                sessionId, source, captureSplitAfterLines, promoTitle, null);
     }
 
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
-                                  int jurorCount, String sessionId,
+                                  String sessionId,
                                   SourceSnapshot source,
                                   java.util.List<Integer> captureSplitAfterLines,
                                   String promoTitle,
                                   String metaphorId) {
         return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                jurorCount, sessionId, source, captureSplitAfterLines, promoTitle, metaphorId, null);
+                sessionId, source, captureSplitAfterLines, promoTitle, metaphorId, null);
     }
 
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
-                                  int jurorCount, String sessionId,
+                                  String sessionId,
                                   SourceSnapshot source,
                                   java.util.List<Integer> captureSplitAfterLines,
                                   String promoTitle,
@@ -194,7 +192,6 @@ public class PostComposeService {
                 // 원문 그대로 표시 (중립화 없음)
                 .title(userTitle)
                 .bodyPublished(bodyRaw)
-                .jurorCount(jurorCount)
                 .category(category)
                 .visibility(PostVisibility.valueOf(visibility.toUpperCase()))
                 .status(PostStatus.VOTING)

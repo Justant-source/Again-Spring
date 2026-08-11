@@ -2,8 +2,7 @@
 
 **위치**: `docs/frontend/ux/flows/README.md`  
 **자매 문서**: [../principles.md](../principles.md) · [../../architecture.md](../../architecture.md)  
-**기준일**: 2026-06-03  
-**성격**: as-is 현행 기준 — 광장형 모델 기준으로 서술.
+**성격**: as-is 현행 기준 — 광장 사연 + 커뮤니티 공감 투표.
 
 ---
 
@@ -40,29 +39,27 @@ flowchart TD
     Root -->|"비로그인"| Feed
     Root -->|"로그인"| Feed
 
-    Feed -->|"카드 클릭"| Detail["/community/[id]\n게시글 상세\n배심원 의견\n투표\n댓글"]
+    Feed -->|"카드 클릭"| Detail["/community/[id]\n게시글 상세\n투표\n댓글"]
 
     Feed -->|"+ 버튼"| AuthGate{"로그인\n확인"}
     AuthGate -->|"미로그인"| Login["/login"]
-    AuthGate -->|"로그인"| NewPost["/community/new\n게시글 작성\nA입장·B입장 작성"]
+    AuthGate -->|"로그인"| NewPost["/community/new\n게시글 작성"]
     Login -->|"완료"| NewPost
 
     NewPost -->|"발행"| Detail
 
-    Detail -->|"배심원 카드\n클릭"| JurorDetail["배심원 의견 상세\n(상세 페이지 내 펼침)"]
-
     Detail -->|"투표"| AuthGate2{"로그인\n확인"}
     AuthGate2 -->|"미로그인"| Login
-    AuthGate2 -->|"로그인"| Vote["A측/B측 투표\n투표 완료 후 비율 표시"]
+    AuthGate2 -->|"로그인"| Vote["작성자/상대방 투표\n투표 완료 후 비율 표시"]
 
     Detail -->|"댓글"| AuthGate3{"로그인\n확인"}
     AuthGate3 -->|"미로그인"| Login
     AuthGate3 -->|"로그인"| Comment["댓글 작성\n무한스크롤 목록"]
 
     Root -->|"로그인"| Profile["/profile\n프로필"]
-    Root -->|"로그인"| Notif["/notifications\n알림\n배심원 분석 완료\n댓글, 좋아요"]
+    Root -->|"로그인"| Notif["/notifications\n알림\n댓글, 좋아요, 투표"]
 
-    Root -->|"관리자"| Admin["/admin\n관리자 대시보드\ncommunity/\nmarketing/"]
+    Root -->|"관리자"| Admin["/admin\n관리자 대시보드\nmarketing/"]
 
     Feed -.->|"비공개 링크\n/s/[token]"| Invite["초대 토큰\n상대방 진입"]
     Invite --> Detail
@@ -99,19 +96,17 @@ flowchart TD
 
 ### 2. 게시글 작성 (`/community/new`)
 1. 로그인 필수 (미로그인 → 로그인 모달)
-2. A입장·B입장 작성
-3. partner_token 발행 (초대 링크)
-4. publish 선택: 상대방 미작성 시에도 혼자 게시 가능
+2. 제목·본문·카테고리 작성
+3. 원문 게시 (사람글 경로 LLM 미호출)
+4. 상대방 초대 링크는 별도 흐름(`/s/[token]`)에서 가능
 
 ### 3. 게시글 상세 (`/community/[id]`)
-1. 배심원 의견 조회 (AI 레이블 표시)
-2. 투표 버튼 (A측/B측, 로그인 필요)
-3. 댓글 무한스크롤 (로그인 필요)
-4. 위기 컨텐츠: CrisisResourceModal 표시
+1. 투표 버튼 (작성자/상대방, 로그인 필요)
+2. 댓글 무한스크롤 (로그인 필요)
+3. 위기 컨텐츠: CrisisResourceModal 표시
 
 ### 4. 알림 (`/notifications`)
-- 배심원 분석 완료 알림
-- 댓글, 좋아요 알림
+- 댓글, 좋아요, 투표 알림
 - 읽음 처리 후 30일 자동 삭제
 
 ---
@@ -125,27 +120,18 @@ flowchart TD
 - OAuth 콜백 (`/auth/callback/[provider]`)
 - 비밀번호 재설정
 
-**광장형 영향**: 정책 유지 (온보딩 게이트 제거 가능)
-
 ### [02-permissions.md](./02-permissions.md)
 - guest/registered/admin 3-tier
 - TESTER role
 - 라우트 게이트
 - 401/403/402/429 에러 처리
 
-**광장형 영향**: 게시글 작성 권한 추가 (registered+)
+### [08-crisis.md](./08-crisis.md) — 전면 재작성 필요
+**현행**: 사용자 입력 필터 미적용 → 자동 위기 감지(`CrisisDetector`) + `/admin/crisis` 관제
 
-### [08-crisis.md](./08-crisis.md) — 전면 재작성 필요 (2026-07-30: 죽은 참조만 수정, 나머지 재작성 여전히 필요)
-**구 모델**: 입력 차단 → 세션 즉시 중단  
-**신 모델**: 사용자 입력 필터 미적용 → 자동 위기 감지(`CrisisDetector`) + `/admin/crisis` 관제  
-재작성 예정 사항:
-- CrisisResourceModal (ESC/바깥클릭 차단 불변)
-- 상시 핫라인 리소스
-
-### [09-admin.md](./09-admin.md) — 전면 재작성 필요 (2026-07-30: 사이드바 5그룹·`/admin/community` 삭제만 반영, 나머지 재작성 여전히 필요)
-**신 콘텐츠**: 
-- `(admin)/admin/reports/` — 신고 처리 (구 광장 관리 `/admin/community` 기능 통합, 2026-07-30 중복 삭제)
-- `(admin)/admin/marketing/**` — 마케팅 대시보드 (5섹션)
+### [09-admin.md](./09-admin.md) — 전면 재작성 필요
+- `(admin)/admin/reports/` — 신고 처리
+- `(admin)/admin/marketing/**` — 마케팅 대시보드
 
 ---
 
@@ -155,9 +141,7 @@ flowchart TD
 |---|---|---|
 | **라우트 구조** | `session/` 중심 | `community/` 중심 |
 | **상태 관리** | sessionStore, communityStore | uiStore (통합) |
-| **중재 방식** | 6턴 chat | 배심원 9인 병렬 분석 |
-| **API 엔드포인트** | `/api/sessions/*` | `/api/posts/**` (community) |
+| **상호작용** | 6턴 chat | 커뮤니티 공감 투표 + 댓글 |
+| **API 엔드포인트** | `/api/sessions/*` | `/api/community/posts/**` |
 | **결과 페이지** | `/session/result/[id]` | 게시글 상세에 통합 |
 | **온보딩** | 10문항 + 선택 | 제거됨 |
-
----

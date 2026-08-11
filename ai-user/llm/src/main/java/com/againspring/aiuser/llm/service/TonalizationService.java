@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
  * Post 톤 정규화 서비스 (2026-06-04)
  *
  * 목적: 사용자가 입력한 제목/본문을 한국 갈등 커뮤니티 톤에 맞게 정규화
- * 사용: JuryService.generateJuryAsync() 호출 전
+ * 사용: AnswerProcessingService / partner invite 경로
  *
  * 규칙:
  * 1. 존댓말 → 반말
