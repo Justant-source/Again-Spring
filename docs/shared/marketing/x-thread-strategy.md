@@ -183,8 +183,12 @@ BE 코드가 들어가므로 **절대 규칙 #4의 dev → e2e-realbe → main p
 이미 `linkMode: first_reply` 경로(`:469`)가 이 방식으로 검증돼 있고, 스레드 컴포저의
 트윗별 미디어 셀렉터를 새로 잡는 것보다 X UI 변경에 훨씬 덜 취약하다.
 
-**중간 실패 시 반쪽 스레드가 남으므로 단계별 멱등 키가 필요하다** — `publication`의
-`idempotency_key`를 `{job_id}:{step}` 형태로 확장해 재시도 시 이미 발행된 칸을 건너뛴다.
+**중간 실패 시 반쪽 스레드는 짝이 맞지 않으므로 전부 삭제한다** (ASM
+`app/publishers/x_thread_retry.py`). 이미 올라간 칸은 `/publish/x/delete`로 지우고
+publication을 `PENDING`으로 되돌린 뒤 **5분 후** 처음부터 재시도한다
+(`claimed_by=retry-hold` + `lease_expires_at`). **3회** 연속 실패하면 게시한 칸을
+다시 삭제하고 잡을 `FAILED`로 종료한다. URL 추출 실패(`postedButUrlMissing`)는
+중복 게시 위험이 있어 자동 재시도하지 않는다(알려진 URL만 삭제 후 수동 확인).
 
 ### 4.3 선행 조건
 
