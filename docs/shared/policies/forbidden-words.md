@@ -132,6 +132,7 @@ FE의 `forbiddenWords.ts`와 BE의 `forbidden-words.yml`이 어긋나면 BE가 �
 - **PII 패턴**: 전화번호, 주민번호, 이메일 등 → 게시 차단
 - **LLM 오류 시그니처**: `LlmErrorSignature.java` 참조 (상세: `.claude/rules/llm-safety.md`)
 - **내부 운영 메타 누출 차단** (2026-06-23): `적용 처리 메모`, `[작성 노트]`, `| 항목 | 처리 내용 |`, `- 트리거:` 등 내부 첨삭/규칙 요약이 붙으면 차단
+- **구조화 스키마 누출 차단** (2026-08-11): thread-plan JSON(`post`/`comments`/`personaId`/`parentRef`)이 댓글·글 본문으로 샌 경우 `STRUCTURED_SCHEMA_LEAK`로 게시 차단. 파서(`StructuredGenerationService.validText`)와 게시 직전(`ThreadPlanPublisher`)에서도 동일 검사
 - **거절/오류 이력 반영 금지**: DB `persona_history_entries`, legacy `history/*.md`, `voice_profile` 강화에도 동일 규칙 적용
   - 예: `I can't write this`, `I can't do this`, `I appreciate the detailed request`, `이 요청은 도와드릴 수 없습니다`, `실제 운영 중인`, `가짜 페르소나`
 

@@ -809,7 +809,32 @@ public class StructuredGenerationService {
         return OutputSanitizer.normalizeLiteralNewlines(n.path(name).asText()).trim();
     }
     private static void validRef(String v) { if (!v.matches("[A-Za-z][A-Za-z0-9_-]{0,63}")) throw new StructuredGenerationException("invalid ref"); }
-    private static void validText(String v, String field, int min, int max) { if (v.length() < min || v.length() > max || LlmErrorSignature.looksLikeProviderError(v) || META.matcher(v).find() || koreanRatio(v) < .10) throw new StructuredGenerationException("invalid " + field); }
+    private static void validText(String v, String field, int min, int max) {
+        if (v.length() < min || v.length() > max || LlmErrorSignature.looksLikeProviderError(v)
+                || META.matcher(v).find() || looksLikeStructuredSchemaLeak(v) || koreanRatio(v) < .10) {
+            throw new StructuredGenerationException("invalid " + field);
+        }
+    }
+
+    /**
+     * Thread-plan JSON dumped into a body field (2026-08-11). Keep in sync with
+     * orchestrator {@code ContentSafetyGuard.looksLikeStructuredSchemaLeak}.
+     */
+    static boolean looksLikeStructuredSchemaLeak(String text) {
+        if (text == null || text.isBlank()) return false;
+        String n = text.trim().replace("\\n", "\n").replace("\\r", "\r");
+        String t = n.trim();
+        if (!t.startsWith("{")) return false;
+        String lower = t.toLowerCase(Locale.ROOT);
+        boolean hasPersona = lower.contains("personaid");
+        boolean hasParentRef = lower.contains("parentref");
+        boolean hasComments = lower.contains("\"comments\"") || lower.contains("comments:");
+        boolean hasPostField = lower.contains("\"post\"") || lower.contains("post:")
+                || lower.startsWith("{post");
+        if (hasPersona && (hasParentRef || hasComments)) return true;
+        if (hasParentRef && hasComments) return true;
+        return hasPostField && hasComments && (hasPersona || hasParentRef);
+    }
     /** Reject title==body (whitespace-normalized). Prevents one-liner posts used as both fields. */
     static void rejectIdenticalTitleBody(String title, String body) {
         String t = collapseWs(title);

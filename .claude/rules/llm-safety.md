@@ -61,6 +61,13 @@ AI 생성 출력(AI-user 글·댓글 등)에서 아래 표현은 **절대 금지
 - L2 최종 가드: `ContentSafetyGuard`가 같은 패턴을 발견하면 `PROMPT_LEAK_META`로 게시 차단
 - 히스토리 차단: `writeHistory` / `loadRecentBodies`도 동일 가드를 거치므로 기존 오염 재주입을 막음
 
+### 추가: 구조화 스키마 누출 차단 (2026-08-11)
+
+- 증상: HUMAN_POST thread-plan 댓글 body에 `{ post: null, comments: [ { ref, parentRef, personaId, body } ] }` JSON이 그대로 게시됨
+- L1 파서: `StructuredGenerationService.validText`가 comment/post body에서 스키마 필드 조합을 감지하면 `invalid …`로 후보 거부
+- L2 최종 가드: `ContentSafetyGuard` → `STRUCTURED_SCHEMA_LEAK`
+- L2 게시 직전: `ThreadPlanPublisher`가 QualityGate 이후에도 한 번 더 검사 (이미 스케줄된 오염 item 방어)
+
 ### 처리 원칙
 
 ```

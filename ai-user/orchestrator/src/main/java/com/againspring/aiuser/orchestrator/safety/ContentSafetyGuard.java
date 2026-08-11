@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -58,6 +59,29 @@ public class ContentSafetyGuard {
         Pattern.compile("(?m)^-\\s*온점·쌍따옴표 없음\\s*$"),
         Pattern.compile("(?m)^\\|\\s*페르소나 quirk\\s*\\|")
     );
+
+    /**
+     * Thread-plan / structured-output JSON이 댓글·글 본문으로 샌 경우.
+     * 2026-08-11 인시던트: {@code { post: null, comments: [ { ref, parentRef, personaId, body } ] }}
+     * 가 그대로 게시됨. 키 인용 여부·리터럴 {@code \\n}·잘린 JSON 모두 차단.
+     */
+    static boolean looksLikeStructuredSchemaLeak(String text) {
+        if (text == null || text.isBlank()) return false;
+        String n = text.trim().replace("\\n", "\n").replace("\\r", "\r");
+        String t = n.trim();
+        if (!t.startsWith("{")) return false;
+        String lower = t.toLowerCase(Locale.ROOT);
+        boolean hasPersona = lower.contains("personaid");
+        boolean hasParentRef = lower.contains("parentref");
+        boolean hasComments = lower.contains("\"comments\"") || lower.contains("comments:");
+        boolean hasPostField = lower.contains("\"post\"") || lower.contains("post:")
+                || lower.startsWith("{post");
+        // Distinctive thread-plan field combos — normal Korean comments do not look like this.
+        if (hasPersona && (hasParentRef || hasComments)) return true;
+        if (hasParentRef && hasComments) return true;
+        if (hasPostField && hasComments && (hasPersona || hasParentRef)) return true;
+        return false;
+    }
 
     // 제공자(LLM) 오류 문자열 — 토큰/크레딧 소진 또는 프록시 라우팅 오류로 본문에 새는 텍스트.
     // 절대 prod에 게시 금지 (2026-06-07 인시던트 + 2026-06-10 Kiro/Claude 자기정체 인시던트). 모두 소문자.
@@ -146,6 +170,10 @@ public class ContentSafetyGuard {
         if (hasInsufficientKorean(text)) {
             log.error("ContentSafetyGuard: insufficient Korean content (language-guard) — BLOCKED.");
             return GuardResult.blocked("INSUFFICIENT_KOREAN");
+        }
+        if (looksLikeStructuredSchemaLeak(text)) {
+            log.error("ContentSafetyGuard: thread-plan/structured JSON schema leaked into content — BLOCKED.");
+            return GuardResult.blocked("STRUCTURED_SCHEMA_LEAK");
         }
         for (Pattern p : PROMPT_LEAK_PATTERNS) {
             if (p.matcher(text).find()) {

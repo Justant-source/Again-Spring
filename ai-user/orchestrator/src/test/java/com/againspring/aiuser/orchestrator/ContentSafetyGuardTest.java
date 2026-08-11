@@ -82,4 +82,37 @@ class ContentSafetyGuardTest {
         assertEquals("PROMPT_LEAK_META", guard.check(memoLeak, ContentType.POST).reason());
         assertEquals("PROMPT_LEAK_META", guard.check(noteLeak, ContentType.POST).reason());
     }
+
+    /**
+     * 2026-08-11 인시던트: HUMAN_POST thread-plan 댓글 body에
+     * {"post":null,"comments":[{"ref","parentRef","personaId",...}]} 스키마가 그대로 게시됨.
+     * ContentSafetyGuard가 최종 차단해야 한다.
+     */
+    @Test
+    void blocksThreadPlanSchemaLeakInCommentBody() {
+        String incidentBody = """
+            {
+              post: null,
+              comments: [
+                {
+                  ref: c1,
+                  parentRef: null,
+                  personaId: 4a7305dac5ed4160b927998c3b0864f6,
+                  body: "남자들 심리 참 모르겠지만 뭐라도 노력하려는 시도는 좋은 거 맞음
+            그동안 싸우는 것도 지치고 포기했다고 하셨는데 이제 남편분도 깨달은 것 같네
+            마음을 열고 받아주되 조심스럽게 접근해봐
+            또 같은 패턴 반복될 수 있으니까",
+            """;
+        // also the DB form with literal backslash-n (pre-normalize)
+        String literalNl = "{\\n  post: null,\\n  comments: [\\n    {\\n      ref: c1,\\n      parentRef: null,\\n      personaId: 4a7305dac5ed4160b927998c3b0864f6,\\n      body: \\\"남자들 심리 참 모르겠지만 뭐라도 노력하려는 시도는 좋은 거 맞음\\n그동안 싸우는 것도 지치고 포기했다고 하셨는데 이제 남편분도 깨달은 것 같네\\n마음을 열고 받아주되 조심스럽게 접근해봐\\n또 같은 패턴 반복될 수 있으니까\\\",";
+
+        assertEquals("STRUCTURED_SCHEMA_LEAK",
+            guard.check(incidentBody, ContentType.COMMENT).reason());
+        assertEquals("STRUCTURED_SCHEMA_LEAK",
+            guard.check(literalNl, ContentType.COMMENT).reason());
+        assertFalse(guard.check(incidentBody, ContentType.POST).passed());
+        // normal Korean must still pass
+        assertTrue(guard.check("갑자기 달라진 남편 적응이 안 되네요 ㅠㅠ", ContentType.COMMENT).passed());
+    }
+
 }

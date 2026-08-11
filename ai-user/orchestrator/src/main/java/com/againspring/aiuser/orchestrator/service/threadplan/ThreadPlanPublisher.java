@@ -10,6 +10,7 @@ import com.againspring.aiuser.orchestrator.repository.AiThreadPlanRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.repository.AiThreadPlanItemRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
+import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class ThreadPlanPublisher {
     private final JdbcTemplate jdbcTemplate;
     private final OrchestratorProperties properties;
     private final AiUserGenerationConfigRepository configRepository;
+    private final ContentSafetyGuard safetyGuard;
 
     /** Threshold above which a scheduledAt offset is considered "stale" (publisher lag after restart). */
     private static final Duration STAMPEDE_THRESHOLD = Duration.ofMinutes(30);
@@ -138,9 +140,18 @@ public class ThreadPlanPublisher {
             String email = jdbcTemplate.queryForObject("select email from users where id = ?", String.class, persona.getId());
             Optional<String> jwt = tokens.getToken(persona.getId(), email, properties.getBotPassword());
             if (jwt.isEmpty()) { leases.releaseFailed(item.getId(), worker, "AUTH_FAILED", false); return; }
+            String body = LiteralNewlineNormalizer.normalize(item.getBody());
+            // Publish-time recheck: QualityGate at plan-time can miss later sanitizer mutations,
+            // and already-scheduled leak bodies must not reach the public feed (2026-08-11).
+            ContentSafetyGuard.GuardResult guard = safetyGuard.check(body, ContentSafetyGuard.ContentType.COMMENT);
+            if (!guard.passed()) {
+                log.error("Plan item {} blocked at publish: {}", item.getId(), guard.reason());
+                leases.releaseFailed(item.getId(), worker, guard.reason(), false);
+                return;
+            }
             Optional<String> posted = backend.addCommentReturningId(
                     jwt.get(), item.getTargetPostId(),
-                    LiteralNewlineNormalizer.normalize(item.getBody()),
+                    body,
                     parent, item.getIdempotencyKey());
             if (posted.isPresent()) leases.completePosted(item.getId(), worker, posted.get());
             else leases.releaseFailed(item.getId(), worker, "BACKEND_WRITE_FAILED", false);

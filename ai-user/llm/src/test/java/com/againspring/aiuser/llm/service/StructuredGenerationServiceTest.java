@@ -492,4 +492,22 @@ class StructuredGenerationServiceTest {
         return "{\"post\":{\"title\":\"한국어 제목입니다\",\"body\":\"한국어 게시글 본문입니다. 충분히 자연스러운 내용입니다.\"},\"comments\":["
                 + String.join(",", items) + "]}";
     }
+
+    @Test
+    void rejectsCommentBodyThatIsThreadPlanSchemaLeak() {
+        String leak = """
+            {
+              post: null,
+              comments: [
+                {
+                  ref: c1,
+                  parentRef: null,
+                  personaId: 4a7305dac5ed4160b927998c3b0864f6,
+                  body: "남자들 심리 참 모르겠지만 뭐라도 노력하려는 시도는 좋은 거 맞음",
+            """;
+        assertTrue(StructuredGenerationService.looksLikeStructuredSchemaLeak(leak));
+        assertFalse(StructuredGenerationService.looksLikeStructuredSchemaLeak(
+                "갑자기 달라진 남편 적응이 안 되네요 ㅠㅠ"));
+    }
+
 }
