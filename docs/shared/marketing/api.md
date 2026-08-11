@@ -277,8 +277,8 @@ Content-Type: image/png | image/jpeg
 **Response 200** — `{ "name": "...", "size_bytes": N }`
 **오류**: 400(이름/타입/크기 불일치), 401, 404(job 없음)
 
-업로드된 커스텀 커버는 다음 발행 시 자동 반영된다:
-- **YouTube Shorts**: 영상 업로드 성공 후 `thumbnails.set` API 호출(실패해도 게시 자체는 성공 처리 — non-fatal). 커스텀 커버가 없으면 호출 자체를 생략하고 YouTube 자동 프레임(항상 인트로 씬=대표 메타포+제목 레이아웃) 사용.
+업로드된 커스텀 커버·자동 썸네일은 다음 발행 시 반영된다:
+- **YouTube Shorts**: 영상 업로드 성공 후 항상 `thumbnails.set` API 호출(실패해도 게시 자체는 성공 처리 — non-fatal). **우선순위** = 운영자 `customcover` → WaggleBot 인트로 썸네일(메타포+제목, `thumbnailUrl`) → mp4 frame0 추출. 1×1 플레이스홀더(≤1KB)는 업로드하지 않는다. Shorts 선반은 `oar` 자동프레임(본문 씬)을 고를 수 있어 **API 썸네일 등록이 필수**이며, 영상 첫 프레임(인트로)은 API 실패 시 백업일 뿐이다.
 - **Instagram Reels**: Graph API `cover_url`(공개 HTTPS 필요, ASM은 현재 Tailscale 내부망 전용이라 **미동작**)은 보류 상태. 대신 API 경로 실패 시 폴백되는 Playwright 자동화 경로의 로컬 파일 첨부(`coverPath`)에는 반영됨.
 
 Again-Spring 측 관리자 UI 경로: `PUT /api/admin/marketing/jobs/{id}/artifacts/{platform}/thumbnail` (멀티파트, `AdminMarketingController` → `AsmClient.putArtifact` 프록시).
