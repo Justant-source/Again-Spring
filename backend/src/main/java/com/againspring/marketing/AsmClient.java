@@ -30,17 +30,31 @@ public class AsmClient {
     private final AsmProperties asmProperties;
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
+    /** Long-read client for platform stats collect (Playwright / Analytics). */
+    private final RestClient statsRestClient;
 
     public AsmClient(AsmProperties asmProperties, RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
         this.asmProperties = asmProperties;
         this.objectMapper = objectMapper;
+        this.restClient = buildClient(restClientBuilder, asmProperties, asmProperties.getRequestTimeoutMs());
+        int statsTimeout = asmProperties.getStatsRequestTimeoutMs() > 0
+            ? asmProperties.getStatsRequestTimeoutMs()
+            : 300_000;
+        this.statsRestClient = buildClient(restClientBuilder, asmProperties, statsTimeout);
+    }
+
+    private static RestClient buildClient(
+            RestClient.Builder restClientBuilder, AsmProperties props, int readTimeoutMs) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(asmProperties.getRequestTimeoutMs());
-        factory.setReadTimeout(asmProperties.getRequestTimeoutMs());
-        this.restClient = restClientBuilder
+        int connectMs = props.getRequestTimeoutMs() > 0 ? props.getRequestTimeoutMs() : 10_000;
+        factory.setConnectTimeout(connectMs);
+        factory.setReadTimeout(readTimeoutMs);
+        return restClientBuilder
+            .clone()
             .requestFactory(factory)
-            .baseUrl(asmProperties.getBaseUrl())
-            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + asmProperties.getApiToken())
+            .baseUrl(props.getBaseUrl())
+            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + props.getApiToken())
+            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .build();
     }
 
@@ -253,15 +267,21 @@ public class AsmClient {
      */
     public JsonNode collectStats(JsonNode body) {
         try {
-            return restClient
+            return statsRestClient
                 .post()
                 .uri("/api/v1/stats/collect")
                 .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
         } catch (HttpClientErrorException e) {
             throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (ResourceAccessException e) {
+            log.error("ASM stats collect timed out or unreachable", e);
+            throw new AsmUnavailableException(
+                "통계 수집 시간 초과/연결 실패 — 잠시 후 다시 시도하거나 limit를 줄여 주세요: "
+                    + e.getMessage(), e);
         } catch (Exception e) {
             log.error("Failed to collect ASM platform stats", e);
             throw new AsmUnavailableException("Failed to collect platform stats: " + e.getMessage(), e);

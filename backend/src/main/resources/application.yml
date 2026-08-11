@@ -149,6 +149,8 @@ asm:
   api-token: ${ASM_API_TOKEN:asm-dev-token-change-in-prod}
   poll-interval-ms: ${ASM_POLL_INTERVAL_MS:15000}
   request-timeout-ms: ${ASM_REQUEST_TIMEOUT_MS:10000}
+  # 통계 수집(X Playwright·YT API)은 10s로는 부족 — 기본 5분
+  stats-request-timeout-ms: ${ASM_STATS_REQUEST_TIMEOUT_MS:300000}
   enabled: ${ASM_ENABLED:true}
   callback-token: ${ASM_CALLBACK_TOKEN:asm-callback-token-dev}
   callback-base-url: ${ASM_CALLBACK_BASE_URL:http://100.81.189.92:8090}

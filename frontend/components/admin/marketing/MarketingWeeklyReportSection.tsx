@@ -41,7 +41,7 @@ export function MarketingWeeklyReportSection() {
     try {
       const summary: MarketingStatsCollectSummary = await collectMarketingPlatformStats({
         lookbackDays: 14,
-        limit: 40,
+        limit: 20,
       });
       setCollectMsg(
         `수집 완료: stored ${summary.stored} · partial ${summary.partial} · errors ${summary.errors}`

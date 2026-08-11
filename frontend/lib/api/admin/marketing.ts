@@ -356,7 +356,9 @@ export async function collectMarketingPlatformStats(opts?: {
   }
   const qs = params.size > 0 ? `?${params}` : '';
   const res = await api.post<MarketingStatsCollectSummary>(
-    `/api/admin/marketing/stats/collect${qs}`
+    `/api/admin/marketing/stats/collect${qs}`,
+    null,
+    { timeout: 320_000 } // ASM X scrape / YT can exceed default; BE read timeout 300s
   );
   return res.data;
 }

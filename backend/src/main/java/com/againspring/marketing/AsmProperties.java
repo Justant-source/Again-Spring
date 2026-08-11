@@ -18,6 +18,8 @@ public class AsmProperties {
     private String apiToken;
     private long pollIntervalMs;
     private int requestTimeoutMs;
+    /** Longer timeout for stats collect (X scrape / YT API can exceed default 10s). */
+    private int statsRequestTimeoutMs = 300_000;
     private boolean enabled;
     private String callbackToken;
     private String callbackBaseUrl;
