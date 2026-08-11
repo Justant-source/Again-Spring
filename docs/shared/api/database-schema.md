@@ -33,6 +33,9 @@ erDiagram
         longtext bodyPublished
         int viewCount
         timestamp deletedAt
+        timestamp authorBodyDeletedAt
+        timestamp partnerBodyDeletedAt
+        timestamp voteCloseAt "legacy unused"
     }
 
     vote_options {
@@ -196,7 +199,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 
 ---
 
-### `posts` (V48~V56, V85, V87, V89, V92, V94, **V97**, **V98**; 검색 인덱스 → V93 `post_search_ngrams`)
+### `posts` (V48~V56, V85, V87, V89, V92, V94, **V97**, **V98**, **V99**, **V105**, **V106**, **V107**; 검색 인덱스 → V93 `post_search_ngrams`)
 
 | 컬럼 | 타입 | Flyway | 비고 |
 |---|---|---|---|
@@ -215,6 +218,8 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `partner_user_id` | VARCHAR(32) FK | V54 | 초대 수락 사용자 |
 | `three_way_partner_id` | VARCHAR(32) FK | V54 | 3자 중재 파트너 |
 | `publish_mode` | VARCHAR(32) | V54 | runtime: `PUBLISH_NOW` \| `WAIT_FOR_PARTNER` (후자는 API 호환·동작=즉시 PUBLIC). **V97** 데이터 정리 |
+| `vote_duration_hours` | INT | V54 | **legacy / unused (2026-08-11~)** — 시한부 투표 제거. API에서 ignore |
+| `vote_close_at` | TIMESTAMP | V54~ | **legacy / unused (2026-08-11~)** — 신규 쓰기 중지. 공감 투표는 상시. 컬럼은 후속 drop 후보 |
 | `expires_at` | TIMESTAMP(3) | V48 | 게시글 만료 시각 (선택) |
 | `empathy_ratio` | DECIMAL(5,2) | V48 | 공감 비율 (0.0~1.0, 동적 계산) |
 | `source_example_id` | BIGINT | **V85** | 원본 사례 예제 ID (nullable) |
@@ -226,6 +231,8 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `content_revision` | INT UNSIGNED | V87 | 내용 변경마다 증가. AI thread plan이 참조한 글 revision과 비교하는 optimistic revision |
 | `created_by_admin` | BOOLEAN | **V89** | 관리자가 통합 콘텐츠관리 화면에서 수동 생성한 글 여부. 공개 API 미노출, 어드민 전용 표시(배지)용 |
 | `metaphor_id` | VARCHAR(64) | **V99** | 대표(1순위) 메타포 일러스트 ID. `post_metaphors`에 랭크 0으로 중복 저장(하위호환) |
+| `author_body_deleted_at` | TIMESTAMP(6) | **V107** | 작성자 본문 tombstone. 상대 ACTIVE면 제목·상대 유지; 양쪽 tombstone이면 `deleted_at` soft full-delete |
+| `partner_body_deleted_at` | TIMESTAMP(6) | **V107** | 상대 본문 tombstone. 토큰 유지·재작성 가능 |
 
 ### `post_metaphors` (**V105**)
 
@@ -451,13 +458,14 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V91** | `ai_user_generation_config`에 `hr_*` 7컬럼 — 댓글 생성량 설정(SSOT: `/admin/ai-user`). 대화 총상한은 저장하지 않고 `hr_distinct_personas_max × hr_replies_per_persona_max` 파생 |
 | **V93** | `post_search_ngrams` — 광장 검색용 문자 바이그램 (MariaDB ngram FULLTEXT 대체) |
 | **V94** | `posts.capture_split_after_line` — X/IG 캡쳐 전반부 끝 개행 블록(1-based) |
-| **V97** | `WAIT_FOR_PARTNER` private-until-partner 폐기 데이터 정리: `PRIVATE + WAIT_FOR_PARTNER` 중 `created_at` >30일 → `deleted_at` soft-delete; 나머지 → `PUBLIC` + `vote_close_at`(없으면 `COALESCE(vote_duration_hours,72)`h) |
+| **V97** | `WAIT_FOR_PARTNER` private-until-partner 폐기 데이터 정리: `PRIVATE + WAIT_FOR_PARTNER` 중 `created_at` >30일 → `deleted_at` soft-delete; 나머지 → `PUBLIC` (+ 당시 `vote_close_at` 보정; **이후 시한부 투표 제거로 미사용**) |
 | **V98** | `posts.capture_split_after_lines` / `partner_capture_split_after_lines` JSON — N장 캡쳐 컷 |
 | **V100** | `ai_user_generation_config`에 `bundle_timeout_ms`·`nightly_paired_share`·`nightly_slot_*` — 구조화 LLM 타임아웃·새벽 배치 슬롯/양면 비율 (SSOT: `/admin/ai-user`, 저장 즉시 반영) |
 | **V101** | `encrypted_secret` — 앱 시크릿 AES-GCM vault (마케팅 자격증명 제외) |
 | **V102** | `marketing_holding` — 24h 대기 보드 (초안·핀 soft-reserve·점수/순위 스냅샷·COMMITTED/DROPPED) |
 | **V104** | `marketing_job.requested_by` VARCHAR(32)→128 — 강제 배포 `admin:force:`+JWT UUID(≈48) 저장 |
 | **V106** | AI jury 제거 — `DROP TABLE jurors`, `posts.juror_count` 컬럼 삭제 |
+| **V107** | `posts.author_body_deleted_at` / `partner_body_deleted_at` — 쪽별 본문 tombstone (상대 초대 소유권·삭제) |
 
 ---
 

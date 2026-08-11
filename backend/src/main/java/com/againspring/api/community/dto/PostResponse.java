@@ -40,6 +40,9 @@ public class PostResponse {
     private Boolean paired;
     /** 현재 사용자가 투표한 진영: "g"=작성자, "r"=상대방, null=미투표 */
     private String myVoteSide;
+    private Boolean deleted;
+    private Boolean authorBodyDeleted;
+    private Boolean partnerBodyDeleted;
 
     public static PostResponse from(Post post, List<VoteOption> options) {
         return from(post, options, 0L, 0L, null, null);
@@ -50,6 +53,17 @@ public class PostResponse {
     }
 
     public static PostResponse from(Post post, List<VoteOption> options, Long voteCount, Long commentCount, String authorNickname, Long votedOptionId) {
+        if (post.getDeletedAt() != null) {
+            return PostResponse.builder()
+                    .id(post.getId())
+                    .deleted(true)
+                    .build();
+        }
+
+        boolean authorBodyDeleted = post.getAuthorBodyDeletedAt() != null;
+        boolean partnerBodyDeleted = post.getPartnerBodyDeletedAt() != null;
+        String bodyPublished = authorBodyDeleted ? null : post.getBodyPublished();
+
         List<VoteOptionDto> voteDtos = options.stream()
                 .map(opt -> VoteOptionDto.builder()
                         .id(opt.getId())
@@ -74,7 +88,7 @@ public class PostResponse {
                 .promoTitle(post.getPromoTitle())
                 .metaphorId(post.getMetaphorId())
                 .metaphorIds(post.getMetaphorIds())
-                .bodyPublished(post.getBodyPublished())
+                .bodyPublished(bodyPublished)
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())
                 .status(post.getStatus().name())
@@ -84,8 +98,11 @@ public class PostResponse {
                 .commentCount(commentCount)
                 .viewCount(post.getViewCount() != null ? post.getViewCount().longValue() : 0L)
                 .authorNickname(authorNickname)
-                .paired(post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null)
+                .paired(!partnerBodyDeleted && post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null)
                 .myVoteSide(myVoteSide)
+                .deleted(false)
+                .authorBodyDeleted(authorBodyDeleted)
+                .partnerBodyDeleted(partnerBodyDeleted)
                 .build();
     }
 }

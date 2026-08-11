@@ -265,6 +265,10 @@ public class CommunityPostController {
         String userId = userDetails != null ? userDetails.getUsername() : null;
         Post post = postService.getPost(id, userId);
 
+        if (post.getDeletedAt() != null) {
+            return ResponseEntity.ok(PostDetailResponse.deleted(post.getId()));
+        }
+
         List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
 
         // 투표 결과 조회 (사람/AI 분리)
@@ -307,17 +311,41 @@ public class CommunityPostController {
     }
 
     /**
-     * 포스트 삭제 (작성자만)
+     * 포스트 삭제 (작성자만).
+     * 상대 ACTIVE → 작성자 tombstone(200 + 상세 플래그).
+     * 그 외 → soft full-delete(200 + deleted:true).
      */
     @DeleteMapping("/{id}")
     @SecurityRequirement(name = "bearer-jwt")
     @Operation(summary = "포스트 삭제")
-    public ResponseEntity<Void> deletePost(
+    public ResponseEntity<PostDetailResponse> deletePost(
             @PathVariable String id,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        postService.deletePost(id, userDetails.getUsername());
-        return ResponseEntity.noContent().build();
+        Post post = postService.deletePost(id, userDetails.getUsername());
+        if (post.getDeletedAt() != null) {
+            return ResponseEntity.ok(PostDetailResponse.deleted(post.getId()));
+        }
+
+        String userId = userDetails.getUsername();
+        List<VoteOption> options = voteOptionRepository.findByPostIdOrderByOrderIdx(id);
+        var voteResultWithBreakdown = voteService.getVoteResultWithBreakdown(id);
+        var weightedPercentages = voteService.calculateWeightedPercentages(voteResultWithBreakdown);
+        Optional<Long> myVote = voteService.getMyVote(id, userId);
+        long commentCount = postCommentRepository.countByPostIdAndStatusAndDeletedAtIsNull(id, CommentStatus.ACTIVE);
+        String authorNickname = userRepository.findById(post.getAuthorId())
+                .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                .orElse("익명");
+        String partnerNickname = post.getPartnerUserId() != null
+                ? userRepository.findById(post.getPartnerUserId())
+                        .map(u -> u.getNickname() != null ? u.getNickname() : "익명")
+                        .orElse("익명")
+                : null;
+        boolean isPartner = userId.equals(post.getPartnerUserId());
+
+        return ResponseEntity.ok(PostDetailResponse.from(
+                post, options, voteResultWithBreakdown, weightedPercentages, myVote, commentCount,
+                userId, authorNickname, partnerNickname, isPartner));
     }
 
     /**

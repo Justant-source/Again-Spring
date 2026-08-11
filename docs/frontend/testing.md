@@ -111,7 +111,8 @@ E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 | 03 | `03-community-feed-compose.spec.ts` | 피드·정렬·카테고리·작성 폼·게스트/회원 올리기 |
 | 04 | `04-voting.spec.ts` | 게스트 투표 지속성·회원 투표·soft-delete 복구 |
 | 05 | `05-comments-lifecycle.spec.ts` | 댓글 CRUD·신고 제출·중복 id 회귀 |
-| 06 | `06-partner-invite-answer.spec.ts` | 초대·paired·답변 화면·publish-mode(WAIT≡즉시 PUBLIC) |
+| 06 | `06-partner-invite-answer.spec.ts` | 초대·paired·게스트/회원 답변 UI·publish-mode(WAIT≡즉시 PUBLIC, 시한부 투표 단언 없음) |
+| 06b | `06b-partner-invite-claim-delete.spec.ts` | 소유권: `/s`→login `next` 복귀·unowned claim·작성자 차단·partner/author tombstone·양쪽 삭제+광장 |
 | 07 | `07-profile.spec.ts` | 마이페이지 탭·profile/info (게스트 가드는 09) |
 | 08 | `08-email-verification-signup.spec.ts` | send-verification·DB 코드·가입 완주 |
 | 09 | `09-permissions-guards.spec.ts` | 라우트 가드·admin API 403 스모크·하단 시트·로그인 정리 |

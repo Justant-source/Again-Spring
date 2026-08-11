@@ -6,16 +6,8 @@ import Link from 'next/link';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
-import { oauthRedirect } from '@/lib/auth/oauth';
+import { oauthRedirect, safeRedirect, authHref } from '@/lib/auth/oauth';
 import { isInAppBrowser, isAndroid, intentOpenUrl } from '@/lib/utils/browser';
-
-// open redirect 방지 — 내부 경로(/로 시작, // 또는 /\는 거부)만 허용
-function safeRedirect(raw: string | null): string {
-  if (!raw) return '/';
-  if (!raw.startsWith('/')) return '/';
-  if (raw.startsWith('//') || raw.startsWith('/\\')) return '/';
-  return raw;
-}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -69,7 +61,7 @@ export default function LoginPage() {
     <PhoneFrame tone="L">
       <PhoneHeader
         title="로그인"
-        onBack={() => router.replace('/')}
+        onBack={() => router.replace(nextPath)}
       />
       <div style={{ padding: '8px 28px 28px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div className="letter-card" style={{ padding: '28px' }}>
@@ -138,7 +130,7 @@ export default function LoginPage() {
                 <div>{error}</div>
                 {errorCode === 'EMAIL_NOT_REGISTERED' && (
                   <Link
-                    href="/signup"
+                    href={authHref('/signup', nextPath)}
                     style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: 'var(--L-ink)', textDecoration: 'underline', fontWeight: 600 }}
                   >
                     회원가입 하러 가기 →
@@ -256,7 +248,7 @@ export default function LoginPage() {
         </div>
 
         <div style={{ marginTop: 16, textAlign: 'center', fontSize: 12, display: 'flex', gap: 16, justifyContent: 'center' }}>
-          <Link href="/signup" style={{ color: 'var(--L-sub)', textDecoration: 'underline' }}>
+          <Link href={authHref('/signup', nextPath)} style={{ color: 'var(--L-sub)', textDecoration: 'underline' }}>
             회원가입
           </Link>
           <span style={{ color: 'var(--L-border)' }}>·</span>

@@ -122,6 +122,10 @@ export default async function globalSetup(): Promise<void> {
         SELECT 'mock_001', id, '저는 직장인인데 주말에도 집안일을 다 도맡아 하고 있어요. 상대방은 이게 당연하다고 생각하는 것 같아요. 저만 쉬는 날이 없는 것 같아서 힘드네요.',
                '저는 직장인인데 주말에도 집안일을 다 도맡아 하고 있어요.', 'WORK', NOW(), 0, 'VOTING', '주말에도 저만 쉬는 날이 없어요', NOW(), 'PUBLIC', 'PUBLISH_NOW', '주말에도 저만 쉬는 날이 없어요', 0
         FROM users WHERE email='test1@again.com';
+        -- soft-delete 잔존 시 e2e(04/05)가 삭제 페이지를 보게 됨 → 복구
+        UPDATE posts SET deleted_at = NULL, author_body_deleted_at = NULL, partner_body_deleted_at = NULL,
+          visibility = 'PUBLIC', status = 'VOTING', updated_at = NOW()
+        WHERE id = 'mock_001';
         -- e2e 반복 시 vote_options 중복 누적 방지 (voteOptions[0]/[1] 계약 깨짐)
         DELETE FROM vote_options WHERE post_id = 'mock_001';
         INSERT INTO vote_options (post_id, label, order_idx) VALUES ('mock_001', '작성자', 0), ('mock_001', '상대방', 1);

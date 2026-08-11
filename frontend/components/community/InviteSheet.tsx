@@ -187,13 +187,13 @@ export function InviteSheet({ postId, initialToken, onClose, onSent }: InviteShe
         ) : (
           // 토큰 표시 상태
           <>
-            {/* 제목 + 공유 아이콘 버튼 */}
+            {/* 제목 + 공유 아이콘 버튼 — 재발송(initialToken) vs 신규 초대 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
               <div
                 className="serif"
                 style={{ fontSize: 20, lineHeight: 1.45, color: 'var(--L-ink)' }}
               >
-                링크로 상대를 초대하세요
+                {initialToken ? '같은 링크로 다시 보내세요' : '링크로 상대를 초대하세요'}
               </div>
               <button
                 onClick={handleMoreShare}

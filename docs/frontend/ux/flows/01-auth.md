@@ -1,8 +1,8 @@
 # 인증 흐름
 
 **위치**: `docs/frontend/ux/flows/01-auth.md`  
-**자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [../principles.md](../principles.md)  
-**기준일**: 2026-05-16  
+**자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [09-partner-invite-ownership.md](./09-partner-invite-ownership.md) · [../principles.md](../principles.md)  
+**기준일**: 2026-08-11  
 **성격**: as-is 현행 기준
 
 ---
@@ -12,12 +12,28 @@
 | 경로 | 설명 |
 |---|---|
 | `/` | 랜딩 — 로그인 상태에 따라 분기 |
-| `/login` | 이메일 로그인 |
-| `/signup` | 이메일 회원가입 |
+| `/login` | 이메일 로그인 (`?next=` 지원) |
+| `/signup` | 이메일 회원가입 (`?next=` 지원) |
 | `/guest` | 게스트 닉네임 입력 |
 | `/auth/callback/[provider]` | OAuth 콜백 처리 |
 | `/forgot-password` | 비밀번호 재설정 요청 |
 | `/reset-password/[token]` | 비밀번호 재설정 실행 |
+| `/s/[token]` | 상대 초대 — 미로그인 시 로그인/가입으로 보내고 **`next=/s/{token}`으로 복귀** |
+
+---
+
+## 초대 URL `next` 보존 (2026-08-11)
+
+상대 초대 `/s/{token}`에서 가입·로그인·OAuth·게스트 승격(GuestUpgrade)을 탈 때 **항상 같은 초대 URL로 복귀**한다. 홈(`/`)·광장(`/community`)으로 보내면 안 된다.
+
+| 경로 | 계약 |
+|---|---|
+| `/login?next=/s/{token}` | 성공 후 `safeRedirect(next)` → `/s/{token}` |
+| `/signup?next=/s/{token}` | 성공 후 동일 (게스트 업그레이드 포함) |
+| OAuth `state` | `next=/s/{token}` 인코딩 → 콜백에서 복원 |
+| GuestUpgradeModal | `redirect`/`next`에 `/s/{token}` 유지 |
+
+근거: `safeRedirect()` · [09-partner-invite-ownership.md](./09-partner-invite-ownership.md).
 
 ---
 
@@ -36,7 +52,8 @@ flowchart TD
     PW --> Terms["약관 동의\n(필수: 이용약관·개인정보)"]
     Terms --> Submit["POST /api/auth/signup"]
     Submit -->|"fromGuestSession 쿼리"| Upgraded["/?upgraded=true\n게스트 데이터 인계"]
-    Submit -->|"일반"| Landing["/\n랜딩"]
+    Submit -->|"next=/s/{token}"| InviteBack["/s/{token}\n초대 URL 복귀"]
+    Submit -->|"일반 (next 없음)"| Landing["/\n랜딩"]
     Submit -->|"에러"| ErrBox["에러 표시"]
 ```
 
@@ -66,7 +83,8 @@ flowchart TD
     Submit -->|"ACCOUNT_SUSPENDED"| ErrBox["계정 정지 안내"]
 ```
 
-`safeRedirect()`: `next` 파라미터가 동일 도메인인지 검증 후 push. 외부 도메인이면 `/`로 fallback.
+`safeRedirect()`: `next` 파라미터가 동일 도메인(상대 경로)인지 검증 후 push. 외부 도메인이면 `/`로 fallback.  
+초대 플로우에서는 `next=/s/{token}`이 반드시 살아 있어야 한다(홈·광장 fallback 금지).
 
 ---
 

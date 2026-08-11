@@ -76,4 +76,10 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
     /** 목록용: 포스트별 미삭제 댓글 수 */
     @Query("SELECT pc.postId, COUNT(pc) FROM PostComment pc WHERE pc.postId IN :postIds AND pc.deletedAt IS NULL GROUP BY pc.postId")
     List<Object[]> countUndeletedByPostIds(@Param("postIds") Collection<String> postIds);
+
+    /** 포스트의 모든 댓글 (상태·삭제 무관 — full delete cascade용) */
+    List<PostComment> findByPostId(String postId);
+
+    /** 포스트 full delete 시 댓글 hard delete */
+    void deleteByPostId(String postId);
 }

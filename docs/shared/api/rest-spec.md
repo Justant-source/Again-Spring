@@ -105,14 +105,14 @@ flowchart LR
 | GET | `/api/community/posts` | 공개 | 200 | 게시글 목록 |
 | GET | `/api/community/posts/search` | 공개 | 200 | 키워드 검색 (`?q=`, `category=`, `page=`, `size≤50`). `q` 정규화 후 2글자 미만이면 빈 페이지. 매칭=`post_search_ngrams` 문자 바이그램 AND(미색인 글은 LIKE 폴백). 정렬=제목 exact 티어 → `(2×votes+comments)×반감기14일`(바닥 0.05). MariaDB는 MySQL ngram FULLTEXT 미지원 → BTREE 바이그램 테이블로 대체 |
 | GET | `/api/community/posts/counts` | 공개 | 200 | 광장별 글 수 (`{"":.., "COUPLE":.., ...}`) |
-| GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | 게시글 상세 |
-| PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만) |
-| DELETE | `/api/community/posts/{id}` | **JWT** | 204 / 403 / 404 | 게시글 삭제 (작성자만) |
+| GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | 게시글 상세. soft-delete면 **200 + `{ deleted: true }`**(본문 생략 가능) 또는 기존 404 — FE는 deleted 플래그 우선. 응답에 `authorBodyDeleted` / `partnerBodyDeleted` boolean |
+| PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만; 작성자 본문 tombstone 후 재작성 경로 포함) |
+| DELETE | `/api/community/posts/{id}` | **JWT(author)** | 200 / 403 / 404 | 작성자 삭제 — **상대 ACTIVE면 작성자 본문만 tombstone**(`author_body_deleted_at`, 200+상세 플래그); 상대 NONE/미작성 또는 양쪽 tombstone이면 **완전 soft-delete**(`deleted_at`) + 댓글 hard delete → 200 `{deleted:true,id}`. 상세: [09-partner-invite-ownership.md](../../frontend/ux/flows/09-partner-invite-ownership.md) |
 | POST | `/api/community/posts/{id}/comments` | **JWT** | 200 / 400 / 409 / 422 | 댓글 작성 (synthetic bot은 내부 멱등성 헤더 지원) |
 | GET | `/api/community/posts/{id}/comments` | 공개 | 200 | 댓글 목록. 최상위·대댓글 모두 `createdAt DESC`(최신순). `?page=&size=`는 최상위만 페이지네이션 |
 | PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | 댓글 수정 (작성자만) |
 | DELETE | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 204 / 403 / 404 | 댓글 삭제 (작성자만) |
-| POST | `/api/community/posts/{id}/vote` | **JWT** | 200 / 403 | 투표 생성 (작성자 vs 상대방, 가중치는 §2.0.2) |
+| POST | `/api/community/posts/{id}/vote` | **JWT** | 200 / 403 | 투표 생성 (작성자 vs 상대방, 가중치는 §2.0.2). PUBLIC·미삭제면 **상시** — `voteCloseAt`/`CLOSED` 잠금 **legacy 미사용** |
 | DELETE | `/api/community/posts/{id}/vote` | **JWT** | 200 / 403 | 투표 취소 |
 | POST | `/api/community/posts/{postId}/comments/{id}/like` | **JWT** | 201 / 204 | 댓글 좋아요 |
 | POST | `/api/community/posts/{id}/like` | **JWT** | 201 / 204 | 게시글 좋아요 |
@@ -143,30 +143,43 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 ### 2.1. Partner Invite API
 
 > **계약 (2026-08-04~)**: 작성자 글은 **항상 즉시 PUBLIC**(투표·댓글 가능). `private-until-partner`는 폐기.
-> `PublishMode.WAIT_FOR_PARTNER` enum은 API 호환용으로 유지하되 동작은 `PUBLISH_NOW`와 동일(즉시 PUBLIC + vote 창).
+> `PublishMode.WAIT_FOR_PARTNER` enum은 API 호환용으로 유지하되 동작은 `PUBLISH_NOW`와 동일(즉시 PUBLIC).
 > 파트너 답변은 이미 공개된 글에 상대 본문만 붙인다 — **첫 PUBLIC 게이트가 아니다**.
-> 마이그레이션 **V97**: 잔존 `PRIVATE + WAIT_FOR_PARTNER` 중 비공개 **>30일** → soft-delete(`deleted_at`), 그 외 → PUBLIC(+ voteCloseAt).
+> 마이그레이션 **V97**: 잔존 `PRIVATE + WAIT_FOR_PARTNER` 중 비공개 **>30일** → soft-delete(`deleted_at`), 그 외 → PUBLIC.
+>
+> **소유권·삭제 (2026-08-11~)**: UX/API SSOT = [`docs/frontend/ux/flows/09-partner-invite-ownership.md`](../../frontend/ux/flows/09-partner-invite-ownership.md).
+> 게스트/익명 상대 본문 = 토큰 capability; 「내 계정으로 연결」claim 후에만 회원 소유.
+>
+> **시한부 투표 제거 (2026-08-11~)**: `voteCloseAt` / `voteDurationHours` / `PostStatus.CLOSED` 잠금은 **제품 동작에서 제거(legacy)**.
+> 공감 투표(VoteBar A/B)는 PUBLIC·미삭제 글에서 **상시** 가능. API 필드는 하위호환으로 남을 수 있으나 **무시·미설정**.
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
-| POST | `/api/community/posts/{id}/invite` | **JWT** | 201 / 403 / 404 | 초대 토큰 생성. 응답: {inviteToken, inviteUrl} |
-| GET | `/api/s/{token}` | 공개 | 200 / 400 / 404 | 토큰으로 포스트 프리뷰 조회. 응답: {postId, userTitle, authorBodyPublished, category} |
-| POST | `/api/s/{token}/answer` | 공개 | 201 / 400 / 404 | 파트너 답변 제출. 본문: {userTitle?, bodyRaw}. 이미 PUBLIC인 글에 partner body 부착(`paired=true`). 공개 전환 게이트 아님 |
-| PATCH | `/api/community/posts/{id}/publish-mode` | **JWT(author)** | 200 / 403 / 404 | 발행 모드 설정. 본문: {mode: PUBLISH_NOW\|WAIT_FOR_PARTNER, voteDurationHours: 24\|72\|168\|null}. `WAIT_FOR_PARTNER`도 즉시 PUBLIC(+ vote 창) — `PUBLISH_NOW`와 동등 |
-| POST | `/api/community/posts/{id}/publish-now` | **JWT(author)** | 200 / 403 / 404 | 즉시 광장 공개(visibility=PUBLIC, voteCloseAt 설정). 이미 PUBLIC이면 voteCloseAt 보정용(파트너 대기 해제가 아님) |
+| POST | `/api/community/posts/{id}/invite` | **JWT(등록 회원)** | 201 / 403 / 404 | 초대 토큰 생성(미답변 시 **동일 토큰 재복사**). 응답: {inviteToken, inviteUrl}. 게스트 차단 |
+| GET | `/api/s/{token}` | 공개 (JWT optional) | 200 / 400 / 404 | 토큰 프리뷰. 확장 응답: `{postId, userTitle, authorBodyPublished, category, deleted, partnerState: NONE\|ACTIVE\|TOMBSTONE, ownership: UNOWNED\|OWNED\|OWNED_BY_OTHER\|AUTHOR, partnerBodyPublished?, canWrite, canEdit, canDelete, canClaim}`. `deletedAt != null` → `deleted: true`. 작성자 본인 → `ownership=AUTHOR`(작성·claim 불가) |
+| POST | `/api/s/{token}/answer` | 공개 (JWT optional) | 201 / 400 / 403 / 404 / 409 | 파트너 답변. 본문: {userTitle?, bodyRaw, captureSplitAfterLines?}. 작성자 → 403 `AUTHOR_CANNOT_BE_PARTNER`. ACTIVE+owned → 409. tombstone/NONE 재·신규 작성 허용. 회원 제출 → 즉시 OWNED; 게스트 → UNOWNED |
+| POST | `/api/s/{token}/claim` | **JWT(회원)** | 200 / 403 / 404 / 409 | 미연결(unowned) 상대 본문을 현재 회원에 연결(`partnerUserId`=회원). 작성자·이미 owned → 403/409 |
+| PATCH | `/api/s/{token}/answer` | 토큰 또는 소유 JWT | 200 / 403 / 404 | 상대 본문 수정. unowned=토큰(또는 게스트); owned=소유자만. tombstone 재작성은 POST answer |
+| DELETE | `/api/s/{token}/answer` | 토큰 또는 소유 JWT | 204 / 403 / 404 | 상대 본문 tombstone(`partner_body_deleted_at` + body clear). 작성자 본문도 tombstone이면 **완전 삭제**. 토큰 유지(재작성용) |
+| PATCH | `/api/community/posts/{id}/publish-mode` | **JWT(author)** | 200 / 403 / 404 | 발행 모드. 본문: {mode: PUBLISH_NOW\|WAIT_FOR_PARTNER, voteDurationHours?: …}. `WAIT_FOR_PARTNER`≡`PUBLISH_NOW`(즉시 PUBLIC). **`voteDurationHours` deprecated — 무시** |
+| POST | `/api/community/posts/{id}/publish-now` | **JWT(author)** | 200 / 403 / 404 | 즉시 광장 공개(visibility=PUBLIC). **`voteCloseAt` 설정 중지**(legacy 필드 미사용) |
 
 **GET /api/community/posts/{id} 응답에 추가된 필드:**
 - `paired` (Boolean): 파트너 답변 도착 여부
 - `partnerAnsweredAt` (String, nullable): 파트너 답변 도착 시각 (ISO-8601 UTC)
-- `partnerBodyPublished` (String, nullable): 파트너 본문
+- `partnerBodyPublished` (String, nullable): 파트너 본문 (tombstone이면 null)
+- `authorBodyDeleted` / `partnerBodyDeleted` (Boolean, **2026-08-11~**): 쪽별 tombstone
+- `deleted` (Boolean, optional): 포스트 soft-delete 시 true (`deletedAt != null` — 이 경우 본문 필드 생략)
 - `inviteToken` (String, nullable): 초대 토큰 (작성자 본인만 조회 가능)
 - `promoTitle` (String, nullable, **2026-08-02~**, **V96→VARCHAR(500)·개행**): IG 훅용. 원제 복제+의미줄바꿈(줄≤10). 생성 시 PLAN 전달 또는 `PromoTitleService` 비동기. 목록/상세 공통.
 - `metaphorId` (String, nullable, **2026-08-05~**, **V99**): 메타포 일러스트 ID (60종 카탈로그). AI PLAN이 사연 생성 시 감정에 맞는 카드를 매칭. Shorts intro / FE 카드용. **대표(1순위) 메타포 — 하위호환 유지, `metaphorIds[0]`와 동일**.
 - `metaphorIds` (String[], nullable, **2026-08-09~**, **V105 `post_metaphors` 테이블**): 사연당 3~5개, 적합도 순 랭크. `metaphorId`(대표)는 `metaphorIds[0]`의 중복 저장. WaggleBot Shorts 렌더링에서 1번째=인트로 대표 이미지, 나머지는 본문 낭독 중간중간 균등 분산 삽입(앞쪽 몰림 방지). `MetaphorCatalog.sanitizeList`가 카탈로그 검증+dedup+최소 3개 미달 시 카테고리 fallback 패딩+최대 5개 cap.
+- `voteCloseAt` / `voteDurationHours` (**legacy, 미사용**): 응답에 남을 수 있으나 FE는 투표 마감 UI에 쓰지 않음
+
+소유권·tombstone UX SSOT: `docs/frontend/ux/flows/09-partner-invite-ownership.md`
 
 `POST /api/community/posts` 성공 시(신규 생성만) optional `promoTitle`이 있으면 저장하고, 없으면 `PromoTitleService.generateAsync`가 1회 실행된다. 마케팅 brief는 개행 포함 `promo_title`을 전달한다.
 봇(AI-user) 생성 요청은 optional `captureSplitAfterLines`(1-based 개행 블록 컷 배열)과 optional `metaphorId`/`metaphorIds`(배열, 최대 5개)를 보낼 수 있다 — X/IG 캡쳐 N장 분할(장당 ≤8, 진영당 ≤4). 구 `captureSplitAfterLine` 단일 값은 길이1 배열로 승격. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완. 파트너 답변(`POST /api/s/{token}/answer`)도 optional `captureSplitAfterLines`를 `partner_capture_split_after_lines`에 저장한다.
-
 ### 3. User
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |

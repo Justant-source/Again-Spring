@@ -201,7 +201,6 @@ public class PostComposeService {
                 .promoTitle(normalizedPromo)
                 .metaphorId(normalizedMetaphor)
                 .metaphorIds(normalizedMetaphorIds)
-                .voteCloseAt(Instant.now().plusSeconds(7L * 24 * 3600))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now());
         // 재구성 출처 스냅샷 (재구성 모드 시만 비-null)

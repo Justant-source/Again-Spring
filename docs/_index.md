@@ -111,5 +111,6 @@
 | `docs/shared/policies/forbidden-words.md` | `.claude/rules/llm-safety.md` · `docs/frontend/policies/forbidden-words-lint.md` |
 | `backend/.../llm/**` | `docs/backend/llm-bridge.md` |
 | `frontend/tailwind.config.ts` · `frontend/app/globals.css` | `docs/frontend/design/system.md` |
+| `frontend/app/s/**` · `frontend/**/postInvite*` · `backend/.../PostInvite*` · partner claim/delete | `docs/frontend/ux/flows/09-partner-invite-ownership.md` · `docs/shared/api/rest-spec.md` §2.1 · `docs/frontend/testing.md` (journey 06) |
 | 환경변수 추가/변경 (`.env.*` · `application*.yml`) | `docs/env/environment-variables.md` · README |
 | `docs/shared/policies/user-permissions.json` | `docs/shared/policies/user-permissions.md` · CLAUDE.md |

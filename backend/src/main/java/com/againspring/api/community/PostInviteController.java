@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * PostInviteController - C3 파트너 초대 API
- * 초대 토큰 생성, 파트너 응답, 발행 모드 관리
+ * 초대 토큰 생성, 파트너 응답·소유권·tombstone, 발행 모드 관리
  */
 @RestController
 @RequestMapping("/api")
@@ -42,22 +42,24 @@ public class PostInviteController {
     }
 
     /**
-     * 초대 토큰으로 포스트 조회 (파트너 사전정보)
+     * 초대 토큰으로 포스트 조회 (파트너 사전정보 + 소유권)
      * GET /api/s/{token}
-     * 인증 불필요 (공개 링크)
+     * 인증 optional
      */
     @GetMapping("/s/{token}")
     @Operation(summary = "초대 링크에서 포스트 조회")
     public ResponseEntity<PostInviteDto.PostByTokenResponse> getPostByToken(
-            @PathVariable String token) {
-        PostInviteDto.PostByTokenResponse response = postInviteService.getPostByToken(token);
+            @PathVariable String token,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String callerUserId = userDetails != null ? userDetails.getUsername() : null;
+        PostInviteDto.PostByTokenResponse response = postInviteService.getPostByToken(token, callerUserId);
         return ResponseEntity.ok(response);
     }
 
     /**
-     * 파트너 답변 제출
+     * 파트너 답변 제출 (NONE 신규 / TOMBSTONE 재작성)
      * POST /api/s/{token}/answer
-     * 인증 불필요 (공개 링크) — 로그인 상태면 실제 userId 사용, 아니면 익명 ID
+     * 인증 optional — 로그인 회원이면 OWNED, 게스트면 UNOWNED
      */
     @PostMapping("/s/{token}/answer")
     @Operation(summary = "파트너 답변 제출")
@@ -65,22 +67,66 @@ public class PostInviteController {
             @PathVariable String token,
             @Valid @RequestBody PostInviteDto.PartnerAnswerRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        String partnerUserId = (userDetails != null)
-                ? userDetails.getUsername()
-                : "partner_" + System.nanoTime();
+        String callerUserId = userDetails != null ? userDetails.getUsername() : null;
         postInviteService.submitPartnerAnswer(
-                token, partnerUserId, request.getBodyRaw(), request.getUserTitle(),
+                token, callerUserId, request.getBodyRaw(), request.getUserTitle(),
                 request.getCaptureSplitAfterLines());
         return ResponseEntity.ok().build();
     }
 
     /**
-     * 발행 모드 설정 (발행 시점 및 투표 기간)
+     * 미연결 상대 슬롯을 회원 계정으로 연결
+     * POST /api/s/{token}/claim
+     */
+    @PostMapping("/s/{token}/claim")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "상대 슬롯을 내 계정으로 연결")
+    public ResponseEntity<Void> claimPartner(
+            @PathVariable String token,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        postInviteService.claimPartner(token, userDetails.getUsername());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 상대 본문 수정
+     * PATCH /api/s/{token}/answer
+     * unowned: 토큰만 / owned: 소유 JWT
+     */
+    @PatchMapping("/s/{token}/answer")
+    @Operation(summary = "파트너 답변 수정")
+    public ResponseEntity<Void> editPartnerAnswer(
+            @PathVariable String token,
+            @Valid @RequestBody PostInviteDto.PartnerAnswerRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String callerUserId = userDetails != null ? userDetails.getUsername() : null;
+        postInviteService.editPartnerAnswer(
+                token, callerUserId, request.getBodyRaw(), request.getUserTitle(),
+                request.getCaptureSplitAfterLines());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 상대 본문 tombstone (양쪽 tombstone 시 포스트 soft-delete)
+     * DELETE /api/s/{token}/answer
+     */
+    @DeleteMapping("/s/{token}/answer")
+    @Operation(summary = "파트너 답변 삭제(tombstone)")
+    public ResponseEntity<Void> deletePartnerAnswer(
+            @PathVariable String token,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String callerUserId = userDetails != null ? userDetails.getUsername() : null;
+        postInviteService.deletePartnerAnswer(token, callerUserId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 발행 모드 설정 (즉시 PUBLIC). voteDurationHours는 legacy·무시.
      * PATCH /api/community/posts/{postId}/publish-mode
      */
     @PatchMapping("/community/posts/{postId}/publish-mode")
     @SecurityRequirement(name = "bearer-jwt")
-    @Operation(summary = "발행 모드 설정")
+    @Operation(summary = "발행 모드 설정", description = "voteDurationHours는 호환용으로 받지만 무시합니다(시한부 투표 제거).")
     public ResponseEntity<Void> setPublishMode(
             @PathVariable String postId,
             @Valid @RequestBody PostInviteDto.PublishModeRequest request,
@@ -91,7 +137,7 @@ public class PostInviteController {
     }
 
     /**
-     * 즉시 발행 (투표 시작)
+     * 즉시 발행 (visibility=PUBLIC). 공감 투표는 시한 없이 가능.
      * POST /api/community/posts/{postId}/publish-now
      */
     @PostMapping("/community/posts/{postId}/publish-now")

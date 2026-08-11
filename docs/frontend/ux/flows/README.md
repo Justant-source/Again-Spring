@@ -12,10 +12,11 @@
 
 | 파일 | 주제 | 상태 |
 |---|---|---|
-| [01-auth.md](./01-auth.md) | 가입·로그인·게스트·OAuth | ✅ 유지 |
+| [01-auth.md](./01-auth.md) | 가입·로그인·게스트·OAuth (`next=/s/{token}` 보존) | ✅ 유지 |
 | [02-permissions.md](./02-permissions.md) | 권한 시스템 (3-tier, TESTER role) | ✅ 유지 |
 | [08-crisis.md](./08-crisis.md) | 위기 감지·CrisisResourceModal | 🔄 전면 재작성 필요 |
 | [09-admin.md](./09-admin.md) | 관리자 대시보드 | 🔄 전면 재작성 필요 |
+| [09-partner-invite-ownership.md](./09-partner-invite-ownership.md) | 상대 초대 소유권·claim·삭제 tombstone·시한부 투표 제거 | ✅ SSOT (2026-08-11) |
 
 ### 삭제된 문서 (구 모델)
 
@@ -61,8 +62,9 @@ flowchart TD
 
     Root -->|"관리자"| Admin["/admin\n관리자 대시보드\nmarketing/"]
 
-    Feed -.->|"비공개 링크\n/s/[token]"| Invite["초대 토큰\n상대방 진입"]
-    Invite --> Detail
+    Feed -.->|"초대 링크\n/s/[token]"| Invite["초대 토큰\n상대 작성·claim·삭제"]
+    Invite -->|"auth next 보존"| Login
+    Invite -->|"paired / 소유 연결"| Detail
 ```
 
 ---
@@ -101,9 +103,14 @@ flowchart TD
 4. 상대방 초대 링크는 별도 흐름(`/s/[token]`)에서 가능
 
 ### 3. 게시글 상세 (`/community/[id]`)
-1. 투표 버튼 (작성자/상대방, 로그인 필요)
+1. 투표 버튼 (작성자/상대방, 로그인 필요) — **마감/시한부 없음**(상시 공감 투표)
 2. 댓글 무한스크롤 (로그인 필요)
 3. 위기 컨텐츠: CrisisResourceModal 표시
+4. 쪽별 tombstone / 완전 삭제 시 「삭제된 게시글」+ 광장 CTA — [09-partner-invite-ownership.md](./09-partner-invite-ownership.md)
+
+### 3b. 상대 초대 (`/s/[token]`)
+1. 미로그인 → 로그인/가입 후 **`next=/s/{token}` 복귀**
+2. 답변 작성 · claim · 수정/삭제(tombstone) — SSOT 동일 문서
 
 ### 4. 알림 (`/notifications`)
 - 댓글, 좋아요, 투표 알림
@@ -132,6 +139,12 @@ flowchart TD
 ### [09-admin.md](./09-admin.md) — 전면 재작성 필요
 - `(admin)/admin/reports/` — 신고 처리
 - `(admin)/admin/marketing/**` — 마케팅 대시보드
+
+### [09-partner-invite-ownership.md](./09-partner-invite-ownership.md) — SSOT
+- `/s/{token}` → 가입/로그인 후 **같은 URL 복귀** (`next=/s/{token}`)
+- unowned 상대 본문: 토큰 capability로 수정·삭제·재작성; 「내 계정으로 연결」claim
+- 한쪽 tombstone / 양쪽·미작성 시 완전 삭제
+- **시한부 투표 제거** (`voteCloseAt` legacy) — 공감 투표(VoteBar)는 유지
 
 ---
 

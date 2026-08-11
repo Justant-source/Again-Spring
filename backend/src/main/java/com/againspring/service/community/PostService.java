@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,6 +34,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final PostSearchNgramIndexer postSearchNgramIndexer;
+    private final CommentService commentService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -106,10 +108,13 @@ public class PostService {
     /**
      * 작성자/상대방 본문 변경은 계획형 AI-user 입장에서 새 revision이다.
      * 이미 게시된 댓글은 삭제하지 않고, downstream이 이전 revision의 미게시 항목만 취소한다.
+     * tombstone 후 재작성 시 해당 사이드 tombstone을 해제한다.
      */
     public Post updateAuthorBody(Post post, String newBody) {
+        assertNotFullyDeleted(post);
         post.setBodyRaw(newBody);
         post.setBodyPublished(newBody);
+        post.setAuthorBodyDeletedAt(null);
         post.advanceContentRevision();
         Post saved = postRepository.save(post);
         postSearchNgramIndexer.reindex(saved);
@@ -118,8 +123,10 @@ public class PostService {
     }
 
     public Post updatePartnerBody(Post post, String newBody) {
+        assertNotFullyDeleted(post);
         post.setPartnerBodyRaw(newBody);
         post.setPartnerBodyPublished(newBody);
+        post.setPartnerBodyDeletedAt(null);
         post.advanceContentRevision();
         Post saved = postRepository.save(post);
         // partner 본문은 검색 코퍼스 제외 (슬라이스 합의) — ngram 재색인 불필요
@@ -290,9 +297,8 @@ public class PostService {
     }
 
     /**
-     * 포스트 상세 조회
-     * - 공개(PUBLIC): 누구나 조회 가능
-     * - 비공개(PRIVATE): 작성자만 조회 가능
+     * 포스트 상세 조회.
+     * soft-deleted({@code deletedAt != null})는 404가 아니라 엔티티를 반환해 FE가 {@code deleted:true}를 그릴 수 있게 한다.
      *
      * @param postId 포스트 ID
      * @param requestUserId 요청 사용자 ID (nullable)
@@ -302,6 +308,10 @@ public class PostService {
     public Post getPost(String postId, String requestUserId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
+
+        if (post.getDeletedAt() != null) {
+            return post;
+        }
 
         // 비공개 포스트는 작성자만 조회 가능
         if (post.getVisibility() == PostVisibility.PRIVATE) {
@@ -321,13 +331,15 @@ public class PostService {
     }
 
     /**
-     * 포스트 삭제 (작성자만)
+     * 작성자 삭제.
+     * <ul>
+     *   <li>상대 ACTIVE → 작성자 본문만 tombstone (제목·상대 유지)</li>
+     *   <li>상대 NONE / TOMBSTONE → soft full-delete + 댓글 hard delete</li>
+     * </ul>
      *
-     * @param postId 포스트 ID
-     * @param userId 요청 사용자 ID
-     * @throws BusinessException POST_NOT_FOUND 또는 ACCESS_DENIED
+     * @return 갱신된 Post (tombstone 또는 deletedAt 설정)
      */
-    public void deletePost(String postId, String userId) {
+    public Post deletePost(String postId, String userId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
 
@@ -335,9 +347,109 @@ public class PostService {
             throw new BusinessException("ACCESS_DENIED", "Only author can delete post", 403);
         }
 
-        aiUserOutboxWriter.postLifecycleChanged(post, "POST_DELETED", "AUTHOR_DELETED");
-        postRepository.deleteById(postId);
-        log.info("Post deleted: {} by user {}", postId, userId);
+        if (post.getDeletedAt() != null) {
+            return post;
+        }
+
+        if (isPartnerActive(post)) {
+            return tombstoneAuthorBody(post);
+        }
+
+        return fullDeletePost(post, "AUTHOR_DELETED");
+    }
+
+    /**
+     * 작성자 본문 tombstone. 상대도 이미 tombstone이면 full delete.
+     */
+    public Post tombstoneAuthorBody(Post post) {
+        assertNotFullyDeleted(post);
+        Instant now = Instant.now();
+        post.setBodyRaw(null);
+        post.setBodyPublished(null);
+        post.setAuthorBodyDeletedAt(now);
+        post.advanceContentRevision();
+        Post saved = postRepository.save(post);
+        postSearchNgramIndexer.reindex(saved);
+        aiUserOutboxWriter.postRevised(saved, "AUTHOR_BODY_TOMBSTONED");
+
+        if (isPartnerTombstone(saved)) {
+            return fullDeletePost(saved, "BOTH_SIDES_TOMBSTONED");
+        }
+        log.info("Author body tombstoned on post {}", saved.getId());
+        return saved;
+    }
+
+    /**
+     * 상대 본문 tombstone (초대 토큰 DELETE 경로에서 호출). 작성자도 tombstone이면 full delete.
+     */
+    public Post tombstonePartnerBody(Post post) {
+        assertNotFullyDeleted(post);
+        Instant now = Instant.now();
+        post.setPartnerBodyRaw(null);
+        post.setPartnerBodyPublished(null);
+        post.setPartnerCaptureSplitAfterLines(null);
+        post.setPartnerBodyDeletedAt(now);
+        post.advanceContentRevision();
+        Post saved = postRepository.save(post);
+        aiUserOutboxWriter.postRevised(saved, "PARTNER_BODY_TOMBSTONED");
+
+        if (isAuthorTombstone(saved)) {
+            return fullDeletePost(saved, "BOTH_SIDES_TOMBSTONED");
+        }
+        log.info("Partner body tombstoned on post {}", saved.getId());
+        return saved;
+    }
+
+    /** 양쪽 tombstone이면 soft full-delete. 아니면 그대로 반환. */
+    public Post fullDeleteIfBothTombstoned(Post post) {
+        if (post.getDeletedAt() != null) {
+            return post;
+        }
+        if (isAuthorTombstone(post) && isPartnerTombstone(post)) {
+            return fullDeletePost(post, "BOTH_SIDES_TOMBSTONED");
+        }
+        return post;
+    }
+
+    /**
+     * Soft full-delete: {@code deletedAt} 설정 + 댓글 hard delete. 행은 유지(GET deleted 플래그용).
+     */
+    public Post fullDeletePost(Post post, String reason) {
+        if (post.getDeletedAt() != null) {
+            return post;
+        }
+        post.setDeletedAt(Instant.now());
+        Post saved = postRepository.save(post);
+        commentService.hardDeleteAllForPost(saved.getId());
+        aiUserOutboxWriter.postLifecycleChanged(saved, "POST_DELETED", reason);
+        log.info("Post soft-deleted (full): {} reason={}", saved.getId(), reason);
+        return saved;
+    }
+
+    public static boolean isAuthorTombstone(Post post) {
+        return post.getAuthorBodyDeletedAt() != null;
+    }
+
+    public static boolean isPartnerTombstone(Post post) {
+        return post.getPartnerBodyDeletedAt() != null;
+    }
+
+    /** 상대 ACTIVE = 본문 있고 tombstone 아님 */
+    public static boolean isPartnerActive(Post post) {
+        if (isPartnerTombstone(post)) {
+            return false;
+        }
+        return hasText(post.getPartnerBodyPublished()) || hasText(post.getPartnerBodyRaw());
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static void assertNotFullyDeleted(Post post) {
+        if (post.getDeletedAt() != null) {
+            throw new BusinessException("POST_DELETED", "Post is deleted: " + post.getId(), 410);
+        }
     }
 
     /**

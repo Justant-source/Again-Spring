@@ -15,11 +15,27 @@ function redirectUriFor(provider: Provider): string {
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
 
+/** open redirect 방지 — 내부 경로(/로 시작, // 또는 /\는 거부)만 허용 */
+export function safeRedirect(raw: string | null | undefined, fallback = '/'): string {
+  if (!raw) return fallback;
+  if (!raw.startsWith('/')) return fallback;
+  if (raw.startsWith('//') || raw.startsWith('/\\')) return fallback;
+  return raw;
+}
+
+/** login/signup 링크에 next를 안전하게 붙인다. fallback(`/`)이면 query 생략 */
+export function authHref(base: '/login' | '/signup', next?: string | null): string {
+  const safe = safeRedirect(next ?? null);
+  if (safe === '/') return base;
+  return `${base}?next=${encodeURIComponent(safe)}`;
+}
+
 // next 경로를 OAuth state 파라미터로 왕복시키기 위한 URL-safe encoding
 export function encodeState(next: string | null | undefined): string {
-  if (!next || !next.startsWith('/')) return '';
+  const safe = safeRedirect(next, '');
+  if (!safe) return '';
   try {
-    return btoa(unescape(encodeURIComponent(next)))
+    return btoa(unescape(encodeURIComponent(safe)))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   } catch {
     return '';
@@ -31,8 +47,8 @@ export function decodeState(state: string | null | undefined): string | null {
   try {
     const padded = state.replace(/-/g, '+').replace(/_/g, '/');
     const decoded = decodeURIComponent(escape(atob(padded)));
-    if (!decoded.startsWith('/') || decoded.startsWith('//') || decoded.startsWith('/\\')) return null;
-    return decoded;
+    const safe = safeRedirect(decoded, '');
+    return safe || null;
   } catch {
     return null;
   }

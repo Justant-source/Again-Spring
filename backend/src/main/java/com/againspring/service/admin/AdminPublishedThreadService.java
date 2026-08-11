@@ -75,7 +75,9 @@ public class AdminPublishedThreadService {
             post.setCategory(PostCategory.valueOf(req.getCategory()));
         }
         if (req.getStatus() != null && !req.getStatus().isBlank()) {
-            post.setStatus(PostStatus.valueOf(req.getStatus()));
+            // CLOSED는 시한부 투표 레거시 — 저장 시 VOTING으로 정규화
+            PostStatus status = PostStatus.valueOf(req.getStatus());
+            post.setStatus(status == PostStatus.CLOSED ? PostStatus.VOTING : status);
         }
         if (req.getViewCount() != null) {
             post.setViewCount(req.getViewCount());

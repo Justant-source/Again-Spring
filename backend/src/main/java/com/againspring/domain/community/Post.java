@@ -114,11 +114,20 @@ public class Post {
 
     private Instant partnerAnsweredAt;
 
+    /** 작성자 본문 tombstone 시각 (한쪽 삭제). null = 작성자 본문 유효 또는 미작성. */
+    @Column(name = "author_body_deleted_at")
+    private Instant authorBodyDeletedAt;
+
+    /** 상대 본문 tombstone 시각. null = 상대 본문 유효 또는 미작성(NONE). */
+    @Column(name = "partner_body_deleted_at")
+    private Instant partnerBodyDeletedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
     private PublishMode publishMode = PublishMode.PUBLISH_NOW;
 
+    /** Legacy unused — 시한부 투표 제거. 신규 쓰기 없음. 컬럼 nullable 방치. */
     private Integer voteDurationHours;
 
     @Enumerated(EnumType.STRING)
@@ -139,6 +148,7 @@ public class Post {
     @Builder.Default
     private Integer viewCount = 0;
 
+    /** Legacy unused — 시한부 투표 제거. 신규 쓰기 없음. 컬럼 nullable 방치. */
     @Column(name = "vote_close_at")
     private Instant voteCloseAt;
 

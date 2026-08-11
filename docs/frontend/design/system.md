@@ -281,7 +281,7 @@ colors: {
 | 5 | `C3_ResultSolo` | 작성자 | P |
 | 6a | `C3_Invite` | 상대 초대 | L |
 | 6b | `C3_PublishChoice` | 상대 초대 | L |
-| 6c | `C3_Closing` (투표 기간) | 상대 초대 | L |
+| 6c | `C3_Closing` (**legacy — 투표 기간 UI 제거**) | 상대 초대 | — |
 | 6d | `C3_Waiting` | 상대 초대 | L |
 | 6e | `C3_PartnerArrived` | 상대 초대 | P |
 | 6f | `C3_PartnerWrite` | 상대 초대 | L |

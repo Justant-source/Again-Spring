@@ -5,13 +5,17 @@
  * - InviteSheet 열림 + 초대 URL /s/tok_
  * - 복사 클릭 → 시트 닫힘 + 대기 상태
  * - Full flow: 초대 → 상대 답변 → paired 확인
+ * - 게스트/회원 UI로 상대 답변 제출
  * - 관람자 — paired 사연 양쪽 투표 버튼
  * - 상대방 답변 화면 (/s/[token]): 유효하지 않은 토큰 오류, 중복 제출 오류
  * - publish-mode: WAIT_FOR_PARTNER여도 작성자 글 즉시 PUBLIC (private-until-partner 폐기)
+ *   — voteCloseAt / 시한부 투표 창 단언 없음 (ownership UX: 공감 투표 상시)
+ *
+ * claim·tombstone·완전 삭제는 `06b-partner-invite-claim-delete.spec.ts`
  */
 import { test, expect } from '../support/no-llm-fixture'
 import { authStatePath } from '../fixtures/auth-state'
-import { PERSONA_TEST1 } from '../fixtures/personas'
+import { PERSONA_TEST1, PERSONA_TESTER_A } from '../fixtures/personas'
 import {
   tokenFromStorageState,
   createPost,
@@ -190,9 +194,51 @@ test.describe('Journey 06-E: 상대방 답변 화면', () => {
     }
     // 이미 답변된 상태면 textarea가 없을 수 있음 — 둘 다 정상
   })
+
+  test('게스트 — UI로 상대 답변 제출 → paired', async ({ page, request }) => {
+    const authorToken = tokenFromStorageState(PERSONA_TEST1.email)
+    const postId = await createPost(request, { token: authorToken, title: 'E2E 게스트 답변 UI' })
+    const inviteToken = await createInviteToken(request, authorToken, postId)
+
+    // 비로그인(또는 페이지 guest-init) — /s 답변은 무인증 허용
+    await page.goto(`${BASE}/s/${inviteToken}`)
+    await page.waitForURL(new RegExp(`/s/${inviteToken}`), { timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: '상대방으로 답하기' })).toBeVisible({ timeout: 8_000 })
+
+    await page.locator('textarea').fill('게스트가 UI로 남긴 상대 답변입니다. 충분한 길이.')
+    await page.getByRole('button', { name: '덧붙이기' }).click()
+
+    await page.waitForURL(new RegExp(`/community/${postId}`), { timeout: 15_000 })
+    const paired = await waitForPaired(request, postId)
+    expect(paired).toBe(true)
+    await expect(page.locator(STORY_BODY('r'))).toContainText('게스트가 UI로 남긴', { timeout: 8_000 })
+  })
 })
 
-// ── F. publish-mode (API — UI 피커 없음; WAIT_FOR_PARTNER ≡ PUBLISH_NOW) ─
+// ── E2. 회원 상대 답변 ───────────────────────────────────────────
+test.describe('Journey 06-E2: 회원 상대 답변', () => {
+  test.use({ storageState: authStatePath(PERSONA_TESTER_A.email) })
+
+  test('회원 — UI로 상대 답변 제출 → paired', async ({ page, request }) => {
+    const authorToken = tokenFromStorageState(PERSONA_TEST1.email)
+    const postId = await createPost(request, { token: authorToken, title: 'E2E 회원 답변 UI' })
+    const inviteToken = await createInviteToken(request, authorToken, postId)
+
+    await page.goto(`${BASE}/s/${inviteToken}`)
+    await page.waitForURL(new RegExp(`/s/${inviteToken}`), { timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: '상대방으로 답하기' })).toBeVisible({ timeout: 8_000 })
+
+    await page.locator('textarea').fill('회원이 UI로 남긴 상대 답변입니다. 충분한 길이.')
+    await page.getByRole('button', { name: '덧붙이기' }).click()
+
+    await page.waitForURL(new RegExp(`/community/${postId}`), { timeout: 15_000 })
+    const paired = await waitForPaired(request, postId)
+    expect(paired).toBe(true)
+    await expect(page.locator(STORY_BODY('r'))).toContainText('회원이 UI로 남긴', { timeout: 8_000 })
+  })
+})
+
+// ── F. publish-mode (API — UI 피커 없음; WAIT ≡ 즉시 PUBLIC; 시한부 투표 단언 없음) ─
 test.describe('Journey 06-F: publish-mode · author public-first', () => {
 
   test('WAIT_FOR_PARTNER여도 작성자 글은 즉시 PUBLIC — 파트너 답변은 paired만', async ({ request }) => {
@@ -210,6 +256,7 @@ test.describe('Journey 06-F: publish-mode · author public-first', () => {
     expect(modeInDb).toMatch(/WAIT_FOR_PARTNER/i)
 
     // private-until-partner 폐기: 모드만 WAIT여도 visibility는 즉시 PUBLIC
+    // voteCloseAt / CLOSED / duration 창 단언 없음 (시한부 투표 제거)
     const beforePartner = await request.get(`${BASE}/api/community/posts/${postId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })

@@ -73,6 +73,23 @@ public class PostDetailResponse {
 
     private Boolean isPartner;
 
+    /** 포스트 soft full-delete 여부 ({@code deletedAt != null}) */
+    private Boolean deleted;
+
+    /** 작성자 본문 tombstone */
+    private Boolean authorBodyDeleted;
+
+    /** 상대 본문 tombstone */
+    private Boolean partnerBodyDeleted;
+
+    /** Soft-deleted 포스트용 최소 응답 */
+    public static PostDetailResponse deleted(String id) {
+        return PostDetailResponse.builder()
+                .id(id)
+                .deleted(true)
+                .build();
+    }
+
     /**
      * Post + VoteOption + 투표 결과로부터 PostDetailResponse 생성 (가중치 적용)
      * @param voteResultWithBreakdown 옵션별 사람/AI 카운트
@@ -85,6 +102,15 @@ public class PostDetailResponse {
                                          long commentCount, String requestUserId,
                                          String authorNickname, String partnerNickname,
                                          boolean isPartner) {
+        if (post.getDeletedAt() != null) {
+            return deleted(post.getId());
+        }
+
+        boolean authorBodyDeleted = post.getAuthorBodyDeletedAt() != null;
+        boolean partnerBodyDeleted = post.getPartnerBodyDeletedAt() != null;
+        String bodyPublished = authorBodyDeleted ? null : post.getBodyPublished();
+        String partnerBodyPublished = partnerBodyDeleted ? null : post.getPartnerBodyPublished();
+
         List<VoteOptionDto> voteDtos = options.stream()
                 .map(opt -> VoteOptionDto.builder()
                         .id(opt.getId())
@@ -122,7 +148,7 @@ public class PostDetailResponse {
                 .promoTitle(post.getPromoTitle())
                 .metaphorId(post.getMetaphorId())
                 .metaphorIds(post.getMetaphorIds())
-                .bodyPublished(post.getBodyPublished())
+                .bodyPublished(bodyPublished)
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())
                 .status(post.getStatus().name())
@@ -133,14 +159,17 @@ public class PostDetailResponse {
                 .createdAt(post.getCreatedAt())
                 .commentCount(commentCount)
                 .viewCount(post.getViewCount() != null ? post.getViewCount().longValue() : 0L)
-                .paired(post.getPartnerAnsweredAt() != null && post.getPartnerBodyPublished() != null)
-                .partnerBodyPublished(post.getPartnerBodyPublished())
+                .paired(!partnerBodyDeleted && post.getPartnerAnsweredAt() != null && partnerBodyPublished != null)
+                .partnerBodyPublished(partnerBodyPublished)
                 .partnerAnsweredAt(post.getPartnerAnsweredAt())
                 .inviteToken(post.getInviteToken())
                 .isAuthor(requestUserId != null && requestUserId.equals(post.getAuthorId()))
                 .authorNickname(authorNickname)
                 .partnerNickname(partnerNickname)
                 .isPartner(isPartner)
+                .deleted(false)
+                .authorBodyDeleted(authorBodyDeleted)
+                .partnerBodyDeleted(partnerBodyDeleted)
                 .build();
     }
 }

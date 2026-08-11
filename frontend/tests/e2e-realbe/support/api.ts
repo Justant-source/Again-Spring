@@ -210,6 +210,38 @@ async function postStillExists(
 
 // ── 초대 ──────────────────────────────────────────────────────────
 
+/** GET /api/s/{token} ownership · can* 플래그 (docs/frontend/ux/flows/09-partner-invite-ownership.md) */
+export type InviteOwnership = 'UNOWNED' | 'OWNED' | 'OWNED_BY_OTHER' | 'AUTHOR'
+export type PartnerState = 'NONE' | 'ACTIVE' | 'TOMBSTONE'
+
+export interface InvitePreviewFlags {
+  postId: string
+  userTitle?: string
+  authorBodyPublished?: string | null
+  category?: string
+  deleted?: boolean
+  partnerState?: PartnerState
+  ownership?: InviteOwnership
+  partnerBodyPublished?: string | null
+  canWrite?: boolean
+  canEdit?: boolean
+  canDelete?: boolean
+  canClaim?: boolean
+}
+
+/** GET /api/community/posts/{id} tombstone · deleted 플래그 */
+export interface PostDetailFlags {
+  id?: string
+  deleted?: boolean
+  authorBodyDeleted?: boolean
+  partnerBodyDeleted?: boolean
+  paired?: boolean
+  partnerBodyPublished?: string | null
+  bodyPublished?: string | null
+  visibility?: string
+  [key: string]: unknown
+}
+
 export async function createInviteToken(
   request: APIRequestContext,
   token: string,
@@ -223,18 +255,103 @@ export async function createInviteToken(
 }
 
 /**
+ * GET /api/s/{token} — 초대 프리뷰 + ownership 플래그.
+ * authToken이 있으면 Authorization 포함 (ownership/can* 계산).
+ */
+export async function getInviteByToken(
+  request: APIRequestContext,
+  inviteToken: string,
+  authToken?: string,
+): Promise<InvitePreviewFlags> {
+  const resp = await request.get(`${e2eBase()}/api/s/${inviteToken}`, {
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+  })
+  if (!resp.ok()) {
+    throw new Error(`초대 프리뷰 조회 실패: ${resp.status()} — ${await resp.text()}`)
+  }
+  return (await resp.json()) as InvitePreviewFlags
+}
+
+/**
  * 상대방 답변 제출.
+ * opts.token이 있으면 회원/게스트 JWT로 제출 (OWNED vs UNOWNED 분기).
  */
 export async function submitPartnerAnswer(
   request: APIRequestContext,
   inviteToken: string,
   body = '상대방 답변입니다. e2e 테스트에 의해 자동 생성됩니다.',
   title = '상대방 입장 제목',
+  opts?: { token?: string },
 ): Promise<void> {
   const resp = await request.post(`${e2eBase()}/api/s/${inviteToken}/answer`, {
+    headers: opts?.token ? { Authorization: `Bearer ${opts.token}` } : undefined,
     data: { bodyRaw: body, userTitle: title },
   })
   if (!resp.ok()) throw new Error(`상대 답변 제출 실패: ${resp.status()} — ${await resp.text()}`)
+}
+
+/**
+ * POST /api/s/{token}/claim — unowned 상대 글을 회원 계정에 연결 (JWT 필수).
+ */
+export async function claimInvite(
+  request: APIRequestContext,
+  inviteToken: string,
+  authToken: string,
+): Promise<void> {
+  const resp = await request.post(`${e2eBase()}/api/s/${inviteToken}/claim`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  })
+  if (!resp.ok()) throw new Error(`초대 claim 실패: ${resp.status()} — ${await resp.text()}`)
+}
+
+/**
+ * PATCH /api/s/{token}/answer — 상대 본문 수정 (unowned=토큰, owned=소유 JWT).
+ */
+export async function patchPartnerAnswer(
+  request: APIRequestContext,
+  inviteToken: string,
+  body: string,
+  opts?: { token?: string; title?: string },
+): Promise<void> {
+  const resp = await request.patch(`${e2eBase()}/api/s/${inviteToken}/answer`, {
+    headers: opts?.token ? { Authorization: `Bearer ${opts.token}` } : undefined,
+    data: { bodyRaw: body, ...(opts?.title != null ? { userTitle: opts.title } : {}) },
+  })
+  if (!resp.ok()) throw new Error(`상대 답변 수정 실패: ${resp.status()} — ${await resp.text()}`)
+}
+
+/**
+ * DELETE /api/s/{token}/answer — 상대 본문 tombstone (양쪽 tombstone이면 완전 삭제).
+ */
+export async function deletePartnerAnswer(
+  request: APIRequestContext,
+  inviteToken: string,
+  opts?: { token?: string },
+): Promise<void> {
+  const resp = await request.delete(`${e2eBase()}/api/s/${inviteToken}/answer`, {
+    headers: opts?.token ? { Authorization: `Bearer ${opts.token}` } : undefined,
+  })
+  if (!resp.ok() && resp.status() !== 204) {
+    throw new Error(`상대 답변 삭제 실패: ${resp.status()} — ${await resp.text()}`)
+  }
+}
+
+/** GET /api/community/posts/{id} — deleted/tombstone 플래그 확인용 */
+export async function getPostDetail(
+  request: APIRequestContext,
+  postId: string,
+  authToken?: string,
+): Promise<{ status: number; data: PostDetailFlags | null }> {
+  const resp = await request.get(`${e2eBase()}/api/community/posts/${postId}`, {
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+  })
+  if (resp.status() === 404 || resp.status() === 410) {
+    return { status: resp.status(), data: null }
+  }
+  if (!resp.ok()) {
+    throw new Error(`포스트 조회 실패: ${resp.status()} — ${await resp.text()}`)
+  }
+  return { status: resp.status(), data: (await resp.json()) as PostDetailFlags }
 }
 
 /** 포스트가 paired 상태인지 최대 maxRetries×500ms 간격으로 폴링 */
@@ -254,7 +371,11 @@ export async function waitForPaired(
   return false
 }
 
-/** PATCH publish-mode (WAIT_FOR_PARTNER | PUBLISH_NOW). WAIT ≡ PUBLISH_NOW(즉시 PUBLIC). LLM 미호출. */
+/**
+ * PATCH publish-mode (WAIT_FOR_PARTNER | PUBLISH_NOW).
+ * WAIT ≡ PUBLISH_NOW(즉시 PUBLIC). voteDurationHours는 API 호환용(시한부 투표 폐기).
+ * LLM 미호출.
+ */
 export async function setPublishMode(
   request: APIRequestContext,
   token: string,
@@ -269,7 +390,7 @@ export async function setPublishMode(
   if (!resp.ok()) throw new Error(`publish-mode 실패: ${resp.status()} — ${await resp.text()}`)
 }
 
-/** POST publish-now — visibility=PUBLIC + voteCloseAt. 이미 PUBLIC이면 보정용(파트너 대기 해제 아님). LLM 미호출. */
+/** POST publish-now — visibility=PUBLIC 보정(파트너 대기 해제 아님). LLM 미호출. */
 export async function publishNow(
   request: APIRequestContext,
   token: string,

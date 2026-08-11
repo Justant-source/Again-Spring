@@ -25,6 +25,9 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
      */
     void deleteByPostIdAndUserId(String postId, String userId);
 
+    /** 포스트 full delete 시 글 단위 좋아요 hard delete */
+    void deleteByPostId(String postId);
+
     /**
      * 댓글 좋아요 삭제
      */

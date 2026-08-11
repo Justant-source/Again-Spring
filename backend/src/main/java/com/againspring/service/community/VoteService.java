@@ -4,6 +4,8 @@ import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.Vote;
 import com.againspring.domain.community.VoteOption;
+import com.againspring.domain.enums.PostStatus;
+import com.againspring.domain.enums.PostVisibility;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.community.VoteRepository;
@@ -11,13 +13,11 @@ import com.againspring.service.notification.event.NewVoteEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * VoteService - 투표 관리 서비스
@@ -48,6 +48,8 @@ public class VoteService {
         // 포스트 존재 확인
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
+
+        assertEmpathyVoteAllowed(post);
 
         // 선택지 존재 확인
         VoteOption option = voteOptionRepository.findById(optionId)
@@ -195,13 +197,31 @@ public class VoteService {
      */
     @Transactional
     public Map<Long, Long> cancelVoteAndGetResult(String postId, String userId) {
-        postRepository.findById(postId)
+        Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
+        assertEmpathyVoteAllowed(post);
         if (!voteRepository.existsByPostIdAndVoterUserId(postId, userId)) {
             throw new BusinessException("NO_VOTE_TO_CANCEL", "취소할 투표가 없습니다", 404);
         }
         voteRepository.deleteByPostIdAndVoterUserId(postId, userId);
         log.info("Vote cancelled for post {} by user {}", postId, userId);
         return getVoteResult(postId);
+    }
+
+    /**
+     * 공감 투표 가능 조건: PUBLIC + 미삭제. CLOSED는 시한부 투표 레거시로 VOTING과 동일 취급.
+     */
+    private void assertEmpathyVoteAllowed(Post post) {
+        if (post.getDeletedAt() != null) {
+            throw new BusinessException("POST_DELETED", "삭제된 게시글에는 투표할 수 없어요.", 410);
+        }
+        if (post.getVisibility() != PostVisibility.PUBLIC) {
+            throw new BusinessException("POST_NOT_PUBLIC", "공개된 게시글에만 투표할 수 있어요.", 403);
+        }
+        PostStatus status = post.getStatus();
+        if (status == PostStatus.BLOCKED || status == PostStatus.DRAFT) {
+            throw new BusinessException("VOTE_NOT_ALLOWED", "이 게시글에는 투표할 수 없어요.", 403);
+        }
+        // VOTING · CLOSED(레거시) 모두 허용 — voteCloseAt 무시
     }
 }

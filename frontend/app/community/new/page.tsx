@@ -8,6 +8,7 @@ import { UserChip } from '@/components/community/c3';
 import { useUserStore } from '@/lib/store/userStore';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { AUTHOR, AUTHOR_BG } from '@/lib/constants/factionColors';
+import { authHref } from '@/lib/auth/oauth';
 
 // C3 대분류 카테고리 — id는 BE PostCategory enum 이름과 1:1 매핑
 const C3_CATEGORIES = [
@@ -298,7 +299,7 @@ export default function CommunityNewPage() {
         <GuestNoticeModal
           isOpen={showGuestNotice}
           onClose={() => setShowGuestNotice(false)}
-          onSignup={() => router.push('/signup')}
+          onSignup={() => router.push(authHref('/signup', '/community/new'))}
           onContinueAsGuest={() => {
             setShowGuestNotice(false);
             createAndNavigate();

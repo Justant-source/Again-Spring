@@ -233,7 +233,9 @@ public class AdminContentController {
             contentChanged = true;
         }
         if (req.getStatus() != null) {
-            post.setStatus(PostStatus.valueOf(req.getStatus()));
+            // CLOSED는 시한부 투표 레거시 — 저장 시 VOTING으로 정규화
+            PostStatus status = PostStatus.valueOf(req.getStatus());
+            post.setStatus(status == PostStatus.CLOSED ? PostStatus.VOTING : status);
         }
         if (req.getCategory() != null) {
             post.setCategory(com.againspring.domain.enums.PostCategory.valueOf(req.getCategory()));

@@ -1,18 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useUiStore } from '@/lib/store/uiStore';
+import { authHref, safeRedirect } from '@/lib/auth/oauth';
 
 const COUNTDOWN_SEC = 10;
 
 export function GuestUpgradeModal() {
   const router = useRouter();
+  const pathname = usePathname();
   const { guestLimitModal, hideGuestLimitModal } = useUiStore();
   const [countdown, setCountdown] = useState(COUNTDOWN_SEC);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const open = guestLimitModal !== null;
+  const nextPath = safeRedirect(pathname);
 
   useEffect(() => {
     if (!open) {
@@ -39,7 +42,7 @@ export function GuestUpgradeModal() {
 
   const handleSignup = () => {
     hideGuestLimitModal();
-    router.push('/signup');
+    router.push(authHref('/signup', nextPath));
   };
 
   const handleBack = () => {

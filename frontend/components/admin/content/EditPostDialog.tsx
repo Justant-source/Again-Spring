@@ -29,12 +29,14 @@ interface Props {
   onUpdated: (updated: AdminPost) => void;
 }
 
+// CLOSED(시한부 투표 종료)는 레거시 — 신규 선택 금지. 기존 CLOSED 글만 표시용으로 노출.
 const POST_STATUS_OPTIONS = [
   { value: 'DRAFT', label: '초안' },
-  { value: 'VOTING', label: '투표 진행' },
-  { value: 'CLOSED', label: '투표 종료' },
+  { value: 'VOTING', label: '공개' },
   { value: 'BLOCKED', label: '차단됨' },
 ];
+
+const CLOSED_LEGACY_OPTION = { value: 'CLOSED', label: '종료(레거시)' };
 
 const CATEGORY_OPTIONS = [
   { value: 'COUPLE', label: '연인' },
@@ -137,7 +139,10 @@ export function EditPostDialog({ post, onClose, onUpdated }: Props) {
                 <SelectValue placeholder="상태 선택" />
               </SelectTrigger>
               <SelectContent>
-                {POST_STATUS_OPTIONS.map((opt) => (
+                {(status === 'CLOSED'
+                  ? [...POST_STATUS_OPTIONS, CLOSED_LEGACY_OPTION]
+                  : POST_STATUS_OPTIONS
+                ).map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
                   </SelectItem>

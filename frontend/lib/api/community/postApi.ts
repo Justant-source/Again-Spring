@@ -40,6 +40,14 @@ export interface PostDetail {
   authorNickname?: string;
   partnerNickname?: string;
   isPartner?: boolean;
+  /** 포스트 soft-delete (완전 삭제) — FE는 삭제된 게시글 화면 */
+  deleted?: boolean;
+  /** 작성자 본문 tombstone */
+  authorBodyDeleted?: boolean;
+  /** 상대 본문 tombstone */
+  partnerBodyDeleted?: boolean;
+  /** NONE=미답변 · ACTIVE=답변 있음 · TOMBSTONE=상대 본문 삭제 */
+  partnerState?: 'NONE' | 'ACTIVE' | 'TOMBSTONE';
 }
 
 export interface PostSummary {

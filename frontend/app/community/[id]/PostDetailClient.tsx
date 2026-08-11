@@ -7,7 +7,7 @@ import { postApi, PostDetail, VoteResult } from '@/lib/api/community/postApi';
 import { commentApi, Comment } from '@/lib/api/community/commentApi';
 import { getOrCreateDeviceId } from '@/lib/utils/deviceId';
 import { VoteBar, SideStory, CommunityComment } from '@/components/community/c3';
-import { AUTHOR, PARTNER, AUTHOR_BG, PARTNER_BG } from '@/lib/constants/factionColors';
+import { AUTHOR, PARTNER } from '@/lib/constants/factionColors';
 import { timeAgo } from '@/lib/utils/timeAgo';
 import { useGuestInit } from '@/lib/hooks/useGuestInit';
 import { useVoteStore } from '@/lib/store/voteStore';
@@ -42,6 +42,120 @@ const ACTION_COL: React.CSSProperties = {
   gap: 7,
   fontSize: 14,
 };
+
+/** 한쪽 본문 삭제(tombstone) 박스 — 소유자에게 다시 작성 진입 */
+function TombstoneBox({
+  side,
+  message,
+  canRewrite,
+  onRewrite,
+  rewriteTestId,
+}: {
+  side: 'g' | 'r';
+  message: string;
+  canRewrite?: boolean;
+  onRewrite?: () => void;
+  rewriteTestId?: string;
+}) {
+  const c = side === 'g' ? AUTHOR : PARTNER;
+  return (
+    <div
+      data-testid={side === 'g' ? 'author-tombstone' : 'partner-tombstone'}
+      style={{
+        border: `1.5px dashed ${c}`,
+        borderRadius: 12,
+        padding: '13px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 96,
+        background: side === 'g' ? 'rgba(201,120,90,0.04)' : 'rgba(95,143,118,0.04)',
+      }}
+    >
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, marginBottom: 8 }} />
+      <span style={{ fontSize: 12, color: 'var(--L-sub)', fontWeight: 500, textAlign: 'center' }}>
+        {message}
+      </span>
+      {canRewrite && onRewrite && (
+        <button
+          type="button"
+          data-testid={rewriteTestId}
+          onClick={onRewrite}
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            color: 'var(--L-point)',
+            fontWeight: 500,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          다시 작성
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** 완전 삭제된 게시글 — 「삭제된 게시글」+ 광장 */
+function DeletedPostView() {
+  return (
+    <div
+      data-testid="deleted-post-page"
+      style={{
+        background: 'var(--L-bg)',
+        minHeight: '100vh',
+        padding: '40px 24px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 20,
+      }}
+    >
+      <p
+        data-testid="deleted-post-message"
+        style={{
+          margin: 0,
+          fontSize: 16,
+          color: 'var(--L-sub)',
+          fontFamily: 'var(--font-serif)',
+          textAlign: 'center',
+        }}
+      >
+        삭제된 게시글
+      </p>
+      <Link
+        href="/community"
+        data-testid="deleted-post-plaza-btn"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '12px 28px',
+          borderRadius: 8,
+          background: 'var(--L-ink)',
+          color: 'var(--L-bg)',
+          fontSize: 14,
+          fontWeight: 500,
+          textDecoration: 'none',
+        }}
+      >
+        광장으로
+      </Link>
+    </div>
+  );
+}
+
+function resolvePartnerState(post: PostDetail): 'NONE' | 'ACTIVE' | 'TOMBSTONE' {
+  if (post.partnerState) return post.partnerState;
+  if (post.partnerBodyDeleted) return 'TOMBSTONE';
+  if (post.partnerBodyPublished) return 'ACTIVE';
+  return 'NONE';
+}
 
 // View A: 관람자 — C3_StoryDetail (Tone L)
 function C3StoryDetail({
@@ -280,82 +394,115 @@ function C3StoryDetail({
 
         {/* 양쪽 사연 — 작성자 위, 상대방 아래 / 닉네임·시간은 각 카드 라벨 오른쪽 */}
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 9 }}>
-          <SideStory
-            side="g"
-            label="작성자"
-            meta={`${post.authorNickname || '익명'} · ${timeAgo(post.createdAt)}`}
-            body={post.bodyPublished}
-            clamp
-            selected={pick === 'g'}
-            voted={voted && pick === 'g'}
-            voteDisabled={isVoting || (voted && pick !== 'g')}
-            onSelect={() => router.push(`/community/${post.id}/read?side=g`)}
-            onVote={() => handleVoteSide('g')}
-          />
-          {post.partnerBodyPublished ? (
-            // 상대방 이야기가 있을 때 — 모두 동일
-            <SideStory
-              side="r"
-              label="상대방"
-              meta={post.partnerAnsweredAt ? `${post.partnerNickname || '익명'} · ${timeAgo(post.partnerAnsweredAt)}` : (post.partnerNickname || '익명')}
-              body={post.partnerBodyPublished}
-              clamp
-              selected={pick === 'r'}
-              voted={voted && pick === 'r'}
-              voteDisabled={isVoting || (voted && pick !== 'r')}
-              onSelect={() => router.push(`/community/${post.id}/read?side=r`)}
-              onVote={() => handleVoteSide('r')}
+          {post.authorBodyDeleted ? (
+            <TombstoneBox
+              side="g"
+              message="작성자가 글을 삭제했습니다"
+              canRewrite={isAuthor}
+              onRewrite={() => router.push(`/community/${post.id}/read?side=g`)}
+              rewriteTestId="rewrite-author-btn"
             />
-          ) : isAuthor ? (
-            // 작성자 — 초대 또는 대기 슬롯
-            activeInviteToken ? (
-              <div
-                style={{ border: `1.5px dashed ${PARTNER}`, borderRadius: 12, padding: '13px 14px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  minHeight: 96, background: 'rgba(95,143,118,0.04)' }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: PARTNER, marginBottom: 8 }} />
-                <span style={{ fontSize: 12, color: PARTNER, fontWeight: 500 }}>초대함 · 답변 대기 중</span>
-                <button
-                  onClick={onInviteClick}
-                  style={{ marginTop: 8, fontSize: 11, color: 'var(--L-point)', fontWeight: 500,
-                    background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                  링크 다시 보내기
-                </button>
-              </div>
-            ) : (
-              <button
-                data-testid="invite-partner-btn"
-                onClick={onInviteClick}
-                style={{ border: `1.5px dashed ${PARTNER}`, borderRadius: 12, padding: '13px 14px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  minHeight: 96, cursor: 'pointer', background: 'rgba(95,143,118,0.04)', width: '100%',
-                  fontFamily: 'inherit' }}
-              >
-                <div style={{ width: 32, height: 32, borderRadius: '50%', border: `1.5px solid ${PARTNER}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PARTNER} strokeWidth="2" strokeLinecap="round">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                </div>
-                <span style={{ fontSize: 12, color: PARTNER, fontWeight: 500 }}>상대 초대하기</span>
-                <span style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 3 }}>상대의 이야기로 채워주세요</span>
-              </button>
-            )
           ) : (
-            // 관람자 — 빈 상대 슬롯 (투표 가능)
             <SideStory
-              side="r"
-              label="상대방"
-              body=""
+              side="g"
+              label="작성자"
+              meta={`${post.authorNickname || '익명'} · ${timeAgo(post.createdAt)}`}
+              body={post.bodyPublished}
               clamp
-              selected={pick === 'r'}
-              voted={voted && pick === 'r'}
-              voteDisabled={isVoting || (voted && pick !== 'r')}
-              onVote={() => handleVoteSide('r')}
+              selected={pick === 'g'}
+              voted={voted && pick === 'g'}
+              voteDisabled={isVoting || (voted && pick !== 'g')}
+              onSelect={() => router.push(`/community/${post.id}/read?side=g`)}
+              onVote={() => handleVoteSide('g')}
             />
           )}
+          {(() => {
+            const partnerState = resolvePartnerState(post);
+            if (partnerState === 'TOMBSTONE' || post.partnerBodyDeleted) {
+              return (
+                <TombstoneBox
+                  side="r"
+                  message="상대방이 글을 삭제했습니다"
+                  canRewrite={!!user && (post.isPartner ?? false)}
+                  onRewrite={() => router.push(`/community/${post.id}/read?side=r`)}
+                  rewriteTestId="rewrite-partner-btn"
+                />
+              );
+            }
+            if (post.partnerBodyPublished) {
+              // ACTIVE — 상대방 이야기 (초대 재발송 숨김)
+              return (
+                <SideStory
+                  side="r"
+                  label="상대방"
+                  meta={post.partnerAnsweredAt ? `${post.partnerNickname || '익명'} · ${timeAgo(post.partnerAnsweredAt)}` : (post.partnerNickname || '익명')}
+                  body={post.partnerBodyPublished}
+                  clamp
+                  selected={pick === 'r'}
+                  voted={voted && pick === 'r'}
+                  voteDisabled={isVoting || (voted && pick !== 'r')}
+                  onSelect={() => router.push(`/community/${post.id}/read?side=r`)}
+                  onVote={() => handleVoteSide('r')}
+                />
+              );
+            }
+            // NONE — 미답변: 작성자만 초대/재발송
+            if (isAuthor) {
+              if (activeInviteToken) {
+                return (
+                  <div
+                    style={{ border: `1.5px dashed ${PARTNER}`, borderRadius: 12, padding: '13px 14px',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      minHeight: 96, background: 'rgba(95,143,118,0.04)' }}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: PARTNER, marginBottom: 8 }} />
+                    <span style={{ fontSize: 12, color: PARTNER, fontWeight: 500 }}>초대함 · 답변 대기 중</span>
+                    <button
+                      type="button"
+                      data-testid="invite-resend-btn"
+                      onClick={onInviteClick}
+                      style={{ marginTop: 8, fontSize: 11, color: 'var(--L-point)', fontWeight: 500,
+                        background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      링크 다시 보내기
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <button
+                  data-testid="invite-partner-btn"
+                  onClick={onInviteClick}
+                  style={{ border: `1.5px dashed ${PARTNER}`, borderRadius: 12, padding: '13px 14px',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    minHeight: 96, cursor: 'pointer', background: 'rgba(95,143,118,0.04)', width: '100%',
+                    fontFamily: 'inherit' }}
+                >
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', border: `1.5px solid ${PARTNER}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PARTNER} strokeWidth="2" strokeLinecap="round">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </div>
+                  <span style={{ fontSize: 12, color: PARTNER, fontWeight: 500 }}>상대 초대하기</span>
+                  <span style={{ fontSize: 11, color: 'var(--L-sub)', marginTop: 3 }}>상대의 이야기로 채워주세요</span>
+                </button>
+              );
+            }
+            // 관람자 — 빈 상대 슬롯 (투표 가능)
+            return (
+              <SideStory
+                side="r"
+                label="상대방"
+                body=""
+                clamp
+                selected={pick === 'r'}
+                voted={voted && pick === 'r'}
+                voteDisabled={isVoting || (voted && pick !== 'r')}
+                onVote={() => handleVoteSide('r')}
+              />
+            );
+          })()}
         </div>
 
         {/* 라이브 비율 막대 (얇은 8px + 좌우 라벨) */}
@@ -620,125 +767,6 @@ function C3ResultPair({
   );
 }
 
-// View D: status=CLOSED — C3_Closed (Tone P)
-function C3Closed({
-  post,
-  voteResult,
-}: {
-  post: PostDetail;
-  voteResult: VoteResult | null;
-}) {
-  const handleShare = async () => {
-    const url = typeof window !== 'undefined' ? window.location.href : '';
-    try {
-      if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({ title: post.title, url });
-      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-      }
-    } catch { /* 사용자 취소 등 — 무시 */ }
-  };
-
-  return (
-    <div style={{ background: 'var(--P-bg)', minHeight: '100vh', padding: '16px' }}>
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          background: '#F0E8E0',
-          color: '#8A7F6B',
-          padding: '6px 12px',
-          borderRadius: 16,
-          display: 'inline-block',
-          marginBottom: 20,
-        }}
-      >
-        마감됨
-      </div>
-
-      <h1
-        style={{
-          fontSize: 18,
-          fontWeight: 600,
-          fontFamily: 'var(--font-serif)',
-          color: 'var(--P-ink)',
-          margin: 0,
-          marginBottom: 20,
-        }}
-      >
-        {post.title}
-      </h1>
-
-      {/* 투표 수 */}
-      <div style={{ fontSize: 12, color: 'var(--P-sub)', marginBottom: 20 }}>
-        최종 {voteResult?.totalVotes || 0}표
-      </div>
-
-      {/* 2칸 그리드 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-        <SideStory
-          side="g"
-          label="작성자"
-          body={post.bodyPublished || ''}
-          clamp={false}
-          selected={false}
-          onSelect={() => {}}
-          onMore={() => {}}
-        />
-        <SideStory
-          side="r"
-          label="상대방"
-          body={post.partnerBodyPublished || ''}
-          clamp={false}
-          selected={false}
-          onSelect={() => {}}
-          onMore={() => {}}
-        />
-      </div>
-
-      {/* VoteBar */}
-      {voteResult && (
-        <div style={{ marginBottom: 20 }}>
-          <VoteBar authorPct={Math.round(voteResult?.options?.[0]?.percentage ?? 50)} big={true} />
-        </div>
-      )}
-
-      {/* 안내 메시지 */}
-      <div
-        style={{
-          fontSize: 12,
-          color: 'var(--P-sub)',
-          background: 'var(--P-card)',
-          padding: '12px',
-          borderRadius: 8,
-          textAlign: 'center',
-        }}
-      >
-        투표가 마감되어 결과가 고정됐어요
-      </div>
-
-      {/* 결과 공유 버튼 */}
-      <button
-        onClick={handleShare}
-        style={{
-          width: '100%',
-          padding: '12px 16px',
-          background: 'var(--P-ink)',
-          color: 'white',
-          border: 'none',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: 'pointer',
-          marginTop: 20,
-        }}
-      >
-        결과 공유
-      </button>
-    </div>
-  );
-}
-
 export default function PostDetailClient({ params }: PageProps) {
   useGuestInit();
   const { setVote, clearVote, getVoteSide } = useVoteStore();
@@ -975,20 +1003,21 @@ export default function PostDetailClient({ params }: PageProps) {
     setInviteSheetOpen(true);
   };
 
-  // 파트너 도착 폴링 — 작성자가 초대 링크를 보낸 후
+  // 파트너 도착 폴링 — 작성자가 초대 링크를 보낸 후 (NONE만)
   useEffect(() => {
-    if (!post?.isAuthor || !activeInviteToken || post.partnerBodyPublished) return;
+    if (!post?.isAuthor || !activeInviteToken) return;
+    if (resolvePartnerState(post) !== 'NONE') return;
     const timer = setInterval(async () => {
       try {
         const data = await postApi.get(params.id);
-        if (data.paired || data.partnerBodyPublished) {
+        if (data.paired || data.partnerBodyPublished || data.partnerBodyDeleted || data.deleted) {
           setPost(data);
           clearInterval(timer);
         }
       } catch { /* ignore */ }
     }, 4000);
     return () => clearInterval(timer);
-  }, [post?.id, post?.isAuthor, activeInviteToken, post?.partnerBodyPublished]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [post?.id, post?.isAuthor, activeInviteToken, post?.partnerBodyPublished, post?.partnerBodyDeleted, post?.partnerState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCancelVote = async () => {
     try {
@@ -1049,11 +1078,12 @@ export default function PostDetailClient({ params }: PageProps) {
     );
   }
 
-  // CLOSED: 별도 결과 화면
-  if (post.status === 'CLOSED') {
-    return <C3Closed post={post} voteResult={voteResult} />;
+  // 완전 삭제 — 「삭제된 게시글」+ 광장
+  if (post.deleted) {
+    return <DeletedPostView />;
   }
 
+  // CLOSED(시한부 투표) 레거시: 공감 투표는 상시 — C3StoryDetail로 동일 처리
   // 작성자·관람자 모두 동일한 C3StoryDetail — 작성자는 상대 슬롯 클릭 시 초대
   return (
     <>

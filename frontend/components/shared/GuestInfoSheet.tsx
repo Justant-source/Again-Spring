@@ -1,7 +1,8 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { User } from '@/lib/types/user';
+import { authHref, safeRedirect } from '@/lib/auth/oauth';
 
 const PARTNER_COLOR = '#5F8F76';
 
@@ -11,6 +12,8 @@ const PARTNER_COLOR = '#5F8F76';
  */
 export function GuestInfoSheet({ user, onClose }: { user: User; onClose: () => void }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const nextPath = safeRedirect(pathname);
   const nickname = user.nickname || '게스트';
 
   return (
@@ -69,7 +72,7 @@ export function GuestInfoSheet({ user, onClose }: { user: User; onClose: () => v
         {/* 버튼 */}
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 9 }}>
           <button
-            onClick={() => { onClose(); router.push('/signup'); }}
+            onClick={() => { onClose(); router.push(authHref('/signup', nextPath)); }}
             style={{
               width: '100%', padding: '15px 0', borderRadius: 4, border: 'none',
               background: 'var(--L-ink)', color: 'var(--L-bg)',
@@ -79,7 +82,7 @@ export function GuestInfoSheet({ user, onClose }: { user: User; onClose: () => v
             회원가입하기
           </button>
           <button
-            onClick={() => { onClose(); router.push('/login'); }}
+            onClick={() => { onClose(); router.push(authHref('/login', nextPath)); }}
             style={{
               width: '100%', padding: '14px 0', borderRadius: 4,
               border: '1px solid var(--L-ink)', background: 'transparent',

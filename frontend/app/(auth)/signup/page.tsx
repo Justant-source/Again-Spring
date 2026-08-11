@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { PhoneFrame, PhoneHeader } from '@/components/shared/PhoneFrame';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
-import { oauthRedirect } from '@/lib/auth/oauth';
+import { oauthRedirect, safeRedirect, authHref } from '@/lib/auth/oauth';
 import { generateGuestNickname } from '@/lib/utils/guestNickname';
 
 export default function SignupPage() {
@@ -14,6 +14,7 @@ export default function SignupPage() {
   const searchParams = useSearchParams();
   const setUser = useUserStore((s) => s.setUser);
   const guestUser = useUserStore((s) => s.user);
+  const nextPath = safeRedirect(searchParams.get('redirect') || searchParams.get('next'));
 
   const [nickname, setNickname] = useState('');
   const [nicknameShuffling, setNicknameShuffling] = useState(false);
@@ -160,7 +161,7 @@ export default function SignupPage() {
         localStorage.setItem('again-spring-token', token.accessToken);
       }
       setUser(user);
-      router.push('/');
+      router.push(nextPath);
     } catch (err: any) {
       setError(err.response?.data?.error?.message || '회원가입에 실패했어요');
     } finally {
@@ -313,7 +314,7 @@ export default function SignupPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button
-              onClick={() => oauthRedirect('google')}
+              onClick={() => oauthRedirect('google', nextPath)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 0', border: '1px solid var(--L-border)', borderRadius: 8, background: 'white', fontSize: 13, cursor: 'pointer', color: '#333' }}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -328,7 +329,7 @@ export default function SignupPage() {
         </div>
 
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: 'var(--L-sub)' }}>
-          <Link href="/login" style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}>
+          <Link href={authHref('/login', nextPath)} style={{ color: 'var(--L-ink)', textDecoration: 'underline' }}>
             이미 계정이 있어요
           </Link>
         </div>
@@ -366,7 +367,7 @@ export default function SignupPage() {
                 다른 이메일로 인증하기
               </button>
               <button
-                onClick={() => { setDuplicateEmailModal(false); router.push('/login'); }}
+                onClick={() => { setDuplicateEmailModal(false); router.push(authHref('/login', nextPath)); }}
                 style={{
                   padding: '12px 0', background: 'transparent', color: 'var(--L-ink)',
                   border: '1px solid var(--L-border)', borderRadius: 8, fontSize: 14, cursor: 'pointer',

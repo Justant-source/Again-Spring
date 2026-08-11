@@ -51,10 +51,36 @@ export const COMMENT_MENU_REPORT = '[data-testid="comment-menu-report"]'
 
 // ── Invite 흐름 ──────────────────────────────────────────────────
 // 실제 컴포넌트 testid와 일치하는 항목 (2026-06-07 교정)
+// claim/edit/delete · tombstone · deleted = ownership UX (09-partner-invite-ownership)
 export const INVITE = {
   partnerBtn: '[data-testid="invite-partner-btn"]',  // 작성자 뷰 초대 버튼
+  resendBtn:  '[data-testid="invite-resend-btn"]',   // 미답변(NONE) 링크 다시 보내기
   sheet:      '[data-testid="invite-sheet"]',         // InviteSheet 바텀시트
   urlText:    '[data-testid="invite-url-text"]',      // 생성된 초대 URL 텍스트
+  /** /s — unowned 답변 후 「내 계정으로 연결」 */
+  claimBtn:   '[data-testid="invite-claim-btn"]',
+  editBtn:    '[data-testid="invite-edit-btn"]',
+  deleteBtn:  '[data-testid="invite-delete-btn"]',
+  rewriteBtn: '[data-testid="invite-rewrite-btn"]',
+  /** 작성자가 자기 초대 링크를 연 경우 */
+  authorBlocked: '[data-testid="invite-author-blocked"]',
+  manageUnowned: '[data-testid="invite-manage-unowned"]',
+  manageOwned:   '[data-testid="invite-manage-owned"]',
+} as const
+
+/** SideStory / 상세 — 한쪽 본문 삭제 tombstone */
+export const TOMBSTONE = {
+  author:  '[data-testid="author-tombstone"]',
+  partner: '[data-testid="partner-tombstone"]',
+  rewriteAuthor:  '[data-testid="rewrite-author-btn"]',
+  rewritePartner: '[data-testid="rewrite-partner-btn"]',
+} as const
+
+/** 완전 삭제된 게시글 (/community/{id} · /s/{token}) */
+export const DELETED_POST = {
+  page:     '[data-testid="deleted-post-page"]',
+  message:  '[data-testid="deleted-post-message"]',
+  plazaBtn: '[data-testid="deleted-post-plaza-btn"]',
 } as const
 
 // ── 랜딩 페이지 ──────────────────────────────────────────────────

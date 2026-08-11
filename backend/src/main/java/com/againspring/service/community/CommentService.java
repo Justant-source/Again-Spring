@@ -285,4 +285,19 @@ public class CommentService {
     public long getCommentLikeCount(Long commentId) {
         return postLikeRepository.countByCommentId(commentId);
     }
+
+    /**
+     * 포스트 full delete 시 댓글·댓글좋아요·글좋아요 hard delete.
+     * (소프트 tombstone 경로에서는 호출하지 않음)
+     */
+    @Transactional
+    public void hardDeleteAllForPost(String postId) {
+        List<PostComment> comments = commentRepository.findByPostId(postId);
+        for (PostComment comment : comments) {
+            postLikeRepository.deleteByCommentId(comment.getId());
+        }
+        postLikeRepository.deleteByPostId(postId);
+        commentRepository.deleteByPostId(postId);
+        log.info("Hard-deleted {} comments (and likes) for post {}", comments.size(), postId);
+    }
 }

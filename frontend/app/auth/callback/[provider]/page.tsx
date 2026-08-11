@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useUserStore } from '@/lib/store/userStore';
 import { api } from '@/lib/api/client';
-import { getRedirectUri, decodeState } from '@/lib/auth/oauth';
+import { getRedirectUri, decodeState, safeRedirect, authHref } from '@/lib/auth/oauth';
 
 export default function OAuthCallbackPage() {
   const router = useRouter();
@@ -12,11 +12,13 @@ export default function OAuthCallbackPage() {
   const searchParams = useSearchParams();
   const setUser = useUserStore((s) => s.setUser);
   const [error, setError] = useState('');
+  const [returnPath, setReturnPath] = useState('/');
 
   useEffect(() => {
     const provider = params.provider as string;
     const code = searchParams.get('code');
-    const nextPath = decodeState(searchParams.get('state')) ?? '/';
+    const nextPath = safeRedirect(decodeState(searchParams.get('state')));
+    setReturnPath(nextPath);
 
     if (!code) {
       setError('인증 코드를 받지 못했어요. 다시 시도해주세요.');
@@ -46,7 +48,7 @@ export default function OAuthCallbackPage() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100dvh', gap: 16 }}>
         <p style={{ fontSize: 15, color: '#c0392b' }}>{error}</p>
-        <button onClick={() => router.push('/login')} style={{ fontSize: 14, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>
+        <button onClick={() => router.push(authHref('/login', returnPath))} style={{ fontSize: 14, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>
           로그인 페이지로 돌아가기
         </button>
       </div>
