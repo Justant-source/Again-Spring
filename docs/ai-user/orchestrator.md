@@ -122,7 +122,9 @@ SELECT status, COUNT(*) as count FROM daily_planner_retry_log GROUP BY status;
 2. author persona는 `voice_profile.voice_type`이 그 community와 맞는 계정
    (BLIND→blind, NATEPAN→natepan).
 3. `PlanSourceStoryResolver.claimAndResolve` →
-   `AiLearningClient.claimPopularSource(source, reservationKey, reserveUntil)`.
+   `AiLearningClient.claimPopularSource(source, reservationKey, reserveUntil, plazaCategory)`.
+   **plazaCategory**(COUPLE/MARRIED/…)로 claim 풀을 스코프한다 — reconstruct 본문이
+   페르소나 interest 라벨과 어긋나지 않게 (2026-08-12: 카테고리 무시 버그 수정).
 4. claim hit → `reconstructMode=true` + sourceExampleId/body/url/title.
    empty → **슬롯 skip** (archetype freestyle 폴백 없음). Blind 풀이 비면 그 Blind
    슬롯만 skip — Natepan으로 바꾸지 않음.

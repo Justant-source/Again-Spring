@@ -66,6 +66,9 @@ class ClaimPopularSourceRequest(CamelCompatModel):
     reserve_until: str  # ISO-8601
     window_days: Optional[int] = 14
     expand_days: Optional[int] = 30
+    # Plaza enum (COUPLE/MARRIED/FRIEND/FAMILY/WORK/OTHER). Filters example_bank
+    # to matching board categories so reconstruct content stays in the right plaza.
+    category: Optional[str] = None
 
 
 class SourceReservationKeyRequest(CamelCompatModel):
@@ -356,6 +359,7 @@ def claim_popular_source(req: ClaimPopularSourceRequest):
             reserve_until=req.reserve_until,
             window_days=req.window_days if req.window_days is not None else 14,
             expand_days=req.expand_days if req.expand_days is not None else 30,
+            category=req.category,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -127,6 +127,8 @@ public class AiLearningClient {
         private Double score;
         /** Relative popularity 0~1 from example_bank.popularity_pct (claim-popular-source). */
         private Double popularityPct;
+        /** example_bank.category (plaza enum or blind board: romance/marriage/workplace). */
+        private String category;
         /** 원본 비교 기능: 크롤 원본 제목 (신규 크롤부터, 기존 행은 null) */
         private String title;
         /** 원본 비교 기능: 크롤 원본 URL */
@@ -147,11 +149,19 @@ public class AiLearningClient {
         private Instant reserveUntil;    // ISO-8601 via Spring ObjectMapper
         private int windowDays = 14;
         private int expandDays = 30;
+        /** Plaza enum — scopes claim to matching example_bank categories. */
+        private String category;
 
         public ClaimPopularSourceRequest(String source, String reservationKey, Instant reserveUntil) {
+            this(source, reservationKey, reserveUntil, null);
+        }
+
+        public ClaimPopularSourceRequest(String source, String reservationKey, Instant reserveUntil,
+                                         String category) {
             this.source = source;
             this.reservationKey = reservationKey;
             this.reserveUntil = reserveUntil;
+            this.category = category;
         }
     }
 
@@ -313,6 +323,15 @@ public class AiLearningClient {
      * {@code reserveUntil}. Empty pool / {@code {"status":"empty"}} / failure → Optional.empty().
      */
     public Optional<ExampleItem> claimPopularSource(String source, String reservationKey, Instant reserveUntil) {
+        return claimPopularSource(source, reservationKey, reserveUntil, null);
+    }
+
+    /**
+     * Same as {@link #claimPopularSource(String, String, Instant)} but scopes the pool to
+     * {@code category} (plaza enum). Reconstruct must stay in the requested relation plaza.
+     */
+    public Optional<ExampleItem> claimPopularSource(String source, String reservationKey,
+                                                    Instant reserveUntil, String category) {
         if (!enabled || source == null || source.isBlank()
                 || reservationKey == null || reservationKey.isBlank()
                 || reserveUntil == null) {
@@ -320,7 +339,7 @@ public class AiLearningClient {
         }
         try {
             ResponseEntity<String> resp = postJson("/examples/claim-popular-source",
-                    new ClaimPopularSourceRequest(source, reservationKey, reserveUntil));
+                    new ClaimPopularSourceRequest(source, reservationKey, reserveUntil, category));
             return parseClaimedExample(resp != null ? resp.getBody() : null);
         } catch (Exception e) {
             log.debug("AiLearning claimPopularSource failed (non-critical): {}", e.getMessage());

@@ -58,7 +58,8 @@ public class PlanSourceStoryResolver {
      *
      * @param author          may be null (persona chosen after claim); recentBodies empty then
      * @param preferredSource {@code "blind"} or {@code "natepan"} (required)
-     * @param categoryHint    optional; ignored for selection (reserved for callers/logging)
+     * @param categoryHint    plaza enum (COUPLE/MARRIED/…); scopes claim so reconstruct
+     *                        content matches the post label (required for correct labeling)
      */
     public Optional<ResolvedSource> claimAndResolve(
             Persona author,
@@ -73,11 +74,12 @@ public class PlanSourceStoryResolver {
             return Optional.empty();
         }
 
+        String plaza = normalizePlazaCategory(categoryHint);
         Optional<AiLearningClient.ExampleItem> claimed =
-                aiLearningClient.claimPopularSource(source, reservationKey, reserveUntil);
+                aiLearningClient.claimPopularSource(source, reservationKey, reserveUntil, plaza);
         if (claimed.isEmpty()) {
-            log.info("claimAndResolve empty: no popular source for preferredSource={} reservationKey={}",
-                    source, reservationKey);
+            log.info("claimAndResolve empty: no popular source for preferredSource={} plaza={} reservationKey={}",
+                    source, plaza, reservationKey);
             return Optional.empty();
         }
 
@@ -145,6 +147,12 @@ public class PlanSourceStoryResolver {
         String s = preferredSource.trim().toLowerCase();
         if ("blind".equals(s) || "natepan".equals(s)) return s;
         return null;
+    }
+
+    /** Plaza enum uppercase; blank/null → null (claim without category filter). */
+    static String normalizePlazaCategory(String categoryHint) {
+        if (categoryHint == null || categoryHint.isBlank()) return null;
+        return categoryHint.trim().toUpperCase();
     }
 
     /** Best-effort style anchors; never blocks claim path. */

@@ -155,17 +155,18 @@ orchestrator 클라이언트 `AiLearningClient.claimPopularSource` /
 
 ### `POST /examples/claim-popular-source`
 
-Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, windowDays?: 14, expandDays?: 30 }`
+Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, windowDays?: 14, expandDays?: 30, category?: "COUPLE"|"MARRIED"|"FRIEND"|"FAMILY"|"WORK"|"OTHER" }`
 
 | 규칙 | 내용 |
 |---|---|
 | 후보 | `content_type=POST`, `source_url IS NOT NULL`, `popularity_pct IS NOT NULL`, source ∈ {blind,natepan} |
+| **카테고리 스코프** | `category`(광장 enum) 지정 시 `example_bank.category`가 해당 광장 매핑만. Blind=`romance→COUPLE` / `marriage→MARRIED` / `workplace→WORK`, Natepan=광장 enum 그대로. **미지정 시 필터 없음(레거시)**. 잘못된 enum → 400 |
 | 순위 | `popularity_pct DESC` (NULL last) |
 | 창 | `created_at` 기준 **14일**. 없으면 **한 번** 30일로 확장. 그래도 없으면 empty (다른 source로 폴백 금지) |
 | 영구 제외 | 같은 `source_url`을 가진 **형제** `example_bank` 행이 `posts.source_example_id`로 쓰였거나 `example_source_reservations.status='COMMITTED'` |
 | soft 제외 | 형제 행 중 `status='SOFT'` AND `reserve_until > NOW(3)` |
 | 동시성 | claim 시 동일 `source_url` 가족 전체를 `FOR UPDATE`로 잠그고 같은 `reservationKey`로 SOFT 예약. commit/release도 key 가족 단위 |
-| 응답 | ExampleItem-like `{id, content, source, title, sourceUrl, score≈popularity_pct}` 또는 `{"status":"empty"}` / null |
+| 응답 | ExampleItem-like `{id, content, source, title, sourceUrl, score≈popularity_pct, category}` 또는 `{"status":"empty"}` / null |
 
 ### 예약 생명주기
 

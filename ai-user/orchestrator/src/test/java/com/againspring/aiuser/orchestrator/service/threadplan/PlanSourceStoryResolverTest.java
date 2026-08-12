@@ -36,13 +36,14 @@ class PlanSourceStoryResolverTest {
 
     @Test
     void claimAndResolveEmptyWhenClaimMisses() {
-        when(aiLearningClient.claimPopularSource(eq("blind"), eq("res-1"), any(Instant.class)))
+        when(aiLearningClient.claimPopularSource(eq("blind"), eq("res-1"), any(Instant.class), eq("FAMILY")))
                 .thenReturn(Optional.empty());
 
         Optional<PlanSourceStoryResolver.ResolvedSource> resolved =
                 resolver.claimAndResolve(null, "blind", "res-1", Instant.now().plus(1, ChronoUnit.HOURS), "FAMILY");
 
         assertThat(resolved).isEmpty();
+        verify(aiLearningClient).claimPopularSource(eq("blind"), eq("res-1"), any(Instant.class), eq("FAMILY"));
         verify(aiLearningClient, never()).findSimilar(anyString(), anyString(), anyString(), anyInt());
         verify(aiLearningClient, never()).findSimilar(anyString(), anyString(), anyString(), anyInt(), anyString());
     }
@@ -59,7 +60,7 @@ class PlanSourceStoryResolverTest {
         claimed.setTitle("시어머니");
 
         Instant until = Instant.now().plus(24, ChronoUnit.HOURS);
-        when(aiLearningClient.claimPopularSource(eq("blind"), eq("sched-uuid"), eq(until)))
+        when(aiLearningClient.claimPopularSource(eq("blind"), eq("sched-uuid"), eq(until), eq("FAMILY")))
                 .thenReturn(Optional.of(claimed));
         when(aiLearningClient.styleSample(eq("blind"), eq("POST"), eq("polite"), eq(2), eq(350)))
                 .thenReturn(List.of());
@@ -82,7 +83,7 @@ class PlanSourceStoryResolverTest {
         assertThat(resolved.sourceContext().get("sourceUrl")).isEqualTo("https://blind.example/post/1");
         assertThat(resolved.recentBodies()).containsExactly("예전 글 본문");
 
-        verify(aiLearningClient).claimPopularSource("blind", "sched-uuid", until);
+        verify(aiLearningClient).claimPopularSource("blind", "sched-uuid", until, "FAMILY");
         verify(aiLearningClient, never()).findSimilar(anyString(), anyString(), anyString(), anyInt());
         verify(aiLearningClient, never()).findSimilar(anyString(), anyString(), anyString(), anyInt(), anyString());
         verify(aiLearningClient, never()).fetchDailyTopics(anyString(), anyInt());
@@ -98,13 +99,13 @@ class PlanSourceStoryResolverTest {
         claimed.setTitle("직장");
 
         Instant until = Instant.now().plus(2, ChronoUnit.HOURS);
-        when(aiLearningClient.claimPopularSource(eq("natepan"), eq("k"), eq(until)))
+        when(aiLearningClient.claimPopularSource(eq("natepan"), eq("k"), eq(until), eq("WORK")))
                 .thenReturn(Optional.of(claimed));
         when(aiLearningClient.styleSample(eq("natepan"), eq("POST"), eq("casual"), eq(2), eq(350)))
                 .thenReturn(List.of());
 
         Optional<PlanSourceStoryResolver.ResolvedSource> opt =
-                resolver.claimAndResolve(null, "natepan", "k", until, null);
+                resolver.claimAndResolve(null, "natepan", "k", until, "WORK");
 
         assertThat(opt).isPresent();
         assertThat(opt.get().recentBodies()).isEmpty();
@@ -124,7 +125,7 @@ class PlanSourceStoryResolverTest {
         claimed.setSourceUrl("https://blind.example/x");
         claimed.setTitle("t");
 
-        when(aiLearningClient.claimPopularSource(eq("blind"), anyString(), any(Instant.class)))
+        when(aiLearningClient.claimPopularSource(eq("blind"), anyString(), any(Instant.class), eq("WORK")))
                 .thenReturn(Optional.of(claimed));
         when(aiLearningClient.styleSample(eq("blind"), eq("POST"), eq("casual"), eq(2), eq(350)))
                 .thenReturn(List.of());
@@ -135,14 +136,14 @@ class PlanSourceStoryResolverTest {
 
         assertThat(resolved.reconstructMode()).isTrue();
         assertThat(resolved.sourceExampleId()).isEqualTo(99L);
-        verify(aiLearningClient).claimPopularSource(eq("blind"), anyString(), any(Instant.class));
+        verify(aiLearningClient).claimPopularSource(eq("blind"), anyString(), any(Instant.class), eq("WORK"));
         verify(aiLearningClient, never()).findSimilar(anyString(), anyString(), anyString(), anyInt(), anyString());
     }
 
     @Test
     void legacyResolveThrowsWhenClaimEmpty_noFreestyle() {
         Persona author = persona("ai-user-2", "NATEPAN", "casual");
-        when(aiLearningClient.claimPopularSource(eq("natepan"), anyString(), any(Instant.class)))
+        when(aiLearningClient.claimPopularSource(eq("natepan"), anyString(), any(Instant.class), eq("WORK")))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> resolver.resolve(author, "WORK", "   "))
@@ -151,6 +152,18 @@ class PlanSourceStoryResolverTest {
 
         verify(aiLearningClient, never()).findSimilar(anyString(), anyString(), anyString(), anyInt(), anyString());
         verify(aiLearningClient, never()).fetchDailyTopics(anyString(), anyInt());
+    }
+
+    @Test
+    void claimAndResolvePassesPlazaCategoryToClaim() {
+        // Regression: FRIEND plaza must not claim unfiltered marriage stories.
+        when(aiLearningClient.claimPopularSource(eq("blind"), eq("rk"), any(Instant.class), eq("FRIEND")))
+                .thenReturn(Optional.empty());
+
+        assertThat(resolver.claimAndResolve(null, "blind", "rk",
+                Instant.now().plusSeconds(60), "friend")).isEmpty();
+
+        verify(aiLearningClient).claimPopularSource(eq("blind"), eq("rk"), any(Instant.class), eq("FRIEND"));
     }
 
     @Test

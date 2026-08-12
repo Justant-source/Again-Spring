@@ -2,6 +2,10 @@
 
 Picks unused high-popularity crawl POSTs from example_bank, soft-reserves them,
 and supports commit / release / expire. Does not change findSimilar/search.
+
+Category filter (2026-08-12): claim is scoped to the target plaza so reconstruct
+content cannot be labeled as a different relation (e.g. marriage story → FRIEND).
+Blind boards use romance/marriage/workplace; natepan uses plaza enum names.
 """
 from __future__ import annotations
 
@@ -23,6 +27,28 @@ STATUS_SOFT = "SOFT"
 STATUS_COMMITTED = "COMMITTED"
 # Max candidates to try per window when soft-reserve races
 _CLAIM_ATTEMPTS_PER_WINDOW = 8
+
+# Plaza (posts.category) → example_bank.category values that may ground it.
+# Blind crawler stores romance/marriage/workplace; natepan stores plaza enums.
+PLAZA_BANK_CATEGORIES: dict[str, tuple[str, ...]] = {
+    "COUPLE": ("COUPLE", "romance"),
+    "MARRIED": ("MARRIED", "marriage"),
+    "FRIEND": ("FRIEND",),
+    "FAMILY": ("FAMILY",),
+    "WORK": ("WORK", "workplace"),
+    "OTHER": ("OTHER",),
+}
+PLAZA_NAMES = frozenset(PLAZA_BANK_CATEGORIES)
+
+
+def bank_categories_for_plaza(category: Optional[str]) -> Optional[tuple[str, ...]]:
+    """Map plaza enum → example_bank category tuple. Unknown/blank → None (no filter)."""
+    if category is None:
+        return None
+    key = str(category).strip().upper()
+    if not key:
+        return None
+    return PLAZA_BANK_CATEGORIES.get(key)
 
 
 def normalize_source(source: str) -> str:
@@ -101,13 +127,20 @@ def filter_claim_candidates(
     reservations: Mapping[int, Mapping[str, Any]],
     window_start: datetime,
     now: datetime,
+    bank_categories: Optional[Sequence[str]] = None,
 ) -> list[Mapping[str, Any]]:
     """Pure filter mirroring claim SQL (for unit tests). Rank preserved.
 
     Exclusion is by example_id **and** source_url: if any sibling row with the same
     source_url is used in posts or has an active reservation, all siblings are blocked.
+    When bank_categories is set, only rows whose category is in that set pass.
     """
     src = normalize_source(source)
+    allowed_cats = (
+        {str(c).strip() for c in bank_categories if c and str(c).strip()}
+        if bank_categories
+        else None
+    )
     blocked_urls = blocked_source_urls(
         rows,
         used_example_ids=used_example_ids,
@@ -124,6 +157,10 @@ def filter_claim_candidates(
             continue
         if row.get("popularity_pct") is None:
             continue
+        if allowed_cats is not None:
+            row_cat = str(row.get("category") or "").strip()
+            if row_cat not in allowed_cats:
+                continue
         created = row.get("created_at")
         if created is not None and created < window_start:
             continue
@@ -176,19 +213,21 @@ def row_to_claimed_item(row: Mapping[str, Any]) -> dict[str, Any]:
         "title": row.get("title"),
         "sourceUrl": row.get("source_url"),
         "score": _score_from_pct(row.get("popularity_pct")),
+        "category": row.get("category"),
     }
 
 
 # Exclude by example_id and by source_url siblings: duplicate crawl rows with the
 # same URL must not be claimable once any sibling is used or soft/COMMITTED reserved.
 _SELECT_CANDIDATE_SQL = """
-SELECT eb.id, eb.content, eb.source, eb.title, eb.source_url, eb.popularity_pct
+SELECT eb.id, eb.content, eb.source, eb.title, eb.source_url, eb.popularity_pct, eb.category
 FROM example_bank eb
 WHERE eb.content_type = 'POST'
   AND eb.source = %s
   AND eb.source_url IS NOT NULL
   AND eb.popularity_pct IS NOT NULL
   AND eb.created_at >= DATE_SUB(NOW(3), INTERVAL %s DAY)
+  {category_clause}
   AND NOT EXISTS (
       SELECT 1
       FROM example_bank sib
@@ -213,16 +252,28 @@ def _select_candidate(
     source: str,
     window_days: int,
     exclude_ids: Sequence[int],
+    bank_categories: Optional[Sequence[str]] = None,
 ) -> Optional[dict[str, Any]]:
     src = normalize_source(source)
+    cats = [str(c).strip() for c in (bank_categories or ()) if c and str(c).strip()]
+    if cats:
+        cat_placeholders = ",".join(["%s"] * len(cats))
+        category_clause = f"AND eb.category IN ({cat_placeholders})"
+        cat_params: list[Any] = list(cats)
+    else:
+        category_clause = ""
+        cat_params = []
     if exclude_ids:
         placeholders = ",".join(["%s"] * len(exclude_ids))
         exclude_clause = f"AND eb.id NOT IN ({placeholders})"
-        params: list[Any] = [src, int(window_days), *exclude_ids]
+        params: list[Any] = [src, int(window_days), *cat_params, *exclude_ids]
     else:
         exclude_clause = ""
-        params = [src, int(window_days)]
-    sql = _SELECT_CANDIDATE_SQL.format(exclude_clause=exclude_clause)
+        params = [src, int(window_days), *cat_params]
+    sql = _SELECT_CANDIDATE_SQL.format(
+        category_clause=category_clause,
+        exclude_clause=exclude_clause,
+    )
     cur.execute(sql, params)
     return cur.fetchone()
 
@@ -339,10 +390,15 @@ def claim_popular_source(
     reserve_until: str | datetime,
     window_days: int = DEFAULT_WINDOW_DAYS,
     expand_days: int = DEFAULT_EXPAND_DAYS,
+    category: Optional[str] = None,
 ) -> Optional[dict[str, Any]]:
     """
     Transactionally pick top unused POST by popularity_pct and soft-reserve it.
     Tries window_days, then expand_days once. Returns claimed item dict or None.
+
+    When category is a plaza name (COUPLE/MARRIED/...), only example_bank
+    rows whose category maps to that plaza are eligible — prevents mislabeling
+    reconstruct content under the wrong relation plaza.
 
     Dedup key is source_url (not only example_bank.id): duplicate crawl rows and
     concurrent claimants are blocked as one family.
@@ -354,21 +410,28 @@ def claim_popular_source(
 
     until = parse_reserve_until(reserve_until)
     src = normalize_source(source)
+    bank_cats = bank_categories_for_plaza(category)
+    if category and str(category).strip() and bank_cats is None:
+        raise ValueError(
+            f"category must be one of {sorted(PLAZA_NAMES)} (got {category!r})"
+        )
 
     with get_db() as conn:
         with conn.cursor() as cur:
             for days in window_attempts(window_days, expand_days):
                 skipped: list[int] = []
                 for _ in range(_CLAIM_ATTEMPTS_PER_WINDOW):
-                    row = _select_candidate(cur, src, days, skipped)
+                    row = _select_candidate(cur, src, days, skipped, bank_cats)
                     if not row:
                         break
                     eid = int(row["id"])
                     if _soft_reserve(cur, eid, str(reservation_key).strip(), until):
                         logger.info(
-                            "claimed source example_id=%s source=%s window_days=%s pct=%s",
+                            "claimed source example_id=%s source=%s plaza=%s bank_cats=%s window_days=%s pct=%s",
                             eid,
                             src,
+                            (str(category).strip().upper() if category else None),
+                            bank_cats,
                             days,
                             row.get("popularity_pct"),
                         )

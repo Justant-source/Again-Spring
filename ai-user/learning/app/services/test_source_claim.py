@@ -6,6 +6,7 @@ import pytest
 
 from app.services.source_claim import (
     ALLOWED_SOURCES,
+    bank_categories_for_plaza,
     commit_source,
     filter_claim_candidates,
     is_allowed_source,
@@ -52,6 +53,7 @@ def _sample_rows(now: datetime):
             "popularity_pct": 0.2,
             "created_at": now - timedelta(days=2),
             "title": "t1",
+            "category": "marriage",
         },
         {
             "id": 2,
@@ -62,6 +64,7 @@ def _sample_rows(now: datetime):
             "popularity_pct": 0.95,
             "created_at": now - timedelta(days=1),
             "title": "t2",
+            "category": "marriage",
         },
         {
             "id": 3,
@@ -72,6 +75,7 @@ def _sample_rows(now: datetime):
             "popularity_pct": 0.99,
             "created_at": now - timedelta(days=1),
             "title": "t3",
+            "category": "FRIEND",
         },
         {
             "id": 4,
@@ -82,6 +86,7 @@ def _sample_rows(now: datetime):
             "popularity_pct": 0.99,
             "created_at": now - timedelta(days=1),
             "title": None,
+            "category": "marriage",
         },
         {
             "id": 5,
@@ -92,6 +97,7 @@ def _sample_rows(now: datetime):
             "popularity_pct": 0.99,
             "created_at": now - timedelta(days=1),
             "title": None,
+            "category": "marriage",
         },
         {
             "id": 6,
@@ -102,6 +108,7 @@ def _sample_rows(now: datetime):
             "popularity_pct": None,
             "created_at": now - timedelta(days=1),
             "title": None,
+            "category": "marriage",
         },
         {
             "id": 7,
@@ -112,8 +119,105 @@ def _sample_rows(now: datetime):
             "popularity_pct": 0.99,
             "created_at": now - timedelta(days=20),
             "title": "old",
+            "category": "marriage",
+        },
+        {
+            "id": 8,
+            "content": "romance high",
+            "content_type": "POST",
+            "source": "blind",
+            "source_url": "https://blind/8",
+            "popularity_pct": 0.97,
+            "created_at": now - timedelta(days=1),
+            "title": "연애",
+            "category": "romance",
+        },
+        {
+            "id": 9,
+            "content": "friend nate",
+            "content_type": "POST",
+            "source": "natepan",
+            "source_url": "https://nate/9",
+            "popularity_pct": 0.9,
+            "created_at": now - timedelta(days=1),
+            "title": "친구",
+            "category": "FRIEND",
         },
     ]
+
+
+def test_bank_categories_for_plaza_maps_blind_and_natepan():
+    assert bank_categories_for_plaza("COUPLE") == ("COUPLE", "romance")
+    assert bank_categories_for_plaza("married") == ("MARRIED", "marriage")
+    assert bank_categories_for_plaza("FRIEND") == ("FRIEND",)
+    assert bank_categories_for_plaza(None) is None
+    assert bank_categories_for_plaza("  ") is None
+    assert bank_categories_for_plaza("UNKNOWN") is None
+
+
+def test_filter_scopes_by_plaza_category_regression():
+    """FRIEND claim must not pick blind marriage stories (user-reported mislabel)."""
+    now = datetime(2026, 8, 5, 12, 0, 0)
+    window_start = now - timedelta(days=14)
+    marriage_only = filter_claim_candidates(
+        _sample_rows(now),
+        source="blind",
+        used_example_ids=set(),
+        reservations={},
+        window_start=window_start,
+        now=now,
+        bank_categories=bank_categories_for_plaza("FRIEND"),
+    )
+    assert marriage_only == []
+
+    couple = filter_claim_candidates(
+        _sample_rows(now),
+        source="blind",
+        used_example_ids=set(),
+        reservations={},
+        window_start=window_start,
+        now=now,
+        bank_categories=bank_categories_for_plaza("COUPLE"),
+    )
+    assert [r["id"] for r in couple] == [8]
+
+    married = filter_claim_candidates(
+        _sample_rows(now),
+        source="blind",
+        used_example_ids=set(),
+        reservations={},
+        window_start=window_start,
+        now=now,
+        bank_categories=bank_categories_for_plaza("MARRIED"),
+    )
+    assert [r["id"] for r in married] == [2, 1]
+
+    friend = filter_claim_candidates(
+        _sample_rows(now),
+        source="natepan",
+        used_example_ids=set(),
+        reservations={},
+        window_start=window_start,
+        now=now,
+        bank_categories=bank_categories_for_plaza("FRIEND"),
+    )
+    assert [r["id"] for r in friend] == [3, 9]
+
+
+def test_row_to_claimed_item_includes_category():
+    item = row_to_claimed_item(
+        {
+            "id": 1,
+            "content": "c",
+            "source": "blind",
+            "title": "t",
+            "source_url": "https://x",
+            "popularity_pct": 0.5,
+            "category": "marriage",
+        }
+    )
+    assert item["category"] == "marriage"
+    assert item["id"] == 1
 
 
 def test_filter_source_and_rank_by_popularity():
@@ -128,7 +232,7 @@ def test_filter_source_and_rank_by_popularity():
         now=now,
     )
     ids = [r["id"] for r in got]
-    assert ids == [2, 1]  # high then low; natepan/comment/null filtered
+    assert ids == [8, 2, 1]  # romance 0.97, marriage 0.95, marriage 0.2
     assert 3 not in ids
     assert 4 not in ids
     assert 5 not in ids
@@ -158,7 +262,7 @@ def test_filter_window_expand_includes_older():
     assert 7 not in [r["id"] for r in narrow]
     assert 7 in [r["id"] for r in wide]
     # expand still ranks by popularity DESC
-    assert [r["id"] for r in wide][0] in (2, 7)
+    assert [r["id"] for r in wide][0] in (8, 2, 7)
 
 
 def test_filter_excludes_used_and_active_reservations():
@@ -167,7 +271,7 @@ def test_filter_excludes_used_and_active_reservations():
     got = filter_claim_candidates(
         _sample_rows(now),
         source="blind",
-        used_example_ids={2},
+        used_example_ids={2, 8},
         reservations={
             1: {"status": "SOFT", "reserve_until": now + timedelta(hours=2)},
         },
@@ -180,7 +284,7 @@ def test_filter_excludes_used_and_active_reservations():
     got2 = filter_claim_candidates(
         _sample_rows(now),
         source="blind",
-        used_example_ids={2},
+        used_example_ids={2, 8},
         reservations={
             1: {"status": "SOFT", "reserve_until": now - timedelta(minutes=1)},
         },
@@ -193,7 +297,7 @@ def test_filter_excludes_used_and_active_reservations():
     got3 = filter_claim_candidates(
         _sample_rows(now),
         source="blind",
-        used_example_ids=set(),
+        used_example_ids={8},
         reservations={2: {"status": "COMMITTED", "reserve_until": now - timedelta(days=9)}},
         window_start=window_start,
         now=now,
@@ -272,6 +376,7 @@ def test_row_to_claimed_item_camel_case():
         "title": "제목",
         "sourceUrl": "https://nate/9",
         "score": pytest.approx(0.812),
+        "category": None,
     }
 
 
