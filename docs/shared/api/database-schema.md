@@ -163,7 +163,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `ai_user_outbox` | backend transaction에서 기록하는 AI-user lifecycle event | CHAR(36) UUID | V87, orchestrator 전달 보장 |
 | `ai_llm_jobs` | provider/model snapshot과 제한 재시도를 기록하는 LLM job | BIGINT auto | V87, prompt/content 원문 미저장 |
 | `ai_thread_plans` | 게시글 revision별 candidate plan | VARCHAR(36) UUID | AI-user Flyway V6가 소유 |
-| `ai_thread_plan_items` | candidate와 due/lease/idempotency 실행 상태 | VARCHAR(36) UUID | AI-user Flyway V6가 소유. V8 `stance`/`source_example_id`, **V15 `human_author_id`**(human-reply 예산 범위) |
+| `ai_thread_plan_items` | candidate와 due/lease/idempotency 실행 상태 | VARCHAR(36) UUID | AI-user Flyway V6가 소유. V8 `stance`/`source_example_id`, **V15 `human_author_id`**(human-reply 예산 범위), **V19 `stance` VARCHAR(64)** (자유 라벨; 구 16은 LLM 라벨 truncate로 persist 실패) |
 | `ai_human_interaction_inbox` | 사람 댓글/대댓글의 30분 batch 입력 · attempt/error ledger | VARCHAR(36) UUID | source comment unique; V14 attempt_count/last_error_code/schema_version |
 | `ai_post_interested_personas` | post별 human-reply 관심 persona pool | BIGINT auto | AI-user Flyway V13. loose refs, UNIQUE(post_id, persona_id) |
 | `bot_request_dedup` | synthetic bot 게시 요청의 `Idempotency-Key`와 결과 target 매핑 | VARCHAR(160) | V88, timeout 재시도 중복 게시 방지 |
@@ -233,13 +233,14 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `created_at`, `updated_at` | TIMESTAMP(3) | V48 | |
 | `content_revision` | INT UNSIGNED | V87 | 내용 변경마다 증가. AI thread plan이 참조한 글 revision과 비교하는 optimistic revision |
 | `created_by_admin` | BOOLEAN | **V89** | 관리자가 통합 콘텐츠관리 화면에서 수동 생성한 글 여부. 공개 API 미노출, 어드민 전용 표시(배지)용 |
-| `metaphor_id` | VARCHAR(64) | **V99** | 대표(1순위) 메타포 일러스트 ID. `post_metaphors`에 랭크 0으로 중복 저장(하위호환) |
+| `metaphor_id` | VARCHAR(64) | **V99** | 대표(1순위) 메타포 일러스트 ID. `post_metaphors`에 랭크 0으로 중복 저장(하위호환). **영상 경로에서는 무시**(시봄이 shortlist로 대체, 컬럼 보존) |
+| `sibom_candidates` | JSON | **V112** | 시봄이 캐릭터 이미지 id 숏리스트(≤12). 사연 본문 keyword 스코어(코드, LLM 없음). soft-fill 풀은 미저장. Spec: `docs/shared/marketing/sibom-video-insertion.md` |
 | `author_body_deleted_at` | TIMESTAMP(6) | **V107** | 작성자 본문 tombstone. 상대 ACTIVE면 제목·상대 유지; 양쪽 tombstone이면 `deleted_at` soft full-delete |
 | `partner_body_deleted_at` | TIMESTAMP(6) | **V107** | 상대 본문 tombstone. 토큰 유지·재작성 가능 |
 
 ### `post_metaphors` (**V105**)
 
-사연당 3~5개 메타포 랭크 목록(적합도 순). WaggleBot Shorts 렌더링에서 인트로(랭크 0)+본문 낭독 중간 삽입(랭크 1+)용.
+사연당 3~5개 메타포 랭크 목록(적합도 순). **레거시** — Shorts/Reels 영상 경로에서는 사용하지 않음(시봄이 `sibom_candidates`/`sibom_plan`으로 대체). DB·API는 하위호환용으로 보존.
 
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
@@ -458,6 +459,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **AI-user V13** | `ai_post_interested_personas` — post별 관심 persona pool (PLAN_CAST seed at READY; MATCHER/MANUAL later) |
 | **AI-user V14** | `ai_human_interaction_inbox`에 `attempt_count` · `last_error_code` · `schema_version` (자동 재시도 원장) |
 | **AI-user V15** | `ai_thread_plan_items.human_author_id` — human-reply 예산을 (post, human) 대화 단위로 분리. 없으면 한 게시글의 첫 사용자가 3×5=15 예산을 독점 |
+| **AI-user V19** | `ai_thread_plan_items.stance` VARCHAR(16)→**64** — LLM 자유 라벨(`concerned_supportive` 등) STRICT insert 실패 방지 |
 | **V91** | `ai_user_generation_config`에 `hr_*` 7컬럼 — 댓글 생성량 설정(SSOT: `/admin/ai-user`). 대화 총상한은 저장하지 않고 `hr_distinct_personas_max × hr_replies_per_persona_max` 파생 |
 | **V93** | `post_search_ngrams` — 광장 검색용 문자 바이그램 (MariaDB ngram FULLTEXT 대체) |
 | **V94** | `posts.capture_split_after_line` — X/IG 캡쳐 전반부 끝 개행 블록(1-based) |
@@ -473,6 +475,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V109** | `system_setting` 시드 — Phase 2 플랫폼별 cap(`marketing.cap.*` 기본 3) + score weights(`marketing.score.weights.{platform}.*`, plan §3). legacy text/video cap은 fallback |
 | **V110** | `marketing_publication_stats` — 발행 후 플랫폼 통계 스냅샷(`job_id`,`post_id`,`platform`,`metrics_json`,partial). SSOT=AS; 수집기는 ASM. `system_setting` `marketing.score.auto_adjust` 기본 `false` |
 | **V111** | `marketing_stats_event` — 통계 탭 append-only 이벤트(`event_type`,`platform`,`payload_json`,`created_at`). 타입: `COLLECT_*` · `PROPOSE` · `APPLY` · `SHADOW_TOGGLE` |
+| **V112** | `posts.sibom_candidates` JSON — 시봄이 이미지 id 숏리스트(≤12). 본문 keyword 스코어(코드). soft-fill 미저장 |
 
 ### `marketing_stats_event` (**V111**)
 

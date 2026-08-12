@@ -189,17 +189,20 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 4. 페이지가 커서(현재도 60KB 근접) 한 번에 못 옮기면: Bash `sed -n 'A,Bp'`로 8–10KB 단위로 잘라 손실 없이 확인한 뒤 전체를 조립해서 `write_files` — **plain text로, placeholder 금지**
 5. `if_match`에 직전 `write_files`/`read_file`이 반환한 etag를 반드시 넣을 것(동시편집 충돌 방지)
 
-### 6.2 런타임 이관 계획 (60장 확정 후 실행 — 아직 미실행)
+### 6.2 런타임 이관 계획 — **재정의 (2026-08-12 그릴링)**
+
+> ⚠️ 아래 구(舊) “60장 확정 후 / WaggleBot이 매칭 SSOT” 계획은 **폐기**.  
+> **현행 SSOT**: [`docs/shared/marketing/sibom-video-insertion.md`](../../../../shared/marketing/sibom-video-insertion.md)  
+> 요약: **30장으로 즉시 진행** · 메타포 영상 경로 **완전 금지** · **AS**가 shortlist·`sibom_plan`·가드 · WaggleBot은 합성·모션만 · YT/IG 채널별 분리 LLM 각색.
 
 | 단계 | 작업 |
 |---|---|
-| 1 | `svg/*.svg` → `rsvg-convert -w 820 -h 820` (배경 옵션 없이, 투명 유지) → PNG 820×820 |
-| 2 | PNG를 WSL `justant@100.115.252.61:~/Data/WaggleBot/assets/sprouts/{id}.png`로 복사 |
-| 3 | `catalog.json`을 같은 위치(`WaggleBot/assets/sprouts/catalog.json`)에 복사 — **이게 런타임 SSOT가 된다** (결정 8) |
-| 4 | WaggleBot `config/layout.json`의 `image_text.elements.image_area`(x90 y550 w820 h820, 1:1 배율 확인됨)에 맞춰 슬롯 rect가 여전히 유효한지 재검증 |
-| 5 | WaggleBot 본문 스크립트 LLM(`ai_worker/pipeline/content_processor.py` 부근)이 문단마다 `{image_id, caption}`을 출력하도록 프롬프트 확장 — `catalog.json`의 `trigger`+`keywords`를 프롬프트 컨텍스트로 주입 |
-| 6 | `again_spring` 전용 `distribute_images()` 균등분배 경로를 이 명시적 매핑으로 교체(`director.py:1044` 부근) |
-| 7 | `PostCreateRequest.java`의 `metaphorIds` 관련 검증(`@Size(max=5)`)은 새 경로에서 안 쓰이므로 그대로 두되, AS 사연 생성 LLM 프롬프트에서 메타포 선택 지시를 제거 |
+| 1 | `svg/*.svg` → PNG 820×820 (투명). `.temp/sprouts/png/` 또는 동등 미러 |
+| 2 | PNG + `catalog.json` → `WaggleBot/assets/sprouts/` (렌더 소비용 미러). **플랜 SSOT는 AS brief** |
+| 3 | AS: 사연 저장 시 코드 keyword → `sibom_candidates` · 영상 직전 LLM이 채널별 `sibom_plan` |
+| 4 | AS→ASM→WaggleBot brief: `sibom_plan` 패스스루 · `metaphor_id` 언플러그 |
+| 5 | WaggleBot: 캡션 PIL 합성 + large/small·hold/punch·모션. `distribute_images()` 메타포 경로 폐기 |
+| 6 | 추가 30장은 이후 상황 보고 — 현재 설계는 30장만 가정 |
 
 ---
 

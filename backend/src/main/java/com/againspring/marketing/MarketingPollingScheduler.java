@@ -42,6 +42,10 @@ public class MarketingPollingScheduler {
     );
 
     private static final long MAX_STALE_AGE_MS = 24 * 60 * 60 * 1000L;
+    private static final long ASM_CIRCUIT_OPEN_MS = 300_000L;
+
+    /** When set, skip ASM GETs until this instant (shared outage backoff). */
+    private volatile Instant asmCircuitOpenUntil = Instant.EPOCH;
 
     @Scheduled(fixedDelayString = "${asm.poll-interval-ms:15000}")
     public void pollJobs() {
@@ -50,12 +54,6 @@ public class MarketingPollingScheduler {
         }
 
         List<MarketingJob> jobsToPoll = marketingJobRepository.findByStatusIn(POLLING_STATUSES);
-        if (jobsToPoll.isEmpty()) {
-            return;
-        }
-
-        log.debug("Polling {} marketing jobs", jobsToPoll.size());
-
         Instant now = Instant.now();
 
         // Evening-slot auto-publish: READY + autoPublish + scheduledPublishAt <= now
@@ -74,44 +72,69 @@ public class MarketingPollingScheduler {
             }
         }
 
-        // Detect and reschedule jobs that missed the slot while still generating (not READY)
+        // Poll ASM first. Carry-over MUST run after this loop: applyPoll saves the
+        // in-memory entity and would otherwise overwrite a just-written next-day slot,
+        // re-triggering Telegram "이월" every pollInterval (~15s) with count stuck at 1.
+        if (!jobsToPoll.isEmpty()) {
+            if (now.isBefore(asmCircuitOpenUntil)) {
+                log.debug("ASM circuit open until {}; skipping {} job polls", asmCircuitOpenUntil, jobsToPoll.size());
+            } else {
+                log.debug("Polling {} marketing jobs", jobsToPoll.size());
+                for (MarketingJob job : jobsToPoll) {
+                    // Completed preview: artifacts already cached — do not hammer ASM.
+                    // Publish is driven by findDueAutoPublishJobs / triggerPublish, not this poll.
+                    if ("READY".equals(job.getStatus()) && job.hasArtifacts()) {
+                        continue;
+                    }
+                    if ("STALE".equals(job.getStatus()) && job.hasArtifacts()) {
+                        job.setStatus("READY");
+                        job.setPollFailCount(0);
+                        job.setErrorMessage(null);
+                        marketingJobRepository.save(job);
+                        continue;
+                    }
+                    if ("STALE".equals(job.getStatus())) {
+                        // 24h expiry → permanent FAILED
+                        if (job.getCreatedAt() != null &&
+                            now.toEpochMilli() - job.getCreatedAt().toEpochMilli() > MAX_STALE_AGE_MS) {
+                            job.setStatus("FAILED");
+                            job.setErrorMessage("ASM 응답 24시간 초과 — 자동 실패 처리");
+                            marketingJobRepository.save(job);
+                            continue;
+                        }
+                        // Exponential backoff: skip if not enough time has passed
+                        if (job.getLastPolledAt() != null) {
+                            long backoffMs = Math.min(
+                                (long) job.getPollFailCount() * asmProperties.getPollIntervalMs(),
+                                300_000L  // max 5 min
+                            );
+                            if (now.toEpochMilli() - job.getLastPolledAt().toEpochMilli() < backoffMs) {
+                                continue;
+                            }
+                        }
+                    }
+                    try {
+                        AsmJobView view = asmClient.getJob(job.getRemoteJobId());
+                        marketingJobService.applyPoll(job, view);
+                        log.debug("Polled job {} -> status: {}", job.getId(), view.getStatus());
+                    } catch (AsmUnavailableException e) {
+                        log.warn("ASM unavailable when polling job {}: {}", job.getId(), e.getMessage());
+                        job.markPollFailure(e.getMessage());
+                        marketingJobRepository.save(job);
+                        asmCircuitOpenUntil = Instant.now().plusMillis(ASM_CIRCUIT_OPEN_MS);
+                        log.warn("ASM circuit open for {}ms after connect failure", ASM_CIRCUIT_OPEN_MS);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Detect and reschedule auto-publish jobs that missed the slot while still generating
         List<MarketingJob> expiredJobs = marketingJobRepository.findExpiredScheduledJobs();
         if (!expiredJobs.isEmpty()) {
             log.info("Found {} expired scheduled jobs, rescheduling...", expiredJobs.size());
             for (MarketingJob expiredJob : expiredJobs) {
                 rescheduleExpiredJob(expiredJob, now);
-            }
-        }
-
-        for (MarketingJob job : jobsToPoll) {
-            if ("STALE".equals(job.getStatus())) {
-                // 24h expiry → permanent FAILED
-                if (job.getCreatedAt() != null &&
-                    now.toEpochMilli() - job.getCreatedAt().toEpochMilli() > MAX_STALE_AGE_MS) {
-                    job.setStatus("FAILED");
-                    job.setErrorMessage("ASM 응답 24시간 초과 — 자동 실패 처리");
-                    marketingJobRepository.save(job);
-                    continue;
-                }
-                // Exponential backoff: skip if not enough time has passed
-                if (job.getLastPolledAt() != null) {
-                    long backoffMs = Math.min(
-                        (long) job.getPollFailCount() * asmProperties.getPollIntervalMs(),
-                        300_000L  // max 5 min
-                    );
-                    if (now.toEpochMilli() - job.getLastPolledAt().toEpochMilli() < backoffMs) {
-                        continue;
-                    }
-                }
-            }
-            try {
-                AsmJobView view = asmClient.getJob(job.getRemoteJobId());
-                marketingJobService.applyPoll(job, view);
-                log.debug("Polled job {} -> status: {}", job.getId(), view.getStatus());
-            } catch (AsmUnavailableException e) {
-                log.warn("ASM unavailable when polling job {}: {}", job.getId(), e.getMessage());
-                job.markPollFailure(e.getMessage());
-                marketingJobRepository.save(job);
             }
         }
     }
@@ -143,16 +166,18 @@ public class MarketingPollingScheduler {
             job.setOriginalScheduledAt(originalScheduledAt);
         }
 
+        int nextCount = (job.getRescheduledCount() == null ? 0 : job.getRescheduledCount()) + 1;
+
         // Update job with new schedule
         job.setScheduledPublishAt(newScheduledTime);
-        job.setRescheduledCount(job.getRescheduledCount() + 1);
+        job.setRescheduledCount(nextCount);
         job.setLastRescheduledAt(now);
         job.setRescheduledReason("예약 시각 경과 (원 예약: " + originalScheduledAt + ")");
 
         marketingJobRepository.save(job);
 
         log.info("Rescheduled expired marketing job {} from {} to {} (reschedule #{}, reason: {})",
-            job.getId(), originalScheduledAt, newScheduledTime, job.getRescheduledCount(),
+            job.getId(), originalScheduledAt, newScheduledTime, nextCount,
             job.getRescheduledReason());
 
         telegramNotifier.send(String.format(
@@ -161,7 +186,7 @@ public class MarketingPollingScheduler {
             KST_FORMAT.format(originalScheduledAt),
             KST_FORMAT.format(newScheduledTime),
             KST_FORMAT.format(job.getOriginalScheduledAt()),
-            job.getRescheduledCount()));
+            nextCount));
     }
 
     /**

@@ -46,6 +46,9 @@ class AdminContentControllerTest {
     @Mock
     private PostSearchNgramIndexer postSearchNgramIndexer;
 
+    @Mock
+    private com.againspring.service.community.SibomCandidateService sibomCandidateService;
+
     @InjectMocks
     private AdminContentController controller;
 

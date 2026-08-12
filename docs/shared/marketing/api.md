@@ -141,6 +141,8 @@ Idempotency-Key: <uuid>
 > `brief.hook_emotion`: `shock|anger|tension|sad|hype` → **WaggleBot S2 Pro TTS** (Phase 2 SSOT).
 > 영상 슬롯 확정 시: `hook_reels`/`hook_shorts` · `script_reels`/`script_shorts` ·
 > `max_duration_reels_sec`(30) / `max_duration_shorts_sec`(45) · alone 시 `max_duration_sec`.
+> 시봄이: `sibom_candidates`(≤12) · `sibom_plan`(채널별). **`metaphor_id`/`metaphor_ids`는 영상 렌더에서 무시**.
+> 삽입 계약 SSOT: [`sibom-video-insertion.md`](sibom-video-insertion.md).
 >
 > UTM (Phase 1 유지): AS가 잡 생성 시 `brief.post_url`(+ `options.post_urls`/`utm_campaign`)에 부착.
 > `utm_source`=`x`|`instagram`|`youtube`, `utm_medium=organic`, `utm_campaign=story_{localJobId}`,
@@ -160,6 +162,17 @@ Idempotency-Key: <uuid>
     "script_reels": "훅 → 요약 → 클리프행어 대본",
     "script_shorts": "훅 → 요약 → 클리프행어 대본",
     "max_duration_sec": 45,
+    "sibom_candidates": ["waiting-reply", "drained", "side-glance"],
+    "sibom_plan": [
+      {
+        "role": "intro",
+        "image_id": "waiting-reply",
+        "caption": "읽씹 3일차",
+        "beat_index": 0,
+        "size": "large",
+        "dwell": "hold"
+      }
+    ],
     "metaphor_id": "empty-chair",
     "neutral_summary": "중립 요약 (최대 500자)",
     "side_a": "작성자 관점(또는 요약 스크립트)",
@@ -195,6 +208,9 @@ Idempotency-Key: <uuid>
 | `script_reels` / `script_shorts` | **2 SSOT** | 요약 대본 (전문 낭독 금지) |
 | `max_duration_reels_sec` / `max_duration_shorts_sec` | **2 SSOT** | 30 / 45 |
 | `max_duration_sec` | **2 SSOT** | alone 잡 활성 캡 |
+| `sibom_candidates` | **시봄이** | string[] ≤12. 사연 생성 후 코드 shortlist |
+| `sibom_plan` | **시봄이** | 채널별 삽입 플랜 배열. 인트로=`role=intro`. 상세 [`sibom-video-insertion.md`](sibom-video-insertion.md) |
+| `metaphor_id` / `metaphor_ids` | **무시(영상)** | DB 보존만. 영상 렌더·썸네일 경로에서 **사용하지 않음** |
 | `tags` | 1 유지 | 플랫폼 clamp. 브랜드 2 항상 |
 | `post_url` + UTM | 1 유지 | X·YT 출구. `utm_content`의 hookType 구분 |
 | `empathy_ratio` | 1 유지 | **실투표 %** |
@@ -278,7 +294,7 @@ Content-Type: image/png | image/jpeg
 **오류**: 400(이름/타입/크기 불일치), 401, 404(job 없음)
 
 업로드된 커스텀 커버·자동 썸네일은 다음 발행 시 반영된다:
-- **YouTube Shorts**: 영상 업로드 성공 후 항상 `thumbnails.set` API 호출(실패해도 게시 자체는 성공 처리 — non-fatal). **우선순위** = 운영자 `customcover` → WaggleBot 인트로 썸네일(메타포+제목, `thumbnailUrl`) → mp4 frame0 추출. 1×1 플레이스홀더(≤1KB)는 업로드하지 않는다. Shorts 선반은 `oar` 자동프레임(본문 씬)을 고를 수 있어 **API 썸네일 등록이 필수**이며, 영상 첫 프레임(인트로)은 API 실패 시 백업일 뿐이다.
+- **YouTube Shorts**: 영상 업로드 성공 후 항상 `thumbnails.set` API 호출(실패해도 게시 자체는 성공 처리 — non-fatal). **우선순위** = 운영자 `customcover` → WaggleBot 인트로 썸네일(`sibom_plan` intro 합성 PNG, `thumbnailUrl`) → mp4 frame0 추출. **메타포 PNG 금지**. 1×1 플레이스홀더(≤1KB)는 업로드하지 않는다. Shorts 선반은 `oar` 자동프레임(본문 씬)을 고를 수 있어 **API 썸네일 등록이 필수**이며, 영상 첫 프레임(인트로)은 API 실패 시 백업일 뿐이다.
 - **Instagram Reels**: Graph API `cover_url`(공개 HTTPS 필요, ASM은 현재 Tailscale 내부망 전용이라 **미동작**)은 보류 상태. 대신 API 경로 실패 시 폴백되는 Playwright 자동화 경로의 로컬 파일 첨부(`coverPath`)에는 반영됨.
 
 Again-Spring 측 관리자 UI 경로: `PUT /api/admin/marketing/jobs/{id}/artifacts/{platform}/thumbnail` (멀티파트, `AdminMarketingController` → `AsmClient.putArtifact` 프록시).
@@ -372,10 +388,12 @@ AS polling → GET /api/v1/jobs/{remote_job_id} → ASM
                   ↓ (ASM 연결 실패 시)
            job.markPollFailure() → poll_fail_count++
            poll_fail_count >= 5 → status = STALE
+             (단 artifacts 있으면 READY 유지 — 미리보기 보존)
+           연결 실패 시 ASM circuit 5분 open (나머지 잡 GET 중단)
            
-           (STALE 상태 시)
-           → 지수 백오프 재시도 (exponential backoff)
-           → 24시간 초과 시 FAILED로 전환
+           READY + artifacts → GET 스킵 (게시는 due-slot/수동 publish)
+           STALE + artifacts → READY 복구
+           STALE (artifacts 없음) → 지수 백오프 / 24h 초과 시 FAILED
 ```
 
 **상태 정의**

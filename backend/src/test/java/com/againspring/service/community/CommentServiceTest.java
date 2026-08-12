@@ -1,5 +1,6 @@
 package com.againspring.service.community;
 
+import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.community.PostComment;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.enums.CommentStatus;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -80,6 +82,21 @@ class CommentServiceTest {
         verify(commentRepository)
                 .findByParentCommentIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(parentId, CommentStatus.ACTIVE);
         verify(commentRepository, never()).findByParentCommentIdOrderByCreatedAtAsc(anyLong());
+    }
+
+    @Test
+    @DisplayName("addComment — 대댓글의 대댓글(depth≥2)은 COMMENT_DEPTH_EXCEEDED")
+    void addComment_rejectsReplyToReply() {
+        Long depth1Id = 10L;
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).build()));
+        when(commentRepository.findById(depth1Id)).thenReturn(Optional.of(PostComment.builder()
+                .id(depth1Id).postId(POST_ID).parentCommentId(1L).body("직계 대댓글").status(CommentStatus.ACTIVE).build()));
+
+        assertThatThrownBy(() -> commentService.addComment(POST_ID, depth1Id, "user-1", "중첩 답글"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code")
+                .isEqualTo("COMMENT_DEPTH_EXCEEDED");
+        verify(commentRepository, never()).save(any());
     }
 
     @Test

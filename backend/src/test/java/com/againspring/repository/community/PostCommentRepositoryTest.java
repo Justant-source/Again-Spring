@@ -146,4 +146,19 @@ class PostCommentRepositoryTest {
         assertThat(repo.countVisibleByPostId(POST_ID, CommentStatus.ACTIVE))
                 .as("목록에 안 보이는 고아 답글 제외").isEqualTo(2);
     }
+
+    @Test
+    @DisplayName("visible count — depth≥2 중첩 대댓글은 UI에 안 보이므로 제외")
+    void countVisible_excludesNestedDepth2PlusReplies() {
+        Instant t = Instant.parse("2026-06-07T03:00:00Z");
+        Long depth1 = save(activeTopId, "직계 대댓글", CommentStatus.ACTIVE, null, t).getId();
+        save(depth1, "depth2 중첩", CommentStatus.ACTIVE, null, t.plusSeconds(1));
+        save(depth1, "depth2 중첩2", CommentStatus.ACTIVE, null, t.plusSeconds(2));
+
+        // setUp visible 2 + depth1 1 = 3. depth2 2건은 배지에 포함되면 안 됨
+        assertThat(repo.countByPostIdAndStatusAndDeletedAtIsNull(POST_ID, CommentStatus.ACTIVE))
+                .as("status-only는 depth2 포함").isEqualTo(5);
+        assertThat(repo.countVisibleByPostId(POST_ID, CommentStatus.ACTIVE))
+                .as("UI 2단만 카운트").isEqualTo(3);
+    }
 }

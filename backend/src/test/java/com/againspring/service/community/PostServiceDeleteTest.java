@@ -39,6 +39,9 @@ class PostServiceDeleteTest {
     @Mock
     private CommentService commentService;
 
+    @Mock
+    private SibomCandidateService sibomCandidateService;
+
     @InjectMocks
     private PostService postService;
 

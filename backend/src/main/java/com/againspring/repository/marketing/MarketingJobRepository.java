@@ -285,14 +285,19 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * QUEUED/RUNNING/STALE past the grace window are carried to the next-day slot
      * (content was not ready in time).
      *
+     * <p>{@code auto_publish=1} only — preview/manual jobs must not keep rolling the slot
+     * or spamming carry-over Telegram alerts.
+     *
      * Conditions:
+     * - auto_publish = true
      * - scheduled_publish_at is not null
      * - scheduled_publish_at < now - 5 minutes (tolerance)
      * - status is one of: QUEUED, RUNNING, STALE (not yet READY/terminal)
      */
     @Query(nativeQuery = true, value = """
         SELECT * FROM marketing_job
-        WHERE scheduled_publish_at IS NOT NULL
+        WHERE auto_publish = 1
+        AND scheduled_publish_at IS NOT NULL
         AND scheduled_publish_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
         AND status IN ('QUEUED', 'RUNNING', 'STALE')
         """)

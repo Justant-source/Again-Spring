@@ -37,6 +37,9 @@ public class PostDetailResponse {
 
     private List<String> metaphorIds;
 
+    /** 시봄이 캐릭터 id 숏리스트(≤12). 본문 keyword 스코어. */
+    private List<String> sibomCandidates;
+
     private String bodyPublished;
 
     private String category;
@@ -152,6 +155,7 @@ public class PostDetailResponse {
                 .hookEmotion(post.getHookEmotion())
                 .metaphorId(post.getMetaphorId())
                 .metaphorIds(post.getMetaphorIds())
+                .sibomCandidates(post.getSibomCandidates())
                 .bodyPublished(bodyPublished)
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())

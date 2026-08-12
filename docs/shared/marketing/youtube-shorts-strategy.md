@@ -2,7 +2,8 @@
 
 > **권위본**: 이 문서. `youtube_shorts` / `instagram_reels` 영상 채널의 생성·검수·게시 계약.
 > 플랫폼 표·분배는 [`platforms.md`](platforms.md), 캡처/피드는 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) · [`x-thread-strategy.md`](x-thread-strategy.md).
-> **작성**: 2026-08-04 · **Phase 2 타깃 SSOT**: 2026-08-11
+> **시봄이 삽입(인트로·본문·brief)**: [`sibom-video-insertion.md`](sibom-video-insertion.md) — **메타포 일러스트는 영상 경로에서 사용 금지**.
+> **작성**: 2026-08-04 · **Phase 2 타깃 SSOT**: 2026-08-11 · **시봄이 삽입**: 2026-08-12
 
 ---
 
@@ -53,7 +54,8 @@ AS 24h 분배 (채널별 score·cap)
 | 댓글 | 광장 **좋아요 순 상위 3**(§4.3/§4.5) — 화자별 TTS |
 | 양면(paired) | 영상에는 작성자 중심. 클로징·첫 댓글만 상대 처리 |
 | 클로징 TTS | 솔로: `여러분의 의견을 댓글로 남겨주세요` / paired: `상대방의 사연이 궁금하면 댓글을 확인해주세요` |
-| 썸네일 | **인트로(메타포+제목) PNG** → 발행 시 `thumbnails.set` 필수. 폴백: mp4 frame0 추출. Shorts 선반은 oar 자동프레임(≠frame0)이라 API 등록 없으면 본문 씬이 노출됨 |
+| 시봄이 | 인트로+본문. 예산 Reels 4~5 / Shorts 5~7 (인트로 포함). **메타포 금지**. 상세 [`sibom-video-insertion.md`](sibom-video-insertion.md) |
+| 썸네일 | **`sibom_plan` `role=intro` 합성 PNG**(없으면 크림+훅) → 발행 시 `thumbnails.set` 필수. 폴백: mp4 frame0 추출. Shorts 선반은 oar 자동프레임(≠frame0)이라 API 등록 없으면 본문 씬이 노출됨 |
 
 ### paired 첫 댓글 (게시 승인 시)
 
@@ -128,7 +130,9 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 | `script_reels` / `script_shorts` | 요약 낭독 대본 + CTA (전문 아님) |
 | `max_duration_reels_sec` / `max_duration_shorts_sec` | 30 / 45 (듀얼·분리 잡) |
 | `max_duration_sec` | alone 잡의 활성 캡 (30 또는 45) |
-| `metaphor_id` | 사연 생성 시 매칭된 메타포 일러스트 ID (60종). intro에 사용. 없으면 크림 빈화면 |
+| `sibom_candidates` | string[] ≤12. 사연 생성 후 코드 keyword shortlist (`posts.sibom_candidates`) |
+| `sibom_plan` | 채널별 삽입 플랜 배열 (`role`/`image_id`/`caption`/`beat_index`/`size`/`dwell`). 인트로·피크·펀치. 상세 [`sibom-video-insertion.md`](sibom-video-insertion.md) |
+| `metaphor_id` / `metaphor_ids` | **영상 렌더에서 무시**. DB 컬럼 보존만. 신규 선택·주입 중지 |
 | `side_a` / `author_body` | 폴백 본문. 렌더 body는 `script_*` 우선 |
 | `partner_body` | paired일 때 상대 — 클로징/첫 댓글용 |
 | `top_comments` | `{ author, author_id?, body, like_count, created_at, side }[]` 최대 3 (§4.5) |
@@ -157,8 +161,8 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 - **보이스 계약**: 본문·intro·클로징 = `tts_voice`. 댓글 = `comment_tts_voices` 풀에서 작성자별 랜덤. **감정** = `hook_emotion` → S2 Pro
 - **클로징**: again_spring 고정 문구는 voice+text 키로 디스크 캐시·loudnorm 후 재사용
 - **AV 동기**: 오디오 타임라인 고정. 화면만 `TTS_TEXT_LEAD_SEC=0.10`(100ms) 앞서 전환
-- **Intro**: `metaphor_id` PNG가 있으면 표지로, 없으면 크림 빈화면+**훅**만 (원제 낭독 intro 폐기)
-- **TTS 음량**: 통합 낭독 wav를 장면 분할해 재사용. 댓글/클로징은 개별 loudnorm(`I=-16`) 후 concat
+- **Intro**: `sibom_plan` 중 `role=intro` 시봄이 합성 PNG가 있으면 표지, 없으면 크림+**훅**만. **메타포 PNG 사용 금지** (원제 낭독 intro 폐기)
+- **TTS 음량**: 통합 낭독 wav를 장면 분할해 재사용. 댓글/클로징은 개별 2-pass loudnorm(`I=-16`) 후, 타깃 밴드(`-19…-14`) 밖이면 **양방향** volume gain(키우기·줄이기)+peak 리미터. 예전 peak-only 부스트는 큰 첫 댓글을 더 키우는 경우가 있어 제거.
 
 ---
 

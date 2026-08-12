@@ -60,8 +60,8 @@ public class AiThreadPlanItem {
     @Column(name = "body", columnDefinition = "LONGTEXT")
     private String body;
 
-    /** Perspective label for 80% stance-cap measurement (AUTHOR|COUNTERPART|NEUTRAL|CONTRARIAN). */
-    @Column(name = "stance", length = 16)
+    /** Free-form perspective label for 80% stance-cap (LLM may emit long tokens). */
+    @Column(name = "stance", length = 64)
     private String stance;
 
     /** Optional crawled/source example provenance; no hard FK to backend tables. */

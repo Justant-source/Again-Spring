@@ -10,14 +10,18 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 /**
  * Stage-2 video variants (H3): when a story is committed to Reels and/or Shorts,
- * generate platform-specific hook + summary script (not full-story read).
+ * generate platform-specific hook + summary script (not full-story read) and optional
+ * channel {@code sibom_plan} (AS-owned; guard downgrades, no 3rd LLM call).
  *
  * <p>Reels ≤30s · Shorts ≤45s. PromptSanitizer + no 판결/처방/승패/배심원.
+ * Channel LLM calls stay separate when both platforms are requested.
  */
 @Slf4j
 @Service
@@ -31,6 +35,7 @@ public class VideoVariantService {
     private static final int HOOK_STORE_MAX = 200;
     private static final int SCRIPT_REELS_MAX = 220;
     private static final int SCRIPT_SHORTS_MAX = 320;
+    private static final int SIBOM_CARD_MAX = 10;
     private static final String CTA_CLIFF =
             "공감 비율은? 댓글로 남겨주세요.";
 
@@ -44,10 +49,26 @@ public class VideoVariantService {
             Integer maxDurationReelsSec,
             String hookShorts,
             String scriptShorts,
-            Integer maxDurationShortsSec
+            Integer maxDurationShortsSec,
+            List<SibomPlanItem> sibomPlanReels,
+            List<SibomPlanItem> sibomPlanShorts
     ) {
+        public Variants {
+            sibomPlanReels = sibomPlanReels == null ? List.of() : List.copyOf(sibomPlanReels);
+            sibomPlanShorts = sibomPlanShorts == null ? List.of() : List.copyOf(sibomPlanShorts);
+        }
+
         public static Variants empty() {
-            return new Variants(null, null, null, null, null, null);
+            return new Variants(null, null, null, null, null, null, List.of(), List.of());
+        }
+
+        /**
+         * Active channel plan when generated for a single channel; prefers reels then shorts.
+         * Dual-channel jobs should use {@link #sibomPlanReels()} / {@link #sibomPlanShorts()}.
+         */
+        public List<SibomPlanItem> sibomPlan() {
+            if (!sibomPlanReels.isEmpty()) return sibomPlanReels;
+            return sibomPlanShorts;
         }
     }
 
@@ -63,10 +84,8 @@ public class VideoVariantService {
     private boolean enabled;
 
     /**
-     * Generate variants only for requested video platforms.
-     *
-     * @param needReels  {@code true} when targets include {@code instagram_reels}
-     * @param needShorts {@code true} when targets include {@code youtube_shorts}
+     * Legacy overload (no sibom candidates). Prefer
+     * {@link #generate(String, String, String, String, boolean, boolean, List)}.
      */
     public Variants generate(
             String masterHook,
@@ -76,6 +95,24 @@ public class VideoVariantService {
             boolean needReels,
             boolean needShorts
     ) {
+        return generate(masterHook, hookEmotion, title, body, needReels, needShorts, List.of());
+    }
+
+    /**
+     * Generate variants for requested video platforms. When both Reels and Shorts are needed,
+     * runs <strong>separate</strong> LLM calls (channel-specific script + {@code sibom_plan}).
+     *
+     * @param sibomCandidates shortlist ids (≤12 from post); prompt injects ≤10 one-line cards
+     */
+    public Variants generate(
+            String masterHook,
+            String hookEmotion,
+            String title,
+            String body,
+            boolean needReels,
+            boolean needShorts,
+            List<String> sibomCandidates
+    ) {
         if (!needReels && !needShorts) {
             return Variants.empty();
         }
@@ -83,60 +120,113 @@ public class VideoVariantService {
         String safeHook = blankToNull(masterHook);
         String safeTitle = title != null ? title.trim() : "";
         String safeBody = body != null ? body.trim() : "";
-
-        Variants llm = null;
-        if (enabled) {
-            try {
-                llm = parseResult(llmProvider.invoke(
-                        buildPrompt(safeHook, hookEmotion, safeTitle, safeBody, needReels, needShorts),
-                        model));
-            } catch (Exception e) {
-                log.warn("VideoVariant LLM failed: {}", e.getMessage());
-            }
-        }
+        List<String> candidates = sibomCandidates != null ? sibomCandidates : List.of();
 
         String hookReels = null;
         String scriptReels = null;
         Integer durReels = null;
+        List<SibomPlanItem> planReels = List.of();
         String hookShorts = null;
         String scriptShorts = null;
         Integer durShorts = null;
+        List<SibomPlanItem> planShorts = List.of();
 
         if (needReels) {
+            ChannelResult reels = generateOneChannel(
+                    safeHook, hookEmotion, safeTitle, safeBody,
+                    SibomPlanGuard.Channel.REELS, candidates);
             durReels = MAX_DURATION_REELS_SEC;
-            hookReels = sanitizeHook(llm != null ? llm.hookReels() : null, safeHook, safeTitle);
-            scriptReels = sanitizeScript(
-                    llm != null ? llm.scriptReels() : null,
-                    safeBody,
-                    SCRIPT_REELS_MAX);
+            hookReels = reels.hook();
+            scriptReels = reels.script();
+            planReels = reels.sibomPlan();
         }
         if (needShorts) {
+            ChannelResult shorts = generateOneChannel(
+                    safeHook, hookEmotion, safeTitle, safeBody,
+                    SibomPlanGuard.Channel.SHORTS, candidates);
             durShorts = MAX_DURATION_SHORTS_SEC;
-            hookShorts = sanitizeHook(llm != null ? llm.hookShorts() : null, safeHook, safeTitle);
-            scriptShorts = sanitizeScript(
-                    llm != null ? llm.scriptShorts() : null,
-                    safeBody,
-                    SCRIPT_SHORTS_MAX);
+            hookShorts = shorts.hook();
+            scriptShorts = shorts.script();
+            planShorts = shorts.sibomPlan();
         }
 
         // Dual: force distinct hooks/scripts so shared-pool dual jobs still unique-render.
         if (needReels && needShorts
                 && hookReels != null && hookReels.equals(hookShorts)
                 && scriptReels != null && scriptReels.equals(scriptShorts)) {
-            hookShorts = distinctHook(hookShorts, "Shorts");
+            hookShorts = distinctHook(hookShorts);
             scriptShorts = clamp(scriptShorts + " 당신은 어느 쪽?", SCRIPT_SHORTS_MAX);
         }
 
-        return new Variants(hookReels, scriptReels, durReels, hookShorts, scriptShorts, durShorts);
+        return new Variants(
+                hookReels, scriptReels, durReels,
+                hookShorts, scriptShorts, durShorts,
+                planReels, planShorts);
     }
 
-    private String buildPrompt(
+    /**
+     * Single-channel entry (Reels or Shorts). Returns a {@link Variants} with only that
+     * channel's fields populated; {@link Variants#sibomPlan()} returns the channel plan.
+     */
+    public Variants generateForChannel(
+            String masterHook,
+            String hookEmotion,
+            String title,
+            String body,
+            String channel,
+            List<String> sibomCandidates
+    ) {
+        SibomPlanGuard.Channel ch = SibomPlanGuard.Channel.from(channel);
+        if (ch == null) {
+            return Variants.empty();
+        }
+        boolean needReels = ch == SibomPlanGuard.Channel.REELS;
+        boolean needShorts = ch == SibomPlanGuard.Channel.SHORTS;
+        return generate(masterHook, hookEmotion, title, body, needReels, needShorts, sibomCandidates);
+    }
+
+    private record ChannelResult(String hook, String script, List<SibomPlanItem> sibomPlan) {
+        static ChannelResult empty() {
+            return new ChannelResult(null, null, List.of());
+        }
+    }
+
+    private ChannelResult generateOneChannel(
+            String masterHook,
+            String hookEmotion,
+            String title,
+            String body,
+            SibomPlanGuard.Channel channel,
+            List<String> sibomCandidates
+    ) {
+        int scriptMax = channel == SibomPlanGuard.Channel.REELS ? SCRIPT_REELS_MAX : SCRIPT_SHORTS_MAX;
+        ChannelResult llm = ChannelResult.empty();
+        if (enabled) {
+            try {
+                llm = parseChannelResult(
+                        llmProvider.invoke(
+                                buildChannelPrompt(
+                                        masterHook, hookEmotion, title, body, channel, sibomCandidates),
+                                model),
+                        channel);
+            } catch (Exception e) {
+                log.warn("VideoVariant LLM failed ({}): {}", channel, e.getMessage());
+            }
+        }
+
+        String hook = sanitizeHook(llm.hook(), masterHook, title);
+        String script = sanitizeScript(llm.script(), body, scriptMax);
+        List<SibomPlanItem> plan = SibomPlanGuard.guard(llm.sibomPlan(), channel);
+        return new ChannelResult(hook, script, plan);
+    }
+
+    private String buildChannelPrompt(
             String masterHook,
             String emotion,
             String title,
             String body,
-            boolean needReels,
-            boolean needShorts
+            SibomPlanGuard.Channel channel,
+            List<String> sibomCandidates
     ) {
         String rawBody = body != null ? body : "";
         if (rawBody.length() > BODY_PROMPT_MAX) {
@@ -148,34 +238,47 @@ public class VideoVariantService {
         String emo = PromoTitleService.validateEmotion(emotion);
         String emoLine = emo != null ? emo : "tension";
 
-        String platforms;
-        if (needReels && needShorts) {
-            platforms = "instagram_reels(≤30초) 와 youtube_shorts(≤45초) 둘 다";
-        } else if (needReels) {
-            platforms = "instagram_reels(≤30초)만";
-        } else {
-            platforms = "youtube_shorts(≤45초)만";
-        }
+        boolean reels = channel == SibomPlanGuard.Channel.REELS;
+        String platform = reels ? "instagram_reels(≤30초)" : "youtube_shorts(≤45초)";
+        String hookKey = reels ? "hook_reels" : "hook_shorts";
+        String scriptKey = reels ? "script_reels" : "script_shorts";
+        String scriptHint = reels
+                ? "script는 짧게(말했을 때 ~25초)."
+                : "script는 조금 더 길게(~40초).";
+        int softTargetLo = reels ? 4 : 5;
+        int softTargetHi = reels ? 5 : 7;
+
+        String cards = buildSibomCards(sibomCandidates);
+        String softFillList = String.join(", ", SibomPlanGuard.SOFT_FILL_POOL);
 
         return """
-            당신은 SNS 숏폼(릴스/쇼츠)용 카피라이터입니다.
-            마스터 훅을 플랫폼별로 변형하고, 전문 낭독이 아닌 **요약 나레이션 + 클리프행어 CTA** 대본을 씁니다.
+            당신은 SNS 숏폼용 카피라이터입니다.
+            마스터 훅을 채널용으로 변형하고, 전문 낭독이 아닌 **요약 나레이션 + 클리프행어 CTA** 대본을 씁니다.
+            같은 호출에서 시봄이 캐릭터 삽입 플랜(sibom_plan)도 제안합니다.
 
             ## 대상
-            %s
+            %s 만 (이 채널 전용 — 다른 채널 필드 금지)
 
             ## 규칙
             - 한국어. 이모지·해시태그·따옴표 장식 금지.
             - 판결/처방/승패/유무죄/가해자·피해자 단정 금지. 「배심원」 금지.
-            - hook_* : 스크롤 스톱 한 줄(개행 허용). 마스터 훅과 글자 복제 금지·비틀기 허용.
+            - %s : 스크롤 스톱 한 줄(개행 허용). 마스터 훅과 글자 복제 금지·비틀기 허용.
               **본문 속 구체적 사실(기간·나이·금액·횟수 등 숫자)을 문장 맨 앞에 두고, 그 직후에 모순·반전을 심으세요.**
               "진짜"·"완전"·"너무" 같은 감정 형용사 대신 사실 자체로 긴장을 만드세요.
-              예(형식 참고용, 실제 사연 아님): "9년 사귄 사람이 결혼 얘기 나오자 혼자 여행부터 갑니다."
-            - script_* : 자극 훅 톤 유지 → 갈등 핵심 2~4문장 요약 → 공감비율/댓글 유도 클리프행어.
-              전문 낭독 금지. 문장마다 사실(숫자·행동) 하나씩 담아 전개하고 형용사로 때우지 마세요.
-              Reels script는 짧게(말했을 때 ~25초), Shorts는 조금 더 길게(~40초).
-            - Reels와 Shorts를 둘 다 쓸 때 hook/script는 **서로 다르게**.
-            - 불필요 필드는 JSON에서 생략(해당 플랫폼만).
+            - %s : 자극 훅 톤 유지 → 갈등 핵심 2~4문장 요약 → 공감비율/댓글 유도 클리프행어.
+              전문 낭독 금지. %s
+            - 메타포 일러스트 사용 금지. 시봄이만.
+            - sibom_plan: 총 %d~%d장(인트로 포함, soft target). role=intro|peak|punch|soft_fill.
+              intro/peak=large+hold, punch/soft_fill=small+punch.
+              soft_fill은 아래 풀 id만·intro/peak 불가. image_id는 후보 카드 또는 soft_fill 풀에서만.
+              caption은 카탈로그 재사용 또는 최대 10자(maxChars=10) 단문(판정·승패·처방 금지).
+              beat_index=대본 비트 인덱스. 1피크=hook_emotion 정렬, 2피크=결말/반전만·후반.
+
+            ## 시봄이 후보 카드 (id|arc|people|meaning|maxChars) — 전체 카탈로그 금지
+            %s
+
+            ## soft_fill 풀
+            %s
 
             <user_input>
             마스터훅: %s
@@ -185,26 +288,96 @@ public class VideoVariantService {
             </user_input>
 
             ## 출력 (JSON only)
-            {"hook_reels":"...","script_reels":"...","hook_shorts":"...","script_shorts":"..."}
-            """.formatted(platforms, safeHook, emoLine, safeTitle, safeBody);
+            {"%s":"...","%s":"...","sibom_plan":[{"role":"intro","image_id":"...","caption":"...","beat_index":0,"size":"large","dwell":"hold"}]}
+            """.formatted(
+                platform,
+                hookKey,
+                scriptKey,
+                scriptHint,
+                softTargetLo,
+                softTargetHi,
+                cards.isBlank() ? "(후보 없음 — soft_fill 풀만 사용 가능, 없으면 sibom_plan=[])" : cards,
+                softFillList,
+                safeHook,
+                emoLine,
+                safeTitle,
+                safeBody,
+                hookKey,
+                scriptKey);
     }
 
-    private Variants parseResult(String jsonResult) {
+    /** ≤10 one-line cards from candidates known in catalog. Never dump full 30. */
+    static String buildSibomCards(List<String> sibomCandidates) {
+        if (sibomCandidates == null || sibomCandidates.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        int n = 0;
+        for (String raw : sibomCandidates) {
+            if (raw == null || raw.isBlank()) continue;
+            var entry = SibomCatalog.get(raw.trim());
+            if (entry.isEmpty()) continue;
+            if (n > 0) sb.append('\n');
+            sb.append(SibomCatalog.oneLineCard(entry.get()));
+            n++;
+            if (n >= SIBOM_CARD_MAX) break;
+        }
+        return sb.toString();
+    }
+
+    private ChannelResult parseChannelResult(String jsonResult, SibomPlanGuard.Channel channel) {
         try {
             String json = TonalizationService.extractJsonObject(jsonResult);
             JsonNode root = objectMapper.readTree(json);
-            return new Variants(
-                    text(root, "hook_reels", "hookReels"),
-                    text(root, "script_reels", "scriptReels"),
-                    null,
-                    text(root, "hook_shorts", "hookShorts"),
-                    text(root, "script_shorts", "scriptShorts"),
-                    null
-            );
+            boolean reels = channel == SibomPlanGuard.Channel.REELS;
+            String hook = reels
+                    ? text(root, "hook_reels", "hookReels")
+                    : text(root, "hook_shorts", "hookShorts");
+            String script = reels
+                    ? text(root, "script_reels", "scriptReels")
+                    : text(root, "script_shorts", "scriptShorts");
+            List<SibomPlanItem> plan = parseSibomPlan(root.path("sibom_plan"));
+            if (plan.isEmpty()) {
+                plan = parseSibomPlan(root.path("sibomPlan"));
+            }
+            return new ChannelResult(hook, script, plan);
         } catch (Exception e) {
-            log.debug("VideoVariant parse failed: {}", e.getMessage());
-            return null;
+            log.debug("VideoVariant parse failed ({}): {}", channel, e.getMessage());
+            return ChannelResult.empty();
         }
+    }
+
+    static List<SibomPlanItem> parseSibomPlan(JsonNode arr) {
+        if (arr == null || !arr.isArray()) return List.of();
+        List<SibomPlanItem> out = new ArrayList<>();
+        for (JsonNode n : arr) {
+            if (n == null || !n.isObject()) continue;
+            String role = textNode(n, "role");
+            String imageId = textNode(n, "image_id", "imageId");
+            if (imageId == null || imageId.isBlank()) continue;
+            String caption = textNode(n, "caption");
+            Integer beat = null;
+            if (n.has("beat_index") && n.get("beat_index").canConvertToInt()) {
+                beat = n.get("beat_index").asInt();
+            } else if (n.has("beatIndex") && n.get("beatIndex").canConvertToInt()) {
+                beat = n.get("beatIndex").asInt();
+            }
+            String size = textNode(n, "size");
+            String dwell = textNode(n, "dwell");
+            out.add(new SibomPlanItem(role, imageId.trim(), caption, beat, size, dwell));
+        }
+        return out;
+    }
+
+    private static String textNode(JsonNode n, String... keys) {
+        for (String key : keys) {
+            JsonNode v = n.get(key);
+            if (v != null && !v.isNull()) {
+                String s = v.asText(null);
+                if (s != null && !s.isBlank()) return s.trim();
+            }
+        }
+        return null;
     }
 
     private static String text(JsonNode root, String snake, String camel) {
@@ -263,7 +436,7 @@ public class VideoVariantService {
         return b + " " + CTA_CLIFF;
     }
 
-    private static String distinctHook(String hook, String suffixTag) {
+    private static String distinctHook(String hook) {
         if (hook == null) return null;
         String flat = hook.replace("\n", " ").trim();
         if (flat.length() + 4 <= HOOK_STORE_MAX) {

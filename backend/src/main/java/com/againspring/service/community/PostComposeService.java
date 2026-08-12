@@ -38,6 +38,7 @@ public class PostComposeService {
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final PostSearchNgramIndexer postSearchNgramIndexer;
     private final ApplicationEventPublisher eventPublisher;
+    private final SibomCandidateService sibomCandidateService;
 
     /**
      * 재구성 출처 스냅샷 — 재구성 모드 생성 시만 전달되며 posts 테이블에 저장.
@@ -217,6 +218,7 @@ public class PostComposeService {
                 .hookEmotion(normalizedEmotion)
                 .metaphorId(normalizedMetaphor)
                 .metaphorIds(normalizedMetaphorIds)
+                .sibomCandidates(sibomCandidateService.shortlist(bodyRaw, userTitle))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now());
         // 재구성 출처 스냅샷 (재구성 모드 시만 비-null)

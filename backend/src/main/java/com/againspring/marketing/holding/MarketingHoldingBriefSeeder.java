@@ -3,6 +3,7 @@ package com.againspring.marketing.holding;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.PostComment;
 import com.againspring.domain.community.VoteOption;
+import com.againspring.marketing.MarketingBriefText;
 import com.againspring.marketing.dto.CreateJobRequest.BriefDto;
 import com.againspring.marketing.dto.CreateJobRequest.EmpathyRatioDto;
 import com.againspring.marketing.dto.CreateJobRequest.PolicyDto;
@@ -95,9 +96,9 @@ public class MarketingHoldingBriefSeeder {
                 })
                 .limit(3)
                 .map(c -> TopCommentDto.builder()
-                    .author(resolveNickname(c.getAuthorId()))
+                    .author(MarketingBriefText.normalize(resolveNickname(c.getAuthorId())))
                     .authorId(c.getAuthorId())
-                    .body(c.getBody())
+                    .body(MarketingBriefText.normalize(c.getBody()))
                     .likeCount(c.getLikeCount() != null ? c.getLikeCount() : 0)
                     .createdAt(c.getCreatedAt())
                     .side(resolveSide(c.getAuthorId(), post.getAuthorId(), post.getPartnerUserId()))
@@ -126,7 +127,8 @@ public class MarketingHoldingBriefSeeder {
             .title(storyTitle)
             .promoTitle(PromoTitleService.resolveOrFallback(post))
             .hookEmotion(blankToNull(post.getHookEmotion()))
-            .metaphorId(post.getMetaphorId())
+            .sibomCandidates(blankListToNull(post.getSibomCandidates()))
+            // metaphor_* omitted — video path uses sibom_plan at job create
             .neutralSummary(summary)
             .sideA(sideAText)
             .sideB(sideBText)
@@ -149,6 +151,11 @@ public class MarketingHoldingBriefSeeder {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static List<String> blankListToNull(List<String> values) {
+        if (values == null || values.isEmpty()) return null;
+        return values;
     }
 
     private String resolveNickname(String userId) {

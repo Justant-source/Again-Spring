@@ -1,5 +1,11 @@
 # 다시봄 메타포 일러스트 시스템
 
+> ⚠️ **영상 경로 폐기 안내 (2026-08-12)**  
+> YouTube Shorts / Instagram Reels의 인트로·본문·썸네일은 더 이상 메타포 일러스트를 쓰지 않는다.  
+> **시봄이** 캐릭터 삽입이 SSOT다 → [`docs/shared/marketing/sibom-video-insertion.md`](../../../shared/marketing/sibom-video-insertion.md).  
+> 메타포 자산(SVG/PNG·`metaphor_id`)은 **영상 파이프라인에 넣지 말 것** (파일·카탈로그는 보관용으로만 유지).  
+> 본 문서는 메타포 디자인/자산 스펙으로 보존한다. 삭제하지 않는다.
+
 > Claude Design에 새 일러스트를 요청할 때 이 파일 전체를 컨텍스트로 붙여넣으세요.
 
 ---

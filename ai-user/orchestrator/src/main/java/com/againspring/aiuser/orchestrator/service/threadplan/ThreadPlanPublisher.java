@@ -187,11 +187,42 @@ public class ThreadPlanPublisher {
         }
     }
     private Long parentId(AiThreadPlanItem item) {
-        if (item.getTargetCommentId() != null) return Long.valueOf(item.getTargetCommentId());
-        if (item.getParentItemId() == null) return null;
-        return items.findById(item.getParentItemId()).map(AiThreadPlanItem::getPostedTargetId)
-                .filter(value -> value != null && value.matches("\\d+"))
-                .map(Long::valueOf).orElse(null);
+        Long raw = null;
+        if (item.getTargetCommentId() != null) {
+            raw = Long.valueOf(item.getTargetCommentId());
+        } else if (item.getParentItemId() != null) {
+            raw = items.findById(item.getParentItemId()).map(AiThreadPlanItem::getPostedTargetId)
+                    .filter(value -> value != null && value.matches("\\d+"))
+                    .map(Long::valueOf).orElse(null);
+        }
+        return flattenToTopLevelParent(raw);
+    }
+
+    /**
+     * UI는 최상위+직계 대댓글만 노출. parent가 이미 대댓글이면 그 최상위로 올려 붙여 depth≥2를 막는다.
+     */
+    private Long flattenToTopLevelParent(Long parentCommentId) {
+        if (parentCommentId == null) return null;
+        Long current = parentCommentId;
+        try {
+            for (int i = 0; i < 16; i++) {
+                List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                        "SELECT parent_comment_id FROM post_comments WHERE id = ?", current);
+                if (rows.isEmpty()) return current;
+                Object grand = rows.get(0).get("parent_comment_id");
+                if (grand == null) {
+                    if (!current.equals(parentCommentId)) {
+                        log.info("flatten nested reply parent {} → top-level {}", parentCommentId, current);
+                    }
+                    return current;
+                }
+                current = ((Number) grand).longValue();
+            }
+            return current;
+        } catch (Exception e) {
+            log.debug("parent flatten skipped id={}: {}", parentCommentId, e.getMessage());
+            return parentCommentId;
+        }
     }
     private boolean quietKst() { int hour = LocalDateTime.ofInstant(Instant.now(), ZoneId.of("Asia/Seoul")).getHour(); return hour >= 2 && hour < 6; }
     private Instant nextActiveKst() {

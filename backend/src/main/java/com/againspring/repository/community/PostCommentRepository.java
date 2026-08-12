@@ -42,8 +42,8 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
     long countByPostIdAndStatusAndDeletedAtIsNull(String postId, CommentStatus status);
 
     /**
-     * 공개 목록에 노출 가능한 댓글 수 (최상위 + visible parent 아래 대댓글).
-     * 부모 soft-delete/BLOCKED 로 목록에 안 나오는 ACTIVE 고아 대댓글은 제외.
+     * 공개 목록에 노출 가능한 댓글 수 = UI 2단만 (최상위 + 직계 대댓글).
+     * depth≥2 중첩·고아(부모 soft-delete/BLOCKED) 대댓글은 제외.
      */
     @Query("""
             SELECT COUNT(pc) FROM PostComment pc
@@ -55,6 +55,7 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
                 OR EXISTS (
                   SELECT 1 FROM PostComment parent
                   WHERE parent.id = pc.parentCommentId
+                    AND parent.parentCommentId IS NULL
                     AND parent.status = :status
                     AND parent.deletedAt IS NULL
                 )

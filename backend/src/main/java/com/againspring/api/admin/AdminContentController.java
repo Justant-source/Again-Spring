@@ -62,6 +62,7 @@ public class AdminContentController {
     private final AdminPublishedThreadService publishedThreadService;
     private final com.againspring.service.community.PromoTitleService promoTitleService;
     private final PostSearchNgramIndexer postSearchNgramIndexer;
+    private final com.againspring.service.community.SibomCandidateService sibomCandidateService;
 
     // ===== 포스트 관리 =====
 
@@ -226,6 +227,9 @@ public class AdminContentController {
             // 관리자 수정은 tonalization 없이 즉시 반영
             post.setBodyPublished(req.getBodyRaw());
             contentChanged = !req.getBodyRaw().equals(originalBody);
+            String titleForScore = req.getTitle() != null ? req.getTitle()
+                    : (post.getUserTitle() != null ? post.getUserTitle() : post.getTitle());
+            post.setSibomCandidates(sibomCandidateService.shortlist(req.getBodyRaw(), titleForScore));
         }
         if (req.getPartnerBodyRaw() != null) {
             post.setPartnerBodyRaw(req.getPartnerBodyRaw());
@@ -678,6 +682,7 @@ public class AdminContentController {
                 .userTitle(req.getTitle())
                 .bodyRaw(req.getBodyRaw())
                 .bodyPublished(req.getBodyRaw())
+                .sibomCandidates(sibomCandidateService.shortlist(req.getBodyRaw(), req.getTitle()))
                 .category(PostCategory.valueOf(req.getCategory()))
                 .status(PostStatus.VOTING)
                 .visibility(com.againspring.domain.enums.PostVisibility.PUBLIC)
@@ -720,6 +725,18 @@ public class AdminContentController {
         Post post = postRepository.findById(req.getPostId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "POST_NOT_FOUND"));
+
+        if (req.getParentCommentId() != null) {
+            PostComment parent = postCommentRepository.findById(req.getParentCommentId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "COMMENT_NOT_FOUND"));
+            if (!req.getPostId().equals(parent.getPostId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "COMMENT_MISMATCH");
+            }
+            if (parent.getParentCommentId() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "COMMENT_DEPTH_EXCEEDED");
+            }
+        }
 
         PostComment comment = PostComment.builder()
                 .postId(req.getPostId())

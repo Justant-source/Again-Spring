@@ -85,11 +85,41 @@ public class CreateJobRequest {
         @JsonProperty("max_duration_sec")
         private Integer maxDurationSec;
 
-        /** Metaphor illustration id (60-card catalog). Shorts intro / cards. */
+        /**
+         * 시봄이 keyword shortlist (≤12) from {@code posts.sibom_candidates}.
+         * Video intro/body use {@link #sibomPlan} (not metaphor).
+         */
+        @JsonProperty("sibom_candidates")
+        private List<String> sibomCandidates;
+
+        /**
+         * Active channel 시봄이 insert plan for alone video jobs (Reels-only or Shorts-only).
+         * Dual-target jobs leave this null and use {@link #sibomPlanReels}/{@link #sibomPlanShorts}.
+         * Video renderer reads this (or channel fields) — not {@code metaphor_*}.
+         */
+        @JsonProperty("sibom_plan")
+        private List<SibomPlanItem> sibomPlan;
+
+        /** Instagram Reels 시봄이 plan (stage-2). */
+        @JsonProperty("sibom_plan_reels")
+        private List<SibomPlanItem> sibomPlanReels;
+
+        /** YouTube Shorts 시봄이 plan (stage-2). */
+        @JsonProperty("sibom_plan_shorts")
+        private List<SibomPlanItem> sibomPlanShorts;
+
+        /**
+         * @deprecated Video path unplugged — keep for backward compat / non-video clients.
+         * AS no longer injects this into renderer-critical briefs; prefer {@link #sibomPlan}.
+         */
+        @Deprecated
         @JsonProperty("metaphor_id")
         private String metaphorId;
 
-        /** Metaphor illustration ids (3-5, first = representative). For ASM video renderer. */
+        /**
+         * @deprecated Video path unplugged — DB may still hold values; not sent as intro source.
+         */
+        @Deprecated
         @JsonProperty("metaphor_ids")
         private List<String> metaphorIds;
 
@@ -206,6 +236,33 @@ public class CreateJobRequest {
         @Deprecated
         @JsonProperty("partner_part1_height_css")
         private Double partnerPart1HeightCss;
+    }
+
+    /**
+     * One 시봄이 insert beat for Shorts/Reels ({@code sibom_plan*}).
+     * Spec: {@code docs/shared/marketing/sibom-video-insertion.md}.
+     */
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SibomPlanItem {
+        /** {@code intro|peak|punch|soft_fill} */
+        private String role;
+
+        @JsonProperty("image_id")
+        private String imageId;
+
+        private String caption;
+
+        @JsonProperty("beat_index")
+        private Integer beatIndex;
+
+        /** {@code large|small} */
+        private String size;
+
+        /** {@code hold|punch} */
+        private String dwell;
     }
 
     /**

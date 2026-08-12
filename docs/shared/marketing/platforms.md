@@ -160,6 +160,7 @@ API: `GET`/`PUT /api/admin/marketing/quota` — Body 플랫폼 필드(`xThread` 
 | 오디오 | TTS (Fish Speech) | 동일 |
 | 잡/렌더 | **별도 잡** (Phase 2.1) · 유니크 mp4는 2.4 | **별도 잡** · ≤30s 계약은 2.4 |
 | Phase 2.4 | ≤45s · 유니크 렌더 · 전문 낭독 폐기 | ≤30s · 유니크 렌더 · 전문 낭독 폐기 |
+| 시봄이 | `sibom_plan` intro+본문 · 메타포 **금지** · [`sibom-video-insertion.md`](sibom-video-insertion.md) | 同 |
 | 상세 | [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) | 同 |
 
 ---

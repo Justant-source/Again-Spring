@@ -11,6 +11,7 @@ import com.againspring.repository.community.PostRepository;
 import com.againspring.service.ai.AiCorrectionService;
 import com.againspring.service.ai.AiUserOutboxWriter;
 import com.againspring.service.community.PostSearchNgramIndexer;
+import com.againspring.service.community.SibomCandidateService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,6 +40,7 @@ class AdminPublishedThreadServiceTest {
     @Mock AiUserOutboxWriter aiUserOutboxWriter;
     @Mock ThreadPlanItemProxyService threadPlanItemProxy;
     @Mock PostSearchNgramIndexer postSearchNgramIndexer;
+    @Mock SibomCandidateService sibomCandidateService;
     @InjectMocks AdminPublishedThreadService service;
 
     @Test

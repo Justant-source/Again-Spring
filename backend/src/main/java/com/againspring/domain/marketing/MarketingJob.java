@@ -136,16 +136,31 @@ public class MarketingJob {
         this.lastPolledAt = Instant.now();
     }
 
+    /** True when ASM already returned render artifacts (preview usable without further poll). */
+    public boolean hasArtifacts() {
+        if (artifacts == null) {
+            return false;
+        }
+        String trimmed = artifacts.trim();
+        return !trimmed.isEmpty() && !"null".equalsIgnoreCase(trimmed) && !"[]".equals(trimmed)
+                && !"{}".equals(trimmed);
+    }
+
     /**
-     * Mark a polling attempt failure with detail message
-     * If fail count reaches 5, mark job as STALE
+     * Mark a polling attempt failure with detail message.
+     * If fail count reaches 5, mark job as STALE — unless artifacts already exist
+     * (ASM outage must not erase a completed READY preview).
      */
     public void markPollFailure(String detail) {
         this.pollFailCount++;
         this.lastPolledAt = Instant.now();
         this.errorMessage = "Poll failure #" + this.pollFailCount + ": " + detail;
         if (this.pollFailCount >= 5) {
-            this.status = "STALE";
+            if (hasArtifacts()) {
+                this.status = "READY";
+            } else {
+                this.status = "STALE";
+            }
         }
     }
 }

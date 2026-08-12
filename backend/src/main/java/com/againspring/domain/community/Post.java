@@ -61,22 +61,29 @@ public class Post {
     private String hookEmotion;
 
     /**
-     * 메타포 일러스트 ID (60종 카탈로그). AI PLAN이 사연 생성 시 매칭.
-     * 예: empty-chair, tangled-thread. Shorts intro / FE 카드용.
+     * 메타포 일러스트 ID (60종 카탈로그). 레거시 — 영상 경로에서는 무시.
+     * 컬럼·API는 하위호환용으로 유지. 예: empty-chair.
      */
     @Column(name = "metaphor_id", length = 64)
     private String metaphorId;
 
     /**
+     * 시봄이 캐릭터 이미지 id 숏리스트 (≤12). 본문 keyword 스코어(코드, LLM 없음).
+     * soft-fill 풀은 저장하지 않음 — 후보만. Spec: sibom-video-insertion.md.
+     */
+    @Type(JsonType.class)
+    @Column(name = "sibom_candidates", columnDefinition = "JSON")
+    private List<String> sibomCandidates;
+
+    /**
      * 메타포 일러스트 ID 순위 목록 (3-5개, 첫번째 = 대표).
-     * AI PLAN이 사연 생성 시 매칭. 마케팅 렌더러용.
+     * 레거시 — 영상 경로에서는 무시. 컬럼은 보존.
      */
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "post_metaphors", joinColumns = @JoinColumn(name = "post_id"))
     @Column(name = "metaphor_id")
     @OrderColumn(name = "rank")
     private List<String> metaphorIds = new ArrayList<>();
-
     /**
      * X/IG 캡쳐 전반부 마지막 개행 블록(1-based).
      * @deprecated use {@link #captureSplitAfterLines}; kept for read fallback.

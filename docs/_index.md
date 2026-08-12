@@ -75,6 +75,7 @@
 | X 스레드 전략 (활성) | `docs/shared/marketing/x-thread-strategy.md` | — | ASM `services/social-poster/src/routes/publish-x.js` |
 | IG 피드 전략 (24h 자동) | `docs/shared/marketing/instagram-feed-strategy.md` | — | ASM `app/worker/ig_feed_pipeline.py` |
 | YouTube Shorts 전략 (조건부 자동 생성 + 수동 게시) | `docs/shared/marketing/youtube-shorts-strategy.md` | — | `MarketingJobService.maybeTriggerYoutubeShorts` · ASM `youtube_shorts` 파이프 · WaggleBot |
+| 시봄이 숏폼 삽입 (Shorts/Reels) | `docs/shared/marketing/sibom-video-insertion.md` | `youtube-shorts-strategy.md` · `api.md` | AS `sibom_candidates`/`sibom_plan` · WaggleBot sprouts 합성 |
 
 ---
 
@@ -107,6 +108,7 @@
 | `ai-user/learning/**` · `AiLearningClient*` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
 | `env/docker-compose*` · `env/nginx/*` | `docs/system.md` · `docs/env/architecture.md` · README 포트표 |
 | `domain/enums/*Status*.java` · `MarketingJob*.java` · orchestrator `ActionStatus*.java` | 해당 모듈의 stateDiagram (`docs/ai-user/orchestrator.md` 등) |
+| `backend/.../marketing/**` · video brief/`sibom_*` · metaphor unplug | `docs/shared/marketing/sibom-video-insertion.md` · `youtube-shorts-strategy.md` · `api.md` |
 | `backend/.../safety/**` · `llm/PromptSanitizer*` · `LlmErrorSignature*` · `ContentSafetyGuard*` | `docs/shared/policies/forbidden-words.md` · `.claude/rules/llm-safety.md` |
 | `docs/shared/policies/forbidden-words.md` | `.claude/rules/llm-safety.md` · `docs/frontend/policies/forbidden-words-lint.md` |
 | `backend/.../llm/**` | `docs/backend/llm-bridge.md` |

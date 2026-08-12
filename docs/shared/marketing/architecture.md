@@ -66,14 +66,17 @@ findByStatusIn([QUEUED, RUNNING, READY, PUBLISHING, STALE])
     │
     ▼
 for each job:
+    READY + artifacts 있음 → ASM GET 스킵 (미리보기 완료; 게시는 due-slot/수동)
+    STALE + artifacts 있음 → READY 복구 후 스킵
+    ASM circuit open(연결 실패 후 5분) → 사이클 전체 GET 스킵
+    │
     AsmClient.getJob(remoteJobId)
     │
-    ├── 성공 → job.applyRemote(status, phase, progress, artifacts, publications)
-    │           poll_fail_count = 0
+    ├── 성공 → job.applyRemote(...) ; poll_fail_count = 0
     │
-    └── 실패 → job.markPollFailure()
-                poll_fail_count >= 5 → status = STALE
-                (STALE 후 24시간 재시도, 초과 시 FAILED)
+    └── 실패 → markPollFailure() ; circuit 5분 open ; 남은 잡 break
+                poll_fail_count >= 5 → STALE (artifacts 있으면 READY 유지)
+                (STALE 후 지수 백오프, 24h 초과 시 FAILED)
 ```
 
 ### 4. 수동 게시 승인
@@ -100,20 +103,18 @@ MarketingPollingScheduler (15초마다)
     ├─ 저녁 슬롯 도래: READY && autoPublish && scheduledPublishAt <= NOW()
     │  → triggerPublish() (ASM에 생성 시 auto_publish=false로 보냈던 잡)
     │
-    ├─ 생성 중 슬롯 경과: scheduledPublishAt < NOW() - 5분
-    │  (status ∈ QUEUED, RUNNING, STALE — READY 제외)
+    ├─ ASM poll / applyPoll (상태·아티팩트 동기화)
     │
-    └─ rescheduleExpiredJob() 실행
-        ├─ originalScheduledAt 기록 (첫 이월 시)
-        ├─ 다음날 동일 시간대로 재예약
-        │  예: 20:30 → 다음날 20:30
-        │
-        └─ 충돌 감지 (동일 시간대에 다른 미발행 잡 있음)
-           └─ 충돌 시 다음 빈 슬롯으로 이동
-              (±5분 범위에서 충돌 없을 때까지)
-              └─ 슬롯 단위: 원본 예약 시각 기준
-                 정각(00분) → 1시간 단위
-                 30분(30분) → 30분 단위
+    └─ 생성 중 슬롯 경과 이월 (poll **이후**에 실행 — 순서 고정)
+       조건: autoPublish=true AND scheduledPublishAt < NOW()-5분
+             AND status ∈ QUEUED, RUNNING, STALE (READY 제외)
+       └─ rescheduleExpiredJob()
+           ├─ originalScheduledAt 기록 (첫 이월 시)
+           ├─ 다음날 동일 시간대로 재예약 (예: 20:30 → 다음날 20:30)
+           ├─ 충돌 시 다음 빈 슬롯 (±5분, 정각=1h / 30분=30m)
+           └─ Telegram 이월 알림 1회/이월
+       ⚠️ poll보다 먼저 이월하면 applyPoll이 옛 엔티티로 슬롯을 덮어
+          15초마다 동일 "1회째 이월" 알림이 반복된다. preview(autoPublish=false)는 이월 대상 아님.
 ```
 
 **저녁 슬롯 (Phase 1 유지)**: 커밋/잡 생성 시 `MarketingPublishSlotService`가 KST 다음 발생을 `scheduledPublishAt`에 기록. 기본 `instagram_feed` 20:00 · reels/shorts 20:30 · `x_thread` 21:30. 설정 키 `marketing.publish_slot.*`.

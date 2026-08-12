@@ -41,6 +41,7 @@ class PostComposeServicePlazaPolicyTest {
     @Mock private AiUserOutboxWriter aiUserOutboxWriter;
     @Mock private PostSearchNgramIndexer postSearchNgramIndexer;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private SibomCandidateService sibomCandidateService;
 
     @InjectMocks private PostComposeService composeService;
 
@@ -54,6 +55,7 @@ class PostComposeServicePlazaPolicyTest {
                         new ScanResult.Match("소송", Level.LEVEL1, "LEGAL_RISK", false, 10),
                         new ScanResult.Match("피해자", Level.LEVEL1, "STIGMA", false, 40)
                 )));
+        when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
         when(voteOptionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 

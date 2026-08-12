@@ -43,6 +43,7 @@
 | `NOT_FOUND` | 404 | 리소스 없음 |
 | `EMAIL_ALREADY_EXISTS` | 409 | 이메일 중복 (회원가입) |
 | `FORBIDDEN_WORD_DETECTED` | 422 | 금지어 감지 (게시글/댓글 작성) |
+| `COMMENT_DEPTH_EXCEEDED` | 400 | 대댓글의 대댓글(depth≥2) 작성 시도 — UI는 최상위+직계 대댓글만 지원 |
 | `USER_NOT_FOUND` | 404 | 사용자 없음 (admin 조회) |
 | `LLM_UNAVAILABLE` | 503 | Claude CLI 불가 (fallback 응답 반환) |
 | `INTERNAL_ERROR` | 500 | 서버 내부 오류 |
@@ -102,13 +103,13 @@ flowchart LR
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
 | POST | `/api/community/posts` | **JWT** | 200 / 400 / 409 / 422 | 게시글 작성 (synthetic bot은 내부 멱등성 헤더 지원) |
-| GET | `/api/community/posts` | 공개 | 200 | 게시글 목록. 항목에 `authorPct`/`partnerPct`(Integer, nullable) — 표>0이면 작성자(orderIdx=0) raw 비율, 표 없으면 null |
+| GET | `/api/community/posts` | 공개 | 200 | 게시글 목록. 항목에 `authorPct`/`partnerPct`(Integer, nullable) — 표>0이면 작성자(orderIdx=0) raw 비율, 표 없으면 null. `commentCount`=공개 2단만(최상위+직계 대댓글; depth≥2·고아 제외) |
 | GET | `/api/community/posts/search` | 공개 | 200 | 키워드 검색 (`?q=`, `category=`, `page=`, `size≤50`). `q` 정규화 후 2글자 미만이면 빈 페이지. 매칭=`post_search_ngrams` 문자 바이그램 AND(미색인 글은 LIKE 폴백). 정렬=제목 exact 티어 → `(2×votes+comments)×반감기14일`(바닥 0.05). MariaDB는 MySQL ngram FULLTEXT 미지원 → BTREE 바이그램 테이블로 대체. 목록과 동일하게 `authorPct`/`partnerPct` |
 | GET | `/api/community/posts/counts` | 공개 | 200 | 광장별 글 수 (`{"":.., "COUPLE":.., ...}`) |
 | GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | 게시글 상세. soft-delete면 **200 + `{ deleted: true }`**(본문 생략 가능) 또는 기존 404 — FE는 deleted 플래그 우선. 응답에 `authorBodyDeleted` / `partnerBodyDeleted` boolean |
 | PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만; 작성자 본문 tombstone 후 재작성 경로 포함) |
 | DELETE | `/api/community/posts/{id}` | **JWT(author)** | 200 / 403 / 404 | 작성자 삭제 — **상대 ACTIVE면 작성자 본문만 tombstone**(`author_body_deleted_at`, 200+상세 플래그); 상대 NONE/미작성 또는 양쪽 tombstone이면 **완전 soft-delete**(`deleted_at`) + 댓글 hard delete → 200 `{deleted:true,id}`. 상세: [09-partner-invite-ownership.md](../../frontend/ux/flows/09-partner-invite-ownership.md) |
-| POST | `/api/community/posts/{id}/comments` | **JWT** | 200 / 400 / 409 / 422 | 댓글 작성 (synthetic bot은 내부 멱등성 헤더 지원) |
+| POST | `/api/community/posts/{id}/comments` | **JWT** | 200 / 400 / 409 / 422 | 댓글 작성 (synthetic bot은 내부 멱등성 헤더 지원). `parentCommentId`가 이미 대댓글이면 `400 COMMENT_DEPTH_EXCEEDED` (UI 2단만) |
 | GET | `/api/community/posts/{id}/comments` | 공개 | 200 | 댓글 목록. 최상위·대댓글 모두 `createdAt DESC`(최신순). `?page=&size=`는 최상위만 페이지네이션 |
 | PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | 댓글 수정 (작성자만) |
 | DELETE | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 204 / 403 / 404 | 댓글 삭제 (작성자만) |
@@ -173,8 +174,9 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 - `inviteToken` (String, nullable): 초대 토큰 (작성자 본인만 조회 가능)
 - `promoTitle` (String, nullable, **2026-08-02~**, **V96→VARCHAR(500)·개행**, **의미 변경 2026-08-11~**): SNS **마스터 훅**(도발적). 원제 복제 아님. IG 패킹용 `\n`(줄≤10). 생성 시 PLAN 전달 또는 `PromoTitleService` 비동기(제목+본문). 목록/상세 공통.
 - `hookEmotion` (String, nullable, **2026-08-11~**, **V108**): 마스터 훅 감정. `shock` \| `anger` \| `tension` \| `sad` \| `hype` only. PLAN 전달 또는 `PromoTitleService`와 동시 생성. 무효값·폴백 시 null.
-- `metaphorId` (String, nullable, **2026-08-05~**, **V99**): 메타포 일러스트 ID (60종 카탈로그). AI PLAN이 사연 생성 시 감정에 맞는 카드를 매칭. Shorts intro / FE 카드용. **대표(1순위) 메타포 — 하위호환 유지, `metaphorIds[0]`와 동일**.
-- `metaphorIds` (String[], nullable, **2026-08-09~**, **V105 `post_metaphors` 테이블**): 사연당 3~5개, 적합도 순 랭크. `metaphorId`(대표)는 `metaphorIds[0]`의 중복 저장. WaggleBot Shorts 렌더링에서 1번째=인트로 대표 이미지, 나머지는 본문 낭독 중간중간 균등 분산 삽입(앞쪽 몰림 방지). `MetaphorCatalog.sanitizeList`가 카탈로그 검증+dedup+최소 3개 미달 시 카테고리 fallback 패딩+최대 5개 cap.
+- `metaphorId` (String, nullable, **2026-08-05~**, **V99**): 레거시 메타포 일러스트 ID. **영상 경로에서는 무시**(시봄이 shortlist로 대체). 컬럼·필드 하위호환 유지.
+- `metaphorIds` (String[], nullable, **2026-08-09~**, **V105 `post_metaphors`**): 레거시 메타포 랭크 목록. **영상 경로에서는 무시**.
+- `sibomCandidates` (String[], nullable, **2026-08-12~**, **V112**): 시봄이 캐릭터 이미지 id 숏리스트(≤12). 사연 본문(+제목) keyword 스코어로 **코드가** 저장(LLM 없음). soft-fill 풀은 미포함. Spec: `docs/shared/marketing/sibom-video-insertion.md`.
 - `voteCloseAt` / `voteDurationHours` (**legacy, 미사용**): 응답에 남을 수 있으나 FE는 투표 마감 UI에 쓰지 않음
 
 **목록(`GET /posts`, `/search`, `/mine`, `/voted`) 응답 필드 (`PostResponse`):**
@@ -183,7 +185,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 소유권·tombstone UX SSOT: `docs/frontend/ux/flows/09-partner-invite-ownership.md`
 
 `POST /api/community/posts` 성공 시(신규 생성만) optional `promoTitle`(+optional `hookEmotion`)이 있으면 저장하고, `promoTitle`이 없으면 `PromoTitleService.generateAsync`가 훅+감정을 1회 생성한다. 마케팅 brief는 개행 포함 `promo_title`을 전달한다.
-봇(AI-user) 생성 요청은 optional `captureSplitAfterLines`(1-based 개행 블록 컷 배열)과 optional `metaphorId`/`metaphorIds`(배열, 최대 5개)를 보낼 수 있다 — X/IG 캡쳐 N장 분할(장당 ≤8, 진영당 ≤4). 구 `captureSplitAfterLine` 단일 값은 길이1 배열로 승격. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완. 파트너 답변(`POST /api/s/{token}/answer`)도 optional `captureSplitAfterLines`를 `partner_capture_split_after_lines`에 저장한다.
+봇(AI-user) 생성 요청은 optional `captureSplitAfterLines`(1-based 개행 블록 컷 배열)과 optional `metaphorId`/`metaphorIds`(배열, 최대 5개, **레거시·영상 미사용**)를 보낼 수 있다 — X/IG 캡쳐 N장 분할(장당 ≤8, 진영당 ≤4). 구 `captureSplitAfterLine` 단일 값은 길이1 배열로 승격. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완. 파트너 답변(`POST /api/s/{token}/answer`)도 optional `captureSplitAfterLines`를 `partner_capture_split_after_lines`에 저장한다. 사연 생성·작성자 본문 갱신 시 `SibomCandidateService`가 `sibom_candidates`를 본문 keyword 스코어로 채운다(시봄이 전용 LLM 없음).
 ### 3. User
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |

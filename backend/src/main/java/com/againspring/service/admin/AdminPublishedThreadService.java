@@ -10,6 +10,7 @@ import com.againspring.repository.community.PostRepository;
 import com.againspring.service.ai.AiCorrectionService;
 import com.againspring.service.ai.AiUserOutboxWriter;
 import com.againspring.service.community.PostSearchNgramIndexer;
+import com.againspring.service.community.SibomCandidateService;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -46,6 +47,7 @@ public class AdminPublishedThreadService {
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final ThreadPlanItemProxyService threadPlanItemProxy;
     private final PostSearchNgramIndexer postSearchNgramIndexer;
+    private final SibomCandidateService sibomCandidateService;
 
     @Transactional(readOnly = true)
     public Map<String, Object> getThread(String postId) {
@@ -70,6 +72,9 @@ public class AdminPublishedThreadService {
             post.setBodyRaw(req.getBody());
             post.setBodyPublished(req.getBody());
             contentChanged = !req.getBody().equals(originalBody);
+            String titleForScore = req.getTitle() != null ? req.getTitle()
+                    : (post.getUserTitle() != null ? post.getUserTitle() : post.getTitle());
+            post.setSibomCandidates(sibomCandidateService.shortlist(req.getBody(), titleForScore));
         }
         if (req.getCategory() != null && !req.getCategory().isBlank()) {
             post.setCategory(PostCategory.valueOf(req.getCategory()));

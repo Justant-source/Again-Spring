@@ -35,6 +35,7 @@ public class PostService {
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final PostSearchNgramIndexer postSearchNgramIndexer;
     private final CommentService commentService;
+    private final SibomCandidateService sibomCandidateService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -114,6 +115,7 @@ public class PostService {
         assertNotFullyDeleted(post);
         post.setBodyRaw(newBody);
         post.setBodyPublished(newBody);
+        post.setSibomCandidates(sibomCandidateService.shortlist(newBody, post.getUserTitle() != null ? post.getUserTitle() : post.getTitle()));
         post.setAuthorBodyDeletedAt(null);
         post.advanceContentRevision();
         Post saved = postRepository.save(post);

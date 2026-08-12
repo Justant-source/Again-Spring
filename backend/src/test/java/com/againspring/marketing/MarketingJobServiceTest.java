@@ -15,6 +15,7 @@ import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.community.CommentService;
+import com.againspring.service.community.SibomPlanItem;
 import com.againspring.service.community.VideoVariantService;
 import com.againspring.service.community.VoteService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -352,6 +353,50 @@ class MarketingJobServiceTest {
         assertThat(thirdComment.getSide()).isEqualTo("neutral");
     }
 
+    @Test
+    void createJob_normalizesJsonEscapedTopCommentsBeforeSendingToAsm() throws Exception {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("제목")
+            .bodyPublished("본문")
+            .build();
+        String escapedBody = "\\u" + "c774\\u" + "b7f0 \\u" + "b313\\uae00\\\\\\n\\ub2e4\\uc74c \\uc904";
+        String escapedNickname = "\\u" + "b2c9\\ub124\\uc784";
+        PostComment comment = PostComment.builder()
+            .authorId("commenter")
+            .body(escapedBody)
+            .likeCount(1)
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(TEST_POST_ID, "x_thread")).thenReturn(0L);
+        when(voteService.getVoteResult(TEST_POST_ID)).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(TEST_POST_ID)).thenReturn(List.of());
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
+        when(userRepository.findById("commenter"))
+            .thenReturn(Optional.of(User.builder().id("commenter").nickname(escapedNickname).build()));
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(1L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+
+        ObjectMapper outboundMapper = new ObjectMapper();
+        String outboundJson = outboundMapper.writeValueAsString(captor.getValue());
+        var topComment = outboundMapper.readTree(outboundJson)
+            .path("brief").path("top_comments").get(0);
+        assertThat(topComment.path("author").asText()).isEqualTo("닉네임");
+        assertThat(topComment.path("body").asText()).isEqualTo("이런 댓글\n다음 줄");
+        assertThat(outboundJson).doesNotContain("\\\\u");
+        assertThat(outboundJson).doesNotContain("\\\\\\n");
+    }
+
 
     @Test
     void createJob_xThread_attachesUtmToPostUrlAndOptions() throws JsonProcessingException {
@@ -405,10 +450,11 @@ class MarketingJobServiceTest {
         stubSaveAssignsId(11L);
         doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
-        when(videoVariantService.generate(any(), any(), any(), any(), eq(true), eq(true)))
+        when(videoVariantService.generate(any(), any(), any(), any(), eq(true), eq(true), any()))
             .thenReturn(new VideoVariantService.Variants(
                 "릴스훅", "릴스대본 공감 비율은?", 30,
-                "쇼츠훅", "쇼츠대본 댓글로", 45
+                "쇼츠훅", "쇼츠대본 댓글로", 45,
+                List.of(), List.of()
             ));
 
         marketingJobService.createJob(
@@ -433,7 +479,62 @@ class MarketingJobServiceTest {
         assertThat(req.getBrief().getMaxDurationReelsSec()).isEqualTo(30);
         assertThat(req.getBrief().getMaxDurationShortsSec()).isEqualTo(45);
         assertThat(req.getBrief().getMaxDurationSec()).isNull(); // dual → per-platform fields
-        verify(videoVariantService).generate(any(), any(), any(), any(), eq(true), eq(true));
+        assertThat(req.getBrief().getMetaphorId()).isNull();
+        assertThat(req.getBrief().getMetaphorIds()).isNull();
+        assertThat(req.getBrief().getSibomPlan()).isNull(); // dual → channel fields only
+        assertThat(req.getBrief().getSibomPlanReels()).isEmpty();
+        assertThat(req.getBrief().getSibomPlanShorts()).isEmpty();
+        verify(videoVariantService).generate(any(), any(), any(), any(), eq(true), eq(true), any());
+    }
+
+    @Test
+    void createJob_shortsAlone_wiresSibomCandidatesAndActivePlan_omitsMetaphor() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("shorts")
+            .bodyPublished("body")
+            .metaphorId("empty-chair")
+            .metaphorIds(List.of("empty-chair", "tangled-thread"))
+            .sibomCandidates(List.of("waiting-reply", "drained"))
+            .build();
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("youtube_shorts")))
+            .thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(13L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        var planItem = new SibomPlanItem(
+            "intro", "waiting-reply", "읽씹 3일차", 0, "large", "hold");
+        when(videoVariantService.generate(any(), any(), any(), any(), eq(false), eq(true), any()))
+            .thenReturn(new VideoVariantService.Variants(
+                null, null, null,
+                "쇼츠훅", "쇼츠대본 댓글", 45,
+                List.of(), List.of(planItem)
+            ));
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("youtube_shorts"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest.BriefDto brief = captor.getValue().getBrief();
+        assertThat(brief.getMetaphorId()).isNull();
+        assertThat(brief.getMetaphorIds()).isNull();
+        assertThat(brief.getSibomCandidates()).containsExactly("waiting-reply", "drained");
+        assertThat(brief.getSibomPlan()).hasSize(1);
+        assertThat(brief.getSibomPlan().get(0).getImageId()).isEqualTo("waiting-reply");
+        assertThat(brief.getSibomPlan().get(0).getRole()).isEqualTo("intro");
+        assertThat(brief.getSibomPlanShorts()).hasSize(1);
+        assertThat(brief.getSibomPlanReels()).isNull();
+        assertThat(brief.getMaxDurationSec()).isEqualTo(45);
+        verify(videoVariantService).generate(
+            any(), any(), any(), any(), eq(false), eq(true), eq(List.of("waiting-reply", "drained")));
     }
 
     @Test
@@ -458,11 +559,14 @@ class MarketingJobServiceTest {
 
         marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
 
-        verify(videoVariantService, never()).generate(any(), any(), any(), any(), any(Boolean.class), any(Boolean.class));
+        verify(videoVariantService, never()).generate(
+            any(), any(), any(), any(), any(Boolean.class), any(Boolean.class), any());
         ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
         verify(asmClient).createJob(captor.capture(), any(String.class));
         assertThat(captor.getValue().getBrief().getHookReels()).isNull();
         assertThat(captor.getValue().getBrief().getScriptShorts()).isNull();
+        assertThat(captor.getValue().getBrief().getMetaphorId()).isNull();
+        assertThat(captor.getValue().getBrief().getSibomPlan()).isNull();
     }
 
     @Test

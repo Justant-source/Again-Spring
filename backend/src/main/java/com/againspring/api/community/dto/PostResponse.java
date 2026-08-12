@@ -25,10 +25,12 @@ public class PostResponse {
     private String promoTitle;
     /** 마스터 훅 감정: shock|anger|tension|sad|hype. 없으면 null. */
     private String hookEmotion;
-    /** 메타포 일러스트 ID (60종). 없으면 null. */
+    /** 메타포 일러스트 ID (60종). 레거시 — 영상 경로 무시. 없으면 null. */
     private String metaphorId;
-    /** 메타포 일러스트 ID 목록 (3-5개, 첫번째 = 대표). 없으면 null. */
+    /** 메타포 일러스트 ID 목록 (3-5개, 첫번째 = 대표). 레거시 — 영상 경로 무시. */
     private List<String> metaphorIds;
+    /** 시봄이 캐릭터 id 숏리스트(≤12). 본문 keyword 스코어. */
+    private List<String> sibomCandidates;
     private String bodyPublished;
     private String category;
     private String visibility;
@@ -110,6 +112,7 @@ public class PostResponse {
                 .hookEmotion(post.getHookEmotion())
                 .metaphorId(post.getMetaphorId())
                 .metaphorIds(post.getMetaphorIds())
+                .sibomCandidates(post.getSibomCandidates())
                 .bodyPublished(bodyPublished)
                 .category(post.getCategory() != null ? post.getCategory().name() : null)
                 .visibility(post.getVisibility().name())

@@ -61,7 +61,7 @@ public class CommentService {
         // 위기 감지
         keywordGuard.scanUserInput(body, authorId);
 
-        // 부모 댓글 존재 확인 (nullable)
+        // 부모 댓글 존재 확인 (nullable). UI는 2단만 지원 — 대댓글의 대댓글(depth≥2) 금지.
         PostComment parent = null;
         if (parentCommentId != null) {
             parent = commentRepository.findById(parentCommentId)
@@ -69,6 +69,10 @@ public class CommentService {
 
             if (!parent.getPostId().equals(postId)) {
                 throw new BusinessException("COMMENT_MISMATCH", "Parent comment does not belong to this post", 400);
+            }
+            if (parent.getParentCommentId() != null) {
+                throw new BusinessException("COMMENT_DEPTH_EXCEEDED",
+                        "대댓글에는 답글을 달 수 없습니다. 최상위 댓글에만 답글이 가능합니다.", 400);
             }
         }
 

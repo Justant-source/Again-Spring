@@ -19,6 +19,7 @@ import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.community.CommentService;
 import com.againspring.service.community.PromoTitleService;
+import com.againspring.service.community.SibomPlanItem;
 import com.againspring.service.community.VideoVariantService;
 import com.againspring.service.community.VoteService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -144,9 +145,9 @@ public class MarketingJobService {
                 })
                 .limit(3)
                 .map(c -> TopCommentDto.builder()
-                    .author(resolveNickname(c.getAuthorId()))
+                    .author(MarketingBriefText.normalize(resolveNickname(c.getAuthorId())))
                     .authorId(c.getAuthorId())
-                    .body(c.getBody())
+                    .body(MarketingBriefText.normalize(c.getBody()))
                     .likeCount(c.getLikeCount() != null ? c.getLikeCount() : 0)
                     .createdAt(c.getCreatedAt())
                     .side(resolveSide(c.getAuthorId(), post.getAuthorId(), post.getPartnerUserId()))
@@ -240,17 +241,21 @@ public class MarketingJobService {
             ? post.getHookEmotion().trim() : null;
 
         // Stage-2 variants (H3): only when committing to video platforms.
+        // Separate LLM calls per channel (script + sibom_plan). Guard = code only, no 3rd LLM.
         boolean needReels = containsTarget(targets, "instagram_reels");
         boolean needShorts = containsTarget(targets, "youtube_shorts");
         VideoVariantService.Variants variants = VideoVariantService.Variants.empty();
         if (needReels || needShorts) {
+            List<String> candidatesForLlm = post.getSibomCandidates() != null
+                ? post.getSibomCandidates() : List.of();
             variants = videoVariantService.generate(
                 masterHook,
                 hookEmotion,
                 storyTitle,
                 authorBodyFull,
                 needReels,
-                needShorts
+                needShorts,
+                candidatesForLlm
             );
         }
         Integer maxDurationSec = null;
@@ -260,6 +265,23 @@ public class MarketingJobService {
         } else if (needShorts && !needReels) {
             maxDurationSec = variants.maxDurationShortsSec() != null
                 ? variants.maxDurationShortsSec() : VideoVariantService.MAX_DURATION_SHORTS_SEC;
+        }
+
+        // Unrequested channel → null; requested empty plan → empty list (not metaphor fallback).
+        List<CreateJobRequest.SibomPlanItem> planReels =
+            needReels ? toBriefSibomPlan(variants.sibomPlanReels()) : null;
+        List<CreateJobRequest.SibomPlanItem> planShorts =
+            needShorts ? toBriefSibomPlan(variants.sibomPlanShorts()) : null;
+        List<CreateJobRequest.SibomPlanItem> activeSibomPlan = null;
+        if (needReels && !needShorts) {
+            activeSibomPlan = planReels;
+        } else if (needShorts && !needReels) {
+            activeSibomPlan = planShorts;
+        }
+
+        List<String> sibomCandidates = post.getSibomCandidates();
+        if (sibomCandidates != null && sibomCandidates.isEmpty()) {
+            sibomCandidates = null;
         }
 
         BriefDto brief = BriefDto.builder()
@@ -273,8 +295,11 @@ public class MarketingJobService {
             .maxDurationReelsSec(variants.maxDurationReelsSec())
             .maxDurationShortsSec(variants.maxDurationShortsSec())
             .maxDurationSec(maxDurationSec)
-            .metaphorId(post.getMetaphorId())
-            .metaphorIds(post.getMetaphorIds())
+            .sibomCandidates(sibomCandidates)
+            .sibomPlan(activeSibomPlan)
+            .sibomPlanReels(needReels ? planReels : null)
+            .sibomPlanShorts(needShorts ? planShorts : null)
+            // metaphor_* intentionally omitted (null) — video intro uses sibom_plan
             .category(post.getCategory() != null ? post.getCategory().name() : null)
             .viewCount(post.getViewCount())
             .neutralSummary(summary)
@@ -389,6 +414,27 @@ public class MarketingJobService {
             if (t != null && platform.equalsIgnoreCase(t.trim())) return true;
         }
         return false;
+    }
+
+    private static List<CreateJobRequest.SibomPlanItem> toBriefSibomPlan(
+            List<SibomPlanItem> items
+    ) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        List<CreateJobRequest.SibomPlanItem> out = new ArrayList<>(items.size());
+        for (SibomPlanItem item : items) {
+            if (item == null) continue;
+            out.add(CreateJobRequest.SibomPlanItem.builder()
+                .role(item.role())
+                .imageId(item.imageId())
+                .caption(item.caption())
+                .beatIndex(item.beatIndex())
+                .size(item.size())
+                .dwell(item.dwell())
+                .build());
+        }
+        return out;
     }
 
     /** 사용자 ID → 닉네임 변환 (없으면 익명 반환). CommunityCommentController#resolveNickname과 동일 패턴. */
