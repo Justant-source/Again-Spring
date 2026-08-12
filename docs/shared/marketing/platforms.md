@@ -106,7 +106,10 @@ T+24h 커밋 = **선정·잡 생성**만. SNS 노출은 KST **저녁 슬롯** (`
 API: `GET`/`PUT /api/admin/marketing/quota` — Body 플랫폼 필드(`xThread` 등) 또는 legacy `dailyTextCap`+`dailyVideoCap`(분배 저장).  
 응답 `platforms.{id}.{cap,usedToday,remaining}` + 파생 `dailyTextCap`/`dailyVideoCap`(합).
 
-**Legacy fallback**: 플랫폼 키가 없으면 `marketing.daily_text_cap` / `marketing.daily_video_cap`으로 보정(텍스트=⌊text/2⌋씩, 영상=video cap 각각). 시드·신규는 V109 플랫폼 키 사용. 커밋 선정은 **플랫폼 cap만** 소비.
+**Legacy fallback**: 플랫폼 키가 없으면 `marketing.daily_text_cap` / `marketing.daily_video_cap`으로 보정(텍스트=⌊text/2⌋씩, 영상=video cap 각각). 시드·신규는 V109 플랫폼 키 사용.
+
+**`usedToday` = 실제 발행 성공 건수 (2026-08-12~)**: `MarketingQuotaService.countPublishedByPlatformSince`가 오늘(KST) `marketing_job.publications` JSON을 잡별로 훑어 플랫폼별 `state=PUBLISHED` 항목만 센다(PARTIAL 잡은 성공한 타겟만 카운트). **커밋(홀딩 COMMITTED)·READY 대기·강제 배포·FAILED는 카운팅에서 제외** — READY 상태로 방치되거나 발행이 실패한 잡이 슬롯을 영구히 점유해 당일 나머지 업로드를 막던 버그 수정. 수동 "게시 승인" 성공 시에도 동일 로직으로 그 순간 카운팅된다.
+> 이전 계약(v1, ~2026-08-11): 커밋 선정(홀딩 COMMITTED) 시점에 플랫폼 cap 소비 — deprecated, `MarketingHoldingRepository.countCommittedForPlatformSince`는 레거시로 남아있으나 quota 계산에 더 이상 쓰이지 않음.
 
 ### Phase 2 잔여 (2.3+)
 

@@ -260,6 +260,23 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     List<MarketingJob> findByPostIdIn(Collection<String> postIds);
 
     /**
+     * Jobs that reached a publish-attempt terminal status since {@code since} — used to
+     * derive true per-platform PUBLISHED counts for the daily quota (see
+     * MarketingQuotaService). Quota must reflect actual publish success, not
+     * commit/creation: a READY job never clicked, or a PARTIAL job that failed on one
+     * platform, must not permanently consume that platform's slot. Caller inspects the
+     * {@code publications} JSON per-platform since a PARTIAL job may have published on
+     * one target and failed on another.
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT * FROM marketing_job
+        WHERE updated_at >= :since
+        AND status IN ('PUBLISHED', 'PARTIAL')
+        AND publications IS NOT NULL
+        """)
+    List<MarketingJob> findPublishAttemptsSince(@Param("since") Instant since);
+
+    /**
      * Find jobs with expired scheduled publish time.
      * Used for reschedule detection in polling scheduler.
      *

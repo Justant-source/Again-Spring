@@ -1,9 +1,14 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
+import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.repository.ai.SystemSettingRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository;
+import com.againspring.repository.marketing.MarketingJobRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,8 +17,11 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Daily marketing auto-publish caps.
@@ -32,6 +40,7 @@ import java.util.Map;
  * Waiting-board meta still exposes derived {@code dailyTextCap}/{@code dailyVideoCap}
  * (= sum of text / video platform caps) for UI compatibility.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MarketingQuotaService {
@@ -57,6 +66,8 @@ public class MarketingQuotaService {
 
     private final SystemSettingRepository systemSettingRepository;
     private final MarketingHoldingRepository holdingRepository;
+    private final MarketingJobRepository jobRepository;
+    private final ObjectMapper objectMapper;
 
     /** @deprecated Phase 1 shape. */
     @Deprecated
@@ -150,12 +161,13 @@ public class MarketingQuotaService {
     public QuotaStatus getStatus() {
         PlatformCaps caps = getPlatformCaps();
         Instant start = startOfTodayKst();
+        Map<String, Long> publishedByPlatform = countPublishedByPlatformSince(start);
 
         Map<String, Long> used = new LinkedHashMap<>();
         Map<String, Long> remaining = new LinkedHashMap<>();
         long remainingSum = 0;
         for (String platform : MarketingPopularityScorer.RANKED_PLATFORMS) {
-            long u = holdingRepository.countCommittedForPlatformSince(platform, start);
+            long u = publishedByPlatform.getOrDefault(platform, 0L);
             int cap = caps.forPlatform(platform);
             long rem = Math.max(0, cap - u);
             used.put(platform, u);
@@ -180,6 +192,48 @@ public class MarketingQuotaService {
             Map.copyOf(used),
             Map.copyOf(remaining)
         );
+    }
+
+    /**
+     * Per-platform count of stories actually PUBLISHED since {@code since}.
+     * A job's overall status may be PARTIAL (succeeded on one target, failed on
+     * another), so this inspects the {@code publications} JSON per platform rather
+     * than trusting job-level status alone. Jobs that never reached a publish
+     * attempt (REQUESTED/QUEUED/RUNNING/READY sitting unclicked, or FAILED outright)
+     * contribute nothing — they must not permanently consume a quota slot.
+     */
+    Map<String, Long> countPublishedByPlatformSince(Instant since) {
+        Map<String, Set<String>> publishedPostsByPlatform = new HashMap<>();
+        for (MarketingJob job : jobRepository.findPublishAttemptsSince(since)) {
+            String publications = job.getPublications();
+            if (publications == null || publications.isBlank()) {
+                continue;
+            }
+            try {
+                JsonNode arr = objectMapper.readTree(publications);
+                if (!arr.isArray()) {
+                    continue;
+                }
+                for (JsonNode entry : arr) {
+                    String platform = entry.path("platform").asText(null);
+                    String state = entry.path("state").asText(null);
+                    if (platform == null || !"PUBLISHED".equalsIgnoreCase(state)) {
+                        continue;
+                    }
+                    publishedPostsByPlatform
+                        .computeIfAbsent(platform, k -> new HashSet<>())
+                        .add(job.getPostId());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse publications for quota count, job={}: {}",
+                    job.getId(), e.getMessage());
+            }
+        }
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (Map.Entry<String, Set<String>> entry : publishedPostsByPlatform.entrySet()) {
+            counts.put(entry.getKey(), (long) entry.getValue().size());
+        }
+        return counts;
     }
 
     /** Mutable remaining map for the commit tick (enabled platforms only filled by caller). */
