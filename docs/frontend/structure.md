@@ -161,7 +161,8 @@ frontend/
     │   ├── visual-reference/
     │   │   └── README.md       # 시각 정본 HTML 포인터
     │   └── specs/
-    │       └── metaphor-illustration-system.md  # 메타포 일러스트 60종 레지스트리
+    │       ├── metaphor-illustration-system.md  # 메타포 일러스트 60종 레지스트리 (레거시)
+    │       └── sprout-character-system/         # 시봄이 캐릭터 60종(진행중 30/60) + catalog.json + gen.py
     └── policies/
         ├── README.md
         ├── forbidden-words-lint.md
