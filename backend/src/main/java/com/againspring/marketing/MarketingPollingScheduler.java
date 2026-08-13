@@ -100,6 +100,11 @@ public class MarketingPollingScheduler {
                             job.setStatus("FAILED");
                             job.setErrorMessage("ASM 응답 24시간 초과 — 자동 실패 처리");
                             marketingJobRepository.save(job);
+                            telegramNotifier.send(String.format(
+                                "❌ [Again-Spring] 마케팅 FAILED%n잡 #%s · post=%s%n채널: %s%n원인: ASM 응답 24시간 초과 — 자동 실패 처리",
+                                job.getId(),
+                                job.getPostId() != null ? job.getPostId() : "?",
+                                job.getTargets() != null ? job.getTargets() : "[]"));
                             continue;
                         }
                         // Exponential backoff: skip if not enough time has passed

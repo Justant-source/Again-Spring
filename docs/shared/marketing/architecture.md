@@ -126,7 +126,7 @@ MarketingPollingScheduler (15초마다)
 - `rescheduledReason`: "예약 시각 경과 (원 예약: {원래시간})"
 - `originalScheduledAt`: 첫 이월 시에만 저장
 
-**로깅**: INFO 레벨로 상세 기록 + `TelegramNotifier`로 @WaggleBot_bot 채팅방에 이월 발생 시마다 알림 (잡 ID·원 예약/새 예약 시각·이월 횟수 포함). 봇 토큰/chat id는 `encrypted_secret` vault(`telegram.bot_token`/`telegram.chat_id`)에서 주입. 워치독과 동일 계열(`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`).
+**로깅**: INFO 레벨로 상세 기록 + `TelegramNotifier`로 @WaggleBot_bot 채팅방에 이월 발생 시마다 알림 (잡 ID·원 예약/새 예약 시각·이월 횟수 포함). **FAILED/PARTIAL 진입 시**에도 잡 ID·post·채널(`targets`)·원인(`errorMessage` / ASM `error`)을 텔레그램으로 1회 알림 (AS `MarketingJobService` + ASM pipeline/dispatcher). 봇 토큰/chat id는 `encrypted_secret` vault(`telegram.bot_token`/`telegram.chat_id`)에서 주입. 워치독과 동일 계열(`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`).
 
 ### 6. Phase 2 분배 · 영상 · 통계 루프
 

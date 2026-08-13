@@ -83,6 +83,9 @@ class MarketingJobServiceTest {
     @Mock
     VideoVariantService videoVariantService;
 
+    @Mock
+    com.againspring.notification.TelegramNotifier telegramNotifier;
+
     @InjectMocks
     MarketingJobService marketingJobService;
 
@@ -681,6 +684,39 @@ class MarketingJobServiceTest {
         assertThat(job.getPollFailCount()).isZero();
 
         verify(marketingJobRepository).save(job);
+    }
+
+    @Test
+    void applyPoll_toFailed_sendsTelegramWithErrorAndTargets() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(777L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .targets("[\"x_thread\"]")
+            .status("RUNNING")
+            .build();
+
+        AsmJobView view = AsmJobView.builder()
+            .status("FAILED")
+            .phase("CAPTURE")
+            .progress(0.0)
+            .error("x_thread capture failed: page.goto Timeout")
+            .build();
+
+        when(marketingJobRepository.save(any(MarketingJob.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+
+        marketingJobService.applyPoll(job, view);
+
+        assertThat(job.getStatus()).isEqualTo("FAILED");
+        assertThat(job.getErrorMessage()).contains("x_thread capture failed");
+        ArgumentCaptor<String> msg = ArgumentCaptor.forClass(String.class);
+        verify(telegramNotifier).send(msg.capture());
+        assertThat(msg.getValue())
+            .contains("FAILED")
+            .contains("777")
+            .contains("x_thread")
+            .contains("capture failed");
     }
 
     // ── Test 5: applyCallback_updatesJobFromRemote ──────────────────────────
