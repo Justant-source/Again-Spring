@@ -68,7 +68,7 @@ flowchart LR
    **AI_POST 캡쳐 분할**: 본문은 문장(짧은 의미 단위)마다 개행. 비어 있지 않은 줄이 **9개 이상**이면 `post.capture_split_after_lines`(1-based, 각 장 마지막 블록; 장당 ≤8·최대 4장)을 넣고, 8 이하면 `null`. 범위 밖 값은 parse 시 null로 강등(PLAN 전체 실패 아님). 게시 시 `posts.capture_split_after_lines`에 저장되고 마케팅 brief → ASM 캡쳐 컷에 쓰인다. 양면 Call2 `partner_post.capture_split_after_lines` → `partner_capture_split_after_lines`.
 2. 부모 후보가 탈락하면 그 후보를 참조하는 대댓글도 탈락시킨다.
 3. `parsePlan` 하한은 요청 파라미터로 조절한다. `minTopLevel`/`minItems` 미지정 시 레거시 기본(최상위 6 · 전체 12, 각각 max에 캡). 품질 게이트로 이후 드롭할 orchestrator는 `minTopLevel=1`, `minItems=1`을 보낸다(현재 `AiPostBundleService`·`ThreadPlanGenerationService` 기본).
-4. **`ThreadQualityGate`** (`persistAndFinalize`): cast 소속 · **story-side 제외(글 작성자·상대방 persona는 댓글/대댓글 불가 — `STORY_PERSONA`)** · parent(대댓글→앞서 남은 최상위) · `ContentSafetyGuard`(COMMENT) · stance 단일 관점 ≤80%(stance 필드 없으면 `UNEVALUATED:stance`로 스킵). 실패 item은 드롭만 하고 filler로 채우지 않는다. 부모 탈락 시 자식도 연쇄 탈락. 사람 댓글에 대한 author 답글(`humanAuthorId` 있는 human-reply batch)은 이 게이트를 타지 않는다.
+4. **`ThreadQualityGate`** (`persistAndFinalize`): cast 소속 · **story-side 제외(글 작성자·상대방 persona는 댓글/대댓글 불가 — `STORY_PERSONA`)** · parent(대댓글→앞서 남은 최상위) · `ContentSafetyGuard`(COMMENT) · stance 단일 관점 ≤80%(stance 필드 없으면 `UNEVALUATED:stance`로 스킵). `stance`는 LLM의 자유 라벨을 보존하는 최대 64자 필드다(V19; 예: `concerned_supportive`). 실패 item은 드롭만 하고 filler로 채우지 않는다. 부모 탈락 시 자식도 연쇄 탈락. 사람 댓글에 대한 author 답글(`humanAuthorId` 있는 human-reply batch)은 이 게이트를 타지 않는다.
 5. 품질 게이트 후 잔여가 운영 READY 하한(`ai-user.thread-plan.ready-min-top-level` 기본 3 · `ready-min-items` 기본 6) 미만이면 **댓글만** `HUMAN_POST`로 LLM **1회** 재생성한다. 재생성 후에도 하한 미달(또는 재생성 불가)이면 kept item을 **버리지 않고** 개수와 무관하게 얇은 READY→ACTIVE로 진행한다(구 `QUALITY_BELOW_MIN_ITEMS` 전량 discard 폐지). 하한 통과 시에도 READY→ACTIVE.
 6. 구조 자체가 깨진 응답(빈 items·상한 초과 등)은 기존처럼 `INVALID_STRUCTURED_OUTPUT`. 동일 provider/model로 한 번만 재시도한다.
 
@@ -144,6 +144,8 @@ flowchart LR
 ## 실행 안전성
 
 `ai_thread_plan_items.idempotency_key`는 unique이며 due executor는 DB lease를 획득한 뒤 실행한다. 실행 직전에 post/comment 공개 상태, 삭제/차단 상태, parent 완료, persona 활성 상태를 재확인한다. 내부 봇 게시 요청은 같은 값을 `Idempotency-Key` 헤더로 전송한다. backend의 `bot_request_dedup`은 synthetic JWT 요청에 한해 같은 키의 기존 target ID를 반환하므로 timeout처럼 성공 여부가 불명확한 경우에도 중복 없이 재시도한다.
+
+댓글 UI와 공개 API는 **최상위 댓글 + 직계 대댓글(깊이 1)** 만 지원한다. 계획 item의 `targetCommentId` 또는 게시된 `parentItemId`가 이미 대댓글을 가리키면, publisher는 조상 체인을 최상위 댓글까지 따라가 그 댓글의 직계 대댓글로 평탄화해 게시한다. 따라서 오래된/수동 편집 계획에 depth≥2 참조가 남아도 게시가 실패하거나 숨겨진 깊은 스레드를 만들지 않는다. 조상 조회가 실패하면 원래 parent를 유지해 backend의 깊이 검증을 따른다.
 
 운영 제어는 분리한다.
 

@@ -270,8 +270,10 @@ async def run_stub(job_id):
 |---|---|---|
 | ASM 서버 일시 불안정 (잡 생성 시) | AsmClient 3회 재시도 후 실패 시 `AsmUnavailableException` → 503 반환 | "마케팅 잡 생성에 실패했어요" |
 | ASM 인증 실패 (401) | 즉시 실패 (재시도 없음) | "ASM 인증 오류" |
-| ASM 서버 다운 (폴링 시) | `markPollFailure()`, 로그 WARN | 잡 상태 유지 |
-| 폴링 5회 연속 실패 | `status = STALE` | 잡 목록에 STALE 배지 |
+| ASM 서버 다운 (폴링 시) | `markPollFailure()` 후 남은 잡 GET을 중단하고 ASM circuit을 5분 연다 | 기존 상태 유지(아티팩트가 있으면 READY 미리보기 보존) |
+| 폴링 5회 연속 실패 | 아티팩트 없으면 `status = STALE`; 있으면 `READY` 유지 | STALE 배지 또는 READY 미리보기 |
+| STALE 24시간 초과 | 아티팩트 없는 잡만 `FAILED` 처리 | 최종 실패 표시 |
+| ASM `FAILED`/`PARTIAL` 전환 | callback/poll의 `error`를 `errorMessage`에 저장(최대 1,000자)하고 상태 전환당 텔레그램 1회 알림 | 채널·원인을 포함한 최종 실패 표시 |
 | 잘못된 postId | BE 400 반환 | 다이얼로그 오류 메시지 |
 | READY가 아닌 잡에 publish | BE 400 반환 | 버튼 비활성화로 방지 |
 

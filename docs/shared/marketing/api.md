@@ -371,7 +371,7 @@ Authorization: Bearer {ASM_CALLBACK_TOKEN}
 - 401 — 잘못된 또는 누락된 `Authorization` 헤더
 - 400 — 필수 필드 누락
 
-**목적**: AS는 콜백 수신 후 원격 상태(`status`, `phase`, `progress`, `artifacts`, `publications`)를 DB에 반영하고 폴링 오류 카운트를 초기화합니다.
+**목적**: AS는 콜백 수신 후 원격 상태(`status`, `phase`, `progress`, `artifacts`, `publications`)와 `error`를 DB에 반영하고 폴링 오류 카운트를 초기화합니다. `error`가 있으면 `marketing_job.error_message`에 최대 1,000자로 저장합니다. `FAILED` 또는 `PARTIAL`에 **새로 진입**한 경우에만 채널(`targets`)과 원인을 담은 텔레그램 알림을 한 번 보냅니다.
 
 ---
 
