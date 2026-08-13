@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Polling scheduler for marketing jobs
@@ -68,6 +69,7 @@ public class MarketingPollingScheduler {
                 } catch (Exception e) {
                     log.warn("Failed to trigger scheduled publish for job {}: {}",
                         due.getId(), e.getMessage());
+                    notifyTriggerFailureOnce(due, e);
                 }
             }
         }
@@ -241,5 +243,19 @@ public class MarketingPollingScheduler {
         long epochMilli = time.toEpochMilli();
         long minutesInDay = (epochMilli / (60 * 1000L)) % (24 * 60);
         return (int) (minutesInDay % 60);
+    }
+
+    /** Persist the error marker so a due job that retries every poll does not spam Telegram. */
+    private void notifyTriggerFailureOnce(MarketingJob job, Exception error) {
+        String logDetail = error.getClass().getSimpleName() + ": " +
+            (error.getMessage() != null ? error.getMessage().replaceAll("[\\r\\n\\t]+", " ") : "메시지 없음");
+        String marker = "예약 발행 트리거 실패: " + logDetail;
+        if (Objects.equals(marker, job.getErrorMessage())) return;
+        job.setErrorMessage(marker);
+        marketingJobRepository.save(job);
+        telegramNotifier.send(String.format(
+            "❌ [Again-Spring] 예약 마케팅 발행 트리거 실패%n잡 #%s · post=%s%n원인: %s%n에러 로그: %s",
+            job.getId(), job.getPostId() != null ? job.getPostId() : "?",
+            error.getClass().getSimpleName(), logDetail));
     }
 }

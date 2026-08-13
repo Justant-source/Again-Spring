@@ -374,6 +374,7 @@ public class MarketingJobService {
     @Transactional
     public void applyCallback(JobCallbackPayload payload) {
         marketingJobRepository.findByRemoteJobId(payload.getJobId()).ifPresent(job -> {
+            String previousStatus = job.getStatus();
             job.applyRemote(
                 payload.getStatus(),
                 payload.getPhase(),
@@ -383,6 +384,7 @@ public class MarketingJobService {
             );
             applyRemoteError(job, payload.getError(), payload.getPublications());
             marketingJobRepository.save(job);
+            notifyTerminalStatusChange(job, previousStatus, payload.getPublications());
             log.info("Callback applied for remote job {}: status={}", payload.getJobId(), payload.getStatus());
         });
     }
@@ -391,6 +393,7 @@ public class MarketingJobService {
      * Apply remote job state to local job entity
      */
     public void applyPoll(MarketingJob job, AsmJobView view) {
+        String previousStatus = job.getStatus();
         job.applyRemote(
             view.getStatus(),
             view.getPhase(),
@@ -400,6 +403,86 @@ public class MarketingJobService {
         );
         applyRemoteError(job, view.getError(), view.getPublications());
         marketingJobRepository.save(job);
+        notifyTerminalStatusChange(job, previousStatus, view.getPublications());
+    }
+
+    /**
+     * Send one operational alert when ASM first reaches a terminal publish state.
+     * The previous persisted state prevents duplicate callback/poll notifications.
+     */
+    private void notifyTerminalStatusChange(MarketingJob job, String previousStatus,
+                                            List<Map<String, Object>> publications) {
+        String currentStatus = job.getStatus();
+        if (currentStatus == null || currentStatus.equalsIgnoreCase(previousStatus)) return;
+        boolean published = "PUBLISHED".equalsIgnoreCase(currentStatus);
+        boolean failed = "FAILED".equalsIgnoreCase(currentStatus) || "PARTIAL".equalsIgnoreCase(currentStatus);
+        if (!published && !failed) return;
+
+        String title = postRepository.findById(job.getPostId())
+            .map(Post::getTitle)
+            .filter(value -> value != null && !value.isBlank())
+            .orElse("제목 없음");
+        if (published) {
+            telegramNotifier.send(formatPublishedAlert(job, title, publications));
+        } else {
+            telegramNotifier.send(formatFailureAlert(job, title, publications));
+        }
+    }
+
+    private static String formatPublishedAlert(MarketingJob job, String title,
+                                                List<Map<String, Object>> publications) {
+        String publicationLines = publicationLines(publications, true);
+        return String.format(
+            "✅ [Again-Spring] 예약 마케팅 게시 완료%n제목: %s%n잡 #%s%n%s",
+            compact(title, 500), job.getId() != null ? job.getId() : "?", publicationLines);
+    }
+
+    private static String formatFailureAlert(MarketingJob job, String title,
+                                              List<Map<String, Object>> publications) {
+        String detail = compact(job.getErrorMessage(), 1200);
+        String publicationLines = publicationLines(publications, false);
+        return String.format(
+            "❌ [Again-Spring] 예약 마케팅 게시 %s%n제목: %s%n잡 #%s%n원인: %s%n에러 로그: %s",
+            "PARTIAL".equalsIgnoreCase(job.getStatus()) ? "일부 실패" : "실패",
+            compact(title, 500),
+            job.getId() != null ? job.getId() : "?",
+            publicationLines,
+            detail == null || detail.isBlank() ? "원격 서비스가 상세 오류를 반환하지 않았습니다." : detail);
+    }
+
+    private static String publicationLines(List<Map<String, Object>> publications, boolean publishedOnly) {
+        if (publications == null || publications.isEmpty()) {
+            return publishedOnly ? "게시 URL: 원격 서비스 응답에 없음" : "실패 플랫폼: 원격 서비스 응답에 없음";
+        }
+        List<String> lines = publications.stream()
+            .filter(publication -> publication != null)
+            .filter(publication -> {
+                String state = String.valueOf(publication.getOrDefault("state", ""));
+                return publishedOnly
+                    ? "PUBLISHED".equalsIgnoreCase(state) || "SUCCESS".equalsIgnoreCase(state)
+                    : "FAILED".equalsIgnoreCase(state) || "NEEDS_AUTH".equalsIgnoreCase(state);
+            })
+            .map(publication -> {
+                String platform = String.valueOf(publication.getOrDefault("platform", "unknown"));
+                Object url = publication.get("url");
+                if (url == null) url = publication.get("published_url");
+                if (url == null) url = publication.get("post_url");
+                Object error = publication.get("error");
+                return publishedOnly
+                    ? platform + ": " + (url == null ? "URL 없음" : url)
+                    : platform + ": " + (error == null ? "상세 오류 없음" : compact(String.valueOf(error), 500));
+            })
+            .toList();
+        if (lines.isEmpty()) {
+            return publishedOnly ? "게시 URL: 원격 서비스 응답에 없음" : "실패 플랫폼: 원격 서비스 응답에 없음";
+        }
+        return String.join("%n", lines);
+    }
+
+    private static String compact(String value, int maxLength) {
+        if (value == null) return null;
+        String compacted = value.replaceAll("[\\r\\n\\t]+", " ").trim();
+        return compacted.length() <= maxLength ? compacted : compacted.substring(0, maxLength) + "…";
     }
 
     private void applyRemoteError(MarketingJob job, String remoteError,

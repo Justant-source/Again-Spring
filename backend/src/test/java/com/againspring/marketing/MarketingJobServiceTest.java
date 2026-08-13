@@ -688,7 +688,7 @@ class MarketingJobServiceTest {
     }
 
     @Test
-    void applyPoll_toFailed_keepsPublicationErrorWithoutDuplicateTelegram() throws JsonProcessingException {
+    void applyPoll_toFailed_alertsOnceWithPublicationError() throws JsonProcessingException {
         MarketingJob job = MarketingJob.builder()
             .id(777L)
             .remoteJobId(TEST_JOB_ID)
@@ -716,7 +716,13 @@ class MarketingJobServiceTest {
         assertThat(job.getErrorMessage())
             .contains("instagram_reels")
             .contains("UPLOAD_NOT_ACCEPTED");
-        verify(telegramNotifier, never()).send(anyString());
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(telegramNotifier).send(message.capture());
+        assertThat(message.getValue()).contains("예약 마케팅 게시 실패").contains("UPLOAD_NOT_ACCEPTED");
+
+        // A repeated poll with the same terminal state must not page the operator again.
+        marketingJobService.applyPoll(job, view);
+        verify(telegramNotifier).send(anyString());
     }
 
     // ── Test 5: applyCallback_updatesJobFromRemote ──────────────────────────
@@ -757,6 +763,12 @@ class MarketingJobServiceTest {
         // Then
         assertThat(job.getStatus()).isEqualTo("PUBLISHED");
         assertThat(job.getPublications()).contains("https://x.com/againspring/status/123");
+
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(telegramNotifier).send(message.capture());
+        assertThat(message.getValue())
+            .contains("예약 마케팅 게시 완료")
+            .contains("https://x.com/againspring/status/123");
 
         verify(marketingJobRepository).findByRemoteJobId(TEST_JOB_ID);
         verify(marketingJobRepository).save(job);

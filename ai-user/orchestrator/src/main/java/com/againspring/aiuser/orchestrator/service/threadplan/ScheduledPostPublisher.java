@@ -10,6 +10,7 @@ import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
 import com.againspring.aiuser.orchestrator.domain.AiThreadPlan;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.domain.enums.ScheduledPartnerAnswerStatus;
+import com.againspring.aiuser.orchestrator.notification.ScheduledPostTelegramNotifier;
 import com.againspring.aiuser.orchestrator.repository.AiScheduledPartnerAnswerRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
@@ -58,6 +59,7 @@ public class ScheduledPostPublisher {
     private final AiScheduledPartnerAnswerRepository partnerAnswerRepository;
     private final CandidateScheduleSupport candidateScheduleSupport;
     private final SourceReservationSupport sourceReservationSupport;
+    private final ScheduledPostTelegramNotifier telegramNotifier;
 
     public void publishDue() {
         if (!properties.isEnabled() || !properties.getThreadPlan().isEnabled()
@@ -132,6 +134,7 @@ public class ScheduledPostPublisher {
             // Hard-commit popular source once the post is live.
             sourceReservationSupport.commitFromCandidatesJson(row.getCandidatesJson());
             leases.completePosted(row.getId(), WORKER, post.getId());
+            telegramNotifier.published(row, post.getId());
         } catch (Exception e) {
             log.warn("Scheduled post publish failed id={}: {}", row.getId(), e.getMessage());
             boolean retryable = row.getAttemptCount() < 3;
@@ -147,6 +150,7 @@ public class ScheduledPostPublisher {
     private void failAndRelease(AiScheduledPost row, String failureCode, boolean retryable) {
         sourceReservationSupport.releaseFromCandidatesJson(row.getCandidatesJson());
         leases.releaseFailed(row.getId(), WORKER, failureCode, retryable);
+        if (!retryable) telegramNotifier.failed(row, failureCode, null);
     }
 
     /**

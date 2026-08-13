@@ -98,6 +98,10 @@ services:
       dockerfile: Dockerfile
     image: againspring-ai-user-orchestrator
     container_name: againspring-ai-user-orchestrator
+    # Shared watchdog credential file; override only when the host stores it elsewhere.
+    # The file is outside the repository and must remain mode 600.
+    env_file:
+      - ${TELEGRAM_ENV_FILE:-/home/justant/.config/again-spring-watchdog/telegram.env}
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
@@ -210,6 +214,8 @@ services:
       dockerfile: Dockerfile
     image: againspring-ai-user-orchestrator-dev
     container_name: againspring-ai-user-orchestrator-dev
+    env_file:
+      - ${TELEGRAM_ENV_FILE:-/home/justant/.config/again-spring-watchdog/telegram.env}
     environment:
       SPRING_PROFILES_ACTIVE: dev
       DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${DEV_DB_NAME:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC

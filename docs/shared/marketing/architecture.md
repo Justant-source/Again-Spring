@@ -126,7 +126,7 @@ MarketingPollingScheduler (15초마다)
 - `rescheduledReason`: "예약 시각 경과 (원 예약: {원래시간})"
 - `originalScheduledAt`: 첫 이월 시에만 저장
 
-**로깅**: INFO 레벨로 상세 기록 + `TelegramNotifier`로 @WaggleBot_bot 채팅방에 이월 발생 시마다 알림 (잡 ID·원 예약/새 예약 시각·이월 횟수 포함). 원격 **FAILED/PARTIAL** 알림은 publication별 오류를 가진 **ASM pipeline/dispatcher만** 상태 전환당 1회 보낸다. AS는 callback/poll의 최상위 `error` 또는 publication `error`를 `errorMessage`에 저장하지만 같은 실패를 다시 알리지 않는다. 단, ASM 잡을 만들기 전 AS에서 실패한 경우에는 AS가 직접 1회 알린다. 봇 토큰/chat id는 `encrypted_secret` vault(`telegram.bot_token`/`telegram.chat_id`)에서 주입. 워치독과 동일 계열(`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`).
+**로깅·알림**: INFO 레벨로 상세 기록 + `TelegramNotifier`로 @WaggleBot_bot 채팅방에 이월 발생 시마다 알림 (잡 ID·원 예약/새 예약 시각·이월 횟수 포함). 예약 발행은 callback/poll에서 상태가 처음 **PUBLISHED**가 되면 제목·플랫폼별 게시 URL을, **FAILED/PARTIAL**이 되면 제목·플랫폼별 원인과 `errorMessage` 로그를 1회 알린다. 예약 시각 도래 후 publish trigger 자체가 실패한 경우도 즉시 알린다. 이전 저장 상태와 비교하므로 callback/poll 중복 호출은 중복 알림을 만들지 않는다. 봇 토큰/chat id는 `encrypted_secret` vault(`telegram.bot_token`/`telegram.chat_id`)에서 주입한다.
 
 ### 6. Phase 2 분배 · 영상 · 통계 루프
 

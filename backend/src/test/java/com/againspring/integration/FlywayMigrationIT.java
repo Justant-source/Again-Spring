@@ -14,7 +14,7 @@ import java.sql.SQLException;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Flyway V1~V32이 실 MariaDB(Testcontainers) 위에서 전부 성공하는지 검증.
+ * Flyway migrations that ship with the backend succeed on real MariaDB (Testcontainers).
  * 새 마이그레이션 추가 시 hasSize 값도 함께 갱신할 것.
  */
 class FlywayMigrationIT extends MariaDbIntegrationSupport {
@@ -35,9 +35,9 @@ class FlywayMigrationIT extends MariaDbIntegrationSupport {
 
         assertThat(failedCount).as("실패한 마이그레이션").isZero();
         assertThat(pendingCount).as("미적용 마이그레이션").isZero();
-        // V107(post_side_tombstones)까지 포함 — 총 107개
+        // V112(post_sibom_candidates)까지 포함 — 총 112개
         // 주의: 마이그레이션 추가 시 이 숫자도 함께 갱신할 것
-        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(107);
+        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(112);
     }
 
     @Test

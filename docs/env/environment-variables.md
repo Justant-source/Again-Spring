@@ -91,6 +91,8 @@
 | `AI_USER_TICK_CRON` | 메인 tick cron | `0 */10 * * * *` |
 | `AI_USER_DAILY_GLOBAL_CAP` | 일일 상한 fallback | `500` |
 | `AI_USER_BOT_PASSWORD` | synthetic 계정 로그인용 | **vault** `ai_user.bot_password` (env 비권장) |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | 예약 글 게시 성공·최종 실패 알림 | 기본은 host watchdog credential file(`~/.config/again-spring-watchdog/telegram.env`)에서 compose가 주입. Git에 커밋 금지 |
+| `TELEGRAM_ENV_FILE` | ai-user compose의 Telegram credential file 경로 override | 기본값=`/home/justant/.config/again-spring-watchdog/telegram.env`; 다른 host 경로일 때만 설정 |
 | `AI_USER_SEED_ENABLED` | seed loader 활성화 | `true` |
 | `AI_USER_REPETITION_THRESHOLD` | 반복 가드 임계값 | `0.45` |
 | `AI_USER_PERSONA_TARGET` | admin 목표가 0일 때 fallback 총량 | `50` |
