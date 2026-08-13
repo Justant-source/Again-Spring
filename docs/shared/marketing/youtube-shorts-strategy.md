@@ -162,7 +162,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 - **클로징**: again_spring 고정 문구는 voice+text 키로 디스크 캐시·loudnorm 후 재사용
 - **AV 동기**: 오디오 타임라인 고정. 화면만 `TTS_TEXT_LEAD_SEC=0.10`(100ms) 앞서 전환
 - **Intro**: `sibom_plan` 중 `role=intro` 시봄이 합성 PNG가 있으면 표지, 없으면 크림+**훅**만. **메타포 PNG 사용 금지** (원제 낭독 intro 폐기)
-- **TTS 음량**: 통합 낭독 wav를 장면 분할해 재사용. 댓글/클로징은 개별 2-pass loudnorm(`I=-16`) 후, 타깃 밴드(`-19…-14`) 밖이면 **양방향** volume gain(키우기·줄이기)+peak 리미터. 예전 peak-only 부스트는 큰 첫 댓글을 더 키우는 경우가 있어 제거.
+- **TTS 음량**: 통합 낭독 분할 청크·장면별 TTS(본문/intro/댓글/클로징)·alignment 폴백 본문 모두 개별 2-pass loudnorm(`I=-16`) 후, 타깃 밴드(`-19…-14`) 밖이면 **양방향** volume gain+peak 리미터. 전역 loudnorm은 이중 적용을 피하기 위해 skip. (본문만 건너뛰던 경로에서 mid-video 볼륨 붕괴가 났음 — WaggleBot `10026251` / YT `_R0dV019OiI`)
 
 ---
 
