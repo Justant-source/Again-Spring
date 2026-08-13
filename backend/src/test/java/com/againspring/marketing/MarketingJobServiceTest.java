@@ -36,6 +36,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
@@ -687,7 +688,7 @@ class MarketingJobServiceTest {
     }
 
     @Test
-    void applyPoll_toFailed_sendsTelegramWithErrorAndTargets() throws JsonProcessingException {
+    void applyPoll_toFailed_keepsPublicationErrorWithoutDuplicateTelegram() throws JsonProcessingException {
         MarketingJob job = MarketingJob.builder()
             .id(777L)
             .remoteJobId(TEST_JOB_ID)
@@ -700,7 +701,10 @@ class MarketingJobServiceTest {
             .status("FAILED")
             .phase("CAPTURE")
             .progress(0.0)
-            .error("x_thread capture failed: page.goto Timeout")
+            .publications(List.of(Map.of(
+                "platform", "instagram_reels",
+                "state", "FAILED",
+                "error", "UPLOAD_NOT_ACCEPTED: create dialog still empty")))
             .build();
 
         when(marketingJobRepository.save(any(MarketingJob.class)))
@@ -709,14 +713,10 @@ class MarketingJobServiceTest {
         marketingJobService.applyPoll(job, view);
 
         assertThat(job.getStatus()).isEqualTo("FAILED");
-        assertThat(job.getErrorMessage()).contains("x_thread capture failed");
-        ArgumentCaptor<String> msg = ArgumentCaptor.forClass(String.class);
-        verify(telegramNotifier).send(msg.capture());
-        assertThat(msg.getValue())
-            .contains("FAILED")
-            .contains("777")
-            .contains("x_thread")
-            .contains("capture failed");
+        assertThat(job.getErrorMessage())
+            .contains("instagram_reels")
+            .contains("UPLOAD_NOT_ACCEPTED");
+        verify(telegramNotifier, never()).send(anyString());
     }
 
     // ── Test 5: applyCallback_updatesJobFromRemote ──────────────────────────

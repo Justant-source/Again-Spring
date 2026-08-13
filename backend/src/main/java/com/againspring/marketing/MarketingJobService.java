@@ -374,7 +374,6 @@ public class MarketingJobService {
     @Transactional
     public void applyCallback(JobCallbackPayload payload) {
         marketingJobRepository.findByRemoteJobId(payload.getJobId()).ifPresent(job -> {
-            String prevStatus = job.getStatus();
             job.applyRemote(
                 payload.getStatus(),
                 payload.getPhase(),
@@ -382,9 +381,8 @@ public class MarketingJobService {
                 serializeJson(payload.getArtifacts()),
                 serializeJson(payload.getPublications())
             );
-            applyRemoteError(job, payload.getError());
+            applyRemoteError(job, payload.getError(), payload.getPublications());
             marketingJobRepository.save(job);
-            notifyIfTerminalFailure(job, prevStatus);
             log.info("Callback applied for remote job {}: status={}", payload.getJobId(), payload.getStatus());
         });
     }
@@ -393,7 +391,6 @@ public class MarketingJobService {
      * Apply remote job state to local job entity
      */
     public void applyPoll(MarketingJob job, AsmJobView view) {
-        String prevStatus = job.getStatus();
         job.applyRemote(
             view.getStatus(),
             view.getPhase(),
@@ -401,16 +398,19 @@ public class MarketingJobService {
             serializeJson(view.getArtifacts()),
             serializeJson(view.getPublications())
         );
-        applyRemoteError(job, view.getError());
+        applyRemoteError(job, view.getError(), view.getPublications());
         marketingJobRepository.save(job);
-        notifyIfTerminalFailure(job, prevStatus);
     }
 
-    private void applyRemoteError(MarketingJob job, String remoteError) {
-        if (remoteError != null && !remoteError.isBlank()) {
-            job.setErrorMessage(remoteError.length() > 1000
-                ? remoteError.substring(0, 1000)
-                : remoteError);
+    private void applyRemoteError(MarketingJob job, String remoteError,
+                                  List<Map<String, Object>> publications) {
+        String detail = remoteError != null && !remoteError.isBlank()
+            ? remoteError
+            : publicationFailureDetail(publications);
+        if (detail != null && !detail.isBlank()) {
+            job.setErrorMessage(detail.length() > 1000
+                ? detail.substring(0, 1000)
+                : detail);
         } else if ("FAILED".equals(job.getStatus()) || "PARTIAL".equals(job.getStatus())) {
             // Keep prior errorMessage if remote omitted detail.
         } else {
@@ -418,30 +418,18 @@ public class MarketingJobService {
         }
     }
 
-    /**
-     * Telegram once when a job newly enters FAILED/PARTIAL — includes targets + error cause.
-     * Carry-over alerts remain in {@link MarketingPollingScheduler}.
-     */
-    private void notifyIfTerminalFailure(MarketingJob job, String previousStatus) {
-        String status = job.getStatus();
-        if (!"FAILED".equals(status) && !"PARTIAL".equals(status)) {
-            return;
+    private static String publicationFailureDetail(List<Map<String, Object>> publications) {
+        if (publications == null) return null;
+        for (Map<String, Object> publication : publications) {
+            if (publication == null) continue;
+            String state = String.valueOf(publication.getOrDefault("state", ""));
+            if (!"FAILED".equalsIgnoreCase(state) && !"NEEDS_AUTH".equalsIgnoreCase(state)) continue;
+            Object error = publication.get("error");
+            if (error == null || String.valueOf(error).isBlank()) continue;
+            String platform = String.valueOf(publication.getOrDefault("platform", "unknown"));
+            return platform + ": " + error;
         }
-        if (status.equals(previousStatus)) {
-            return;
-        }
-        String targets = job.getTargets() != null ? job.getTargets() : "[]";
-        String err = job.getErrorMessage() != null ? job.getErrorMessage() : "(원인 미상)";
-        if (err.length() > 700) {
-            err = err.substring(0, 700) + "…";
-        }
-        telegramNotifier.send(String.format(
-            "❌ [Again-Spring] 마케팅 %s%n잡 #%s · post=%s%n채널: %s%n원인: %s",
-            status,
-            job.getId() != null ? job.getId() : "?",
-            job.getPostId() != null ? job.getPostId() : "?",
-            targets,
-            err));
+        return null;
     }
 
     /**
