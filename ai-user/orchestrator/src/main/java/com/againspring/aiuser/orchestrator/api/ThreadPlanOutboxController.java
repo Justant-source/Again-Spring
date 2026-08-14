@@ -49,8 +49,9 @@ public class ThreadPlanOutboxController {
             planService.requestPlan(event.postId, revision, event.syntheticPost ? "AI_POST" : "HUMAN_POST", occurred,
                     event.title, event.body, event.category);
         } else if (type.equals("COMMENT_CREATED") || type.equals("COMMENT") || type.equals("REPLY_CREATED") || type.equals("REPLY")) {
-            // Backend must mark synthetic authors. Missing/true means never treat the action as human input.
-            if (!event.syntheticAuthor && event.commentId != null) {
+            // Fail closed: only an explicit false from the backend is eligible as human input.
+            // Older/malformed events without this fact must not create an AI-to-AI reply loop.
+            if (Boolean.FALSE.equals(event.syntheticAuthor) && event.commentId != null) {
                 int ttlDays = Math.max(1, properties.getHumanReply().getInboxTtlDays());
                 inboxService.observe(event.postId, event.commentId, event.parentCommentId, safe(event.authorId),
                         (type.equals("REPLY_CREATED") || type.equals("REPLY")) ? "REPLY" : "COMMENT",
@@ -114,7 +115,7 @@ public class ThreadPlanOutboxController {
         private String eventId, type, postId, commentId, parentCommentId, authorId, title, body, category;
         private Integer postRevision;
         private boolean syntheticPost;
-        private boolean syntheticAuthor;
+        private Boolean syntheticAuthor;
         private Instant occurredAt;
         private Map<String, Object> payload;
     }

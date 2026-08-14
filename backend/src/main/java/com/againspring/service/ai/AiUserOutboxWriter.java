@@ -84,6 +84,9 @@ public class AiUserOutboxWriter {
         payload.put("commentRevision", comment.getContentRevision());
         payload.put("parentCommentId", comment.getParentCommentId());
         payload.put("authorId", comment.getAuthorId());
+        // The orchestrator must never infer this from a missing field: AI-authored
+        // comments are outbox facts too, but they are not human-reply triggers.
+        payload.put("syntheticAuthor", isSyntheticAuthor(comment.getAuthorId()));
         payload.put("createdAt", comment.getCreatedAt());
         payload.put("status", comment.getStatus() == null ? null : comment.getStatus().name());
         payload.put("deletedAt", comment.getDeletedAt());
