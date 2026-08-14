@@ -58,6 +58,14 @@ class PromoTitleServiceTest {
     }
 
     @Test
+    void normalizeHook_removesSlashSeparators() {
+        String got = PromoTitleService.normalizeHook("퇴근/주말／연락은 없다");
+        assertFalse(got.contains("/"));
+        assertFalse(got.contains("／"));
+        assertEquals("퇴근 주말 연락은 없다", got.replace("\n", " "));
+    }
+
+    @Test
     void normalizeAgainstTitle_blankFallsBackToWrap() {
         String title = "원제입니다 그대로";
         String got = PromoTitleService.normalizeAgainstTitle(null, title);
