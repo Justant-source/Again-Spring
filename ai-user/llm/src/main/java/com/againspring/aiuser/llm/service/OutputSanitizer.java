@@ -43,6 +43,19 @@ public class OutputSanitizer {
     private static final Pattern THEQOO_ONE_DO_MORUGET = Pattern.compile("1도\\s+모르겠(음|고)");
     private static final Pattern THEQOO_ONE_DO_IDEAL = Pattern.compile("1도\\s+이해가\\s+안\\s*됨");
     private static final Pattern THEQOO_WEEKDAY_MIDDOT = Pattern.compile("([월화수목금토일])·(?=[월화수목금토일])");
+    // 외부 크롤 원문에서 비롯된 특정 커뮤니티명은 다시봄 공개 글에 남기지 않는다.
+    // 출처 식별자는 source/source_url 내부 메타데이터로만 보존한다.
+    private static final Pattern NAMED_COMMUNITY_REFERENCE = Pattern.compile(
+        "네이트\\s*판|nate\\s*pann?|블라인드|(?<![가-힣])블라(?=(?:랑|와|는|가|에|에서|도|의|에요|임|야|하고|같은|글|댓글|유저|사람|분들|반응|문화|$))|\\bblind\\b|"
+            + "디시인사이드|디시|dcinside|dc\\s*inside|에펨코리아|펨코|fm\\s*korea|"
+            + "더쿠|인스티즈|보배드림|클리앙|루리웹|웃긴대학|웃대|오늘의유머|오유|여시|개드립",
+        Pattern.CASE_INSENSITIVE);
+    private static final Pattern PANN_FEMALE_USER_REFERENCE = Pattern.compile("(?<![가-힣])판녀(?:들)?");
+    // 일반 명사인 '판'은 커뮤니티 문맥에서만 치환한다 (판사 등 오탐 방지).
+    private static final Pattern PANN_COMMUNITY_CONTEXT = Pattern.compile(
+        "(?<![가-힣])판\\s*(?=(?:에|에서|으로|은|는|도|만|글|댓글|유저|사람|분들|반응|문화))");
+    private static final Pattern PANN_COMMUNITY_SPACED_CONTEXT = Pattern.compile(
+        "(?<![가-힣])판\\s+(?=(?:이럴|보면|에서는|문화|분위기|반응))");
 
     // ── 커뮤니티별 분포 매칭 설정 (Step 6) ──────────────────────────────────────
     // typoInject/typoProb: Track A R9 결정론적 오타 주입 (D-50). LLM 준수 비의존.
@@ -403,6 +416,16 @@ public class OutputSanitizer {
         s = s.replaceAll("(?<![.!?])\\. *$", "");
         // 쌍따옴표 → 제거 (안의 내용은 유지, 인용 그대로)
         s = s.replaceAll("\"([^\"\\n]{1,60})\"", "$1");
+
+        // 4.6 크롤 원문 출처 커뮤니티명은 범용 용어로 정규화한다.
+        // 기존 오염 코퍼스가 LLM 출력에 재현되는 경우까지 막는 마지막 변환 계층이다.
+        s = NAMED_COMMUNITY_REFERENCE.matcher(s).replaceAll("온라인 커뮤니티");
+        s = PANN_FEMALE_USER_REFERENCE.matcher(s).replaceAll("커뮤니티 이용자들");
+        s = PANN_COMMUNITY_CONTEXT.matcher(s).replaceAll("커뮤니티");
+        s = PANN_COMMUNITY_SPACED_CONTEXT.matcher(s).replaceAll("커뮤니티 ");
+        s = s.replace("커뮤니티을", "커뮤니티를")
+             .replace("커뮤니티은", "커뮤니티는")
+             .replace("커뮤니티이", "커뮤니티가");
 
         // 5. 후행 AI 말투 제거 ("어떤 톤으로 반응하고 싶은지 알려주면..." 류)
         s = s.replaceAll("(?s)\n+(?:어[떤떻]\\s*[^\n]*알려|더\\s*정확하게|앞\\s*댓글\\s*내용을\\s*보여)[^\n]*$", "").trim();

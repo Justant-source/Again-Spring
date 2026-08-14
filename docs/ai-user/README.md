@@ -32,6 +32,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - `ai-learning`은 `AI_LEARNING_ENABLED=false`면 scheduler를 올리지 않고, `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic 작업을 등록하지 않는다. 크롤 ingest 전 **popularity gate**가 UNRANKED를 차단한다.
 - human reply 예산·responder 수 등은 admin **댓글 생성량 설정**(`ai_user_generation_config.hr_*`, V91)이 SSOT다.
 - **Source dedup (2026-08-05 · 가드 강화 2026-08-10 · 카테고리 스코프 2026-08-12)**: AI_POST primary = popular crawl claim(Blind70/Natepan30, soft-reserve, **`source_url` 가족** 영구 제외, **plaza `category`로 example_bank 보드 필터**). crawl ingest는 `GET_LOCK` 동시성 가드. `StoryTwinGuard`로 최근 14일 AI 글 twin 차단. crawl budget 불변.
+- **크롤 원문 커뮤니티명 정규화 (2026-08-14)**: 외부 크롤의 제목·본문은 `example_bank` 적재 전 특정 커뮤니티명(예: 네이트판·블라인드)을 `온라인/인터넷 커뮤니티` 등 범용 표현으로 바꾼다. 내부 provenance인 `source`·`source_url`은 유지한다. 기존 데이터·연결된 재구성 글은 prod SoT를 읽기 전용으로 확인하는 `ai-user/tools/sanitize_crawled_community_references.py` dry-run 후 정리한다.
 
 ## 2026-08-01 Wave 요약 (WP1~WP5)
 

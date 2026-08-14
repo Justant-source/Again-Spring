@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks
 from app.db.session import get_db
 from app.services.quality_filter import QualityFilter
 from app.services.register_classifier import classify as classify_register
+from app.services.community_reference_sanitizer import sanitize_crawled_item
 from app.services.popularity_gate import (
     MIN_POPULARITY_PCT,
     filter_comments_for_parents,
@@ -62,7 +63,10 @@ async def _do_crawl_inner(source, daily_limit, embed_service):
         import importlib
         crawl = importlib.import_module(module_path).crawl
 
-        items = await crawl(daily_limit=daily_limit)
+        # External community names must not survive into example_bank.  Preserve
+        # source/source_url as internal provenance, but normalize title/body
+        # before every downstream use (quality, embeddings, register, storage).
+        items = [sanitize_crawled_item(item) for item in await crawl(daily_limit=daily_limit)]
         saved = 0
         skipped_dupes = 0
         skipped_unpopular = 0
