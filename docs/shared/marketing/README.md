@@ -120,9 +120,15 @@ docs/shared/marketing/
 REQUESTED → QUEUED → RUNNING → READY → PUBLISHING → PUBLISHED
                                   ↓
                                (수동 승인 시 PUBLISHING)
+RUNNING → SLA_BREACHED (15분 생성 SLA 경고, 계속 폴링)
+FAILED(WaggleBot poll timeout) → WAITING_EXTERNAL → READY
                 ↓
-             FAILED / STALE (폴링 5회 연속 실패)
+             STALE (폴링 5회 연속 실패) → FAILED (24시간 ASM 무응답)
 ```
+
+`SLA_BREACHED`와 `WAITING_EXTERNAL`은 게시 실패가 아닌 원격 처리 대기 상태다. AS는 같은
+remote job ID를 계속 조회하며, 나중에 `READY`가 되었고 예약 시각이 지났다면 그 폴링 주기 안에
+즉시 게시한다. 이후 `READY`/`PUBLISHED` 응답은 이전의 처리 지연 상세와 오류 표시를 지운다.
 
 ---
 
@@ -134,6 +140,7 @@ REQUESTED → QUEUED → RUNNING → READY → PUBLISHING → PUBLISHED
 | `ASM_API_TOKEN` | `asm-dev-token-change-in-prod` | Bearer 인증 토큰 |
 | `ASM_ENABLED` | `true` | false 시 잡 생성 API 비활성화 |
 | `ASM_POLL_INTERVAL_MS` | `15000` | 폴링 주기 (밀리초) |
+| `ASM_PROCESSING_SLA_MS` | `900000` | 원격 생성 지연 경고 기준; 초과해도 실패 처리하지 않음 |
 | `ASM_REQUEST_TIMEOUT_MS` | `10000` | ASM HTTP 타임아웃 |
 
 > **ASM 측 추가 env**: `ASM_CREDENTIAL_KEY` (base64 32바이트) — 플랫폼 계정 자격증명 AES-256-GCM 마스터키.

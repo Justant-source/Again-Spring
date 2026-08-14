@@ -35,7 +35,7 @@ public class MarketingPollingScheduler {
                     .withZone(java.time.ZoneId.of("Asia/Seoul"));
 
     private static final List<String> POLLING_STATUSES = Arrays.asList(
-        "QUEUED", "RUNNING", "READY", "PUBLISHING", "STALE"
+        "QUEUED", "RUNNING", "SLA_BREACHED", "WAITING_EXTERNAL", "READY", "PUBLISHING", "STALE"
     );
 
     private static final List<String> TERMINAL_STATUSES = Arrays.asList(
@@ -124,6 +124,7 @@ public class MarketingPollingScheduler {
                         AsmJobView view = asmClient.getJob(job.getRemoteJobId());
                         marketingJobService.applyPoll(job, view);
                         log.debug("Polled job {} -> status: {}", job.getId(), view.getStatus());
+                        triggerImmediatelyWhenReadyAfterSlot(job, now);
                     } catch (AsmUnavailableException e) {
                         log.warn("ASM unavailable when polling job {}: {}", job.getId(), e.getMessage());
                         job.markPollFailure(e.getMessage());
@@ -143,6 +144,25 @@ public class MarketingPollingScheduler {
             for (MarketingJob expiredJob : expiredJobs) {
                 rescheduleExpiredJob(expiredJob, now);
             }
+        }
+    }
+
+    /**
+     * Rendering may finish after the evening slot. Publish the newly READY artifact in
+     * this same reconciliation cycle; do not defer it to tomorrow or wait for another poll.
+     */
+    private void triggerImmediatelyWhenReadyAfterSlot(MarketingJob job, Instant now) {
+        if (!"READY".equals(job.getStatus()) || !Boolean.TRUE.equals(job.getAutoPublish())
+            || job.getScheduledPublishAt() == null || job.getScheduledPublishAt().isAfter(now)) {
+            return;
+        }
+        try {
+            marketingJobService.triggerPublish(job.getId());
+            log.info("Immediately triggered late READY marketing job {} (slot={})",
+                job.getId(), job.getScheduledPublishAt());
+        } catch (Exception e) {
+            log.warn("Failed to immediately trigger late READY job {}: {}", job.getId(), e.getMessage());
+            notifyTriggerFailureOnce(job, e);
         }
     }
 

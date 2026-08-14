@@ -42,6 +42,26 @@ public class MarketingJob {
     @Column(length = 20)
     private String phase;
 
+    /** Last status reported by ASM. Local status may be WAITING_EXTERNAL/SLA_BREACHED. */
+    @Column(length = 32)
+    private String remoteStatus;
+
+    /** Last phase reported by ASM; retained independently of the local display phase. */
+    @Column(length = 128)
+    private String remotePhase;
+
+    /** Detail of a transient remote processing delay. It is not a terminal publish error. */
+    @Column(columnDefinition = "TEXT")
+    private String processingDetail;
+
+    /** First time AS started waiting for a remote job after its transient timeout. */
+    @Column
+    private Instant waitingExternalSince;
+
+    /** Set once the remote generation has exceeded the operational processing SLA. */
+    @Column
+    private Instant slaBreachedAt;
+
     @Column
     @Builder.Default
     private Double progress = 0.0;
@@ -125,13 +145,17 @@ public class MarketingJob {
     /**
      * Apply remote job state to this entity
      */
-    public void applyRemote(String remoteStatus, String remotePhase, Double remoteProgress,
+    public void applyRemote(String localStatus, String remoteStatus, String remotePhase, Double remoteProgress,
                            String remoteArtifacts, String remotePublications) {
-        this.status = remoteStatus;
-        this.phase = remotePhase;
-        this.progress = remoteProgress;
-        this.artifacts = remoteArtifacts;
-        this.publications = remotePublications;
+        this.status = localStatus;
+        if (remoteStatus != null && !remoteStatus.isBlank()) this.remoteStatus = remoteStatus;
+        if (remotePhase != null && !remotePhase.isBlank()) {
+            this.remotePhase = remotePhase;
+            this.phase = remotePhase.length() > 20 ? remotePhase.substring(0, 20) : remotePhase;
+        }
+        if (remoteProgress != null) this.progress = remoteProgress;
+        if (remoteArtifacts != null) this.artifacts = remoteArtifacts;
+        if (remotePublications != null) this.publications = remotePublications;
         this.pollFailCount = 0;
         this.lastPolledAt = Instant.now();
     }

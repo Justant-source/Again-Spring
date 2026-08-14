@@ -476,6 +476,16 @@ class MarketingJobServiceTest {
         assertThat(urls.get("instagram_reels")).contains("utm_source=instagram");
         assertThat(req.getBrief().getPostUrl()).isEqualTo(urls.get("youtube_shorts"));
         assertThat(req.getOptions().getUtmCampaign()).isEqualTo("story_11");
+        assertThat(req.getOptions().getPriority()).isEqualTo("MARKETING_CRITICAL");
+        assertThat(req.getOptions().isPreScripted()).isTrue();
+        assertThat(req.getOptions().getRenderProfile()).isEqualTo("marketing_fast");
+        assertThat(req.getOptions().getDeadlineAt()).isNotBlank();
+        var schedulingOptions = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(req))
+            .path("options");
+        assertThat(schedulingOptions.path("priority").asText()).isEqualTo("MARKETING_CRITICAL");
+        assertThat(schedulingOptions.path("pre_scripted").asBoolean()).isTrue();
+        assertThat(schedulingOptions.path("render_profile").asText()).isEqualTo("marketing_fast");
+        assertThat(schedulingOptions.path("deadline_at").asText()).isNotBlank();
         assertThat(req.getBrief().getHookReels()).isEqualTo("릴스훅");
         assertThat(req.getBrief().getHookShorts()).isEqualTo("쇼츠훅");
         assertThat(req.getBrief().getScriptReels()).contains("공감");
@@ -723,6 +733,50 @@ class MarketingJobServiceTest {
         // A repeated poll with the same terminal state must not page the operator again.
         marketingJobService.applyPoll(job, view);
         verify(telegramNotifier).send(anyString());
+    }
+
+    @Test
+    void applyPoll_waggleBotProcessingTimeout_waitsForSameRemoteJobInsteadOfFailing()
+            throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(778L).remoteJobId(TEST_JOB_ID).postId(TEST_POST_ID).status("RUNNING").build();
+        AsmJobView timedOut = AsmJobView.builder()
+            .status("FAILED").phase("TTS 합성").progress(0.7)
+            .error("WaggleBot poll timeout after 1800.0s jobId=10026593 last={status=PROCESSING}")
+            .build();
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        marketingJobService.applyPoll(job, timedOut);
+
+        assertThat(job.getStatus()).isEqualTo("WAITING_EXTERNAL");
+        assertThat(job.getRemoteStatus()).isEqualTo("FAILED");
+        assertThat(job.getProcessingDetail()).contains("WaggleBot poll timeout");
+        assertThat(job.getErrorMessage()).isNull();
+        assertThat(job.getWaitingExternalSince()).isNotNull();
+        verify(telegramNotifier, never()).send(anyString());
+
+        AsmJobView ready = AsmJobView.builder().status("READY").phase("done").progress(1.0).build();
+        marketingJobService.applyPoll(job, ready);
+
+        assertThat(job.getStatus()).isEqualTo("READY");
+        assertThat(job.getErrorMessage()).isNull();
+        assertThat(job.getProcessingDetail()).isNull();
+        assertThat(job.getWaitingExternalSince()).isNull();
+    }
+
+    @Test
+    void applyPoll_missingRemoteStatus_preservesWaitingExternalState() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(779L).remoteJobId(TEST_JOB_ID).postId(TEST_POST_ID).status("WAITING_EXTERNAL")
+            .remoteStatus("FAILED").processingDetail("WaggleBot poll timeout")
+            .waitingExternalSince(Instant.now()).slaBreachedAt(Instant.now()).build();
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        marketingJobService.applyPoll(job, AsmJobView.builder().phase("FFmpeg 렌더링").build());
+
+        assertThat(job.getStatus()).isEqualTo("WAITING_EXTERNAL");
+        assertThat(job.getRemoteStatus()).isEqualTo("FAILED");
+        assertThat(job.getProcessingDetail()).isEqualTo("WaggleBot poll timeout");
     }
 
     // ── Test 5: applyCallback_updatesJobFromRemote ──────────────────────────

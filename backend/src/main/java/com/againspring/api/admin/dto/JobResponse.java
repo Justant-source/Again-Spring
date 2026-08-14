@@ -26,12 +26,17 @@ public class JobResponse {
     private String postId;
     private String status;
     private String phase;
+    private String remoteStatus;
+    private String remotePhase;
     private Double progress;
     private List<String> targets;
     private Boolean autoPublish;
     private Map<String, Object> artifacts;
     private List<Map<String, Object>> publications;
     private String errorMessage;
+    private String processingDetail;
+    private Instant waitingExternalSince;
+    private Instant slaBreachedAt;
     private String requestedBy;
     private Integer pollFailCount;
     private Instant lastPolledAt;
@@ -68,12 +73,17 @@ public class JobResponse {
             .postId(job.getPostId())
             .status(job.getStatus())
             .phase(job.getPhase())
+            .remoteStatus(job.getRemoteStatus())
+            .remotePhase(job.getRemotePhase())
             .progress(job.getProgress())
             .targets(targets)
             .autoPublish(job.getAutoPublish())
             .artifacts(artifacts)
             .publications(publications)
             .errorMessage(job.getErrorMessage())
+            .processingDetail(job.getProcessingDetail())
+            .waitingExternalSince(job.getWaitingExternalSince())
+            .slaBreachedAt(job.getSlaBreachedAt())
             .requestedBy(job.getRequestedBy())
             .pollFailCount(job.getPollFailCount())
             .lastPolledAt(job.getLastPolledAt())

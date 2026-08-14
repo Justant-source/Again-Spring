@@ -26,6 +26,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 @ExtendWith(MockitoExtension.class)
 class MarketingPollingSchedulerTest {
@@ -168,6 +169,28 @@ class MarketingPollingSchedulerTest {
         assertThat(stale.getStatus()).isEqualTo("READY");
         assertThat(stale.getPollFailCount()).isZero();
         assertThat(stale.getErrorMessage()).isNull();
+    }
+
+    @Test
+    @DisplayName("late READY job is published in the same reconciliation cycle")
+    void publishesImmediatelyWhenRemoteBecomesReadyAfterSlot() {
+        Instant past = Instant.now().minus(10, ChronoUnit.MINUTES);
+        MarketingJob job = MarketingJob.builder()
+            .id(572L).remoteJobId("asm-late-ready").postId("post_late").status("WAITING_EXTERNAL")
+            .autoPublish(true).scheduledPublishAt(past).build();
+
+        when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of(job));
+        when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
+        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of());
+        when(asmClient.getJob("asm-late-ready")).thenReturn(AsmJobView.builder().status("READY").build());
+        doAnswer(invocation -> {
+            ((MarketingJob) invocation.getArgument(0)).setStatus("READY");
+            return null;
+        }).when(marketingJobService).applyPoll(any(MarketingJob.class), any(AsmJobView.class));
+
+        scheduler.pollJobs();
+
+        verify(marketingJobService).triggerPublish(572L);
     }
 
     @Test

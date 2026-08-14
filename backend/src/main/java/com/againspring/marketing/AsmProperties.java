@@ -24,6 +24,8 @@ public class AsmProperties {
     private String callbackToken;
     private String callbackBaseUrl;
     private long xThreadPollIntervalMs = 600000; // 10 minutes default
+    /** Generation delay is an operational warning, not a terminal publish failure. */
+    private long processingSlaMs = 900_000L;
 
     /**
      * Lower bound for 24h auto-publish eligibility ({@code post.createdAt >= since}).

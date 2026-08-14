@@ -27,7 +27,8 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
 
     /**
      * Count active marketing jobs for a post with a specific platform.
-     * Active statuses: REQUESTED, QUEUED, RUNNING, PUBLISHING, STALE
+     * Active statuses: REQUESTED, QUEUED, RUNNING, SLA_BREACHED, WAITING_EXTERNAL,
+     * PUBLISHING, STALE. Delayed remote rendering stays active until ASM gives a real terminal result.
      *
      * {@code platform} is the bare target id (e.g. {@code x_thread}); the query wraps it
      * as a JSON string literal for {@code JSON_CONTAINS}.
@@ -40,7 +41,7 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     @Query(nativeQuery = true, value = """
         SELECT COUNT(*) FROM marketing_job
         WHERE post_id = :postId
-        AND status IN ('REQUESTED', 'QUEUED', 'RUNNING', 'PUBLISHING', 'STALE')
+        AND status IN ('REQUESTED', 'QUEUED', 'RUNNING', 'SLA_BREACHED', 'WAITING_EXTERNAL', 'PUBLISHING', 'STALE')
         AND JSON_CONTAINS(targets, JSON_QUOTE(:platform)) = TRUE
         """)
     long countActivePlatformJobs(String postId, String platform);
@@ -282,7 +283,7 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      *
      * <p>READY is excluded: auto-publish jobs due at {@code scheduled_publish_at} are
      * triggered by {@link com.againspring.marketing.MarketingPollingScheduler}, not carried over.
-     * QUEUED/RUNNING/STALE past the grace window are carried to the next-day slot
+     * QUEUED/RUNNING/SLA_BREACHED/WAITING_EXTERNAL/STALE past the grace window are carried to the next-day slot
      * (content was not ready in time).
      *
      * <p>{@code auto_publish=1} only — preview/manual jobs must not keep rolling the slot
@@ -292,14 +293,14 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * - auto_publish = true
      * - scheduled_publish_at is not null
      * - scheduled_publish_at < now - 5 minutes (tolerance)
-     * - status is one of: QUEUED, RUNNING, STALE (not yet READY/terminal)
+     * - status is one of: QUEUED, RUNNING, SLA_BREACHED, WAITING_EXTERNAL, STALE (not yet READY/terminal)
      */
     @Query(nativeQuery = true, value = """
         SELECT * FROM marketing_job
         WHERE auto_publish = 1
         AND scheduled_publish_at IS NOT NULL
         AND scheduled_publish_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
-        AND status IN ('QUEUED', 'RUNNING', 'STALE')
+        AND status IN ('QUEUED', 'RUNNING', 'SLA_BREACHED', 'WAITING_EXTERNAL', 'STALE')
         """)
     List<MarketingJob> findExpiredScheduledJobs();
 

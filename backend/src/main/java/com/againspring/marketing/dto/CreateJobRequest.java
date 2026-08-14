@@ -339,5 +339,20 @@ public class CreateJobRequest {
          */
         @JsonProperty("post_urls")
         private Map<String, String> postUrls;
+
+        /** Highest-priority SLA lane for scheduled Again-Spring short-form renders. */
+        private String priority;
+
+        /** Absolute render-ready deadline in UTC; used for deadline-aware degradation. */
+        @JsonProperty("deadline_at")
+        private String deadlineAt;
+
+        /** The channel-specific script is already produced by Again-Spring. */
+        @JsonProperty("pre_scripted")
+        private boolean preScripted;
+
+        /** Render policy understood by the WaggleBot marketing fast lane. */
+        @JsonProperty("render_profile")
+        private String renderProfile;
     }
 }

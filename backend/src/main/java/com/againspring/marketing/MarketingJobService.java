@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -331,12 +332,22 @@ public class MarketingJobService {
                 .build())
             .build();
 
+        long waggleSlaMs = asmProperties.getProcessingSlaMs() > 0
+            ? asmProperties.getProcessingSlaMs()
+            : 900_000L;
         OptionsDto options = OptionsDto.builder()
             .voiceId("default")
             .tone("warm")
             .autoPublish(asmAutoPublish)
             .utmCampaign(campaign)
             .postUrls(postUrls.isEmpty() ? null : postUrls)
+            // The AS variants are already final channel scripts.  Preserve the
+            // marketing SLA through ASM instead of asking WaggleBot to re-run
+            // its general-purpose Claude chunking path.
+            .priority("MARKETING_CRITICAL")
+            .deadlineAt(Instant.now().plusMillis(waggleSlaMs).toString())
+            .preScripted(needReels || needShorts)
+            .renderProfile((needReels || needShorts) ? "marketing_fast" : null)
             .build();
 
         CreateJobRequest request = CreateJobRequest.builder()
@@ -375,14 +386,9 @@ public class MarketingJobService {
     public void applyCallback(JobCallbackPayload payload) {
         marketingJobRepository.findByRemoteJobId(payload.getJobId()).ifPresent(job -> {
             String previousStatus = job.getStatus();
-            job.applyRemote(
-                payload.getStatus(),
-                payload.getPhase(),
-                payload.getProgress() != null ? payload.getProgress() : 0.0,
-                serializeJson(payload.getArtifacts()),
-                serializeJson(payload.getPublications())
-            );
-            applyRemoteError(job, payload.getError(), payload.getPublications());
+            applyRemoteState(job, payload.getStatus(), payload.getPhase(), payload.getProgress(),
+                serializeJson(payload.getArtifacts()), serializeJson(payload.getPublications()),
+                payload.getError(), payload.getPublications());
             marketingJobRepository.save(job);
             notifyTerminalStatusChange(job, previousStatus, payload.getPublications());
             log.info("Callback applied for remote job {}: status={}", payload.getJobId(), payload.getStatus());
@@ -394,16 +400,76 @@ public class MarketingJobService {
      */
     public void applyPoll(MarketingJob job, AsmJobView view) {
         String previousStatus = job.getStatus();
-        job.applyRemote(
-            view.getStatus(),
-            view.getPhase(),
-            view.getProgress(),
-            serializeJson(view.getArtifacts()),
-            serializeJson(view.getPublications())
-        );
-        applyRemoteError(job, view.getError(), view.getPublications());
+        applyRemoteState(job, view.getStatus(), view.getPhase(), view.getProgress(),
+            serializeJson(view.getArtifacts()), serializeJson(view.getPublications()),
+            view.getError(), view.getPublications());
         marketingJobRepository.save(job);
         notifyTerminalStatusChange(job, previousStatus, view.getPublications());
+    }
+
+    /**
+     * Reconcile ASM state without turning a known WaggleBot processing timeout into a
+     * publish failure. ASM can finish the same remote id after its caller timed out, so
+     * WAITING_EXTERNAL stays pollable and preserves the exact remote state for operators.
+     */
+    private void applyRemoteState(MarketingJob job, String remoteStatus, String remotePhase,
+                                  Double remoteProgress, String artifacts, String publications,
+                                  String remoteError, List<Map<String, Object>> publicationRows) {
+        String normalizedRemoteStatus = normalizeStatus(remoteStatus);
+        String localStatus = resolveLocalStatus(job, normalizedRemoteStatus, remoteError);
+        job.applyRemote(localStatus, normalizedRemoteStatus, remotePhase, remoteProgress, artifacts, publications);
+
+        if ("WAITING_EXTERNAL".equals(localStatus)) {
+            if (job.getWaitingExternalSince() == null) job.setWaitingExternalSince(Instant.now());
+            if (job.getSlaBreachedAt() == null) job.setSlaBreachedAt(Instant.now());
+            if (remoteError != null && !remoteError.isBlank()) {
+                job.setProcessingDetail(compact(remoteError, 1000));
+            }
+            job.setErrorMessage(null);
+            return;
+        }
+        if ("SLA_BREACHED".equals(localStatus)) {
+            if (job.getSlaBreachedAt() == null) job.setSlaBreachedAt(Instant.now());
+            job.setErrorMessage(null);
+            return;
+        }
+
+        // A later READY/PUBLISHED response is authoritative and must erase the old timeout.
+        job.setWaitingExternalSince(null);
+        job.setSlaBreachedAt(null);
+        job.setProcessingDetail(null);
+        applyRemoteError(job, remoteError, publicationRows);
+    }
+
+    private String resolveLocalStatus(MarketingJob job, String remoteStatus, String remoteError) {
+        if (remoteStatus == null) {
+            // ASM rollout compatibility: omit/no-new status must not erase a viable local state.
+            return job.getStatus() == null || job.getStatus().isBlank() ? "RUNNING" : job.getStatus();
+        }
+        if ("FAILED".equals(remoteStatus) && isTransientWaggleTimeout(remoteError)) {
+            return "WAITING_EXTERNAL";
+        }
+        return switch (remoteStatus) {
+            case "REQUESTED", "QUEUED", "READY", "PUBLISHING", "PUBLISHED", "FAILED", "PARTIAL", "STALE" -> remoteStatus;
+            case "RUNNING", "PROCESSING", "IN_PROGRESS" -> generationExceededSla(job) ? "SLA_BREACHED" : "RUNNING";
+            default -> job.getStatus() == null || job.getStatus().isBlank() ? "RUNNING" : job.getStatus();
+        };
+    }
+
+    private boolean generationExceededSla(MarketingJob job) {
+        if (job.getCreatedAt() == null) return false;
+        return job.getCreatedAt().plusMillis(asmProperties.getProcessingSlaMs()).isBefore(Instant.now());
+    }
+
+    private static boolean isTransientWaggleTimeout(String detail) {
+        if (detail == null) return false;
+        String normalized = detail.toLowerCase(Locale.ROOT);
+        return normalized.contains("wagglebot") && normalized.contains("poll timeout");
+    }
+
+    private static String normalizeStatus(String rawStatus) {
+        if (rawStatus == null || rawStatus.isBlank()) return null;
+        return rawStatus.trim().toUpperCase(Locale.ROOT);
     }
 
     /**
