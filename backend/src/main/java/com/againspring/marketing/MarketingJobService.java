@@ -62,7 +62,6 @@ public class MarketingJobService {
     private final VideoVariantService videoVariantService;
     private final TelegramNotifier telegramNotifier;
     private final MarketingLlmAuthGuard llmAuthGuard;
-    private final MarketingPublishSlotService marketingPublishSlotService;
 
     /**
      * Create a new marketing job for a post.
@@ -214,9 +213,6 @@ public class MarketingJobService {
 
         // Persist first so utm_campaign / post_url can use local job id (story_{id}).
         String idempotencyKey = UUID.randomUUID().toString();
-        // V117 makes this column NOT NULL for every job, including render-only
-        // manual jobs. autoPublish=false still prevents any external publication.
-        Instant scheduledPublishAt = marketingPublishSlotService.nextSlotForTargets(targets, Instant.now());
         MarketingJob.MarketingJobBuilder pendingBuilder = MarketingJob.builder()
             .postId(post.getId())
             .status("REQUESTED")
@@ -225,8 +221,6 @@ public class MarketingJobService {
             .retryOfJobId(retryOfJobId)
             .generationAttempt(generationAttempt)
             .targets(serializeJson(targets))
-            .scheduledPublishAt(scheduledPublishAt)
-            .originalScheduledAt(scheduledPublishAt)
             .idempotencyKey(idempotencyKey);
         MarketingJob savedJob = marketingJobRepository.save(pendingBuilder.build());
 
