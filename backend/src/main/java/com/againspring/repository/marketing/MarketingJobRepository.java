@@ -358,6 +358,25 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     List<MarketingJob> findByScheduledPublishAtBetween(Instant start, Instant end);
 
     /**
+     * Find READY auto-publish jobs whose scheduled publish time has passed by 30+ minutes
+     * without being published (Decision #10 monitoring).
+     *
+     * These jobs are likely stuck due to ASM/rendering delays or similar operational issues.
+     * Used by monitoring sweep to detect and alert on publishing delays.
+     *
+     * @param thirtyMinutesAgo the cutoff time (current instant - 30 minutes)
+     * @return List of READY jobs past their scheduled time by 30+ minutes
+     */
+    @Query("""
+        SELECT mj FROM MarketingJob mj
+        WHERE mj.status = 'READY'
+        AND mj.autoPublish = true
+        AND mj.scheduledPublishAt IS NOT NULL
+        AND mj.scheduledPublishAt < :thirtyMinutesAgo
+        """)
+    List<MarketingJob> findReadyJobsPastScheduleBy30Minutes(@Param("thirtyMinutesAgo") Instant thirtyMinutesAgo);
+
+    /**
      * Count marketing jobs scheduled for a specific time that are not yet in terminal status.
      * Used for carry-over collision detection to ensure multiple jobs don't publish
      * at the exact same instant, raising a scheduling conflict for manual resolution.
@@ -385,4 +404,16 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
            "WHERE mj.scheduledPublishAt < :cutoffTime " +
            "AND mj.status NOT IN ('PUBLISHED', 'FAILED', 'PARTIAL')")
     List<MarketingJob> findExpiredUnpublishedJobs(@Param("cutoffTime") Instant cutoffTime);
+
+    /**
+     * Find all marketing jobs created within a specific instant range.
+     * Used for daily reporting to aggregate job statistics by channel.
+     *
+     * @param startInclusive the start time (inclusive)
+     * @param endExclusive the end time (exclusive)
+     * @return List of marketing jobs created within the time range
+     */
+    List<MarketingJob> findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+        @Param("startInclusive") Instant startInclusive,
+        @Param("endExclusive") Instant endExclusive);
 }

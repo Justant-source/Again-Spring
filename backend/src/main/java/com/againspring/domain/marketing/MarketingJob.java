@@ -128,10 +128,11 @@ public class MarketingJob {
 
     /**
      * Scheduled publish time for this job.
-     * If null, the job has no specific publish schedule.
-     * Updated when the job is deferred to a later time.
+     * Never null; enforced by DB constraint and application logic (Decision #10).
+     * Always populated at job creation; updated when the job is deferred to a later time.
+     * This ensures no job can become "orphaned" without a publish schedule.
      */
-    @Column
+    @Column(nullable = false)
     private Instant scheduledPublishAt;
 
     /**

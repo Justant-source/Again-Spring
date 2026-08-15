@@ -1,6 +1,7 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
+import com.againspring.notification.TelegramNotifier;
 import com.againspring.repository.ai.SystemSettingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +32,9 @@ class MarketingPublishSlotServiceTest {
 
     @Mock
     private SystemSettingRepository systemSettingRepository;
+
+    @Mock
+    private TelegramNotifier telegramNotifier;
 
     @InjectMocks
     private MarketingPublishSlotService service;
@@ -85,7 +89,7 @@ class MarketingPublishSlotServiceTest {
                 .build()));
 
         Instant now = LocalDate.of(2026, 8, 11).atTime(18, 0).atZone(KST).toInstant();
-        Instant slot = service.nextSlotForPlatform("x_thread", now).orElseThrow();
+        Instant slot = service.nextSlotForPlatform("x_thread", now);
 
         assertThat(slot).isEqualTo(
             LocalDate.of(2026, 8, 11).atTime(19, 45).atZone(KST).toInstant());
@@ -98,7 +102,7 @@ class MarketingPublishSlotServiceTest {
         // 19:00 KST — feed 20:00 and x 21:30 both still today; earliest = feed
         Instant now = LocalDate.of(2026, 8, 11).atTime(19, 0).atZone(KST).toInstant();
         Instant slot = service.nextSlotForTargets(
-            List.of("x_thread", "instagram_feed"), now).orElseThrow();
+            List.of("x_thread", "instagram_feed"), now);
 
         assertThat(slot).isEqualTo(
             LocalDate.of(2026, 8, 11).atTime(20, 0).atZone(KST).toInstant());
@@ -110,18 +114,59 @@ class MarketingPublishSlotServiceTest {
 
         Instant now = LocalDate.of(2026, 8, 11).atTime(12, 0).atZone(KST).toInstant();
         Instant slot = service.nextSlotForTargets(
-            List.of("instagram_reels", "youtube_shorts"), now).orElseThrow();
+            List.of("instagram_reels", "youtube_shorts"), now);
 
         assertThat(slot).isEqualTo(
             LocalDate.of(2026, 8, 11).atTime(20, 30).atZone(KST).toInstant());
     }
 
     @Test
-    void nextSlotForPlatform_unknownPlatform_empty() {
+    void nextSlotForPlatform_unknownPlatform_fallsbackToNextHour() {
+        // Decision #10: unknown platform with no default → fallback to next hour
         when(systemSettingRepository.findById(MarketingPublishSlotService.keyFor("naver_blog")))
             .thenReturn(Optional.empty());
 
-        assertThat(service.nextSlotForPlatform("naver_blog", Instant.now())).isEmpty();
+        Instant now = LocalDate.of(2026, 8, 11).atTime(18, 30, 45).atZone(KST).toInstant();
+        Instant slot = service.nextSlotForPlatform("naver_blog", now);
+
+        // Should be next full hour: 19:00
+        Instant expectedNextHour = LocalDate.of(2026, 8, 11).atTime(19, 0).atZone(KST).toInstant();
+        assertThat(slot).isEqualTo(expectedNextHour);
+
+        // Should have sent Telegram alert
+        ArgumentCaptor<String> msgCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramNotifier).send(msgCaptor.capture());
+        assertThat(msgCaptor.getValue()).contains("naver_blog").contains("설정 확인");
+    }
+
+    @Test
+    void nextSlotForPlatform_nullPlatform_fallsbackToNextHour() {
+        // Decision #10: null platform → fallback to next hour
+        Instant now = LocalDate.of(2026, 8, 11).atTime(18, 15).atZone(KST).toInstant();
+        Instant slot = service.nextSlotForPlatform(null, now);
+
+        Instant expectedNextHour = LocalDate.of(2026, 8, 11).atTime(19, 0).atZone(KST).toInstant();
+        assertThat(slot).isEqualTo(expectedNextHour);
+    }
+
+    @Test
+    void nextSlotForTargets_emptyTargets_fallsbackToNextHour() {
+        // Decision #10: empty targets → fallback to next hour
+        Instant now = LocalDate.of(2026, 8, 11).atTime(20, 45).atZone(KST).toInstant();
+        Instant slot = service.nextSlotForTargets(List.of(), now);
+
+        Instant expectedNextHour = LocalDate.of(2026, 8, 11).atTime(21, 0).atZone(KST).toInstant();
+        assertThat(slot).isEqualTo(expectedNextHour);
+    }
+
+    @Test
+    void nextSlotForTargets_nullTargets_fallsbackToNextHour() {
+        // Decision #10: null targets → fallback to next hour
+        Instant now = LocalDate.of(2026, 8, 11).atTime(21, 20).atZone(KST).toInstant();
+        Instant slot = service.nextSlotForTargets(null, now);
+
+        Instant expectedNextHour = LocalDate.of(2026, 8, 11).atTime(22, 0).atZone(KST).toInstant();
+        assertThat(slot).isEqualTo(expectedNextHour);
     }
 
     @Test

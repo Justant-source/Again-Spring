@@ -84,6 +84,9 @@ class MarketingJobServiceTest {
     @Mock
     com.againspring.notification.TelegramNotifier telegramNotifier;
 
+    @Mock
+    com.againspring.marketing.MarketingLlmAuthGuard llmAuthGuard;
+
     @InjectMocks
     MarketingJobService marketingJobService;
 
@@ -1006,5 +1009,83 @@ class MarketingJobServiceTest {
         verify(asmClient, never()).createJob(any(CreateJobRequest.class), any(String.class));
         verify(commentService, never()).getTopLevelComments(any());
         verify(marketingJobRepository, times(1)).save(any(MarketingJob.class));
+    }
+
+    /**
+     * Test that failJob() sets all required fields: stage, code, retryable, errorSummary, errorMessage
+     */
+    @Test
+    void failJobRecordsAllFailureFields() {
+        MarketingJob job = MarketingJob.builder()
+            .id(123L)
+            .postId("post-123")
+            .status("RUNNING")
+            .targets("[\"youtube_shorts\"]")
+            .generationAttempt(1)
+            .build();
+
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        marketingJobService.failJob(job, MarketingFailureStage.QUALITY_GATE, "SIBOM_PLAN_TOO_SHORT", false,
+            "Video variant quality gate failed: only 3 items, need 4");
+
+        ArgumentCaptor<MarketingJob> captor = ArgumentCaptor.forClass(MarketingJob.class);
+        verify(marketingJobRepository).save(captor.capture());
+
+        MarketingJob saved = captor.getValue();
+        assertThat(saved.getStatus()).isEqualTo("FAILED");
+        assertThat(saved.getFailureStage()).isEqualTo("AS:QUALITY_GATE");
+        assertThat(saved.getFailureCode()).isEqualTo("SIBOM_PLAN_TOO_SHORT");
+        assertThat(saved.getRetryable()).isFalse();
+        assertThat(saved.getErrorMessage()).contains("quality gate failed");
+        assertThat(saved.getErrorSummary()).isNotNull();
+    }
+
+    /**
+     * Test that failJob() sends Telegram notification
+     */
+    @Test
+    void failJobSendsTelegramNotification() {
+        MarketingJob job = MarketingJob.builder()
+            .id(456L)
+            .postId("post-456")
+            .status("RUNNING")
+            .targets("[\"instagram_reels\"]")
+            .build();
+
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        marketingJobService.failJob(job, MarketingFailureStage.ASM_CREATE, "ASM_TIMEOUT", true,
+            "ASM request timeout after 30 seconds");
+
+        verify(telegramNotifier).send(anyString());
+    }
+
+    /**
+     * Test that failJob() handles null stage/code by logging error and still sending alert (Force III - prevent silence)
+     */
+    @Test
+    void failJobSendsAlertWhenStageIsNull() {
+        MarketingJob job = MarketingJob.builder()
+            .id(789L)
+            .postId("post-789")
+            .status("RUNNING")
+            .targets("[\"x_thread\"]")
+            .build();
+
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Call failJob with null stage (code defect)
+        marketingJobService.failJob(job, null, null, false, "Unknown error");
+
+        // Verify save was still called
+        verify(marketingJobRepository).save(any(MarketingJob.class));
+        // Verify Telegram alert was sent (침묵 방지)
+        ArgumentCaptor<String> msgCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramNotifier, times(2)).send(msgCaptor.capture());
+        // Check that one of the messages contains the "코드 결함" marker
+        assertThat(msgCaptor.getAllValues().stream()
+            .anyMatch(msg -> msg.contains("코드 결함")))
+            .isTrue();
     }
 }

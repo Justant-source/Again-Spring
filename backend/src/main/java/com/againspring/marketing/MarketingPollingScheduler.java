@@ -30,6 +30,8 @@ public class MarketingPollingScheduler {
     private final AsmProperties asmProperties;
     private final TelegramNotifier telegramNotifier;
 
+    private static final long RETRY_AUTO_DELAY_MS = 5 * 60 * 1000L; // 5 minutes
+
     private static final java.time.format.DateTimeFormatter KST_FORMAT =
             java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")
                     .withZone(java.time.ZoneId.of("Asia/Seoul"));
@@ -47,6 +49,95 @@ public class MarketingPollingScheduler {
 
     /** When set, skip ASM GETs until this instant (shared outage backoff). */
     private volatile Instant asmCircuitOpenUntil = Instant.EPOCH;
+
+    /**
+     * Auto-retry transient LLM failures at the job level (Decision #4).
+     *
+     * <p>VARIANT_LLM_ERROR failures that are marked retryable are automatically regenerated
+     * 5 minutes after initial failure, up to a maximum of 2 total attempts (initial + 1 retry).
+     * This gives infrastructure time to recover from transient conditions (rate limits, timeouts)
+     * without user intervention.
+     *
+     * <p>Runs every 60 seconds to keep retry latency low.
+     */
+    @Scheduled(fixedDelayString = "${marketing.retry-auto-interval-ms:60000}")
+    public void autoRetryTransientFailures() {
+        if (!asmProperties.isEnabled()) {
+            return;
+        }
+
+        Instant now = Instant.now();
+        Instant fiveMinutesAgo = now.minus(5, ChronoUnit.MINUTES);
+
+        // Find FAILED jobs that are retryable, code matches transient patterns, and updated > 5 min ago
+        List<MarketingJob> retryableJobs = marketingJobRepository.findAll().stream()
+            .filter(job -> "FAILED".equals(job.getStatus()))
+            .filter(job -> Boolean.TRUE.equals(job.getRetryable()))
+            .filter(job -> job.getFailureCode() != null &&
+                (job.getFailureCode().startsWith("VARIANT_") ||
+                 job.getFailureCode().startsWith("SIBOM_") ||
+                 job.getFailureCode().startsWith("DURATION_") ||
+                 job.getFailureCode().startsWith("LAYOUT_")))
+            .filter(job -> job.getGenerationAttempt() == null || job.getGenerationAttempt() < 2)
+            .filter(job -> job.getUpdatedAt() != null && job.getUpdatedAt().isBefore(fiveMinutesAgo))
+            // Exclude jobs that already have a retry child
+            .filter(job -> !hasRetryChild(job.getId()))
+            .toList();
+
+        if (!retryableJobs.isEmpty()) {
+            log.info("Found {} transient failures eligible for auto-retry", retryableJobs.size());
+            for (MarketingJob job : retryableJobs) {
+                try {
+                    MarketingJob retried = marketingJobService.regenerateJob(job.getId(), "system:auto-retry");
+                    log.info("Auto-retried job {} -> new job {}", job.getId(), retried.getId());
+                } catch (Exception e) {
+                    log.warn("Failed to auto-retry job {}: {}", job.getId(), e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Check if a job has a retry child (indicates retry already attempted).
+     */
+    private boolean hasRetryChild(Long jobId) {
+        return marketingJobRepository.findAll().stream()
+            .anyMatch(job -> jobId.equals(job.getRetryOfJobId()));
+    }
+
+    /**
+     * Monitor READY jobs that are past their scheduled publish time by 30+ minutes.
+     * Alerts on operational delays (Decision #10 monitoring).
+     * Runs every 5 minutes to catch delays early.
+     */
+    @Scheduled(fixedDelayString = "${marketing.monitor-delay-interval-ms:300000}")
+    public void monitorPublishingDelays() {
+        if (!asmProperties.isEnabled()) {
+            return;
+        }
+        Instant now = Instant.now();
+        Instant thirtyMinutesAgo = now.minus(30, ChronoUnit.MINUTES);
+        List<MarketingJob> delayedJobs = marketingJobRepository.findReadyJobsPastScheduleBy30Minutes(thirtyMinutesAgo);
+
+        if (!delayedJobs.isEmpty()) {
+            for (MarketingJob delayedJob : delayedJobs) {
+                long delayMinutes = (now.toEpochMilli() - delayedJob.getScheduledPublishAt().toEpochMilli()) / 60_000;
+                log.warn("Marketing job {} READY but {} minutes past scheduled time {}",
+                    delayedJob.getId(), delayMinutes, KST_FORMAT.format(delayedJob.getScheduledPublishAt()));
+                telegramNotifier.send(String.format(
+                    "⚠️ [Again-Spring] 마케팅 발행 지연%n" +
+                    "잡 #%d · post=%s%n" +
+                    "상태: READY · 채널: %s%n" +
+                    "예약: %s · 경과: %d분%n" +
+                    "조치: ASM/렌더링 지연 감시, 필요시 수동 발행 고려",
+                    delayedJob.getId(),
+                    delayedJob.getPostId() != null ? delayedJob.getPostId() : "?",
+                    delayedJob.getTargets() != null ? delayedJob.getTargets() : "[]",
+                    KST_FORMAT.format(delayedJob.getScheduledPublishAt()),
+                    delayMinutes));
+            }
+        }
+    }
 
     @Scheduled(fixedDelayString = "${asm.poll-interval-ms:15000}")
     public void pollJobs() {
@@ -99,14 +190,8 @@ public class MarketingPollingScheduler {
                         // 24h expiry → permanent FAILED
                         if (job.getCreatedAt() != null &&
                             now.toEpochMilli() - job.getCreatedAt().toEpochMilli() > MAX_STALE_AGE_MS) {
-                            job.setStatus("FAILED");
-                            job.setErrorMessage("ASM 응답 24시간 초과 — 자동 실패 처리");
-                            marketingJobRepository.save(job);
-                            telegramNotifier.send(String.format(
-                                "❌ [Again-Spring] 마케팅 FAILED%n잡 #%s · post=%s%n채널: %s%n원인: ASM 응답 24시간 초과 — 자동 실패 처리",
-                                job.getId(),
-                                job.getPostId() != null ? job.getPostId() : "?",
-                                job.getTargets() != null ? job.getTargets() : "[]"));
+                            marketingJobService.failJob(job, MarketingFailureStage.ASM_POLL, "ASM_24H_TIMEOUT", false,
+                                "ASM 응답 24시간 초과 — 자동 실패 처리");
                             continue;
                         }
                         // Exponential backoff: skip if not enough time has passed
@@ -180,7 +265,16 @@ public class MarketingPollingScheduler {
     private void rescheduleExpiredJob(MarketingJob job, Instant now) {
         Instant originalScheduledAt = job.getScheduledPublishAt();
         if (originalScheduledAt == null) {
-            log.warn("Expired job {} has null scheduledPublishAt, skipping reschedule", job.getId());
+            // After NOT NULL migration (Task C), this should never occur.
+            // If it does, it's a code defect and must be loud.
+            log.error("Code defect: Expired job {} has null scheduledPublishAt — DB constraint should prevent this", job.getId());
+            telegramNotifier.send(String.format(
+                "🚨 [Again-Spring] 마케팅 코드 결함 - 발행 시각 NULL%n" +
+                "잡 #%d · post=%s%n" +
+                "원인: scheduledPublishAt이 NOT NULL이어야 하는데 NULL 발견%n" +
+                "조치: DB 제약이 실패했거나 마이그레이션이 불완전함. 즉시 조사 필요",
+                job.getId(),
+                job.getPostId() != null ? job.getPostId() : "?"));
             return;
         }
 

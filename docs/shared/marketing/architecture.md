@@ -235,8 +235,30 @@ CREATE TABLE marketing_job (
 
 **V116 실패 계약**: ASM/WaggleBot이 `failure_code`, `failure_stage`, `retryable`, `error_summary`와 안전한 생성 진단을 전달하면 AS가 폴링·콜백 모두에서 보존한다. 예를 들어 MariaDB 낙관적 동시성 충돌은 `INFRA_DB_CONFLICT` 및 재시도 가능으로, 품질 게이트 실패는 재시도 불가로 표시한다.
 
+**2026-08-15 실측 및 강제**: V116 컬럼은 존재했으나 실측 결과 AS 실패의 70%, ASM·WaggleBot 실패의
+100%가 이 필드들을 채우지 않고 있었다(스키마는 있었으나 강제가 없었다). 2026-08-15부터 3개
+저장소 모두 **단일 진입점**을 통해서만 실패 상태를 기록하도록 강제한다:
+
+| 저장소 | 진입점 | 단계 어휘 접두사 |
+|---|---|---|
+| AS | `MarketingJobService.failJob()` | `AS:` (BRIEF_BUILD·VARIANT_LLM·SIBOM_GUARD·QUALITY_GATE·ASM_CREATE·ASM_POLL·PUBLISH_TRIGGER) |
+| ASM | `app/worker/failure.py::fail_job()` | `ASM:` (CLAIM·BRIEF_PARSE·SCRIPT_GEN·TTS·WAGGLE_SUBMIT·WAGGLE_POLL·CAPTURE·UPLOAD·PUBLISH·CALLBACK) |
+| WaggleBot | 실패 응답 페이로드 (`failureCode`/`failureStage`/`retryable`/`error`) | `WAGGLE:` (기존 `phaseName`을 영문 상수로 승격, 예: "씬 구성"→`SCENE_COMPOSE`) |
+
+공통 enum을 두지 않고 저장소별로 독립 정의한 이유: ASM `CLAUDE.md`의 단방향 계약("ASM은 AS를
+모른다")을 지키기 위해서다. `failure_stage`가 비면(코드 결함) 텔레그램에 "⚠️ 원인 미기록"으로
+눈에 띄게 표시된다 — 조용히 UNKNOWN으로 덮지 않는다. FAILED인데 `failure_stage`가 NULL이면
+실패하는 회귀 테스트를 AS·ASM 양쪽에 추가해 재발을 막는다.
+
+ASM 렌더 실패는 `retryable=true`이고 `ingest_attempts < 2`면 1회 자동 재시도한다 —
+쿼터가 "실제 발행 성공" 기준(2026-08-12, `83e14ba7`)이라 재시도가 그날 발행 편수를 깎지 않는다.
+WaggleBot poll timeout은 1800초→2700초로 상향(2026-08-14 실측 타임아웃 2건).
+
 **이월 정책 필드 (V103 추가)**:
-- `scheduled_publish_at`: 현재 예약된 발행 시각 (이월 시 갱신됨)
+- `scheduled_publish_at`: 현재 예약된 발행 시각 (이월 시 갱신됨). **V117(2026-08-15)부터 DB NOT NULL** —
+  슬롯 조회 실패 시 `MarketingPublishSlotService`가 플랫폼 기본 슬롯 → 다음 정시 순으로 폴백해
+  반드시 값을 채운다. 이전에는 NULL이 저장돼 자동 발행 쿼리(`scheduledPublishAt IS NOT NULL`)에
+  영원히 걸리지 않는 "미아 잡"이 생겼다(발견 시점 최장 3일 방치 20건, 일괄 STALE 종료로 정리).
 - `rescheduled_count`: 총 이월 횟수 (0 = 원래 예약시각, 1+ = 이월됨)
 - `rescheduled_reason`: 이월 사유 예: "예약 시각 경과 (원 예약: 2026-08-08T14:00:00Z)"
 - `original_scheduled_at`: 첫 이월 시 저장, 변경되지 않음 (감사 추적용)

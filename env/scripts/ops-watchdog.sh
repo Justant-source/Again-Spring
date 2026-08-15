@@ -149,7 +149,7 @@ check_claude_session() {
     fi
 
     local elapsed=$((now - last_check))
-    local canary_interval=$((3600))  # 1시간
+    local canary_interval=$((600))  # 10분
 
     if [[ $elapsed -lt $canary_interval ]]; then
         # Canary 실행 시간이 아직 안 됨

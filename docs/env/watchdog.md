@@ -6,9 +6,10 @@
 
 systemd 사용자 타이머가 5분마다 watchdog 스크립트를 실행하여:
 
-1. **Claude 세션 생존** — 1시간마다 canary ping (최소 토큰 호출)
+1. **Claude 세션 생존** — **10분마다**(2026-08-15 단축, 기존 1시간) canary ping (최소 토큰 호출). 마케팅 LLM 호출 실패 기반 즉시 감지(연속 인증 오류 2회 → 긴급 알림)는 `docs/backend/llm-bridge.md` §인증 오류 감지 참조 — canary는 요청이 없는 시간대(새벽)만 보조로 커버한다.
 2. **자격증명 소유권** — `~/.claude/.credentials.json` 소유자 확인 (justant 여부)
-3. **컨테이너 헬스** — `docker ps`에서 `unhealthy` 상태인 againspring 컨테이너 자동 재시작
+3. **컨테이너 헬스** — `docker ps`에서 `unhealthy` 상태인 againspring 컨테이너 자동 재시작. `.State.Health.Status`가 있는 컨테이너는 그 값을, 없으면(`health=NONE`) 기존처럼 `.State.Status`만 판정 (2026-08-15부터 WSL 워치독에 반영)
+4. **WSL 재부팅 감지** — 부팅 시각을 상태 파일에 기록해 이전 값과 비교, 변경 시 Telegram 통보 (2026-08-15 신설 — 최근 12일 재부팅 5회 실측, 근본원인 미확정 상태에서 최소한의 가시성 확보)
 
 **자동 복구 한도**: 각 항목당 최대 3회. 초과 시 사용자 수동 조치 필요 메시지 전송.
 
@@ -120,9 +121,16 @@ rm -f watchdog-state/retry-state.json
 
 | 대상 | 감지 방법 | 복구 | 복구 한도 |
 |---|---|---|---|
-| Claude 세션 | `timeout 30 claude -p 'ping'` | 사용자 수동 (재로그인) | 3회 후 중단 |
+| Claude 세션 | `timeout 30 claude -p 'ping'` (10분 주기) | 사용자 수동 (재로그인) | 3회 후 중단 |
 | 자격증명 소유권 | `stat -c '%U' ~/.claude/.credentials.json` | `chown justant:justant` | 3회 후 중단 |
-| Unhealthy 컨테이너 | `docker ps --filter health=unhealthy` | `docker restart <container>` | 컨테이너당 3회 |
+| Unhealthy 컨테이너 | `docker ps --filter health=unhealthy` (건강체크 없는 컨테이너는 `.State.Status`) | `docker restart <container>` | 컨테이너당 3회 |
+| WSL 재부팅 | 부팅 시각 비교(`uptime -s`) | 자동 복구 없음, Telegram 통보만 | — |
+
+**WSL 워치독(`wsl-ops-watchdog-script.sh`) 감시 컨테이너 목록** (2026-08-15 comfyui 추가):
+`llm-worker`, `again-spring-marketing-asm-1`, `again-spring-marketing-llm-bridge-1`,
+`again-spring-marketing-social-poster-1`, `env-ai_worker-1`, `comfyui`
+— comfyui는 5일간 `Exited(137)`(OOM)로 죽어 있었는데 감시 목록에 없어 아무도 몰랐던 사고 이후 추가됨.
+발행 경로 자체는 comfyui에 의존하지 않으나(WaggleBot 렌더는 별도), 죽은 채 방치되는 걸 막기 위해 감시만 한다.
 
 **예외 — `againspring-ai-learning` 크롤 보호 (2026-08-11)**:
 - 컨테이너 안 `/tmp/ai_learning_crawl_in_progress` 마커가 있거나
@@ -150,11 +158,27 @@ rm -f watchdog-state/retry-state.json
 ## 참고: WSL 호스트 watchdog
 
 WSL(`100.115.252.61`)의 watchdog은 동일 구조로 별도 배포.
-- 타이머: `~/.config/systemd/user/again-spring-watchdog-wsl.timer`
-- 스크립트: WSL 내 별도 경로
-- Telegram: 동일 채널 (호스트 구분 prefix 추가)
+- 타이머: `~/.config/systemd/user/wsl-ops-watchdog.timer` (5분 간격)
+- 서비스: `~/.config/systemd/user/wsl-ops-watchdog.service`
+- 스크립트: `~/.config/systemd/user/wsl-ops-watchdog-script.sh`
+- 상태 파일: `~/.wsl-watchdog/` (canary 타임스탬프, 재시도 카운터, 부팅 시각, 로그)
+- Telegram: 동일 채널 (`[감지]`/`[조치중]`/`[성공]`/`[실패]` prefix)
 
 **양방향 감시**: 로컬 ↔ WSL 상호 확인 가능 (ssh reverse tunnel 성공 가정).
+
+### ASM 컨테이너 healthcheck (2026-08-15 추가)
+
+`~/Data/Again-Spring-Marketing/docker-compose.yml`에 `asm`·`renderer`·`social-poster` 서비스의
+healthcheck를 추가했다 (기존 `health=NONE` → WSL 워치독이 `.State.Health.Status`로 unhealthy를 감지 가능):
+
+| 서비스 | 방식 |
+|---|---|
+| `asm` | `curl -f http://localhost:8200/api/v1/health` |
+| `renderer` | TCP 포트 오픈 확인 (HTTP 엔드포인트 미확인) |
+| `social-poster` | TCP 포트 오픈 확인 (HTTP 엔드포인트 미확인) |
+
+renderer·social-poster는 HTTP 헬스 엔드포인트가 코드에 명시적으로 없어 TCP 체크로 대체했다 —
+추후 각 서비스에 `/health`가 추가되면 HTTP 방식으로 승격할 것.
 
 ---
 
@@ -194,4 +218,4 @@ stat ~/.claude/.credentials.json
 
 ---
 
-**마지막 업데이트**: 2026-08-11 | **형태**: systemd user timer + bash script
+**마지막 업데이트**: 2026-08-15 | **형태**: systemd user timer + bash script

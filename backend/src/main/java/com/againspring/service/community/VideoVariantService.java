@@ -2,6 +2,7 @@ package com.againspring.service.community;
 
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.PromptSanitizer;
+import com.againspring.marketing.MarketingLlmAuthGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -147,6 +150,7 @@ public class VideoVariantService {
     private final LLMProvider llmProvider;
     private final PromptSanitizer promptSanitizer;
     private final ObjectMapper objectMapper;
+    private final MarketingLlmAuthGuard llmAuthGuard;
 
     @Value("${llm.model:claude-haiku-4-5-20251001}")
     private String model;
@@ -315,15 +319,25 @@ public class VideoVariantService {
             SibomPlanGuard.Channel channel, List<String> sibomCandidates,
             String correction, int attemptNumber, List<Map<String, Object>> attempts
     ) {
+        Instant startedAt = Instant.now();
         ChannelResult llm = ChannelResult.empty(enabled ? "PARSE_ERROR" : "LLM_DISABLED");
+        String errorMessage = null;
         if (enabled) {
             try {
                 llm = parseChannelResult(llmProvider.invoke(buildChannelPrompt(
                         masterHook, hookEmotion, title, body, channel, sibomCandidates, correction), model), channel);
             } catch (Exception e) {
                 String status = isTransientLlmFailure(e) ? "LLM_TRANSIENT_ERROR" : "LLM_ERROR";
+                errorMessage = e.getMessage();
                 log.warn("VideoVariant LLM failed ({} attempt {}): {}", channel, attemptNumber, e.getMessage());
                 llm = ChannelResult.empty(status);
+
+                // Check for authentication errors and record in guard (Decision #6)
+                if (llmAuthGuard != null && llmAuthGuard.isAuthenticationError(errorMessage)) {
+                    if (llmAuthGuard.recordAuthError(errorMessage)) {
+                        log.error("🚨 LLM authentication circuit opened after {} consecutive errors", attemptNumber);
+                    }
+                }
             }
         }
         int scriptMax = channel == SibomPlanGuard.Channel.REELS ? SCRIPT_REELS_MAX : SCRIPT_SHORTS_MAX;
@@ -332,8 +346,13 @@ public class VideoVariantService {
         List<SibomPlanItem> plan = SibomPlanGuard.guard(llm.sibomPlan(), channel);
         Map<String, Object> attempt = new LinkedHashMap<>();
         attempt.put("attempt", attemptNumber);
+        attempt.put("started_at", startedAt.toString());
+        attempt.put("duration_ms", Duration.between(startedAt, Instant.now()).toMillis());
         attempt.put("result", llm.generationStatus());
         attempt.put("guarded_plan_count", plan.size());
+        if (errorMessage != null) {
+            attempt.put("error", clamp(errorMessage, 200));
+        }
         attempts.add(Map.copyOf(attempt));
         return new ChannelResult(hook, script, plan, llm.generationStatus(), Map.of());
     }
@@ -341,15 +360,15 @@ public class VideoVariantService {
     private static boolean shouldCorrect(ChannelResult result, int minimum) {
         if (result.sibomPlan().size() >= minimum) return false;
         return switch (result.generationStatus()) {
-            case "OK", "PARSE_ERROR", "LLM_TRANSIENT_ERROR" -> true;
+            case "OK", "PARSE_ERROR" -> true;
             default -> false;
         };
     }
 
     private static String correctionInstruction(String status, int count, int required) {
-        return "첫 결과는 " + status + " 상태이며 가드 후 시봄이 플랜이 " + count
-                + "장입니다. 반드시 " + required
-                + "장 이상을, 제공된 허용 image_id만 사용해 중복 image_id·swap_group 없이 JSON으로 다시 작성하세요.";
+        return "첫 결과의 가드 후 시봄이 플랜이 " + count + "장으로 최소 " + required
+                + "장에 미달합니다. 중복 image_id·swap_group을 피해 " + required
+                + "장 이상 남도록 다시 작성하세요.";
     }
 
     /** Count unique image/swap groups legally selectable by the prompt, including soft fill. */
@@ -405,7 +424,7 @@ public class VideoVariantService {
         String scriptHint = reels
                 ? "script는 짧게(말했을 때 ~25초)."
                 : "script는 조금 더 길게(~40초).";
-        int softTargetLo = reels ? 4 : 5;
+        int softTargetLo = reels ? 5 : 6;
         int softTargetHi = reels ? 5 : 7;
 
         String cards = buildSibomCards(sibomCandidates);
@@ -428,8 +447,10 @@ public class VideoVariantService {
             - %s : 자극 훅 톤 유지 → 갈등 핵심 2~4문장 요약 → 공감비율/댓글 유도 클리프행어.
               전문 낭독 금지. %s
             - 메타포 일러스트 사용 금지. 시봄이만.
-            - sibom_plan: 총 %d~%d장(인트로 포함, soft target). role=intro|peak|punch|soft_fill.
-              intro/peak=large+hold, punch/soft_fill=small+punch.
+            - sibom_plan: 인트로 포함 최소 4장 필수(절대 하한 — 미달 시 발행 불가), 권장 %d~%d장.
+              role=intro|peak|punch|soft_fill. intro/peak=large+hold, punch/soft_fill=small+punch.
+              image_id와 swap_group은 전 항목에서 서로 달라야 합니다. 중복은 자동으로 제거되어
+              장수가 줄어드니, 중복 제거 후에도 4장 이상 남도록 여유 있게 작성하세요.
               soft_fill은 아래 풀 id만·intro/peak 불가. image_id는 후보 카드 또는 soft_fill 풀에서만.
               caption은 카탈로그 재사용 또는 최대 10자(maxChars=10) 단문(판정·승패·처방 금지).
               beat_index=대본 비트 인덱스. 1피크=hook_emotion 정렬, 2피크=결말/반전만·후반.

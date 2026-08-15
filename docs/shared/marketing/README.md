@@ -130,6 +130,52 @@ FAILED(WaggleBot poll timeout) → WAITING_EXTERNAL → READY
 remote job ID를 계속 조회하며, 나중에 `READY`가 되었고 예약 시각이 지났다면 그 폴링 주기 안에
 즉시 게시한다. 이후 `READY`/`PUBLISHED` 응답은 이전의 처리 지연 상세와 오류 표시를 지운다.
 
+`scheduled_publish_at`은 **DB NOT NULL**이다(2026-08-15, `V117`). 슬롯 조회가 실패해도
+`MarketingPublishSlotService`가 플랫폼 기본 슬롯 → 다음 정시 순으로 반드시 값을 채운다 —
+이전에는 슬롯 미설정 시 NULL이 저장돼 자동 발행 쿼리에 영원히 걸리지 않는 "미아 잡"이 생겼다
+(2026-08-15 발견 시점 기준 최장 3일 방치 20건, 일괄 STALE 종료로 정리).
+
+---
+
+## 실패 처리 정책 (2026-08-15 안정화)
+
+### 재시도 원칙
+
+**콘텐츠 안전만 fail-closed. 운영 문제는 재시도한다.**
+
+| 실패 종류 | 예 | 처리 |
+|---|---|---|
+| 콘텐츠 안전 | 금지어·판결 표현·스키마 누출·LLM 오류 문자열 | 재시도 금지, 즉시 사망 |
+| 운영 문제 | 시봄이 분량 미달·LLM 타임아웃·렌더 실패 | **총 2회**(초기 1 + 5분 후 재큐잉 1) |
+| 인증/세션 오류 | Claude 세션 만료 | 재시도 없음 — 재시도해도 100% 실패하므로 즉시 긴급 알림 + 회로 차단(위 원칙의 유일한 예외) |
+
+### 실패 계약
+
+`MarketingJobService.failJob()`이 모든 실패 처리의 단일 진입점이다. `job.setStatus("FAILED")`를
+직접 호출하는 코드는 없어야 한다. 각 실패는 4개 필드를 반드시 채운다:
+
+| 필드 | 예 |
+|---|---|
+| `failureStage` | `AS:QUALITY_GATE`, `AS:ASM_POLL` (AS 자체 7단계). ASM은 `ASM:WAGGLE_POLL` 등 10단계, WaggleBot은 `WAGGLE:SCENE_COMPOSE` 등 phaseName 기반 — 저장소별 독립 어휘 + 접두사(공통 enum 없음, ASM 단방향 계약 보호) |
+| `failureCode` | 예: `SIBOM_PLAN_TOO_SHORT`, `ASM_24H_TIMEOUT` |
+| `retryable` | boolean |
+| `errorSummary`/`errorMessage` | 사람이 읽을 원인 |
+
+stage·code가 비면 "⚠️ 원인 미기록(코드 결함)"으로 텔레그램에 표시된다(침묵 방지) — 조용히
+UNKNOWN으로 덮지 않는다.
+
+### 텔레그램 진단 메시지
+
+실패 알림은 잡 ID뿐 아니라 **환경·재시도 상태·3중 식별자(AS/ASM/WaggleBot)·단계·시도 이력
+(KST 시각·소요시간·오류 원문)·컨텍스트(시봄이 장수·TTS voice 등)·실패 단계별 확인 명령**까지
+담는다 — 붙여넣으면 추가 조사 없이 진단 가능하게 설계됐다. 3800자 초과 시 시도 이력부터 축약.
+
+### 일일 발행 리포트
+
+`MarketingDailyReportScheduler`가 매일 22:00 KST에 채널별 생성/발행/실패/대기 건수와 전환율을
+텔레그램으로 보고한다. **전 채널 발행 0건이어도 반드시 보고**한다("⚠️ 오늘 발행 0건") — 그 전까지는
+잡이 아예 안 만들어지거나 조용히 0건 발행돼도 알림이 없었다.
+
 ---
 
 ## 환경 변수 (Again-Spring 측)
@@ -141,7 +187,7 @@ remote job ID를 계속 조회하며, 나중에 `READY`가 되었고 예약 시�
 | `ASM_ENABLED` | `true` | false 시 잡 생성 API 비활성화 |
 | `ASM_POLL_INTERVAL_MS` | `15000` | 폴링 주기 (밀리초) |
 | `ASM_PROCESSING_SLA_MS` | `900000` | 원격 생성 지연 경고 기준; 초과해도 실패 처리하지 않음 |
-| `ASM_REQUEST_TIMEOUT_MS` | `10000` | ASM HTTP 타임아웃 |
+| `ASM_REQUEST_TIMEOUT_MS` | `30000` (2026-08-15, 기존 `10000`) | ASM HTTP 타임아웃 |
 
 > **ASM 측 추가 env**: `ASM_CREDENTIAL_KEY` (base64 32바이트) — 플랫폼 계정 자격증명 AES-256-GCM 마스터키.
 > ASM `.env`에만 두고 git 커밋 금지. 생성: `openssl rand -base64 32`. 상세: [`credentials.md`](credentials.md)

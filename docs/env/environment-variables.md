@@ -67,11 +67,20 @@
 | `CLAUDE_HOST_CONFIG_DIR` | `/root/.claude`로 마운트할 호스트 경로 | 환경별 실제 값 |
 | `LLM_POOL_SIZE` | worker pool size | `100` |
 | `LLM_QUEUE_CAPACITY` | queue size | `500` |
-| `LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `30000` |
+| `LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `120000` (2026-08-15, 기존 `30000`) |
 | `LLM_DEFAULT_TIMEOUT_MS` | Claude CLI 브리지의 요청 실행 timeout | `600000` |
 | `LLM_REMOTE_DEFAULT_TIMEOUT_MS` | backend가 bridge에 전달하는 요청 timeout | `600000` |
 | `LLM_REMOTE_READ_TIMEOUT_MS` | backend → bridge HTTP read timeout (실행 timeout보다 길어야 함) | `610000` |
 | `LLM_PROCESS_TERMINATION_GRACE_MS` | 타임아웃·취소 뒤 CLI 프로세스 트리에 정상 종료를 허용하는 시간 | `2000` |
+| `LLM_REMOTE_CONNECT_TIMEOUT_MS` | backend → bridge HTTP connect timeout | `10000` (2026-08-15, 기존 `5000`) |
+| `ASM_REQUEST_TIMEOUT_MS` | backend → ASM 일반 요청 timeout | `30000` (2026-08-15, 기존 `10000`) |
+
+**2026-08-15 마케팅 파이프라인 안정화**: 시봄이 영상 생성 LLM 호출이 최대 600초까지 걸릴 수 있어
+`LLM_QUEUE_WAIT_TIMEOUT_MS`를 4배 상향했다(30s는 호출 1건이 600초를 점유하는 상황에서 큐 포화 시
+즉시 실패했다). `LLM_REMOTE_CONNECT_TIMEOUT_MS`·`ASM_REQUEST_TIMEOUT_MS`도 WSL 부하 상황을
+감안해 상향했다. 위 값들은 `application.yml` **기본값**이며 `.env.prod`는 이미 별도로 올바른
+런타임 값을 갖고 있었다(`b9a293c4`) — 이번 변경은 env 누락 시 안전망이다. **dev는 LLM 호출 자체가
+`127.0.0.1:1`로 차단돼 있어(아래 prod 체크리스트 참조) 이 값들과 무관하다.**
 
 ## dev/prod backend가 shared ai-user를 바라보는 변수
 

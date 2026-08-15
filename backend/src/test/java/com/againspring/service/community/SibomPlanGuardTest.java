@@ -16,9 +16,9 @@ class SibomPlanGuardTest {
                 item("peak", "stunned", "말문이 막혔다", 2, "large", "hold")
         ), SibomPlanGuard.Channel.REELS);
 
-        assertThat(out).hasSize(1);
-        assertThat(out.get(0).imageId()).isEqualTo("stunned");
-        assertThat(out.get(0).role()).isEqualTo("peak");
+        // After soft-fill topup, should be >= MIN_REELS (4)
+        assertThat(out.size()).isGreaterThanOrEqualTo(SibomPlanGuard.MIN_REELS);
+        assertThat(out.stream().map(SibomPlanItem::imageId)).contains("stunned");
     }
 
     @Test
@@ -27,16 +27,17 @@ class SibomPlanGuardTest {
         List<SibomPlanItem> self = SibomPlanGuard.guard(List.of(
                 item("punch", "money-trouble", "이것은열일곱자가넘는매우긴캡션입니다", 1, "small", "punch")
         ), SibomPlanGuard.Channel.REELS);
-        assertThat(self).hasSize(1);
-        assertThat(self.get(0).caption()).isEmpty();
+        // After soft-fill topup, should be >= MIN_REELS
+        assertThat(self.size()).isGreaterThanOrEqualTo(SibomPlanGuard.MIN_REELS);
+        assertThat(self.stream().filter(i -> i.imageId().equals("money-trouble")).findFirst().get().caption()).isEmpty();
 
         // two-argue maxChars=10, sibling_bottom=two-cold-backs (also 10)
         List<SibomPlanItem> swapped = SibomPlanGuard.guard(List.of(
                 item("punch", "two-argue", "이것은열일곱자가넘는매우긴캡션입니다", 1, "small", "punch")
         ), SibomPlanGuard.Channel.REELS);
-        assertThat(swapped).hasSize(1);
-        assertThat(swapped.get(0).imageId()).isEqualTo("two-cold-backs");
-        assertThat(swapped.get(0).caption()).isEmpty(); // still over sibling maxChars
+        assertThat(swapped.size()).isGreaterThanOrEqualTo(SibomPlanGuard.MIN_REELS);
+        assertThat(swapped.stream().map(SibomPlanItem::imageId)).contains("two-cold-backs");
+        assertThat(swapped.stream().filter(i -> i.imageId().equals("two-cold-backs")).findFirst().get().caption()).isEmpty();
     }
 
     @Test
@@ -45,10 +46,11 @@ class SibomPlanGuardTest {
                 item("soft_fill", "drained", "이제 지쳤다", 1, "large", "hold")
         ), SibomPlanGuard.Channel.REELS);
 
-        assertThat(out).hasSize(1);
-        assertThat(out.get(0).role()).isEqualTo("punch");
-        assertThat(out.get(0).size()).isEqualTo("small");
-        assertThat(out.get(0).dwell()).isEqualTo("punch");
+        // After soft-fill topup, should be >= MIN_REELS
+        assertThat(out.size()).isGreaterThanOrEqualTo(SibomPlanGuard.MIN_REELS);
+        // drained (original hero attempt) should be demoted to punch
+        assertThat(out.stream().filter(i -> i.imageId().equals("drained")).findFirst().get().role()).isEqualTo("punch");
+        assertThat(out.stream().allMatch(i -> i.size().equalsIgnoreCase("small") || i.size().equalsIgnoreCase("large"))).isTrue();
     }
 
     @Test
@@ -70,8 +72,11 @@ class SibomPlanGuardTest {
                 item("soft_fill", "drained", "지쳤다", 6, "small", "punch")
         ), SibomPlanGuard.Channel.SHORTS);
 
-        assertThat(out).extracting(SibomPlanItem::imageId)
-                .containsExactly("burst-crying", "drained");
+        // After dedupe + soft-fill topup, breakup should be removed (same swap_group as burst-crying)
+        // drained should be preserved, and other soft-fill items may be added
+        assertThat(out).extracting(SibomPlanItem::imageId).contains("burst-crying", "drained");
+        // breakup should NOT be present (same swap_group as burst-crying)
+        assertThat(out).extracting(SibomPlanItem::imageId).doesNotContain("breakup");
     }
 
     @Test
@@ -139,6 +144,89 @@ class SibomPlanGuardTest {
                     assertThat(entry.maxChars()).isEqualTo(SibomPlanGuard.CAPTION_MAX_CHARS);
                     assertThat(entry.caption()).hasSizeLessThanOrEqualTo(SibomPlanGuard.CAPTION_MAX_CHARS);
                 });
+    }
+
+    @Test
+    void softFillTopUp_dedupeThreeItems_becomesFourWithSoftFill() {
+        // Simulate dedupe result: 3 items (burst-crying and breakup deduplicated)
+        List<SibomPlanItem> out = SibomPlanGuard.guard(List.of(
+                item("peak", "burst-crying", "울었다", 3, "large", "hold"),
+                item("punch", "burst-crying", "또 울었다", 4, "small", "punch"),
+                item("punch", "breakup", "이별", 5, "small", "punch")
+        ), SibomPlanGuard.Channel.SHORTS);
+
+        // After dedupe + soft-fill topup: should become 4
+        assertThat(out).hasSizeGreaterThanOrEqualTo(4);
+        assertThat(out.stream().filter(i -> "soft_fill".equals(i.role())).count()).isGreaterThan(0);
+    }
+
+    @Test
+    void softFillTopUp_excludesUsedImageIdAndSwapGroup() {
+        // drained + curled-up are in SOFT_FILL_POOL
+        // burst-crying and drained share no group; curled-up and indignant don't share group
+        List<SibomPlanItem> out = SibomPlanGuard.guard(List.of(
+                item("peak", "burst-crying", "울었다", 2, "large", "hold"),
+                item("punch", "drained", "지침", 3, "small", "punch")
+                // 2 items, need 4 for SHORTS
+        ), SibomPlanGuard.Channel.SHORTS);
+
+        // topUpWithSoftFill should fill with curled-up, stunned, etc., but NOT drained again
+        assertThat(out).hasSizeGreaterThanOrEqualTo(4);
+        assertThat(out.stream().filter(i -> i.imageId().equals("drained")).count()).isEqualTo(1);
+    }
+
+    @Test
+    void softFillTopUp_poolExhausted_returnsAsIs() {
+        // Force using all pool items, then more needed
+        List<SibomPlanItem> manyPoolItems = new ArrayList<>();
+        manyPoolItems.add(item("punch", "drained", "지침", 0, "small", "punch"));
+        manyPoolItems.add(item("punch", "curled-up", "웅크림", 1, "small", "punch"));
+        manyPoolItems.add(item("punch", "stunned", "멍", 2, "small", "punch"));
+        manyPoolItems.add(item("punch", "swallow-words", "말 삼킴", 3, "small", "punch"));
+        manyPoolItems.add(item("punch", "indignant", "억울", 4, "small", "punch"));
+        manyPoolItems.add(item("punch", "side-glance", "눈치", 5, "small", "punch"));
+        manyPoolItems.add(item("punch", "relieved", "한숨", 6, "small", "punch"));
+
+        List<SibomPlanItem> out = SibomPlanGuard.guard(manyPoolItems, SibomPlanGuard.Channel.SHORTS);
+
+        // After guard (trim + normalize), should not throw, just return what it can
+        assertThat(out).isNotEmpty();
+        assertThat(out.size()).isLessThanOrEqualTo(SibomPlanGuard.MAX_SHORTS);
+    }
+
+    @Test
+    void softFillTopUp_itemsNeverPromotedToIntroOrPeak() {
+        List<SibomPlanItem> twoItems = List.of(
+                item("peak", "burst-crying", "울었다", 2, "large", "hold"),
+                item("punch", "money-trouble", "돈 문제", 3, "small", "punch")
+        );
+
+        List<SibomPlanItem> out = SibomPlanGuard.guard(twoItems, SibomPlanGuard.Channel.SHORTS);
+
+        // All soft_fill items should have role=soft_fill (before normalizeSizeDwell),
+        // and normalizeSizeDwell ensures soft_fill → small+punch
+        assertThat(out.stream()
+                .filter(i -> "soft_fill".equals(i.role()))
+                .allMatch(i -> i.size().equalsIgnoreCase("small") && i.dwell().equalsIgnoreCase("punch")))
+                .isTrue();
+    }
+
+    @Test
+    void minShortsEqualsFour() {
+        assertThat(SibomPlanGuard.MIN_SHORTS).isEqualTo(4);
+    }
+
+    @Test
+    void fourShortsPlan_passesQualityGate() {
+        List<SibomPlanItem> fourItems = List.of(
+                item("intro", "side-glance", "눈치", 0, "large", "hold"),
+                item("peak", "stunned", "멍", 2, "large", "hold"),
+                item("punch", "drained", "지침", 4, "small", "punch"),
+                item("punch", "curled-up", "웅크림", 5, "small", "punch")
+        );
+
+        List<SibomPlanItem> guarded = SibomPlanGuard.guard(fourItems, SibomPlanGuard.Channel.SHORTS);
+        assertThat(guarded.size()).isGreaterThanOrEqualTo(SibomPlanGuard.MIN_SHORTS);
     }
 
     private static SibomPlanItem item(

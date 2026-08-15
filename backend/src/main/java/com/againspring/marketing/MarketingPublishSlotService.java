@@ -1,8 +1,10 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
+import com.againspring.notification.TelegramNotifier;
 import com.againspring.repository.ai.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +16,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,7 +40,15 @@ import java.util.Optional;
  * </ul>
  * Multi-target jobs (e.g. Reels+Shorts dual) resolve the earliest next occurrence among
  * targets that have a configured/default slot.
+ *
+ * <h2>Fallback strategy (Decision #10)</h2>
+ * <p>{@code nextSlotFor*} methods never return null or empty.
+ * <ul>
+ *   <li>Fallback 1: Platform default evening time (SLOT_PLATFORMS base times)</li>
+ *   <li>Fallback 2: Next full hour (error case; triggers log.error + Telegram alert)</li>
+ * </ul>
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MarketingPublishSlotService {
@@ -66,6 +77,7 @@ public class MarketingPublishSlotService {
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
 
     private final SystemSettingRepository systemSettingRepository;
+    private final TelegramNotifier telegramNotifier;
 
     public record Slots(
         String instagramFeed,
@@ -105,38 +117,54 @@ public class MarketingPublishSlotService {
 
     /**
      * Next KST occurrence of {@code platform}'s configured slot after {@code now}.
-     * Unknown / unconfigured platforms → empty.
+     * Never returns null; applies 2-stage fallback:
+     * 1. Platform default evening slot (from SLOT_PLATFORMS)
+     * 2. Next full hour (with error log + Telegram alert)
+     *
+     * Decision #10: This method must never return empty/null, so scheduled_publish_at
+     * is always populated in the database.
      */
-    public Optional<Instant> nextSlotForPlatform(String platform, Instant now) {
+    public Instant nextSlotForPlatform(String platform, Instant now) {
         if (platform == null || platform.isBlank() || now == null) {
-            return Optional.empty();
+            return nextHourFallback(now);
         }
         String id = platform.trim().toLowerCase(Locale.ROOT);
         Optional<LocalTime> slotTime = slotTimeFor(id);
-        if (slotTime.isEmpty()) {
-            return Optional.empty();
+        if (slotTime.isPresent()) {
+            return nextOccurrence(now, slotTime.get());
         }
-        return Optional.of(nextOccurrence(now, slotTime.get()));
+
+        // Fallback 1: Platform default evening time
+        Optional<LocalTime> defaultSlot = defaultSlotTimeFor(id);
+        if (defaultSlot.isPresent()) {
+            log.warn("No configured slot for {}, using platform default {}", id, defaultSlot.get());
+            return nextOccurrence(now, defaultSlot.get());
+        }
+
+        // Fallback 2: Next full hour (error case - config missing)
+        log.error("No slot or default for {} — falling back to next hour. 설정 확인 필요", id);
+        notifySlotConfigMissing(id);
+        return nextHourFallback(now);
     }
 
     /**
-     * Earliest next slot among {@code targets}. Empty if none have a slot.
+     * Earliest next slot among {@code targets}.
+     * Never returns null; applies fallback if targets is null/empty.
+     *
+     * Decision #10: This method must never return empty/null.
      */
-    public Optional<Instant> nextSlotForTargets(Collection<String> targets, Instant now) {
+    public Instant nextSlotForTargets(Collection<String> targets, Instant now) {
         if (targets == null || targets.isEmpty() || now == null) {
-            return Optional.empty();
+            return nextHourFallback(now);
         }
         Instant earliest = null;
         for (String target : targets) {
-            Optional<Instant> candidate = nextSlotForPlatform(target, now);
-            if (candidate.isEmpty()) {
-                continue;
-            }
-            if (earliest == null || candidate.get().isBefore(earliest)) {
-                earliest = candidate.get();
+            Instant candidate = nextSlotForPlatform(target, now);
+            if (earliest == null || candidate.isBefore(earliest)) {
+                earliest = candidate;
             }
         }
-        return Optional.ofNullable(earliest);
+        return earliest != null ? earliest : nextHourFallback(now);
     }
 
     /**
@@ -152,6 +180,51 @@ public class MarketingPublishSlotService {
             return todaySlot;
         }
         return today.plusDays(1).atTime(slotTime).atZone(KST).toInstant();
+    }
+
+    /**
+     * Next full hour slot (fallback when no configuration is available).
+     */
+    private static Instant nextHourFallback(Instant now) {
+        return now.truncatedTo(ChronoUnit.HOURS).plus(1, ChronoUnit.HOURS);
+    }
+
+    /**
+     * Platform's default evening slot time (Phase-1 base).
+     */
+    private Optional<LocalTime> defaultSlotTimeFor(String platformId) {
+        String defaultHhMm = switch (platformId) {
+            case PLATFORM_INSTAGRAM_FEED -> DEFAULT_INSTAGRAM_FEED;
+            case PLATFORM_INSTAGRAM_REELS -> DEFAULT_INSTAGRAM_REELS;
+            case PLATFORM_YOUTUBE_SHORTS -> DEFAULT_YOUTUBE_SHORTS;
+            case PLATFORM_X_THREAD -> DEFAULT_X_THREAD;
+            default -> null;
+        };
+        if (defaultHhMm == null) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(LocalTime.parse(defaultHhMm, HH_MM));
+        } catch (DateTimeParseException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Notify via Telegram when a platform has no configured or default slot.
+     * This indicates a configuration error that should not occur in production.
+     */
+    private void notifySlotConfigMissing(String platformId) {
+        try {
+            telegramNotifier.send(String.format(
+                "⚠️ [Again-Spring] 마케팅 발행 슬롯 설정 누락%n" +
+                "플랫폼: %s%n" +
+                "원인: 미설정 + 플랫폼 기본값 없음%n" +
+                "조치: 폴백 2 발동 (다음 정시) · 설정 확인 필수",
+                platformId));
+        } catch (Exception e) {
+            log.warn("Failed to send Telegram alert for missing slot config on {}: {}", platformId, e.getMessage());
+        }
     }
 
     public static String keyFor(String platform) {

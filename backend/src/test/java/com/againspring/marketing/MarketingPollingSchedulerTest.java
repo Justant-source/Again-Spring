@@ -212,4 +212,95 @@ class MarketingPollingSchedulerTest {
         verify(asmClient, never()).getJob("b");
         assertThat(a.getPollFailCount()).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("rescheduleExpiredJob with null scheduledPublishAt sends error alert (Decision #10)")
+    void rescheduleExpiredJobWithNullScheduledTime_sendsCodeDefectAlert() {
+        MarketingJob job = MarketingJob.builder()
+            .id(999L)
+            .remoteJobId("asm-defect")
+            .postId("post_defect")
+            .status("QUEUED")
+            .autoPublish(true)
+            .scheduledPublishAt(null)  // This should never happen after NOT NULL migration
+            .build();
+
+        when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of());
+        when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
+        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of(job));
+
+        scheduler.pollJobs();
+
+        ArgumentCaptor<String> msg = ArgumentCaptor.forClass(String.class);
+        verify(telegramNotifier).send(msg.capture());
+        assertThat(msg.getValue())
+            .contains("코드 결함")
+            .contains("잡 #999")
+            .contains("NOT NULL");
+    }
+
+    @Test
+    @DisplayName("monitorPublishingDelays detects READY jobs 30+ minutes past scheduled time")
+    void monitoringDelayAlertsOnReadyJobsPast30Minutes() {
+        Instant now = Instant.now();
+        Instant thirtyMinutesAgo = now.minus(30, ChronoUnit.MINUTES);
+        Instant fortyMinutesAgo = now.minus(40, ChronoUnit.MINUTES);
+
+        MarketingJob delayed = MarketingJob.builder()
+            .id(777L)
+            .remoteJobId("asm-delayed")
+            .postId("post_delayed")
+            .status("READY")
+            .autoPublish(true)
+            .scheduledPublishAt(fortyMinutesAgo)
+            .targets("[\"instagram_reels\",\"youtube_shorts\"]")
+            .build();
+
+        MarketingJob onTime = MarketingJob.builder()
+            .id(778L)
+            .remoteJobId("asm-ontime")
+            .postId("post_ontime")
+            .status("READY")
+            .autoPublish(true)
+            .scheduledPublishAt(thirtyMinutesAgo.plus(1, ChronoUnit.MINUTES))
+            .targets("[\"x_thread\"]")
+            .build();
+
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.findReadyJobsPastScheduleBy30Minutes(any()))
+            .thenReturn(List.of(delayed));
+
+        scheduler.monitorPublishingDelays();
+
+        ArgumentCaptor<String> msg = ArgumentCaptor.forClass(String.class);
+        verify(telegramNotifier).send(msg.capture());
+        assertThat(msg.getValue())
+            .contains("발행 지연")
+            .contains("잡 #777")
+            .contains("post_delayed")
+            .contains("instagram_reels")
+            .contains("분");
+    }
+
+    @Test
+    @DisplayName("monitorPublishingDelays does nothing when no delayed jobs")
+    void monitoringDelaySkipsWhenNoDelayedJobs() {
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.findReadyJobsPastScheduleBy30Minutes(any()))
+            .thenReturn(List.of());
+
+        scheduler.monitorPublishingDelays();
+
+        verify(telegramNotifier, never()).send(anyString());
+    }
+
+    @Test
+    @DisplayName("monitorPublishingDelays disabled when ASM disabled")
+    void monitoringDelaySkipsWhenAsmDisabled() {
+        when(asmProperties.isEnabled()).thenReturn(false);
+
+        scheduler.monitorPublishingDelays();
+
+        verify(marketingJobRepository, never()).findReadyJobsPastScheduleBy30Minutes(any());
+    }
 }

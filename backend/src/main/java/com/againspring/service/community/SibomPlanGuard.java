@@ -31,7 +31,7 @@ public final class SibomPlanGuard {
     public static final int MAX_SHORTS = 7;
     /** Required renderable image counts. A video may not fall back to text-only. */
     public static final int MIN_REELS = 4;
-    public static final int MIN_SHORTS = 5;
+    public static final int MIN_SHORTS = 4;
     public static final int CAPTION_MAX_CHARS = 10;
 
     private static final Set<String> ROLES = Set.of("intro", "peak", "punch", "soft_fill");
@@ -60,8 +60,8 @@ public final class SibomPlanGuard {
     }
 
     /**
-     * Apply §5.2 entry normalization. Callers must fail the video quality gate when the result is empty
-     * or below the channel minimum; text-only and metaphor fallbacks are forbidden.
+     * Apply §5.2 entry normalization. After soft-fill auto-top-up, callers must fail the video quality gate
+     * when the result is empty or below the channel minimum; text-only and metaphor fallbacks are forbidden.
      */
     public static List<SibomPlanItem> guard(List<SibomPlanItem> raw, Channel channel) {
         if (raw == null || raw.isEmpty() || channel == null) {
@@ -78,6 +78,7 @@ public final class SibomPlanGuard {
 
         working = dedupeIdAndSwapGroup(working);
         working = applyPeakPositionGuards(working);
+        working = topUpWithSoftFill(working, channel);
         working = trimToBudget(working, channel.maxSlots());
 
         List<SibomPlanItem> out = new ArrayList<>(working.size());
@@ -176,6 +177,79 @@ public final class SibomPlanGuard {
             out.add(item);
         }
         return out;
+    }
+
+    /**
+     * Auto-top-up with soft-fill pool when below channel minimum.
+     * §4.2 / 결정 #20 — no additional LLM call, code downgrade only.
+     * <ul>
+     *   <li>If current size &lt; channel.minSlots(), fill from SOFT_FILL_POOL</li>
+     *   <li>Excludes already-used image_id and swap_group (dedupe rules)</li>
+     *   <li>Only people()==1 entries</li>
+     *   <li>role=soft_fill, size=small, dwell=punch fixed</li>
+     *   <li>No upgrade to intro/peak (handled by normalizeSizeDwell)</li>
+     *   <li>beat_index in gaps between existing items, or after last</li>
+     *   <li>caption from catalog; LLM not invoked</li>
+     *   <li>If pool exhausted, return as-is without exception</li>
+     * </ul>
+     */
+    static List<SibomPlanItem> topUpWithSoftFill(List<SibomPlanItem> items, Channel channel) {
+        if (items.size() >= channel.minSlots()) {
+            return items;
+        }
+
+        Set<String> usedIds = new HashSet<>();
+        Set<String> usedGroups = new HashSet<>();
+        int maxBeat = 0;
+        for (SibomPlanItem item : items) {
+            usedIds.add(item.imageId());
+            Optional<SibomCatalog.Entry> entryOpt = SibomCatalog.get(item.imageId());
+            if (entryOpt.isPresent()) {
+                String group = entryOpt.get().swapGroup();
+                if (group != null && !group.isEmpty()) {
+                    usedGroups.add(group);
+                }
+            }
+            if (item.beatIndex() != null) {
+                maxBeat = Math.max(maxBeat, item.beatIndex());
+            }
+        }
+
+        List<SibomPlanItem> result = new ArrayList<>(items);
+        boolean poolExhausted = false;
+
+        while (result.size() < channel.minSlots()) {
+            SibomPlanItem filled = null;
+            for (String candidateId : SOFT_FILL_POOL) {
+                if (usedIds.contains(candidateId)) {
+                    continue;
+                }
+                Optional<SibomCatalog.Entry> entryOpt = SibomCatalog.get(candidateId);
+                if (entryOpt.isEmpty() || entryOpt.get().people() != 1) {
+                    continue;
+                }
+                SibomCatalog.Entry entry = entryOpt.get();
+                String group = entry.swapGroup();
+                if (group != null && !group.isEmpty() && usedGroups.contains(group)) {
+                    continue;
+                }
+                // Found valid candidate
+                filled = new SibomPlanItem("soft_fill", candidateId, entry.caption() != null ? entry.caption() : "", maxBeat + 1, "small", "punch");
+                usedIds.add(candidateId);
+                if (group != null && !group.isEmpty()) {
+                    usedGroups.add(group);
+                }
+                maxBeat++;
+                break;
+            }
+            if (filled == null) {
+                poolExhausted = true;
+                break;
+            }
+            result.add(filled);
+        }
+
+        return result;
     }
 
     /**

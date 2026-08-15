@@ -31,12 +31,17 @@ class VideoVariantServiceTest {
 
     VideoVariantService service;
 
+    @Mock
+    com.againspring.marketing.MarketingLlmAuthGuard llmAuthGuard;
+
     @BeforeEach
     void setUp() {
-        service = new VideoVariantService(llmProvider, promptSanitizer, new ObjectMapper());
+        service = new VideoVariantService(llmProvider, promptSanitizer, new ObjectMapper(), llmAuthGuard);
         ReflectionTestUtils.setField(service, "model", "test-model");
         ReflectionTestUtils.setField(service, "enabled", true);
         lenient().when(promptSanitizer.sanitize(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(llmAuthGuard.isCircuitOpen()).thenReturn(false);
+        lenient().when(llmAuthGuard.isAuthenticationError(anyString())).thenReturn(false);
     }
 
     @Test
@@ -90,20 +95,17 @@ class VideoVariantServiceTest {
     }
 
     @Test
-    void generate_transientLlmFailure_correctsOnce() throws Exception {
+    void generate_transientLlmFailure_doesNotCorrectInProcess() throws Exception {
+        // Transient LLM failures do NOT trigger in-process correction (only OK/PARSE_ERROR do)
         when(llmProvider.invoke(anyString(), anyString()))
-                .thenThrow(new RuntimeException("upstream timeout"))
-                .thenReturn("""
-                    {"hook_reels":"보정훅","script_reels":"보정대본 공감","sibom_plan":[
-                      {"role":"intro","image_id":"side-glance"},{"role":"peak","image_id":"stunned"},
-                      {"role":"punch","image_id":"drained"},{"role":"punch","image_id":"indignant"}]}
-                    """);
+                .thenThrow(new RuntimeException("upstream timeout"));
 
         VideoVariantService.Variants variants = service.generate(
                 "마스터", "shock", "제목", "본문", true, false, List.of("side-glance"));
 
-        assertThat(variants.sibomPlanReels()).hasSize(4);
-        verify(llmProvider, times(2)).invoke(anyString(), anyString());
+        // Should call LLM only once (transient, no in-process retry)
+        verify(llmProvider, times(1)).invoke(anyString(), anyString());
+        assertThat(variants.sibomPlanReels()).isEmpty();
     }
 
     @Test
@@ -125,8 +127,11 @@ class VideoVariantServiceTest {
                 "마스터", "shock", "제목", "본문", true, false,
                 List.of("side-glance", "stunned", "drained", "waiting-reply"));
 
+        // After guard (dedupe + soft-fill topup), should contain the valid items
         assertThat(v.sibomPlan()).extracting(SibomPlanItem::imageId)
-                .containsExactly("side-glance", "stunned", "drained");
+                .contains("side-glance", "stunned", "drained");
+        // unknown-xx should be dropped
+        assertThat(v.sibomPlan()).extracting(SibomPlanItem::imageId).doesNotContain("unknown-xx");
         assertThat(v.sibomPlanReels()).isEqualTo(v.sibomPlan());
         assertThat(v.sibomPlanShorts()).isEmpty();
     }
@@ -167,7 +172,8 @@ class VideoVariantServiceTest {
 
         assertThat(v.hookShorts()).isEqualTo("쇼츠");
         assertThat(v.hookReels()).isNull();
-        assertThat(v.sibomPlan()).hasSize(1);
+        // After soft-fill topup, should be >= MIN_SHORTS
+        assertThat(v.sibomPlan().size()).isGreaterThanOrEqualTo(SibomPlanGuard.MIN_SHORTS);
         assertThat(v.maxDurationShortsSec()).isEqualTo(45);
     }
 
@@ -236,5 +242,184 @@ class VideoVariantServiceTest {
         String cards = VideoVariantService.buildSibomCards(many);
         assertThat(cards.lines().count()).isEqualTo(10);
         assertThat(cards).doesNotContain("left-out|");
+    }
+
+    @Test
+    void generate_transientError_doesNotCorrectInProcess() throws Exception {
+        // Transient failure should not trigger in-process correction (no 2nd call in sequence)
+        when(llmProvider.invoke(anyString(), anyString()))
+                .thenThrow(new RuntimeException("503 Service Unavailable"));
+
+        VideoVariantService.Variants variants = service.generate(
+                "마스터", "shock", "제목", "본문", true, false, List.of("side-glance"));
+
+        // Should call LLM only once (transient error, no in-process retry)
+        verify(llmProvider, times(1)).invoke(anyString(), anyString());
+        assertThat(variants.sibomPlanReels()).isEmpty();
+    }
+
+    @Test
+    void generate_okButShortPlan_autoTopUpWithSoftFill() throws Exception {
+        // 1 LLM result gets auto top-up via soft-fill, no 2nd call needed
+        when(llmProvider.invoke(anyString(), anyString()))
+                .thenReturn("""
+                    {"hook_reels":"훅","script_reels":"대본 공감","sibom_plan":[
+                      {"role":"intro","image_id":"side-glance"}
+                    ]}
+                    """);
+
+        VideoVariantService.Variants variants = service.generate(
+                "마스터", "shock", "제목", "본문", true, false, List.of("side-glance"));
+
+        // Should call LLM only once (soft-fill auto top-up handles it)
+        verify(llmProvider, times(1)).invoke(anyString(), anyString());
+        // After soft-fill, should be >= MIN_REELS
+        assertThat(variants.sibomPlanReels().size()).isGreaterThanOrEqualTo(SibomPlanGuard.MIN_REELS);
+    }
+
+    @Test
+    void generate_okButShortPlanReallyInsufficient_correctsInProcess() throws Exception {
+        // If LLM result is parse error (empty), in-process correction should happen
+        when(llmProvider.invoke(anyString(), anyString()))
+                .thenReturn("""
+                    {"hook_reels":"훅","script_reels":"대본 공감","sibom_plan":[]}
+                    """)
+                .thenReturn("""
+                    {"hook_reels":"보정훅","script_reels":"보정대본 공감","sibom_plan":[
+                      {"role":"intro","image_id":"side-glance"},
+                      {"role":"peak","image_id":"stunned"},
+                      {"role":"punch","image_id":"drained"},
+                      {"role":"punch","image_id":"indignant"}
+                    ]}
+                    """);
+
+        VideoVariantService.Variants variants = service.generate(
+                "마스터", "shock", "제목", "본문", true, false, List.of("side-glance"));
+
+        // Empty sibom_plan after soft-fill topup should trigger 2nd call
+        verify(llmProvider, times(2)).invoke(anyString(), anyString());
+        assertThat(variants.sibomPlanReels().size()).isGreaterThanOrEqualTo(SibomPlanGuard.MIN_REELS);
+    }
+
+    @Test
+    void generate_promptContainsSoftTargetValues_forReels() throws Exception {
+        ArgumentCaptor<String> promptCap = ArgumentCaptor.forClass(String.class);
+        when(llmProvider.invoke(promptCap.capture(), anyString())).thenReturn("""
+            {"hook_reels":"h","script_reels":"s 공감","sibom_plan":[]}
+            """);
+
+        service.generate("훅", "tension", "제목", "본문", true, false, List.of());
+
+        String prompt = promptCap.getValue();
+        // Reels: softTargetLo=5, softTargetHi=5
+        assertThat(prompt).contains("5~5");
+        assertThat(prompt).contains("최소 4장 필수(절대 하한");
+    }
+
+    @Test
+    void generate_promptContainsSoftTargetValues_forShorts() throws Exception {
+        ArgumentCaptor<String> promptCap = ArgumentCaptor.forClass(String.class);
+        when(llmProvider.invoke(promptCap.capture(), anyString())).thenReturn("""
+            {"hook_shorts":"h","script_shorts":"s 댓글","sibom_plan":[]}
+            """);
+
+        service.generate("훅", "tension", "제목", "본문", false, true, List.of());
+
+        String prompt = promptCap.getValue();
+        // Shorts: softTargetLo=6, softTargetHi=7
+        assertThat(prompt).contains("6~7");
+        assertThat(prompt).contains("최소 4장 필수(절대 하한");
+    }
+
+    @Test
+    void generate_promptContainsDupeDuplicatePreventionInFirstAttempt() throws Exception {
+        ArgumentCaptor<String> promptCap = ArgumentCaptor.forClass(String.class);
+        when(llmProvider.invoke(promptCap.capture(), anyString())).thenReturn("""
+            {"hook_reels":"h","script_reels":"s 공감","sibom_plan":[]}
+            """);
+
+        service.generate("훅", "tension", "제목", "본문", true, false, List.of());
+
+        String prompt = promptCap.getValue();
+        // 1차 프롬프트에 중복 금지가 있어야 함
+        assertThat(prompt).contains("image_id와 swap_group은 전 항목에서 서로 달라야");
+        assertThat(prompt).contains("중복은 자동으로 제거되어");
+    }
+
+    @Test
+    void generate_attemptsRecordStartedAtDurationAndError() throws Exception {
+        when(llmProvider.invoke(anyString(), anyString()))
+                .thenReturn("""
+                    {"hook_reels":"첫훅","script_reels":"첫대본 공감","sibom_plan":[]}
+                    """)
+                .thenReturn("""
+                    {"hook_reels":"보정훅","script_reels":"보정대본 공감","sibom_plan":[
+                      {"role":"intro","image_id":"side-glance"},
+                      {"role":"peak","image_id":"stunned"},
+                      {"role":"punch","image_id":"drained"},
+                      {"role":"punch","image_id":"indignant"}
+                    ]}
+                    """);
+
+        VideoVariantService.Variants variants = service.generate(
+                "마스터", "shock", "제목", "본문", true, false, List.of("side-glance"));
+
+        @SuppressWarnings("unchecked")
+        var channelDiagnostics = (java.util.Map<String, Object>) variants.generationDiagnostics().get("instagram_reels");
+        @SuppressWarnings("unchecked")
+        List<java.util.Map<String, Object>> attempts = (List<java.util.Map<String, Object>>) channelDiagnostics.get("attempts");
+
+        assertThat(attempts).hasSize(2);
+
+        // First attempt: empty plan (PARSE_ERROR status)
+        var attempt1 = attempts.get(0);
+        assertThat(attempt1).containsKeys("attempt", "started_at", "duration_ms", "result", "guarded_plan_count");
+        assertThat(attempt1.get("started_at")).isNotNull();
+        assertThat(attempt1.get("duration_ms")).isInstanceOf(Long.class);
+        assertThat(attempt1.get("result")).isEqualTo("OK"); // LLM returned OK but empty plan
+
+        // Second attempt: successful correction
+        var attempt2 = attempts.get(1);
+        assertThat(attempt2).containsKeys("attempt", "started_at", "duration_ms", "result", "guarded_plan_count");
+        assertThat(attempt2.get("started_at")).isNotNull();
+        assertThat(attempt2.get("duration_ms")).isInstanceOf(Long.class);
+        assertThat(attempt2.get("result")).isEqualTo("OK");
+    }
+
+    @Test
+    void qualityGate_fourShortsPlanPasses() {
+        VideoVariantService.Variants variants = new VideoVariantService.Variants(
+            "h", "s", 30, null, null, null,
+            List.of(),
+            List.of(
+                new SibomPlanItem("intro", "side-glance", "", 0, "large", "hold"),
+                new SibomPlanItem("peak", "stunned", "", 2, "large", "hold"),
+                new SibomPlanItem("punch", "drained", "", 4, "small", "punch"),
+                new SibomPlanItem("punch", "curled-up", "", 5, "small", "punch")
+            ));
+
+        VideoVariantService.QualityGateResult result =
+            VideoVariantService.validateRequiredSibomPlans(variants, false, true);
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.failureCode()).isNull();
+    }
+
+    @Test
+    void qualityGate_threeShortsPlanFails() {
+        VideoVariantService.Variants variants = new VideoVariantService.Variants(
+            "h", "s", 30, null, null, null,
+            List.of(),
+            List.of(
+                new SibomPlanItem("intro", "side-glance", "", 0, "large", "hold"),
+                new SibomPlanItem("peak", "stunned", "", 2, "large", "hold"),
+                new SibomPlanItem("punch", "drained", "", 4, "small", "punch")
+            ));
+
+        VideoVariantService.QualityGateResult result =
+            VideoVariantService.validateRequiredSibomPlans(variants, false, true);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.failureCode()).isEqualTo("SIBOM_PLAN_TOO_SHORT");
     }
 }

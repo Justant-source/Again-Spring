@@ -61,6 +61,7 @@ public class MarketingJobService {
     private final UserRepository userRepository;
     private final VideoVariantService videoVariantService;
     private final TelegramNotifier telegramNotifier;
+    private final MarketingLlmAuthGuard llmAuthGuard;
 
     /**
      * Create a new marketing job for a post.
@@ -237,6 +238,13 @@ public class MarketingJobService {
         boolean needShorts = containsTarget(targets, "youtube_shorts");
         VideoVariantService.Variants variants = VideoVariantService.Variants.empty();
         if (needReels || needShorts) {
+            // Check authentication circuit before calling LLM (Decision #6)
+            if (llmAuthGuard.isCircuitOpen()) {
+                failJob(savedJob, MarketingFailureStage.VARIANT_LLM, "LLM_AUTH_CIRCUIT_OPEN", false,
+                    "Claude session has expired; manual re-authentication required. Circuit is open.");
+                return savedJob;
+            }
+
             List<String> candidatesForLlm = post.getSibomCandidates() != null
                 ? post.getSibomCandidates() : List.of();
             variants = videoVariantService.generate(
@@ -253,11 +261,9 @@ public class MarketingJobService {
         VideoVariantService.QualityGateResult qualityGate =
             VideoVariantService.validateRequiredSibomPlans(variants, needReels, needShorts);
         if (!qualityGate.isValid()) {
-            savedJob.setStatus("FAILED");
-            savedJob.setFailureCode(qualityGate.failureCode());
-            savedJob.setErrorMessage("Video variant quality gate failed: " + qualityGate.failureCode());
             savedJob.setGenerationDiagnostics(serializeJson(qualityGate.diagnostics()));
-            marketingJobRepository.save(savedJob);
+            failJob(savedJob, MarketingFailureStage.QUALITY_GATE, qualityGate.failureCode(), false,
+                "Video variant quality gate failed: " + qualityGate.failureCode());
             log.warn("Marketing job {} blocked before ASM: {}", savedJob.getId(), qualityGate.failureCode());
             return savedJob;
         }
@@ -369,15 +375,11 @@ public class MarketingJobService {
             savedJob.setStatus(response.getStatus());
             return marketingJobRepository.save(savedJob);
         } catch (RuntimeException e) {
-            savedJob.setStatus("FAILED");
-            savedJob.setErrorMessage(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
-            marketingJobRepository.save(savedJob);
-            telegramNotifier.send(String.format(
-                "❌ [Again-Spring] 마케팅 FAILED%n잡 #%s · post=%s%n채널: %s%n원인: %s",
-                savedJob.getId() != null ? savedJob.getId() : "?",
-                savedJob.getPostId() != null ? savedJob.getPostId() : "?",
-                savedJob.getTargets() != null ? savedJob.getTargets() : "[]",
-                savedJob.getErrorMessage()));
+            String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            // Determine if retryable: network/timeout errors are retryable, validation errors are not
+            boolean retryable = isRetryableAsmError(e);
+            failJob(savedJob, MarketingFailureStage.ASM_CREATE,
+                deriveAsmErrorCode(e), retryable, errorMsg);
             throw e;
         }
     }
@@ -713,6 +715,408 @@ public class MarketingJobService {
         if (postAuthorId != null && postAuthorId.equals(commentAuthorId)) return "author";
         if (postPartnerUserId != null && postPartnerUserId.equals(commentAuthorId)) return "partner";
         return "neutral";
+    }
+
+    /**
+     * Determine if an ASM creation error is retryable.
+     * Network/timeout errors = retryable. Validation/serialization errors = not retryable.
+     */
+    private boolean isRetryableAsmError(RuntimeException e) {
+        if (e == null) return false;
+        String msg = e.getMessage();
+        if (msg == null) return true; // Unknown error, assume retryable
+        String lower = msg.toLowerCase();
+        // Connection/timeout errors are retryable
+        if (lower.contains("timeout") || lower.contains("connection") || lower.contains("temporarily")) {
+            return true;
+        }
+        // Validation/parsing errors are not retryable
+        if (lower.contains("invalid") || lower.contains("malformed") || lower.contains("cannot deserialize")) {
+            return false;
+        }
+        // Default: assume retryable for network-adjacent errors
+        return true;
+    }
+
+    /**
+     * Derive a stable failure code from ASM exception.
+     */
+    private String deriveAsmErrorCode(RuntimeException e) {
+        if (e instanceof AsmUnavailableException) {
+            return "ASM_UNAVAILABLE";
+        }
+        String msg = e.getMessage();
+        if (msg == null) {
+            return "ASM_ERROR_UNKNOWN";
+        }
+        String lower = msg.toLowerCase();
+        if (lower.contains("timeout")) {
+            return "ASM_TIMEOUT";
+        }
+        if (lower.contains("connection")) {
+            return "ASM_CONNECTION_FAILED";
+        }
+        if (lower.contains("invalid") || lower.contains("malformed")) {
+            return "ASM_INVALID_REQUEST";
+        }
+        if (lower.contains("unauthorized") || lower.contains("forbidden")) {
+            return "ASM_AUTH_FAILED";
+        }
+        return "ASM_ERROR_UNKNOWN";
+    }
+
+    /**
+     * Single entry point for all marketing job failures.
+     * Ensures consistent failure tracking with stage, code, retryable flag, and cause.
+     *
+     * <p>This method is mandatory for all failure paths. Direct {@code setStatus("FAILED")}
+     * calls bypass failure contract enforcement and must not be used.
+     *
+     * @param job the job to fail
+     * @param stage the failure stage (from MarketingFailureStage enum)
+     * @param failureCode operator-facing, stable code (e.g., "SIBOM_PLAN_TOO_SHORT")
+     * @param retryable whether a new generation attempt is meaningful
+     * @param cause detailed failure cause (raw exceptions, diagnostics)
+     */
+    public void failJob(MarketingJob job, MarketingFailureStage stage, String failureCode,
+                        boolean retryable, String cause) {
+        // Enforce contract: stage and code are mandatory
+        if (stage == null || failureCode == null || failureCode.isBlank()) {
+            log.error("Failure contract violation — jobId={} stage={} code={} — this is a code defect",
+                job.getId(), stage, failureCode);
+            // Telegram alert for contract violation (침묵 방지 강제③)
+            telegramNotifier.send(String.format(
+                "⚠️ 원인 미기록(코드 결함) — AS#%d%n" +
+                "stage=%s · code=%s%n" +
+                "post=%s · 채널: %s%n" +
+                "이 알림 자체가 버그 신고입니다. 코드를 검토하고 commit을 취소하세요.",
+                job.getId(), stage, failureCode,
+                job.getPostId(), job.getTargets()));
+        }
+
+        job.setStatus("FAILED");
+        job.setFailureStage(stage != null ? stage.tagged() : null);
+        job.setFailureCode(failureCode != null ? compact(failureCode, 64) : null);
+        job.setRetryable(retryable);
+        job.setErrorSummary(compact(cause, 500));
+        job.setErrorMessage(cause);
+        marketingJobRepository.save(job);
+
+        // Build and send telegram notification (결정 9의 재설계된 메시지)
+        sendFailureNotification(job);
+
+        log.info("Job {} failed: stage={} code={} retryable={}", job.getId(), stage, failureCode, retryable);
+    }
+
+    /**
+     * Build and send Telegram notification for job failure.
+     * Implements 결정 9 spec (07-p1-telegram.md): environment, retry status, 3-way IDs, stage,
+     * code, version, attempt history (KST timestamps), context, and diagnostic commands.
+     */
+    private void sendFailureNotification(MarketingJob job) {
+        String message = buildFailureMessage(job);
+        if (message != null && !message.isBlank()) {
+            telegramNotifier.send(message);
+        }
+    }
+
+    /**
+     * Build complete failure notification message per 결정 9 spec.
+     * Message structure:
+     * - Header (environment, retry state)
+     * - Identifiers (AS#, ASM, WaggleBot)
+     * - Stage/Code/Retryable
+     * - Version (git commit hash)
+     * - Attempt history (KST times, durations, errors)
+     * - Context (sibom count, voice, channel)
+     * - Diagnostic commands
+     */
+    String buildFailureMessage(MarketingJob job) {
+        StringBuilder sb = new StringBuilder();
+
+        // Header: environment, retry state
+        String env = isProductionEnvironment() ? "prod" : "dev";
+        int retryCount = (job.getGenerationAttempt() != null) ? job.getGenerationAttempt() : 1;
+        sb.append(String.format("❌ [다시봄 마케팅/%s] 발행 실패 — %s (%d/2)%n%n",
+            env,
+            retryCount >= 2 ? "재시도 소진" : "재시도 가능",
+            retryCount));
+
+        // Identifiers (3-way: AS#, ASM job_id, WaggleBot)
+        String asmJobId = job.getRemoteJobId() != null ? job.getRemoteJobId() : "-";
+        String waggleBotId = extractWaggleBotIdFromDiagnostics(job) != null
+            ? extractWaggleBotIdFromDiagnostics(job) : "-";
+        sb.append(String.format("잡      AS#%d · ASM %s · WaggleBot %s%n",
+            job.getId(), compact(asmJobId, 20), waggleBotId));
+
+        // Content: post ID, channels
+        sb.append(String.format("콘텐츠  %s · %s%n",
+            compact(job.getPostId(), 25),
+            compact(parseChannels(job.getTargets()), 50)));
+
+        // Stage / Code / Retryable
+        String stage = job.getFailureStage() != null ? job.getFailureStage() : "⚠️ 단계 미기록";
+        String code = job.getFailureCode() != null ? job.getFailureCode() : "⚠️ 코드 미기록";
+        String retryable = (job.getRetryable() != null && job.getRetryable()) ? "true" : "false";
+        sb.append(String.format("단계    %s%n", stage));
+        sb.append(String.format("코드    %s · retryable=%s%n", code, retryable));
+
+        // Version (git commit hash from build or placeholder)
+        String version = getCurrentGitVersion();
+        sb.append(String.format("버전    AS %s%n", version));
+
+        // Attempt history (KST timestamps + durations)
+        String attemptHistory = buildAttemptHistory(job);
+        if (!attemptHistory.isBlank()) {
+            sb.append(String.format("%n시도 이력 (KST)%n%s", attemptHistory));
+        }
+
+        // Context (channel-specific info)
+        String context = buildContextBlock(job);
+        if (!context.isBlank()) {
+            sb.append(String.format("%n컨텍스트%n%s", context));
+        }
+
+        // Diagnostic commands
+        String commands = buildDiagnosticCommands(job);
+        if (!commands.isBlank()) {
+            sb.append(String.format("%n확인 명령%n%s", commands));
+        }
+
+        String message = sb.toString();
+        // Truncate to 3800 chars if needed
+        if (message.length() > 3800) {
+            message = message.substring(0, 3750) + "…\n(메시지 길이 초과로 일부 생략)";
+        }
+
+        return message;
+    }
+
+    /**
+     * Parse attempt history from generation_diagnostics JSON.
+     * Formats each attempt as: "Nth HH:MM:SS → HH:MM:SS (Xm Ys) result_code [error_text]"
+     */
+    private String buildAttemptHistory(MarketingJob job) {
+        if (job.getGenerationDiagnostics() == null) {
+            return "";
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> diagnostics = objectMapper.readValue(job.getGenerationDiagnostics(),
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> attempts = (List<Map<String, Object>>) diagnostics.get("attempts");
+            if (attempts == null || attempts.isEmpty()) {
+                return "";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            int maxAttempts = Math.min(5, attempts.size()); // Show max 5 attempts
+            java.time.format.DateTimeFormatter kstFormat =
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+                    .withZone(java.time.ZoneId.of("Asia/Seoul"));
+
+            for (int i = 0; i < maxAttempts; i++) {
+                Map<String, Object> attempt = attempts.get(i);
+                String startedAtStr = (String) attempt.get("started_at");
+                Object durationObj = attempt.get("duration_ms");
+                String result = (String) attempt.get("result");
+                String error = (String) attempt.get("error");
+
+                String startTime = "??:??:??";
+                String endTime = "??:??:??";
+                String duration = "?s";
+
+                if (startedAtStr != null) {
+                    try {
+                        java.time.Instant startedAt = java.time.Instant.parse(startedAtStr);
+                        startTime = kstFormat.format(startedAt);
+                        if (durationObj != null) {
+                            long durationMs = ((Number) durationObj).longValue();
+                            java.time.Instant endedAt = startedAt.plusMillis(durationMs);
+                            endTime = kstFormat.format(endedAt);
+                            duration = formatDuration(durationMs);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to parse attempt timestamp: {}", startedAtStr);
+                    }
+                }
+
+                sb.append(String.format(" %d차 %s → %s (%s) %s", i + 1, startTime, endTime, duration, result));
+                if (error != null && !error.isBlank()) {
+                    sb.append(String.format(" — %s", compact(error, 120)));
+                }
+                sb.append("\n");
+            }
+
+            if (attempts.size() > maxAttempts) {
+                sb.append(String.format(" … 외 %d건\n", attempts.size() - maxAttempts));
+            }
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("Failed to parse generation diagnostics: {}", e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * Format duration in milliseconds as "Xm Ys" format.
+     */
+    private static String formatDuration(long ms) {
+        long secs = ms / 1000;
+        long mins = secs / 60;
+        long seconds = secs % 60;
+        if (mins > 0) {
+            return String.format("%dm %ds", mins, seconds);
+        } else {
+            return String.format("%ds", seconds);
+        }
+    }
+
+    /**
+     * Build context block: channel-specific info (sibom count, TTS voice, etc.)
+     */
+    private String buildContextBlock(MarketingJob job) {
+        StringBuilder sb = new StringBuilder();
+
+        // Channel info
+        String channels = parseChannels(job.getTargets());
+        if (!channels.isBlank()) {
+            sb.append(" 채널: ").append(channels).append("\n");
+        }
+
+        // Parse generation diagnostics for context
+        if (job.getGenerationDiagnostics() != null) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> diag = objectMapper.readValue(job.getGenerationDiagnostics(),
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+
+                // Sibom plan count
+                Object sibomCount = diag.get("guarded_plan_count");
+                if (sibomCount != null) {
+                    Object sibomRequired = diag.get("shorts_required");
+                    if (sibomRequired != null) {
+                        sb.append(String.format(" 시봄이: %s장 (요구 %s)%n", sibomCount, sibomRequired));
+                    } else {
+                        sb.append(String.format(" 시봄이: %s장%n", sibomCount));
+                    }
+                }
+
+                // TTS voice
+                Object voiceId = diag.get("voice_id");
+                if (voiceId != null && !String.valueOf(voiceId).equalsIgnoreCase("default")) {
+                    sb.append(" TTS: ").append(voiceId).append("\n");
+                }
+
+                // Script duration
+                Object scriptDuration = diag.get("script_duration_sec");
+                if (scriptDuration != null) {
+                    sb.append(String.format(" 대본: %s초%n", scriptDuration));
+                }
+            } catch (Exception e) {
+                log.debug("Could not extract additional context from diagnostics", e);
+            }
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * Build stage-specific diagnostic commands.
+     */
+    private String buildDiagnosticCommands(MarketingJob job) {
+        String stage = job.getFailureStage();
+        if (stage == null) {
+            return "";
+        }
+
+        String jobId = String.valueOf(job.getId());
+
+        if (stage.contains("QUALITY_GATE") || stage.contains("VARIANT_LLM")) {
+            // Query generation_diagnostics from marketing_job
+            return String.format(
+                " mysql -uroot -p$PW againspring%n" +
+                "  → SELECT id, failure_stage, failure_code, generation_diagnostics FROM marketing_job WHERE id=%s\\G",
+                jobId);
+        } else if (stage.contains("ASM_CREATE") || stage.contains("ASM_POLL")) {
+            // Query ASM job table
+            return String.format(
+                " docker exec again-spring-marketing-asm-db-1 mariadb -uroot -p$PW asm%n" +
+                "  → SELECT * FROM job WHERE remote_job_id='%s'\\G",
+                compact(job.getRemoteJobId(), 40));
+        } else if (stage.contains("PUBLISH_TRIGGER")) {
+            // Check social-poster logs
+            return " docker logs again-spring-marketing-social-poster-1 --since 30m";
+        } else {
+            // Default: check ASM logs
+            return " docker logs again-spring-marketing-asm-1 --since 30m";
+        }
+    }
+
+    /**
+     * Parse JSON targets array into readable channel names.
+     */
+    private String parseChannels(String targetsJson) {
+        if (targetsJson == null || targetsJson.isBlank()) {
+            return "unknown";
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            List<String> targets = objectMapper.readValue(targetsJson, List.class);
+            return String.join(", ", targets);
+        } catch (Exception e) {
+            return compact(targetsJson, 40);
+        }
+    }
+
+    /**
+     * Extract WaggleBot remote job ID from diagnostics if available.
+     */
+    private String extractWaggleBotIdFromDiagnostics(MarketingJob job) {
+        if (job.getGenerationDiagnostics() == null) {
+            return null;
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> diag = objectMapper.readValue(job.getGenerationDiagnostics(),
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            return (String) diag.get("waggle_remote_job_id");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get current git version (commit hash) for version field.
+     * For now, returns placeholder. In production, this would be injected at build time.
+     */
+    private String getCurrentGitVersion() {
+        // TODO: Inject git commit hash at build time via gradle/maven property
+        // For now, try to read from a runtime file or return placeholder
+        try {
+            Process p = Runtime.getRuntime().exec("git rev-parse --short HEAD");
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(p.getInputStream()));
+            String line = reader.readLine();
+            if (line != null && !line.isBlank()) {
+                return line.trim();
+            }
+        } catch (Exception e) {
+            log.debug("Could not determine git version: {}", e.getMessage());
+        }
+        return "unknown";
+    }
+
+    /**
+     * Check if running in production environment.
+     */
+    private boolean isProductionEnvironment() {
+        String profile = System.getProperty("spring.profiles.active", "");
+        return profile.contains("prod") || profile.contains("production");
     }
 
     private String serializeJson(Object obj) {

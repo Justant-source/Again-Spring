@@ -95,6 +95,22 @@ cd /home/justant/Data/Again-Spring/env
 docker compose restart againspring-llm   # base 스택 (dev·prod 공유)
 ```
 
+### 마케팅 경로 인증 오류 즉시 감지 (2026-08-15)
+
+마케팅 LLM 호출(`VideoVariantService` 등)에서 `LlmErrorSignature`의 `authentication_error` 시그니처가
+**연속 2회** 감지되면 `MarketingLlmAuthGuard`가 재시도 없이 즉시 회로를 열고 긴급 텔레그램을 보낸다
+(`🚨 [긴급] Claude 세션 만료 — 수동 재인증 필요`). 인증 오류는 재시도해도 100% 실패하므로
+일반 운영 오류 재시도 정책(총 2회, 5분 후 재큐잉)의 **유일한 예외**다.
+
+회로가 열려 있는 동안 신규 마케팅 LLM 호출은 즉시 실패 처리되며(재시도 대상에서도 제외), 5분 후
+자동으로 반닫히거나 수동으로 리셋할 수 있다. 마케팅 워커(`againspring-llm`)와 AI-user 워커
+(`againspring-llm-ai-user`)는 별개 컨테이너지만 **같은 `~/.claude` 계정을 공유**하므로, 세션 만료 시
+두 경로가 동시에 멈춘다 — 위 재인증 절차 한 번으로 양쪽 모두 복구된다.
+
+이전에는 5분 주기 WSL 워치독의 canary ping(현재 10분 주기, `docs/env/watchdog.md`)만이 세션 만료를
+감지했는데, 요청이 없는 시간대(특히 새벽)에는 최대 감지 지연이 컸다. 이 가드는 **실제 호출이 발생한
+순간** 실패를 신호로 쓰므로 지연이 0에 가깝다.
+
 ---
 
 ## 동시성

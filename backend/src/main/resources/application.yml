@@ -129,9 +129,9 @@ llm:
     reduce-model: ${CORRECTION_REDUCE_LLM_MODEL:claude-opus-4-8}      # REDUCE 단계 (통합·scope 판정) — Opus
   remote:
     base-url: ${LLM_WORKER_URL:http://againspring-llm:8090}
-    connect-timeout-ms: ${LLM_REMOTE_CONNECT_TIMEOUT_MS:5000}
-    read-timeout-ms: ${LLM_REMOTE_READ_TIMEOUT_MS:130000}
-    default-timeout-ms: ${LLM_REMOTE_DEFAULT_TIMEOUT_MS:120000}
+    connect-timeout-ms: ${LLM_REMOTE_CONNECT_TIMEOUT_MS:10000}
+    read-timeout-ms: ${LLM_REMOTE_READ_TIMEOUT_MS:610000}
+    default-timeout-ms: ${LLM_REMOTE_DEFAULT_TIMEOUT_MS:600000}
     poll-wait-ms: ${LLM_REMOTE_POLL_WAIT_MS:25000}
 
 ai-learning:
@@ -150,7 +150,7 @@ asm:
   poll-interval-ms: ${ASM_POLL_INTERVAL_MS:15000}
   # Remote renderer/TTS delay is reconciled as SLA_BREACHED/WAITING_EXTERNAL, never FAILED by itself.
   processing-sla-ms: ${ASM_PROCESSING_SLA_MS:900000}
-  request-timeout-ms: ${ASM_REQUEST_TIMEOUT_MS:10000}
+  request-timeout-ms: ${ASM_REQUEST_TIMEOUT_MS:30000}
   # 통계 수집(X Playwright·YT API)은 10s로는 부족 — 기본 5분
   stats-request-timeout-ms: ${ASM_STATS_REQUEST_TIMEOUT_MS:300000}
   enabled: ${ASM_ENABLED:true}
