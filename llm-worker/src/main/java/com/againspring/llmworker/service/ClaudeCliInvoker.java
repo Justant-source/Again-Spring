@@ -35,12 +35,15 @@ public class ClaudeCliInvoker {
 
     private final String claudeBinaryPath;
     private final LlmConfigService llmConfigService;
+    private final ProcessTerminator processTerminator;
 
     public ClaudeCliInvoker(
             @Value("${llm.worker.claude-binary-path:claude}") String claudeBinaryPath,
-            LlmConfigService llmConfigService) {
+            LlmConfigService llmConfigService,
+            ProcessTerminator processTerminator) {
         this.claudeBinaryPath = claudeBinaryPath;
         this.llmConfigService = llmConfigService;
+        this.processTerminator = processTerminator;
     }
 
     /**
@@ -51,18 +54,23 @@ public class ClaudeCliInvoker {
         ProcessBuilder pb = buildProcessBuilder(prompt, model);
         try {
             Process process = pb.start();
-            drainStderr(process, "sync");
-            String result = readStreamingOutput(process, null);
-            int exitCode = process.waitFor();
-            if (exitCode != 0 && !result.isBlank()) {
-                // 내용이 있으면 성공으로 처리 (일부 CLI 버전 비정상 exit code 방어)
+            try {
+                processTerminator.register(process);
+                drainStderr(process, "sync");
+                String result = readStreamingOutput(process, null);
+                int exitCode = process.waitFor();
+                if (exitCode != 0 && !result.isBlank()) {
+                    // 내용이 있으면 성공으로 처리 (일부 CLI 버전 비정상 exit code 방어)
+                    return result;
+                }
+                if (exitCode != 0) {
+                    throw new ClaudeCodeException("CLAUDE_ERROR",
+                            "Claude CLI exited with code " + exitCode, exitCode, null);
+                }
                 return result;
+            } finally {
+                processTerminator.release(process);
             }
-            if (exitCode != 0) {
-                throw new ClaudeCodeException("CLAUDE_ERROR",
-                        "Claude CLI exited with code " + exitCode, exitCode, null);
-            }
-            return result;
         } catch (ClaudeCodeException e) {
             throw e;
         } catch (Exception e) {
@@ -78,21 +86,26 @@ public class ClaudeCliInvoker {
             throws Exception {
         ProcessBuilder pb = buildProcessBuilder(prompt, model);
         Process process = pb.start();
-        inv.attachProcess(process);
-        drainStderr(process, inv.getInvocationId());
+        try {
+            processTerminator.register(process);
+            inv.attachProcess(process);
+            drainStderr(process, inv.getInvocationId());
 
-        String result = readStreamingOutput(process, inv);
-        int exitCode = process.waitFor();
+            String result = readStreamingOutput(process, inv);
+            int exitCode = process.waitFor();
 
-        if (inv.isCanceled()) {
-            throw new InvocationCanceledException("Canceled mid-flight", inv.getInvocationId());
+            if (inv.isCanceled()) {
+                throw inv.terminationException();
+            }
+            if (exitCode != 0 && !result.isBlank()) return result;
+            if (exitCode != 0) {
+                throw new ClaudeCodeException("CLAUDE_ERROR",
+                        "Claude CLI exited with code " + exitCode, exitCode, null);
+            }
+            return result;
+        } finally {
+            processTerminator.release(process);
         }
-        if (exitCode != 0 && !result.isBlank()) return result;
-        if (exitCode != 0) {
-            throw new ClaudeCodeException("CLAUDE_ERROR",
-                    "Claude CLI exited with code " + exitCode, exitCode, null);
-        }
-        return result;
     }
 
     // ── 내부 메서드 ──────────────────────────────────────────────────────────────

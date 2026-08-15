@@ -42,7 +42,9 @@ services:
       LLM_POOL_SIZE: ${LLM_POOL_SIZE:-100}
       LLM_QUEUE_CAPACITY: ${LLM_QUEUE_CAPACITY:-500}
       LLM_QUEUE_WAIT_TIMEOUT_MS: ${LLM_QUEUE_WAIT_TIMEOUT_MS:-30000}
-      LLM_DEFAULT_TIMEOUT_MS: ${LLM_DEFAULT_TIMEOUT_MS:-120000}
+      # Claude CLI can legitimately take several minutes for long structured responses.
+      LLM_DEFAULT_TIMEOUT_MS: ${LLM_DEFAULT_TIMEOUT_MS:-600000}
+      LLM_PROCESS_TERMINATION_GRACE_MS: ${LLM_PROCESS_TERMINATION_GRACE_MS:-2000}
       HOME: /home/justant
     volumes:
       - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/home/justant/.claude

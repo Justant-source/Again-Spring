@@ -3,6 +3,7 @@ package com.againspring.llmworker.pool;
 import com.againspring.llmworker.dto.WorkerMetrics;
 import com.againspring.llmworker.exception.*;
 import com.againspring.llmworker.service.ClaudeCliInvoker;
+import com.againspring.llmworker.service.ProcessTerminator;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -43,19 +44,24 @@ public class LlmWorkerPool {
     private String defaultModel;
 
     private final ClaudeCliInvoker invoker;
+    private final ProcessTerminator processTerminator;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4,
             r -> { Thread t = new Thread(r, "llm-pool-scheduler"); t.setDaemon(true); return t; });
 
     private ThreadPoolExecutor executor;
     private final ConcurrentHashMap<String, CancelableInvocation> invocations = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<CancelableInvocation, Boolean> activeInvocations = new ConcurrentHashMap<>();
 
     private final AtomicInteger activeCount = new AtomicInteger(0);
     private final AtomicLong completedCount = new AtomicLong(0);
     private final AtomicLong rejectedCount = new AtomicLong(0);
     private final AtomicLong throttledCount = new AtomicLong(0);
+    private final AtomicLong timedOutCount = new AtomicLong(0);
+    private final AtomicLong manuallyCanceledCount = new AtomicLong(0);
 
-    public LlmWorkerPool(ClaudeCliInvoker invoker) {
+    public LlmWorkerPool(ClaudeCliInvoker invoker, ProcessTerminator processTerminator) {
         this.invoker = invoker;
+        this.processTerminator = processTerminator;
     }
 
     @PostConstruct
@@ -89,7 +95,9 @@ public class LlmWorkerPool {
         String resolvedModel = (model != null && !model.isBlank()) ? model : defaultModel;
         long enqueueTime = System.currentTimeMillis();
 
-        CompletableFuture<String> resultFuture = new CompletableFuture<>();
+        CancelableInvocation inv = new CancelableInvocation(correlationId, "sync", processTerminator);
+        trackInvocation(inv);
+        CompletableFuture<String> resultFuture = inv.getResultFuture();
 
         try {
             executor.submit(() -> {
@@ -101,11 +109,13 @@ public class LlmWorkerPool {
                             new LlmCapacityException("Queue wait timeout exceeded: " + waited + "ms"));
                     return;
                 }
+                if (inv.isCanceled()) return;
                 activeCount.incrementAndGet();
                 try {
-                    String result = invoker.invoke(prompt, resolvedModel);
-                    resultFuture.complete(result);
-                    completedCount.incrementAndGet();
+                    String result = invoker.invokeWithCancelSupport(prompt, resolvedModel, inv);
+                    if (!inv.isCanceled() && resultFuture.complete(result)) completedCount.incrementAndGet();
+                } catch (InvocationCanceledException | LlmTimeoutException e) {
+                    // timeout/cancel already completed the future and terminated its process tree
                 } catch (ClaudeCodeException e) {
                     if (e.isThrottled()) throttledCount.incrementAndGet();
                     resultFuture.completeExceptionally(e);
@@ -120,11 +130,11 @@ public class LlmWorkerPool {
             throw new LlmCapacityException("Worker queue full (capacity=" + queueCapacity + ")");
         }
 
-        // 실행 타임아웃 강제 + 프로세스 킬
+        // 실행 타임아웃은 결과만 실패시키지 않고 Claude CLI 프로세스 트리를 종료한다.
         ScheduledFuture<?> timeoutTask = scheduler.schedule(() -> {
-            if (!resultFuture.isDone()) {
-                resultFuture.completeExceptionally(new LlmTimeoutException(
-                        "Sync task timed out after " + effectiveTimeout + "ms"));
+            if (!resultFuture.isDone() && inv.timeout()) {
+                timedOutCount.incrementAndGet();
+                log.warn("Sync task execution timeout after {}ms: corr={}", effectiveTimeout, correlationId);
             }
         }, effectiveTimeout, TimeUnit.MILLISECONDS);
 
@@ -154,10 +164,11 @@ public class LlmWorkerPool {
         String resolvedModel = (model != null && !model.isBlank()) ? model : defaultModel;
         long effectiveTimeout = timeoutMs > 0 ? timeoutMs : defaultTimeoutMs;
         String invocationId = UUID.randomUUID().toString();
-        CancelableInvocation inv = new CancelableInvocation(invocationId, sessionId);
+        CancelableInvocation inv = new CancelableInvocation(invocationId, sessionId, processTerminator);
         long enqueueTime = System.currentTimeMillis();
 
         invocations.put(invocationId, inv);
+        trackInvocation(inv);
 
         // TTL 정리: resultFuture 완료 후 60초 뒤 맵에서 제거
         inv.getResultFuture().whenComplete((r, ex) ->
@@ -183,15 +194,14 @@ public class LlmWorkerPool {
                 ScheduledFuture<?> timeoutTask = scheduler.schedule(() -> {
                     if (!inv.isCanceled() && !inv.getResultFuture().isDone()) {
                         log.warn("Cancelable task execution timeout after {}ms: inv={}", effectiveTimeout, invocationId);
-                        inv.cancel(); // destroyForcibly + completeExceptionally(InvocationCanceledException)
+                        if (inv.timeout()) timedOutCount.incrementAndGet();
                     }
                 }, effectiveTimeout, TimeUnit.MILLISECONDS);
 
                 try {
                     String result = invoker.invokeWithCancelSupport(prompt, resolvedModel, inv);
                     timeoutTask.cancel(false);
-                    if (!inv.isCanceled()) {
-                        inv.getResultFuture().complete(result);
+                    if (!inv.isCanceled() && inv.getResultFuture().complete(result)) {
                         completedCount.incrementAndGet();
                     }
                 } catch (InvocationCanceledException e) {
@@ -228,10 +238,15 @@ public class LlmWorkerPool {
     public boolean cancelInvocation(String invocationId) {
         CancelableInvocation inv = invocations.remove(invocationId);
         if (inv != null) {
-            inv.cancel();
+            if (inv.cancel()) manuallyCanceledCount.incrementAndGet();
             return true;
         }
         return false;
+    }
+
+    private void trackInvocation(CancelableInvocation inv) {
+        activeInvocations.put(inv, Boolean.TRUE);
+        inv.getResultFuture().whenComplete((result, error) -> activeInvocations.remove(inv));
     }
 
     public WorkerMetrics getMetrics() {
@@ -243,6 +258,11 @@ public class LlmWorkerPool {
                 .completed(completedCount.get())
                 .rejected(rejectedCount.get())
                 .throttled(throttledCount.get())
+                .timedOut(timedOutCount.get())
+                .manuallyCanceled(manuallyCanceledCount.get())
+                .terminatedProcesses(processTerminator.getTerminatedProcesses())
+                .forcedTerminations(processTerminator.getForcedTerminations())
+                .activeProcessCount(processTerminator.getActiveProcessCount())
                 .build();
     }
 
@@ -250,6 +270,7 @@ public class LlmWorkerPool {
     public void shutdown() {
         log.info("Shutting down LlmWorkerPool (active={}, queued={})",
                 activeCount.get(), executor.getQueue().size());
+        activeInvocations.keySet().parallelStream().forEach(CancelableInvocation::shutdown);
         executor.shutdown();
         scheduler.shutdown();
         try {

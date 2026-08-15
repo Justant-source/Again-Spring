@@ -68,7 +68,10 @@
 | `LLM_POOL_SIZE` | worker pool size | `100` |
 | `LLM_QUEUE_CAPACITY` | queue size | `500` |
 | `LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `30000` |
-| `LLM_DEFAULT_TIMEOUT_MS` | 요청 timeout | `120000` |
+| `LLM_DEFAULT_TIMEOUT_MS` | Claude CLI 브리지의 요청 실행 timeout | `600000` |
+| `LLM_REMOTE_DEFAULT_TIMEOUT_MS` | backend가 bridge에 전달하는 요청 timeout | `600000` |
+| `LLM_REMOTE_READ_TIMEOUT_MS` | backend → bridge HTTP read timeout (실행 timeout보다 길어야 함) | `610000` |
+| `LLM_PROCESS_TERMINATION_GRACE_MS` | 타임아웃·취소 뒤 CLI 프로세스 트리에 정상 종료를 허용하는 시간 | `2000` |
 
 ## dev/prod backend가 shared ai-user를 바라보는 변수
 

@@ -84,6 +84,8 @@ Again-Spring/
 | AI-user | orchestrator + llm + learning + sync | dev/prod 공통 스택 |
 | Infra | Docker Compose 4개 스택, nginx, Cloudflare Tunnel | base/dev/prod/ai-user |
 
+`againspring-llm`은 요청을 최대 600초 실행하며, timeout·취소 시 Claude CLI 프로세스 트리를 종료한다.
+
 ---
 
 ## 포트 점유표

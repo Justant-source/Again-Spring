@@ -32,7 +32,7 @@ backend/src/main/java/com/againspring/
 - HTTP POST `{llm.remote.base-url}/v1/invoke`
 - `llm.enabled=false`(env `LLM_ENABLED`)이면 워커 호출 없이 `501 LLM_DISABLED` (server-dev L3)
 - 로컬/prod 기본 base-url: `http://againspring-llm:8090` (server-dev는 compose에서 더미 URL + 네트워크 격리)
-- 타임아웃: `llm.remote.default-timeout-ms` (기본 120,000ms)
+- 타임아웃: `llm.remote.default-timeout-ms` (운영 기본 600,000ms). HTTP read timeout은 이 값보다 길게 둔다.
 - 인증: 없음 (내부 네트워크, 컨테이너 간)
 
 ---
@@ -100,8 +100,9 @@ docker compose restart againspring-llm   # base 스택 (dev·prod 공유)
 ## 동시성
 
 - ThreadPoolExecutor: 코어 100, 큐 500
-- 타임아웃: 120초
-- monitoring: 호출 성공/실패/지연 지표 수집
+- 타임아웃: 600초. 타임아웃·원격 취소·워커 종료 시 Claude CLI 부모와 자식 프로세스를 함께 종료한다.
+- 종료 순서: stdin/stdout/stderr를 닫고 자식부터 정상 종료를 요청한 뒤, 2초 내 남은 프로세스는 강제 종료한다.
+- monitoring: 호출 성공/실패/지연과 timeout·수동 취소·프로세스 종료 지표를 `/v1/metrics`에서 제공한다.
 
 ---
 

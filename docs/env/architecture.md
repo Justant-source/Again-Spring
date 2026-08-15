@@ -127,6 +127,7 @@ flowchart LR
 - `againspring-llm`
 - 내부 포트 `8090`
 - base LLM 요청 처리 (`RemoteLlmProvider` 경로; 제품 사람글 경로에서는 미사용)
+- 실행 제한은 600초이며, timeout·취소 시 Claude CLI 부모와 자식 프로세스를 함께 종료한다.
 
 ### Shared AI-user
 
