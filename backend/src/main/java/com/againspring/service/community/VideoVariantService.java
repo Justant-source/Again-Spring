@@ -2,6 +2,7 @@ package com.againspring.service.community;
 
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.PromptSanitizer;
+import com.againspring.marketing.MarketingBriefText;
 import com.againspring.marketing.MarketingLlmAuthGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -119,6 +120,14 @@ public class VideoVariantService {
         if (variants != null && !variants.generationDiagnostics().isEmpty()) {
             diagnostics.putAll(variants.generationDiagnostics());
         }
+        // Empty/unresolvable script (no sentence boundary found even after retry) must block
+        // publish rather than send ASM/WaggleBot a blank or truncated narration (2026-08-16).
+        if (needReels && isBlank(variants == null ? null : variants.scriptReels())) {
+            return new QualityGateResult("SCRIPT_REELS_EMPTY", diagnostics);
+        }
+        if (needShorts && isBlank(variants == null ? null : variants.scriptShorts())) {
+            return new QualityGateResult("SCRIPT_SHORTS_EMPTY", diagnostics);
+        }
         if (needReels && reelsCount < SibomPlanGuard.MIN_REELS) {
             return new QualityGateResult(failureFor(channelStatus(variants, "instagram_reels"), reelsCount), diagnostics);
         }
@@ -126,6 +135,10 @@ public class VideoVariantService {
             return new QualityGateResult(failureFor(channelStatus(variants, "youtube_shorts"), shortsCount), diagnostics);
         }
         return new QualityGateResult(null, diagnostics);
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     private static String channelStatus(Variants variants, String channel) {
@@ -299,7 +312,7 @@ public class VideoVariantService {
         ChannelResult resolved = first;
         if (shouldCorrect(first, minimum)) {
             resolved = invokeChannelAttempt(masterHook, hookEmotion, title, body, channel, sibomCandidates,
-                    correctionInstruction(first.generationStatus(), first.sibomPlan().size(), minimum), 2, attempts);
+                    correctionInstruction(first, minimum), 2, attempts);
         }
 
         Map<String, Object> diagnostics = new LinkedHashMap<>();
@@ -341,20 +354,25 @@ public class VideoVariantService {
         String hook = sanitizeHook(llm.hook(), masterHook, title);
         String script = sanitizeScript(llm.script(), body, scriptMax);
         List<SibomPlanItem> plan = SibomPlanGuard.guard(llm.sibomPlan(), channel);
+        // Neither the LLM candidate nor the raw-body fallback fit a sentence boundary —
+        // more specific than the underlying LLM status so validateRequiredSibomPlans and
+        // the correction retry can react to it (2026-08-16).
+        String effectiveStatus = script == null ? "SCRIPT_QUALITY_ERROR" : llm.generationStatus();
         Map<String, Object> attempt = new LinkedHashMap<>();
         attempt.put("attempt", attemptNumber);
         attempt.put("started_at", startedAt.toString());
         attempt.put("duration_ms", Duration.between(startedAt, Instant.now()).toMillis());
-        attempt.put("result", llm.generationStatus());
+        attempt.put("result", effectiveStatus);
         attempt.put("guarded_plan_count", plan.size());
         if (errorMessage != null) {
             attempt.put("error", clamp(errorMessage, 200));
         }
         attempts.add(Map.copyOf(attempt));
-        return new ChannelResult(hook, script, plan, llm.generationStatus(), Map.of());
+        return new ChannelResult(hook, script, plan, effectiveStatus, Map.of());
     }
 
     private static boolean shouldCorrect(ChannelResult result, int minimum) {
+        if (result.script() == null) return true;
         if (result.sibomPlan().size() >= minimum) return false;
         return switch (result.generationStatus()) {
             case "OK", "PARSE_ERROR" -> true;
@@ -362,10 +380,20 @@ public class VideoVariantService {
         };
     }
 
-    private static String correctionInstruction(String status, int count, int required) {
-        return "첫 결과의 가드 후 시봄이 플랜이 " + count + "장으로 최소 " + required
-                + "장에 미달합니다. 중복 image_id·swap_group을 피해 " + required
-                + "장 이상 남도록 다시 작성하세요.";
+    private static String correctionInstruction(ChannelResult first, int required) {
+        StringBuilder sb = new StringBuilder();
+        if (first.script() == null) {
+            sb.append("직전 결과의 대본이 비어있거나 문장 단위로 정리할 수 없을 만큼 길었습니다. ")
+              .append("완결된 문장으로 이루어진 짧은 요약 대본을 다시 작성하세요.");
+        }
+        int count = first.sibomPlan().size();
+        if (count < required) {
+            if (sb.length() > 0) sb.append(' ');
+            sb.append("첫 결과의 가드 후 시봄이 플랜이 ").append(count).append("장으로 최소 ").append(required)
+              .append("장에 미달합니다. 중복 image_id·swap_group을 피해 ").append(required)
+              .append("장 이상 남도록 다시 작성하세요.");
+        }
+        return sb.toString();
     }
 
     /** Count unique image/swap groups legally selectable by the prompt, including soft fill. */
@@ -568,7 +596,7 @@ public class VideoVariantService {
             v = root.path(camel).asText(null);
         }
         if (v == null || v.isBlank()) return null;
-        return v.trim().replace("\\n", "\n");
+        return MarketingBriefText.normalize(v.trim());
     }
 
     private static String sanitizeHook(String candidate, String masterHook, String title) {
@@ -580,36 +608,65 @@ public class VideoVariantService {
             h = blankToNull(title);
         }
         if (h == null) return null;
-        h = stripForbidden(h.replace("\r\n", "\n").replace('\r', '\n').trim());
+        h = stripForbidden(MarketingBriefText.normalize(h).trim());
         if (h.isBlank() || looksLikeLlmError(h)) {
             h = blankToNull(masterHook);
             if (h == null) h = blankToNull(title);
             if (h == null) return null;
-            h = stripForbidden(h);
+            h = stripForbidden(MarketingBriefText.normalize(h));
         }
         return clamp(h, HOOK_STORE_MAX);
     }
 
+    /**
+     * Video script text (Reels/Shorts narration). Cuts only at a sentence boundary
+     * within the platform's char budget — a mid-sentence character-count cut reads as
+     * broken narration/subtitles (2026-08-16 shortform text quality fix). When neither
+     * the LLM candidate nor the raw-body fallback contains a sentence boundary inside
+     * the budget, this returns null so the caller can fail the job closed instead of
+     * publishing a truncated fragment.
+     */
     private static String sanitizeScript(String candidate, String body, int maxLen) {
         String s = blankToNull(candidate);
         if (s == null || looksLikeLlmError(s) || containsForbidden(s)) {
-            s = heuristicScript(body, maxLen);
-        } else {
-            s = stripForbidden(s.replace("\r\n", "\n").replace('\r', '\n').trim());
-            if (s.isBlank()) {
-                s = heuristicScript(body, maxLen);
-            }
+            return heuristicScript(body, maxLen);
         }
-        return clamp(s, maxLen);
+        s = stripForbidden(MarketingBriefText.normalize(s).trim());
+        if (s.isBlank()) {
+            return heuristicScript(body, maxLen);
+        }
+        if (s.length() <= maxLen) return s;
+        String cut = sentenceBoundaryClamp(s, maxLen);
+        return cut != null ? cut : heuristicScript(body, maxLen);
     }
 
+    /** Raw-story fallback when the LLM candidate is missing/unusable. May return null (see below). */
     private static String heuristicScript(String body, int maxLen) {
-        String b = body != null ? body.trim().replaceAll("\\s+", " ") : "";
-        int budget = Math.max(40, maxLen);
-        if (b.length() > budget) {
-            b = b.substring(0, budget).trim() + "…";
+        String b = MarketingBriefText.normalize(body != null ? body : "").trim().replaceAll("[ \\t]+", " ");
+        if (b.isEmpty()) return null;
+        if (b.length() <= maxLen) return b;
+        return sentenceBoundaryClamp(b, maxLen);
+    }
+
+    /**
+     * Cuts {@code s} at the last sentence-ending punctuation at/before {@code max},
+     * searching an 80-char lookback window. Never returns a mid-sentence/mid-word cut —
+     * returns null when no boundary exists in that window, which real Korean prose only
+     * hits in pathological inputs (no punctuation at all within the last ~80 chars).
+     */
+    private static String sentenceBoundaryClamp(String s, int max) {
+        if (s == null) return null;
+        String t = s.trim();
+        if (t.isEmpty() || t.length() <= max) return t.isEmpty() ? null : t;
+        String endings = ".!?…\n";
+        int lookback = Math.min(max, 80);
+        for (int i = max - 1; i >= max - lookback; i--) {
+            if (endings.indexOf(t.charAt(i)) >= 0) {
+                String cut = t.substring(0, i + 1).trim();
+                return cut.isEmpty() ? null : cut;
+            }
         }
-        return b;
+        return null;
     }
 
     private static String distinctHook(String hook) {

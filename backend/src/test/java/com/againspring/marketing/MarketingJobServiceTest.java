@@ -87,6 +87,9 @@ class MarketingJobServiceTest {
     @Mock
     com.againspring.marketing.MarketingLlmAuthGuard llmAuthGuard;
 
+    @Mock
+    MarketingPublishSlotService marketingPublishSlotService;
+
     @InjectMocks
     MarketingJobService marketingJobService;
 

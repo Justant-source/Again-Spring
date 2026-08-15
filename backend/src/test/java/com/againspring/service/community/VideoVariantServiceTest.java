@@ -389,7 +389,7 @@ class VideoVariantServiceTest {
     @Test
     void qualityGate_fourShortsPlanPasses() {
         VideoVariantService.Variants variants = new VideoVariantService.Variants(
-            "h", "s", 30, null, null, null,
+            "h", "s", 30, null, "숏츠 대본", null,
             List.of(),
             List.of(
                 new SibomPlanItem("intro", "side-glance", "", 0, "large", "hold"),
@@ -408,7 +408,7 @@ class VideoVariantServiceTest {
     @Test
     void qualityGate_threeShortsPlanFails() {
         VideoVariantService.Variants variants = new VideoVariantService.Variants(
-            "h", "s", 30, null, null, null,
+            "h", "s", 30, null, "숏츠 대본", null,
             List.of(),
             List.of(
                 new SibomPlanItem("intro", "side-glance", "", 0, "large", "hold"),

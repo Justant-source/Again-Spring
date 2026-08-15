@@ -41,15 +41,22 @@ Content-Type: application/json
   "requested_by": null,
   "poll_fail_count": 0,
   "last_polled_at": null,
-  "scheduled_publish_at": null,
+  "scheduled_publish_at": "2026-08-16T11:30:00Z",
   "rescheduled_count": 0,
   "rescheduled_reason": null,
-  "original_scheduled_at": null,
+  "original_scheduled_at": "2026-08-16T11:30:00Z",
   "last_rescheduled_at": null,
   "created_at": "2026-06-09T05:00:00Z",
   "updated_at": "2026-06-09T05:00:00Z"
 }
 ```
+
+`scheduled_publish_at`는 모든 잡에서 NOT NULL이다 (V117, Decision #10) — 생성 시
+`MarketingPublishSlotService.nextSlotForTargets`로 저녁 발행 슬롯을 채운다.
+`autoPublish=true` 잡은 이 슬롯이 실제 자동 게시를 게이팅하지만(`MarketingPollingScheduler`
+evening-slot auto-publish), `autoPublish=false`(render-only) 잡은 값이 채워져도 결코 이
+슬롯으로 자동 게시되지 않는다 — `findDueAutoPublishJobs`/`findExpiredScheduledJobs`가
+`auto_publish=1`만 조회하기 때문이다(2026-08-16).
 
 **오류**
 | 코드 | 이유 |

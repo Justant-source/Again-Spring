@@ -62,13 +62,18 @@ public class MarketingJobService {
     private final VideoVariantService videoVariantService;
     private final TelegramNotifier telegramNotifier;
     private final MarketingLlmAuthGuard llmAuthGuard;
+    private final MarketingPublishSlotService marketingPublishSlotService;
 
     /**
      * Create a new marketing job for a post.
      *
-     * <p>Automatic jobs are sent to ASM with {@code auto_publish=true}.  Once a story has
-     * passed its 24-hour ranking window and is selected for a platform, it must publish as
-     * soon as that platform's render is READY; there is no local time-slot deferment.
+     * <p>Automatic jobs are sent to ASM with {@code auto_publish=true} and gated by the
+     * evening publish slot (Decision #10, {@link MarketingPublishSlotService}) — see
+     * {@link MarketingPollingScheduler#pollJobs()}. Manual/render-only jobs
+     * ({@code autoPublish=false}) still receive a slot to satisfy the
+     * {@code scheduled_publish_at} NOT NULL constraint (V117), but the slot never triggers
+     * external publication for them since every auto-publish query filters on
+     * {@code auto_publish = true}.
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
         return createJob(postId, targets, autoPublish, requestedBy, null, 1);
@@ -94,26 +99,33 @@ public class MarketingJobService {
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new IllegalArgumentException("Post not found: " + postId));
 
-        // Build brief from post — inject real data
-        String summary = post.getBodyPublished() != null ? post.getBodyPublished() : post.getBodyRaw();
+        // Build brief from post — inject real data. Normalize line breaks (real CRLF,
+        // literal \n/₩n) before any length-based truncation so cut points aren't thrown
+        // off by escape sequences that later collapse to newlines (2026-08-16).
+        String normalizedBody = MarketingBriefText.normalize(
+            post.getBodyPublished() != null ? post.getBodyPublished() : post.getBodyRaw());
+        String normalizedPartnerBody = MarketingBriefText.normalize(
+            post.getPartnerBodyPublished() != null ? post.getPartnerBodyPublished() : post.getPartnerBodyRaw());
+
+        String summary = normalizedBody;
         if (summary != null && summary.length() > 500) {
             summary = summary.substring(0, 500);
         }
 
         // Side A: author's actual text (up to 300 chars)
-        String sideAText = post.getBodyPublished() != null ? post.getBodyPublished() : post.getBodyRaw();
+        String sideAText = normalizedBody;
         if (sideAText != null && sideAText.length() > 300) sideAText = sideAText.substring(0, 300);
         if (sideAText == null) sideAText = "작성자 관점";
 
         // Side B: partner's text (up to 300 chars), or placeholder
-        String sideBText = post.getPartnerBodyPublished() != null ? post.getPartnerBodyPublished() : post.getPartnerBodyRaw();
+        String sideBText = normalizedPartnerBody;
         if (sideBText != null && sideBText.length() > 300) sideBText = sideBText.substring(0, 300);
         if (sideBText == null || sideBText.isBlank()) sideBText = "상대방 입장은 아직 등록되지 않았어요";
 
         // Full (untruncated) author body — always enriched for channels that need the
         // whole story (e.g. youtube_shorts narration). side_a/side_b above stay
         // 300-char-capped for X/IG capture and are unaffected.
-        String authorBodyFull = post.getBodyPublished() != null ? post.getBodyPublished() : post.getBodyRaw();
+        String authorBodyFull = normalizedBody;
 
         // Vote results → empathy ratio
         int empathyA = 50, empathyB = 50;
@@ -175,7 +187,7 @@ public class MarketingJobService {
                 && !post.getPartnerBodyPublished().isBlank();
 
         // Full (untruncated) partner body, only when actually paired.
-        String partnerBodyFull = paired ? post.getPartnerBodyPublished() : null;
+        String partnerBodyFull = paired ? normalizedPartnerBody : null;
 
         List<Integer> authorProposed = CaptureSplitSupport.coalesceProposed(
                 post.getCaptureSplitAfterLines(), post.getCaptureSplitAfterLine());
@@ -210,9 +222,14 @@ public class MarketingJobService {
         if (storyTitle == null || storyTitle.isBlank()) {
             storyTitle = post.getUserTitle();
         }
+        storyTitle = MarketingBriefText.normalize(storyTitle);
 
         // Persist first so utm_campaign / post_url can use local job id (story_{id}).
         String idempotencyKey = UUID.randomUUID().toString();
+        // scheduled_publish_at is NOT NULL for every job (V117). autoPublish=false jobs still
+        // get a slot — it just never fires since findDueAutoPublishJobs/findExpiredScheduledJobs
+        // filter on auto_publish=true, so render-only jobs stay inert regardless of this value.
+        Instant scheduledPublishAt = marketingPublishSlotService.nextSlotForTargets(targets, Instant.now());
         MarketingJob.MarketingJobBuilder pendingBuilder = MarketingJob.builder()
             .postId(post.getId())
             .status("REQUESTED")
@@ -221,6 +238,8 @@ public class MarketingJobService {
             .retryOfJobId(retryOfJobId)
             .generationAttempt(generationAttempt)
             .targets(serializeJson(targets))
+            .scheduledPublishAt(scheduledPublishAt)
+            .originalScheduledAt(scheduledPublishAt)
             .idempotencyKey(idempotencyKey);
         MarketingJob savedJob = marketingJobRepository.save(pendingBuilder.build());
 
@@ -228,7 +247,7 @@ public class MarketingJobService {
         Map<String, String> postUrls = MarketingUtmUrls.buildPostUrls(postId, targets, campaign);
         String postUrl = MarketingUtmUrls.primaryPostUrl(postId, postUrls);
 
-        String masterHook = PromoTitleService.resolveOrFallback(post);
+        String masterHook = MarketingBriefText.normalize(PromoTitleService.resolveOrFallback(post));
         String hookEmotion = post.getHookEmotion() != null && !post.getHookEmotion().isBlank()
             ? post.getHookEmotion().trim() : null;
 
