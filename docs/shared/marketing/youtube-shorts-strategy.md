@@ -48,12 +48,12 @@ AS 24h 분배 (채널별 score·cap)
 | 길이 | **Reels ≤30s** · **Shorts ≤45s** |
 | LTX / ComfyUI | **off** (`videoGen: false`) |
 | 프레임 | Waggle `text_only` / `comments` / `outro` 재활용 |
-| 본문 비트 | **자극 훅 → 요약 → 비율/클리프행어**. **전문 낭독 금지** |
+| 본문 비트 | **자극 훅 → 요약 → 사연의 여운**. 공감비율 확인·댓글 작성·의견 요청 CTA 금지. **전문 낭독 금지** |
 | 훅 | 사연 생성 = 마스터 훅+`hook_emotion` / **영상 슬롯 확정 시** = `hook_reels` 또는 `hook_shorts` + `script_*` |
 | 감정 → TTS | `hook_emotion` → ASM→WaggleBot `options.mood`/`ttsEmotion` (Fish Speech markers; plan S2 Pro path) |
 | 댓글 | 광장 **좋아요 순 상위 2**(§4.3/§4.5) — 화자별 TTS |
 | 양면(paired) | 영상에는 작성자 중심. 클로징·첫 댓글만 상대 처리 |
-| 클로징 TTS | 솔로: `여러분의 의견을 댓글로 남겨주세요` / paired: `상대방의 사연이 궁금하면 댓글을 확인해주세요` |
+| 클로징 TTS | 참여 유도 문구 없이 종료. 사연 본문에 없는 공감비율·댓글 확인 문구를 추가하지 않음. |
 | 시봄이 | 인트로+본문. 예산 Reels 4~5 / Shorts 5~7 (인트로 포함). **메타포 금지**. 상세 [`sibom-video-insertion.md`](sibom-video-insertion.md) |
 | 썸네일 | **`sibom_plan` `role=intro` 합성 PNG**(없으면 크림+훅) → 발행 시 `thumbnails.set` 필수. 폴백: mp4 frame0 추출. Shorts 선반은 oar 자동프레임(≠frame0)이라 API 등록 없으면 본문 씬이 노출됨 |
 
@@ -133,7 +133,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 | `promo_title` / `hook_text` | **마스터 훅** (사연 생성 시) |
 | `hook_emotion` | `shock`\|`anger`\|`tension`\|`sad`\|`hype` → **TTS S2 Pro** |
 | `hook_reels` / `hook_shorts` | **영상 슬롯 확정 시** 변형 훅 (`VideoVariantService`) |
-| `script_reels` / `script_shorts` | 요약 낭독 대본 + CTA (전문 아님) |
+| `script_reels` / `script_shorts` | 요약 낭독 대본. 끝에 공감비율·댓글·의견 요청 CTA를 추가하지 않음. |
 | `max_duration_reels_sec` / `max_duration_shorts_sec` | 본문 목표 30 / 45초 (듀얼·분리 잡). 본문 TTS는 각각 32 / 47초를 넘으면 실패한다. 댓글 2개·아웃트로는 본문 길이 판정에서 제외한다. |
 | `max_duration_sec` | alone 잡의 활성 캡 (30 또는 45) |
 | `sibom_candidates` | string[] ≤12. 사연 생성 후 코드 keyword shortlist (`posts.sibom_candidates`) |
@@ -184,7 +184,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 
 ### 7.1 레이아웃 리디자인 (§4 — 반영 완료)
 
-1. **본문 프레임**: 좌측 정렬·최대 3줄 + Tone L 팔레트/타이포 (WaggleBot `text_only`)
+1. **본문 프레임**: 좌측 정렬·화면당 독립 텍스트 블록 최대 3개 + Tone L 팔레트/타이포 (WaggleBot `text_only`). 블록 수가 4개가 되면 새 화면에서 시작하며, 다시봄 경로에서는 짧은 블록을 병합하지 않는다.
 2. **댓글 프레임**: 최대 3개 + fade-in + 닉네임/medium blur/좋아요+상대시간/진영색 + AS brief `top_comments`(§4.5)
 3. **아웃트로**: 마스코트 제거 + Tone L CTA
 4. **AV lead**: `TTS_TEXT_LEAD_SEC=0.10` (job `#462` 확정)

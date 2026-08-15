@@ -41,9 +41,6 @@ public class VideoVariantService {
     private static final int SCRIPT_REELS_MAX = 220;
     private static final int SCRIPT_SHORTS_MAX = 320;
     private static final int SIBOM_CARD_MAX = 10;
-    private static final String CTA_CLIFF =
-            "공감 비율은? 댓글로 남겨주세요.";
-
     private static final Set<String> FORBIDDEN = Set.of(
             "판결", "처방", "승패", "승자", "패자", "가해자", "피해자", "배심원", "유죄", "무죄");
 
@@ -432,7 +429,7 @@ public class VideoVariantService {
 
         return """
             당신은 SNS 숏폼용 카피라이터입니다.
-            마스터 훅을 채널용으로 변형하고, 전문 낭독이 아닌 **요약 나레이션 + 클리프행어 CTA** 대본을 씁니다.
+            마스터 훅을 채널용으로 변형하고, 전문 낭독이 아닌 **요약 나레이션** 대본을 씁니다.
             같은 호출에서 시봄이 캐릭터 삽입 플랜(sibom_plan)도 제안합니다.
 
             ## 대상
@@ -444,8 +441,8 @@ public class VideoVariantService {
             - %s : 스크롤 스톱 한 줄(개행 허용). 마스터 훅과 글자 복제 금지·비틀기 허용.
               **본문 속 구체적 사실(기간·나이·금액·횟수 등 숫자)을 문장 맨 앞에 두고, 그 직후에 모순·반전을 심으세요.**
               "진짜"·"완전"·"너무" 같은 감정 형용사 대신 사실 자체로 긴장을 만드세요.
-            - %s : 자극 훅 톤 유지 → 갈등 핵심 2~4문장 요약 → 공감비율/댓글 유도 클리프행어.
-              전문 낭독 금지. %s
+            - %s : 자극 훅 톤 유지 → 갈등 핵심 2~4문장 요약 → 사연의 여운이 남는 마무리.
+              전문 낭독 금지. 공감비율 확인·댓글 작성·의견 요청 같은 참여 유도 문구를 끝에 넣지 마세요. %s
             - 메타포 일러스트 사용 금지. 시봄이만.
             - sibom_plan: 인트로 포함 최소 4장 필수(절대 하한 — 미달 시 발행 불가), 권장 %d~%d장.
               role=intro|peak|punch|soft_fill. intro/peak=large+hold, punch/soft_fill=small+punch.
@@ -603,22 +600,16 @@ public class VideoVariantService {
                 s = heuristicScript(body, maxLen);
             }
         }
-        if (!s.contains("공감") && !s.contains("댓글")) {
-            s = clamp(s + " " + CTA_CLIFF, maxLen);
-        }
         return clamp(s, maxLen);
     }
 
     private static String heuristicScript(String body, int maxLen) {
         String b = body != null ? body.trim().replaceAll("\\s+", " ") : "";
-        int budget = Math.max(40, maxLen - CTA_CLIFF.length() - 2);
+        int budget = Math.max(40, maxLen);
         if (b.length() > budget) {
             b = b.substring(0, budget).trim() + "…";
         }
-        if (b.isBlank()) {
-            return CTA_CLIFF;
-        }
-        return b + " " + CTA_CLIFF;
+        return b;
     }
 
     private static String distinctHook(String hook) {
