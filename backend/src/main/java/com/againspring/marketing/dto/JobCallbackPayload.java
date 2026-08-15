@@ -1,6 +1,7 @@
 package com.againspring.marketing.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -35,4 +36,22 @@ public class JobCallbackPayload {
     private String event;
 
     private String error;
+
+    /** Additive renderer quality facts; raw prompt/LLM output must never be included. */
+    @JsonAlias("generation_diagnostics")
+    private Map<String, Object> diagnostics;
+
+    @JsonProperty("actual_duration_ms")
+    private Long actualDurationMs;
+
+    @JsonProperty("failure_code")
+    private String failureCode;
+
+    @JsonProperty("failure_stage")
+    private String failureStage;
+
+    private Boolean retryable;
+
+    @JsonProperty("error_summary")
+    private String errorSummary;
 }

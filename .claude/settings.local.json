@@ -10,7 +10,8 @@
       "Glob(*)",
       "Grep(*)",
       "Skill(update-config)",
-      "mcp__claude-design__render_preview"
+      "mcp__claude-design__render_preview",
+      "mcp__claude-design__read_file"
     ],
     "deny": [
       "Bash(git merge*)",

@@ -326,6 +326,23 @@ public class AdminMarketingController {
         return ResponseEntity.ok(JobResponse.from(job));
     }
 
+    /** Create a new child job when the previous video was blocked by a quality gate. */
+    @PostMapping("/jobs/{id}/regenerate")
+    @Operation(summary = "Regenerate quality-failed video", description = "영상 품질 실패 잡을 새 자동게시 잡으로 재생성")
+    @ApiResponse(responseCode = "201", description = "Regeneration job created")
+    @ApiResponse(responseCode = "409", description = "Job is not a regenerable quality failure or another job is active")
+    @Auditable(action = "REGENERATE_MARKETING_VIDEO")
+    public ResponseEntity<JobResponse> regenerateJob(@PathVariable Long id, Authentication auth) {
+        try {
+            String requestedBy = auth == null ? "admin:regenerate:" + id
+                : "admin:regenerate:" + auth.getName();
+            MarketingJob job = marketingJobService.regenerateJob(id, requestedBy);
+            return ResponseEntity.status(HttpStatus.CREATED).body(JobResponse.from(job));
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage(), e);
+        }
+    }
+
     // ===== Platform credentials (proxied to ASM; encrypted at rest in ASM) =====
 
     /**

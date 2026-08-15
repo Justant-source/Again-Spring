@@ -195,7 +195,7 @@ AS 어드민: 폴링 재조정 (15초, STALE 상태 지수 백오프)
 
 ---
 
-## DB 스키마 (V104)
+## DB 스키마 (V115)
 
 ```sql
 CREATE TABLE marketing_job (
@@ -210,6 +210,11 @@ CREATE TABLE marketing_job (
   artifacts               JSON,                              -- ASM 생성 결과물 경로
   publications            JSON,                              -- 게시 기록 [{platform, state, url}]
   error_message           TEXT,
+  failure_code            VARCHAR(80) NULL,                  -- 품질 실패 분류 (V115)
+  generation_diagnostics  JSON NULL,                          -- 최종 플랜·실제 길이·폴백 사유 (V115, LLM 원출력 금지)
+  actual_duration_ms      BIGINT NULL,                        -- 최종 MP4 실제 길이 (V115)
+  retry_of_job_id         BIGINT NULL,                        -- 재생성 원 잡 (V115)
+  generation_attempt      INT NOT NULL DEFAULT 1,             -- 재생성 시도 횟수 (V115)
   requested_by            VARCHAR(128),                      -- V104: force=`admin:force:`+JWT subject(UUID)
   poll_fail_count         INT DEFAULT 0,
   last_polled_at          TIMESTAMP NULL,
@@ -225,6 +230,10 @@ CREATE TABLE marketing_job (
 ```
 
 **V104**: `requested_by` VARCHAR(32)→128 — `admin:force:`(12)+JWT UUID(36)=48이 32를 넘겨 강제 배포 500 발생.
+
+**V115 품질 게이트**: 비어 있거나 기준 미달인 시봄이 플랜, 또는 본문 TTS가 Reels 32초/Shorts 47초를 넘으면 `FAILED`다. 댓글 2개·아웃트로는 본문 이후에 붙으며 최종 MP4에는 별도 하드 상한을 적용하지 않는다. 품질 실패 잡은 READY·자동 게시로 전환할 수 없고, 재생성은 추적 가능한 새 자식 잡으로만 수행한다.
+
+**V116 실패 계약**: ASM/WaggleBot이 `failure_code`, `failure_stage`, `retryable`, `error_summary`와 안전한 생성 진단을 전달하면 AS가 폴링·콜백 모두에서 보존한다. 예를 들어 MariaDB 낙관적 동시성 충돌은 `INFRA_DB_CONFLICT` 및 재시도 가능으로, 품질 게이트 실패는 재시도 불가로 표시한다.
 
 **이월 정책 필드 (V103 추가)**:
 - `scheduled_publish_at`: 현재 예약된 발행 시각 (이월 시 갱신됨)

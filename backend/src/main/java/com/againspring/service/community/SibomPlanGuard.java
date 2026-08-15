@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Schema guard for channel {@code sibom_plan} — downgrades in code, never retries LLM.
+ * Schema guard for channel {@code sibom_plan} — normalizes entries in code, never retries LLM.
  *
  * @see docs/shared/marketing/sibom-video-insertion.md §5.2
  */
@@ -29,6 +29,9 @@ public final class SibomPlanGuard {
 
     public static final int MAX_REELS = 5;
     public static final int MAX_SHORTS = 7;
+    /** Required renderable image counts. A video may not fall back to text-only. */
+    public static final int MIN_REELS = 4;
+    public static final int MIN_SHORTS = 5;
     public static final int CAPTION_MAX_CHARS = 10;
 
     private static final Set<String> ROLES = Set.of("intro", "peak", "punch", "soft_fill");
@@ -43,6 +46,10 @@ public final class SibomPlanGuard {
             return this == REELS ? MAX_REELS : MAX_SHORTS;
         }
 
+        public int minSlots() {
+            return this == REELS ? MIN_REELS : MIN_SHORTS;
+        }
+
         public static Channel from(String raw) {
             if (raw == null) return null;
             String t = raw.trim().toLowerCase(Locale.ROOT);
@@ -53,7 +60,8 @@ public final class SibomPlanGuard {
     }
 
     /**
-     * Apply §5.2 downgrades. Empty result is valid (cream+text only; metaphor fallback forbidden).
+     * Apply §5.2 entry normalization. Callers must fail the video quality gate when the result is empty
+     * or below the channel minimum; text-only and metaphor fallbacks are forbidden.
      */
     public static List<SibomPlanItem> guard(List<SibomPlanItem> raw, Channel channel) {
         if (raw == null || raw.isEmpty() || channel == null) {

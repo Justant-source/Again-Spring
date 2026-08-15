@@ -11,8 +11,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -51,15 +53,36 @@ public class VideoVariantService {
             String scriptShorts,
             Integer maxDurationShortsSec,
             List<SibomPlanItem> sibomPlanReels,
-            List<SibomPlanItem> sibomPlanShorts
+            List<SibomPlanItem> sibomPlanShorts,
+            Map<String, String> channelGenerationStatus,
+            Map<String, Object> generationDiagnostics
     ) {
         public Variants {
             sibomPlanReels = sibomPlanReels == null ? List.of() : List.copyOf(sibomPlanReels);
             sibomPlanShorts = sibomPlanShorts == null ? List.of() : List.copyOf(sibomPlanShorts);
+            channelGenerationStatus = channelGenerationStatus == null ? Map.of() : Map.copyOf(channelGenerationStatus);
+            generationDiagnostics = generationDiagnostics == null ? Map.of() : Map.copyOf(generationDiagnostics);
+        }
+
+        /** Source-compatible constructor for callers that only supply the render brief. */
+        public Variants(String hookReels, String scriptReels, Integer maxDurationReelsSec,
+                        String hookShorts, String scriptShorts, Integer maxDurationShortsSec,
+                        List<SibomPlanItem> sibomPlanReels, List<SibomPlanItem> sibomPlanShorts) {
+            this(hookReels, scriptReels, maxDurationReelsSec, hookShorts, scriptShorts, maxDurationShortsSec,
+                sibomPlanReels, sibomPlanShorts, Map.of(), Map.of());
+        }
+
+        /** Compatibility constructor retained for callers that provide channel statuses. */
+        public Variants(String hookReels, String scriptReels, Integer maxDurationReelsSec,
+                        String hookShorts, String scriptShorts, Integer maxDurationShortsSec,
+                        List<SibomPlanItem> sibomPlanReels, List<SibomPlanItem> sibomPlanShorts,
+                        Map<String, String> channelGenerationStatus) {
+            this(hookReels, scriptReels, maxDurationReelsSec, hookShorts, scriptShorts, maxDurationShortsSec,
+                sibomPlanReels, sibomPlanShorts, channelGenerationStatus, Map.of());
         }
 
         public static Variants empty() {
-            return new Variants(null, null, null, null, null, null, List.of(), List.of());
+            return new Variants(null, null, null, null, null, null, List.of(), List.of(), Map.of(), Map.of());
         }
 
         /**
@@ -70,6 +93,54 @@ public class VideoVariantService {
             if (!sibomPlanReels.isEmpty()) return sibomPlanReels;
             return sibomPlanShorts;
         }
+    }
+
+    /** Result of the AS-owned mandatory video quality gate, before any ASM request. */
+    public record QualityGateResult(String failureCode, Map<String, Object> diagnostics) {
+        public boolean isValid() {
+            return failureCode == null;
+        }
+    }
+
+    /**
+     * Video publication is fail-closed: an absent or undersized guarded Sibom plan must
+     * not silently become a text-only render. This deliberately validates the post-guard
+     * plan, which is the exact plan sent to ASM.
+     */
+    public static QualityGateResult validateRequiredSibomPlans(
+            Variants variants, boolean needReels, boolean needShorts) {
+        Map<String, Object> diagnostics = new LinkedHashMap<>();
+        diagnostics.put("reels_required", needReels ? SibomPlanGuard.MIN_REELS : 0);
+        diagnostics.put("shorts_required", needShorts ? SibomPlanGuard.MIN_SHORTS : 0);
+        int reelsCount = variants == null ? 0 : variants.sibomPlanReels().size();
+        int shortsCount = variants == null ? 0 : variants.sibomPlanShorts().size();
+        diagnostics.put("reels_guarded_plan_count", reelsCount);
+        diagnostics.put("shorts_guarded_plan_count", shortsCount);
+        if (variants != null && !variants.generationDiagnostics().isEmpty()) {
+            diagnostics.putAll(variants.generationDiagnostics());
+        }
+        if (needReels && reelsCount < SibomPlanGuard.MIN_REELS) {
+            return new QualityGateResult(failureFor(channelStatus(variants, "instagram_reels"), reelsCount), diagnostics);
+        }
+        if (needShorts && shortsCount < SibomPlanGuard.MIN_SHORTS) {
+            return new QualityGateResult(failureFor(channelStatus(variants, "youtube_shorts"), shortsCount), diagnostics);
+        }
+        return new QualityGateResult(null, diagnostics);
+    }
+
+    private static String channelStatus(Variants variants, String channel) {
+        String status = variants == null ? null : variants.channelGenerationStatus().get(channel);
+        return status == null ? "OK" : status;
+    }
+
+    private static String failureFor(String status, int planCount) {
+        if (planCount > 0) return "SIBOM_PLAN_TOO_SHORT";
+        return switch (status) {
+            case "LLM_ERROR", "LLM_DISABLED", "LLM_TRANSIENT_ERROR" -> "VARIANT_LLM_ERROR";
+            case "PARSE_ERROR" -> "VARIANT_PARSE_ERROR";
+            case "CANDIDATE_POOL_TOO_SMALL" -> "SIBOM_CANDIDATE_POOL_TOO_SMALL";
+            default -> "SIBOM_PLAN_EMPTY";
+        };
     }
 
     @Qualifier("remoteLlmProvider")
@@ -130,6 +201,8 @@ public class VideoVariantService {
         String scriptShorts = null;
         Integer durShorts = null;
         List<SibomPlanItem> planShorts = List.of();
+        Map<String, String> channelStatuses = new LinkedHashMap<>();
+        Map<String, Object> generationDiagnostics = new LinkedHashMap<>();
 
         if (needReels) {
             ChannelResult reels = generateOneChannel(
@@ -139,6 +212,8 @@ public class VideoVariantService {
             hookReels = reels.hook();
             scriptReels = reels.script();
             planReels = reels.sibomPlan();
+            channelStatuses.put("instagram_reels", reels.generationStatus());
+            generationDiagnostics.put("instagram_reels", reels.diagnostics());
         }
         if (needShorts) {
             ChannelResult shorts = generateOneChannel(
@@ -148,6 +223,8 @@ public class VideoVariantService {
             hookShorts = shorts.hook();
             scriptShorts = shorts.script();
             planShorts = shorts.sibomPlan();
+            channelStatuses.put("youtube_shorts", shorts.generationStatus());
+            generationDiagnostics.put("youtube_shorts", shorts.diagnostics());
         }
 
         // Dual: force distinct hooks/scripts so shared-pool dual jobs still unique-render.
@@ -161,7 +238,7 @@ public class VideoVariantService {
         return new Variants(
                 hookReels, scriptReels, durReels,
                 hookShorts, scriptShorts, durShorts,
-                planReels, planShorts);
+                planReels, planShorts, channelStatuses, generationDiagnostics);
     }
 
     /**
@@ -185,9 +262,15 @@ public class VideoVariantService {
         return generate(masterHook, hookEmotion, title, body, needReels, needShorts, sibomCandidates);
     }
 
-    private record ChannelResult(String hook, String script, List<SibomPlanItem> sibomPlan) {
-        static ChannelResult empty() {
-            return new ChannelResult(null, null, List.of());
+    private record ChannelResult(
+            String hook,
+            String script,
+            List<SibomPlanItem> sibomPlan,
+            String generationStatus,
+            Map<String, Object> diagnostics
+    ) {
+        static ChannelResult empty(String status) {
+            return new ChannelResult(null, null, List.of(), status, Map.of());
         }
     }
 
@@ -199,25 +282,101 @@ public class VideoVariantService {
             SibomPlanGuard.Channel channel,
             List<String> sibomCandidates
     ) {
-        int scriptMax = channel == SibomPlanGuard.Channel.REELS ? SCRIPT_REELS_MAX : SCRIPT_SHORTS_MAX;
-        ChannelResult llm = ChannelResult.empty();
-        if (enabled) {
-            try {
-                llm = parseChannelResult(
-                        llmProvider.invoke(
-                                buildChannelPrompt(
-                                        masterHook, hookEmotion, title, body, channel, sibomCandidates),
-                                model),
-                        channel);
-            } catch (Exception e) {
-                log.warn("VideoVariant LLM failed ({}): {}", channel, e.getMessage());
-            }
+        int minimum = channel.minSlots();
+        int eligibleCandidateCount = eligibleCandidateCount(sibomCandidates);
+        List<Map<String, Object>> attempts = new ArrayList<>();
+        if (eligibleCandidateCount < minimum) {
+            Map<String, Object> diagnostics = new LinkedHashMap<>();
+            diagnostics.put("eligible_candidate_count", eligibleCandidateCount);
+            diagnostics.put("required_plan_count", minimum);
+            diagnostics.put("attempts", List.of());
+            return new ChannelResult(null, null, List.of(), "CANDIDATE_POOL_TOO_SMALL", diagnostics);
         }
 
+        ChannelResult first = invokeChannelAttempt(
+                masterHook, hookEmotion, title, body, channel, sibomCandidates, null, 1, attempts);
+        ChannelResult resolved = first;
+        if (shouldCorrect(first, minimum)) {
+            resolved = invokeChannelAttempt(masterHook, hookEmotion, title, body, channel, sibomCandidates,
+                    correctionInstruction(first.generationStatus(), first.sibomPlan().size(), minimum), 2, attempts);
+        }
+
+        Map<String, Object> diagnostics = new LinkedHashMap<>();
+        diagnostics.put("eligible_candidate_count", eligibleCandidateCount);
+        diagnostics.put("required_plan_count", minimum);
+        diagnostics.put("guarded_plan_count", resolved.sibomPlan().size());
+        diagnostics.put("attempts", List.copyOf(attempts));
+        return new ChannelResult(
+                resolved.hook(), resolved.script(), resolved.sibomPlan(), resolved.generationStatus(), diagnostics);
+    }
+
+    private ChannelResult invokeChannelAttempt(
+            String masterHook, String hookEmotion, String title, String body,
+            SibomPlanGuard.Channel channel, List<String> sibomCandidates,
+            String correction, int attemptNumber, List<Map<String, Object>> attempts
+    ) {
+        ChannelResult llm = ChannelResult.empty(enabled ? "PARSE_ERROR" : "LLM_DISABLED");
+        if (enabled) {
+            try {
+                llm = parseChannelResult(llmProvider.invoke(buildChannelPrompt(
+                        masterHook, hookEmotion, title, body, channel, sibomCandidates, correction), model), channel);
+            } catch (Exception e) {
+                String status = isTransientLlmFailure(e) ? "LLM_TRANSIENT_ERROR" : "LLM_ERROR";
+                log.warn("VideoVariant LLM failed ({} attempt {}): {}", channel, attemptNumber, e.getMessage());
+                llm = ChannelResult.empty(status);
+            }
+        }
+        int scriptMax = channel == SibomPlanGuard.Channel.REELS ? SCRIPT_REELS_MAX : SCRIPT_SHORTS_MAX;
         String hook = sanitizeHook(llm.hook(), masterHook, title);
         String script = sanitizeScript(llm.script(), body, scriptMax);
         List<SibomPlanItem> plan = SibomPlanGuard.guard(llm.sibomPlan(), channel);
-        return new ChannelResult(hook, script, plan);
+        Map<String, Object> attempt = new LinkedHashMap<>();
+        attempt.put("attempt", attemptNumber);
+        attempt.put("result", llm.generationStatus());
+        attempt.put("guarded_plan_count", plan.size());
+        attempts.add(Map.copyOf(attempt));
+        return new ChannelResult(hook, script, plan, llm.generationStatus(), Map.of());
+    }
+
+    private static boolean shouldCorrect(ChannelResult result, int minimum) {
+        if (result.sibomPlan().size() >= minimum) return false;
+        return switch (result.generationStatus()) {
+            case "OK", "PARSE_ERROR", "LLM_TRANSIENT_ERROR" -> true;
+            default -> false;
+        };
+    }
+
+    private static String correctionInstruction(String status, int count, int required) {
+        return "첫 결과는 " + status + " 상태이며 가드 후 시봄이 플랜이 " + count
+                + "장입니다. 반드시 " + required
+                + "장 이상을, 제공된 허용 image_id만 사용해 중복 image_id·swap_group 없이 JSON으로 다시 작성하세요.";
+    }
+
+    /** Count unique image/swap groups legally selectable by the prompt, including soft fill. */
+    private static int eligibleCandidateCount(List<String> sibomCandidates) {
+        Set<String> ids = new java.util.LinkedHashSet<>();
+        if (sibomCandidates != null) {
+            for (String raw : sibomCandidates) {
+                if (raw != null && SibomCatalog.isKnown(raw.trim())) ids.add(raw.trim());
+                if (ids.size() >= SIBOM_CARD_MAX) break;
+            }
+        }
+        ids.addAll(SibomPlanGuard.SOFT_FILL_POOL);
+        Set<String> groups = new java.util.HashSet<>();
+        int count = 0;
+        for (String id : ids) {
+            String group = SibomCatalog.get(id).map(SibomCatalog.Entry::swapGroup).orElse("");
+            if (group.isEmpty() || groups.add(group)) count++;
+        }
+        return count;
+    }
+
+    private static boolean isTransientLlmFailure(Exception error) {
+        String message = error.getMessage() == null ? "" : error.getMessage().toLowerCase(Locale.ROOT);
+        return message.contains("timeout") || message.contains("timed out")
+                || message.contains("502") || message.contains("503") || message.contains("504")
+                || message.contains("temporar") || message.contains("overload")
+                || message.contains("connection reset") || message.contains("service unavailable");
     }
 
     private String buildChannelPrompt(
@@ -226,7 +385,8 @@ public class VideoVariantService {
             String title,
             String body,
             SibomPlanGuard.Channel channel,
-            List<String> sibomCandidates
+            List<String> sibomCandidates,
+            String correction
     ) {
         String rawBody = body != null ? body : "";
         if (rawBody.length() > BODY_PROMPT_MAX) {
@@ -280,6 +440,9 @@ public class VideoVariantService {
             ## soft_fill 풀
             %s
 
+            ## 보정 지시
+            %s
+
             <user_input>
             마스터훅: %s
             hook_emotion: %s
@@ -298,6 +461,7 @@ public class VideoVariantService {
                 softTargetHi,
                 cards.isBlank() ? "(후보 없음 — soft_fill 풀만 사용 가능, 없으면 sibom_plan=[])" : cards,
                 softFillList,
+                correction == null ? "첫 시도입니다." : correction,
                 safeHook,
                 emoLine,
                 safeTitle,
@@ -340,10 +504,10 @@ public class VideoVariantService {
             if (plan.isEmpty()) {
                 plan = parseSibomPlan(root.path("sibomPlan"));
             }
-            return new ChannelResult(hook, script, plan);
+            return new ChannelResult(hook, script, plan, "OK", Map.of());
         } catch (Exception e) {
             log.debug("VideoVariant parse failed ({}): {}", channel, e.getMessage());
-            return ChannelResult.empty();
+            return ChannelResult.empty("PARSE_ERROR");
         }
     }
 

@@ -34,6 +34,14 @@ public class JobResponse {
     private Map<String, Object> artifacts;
     private List<Map<String, Object>> publications;
     private String errorMessage;
+    private String failureCode;
+    private String failureStage;
+    private Boolean retryable;
+    private String errorSummary;
+    private Map<String, Object> generationDiagnostics;
+    private Long actualDurationMs;
+    private Long retryOfJobId;
+    private Integer generationAttempt;
     private String processingDetail;
     private Instant waitingExternalSince;
     private Instant slaBreachedAt;
@@ -52,6 +60,7 @@ public class JobResponse {
         List<String> targets = null;
         Map<String, Object> artifacts = null;
         List<Map<String, Object>> publications = null;
+        Map<String, Object> generationDiagnostics = null;
 
         try {
             if (job.getTargets() != null) {
@@ -62,6 +71,9 @@ public class JobResponse {
             }
             if (job.getPublications() != null) {
                 publications = mapper.readValue(job.getPublications(), new TypeReference<List<Map<String, Object>>>() {});
+            }
+            if (job.getGenerationDiagnostics() != null) {
+                generationDiagnostics = mapper.readValue(job.getGenerationDiagnostics(), new TypeReference<Map<String, Object>>() {});
             }
         } catch (Exception e) {
             // Log or handle JSON parsing errors
@@ -81,6 +93,14 @@ public class JobResponse {
             .artifacts(artifacts)
             .publications(publications)
             .errorMessage(job.getErrorMessage())
+            .failureCode(job.getFailureCode())
+            .failureStage(job.getFailureStage())
+            .retryable(job.getRetryable())
+            .errorSummary(job.getErrorSummary())
+            .generationDiagnostics(generationDiagnostics)
+            .actualDurationMs(job.getActualDurationMs())
+            .retryOfJobId(job.getRetryOfJobId())
+            .generationAttempt(job.getGenerationAttempt())
             .processingDetail(job.getProcessingDetail())
             .waitingExternalSince(job.getWaitingExternalSince())
             .slaBreachedAt(job.getSlaBreachedAt())

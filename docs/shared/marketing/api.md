@@ -145,7 +145,7 @@ Idempotency-Key: <uuid>
 > `brief.promo_title`: **마스터 훅** (광장 `title`과 분리). AS `PromoTitleService`/훅 필드.
 > `brief.hook_emotion`: `shock|anger|tension|sad|hype` → **WaggleBot S2 Pro TTS** (Phase 2 SSOT).
 > 영상 슬롯 확정 시: `hook_reels`/`hook_shorts` · `script_reels`/`script_shorts` ·
-> `max_duration_reels_sec`(30) / `max_duration_shorts_sec`(45) · alone 시 `max_duration_sec`.
+> `max_duration_reels_sec`(30) / `max_duration_shorts_sec`(45) 목표 · alone 시 `max_duration_sec`. Reels 32초·Shorts 47초 상한은 본문 TTS에만 적용한다. 댓글 2개와 아웃트로는 이후에 붙고 최종 MP4에는 별도 하드 상한을 적용하지 않는다.
 > 시봄이: `sibom_candidates`(≤12) · `sibom_plan`(채널별). **`metaphor_id`/`metaphor_ids`는 영상 렌더에서 무시**.
 > 삽입 계약 SSOT: [`sibom-video-insertion.md`](sibom-video-insertion.md).
 >
@@ -364,7 +364,19 @@ Authorization: Bearer {ASM_CALLBACK_TOKEN}
     "naver_blog": { "blog_md": "/api/v1/jobs/01HX.../artifacts/naver_blog/post.md" }
   },
   "publications": [
-    { "platform": "x", "state": "published", "url": "https://x.com/..." }
+    { "platform": "x", "state": "published", "url": "https://x.com/..." },
+    {
+      "platform": "youtube_shorts",
+      "state": "PUBLISHED",
+      "url": "https://www.youtube.com/shorts/...",
+      "partner_comment": {
+        "state": "PUBLISHED",
+        "comment_id": "Ug...",
+        "url": "https://www.youtube.com/watch?v=...&lc=Ug...",
+        "truncated": false,
+        "error": null
+      }
+    }
   ],
   "event": "terminal_state_transition",
   "error": null
@@ -375,6 +387,13 @@ Authorization: Bearer {ASM_CALLBACK_TOKEN}
 **오류**: 
 - 401 — 잘못된 또는 누락된 `Authorization` 헤더
 - 400 — 필수 필드 누락
+
+**품질 진단·실패 계약 (additive)**: 콜백/잡 조회는 `failure_code`, `failure_stage`, `retryable`, `error_summary`, `actual_duration_ms`, `diagnostics`(ASM은 호환을 위해 `generation_diagnostics`도 허용)를 추가로 보낼 수 있다. 진단에는 최종 시봄이 플랜·적용 장수·본문/댓글/아웃트로/MP4 실제 길이·폴백/실패 사유만 넣고 원문 프롬프트나 LLM 원출력은 넣지 않는다. `SIBOM_*`, `VARIANT_*`, `DURATION_*`, `LAYOUT_SAFETY_EXCEEDED`는 READY/자동 게시로 승격할 수 없는 터미널 품질 실패다. 인프라 동시성 충돌은 `INFRA_DB_CONFLICT`·`retryable=true`로 구분한다.
+
+**양면 Shorts 댓글 계약 (additive)**: 신규 `youtube_shorts` 양면 사연은 영상 게시 후
+`brief.partner_body`를 첫 댓글로 작성한다. 결과는 해당 publication의 `partner_comment`에
+기록한다. `partner_comment.state=FAILED`여도 영상 publication은 `PUBLISHED`로 유지하며, AS는
+운영 알림에서 수동 댓글 작성·고정을 안내한다.
 
 **목적**: AS는 콜백 수신 후 원격 상태(`status`, `phase`, `progress`, `artifacts`, `publications`)와 `error`를 DB에 반영하고 폴링 오류 카운트를 초기화합니다. `error`가 있으면 `marketing_job.error_message`에 최대 1,000자로 저장하며, 최상위 `error`가 비어도 `publications[].error`의 실패 상세를 사용합니다. 원격 `FAILED`/`PARTIAL` 텔레그램은 ASM만 전송해 중복을 막습니다.
 

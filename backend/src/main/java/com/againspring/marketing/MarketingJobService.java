@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 /**
  * Service for managing marketing jobs
@@ -69,6 +70,11 @@ public class MarketingJobService {
      * soon as that platform's render is READY; there is no local time-slot deferment.
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
+        return createJob(postId, targets, autoPublish, requestedBy, null, 1);
+    }
+
+    private MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy,
+                                   Long retryOfJobId, int generationAttempt) {
         if (!asmProperties.isEnabled()) {
             throw new AsmUnavailableException("ASM is disabled (ASM_ENABLED=false)");
         }
@@ -129,7 +135,7 @@ public class MarketingJobService {
             log.warn("Failed to load vote data for post {}: {}", postId, e.getMessage());
         }
 
-        // Top comments by likeCount (descending) — top 3, full body (no truncation).
+        // Top comments by likeCount (descending) — top 2, full body (no truncation).
         // Always enriched (not gated by target) for consistency across platforms;
         // youtube_shorts narration needs the full text, others simply ignore extra fields.
         List<TopCommentDto> topComments = new ArrayList<>();
@@ -142,7 +148,7 @@ public class MarketingJobService {
                     int lb = b.getLikeCount() != null ? b.getLikeCount() : 0;
                     return Integer.compare(lb, la);
                 })
-                .limit(3)
+                .limit(2)
                 .map(c -> TopCommentDto.builder()
                     .author(MarketingBriefText.normalize(resolveNickname(c.getAuthorId())))
                     .authorId(c.getAuthorId())
@@ -211,6 +217,8 @@ public class MarketingJobService {
             .status("REQUESTED")
             .autoPublish(autoPublish)
             .requestedBy(requestedBy)
+            .retryOfJobId(retryOfJobId)
+            .generationAttempt(generationAttempt)
             .targets(serializeJson(targets))
             .idempotencyKey(idempotencyKey);
         MarketingJob savedJob = marketingJobRepository.save(pendingBuilder.build());
@@ -240,6 +248,21 @@ public class MarketingJobService {
                 needShorts,
                 candidatesForLlm
             );
+        }
+
+        VideoVariantService.QualityGateResult qualityGate =
+            VideoVariantService.validateRequiredSibomPlans(variants, needReels, needShorts);
+        if (!qualityGate.isValid()) {
+            savedJob.setStatus("FAILED");
+            savedJob.setFailureCode(qualityGate.failureCode());
+            savedJob.setErrorMessage("Video variant quality gate failed: " + qualityGate.failureCode());
+            savedJob.setGenerationDiagnostics(serializeJson(qualityGate.diagnostics()));
+            marketingJobRepository.save(savedJob);
+            log.warn("Marketing job {} blocked before ASM: {}", savedJob.getId(), qualityGate.failureCode());
+            return savedJob;
+        }
+        if (needReels || needShorts) {
+            savedJob.setGenerationDiagnostics(serializeJson(qualityGate.diagnostics()));
         }
         Integer maxDurationSec = null;
         if (needReels && !needShorts) {
@@ -359,6 +382,32 @@ public class MarketingJobService {
         }
     }
 
+    /** Regenerate a quality-failed video as a separately auditable, auto-publishing child job. */
+    public MarketingJob regenerateJob(Long jobId, String requestedBy) {
+        MarketingJob previous = marketingJobRepository.findById(jobId)
+            .orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
+        if (!"FAILED".equals(previous.getStatus()) || !isRegenerableFailure(previous.getFailureCode())) {
+            throw new IllegalStateException("Job is not a regenerable video-quality failure");
+        }
+        List<String> targets;
+        try {
+            targets = objectMapper.readValue(previous.getTargets(), new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            throw new IllegalStateException("Job targets cannot be read for regeneration", e);
+        }
+        int nextAttempt = previous.getGenerationAttempt() == null ? 2 : previous.getGenerationAttempt() + 1;
+        return createJob(previous.getPostId(), targets, true,
+            requestedBy == null ? "admin:regenerate:" + jobId : requestedBy,
+            previous.getId(), nextAttempt);
+    }
+
+    private static boolean isRegenerableFailure(String failureCode) {
+        return failureCode != null && (failureCode.startsWith("SIBOM_")
+            || failureCode.startsWith("VARIANT_")
+            || failureCode.startsWith("DURATION_")
+            || failureCode.startsWith("LAYOUT_"));
+    }
+
     /**
      * Apply callback from ASM
      */
@@ -369,6 +418,8 @@ public class MarketingJobService {
             applyRemoteState(job, payload.getStatus(), payload.getPhase(), payload.getProgress(),
                 serializeJson(payload.getArtifacts()), serializeJson(payload.getPublications()),
                 payload.getError(), payload.getPublications());
+            applyRemoteGenerationDiagnostics(job, payload.getDiagnostics(), payload.getActualDurationMs(),
+                payload.getFailureCode(), payload.getFailureStage(), payload.getRetryable(), payload.getErrorSummary());
             marketingJobRepository.save(job);
             notifyTerminalStatusChange(job, previousStatus, payload.getPublications());
             log.info("Callback applied for remote job {}: status={}", payload.getJobId(), payload.getStatus());
@@ -383,6 +434,8 @@ public class MarketingJobService {
         applyRemoteState(job, view.getStatus(), view.getPhase(), view.getProgress(),
             serializeJson(view.getArtifacts()), serializeJson(view.getPublications()),
             view.getError(), view.getPublications());
+        applyRemoteGenerationDiagnostics(job, view.getDiagnostics(), view.getActualDurationMs(),
+            view.getFailureCode(), view.getFailureStage(), view.getRetryable(), view.getErrorSummary());
         marketingJobRepository.save(job);
         notifyTerminalStatusChange(job, previousStatus, view.getPublications());
     }
@@ -419,6 +472,18 @@ public class MarketingJobService {
         job.setSlaBreachedAt(null);
         job.setProcessingDetail(null);
         applyRemoteError(job, remoteError, publicationRows);
+    }
+
+    /** ASM/WaggleBot diagnostics are additive and intentionally limited to safe operational facts. */
+    private void applyRemoteGenerationDiagnostics(MarketingJob job, Map<String, Object> diagnostics,
+                                                   Long actualDurationMs, String failureCode, String failureStage,
+                                                   Boolean retryable, String errorSummary) {
+        if (diagnostics != null) job.setGenerationDiagnostics(serializeJson(diagnostics));
+        if (actualDurationMs != null && actualDurationMs >= 0) job.setActualDurationMs(actualDurationMs);
+        if (failureCode != null && !failureCode.isBlank()) job.setFailureCode(compact(failureCode, 64));
+        if (failureStage != null && !failureStage.isBlank()) job.setFailureStage(compact(failureStage, 64));
+        if (retryable != null) job.setRetryable(retryable);
+        if (errorSummary != null && !errorSummary.isBlank()) job.setErrorSummary(compact(errorSummary, 1000));
     }
 
     private String resolveLocalStatus(MarketingJob job, String remoteStatus, String remoteError) {
@@ -514,15 +579,43 @@ public class MarketingJobService {
                 if (url == null) url = publication.get("published_url");
                 if (url == null) url = publication.get("post_url");
                 Object error = publication.get("error");
-                return publishedOnly
-                    ? platform + ": " + (url == null ? "URL 없음" : url)
-                    : platform + ": " + (error == null ? "상세 오류 없음" : compact(String.valueOf(error), 500));
+                if (publishedOnly) {
+                    return platform + ": " + (url == null ? "URL 없음" : url)
+                        + partnerCommentLine(platform, publication);
+                }
+                return platform + ": "
+                    + (error == null ? "상세 오류 없음" : compact(String.valueOf(error), 500));
             })
             .toList();
         if (lines.isEmpty()) {
             return publishedOnly ? "게시 URL: 원격 서비스 응답에 없음" : "실패 플랫폼: 원격 서비스 응답에 없음";
         }
-        return String.join("%n", lines);
+        return String.join(System.lineSeparator(), lines);
+    }
+
+    /**
+     * A paired YouTube Short may publish successfully even when its follow-up
+     * partner-story comment fails.  Surface that distinct outcome in the
+     * operator alert without changing the successful video publication state.
+     */
+    private static String partnerCommentLine(String platform, Map<String, Object> publication) {
+        if (!"youtube_shorts".equalsIgnoreCase(platform)) return "";
+        Object raw = publication.get("partner_comment");
+        if (!(raw instanceof Map<?, ?> comment)) return "";
+
+        Object stateRaw = comment.get("state");
+        String state = stateRaw == null ? "" : String.valueOf(stateRaw);
+        Object urlRaw = comment.get("url");
+        String url = urlRaw == null ? null : String.valueOf(urlRaw);
+        if ("PUBLISHED".equalsIgnoreCase(state) || "SUCCESS".equalsIgnoreCase(state)) {
+            return System.lineSeparator() + "상대방 사연 댓글: "
+                + (url == null || url.isBlank() ? "작성됨 (URL 없음)" : url)
+                + System.lineSeparator() + "YouTube Studio에서 댓글 고정 필요";
+        }
+        Object errorRaw = comment.get("error");
+        String error = errorRaw == null ? "상세 오류 없음" : compact(String.valueOf(errorRaw), 500);
+        return System.lineSeparator() + "상대방 사연 댓글 미게시: " + error
+            + System.lineSeparator() + "YouTube Studio에서 수동 작성·고정 필요";
     }
 
     private static String compact(String value, int maxLength) {

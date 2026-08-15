@@ -94,7 +94,7 @@ public class MarketingHoldingBriefSeeder {
                     int lb = b.getLikeCount() != null ? b.getLikeCount() : 0;
                     return Integer.compare(lb, la);
                 })
-                .limit(3)
+                .limit(2)
                 .map(c -> TopCommentDto.builder()
                     .author(MarketingBriefText.normalize(resolveNickname(c.getAuthorId())))
                     .authorId(c.getAuthorId())

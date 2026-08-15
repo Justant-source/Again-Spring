@@ -14,6 +14,14 @@ export interface MarketingJob {
   artifacts: Record<string, string> | null; // { video_mp4, thumbnail, blog_md, ... }
   publications: Array<{ platform: string; state: string; url: string }> | null;
   errorMessage: string | null;
+  failureCode?: string | null;
+  failureStage?: string | null;
+  retryable?: boolean | null;
+  errorSummary?: string | null;
+  generationDiagnostics?: Record<string, unknown> | null;
+  actualDurationMs?: number | null;
+  retryOfJobId?: number | null;
+  generationAttempt?: number | null;
   pollFailCount: number;
   lastPolledAt: string | null;
   createdAt: string;
@@ -62,6 +70,11 @@ export async function publishMarketingJob(id: number): Promise<MarketingJob> {
 
 export async function republishMarketingJob(id: number): Promise<MarketingJob> {
   const res = await api.post<MarketingJob>(`/api/admin/marketing/jobs/${id}/republish`);
+  return res.data;
+}
+
+export async function regenerateMarketingJob(id: number): Promise<MarketingJob> {
+  const res = await api.post<MarketingJob>(`/api/admin/marketing/jobs/${id}/regenerate`);
   return res.data;
 }
 

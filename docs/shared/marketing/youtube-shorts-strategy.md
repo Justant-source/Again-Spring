@@ -51,7 +51,7 @@ AS 24h 분배 (채널별 score·cap)
 | 본문 비트 | **자극 훅 → 요약 → 비율/클리프행어**. **전문 낭독 금지** |
 | 훅 | 사연 생성 = 마스터 훅+`hook_emotion` / **영상 슬롯 확정 시** = `hook_reels` 또는 `hook_shorts` + `script_*` |
 | 감정 → TTS | `hook_emotion` → ASM→WaggleBot `options.mood`/`ttsEmotion` (Fish Speech markers; plan S2 Pro path) |
-| 댓글 | 광장 **좋아요 순 상위 3**(§4.3/§4.5) — 화자별 TTS |
+| 댓글 | 광장 **좋아요 순 상위 2**(§4.3/§4.5) — 화자별 TTS |
 | 양면(paired) | 영상에는 작성자 중심. 클로징·첫 댓글만 상대 처리 |
 | 클로징 TTS | 솔로: `여러분의 의견을 댓글로 남겨주세요` / paired: `상대방의 사연이 궁금하면 댓글을 확인해주세요` |
 | 시봄이 | 인트로+본문. 예산 Reels 4~5 / Shorts 5~7 (인트로 포함). **메타포 금지**. 상세 [`sibom-video-insertion.md`](sibom-video-insertion.md) |
@@ -59,8 +59,14 @@ AS 24h 분배 (채널별 score·cap)
 
 ### paired 첫 댓글 (게시 승인 시)
 
-- 본문 = 상대방 사연 전문 (한도 초과 시 절단 + 광장 URL)
-- **1차: 채널 첫 댓글만** (YouTube Data API에 pin 없음 → pin UI는 후속)
+- 대상 = 신규 `youtube_shorts` 양면 사연 중 공개된 `partner_body`가 있는 경우만. 본문은
+  `partner_body_published`를 라벨·요약 없이 그대로 사용한다.
+- 한도 초과 시 문장/줄바꿈 경계에서 절단하고 `전체 사연: {광장 URL}`을 덧붙인다.
+- `commentThreads.insert` 성공 결과는 `publications[].partner_comment`
+  (`state`, `comment_id`, `url`, `truncated`, `error`)에 기록한다. 댓글 실패는 영상 게시를
+  되돌리지 않으며 운영 알림에서 수동 조치를 안내한다.
+- YouTube Data API에는 pin 메서드가 없으므로, 성공 알림의 댓글 링크를 열어 YouTube Studio에서
+  운영자가 수동으로 고정한다.
 
 ---
 
@@ -128,14 +134,14 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 | `hook_emotion` | `shock`\|`anger`\|`tension`\|`sad`\|`hype` → **TTS S2 Pro** |
 | `hook_reels` / `hook_shorts` | **영상 슬롯 확정 시** 변형 훅 (`VideoVariantService`) |
 | `script_reels` / `script_shorts` | 요약 낭독 대본 + CTA (전문 아님) |
-| `max_duration_reels_sec` / `max_duration_shorts_sec` | 30 / 45 (듀얼·분리 잡) |
+| `max_duration_reels_sec` / `max_duration_shorts_sec` | 본문 목표 30 / 45초 (듀얼·분리 잡). 본문 TTS는 각각 32 / 47초를 넘으면 실패한다. 댓글 2개·아웃트로는 본문 길이 판정에서 제외한다. |
 | `max_duration_sec` | alone 잡의 활성 캡 (30 또는 45) |
 | `sibom_candidates` | string[] ≤12. 사연 생성 후 코드 keyword shortlist (`posts.sibom_candidates`) |
 | `sibom_plan` | 채널별 삽입 플랜 배열 (`role`/`image_id`/`caption`/`beat_index`/`size`/`dwell`). 인트로·피크·펀치. 상세 [`sibom-video-insertion.md`](sibom-video-insertion.md) |
 | `metaphor_id` / `metaphor_ids` | **영상 렌더에서 무시**. DB 컬럼 보존만. 신규 선택·주입 중지 |
 | `side_a` / `author_body` | 폴백 본문. 렌더 body는 `script_*` 우선 |
 | `partner_body` | paired일 때 상대 — 클로징/첫 댓글용 |
-| `top_comments` | `{ author, author_id?, body, like_count, created_at, side }[]` 최대 3 (§4.5) |
+| `top_comments` | `{ author, author_id?, body, like_count, created_at, side }[]` 최대 2 (§4.5) |
 | `paired` | boolean |
 | `post_url` | 광장 URL + UTM (`utm_source=youtube`\|`instagram` 등) — Phase 1 유지 |
 

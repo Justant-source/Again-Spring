@@ -43,10 +43,15 @@ class VideoVariantServiceTest {
     void generate_parsesLlmJson_forBothPlatforms() throws Exception {
         when(llmProvider.invoke(anyString(), anyString()))
                 .thenReturn("""
-                    {"hook_reels":"릴스만의훅","script_reels":"짧은요약. 공감 비율은?","sibom_plan":[]}
+                    {"hook_reels":"릴스만의훅","script_reels":"짧은요약. 공감 비율은?","sibom_plan":[
+                      {"role":"intro","image_id":"side-glance"},{"role":"peak","image_id":"stunned"},
+                      {"role":"punch","image_id":"drained"},{"role":"punch","image_id":"indignant"}]}
                     """)
                 .thenReturn("""
-                    {"hook_shorts":"쇼츠훅","script_shorts":"조금긴요약. 댓글로","sibom_plan":[]}
+                    {"hook_shorts":"쇼츠훅","script_shorts":"조금긴요약. 댓글로","sibom_plan":[
+                      {"role":"intro","image_id":"side-glance"},{"role":"peak","image_id":"stunned"},
+                      {"role":"punch","image_id":"drained"},{"role":"punch","image_id":"indignant"},
+                      {"role":"punch","image_id":"relieved"}]}
                     """);
 
         VideoVariantService.Variants v = service.generate(
@@ -58,6 +63,46 @@ class VideoVariantServiceTest {
         assertThat(v.scriptShorts()).contains("댓글");
         assertThat(v.maxDurationReelsSec()).isEqualTo(30);
         assertThat(v.maxDurationShortsSec()).isEqualTo(45);
+        verify(llmProvider, times(2)).invoke(anyString(), anyString());
+    }
+
+    @Test
+    void generate_emptyPlan_correctsOnceAndRecordsSafeAttemptFacts() throws Exception {
+        when(llmProvider.invoke(anyString(), anyString()))
+                .thenReturn("{\"hook_reels\":\"첫훅\",\"script_reels\":\"첫대본\",\"sibom_plan\":[]}")
+                .thenReturn("""
+                    {"hook_reels":"보정훅","script_reels":"보정대본 공감","sibom_plan":[
+                      {"role":"intro","image_id":"side-glance"},{"role":"peak","image_id":"stunned"},
+                      {"role":"punch","image_id":"drained"},{"role":"punch","image_id":"indignant"}]}
+                    """);
+
+        VideoVariantService.Variants variants = service.generate(
+                "마스터", "shock", "제목", "본문", true, false, List.of("side-glance"));
+
+        assertThat(variants.sibomPlanReels()).hasSize(4);
+        assertThat(variants.generationDiagnostics())
+                .containsKey("instagram_reels");
+        @SuppressWarnings("unchecked")
+        var channelDiagnostics = (java.util.Map<String, Object>) variants.generationDiagnostics().get("instagram_reels");
+        assertThat(channelDiagnostics).containsEntry("guarded_plan_count", 4);
+        assertThat((List<?>) channelDiagnostics.get("attempts")).hasSize(2);
+        verify(llmProvider, times(2)).invoke(anyString(), anyString());
+    }
+
+    @Test
+    void generate_transientLlmFailure_correctsOnce() throws Exception {
+        when(llmProvider.invoke(anyString(), anyString()))
+                .thenThrow(new RuntimeException("upstream timeout"))
+                .thenReturn("""
+                    {"hook_reels":"보정훅","script_reels":"보정대본 공감","sibom_plan":[
+                      {"role":"intro","image_id":"side-glance"},{"role":"peak","image_id":"stunned"},
+                      {"role":"punch","image_id":"drained"},{"role":"punch","image_id":"indignant"}]}
+                    """);
+
+        VideoVariantService.Variants variants = service.generate(
+                "마스터", "shock", "제목", "본문", true, false, List.of("side-glance"));
+
+        assertThat(variants.sibomPlanReels()).hasSize(4);
         verify(llmProvider, times(2)).invoke(anyString(), anyString());
     }
 
@@ -139,6 +184,21 @@ class VideoVariantServiceTest {
         assertThat(v.maxDurationReelsSec()).isEqualTo(30);
         assertThat(v.maxDurationShortsSec()).isNull();
         assertThat(v.sibomPlan()).isEmpty();
+        assertThat(VideoVariantService.validateRequiredSibomPlans(v, true, false).failureCode())
+            .isEqualTo("VARIANT_LLM_ERROR");
+    }
+
+    @Test
+    void qualityGate_rejectsPlanBelowChannelMinimum() {
+        VideoVariantService.Variants variants = new VideoVariantService.Variants(
+            "h", "s", 30, null, null, null,
+            List.of(new SibomPlanItem("intro", "side-glance", "", 0, "large", "hold")), List.of());
+
+        VideoVariantService.QualityGateResult result =
+            VideoVariantService.validateRequiredSibomPlans(variants, true, false);
+
+        assertThat(result.failureCode()).isEqualTo("SIBOM_PLAN_TOO_SHORT");
+        assertThat(result.diagnostics()).containsEntry("reels_guarded_plan_count", 1);
     }
 
     @Test

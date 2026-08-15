@@ -145,7 +145,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `revoked_tokens` | JWT 블랙리스트 | BIGINT auto |
 | `encrypted_secret` | 앱 시크릿 AES-GCM vault (마케팅 제외) | `secret_key` VARCHAR(128) **V101** |
 | `marketing_holding` | 마케팅 대기 보드 (초안·순위 스냅샷) | `post_id` VARCHAR(32) PK **V102** |
-| `marketing_job` | ASM 마케팅 잡 | BIGINT auto · `requested_by` VARCHAR(128) **V104** |
+| `marketing_job` | ASM 마케팅 잡 | BIGINT auto · `requested_by` VARCHAR(128) · 품질 진단/재생성 추적 **V115** · 구조화 실패 계약 **V116** |
 | `marketing_publication_stats` | 플랫폼 참여 스냅샷 (X/IG/YT best-effort) | BIGINT auto **V110** |
 | `marketing_stats_event` | 통계 탭 활동 타임라인 (수집·제안·확정) | BIGINT auto **V111** |
 
@@ -477,6 +477,8 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V110** | `marketing_publication_stats` — 발행 후 플랫폼 통계 스냅샷(`job_id`,`post_id`,`platform`,`metrics_json`,partial). SSOT=AS; 수집기는 ASM. `system_setting` `marketing.score.auto_adjust` 기본 `false` |
 | **V111** | `marketing_stats_event` — 통계 탭 append-only 이벤트(`event_type`,`platform`,`payload_json`,`created_at`). 타입: `COLLECT_*` · `PROPOSE` · `APPLY` · `SHADOW_TOGGLE` |
 | **V112** | `posts.sibom_candidates` JSON — 시봄이 이미지 id 숏리스트(≤12). 본문 keyword 스코어(코드). soft-fill 미저장 |
+| **V115** | `marketing_job.failure_code`, `generation_diagnostics` JSON, `actual_duration_ms`, `retry_of_job_id`, `generation_attempt` — 영상 품질 실패 원인·실제 길이·재생성 계보. 진단에는 원 프롬프트/LLM 원출력을 저장하지 않음 |
+| **V116** | `marketing_job.failure_stage`, `retryable`, `error_summary` — ASM/WaggleBot의 구조화 실패 단계·재시도 가능 여부·정제된 운영자 요약 |
 | **V114** | `marketing_holding.platform_rank_snapshot` JSON — T+24h 자동 선정의 실제 플랫폼별 순위 잠금 |
 
 ### `marketing_stats_event` (**V111**)

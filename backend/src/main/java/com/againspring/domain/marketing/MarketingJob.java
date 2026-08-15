@@ -82,6 +82,39 @@ public class MarketingJob {
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
+    /** Stable, operator-actionable code for generation/quality failures. */
+    @Column(length = 64)
+    private String failureCode;
+
+    /** Renderer stage that produced the terminal failure (for example TTS or LAYOUT). */
+    @Column(length = 64)
+    private String failureStage;
+
+    /** Whether a new generation attempt is expected to be meaningful without code changes. */
+    @Column
+    private Boolean retryable;
+
+    /** Sanitized, operator-facing failure summary. Raw provider/LLM output is never stored here. */
+    @Column(length = 1000)
+    private String errorSummary;
+
+    /** Safe generation facts only (counts, limits and error category; never raw LLM output). */
+    @Column(columnDefinition = "JSON")
+    private String generationDiagnostics;
+
+    /** Duration reported by the renderer for the final MP4, when available. */
+    @Column
+    private Long actualDurationMs;
+
+    /** Previous local job when this is an explicit quality-regeneration child. */
+    @Column
+    private Long retryOfJobId;
+
+    /** One-based generation attempt number within a regeneration lineage. */
+    @Column
+    @Builder.Default
+    private Integer generationAttempt = 1;
+
     /** Actor id; force path uses {@code admin:force:} + JWT subject (UUID → up to ~48). */
     @Column(length = 128)
     private String requestedBy;

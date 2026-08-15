@@ -155,7 +155,7 @@ public class CreateJobRequest {
         @JsonProperty("empathy_ratio")
         private EmpathyRatioDto empathyRatio;
 
-        /** 좋아요 순 상위 3, 본문 전문(미절단). */
+        /** 좋아요 순 상위 2, 본문 전문(미절단). */
         @JsonProperty("top_comments")
         private List<TopCommentDto> topComments;
 

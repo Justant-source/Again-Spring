@@ -32,7 +32,7 @@
         740,
         200
       ],
-      "maxChars": 16,
+      "maxChars": 10,
       "font_size": 80,
       "font_weight": "bold",
       "color": "#5C4030"
@@ -44,7 +44,7 @@
         740,
         200
       ],
-      "maxChars": 16,
+      "maxChars": 10,
       "font_size": 80,
       "font_weight": "bold",
       "color": "#5C4030"
@@ -56,7 +56,7 @@
         376,
         300
       ],
-      "maxChars": 12,
+      "maxChars": 10,
       "font_size": 80,
       "font_weight": "bold",
       "color": "#5C4030"
@@ -88,14 +88,14 @@
         "서로 피하고",
         "눈도 안 마주치고"
       ],
-      "caption": "말 안 한 지 3일",
+      "caption": "사흘째 침묵",
       "alt_captions": [
-        "대화가 끊겼다",
-        "서로 말이 없다"
+        "끊긴 대화",
+        "말 없는 사이"
       ],
       "swap_group": "silence",
       "sibling_bottom": null,
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "two-argue",
@@ -117,14 +117,14 @@
         "소리를 질렀다",
         "말다툼이 났다"
       ],
-      "caption": "결국 터졌다",
+      "caption": "끝내 부딪쳤다",
       "alt_captions": [
-        "언성이 높아졌다",
-        "그 자리서 다퉜다"
+        "높아진 목소리",
+        "서로 날 선 말"
       ],
       "swap_group": "clash",
       "sibling_bottom": "two-cold-backs",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "two-hand-hesitate",
@@ -145,14 +145,14 @@
         "화해를 시도했지만",
         "받아주지 않았다"
       ],
-      "caption": "먼저 사과했는데",
+      "caption": "손 내밀었는데",
       "alt_captions": [
-        "손을 내밀었지만",
-        "화해는 실패했다"
+        "닿지 못한 손",
+        "멀어진 화해"
       ],
       "swap_group": "reach_out",
       "sibling_bottom": "two-hand-hesitate",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "waiting-reply",
@@ -171,14 +171,14 @@
         "연락이 끊겼다",
         "답이 없었다"
       ],
-      "caption": "읽씹 3일차",
+      "caption": "사흘째 읽씹",
       "alt_captions": [
-        "답장이 없다",
-        "읽고 씹혔다"
+        "답 없는 화면",
+        "읽고도 무응답"
       ],
       "swap_group": "no_response",
       "sibling_bottom": "waiting-reply",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "swallow-words",
@@ -196,14 +196,14 @@
         "하고 싶은 말이 있었지만",
         "속으로만"
       ],
-      "caption": "말을 삼켰다",
+      "caption": "삼킨 한마디",
       "alt_captions": [
-        "아무 말 못 함",
-        "속으로만 삼킴"
+        "말 없는 입술",
+        "속에만 남은 말"
       ],
       "swap_group": "unspoken",
       "sibling_bottom": null,
-      "maxChars": 12
+      "maxChars": 10
     },
     {
       "id": "stunned",
@@ -221,14 +221,14 @@
         "황당했다",
         "순간 멍해졌다"
       ],
-      "caption": "말문이 막혔다",
+      "caption": "말문이 멎었다",
       "alt_captions": [
-        "어이가 없었다",
-        "순간 멍해졌다"
+        "순간 멍해짐",
+        "믿기 어려운 말"
       ],
       "swap_group": "shock",
       "sibling_bottom": "stunned",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "side-glance",
@@ -246,14 +246,14 @@
         "눈치가 보였다",
         "조심스러웠다"
       ],
-      "caption": "눈치만 봤다",
+      "caption": "눈치만 본 날",
       "alt_captions": [
-        "분위기를 살폈다",
-        "조심스러웠다"
+        "살피는 표정",
+        "조심스런 눈빛"
       ],
       "swap_group": "watching",
       "sibling_bottom": null,
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "drained",
@@ -271,14 +271,14 @@
         "반복되니까 지친다",
         "힘이 다 빠졌다"
       ],
-      "caption": "이제 지쳤다",
+      "caption": "기운이 빠졌다",
       "alt_captions": [
-        "더는 못하겠다",
-        "힘이 다 빠졌다"
+        "더는 못 하겠어",
+        "버거운 하루"
       ],
       "swap_group": "exhausted",
       "sibling_bottom": "drained",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "indignant",
@@ -296,14 +296,14 @@
         "나만 이러는",
         "너무 억울해서"
       ],
-      "caption": "왜 나만",
+      "caption": "왜 나만 그래",
       "alt_captions": [
-        "너무 억울함",
-        "왜 나만 그래"
+        "억울한 마음",
+        "나만 남은 일"
       ],
       "swap_group": "unfair",
       "sibling_bottom": null,
-      "maxChars": 12
+      "maxChars": 10
     },
     {
       "id": "relieved",
@@ -321,14 +321,14 @@
         "한숨 돌렸다",
         "정리가 됐다"
       ],
-      "caption": "조금은 풀렸다",
+      "caption": "한숨 돌렸다",
       "alt_captions": [
-        "한숨 돌렸다",
-        "마음이 나아졌다"
+        "조금 가벼워짐",
+        "마음이 풀림"
       ],
       "swap_group": "ease",
       "sibling_bottom": "relieved",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "money-trouble",
@@ -349,14 +349,14 @@
         "돈 문제로",
         "정산이 안 맞았다"
       ],
-      "caption": "돈 얘기가 남았다",
+      "caption": "돈 얘기만 남아",
       "alt_captions": [
-        "계산이 안 맞았다",
-        "돈 문제가 생겼다"
+        "엇갈린 계산",
+        "남은 정산"
       ],
       "swap_group": "money",
       "sibling_bottom": "money-trouble",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "left-out",
@@ -376,14 +376,14 @@
         "나만 몰랐다",
         "나 빼고"
       ],
-      "caption": "나만 몰랐다",
+      "caption": "나만 빠진 자리",
       "alt_captions": [
-        "나 빼고 만났다",
-        "단톡서 빠졌다"
+        "나 빼고 만남",
+        "단톡 밖의 나"
       ],
       "swap_group": "excluded",
       "sibling_bottom": "left-out",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "nagging",
@@ -403,14 +403,14 @@
         "또 잔소리",
         "훈계를 늘어놨다"
       ],
-      "caption": "또 시작이다",
+      "caption": "또 시작이구나",
       "alt_captions": [
-        "잔소리가 시작됐다",
-        "또 지적한다"
+        "쏟아진 잔소리",
+        "계속된 지적"
       ],
       "swap_group": "scolded",
       "sibling_bottom": null,
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "overloaded",
@@ -430,14 +430,14 @@
         "혼자 다 떠안았다",
         "감당이 안 됐다"
       ],
-      "caption": "다 내 몫이었다",
+      "caption": "몫이 너무 많다",
       "alt_captions": [
-        "나한테만 몰렸다",
-        "감당이 안 됐다"
+        "혼자 떠안은 일",
+        "쌓인 할 일"
       ],
       "swap_group": "overload",
       "sibling_bottom": "overloaded",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "compared",
@@ -457,14 +457,14 @@
         "비교를 당했다",
         "다른 사람이랑 비교"
       ],
-      "caption": "누구는 잘한다며",
+      "caption": "또 비교당했다",
       "alt_captions": [
-        "비교를 당했다",
-        "누구는 안 그런다며"
+        "누구는 잘한다며",
+        "나만 뒤처진 듯"
       ],
       "swap_group": "compared",
       "sibling_bottom": "compared",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "no-apology",
@@ -482,14 +482,14 @@
         "잘못을 인정 안 했다",
         "미안하다는 말 한마디 없이"
       ],
-      "caption": "사과는 없었다",
+      "caption": "미안하단 말 없음",
       "alt_captions": [
-        "끝까지 사과 안 함",
-        "미안하단 말 없이"
+        "끝내 없는 사과",
+        "사과 없이 끝남"
       ],
       "swap_group": "unapologized",
       "sibling_bottom": "no-apology",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "burst-crying",
@@ -507,14 +507,14 @@
         "참다가 터졌다",
         "울음이 터졌다"
       ],
-      "caption": "결국 울었다",
+      "caption": "참은 눈물 터짐",
       "alt_captions": [
-        "눈물이 났다",
-        "참다가 터졌다"
+        "쏟아진 눈물",
+        "울음이 번졌다"
       ],
       "swap_group": "grief",
       "sibling_bottom": "breakup",
-      "maxChars": 12
+      "maxChars": 10
     },
     {
       "id": "curled-up",
@@ -532,14 +532,14 @@
         "밤새 생각했다",
         "잠도 못 잤다"
       ],
-      "caption": "밤새 곱씹었다",
+      "caption": "밤새 떠올랐다",
       "alt_captions": [
-        "계속 생각났다",
-        "혼자 곱씹었다"
+        "혼자 곱씹음",
+        "잠 못 든 밤"
       ],
       "swap_group": "rumination",
       "sibling_bottom": "curled-up",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "comforted",
@@ -557,14 +557,14 @@
         "다독여줬다",
         "곁에 있어줬다"
       ],
-      "caption": "네 편이라고",
+      "caption": "내 편이 되어줘",
       "alt_captions": [
-        "위로해줬다",
-        "곁에 있어줬다"
+        "곁을 지킨 사람",
+        "따뜻한 한마디"
       ],
       "swap_group": "supported",
       "sibling_bottom": "comforted",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "cut-off",
@@ -582,14 +582,14 @@
         "마음을 정했다",
         "여기까지만"
       ],
-      "caption": "이제 그만하자",
+      "caption": "여기까지 하자",
       "alt_captions": [
-        "거리를 두기로 함",
-        "여기까지만"
+        "거리를 두기로",
+        "마음 정리 중"
       ],
       "swap_group": "boundary",
       "sibling_bottom": null,
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "caught-lying",
@@ -610,14 +610,14 @@
         "거짓말한 걸 알았다",
         "속인 걸 알게 됐다"
       ],
-      "caption": "거짓말이 들켰다",
+      "caption": "숨긴 말이 들킴",
       "alt_captions": [
-        "숨긴 게 들켰다",
-        "속인 걸 알았다"
+        "거짓말의 끝",
+        "속였단 걸 앎"
       ],
       "swap_group": "deception",
       "sibling_bottom": null,
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "talked-behind-back",
@@ -637,14 +637,14 @@
         "내 얘기를 하고 다녔다",
         "뒷말을 들었다"
       ],
-      "caption": "뒷말을 들었다",
+      "caption": "내 얘길 들었다",
       "alt_captions": [
-        "뒤에서 내 얘기를",
-        "뒷담화를 알았다"
+        "뒤에서 오간 말",
+        "뒷말을 알았다"
       ],
       "swap_group": "gossip",
       "sibling_bottom": null,
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "stood-up",
@@ -662,14 +662,14 @@
         "혼자 기다렸다",
         "안 나타났다"
       ],
-      "caption": "혼자 기다렸다",
+      "caption": "혼자 남은 약속",
       "alt_captions": [
-        "바람을 맞았다",
-        "약속을 어겼다"
+        "텅 빈 자리",
+        "오지 않은 사람"
       ],
       "swap_group": "no_response",
       "sibling_bottom": "waiting-reply",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "talked-over",
@@ -687,14 +687,14 @@
         "듣지도 않고",
         "말을 자르며"
       ],
-      "caption": "말이 잘렸다",
+      "caption": "말이 끊겼다",
       "alt_captions": [
-        "무시당했다",
-        "듣지도 않았다"
+        "들리지 않은 말",
+        "내 말을 자름"
       ],
       "swap_group": "dismissed",
       "sibling_bottom": null,
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "pressured-decision",
@@ -714,14 +714,14 @@
         "물어보지도 않고",
         "내 의견은 없이"
       ],
-      "caption": "대신 정해버렸다",
+      "caption": "내 몫 아닌 결정",
       "alt_captions": [
-        "상의도 없었다",
-        "내 의견은 없이"
+        "상의 없는 선택",
+        "내 뜻은 없었다"
       ],
       "swap_group": "overruled",
       "sibling_bottom": null,
-      "maxChars": 12
+      "maxChars": 10
     },
     {
       "id": "breakup",
@@ -739,14 +739,14 @@
         "그만 만나자고",
         "이별 통보"
       ],
-      "caption": "이별을 통보받았다",
+      "caption": "헤어지잔 말",
       "alt_captions": [
-        "헤어지자고 했다",
-        "그만 만나자고"
+        "끝내자는 말",
+        "이별을 들었다"
       ],
       "swap_group": "grief",
       "sibling_bottom": "breakup",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "solo-parenting",
@@ -765,14 +765,14 @@
         "나 혼자 다 했다",
         "도와주지 않았다"
       ],
-      "caption": "혼자 다 떠맡았다",
+      "caption": "혼자 떠안은 하루",
       "alt_captions": [
-        "독박을 썼다",
-        "혼자 다 했다"
+        "나만 하는 육아",
+        "도움 없는 집안일"
       ],
       "swap_group": "overload",
       "sibling_bottom": "overloaded",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "in-law-conflict",
@@ -791,14 +791,14 @@
         "양가 문제로",
         "명절마다"
       ],
-      "caption": "양가 눈치만 봤다",
+      "caption": "양가 사이 눈치",
       "alt_captions": [
-        "시댁 눈치를 봤다",
-        "양가 사이서 눈치"
+        "명절의 눈치",
+        "사이에서 맴돎"
       ],
       "swap_group": "watching",
       "sibling_bottom": null,
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "late-regret",
@@ -816,14 +816,14 @@
         "계속 생각났다",
         "그때가 자꾸"
       ],
-      "caption": "계속 생각났다",
+      "caption": "그날이 떠오른다",
       "alt_captions": [
-        "후회가 됐다",
-        "그때가 자꾸 떠오름"
+        "늦은 후회",
+        "자꾸 생각나는 밤"
       ],
       "swap_group": "rumination",
       "sibling_bottom": "curled-up",
-      "maxChars": 16
+      "maxChars": 10
     },
     {
       "id": "reconciled",
@@ -841,14 +841,14 @@
         "화해를 했다",
         "다시 웃을 수 있었다"
       ],
-      "caption": "마침내 웃었다",
+      "caption": "다시 마주 웃음",
       "alt_captions": [
-        "결국 화해했다",
-        "다시 웃게 됐다"
+        "마침내 화해",
+        "풀어진 마음"
       ],
       "swap_group": "ease",
       "sibling_bottom": "relieved",
-      "maxChars": 16
+      "maxChars": 10
     }
   ]
 }

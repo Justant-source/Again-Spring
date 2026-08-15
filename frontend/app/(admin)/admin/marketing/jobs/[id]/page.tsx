@@ -11,6 +11,7 @@ import {
   getMarketingJob,
   publishMarketingJob,
   republishMarketingJob,
+  regenerateMarketingJob,
   getJobTraffic,
   MarketingJob,
   JobTrafficDto,
@@ -53,6 +54,7 @@ export default function MarketingJobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [republishing, setRepublishing] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [traffic, setTraffic] = useState<JobTrafficDto | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -139,6 +141,21 @@ export default function MarketingJobDetailPage() {
     }
   };
 
+  const handleRegenerate = async () => {
+    if (!job) return;
+    if (!confirm('영상 품질 검증을 다시 실행합니다. 통과한 새 잡은 즉시 자동 게시됩니다.')) return;
+
+    setRegenerating(true);
+    try {
+      const replacement = await regenerateMarketingJob(job.id);
+      router.push(`/admin/marketing/jobs/${replacement.id}`);
+    } catch {
+      alert('영상 재생성 요청에 실패했습니다. 활성 잡이 있는지 확인해주세요.');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   if (loading) {
     return (
       <AdminSection title="마케팅 잡 상세">
@@ -161,6 +178,8 @@ export default function MarketingJobDetailPage() {
 
   const needsAuthExists = hasNeedsAuth(job);
   const canRepublish = ['PARTIAL', 'FAILED', 'PUBLISHED'].includes(job.status);
+  const canRegenerate = job.status === 'FAILED' && Boolean(job.failureCode) &&
+    /^(SIBOM_|VARIANT_|DURATION_|LAYOUT_)/.test(job.failureCode ?? '');
 
   return (
     <AdminSection title="마케팅 잡 상세">
@@ -230,6 +249,18 @@ export default function MarketingJobDetailPage() {
                 </Badge>
               </p>
             </div>
+            {job.generationAttempt != null && (
+              <div>
+                <label className="text-sm font-medium text-gray-600">생성 시도</label>
+                <p className="text-lg font-mono">{job.generationAttempt}회</p>
+              </div>
+            )}
+            {job.actualDurationMs != null && (
+              <div>
+                <label className="text-sm font-medium text-gray-600">최종 영상 길이</label>
+                <p className="text-lg font-mono">{(job.actualDurationMs / 1000).toFixed(1)}초</p>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium text-gray-600">생성일</label>
               <p className="text-lg">
@@ -320,10 +351,30 @@ export default function MarketingJobDetailPage() {
         )}
 
         {/* 오류 메시지 */}
-        {job.errorMessage && (
+        {(job.errorMessage || job.errorSummary || job.failureCode) && (
           <Card className="p-6 bg-red-50 border-red-200">
             <h3 className="text-lg font-semibold mb-4 text-red-800">오류</h3>
-            <p className="text-red-700 font-mono text-sm">{job.errorMessage}</p>
+            {job.failureCode && (
+              <p className="mb-2 font-mono text-sm font-semibold text-red-800">{job.failureCode}</p>
+            )}
+            {(job.failureStage || job.retryable !== null && job.retryable !== undefined) && (
+              <p className="mb-2 text-sm text-red-700">
+                {job.failureStage ? `단계: ${job.failureStage}` : ''}
+                {job.failureStage && job.retryable !== null && job.retryable !== undefined ? ' · ' : ''}
+                {job.retryable !== null && job.retryable !== undefined
+                  ? `재생성 가능: ${job.retryable ? '예' : '아니오'}` : ''}
+              </p>
+            )}
+            <p className="text-red-700 font-mono text-sm">{job.errorSummary ?? job.errorMessage}</p>
+          </Card>
+        )}
+
+        {job.generationDiagnostics && Object.keys(job.generationDiagnostics).length > 0 && (
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-3">영상 품질 진단</h3>
+            <pre className="max-h-72 overflow-auto rounded bg-slate-950 p-4 text-xs leading-5 text-slate-100">
+              {JSON.stringify(job.generationDiagnostics, null, 2)}
+            </pre>
           </Card>
         )}
 
@@ -380,6 +431,16 @@ export default function MarketingJobDetailPage() {
               disabled={republishing || ACTIVE_STATUSES.has(job.status)}
             >
               {republishing ? '재시도 중...' : '게시 재시도'}
+            </Button>
+          )}
+
+          {canRegenerate && (
+            <Button
+              variant="default"
+              onClick={handleRegenerate}
+              disabled={regenerating}
+            >
+              {regenerating ? '재생성 중...' : '영상 재생성'}
             </Button>
           )}
 

@@ -327,8 +327,8 @@ class MarketingJobServiceTest {
         assertThat(brief.getAuthorBody()).isEqualTo(longPostBody);
         assertThat(brief.getSideA()).hasSize(300);
 
-        // top 3 by likeCount desc, full body (no 100-char truncation)
-        assertThat(brief.getTopComments()).hasSize(3);
+        // top 2 by likeCount desc, full body (no 100-char truncation)
+        assertThat(brief.getTopComments()).hasSize(2);
 
         CreateJobRequest.TopCommentDto topComment = brief.getTopComments().get(0);
         assertThat(topComment.getBody()).isEqualTo(longCommentBody);
@@ -344,10 +344,6 @@ class MarketingJobServiceTest {
         assertThat(secondComment.getAuthor()).isEqualTo("상대방닉");
         assertThat(secondComment.getSide()).isEqualTo("partner");
 
-        // unresolved nickname (mock returns empty) falls back to "익명", side is neutral
-        CreateJobRequest.TopCommentDto thirdComment = brief.getTopComments().get(2);
-        assertThat(thirdComment.getAuthor()).isEqualTo("익명");
-        assertThat(thirdComment.getSide()).isEqualTo("neutral");
     }
 
     @Test
@@ -451,7 +447,8 @@ class MarketingJobServiceTest {
             .thenReturn(new VideoVariantService.Variants(
                 "릴스훅", "릴스대본 공감 비율은?", 30,
                 "쇼츠훅", "쇼츠대본 댓글로", 45,
-                List.of(), List.of()
+                List.of(plan("side-glance"), plan("stunned"), plan("drained"), plan("indignant")),
+                List.of(plan("side-glance"), plan("stunned"), plan("drained"), plan("indignant"), plan("relieved"))
             ));
 
         marketingJobService.createJob(
@@ -489,8 +486,8 @@ class MarketingJobServiceTest {
         assertThat(req.getBrief().getMetaphorId()).isNull();
         assertThat(req.getBrief().getMetaphorIds()).isNull();
         assertThat(req.getBrief().getSibomPlan()).isNull(); // dual → channel fields only
-        assertThat(req.getBrief().getSibomPlanReels()).isEmpty();
-        assertThat(req.getBrief().getSibomPlanShorts()).isEmpty();
+        assertThat(req.getBrief().getSibomPlanReels()).hasSize(4);
+        assertThat(req.getBrief().getSibomPlanShorts()).hasSize(5);
         verify(videoVariantService).generate(any(), any(), any(), any(), eq(true), eq(true), any());
     }
 
@@ -517,13 +514,11 @@ class MarketingJobServiceTest {
         doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
 
-        var planItem = new SibomPlanItem(
-            "intro", "waiting-reply", "읽씹 3일차", 0, "large", "hold");
         when(videoVariantService.generate(any(), any(), any(), any(), eq(false), eq(true), any()))
             .thenReturn(new VideoVariantService.Variants(
                 null, null, null,
                 "쇼츠훅", "쇼츠대본 댓글", 45,
-                List.of(), List.of(planItem)
+                List.of(), List.of(plan("waiting-reply"), plan("drained"), plan("stunned"), plan("indignant"), plan("relieved"))
             ));
 
         marketingJobService.createJob(TEST_POST_ID, List.of("youtube_shorts"), false, "admin");
@@ -534,14 +529,41 @@ class MarketingJobServiceTest {
         assertThat(brief.getMetaphorId()).isNull();
         assertThat(brief.getMetaphorIds()).isNull();
         assertThat(brief.getSibomCandidates()).containsExactly("waiting-reply", "drained");
-        assertThat(brief.getSibomPlan()).hasSize(1);
+        assertThat(brief.getSibomPlan()).hasSize(5);
         assertThat(brief.getSibomPlan().get(0).getImageId()).isEqualTo("waiting-reply");
-        assertThat(brief.getSibomPlan().get(0).getRole()).isEqualTo("intro");
-        assertThat(brief.getSibomPlanShorts()).hasSize(1);
+        assertThat(brief.getSibomPlan().get(0).getRole()).isEqualTo("punch");
+        assertThat(brief.getSibomPlanShorts()).hasSize(5);
         assertThat(brief.getSibomPlanReels()).isNull();
         assertThat(brief.getMaxDurationSec()).isEqualTo(45);
         verify(videoVariantService).generate(
             any(), any(), any(), any(), eq(false), eq(true), eq(List.of("waiting-reply", "drained")));
+    }
+
+    @Test
+    void createJob_videoWithEmptySibomPlan_persistsFailureAndDoesNotCallAsm() throws JsonProcessingException {
+        Post post = Post.builder().id(TEST_POST_ID).title("video").bodyPublished("body").build();
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(TEST_POST_ID, "instagram_reels")).thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        stubSaveAssignsId(77L);
+        doReturn("{\"reels_guarded_plan_count\":0}").when(objectMapper).writeValueAsString(any());
+        when(videoVariantService.generate(any(), any(), any(), any(), eq(true), eq(false), any()))
+            .thenReturn(new VideoVariantService.Variants("h", "s", 30, null, null, null, List.of(), List.of()));
+
+        MarketingJob result = marketingJobService.createJob(
+            TEST_POST_ID, List.of("instagram_reels"), true, "system");
+
+        assertThat(result.getStatus()).isEqualTo("FAILED");
+        assertThat(result.getFailureCode()).isEqualTo("SIBOM_PLAN_EMPTY");
+        assertThat(result.getGenerationDiagnostics()).contains("reels_guarded_plan_count");
+        verify(asmClient, never()).createJob(any(CreateJobRequest.class), anyString());
+    }
+
+    private static SibomPlanItem plan(String imageId) {
+        return new SibomPlanItem("punch", imageId, "", 0, "small", "punch");
     }
 
     @Test
@@ -691,6 +713,31 @@ class MarketingJobServiceTest {
     }
 
     @Test
+    void applyPoll_preservesStructuredRendererFailureContract() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(1L).remoteJobId(TEST_JOB_ID).postId(TEST_POST_ID).status("RUNNING").build();
+        AsmJobView view = AsmJobView.builder()
+            .status("FAILED")
+            .failureCode("DURATION_RENDER_EXCEEDED")
+            .failureStage("RENDER")
+            .retryable(true)
+            .errorSummary("최종 렌더 길이가 플랫폼 상한을 초과했습니다.")
+            .diagnostics(Map.of("final_duration_ms", 48100))
+            .actualDurationMs(48100L)
+            .build();
+        doReturn("{}").when(objectMapper).writeValueAsString(any());
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        marketingJobService.applyPoll(job, view);
+
+        assertThat(job.getFailureCode()).isEqualTo("DURATION_RENDER_EXCEEDED");
+        assertThat(job.getFailureStage()).isEqualTo("RENDER");
+        assertThat(job.getRetryable()).isTrue();
+        assertThat(job.getErrorSummary()).contains("플랫폼 상한");
+        assertThat(job.getActualDurationMs()).isEqualTo(48100L);
+    }
+
+    @Test
     void applyPoll_toFailed_alertsOnceWithPublicationError() throws JsonProcessingException {
         MarketingJob job = MarketingJob.builder()
             .id(777L)
@@ -819,6 +866,42 @@ class MarketingJobServiceTest {
 
         verify(marketingJobRepository).findByRemoteJobId(TEST_JOB_ID);
         verify(marketingJobRepository).save(job);
+    }
+
+    @Test
+    void applyCallback_publishedPairedShorts_alertsPartnerCommentAndManualPin() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(2L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("PUBLISHING")
+            .build();
+        Map<String, Object> partnerComment = new java.util.LinkedHashMap<>();
+        partnerComment.put("state", "PUBLISHED");
+        partnerComment.put("comment_id", "Ugxyz");
+        partnerComment.put("url", "https://www.youtube.com/watch?v=video123&lc=Ugxyz");
+        Map<String, Object> publication = new java.util.LinkedHashMap<>();
+        publication.put("platform", "youtube_shorts");
+        publication.put("state", "PUBLISHED");
+        publication.put("url", "https://www.youtube.com/shorts/video123");
+        publication.put("partner_comment", partnerComment);
+        JobCallbackPayload payload = JobCallbackPayload.builder()
+            .jobId(TEST_JOB_ID)
+            .status("PUBLISHED")
+            .publications(List.of(publication))
+            .build();
+
+        when(marketingJobRepository.findByRemoteJobId(TEST_JOB_ID)).thenReturn(Optional.of(job));
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+
+        marketingJobService.applyCallback(payload);
+
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(telegramNotifier).send(message.capture());
+        assertThat(message.getValue())
+            .contains("상대방 사연 댓글: https://www.youtube.com/watch?v=video123&lc=Ugxyz")
+            .contains("YouTube Studio에서 댓글 고정 필요");
     }
 
     // ── Test 6: applyCallback_unknownJobId_noOp ────────────────────────────
