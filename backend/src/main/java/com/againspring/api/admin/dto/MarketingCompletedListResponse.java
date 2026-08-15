@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -46,6 +47,7 @@ public class MarketingCompletedListResponse {
         private String committedFormat;
 
         private Double scoreSnapshot;
+        private Map<String, Integer> platformRankSnapshot;
         private Instant lockedAt;
         private Instant createdAt;
         private Instant updatedAt;
@@ -59,6 +61,7 @@ public class MarketingCompletedListResponse {
                 .pinFormat(c.pinFormat())
                 .committedFormat(c.committedFormat())
                 .scoreSnapshot(c.scoreSnapshot())
+                .platformRankSnapshot(c.platformRankSnapshot())
                 .lockedAt(c.lockedAt())
                 .createdAt(c.createdAt())
                 .updatedAt(c.updatedAt())

@@ -93,6 +93,7 @@ public class MarketingHoldingService {
         String pinFormat,
         Double scoreSnapshot,
         Integer rankSnapshot,
+        Map<String, Integer> platformRankSnapshot,
         String projectedFormat,
         Instant postCreatedAt,
         Instant lockedAt,
@@ -598,6 +599,7 @@ public class MarketingHoldingService {
             holding.getPinFormat() != null ? holding.getPinFormat().name() : null,
             holding.getScoreSnapshot(),
             holding.getRankSnapshot(),
+            parsePlatformRanks(holding.getPlatformRankSnapshot()),
             projectedFormat,
             postCreatedAt,
             holding.getLockedAt(),
@@ -612,6 +614,17 @@ public class MarketingHoldingService {
             return objectMapper.writeValueAsString(brief);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize holding draft", e);
+        }
+    }
+
+    private Map<String, Integer> parsePlatformRanks(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (Exception e) {
+            return Map.of();
         }
     }
 

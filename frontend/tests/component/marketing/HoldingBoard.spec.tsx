@@ -11,6 +11,7 @@ function buildRow(overrides: Partial<MarketingHoldingRow> = {}): MarketingHoldin
     pinFormat: null,
     scoreSnapshot: 12.3,
     rankSnapshot: 1,
+    platformRankSnapshot: {},
     viewCount: 10,
     commentCount: 2,
     voteCount: 5,

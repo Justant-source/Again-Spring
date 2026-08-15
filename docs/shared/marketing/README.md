@@ -154,7 +154,7 @@ remote job ID를 계속 조회하며, 나중에 `READY`가 되었고 예약 시�
 |---|---|
 | BE 얇은 클라이언트 | `backend/.../marketing/AsmClient.java` |
 | BE 홀딩·확정 | `backend/.../marketing/holding/MarketingHoldingService.java` · `MarketingHoldingCommitService.java` |
-| BE 플랫폼 auto / 점수 / 상한 / 저녁 슬롯 | `MarketingPlatformAutoService` · `MarketingScoreWeightService` · `MarketingQuotaService` · `MarketingPublishSlotService` |
+| BE 플랫폼 auto / 점수 / 상한 / 자동 즉시발행 | `MarketingPlatformAutoService` · `MarketingScoreWeightService` · `MarketingQuotaService` · `MarketingJobService` |
 | BE 잡·폴링 | `MarketingJobService.java` · `MarketingPollingScheduler.java` |
 | BE Admin API | `AdminMarketingController` · `AdminMarketingHoldingController` · `AdminMarketingCompletedController` · `AdminMarketingPlatformController` |
 | FE 마케팅 허브 | `frontend/app/(admin)/admin/marketing/page.tsx` (탭: 대기/완료/설정) |

@@ -79,9 +79,6 @@ class MarketingJobServiceTest {
     UserRepository userRepository;
 
     @Mock
-    MarketingPublishSlotService publishSlotService;
-
-    @Mock
     VideoVariantService videoVariantService;
 
     @Mock
@@ -165,7 +162,7 @@ class MarketingJobServiceTest {
     }
 
     @Test
-    void createJob_autoPublish_setsEveningSlotAndDefersAsmAutoPublish() throws JsonProcessingException {
+    void createJob_autoPublish_passesThroughToAsmWithoutLocalSlot() throws JsonProcessingException {
         Post post = Post.builder()
             .id(TEST_POST_ID)
             .title("Evening slot")
@@ -182,10 +179,6 @@ class MarketingJobServiceTest {
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
         doReturn("[]").when(objectMapper).writeValueAsString(any());
 
-        Instant slot = Instant.parse("2026-08-11T12:30:00Z"); // 21:30 KST
-        when(publishSlotService.nextSlotForTargets(eq(List.of("x_thread")), any(Instant.class)))
-            .thenReturn(Optional.of(slot));
-
         when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
             .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
         stubSaveAssignsId(10L);
@@ -194,12 +187,12 @@ class MarketingJobServiceTest {
             TEST_POST_ID, List.of("x_thread"), true, "system:holding-commit-trigger");
 
         assertThat(result.getAutoPublish()).isTrue();
-        assertThat(result.getScheduledPublishAt()).isEqualTo(slot);
-        assertThat(result.getOriginalScheduledAt()).isEqualTo(slot);
+        assertThat(result.getScheduledPublishAt()).isNull();
+        assertThat(result.getOriginalScheduledAt()).isNull();
 
         ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
         verify(asmClient).createJob(captor.capture(), any(String.class));
-        assertThat(captor.getValue().getOptions().isAutoPublish()).isFalse();
+        assertThat(captor.getValue().getOptions().isAutoPublish()).isTrue();
     }
 
     @Test

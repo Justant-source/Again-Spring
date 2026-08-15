@@ -100,12 +100,9 @@ MarketingJobService.triggerPublish(id)
 ```
 MarketingPollingScheduler (15초마다)
     │
-    ├─ 저녁 슬롯 도래: READY && autoPublish && scheduledPublishAt <= NOW()
-    │  → triggerPublish() (ASM에 생성 시 auto_publish=false로 보냈던 잡)
-    │
     ├─ ASM poll / applyPoll (상태·아티팩트 동기화)
     │
-    └─ 생성 중 슬롯 경과 이월 (poll **이후**에 실행 — 순서 고정)
+    └─ 명시적 수동 예약만: 생성 중 예약 시각 경과 이월 (poll **이후**에 실행 — 순서 고정)
        조건: autoPublish=true AND scheduledPublishAt < NOW()-5분
              AND status ∈ QUEUED, RUNNING, STALE (READY 제외)
        └─ rescheduleExpiredJob()
@@ -117,7 +114,7 @@ MarketingPollingScheduler (15초마다)
           15초마다 동일 "1회째 이월" 알림이 반복된다. preview(autoPublish=false)는 이월 대상 아님.
 ```
 
-**저녁 슬롯 (Phase 1 유지)**: 커밋/잡 생성 시 `MarketingPublishSlotService`가 KST 다음 발생을 `scheduledPublishAt`에 기록. 기본 `instagram_feed` 20:00 · reels/shorts 20:30 · `x_thread` 21:30. 설정 키 `marketing.publish_slot.*`.
+**자동 발행**: T+24h 자동 선정 잡은 `auto_publish=true`로 ASM에 생성한다. 채널 렌더가 READY가 되면 ASM이 즉시 게시하며, KST 고정 슬롯과 `scheduledPublishAt`은 사용하지 않는다. 예약 이월은 명시적으로 `scheduledPublishAt`이 있는 수동 예약 잡에만 적용한다.
 
 **상태 업데이트**:
 - `scheduledPublishAt`: 새 예약 시각
@@ -133,7 +130,7 @@ MarketingPollingScheduler (15초마다)
 ```
 T+24h MarketingHoldingCommitService
     │
-    ├─ 채널별 score (platforms.md §식) DESC
+    ├─ 채널별 score (platforms.md §식) DESC · 선택 채널 실제 1-based rank를 holding JSON에 기록
     ├─ 채널별 cap (기본 3) 잔여까지 COMMIT
     ├─ 같은 사연 → 멀티 플랫폼 허용
     ├─ IG: score_feed vs score_reels (동점→Reels) 만 배타

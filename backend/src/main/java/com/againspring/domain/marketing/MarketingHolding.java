@@ -43,6 +43,10 @@ public class MarketingHolding {
     @Column(name = "rank_snapshot")
     private Integer rankSnapshot;
 
+    /** Actual 1-based rank for each platform selected at T+24h, serialized as JSON. */
+    @Column(name = "platform_rank_snapshot", columnDefinition = "JSON")
+    private String platformRankSnapshot;
+
     @Column(name = "locked_at")
     private Instant lockedAt;
 

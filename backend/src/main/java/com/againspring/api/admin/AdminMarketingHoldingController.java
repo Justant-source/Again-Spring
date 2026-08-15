@@ -89,6 +89,7 @@ public class AdminMarketingHoldingController {
             .pinFormat(item.pinFormat())
             .scoreSnapshot(item.scoreSnapshot())
             .rankSnapshot(item.rankSnapshot())
+            .platformRankSnapshot(item.platformRankSnapshot())
             .projectedFormat(item.projectedFormat())
             .postCreatedAt(item.postCreatedAt())
             .lockedAt(item.lockedAt())

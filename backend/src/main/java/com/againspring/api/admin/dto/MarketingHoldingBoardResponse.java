@@ -31,6 +31,7 @@ public class MarketingHoldingBoardResponse {
         private String pinFormat;
         private Double scoreSnapshot;
         private Integer rankSnapshot;
+        private Map<String, Integer> platformRankSnapshot;
         private String projectedFormat;
         private Instant postCreatedAt;
         private Instant lockedAt;
@@ -64,6 +65,7 @@ public class MarketingHoldingBoardResponse {
                 .pinFormat(i.pinFormat())
                 .scoreSnapshot(i.scoreSnapshot())
                 .rankSnapshot(i.rankSnapshot())
+                .platformRankSnapshot(i.platformRankSnapshot())
                 .projectedFormat(i.projectedFormat())
                 .postCreatedAt(i.postCreatedAt())
                 .lockedAt(i.lockedAt())

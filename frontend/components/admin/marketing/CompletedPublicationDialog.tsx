@@ -120,6 +120,16 @@ export function CompletedPublicationDialog({
                     : '—'}
                 </p>
               </div>
+              <div>
+                <p className="text-xs text-gray-500">채널별 순위</p>
+                <p className="font-mono text-sm">
+                  {Object.entries(item.platformRankSnapshot ?? {}).length > 0
+                    ? Object.entries(item.platformRankSnapshot ?? {})
+                        .map(([platform, rank]) => `${platform} #${rank}`)
+                        .join(' · ')
+                    : '—'}
+                </p>
+              </div>
             </div>
 
             <div className="space-y-3" data-testid="completed-publication-jobs">

@@ -138,6 +138,7 @@ public class MarketingHoldingCommitService {
         String pinFormat,
         String committedFormat,
         Double scoreSnapshot,
+        Map<String, Integer> platformRankSnapshot,
         Instant lockedAt,
         Instant createdAt,
         Instant updatedAt,
@@ -298,6 +299,7 @@ public class MarketingHoldingCommitService {
         Map<String, List<String>> autoByPlatform =
             MarketingPlatformSelector.selectAutos(autoCandidates, remaining);
         Map<String, List<String>> autoByPost = MarketingPlatformSelector.invertSelections(autoByPlatform);
+        Map<String, Map<String, Integer>> platformRanks = platformRanks(autoCandidates);
 
         int autoCommitted = 0;
         for (Map.Entry<String, List<String>> e : autoByPost.entrySet()) {
@@ -311,7 +313,8 @@ public class MarketingHoldingCommitService {
             for (String platform : platforms) {
                 selectedCounts.merge(platform, 1, Integer::sum);
             }
-            if (commitHolding(postId, platforms, REQUESTED_BY_SCHEDULER)) {
+            if (commitHolding(postId, platforms, REQUESTED_BY_SCHEDULER,
+                    selectedPlatformRanks(platformRanks.get(postId), platforms))) {
                 autoCommitted++;
                 handled.add(postId);
             } else {
@@ -452,6 +455,7 @@ public class MarketingHoldingCommitService {
                 h.getPinFormat() != null ? h.getPinFormat().name() : null,
                 resolveCommittedFormat(h, holdingJobs),
                 h.getScoreSnapshot(),
+                parsePlatformRanks(h.getPlatformRankSnapshot()),
                 h.getLockedAt(),
                 h.getCreatedAt(),
                 h.getUpdatedAt(),
@@ -528,6 +532,12 @@ public class MarketingHoldingCommitService {
     }
 
     private boolean commitHolding(String postId, List<String> targets, String requestedBy) {
+        return commitHolding(postId, targets, requestedBy, Map.of());
+    }
+
+    private boolean commitHolding(
+            String postId, List<String> targets, String requestedBy,
+            Map<String, Integer> platformRanks) {
         MarketingHolding holding = holdingRepository.findById(postId).orElse(null);
         if (holding == null) {
             log.warn("Commit skipped — holding missing for {}", postId);
@@ -550,8 +560,11 @@ public class MarketingHoldingCommitService {
         }
 
         lockCommitted(holding);
+        if (platformRanks != null && !platformRanks.isEmpty()) {
+            holding.setPlatformRankSnapshot(serializePlatformRanks(platformRanks));
+        }
         holdingRepository.save(holding);
-        log.info("COMMITTED holding {} targets={}", postId, targets);
+        log.info("COMMITTED holding {} targets={} platformRanks={}", postId, targets, platformRanks);
         return true;
     }
 
@@ -665,6 +678,60 @@ public class MarketingHoldingCommitService {
         return Comparator
             .comparingDouble(ScoredDue::score).reversed()
             .thenComparing(ScoredDue::postCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+    }
+
+    /** Rank every auto candidate independently for each platform, before cap/IG backfill. */
+    private static Map<String, Map<String, Integer>> platformRanks(
+            List<MarketingPlatformSelector.Candidate> candidates) {
+        Map<String, Map<String, Integer>> ranks = new HashMap<>();
+        for (String platform : MarketingPopularityScorer.RANKED_PLATFORMS) {
+            List<MarketingPlatformSelector.Candidate> ranked = new ArrayList<>(candidates);
+            ranked.sort(Comparator
+                .comparingDouble((MarketingPlatformSelector.Candidate c) -> c.scoreOf(platform)).reversed()
+                .thenComparing(MarketingPlatformSelector.Candidate::createdAt,
+                    Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(MarketingPlatformSelector.Candidate::postId));
+            for (int i = 0; i < ranked.size(); i++) {
+                ranks.computeIfAbsent(ranked.get(i).postId(), ignored -> new LinkedHashMap<>())
+                    .put(platform, i + 1);
+            }
+        }
+        return ranks;
+    }
+
+    private static Map<String, Integer> selectedPlatformRanks(
+            Map<String, Integer> ranks, List<String> targets) {
+        if (ranks == null || targets == null || targets.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Integer> selected = new LinkedHashMap<>();
+        for (String platform : targets) {
+            Integer rank = ranks.get(platform);
+            if (rank != null) {
+                selected.put(platform, rank);
+            }
+        }
+        return Map.copyOf(selected);
+    }
+
+    private String serializePlatformRanks(Map<String, Integer> ranks) {
+        try {
+            return objectMapper.writeValueAsString(ranks);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to serialize marketing platform ranks", e);
+        }
+    }
+
+    private Map<String, Integer> parsePlatformRanks(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (Exception e) {
+            log.warn("Ignoring invalid platform rank snapshot: {}", e.getMessage());
+            return Map.of();
+        }
     }
 
     private static MarketingPinFormat parsePinFormat(String raw) {

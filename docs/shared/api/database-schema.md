@@ -412,6 +412,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | `draft_json` | JSON NULL | BriefDto형 마케팅 초안 |
 | `score_snapshot` | DOUBLE NULL | 마지막 가중 점수 |
 | `rank_snapshot` | INT NULL | 마지막 투영 순위 |
+| `platform_rank_snapshot` | JSON NULL | T+24h 자동 선정 때 실제 선택된 플랫폼별 1-based 순위 (`{"youtube_shorts":1}`); 핀/강제 확정은 빈 값 |
 | `locked_at` | TIMESTAMP(3) NULL | COMMITTED 시 잠금 (이후 draft 읽기 전용) |
 | `created_at` / `updated_at` | TIMESTAMP(3) | |
 
@@ -476,6 +477,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V110** | `marketing_publication_stats` — 발행 후 플랫폼 통계 스냅샷(`job_id`,`post_id`,`platform`,`metrics_json`,partial). SSOT=AS; 수집기는 ASM. `system_setting` `marketing.score.auto_adjust` 기본 `false` |
 | **V111** | `marketing_stats_event` — 통계 탭 append-only 이벤트(`event_type`,`platform`,`payload_json`,`created_at`). 타입: `COLLECT_*` · `PROPOSE` · `APPLY` · `SHADOW_TOGGLE` |
 | **V112** | `posts.sibom_candidates` JSON — 시봄이 이미지 id 숏리스트(≤12). 본문 keyword 스코어(코드). soft-fill 미저장 |
+| **V114** | `marketing_holding.platform_rank_snapshot` JSON — T+24h 자동 선정의 실제 플랫폼별 순위 잠금 |
 
 ### `marketing_stats_event` (**V111**)
 

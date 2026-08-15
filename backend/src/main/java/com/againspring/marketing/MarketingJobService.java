@@ -36,7 +36,6 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -59,18 +58,15 @@ public class MarketingJobService {
     private final CommentService commentService;
     private final VoteOptionRepository voteOptionRepository;
     private final UserRepository userRepository;
-    private final MarketingPublishSlotService publishSlotService;
     private final VideoVariantService videoVariantService;
     private final TelegramNotifier telegramNotifier;
 
     /**
      * Create a new marketing job for a post.
      *
-     * <p>When {@code autoPublish} is true and targets have a KST evening slot
-     * ({@link MarketingPublishSlotService}), sets {@code scheduledPublishAt} to the next
-     * occurrence and sends {@code auto_publish=false} to ASM so generation stops at READY;
-     * {@link MarketingPollingScheduler} triggers publish when the slot arrives.
-     * Holding COMMIT ≠ social publish (commit selects; slot schedules).
+     * <p>Automatic jobs are sent to ASM with {@code auto_publish=true}.  Once a story has
+     * passed its 24-hour ranking window and is selected for a platform, it must publish as
+     * soon as that platform's render is READY; there is no local time-slot deferment.
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
         if (!asmProperties.isEnabled()) {
@@ -208,18 +204,6 @@ public class MarketingJobService {
             storyTitle = post.getUserTitle();
         }
 
-        // Evening slot: COMMIT/create may be any time of day; social publish waits for KST slot.
-        Instant scheduledPublishAt = null;
-        boolean asmAutoPublish = autoPublish;
-        if (autoPublish) {
-            Optional<Instant> slot = publishSlotService.nextSlotForTargets(targets, Instant.now());
-            if (slot.isPresent()) {
-                scheduledPublishAt = slot.get();
-                // Defer ASM auto-publish until AS triggers at scheduledPublishAt.
-                asmAutoPublish = false;
-            }
-        }
-
         // Persist first so utm_campaign / post_url can use local job id (story_{id}).
         String idempotencyKey = UUID.randomUUID().toString();
         MarketingJob.MarketingJobBuilder pendingBuilder = MarketingJob.builder()
@@ -229,10 +213,6 @@ public class MarketingJobService {
             .requestedBy(requestedBy)
             .targets(serializeJson(targets))
             .idempotencyKey(idempotencyKey);
-        if (scheduledPublishAt != null) {
-            pendingBuilder.scheduledPublishAt(scheduledPublishAt)
-                .originalScheduledAt(scheduledPublishAt);
-        }
         MarketingJob savedJob = marketingJobRepository.save(pendingBuilder.build());
 
         String campaign = MarketingUtmUrls.campaignForJob(savedJob.getId());
@@ -338,7 +318,7 @@ public class MarketingJobService {
         OptionsDto options = OptionsDto.builder()
             .voiceId("default")
             .tone("warm")
-            .autoPublish(asmAutoPublish)
+            .autoPublish(autoPublish)
             .utmCampaign(campaign)
             .postUrls(postUrls.isEmpty() ? null : postUrls)
             // The AS variants are already final channel scripts.  Preserve the

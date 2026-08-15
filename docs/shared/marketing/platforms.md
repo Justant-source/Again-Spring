@@ -63,28 +63,21 @@ API: `GET`/`PUT /api/admin/marketing/score-weights` — 응답 `platforms` 맵.
 | 단계 | 동작 |
 |---|---|
 | 핀(PINNED) | soft-reserve 우선 COMMITTED. 잔여 부족 시 **가능한 플랫폼만** 커밋 · 전부 없으면 PINNED 유지 |
-| 자동 | 플랫폼별 점수 DESC → 각 플랫폼 잔여 cap까지 독립 선정. **같은 사연 멀티 플랫폼 허용** |
+| 자동 | 플랫폼별 점수 DESC → 각 플랫폼 잔여 cap까지 독립 선정. **같은 사연 멀티 플랫폼 허용**. 확정된 채널의 실제 1-based 순위는 `platform_rank_snapshot`에 JSON으로 잠금 |
 | IG 배타 | 같은 날 `instagram_feed` ∩ `instagram_reels` 금지. `score_feed` vs `score_reels`, 동점 → Reels. 탈락 슬롯은 다음 순위 backfill |
 | 잡 | **플랫폼당 1잡** (Reels ≠ Shorts — 듀얼 mp4 폐기 준비) |
 | 그 외 | T+24h 도달·미선정 → DROPPED. COMMITTED 시 초안 `locked_at` |
 
-### 커밋 ≠ 실발행 (Phase 1 계약 유지)
+### 커밋 후 즉시 발행
 
-T+24h 커밋 = **선정·잡 생성**만. SNS 노출은 KST **저녁 슬롯** (`MarketingPublishSlotService`).  
-잡 생성 시 `scheduledPublishAt` = 해당 플랫폼 슬롯의 **다음 발생** (Asia/Seoul; 오늘 슬롯이 지났으면 내일). ASM에는 `auto_publish=false`로 보내 READY 대기 → `MarketingPollingScheduler`가 슬롯 시각에 `triggerPublish`.
+T+24h 커밋은 채널별 상위 사연을 선정하고 잡을 생성한다. 잡은 ASM에 `auto_publish=true`로 전달되며, 각 채널의 렌더가 READY가 되는 즉시 발행된다. Again-Spring에는 저녁 고정 슬롯이나 `scheduledPublishAt` 대기가 없다.
 
 | 단계 | 의미 |
 |---|---|
-| **커밋 (T+24h)** | 홀딩 선정 → `COMMITTED` · 잡 enqueue · 아티팩트 빌드. **이 시각 ≠ SNS 노출** |
-| **실발행** | KST 저녁 슬롯에 ASM publish |
+| **커밋 (T+24h)** | 홀딩 선정 → `COMMITTED` · 채널별 실제 순위 잠금 · 잡 enqueue · 아티팩트 빌드 |
+| **실발행** | 채널 렌더 READY 즉시 ASM이 발행 |
 
-| 채널 | 기본 슬롯 (KST) |
-|---|---|
-| `instagram_feed` | 20:00 |
-| `instagram_reels` · `youtube_shorts` | 20:30 |
-| `x_thread` | 21:30 |
-
-설정: `system_setting` `marketing.publish_slot.{platform}=HH:mm` · API `GET`/`PUT /api/admin/marketing/publish-slots`. 댓글 노티 창 기본 24h: `marketing.comment_notify_hours`.
+`scheduledPublishAt`은 관리자 수동 예약 등 명시적 예약에만 사용한다. 자동 선정에는 적용하지 않는다. 댓글 노티 창 기본 24h: `marketing.comment_notify_hours`.
 
 | 포맷 | 타겟 (`resolveTargets` — force/수동) |
 |---|---|

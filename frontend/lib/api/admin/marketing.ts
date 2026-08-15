@@ -1096,6 +1096,8 @@ export interface MarketingHoldingRow {
   scoreSnapshot: number;
   /** 1-based projected rank on the board (null if unranked). */
   rankSnapshot: number | null;
+  /** Actual 1-based rank per platform at automatic T+24h selection. */
+  platformRankSnapshot: Record<string, number>;
   viewCount: number;
   commentCount: number;
   voteCount: number;
@@ -1193,6 +1195,7 @@ function normalizeHoldingRow(raw: MarketingHoldingRowRaw): MarketingHoldingRow {
     pinFormat: (raw.pinFormat as MarketingPinFormat | null) ?? null,
     scoreSnapshot: Number(raw.scoreSnapshot ?? 0),
     rankSnapshot: raw.rankSnapshot ?? null,
+    platformRankSnapshot: raw.platformRankSnapshot ?? {},
     viewCount: Number(raw.viewCount ?? 0),
     commentCount: Number(raw.commentCount ?? 0),
     voteCount: Number(raw.voteCount ?? 0),
@@ -1313,6 +1316,8 @@ export interface MarketingCompletedItem {
   status: MarketingHoldingStatus;
   pinFormat: MarketingPinFormat | null;
   scoreSnapshot: number | null;
+  /** Actual 1-based rank per selected platform; empty for manual/pinned commits. */
+  platformRankSnapshot?: Record<string, number>;
   lockedAt: string | null;
   createdAt: string;
   updatedAt: string;

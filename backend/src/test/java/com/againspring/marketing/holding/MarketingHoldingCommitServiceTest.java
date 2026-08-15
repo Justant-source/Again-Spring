@@ -129,6 +129,8 @@ class MarketingHoldingCommitServiceTest {
         // IG exclusivity: tie-ish / reels preferred when both would win — feed goes to other or skipped
         verify(marketingJobService, never()).createJob(
             eq("hot"), eq(List.of("instagram_feed")), anyBoolean(), anyString());
+        assertThat(holdings.get("hot").getPlatformRankSnapshot())
+            .contains("instagram_reels", "youtube_shorts", "x_thread");
     }
 
     @Test
