@@ -97,6 +97,10 @@ class AiPostBundleServiceTest {
             m.put(SourceReservationSupport.RESERVATION_KEY, key);
             return m;
         });
+        // 2026-08-16 shortform-content-quality fix: proofread gate defaults to a no-op echo
+        // (identical text trivially satisfies ProofreadQualityGate's line-count/length checks)
+        // so existing success-path tests don't need to know about this new call.
+        when(llmClient.proofreadPost(anyString(), anyString())).thenAnswer(inv -> Optional.of(inv.getArgument(0)));
         service = new AiPostBundleService(
                 configRepository, properties, personaRepository, llmClient, backendBot,
                 safetyGuard, planService, planGenerationService, scheduledPostRepository,
@@ -181,6 +185,71 @@ class AiPostBundleServiceTest {
         assertThat(held.get().getCandidatesJson()).contains("99");
         assertThat(held.get().getCandidatesJson()).contains("reservationKey");
         assertThat(held.get().getCandidatesJson()).contains(held.get().getId());
+    }
+
+    /** Shared minimal fixture for the 2026-08-16 proofread-gate tests below. */
+    private void stubMinimalSuccessfulBundle(Persona author, Persona other, PlanSourceStoryResolver.ResolvedSource source) {
+        AiUserGenerationConfig cfg = config("CLAUDE", 16);
+        when(configRepository.findById(1)).thenReturn(Optional.of(cfg));
+        when(personaRepository.findByActiveTrue()).thenReturn(List.of(author, other));
+        Map<String, Object> authorMap = Map.of("personaId", author.getId(), "nickname", "밤하늘여행",
+                "formality", "polite", "voiceProfile", Map.of("formality", "polite"));
+        Map<String, Object> otherMap = Map.of("personaId", other.getId(), "nickname", "커피중독",
+                "formality", "casual", "voiceProfile", Map.of("formality", "casual"));
+        when(planPersonaMapper.mapCast(any())).thenReturn(List.of(authorMap, otherMap));
+        when(planPersonaMapper.castIds(any())).thenReturn(Set.of(author.getId(), other.getId()));
+        when(planPersonaMapper.mapAuthor(author)).thenReturn(authorMap);
+        when(sourceStoryResolver.claimAndResolve(eq(author), eq("natepan"), anyString(), any(Instant.class), eq("FAMILY")))
+                .thenReturn(Optional.of(source));
+        Map<String, Object> llmResponse = new LinkedHashMap<>();
+        llmResponse.put("post", Map.of("title", "시어머니 간섭", "body", "육아 갈등 본문입니다.\n충분히 길게 씁니다."));
+        llmResponse.put("items", List.of(Map.of("ref", "c1", "personaId", other.getId(), "body", "공감 댓글")));
+        when(llmClient.generateThreadPlan(any())).thenReturn(Optional.of(llmResponse));
+        when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+    }
+
+    private PlanSourceStoryResolver.ResolvedSource minimalSource() {
+        return new PlanSourceStoryResolver.ResolvedSource(
+                "시어머니가 육아에 간섭한다",
+                Map.of("exampleId", 99L, "body", "원본 사연", "reconstructMode", true, "sourceUrl", "https://nate.example/1"),
+                true, 99L, "원본 사연 본문", "natepan", "https://nate.example/1", "원제목",
+                "문체앵커", List.of("내가 예전에 쓴 글"));
+    }
+
+    @Test
+    void proofreadCallFailure_releasesReservationAndReturnsEmpty() {
+        when(threadPlan.isMicroBatchEnabled()).thenReturn(false);
+        Persona author = persona("ai-user-1", "polite", null);
+        Persona other = persona("ai-user-2", "casual", null);
+        PlanSourceStoryResolver.ResolvedSource source = minimalSource();
+        stubMinimalSuccessfulBundle(author, other, source);
+        // 2026-08-16: proofread call itself fails (LLM error/refusal/empty) — fail-closed.
+        when(llmClient.proofreadPost(anyString(), anyString())).thenReturn(Optional.empty());
+
+        Optional<AiScheduledPost> held = service.generateAndHold(
+                author, "FAMILY", null, "corr-proofread-fail", Instant.parse("2026-08-01T01:00:00Z"));
+
+        assertThat(held).isEmpty();
+        verify(sourceReservationSupport).release(eq(99L), anyString());
+    }
+
+    @Test
+    void proofreadStructureChanged_releasesReservationAndReturnsEmpty() {
+        when(threadPlan.isMicroBatchEnabled()).thenReturn(false);
+        Persona author = persona("ai-user-1", "polite", null);
+        Persona other = persona("ai-user-2", "casual", null);
+        PlanSourceStoryResolver.ResolvedSource source = minimalSource();
+        stubMinimalSuccessfulBundle(author, other, source);
+        // 2026-08-16: "교정" that merges the two lines into one — quality gate must reject it
+        // rather than let a capture_split_after_lines mismatch reach the published post.
+        when(llmClient.proofreadPost(anyString(), anyString()))
+                .thenReturn(Optional.of("육아 갈등 본문입니다. 충분히 길게 씁니다."));
+
+        Optional<AiScheduledPost> held = service.generateAndHold(
+                author, "FAMILY", null, "corr-proofread-structure", Instant.parse("2026-08-01T01:00:00Z"));
+
+        assertThat(held).isEmpty();
+        verify(sourceReservationSupport).release(eq(99L), anyString());
     }
 
     @Test

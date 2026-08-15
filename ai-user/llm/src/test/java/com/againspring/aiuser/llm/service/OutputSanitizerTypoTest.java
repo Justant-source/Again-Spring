@@ -10,10 +10,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * R9 Track A: injectTypos 결정론적 오타 주입 통계적 불변식 테스트 (D-50).
- * - MAX_POST 불변: 주입 후 길이가 MAX_POST(1000)를 초과하지 않음
+ * 2026-08-16: 오타 주입은 댓글(sanitizeComment)에만 남고 공개 사연(sanitizePost)에서는
+ * 완전히 제거됐다 — 통계적 다양성/fireProb 불변식은 sanitizeComment로 옮기고,
+ * sanitizePost 쪽은 "오타가 절대 섞이지 않는다"는 역방향 불변식으로 대체했다.
+ * - MAX_POST 불변: 결과 길이가 MAX_POST(1000)를 초과하지 않음
  * - 첫 줄 불변: 첫 줄(hook)이 변형되지 않음
- * - 랜덤성: 동일 입력 100회 중 distinct>5 (오타 패턴 다양성)
- * - fireProb 게이트: 일부는 클린(오타 0)임을 확인
+ * - sanitizePost 오타 미주입: typoInject=true인 voice로도 T1/T7/T8 변환 흔적이 전혀 없음
+ * - sanitizeComment 랜덤성: 동일 입력 100회 중 distinct>5 (오타 패턴 다양성)
+ * - sanitizeComment fireProb 게이트: 일부는 클린(오타 0)임을 확인
  * - 단문 보호: len<40이면 무변
  * - UNKNOWN voice 무변: 기존 UNKNOWN voice 테스트 회귀 0
  */
@@ -77,25 +81,39 @@ class OutputSanitizerTypoTest {
     }
 
     @Test
-    void sanitizePost_diverseOutputs_over100Runs() {
-        // 동일 입력 100회 중 distinct>5 (오타 패턴 다양성 보장)
+    void sanitizePost_neverInjectsTypos_evenForTypoEnabledVoice() {
+        // NATEPAN: typoInject=true, chosungInject=true — but sanitizePost must never apply
+        // any of the T1/T7/T8 deterministic typo transforms (2026-08-16). "됐"/"갔"/"왔"/
+        // "봤"/"있었"/"없었"/"했었" in SAMPLE_POST could only become their typo'd forms via
+        // those transforms; they must never appear regardless of how many times this runs.
+        for (int i = 0; i < 100; i++) {
+            String result = sanitizer.sanitizePost(SAMPLE_POST, "NATEPAN");
+            assertFalse(result.contains("됬"), "sanitizePost가 T1 오타 변환을 적용함 (시도=" + i + "): " + result);
+            assertFalse(result.contains("갓어") || result.contains("왓어") || result.contains("봣어"),
+                "sanitizePost가 T7 오타 변환을 적용함 (시도=" + i + "): " + result);
+            assertFalse(result.contains("있엇") || result.contains("없엇") || result.contains("했엇"),
+                "sanitizePost가 T8 오타 변환을 적용함 (시도=" + i + "): " + result);
+        }
+    }
+
+    @Test
+    void sanitizeComment_diverseOutputs_over100Runs() {
+        // 오타 주입은 댓글 경로에만 남는다 — 다양성 불변식은 sanitizeComment로 이전.
         Set<String> distinct = new HashSet<>();
         for (int i = 0; i < 100; i++) {
-            distinct.add(sanitizer.sanitizePost(SAMPLE_POST, "CLIEN"));
+            distinct.add(sanitizer.sanitizeComment(SAMPLE_POST, "CLIEN"));
         }
         assertTrue(distinct.size() > 5,
             "100회 중 distinct 결과가 5 이하 — 오타 주입 다양성 부족: " + distinct.size());
     }
 
     @Test
-    void sanitizePost_someRunsAreClean_fireProbGate() {
+    void sanitizeComment_someRunsAreClean_fireProbGate() {
         // typoProb=0.55 (CLIEN) → 약 45%는 오타 없음 (fireProb 게이트)
-        // 100회 중 최소 10개는 SAMPLE_POST와 오타 없이 동일한 베이스(다른 dist 처리 후)여야 함
-        // 실제로는 sampleProb gate도 있어 applyDist 자체 미적용 건도 있음
         // 단순히: 100회 중 distinct < 100이면 (일부 동일 결과 존재) 게이트 작동 증거
         Set<String> results = new HashSet<>();
         for (int i = 0; i < 100; i++) {
-            results.add(sanitizer.sanitizePost(SAMPLE_POST, "CLIEN"));
+            results.add(sanitizer.sanitizeComment(SAMPLE_POST, "CLIEN"));
         }
         assertTrue(results.size() < 100,
             "100회 전부 달라선 안 됨 — fireProb gate가 일부 동일 결과를 만들어야 함: distinct=" + results.size());

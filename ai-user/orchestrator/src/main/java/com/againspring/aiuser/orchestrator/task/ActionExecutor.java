@@ -19,6 +19,7 @@ import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepo
 import com.againspring.aiuser.orchestrator.repository.PersonaActionLogRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.safety.ProofreadQualityGate;
 import com.againspring.aiuser.orchestrator.service.PersonaHistoryStore;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -526,12 +527,35 @@ public class ActionExecutor {
             }
         }
         // 부수버그: LLM 메타텍스트 제거 (예: "[원문 수정본]", "[수정본]" 등)
-        final String body = cleanLlmMetaText(rawBody);
-        ContentSafetyGuard.GuardResult guard = safetyGuard.check(body, ContentSafetyGuard.ContentType.POST);
-        if (!guard.passed()) {
-            logAction(persona, action, "BLOCKED", corrId, java.util.Map.of("reason", guard.reason(), "usedLlm", true));
+        final String sanitizedBody = cleanLlmMetaText(rawBody);
+        ContentSafetyGuard.GuardResult preGuard = safetyGuard.check(sanitizedBody, ContentSafetyGuard.ContentType.POST);
+        if (!preGuard.passed()) {
+            logAction(persona, action, "BLOCKED", corrId, java.util.Map.of("reason", preGuard.reason(), "usedLlm", true));
             return;
         }
+
+        // 게시 직전 맞춤법 교정 게이트 (2026-08-16 shortform-content-quality fix) — fail-closed:
+        // 교정 호출 실패, 구조/길이 이탈, 교정 후 안전 검사 실패 중 하나라도 걸리면 미게시.
+        java.util.Optional<String> proofreadOpt = llmClient.proofreadPost(sanitizedBody, corrId);
+        if (proofreadOpt.isEmpty()) {
+            logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "proofread_call_failed", "usedLlm", true));
+            return;
+        }
+        String proofread = proofreadOpt.get();
+        ProofreadQualityGate.Result proofreadQuality = ProofreadQualityGate.validate(sanitizedBody, proofread);
+        if (!proofreadQuality.passed()) {
+            logAction(persona, action, "FAILED", corrId,
+                java.util.Map.of("error", proofreadQuality.reason(), "usedLlm", true));
+            return;
+        }
+        ContentSafetyGuard.GuardResult postProofreadGuard =
+            safetyGuard.check(proofread, ContentSafetyGuard.ContentType.POST);
+        if (!postProofreadGuard.passed()) {
+            logAction(persona, action, "BLOCKED", corrId,
+                java.util.Map.of("reason", postProofreadGuard.reason(), "stage", "post_proofread", "usedLlm", true));
+            return;
+        }
+        final String body = proofread;
         String title = extractTitle(body);
         CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
             .userTitle(title)
@@ -581,14 +605,17 @@ public class ActionExecutor {
 
     // ── Voice Profile Blocks (Phase 1b) ──────────────────────────────────────
 
-    /** 글 생성용 voice 블록: general_style + example_post_openers + writing_quirks + lexicon + age/political notes */
+    /** 글 생성용 voice 블록: general_style + example_post_openers + writing_quirks(오타 패턴 제외) + lexicon + age/political notes */
     private String voiceBlockForPost(Persona persona) {
         Map<String, Object> vp = persona.getVoiceProfile();
         if (vp == null) return "일반 커뮤니티 사용자";
         StringBuilder sb = new StringBuilder();
         appendStr(sb, vp, "general_style");
         appendExamples(sb, vp, "example_post_openers", "글 시작 예시", 2);
-        appendWritingQuirks(sb, vp);
+        // 공개 사연 원문은 의도적 오타 재현 지시 대상에서 제외 (consistent_errors/mobile_typos) —
+        // 구어체·문체 패턴(features)은 유지한다. 댓글/대댓글은 기존과 동일하게 포함.
+        // (2026-08-16 shortform-content-quality fix)
+        appendWritingQuirks(sb, vp, false);
         appendLexicon(sb, vp);
         appendStr(sb, vp, "age_voice_notes", "\n[연령 말투] ");
         appendStr(sb, vp, "political_voice_notes", "\n[성향 표현] ");
@@ -658,7 +685,7 @@ public class ActionExecutor {
         StringBuilder sb = new StringBuilder();
         appendStr(sb, vp, "general_style");
         appendExamples(sb, vp, "example_comments", "댓글 예시", 3);
-        appendWritingQuirks(sb, vp);
+        appendWritingQuirks(sb, vp, true);
         appendLexicon(sb, vp);
         appendHotButtons(sb, vp);
         // Reactions: pick by stance
@@ -690,7 +717,7 @@ public class ActionExecutor {
         StringBuilder sb = new StringBuilder();
         appendStr(sb, vp, "general_style");
         appendExamples(sb, vp, "example_replies", "대댓글 예시", 2);
-        appendWritingQuirks(sb, vp);
+        appendWritingQuirks(sb, vp, true);
         appendLexicon(sb, vp);
         appendHotButtons(sb, vp);
         // Add all reactions as reference
@@ -733,10 +760,12 @@ public class ActionExecutor {
 
     /**
      * writing_quirks 맞춤법/오탈자 패턴 + 문체 패턴(TSD)을 프롬프트에 주입.
-     * features(TSD 문체 제약), consistent_errors(고정 오류), mobile_typos 순으로 출력.
+     * features(TSD 문체 제약)는 항상 출력. consistent_errors(고정 오류)·mobile_typos는
+     * {@code includeTypoPatterns=true}일 때만 출력 — 공개 사연(글)은 의도적 오타 재현
+     * 지시 대상에서 제외한다 (댓글/대댓글은 계속 포함). 2026-08-16 shortform-content-quality fix.
      */
     @SuppressWarnings("unchecked")
-    private void appendWritingQuirks(StringBuilder sb, Map<String, Object> vp) {
+    private void appendWritingQuirks(StringBuilder sb, Map<String, Object> vp, boolean includeTypoPatterns) {
         Object quirksObj = vp.get("writing_quirks");
         if (!(quirksObj instanceof Map)) return;
         Map<String, Object> quirks = (Map<String, Object>) quirksObj;
@@ -750,6 +779,8 @@ public class ActionExecutor {
                 sb.append("\n[문체 패턴] ").append(featureStr);
             }
         }
+
+        if (!includeTypoPatterns) return;
 
         sb.append("\n[맞춤법·오타 패턴] ");
         boolean addedAny = false;

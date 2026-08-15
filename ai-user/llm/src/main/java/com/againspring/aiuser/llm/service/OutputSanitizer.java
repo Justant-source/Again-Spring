@@ -190,8 +190,10 @@ public class OutputSanitizer {
 
     public String sanitizePost(String raw, String voiceType) {
         String base = sanitize(raw, MAX_POST);
-        String result = applyDist(base, voiceType, true);
-        // T6 등 injectTypos가 수 글자 추가할 수 있으므로 MAX_POST 재보장
+        // 공개 사연 원문은 결정론적 오타 주입 대상에서 제외 — 오타는 게시 전 별도
+        // 교정 단계(StoryProofreader)로만 걸러진다. 구어체/초성체/쉼표 밀도 등
+        // 문체 특성은 유지한다 (2026-08-16 shortform-content-quality fix).
+        String result = applyDist(base, voiceType, true, false);
         if (result.length() > MAX_POST) result = result.substring(0, MAX_POST).stripTrailing();
         return result;
     }
@@ -200,12 +202,12 @@ public class OutputSanitizer {
         String base = sanitize(raw, MAX_COMMENT);
         // N6: allowChosung=true — VOICE_DIST.chosungInject 값이 voice별 주입 여부를 결정
         // (이전: false 하드코딩 → DCINSIDE/THEQOO/FMKOREA/ARCALIVE 댓글 초성체 완전 차단)
-        String result = applyDist(base, voiceType, true);
+        String result = applyDist(base, voiceType, true, true);
         if (result.length() > MAX_COMMENT) result = result.substring(0, MAX_COMMENT).stripTrailing();
         return result;
     }
 
-    private String applyDist(String text, String voiceType, boolean allowChosung) {
+    private String applyDist(String text, String voiceType, boolean allowChosung, boolean allowTypoInject) {
         if (voiceType == null || text.isBlank()) return text;
         String normalizedVoice = voiceType.toUpperCase();
         VoiceDistribution dist = VOICE_DIST.get(normalizedVoice);
@@ -217,7 +219,7 @@ public class OutputSanitizer {
                 s = injectChosung(s, dist.chosungPhrases());
             }
             // R9 Track A: 결정론적 오타 주입 (LLM 무시 우회) — chosung 이후 마지막으로 실행
-            if (dist.typoInject()) {
+            if (allowTypoInject && dist.typoInject()) {
                 s = injectTypos(s, dist.typoProb());
             }
         }

@@ -226,6 +226,19 @@ public class LlmAiUserClient {
         }
     }
 
+    /**
+     * 게시 직전 맞춤법 교정 — 의미/구조 보존, 오탈자만 수정 (2026-08-16 shortform-content-quality fix).
+     * persona/voice 컨텍스트 없이 원문만 보낸다. 실패(호출 실패·거절·빈 응답)는 여기서 empty로
+     * 흡수되지 않고 그대로 Optional.empty()로 전달되므로, 호출자가 fail-closed로 처리해야 한다.
+     */
+    public Optional<String> proofreadPost(String body, String correlationId) {
+        Map<String, Object> req = new java.util.HashMap<>();
+        req.put("body", body != null ? body : "");
+        req.put("correlationId", correlationId != null ? correlationId : "proofread-" + System.nanoTime());
+        req.put("timeoutMs", 60000L);
+        return generate("/generate/proofread", req);
+    }
+
     /** 페르소나 voice JSON 생성 */
     public Optional<String> generatePersonaVoice(String prompt) {
         try {

@@ -418,7 +418,7 @@ public class PromptAssembler {
 
     public String assembleCommentPrompt(CommentGenRequest req) {
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), commentGuide, req.getFormality(),
-                req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
+                req.getCorrectionCautions(), req.getGlobalForbidRules(), null, true);
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요, ~더라고요, ~것 같아요)"
             : "- 반말로 작성 (요/습니다 금지)";
@@ -464,7 +464,7 @@ public class PromptAssembler {
 
     public String assembleReplyPrompt(ReplyGenRequest req) {
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), replyGuide, req.getFormality(),
-                req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
+                req.getCorrectionCautions(), req.getGlobalForbidRules(), null, true);
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요 등 자연스럽게)"
             : "- 반말로 작성 (요/습니다 금지)";
@@ -547,6 +547,30 @@ public class PromptAssembler {
         return system + "\n" + SEP + "\n" + user;
     }
 
+    /**
+     * 게시 직전 맞춤법 교정 프롬프트 — 의미·사건·인물관계·문단구조 변경 없이 오탈자만 수정.
+     * persona/voice/category 컨텍스트를 의도적으로 주입하지 않는다 (좁은 목적의 호출).
+     * formatted() 미사용 → 본문의 % 안전 (assemblePostAnalysisPrompt와 동일 이유).
+     * 2026-08-16 shortform-content-quality fix.
+     */
+    public String assembleProofreadPrompt(ProofreadRequest req) {
+        String body = req.getBody() != null ? req.getBody() : "";
+
+        String system = """
+당신은 한국어 맞춤법 교정 전문가입니다. 사용자가 준 글의 맞춤법·오탈자·자모 결합 오류만 고칩니다.
+- 의미, 사건 사실, 인물 관계, 문단 구조를 절대 바꾸지 않습니다.
+- 문장을 추가·삭제·재배열하지 않습니다. 줄바꿈 위치를 그대로 유지합니다.
+- 구어체·슬랭·말투·문장 길이는 그대로 유지합니다 — 표준어나 문어체로 다듬지 않습니다.
+- 설명, 분석, 체크리스트, 따옴표 장식을 절대 출력하지 않습니다.
+- 고칠 부분이 없으면 원문을 그대로 반환합니다.
+- 결과는 JSON 1개만 출력합니다: {"corrected_body":"..."}""";
+
+        StringBuilder user = new StringBuilder();
+        user.append("[원문]\n").append(body).append("\n\n위 글을 교정해 JSON 1개만 출력하세요.");
+
+        return system + "\n" + SEP + "\n" + user;
+    }
+
     /** String.formatted()에 넘기기 전 % 이스케이프 */
     private String safe(String s) {
         return s != null ? s.replace("%", "%%") : "";
@@ -612,8 +636,22 @@ public class PromptAssembler {
         return "polite".equalsIgnoreCase(formality);
     }
 
+    /** 게시글류(post/rewrite/reconstruct/casual/paired-author/partner) 전용 — 오타 재현 지시 제외. */
     private String buildSystem(String voiceProfile, double slangLevel, String guide, String formality,
                                String correctionCautions, String globalForbidRules, String reconstructionRules) {
+        return buildSystem(voiceProfile, slangLevel, guide, formality,
+            correctionCautions, globalForbidRules, reconstructionRules, false);
+    }
+
+    /**
+     * @param includeTypoInstruction consistent_errors/mobile_typos 오타 재현 지시 포함 여부.
+     *        댓글/대댓글은 true, 공개 사연(글) 계열은 false — 오타는 게시 전 별도 교정 단계로만
+     *        걸러진다 (2026-08-16 shortform-content-quality fix). <<<PERSONA_SECTION>>> 마커
+     *        뒤(가변 영역)에서만 분기하므로 캐싱 prefix 불변식은 깨지지 않는다.
+     */
+    private String buildSystem(String voiceProfile, double slangLevel, String guide, String formality,
+                               String correctionCautions, String globalForbidRules, String reconstructionRules,
+                               boolean includeTypoInstruction) {
         boolean polite = isPolite(formality);
         // % 문자가 String.formatted()의 포맷 지시자로 오해받지 않도록 이스케이프
         String safeVoice    = voiceProfile != null ? voiceProfile.replace("%", "%%") : "일반 커뮤니티 사용자";
@@ -699,9 +737,7 @@ public class PromptAssembler {
 ## 말투 규칙 (가장 중요)
 
 %s
-
-**자연스러운 구어체** — 페르소나 특성의 writing_quirks에 consistent_errors가 있으면 그 오류 패턴을 **일관되게** 재현. mobile_typos: true이면 모바일 오탈자(자모분리·인접키) 2~3개 자연스럽게 포함. 맞춤법이 완벽할 필요 없음.
-
+%s
 슬랭 수준 %.1f/1.0 %s
 
 ## 페르소나 특성
@@ -709,6 +745,9 @@ public class PromptAssembler {
 %s%s%s""".formatted(
             safeGuide,
             speechRules,
+            includeTypoInstruction
+                ? "\n**자연스러운 구어체** — 페르소나 특성의 writing_quirks에 consistent_errors가 있으면 그 오류 패턴을 **일관되게** 재현. mobile_typos: true이면 모바일 오탈자(자모분리·인접키) 2~3개 자연스럽게 포함. 맞춤법이 완벽할 필요 없음.\n"
+                : "\n**자연스러운 구어체** — 문장 길이·어미·쉼표 밀도는 자유롭게 다양화하되, 맞춤법과 띄어쓰기는 정확하게 지킬 것. 의도적인 오탈자는 넣지 않음.\n",
             slangLevel,
             slangGuide,
             safeVoice,

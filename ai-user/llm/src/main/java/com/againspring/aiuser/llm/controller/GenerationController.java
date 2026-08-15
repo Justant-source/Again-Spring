@@ -6,6 +6,8 @@ import com.againspring.aiuser.llm.pool.LlmWorkerPool;
 import com.againspring.aiuser.llm.service.OutputSanitizer;
 import com.againspring.aiuser.llm.service.PromptAssembler;
 import com.againspring.aiuser.llm.service.SelfCritiqueService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,7 @@ public class GenerationController {
     private final PromptAssembler promptAssembler;
     private final OutputSanitizer outputSanitizer;
     private final SelfCritiqueService selfCritique;
+    private final ObjectMapper objectMapper;
 
     /** 글(POST) 전용 모델 오버라이드 — 빈 값이면 풀 기본 모델 (문체 현실화 S5: 글만 Sonnet 승격). */
     @org.springframework.beans.factory.annotation.Value("${llm.post-model:}")
@@ -94,6 +97,63 @@ public class GenerationController {
             log.error("Reply generation error: corr={}", corrId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(GenResponse.genError(e.getMessage()));
         }
+    }
+
+    /**
+     * 게시 직전 맞춤법 교정 — 의미/구조 보존, 오탈자만 수정 (2026-08-16 shortform-content-quality fix).
+     * persona/voice 컨텍스트 없음 → OutputSanitizer의 voice-free 오버로드(sanitizePost(raw))로
+     * 메타/마크다운 노이즈만 제거하고, 커뮤니티 오타 주입 등 문체 변형은 재적용하지 않는다.
+     */
+    @PostMapping("/proofread")
+    public ResponseEntity<GenResponse> proofreadPost(@RequestBody ProofreadRequest req) {
+        String corrId = corrId(req.getCorrelationId());
+        long start = System.currentTimeMillis();
+        try {
+            String prompt = promptAssembler.assembleProofreadPrompt(req);
+            long timeoutMs = req.getTimeoutMs() > 0 ? req.getTimeoutMs() : 60000L;
+            String raw = pool.executeSyncTask(prompt, null, timeoutMs, corrId, req.getBackend());
+            String correctedBody = extractCorrectedBody(raw);
+            String text = outputSanitizer.sanitizePost(correctedBody);
+            return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));
+        } catch (LlmCapacityException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(GenResponse.capacity(e.getMessage()));
+        } catch (LlmTimeoutException e) {
+            return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(GenResponse.timeout(corrId));
+        } catch (Exception e) {
+            log.error("Proofread error: corr={}", corrId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(GenResponse.genError(e.getMessage()));
+        }
+    }
+
+    /** PostRewriteService.parseJson과 동일 패턴(코드펜스 우선 제거 → 중괄호 경계 추출). */
+    private String extractCorrectedBody(String raw) throws Exception {
+        String json = raw != null ? raw.trim() : "";
+        if (json.contains("```json")) {
+            int s = json.indexOf("```json") + 7;
+            int e = json.lastIndexOf("```");
+            if (e > s) json = json.substring(s, e).trim();
+        } else if (json.contains("```")) {
+            int s = json.indexOf("```") + 3;
+            int e = json.lastIndexOf("```");
+            if (e > s) {
+                String candidate = json.substring(s, e).trim();
+                if (candidate.startsWith("{")) json = candidate;
+            }
+        }
+        int bs = json.indexOf('{');
+        int be = json.lastIndexOf('}');
+        if (bs < 0 || be <= bs) {
+            throw new IllegalStateException("proofread response does not contain JSON");
+        }
+        JsonNode node = objectMapper.readTree(json.substring(bs, be + 1));
+        String body = node.path("corrected_body").asText(null);
+        if (body == null || body.isBlank()) {
+            body = node.path("correctedBody").asText(null);
+        }
+        if (body == null || body.isBlank()) {
+            throw new IllegalStateException("proofread response missing corrected_body");
+        }
+        return body;
     }
 
     @PostMapping("/persona")

@@ -15,6 +15,7 @@ import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.safety.ProofreadQualityGate;
 import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
 import com.againspring.aiuser.orchestrator.service.match.RankedPersona;
 import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
@@ -307,7 +308,39 @@ public class AiPostBundleService {
                 log.info("AI post bundle stripped {} story-persona comment(s) corr={}", stripped, correlationId);
             }
         });
-        return bundle;
+        return bundle.flatMap(b -> proofreadBundle(b, correlationId));
+    }
+
+    /**
+     * 게시 직전 맞춤법 교정 게이트 (2026-08-16 shortform-content-quality fix) — fail-closed:
+     * 교정 호출 실패, 구조/길이 이탈, 교정 후 안전 검사 실패 중 하나라도 걸리면 이 소스 claim은
+     * 상위 호출자(release)로 흘러가 폐기된다. capture_split_after_lines는 줄 번호 기반이라
+     * ProofreadQualityGate의 줄 수 불변식이 지켜지는 한 그대로 유효 — 재계산 불필요.
+     * {@code bundle.response()}(원시 LLM 응답)는 의도적으로 그대로 둔다 — 감사용 원본 기록.
+     */
+    private Optional<Bundle> proofreadBundle(Bundle bundle, String correlationId) {
+        String original = bundle.content().body();
+        Optional<String> proofreadOpt = llmClient.proofreadPost(original, correlationId);
+        if (proofreadOpt.isEmpty()) {
+            log.warn("AI post bundle proofread call failed corr={}", correlationId);
+            return Optional.empty();
+        }
+        String proofread = proofreadOpt.get();
+        ProofreadQualityGate.Result quality = ProofreadQualityGate.validate(original, proofread);
+        if (!quality.passed()) {
+            log.warn("AI post bundle proofread quality rejected corr={}: {}", correlationId, quality.reason());
+            return Optional.empty();
+        }
+        ContentSafetyGuard.GuardResult guard = safetyGuard.check(proofread, ContentSafetyGuard.ContentType.POST);
+        if (!guard.passed()) {
+            log.warn("AI post bundle proofread output blocked corr={}: {}", correlationId, guard.reason());
+            return Optional.empty();
+        }
+        PostContent c = bundle.content();
+        PostContent updated = new PostContent(c.title(), proofread, c.captureSplitAfterLines(),
+            c.promoTitle(), c.hookEmotion(), c.metaphorId(), c.metaphorIds());
+        return Optional.of(new Bundle(bundle.response(), updated, bundle.provider(), bundle.model(),
+            bundle.castIds(), bundle.source()));
     }
 
     /** Legacy single-call path: full cast in one AI_POST request. */

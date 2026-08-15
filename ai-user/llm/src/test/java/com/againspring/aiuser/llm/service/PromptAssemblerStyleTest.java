@@ -171,4 +171,52 @@ class PromptAssemblerStyleTest {
         assertTrue(user.contains("12~40자"), "제목 글자수");
         assertTrue(user.contains("제목=본문 동일 문자열 금지"));
     }
+
+    // ── 2026-08-16 shortform-content-quality fix: 오타 재현 지시는 댓글/대댓글에만 남는다 ──
+
+    private static final String TYPO_INSTRUCTION_MARKER = "consistent_errors가 있으면";
+
+    @Test
+    void postPromptExcludesTypoInstruction() {
+        PostGenRequest req = PostGenRequest.builder()
+            .personaId("p1").voiceProfile("v").slangLevel(0.3)
+            .category("WORK").archetype("work_credit_steal").formality("casual")
+            .lengthTier("MEDIUM")
+            .build();
+        String prompt = assembler.assemblePostPrompt(req);
+
+        assertFalse(prompt.contains(TYPO_INSTRUCTION_MARKER),
+            "공개 사연(글)은 의도적 오타 재현 지시를 포함하면 안 됨 — 오타는 게시 전 교정 단계로만 걸러짐");
+        assertTrue(prompt.contains("의도적인 오탈자는 넣지 않음"), "글은 오타 비주입 지시로 대체됨");
+    }
+
+    @Test
+    void postRewritePromptExcludesTypoInstruction() {
+        PostRewriteRequest req = PostRewriteRequest.builder()
+            .personaId("p1").voiceProfile("v").slangLevel(0.3).formality("casual")
+            .category("WORK").targetCategory("WORK")
+            .originalTitle("제목").originalBody("본문")
+            .build();
+        String prompt = assembler.assemblePostRewritePrompt(req);
+
+        assertFalse(prompt.contains(TYPO_INSTRUCTION_MARKER), "글 재작성도 오타 재현 지시 제외");
+    }
+
+    @Test
+    void commentPromptStillIncludesTypoInstruction() {
+        String prompt = assembler.assembleCommentPrompt(commentReq());
+
+        assertTrue(prompt.contains(TYPO_INSTRUCTION_MARKER), "댓글은 기존대로 오타 재현 지시 유지");
+    }
+
+    @Test
+    void replyPromptStillIncludesTypoInstruction() {
+        ReplyGenRequest req = ReplyGenRequest.builder()
+            .personaId("p1").voiceProfile("v").slangLevel(0.3)
+            .parentCommentExcerpt("나도 그랬음").stance("AGREE").formality("casual")
+            .build();
+        String prompt = assembler.assembleReplyPrompt(req);
+
+        assertTrue(prompt.contains(TYPO_INSTRUCTION_MARKER), "대댓글은 기존대로 오타 재현 지시 유지");
+    }
 }
