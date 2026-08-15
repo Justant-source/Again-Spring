@@ -124,7 +124,7 @@ rm -f watchdog-state/retry-state.json
 | Claude 세션 | `timeout 30 claude -p 'ping'` (10분 주기) | 사용자 수동 (재로그인) | 3회 후 중단 |
 | 자격증명 소유권 | `stat -c '%U' ~/.claude/.credentials.json` | `chown justant:justant` | 3회 후 중단 |
 | Unhealthy 컨테이너 | `docker ps --filter health=unhealthy` (건강체크 없는 컨테이너는 `.State.Status`) | `docker restart <container>` | 컨테이너당 3회 |
-| WSL 재부팅 | 부팅 시각 비교(`uptime -s`) | 자동 복구 없음, Telegram 통보만 | — |
+| WSL 재부팅 | `/proc/sys/kernel/random/boot_id` 비교(2026-08-16, `uptime -s` 초 단위 흔들림으로 인한 중복 알림 수정) | 자동 복구 없음, Telegram 통보만 | — |
 
 **WSL 워치독(`wsl-ops-watchdog-script.sh`) 감시 컨테이너 목록** (2026-08-15 comfyui 추가):
 `llm-worker`, `again-spring-marketing-asm-1`, `again-spring-marketing-llm-bridge-1`,
@@ -161,7 +161,13 @@ WSL(`100.115.252.61`)의 watchdog은 동일 구조로 별도 배포.
 - 타이머: `~/.config/systemd/user/wsl-ops-watchdog.timer` (5분 간격)
 - 서비스: `~/.config/systemd/user/wsl-ops-watchdog.service`
 - 스크립트: `~/.config/systemd/user/wsl-ops-watchdog-script.sh`
-- 상태 파일: `~/.wsl-watchdog/` (canary 타임스탬프, 재시도 카운터, 부팅 시각, 로그)
+- 상태 파일: `~/.wsl-watchdog/` (canary 타임스탬프, 재시도 카운터, 부팅 식별자, 로그)
+  - `boot.ts`: `{"boot_id": "...", "boot_epoch": ...}` — boot_id는 부팅마다 커널이 새로 발급하는
+    고정값이라 같은 부팅 중 재확인해도 값이 흔들리지 않는다(2026-08-16, 기존 `uptime -s` 초 단위
+    파싱 오차로 인한 중복 재부팅 오탐·중복 알림 수정). 구 형식(숫자 epoch만)은 첫 실행 시 알림 없이
+    신 형식으로 자동 마이그레이션된다.
+  - 재부팅 알림의 중복방지 키는 메시지 본문이 아닌 `wsl-reboot:{boot_id}`로 고정 — 같은 부팅에서는
+    시각 문구가 달라져도 두 번 발송되지 않는다.
 - Telegram: 동일 채널 (`[감지]`/`[조치중]`/`[성공]`/`[실패]` prefix)
 
 **양방향 감시**: 로컬 ↔ WSL 상호 확인 가능 (ssh reverse tunnel 성공 가정).
