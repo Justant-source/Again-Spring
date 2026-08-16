@@ -196,6 +196,7 @@ export default function MarketingJobsPage() {
           <p className="text-sm text-gray-500">
             24h 대기 N-top 보드입니다. 상한·가중치 저장 시 순위가 바로 다시 계산됩니다.
             핀은 상한 안에서 최우선이며, T+24h에 자동 확정됩니다.
+            24시간이 지났는데 아직 확정되지 않은 사연은 맨 위에 「24h 경과 · 확정 재시도」로 남습니다.
           </p>
 
           <HoldingControlsBar onSaved={() => loadHolding(false)} />

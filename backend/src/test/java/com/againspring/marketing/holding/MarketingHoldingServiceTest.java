@@ -9,6 +9,7 @@ import com.againspring.marketing.MarketingScoreWeightService;
 import com.againspring.marketing.dto.CreateJobRequest.BriefDto;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository;
+import com.againspring.repository.marketing.MarketingHoldingRepository.DueHoldingProjection;
 import com.againspring.repository.marketing.MarketingHoldingRepository.HoldingCandidateProjection;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -557,6 +559,81 @@ class MarketingHoldingServiceTest {
         assertThat(byId.get("v2").projectedFormat()).isEqualTo("VIDEO");
         assertThat(byId.get("t1").projectedFormat()).isEqualTo("TEXT");
         assertThat(byId.get("o1").projectedFormat()).isEqualTo("TEXT");
+    }
+
+    @Test
+    void getBoard_prependsOverdueDueHoldings_andDoesNotDemoteThem() {
+        when(quotaService.getStatus()).thenReturn(new MarketingQuotaService.QuotaStatus(
+            6, 3, 0, 0, 2L));
+        when(scoreWeightService.getWeights()).thenReturn(new MarketingScoreWeightService.Weights(
+            0.1, 1.0, 0.5));
+        Instant t0 = Instant.parse("2026-08-08T10:00:00Z");
+        List<HoldingCandidateProjection> candidates = List.of(
+            candidate("p1", 100, 10, 5, t0));
+        when(holdingRepository.findActiveCandidates()).thenReturn(candidates);
+
+        MarketingHolding overdue = MarketingHolding.builder()
+            .postId("old")
+            .status(MarketingHoldingStatus.OUT_OF_CUT)
+            .draftJson("{}")
+            .build();
+        DueHoldingProjection due = new DueHoldingProjection() {
+            @Override public String getPostId() { return "old"; }
+            @Override public String getStatus() { return "OUT_OF_CUT"; }
+            @Override public String getPinFormat() { return null; }
+            @Override public Double getScoreSnapshot() { return null; }
+            @Override public Instant getPostCreatedAt() { return t0.minus(25, ChronoUnit.HOURS); }
+            @Override public Number getViewCount() { return 0; }
+            @Override public Number getCommentCount() { return 0; }
+            @Override public Number getVoteCount() { return 0; }
+            @Override public Number getAuthorVoteCount() { return 0; }
+            @Override public Number getHasPartner() { return 0; }
+            @Override public String getHookText() { return null; }
+        };
+        when(holdingRepository.findDueHoldings(any())).thenReturn(List.of(due));
+
+        when(holdingRepository.findByPostIdIn(anyCollection())).thenAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Collection<String> ids = inv.getArgument(0);
+            List<MarketingHolding> found = new ArrayList<>();
+            if (ids.contains("old")) {
+                found.add(overdue);
+            }
+            return found;
+        });
+        when(postRepository.findAllById(any())).thenAnswer(inv -> {
+            Collection<?> ids = inv.getArgument(0);
+            List<Post> posts = new ArrayList<>();
+            if (ids.contains("p1")) {
+                posts.add(post("p1", "Fresh", t0));
+            }
+            if (ids.contains("old")) {
+                posts.add(post("old", "Overdue story", t0.minus(25, ChronoUnit.HOURS)));
+            }
+            return posts;
+        });
+        when(briefSeeder.seedFromPost(any(Post.class))).thenAnswer(inv -> {
+            Post p = inv.getArgument(0);
+            return BriefDto.builder().title("seeded-" + p.getId()).build();
+        });
+        stubStatusQueries(List.of(), List.of(overdue));
+        when(holdingRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        MarketingHoldingService.HoldingBoard board = service.getBoard();
+
+        assertThat(board.items()).hasSize(2);
+        assertThat(board.items().get(0).postId()).isEqualTo("old");
+        assertThat(board.items().get(0).overdue()).isTrue();
+        assertThat(board.items().get(0).title()).isEqualTo("Overdue story");
+        assertThat(board.items().get(1).postId()).isEqualTo("p1");
+        assertThat(board.items().get(1).overdue()).isFalse();
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MarketingHolding>> saveCaptor = ArgumentCaptor.forClass(List.class);
+        verify(holdingRepository).saveAll(saveCaptor.capture());
+        assertThat(saveCaptor.getValue()).noneMatch(h -> "old".equals(h.getPostId())
+            && h.getStatus() != MarketingHoldingStatus.OUT_OF_CUT);
+        assertThat(overdue.getStatus()).isEqualTo(MarketingHoldingStatus.OUT_OF_CUT);
     }
 
     private void stubStatusQueries(

@@ -129,6 +129,8 @@ MarketingPollingScheduler (15초마다)
 
 ```
 T+24h MarketingHoldingCommitService
+    │  틱은 오케스트레이션만. 사연별 commit/drop 은 REQUIRES_NEW.
+    │  선정 후 잡 insert 실패 → DROPPED 금지, due 유지, 텔레그램, 다음 틱 재시도.
     │
     ├─ 채널별 score (platforms.md §식) DESC · 선택 채널 실제 1-based rank를 holding JSON에 기록
     ├─ 채널별 cap (기본 3) 잔여까지 COMMIT

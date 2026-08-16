@@ -145,6 +145,8 @@ class MarketingJobServiceTest {
 
         doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+        Instant slot = Instant.parse("2026-08-16T11:30:00Z");
+        when(marketingPublishSlotService.nextSlotForTargets(any(), any())).thenReturn(slot);
 
         // When
         MarketingJob result = marketingJobService.createJob(
@@ -159,6 +161,7 @@ class MarketingJobServiceTest {
         assertThat(result.getRemoteJobId()).isEqualTo(TEST_JOB_ID);
         assertThat(result.getPostId()).isEqualTo(TEST_POST_ID);
         assertThat(result.getStatus()).isEqualTo("QUEUED");
+        assertThat(result.getScheduledPublishAt()).isEqualTo(slot);
 
         verify(postRepository).findById(TEST_POST_ID);
         verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "twitter");

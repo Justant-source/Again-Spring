@@ -22,11 +22,11 @@
 
 ### 24h 대기 보드 (`AdminMarketingHoldingController` · `marketing_holding`)
 
-T+24h 전 사연을 seed·순위 스냅샷하는 **대기 보드** (`GET /api/admin/marketing/holding`, 최대 20행 + meta).
+T+24h 전 사연을 seed·순위 스냅샷하는 **대기 보드** (`GET /api/admin/marketing/holding`, 24h 미만 최대 20행 + T+24h 경과 미확정 `overdue` 행 + meta).
 
 | API | 동작 |
 |---|---|
-| `GET …/holding` | 보드 + meta. 컷라인 N = `remainingPool - softReservedPool`(핀 soft-reserve; remainingPool은 플랫폼 잔여 **합**) |
+| `GET …/holding` | 보드 + meta. 컷라인 N = `remainingPool - softReservedPool`. T+24h 경과·미확정은 `overdue=true`로 앞에 붙음 |
 | `PATCH …/holding/{postId}/draft` | `draft_json` 교체. `locked_at != null` → 400 |
 | `POST …/holding/{postId}/pin` | Body `{format: VIDEO\|TEXT}`. 핀 + soft-reserve |
 | `DELETE …/holding/{postId}/pin` | 핀 해제·예약 반환 → `IN_POOL` 또는 `OUT_OF_CUT` |
@@ -66,7 +66,7 @@ API: `GET`/`PUT /api/admin/marketing/score-weights` — 응답 `platforms` 맵.
 | 자동 | 플랫폼별 점수 DESC → 각 플랫폼 잔여 cap까지 독립 선정. **같은 사연 멀티 플랫폼 허용**. 확정된 채널의 실제 1-based 순위는 `platform_rank_snapshot`에 JSON으로 잠금 |
 | IG 배타 | 같은 날 `instagram_feed` ∩ `instagram_reels` 금지. `score_feed` vs `score_reels`, 동점 → Reels. 탈락 슬롯은 다음 순위 backfill |
 | 잡 | **플랫폼당 1잡** (Reels ≠ Shorts — 듀얼 mp4 폐기 준비) |
-| 그 외 | T+24h 도달·미선정 → DROPPED. COMMITTED 시 초안 `locked_at` |
+| 그 외 | T+24h 도달·미선정 → DROPPED. **선정됐는데 잡 생성 실패 → due 유지(탈락 없음)·다음 틱 재시도**. COMMITTED 시 초안 `locked_at` |
 
 ### 커밋 후 즉시 발행
 
@@ -74,7 +74,7 @@ T+24h 커밋은 채널별 상위 사연을 선정하고 잡을 생성한다. 잡
 
 | 단계 | 의미 |
 |---|---|
-| **커밋 (T+24h)** | 홀딩 선정 → `COMMITTED` · 채널별 실제 순위 잠금 · 잡 enqueue · 아티팩트 빌드 |
+| **커밋 (T+24h)** | 홀딩 선정 → 사연 단위 TX로 잡 enqueue → `COMMITTED`. 잡 생성 실패 시 홀딩 유지·재시도 |
 | **실발행** | 채널 렌더 READY 즉시 ASM이 발행 |
 
 `scheduledPublishAt`은 관리자 수동 예약 등 명시적 예약에만 사용한다. 자동 선정에는 적용하지 않는다. 댓글 노티 창 기본 24h: `marketing.comment_notify_hours`.

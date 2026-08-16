@@ -47,11 +47,12 @@ const STATUS_LABEL: Record<MarketingHoldingStatus, string> = {
   DROPPED: '탈락',
 };
 
-function formatTimeTo24h(postCreatedAt: string): string {
+function formatTimeTo24h(postCreatedAt: string, overdue?: boolean): string {
+  if (overdue) return '24h 경과 · 확정 재시도';
   const created = new Date(postCreatedAt).getTime();
   if (Number.isNaN(created)) return '—';
   const ms = created + 24 * 60 * 60 * 1000 - Date.now();
-  if (ms <= 0) return '만료';
+  if (ms <= 0) return '24h 경과 · 확정 재시도';
   const totalMin = Math.floor(ms / 60_000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
@@ -100,7 +101,9 @@ export function HoldingBoard({
   onUnpin,
   className,
 }: HoldingBoardProps) {
-  const visible = rows.slice(0, maxRows);
+  const overdueRows = rows.filter((row) => row.overdue);
+  const waitingRows = rows.filter((row) => !row.overdue).slice(0, maxRows);
+  const visible = [...overdueRows, ...waitingRows];
   const canEdit = typeof onEdit === 'function';
   const canOpenPost = typeof onOpenPost === 'function';
   const canPin = typeof onPin === 'function';
@@ -193,8 +196,15 @@ export function HoldingBoard({
               key: 'timeTo24h',
               header: 'T+24h까지',
               render: (row) => (
-                <span className="text-sm text-gray-700 whitespace-nowrap">
-                  {formatTimeTo24h(row.postCreatedAt)}
+                <span
+                  className={
+                    row.overdue
+                      ? 'text-sm text-amber-800 whitespace-nowrap font-medium'
+                      : 'text-sm text-gray-700 whitespace-nowrap'
+                  }
+                  data-testid={row.overdue ? `holding-overdue-${row.postId}` : undefined}
+                >
+                  {formatTimeTo24h(row.postCreatedAt, row.overdue)}
                 </span>
               ),
             },

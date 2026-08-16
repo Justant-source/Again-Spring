@@ -100,7 +100,7 @@ docs/shared/marketing/
 1. `https://againspring.net/admin/marketing` (기본 탭 = **대기**)
 2. 상한·가중치 조정 → 순위/컷라인 즉시 반영
 3. 필요 시 핀으로 soft-reserve · 초안 PATCH (tags·topComments)
-4. T+24h에 스케줄러가 채널별 점수·cap으로 COMMITTED, 미선정 DROPPED
+4. T+24h에 스케줄러가 채널별 점수·cap으로 COMMITTED(잡 생성). 선정 실패는 대기 탭에 잔류·재시도, 미선정만 DROPPED
 5. **완료** 탭에서 게시 이력(플랫폼별 상태·URL) 확인 · 탈락 건 강제 배포 · 긴급 시 잡 상세에서 직접 게시/재게시
 6. **설정**에서 채널 auto on/off · 계정 자격증명 · Phase 2 cap/가중치 · **통계** 탭에서 KPI·테마 배수·주간 리포트
 

@@ -1120,6 +1120,8 @@ export interface MarketingHoldingRow {
   postCreatedAt: string;
   createdAt: string;
   updatedAt: string;
+  /** T+24h elapsed; commit tick will retry instead of dropping from the waiting board. */
+  overdue?: boolean;
 }
 
 export interface MarketingHoldingMeta {
@@ -1218,6 +1220,7 @@ function normalizeHoldingRow(raw: MarketingHoldingRowRaw): MarketingHoldingRow {
     postCreatedAt: String(raw.postCreatedAt ?? ''),
     createdAt: String(raw.createdAt ?? ''),
     updatedAt: String(raw.updatedAt ?? ''),
+    overdue: raw.overdue === true,
   };
 }
 

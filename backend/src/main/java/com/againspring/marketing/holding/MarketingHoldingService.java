@@ -9,6 +9,7 @@ import com.againspring.marketing.MarketingScoreWeightService;
 import com.againspring.marketing.dto.CreateJobRequest.BriefDto;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository;
+import com.againspring.repository.marketing.MarketingHoldingRepository.DueHoldingProjection;
 import com.againspring.repository.marketing.MarketingHoldingRepository.HoldingCandidateProjection;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -46,6 +47,7 @@ import java.util.stream.Collectors;
 public class MarketingHoldingService {
 
     public static final int BOARD_DISPLAY_LIMIT = 20;
+    public static final int BOARD_OVERDUE_LIMIT = 20;
     private static final int BOARD_REFRESH_MAX_ATTEMPTS = 3;
 
     private final MarketingHoldingRepository holdingRepository;
@@ -99,7 +101,8 @@ public class MarketingHoldingService {
         Instant lockedAt,
         Instant createdAt,
         Instant updatedAt,
-        Map<String, Object> draft
+        Map<String, Object> draft,
+        boolean overdue
     ) {}
 
     public record HoldingBoard(
@@ -227,13 +230,27 @@ public class MarketingHoldingService {
                     projected = projectedFormat(autoInCut, cutlineN, videoSlots);
                 }
             }
-            items.add(toBoardItem(holding, post, projected));
+            items.add(toBoardItem(holding, post, projected, false));
         }
 
-        demoteOutsideDisplay(displayIds, toSave);
+        Set<String> overdueIds = new HashSet<>();
+        List<DueHoldingProjection> overdueRows = holdingRepository.findDueHoldings(Instant.EPOCH);
+        for (DueHoldingProjection row : overdueRows) {
+            overdueIds.add(row.getPostId());
+        }
+
+        demoteOutsideDisplay(displayIds, toSave, overdueIds);
         if (!toSave.isEmpty()) {
             holdingRepository.saveAll(toSave);
         }
+
+        List<BoardItem> overdueItems = buildOverdueItems(overdueRows, displayIds, existingById);
+        if (overdueItems.size() > BOARD_OVERDUE_LIMIT) {
+            overdueItems = overdueItems.subList(0, BOARD_OVERDUE_LIMIT);
+        }
+        List<BoardItem> merged = new ArrayList<>(overdueItems.size() + items.size());
+        merged.addAll(overdueItems);
+        merged.addAll(items);
 
         BoardMeta meta = new BoardMeta(
             quota.remainingPool(),
@@ -246,7 +263,7 @@ public class MarketingHoldingService {
             weights.weightComments(),
             weights.weightVotes()
         );
-        return new HoldingBoard(items, meta);
+        return new HoldingBoard(merged, meta);
     }
 
     static boolean isMariaRecordChanged(Throwable ex) {
@@ -523,8 +540,10 @@ public class MarketingHoldingService {
     /**
      * Rows previously on the board that fell outside the display top-20:
      * leave as OUT_OF_CUT (do not delete). PINNED/COMMITTED/DROPPED untouched.
+     * T+24h due holdings are skipped — they stay until the commit tick COMMITTED/DROPPED them.
      */
-    void demoteOutsideDisplay(Set<String> displayIds, List<MarketingHolding> pendingSaves) {
+    void demoteOutsideDisplay(
+            Set<String> displayIds, List<MarketingHolding> pendingSaves, Set<String> overdueIds) {
         Set<String> pendingIds = pendingSaves.stream()
             .map(MarketingHolding::getPostId)
             .collect(Collectors.toSet());
@@ -536,11 +555,60 @@ public class MarketingHoldingService {
             if (displayIds.contains(h.getPostId()) || pendingIds.contains(h.getPostId())) {
                 continue;
             }
+            if (overdueIds.contains(h.getPostId())) {
+                continue;
+            }
             if (h.getStatus() == MarketingHoldingStatus.IN_POOL) {
                 h.setStatus(MarketingHoldingStatus.OUT_OF_CUT);
                 pendingSaves.add(h);
             }
         }
+    }
+
+    private List<BoardItem> buildOverdueItems(
+            List<DueHoldingProjection> overdueRows,
+            Set<String> displayIds,
+            Map<String, MarketingHolding> alreadyLoaded) {
+        List<String> ids = overdueRows.stream()
+            .map(DueHoldingProjection::getPostId)
+            .filter(id -> !displayIds.contains(id))
+            .distinct()
+            .toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, MarketingHolding> holdings = new HashMap<>(alreadyLoaded);
+        List<String> missing = ids.stream().filter(id -> !holdings.containsKey(id)).toList();
+        if (!missing.isEmpty()) {
+            holdingRepository.findByPostIdIn(missing)
+                .forEach(h -> holdings.put(h.getPostId(), h));
+        }
+        Map<String, Post> posts = postRepository.findAllById(ids).stream()
+            .collect(Collectors.toMap(Post::getId, p -> p, (a, b) -> a));
+
+        List<BoardItem> out = new ArrayList<>();
+        for (String id : ids) {
+            MarketingHolding holding = holdings.get(id);
+            if (holding == null) {
+                continue;
+            }
+            if (holding.getStatus() == MarketingHoldingStatus.COMMITTED
+                || holding.getStatus() == MarketingHoldingStatus.DROPPED) {
+                continue;
+            }
+            String projected;
+            if (holding.getStatus() == MarketingHoldingStatus.PINNED
+                && holding.getPinFormat() != null) {
+                projected = holding.getPinFormat().name();
+            } else if (holding.getStatus() == MarketingHoldingStatus.OUT_OF_CUT) {
+                projected = "OUT_OF_CUT";
+            } else {
+                projected = "TEXT";
+            }
+            out.add(toBoardItem(holding, posts.get(id), projected, true));
+        }
+        return out;
     }
 
     /**
@@ -583,6 +651,11 @@ public class MarketingHoldingService {
     }
 
     private BoardItem toBoardItem(MarketingHolding holding, Post post, String projectedFormat) {
+        return toBoardItem(holding, post, projectedFormat, false);
+    }
+
+    private BoardItem toBoardItem(
+            MarketingHolding holding, Post post, String projectedFormat, boolean overdue) {
         String title = null;
         Instant postCreatedAt = null;
         if (post != null) {
@@ -605,7 +678,8 @@ public class MarketingHoldingService {
             holding.getLockedAt(),
             holding.getCreatedAt(),
             holding.getUpdatedAt(),
-            parseDraftMap(holding.getDraftJson())
+            parseDraftMap(holding.getDraftJson()),
+            overdue
         );
     }
 

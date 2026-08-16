@@ -31,7 +31,7 @@ public class AdminMarketingHoldingController {
 
     @GetMapping
     @Operation(summary = "Marketing holding board",
-        description = "최대 20행 대기 보드 + 메타(잔여 풀 N, 상한, 가중치). "
+        description = "24h 미만 N-top(최대 20) + T+24h 경과 미확정(overdue) + 메타. "
             + "컷라인 N = remainingPool - softReservedPool(핀). 진입 시 seed/상태 갱신.")
     @ApiResponse(responseCode = "200", description = "Board returned")
     public ResponseEntity<MarketingHoldingBoardResponse> getBoard() {

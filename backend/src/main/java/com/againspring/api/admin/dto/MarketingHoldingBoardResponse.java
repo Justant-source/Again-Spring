@@ -38,6 +38,8 @@ public class MarketingHoldingBoardResponse {
         private Instant createdAt;
         private Instant updatedAt;
         private Map<String, Object> draft;
+        /** T+24h elapsed, still IN_POOL/PINNED/OUT_OF_CUT awaiting commit retry. */
+        private Boolean overdue;
     }
 
     @Getter
@@ -72,6 +74,7 @@ public class MarketingHoldingBoardResponse {
                 .createdAt(i.createdAt())
                 .updatedAt(i.updatedAt())
                 .draft(i.draft())
+                .overdue(i.overdue())
                 .build())
             .toList();
         MarketingHoldingService.BoardMeta m = board.meta();

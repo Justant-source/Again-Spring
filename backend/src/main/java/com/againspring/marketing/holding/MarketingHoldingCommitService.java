@@ -14,6 +14,7 @@ import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.MarketingScoreWeightService;
 import com.againspring.marketing.MarketingThemeBoostService;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.notification.TelegramNotifier;
 import com.againspring.repository.marketing.MarketingHoldingRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository.DueHoldingProjection;
 import com.againspring.repository.marketing.MarketingJobRepository;
@@ -23,7 +24,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -47,6 +51,10 @@ import java.util.stream.Collectors;
  * <p>Per-platform popularity scores + per-platform daily caps. Same story may win
  * multiple platforms the same day. Instagram feed ⊥ Reels exclusivity
  * (higher score wins; tie → Reels). Reels and Shorts enqueue as <b>separate</b> jobs.
+ *
+ * <p>The tick itself is not one transaction. Each holding commit/drop runs in
+ * {@code REQUIRES_NEW} so a job-insert failure cannot mark the whole tick
+ * rollback-only or drop a platform-selected story.
  */
 @Slf4j
 @Service
@@ -68,6 +76,8 @@ public class MarketingHoldingCommitService {
     private final MarketingPlatformAutoService platformAutoService;
     private final PostRepository postRepository;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
+    private final TelegramNotifier telegramNotifier;
 
     public enum ForceMode {
         VIDEO_AND_TEXT,
@@ -97,6 +107,7 @@ public class MarketingHoldingCommitService {
         int autoCommitted,
         int dropped,
         int pinnedDeferred,
+        int autoDeferred,
         Map<String, Integer> selectedByPlatform
     ) {
         /** Phase 1 field aliases for older callers/tests. */
@@ -165,8 +176,8 @@ public class MarketingHoldingCommitService {
 
     /**
      * Scheduler entry: pins first, then independent per-platform auto fill, drop rest.
+     * Orchestration only — per-story writes use isolated transactions.
      */
-    @Transactional
     public CommitTickResult runCommitTick(Instant since) {
         Objects.requireNonNull(since, "since");
 
@@ -187,7 +198,7 @@ public class MarketingHoldingCommitService {
         List<DueHoldingProjection> due = holdingRepository.findDueHoldings(since);
         if (due.isEmpty()) {
             log.debug("Holding commit tick: no due holdings since={}", since);
-            return new CommitTickResult(0, 0, 0, 0, Map.of());
+            return new CommitTickResult(0, 0, 0, 0, 0, Map.of());
         }
 
         Map<String, Post> postsById = postRepository.findAllById(
@@ -219,6 +230,7 @@ public class MarketingHoldingCommitService {
 
         int pinnedCommitted = 0;
         int pinnedDeferred = 0;
+        int autoDeferred = 0;
         int dropped = 0;
 
         // Soft-reserve still-PINNED so autos do not steal (after this tick's pin pass).
@@ -318,11 +330,14 @@ public class MarketingHoldingCommitService {
                 autoCommitted++;
                 handled.add(postId);
             } else {
-                selectedStories.remove(postId);
+                // Keep in selectedStories so the drop pass cannot DROPPED a selected candidate.
+                // Roll back in-memory caps so later autos in this tick can use the slots.
                 assignedByPost.remove(postId);
                 for (String platform : platforms) {
+                    remaining.merge(platform, 1, Integer::sum);
                     selectedCounts.merge(platform, -1, Integer::sum);
                 }
+                autoDeferred++;
             }
         }
 
@@ -342,10 +357,10 @@ public class MarketingHoldingCommitService {
             }
         }
 
-        log.info("Holding commit tick: pinned={} auto={} dropped={} deferredPins={} byPlatform={}",
-            pinnedCommitted, autoCommitted, dropped, pinnedDeferred, selectedCounts);
+        log.info("Holding commit tick: pinned={} auto={} dropped={} deferredPins={} deferredAutos={} byPlatform={}",
+            pinnedCommitted, autoCommitted, dropped, pinnedDeferred, autoDeferred, selectedCounts);
         return new CommitTickResult(
-            pinnedCommitted, autoCommitted, dropped, pinnedDeferred, Map.copyOf(selectedCounts));
+            pinnedCommitted, autoCommitted, dropped, pinnedDeferred, autoDeferred, Map.copyOf(selectedCounts));
     }
 
     /**
@@ -535,7 +550,26 @@ public class MarketingHoldingCommitService {
         return commitHolding(postId, targets, requestedBy, Map.of());
     }
 
+    /**
+     * Isolated write: job insert + COMMITTED. Failures roll back only this story and
+     * return false so the tick can defer (not drop) and continue.
+     */
     private boolean commitHolding(
+            String postId, List<String> targets, String requestedBy,
+            Map<String, Integer> platformRanks) {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        try {
+            Boolean ok = tx.execute(status -> doCommitHolding(postId, targets, requestedBy, platformRanks));
+            return Boolean.TRUE.equals(ok);
+        } catch (RuntimeException e) {
+            log.error("Failed to enqueue jobs for {}: {}", postId, e.getMessage());
+            notifyCommitFailure(postId, targets, e);
+            return false;
+        }
+    }
+
+    private boolean doCommitHolding(
             String postId, List<String> targets, String requestedBy,
             Map<String, Integer> platformRanks) {
         MarketingHolding holding = holdingRepository.findById(postId).orElse(null);
@@ -552,12 +586,7 @@ public class MarketingHoldingCommitService {
             return false;
         }
 
-        try {
-            enqueueJobs(postId, targets, requestedBy);
-        } catch (Exception e) {
-            log.error("Failed to enqueue jobs for {}: {}", postId, e.getMessage());
-            return false;
-        }
+        enqueueJobs(postId, targets, requestedBy);
 
         lockCommitted(holding);
         if (platformRanks != null && !platformRanks.isEmpty()) {
@@ -566,6 +595,17 @@ public class MarketingHoldingCommitService {
         holdingRepository.save(holding);
         log.info("COMMITTED holding {} targets={} platformRanks={}", postId, targets, platformRanks);
         return true;
+    }
+
+    private void notifyCommitFailure(String postId, List<String> targets, Exception e) {
+        String cause = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+        telegramNotifier.send(String.format(
+            "⚠️ [Again-Spring] 마케팅 확정 잡 생성 실패%n"
+                + "사연: %s%n"
+                + "플랫폼: %s%n"
+                + "원인: %s%n"
+                + "조치: 홀딩 유지 · 다음 틱에서 재시도 (탈락 없음)",
+            postId, targets, cause));
     }
 
     private List<MarketingJob> enqueueJobs(String postId, List<String> targets, String requestedBy) {
@@ -606,6 +646,18 @@ public class MarketingHoldingCommitService {
     }
 
     private boolean markDropped(String postId) {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        try {
+            Boolean ok = tx.execute(status -> doMarkDropped(postId));
+            return Boolean.TRUE.equals(ok);
+        } catch (RuntimeException e) {
+            log.error("Failed to mark DROPPED for {}: {}", postId, e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean doMarkDropped(String postId) {
         MarketingHolding holding = holdingRepository.findById(postId).orElse(null);
         if (holding == null) {
             return false;

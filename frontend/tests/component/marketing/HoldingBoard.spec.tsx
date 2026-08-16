@@ -78,13 +78,43 @@ describe('HoldingBoard', () => {
     expect(screen.getByTestId('holding-pin-post-1')).toBeInTheDocument();
   });
 
-  it('keeps the "핀 해제" unpin flow unchanged for pinned rows', () => {
-    const onUnpin = vi.fn();
-    const row = buildRow({ status: 'PINNED', pinFormat: 'VIDEO' });
-    render(<HoldingBoard rows={[row]} onPin={vi.fn()} onUnpin={onUnpin} />);
+    it('shows overdue retry copy for T+24h rows that have not committed', () => {
+      const row = buildRow({
+        postId: 'old-1',
+        overdue: true,
+        postCreatedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+      });
+      render(<HoldingBoard rows={[row]} />);
+      expect(screen.getByTestId('holding-overdue-old-1')).toHaveTextContent(
+        '24h 경과 · 확정 재시도'
+      );
+      expect(screen.queryByText('만료')).not.toBeInTheDocument();
+    });
 
-    const unpinButton = screen.getByTestId('holding-unpin-post-1');
-    fireEvent.click(unpinButton);
-    expect(onUnpin).toHaveBeenCalledWith(row);
-  });
+    it('keeps the "핀 해제" unpin flow unchanged for pinned rows', () => {
+      const onUnpin = vi.fn();
+      const row = buildRow({ status: 'PINNED', pinFormat: 'VIDEO' });
+      render(<HoldingBoard rows={[row]} onPin={vi.fn()} onUnpin={onUnpin} />);
+
+      const unpinButton = screen.getByTestId('holding-unpin-post-1');
+      fireEvent.click(unpinButton);
+      expect(onUnpin).toHaveBeenCalledWith(row);
+    });
+
+    it('does not let overdue rows consume the in-window maxRows budget', () => {
+      const rows = [
+        buildRow({ postId: 'old-a', overdue: true, title: '경과A' }),
+        buildRow({ postId: 'old-b', overdue: true, title: '경과B' }),
+        ...Array.from({ length: 20 }, (_, i) =>
+          buildRow({ postId: `win-${i}`, title: `대기${i}` })
+        ),
+        buildRow({ postId: 'win-overflow', title: '잘림' }),
+      ];
+      render(<HoldingBoard rows={rows} maxRows={20} />);
+      expect(screen.getByTestId('holding-overdue-old-a')).toBeInTheDocument();
+      expect(screen.getByTestId('holding-overdue-old-b')).toBeInTheDocument();
+      expect(screen.getByTestId('holding-row-title-win-0')).toBeInTheDocument();
+      expect(screen.getByTestId('holding-row-title-win-19')).toBeInTheDocument();
+      expect(screen.queryByTestId('holding-row-title-win-overflow')).not.toBeInTheDocument();
+    });
 });

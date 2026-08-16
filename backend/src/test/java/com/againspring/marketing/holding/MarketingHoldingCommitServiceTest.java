@@ -11,6 +11,7 @@ import com.againspring.marketing.MarketingPublishFormat;
 import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.MarketingScoreWeightService;
 import com.againspring.marketing.MarketingThemeBoostService;
+import com.againspring.notification.TelegramNotifier;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository.DueHoldingProjection;
@@ -22,7 +23,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -66,6 +71,8 @@ class MarketingHoldingCommitServiceTest {
     @Mock MarketingThemeBoostService themeBoostService;
     @Mock MarketingPlatformAutoService platformAutoService;
     @Mock PostRepository postRepository;
+    @Mock PlatformTransactionManager transactionManager;
+    @Mock TelegramNotifier telegramNotifier;
 
     @InjectMocks
     MarketingHoldingCommitService service;
@@ -76,6 +83,10 @@ class MarketingHoldingCommitServiceTest {
     void setUp() {
         ReflectionTestUtils.setField(service, "objectMapper", new ObjectMapper());
         holdings.clear();
+        lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+            .thenReturn(new SimpleTransactionStatus());
+        lenient().doNothing().when(transactionManager).commit(any());
+        lenient().doNothing().when(transactionManager).rollback(any());
         lenient().when(holdingRepository.findById(anyString())).thenAnswer(inv ->
             Optional.ofNullable(holdings.get(inv.getArgument(0))));
         lenient().when(holdingRepository.save(any(MarketingHolding.class))).thenAnswer(inv -> {
@@ -177,6 +188,62 @@ class MarketingHoldingCommitServiceTest {
         assertThat(result.dropped()).isEqualTo(1);
         assertThat(holdings.get("pin").getStatus()).isEqualTo(MarketingHoldingStatus.PINNED);
         verify(marketingJobService, never()).createJob(anyString(), any(), anyBoolean(), anyString());
+    }
+
+    @Test
+    void commitTick_createJobFailure_defersSelectedAuto_doesNotDrop_andContinues() {
+        when(quotaService.remainingCapsMutable()).thenReturn(remaining(1, 0, 1, 0));
+        when(holdingRepository.findDueHoldings(SINCE)).thenReturn(List.of(
+            due("hot", "IN_POOL", null, 100, 20, 10, 5, 0, null, T0.plusSeconds(2)),
+            due("other", "OUT_OF_CUT", null, 10, 0, 0, 0, 0, null, T0)
+        ));
+        when(holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED)))
+            .thenReturn(List.of());
+        putHolding("hot", MarketingHoldingStatus.IN_POOL, null);
+        putHolding("other", MarketingHoldingStatus.OUT_OF_CUT, null);
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
+            .thenThrow(new DataIntegrityViolationException("Column 'scheduled_publish_at' cannot be null"));
+
+        MarketingHoldingCommitService.CommitTickResult result = service.runCommitTick(SINCE);
+
+        assertThat(result.autoCommitted()).isZero();
+        assertThat(result.autoDeferred()).isEqualTo(1);
+        assertThat(result.dropped()).isEqualTo(1);
+        assertThat(holdings.get("hot").getStatus()).isEqualTo(MarketingHoldingStatus.IN_POOL);
+        assertThat(holdings.get("other").getStatus()).isEqualTo(MarketingHoldingStatus.DROPPED);
+        verify(telegramNotifier).send(org.mockito.ArgumentMatchers.contains("hot"));
+    }
+
+    @Test
+    void commitTick_createJobFailureOnAuto_stillCommitsPin() {
+        when(quotaService.remainingCapsMutable()).thenReturn(remaining(1, 1, 1, 1));
+        when(holdingRepository.findDueHoldings(SINCE)).thenReturn(List.of(
+            due("pin", "PINNED", "TEXT", 1, 0, 0, 0, 0, null, T0),
+            due("hot", "IN_POOL", null, 100, 20, 10, 5, 0, null, T0.plusSeconds(2))
+        ));
+        when(holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED)))
+            .thenReturn(List.of());
+        putHolding("pin", MarketingHoldingStatus.PINNED, MarketingPinFormat.TEXT);
+        putHolding("hot", MarketingHoldingStatus.IN_POOL, null);
+        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
+            .thenAnswer(inv -> {
+                String postId = inv.getArgument(0);
+                if ("hot".equals(postId)) {
+                    throw new DataIntegrityViolationException("Column 'scheduled_publish_at' cannot be null");
+                }
+                return MarketingJob.builder().id(1L).postId(postId).status("REQUESTED").build();
+            });
+
+        MarketingHoldingCommitService.CommitTickResult result = service.runCommitTick(SINCE);
+
+        assertThat(result.pinnedCommitted()).isEqualTo(1);
+        assertThat(result.autoDeferred()).isEqualTo(1);
+        assertThat(holdings.get("pin").getStatus()).isEqualTo(MarketingHoldingStatus.COMMITTED);
+        assertThat(holdings.get("hot").getStatus()).isEqualTo(MarketingHoldingStatus.IN_POOL);
     }
 
     @Test
