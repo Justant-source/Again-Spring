@@ -51,12 +51,9 @@ Content-Type: application/json
 }
 ```
 
-`scheduled_publish_at`는 모든 잡에서 NOT NULL이다 (V117, Decision #10) — 생성 시
-`MarketingPublishSlotService.nextSlotForTargets`로 저녁 발행 슬롯을 채운다.
-`autoPublish=true` 잡은 이 슬롯이 실제 자동 게시를 게이팅하지만(`MarketingPollingScheduler`
-evening-slot auto-publish), `autoPublish=false`(render-only) 잡은 값이 채워져도 결코 이
-슬롯으로 자동 게시되지 않는다 — `findDueAutoPublishJobs`/`findExpiredScheduledJobs`가
-`auto_publish=1`만 조회하기 때문이다(2026-08-16).
+`scheduled_publish_at`는 모든 잡에서 NOT NULL이다 (V117) — 생성 시각을 넣는다.
+`autoPublish=true` 잡은 **READY 도달 즉시** 게시되며 이 컬럼으로 시각을 기다리지 않는다.
+`autoPublish=false`(render-only) 잡은 `findDueAutoPublishJobs`에 안 걸린다.
 
 **오류**
 | 코드 | 이유 |
@@ -500,14 +497,15 @@ ASM: `POST /api/v1/stats/collect` (`skip_slow`) · social-poster `POST /stats/x`
 
 일 06:30 KST 스케줄 수집. 실패는 배치 전체를 막지 않음.
 
-### 4.3 저녁 슬롯 · 댓글 노티 창 (Phase 1 유지)
+### 4.3 저녁 슬롯 API (레거시, 자동 발행에 미사용)
 
 ```
 GET /api/admin/marketing/publish-slots
 PUT /api/admin/marketing/publish-slots
 ```
 
-키 `marketing.publish_slot.{platform}` · `marketing.comment_notify_hours`(기본 24).
+키 `marketing.publish_slot.{platform}` 은 관리자 UI에 남아 있으나 **T+24h 자동 선정·영상 게시를 게이팅하지 않는다**.
+댓글 노티 창: `marketing.comment_notify_hours`(기본 24).
 
 ### 4.4 플랫폼 통계 수집 · 주간 리포트
 

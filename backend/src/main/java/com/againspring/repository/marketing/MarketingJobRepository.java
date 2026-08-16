@@ -305,14 +305,12 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     List<MarketingJob> findExpiredScheduledJobs();
 
     /**
-     * READY auto-publish jobs whose evening slot has arrived (scheduled_publish_at &lt;= now).
+     * READY auto-publish jobs. Publish is READY-driven; {@code now} is unused (kept for call-site stability).
      */
     @Query("""
         SELECT mj FROM MarketingJob mj
         WHERE mj.status = 'READY'
         AND mj.autoPublish = true
-        AND mj.scheduledPublishAt IS NOT NULL
-        AND mj.scheduledPublishAt <= :now
         """)
     List<MarketingJob> findDueAutoPublishJobs(@Param("now") Instant now);
 
@@ -358,21 +356,18 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     List<MarketingJob> findByScheduledPublishAtBetween(Instant start, Instant end);
 
     /**
-     * Find READY auto-publish jobs whose scheduled publish time has passed by 30+ minutes
-     * without being published (Decision #10 monitoring).
-     *
-     * These jobs are likely stuck due to ASM/rendering delays or similar operational issues.
-     * Used by monitoring sweep to detect and alert on publishing delays.
+     * Find READY auto-publish jobs that have been sitting READY for 30+ minutes
+     * without being published (stuck trigger / ASM publish).
      *
      * @param thirtyMinutesAgo the cutoff time (current instant - 30 minutes)
-     * @return List of READY jobs past their scheduled time by 30+ minutes
+     * @return List of READY auto-publish jobs whose {@code updatedAt} is older than the cutoff
      */
     @Query("""
         SELECT mj FROM MarketingJob mj
         WHERE mj.status = 'READY'
         AND mj.autoPublish = true
-        AND mj.scheduledPublishAt IS NOT NULL
-        AND mj.scheduledPublishAt < :thirtyMinutesAgo
+        AND mj.updatedAt IS NOT NULL
+        AND mj.updatedAt < :thirtyMinutesAgo
         """)
     List<MarketingJob> findReadyJobsPastScheduleBy30Minutes(@Param("thirtyMinutesAgo") Instant thirtyMinutesAgo);
 

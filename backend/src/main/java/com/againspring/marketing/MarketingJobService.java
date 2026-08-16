@@ -62,18 +62,14 @@ public class MarketingJobService {
     private final VideoVariantService videoVariantService;
     private final TelegramNotifier telegramNotifier;
     private final MarketingLlmAuthGuard llmAuthGuard;
-    private final MarketingPublishSlotService marketingPublishSlotService;
 
     /**
      * Create a new marketing job for a post.
      *
-     * <p>Automatic jobs are sent to ASM with {@code auto_publish=true} and gated by the
-     * evening publish slot (Decision #10, {@link MarketingPublishSlotService}) — see
-     * {@link MarketingPollingScheduler#pollJobs()}. Manual/render-only jobs
-     * ({@code autoPublish=false}) still receive a slot to satisfy the
-     * {@code scheduled_publish_at} NOT NULL constraint (V117), but the slot never triggers
-     * external publication for them since every auto-publish query filters on
-     * {@code auto_publish = true}.
+     * <p>Automatic jobs are sent to ASM with {@code auto_publish=true}. Publication fires
+     * as soon as the remote job is READY — there is no evening slot gate.
+     * {@code scheduled_publish_at} is still set (V117 NOT NULL) to the creation instant
+     * so the column is never empty; it does not delay publish.
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
         return createJob(postId, targets, autoPublish, requestedBy, null, 1);
@@ -226,10 +222,8 @@ public class MarketingJobService {
 
         // Persist first so utm_campaign / post_url can use local job id (story_{id}).
         String idempotencyKey = UUID.randomUUID().toString();
-        // scheduled_publish_at is NOT NULL for every job (V117). autoPublish=false jobs still
-        // get a slot — it just never fires since findDueAutoPublishJobs/findExpiredScheduledJobs
-        // filter on auto_publish=true, so render-only jobs stay inert regardless of this value.
-        Instant scheduledPublishAt = marketingPublishSlotService.nextSlotForTargets(targets, Instant.now());
+        // V117 NOT NULL. Value is "created now", not an evening gate — auto-publish is READY-driven.
+        Instant scheduledPublishAt = Instant.now();
         MarketingJob.MarketingJobBuilder pendingBuilder = MarketingJob.builder()
             .postId(post.getId())
             .status("REQUESTED")
@@ -695,6 +689,9 @@ public class MarketingJobService {
         }
 
         AsmJobView view = asmClient.publish(job.getRemoteJobId());
+        if (view.getPublications() == null || view.getPublications().isEmpty()) {
+            view = asmClient.getJob(job.getRemoteJobId());
+        }
         applyPoll(job, view);
         return job;
     }

@@ -214,7 +214,7 @@ flowchart LR
 | `PUT` | `/api/admin/marketing/quota` | 글/영상 상한 저장 (`system_setting`) |
 | `GET` | `/api/admin/marketing/score-weights` | 인기 점수 가중치 (views/comments/votes) |
 | `PUT` | `/api/admin/marketing/score-weights` | 가중치 저장 (`system_setting`, 0–100) |
-| `GET` | `/api/admin/marketing/publish-slots` | KST 저녁 발행 슬롯 (HH:mm, 기본 20:00/20:30/20:30/21:30) |
+| `GET` | `/api/admin/marketing/publish-slots` | 레거시 슬롯 조회. **자동 발행 게이팅에 사용하지 않음** (READY 즉시) |
 | `PUT` | `/api/admin/marketing/publish-slots` | 슬롯 저장 (`marketing.publish_slot.*`) |
 | `GET` | `/api/admin/marketing/platforms` | 전체 플랫폼 auto on/off (`autoEnabled`, `runtimeSupported`, 선택 `warning`) |
 | `PUT` | `/api/admin/marketing/platforms/{platform}/auto` | Body `{enabled}` — 미지원 on도 허용·경고 반환 |

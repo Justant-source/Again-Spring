@@ -12,7 +12,7 @@
 | 항목 | 값 |
 |---|---|
 | 자동 생성 | **활성** — 사연 `+24h` 후 **채널별 popularity·cap**으로 독립 선정 (`MarketingHoldingCommitService`) |
-| 자동 게시 | **활성** — READY 후 저녁 슬롯에 YT API / Reels Graph·세션 게시 |
+| 자동 게시 | **활성** — READY 즉시 YT API / Reels Graph·세션 게시 (저녁 슬롯 없음) |
 | 렌더 | WaggleBot (`POST /api/external/jobs`) — LLM은 **Claude CLI 브릿지** (`llm_backend=cli`). **채널별 유니크 렌더** (동일 mp4 공유 금지) |
 | 게시 계정 | 다시봄 전용 YouTube (ASM `youtube_shorts` OAuth) · IG Reels 세션/Graph |
 
@@ -31,7 +31,7 @@ AS 24h 분배 (채널별 score·cap)
   → Reels 확정 시: 변형 훅·스크립트 → ASM 잡(targets=[instagram_reels]) → WaggleBot 유니크 렌더 ≤30s
   → Shorts 확정 시: 변형 훅·스크립트 → ASM 잡(targets=[youtube_shorts]) → WaggleBot 유니크 렌더 ≤45s
   → 아티팩트: 플랫폼별 upload.json + **각자** video/thumbnail → READY
-  → 저녁 슬롯 publish: YouTube API / Instagram Reels
+  → READY 즉시 publish: YouTube API / Instagram Reels
 ```
 
 - ASM `app/media` 로컬 GPU 파이프는 Shorts에 사용하지 않는다.
@@ -167,7 +167,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 ## 6. 어드민 UX
 
 - 잡 상세: **인라인 mp4 재생** + 썸네일 + 사용 댓글 최대 3(§4.5) + (paired) 예정 첫 댓글
-- `READY && !autoPublish` → **게시 승인** 또는 저녁 슬롯 자동
+- `READY && !autoPublish` → **게시 승인** (미리보기). `autoPublish=true`면 READY 즉시 게시
 - **설정 탭 → 숏폼영상**: 본문 `tts_voice` + 댓글 풀 `comment_tts_voices`(최대 5). Reels/Shorts가 **파일은 분리**해도 보이스 풀은 공유 가능
 - **보이스 계약**: 본문·intro·클로징 = `tts_voice`. 댓글 = `comment_tts_voices` 풀에서 작성자별 랜덤. **감정** = `hook_emotion` → S2 Pro
 - **클로징**: again_spring 고정 문구는 voice+text 키로 디스크 캐시·loudnorm 후 재사용
@@ -182,7 +182,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 1. WaggleBot `POST/GET /api/external/jobs` — **완료**
 2. ASM Waggle 파이프 — **유니크 듀얼 렌더**(플랫폼별 Waggle 호출) — **완료** (2.4)
 3. AS brief + 24h 스케줄러 + 어드민 미리보기 — **완료** → Phase 2 **채널별 score·cap**(2.1)
-4. `auto_publish` / 저녁 슬롯 → YouTube + Reels — **활성** (Phase 1 슬롯 유지)
+4. `auto_publish` → READY 즉시 YouTube + Reels — **활성**
 5. **Phase 1 유지**: UTM · 태그 · 마스터 훅 · `hook_emotion` 필드 · 텔레그램 댓글 노티
 6. **Phase 2.3–2.5 완료**: `VideoVariantService` 변형 훅·`script_*` · ≤30/≤45s · 유니크 렌더 · `hook_emotion`→WaggleBot TTS mood
 7. **잔여 Phase 2**: 통계·주간리포트·`auto_adjust`(2.6+)

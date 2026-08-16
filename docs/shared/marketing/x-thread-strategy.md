@@ -206,7 +206,7 @@ BE(Again-Spring)의 24시간 트리거 + 마케팅 잡 생성(플랫폼 `"x_thre
 ASM(Again-Spring-Marketing, WSL)의 Playwright 캡처+슬라이스 및 순차 답글 발행 — 둘 다 구현 완료,
 prod에서 자동 발행 중(2026-08-02 기준). 짧은 사연 3단/긴 사연 4단 분기, 컷 지점 로직,
 메인 트윗 텍스트는 §2(Phase 1 = **마스터 훅**)·§6·§7 참고.
-**실발행 저녁 슬롯**(커밋≠publish)은 [`platforms.md`](platforms.md) Phase 1 계약.
+**실발행은 렌더 READY 즉시**(커밋≠publish 시계 슬롯 없음) — [`platforms.md`](platforms.md).
 **구현 세부사항은 이 문서가 아닌 실제 코드(BE 잡 생성 로직, ASM 발행 서비스)에서 확인하십시오.**
 
 ---

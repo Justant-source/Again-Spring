@@ -145,8 +145,8 @@ class MarketingJobServiceTest {
 
         doReturn("[]").when(objectMapper).writeValueAsString(any());
         when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
-        Instant slot = Instant.parse("2026-08-16T11:30:00Z");
-        when(marketingPublishSlotService.nextSlotForTargets(any(), any())).thenReturn(slot);
+
+        Instant before = Instant.now();
 
         // When
         MarketingJob result = marketingJobService.createJob(
@@ -161,7 +161,10 @@ class MarketingJobServiceTest {
         assertThat(result.getRemoteJobId()).isEqualTo(TEST_JOB_ID);
         assertThat(result.getPostId()).isEqualTo(TEST_POST_ID);
         assertThat(result.getStatus()).isEqualTo("QUEUED");
-        assertThat(result.getScheduledPublishAt()).isEqualTo(slot);
+        assertThat(result.getScheduledPublishAt()).isNotNull();
+        assertThat(result.getScheduledPublishAt()).isAfterOrEqualTo(before.minusSeconds(2));
+        assertThat(result.getScheduledPublishAt()).isBeforeOrEqualTo(Instant.now().plusSeconds(2));
+        verify(marketingPublishSlotService, never()).nextSlotForTargets(any(), any());
 
         verify(postRepository).findById(TEST_POST_ID);
         verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "twitter");
@@ -196,8 +199,8 @@ class MarketingJobServiceTest {
             TEST_POST_ID, List.of("x_thread"), true, "system:holding-commit-trigger");
 
         assertThat(result.getAutoPublish()).isTrue();
-        assertThat(result.getScheduledPublishAt()).isNull();
-        assertThat(result.getOriginalScheduledAt()).isNull();
+        assertThat(result.getScheduledPublishAt()).isNotNull();
+        verify(marketingPublishSlotService, never()).nextSlotForTargets(any(), any());
 
         ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
         verify(asmClient).createJob(captor.capture(), any(String.class));
@@ -1121,5 +1124,37 @@ class MarketingJobServiceTest {
         assertThat(msgCaptor.getAllValues().stream()
             .anyMatch(msg -> msg.contains("코드 결함")))
             .isTrue();
+    }
+
+    @Test
+    void triggerPublish_refetchesJobWhenPublishResponseOmitsPublications() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(671L)
+            .remoteJobId("asm-reels")
+            .postId(TEST_POST_ID)
+            .status("READY")
+            .autoPublish(true)
+            .build();
+        when(marketingJobRepository.findById(671L)).thenReturn(Optional.of(job));
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(asmClient.publish("asm-reels")).thenReturn(AsmJobView.builder()
+            .status("PUBLISHED")
+            .publications(List.of())
+            .build());
+        List<Map<String, Object>> pubs = List.of(Map.of(
+            "platform", "instagram_reels",
+            "state", "PUBLISHED",
+            "url", "https://www.instagram.com/reel/example/"
+        ));
+        when(asmClient.getJob("asm-reels")).thenReturn(AsmJobView.builder()
+            .status("PUBLISHED")
+            .publications(pubs)
+            .build());
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+
+        MarketingJob result = marketingJobService.triggerPublish(671L);
+
+        verify(asmClient).getJob("asm-reels");
+        assertThat(result.getStatus()).isEqualTo("PUBLISHED");
     }
 }

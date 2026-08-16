@@ -1,7 +1,7 @@
 # 마케팅 시스템 아키텍처
 
 > **Phase 2 = 타깃 SSOT** (코드 병렬 착수). 분배·영상·통계는 [`platforms.md`](platforms.md) · [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) · [`api.md`](api.md).  
-> Phase 1 유지: UTM · 저녁 슬롯 · 텔레그램 댓글 노티 · 태그 · 배심원 없음 · 2027-01 고지.
+> Phase 1 유지: UTM · 텔레그램 댓글 노티 · 태그 · 배심원 없음 · 2027-01 고지. **저녁 슬롯은 폐기** — READY 즉시 발행.
 
 ## 설계 원칙
 
@@ -95,35 +95,14 @@ MarketingJobService.triggerPublish(id)
                     └── ASM: status = PUBLISHING → 소셜 게시 → PUBLISHED (콜백)
 ```
 
-### 5. 이월 정책 (P3-10) — 예약 시각 경과 자동 재예약
+### 5. 자동 발행 — READY 즉시 (저녁 슬롯 폐기)
 
-```
-MarketingPollingScheduler (15초마다)
-    │
-    ├─ ASM poll / applyPoll (상태·아티팩트 동기화)
-    │
-    └─ 명시적 수동 예약만: 생성 중 예약 시각 경과 이월 (poll **이후**에 실행 — 순서 고정)
-       조건: autoPublish=true AND scheduledPublishAt < NOW()-5분
-             AND status ∈ QUEUED, RUNNING, STALE (READY 제외)
-       └─ rescheduleExpiredJob()
-           ├─ originalScheduledAt 기록 (첫 이월 시)
-           ├─ 다음날 동일 시간대로 재예약 (예: 20:30 → 다음날 20:30)
-           ├─ 충돌 시 다음 빈 슬롯 (±5분, 정각=1h / 30분=30m)
-           └─ Telegram 이월 알림 1회/이월
-       ⚠️ poll보다 먼저 이월하면 applyPoll이 옛 엔티티로 슬롯을 덮어
-          15초마다 동일 "1회째 이월" 알림이 반복된다. preview(autoPublish=false)는 이월 대상 아님.
-```
+T+24h 자동 선정 잡과 강제 배포 잡은 `auto_publish=true`로 ASM에 생성한다.
+X 캡처·IG 피드·Reels·Shorts 모두 채널 렌더가 READY가 되면 **즉시 게시**한다.
+`scheduled_publish_at`은 V117 NOT NULL용 생성 시각일 뿐 게이팅하지 않으며, 다음날 저녁 이월도 하지 않는다.
 
-**자동 발행**: T+24h 자동 선정 잡은 `auto_publish=true`로 ASM에 생성한다. 채널 렌더가 READY가 되면 ASM이 즉시 게시하며, KST 고정 슬롯과 `scheduledPublishAt`은 사용하지 않는다. 예약 이월은 명시적으로 `scheduledPublishAt`이 있는 수동 예약 잡에만 적용한다.
-
-**상태 업데이트**:
-- `scheduledPublishAt`: 새 예약 시각
-- `rescheduledCount`: +1
-- `lastRescheduledAt`: 현재 시각
-- `rescheduledReason`: "예약 시각 경과 (원 예약: {원래시간})"
-- `originalScheduledAt`: 첫 이월 시에만 저장
-
-**로깅·알림**: INFO 레벨로 상세 기록 + `TelegramNotifier`로 @WaggleBot_bot 채팅방에 이월 발생 시마다 알림 (잡 ID·원 예약/새 예약 시각·이월 횟수 포함). 예약 발행은 callback/poll에서 상태가 처음 **PUBLISHED**가 되면 제목·플랫폼별 게시 URL을, **FAILED/PARTIAL**이 되면 제목·플랫폼별 원인과 `errorMessage` 로그를 1회 알린다. 예약 시각 도래 후 publish trigger 자체가 실패한 경우도 즉시 알린다. 이전 저장 상태와 비교하므로 callback/poll 중복 호출은 중복 알림을 만들지 않는다. 봇 토큰/chat id는 `encrypted_secret` vault(`telegram.bot_token`/`telegram.chat_id`)에서 주입한다.
+ASM Waggle 영상 경로도 X와 같이 `auto_publish`면 READY 직후 `PUBLISHING`으로 올린다.
+Again-Spring 폴러는 READY auto-publish 잡을 슬롯 대기 없이 `triggerPublish`한다.
 
 ### 6. Phase 2 분배 · 영상 · 통계 루프
 
@@ -142,7 +121,7 @@ T+24h MarketingHoldingCommitService
     │     ├─ hook_emotion → brief → WaggleBot S2 Pro TTS
     │     └─ 유니크 렌더 (Reels≤30s / Shorts≤45s · 전문 낭독 금지)
     │
-    └─ 저녁 슬롯 publish (Phase 1)
+    └─ READY 즉시 publish
             │
             ▼
         [발행 성공] → 댓글 감시 창 (published_at + N h, 기본 24)
@@ -220,11 +199,11 @@ CREATE TABLE marketing_job (
   requested_by            VARCHAR(128),                      -- V104: force=`admin:force:`+JWT subject(UUID)
   poll_fail_count         INT DEFAULT 0,
   last_polled_at          TIMESTAMP NULL,
-  scheduled_publish_at    DATETIME(6) NULL,                  -- 예약된 발행 시각 (이월 정책)
-  rescheduled_count       INT DEFAULT 0,                     -- 이월된 횟수
-  rescheduled_reason      VARCHAR(255) NULL,                 -- 이월 사유
-  original_scheduled_at   DATETIME(6) NULL,                  -- 원래 예약 시각 (첫 이월 시 기록)
-  last_rescheduled_at     DATETIME(6) NULL,                  -- 마지막 이월 시각
+  scheduled_publish_at    DATETIME(6) NOT NULL,              -- 생성 시각 (V117). 자동 발행 게이트 아님
+  rescheduled_count       INT DEFAULT 0,                     -- 레거시 이월 횟수 (신규 자동 잡 미사용)
+  rescheduled_reason      VARCHAR(255) NULL,
+  original_scheduled_at   DATETIME(6) NULL,
+  last_rescheduled_at     DATETIME(6) NULL,
   created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_mj_post FOREIGN KEY (post_id) REFERENCES posts(id)
@@ -256,15 +235,9 @@ ASM 렌더 실패는 `retryable=true`이고 `ingest_attempts < 2`면 1회 자동
 쿼터가 "실제 발행 성공" 기준(2026-08-12, `83e14ba7`)이라 재시도가 그날 발행 편수를 깎지 않는다.
 WaggleBot poll timeout은 1800초→2700초로 상향(2026-08-14 실측 타임아웃 2건).
 
-**이월 정책 필드 (V103 추가)**:
-- `scheduled_publish_at`: 현재 예약된 발행 시각 (이월 시 갱신됨). **V117(2026-08-15)부터 DB NOT NULL** —
-  슬롯 조회 실패 시 `MarketingPublishSlotService`가 플랫폼 기본 슬롯 → 다음 정시 순으로 폴백해
-  반드시 값을 채운다. 이전에는 NULL이 저장돼 자동 발행 쿼리(`scheduledPublishAt IS NOT NULL`)에
-  영원히 걸리지 않는 "미아 잡"이 생겼다(발견 시점 최장 3일 방치 20건, 일괄 STALE 종료로 정리).
-- `rescheduled_count`: 총 이월 횟수 (0 = 원래 예약시각, 1+ = 이월됨)
-- `rescheduled_reason`: 이월 사유 예: "예약 시각 경과 (원 예약: 2026-08-08T14:00:00Z)"
-- `original_scheduled_at`: 첫 이월 시 저장, 변경되지 않음 (감사 추적용)
-- `last_rescheduled_at`: 마지막 이월 시각
+**예약 시각 필드 (V103/V117)**:
+- `scheduled_publish_at`: **V117부터 DB NOT NULL**. 신규 잡은 생성 시각을 넣는다. **READY 즉시 발행**이며 저녁 슬롯·이월 게이팅에 쓰지 않는다(2026-08-16).
+- `rescheduled_count` / `rescheduled_reason` / `original_scheduled_at` / `last_rescheduled_at`: 과거 저녁 슬롯 이월용. 신규 자동 발행 경로는 갱신하지 않는다.
 
 ---
 

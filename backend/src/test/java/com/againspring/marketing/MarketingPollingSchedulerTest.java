@@ -9,7 +9,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -21,8 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,8 +44,45 @@ class MarketingPollingSchedulerTest {
     }
 
     @Test
-    @DisplayName("carry-over runs after applyPoll so the next-day slot is not overwritten")
-    void carryOverRunsAfterPoll() {
+    @DisplayName("READY auto-publish jobs publish immediately even if an evening slot is still in the future")
+    void readyAutoPublishJobsPublishWithoutWaitingForEveningSlot() {
+        Instant futureEvening = Instant.now().plus(8, ChronoUnit.HOURS);
+        MarketingJob job = MarketingJob.builder()
+            .id(580L)
+            .remoteJobId("asm-reels")
+            .postId("post_v")
+            .status("READY")
+            .autoPublish(true)
+            .scheduledPublishAt(futureEvening)
+            .artifacts("{\"mp4\":\"https://example/x.mp4\"}")
+            .build();
+
+        when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of(job));
+        when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of(job));
+
+        scheduler.pollJobs();
+
+        verify(marketingJobService).triggerPublish(580L);
+        verify(asmClient, never()).getJob(anyString());
+        verify(telegramNotifier, never()).send(anyString());
+    }
+
+    @Test
+    @DisplayName("preview jobs (autoPublish=false) never auto-publish")
+    void previewJobsDoNotAutoPublish() {
+        when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of());
+        when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
+
+        scheduler.pollJobs();
+
+        verify(telegramNotifier, never()).send(anyString());
+        verify(marketingJobRepository, never()).save(any());
+        verify(marketingJobService, never()).triggerPublish(anyLong());
+    }
+
+    @Test
+    @DisplayName("still-generating auto-publish jobs are not rolled to a next-day evening slot")
+    void generatingJobsAreNotCarriedToNextEvening() {
         Instant past = Instant.now().minus(1, ChronoUnit.HOURS);
         MarketingJob job = MarketingJob.builder()
             .id(561L)
@@ -65,64 +99,13 @@ class MarketingPollingSchedulerTest {
         when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
         when(asmClient.getJob("asm-1")).thenReturn(AsmJobView.builder()
             .status("QUEUED").phase("SCRIPT").progress(0.1).build());
-        // Second lookup (after poll) still sees expired auto-publish job
-        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of(job));
-        when(marketingJobRepository.findJobsByScheduledTimeRange(any(), anyLong()))
-            .thenReturn(List.of());
 
         scheduler.pollJobs();
 
-        InOrder order = inOrder(marketingJobService, marketingJobRepository, telegramNotifier);
-        order.verify(marketingJobService).applyPoll(any(), any());
-        order.verify(marketingJobRepository, atLeastOnce()).save(any());
-        order.verify(telegramNotifier).send(anyString());
-
-        assertThat(job.getRescheduledCount()).isEqualTo(1);
-        assertThat(job.getScheduledPublishAt()).isEqualTo(past.plus(1, ChronoUnit.DAYS));
-    }
-
-    @Test
-    @DisplayName("preview jobs (autoPublish=false) never trigger carry-over telegram")
-    void previewJobsDoNotCarryOver() {
-        when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of());
-        when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
-        // Repository query filters auto_publish=1; empty list simulates that.
-        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of());
-
-        scheduler.pollJobs();
-
+        verify(marketingJobService).applyPoll(any(), any());
         verify(telegramNotifier, never()).send(anyString());
-        verify(marketingJobRepository, never()).save(any());
-        verify(marketingJobRepository).findExpiredScheduledJobs();
-    }
-
-    @Test
-    @DisplayName("telegram message uses incremented carry-over count")
-    void telegramIncludesCarryCount() {
-        Instant past = Instant.parse("2026-08-12T11:30:00Z");
-        MarketingJob job = MarketingJob.builder()
-            .id(562L)
-            .remoteJobId("asm-2")
-            .postId("post_y")
-            .status("RUNNING")
-            .autoPublish(true)
-            .scheduledPublishAt(past)
-            .originalScheduledAt(past)
-            .rescheduledCount(0)
-            .build();
-
-        when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of());
-        when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
-        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of(job));
-        when(marketingJobRepository.findJobsByScheduledTimeRange(any(), anyLong()))
-            .thenReturn(List.of());
-
-        scheduler.pollJobs();
-
-        ArgumentCaptor<String> msg = ArgumentCaptor.forClass(String.class);
-        verify(telegramNotifier).send(msg.capture());
-        assertThat(msg.getValue()).contains("잡 #562").contains("1회째 이월");
-        assertThat(job.getRescheduledCount()).isEqualTo(1);
+        assertThat(job.getRescheduledCount()).isZero();
+        assertThat(job.getScheduledPublishAt()).isEqualTo(past);
     }
 
     @Test
@@ -138,7 +121,6 @@ class MarketingPollingSchedulerTest {
 
         when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of(ready));
         when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
-        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of());
 
         scheduler.pollJobs();
 
@@ -160,7 +142,6 @@ class MarketingPollingSchedulerTest {
 
         when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of(stale));
         when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
-        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of());
 
         scheduler.pollJobs();
 
@@ -172,16 +153,15 @@ class MarketingPollingSchedulerTest {
     }
 
     @Test
-    @DisplayName("late READY job is published in the same reconciliation cycle")
-    void publishesImmediatelyWhenRemoteBecomesReadyAfterSlot() {
-        Instant past = Instant.now().minus(10, ChronoUnit.MINUTES);
+    @DisplayName("late READY job is published in the same reconciliation cycle even before any clock slot")
+    void publishesImmediatelyWhenRemoteBecomesReady() {
+        Instant futureEvening = Instant.now().plus(8, ChronoUnit.HOURS);
         MarketingJob job = MarketingJob.builder()
             .id(572L).remoteJobId("asm-late-ready").postId("post_late").status("WAITING_EXTERNAL")
-            .autoPublish(true).scheduledPublishAt(past).build();
+            .autoPublish(true).scheduledPublishAt(futureEvening).build();
 
         when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of(job));
         when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
-        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of());
         when(asmClient.getJob("asm-late-ready")).thenReturn(AsmJobView.builder().status("READY").build());
         doAnswer(invocation -> {
             ((MarketingJob) invocation.getArgument(0)).setStatus("READY");
@@ -203,7 +183,6 @@ class MarketingPollingSchedulerTest {
 
         when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of(a, b));
         when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
-        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of());
         when(asmClient.getJob("a")).thenThrow(new AsmUnavailableException("connect timeout"));
 
         scheduler.pollJobs();
@@ -214,36 +193,9 @@ class MarketingPollingSchedulerTest {
     }
 
     @Test
-    @DisplayName("rescheduleExpiredJob with null scheduledPublishAt sends error alert (Decision #10)")
-    void rescheduleExpiredJobWithNullScheduledTime_sendsCodeDefectAlert() {
-        MarketingJob job = MarketingJob.builder()
-            .id(999L)
-            .remoteJobId("asm-defect")
-            .postId("post_defect")
-            .status("QUEUED")
-            .autoPublish(true)
-            .scheduledPublishAt(null)  // This should never happen after NOT NULL migration
-            .build();
-
-        when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of());
-        when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of());
-        when(marketingJobRepository.findExpiredScheduledJobs()).thenReturn(List.of(job));
-
-        scheduler.pollJobs();
-
-        ArgumentCaptor<String> msg = ArgumentCaptor.forClass(String.class);
-        verify(telegramNotifier).send(msg.capture());
-        assertThat(msg.getValue())
-            .contains("코드 결함")
-            .contains("잡 #999")
-            .contains("NOT NULL");
-    }
-
-    @Test
-    @DisplayName("monitorPublishingDelays detects READY jobs 30+ minutes past scheduled time")
+    @DisplayName("monitorPublishingDelays detects READY auto-publish jobs stuck 30+ minutes")
     void monitoringDelayAlertsOnReadyJobsPast30Minutes() {
         Instant now = Instant.now();
-        Instant thirtyMinutesAgo = now.minus(30, ChronoUnit.MINUTES);
         Instant fortyMinutesAgo = now.minus(40, ChronoUnit.MINUTES);
 
         MarketingJob delayed = MarketingJob.builder()
@@ -252,18 +204,8 @@ class MarketingPollingSchedulerTest {
             .postId("post_delayed")
             .status("READY")
             .autoPublish(true)
-            .scheduledPublishAt(fortyMinutesAgo)
+            .updatedAt(fortyMinutesAgo)
             .targets("[\"instagram_reels\",\"youtube_shorts\"]")
-            .build();
-
-        MarketingJob onTime = MarketingJob.builder()
-            .id(778L)
-            .remoteJobId("asm-ontime")
-            .postId("post_ontime")
-            .status("READY")
-            .autoPublish(true)
-            .scheduledPublishAt(thirtyMinutesAgo.plus(1, ChronoUnit.MINUTES))
-            .targets("[\"x_thread\"]")
             .build();
 
         when(asmProperties.isEnabled()).thenReturn(true);

@@ -29,7 +29,7 @@
 | 마스터 훅 | 광장 `title` ≠ SNS 훅. `promoTitle`/`hook*` + `hook_emotion` | 전략 문서·[`api.md`](api.md) |
 | 태그 | 브랜드 항상 `#다시봄`+`#againspring`. X=2개만 / IG≤5 / YT=`#Shorts`+브랜드+니치 | [`platforms.md`](platforms.md) |
 | IG 캡션 | raw URL 제거 · 프로필 링크 | [`instagram-feed-strategy.md`](instagram-feed-strategy.md) |
-| 발행 | T+24h **커밋 ≠** KST 저녁 **실발행** (feed 20:00 / 영상 20:30 / X 21:30) | [`platforms.md`](platforms.md) |
+| 발행 | T+24h 커밋 후 **채널 렌더 READY 즉시 실발행** (저녁 슬롯 없음) | [`platforms.md`](platforms.md) |
 | UTM | X·YT 등 링크 → 사연 상세 | [`api.md`](api.md) |
 | 텔레그램 | 발행 후 N시간(기본 24h) 신규 댓글 → WaggleBot 텔레그램 · 수동 답글 | [`architecture.md`](architecture.md) |
 | 고지 | **2027-01**까지 AI/합성 고지 없음 · 배심원 카피 금지 | 본 절 |
@@ -83,7 +83,7 @@ docs/shared/marketing/
 
 ## 빠른 시작
 
-> **24h 자동 분배 (Phase 2 타깃)**: 대기 보드 → T+24h **커밋**. 채널별 독립 점수·cap(기본 3) · 같은 사연 멀티 플랫폼 허용 · IG feed⊥Reels만 배타. **실발행**은 저녁 슬롯. 상세 [`platforms.md`](platforms.md).
+> **24h 자동 분배 (Phase 2 타깃)**: 대기 보드 → T+24h **커밋**. 채널별 독립 점수·cap(기본 3) · 같은 사연 멀티 플랫폼 허용 · IG feed⊥Reels만 배타. **실발행**은 렌더 READY 즉시. 상세 [`platforms.md`](platforms.md).
 
 ### 어드민 `/admin/marketing` 탭
 
@@ -127,13 +127,12 @@ FAILED(WaggleBot poll timeout) → WAITING_EXTERNAL → READY
 ```
 
 `SLA_BREACHED`와 `WAITING_EXTERNAL`은 게시 실패가 아닌 원격 처리 대기 상태다. AS는 같은
-remote job ID를 계속 조회하며, 나중에 `READY`가 되었고 예약 시각이 지났다면 그 폴링 주기 안에
+remote job ID를 계속 조회하며, 나중에 `READY`가 되면 그 폴링 주기 안에
 즉시 게시한다. 이후 `READY`/`PUBLISHED` 응답은 이전의 처리 지연 상세와 오류 표시를 지운다.
 
-`scheduled_publish_at`은 **DB NOT NULL**이다(2026-08-15, `V117`). 슬롯 조회가 실패해도
-`MarketingPublishSlotService`가 플랫폼 기본 슬롯 → 다음 정시 순으로 반드시 값을 채운다 —
-이전에는 슬롯 미설정 시 NULL이 저장돼 자동 발행 쿼리에 영원히 걸리지 않는 "미아 잡"이 생겼다
-(2026-08-15 발견 시점 기준 최장 3일 방치 20건, 일괄 STALE 종료로 정리).
+`scheduled_publish_at`은 **DB NOT NULL**이다(2026-08-15, `V117`). 값은 잡 생성 시각이며
+**자동 발행을 게이팅하지 않는다** — `auto_publish=true` 잡은 READY 도달 즉시 게시한다.
+저녁 고정 슬롯·다음날 이월은 폐기했다(2026-08-16).
 
 ---
 
