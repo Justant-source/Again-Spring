@@ -1,6 +1,6 @@
 # 시봄이 숏폼 삽입 스펙 — Shorts / Reels
 
-> **권위본**: 이 문서 (2026-08-12 그릴링 합의).  
+> **권위본**: 이 문서 (2026-08-12 그릴링 합의 · **2026-08-16 본문 레이아웃 SSOT**, 검증 job `#669`).  
 > 캐릭터 자산·카탈로그: [`docs/frontend/design/specs/sprout-character-system/`](../../frontend/design/specs/sprout-character-system/) · 런타임 패키지: `.temp/sprouts/` (승격 예정).  
 > 채널 계약: [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md).  
 > **메타포 일러스트 60종은 영상 경로에서 완전 사용 금지.**
@@ -42,6 +42,7 @@
 | 22 | **AS**가 후보·플랜·가드 · catalog SSOT · ASM/WaggleBot은 합성·모션만 |
 | 23 | 발행 최소선 = 4장(전 채널 공통). 4장 미만은 재생성 1회 후 사망. 4장 이상이면 soft target 미달이어도 발행 (2026-08-15 그릴링) |
 | 24 | soft-fill 자동 보충을 코드로 구현. LLM 추가 호출 없음(결정 #20 준수). 풀 고갈 시 채울 수 있는 만큼만 (2026-08-15 그릴링) |
+| 25 | **본문 레이아웃 SSOT (2026-08-16, job 669)**: 사연 줄 = 마침표·절(`는데`/`지만`)만. 시봄이 없는 줄만 화면당 최대 3. 시봄이 비트 = **그 한 절 + 캐릭터 `image_text` 카드**(TTS 유지). 20자 wrap·조사 절단·무음 `image_only`·3줄 우하단 스티커 금지 |
 
 ---
 
@@ -118,8 +119,8 @@ WaggleBot `min_sibom` 하드 게이트는 이 최소선(4)과 같아야 한다. 
 ```
 
 - 고르기 근거 = 원문 의미 / keywords·trigger  
-- `beat_index` = 해당 채널 대본 비트 인덱스  
-- 캡션: catalog `caption`/`alt_captions` 재사용 또는 **최대 10자** 신규(`maxChars=10`). 판정·평가 금지
+- `beat_index` = Waggle이 사연을 문장/절 줄로 나눈 **뒤**(pack 전)의 본문 줄 인덱스. 3줄로 묶인 `text_only` 화면 인덱스가 아니다. intro는 본문 인덱스와 별개(`role=intro`).  
+- 캡션: catalog `caption`/`alt_captions` 재사용 또는 **최대 10자** 신규(`maxChars=10`). 판정·평가 금지. **사연 문장을 캡션에 넣지 않는다.**
 
 ### 5.2 스키마·품질 가드 (코드, LLM 보정 1회)
 
@@ -144,18 +145,73 @@ AS는 채널별 초기 생성 결과가 비었거나 최소 장수(4장)에 못 
 
 ---
 
-## 6. 레이아웃·모션 (렌더러)
+## 6. 레이아웃·모션 (렌더러) — 본문 SSOT
 
-| 모드 | 배치 | 모션 |
-|---|---|---|
-| large (intro/peak) | 상단 사연 텍스트 + 중하단 시봄이 크게 | 페이드 인, hold 동안 유지 |
-| small (punch/soft_fill) | 사연 텍스트 主役 + 시봄이 ≈화면폭 35–45% 코너 스티커 | 팝(scale 92→100)+짧은 페이드 · 0.8–1.5s |
-| 특수 | `indignant`, `stunned` 등 | 약한 바운스/쉐이크 (목록·강도는 결과 보고 조정) |
+> 런타임: WaggleBot `again_spring_text.split_story_lines` → 줄당 씬 → `apply_sibom_plan_to_body`(`image_text`) → `pack_undecorated_story_screens`.  
+> 검증: job **#669** (2026-08-16). 이 절과 코드가 어긋나면 **코드를 문서에 맞춘다.**
 
-- 본문 시봄이 컷에서도 **사연 텍스트는 유지** (메인).  
-- 댓글 씬·아웃트로: 시봄이 없음.  
-- 기본 좌표 참고: catalog 합성 후 프레임 `(90, 550)` @ 1:1 (large). small은 스케일·앵커만 변경.
-- 카드·텍스트 블록의 배경·테두리·타이포 크롬은 **Tone L**을 유지한다. 줄바꿈으로 블록이 직사각형이 되어도 캐릭터 PNG 자체는 1:1이다.
+본문은 두 종류의 화면만 쓴다.
+
+| 화면 | 언제 | 보이는 것 | TTS |
+|---|---|---|---|
+| `text_only` | 시봄이가 **없는** 연속 절 | 문장/절 블록 **최대 3개**, 좌측 정렬 Tone L | 줄마다 낭독 |
+| `image_text` | `sibom_plan` 본문 비트 (peak/punch/soft_fill) | **그 비트의 절 하나** + 시봄이 카드(PNG 상황 캡션) | 그 절 낭독 |
+
+인트로(`role=intro`)는 훅 카드 + large 시봄이. 댓글·아웃트로에는 시봄이 없음.
+
+### 6.1 사연 줄을 나누는 규칙
+
+Waggle `split_story_lines`만 사용한다.
+
+1. 공백 정규화 후 **문장 끝** `[.!?…]` + 공백에서 자른다.  
+2. 한 문장 안에서는 절 끝만 자른다: `는데` / `지만` / `은데` / `ㄴ데` (쉼표 포함 `는데,` 우선).  
+3. **하지 않는다**: `smart_split_korean(..., max_chars=20)` 또는 22자 창, `가`/`를`/`을` 조사로 명사구를 쪼개기, 시봄이 캡션 칸에 사연을 20자로 욱여넣기.
+
+예 (job 668 대본 기준 올바른 줄):
+
+```
+아이를 낳자는 얘기를 꺼냈는데
+조건이 나왔어요.
+지금까지 생활비를 반반씩 내고 있었는데,
+임신하는 동안 생활비를 제가 전부 내야 한다는 거였죠.
+```
+
+잘못된 줄 (금지): `지금까지 생활비를` / `생활비를 제가` / `함께` 다음 줄에 `낳는 건데`.
+
+화면 표시에서 폰트가 길면 **렌더러가 시각적으로만 wrap**할 수 있다. 그건 새 비트·새 TTS 청크가 아니다.
+
+### 6.2 시봄이가 없는 화면 (`text_only`)
+
+`pack_undecorated_story_screens`: 시봄이 역할이 **없는** 인접 줄만 모아 화면당 **최대 3블록**. 4번째부터 다음 `text_only`.  
+시봄이 `image_text` 앞뒤에서 버퍼를 비운다. 캐릭터 카드를 3줄 스택 안에 넣지 않는다.
+
+### 6.3 시봄이 본문 비트 (`image_text`)
+
+`apply_sibom_plan_to_body`가 해당 줄 씬을 `image_text`로 바꾸고, 사연 `text_lines`/`pre_split_lines`는 **그대로 둔다.**
+
+- 한 화면에 사연 **한 절** + 캐릭터(캡션은 PNG에 이미 합성).  
+- TTS는 그 절이다. 무음 컷이 아니다.  
+- `size=large`(intro/peak): Tone L 카드 미디어 슬롯에 크게, hold·숨쉬기.  
+- `size=small`(punch/soft_fill): **그 카드 슬롯 안에서** 작게. 3줄 `text_only`의 우하단에 스티커로 상주시키지 않는다.  
+- 모션: 팝(약 1.2s, scale 92→100) + punch는 유지, hold는 숨쉬기 루프. shake id는 §9.
+
+`beat_index`는 pack **전** 줄 인덱스에 붙인다. 화면을 3줄로 묶은 뒤에 붙이면 캐릭터가 3문장 내내 남거나 비트가 스킵된다 (`no free body scene`).
+
+### 6.4 좌표·크롬
+
+- 인트로 large 참고: 합성 후 `(90, 550)` @ 1:1, scale 1.0.  
+- small 기본 스케일 0.40 of 820px (1080 캔버스) — **본문에서는 카드 슬롯 기준**.  
+- Tone L 카드·불릿·타이포는 [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) §4. PNG 자체는 1:1.
+
+### 6.5 명시적 금지 (2026-08-16에 품질을 떨어뜨린 패턴)
+
+| 금지 | 증상 |
+|---|---|
+| 사연을 20/22자로 재분할 | 문장 중간에서 줄바꿈 |
+| 조사 `가/를/을`로 분할 | `생활비를` / `제가` 같은 조각 |
+| 본문 시봄이를 무음 `image_only`로 삽입 | 그 구간 글·TTS 없음 |
+| 3줄 `text_only` 전체에 small 우하단 오버레이 | 캐릭터가 어색하게 계속 붙어 있음 |
+| pack 후 화면에 `beat_index` 매핑 | 1절+캐릭터 씬 소멸, 비트 스킵 |
 
 ---
 
@@ -204,14 +260,15 @@ AS는 채널별 초기 생성 결과가 비었거나 최소 장수(4장)에 못 
 - 댓글/아웃트로 시봄이  
 - 캡션에 판정·승패·처방 표현  
 - 1인 장면에 진영색 칠하기  
+- 사연 20/22자 wrap · 조사 절단 · 본문 시봄이 무음 `image_only` · 3줄 화면 우하단 스티커 상주 (§6.5)  
 
 ---
 
 ## 11. Doc-Sync
 
-- 본 문서 = 영상 삽입 계약 SSOT  
-- `youtube-shorts-strategy.md`: 메타포 intro → 시봄이 intro/`sibom_plan`으로 갱신  
+- 본 문서 §6 = **본문 레이아웃 SSOT** (job 669). Waggle `again_spring_text` · `apply_sibom_plan_to_body` · `pack_undecorated_story_screens`  
+- `youtube-shorts-strategy.md` §4.2·§7.1: 동일 계약  
 - `sprout-character-system/README.md` §6.2: 본 스펙이 런타임 이관을 **재정의** (30장 즉시, AS 플랜 소유)  
 - `platforms.md` / `api.md`: brief 필드 반영  
 
-**마지막 합의**: 2026-08-12 그릴링
+**마지막 합의**: 2026-08-16 본문 레이아웃 복구 (문장/절 줄 · 1절+시봄이 카드 · 시봄이 없는 줄만 3블록)

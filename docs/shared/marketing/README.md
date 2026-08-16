@@ -17,7 +17,7 @@
 | 플랫폼별 점수·cap | X / IG feed / Reels / Shorts **독립 popularity** + **일일 cap 기본 각 3** | [`platforms.md`](platforms.md) §점수·cap |
 | 멀티 플랫폼 | 같은 사연·같은 날 **중복 허용**. **IG feed ⊥ Reels만** 배타 (`score_feed` vs `score_reels`, 동점→Reels) | [`platforms.md`](platforms.md) |
 | 영상 | Reels ≤30s / Shorts ≤45s · **유니크 mp4** · 전문 낭독 폐기 · 비트 = 자극 훅→요약→비율/클리프행어 | [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) |
-| 시봄이 삽입 | 메타포 **금지** · 시봄이 30장 · 인트로+본문 4~7 · AS `sibom_plan` · 채널별 각색 | [`sibom-video-insertion.md`](sibom-video-insertion.md) |
+| 시봄이 삽입 | 메타포 **금지** · 시봄이 30장 · 인트로+본문 4~7 · 본문 = 1절+캐릭터 카드 / 시봄이 없는 줄만 ≤3블록 | [`sibom-video-insertion.md`](sibom-video-insertion.md) §6 |
 | 2단 훅 | 사연 생성 = 마스터 훅+감정 / **영상 슬롯 확정 시** = `hook_reels`·`hook_shorts` + 스크립트 | [`api.md`](api.md) · [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) |
 | TTS 감정 | `hook_emotion` → WaggleBot S2 Pro (`shock`\|`anger`\|`tension`\|`sad`\|`hype`) | [`api.md`](api.md) |
 | 통계·학습 | 플랫폼 통계 수집 + **주간 리포트** + 가중치 `auto_adjust` on/off (프롬프트 자동 패치 없음) | [`platforms.md`](platforms.md) · [`api.md`](api.md) · [`architecture.md`](architecture.md) |
@@ -76,7 +76,7 @@ docs/shared/marketing/
 ├── x-thread-strategy.md        ← X 스레드 전략 (솔로 3~4 / 양면 최대 6단)
 ├── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (24h · 글 슬롯)
 ├── youtube-shorts-strategy.md  ← Shorts/Reels (유니크·길이·TTS 감정)
-└── sibom-video-insertion.md    ← 시봄이 숏폼 삽입 (메타포 금지 · sibom_plan)
+└── sibom-video-insertion.md    ← 시봄이 숏폼 삽입 (메타포 금지 · 본문 §6 레이아웃 SSOT)
 ```
 
 ---

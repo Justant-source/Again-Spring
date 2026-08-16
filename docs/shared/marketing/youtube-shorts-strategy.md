@@ -2,8 +2,8 @@
 
 > **권위본**: 이 문서. `youtube_shorts` / `instagram_reels` 영상 채널의 생성·검수·게시 계약.
 > 플랫폼 표·분배는 [`platforms.md`](platforms.md), 캡처/피드는 [`instagram-feed-strategy.md`](instagram-feed-strategy.md) · [`x-thread-strategy.md`](x-thread-strategy.md).
-> **시봄이 삽입(인트로·본문·brief)**: [`sibom-video-insertion.md`](sibom-video-insertion.md) — **메타포 일러스트는 영상 경로에서 사용 금지**.
-> **작성**: 2026-08-04 · **Phase 2 타깃 SSOT**: 2026-08-11 · **시봄이 삽입**: 2026-08-12
+> **시봄이 삽입(인트로·본문·brief)**: [`sibom-video-insertion.md`](sibom-video-insertion.md) — **메타포 일러스트는 영상 경로에서 사용 금지**. 본문 레이아웃 SSOT는 그 문서 §6 (job `#669`).
+> **작성**: 2026-08-04 · **Phase 2 타깃 SSOT**: 2026-08-11 · **시봄이 삽입**: 2026-08-12 · **본문 레이아웃 복구**: 2026-08-16
 
 ---
 
@@ -47,7 +47,7 @@ AS 24h 분배 (채널별 score·cap)
 | 해상도 | **1080×1920 (9:16)** |
 | 길이 | **Reels ≤30s** · **Shorts ≤45s** |
 | LTX / ComfyUI | **off** (`videoGen: false`) |
-| 프레임 | Waggle `text_only` / `comments` / `outro` 재활용 |
+| 프레임 | Waggle `text_only`(시봄이 없는 줄, 화면당 ≤3) · `image_text`(시봄이 비트 = 1절+캐릭터) · `comments` · `outro` |
 | 본문 비트 | **자극 훅 → 요약 → 사연의 여운**. 공감비율 확인·댓글 작성·의견 요청 CTA 금지. **전문 낭독 금지** |
 | 훅 | 사연 생성 = 마스터 훅+`hook_emotion` / **영상 슬롯 확정 시** = `hook_reels` 또는 `hook_shorts` + `script_*` |
 | 감정 → TTS | `hook_emotion` → ASM→WaggleBot `options.mood`/`ttsEmotion` (Fish Speech markers; plan S2 Pro path) |
@@ -93,7 +93,12 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 
 ### 4.2 본문 프레임
 
-- **좌측 정렬**, 최대 **3줄**. 가운데 정렬·중앙 배치였던 기존 프레임과 다르다.
+권위본은 [`sibom-video-insertion.md`](sibom-video-insertion.md) **§6**. 요약:
+
+- **좌측 정렬** Tone L. 시봄이가 **없는** 연속 절만 화면당 **최대 3블록** (`text_only`). 4번째부터 새 화면.
+- 줄 나누기: 마침표·절(`는데`/`지만` 등)만. `smart_split_korean(..., max_chars=20)` · 22자 창 · 조사 `가/를/을` 절단 **금지**.
+- 시봄이 비트는 별도 `image_text` 카드: **그 한 절** + 캐릭터(PNG 상황 캡션). TTS는 그 절. 무음 컷 아님. 3줄 화면 우하단에 스티커로 상주시키지 않음.
+- `beat_index`는 3줄로 묶기 **전** 줄 인덱스.
 - 폰트는 세리프(`--font-serif`), 색은 `--L-ink`.
 
 ### 4.3 댓글 프레임
@@ -184,7 +189,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 
 ### 7.1 레이아웃 리디자인 (§4 — 반영 완료)
 
-1. **본문 프레임**: 좌측 정렬·화면당 독립 텍스트 블록 최대 3개 + Tone L 팔레트/타이포 (WaggleBot `text_only`). 블록 수가 4개가 되면 새 화면에서 시작하며, 다시봄 경로에서는 짧은 블록을 병합하지 않는다.
+1. **본문 프레임**: [`sibom-video-insertion.md`](sibom-video-insertion.md) §6. `text_only` ≤3(시봄이 없는 줄만) · 시봄이 = 1절 `image_text` 카드 · 20자/조사 wrap 금지. 검증 job `#669`.
 2. **댓글 프레임**: 최대 3개 + fade-in + 닉네임/medium blur/좋아요+상대시간/진영색 + AS brief `top_comments`(§4.5)
 3. **아웃트로**: 마스코트 제거 + Tone L CTA
 4. **AV lead**: `TTS_TEXT_LEAD_SEC=0.10` (job `#462` 확정)
