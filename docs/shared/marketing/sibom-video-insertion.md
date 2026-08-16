@@ -68,6 +68,8 @@
 
 **발행 최소선 = 4장(전 채널 공통). 4장 미만은 재생성 1회 후 사망.**
 4장 이상이면 soft target 미달이어도 발행한다.
+WaggleBot `min_sibom` 하드 게이트는 이 최소선(4)과 같아야 한다. Shorts soft target 5~7을 하드 실패로 쓰면
+4장 플랜이 `SIBOM_SCENES_TOO_SHORT` → `RENDER_UNKNOWN`으로 죽는다 (job 665, 2026-08-16).
 강한 매칭 부족 시 soft-fill 자동 보충 → 그래도 4장 미만이면 재생성 (추가 LLM 호출 없음).
 
 ### 4.2 role

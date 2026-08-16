@@ -747,6 +747,34 @@ class MarketingJobServiceTest {
     }
 
     @Test
+    void applyPoll_liftsNestedSibomCodeFromRenderUnknownDump() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(665L).remoteJobId(TEST_JOB_ID).postId(TEST_POST_ID).status("RUNNING").build();
+        AsmJobView view = AsmJobView.builder()
+            .status("FAILED")
+            .failureCode("RENDER_UNKNOWN")
+            .failureStage("ASM:WAGGLE_POLL")
+            .retryable(false)
+            .errorSummary("{'ok': True, 'jobId': 10027231, 'status': 'FAILED', 'sibom_plan_count'")
+            .diagnostics(Map.of(
+                "youtube_shorts", Map.of(
+                    "failure_code", "SIBOM_SCENES_TOO_SHORT",
+                    "sibom_applied_count", 4,
+                    "sibom_required_count", 5
+                )
+            ))
+            .build();
+        doReturn("{}").when(objectMapper).writeValueAsString(any());
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        marketingJobService.applyPoll(job, view);
+
+        assertThat(job.getFailureCode()).isEqualTo("SIBOM_SCENES_TOO_SHORT");
+        assertThat(job.getErrorSummary()).contains("SIBOM_SCENES_TOO_SHORT");
+        assertThat(job.getErrorSummary()).doesNotContain("{'ok'");
+    }
+
+    @Test
     void applyPoll_toFailed_alertsOnceWithPublicationError() throws JsonProcessingException {
         MarketingJob job = MarketingJob.builder()
             .id(777L)

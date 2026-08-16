@@ -501,10 +501,18 @@ public class MarketingJobService {
                                                    Boolean retryable, String errorSummary) {
         if (diagnostics != null) job.setGenerationDiagnostics(serializeJson(diagnostics));
         if (actualDurationMs != null && actualDurationMs >= 0) job.setActualDurationMs(actualDurationMs);
-        if (failureCode != null && !failureCode.isBlank()) job.setFailureCode(compact(failureCode, 64));
+        String resolvedCode = MarketingRemoteFailureCodes.resolve(failureCode, diagnostics);
+        if (resolvedCode != null && !resolvedCode.isBlank()) job.setFailureCode(compact(resolvedCode, 64));
         if (failureStage != null && !failureStage.isBlank()) job.setFailureStage(compact(failureStage, 64));
         if (retryable != null) job.setRetryable(retryable);
-        if (errorSummary != null && !errorSummary.isBlank()) job.setErrorSummary(compact(errorSummary, 1000));
+        if (errorSummary != null && !errorSummary.isBlank()) {
+            String summary = errorSummary;
+            if (MarketingRemoteFailureCodes.isQualityFailure(resolvedCode)
+                && MarketingRemoteFailureCodes.looksLikeRawDump(summary)) {
+                summary = "terminal video quality gate failed: " + resolvedCode;
+            }
+            job.setErrorSummary(compact(summary, 1000));
+        }
     }
 
     private String resolveLocalStatus(MarketingJob job, String remoteStatus, String remoteError) {
