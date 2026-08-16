@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import type { CompletedHoldingView } from './CompletedHoldingsBoard';
 
@@ -139,7 +140,15 @@ export function CompletedPublicationDialog({
               {(item.jobs ?? []).map((job) => (
                 <div key={job.id} className="rounded border p-3" data-testid={`completed-publication-job-${job.id}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono text-xs text-gray-500">Job {job.id}</span>
+                    <Link
+                      href={`/admin/marketing/jobs/${job.id}`}
+                      className="font-mono text-xs text-blue-700 hover:underline"
+                      data-testid={`completed-publication-job-link-${job.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      Job {job.id}
+                    </Link>
                     <Badge
                       className={JOB_STATUS_COLOR[job.status] || 'bg-gray-100 text-gray-700'}
                       data-testid="job-status-badge"

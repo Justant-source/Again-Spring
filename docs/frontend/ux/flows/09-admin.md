@@ -124,7 +124,7 @@ flowchart TD
 | 탭 | 역할 |
 |---|---|
 | **대기** | 24h 홀딩 보드. 카드 라벨 = 포맷(VIDEO/TEXT) + 상태(후보/후보 외). 핀 = 인라인 포맷 select. 초안 다이얼로그 = 게시글 제목+작성자/상대방 본문 read-only, `promoTitle` 숨김, `tags`·`topComments`만 편집 |
-| **완료** | 사연 단위 리스트. 상단 게시 이력(COMMITTED, 클릭 시 플랫폼별 상태+URL+잡 상세 링크) · 하단 탈락(DROPPED, 강제 배포) |
+| **완료** | 사연 단위 리스트. 상단 게시 이력(COMMITTED, 클릭 시 플랫폼별 상태+URL · **Job {id}** → `/admin/marketing/jobs/{id}`) · 하단 탈락(DROPPED, 강제 배포) |
 | **설정** | 플랫폼 자동 on/off · 계정 자격증명 |
 
 긴급 재게시는 완료 탭 다이얼로그가 아니라 잡 상세 페이지(`/admin/marketing/jobs/[id]`)의 게시/재게시로 처리한다.

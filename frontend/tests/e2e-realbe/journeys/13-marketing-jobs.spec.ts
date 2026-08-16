@@ -24,6 +24,7 @@ import {
   completedPublishedRow,
   completedForceModeSelect,
   completedForceExecuteBtn,
+  completedPublicationJobLink,
 } from '../support/selectors'
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:8090'
@@ -209,10 +210,23 @@ test.describe('Journey 13-H: 완료 탭 — 게시 상세 다이얼로그', () =
       body: 'e2e marketing publication dialog seed post body — cleanup targets this author.',
     })
 
+    const remoteJobId = `e2e-pub-dialog-${Date.now()}`
+    sql(`
+      INSERT INTO marketing_job (
+        remote_job_id, post_id, status, phase, progress, targets, auto_publish,
+        requested_by, poll_fail_count, scheduled_publish_at, created_at, updated_at, idempotency_key
+      ) VALUES (
+        '${remoteJobId}', '${postId}', 'RUNNING', 'RENDER', 0.4,
+        '["youtube_shorts"]', 0, 'e2epersona01', 0, NOW(), NOW(), NOW(), '${remoteJobId}'
+      );
+    `)
     sql(`
       INSERT INTO marketing_holding (post_id, status, score_snapshot, rank_snapshot, locked_at, created_at, updated_at)
       VALUES ('${postId}', 'COMMITTED', 20.0, 1, NOW(), NOW(), NOW());
     `)
+    const jobId = sql(
+      `SELECT id FROM marketing_job WHERE remote_job_id='${remoteJobId}' LIMIT 1`,
+    )
 
     try {
       await page.goto(`${BASE}/admin/marketing?tab=completed`)
@@ -230,7 +244,16 @@ test.describe('Journey 13-H: 완료 탭 — 게시 상세 다이얼로그', () =
         page.locator(ADMIN_MARKETING.completedPublicationDialog),
         `게시 상세 다이얼로그 노출 필요 (assumption testid: ${ADMIN_MARKETING.completedPublicationDialog})`,
       ).toBeVisible({ timeout: 8_000 })
+
+      const jobLink = page.locator(completedPublicationJobLink(jobId))
+      await expect(jobLink, '잡 상세 링크').toBeVisible({ timeout: 8_000 })
+      await expect(jobLink).toHaveAttribute('href', `/admin/marketing/jobs/${jobId}`)
+      await jobLink.click()
+      await page.waitForURL(new RegExp(`/admin/marketing/jobs/${jobId}`), {
+        timeout: 10_000,
+      })
     } finally {
+      sql(`DELETE FROM marketing_job WHERE remote_job_id='${remoteJobId}'`)
       sql(`DELETE FROM marketing_holding WHERE post_id='${postId}'`)
     }
   })

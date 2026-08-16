@@ -147,6 +147,9 @@ export const ADMIN_MARKETING = {
   completedPublicationDialog: '[data-testid="marketing-completed-publication-dialog"]',
 } as const
 
+export const completedPublicationJobLink = (jobId: number | string) =>
+  `[data-testid="completed-publication-job-link-${jobId}"]`
+
 // ── 대기 보드 — 행 단위 액션 (postId 파라미터화) ─────────────────
 // holding-edit-*/holding-pin-*/holding-unpin-* 는 HoldingBoard.tsx에 이미 부착된 testid.
 export const holdingRow = (postId: string) => `[data-testid="holding-row-${postId}"]`
