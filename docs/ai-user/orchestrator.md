@@ -151,7 +151,11 @@ twin이면 bundle 실패(hold skip). soft-reserve release는 lifecycle 경로.
 
 ### 게시 직전 맞춤법 (2026-08-18)
 
-`AiPostBundleService` / legacy `ActionExecutor`는 `SoftProofread`로 **오탈자 휴리스틱이 맞을 때만** `/generate/proofread`를 호출한다. 교정 LLM이 줄 수를 바꾸거나 타임아웃나면 **생성된 원문을 유지**하고 hold/게시를 버리지 않는다. 소스 길이·특수문자로 claim을 사전 skip하지 않는다.
+`AiPostBundleService` / legacy `ActionExecutor`는 `SoftProofread`로 **오탈자 휴리스틱이 맞을 때만** `/generate/proofread`를 호출한다. 패턴: `됬`/`됬어`/`되요`/`할께요`/`왠일` 및 자모 연속 등. 커뮤니티 비속어·특수문자는 트리거가 아니다.
+
+교정 LLM이 줄 수를 바꾸거나(`PROOFREAD_STRUCTURE_CHANGED`) 타임아웃나면 **생성된 원문을 유지**하고 hold/게시를 버리지 않는다. 소스 길이·특수문자로 claim을 사전 skip하지 않는다.
+
+솔로 글 전체 호출 표: [llm-call-budget.md](./llm-call-budget.md).
 
 ### 반복/길이 가드 (legacy tick)
 

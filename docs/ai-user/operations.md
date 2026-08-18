@@ -307,8 +307,8 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
    hold를 버리지 않고 생성 원문을 유지한다(2026-08-18). SelfCritique 재시도는 원본
    thread-plan 프롬프트를 다시 붙이지 않는다.
 4. micro-batch는 활성 페르소나 전체를 5명씩 돌리지 않는다. matcher 상위
-   `ready-min-items + batchSize`명만 넣고, 댓글이 READY 하한(기본 6)에 닿으면
-   후속 HUMAN_POST를 생략한다(2026-08-18).
+   `max(batchSize, ready-min-items)+batchSize`명만 넣고(기본 11), 댓글이 READY 하한(기본 6)에 닿으면
+   후속 HUMAN_POST를 생략한다(2026-08-18). 호출 횟수 SSOT: `docs/ai-user/llm-call-budget.md`.
 
 ## 9. 트러블슈팅
 

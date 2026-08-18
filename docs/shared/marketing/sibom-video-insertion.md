@@ -91,19 +91,22 @@ WaggleBot `min_sibom` 하드 게이트는 이 최소선(4)과 같아야 한다. 
 
 ## 5. LLM·토큰 계약
 
+상세 횟수: [docs/ai-user/llm-call-budget.md](../../ai-user/llm-call-budget.md) §3.
+
 ```
-[1] 사연 생성 LLM (기존)
+[1] 사연 생성 LLM (기존) — ai-user 워커
     → hook, hook_emotion, body…
     → 코드: 원문 × catalog keywords 스코어 → posts.sibom_candidates (≤12 id)
     ※ 시봄이 전용 LLM 호출 없음. 메타포 선택 지시 제거.
 
-[2] 영상 직전 LLM — 채널별 분리 (기존 VideoVariant / 동등 경로)
-    → script_reels|script_shorts + sibom_plan (해당 채널)
-    → 인증 회로가 열려 있으면 채널 LLM을 호출하지 않고 `LLM_AUTH_CIRCUIT_OPEN`
-    → 컨텍스트: shortlist ≤10 1줄 카드 (id|arc|people|meaning|maxChars)
-               + soft_fill 풀 고정 목록
-               + 원문 요약/핵심 문단 + 훅/emotion
+[2] 영상 직전 LLM — AS VideoVariantService → againspring-llm (채널별)
+    → script_reels|script_shorts + sibom_plan (해당 채널만)
+    → 채널당 1회 + (대본 공백 또는 가드 후 플랜 미달이고 OK/PARSE_ERROR)이면 보정 1회
+    → 인증 회로 open → 0회, 상태 LLM_AUTH_CIRCUIT_OPEN
+    → session limit 문자열은 인증 오류가 아님 (회로를 열지 않음)
+    → 컨텍스트: shortlist ≤10 1줄 카드 + soft_fill 목록 + 본문 ≤900자 + 훅/emotion
     → 금지: 30장 풀 catalog dump
+    → ASM/WaggleBot은 이 JSON을 렌더만 함 (추가 사연 LLM 없음)
 ```
 
 ### 5.1 `sibom_plan` 항목 (채널별)

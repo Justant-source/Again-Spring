@@ -54,6 +54,7 @@
 |---|---|---|---|
 | LLM 프롬프트 | **`docs/shared/prompts/`** (런타임 자산·볼륨마운트) | — | `backend/.../llm/prompt/PromptLoader.java` |
 | LLM 브릿지 | `docs/backend/llm-bridge.md` | `CLAUDE.md` (요약) | `backend/.../llm/remote/RemoteLlmProvider.java` |
+| AI-user·마케팅 **호출 횟수·게이트** (2026-08-18) | `docs/ai-user/llm-call-budget.md` | `docs/ai-user/llm.md` · `thread-planning.md` · `docs/shared/marketing/sibom-video-insertion.md` §5 | `AiPostBundleService` · `SoftProofread` · `SelfCritiqueService` · `VideoVariantService` |
 
 ### 환경 / 인프라
 
@@ -104,11 +105,11 @@
 | `backend/.../db/migration/V*.sql` | `docs/shared/api/database-schema.md` (ER 다이어그램 포함) |
 | `backend/.../domain/**/*.java` | `docs/shared/api/database-schema.md` |
 | `backend/.../api/**/*Controller.java` | `docs/shared/api/rest-spec.md` · `docs/shared/api/flows.md` |
-| `ai-user/orchestrator/**/threadplan/**` · `ai-user/llm/**/Structured*` | `docs/ai-user/thread-planning.md` · `docs/ai-user/llm.md` · `docs/ai-user/operations.md` · `docs/ai-user/orchestrator.md` |
+| `ai-user/orchestrator/**/threadplan/**` · `ai-user/llm/**/Structured*` · `ai-user/orchestrator/**/safety/SoftProofread*` · `SelfCritiqueService*` | `docs/ai-user/thread-planning.md` · `docs/ai-user/llm.md` · `docs/ai-user/llm-call-budget.md` · `docs/ai-user/operations.md` · `docs/ai-user/orchestrator.md` |
 | `ai-user/learning/**` · `AiLearningClient*` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
 | `env/docker-compose*` · `env/nginx/*` | `docs/system.md` · `docs/env/architecture.md` · README 포트표 |
 | `domain/enums/*Status*.java` · `MarketingJob*.java` · orchestrator `ActionStatus*.java` | 해당 모듈의 stateDiagram (`docs/ai-user/orchestrator.md` 등) |
-| `backend/.../marketing/**` · video brief/`sibom_*` · metaphor unplug | `docs/shared/marketing/sibom-video-insertion.md` · `youtube-shorts-strategy.md` · `api.md` |
+| `backend/.../marketing/**` · video brief/`sibom_*` · metaphor unplug · `VideoVariantService*` | `docs/shared/marketing/sibom-video-insertion.md` · `youtube-shorts-strategy.md` · `api.md` · `docs/ai-user/llm-call-budget.md` §3 |
 | `backend/.../safety/**` · `llm/PromptSanitizer*` · `LlmErrorSignature*` · `ContentSafetyGuard*` | `docs/shared/policies/forbidden-words.md` · `.claude/rules/llm-safety.md` |
 | `docs/shared/policies/forbidden-words.md` | `.claude/rules/llm-safety.md` · `docs/frontend/policies/forbidden-words-lint.md` |
 | `backend/.../llm/**` | `docs/backend/llm-bridge.md` |

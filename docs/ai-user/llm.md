@@ -103,7 +103,7 @@ solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워
 1. controller가 prompt를 조립한다.
 2. `LlmWorkerPool`이 sync task를 실행한다.
 3. 글은 `OutputSanitizer.sanitizePost()`, 댓글/대댓글은 `sanitizeComment()`를 거친다.
-4. 글과 댓글은 `SelfCritiqueService`를 통해 재생성 루프를 탈 수 있다. FAIL 재시도는 **이슈 + 원문 전체 + 반말/존댓말 한 줄**만 보낸다. 원본 thread-plan 프롬프트·소스 본문·페르소나 목록·JSON 스키마는 재첨부하지 않는다.
+4. 글과 댓글은 `SelfCritiqueService`를 통해 재생성 루프를 탈 수 있다. FAIL 재시도는 **이슈 + 원문 전체 + 반말/존댓말 한 줄**만 보낸다. 원본 thread-plan 프롬프트·소스 본문·페르소나 목록·JSON 스키마는 재첨부하지 않는다. 호출 횟수 전체 표: [llm-call-budget.md](./llm-call-budget.md).
 5. 댓글/대댓글은 `<<<REACT>>>` sentinel 뒤 JSON을 분리해 orchestrator로 돌려준다.
 
 ### PLAN `/v2/generate/*` 개행 정규화
@@ -137,7 +137,9 @@ orchestrator 쪽 발행 경계(`AiPostBundleService`·`ThreadPlanPublisher`·`Sc
 
 compose는 dev/prod 모두 `SELF_CRITIQUE_ENABLED=true`를 넘긴다. rare vocab detector는 기본으로 꺼져 있다.
 
-결정론 `quickCheck`가 FAIL이면 짧은 rewrite만 호출한다(90s). 운영 로그의 FAIL 다수는 **casual 페르소나 + 존댓말 `~요`**(반말 위반)이며, 원문 1000자·특수문자와는 무관하다.
+`quickCheck`는 온점·상투구·강조어·ㅠ·쉼표율·casual **반말 위반(`~요`)** 등을 결정론으로 본다. PASS면 CLI를 더 부르지 않는다. FAIL이면 `buildRetryPrompt`로 짧은 본문 rewrite만 돌린다(timeout 90s, 실패 시 초안 유지). `originalPrompt` 인자는 API 호환용이며 **무시**한다.
+
+운영 로그 FAIL 다수는 casual 페르소나 + 존댓말이지, 원문 1000자·특수문자가 아니다. 호출 횟수·솔로 글 파이프라인은 [llm-call-budget.md](./llm-call-budget.md).
 
 ## prompt source
 

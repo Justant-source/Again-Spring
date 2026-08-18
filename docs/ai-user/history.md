@@ -97,6 +97,7 @@
 
 ## 현재 운영 상태를 해석할 때 주의할 점
 
+- 2026-08-18 이후 솔로 글 LLM 횟수는 전원 micro-batch·항상 proofread가 아니다. [llm-call-budget.md](./llm-call-budget.md).
 - `.result/ai-user-v2/` 문서는 historical artifact다. 현재 런타임 truth는 `ai-user/*` 코드와 compose 파일이다.
 - compose/env에 있는 flag가 곧 실제 kill-switch는 아니다. 지금 코드에서는 runtime row나 scheduler 구현이 더 직접적인 truth다.
 - persona corpus는 실험을 거치며 누적된 상태라 target 값과 실제 디렉토리 수가 다를 수 있다.

@@ -102,6 +102,8 @@ docker compose restart againspring-llm   # base 스택 (dev·prod 공유)
 (`🚨 [긴급] Claude 세션 만료 — 수동 재인증 필요`). 인증 오류는 재시도해도 100% 실패하므로
 일반 운영 오류 재시도 정책(총 2회, 5분 후 재큐잉)의 **유일한 예외**다.
 
+회로가 열려 있는 동안 `VideoVariantService`는 채널 LLM을 **호출하지 않고** `LLM_AUTH_CIRCUIT_OPEN`만 기록한다. `session limit` / `hit your session`은 쿼터 창이지 OAuth 만료가 아니므로 회로를 열지 않는다. 호출 횟수: `docs/ai-user/llm-call-budget.md` §3.
+
 회로가 열려 있는 동안 신규 마케팅 LLM 호출은 즉시 실패 처리되며(재시도 대상에서도 제외), 5분 후
 자동으로 반닫히거나 수동으로 리셋할 수 있다. 마케팅 워커(`againspring-llm`)와 AI-user 워커
 (`againspring-llm-ai-user`)는 별개 컨테이너지만 **같은 `~/.claude` 계정을 공유**하므로, 세션 만료 시
