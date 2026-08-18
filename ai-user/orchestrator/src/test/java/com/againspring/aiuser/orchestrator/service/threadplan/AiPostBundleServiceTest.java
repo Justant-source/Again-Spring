@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,6 +78,8 @@ class AiPostBundleServiceTest {
         when(threadPlan.getBundleTimeoutMs()).thenReturn(240_000L);
         when(threadPlan.isMicroBatchEnabled()).thenReturn(true);
         when(threadPlan.resolvedMicroBatchSize()).thenReturn(5);
+        when(threadPlan.getReadyMinItems()).thenReturn(6);
+        when(threadPlan.getReadyMinTopLevel()).thenReturn(3);
         // Matches the real application.yml default; an unstubbed int mock returns 0, which would
         // wrongly cap every mega-call test down to 1 persona (see capMegaCallCastBoundsSize* below
         // for the dedicated cap-behavior tests instead).
@@ -189,6 +192,11 @@ class AiPostBundleServiceTest {
 
     /** Shared minimal fixture for the 2026-08-16 proofread-gate tests below. */
     private void stubMinimalSuccessfulBundle(Persona author, Persona other, PlanSourceStoryResolver.ResolvedSource source) {
+        stubMinimalSuccessfulBundle(author, other, source, "육아 갈등 본문입니다.\n충분히 길게 씁니다.");
+    }
+
+    private void stubMinimalSuccessfulBundle(Persona author, Persona other,
+            PlanSourceStoryResolver.ResolvedSource source, String body) {
         AiUserGenerationConfig cfg = config("CLAUDE", 16);
         when(configRepository.findById(1)).thenReturn(Optional.of(cfg));
         when(personaRepository.findByActiveTrue()).thenReturn(List.of(author, other));
@@ -202,10 +210,11 @@ class AiPostBundleServiceTest {
         when(sourceStoryResolver.claimAndResolve(eq(author), eq("natepan"), anyString(), any(Instant.class), eq("FAMILY")))
                 .thenReturn(Optional.of(source));
         Map<String, Object> llmResponse = new LinkedHashMap<>();
-        llmResponse.put("post", Map.of("title", "시어머니 간섭", "body", "육아 갈등 본문입니다.\n충분히 길게 씁니다."));
+        llmResponse.put("post", Map.of("title", "시어머니 간섭", "body", body));
         llmResponse.put("items", List.of(Map.of("ref", "c1", "personaId", other.getId(), "body", "공감 댓글")));
         when(llmClient.generateThreadPlan(any())).thenReturn(Optional.of(llmResponse));
         when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+        when(scheduledPostRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     private PlanSourceStoryResolver.ResolvedSource minimalSource() {
@@ -217,39 +226,75 @@ class AiPostBundleServiceTest {
     }
 
     @Test
-    void proofreadCallFailure_releasesReservationAndReturnsEmpty() {
+    void proofreadSkippedWhenBodyHasNoSpellingSuspect() {
         when(threadPlan.isMicroBatchEnabled()).thenReturn(false);
         Persona author = persona("ai-user-1", "polite", null);
         Persona other = persona("ai-user-2", "casual", null);
         PlanSourceStoryResolver.ResolvedSource source = minimalSource();
         stubMinimalSuccessfulBundle(author, other, source);
-        // 2026-08-16: proofread call itself fails (LLM error/refusal/empty) — fail-closed.
+
+        Optional<AiScheduledPost> held = service.generateAndHold(
+                author, "FAMILY", null, "corr-proofread-skip", Instant.parse("2026-08-01T01:00:00Z"));
+
+        assertThat(held).isPresent();
+        assertThat(held.get().getBody()).isEqualTo("육아 갈등 본문입니다.\n충분히 길게 씁니다.");
+        verify(llmClient, never()).proofreadPost(anyString(), anyString());
+        verify(sourceReservationSupport, never()).release(eq(99L), anyString());
+    }
+
+    @Test
+    void proofreadCallFailure_keepsOriginalAndHolds() {
+        when(threadPlan.isMicroBatchEnabled()).thenReturn(false);
+        Persona author = persona("ai-user-1", "polite", null);
+        Persona other = persona("ai-user-2", "casual", null);
+        PlanSourceStoryResolver.ResolvedSource source = minimalSource();
+        String original = "육아 갈등 본문입니다.\n어제 일이 됬어 그냥 넘어가려고 했는데";
+        stubMinimalSuccessfulBundle(author, other, source, original);
         when(llmClient.proofreadPost(anyString(), anyString())).thenReturn(Optional.empty());
 
         Optional<AiScheduledPost> held = service.generateAndHold(
                 author, "FAMILY", null, "corr-proofread-fail", Instant.parse("2026-08-01T01:00:00Z"));
 
-        assertThat(held).isEmpty();
-        verify(sourceReservationSupport).release(eq(99L), anyString());
+        assertThat(held).isPresent();
+        assertThat(held.get().getBody()).isEqualTo(original);
+        verify(sourceReservationSupport, never()).release(eq(99L), anyString());
     }
 
     @Test
-    void proofreadStructureChanged_releasesReservationAndReturnsEmpty() {
+    void proofreadStructureChanged_keepsOriginalAndHolds() {
         when(threadPlan.isMicroBatchEnabled()).thenReturn(false);
         Persona author = persona("ai-user-1", "polite", null);
         Persona other = persona("ai-user-2", "casual", null);
         PlanSourceStoryResolver.ResolvedSource source = minimalSource();
-        stubMinimalSuccessfulBundle(author, other, source);
-        // 2026-08-16: "교정" that merges the two lines into one — quality gate must reject it
-        // rather than let a capture_split_after_lines mismatch reach the published post.
+        String original = "육아 갈등 본문입니다.\n어제 일이 됬어 그냥 넘어가려고 했는데";
+        stubMinimalSuccessfulBundle(author, other, source, original);
         when(llmClient.proofreadPost(anyString(), anyString()))
-                .thenReturn(Optional.of("육아 갈등 본문입니다. 충분히 길게 씁니다."));
+                .thenReturn(Optional.of("육아 갈등 본문입니다. 어제 일이 됐어 그냥 넘어가려고 했는데"));
 
         Optional<AiScheduledPost> held = service.generateAndHold(
                 author, "FAMILY", null, "corr-proofread-structure", Instant.parse("2026-08-01T01:00:00Z"));
 
-        assertThat(held).isEmpty();
-        verify(sourceReservationSupport).release(eq(99L), anyString());
+        assertThat(held).isPresent();
+        assertThat(held.get().getBody()).isEqualTo(original);
+        verify(sourceReservationSupport, never()).release(eq(99L), anyString());
+    }
+
+    @Test
+    void proofreadSpellingFix_appliedWhenStructurePreserved() {
+        when(threadPlan.isMicroBatchEnabled()).thenReturn(false);
+        Persona author = persona("ai-user-1", "polite", null);
+        Persona other = persona("ai-user-2", "casual", null);
+        PlanSourceStoryResolver.ResolvedSource source = minimalSource();
+        String original = "육아 갈등 본문입니다.\n어제 일이 됬어 그냥 넘어가려고 했는데";
+        stubMinimalSuccessfulBundle(author, other, source, original);
+        when(llmClient.proofreadPost(anyString(), anyString()))
+                .thenReturn(Optional.of("육아 갈등 본문입니다.\n어제 일이 됐어 그냥 넘어가려고 했는데"));
+
+        Optional<AiScheduledPost> held = service.generateAndHold(
+                author, "FAMILY", null, "corr-proofread-ok", Instant.parse("2026-08-01T01:00:00Z"));
+
+        assertThat(held).isPresent();
+        assertThat(held.get().getBody()).isEqualTo("육아 갈등 본문입니다.\n어제 일이 됐어 그냥 넘어가려고 했는데");
     }
 
     @Test
@@ -373,6 +418,70 @@ class AiPostBundleServiceTest {
         assertThat(held.get().getCandidatesJson()).contains("b0_c1");
         assertThat(held.get().getCandidatesJson()).contains("b1_c1");
         verify(llmClient, times(requests.size())).generateThreadPlan(any());
+        assertThat(requests.size()).isBetween(2, 3);
+    }
+
+    @Test
+    void microBatchSkipsFollowUpWhenFirstBatchMeetsReadyMinItems() {
+        Persona author = persona("ai-user-1", "casual", null);
+        List<Persona> pool = new ArrayList<>();
+        pool.add(author);
+        for (int i = 2; i <= 40; i++) pool.add(persona("ai-user-" + i, "casual", null));
+
+        AiUserGenerationConfig cfg = config("CLAUDE", 16);
+        when(configRepository.findById(1)).thenReturn(Optional.of(cfg));
+        when(personaRepository.findByActiveTrue()).thenReturn(pool);
+
+        List<Map<String, Object>> cast = pool.stream()
+                .<Map<String, Object>>map(p -> Map.of(
+                        "personaId", p.getId(),
+                        "nickname", "nick-" + p.getId(),
+                        "formality", "casual",
+                        "voiceProfile", Map.of("formality", "casual")))
+                .toList();
+        when(planPersonaMapper.mapCast(pool)).thenReturn(cast);
+        when(planPersonaMapper.castIds(any())).thenReturn(
+                pool.stream().map(Persona::getId).collect(Collectors.toSet()));
+        when(planPersonaMapper.mapAuthor(author)).thenReturn(cast.get(0));
+        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any()))
+                .thenReturn(Optional.of(new PlanSourceStoryResolver.ResolvedSource(
+                        "seed", Map.of("body", "s"), false,
+                        1L, "본문", null, null, null, "", List.of())));
+
+        when(llmClient.generateThreadPlan(any())).thenAnswer(inv -> {
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("post", Map.of("title", "제목입니다", "body", "본문입니다. 충분히 길게 작성."));
+            resp.put("items", List.of(
+                    Map.of("ref", "c1", "personaId", "ai-user-2", "body", "댓글1"),
+                    Map.of("ref", "c2", "personaId", "ai-user-3", "body", "댓글2"),
+                    Map.of("ref", "c3", "personaId", "ai-user-4", "body", "댓글3"),
+                    Map.of("ref", "c4", "personaId", "ai-user-5", "body", "댓글4"),
+                    Map.of("ref", "c5", "personaId", "ai-user-6", "body", "댓글5"),
+                    Map.of("ref", "c6", "personaId", "ai-user-2", "parentRef", "c1", "body", "대댓글")));
+            return Optional.of(resp);
+        });
+        when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
+        when(scheduledPostRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Optional<AiScheduledPost> held = service.generateAndHold(
+                author, "WORK", null, "corr-micro-skip", Instant.now());
+
+        assertThat(held).isPresent();
+        verify(llmClient, times(1)).generateThreadPlan(any());
+        assertThat(held.get().getCandidatesJson()).contains("b0_c1");
+        assertThat(held.get().getCandidatesJson()).doesNotContain("b1_");
+    }
+
+    @Test
+    void capCommentersForMicroBatchLimitsRosterToOneFollowUpSlice() {
+        List<Map<String, Object>> commenters = new ArrayList<>();
+        for (int i = 0; i < 80; i++) {
+            commenters.add(Map.of("personaId", "p" + i));
+        }
+        List<Map<String, Object>> capped = AiPostBundleService.capCommentersForMicroBatch(commenters, 5, 6);
+        assertThat(capped).hasSize(11);
+        assertThat(capped.get(0).get("personaId")).isEqualTo("p0");
+        assertThat(AiPostBundleService.sliceCommenters(capped, 5)).hasSize(3);
     }
 
     @Test

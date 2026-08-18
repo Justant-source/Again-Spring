@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.time.Instant;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -722,6 +723,68 @@ class MarketingJobServiceTest {
         assertThat(job.getPollFailCount()).isZero();
 
         verify(marketingJobRepository).save(job);
+    }
+
+    @Test
+    void applyPoll_shortformWithoutOutro_failsQualityGate() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(99L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("RUNNING")
+            .targets("[\"youtube_shorts\"]")
+            .build();
+
+        AsmJobView view = AsmJobView.builder()
+            .status("READY")
+            .phase("completion")
+            .progress(100.0)
+            .diagnostics(Map.of("story_duration_ms", 30000, "outro_duration_ms", 0))
+            .build();
+
+        when(objectMapper.readValue(eq("[\"youtube_shorts\"]"), any(TypeReference.class)))
+            .thenReturn(List.of("youtube_shorts"));
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(marketingJobRepository.save(any(MarketingJob.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+
+        marketingJobService.applyPoll(job, view);
+
+        assertThat(job.getStatus()).isEqualTo("FAILED");
+        assertThat(job.getFailureCode()).isEqualTo("LAYOUT_OUTRO_MISSING");
+        assertThat(job.getRetryable()).isTrue();
+    }
+
+    @Test
+    void applyPoll_shortformWithNestedOutro_passesQualityGate() throws JsonProcessingException {
+        MarketingJob job = MarketingJob.builder()
+            .id(100L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("RUNNING")
+            .targets("[\"instagram_reels\"]")
+            .build();
+
+        AsmJobView view = AsmJobView.builder()
+            .status("READY")
+            .phase("completion")
+            .progress(100.0)
+            .diagnostics(Map.of("instagram_reels", Map.of(
+                "story_duration_ms", 15000,
+                "outro_duration_ms", 2687,
+                "final_duration_ms", 27000)))
+            .build();
+
+        when(objectMapper.readValue(eq("[\"instagram_reels\"]"), any(TypeReference.class)))
+            .thenReturn(List.of("instagram_reels"));
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(marketingJobRepository.save(any(MarketingJob.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+
+        marketingJobService.applyPoll(job, view);
+
+        assertThat(job.getStatus()).isEqualTo("READY");
+        assertThat(job.getFailureCode()).isNull();
     }
 
     @Test

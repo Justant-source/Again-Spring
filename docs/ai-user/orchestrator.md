@@ -41,7 +41,7 @@
 - score: `0.45*semantic + 0.25*register + 0.15*fact_ratio + 0.15*interest[category]`
 - API: `matchAuthors` / `matchCommenters` / `bestAuthorAbove` (threshold default `ai-user.matcher.author-threshold=0.35`)
 - audits: purpose `AUTHOR_CANDIDATE`|`COMMENT_CANDIDATE`, reasons에 UNEVALUATED 축·점수 기록 (capsule search purpose 미설정 → 이중 기록 방지)
-- PLAN 연동: `AiPostBundleService`가 source 사연을 `StoryProfileAnalyzer`로 1회 구조화하고, `matchCommenters`로 cast를 재정렬(author=`personas[0]` 유지). 요청에 `storyProfile`/`storySearchDoc` 포함. 기본 생성은 **micro-batch**(4~6 persona/call, `ai-user.thread-plan.micro-batch-enabled`, 기본 ON)이며 publisher는 저장된 텍스트만 게시한다.
+- PLAN 연동: `AiPostBundleService`가 source 사연을 `StoryProfileAnalyzer`로 1회 구조화하고, `matchCommenters`로 cast를 재정렬(author=`personas[0]` 유지). 요청에 `storyProfile`/`storySearchDoc` 포함. 기본 생성은 **micro-batch**(4~6 persona/call; 댓글 캐스트는 READY 하한+1슬라이스로 캡, follow-up은 하한 미달일 때만)이며 publisher는 저장된 텍스트만 게시한다.
 - 매칭 실패 시: `PersonaAutoProvisionService` + `POST /admin/trigger/auto-persona-for-story`
 - SSOT: `python3 ai-user/tools/wp3_persona_ssot_report.py`
 
@@ -148,6 +148,10 @@ SELECT status, COUNT(*) as count FROM daily_planner_retry_log GROUP BY status;
 | body char-bigram Jaccard | ≥ **0.35** |
 
 twin이면 bundle 실패(hold skip). soft-reserve release는 lifecycle 경로.
+
+### 게시 직전 맞춤법 (2026-08-18)
+
+`AiPostBundleService` / legacy `ActionExecutor`는 `SoftProofread`로 **오탈자 휴리스틱이 맞을 때만** `/generate/proofread`를 호출한다. 교정 LLM이 줄 수를 바꾸거나 타임아웃나면 **생성된 원문을 유지**하고 hold/게시를 버리지 않는다. 소스 길이·특수문자로 claim을 사전 skip하지 않는다.
 
 ### 반복/길이 가드 (legacy tick)
 

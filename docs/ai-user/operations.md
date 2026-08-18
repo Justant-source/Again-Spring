@@ -303,6 +303,12 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
    env `AI_USER_THREAD_PLAN_BUNDLE_TIMEOUT_MS` / `AI_USER_LLM_DEFAULT_TIMEOUT_MS`는 DB 부재·비정상 시 fallback.
 2. 후보 풀 크기: `ai_user_generation_config.candidate_pool_size`를 24보다 작게
    (16 권장: 최상위 14 + 대댓글 2)으로 설정하면 생성 속도 개선. 허용 범위 8~30.
+3. 맞춤법 LLM은 오탈자 휴리스틱(`됬` 등)이 있을 때만 돈다. 교정 실패·줄바꿈 변경은
+   hold를 버리지 않고 생성 원문을 유지한다(2026-08-18). SelfCritique 재시도는 원본
+   thread-plan 프롬프트를 다시 붙이지 않는다.
+4. micro-batch는 활성 페르소나 전체를 5명씩 돌리지 않는다. matcher 상위
+   `ready-min-items + batchSize`명만 넣고, 댓글이 READY 하한(기본 6)에 닿으면
+   후속 HUMAN_POST를 생략한다(2026-08-18).
 
 ## 9. 트러블슈팅
 

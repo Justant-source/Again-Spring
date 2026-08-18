@@ -49,10 +49,16 @@ public class MarketingLlmAuthGuard {
             return false;
         }
         String lower = errorMessage.toLowerCase();
+        // Usage quota window — not an OAuth/session expiry (re-login does not help).
+        if (lower.contains("session limit") || lower.contains("hit your session")) {
+            return false;
+        }
         // Match LlmErrorSignature's authentication patterns
         return lower.contains("authentication_error") ||
                lower.contains("authentication") ||
-               lower.contains("session") ||
+               lower.contains("session expired") ||
+               lower.contains("session has expired") ||
+               lower.contains("not logged in") ||
                lower.contains("unauthorized") ||
                lower.contains("forbidden") ||
                lower.contains("authentication failed") ||

@@ -111,8 +111,11 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 
 ### 4.4 아웃트로
 
+- **필수(mandatory)**: tail 순서 `comments` → `outro`. 본문 duration trim·`marketing_fast` 경로에서도 생략 불가.
+- 고정 문구(예): `여러분은 어떻게 생각하세요? 댓글로 알려주세요` — WaggleBot `variant_config.outro_text` + Tone L 레이아웃.
 - **마스코트 없음**.
 - CTA는 **Tone L** 팔레트로 통일 (배경 `--L-bg`/`--L-card`, 텍스트 `--L-ink`, 포인트만 `--L-point`).
+- 본문 TTS 32/47초 상한·MP4 trim 대상에서 **제외**. AS는 `generation_diagnostics.outro_duration_ms <= 0`이면 `LAYOUT_OUTRO_MISSING`으로 READY 승격을 거부한다.
 
 ### 4.5 brief `top_comments` 계약
 

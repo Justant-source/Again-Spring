@@ -72,6 +72,21 @@ class SelfCritiqueServiceTest {
     }
 
     @Test
+    void retryPromptOmitsOriginalGenerationBlobAndKeepsFullDraft() {
+        String draft = "다들 어떻게 생각해요? 저만 이상한가요 진짜";
+        String prompt = service.buildRetryPrompt(
+                draft,
+                java.util.List.of("반말 위반(~요/~어요 사용) — ~음/~임/~더라 류 반말로 고쳐라"),
+                "post",
+                "casual");
+        assertFalse(prompt.contains("<<<USER_PROMPT>>>"));
+        assertFalse(prompt.contains("원래 요청"));
+        assertTrue(prompt.contains(draft));
+        assertTrue(prompt.contains("반말"));
+        assertTrue(prompt.contains("[원문]"));
+    }
+
+    @Test
     void disabledServiceAlwaysPasses() {
         ReflectionTestUtils.setField(service, "enabled", false);
         assertTrue(service.quickCheck("정말 공감되네요 힘내세요 응원합니다", "comment", "polite").passed());

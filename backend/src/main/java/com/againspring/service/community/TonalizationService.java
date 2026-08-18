@@ -135,16 +135,57 @@ public class TonalizationService {
         }
     }
 
-    /** LLM이 prose를 섞어 반환해도 첫 JSON object만 추출. */
+    /** LLM이 prose·markdown fence를 섞어 반환해도 첫 JSON object만 추출. */
     static String extractJsonObject(String raw) {
         if (raw == null) return "{}";
         String trimmed = raw.trim();
-        if (trimmed.startsWith("{")) return trimmed;
+        if (trimmed.startsWith("```")) {
+            int fenceEnd = trimmed.indexOf('\n');
+            if (fenceEnd > 0) {
+                trimmed = trimmed.substring(fenceEnd + 1).trim();
+            }
+            if (trimmed.endsWith("```")) {
+                trimmed = trimmed.substring(0, trimmed.length() - 3).trim();
+            }
+        }
+        if (trimmed.startsWith("{")) {
+            return balancedJsonObject(trimmed);
+        }
         int start = trimmed.indexOf('{');
-        int end = trimmed.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            return trimmed.substring(start, end + 1);
+        if (start >= 0) {
+            return balancedJsonObject(trimmed.substring(start));
         }
         return trimmed;
+    }
+
+    /** Brace-balanced slice — avoids lastIndexOf('}') breaking on prose after JSON. */
+    private static String balancedJsonObject(String fromFirstBrace) {
+        int depth = 0;
+        boolean inString = false;
+        boolean escape = false;
+        for (int i = 0; i < fromFirstBrace.length(); i++) {
+            char c = fromFirstBrace.charAt(i);
+            if (inString) {
+                if (escape) {
+                    escape = false;
+                } else if (c == '\\') {
+                    escape = true;
+                } else if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inString = true;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return fromFirstBrace.substring(0, i + 1);
+                }
+            }
+        }
+        return fromFirstBrace;
     }
 }

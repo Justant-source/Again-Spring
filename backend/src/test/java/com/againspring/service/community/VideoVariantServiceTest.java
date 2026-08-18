@@ -95,6 +95,31 @@ class VideoVariantServiceTest {
     }
 
     @Test
+    void generate_sessionLimitResponse_classifiedAsTransientLlmError() throws Exception {
+        when(llmProvider.invoke(anyString(), anyString()))
+                .thenReturn("You've hit your session limit · resets 12:40pm (UTC)");
+
+        VideoVariantService.Variants variants = service.generate(
+                "마스터", "shock", "제목", "본문", true, false, List.of("side-glance"));
+
+        assertThat(variants.sibomPlanReels()).isEmpty();
+        assertThat(variants.channelGenerationStatus().get("instagram_reels")).isEqualTo("LLM_TRANSIENT_ERROR");
+        verify(llmProvider, times(1)).invoke(anyString(), anyString());
+    }
+
+    @Test
+    void generate_circuitOpen_skipsLlm() throws Exception {
+        when(llmAuthGuard.isCircuitOpen()).thenReturn(true);
+
+        VideoVariantService.Variants variants = service.generate(
+                "마스터", "shock", "제목", "본문", true, true, List.of("side-glance"));
+
+        assertThat(variants.channelGenerationStatus().get("instagram_reels")).isEqualTo("LLM_AUTH_CIRCUIT_OPEN");
+        assertThat(variants.channelGenerationStatus().get("youtube_shorts")).isEqualTo("LLM_AUTH_CIRCUIT_OPEN");
+        verify(llmProvider, org.mockito.Mockito.never()).invoke(anyString(), anyString());
+    }
+
+    @Test
     void generate_transientLlmFailure_doesNotCorrectInProcess() throws Exception {
         // Transient LLM failures do NOT trigger in-process correction (only OK/PARSE_ERROR do)
         when(llmProvider.invoke(anyString(), anyString()))
@@ -185,7 +210,7 @@ class VideoVariantServiceTest {
                 "마스터", "anger", "제목", "본문요약용텍스트입니다", true, false);
 
         assertThat(v.hookReels()).isEqualTo("마스터");
-        assertThat(v.scriptReels()).contains("공감");
+        assertThat(v.scriptReels()).contains("본문");
         assertThat(v.hookShorts()).isNull();
         assertThat(v.maxDurationReelsSec()).isEqualTo(30);
         assertThat(v.maxDurationShortsSec()).isNull();

@@ -10,7 +10,7 @@
 | `POST` | `/generate/comment` | 댓글 생성 |
 | `POST` | `/generate/reply` | 대댓글 생성 |
 | `POST` | `/generate/persona` | 페르소나 JSON 생성 |
-| `POST` | `/generate/proofread` | 게시 직전 맞춤법 교정 — persona/voice 컨텍스트 없음, 의미·구조 보존하고 오탈자만 수정 (2026-08-16) |
+| `POST` | `/generate/proofread` | 게시 직전 맞춤법 교정 — persona/voice 없음, 의미·구조 보존하고 오탈자만 수정. orchestrator는 오탈자 휴리스틱(`됬` 등)이 맞을 때만 호출하고, 호출/구조/안전 실패 시 **원문 유지**(fail-open, 2026-08-18) |
 | `POST` | `/internal/rewrite/post` | legacy synthetic 게시글 부분 교정용 내부 rewrite |
 | `POST` | `/analyze/post` | 좋아요/투표용 구조화 post 분석 |
 | `POST` | `/v2/generate/thread-plan` | PLAN 모드의 AI 글 묶음 또는 사람 글 후보 plan 구조화 생성. AI_POST `post`에 optional `capture_split_after_lines`(개행 블록 N장 컷) + required-for-AI `metaphor_ids`(3~5개, 적합도 순, 60종 메타포 일러스트 — `metaphor_id`는 `metaphor_ids[0]` 하위호환 값). 요청에 optional `overused_metaphor_ids`(최근 다빈도 사용 상위 10개 — orchestrator가 `post_metaphors` 집계로 산출, 프롬프트에 회피 힌트로 주입) |
@@ -103,7 +103,7 @@ solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워
 1. controller가 prompt를 조립한다.
 2. `LlmWorkerPool`이 sync task를 실행한다.
 3. 글은 `OutputSanitizer.sanitizePost()`, 댓글/대댓글은 `sanitizeComment()`를 거친다.
-4. 글과 댓글은 `SelfCritiqueService`를 통해 재생성 루프를 탈 수 있다.
+4. 글과 댓글은 `SelfCritiqueService`를 통해 재생성 루프를 탈 수 있다. FAIL 재시도는 **이슈 + 원문 전체 + 반말/존댓말 한 줄**만 보낸다. 원본 thread-plan 프롬프트·소스 본문·페르소나 목록·JSON 스키마는 재첨부하지 않는다.
 5. 댓글/대댓글은 `<<<REACT>>>` sentinel 뒤 JSON을 분리해 orchestrator로 돌려준다.
 
 ### PLAN `/v2/generate/*` 개행 정규화
@@ -136,6 +136,8 @@ orchestrator 쪽 발행 경계(`AiPostBundleService`·`ThreadPlanPublisher`·`Sc
 | `SELF_CRITIQUE_RARE_VOCAB_RATIO` | `0.18` |
 
 compose는 dev/prod 모두 `SELF_CRITIQUE_ENABLED=true`를 넘긴다. rare vocab detector는 기본으로 꺼져 있다.
+
+결정론 `quickCheck`가 FAIL이면 짧은 rewrite만 호출한다(90s). 운영 로그의 FAIL 다수는 **casual 페르소나 + 존댓말 `~요`**(반말 위반)이며, 원문 1000자·특수문자와는 무관하다.
 
 ## prompt source
 

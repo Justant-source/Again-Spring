@@ -275,7 +275,8 @@ public class MarketingJobService {
             VideoVariantService.validateRequiredSibomPlans(variants, needReels, needShorts);
         if (!qualityGate.isValid()) {
             savedJob.setGenerationDiagnostics(serializeJson(qualityGate.diagnostics()));
-            failJob(savedJob, MarketingFailureStage.QUALITY_GATE, qualityGate.failureCode(), false,
+            failJob(savedJob, MarketingFailureStage.QUALITY_GATE, qualityGate.failureCode(),
+                isRegenerableFailure(qualityGate.failureCode()),
                 "Video variant quality gate failed: " + qualityGate.failureCode());
             log.warn("Marketing job {} blocked before ASM: {}", savedJob.getId(), qualityGate.failureCode());
             return savedJob;
@@ -433,9 +434,10 @@ public class MarketingJobService {
             applyRemoteState(job, payload.getStatus(), payload.getPhase(), payload.getProgress(),
                 serializeJson(payload.getArtifacts()), serializeJson(payload.getPublications()),
                 payload.getError(), payload.getPublications());
-            applyRemoteGenerationDiagnostics(job, payload.getDiagnostics(), payload.getActualDurationMs(),
-                payload.getFailureCode(), payload.getFailureStage(), payload.getRetryable(), payload.getErrorSummary());
-            marketingJobRepository.save(job);
+        applyRemoteGenerationDiagnostics(job, payload.getDiagnostics(), payload.getActualDurationMs(),
+            payload.getFailureCode(), payload.getFailureStage(), payload.getRetryable(), payload.getErrorSummary());
+        enforceShortformOutroGate(job, job.getStatus(), payload.getDiagnostics());
+        marketingJobRepository.save(job);
             notifyTerminalStatusChange(job, previousStatus, payload.getPublications());
             log.info("Callback applied for remote job {}: status={}", payload.getJobId(), payload.getStatus());
         });
@@ -451,6 +453,7 @@ public class MarketingJobService {
             view.getError(), view.getPublications());
         applyRemoteGenerationDiagnostics(job, view.getDiagnostics(), view.getActualDurationMs(),
             view.getFailureCode(), view.getFailureStage(), view.getRetryable(), view.getErrorSummary());
+        enforceShortformOutroGate(job, job.getStatus(), view.getDiagnostics());
         marketingJobRepository.save(job);
         notifyTerminalStatusChange(job, previousStatus, view.getPublications());
     }
@@ -507,6 +510,70 @@ public class MarketingJobService {
             }
             job.setErrorSummary(compact(summary, 1000));
         }
+    }
+
+    /**
+     * Short-form renders must include the Tone L outro CTA (WaggleBot reports {@code outro_duration_ms}).
+     */
+    private void enforceShortformOutroGate(MarketingJob job, String localStatus,
+                                           Map<String, Object> diagnostics) {
+        if (localStatus == null || (!"READY".equals(localStatus) && !"PUBLISHED".equals(localStatus))) {
+            return;
+        }
+        List<String> targets;
+        try {
+            targets = objectMapper.readValue(job.getTargets(), new TypeReference<>() {});
+        } catch (Exception e) {
+            return;
+        }
+        if (!containsTarget(targets, "instagram_reels") && !containsTarget(targets, "youtube_shorts")) {
+            return;
+        }
+        if (extractOutroDurationMs(diagnostics) > 0) {
+            return;
+        }
+        failJob(job, MarketingFailureStage.QUALITY_GATE, "LAYOUT_OUTRO_MISSING", true,
+            "Rendered short-form video is missing the mandatory outro CTA frame");
+    }
+
+    private static long extractOutroDurationMs(Map<String, Object> diagnostics) {
+        if (diagnostics == null || diagnostics.isEmpty()) {
+            return 0L;
+        }
+        long topLevel = parseOutroDurationValue(diagnostics.get("outro_duration_ms"));
+        if (topLevel == 0L) {
+            topLevel = parseOutroDurationValue(diagnostics.get("outroDurationMs"));
+        }
+        if (topLevel > 0L) {
+            return topLevel;
+        }
+        for (Object value : diagnostics.values()) {
+            if (!(value instanceof Map<?, ?> nested)) {
+                continue;
+            }
+            long nestedMs = parseOutroDurationValue(nested.get("outro_duration_ms"));
+            if (nestedMs == 0L) {
+                nestedMs = parseOutroDurationValue(nested.get("outroDurationMs"));
+            }
+            if (nestedMs > 0L) {
+                return nestedMs;
+            }
+        }
+        return 0L;
+    }
+
+    private static long parseOutroDurationValue(Object raw) {
+        if (raw instanceof Number n) {
+            return n.longValue();
+        }
+        if (raw instanceof String s && !s.isBlank()) {
+            try {
+                return Long.parseLong(s.trim());
+            } catch (NumberFormatException ignored) {
+                return 0L;
+            }
+        }
+        return 0L;
     }
 
     private String resolveLocalStatus(MarketingJob job, String remoteStatus, String remoteError) {

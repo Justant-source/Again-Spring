@@ -16,6 +16,7 @@ import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepo
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.safety.ProofreadQualityGate;
+import com.againspring.aiuser.orchestrator.safety.SoftProofread;
 import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
 import com.againspring.aiuser.orchestrator.service.match.RankedPersona;
 import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
@@ -42,8 +43,9 @@ import java.util.UUID;
  * PLAN-mode AI post creation boundary.
  *
  * <p>Default path (micro-batch ON): author+post in call 1 with the first 4~6 comment
- * personas, then HUMAN_POST follow-ups for remaining slices — all inside the initial
- * generation job. Mega-call (full cast, one LLM request) remains when
+ * personas. Follow-up HUMAN_POST runs only while items are below READY min
+ * ({@code ready-min-items}, default 6) and only against a capped commenter prefix
+ * (one extra slice). Mega-call remains when
  * {@code ai-user.thread-plan.micro-batch-enabled=false}.</p>
  *
  * <p>Source-story grounding (popular crawl claim via {@link PlanSourceStoryResolver},
@@ -312,32 +314,42 @@ public class AiPostBundleService {
     }
 
     /**
-     * 게시 직전 맞춤법 교정 게이트 (2026-08-16 shortform-content-quality fix) — fail-closed:
-     * 교정 호출 실패, 구조/길이 이탈, 교정 후 안전 검사 실패 중 하나라도 걸리면 이 소스 claim은
-     * 상위 호출자(release)로 흘러가 폐기된다. capture_split_after_lines는 줄 번호 기반이라
-     * ProofreadQualityGate의 줄 수 불변식이 지켜지는 한 그대로 유효 — 재계산 불필요.
-     * {@code bundle.response()}(원시 LLM 응답)는 의도적으로 그대로 둔다 — 감사용 원본 기록.
+     * Soft spelling pass: LLM only when {@link SoftProofread#needsLlm} matches.
+     * Call/structure/safety failure keeps the generated body (fail-open). Nightly logs
+     * showed fail-closed proofread discarding holds on {@code PROOFREAD_STRUCTURE_CHANGED}
+     * (newline drift) and 504 — not source length or punctuation.
+     * {@code bundle.response()} stays the raw LLM payload for audit.
      */
     private Optional<Bundle> proofreadBundle(Bundle bundle, String correlationId) {
         String original = bundle.content().body();
+        if (!SoftProofread.needsLlm(original)) {
+            return Optional.of(bundle);
+        }
         Optional<String> proofreadOpt = llmClient.proofreadPost(original, correlationId);
         if (proofreadOpt.isEmpty()) {
-            log.warn("AI post bundle proofread call failed corr={}", correlationId);
-            return Optional.empty();
+            log.warn("AI post bundle proofread call failed corr={} — keeping original", correlationId);
+        } else {
+            ProofreadQualityGate.Result quality = ProofreadQualityGate.validate(original, proofreadOpt.get());
+            if (!quality.passed()) {
+                log.warn("AI post bundle proofread quality rejected corr={} {} — keeping original",
+                        correlationId, quality.reason());
+            }
+            ContentSafetyGuard.GuardResult guard =
+                    safetyGuard.check(proofreadOpt.get(), ContentSafetyGuard.ContentType.POST);
+            if (!guard.passed()) {
+                log.warn("AI post bundle proofread output blocked corr={} {} — keeping original",
+                        correlationId, guard.reason());
+            }
         }
-        String proofread = proofreadOpt.get();
-        ProofreadQualityGate.Result quality = ProofreadQualityGate.validate(original, proofread);
-        if (!quality.passed()) {
-            log.warn("AI post bundle proofread quality rejected corr={}: {}", correlationId, quality.reason());
-            return Optional.empty();
-        }
-        ContentSafetyGuard.GuardResult guard = safetyGuard.check(proofread, ContentSafetyGuard.ContentType.POST);
-        if (!guard.passed()) {
-            log.warn("AI post bundle proofread output blocked corr={}: {}", correlationId, guard.reason());
-            return Optional.empty();
+        boolean safetyOk = proofreadOpt
+                .map(text -> safetyGuard.check(text, ContentSafetyGuard.ContentType.POST).passed())
+                .orElse(false);
+        String body = SoftProofread.resolve(original, proofreadOpt, safetyOk);
+        if (body.equals(original)) {
+            return Optional.of(bundle);
         }
         PostContent c = bundle.content();
-        PostContent updated = new PostContent(c.title(), proofread, c.captureSplitAfterLines(),
+        PostContent updated = new PostContent(c.title(), body, c.captureSplitAfterLines(),
             c.promoTitle(), c.hookEmotion(), c.metaphorId(), c.metaphorIds());
         return Optional.of(new Bundle(bundle.response(), updated, bundle.provider(), bundle.model(),
             bundle.castIds(), bundle.source()));
@@ -391,6 +403,8 @@ public class AiPostBundleService {
         List<Map<String, Object>> commenters = personas.size() <= 1
                 ? List.of()
                 : personas.subList(1, personas.size());
+        int readyMinItems = Math.max(1, properties.getThreadPlan().getReadyMinItems());
+        commenters = capCommentersForMicroBatch(commenters, batchSize, readyMinItems);
 
         List<List<Map<String, Object>>> slices = sliceCommenters(commenters, batchSize);
         if (slices.isEmpty()) {
@@ -434,7 +448,11 @@ public class AiPostBundleService {
         appendRemappedItems(mergedItems, usedRefs, firstOpt.get(), "b0", remaining);
         remaining = pool - mergedItems.size();
 
+        int followUps = 0;
         for (int i = 1; i < slices.size() && remaining > 0; i++) {
+            if (mergedItems.size() >= readyMinItems) {
+                break;
+            }
             List<Map<String, Object>> slice = slices.get(i);
             if (slice.isEmpty()) continue;
             int top = Math.max(1, Math.min(slice.size(), remaining));
@@ -472,6 +490,7 @@ public class AiPostBundleService {
             }
             appendRemappedItems(mergedItems, usedRefs, followOpt.get(), "b" + i, remaining);
             remaining = pool - mergedItems.size();
+            followUps++;
         }
 
         merged.put("items", mergedItems);
@@ -488,8 +507,8 @@ public class AiPostBundleService {
         }
         postMap.put("metaphor_ids", postContent.metaphorIds());
         merged.put("post", postMap);
-        log.info("AI post micro-batch done corr={} batches={} items={}/{} size={}",
-                correlationId, slices.size(), mergedItems.size(), pool,
+        log.info("AI post micro-batch done corr={} llmCalls={} followUps={} plannedSlices={} items={}/{} size={}",
+                correlationId, 1 + followUps, followUps, slices.size(), mergedItems.size(), pool,
                 properties.getThreadPlan().resolvedMicroBatchSize());
         return Optional.of(new Bundle(merged, postContent, provider, model, castIds, source));
     }
@@ -527,6 +546,21 @@ public class AiPostBundleService {
     static void putParsePlanFloors(Map<String, Object> request) {
         request.put("minTopLevel", 1);
         request.put("minItems", 1);
+    }
+
+    /**
+     * Matcher already ranked commenters. Keep enough for call-1 plus at most one extra
+     * slice so READY mins can be filled — do not walk the full active roster (~150 → 30 slices).
+     */
+    static List<Map<String, Object>> capCommentersForMicroBatch(
+            List<Map<String, Object>> commenters, int batchSize, int readyMinItems) {
+        if (commenters == null || commenters.isEmpty()) {
+            return List.of();
+        }
+        int size = Math.max(4, Math.min(6, batchSize <= 0 ? 5 : batchSize));
+        int floor = Math.max(1, readyMinItems);
+        int budget = Math.min(commenters.size(), Math.max(size, floor) + size);
+        return List.copyOf(commenters.subList(0, budget));
     }
 
     static List<List<Map<String, Object>>> sliceCommenters(List<Map<String, Object>> commenters, int batchSize) {

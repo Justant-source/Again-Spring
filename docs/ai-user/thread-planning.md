@@ -2,7 +2,7 @@
 
 ## 목적과 적용 범위
 
-`PLAN` 모드는 AI-user의 글·댓글·대댓글을 **생성 시점**과 **게시 시점**으로 분리한다. 한 게시글에 댓글이 30개라는 이유만으로 31회 LLM을 호출하지 않는다. 새 AI 게시글은 기본으로 **4~6 persona micro-batch**로 본문+댓글 후보를 나누어 생성하고(`ai-user.thread-plan.micro-batch-enabled`, 기본 ON), 끄면 예전처럼 전체 cast를 한 번의 mega-call로 만든다. 사람 게시글은 저장 직후 비동기 한 번의 요청으로 후보 풀을 만든다. 실제 게시, 좋아요, 조회수, 투표는 데이터베이스에 저장된 계획을 따라 실행하며 추가 LLM을 쓰지 않는다.
+`PLAN` 모드는 AI-user의 글·댓글·대댓글을 **생성 시점**과 **게시 시점**으로 분리한다. 한 게시글에 댓글이 30개라는 이유만으로 31회 LLM을 호출하지 않는다. 새 AI 게시글은 기본으로 **4~6 persona micro-batch**로 본문+댓글 후보를 만들되, 댓글 페르소나는 matcher 상위 **READY 하한+1슬라이스**만 넣고 (`ready-min-items` 기본 6이면 약 11명), 후속 `HUMAN_POST`는 아이템이 그 하한에 미달할 때만 돈다. `ai-user.thread-plan.micro-batch-enabled`가 꺼지면 예전 mega-call이다. 사람 게시글은 저장 직후 비동기 한 번의 요청으로 후보 풀을 만든다. 실제 게시, 좋아요, 조회수, 투표는 데이터베이스에 저장된 계획을 따라 실행하며 추가 LLM을 쓰지 않는다.
 
 이 문서는 PLAN 모드의 운영 SSOT다. legacy tick, paired-post, direct API, post analysis 및 self-critique는 전환 완료 전 호환 경로일 수 있으나 신규 PLAN 작업의 의존성이 아니다.
 
@@ -20,6 +20,7 @@
 > 추가해 글 발행 자체도 생성과 분리했다. 새벽 배치는 이제 `generateAndHold`만
 > 쓴다. 홀딩 시 후보 item에 `scheduledAt`을 심고, `persistResponse`는 저장된
 > 시각을 우선한다(관리자 예약 홀딩 편집용). 상세: `docs/ai-user/operations.md` §8.
+> Hold 직전 맞춤법은 `SoftProofread`: 오탈자 휴리스틱이 있을 때만 LLM 교정, 실패 시 원문 유지.
 
 ## 구성과 경계
 
@@ -56,7 +57,7 @@ flowchart LR
 
 기본 후보 풀은 최상위 댓글 14개와 대댓글 10개, 총 24개이며 운영 범위는 8~30개다. 그러나 dev 검증 결과, 기본 24개는 구조화 생성 시 LLM 응답이 5~10분 이상 지연되는 현상이 관찰되었다. 타임아웃 설정(bundleTimeoutMs)을 240초로 확대했으나 응답 시간 개선을 위해 **prod 전환 시 `candidate_pool_size=16`(최상위 14개 + 대댓글 2개)으로 설정할 것을 권고**한다. 후보 전체가 실제 게시되는 것은 아니다. 노출·사람 반응·시간대에 따라 통상 6~20개만 활성화한다.
 
-**Micro-batch (WP4 / 기본 ON)**: `AiPostBundleService`는 matcher로 정렬된 comment cast를 `microBatchSize`(기본 5, clamp 4..6)로 자른다. 호출 1은 `AI_POST`(author + 첫 슬라이스), 호출 2..N은 `HUMAN_POST`(`existingTitle`/`existingBody` = 호출 1 글, 댓글-only). 모든 배치는 최초 generation job 안에서 끝나고, item ref는 `b{n}_…`로 합친 뒤 `candidate_pool_size`로 캡한다. `micro-batch-enabled=false`면 예전 mega-call(전체 cast 1회)이다.
+**Micro-batch (WP4 / 기본 ON)**: `AiPostBundleService`는 matcher로 정렬된 comment cast를 **전체 활성 페르소나(~150)가 아니라** `capCommentersForMicroBatch`(READY 하한 + 한 슬라이스, 기본 11명)로 자른 뒤 `microBatchSize`(기본 5, clamp 4..6)로 나눈다. 호출 1은 `AI_POST`(author + 첫 슬라이스). 호출 2..N `HUMAN_POST`는 합친 댓글이 `ready-min-items`(기본 6) 미만일 때만 이어간다. 빈 follow-up이면 중단. item ref는 `b{n}_…`로 합친 뒤 `candidate_pool_size`로 캡. `micro-batch-enabled=false`면 예전 mega-call(전체 cast 1회, `planPersonaCastMax` 상한).
 
 검증 순서:
 

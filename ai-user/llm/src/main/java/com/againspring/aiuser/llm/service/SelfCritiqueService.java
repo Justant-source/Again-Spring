@@ -283,8 +283,7 @@ public class SelfCritiqueService {
 
         log.info("critique FAIL corr={} score={} issues={} → retrying", corrId, result.score(), result.issues());
 
-        // 재생성 프롬프트: 원본 + 비평 피드백 주입
-        String retryPrompt = buildRetryPrompt(originalPrompt, draft, result.issues());
+        String retryPrompt = buildRetryPrompt(draft, result.issues(), contentType, formality);
 
         try {
             String raw = pool.executeSyncTask(retryPrompt, model, 90000L, corrId + "-retry", backend);
@@ -354,29 +353,35 @@ public class SelfCritiqueService {
         return p.matcher(text).find();
     }
 
-    private String buildRetryPrompt(String originalPrompt, String draft, List<String> issues) {
+    /**
+     * Short rewrite only — never re-attach the original thread-plan / source / cast prompt.
+     * {@code originalPrompt} is kept on the public API for callers but ignored here.
+     */
+    String buildRetryPrompt(String draft, List<String> issues, String contentType, String formality) {
         String issueText = String.join(", ", issues);
 
-        // 반말/존댓말 위반에 대한 상세 지시 추가
         String issueDetail = issueText.contains("반말 위반")
             ? issueText + " — ~요/~어요/~했어요로 끝나는 모든 문장을 ~음/~임/~더라/~잖아/~거든 류 반말로 바꿔라"
             : issueText.contains("존댓말 어미 단조")
             ? issueText + " — 매 문장마다 다른 종결어미 사용(~요 / ~더라고요 / ~거든요 / ~네요 / 명사종결 등 혼용)"
             : issueText;
 
-        // system 부분 유지, user 부분에 피드백 추가
-        String sep = "<<<USER_PROMPT>>>";
-        if (originalPrompt.contains(sep)) {
-            String[] parts = originalPrompt.split(sep, 2);
-            String system = parts[0];
-            String user = parts.length > 1 ? parts[1] : "";
-            String retryUser = "[수정 요청] 아래 글에서 다음 문제를 수정해 다시 써라: " + issueDetail +
-                               "\n원문:\n" + draft.substring(0, Math.min(draft.length(), 400)) +
-                               "\n\n원래 요청:\n" + user;
-            return system + "\n" + sep + "\n" + retryUser;
-        }
-        // 구분자 없으면 그냥 붙임
-        return originalPrompt + "\n\n[수정 요청] 다음 문제 수정: " + issueDetail + "\n원문: " + draft.substring(0, Math.min(300, draft.length()));
+        String kind = "post".equalsIgnoreCase(contentType) ? "사연 본문" : "댓글";
+        String register = "polite".equalsIgnoreCase(formality)
+            ? "존댓말(해요체)을 유지하라."
+            : "casual".equalsIgnoreCase(formality)
+            ? "반말만 사용하라. 요/어요 종결을 쓰지 마라."
+            : "원문의 반말/존댓말을 유지하라.";
+
+        return """
+                아래 %s만 다시 써라. JSON·스키마·페르소나 목록·원본 생성 프롬프트를 출력하지 마라.
+                %s
+                고칠 문제: %s
+                의미·사실·줄바꿈 구조를 유지하고 문제만 고쳐라. 본문만 출력하라.
+
+                [원문]
+                %s
+                """.formatted(kind, register, issueDetail, draft == null ? "" : draft);
     }
 
     // ── 어휘이질 탐지용 한국어 토크나이저 (Python build_common_words.py와 동일 알고리즘) ──

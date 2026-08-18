@@ -392,7 +392,7 @@ Authorization: Bearer {ASM_CALLBACK_TOKEN}
 - 401 — 잘못된 또는 누락된 `Authorization` 헤더
 - 400 — 필수 필드 누락
 
-**품질 진단·실패 계약 (additive)**: 콜백/잡 조회는 `failure_code`, `failure_stage`, `retryable`, `error_summary`, `actual_duration_ms`, `diagnostics`(ASM은 호환을 위해 `generation_diagnostics`도 허용)를 추가로 보낼 수 있다. 진단에는 최종 시봄이 플랜·적용 장수·본문/댓글/아웃트로/MP4 실제 길이·폴백/실패 사유만 넣고 원문 프롬프트나 LLM 원출력은 넣지 않는다. `SIBOM_*`, `VARIANT_*`, `DURATION_*`, `LAYOUT_SAFETY_EXCEEDED`는 READY/자동 게시로 승격할 수 없는 터미널 품질 실패다. 인프라 동시성 충돌은 `INFRA_DB_CONFLICT`·`retryable=true`로 구분한다.
+**품질 진단·실패 계약 (additive)**: 콜백/잡 조회는 `failure_code`, `failure_stage`, `retryable`, `error_summary`, `actual_duration_ms`, `diagnostics`(ASM은 호환을 위해 `generation_diagnostics`도 허용)를 추가로 보낼 수 있다. 진단에는 최종 시봄이 플랜·적용 장수·본문/댓글/아웃트로/MP4 실제 길이·폴백/실패 사유만 넣고 원문 프롬프트나 LLM 원출력은 넣지 않는다. `SIBOM_*`, `VARIANT_*`, `DURATION_*`, `LAYOUT_*`(예: `LAYOUT_OUTRO_MISSING` — `outro_duration_ms<=0`)는 READY/자동 게시로 승격할 수 없는 터미널 품질 실패다. 인프라 동시성 충돌은 `INFRA_DB_CONFLICT`·`retryable=true`로 구분한다.
 
 **양면 Shorts 댓글 계약 (additive)**: 신규 `youtube_shorts` 양면 사연은 영상 게시 후
 `brief.partner_body`를 첫 댓글로 작성한다. 결과는 해당 publication의 `partner_comment`에

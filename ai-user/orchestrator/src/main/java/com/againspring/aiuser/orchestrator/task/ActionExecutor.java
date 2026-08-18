@@ -20,6 +20,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaActionLogRepository
 import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.safety.ProofreadQualityGate;
+import com.againspring.aiuser.orchestrator.safety.SoftProofread;
 import com.againspring.aiuser.orchestrator.service.PersonaHistoryStore;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -534,28 +535,7 @@ public class ActionExecutor {
             return;
         }
 
-        // 게시 직전 맞춤법 교정 게이트 (2026-08-16 shortform-content-quality fix) — fail-closed:
-        // 교정 호출 실패, 구조/길이 이탈, 교정 후 안전 검사 실패 중 하나라도 걸리면 미게시.
-        java.util.Optional<String> proofreadOpt = llmClient.proofreadPost(sanitizedBody, corrId);
-        if (proofreadOpt.isEmpty()) {
-            logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "proofread_call_failed", "usedLlm", true));
-            return;
-        }
-        String proofread = proofreadOpt.get();
-        ProofreadQualityGate.Result proofreadQuality = ProofreadQualityGate.validate(sanitizedBody, proofread);
-        if (!proofreadQuality.passed()) {
-            logAction(persona, action, "FAILED", corrId,
-                java.util.Map.of("error", proofreadQuality.reason(), "usedLlm", true));
-            return;
-        }
-        ContentSafetyGuard.GuardResult postProofreadGuard =
-            safetyGuard.check(proofread, ContentSafetyGuard.ContentType.POST);
-        if (!postProofreadGuard.passed()) {
-            logAction(persona, action, "BLOCKED", corrId,
-                java.util.Map.of("reason", postProofreadGuard.reason(), "stage", "post_proofread", "usedLlm", true));
-            return;
-        }
-        final String body = proofread;
+        final String body = applySoftProofread(sanitizedBody, corrId);
         String title = extractTitle(body);
         CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
             .userTitle(title)
@@ -590,6 +570,33 @@ public class ActionExecutor {
         if (postOpt.isEmpty()) {
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "post_failed", "usedLlm", true));
         }
+    }
+
+    private String applySoftProofread(String sanitizedBody, String corrId) {
+        if (!SoftProofread.needsLlm(sanitizedBody)) {
+            return sanitizedBody;
+        }
+        java.util.Optional<String> proofreadOpt = llmClient.proofreadPost(sanitizedBody, corrId);
+        if (proofreadOpt.isEmpty()) {
+            log.warn("legacy post proofread call failed corr={} — keeping original", corrId);
+        } else {
+            ProofreadQualityGate.Result proofreadQuality =
+                    ProofreadQualityGate.validate(sanitizedBody, proofreadOpt.get());
+            if (!proofreadQuality.passed()) {
+                log.warn("legacy post proofread quality rejected corr={} {} — keeping original",
+                        corrId, proofreadQuality.reason());
+            }
+            ContentSafetyGuard.GuardResult postProofreadGuard =
+                    safetyGuard.check(proofreadOpt.get(), ContentSafetyGuard.ContentType.POST);
+            if (!postProofreadGuard.passed()) {
+                log.warn("legacy post proofread output blocked corr={} {} — keeping original",
+                        corrId, postProofreadGuard.reason());
+            }
+        }
+        boolean safetyOk = proofreadOpt
+                .map(text -> safetyGuard.check(text, ContentSafetyGuard.ContentType.POST).passed())
+                .orElse(false);
+        return SoftProofread.resolve(sanitizedBody, proofreadOpt, safetyOk);
     }
 
     // ── Register Resolver (문체 → register 변환) ──────────────────────────────

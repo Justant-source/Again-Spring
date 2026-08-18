@@ -299,6 +299,13 @@ public class VideoVariantService {
         int minimum = channel.minSlots();
         int eligibleCandidateCount = eligibleCandidateCount(sibomCandidates);
         List<Map<String, Object>> attempts = new ArrayList<>();
+        if (llmAuthGuard != null && llmAuthGuard.isCircuitOpen()) {
+            Map<String, Object> diagnostics = new LinkedHashMap<>();
+            diagnostics.put("eligible_candidate_count", eligibleCandidateCount);
+            diagnostics.put("required_plan_count", minimum);
+            diagnostics.put("attempts", List.of());
+            return new ChannelResult(null, null, List.of(), "LLM_AUTH_CIRCUIT_OPEN", diagnostics);
+        }
         if (eligibleCandidateCount < minimum) {
             Map<String, Object> diagnostics = new LinkedHashMap<>();
             diagnostics.put("eligible_candidate_count", eligibleCandidateCount);
@@ -334,8 +341,15 @@ public class VideoVariantService {
         String errorMessage = null;
         if (enabled) {
             try {
-                llm = parseChannelResult(llmProvider.invoke(buildChannelPrompt(
-                        masterHook, hookEmotion, title, body, channel, sibomCandidates, correction), model), channel);
+                String raw = llmProvider.invoke(buildChannelPrompt(
+                        masterHook, hookEmotion, title, body, channel, sibomCandidates, correction), model);
+                if (looksLikeLlmError(raw)) {
+                    errorMessage = clamp(raw, 200);
+                    llm = ChannelResult.empty(isTransientLlmFailureMessage(errorMessage)
+                            ? "LLM_TRANSIENT_ERROR" : "LLM_ERROR");
+                } else {
+                    llm = parseChannelResult(raw, channel);
+                }
             } catch (Exception e) {
                 String status = isTransientLlmFailure(e) ? "LLM_TRANSIENT_ERROR" : "LLM_ERROR";
                 errorMessage = e.getMessage();
@@ -416,11 +430,16 @@ public class VideoVariantService {
     }
 
     private static boolean isTransientLlmFailure(Exception error) {
-        String message = error.getMessage() == null ? "" : error.getMessage().toLowerCase(Locale.ROOT);
-        return message.contains("timeout") || message.contains("timed out")
-                || message.contains("502") || message.contains("503") || message.contains("504")
-                || message.contains("temporar") || message.contains("overload")
-                || message.contains("connection reset") || message.contains("service unavailable");
+        return isTransientLlmFailureMessage(error.getMessage());
+    }
+
+    private static boolean isTransientLlmFailureMessage(String message) {
+        String lower = message == null ? "" : message.toLowerCase(Locale.ROOT);
+        return lower.contains("timeout") || lower.contains("timed out")
+                || lower.contains("502") || lower.contains("503") || lower.contains("504")
+                || lower.contains("temporar") || lower.contains("overload")
+                || lower.contains("connection reset") || lower.contains("service unavailable")
+                || lower.contains("session limit") || lower.contains("rate limit");
     }
 
     private String buildChannelPrompt(
@@ -702,6 +721,8 @@ public class VideoVariantService {
         String t = s.toLowerCase(Locale.ROOT);
         return t.contains("credit balance")
                 || t.contains("rate limit")
+                || t.contains("session limit")
+                || t.contains("hit your session")
                 || t.contains("api error")
                 || t.contains("overloaded")
                 || t.contains("prompt is too long")
