@@ -45,8 +45,8 @@ public class PromoTitleService {
             "shock", "anger", "tension", "sad", "hype");
 
     private static final Pattern WS = Pattern.compile("\\s+");
-    /** SNS 훅에는 구분자 슬래시를 쓰지 않는다. 전각 슬래시도 함께 정리한다. */
-    private static final Pattern SLASH_SEPARATORS = Pattern.compile("[/／]");
+    /** SNS 훅·영상 변형 훅에는 구분자 슬래시를 쓰지 않는다. 전각 슬래시도 함께 정리한다. */
+    static final Pattern SLASH_SEPARATORS = Pattern.compile("[/／]");
     private static final int BODY_PROMPT_MAX = 800;
 
     /** LLM/정규화 결과. emotion은 검증 실패 시 null. */
@@ -224,7 +224,7 @@ public class PromoTitleService {
     static String normalizeHook(String promo) {
         if (promo == null || promo.isBlank()) return "";
 
-        String cleaned = SLASH_SEPARATORS.matcher(promo).replaceAll(" ");
+        String cleaned = stripSlashSeparators(promo);
         String[] rawLines = cleaned.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1);
         List<String> lines = new ArrayList<>();
         for (String line : rawLines) {
@@ -272,7 +272,7 @@ public class PromoTitleService {
      */
     static String wrapSemantic(String title) {
         if (title == null || title.isBlank()) return "";
-        String t = SLASH_SEPARATORS.matcher(title).replaceAll(" ").trim();
+        String t = stripSlashSeparators(title);
         if (t.length() <= MAX_LINE_LEN) return clampStore(t);
 
         List<String> tokens = tokenize(t);
@@ -429,6 +429,18 @@ public class PromoTitleService {
     static String collapseWs(String s) {
         if (s == null) return "";
         return WS.matcher(s.trim()).replaceAll("");
+    }
+
+    /**
+     * TTS가 {@code /}를 "슬래시"로 읽는 것을 막기 위해 구분자 슬래시를 공백으로 바꾼다.
+     * 마스터 훅과 영상 변형 훅이 같은 규칙을 쓴다.
+     */
+    public static String stripSlashSeparators(String value) {
+        if (value == null || value.isBlank()) {
+            return value == null ? "" : "";
+        }
+        String cleaned = SLASH_SEPARATORS.matcher(value).replaceAll(" ");
+        return cleaned.replaceAll(" {2,}", " ").trim();
     }
 
     static String clampStore(String s) {

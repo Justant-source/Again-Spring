@@ -483,7 +483,7 @@ public class VideoVariantService {
             %s 만 (이 채널 전용 — 다른 채널 필드 금지)
 
             ## 규칙
-            - 한국어. 이모지·해시태그·따옴표 장식 금지.
+            - 한국어. 이모지·해시태그·따옴표 장식·슬래시(/, ／) 금지. 절을 이을 때는 공백이나 개행만.
             - 판결/처방/승패/유무죄/가해자·피해자 단정 금지. 「배심원」 금지.
             - %s : 스크롤 스톱 한 줄(개행 허용). 마스터 훅과 글자 복제 금지·비틀기 허용.
               **본문 속 구체적 사실(기간·나이·금액·횟수 등 숫자)을 문장 맨 앞에 두고, 그 직후에 모순·반전을 심으세요.**
@@ -627,12 +627,12 @@ public class VideoVariantService {
             h = blankToNull(title);
         }
         if (h == null) return null;
-        h = stripForbidden(MarketingBriefText.normalize(h).trim());
+        h = cleanSpokenText(h);
         if (h.isBlank() || looksLikeLlmError(h)) {
             h = blankToNull(masterHook);
             if (h == null) h = blankToNull(title);
             if (h == null) return null;
-            h = stripForbidden(MarketingBriefText.normalize(h));
+            h = cleanSpokenText(h);
         }
         return clamp(h, HOOK_STORE_MAX);
     }
@@ -650,7 +650,7 @@ public class VideoVariantService {
         if (s == null || looksLikeLlmError(s) || containsForbidden(s)) {
             return heuristicScript(body, maxLen);
         }
-        s = stripForbidden(MarketingBriefText.normalize(s).trim());
+        s = cleanSpokenText(s);
         if (s.isBlank()) {
             return heuristicScript(body, maxLen);
         }
@@ -661,7 +661,8 @@ public class VideoVariantService {
 
     /** Raw-story fallback when the LLM candidate is missing/unusable. May return null (see below). */
     private static String heuristicScript(String body, int maxLen) {
-        String b = MarketingBriefText.normalize(body != null ? body : "").trim().replaceAll("[ \\t]+", " ");
+        String b = PromoTitleService.stripSlashSeparators(
+                MarketingBriefText.normalize(body != null ? body : "").trim().replaceAll("[ \\t]+", " "));
         if (b.isEmpty()) return null;
         if (b.length() <= maxLen) return b;
         return sentenceBoundaryClamp(b, maxLen);
@@ -686,6 +687,12 @@ public class VideoVariantService {
             }
         }
         return null;
+    }
+
+    /** Newlines stay; slash separators become spaces so TTS never reads "슬래시". */
+    private static String cleanSpokenText(String s) {
+        return PromoTitleService.stripSlashSeparators(
+                stripForbidden(MarketingBriefText.normalize(s == null ? "" : s).trim()));
     }
 
     private static String distinctHook(String hook) {

@@ -213,7 +213,7 @@ Idempotency-Key: <uuid>
 | `title` | 1 유지 | 광장용. SNS 훅과 분리 |
 | `promo_title` / `hook_text` | 1 유지 | 마스터 훅 |
 | `hook_emotion` | 1+2 | enum 5종. **Phase 2: TTS에 전달** |
-| `hook_reels` / `hook_shorts` | **2 SSOT** | 영상 슬롯 확정 시 변형 훅 (`VideoVariantService`) |
+| `hook_reels` / `hook_shorts` | **2 SSOT** | 영상 슬롯 확정 시 변형 훅 (`VideoVariantService`). `/`·`／`는 공백으로 정규화 |
 | `script_reels` / `script_shorts` | **2 SSOT** | 요약 대본 (전문 낭독 금지) |
 | `max_duration_reels_sec` / `max_duration_shorts_sec` | **2 SSOT** | 30 / 45 |
 | `max_duration_sec` | **2 SSOT** | alone 잡 활성 캡 |

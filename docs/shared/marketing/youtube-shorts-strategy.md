@@ -140,7 +140,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 | `title` | 광장 제목 (훅과 불일치 허용) |
 | `promo_title` / `hook_text` | **마스터 훅** (사연 생성 시) |
 | `hook_emotion` | `shock`\|`anger`\|`tension`\|`sad`\|`hype` → **TTS S2 Pro** |
-| `hook_reels` / `hook_shorts` | **영상 슬롯 확정 시** 변형 훅 (`VideoVariantService`). 채널당 LLM 1회(+보정 최대 1). 회로 open이면 호출 없음. [llm-call-budget.md](../../ai-user/llm-call-budget.md) §3 |
+| `hook_reels` / `hook_shorts` | **영상 슬롯 확정 시** 변형 훅 (`VideoVariantService`). 채널당 LLM 1회(+보정 최대 1). 회로 open이면 호출 없음. `/`·`／` 구분자는 공백으로 정규화. [llm-call-budget.md](../../ai-user/llm-call-budget.md) §3 |
 | `script_reels` / `script_shorts` | 요약 낭독 대본. 끝에 공감비율·댓글·의견 요청 CTA를 추가하지 않음. |
 | `max_duration_reels_sec` / `max_duration_shorts_sec` | 본문 목표 30 / 45초 (듀얼·분리 잡). 본문 TTS는 각각 32 / 47초를 넘으면 실패한다. 댓글 2개·아웃트로는 본문 길이 판정에서 제외한다. |
 | `max_duration_sec` | alone 잡의 활성 캡 (30 또는 45) |
@@ -159,7 +159,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 
 | 항목 | 규칙 |
 |---|---|
-| 제목 | 변형 훅(`hook_reels`/`hook_shorts`) → 마스터 훅 → `title` 폴백 |
+| 제목 | 변형 훅(`hook_reels`/`hook_shorts`) → 마스터 훅 → `title` 폴백. `/`·`／` 구분자는 금지이며 `VideoVariantService`가 공백으로 정규화한다(TTS가 "슬래시"로 읽는 것 방지). |
 | 링크 | 광장 URL + **UTM** — 랜딩 = 사연 상세. IG Reels 캡션 URL 정책은 피드와 동일 계열(프로필 중심) 가능 |
 | CTA | `당신은 어느 쪽에 공감하나요?` |
 | 해시태그 | `#Shorts`(YT) + 브랜드 2(`#다시봄` `#againspring`) + 니치. IG ≤5, YT ≤15 |

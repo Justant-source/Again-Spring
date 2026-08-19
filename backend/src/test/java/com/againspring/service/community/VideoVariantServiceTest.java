@@ -185,6 +185,39 @@ class VideoVariantServiceTest {
     }
 
     @Test
+    void generate_promptForbidsSlashSeparators() throws Exception {
+        ArgumentCaptor<String> promptCap = ArgumentCaptor.forClass(String.class);
+        when(llmProvider.invoke(promptCap.capture(), anyString())).thenReturn("""
+            {"hook_shorts":"쇼츠","script_shorts":"대본 댓글","sibom_plan":[
+              {"role":"intro","image_id":"side-glance"},{"role":"peak","image_id":"stunned"},
+              {"role":"punch","image_id":"drained"},{"role":"punch","image_id":"indignant"},
+              {"role":"punch","image_id":"relieved"}]}
+            """);
+
+        service.generate("훅", "tension", "제목", "본문", false, true, List.of("side-glance"));
+
+        assertThat(promptCap.getValue()).contains("슬래시(/, ／) 금지");
+    }
+
+    @Test
+    void generate_stripsSlashSeparatorsFromHookAndScript() throws Exception {
+        when(llmProvider.invoke(anyString(), anyString())).thenReturn("""
+            {"hook_shorts":"연애 3개월에 8개월 동거를 들었다 / 지금의 연애가 뭐인지 모르겠어","script_shorts":"말해준 건 고마운데／왜 굳이 지금이야. 댓글로","sibom_plan":[
+              {"role":"intro","image_id":"side-glance"},{"role":"peak","image_id":"stunned"},
+              {"role":"punch","image_id":"drained"},{"role":"punch","image_id":"indignant"},
+              {"role":"punch","image_id":"relieved"}]}
+            """);
+
+        VideoVariantService.Variants v = service.generate(
+                "마스터훅", "tension", "제목", "본문 갈등", false, true);
+
+        assertThat(v.hookShorts()).doesNotContain("/").doesNotContain("／");
+        assertThat(v.hookShorts()).isEqualTo("연애 3개월에 8개월 동거를 들었다 지금의 연애가 뭐인지 모르겠어");
+        assertThat(v.scriptShorts()).doesNotContain("/").doesNotContain("／");
+        assertThat(v.scriptShorts()).contains("말해준 건 고마운데 왜 굳이 지금이야");
+    }
+
+    @Test
     void generateForChannel_shortsOnly() throws Exception {
         when(llmProvider.invoke(anyString(), anyString())).thenReturn("""
             {"hook_shorts":"쇼츠","script_shorts":"대본 댓글","sibom_plan":[

@@ -66,6 +66,14 @@ class PromoTitleServiceTest {
     }
 
     @Test
+    void stripSlashSeparators_replacesSlashWithSpace_keepsNewlines() {
+        assertEquals("들었다 지금의 연애가",
+                PromoTitleService.stripSlashSeparators("들었다 / 지금의 연애가"));
+        assertEquals("첫줄\n둘째", PromoTitleService.stripSlashSeparators("첫줄\n둘째"));
+        assertEquals("", PromoTitleService.stripSlashSeparators(null));
+    }
+
+    @Test
     void normalizeAgainstTitle_blankFallsBackToWrap() {
         String title = "원제입니다 그대로";
         String got = PromoTitleService.normalizeAgainstTitle(null, title);

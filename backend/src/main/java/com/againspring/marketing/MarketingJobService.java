@@ -312,12 +312,12 @@ public class MarketingJobService {
 
         BriefDto brief = BriefDto.builder()
             .title(storyTitle)
-            .promoTitle(masterHook)
+            .promoTitle(spokenCopy(masterHook))
             .hookEmotion(hookEmotion)
-            .hookReels(variants.hookReels())
-            .hookShorts(variants.hookShorts())
-            .scriptReels(variants.scriptReels())
-            .scriptShorts(variants.scriptShorts())
+            .hookReels(spokenCopy(variants.hookReels()))
+            .hookShorts(spokenCopy(variants.hookShorts()))
+            .scriptReels(spokenCopy(variants.scriptReels()))
+            .scriptShorts(spokenCopy(variants.scriptShorts()))
             .maxDurationReelsSec(variants.maxDurationReelsSec())
             .maxDurationShortsSec(variants.maxDurationShortsSec())
             .maxDurationSec(maxDurationSec)
@@ -706,6 +706,13 @@ public class MarketingJobService {
         String error = errorRaw == null ? "상세 오류 없음" : compact(String.valueOf(errorRaw), 500);
         return System.lineSeparator() + "상대방 사연 댓글 미게시: " + error
             + System.lineSeparator() + "YouTube Studio에서 수동 작성·고정 필요";
+    }
+
+    /** TTS/"슬래시" 오염 방지 — brief 훅·대본의 마지막 가드. */
+    private static String spokenCopy(String value) {
+        if (value == null) return null;
+        String cleaned = PromoTitleService.stripSlashSeparators(value);
+        return cleaned.isBlank() ? null : cleaned;
     }
 
     private static String compact(String value, int maxLength) {
