@@ -53,6 +53,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("POST", "/api/internal/marketing/callback").permitAll()
+                        // 컨트롤러가 ASM callback 토큰을 상수시간 비교로 자체 검증한다 (JWT 미사용 내부 채널)
+                        .requestMatchers("POST", "/api/internal/marketing/redrive").permitAll()
                         .requestMatchers("/api/auth/agree").authenticated()
                         .requestMatchers("/api/auth/logout").authenticated()
                         .requestMatchers("/api/auth/**").permitAll()

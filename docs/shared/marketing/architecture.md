@@ -279,6 +279,8 @@ async def run_stub(job_id):
 
 **적용 메서드**: `createJob()`, `getJob()`, `publish()`, `republish()`
 
+**로컬 영상 보존**: 게시 성공 직후 ASM `data/jobs/` mp4를 삭제하지 않는다. `PUBLISHED` 후 30일 지난 영상만 시간당 스윕이 바이트를 지운다. 정책 SSOT: [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md).
+
 ---
 
 | 오류 상황 | AS 동작 | 사용자 표시 |

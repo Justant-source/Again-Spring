@@ -120,7 +120,7 @@ API: `GET`/`PUT /api/admin/marketing/quota` — Body 플랫폼 필드(`xThread` 
 | X 4단 스레드 | `x_thread` | 텍스트 스레드 | Playwright (`x-thread-strategy.md`) | **활성 (24h · 독립 cap)** |
 | 네이버 블로그 | `naver_blog` | 마크다운 → HTML | Playwright 자동 로그인 | 보류 |
 | 인스타그램 피드 | `instagram_feed` | 하이브리드 캐러셀 (훅+캡처+비율) | Playwright (`instagram-feed-strategy.md`) | **활성 (24h · 독립 cap)** — **릴스와만 배타** |
-| 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Meta Graph / 세션 | **활성 (24h · 독립 cap · 별도 잡)** |
+| 인스타그램 릴스 | `instagram_reels` | 세로형 영상 (9:16) | Meta Graph만 (Playwright 업로드 금지) | **활성 (24h · 독립 cap · 별도 잡)** |
 | YouTube Shorts | `youtube_shorts` | 세로형 영상 (9:16) | WaggleBot 렌더 → API 업로드 | **활성 (24h · 독립 cap · 별도 잡)** — [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) |
 | 네이버 클립 | `naver_clip` | 세로형 영상 (9:16) | Playwright (미구현) | 보류 |
 | Threads | `threads` | 텍스트 + 이미지 | Playwright 자동 로그인 (인스타 계정 상속) | 보류 |

@@ -290,6 +290,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/announcements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateAnnouncement"];
+        post?: never;
+        delete: operations["deleteAnnouncement"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/weekly-reports/generate": {
         parameters: {
             query?: never;
@@ -748,6 +764,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["startVoting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/events/{eventId}/photo-exhibition/payout-live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["payoutLive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2290,22 +2322,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/announcements/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["deleteAnnouncement"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/announcements/deactivate-all": {
         parameters: {
             query?: never;
@@ -2455,6 +2471,28 @@ export interface components {
             phrase?: string;
             category?: string;
             active?: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        AdminAnnouncementRequest: {
+            title?: string;
+            content?: string;
+            type?: string;
+            relatedUrl?: string;
+            relatedLabel?: string;
+            expiresAt?: string;
+        };
+        AnnouncementResponse: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            content?: string;
+            type?: string;
+            active?: boolean;
+            relatedUrl?: string;
+            relatedLabel?: string;
+            /** Format: date-time */
+            expiresAt?: string;
             /** Format: date-time */
             createdAt?: string;
         };
@@ -2651,28 +2689,6 @@ export interface components {
             color?: string;
             hasStatus?: boolean;
             adminOnly?: boolean;
-        };
-        AdminAnnouncementRequest: {
-            title?: string;
-            content?: string;
-            type?: string;
-            relatedUrl?: string;
-            relatedLabel?: string;
-            expiresAt?: string;
-        };
-        AnnouncementResponse: {
-            /** Format: int64 */
-            id?: number;
-            title?: string;
-            content?: string;
-            type?: string;
-            active?: boolean;
-            relatedUrl?: string;
-            relatedLabel?: string;
-            /** Format: date-time */
-            expiresAt?: string;
-            /** Format: date-time */
-            createdAt?: string;
         };
         CaptionUpdateRequest: {
             caption?: string;
@@ -3772,6 +3788,52 @@ export interface operations {
             };
         };
     };
+    updateAnnouncement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminAnnouncementRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AnnouncementResponse"];
+                };
+            };
+        };
+    };
+    deleteAnnouncement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     generateReports: {
         parameters: {
             query?: never;
@@ -4755,6 +4817,26 @@ export interface operations {
         };
     };
     startVoting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    payoutLive: {
         parameters: {
             query?: never;
             header?: never;
@@ -7145,26 +7227,6 @@ export interface operations {
         };
     };
     deleteCategory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    deleteAnnouncement: {
         parameters: {
             query?: never;
             header?: never;

@@ -914,8 +914,41 @@ public class MarketingJobService {
     private void sendFailureNotification(MarketingJob job) {
         String message = buildFailureMessage(job);
         if (message != null && !message.isBlank()) {
-            telegramNotifier.send(message);
+            Map<String, Object> markup = buildFailureAlertMarkup(job);
+            telegramNotifier.sendWithMarkup(message, markup);
         }
+    }
+
+    /**
+     * Build inline keyboard markup for failure alert (redrive + ignore buttons).
+     * Returns null if buttons are not enabled or if idempotency child already exists.
+     */
+    private Map<String, Object> buildFailureAlertMarkup(MarketingJob job) {
+        if (!telegramNotifier.areButtonsEnabled()) {
+            return null;
+        }
+
+        // Check if already has a non-terminal redrive child (idempotency)
+        boolean hasChild = marketingJobRepository.findByRetryOfJobId(job.getId()).stream()
+            .anyMatch(child -> !isTerminalStatus(child.getStatus()));
+        if (hasChild) {
+            return null; // Redrive already in progress, don't add button again
+        }
+
+        long nowEpochSec = System.currentTimeMillis() / 1000;
+        String env = isProductionEnvironment() ? "prod" : "dev";
+
+        Map<String, Object> reddriveButton = new LinkedHashMap<>();
+        reddriveButton.put("text", "재구동");
+        reddriveButton.put("callback_data", String.format("redrive:%s:%d:%d", env, job.getId(), nowEpochSec));
+
+        Map<String, Object> ignoreButton = new LinkedHashMap<>();
+        ignoreButton.put("text", "무시");
+        ignoreButton.put("callback_data", String.format("ignore:%s:%d", env, job.getId()));
+
+        Map<String, Object> markup = new LinkedHashMap<>();
+        markup.put("inline_keyboard", List.of(List.of(reddriveButton, ignoreButton)));
+        return markup;
     }
 
     /**
@@ -1227,5 +1260,172 @@ public class MarketingJobService {
             log.warn("Failed to serialize object to JSON", e);
             return null;
         }
+    }
+
+    /**
+     * Redrive failed marketing jobs: regenerate if regenerable, or recreate with same params.
+     * Returns immediately after starting the jobs (no polling).
+     * Completion is observed by the existing polling scheduler.
+     *
+     * @param jobIds list of job IDs to redrive
+     * @param skipExisting if true, skip platforms already PUBLISHED
+     * @param requestedBy user/admin performing the redrive
+     * @return response containing per-job redrive result
+     */
+    public List<Map<String, Object>> redriveJobs(List<Long> jobIds, boolean skipExisting, String requestedBy) {
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        for (Long jobId : jobIds) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("sourceId", jobId);
+            result.put("action", "ERROR");
+            result.put("reason", null);
+            result.put("targetId", null);
+            result.put("platformStates", new LinkedHashMap<>());
+
+            MarketingJob source;
+            try {
+                source = marketingJobRepository.findById(jobId)
+                    .orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
+            } catch (Exception e) {
+                result.put("reason", "Job not found: " + e.getMessage());
+                results.add(result);
+                continue;
+            }
+
+            // Check for existing non-terminal redrive child (idempotency)
+            MarketingJob existingChild = marketingJobRepository.findByRetryOfJobId(jobId).stream()
+                .filter(job -> !isTerminalStatus(job.getStatus()))
+                .findFirst()
+                .orElse(null);
+
+            if (existingChild != null) {
+                result.put("action", "SKIPPED");
+                result.put("reason", "Non-terminal redrive child already exists");
+                result.put("targetId", existingChild.getId());
+                extractPlatformStates((Map<String, String>) result.get("platformStates"), existingChild);
+                results.add(result);
+                continue;
+            }
+
+            // Determine targets and filter for skipExisting
+            List<String> targets;
+            try {
+                targets = objectMapper.readValue(source.getTargets(), new TypeReference<List<String>>() {});
+            } catch (Exception e) {
+                result.put("reason", "Failed to parse targets: " + e.getMessage());
+                results.add(result);
+                continue;
+            }
+
+            // Filter out already-published platforms if skipExisting is true
+            if (skipExisting) {
+                targets = filterPublishedPlatforms(source, targets);
+                if (targets.isEmpty()) {
+                    result.put("action", "SKIPPED");
+                    result.put("reason", "All platforms already PUBLISHED");
+                    results.add(result);
+                    continue;
+                }
+            }
+
+            // Try regenerate first (409 fallback to recreate)
+            MarketingJob child = null;
+            try {
+                if ("FAILED".equals(source.getStatus()) && isRegenerableFailure(source.getFailureCode())) {
+                    // Use regenerate endpoint
+                    child = regenerateJob(jobId, requestedBy);
+                    result.put("action", "REGENERATED");
+                } else {
+                    // Use recreate fallback
+                    child = createJob(source.getPostId(), targets, true, requestedBy, source.getId(),
+                        (source.getGenerationAttempt() != null ? source.getGenerationAttempt() : 1) + 1);
+                    result.put("action", "RECREATED");
+                }
+                result.put("targetId", child.getId());
+                result.put("reason", null);
+                extractPlatformStates((Map<String, String>) result.get("platformStates"), child);
+            } catch (Exception e) {
+                // 409 Conflict on regenerate → fallback to createJob
+                if (e.getMessage() != null && e.getMessage().contains("409")) {
+                    try {
+                        child = createJob(source.getPostId(), targets, true, requestedBy, source.getId(),
+                            (source.getGenerationAttempt() != null ? source.getGenerationAttempt() : 1) + 1);
+                        result.put("action", "RECREATED");
+                        result.put("targetId", child.getId());
+                        result.put("reason", null);
+                        extractPlatformStates((Map<String, String>) result.get("platformStates"), child);
+                    } catch (Exception e2) {
+                        result.put("action", "ERROR");
+                        result.put("reason", "Regenerate and recreate both failed: " + e2.getMessage());
+                    }
+                } else {
+                    result.put("action", "ERROR");
+                    result.put("reason", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                }
+            }
+
+            results.add(result);
+        }
+
+        return results;
+    }
+
+    /**
+     * Filter platforms that already have PUBLISHED state in the source job's publications.
+     */
+    private List<String> filterPublishedPlatforms(MarketingJob source, List<String> targets) {
+        if (source.getPublications() == null || source.getPublications().isBlank()) {
+            return targets; // No publication data, return all targets
+        }
+
+        try {
+            List<Map<String, Object>> publications = objectMapper.readValue(
+                source.getPublications(), new TypeReference<List<Map<String, Object>>>() {});
+            java.util.Set<String> publishedPlatforms = new java.util.HashSet<>();
+            for (Map<String, Object> pub : publications) {
+                String state = String.valueOf(pub.getOrDefault("state", ""));
+                if ("PUBLISHED".equalsIgnoreCase(state) || "SUCCESS".equalsIgnoreCase(state)) {
+                    String platform = String.valueOf(pub.getOrDefault("platform", ""));
+                    if (!platform.isBlank()) {
+                        publishedPlatforms.add(platform);
+                    }
+                }
+            }
+            return targets.stream()
+                .filter(t -> !publishedPlatforms.contains(t))
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("Failed to filter published platforms for job {}: {}", source.getId(), e.getMessage());
+            return targets; // On error, return all targets (fail open)
+        }
+    }
+
+    /**
+     * Extract platform publication states from a job's publications for response.
+     */
+    private void extractPlatformStates(Map<String, String> platformStates, MarketingJob job) {
+        if (job.getPublications() == null || job.getPublications().isBlank()) {
+            return;
+        }
+        try {
+            List<Map<String, Object>> publications = objectMapper.readValue(
+                job.getPublications(), new TypeReference<List<Map<String, Object>>>() {});
+            for (Map<String, Object> pub : publications) {
+                String platform = String.valueOf(pub.getOrDefault("platform", "unknown"));
+                String state = String.valueOf(pub.getOrDefault("state", "UNKNOWN"));
+                platformStates.put(platform, state);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to extract platform states for job {}: {}", job.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Check if a job status is terminal.
+     */
+    private boolean isTerminalStatus(String status) {
+        return status != null && (status.equalsIgnoreCase("PUBLISHED") || status.equalsIgnoreCase("FAILED")
+            || status.equalsIgnoreCase("PARTIAL"));
     }
 }

@@ -12,9 +12,9 @@
 | 항목 | 값 |
 |---|---|
 | 자동 생성 | **활성** — 사연 `+24h` 후 **채널별 popularity·cap**으로 독립 선정 (`MarketingHoldingCommitService`) |
-| 자동 게시 | **활성** — READY 즉시 YT API / Reels Graph·세션 게시 (저녁 슬롯 없음) |
+| 자동 게시 | **활성** — READY 즉시 YT API / Reels Graph 게시 (저녁 슬롯 없음) |
 | 렌더 | WaggleBot (`POST /api/external/jobs`) — LLM은 **Claude CLI 브릿지** (`llm_backend=cli`). **채널별 유니크 렌더** (동일 mp4 공유 금지) |
-| 게시 계정 | 다시봄 전용 YouTube (ASM `youtube_shorts` OAuth) · IG Reels 세션/Graph |
+| 게시 계정 | 다시봄 전용 YouTube (ASM `youtube_shorts` OAuth) · IG Reels Graph (`instagram_reels` 토큰). Graph 25/2207050이면 scraping_warning 닫기 후 Graph 재시도 |
 
 `instagram_reels`와 `youtube_shorts`는 **독립 선정**. 같은 사연이 양쪽에 가도 **레이아웃·대사·mp4가 다름**.  
 피드(`instagram_feed`)와 Reels는 **상호배타** (`score_feed` vs `score_reels`, 동점→Reels) — [`platforms.md`](platforms.md).  
@@ -34,6 +34,7 @@ AS 24h 분배 (채널별 score·cap)
   → READY 즉시 publish: YouTube API / Instagram Reels
 ```
 
+- **로컬 mp4 보존**: 게시 성공 직후 ASM 디스크의 `*__video.mp4`를 지우지 않는다. **게시 시각(`publication.updated_at`)부터 30일** 지난 뒤에만 바이트를 삭제한다(아티팩트 DB row·게시 URL은 유지). 미게시(`NEEDS_AUTH`/`FAILED`) 영상은 재게시용으로 남긴다. 썸네일·`upload.json`은 이 정책 밖. 구현: ASM `app/worker/video_retention.py` (시간당 스윕). `VIDEO_RETENTION_DAYS`(기본 30).
 - ASM `app/media` 로컬 GPU 파이프는 Shorts에 사용하지 않는다.
 - WaggleBot 크롤 채널·자체 YT 업로드는 사용하지 않는다.
 - alone / 양 채널 동시 선정 모두 **렌더는 분리**.

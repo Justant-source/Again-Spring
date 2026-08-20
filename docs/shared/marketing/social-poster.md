@@ -31,11 +31,13 @@ services/social-poster/
 │   │   ├── anti-bot.js       # 봇 탐지 우회 (랜덤 딜레이, 사람처럼 입력)
 │   │   ├── x-selectors.js    # X(트위터) CSS 셀렉터
 │   │   ├── ig-selectors.js   # Instagram CSS 셀렉터
+│   │   ├── ig-restriction.js # IG scraping_warning 닫기 (Graph 25/2207050 해제)
 │   │   └── naver-selectors.js # 네이버 블로그 CSS 셀렉터
 │   └── routes/
 │       ├── capture-x-thread.js   # 광장 캡처 (X·IG 공유, IG만 commentsReadableBudget)
 │       ├── publish-x.js          # X 게시 엔드포인트
-│       ├── publish-instagram.js  # Instagram 게시 엔드포인트
+│       ├── publish-instagram.js  # Instagram 피드 게시 엔드포인트
+│       ├── dismiss-instagram-restriction.js  # scraping_warning 닫기
 │       ├── publish-naver-blog.js # 네이버 블로그 게시 엔드포인트
 │       ├── session-health.js     # 세션 유효성 확인
 │       └── test-login.js         # 로그인 테스트
@@ -73,9 +75,19 @@ X(트위터)에 텍스트 + 이미지를 게시합니다.
 }
 ```
 
+### POST /instagram/dismiss-restriction
+
+Instagram `scraping_warning`(자동화된 행동 의심) 화면의 **닫기**를 눌러 Meta Graph `User access is restricted`(code 25 / 2207050)를 해제한다. 미디어는 올리지 않는다. 릴스 게시는 Graph API가 이 엔드포인트를 한 번 호출한 뒤 `/media`를 재시도한다.
+
+```json
+{ "storageState": "{...Playwright storageState...}" }
+```
+
+성공: `{ "ok": true }`. 닫기를 못 누르면 `{ "ok": false, "error": "SCRAPING_WARNING_UNCLEARED …" }`.
+
 ### POST /publish/instagram
 
-Instagram 피드 또는 릴스를 게시합니다.
+Instagram 피드를 게시합니다. 릴스 영상 업로드는 Graph API만 사용한다(웹 업로드는 anti-bot에 막힘).
 
 ```json
 {

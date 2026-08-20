@@ -411,4 +411,14 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     List<MarketingJob> findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
         @Param("startInclusive") Instant startInclusive,
         @Param("endExclusive") Instant endExclusive);
+
+    /**
+     * Find all redrive child jobs for a given source job ID.
+     * Used for idempotency checks in redrive logic: if a source job already has a
+     * non-terminal child, reuse it instead of creating a new one.
+     *
+     * @param retryOfJobId the source job ID
+     * @return List of child jobs (may be empty)
+     */
+    List<MarketingJob> findByRetryOfJobId(Long retryOfJobId);
 }

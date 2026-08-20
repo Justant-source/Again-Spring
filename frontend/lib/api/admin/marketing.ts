@@ -1397,6 +1397,41 @@ export async function forceMarketingCompleted(
   return res.data;
 }
 
+// ===== Job redrive (failed jobs bulk redrive) =====
+
+export interface RedriveJobIdRequest {
+  jobIds: number[];
+  skipExisting?: boolean;
+}
+
+export interface RedriveJobFilterRequest {
+  filter: {
+    status: string;
+    since?: string;
+  };
+  skipExisting?: boolean;
+}
+
+export type RedriveRequest = RedriveJobIdRequest | RedriveJobFilterRequest;
+
+export interface RedriveResult {
+  sourceId: number;
+  targetId: number | null;
+  action: 'REGENERATED' | 'RECREATED' | 'SKIPPED' | 'ERROR';
+  reason: string | null;
+  platformStates: Record<string, string> | null;
+}
+
+export interface RedriveResponse {
+  requested: number;
+  results: RedriveResult[];
+}
+
+export async function redriveMarketingJobs(request: RedriveRequest): Promise<RedriveResponse> {
+  const res = await api.post<RedriveResponse>('/api/admin/marketing/jobs/redrive', request);
+  return res.data;
+}
+
 /** Redesign note aliases (S6 wiring). Prefer the Marketing* names above. */
 export const getScoreWeights = getMarketingScoreWeights;
 export const updateScoreWeights = updateMarketingScoreWeights;

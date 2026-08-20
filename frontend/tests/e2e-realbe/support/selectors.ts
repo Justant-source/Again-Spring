@@ -174,6 +174,23 @@ export const completedPublishedRow = (postId: string) =>
 export const completedDroppedRow = (postId: string) =>
   `[data-testid="completed-dropped-row-${postId}"]`
 
+// ── 완료 탭 — 실패 잡 일괄 재구동 ────────────────────────────────
+/** 실패 잡 일괄 재구동 버튼 (헤더 액션). */
+export const completedRedriveButton = '[data-testid="completed-redrive-button"]'
+/** 실패 잡 재구동 확인 다이얼로그. */
+export const completedRedriveDialog = '[data-testid="completed-redrive-dialog"]'
+/** 재구동 대상 잡 개수 요약. */
+export const completedRedriveSummary = '[data-testid="completed-redrive-summary"]'
+/** 재구동 실행 버튼. */
+export const completedRedriveExecuteBtn = '[data-testid="completed-redrive-execute-btn"]'
+/** 재구동 취소 버튼. */
+export const completedRedriveCancelBtn = '[data-testid="completed-redrive-cancel-btn"]'
+/** 재구동 결과 테이블. */
+export const completedRedriveResultsTable = '[data-testid="completed-redrive-results-table"]'
+/** 개별 잡 행의 재구동 버튼 (jobId 파라미터화). */
+export const jobRedriveBtn = (jobId: number) =>
+  `[data-testid="job-redrive-btn-${jobId}"]`
+
 // ── 어드민 원본 비교 (/admin/content/[postId]/compare) ───────────
 export const ADMIN_CONTENT = {
   tabs: '[data-testid="admin-content-tabs"]',

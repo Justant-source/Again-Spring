@@ -151,6 +151,10 @@ docker compose ps
 docker compose logs --tail=30
 ```
 
+### 로컬 영상 보존
+
+게시 성공 직후 `data/jobs/<job_id>/*__video.mp4`를 지우지 않는다. `PUBLISHED` 시각 + **30일** 후 시간당 스윕이 mp4 바이트만 삭제한다(`VIDEO_RETENTION_DAYS`, 기본 30 · `VIDEO_RETENTION_POLL_INTERVAL_SECONDS` 기본 3600). 어드민 인라인 미리보기는 그 동안 동작한다.
+
 ### Again-Spring 폴링 오류 (STALE 상태)
 
 STALE 상태는 ASM에 5회 연속 폴링 실패 시 발생합니다.

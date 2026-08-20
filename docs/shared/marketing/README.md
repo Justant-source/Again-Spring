@@ -57,7 +57,7 @@ POST /api/v1/jobs → [Again-Spring-Marketing (ASM)]
 | 컴포넌트 | 위치 | 역할 |
 |---|---|---|
 | **Again-Spring (AS)** | Ubuntu 서버 | 홀딩 보드·24h 확정·잡 폴링·Admin UI. 얇은 ASM 클라이언트 |
-| **Again-Spring-Marketing (ASM)** | WSL GPU 서버 | 콘텐츠 생성·렌더링·소셜 게시 전담 |
+| **Again-Spring-Marketing (ASM)** | WSL GPU 서버 | 콘텐츠 생성·렌더링·소셜 게시 전담. 게시된 로컬 mp4는 **30일** 보존 |
 | **ASM social-poster** | ASM `services/social-poster/` | Playwright 자동 게시. **타깃 분배 = 플랫폼별 score·cap** (런타임 전환 중일 수 있음 — SSOT는 Phase 2) |
 
 **접속**: AS 호스트 Tailscale `100.81.189.92`에서 `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`

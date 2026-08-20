@@ -268,6 +268,12 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=6000
 - `ASM_BASE_URL`, `ASM_ENABLED`, `ASM_CALLBACK_*` 비시크릿 설정은 env. `ASM_API_TOKEN` / callback token → vault (ASM 권위본=`system_secret`).
 - Instagram/Meta `app_id`·`app_secret`·`access_token`은 **env에 두지 않음** — ASM `instagram_reels` credential(AES-256-GCM)만. 상세 [`docs/shared/marketing/credentials.md`](../shared/marketing/credentials.md)
 - ASM 런타임 (`ASM_BEARER_TOKEN`, `ASM_CALLBACK_TOKEN`, `WAGGLEBOT_API_KEY`, ASM `ANTHROPIC_API_KEY`) → ASM `system_secret`. ASM `.env`에는 `ASM_DATABASE_URL` + `ASM_CREDENTIAL_KEY`만.
+- ASM 로컬 mp4 보존: `VIDEO_RETENTION_DAYS`(기본 30) · `VIDEO_RETENTION_POLL_INTERVAL_SECONDS`(기본 3600). AS env가 아님. 정책 [`docs/shared/marketing/youtube-shorts-strategy.md`](../shared/marketing/youtube-shorts-strategy.md).
+- `MARKETING_TELEGRAM_BUTTONS_ENABLED` — 마케팅 실패 알림 메시지에 인라인 버튼(재구동/무시) 표시 여부. 기본값 `false` (안전 장치).
+  `true`일 때 Telegram 인라인 버튼 클릭 → ASM webhook → AS `/api/admin/marketing/jobs/redrive` API 호출. 
+  상세: [`docs/shared/marketing/api.md`](../shared/marketing/api.md) §1.6 및 `TelegramNotifier`·`MarketingJobService.buildFailureAlertMarkup()`.
+  사람이 버튼을 눌러야만 재구동되는 반자동 장치이므로 dev/prod 모두 활성화 가능(2026-08-20 dev 활성화).
+  단, 재구동은 기존 admin regenerate와 동일하게 공유 ASM 인스턴스를 경유하므로 dev 잡 재구동도 실제 파이프라인을 태운다는 점은 동일.
 - `ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED` — `XThreadPublishTriggerScheduler` opt-in 게이트(기본 `false`).
   **X(`x_thread`)와 Instagram(`instagram_feed`) 24h 자동 발행을 함께 켠다.** prod만 `true`.
   `.env.prod`에만 `true`로 설정한다(dev는 절대 금지 — ASM이 dev/prod 공유 단일 인스턴스라 dev에서 켜면

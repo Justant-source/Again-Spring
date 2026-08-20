@@ -37,6 +37,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -341,6 +342,73 @@ public class AdminMarketingController {
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage(), e);
         }
+    }
+
+    /**
+     * Generic redrive endpoint: regenerate or recreate failed marketing jobs.
+     * Accepts either jobIds list or filter query (status, since).
+     * Returns immediately with per-job results; completion is observed by polling scheduler.
+     */
+    @PostMapping("/jobs/redrive")
+    @Operation(summary = "Redrive failed marketing jobs", description = "실패한 마케팅 잡 일괄 재구동 또는 재생성 (regenerate → 409 fallback to recreate)")
+    @ApiResponse(responseCode = "200", description = "Redrive operations initiated")
+    @ApiResponse(responseCode = "400", description = "Invalid request")
+    @Auditable(action = "REDRIVE_MARKETING_JOBS")
+    public ResponseEntity<com.againspring.api.admin.dto.RedriveJobResponse> redriveJobs(
+            @Valid @RequestBody com.againspring.api.admin.dto.RedriveJobRequest req,
+            Authentication auth) {
+        String requestedBy = auth == null ? "admin:redrive" : "admin:redrive:" + auth.getName();
+
+        // Determine target jobs
+        List<Long> jobIds = new ArrayList<>();
+        if (req.getJobIds() != null && !req.getJobIds().isEmpty()) {
+            jobIds = req.getJobIds();
+        } else if (req.getFilter() != null && !req.getFilter().isEmpty()) {
+            String status = req.getFilter().get("status");
+            String since = req.getFilter().get("since");
+            // Query jobs matching filter (basic implementation)
+            if ("FAILED".equals(status)) {
+                List<MarketingJob> failed = marketingJobRepository.findAll().stream()
+                    .filter(job -> "FAILED".equalsIgnoreCase(job.getStatus()))
+                    .filter(job -> since == null || job.getCreatedAt() != null
+                        && job.getCreatedAt().isAfter(java.time.Instant.parse(since)))
+                    .toList();
+                jobIds = failed.stream().map(MarketingJob::getId).collect(Collectors.toList());
+            }
+        }
+
+        if (jobIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Provide either jobIds or filter (status, since)");
+        }
+
+        // Execute redrive and collect results
+        List<Map<String, Object>> results = marketingJobService.redriveJobs(jobIds, req.isSkipExisting(), requestedBy);
+
+        // Build response
+        com.againspring.api.admin.dto.RedriveJobResponse response =
+            com.againspring.api.admin.dto.RedriveJobResponse.builder()
+            .requested(jobIds.size())
+            .results(results.stream()
+                .map(this::mapToJobRedriveResult)
+                .collect(Collectors.toList()))
+            .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Map internal redrive result map to DTO.
+     */
+    private com.againspring.api.admin.dto.RedriveJobResponse.JobRedriveResult mapToJobRedriveResult(
+            Map<String, Object> internal) {
+        return com.againspring.api.admin.dto.RedriveJobResponse.JobRedriveResult.builder()
+            .sourceId((Long) internal.get("sourceId"))
+            .targetId((Long) internal.get("targetId"))
+            .action((String) internal.get("action"))
+            .reason((String) internal.get("reason"))
+            .platformStates((Map<String, String>) internal.get("platformStates"))
+            .build();
     }
 
     // ===== Platform credentials (proxied to ASM; encrypted at rest in ASM) =====

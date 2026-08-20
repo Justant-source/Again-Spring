@@ -166,6 +166,12 @@ asm:
   # 비어 있으면 fail-closed(스킵) — 과거 백로그 폭주 방지 (2026-08-02).
   auto-publish-since: ${ASM_AUTO_PUBLISH_SINCE:}
 
+marketing:
+  telegram:
+    # 실패 알림에 인라인 버튼(재구동/무시) 표시 여부. 기본값 false (안전 장치).
+    # 활성화 시 Telegram 인라인 버튼 클릭 → ASM webhook → AS redrive API 호출 흐름 개시.
+    buttons-enabled: ${MARKETING_TELEGRAM_BUTTONS_ENABLED:false}
+
 logging:
   level:
     root: INFO

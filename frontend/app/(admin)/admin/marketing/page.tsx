@@ -16,6 +16,8 @@ import {
   type CompletedHoldingView,
 } from '@/components/admin/marketing/CompletedHoldingsBoard';
 import { CompletedPublicationDialog } from '@/components/admin/marketing/CompletedPublicationDialog';
+import { JobRedriveDialog } from '@/components/admin/marketing/JobRedriveDialog';
+import { FailedJobsBoard } from '@/components/admin/marketing/FailedJobsBoard';
 import { EditPublishedThreadDialog } from '@/components/admin/content/EditPublishedThreadDialog';
 import { RefreshControl } from '@/components/admin/RefreshControl';
 import {
@@ -59,6 +61,19 @@ function formatApiError(err: unknown): string {
   return String(err);
 }
 
+/** Extract all FAILED job IDs from completed items. */
+function getFailedJobIds(items: CompletedHoldingView[]): number[] {
+  const failedIds = new Set<number>();
+  for (const item of items) {
+    for (const job of item.jobs ?? []) {
+      if (job.status === 'FAILED') {
+        failedIds.add(job.id);
+      }
+    }
+  }
+  return Array.from(failedIds).sort((a, b) => a - b);
+}
+
 export default function MarketingJobsPage() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<MainTab>(() =>
@@ -81,6 +96,10 @@ export default function MarketingJobsPage() {
   const [selectedCompletedItem, setSelectedCompletedItem] =
     useState<CompletedHoldingView | null>(null);
   const [viewPostId, setViewPostId] = useState<string | null>(null);
+
+  // Redrive failed jobs
+  const [redriveOpen, setRedriveOpen] = useState(false);
+  const [redriveSuccess, setRedriveSuccess] = useState<string | null>(null);
 
   const loadHolding = useCallback(async (showLoader = true) => {
     if (showLoader) setHoldingLoading(true);
@@ -268,6 +287,32 @@ export default function MarketingJobsPage() {
             </div>
           )}
 
+          {redriveSuccess && (
+            <div className="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+              {redriveSuccess}
+              <button
+                type="button"
+                className="ml-2 text-green-600 hover:text-green-800 font-medium"
+                onClick={() => setRedriveSuccess(null)}
+              >
+                닫기
+              </button>
+            </div>
+          )}
+
+          {getFailedJobIds(completedItems).length > 0 && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setRedriveOpen(true)}
+                className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 transition"
+                data-testid="completed-redrive-button"
+              >
+                ⚠️ 실패 잡 일괄 재구동 ({getFailedJobIds(completedItems).length})
+              </button>
+            </div>
+          )}
+
           <CompletedHoldingsBoard
             items={completedItems}
             loading={completedLoading}
@@ -277,10 +322,38 @@ export default function MarketingJobsPage() {
             forceBusyPostId={forceBusyId}
           />
 
+          <FailedJobsBoard
+            items={completedItems}
+            loading={completedLoading}
+            onRedriveSuccess={(response) => {
+              setRedriveSuccess(
+                `재구동 완료: ${response.requested}개 요청, ${response.results.length}개 결과`
+              );
+              // Refresh completed items to reflect updated status
+              void loadCompleted();
+            }}
+            className="mt-8"
+          />
+
           <CompletedPublicationDialog
             open={!!selectedCompletedItem}
             item={selectedCompletedItem}
             onClose={() => setSelectedCompletedItem(null)}
+          />
+
+          <JobRedriveDialog
+            open={redriveOpen}
+            failedJobIds={getFailedJobIds(completedItems)}
+            loading={completedLoading}
+            error={completedError}
+            onClose={() => setRedriveOpen(false)}
+            onSuccess={(response) => {
+              setRedriveSuccess(
+                `재구동 완료: ${response.requested}개 요청, ${response.results.length}개 결과`
+              );
+              // Refresh completed items to reflect updated status
+              void loadCompleted();
+            }}
           />
         </TabsContent>
 

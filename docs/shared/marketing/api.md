@@ -128,6 +128,88 @@ Authorization: Bearer <admin-jwt>
 
 ---
 
+### 1.6 실패 잡 일괄 재구동
+
+```
+POST /api/admin/marketing/jobs/redrive
+Authorization: Bearer <admin-jwt>
+Content-Type: application/json
+```
+
+실패한 마케팅 잡(또는 필터 쿼리)을 재구동한다. 요청 직후 반환하며(즉시 응답), 실제 완료는 기존 폴링 스케줄러가 관찰한다.
+
+**Request Body**
+```json
+{
+  "jobIds": [1, 2, 3],
+  "filter": null,
+  "skipExisting": false
+}
+```
+
+| 필드 | 설명 |
+|---|---|
+| `jobIds` | 재구동할 잡 ID 배열. `filter`가 없을 때 필수. |
+| `filter` | 대체 필터 쿼리: `{"status": "FAILED", "since": "2026-08-16T00:00:00Z"}`. `jobIds`가 있으면 무시됨. |
+| `skipExisting` | `true`일 때, 이미 `PUBLISHED` 상태인 플랫폼은 재생성 스킵 (child job 재사용, idempotent). 기본값 `false`. |
+
+**Response 200**
+```json
+{
+  "requested": 3,
+  "results": [
+    {
+      "sourceId": 1,
+      "targetId": 2,
+      "action": "REGENERATED",
+      "reason": null,
+      "platformStates": {
+        "youtube_shorts": "RUNNING",
+        "instagram_reels": "PUBLISHED"
+      }
+    },
+    {
+      "sourceId": 2,
+      "targetId": 3,
+      "action": "SKIPPED",
+      "reason": "모든 플랫폼이 이미 PUBLISHED",
+      "platformStates": null
+    },
+    {
+      "sourceId": 3,
+      "targetId": null,
+      "action": "ERROR",
+      "reason": "원본 잡이 존재하지 않음",
+      "platformStates": null
+    }
+  ]
+}
+```
+
+| 필드 | 설명 |
+|---|---|
+| `sourceId` | 원본 잡(실패한 잡) ID |
+| `targetId` | 새로 생성된 자식 잡 ID. SKIPPED/ERROR면 `null`. |
+| `action` | 취한 조치: `REGENERATED`(ASM regenerate 성공) / `RECREATED`(409 fallback, 새로 create) / `SKIPPED`(모든 플랫폼 published) / `ERROR`(예외 발생) |
+| `reason` | 스킵/에러 메시지 (성공 시 `null`) |
+| `platformStates` | `targetId`가 있을 때만 포함. 자식 잡의 플랫폼별 현재 상태(`PUBLISHED`, `RUNNING`, `FAILED` 등). |
+
+**오류**
+| 코드 | 이유 |
+|---|---|
+| 400 | `jobIds`·`filter` 모두 빈 경우 |
+| 401/403 | 인증 없음 또는 권한 없음 |
+
+**Telegram 인라인 버튼 통합** (선택사항):
+- `MARKETING_TELEGRAM_BUTTONS_ENABLED=true`일 때, 마케팅 잡이 `FAILED` 상태로 알림 메시지가 발송되면
+  Telegram 인라인 버튼 2개가 붙는다: "재구동" / "무시"
+- "재구동" 버튼 클릭 → ASM webhook 수신 → 이 API 호출 (`POST /api/admin/marketing/jobs/redrive` with `jobIds=[<jobId>]`)
+- "무시" 버튼 클릭 → alert 추적만 갱신, API 호출 없음
+- 멱등성: 이미 비터미널 child job이 있으면 버튼 미표시 (redundant redrive 방지)
+- callback_data 포맷: `redrive:{env}:{jobId}:{epochSecond}` / `ignore:{env}:{jobId}`
+
+---
+
 ## 2. ASM (Again-Spring-Marketing) API
 
 > Base URL: `http://100.115.252.61:8200`  
@@ -286,6 +368,8 @@ Authorization: Bearer <asm-token>
 
 **Response**: 파일 스트림 (FileResponse)
 
+파일이 없으면 404. **영상 mp4**는 게시 직후 삭제하지 않고, 해당 플랫폼이 `PUBLISHED`가 된 시각부터 **30일** 지난 뒤에 ASM 워커가 로컬 바이트만 지운다(메타데이터 row는 유지 → 그 시점부터 이 GET은 404). 권위 정책: [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) 파이프라인 주석.
+
 ---
 
 ### 2.4.1 커스텀 썸네일 업로드 (쇼츠/릴스)
@@ -354,6 +438,14 @@ ASM은 잡이 종료 상태(`READY`, `PUBLISHED`, `PARTIAL`, `FAILED`)로 전환
 ```
 POST /api/internal/marketing/callback
 Authorization: Bearer {ASM_CALLBACK_TOKEN}
+```
+
+**내부 재구동 채널 (2026-08-20)** — 텔레그램 "재구동" 버튼 승인 시 ASM이 같은 토큰으로 호출하는 내부 엔드포인트. 어드민 JWT 없이 이 채널로만 접근하며, `jobIds` 명시가 필수(필터 미지원). 응답은 §1.6 redrive와 동일한 `{requested, results[]}` 구조.
+
+```
+POST /api/internal/marketing/redrive
+Authorization: Bearer {ASM_CALLBACK_TOKEN}
+{"jobIds": [689], "skipExisting": true}
 ```
 
 **Request Body**
