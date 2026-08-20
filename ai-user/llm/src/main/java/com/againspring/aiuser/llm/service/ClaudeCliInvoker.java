@@ -13,6 +13,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 /**
  * Claude CLI 프로세스를 spawn하는 서비스 (AI 사용자 생성 전용).
@@ -96,27 +97,33 @@ public class ClaudeCliInvoker implements Invoker {
     }
 
     private String invokeOnce(String prompt, String model, StructuredOutputSchema schema) throws ClaudeCodeException {
+        String corrId = UUID.randomUUID().toString();
+        long startMs = System.currentTimeMillis();
         SplitPrompt split = splitPrompt(prompt);
         ProcessBuilder pb = buildProcessBuilder(split.systemPart(), model, schema == null ? null : schemaCatalog.json(schema));
         try {
             Process process = pb.start();
             drainStderr(process, "sync");
             writeUserPromptToStdin(process, split.userPart());
-            String result = readStreamingOutput(process, null);
+            StreamResult result = readStreamingOutput(process, null, corrId, model, 1, startMs);
             int exitCode = process.waitFor();
-            if (exitCode != 0 && !result.isBlank()) {
+            if (exitCode != 0 && !result.text.isBlank()) {
                 // 내용이 있으면 성공으로 처리 (일부 CLI 버전 비정상 exit code 방어)
-                return result;
+                return result.text;
             }
             if (exitCode != 0) {
+                long duration = System.currentTimeMillis() - startMs;
+                logLlmStats(model, 1, "CLAUDE_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
                 throw new ClaudeCodeException("CLAUDE_ERROR",
                         "Claude CLI exited with code " + exitCode, exitCode, null);
             }
-            return result;
+            return result.text;
         } catch (ClaudeCodeException e) {
             throw e;
         } catch (Exception e) {
+            long duration = System.currentTimeMillis() - startMs;
             log.error("Unexpected error running claude CLI: {}", e.getMessage(), e);
+            logLlmStats(model, 1, "UNKNOWN_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
             throw new ClaudeCodeException("UNKNOWN_ERROR", e.getMessage(), -1, null);
         }
     }
@@ -147,6 +154,8 @@ public class ClaudeCliInvoker implements Invoker {
 
     private String invokeWithCancelSupportOnce(String prompt, String model, CancelableInvocation inv)
             throws Exception {
+        String corrId = UUID.randomUUID().toString();
+        long startMs = System.currentTimeMillis();
         SplitPrompt split = splitPrompt(prompt);
         ProcessBuilder pb = buildProcessBuilder(split.systemPart(), model, null);
         Process process = pb.start();
@@ -154,18 +163,20 @@ public class ClaudeCliInvoker implements Invoker {
         drainStderr(process, inv.getInvocationId());
         writeUserPromptToStdin(process, split.userPart());
 
-        String result = readStreamingOutput(process, inv);
+        StreamResult result = readStreamingOutput(process, inv, corrId, model, 1, startMs);
         int exitCode = process.waitFor();
 
         if (inv.isCanceled()) {
             throw new InvocationCanceledException("Canceled mid-flight", inv.getInvocationId());
         }
-        if (exitCode != 0 && !result.isBlank()) return result;
+        if (exitCode != 0 && !result.text.isBlank()) return result.text;
         if (exitCode != 0) {
+            long duration = System.currentTimeMillis() - startMs;
+            logLlmStats(model, 1, "CLAUDE_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
             throw new ClaudeCodeException("CLAUDE_ERROR",
                     "Claude CLI exited with code " + exitCode, exitCode, null);
         }
-        return result;
+        return result.text;
     }
 
     /**
@@ -176,11 +187,20 @@ public class ClaudeCliInvoker implements Invoker {
      *   → 토큰 단위 누적, updatePartial 호출
      *
      * 최종 이벤트 (공통):
-     *   {"type":"result","result":"최종 전체 텍스트"}
+     *   {"type":"result","result":"최종 전체 텍스트","usage":{...}}
+     *
+     * @param corrId correlation ID for logging
+     * @param model model name for logging
+     * @param attempt attempt number for logging
+     * @param startMs start time in ms for duration calculation
      */
-    private String readStreamingOutput(Process process, CancelableInvocation inv) throws Exception {
+    private StreamResult readStreamingOutput(Process process, CancelableInvocation inv, String corrId, String model, int attempt, long startMs) throws Exception {
         StringBuilder accumulated = new StringBuilder();
         String finalResult = "";
+        int inputTokens = 0;
+        int outputTokens = 0;
+        int cacheReadTokens = 0;
+        int cacheWriteTokens = 0;
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
@@ -209,10 +229,20 @@ public class ClaudeCliInvoker implements Invoker {
                         String subtype = node.path("subtype").asText("");
                         String r = node.path("result").asText("");
                         if (isError || (!subtype.isBlank() && !"success".equals(subtype))) {
+                            long duration = System.currentTimeMillis() - startMs;
+                            logLlmStats(model, attempt, "CLAUDE_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
                             throw new ClaudeCodeException("CLAUDE_ERROR",
                                 "Claude CLI error result (subtype=" + subtype + "): " + truncate(r), -1, null);
                         }
                         if (!r.isBlank()) finalResult = r;
+                        // Extract usage data from result event
+                        JsonNode usage = node.path("usage");
+                        if (usage != null && !usage.isMissingNode()) {
+                            inputTokens = usage.path("input_tokens").asInt(0);
+                            outputTokens = usage.path("output_tokens").asInt(0);
+                            cacheReadTokens = usage.path("cache_read_input_tokens").asInt(0);
+                            cacheWriteTokens = usage.path("cache_creation_input_tokens").asInt(0);
+                        }
                     }
                 } catch (ClaudeCodeException e) {
                     throw e;  // 제공자 오류 — 전파 (절대 콘텐츠로 사용 금지)
@@ -225,10 +255,26 @@ public class ClaudeCliInvoker implements Invoker {
         String answer = (finalResult.isBlank() ? accumulated.toString() : finalResult).trim();
         // 최종 안전망: 제공자 오류 문자열("Credit balance is too low" 등)이 본문으로 새면 실패 처리
         if (LlmErrorSignature.looksLikeProviderError(answer)) {
+            long duration = System.currentTimeMillis() - startMs;
+            logLlmStats(model, attempt, "PROVIDER_ERROR", inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, 0, "FAIL", duration, corrId);
             log.error("CLI output looks like a provider error — refusing to return as content: {}", truncate(answer));
             throw new ClaudeCodeException("PROVIDER_ERROR", "Provider error text in CLI output", -1, null);
         }
-        return answer;
+        // Log success
+        long duration = System.currentTimeMillis() - startMs;
+        int cacheHitPercent = inputTokens + cacheReadTokens + cacheWriteTokens > 0
+            ? (int) Math.round(cacheReadTokens * 100.0 / (inputTokens + cacheReadTokens + cacheWriteTokens))
+            : 0;
+        logLlmStats(model, attempt, null, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheHitPercent, "OK", duration, corrId);
+        return new StreamResult(answer, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens);
+    }
+
+    /**
+     * Legacy readStreamingOutput without logging (for backward compatibility if needed).
+     */
+    private String readStreamingOutputLegacy(Process process, CancelableInvocation inv) throws Exception {
+        StreamResult result = readStreamingOutput(process, inv, UUID.randomUUID().toString(), "unknown", 1, System.currentTimeMillis());
+        return result.text;
     }
 
     /** stderr를 데몬 스레드로 drain — 파이프 버퍼 포화(데드락) 방지 */
@@ -243,6 +289,31 @@ public class ClaudeCliInvoker implements Invoker {
     }
 
     private record SplitPrompt(String systemPart, String userPart) { }
+
+    /**
+     * Result + usage data extracted from stream-json.
+     * Used internally to pass both the output text and token metrics through the pipeline.
+     */
+    private static class StreamResult {
+        final String text;
+        final int inputTokens;
+        final int outputTokens;
+        final int cacheReadTokens;
+        final int cacheWriteTokens;
+
+        StreamResult(String text, int inputTokens, int outputTokens, int cacheReadTokens, int cacheWriteTokens) {
+            this.text = text;
+            this.inputTokens = inputTokens;
+            this.outputTokens = outputTokens;
+            this.cacheReadTokens = cacheReadTokens;
+            this.cacheWriteTokens = cacheWriteTokens;
+        }
+
+        int getCacheHitPercent() {
+            long denom = (long) inputTokens + cacheReadTokens + cacheWriteTokens;
+            return denom > 0 ? (int) Math.round(cacheReadTokens * 100.0 / denom) : 0;
+        }
+    }
 
     private static SplitPrompt splitPrompt(String prompt) {
         int sepIdx = prompt.indexOf(USER_PROMPT_SEP);
@@ -312,5 +383,24 @@ public class ClaudeCliInvoker implements Invoker {
             return "";
         }
         return s.length() <= 200 ? s : s.substring(0, 200) + "…";
+    }
+
+    /**
+     * Log [LLMSTATS] format for metrics collection.
+     * Format: [LLMSTATS] ts=... sys=AS type=CLI model=... attempt=... retryReason=... in=... out=... cache_read=... cache_write=... cache_hit=...% result=... duration_ms=... corrId=...
+     */
+    private void logLlmStats(String model, int attempt, String retryReason, int inTokens, int outTokens,
+                            int cacheReadTokens, int cacheWriteTokens, int cacheHitPercent,
+                            String result, long durationMs, String corrId) {
+        String stats = new LlmStatsLogger("CLI", model, corrId)
+            .attempt(attempt)
+            .retryReason(retryReason)
+            .tokens(inTokens, outTokens)
+            .cacheTokens(cacheReadTokens, cacheWriteTokens)
+            .cacheHitPercent(cacheHitPercent)
+            .result(result)
+            .duration(durationMs)
+            .build();
+        log.info(stats);
     }
 }

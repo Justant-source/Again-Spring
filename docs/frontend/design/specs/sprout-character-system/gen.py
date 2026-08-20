@@ -10,24 +10,50 @@ INK = "#5C4030"
 CREAM = "#FFF8F0"
 LEAF = "#A8C8B4"
 BLUSH = "#F4A896"
-PEACH = "#C9785A"   # 작성자 진영
-SAGE = "#5F8F76"    # 상대방 진영
+# 캐릭터 몸통용 진영색 — FE 토큰(피치 #C9785A / 세이지 #5F8F76)과 같은 계열의
+# 밝은 변주. 어두운 원색 위에서는 잉크 이목구비 대비가 죽어 표정이 안 읽힌다.
+PEACH = "#E89A72"   # 작성자 진영
+SAGE = "#6FB08A"    # 상대방 진영
+
+# ── 얼굴 기준 좌표 ──────────────────────────────────────────────────
+# 몸통 = ellipse(cy=282, ry=158). 이목구비를 몸통 중심보다 살짝 아래로 내리고
+# 크게 키워야 유아도식(baby schema)이 살아난다. 쇼츠 40% 축소에서도 읽혀야 함.
+EX, EY = 56, 286    # 눈 중심 (좌우 ±EX)
+PUP = 27            # 기본 동공 반지름
+BRW = 232           # 눈썹 기준 y
+MO = 348            # 입 기준 y
+BLY = 334           # 볼터치 y
+
+# 이목구비 전체를 한 번에 키우고 내리는 배율. 부품 좌표를 일일이 고치지 않고
+# face 그룹에 transform으로 적용한다 (선 굵기도 함께 커져 축소 시 가독성↑).
+FACE_SCALE = 1.22
+# 몸통 하단(y≈360~440)은 팔짱·소품 자리다. 얼굴이 그 위로 올라가야 입이 안 가린다.
+FACE_DY = -18
 
 OUT = Path(__file__).parent / "svg"
 
 # ── 부품 (로컬 좌표) ────────────────────────────────────────────────
 
 def stem():
-    return '<path d="M 0 142 C -6 112, -6 90, -2 70" stroke-width="9"/>'
+    return '<path d="M 0 142 C -6 112, -6 90, -2 70" stroke-width="11"/>'
 
 
 def leaves(mode="normal"):
+    """떡잎 = 브랜드 아이덴티티이자 감정 증폭기.
+
+    시그니처 규칙 — 감정이 떡잎에 반드시 반영된다:
+      droop=시듦(소진·낙담·슬픔) · perky=쫑긋(놀람·기대·안도)
+      bristle=곤두섬(분노·격앙) · normal=평상
+    """
     if mode == "droop":   # 시든 떡잎 — 소진·낙담
         l = "M -4 76 C -52 58, -120 92, -132 148 C -88 156, -32 118, -4 76 Z"
         r = "M -2 70 C 52 52, 126 88, 140 144 C 94 154, 34 112, -2 70 Z"
     elif mode == "perky":  # 쫑긋 — 놀람·기대
         l = "M -4 74 C -74 -4, -148 -18, -172 26 C -136 80, -50 96, -4 74 Z"
         r = "M -2 68 C 72 -14, 156 -26, 182 20 C 140 78, 44 92, -2 68 Z"
+    elif mode == "bristle":  # 곤두섬 — 분노·격앙
+        l = "M -4 76 C -44 30, -66 -30, -58 -88 C -16 -42, -2 20, -4 76 Z"
+        r = "M -2 70 C 38 24, 60 -36, 54 -94 C 12 -48, 0 14, -2 70 Z"
     else:
         l = "M -4 74 C -66 10, -142 8, -166 50 C -128 98, -48 100, -4 74 Z"
         r = "M -2 68 C 66 0, 150 -4, 176 40 C 132 92, 42 96, -2 68 Z"
@@ -35,20 +61,28 @@ def leaves(mode="normal"):
 
 
 def body(fill=CREAM):
-    return f'<ellipse cx="0" cy="282" rx="150" ry="158" fill="{fill}"/>'
+    """씨앗형 몸통 — 위가 좁고 볼 높이(y≈320)에서 가장 넓다.
+
+    완전한 타원은 어떤 캐릭터에서나 보이는 밋밋한 덩어리라 식별이 안 된다.
+    위를 좁히고 볼살을 부풀리면 '새싹 씨앗 + 통통한 볼'이라는 실루엣이 생긴다.
+    """
+    return (f'<path d="M 0 124 C 74 124, 138 174, 146 244 '
+            f'C 156 330, 118 442, 0 442 '
+            f'C -118 442, -156 330, -146 244 '
+            f'C -138 174, -74 124, 0 124 Z" fill="{fill}"/>')
 
 
 ARM_FRONT = {"phone", "cross", "clasp", "hug", "hold"}   # 몸통 앞에 그리는 팔
 
 
 def arms(mode="rest"):
-    sw = ' stroke-width="22"'
+    sw = ' stroke-width="28"'
     if mode == "phone":       # 짧은 두 팔이 휴대폰을 받침
-        return (f'<path d="M -120 344 C -104 372, -84 388, -62 394"{sw}/>'
-                f'<path d="M 120 344 C 104 372, 84 388, 62 394"{sw}/>')
-    if mode == "cross":       # 팔짱 — 몸 앞에서 X로 교차
-        return (f'<path d="M -158 330 L 72 386"{sw}/>'
-                f'<path d="M 158 330 L -72 386"{sw}/>')
+        return (f'<path d="M -120 368 C -104 396, -84 412, -62 418"{sw}/>'
+                f'<path d="M 120 368 C 104 396, 84 412, 62 418"{sw}/>')
+    if mode == "cross":       # 팔짱 — 몸 앞에서 X로 교차 (입 아래에서)
+        return (f'<path d="M -156 362 L 70 416"{sw}/>'
+                f'<path d="M 156 362 L -70 416"{sw}/>')
     if mode == "limp":        # 축 늘어짐
         return (f'<path d="M -140 296 C -176 344, -184 396, -178 434"{sw}/>'
                 f'<path d="M 140 296 C 176 344, 184 396, 178 434"{sw}/>')
@@ -59,14 +93,14 @@ def arms(mode="rest"):
         return (f'<path d="M -110 312 C -152 330, -186 344, -204 362"{sw}/>'
                 f'<path d="M 112 300 C 180 290, 250 288, 306 292"{sw}/>')
     if mode == "clasp":       # 두 손을 앞에 모아 쥠 (말 삼킴)
-        return (f'<path d="M -114 358 C -90 386, -58 398, -26 400"{sw}/>'
-                f'<path d="M 114 358 C 90 386, 58 398, 26 400"{sw}/>')
+        return (f'<path d="M -114 382 C -90 410, -58 422, -26 424"{sw}/>'
+                f'<path d="M 114 382 C 90 410, 58 422, 26 424"{sw}/>')
     if mode == "hug":         # 무릎·몸을 감싸 안음
         return (f'<path d="M -136 344 C -114 386, -72 406, -30 406"{sw}/>'
                 f'<path d="M 136 344 C 114 386, 72 406, 30 406"{sw}/>')
     if mode == "hold":        # 두 팔로 무거운 것을 감싸 받쳐 듦
-        return (f'<path d="M -128 336 C -116 372, -84 396, -46 402"{sw}/>'
-                f'<path d="M 128 336 C 116 372, 84 396, 46 402"{sw}/>')
+        return (f'<path d="M -128 360 C -116 396, -84 418, -46 424"{sw}/>'
+                f'<path d="M 128 360 C 116 396, 84 418, 46 424"{sw}/>')
     if mode == "shrug":       # 어깨 으쓱 — 체념, 손바닥이 위로
         return (f'<path d="M -120 314 C -158 288, -172 254, -160 226"{sw}/>'
                 f'<path d="M 120 314 C 158 288, 172 254, 160 226"{sw}/>')
@@ -75,7 +109,7 @@ def arms(mode="rest"):
 
 
 def legs(mode="stand"):
-    sw = ' stroke-width="22"'
+    sw = ' stroke-width="28"'
     if mode == "sit":
         return (f'<path d="M -30 410 C -30 444, -46 456, -78 458"{sw}/>'
                 f'<path d="M 30 410 C 30 444, 46 456, 78 458"{sw}/>')
@@ -84,98 +118,161 @@ def legs(mode="stand"):
                 f'<path d="M 54 426 C 82 442, 104 444, 120 438"{sw}/>')
     if mode == "none":
         return ""
-    return f'<path d="M -42 392 L -42 458"{sw}/><path d="M 42 392 L 42 458"{sw}/>'
+    # 몸통 바닥이 y=440이라 다리는 그 아래만 보인다. 짧고 통통하게,
+    # 살짝 바깥으로 벌려야 페그(말뚝)가 아니라 발로 읽힌다.
+    return (f'<path d="M -46 404 C -48 430, -52 446, -52 456"{sw}/>'
+            f'<path d="M 46 404 C 48 430, 52 446, 52 456"{sw}/>')
 
 
 def blush(on=True):
     if not on:
         return ""
-    return (f'<ellipse cx="-94" cy="320" rx="27" ry="15" fill="{BLUSH}" stroke="none"/>'
-            f'<ellipse cx="94" cy="320" rx="27" ry="15" fill="{BLUSH}" stroke="none"/>')
+    return (f'<ellipse cx="-106" cy="{BLY}" rx="30" ry="17" fill="{BLUSH}" stroke="none"/>'
+            f'<ellipse cx="106" cy="{BLY}" rx="30" ry="17" fill="{BLUSH}" stroke="none"/>')
 
 
 def brow(mode=""):
     if mode == "angry":                      # 찌푸림 — 분노·째려봄
-        return '<path d="M -88 232 L -32 254"/><path d="M 88 232 L 32 254"/>'
+        return (f'<path d="M -96 {BRW - 6} L -32 {BRW + 20}"/>'
+                f'<path d="M 96 {BRW - 6} L 32 {BRW + 20}"/>')
     if mode == "sad":                        # 팔자 — 서운·미안
-        return '<path d="M -88 254 L -32 232"/><path d="M 88 254 L 32 232"/>'
+        return (f'<path d="M -96 {BRW + 20} L -32 {BRW - 6}"/>'
+                f'<path d="M 96 {BRW + 20} L 32 {BRW - 6}"/>')
     if mode == "up":                         # 치켜올림 — 당황·놀람
-        return ('<path d="M -84 228 C -70 216, -46 216, -32 226"/>'
-                '<path d="M 84 228 C 70 216, 46 216, 32 226"/>')
+        return (f'<path d="M -92 {BRW + 2} C -76 {BRW - 14}, -48 {BRW - 14}, '
+                f'-32 {BRW}"/>'
+                f'<path d="M 92 {BRW + 2} C 76 {BRW - 14}, 48 {BRW - 14}, '
+                f'32 {BRW}"/>')
     return ""
+
+
+def _hl(cx, cy, r=PUP):
+    """동공 하이라이트 — 큰 것 + 작은 것. 눈에 생기를 넣는 핵심 요소."""
+    return (f'<circle cx="{cx - r * 0.34:.0f}" cy="{cy - r * 0.40:.0f}" '
+            f'r="{r * 0.34:.0f}" fill="{CREAM}" stroke="none"/>'
+            f'<circle cx="{cx + r * 0.32:.0f}" cy="{cy + r * 0.36:.0f}" '
+            f'r="{r * 0.15:.0f}" fill="{CREAM}" stroke="none"/>')
+
+
+def _drop(cx, cy, r=13):
+    """눈물방울 — 위가 뾰족하고 아래가 둥근 물방울."""
+    return (f'<path d="M {cx} {cy - r * 1.7:.0f} '
+            f'C {cx + r * 0.9:.0f} {cy - r * 0.4:.0f}, {cx + r} {cy + r * 0.3:.0f}, '
+            f'{cx} {cy + r} '
+            f'C {cx - r} {cy + r * 0.3:.0f}, {cx - r * 0.9:.0f} {cy - r * 0.4:.0f}, '
+            f'{cx} {cy - r * 1.7:.0f} Z" fill="{CREAM}" stroke-width="6"/>')
 
 
 def eyes(mode="dot"):
     d = ""
     if mode == "dot":
-        d = (f'<circle cx="-50" cy="282" r="17" fill="{INK}" stroke="none"/>'
-             f'<circle cx="50" cy="282" r="17" fill="{INK}" stroke="none"/>')
-    elif mode == "wide":       # 놀람·굳음
-        d = (f'<circle cx="-52" cy="280" r="26" fill="{CREAM}"/>'
-             f'<circle cx="52" cy="280" r="26" fill="{CREAM}"/>'
-             f'<circle cx="-52" cy="284" r="13" fill="{INK}" stroke="none"/>'
-             f'<circle cx="52" cy="284" r="13" fill="{INK}" stroke="none"/>')
+        d = (f'<circle cx="{-EX}" cy="{EY}" r="{PUP}" fill="{INK}" stroke="none"/>'
+             f'<circle cx="{EX}" cy="{EY}" r="{PUP}" fill="{INK}" stroke="none"/>'
+             + _hl(-EX, EY) + _hl(EX, EY))
+    elif mode == "wide":       # 놀람·굳음 — 동공을 키워 눈이 커진 것으로 읽힌다.
+        d = (f'<ellipse cx="{-EX}" cy="{EY - 2}" rx="31" ry="35" '
+             f'fill="{INK}" stroke="none"/>'
+             f'<ellipse cx="{EX}" cy="{EY - 2}" rx="31" ry="35" '
+             f'fill="{INK}" stroke="none"/>'
+             + _hl(-EX, EY - 4, 33) + _hl(EX, EY - 4, 33))
     elif mode == "flat":       # ㅡㅡ 어이없음
-        d = ('<path d="M -70 282 L -30 282"/><path d="M 30 282 L 70 282"/>')
+        d = (f'<path d="M {-EX - 28} {EY} L {-EX + 28} {EY}"/>'
+             f'<path d="M {EX - 28} {EY} L {EX + 28} {EY}"/>')
     elif mode == "happy":      # ⌒⌒ 미소
-        d = ('<path d="M -72 288 C -62 270, -38 270, -28 288"/>'
-             '<path d="M 28 288 C 38 270, 62 270, 72 288"/>')
+        d = (f'<path d="M {-EX - 30} {EY + 12} C {-EX - 16} {EY - 18}, '
+             f'{-EX + 16} {EY - 18}, {-EX + 30} {EY + 12}"/>'
+             f'<path d="M {EX - 30} {EY + 12} C {EX - 16} {EY - 18}, '
+             f'{EX + 16} {EY - 18}, {EX + 30} {EY + 12}"/>')
     elif mode == "squint":     # >< 억울·분함
-        d = ('<path d="M -72 266 L -34 282 L -72 298"/>'
-             '<path d="M 72 266 L 34 282 L 72 298"/>')
-    elif mode == "teary":      # 그렁그렁
-        d = (f'<circle cx="-50" cy="278" r="19" fill="{INK}" stroke="none"/>'
-             f'<circle cx="50" cy="278" r="19" fill="{INK}" stroke="none"/>'
-             f'<circle cx="-44" cy="272" r="6" fill="{CREAM}" stroke="none"/>'
-             f'<circle cx="56" cy="272" r="6" fill="{CREAM}" stroke="none"/>'
-             f'<path d="M -68 300 C -76 314, -74 326, -64 328" stroke-width="5"/>')
-    elif mode == "side":       # 곁눈질
-        d = (f'<ellipse cx="-52" cy="280" rx="24" ry="22" fill="{CREAM}"/>'
-             f'<ellipse cx="52" cy="280" rx="24" ry="22" fill="{CREAM}"/>'
-             f'<circle cx="-38" cy="282" r="12" fill="{INK}" stroke="none"/>'
-             f'<circle cx="66" cy="282" r="12" fill="{INK}" stroke="none"/>')
+        d = (f'<path d="M {-EX - 30} {EY - 22} L {-EX + 22} {EY} '
+             f'L {-EX - 30} {EY + 22}"/>'
+             f'<path d="M {EX + 30} {EY - 22} L {EX - 22} {EY} '
+             f'L {EX + 30} {EY + 22}"/>')
+    elif mode == "teary":      # 그렁그렁 — 눈물이 고였지만 아직 안 흐름
+        d = (f'<circle cx="{-EX}" cy="{EY - 3}" r="30" fill="{INK}" stroke="none"/>'
+             f'<circle cx="{EX}" cy="{EY - 3}" r="30" fill="{INK}" stroke="none"/>'
+             + _hl(-EX, EY - 3, 30) + _hl(EX, EY - 3, 30)
+             + _drop(-EX - 34, EY + 22, 13) + _drop(EX + 34, EY + 22, 13))
+    elif mode == "side":       # 곁눈질 — 동공만 한쪽으로 몰아 시선을 만든다
+        d = (f'<circle cx="{-EX + 17}" cy="{EY}" r="25" fill="{INK}" stroke="none"/>'
+             f'<circle cx="{EX + 17}" cy="{EY}" r="25" fill="{INK}" stroke="none"/>'
+             + _hl(-EX + 17, EY, 25) + _hl(EX + 17, EY, 25)
+             + f'<path d="M {-EX - 30} {EY - 26} C {-EX - 14} {EY - 36}, '
+               f'{-EX + 16} {EY - 34}, {-EX + 30} {EY - 26}" stroke-width="7"/>'
+               f'<path d="M {EX - 30} {EY - 26} C {EX - 14} {EY - 36}, '
+               f'{EX + 16} {EY - 34}, {EX + 30} {EY - 26}" stroke-width="7"/>')
     elif mode == "sleepy":     # 반쯤 감김 — 체념·무기력
-        d = ('<path d="M -74 276 L -26 276"/>'
-             '<path d="M -70 286 C -58 296, -42 296, -30 286"/>'
-             '<path d="M 74 276 L 26 276"/>'
-             '<path d="M 70 286 C 58 296, 42 296, 30 286"/>')
-    elif mode == "cry":        # 눈물 터짐
-        d = (f'<circle cx="-50" cy="276" r="18" fill="{INK}" stroke="none"/>'
-             f'<circle cx="50" cy="276" r="18" fill="{INK}" stroke="none"/>'
-             f'<path d="M -56 300 C -70 330, -66 360, -52 376" stroke-width="7"/>'
-             f'<path d="M 56 300 C 70 330, 66 360, 52 376" stroke-width="7"/>')
+        d = (f'<path d="M {-EX - 30} {EY - 12} L {-EX + 28} {EY - 12}"/>'
+             f'<path d="M {-EX - 26} {EY} C {-EX - 12} {EY + 16}, '
+             f'{-EX + 12} {EY + 16}, {-EX + 26} {EY}"/>'
+             f'<path d="M {EX + 30} {EY - 12} L {EX - 28} {EY - 12}"/>'
+             f'<path d="M {EX - 26} {EY} C {EX - 12} {EY + 16}, '
+             f'{EX + 12} {EY + 16}, {EX + 26} {EY}"/>')
+    elif mode == "cry":        # 눈물 터짐 — 눈 바로 아래로 흘러내린다
+        d = (f'<circle cx="{-EX}" cy="{EY - 6}" r="25" fill="{INK}" stroke="none"/>'
+             f'<circle cx="{EX}" cy="{EY - 6}" r="25" fill="{INK}" stroke="none"/>'
+             + _hl(-EX, EY - 6, 25) + _hl(EX, EY - 6, 25)
+             + f'<path d="M {-EX} {EY + 22} C {-EX - 13} {EY + 52}, '
+               f'{-EX - 13} {EY + 76}, {-EX} {EY + 90} '
+               f'C {-EX + 13} {EY + 76}, {-EX + 13} {EY + 52}, {-EX} {EY + 22} Z" '
+               f'fill="{CREAM}" stroke-width="6"/>'
+               f'<path d="M {EX} {EY + 22} C {EX - 13} {EY + 52}, '
+               f'{EX - 13} {EY + 76}, {EX} {EY + 90} '
+               f'C {EX + 13} {EY + 76}, {EX + 13} {EY + 52}, {EX} {EY + 22} Z" '
+               f'fill="{CREAM}" stroke-width="6"/>')
     elif mode == "sparkle":    # 반짝 — 부러움·기대
-        d = (f'<circle cx="-50" cy="280" r="23" fill="{INK}" stroke="none"/>'
-             f'<circle cx="50" cy="280" r="23" fill="{INK}" stroke="none"/>'
-             f'<circle cx="-42" cy="272" r="8" fill="{CREAM}" stroke="none"/>'
-             f'<circle cx="58" cy="272" r="8" fill="{CREAM}" stroke="none"/>'
-             f'<circle cx="-56" cy="290" r="4" fill="{CREAM}" stroke="none"/>'
-             f'<circle cx="44" cy="290" r="4" fill="{CREAM}" stroke="none"/>')
-    elif mode == "down":       # 내리깐 눈 — 낙담
-        d = ('<path d="M -72 278 C -62 296, -38 296, -28 278"/>'
-             '<path d="M 28 278 C 38 296, 62 296, 72 278"/>')
+        d = (f'<circle cx="{-EX}" cy="{EY - 2}" r="30" fill="{INK}" stroke="none"/>'
+             f'<circle cx="{EX}" cy="{EY - 2}" r="30" fill="{INK}" stroke="none"/>'
+             + _hl(-EX, EY - 2, 30) + _hl(EX, EY - 2, 30)
+             + f'<circle cx="{-EX + 12}" cy="{EY - 20}" r="5" '
+               f'fill="{CREAM}" stroke="none"/>'
+               f'<circle cx="{EX + 12}" cy="{EY - 20}" r="5" '
+               f'fill="{CREAM}" stroke="none"/>')
+    elif mode == "down":       # 내리깐 눈 — 시무룩하지만 눈은 살아 있다.
+        # 30장 중 가장 많이 쓰이는 눈. 단순 아래꺾임 곡선은 '눈 감음'으로 읽혀
+        # 캐릭터를 죽인다. 윗꺼풀로 덮인 큰 동공으로 바꾼다.
+        d = (f'<path d="M {-EX - 28} {EY - 6} C {-EX - 28} {EY + 30}, '
+             f'{-EX + 28} {EY + 30}, {-EX + 28} {EY - 6} Z" '
+             f'fill="{INK}" stroke="none"/>'
+             f'<path d="M {EX - 28} {EY - 6} C {EX - 28} {EY + 30}, '
+             f'{EX + 28} {EY + 30}, {EX + 28} {EY - 6} Z" '
+             f'fill="{INK}" stroke="none"/>'
+             f'<circle cx="{-EX - 9}" cy="{EY + 8}" r="8" '
+             f'fill="{CREAM}" stroke="none"/>'
+             f'<circle cx="{EX - 9}" cy="{EY + 8}" r="8" '
+             f'fill="{CREAM}" stroke="none"/>')
+    elif mode == "blink":      # 감은 눈 — idle 루프 깜빡임 프레임용
+        d = (f'<path d="M {-EX - 28} {EY - 4} C {-EX - 14} {EY + 16}, '
+             f'{-EX + 14} {EY + 16}, {-EX + 28} {EY - 4}"/>'
+             f'<path d="M {EX - 28} {EY - 4} C {EX - 14} {EY + 16}, '
+             f'{EX + 14} {EY + 16}, {EX + 28} {EY - 4}"/>')
     return d
 
 
 def mouth(mode="smile"):
     if mode == "smile":
-        return '<path d="M -12 336 C -5 345, 5 345, 12 336"/>'
+        return f'<path d="M -18 {MO - 5} C -8 {MO + 9}, 8 {MO + 9}, 18 {MO - 5}"/>'
     if mode == "flat":
-        return '<path d="M -18 338 L 18 338"/>'
+        return f'<path d="M -22 {MO} L 22 {MO}"/>'
     if mode == "wavy":
-        return '<path d="M -26 338 C -16 328, -8 348, 0 338 C 8 328, 16 348, 26 338"/>'
+        return (f'<path d="M -30 {MO} C -19 {MO - 12}, -10 {MO + 11}, 0 {MO} '
+                f'C 10 {MO - 12}, 19 {MO + 11}, 30 {MO}"/>')
     if mode == "open":
-        return f'<ellipse cx="0" cy="342" rx="20" ry="26" fill="{INK}" stroke="none"/>'
+        return (f'<ellipse cx="0" cy="{MO + 5}" rx="22" ry="27" '
+                f'fill="{INK}" stroke="none"/>')
     if mode == "small_open":
-        return f'<ellipse cx="0" cy="340" rx="12" ry="15" fill="{INK}" stroke="none"/>'
+        return (f'<ellipse cx="0" cy="{MO + 2}" rx="14" ry="17" '
+                f'fill="{INK}" stroke="none"/>')
     if mode == "tight":
-        return '<path d="M -22 340 C -12 332, 12 332, 22 340"/>'
+        return f'<path d="M -26 {MO + 2} C -14 {MO - 8}, 14 {MO - 8}, 26 {MO + 2}"/>'
     if mode == "grit":      # 이 악뭄 — 참는 중
-        return '<path d="M -32 340 L -16 330 L 0 340 L 16 330 L 32 340"/>'
+        return (f'<path d="M -36 {MO + 2} L -18 {MO - 10} L 0 {MO + 2} '
+                f'L 18 {MO - 10} L 36 {MO + 2}"/>')
     if mode == "pout":      # 삐죽
-        return '<path d="M -20 340 C -6 350, 6 330, 20 338"/>'
+        return f'<path d="M -24 {MO + 2} C -7 {MO + 13}, 7 {MO - 10}, 24 {MO}"/>'
     if mode == "big_smile":
-        return f'<path d="M -36 328 C -30 360, 30 360, 36 328 Z" fill="{INK}" stroke="none"/>'
+        return (f'<path d="M -40 {MO - 12} C -34 {MO + 24}, 34 {MO + 24}, '
+                f'40 {MO - 12} Z" fill="{INK}" stroke="none"/>')
     if mode == "none":
         return ""
     return ""
@@ -223,20 +320,21 @@ def marks(mode=""):
 
 
 def prop(mode=""):
+    # 소품은 모두 몸통 하단(얼굴 아래)에 놓는다 — 입을 가리면 표정이 죽는다.
     if mode == "papers":      # 서류 더미
-        return (f'<rect x="-84" y="352" width="168" height="28" rx="5" fill="{CREAM}"/>'
-                f'<rect x="-74" y="380" width="148" height="28" rx="5" fill="{CREAM}"/>'
-                f'<rect x="-88" y="408" width="176" height="28" rx="5" fill="{CREAM}"/>')
+        return (f'<rect x="-84" y="378" width="168" height="26" rx="5" fill="{CREAM}"/>'
+                f'<rect x="-74" y="404" width="148" height="26" rx="5" fill="{CREAM}"/>'
+                f'<rect x="-88" y="430" width="176" height="26" rx="5" fill="{CREAM}"/>')
     if mode == "receipt":     # 길게 늘어진 영수증
-        return (f'<path d="M -26 366 L 26 366 L 26 486 L 13 474 L 0 486 L -13 474 L -26 486 Z" '
-                f'fill="{CREAM}"/><path d="M -13 392 L 13 392"/><path d="M -13 416 L 13 416"/>'
-                f'<path d="M -13 440 L 4 440"/>')
+        return (f'<path d="M -26 388 L 26 388 L 26 502 L 13 490 L 0 502 L -13 490 L -26 502 Z" '
+                f'fill="{CREAM}"/><path d="M -13 412 L 13 412"/><path d="M -13 436 L 13 436"/>'
+                f'<path d="M -13 460 L 4 460"/>')
     if mode == "phone":
-        return (f'<rect x="-42" y="336" width="84" height="104" rx="14" fill="{CREAM}"/>'
-                f'<path d="M -20 364 L 20 364"/><path d="M -20 392 L 2 392"/>')
+        return (f'<rect x="-42" y="366" width="84" height="94" rx="14" fill="{CREAM}"/>'
+                f'<path d="M -20 392 L 20 392"/><path d="M -20 418 L 2 418"/>')
     if mode == "bundle":
-        return (f'<path d="M -52 344 C -52 306, 52 306, 52 344 L 52 400 C 52 424, -52 424, -52 400 Z" '
-                f'fill="{CREAM}"/><path d="M -34 344 L 34 344"/>')
+        return (f'<path d="M -52 374 C -52 336, 52 336, 52 374 L 52 428 C 52 452, -52 452, -52 428 Z" '
+                f'fill="{CREAM}"/><path d="M -34 374 L 34 374"/>')
     return ""
 
 
@@ -252,7 +350,9 @@ def sibom(*, fill=CREAM, eye="dot", mo="smile", arm="rest", leg="stand",
         parts.append('<path d="M 0 132 C 8 220, 8 340, 0 434" stroke-width="5"/>')
     else:
         face = blush(bl) + brow(br) + eyes(eye) + mouth(mo)
-        parts.append(f'<g transform="translate({face_dx} 0)">{face}</g>' if face_dx else face)
+        parts.append(
+            f'<g transform="translate({face_dx} {FACE_DY}) translate(0 {EY}) '
+            f'scale({FACE_SCALE}) translate(0 {-EY})">{face}</g>')
     parts.append(prop(pr))
     if front_arm:
         parts.append(arms(arm))
@@ -279,7 +379,7 @@ BUBBLE = (
 def canvas(inner, preset):
     bub = BUBBLE if preset == "bubble" else ""
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 820" width="820" height="820">'
-            f'<g fill="none" stroke="{INK}" stroke-width="7" stroke-linecap="round" '
+            f'<g fill="none" stroke="{INK}" stroke-width="9" stroke-linecap="round" '
             f'stroke-linejoin="round">{bub}{inner}</g></svg>')
 
 
@@ -340,8 +440,10 @@ emit("two-cold-backs", "bottom",
 
 # 2. 정면충돌
 emit("two-argue", "top",
-     duo(sibom(fill=PEACH, eye="squint", mo="open", arm="up", br="angry", mk="steam"),
-         flip(sibom(fill=SAGE, eye="squint", mo="open", arm="up", br="angry", mk="steam")),
+     duo(sibom(fill=PEACH, eye="squint", mo="open", arm="up", br="angry",
+               mk="steam", leaf="bristle"),
+         flip(sibom(fill=SAGE, eye="squint", mo="open", arm="up", br="angry",
+                    mk="steam", leaf="bristle")),
          "top", gap=400, scale=0.74),
      "정면충돌·언성이 높아진 순간",
      "그 자리에서 다투거나 언성이 높아졌다고 서술하는 대목")
@@ -356,7 +458,8 @@ emit("two-hand-hesitate", "bottom",
 
 # 4. 읽씹
 emit("waiting-reply", "bottom",
-     place(sibom(eye="down", mo="flat", arm="phone", pr="phone", bl=False), "bottom"),
+     place(sibom(eye="down", mo="flat", arm="phone", pr="phone", bl=False,
+                 leaf="droop"), "bottom"),
      "읽씹·답장 없음",
      "연락을 했는데 답이 없거나 읽고 씹혔다고 말하는 대목")
 
@@ -387,7 +490,8 @@ emit("drained", "bottom",
 
 # 9. 억울
 emit("indignant", "bubble",
-     place(sibom(eye="squint", mo="open", arm="up", br="angry", mk="shake"), "bubble"),
+     place(sibom(eye="squint", mo="open", arm="up", br="angry", mk="shake",
+                 leaf="bristle"), "bubble"),
      "억울하고 분함",
      "억울하다·왜 나만 그러냐고 말하는 대목")
 
@@ -415,7 +519,8 @@ emit("left-out", "bottom",
 
 # 13. 잔소리 폭격
 emit("nagging", "top",
-     duo(sibom(fill=SAGE, eye="squint", mo="open", arm="rest", br="angry", mk="chatter"),
+     duo(sibom(fill=SAGE, eye="squint", mo="open", arm="rest", br="angry",
+               mk="chatter", leaf="bristle"),
          flip(sibom(fill=PEACH, eye="down", mo="grit", arm="hug", bl=False, br="sad")),
          "top", gap=400, scale=0.74),
      "일방적인 잔소리·훈계",
@@ -545,10 +650,68 @@ emit("reconciled", "bottom",
 
 
 import json
-(OUT / "catalog.json").write_text(
-    json.dumps({"font_size": 80,
-                "presets": {"bottom": {"rect": [40, 596, 740, 200], "maxChars": 16},
-                            "top": {"rect": [40, 24, 740, 200], "maxChars": 16},
-                            "bubble": {"rect": [420, 40, 376, 300], "maxChars": 12}},
-                "images": SHEET}, ensure_ascii=False, indent=2), encoding="utf-8")
-print(f"wrote {len(SHEET)} svg + catalog.json")
+
+# ── 떡잎 시그니처 규칙 (Phase 1) ─────────────────────────────────────
+# 떡잎은 장식이 아니라 감정 증폭기다. 모든 씬은 감정에 맞는 떡잎 상태를 갖는다.
+LEAF_RULE = {
+    "droop": "시듦 — 소진·낙담·슬픔·기다림",
+    "perky": "쫑긋 — 놀람·기대·안도·결심",
+    "bristle": "곤두섬 — 분노·격앙",
+    "normal": "평상",
+}
+
+# ── 감정별 모션 매핑 (Phase 2 애니메이션용) ─────────────────────────
+# WaggleBot 렌더러가 dwell 구간에서 재생할 모션. 미지정은 sway(기본 idle).
+MOTION = {
+    "two-argue": "shake", "indignant": "shake", "stunned": "shake",
+    "burst-crying": "sob",
+    "drained": "sink", "overloaded": "sink", "solo-parenting": "sink",
+    "curled-up": "sink", "late-regret": "sink", "breakup": "sink",
+    "stood-up": "sink",
+    "reconciled": "pop", "relieved": "pop",
+}
+for _it in SHEET:
+    _it["motion"] = MOTION.get(_it["id"], "sway")
+
+MOTION_KINDS = {
+    "sway": "기본 idle — 숨쉬기 바운스 + 눈 깜빡임 + 떡잎 살랑임",
+    "shake": "분노·충격 — 좌우 떨림 (감쇠)",
+    "sob": "울음 — 세로 들썩임",
+    "sink": "지침·낙담 — 아래로 처지는 느린 드리프트",
+    "pop": "안도·화해 — 살짝 튀어오름",
+}
+
+# ── catalog 병합 (덮어쓰기 금지) ─────────────────────────────────────
+# 🚨 런타임 catalog.json에는 이 생성기가 만들지 않는 값들이 들어 있다:
+#    · 매칭 메타: categories · arc · keywords · caption · alt_captions
+#                 · swap_group · sibling_bottom · people
+#    · 조정된 presets: maxChars=10 (테스트가 이 값을 검증한다)
+#    · fallback_chain
+# 통째로 쓰면 장면 매칭과 자막 길이 제한이 파괴되므로 반드시 병합한다.
+CAT = OUT / "catalog.json"
+cat = json.loads(CAT.read_text(encoding="utf-8")) if CAT.exists() else {}
+gen_by_id = {it["id"]: it for it in SHEET}
+
+if cat.get("images"):
+    for it in cat["images"]:
+        g = gen_by_id.get(it["id"])
+        if g:
+            it["slot"] = g["slot"]        # 슬롯은 생성기가 권위 (아트 레이아웃)
+            it["motion"] = g["motion"]
+    known = {it["id"] for it in cat["images"]}
+    cat["images"].extend(it for it in SHEET if it["id"] not in known)
+else:
+    cat["images"] = SHEET
+
+cat["leaf_rule"] = LEAF_RULE
+cat["motion_kinds"] = MOTION_KINDS
+cat.setdefault("palette", {}).update(
+    {"peach_author": PEACH, "sage_partner": SAGE,
+     "cream_body": CREAM, "leaf": LEAF, "blush": BLUSH, "ink": INK})
+
+CAT.write_text(json.dumps(cat, ensure_ascii=False, indent=2), encoding="utf-8")
+missing = [k for k in ("categories", "sibling_bottom", "caption")
+           if not any(k in i for i in cat["images"])]
+print(f"wrote {len(SHEET)} svg + catalog.json "
+      f"(images={len(cat['images'])}, presets 보존={'presets' in cat}, "
+      f"매칭메타 유실={missing or '없음'})")

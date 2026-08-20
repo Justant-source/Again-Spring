@@ -48,8 +48,9 @@ public class MarketingCallbackController {
     }
 
     /**
-     * Telegram "재구동" 버튼 승인 경로: ASM이 기존 callback 토큰으로 재구동을 위임 호출한다.
-     * 어드민 JWT 없이 이 내부 채널로만 접근 가능하며, 대상 잡 id 명시가 필수(필터 미지원).
+     * Telegram "재구동" 버튼 승인 경로: ASM이 기존 callback 토큰으로 단일 잡 재구동을 위임 호출한다.
+     * 어드민 JWT 없이 이 내부 채널로만 접근 가능하며, 호출자는 remoteJobId(ULID)로 신원 증명해야 한다.
+     * remoteJobId 불일치 시 409로 거부하여 dev id 재사용 위험을 차단한다.
      */
     @PostMapping("/redrive")
     public ResponseEntity<Map<String, Object>> redrive(
@@ -59,19 +60,39 @@ public class MarketingCallbackController {
             log.debug("Marketing internal redrive rejected: invalid or missing token");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        if (req == null || req.jobIds() == null || req.jobIds().isEmpty()) {
+
+        // ① 신원 증명 필수: remoteJobId 필드 확인
+        if (req == null || req.remoteJobId() == null || req.remoteJobId().trim().isEmpty()) {
+            log.info("[REDRIVE_REJECT] reason=NO_IDENTITY jobId={}", req != null ? req.jobId() : "?");
             return ResponseEntity.badRequest().build();
         }
-        log.info("[REDRIVE_INTERNAL] jobIds={} skipExisting={} via=asm-callback-token",
-                req.jobIds(), req.skipExisting());
+
+        // ② 잡 존재 확인
+        var jobOpt = marketingJobService.findJobById(req.jobId());
+        if (jobOpt.isEmpty()) {
+            log.info("[REDRIVE_REJECT] reason=JOB_NOT_FOUND jobId={}", req.jobId());
+            return ResponseEntity.notFound().build();
+        }
+
+        // ③ 신원 일치 확인: 저장된 remoteJobId와 비교
+        var job = jobOpt.get();
+        if (!req.remoteJobId().equals(job.getRemoteJobId())) {
+            log.info("[REDRIVE_REJECT] reason=IDENTITY_MISMATCH jobId={} expected={} got={}",
+                    req.jobId(), job.getRemoteJobId(), req.remoteJobId());
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+
+        // ④ 검증 통과: 재구동 진행
+        log.info("[REDRIVE_INTERNAL] jobId={} remoteJobId={} skipExisting={} via=asm-callback-token",
+                req.jobId(), req.remoteJobId(), req.skipExisting());
         List<Map<String, Object>> results = marketingJobService.redriveJobs(
-                req.jobIds(), req.skipExisting(), "asm:telegram-redrive");
+                List.of(req.jobId()), req.skipExisting(), "asm:telegram-redrive");
         return ResponseEntity.ok(Map.of(
-                "requested", req.jobIds().size(),
+                "requested", 1,
                 "results", results));
     }
 
-    public record InternalRedriveRequest(List<Long> jobIds, boolean skipExisting) {
+    public record InternalRedriveRequest(long jobId, String remoteJobId, boolean skipExisting) {
     }
 
     private boolean isAuthorized(String authHeader) {

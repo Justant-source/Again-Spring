@@ -440,12 +440,36 @@ POST /api/internal/marketing/callback
 Authorization: Bearer {ASM_CALLBACK_TOKEN}
 ```
 
-**내부 재구동 채널 (2026-08-20)** — 텔레그램 "재구동" 버튼 승인 시 ASM이 같은 토큰으로 호출하는 내부 엔드포인트. 어드민 JWT 없이 이 채널로만 접근하며, `jobIds` 명시가 필수(필터 미지원). 응답은 §1.6 redrive와 동일한 `{requested, results[]}` 구조.
+**내부 재구동 채널 (2026-08-20)** — 텔레그램 "재구동" 버튼 승인 시 ASM이 같은 토큰으로 호출하는 내부 엔드포인트. 어드민 JWT 없이 이 채널로만 접근하며, 단일 잡만 지원(필터 미지원). **ASM은 호출자 신원으로 `remoteJobId`(ULID)를 함께 제공해야 하며**, AS는 이를 DB의 저장된 `remoteJobId`와 검증한다. 이는 dev 환경에서 job id 재사용 시 잘못된 잡을 재구동할 위험을 차단한다(조회 테스트 참조: 2026-08-20 진행 중 발견). 응답은 §1.6 redrive와 동일한 `{requested, results[]}` 구조.
 
 ```
 POST /api/internal/marketing/redrive
 Authorization: Bearer {ASM_CALLBACK_TOKEN}
-{"jobIds": [689], "skipExisting": true}
+{"jobId": 689, "remoteJobId": "01KZZ30T74V3SB8WQW7VA5AEC1", "skipExisting": true}
+```
+
+| 필드 | 설명 |
+|---|---|
+| `jobId` | 재구동할 로컬 잡 ID (long). 단일 값만 허용. |
+| `remoteJobId` | ASM 원격 잡의 ULID (예: `01KZZ30T74V3SB8WQW7VA5AEC1`). 신원 검증 필수. 빈 문자열이면 400 거부. |
+| `skipExisting` | `true`일 때, 이미 `PUBLISHED` 상태인 플랫폼은 재생성 스킵 (child job 재사용, idempotent). 기본값 `false`. |
+
+**Response 200** — `{requested: 1, results: [{...}]}` (§1.6과 동일)
+
+**오류**
+| 코드 | 이유 | 로그 |
+|---|---|---|
+| 401 | 유효하지 않거나 누락된 Authorization 헤더 | (기존 debug 로그) |
+| 400 | `remoteJobId` 누락 또는 공백 | `[REDRIVE_REJECT] reason=NO_IDENTITY jobId=...` |
+| 404 | `jobId`가 존재하지 않음 | `[REDRIVE_REJECT] reason=JOB_NOT_FOUND jobId=...` |
+| 409 | `remoteJobId` 저장값과 불일치 (신원 검증 실패) | `[REDRIVE_REJECT] reason=IDENTITY_MISMATCH jobId=... expected=<stored> got=<given>` |
+
+**배경**
+Telegram 버튼의 callback_data는 `{env}:{jobId}`를 포함한다. env와 jobId가 다른 소스에서 나오면 불일치할 수 있다. 실제 버그: 버튼이 `dev:698`을 지정했으나 job 698은 prod에만 존재 → dev로 라우팅 시 not found (무해). 위험: dev는 job id를 리셋한 적이 있어(현재 max=65), 재사용되는 id는 스테일 버튼으로 다른 잡을 재구동할 수 있다. 해결책: remoteJobId(ULID)로 신원 증명 → 재사용 불가능.
+
+**성공 로그**
+```
+[REDRIVE_INTERNAL] jobId=689 remoteJobId=01KZZ... skipExisting=true via=asm-callback-token
 ```
 
 **Request Body**

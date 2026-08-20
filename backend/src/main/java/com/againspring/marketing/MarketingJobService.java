@@ -1402,6 +1402,13 @@ public class MarketingJobService {
     }
 
     /**
+     * Find a marketing job by ID (for internal redrive validation).
+     */
+    public java.util.Optional<MarketingJob> findJobById(Long jobId) {
+        return marketingJobRepository.findById(jobId);
+    }
+
+    /**
      * Extract platform publication states from a job's publications for response.
      */
     private void extractPlatformStates(Map<String, String> platformStates, MarketingJob job) {

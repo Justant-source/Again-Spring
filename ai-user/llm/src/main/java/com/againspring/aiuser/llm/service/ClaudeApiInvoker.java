@@ -21,6 +21,9 @@ import java.util.UUID;
 
 /**
  * Anthropic Messages API를 직접 호출하는 LLM 인보커.
+ * ⚠️ **CURRENTLY UNROUTED** — InvokerRouter(2026-07-30 CLI consolidation) always returns cliInvoker.
+ * This class is kept for potential future revival.
+ *
  * - API 키: ApiKeyProvider 경유 (DB 우선 → 환경변수 폴백)
  * - 시스템 프롬프트: <<<USER_PROMPT>>> 앞 부분 → &lt;instructions&gt; 태그로 user 메시지에 주입
  * - 유저 메시지: <<<USER_PROMPT>>> 뒤 부분
