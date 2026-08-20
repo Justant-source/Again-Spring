@@ -66,4 +66,57 @@ class ClaudeCliInvokerStructuredCommandTest {
 
         assertTrue(command.stream().noneMatch(arg -> arg.contains(hugeUserPart)));
     }
+
+    /**
+     * 2026-08-21 프롬프트 모드 OFF: 명령어는 현재와 byte-identical
+     */
+    @Test
+    void flagOffProducesIdenticalCommand() {
+        List<String> legacyCommand = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system", false);
+        List<String> defaultCommand = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system");
+
+        assertEquals(legacyCommand, defaultCommand, "Flag OFF must produce identical command to default behavior");
+    }
+
+    /**
+     * 2026-08-21 프롬프트 모드 ON (스키마 있음): --disallowedTools "*", 스키마 지시 프롬프트에 포함
+     */
+    @Test
+    void flagOnWithSchemaUsesWildcardDisallow() {
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system", true);
+
+        // Must use wildcard disallow (not explicit list)
+        int disallowIdx = command.indexOf("--disallowedTools");
+        assertTrue(disallowIdx >= 0, "--disallowedTools must be present");
+        assertEquals("*", command.get(disallowIdx + 1), "Prompt mode should use wildcard --disallowedTools");
+
+        // Must NOT have --json-schema
+        assertFalse(command.contains("--json-schema"), "Prompt mode should not pass --json-schema");
+    }
+
+    /**
+     * 2026-08-21 프롬프트 모드 ON (스키마 없음): --disallowedTools "*"
+     */
+    @Test
+    void flagOnNoSchemaUsesWildcardDisallow() {
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", null, "system", true);
+
+        int disallowIdx = command.indexOf("--disallowedTools");
+        assertEquals("*", command.get(disallowIdx + 1), "No schema should use wildcard --disallowedTools");
+        assertFalse(command.contains("--json-schema"), "No --json-schema expected");
+    }
+
+    /**
+     * 2026-08-21 프롬프트 모드 OFF (스키마 있음): 기존 명령어와 동일 (explicit disallow list + --json-schema)
+     */
+    @Test
+    void flagOffWithSchemaPreservesExplicitDisallow() {
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system", false);
+
+        int disallowIdx = command.indexOf("--disallowedTools");
+        String disallowValue = command.get(disallowIdx + 1);
+        assertFalse(disallowValue.equals("*"), "Flag OFF should not use wildcard");
+        assertTrue(disallowValue.contains("Bash"), "Explicit list should be present");
+        assertTrue(command.contains("--json-schema"), "--json-schema must be present");
+    }
 }

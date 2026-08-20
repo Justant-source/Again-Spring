@@ -84,6 +84,9 @@ public class ClaudeCliInvoker implements Invoker {
     @Value("${llm.api.refusal-fallback-model:}")
     private String refusalFallbackModel;
 
+    @Value("${llm.structured.prompt-mode-enabled:false}")
+    private boolean structuredPromptModeEnabled;
+
     private final StructuredSchemaCatalog schemaCatalog;
 
     public ClaudeCliInvoker(StructuredSchemaCatalog schemaCatalog) {
@@ -355,7 +358,7 @@ public class ClaudeCliInvoker implements Invoker {
     }
 
     private ProcessBuilder buildProcessBuilder(String systemPart, String model, String jsonSchema) {
-        ProcessBuilder pb = new ProcessBuilder(buildCommand(claudeBinaryPath, model, jsonSchema, systemPart));
+        ProcessBuilder pb = new ProcessBuilder(buildCommand(claudeBinaryPath, model, jsonSchema, systemPart, structuredPromptModeEnabled));
         // CLI 모드는 OAuth(구독) 사용 — ANTHROPIC_API_KEY가 env에 있으면 CLI가 API 크레딧으로 전환됨.
         pb.environment().remove("ANTHROPIC_API_KEY");
         return pb;
@@ -366,21 +369,34 @@ public class ClaudeCliInvoker implements Invoker {
      * "Exec failed, error: 7 (Argument list too long)"(E2BIG)로 REQUESTED 플랜 173건이
      * 전부 실패했다. stdin에는 인자 길이 한도가 없으므로 여기서만 넘긴다.
      * (CodexCliInvoker는 애초에 stdin 방식이라 이 문제가 없었다.)
+     *
+     * 2026-08-21: 프롬프트 모드 추가 — jsonSchema를 --json-schema로 전달하지 않고
+     * 프롬프트에 스키마 주입. --disallowedTools "*"로 전환해 토큰 절약.
      */
     static java.util.List<String> buildCommand(String binary, String model, String jsonSchema, String systemPart) {
+        return buildCommand(binary, model, jsonSchema, systemPart, false);
+    }
+
+    static java.util.List<String> buildCommand(String binary, String model, String jsonSchema, String systemPart, boolean promptModeEnabled) {
         var command = new java.util.ArrayList<String>(java.util.List.of(
                 binary, "--print", "--output-format", "stream-json", "--verbose",
                 "--include-partial-messages", "--model", model, "--strict-mcp-config",
                 "--no-session-persistence"));
 
         // Token reduction: limit CLI tools to reduce prompt overhead (~22-25k tokens -> ~279 or ~18.8k)
+        command.add("--disallowedTools");
         if (jsonSchema != null && !jsonSchema.isBlank()) {
-            command.add("--disallowedTools");
-            command.add(DISALLOWED_TOOLS_WITH_SCHEMA);
-            command.add("--json-schema");
-            command.add(jsonSchema);
+            if (promptModeEnabled) {
+                // Prompt mode: schema injected into prompt, use wildcard to maximize token saving
+                command.add(DISALLOWED_TOOLS_NO_SCHEMA);
+            } else {
+                // Legacy mode: use --json-schema flag, preserve StructuredOutput tool
+                command.add(DISALLOWED_TOOLS_WITH_SCHEMA);
+                command.add("--json-schema");
+                command.add(jsonSchema);
+            }
         } else {
-            command.add("--disallowedTools");
+            // No schema needed
             command.add(DISALLOWED_TOOLS_NO_SCHEMA);
         }
 

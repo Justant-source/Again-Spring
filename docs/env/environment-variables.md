@@ -150,6 +150,19 @@
 | `SELF_CRITIQUE_EXTRA_CLICHES` | 추가 상투구 차단 | 공란 |
 | `LLM_API_REFUSAL_RETRIES` | refusal 재시도 | `0` |
 | `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 후 fallback | 공란 |
+| `LLM_STRUCTURED_PROMPT_MODE` | 구조화 생성 시 `--json-schema` 플래그 대신 프롬프트에 스키마 주입 (기본 off) | `false` |
+
+**구조화 프롬프트 모드** (`LLM_STRUCTURED_PROMPT_MODE`, 2026-08-21 신규):
+
+- **OFF (기본값)**: 구조화 생성이 `--json-schema` 플래그를 사용. Claude Code CLI는 도구 정의를 로드하되 StructuredOutput만 활성화(`--disallowedTools BASH,READ,...` 명시 리스트). 토큰 오버헤드 약 18.8k.
+- **ON**: `--json-schema` 플래그 제거, 대신 system prompt 끝에 Korean instruction + schema JSON을 텍스트 주입. CLI가 모든 도구를 차단(`--disallowedTools "*"`)하므로 토큰 절감: **~18.5k/call** (스키마 인라인 비용 ~350-400 토큰, net 절감 ~18.1k). 대신 **스키마 검증이 없으므로** 모델이 malformed JSON 반환 시 post+comments 번들 전체 손실 위험. 추출 전략은 lenient(`JsonExtractorUtil`: direct parse → strip ```json fences → substring first`{`/`[`to last`}`/`]`), 실패 시 예외.
+- **A/B 테스트**: `scripts/llm-mode-ab.py`에서 두 모드 성능 비교 가능.
+
+실측 (2026-08-21, AI-user PLAN 모드 포스트 생성):
+- 입력 토큰: 22,739 → 4,242 (81.4% 절감)
+- 출력 토큰: 7,714 → 307 (96% 절감)
+- 소요 시간: 115s → 8.4s (92.7% 단축)
+- 기본 작업자(`llm-worker`): 입력 기준 279 token (모든 도구 차단 방식)
 
 PLAN 모드의 운영 설정 권위는 다음과 같이 분리한다.
 

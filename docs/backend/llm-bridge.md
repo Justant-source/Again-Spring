@@ -86,6 +86,13 @@ String sanitized = promptSanitizer.sanitize(userInput);
 - `~/.claude` bind mount (Claude 인증)
 - 엔드포인트: `POST /v1/invoke`, `GET /v1/invocations`
 
+**CLI 도구 오버헤드 감소 (2026-08-21)**: llm-worker는 structured output이 불필요하므로 `--disallowedTools "*"`로 모든 CLI 도구를 차단. 입력 토큰 오버헤드를 ~279 토큰으로 감소시킨다.
+
+**[LLMSTATS] 로깅 (2026-08-21)**: llm-worker의 `ClaudeCliInvoker.logLlmStats()` 메서드가 모든 호출(성공/실패)에 대해 `[LLMSTATS]` 포맷으로 메트릭스를 기록한다:
+```
+[LLMSTATS] ts=2026-08-21T12:34:56.789Z sys=AS type=INVOKE model=claude-haiku-4-5-20251001 attempt=1 retryReason=null in=2847 out=156 cache_read=0 cache_write=0 cache_hit=0% result=OK duration_ms=3421 corrId=abc-123
+```
+
 **세션 만료 시 갱신**:
 ```bash
 # 호스트에서 재인증

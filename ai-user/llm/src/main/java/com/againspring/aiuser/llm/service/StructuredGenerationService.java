@@ -2,6 +2,7 @@ package com.againspring.aiuser.llm.service;
 
 import com.againspring.aiuser.llm.dto.*;
 import com.againspring.aiuser.llm.exception.LlmCapacityException;
+import com.againspring.aiuser.llm.exception.LlmException;
 import com.againspring.aiuser.llm.exception.LlmTimeoutException;
 import com.againspring.aiuser.llm.pool.LlmWorkerPool;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -26,6 +27,9 @@ public class StructuredGenerationService {
     @Value("${llm.worker.default-timeout-ms:600000}")
     private long defaultTimeoutMs;
 
+    @Value("${llm.structured.prompt-mode-enabled:false}")
+    private boolean structuredPromptModeEnabled;
+
     private static final Pattern META = Pattern.compile("(?i)(적용 처리 메모|작성 노트|<<<|```|i can't help|i am (claude|codex))");
     /** SNS hook emotion enum (PLAN {@code hook_emotion}). */
     static final Set<String> HOOK_EMOTIONS = Set.of("shock", "anger", "tension", "sad", "hype");
@@ -39,6 +43,7 @@ public class StructuredGenerationService {
     private final LlmWorkerPool pool;
     private final SelfCritiqueService selfCritique;
     private final LlmParseFailureSampler parseFailureSampler;
+    private final StructuredSchemaCatalog schemaCatalog;
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}") private String claudeDefault;
     @Value("${llm.post-model:claude-sonnet-5}") private String claudePostModel;
@@ -52,7 +57,7 @@ public class StructuredGenerationService {
         long started = System.currentTimeMillis();
         String prompt = planPrompt(req);
         String promptHash = hashPrompt(prompt);
-        return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
+        return withOneRetry(() -> executeProviderTaskWithSchemaMode(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
                         StructuredOutputSchema.THREAD_PLAN),
                 raw -> applySelfCritique(parsePlan(raw, req, provider, model, correlationId, started),
                         req, prompt, model, correlationId), correlationId, promptHash);
@@ -65,7 +70,7 @@ public class StructuredGenerationService {
         long started = System.currentTimeMillis();
         String prompt = replyPrompt(req);
         String promptHash = hashPrompt(prompt);
-        return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
+        return withOneRetry(() -> executeProviderTaskWithSchemaMode(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
                         StructuredOutputSchema.HUMAN_REPLIES),
                 raw -> parseReplies(raw, req, provider, model, correlationId, started), correlationId, promptHash);
     }
@@ -81,7 +86,7 @@ public class StructuredGenerationService {
         long started = System.currentTimeMillis();
         String prompt = pairedPhase1Prompt(req);
         String promptHash = hashPrompt(prompt);
-        return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
+        return withOneRetry(() -> executeProviderTaskWithSchemaMode(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
                         StructuredOutputSchema.PAIRED_PHASE1),
                 raw -> applyPairedPhase1Critique(
                         parsePairedPhase1(raw, req, provider, model, correlationId, started),
@@ -101,7 +106,7 @@ public class StructuredGenerationService {
         long started = System.currentTimeMillis();
         String prompt = pairedPhase2Prompt(req);
         String promptHash = hashPrompt(prompt);
-        return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
+        return withOneRetry(() -> executeProviderTaskWithSchemaMode(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
                         StructuredOutputSchema.PAIRED_PHASE2),
                 raw -> applyPairedPhase2Critique(
                         parsePairedPhase2(raw, req, provider, model, correlationId, started),
@@ -739,10 +744,19 @@ public class StructuredGenerationService {
 
     private JsonNode parseObject(String raw) {
         try {
-            JsonNode root = JSON.readTree(raw == null ? "" : raw.trim());
+            // In prompt mode, use lenient extraction to handle wrapped/fenced JSON
+            JsonNode root;
+            if (structuredPromptModeEnabled) {
+                root = JsonExtractorUtil.extract(raw);
+            } else {
+                root = JSON.readTree(raw == null ? "" : raw.trim());
+            }
             if (root == null || !root.isObject()) throw new StructuredGenerationException("response is not a JSON object");
             return root;
         } catch (StructuredGenerationException e) { throw e;
+        } catch (RuntimeException e) {
+            // JsonExtractorUtil throws RuntimeException for extraction failures
+            throw new StructuredGenerationException("invalid JSON response: " + e.getMessage());
         } catch (Exception e) { throw new StructuredGenerationException("invalid JSON response"); }
     }
     private void validatePlanRequest(ThreadPlanRequest r) {
@@ -848,6 +862,68 @@ public class StructuredGenerationService {
         log.warn("[LLMSTATS] type=PARSE_FAIL attempt=2 final_error={} corrId={}", last.getClass().getSimpleName(), callId);
         throw last;
     }
+
+    /**
+     * Execute provider task with optional schema injection into prompt.
+     * When structured prompt mode is ON, inject the schema instruction at the end of the system prompt
+     * and pass null as the schema (so ClaudeCliInvoker doesn't use --json-schema).
+     * When OFF, pass schema as-is to use --json-schema.
+     */
+    private String executeProviderTaskWithSchemaMode(String prompt, String model, long timeoutMs, String correlationId,
+                                                      LlmProvider provider, StructuredOutputSchema schema) throws LlmException {
+        if (!structuredPromptModeEnabled || schema == null) {
+            // Legacy mode or no schema: use --json-schema
+            return pool.executeProviderTask(prompt, model, timeoutMs, correlationId, provider, schema);
+        }
+
+        // Prompt mode: inject schema into prompt, pass null as schema
+        String schemaJson = schemaCatalog.json(schema);
+        String augmentedPrompt = injectSchemaIntoPrompt(prompt, schemaJson);
+        return pool.executeProviderTask(augmentedPrompt, model, timeoutMs, correlationId, provider, null);
+    }
+
+    /**
+     * Inject schema instruction at the end of the system prompt.
+     * Split prompt using USER_PROMPT_SEP, append instruction to system part, rejoin.
+     * The instruction demands raw JSON only in Korean.
+     */
+    private String injectSchemaIntoPrompt(String prompt, String schemaJson) {
+        if (prompt == null || prompt.isBlank() || schemaJson == null || schemaJson.isBlank()) {
+            return prompt;
+        }
+
+        // Split into system and user parts
+        String sep = "<<<USER_PROMPT>>>";
+        int sepIdx = prompt.indexOf(sep);
+        String systemPart;
+        String userPart;
+        if (sepIdx >= 0) {
+            systemPart = prompt.substring(0, sepIdx).trim();
+            userPart = prompt.substring(sepIdx + sep.length()).trim();
+        } else {
+            systemPart = prompt.trim();
+            userPart = "";
+        }
+
+        // Build schema instruction in Korean
+        String schemaInstruction = """
+
+            ===== 스키마 지시 (필수) =====
+            다음 스키마에 정확히 맞는 JSON을 출력하시오.
+            코드 펜스 없음. 마크다운 없음. 설명 없음. 순수 JSON만 출력.
+            줄바꿈이나 들여쓰기는 자유롭고, 결과는 유효한 JSON이어야 함.
+
+            스키마:
+            """ + schemaJson;
+
+        // Rejoin: system + instruction + user part
+        String augmented = systemPart + schemaInstruction;
+        if (!userPart.isBlank()) {
+            augmented = augmented + "\n\n" + sep + "\n" + userPart;
+        }
+        return augmented;
+    }
+
     /** Compute short hash of prompt for parse-failure tracking. */
     private String hashPrompt(String prompt) {
         if (prompt == null) return "null";

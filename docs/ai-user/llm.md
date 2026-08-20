@@ -54,6 +54,21 @@ solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워
 
 2026-07-30에 컨테이너에서 provider별로 승인된 단일 구조화 요청을 실행했다. Codex `gpt-5.6-terra`와 Claude `claude-sonnet-5` 모두 schema 유효 JSON을 반환했다. 이 검증은 DB/게시 API에 쓰지 않았으며, 실제 운영 콘텐츠 생성은 별도 승인 범위다.
 
+## Claude CLI tool 오버헤드 감소 (2026-08-21)
+
+Claude Code CLI는 기본적으로 모든 tool 정의를 프롬프트에 함께 전송한다 (~22-25k 입력 토큰). 
+다시봄은 structured 생성에서만 `StructuredOutput` 도구가 필요하므로, `--disallowedTools` 플래그로 나머지를 차단한다.
+
+| 모드 | 조건 | --disallowedTools 값 | 오버헤드 | 설명 |
+|---|---|---|---|---|
+| 구조화 + 스키마 플래그 | `--json-schema` 사용 | `BASH,READ,WRITE,...` (StructuredOutput 제외) | 약 18.8k | 명시 리스트: 스키마 검증 유지 |
+| 구조화 + 프롬프트 모드 | `LLM_STRUCTURED_PROMPT_MODE=true` | `*` (모두 차단) | 약 279 token | 모든 도구 차단, 최대 절감. 스키마는 prompt 텍스트로 주입 |
+| 비구조화 생성 | schema 없음 | `*` (모두 차단) | 약 279 token | 도구 불필요 |
+
+**왜 StructuredOutput이 필요한가**: `--json-schema` 플래그를 사용할 때, CLI는 모델의 JSON 결과를 stream-json으로 검증하며 전송하고, 실패 시 `STRUCTURED_OUTPUT_ERROR` 에러를 반환한다. 따라서 StructuredOutput 도구를 활성화해야 이 검증이 동작한다. 리스트에서 빼면 스키마 검증이 작동하지 않는다.
+
+**프롬프트 모드 선택 시**: `--disallowedTools "*"`로 전환하되, 스키마를 JSON 텍스트로 system prompt 끝에 주입하고 `JsonExtractorUtil`로 lenient 파싱(direct parse → strip ```json fences → substring 추출)한다. 검증이 없으므로 malformed JSON이 들어오면 손실.
+
 ## 실행 모델
 
 ### worker pool

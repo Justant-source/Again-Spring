@@ -38,6 +38,9 @@ llm:
     codex-luna-model: ${AI_INTERACTION_CODEX_MODEL:gpt-5.6-luna}
   # 글(POST) 전용 모델 오버라이드 — 빈 값이면 claude-model 사용
   post-model: ${AI_POST_CLAUDE_MODEL:${LLM_POST_MODEL:claude-sonnet-5}}
+  structured:
+    # 프롬프트 내 스키마 주입으로 ~18.5k 토큰 절약 (기본 OFF — 증거 후 활성화)
+    prompt-mode-enabled: ${LLM_STRUCTURED_PROMPT_MODE:false}
   api:
     prompt-caching: ${LLM_API_PROMPT_CACHING:false}
     cache-ttl: ${LLM_API_CACHE_TTL:5m}
