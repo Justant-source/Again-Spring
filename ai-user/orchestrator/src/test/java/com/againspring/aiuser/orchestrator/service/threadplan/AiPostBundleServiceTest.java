@@ -141,7 +141,7 @@ class AiPostBundleServiceTest {
                 Map.of("exampleId", 99L, "body", "원본 사연", "reconstructMode", true, "sourceUrl", "https://nate.example/1"),
                 true, 99L, "원본 사연 본문", "natepan", "https://nate.example/1", "원제목",
                 "문체앵커", List.of("내가 예전에 쓴 글"));
-        when(sourceStoryResolver.claimAndResolve(eq(author), eq("natepan"), anyString(), any(Instant.class), eq("FAMILY")))
+        when(sourceStoryResolver.claimAndResolve(eq(author), eq("natepan"), anyString(), any(Instant.class), eq("FAMILY"), any()))
                 .thenReturn(Optional.of(source));
 
         Map<String, Object> llmResponse = new LinkedHashMap<>();
@@ -159,7 +159,7 @@ class AiPostBundleServiceTest {
         assertThat(held.get().getId()).isNotBlank();
         verify(sourceStoryResolver).claimAndResolve(
                 eq(author), eq("natepan"), eq(held.get().getId()),
-                eq(slot.plusSeconds(24 * 3600)), eq("FAMILY"));
+                eq(slot.plusSeconds(24 * 3600)), eq("FAMILY"), any());
         ArgumentCaptor<Map<String, Object>> reqCaptor = ArgumentCaptor.forClass(Map.class);
         verify(llmClient).generateThreadPlan(reqCaptor.capture());
         Map<String, Object> req = reqCaptor.getValue();
@@ -207,7 +207,7 @@ class AiPostBundleServiceTest {
         when(planPersonaMapper.mapCast(any())).thenReturn(List.of(authorMap, otherMap));
         when(planPersonaMapper.castIds(any())).thenReturn(Set.of(author.getId(), other.getId()));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(authorMap);
-        when(sourceStoryResolver.claimAndResolve(eq(author), eq("natepan"), anyString(), any(Instant.class), eq("FAMILY")))
+        when(sourceStoryResolver.claimAndResolve(eq(author), eq("natepan"), anyString(), any(Instant.class), eq("FAMILY"), any()))
                 .thenReturn(Optional.of(source));
         Map<String, Object> llmResponse = new LinkedHashMap<>();
         llmResponse.put("post", Map.of("title", "시어머니 간섭", "body", body));
@@ -320,7 +320,7 @@ class AiPostBundleServiceTest {
         when(planPersonaMapper.castIds(any())).thenReturn(
                 pool.stream().map(Persona::getId).collect(Collectors.toSet()));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(cast.get(0));
-        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any()))
+        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any(), any()))
                 .thenReturn(Optional.of(new PlanSourceStoryResolver.ResolvedSource(
                         "seed", Map.of("body", "s"), false,
                         1L, null, null, null, null, "", List.of())));
@@ -363,7 +363,7 @@ class AiPostBundleServiceTest {
         when(planPersonaMapper.castIds(any())).thenReturn(
                 pool.stream().map(Persona::getId).collect(Collectors.toSet()));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(cast.get(0));
-        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any()))
+        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any(), any()))
                 .thenReturn(Optional.of(new PlanSourceStoryResolver.ResolvedSource(
                         "seed", Map.of("body", "s"), false,
                         1L, "본문", null, null, null, "", List.of())));
@@ -443,7 +443,7 @@ class AiPostBundleServiceTest {
         when(planPersonaMapper.castIds(any())).thenReturn(
                 pool.stream().map(Persona::getId).collect(Collectors.toSet()));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(cast.get(0));
-        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any()))
+        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any(), any()))
                 .thenReturn(Optional.of(new PlanSourceStoryResolver.ResolvedSource(
                         "seed", Map.of("body", "s"), false,
                         1L, "본문", null, null, null, "", List.of())));
@@ -564,5 +564,38 @@ class AiPostBundleServiceTest {
     void capMegaCallCastReturnsUnchangedWhenAlreadyWithinBound() {
         List<Map<String, Object>> personas = List.of(Map.of("personaId", "a"), Map.of("personaId", "b"));
         assertThat(AiPostBundleService.capMegaCallCast(personas, 40)).hasSize(2);
+    }
+
+    @Test
+    void generateAndHoldResultClaimEmptyDoesNotCallLlm() {
+        Persona author = persona("ai-user-1", "polite", null);
+        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any(), any()))
+                .thenReturn(Optional.empty());
+
+        HoldResult result = service.generateAndHoldResult(
+                author, "FAMILY", null, "corr-empty", Instant.now(), "blind");
+
+        assertThat(result.outcome()).isEqualTo(HoldResult.Outcome.CLAIM_EMPTY);
+        assertThat(result.saved()).isEmpty();
+        assertThat(result.llmInvoked()).isFalse();
+        assertThat(service.generateAndHold(author, "FAMILY", null, "corr-empty", Instant.now(), "blind")).isEmpty();
+        verify(llmClient, never()).generateThreadPlan(any());
+        verify(sourceReservationSupport, never()).release(any(), anyString());
+    }
+
+    @Test
+    void generateAndHoldResultSkipsLlmWhenExampleAlreadyFailed() {
+        Persona author = persona("ai-user-1", "polite", null);
+        PlanSourceStoryResolver.ResolvedSource source = minimalSource();
+        when(sourceStoryResolver.claimAndResolve(any(), anyString(), anyString(), any(Instant.class), any(), any()))
+                .thenReturn(Optional.of(source));
+
+        HoldResult result = service.generateAndHoldResult(
+                author, "FAMILY", null, "corr-skip", Instant.now(), "natepan", Set.of(99L));
+
+        assertThat(result.outcome()).isEqualTo(HoldResult.Outcome.SAME_EXAMPLE);
+        assertThat(result.llmInvoked()).isFalse();
+        verify(llmClient, never()).generateThreadPlan(any());
+        verify(sourceReservationSupport).release(eq(99L), anyString());
     }
 }

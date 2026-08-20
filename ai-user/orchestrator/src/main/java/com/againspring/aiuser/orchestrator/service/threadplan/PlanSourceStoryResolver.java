@@ -67,6 +67,16 @@ public class PlanSourceStoryResolver {
             String reservationKey,
             Instant reserveUntil,
             String categoryHint) {
+        return claimAndResolve(author, preferredSource, reservationKey, reserveUntil, categoryHint, null);
+    }
+
+    public Optional<ResolvedSource> claimAndResolve(
+            Persona author,
+            String preferredSource,
+            String reservationKey,
+            Instant reserveUntil,
+            String categoryHint,
+            java.util.Set<Long> excludeExampleIds) {
         String source = normalizePreferredSource(preferredSource);
         if (source == null || reservationKey == null || reservationKey.isBlank() || reserveUntil == null) {
             log.debug("claimAndResolve skipped: invalid args source={} key={} until={} categoryHint={}",
@@ -76,7 +86,7 @@ public class PlanSourceStoryResolver {
 
         String plaza = normalizePlazaCategory(categoryHint);
         Optional<AiLearningClient.ExampleItem> claimed =
-                aiLearningClient.claimPopularSource(source, reservationKey, reserveUntil, plaza);
+                aiLearningClient.claimPopularSource(source, reservationKey, reserveUntil, plaza, excludeExampleIds);
         if (claimed.isEmpty()) {
             log.info("claimAndResolve empty: no popular source for preferredSource={} plaza={} reservationKey={}",
                     source, plaza, reservationKey);

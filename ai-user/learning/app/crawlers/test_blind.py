@@ -8,6 +8,7 @@ from app.crawlers.blind import (
     _extract_comments,
     _extract_post_stats,
     _parse_like_element,
+    _resolve_category,
 )
 
 
@@ -142,3 +143,26 @@ class TestExtractComments:
         assert len(ts) == 2
         assert ts[0] == "2026-08-01 14:00:00"
         assert ts[1] == "2026-07-31 16:00:00"
+
+
+class TestResolveCategory:
+    def test_family_body_on_marriage_board_stores_family(self):
+        assert _resolve_category(
+            "아빠랑 친오빠, 친동생이 본가에서 싸운다. 부모님이 너무 힘들다.",
+            "아빠 본가 원가족",
+            board_category="marriage",
+        ) == "FAMILY"
+
+    def test_parenting_plus_husband_on_marriage_board_stays_married(self):
+        assert _resolve_category(
+            "육아 너무 힘든데 남편이 전혀 안 도와줘.",
+            "육아",
+            board_category="marriage",
+        ) == "MARRIED"
+
+    def test_workplace_hint_does_not_block_family(self):
+        assert _resolve_category(
+            "아빠랑 친오빠, 친동생이 본가에서 싸운다. 부모님이 너무 힘들다.",
+            "아빠 본가",
+            board_category="workplace",
+        ) == "FAMILY"

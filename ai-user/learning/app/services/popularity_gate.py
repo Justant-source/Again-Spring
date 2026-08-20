@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections import defaultdict
 from typing import Any, Mapping, Optional, Sequence
 from urllib.parse import urldefrag
 
@@ -30,6 +31,14 @@ MIN_POPULARITY_PCT = float(os.getenv("CRAWL_MIN_POPULARITY_PCT", "0.50"))
 ABSOLUTE_FLOOR: dict[str, dict[str, int]] = {
     "natepan": {"view_count": 50, "like_count": 3, "comment_count": 5},
     "blind": {"view_count": 30, "like_count": 1, "comment_count": 3},
+}
+
+# Blind boards use romance/marriage/workplace; natepan uses plaza enums.
+PLAZA_ENUMS = frozenset({"COUPLE", "MARRIED", "FRIEND", "FAMILY", "WORK", "OTHER"})
+_BOARD_TO_PLAZA: dict[str, str] = {
+    "romance": "COUPLE",
+    "marriage": "MARRIED",
+    "workplace": "WORK",
 }
 
 
@@ -51,6 +60,23 @@ def has_any_metric(item: Mapping[str, Any]) -> bool:
             except (TypeError, ValueError):
                 continue
     return False
+
+
+def plaza_group_key(item: Mapping[str, Any]) -> str:
+    """Normalize crawl category onto a plaza bucket for in-plaza ranking."""
+    raw = item.get("category")
+    if raw is None:
+        return "OTHER"
+    key = str(raw).strip()
+    if not key:
+        return "OTHER"
+    mapped = _BOARD_TO_PLAZA.get(key.lower())
+    if mapped:
+        return mapped
+    upper = key.upper()
+    if upper in PLAZA_ENUMS:
+        return upper
+    return "OTHER"
 
 
 def passes_absolute_floor(item: Mapping[str, Any], source: str) -> bool:
@@ -75,7 +101,8 @@ def select_popular_posts(
     min_pct: float = MIN_POPULARITY_PCT,
 ) -> tuple[list[Mapping[str, Any]], dict[str, float]]:
     """
-    Filter POST items: metrics required → absolute floor → in-batch relative pct gate.
+    Filter POST items: metrics required → absolute floor → per-plaza relative pct gate.
+    Relative rank is within the post's plaza cohort, not the whole source batch.
     Returns (accepted_posts, url→popularity_pct).
     """
     source_key = source.lower()
@@ -92,7 +119,6 @@ def select_popular_posts(
         row = dict(p)
         row["source"] = source_key
         row["content_type"] = "POST"
-        row["id"] = len(eligible)  # temporary id for score_posts
         eligible.append(row)
 
     if not eligible:
@@ -102,28 +128,42 @@ def select_popular_posts(
         )
         return [], {}
 
-    pct_by_id = score_posts(eligible)
+    by_plaza: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in eligible:
+        by_plaza[plaza_group_key(row)].append(row)
 
     accepted: list[Mapping[str, Any]] = []
     url_pct: dict[str, float] = {}
     skipped_pct = 0
-    for row in eligible:
-        pct = pct_by_id.get(row["id"])
-        if pct is None or pct < min_pct:
-            skipped_pct += 1
-            continue
-        # stash for ingest so DB gets an initial popularity_pct
-        row["popularity_pct"] = float(pct)
-        accepted.append(row)
-        url = row.get("source_url")
-        if url:
-            url_pct[str(url)] = float(pct)
+    plaza_bits: list[str] = []
+
+    for plaza, group in sorted(by_plaza.items()):
+        for i, row in enumerate(group):
+            row["id"] = i  # temporary id for score_posts; unique within this plaza
+        pct_by_id = score_posts(group)
+        plaza_accepted = 0
+        plaza_skipped = 0
+        for row in group:
+            pct = pct_by_id.get(row["id"])
+            if pct is None or pct < min_pct:
+                skipped_pct += 1
+                plaza_skipped += 1
+                continue
+            # stash for ingest so DB gets an initial popularity_pct
+            row["popularity_pct"] = float(pct)
+            accepted.append(row)
+            plaza_accepted += 1
+            url = row.get("source_url")
+            if url:
+                url_pct[str(url)] = float(pct)
+        plaza_bits.append(f"{plaza}:accepted={plaza_accepted}/skipped={plaza_skipped}")
 
     logger.info(
         "popularity_gate: source=%s posts in=%s eligible=%s accepted=%s "
-        "(no_metric=%s floor=%s below_pct=%s) min_pct=%.2f",
+        "(no_metric=%s floor=%s below_pct=%s) min_pct=%.2f plazas=[%s]",
         source_key, len(posts), len(eligible), len(accepted),
         skipped_no_metric, skipped_floor, skipped_pct, min_pct,
+        ", ".join(plaza_bits),
     )
     return accepted, url_pct
 

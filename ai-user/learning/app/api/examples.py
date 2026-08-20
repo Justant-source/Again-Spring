@@ -69,6 +69,8 @@ class ClaimPopularSourceRequest(CamelCompatModel):
     # Plaza enum (COUPLE/MARRIED/FRIEND/FAMILY/WORK/OTHER). Filters example_bank
     # to matching board categories so reconstruct content stays in the right plaza.
     category: Optional[str] = None
+    # Already-tried example_bank ids (LLM/safety failed). Claim the next popular row.
+    exclude_example_ids: Optional[list[int]] = None
 
 
 class SourceReservationKeyRequest(CamelCompatModel):
@@ -360,6 +362,7 @@ def claim_popular_source(req: ClaimPopularSourceRequest):
             window_days=req.window_days if req.window_days is not None else 14,
             expand_days=req.expand_days if req.expand_days is not None else 30,
             category=req.category,
+            exclude_ids=req.exclude_example_ids,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

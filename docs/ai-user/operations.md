@@ -183,13 +183,15 @@ env/scripts/nightly-ai-user-batch.sh (호스트 crontab 05 3 * * *, KST)
   │    N=target_posts, paired=ceil(N×nightly_paired_share), solo=N−paired
   │    slots=nightly_slot_from_hour~to_hour, spacing=nightly_slot_min_spacing_minutes
   │    (DB 조회 실패 시에만 NIGHTLY_BATCH_* env fallback)
-  ├─ POST /admin/trigger/generate-scheduled-posts?count=solo&fromHour&toHour&minSpacingMinutes
+  ├─ 목표 N=target_posts **저장**(시도 횟수가 아님). 상세 재시도·텔레그램은 아래 「새벽 fill」
+  ├─ POST /admin/trigger/fill-nightly-scheduled-posts (있으면) 또는
+  │    generate-scheduled-posts(solo) + paired-posts — 스크립트가 호출하는 경로
   │    ├─ ActivityCurve.sampleFutureInstants 로 발행 슬롯 샘플링
-  │    └─ generateAndHold() → ai_scheduled_posts SCHEDULED
-  ├─ POST /admin/trigger/paired-posts?count=paired
+  │    ├─ generateAndHold() → ai_scheduled_posts SCHEDULED
   │    └─ PairedPostScheduler: Call1 hold(AUTHOR+phase1)→PUBLIC(T0, KST 02–06 밴)
   │       → Δ(10m–2h, median~50–60m) 후 Call2(PARTNER+phase2)→invite answer
   │       → partner 도착 시 미게시 cancel + phase2 both-context (phase1 게시분 보존)
+  │       양면 부족분은 솔로로 채워 N을 맞춤
   ├─ 낮 동안 밀린 REQUESTED 스레드플랜(실사람 글 반응 등)도 이 창에서 같이 소진
   └─ provider = 스냅샷 복원 (강제 OFF 금지 — 관리자가 CLAUDE로 둔 값 유지)
 
@@ -215,6 +217,21 @@ PairedPostScheduler cron (PAIRED_POST_CRON, 기본 2시간) — 당일 양면 �
 
 스크립트 로그: `env/logs/nightly-ai-user-batch.log`(자체 타임스탬프) /
 `env/logs/nightly-ai-user-batch.cron.log`(cron stdout/stderr).
+
+### 새벽 fill — claim 재시도 · LLM 상한 · 부족분 텔레그램
+
+권위 스크립트: `env/scripts/nightly-ai-user-batch.sh`. 새 env 변수 없음 — 알림은 기존 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`.
+
+| 규칙 | 내용 |
+|---|---|
+| empty claim | 그 슬롯만 skip하고 끝내지 **않음**. 다른 **페르소나 / 광장 / 소스(blind↔natepan)** 로 재claim. 선호 소스·광장을 먼저 쓰지만 필수는 아님. Blind empty여도 Natepan 재시도 허용 |
+| 같은 원본 | claim된 같은 example에 LLM/세이프가드 재시도 금지. release 후 **다른** 예시 |
+| 양면 부족 | paired가 목표에 못 미치면 나머지를 **솔로**로 채워 N 도달을 시도 |
+| LLM 상한 | claim 성공 후 생성이 들어간 호출만. 전체 새벽 fill(솔로+양면) **3 × target_posts**. empty claim은 카운트하지 않음. 수동 `generate-scheduled-posts`는 그 요청의 `count` 기준 3× |
+| 로그 | attempted vs saved. 슬롯별 실패 이유(source, plaza, persona id, claim empty vs LLM/safety/serialize/persist) |
+| Telegram | **saved < N일 때만**. N·saved·실패 원인 상세(메시지 길이 상한 ~3500자). 가득 채우면 보내지 않음 |
+
+광장 재시도 순서: 페르소나 최상위 interest → COUPLE/MARRIED/FRIEND/FAMILY/WORK. OTHER로 그라운딩하지 않는 편. claim empty여도 프리스타일 폴백은 없다.
 
 ### ActivityCurve — KST 시간대 활동 가중치
 
@@ -335,12 +352,13 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
 - `AI_LEARNING_CRAWL_ENABLED=true`인지 확인
 - 수동 실행이 아니라면 scheduler 로그에 등록 시각이 찍혔는지 확인
 
-### source claim / Blind 풀 고갈 (2026-08-05)
+### source claim / 풀 고갈 (2026-08-05, fill 재시도 2026-08-20)
 
 - 일일 crawl **budget은 그대로**(natepan 1500 · blind 500). claim API가 budget을 바꾸지 않는다.
-- Blind 슬롯에서 `claim-popular-source`가 empty면 **그 슬롯만 skip** — Natepan으로 대체하지 않는다.
+- **한 번의** `claim-popular-source`는 요청한 source만 본다. 새벽 배치는 empty면 **Blind↔Natepan·다른 광장·다른 페르소나**로 다시 claim한다. Blind empty를 Natepan으로 바꾸는 대체를 **금지하지 않는다**.
 - 원인 후보: 14→30일 창에 미사용 `popularity_pct` POST 부족 · 같은 `source_url`이
-  이미 posts/예약에 소진 · soft/COMMITTED 예약 과다.
+  이미 posts/예약에 소진 · soft/COMMITTED 예약 과다 · 광장 스코프가 좁은데 해당 plaza 코호트가 비어 있음.
+- saved < N이면 Telegram(기존 TELEGRAM_*). 로그의 attempted/saved·슬롯 이유를 본다.
 - 2026-08-10: claim/crawl은 **source_url 동시성 가드**를 쓴다. 과거 이중 INSERT된
   형제 row가 남아 있어도 claim 가족이 한 번만 잡힌다. 신규 이중 INSERT는
   `GET_LOCK(ai_learning_crawl_ingest:*)`로 막는다.

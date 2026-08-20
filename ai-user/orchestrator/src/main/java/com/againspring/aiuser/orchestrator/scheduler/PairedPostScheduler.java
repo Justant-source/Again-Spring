@@ -17,6 +17,9 @@ import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.CandidateScheduleSupport;
+import com.againspring.aiuser.orchestrator.service.threadplan.HoldResult;
+import com.againspring.aiuser.orchestrator.service.threadplan.LlmCallBudget;
+import com.againspring.aiuser.orchestrator.service.threadplan.NightlySlotFailure;
 import com.againspring.aiuser.orchestrator.service.threadplan.PairedHoldMeta;
 import com.againspring.aiuser.orchestrator.service.threadplan.PlanPersonaMapper;
 import com.againspring.aiuser.orchestrator.service.threadplan.QuietHours;
@@ -84,11 +87,19 @@ public class PairedPostScheduler {
     }
 
     public int triggerNow() {
-        return runPairedPosts(null);
+        return runPairedPosts(null, null, null, false).saved();
     }
 
     public int triggerNow(int maxPairs) {
-        return runPairedPosts(Math.max(0, maxPairs));
+        return runPairedPosts(Math.max(0, maxPairs), null, null, false).saved();
+    }
+
+    /**
+     * Nightly fill: try up to {@code maxPairs} holds, sharing {@code budget}. Does not shrink
+     * the request by the daytime remainingTarget (paired dry → caller fills solo remainder).
+     */
+    public PairHoldBatch tryHoldPairs(int maxPairs, LlmCallBudget budget, List<NightlySlotFailure> failures) {
+        return runPairedPosts(Math.max(0, maxPairs), budget, failures, true);
     }
 
     /**
@@ -96,21 +107,30 @@ public class PairedPostScheduler {
      * @return 이번 실행에서 홀딩에 성공한 pair 수
      */
     public int runPairedPosts(Integer maxPairsOverride) {
+        return runPairedPosts(maxPairsOverride, null, null, false).saved();
+    }
+
+    public record PairHoldBatch(int saved, int attempted, List<String> scheduledIds) {}
+
+    PairHoldBatch runPairedPosts(Integer maxPairsOverride, LlmCallBudget budget,
+                                 List<NightlySlotFailure> failures, boolean ignoreDailyTarget) {
         if (!props.isEnabled()) {
             log.debug("[PairedPost] AI_USER_ENABLED=false — skip");
-            return 0;
+            return new PairHoldBatch(0, 0, List.of());
         }
         OrchestratorProperties.PairedPost config = props.getPairedPost();
         if (config == null || !config.isEnabled()) {
             log.debug("[PairedPost] disabled — skip");
-            return 0;
+            return new PairHoldBatch(0, 0, List.of());
         }
         List<PersonaRelationship> all =
             relationshipRepo.findByRelationTypeInAndStatus(PAIR_TYPES, "ACTIVE");
         if (all.isEmpty()) {
             log.warn("[PairedPost] No COUPLE/MARRIAGE/FRIEND relationships found. " +
                      "Seed ai-user/docs/personas/profiles/relationships.yml first.");
-            return 0;
+            addFailure(failures, "paired", "-", "-", "-", HoldResult.Outcome.GENERATION_SKIPPED,
+                    "no COUPLE/MARRIAGE/FRIEND relationships");
+            return new PairHoldBatch(0, 0, List.of());
         }
 
         List<PersonaRelationship> shuffled = new ArrayList<>(all);
@@ -129,15 +149,20 @@ public class PairedPostScheduler {
         int runCap = maxPairsOverride != null
             ? Math.max(0, maxPairsOverride)
             : Math.max(0, config.getPairsPerRun());
-        int toRun = Math.min(Math.min(runCap, remainingTarget), shuffled.size());
-        if (quotaRemaining >= 0 && targetPosts > 0) {
-            toRun = Math.min(toRun, quotaRemaining);
+        int toRun;
+        if (ignoreDailyTarget) {
+            toRun = Math.min(runCap, shuffled.size());
+        } else {
+            toRun = Math.min(Math.min(runCap, remainingTarget), shuffled.size());
+            if (quotaRemaining >= 0 && targetPosts > 0) {
+                toRun = Math.min(toRun, quotaRemaining);
+            }
         }
 
         if (toRun <= 0) {
             log.debug("[PairedPost] target satisfied — totalToday={} pairedToday={} desiredToday={} runCap={} quotaRemaining={}",
                 totalSyntheticToday, pairedToday, desiredToday, runCap, quotaRemaining);
-            return 0;
+            return new PairHoldBatch(0, 0, List.of());
         }
 
         EnumMap<PairBucket, Integer> mixCounts = countPairedMixToday();
@@ -156,8 +181,17 @@ public class PairedPostScheduler {
             sourceMix.blind(),
             sourceMix.natepan());
 
+        int saved = 0;
         int attempted = 0;
+        List<String> scheduledIds = new ArrayList<>();
         for (int i = 0; i < toRun; i++) {
+            if (budget != null && !budget.hasRemaining()) {
+                log.info("[PairedPost] LLM budget exhausted used={}/{} — stop paired, leftover becomes solo",
+                        budget.used(), budget.max());
+                addFailure(failures, "paired", i < sources.size() ? sources.get(i) : "-", "-", "-",
+                        HoldResult.Outcome.GENERATION_SKIPPED, "LLM cap reached during paired fill");
+                break;
+            }
             String preferredSource = sources.get(i);
             PairBucket desiredBucket = chooseNextBucket(config, mixCounts);
             Optional<PersonaRelationship> relOpt = takeCandidateForSourceAndBucket(
@@ -168,34 +202,47 @@ public class PairedPostScheduler {
             if (relOpt.isEmpty()) {
                 log.warn("[PairedPost] No relationship author with voice_type for source={} — skip slot {}",
                         preferredSource, i);
+                addFailure(failures, "paired", preferredSource, "-", "-", HoldResult.Outcome.CLAIM_EMPTY,
+                        "no relationship author for source=" + preferredSource);
                 continue;
             }
 
             try {
                 PersonaRelationship rel = relOpt.get();
                 Instant slot = i < slots.size() ? slots.get(i) : QuietHours.enforceAuthorSlot(Instant.now().plus(Duration.ofHours(1)));
-                if (holdPair(rel, slot, preferredSource)) {
-                    attempted++;
+                HoldPairResult held = holdPair(rel, slot, preferredSource, budget);
+                attempted++;
+                if (held.saved()) {
+                    saved++;
+                    if (held.scheduledId() != null) scheduledIds.add(held.scheduledId());
                     mixCounts.merge(bucketForRelationType(rel.getRelationType()), 1, Integer::sum);
+                } else {
+                    addFailure(failures, "paired", preferredSource, categoryForRelationType(rel.getRelationType()),
+                            rel.getPersonaId(), held.outcome(), held.detail());
                 }
             } catch (Exception e) {
+                attempted++;
                 log.error("[PairedPost] Pair {} source={} failed: {}", i, preferredSource, e.getMessage(), e);
+                addFailure(failures, "paired", preferredSource, "-", "-", HoldResult.Outcome.LLM_OR_SAFETY,
+                        e.getMessage());
             }
         }
-        return attempted;
+        return new PairHoldBatch(saved, attempted, scheduledIds);
     }
 
     /**
      * Call1 ({@code PAIRED_PHASE1}) → hold in {@code ai_scheduled_posts}. No backend write until
      * {@code ScheduledPostPublisher} fires the non-quiet slot.
      */
-    private boolean holdPair(PersonaRelationship rel, Instant scheduledPublishAt, String preferredSource) {
+    private HoldPairResult holdPair(PersonaRelationship rel, Instant scheduledPublishAt, String preferredSource,
+                                    LlmCallBudget budget) {
         Optional<Persona> authorOpt = personaRepo.findById(rel.getPersonaId());
         Optional<Persona> partnerOpt = personaRepo.findById(rel.getOtherId());
         if (authorOpt.isEmpty() || partnerOpt.isEmpty()) {
             log.warn("[PairedPost] Persona not found — personaId={} otherId={}",
                 rel.getPersonaId(), rel.getOtherId());
-            return false;
+            return HoldPairResult.fail(HoldResult.Outcome.GENERATION_SKIPPED, false,
+                    "persona not found personaId=" + rel.getPersonaId());
         }
         Persona author = authorOpt.get();
         Persona partner = partnerOpt.get();
@@ -205,20 +252,27 @@ public class PairedPostScheduler {
         Instant slot = QuietHours.enforceAuthorSlot(scheduledPublishAt);
         if (QuietHours.isQuiet(slot)) {
             log.warn("[PairedPost] Author slot still quiet after enforce — skip corrId={}", corrId);
-            return false;
+            return HoldPairResult.fail(HoldResult.Outcome.GENERATION_SKIPPED, false, "author slot still quiet");
         }
 
-        Optional<Call1Hold> call1 = generateCall1(author, category, corrId, slot, preferredSource);
-        if (call1.isEmpty()) {
-            log.warn("[PairedPost] Call1 failed corrId={}", corrId);
-            return false;
+        Call1Attempt call1 = generateCall1(author, category, corrId, slot, preferredSource);
+        if (call1.llmInvoked() && budget != null) {
+            budget.consume();
         }
-        Call1Hold heldContent = call1.get();
+        if (call1.hold().isEmpty()) {
+            log.warn("[PairedPost] Call1 failed corrId={} reason={}", corrId, call1.detail());
+            return HoldPairResult.fail(
+                    call1.llmInvoked() ? HoldResult.Outcome.LLM_OR_SAFETY : HoldResult.Outcome.GENERATION_SKIPPED,
+                    call1.llmInvoked(),
+                    call1.detail());
+        }
+        Call1Hold heldContent = call1.hold().get();
         ContentSafetyGuard.GuardResult authorGuard =
                 safetyGuard.check(heldContent.body(), ContentSafetyGuard.ContentType.POST);
         if (!authorGuard.passed()) {
             log.warn("[PairedPost] Author body blocked: {}", authorGuard.reason());
-            return false;
+            return HoldPairResult.fail(HoldResult.Outcome.LLM_OR_SAFETY, true,
+                    "unsafe author body: " + authorGuard.reason());
         }
 
         String candidatesJson;
@@ -230,7 +284,7 @@ public class PairedPostScheduler {
             candidatesJson = objectMapper.writeValueAsString(payload);
         } catch (Exception e) {
             log.error("[PairedPost] Could not serialize Call1 hold corrId={}", corrId, e);
-            return false;
+            return HoldPairResult.fail(HoldResult.Outcome.SERIALIZE, true, e.getMessage());
         }
 
         AiScheduledPost held = AiScheduledPost.builder()
@@ -252,11 +306,11 @@ public class PairedPostScheduler {
                 author.getId().substring(0, Math.min(8, author.getId().length())),
                 partner.getId().substring(0, Math.min(8, partner.getId().length())),
                 category, slot, heldContent.itemCount());
-        return true;
+        return new HoldPairResult(true, held.getId(), HoldResult.Outcome.SAVED, "saved");
     }
 
-    private Optional<Call1Hold> generateCall1(Persona author, String category, String corrId, Instant slot,
-                                              String preferredSource) {
+    private Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,
+                                       String preferredSource) {
         AiUserGenerationConfig config = generationConfigRepository.findById(1).orElse(null);
         String provider = config == null ? props.getThreadPlan().getAiPostProvider()
                 : config.getProviderAiPostBundle();
@@ -265,7 +319,7 @@ public class PairedPostScheduler {
         }
         if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) {
             log.info("[PairedPost] Call1 skipped: provider OFF corrId={}", corrId);
-            return Optional.empty();
+            return Call1Attempt.skipped("provider OFF");
         }
         String model = props.getThreadPlan().getAiPostModel();
 
@@ -300,11 +354,11 @@ public class PairedPostScheduler {
         // LLM Generation Gate check: skip generation if held
         if (llmGenerationGateService.isHeld()) {
             log.info("[PairedPost] Call1 generation held (LLM gate) corrId={}", corrId);
-            return Optional.empty();
+            return Call1Attempt.skipped("LLM generation gate held");
         }
 
         Optional<Map<String, Object>> responseOpt = llmClient.generatePairedCall1(request);
-        if (responseOpt.isEmpty()) return Optional.empty();
+        if (responseOpt.isEmpty()) return Call1Attempt.llmFail("Call1 LLM empty response");
         Map<String, Object> response = new LinkedHashMap<>(responseOpt.get());
         if (!(response.get("items") instanceof List<?>) && response.get("comments") instanceof List<?> comments) {
             response.put("items", comments);
@@ -314,13 +368,13 @@ public class PairedPostScheduler {
         Object postRaw = response.get("post");
         if (!(postRaw instanceof Map<?, ?> post)) {
             log.warn("[PairedPost] Call1 missing post corrId={}", corrId);
-            return Optional.empty();
+            return Call1Attempt.llmFail("Call1 missing post");
         }
         String title = stringVal(post.get("title"));
         String body = stringVal(post.get("body"));
         if (title == null || title.isBlank() || body == null || body.isBlank()) {
             log.warn("[PairedPost] Call1 empty title/body corrId={}", corrId);
-            return Optional.empty();
+            return Call1Attempt.llmFail("Call1 empty title/body");
         }
         int items = response.get("items") instanceof List<?> list ? list.size() : 0;
         int stripped = StoryPersonaCommentFilter.stripFromResponse(response, Set.of(author.getId()));
@@ -328,7 +382,7 @@ public class PairedPostScheduler {
             log.info("[PairedPost] Call1 stripped {} author self-comment(s) corrId={}", stripped, corrId);
             items = response.get("items") instanceof List<?> list ? list.size() : 0;
         }
-        return Optional.of(new Call1Hold(title.strip(), body.strip(), response, provider, model, items));
+        return Call1Attempt.ok(new Call1Hold(title.strip(), body.strip(), response, provider, model, items));
     }
 
     private static String stringVal(Object v) {
@@ -339,6 +393,32 @@ public class PairedPostScheduler {
 
     private record Call1Hold(String title, String body, Map<String, Object> response,
                              String provider, String model, int itemCount) { }
+
+    private record Call1Attempt(Optional<Call1Hold> hold, boolean llmInvoked, String detail) {
+        static Call1Attempt ok(Call1Hold hold) {
+            return new Call1Attempt(Optional.of(hold), true, "ok");
+        }
+        static Call1Attempt llmFail(String detail) {
+            return new Call1Attempt(Optional.empty(), true, detail);
+        }
+        static Call1Attempt skipped(String detail) {
+            return new Call1Attempt(Optional.empty(), false, detail);
+        }
+    }
+
+    private record HoldPairResult(boolean saved, String scheduledId, HoldResult.Outcome outcome, String detail) {
+        static HoldPairResult fail(HoldResult.Outcome outcome, boolean ignoredLlm, String detail) {
+            return new HoldPairResult(false, null, outcome, detail);
+        }
+    }
+
+    private static void addFailure(List<NightlySlotFailure> failures, String kind, String source, String plaza,
+                                   String personaId, HoldResult.Outcome outcome, String detail) {
+        if (failures == null) return;
+        String reason = String.format("outcome=%s source=%s plaza=%s persona=%s exampleId=- %s",
+                outcome, source, plaza, personaId, detail == null ? "" : detail);
+        failures.add(new NightlySlotFailure(kind, source, plaza, personaId, outcome, reason));
+    }
 
     /**
      * Samples author publish slots via ActivityCurve, then hard-bans KST 02–06.

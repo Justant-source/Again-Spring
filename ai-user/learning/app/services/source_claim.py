@@ -391,6 +391,7 @@ def claim_popular_source(
     window_days: int = DEFAULT_WINDOW_DAYS,
     expand_days: int = DEFAULT_EXPAND_DAYS,
     category: Optional[str] = None,
+    exclude_ids: Optional[Sequence[int]] = None,
 ) -> Optional[dict[str, Any]]:
     """
     Transactionally pick top unused POST by popularity_pct and soft-reserve it.
@@ -419,7 +420,7 @@ def claim_popular_source(
     with get_db() as conn:
         with conn.cursor() as cur:
             for days in window_attempts(window_days, expand_days):
-                skipped: list[int] = []
+                skipped: list[int] = [int(i) for i in (exclude_ids or []) if i is not None]
                 for _ in range(_CLAIM_ATTEMPTS_PER_WINDOW):
                     row = _select_candidate(cur, src, days, skipped, bank_cats)
                     if not row:

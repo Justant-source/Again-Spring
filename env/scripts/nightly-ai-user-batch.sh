@@ -19,9 +19,9 @@
 # 절차:
 #   1) /admin/ai-user 의 provider_* 값을 스냅샷한 뒤, 배치에 필요한
 #      provider(ai_post_bundle/human_post_plan/human_interaction)만 잠깐 CLAUDE로 켠다.
-#   2) /admin/trigger/generate-scheduled-posts — N개 글을 "생성만" 함(발행 안 함).
-#      각 글의 발행 슬롯은 ActivityCurve로 오늘 남은 활동 시간대(기본 08~22시 KST)에
-#      가중 샘플링됨 — 20~40대 커뮤니티 체류 패턴 근사치(실측 데이터 아님, 하드코딩값).
+#   2) /admin/trigger/fill-nightly-scheduled-posts — DB target_posts(N)를 저장할 때까지
+#      양면 우선 + 솔로 잔여. 빈 claim은 광장/소스(blind↔natepan)/페르소나 재시도.
+#      LLM 캡 3N. 부족 시 Telegram. 슬롯은 ActivityCurve(기본 08~22시 KST).
 #   3) 낮 동안 실사람이 새로 올린 글에 대한 REQUESTED 스레드플랜 백로그도 이 새벽
 #      창에서 같이 소진한다(provider가 어차피 켜져 있으므로).
 #   4) provider를 **스냅샷 값으로 복원**한다(강제 OFF 금지). 관리자가 CLAUDE로
@@ -53,19 +53,6 @@ PAIRED_SHARE_FALLBACK=${NIGHTLY_BATCH_PAIRED_SHARE:-0.20}
 SLOT_FROM_HOUR_FALLBACK=${NIGHTLY_BATCH_SLOT_FROM_HOUR:-8}
 SLOT_TO_HOUR_FALLBACK=${NIGHTLY_BATCH_SLOT_TO_HOUR:-22}
 SLOT_MIN_SPACING_MINUTES_FALLBACK=${NIGHTLY_BATCH_SLOT_MIN_SPACING_MINUTES:-45}
-
-# ceil(N * share); N>=1이면 최소 1 (비율>0일 때)
-paired_count_for() {
-  local n=$1
-  local share=$2
-  if [ "$n" -le 0 ]; then echo 0; return; fi
-  # awk ceil
-  local p
-  p=$(awk -v n="$n" -v s="$share" 'BEGIN { x=n*s; if (x<=0) print 0; else print int(x)==x ? x : int(x)+1 }')
-  if [ "$p" -lt 1 ] && awk -v s="$share" 'BEGIN { exit !(s>0) }'; then p=1; fi
-  if [ "$p" -gt "$n" ]; then p=$n; fi
-  echo "$p"
-}
 
 log() { printf '[%s] %s\n' "$(date '+%F %T %Z')" "$*" | tee -a "$LOG_FILE"; }
 
@@ -158,27 +145,12 @@ if ! db "UPDATE ai_user_generation_config SET provider_ai_post_bundle='CLAUDE', 
 fi
 log "provider_ai_post_bundle/human_post_plan/human_interaction temporarily=CLAUDE (will restore snapshot on exit)"
 load_generation_config
-PAIRED_COUNT=$(paired_count_for "$SCHEDULED_POST_COUNT" "$PAIRED_SHARE")
-SOLO_COUNT=$(( SCHEDULED_POST_COUNT - PAIRED_COUNT ))
-log "nightly allocation: total=${SCHEDULED_POST_COUNT} solo=${SOLO_COUNT} paired=${PAIRED_COUNT} (share=${PAIRED_SHARE} slots=${SLOT_FROM_HOUR}-${SLOT_TO_HOUR} spacing=${SLOT_MIN_SPACING_MINUTES}m) [from ai_user_generation_config]"
+log "nightly fill: target=${SCHEDULED_POST_COUNT} paired_share=${PAIRED_SHARE} slots=${SLOT_FROM_HOUR}-${SLOT_TO_HOUR} spacing=${SLOT_MIN_SPACING_MINUTES}m [from ai_user_generation_config; orchestrator reads SSOT]"
 
-if [ "$SOLO_COUNT" -gt 0 ]; then
-  GEN_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- -T 1800 --post-data='' \
-    "http://localhost:8096/admin/trigger/generate-scheduled-posts?count=${SOLO_COUNT}&fromHour=${SLOT_FROM_HOUR}&toHour=${SLOT_TO_HOUR}&minSpacingMinutes=${SLOT_MIN_SPACING_MINUTES}" \
-    2>>"$LOG_FILE")
-  log "generate-scheduled-posts result: ${GEN_RESULT:-<empty>}"
-else
-  log "solo count=0 — skip generate-scheduled-posts"
-fi
-
-if [ "$PAIRED_COUNT" -gt 0 ]; then
-  PAIRED_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- -T 1800 --post-data='' \
-    "http://localhost:8096/admin/trigger/paired-posts?count=${PAIRED_COUNT}" \
-    2>>"$LOG_FILE")
-  log "paired-posts result: ${PAIRED_RESULT:-<empty>}"
-else
-  log "paired count=0 — skip paired-posts"
-fi
+FILL_RESULT=$(docker exec "$ORCH_CONTAINER" wget -qO- -T 3600 --post-data='' \
+  "http://localhost:8096/admin/trigger/fill-nightly-scheduled-posts?fromHour=${SLOT_FROM_HOUR}&toHour=${SLOT_TO_HOUR}&minSpacingMinutes=${SLOT_MIN_SPACING_MINUTES}" \
+  2>>"$LOG_FILE")
+log "fill-nightly-scheduled-posts result: ${FILL_RESULT:-<empty>}"
 
 # 낮 동안 밀린 REQUESTED 스레드플랜(실사람 글에 대한 AI 반응 등)도 이 창에서 소진한다.
 START_TS=$(date +%s)

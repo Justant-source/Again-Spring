@@ -1,7 +1,6 @@
 package com.againspring.aiuser.orchestrator.admin;
 
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
-import com.againspring.aiuser.orchestrator.domain.AiScheduledPost;
 import com.againspring.aiuser.orchestrator.domain.LlmGenerationGate;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.engine.PlannedAction;
@@ -18,9 +17,9 @@ import com.againspring.aiuser.orchestrator.service.persona.PersonaAutoProvisionS
 import com.againspring.aiuser.orchestrator.domain.StoryProfile;
 import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
-import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.againspring.aiuser.orchestrator.service.threadplan.HumanReplyTtlCleanupService;
-import com.againspring.aiuser.orchestrator.service.threadplan.SourceMixPlanner;
+import com.againspring.aiuser.orchestrator.service.threadplan.LlmCallBudget;
+import com.againspring.aiuser.orchestrator.service.threadplan.NightlyScheduledFillService;
 import com.againspring.aiuser.orchestrator.service.threadplan.ThreadPlanGenerationService;
 import com.againspring.aiuser.orchestrator.task.ActionExecutor;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +41,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -62,7 +60,7 @@ public class AdminTriggerController {
     private final ActionExecutor actionExecutor;
     private final JdbcTemplate jdbcTemplate;
     private final OrchestratorProperties properties;
-    private final AiPostBundleService aiPostBundleService;
+    private final NightlyScheduledFillService nightlyScheduledFillService;
     private final AiScheduledPostRepository scheduledPostRepository;
     private final PlanEngagementDispatcher engagementDispatcher;
     private final ViewDispatcher viewDispatcher;
@@ -101,9 +99,8 @@ public class AdminTriggerController {
     }
 
     /**
-     * 새벽 배치 전용: N개 글을 "생성만" 하고 발행하지 않는다(ai_scheduled_posts에 저장,
-     * 실제 게시는 ScheduledPostPublisher가 슬롯 도래 시 담당). LLM+세이프가드 통과분만 저장됨.
-     * 슬롯은 오늘 하루(fromHour~toHour, KST) 안에서 활동 곡선 가중 샘플링한다.
+     * Manual/nightly solo fill: retry until {@code count} rows are saved or LLM cap {@code 3*count}.
+     * Empty claims retry other plaza/source/persona and do not count against the cap.
      */
     @PostMapping("/generate-scheduled-posts")
     public ResponseEntity<Map<String, Object>> generateScheduledPosts(
@@ -112,59 +109,50 @@ public class AdminTriggerController {
             @RequestParam(defaultValue = "22") int toHour,
             @RequestParam(defaultValue = "45") long minSpacingMinutes) {
         int n = Math.max(1, Math.min(count, 100));
-        var active = new ArrayList<>(personaRepo.findByActiveTrue());
-        if (active.isEmpty()) return ResponseEntity.ok(Map.of("attempted", 0, "message", "활성 페르소나 없음"));
-
-        Random rng = new Random();
-        // Source first (Blind 70% / Natepan 30%), then author by matching voice_type.
-        List<String> sources = SourceMixPlanner.planSources(n, rng);
-        SourceMixPlanner.MixCounts mix = SourceMixPlanner.planCounts(n);
-
-        ZoneId kst = ActivityCurve.KST;
-        LocalDate today = LocalDate.now(kst);
-        Instant from = Instant.now().isAfter(today.atStartOfDay(kst).plusHours(fromHour).toInstant())
-                ? Instant.now() : today.atStartOfDay(kst).plusHours(fromHour).toInstant();
-        Instant to = today.atStartOfDay(kst).plusHours(toHour).toInstant();
-        List<Instant> slots;
-        try {
-            slots = ActivityCurve.sampleFutureInstants(from, to, n,
-                    properties.getThreadPlan().getKstHourlyHumanWeights(),
-                    Duration.ofMinutes(minSpacingMinutes), rng);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "슬롯 샘플링 실패: " + e.getMessage()));
+        NightlyScheduledFillService.FillResult result = nightlyScheduledFillService.fillSolo(
+                n, fromHour, toHour, minSpacingMinutes, LlmCallBudget.ofMultiplier(n, NightlyScheduledFillService.LLM_CAP_MULTIPLIER));
+        if (result.error() != null && result.error().startsWith("슬롯 샘플링 실패")) {
+            return ResponseEntity.badRequest().body(Map.of("error", result.error()));
         }
+        log.info("[generate-scheduled-posts] saved={}/{} attempted={} llm={}/{} failures={}",
+                result.saved(), n, result.attempted(), result.llmUsed(), result.llmMax(), result.failures().size());
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("attempted", result.attempted());
+        body.put("saved", result.saved());
+        body.put("scheduledIds", result.scheduledIds());
+        body.put("llmUsed", result.llmUsed());
+        body.put("llmMax", result.llmMax());
+        body.put("failures", result.failureReasons());
+        body.put("message", result.saved() + "개 예약글 저장(목표 " + n + ", LLM " + result.llmUsed() + "/" + result.llmMax() + ").");
+        return ResponseEntity.ok(body);
+    }
 
-        List<Persona> pool = new ArrayList<>(active);
-        int attempted = 0;
-        int skippedNoPersona = 0;
-        List<String> scheduledIds = new ArrayList<>();
-        for (int i = 0; i < n; i++) {
-            String preferredSource = sources.get(i);
-            Optional<Persona> personaOpt = SourceMixPlanner.pickAuthor(pool, preferredSource, rng);
-            if (personaOpt.isEmpty()) {
-                skippedNoPersona++;
-                log.warn("[generate-scheduled-posts] No active persona with voice_type for source={} — skip slot {}",
-                        preferredSource, i);
-                continue;
-            }
-            Persona persona = personaOpt.get();
-            String corrId = "nightly-hold-" + persona.getId() + "-" + i;
-            try {
-                Optional<AiScheduledPost> held = aiPostBundleService.generateAndHold(
-                        persona, topCategory(persona), null, corrId, slots.get(i), preferredSource);
-                held.ifPresent(row -> scheduledIds.add(row.getId()));
-                attempted++;
-            } catch (Exception e) {
-                log.warn("[generate-scheduled-posts] persona={} source={} error={}",
-                        persona.getId(), preferredSource, e.getMessage());
-            }
+    /**
+     * Combined nightly fill: paired first, leftover as solo, LLM cap {@code 3*target_posts}.
+     * Telegram only when saved &lt; N.
+     */
+    @PostMapping("/fill-nightly-scheduled-posts")
+    public ResponseEntity<Map<String, Object>> fillNightlyScheduledPosts(
+            @RequestParam(defaultValue = "8") int fromHour,
+            @RequestParam(defaultValue = "22") int toHour,
+            @RequestParam(defaultValue = "45") long minSpacingMinutes) {
+        NightlyScheduledFillService.FillResult result = nightlyScheduledFillService.fillNightly(
+                fromHour, toHour, minSpacingMinutes, true);
+        if (result.error() != null && result.error().startsWith("슬롯 샘플링 실패")) {
+            return ResponseEntity.badRequest().body(Map.of("error", result.error()));
         }
-        log.info("[generate-scheduled-posts] {} post(s) attempted (count={}, mix blind={}/natepan={}, skippedNoPersona={})",
-                attempted, n, mix.blind(), mix.natepan(), skippedNoPersona);
-        return ResponseEntity.ok(Map.of("attempted", attempted, "scheduledIds", scheduledIds,
-                "blindSlots", mix.blind(), "natepanSlots", mix.natepan(),
-                "skippedNoPersona", skippedNoPersona,
-                "message", attempted + "개 예약글 생성 시도 완료(LLM+세이프가드 통과분만 저장됨, 미발행)."));
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("target", result.target());
+        body.put("saved", result.saved());
+        body.put("attempted", result.attempted());
+        body.put("pairedSaved", result.pairedSaved());
+        body.put("soloSaved", result.soloSaved());
+        body.put("scheduledIds", result.scheduledIds());
+        body.put("llmUsed", result.llmUsed());
+        body.put("llmMax", result.llmMax());
+        body.put("failures", result.failureReasons());
+        body.put("message", "nightly fill saved " + result.saved() + "/" + result.target());
+        return ResponseEntity.ok(body);
     }
 
     /** PairedPostScheduler 즉시 실행 — 양면 사연(작성자+상대방) 생성. count>0이면 최대 N쌍. */
@@ -624,15 +612,5 @@ public class AdminTriggerController {
         body.put("reason", gate.getReason());
         body.put("updatedAt", gate.getUpdatedAt());
         return ResponseEntity.ok(body);
-    }
-
-    /** ActionExecutor.topCategory()와 동일한 로직 — category NOT NULL이라 반드시 채워야 한다. */
-    private static String topCategory(Persona persona) {
-        Map<String, Double> interests = persona.getInterests();
-        if (interests == null || interests.isEmpty()) return "OTHER";
-        return interests.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse("OTHER");
     }
 }

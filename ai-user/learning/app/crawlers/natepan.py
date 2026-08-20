@@ -4,7 +4,7 @@
   1. 정적 랭킹 9섹션 listing → 동시 fetch
   2. post detail → 8병렬 fetch
   3. ID 범위 크롤 → 배치(32개)씩 8병렬
-  4. 테마 채널 크롤 → 채널별 plaza 분류 (분류기 precision gate)
+  4. 테마 채널 크롤 → 채널 plaza는 분류기 hint (veto 아님)
 확인된 셀렉터: 작성자=a.writer, 본문=div.talk-content div.text 또는 div#contentArea
 """
 import asyncio
@@ -47,6 +47,7 @@ CHANNELS = [
     {"id": "20023", "name": "남편 VS 아내", "plaza": "MARRIED"},
     {"id": "20025", "name": "결혼/시집/친정", "plaza": "MARRIED"},
     {"id": "20026", "name": "맞벌이 부부 이야기", "plaza": "MARRIED"},
+    {"id": "20027", "name": "임신/출산/육아", "plaza": "MARRIED"},
     {"id": "20006", "name": "사랑과 이별", "plaza": "COUPLE"},
     {"id": "20009", "name": "지금은 연애중", "plaza": "COUPLE"},
     {"id": "20011", "name": "헤어진 다음날", "plaza": "COUPLE"},
@@ -374,6 +375,22 @@ def _is_valid(title: str, content: str) -> bool:
     return True
 
 
+def _resolve_category(
+    content: str,
+    title: str = "",
+    *,
+    channel_plaza: Optional[str] = None,
+    section_name: Optional[str] = None,
+) -> str:
+    """Always classify title+content. Channel/section is a small hint, never a veto."""
+    hint = None
+    if channel_plaza:
+        hint = channel_plaza
+    elif section_name and "연애" in section_name:
+        hint = "COUPLE"
+    return classify_plaza(content, title or "", channel_hint=hint)
+
+
 def _parse_post_soup(soup, url: str, author_listing: Optional[str] = None,
                      section_name: Optional[str] = None,
                      channel_plaza: Optional[str] = None) -> Optional[Dict]:
@@ -390,17 +407,12 @@ def _parse_post_soup(soup, url: str, author_listing: Optional[str] = None,
 
     author = _extract_author_from_detail(soup) or author_listing
 
-    # category 결정 로직
-    # 1. channel_plaza 지정 → 분류기로 검증 (precision gate)
-    # 2. section_name 지정 → 섹션 기반 (정적 섹션용)
-    # 3. 기본값 → OTHER
-    if channel_plaza:
-        classified = classify_plaza(content, title or "")
-        category = channel_plaza if classified == channel_plaza else "OTHER"
-    elif section_name and "연애" in section_name:
-        category = "COUPLE"
-    else:
-        category = "OTHER"
+    category = _resolve_category(
+        content,
+        title or "",
+        channel_plaza=channel_plaza,
+        section_name=section_name,
+    )
 
     return {
         "content": content,
@@ -594,7 +606,7 @@ async def _fetch_channels(sem: asyncio.Semaphore,
                           limit: int,
                           comment_budget: List[int]) -> List[Dict]:
     """
-    테마 채널 크롤 — 채널별 plaza 분류 + 페이지네이션 (분류기 precision gate).
+    테마 채널 크롤 — 채널 plaza를 분류기 hint로 쓰고 페이지네이션.
 
     페이지네이션 규칙:
     - WORK 채널 (plaza="WORK"): 페이지 1~MAX_PAGES_WORK
@@ -604,7 +616,7 @@ async def _fetch_channels(sem: asyncio.Semaphore,
     Step 1: 각 채널의 listing 페이지 fetch (페이지 1..MAX_PAGES)
     Step 2: 고유한 post URL 추출 (dedup via seen_ids)
     Step 3: 채널 target 도달 또는 페이지 소진 시 post detail 병렬 fetch
-    Step 4: 분류기로 검증 후 channel_plaza와 일치할 때만 결과 포함 (+ COMMENT)
+    Step 4: 분류기 결과 저장 (hint일 뿐, 채널과 달라도 OTHER로 버리지 않음) (+ COMMENT)
     """
     if not CHANNELS or limit <= 0:
         return []
@@ -692,7 +704,7 @@ async def _fetch_channels(sem: asyncio.Semaphore,
             _fetch(sem, item["url"]) for item in post_items
         ])
 
-        # Step 4: 분류기 검증 후 저장 (+ COMMENT)
+        # Step 4: 분류기 결과 저장 (+ COMMENT)
         channel_found = 0
         for item, detail_html in zip(post_items, detail_results):
             if post_found >= limit:
@@ -715,7 +727,7 @@ async def _fetch_channels(sem: asyncio.Semaphore,
             comment_budget[0] -= n_comments
             channel_found += n_posts
 
-        logger.info(f"Channel '{ch_name}': {channel_found}/{len(post_items)} 분류기 통과 (plaza={ch_plaza})")
+        logger.info(f"Channel '{ch_name}': {channel_found}/{len(post_items)} 저장 (hint={ch_plaza})")
 
     logger.info(f"채널 크롤 완료: posts={post_found}, total_rows={len(results)}")
     return results
@@ -724,7 +736,7 @@ async def _fetch_channels(sem: asyncio.Semaphore,
 async def crawl(daily_limit: int = 1500) -> List[Dict]:
     """
     네이트판 공격 크롤 v5+ — 완전 병렬 with 테마 채널 + COMMENT.
-    정적 섹션(9개 동시) + 테마 채널(9개 channels × classifier) + ID 범위(8병렬 배치)
+    정적 섹션(9개 동시) + 테마 채널(channel hint × classifier) + ID 범위(8병렬 배치)
     = 순차 대비 5~8× 속도.
 
     예산 배분:
@@ -743,7 +755,7 @@ async def crawl(daily_limit: int = 1500) -> List[Dict]:
         sem, seen_ids, static_limit, comment_budget)
     static_count = len([r for r in static_results if r["content_type"] == "POST"])
 
-    # Step 2: 테마 채널 (분류기 precision gate)
+    # Step 2: 테마 채널 (분류기 + channel hint)
     channel_limit = 250
     channel_results = await _fetch_channels(
         sem, seen_ids, channel_limit, comment_budget)

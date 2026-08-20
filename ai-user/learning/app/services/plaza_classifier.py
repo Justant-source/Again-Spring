@@ -5,26 +5,30 @@ Classifies Korean community posts into the 6 plazas:
   COUPLE  - 연인·연애 갈등
   MARRIED - 부부·기혼 갈등
   FRIEND  - 친구·지인 갈등
-  FAMILY  - 가족·부모 갈등
+  FAMILY  - 본가(natal family) 갈등 — 부모·형제·조부모
   WORK    - 직장·직업 갈등
   OTHER   - 기타 갈등 (default fallback)
 
-Keyword mapping extends Phase 2 SQL CASE/REGEXP from v2.1-plaza-inventory.md,
-with enriched WORK and FRIEND sets to boost thin plazas.
-
-Scoring: count keyword hits per plaza (title weighted 2x), return argmax.
-Precedence rules handle overlaps (e.g., 남편+시댁 → MARRIED beats FAMILY).
+Scoring (do not flatten primary+supporting):
+  title keyword hits * 3
+  primary keyword hits in body * 2
+  supporting keyword hits in body * 1
+Optional channel_hint adds a small bonus to that plaza only (never a veto).
 
 Pure Python, no external deps (stdlib re only).
-Side-effect free, importable, testable.
 """
 
 import re
-from typing import Optional, Dict
+from typing import Dict, Optional, Tuple
 
-# ============================================================================
-# Keyword Sets per Plaza (authoritative from Phase 2 + enriched)
-# ============================================================================
+PLAZAS = ("COUPLE", "MARRIED", "FRIEND", "FAMILY", "WORK")
+CHANNEL_HINT_BONUS = 2
+
+# Disambiguate MARRIED vs FAMILY. Scored with the same title/body weights as a bonus
+# (not flattened). Concat must parenthesize content/title — `content or "" + title` drops title.
+SPOUSE_KEYWORDS = [
+    "남편", "아내", "와이프", "신랑", "시어머니", "시어머", "시아버", "시댁",
+]
 
 PLAZA_KEYWORDS: Dict[str, Dict[str, list]] = {
     "COUPLE": {
@@ -60,39 +64,38 @@ PLAZA_KEYWORDS: Dict[str, Dict[str, list]] = {
             "친구", "절친", "베프", "동창", "동기", "지인", "무리", "절교",
             "손절", "친구사이", "친구와", "친구가", "친구때문에",
             "학교", "반", "같은반", "같은학교", "동창회", "후배",
-            "선배", "단짝", "같이", "우리반", "우리학교",
+            "선배", "단짝", "우리반", "우리학교",
         ],
         "supporting": [
             "빌려준돈", "돈빌려", "돈빌", "빌렸", "갚아", "이자", "빌려줬",
-            "약속", "약속어김", "약속지킴", "거짓", "거짓말", "배신",
-            "무시", "무시하", "따돌", "따돌림", "괴롭", "괴롭힘",
-            "싸움", "싸워", "싸운", "싸운후", "싸운이후", "화났", "화나",
+            "약속어김", "약속지킴",
+            "따돌", "따돌림", "괴롭", "괴롭힘",
+            "싸운후", "싸운이후",
             "관계단절", "절교선포", "끝장", "끝낸", "이별선포",
         ],
     },
     "FAMILY": {
         "primary": [
             "엄마", "아빠", "어머니", "아버지", "부모", "부모님", "아부지",
-            "어무니", "어머님", "아버님", "엄친아", "아빠", "부친",
+            "어무니", "어머님", "아버님", "엄친아", "부친",
             "모친", "동생", "형", "누나", "언니", "오빠", "형님",
-            "누님", "우니", "언니", "형아", "오빠야", "누나야",
+            "누님", "우니", "형아", "오빠야", "누나야",
             "조부모", "할머니", "할아버지", "할머님", "할아버님",
-            "외할머니", "외할아버지", "할아버지", "증조", "이모",
+            "외할머니", "외할아버지", "증조", "이모",
             "삼촌", "고모", "숙모", "서방", "조카", "조카딸",
-            "조카아들", "갓난", "신생", "유아", "영유아",
+            "조카아들",
+            "본가", "원가족", "친오빠", "친동생",
             "혼나고", "혼나", "혼내", "폐를", "폐가",
         ],
         "supporting": [
-            "집", "집에서", "집안", "집안일", "가정", "가정불화",
+            "가정", "가정불화",
             "가족", "가족관계", "가족싸움", "가족문제", "가족갈등",
-            "친정", "친정엄마", "친정아빠", "친정가", "친정식구",
-            "시댁", "시집", "시댁식구", "시어머니", "시아버지",
-            "상속", "유산", "재산", "돈", "보험", "저축",
+            "상속", "유산", "재산", "보험", "저축",
             "용돈", "생활비", "학비", "교육비", "결혼자금",
             "대출", "빚", "빚때문에", "빚독촉", "깡패", "사채",
-            "폭력", "폭행", "학대", "학대받", "맞았", "맞는다",
-            "심한말", "욕설", "욕", "모욕", "모욕감",
-            "독립", "독립하", "나가", "나가고싶", "집나가",
+            "폭행", "학대", "학대받", "맞았", "맞는다",
+            "심한말", "욕설", "모욕", "모욕감",
+            "독립", "독립하", "나가", "나가고싶",
             "손절", "연락끊", "왕래끊", "관계끊", "게을러", "게으름",
         ],
     },
@@ -127,17 +130,12 @@ PLAZA_KEYWORDS: Dict[str, Dict[str, list]] = {
     },
 }
 
-# ============================================================================
-# Scoring & Classification Logic
-# ============================================================================
 
 def _normalize_text(text: str) -> str:
     """Normalize Korean text for keyword matching."""
     if not text:
         return ""
-    # Remove extra whitespace, convert to lowercase (for English keywords)
     text = re.sub(r"\s+", " ", text.strip())
-    # Preserve Korean text as-is for keyword matching
     return text.lower()
 
 
@@ -148,122 +146,66 @@ def _count_keywords_in_text(text: str, keywords: list) -> int:
     text_lower = text.lower()
     count = 0
     for kw in keywords:
-        # Simple substring match to avoid regex complexity
-        # Each keyword only counts once per text
         if kw.lower() in text_lower:
             count += 1
     return count
 
 
 def _score_plaza(content: str, title: str, plaza_name: str) -> int:
-    """
-    Calculate score for a single plaza.
-
-    Args:
-        content: Post body text
-        title: Post title (weighted 2x higher)
-        plaza_name: One of "COUPLE", "MARRIED", "FRIEND", "FAMILY", "WORK"
-
-    Returns:
-        Integer score (sum of keyword hits, with bonus for explicit spouse keywords)
-    """
+    """Score one plaza: title hits * 3, body primary * 2, body supporting * 1."""
     if plaza_name not in PLAZA_KEYWORDS:
         return 0
 
     keywords_dict = PLAZA_KEYWORDS[plaza_name]
-    all_keywords = []
+    primary = keywords_dict.get("primary") or []
+    supporting = keywords_dict.get("supporting") or []
 
-    for keyword_list in keywords_dict.values():
-        all_keywords.extend(keyword_list)
+    title_hits = (
+        _count_keywords_in_text(title or "", primary)
+        + _count_keywords_in_text(title or "", supporting)
+    )
+    primary_body = _count_keywords_in_text(content or "", primary)
+    supporting_body = _count_keywords_in_text(content or "", supporting)
+    score = title_hits * 3 + primary_body * 2 + supporting_body * 1
 
-    # Title counts 2x (higher weight for plaza determination)
-    title_hits = _count_keywords_in_text(title or "", all_keywords) * 2
-    content_hits = _count_keywords_in_text(content or "", all_keywords)
-
-    score = title_hits + content_hits
-
-    # Bonus: explicit spouse keywords boost MARRIED (남편, 아내, 시어머니, 시댁)
-    # to disambiguate from FAMILY (엄마, 아빠, 동생)
     if plaza_name == "MARRIED":
-        spouse_keywords = ["남편", "아내", "와이프", "신랑", "시어머니", "시어머", "시아버", "시댁"]
-        spouse_hits = _count_keywords_in_text(content or "" + " " + title or "", spouse_keywords)
-        score += spouse_hits * 2  # Double the impact of spouse keywords
+        # Bonus uses the same weights; title must be included (parens, not `or`+concat).
+        score += (
+            _count_keywords_in_text(title or "", SPOUSE_KEYWORDS) * 3
+            + _count_keywords_in_text(content or "", SPOUSE_KEYWORDS) * 2
+        )
 
     return score
 
 
-def classify_plaza(content: str, title: str = "") -> str:
-    """
-    Classify a Korean community post into one of 6 plazas.
-
-    Algorithm:
-    1. Score each plaza by counting keyword hits (title weighted 2x)
-    2. Return plaza with highest score
-    3. If no hits or tie at score 0, return "OTHER"
-    4. Tie-breaking: COUPLE < FRIEND < WORK < MARRIED < FAMILY
-       (empirical precedence for ambiguous overlaps)
-
-    Args:
-        content: Post body text (required, can be empty but not None)
-        title: Post title (optional, defaults to "")
-
-    Returns:
-        One of: "COUPLE", "MARRIED", "FRIEND", "FAMILY", "WORK", "OTHER"
-
-    Examples:
-        >>> classify_plaza("남자친구가 전여친 얘기를 자꾸 해", "연애 고민")
-        'COUPLE'
-
-        >>> classify_plaza("시어머니가 자꾸 참견해", "결혼생활")
-        'MARRIED'
-
-        >>> classify_plaza("친구가 돈을 안 갚아", "절친 배신")
-        'FRIEND'
-
-        >>> classify_plaza("아빠가 자꾸 술을 마셔", "부모님 걱정")
-        'FAMILY'
-
-        >>> classify_plaza("상사가 야근을 강요해", "직장 갑질")
-        'WORK'
-
-        >>> classify_plaza("날씨가 좋네요", "일상 잡담")
-        'OTHER'
-    """
-    # Normalize inputs
+def score_all_plazas(
+    content: str,
+    title: str = "",
+    channel_hint: Optional[str] = None,
+) -> Dict[str, int]:
+    """Return scores for the five real plazas. channel_hint adds CHANNEL_HINT_BONUS only."""
     content_norm = _normalize_text(content or "")
     title_norm = _normalize_text(title or "")
+    scores = {
+        plaza: _score_plaza(content_norm, title_norm, plaza) for plaza in PLAZAS
+    }
+    if channel_hint in scores:
+        scores[channel_hint] += CHANNEL_HINT_BONUS
+    return scores
 
-    if not content_norm and not title_norm:
-        return "OTHER"
 
-    # Score all plazas except fallback "OTHER"
-    plazas_to_score = ["COUPLE", "MARRIED", "FRIEND", "FAMILY", "WORK"]
-    scores = {}
-
-    for plaza in plazas_to_score:
-        scores[plaza] = _score_plaza(content_norm, title_norm, plaza)
-
-    # Find max score
+def _pick_winner(scores: Dict[str, int], content_norm: str, title_norm: str) -> str:
     max_score = max(scores.values()) if scores else 0
-
-    # If no keywords matched, return OTHER
     if max_score == 0:
         return "OTHER"
 
-    # Find all plazas with max score (tie-breaking)
-    tied_plazas = [p for p in plazas_to_score if scores[p] == max_score]
-
+    tied_plazas = [p for p in PLAZAS if scores[p] == max_score]
     if len(tied_plazas) == 1:
         return tied_plazas[0]
 
-    # Tie-breaking precedence (empirical from overlaps)
-    # MARRIED > FAMILY (남편+시댁 or 남편+엄마 → MARRIED, not parent)
-    # COUPLE > FRIEND (남친 → COUPLE, not friend)
-    # FAMILY > WORK (부모 > 상사)
-    # WORK > FRIEND (workplace > peers)
-    # Also boost MARRIED if explicit spouse keywords present
+    combined = (content_norm or "") + " " + (title_norm or "")
     married_keywords = ["남편", "아내", "와이프", "신랑", "부부", "시어머니", "시댁"]
-    if any(kw in (content_norm + " " + title_norm) for kw in married_keywords):
+    if any(kw in combined for kw in married_keywords):
         if "MARRIED" in tied_plazas:
             return "MARRIED"
 
@@ -271,18 +213,69 @@ def classify_plaza(content: str, title: str = "") -> str:
     for plaza in precedence_order:
         if plaza in tied_plazas:
             return plaza
-
-    # Fallback (shouldn't reach here)
     return "COUPLE"
 
 
-# ============================================================================
-# Self-Test (Dry Run)
-# ============================================================================
+def classify_plaza(
+    content: str,
+    title: str = "",
+    channel_hint: Optional[str] = None,
+) -> str:
+    """
+    Classify a Korean community post into one of 6 plazas.
+
+    channel_hint (COUPLE/MARRIED/FRIEND/FAMILY/WORK) is a small score bonus only.
+    It never forces the plaza and never dumps a mismatch to OTHER.
+    """
+    content_norm = _normalize_text(content or "")
+    title_norm = _normalize_text(title or "")
+
+    if not content_norm and not title_norm:
+        return "OTHER"
+
+    scores = score_all_plazas(content, title, channel_hint=channel_hint)
+    return _pick_winner(scores, content_norm, title_norm)
+
+
+def confident_plaza(
+    content: str,
+    title: str = "",
+    channel_hint: Optional[str] = None,
+) -> Optional[Tuple[str, dict]]:
+    """
+    Predicted plaza only if the winner is confident.
+
+    Confident when winner score >= 6 and either:
+      - only one plaza scored > 0, or
+      - winner >= 2 * runner-up
+    Otherwise None (keep OTHER / uncertain).
+    """
+    content_norm = _normalize_text(content or "")
+    title_norm = _normalize_text(title or "")
+    if not content_norm and not title_norm:
+        return None
+
+    scores = score_all_plazas(content, title, channel_hint=channel_hint)
+    winner = _pick_winner(scores, content_norm, title_norm)
+    if winner == "OTHER":
+        return None
+
+    winner_score = scores[winner]
+    if winner_score < 6:
+        return None
+
+    positive = [p for p in PLAZAS if scores[p] > 0]
+    if len(positive) == 1:
+        return (winner, scores)
+
+    runner_up = max(scores[p] for p in PLAZAS if p != winner)
+    if winner_score >= 2 * runner_up:
+        return (winner, scores)
+    return None
+
 
 if __name__ == "__main__":
     test_cases = [
-        # COUPLE (2 examples)
         (
             "남자친구가 전여친 얘기를 자꾸 꺼냐. 처음엔 괜찮았는데 이제 진짜 답답함.",
             "연인·연애 갈등",
@@ -293,7 +286,6 @@ if __name__ == "__main__":
             "헤어짐 위기",
             "COUPLE",
         ),
-        # MARRIED (2 examples)
         (
             "남편이 시어머니 말만 듣고 나한테 잔소리해. 시댁에서 자꾸 간섭해.",
             "부부·기혼 갈등",
@@ -304,7 +296,16 @@ if __name__ == "__main__":
             "결혼생활",
             "MARRIED",
         ),
-        # FRIEND (2 examples)
+        (
+            "시어머니가 자꾸 참견해",
+            "",
+            "MARRIED",
+        ),
+        (
+            "육아 너무 힘든데 남편이 전혀 안 도와줘.",
+            "육아 스트레스",
+            "MARRIED",
+        ),
         (
             "절친이 돈을 빌려갔는데 1년이 넘게 안 갚아. 너무 화난다.",
             "친구 배신",
@@ -315,7 +316,6 @@ if __name__ == "__main__":
             "친구 관계",
             "FRIEND",
         ),
-        # FAMILY (2 examples)
         (
             "엄마가 자꾸 나한테 심한 말을 해. 아빠는 뭘 해? 싸움만 해.",
             "가족·부모 갈등",
@@ -326,7 +326,11 @@ if __name__ == "__main__":
             "형제자매",
             "FAMILY",
         ),
-        # WORK (2 examples)
+        (
+            "아빠가 자꾸 술을 마셔",
+            "부모님 걱정",
+            "FAMILY",
+        ),
         (
             "상사가 회식 때 자꾸 술을 강요해. 야근도 많고 연봉도 낮아.",
             "직장·직업 갈등",
@@ -337,7 +341,6 @@ if __name__ == "__main__":
             "직장 갑질",
             "WORK",
         ),
-        # OTHER (2 examples)
         (
             "날씨가 요즘 정말 좋네. 산책도 많이 가고.",
             "일상 잡담",
@@ -375,13 +378,3 @@ if __name__ == "__main__":
     print("=" * 80)
     print(f"Results: {passed}/{len(test_cases)} PASSED, {failed}/{len(test_cases)} FAILED")
     print("=" * 80)
-
-    # Print keyword counts per plaza
-    print()
-    print("Keyword Counts per Plaza:")
-    print("-" * 80)
-    for plaza in ["COUPLE", "MARRIED", "FRIEND", "FAMILY", "WORK"]:
-        keywords_dict = PLAZA_KEYWORDS[plaza]
-        total = sum(len(kw_list) for kw_list in keywords_dict.values())
-        print(f"  {plaza:10} : {total:3} keywords")
-    print()

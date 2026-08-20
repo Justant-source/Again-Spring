@@ -14,6 +14,8 @@ from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 
+from app.services.plaza_classifier import classify_plaza
+
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://www.teamblind.com"
@@ -27,6 +29,20 @@ CHANNELS = [
     ("썸·연애",  "romance",   quote("썸·연애")),
     ("회사생활", "workplace", quote("회사생활")),
 ]
+
+# Board slug → plaza hint only. Stored category is the classifier plaza enum
+# (FAMILY/FRIEND can appear from these three boards). PLAZA_BANK_CATEGORIES
+# already accepts both enums and romance/marriage/workplace.
+BOARD_PLAZA_HINT = {
+    "marriage": "MARRIED",
+    "romance": "COUPLE",
+    "workplace": "WORK",
+}
+
+
+def _resolve_category(content: str, title: str = "", board_category: str = "") -> str:
+    hint = BOARD_PLAZA_HINT.get(board_category)
+    return classify_plaza(content, title or "", channel_hint=hint)
 
 BROWSER_PROFILES = [
     {
@@ -497,10 +513,12 @@ async def crawl(daily_limit: int = 240) -> List[Dict]:
                     comment_timestamps = _extract_comment_timestamps(post_soup, fetch_reference)
                     posted_at = _extract_post_date(post_soup, fetch_reference)
 
+                    stored_category = _resolve_category(content, title, board_category=category)
+
                     results.append({
                         "content": content[:1500],
                         "content_type": "POST",
-                        "category": category,
+                        "category": stored_category,
                         "title": title or None,
                         "source_url": post_url,
                         "posted_at": posted_at,
@@ -520,7 +538,7 @@ async def crawl(daily_limit: int = 240) -> List[Dict]:
                         post_soup,
                         fetch_reference,
                         post_url=post_url,
-                        category=category,
+                        category=stored_category,
                     )
                     results.extend(comment_rows)
                     if comment_rows:

@@ -151,17 +151,27 @@ public class AiLearningClient {
         private int expandDays = 30;
         /** Plaza enum — scopes claim to matching example_bank categories. */
         private String category;
+        /** example_bank ids already tried (LLM/safety failed) — pick the next popular row. */
+        private java.util.List<Long> excludeExampleIds;
 
         public ClaimPopularSourceRequest(String source, String reservationKey, Instant reserveUntil) {
-            this(source, reservationKey, reserveUntil, null);
+            this(source, reservationKey, reserveUntil, null, null);
         }
 
         public ClaimPopularSourceRequest(String source, String reservationKey, Instant reserveUntil,
                                          String category) {
+            this(source, reservationKey, reserveUntil, category, null);
+        }
+
+        public ClaimPopularSourceRequest(String source, String reservationKey, Instant reserveUntil,
+                                         String category, java.util.Collection<Long> excludeExampleIds) {
             this.source = source;
             this.reservationKey = reservationKey;
             this.reserveUntil = reserveUntil;
             this.category = category;
+            this.excludeExampleIds = excludeExampleIds == null || excludeExampleIds.isEmpty()
+                    ? null
+                    : new java.util.ArrayList<>(excludeExampleIds);
         }
     }
 
@@ -332,6 +342,12 @@ public class AiLearningClient {
      */
     public Optional<ExampleItem> claimPopularSource(String source, String reservationKey,
                                                     Instant reserveUntil, String category) {
+        return claimPopularSource(source, reservationKey, reserveUntil, category, null);
+    }
+
+    public Optional<ExampleItem> claimPopularSource(String source, String reservationKey,
+                                                    Instant reserveUntil, String category,
+                                                    java.util.Collection<Long> excludeExampleIds) {
         if (!enabled || source == null || source.isBlank()
                 || reservationKey == null || reservationKey.isBlank()
                 || reserveUntil == null) {
@@ -339,7 +355,8 @@ public class AiLearningClient {
         }
         try {
             ResponseEntity<String> resp = postJson("/examples/claim-popular-source",
-                    new ClaimPopularSourceRequest(source, reservationKey, reserveUntil, category));
+                    new ClaimPopularSourceRequest(source, reservationKey, reserveUntil,
+                            category, excludeExampleIds));
             return parseClaimedExample(resp != null ? resp.getBody() : null);
         } catch (Exception e) {
             log.debug("AiLearning claimPopularSource failed (non-critical): {}", e.getMessage());

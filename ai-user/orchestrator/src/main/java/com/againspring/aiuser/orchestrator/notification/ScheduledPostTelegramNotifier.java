@@ -41,6 +41,25 @@ public class ScheduledPostTelegramNotifier {
             text(scheduled.getTitle()), scheduled.getId(), text(reason), limit(errorLog, 1200)));
     }
 
+    /**
+     * Nightly fill saved fewer than target N. Includes each slot failure reason (truncated).
+     */
+    public void nightlyShortfall(int targetN, int saved, int llmUsed, int llmMax, java.util.List<String> failureReasons) {
+        StringBuilder body = new StringBuilder();
+        body.append(String.format(
+                "⚠️ [Again-Spring] 새벽 예약글 부족%n목표 N=%d, 저장=%d, LLM=%d/%d%n실패:",
+                targetN, saved, llmUsed, llmMax));
+        if (failureReasons == null || failureReasons.isEmpty()) {
+            body.append("\n(상세 사유 없음)");
+        } else {
+            int i = 1;
+            for (String reason : failureReasons) {
+                body.append(String.format("%n%d. %s", i++, reason == null ? "-" : reason));
+            }
+        }
+        send(limit(body.toString(), 3500));
+    }
+
     private void send(String message) {
         if (botToken == null || botToken.isBlank() || chatId == null || chatId.isBlank()) {
             log.debug("[telegram] Scheduled-post alert skipped: Telegram is not configured");

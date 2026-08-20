@@ -140,11 +140,26 @@ learning container가 뜨면 아래가 항상 실행된다.
 | 규칙 | 내용 |
 |---|---|
 | POST 지표 | view/like/comment 중 ≥1개 필수 |
-| 절대 하한 | source별 floor (natepan: view≥50 ∨ like≥3 ∨ comment≥5 등) |
-| 상대 순위 | 배치 내 per-source relative percentile ≥ `CRAWL_MIN_POPULARITY_PCT`(기본 **0.50**) |
+| 절대 하한 | source별 floor (natepan: view≥50 ∨ like≥3 ∨ comment≥5 · blind: view≥30 ∨ like≥1 ∨ comment≥3) |
+| 상대 순위 | **광장(plaza) 코호트 안** relative percentile ≥ `CRAWL_MIN_POPULARITY_PCT`(기본 **0.50**). 소스 배치 전체가 아니라 COUPLE/MARRIED/…별로 순위 |
 | COMMENT | 인기 POST(이번에 통과했거나 DB에 `popularity_pct≥threshold`)의 자식만 저장 |
 
 `UNRANKED`(지표 없음) 글은 코퍼스에 넣지 않는다. 사연 선별도 인기 보장 코퍼스를 전제로 한다.
+
+### 크롤 광장 분류 (로컬 분류기, LLM 없음)
+
+저장 `category`는 보드명을 게이트로 쓰지 않는다. `plaza_classifier`가 제목+본문으로 점수를 매긴다.
+
+| 규칙 | 내용 |
+|---|---|
+| 가중치 | 제목 히트 ×**3**, primary 키워드 ×**2**, supporting ×**1**. 남편/아내/시댁 등 spouse 보너스는 MARRIED에만 (이중 가산 없이) |
+| 채널 힌트 | Natepan 테마 plaza · Blind 보드 → `channel_hint`로 해당 광장에 **작은 가산(+2)**. 힌트≠분류여도 OTHER로 버리지 않음. 채널은 veto가 아님 |
+| Natepan 랭킹 | 섹션이 연애가 아니어도 항상 분류. 섹션명에 「연애」가 있으면 `channel_hint=COUPLE`만 |
+| Natepan 테마 | `20027` **임신/출산/육아** → `channel_hint=MARRIED` (다른 MARRIED 채널과 같은 페이지네이션) |
+| Blind | 보드 3개만 (결혼생활 / 썸·연애 / 회사생활). 힌트는 MARRIED/COUPLE/WORK. **저장은 광장 enum** — 세 보드에서도 FAMILY/FRIEND/OTHER가 나올 수 있음. 레거시 `romance`/`marriage`/`workplace` 행은 claim 매핑이 계속 인식 |
+| FAMILY | 본가·부모·형제·조부모. 시댁/시집/친정·육아 인접은 MARRIED 쪽 |
+
+기존 crawl 행 재라벨: `ai-user/tools/reclassify_example_bank_categories.py` (기본 **dry-run**, `--env prod|dev`, `--apply`로 `example_bank` UPDATE). **고신뢰만** 이동 — 1등 점수 ≥ 2×2등 **그리고** 1등 ≥ 6. 약함/동점은 그대로(OTHER 유지). LLM 없음. `posts` 재분류는 별도 `reclassify_post_categories.py`.
 
 ## Popular source claim (2026-08-05)
 
@@ -155,14 +170,15 @@ orchestrator 클라이언트 `AiLearningClient.claimPopularSource` /
 
 ### `POST /examples/claim-popular-source`
 
-Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, windowDays?: 14, expandDays?: 30, category?: "COUPLE"|"MARRIED"|"FRIEND"|"FAMILY"|"WORK"|"OTHER" }`
+Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, windowDays?: 14, expandDays?: 30, category?: "COUPLE"|"MARRIED"|"FRIEND"|"FAMILY"|"WORK"|"OTHER", excludeExampleIds?: number[] }`
 
 | 규칙 | 내용 |
 |---|---|
 | 후보 | `content_type=POST`, `source_url IS NOT NULL`, `popularity_pct IS NOT NULL`, source ∈ {blind,natepan} |
-| **카테고리 스코프** | `category`(광장 enum) 지정 시 `example_bank.category`가 해당 광장 매핑만. Blind=`romance→COUPLE` / `marriage→MARRIED` / `workplace→WORK`, Natepan=광장 enum 그대로. **미지정 시 필터 없음(레거시)**. 잘못된 enum → 400 |
+| **카테고리 스코프** | `category`(광장 enum) 지정 시 해당 광장 매핑만. Blind 레거시=`romance`/`marriage`/`workplace` + 신규 광장 enum(FAMILY/FRIEND 포함). Natepan=광장 enum. **미지정 시 필터 없음(레거시)**. 잘못된 enum → 400 |
+| 요청 제외 | `excludeExampleIds` — LLM/세이프가드 실패한 example id. 다음 인기 글을 claim |
 | 순위 | `popularity_pct DESC` (NULL last) |
-| 창 | `created_at` 기준 **14일**. 없으면 **한 번** 30일로 확장. 그래도 없으면 empty (다른 source로 폴백 금지) |
+| 창 | `created_at` 기준 **14일**. 없으면 **한 번** 30일로 확장. 그래도 없으면 이 요청은 empty. **한 claim 호출이 source를 바꾸지는 않음** — 새벽 배치는 다른 source/plaza/persona로 **새 claim**을 재시도한다 ([operations.md](./operations.md) §8) |
 | 영구 제외 | 같은 `source_url`을 가진 **형제** `example_bank` 행이 `posts.source_example_id`로 쓰였거나 `example_source_reservations.status='COMMITTED'` |
 | soft 제외 | 형제 행 중 `status='SOFT'` AND `reserve_until > NOW(3)` |
 | 동시성 | claim 시 동일 `source_url` 가족 전체를 `FOR UPDATE`로 잠그고 같은 `reservationKey`로 SOFT 예약. commit/release도 key 가족 단위 |

@@ -126,8 +126,10 @@ SELECT status, COUNT(*) as count FROM daily_planner_retry_log GROUP BY status;
    **plazaCategory**(COUPLE/MARRIED/…)로 claim 풀을 스코프한다 — reconstruct 본문이
    페르소나 interest 라벨과 어긋나지 않게 (2026-08-12: 카테고리 무시 버그 수정).
 4. claim hit → `reconstructMode=true` + sourceExampleId/body/url/title.
-   empty → **슬롯 skip** (archetype freestyle 폴백 없음). Blind 풀이 비면 그 Blind
-   슬롯만 skip — Natepan으로 바꾸지 않음.
+   empty → 그 **시도**는 skip (archetype freestyle 폴백 없음). 새벽 fill /
+   `generate-scheduled-posts`는 다른 페르소나·광장·소스(blind↔natepan)로
+   재claim해 `count`/`target_posts` 저장을 맞춘다. 같은 example에 LLM 재시도는 하지 않는다.
+   상세: [operations.md](./operations.md) §8 새벽 fill.
 5. soft-reserve lifecycle: hold 성공 시 **같은 source_url 형제 row까지** 같은 key로
    reserve 유지 → publish 시 `commitSource`(key 가족 COMMITTED) →
    cancel/fail/twin-reject 시 `releaseSource` (lifecycle 경로 소유).

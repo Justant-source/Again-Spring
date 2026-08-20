@@ -2,11 +2,13 @@
 from bs4 import BeautifulSoup
 
 from app.crawlers.natepan import (
+    CHANNELS,
     _extract_view_count,
     _extract_like_count,
     _extract_comment_count,
     _extract_comment_rows,
     _parse_detail_bundle,
+    _resolve_category,
 )
 
 
@@ -109,6 +111,39 @@ class TestCommentRows:
         )
         assert len(rows) == 1
         assert rows[0]["content_type"] == "POST"
+
+
+class TestResolveCategory:
+    def test_ranking_yeonae_is_hint_not_forced_couple(self):
+        assert _resolve_category(
+            "시어머니가 자꾸 참견해. 시댁에서 간섭이 심하다.",
+            "시어머니 참견",
+            section_name="연애-오늘",
+        ) == "MARRIED"
+
+    def test_family_body_on_married_channel_stays_family(self):
+        assert _resolve_category(
+            "아빠랑 친오빠, 친동생이 본가에서 싸운다. 부모님이 너무 힘들다.",
+            "아빠 본가 원가족",
+            channel_plaza="MARRIED",
+        ) == "FAMILY"
+
+    def test_parenting_plus_husband_stays_married(self):
+        assert _resolve_category(
+            "육아 너무 힘든데 남편이 전혀 안 도와줘.",
+            "육아",
+            channel_plaza="MARRIED",
+        ) == "MARRIED"
+
+    def test_non_yeonae_ranking_still_classifies(self):
+        assert _resolve_category(
+            "시어머니가 자꾸 참견해. 시댁에서 간섭이 심하다.",
+            "시어머니",
+            section_name="베스트-오늘",
+        ) == "MARRIED"
+
+    def test_parenting_theme_channel_exists(self):
+        assert any(c["id"] == "20027" and c["plaza"] == "MARRIED" for c in CHANNELS)
 
 
 if __name__ == "__main__":

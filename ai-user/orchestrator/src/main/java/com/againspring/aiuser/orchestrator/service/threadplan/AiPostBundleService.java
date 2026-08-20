@@ -127,11 +127,12 @@ public class AiPostBundleService {
         }
         Long exampleId = claimed.get().sourceExampleId();
 
-        Bundle bundle = generateBundleWithSource(author, category, correlationId, claimed.get()).orElse(null);
-        if (bundle == null) {
+        BundleAttempt generated = generateBundleWithSource(author, category, correlationId, claimed.get());
+        if (!generated.ok()) {
             sourceReservationSupport.release(exampleId, reservationKey);
             return Optional.empty();
         }
+        Bundle bundle = generated.bundle();
 
         CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
                 .userTitle(bundle.content.title()).bodyRaw(bundle.content.body()).category(category)
@@ -178,7 +179,8 @@ public class AiPostBundleService {
      */
     public Optional<AiScheduledPost> generateAndHold(Persona author, String category, String topicHint,
                                                       String correlationId, Instant scheduledPublishAt) {
-        return generateAndHold(author, category, topicHint, correlationId, scheduledPublishAt, null);
+        return generateAndHoldResult(author, category, topicHint, correlationId, scheduledPublishAt, null, Set.of())
+                .saved();
     }
 
     /**
@@ -190,28 +192,62 @@ public class AiPostBundleService {
     public Optional<AiScheduledPost> generateAndHold(Persona author, String category, String topicHint,
                                                       String correlationId, Instant scheduledPublishAt,
                                                       String preferredSource) {
+        return generateAndHoldResult(author, category, topicHint, correlationId, scheduledPublishAt,
+                preferredSource, Set.of()).saved();
+    }
+
+    /** @see #generateAndHoldResult(Persona, String, String, String, Instant, String, Set) */
+    public HoldResult generateAndHoldResult(Persona author, String category, String topicHint,
+                                            String correlationId, Instant scheduledPublishAt,
+                                            String preferredSource) {
+        return generateAndHoldResult(author, category, topicHint, correlationId, scheduledPublishAt,
+                preferredSource, Set.of());
+    }
+
+    /**
+     * Distinguishes skip reasons for nightly fill retry. Same claimed {@code exampleId} in
+     * {@code skipExampleIds} is released without a second LLM/safeguard pass.
+     */
+    public HoldResult generateAndHoldResult(Persona author, String category, String topicHint,
+                                            String correlationId, Instant scheduledPublishAt,
+                                            String preferredSource, Set<Long> skipExampleIds) {
+        String personaId = author == null ? null : author.getId();
+        String plaza = category;
         if (scheduledPublishAt == null) {
             log.warn("AI post hold skipped: scheduledPublishAt is null corr={}", correlationId);
-            return Optional.empty();
+            return HoldResult.generationSkipped(preferredSource, plaza, personaId, null,
+                    "scheduledPublishAt is null");
         }
         String holdId = UUID.randomUUID().toString();
         Instant reserveUntil = scheduledPublishAt.plus(Duration.ofHours(24));
         String sourceName = SourceReservationSupport.resolvePreferredSource(preferredSource, author);
 
         Optional<PlanSourceStoryResolver.ResolvedSource> claimed = sourceStoryResolver.claimAndResolve(
-                author, sourceName, holdId, reserveUntil, category);
+                author, sourceName, holdId, reserveUntil, category, skipExampleIds);
         if (claimed.isEmpty()) {
-            log.info("AI post hold skipped: no claimed source preferred={} holdId={} corr={}",
-                    sourceName, holdId, correlationId);
-            return Optional.empty();
+            log.info("AI post hold skipped: no claimed source preferred={} plaza={} holdId={} corr={}",
+                    sourceName, plaza, holdId, correlationId);
+            return HoldResult.claimEmpty(sourceName, plaza, personaId,
+                    "no claimed source (no freestyle)");
         }
         Long exampleId = claimed.get().sourceExampleId();
-
-        Bundle bundle = generateBundleWithSource(author, category, correlationId, claimed.get()).orElse(null);
-        if (bundle == null) {
+        if (exampleId != null && skipExampleIds != null && skipExampleIds.contains(exampleId)) {
+            log.info("AI post hold skipped: same exampleId={} without LLM retry holdId={} corr={}",
+                    exampleId, holdId, correlationId);
             sourceReservationSupport.release(exampleId, holdId);
-            return Optional.empty();
+            return HoldResult.sameExample(sourceName, plaza, personaId, exampleId,
+                    "released duplicate example without LLM retry");
         }
+
+        BundleAttempt attempt = generateBundleWithSource(author, category, correlationId, claimed.get());
+        if (!attempt.ok()) {
+            sourceReservationSupport.release(exampleId, holdId);
+            if (attempt.llmInvoked()) {
+                return HoldResult.llmOrSafety(sourceName, plaza, personaId, exampleId, attempt.detail());
+            }
+            return HoldResult.generationSkipped(sourceName, plaza, personaId, exampleId, attempt.detail());
+        }
+        Bundle bundle = attempt.bundle();
 
         candidateScheduleSupport.enrichMissingScheduledAts(bundle.response, scheduledPublishAt);
 
@@ -226,7 +262,8 @@ public class AiPostBundleService {
             log.error("AI post bundle generated but candidates could not be serialized corr={}",
                     correlationId, serializationFailure);
             sourceReservationSupport.release(exampleId, holdId);
-            return Optional.empty();
+            return HoldResult.serialize(sourceName, plaza, personaId, exampleId,
+                    serializationFailure.getMessage());
         }
 
         AiScheduledPost.AiScheduledPostBuilder rowBuilder = AiScheduledPost.builder()
@@ -243,34 +280,35 @@ public class AiPostBundleService {
         // W1-H may add sourceExampleId on the entity — set when present without owning the migration.
         applyScheduledSourceHook(rowBuilder, bundle.source);
         try {
-            return Optional.of(scheduledPostRepository.save(rowBuilder.build()));
+            AiScheduledPost saved = scheduledPostRepository.save(rowBuilder.build());
+            return HoldResult.saved(saved, sourceName, plaza, personaId, exampleId);
         } catch (RuntimeException persistFailure) {
             log.error("AI post hold persist failed holdId={} corr={}", holdId, correlationId, persistFailure);
             sourceReservationSupport.release(exampleId, holdId);
-            return Optional.empty();
+            return HoldResult.persist(sourceName, plaza, personaId, exampleId, persistFailure.getMessage());
         }
     }
 
     /**
      * Shared generation step given an already-claimed source. Callers own claim / release / commit.
      */
-    private Optional<Bundle> generateBundleWithSource(
+    private BundleAttempt generateBundleWithSource(
             Persona author, String category, String correlationId,
             PlanSourceStoryResolver.ResolvedSource source) {
         if (author == null) {
             log.warn("AI post bundle skipped: author is null corr={}", correlationId);
-            return Optional.empty();
+            return BundleAttempt.skipped("author is null");
         }
         if (source == null) {
             log.warn("AI post bundle skipped: source is null corr={}", correlationId);
-            return Optional.empty();
+            return BundleAttempt.skipped("source is null");
         }
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
         String provider = config == null ? properties.getThreadPlan().getAiPostProvider()
                 : config.getProviderAiPostBundle();
         if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) {
             log.info("AI post bundle skipped: provider is OFF corr={}", correlationId);
-            return Optional.empty();
+            return BundleAttempt.skipped("provider is OFF");
         }
         String model = properties.getThreadPlan().getAiPostModel();
         int pool = config == null ? 24 : Math.max(8, Math.min(30, config.getCandidatePoolSize()));
@@ -290,27 +328,29 @@ public class AiPostBundleService {
                 planPersonaMapper.mapCast(active), author, storyProfile, exampleId, corr);
         if (personas.isEmpty()) {
             log.warn("AI post bundle skipped: no active personas corr={}", correlationId);
-            return Optional.empty();
+            return BundleAttempt.skipped("no active personas");
         }
         Set<String> castIds = planPersonaMapper.castIds(personas);
 
         OrchestratorProperties.ThreadPlan tp = properties.getThreadPlan();
-        Optional<Bundle> bundle;
+        BundleAttempt attempt;
         if (tp.isMicroBatchEnabled()) {
-            bundle = generateBundleMicroBatch(
+            attempt = generateBundleMicroBatch(
                     author, category, correlationId, corr,
                     provider, model, pool, source, storyProfile, personas, castIds);
         } else {
-            bundle = generateBundleMegaCall(
+            attempt = generateBundleMegaCall(
                     author, category, correlationId, provider, model, pool, source, storyProfile, personas, castIds);
         }
-        bundle.ifPresent(b -> {
-            int stripped = StoryPersonaCommentFilter.stripFromResponse(b.response(), Set.of(author.getId()));
-            if (stripped > 0) {
-                log.info("AI post bundle stripped {} story-persona comment(s) corr={}", stripped, correlationId);
-            }
-        });
-        return bundle.flatMap(b -> proofreadBundle(b, correlationId));
+        if (!attempt.ok()) return attempt;
+        Bundle bundle = attempt.bundle();
+        int stripped = StoryPersonaCommentFilter.stripFromResponse(bundle.response(), Set.of(author.getId()));
+        if (stripped > 0) {
+            log.info("AI post bundle stripped {} story-persona comment(s) corr={}", stripped, correlationId);
+        }
+        return proofreadBundle(bundle, correlationId)
+                .map(BundleAttempt::ok)
+                .orElseGet(() -> BundleAttempt.llmFail("proofread dropped bundle"));
     }
 
     /**
@@ -356,7 +396,7 @@ public class AiPostBundleService {
     }
 
     /** Legacy single-call path: full cast in one AI_POST request. */
-    private Optional<Bundle> generateBundleMegaCall(
+    private BundleAttempt generateBundleMegaCall(
             Persona author, String category, String correlationId,
             String provider, String model, int pool,
             PlanSourceStoryResolver.ResolvedSource source, StoryProfile storyProfile,
@@ -375,15 +415,15 @@ public class AiPostBundleService {
         putParsePlanFloors(request);
 
         Optional<Map<String, Object>> response = llmClient.generateThreadPlan(request);
-        if (response.isEmpty()) return Optional.empty();
+        if (response.isEmpty()) return BundleAttempt.llmFail("LLM empty response");
         try {
             PostContent postContent = readAndValidatePost(response.get());
             rejectIfStoryTwin(postContent, correlationId);
             validateCast(response.get(), castIds);
-            return Optional.of(new Bundle(response.get(), postContent, provider, model, castIds, source));
+            return BundleAttempt.ok(new Bundle(response.get(), postContent, provider, model, castIds, source));
         } catch (IllegalArgumentException invalid) {
             log.warn("AI post bundle rejected corr={}: {}", correlationId, invalid.getMessage());
-            return Optional.empty();
+            return BundleAttempt.llmFail(invalid.getMessage());
         }
     }
 
@@ -393,7 +433,7 @@ public class AiPostBundleService {
      * All batches finish inside this generation job.
      */
     @SuppressWarnings("unchecked")
-    private Optional<Bundle> generateBundleMicroBatch(
+    private BundleAttempt generateBundleMicroBatch(
             Persona author, String category, String correlationId, String corr,
             String provider, String model, int pool,
             PlanSourceStoryResolver.ResolvedSource source, StoryProfile storyProfile,
@@ -429,7 +469,7 @@ public class AiPostBundleService {
         putParsePlanFloors(firstReq);
 
         Optional<Map<String, Object>> firstOpt = llmClient.generateThreadPlan(firstReq);
-        if (firstOpt.isEmpty()) return Optional.empty();
+        if (firstOpt.isEmpty()) return BundleAttempt.llmFail("LLM empty response (micro-batch[0])");
 
         PostContent postContent;
         Map<String, Object> merged;
@@ -440,7 +480,7 @@ public class AiPostBundleService {
             merged = new LinkedHashMap<>(firstOpt.get());
         } catch (IllegalArgumentException invalid) {
             log.warn("AI post micro-batch[0] rejected corr={}: {}", correlationId, invalid.getMessage());
-            return Optional.empty();
+            return BundleAttempt.llmFail("micro-batch[0]: " + invalid.getMessage());
         }
 
         List<Map<String, Object>> mergedItems = new ArrayList<>();
@@ -510,7 +550,7 @@ public class AiPostBundleService {
         log.info("AI post micro-batch done corr={} llmCalls={} followUps={} plannedSlices={} items={}/{} size={}",
                 correlationId, 1 + followUps, followUps, slices.size(), mergedItems.size(), pool,
                 properties.getThreadPlan().resolvedMicroBatchSize());
-        return Optional.of(new Bundle(merged, postContent, provider, model, castIds, source));
+        return BundleAttempt.ok(new Bundle(merged, postContent, provider, model, castIds, source));
     }
 
     private Map<String, Object> baseAiPostRequest(
@@ -788,6 +828,24 @@ public class AiPostBundleService {
             if (vt != null && !String.valueOf(vt).isBlank()) return String.valueOf(vt);
         }
         return "NATEPAN";
+    }
+
+    private record BundleAttempt(Bundle bundle, String detail, boolean llmInvoked) {
+        static BundleAttempt ok(Bundle bundle) {
+            return new BundleAttempt(bundle, "", true);
+        }
+
+        static BundleAttempt llmFail(String detail) {
+            return new BundleAttempt(null, detail == null ? "LLM or safety rejected" : detail, true);
+        }
+
+        static BundleAttempt skipped(String detail) {
+            return new BundleAttempt(null, detail == null ? "generation skipped" : detail, false);
+        }
+
+        boolean ok() {
+            return bundle != null;
+        }
     }
 
     private record Bundle(Map<String, Object> response, PostContent content, String provider, String model,

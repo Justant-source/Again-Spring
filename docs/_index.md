@@ -107,6 +107,7 @@
 | `backend/.../api/**/*Controller.java` | `docs/shared/api/rest-spec.md` · `docs/shared/api/flows.md` |
 | `ai-user/orchestrator/**/threadplan/**` · `ai-user/llm/**/Structured*` · `ai-user/orchestrator/**/safety/SoftProofread*` · `SelfCritiqueService*` | `docs/ai-user/thread-planning.md` · `docs/ai-user/llm.md` · `docs/ai-user/llm-call-budget.md` · `docs/ai-user/operations.md` · `docs/ai-user/orchestrator.md` |
 | `ai-user/learning/**` · `AiLearningClient*` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
+| `ai-user/tools/**` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
 | `env/docker-compose*` · `env/nginx/*` | `docs/system.md` · `docs/env/architecture.md` · README 포트표 |
 | `domain/enums/*Status*.java` · `MarketingJob*.java` · orchestrator `ActionStatus*.java` | 해당 모듈의 stateDiagram (`docs/ai-user/orchestrator.md` 등) |
 | `backend/.../marketing/**` · video brief/`sibom_*` · metaphor unplug · `VideoVariantService*` | `docs/shared/marketing/sibom-video-insertion.md` · `youtube-shorts-strategy.md` · `api.md` · `docs/ai-user/llm-call-budget.md` §3 |
