@@ -277,6 +277,7 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 | 배포 전 백업 | WSL `assets/sprouts.bak/` |
 
 - **PNG는 로컬에서 렌더해 rsync한다** — WSL에는 `rsvg-convert`·`inkscape`·`cairosvg`가 **하나도 없다**.
+- 🚨 **WaggleBot의 `assets/`는 gitignore 대상**(`.gitignore:61`)이다. 거기 있는 시봄이 SVG·PNG·catalog는 **버전관리되지 않는 배포 산출물**이고, **버전 권위본은 이 폴더(AS)** 다. 아트를 고치면 ① 여기에 커밋하고 ② WSL로 rsync 배포한다. WaggleBot 쪽만 고치면 다음 배포나 컨테이너 재생성 때 소리 없이 사라질 수 있다.
 - 검증: WSL `pytest worker/test/test_sibom_composite.py` → 9 passed
 
 ### 판정 기준
