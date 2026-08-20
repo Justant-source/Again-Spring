@@ -17,7 +17,7 @@ Two parallel paths:
 
 - **Report path** (summary generation): `RemoteLlmProvider` → Claude Code CLI (host `~/.claude`, no API key)
   - Batch inference after 5+ messages (slower, more expensive)
-  - Model: `claude-sonnet-4-6`
+  - Model: `claude-sonnet-5`
   - Used by: `ReportService.generateReport()`
 
 **Hybrid complexity**:

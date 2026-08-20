@@ -57,7 +57,7 @@ public class AiCorrectionService {
     private final LLMProvider llmProvider;
 
     /** 첨삭 분석 전용 모델 — Sonnet (MAP 단계: 청크별 패턴 추출) */
-    @Value("${llm.correction.model:claude-sonnet-4-6}")
+    @Value("${llm.correction.model:claude-sonnet-5}")
     private String correctionModel;
 
     /** correction_cautions 최대 보관 수 */

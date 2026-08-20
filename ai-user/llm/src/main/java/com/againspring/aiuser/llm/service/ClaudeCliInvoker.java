@@ -40,6 +40,36 @@ public class ClaudeCliInvoker implements Invoker {
     private static final String DEFAULT_SYSTEM =
         "아래 지시에 따라 자연스러운 한국 갈등 커뮤니티 텍스트를 창작합니다.";
 
+    /**
+     * Explicit disallow list for --disallowedTools when --json-schema is used.
+     *
+     * Purpose: Reduce input token overhead from Claude Code CLI's tool definitions.
+     * Without this, each invocation carries ~22-25k tokens of CLI tool metadata,
+     * even for trivial prompts (~2.9k actual content). With --disallowedTools "*",
+     * overhead drops to 279 tokens, but that breaks StructuredOutput (a CLI tool).
+     * This list preserves StructuredOutput while blocking all other tools,
+     * reducing overhead to ~18.8k tokens (still high but functional for structured output).
+     *
+     * Measured (model=claude-sonnet-5, --strict-mcp-config --no-session-persistence):
+     * - baseline (all tools): 25,267 input tokens
+     * - --disallowedTools "*": 279 tokens (but breaks --json-schema)
+     * - explicit list WITH StructuredOutput: 18,812 tokens (works)
+     *
+     * CRITICAL: Must include all CLI tools EXCEPT StructuredOutput.
+     * Adding StructuredOutput here will break --json-schema output.
+     */
+    private static final String DISALLOWED_TOOLS_WITH_SCHEMA =
+        "Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Task,TodoWrite,NotebookEdit," +
+        "BashOutput,KillShell,SlashCommand,ExitPlanMode,AskUserQuestion,Agent,Skill," +
+        "EnterPlanMode,Monitor,SendMessage,ToolSearch,Artifact,ScheduleWakeup," +
+        "ListAgents,TaskOutput,TaskStop";
+
+    /**
+     * Disallow list for --disallowedTools when no structured output is needed.
+     * Blocks all tools, reducing overhead to ~279 tokens.
+     */
+    private static final String DISALLOWED_TOOLS_NO_SCHEMA = "*";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Value("${llm.worker.claude-binary-path:claude}")
@@ -342,10 +372,18 @@ public class ClaudeCliInvoker implements Invoker {
                 binary, "--print", "--output-format", "stream-json", "--verbose",
                 "--include-partial-messages", "--model", model, "--strict-mcp-config",
                 "--no-session-persistence"));
+
+        // Token reduction: limit CLI tools to reduce prompt overhead (~22-25k tokens -> ~279 or ~18.8k)
         if (jsonSchema != null && !jsonSchema.isBlank()) {
+            command.add("--disallowedTools");
+            command.add(DISALLOWED_TOOLS_WITH_SCHEMA);
             command.add("--json-schema");
             command.add(jsonSchema);
+        } else {
+            command.add("--disallowedTools");
+            command.add(DISALLOWED_TOOLS_NO_SCHEMA);
         }
+
         command.add("--system-prompt");
         command.add(systemPart);
         return command;

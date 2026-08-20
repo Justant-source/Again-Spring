@@ -41,7 +41,7 @@ public class StructuredGenerationService {
     private final LlmParseFailureSampler parseFailureSampler;
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}") private String claudeDefault;
-    @Value("${llm.post-model:claude-sonnet-4-6}") private String claudePostModel;
+    @Value("${llm.post-model:claude-sonnet-5}") private String claudePostModel;
     @Value("${llm.worker.codex-terra-model:gpt-5.6-terra}") private String codexTerra;
     @Value("${llm.worker.codex-luna-model:gpt-5.6-luna}") private String codexLuna;
 

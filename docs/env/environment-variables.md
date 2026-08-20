@@ -63,7 +63,7 @@
 | `LLM_ENABLED` | `false`면 RemoteLlmProvider가 501 거절 (server-dev L3) | `true` |
 | `CLAUDE_BIN` | Claude CLI 바이너리 | `claude` |
 | `CLAUDE_MODEL` | 기본 모델 | `claude-haiku-4-5-20251001` |
-| `REPORT_LLM_MODEL` | 리포트 모델 | `claude-sonnet-4-6` |
+| `REPORT_LLM_MODEL` | 리포트 모델 | `claude-sonnet-5` |
 | `CLAUDE_HOST_CONFIG_DIR` | `/root/.claude`로 마운트할 호스트 경로 | 환경별 실제 값 |
 | `LLM_POOL_SIZE` | worker pool size | `100` |
 | `LLM_QUEUE_CAPACITY` | queue size | `500` |
@@ -135,7 +135,7 @@
 | 변수 | 설명 | 기본값 |
 |---|---|---|
 | `AI_USER_LLM_MODEL` | 댓글/대댓글 기본 모델 | `claude-haiku-4-5-20251001` |
-| `AI_POST_CLAUDE_MODEL` | PLAN AI 글 묶음의 Claude(Sonnet) 모델 | `claude-sonnet-4-6` |
+| `AI_POST_CLAUDE_MODEL` | PLAN AI 글 묶음의 Claude(Sonnet) 모델 | `claude-sonnet-5` |
 | `AI_POST_CODEX_MODEL` | PLAN AI 글 묶음의 Codex(Terra) 모델 | `gpt-5.6-terra` |
 | `AI_INTERACTION_CLAUDE_MODEL` | 사람 글 계획·사람 반응 batch의 Claude(Haiku) 모델 | `claude-haiku-4-5-20251001` |
 | `AI_INTERACTION_CODEX_MODEL` | 사람 글 계획·사람 반응 batch의 Codex(Luna) 모델 | `gpt-5.6-luna` |

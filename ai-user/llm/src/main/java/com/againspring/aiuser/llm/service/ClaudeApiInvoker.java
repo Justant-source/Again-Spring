@@ -85,7 +85,7 @@ public class ClaudeApiInvoker implements Invoker {
     @Value("${llm.api.refusal-retries:2}")
     private int refusalRetries;
 
-    /** 재시도 소진 후 1회 폴백할 모델 (예: claude-sonnet-4-6). 빈 값 = 폴백 비활성. */
+    /** 재시도 소진 후 1회 폴백할 모델 (예: claude-sonnet-5). 빈 값 = 폴백 비활성. */
     @Value("${llm.api.refusal-fallback-model:}")
     private String refusalFallbackModel;
 

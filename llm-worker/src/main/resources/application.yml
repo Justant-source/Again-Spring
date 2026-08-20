@@ -24,7 +24,7 @@ llm:
     process-termination-grace-ms: ${LLM_PROCESS_TERMINATION_GRACE_MS:2000}
     claude-binary-path: ${CLAUDE_BIN:claude}
     claude-model: ${CLAUDE_MODEL:claude-haiku-4-5-20251001}
-    report-model: ${REPORT_LLM_MODEL:claude-sonnet-4-6}
+    report-model: ${REPORT_LLM_MODEL:claude-sonnet-5}
 
 logging:
   level:

@@ -37,7 +37,7 @@ llm:
     codex-terra-model: ${AI_POST_CODEX_MODEL:gpt-5.6-terra}
     codex-luna-model: ${AI_INTERACTION_CODEX_MODEL:gpt-5.6-luna}
   # 글(POST) 전용 모델 오버라이드 — 빈 값이면 claude-model 사용
-  post-model: ${AI_POST_CLAUDE_MODEL:${LLM_POST_MODEL:claude-sonnet-4-6}}
+  post-model: ${AI_POST_CLAUDE_MODEL:${LLM_POST_MODEL:claude-sonnet-5}}
   api:
     prompt-caching: ${LLM_API_PROMPT_CACHING:false}
     cache-ttl: ${LLM_API_CACHE_TTL:5m}

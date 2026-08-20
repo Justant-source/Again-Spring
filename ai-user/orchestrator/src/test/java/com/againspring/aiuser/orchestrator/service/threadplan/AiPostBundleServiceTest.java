@@ -72,7 +72,7 @@ class AiPostBundleServiceTest {
     void setUp() {
         when(properties.getThreadPlan()).thenReturn(threadPlan);
         when(threadPlan.getAiPostProvider()).thenReturn("CLAUDE");
-        when(threadPlan.getAiPostModel()).thenReturn("claude-sonnet-4-6");
+        when(threadPlan.getAiPostModel()).thenReturn("claude-sonnet-5");
         when(threadPlan.getHumanPlanProvider()).thenReturn("CLAUDE");
         when(threadPlan.getHumanPlanModel()).thenReturn("");
         when(threadPlan.getBundleTimeoutMs()).thenReturn(240_000L);

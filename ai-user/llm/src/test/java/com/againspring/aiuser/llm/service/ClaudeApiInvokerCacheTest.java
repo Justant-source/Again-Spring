@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ClaudeApiInvokerCacheTest {
 
     private static final String HAIKU = "claude-haiku-4-5-20251001";
-    private static final String SONNET = "claude-sonnet-4-6";
+    private static final String SONNET = "claude-sonnet-5";
     private static final String STATIC_PART = "정적 코어 규칙\n## 커뮤니티 스타일 가이드\n가이드 본문";
     private static final String DYNAMIC_PART = "## 말투 규칙\n반말\n## 페르소나 특성\n40대 주부";
     private static final String SYSTEM = STATIC_PART + "\n\n<<<PERSONA_SECTION>>>\n" + DYNAMIC_PART;

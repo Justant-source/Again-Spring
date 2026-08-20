@@ -52,7 +52,7 @@ solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워
 
 ### 검증된 세션 smoke 결과
 
-2026-07-30에 컨테이너에서 provider별로 승인된 단일 구조화 요청을 실행했다. Codex `gpt-5.6-terra`와 Claude `claude-sonnet-4-6` 모두 schema 유효 JSON을 반환했다. 이 검증은 DB/게시 API에 쓰지 않았으며, 실제 운영 콘텐츠 생성은 별도 승인 범위다.
+2026-07-30에 컨테이너에서 provider별로 승인된 단일 구조화 요청을 실행했다. Codex `gpt-5.6-terra`와 Claude `claude-sonnet-5` 모두 schema 유효 JSON을 반환했다. 이 검증은 DB/게시 API에 쓰지 않았으며, 실제 운영 콘텐츠 생성은 별도 승인 범위다.
 
 ## 실행 모델
 
@@ -67,7 +67,7 @@ solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워
 | queue wait timeout | `30000ms` |
 | default timeout | `120000ms` |
 | base model | `claude-haiku-4-5-20251001` |
-| post model override | 빈 값, compose에서는 `claude-sonnet-4-6` |
+| post model override | 빈 값, compose에서는 `claude-sonnet-5` |
 
 ### backend 경로 (legacy 전용)
 

@@ -54,7 +54,7 @@ class LlmStatsLoggerTest {
 
     @Test
     void testDefaultValues() {
-        LlmStatsLogger logger = new LlmStatsLogger("CRITIQUE", "claude-sonnet-4-6", "corr-456");
+        LlmStatsLogger logger = new LlmStatsLogger("CRITIQUE", "claude-sonnet-5", "corr-456");
         String logLine = logger.build();
 
         assertTrue(logLine.contains("retryReason=NONE"), "Default retryReason should be NONE");
