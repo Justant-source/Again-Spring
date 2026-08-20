@@ -38,6 +38,7 @@ public class StructuredGenerationService {
     public static final int MAX_PARTS_PER_SIDE = 4;
     private final LlmWorkerPool pool;
     private final SelfCritiqueService selfCritique;
+    private final LlmParseFailureSampler parseFailureSampler;
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}") private String claudeDefault;
     @Value("${llm.post-model:claude-sonnet-4-6}") private String claudePostModel;
@@ -50,10 +51,11 @@ public class StructuredGenerationService {
         String model = resolvePlanModel(req, provider);
         long started = System.currentTimeMillis();
         String prompt = planPrompt(req);
+        String promptHash = hashPrompt(prompt);
         return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
                         StructuredOutputSchema.THREAD_PLAN),
                 raw -> applySelfCritique(parsePlan(raw, req, provider, model, correlationId, started),
-                        req, prompt, model, correlationId));
+                        req, prompt, model, correlationId), correlationId, promptHash);
     }
 
     public HumanReplyBatchResponse createHumanReplies(HumanReplyBatchRequest req, String correlationId) {
@@ -61,9 +63,11 @@ public class StructuredGenerationService {
         LlmProvider provider = LlmProvider.parse(req.getProvider());
         String model = resolveReplyModel(req, provider);
         long started = System.currentTimeMillis();
-        return withOneRetry(() -> pool.executeProviderTask(replyPrompt(req), model, timeout(req.getTimeoutMs()), correlationId, provider,
+        String prompt = replyPrompt(req);
+        String promptHash = hashPrompt(prompt);
+        return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
                         StructuredOutputSchema.HUMAN_REPLIES),
-                raw -> parseReplies(raw, req, provider, model, correlationId, started));
+                raw -> parseReplies(raw, req, provider, model, correlationId, started), correlationId, promptHash);
     }
 
     /**
@@ -76,11 +80,12 @@ public class StructuredGenerationService {
         String model = resolvePairedPostModel(req.getModel(), provider);
         long started = System.currentTimeMillis();
         String prompt = pairedPhase1Prompt(req);
+        String promptHash = hashPrompt(prompt);
         return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
                         StructuredOutputSchema.PAIRED_PHASE1),
                 raw -> applyPairedPhase1Critique(
                         parsePairedPhase1(raw, req, provider, model, correlationId, started),
-                        req, prompt, model, correlationId));
+                        req, prompt, model, correlationId), correlationId, promptHash);
     }
 
     /**
@@ -95,11 +100,12 @@ public class StructuredGenerationService {
         String model = resolvePairedPostModel(req.getModel(), provider);
         long started = System.currentTimeMillis();
         String prompt = pairedPhase2Prompt(req);
+        String promptHash = hashPrompt(prompt);
         return withOneRetry(() -> pool.executeProviderTask(prompt, model, timeout(req.getTimeoutMs()), correlationId, provider,
                         StructuredOutputSchema.PAIRED_PHASE2),
                 raw -> applyPairedPhase2Critique(
                         parsePairedPhase2(raw, req, provider, model, correlationId, started),
-                        req, prompt, model, correlationId));
+                        req, prompt, model, correlationId), correlationId, promptHash);
     }
 
     private ThreadPlanResponse parsePlan(String raw, ThreadPlanRequest req, LlmProvider provider, String model,
@@ -801,15 +807,64 @@ public class StructuredGenerationService {
         return configured;
     }
     private <T> T withOneRetry(java.util.concurrent.Callable<String> call, Function<String, T> parse) {
+        return withOneRetry(call, parse, null, null);
+    }
+
+    private <T> T withOneRetry(java.util.concurrent.Callable<String> call, Function<String, T> parse,
+                              String correlationId, String promptHash) {
         RuntimeException last = null;
-        for (int attempt = 0; attempt < 2; attempt++) {
-            try { return parse.apply(call.call()); }
-            catch (LlmCapacityException | LlmTimeoutException e) { throw e; }
-            catch (RuntimeException e) { last = e; }
-            catch (Exception e) { last = new StructuredGenerationException("generation invocation failed"); }
+        String callId = correlationId != null ? correlationId : java.util.UUID.randomUUID().toString();
+        String rawResponse = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                rawResponse = call.call();
+                return parse.apply(rawResponse);
+            } catch (LlmCapacityException | LlmTimeoutException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                last = e;
+                if (attempt == 1) {
+                    String errorMsg = e.getMessage();
+                    if (errorMsg != null && errorMsg.length() > 200) {
+                        errorMsg = errorMsg.substring(0, 200);
+                    }
+                    log.warn("[LLMSTATS] type=PARSE_FAIL attempt={} error={} corrId={}", attempt, errorMsg, callId);
+                    // Record sample on first failure attempt
+                    if (correlationId != null && parseFailureSampler != null) {
+                        parseFailureSampler.recordFailure(correlationId, promptHash, errorMsg, rawResponse, attempt);
+                    }
+                }
+            } catch (Exception e) {
+                last = new StructuredGenerationException("generation invocation failed");
+                if (attempt == 1) {
+                    log.warn("[LLMSTATS] type=PARSE_FAIL attempt={} error={} corrId={}", attempt, e.getClass().getSimpleName(), callId);
+                    // Record sample on first failure attempt
+                    if (correlationId != null && parseFailureSampler != null) {
+                        parseFailureSampler.recordFailure(correlationId, promptHash, e.getClass().getSimpleName(), rawResponse, attempt);
+                    }
+                }
+            }
         }
+        log.warn("[LLMSTATS] type=PARSE_FAIL attempt=2 final_error={} corrId={}", last.getClass().getSimpleName(), callId);
         throw last;
     }
+    /** Compute short hash of prompt for parse-failure tracking. */
+    private String hashPrompt(String prompt) {
+        if (prompt == null) return "null";
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(prompt.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            // Take first 8 bytes, convert to hex
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < Math.min(8, digest.length); i++) {
+                sb.append(String.format("%02x", digest[i] & 0xff));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return prompt.substring(0, Math.min(16, prompt.length()));
+        }
+    }
+
     /** Cap matches orchestrator bundle timeout (600s). Raising without env bump is a no-op. */
     private long timeout(Long v) {
         long fallback = defaultTimeoutMs > 0 ? defaultTimeoutMs : 600_000L;

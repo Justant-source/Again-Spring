@@ -243,7 +243,80 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 
 - `POST /api/test/plan-daily`
 
-## 설정값 메모
+### admin/metrics — LLM 관찰성
+
+```
+GET /admin/metrics/llm-today
+Authorization: (내부 네트워크만, JWT 불필요)
+```
+
+AI-user orchestrator의 LLM 호출 통계를 24시간 rolling 집계로 반환한다. **메모리 기반**(영속하지 않음, 재시작 시 리셋).
+
+**Response 200**
+```json
+{
+  "timestamp": "2026-08-20T15:30:45.123Z",
+  "scope": "in-memory 24h rolling",
+  "stats": {
+    "AI_POST": {
+      "totalCalls": 42,
+      "totalRetries": 3,
+      "retryRate": "7.1%",
+      "retryReasons": {
+        "PROVIDER_ERROR": 2,
+        "PARSE_FAIL": 1
+      },
+      "resultCounts": {
+        "OK": 40,
+        "FAIL": 2
+      },
+      "totalInputTokens": 125000,
+      "totalOutputTokens": 45000,
+      "totalCacheRead": 8000,
+      "totalCacheWrite": 2000,
+      "avgCacheHitPercent": "5.6%"
+    },
+    "COMMENT": { ... },
+    "HUMAN_REPLY": { ... }
+  }
+}
+```
+
+**[LLMSTATS] 로그 형식** (내부, 단일행):
+
+orchestrator가 LLM을 호출할 때마다 로그에 다음 포맷의 한 줄이 나온다:
+
+```
+[LLMSTATS] ts=2026-08-20T15:30:45Z sys=AS type=AI_POST model=claude-sonnet-4-6 attempt=1 retryReason=NONE in=1500 out=450 cache_read=200 cache_write=50 cache_hit=13% result=OK duration_ms=2500 corrId=f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+| 필드 | 설명 |
+|---|---|
+| `ts` | ISO-8601 UTC 타임스탬프 |
+| `sys` | 시스템 식별자 (`AS` = Again-Spring 메인) |
+| `type` | 워크로드 타입 (`AI_POST`, `COMMENT`, `REPLY`, `HUMAN_POST`, `HUMAN_REPLY`, `PAIRED_PHASE1`, `PAIRED_PHASE2` 등) |
+| `model` | 사용한 모델 ID (`claude-haiku-4-5-20251001`, `claude-sonnet-4-6` 등) |
+| `attempt` | 시도 번호 (1부터 시작) |
+| `retryReason` | 재시도 사유: `NONE` / `PROVIDER_ERROR` / `PARSE_FAIL` / `EMPTY_RESULT` / `CRITIQUE_FAIL` / `SAFETY_BLOCKED` / `TIMEOUT` |
+| `in` | 입력 토큰 수 |
+| `out` | 출력 토큰 수 |
+| `cache_read` | 캐시 읽기 토큰 수 |
+| `cache_write` | 캐시 쓰기 토큰 수 |
+| `cache_hit` | 캐시 히트율(%) |
+| `result` | 최종 결과: `OK` / `RETRY` (재시도 중) / `FAIL` (최종 실패) |
+| `duration_ms` | 실행 시간(밀리초) |
+| `corrId` | 요청 correlation ID (UUID) |
+
+**활용**: grep + jq로 실시간 파싱 가능. 예시:
+```bash
+# 지난 1시간의 AI_POST retry rate
+docker logs orchestrator | grep '\[LLMSTATS\]' | jq 'select(.type=="AI_POST" and .retryReason!="NONE")' | wc -l
+
+# 오늘의 마케팅 LLM 비용 추정 (tokenomics 기준)
+curl http://localhost:8096/admin/metrics/llm-today | jq '.stats | to_entries[] | {type: .key, totalIn: .value.totalInputTokens, totalOut: .value.totalOutputTokens}'
+```
+
+---
 
 | 설정 | 코드 기본 | compose dev | compose prod |
 |---|---|---|---|

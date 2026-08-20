@@ -43,6 +43,9 @@ llm:
     cache-ttl: ${LLM_API_CACHE_TTL:5m}
     refusal-retries: ${LLM_API_REFUSAL_RETRIES:0}
     refusal-fallback-model: ${LLM_API_REFUSAL_FALLBACK_MODEL:}
+  parse-failure-sampling:
+    enabled: ${LLM_PARSE_FAILURE_SAMPLING_ENABLED:true}
+    dir: ${LLM_PARSE_FAILURE_SAMPLING_DIR:/tmp/llm-parse-failures}
 
 logging:
   level:

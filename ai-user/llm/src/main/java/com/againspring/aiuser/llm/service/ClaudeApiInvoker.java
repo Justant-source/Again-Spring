@@ -17,6 +17,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.UUID;
 
 /**
  * Anthropic Messages API를 직접 호출하는 LLM 인보커.
@@ -91,12 +92,12 @@ public class ClaudeApiInvoker implements Invoker {
         // "I appreciate you testing…" 류 거절 응답을 받음 (prefill·모델명 alias 무관, 4분면 실측).
         // 거절(PROVIDER_ERROR)에 한해 재시도하고, 소진 시 폴백 모델(거절 0% 실측인 sonnet)로 1회 승격.
         ClaudeCodeException lastRefusal = null;
-        for (int attempt = 0; attempt <= refusalRetries; attempt++) {
+        for (int attempt = 1; attempt <= refusalRetries + 1; attempt++) {
             try {
-                if (attempt > 0) {
-                    log.info("PROVIDER_ERROR retry {}/{} (clcocloud refusal node)", attempt, refusalRetries);
+                if (attempt > 1) {
+                    log.info("PROVIDER_ERROR retry {}/{} (clcocloud refusal node)", attempt - 1, refusalRetries);
                 }
-                return call(prompt, model, 120_000);
+                return call(prompt, model, 120_000, attempt);
             } catch (ClaudeCodeException e) {
                 if (!"PROVIDER_ERROR".equals(e.getErrorCode())) throw e;  // 거절 외 오류는 즉시 전파
                 lastRefusal = e;
@@ -104,9 +105,10 @@ public class ClaudeApiInvoker implements Invoker {
         }
         if (refusalFallbackModel != null && !refusalFallbackModel.isBlank()) {
             log.info("PROVIDER_ERROR {}회 연속 — {} 폴백 시도", refusalRetries + 1, refusalFallbackModel);
-            return call(prompt, refusalFallbackModel, 120_000);
+            return call(prompt, refusalFallbackModel, 120_000, refusalRetries + 2);
         }
-        log.error("PROVIDER_ERROR {}회 연속 — 액션 스킵 (폴백 모델 미설정)", refusalRetries + 1);
+        log.error("REFUSAL_RETRY_EXHAUSTED attempts={} fallbackModel={} —액션 스킵",
+            refusalRetries + 1, refusalFallbackModel);
         throw lastRefusal;
     }
 
@@ -178,12 +180,18 @@ public class ClaudeApiInvoker implements Invoker {
     }
 
     private String call(String prompt, String model, long timeoutMs) throws LlmException {
+        return call(prompt, model, timeoutMs, 1);
+    }
+
+    private String call(String prompt, String model, long timeoutMs, int attemptNumber) throws LlmException {
         String apiKey = apiKeyProvider.getKey();
         if (apiKey == null || apiKey.isBlank()) {
             throw new ClaudeCodeException("API_KEY_MISSING", "ANTHROPIC_API_KEY not configured", -1, null);
         }
 
         String resolvedModel = (model != null && !model.isBlank()) ? model : defaultModel;
+        long callStartMs = System.currentTimeMillis();
+        String callId = UUID.randomUUID().toString();
 
         // ── 시스템 / 유저 분리 ────────────────────────────────────────────
         String systemPart = "";
@@ -222,8 +230,10 @@ public class ClaudeApiInvoker implements Invoker {
             }
             if (res.statusCode() != 200) {
                 // 크레딧/쿼터 소진 등 모든 비정상 응답 → ERROR 로그 + 예외 (절대 콘텐츠로 게시 안 됨)
+                long duration = System.currentTimeMillis() - callStartMs;
                 log.error("Anthropic API error {} — generation failed, NOT publishing: {}",
                     res.statusCode(), res.body());
+                logLlmStats(resolvedModel, attemptNumber, "API_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, callId);
                 throw new ClaudeCodeException("API_ERROR", "API status " + res.statusCode(), res.statusCode(), null);
             }
 
@@ -233,14 +243,14 @@ public class ClaudeApiInvoker implements Invoker {
             JsonNode usage = resp.get("usage");
             if (usage != null) {
                 int inTok    = usage.path("input_tokens").asInt();
+                int outTok   = usage.path("output_tokens").asInt();
                 int cacheRead = usage.path("cache_read_input_tokens").asInt(0);
                 int cacheWrite = usage.path("cache_creation_input_tokens").asInt(0);
                 long denom = (long) inTok + cacheRead + cacheWrite;
                 int hitPct = denom > 0 ? (int) Math.round(cacheRead * 100.0 / denom) : 0;
-                // stop= max_tokens면 길이 제한 절단, end_turn이면 모델 자연 종료 (글 짧음 원인 진단용)
-                log.info("API usage: model={} stop={} input={} output={} cache_read={} cache_write={} cache_hit={}%",
-                    resp.path("model").asText(resolvedModel), resp.path("stop_reason").asText("?"),
-                    inTok, usage.path("output_tokens").asInt(), cacheRead, cacheWrite, hitPct);
+                long duration = System.currentTimeMillis() - callStartMs;
+                // [LLMSTATS] format with token counts
+                logLlmStats(resolvedModel, attemptNumber, null, inTok, outTok, cacheRead, cacheWrite, hitPct, "OK", duration, callId);
             }
 
             JsonNode contentArr = resp.path("content");
@@ -259,8 +269,27 @@ public class ClaudeApiInvoker implements Invoker {
         } catch (ClaudeCodeException e) {
             throw e;
         } catch (Exception e) {
+            long duration = System.currentTimeMillis() - callStartMs;
             log.error("Anthropic API call failed: {}", e.getMessage());
+            logLlmStats(resolvedModel, attemptNumber, "API_CALL_FAILED", 0, 0, 0, 0, 0, "FAIL", duration, callId);
             throw new ClaudeCodeException("API_CALL_FAILED", e.getMessage(), -1, null);
         }
+    }
+
+    /**
+     * Log [LLMSTATS] format for metrics collection.
+     * Format: [LLMSTATS] ts=... sys=AS type=API model=... attempt=... retryReason=... in=... out=... cache_read=... cache_write=... cache_hit=...% result=... duration_ms=... corrId=...
+     */
+    private void logLlmStats(String model, int attempt, String retryReason, int inTokens, int outTokens,
+                            int cacheReadTokens, int cacheWriteTokens, int cacheHitPercent,
+                            String result, long durationMs, String corrId) {
+        String reason = retryReason != null ? retryReason : "NONE";
+        String logLine = String.format(
+            "[LLMSTATS] ts=%s sys=AS type=API model=%s attempt=%d retryReason=%s " +
+            "in=%d out=%d cache_read=%d cache_write=%d cache_hit=%d%% result=%s duration_ms=%d corrId=%s",
+            java.time.Instant.now(), model, attempt, reason,
+            inTokens, outTokens, cacheReadTokens, cacheWriteTokens, cacheHitPercent, result, durationMs, corrId
+        );
+        log.info(logLine);
     }
 }

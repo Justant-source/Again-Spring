@@ -78,6 +78,7 @@ public class AiPostBundleService {
     private final SourceReservationSupport sourceReservationSupport;
     private final GenerationConfigSupport generationConfigSupport;
     private final JdbcTemplate jdbcTemplate;
+    private final com.againspring.aiuser.orchestrator.service.llm.LlmCircuitBreaker circuitBreaker;
 
     /** 최근 과다 사용된 메타포 top-10 (post_metaphors 집계) — LLM 프롬프트에 다양성 힌트로 전달. */
     private List<String> fetchOverusedMetaphorIds() {
@@ -363,6 +364,7 @@ public class AiPostBundleService {
     private Optional<Bundle> proofreadBundle(Bundle bundle, String correlationId) {
         String original = bundle.content().body();
         if (!SoftProofread.needsLlm(original)) {
+            log.debug("[LLMSTATS] type=PROOFREAD action=skipped_not_needed corr={}", correlationId);
             return Optional.of(bundle);
         }
         Optional<String> proofreadOpt = llmClient.proofreadPost(original, correlationId);
@@ -414,15 +416,28 @@ public class AiPostBundleService {
         request.put("maxReplies", pool - roots);
         putParsePlanFloors(request);
 
+        // Check circuit breaker before generation
+        if (circuitBreaker.isOpen()) {
+            log.error("[CIRCUIT] OPEN skipped=THREAD_PLAN corrId={} reason={}", correlationId, circuitBreaker.getTelemetry().getReason());
+            return BundleAttempt.llmFail("Circuit breaker OPEN");
+        }
+
         Optional<Map<String, Object>> response = llmClient.generateThreadPlan(request);
-        if (response.isEmpty()) return BundleAttempt.llmFail("LLM empty response");
+        if (response.isEmpty()) {
+            log.warn("[CIRCUIT] recordFailure type=THREAD_PLAN retryReason=GEN_FAILED corrId={}", correlationId);
+            circuitBreaker.recordFailure("GEN_FAILED", null);
+            return BundleAttempt.llmFail("LLM empty response");
+        }
         try {
             PostContent postContent = readAndValidatePost(response.get());
             rejectIfStoryTwin(postContent, correlationId);
             validateCast(response.get(), castIds);
+            circuitBreaker.recordSuccess();
             return BundleAttempt.ok(new Bundle(response.get(), postContent, provider, model, castIds, source));
         } catch (IllegalArgumentException invalid) {
             log.warn("AI post bundle rejected corr={}: {}", correlationId, invalid.getMessage());
+            log.warn("[CIRCUIT] recordFailure type=THREAD_PLAN retryReason=VALIDATION_FAIL corrId={}", correlationId);
+            circuitBreaker.recordFailure("VALIDATION_FAIL", null);
             return BundleAttempt.llmFail(invalid.getMessage());
         }
     }

@@ -282,6 +282,7 @@ public class SelfCritiqueService {
         }
 
         log.info("critique FAIL corr={} score={} issues={} → retrying", corrId, result.score(), result.issues());
+        log.info("[LLMSTATS] type=CRITIQUE retryReason=CRITIQUE_FAIL score={} corr={}", result.score(), corrId);
 
         String retryPrompt = buildRetryPrompt(draft, result.issues(), contentType, formality);
 

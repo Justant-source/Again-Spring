@@ -99,7 +99,8 @@ class HumanReplyStructuredGenerationTest {
     }
 
     private static StructuredGenerationService configured(LlmWorkerPool pool) {
-        StructuredGenerationService service = new StructuredGenerationService(pool, disabledCritique());
+        LlmParseFailureSampler sampler = org.mockito.Mockito.mock(LlmParseFailureSampler.class);
+        StructuredGenerationService service = new StructuredGenerationService(pool, disabledCritique(), sampler);
         ReflectionTestUtils.setField(service, "codexTerra", "gpt-5.6-terra");
         ReflectionTestUtils.setField(service, "codexLuna", "gpt-5.6-luna");
         ReflectionTestUtils.setField(service, "claudeDefault", "claude-haiku-4-5-20251001");

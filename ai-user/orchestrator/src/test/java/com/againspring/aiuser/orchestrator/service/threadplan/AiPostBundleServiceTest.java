@@ -104,13 +104,15 @@ class AiPostBundleServiceTest {
         // (identical text trivially satisfies ProofreadQualityGate's line-count/length checks)
         // so existing success-path tests don't need to know about this new call.
         when(llmClient.proofreadPost(anyString(), anyString())).thenAnswer(inv -> Optional.of(inv.getArgument(0)));
+        var circuitBreaker = mock(com.againspring.aiuser.orchestrator.service.llm.LlmCircuitBreaker.class);
+        when(circuitBreaker.isOpen()).thenReturn(false);  // Circuit closed by default for tests
         service = new AiPostBundleService(
                 configRepository, properties, personaRepository, llmClient, backendBot,
                 safetyGuard, planService, planGenerationService, scheduledPostRepository,
                 scheduleSupport, new ObjectMapper(), planPersonaMapper, sourceStoryResolver,
                 storyProfileAnalyzer, personaMatcherService, storyTwinGuard, sourceReservationSupport,
                 new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
-                mock(org.springframework.jdbc.core.JdbcTemplate.class));
+                mock(org.springframework.jdbc.core.JdbcTemplate.class), circuitBreaker);
     }
 
     @Test

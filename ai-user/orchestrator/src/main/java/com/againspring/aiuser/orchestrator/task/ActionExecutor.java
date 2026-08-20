@@ -22,6 +22,7 @@ import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.safety.ProofreadQualityGate;
 import com.againspring.aiuser.orchestrator.safety.SoftProofread;
 import com.againspring.aiuser.orchestrator.service.PersonaHistoryStore;
+import com.againspring.aiuser.orchestrator.service.llm.LlmCircuitBreaker;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,7 @@ public class ActionExecutor {
     private final AiUserGenerationConfigRepository generationConfigRepository;
     private final PersonaHistoryStore personaHistoryStore;
     private final AiPostBundleService aiPostBundleService;
+    private final LlmCircuitBreaker circuitBreaker;
 
     /** 반복 가드 임계 — 생성문 vs 최근 출력의 문자 2-gram Jaccard 최대값이 이 값을 넘으면 1회 재생성. */
     @Value("${ai-user.repetition-threshold:0.45}")
@@ -247,9 +249,19 @@ public class ActionExecutor {
             .modeHint(commentModeHint(pickCommentMode(persona, stance)))
             .voiceType(voiceProfileField(persona, "voice_type"))
             .build();
+
+        // Check circuit breaker before generation
+        if (circuitBreaker.isOpen()) {
+            log.error("[CIRCUIT] OPEN skipped=COMMENT corrId={} reason={}", corrId, circuitBreaker.getTelemetry().getReason());
+            logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "circuit_open"));
+            return;
+        }
+
         java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateCommentR(genReq);
 
         if (resultOpt.isEmpty()) {
+            log.warn("[CIRCUIT] recordFailure type=COMMENT retryReason=GEN_FAILED corrId={}", corrId);
+            circuitBreaker.recordFailure("GEN_FAILED", null);
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
             return;
         }
@@ -277,6 +289,7 @@ public class ActionExecutor {
         boolean ok = backendBot.addComment(jwt, postId, text, null);
         markSeen(persona, postId, true);
         if (ok) {
+            circuitBreaker.recordSuccess();
             writeHistory(persona, "comments", text, postId, null);
             // AI Learning: 합격한 댓글 예시 뱅크에 저장
             aiLearningClient.saveAsync(text, "COMMENT",
@@ -325,9 +338,19 @@ public class ActionExecutor {
             .modeHint(replyLengthHint())
             .voiceType(voiceProfileField(persona, "voice_type"))
             .build();
+
+        // Check circuit breaker before generation
+        if (circuitBreaker.isOpen()) {
+            log.error("[CIRCUIT] OPEN skipped=REPLY corrId={} reason={}", corrId, circuitBreaker.getTelemetry().getReason());
+            logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "circuit_open"));
+            return;
+        }
+
         java.util.Optional<LlmAiUserClient.GenResult> resultOpt = llmClient.generateReplyR(genReq);
 
         if (resultOpt.isEmpty()) {
+            log.warn("[CIRCUIT] recordFailure type=REPLY retryReason=GEN_FAILED corrId={}", corrId);
+            circuitBreaker.recordFailure("GEN_FAILED", null);
             logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
             return;
         }
@@ -351,6 +374,7 @@ public class ActionExecutor {
         }
         boolean ok = backendBot.addComment(jwt, postId, text, action.parentCommentId());
         if (ok) {
+            circuitBreaker.recordSuccess();
             writeHistory(persona, "comments", text, postId, null);
             // 피기백 반응 디스패치 — 부모 댓글(항목 1)만 대상
             // ActionPlanner가 자작 댓글 reply 타겟을 사전 제외하므로 authorId 검사 불필요
@@ -499,8 +523,11 @@ public class ActionExecutor {
                 log.debug("Best-of-N rerank unavailable, using first draft persona={} corr={}", persona.getId(), corrId);
             }
         } else {
+            // Legacy single-call generatePost path (PLAN mode is now primary via AiPostBundleService)
+            log.info("[LLMSTATS] type=POST_LEGACY action=legacy_path corr={}", corrId);
             java.util.Optional<String> bodyOpt = llmClient.generatePost(genReq);
             if (bodyOpt.isEmpty()) {
+                log.warn("[LLMSTATS] type=POST_LEGACY action=empty_result attempt=1 corr={}", corrId);
                 logAction(persona, action, "FAILED", corrId, java.util.Map.of("error", "gen_failed"));
                 return;
             }

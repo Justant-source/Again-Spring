@@ -97,3 +97,23 @@ ASM은 이 JSON brief를 받아 렌더만 한다.
 - 마케팅: 회로 open 시 `LLM_AUTH_CIRCUIT_OPEN`이고 `againspring-llm` invoke가 없는지
 
 생성 품질 프롬프트(`voice/*.md`, PLAN schema) 변경 여부와 호출 **횟수**는 별개다.
+
+---
+
+## 6. LLM 관찰성 (Observability)
+
+orchestrator는 모든 LLM 호출을 `[LLMSTATS]` 단일행 로그로 기록한다. 형식은 [`docs/ai-user/orchestrator.md` § admin/metrics](./orchestrator.md)를 참조.
+
+**실시간 모니터링**:
+
+```bash
+# 예시: 마케팅 호출 중 실패율
+docker logs againspring-ai-user-orchestrator | grep '\[LLMSTATS\].*type=VARIANT' | \
+  jq -s 'group_by(.result) | map({result: .[0].result, count: length})'
+
+# 토큰 비용 추정 (최근 24시간)
+curl http://localhost:8096/admin/metrics/llm-today | \
+  jq '.stats | to_entries | map({type: .key, tokens_in: .value.totalInputTokens, tokens_out: .value.totalOutputTokens})'
+```
+
+**대시보드 통합**: `/admin/metrics/llm-today` 엔드포인트를 Grafana/Datadog 등에 연동 가능(메모리 기반, 재시작 시 리셋).
