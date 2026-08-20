@@ -76,7 +76,7 @@ def build_thread_plan_payload():
         "kind": "AI_POST",
         "provider": "CLAUDE",  # Use CLI provider (model selection is automatic)
         "correlationId": f"test-{uuid4().hex[:8]}",
-        "timeoutMs": 60000,
+        "timeoutMs": 180000,  # 3 minutes, since structured generation + parsing can take time
         "category": "conflict",
         "topicHint": "relationship",
         # Minimal source context
@@ -162,7 +162,7 @@ def trigger_generation(endpoint="scheduled"):
         payload = build_thread_plan_payload()
 
         try:
-            response = requests.post(url, json=payload, timeout=120)
+            response = requests.post(url, json=payload, timeout=240)  # 4 minutes, matching timeoutMs + overhead
             response_json = response.json() if response.ok else None
             if not response.ok:
                 print(f"WARNING: Direct endpoint returned {response.status_code}: {response.text[:200]}", file=sys.stderr)

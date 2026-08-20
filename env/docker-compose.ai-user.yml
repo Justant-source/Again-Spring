@@ -22,6 +22,8 @@ services:
       CLAUDE_MODEL: ${AI_USER_LLM_MODEL:-claude-haiku-4-5-20251001}
       LLM_POST_MODEL: ${LLM_POST_MODEL:-claude-sonnet-5}
       AI_POST_CLAUDE_MODEL: ${AI_POST_CLAUDE_MODEL:-claude-sonnet-5}
+      # 구조화 생성에서 --json-schema 대신 프롬프트 지시 사용 (CLI 도구 오버헤드 제거). 기본 false.
+      LLM_STRUCTURED_PROMPT_MODE: ${LLM_STRUCTURED_PROMPT_MODE:-false}
       AI_POST_CODEX_MODEL: ${AI_POST_CODEX_MODEL:-gpt-5.6-terra}
       AI_INTERACTION_CLAUDE_MODEL: ${AI_INTERACTION_CLAUDE_MODEL:-claude-haiku-4-5-20251001}
       AI_INTERACTION_CODEX_MODEL: ${AI_INTERACTION_CODEX_MODEL:-gpt-5.6-luna}
