@@ -16,6 +16,8 @@ services:
     image: againspring-llm-ai-user
     container_name: againspring-llm-ai-user
     user: "1000:1000"
+    env_file:
+      - ${TELEGRAM_ENV_FILE:-/home/justant/.config/again-spring-watchdog/telegram.env}
     environment:
       CLAUDE_BIN: ${CLAUDE_BIN:-claude}
       CODEX_BIN: ${CODEX_BIN:-codex}

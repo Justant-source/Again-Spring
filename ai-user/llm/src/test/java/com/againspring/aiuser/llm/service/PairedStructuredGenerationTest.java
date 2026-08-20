@@ -177,7 +177,12 @@ class PairedStructuredGenerationTest {
     private static StructuredGenerationService configured(LlmWorkerPool pool) {
         LlmParseFailureSampler sampler = org.mockito.Mockito.mock(LlmParseFailureSampler.class);
         StructuredSchemaCatalog schemaCatalog = org.mockito.Mockito.mock(StructuredSchemaCatalog.class);
-        StructuredGenerationService service = new StructuredGenerationService(pool, disabledCritique(), sampler, schemaCatalog);
+        com.againspring.aiuser.llm.notification.ParseFailureRateLimiter rateLimiter =
+            org.mockito.Mockito.mock(com.againspring.aiuser.llm.notification.ParseFailureRateLimiter.class);
+        com.againspring.aiuser.llm.notification.StructuredGenerationParseFailTelegramNotifier notifier =
+            org.mockito.Mockito.mock(com.againspring.aiuser.llm.notification.StructuredGenerationParseFailTelegramNotifier.class);
+        com.againspring.aiuser.llm.config.LlmProperties props = new com.againspring.aiuser.llm.config.LlmProperties();
+        StructuredGenerationService service = new StructuredGenerationService(pool, disabledCritique(), sampler, schemaCatalog, rateLimiter, notifier, props);
         ReflectionTestUtils.setField(service, "codexTerra", "gpt-5.6-terra");
         ReflectionTestUtils.setField(service, "codexLuna", "gpt-5.6-luna");
         ReflectionTestUtils.setField(service, "claudeDefault", "claude-haiku-4-5-20251001");

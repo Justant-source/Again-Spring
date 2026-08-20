@@ -139,6 +139,8 @@ public class OrchestratorProperties {
         private int humanReplyMaxComments = 50;
         /** 글+최대 24개 후보를 한 번에 요청하는 구조화 생성용 타임아웃 (단건 생성보다 오래 걸림). */
         private long bundleTimeoutMs = 600000;
+        /** Structured-generation failure alerting via Telegram. */
+        private StructuredGeneration structuredGeneration = new StructuredGeneration();
         /**
          * When true (default), AI_POST bundle generation splits comment personas into
          * 4~6-sized micro-batches inside the initial job (no publish-time LLM).
@@ -188,6 +190,19 @@ public class OrchestratorProperties {
             for (int hour = 0; hour < 24; hour++) weights.put(hour, hourly[hour]);
             return weights;
         }
+    }
+
+    @Getter
+    @Setter
+    public static class StructuredGeneration {
+        /** Enable/disable structured-generation failure alerting via Telegram. */
+        private boolean failureAlertsEnabled = true;
+        /** Number of PARSE_FAIL events within window to trigger alert. */
+        private int parseFailThreshold = 3;
+        /** Time window in minutes for PARSE_FAIL counting. */
+        private int parseFailWindowMinutes = 30;
+        /** Cooldown in minutes after alert sent (suppresses duplicate alerts). */
+        private int parseFailCooldownMinutes = 360;
     }
 
     @Getter

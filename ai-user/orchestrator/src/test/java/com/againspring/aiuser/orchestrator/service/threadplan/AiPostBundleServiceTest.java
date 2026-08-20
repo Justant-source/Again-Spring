@@ -106,13 +106,14 @@ class AiPostBundleServiceTest {
         when(llmClient.proofreadPost(anyString(), anyString())).thenAnswer(inv -> Optional.of(inv.getArgument(0)));
         var circuitBreaker = mock(com.againspring.aiuser.orchestrator.service.llm.LlmCircuitBreaker.class);
         when(circuitBreaker.isOpen()).thenReturn(false);  // Circuit closed by default for tests
+        var notifier = mock(com.againspring.aiuser.orchestrator.notification.StructuredGenerationFailureTelegramNotifier.class);
         service = new AiPostBundleService(
                 configRepository, properties, personaRepository, llmClient, backendBot,
                 safetyGuard, planService, planGenerationService, scheduledPostRepository,
                 scheduleSupport, new ObjectMapper(), planPersonaMapper, sourceStoryResolver,
                 storyProfileAnalyzer, personaMatcherService, storyTwinGuard, sourceReservationSupport,
                 new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
-                mock(org.springframework.jdbc.core.JdbcTemplate.class), circuitBreaker);
+                mock(org.springframework.jdbc.core.JdbcTemplate.class), circuitBreaker, notifier);
     }
 
     @Test

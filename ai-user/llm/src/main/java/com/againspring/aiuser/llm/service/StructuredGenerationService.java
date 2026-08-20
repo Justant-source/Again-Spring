@@ -1,9 +1,12 @@
 package com.againspring.aiuser.llm.service;
 
+import com.againspring.aiuser.llm.config.LlmProperties;
 import com.againspring.aiuser.llm.dto.*;
 import com.againspring.aiuser.llm.exception.LlmCapacityException;
 import com.againspring.aiuser.llm.exception.LlmException;
 import com.againspring.aiuser.llm.exception.LlmTimeoutException;
+import com.againspring.aiuser.llm.notification.ParseFailureRateLimiter;
+import com.againspring.aiuser.llm.notification.StructuredGenerationParseFailTelegramNotifier;
 import com.againspring.aiuser.llm.pool.LlmWorkerPool;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,11 +47,25 @@ public class StructuredGenerationService {
     private final SelfCritiqueService selfCritique;
     private final LlmParseFailureSampler parseFailureSampler;
     private final StructuredSchemaCatalog schemaCatalog;
+    private final ParseFailureRateLimiter parseFailureRateLimiter;
+    private final StructuredGenerationParseFailTelegramNotifier parseFailNotifier;
+    private final LlmProperties llmProperties;
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}") private String claudeDefault;
     @Value("${llm.post-model:claude-sonnet-5}") private String claudePostModel;
     @Value("${llm.worker.codex-terra-model:gpt-5.6-terra}") private String codexTerra;
     @Value("${llm.worker.codex-luna-model:gpt-5.6-luna}") private String codexLuna;
+    @Value("${DB_URL:}") private String dbUrl;
+
+    /** Derive environment (dev/prod) from database URL for alerting. */
+    /**
+     * 이 워커(againspring-llm-ai-user)는 dev/prod 오케스트레이터가 함께 쓰는 단일 컨테이너다.
+     * 요청이 어느 쪽에서 왔는지 알 수 없으므로 특정 환경을 단정하지 않는다.
+     * (DB_URL은 compose에서 prod DB로 고정돼 있어 그것으로 판별하면 항상 prod로 오인된다.)
+     */
+    private String deriveEnvironment() {
+        return "shared(dev+prod)";
+    }
 
     public ThreadPlanResponse createThreadPlan(ThreadPlanRequest req, String correlationId) {
         validatePlanRequest(req);
@@ -860,6 +877,8 @@ public class StructuredGenerationService {
             }
         }
         log.warn("[LLMSTATS] type=PARSE_FAIL attempt=2 final_error={} corrId={}", last.getClass().getSimpleName(), callId);
+        // Check if PARSE_FAIL rate has crossed alerting threshold
+        alertParseFailureRateIfNeeded(callId);
         throw last;
     }
 
@@ -938,6 +957,39 @@ public class StructuredGenerationService {
             return sb.toString();
         } catch (java.security.NoSuchAlgorithmException e) {
             return prompt.substring(0, Math.min(16, prompt.length()));
+        }
+    }
+
+    /**
+     * Alert on PARSE_FAIL rate spike if threshold is crossed.
+     * Called after a final parse failure. Wrapped in try/catch so notification
+     * failure never breaks generation. Follows the same config and alert pattern
+     * as the orchestrator-side notifier.
+     */
+    private void alertParseFailureRateIfNeeded(String callId) {
+        if (parseFailureRateLimiter == null || parseFailNotifier == null ||
+                llmProperties == null || !llmProperties.getStructured().isFailureAlertsEnabled()) {
+            return;
+        }
+        try {
+            LlmProperties.StructuredGeneration config = llmProperties.getStructured();
+            if (parseFailureRateLimiter.shouldAlertAndMarkSuppressed(
+                    config.getParseFailThreshold(),
+                    config.getParseFailWindowMinutes(),
+                    config.getParseFailCooldownMinutes())) {
+                int count = parseFailureRateLimiter.countRecentFailures(config.getParseFailWindowMinutes());
+                String snippet = parseFailureRateLimiter.getRecentFailureSnippet(config.getParseFailWindowMinutes());
+                String env = deriveEnvironment();
+                parseFailNotifier.parseFailureRateAlert(
+                        config.getParseFailThreshold(),
+                        count,
+                        config.getParseFailWindowMinutes(),
+                        config.getParseFailCooldownMinutes(),
+                        env,
+                        snippet);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to alert PARSE_FAIL rate via Telegram: {}", e.getMessage());
         }
     }
 

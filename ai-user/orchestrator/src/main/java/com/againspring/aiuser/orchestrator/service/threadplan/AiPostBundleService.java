@@ -22,6 +22,7 @@ import com.againspring.aiuser.orchestrator.service.match.RankedPersona;
 import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
+import com.againspring.aiuser.orchestrator.notification.StructuredGenerationFailureTelegramNotifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -79,6 +80,17 @@ public class AiPostBundleService {
     private final GenerationConfigSupport generationConfigSupport;
     private final JdbcTemplate jdbcTemplate;
     private final com.againspring.aiuser.orchestrator.service.llm.LlmCircuitBreaker circuitBreaker;
+    private final StructuredGenerationFailureTelegramNotifier structuredGenNotifier;
+
+    /** Derive environment (dev/prod) from backend base URL for alerting. */
+    private String deriveEnvironment() {
+        String url = properties.getBackendBaseUrl();
+        if (url != null) {
+            if (url.contains("prod")) return "prod";
+            if (url.contains("dev")) return "dev";
+        }
+        return "unknown";
+    }
 
     /** 최근 과다 사용된 메타포 top-10 (post_metaphors 집계) — LLM 프롬프트에 다양성 힌트로 전달. */
     private List<String> fetchOverusedMetaphorIds() {
@@ -130,6 +142,9 @@ public class AiPostBundleService {
 
         BundleAttempt generated = generateBundleWithSource(author, category, correlationId, claimed.get());
         if (!generated.ok()) {
+            if (generated.llmInvoked()) {
+                alertStructuredGenerationBundleLost(correlationId, generated.detail());
+            }
             sourceReservationSupport.release(exampleId, reservationKey);
             return Optional.empty();
         }
@@ -244,6 +259,7 @@ public class AiPostBundleService {
         if (!attempt.ok()) {
             sourceReservationSupport.release(exampleId, holdId);
             if (attempt.llmInvoked()) {
+                alertStructuredGenerationBundleLost(correlationId, attempt.detail());
                 return HoldResult.llmOrSafety(sourceName, plaza, personaId, exampleId, attempt.detail());
             }
             return HoldResult.generationSkipped(sourceName, plaza, personaId, exampleId, attempt.detail());
@@ -843,6 +859,26 @@ public class AiPostBundleService {
             if (vt != null && !String.valueOf(vt).isBlank()) return String.valueOf(vt);
         }
         return "NATEPAN";
+    }
+
+    /**
+     * Alert on structured-generation bundle loss (hard failure: no post/comments produced).
+     * Wrapped in try/catch so notification failure never breaks generation.
+     */
+    private void alertStructuredGenerationBundleLost(String correlationId, String failureDetail) {
+        if (structuredGenNotifier == null || !properties.getThreadPlan().getStructuredGeneration().isFailureAlertsEnabled()) {
+            return;
+        }
+        try {
+            String env = deriveEnvironment();
+            // Try to extract a snippet from the failure detail (truncate to ~200 chars)
+            String snippet = failureDetail != null && failureDetail.length() > 200
+                    ? failureDetail.substring(0, 200)
+                    : failureDetail;
+            structuredGenNotifier.bundleLost(correlationId, failureDetail, env, snippet);
+        } catch (Exception e) {
+            log.warn("Failed to alert bundle-lost via Telegram: {}", e.getMessage());
+        }
     }
 
     private record BundleAttempt(Bundle bundle, String detail, boolean llmInvoked) {

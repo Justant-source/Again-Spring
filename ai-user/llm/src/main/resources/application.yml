@@ -41,6 +41,11 @@ llm:
   structured:
     # 프롬프트 내 스키마 주입으로 ~18.5k 토큰 절약 (기본 OFF — 증거 후 활성화)
     prompt-mode-enabled: ${LLM_STRUCTURED_PROMPT_MODE:false}
+    # PARSE_FAIL rate alerting via Telegram
+    failure-alerts-enabled: ${LLM_STRUCTURED_GENERATION_FAILURE_ALERTS_ENABLED:true}
+    parse-fail-threshold: ${LLM_STRUCTURED_GENERATION_PARSE_FAIL_THRESHOLD:3}
+    parse-fail-window-minutes: ${LLM_STRUCTURED_GENERATION_PARSE_FAIL_WINDOW_MINUTES:30}
+    parse-fail-cooldown-minutes: ${LLM_STRUCTURED_GENERATION_PARSE_FAIL_COOLDOWN_MINUTES:360}
   api:
     prompt-caching: ${LLM_API_PROMPT_CACHING:false}
     cache-ttl: ${LLM_API_CACHE_TTL:5m}
