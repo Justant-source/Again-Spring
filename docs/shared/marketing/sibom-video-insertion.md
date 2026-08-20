@@ -197,7 +197,11 @@ Waggle `split_story_lines`만 사용한다.
 - TTS는 그 절이다. 무음 컷이 아니다.  
 - `size=large`(intro/peak): Tone L 카드 미디어 슬롯에 크게, hold·숨쉬기.  
 - `size=small`(punch/soft_fill): **그 카드 슬롯 안에서** 작게. 3줄 `text_only`의 우하단에 스티커로 상주시키지 않는다.  
-- 모션: 팝(약 1.2s, scale 92→100) + punch는 유지, hold는 숨쉬기 루프. shake id는 §9.
+- 모션: 팝(약 1.2s, scale 92→100, ease-out 12프레임) + `dwell=punch`는 등장만, `dwell=hold`는 idle 루프.
+  **모션 종류는 `assets/sprouts/catalog.json`의 이미지별 `motion` 필드가 정한다** — `sway`(기본 숨쉬기 ±3%) · `shake`(잔떨림) · `sob`(세로 들썩임) · `sink`(처짐) · `pop`(크게 숨쉬기). 정의는 같은 파일 `motion_kinds`.
+  구현: `layout.py`의 `_wire_sibom_motion` / `_sibom_motion_sequences` / `_sibom_variant`(2026-08-21). 캐릭터를 **자기 캔버스 안에서** 변형해 프레임 렌더러를 재호출하는 방식 — `_frames.py`는 건드리지 않는다.
+  검증: `worker/test/test_sibom_motion.py`(유닛) + `worker/test/smoke_sibom_motion.py`(실렌더 픽셀 검증, 컨테이너에서 `python3 /app/test/smoke_sibom_motion.py`).
+  미구현: 눈 깜빡임(감은 눈 PNG 자산 없음 — scale/offset 모션만).
 
 `beat_index`는 pack **전** 줄 인덱스에 붙인다. 화면을 3줄로 묶은 뒤에 붙이면 캐릭터가 3문장 내내 남거나 비트가 스킵된다 (`no free body scene`).
 

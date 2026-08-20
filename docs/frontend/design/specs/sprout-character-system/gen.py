@@ -688,8 +688,19 @@ MOTION_KINDS = {
 #    · 조정된 presets: maxChars=10 (테스트가 이 값을 검증한다)
 #    · fallback_chain
 # 통째로 쓰면 장면 매칭과 자막 길이 제한이 파괴되므로 반드시 병합한다.
-CAT = OUT / "catalog.json"
-cat = json.loads(CAT.read_text(encoding="utf-8")) if CAT.exists() else {}
+# 병합 기준은 레포마다 위치가 다르다 (런타임=svg 옆 / AS SSOT=스펙 루트).
+# 기준을 못 찾으면 얇은 catalog를 쓰는 대신 **중단**한다 — 조용한 메타 유실이 최악이다.
+BASES = [OUT / "catalog.json", OUT.parent / "catalog.json"]
+found = [p for p in BASES if p.exists()]
+if not found:
+    raise SystemExit(
+        "[gen.py] 중단: 병합 기준 catalog.json을 찾지 못했다.\n"
+        f"  탐색: {[str(p) for p in BASES]}\n"
+        "  런타임 catalog에는 categories·keywords·sibling_bottom·presets.maxChars 등\n"
+        "  이 생성기가 만들지 않는 매칭 메타가 있다. 덮어쓰면 장면 매칭이 깨진다.\n"
+        "  → 위 경로 중 하나에 현행 catalog.json을 두고 다시 실행할 것.")
+
+cat = json.loads(found[0].read_text(encoding="utf-8"))
 gen_by_id = {it["id"]: it for it in SHEET}
 
 if cat.get("images"):
@@ -709,9 +720,14 @@ cat.setdefault("palette", {}).update(
     {"peach_author": PEACH, "sage_partner": SAGE,
      "cream_body": CREAM, "leaf": LEAF, "blush": BLUSH, "ink": INK})
 
-CAT.write_text(json.dumps(cat, ensure_ascii=False, indent=2), encoding="utf-8")
+blob = json.dumps(cat, ensure_ascii=False, indent=2)
+for p in found:                      # 기존에 있던 위치 전부 동일하게 갱신
+    p.write_text(blob, encoding="utf-8")
+
 missing = [k for k in ("categories", "sibling_bottom", "caption")
            if not any(k in i for i in cat["images"])]
-print(f"wrote {len(SHEET)} svg + catalog.json "
-      f"(images={len(cat['images'])}, presets 보존={'presets' in cat}, "
-      f"매칭메타 유실={missing or '없음'})")
+assert not missing, f"매칭 메타 유실: {missing}"
+print(f"wrote {len(SHEET)} svg + catalog ({len(found)}곳: "
+      f"{', '.join(p.parent.name + '/' for p in found)}) "
+      f"images={len(cat['images'])} keys={len(cat['images'][0])} "
+      f"maxChars={ {k: v['maxChars'] for k, v in cat.get('presets', {}).items()} }")

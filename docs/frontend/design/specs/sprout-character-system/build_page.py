@@ -110,7 +110,7 @@ def face_strip():
         body = gen.sibom(eye=e, mo=mo, br=br, arm="rest", bl=(e in ("dot", "happy", "sparkle")))
         svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 620" '
                f'width="820" height="620"><g fill="none" stroke="{gen.INK}" '
-               f'stroke-width="7" stroke-linecap="round" stroke-linejoin="round">'
+               f'stroke-width="9" stroke-linecap="round" stroke-linejoin="round">'
                f'<g transform="translate(410 40)">{body}</g></g></svg>')
         (SVG / f"face-{label}.svg").write_text(svg, encoding="utf-8")
         out.append(f'<div class="face"><svg viewBox="0 0 820 620" class="art">'
