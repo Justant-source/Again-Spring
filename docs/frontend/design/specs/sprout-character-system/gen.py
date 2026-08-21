@@ -427,8 +427,39 @@ def row(items, preset, scale=0.66):
 SHEET = []
 
 
-def emit(name, preset, inner, meaning, trigger):
-    SHEET.append(dict(id=name, slot=preset, meaning=meaning, trigger=trigger))
+def emit(name, preset, inner, meaning, trigger, *,
+         people=None, arc=None, categories=None, keywords=None,
+         caption=None, alt_captions=None, swap_group=None,
+         sibling_bottom=None, max_chars=None):
+    """씬 1장을 등록한다.
+
+    2배치(31~60)부터는 완전히 새 id를 만들 수도 있다. 새 id는 catalog에
+    아직 없어 merge가 병합해줄 기존 항목이 없으므로, **매칭에 필요한
+    필드를 여기서 전부 채워야 한다**(people/arc/categories/keywords/
+    caption/swap_group). 안 채우면 merge 단계의 완결성 검사가 막는다.
+    기존 id를 다시 emit()하면(1배치 재실행) slot/motion만 갱신되고
+    나머지는 여전히 병합 기준 catalog 쪽 값이 우선한다(§ merge 로직).
+    """
+    entry = dict(id=name, slot=preset, meaning=meaning, trigger=trigger)
+    if people is not None:
+        entry["people"] = people
+    if arc is not None:
+        entry["arc"] = arc
+    if categories is not None:
+        entry["categories"] = categories
+    if keywords is not None:
+        entry["keywords"] = keywords
+    if caption is not None:
+        entry["caption"] = caption
+    if alt_captions is not None:
+        entry["alt_captions"] = alt_captions
+    if swap_group is not None:
+        entry["swap_group"] = swap_group
+    if sibling_bottom is not None:
+        entry["sibling_bottom"] = sibling_bottom
+    if max_chars is not None:
+        entry["maxChars"] = max_chars
+    SHEET.append(entry)
     OUT.mkdir(exist_ok=True)
     (OUT / f"{name}.svg").write_text(canvas(inner, preset), encoding="utf-8")
 
@@ -652,6 +683,308 @@ emit("reconciled", "bottom",
      "결국 화해했다·마음이 풀려 웃었다고 말하는 대목")
 
 
+
+# ══════════════════════════════════════════════════════════════════
+# 2배치 (31~60) — 매칭 실측 기반 재설계. 9장=폴백 형제, 21장=코퍼스 신규주제
+# ══════════════════════════════════════════════════════════════════
+
+# 31. holding-in — 속으로 삭이며 참음
+emit("holding-in", "bottom",
+     place(sibom(eye="down", mo="grit", arm="cross", bl=False), "bottom"),
+     "속으로 삭이며 참음",
+     "말하고 싶은 걸 속으로 삼켰다고 말하는 대목",
+     people=1, arc="reaction", categories=["ANY"],
+     keywords=["참았","속으로","말 못","삼켰","꾹 참","입을 다물","버티","침묵","못 하","견디"],
+     caption="말 못 삼킴", swap_group="unspoken")
+
+# 32. glancing-around — 눈치 보며 주변을 살핌
+emit("glancing-around", "bottom",
+     place(sibom(eye="side", mo="flat", arm="rest", bl=False, face_dx=-28, mk="sweat"), "bottom"),
+     "눈치 보며 주변을 살핌",
+     "분위기를 살피거나 눈치가 보였다고 말하는 대목",
+     people=1, arc="reaction", categories=["ANY"],
+     keywords=["눈치","살피","신경 쓰","조심스럽","분위기 봐","눈길","반응보기","분위기","살펴보","주변 봐"],
+     caption="눈치 보기", swap_group="watching")
+
+# 33. quiet-anger — 분을 삭이며 참음
+emit("quiet-anger", "bottom",
+     place(sibom(eye="squint", mo="tight", arm="cross", bl=False, br="angry", leaf="normal"), "bottom"),
+     "분을 삭이며 참음",
+     "억울하다·화가 나지만 표현하지 못했다고 말하는 대목",
+     people=1, arc="reaction", categories=["ANY"],
+     keywords=["화가 나지만","참았","억울하지만","꾹 눌러","노여움","분을 삼킨","버티는","내색 못","참고 있","감정 숨김"],
+     caption="분을 삭임", swap_group="unfair")
+
+# 34. scolded-silent — 고개 숙이고 야단맞음
+emit("scolded-silent", "bottom",
+     duo(sibom(fill=SAGE, eye="flat", mo="open", arm="up", mk="chatter", leaf="bristle"),
+         flip(sibom(fill=PEACH, eye="down", mo="flat", arm="hug", bl=False, br="sad")),
+         "bottom", gap=390, scale=0.72),
+     "고개 숙이고 야단맞음",
+     "상대가 크게 질책하거나 야단을 쳤다고 말하는 대목",
+     people=2, arc="trigger", categories=["FAMILY","MARRIED","WORK"],
+     keywords=["혼났","야단","뭐라 하","잔소리 듣","고개 숙이","지적당했","책망","훈계","피나","꾸중"],
+     caption="야단맞음", swap_group="scolded")
+
+# 35. walking-away — 마음을 정하고 뒤돌아 멀어짐
+emit("walking-away", "bottom",
+     place(sibom(eye="flat", mo="flat", arm="reach_r", bl=False, br="up", leaf="perky"), "bottom"),
+     "마음을 정하고 뒤돌아 멀어짐",
+     "이제 그만하기로 했다·거리를 두기로 결심했다고 말하는 대목",
+     people=1, arc="resolution", categories=["ANY"],
+     keywords=["정리하기로","거리를 두","멀어지기로","연락 끊기로","떠나기로","나가기로","돌아서","결심","떠남","갈라서기로"],
+     caption="떠나기로", swap_group="boundary")
+
+# 31. 거짓말의 증거를 발견한 순간
+emit("evidence-found", "bottom",
+     duo(sibom(fill=PEACH, eye="wide", mo="open", arm="rest", bl=True, br="up"),
+         flip(sibom(fill=SAGE, eye="down", mo="flat", arm="cross", bl=False, br="sad")),
+         "bottom", gap=400, scale=0.74),
+     "거짓말의 증거를 발견한 순간",
+     "증거를 발견하거나 거짓이 들통났다고 말하는 대목",
+     people=2, arc="trigger", categories=["COUPLE","MARRIED","FRIEND","FAMILY"],
+     keywords=["알고 보니","걸렸","증거","들통","확인해보니","알게 됐","페이크","속았","뒤통수"],
+     caption="증거를 본 순간",
+     swap_group="deception")
+
+# 32. 지나가다 자기 얘기를 우연히 엣들음
+emit("overheard", "bottom",
+     place(sibom(eye="wide", mo="small_open", arm="up", bl=True, mk="shock", leaf="perky", br="up"), "bottom"),
+     "지나가다 자기 얘기를 우연히 엣들음",
+     "우연히 자기 뒷담화를 들었다고 말하는 대목",
+     people=1, arc="trigger", categories=["FRIEND","WORK","OTHER"],
+     keywords=["우연히 듣","엿들","지나가다","뒤에서 하는 말","내 얘기","몰랐는데","정말","충격","나까지"],
+     caption="우연히 들은 순간",
+     swap_group="gossip")
+
+# 33. 말이 끊기고 목소리가 묻힘
+emit("voice-drowned-out", "bottom",
+     duo(sibom(fill=PEACH, eye="wide", mo="open", arm="up", br="up", bl=False),
+         flip(sibom(fill=SAGE, eye="squint", mo="open", arm="up", br="angry", mk="chatter", leaf="bristle")),
+         "bottom", gap=400, scale=0.74),
+     "말이 끊기고 목소리가 묻힘",
+     "내 말이 묻혀서 들리지 않거나 계속 무시당했다고 말하는 대목",
+     people=2, arc="reaction", categories=["ANY"],
+     keywords=["끼어들","말을 자르","안 들어주","묻혀버렸","더 크게","내 말","무시","정신 못 써"],
+     caption="목소리가 묻혀버림",
+     swap_group="dismissed")
+
+# 34. 상의 없이 일방적으로 통보받음
+emit("decision-announced", "bottom",
+     place(sibom(eye="wide", mo="open", arm="up", bl=True, br="up", mk="shock"), "bottom"),
+     "상의 없이 일방적으로 결정을 통보받음",
+     "상의도 없이 이미 결정을 내려버렸다고 통보받았다고 말하는 대목",
+     people=1, arc="trigger", categories=["FAMILY","MARRIED","WORK"],
+     keywords=["통보받","이미 정해","상의도 없이","일방적으로","결정됨","선택지 없이","한 번에","정해버렸"],
+     caption="일방적으로 통보받음",
+     swap_group="overruled")
+
+# 35. 생활습관 충돌
+emit("habit-clash", "top",
+     duo(sibom(fill=PEACH, eye="down", mo="flat", arm="cross", bl=False, br="sad", leaf="normal"),
+         flip(sibom(fill=SAGE, eye="side", mo="tight", arm="cross", bl=False, leaf="normal")),
+         "top", gap=400, scale=0.74),
+     "생활습관 충돌·정리 안 함·핸드폰·게임",
+     "생활습관이 달라서 자꾸 싸운다고 말하는 대목",
+     people=2, arc="trigger", categories=["COUPLE"],
+     keywords=["정리를 안","핸드폰만","게임만","담배","청소를 안","습관","변하지 않는","같이 못","짜증"],
+     caption="생활습관이 맞지 않음",
+     swap_group="habit")
+
+# 33. 부모님 간섭 - 눈치 보며 답답함
+emit("parents-control", "bottom",
+     place(sibom(eye="side", mo="flat", arm="cross", bl=False, br="sad", mk="sweat", leaf="droop"), "bottom"),
+     "부모님의 간섭과 독립 압박",
+     "부모가 자꾸 간섭하거나 연락하라고 재촉했다고 말하는 대목",
+     people=1, arc="trigger", categories=["FAMILY"],
+     keywords=["부모님", "간섭", "연락", "독립", "자꾸", "전화", "챙기라", "얘기"],
+     caption="부모님 간섭", swap_group="parent-grip")
+
+# 34. 기념일 소홀 - COUPLE×reaction 구조적 갭 메우기
+emit("forgotten-anniversary", "bottom",
+     place(sibom(eye="down", mo="tight", arm="limp", bl=False, br="sad", leaf="droop"), "bottom"),
+     "기념일을 소홀히 당하고 서운함",
+     "기념일을 챙겨주지 않았거나 선물이 없었다고 말하는 대목",
+     people=1, arc="reaction", categories=["COUPLE"],
+     keywords=["기념일", "잊어버렸", "챙기지", "선물", "깜빡", "기억", "중요", "안했다"],
+     caption="기념일 소홀", swap_group="forgotten")
+
+# 35. 몰래 쓴 돈 발각
+emit("secret-spending", "bottom",
+     place(sibom(eye="wide", mo="small_open", arm="rest", bl=False, br="up", mk="shock", leaf="perky", pr="receipt"), "bottom"),
+     "배우자가 몰래 쓴 돈을 알게 됨",
+     "배우자가 모르게 큰 돈을 썼거나 카드 결제 내역을 숨겼다고 말하는 대목",
+     people=1, arc="trigger", categories=["MARRIED"],
+     keywords=["몰래", "쓴돈", "카드", "결제", "모르게", "큰돈", "내역", "발각"],
+     caption="몰래 쓴 돈", swap_group="money-secret")
+
+# 36. 공로 가로채기 - 억울하고 분함
+emit("credit-stolen", "bottom",
+     place(sibom(eye="squint", mo="open", arm="up", bl=False, br="angry", mk="shake", leaf="bristle"), "bottom"),
+     "내 공로를 남이 가져가고 불공정한 대우를 받음",
+     "내가 한 일의 공을 누군가에게 뺏겼거나 인정받지 못했다고 말하는 대목",
+     people=1, arc="reaction", categories=["WORK"],
+     keywords=["내가", "공은", "팀장", "인정", "못", "가져갔", "받지", "불공정"],
+     caption="공로 가로채기", swap_group="unfair-credit")
+
+# 37. 여행 계획 충돌 - 의견 대치
+emit("travel-plan-clash", "bottom",
+     duo(sibom(fill=PEACH, eye="flat", mo="open", arm="up", bl=False, br="angry", leaf="bristle"),
+         flip(sibom(fill=SAGE, eye="down", mo="tight", arm="cross", bl=False, br="sad")),
+         "bottom", gap=380, scale=0.74, tilt=6),
+     "여행·일정 계획이 안 맞아 충돌",
+     "여행이나 휴가 계획을 짤 때 일정이 맞지 않거나 의견이 부딪혔다고 말하는 대목",
+     people=2, arc="trigger", categories=["COUPLE"],
+     keywords=["여행", "계획", "일정", "휴가", "연차", "맞지", "충돌", "의견"],
+     caption="여행 계획 충돌", swap_group="plan-clash")
+
+# 34. 가사분담을 놓고 부부가 언쌍
+emit("chore-fight", "top",
+     duo(sibom(fill=PEACH, eye="squint", mo="open", arm="up", br="angry",
+               mk="steam", leaf="bristle"),
+         flip(sibom(fill=SAGE, eye="squint", mo="open", arm="up", br="angry",
+                    mk="steam", leaf="bristle")),
+         "top", gap=400, scale=0.74),
+     "가사분담을 놓고 부부가 언쌍",
+     "집안일을 누가 해야 하는지 싸웠다고 말하는 대목",
+     people=2, arc="trigger", categories=["MARRIED"],
+     keywords=["집안일", "왜나만", "분담", "같이좀", "청소", "설거지", "가사", "불공평", "나만", "도와줘"],
+     caption="가사분담 싸움",
+     swap_group="chore")
+
+# 35. 적반하장 — 오히려 상대가 화를 냄
+emit("turned-blame", "top",
+     duo(sibom(fill=PEACH, eye="wide", mo="small_open", arm="reach_r", br="up"),
+         flip(sibom(fill=SAGE, eye="flat", mo="flat", arm="cross", br="angry", bl=False, face_dx=64)),
+         "top", gap=372, scale=0.74),
+     "적반하장 — 오히려 상대가 화를 냄",
+     "내가 지적했는데 오히려 상대가 화를 냈다고 말하는 대목",
+     people=2, arc="trigger", categories=["OTHER"],
+     keywords=["오히려화", "적반하장", "왜니가", "당당하게", "화내", "나한테", "더화내", "억울해", "몰상식", "역할"],
+     caption="적반하장 화내기",
+     swap_group="reversal")
+
+# 36. 학업·진로를 놓고 부모와 압박
+emit("study-pressure", "bottom",
+     place(sibom(eye="down", mo="grit", arm="rest", br="sad", leaf="droop", bl=False), "bottom"),
+     "학업·진로를 놓고 부모와 압박",
+     "공부하라고 재촉받거나 진로로 눌렸다고 말하는 대목",
+     people=1, arc="trigger", categories=["FAMILY"],
+     keywords=["공부하라", "성적", "진로", "학원", "시험", "입시", "대학", "너는왜", "항상", "잘해야"],
+     caption="부모 공부 압박",
+     swap_group="study")
+
+# 37. 이직·퇴사를 마음먹은 순간 — 결심
+emit("quit-decided", "bottom",
+     place(sibom(eye="flat", mo="tight", arm="rest", bl=False, leaf="perky", br=""), "bottom"),
+     "이직·퇴사를 마음먹은 순간",
+     "그만두기로 마음먹었다·사표를 낼 준비를 했다고 말하는 대목",
+     people=1, arc="resolution", categories=["WORK"],
+     keywords=["그만두기로", "퇴사", "이직하기로", "사표", "나갈래", "정리하기", "내가나가", "더는", "끝내기로", "나가"],
+     caption="이직 결심의 순간",
+     swap_group="quit")
+
+# 38. 회식·술자리에서의 갈등
+emit("drunk-conflict", "bottom",
+     row([(sibom(eye="down", mo="flat", arm="limp", bl=True, br="sad", mk="sweat", face_dx=-56), 150),
+          (sibom(fill=SAGE, eye="squint", mo="open", arm="rest", bl=True, mk="sweat"), 490),
+          (flip(sibom(fill=SAGE, eye="squint", mo="open", arm="rest", bl=True, mk="sweat")), 706)],
+         "bottom", scale=0.56),
+     "회식·술자리에서의 갈등",
+     "술 취한 자리에서 싸웠거나 불편한 일이 있었다고 말하는 대목",
+     people=3, arc="trigger", categories=["OTHER"],
+     keywords=["회식", "술자리", "취해서", "다들마시", "폭탄주", "술마신", "술", "싸우다", "불편해", "기분"],
+     caption="술자리 갈등",
+     swap_group="drink")
+
+# 35. 형제자매 갈등 - 편애·차별감
+emit("sibling-rivalry", "top",
+     duo(sibom(fill=PEACH, eye="wide", mo="big_smile", arm="rest", leaf="normal", mk="sparkle"),
+         flip(sibom(fill=SAGE, eye="squint", mo="open", arm="up", br="sad", leaf="bristle", mk="steam")),
+         "top", gap=400, scale=0.74),
+     "형제자매 중 한 명이 차별받는 느낌",
+     "언니만 편해 보인다·오빠 편애 때문이라고 말하는 대목",
+     people=2, arc="trigger", categories=["FAMILY"], keywords=["형은", "동생은", "차별", "편애", "오빠만"],
+     caption="형만 자유로워 보여", swap_group="sibling")
+
+# 36. 가치관 차이 수용 - resolution
+emit("different-values", "bottom",
+     duo(sibom(fill=PEACH, eye="down", mo="smile", arm="rest", leaf="normal"),
+         flip(sibom(fill=SAGE, eye="side", mo="flat", arm="rest", leaf="normal")),
+         "bottom", gap=380, scale=0.74),
+     "서로 다른 생각을 받아들이기",
+     "생각이 다르긴 한데 그게 다가 아니라고 말하는 대목",
+     people=2, arc="resolution", categories=["COUPLE"], keywords=["생각이 다르", "가치관", "안 맞", "다르다는 걸"],
+     caption="다르긴 해도 괜찮아", swap_group="values")
+
+# 37. 휴대폰 확인 - 의심
+emit("checking-phone", "bottom",
+     place(sibom(eye="side", mo="tight", arm="phone", pr="phone", bl=False, br="sad", leaf="droop", mk="sweat"), "bottom"),
+     "신뢰가 흔들려 상대의 휴대폰을 확인함",
+     "휴대폰 비밀번호를 몰래 봤다·확인해버렸다고 말하는 대목",
+     people=1, arc="trigger", categories=["OTHER"], keywords=["휴대폰을", "확인하", "비밀번호", "몰래 보", "의심"],
+     caption="마음이 자꾸 흔들려", swap_group="suspicion")
+
+# 38. 결혼 준비 스트레스
+emit("wedding-stress", "top",
+     duo(sibom(fill=PEACH, eye="sleepy", mo="wavy", arm="limp", leaf="droop", mk="sweat"),
+         flip(sibom(fill=SAGE, eye="flat", mo="tight", arm="cross", br="angry", leaf="normal")),
+         "top", gap=400, scale=0.74),
+     "결혼 준비 과정에서 스트레스와 갈등",
+     "예물·예단 때문에 싸웠다·결혼 준비가 힘들다고 말하는 대목",
+     people=2, arc="trigger", categories=["COUPLE"], keywords=["결혼 준비", "예단", "예물", "상견례", "결혼식"],
+     caption="준비할 게 너무 많아", swap_group="wedding")
+
+# 39. 외도 의심 - 극도의 충격 (BUBBLE)
+emit("affair-suspicion", "bubble",
+     place(sibom(eye="wide", mo="open", arm="up", leaf="perky", bl=False, br="up", mk="shock"), "bubble"),
+     "외도를 의심하는 순간의 극도의 충격",
+     "상대가 다른 사람을 만났다는 걸 알았을 때라고 말하는 대목",
+     people=1, arc="trigger", categories=["COUPLE"], keywords=["외도", "다른 여자", "다른 남자", "몰래 만나", "수상한 문자"],
+     caption="설마...", swap_group="affair")
+
+# 31. 아파도 신경 써주지 않는 무관심
+emit("health-ignored", "bottom",
+     place(sibom(eye="sleepy", mo="pout", arm="limp", bl=False, leaf="droop", br="sad"), "bottom"),
+     "아파도 신경 써주지 않는 무관심",
+     "아팠는데 아무도 신경 써주지 않거나 챙겨주지 않았다고 말하는 대목",
+     people=1, arc="reaction", categories=["OTHER"], keywords=["아팠는데", "병원도", "신경도 안", "걱정도", "안 챙겨", "무관심", "혼자 있었다", "외로웠어"],
+     caption="혼자인 아픔", swap_group="health")
+
+# 32. SNS·사진 때문에 생긴 질투·갈등
+emit("photo-jealousy", "bottom",
+     place(sibom(eye="side", mo="flat", arm="phone", pr="phone", bl=False, leaf="normal"), "bottom"),
+     "SNS·사진 때문에 생긴 질투",
+     "사진이나 인스타그램 때문에 질투나 불안감을 느꼈다고 말하는 대목",
+     people=1, arc="trigger", categories=["COUPLE"], keywords=["사진을", "인스타", "댓글", "팔로우", "좋아요", "SNS", "자랑", "올렸더니"],
+     caption="사진 앞의 질투", swap_group="photo")
+
+# 33. 이사·주거를 둘러싼 갈등
+emit("moving-conflict", "bottom",
+     duo(sibom(fill=PEACH, eye="flat", mo="tight", arm="cross", bl=False, leaf="normal", face_dx=-64),
+         flip(sibom(fill=SAGE, eye="squint", mo="open", arm="up", br="angry", leaf="normal", face_dx=64)),
+         "bottom", gap=420, scale=0.76, tilt=6),
+     "이사·주거를 둘러싼 갈등",
+     "이사 비용이나 전세·월세·보증금 문제로 싸웠다고 말하는 대목",
+     people=2, arc="trigger", categories=["OTHER"], keywords=["이사", "전세", "월세", "보증금", "집을 구하", "이사비", "주거", "이사 가자"],
+     caption="집 때문에", swap_group="moving")
+
+# 34. 질투·부러움 (기존 15번 "compared"와 다른 감정 — 자신이 남을 부러워하는 능동적 감정)
+emit("jealous-envy", "bubble",
+     place(sibom(eye="down", mo="wavy", arm="limp", bl=False, leaf="droop", mk="quiet"), "bubble"),
+     "질투·부러움",
+     "남을 부러워하거나 질투했다고 말하는 대목",
+     people=1, arc="reaction", categories=["COUPLE", "FRIEND"], keywords=["부러웠", "나도 저렇게", "질투", "나만 이러나", "다들 좋아 보여", "왜 나만", "저 사람은"],
+     caption="부러움", swap_group="envy")
+
+# 35. 죄책감·미안함 (자기 자신을 향한 자책 감정)
+emit("guilt-heavy", "bottom",
+     place(sibom(eye="down", mo="tight", arm="hug", leg="curl", bl=False, leaf="droop"), "bottom"),
+     "죄책감·미안함",
+     "내 잘못으로 상대에게 상처를 줬다는 죄책감이나 자책을 느꼈다고 말하는 대목",
+     people=1, arc="reaction", categories=["ANY"], keywords=["내 잘못", "미안해서", "죄책감", "괜히 그랬어", "후회했다", "내가 먼저", "잘못했어", "자책"],
+     caption="자책", swap_group="guilt")
+
 import json
 
 # ── 떡잎 시그니처 규칙 (Phase 1) ─────────────────────────────────────
@@ -706,6 +1039,9 @@ if not found:
 cat = json.loads(found[0].read_text(encoding="utf-8"))
 gen_by_id = {it["id"]: it for it in SHEET}
 
+_REQUIRED_NEW_FIELDS = ("people", "arc", "categories", "keywords",
+                        "caption", "swap_group")
+
 if cat.get("images"):
     for it in cat["images"]:
         g = gen_by_id.get(it["id"])
@@ -713,7 +1049,21 @@ if cat.get("images"):
             it["slot"] = g["slot"]        # 슬롯은 생성기가 권위 (아트 레이아웃)
             it["motion"] = g["motion"]
     known = {it["id"] for it in cat["images"]}
-    cat["images"].extend(it for it in SHEET if it["id"] not in known)
+    new_entries = [it for it in SHEET if it["id"] not in known]
+    # 🚨 새 id는 병합해줄 기존 항목이 없다 — 매칭 필드를 emit()에서
+    #    직접 채우지 않으면 조용히 얇은 항목이 섞여 들어간다. 여기서 막는다.
+    for it in new_entries:
+        gaps = [f for f in _REQUIRED_NEW_FIELDS if f not in it]
+        if gaps:
+            raise SystemExit(
+                f"[gen.py] 중단: 신규 id '{it['id']}'의 필수 필드 누락: {gaps}\n"
+                "  emit()에 people/arc/categories/keywords/caption/swap_group을 "
+                "전달할 것.")
+        it.setdefault("maxChars",
+                      cat.get("presets", {}).get(it["slot"], {}).get("maxChars", 10))
+        it.setdefault("sibling_bottom", None)
+        it.setdefault("alt_captions", [])
+    cat["images"].extend(new_entries)
 else:
     cat["images"] = SHEET
 
@@ -727,9 +1077,13 @@ blob = json.dumps(cat, ensure_ascii=False, indent=2)
 for p in found:                      # 기존에 있던 위치 전부 동일하게 갱신
     p.write_text(blob, encoding="utf-8")
 
-missing = [k for k in ("categories", "sibling_bottom", "caption")
-           if not any(k in i for i in cat["images"])]
-assert not missing, f"매칭 메타 유실: {missing}"
+# 완결성 검사: "이미지 중 하나라도 있으면 통과"가 아니라 **전부 있어야** 통과.
+# (예전 any() 검사는 신규 30장이 전부 필드 누락이어도 기존 30장 중 1개만
+#  값이 있으면 통과해버리는 약한 가드였다 — 2배치부터 강화)
+missing = [k for k in ("categories", "sibling_bottom", "caption", "people",
+                       "arc", "keywords", "swap_group")
+           if not all(k in i for i in cat["images"])]
+assert not missing, f"매칭 메타 유실(일부 이미지에 없음): {missing}"
 print(f"wrote {len(SHEET)} svg + catalog ({len(found)}곳: "
       f"{', '.join(p.parent.name + '/' for p in found)}) "
       f"images={len(cat['images'])} keys={len(cat['images'][0])} "

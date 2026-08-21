@@ -1,13 +1,13 @@
 {
-  "$schema_note": "다시봄 시봄이(Sibom) 캐릭터 카탈로그 — batch 1/2 (30/60). 발동조건 문장은 LLM 프롬프트 컨텍스트용, keywords는 정규식/포함검사 폴백용.",
+  "$schema_note": "다시봄 시봄이(Sibom) 캐릭터 카탈로그 — batch 2/2 완료(60/60). 발동조건 문장은 LLM 프롬프트 컨텍스트용, keywords는 부분문자열 매칭용(2~6자 어간 권장, 실측 검증됨).",
   "character": {
     "name": "시봄이",
     "name_en": "sibom",
     "concept": "서툰 존재 — 서툴러서 갈등하고, 그래서 다시 봄이 필요하다"
   },
-  "batch": 1,
+  "batch": 2,
   "batch_total": 2,
-  "images_in_batch": 30,
+  "images_in_batch": 60,
   "target_total": 60,
   "canvas": {
     "size": [
@@ -82,11 +82,13 @@
       "meaning": "말없이 등 돌린 냉전",
       "trigger": "서로 말을 안 한 지 며칠째라고 서술하는 대목",
       "keywords": [
-        "말을 안 한 지",
-        "냉전",
-        "며칠째 대화가",
-        "서로 피하고",
-        "눈도 안 마주치고"
+        "말 한마디",
+        "한마디도",
+        "어색",
+        "서로 말",
+        "말이 없어",
+        "대화가 없",
+        "연락도"
       ],
       "caption": "사흘째 침묵",
       "alt_captions": [
@@ -94,7 +96,7 @@
         "말 없는 사이"
       ],
       "swap_group": "silence",
-      "sibling_bottom": null,
+      "sibling_bottom": "two-cold-backs",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -113,10 +115,14 @@
       "meaning": "정면충돌·언성이 높아진 순간",
       "trigger": "그 자리에서 다투거나 언성이 높아졌다고 서술하는 대목",
       "keywords": [
-        "언성이 높아졌다",
-        "그 자리에서 다퉜다",
-        "소리를 질렀다",
-        "말다툼이 났다"
+        "싸우",
+        "싸움",
+        "따지",
+        "싸운",
+        "싸울",
+        "화를 냈",
+        "소리 지",
+        "막말"
       ],
       "caption": "끝내 부딪쳤다",
       "alt_captions": [
@@ -142,10 +148,13 @@
       "meaning": "화해를 시도했지만 받아들여지지 않음",
       "trigger": "먼저 사과하거나 손을 내밀었는데 반응이 없었다고 말하는 대목",
       "keywords": [
-        "먼저 사과했는데",
-        "손을 내밀었는데",
-        "화해를 시도했지만",
-        "받아주지 않았다"
+        "미안하다",
+        "먼저 연락",
+        "사과하",
+        "화해",
+        "풀어보",
+        "다가가",
+        "말 걸었"
       ],
       "caption": "손 내밀었는데",
       "alt_captions": [
@@ -168,11 +177,14 @@
       "meaning": "읽씹·답장 없음",
       "trigger": "연락을 했는데 답이 없거나 읽고 씹혔다고 말하는 대목",
       "keywords": [
+        "뜸",
+        "씹",
+        "연락도",
         "읽씹",
-        "답장이 없다",
-        "카톡을 읽고도",
-        "연락이 끊겼다",
-        "답이 없었다"
+        "연락이 없",
+        "답장",
+        "톡을",
+        "톡도"
       ],
       "caption": "사흘째 읽씹",
       "alt_captions": [
@@ -195,10 +207,13 @@
       "meaning": "하고 싶은 말을 삼킴",
       "trigger": "말하고 싶었지만 결국 아무 말도 못 했다고 말하는 대목",
       "keywords": [
-        "말을 삼켰다",
-        "결국 아무 말도",
-        "하고 싶은 말이 있었지만",
-        "속으로만"
+        "한마디도",
+        "말 못",
+        "속으로",
+        "할 말이",
+        "말을 못",
+        "참았",
+        "말하려"
       ],
       "caption": "삼킨 한마디",
       "alt_captions": [
@@ -206,7 +221,7 @@
         "속에만 남은 말"
       ],
       "swap_group": "unspoken",
-      "sibling_bottom": null,
+      "sibling_bottom": "holding-in",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -221,10 +236,12 @@
       "meaning": "어이없어 말문이 막힘",
       "trigger": "상대의 말·행동에 황당하거나 말문이 막혔다고 말하는 대목",
       "keywords": [
-        "말문이 막혔다",
-        "어이가 없었다",
-        "황당했다",
-        "순간 멍해졌다"
+        "헐",
+        "어이없",
+        "황당",
+        "할 말이",
+        "기가 막",
+        "말문"
       ],
       "caption": "말문이 멎었다",
       "alt_captions": [
@@ -247,10 +264,12 @@
       "meaning": "눈치를 보며 살핌",
       "trigger": "분위기를 살피거나 눈치가 보였다고 말하는 대목",
       "keywords": [
-        "눈치를 봤다",
-        "분위기를 살폈다",
-        "눈치가 보였다",
-        "조심스러웠다"
+        "분위기",
+        "눈치",
+        "신경 쓰",
+        "조심",
+        "살피",
+        "기색"
       ],
       "caption": "눈치만 본 날",
       "alt_captions": [
@@ -258,7 +277,7 @@
         "조심스런 눈빛"
       ],
       "swap_group": "watching",
-      "sibling_bottom": null,
+      "sibling_bottom": "glancing-around",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -273,10 +292,14 @@
       "meaning": "지치고 소진됨",
       "trigger": "반복되는 일에 지쳤다·더는 못 하겠다고 말하는 대목",
       "keywords": [
-        "이제 지쳤다",
-        "더는 못 하겠다",
-        "반복되니까 지친다",
-        "힘이 다 빠졌다"
+        "힘들",
+        "반복",
+        "버티",
+        "지쳐",
+        "포기",
+        "지치",
+        "한숨",
+        "소모"
       ],
       "caption": "기운이 빠졌다",
       "alt_captions": [
@@ -299,10 +322,14 @@
       "meaning": "억울하고 분함",
       "trigger": "억울하다·왜 나만 그러냐고 말하는 대목",
       "keywords": [
-        "억울했다",
-        "왜 나만",
-        "나만 이러는",
-        "너무 억울해서"
+        "나만",
+        "서운",
+        "억울",
+        "짜증",
+        "열받",
+        "화가 나",
+        "섭섭",
+        "분하"
       ],
       "caption": "왜 나만 그래",
       "alt_captions": [
@@ -310,7 +337,7 @@
         "나만 남은 일"
       ],
       "swap_group": "unfair",
-      "sibling_bottom": null,
+      "sibling_bottom": "quiet-anger",
       "maxChars": 10,
       "motion": "shake"
     },
@@ -325,10 +352,13 @@
       "meaning": "한숨 돌린 안도",
       "trigger": "이야기 끝에 마음이 조금 풀렸거나 정리됐다고 말하는 대목",
       "keywords": [
-        "마음이 풀렸다",
-        "조금 나아졌다",
-        "한숨 돌렸다",
-        "정리가 됐다"
+        "괜찮",
+        "다행",
+        "편해",
+        "잘 지내",
+        "이제야",
+        "홀가분",
+        "나아졌"
       ],
       "caption": "한숨 돌렸다",
       "alt_captions": [
@@ -354,10 +384,14 @@
       "meaning": "돈·계산 문제로 상한 마음",
       "trigger": "돈을 빌려주고 못 받았다·계산이 불공평했다고 말하는 대목",
       "keywords": [
-        "돈을 빌려줬는데",
-        "계산이 불공평",
-        "돈 문제로",
-        "정산이 안 맞았다"
+        "만원",
+        "금액",
+        "생활비",
+        "용돈",
+        "각자",
+        "대출",
+        "반반",
+        "월급"
       ],
       "caption": "돈 얘기만 남아",
       "alt_captions": [
@@ -382,10 +416,14 @@
       "meaning": "나만 빠진 자리·배제",
       "trigger": "나만 부르지 않았다·단톡에서 빠졌다고 말하는 대목",
       "keywords": [
-        "나만 부르지 않았다",
-        "단톡에서 빠졌다",
-        "나만 몰랐다",
-        "나 빼고"
+        "끼리",
+        "단톡",
+        "빼고",
+        "따돌",
+        "소외",
+        "제외",
+        "나 빼",
+        "안 부르"
       ],
       "caption": "나만 빠진 자리",
       "alt_captions": [
@@ -410,10 +448,11 @@
       "meaning": "일방적인 잔소리·훈계",
       "trigger": "상대가 계속 지적하거나 잔소리를 쏟아냈다고 말하는 대목",
       "keywords": [
-        "계속 지적했다",
-        "잔소리를 쏟아냈다",
-        "또 잔소리",
-        "훈계를 늘어놨다"
+        "뭐라",
+        "지적",
+        "잔소리",
+        "계속 말",
+        "꼬투리"
       ],
       "caption": "또 시작이구나",
       "alt_captions": [
@@ -421,7 +460,7 @@
         "계속된 지적"
       ],
       "swap_group": "scolded",
-      "sibling_bottom": null,
+      "sibling_bottom": "scolded-silent",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -438,10 +477,12 @@
       "meaning": "감당 못 할 만큼 떠안음",
       "trigger": "일·역할이 나에게만 몰렸다고 말하는 대목",
       "keywords": [
-        "다 내 몫이었다",
-        "나한테만 몰렸다",
-        "혼자 다 떠안았다",
-        "감당이 안 됐다"
+        "다 내",
+        "집안일",
+        "감당",
+        "혼자 다",
+        "몰아",
+        "몫"
       ],
       "caption": "몫이 너무 많다",
       "alt_captions": [
@@ -466,10 +507,11 @@
       "meaning": "남과 비교당함",
       "trigger": "누구는 이런데 너는 왜 그러냐는 말을 들었다고 말하는 대목",
       "keywords": [
-        "누구는 이런데",
-        "너는 왜 그러냐고",
-        "비교를 당했다",
-        "다른 사람이랑 비교"
+        "남편은",
+        "비교",
+        "다른 사람",
+        "친구는",
+        "남들"
       ],
       "caption": "또 비교당했다",
       "alt_captions": [
@@ -492,10 +534,12 @@
       "meaning": "끝내 사과하지 않음",
       "trigger": "상대가 잘못을 인정하거나 사과하지 않았다고 말하는 대목",
       "keywords": [
-        "끝내 사과하지 않았다",
-        "사과는 없었다",
-        "잘못을 인정 안 했다",
-        "미안하다는 말 한마디 없이"
+        "인정",
+        "미안하다",
+        "잘못했",
+        "핑계",
+        "변명",
+        "뻔뻔"
       ],
       "caption": "미안하단 말 없음",
       "alt_captions": [
@@ -518,10 +562,12 @@
       "meaning": "참다가 결국 터진 울음",
       "trigger": "참다가 울어버렸다·눈물이 났다고 말하는 대목",
       "keywords": [
-        "결국 울었다",
-        "눈물이 났다",
-        "참다가 터졌다",
-        "울음이 터졌다"
+        "눈물",
+        "울었",
+        "울면서",
+        "울음",
+        "울고",
+        "울먹"
       ],
       "caption": "참은 눈물 터짐",
       "alt_captions": [
@@ -544,10 +590,12 @@
       "meaning": "혼자 곱씹으며 웅크림",
       "trigger": "그날 일이 계속 생각났다·혼자 곱씹었다고 말하는 대목",
       "keywords": [
-        "계속 생각났다",
-        "혼자 곱씹었다",
-        "밤새 생각했다",
-        "잠도 못 잤다"
+        "머릿속",
+        "떠오",
+        "계속 생각",
+        "자꾸 생각",
+        "곱씹",
+        "잠이 안"
       ],
       "caption": "밤새 떠올랐다",
       "alt_captions": [
@@ -570,10 +618,14 @@
       "meaning": "곁에서 편들어주고 다독임",
       "trigger": "누군가 내 편을 들어주거나 위로해줬다고 말하는 대목",
       "keywords": [
-        "내 편을 들어줬다",
-        "위로해줬다",
-        "다독여줬다",
-        "곁에 있어줬다"
+        "들어주",
+        "위로",
+        "옆에 있",
+        "털어놓",
+        "챙겨주",
+        "공감",
+        "편들",
+        "내 편"
       ],
       "caption": "내 편이 되어줘",
       "alt_captions": [
@@ -596,10 +648,12 @@
       "meaning": "마음을 정하고 거리를 둠",
       "trigger": "이제 그만하기로 했다·거리를 두기로 했다고 말하는 대목",
       "keywords": [
-        "이제 그만하기로",
-        "거리를 두기로",
-        "마음을 정했다",
-        "여기까지만"
+        "끊었",
+        "거리를",
+        "정리하",
+        "손절",
+        "멀어",
+        "연 끊"
       ],
       "caption": "여기까지 하자",
       "alt_captions": [
@@ -607,7 +661,7 @@
         "마음 정리 중"
       ],
       "swap_group": "boundary",
-      "sibling_bottom": null,
+      "sibling_bottom": "walking-away",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -625,10 +679,14 @@
       "meaning": "거짓말·숨긴 일이 들통남",
       "trigger": "거짓말이나 숨긴 일이 들통났다고 말하는 대목",
       "keywords": [
-        "거짓말이 들통났다",
-        "숨긴 게 들켰다",
-        "거짓말한 걸 알았다",
-        "속인 걸 알게 됐다"
+        "말 안 했",
+        "몰래",
+        "알고 보니",
+        "걸렸",
+        "뒤늦게",
+        "거짓말",
+        "나중에 알",
+        "안 알려"
       ],
       "caption": "숨긴 말이 들킴",
       "alt_captions": [
@@ -636,7 +694,7 @@
         "속였단 걸 앎"
       ],
       "swap_group": "deception",
-      "sibling_bottom": null,
+      "sibling_bottom": "evidence-found",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -653,10 +711,12 @@
       "meaning": "뒤에서 이야기됨을 알게 됨",
       "trigger": "누군가 내 뒷담화를 했다는 걸 알게 됐다고 말하는 대목",
       "keywords": [
-        "뒷담화를 했다는 걸",
-        "뒤에서 내 얘기를",
-        "내 얘기를 하고 다녔다",
-        "뒷말을 들었다"
+        "뒤에서",
+        "뒤통수",
+        "건너",
+        "뒷담화",
+        "소문",
+        "험담"
       ],
       "caption": "내 얘길 들었다",
       "alt_captions": [
@@ -664,7 +724,7 @@
         "뒷말을 알았다"
       ],
       "swap_group": "gossip",
-      "sibling_bottom": null,
+      "sibling_bottom": "overheard",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -679,10 +739,12 @@
       "meaning": "약속 장소에서 혼자 기다림",
       "trigger": "약속을 어기거나 바람맞았다고 말하는 대목",
       "keywords": [
-        "약속을 어겼다",
-        "바람을 맞았다",
-        "혼자 기다렸다",
-        "안 나타났다"
+        "약속",
+        "기다렸",
+        "안 왔",
+        "취소하",
+        "파토",
+        "만나기로"
       ],
       "caption": "혼자 남은 약속",
       "alt_captions": [
@@ -705,10 +767,11 @@
       "meaning": "말이 끊기거나 무시당함",
       "trigger": "말을 하려는데 끊기거나 무시당했다고 말하는 대목",
       "keywords": [
-        "말을 끊었다",
-        "무시당했다",
-        "듣지도 않고",
-        "말을 자르며"
+        "말이 안",
+        "무시",
+        "끼어들",
+        "씹었",
+        "안 듣"
       ],
       "caption": "말이 끊겼다",
       "alt_captions": [
@@ -716,7 +779,7 @@
         "내 말을 자름"
       ],
       "swap_group": "dismissed",
-      "sibling_bottom": null,
+      "sibling_bottom": "voice-drowned-out",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -733,10 +796,11 @@
       "meaning": "내 의사와 상관없이 결정됨",
       "trigger": "상의 없이 결정을 대신 내려버렸다고 말하는 대목",
       "keywords": [
-        "상의도 없이",
-        "대신 정해버렸다",
-        "물어보지도 않고",
-        "내 의견은 없이"
+        "정해",
+        "상의",
+        "강요",
+        "통보",
+        "혼자 결정"
       ],
       "caption": "내 몫 아닌 결정",
       "alt_captions": [
@@ -744,7 +808,7 @@
         "내 뜻은 없었다"
       ],
       "swap_group": "overruled",
-      "sibling_bottom": null,
+      "sibling_bottom": "decision-announced",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -759,10 +823,10 @@
       "meaning": "이별을 통보받음",
       "trigger": "이별을 통보받았다·헤어지자는 말을 들었다고 말하는 대목",
       "keywords": [
-        "이별을 통보받았다",
-        "헤어지자고 했다",
-        "그만 만나자고",
-        "이별 통보"
+        "헤어지",
+        "헤어졌",
+        "끝내",
+        "이별"
       ],
       "caption": "헤어지잔 말",
       "alt_captions": [
@@ -786,10 +850,14 @@
       "meaning": "육아·집안일을 혼자 떠맡음",
       "trigger": "혼자 다 떠맡았다·독박을 썼다고 말하는 대목",
       "keywords": [
-        "독박을 썼다",
-        "혼자 다 떠맡았다",
-        "나 혼자 다 했다",
-        "도와주지 않았다"
+        "아이",
+        "집안일",
+        "육아",
+        "키우",
+        "아기",
+        "애기",
+        "설거지",
+        "독박"
       ],
       "caption": "혼자 떠안은 하루",
       "alt_captions": [
@@ -813,10 +881,14 @@
       "meaning": "양가 사이에서 눈치를 봄",
       "trigger": "시댁·처가 등 양가 문제로 눈치를 봤다고 말하는 대목",
       "keywords": [
-        "시댁 눈치",
-        "처가 눈치",
-        "양가 문제로",
-        "명절마다"
+        "시댁",
+        "시어머니",
+        "처가",
+        "명절",
+        "장인",
+        "장모",
+        "양가",
+        "어머님"
       ],
       "caption": "양가 사이 눈치",
       "alt_captions": [
@@ -824,7 +896,7 @@
         "사이에서 맴돎"
       ],
       "swap_group": "watching",
-      "sibling_bottom": null,
+      "sibling_bottom": "glancing-around",
       "maxChars": 10,
       "motion": "sway"
     },
@@ -839,10 +911,12 @@
       "meaning": "그때 일이 계속 떠오름",
       "trigger": "그때 그러지 말 걸 하고 후회했다고 말하는 대목",
       "keywords": [
-        "그때 그러지 말 걸",
-        "후회가 됐다",
-        "계속 생각났다",
-        "그때가 자꾸"
+        "그때",
+        "미련",
+        "후회",
+        "되돌",
+        "그러지",
+        "아쉬"
       ],
       "caption": "그날이 떠오른다",
       "alt_captions": [
@@ -865,10 +939,12 @@
       "meaning": "마침내 화해하고 웃음",
       "trigger": "결국 화해했다·마음이 풀려 웃었다고 말하는 대목",
       "keywords": [
-        "결국 화해했다",
-        "마음이 풀려 웃었다",
-        "화해를 했다",
-        "다시 웃을 수 있었다"
+        "웃으",
+        "화해",
+        "잘 지내",
+        "좋아졌",
+        "오해",
+        "나아졌"
       ],
       "caption": "다시 마주 웃음",
       "alt_captions": [
@@ -879,6 +955,832 @@
       "sibling_bottom": "relieved",
       "maxChars": 10,
       "motion": "pop"
+    },
+    {
+      "id": "holding-in",
+      "slot": "bottom",
+      "meaning": "속으로 삭이며 참음",
+      "trigger": "말하고 싶은 걸 속으로 삼켰다고 말하는 대목",
+      "people": 1,
+      "arc": "reaction",
+      "categories": [
+        "ANY"
+      ],
+      "keywords": [
+        "참았",
+        "속으로",
+        "말 못",
+        "삼켰",
+        "꾹 참",
+        "입을 다물",
+        "버티",
+        "침묵",
+        "못 하",
+        "견디"
+      ],
+      "caption": "말 못 삼킴",
+      "swap_group": "unspoken",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": "holding-in",
+      "alt_captions": []
+    },
+    {
+      "id": "glancing-around",
+      "slot": "bottom",
+      "meaning": "눈치 보며 주변을 살핌",
+      "trigger": "분위기를 살피거나 눈치가 보였다고 말하는 대목",
+      "people": 1,
+      "arc": "reaction",
+      "categories": [
+        "ANY"
+      ],
+      "keywords": [
+        "눈치",
+        "살피",
+        "신경 쓰",
+        "조심스럽",
+        "분위기 봐",
+        "눈길",
+        "반응보기",
+        "분위기",
+        "살펴보",
+        "주변 봐"
+      ],
+      "caption": "눈치 보기",
+      "swap_group": "watching",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": "glancing-around",
+      "alt_captions": []
+    },
+    {
+      "id": "quiet-anger",
+      "slot": "bottom",
+      "meaning": "분을 삭이며 참음",
+      "trigger": "억울하다·화가 나지만 표현하지 못했다고 말하는 대목",
+      "people": 1,
+      "arc": "reaction",
+      "categories": [
+        "ANY"
+      ],
+      "keywords": [
+        "화가 나지만",
+        "참았",
+        "억울하지만",
+        "꾹 눌러",
+        "노여움",
+        "분을 삼킨",
+        "버티는",
+        "내색 못",
+        "참고 있",
+        "감정 숨김"
+      ],
+      "caption": "분을 삭임",
+      "swap_group": "unfair",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": "quiet-anger",
+      "alt_captions": []
+    },
+    {
+      "id": "scolded-silent",
+      "slot": "bottom",
+      "meaning": "고개 숙이고 야단맞음",
+      "trigger": "상대가 크게 질책하거나 야단을 쳤다고 말하는 대목",
+      "people": 2,
+      "arc": "trigger",
+      "categories": [
+        "FAMILY",
+        "MARRIED",
+        "WORK"
+      ],
+      "keywords": [
+        "혼났",
+        "야단",
+        "뭐라 하",
+        "잔소리 듣",
+        "고개 숙이",
+        "지적당했",
+        "책망",
+        "훈계",
+        "피나",
+        "꾸중"
+      ],
+      "caption": "야단맞음",
+      "swap_group": "scolded",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": "scolded-silent",
+      "alt_captions": []
+    },
+    {
+      "id": "walking-away",
+      "slot": "bottom",
+      "meaning": "마음을 정하고 뒤돌아 멀어짐",
+      "trigger": "이제 그만하기로 했다·거리를 두기로 결심했다고 말하는 대목",
+      "people": 1,
+      "arc": "resolution",
+      "categories": [
+        "ANY"
+      ],
+      "keywords": [
+        "정리하기로",
+        "거리를 두",
+        "멀어지기로",
+        "연락 끊기로",
+        "떠나기로",
+        "나가기로",
+        "돌아서",
+        "결심",
+        "떠남",
+        "갈라서기로"
+      ],
+      "caption": "떠나기로",
+      "swap_group": "boundary",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": "walking-away",
+      "alt_captions": []
+    },
+    {
+      "id": "evidence-found",
+      "slot": "bottom",
+      "meaning": "거짓말의 증거를 발견한 순간",
+      "trigger": "증거를 발견하거나 거짓이 들통났다고 말하는 대목",
+      "people": 2,
+      "arc": "trigger",
+      "categories": [
+        "COUPLE",
+        "MARRIED",
+        "FRIEND",
+        "FAMILY"
+      ],
+      "keywords": [
+        "알고 보니",
+        "걸렸",
+        "증거",
+        "들통",
+        "확인해보니",
+        "알게 됐",
+        "페이크",
+        "속았",
+        "뒤통수"
+      ],
+      "caption": "증거를 본 순간",
+      "swap_group": "deception",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": "evidence-found",
+      "alt_captions": []
+    },
+    {
+      "id": "overheard",
+      "slot": "bottom",
+      "meaning": "지나가다 자기 얘기를 우연히 엣들음",
+      "trigger": "우연히 자기 뒷담화를 들었다고 말하는 대목",
+      "people": 1,
+      "arc": "trigger",
+      "categories": [
+        "FRIEND",
+        "WORK",
+        "OTHER"
+      ],
+      "keywords": [
+        "우연히 듣",
+        "엿들",
+        "지나가다",
+        "뒤에서 하는 말",
+        "내 얘기",
+        "몰랐는데",
+        "정말",
+        "충격",
+        "나까지"
+      ],
+      "caption": "우연히 들은 순간",
+      "swap_group": "gossip",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": "overheard",
+      "alt_captions": []
+    },
+    {
+      "id": "voice-drowned-out",
+      "slot": "bottom",
+      "meaning": "말이 끊기고 목소리가 묻힘",
+      "trigger": "내 말이 묻혀서 들리지 않거나 계속 무시당했다고 말하는 대목",
+      "people": 2,
+      "arc": "reaction",
+      "categories": [
+        "ANY"
+      ],
+      "keywords": [
+        "끼어들",
+        "말을 자르",
+        "안 들어주",
+        "묻혀버렸",
+        "더 크게",
+        "내 말",
+        "무시",
+        "정신 못 써"
+      ],
+      "caption": "목소리가 묻혀버림",
+      "swap_group": "dismissed",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": "voice-drowned-out",
+      "alt_captions": []
+    },
+    {
+      "id": "decision-announced",
+      "slot": "bottom",
+      "meaning": "상의 없이 일방적으로 결정을 통보받음",
+      "trigger": "상의도 없이 이미 결정을 내려버렸다고 통보받았다고 말하는 대목",
+      "people": 1,
+      "arc": "trigger",
+      "categories": [
+        "FAMILY",
+        "MARRIED",
+        "WORK"
+      ],
+      "keywords": [
+        "통보받",
+        "이미 정해",
+        "상의도 없이",
+        "일방적으로",
+        "결정됨",
+        "선택지 없이",
+        "한 번에",
+        "정해버렸"
+      ],
+      "caption": "일방적으로 통보받음",
+      "swap_group": "overruled",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": "decision-announced",
+      "alt_captions": []
+    },
+    {
+      "id": "habit-clash",
+      "slot": "top",
+      "meaning": "생활습관 충돌·정리 안 함·핸드폰·게임",
+      "trigger": "생활습관이 달라서 자꾸 싸운다고 말하는 대목",
+      "people": 2,
+      "arc": "trigger",
+      "categories": [
+        "COUPLE"
+      ],
+      "keywords": [
+        "정리를 안",
+        "핸드폰만",
+        "게임만",
+        "담배",
+        "청소를 안",
+        "습관",
+        "변하지 않는",
+        "같이 못",
+        "짜증"
+      ],
+      "caption": "습관이 안 맞아",
+      "swap_group": "habit",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "parents-control",
+      "slot": "bottom",
+      "meaning": "부모님의 간섭과 독립 압박",
+      "trigger": "부모가 자꾸 간섭하거나 연락하라고 재촉했다고 말하는 대목",
+      "people": 1,
+      "arc": "trigger",
+      "categories": [
+        "FAMILY"
+      ],
+      "keywords": [
+        "부모님",
+        "간섭",
+        "연락",
+        "독립",
+        "자꾸",
+        "전화",
+        "챙기라",
+        "얘기"
+      ],
+      "caption": "부모님 간섭",
+      "swap_group": "parent-grip",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "forgotten-anniversary",
+      "slot": "bottom",
+      "meaning": "기념일을 소홀히 당하고 서운함",
+      "trigger": "기념일을 챙겨주지 않았거나 선물이 없었다고 말하는 대목",
+      "people": 1,
+      "arc": "reaction",
+      "categories": [
+        "COUPLE"
+      ],
+      "keywords": [
+        "기념일",
+        "잊어버렸",
+        "챙기지",
+        "선물",
+        "깜빡",
+        "기억",
+        "중요",
+        "안했다"
+      ],
+      "caption": "기념일 소홀",
+      "swap_group": "forgotten",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "secret-spending",
+      "slot": "bottom",
+      "meaning": "배우자가 몰래 쓴 돈을 알게 됨",
+      "trigger": "배우자가 모르게 큰 돈을 썼거나 카드 결제 내역을 숨겼다고 말하는 대목",
+      "people": 1,
+      "arc": "trigger",
+      "categories": [
+        "MARRIED"
+      ],
+      "keywords": [
+        "몰래",
+        "쓴돈",
+        "카드",
+        "결제",
+        "모르게",
+        "큰돈",
+        "내역",
+        "발각"
+      ],
+      "caption": "몰래 쓴 돈",
+      "swap_group": "money-secret",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "credit-stolen",
+      "slot": "bottom",
+      "meaning": "내 공로를 남이 가져가고 불공정한 대우를 받음",
+      "trigger": "내가 한 일의 공을 누군가에게 뺏겼거나 인정받지 못했다고 말하는 대목",
+      "people": 1,
+      "arc": "reaction",
+      "categories": [
+        "WORK"
+      ],
+      "keywords": [
+        "내가",
+        "공은",
+        "팀장",
+        "인정",
+        "못",
+        "가져갔",
+        "받지",
+        "불공정"
+      ],
+      "caption": "공로 가로채기",
+      "swap_group": "unfair-credit",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "travel-plan-clash",
+      "slot": "bottom",
+      "meaning": "여행·일정 계획이 안 맞아 충돌",
+      "trigger": "여행이나 휴가 계획을 짤 때 일정이 맞지 않거나 의견이 부딪혔다고 말하는 대목",
+      "people": 2,
+      "arc": "trigger",
+      "categories": [
+        "COUPLE"
+      ],
+      "keywords": [
+        "여행",
+        "계획",
+        "일정",
+        "휴가",
+        "연차",
+        "맞지",
+        "충돌",
+        "의견"
+      ],
+      "caption": "여행 계획 충돌",
+      "swap_group": "plan-clash",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "chore-fight",
+      "slot": "top",
+      "meaning": "가사분담을 놓고 부부가 언쌍",
+      "trigger": "집안일을 누가 해야 하는지 싸웠다고 말하는 대목",
+      "people": 2,
+      "arc": "trigger",
+      "categories": [
+        "MARRIED"
+      ],
+      "keywords": [
+        "집안일",
+        "왜나만",
+        "분담",
+        "같이좀",
+        "청소",
+        "설거지",
+        "가사",
+        "불공평",
+        "나만",
+        "도와줘"
+      ],
+      "caption": "가사분담 싸움",
+      "swap_group": "chore",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "turned-blame",
+      "slot": "top",
+      "meaning": "적반하장 — 오히려 상대가 화를 냄",
+      "trigger": "내가 지적했는데 오히려 상대가 화를 냈다고 말하는 대목",
+      "people": 2,
+      "arc": "trigger",
+      "categories": [
+        "OTHER"
+      ],
+      "keywords": [
+        "오히려화",
+        "적반하장",
+        "왜니가",
+        "당당하게",
+        "화내",
+        "나한테",
+        "더화내",
+        "억울해",
+        "몰상식",
+        "역할"
+      ],
+      "caption": "적반하장 화내기",
+      "swap_group": "reversal",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "study-pressure",
+      "slot": "bottom",
+      "meaning": "학업·진로를 놓고 부모와 압박",
+      "trigger": "공부하라고 재촉받거나 진로로 눌렸다고 말하는 대목",
+      "people": 1,
+      "arc": "trigger",
+      "categories": [
+        "FAMILY"
+      ],
+      "keywords": [
+        "공부하라",
+        "성적",
+        "진로",
+        "학원",
+        "시험",
+        "입시",
+        "대학",
+        "너는왜",
+        "항상",
+        "잘해야"
+      ],
+      "caption": "부모 공부 압박",
+      "swap_group": "study",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "quit-decided",
+      "slot": "bottom",
+      "meaning": "이직·퇴사를 마음먹은 순간",
+      "trigger": "그만두기로 마음먹었다·사표를 낼 준비를 했다고 말하는 대목",
+      "people": 1,
+      "arc": "resolution",
+      "categories": [
+        "WORK"
+      ],
+      "keywords": [
+        "그만두기로",
+        "퇴사",
+        "이직하기로",
+        "사표",
+        "나갈래",
+        "정리하기",
+        "내가나가",
+        "더는",
+        "끝내기로",
+        "나가"
+      ],
+      "caption": "이직 결심의 순간",
+      "swap_group": "quit",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "drunk-conflict",
+      "slot": "bottom",
+      "meaning": "회식·술자리에서의 갈등",
+      "trigger": "술 취한 자리에서 싸웠거나 불편한 일이 있었다고 말하는 대목",
+      "people": 3,
+      "arc": "trigger",
+      "categories": [
+        "OTHER"
+      ],
+      "keywords": [
+        "회식",
+        "술자리",
+        "취해서",
+        "다들마시",
+        "폭탄주",
+        "술마신",
+        "술",
+        "싸우다",
+        "불편해",
+        "기분"
+      ],
+      "caption": "술자리 갈등",
+      "swap_group": "drink",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "sibling-rivalry",
+      "slot": "top",
+      "meaning": "형제자매 중 한 명이 차별받는 느낌",
+      "trigger": "언니만 편해 보인다·오빠 편애 때문이라고 말하는 대목",
+      "people": 2,
+      "arc": "trigger",
+      "categories": [
+        "FAMILY"
+      ],
+      "keywords": [
+        "형은",
+        "동생은",
+        "차별",
+        "편애",
+        "오빠만"
+      ],
+      "caption": "형만 자유로워 보여",
+      "swap_group": "sibling",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "different-values",
+      "slot": "bottom",
+      "meaning": "서로 다른 생각을 받아들이기",
+      "trigger": "생각이 다르긴 한데 그게 다가 아니라고 말하는 대목",
+      "people": 2,
+      "arc": "resolution",
+      "categories": [
+        "COUPLE"
+      ],
+      "keywords": [
+        "생각이 다르",
+        "가치관",
+        "안 맞",
+        "다르다는 걸"
+      ],
+      "caption": "다르긴 해도 괜찮아",
+      "swap_group": "values",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "checking-phone",
+      "slot": "bottom",
+      "meaning": "신뢰가 흔들려 상대의 휴대폰을 확인함",
+      "trigger": "휴대폰 비밀번호를 몰래 봤다·확인해버렸다고 말하는 대목",
+      "people": 1,
+      "arc": "trigger",
+      "categories": [
+        "OTHER"
+      ],
+      "keywords": [
+        "휴대폰을",
+        "확인하",
+        "비밀번호",
+        "몰래 보",
+        "의심"
+      ],
+      "caption": "마음이 자꾸 흔들려",
+      "swap_group": "suspicion",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "wedding-stress",
+      "slot": "top",
+      "meaning": "결혼 준비 과정에서 스트레스와 갈등",
+      "trigger": "예물·예단 때문에 싸웠다·결혼 준비가 힘들다고 말하는 대목",
+      "people": 2,
+      "arc": "trigger",
+      "categories": [
+        "COUPLE"
+      ],
+      "keywords": [
+        "결혼 준비",
+        "예단",
+        "예물",
+        "상견례",
+        "결혼식"
+      ],
+      "caption": "결혼 준비 지침",
+      "swap_group": "wedding",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "affair-suspicion",
+      "slot": "bubble",
+      "meaning": "외도를 의심하는 순간의 극도의 충격",
+      "trigger": "상대가 다른 사람을 만났다는 걸 알았을 때라고 말하는 대목",
+      "people": 1,
+      "arc": "trigger",
+      "categories": [
+        "COUPLE"
+      ],
+      "keywords": [
+        "외도",
+        "다른 여자",
+        "다른 남자",
+        "몰래 만나",
+        "수상한 문자"
+      ],
+      "caption": "설마...",
+      "swap_group": "affair",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "health-ignored",
+      "slot": "bottom",
+      "meaning": "아파도 신경 써주지 않는 무관심",
+      "trigger": "아팠는데 아무도 신경 써주지 않거나 챙겨주지 않았다고 말하는 대목",
+      "people": 1,
+      "arc": "reaction",
+      "categories": [
+        "OTHER"
+      ],
+      "keywords": [
+        "아팠는데",
+        "병원도",
+        "신경도 안",
+        "걱정도",
+        "안 챙겨",
+        "무관심",
+        "혼자 있었다",
+        "외로웠어"
+      ],
+      "caption": "혼자인 아픔",
+      "swap_group": "health",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "photo-jealousy",
+      "slot": "bottom",
+      "meaning": "SNS·사진 때문에 생긴 질투",
+      "trigger": "사진이나 인스타그램 때문에 질투나 불안감을 느꼈다고 말하는 대목",
+      "people": 1,
+      "arc": "trigger",
+      "categories": [
+        "COUPLE"
+      ],
+      "keywords": [
+        "사진을",
+        "인스타",
+        "댓글",
+        "팔로우",
+        "좋아요",
+        "SNS",
+        "자랑",
+        "올렸더니"
+      ],
+      "caption": "사진 앞의 질투",
+      "swap_group": "photo",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "moving-conflict",
+      "slot": "bottom",
+      "meaning": "이사·주거를 둘러싼 갈등",
+      "trigger": "이사 비용이나 전세·월세·보증금 문제로 싸웠다고 말하는 대목",
+      "people": 2,
+      "arc": "trigger",
+      "categories": [
+        "OTHER"
+      ],
+      "keywords": [
+        "이사",
+        "전세",
+        "월세",
+        "보증금",
+        "집을 구하",
+        "이사비",
+        "주거",
+        "이사 가자"
+      ],
+      "caption": "집 때문에",
+      "swap_group": "moving",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "jealous-envy",
+      "slot": "bubble",
+      "meaning": "질투·부러움",
+      "trigger": "남을 부러워하거나 질투했다고 말하는 대목",
+      "people": 1,
+      "arc": "reaction",
+      "categories": [
+        "COUPLE",
+        "FRIEND"
+      ],
+      "keywords": [
+        "부러웠",
+        "나도 저렇게",
+        "질투",
+        "나만 이러나",
+        "다들 좋아 보여",
+        "왜 나만",
+        "저 사람은"
+      ],
+      "caption": "부러움",
+      "swap_group": "envy",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
+    },
+    {
+      "id": "guilt-heavy",
+      "slot": "bottom",
+      "meaning": "죄책감·미안함",
+      "trigger": "내 잘못으로 상대에게 상처를 줬다는 죄책감이나 자책을 느꼈다고 말하는 대목",
+      "people": 1,
+      "arc": "reaction",
+      "categories": [
+        "ANY"
+      ],
+      "keywords": [
+        "내 잘못",
+        "미안해서",
+        "죄책감",
+        "괜히 그랬어",
+        "후회했다",
+        "내가 먼저",
+        "잘못했어",
+        "자책"
+      ],
+      "caption": "자책",
+      "swap_group": "guilt",
+      "motion": "sway",
+      "maxChars": 10,
+      "sibling_bottom": null,
+      "alt_captions": []
     }
   ],
   "leaf_rule": {

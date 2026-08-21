@@ -2,7 +2,7 @@
 
 **작성일**: 2026-08-12
 **작성자**: Claude Code (Claude Design 세션 기반)
-**상태**: 1/2 배치(30/60장) + **그림체 리파인 1차 완료·배포됨**(2026-08-20, §9). 31~60장은 보류 — 계획: `.temp/sibom/emoticon/upgrade-plan.md`
+**상태**: **2/2 배치 완료(60/60장), 배포됨**(2026-08-21, §10). 매칭 실측 기반 키워드 전면 재설계 포함 — 코퍼스 커버리지 5%→99.2%. 경위: `.temp/sibom/emoticon/upgrade-plan.md`
 **목적**: 컨텍스트가 완전히 초기화돼도 이 폴더 하나만으로 작업을 그대로 이어갈 수 있게 한다.
 
 > ⚠️ 이 문서는 **`docs/frontend/design/specs/metaphor-illustration-system.md`(기존 60종 사물 메타포)를 대체하지 않는다.**
@@ -14,8 +14,8 @@
 
 - **무엇을 만드는가**: 다시봄 Shorts 영상(WaggleBot 파이프라인)에 쓸 자체 캐릭터 "시봄이" 일러스트 60장. 카카오 이모티콘 문법(단일 캐릭터 + 과장된 리액션 + 짧은 상황 라벨)을 차용하되 그림은 100% 자체 제작.
 - **왜 새로 만드는가**: 기존 사물 은유 60종(`metaphor-illustration-system.md`)은 prod 실사용률 17%(332건 중 57건)로 사실상 실패했다. 원인은 ① 은유가 너무 추상적이고 ② 카테고리(연인/친구/직장/가족)로 쪼개져 같은 감정을 5번씩 그려 커버리지가 얇았고 ③ AI-user가 사연 작성 시점에 메타포를 고르는데 대본 LLM은 그 선택을 참고하지 않아 미스매치가 났기 때문. 이 세 문제를 전부 설계로 풀었다(§2 결정 로그 참고).
-- **지금 어디까지 됐는가**: 30/60장 SVG 완성 → 사용자 리뷰 완료 → **그림체 리파인 1차 완료·3곳 배포**(2026-08-20, §9). 31~60장은 **보류**(장수보다 그림체·모션이 먼저라는 사용자 판단).
-- **다음에 할 일**: `.temp/sibom/emoticon/upgrade-plan.md` 의 Phase 2(시봄이 모션 — 현재 영상에서 **완전 정지 상태**). §7 체크리스트는 리파인 이전 기준이라 일부 낡음.
+- **지금 어디까지 됐는가**: 60/60장 완성. 그림체 리파인(§9) → 모션 배선(WaggleBot `layout.py`, 완료) → **2배치 31~60장 + 매칭 실측 재설계 완료·5곳 배포**(2026-08-21, §10). 코퍼스 실측 커버리지 5%→99.2%.
+- **다음에 할 일**: 없음(60/60 완료). Claude Design 게시(§6)와 커밋만 남음 — 진행 상황은 `.temp/sibom/emoticon/upgrade-plan.md` 참고. §7 체크리스트는 1배치 시절 기준이라 낡았다.
 
 ---
 
@@ -28,7 +28,7 @@ docs/frontend/design/specs/sprout-character-system/
 ├── gen.py               # SVG 생성기 — 부품 조립식 (몸통·팔·눈·입·소품을 함수로 분리)
 ├── build_page.py        # Claude Design 리뷰 페이지(.dc.html) 빌더 — gen.py 산출물을 소비
 └── svg/
-    ├── {30개 씬 ID}.svg       # 30장 원본 (820×820, 배경 투명, 자체 완결형 — <use> 참조 없음)
+    ├── {60개 씬 ID}.svg       # 60장 원본 (820×820, 배경 투명, 자체 완결형 — <use> 참조 없음)
     └── face-{표정라벨}.svg     # 표정 세트 20종 (리뷰용 별도 크롭, 씬에는 안 쓰임)
 ```
 
@@ -97,7 +97,7 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 | 입 | `mouth(mode)` | `smile` `flat` `wavy`(당황) `open`(크게 벌림) `small_open` `tight`(꾹 다뭄) `grit`(이 악뭄) `pout`(삐죽) `big_smile`(활짝) `none` |
 | 팔 | `arms(mode)` | `rest`(기본, 뒤) `phone`(짧은 팔로 휴대폰 받침, 앞) `cross`(팔짱 X자 교차, 앞) `clasp`(손 모아쥠, 앞) `limp`(축 늘어짐) `up`(두 팔 위/부들거림) `reach_r`(오른팔 뻗음) `hug`(무릎 감싸안기, 앞) `hold`(무거운 것 받쳐 듦, 앞) `shrug`(어깨 으쓱/손바닥 위로, 앞) |
 | 다리 | `legs(mode)` | `stand`(기본) `sit`(앉음) `curl`(웅크려 접음) `none` |
-| 떡잎 | `leaves(mode)` | `normal` `droop`(시듦/낙담) `perky`(쫑긋/놀람·기대) |
+| 떡잎 | `leaves(mode)` | `normal` `droop`(시듦/낙담) `perky`(쫑긋/놀람·기대) `bristle`(곤두섬/분노 — perky를 밑동 기준 40° 회전+길이 75%로 변환한 것. 맨손으로 새 path 그리면 "토끼 귀"가 된다, §9 참고) |
 | 소품 | `prop(mode)` | `phone` `bundle`(포대기) `receipt`(영수증) `papers`(서류 더미) — 얼굴을 가리지 않는 y좌표(**≥366**, 2026-08-20 얼굴 확대로 하향 조정)에 배치 |
 | 효과기호 | `marks(mode)` | `shock`(충격선) `sweat`(땀방울) `steam`(김/분노) `shake`(부들 떨림선) `quiet`(말줄임 점 3개) `sparkle`(반짝 마름모) `chatter`(뒷담화 말풍선 3개) `clock`(혼자 기다림 시계) `flinch`(움찔선) |
 | 몸통 fill | `body(fill)` | §3.2 색 규칙 참고 |
@@ -118,9 +118,11 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 
 | preset | 캐릭터 안전영역 | 캡션 rect | maxChars | 용도 |
 |---|---|---|---|---|
-| `bottom` | y 24–560 전폭 | x40 y596 w740 h200 | 16 (2줄×8자) | 기본값, 가장 넉넉 |
-| `top` | y 260–796 전폭 | x40 y24 w740 h200 | 16 | 캐릭터가 아래를 보는 구도 |
-| `bubble` | x24–400 y180–796(좌하단) | x420 y40 w376 h300(말풍선) | 12 (3줄×4자) | 가장 빡빡 — 폴백이 가장 자주 필요 |
+| `bottom` | y 24–560 전폭 | x40 y596 w740 h200 | **10**(2026-08 이후 조정, 코드가 이 값을 검증함) | 기본값, 가장 넉넉 |
+| `top` | y 260–796 전폭 | x40 y24 w740 h200 | **10** | 캐릭터가 아래를 보는 구도 |
+| `bubble` | x24–400 y180–796(좌하단) | x420 y40 w376 h300(말풍선) | **10** | 가장 빡빡 — 폴백이 가장 자주 필요 |
+
+> ⚠️ 예전엔 16/16/12로 슬롯마다 달랐으나 현재 catalog는 **세 슬롯 모두 10으로 통일**돼 있다(`test_sibom_composite.py`가 이 값을 단언). 캡션은 항상 10자 이내로 써야 한다.
 
 캡션 폰트: **80px bold `#5C4030`**, 위쪽 자막(기존 `image_text.caption_above`, 20자 상한)보다 크고 굵게 — 자막이 아니라 짤 글씨로 읽히게.
 
@@ -282,3 +284,53 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 
 ### 판정 기준
 **쇼츠 축소(165px 상당) 렌더로 판정한다.** 원본 820px에서 괜찮아 보여도 축소하면 표정이 소멸한다 — 이 테스트가 리파인 성패를 가른 기준이었다.
+
+---
+
+## 10. 2배치(31~60) — 매칭 실측 기반 재설계 (2026-08-21 · 배포 완료)
+
+계획·실측 근거 권위본: `.temp/sibom/emoticon/upgrade-plan.md`
+
+### 착수 전 실측이 뒤집은 것
+
+31~60장을 그리기 전, "그림 커버리지가 아니라 **매칭이 실제로 동작하는지**"부터 실측했다. 코드(`SibomCandidateService.java`)를 읽어보니 이미지 선택은 **순수 부분문자열 검사**(`text.contains(keyword)`, 형태소 분석 전혀 없음)였다. prod 사연 265건에 당시(1배치) keywords를 그대로 돌리자 **252건(95%)에서 후보 0개**였다 — 조사·어미가 붙은 문장형 키워드(`"말을 안 한 지"`)가 실제 사연 문장과 거의 일치하지 않았기 때문. soft_fill 풀 7개가 항상 최소조건을 채워줘서 발행은 안 막혔지만, **265건 중 252건이 조용히 범용 7장으로만 영상이 만들어지는 상태**였다(에러 없음).
+
+→ 순서를 바꿨다: **① 기존 30장 keywords를 2~6자 어간으로 전면 교체(그림 불변) → ② 31~60장을 같은 규칙으로 설계.**
+
+### 결과 (실측)
+
+| 단계 | 코퍼스 커버리지(265건 기준) | 평균 후보수 |
+|---|---|---|
+| 1배치 keywords(문장형) | 5% | 0.2 |
+| 1배치 keywords 어간 교체 후 | 94.3% | 3.36 |
+| 2배치(60장) 완료 후 | **99.2%** | **6.74** |
+
+매칭 0건 이미지 없음. swap_group dedup 이후에도 4장 미만으로 떨어지는 사연은 17.4%뿐(전량 soft_fill이 보완, 발행 차단 없음 — 1배치 시절 95%에서 대폭 개선).
+
+### 31~60장 구성
+
+- **9장** = 기존 30장 중 캡션 폴백(`sibling_bottom`)이 없던 그룹에 **bottom 슬롯 형제**를 새로 그려 채움(`holding-in`·`glancing-around`·`quiet-anger`·`scolded-silent`·`walking-away`·`evidence-found`·`overheard`·`voice-drowned-out`·`decision-announced`). 구·신 상호 링크까지 완료 — `sibling_bottom` 미보유가 11개→21개(전부 신규 top/bubble, 알려진 스코프)로 감소.
+- **21장** = prod 사연 코퍼스 실측 상위 주제(잠정 추정과 실측이 갈린 항목 다수 — 예: "외도"는 잠정 2위였으나 실측 25위, "생활습관 충돌"이 실측 2위로 상향). `COUPLE×reaction`(`forgotten-anniversary`) · `WORK×resolution`(`quit-decided`) 구조적 갭도 메움. 3인 장면 1→2장(`drunk-conflict` 신설), 감정 스펙트럼에 없던 질투(`jealous-envy`)·죄책감(`guilt-heavy`) 신설.
+- 기존 30장과 의미가 겹치는 주제(뒷담화·시댁·독박육아·잔소리·사과거부 등)는 신규 이미지 없이 1배치 키워드 보강으로 흡수.
+
+### gen.py 구조 변경 — `emit()` 확장 + 완결성 가드 강화
+
+기존 `emit(name, preset, inner, meaning, trigger)`는 **1배치 이미지 갱신만** 전제로 설계돼 있었다(catalog 병합 시 기존 id는 slot/motion만 갱신, 나머지는 병합 기준 catalog 값을 그대로 씀). **완전히 새 id는 병합해줄 기존 항목이 없다** — 그래서 `emit()`에 `people`·`arc`·`categories`·`keywords`·`caption`·`alt_captions`·`swap_group`·`sibling_bottom`·`max_chars` kwargs를 추가했고, 병합 로직에 **신규 id의 필수 필드 누락 시 `SystemExit`으로 중단**하는 가드를 넣었다(구 가드는 "이미지 중 하나라도 있으면 통과"였던 약한 `any()` 검사였다 — 전부 있어야 통과하는 `all()`로 강화).
+
+**🚨 구조적 함정**: catalog 병합 블록(`import json` 이하)은 **파일 끝이 아니라 30번째 이미지 직후**에 최상위 코드로 실행된다. 새 `emit()` 호출을 파일 끝에 추가하면 **에러 없이 조용히 무시된다**(병합이 이미 끝난 뒤에 실행되므로). 31~60번 씬은 반드시 30번(`reconciled`) 직후 · `import json` 직전에 삽입해야 한다.
+
+**병렬 제작 방식**: 6개 sonnet 에이전트가 5장씩 담당하되, **각자 `emit()` 호출 코드만 별도 파일에 작성**하고 gen.py를 직접 실행하지 않게 했다(위 삽입 지점이 하나뿐이라 여러 에이전트가 동시에 같은 파일을 건드리면 충돌한다). 메인 세션이 6개 결과를 한 파일로 통합해 1회 실행.
+
+### 🚨 배포 시 발견한 다섯 번째 사본 — AS 백엔드 classpath 리소스
+
+지금까지 "3곳 동기화"(AS SSOT·WSL 런타임·WSL 생성기)로 충분한 줄 알았는데, **AS 백엔드가 실제 매칭에 쓰는 catalog는 이 중 어디도 아니었다.** `SibomCatalog.java`가 읽는 경로는 `ClassPathResource("sibom/catalog.json")` — 즉 **`backend/src/main/resources/sibom/catalog.json`** (별도 빌드 리소스 사본). 이 사본이 1배치 키워드 교체 이전 상태로 굳어 있었다 — **동기화가 안 됐으면 이번 매칭 개선 전체가 실제 운영에 반영되지 않을 뻔했다.**
+
+→ **동기화 대상은 5곳**: AS SSOT(`docs/frontend/design/specs/sprout-character-system/catalog.json`) · **AS 백엔드 리소스**(`backend/src/main/resources/sibom/catalog.json`) · WSL 런타임(`assets/sprouts/catalog.json`) · WSL 생성기 2곳(`assets/sprouts_design/catalog.json`, `assets/sprouts_design/svg/catalog.json`). 백엔드 리소스는 `JsonNode` 트리로 느슨하게 파싱해서 WaggleBot 전용 필드(`motion`·`leaf_rule`·`motion_kinds`)가 섞여 있어도 무해하다 — 5곳 전부 **동일 파일**을 그대로 복사하면 된다.
+
+### 검증
+
+- 코퍼스 재측정(위 표) — `/tmp/posts.txt` 265건 기준
+- WSL `pytest test_sibom_motion.py test_sibom_plan_director.py test_sibom_composite.py` → 33 passed(`test_catalog_loads_30_images`가 `_60_images`로, 카운트 단언도 60으로 갱신)
+- AS 백엔드 `./gradlew test --tests "*Sibom*" --tests "*VideoVariantService*"` → 49 passed (SibomCandidateService 8·SibomPlanGuard 17·VideoVariantService 24)
+- 60장 렌더 후 165px 축소 콘택트시트로 육안 검수. 🚨 **1차 검수에서 자체 QA 스크립트 버그**(PNG를 `.resize()` 없이 그대로 붙여넣어 인접 이미지가 겹쳐 보임)로 5장을 오탐 — 개별 파일로 재확인해 전부 정상임을 확인. 그리드 스크립트를 쓸 때는 반드시 `paste()` 전에 `resize()`를 확인할 것.
+- `caption`/`alt_captions` 10자 초과 2건(`habit-clash`·`wedding-stress`) 발견 후 수정.

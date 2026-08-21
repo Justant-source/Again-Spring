@@ -98,6 +98,13 @@ WaggleBot `min_sibom` 하드 게이트는 이 최소선(4)과 같아야 한다. 
     → hook, hook_emotion, body…
     → 코드: 원문 × catalog keywords 스코어 → posts.sibom_candidates (≤12 id)
     ※ 시봄이 전용 LLM 호출 없음. 메타포 선택 지시 제거.
+    🚨 매칭은 순수 부분문자열 검사(SibomCandidateService, 형태소분석·정규화 없음).
+       keywords 히트 ×10점(누적, 상한없음) + trigger 토큰 히트 ×1점, 동점은 catalog
+       배열 순서로 tie-break. categories 필드는 선택 로직 어디에도 안 쓰인다(2026-08
+       실측 재검증). → keywords는 2~6자 어간/구어 조각으로, 이미지당 6~10개 권장
+       (조사·어미 붙은 문장형은 실사연과 거의 안 걸린다 — 실측: 문장형 5% 커버리지 →
+       어간 교체 후 99.2%). swap_group은 SibomPlanGuard가 실제로 강제(같은 그룹
+       2번째부터 dedupe 제거) — 그룹당 1~2장 유지 권장.
 
 [2] 영상 직전 LLM — AS VideoVariantService → againspring-llm (채널별)
     → script_reels|script_shorts + sibom_plan (해당 채널만)
@@ -105,7 +112,7 @@ WaggleBot `min_sibom` 하드 게이트는 이 최소선(4)과 같아야 한다. 
     → 인증 회로 open → 0회, 상태 LLM_AUTH_CIRCUIT_OPEN
     → session limit 문자열은 인증 오류가 아님 (회로를 열지 않음)
     → 컨텍스트: shortlist ≤10 1줄 카드 + soft_fill 목록 + 본문 ≤900자 + 훅/emotion
-    → 금지: 30장 풀 catalog dump
+    → 금지: 60장 풀 catalog dump
     → ASM/WaggleBot은 이 JSON을 렌더만 함 (추가 사연 LLM 없음)
 ```
 
@@ -227,7 +234,7 @@ Waggle `split_story_lines`만 사용한다.
 
 | 단계 | 소유 |
 |---|---|
-| catalog.json + PNG 30장 SSOT | 레포 자산 (design specs / sprouts 패키지 → WaggleBot `assets/sprouts/` 배포) |
+| catalog.json + PNG 60장 SSOT | 레포 자산 (design specs / sprouts 패키지 → WaggleBot `assets/sprouts/` 배포). 🚨 AS 백엔드는 별도 classpath 사본(`backend/src/main/resources/sibom/catalog.json`)을 읽는다 — 갱신 시 **5곳 전부** 동기화할 것(SSOT·백엔드 리소스·WSL 런타임·WSL 생성기 2곳) |
 | keyword shortlist | **AS** (사연 저장 시) |
 | `script_*` + `sibom_plan` + 가드 | **AS** (영상 잡 생성 직전, 채널별) |
 | brief 전달 | AS → ASM → WaggleBot |
