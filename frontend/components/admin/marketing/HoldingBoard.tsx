@@ -47,8 +47,19 @@ const STATUS_LABEL: Record<MarketingHoldingStatus, string> = {
   DROPPED: '탈락',
 };
 
-function formatTimeTo24h(postCreatedAt: string, overdue?: boolean): string {
+function formatTimeTo24h(
+  postCreatedAt: string,
+  overdue?: boolean,
+  status?: MarketingHoldingStatus
+): string {
+  const isTerminal = status === 'COMMITTED' || status === 'DROPPED';
+
+  // Terminal statuses never show retry copy, regardless of age
+  if (isTerminal) return '—';
+
+  // For pending statuses, show retry copy if overdue
   if (overdue) return '24h 경과 · 확정 재시도';
+
   const created = new Date(postCreatedAt).getTime();
   if (Number.isNaN(created)) return '—';
   const ms = created + 24 * 60 * 60 * 1000 - Date.now();
@@ -198,13 +209,13 @@ export function HoldingBoard({
               render: (row) => (
                 <span
                   className={
-                    row.overdue
+                    row.overdue && (row.status === 'IN_POOL' || row.status === 'PINNED' || row.status === 'OUT_OF_CUT')
                       ? 'text-sm text-amber-800 whitespace-nowrap font-medium'
                       : 'text-sm text-gray-700 whitespace-nowrap'
                   }
-                  data-testid={row.overdue ? `holding-overdue-${row.postId}` : undefined}
+                  data-testid={row.overdue && (row.status === 'IN_POOL' || row.status === 'PINNED' || row.status === 'OUT_OF_CUT') ? `holding-overdue-${row.postId}` : undefined}
                 >
-                  {formatTimeTo24h(row.postCreatedAt, row.overdue)}
+                  {formatTimeTo24h(row.postCreatedAt, row.overdue, row.status)}
                 </span>
               ),
             },

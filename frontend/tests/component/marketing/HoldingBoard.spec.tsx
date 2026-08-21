@@ -81,6 +81,7 @@ describe('HoldingBoard', () => {
     it('shows overdue retry copy for T+24h rows that have not committed', () => {
       const row = buildRow({
         postId: 'old-1',
+        status: 'IN_POOL',
         overdue: true,
         postCreatedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
       });
@@ -89,6 +90,30 @@ describe('HoldingBoard', () => {
         '24h 경과 · 확정 재시도'
       );
       expect(screen.queryByText('만료')).not.toBeInTheDocument();
+    });
+
+    it('does not show retry copy for COMMITTED rows older than 24h', () => {
+      const row = buildRow({
+        postId: 'committed-old-1',
+        status: 'COMMITTED',
+        overdue: true,
+        postCreatedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+      });
+      render(<HoldingBoard rows={[row]} />);
+      expect(screen.queryByTestId('holding-overdue-committed-old-1')).not.toBeInTheDocument();
+      expect(screen.queryByText('24h 경과 · 확정 재시도')).not.toBeInTheDocument();
+    });
+
+    it('does not show retry copy for DROPPED rows older than 24h', () => {
+      const row = buildRow({
+        postId: 'dropped-old-1',
+        status: 'DROPPED',
+        overdue: true,
+        postCreatedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+      });
+      render(<HoldingBoard rows={[row]} />);
+      expect(screen.queryByTestId('holding-overdue-dropped-old-1')).not.toBeInTheDocument();
+      expect(screen.queryByText('24h 경과 · 확정 재시도')).not.toBeInTheDocument();
     });
 
     it('keeps the "핀 해제" unpin flow unchanged for pinned rows', () => {
