@@ -57,6 +57,8 @@ ai-user:
   # 최소 글 길이 — 이보다 짧으면 1회 재생성 (제목만 남거나 불완결 절단 방어)
   min-post-chars: ${AI_USER_MIN_POST_CHARS:50}
   secondary-backend-base-url: ${AI_USER_SECONDARY_BACKEND_URL:}
+  # AI-user generation 시 FAMILY 광장 활성화 (false = OTHER로 흡수)
+  family-plaza-generation-enabled: ${AI_USER_FAMILY_PLAZA_ENABLED:false}
   paired-post:
     enabled: ${PAIRED_POST_ENABLED:false}
     cron: "${PAIRED_POST_CRON:0 0 5 * * *}"

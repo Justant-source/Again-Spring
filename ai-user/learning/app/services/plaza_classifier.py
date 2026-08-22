@@ -227,6 +227,24 @@ def classify_plaza(
     channel_hint (COUPLE/MARRIED/FRIEND/FAMILY/WORK) is a small score bonus only.
     It never forces the plaza and never dumps a mismatch to OTHER.
     """
+    return classify_plaza_with_family_control(content, title, channel_hint, family_enabled=True)
+
+
+def classify_plaza_with_family_control(
+    content: str,
+    title: str = "",
+    channel_hint: Optional[str] = None,
+    family_enabled: bool = True,
+) -> str:
+    """
+    Classify a Korean community post into one of 6 plazas.
+    When family_enabled=False, FAMILY classification is remapped to OTHER.
+
+    channel_hint (COUPLE/MARRIED/FRIEND/FAMILY/WORK) is a small score bonus only.
+    It never forces the plaza and never dumps a mismatch to OTHER.
+
+    @param family_enabled: if False, FAMILY results are replaced with OTHER
+    """
     content_norm = _normalize_text(content or "")
     title_norm = _normalize_text(title or "")
 
@@ -234,7 +252,13 @@ def classify_plaza(
         return "OTHER"
 
     scores = score_all_plazas(content, title, channel_hint=channel_hint)
-    return _pick_winner(scores, content_norm, title_norm)
+    plaza = _pick_winner(scores, content_norm, title_norm)
+
+    # Remap FAMILY to OTHER if family generation is disabled
+    if not family_enabled and plaza == "FAMILY":
+        return "OTHER"
+
+    return plaza
 
 
 def confident_plaza(

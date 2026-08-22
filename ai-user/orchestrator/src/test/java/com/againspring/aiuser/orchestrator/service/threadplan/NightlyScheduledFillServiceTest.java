@@ -198,6 +198,9 @@ class NightlyScheduledFillServiceTest {
 
     @Test
     void precomputeEmptyPairsSkipsZeroInventoryPlazas() {
+        // Enable FAMILY generation for this test (tests that empty pairs are correctly precomputed)
+        properties.setFamilyPlazaGenerationEnabled(true);
+
         Persona nate = persona("p-nate", "NATEPAN");
         Instant slot = Instant.now().plusSeconds(3600);
         LlmCallBudget budget = LlmCallBudget.ofMultiplier(1, 3);

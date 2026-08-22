@@ -179,11 +179,23 @@ public class NightlyScheduledFillService {
      * Avoids burning retry attempts on guaranteed CLAIM_EMPTY outcomes.
      * Uses ML service to query available counts for all source/plaza combinations.
      * On error/network failure, conservatively assumes inventory exists.
+     * When familyPlazaGenerationEnabled=false, FAMILY is excluded (will never be requested).
      */
     private Set<String> precomputeEmptyPairs() {
         Set<String> empty = new HashSet<>();
         String[] sources = {SourceMixPlanner.SOURCE_BLIND, SourceMixPlanner.SOURCE_NATEPAN};
-        String[] plazas = {"MARRIED", "COUPLE", "WORK", "FAMILY", "FRIEND", "OTHER"};
+        // When FAMILY generation is disabled, exclude it from inventory checks
+        boolean includeFamilyInPrecompute = properties.isFamilyPlazaGenerationEnabled();
+        List<String> plazaList = new ArrayList<>();
+        plazaList.add("MARRIED");
+        plazaList.add("COUPLE");
+        plazaList.add("WORK");
+        if (includeFamilyInPrecompute) {
+            plazaList.add("FAMILY");
+        }
+        plazaList.add("FRIEND");
+        plazaList.add("OTHER");
+        String[] plazas = plazaList.toArray(new String[0]);
 
         for (String source : sources) {
             for (String plaza : plazas) {
@@ -227,7 +239,7 @@ public class NightlyScheduledFillService {
             java.util.Collections.shuffle(candidates, rng);
             for (Persona persona : candidates) {
                 if (!budget.hasRemaining()) break;
-                for (String plaza : PlazaGrounding.retryOrder(persona)) {
+                for (String plaza : PlazaGrounding.retryOrderWithFamilyControl(persona, properties.isFamilyPlazaGenerationEnabled())) {
                     String emptyKey = source + "|" + plaza;
                     if (emptyPlazaSources.contains(emptyKey)) {
                         skipped++;

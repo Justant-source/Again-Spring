@@ -15,6 +15,7 @@ import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.safety.PlazaTopicalFitGate;
 import com.againspring.aiuser.orchestrator.safety.ProofreadQualityGate;
 import com.againspring.aiuser.orchestrator.safety.SoftProofread;
 import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
@@ -81,6 +82,7 @@ public class AiPostBundleService {
     private final JdbcTemplate jdbcTemplate;
     private final com.againspring.aiuser.orchestrator.service.llm.LlmCircuitBreaker circuitBreaker;
     private final StructuredGenerationFailureTelegramNotifier structuredGenNotifier;
+    private final PlazaTopicalFitGate plazaTopicalFitGate;
 
     /** Derive environment (dev/prod) from backend base URL for alerting. */
     private String deriveEnvironment() {
@@ -365,6 +367,9 @@ public class AiPostBundleService {
         if (stripped > 0) {
             log.info("AI post bundle stripped {} story-persona comment(s) corr={}", stripped, correlationId);
         }
+        // Evaluate plaza topical fit (log-only, no blocking yet)
+        evaluatePlazaTopicalFit(category, bundle.content().title(), bundle.content().body(), correlationId);
+
         return proofreadBundle(bundle, correlationId)
                 .map(BundleAttempt::ok)
                 .orElseGet(() -> BundleAttempt.llmFail("proofread dropped bundle"));
@@ -859,6 +864,29 @@ public class AiPostBundleService {
             if (vt != null && !String.valueOf(vt).isBlank()) return String.valueOf(vt);
         }
         return "NATEPAN";
+    }
+
+    /**
+     * Evaluate plaza topical fit for generated story (log-only, Phase 4).
+     * When gate is configured for blocking (future), this would be a veto point.
+     */
+    private void evaluatePlazaTopicalFit(String category, String title, String body, String correlationId) {
+        if (!properties.getThreadPlan().getPlazaTopicalFitGate().isLoggingEnabled()) {
+            return;
+        }
+        try {
+            PlazaTopicalFitGate.Result result = plazaTopicalFitGate.evaluate(category, title, body);
+            if (!result.matches() && properties.getThreadPlan().getPlazaTopicalFitGate().isBlockingEnabled()) {
+                log.warn("AI post bundle rejected: PLAZA_MISMATCH corr={} declaredPlaza={} inferredPlaza={}",
+                    correlationId, result.declaredPlaza(), result.inferredPlaza());
+                throw new IllegalArgumentException(
+                    "plaza mismatch: declared=" + result.declaredPlaza() + " inferred=" + result.inferredPlaza());
+            }
+        } catch (IllegalArgumentException blocking) {
+            throw blocking;
+        } catch (Exception e) {
+            log.warn("Plaza topical-fit evaluation failed corr={}: {}", correlationId, e.getMessage());
+        }
     }
 
     /**

@@ -24,6 +24,8 @@ public class OrchestratorProperties {
     private boolean forceActive = false;  // 시간대 무관 강제 활성 (dev 테스트용)
     /** 보조 백엔드 URL (prod↔dev 동시 게시). 빈 문자열이면 미사용. */
     private String secondaryBackendBaseUrl = "";
+    /** FAMILY 광장 AI 생성 활성화 (false = OTHER로 흡수). */
+    private boolean familyPlazaGenerationEnabled = false;
 
     /** 콘텐츠 인식 좋아요·투표 결정 설정. */
     private ContentAwareDecisions contentAwareDecisions = new ContentAwareDecisions();
@@ -169,6 +171,8 @@ public class OrchestratorProperties {
         private Map<Integer, Double> kstHourlyHumanWeights = defaultKstWeights();
         /** Engagement (likes/views) reconciler settings. */
         private Engagement engagement = new Engagement();
+        /** Plaza topical-fit gate settings (Phase 4: log-only mode). */
+        private PlazaTopicalFitGate plazaTopicalFitGate = new PlazaTopicalFitGate();
 
         /** Effective micro-batch size clamped to the plan contract (4..6). */
         public int resolvedMicroBatchSize() {
@@ -250,5 +254,22 @@ public class OrchestratorProperties {
 
         /** 글 좋아요 리콘실 on/off (2026-07-31~, VoteLikeBatchService 대체). */
         private boolean postLikesEnabled = true;
+    }
+
+    @Getter
+    @Setter
+    public static class PlazaTopicalFitGate {
+        /**
+         * Enable logging of plaza topical-fit verdicts (MATCH/MISMATCH).
+         * When true (default), evaluates generated stories and logs verdicts.
+         * When false, evaluation is skipped entirely.
+         */
+        private boolean loggingEnabled = true;
+        /**
+         * Enable blocking of mismatched stories (blocking = not publishing).
+         * When true, MISMATCH verdicts prevent post publication.
+         * When false (default), all verdicts are log-only (no blocking).
+         */
+        private boolean blockingEnabled = false;
     }
 }

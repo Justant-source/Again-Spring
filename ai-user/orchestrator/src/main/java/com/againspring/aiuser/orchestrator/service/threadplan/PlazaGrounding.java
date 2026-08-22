@@ -30,12 +30,31 @@ public final class PlazaGrounding {
      * remaining primary plazas, then OTHER.
      */
     public static List<String> retryOrder(Persona persona) {
+        return retryOrderWithFamilyControl(persona, true);
+    }
+
+    /**
+     * Preferred plaza first (persona top interest when it is a primary plaza), then the
+     * remaining primary plazas, then OTHER.
+     * When familyEnabled=false, FAMILY is replaced with OTHER if it would be first,
+     * and excluded from the primary sequence.
+     *
+     * @param persona the persona to ground plaza preferences
+     * @param familyEnabled if false, FAMILY is routed to OTHER (for nightly fill when corpus lacks family stories)
+     */
+    public static List<String> retryOrderWithFamilyControl(Persona persona, boolean familyEnabled) {
         String top = topCategory(persona);
+        // When family is disabled, remap FAMILY → OTHER in top position
+        if (!familyEnabled && "FAMILY".equals(top)) {
+            top = "OTHER";
+        }
         List<String> order = new ArrayList<>(PRIMARY.size() + 1);
         if (PRIMARY.contains(top)) {
             order.add(top);
         }
         for (String plaza : PRIMARY) {
+            // Skip FAMILY if disabled
+            if (!familyEnabled && "FAMILY".equals(plaza)) continue;
             if (!plaza.equals(top)) order.add(plaza);
         }
         order.add("OTHER");
