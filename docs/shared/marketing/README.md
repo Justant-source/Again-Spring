@@ -93,6 +93,7 @@ docs/shared/marketing/
 | **완료** | 사연(story) 단위 리스트 · 상단 **게시 이력**(COMMITTED) — 클릭 시 플랫폼별 상태+URL · **Job {id}** 는 `/admin/marketing/jobs/{id}` 로 이동(다이얼로그 내 승인/재시도 없음) · 하단 **탈락**(DROPPED) — 강제 배포(인라인 모드 선택 + 확인) · 플랫폼 성과 카드·잡 보드 박스·구 타임라인 UI는 이 탭에서 제거됨 |
 | **설정** | 플랫폼 자동 on/off · 플랫폼 계정 자격증명 · (Phase 2) 채널별 cap·가중치·`auto_adjust` |
 | **통계** | Phase 3: 채널 KPI·UTM·수집 건강 · 감정×카테고리 테마 배수(제안→확정) · 이벤트 타임라인 · 주간 리포트 |
+| **테스트** (2026-08-22) | 최근 사연 목록 또는 postId 직접 입력 → 릴스/쇼츠 렌더 테스트. `POST /jobs`를 `autoPublish:false`로 호출 — LLM 대본·시봄이 매핑을 실제로 생성하고 WaggleBot이 렌더링하지만 **실제 플랫폼에는 절대 게시되지 않는다**. 완료된 영상은 탭 안에서 `ArtifactSection`으로 바로 미리보기(같은 사연을 반복 실행해 LLM 결과 편차 비교 가능). 게시 버튼 없음 — 대기/완료 탭과 완전히 분리된 QA 전용 화면 |
 
 > **신규 홀딩 기본 태그 시드**: `#다시봄` `#againspring` `#공감비율` `#[카테고리]` (≤5) — 신규 홀딩 생성 시에만 적용, 기존 홀딩 백필 없음 (`MarketingHoldingBriefSeeder`). X 텍스트는 브랜드 2개만.
 > **긴급 재게시**: 완료 탭 다이얼로그에는 승인/재시도가 없다 — 잡 상세 페이지(`/admin/marketing/jobs/[id]`)의 게시/재게시 버튼으로 처리.
@@ -104,7 +105,7 @@ docs/shared/marketing/
 5. **완료** 탭에서 게시 이력(플랫폼별 상태·URL) 확인 · 탈락 건 강제 배포 · 긴급 시 잡 상세에서 직접 게시/재게시
 6. **설정**에서 채널 auto on/off · 계정 자격증명 · Phase 2 cap/가중치 · **통계** 탭에서 KPI·테마 배수·주간 리포트
 
-> 수동 `POST /api/admin/marketing/jobs`는 BE에 남아 있으나(스케줄러·force·e2e), Admin UI의 주 경로는 **대기 보드 → 자동/강제 확정**이다.
+> 수동 `POST /api/admin/marketing/jobs`는 BE에 남아 있으나(스케줄러·force·e2e·**테스트 탭**), Admin UI의 실게시 주 경로는 여전히 **대기 보드 → 자동/강제 확정**이다. 테스트 탭은 같은 엔드포인트를 `autoPublish:false`로만 호출하므로 실게시 경로와 절대 섞이지 않는다.
 
 ### IG 단건 검증 (요청 시 1사연)
 
@@ -202,8 +203,9 @@ UNKNOWN으로 덮지 않는다.
 | BE 플랫폼 auto / 점수 / 상한 / 자동 즉시발행 | `MarketingPlatformAutoService` · `MarketingScoreWeightService` · `MarketingQuotaService` · `MarketingJobService` |
 | BE 잡·폴링 | `MarketingJobService.java` · `MarketingPollingScheduler.java` |
 | BE Admin API | `AdminMarketingController` · `AdminMarketingHoldingController` · `AdminMarketingCompletedController` · `AdminMarketingPlatformController` |
-| FE 마케팅 허브 | `frontend/app/(admin)/admin/marketing/page.tsx` (탭: 대기/완료/설정) |
+| FE 마케팅 허브 | `frontend/app/(admin)/admin/marketing/page.tsx` (탭: 대기/완료/통계/테스트/설정) |
 | FE 홀딩 UI | `frontend/components/admin/marketing/HoldingBoard.tsx` · `HoldingControlsBar.tsx` · `HoldingDraftDialog.tsx` |
+| FE 테스트 탭 (렌더 QA) | `frontend/components/admin/marketing/RenderTestSection.tsx` — `createMarketingTestJob`(항상 `autoPublish:false`) |
 | FE 잡 상세 | `frontend/app/(admin)/admin/marketing/jobs/[id]/page.tsx` |
 | FE API 클라이언트 | `frontend/lib/api/admin/marketing.ts` |
 | FE 플랫폼 계정 UI | `frontend/components/admin/marketing/PlatformCredentialsSection.tsx` · `PlatformAutoSection.tsx` |

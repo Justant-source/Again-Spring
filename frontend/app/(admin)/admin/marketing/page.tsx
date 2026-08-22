@@ -11,6 +11,7 @@ import { HoldingControlsBar } from '@/components/admin/marketing/HoldingControls
 import { HoldingBoard } from '@/components/admin/marketing/HoldingBoard';
 import { HoldingDraftDialog } from '@/components/admin/marketing/HoldingDraftDialog';
 import { MarketingStatsTab } from '@/components/admin/marketing/MarketingStatsTab';
+import { RenderTestSection } from '@/components/admin/marketing/RenderTestSection';
 import {
   CompletedHoldingsBoard,
   type CompletedHoldingView,
@@ -33,12 +34,13 @@ import {
   MarketingForceMode,
 } from '@/lib/api/admin/marketing';
 
-type MainTab = 'holding' | 'completed' | 'settings' | 'stats';
+type MainTab = 'holding' | 'completed' | 'stats' | 'test' | 'settings';
 
 function resolveTab(raw: string | null): MainTab {
   if (raw === 'completed' || raw === 'jobs') return 'completed';
-  if (raw === 'settings' || raw === 'credentials' || raw === 'quota') return 'settings';
   if (raw === 'stats' || raw === 'report') return 'stats';
+  if (raw === 'test') return 'test';
+  if (raw === 'settings' || raw === 'credentials' || raw === 'quota') return 'settings';
   return 'holding';
 }
 
@@ -208,6 +210,7 @@ export default function MarketingJobsPage() {
           <TabsTrigger value="holding">대기</TabsTrigger>
           <TabsTrigger value="completed">완료</TabsTrigger>
           <TabsTrigger value="stats">통계</TabsTrigger>
+          <TabsTrigger value="test">테스트</TabsTrigger>
           <TabsTrigger value="settings">설정</TabsTrigger>
         </TabsList>
 
@@ -359,6 +362,10 @@ export default function MarketingJobsPage() {
 
         <TabsContent value="stats" className="space-y-4">
           <MarketingStatsTab />
+        </TabsContent>
+
+        <TabsContent value="test" className="space-y-4">
+          <RenderTestSection />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-8">

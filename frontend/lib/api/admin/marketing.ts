@@ -53,6 +53,24 @@ export async function createMarketingJob(
   return res.data;
 }
 
+/**
+ * Create a render-only test job (테스트 탭 전용). Always autoPublish=false — this
+ * never posts to a real platform, only renders artifacts (video/cards/etc.) for
+ * preview via {@link ArtifactSection}. Distinct from the deprecated
+ * {@link createMarketingJob} (manual *publish* job creation being removed).
+ */
+export async function createMarketingTestJob(
+  postId: string,
+  targets: string[]
+): Promise<MarketingJob> {
+  const res = await api.post<MarketingJob>('/api/admin/marketing/jobs', {
+    postId,
+    targets,
+    autoPublish: false,
+  });
+  return res.data;
+}
+
 export async function listMarketingJobs(): Promise<MarketingJob[]> {
   const res = await api.get<MarketingJob[]>('/api/admin/marketing/jobs');
   return res.data;
@@ -304,20 +322,40 @@ export async function updateMarketingPlatformQuota(caps: {
 export interface PickerPost {
   id: string;
   title: string;
-  authorNickname: string | null;
-  voteCount: number;
+  category: string | null;
   commentCount: number;
+  synthetic: boolean;
   createdAt: string;
 }
 
-export async function listAdminPostsForPicker(page?: number): Promise<PickerPost[]> {
+interface AdminPostViewRaw {
+  id: string;
+  title: string | null;
+  category?: string | null;
+  commentCount?: number;
+  synthetic?: boolean;
+  createdAt: string;
+}
+
+/**
+ * GET /api/admin/content/posts?page=&size= — 최근 순 페이지네이션.
+ * 응답은 Spring `Page<AdminPostView>`(래핑 객체)이므로 `content`를 풀어 PickerPost로 매핑한다.
+ */
+export async function listAdminPostsForPicker(page = 0, size = 20): Promise<PickerPost[]> {
   const params = new URLSearchParams();
-  if (page !== undefined) params.append('page', String(page));
-  params.append('size', '20');
-  const res = await api.get<PickerPost[]>(
-    `/api/admin/content/posts${params.size > 0 ? '?' + params.toString() : ''}`
+  params.append('page', String(page));
+  params.append('size', String(size));
+  const res = await api.get<{ content: AdminPostViewRaw[] }>(
+    `/api/admin/content/posts?${params.toString()}`
   );
-  return res.data;
+  return (res.data.content ?? []).map((p) => ({
+    id: p.id,
+    title: p.title ?? '(제목 없음)',
+    category: p.category ?? null,
+    commentCount: p.commentCount ?? 0,
+    synthetic: p.synthetic ?? false,
+    createdAt: p.createdAt,
+  }));
 }
 
 // ===== Score weights (marketing redesign) =====
