@@ -334,3 +334,19 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 - AS 백엔드 `./gradlew test --tests "*Sibom*" --tests "*VideoVariantService*"` → 49 passed (SibomCandidateService 8·SibomPlanGuard 17·VideoVariantService 24)
 - 60장 렌더 후 165px 축소 콘택트시트로 육안 검수. 🚨 **1차 검수에서 자체 QA 스크립트 버그**(PNG를 `.resize()` 없이 그대로 붙여넣어 인접 이미지가 겹쳐 보임)로 5장을 오탐 — 개별 파일로 재확인해 전부 정상임을 확인. 그리드 스크립트를 쓸 때는 반드시 `paste()` 전에 `resize()`를 확인할 것.
 - `caption`/`alt_captions` 10자 초과 2건(`habit-clash`·`wedding-stress`) 발견 후 수정.
+
+### 10.1 키워드 노이즈 정리 (2026-08-22)
+
+prod 실사연 렌더 테스트 도중 `credit-stolen`이 `내가`(코퍼스 265건 중 129건=49%!)로,
+`parents-control`이 `얘기`(106건=40%)로 걸리는 걸 실측으로 발견했다. 부분문자열 매칭
+특성상 대명사·접속사급 단어를 키워드로 두면 사실상 랜덤 노이즈가 된다.
+
+전체 60장을 코퍼스 재감사(빈도 8% 이상 또는 정지어 사전 매칭) → 16건 의심 항목 중
+**의미상 진짜 핵심어인 것(`헐`·`분위기`·`힘들`·`나만` 등, 빈도는 높지만 주제와 실제로
+맞음)은 유지하고, 대명사/접속사성 노이즈만 제거**했다(7장: credit-stolen·
+parents-control·late-regret·turned-blame·quit-decided·drunk-conflict·overheard).
+제거로 놓친 5건(코퍼스 기준 커버리지 99.2%→98.1%)을 직접 확인한 결과 전부 그 노이즈
+키워드 덕분에 우연히 걸렸던 무관한 사연이었다 — 정밀도 개선이 맞았다.
+
+**교훈**: 키워드 개수·길이 규칙(2~6자, 6~10개)만으로는 부족하다. 배포 후 반드시
+실제 코퍼스로 빈도 감사를 해서 "흔하지만 무관한 단어"가 섞이지 않았는지 확인할 것.
