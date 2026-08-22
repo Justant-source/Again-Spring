@@ -146,6 +146,14 @@ export function RenderTestSection() {
   const launchRun = useRenderTestStore((s) => s.launch);
   const clearRuns = useRenderTestStore((s) => s.clearRuns);
   const removeRun = useRenderTestStore((s) => s.removeRun);
+  const resumePolling = useRenderTestStore((s) => s.resumePolling);
+
+  // 새로고침 이후 복원된 run 중 아직 터미널 상태가 아닌 것들의 폴링을 다시 건다
+  // (setTimeout 체인은 persist되지 않으므로 마운트 시 1회 재시작 필요).
+  useEffect(() => {
+    resumePolling();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadPosts = useCallback(async (targetPage: number) => {
     setPostsLoading(true);
@@ -288,8 +296,8 @@ export function RenderTestSection() {
           )}
         </div>
         <p className="mb-2 text-xs text-gray-400">
-          다른 탭으로 이동해도 이 결과는 지워지지 않습니다. 직접 지우거나(카드의 ✕ 또는
-          「전체 지우기」) 페이지를 새로고침하기 전까지 계속 남아 있습니다.
+          다른 탭으로 이동하거나 페이지를 새로고침해도 이 결과는 지워지지 않습니다(이 브라우저에
+          로컬 저장). 직접 지우기 전까지(카드의 ✕ 또는 「전체 지우기」) 계속 남아 있습니다.
         </p>
         {runs.length === 0 ? (
           <p className="text-sm text-gray-400">
