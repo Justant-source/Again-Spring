@@ -470,12 +470,21 @@ def available_count(
             }
 
         # Build SQL similar to _SELECT_CANDIDATE_SQL but COUNT only
+        # Phase 2 quality gate (2026-08-22 redesign): Detect conflict narratives vs chatter
+        # (must sync with source_claim.py _SELECT_CANDIDATE_SQL)
         where_conditions = [
             "eb.content_type = 'POST'",
             "eb.source = %s",
             "eb.source_url IS NOT NULL",
             "eb.popularity_pct IS NOT NULL",
             "eb.created_at >= DATE_SUB(NOW(3), INTERVAL %s DAY)",
+            # source_claim._SELECT_CANDIDATE_SQL의 잡담 배제 조건과 **반드시 동일하게** 유지.
+            # 두 곳이 어긋나면 "재고 있다"고 보고해놓고 claim은 실패하는 상태가 된다.
+            # 근거·측정치는 source_claim.py 쪽 주석 참조.
+            """NOT (
+            eb.content REGEXP '라고 (함|한다|했다|밝혔|전했)|다고 (함|한다|했다|밝혔|전했|알려)|소속사|인터뷰|보도|누리꾼|기록으로'
+            AND eb.content NOT REGEXP '했는데|하는데|했음|더라|했어요|했습니다|어떡|제가 |내가 '
+            )""",
         ]
         params = [normalized_src, int(window_days)]
 

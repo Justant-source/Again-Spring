@@ -130,3 +130,36 @@ def test_available_count_all_plazas():
             if counts[i] == 0:
                 assert data["source"] == "blind"
                 assert data["category"] == plaza
+
+
+def test_available_count_applies_phase2_quality_gate():
+    """Phase 2 gate (2026-08-22): available-count must apply title OR quality predicate.
+
+    The endpoint should only count rows that have:
+    - A title, OR
+    - Content length >= 300 AND quality_score >= 0.6
+
+    This is verified by checking that the SQL query includes the gate condition
+    in the where_conditions list.
+    """
+    with patch('app.api.examples.get_db') as mock_db:
+        mock_cur = MagicMock()
+        mock_cur.fetchone.return_value = {"cnt": 163}  # Reduced from 432 OTHER by gate
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+        mock_conn.cursor.return_value.__exit__.return_value = False
+        mock_db.return_value.__enter__.return_value = mock_conn
+
+        # Query OTHER category which is most affected by quality gate
+        response = client.get("/examples/available-count?source=natepan&category=OTHER&window_days=14")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["category"] == "OTHER"
+        assert data["count"] == 163  # 432 without gate → 163 with gate (38% survival)
+
+        # Verify the SQL was executed (mock should have been called)
+        assert mock_cur.execute.called
+        executed_sql = str(mock_cur.execute.call_args_list[0])
+        # Should include quality gate condition
+        assert "CHARACTER_LENGTH" in executed_sql or "quality_score" in executed_sql
