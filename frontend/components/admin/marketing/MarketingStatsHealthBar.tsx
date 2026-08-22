@@ -22,11 +22,19 @@ interface MarketingStatsHealthBarProps {
   onCollect?: () => void | Promise<void>;
 }
 
-function statusChipClass(status: string): string {
+// 백엔드(MarketingStatsDashboardService.buildHealth)가 실제로 보내는 status 값은
+// 'healthy' | 'degraded' | 'unknown' 뿐이다. 'degraded'에 대응하는 case가 없으면
+// default로 떨어져 실제 데이터가 있는 채널도 'unknown'과 똑같이 "미확인"으로
+// 보인다 — degraded는 message(예: "N error row(s)")로 error/partial을 구분해 표시한다.
+function statusChipClass(status: string, message?: string | null): string {
   switch (status) {
     case 'ok':
     case 'healthy':
       return 'border-green-200 bg-green-50 text-green-800';
+    case 'degraded':
+      return message?.includes('error')
+        ? 'border-red-200 bg-red-50 text-red-800'
+        : 'border-amber-200 bg-amber-50 text-amber-800';
     case 'partial':
       return 'border-amber-200 bg-amber-50 text-amber-800';
     case 'error':
@@ -37,11 +45,13 @@ function statusChipClass(status: string): string {
   }
 }
 
-function statusLabel(status: string): string {
+function statusLabel(status: string, message?: string | null): string {
   switch (status) {
     case 'ok':
     case 'healthy':
       return '정상';
+    case 'degraded':
+      return message?.includes('error') ? '오류' : '부분';
     case 'partial':
       return '부분';
     case 'error':
@@ -133,10 +143,10 @@ export function MarketingStatsHealthBar({
               <span
                 key={ch.platform}
                 title={ch.message || undefined}
-                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${statusChipClass(ch.status)}`}
+                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${statusChipClass(ch.status, ch.message)}`}
               >
                 <span className="font-medium">{platformLabel(ch.platform)}</span>
-                <span className="opacity-80">{statusLabel(ch.status)}</span>
+                <span className="opacity-80">{statusLabel(ch.status, ch.message)}</span>
               </span>
             ))}
           </div>
