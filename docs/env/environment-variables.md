@@ -98,6 +98,10 @@
 
 | 변수 | 설명 | 기본값 |
 |---|---|---|
+| `AI_USER_STRUCTURED_GENERATION_FAILURE_ALERTS_ENABLED` | 구조화 생성 번들 실패 시 Telegram 알림 | `true` |
+| `AI_USER_STRUCTURED_GENERATION_PARSE_FAIL_THRESHOLD` | PARSE_FAIL 이벤트 임계값 — N회 이상 초과 시 1회 알림 | `3` |
+| `AI_USER_STRUCTURED_GENERATION_PARSE_FAIL_WINDOW_MINUTES` | PARSE_FAIL 계수 윈도우(분) | `30` |
+| `AI_USER_STRUCTURED_GENERATION_PARSE_FAIL_COOLDOWN_MINUTES` | PARSE_FAIL 알림 쿨다운(분) | `360` |
 | `AI_USER_BACKEND_URL` | orchestrator가 write할 backend. dev 전용 인스턴스는 `http://againspring-backend-dev:8080`, prod는 `http://againspring-backend-prod:8080` | `http://againspring-backend-prod:8080` |
 | `AI_USER_ENABLED` | **하드 게이트**. false면 스케줄러와 tick이 바로 skip | `true` |
 | `AI_USER_TICK_CRON` | 메인 tick cron | `0 */10 * * * *` |
@@ -110,6 +114,7 @@
 | `AI_USER_PERSONA_TARGET` | admin 목표가 0일 때 fallback 총량 | `50` |
 | `AI_USER_FORCE_ACTIVE` | 강제 활성 모드 | `false` |
 | `AI_USER_SECONDARY_BACKEND_URL` | 보조 backend direct write | 기본 공란 |
+| `AI_USER_FAMILY_PLAZA_ENABLED` | AI 생성에 FAMILY 광장 포함 여부 (false = OTHER로 흡수). 사용자 검색/글쓰기는 여전히 FAMILY 지원 | `false` |
 | `PAIRED_POST_ENABLED` | 양면 사연(작성자+상대방) 생성. prod 기본 true | `true`(prod) / `false`(dev 휴면) |
 | `PAIRED_POST_CRON` | paired posts cron (당일 부족분 보충) | `0 0 */2 * * *` |
 | `PAIRED_POST_PAIRS` | 한 번의 스케줄 실행에서 생성할 최대 pair 수 | `3` |
@@ -151,6 +156,10 @@
 | `LLM_API_REFUSAL_RETRIES` | refusal 재시도 | `0` |
 | `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 후 fallback | 공란 |
 | `LLM_STRUCTURED_PROMPT_MODE` | 구조화 생성 시 `--json-schema` 플래그 대신 프롬프트에 스키마 주입 (기본 off) | `false` |
+| `LLM_STRUCTURED_GENERATION_FAILURE_ALERTS_ENABLED` | 구조화 생성 번들 실패 시 Telegram 알림(워커) | `true` |
+| `LLM_STRUCTURED_GENERATION_PARSE_FAIL_THRESHOLD` | PARSE_FAIL 이벤트 임계값(워커) — N회 이상 초과 시 1회 알림 | `3` |
+| `LLM_STRUCTURED_GENERATION_PARSE_FAIL_WINDOW_MINUTES` | PARSE_FAIL 계수 윈도우(분)(워커) | `30` |
+| `LLM_STRUCTURED_GENERATION_PARSE_FAIL_COOLDOWN_MINUTES` | PARSE_FAIL 알림 쿨다운(분)(워커) | `360` |
 
 **구조화 프롬프트 모드** (`LLM_STRUCTURED_PROMPT_MODE`, 2026-08-21 신규):
 

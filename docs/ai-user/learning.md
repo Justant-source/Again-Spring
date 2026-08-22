@@ -153,13 +153,29 @@ learning container가 뜨면 아래가 항상 실행된다.
 | 규칙 | 내용 |
 |---|---|
 | 가중치 | 제목 히트 ×**3**, primary 키워드 ×**2**, supporting ×**1**. 남편/아내/시댁 등 spouse 보너스는 MARRIED에만 (이중 가산 없이) |
-| 채널 힌트 | Natepan 테마 plaza · Blind 보드 → `channel_hint`로 해당 광장에 **작은 가산(+2)**. 힌트≠분류여도 OTHER로 버리지 않음. 채널은 veto가 아님 |
+| 채널 힌트 | Natepan 테마 plaza · Blind 보드 → `channel_hint`로 해당 광장에 **작은 가산(+1, Phase3 약화)** |
 | Natepan 랭킹 | 섹션이 연애가 아니어도 항상 분류. 섹션명에 「연애」가 있으면 `channel_hint=COUPLE`만 |
 | Natepan 테마 | `20027` **임신/출산/육아** → `channel_hint=MARRIED` (다른 MARRIED 채널과 같은 페이지네이션) |
 | Blind | 보드 3개만 (결혼생활 / 썸·연애 / 회사생활). 힌트는 MARRIED/COUPLE/WORK. **저장은 광장 enum** — 세 보드에서도 FAMILY/FRIEND/OTHER가 나올 수 있음. 레거시 `romance`/`marriage`/`workplace` 행은 claim 매핑이 계속 인식 |
-| FAMILY | 본가·부모·형제·조부모. 시댁/시집/친정·육아 인접은 MARRIED 쪽 |
+| FAMILY | 본가·부모·형제·조부모. 시댁/시집/친정·육아 인접은 MARRIED 쪽. **2026-08-22 이후: AI 생성 비활성화** (아래 FAMILY 흡수 참조) |
 
 기존 crawl 행 재라벨: `ai-user/tools/reclassify_example_bank_categories.py` (기본 **dry-run**, `--env prod|dev`, `--apply`로 `example_bank` UPDATE). **고신뢰만** 이동 — 1등 점수 ≥ 2×2등 **그리고** 1등 ≥ 6. 약함/동점은 그대로(OTHER 유지). LLM 없음. `posts` 재분류는 별도 `reclassify_post_categories.py`.
+
+#### 광장 분류 개선 이력 (2026-08-22, 소스 재고 파이프라인 안정화)
+
+다섯 건의 커밋이 example_bank 제목 추출 버그부터 AI 생성 광장 라우팅까지 근본 원인을 하나씩 복구했다.
+
+**①** (`f2f8f8f3` 제목 추출 버그): Natepan ID 범위 크롤이 제목 선택자 오류로 모든 글의 제목을 None으로 저장했다. 실제 페이지는 `og:title` 메타태그 또는 클래스 없는 `<h1>`을 쓰는데 선택자(`h2.tit`, `dd.tit h2` 등)가 맞지 않았다. 재고 기준 OTHER 432/432(100%), COUPLE 119/287(41%), MARRIED 142/426(33%), WORK 52/234(22%)가 무제목이었으며, plaza_classifier가 제목에 ×3 가중치를 주므로 분류 정확도가 구조적으로 훼손됐다. 수정 후: og:title 우선, 클래스 없는 h1 폴백, 레거시 선택자 유지.
+
+**②** (`ebd7d0d5`, `e8a8a76d` 소급 복구): 기존 4,180건 무제목 행을 원본 URL로 재조회해 제목만 채워 **3,590건 복구(86%)**했다. 실행 결과: POST 제목 있는 행 2,201 → 5,301 / 6,909. 2차 버그(SQL 주석의 퍼센트 기호 `9.8%가`가 파이썬 파라미터 바인딩 자리표시자로 해석돼 claim 전체가 400 오류) 수정 완료.
+
+**③** (`b483f8d1`, `0a61c983` 재고 사전조회): nightly fill이 재고 0인 (source, plaza) 조합에도 claim을 시도해 CLAIM_EMPTY로 헛도는 현상 수정. blind는 결혼·연애·직장 게시판만 크롤해 FAMILY/FRIEND 재고가 0인데 계속 요청했다. 신규 `GET /examples/available-count` 엔드포인트가 같은 술어로 재고를 확인 후 0인 조합은 skip(`SKIP_NO_INVENTORY` 로그). 즉시 발견된 성능 버그: available-count가 `COUNT(*)`로 모든 행을 스캔해 blind+MARRIED 98.6초, natepan+MARRIED 40.5초 소요 → **EXISTS로 변경해 0.31초로 단축**.
+
+**④** (`41857752` 잡담 필터): 발행 글의 9.8%(275건 중 27건)가 갈등 사연이 아닌 정보 전달 글(역사 기사 예: "덕혜옹주가…" 제목의 '친구'로 FRIEND로 claim돼 "덕혜옹주가 친구한테 한 고종 독살 얘기"로 각색). 넓은 필터들(제목 유무, 길이·품질 조건, 관계어/1인칭/동사 OR)은 진짜 사연의 절반까지 버렸다. 대신 **오탐 0%인 좁은 규칙 채택**: 전언 형식이면서 1인칭 경험 서술이 전혀 없는 글만 제외(`라고 함/다고 알려 AND NOT 했는데/내가`). 실측 확실한 사연 200건 0%, OTHER 300건 5%로 확실한 사연 손실 0.
+
+**⑤** (`ac2dce59` 채널 힌트 왜곡): channel_hint(크롤 게시판 → MARRIED 등)의 보너스가 2점이라 약한 점수 구간에서 내용을 눌렀다. 결혼생활 게시판에 올라온 친구·가족 갈등 글이 MARRIED로 흡수되던 이유다. 수정: 힌트 보너스 2→1, MARRIED spouse 보너스는 제목만, 약한 동점은 COUPLE 대신 OTHER 선호, body spouse 키워드는 이미 primary 점수가 있을 때만 추가. 실측(1,500건): 힌트 MARRIED 115건 이동(COUPLE 37·WORK 29·FRIEND 25·FAMILY 24)이 모두 "내용이 가리키는 광장" 방향. FRIEND가 모든 힌트에서 상위 이동처인 것이 재고 5까지 마른 원인.
+
+**⑥** (`f5e1ec7a` FAMILY 흡수): 세 접근(채널 추가·재분류·분류기 개선)을 모두 시도했으나 FAMILY 재고를 늘리지 못했다(FAMILY ±0). prod 재고: MARRIED 411·OTHER 430·COUPLE 271·WORK 224·FAMILY 21·FRIEND 5. 코퍼스에 가족 갈등 사연이 실제로 없어 나이틀리 fill이 채울 수 없는 광장을 계속 요청했다. 환경변수 `AI_USER_FAMILY_PLAZA_ENABLED`(기본 false)로 끄면 페르소나 관심사에서 FAMILY를 필터해 OTHER로 재배치하고, 재고 사전조회에서도 FAMILY 조합 건너뛴다. 사용자 대면은 일절 변화 없음 — 검색 필터 '가족' 칩, 글쓰기 카테고리, 상세·프로필 라벨, 관리자 선택지 모두 유지. 발행된 26건도 그대로. 사용자는 가족 글을 쓰고 검색하되 AI만 그 광장을 채우지 않는다.
 
 ## Popular source claim (2026-08-05)
 

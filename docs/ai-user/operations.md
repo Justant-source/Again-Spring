@@ -231,7 +231,9 @@ PairedPostScheduler cron (PAIRED_POST_CRON, 기본 2시간) — 당일 양면 �
 | 로그 | attempted vs saved. 슬롯별 실패 이유(source, plaza, persona id, claim empty vs LLM/safety/serialize/persist) |
 | Telegram | **saved < N일 때만**. N·saved·실패 원인 상세(메시지 길이 상한 ~3500자). 가득 채우면 보내지 않음 |
 
-광장 재시도 순서: 페르소나 최상위 interest → COUPLE/MARRIED/FRIEND/FAMILY/WORK. OTHER로 그라운딩하지 않는 편. claim empty여도 프리스타일 폴백은 없다.
+광장 재시도 순서: 페르소나 최상위 interest → COUPLE/MARRIED/FRIEND/[FAMILY/]WORK. OTHER로 그라운딩하지 않는 편. claim empty여도 프리스타일 폴백은 없다.
+
+**FAMILY 광장 라우팅 (2026-08-22~)**: prod corpus에 가족 갈등 사연이 실제로 부족해(재고 21 vs MARRIED 411) 환경변수 `AI_USER_FAMILY_PLAZA_ENABLED`(기본 false)이 꺼져 있다. 꺼지면 페르소나의 최상위 interest가 FAMILY여도 OTHER로 재배치되고, 나이틀리 fill의 광장 재시도 순서에서도 FAMILY가 제외된다. 환경변수 하나로 뒤돌리기 가능 — 사용자 대면(검색 필터, 글쓰기 카테고리, 라벨, 관리자 선택지)은 변화 없음. 코퍼스가 늘어나면 true로 복구.
 
 ### ActivityCurve — KST 시간대 활동 가중치
 
@@ -352,17 +354,24 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
 - `AI_LEARNING_CRAWL_ENABLED=true`인지 확인
 - 수동 실행이 아니라면 scheduler 로그에 등록 시각이 찍혔는지 확인
 
-### source claim / 풀 고갈 (2026-08-05, fill 재시도 2026-08-20)
+### source claim / 풀 고갈 (2026-08-05, 파이프라인 안정화 2026-08-22)
 
-- 일일 crawl **budget은 그대로**(natepan 1500 · blind 500). claim API가 budget을 바꾸지 않는다.
-- **한 번의** `claim-popular-source`는 요청한 source만 본다. 새벽 배치는 empty면 **Blind↔Natepan·다른 광장·다른 페르소나**로 다시 claim한다. Blind empty를 Natepan으로 바꾸는 대체를 **금지하지 않는다**.
-- 원인 후보: 14→30일 창에 미사용 `popularity_pct` POST 부족 · 같은 `source_url`이
-  이미 posts/예약에 소진 · soft/COMMITTED 예약 과다 · 광장 스코프가 좁은데 해당 plaza 코호트가 비어 있음.
-- saved < N이면 Telegram(기존 TELEGRAM_*). 로그의 attempted/saved·슬롯 이유를 본다.
-- 2026-08-10: claim/crawl은 **source_url 동시성 가드**를 쓴다. 과거 이중 INSERT된
-  형제 row가 남아 있어도 claim 가족이 한 번만 잡힌다. 신규 이중 INSERT는
-  `GET_LOCK(ai_learning_crawl_ingest:*)`로 막는다.
-- twin 거절(`StoryTwinGuard`) 로그: `AI post rejected as story twin` — soft-reserve는 lifecycle release 경로가 회수해야 한다.
+일일 crawl **budget은 그대로**(natepan 1500 · blind 500). claim API가 budget을 바꾸지 않는다.
+
+**한 번의** `claim-popular-source`는 요청한 source만 본다. 새벽 배치는 empty면 **Blind↔Natepan·다른 광장·다른 페르소나**로 다시 claim한다. Blind empty를 Natepan으로 바꾸는 대체를 **금지하지 않는다**.
+
+원인 후보: 14→30일 창에 미사용 `popularity_pct` POST 부족 · 같은 `source_url`이
+이미 posts/예약에 소진 · soft/COMMITTED 예약 과다 · 광장 스코프가 좁은데 해당 plaza 코호트가 비어 있음.
+
+saved < N이면 Telegram(기존 TELEGRAM_*). 로그의 attempted/saved·슬롯 이유를 본다.
+
+**2026-08-22 소스 재고 파이프라인 안정화**: 제목 추출 버그부터 광장 흡수까지 여섯 건의 수정이 nightly fill의 근본 원인을 순차 제거했다. 상세: [learning.md 광장 분류 개선 이력](./learning.md#광장-분류-개선-이력-2026-08-22-소스-재고-파이프라인-안정화).
+
+2026-08-10: claim/crawl은 **source_url 동시성 가드**를 쓴다. 과거 이중 INSERT된
+형제 row가 남아 있어도 claim 가족이 한 번만 잡힌다. 신규 이중 INSERT는
+`GET_LOCK(ai_learning_crawl_ingest:*)`로 막는다.
+
+twin 거절(`StoryTwinGuard`) 로그: `AI post rejected as story twin` — soft-reserve는 lifecycle release 경로가 회수해야 한다.
 
 ### 크롤이 조용히 멈췄을 때 (2026-06-24~07-30, 36일 무크롤 인시던트)
 

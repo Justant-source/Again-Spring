@@ -159,6 +159,46 @@ twin이면 bundle 실패(hold skip). soft-reserve release는 lifecycle 경로.
 
 솔로 글 전체 호출 표: [llm-call-budget.md](./llm-call-budget.md).
 
+### 광장 주제 적합성 게이트 (2026-08-22)
+
+`PlazaTopicalFitGate`(`safety/`)는 생성된 사연이 선언된 광장(plaza)과 실제로 맞는지 규칙 기반으로 검사한다. LLM 호출 없음 — 제목·본문 키워드 점수(제목 ×3, 본문 주요 키워드 ×2, 보조 ×1)로 판정.
+
+**도입 배경**: 광장은 프롬프트에 하드 제약으로 들어간다("가족 갈등만, 연인·직장·친구 제외" 등). 소스가 잘못 분류되면 LLM이 그 형식에 맞춰 조용히 각색한다 — 실사례: 역사 기사("고종의 딸 덕혜옹주가…")가 제목의 '친구' 때문에 FRIEND로 claim돼 "덕혜옹주가 일본 친구한테 털어놓은 고종 독살 얘기"로 발행됐다. 표절 가드(`StoryTwinGuard`, bigram 유사도)는 각색된 텍스트를 통과시키므로 이 오분류를 못 잡는다.
+
+**판정**:
+- `EXEMPT` — 선언 광장이 `OTHER`(특정 광장에 안 맞는 갈등이라는 뜻이라 항상 불일치로 잡히므로 평가 제외)
+- `MATCH` — 선언=추론 동일 / 인접 광장(`COUPLE↔MARRIED`, `FRIEND↔FAMILY`) / 1·2위 점수차(margin) ≤ 4
+- `MISMATCH` — margin > 4 (추론 광장이 명확히 우세)
+
+로그: `[PLAZA_FIT] declaredPlaza=... inferredPlaza=... declaredScore=... inferredScore=... margin=... verdict=... reason=...`
+
+**설정** (`ai-user.thread-plan.plaza-topical-fit-gate`, `OrchestratorProperties` — 현재 env override 없이 코드 기본값만):
+| 필드 | 기본값 | 설명 |
+|---|---|---|
+| `loggingEnabled` | `true` | 판정·로그 수행 여부. false면 평가 자체를 건너뜀 |
+| `blockingEnabled` | `false` | MISMATCH 시 발행 차단 여부. 현재 로그 전용 |
+
+**실측**: 초기 규칙(OTHER 미제외 + 등장 여부만 판정)은 실제 발행 글 275건에서 오탐 32.0%. OTHER 제외 + 인접 광장 허용 + margin>4 판정으로 재설계 후 258건 기준 오탐 **5.0%**(13건, 그중 9건은 실제 오분류를 정상 탐지).
+
+### 구조화 생성 실패 텔레그램 알림 (2026-08-21)
+
+스키마 강제 없이 프롬프트 지시로 JSON을 생성하는 모드([llm.md](./llm.md) 참조)에서는 파스 실패가 조용한 콘텐츠 누락으로 이어질 수 있다. 두 신호를 분리해 알림한다.
+
+- **번들 유실(하드 실패)**: `AiPostBundleService`의 `generateAndPublish`/`generateAndHoldResult` 실패 경로에서 즉시 알림
+- **PARSE_FAIL(재시도로 복구됨)**: 빈도 기반 — 임계값 초과 시 1회 알림 후 쿨다운 동안 재알림 억제(복구 가능한 실패마다 울리면 곧 무시하게 됨)
+
+**설정** (`ai-user.thread-plan.structured-generation`, env override 가능):
+| 키 | 환경변수 | 기본값 |
+|---|---|---|
+| `failure-alerts-enabled` | `AI_USER_STRUCTURED_GENERATION_FAILURE_ALERTS_ENABLED` | `true` |
+| `parse-fail-threshold` | `AI_USER_STRUCTURED_GENERATION_PARSE_FAIL_THRESHOLD` | `3` |
+| `parse-fail-window-minutes` | `AI_USER_STRUCTURED_GENERATION_PARSE_FAIL_WINDOW_MINUTES` | `30` |
+| `parse-fail-cooldown-minutes` | `AI_USER_STRUCTURED_GENERATION_PARSE_FAIL_COOLDOWN_MINUTES` | `360` |
+
+PARSE_FAIL은 오케스트레이터가 아니라 `ai-user/llm`(별도 gradle 모듈) 워커에서 발생하므로, 같은 알림·레이트리미터 로직을 워커 쪽에도 별도 구현해 중복 유지한다(`LlmStatsLogger` 중복과 동일한 이유 — 모듈 간 의존성을 새로 만들지 않기 위함). 워커측 설정 키는 `llm.structured.*`, env var는 `LLM_STRUCTURED_GENERATION_*` 접두사.
+
+알림 문구에는 환경·상관ID·실패 사유·롤백 힌트(`LLM_STRUCTURED_PROMPT_MODE=false` + 재빌드)가 포함된다. 전송 실패가 생성을 깨뜨리지 않도록 try/catch로 감싼다.
+
 ### 반복/길이 가드 (legacy tick)
 
 - 최근 글 history에서 본문 3개를 읽어 2-gram Jaccard를 계산한다.
@@ -280,6 +320,11 @@ AI-user orchestrator의 LLM 호출 통계를 24시간 rolling 집계로 반환�
     "HUMAN_REPLY": { ... }
   }
 }
+```
+
+**LlmCircuitBreaker**(`service/llm/`): 동일 `retryReason`이 3회 연속 발생하면 OPEN → 30분 뒤 자동 HALF_OPEN(재시도 허용). OPEN 상태에서는 해당 사유의 생성을 스킵하고 아래 로그를 남긴다. `/admin/metrics/llm-today` 응답에도 현재 서킷 상태가 포함된다.
+```
+[CIRCUIT] OPEN reason=PROVIDER_ERROR consecutiveFailures=3 promptHashes=[...]
 ```
 
 **[LLMSTATS] 로그 형식** (내부, 단일행):

@@ -83,10 +83,30 @@ String sanitized = promptSanitizer.sanitize(userInput);
 
 `llm-worker/` 디렉토리: Spring Boot + Claude CLI 실행 앱  
 - 모델: `claude-haiku-4-5-20251001`
+- 보고서/분석 모델: `claude-sonnet-5` (2026-08-21부터; 이전 `claude-sonnet-4-6`)
 - `~/.claude` bind mount (Claude 인증)
 - 엔드포인트: `POST /v1/invoke`, `GET /v1/invocations`
 
-**CLI 도구 오버헤드 감소 (2026-08-21)**: llm-worker는 structured output이 불필요하므로 `--disallowedTools "*"`로 모든 CLI 도구를 차단. 입력 토큰 오버헤드를 ~279 토큰으로 감소시킨다.
+**CLI 도구 오버헤드 감소 (2026-08-21)**: llm-worker는 structured output이 불필요하므로 `--disallowedTools "*"`로 모든 CLI 도구를 차단. 
+입력 토큰 오버헤드를 25,267 토큰에서 ~279 토큰으로 감소시킨다(기본값 대비 -99%). 
+구조화 경로가 필요할 때는 명시 도구 리스트로 `StructuredOutput` 유지하면 약 18,812 토큰 오버헤드다.
+
+**프롬프트 지시 JSON 모드 (2026-08-21 도입, 2026-08-21 활성화)**: 
+`--json-schema` 플래그 대신 schema를 프롬프트 텍스트로 주입하는 `LLM_STRUCTURED_PROMPT_MODE` 플래그(기본 `false`, `.env.ai-user`에서 `true`로 활성화).
+이 모드에서는 `--disallowedTools "*"`를 사용하므로 오버헤드가 279 토큰으로 떨어진다(스키마 인라인 350~400 토큰 비용으로 순절감 ~18.1k/호출).
+
+| 모드 | --disallowedTools | 오버헤드 | 검증 |
+|---|---|---|---|
+| 스키마 플래그 (`--json-schema`) | 명시 리스트 (StructuredOutput만 허용) | ~18.8k | 엄격 (CLI stream-json 검증) |
+| 프롬프트 모드 (LLM_STRUCTURED_PROMPT_MODE=true) | `*` (모두 차단) | ~279 | lenient (JsonExtractorUtil로 substring 추출) |
+| 비구조화 (기본) | `*` (모두 차단) | ~279 | — |
+
+프롬프트 모드 실측 (/v2/generate/thread-plan, 2026-08-21):
+- 스키마 모드 (캐시 warm): 입력 49,311 / 출력 3,888 / 43.3s
+- 프롬프트 모드 (캐시 cold): 입력 4,381 / 출력 859 / 13.9s
+
+캐시가 걸린 스키마 모드보다 캐시 없는 프롬프트 모드가 11배 작은 이유는 그동안 캐시에 얹혀 있던 4만 토큰대가 
+앱 프롬프트가 아니라 **CLI 도구 정의였다는 증거**다.
 
 **[LLMSTATS] 로깅 (2026-08-21)**: llm-worker의 `ClaudeCliInvoker.logLlmStats()` 메서드가 모든 호출(성공/실패)에 대해 `[LLMSTATS]` 포맷으로 메트릭스를 기록한다:
 ```

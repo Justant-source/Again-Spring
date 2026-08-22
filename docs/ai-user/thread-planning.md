@@ -21,6 +21,8 @@
 > 쓴다. 홀딩 시 후보 item에 `scheduledAt`을 심고, `persistResponse`는 저장된
 > 시각을 우선한다(관리자 예약 홀딩 편집용). 상세: `docs/ai-user/operations.md` §8.
 > Hold 직전 맞춤법은 `SoftProofread`: 오탈자 휴리스틱이 있을 때만 LLM 교정, 실패 시 원문 유지. 솔로 글당 LLM 횟수: [llm-call-budget.md](./llm-call-budget.md).
+>
+> **FAMILY 광장 라우팅 (2026-08-22~)**: prod corpus에 가족 갈등 사연이 실제로 부족해 환경변수 `AI_USER_FAMILY_PLAZA_ENABLED`(기본 false)로 꺼져 있다. 꺼지면 페르소나의 최상위 interest가 FAMILY여도 OTHER로 재배치된다. 사용자 대면(검색·카테고리·라벨)은 변화 없음. 코퍼스가 늘어나면 환경변수 하나로 복구.
 
 ## 구성과 경계
 

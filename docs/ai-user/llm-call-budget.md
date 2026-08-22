@@ -50,6 +50,23 @@ claim source (no LLM)
 
 `/v2/generate/thread-plan` 파싱 후 본문·댓글 각각 `critiqueAndRefine`을 탄다. `quickCheck` PASS면 **추가 CLI 호출 없음**. FAIL이면 항목당 짧은 rewrite 1회. 생성 JSON 스키마 호출과는 별개다.
 
+### 1.4 CLI 도구 오버헤드 + 프롬프트 지시 JSON 모드 (2026-08-21~22)
+
+`claude -p` 호출은 매번 Claude Code CLI의 도구 정의 전체를 프롬프트에 실어 보낸다 — 앱 프롬프트 크기와 무관한 고정 부담(빈 호출 기준 ~25k 토큰). `--disallowedTools "*"`로 대부분 제거 가능하지만, `--json-schema`를 쓰는 구조화 호출은 `StructuredOutput` 도구를 살려둬야 해서(`"*"`를 쓰면 스키마 강제가 깨짐) 명시 disallow 목록만 적용 가능 — 그래도 ~18.8k 토큰이 남는다.
+
+`LLM_STRUCTURED_PROMPT_MODE=true`(`.env.ai-user`에서 활성)는 `--json-schema` 대신 스키마를 프롬프트 지시로 주입하고 `"*"`를 적용해 이 잔여 오버헤드도 없앤다. 스키마 강제가 사라지므로 관대한 JSON 추출기(직접 파싱 → 코드펜스 제거 → 첫 `{`~마지막 `}` 추출)가 필요하다.
+
+**dev 실측** (`/v2/generate/thread-plan`, 동일 요청):
+
+| | 입력 | 출력 | 소요 |
+|---|---|---|---|
+| 스키마 모드(캐시 warm) | 49,311 | 3,888 | 43.3s |
+| 프롬프트 모드(캐시 cold) | 4,381 | 859 | 13.9s |
+
+캐시가 걸린 스키마 모드보다 캐시 없는 프롬프트 모드가 11배 작다 — 그동안 캐시에 얹혀 있던 4만 토큰대가 앱 프롬프트가 아니라 CLI 도구 정의였다는 증거. 파스 실패 시 스키마 강제가 없어 글+댓글 번들 전체가 유실되므로 실패율은 `[LLMSTATS] retryReason=PARSE_FAIL` + §6 서킷브레이커·§Phase4 텔레그램 알림으로 감시한다.
+
+롤백: `LLM_STRUCTURED_PROMPT_MODE=false` + 워커(`llm-ai-user`) 재빌드·재기동.
+
 ---
 
 ## 2. 양면 사연
