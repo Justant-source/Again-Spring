@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArtifactSection } from '@/components/admin/marketing/ArtifactSection';
-import { listAdminPostsForPicker, PickerPost } from '@/lib/api/admin/marketing';
+import { listAdminPostsForPicker, listMarketingJobs, MarketingJob, PickerPost } from '@/lib/api/admin/marketing';
 import { useRenderTestStore, formatApiError, TestRun } from '@/lib/store/renderTestStore';
 import { RefreshCw, Play, X } from 'lucide-react';
 
@@ -133,6 +133,41 @@ function TestRunCard({ run, onRemove }: { run: TestRun; onRemove: (runKey: strin
   );
 }
 
+function ServerJobCard({ job }: { job: MarketingJob }) {
+  return (
+    <Card className="p-4" data-testid="render-test-server-job-card">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-sm font-semibold text-gray-800">{job.postId}</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Job {job.id} · {job.targets.join(', ')} · {new Date(job.createdAt).toLocaleString('ko-KR')}
+          </p>
+        </div>
+        <Badge className={STATUS_COLORS[job.status] || 'bg-gray-200 text-gray-800'}>{job.status}</Badge>
+      </div>
+
+      {job.status === 'FAILED' && (job.errorSummary || job.errorMessage) && (
+        <p className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {job.errorSummary || job.errorMessage}
+        </p>
+      )}
+
+      {!TERMINAL_STATUSES.has(job.status) && (
+        <p className="mt-2 text-xs text-gray-500">
+          LLM 대본·시봄이 매핑 생성 후 WaggleBot 렌더 진행 중… (렌더 파이프라인은 동시 1건
+          처리라 대기열에 걸려 있을 수 있습니다)
+        </p>
+      )}
+
+      {job.artifacts && Object.keys(job.artifacts).length > 0 && (
+        <div className="mt-3">
+          <ArtifactSection jobId={job.id} artifacts={job.artifacts} />
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function RenderTestSection() {
   const [posts, setPosts] = useState<PickerPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
@@ -154,6 +189,41 @@ export function RenderTestSection() {
     resumePolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 서버 전체의 최근 테스트 잡(autoPublish=false) — 브라우저·실행 주체와 무관하게 항상
+  // 서버 기준 진실을 보여준다("이 브라우저에서 누른 것"만 보이는 로컬 세션 결과와는 별개).
+  const [serverJobs, setServerJobs] = useState<MarketingJob[]>([]);
+  const [serverJobsLoading, setServerJobsLoading] = useState(true);
+  const [serverJobsError, setServerJobsError] = useState<string | null>(null);
+
+  const loadServerJobs = useCallback(async (showLoader = true) => {
+    if (showLoader) setServerJobsLoading(true);
+    setServerJobsError(null);
+    try {
+      const all = await listMarketingJobs();
+      const testJobs = all
+        .filter((j) => !j.autoPublish)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 20);
+      setServerJobs(testJobs);
+    } catch (err: unknown) {
+      setServerJobsError(`서버 테스트 잡 목록을 불러오지 못했습니다: ${formatApiError(err)}`);
+    } finally {
+      if (showLoader) setServerJobsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadServerJobs();
+  }, [loadServerJobs]);
+
+  // 미종료 잡이 있으면 10초마다 자동 갱신 (누가/어디서 실행했든 진행 상황 반영).
+  useEffect(() => {
+    const hasActive = serverJobs.some((j) => !TERMINAL_STATUSES.has(j.status));
+    if (!hasActive) return;
+    const t = setInterval(() => loadServerJobs(false), 10000);
+    return () => clearInterval(t);
+  }, [serverJobs, loadServerJobs]);
 
   const loadPosts = useCallback(async (targetPage: number) => {
     setPostsLoading(true);
@@ -287,6 +357,42 @@ export function RenderTestSection() {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-700">
+            서버의 최근 테스트 잡 ({serverJobs.length})
+          </h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadServerJobs(true)}
+            disabled={serverJobsLoading}
+            data-testid="render-test-server-refresh"
+          >
+            <RefreshCw className={`h-3 w-3 ${serverJobsLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+        <p className="mb-2 text-xs text-gray-400">
+          누가·어디서(이 화면·다른 브라우저·스크립트) 실행했든 서버에 있는 최근
+          테스트 잡(autoPublish=false) 20건을 그대로 보여줍니다. 진행 중인 잡이 있으면
+          10초마다 자동 갱신됩니다.
+        </p>
+        {serverJobsError && (
+          <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {serverJobsError}
+          </div>
+        )}
+        {serverJobs.length === 0 && !serverJobsLoading ? (
+          <p className="text-sm text-gray-400">아직 서버에 테스트 잡이 없습니다.</p>
+        ) : (
+          <div className="space-y-3">
+            {serverJobs.map((job) => (
+              <ServerJobCard key={job.id} job={job} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">
             이번 세션 테스트 결과 ({runs.length})
           </h3>
           {runs.length > 0 && (
@@ -296,8 +402,9 @@ export function RenderTestSection() {
           )}
         </div>
         <p className="mb-2 text-xs text-gray-400">
-          다른 탭으로 이동하거나 페이지를 새로고침해도 이 결과는 지워지지 않습니다(이 브라우저에
-          로컬 저장). 직접 지우기 전까지(카드의 ✕ 또는 「전체 지우기」) 계속 남아 있습니다.
+          위 「서버의 최근 테스트 잡」과 달리 이 목록은 <strong>이 브라우저에서 직접 「테스트
+          렌더」를 눌렀을 때만</strong> 쌓입니다(로컬 저장). 다른 탭 이동·새로고침에도 지워지지
+          않고, 직접 지우기 전까지(카드의 ✕ 또는 「전체 지우기」) 남아 있습니다.
         </p>
         {runs.length === 0 ? (
           <p className="text-sm text-gray-400">
