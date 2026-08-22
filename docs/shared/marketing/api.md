@@ -608,10 +608,14 @@ ASM: `POST /api/v1/stats/collect` (`skip_slow`) · social-poster `POST /stats/x`
 | 플랫폼 | 지금 수집 가능 | 비고 |
 |---|---|---|
 | X | impressions≈views, likes, replies, reposts | 세션 Playwright scrape (`/stats/x`). API 키 없음 |
-| IG Reels/Feed | reach, plays/views, saves, shares, comments | Graph insights + media fields. numeric media id + token 필요. 권한 부족 시 partial + 로그 |
+| IG Reels/Feed | reach, saves, shares, likes, comments | Graph insights + media fields. numeric media id + token 필요. **v21에서 `plays`/`views` 제거** — 요청하면 전건 HTTP 400. 대표 지표는 양쪽 모두 `reach` |
 | YT Shorts | views, likes, comments | Data API `videos.list`. **avgViewDuration** → Analytics + `yt-analytics.readonly` 재동의 필요(없으면 partial) |
 
-일 06:30 KST 스케줄 수집. 실패는 배치 전체를 막지 않음.
+일 06:30 KST 스케줄 수집(`skip_slow=false`, X 포함). 실패는 배치 전체를 막지 않음.
+
+**`skip_slow=true`(어드민 수동 수집)는 X Playwright를 건너뛴다.** 건너뛴 항목은 결과에서 제외되어 오류 행으로 저장되지 않는다 — 수집을 시도하지 않은 것과 실패한 것은 다르며, 섞이면 대시보드 채널 상태가 degraded로 잘못 표시된다. X 지표는 스케줄 수집으로만 채워진다.
+
+**IG 토큰**: `instagram_manage_insights` scope 필요. Meta 앱에서 권한을 추가해도 **이미 발급된 토큰에는 반영되지 않으므로** 재발급해야 한다. ASM `scripts/refresh_ig_token.py` 참고(장기/페이지 토큰 교환).
 
 ### 4.3 저녁 슬롯 API (레거시, 자동 발행에 미사용)
 

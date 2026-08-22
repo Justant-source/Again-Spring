@@ -530,7 +530,8 @@ export const MARKETING_STATS_PLATFORM_LABELS: Record<MarketingStatsPlatform, str
 export const MARKETING_STATS_DEFAULT_METRICS: Record<MarketingStatsPlatform, string> = {
   x_thread: 'impressions',
   instagram_feed: 'reach',
-  instagram_reels: 'plays',
+  // Graph API v21 dropped plays for reels; reach is what the collector returns.
+  instagram_reels: 'reach',
   youtube_shorts: 'views',
 };
 

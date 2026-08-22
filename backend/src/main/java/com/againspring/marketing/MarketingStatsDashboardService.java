@@ -163,7 +163,8 @@ public class MarketingStatsDashboardService {
         return switch (MarketingPopularityScorer.normalizePlatform(platform)) {
             case MarketingPopularityScorer.PLATFORM_X_THREAD -> "impressions";
             case MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED -> "reach";
-            case MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS -> "plays";
+            // Graph API v21 dropped plays/views for reels; reach is the surviving default.
+            case MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS -> "reach";
             case MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS -> "views";
             default -> "views";
         };
@@ -178,7 +179,7 @@ public class MarketingStatsDashboardService {
 
     /**
      * Pick the primary metric value from metrics_json.
-     * Defaults: x_thread impressions→views; ig_feed reach; ig_reels plays→views; yt views.
+     * Defaults: x_thread impressions→views; ig_feed reach; ig_reels reach→plays→views; yt views.
      */
     long pickMetricValue(String platform, String override, String metricsJson) {
         if (metricsJson == null || metricsJson.isBlank()) {
@@ -195,7 +196,7 @@ public class MarketingStatsDashboardService {
                 case MarketingPopularityScorer.PLATFORM_INSTAGRAM_FEED ->
                     firstNumber(n, "reach");
                 case MarketingPopularityScorer.PLATFORM_INSTAGRAM_REELS ->
-                    firstNumber(n, "plays", "views");
+                    firstNumber(n, "reach", "plays", "views");
                 case MarketingPopularityScorer.PLATFORM_YOUTUBE_SHORTS ->
                     firstNumber(n, "views");
                 default -> firstNumber(n, "views", "impressions", "plays", "reach");

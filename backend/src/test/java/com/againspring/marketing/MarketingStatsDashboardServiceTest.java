@@ -50,13 +50,13 @@ class MarketingStatsDashboardServiceTest {
         assertThat(MarketingStatsDashboardService.defaultPrimaryMetric("instagram_feed"))
             .isEqualTo("reach");
         assertThat(MarketingStatsDashboardService.defaultPrimaryMetric("instagram_reels"))
-            .isEqualTo("plays");
+            .isEqualTo("reach");
         assertThat(MarketingStatsDashboardService.defaultPrimaryMetric("youtube_shorts"))
             .isEqualTo("views");
     }
 
     @Test
-    @DisplayName("pickMetricValue uses platform fallbacks (impressions→views, plays→views)")
+    @DisplayName("pickMetricValue uses platform fallbacks (impressions→views, reach→plays→views)")
     void pickMetricFallbacks() {
         assertThat(service.pickMetricValue("x_thread", null, "{\"views\":42}"))
             .isEqualTo(42L);
@@ -68,6 +68,9 @@ class MarketingStatsDashboardServiceTest {
             .isEqualTo(9L);
         assertThat(service.pickMetricValue("instagram_reels", null, "{\"plays\":11,\"views\":9}"))
             .isEqualTo(11L);
+        // Graph v21 dropped plays; reach is what the collector now returns and wins the fallback.
+        assertThat(service.pickMetricValue("instagram_reels", null, "{\"reach\":77,\"plays\":11}"))
+            .isEqualTo(77L);
         assertThat(service.pickMetricValue("youtube_shorts", null, "{\"views\":5,\"plays\":99}"))
             .isEqualTo(5L);
         assertThat(service.pickMetricValue("x_thread", "likes", "{\"likes\":3,\"views\":99}"))
