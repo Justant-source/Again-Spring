@@ -55,8 +55,11 @@ class SibomPlanGuardTest {
 
     @Test
     void softFillNonPool_demotesToPunch() {
+        // late-regret: people()==1 but not in SOFT_FILL_POOL — must still demote.
+        // (money-trouble used to be the example here; it joined the pool in the
+        // 2026-08-22 7→14 expansion, so it no longer demonstrates this branch.)
         List<SibomPlanItem> out = SibomPlanGuard.guard(List.of(
-                item("soft_fill", "money-trouble", "돈 문제", 1, "small", "punch")
+                item("soft_fill", "late-regret", "그때 생각", 1, "small", "punch")
         ), SibomPlanGuard.Channel.SHORTS);
 
         assertThat(out.get(0).role()).isEqualTo("punch");

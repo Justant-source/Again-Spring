@@ -14,7 +14,13 @@ import java.util.Set;
  */
 public final class SibomPlanGuard {
 
-    /** Soft-fill pool (§4.3). Catalog ids only; situation-specific cuts forbidden. */
+    /**
+     * Soft-fill pool (§4.3). Catalog ids only; situation-specific cuts forbidden.
+     * Expanded 7→14 for the 60-image catalog (2026-08-22): every entry is people()==1
+     * and each occupies a distinct swap_group, so a single top-up pass (topUpWithSoftFill)
+     * can draw up to 14 non-duplicate generic reaction shots instead of always the same 7.
+     * All captions are catalog defaults (&lt;=10 chars, verified against presets.maxChars).
+     */
     public static final List<String> SOFT_FILL_POOL = List.of(
             "drained",
             "curled-up",
@@ -22,7 +28,14 @@ public final class SibomPlanGuard {
             "swallow-words",
             "indignant",
             "side-glance",
-            "relieved"
+            "relieved",
+            "guilt-heavy",
+            "walking-away",
+            "overloaded",
+            "money-trouble",
+            "health-ignored",
+            "jealous-envy",
+            "burst-crying"
     );
 
     public static final Set<String> SOFT_FILL_POOL_SET = Set.copyOf(SOFT_FILL_POOL);

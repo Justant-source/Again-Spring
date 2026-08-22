@@ -350,3 +350,24 @@ parents-control·late-regret·turned-blame·quit-decided·drunk-conflict·overhe
 
 **교훈**: 키워드 개수·길이 규칙(2~6자, 6~10개)만으로는 부족하다. 배포 후 반드시
 실제 코퍼스로 빈도 감사를 해서 "흔하지만 무관한 단어"가 섞이지 않았는지 확인할 것.
+
+### 10.2 soft_fill 풀 7→14 확장 (2026-08-22)
+
+`SibomPlanGuard.SOFT_FILL_POOL`(AS 백엔드, `backend/.../service/community/SibomPlanGuard.java`)은
+1배치(30장) 시절 고른 7개로 고정돼 있었다 — 60장 확장 후에도 자동으로 늘지 않는
+하드코딩 상수라 §10 스코프에서 명시적으로 제외했던 항목이다. 매칭 실패 사연이
+99.2%→17.4%(swap_group dedup 이후 4장 미만)로 줄면서 soft_fill 의존도는 낮아졌지만,
+여전히 걸리는 사연은 항상 같은 7장(`drained`·`curled-up`·`stunned`·`swallow-words`·
+`indignant`·`side-glance`·`relieved`)만 봤다.
+
+60장 카탈로그에서 `people()==1`이면서 기존 7개와 겹치지 않는 새 `swap_group`을 가진
+7개(`guilt-heavy`·`walking-away`·`overloaded`·`money-trouble`·`health-ignored`·
+`jealous-envy`·`burst-crying`)를 추가해 풀을 14개로 확장했다 — 전부 캡션 10자 이내
+(`presets.maxChars` 검증 완료). `SibomPlanGuardTest.softFillNonPool_demotesToPunch`가
+"풀에 없는 이미지" 예시로 쓰던 `money-trouble`이 이번에 풀에 편입되면서 테스트 전제가
+깨져 `late-regret`으로 교체했다.
+
+검증: `./gradlew test --tests "*Sibom*" --tests "*VideoVariantService*"` 49 passed →
+dev(:8090) 배포·jar 문자열로 신규 7개 확인 → e2e-realbe 116 passed → prod DB 백업 →
+prod(:8091) 배포·jar 문자열 재확인 → `https://againspring.net/api/health` 200(nginx
+stale-IP 재발 없음).
