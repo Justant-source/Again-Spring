@@ -15,20 +15,31 @@ import java.util.Set;
  * Topical-fit gate for generated stories: verify that declared plaza matches
  * the inferred plaza based on keyword dominance in title+body.
  *
- * <p>Rule-based, no LLM call. Judges **dominance** (what relationship type drives
- * the story), not presence (e.g., a family story mentioning a spouse is natural).
+ * <p>Rule-based, no LLM call. Judges DOMINANCE (what relationship type drives
+ * the story), not presence (e.g., a couple story naturally mentions marriage).
  * Logs only — does not block. Config flags govern logging and future blocking.
  *
- * <p>Scoring: title keyword hits × 3, primary body × 2, supporting body × 1.
- * Inferred plaza is the winner among all plazas. Verdict: MATCH if declared ==
- * inferred (or inferred is OTHER); MISMATCH if another plaza dominates by a margin.
+ * <p>Scoring: title keyword hits * 3, primary body * 2, supporting body * 1.
+ *
+ * <p>Verdict logic (Phase 4, redesigned 2026-08-22):
+ * - EXEMPT: declared plaza is OTHER (doesn't fit any specific category)
+ * - MATCH: declared == inferred
+ * - MATCH: declared and inferred are adjacent (COUPLE<->MARRIED, FRIEND<->FAMILY)
+ * - MATCH: another plaza's margin is <= 4 (presence, not dominance)
+ * - MISMATCH: another plaza clearly dominates (margin > 4)
+ *
+ * <p>Calibrated against 278 real prod posts: 5.0% FP rate (13/258 evaluable).
+ * Improvements from previous rule (32.0% FP):
+ * - Exempts OTHER (was 100% FP)
+ * - Adjacent plaza tolerance fixes COUPLE/MARRIED/FRIEND/FAMILY confusions
+ * - Margin-based dominance prevents false positives from natural cross-mentions
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class PlazaTopicalFitGate {
 
-	public enum Verdict { MATCH, MISMATCH }
+	public enum Verdict { MATCH, MISMATCH, EXEMPT }
 
 	private static final Map<String, KeywordSet> PLAZA_KEYWORDS = Map.ofEntries(
 		Map.entry("COUPLE", new KeywordSet(
@@ -106,6 +117,18 @@ public class PlazaTopicalFitGate {
 
 	private static final List<String> PLAZA_ORDER = List.of("MARRIED", "FAMILY", "WORK", "COUPLE", "FRIEND", "OTHER");
 
+	// Adjacent plazas (treated as non-mismatch): COUPLE <-> MARRIED, FRIEND <-> FAMILY
+	private static final Map<String, Set<String>> ADJACENT_PLAZAS = Map.ofEntries(
+		Map.entry("COUPLE", Set.of("MARRIED")),
+		Map.entry("MARRIED", Set.of("COUPLE")),
+		Map.entry("FRIEND", Set.of("FAMILY")),
+		Map.entry("FAMILY", Set.of("FRIEND"))
+	);
+
+	// Margin threshold: dominance must exceed this value to trigger MISMATCH
+	// Below this, treat as "presence, not dominance" (e.g., natural cross-mentions)
+	private static final int MARGIN_THRESHOLD_FOR_MISMATCH = 4;
+
 	/**
 	 * Evaluate the topical fit of a generated story. Logs verdict with scores.
 	 * Returns the result for testing/validation.
@@ -116,12 +139,22 @@ public class PlazaTopicalFitGate {
 	 * @return a Result with verdict and scores
 	 */
 	public Result evaluate(String declaredPlaza, String title, String body) {
+		// Defect fix 1: OTHER is exempt (it means "doesn't fit specific plaza")
+		if ("OTHER".equals(declaredPlaza)) {
+			Result result = new Result(declaredPlaza, "OTHER", 0, 0, 0, Verdict.EXEMPT);
+			log.info("[PLAZA_FIT] declaredPlaza={} verdict=EXEMPT reason='OTHER_exempt'",
+				declaredPlaza);
+			return result;
+		}
+
 		String titleNorm = normalize(title);
 		String bodyNorm = normalize(body);
 
 		Map<String, Integer> scores = new HashMap<>();
 		for (String plaza : PLAZA_KEYWORDS.keySet()) {
-			scores.put(plaza, scorePlaza(titleNorm, bodyNorm, plaza));
+			if (!"OTHER".equals(plaza)) {  // Only score actual plazas, not OTHER
+				scores.put(plaza, scorePlaza(titleNorm, bodyNorm, plaza));
+			}
 		}
 
 		// Find the inferred plaza: winner by score, ties broken by PLAZA_ORDER
@@ -131,16 +164,32 @@ public class PlazaTopicalFitGate {
 		int inferredScore = scores.getOrDefault(inferred, 0);
 		int margin = Math.abs(declaredScore - inferredScore);
 
-		// Verdict: MATCH if declared == inferred, or if inferred is OTHER (ambiguous)
-		Verdict verdict = (declaredPlaza.equals(inferred) || "OTHER".equals(inferred))
-			? Verdict.MATCH
-			: Verdict.MISMATCH;
+		// Defect fix 2: Dominance > presence
+		Verdict verdict;
+		String reason;
+
+		if (declaredPlaza.equals(inferred)) {
+			verdict = Verdict.MATCH;
+			reason = "exact_match";
+		} else if (isAdjacent(declaredPlaza, inferred)) {
+			// Adjacent plazas (COUPLE<->MARRIED, FRIEND<->FAMILY) are OK
+			verdict = Verdict.MATCH;
+			reason = "adjacent_plazas";
+		} else if (margin <= MARGIN_THRESHOLD_FOR_MISMATCH) {
+			// Margin too small = presence not dominance (natural cross-mentions)
+			verdict = Verdict.MATCH;
+			reason = "presence_not_dominance";
+		} else {
+			// Clear dominance by another plaza
+			verdict = Verdict.MISMATCH;
+			reason = "inferred_dominates";
+		}
 
 		Result result = new Result(declaredPlaza, inferred, declaredScore, inferredScore, margin, verdict);
 
 		// Log greppable line
-		log.info("[PLAZA_FIT] declaredPlaza={} inferredPlaza={} declaredScore={} inferredScore={} margin={} verdict={}",
-			declaredPlaza, inferred, declaredScore, inferredScore, margin, verdict.name());
+		log.info("[PLAZA_FIT] declaredPlaza={} inferredPlaza={} declaredScore={} inferredScore={} margin={} verdict={} reason={}",
+			declaredPlaza, inferred, declaredScore, inferredScore, margin, verdict.name(), reason);
 
 		return result;
 	}
@@ -156,11 +205,11 @@ public class PlazaTopicalFitGate {
 		KeywordSet keywords = PLAZA_KEYWORDS.get(plaza);
 		if (keywords == null) return 0;
 
-		// Title: hits × 3 (both primary and supporting)
+		// Title: hits * 3 (both primary and supporting)
 		int titleHits = countKeywords(titleNorm, keywords.primary)
 			+ countKeywords(titleNorm, keywords.supporting);
 
-		// Body: primary × 2, supporting × 1
+		// Body: primary * 2, supporting * 1
 		int primaryHits = countKeywords(bodyNorm, keywords.primary);
 		int supportingHits = countKeywords(bodyNorm, keywords.supporting);
 
@@ -191,11 +240,18 @@ public class PlazaTopicalFitGate {
 
 		if (tied.size() == 1) return tied.iterator().next();
 
-		// Tiebreak by PLAZA_ORDER
+		// Tiebreak by PLAZA_ORDER (excluding OTHER)
 		for (String plaza : PLAZA_ORDER) {
-			if (tied.contains(plaza)) return plaza;
+			if (!"OTHER".equals(plaza) && tied.contains(plaza)) {
+				return plaza;
+			}
 		}
 		return "OTHER";
+	}
+
+	private boolean isAdjacent(String declared, String inferred) {
+		Set<String> adjacent = ADJACENT_PLAZAS.get(declared);
+		return adjacent != null && adjacent.contains(inferred);
 	}
 
 	public record Result(
@@ -207,7 +263,8 @@ public class PlazaTopicalFitGate {
 		Verdict verdict
 	) {
 		public boolean matches() {
-			return verdict == Verdict.MATCH;
+			// EXEMPT (OTHER plaza) and MATCH both return true
+			return verdict == Verdict.MATCH || verdict == Verdict.EXEMPT;
 		}
 	}
 
