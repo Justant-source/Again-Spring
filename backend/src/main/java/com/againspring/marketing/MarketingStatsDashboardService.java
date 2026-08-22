@@ -418,12 +418,18 @@ public class MarketingStatsDashboardService {
                 partialCount++;
                 agg.partial++;
             }
-            if (row.getErrorMessage() != null && !row.getErrorMessage().isBlank()) {
+            boolean rowHasError = row.getErrorMessage() != null && !row.getErrorMessage().isBlank();
+            if (rowHasError) {
                 errorCount++;
                 agg.errors++;
             }
+            // 채널 배지는 "이번 주 누적 오류 유무"가 아니라 "가장 최근 수집이 성공했는가"로
+            // 판정한다. 누적 기준이면 며칠 전 오류가 그 주 내내 채널을 계속 빨갛게 만들어,
+            // 방금 성공한 최신 수집과 무관하게 오류로 보이는 문제가 있었다.
             if (agg.lastCollectAt == null || row.getCollectedAt().isAfter(agg.lastCollectAt)) {
                 agg.lastCollectAt = row.getCollectedAt();
+                agg.lastRowPartial = Boolean.TRUE.equals(row.getPartial());
+                agg.lastRowError = rowHasError;
             }
         }
 
@@ -437,12 +443,14 @@ public class MarketingStatsDashboardService {
             if (agg.rows == 0) {
                 status = "unknown";
                 message = "no stats in selected week";
-            } else if (agg.errors > 0) {
+            } else if (agg.lastRowError) {
                 status = "degraded";
-                message = agg.errors + " error row(s)";
-            } else if (agg.partial > 0) {
+                message = "latest collect errored"
+                    + (agg.errors > 1 ? " (" + agg.errors + " error row(s) this week)" : "");
+            } else if (agg.lastRowPartial) {
                 status = "degraded";
-                message = agg.partial + " partial row(s)";
+                message = "latest collect partial"
+                    + (agg.partial > 1 ? " (" + agg.partial + " partial row(s) this week)" : "");
             } else {
                 status = "healthy";
                 message = "ok";
@@ -463,6 +471,8 @@ public class MarketingStatsDashboardService {
         int partial;
         int errors;
         Instant lastCollectAt;
+        boolean lastRowPartial;
+        boolean lastRowError;
     }
 
     // ── unknown emotion/category ──

@@ -617,6 +617,8 @@ ASM: `POST /api/v1/stats/collect` (`skip_slow`) · social-poster `POST /stats/x`
 
 **IG 토큰**: `instagram_manage_insights` scope 필요. Meta 앱에서 권한을 추가해도 **이미 발급된 토큰에는 반영되지 않으므로** 재발급해야 한다. ASM `scripts/refresh_ig_token.py` 참고(장기/페이지 토큰 교환).
 
+**채널 배지(healthy/degraded/unknown) 판정 기준(2026-08-22)**: 플랫폼별 **가장 최근 수집 1건**의 성공 여부로 정한다. 대시보드 상단의 `partial N / errors N`은 선택된 주 전체의 누적 카운트라 별개 지표다 — 예전에는 배지도 이 누적치로 판정해서, 며칠 전 오류가 하나만 있어도 그 주 내내 채널이 계속 오류로 보였다(최신 수집이 성공해도 무관하게).
+
 ### 4.3 저녁 슬롯 API (레거시, 자동 발행에 미사용)
 
 ```
