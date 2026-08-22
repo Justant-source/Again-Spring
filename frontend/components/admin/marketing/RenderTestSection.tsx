@@ -1,18 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArtifactSection } from '@/components/admin/marketing/ArtifactSection';
-import {
-  listAdminPostsForPicker,
-  createMarketingTestJob,
-  getMarketingJob,
-  MarketingJob,
-  PickerPost,
-} from '@/lib/api/admin/marketing';
-import { RefreshCw, Play } from 'lucide-react';
+import { listAdminPostsForPicker, PickerPost } from '@/lib/api/admin/marketing';
+import { useRenderTestStore, formatApiError, TestRun } from '@/lib/store/renderTestStore';
+import { RefreshCw, Play, X } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
   REQUESTED: 'bg-gray-200 text-gray-800',
@@ -32,30 +27,6 @@ const TARGET_OPTIONS: Array<{ key: string; label: string }> = [
   { key: 'instagram_reels', label: '릴스 (세로 영상)' },
   { key: 'youtube_shorts', label: '쇼츠 (세로 영상)' },
 ];
-
-function formatApiError(err: unknown): string {
-  if (typeof err === 'object' && err !== null) {
-    const anyErr = err as {
-      response?: { status?: number; data?: { error?: { message?: string }; message?: string } };
-      message?: string;
-    };
-    const serverMsg = anyErr.response?.data?.error?.message || anyErr.response?.data?.message;
-    if (serverMsg) return serverMsg;
-    if (anyErr.response?.status) return `HTTP ${anyErr.response.status}`;
-    if (anyErr.message) return anyErr.message;
-  }
-  return String(err);
-}
-
-/** Local-only test run — never persisted, cleared on page reload by design (test tab, not a job history view). */
-interface TestRun {
-  runKey: string;
-  postId: string;
-  postTitle: string;
-  targets: string[];
-  job: MarketingJob | null;
-  error: string | null;
-}
 
 function PostRow({
   post,
@@ -108,7 +79,7 @@ function PostRow({
   );
 }
 
-function TestRunCard({ run }: { run: TestRun }) {
+function TestRunCard({ run, onRemove }: { run: TestRun; onRemove: (runKey: string) => void }) {
   const job = run.job;
   const status = job?.status ?? (run.error ? 'ERROR' : 'REQUESTED');
   return (
@@ -121,7 +92,18 @@ function TestRunCard({ run }: { run: TestRun }) {
             {job ? ` · Job ${job.id}` : ''}
           </p>
         </div>
-        <Badge className={STATUS_COLORS[status] || 'bg-gray-200 text-gray-800'}>{status}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge className={STATUS_COLORS[status] || 'bg-gray-200 text-gray-800'}>{status}</Badge>
+          <button
+            type="button"
+            onClick={() => onRemove(run.runKey)}
+            className="text-gray-400 hover:text-gray-600"
+            aria-label="이 결과 지우기"
+            data-testid="render-test-remove-run"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {run.error && (
@@ -158,10 +140,12 @@ export function RenderTestSection() {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [manualPostId, setManualPostId] = useState('');
-
-  const [runs, setRuns] = useState<TestRun[]>([]);
   const [launchingPostId, setLaunchingPostId] = useState<string | null>(null);
-  const pollTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const runs = useRenderTestStore((s) => s.runs);
+  const launchRun = useRenderTestStore((s) => s.launch);
+  const clearRuns = useRenderTestStore((s) => s.clearRuns);
+  const removeRun = useRenderTestStore((s) => s.removeRun);
 
   const loadPosts = useCallback(async (targetPage: number) => {
     setPostsLoading(true);
@@ -180,54 +164,16 @@ export function RenderTestSection() {
     loadPosts(page);
   }, [page, loadPosts]);
 
-  useEffect(() => {
-    return () => {
-      Object.values(pollTimers.current).forEach(clearTimeout);
-    };
-  }, []);
-
-  const pollJob = useCallback((runKey: string, jobId: number) => {
-    const tick = async () => {
-      try {
-        const job = await getMarketingJob(jobId);
-        setRuns((prev) => prev.map((r) => (r.runKey === runKey ? { ...r, job } : r)));
-        if (!TERMINAL_STATUSES.has(job.status)) {
-          pollTimers.current[runKey] = setTimeout(tick, 5000);
-        } else {
-          delete pollTimers.current[runKey];
-        }
-      } catch (err: unknown) {
-        setRuns((prev) =>
-          prev.map((r) => (r.runKey === runKey ? { ...r, error: formatApiError(err) } : r))
-        );
-      }
-    };
-    pollTimers.current[runKey] = setTimeout(tick, 3000);
-  }, []);
-
   const launch = useCallback(
     async (postId: string, postTitle: string, targets: string[]) => {
-      const runKey = `${postId}-${targets.join('+')}-${Date.now()}`;
       setLaunchingPostId(postId);
-      setRuns((prev) => [
-        { runKey, postId, postTitle, targets, job: null, error: null },
-        ...prev,
-      ]);
       try {
-        const job = await createMarketingTestJob(postId, targets);
-        setRuns((prev) => prev.map((r) => (r.runKey === runKey ? { ...r, job } : r)));
-        if (!TERMINAL_STATUSES.has(job.status)) {
-          pollJob(runKey, job.id);
-        }
-      } catch (err: unknown) {
-        setRuns((prev) =>
-          prev.map((r) => (r.runKey === runKey ? { ...r, error: formatApiError(err) } : r))
-        );
+        await launchRun(postId, postTitle, targets);
       } finally {
         setLaunchingPostId(null);
       }
     },
-    [pollJob]
+    [launchRun]
   );
 
   const handleManualLaunch = () => {
@@ -331,9 +277,20 @@ export function RenderTestSection() {
       </Card>
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-gray-700">
-          이번 세션 테스트 결과 ({runs.length})
-        </h3>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">
+            이번 세션 테스트 결과 ({runs.length})
+          </h3>
+          {runs.length > 0 && (
+            <Button variant="outline" size="sm" onClick={clearRuns} data-testid="render-test-clear-all">
+              전체 지우기
+            </Button>
+          )}
+        </div>
+        <p className="mb-2 text-xs text-gray-400">
+          다른 탭으로 이동해도 이 결과는 지워지지 않습니다. 직접 지우거나(카드의 ✕ 또는
+          「전체 지우기」) 페이지를 새로고침하기 전까지 계속 남아 있습니다.
+        </p>
         {runs.length === 0 ? (
           <p className="text-sm text-gray-400">
             위에서 사연을 골라 「테스트 렌더」를 누르면 여기 결과가 쌓입니다. 같은 사연을 여러 번
@@ -342,7 +299,7 @@ export function RenderTestSection() {
         ) : (
           <div className="space-y-3">
             {runs.map((run) => (
-              <TestRunCard key={run.runKey} run={run} />
+              <TestRunCard key={run.runKey} run={run} onRemove={removeRun} />
             ))}
           </div>
         )}
