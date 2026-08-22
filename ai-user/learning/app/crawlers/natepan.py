@@ -391,6 +391,45 @@ def _resolve_category(
     return classify_plaza(content, title or "", channel_hint=hint)
 
 
+def _extract_title_from_detail(soup) -> Optional[str]:
+    """Extract title from detail page — tries multiple methods.
+
+    v5 (2026-08): added fallback to og:title and improved h1 detection.
+    The site stores titles in <h1> without class. HTML structure:
+      <h1>제목</h1> (inside article/main content area, not header)
+    """
+    # Method 1: Original selectors (with class constraints)
+    title_el = soup.select_one("h2.tit, h1.tit, .post_title, dd.tit h2, dt h2")
+    if title_el:
+        return title_el.get_text(strip=True)
+
+    # Method 2: og:title meta tag (server-rendered title, most reliable)
+    og_title = soup.find("meta", property="og:title")
+    if og_title:
+        content = og_title.get("content", "").strip()
+        if content:
+            # Remove domain suffix like "| 네이트 판"
+            if "|" in content:
+                content = content.split("|")[0].strip()
+            return content if content else None
+
+    # Method 3: h1 without class (in main content, not header navigation)
+    # Prefer h1 inside talk-content or article, but accept any h1 if reasonable
+    h1_el = soup.select_one("div.talk-content h1, main h1, article h1")
+    if not h1_el:
+        h1_el = soup.select_one("h1")  # Fallback to any h1
+
+    if h1_el:
+        text = h1_el.get_text(strip=True)
+        # Sanity checks: avoid UI labels, min length 3 chars
+        if text and len(text) >= 3 and len(text) <= 500:
+            # Avoid common nav text
+            if text not in ("전체목록", "목록", "홈", "검색"):
+                return text
+
+    return None
+
+
 def _parse_post_soup(soup, url: str, author_listing: Optional[str] = None,
                      section_name: Optional[str] = None,
                      channel_plaza: Optional[str] = None) -> Optional[Dict]:
@@ -399,8 +438,7 @@ def _parse_post_soup(soup, url: str, author_listing: Optional[str] = None,
     if not content:
         return None
 
-    title_el = soup.select_one("h2.tit, h1.tit, .post_title, dd.tit h2, dt h2")
-    title = title_el.get_text(strip=True) if title_el else None
+    title = _extract_title_from_detail(soup)
 
     if not _is_valid(title or "", content):
         return None
