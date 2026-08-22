@@ -105,6 +105,7 @@ app:
       enabled: ${MARKETING_ENABLED:false}        # dev 전용 — prod에서 절대 true 설정 금지
       renderer-url: ${MARKETING_RENDERER_URL:http://localhost:9000}
       public-base-url: ${MARKETING_PUBLIC_BASE_URL:https://againspring.net}  # 홍보 사연 링크 도메인
+      render-profile: ${MARKETING_RENDER_PROFILE:marketing_fast}  # WS6.1 — render profile for ASM
   categories:
     path: ${CATEGORIES_PATH:./shared/docs/categories.yml}
   user-permissions:

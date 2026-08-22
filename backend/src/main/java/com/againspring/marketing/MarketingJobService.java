@@ -27,6 +27,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,6 +65,14 @@ public class MarketingJobService {
     private final MarketingLlmAuthGuard llmAuthGuard;
 
     /**
+     * 기본 렌더 프로필. Spring 컨텍스트에서는 {@code @Value}가 덮어쓰지만, 필드 이니셜라이저를
+     * 남겨 둬야 @InjectMocks 같은 비-Spring 생성 경로에서도 null이 되지 않는다
+     * (프로필 null은 ASM 요청에서 프로필 정보를 통째로 잃는 조용한 회귀가 된다).
+     */
+    @Value("${MARKETING_RENDER_PROFILE:marketing_fast}")
+    private String defaultRenderProfile = "marketing_fast";
+
+    /**
      * Create a new marketing job for a post.
      *
      * <p>Automatic jobs are sent to ASM with {@code auto_publish=true}. Publication fires
@@ -72,11 +81,21 @@ public class MarketingJobService {
      * so the column is never empty; it does not delay publish.
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy) {
-        return createJob(postId, targets, autoPublish, requestedBy, null, 1);
+        return createJob(postId, targets, autoPublish, requestedBy, null, 1, null);
+    }
+
+    /**
+     * Create a new marketing job with explicit render profile.
+     *
+     * @param renderProfile Render profile ("marketing_fast" | "marketing_v2"). If null, uses env default.
+     */
+    public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy,
+                                  String renderProfile) {
+        return createJob(postId, targets, autoPublish, requestedBy, null, 1, renderProfile);
     }
 
     private MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy,
-                                   Long retryOfJobId, int generationAttempt) {
+                                   Long retryOfJobId, int generationAttempt, String renderProfile) {
         if (!asmProperties.isEnabled()) {
             throw new AsmUnavailableException("ASM is disabled (ASM_ENABLED=false)");
         }
@@ -224,6 +243,12 @@ public class MarketingJobService {
         String idempotencyKey = UUID.randomUUID().toString();
         // V117 NOT NULL. Value is "created now", not an evening gate — auto-publish is READY-driven.
         Instant scheduledPublishAt = Instant.now();
+
+        // Determine render profile (WS6.1 priority: caller → env → default).
+        // 빈 문자열·null이 흘러들어와도 절대 프로필 없이 진행하지 않는다.
+        String resolvedRenderProfile = firstNonBlank(
+                renderProfile, defaultRenderProfile, "marketing_fast");
+
         MarketingJob.MarketingJobBuilder pendingBuilder = MarketingJob.builder()
             .postId(post.getId())
             .status("REQUESTED")
@@ -234,7 +259,8 @@ public class MarketingJobService {
             .targets(serializeJson(targets))
             .scheduledPublishAt(scheduledPublishAt)
             .originalScheduledAt(scheduledPublishAt)
-            .idempotencyKey(idempotencyKey);
+            .idempotencyKey(idempotencyKey)
+            .renderProfile(resolvedRenderProfile);
         MarketingJob savedJob = marketingJobRepository.save(pendingBuilder.build());
 
         String campaign = MarketingUtmUrls.campaignForJob(savedJob.getId());
@@ -370,7 +396,7 @@ public class MarketingJobService {
             .priority("MARKETING_CRITICAL")
             .deadlineAt(Instant.now().plusMillis(waggleSlaMs).toString())
             .preScripted(needReels || needShorts)
-            .renderProfile((needReels || needShorts) ? "marketing_fast" : null)
+            .renderProfile((needReels || needShorts) ? resolvedRenderProfile : null)
             .build();
 
         CreateJobRequest request = CreateJobRequest.builder()
@@ -414,7 +440,7 @@ public class MarketingJobService {
         int nextAttempt = previous.getGenerationAttempt() == null ? 2 : previous.getGenerationAttempt() + 1;
         return createJob(previous.getPostId(), targets, true,
             requestedBy == null ? "admin:regenerate:" + jobId : requestedBy,
-            previous.getId(), nextAttempt);
+            previous.getId(), nextAttempt, previous.getRenderProfile());
     }
 
     private static boolean isRegenerableFailure(String failureCode) {
@@ -768,6 +794,14 @@ public class MarketingJobService {
         }
         applyPoll(job, view);
         return job;
+    }
+
+    /** 첫 번째 non-blank 값을 고른다(렌더 프로필 해석용). */
+    private static String firstNonBlank(String... values) {
+        for (String v : values) {
+            if (v != null && !v.isBlank()) return v;
+        }
+        return null;
     }
 
     private static boolean containsTarget(List<String> targets, String platform) {
@@ -1339,7 +1373,8 @@ public class MarketingJobService {
                 } else {
                     // Use recreate fallback
                     child = createJob(source.getPostId(), targets, true, requestedBy, source.getId(),
-                        (source.getGenerationAttempt() != null ? source.getGenerationAttempt() : 1) + 1);
+                        (source.getGenerationAttempt() != null ? source.getGenerationAttempt() : 1) + 1,
+                        source.getRenderProfile());
                     result.put("action", "RECREATED");
                 }
                 result.put("targetId", child.getId());
@@ -1350,7 +1385,8 @@ public class MarketingJobService {
                 if (e.getMessage() != null && e.getMessage().contains("409")) {
                     try {
                         child = createJob(source.getPostId(), targets, true, requestedBy, source.getId(),
-                            (source.getGenerationAttempt() != null ? source.getGenerationAttempt() : 1) + 1);
+                            (source.getGenerationAttempt() != null ? source.getGenerationAttempt() : 1) + 1,
+                            source.getRenderProfile());
                         result.put("action", "RECREATED");
                         result.put("targetId", child.getId());
                         result.put("reason", null);

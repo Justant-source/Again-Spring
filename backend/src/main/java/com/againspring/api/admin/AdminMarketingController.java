@@ -193,11 +193,21 @@ public class AdminMarketingController {
     @ApiResponse(responseCode = "400", description = "Invalid request")
     @Auditable(action = "CREATE_MARKETING_JOB")
     public ResponseEntity<JobResponse> createJob(@Valid @RequestBody CreateJobRequest req) {
+        // Validate render profile if specified
+        String renderProfile = req.getRenderProfile();
+        if (renderProfile != null && !renderProfile.isEmpty()) {
+            if (!renderProfile.matches("marketing_fast|marketing_v2")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid renderProfile: must be 'marketing_fast' or 'marketing_v2'");
+            }
+        }
+
         MarketingJob job = marketingJobService.createJob(
             req.getPostId(),
             req.getTargets(),
             req.isAutoPublish(),
-            null // requestedBy will be set from security context if needed
+            null, // requestedBy will be set from security context if needed
+            renderProfile
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(JobResponse.from(job));
     }

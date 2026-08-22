@@ -42,13 +42,14 @@ export interface TestRun {
   postId: string;
   postTitle: string;
   targets: string[];
+  renderProfile?: string; // 이 실행에서 사용한 렌더 프로필 ('marketing_v2'|'marketing_fast')
   job: MarketingJob | null;
   error: string | null;
 }
 
 interface RenderTestStoreState {
   runs: TestRun[];
-  launch: (postId: string, postTitle: string, targets: string[]) => Promise<void>;
+  launch: (postId: string, postTitle: string, targets: string[], renderProfile?: string) => Promise<void>;
   clearRuns: () => void;
   removeRun: (runKey: string) => void;
   resumePolling: () => void;
@@ -94,13 +95,13 @@ export const useRenderTestStore = create<RenderTestStoreState>()(
     (set, get) => ({
       runs: [],
 
-      launch: async (postId, postTitle, targets) => {
-        const runKey = `${postId}-${targets.join('+')}-${Date.now()}`;
+      launch: async (postId, postTitle, targets, renderProfile) => {
+        const runKey = `${postId}-${targets.join('+')}-${renderProfile ?? 'default'}-${Date.now()}`;
         set((s) => ({
-          runs: [{ runKey, postId, postTitle, targets, job: null, error: null }, ...s.runs],
+          runs: [{ runKey, postId, postTitle, targets, renderProfile, job: null, error: null }, ...s.runs],
         }));
         try {
-          const job = await createMarketingTestJob(postId, targets);
+          const job = await createMarketingTestJob(postId, targets, renderProfile);
           set((s) => ({ runs: s.runs.map((r) => (r.runKey === runKey ? { ...r, job } : r)) }));
           if (!TERMINAL_STATUSES.has(job.status)) {
             pollJob(runKey, job.id, set);

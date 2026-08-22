@@ -22,4 +22,7 @@ public class CreateJobRequest {
     private List<String> targets;
 
     private boolean autoPublish;
+
+    /** Render profile: "marketing_fast" | "marketing_v2". Nullable; uses env default if not specified. */
+    private String renderProfile;
 }

@@ -50,6 +50,7 @@ public class JobResponse {
     private Instant lastPolledAt;
     private Instant createdAt;
     private Instant updatedAt;
+    private String renderProfile;
 
     /**
      * Convert MarketingJob entity to response DTO
@@ -77,6 +78,11 @@ public class JobResponse {
             }
         } catch (Exception e) {
             // Log or handle JSON parsing errors
+        }
+
+        String profile = job.getRenderProfile();
+        if (profile == null) {
+            profile = "marketing_fast";  // Default for legacy jobs (NULL in DB)
         }
 
         return JobResponse.builder()
@@ -109,6 +115,7 @@ public class JobResponse {
             .lastPolledAt(job.getLastPolledAt())
             .createdAt(job.getCreatedAt())
             .updatedAt(job.getUpdatedAt())
+            .renderProfile(profile)
             .build();
     }
 }

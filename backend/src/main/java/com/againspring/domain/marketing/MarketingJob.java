@@ -168,6 +168,16 @@ public class MarketingJob {
     @Column
     private Instant lastRescheduledAt;
 
+    /**
+     * Render profile for this video job (WS6.1).
+     * Values: "marketing_fast" (v1) or "marketing_v2" (v2).
+     * Nullable; NULL or unset = interpret as "marketing_fast" for backward compatibility.
+     * Set at job creation via env MARKETING_RENDER_PROFILE or explicit request.
+     * Used in admin test tab to distinguish and filter renders, enable side-by-side comparison.
+     */
+    @Column(length = 32)
+    private String renderProfile;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

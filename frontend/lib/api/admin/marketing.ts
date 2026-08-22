@@ -11,6 +11,7 @@ export interface MarketingJob {
   progress: number;
   targets: string[];
   autoPublish: boolean;
+  renderProfile?: string | null; // 'marketing_v2'|'marketing_fast'|null
   artifacts: Record<string, string> | null; // { video_mp4, thumbnail, blog_md, ... }
   publications: Array<{ platform: string; state: string; url: string }> | null;
   errorMessage: string | null;
@@ -58,17 +59,37 @@ export async function createMarketingJob(
  * never posts to a real platform, only renders artifacts (video/cards/etc.) for
  * preview via {@link ArtifactSection}. Distinct from the deprecated
  * {@link createMarketingJob} (manual *publish* job creation being removed).
+ *
+ * @param renderProfile - Optional profile hint ('marketing_v2'|'marketing_fast').
+ *   If not provided, backend uses its default. Sent only when explicitly specified.
+ *   Backend may not yet support this field, so graceful null/undefined handling required.
  */
 export async function createMarketingTestJob(
   postId: string,
-  targets: string[]
+  targets: string[],
+  renderProfile?: string | null
 ): Promise<MarketingJob> {
-  const res = await api.post<MarketingJob>('/api/admin/marketing/jobs', {
+  const body: { postId: string; targets: string[]; autoPublish: boolean; renderProfile?: string | null } = {
     postId,
     targets,
     autoPublish: false,
-  });
+  };
+  // renderProfile이 있을 때만 본문에 포함 (백엔드가 아직 이 필드를 안 받을 수 있으므로)
+  if (renderProfile != null) {
+    body.renderProfile = renderProfile;
+  }
+  const res = await api.post<MarketingJob>('/api/admin/marketing/jobs', body);
   return res.data;
+}
+
+/**
+ * Resolve renderProfile from a MarketingJob, falling back to 'marketing_fast'
+ * if not provided or null. This handles the case where the backend doesn't yet
+ * populate the field in responses.
+ */
+export function resolveRenderProfile(job: MarketingJob | null | undefined): string {
+  if (!job) return 'marketing_fast';
+  return job.renderProfile ?? 'marketing_fast';
 }
 
 export async function listMarketingJobs(): Promise<MarketingJob[]> {
