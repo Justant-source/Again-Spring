@@ -135,13 +135,9 @@ def filter_claim_candidates(
     source_url is used in posts or has an active reservation, all siblings are blocked.
     When bank_categories is set, only rows whose category is in that set pass.
 
-    Phase 2 quality gate (2026-08-22): Detect conflict narratives vs chatter.
-    Rows must: (1) have length >= 300 AND quality_score >= 0.6, AND
-               (2) match at least one conflict marker:
-                   - relationship nouns (남편/아내/엄마 etc)
-                   - first-person pronouns (나/제/저 appearing 2+)
-                   - conflict/emotion verbs (싸웠/화났 etc)
-    This filters out K-pop gossip/opinion content while keeping personal conflict narratives.
+    잡담 배제(2026-08-22): 전언 형식이면서 1인칭 경험 서술이 전혀 없는 글만 제외한다.
+    확실한 사연 200건에 대해 오탐 0건으로 실측됐다. 넓은 조건(길이·품질·관계어 등)은
+    진짜 사연의 절반을 함께 버려 기각했다 — 근거는 _SELECT_CANDIDATE_SQL 주석 참조.
     """
     import re
 
@@ -263,19 +259,21 @@ WHERE eb.content_type = 'POST'
   AND eb.created_at >= DATE_SUB(NOW(3), INTERVAL %s DAY)
   -- 잡담(연예 기사·역사 글·시황) 배제. **좁게** 잡는다.
   --
-  -- 배경: 실제 발행 글의 9.8%가 갈등 사연이 아닌 정보 전달 글이었다. 예: 역사 기사
-  -- "고종의 딸 덕혜옹주가…"가 제목의 '친구' 때문에 FRIEND로 claim돼 "덕혜옹주가 일본
-  -- 친구한테 털어놓은 고종 독살 얘기"로 각색·발행됐다. 광장이 프롬프트에 하드 제약으로
-  -- 들어가므로 LLM은 소스가 무엇이든 그 형식에 맞춰 써낸다.
+  -- 배경: 실제 발행 글의 열에 하나꼴로 갈등 사연이 아닌 정보 전달 글이었다. 예: 역사
+  -- 기사 "고종의 딸 덕혜옹주가..."가 제목의 '친구' 때문에 FRIEND로 claim돼 각색·발행됐다.
+  -- 광장이 프롬프트에 하드 제약으로 들어가므로 LLM은 소스가 무엇이든 그 형식에 맞춰 쓴다.
   --
-  -- 신호 선택 근거(실측, 확실한 사연 200건 vs OTHER 300건):
-  --   길이·품질 조건    46% vs 39%  → 판별력 없음(진짜 사연의 절반을 버림)
-  --   경험 서술 어미    70% vs 54%  → 약함
-  --   연예·금융 어휘    18% vs 26%  → 약함(사연에도 드라마·아이돌 얘기가 섞임)
-  --   전언형식+경험없음  0% vs  5%  → 오탐 0%, 채택
+  -- 신호 선택 근거(실측, 확실한 사연 200건 vs OTHER 300건 / 단위는 비율):
+  --   길이·품질 조건    0.46 vs 0.39  판별력 없음(진짜 사연의 절반을 버림)
+  --   경험 서술 어미    0.70 vs 0.54  약함
+  --   연예·금융 어휘    0.18 vs 0.26  약함(사연에도 드라마·아이돌 얘기가 섞임)
+  --   전언형식+경험없음 0.00 vs 0.05  오탐 0, 채택
   --
-  -- 넓은 조건으로 71%를 걸러내려다 진짜 사연까지 버리는 것보다, 오탐 0%인 5%를 확실히
+  -- 넓은 조건으로 많이 걸러내려다 진짜 사연까지 버리는 것보다, 오탐 0인 소수를 확실히
   -- 거르는 편이 낫다. 나머지는 생성 후 PlazaTopicalFitGate가 잡는다.
+  --
+  -- 주의: 이 문자열은 파이썬 파라미터 바인딩 자리표시자를 쓴다. 주석에 퍼센트 기호를 넣으면
+  -- 포맷 지정자로 해석돼 claim 전체가 400으로 깨진다(2026-08-22 실제 발생).
   AND NOT (
     eb.content REGEXP '라고 (함|한다|했다|밝혔|전했)|다고 (함|한다|했다|밝혔|전했|알려)|소속사|인터뷰|보도|누리꾼|기록으로'
     AND eb.content NOT REGEXP '했는데|하는데|했음|더라|했어요|했습니다|어떡|제가 |내가 '
