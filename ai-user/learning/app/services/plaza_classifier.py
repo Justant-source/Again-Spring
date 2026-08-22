@@ -22,7 +22,7 @@ import re
 from typing import Dict, Optional, Tuple
 
 PLAZAS = ("COUPLE", "MARRIED", "FRIEND", "FAMILY", "WORK")
-CHANNEL_HINT_BONUS = 2
+CHANNEL_HINT_BONUS = 1  # Phase 3: weakened hint (more conservative)
 
 # Disambiguate MARRIED vs FAMILY. Scored with the same title/body weights as a bonus
 # (not flattened). Concat must parenthesize content/title — `content or "" + title` drops title.
@@ -169,11 +169,14 @@ def _score_plaza(content: str, title: str, plaza_name: str) -> int:
     score = title_hits * 3 + primary_body * 2 + supporting_body * 1
 
     if plaza_name == "MARRIED":
-        # Bonus uses the same weights; title must be included (parens, not `or`+concat).
-        score += (
-            _count_keywords_in_text(title or "", SPOUSE_KEYWORDS) * 3
-            + _count_keywords_in_text(content or "", SPOUSE_KEYWORDS) * 2
-        )
+        # Title spouse keywords always count (strong signal)
+        score += _count_keywords_in_text(title or "", SPOUSE_KEYWORDS) * 3
+
+        # Body spouse keywords only count if paired with MARRIED primary keywords or multiple spouse mentions
+        # This prevents "시어머니 한 번 언급" from pulling unrelated family stories to MARRIED
+        spouse_body_hits = _count_keywords_in_text(content or "", SPOUSE_KEYWORDS)
+        if primary_body > 0 or spouse_body_hits >= 2:
+            score += spouse_body_hits * 2
 
     return score
 
@@ -203,9 +206,9 @@ def _pick_winner(scores: Dict[str, int], content_norm: str, title_norm: str) -> 
     if len(tied_plazas) == 1:
         return tied_plazas[0]
 
-    combined = (content_norm or "") + " " + (title_norm or "")
+    # Phase 3: Check spouse keywords only in title for tiebreak (more conservative)
     married_keywords = ["남편", "아내", "와이프", "신랑", "부부", "시어머니", "시댁"]
-    if any(kw in combined for kw in married_keywords):
+    if any(kw in (title_norm or "") for kw in married_keywords):
         if "MARRIED" in tied_plazas:
             return "MARRIED"
 
@@ -213,7 +216,8 @@ def _pick_winner(scores: Dict[str, int], content_norm: str, title_norm: str) -> 
     for plaza in precedence_order:
         if plaza in tied_plazas:
             return plaza
-    return "COUPLE"
+    # Phase 3: Return OTHER instead of COUPLE for weak ties (more conservative)
+    return "OTHER"
 
 
 def classify_plaza(
