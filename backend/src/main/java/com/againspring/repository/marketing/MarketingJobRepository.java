@@ -26,7 +26,9 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
     Optional<MarketingJob> findFirstByPostIdAndStatusIn(String postId, List<String> statuses);
 
     /**
-     * Count active marketing jobs for a post with a specific platform.
+     * Count active marketing jobs for a post with a specific platform (legacy, no time filter).
+     * Kept for backward compatibility; prefer {@link #countActivePlatformJobs(String, String, Instant)}.
+     *
      * Active statuses: REQUESTED, QUEUED, RUNNING, SLA_BREACHED, WAITING_EXTERNAL,
      * PUBLISHING, STALE. Delayed remote rendering stays active until ASM gives a real terminal result.
      *
@@ -37,7 +39,10 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * as an integral JDBC type, which Hibernate's native-query scalar extraction cannot
      * coerce into a {@code boolean} return type (throws ClassCastException at runtime;
      * not caught by mocked-repository unit tests). Callers compare {@code > 0} themselves.
+     *
+     * @deprecated Use {@link #countActivePlatformJobs(String, String, Instant)} to filter zombie jobs.
      */
+    @Deprecated
     @Query(nativeQuery = true, value = """
         SELECT COUNT(*) FROM marketing_job
         WHERE post_id = :postId
@@ -45,6 +50,33 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         AND JSON_CONTAINS(targets, JSON_QUOTE(:platform)) = TRUE
         """)
     long countActivePlatformJobs(String postId, String platform);
+
+    /**
+     * Count active marketing jobs for a post with a specific platform, updated within a recency window.
+     * Active statuses: REQUESTED, QUEUED, RUNNING, SLA_BREACHED, WAITING_EXTERNAL,
+     * PUBLISHING, STALE. Delayed remote rendering stays active until ASM gives a real terminal result.
+     *
+     * {@code recencyCutoff}: Jobs whose {@code updated_at} is older than this instant are excluded.
+     * This prevents zombie jobs (e.g., SLA_BREACHED for 90+ minutes) from permanently blocking
+     * new job creation for the same post+platform. Intended callers pass
+     * {@code Instant.now().minus(marketingConfig.activeJobRecencyMinutes, ChronoUnit.MINUTES)}.
+     *
+     * {@code platform} is the bare target id (e.g. {@code x_thread}); the query wraps it
+     * as a JSON string literal for {@code JSON_CONTAINS}.
+     *
+     * Returns a count rather than a boolean. Callers compare {@code > 0} themselves.
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT COUNT(*) FROM marketing_job
+        WHERE post_id = :postId
+        AND status IN ('REQUESTED', 'QUEUED', 'RUNNING', 'SLA_BREACHED', 'WAITING_EXTERNAL', 'PUBLISHING', 'STALE')
+        AND JSON_CONTAINS(targets, JSON_QUOTE(:platform)) = TRUE
+        AND updated_at > :recencyCutoff
+        """)
+    long countActivePlatformJobs(
+        @Param("postId") String postId,
+        @Param("platform") String platform,
+        @Param("recencyCutoff") Instant recencyCutoff);
 
     /**
      * Count marketing jobs for a post with a specific platform, regardless of status.

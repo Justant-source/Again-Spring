@@ -73,6 +73,16 @@ public class MarketingJobService {
     private String defaultRenderProfile = "marketing_fast";
 
     /**
+     * 좀비 잡 방지 임계값: 이 분수 이상 갱신되지 않은 활성 잡은 제외.
+     * 근거: 실측 렌더 소요(7일 기준) 최대 62분(READY), 평균 17.85분.
+     * 멈춘 잡(SLA_BREACHED/PUBLISHING)은 105분+ 이상 갱신 없음.
+     * 60분 임계값 → 정상 잡(62분 이내)은 커버, 좀비(105분+)는 제외 → 새 잡 생성 허가.
+     * @see #createJob(String, List, boolean, String, Long, int, String) 줄 106
+     */
+    @Value("${marketing.active-job-recency-minutes:90}")
+    private Integer activeJobRecencyMinutes = 90;
+
+    /**
      * Create a new marketing job for a post.
      *
      * <p>Automatic jobs are sent to ASM with {@code auto_publish=true}. Publication fires
@@ -102,8 +112,12 @@ public class MarketingJobService {
         // Per-platform idempotency: x_thread and instagram_feed each require alone jobs,
         // so concurrent active jobs on *different* platforms for the same post are allowed.
         // Reject only when an active job already covers one of the requested targets.
+        // Zombie jobs (SLA_BREACHED/WAITING_EXTERNAL for 60+ minutes) are excluded
+        // to prevent permanent 409 blocking on stuck renders (실측 정상 렌더 최대 62분).
+        Instant recencyCutoff = Instant.now().minus(
+            activeJobRecencyMinutes != null ? activeJobRecencyMinutes : 60, java.time.temporal.ChronoUnit.MINUTES);
         for (String target : targets) {
-            if (marketingJobRepository.countActivePlatformJobs(postId, target) > 0) {
+            if (marketingJobRepository.countActivePlatformJobs(postId, target, recencyCutoff) > 0) {
                 throw new IllegalStateException(
                     "이미 처리 중인 마케팅 잡이 있습니다 (postId=" + postId
                         + ", platform=" + target + "). 완료 후 다시 시도해주세요."

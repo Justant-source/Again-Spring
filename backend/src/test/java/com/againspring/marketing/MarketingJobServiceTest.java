@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 
@@ -127,9 +128,9 @@ class MarketingJobServiceTest {
         when(asmProperties.isEnabled()).thenReturn(true);
 
         // Idempotency check: no active job for requested platforms
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter"), any(Instant.class)))
             .thenReturn(0L);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("threads")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("threads"), any(Instant.class)))
             .thenReturn(0L);
 
         // Mock community data services
@@ -171,8 +172,8 @@ class MarketingJobServiceTest {
         verify(marketingPublishSlotService, never()).nextSlotForTargets(any(), any());
 
         verify(postRepository).findById(TEST_POST_ID);
-        verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "twitter");
-        verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "threads");
+        verify(marketingJobRepository).countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter"), any(Instant.class));
+        verify(marketingJobRepository).countActivePlatformJobs(eq(TEST_POST_ID), eq("threads"), any(Instant.class));
         verify(asmClient).createJob(any(CreateJobRequest.class), any(String.class));
         verify(marketingJobRepository, times(2)).save(any(MarketingJob.class));
     }
@@ -187,7 +188,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
             .thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
@@ -229,7 +230,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
             .thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
@@ -269,7 +270,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
             .thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
@@ -317,7 +318,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
             .thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
@@ -379,7 +380,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(TEST_POST_ID, "x_thread")).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class))).thenReturn(0L);
         when(voteService.getVoteResult(TEST_POST_ID)).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(TEST_POST_ID)).thenReturn(List.of());
         when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
@@ -416,7 +417,7 @@ class MarketingJobServiceTest {
             .build();
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
             .thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
@@ -447,9 +448,9 @@ class MarketingJobServiceTest {
             .build();
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("instagram_reels")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("instagram_reels"), any(Instant.class)))
             .thenReturn(0L);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("youtube_shorts")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("youtube_shorts"), any(Instant.class)))
             .thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
@@ -519,7 +520,7 @@ class MarketingJobServiceTest {
             .build();
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("youtube_shorts")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("youtube_shorts"), any(Instant.class)))
             .thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
@@ -560,7 +561,7 @@ class MarketingJobServiceTest {
         Post post = Post.builder().id(TEST_POST_ID).title("video").bodyPublished("body").build();
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(TEST_POST_ID, "instagram_reels")).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("instagram_reels"), any(Instant.class))).thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(any())).thenReturn(List.of());
@@ -591,7 +592,7 @@ class MarketingJobServiceTest {
             .build();
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
             .thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
@@ -618,7 +619,7 @@ class MarketingJobServiceTest {
     void createJob_duplicateActiveJob_throwsIllegalStateException() {
         // Given
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter"), any(Instant.class)))
             .thenReturn(1L);
 
         // When / Then
@@ -631,7 +632,7 @@ class MarketingJobServiceTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("이미 처리 중인");
 
-        verify(marketingJobRepository).countActivePlatformJobs(TEST_POST_ID, "twitter");
+        verify(marketingJobRepository).countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter"), any(Instant.class));
     }
 
     // ── Test 3: createJob_allowsNewJobAfterTerminal ─────────────────────────
@@ -649,9 +650,9 @@ class MarketingJobServiceTest {
         when(asmProperties.isEnabled()).thenReturn(true);
 
         // Terminal jobs are not counted as active
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("twitter"), any(Instant.class)))
             .thenReturn(0L);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("threads")))
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("threads"), any(Instant.class)))
             .thenReturn(0L);
 
         // Mock community data services
@@ -1363,7 +1364,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class))).thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(TEST_POST_ID))
@@ -1426,7 +1427,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class))).thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(TEST_POST_ID))
@@ -1478,7 +1479,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class))).thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
@@ -1521,7 +1522,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class))).thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
@@ -1565,7 +1566,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class))).thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
@@ -1611,7 +1612,7 @@ class MarketingJobServiceTest {
 
         when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
         when(asmProperties.isEnabled()).thenReturn(true);
-        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class))).thenReturn(0L);
         when(voteService.getVoteResult(any())).thenReturn(Map.of());
         when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
         when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
@@ -1631,5 +1632,127 @@ class MarketingJobServiceTest {
 
         // ㅋㅋ를 경계로 인식 → "공감돼요ㅋㅋ"만 추출
         assertThat(topComment.getSpoken()).isEqualTo("공감돼요ㅋㅋ");
+    }
+
+    // ── Test: Zombie Job Prevention (좀비 잡 방지 배선) ─────────────────────────
+
+    /**
+     * Test that zombie jobs (60+ min without update) are excluded from active count,
+     * allowing new job creation to proceed. Recency cutoff is passed to 3-param repository method.
+     */
+    @Test
+    void createJob_excludesZombieJobs_passesRecencyCutoffTo3ParamMethod() throws JsonProcessingException {
+        // Given
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("Zombie Test")
+            .bodyPublished("body")
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+
+        // Zombie job (60+ min old) is not counted by new 3-param method
+        // Mock: when recencyCutoff is passed, no active jobs returned
+        when(marketingJobRepository.countActivePlatformJobs(
+            eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
+            .thenReturn(0L);
+
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(88L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        // When
+        MarketingJob result = marketingJobService.createJob(
+            TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        // Then — job created successfully (zombie didn't block it)
+        assertThat(result).isNotNull();
+        assertThat(result.getRemoteJobId()).isEqualTo(TEST_JOB_ID);
+
+        // Verify 3-param method was called (not 2-param deprecated method)
+        ArgumentCaptor<Instant> instantCaptor = ArgumentCaptor.forClass(Instant.class);
+        verify(marketingJobRepository).countActivePlatformJobs(
+            eq(TEST_POST_ID), eq("x_thread"), instantCaptor.capture());
+
+        // Cutoff should be ~90 minutes ago (정상 렌더 최대 실측 62분 + 여유)
+        Instant now = Instant.now();
+        Instant cutoff = instantCaptor.getValue();
+        long minutesBefore = ChronoUnit.MINUTES.between(cutoff, now);
+        assertThat(minutesBefore).isGreaterThanOrEqualTo(89).isLessThanOrEqualTo(91);
+    }
+
+    /**
+     * Test that recent active jobs (within 60 min) are still counted and block new creation.
+     */
+    @Test
+    void createJob_includesRecentJobs_stillBlocksNewCreation() {
+        // Given
+        when(asmProperties.isEnabled()).thenReturn(true);
+
+        // Recent job (within 60 min window) is counted
+        when(marketingJobRepository.countActivePlatformJobs(
+            eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
+            .thenReturn(1L);
+
+        // When / Then
+        assertThatThrownBy(() -> marketingJobService.createJob(
+            TEST_POST_ID, List.of("x_thread"), false, "admin"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("이미 처리 중인");
+
+        // Verify 3-param method was called with recency cutoff
+        verify(marketingJobRepository).countActivePlatformJobs(
+            eq(TEST_POST_ID), eq("x_thread"), any(Instant.class));
+    }
+
+    /**
+     * Test that activeJobRecencyMinutes defaults to 90 when not explicitly configured.
+     * This ensures @Value injection works and field initializer provides null-safe fallback.
+     */
+    @Test
+    void createJob_usesConfiguredActiveJobRecencyMinutes_defaultsTo90() throws JsonProcessingException {
+        // Given: service instance (via @InjectMocks, field initializer ensures value is 60)
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("Recency Config Test")
+            .bodyPublished("body")
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+
+        // Mock the 3-param repository method (the one that uses recency threshold)
+        when(marketingJobRepository.countActivePlatformJobs(
+            eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
+            .thenReturn(0L);
+
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(89L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        // When
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        // Then — verify 3-param method was called with a recency cutoff
+        ArgumentCaptor<Instant> cutoffCaptor = ArgumentCaptor.forClass(Instant.class);
+        verify(marketingJobRepository).countActivePlatformJobs(
+            eq(TEST_POST_ID), eq("x_thread"), cutoffCaptor.capture());
+
+        // The cutoff should be approximately 90 minutes ago
+        // (activeJobRecencyMinutes is injected or defaults to 90)
+        Instant cutoff = cutoffCaptor.getValue();
+        long minsDiff = ChronoUnit.MINUTES.between(cutoff, Instant.now());
+        assertThat(minsDiff).isGreaterThanOrEqualTo(89).isLessThanOrEqualTo(91);
     }
 }

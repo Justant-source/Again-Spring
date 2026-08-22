@@ -5,9 +5,9 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArtifactSection } from '@/components/admin/marketing/ArtifactSection';
-import { listAdminPostsForPicker, listMarketingJobs, MarketingJob, PickerPost, resolveRenderProfile } from '@/lib/api/admin/marketing';
-import { useRenderTestStore, formatApiError, TestRun } from '@/lib/store/renderTestStore';
-import { RefreshCw, Play, X } from 'lucide-react';
+import { listAdminPostsForPicker, listMarketingJobs, MarketingJob, PickerPost, resolveRenderProfile, createMarketingTestJob, getMarketingJob } from '@/lib/api/admin/marketing';
+import { useRenderTestStore, formatApiError, EMPTY_REVIEW, TestRun, ReviewItem } from '@/lib/store/renderTestStore';
+import { RefreshCw, Play, X, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
   REQUESTED: 'bg-gray-200 text-gray-800',
@@ -168,6 +168,69 @@ function TestRunCard({ run, onRemove }: { run: TestRun; onRemove: (runKey: strin
   );
 }
 
+const REVIEW_FLAGS = [
+  { key: 'blank_screen', label: '빈 화면 많음' },
+  { key: 'monotone_sound', label: '소리 단조' },
+  { key: 'static_feel', label: '정지감' },
+  { key: 'app_mimicry', label: '앱 흉내' },
+  { key: 'weak_cta', label: 'CTA 약함' },
+];
+
+function ReviewChecklist({ jobId }: { jobId: number }) {
+  // 셀렉터에서 함수를 호출하면 매 렌더마다 새 값이 나올 수 있다 — 상태를 직접 구독한다.
+  const review = useRenderTestStore((s) => s.reviews[jobId]) ?? EMPTY_REVIEW;
+  const toggleFlag = useRenderTestStore((s) => s.toggleReviewFlag);
+  const setMemo = useRenderTestStore((s) => s.setReviewMemo);
+
+  const checkedCount = review.flags.length;
+  const isClean = checkedCount === 0;
+
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3" data-testid="render-test-review-flag">
+      <div className="mb-2 flex items-center justify-between">
+        <h5 className="text-xs font-semibold text-gray-700">AI 티 체크</h5>
+        <div className="flex items-center gap-1">
+          {isClean ? (
+            <>
+              <CheckCircle2 className="h-3 w-3 text-green-600" />
+              <span className="text-xs font-medium text-green-700">이상 없음</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="h-3 w-3 text-amber-600" />
+              <span className="text-xs font-medium text-amber-700">{checkedCount}건 체크됨</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 체크박스 항목들 */}
+      <div className="space-y-1">
+        {REVIEW_FLAGS.map((flag) => (
+          <label key={flag.key} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={review.flags.includes(flag.key)}
+              onChange={() => toggleFlag(jobId, flag.key)}
+              className="h-3 w-3 rounded border-gray-300"
+            />
+            <span className="text-xs text-gray-700">{flag.label}</span>
+          </label>
+        ))}
+      </div>
+
+      {/* 메모 입력란 */}
+      <input
+        type="text"
+        placeholder="자유 메모…"
+        value={review.memo}
+        onChange={(e) => setMemo(jobId, e.target.value)}
+        className="mt-2 w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 placeholder-gray-400"
+      />
+    </div>
+  );
+}
+
 function ServerJobCard({ job }: { job: MarketingJob }) {
   const profile = resolveRenderProfile(job);
   const diagnostics = job.generationDiagnostics as Record<string, unknown> | null | undefined;
@@ -245,6 +308,9 @@ function ServerJobCard({ job }: { job: MarketingJob }) {
         </p>
       )}
 
+      {/* WS6.5 체크리스트 */}
+      {TERMINAL_STATUSES.has(job.status) && <ReviewChecklist jobId={job.id} />}
+
       {job.artifacts && Object.keys(job.artifacts).length > 0 && (
         <div className="mt-3">
           <ArtifactSection jobId={job.id} artifacts={job.artifacts} />
@@ -263,6 +329,11 @@ export function RenderTestSection() {
   const [manualPostId, setManualPostId] = useState('');
   const [launchingPostId, setLaunchingPostId] = useState<string | null>(null);
   const [profileFilter, setProfileFilter] = useState<'all' | 'v2' | 'fast'>('all');
+
+  // WS6.6 승인 세트 렌더
+  const [isRunningApprovalSet, setIsRunningApprovalSet] = useState(false);
+  const [approvalSetProgress, setApprovalSetProgress] = useState<string>('');
+  const [cancelApprovalSetFlag, setCancelApprovalSetFlag] = useState(false);
 
   const runs = useRenderTestStore((s) => s.runs);
   const launchRun = useRenderTestStore((s) => s.launch);
@@ -348,6 +419,111 @@ export function RenderTestSection() {
     if (!postId) return;
     void launch(postId, postId, ['instagram_reels', 'youtube_shorts'], manualRenderProfile);
   };
+
+  /**
+   * WS6.6 승인 세트 렌더: COUPLE/MARRIED/WORK/FAMILY/FRIEND 카테고리별 최신 1편씩 선택해 v2로 순차 렌더.
+   * - listAdminPostsForPicker에서 대량으로 받아서 클라이언트에서 카테고리별 최신 1편 고르기
+   * - 순차 실행 (하나 READY 후 다음), 409 처리 (해당 사연 건너뛰기)
+   * - 진행 상황을 UI에 표시
+   */
+  const launchApprovalSetRender = useCallback(async () => {
+    const categories = ['COUPLE', 'MARRIED', 'WORK', 'FAMILY', 'FRIEND'];
+
+    setIsRunningApprovalSet(true);
+    setApprovalSetProgress('');
+    setCancelApprovalSetFlag(false);
+
+    try {
+      // 1단계: 대량 사연 목록 로드 (여러 페이지)
+      setApprovalSetProgress('사연 목록 로딩 중…');
+      const allPosts: PickerPost[] = [];
+      const maxPages = 5; // 최대 100건 로드 (페이지당 20건 × 5)
+      for (let p = 0; p < maxPages; p++) {
+        if (cancelApprovalSetFlag) {
+          setApprovalSetProgress('취소됨');
+          return;
+        }
+        const batch = await listAdminPostsForPicker(p, 20);
+        if (batch.length === 0) break;
+        allPosts.push(...batch);
+      }
+
+      // 2단계: 카테고리별 최신 1편씩 선택
+      const selectedPosts = new Map<string, PickerPost>();
+      for (const cat of categories) {
+        const latestInCat = allPosts.find((p) => p.category === cat);
+        if (latestInCat) {
+          selectedPosts.set(cat, latestInCat);
+        }
+      }
+
+      setApprovalSetProgress(`선택 완료: ${selectedPosts.size}/${categories.length}개 사연`);
+
+      // 3단계: 순차 렌더
+      let succeededCount = 0;
+      for (let i = 0; i < categories.length; i++) {
+        if (cancelApprovalSetFlag) {
+          setApprovalSetProgress(`취소됨 (${succeededCount}/${categories.length} 완료)`);
+          return;
+        }
+
+        const cat = categories[i];
+        const post = selectedPosts.get(cat);
+
+        if (!post) {
+          setApprovalSetProgress(`${i + 1}/${categories.length} 진행 중 — ${cat} 사연 없음`);
+          continue;
+        }
+
+        setApprovalSetProgress(`${i + 1}/${categories.length} 진행 중 — ${post.id} (${cat}) 렌더링 중…`);
+
+        try {
+          // v2로 렌더 요청
+          const job = await createMarketingTestJob(post.id, ['instagram_reels', 'youtube_shorts'], 'marketing_v2');
+
+          // job이 터미널 상태가 아니면 READY될 때까지 폴링
+          if (!TERMINAL_STATUSES.has(job.status)) {
+            await new Promise<void>((resolve) => {
+              const poll = async () => {
+                try {
+                  const updated = await getMarketingJob(job.id);
+                  if (TERMINAL_STATUSES.has(updated.status)) {
+                    resolve();
+                  } else if (cancelApprovalSetFlag) {
+                    resolve();
+                  } else {
+                    setTimeout(poll, 5000);
+                  }
+                } catch {
+                  resolve(); // 에러 나도 계속 진행
+                }
+              };
+              setTimeout(poll, 3000);
+            });
+          }
+
+          succeededCount++;
+          setApprovalSetProgress(`${i + 1}/${categories.length} 완료 (${succeededCount}건)`);
+        } catch (err: unknown) {
+          const errMsg = formatApiError(err);
+          // 409는 이미 활성 잡이 있다는 뜻 — 건너뛰고 계속
+          if (errMsg.includes('409') || errMsg.includes('Conflict')) {
+            setApprovalSetProgress(`${i + 1}/${categories.length} — ${post.id} 이미 렌더 중, 건너뜀`);
+          } else {
+            setApprovalSetProgress(`${i + 1}/${categories.length} — ${post.id} 오류: ${errMsg}`);
+          }
+        }
+      }
+
+      setApprovalSetProgress(`완료! 위 「서버의 최근 테스트 잡」에서 승인 세트 5편을 확인하세요.`);
+      // 서버 목록 자동 갱신 유도
+      await loadServerJobs(true);
+    } catch (err: unknown) {
+      setApprovalSetProgress(`오류: ${formatApiError(err)}`);
+    } finally {
+      setIsRunningApprovalSet(false);
+    }
+  }, [cancelApprovalSetFlag, loadServerJobs]);
 
   const filteredPosts = search.trim()
     ? posts.filter((p) => p.title.toLowerCase().includes(search.trim().toLowerCase()))
@@ -467,6 +643,41 @@ export function RenderTestSection() {
           </div>
         </div>
       </Card>
+
+      {/* WS6.6 승인 세트 렌더 */}
+      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+        <h3 className="mb-2 text-sm font-semibold text-indigo-900">
+          🎬 승인 세트 렌더 (WS6.6)
+        </h3>
+        <p className="mb-3 text-xs text-indigo-800">
+          COUPLE · MARRIED · WORK · FAMILY · FRIEND 카테고리별 최신 1편씩을 자동으로 선택해 v2 프로필로 렌더합니다.
+          렌더는 순차 실행되며, 완료 후 위 「서버의 최근 테스트 잡」에서 5편 영상을 비교해 모두 "이상 없음"으로 체크할 수 있으면 Phase 3 승인입니다.
+        </p>
+        {approvalSetProgress && (
+          <div className="mb-3 rounded border border-indigo-300 bg-white px-3 py-2 text-xs text-indigo-700">
+            {approvalSetProgress}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Button
+            disabled={isRunningApprovalSet}
+            onClick={() => void launchApprovalSetRender()}
+            data-testid="render-test-approval-set"
+          >
+            <Play className="mr-1 h-3 w-3" />
+            승인 세트 렌더 시작
+          </Button>
+          {isRunningApprovalSet && (
+            <Button
+              variant="outline"
+              onClick={() => setCancelApprovalSetFlag(true)}
+            >
+              <X className="mr-1 h-3 w-3" />
+              중단
+            </Button>
+          )}
+        </div>
+      </div>
 
       <div>
         <div className="mb-2 flex items-center justify-between">

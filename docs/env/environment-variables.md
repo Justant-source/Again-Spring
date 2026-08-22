@@ -75,6 +75,12 @@
 | `LLM_REMOTE_CONNECT_TIMEOUT_MS` | backend → bridge HTTP connect timeout | `10000` (2026-08-15, 기존 `5000`) |
 | `ASM_REQUEST_TIMEOUT_MS` | backend → ASM 일반 요청 timeout | `30000` (2026-08-15, 기존 `10000`) |
 
+## 마케팅 (Again-Spring & ASM)
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `MARKETING_RENDER_PROFILE` | `marketing_fast` | WaggleBot 렌더 프로필 선택. `marketing_fast` = 현행 운영 (간편 레이아웃) / `marketing_v2` = 신규 v2 (BGM·SFX·전환·앱크롬제거·투표바). 기본값은 env, 잡 생성 시 `renderProfile` 필드로 개별 지정 가능 (Phase 3: 2026-08-23, 기준선 수집 중) |
+
 **2026-08-15 마케팅 파이프라인 안정화**: 시봄이 영상 생성 LLM 호출이 최대 600초까지 걸릴 수 있어
 `LLM_QUEUE_WAIT_TIMEOUT_MS`를 4배 상향했다(30s는 호출 1건이 600초를 점유하는 상황에서 큐 포화 시
 즉시 실패했다). `LLM_REMOTE_CONNECT_TIMEOUT_MS`·`ASM_REQUEST_TIMEOUT_MS`도 WSL 부하 상황을

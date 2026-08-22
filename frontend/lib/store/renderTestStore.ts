@@ -47,12 +47,30 @@ export interface TestRun {
   error: string | null;
 }
 
+/**
+ * WS6.5 심사 체크리스트: jobId별 AI 티 체크 결과
+ */
+export interface ReviewItem {
+  flags: string[]; // 체크된 항목들: 'blank_screen', 'monotone_sound', 'static_feel', 'app_mimicry', 'weak_cta'
+  memo: string; // 자유 메모
+}
+
+/** 리뷰가 없을 때 반환할 공유 불변 객체 (참조 동일성 유지용).
+ *  없을 때마다 새 객체를 만들면 zustand 셀렉터가 항상 "변경됨"으로 보고
+ *  무한 리렌더(React #185)가 나서 화면이 통째로 죽는다. */
+export const EMPTY_REVIEW: ReviewItem = Object.freeze({ flags: [], memo: '' }) as ReviewItem;
+
 interface RenderTestStoreState {
   runs: TestRun[];
+  reviews: Record<number, ReviewItem>; // jobId → 체크리스트
   launch: (postId: string, postTitle: string, targets: string[], renderProfile?: string) => Promise<void>;
   clearRuns: () => void;
   removeRun: (runKey: string) => void;
   resumePolling: () => void;
+  // WS6.5 체크리스트 액션
+  toggleReviewFlag: (jobId: number, flag: string) => void;
+  setReviewMemo: (jobId: number, memo: string) => void;
+  getReviewItem: (jobId: number) => ReviewItem;
 }
 
 // 카카오톡 인앱 등 localStorage 제한 환경에서 setItem/removeItem이 throw할 수 있으므로
@@ -94,6 +112,7 @@ export const useRenderTestStore = create<RenderTestStoreState>()(
   persist(
     (set, get) => ({
       runs: [],
+      reviews: {},
 
       launch: async (postId, postTitle, targets, renderProfile) => {
         const runKey = `${postId}-${targets.join('+')}-${renderProfile ?? 'default'}-${Date.now()}`;
@@ -123,11 +142,40 @@ export const useRenderTestStore = create<RenderTestStoreState>()(
           }
         }
       },
+
+      // WS6.5 체크리스트 액션들
+      toggleReviewFlag: (jobId, flag) => {
+        set((s) => {
+          const current = s.reviews[jobId] ?? { flags: [], memo: '' };
+          const flags = current.flags.includes(flag)
+            ? current.flags.filter((f) => f !== flag)
+            : [...current.flags, flag];
+          return {
+            reviews: { ...s.reviews, [jobId]: { ...current, flags } },
+          };
+        });
+      },
+
+      setReviewMemo: (jobId, memo) => {
+        set((s) => {
+          const current = s.reviews[jobId] ?? { flags: [], memo: '' };
+          return {
+            reviews: { ...s.reviews, [jobId]: { ...current, memo } },
+          };
+        });
+      },
+
+      getReviewItem: (jobId) => {
+        const state = get();
+        // ⚠️ 없을 때 매번 새 객체를 만들면 zustand 셀렉터가 항상 "변경됨"으로 보고
+        // 무한 리렌더(React #185)가 난다 — 공유 불변 상수를 반환해야 한다.
+        return state.reviews[jobId] ?? EMPTY_REVIEW;
+      },
     }),
     {
       name: 'again-spring-render-test-runs',
       storage: createJSONStorage(() => safeStorage),
-      partialize: (s) => ({ runs: s.runs }),
+      partialize: (s) => ({ runs: s.runs, reviews: s.reviews }),
     }
   )
 );

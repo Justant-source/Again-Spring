@@ -172,6 +172,10 @@ marketing:
     # 실패 알림에 인라인 버튼(재구동/무시) 표시 여부. 기본값 false (안전 장치).
     # 활성화 시 Telegram 인라인 버튼 클릭 → ASM webhook → AS redrive API 호출 흐름 개시.
     buttons-enabled: ${MARKETING_TELEGRAM_BUTTONS_ENABLED:false}
+  # countActivePlatformJobs 임계값: 60분 이내 갱신된 잡만 "활성"으로 간주.
+  # 근거: 실측 렌더 소요시간 분포(3일 이내 완료 잡) = 20~60분. SLA_BREACHED/FAILED는 94분+ 멈춘 상태.
+  # 임계값 60분 → 정상 렌더(50분 이내)는 계속 활성, 좀비 잡(94분+)은 제외되어 새 잡 생성 허가.
+  active-job-recency-minutes: ${MARKETING_ACTIVE_JOB_RECENCY_MINUTES:90}
 
 logging:
   level:

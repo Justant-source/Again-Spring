@@ -402,23 +402,30 @@ public class VideoVariantService {
         if (result.script() == null) return true;
         if (result.sibomPlan().size() >= minimum) return false;
         return switch (result.generationStatus()) {
-            case "OK", "PARSE_ERROR" -> true;
+            case "OK", "PARSE_ERROR", "TRUNCATED_JSON" -> true;
             default -> false;
         };
     }
 
     private static String correctionInstruction(ChannelResult first, int required) {
         StringBuilder sb = new StringBuilder();
-        if (first.script() == null) {
+        String status = first.generationStatus();
+
+        if ("TRUNCATED_JSON".equals(status)) {
+            // Output was cut mid-response — request shorter output to complete within LLM limits
+            sb.append("응답이 중간에 끊겼습니다. 훅과 대본을 더 짧게(한두 문장) 다시 작성하고, ")
+              .append("sibom_plan은 필수 항목만 간결하게 작성하세요.");
+        } else if (first.script() == null) {
             sb.append("직전 결과의 대본이 비어있거나 문장 단위로 정리할 수 없을 만큼 길었습니다. ")
               .append("완결된 문장으로 이루어진 짧은 요약 대본을 다시 작성하세요.");
         }
+
         int count = first.sibomPlan().size();
         if (count < required) {
             if (sb.length() > 0) sb.append(' ');
             sb.append("첫 결과의 가드 후 시봄이 플랜이 ").append(count).append("장으로 최소 ").append(required)
               .append("장에 미달합니다. 중복 image_id·swap_group을 피해 ").append(required)
-              .append("장 이상 남도록 다시 작성하세요.");
+              .append("장 이상 남도록 여유 있게 작성하세요.");
         }
         return sb.toString();
     }
@@ -589,9 +596,41 @@ public class VideoVariantService {
             }
             return new ChannelResult(hook, script, plan, "OK", Map.of());
         } catch (Exception e) {
+            // Detect truncated JSON (missing closing brace or trailing array open)
+            // which indicates LLM output was cut mid-response (2026-08-23)
+            if (looksLikeTruncatedJson(jsonResult)) {
+                log.debug("VideoVariant detected truncated JSON ({}): {}", channel, e.getMessage());
+                return ChannelResult.empty("TRUNCATED_JSON");
+            }
             log.debug("VideoVariant parse failed ({}): {}", channel, e.getMessage());
             return ChannelResult.empty("PARSE_ERROR");
         }
+    }
+
+    /**
+     * Detect if the JSON response was truncated mid-generation.
+     * Symptoms: trailing array open, missing closing brace, incomplete object.
+     */
+    private static boolean looksLikeTruncatedJson(String s) {
+        if (s == null || s.length() < 20) return false;
+        String trimmed = s.trim();
+        // Truncated at array open: ...,"sibom_plan":[
+        if (trimmed.endsWith("[") || trimmed.endsWith(":[")) {
+            return true;
+        }
+        // Truncated mid-field: ...,"hook_shorts": "some text without closing
+        if (trimmed.endsWith("\"") && !trimmed.endsWith("\"}") && !trimmed.endsWith("\"],") && !trimmed.endsWith("\"]")) {
+            return true;
+        }
+        // Missing closing brace but has opening
+        int opens = 0;
+        int closes = 0;
+        for (char c : trimmed.toCharArray()) {
+            if (c == '{') opens++;
+            else if (c == '}') closes++;
+        }
+        // More opens than closes = incomplete object
+        return opens > closes;
     }
 
     static List<SibomPlanItem> parseSibomPlan(JsonNode arr) {

@@ -14,6 +14,19 @@
 
 ---
 
+## 렌더 프로필 (Phase 3: 2026-08-23)
+
+**렌더 프로필**은 WaggleBot이 영상을 렌더링할 때 사용할 기능 세트를 지정합니다. 기본값은 env `MARKETING_RENDER_PROFILE` (기본 `marketing_fast`), 잡 생성 시 `POST /api/v1/jobs`의 `renderProfile` 필드로 개별 지정 가능.
+
+| 프로필 | 설명 | 상태 |
+|---|---|---|
+| `marketing_fast` | 현행 운영 중인 기본 프로필. 간편 레이아웃, BGM/SFX/전환 없음 | 활성 |
+| `marketing_v2` | 신규 v2 렌더. BGM(감정별 2곡, `assets/media/bgm/<emotion>/`) + SFX(6종 팔레트, `assets/media/sfx/<event>.wav`) + ffmpeg 전환(xfade) + 앱 크롬 제거 + 투표 비율 바(실제 `empathy_ratio` 없으면 미표시) | Phase 3 기준선 수집 중, 사용자 승인 대기 |
+
+**⚠️ 에셋 위치 중요**: BGM/SFX는 반드시 `assets/media/` 하위에 있어야 합니다. WaggleBot 컨테이너가 `MEDIA_DIR=/app/media`로만 마운트하므로, `assets/voices/`, `assets/images/` 등 다른 디렉터리는 보이지 않습니다.
+
+---
+
 ## 데이터 흐름
 
 ### 1. 잡 생성 (Idempotency 포함)
