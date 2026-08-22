@@ -163,29 +163,16 @@ public class MarketingJobService {
             log.warn("Failed to load vote data for post {}: {}", postId, e.getMessage());
         }
 
-        // Top comments by likeCount (descending) — top 2, full body (no truncation).
+        // Top comments by scoring (WS3.1~3.2): prefer short, faction-clear comments.
+        // Scoring rule: likeCount + (≤60 chars bonus) + (side≠neutral bonus).
+        // Selection: author side top 1 + partner side top 1, neutral fallback.
         // Always enriched (not gated by target) for consistency across platforms;
         // youtube_shorts narration needs the full text, others simply ignore extra fields.
         List<TopCommentDto> topComments = new ArrayList<>();
         try {
             List<PostComment> comments = commentService.getTopLevelComments(postId);
-            topComments = comments.stream()
-                .filter(c -> c.getBody() != null && !c.getBody().isBlank())
-                .sorted((a, b) -> {
-                    int la = a.getLikeCount() != null ? a.getLikeCount() : 0;
-                    int lb = b.getLikeCount() != null ? b.getLikeCount() : 0;
-                    return Integer.compare(lb, la);
-                })
-                .limit(2)
-                .map(c -> TopCommentDto.builder()
-                    .author(MarketingBriefText.normalize(resolveNickname(c.getAuthorId())))
-                    .authorId(c.getAuthorId())
-                    .body(MarketingBriefText.normalize(c.getBody()))
-                    .likeCount(c.getLikeCount() != null ? c.getLikeCount() : 0)
-                    .createdAt(c.getCreatedAt())
-                    .side(resolveSide(c.getAuthorId(), post.getAuthorId(), post.getPartnerUserId()))
-                    .build())
-                .collect(Collectors.toList());
+            topComments = selectAndScoreComments(
+                comments, post.getAuthorId(), post.getPartnerUserId());
         } catch (Exception e) {
             log.warn("Failed to load comments for post {}: {}", postId, e.getMessage());
         }
@@ -1470,5 +1457,187 @@ public class MarketingJobService {
     private boolean isTerminalStatus(String status) {
         return status != null && (status.equalsIgnoreCase("PUBLISHED") || status.equalsIgnoreCase("FAILED")
             || status.equalsIgnoreCase("PARTIAL"));
+    }
+
+    /**
+     * WS3.1: Select and score top comments for enriched brief.
+     *
+     * <p>Scoring rule:
+     * - Base: likeCount
+     * - Bonus (짧은 댓글이 영상에서 더 잘 작동): +15 if body ≤ 60 chars
+     * - Bonus (진영이 분명할수록 반응이 강함): +10 if side ≠ "neutral"
+     *
+     * <p>Selection: top 1 from author side + top 1 from partner side.
+     * If either side missing, fill from neutral. Max 2 comments returned.
+     * All comments have normalized body (full text, untruncated) + spoken field (TTS).
+     *
+     * @param allComments all top-level comments (unfiltered)
+     * @param postAuthorId post creator's user ID
+     * @param postPartnerUserId post partner's user ID (may be null)
+     * @return list of up to 2 TopCommentDto, scored and selected per WS3.1
+     */
+    private List<TopCommentDto> selectAndScoreComments(List<PostComment> allComments,
+                                                        String postAuthorId,
+                                                        String postPartnerUserId) {
+        // Step 1: Filter & score
+        List<CommentScoreEntry> scored = allComments.stream()
+            .filter(c -> c.getBody() != null && !c.getBody().isBlank())
+            .map(c -> {
+                String normalizedBody = MarketingBriefText.normalize(c.getBody());
+                String side = resolveSide(c.getAuthorId(), postAuthorId, postPartnerUserId);
+                int likeCount = c.getLikeCount() != null ? c.getLikeCount() : 0;
+                int score = scoreComment(likeCount, normalizedBody, side);
+                return new CommentScoreEntry(c, normalizedBody, side, score);
+            })
+            .sorted((a, b) -> Integer.compare(b.score, a.score))
+            .toList();
+
+        // Step 2: Partition by side
+        List<CommentScoreEntry> authors = scored.stream()
+            .filter(e -> "author".equals(e.side)).toList();
+        List<CommentScoreEntry> partners = scored.stream()
+            .filter(e -> "partner".equals(e.side)).toList();
+        List<CommentScoreEntry> neutrals = scored.stream()
+            .filter(e -> "neutral".equals(e.side)).toList();
+
+        // Step 3: Pick top from each side + fallback
+        List<TopCommentDto> result = new ArrayList<>(2);
+
+        if (!authors.isEmpty()) {
+            result.add(buildTopCommentDto(authors.get(0)));
+        } else if (!neutrals.isEmpty()) {
+            result.add(buildTopCommentDto(neutrals.get(0)));
+            neutrals = neutrals.subList(1, neutrals.size()); // Consume 1
+        }
+
+        if (!partners.isEmpty()) {
+            result.add(buildTopCommentDto(partners.get(0)));
+        } else if (!neutrals.isEmpty()) {
+            result.add(buildTopCommentDto(neutrals.get(0)));
+        }
+
+        return result;
+    }
+
+    /**
+     * Scoring entry: capture PostComment with precomputed side & normalized body.
+     * Used internally by selectAndScoreComments to avoid repeated resolveSide / normalize.
+     */
+    private static class CommentScoreEntry {
+        PostComment raw;
+        String normalizedBody;
+        String side;
+        int score;
+
+        CommentScoreEntry(PostComment raw, String normalizedBody, String side, int score) {
+            this.raw = raw;
+            this.normalizedBody = normalizedBody;
+            this.side = side;
+            this.score = score;
+        }
+    }
+
+    /**
+     * Score a comment based on likes, length, and faction clarity.
+     * Score = likeCount + bonuses.
+     *
+     * Bonuses (실측):
+     * - ≤60 chars: +15 (짧은 댓글이 영상에서 더 잘 작동 — 낭독 3~4s에 어울림)
+     * - side ≠ neutral: +10 (진영이 분명할수록 반응이 강함 — 투표와 댓글이 일관성)
+     *
+     * @param likeCount raw like count
+     * @param normalizedBody comment text (never null)
+     * @param side "author" | "partner" | "neutral"
+     * @return composite score
+     */
+    private int scoreComment(int likeCount, String normalizedBody, String side) {
+        int bonus = 0;
+
+        // Bonus: short comments (≤60 chars) perform better in video
+        if (normalizedBody.length() <= 60) {
+            bonus += 15;
+        }
+
+        // Bonus: faction-clear comments (side ≠ neutral) get stronger reactions
+        if (!"neutral".equals(side)) {
+            bonus += 10;
+        }
+
+        return likeCount + bonus;
+    }
+
+    /**
+     * Build TopCommentDto from a CommentScoreEntry with full normalization + spoken field.
+     *
+     * @param entry scored entry with raw PostComment and precomputed fields
+     * @return TopCommentDto ready for ASM brief
+     */
+    private TopCommentDto buildTopCommentDto(CommentScoreEntry entry) {
+        PostComment c = entry.raw;
+        String body = entry.normalizedBody;
+        String spoken = extractFirstSentence(body, 40);
+
+        return TopCommentDto.builder()
+            .author(MarketingBriefText.normalize(resolveNickname(c.getAuthorId())))
+            .authorId(c.getAuthorId())
+            .body(body)
+            .likeCount(c.getLikeCount() != null ? c.getLikeCount() : 0)
+            .createdAt(c.getCreatedAt())
+            .side(entry.side)
+            .spoken(spoken)
+            .build();
+    }
+
+    /**
+     * WS3.2: Extract first sentence from text, max length.
+     *
+     * <p>Sentence boundaries: `.`, `!`, `?`, `…`, or Korean colloquial markers (`ㅋㅋ`, `ㅠㅠ`).
+     * If no boundary found within maxLength, cut at word (어절) boundary before maxLength.
+     *
+     * <p>Examples:
+     * - "좋은 댓글이에요. 맞아요." → "좋은 댓글이에요" (40자 이내, 마침표 경계)
+     * - "정말 길고 긴 댓글" (30자) + " 더 있어요" → "정말 길고 긴 댓글" (어절 절단)
+     * - "ㅋㅋㅋㅋㅋ" → "ㅋㅋㅋㅋㅋ" (경계 없음, 전체 &lt; 40자)
+     *
+     * @param text input text (never null from caller)
+     * @param maxLength max output length (40)
+     * @return first sentence, max maxLength chars
+     */
+    private String extractFirstSentence(String text, int maxLength) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+
+        // Find sentence boundaries: . ! ? … + Korean markers
+        int endIdx = -1;
+        String[] boundaries = { ".", "!", "?", "…", "ㅋㅋ", "ㅠㅠ" };
+        for (String boundary : boundaries) {
+            int idx = text.indexOf(boundary);
+            if (idx >= 0 && idx < maxLength) {
+                if (endIdx == -1 || idx < endIdx) {
+                    endIdx = idx + boundary.length();
+                }
+            }
+        }
+
+        // If boundary found within maxLength, return up to that boundary
+        if (endIdx > 0 && endIdx <= maxLength) {
+            return text.substring(0, endIdx).trim();
+        }
+
+        // No boundary found within maxLength: cut at word boundary before maxLength
+        if (text.length() <= maxLength) {
+            return text; // Entire text fits
+        }
+
+        // Find last space before maxLength to cut at word boundary
+        String truncated = text.substring(0, maxLength);
+        int lastSpace = truncated.lastIndexOf(' ');
+        if (lastSpace > 0) {
+            return truncated.substring(0, lastSpace);
+        }
+
+        // No space found (single long word), return maxLength chars as-is
+        return truncated;
     }
 }

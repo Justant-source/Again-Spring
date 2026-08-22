@@ -15,7 +15,8 @@ Content-Type: application/json
 {
   "postId": "abc123def456",              // posts.id (VARCHAR(32))
   "targets": ["naver_blog", "x_thread"], // 지원 플랫폼 목록 참조
-  "autoPublish": false                   // true 시 READY 도달 즉시 자동 게시
+  "autoPublish": false,                  // true 시 READY 도달 즉시 자동 게시
+  "renderProfile": "marketing_v2"        // [선택사항] 렌더 프로필 ('marketing_v2'|'marketing_fast') — 테스트 탭 전용
 }
 ```
 
@@ -32,10 +33,12 @@ Content-Type: application/json
   "progress": 0,
   "targets": ["naver_blog", "x_thread"],
   "auto_publish": false,
+  "render_profile": "marketing_v2",
   "artifacts": null,
   "publications": null,
   "error_message": null,
   "processing_detail": null,
+  "generation_diagnostics": null,
   "waiting_external_since": null,
   "sla_breached_at": null,
   "requested_by": null,

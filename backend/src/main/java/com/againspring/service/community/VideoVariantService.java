@@ -39,9 +39,21 @@ public class VideoVariantService {
 
     private static final int BODY_PROMPT_MAX = 900;
     private static final int HOOK_STORE_MAX = 200;
-    private static final int SCRIPT_REELS_MAX = 220;
-    private static final int SCRIPT_SHORTS_MAX = 320;
+    // TTS 한국어 발화 속도: 10.19 글자/초 (편차 0.35, 범위 9.41~10.52)
+    // 실측: 256편 오디오 재생 시간 대비 워커 로그의 text=N자 기준
+    // 보수 하림: 9.4 글자/초
+    // Q6 구조: 훅(3s) + 본문(릴스 13~16s, 쇼츠 16~20s) + 댓글(별도) + CTA(3s)
+    private static final double TTS_CHARS_PER_SEC = 10.19;
+    // 릴스 본문 목표 13~16초 → (13+16)/2 * 10.19 = 148자 중앙값
+    // 상한은 16.7초 (170자) 버림
+    private static final int SCRIPT_REELS_MAX = 170;
+    // 쇼츠 본문 목표 16~20초 → (16+20)/2 * 10.19 = 183자 중앙값
+    // 상한은 20초 (205자) 버림
+    private static final int SCRIPT_SHORTS_MAX = 205;
     private static final int SIBOM_CARD_MAX = 10;
+    // 훅 목표 2.5~3초 → 3 * 10.19 = 30자 중앙값, 상한 34자
+    private static final int HOOK_TARGET_CHARS = 30;
+    private static final int HOOK_MAX_CHARS = 34;
     private static final Set<String> FORBIDDEN = Set.of(
             "판결", "처방", "승패", "승자", "패자", "가해자", "피해자", "배심원", "유죄", "무죄");
 
@@ -246,7 +258,8 @@ public class VideoVariantService {
                 && hookReels != null && hookReels.equals(hookShorts)
                 && scriptReels != null && scriptReels.equals(scriptShorts)) {
             hookShorts = distinctHook(hookShorts);
-            scriptShorts = clamp(scriptShorts + " 당신은 어느 쪽?", SCRIPT_SHORTS_MAX);
+            // CTA ("당신은 어느 쪽?")는 아웃트로 씬에서만 나타나야 함 (2026-08-22)
+            // 대본 append는 제거하고, WaggleBot outro 씬 렌더링에서 담당
         }
 
         return new Variants(
@@ -465,9 +478,12 @@ public class VideoVariantService {
         String platform = reels ? "instagram_reels(≤30초)" : "youtube_shorts(≤45초)";
         String hookKey = reels ? "hook_reels" : "hook_shorts";
         String scriptKey = reels ? "script_reels" : "script_shorts";
+        // 목표 재생 시간 기준 권장 글자 수 (TTS 10.19 글자/초 기준)
+        // 릴스: 13~16초 = 132~163자 (목표 125~155자, 상한 170자)
+        // 쇼츠: 16~20초 = 163~204자 (목표 155~190자, 상한 205자)
         String scriptHint = reels
-                ? "script는 짧게(말했을 때 ~25초)."
-                : "script는 조금 더 길게(~40초).";
+                ? "script는 125~155자 범위(재생시간 목표 13~16초). 너무 짧지 않게."
+                : "script는 155~190자 범위(재생시간 목표 16~20초). 너무 짧지 않게.";
         int softTargetLo = reels ? 5 : 6;
         int softTargetHi = reels ? 5 : 7;
 
@@ -486,10 +502,12 @@ public class VideoVariantService {
             - 한국어. 이모지·해시태그·따옴표 장식·슬래시(/, ／) 금지. 절을 이을 때는 공백이나 개행만.
             - 판결/처방/승패/유무죄/가해자·피해자 단정 금지. 「배심원」 금지.
             - %s : 스크롤 스톱 한 줄(개행 허용). 마스터 훅과 글자 복제 금지·비틀기 허용.
-              **본문 속 구체적 사실(기간·나이·금액·횟수 등 숫자)을 문장 맨 앞에 두고, 그 직후에 모순·반전을 심으세요.**
-              "진짜"·"완전"·"너무" 같은 감정 형용사 대신 사실 자체로 긴장을 만드세요.
-            - %s : 자극 훅 톤 유지 → 갈등 핵심 2~4문장 요약 → 사연의 여운이 남는 마무리.
-              전문 낭독 금지. 공감비율 확인·댓글 작성·의견 요청 같은 참여 유도 문구를 끝에 넣지 마세요. %s
+            - %s : 정해진 구조로 작성:
+              ① [사건] 구체적 사실(기간·나이·금액·횟수 등)을 문장 맨 앞에 두어 긴장을 만드세요. "진짜"·"완전"·"너무" 같은 감정 형용사 대신 사실 자체로 표현.
+              ② [상대방 입장] 본문에 상대방 입장(partner_body)이 있으면 그것을 1문장으로 인용하세요. 없으면 이 단계 생략(추측 생성 금지).
+              ③ [반전/결정적 한마디] 사건의 모순이나 예상을 깬 한 문장.
+              ④ [여운] 화자의 미해결 질문으로 끝내기 / 시간 경과 암시 / 마지막에 짧은 문장 하나 — 시청자 여운 남기기.
+              전문 낭독 금지. 공감비율 확인·댓글 작성·의견 요청·"당신은 어느 쪽" 같은 참여 유도 문구를 넣지 마세요(아웃트로에서만). %s
             - 메타포 일러스트 사용 금지. 시봄이만.
             - sibom_plan: 인트로 포함 최소 4장 필수(절대 하한 — 미달 시 발행 불가), 권장 %d~%d장.
               role=intro|peak|punch|soft_fill. intro/peak=large+hold, punch/soft_fill=small+punch.
@@ -670,9 +688,10 @@ public class VideoVariantService {
 
     /**
      * Cuts {@code s} at the last sentence-ending punctuation at/before {@code max},
-     * searching an 80-char lookback window. Never returns a mid-sentence/mid-word cut —
-     * returns null when no boundary exists in that window, which real Korean prose only
-     * hits in pathological inputs (no punctuation at all within the last ~80 chars).
+     * searching an 80-char lookback window. When no boundary exists in that window,
+     * falls back to cutting at the last space before {@code max} to avoid mid-word cuts.
+     * Pathological: no sentence boundary AND no space in window → returns null only when
+     * text is truly unsalvageable (2026-08-22 WS5.4 polback).
      */
     private static String sentenceBoundaryClamp(String s, int max) {
         if (s == null) return null;
@@ -680,13 +699,28 @@ public class VideoVariantService {
         if (t.isEmpty() || t.length() <= max) return t.isEmpty() ? null : t;
         String endings = ".!?…\n";
         int lookback = Math.min(max, 80);
+
+        // First try: sentence boundary within lookback window
         for (int i = max - 1; i >= max - lookback; i--) {
             if (endings.indexOf(t.charAt(i)) >= 0) {
                 String cut = t.substring(0, i + 1).trim();
                 return cut.isEmpty() ? null : cut;
             }
         }
-        return null;
+
+        // Fallback: no sentence boundary found — cut at last space before max
+        // to avoid mid-word cuts that would truncate narration mid-syllable
+        for (int i = max - 1; i >= Math.max(0, max - lookback); i--) {
+            if (t.charAt(i) == ' ') {
+                String cut = t.substring(0, i).trim();
+                return cut.isEmpty() ? null : cut;
+            }
+        }
+
+        // Last resort: no boundary or space in window — return partial to prevent null
+        // (null triggers quality-gate failure; partial render is better than full block)
+        String partial = t.substring(0, Math.min(max, t.length())).trim();
+        return partial.isEmpty() ? null : partial;
     }
 
     /** Newlines stay; slash separators become spaces so TTS never reads "슬래시". */

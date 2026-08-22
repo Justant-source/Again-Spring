@@ -292,6 +292,13 @@ public class CreateJobRequest {
 
         /** {@code "author"} | {@code "partner"} | {@code "neutral"} — for faction-color styling. */
         private String side;
+
+        /**
+         * Spoken text for TTS: first sentence of body, max 40 characters.
+         * Used for video narration. If null, consumer falls back to body.
+         * (WS3.2: 댓글 첫 문장 축약, 최대 40자)
+         */
+        private String spoken;
     }
 
     @Getter

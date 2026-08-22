@@ -25,6 +25,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.util.Arrays;
 import java.util.List;
@@ -50,6 +52,7 @@ import static org.mockito.Mockito.when;
  * Tests job creation with idempotency, status application, and callback handling.
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class MarketingJobServiceTest {
 
     @Mock
@@ -1324,5 +1327,309 @@ class MarketingJobServiceTest {
 
         // Verify sendWithMarkup was called (buttons included)
         verify(telegramNotifier).sendWithMarkup(anyString(), any(Map.class));
+    }
+
+    // ── WS3.1~3.2: Comment Selection & First Sentence Extraction ────────
+
+    /**
+     * Test WS3.1: Author + Partner 1개씩 선택 (둘 다 있을 때)
+     */
+    @Test
+    void createJob_selectsTopCommentsByScore_oneAuthorOnePartner() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("양진영 댓글")
+            .bodyPublished("본문")
+            .authorId("author-user")
+            .partnerUserId("partner-user")
+            .build();
+
+        // Create comments: author, partner, neutral
+        PostComment authorComment = PostComment.builder()
+            .authorId("author-user")
+            .body("좋은 댓글이에요.")  // short, author side → high score
+            .likeCount(5)
+            .build();
+        PostComment partnerComment = PostComment.builder()
+            .authorId("partner-user")
+            .body("다른 관점도 있어요.")  // short, partner side → high score
+            .likeCount(3)
+            .build();
+        PostComment neutralComment = PostComment.builder()
+            .authorId("other-user")
+            .body("이 상황은 매우 복잡하고 어려운 문제입니다.")  // long, neutral → lower score
+            .likeCount(10)  // 높은 좋아요 점수도 길이 페널티로 상쇄됨
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(TEST_POST_ID))
+            .thenReturn(List.of(authorComment, neutralComment, partnerComment));
+        when(userRepository.findById("author-user"))
+            .thenReturn(Optional.of(User.builder().id("author-user").nickname("작성자").build()));
+        when(userRepository.findById("partner-user"))
+            .thenReturn(Optional.of(User.builder().id("partner-user").nickname("상대방").build()));
+        when(userRepository.findById("other-user"))
+            .thenReturn(Optional.of(User.builder().id("other-user").nickname("일반사용자").build()));
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(1L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest.BriefDto brief = captor.getValue().getBrief();
+
+        assertThat(brief.getTopComments()).hasSize(2);
+        // 첫 번째: author side (좋아요 5 + 길이보너스 15 + 진영보너스 10 = 30)
+        assertThat(brief.getTopComments().get(0).getSide()).isEqualTo("author");
+        assertThat(brief.getTopComments().get(0).getBody()).isEqualTo("좋은 댓글이에요.");
+        // 두 번째: partner side (좋아요 3 + 길이보너스 15 + 진영보너스 10 = 28)
+        assertThat(brief.getTopComments().get(1).getSide()).isEqualTo("partner");
+        assertThat(brief.getTopComments().get(1).getBody()).isEqualTo("다른 관점도 있어요.");
+    }
+
+    /**
+     * Test WS3.1: 한쪽 진영이 없으면 neutral로 폴백
+     */
+    @Test
+    void createJob_selectsTopComments_fallsBackToNeutral_whenAuthorMissing() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("상대방만 있음")
+            .bodyPublished("본문")
+            .authorId("author-user")
+            .partnerUserId("partner-user")
+            .build();
+
+        PostComment partnerComment = PostComment.builder()
+            .authorId("partner-user")
+            .body("상대방 댓글")
+            .likeCount(5)
+            .build();
+        PostComment neutral1 = PostComment.builder()
+            .authorId("user-1")
+            .body("일반 댓글 1")
+            .likeCount(3)
+            .build();
+        PostComment neutral2 = PostComment.builder()
+            .authorId("user-2")
+            .body("일반 댓글 2")
+            .likeCount(1)
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(TEST_POST_ID))
+            .thenReturn(List.of(partnerComment, neutral1, neutral2));
+        when(userRepository.findById("partner-user"))
+            .thenReturn(Optional.of(User.builder().id("partner-user").nickname("상대방").build()));
+        when(userRepository.findById("user-1"))
+            .thenReturn(Optional.of(User.builder().id("user-1").nickname("사용자1").build()));
+        when(userRepository.findById("user-2"))
+            .thenReturn(Optional.of(User.builder().id("user-2").nickname("사용자2").build()));
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(2L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest.BriefDto brief = captor.getValue().getBrief();
+
+        assertThat(brief.getTopComments()).hasSize(2);
+        // 첫 번째: neutral (author가 없으므로 상위 neutral)
+        assertThat(brief.getTopComments().get(0).getSide()).isEqualTo("neutral");
+        assertThat(brief.getTopComments().get(0).getBody()).isEqualTo("일반 댓글 1");
+        // 두 번째: partner
+        assertThat(brief.getTopComments().get(1).getSide()).isEqualTo("partner");
+    }
+
+    /**
+     * Test WS3.2: 첫 문장 추출 — 마침표 경계
+     */
+    @Test
+    void createJob_populatesSpokenField_extractsFirstSentenceWithPeriod() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("spoken 필드")
+            .bodyPublished("본문")
+            .authorId("author-user")
+            .partnerUserId(null)
+            .build();
+
+        PostComment comment = PostComment.builder()
+            .authorId("author-user")
+            .body("첫 번째 문장입니다. 두 번째 문장도 있네요.")
+            .likeCount(1)
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
+        when(userRepository.findById("author-user"))
+            .thenReturn(Optional.of(User.builder().id("author-user").nickname("작성자").build()));
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(3L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest.TopCommentDto topComment = captor.getValue().getBrief().getTopComments().get(0);
+
+        assertThat(topComment.getBody()).isEqualTo("첫 번째 문장입니다. 두 번째 문장도 있네요.");
+        assertThat(topComment.getSpoken()).isEqualTo("첫 번째 문장입니다.");
+    }
+
+    /**
+     * Test WS3.2: 첫 문장 추출 — 경계 없음, 40자 이내면 전체 반환
+     */
+    @Test
+    void createJob_populatesSpokenField_noBoundary_lessThan40Chars() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("short spoken")
+            .bodyPublished("본문")
+            .authorId("author-user")
+            .partnerUserId(null)
+            .build();
+
+        PostComment comment = PostComment.builder()
+            .authorId("author-user")
+            .body("짧은 댓글ㅋㅋ")  // 10자 < 40자
+            .likeCount(1)
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
+        when(userRepository.findById("author-user"))
+            .thenReturn(Optional.of(User.builder().id("author-user").nickname("작성자").build()));
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(4L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest.TopCommentDto topComment = captor.getValue().getBrief().getTopComments().get(0);
+
+        // 경계 없음, 40자 이내 → 전체 반환
+        assertThat(topComment.getSpoken()).isEqualTo("짧은 댓글ㅋㅋ");
+    }
+
+    /**
+     * Test WS3.2: 첫 문장 추출 — 40자 초과, 어절 단위 절단
+     */
+    @Test
+    void createJob_populatesSpokenField_exceedsMaxLength_cutAtWordBoundary() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("long spoken")
+            .bodyPublished("본문")
+            .authorId("author-user")
+            .partnerUserId(null)
+            .build();
+
+        // 이것은 아주 긴 댓글이라서 첫 문장 추출 시 40자를 초과할 것입니다 마침표
+        PostComment comment = PostComment.builder()
+            .authorId("author-user")
+            .body("이것은 아주 긴 댓글이라서 첫 문장 추출 시 40자를 초과할 것입니다 마침표. 두 번째 문장")
+            .likeCount(1)
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
+        when(userRepository.findById("author-user"))
+            .thenReturn(Optional.of(User.builder().id("author-user").nickname("작성자").build()));
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(5L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest.TopCommentDto topComment = captor.getValue().getBrief().getTopComments().get(0);
+
+        // 40자 초과, 마침표 경계 없음 → 어절 단위 절단
+        String spoken = topComment.getSpoken();
+        assertThat(spoken).isNotNull();
+        assertThat(spoken.length()).isLessThanOrEqualTo(40);
+        assertThat(spoken).doesNotContain("마침표");  // 40자 넘어서는 내용
+    }
+
+    /**
+     * Test WS3.2: 첫 문장 추출 — 한글 마커 (ㅋㅋ, ㅠㅠ) 경계
+     */
+    @Test
+    void createJob_populatesSpokenField_extractsFirstSentenceWithKoreanMarker() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("korean marker")
+            .bodyPublished("본문")
+            .authorId("author-user")
+            .partnerUserId(null)
+            .build();
+
+        PostComment comment = PostComment.builder()
+            .authorId("author-user")
+            .body("공감돼요ㅋㅋ 정말 그래요")
+            .likeCount(1)
+            .build();
+
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"))).thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(TEST_POST_ID)).thenReturn(List.of(comment));
+        when(userRepository.findById("author-user"))
+            .thenReturn(Optional.of(User.builder().id("author-user").nickname("작성자").build()));
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(6L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("x_thread"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        CreateJobRequest.TopCommentDto topComment = captor.getValue().getBrief().getTopComments().get(0);
+
+        // ㅋㅋ를 경계로 인식 → "공감돼요ㅋㅋ"만 추출
+        assertThat(topComment.getSpoken()).isEqualTo("공감돼요ㅋㅋ");
     }
 }
