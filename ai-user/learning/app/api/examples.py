@@ -502,7 +502,11 @@ def available_count(
         """)
 
         where_clause = " AND ".join(where_conditions)
-        sql = f"SELECT COUNT(*) as cnt FROM example_bank eb WHERE {where_clause}"
+        # 정확한 개수가 아니라 "재고가 있느냐"만 필요하다. COUNT(*)는 조건을 만족하는
+        # 모든 행을 스캔해야 해서 prod에서 조합당 40~99초가 걸렸다(형제 URL 중복제거
+        # 서브쿼리 때문). EXISTS는 첫 일치에서 멈추므로 호출자 의미(0=스킵)를 유지한
+        # 채 비용만 없앤다. 반환값은 0 또는 1이며 호출자는 0 여부만 본다.
+        sql = f"SELECT EXISTS(SELECT 1 FROM example_bank eb WHERE {where_clause}) AS cnt"
 
         with get_db() as conn:
             with conn.cursor() as cur:
