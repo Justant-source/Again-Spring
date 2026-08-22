@@ -193,4 +193,61 @@ public class AiUserMlClient {
         }
         return normalized;
     }
+
+    // ── Inventory Precompute ──────────────────────────────────────────
+
+    @Getter @Setter @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AvailableCountResponse {
+        private String source;
+        private String category;
+        private int count;
+        private int windowDays;
+        private String error;
+    }
+
+    /**
+     * Query claimable inventory count for (source, category) pair.
+     * Returns: count >= 0 on success, -1 on error/disabled (graceful degradation).
+     *
+     * Used by orchestrator to precompute empty (source, plaza) pairs
+     * before entering nightly fill slot loop — avoids doomed claim attempts.
+     * On error, returns -1 so the orchestrator assumes inventory exists (conservative).
+     */
+    public int getAvailableCount(String source, String category, int windowDays) {
+        if (!enabled) return -1;
+        try {
+            StringBuilder url = new StringBuilder(baseUrl)
+                    .append("/examples/available-count?source=").append(urlEncode(source));
+            if (category != null && !category.isBlank()) {
+                url.append("&category=").append(urlEncode(category));
+            }
+            url.append("&window_days=").append(windowDays);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + apiToken);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            var response = restTemplate.exchange(url.toString(), org.springframework.http.HttpMethod.GET,
+                    entity, AvailableCountResponse.class);
+
+            if (response.getBody() == null) {
+                return -1;
+            }
+            return response.getBody().count;
+        } catch (Exception e) {
+            log.debug("AiUserMl getAvailableCount failed (non-critical, assume non-empty): source={} category={} {}",
+                    source, category, e.getMessage());
+            return -1;  // Return -1 to indicate unknown/error; orchestrator treats as non-empty
+        }
+    }
+
+    private String urlEncode(String s) {
+        try {
+            return java.net.URLEncoder.encode(s, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return s;
+        }
+    }
 }

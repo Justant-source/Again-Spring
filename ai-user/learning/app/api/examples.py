@@ -424,6 +424,109 @@ def expire_source_reservations():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/available-count")
+def available_count(
+    source: str = Query(...),
+    category: Optional[str] = Query(None),
+    window_days: int = Query(14),
+):
+    """Count claimable inventory for a (source, category) pair without claiming.
+
+    Applies the same filtering as claim-popular-source:
+      - content_type = 'POST'
+      - popularity_pct IS NOT NULL
+      - created_at >= NOW() - window_days
+      - (optional) category filter mapped to PLAZA_BANK_CATEGORIES
+      - unreserved (not in posts.source_example_id or active reservations)
+      - URL-sibling dedup (if any sibling is used/reserved, all are blocked)
+
+    Returns: {"source": "blind", "category": "MARRIED", "count": 271, "windowDays": 14}
+    Used by orchestrator to precompute (source, plaza) pairs with zero inventory.
+    """
+    from app.services import source_claim
+    from datetime import datetime, timezone
+
+    try:
+        # Normalize and validate source
+        normalized_src = source_claim.normalize_source(source)
+        if not source_claim.is_allowed_source(source):
+            return {
+                "source": source,
+                "category": category,
+                "count": 0,
+                "windowDays": window_days,
+                "error": f"invalid source (must be one of {sorted(source_claim.ALLOWED_SOURCES)})"
+            }
+
+        # Validate category if provided
+        bank_cats = source_claim.bank_categories_for_plaza(category) if category else None
+        if category and str(category).strip() and bank_cats is None:
+            return {
+                "source": source,
+                "category": category,
+                "count": 0,
+                "windowDays": window_days,
+                "error": f"invalid category (must be one of {sorted(source_claim.PLAZA_NAMES)})"
+            }
+
+        # Build SQL similar to _SELECT_CANDIDATE_SQL but COUNT only
+        where_conditions = [
+            "eb.content_type = 'POST'",
+            "eb.source = %s",
+            "eb.source_url IS NOT NULL",
+            "eb.popularity_pct IS NOT NULL",
+            "eb.created_at >= DATE_SUB(NOW(3), INTERVAL %s DAY)",
+        ]
+        params = [normalized_src, int(window_days)]
+
+        # Add category filter if provided
+        if bank_cats:
+            cat_placeholders = ",".join(["%s"] * len(bank_cats))
+            where_conditions.append(f"eb.category IN ({cat_placeholders})")
+            params.extend(bank_cats)
+
+        # Exclude used/reserved examples (same logic as claim)
+        where_conditions.append("""
+            NOT EXISTS (
+                SELECT 1
+                FROM example_bank sib
+                LEFT JOIN posts p ON p.source_example_id = sib.id
+                LEFT JOIN example_source_reservations r ON r.example_id = sib.id
+                WHERE sib.source_url = eb.source_url
+                  AND (
+                      p.id IS NOT NULL
+                      OR r.status = 'COMMITTED'
+                      OR (r.status = 'SOFT' AND r.reserve_until > NOW(3))
+                  )
+            )
+        """)
+
+        where_clause = " AND ".join(where_conditions)
+        sql = f"SELECT COUNT(*) as cnt FROM example_bank eb WHERE {where_clause}"
+
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                result = cur.fetchone()
+                count = int(result["cnt"]) if result else 0
+
+        return {
+            "source": normalized_src,
+            "category": (str(category).strip().upper() if category else None),
+            "count": count,
+            "windowDays": window_days,
+        }
+    except Exception as e:
+        logger.error(f"available_count error: source={source} category={category} {e}")
+        return {
+            "source": source,
+            "category": category,
+            "count": 0,
+            "windowDays": window_days,
+            "error": str(e)
+        }
+
+
 @router.get("/{example_id}", response_model=ExampleItem)
 def get_example(example_id: int) -> ExampleItem:
     """단일 원본 조회 — 원본 비교 화면에서 정확한 1건을 id로 가져오는 경로."""
