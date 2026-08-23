@@ -625,19 +625,34 @@ GET  /api/admin/marketing/weekly-report?weeksAgo=0
 
 ASM: `POST /api/v1/stats/collect` (`skip_slow`) · social-poster `POST /stats/x`.
 
-| 플랫폼 | 지금 수집 가능 | 비고 |
-|---|---|---|
-| X | impressions≈views, likes, replies, reposts | 세션 Playwright scrape (`/stats/x`). API 키 없음 |
-| IG Reels/Feed | reach, saves, shares, likes, comments | Graph insights + media fields. numeric media id + token 필요. **v21에서 `plays`/`views` 제거** — 요청하면 전건 HTTP 400. 대표 지표는 양쪽 모두 `reach` |
-| YT Shorts | views, likes, comments | Data API `videos.list`. **avgViewDuration** → Analytics + `yt-analytics.readonly` 재동의 필요(없으면 partial) |
+| 플랫폼 | 지금 수집 가능 | 대표 지표(primaryMetric) | 비고 |
+|---|---|---|---|
+| X | impressions≈views, likes, replies, reposts | `impressions` | 세션 Playwright scrape (`/stats/x`). API 키 없음. **스케줄 수집(06:30)에서만 채워짐** — 수동 버튼은 항상 건너뜀 |
+| IG Feed | reach, saves, shares, likes, comments | `reach` | Graph insights. media_id는 발행 URL이 없어 **발행 시각 대조**로 역추적(아래 참조) |
+| IG Reels | reach, saves, shares, likes, comments | `reach` (2026-08-22부터, 과거 `plays`) | Graph insights + numeric media id. **v21에서 `plays`/`views` 제거** — 요청하면 전건 HTTP 400 |
+| YT Shorts | views, likes, comments, avg_view_duration_sec | `views` | Data API `videos.list` + Analytics API |
 
 일 06:30 KST 스케줄 수집(`skip_slow=false`, X 포함). 실패는 배치 전체를 막지 않음.
 
-**`skip_slow=true`(어드민 수동 수집)는 X Playwright를 건너뛴다.** 건너뛴 항목은 결과에서 제외되어 오류 행으로 저장되지 않는다 — 수집을 시도하지 않은 것과 실패한 것은 다르며, 섞이면 대시보드 채널 상태가 degraded로 잘못 표시된다. X 지표는 스케줄 수집으로만 채워진다.
+#### 2026-08-22~23 장애 대응 — 4채널 전부 미수집이었던 근본원인과 조치
 
-**IG 토큰**: `instagram_manage_insights` scope 필요. Meta 앱에서 권한을 추가해도 **이미 발급된 토큰에는 반영되지 않으므로** 재발급해야 한다. ASM `scripts/refresh_ig_token.py` 참고(장기/페이지 토큰 교환).
+**증상**: admin `/marketing` 통계 탭 "데이터 건강"이 4채널 전부 오류/미확인, 실제로 X를 제외한 IG·YT는 며칠째 지표가 전혀 안 쌓이고 있었다. 표면 오류를 하나 고치면 그 뒤에 또 다른 원인이 있는 패턴이 채널마다 반복됐다 — **오류 메시지가 지목하는 원인을 그대로 믿지 말고, 실제 값이 들어오는 것까지 확인**해야 한다는 게 이번 사고의 핵심 교훈이다.
 
-**채널 배지(healthy/degraded/unknown) 판정 기준(2026-08-22)**: 플랫폼별 **가장 최근 수집 1건**의 성공 여부로 정한다. 대시보드 상단의 `partial N / errors N`은 선택된 주 전체의 누적 카운트라 별개 지표다 — 예전에는 배지도 이 누적치로 판정해서, 며칠 전 오류가 하나만 있어도 그 주 내내 채널이 계속 오류로 보였다(최신 수집이 성공해도 무관하게).
+| 채널 | 겹쳐 있던 원인 | 조치 |
+|---|---|---|
+| **IG Reels** | ① 토큰에 `instagram_manage_insights` scope 없음 ② 권한을 고쳐도 v21에서 제거된 `plays`/`views`를 요청해 전건 HTTP 400 | 토큰 재발급(아래) + 요청 지표를 `reach,saved,shares,total_interactions,likes,comments`로 변경 |
+| **IG Feed** | ① 위와 동일한 토큰 문제 ② 발행 URL이 애초에 저장되지 않아 media_id 확보 불가 ③ media_id를 찾아도 `instagram_feed` 자격에 Graph 토큰이 없어(브라우저 로그인 정보만 존재) `instagram_reels` 자격으로 폴백하지 못함(자격 행 존재 자체가 truthy 체크를 통과해버림) | 발행 시각 대조로 media_id 역추적(아래) + 토큰 유무 기준 폴백으로 수정 |
+| **YT Shorts** | ① Google Cloud 프로젝트에서 YouTube Analytics API 자체가 비활성 — **토큰/scope 문제가 아니었다**(scope는 이미 정상, `tokeninfo`로 확인) ② API를 켜자 드러난 파싱 버그: `dimensions=video`로 요청하면 응답의 첫 컬럼은 영상 ID인데 `rows[0][0]`을 지표로 읽어 조용히 `None`이 됨 | 콘솔에서 API 활성화 + `columnHeaders`에서 지표 이름으로 컬럼 위치를 찾도록 수정 |
+| **대시보드 배지** | 채널 상태를 "선택된 주 전체 누적 오류 유무"로 판정 — 며칠 전 오류 행 하나가 그 주 내내 채널을 계속 "오류"로 보이게 함(최신 수집이 성공해도 무관) | **플랫폼별 가장 최근 수집 1건**의 성공 여부로 판정하도록 변경. 상단 `partial N / errors N`은 "이번 주 누적 문제 건수"로 계속 별개 지표 |
+| **수동 수집 UI** | `skip_slow=true`(타임아웃 회피)로 건너뛴 X를 오류 행으로 저장 → 수동 버튼 누를 때마다 X가 degraded로 떨어짐 | 건너뛴 항목은 결과에서 제외(오류 행으로 저장하지 않음) |
+
+**IG 토큰 재발급 필요 이유**: Meta 앱 설정에서 권한(scope)을 추가해도 **이미 발급된 access_token에는 반영되지 않는다** — OAuth 토큰은 발급 시점의 scope가 고정된다. ASM `scripts/refresh_ig_token.py`가 단기 Explorer 토큰을 stdin으로만 받아(인자/환경변수 미사용, 화면에 값 미표시) scope 검증 → 60일 장기 토큰 교환 → 가능하면 **만료 없는 페이지 토큰**으로 승격 → 암호화 저장까지 처리한다.
+
+**IG Feed 발행 시각 대조**: 사이드카(`publish-instagram.js`)가 공유 직후 `page.url()`에서 `/p/`를 찾아 URL을 얻으려 하는데, 인스타 웹이 공유 완료 후 게시물 페이지로 이동하지 않아 이 검사가 항상 실패해 URL이 NULL로 저장된다. 대신 `publication.updated_at`(발행 시각)과 Graph `/{ig_user_id}/media`가 반환하는 `timestamp`를 대조한다 — 실측 오차 3~5초. **30초 창에 후보가 정확히 하나일 때만** 채택(2건 이상이면 오매칭 위험이 크니 스킵). 창을 넓히면 오히려 나빠진다: 120초 창은 17건 매칭·7건 모호, 30초 창은 24건 매칭·0건 모호 — 연달아 발행된 게시물이 넓은 창에서 서로의 후보가 되기 때문. Graph API가 반환하는 미디어는 최근 100건까지라 그 이전 발행분은 소급 수집 불가.
+
+**채널 배지(healthy/degraded/unknown) 판정 기준**: 플랫폼별 **가장 최근 수집 1건**의 성공 여부로 정한다. 이 기준이라도 **직전에 저장된 낡은 오류 행**이 그날의 "최신"으로 남아 있으면 다음 스케줄 수집(06:30)까지는 배지가 오류로 보인다 — 실제 수집 실패가 아니라 표시 지연이므로, 다음 06:30 이후에도 오류면 그때 실제 장애로 취급할 것.
+
+**결과 검증(2026-08-23 06:31 KST 스케줄 수집)**: X 16건 전건 성공(예: impressions 171~252), IG Feed/Reels 정상, YT Shorts 11/13건 성공(2건은 `youtube video not found` — 삭제된 영상 참조로 지표 수집 로직과 무관). 4채널 모두 정상 배지로 전환 확인.
 
 ### 4.3 저녁 슬롯 API (레거시, 자동 발행에 미사용)
 
