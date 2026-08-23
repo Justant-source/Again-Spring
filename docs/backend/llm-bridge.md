@@ -82,10 +82,12 @@ String sanitized = promptSanitizer.sanitize(userInput);
 ## llm-worker 컨테이너
 
 `llm-worker/` 디렉토리: Spring Boot + Claude CLI 실행 앱  
+컨테이너: `againspring-llm` (base 스택, dev·prod 공유, port :8090)  
 - 모델: `claude-haiku-4-5-20251001`
 - 보고서/분석 모델: `claude-sonnet-5` (2026-08-21부터; 이전 `claude-sonnet-4-6`)
 - `~/.claude` bind mount (Claude 인증)
 - 엔드포인트: `POST /v1/invoke`, `GET /v1/invocations`
+- **호출 경로**: `backend` → HTTP POST → `againspring-llm:8090/v1/invoke` (RemoteLlmProvider 경유)
 
 **CLI 도구 오버헤드 감소 (2026-08-21)**: llm-worker는 structured output이 불필요하므로 `--disallowedTools "*"`로 모든 CLI 도구를 차단. 
 입력 토큰 오버헤드를 25,267 토큰에서 ~279 토큰으로 감소시킨다(기본값 대비 -99%). 
@@ -108,10 +110,37 @@ String sanitized = promptSanitizer.sanitize(userInput);
 캐시가 걸린 스키마 모드보다 캐시 없는 프롬프트 모드가 11배 작은 이유는 그동안 캐시에 얹혀 있던 4만 토큰대가 
 앱 프롬프트가 아니라 **CLI 도구 정의였다는 증거**다.
 
+### 응답 절단 감지 및 차단 (2026-08-23)
+
+**문제**: 마케팅 영상 발행 잡의 44.5%가 `VARIANT_LLM_ERROR`로 실패. LLM이 낸 JSON 응답이 문장 중간에서 잘렸다.
+
+**근본 원인** (b2eb851a 커밋으로 확정):
+1. Claude CLI의 `--output-format stream-json` 출력이 최종 `result` 이벤트 없이 끝날 때(생성이 중간에 끊김)
+2. `ClaudeCliInvoker.readStreamingOutput()`이 누적된 부분 스트림을 정상 응답으로 반환
+3. 호출자(백엔드)가 잘린 JSON을 파싱하다 실패 → 잡 사망
+
+CLI가 오류 종료해도 부분 텍스트가 있으면 성공으로 반환하던 경로도 동일한 문제였다.
+
+**수정**:
+- `StreamResult.truncatedStream` 플래그: 최종 `result` 이벤트 유무로 완결 여부 판정
+- 부분 스트림 감지 시 경고 로그 기록 (예: `[llm] 최종 result 이벤트 없음 — 부분 스트림 1234자 (절단)`)
+- `[LLMSTATS]` 로그를 `OK` 대신 `TRUNCATED`로 기록
+- `CLAUDE_TRUNCATED` 예외 발생 → 호출자의 재시도 경로로 전달
+- 오류 종료 시 부분 텍스트 폐기
+
+**토큰 상한 가설의 오류**:
+- 초기 진단: 출력 토큰이 상한에 닿아 절단되는 줄 알았으나 **틀렸다**
+- 실측: 누적 출력 11,926 토큰까지 나오고, Claude CLI에는 출력 상한 옵션이 없다
+- 시도 2회: `maxTokens` 전달로 해결하려 했으나 **대상 저장소를 잘못 짚었다**
+  - 백엔드가 호출하는 워커는 `ai-user/llm/` 아님 → `llm-worker/` (컨테이너 `againspring-llm`)
+  - `ai-user/llm/`은 orchestrator 내부 경로(다른 구조)
+  - 혼동 근거: "LLM 생성"과 "마케팅 LLM"이 다른 워커를 탄다(§3)
+
 **[LLMSTATS] 로깅 (2026-08-21)**: llm-worker의 `ClaudeCliInvoker.logLlmStats()` 메서드가 모든 호출(성공/실패)에 대해 `[LLMSTATS]` 포맷으로 메트릭스를 기록한다:
 ```
 [LLMSTATS] ts=2026-08-21T12:34:56.789Z sys=AS type=INVOKE model=claude-haiku-4-5-20251001 attempt=1 retryReason=null in=2847 out=156 cache_read=0 cache_write=0 cache_hit=0% result=OK duration_ms=3421 corrId=abc-123
 ```
+절단 감지 시 `result=TRUNCATED`로 기록된다 (2026-08-23).
 
 **세션 만료 시 갱신**:
 ```bash

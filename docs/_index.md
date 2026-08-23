@@ -69,6 +69,7 @@
 > **미공개 초점**: 활성 채널 = **X / `x_thread`만**. IG·네이버·YouTube·Threads 보류
 > (`instagram_feed`는 24h 자동 + 단건 수동 — `instagram-feed-strategy.md`).
 > **접속**: AS(`100.81.189.92`) → `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
+> **⚠️ WaggleBot 단일 공유 인스턴스**: 렌더러 설정(`worker/ai_worker/renderer/settings.yaml`)은 dev/prod 구분 없음. 즉시 반영 — 변경 전 사전 공지 필수.
 
 | 토픽 | authority | derived | runtime |
 |---|---|---|---|
@@ -77,6 +78,7 @@
 | IG 피드 전략 (24h 자동) | `docs/shared/marketing/instagram-feed-strategy.md` | — | ASM `app/worker/ig_feed_pipeline.py` |
 | YouTube Shorts 전략 (조건부 자동 생성 + 수동 게시) | `docs/shared/marketing/youtube-shorts-strategy.md` | — | `MarketingJobService.maybeTriggerYoutubeShorts` · ASM `youtube_shorts` 파이프 · WaggleBot |
 | 시봄이 숏폼 삽입 (Shorts/Reels) | `docs/shared/marketing/sibom-video-insertion.md` | `youtube-shorts-strategy.md` · `api.md` | AS `sibom_candidates`/`sibom_plan` · WaggleBot sprouts 합성 |
+| **BGM/SFX 관리** (2026-08-23) | `docs/shared/marketing/README.md` (어드민 탭) | — | AS `AdminMarketingController` BGM/SFX 경로 · WaggleBot `renderer/settings.yaml` |
 
 ---
 
@@ -110,7 +112,8 @@
 | `ai-user/tools/**` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
 | `env/docker-compose*` · `env/nginx/*` | `docs/system.md` · `docs/env/architecture.md` · README 포트표 |
 | `domain/enums/*Status*.java` · `MarketingJob*.java` · orchestrator `ActionStatus*.java` | 해당 모듈의 stateDiagram (`docs/ai-user/orchestrator.md` 등) |
-| `backend/.../marketing/**` · video brief/`sibom_*` · metaphor unplug · `VideoVariantService*` | `docs/shared/marketing/sibom-video-insertion.md` · `youtube-shorts-strategy.md` · `api.md` · `docs/ai-user/llm-call-budget.md` §3 |
+| `backend/.../marketing/**` · video brief/`sibom_*` · metaphor unplug · `VideoVariantService*` · `AdminMarketingController` BGM/SFX 메서드 | `docs/shared/marketing/sibom-video-insertion.md` · `youtube-shorts-strategy.md` · `api.md` · `docs/ai-user/llm-call-budget.md` §3 · `README.md` (어드민 탭 BGM/SFX) |
+| WaggleBot 렌더러/SFX/BGM 설정 (`worker/ai_worker/renderer/settings.yaml`) | `docs/shared/marketing/README.md` (컴포넌트 역할·API 경로·환경변수) |
 | `backend/.../safety/**` · `llm/PromptSanitizer*` · `LlmErrorSignature*` · `ContentSafetyGuard*` | `docs/shared/policies/forbidden-words.md` · `.claude/rules/llm-safety.md` |
 | `docs/shared/policies/forbidden-words.md` | `.claude/rules/llm-safety.md` · `docs/frontend/policies/forbidden-words-lint.md` |
 | `backend/.../llm/**` | `docs/backend/llm-bridge.md` |

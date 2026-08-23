@@ -56,8 +56,9 @@ POST /api/v1/jobs → [Again-Spring-Marketing (ASM)]
 
 | 컴포넌트 | 위치 | 역할 |
 |---|---|---|
-| **Again-Spring (AS)** | Ubuntu 서버 | 홀딩 보드·24h 확정·잡 폴링·Admin UI. 얇은 ASM 클라이언트 |
-| **Again-Spring-Marketing (ASM)** | WSL GPU 서버 | 콘텐츠 생성·렌더링·소셜 게시 전담. 게시된 로컬 mp4는 **30일** 보존 |
+| **Again-Spring (AS)** | Ubuntu 서버 | 홀딩 보드·24h 확정·잡 폴링·Admin UI. 얇은 ASM 클라이언트. 렌더러/SFX/BGM 설정은 **WaggleBot 권위본** 참조 |
+| **Again-Spring-Marketing (ASM)** | WSL GPU 서버 | 콘텐츠 생성·렌더링·소셜 게시 전담. 게시된 로컬 mp4는 **30일** 보존. WaggleBot 프록시 게이트웨이 |
+| **WaggleBot** | WSL GPU 서버 (ASM과 동일) | 비디오 렌더링 엔진. **단일 공유 인스턴스** (dev/prod 구분 없음) — 렌더러 설정(`worker/ai_worker/renderer/settings.yaml`) 변경은 즉시 운영 발행에 반영 |
 | **ASM social-poster** | ASM `services/social-poster/` | Playwright 자동 게시. **타깃 분배 = 플랫폼별 score·cap** (런타임 전환 중일 수 있음 — SSOT는 Phase 2) |
 
 **접속**: AS 호스트 Tailscale `100.81.189.92`에서 `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
@@ -91,7 +92,7 @@ docs/shared/marketing/
 |---|---|
 | **대기** | 24h N-top 홀딩 보드 · 카드 라벨 = 포맷(VIDEO/TEXT) + 상태(후보/후보 외) · 핀 = 인라인 포맷 select(`VIDEO\|TEXT`, soft-reserve) · 초안 다이얼로그 = 게시글 제목 + 작성자/상대방 본문 read-only 표시, `promoTitle` 숨김, `tags`·`topComments`만 편집 가능 · 일일 상한·점수 가중치 |
 | **완료** | 사연(story) 단위 리스트 · 상단 **게시 이력**(COMMITTED) — 클릭 시 플랫폼별 상태+URL · **Job {id}** 는 `/admin/marketing/jobs/{id}` 로 이동(다이얼로그 내 승인/재시도 없음) · 하단 **탈락**(DROPPED) — 강제 배포(인라인 모드 선택 + 확인) · 플랫폼 성과 카드·잡 보드 박스·구 타임라인 UI는 이 탭에서 제거됨 |
-| **설정** | 플랫폼 자동 on/off · 플랫폼 계정 자격증명 · (Phase 2) 채널별 cap·가중치·`auto_adjust` |
+| **설정** | 플랫폼 자동 on/off · 플랫폼 계정 자격증명 · (Phase 2) 채널별 cap·가중치·`auto_adjust` · **배경음악(BGM)** on/off + 감정별 곡 선택 · **효과음 매핑** (삽입 지점 17개 × 음원 282개) |
 | **통계** | Phase 3: 채널 KPI·UTM·수집 건강 · 감정×카테고리 테마 배수(제안→확정) · 이벤트 타임라인 · 주간 리포트 |
 | **테스트** (2026-08-22) | 최근 사연 목록 또는 postId 직접 입력 → 릴스/쇼츠 렌더 테스트. `POST /jobs`를 `autoPublish:false`로 호출 — LLM 대본·시봄이 매핑을 실제로 생성하고 WaggleBot이 렌더링하지만 **실제 플랫폼에는 절대 게시되지 않는다**. 완료된 영상은 탭 안에서 `ArtifactSection`으로 바로 미리보기(같은 사연을 반복 실행해 LLM 결과 편차 비교 가능). 게시 버튼 없음 — 대기/완료 탭과 완전히 분리된 QA 전용 화면 |
 
@@ -203,12 +204,16 @@ UNKNOWN으로 덮지 않는다.
 | BE 플랫폼 auto / 점수 / 상한 / 자동 즉시발행 | `MarketingPlatformAutoService` · `MarketingScoreWeightService` · `MarketingQuotaService` · `MarketingJobService` |
 | BE 잡·폴링 | `MarketingJobService.java` · `MarketingPollingScheduler.java` |
 | BE Admin API | `AdminMarketingController` · `AdminMarketingHoldingController` · `AdminMarketingCompletedController` · `AdminMarketingPlatformController` |
+| BE Admin API 경로 (BGM/SFX) | `GET /api/admin/marketing/bgm/tracks` · `GET /api/admin/marketing/bgm/sample` · `PUT /api/admin/marketing/bgm/settings` · `GET /api/admin/marketing/sfx/mapping` · `PUT /api/admin/marketing/sfx/mapping` · `GET /api/admin/marketing/sfx/sample` |
 | FE 마케팅 허브 | `frontend/app/(admin)/admin/marketing/page.tsx` (탭: 대기/완료/통계/테스트/설정) |
 | FE 홀딩 UI | `frontend/components/admin/marketing/HoldingBoard.tsx` · `HoldingControlsBar.tsx` · `HoldingDraftDialog.tsx` |
 | FE 테스트 탭 (렌더 QA) | `frontend/components/admin/marketing/RenderTestSection.tsx` — `createMarketingTestJob`(항상 `autoPublish:false`) |
 | FE 잡 상세 | `frontend/app/(admin)/admin/marketing/jobs/[id]/page.tsx` |
 | FE API 클라이언트 | `frontend/lib/api/admin/marketing.ts` |
 | FE 플랫폼 계정 UI | `frontend/components/admin/marketing/PlatformCredentialsSection.tsx` · `PlatformAutoSection.tsx` |
+| FE 설정 탭 (BGM/SFX) | BGM 선택·on/off = `PlatformCredentialsSection.tsx`의 `BgmTrackPicker` (배치는 `ShortformVideoSection.tsx`) · 효과음 매핑 = `SfxMappingSection.tsx` |
 | ASM 자격증명 (crypto/스키마/API) | `app/core/crypto.py` · `app/domain/credentials.py` · `app/api/routes_credentials.py` |
+| ASM WaggleBot 프록시 | `app/api/routes_waggle_voices.py` (TTS voices · `/bgm/tracks`·`/bgm/sample`·`/bgm/settings` · `/sfx/mapping`) |
 | ASM 프로젝트 | `/home/justant/Data/Again-Spring-Marketing/` (WSL) |
-| ASM social-poster | `ASM/services/social-poster/` (WSL) |
+| ASM social-poster | `services/social-poster/` (WSL) |
+| WaggleBot 렌더러 설정 권위본 | `worker/ai_worker/renderer/settings.yaml` (WSL) — `sfx.active` · `bgm.enabled` · 트랙 할당 |

@@ -150,7 +150,9 @@ API: `GET`/`PUT /api/admin/marketing/quota` — Body 플랫폼 필드(`xThread` 
 | 분류(공식) | 정방 **또는** 세로 ≤3분 | 권장 9:16 (허용 1.91:1~9:16) |
 | 코덱 | H.264 | H.264 |
 | 프레임률 | ≥30fps | ≥30fps |
-| 오디오 | TTS (Fish Speech) | 동일 |
+| 오디오 — 나레이션 | TTS (Fish Speech S2-pro) · 어드민「숏폼영상」 설정의 `tts_voice` | 동일 |
+| 오디오 — 배경음악 | 감정 5종(shock·anger·tension·sad·hype) × 2곡, Mixkit · 어드민 UI에서 곡 직접 선택 또는「자동 선택」(빈 값) · 나레이션보다 약 14 dB 하향 · **현재 off** (`settings.yaml` `bgm.enabled=false`) | 동일 |
+| 오디오 — 효과음 | 17개 지점 매핑 가능, 262개 음원 라이브러리(Mixkit 12개 카테고리) · 어드민「설정 → 효과음 매핑」에서 지점별 음원·음량·오프셋 지정 · `assets/media/sfx/LICENSES.md` 출처 기록 | 동일 |
 | 잡/렌더 | **별도 잡** (Phase 2.1) · 유니크 mp4는 2.4 | **별도 잡** · ≤30s 계약은 2.4 |
 | Phase 2.4 | ≤45s · 유니크 렌더 · 전문 낭독 폐기 | ≤30s · 유니크 렌더 · 전문 낭독 폐기 |
 | 시봄이 | `sibom_plan` intro+본문 · 메타포 **금지** · [`sibom-video-insertion.md`](sibom-video-insertion.md) | 同 |

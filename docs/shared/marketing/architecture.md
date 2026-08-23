@@ -54,7 +54,20 @@
 음원은 `assets/media/sfx/_library/<카테고리>/`에 Mixkit 262개(상업 사용 가능·표기 불필요).
 `file` 값은 `assets/media/sfx/` 기준 상대경로이고 하위 경로도 그대로 해석된다(`_resolve_sfx_path`).
 **`assets/`는 gitignore라 음원 파일은 git에 없다** — 출처 URL은 `assets/media/sfx/LICENSES.md`에 기록.
-BGM은 `volume=0.40` + 사이드체인 더킹(`threshold=0.10 ratio=4`)으로 목소리보다 약 14dB 아래에 깔린다.
+**BGM 전역 스위치 — `settings.yaml`의 `bgm.enabled` (현재 `false`, 모든 렌더에서 제외)**
+
+`false`면 프로필과 무관하게 어떤 렌더에도 BGM이 들어가지 않는다. 고르는 기능
+(카탈로그 API · 어드민 곡 선택 · 잡별 `bgmTrack` · `hook_emotion` 자동 선택)은 그대로 살아 있어
+`true`로 되돌리면 고른 곡 그대로 복귀한다. 어드민 「설정 → 배경음악 (BGM)」 박스의 체크박스로 켜고 끄며,
+`PUT /api/admin/marketing/bgm/settings` → ASM → WaggleBot `PUT /api/bgm/settings`로 전달된다.
+차단은 소비 지점(`_bgm_allowed_for_profile`) 한 곳에서만 한다 — director는 여전히 곡을 고른다.
+
+켜져 있을 때: `volume=0.40` + 사이드체인 더킹(`threshold=0.10 ratio=4`)으로 목소리보다 약 14dB 아래.
+**이 값은 실측으로 잡았다** — 이전 `volume=0.15`·`threshold=0.03 ratio=9`는 원본 −18.5dB를 최종 −44.2dB까지
+끌어내려 목소리(−16.0dB)보다 28dB 아래였고, 사실상 들리지 않았다.
+검증은 말이 멈추는 구간 비교가 유일하게 결정적이다(−14dB 신호는 전체 볼륨에 0.2dB만 더한다):
+TTS 원본 −70.4dB(무음) vs 최종본 −22.5dB.
+
 BGM 곡은 어드민 설정에서 직접 고를 수 있고(`shortform_video` 자격증명 `bgm_track`), 비우면 `hook_emotion`으로 자동 선택된다.
 
 **⚠️ 에셋 위치 중요**: BGM/SFX는 반드시 `assets/media/` 하위에 있어야 합니다. WaggleBot 컨테이너가 `MEDIA_DIR=/app/media`로만 마운트하므로, `assets/voices/`, `assets/images/` 등 다른 디렉터리는 보이지 않습니다.

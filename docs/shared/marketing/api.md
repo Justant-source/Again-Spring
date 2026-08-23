@@ -137,10 +137,16 @@ Authorization: Bearer <admin-jwt>
 ```
 GET /api/admin/marketing/bgm/tracks
 GET /api/admin/marketing/bgm/sample?path=/api/media/bgm/{emotion}/{file}.mp3
+PUT /api/admin/marketing/bgm/settings          body: { "enabled": true|false }
 Authorization: Bearer <admin-jwt>
 ```
 
-**tracks 200** — `{ tracks:[{ emotion, emotionLabel, file, path }] }`
+**settings 200** — `{ enabled }`. **`false`면 프로필과 무관하게 모든 렌더에서 BGM이 빠진다.**
+곡 선택 기능은 그대로 살아 있어 `true`로 되돌리면 고른 곡 그대로 복귀한다.
+권위본은 WaggleBot 렌더러 설정의 `bgm.enabled`이며, `tracks` 응답에도 현재 값이 `enabled`로 함께 온다
+(이 값을 빼먹으면 실제로는 꺼져 있는데 어드민에는 항상 "켜짐"으로 보인다 — 2026-08-23 실제로 겪은 버그).
+
+**tracks 200** — `{ tracks:[{ emotion, emotionLabel, file, path }], enabled }`
 감정 5종(`shock`·`anger`·`tension`·`sad`·`hype`) × 2곡. `path`가 곧 선택값이자 미리듣기 경로이며,
 그대로 `variant_config.bgm_track`으로 저장된다. `sample`은 `/api/media/bgm/` 접두만 허용.
 
