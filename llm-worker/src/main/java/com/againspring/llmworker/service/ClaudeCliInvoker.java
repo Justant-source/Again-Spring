@@ -106,12 +106,21 @@ public class ClaudeCliInvoker {
             if (inv.isCanceled()) {
                 throw inv.terminationException();
             }
-            if (exitCode != 0 && !result.text.isBlank()) return result.text;
+            // 오류 종료 시 부분 텍스트를 성공처럼 돌려주면 잘린 JSON이 그대로 흘러간다.
             if (exitCode != 0) {
-                long duration = System.currentTimeMillis() - startMs;
-                logLlmStats(model, 1, "CLAUDE_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
-                throw new ClaudeCodeException("CLAUDE_ERROR",
-                        "Claude CLI exited with code " + exitCode, exitCode, null);
+                long d = System.currentTimeMillis() - startMs;
+                logLlmStats(model, 1, "CLAUDE_TRUNCATED", 0, 0, 0, 0, 0, "FAIL", d, corrId);
+                throw new ClaudeCodeException("CLAUDE_TRUNCATED",
+                        "Claude CLI exited with code " + exitCode
+                                + " (부분 응답 " + result.text.length() + "자 폐기)", exitCode, null);
+            }
+            // 정상 종료라도 최종 result 이벤트가 없으면 부분 스트림이다 — 잘린 JSON을
+            // 성공으로 넘기면 호출자가 파싱에 실패해 잡이 죽는다. 명시적으로 실패시켜
+            // 호출자의 재시도 경로를 타게 한다.
+            if (result.truncatedStream) {
+                throw new ClaudeCodeException("CLAUDE_TRUNCATED",
+                        "응답이 완결되지 않았습니다 (부분 스트림 " + result.text.length() + "자)",
+                        exitCode, null);
             }
             return result.text;
         } finally {
@@ -181,15 +190,24 @@ public class ClaudeCliInvoker {
                 }
             }
         }
-        // result 이벤트 우선 (깔끔한 최종 텍스트), 없으면 누적 partial 사용
-        String answer = (finalResult.isBlank() ? accumulated.toString() : finalResult).trim();
+        // result 이벤트 우선 (깔끔한 최종 텍스트), 없으면 누적 partial 사용.
+        // ⚠️ 후자는 생성이 중간에 끊긴 것이다 — 문장 중간에서 잘린 JSON이 나온다.
+        boolean incomplete = finalResult.isBlank();
+        String answer = (incomplete ? accumulated.toString() : finalResult).trim();
+        if (incomplete && !answer.isBlank()) {
+            log.warn("[llm] 최종 result 이벤트 없음 — 부분 스트림 {}자 (절단), corrId={}",
+                    answer.length(), corrId);
+        }
         // Log success
         long duration = System.currentTimeMillis() - startMs;
         int cacheHitPercent = inputTokens + cacheReadTokens + cacheWriteTokens > 0
             ? (int) Math.round(cacheReadTokens * 100.0 / (inputTokens + cacheReadTokens + cacheWriteTokens))
             : 0;
-        logLlmStats(model, attempt, null, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheHitPercent, "OK", duration, corrId);
-        return new StreamResult(answer, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens);
+        logLlmStats(model, attempt, null, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens,
+                cacheHitPercent, incomplete ? "TRUNCATED" : "OK", duration, corrId);
+        StreamResult sr = new StreamResult(answer, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens);
+        sr.truncatedStream = incomplete;
+        return sr;
     }
 
     /** stderr를 데몬 스레드로 drain — 파이프 버퍼 포화(데드락) 방지 */
@@ -213,6 +231,8 @@ public class ClaudeCliInvoker {
         final int outputTokens;
         final int cacheReadTokens;
         final int cacheWriteTokens;
+        /** 최종 result 이벤트를 받았는가. false면 부분 스트림(=절단)이다. */
+        boolean truncatedStream;
 
         StreamResult(String text, int inputTokens, int outputTokens, int cacheReadTokens, int cacheWriteTokens) {
             this.text = text;
