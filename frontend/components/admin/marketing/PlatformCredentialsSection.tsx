@@ -991,11 +991,12 @@ export function BgmTrackPicker({ value, onChange }: BgmTrackPickerProps) {
                       />
                       <label htmlFor={`bgm-${track.file}`} className="min-w-0 flex-1 cursor-pointer">
                         <div className="text-sm text-gray-800">{track.file}</div>
-                        <div className="font-mono text-[10px] text-gray-400">
-                          {track.durationSec
-                            ? `${Math.floor(track.durationSec / 60)}:${String(track.durationSec % 60).padStart(2, '0')}`
-                            : '길이 미측정'}
-                        </div>
+                        {/* 길이는 카탈로그가 줄 때만 보여준다 — 매번 "미측정"이 붙으면 잡음일 뿐이다 */}
+                        {track.durationSec ? (
+                          <div className="font-mono text-[10px] text-gray-400">
+                            {`${Math.floor(track.durationSec / 60)}:${String(track.durationSec % 60).padStart(2, '0')}`}
+                          </div>
+                        ) : null}
                       </label>
                       <Button
                         type="button"
