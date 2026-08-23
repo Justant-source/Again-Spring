@@ -103,12 +103,14 @@ export function ShortformVideoSection() {
         ) : (
           <div className="space-y-4">
             <TtsVoicePicker value={ttsVoice} onChange={setTtsVoice} />
+            {/* 배경음악을 댓글 음성 풀보다 위에 둔다. 아래에 있으면 음성 목록이
+                길어 한참 스크롤해야 나오고, 있는 줄도 모르고 지나친다. */}
+            <BgmTrackPicker value={bgmTrack} onChange={setBgmTrack} />
             <CommentTtsVoicePicker
               value={commentVoices}
               narratorVoice={ttsVoice}
               onChange={setCommentVoices}
             />
-            <BgmTrackPicker value={bgmTrack} onChange={setBgmTrack} />
 
             {saveError && (
               <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -21,7 +21,23 @@
 | 프로필 | 설명 | 상태 |
 |---|---|---|
 | `marketing_fast` | 현행 운영 중인 기본 프로필. 간편 레이아웃, BGM/SFX/전환 없음 | 활성 |
-| `marketing_v2` | 신규 v2 렌더. BGM(감정별 2곡, `assets/media/bgm/<emotion>/`) + SFX(6종 팔레트, `assets/media/sfx/<event>.wav`) + ffmpeg 전환(xfade) + 앱 크롬 제거 + 투표 비율 바(실제 `empathy_ratio` 없으면 미표시) | Phase 3 기준선 수집 중, 사용자 승인 대기 |
+| `marketing_v2` | 신규 v2 렌더. BGM(감정별 2곡, `assets/media/bgm/<emotion>/`) + SFX(7종 팔레트, `assets/media/sfx/<event>.wav`) + ffmpeg 전환(xfade) + 앱 크롬 제거(인트로 포함) + 투표 비율 바(실제 `empathy_ratio` 없으면 미표시) | Phase 3 기준선 수집 중, 사용자 승인 대기 |
+
+**SFX 팔레트 (역할별로 다른 소리 — 한 소리를 반복하면 금세 물린다)**
+
+| 이벤트 | 붙는 자리 | 음량 |
+|---|---|---|
+| `hook_in` | 첫 화면 | 0.9 |
+| `page` | 본문 화면 전환마다 (첫 화면 제외 — `hook_in`과 겹침) | 0.30 |
+| `turn` | 시봄이 비트(`image_text`) | 0.8 |
+| `section_whoosh` | 본문 → 댓글 전환 | 0.7 |
+| `bubble` | 댓글 카드마다 | 0.8 |
+| `vote_fill` · `logo` | 아웃트로 | 0.7 · 0.6 |
+
+간격 규칙은 실제 재생 시각(이벤트별 `offset` 반영) 기준이며 `page`·`bubble`은 1.0초, 나머지는 2.5초다.
+영상당 상한은 `settings.yaml`의 `sfx.max_per_video`(현재 18)가 권위본이다.
+BGM은 `volume=0.40` + 사이드체인 더킹(`threshold=0.10 ratio=4`)으로 목소리보다 약 14dB 아래에 깔린다.
+BGM 곡은 어드민 설정에서 직접 고를 수 있고(`shortform_video` 자격증명 `bgm_track`), 비우면 `hook_emotion`으로 자동 선택된다.
 
 **⚠️ 에셋 위치 중요**: BGM/SFX는 반드시 `assets/media/` 하위에 있어야 합니다. WaggleBot 컨테이너가 `MEDIA_DIR=/app/media`로만 마운트하므로, `assets/voices/`, `assets/images/` 등 다른 디렉터리는 보이지 않습니다.
 
