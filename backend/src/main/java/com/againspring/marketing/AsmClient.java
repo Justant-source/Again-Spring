@@ -261,6 +261,45 @@ public class AsmClient {
     }
 
     /**
+     * WaggleBot BGM track catalog (via ASM proxy).
+     * Returns {@code { tracks:[{emotion,file,path,durationSec?}] }}.
+     */
+    public JsonNode listWaggleBgmTracks() {
+        try {
+            return restClient
+                .get()
+                .uri("/api/v1/waggle/bgm/tracks")
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (Exception e) {
+            log.error("Failed to list WaggleBot BGM tracks via ASM", e);
+            throw new AsmUnavailableException("Failed to list WaggleBot BGM tracks: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Stream a WaggleBot BGM sample file through ASM.
+     * {@code path} must be a WB media path like {@code /api/media/bgm/...}.
+     */
+    public ResponseEntity<Resource> getWaggleBgmSample(String path) {
+        try {
+            return restClient
+                .get()
+                .uri(uriBuilder -> uriBuilder
+                    .path("/api/v1/waggle/bgm/sample")
+                    .queryParam("path", path)
+                    .build())
+                .retrieve()
+                .toEntity(Resource.class);
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to fetch WaggleBot BGM sample {}", path, e);
+            throw new AsmUnavailableException("Failed to fetch BGM sample: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Best-effort platform stats collect (Phase 2.6).
      * Body: {@code {"job_ids":[...], "lookback_days":14, "limit":40}}.
      * Returns {@code {"results":[...], "count":N}} — partial failures included per row.

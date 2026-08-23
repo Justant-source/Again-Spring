@@ -129,6 +129,21 @@ Authorization: Bearer <admin-jwt>
 **voices 200** — `{ defaultVoice, voices:[{ key, label, gender?, sampleUrl, hasSample, ... }] }`  
 `sampleUrl` = WaggleBot 키 기반 경로(`/api/tts/voices/{key}/sample`). 미리듣기는 `voice-sample`로 스트리밍 (path는 `/api/tts/voices/*/sample` 또는 `/api/media/voices/` 접두만 허용).
 
+### 1.5.2 WaggleBot 배경음악 (숏폼영상 설정)
+
+> TTS 음성과 같은 경로. `bgm_track`도 `shortform_video` pseudo-platform 자격증명 public 필드다.
+> **비워두면 사연의 `hook_emotion`에 맞춰 WaggleBot이 자동 선택한다** — 값이 있을 때만 그 곡으로 고정된다.
+
+```
+GET /api/admin/marketing/bgm/tracks
+GET /api/admin/marketing/bgm/sample?path=/api/media/bgm/{emotion}/{file}.mp3
+Authorization: Bearer <admin-jwt>
+```
+
+**tracks 200** — `{ tracks:[{ emotion, emotionLabel, file, path }] }`
+감정 5종(`shock`·`anger`·`tension`·`sad`·`hype`) × 2곡. `path`가 곧 선택값이자 미리듣기 경로이며,
+그대로 `variant_config.bgm_track`으로 저장된다. `sample`은 `/api/media/bgm/` 접두만 허용.
+
 ---
 
 ### 1.6 실패 잡 일괄 재구동
@@ -408,6 +423,8 @@ DELETE /api/v1/credentials/{platform}  # 삭제 (204)
 
 GET    /api/v1/waggle/voices                         # WaggleBot TTS 카탈로그
 GET    /api/v1/waggle/voice-sample?path=/api/tts/…/sample # 샘플 오디오 프록시
+GET    /api/v1/waggle/bgm/tracks                     # WaggleBot BGM 카탈로그
+GET    /api/v1/waggle/bgm/sample?path=/api/media/bgm/… # BGM 샘플 프록시
 Authorization: Bearer <asm-token>
 ```
 

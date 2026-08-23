@@ -11,6 +11,7 @@ import {
 import {
   TtsVoicePicker,
   CommentTtsVoicePicker,
+  BgmTrackPicker,
   extractError,
 } from '@/components/admin/marketing/PlatformCredentialsSection';
 
@@ -29,6 +30,7 @@ export function ShortformVideoSection() {
 
   const [ttsVoice, setTtsVoice] = useState('');
   const [commentVoices, setCommentVoices] = useState('');
+  const [bgmTrack, setBgmTrack] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -42,6 +44,7 @@ export function ShortformVideoSection() {
       setCred(found);
       setTtsVoice(found?.values['tts_voice'] ?? '');
       setCommentVoices(found?.values['comment_tts_voices'] ?? '');
+      setBgmTrack(found?.values['bgm_track'] ?? '');
     } catch (err: unknown) {
       setError(`숏폼영상 설정을 불러오지 못했습니다: ${extractError(err)}`);
     } finally {
@@ -61,6 +64,7 @@ export function ShortformVideoSection() {
       await upsertPlatformCredential(SHORTFORM_PLATFORM, {
         tts_voice: ttsVoice,
         comment_tts_voices: commentVoices,
+        bgm_track: bgmTrack,
       });
       setSaved(true);
       await load();
@@ -104,6 +108,7 @@ export function ShortformVideoSection() {
               narratorVoice={ttsVoice}
               onChange={setCommentVoices}
             />
+            <BgmTrackPicker value={bgmTrack} onChange={setBgmTrack} />
 
             {saveError && (
               <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

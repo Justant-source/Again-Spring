@@ -238,6 +238,36 @@ export async function fetchTtsVoiceSampleBlob(samplePath: string): Promise<Blob>
   return res.data;
 }
 
+// ===== WaggleBot BGM tracks (background music editor) =====
+
+export interface BgmTrack {
+  emotion: string;
+  file: string;
+  path: string;
+  durationSec?: number;
+}
+
+export interface BgmCatalog {
+  tracks: BgmTrack[];
+}
+
+export async function listBgmTracks(): Promise<BgmCatalog> {
+  const res = await api.get<BgmCatalog>('/api/admin/marketing/bgm/tracks');
+  return res.data;
+}
+
+/**
+ * Fetch sample audio bytes with admin auth (for audio preview via blob URL).
+ * {@code samplePath} is the WaggleBot BGM media path from the catalog (`/api/media/bgm/...`).
+ */
+export async function fetchBgmSampleBlob(samplePath: string): Promise<Blob> {
+  const res = await api.get<Blob>('/api/admin/marketing/bgm/sample', {
+    params: { path: samplePath },
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
 // ===== Marketing Analytics =====
 
 export interface PlatformStatsDto {

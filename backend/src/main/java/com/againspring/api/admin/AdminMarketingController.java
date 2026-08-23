@@ -487,6 +487,32 @@ public class AdminMarketingController {
         return asmClient.getWaggleVoiceSample(path);
     }
 
+    // ===== WaggleBot BGM (background music for video editing) =====
+
+    /**
+     * List BGM tracks available in WaggleBot (via ASM).
+     * Returns {@code { tracks:[{emotion,file,path,durationSec?}] }}.
+     */
+    @GetMapping("/bgm/tracks")
+    @Operation(summary = "List WaggleBot BGM tracks", description = "와글봇 배경음악(BGM) 목록")
+    @ApiResponse(responseCode = "200", description = "BGM catalog returned")
+    public ResponseEntity<JsonNode> listBgmTracks() {
+        return ResponseEntity.ok(asmClient.listWaggleBgmTracks());
+    }
+
+    /**
+     * Stream a WaggleBot BGM sample (mp3) for admin preview.
+     * {@code path} must be a WB BGM path like {@code /api/media/bgm/emotion/emotion_0{1,2}.mp3}.
+     */
+    @GetMapping("/bgm/sample")
+    @Operation(summary = "Preview WaggleBot BGM sample", description = "배경음악 샘플 스트리밍")
+    public ResponseEntity<Resource> getBgmSample(@RequestParam("path") String path) {
+        if (!isAllowedBgmSamplePath(path)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid BGM sample path");
+        }
+        return asmClient.getWaggleBgmSample(path);
+    }
+
     private static boolean isAllowedWaggleSamplePath(String path) {
         if (path == null || path.contains("..")) {
             return false;
@@ -498,6 +524,25 @@ public class AdminMarketingController {
         return path.startsWith("/api/tts/voices/")
                 && path.endsWith("/sample")
                 && path.chars().filter(ch -> ch == '/').count() == 5;
+    }
+
+    private static boolean isAllowedBgmSamplePath(String path) {
+        if (path == null || path.contains("..")) {
+            return false;
+        }
+        // /api/media/bgm/{emotion}/{emotion}_0{1,2}.mp3
+        if (path.startsWith("/api/media/bgm/") && path.chars().filter(ch -> ch == '/').count() >= 4) {
+            // Validate structure: /api/media/bgm/emotion/emotion_0{1,2}.mp3
+            String[] parts = path.split("/");
+            if (parts.length >= 5) {
+                String emotion = parts[4];
+                // Only allow known emotions
+                if (emotion.matches("(shock|anger|tension|sad|hype)")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     // ===== YouTube Shorts OAuth 2.0 authorization-code flow =====
