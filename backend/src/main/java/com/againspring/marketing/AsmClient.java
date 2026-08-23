@@ -278,6 +278,44 @@ public class AsmClient {
     }
 
     /**
+     * WaggleBot SFX mapping (via ASM proxy).
+     * Returns {@code { events:[...], maxPerVideo:N, library:[...] }}.
+     */
+    public JsonNode getWaggleSfxMapping() {
+        try {
+            return restClient
+                .get()
+                .uri("/api/v1/waggle/sfx/mapping")
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (Exception e) {
+            log.error("Failed to get WaggleBot SFX mapping via ASM", e);
+            throw new AsmUnavailableException("Failed to get WaggleBot SFX mapping: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Update WaggleBot SFX mapping (via ASM proxy).
+     * Body: {@code { events:[...], maxPerVideo:N }}.
+     */
+    public JsonNode putWaggleSfxMapping(JsonNode body) {
+        try {
+            return restClient
+                .put()
+                .uri("/api/v1/waggle/sfx/mapping")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to update WaggleBot SFX mapping via ASM", e);
+            throw new AsmUnavailableException("Failed to update WaggleBot SFX mapping: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Stream a WaggleBot BGM sample file through ASM.
      * {@code path} must be a WB media path like {@code /api/media/bgm/...}.
      */

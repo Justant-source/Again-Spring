@@ -268,6 +268,19 @@ export async function fetchBgmSampleBlob(samplePath: string): Promise<Blob> {
   return res.data;
 }
 
+/**
+ * 효과음 미리듣기 바이트. `path` 는 매핑 카탈로그가 준 라이브러리 상대경로다
+ * (`_library/click/click_1109.wav` 또는 `hook_in.wav`).
+ * 소리를 들어보지 않고는 고를 수 없으므로 매핑 화면의 핵심 기능이다.
+ */
+export async function fetchSfxSampleBlob(path: string): Promise<Blob> {
+  const res = await api.get<Blob>('/api/admin/marketing/sfx/sample', {
+    params: { path },
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
 // ===== Marketing Analytics =====
 
 export interface PlatformStatsDto {
@@ -1144,6 +1157,41 @@ export function marketingHoldingThemeDeepLink(emotion?: string | null, category?
 export function themeProposalSuggestedBoost(p: MarketingThemeProposal): number | null {
   const v = p.suggestedBoost ?? p.boost;
   return v != null && Number.isFinite(v) ? Number(v) : null;
+}
+
+// ===== Sound Effects (SFX) Mapping =====
+
+export interface SfxEvent {
+  key: string;
+  file: string;
+  volume: number;
+  offset: number;
+}
+
+export interface SfxLibraryFile {
+  name: string;
+  path: string;
+}
+
+export interface SfxLibraryCategory {
+  category: string;
+  files: SfxLibraryFile[];
+}
+
+export interface SfxMapping {
+  events: SfxEvent[];
+  maxPerVideo: number;
+  library: SfxLibraryCategory[];
+}
+
+export async function getSfxMapping(): Promise<SfxMapping> {
+  const res = await api.get<SfxMapping>('/api/admin/marketing/sfx/mapping');
+  return res.data;
+}
+
+export async function putSfxMapping(body: { events: SfxEvent[]; maxPerVideo: number }): Promise<SfxMapping> {
+  const res = await api.put<SfxMapping>('/api/admin/marketing/sfx/mapping', body);
+  return res.data;
 }
 
 // ===== Holding board (marketing redesign) =====

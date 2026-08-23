@@ -513,6 +513,54 @@ public class AdminMarketingController {
         return asmClient.getWaggleBgmSample(path);
     }
 
+    // ===== WaggleBot SFX (sound effects mapping for video editing) =====
+
+    /**
+     * Get SFX mapping from WaggleBot (via ASM).
+     * Returns {@code { events:[{key,file,volume,offset},...], maxPerVideo:N, library:[...] }}.
+     */
+    @GetMapping("/sfx/mapping")
+    @Operation(summary = "Get SFX mapping", description = "와글봇 효과음 매핑 조회")
+    @ApiResponse(responseCode = "200", description = "SFX mapping returned")
+    public ResponseEntity<JsonNode> getSfxMapping() {
+        return ResponseEntity.ok(asmClient.getWaggleSfxMapping());
+    }
+
+    /**
+     * Update SFX mapping on WaggleBot (via ASM).
+     * Body: {@code { events:[{key,file,volume,offset},...], maxPerVideo:N }}.
+     */
+    @PutMapping("/sfx/mapping")
+    @Operation(summary = "Update SFX mapping", description = "와글봇 효과음 매핑 갱신")
+    @ApiResponse(responseCode = "200", description = "SFX mapping updated")
+    @Auditable(action = "UPDATE_MARKETING_SFX_MAPPING")
+    public ResponseEntity<JsonNode> updateSfxMapping(@RequestBody JsonNode body) {
+        return ResponseEntity.ok(asmClient.putWaggleSfxMapping(body));
+    }
+
+    /**
+     * Stream an SFX file for admin preview.
+     * {@code path} is the library-relative path from the mapping catalog
+     * (e.g. {@code _library/click/click_1109.wav} or {@code hook_in.wav}).
+     * 소리를 듣지 않고 고를 수는 없으므로 미리듣기는 매핑 화면의 핵심이다.
+     */
+    @GetMapping("/sfx/sample")
+    @Operation(summary = "Preview SFX file", description = "효과음 미리듣기 스트리밍")
+    public ResponseEntity<Resource> getSfxSample(@RequestParam("path") String path) {
+        if (!isAllowedSfxPath(path)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid SFX path");
+        }
+        return asmClient.getWaggleBgmSample("/api/media/sfx/" + path);
+    }
+
+    /** 라이브러리 안의 wav 만 허용한다 — 경로 탈출과 임의 파일 열람을 막는다. */
+    private static boolean isAllowedSfxPath(String path) {
+        if (path == null || path.isBlank() || path.contains("..") || path.startsWith("/")) {
+            return false;
+        }
+        return path.matches("(_library/[A-Za-z0-9_-]+/|_candidates/[A-Za-z0-9_-]+/)?[A-Za-z0-9_.-]+\\.wav");
+    }
+
     private static boolean isAllowedWaggleSamplePath(String path) {
         if (path == null || path.contains("..")) {
             return false;

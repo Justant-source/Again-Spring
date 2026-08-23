@@ -6,6 +6,7 @@ import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlatformCredentialsSection } from '@/components/admin/marketing/PlatformCredentialsSection';
 import { ShortformVideoSection } from '@/components/admin/marketing/ShortformVideoSection';
+import { SfxMappingSection } from '@/components/admin/marketing/SfxMappingSection';
 import { PlatformAutoSection } from '@/components/admin/marketing/PlatformAutoSection';
 import { HoldingControlsBar } from '@/components/admin/marketing/HoldingControlsBar';
 import { HoldingBoard } from '@/components/admin/marketing/HoldingBoard';
@@ -372,6 +373,9 @@ export default function MarketingJobsPage() {
           <PlatformAutoSection />
           <div className="border-t pt-6">
             <ShortformVideoSection />
+          </div>
+          <div className="border-t pt-6">
+            <SfxMappingSection />
           </div>
           <div className="border-t pt-6">
             <PlatformCredentialsSection />
