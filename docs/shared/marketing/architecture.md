@@ -23,19 +23,37 @@
 | `marketing_fast` | 현행 운영 중인 기본 프로필. 간편 레이아웃, BGM/SFX/전환 없음 | 활성 |
 | `marketing_v2` | 신규 v2 렌더. BGM(감정별 2곡, `assets/media/bgm/<emotion>/`) + SFX(7종 팔레트, `assets/media/sfx/<event>.wav`) + ffmpeg 전환(xfade) + 앱 크롬 제거(인트로 포함) + 투표 비율 바(실제 `empathy_ratio` 없으면 미표시) | Phase 3 기준선 수집 중, 사용자 승인 대기 |
 
-**SFX 팔레트 (역할별로 다른 소리 — 한 소리를 반복하면 금세 물린다)**
+**SFX 팔레트 — 삽입 지점 17개.** 음원·음량·오프셋은 **어드민 「설정 → 효과음 매핑」에서 직접 고른다**
+(`GET`/`PUT /api/admin/marketing/sfx/mapping` → ASM → WaggleBot `/api/sfx/mapping` → `settings.yaml`의 `sfx.active`).
 
-| 이벤트 | 붙는 자리 | 음량 |
-|---|---|---|
-| `hook_in` | 첫 화면 | 0.9 |
-| `page` | 본문 화면 전환마다 (첫 화면 제외 — `hook_in`과 겹침) | 0.30 |
-| `turn` | 시봄이 비트(`image_text`) | 0.8 |
-| `section_whoosh` | 본문 → 댓글 전환 | 0.7 |
-| `bubble` | 댓글 카드마다 | 0.8 |
-| `vote_fill` · `logo` | 아웃트로 | 0.7 · 0.6 |
+| 구분 | 이벤트 | 붙는 자리 | 영상당 |
+|---|---|---|---|
+| 씬 전환 | `hook_in` | 인트로 시작 | 1 |
+| | `intro_out` | 인트로 → 본문 첫 항목 | 1 |
+| | `page` | 본문 3줄마다 (화면이 비워지는 순간) | 2~3 |
+| | `card_in` | 본문 → 시봄이 카드(`image_text`) | 2~3 |
+| | `card_out` | 시봄이 카드 → 본문 | 2~3 |
+| | `section_whoosh` | 본문 → 댓글 | 1 |
+| | `bubble` | 댓글 카드마다 | 1~3 |
+| | `outro_in` | 댓글 → 아웃트로 | 1 |
+| 시봄이 | `sibom_punch` | 캐릭터 등장(24프레임 페이드인) | 2~3 |
+| | `motion_sway`·`sink`·`shake`·`pop`·`sob` | 카탈로그 `motion` 값으로 갈라짐 | 2~3 |
+| 화면 요소 | `text_line` | 본문 줄이 하나 나타날 때 — 가장 잦아 가장 낮은 음량 | 5~8 |
+| | `best_badge` | 추천 1위 댓글 배지 | 1 |
+| | `vote_fill` | ⚠️ 투표 바 — **렌더러에 그리는 코드가 없다.** 소리만 있고 그림이 없는 상태 | 1 |
 
-간격 규칙은 실제 재생 시각(이벤트별 `offset` 반영) 기준이며 `page`·`bubble`은 1.0초, 나머지는 2.5초다.
-영상당 상한은 `settings.yaml`의 `sfx.max_per_video`(현재 18)가 권위본이다.
+**같은 순간에 겹치는 소리는 오프셋으로 시간차를 준다.** 시봄이 카드 지점은
+`card_in`(착지) → `sibom_punch`(+0.25초, 캐릭터 등장) → `motion_*`(+0.95초, punch 24프레임이 끝난 뒤)
+순으로 벌려 하나의 연출처럼 들리게 했다. 댓글 구간도 `section_whoosh` → `bubble` → `best_badge` 로 벌린다.
+
+간격 규칙은 실제 재생 시각(오프셋 반영) 기준이다. `sfx.short_gap_events`에 적힌 이벤트는
+`short_gap_sec`(0.34초), 나머지는 `min_gap_sec`(2.0초). **오프셋이 실제 간격을 정하므로 규칙은 최소만 건다** —
+2.5초를 일괄 적용했을 때 일부러 겹쳐 배치한 소리가 통째로 버려졌다.
+영상당 상한은 `sfx.max_per_video`(현재 40)가 권위본이다.
+
+음원은 `assets/media/sfx/_library/<카테고리>/`에 Mixkit 262개(상업 사용 가능·표기 불필요).
+`file` 값은 `assets/media/sfx/` 기준 상대경로이고 하위 경로도 그대로 해석된다(`_resolve_sfx_path`).
+**`assets/`는 gitignore라 음원 파일은 git에 없다** — 출처 URL은 `assets/media/sfx/LICENSES.md`에 기록.
 BGM은 `volume=0.40` + 사이드체인 더킹(`threshold=0.10 ratio=4`)으로 목소리보다 약 14dB 아래에 깔린다.
 BGM 곡은 어드민 설정에서 직접 고를 수 있고(`shortform_video` 자격증명 `bgm_track`), 비우면 `hook_emotion`으로 자동 선택된다.
 

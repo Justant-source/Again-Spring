@@ -144,6 +144,24 @@ Authorization: Bearer <admin-jwt>
 감정 5종(`shock`·`anger`·`tension`·`sad`·`hype`) × 2곡. `path`가 곧 선택값이자 미리듣기 경로이며,
 그대로 `variant_config.bgm_track`으로 저장된다. `sample`은 `/api/media/bgm/` 접두만 허용.
 
+### 1.5.3 WaggleBot 효과음 매핑 (숏폼영상 설정)
+
+> 삽입 지점 17개에 음원·음량·오프셋을 지정한다. 권위본은 WaggleBot 렌더러 설정(`settings.yaml`의 `sfx.active`)이며
+> AS → ASM → WaggleBot `/api/sfx/mapping` 으로 프록시한다. 지점 목록과 성격: `architecture.md`.
+
+```
+GET /api/admin/marketing/sfx/mapping
+PUT /api/admin/marketing/sfx/mapping     body: { events:[{key,file,volume,offset}], maxPerVideo }
+GET /api/admin/marketing/sfx/sample?path=_library/click/click_1109.wav
+Authorization: Bearer <admin-jwt>
+```
+
+**mapping 200** — `{ events:[{key,file,volume,offset}], maxPerVideo, library:[{category,files:[{name,path}]}] }`
+`file`·`path`는 `assets/media/sfx/` 기준 상대경로(`_library/<카테고리>/<파일>.wav` 또는 파일명).
+**PUT은 `sfx.active`를 통째로 교체한다** — 보내지 않은 이벤트는 사라진다.
+검증: 키 `[a-z_]{2,32}` · 경로 탈출 차단 · 실제 파일 존재 · `volume` 0~1.5 · `offset` −5~10. 위반 시 400.
+`sample`은 라이브러리 안의 `.wav`만 허용하며, 어드민 인증이 걸린 스트림이라 FE는 blob으로 받아 재생한다.
+
 ---
 
 ### 1.6 실패 잡 일괄 재구동
