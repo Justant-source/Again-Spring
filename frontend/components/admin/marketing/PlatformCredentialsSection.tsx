@@ -21,6 +21,7 @@ import {
   listTtsVoices,
   fetchTtsVoiceSampleBlob,
   listBgmTracks,
+  setBgmEnabled,
   fetchBgmSampleBlob,
   PlatformCredentialStatus,
   TtsVoice,
@@ -832,6 +833,9 @@ export interface BgmTrackPickerProps {
 
 export function BgmTrackPicker({ value, onChange }: BgmTrackPickerProps) {
   const [tracks, setTracks] = useState<BgmTrack[]>([]);
+  // 전역 스위치. 끄면 어떤 렌더에도 BGM 이 들어가지 않는다 — 고른 곡은 그대로 남는다.
+  const [enabled, setEnabled] = useState(true);
+  const [toggling, setToggling] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -860,6 +864,7 @@ export function BgmTrackPicker({ value, onChange }: BgmTrackPickerProps) {
         const catalog = await listBgmTracks();
         if (cancelled) return;
         setTracks(catalog.tracks ?? []);
+        setEnabled(catalog.enabled !== false);
       } catch (err: unknown) {
         if (!cancelled) setError(`배경음악 목록을 불러오지 못했습니다: ${extractError(err)}`);
       } finally {
@@ -930,13 +935,41 @@ export function BgmTrackPicker({ value, onChange }: BgmTrackPickerProps) {
 
   return (
     <div className="rounded border border-gray-200 bg-gray-50 p-3">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between gap-3">
         <span className="text-sm font-medium text-gray-700">배경음악 (BGM)</span>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-600">
+          <input
+            type="checkbox"
+            className="accent-[#5F8F76]"
+            checked={enabled}
+            disabled={toggling}
+            onChange={async (e) => {
+              const next = e.target.checked;
+              setToggling(true);
+              setPreviewError(null);
+              try {
+                const r = await setBgmEnabled(next);
+                setEnabled(r.enabled);
+              } catch (err: unknown) {
+                setPreviewError(`배경음악 설정을 바꾸지 못했습니다: ${extractError(err)}`);
+              } finally {
+                setToggling(false);
+              }
+            }}
+          />
+          {enabled ? '영상에 사용' : '사용 안 함 (전체 렌더에서 제외)'}
+        </label>
       </div>
       <p className="mb-3 text-xs text-gray-500">
         영상에 사용할 배경음악을 감정별로 선택합니다. 미리듣기로 확인한 뒤 선택하세요.
         고르지 않으면 사연의 후킹 감정에 맞춰 자동으로 골라집니다.
       </p>
+      {!enabled && (
+        <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          지금은 배경음악이 <b>모든 렌더에서 제외</b>됩니다. 아래에서 곡을 고르면 저장은 되지만
+          영상에는 들어가지 않습니다. 위 체크를 켜면 고른 곡 그대로 다시 적용됩니다.
+        </div>
+      )}
       {loading ? (
         <div className="py-3 text-center text-xs text-gray-400">배경음악 목록 로드 중…</div>
       ) : error ? (

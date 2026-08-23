@@ -196,6 +196,19 @@ export function SfxMappingSection() {
             숏폼 영상의 각 지점별로 효과음을 지정합니다. 음원은 오른쪽 라이브러리에서 선택하고,
             음량과 시간 오프셋을 조절할 수 있습니다.
           </p>
+          {/* 지점별 실제 렌더 화면을 나란히 놓고 고르는 별도 화면.
+              사내망(Tailscale) 주소라 새 탭으로 연다. */}
+          <a
+            href="http://100.115.252.61:8080/api/media/sfx-picker.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[#C9785A] underline underline-offset-2 hover:text-[#B5674B]"
+          >
+            지점별 화면 보며 고르기 ↗
+          </a>
+          <p className="mt-1 text-xs text-gray-400">
+            각 지점의 실제 렌더 프레임을 보면서 음원을 비교할 수 있습니다. 사내망에서만 열립니다.
+          </p>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
           {loading ? '로드 중…' : '새로고침'}

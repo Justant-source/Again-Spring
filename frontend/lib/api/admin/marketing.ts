@@ -249,10 +249,21 @@ export interface BgmTrack {
 
 export interface BgmCatalog {
   tracks: BgmTrack[];
+  /** 배경음악 전역 사용 여부. false 면 어떤 렌더에도 BGM 이 들어가지 않는다. */
+  enabled?: boolean;
 }
 
 export async function listBgmTracks(): Promise<BgmCatalog> {
   const res = await api.get<BgmCatalog>('/api/admin/marketing/bgm/tracks');
+  return res.data;
+}
+
+/**
+ * 배경음악 전역 on/off. 곡을 고르는 기능은 그대로 두고 렌더 반영만 막는 스위치라,
+ * 껐다가 다시 켜도 고른 곡은 그대로 남는다.
+ */
+export async function setBgmEnabled(enabled: boolean): Promise<{ enabled: boolean }> {
+  const res = await api.put<{ enabled: boolean }>('/api/admin/marketing/bgm/settings', { enabled });
   return res.data;
 }
 

@@ -513,6 +513,16 @@ public class AdminMarketingController {
         return asmClient.getWaggleBgmSample(path);
     }
 
+    /**
+     * 배경음악 전역 on/off. 고르는 기능은 그대로 두고 렌더 반영만 막는다.
+     */
+    @PutMapping("/bgm/settings")
+    @Operation(summary = "Toggle BGM globally", description = "배경음악 전역 사용 여부")
+    @Auditable(action = "UPDATE_MARKETING_BGM_SETTINGS")
+    public ResponseEntity<JsonNode> updateBgmSettings(@RequestBody JsonNode body) {
+        return ResponseEntity.ok(asmClient.putWaggleBgmSettings(body));
+    }
+
     // ===== WaggleBot SFX (sound effects mapping for video editing) =====
 
     /**

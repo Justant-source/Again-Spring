@@ -316,6 +316,27 @@ public class AsmClient {
     }
 
     /**
+     * 배경음악 전역 사용 여부를 바꾼다. false 면 어떤 렌더에도 BGM 이 들어가지 않는다.
+     * 고르는 기능(카탈로그·잡별 bgmTrack)은 그대로 두고 소비만 막는 스위치다.
+     */
+    public JsonNode putWaggleBgmSettings(JsonNode body) {
+        try {
+            return restClient
+                .put()
+                .uri("/api/v1/waggle/bgm/settings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            log.error("Failed to update WaggleBot BGM settings via ASM", e);
+            throw new AsmUnavailableException("Failed to update BGM settings: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Stream a WaggleBot BGM sample file through ASM.
      * {@code path} must be a WB media path like {@code /api/media/bgm/...}.
      */
