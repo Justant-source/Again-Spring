@@ -68,6 +68,10 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-againspring2026@gmail.com}
       ASM_BASE_URL: ${ASM_BASE_URL:-}
       ASM_ENABLED: ${ASM_ENABLED:-false}
+      # 숏폼 렌더 프로필. marketing_v2 = 새 레이아웃 + 효과음.
+      # 이 줄이 없으면 .env 값이 컨테이너에 전달되지 않아 코드 기본값
+      # (marketing_fast)이 쓰인다 — 효과음이 통째로 빠지는 원인이었다.
+      MARKETING_RENDER_PROFILE: ${MARKETING_RENDER_PROFILE:-marketing_fast}
       ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED: ${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:-false}
       # ISO-8601 Instant. Required when trigger is on — only posts created at/after this get 24h auto-publish.
       ASM_AUTO_PUBLISH_SINCE: ${ASM_AUTO_PUBLISH_SINCE:-}
