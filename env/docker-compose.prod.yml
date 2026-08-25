@@ -72,6 +72,10 @@ services:
       # 이 줄이 없으면 .env 값이 컨테이너에 전달되지 않아 코드 기본값
       # (marketing_fast)이 쓰인다 — 효과음이 통째로 빠지는 원인이었다.
       MARKETING_RENDER_PROFILE: ${MARKETING_RENDER_PROFILE:-marketing_fast}
+      # 24h 홀딩 풀 적재 스케줄러. 이게 꺼져 있으면 어드민이 「대기」 탭을
+      # 열어야만 새 사연이 풀에 들어가고, 열지 않은 날은 영상 잡이 0건이 된다.
+      # 무인 스케줄러라 코드 기본값은 false — 켜는 곳에서 명시한다.
+      MARKETING_HOLDING_POOL_REFRESH_ENABLED: ${MARKETING_HOLDING_POOL_REFRESH_ENABLED:-false}
       ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED: ${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:-false}
       # ISO-8601 Instant. Required when trigger is on — only posts created at/after this get 24h auto-publish.
       ASM_AUTO_PUBLISH_SINCE: ${ASM_AUTO_PUBLISH_SINCE:-}
