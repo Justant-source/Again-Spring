@@ -352,10 +352,13 @@ public class VideoVariantService {
         Instant startedAt = Instant.now();
         ChannelResult llm = ChannelResult.empty(enabled ? "PARSE_ERROR" : "LLM_DISABLED");
         String errorMessage = null;
+        String raw = null;
+        String promptText = null;
         if (enabled) {
             try {
-                String raw = llmProvider.invoke(buildChannelPrompt(
-                        masterHook, hookEmotion, title, body, channel, sibomCandidates, correction), model);
+                promptText = buildChannelPrompt(
+                        masterHook, hookEmotion, title, body, channel, sibomCandidates, correction);
+                raw = llmProvider.invoke(promptText, model);
                 if (looksLikeLlmError(raw)) {
                     errorMessage = clamp(raw, 200);
                     llm = ChannelResult.empty(isTransientLlmFailureMessage(errorMessage)
@@ -380,7 +383,8 @@ public class VideoVariantService {
         int scriptMax = channel == SibomPlanGuard.Channel.REELS ? SCRIPT_REELS_MAX : SCRIPT_SHORTS_MAX;
         String hook = sanitizeHook(llm.hook(), masterHook, title);
         String script = sanitizeScript(llm.script(), body, scriptMax);
-        List<SibomPlanItem> plan = SibomPlanGuard.guard(llm.sibomPlan(), channel);
+        SibomPlanGuard.GuardResult guardResult = SibomPlanGuard.guardWithLog(llm.sibomPlan(), channel);
+        List<SibomPlanItem> plan = guardResult.items();
         // Neither the LLM candidate nor the raw-body fallback fit a sentence boundary —
         // more specific than the underlying LLM status so validateRequiredSibomPlans and
         // the correction retry can react to it (2026-08-16).
@@ -394,6 +398,13 @@ public class VideoVariantService {
         if (errorMessage != null) {
             attempt.put("error", clamp(errorMessage, 200));
         }
+        attempt.put("model", model);
+        attempt.put("prompt", promptText);
+        if (raw != null) {
+            attempt.put("response", raw);
+        }
+        attempt.put("sibom_plan_llm", llm.sibomPlan());
+        attempt.put("guard_log", guardResult.log());
         attempts.add(Map.copyOf(attempt));
         return new ChannelResult(hook, script, plan, effectiveStatus, Map.of());
     }

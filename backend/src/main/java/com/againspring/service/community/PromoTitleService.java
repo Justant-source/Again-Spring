@@ -1,9 +1,11 @@
 package com.againspring.service.community;
 
 import com.againspring.domain.community.Post;
+import com.againspring.domain.marketing.MarketingGenerationTrace;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.PromptSanitizer;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.repository.marketing.MarketingGenerationTraceRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -52,11 +54,15 @@ public class PromoTitleService {
     /** LLM/정규화 결과. emotion은 검증 실패 시 null. */
     public record HookResult(String promoTitle, String hookEmotion) {}
 
+    /** Traced LLM result with prompt, response, model, and timing. */
+    private record TracedResult(HookResult result, String prompt, String rawResponse, String llmModel, String llmResultStatus, long durationMs) {}
+
     @Qualifier("remoteLlmProvider")
     private final LLMProvider llmProvider;
     private final PromptSanitizer promptSanitizer;
     private final PostRepository postRepository;
     private final ObjectMapper objectMapper;
+    private final MarketingGenerationTraceRepository generationTraceRepository;
 
     @Value("${llm.model:claude-haiku-4-5-20251001}")
     private String model;
@@ -116,7 +122,8 @@ public class PromoTitleService {
                 : post.getBodyRaw();
         if (body == null) body = "";
 
-        HookResult generated = generate(title, body);
+        TracedResult traced = generateTraced(title, body);
+        HookResult generated = traced.result();
         String promo;
         String emotion;
         if (generated == null || generated.promoTitle() == null || generated.promoTitle().isBlank()) {
@@ -137,21 +144,54 @@ public class PromoTitleService {
         }
         log.info("PromoTitle saved for {}: '{}' emotion={}",
                 postId, promo.replace("\n", "\\n"), emotion);
+
+        // Save trace record
+        try {
+            MarketingGenerationTrace trace = MarketingGenerationTrace.builder()
+                    .postId(postId)
+                    .platform("promo_title")
+                    .stage("PROMO_TITLE")
+                    .llmModel(traced.llmModel())
+                    .llmPrompt(traced.prompt())
+                    .llmResponse(traced.rawResponse())
+                    .llmResult(traced.llmResultStatus())
+                    .llmDurationMs(traced.durationMs())
+                    .finalHook(promo)
+                    .build();
+            generationTraceRepository.save(trace);
+        } catch (Exception e) {
+            log.warn("PromoTitle trace save failed for {}: {}", postId, e.getMessage());
+        }
+    }
+
+    /**
+     * LLM으로 마스터 훅+감정 생성, 프롬프트/응답/타이밍 기록.
+     * 실패 시도 trace 구조 반환 (result는 null, status는 오류 코드).
+     */
+    private TracedResult generateTraced(String title, String body) {
+        String prompt = buildPrompt(title, body);
+        if (!enabled) {
+            return new TracedResult(null, prompt, null, model, "LLM_DISABLED", 0);
+        }
+        long start = System.currentTimeMillis();
+        try {
+            String raw = llmProvider.invoke(prompt, model);
+            long dur = System.currentTimeMillis() - start;
+            HookResult parsed = parseResult(raw);
+            String status = (parsed == null || parsed.promoTitle() == null || parsed.promoTitle().isBlank()) ? "PARSE_ERROR" : "OK";
+            return new TracedResult(parsed, prompt, raw, model, status, dur);
+        } catch (Exception e) {
+            long dur = System.currentTimeMillis() - start;
+            log.warn("PromoTitle LLM failed: {}", e.getMessage());
+            return new TracedResult(null, prompt, null, model, "LLM_ERROR", dur);
+        }
     }
 
     /**
      * LLM으로 마스터 훅+감정 생성. 실패 시 null.
      */
     public HookResult generate(String title, String body) {
-        if (!enabled) return null;
-        try {
-            String prompt = buildPrompt(title, body);
-            String result = llmProvider.invoke(prompt, model);
-            return parseResult(result);
-        } catch (Exception e) {
-            log.warn("PromoTitle LLM failed: {}", e.getMessage());
-            return null;
-        }
+        return generateTraced(title, body).result();
     }
 
     /** @deprecated prefer {@link #generate(String, String)} */

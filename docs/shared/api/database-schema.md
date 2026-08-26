@@ -146,6 +146,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `encrypted_secret` | 앱 시크릿 AES-GCM vault (마케팅 제외) | `secret_key` VARCHAR(128) **V101** |
 | `marketing_holding` | 마케팅 대기 보드 (초안·순위 스냅샷) | `post_id` VARCHAR(32) PK **V102** |
 | `marketing_job` | ASM 마케팅 잡 | BIGINT auto · `requested_by` VARCHAR(128) · 품질 진단/재생성 추적 **V115** · 구조화 실패 계약 **V116** · `scheduled_publish_at` NOT NULL **V117** |
+| `marketing_generation_trace` | LLM 생성 기록 (프롬프트·응답·시봄이 선택) | BIGINT auto **V119** |
 | `marketing_publication_stats` | 플랫폼 참여 스냅샷 (X/IG/YT best-effort) | BIGINT auto **V110** |
 | `marketing_stats_event` | 통계 탭 활동 타임라인 (수집·제안·확정) | BIGINT auto **V111** |
 
@@ -481,6 +482,38 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V116** | `marketing_job.failure_stage`, `retryable`, `error_summary` — ASM/WaggleBot의 구조화 실패 단계·재시도 가능 여부·정제된 운영자 요약 |
 | **V114** | `marketing_holding.platform_rank_snapshot` JSON — T+24h 자동 선정의 실제 플랫폼별 순위 잠금 |
 | **V117** | `marketing_job.scheduled_publish_at` **NOT NULL** 승격(2026-08-15) — 슬롯 조회 실패 시 폴백 로직으로 항상 값을 채우도록 코드가 먼저 바뀐 뒤 승격. 잔여 NULL 행은 `created_at`으로 백필 |
+| **V119** | `marketing_generation_trace` — 영상 변형 단계에서 LLM 호출·시봄이 선택 이력 저장(프롬프트·응답·가드 로그 포함). **사연 본문은 30일 후 NULL이지만 trace에 영구 보관** |
+
+### `marketing_generation_trace` (**V119**)
+
+Video variant 및 promo title 생성 시 LLM 프롬프트·응답·시봄이 가드 로직을 감사·디버깅 목적으로 저장.
+Phase 1 = VIDEO_VARIANT 스테이지(instagram_reels/youtube_shorts). Phase 2+ 향후 PROMO_TITLE, WaggleBot 이펙트음 확장 예정.
+
+**데이터 보존 정책**: 사연 `posts.content`는 30일 후 NULL 처리되지만, 이 테이블의 `llm_prompt`에 본문이 포함되어 있어 사실상 **사연 본문은 영구 보관된다**. 오너(마케팅팀)가 LLM 호출 원문 추적을 목적으로 명시적으로 이를 선택했으므로 의도된 동작이다. 민감한 콘텐츠 관리 필요 시 별도 보존 정책 재검토.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `job_id` | BIGINT FK | marketing_job.id, ON DELETE CASCADE |
+| `post_id` | VARCHAR(32) FK | posts.id |
+| `platform` | VARCHAR(32) NOT NULL | `instagram_reels` \| `youtube_shorts` |
+| `stage` | VARCHAR(32) NOT NULL | `VIDEO_VARIANT` \| `PROMO_TITLE` (향후) |
+| `render_profile` | VARCHAR(64) | 마케팅 렌더 프로필 (`marketing_fast`, `marketing_v2` 등) |
+| `llm_model` | VARCHAR(64) | `claude-haiku-4-5-20251001` 등. 재시도 후 폴백 모델명 가능 |
+| `llm_prompt` | LONGTEXT | LLM 호출 시 전송된 완전 프롬프트(**사연 본문 포함, 영구 보관**) |
+| `llm_response` | LONGTEXT | LLM 응답 원문 (파싱 전) |
+| `llm_attempt` | INT | 시도 번호 (1기반, 재시도 후 증가) |
+| `llm_result` | VARCHAR(64) | 결과 코드 (`OK`, `PARSE_ERROR`, `TRUNCATED_JSON`, `LLM_ERROR`, `TIMEOUT` 등) |
+| `llm_duration_ms` | BIGINT | LLM 호출 소요 시간 (밀리초) |
+| `final_hook` | VARCHAR(1000) | 최종 hook 문구 (TTS 마지막 가드 통과 후) |
+| `final_script` | LONGTEXT | 최종 영상 대본 (TTS 입력) |
+| `sibom_scores` | JSON | 시봄이 후보 점수 리스트 — `ScoredCandidate[]`: `{id, score, matchedKeywords, matchedTriggers}` |
+| `sibom_plan_llm` | JSON | LLM 생성 원안 시봄이 플랜 — 가드 전 |
+| `sibom_plan_final` | JSON | 가드 통과 후 최종 시봄이 플랜(렌더링 입력) |
+| `sibom_guard_log` | JSON | 가드 실행 로그 — `GuardLogEntry[]`: `{action, imageId, reason}` |
+| `created_at` | TIMESTAMP(3) | |
+
+인덱스: `idx_mgt_job_id(job_id)`, `idx_mgt_platform_stage(platform, stage)`.
 
 ### `marketing_stats_event` (**V111**)
 

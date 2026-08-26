@@ -3,6 +3,7 @@ package com.againspring.marketing;
 import com.againspring.domain.community.Post;
 import com.againspring.domain.community.PostComment;
 import com.againspring.domain.community.VoteOption;
+import com.againspring.domain.marketing.MarketingGenerationTrace;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.marketing.dto.CreateJobRequest;
@@ -63,6 +64,8 @@ public class MarketingJobService {
     private final VideoVariantService videoVariantService;
     private final TelegramNotifier telegramNotifier;
     private final MarketingLlmAuthGuard llmAuthGuard;
+    private final com.againspring.repository.marketing.MarketingGenerationTraceRepository generationTraceRepository;
+    private final com.againspring.service.community.SibomCandidateService sibomCandidateService;
 
     /**
      * 기본 렌더 프로필. Spring 컨텍스트에서는 {@code @Value}가 덮어쓰지만, 필드 이니셜라이저를
@@ -311,6 +314,11 @@ public class MarketingJobService {
         if (needReels || needShorts) {
             savedJob.setGenerationDiagnostics(serializeJson(qualityGate.diagnostics()));
         }
+
+        // Save generation trace for diagnostic audit
+        saveGenerationTrace(savedJob, postId, "instagram_reels", needReels, variants, resolvedRenderProfile, storyTitle, authorBodyFull);
+        saveGenerationTrace(savedJob, postId, "youtube_shorts", needShorts, variants, resolvedRenderProfile, storyTitle, authorBodyFull);
+
         Integer maxDurationSec = null;
         if (needReels && !needShorts) {
             maxDurationSec = variants.maxDurationReelsSec() != null
@@ -1294,6 +1302,52 @@ public class MarketingJobService {
         } catch (JsonProcessingException e) {
             log.warn("Failed to serialize object to JSON", e);
             return null;
+        }
+    }
+
+    /**
+     * Save generation trace from variant diagnostics for audit and debugging.
+     * Captures LLM prompts, responses, and sibom selection logic per platform/attempt.
+     * Failures are logged but do not block job publishing.
+     */
+    @SuppressWarnings("unchecked")
+    private void saveGenerationTrace(MarketingJob job, String postId, String platform, boolean requested,
+                                     VideoVariantService.Variants variants, String renderProfile,
+                                     String title, String body) {
+        if (!requested) return;
+        try {
+            Map<String, Object> channelDiag = (Map<String, Object>) variants.generationDiagnostics().get(platform);
+            if (channelDiag == null) return;
+            List<Map<String, Object>> attempts = (List<Map<String, Object>>) channelDiag.get("attempts");
+            Map<String, Object> resolved = (attempts != null && !attempts.isEmpty())
+                ? attempts.get(attempts.size() - 1) : Map.of();
+
+            List<com.againspring.service.community.SibomCandidateService.ScoredCandidate> scored =
+                sibomCandidateService.scoreDetailed(body, title);
+
+            boolean isReels = "instagram_reels".equals(platform);
+            MarketingGenerationTrace trace = MarketingGenerationTrace.builder()
+                .jobId(job.getId())
+                .postId(postId)
+                .platform(platform)
+                .stage("VIDEO_VARIANT")
+                .renderProfile(renderProfile)
+                .llmModel((String) resolved.get("model"))
+                .llmPrompt((String) resolved.get("prompt"))
+                .llmResponse((String) resolved.get("response"))
+                .llmAttempt(resolved.get("attempt") instanceof Integer i ? i : null)
+                .llmResult((String) resolved.get("result"))
+                .llmDurationMs(resolved.get("duration_ms") instanceof Number n ? n.longValue() : null)
+                .finalHook(isReels ? variants.hookReels() : variants.hookShorts())
+                .finalScript(isReels ? variants.scriptReels() : variants.scriptShorts())
+                .sibomScores(serializeJson(scored))
+                .sibomPlanLlm(serializeJson(resolved.get("sibom_plan_llm")))
+                .sibomPlanFinal(serializeJson(isReels ? variants.sibomPlanReels() : variants.sibomPlanShorts()))
+                .sibomGuardLog(serializeJson(resolved.get("guard_log")))
+                .build();
+            generationTraceRepository.save(trace);
+        } catch (Exception e) {
+            log.warn("Marketing generation trace save failed (job={}, platform={}): {}", job.getId(), platform, e.getMessage());
         }
     }
 

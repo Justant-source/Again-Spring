@@ -15,6 +15,16 @@ import java.util.Set;
 public final class SibomPlanGuard {
 
     /**
+     * Single audit log entry: action, image_id, and reason text.
+     */
+    public record GuardLogEntry(String action, String imageId, String reason) {}
+
+    /**
+     * Result of guarding with audit trail.
+     */
+    public record GuardResult(List<SibomPlanItem> items, List<GuardLogEntry> log) {}
+
+    /**
      * Soft-fill pool (§4.3). Catalog ids only; situation-specific cuts forbidden.
      * Expanded 7→14 for the 60-image catalog (2026-08-22): every entry is people()==1
      * and each occupies a distinct swap_group, so a single top-up pass (topUpWithSoftFill)
@@ -75,30 +85,43 @@ public final class SibomPlanGuard {
     /**
      * Apply §5.2 entry normalization. After soft-fill auto-top-up, callers must fail the video quality gate
      * when the result is empty or below the channel minimum; text-only and metaphor fallbacks are forbidden.
+     *
+     * Delegates to {@link #guardWithLog(List, Channel)} and returns items only.
      */
     public static List<SibomPlanItem> guard(List<SibomPlanItem> raw, Channel channel) {
+        return guardWithLog(raw, channel).items();
+    }
+
+    /**
+     * Guard with audit trail. Like {@link #guard(List, Channel)} but includes log entries
+     * documenting each normalization, deduplication, promotion/demotion, and trim decision.
+     */
+    public static GuardResult guardWithLog(List<SibomPlanItem> raw, Channel channel) {
         if (raw == null || raw.isEmpty() || channel == null) {
-            return List.of();
+            return new GuardResult(List.of(), List.of());
         }
 
+        List<GuardLogEntry> log = new ArrayList<>();
         List<SibomPlanItem> working = new ArrayList<>();
         for (SibomPlanItem item : raw) {
             SibomPlanItem fixed = normalizeAndValidate(item);
             if (fixed != null) {
                 working.add(fixed);
+            } else if (item != null && blankToNull(item.imageId()) != null) {
+                log.add(new GuardLogEntry("normalize_drop", item.imageId(), "unknown or invalid image_id"));
             }
         }
 
-        working = dedupeIdAndSwapGroup(working);
-        working = applyPeakPositionGuards(working);
-        working = topUpWithSoftFill(working, channel);
-        working = trimToBudget(working, channel.maxSlots());
+        working = dedupeIdAndSwapGroup(working, log);
+        working = applyPeakPositionGuards(working, log);
+        working = topUpWithSoftFill(working, channel, log);
+        working = trimToBudget(working, channel.maxSlots(), log);
 
         List<SibomPlanItem> out = new ArrayList<>(working.size());
         for (SibomPlanItem item : working) {
             out.add(normalizeSizeDwell(item));
         }
-        return List.copyOf(out);
+        return new GuardResult(List.copyOf(out), List.copyOf(log));
     }
 
     private static SibomPlanItem normalizeAndValidate(SibomPlanItem item) {
@@ -178,15 +201,21 @@ public final class SibomPlanGuard {
     }
 
     /** §5.2.5 keep first occurrence of each image_id and each swap_group. */
-    static List<SibomPlanItem> dedupeIdAndSwapGroup(List<SibomPlanItem> items) {
+    static List<SibomPlanItem> dedupeIdAndSwapGroup(List<SibomPlanItem> items, List<GuardLogEntry> log) {
         Set<String> seenIds = new HashSet<>();
         Set<String> seenGroups = new HashSet<>();
         List<SibomPlanItem> out = new ArrayList<>();
         for (SibomPlanItem item : items) {
             String id = item.imageId();
-            if (!seenIds.add(id)) continue;
+            if (!seenIds.add(id)) {
+                log.add(new GuardLogEntry("dedup_id", id, "duplicate image_id — kept first occurrence"));
+                continue;
+            }
             String group = SibomCatalog.get(id).map(SibomCatalog.Entry::swapGroup).orElse("");
-            if (!group.isEmpty() && !seenGroups.add(group)) continue;
+            if (!group.isEmpty() && !seenGroups.add(group)) {
+                log.add(new GuardLogEntry("dedup_swap_group", id, "duplicate swap_group '" + group + "' — kept first"));
+                continue;
+            }
             out.add(item);
         }
         return out;
@@ -206,7 +235,7 @@ public final class SibomPlanGuard {
      *   <li>If pool exhausted, return as-is without exception</li>
      * </ul>
      */
-    static List<SibomPlanItem> topUpWithSoftFill(List<SibomPlanItem> items, Channel channel) {
+    static List<SibomPlanItem> topUpWithSoftFill(List<SibomPlanItem> items, Channel channel, List<GuardLogEntry> log) {
         if (items.size() >= channel.minSlots()) {
             return items;
         }
@@ -248,6 +277,7 @@ public final class SibomPlanGuard {
                 }
                 // Found valid candidate
                 filled = new SibomPlanItem("soft_fill", candidateId, entry.caption() != null ? entry.caption() : "", maxBeat + 1, "small", "punch");
+                log.add(new GuardLogEntry("soft_fill_added", candidateId, "top-up to " + channel.minSlots() + " items"));
                 usedIds.add(candidateId);
                 if (group != null && !group.isEmpty()) {
                     usedGroups.add(group);
@@ -272,7 +302,7 @@ public final class SibomPlanGuard {
      *   <li>2nd+ peak kept only if resolution arc and in the later half; else demote to punch</li>
      * </ul>
      */
-    static List<SibomPlanItem> applyPeakPositionGuards(List<SibomPlanItem> items) {
+    static List<SibomPlanItem> applyPeakPositionGuards(List<SibomPlanItem> items, List<GuardLogEntry> log) {
         if (items.isEmpty()) return items;
 
         int maxBeat = 0;
@@ -295,6 +325,7 @@ public final class SibomPlanGuard {
             int beat = item.beatIndex() != null ? item.beatIndex() : 0;
             if (peakOrdinal == 1) {
                 if (maxBeat > 0 && beat < earlyCutoff) {
+                    log.add(new GuardLogEntry("peak_too_early", item.imageId(), "beat " + beat + " < cutoff " + earlyCutoff));
                     out.add(item.withRole("punch"));
                 } else {
                     out.add(item);
@@ -305,6 +336,8 @@ public final class SibomPlanGuard {
                 if (resolution && beat >= lateCutoff) {
                     out.add(item);
                 } else {
+                    String reason = !resolution ? "arc='" + arc + "' (not resolution)" : "beat " + beat + " < cutoff " + lateCutoff;
+                    log.add(new GuardLogEntry("peak_not_resolution", item.imageId(), reason));
                     out.add(item.withRole("punch"));
                 }
             }
@@ -315,16 +348,18 @@ public final class SibomPlanGuard {
     /**
      * §5.2.3 over budget → drop punch/soft_fill from the end first; keep intro/peak longer.
      */
-    static List<SibomPlanItem> trimToBudget(List<SibomPlanItem> items, int max) {
+    static List<SibomPlanItem> trimToBudget(List<SibomPlanItem> items, int max, List<GuardLogEntry> log) {
         if (items.size() <= max) return items;
         List<SibomPlanItem> mutable = new ArrayList<>(items);
         while (mutable.size() > max) {
             int dropIdx = indexOfLastRemovable(mutable);
+            SibomPlanItem dropped;
             if (dropIdx < 0) {
-                mutable.remove(mutable.size() - 1);
+                dropped = mutable.remove(mutable.size() - 1);
             } else {
-                mutable.remove(dropIdx);
+                dropped = mutable.remove(dropIdx);
             }
+            log.add(new GuardLogEntry("budget_trim", dropped.imageId(), "over budget (max " + max + ")"));
         }
         return mutable;
     }

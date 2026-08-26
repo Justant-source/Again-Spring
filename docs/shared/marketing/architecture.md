@@ -236,6 +236,30 @@ AS 어드민: 폴링 재조정 (15초, STALE 상태 지수 백오프)
 
 ---
 
+## 생성 기록 수집 (V118)
+
+마케팅 영상 변형 단계에서 LLM 호출의 프롬프트·응답·시봄이 가드 로직을 감사 및 디버깅 목적으로 저장합니다.
+
+| Phase | 스테이지 | 채널 | 기록 내용 |
+|---|---|---|---|
+| **Phase 1** | `VIDEO_VARIANT` | instagram_reels, youtube_shorts | LLM 훅/스크립트 생성 호출, 최종 시봄이 플랜, guard_log |
+| Phase 2 (향후) | `PROMO_TITLE` | x_thread 등 | 프로모 훅 생성 호출 |
+| Phase 3 (향후) | 효과음/배치 확장 | WaggleBot 채널 | 음향 설정·시봄이 애니메이션 선택 이력 |
+
+**테이블**: `marketing_generation_trace` (V118, `backend/src/main/resources/db/migration/V118__add_generation_trace.sql`)
+
+각 trace는:
+- `llm_prompt` (LONGTEXT): 전송된 완전 프롬프트 — **사연 본문 포함, 영구 보관** (posts.content는 30일 후 NULL)
+- `llm_response` (LONGTEXT): LLM 원응답 (파싱 전)
+- `llm_model`, `llm_attempt`, `llm_result`, `llm_duration_ms`: 시도 메타데이터
+- `sibom_plan_llm`, `sibom_plan_final`: 시봄이 가드 전/후 플랜
+- `sibom_guard_log` (JSON): 가드 실행 로그 (`[{action, imageId, reason}, ...]`)
+- `final_hook`, `final_script`: TTS 입력 직전 최종 버전
+
+**가드 로직**은 코드 전용 (외부 3rd-party LLM 미사용) — WaggleBot이 guard와 동시에 렌더를 시작하므로, 생성 완료 후 저장은 비블로킹 시도(실패 시 로그만 남김).
+
+---
+
 ## DB 스키마 (V115)
 
 ```sql
