@@ -64,6 +64,9 @@ public class MarketingQuotaService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+    /** 쿼터를 세는 창의 길이(시간). 발행 후 이 시간이 지나면 자리 하나가 돌아온다. */
+    private static final int QUOTA_WINDOW_HOURS = 24;
+
     private final SystemSettingRepository systemSettingRepository;
     private final MarketingHoldingRepository holdingRepository;
     private final MarketingJobRepository jobRepository;
@@ -158,9 +161,24 @@ public class MarketingQuotaService {
         return LocalDate.now(KST).atStartOfDay(KST).toInstant();
     }
 
+    /**
+     * 쿼터를 세는 창의 시작점 — 지금부터 24시간 전.
+     *
+     * <p>예전에는 KST 자정을 경계로 삼았다. 그러면 자정 직전에 몰려 나간 발행이
+     * 다음 날 몫까지 잡아먹고, 그날은 하루 종일 한 건도 못 내보낸다.
+     * 실제로 2026-08-25 백필 9건이 자정을 넘겨 발행되면서 08-26 영상 쿼터가
+     * (쇼츠 7/3 · 릴스 4/3) 소진돼 그날 영상이 0건이 됐다.
+     *
+     * <p>롤링 창으로 바꾸면 한 건이 나간 지 24시간이 지나는 순간 그 자리가
+     * 하나씩 되살아난다. 몰아치기 뒤에도 하루를 통째로 굶지 않는다.
+     */
+    Instant rollingWindowStart() {
+        return Instant.now().minus(java.time.Duration.ofHours(QUOTA_WINDOW_HOURS));
+    }
+
     public QuotaStatus getStatus() {
         PlatformCaps caps = getPlatformCaps();
-        Instant start = startOfTodayKst();
+        Instant start = rollingWindowStart();
         Map<String, Long> publishedByPlatform = countPublishedByPlatformSince(start);
 
         Map<String, Long> used = new LinkedHashMap<>();
