@@ -57,6 +57,18 @@ public class MarketingPublicationStats {
     @Builder.Default
     private Boolean partial = true;
 
+    /**
+     * 핵심 지표 중 하나라도 숫자로 채워졌는지. 스크래핑 실패·skip_slow 같은 "빈 스냅샷"은
+     * partial 플래그와 별개로 지표가 전부 null이라, 최신 스냅샷 선택 시 이걸로 걸러야
+     * 직전의 정상 수집분을 덮어쓰지 않는다.
+     */
+    private static final java.util.regex.Pattern ANY_METRIC = java.util.regex.Pattern.compile(
+        "\"(impressions|views|reach|plays|likes|replies|comments|reposts|shares|saves)\"\\s*:\\s*\\d");
+
+    public boolean hasAnyMetric() {
+        return metricsJson != null && ANY_METRIC.matcher(metricsJson).find();
+    }
+
     @Column(name = "error_message", length = 500)
     private String errorMessage;
 

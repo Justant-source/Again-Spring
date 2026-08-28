@@ -257,6 +257,9 @@ public class MarketingStatsDashboardService {
             if (!norm.equals(MarketingPopularityScorer.normalizePlatform(row.getPlatform()))) {
                 continue;
             }
+            if (!row.hasAnyMetric()) {
+                continue; // 빈 스냅샷(스크래핑 실패·skip_slow)이 정상 수집분을 덮어쓰지 않게
+            }
             Long jobId = row.getJobId();
             if (jobId == null) {
                 continue;
@@ -287,7 +290,7 @@ public class MarketingStatsDashboardService {
                 continue;
             }
             String p = MarketingPopularityScorer.normalizePlatform(row.getPlatform());
-            if (!wanted.contains(p) || row.getJobId() == null) {
+            if (!wanted.contains(p) || row.getJobId() == null || !row.hasAnyMetric()) {
                 continue;
             }
             String key = row.getJobId() + "|" + p;

@@ -42,7 +42,8 @@ public class MarketingWeeklyReportService {
         Instant since = weekStart.toInstant();
         Instant until = weekEnd.toInstant();
 
-        List<MarketingPublicationStats> latest = statsRepository.findLatestPerJobPlatformSince(since)
+        List<MarketingPublicationStats> latest = MarketingStatsSnapshots
+            .latestWithMetricsPerJobPlatform(statsRepository.findCollectedSince(since))
             .stream()
             .filter(s -> s.getCollectedAt() != null && s.getCollectedAt().isBefore(until))
             .collect(Collectors.toList());

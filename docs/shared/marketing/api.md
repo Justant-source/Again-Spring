@@ -652,6 +652,8 @@ ASM: `POST /api/v1/stats/collect` (`skip_slow`) · social-poster `POST /stats/x`
 | 플랫폼 | 지금 수집 가능 | 대표 지표(primaryMetric) | 비고 |
 |---|---|---|---|
 | X | impressions≈views, likes, replies, reposts | `impressions` | 세션 Playwright scrape (`/stats/x`). API 키 없음. **스케줄 수집(06:30)에서만 채워짐** — 수동 버튼은 항상 건너뜀 |
+
+**빈 스냅샷 처리 (2026-08-29)**: X 스크래핑이 로그인 벽·레이아웃 변경으로 숫자를 하나도 못 읽으면 social-poster는 `ok:false` + 원인(`login wall` / `article not found`)을 돌려주고, ASM은 이를 `error`로 남긴다(이전엔 `ok:true`+전부 null → 무음 실패). AS의 대시보드·주간 리포트·`auto_adjust`는 `MarketingStatsSnapshots.latestWithMetricsPerJobPlatform()`으로 **지표가 있는 최신 행**만 고른다 — 수동 수집(`skip_slow`)이나 빈 스냅샷이 더 최신 `collected_at`으로 쌓여도 직전 정상 수집분을 가리지 않는다. (`findLatestPerJobPlatformSince` 네이티브 쿼리는 이 함정 때문에 제거.)
 | IG Feed | reach, saves, shares, likes, comments | `reach` | Graph insights. media_id는 발행 URL이 없어 **발행 시각 대조**로 역추적(아래 참조) |
 | IG Reels | reach, saves, shares, likes, comments | `reach` (2026-08-22부터, 과거 `plays`) | Graph insights + numeric media id. **v21에서 `plays`/`views` 제거** — 요청하면 전건 HTTP 400 |
 | YT Shorts | views, likes, comments, avg_view_duration_sec | `views` | Data API `videos.list` + Analytics API |

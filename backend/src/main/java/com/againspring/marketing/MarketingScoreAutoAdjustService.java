@@ -53,7 +53,8 @@ public class MarketingScoreAutoAdjustService {
         }
 
         Instant since = Instant.now().minus(7, ChronoUnit.DAYS);
-        List<MarketingPublicationStats> latest = statsRepository.findLatestPerJobPlatformSince(since);
+        List<MarketingPublicationStats> latest = MarketingStatsSnapshots
+            .latestWithMetricsPerJobPlatform(statsRepository.findCollectedSince(since));
         if (latest.isEmpty()) {
             return new AdjustResult(true, false, beforeMap, beforeMap, "no recent platform stats");
         }

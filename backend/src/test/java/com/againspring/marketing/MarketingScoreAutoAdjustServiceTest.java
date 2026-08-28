@@ -60,7 +60,7 @@ class MarketingScoreAutoAdjustServiceTest {
         when(scoreWeightService.getPlatformWeights()).thenReturn(sampleAll());
         when(scoreWeightService.toNestedMap(any())).thenAnswer(inv -> Map.of("x_thread", Map.of("comments", 2.0)));
         when(scoreWeightService.isAutoAdjustEnabled()).thenReturn(true);
-        when(statsRepository.findLatestPerJobPlatformSince(any())).thenReturn(List.of(
+        when(statsRepository.findCollectedSince(any())).thenReturn(List.of(
             MarketingPublicationStats.builder()
                 .jobId(1L).postId("p1").platform("x_thread")
                 .collectedAt(Instant.now())

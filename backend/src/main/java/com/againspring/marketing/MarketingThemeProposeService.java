@@ -470,6 +470,9 @@ public class MarketingThemeProposeService {
             if (!norm.equals(MarketingPopularityScorer.normalizePlatform(row.getPlatform()))) {
                 continue;
             }
+            if (!row.hasAnyMetric()) {
+                continue;
+            }
             MarketingPublicationStats prev = latest.get(row.getJobId());
             if (prev == null || row.getCollectedAt().isAfter(prev.getCollectedAt())) {
                 latest.put(row.getJobId(), row);
