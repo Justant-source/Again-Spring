@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -45,12 +47,17 @@ public class PublicVisitController {
     private final VisitEventRepository visitEventRepository;
     private final VisitorClassifier visitorClassifier;
 
-    // IP별 마지막 기록 시각 (분당 30건 limit)
-    // key = IP 주소, value = 마지막 허용된 ms
-    // 간단한 rate limit (production에서는 Redis 권장)
-    private static final ConcurrentHashMap<String, Long> ipRateLimit = new ConcurrentHashMap<>();
+    // IP별 최근 요청 시각들 (슬라이딩 윈도우 카운터)
+    //
+    // 2026-08-29: 이전 구현은 "윈도우 시작 시각"만 저장하고 그 뒤 2초(=60s/30) 안의
+    // 요청을 전부 거부했다. UTM/외부 referrer가 있을 때만 기록하던 시절엔 드러나지
+    // 않았지만, 모든 페이지뷰를 기록하게 되면서 홈 → 사연처럼 빠르게 이동하는 정상
+    // 사용자의 두 번째 방문이 429로 유실됐다(e2e에서 실측). 진짜 슬라이딩 윈도우로 바꾼다.
+    private static final ConcurrentHashMap<String, Deque<Long>> ipHits = new ConcurrentHashMap<>();
     private static final long RATE_WINDOW_MS = 60_000L; // 1분
     private static final int RATE_LIMIT_PER_WINDOW = 30;
+    /** 맵이 무한히 자라지 않도록 하는 상한. 넘으면 오래된 항목부터 비운다. */
+    private static final int MAX_TRACKED_IPS = 10_000;
 
     // HTML/JS 인젝션 방지 정규식
     private static final Pattern INJECTION_PATTERN = Pattern.compile("[<>\"';&]");
@@ -121,30 +128,45 @@ public class PublicVisitController {
     }
 
     /**
-     * rate limit 확인 (분당 30건)
-     * 같은 IP에서 1분 내에 30건을 초과하면 false
+     * rate limit 확인 — IP당 60초 슬라이딩 윈도우로 최대 30건.
+     *
+     * <p>계측은 사용자 행동을 막지 않아야 하지만, 공개 엔드포인트라 무제한으로 열어둘 수도
+     * 없다. 윈도우 안의 실제 요청 수를 세므로 "빠르게 3페이지를 본 사람"은 통과하고
+     * "초당 수십 건을 쏘는 스크립트"는 막힌다.
      */
-    private synchronized boolean checkRateLimit(String ip) {
+    private boolean checkRateLimit(String ip) {
         long now = System.currentTimeMillis();
-        Long lastAllowed = ipRateLimit.get(ip);
+        long cutoff = now - RATE_WINDOW_MS;
 
-        if (lastAllowed == null || now - lastAllowed >= RATE_WINDOW_MS) {
-            // 새 윈도우 시작
-            ipRateLimit.put(ip, now);
-            return true;
+        if (ipHits.size() > MAX_TRACKED_IPS) {
+            // 만료된 항목을 정리한다. 이전 구현은 맵을 영원히 비우지 않아 서서히 샜다.
+            ipHits.entrySet().removeIf(e -> {
+                Deque<Long> hits = e.getValue();
+                synchronized (hits) {
+                    while (!hits.isEmpty() && hits.peekFirst() < cutoff) {
+                        hits.pollFirst();
+                    }
+                    return hits.isEmpty();
+                }
+            });
         }
 
-        // 같은 윈도우 내 — 카운터 체크
-        // 간단한 구현: 마지막 시각 ± offset으로 카운트
-        // 정확한 구현을 위해서는 sliding window 또는 token bucket 필요
-        // 현재는 단순화: 1분 동안 최대 1회만 허용 (분당 30건 ≈ ~2초마다 1회)
-        // 더 정확한 구현은 동시성 환경에서 Map<IP, List<Long>> 사용
-        // 현재는 단순히 "같은 초(second) 내에 여러 요청 거부"로 간단히 구현
+        Deque<Long> hits = ipHits.computeIfAbsent(ip, k -> new ArrayDeque<>());
+        synchronized (hits) {
+            while (!hits.isEmpty() && hits.peekFirst() < cutoff) {
+                hits.pollFirst();
+            }
+            if (hits.size() >= RATE_LIMIT_PER_WINDOW) {
+                return false;
+            }
+            hits.addLast(now);
+            return true;
+        }
+    }
 
-        // sliding window counter (간단 버전)
-        long elapsed = now - lastAllowed;
-        long allowedRequests = Math.max(1, (RATE_WINDOW_MS / RATE_LIMIT_PER_WINDOW));
-        return elapsed >= allowedRequests;
+    /** 테스트 전용 — 슬라이딩 윈도우 상태 초기화. */
+    static void resetRateLimitState() {
+        ipHits.clear();
     }
 
     /**

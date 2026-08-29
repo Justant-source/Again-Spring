@@ -73,18 +73,24 @@ test.describe('Journey 18-A: UTM 방문 추적', () => {
 
 test.describe('Journey 18-B: 어드민 경로 추적 제외', () => {
 
-  test('/admin 경로는 방문 이벤트 미전송', async ({ page }) => {
-    const requests: string[] = []
+  // 검증하는 불변식은 "요청이 0건"이 아니라 "/admin 경로가 기록되지 않는다"이다.
+  // 비로그인 상태로 /admin에 가면 클라이언트가 /login으로 보내고, 거기서 방문이
+  // 기록되는 것은 정상이다(2026-08-29 개편으로 모든 페이지뷰를 기록한다).
+  // 이전 버전은 "요청 0건"을 단언해, 리다이렉트된 정상 페이지뷰까지 실패로 잡았다.
+  test('/admin 경로는 방문 이벤트로 기록되지 않는다', async ({ page }) => {
+    const recordedPaths: string[] = []
     page.on('request', req => {
-      if (req.url().includes('/api/public/visits')) {
-        requests.push(req.method())
+      if (req.url().includes('/api/public/visits') && req.method() === 'POST') {
+        const body = req.postDataJSON() as { path?: string } | null
+        if (body?.path) recordedPaths.push(body.path)
       }
     })
 
     await page.goto(`${BASE}/admin?utm_source=test`)
     await page.waitForLoadState('domcontentloaded')
     await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
-    expect(requests.length).toBe(0)
+
+    expect(recordedPaths.filter(p => p.startsWith('/admin'))).toEqual([])
   })
 })
 
@@ -160,33 +166,31 @@ test.describe('Journey 18-E: as_utm 쿠키 first-touch', () => {
 
   test('as_utm 쿠키는 최초 유입 값을 유지하고 이후 다른 UTM으로 덮어써지지 않는다', async ({ page, context }) => {
     // first-touch 정책: 마지막 클릭이 아니라 "처음 데려온 채널"을 가입에 귀속시킨다.
+    // 방문 POST 응답을 기다리지 않고 검증 대상인 쿠키 자체를 폴링한다.
+    // waitForResponse는 goto() 도중 POST가 이미 끝나버리면 다음 응답을 영원히
+    // 기다리다 타임아웃난다(실제로 그렇게 깨졌다). 쿠키는 최종 상태라 경합이 없다.
+    const readUtmCookie = async () => {
+      const cookie = (await context.cookies()).find((c) => c.name === 'as_utm')
+      return cookie ? JSON.parse(decodeURIComponent(cookie.value)) : null
+    }
+
     await page.goto(`${BASE}/?utm_source=first-touch-a&utm_medium=email&utm_campaign=camp-a`)
     await page.waitForLoadState('domcontentloaded')
-    await page.waitForResponse(
-      (res) => res.url().includes('/api/public/visits') && res.request().method() === 'POST',
-      { timeout: 8_000 },
-    )
 
-    const cookiesAfterFirst = await context.cookies()
-    const utmCookie1 = cookiesAfterFirst.find((c) => c.name === 'as_utm')
-    expect(utmCookie1).toBeTruthy()
-    const parsed1 = JSON.parse(decodeURIComponent(utmCookie1!.value))
-    expect(parsed1.source).toBe('first-touch-a')
-    expect(parsed1.campaign).toBe('camp-a')
+    await expect.poll(readUtmCookie, { timeout: 10_000 }).toMatchObject({
+      source: 'first-touch-a',
+      campaign: 'camp-a',
+    })
 
     // 다른 경로 + 다른 UTM으로 재진입 — first-touch가 유지되어야 한다
     await page.goto(`${BASE}/community?utm_source=second-touch-b&utm_medium=push&utm_campaign=camp-b`)
     await page.waitForLoadState('domcontentloaded')
-    await page.waitForResponse(
-      (res) => res.url().includes('/api/public/visits') && res.request().method() === 'POST',
-      { timeout: 8_000 },
-    ).catch(() => {})
+    await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
 
-    const cookiesAfterSecond = await context.cookies()
-    const utmCookie2 = cookiesAfterSecond.find((c) => c.name === 'as_utm')
-    expect(utmCookie2).toBeTruthy()
-    const parsed2 = JSON.parse(decodeURIComponent(utmCookie2!.value))
-    expect(parsed2.source).toBe('first-touch-a')
-    expect(parsed2.campaign).toBe('camp-a')
+    // 덮어쓰기가 일어난다면 이 시점에 이미 바뀌어 있다 — poll이 아니라 즉시 단언한다.
+    expect(await readUtmCookie()).toMatchObject({
+      source: 'first-touch-a',
+      campaign: 'camp-a',
+    })
   })
 })

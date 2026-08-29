@@ -43,6 +43,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("PublicVisitController 계약 테스트 — JSON 필드명·봇 판정·admin 차단")
 class PublicVisitControllerTest {
 
+    @org.junit.jupiter.api.BeforeEach
+    void resetRateLimiter() {
+        PublicVisitController.resetRateLimitState();
+    }
+
+
     /**
      * Spring Boot가 자동구성하는 ObjectMapper와 동일한 방식으로 만든다.
      * {@link Jackson2ObjectMapperBuilder}는 기본값으로
