@@ -61,4 +61,38 @@ ssh justant@100.115.252.61 "source ~/.nvm/nvm.sh && npm install -g @anthropic-ai
 처음 또는 세션 재시작 시:
 1. `ssh justant@100.115.252.61 "source ~/.nvm/nvm.sh && which claude"` → 경로 확인
 2. 미설치면: `ssh justant@100.115.252.61 "source ~/.nvm/nvm.sh && npm install -g @anthropic-ai/claude-code"`
-3. 인증 만료 시: 사용자에게 WSL 터미널에서 `claude` 직접 실행 요청 (브라우저 로그인)
+3. 인증이 거부되면 → **§5 세션 복사** (브라우저 재로그인으로는 해결되지 않는다)
+
+---
+
+## 5. WSL로 Claude 세션 복사 — "WSL로 claude 세션 복사해줘"
+
+사용자가 이 요청을 하면 **되묻지 말고 바로 실행**한다:
+
+```bash
+scripts/sync-claude-creds-to-wsl.sh            # 복사 + 검증 (멱등, 백업 자동)
+scripts/sync-claude-creds-to-wsl.sh --check    # 복사 없이 현재 상태만 확인
+```
+
+`AUTH_OK`(WSL CLI)와 `BRIDGE_AUTH_OK`(llm-bridge 컨테이너)가 모두 나오면 성공이다.
+
+**왜 필요한가** — WSL 자체 계정(`subscriptionType=max`)은 토큰이 **만료되지 않았는데도**
+조직 정책으로 Claude Code 접근이 차단된다:
+`Your organization has disabled Claude subscription access for Claude Code`.
+로컬 AS 호스트 계정(`pro`)은 정상이므로 그 `claudeAiOauth`를 옮긴다.
+
+**동작** — 로컬 `~/.claude/.credentials.json`의 `claudeAiOauth` 키만 WSL로 병합한다.
+로컬 `mcpOAuth`는 WSL과 무관해 옮기지 않는다. 기존 WSL 파일은 타임스탬프 백업 후 교체,
+mode 600 유지. 토큰 값은 SSH 파이프로만 흐르고 화면·로그에 남기지 않는다.
+
+**컨테이너 재시작 불필요** — WSL의 `again-spring-marketing-asm-1` ·
+`again-spring-marketing-llm-bridge-1` · `llm-worker` 가 `~/.claude`를 **디렉토리 bind mount**로
+물고 있어 즉시 반영된다. 실제 LLM 호출 주체는 **llm-bridge**(`/usr/local/bin/claude`)이고
+ASM 본체 컨테이너엔 claude 바이너리가 없다.
+(AS CLAUDE.md의 "세션 만료 시 컨테이너 restart"는 로컬 `againspring-llm` 얘기다.)
+
+**주의**
+- 토큰 수명이 **하루 단위**다. 로컬이 갱신하면 WSL 사본은 낡는다 → 그때 다시 실행하면 된다.
+- 한 토큰을 두 머신이 공유하므로 refresh 회전 시 한쪽이 끊길 수 있고, 사용량 한도도 공유한다.
+- 스크립트가 `~/.claude`의 root 소유 항목을 점검한다 — 과거 컨테이너가 root로 써서
+  세션이 끊긴 전례가 있다. 경고가 뜨면 소유권을 회수할 것.
