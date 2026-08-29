@@ -149,6 +149,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `marketing_generation_trace` | LLM 생성 기록 (프롬프트·응답·시봄이 선택) | BIGINT auto **V119** |
 | `marketing_publication_stats` | 플랫폼 참여 스냅샷 (X/IG/YT best-effort) | BIGINT auto **V110** |
 | `marketing_stats_event` | 통계 탭 활동 타임라인 (수집·제안·확정) | BIGINT auto **V111** |
+| `visit_events` | 방문 계측 (경로·UTM·referrer·봇 판정·고유방문자) | BIGINT auto · 유입 귀속 확장 **V120** |
 
 ### AI-user 운영 테이블
 
@@ -197,6 +198,8 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `marketing_agreed_at` | DATETIME(6) | **V17** | 마케팅 수신 동의 (선택) |
 | `must_change_password` | BOOLEAN | **V20** | 임시 비밀번호 강제 변경 플래그 |
 | `tutorial_completed_at` | TIMESTAMP | **V24** | 30초 튜토리얼 완료 시각. NULL=미완료 |
+| `acquisition_source` | VARCHAR(100) | (기존) | 유입 채널 first-touch (youtube/x/instagram). **2026-08-29까지 엔티티 매핑·기록 코드가 없어 전 행 NULL이었다** — `AcquisitionAttribution`이 `as_utm` 쿠키에서 채운다 |
+| `acquisition_campaign` | VARCHAR(100) | (기존) | 유입 캠페인 (`story_{jobId}`). 사연 단위 성과 역추적 키 |
 | `deleted_at` | TIMESTAMP(3) | V1 | 소프트 삭제 |
 | `created_at`, `updated_at` | TIMESTAMP(3) | V1 | |
 
@@ -399,6 +402,29 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | `updated_at` | TIMESTAMP(3) | 자동 갱신 |
 
 기동 로더: `EncryptedSecretEnvironmentPostProcessor`. 시딩: `scripts/seed_encrypted_secrets_from_env.py`. GitHub PAT는 `scripts/git-credential-as-vault`.
+
+### `visit_events` (**V120** 유입 계측 확장)
+
+방문 1건 = 1행. `PublicVisitController`가 저장하고 `AcquisitionFunnelService`가 집계한다.
+
+| 컬럼 | 타입 | Flyway | 비고 |
+|---|---|---|---|
+| `id` | BIGINT PK | (기존) | auto |
+| `occurred_at` | TIMESTAMP | (기존) | 방문 시각 |
+| `path` | VARCHAR(500) | (기존) | 쿼리스트링 제외 경로 |
+| `utm_source/medium/campaign/content` | VARCHAR(100) | (기존) | **2026-08-29까지 FE가 snake_case로 전송해 전량 유실됐다** (DTO는 camelCase). `visits.ts` 참조 |
+| `referrer` | VARCHAR(500) | (기존) | `document.referrer` |
+| `session_key` | VARCHAR(64) | (기존) | sessionStorage 단위. 같은 이유로 100% NULL이었음 |
+| `visitor_key` | VARCHAR(64) | **V120** | 1년 쿠키(`as_vid`). 고유 방문자·재방문 |
+| `user_agent` | VARCHAR(300) | **V120** | 봇 판정 근거 보존 — 규칙 변경 시 재분류용 |
+| `is_bot` | TINYINT(1) | **V120** | `VisitorClassifier` 판정. **집계는 항상 `is_bot=0` 필터** |
+| `country` | VARCHAR(8) | **V120** | `CF-IPCountry` 헤더 |
+| `device_type` | VARCHAR(16) | **V120** | mobile/tablet/desktop/unknown |
+| `user_id` | VARCHAR(32) | **V120** | 로그인·게스트 상태면 기록 (방문→투표→가입 연결) |
+
+인덱스: `visitor_key` · `(is_bot, occurred_at)` · `(utm_source, occurred_at)` · users `(acquisition_source, created_at)`
+
+---
 
 ### `marketing_holding` (**V102**)
 

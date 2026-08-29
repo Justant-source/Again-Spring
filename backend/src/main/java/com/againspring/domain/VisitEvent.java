@@ -49,6 +49,29 @@ public class VisitEvent {
     @Column(length = 64)
     private String sessionKey;
 
+    /** 30일 쿠키 기반 고유 방문자 키. 세션(session_key)보다 상위 — 재방문을 센다. */
+    @Column(name = "visitor_key", length = 64)
+    private String visitorKey;
+
+    /** 봇 판정 근거. 규칙이 바뀌어도 과거 행을 재분류할 수 있게 원문을 남긴다. */
+    @Column(name = "user_agent", length = 300)
+    private String userAgent;
+
+    /** 집계는 항상 isBot=false로 필터한다. 봇 행도 버리지 않고 남겨 오탐을 추적한다. */
+    @Column(name = "is_bot", nullable = false)
+    @Builder.Default
+    private boolean bot = false;
+
+    @Column(length = 8)
+    private String country;
+
+    @Column(name = "device_type", length = 16)
+    private String deviceType;
+
+    /** 로그인/게스트 상태면 기록 — 방문에서 투표·가입까지 이어 붙이기 위한 고리. */
+    @Column(name = "user_id", length = 32)
+    private String userId;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 

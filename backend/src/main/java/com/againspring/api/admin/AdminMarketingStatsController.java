@@ -2,6 +2,7 @@ package com.againspring.api.admin;
 
 import com.againspring.annotation.Auditable;
 import com.againspring.domain.marketing.MarketingStatsEvent;
+import com.againspring.marketing.AcquisitionFunnelService;
 import com.againspring.marketing.MarketingStatsDashboardService;
 import com.againspring.marketing.MarketingStatsEventService;
 import com.againspring.marketing.MarketingThemeBoostService;
@@ -41,6 +42,7 @@ import java.util.Map;
 public class AdminMarketingStatsController {
 
     private final MarketingStatsDashboardService dashboardService;
+    private final AcquisitionFunnelService acquisitionFunnelService;
     private final MarketingThemeProposeService themeProposeService;
     private final MarketingThemeBoostService themeBoostService;
     private final MarketingStatsEventService statsEventService;
@@ -57,6 +59,15 @@ public class AdminMarketingStatsController {
             @RequestParam(required = false) String primaryMetric) {
         return ResponseEntity.ok(dashboardService.dashboard(
             platform, weeksAgo, rangeDays, primaryMetric));
+    }
+
+    @GetMapping("/acquisition")
+    @Operation(summary = "유입 퍼널 (방문 → 고유 방문자 → 가입)",
+        description = "봇 제외. 채널별·일별. 발행 건수 다음 칸을 채우는 지표 (2026-08-29).")
+    @ApiResponse(responseCode = "200", description = "Funnel returned")
+    public ResponseEntity<AcquisitionFunnelService.FunnelDto> acquisition(
+            @RequestParam(defaultValue = "30") int days) {
+        return ResponseEntity.ok(acquisitionFunnelService.funnel(days));
     }
 
     @GetMapping("/theme-matrix")

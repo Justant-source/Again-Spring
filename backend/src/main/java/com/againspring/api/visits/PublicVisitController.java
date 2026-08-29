@@ -2,6 +2,7 @@ package com.againspring.api.visits;
 
 import com.againspring.domain.VisitEvent;
 import com.againspring.repository.VisitEventRepository;
+import com.againspring.service.acquisition.VisitorClassifier;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,6 +43,7 @@ import java.util.regex.Pattern;
 public class PublicVisitController {
 
     private final VisitEventRepository visitEventRepository;
+    private final VisitorClassifier visitorClassifier;
 
     // IP별 마지막 기록 시각 (분당 30건 limit)
     // key = IP 주소, value = 마지막 허용된 ms
@@ -82,6 +86,8 @@ public class PublicVisitController {
                     .body(Map.of("error", "rate limit exceeded"));
         }
 
+        String userAgent = httpReq.getHeader("User-Agent");
+
         // 저장
         try {
             VisitEvent event = VisitEvent.builder()
@@ -93,10 +99,18 @@ public class PublicVisitController {
                     .utmContent(req.utmContent)
                     .referrer(req.referrer)
                     .sessionKey(req.sessionKey)
+                    .visitorKey(req.visitorKey)
+                    .userAgent(truncate(userAgent, 300))
+                    // 봇도 저장하되 표시해 둔다. 지우면 오탐을 영영 검증할 수 없다.
+                    .bot(visitorClassifier.isBot(userAgent))
+                    .country(visitorClassifier.country(httpReq))
+                    .deviceType(visitorClassifier.deviceType(userAgent))
+                    .userId(currentUserId())
                     .build();
 
             visitEventRepository.save(event);
-            log.debug("Visit recorded: path={}, utm_campaign={}", req.path, req.utmCampaign);
+            log.debug("Visit recorded: path={}, utm_campaign={}, bot={}",
+                    req.path, req.utmCampaign, event.isBot());
 
             return ResponseEntity.ok(Map.of("status", "recorded"));
         } catch (Exception e) {
@@ -134,6 +148,29 @@ public class PublicVisitController {
     }
 
     /**
+     * 인증 컨텍스트의 사용자 id. 이 엔드포인트는 permitAll이지만 토큰이 함께 오면
+     * 방문 → 투표 → 가입을 한 사람으로 이을 수 있다. 익명이면 null.
+     */
+    private String currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return null;
+        }
+        String name = auth.getName();
+        if (name == null || name.isBlank() || "anonymousUser".equals(name)) {
+            return null;
+        }
+        return name.length() > 32 ? name.substring(0, 32) : name;
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) {
+            return null;
+        }
+        return s.length() <= max ? s : s.substring(0, max);
+    }
+
+    /**
      * 클라이언트 IP 추출 (X-Forwarded-For 헤더 또는 RemoteAddr)
      */
     private String getClientIp(HttpServletRequest request) {
@@ -166,6 +203,9 @@ public class PublicVisitController {
         @NotBlank(message = "path is required")
         @Size(max = 500, message = "path must be <= 500 chars")
         private String path;
+
+        @Size(max = 64, message = "visitorKey must be <= 64 chars")
+        private String visitorKey;
 
         @Size(max = 100, message = "utmSource must be <= 100 chars")
         private String utmSource;

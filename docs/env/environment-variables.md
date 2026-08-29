@@ -312,6 +312,12 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=6000
   자동 발행. 비어 있으면 fail-closed(스킵). 2026-08-02 백로그 폭주 이후 필수.
   예: `2026-08-02T08:43:52Z`. compose `backend-prod`에 wiring 필요.
 
+- `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` · `NEXT_PUBLIC_NAVER_SITE_VERIFICATION` — 검색엔진 소유 확인
+  메타태그 값(2026-08-29 신설). 비시크릿. 비어 있으면 태그를 아예 렌더하지 않는다(`app/layout.tsx`
+  `metadata.verification`). Google Search Console / 네이버 서치어드바이저에서 발급받은 문자열을
+  **prod에만** 넣는다 — dev는 `app/robots.ts`가 전체 색인을 차단하므로 등록 대상이 아니다.
+  FE 빌드 타임 주입이라 값 변경 시 프론트엔드 재빌드가 필요하다(`NEXT_PUBLIC_*` 공통).
+
 prod는 OAuth와 메일 관련 값을 모두 실제 값으로 채워야 한다.
 
 ## prod 필수 체크리스트

@@ -96,6 +96,20 @@ public class User {
     @Builder.Default
     private boolean synthetic = false;
 
+    /**
+     * 이 사람을 데려온 채널(first-touch). 예: youtube · x · instagram.
+     *
+     * <p>컬럼은 오래 전부터 있었지만 매핑도 기록 코드도 없어 2026-08-29까지 전 행이
+     * NULL이었다. 마케팅이 가입을 만들었는지 판정할 유일한 종단 지표라 배선을 복구했다.
+     * 값은 {@code AcquisitionAttribution}이 as_utm 쿠키에서 채운다.
+     */
+    @Column(name = "acquisition_source", length = 100)
+    private String acquisitionSource;
+
+    /** 유입 캠페인(예: story_1234). 사연 단위까지 성과를 되짚기 위한 키. */
+    @Column(name = "acquisition_campaign", length = 100)
+    private String acquisitionCampaign;
+
     /** 임시 비밀번호 발급 후 강제 변경 필요 여부 (V20) */
     @Column(name = "must_change_password", nullable = false)
     @Builder.Default

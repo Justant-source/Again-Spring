@@ -38,6 +38,7 @@ class AuthServiceGuestTest {
     @Mock private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     @Mock private EmailVerificationService emailVerificationService;
     @Mock private AdminRoleAssigner adminRoleAssigner;
+    @Mock private com.againspring.service.acquisition.AcquisitionAttribution acquisitionAttribution;
 
     private AuthService authService;
 
@@ -45,7 +46,7 @@ class AuthServiceGuestTest {
     void setUp() {
         authService = new AuthService(
                 userRepository, jwtService, passwordEncoder,
-                emailVerificationService, adminRoleAssigner);
+                emailVerificationService, adminRoleAssigner, acquisitionAttribution);
         lenient().when(jwtService.generateGuestToken(anyString())).thenReturn("guest.jwt.token");
     }
 

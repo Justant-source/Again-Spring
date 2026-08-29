@@ -711,6 +711,14 @@ GET  /api/admin/marketing/stats/dashboard
      → { weekStart, weekEnd, prevWeek*, platforms[{platform,primaryMetric,value,prevValue,deltaPct,series}],
          utm, health, unknownCounts, todoHints }
 
+GET  /api/admin/marketing/stats/acquisition?days=30
+     → { days, totalVisits, totalVisitors, totalSignups, botSplit{human,bot},
+         byChannel[{source,visits,visitors,sessions,signups}],
+         daily[{date,visits,visitors,signups}], topReferrers[], topPaths[] }
+     유입 퍼널 — 발행 건수 다음 칸(방문·고유방문자·가입)을 채운다 (2026-08-29).
+     집계에서 is_bot=1 행은 항상 제외. 가입은 users.acquisition_source 기준이며
+     채널 미상은 '(unknown)'으로 분리해 합계를 부풀리지 않는다.
+
 GET  /api/admin/marketing/stats/theme-matrix?platform=&weeksAgo=0
      → { platform, emotions[], categories[], cells[{emotion,category,n,score,delta,boost,locked}],
          proposals[], rolledProposals[], unknownHints }

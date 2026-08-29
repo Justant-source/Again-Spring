@@ -8,6 +8,7 @@ import com.againspring.api.dto.response.AuthResponse;
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.User;
 import com.againspring.repository.UserRepository;
+import com.againspring.service.acquisition.AcquisitionAttribution;
 import com.againspring.security.JwtService;
 import com.againspring.util.GuestNicknameGenerator;
 import java.time.Instant;
@@ -31,6 +32,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
     private final AdminRoleAssigner adminRoleAssigner;
+    private final AcquisitionAttribution acquisitionAttribution;
     private final Random random = new Random();
 
     @Transactional
@@ -60,6 +62,9 @@ public class AuthService {
                 .marketingAgreedAt(request.isMarketingAgreed() ? now : null)
                 .build();
         user.getRoles().add("USER");
+        // 어느 채널이 이 사람을 데려왔는지 남긴다. 이 한 줄이 없어서 한 달간
+        // "마케팅이 가입을 만들었나"에 답할 수 없었다.
+        acquisitionAttribution.applyTo(user);
 
         User saved = userRepository.save(user);
         saved = adminRoleAssigner.ensureAdminIfWhitelisted(saved);
@@ -112,6 +117,7 @@ public class AuthService {
         if (guest.getOnboardingCompletedAt() != null && newMember.getOnboardingCompletedAt() == null) {
             newMember.setOnboardingCompletedAt(guest.getOnboardingCompletedAt());
         }
+        acquisitionAttribution.inherit(guest, newMember);
         User savedMember = userRepository.save(newMember);
 
         // 2) 게스트 user soft delete (재인증 시도 차단)
@@ -207,6 +213,7 @@ public class AuthService {
                             .roles(new ArrayList<>())
                             .build();
                     newUser.getRoles().add("USER");
+                    acquisitionAttribution.applyTo(newUser);
                     User saved = userRepository.save(newUser);
                     isNewUser[0] = true;
                     log.info("OAuth user created: {} via {}", saved.getId(), provider);
@@ -273,6 +280,9 @@ public class AuthService {
                     .isGuest(true)
                     .roles(new ArrayList<>(List.of("USER")))
                     .build();
+            // 게스트에도 채널을 남긴다. 며칠 뒤 가입할 때 쿠키가 만료됐어도
+            // 게스트 행에서 승계할 수 있어야 유입 경로를 잃지 않는다.
+            acquisitionAttribution.applyTo(guestUser);
             userRepository.save(guestUser);
             log.info("Guest user row created: {}", guestId);
         }
