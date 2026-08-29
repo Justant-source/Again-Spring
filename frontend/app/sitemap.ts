@@ -1,6 +1,12 @@
 import type { MetadataRoute } from 'next';
 import { SERVER_API_BASE as API_BASE } from '@/lib/serverApiBase';
 
+// 🔴 요청 시 생성 — 정적 프리렌더 금지.
+// 홈/광장과 같은 이유다(2026-08-29): 빌드 시점에는 backend 컨테이너가 없어 fetch가
+// 반드시 실패하고, 정적 사이트맵에는 고정 경로 4개만 남아 사연 URL이 통째로 빠진다.
+// 크롤러에게 사연을 알리는 것이 이 파일의 유일한 목적이므로 항상 실시간으로 만든다.
+export const dynamic = 'force-dynamic';
+
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://againspring.net';
 
 // 사연 상세는 검색 유입의 실질적 진입점이다(홈은 CSR이라 크롤러가 볼 내용이 적다).
@@ -16,7 +22,7 @@ async function fetchPostIds(): Promise<ListedPost[]> {
     try {
       const res = await fetch(
         `${API_BASE}/api/community/posts?page=${page}&size=${PAGE_SIZE}&sortBy=latest`,
-        { next: { revalidate: 3600 } },
+        { cache: 'no-store' },
       );
       if (!res.ok) break;
       const body = await res.json();

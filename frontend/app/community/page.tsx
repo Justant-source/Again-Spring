@@ -23,7 +23,17 @@ import { SERVER_API_BASE as API_BASE } from '@/lib/serverApiBase';
 
 
 // 광장은 홈보다 갱신 빈도가 잦다(새 사연·투표·댓글이 계속 쌓임) — 권장 구간(60~300초) 하단에 가깝게.
-export const revalidate = 90;
+// 🔴 정적 프리렌더 금지 — 요청 시 렌더한다.
+//
+// 2026-08-29: ISR(revalidate=90)로 두었더니 광장 HTML이 빈 채로 배포됐다.
+// 원인은 구조적이다 — 정적 프리렌더는 `docker build` 중에 실행되는데 그 시점에는
+// backend 컨테이너가 아직 없어 fetch가 반드시 실패한다. 그래서 "아직 사연이
+// 없습니다"가 그대로 구워졌고, ISR 재검증도 이를 되돌리지 못했다(x-nextjs-cache: HIT).
+//
+// 크롤러가 배포 직후 한 번 들르고 마는 상황에서 "몇 번 요청하면 채워진다"는
+// 자기치유는 SEO 목적에 맞지 않는다. 백엔드 응답이 0.1초대라 요청마다 렌더해도
+// 비용이 무시할 수준이고, 무엇보다 항상 옳다. 트래픽이 커지면 그때 캐시를 다시 건다.
+export const dynamic = 'force-dynamic';
 
 // layout.tsx 기본 메타(홈 전용, canonical '/')와 겹치지 않도록 목록 페이지 전용 title/description.
 // title은 layout의 template('%s · 다시봄')이 자동으로 '· 다시봄'을 붙이므로 여기서는 중복 표기하지 않는다.
@@ -49,7 +59,7 @@ async function fetchInitialPosts(): Promise<{ content: PostSummary[]; totalPages
       `${API_BASE}/api/community/posts?page=0&size=20&sortBy=latest`,
       {
         headers: { Accept: 'application/json' },
-        next: { revalidate: 90 },
+        cache: 'no-store',
         signal: AbortSignal.timeout(2500),
       },
     );

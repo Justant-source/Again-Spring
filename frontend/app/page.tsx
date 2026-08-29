@@ -24,7 +24,17 @@ import { SERVER_API_BASE as API_BASE } from '@/lib/serverApiBase';
 
 // 사연은 자주 올라오지 않지만 "방금 올라온 사연" 알약은 신선도가 중요하다.
 // 매 요청마다 BE를 두드리면 부하만 커지므로 60~300초 권장 구간의 중간값(120초) ISR로 절충한다.
-export const revalidate = 120;
+// 🔴 정적 프리렌더 금지 — 요청 시 렌더한다.
+//
+// 2026-08-29: ISR(revalidate=120)로 두었더니 홈 HTML이 빈 채로 배포됐다.
+// 원인은 구조적이다 — 정적 프리렌더는 `docker build` 중에 실행되는데 그 시점에는
+// backend 컨테이너가 아직 없어 fetch가 반드시 실패한다. 그래서 "아직 사연이
+// 없습니다"가 그대로 구워졌고, ISR 재검증도 이를 되돌리지 못했다(x-nextjs-cache: HIT).
+//
+// 크롤러가 배포 직후 한 번 들르고 마는 상황에서 "몇 번 요청하면 채워진다"는
+// 자기치유는 SEO 목적에 맞지 않는다. 백엔드 응답이 0.1초대라 요청마다 렌더해도
+// 비용이 무시할 수준이고, 무엇보다 항상 옳다. 트래픽이 커지면 그때 캐시를 다시 건다.
+export const dynamic = 'force-dynamic';
 
 async function fetchList(sortBy: 'latest' | 'recommended', size: number): Promise<PostSummary[]> {
   try {
@@ -32,7 +42,7 @@ async function fetchList(sortBy: 'latest' | 'recommended', size: number): Promis
       `${API_BASE}/api/community/posts?page=0&size=${size}&sortBy=${sortBy}`,
       {
         headers: { Accept: 'application/json' },
-        next: { revalidate: 120 },
+        cache: 'no-store',
         signal: AbortSignal.timeout(2500),
       },
     );
