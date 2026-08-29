@@ -104,6 +104,8 @@ ai-user/tools/snapshots/
 env/backups/
 backups/
 # 운영 스크립트 실행 로그 (env/scripts/*.sh 산출물)
+# nginx 접근/에러 로그도 여기 포함 (env/logs/nginx/{dev,prod} — 17MB DB 덤프
+# 커밋 사고 재발 방지 차원에서 명시. 90일치라도 git에 절대 들어가면 안 됨)
 env/logs/
 # Watchdog 상태 파일 (자동 생성, git 무시)
 /watchdog-state/

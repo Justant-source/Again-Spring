@@ -2,12 +2,14 @@ package com.againspring.marketing.holding;
 
 import com.againspring.domain.community.Post;
 import com.againspring.domain.marketing.MarketingHolding;
+import com.againspring.domain.marketing.MarketingHoldingExclusion;
 import com.againspring.domain.marketing.MarketingHoldingStatus;
 import com.againspring.domain.marketing.MarketingPinFormat;
 import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.MarketingScoreWeightService;
 import com.againspring.marketing.dto.CreateJobRequest.BriefDto;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.repository.marketing.MarketingHoldingExclusionRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository.DueHoldingProjection;
 import com.againspring.repository.marketing.MarketingHoldingRepository.HoldingCandidateProjection;
@@ -71,6 +73,9 @@ class MarketingHoldingServiceTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    @Mock
+    private MarketingHoldingExclusionRepository exclusionRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private MarketingHoldingService service;
@@ -89,7 +94,8 @@ class MarketingHoldingServiceTest {
             scoreWeightService,
             briefSeeder,
             objectMapper,
-            transactionManager
+            transactionManager,
+            exclusionRepository
         );
     }
 
@@ -636,6 +642,56 @@ class MarketingHoldingServiceTest {
         assertThat(overdue.getStatus()).isEqualTo(MarketingHoldingStatus.OUT_OF_CUT);
     }
 
+    @Test
+    void rankCandidates_excludesNonConflictContent_andRecordsExclusionOnce() {
+        when(scoreWeightService.getWeights()).thenReturn(new MarketingScoreWeightService.Weights(
+            0.1, 1.0, 0.5));
+        when(exclusionRepository.existsById(any())).thenReturn(false);
+
+        List<HoldingCandidateProjection> candidates = List.of(
+            candidate("post-conflict", 100, 10, 5, Instant.parse("2026-08-08T10:00:00Z"),
+                "아내가 상의없이 오백만원 빌려준 걸 알았다", "남편이 몰래 오백만원을 빌려줬다는 걸 알고 화가 났다"),
+            candidate("post-trivia", 50, 5, 2, Instant.parse("2026-08-08T09:00:00Z"),
+                "덕혜옹주가 일본 친구한테 털어놓은 고종 독살 얘기", "1919년 총독부 명령으로 독살했다는 문건이 있다고 함"),
+            candidate("post-listicle", 40, 4, 1, Instant.parse("2026-08-08T08:00:00Z"),
+                "여초회사 1년 근무자가 쓰는 장단점", "장점부터 말하면... 단점도 당연히 있는데")
+        );
+        when(holdingRepository.findActiveCandidates()).thenReturn(candidates);
+
+        List<MarketingHoldingService.RankedCandidate> ranked = service.rankCandidates(
+            scoreWeightService.getWeights());
+
+        assertThat(ranked)
+            .extracting(MarketingHoldingService.RankedCandidate::postId)
+            .containsExactly("post-conflict");
+
+        ArgumentCaptor<MarketingHoldingExclusion> exclusionCaptor =
+            ArgumentCaptor.forClass(MarketingHoldingExclusion.class);
+        verify(exclusionRepository, org.mockito.Mockito.times(2)).save(exclusionCaptor.capture());
+        Map<String, String> reasonsByPostId = exclusionCaptor.getAllValues().stream()
+            .collect(Collectors.toMap(
+                MarketingHoldingExclusion::getPostId, MarketingHoldingExclusion::getReason));
+        assertThat(reasonsByPostId)
+            .containsEntry("post-trivia", MarketingHoldingContentGuard.REASON_YEAR_TRIVIA_PATTERN)
+            .containsEntry("post-listicle", MarketingHoldingContentGuard.REASON_PROS_CONS_LISTICLE);
+    }
+
+    @Test
+    void rankCandidates_doesNotReRecordExclusionAlreadyPersisted() {
+        when(exclusionRepository.existsById("post-trivia")).thenReturn(true);
+
+        List<HoldingCandidateProjection> candidates = List.of(
+            candidate("post-trivia", 50, 5, 2, Instant.parse("2026-08-08T09:00:00Z"),
+                "덕혜옹주가 일본 친구한테 털어놓은 고종 독살 얘기", "1919년 독살했다는 문건이 있다고 함"));
+        when(holdingRepository.findActiveCandidates()).thenReturn(candidates);
+
+        List<MarketingHoldingService.RankedCandidate> ranked = service.rankCandidates(
+            new MarketingScoreWeightService.Weights(0.1, 1.0, 0.5));
+
+        assertThat(ranked).isEmpty();
+        verify(exclusionRepository, never()).save(any());
+    }
+
     private void stubStatusQueries(
             List<MarketingHolding> pinned,
             List<MarketingHolding> activeNonPinned) {
@@ -659,12 +715,20 @@ class MarketingHoldingServiceTest {
 
     private static HoldingCandidateProjection candidate(
             String id, int views, long comments, long votes, Instant createdAt) {
+        return candidate(id, views, comments, votes, createdAt, null, null);
+    }
+
+    private static HoldingCandidateProjection candidate(
+            String id, int views, long comments, long votes, Instant createdAt,
+            String title, String bodyPublished) {
         HoldingCandidateProjection projection = mock(HoldingCandidateProjection.class);
-        when(projection.getId()).thenReturn(id);
-        when(projection.getViewCount()).thenReturn(views);
-        when(projection.getCommentCount()).thenReturn(comments);
-        when(projection.getVoteCount()).thenReturn(votes);
-        when(projection.getCreatedAt()).thenReturn(createdAt);
+        lenient().when(projection.getId()).thenReturn(id);
+        lenient().when(projection.getViewCount()).thenReturn(views);
+        lenient().when(projection.getCommentCount()).thenReturn(comments);
+        lenient().when(projection.getVoteCount()).thenReturn(votes);
+        lenient().when(projection.getCreatedAt()).thenReturn(createdAt);
+        lenient().when(projection.getTitle()).thenReturn(title);
+        lenient().when(projection.getBodyPublished()).thenReturn(bodyPublished);
         return projection;
     }
 }

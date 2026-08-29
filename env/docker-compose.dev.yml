@@ -104,6 +104,8 @@ services:
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
         NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
         NEXT_PUBLIC_NAVER_CLIENT_ID: ${NAVER_CLIENT_ID:-}
+        NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+        NEXT_PUBLIC_NAVER_SITE_VERIFICATION: ${NAVER_SITE_VERIFICATION:-}
     image: againspring-frontend-dev
     container_name: againspring-frontend-dev
     environment:
@@ -128,6 +130,11 @@ services:
       - "8090:80"
     volumes:
       - ./nginx/dev.conf:/etc/nginx/conf.d/default.conf:ro
+      # 접근/에러 로그 영속화 (18일치만 남던 docker stdout 순환 소실 방지).
+      # 호스트 디렉토리는 미리 justant 소유로 생성해둘 것 — Docker가 자동 생성하면
+      # root 소유가 되어 과거 마운트 지점 권한 사고가 재발한다. 로테이션은
+      # env/nginx/logrotate.conf(호스트 cron) 참조. docs/env/deployment.md 참고.
+      - ./logs/nginx/dev:/var/log/nginx
     depends_on:
       - frontend-dev
       - backend-dev

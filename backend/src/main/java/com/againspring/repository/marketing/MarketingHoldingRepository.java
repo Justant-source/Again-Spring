@@ -100,6 +100,8 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
                 THEN 1 ELSE 0
             END AS hasPartner,
             COALESCE(NULLIF(TRIM(p.promo_title), ''), p.title, p.user_title, '') AS hookText,
+            COALESCE(p.title, p.user_title, '') AS title,
+            COALESCE(p.body_published, '') AS bodyPublished,
             p.created_at AS createdAt
         FROM posts p
         WHERE p.created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
@@ -120,6 +122,8 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
         Number getAuthorVoteCount();
         Number getHasPartner();
         String getHookText();
+        String getTitle();
+        String getBodyPublished();
         java.time.Instant getCreatedAt();
     }
 

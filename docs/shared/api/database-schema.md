@@ -150,6 +150,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `marketing_publication_stats` | 플랫폼 참여 스냅샷 (X/IG/YT best-effort) | BIGINT auto **V110** |
 | `marketing_stats_event` | 통계 탭 활동 타임라인 (수집·제안·확정) | BIGINT auto **V111** |
 | `visit_events` | 방문 계측 (경로·UTM·referrer·봇 판정·고유방문자) | BIGINT auto · 유입 귀속 확장 **V120** |
+| `marketing_holding_exclusion` | 홀딩 풀 콘텐츠 가드 제외 사유 (조용한 누락 방지) | `post_id` VARCHAR(32) PK **V121** |
 
 ### AI-user 운영 테이블
 
@@ -423,6 +424,23 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | `user_id` | VARCHAR(32) | **V120** | 로그인·게스트 상태면 기록 (방문→투표→가입 연결) |
 
 인덱스: `visitor_key` · `(is_bot, occurred_at)` · `(utm_source, occurred_at)` · users `(acquisition_source, created_at)`
+
+---
+
+### `marketing_holding_exclusion` (**V121**)
+
+`MarketingHoldingContentGuard`가 홀딩 풀 적재에서 후보를 걸러낼 때 사유를 남긴다.
+2026-08-29 X 상위 노출 5건 중 2건이 갈등 사연이 아니었던 데서 출발했다
+("덕혜옹주…고종 독살", "여초회사 1년 근무자가 쓰는 장단점").
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `post_id` | VARCHAR(32) PK | posts.id. post당 1행 — 최초 감지 사유만 유지 |
+| `reason` | VARCHAR(64) | `YEAR_TRIVIA_PATTERN` · `PROS_CONS_LISTICLE` |
+| `detected_at` | TIMESTAMP(3) | 최초 감지 시각 |
+
+제외는 삭제가 아니다. 오탐이 미탐보다 비싸므로 판정은 의도적으로 좁고, 걸린 글이
+여기 남아야 나중에 오탐을 SELECT로 검증하고 되돌릴 수 있다.
 
 ---
 

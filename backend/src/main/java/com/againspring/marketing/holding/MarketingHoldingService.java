@@ -2,12 +2,14 @@ package com.againspring.marketing.holding;
 
 import com.againspring.domain.community.Post;
 import com.againspring.domain.marketing.MarketingHolding;
+import com.againspring.domain.marketing.MarketingHoldingExclusion;
 import com.againspring.domain.marketing.MarketingHoldingStatus;
 import com.againspring.domain.marketing.MarketingPinFormat;
 import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.MarketingScoreWeightService;
 import com.againspring.marketing.dto.CreateJobRequest.BriefDto;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.repository.marketing.MarketingHoldingExclusionRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository;
 import com.againspring.repository.marketing.MarketingHoldingRepository.DueHoldingProjection;
 import com.againspring.repository.marketing.MarketingHoldingRepository.HoldingCandidateProjection;
@@ -57,6 +59,7 @@ public class MarketingHoldingService {
     private final MarketingHoldingBriefSeeder briefSeeder;
     private final ObjectMapper objectMapper;
     private final PlatformTransactionManager transactionManager;
+    private final MarketingHoldingExclusionRepository exclusionRepository;
 
     /** Serializes board refresh so concurrent admin polls cannot trip MariaDB 1020. */
     private final Object boardRefreshLock = new Object();
@@ -438,6 +441,13 @@ public class MarketingHoldingService {
         List<HoldingCandidateProjection> rows = holdingRepository.findActiveCandidates();
         List<RankedCandidate> scored = new ArrayList<>(rows.size());
         for (HoldingCandidateProjection row : rows) {
+            String reason = MarketingHoldingContentGuard
+                .exclusionReason(row.getTitle(), row.getBodyPublished())
+                .orElse(null);
+            if (reason != null) {
+                recordExclusion(row.getId(), reason);
+                continue;
+            }
             int views = toInt(row.getViewCount());
             long comments = toLong(row.getCommentCount());
             long votes = toLong(row.getVoteCount());
@@ -458,6 +468,30 @@ public class MarketingHoldingService {
                 c.postId(), c.score(), c.views(), c.comments(), c.votes(), c.createdAt(), i + 1));
         }
         return ranked;
+    }
+
+    /**
+     * Persists a holding-pool exclusion the first time it is detected (idempotent —
+     * {@link MarketingHoldingContentGuard} re-evaluates every candidate on every board
+     * refresh / pool-scheduler tick, so without this guard the same post would log and
+     * write repeatedly for as long as it stays inside the 24h candidate window).
+     */
+    private void recordExclusion(String postId, String reason) {
+        if (exclusionRepository.existsById(postId)) {
+            return;
+        }
+        try {
+            exclusionRepository.save(MarketingHoldingExclusion.builder()
+                .postId(postId)
+                .reason(reason)
+                .build());
+            log.warn("[holding-guard] 홀딩 풀 제외 — postId={} reason={} "
+                + "(갈등 사연 아님으로 판정, marketing_holding_exclusion에서 오탐 검증 가능)",
+                postId, reason);
+        } catch (RuntimeException e) {
+            // Concurrent tick already inserted the same row — safe to ignore.
+            log.debug("[holding-guard] exclusion 기록 경합 (이미 기록됨) postId={}", postId, e);
+        }
     }
 
     /**

@@ -144,6 +144,16 @@ flowchart LR
   - 스케줄러 전용
   - prod DB를 읽고 dev DB로 비식별 upsert
 
+### Nginx
+
+- `nginx-dev`, `nginx-prod`
+- 접근/에러 로그는 `env/logs/nginx/{dev,prod}/` 호스트 bind mount로 영속화 (컨테이너 내부 `/var/log/nginx`).
+  이전에는 docker stdout에만 남아 로그 드라이버 순환으로 18일치만 존재했다.
+- 로그 포맷은 nginx 기본 `main`(`$remote_addr`·`$http_referer`·`$http_user_agent` 포함).
+  prod는 `real_ip_header CF-Connecting-IP`로 Cloudflare 뒤에서도 실 클라이언트 IP가 `$remote_addr`에 들어온다.
+- 보존 90일, 호스트 cron + `logrotate`로 회전 (사이드카 컨테이너 아님 — 근거·설정: `env/nginx/logrotate.conf`).
+  운영 절차: `docs/env/deployment.md`.
+
 ## 운영 사실
 
 - `AI_USER_ENABLED=false`면 orchestrator 스케줄러와 tick이 바로 멈춘다.

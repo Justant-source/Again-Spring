@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
+import { SERVER_API_BASE as API_BASE } from '@/lib/serverApiBase';
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://againspring.net';
-const API_BASE = process.env.API_BASE_URL || 'http://localhost:8080';
 
 // 사연 상세는 검색 유입의 실질적 진입점이다(홈은 CSR이라 크롤러가 볼 내용이 적다).
 // 한 번에 너무 많이 넣으면 생성이 느려지므로 최근분 위주로 상한을 둔다.

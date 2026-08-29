@@ -464,6 +464,41 @@ class VideoVariantServiceTest {
     }
 
     @Test
+    void generate_sibomCaptionLeakedFromBody_replacedWithCatalogDefault() throws Exception {
+        // Reproduces job 01M13K1KH1SYEMYSH5PCFFJP9N (marketing_generation_trace id=11):
+        // the LLM copied "상의없이" / "오백만원" straight out of the title/body into
+        // sibom_plan captions instead of writing an emotion/situation label.
+        String title = "아내가 상의없이 오백만원 빌려준 걸 알았다";
+        String body = "언제 갚는지 나랑 상의도 없이 그냥 빌려줬다는 게\n"
+                + "결혼하고 처음으로 진짜 낯설게 느껴졌어\n"
+                + "오백만원이 빠져나간 걸 봤어";
+
+        when(llmProvider.invoke(anyString(), anyString())).thenReturn("""
+            {"hook_shorts":"h","script_shorts":"요약 댓글","sibom_plan":[
+              {"role":"intro","image_id":"decision-announced","caption":"상의없이","beat_index":0,"size":"large","dwell":"hold"},
+              {"role":"peak","image_id":"money-trouble","caption":"오백만원","beat_index":1,"size":"large","dwell":"hold"},
+              {"role":"punch","image_id":"different-values","caption":"다른선택","beat_index":2,"size":"small","dwell":"punch"},
+              {"role":"soft_fill","image_id":"swallow-words","caption":"말못함","beat_index":2,"size":"small","dwell":"punch"}
+            ]}
+            """);
+
+        VideoVariantService.Variants v = service.generate(
+                null, "shock", title, body, false, true,
+                List.of("decision-announced", "money-trouble", "different-values", "swallow-words"));
+
+        SibomPlanItem intro = v.sibomPlanShorts().stream()
+                .filter(i -> i.imageId().equals("decision-announced")).findFirst().orElseThrow();
+        SibomPlanItem peak = v.sibomPlanShorts().stream()
+                .filter(i -> i.imageId().equals("money-trouble")).findFirst().orElseThrow();
+
+        assertThat(intro.caption()).doesNotContain("상의없이");
+        assertThat(peak.caption()).doesNotContain("오백만원");
+        // Legitimate labels untouched.
+        assertThat(v.sibomPlanShorts().stream().anyMatch(i -> "다른선택".equals(i.caption()))).isTrue();
+        assertThat(v.sibomPlanShorts().stream().anyMatch(i -> "말못함".equals(i.caption()))).isTrue();
+    }
+
+    @Test
     void qualityGate_threeShortsPlanFails() {
         VideoVariantService.Variants variants = new VideoVariantService.Variants(
             "h", "s", 30, null, "숏츠 대본", null,

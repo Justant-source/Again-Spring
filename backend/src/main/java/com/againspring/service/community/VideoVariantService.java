@@ -54,7 +54,9 @@ public class VideoVariantService {
     // 훅 목표 2.5~3초 → 3 * 10.19 = 30자 중앙값, 상한 34자
     private static final int HOOK_TARGET_CHARS = 30;
     private static final int HOOK_MAX_CHARS = 34;
-    private static final Set<String> FORBIDDEN = Set.of(
+    // Package-private (not private): SibomPlanGuard reuses this set for sibom_plan
+    // caption validation so the forbidden-word list stays single-sourced (2026-08-29).
+    static final Set<String> FORBIDDEN = Set.of(
             "판결", "처방", "승패", "승자", "패자", "가해자", "피해자", "배심원", "유죄", "무죄");
 
     /** Platform variant bundle for brief / Waggle render. */
@@ -383,7 +385,9 @@ public class VideoVariantService {
         int scriptMax = channel == SibomPlanGuard.Channel.REELS ? SCRIPT_REELS_MAX : SCRIPT_SHORTS_MAX;
         String hook = sanitizeHook(llm.hook(), masterHook, title);
         String script = sanitizeScript(llm.script(), body, scriptMax);
-        SibomPlanGuard.GuardResult guardResult = SibomPlanGuard.guardWithLog(llm.sibomPlan(), channel);
+        String leakCheckSource = SibomPlanGuard.buildLeakIndex(title, body);
+        SibomPlanGuard.GuardResult guardResult =
+                SibomPlanGuard.guardWithLog(llm.sibomPlan(), channel, leakCheckSource);
         List<SibomPlanItem> plan = guardResult.items();
         // Neither the LLM candidate nor the raw-body fallback fit a sentence boundary —
         // more specific than the underlying LLM status so validateRequiredSibomPlans and
@@ -533,6 +537,8 @@ public class VideoVariantService {
               장수가 줄어드니, 중복 제거 후에도 4장 이상 남도록 여유 있게 작성하세요.
               soft_fill은 아래 풀 id만·intro/peak 불가. image_id는 후보 카드 또는 soft_fill 풀에서만.
               caption은 카탈로그 재사용 또는 최대 10자(maxChars=10) 단문(판정·승패·처방 금지).
+              caption은 감정·상황을 나타내는 명사구여야 합니다("낯섦", "말못함"처럼). 본문/제목 문장이나
+              그 안의 어절(사건·금액·날짜·이름 등 구체적 사실)을 그대로 잘라 caption에 쓰지 마세요.
               beat_index=대본 비트 인덱스. 1피크=hook_emotion 정렬, 2피크=결말/반전만·후반.
 
             ## 시봄이 후보 카드 (id|arc|people|meaning|maxChars) — 전체 카탈로그 금지

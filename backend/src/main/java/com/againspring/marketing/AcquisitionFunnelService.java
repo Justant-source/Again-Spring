@@ -32,6 +32,20 @@ public class AcquisitionFunnelService {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * "사람 가입자" 조건.
+     *
+     * <p>2026-08-29: prod에 e2e 픽스처 계정 10개(`e2epersona01`~`10`, 2026-08-01 생성)가
+     * 남아 있어 30일 사람 가입이 11명으로 잡혔다. 실제로는 1명이다. 유입 판정의 최종
+     * 지표라 이 오차가 그대로 오독으로 이어진다. 실제 사용자 id는 26자 hex라
+     * `e2e` 접두사와 겹치지 않는다.
+     *
+     * <p>근본 해결은 prod에서 픽스처 계정을 정리하는 것이지만, 운영 데이터 변경은
+     * 별도 승인이 필요하므로 집계 쪽에서 먼저 막는다.
+     */
+    private static final String HUMAN_USER_PREDICATE =
+        "synthetic = 0 AND is_guest = 0 AND deleted_at IS NULL AND id NOT LIKE 'e2e%'";
+
     public record ChannelRow(
         String source,
         long visits,
@@ -77,8 +91,8 @@ public class AcquisitionFunnelService {
             window);
 
         long totalSignups = count(
-            "SELECT COUNT(*) FROM users WHERE synthetic = 0 AND is_guest = 0 AND deleted_at IS NULL "
-                + "AND created_at >= NOW() - INTERVAL ? DAY",
+            "SELECT COUNT(*) FROM users WHERE " + HUMAN_USER_PREDICATE
+                + " AND created_at >= NOW() - INTERVAL ? DAY",
             window);
 
         List<ChannelRow> byChannel = channelRows(window);
@@ -116,13 +130,11 @@ public class AcquisitionFunnelService {
             GROUP BY source
             """, window);
 
-        List<Map<String, Object>> signupRows = jdbcTemplate.queryForList("""
-            SELECT COALESCE(acquisition_source, '(unknown)') AS source, COUNT(*) AS signups
-            FROM users
-            WHERE synthetic = 0 AND is_guest = 0 AND deleted_at IS NULL
-              AND created_at >= NOW() - INTERVAL ? DAY
-            GROUP BY source
-            """, window);
+        List<Map<String, Object>> signupRows = jdbcTemplate.queryForList(
+            "SELECT COALESCE(acquisition_source, '(unknown)') AS source, COUNT(*) AS signups "
+                + "FROM users WHERE " + HUMAN_USER_PREDICATE
+                + " AND created_at >= NOW() - INTERVAL ? DAY GROUP BY source",
+            window);
 
         java.util.Map<String, Long> signupBySource = new java.util.LinkedHashMap<>();
         for (Map<String, Object> row : signupRows) {
@@ -158,13 +170,11 @@ public class AcquisitionFunnelService {
             WHERE is_bot = 0 AND occurred_at >= NOW() - INTERVAL ? DAY
             GROUP BY d ORDER BY d
             """, window);
-        List<Map<String, Object>> signups = jdbcTemplate.queryForList("""
-            SELECT DATE(created_at) AS d, COUNT(*) AS signups
-            FROM users
-            WHERE synthetic = 0 AND is_guest = 0 AND deleted_at IS NULL
-              AND created_at >= NOW() - INTERVAL ? DAY
-            GROUP BY d ORDER BY d
-            """, window);
+        List<Map<String, Object>> signups = jdbcTemplate.queryForList(
+            "SELECT DATE(created_at) AS d, COUNT(*) AS signups FROM users WHERE "
+                + HUMAN_USER_PREDICATE
+                + " AND created_at >= NOW() - INTERVAL ? DAY GROUP BY d ORDER BY d",
+            window);
 
         java.util.Map<String, Long> signupByDay = new java.util.HashMap<>();
         for (Map<String, Object> row : signups) {

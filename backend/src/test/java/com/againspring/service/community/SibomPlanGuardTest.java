@@ -232,6 +232,118 @@ class SibomPlanGuardTest {
         assertThat(guarded.size()).isGreaterThanOrEqualTo(SibomPlanGuard.MIN_SHORTS);
     }
 
+    // --- §5.1 caption content gate (2026-08-29, job 01M13K1KH1SYEMYSH5PCFFJP9N incident) ---
+    // marketing_generation_trace id=11 showed the LLM literally lifted body words into
+    // sibom_plan captions ("상의없이", "오백만원" — from title "아내가 상의없이 오백만원
+    // 빌려준 걸 알았다" / body "...상의도 없이 그냥 빌려줬다는 게...오백만원이 빠져나간...").
+    // sibom_plan_llm == sibom_plan_final in the trace, proving the schema guard let it through
+    // unchanged (it only checked caption length, never content).
+
+    private static final String INCIDENT_TITLE = "아내가 상의없이 오백만원 빌려준 걸 알았다";
+    private static final String INCIDENT_BODY = String.join("\n",
+            "어제 저녁에 밥 차려놓고 아내 기다렸어",
+            "계모임 저녁 약속 있다고만 하고 나갔거든",
+            "아홉시 넘어서 카톡으로 늦는다고만 왔어",
+            "자정 다 돼서야 들어오더라",
+            "근데 오늘 통장 정리하다가 오백만원이 빠져나간 걸 봤어",
+            "왜 나갔냐고 물으니 계모임 언니가 급하다고 해서 빌려줬대",
+            "언제 갚는지 나랑 상의도 없이 그냥 빌려줬다는 게",
+            "결혼하고 처음으로 진짜 낯설게 느껴졌어");
+
+    @Test
+    void buildLeakIndex_catchesIncidentCaptions_butNotLegitimateEmotionLabel() {
+        String leakIndex = SibomPlanGuard.buildLeakIndex(INCIDENT_TITLE, INCIDENT_BODY);
+
+        // Actual bad captions from the incident trace — literal body/title chunks.
+        assertThat(SibomPlanGuard.isBodyLeak("상의없이", leakIndex)).isTrue();
+        assertThat(SibomPlanGuard.isBodyLeak("오백만원", leakIndex)).isTrue();
+
+        // "낯섦" (nominalized) never appears verbatim in the body ("낯설게", adjective form) —
+        // must NOT be flagged, since this is exactly the kind of good label the user confirmed
+        // as normal ("정상: 낯섦", "말못함").
+        assertThat(SibomPlanGuard.isBodyLeak("낯섦", leakIndex)).isFalse();
+        assertThat(SibomPlanGuard.isBodyLeak("말못함", leakIndex)).isFalse();
+    }
+
+    @Test
+    void guardWithLog_bodyLeakCaption_replacedWithCatalogDefault() {
+        String leakIndex = SibomPlanGuard.buildLeakIndex(INCIDENT_TITLE, INCIDENT_BODY);
+
+        SibomPlanGuard.GuardResult result = SibomPlanGuard.guardWithLog(List.of(
+                item("intro", "decision-announced", "상의없이", 0, "large", "hold"),
+                item("peak", "money-trouble", "오백만원", 1, "large", "hold"),
+                item("soft_fill", "stunned", "낯섦", 2, "small", "punch")
+        ), SibomPlanGuard.Channel.SHORTS, leakIndex);
+
+        SibomPlanItem intro = result.items().stream()
+                .filter(i -> i.imageId().equals("decision-announced")).findFirst().orElseThrow();
+        SibomPlanItem peak = result.items().stream()
+                .filter(i -> i.imageId().equals("money-trouble")).findFirst().orElseThrow();
+        SibomPlanItem softFill = result.items().stream()
+                .filter(i -> i.imageId().equals("stunned")).findFirst().orElseThrow();
+
+        // Leaked captions replaced with the catalog's own vetted default for that image.
+        assertThat(intro.caption()).isEqualTo(SibomCatalog.get("decision-announced").get().caption());
+        assertThat(peak.caption()).isEqualTo(SibomCatalog.get("money-trouble").get().caption());
+        assertThat(intro.caption()).doesNotContain("상의없이");
+        assertThat(peak.caption()).doesNotContain("오백만원");
+
+        // Legitimate emotion label untouched.
+        assertThat(softFill.caption()).isEqualTo("낯섦");
+
+        assertThat(result.log()).anySatisfy(entry -> {
+            assertThat(entry.action()).isEqualTo("caption_replaced");
+            assertThat(entry.reason()).contains("body_leak");
+        });
+    }
+
+    @Test
+    void guardWithLog_amountCaption_replacedEvenWithoutBodyMatch() {
+        // A caption made of digits (e.g. LLM writes "500만원" instead of "오백만원") is never
+        // a valid emotion label regardless of whether it literally appears in the body.
+        SibomPlanGuard.GuardResult result = SibomPlanGuard.guardWithLog(List.of(
+                item("peak", "money-trouble", "500만원", 1, "large", "hold")
+        ), SibomPlanGuard.Channel.SHORTS, null);
+
+        SibomPlanItem peak = result.items().stream()
+                .filter(i -> i.imageId().equals("money-trouble")).findFirst().orElseThrow();
+        assertThat(peak.caption()).isEqualTo(SibomCatalog.get("money-trouble").get().caption());
+        assertThat(result.log()).anySatisfy(entry -> {
+            assertThat(entry.action()).isEqualTo("caption_replaced");
+            assertThat(entry.reason()).contains("amount_or_number");
+        });
+    }
+
+    @Test
+    void guardWithLog_forbiddenWordCaption_replaced() {
+        SibomPlanGuard.GuardResult result = SibomPlanGuard.guardWithLog(List.of(
+                item("punch", "stunned", "가해자", 1, "small", "punch")
+        ), SibomPlanGuard.Channel.SHORTS, null);
+
+        SibomPlanItem punch = result.items().stream()
+                .filter(i -> i.imageId().equals("stunned")).findFirst().orElseThrow();
+        assertThat(punch.caption()).isEqualTo(SibomCatalog.get("stunned").get().caption());
+        assertThat(punch.caption()).doesNotContain("가해자");
+        assertThat(result.log()).anySatisfy(entry -> {
+            assertThat(entry.action()).isEqualTo("caption_replaced");
+            assertThat(entry.reason()).contains("forbidden_word");
+        });
+    }
+
+    @Test
+    void guardWithLog_noLeakIndex_skipsBodyLeakCheckButStillCatchesAmountAndForbidden() {
+        // Legacy 2-arg overload (no post text on hand) still runs the amount/forbidden checks,
+        // just not the body-leak check.
+        List<SibomPlanItem> out = SibomPlanGuard.guard(List.of(
+                item("intro", "decision-announced", "상의없이", 0, "large", "hold")
+        ), SibomPlanGuard.Channel.SHORTS);
+
+        // Without a leak index, "상의없이" isn't flagged as a body leak (nothing to compare
+        // against), so it passes through as normal LLM output would have before this fix.
+        assertThat(out.stream().filter(i -> i.imageId().equals("decision-announced")).findFirst().get().caption())
+                .isEqualTo("상의없이");
+    }
+
     private static SibomPlanItem item(
             String role, String id, String caption, int beat, String size, String dwell) {
         return new SibomPlanItem(role, id, caption, beat, size, dwell);

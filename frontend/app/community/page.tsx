@@ -1,283 +1,71 @@
-'use client';
+/**
+ * /community (광장) — 서버 컴포넌트 래퍼.
+ *
+ * 이전에는 파일 전체가 'use client' + useEffect 페칭이었다. SSR 시점엔 posts=[]라서
+ * 크롤러가 받는 HTML은 실제 사연 목록 대신 "아직 사연이 없습니다" 빈 상태 문구였다
+ * (완전한 CSR bailout은 아니지만 결과적으로 검색엔진에 콘텐츠가 전혀 안 잡히는 건 같다).
+ *
+ * 기본 필터(전체 카테고리·최신순) 1페이지(20건)만 서버에서 fetch해
+ * CommunityFeedClient에 initial prop으로 넘긴다. 카테고리 필터·정렬 전환·무한스크롤·투표는
+ * 기존 그대로 클라이언트가 담당 — 전면 재작성이 아니라 초기 데이터 주입이다.
+ *
+ * 로그인 사용자별 데이터(내 투표 여부 myVoteSide 등)는 서버 fetch에 인증 토큰을 싣지 않으므로
+ * 항상 비어 있다 — voteStore(localStorage 기반)가 클라이언트에서 채운다.
+ * 사연 상세(/community/[id])의 generateMetadata + opengraph-image.tsx는 이미 잘 되어 있어 손대지 않는다.
+ */
+import type { Metadata } from 'next';
+import CommunityFeedClient from './CommunityFeedClient';
+import type { PostSummary } from '@/lib/api/community/postApi';
+import { SERVER_API_BASE as API_BASE } from '@/lib/serverApiBase';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { postApi, PostSummary } from '@/lib/api/community/postApi';
-import { FeedCard, BrandBar, SearchPanel } from '@/components/community/c3';
-import { useUserStore } from '@/lib/store/userStore';
-import { useGuestInit } from '@/lib/hooks/useGuestInit';
-import { useVoteStore } from '@/lib/store/voteStore';
-import { timeAgo } from '@/lib/utils/timeAgo';
-import { resolveAuthorPct } from '@/lib/utils/empathyPct';
+// app/sitemap.ts와 동일한 패턴 — 서버 컴포넌트는 next.config.mjs의 /api rewrite를 타지 않으므로
+// API_BASE_URL을 직접 사용해야 한다.
 
-// id = BE PostCategory enum, label = 표시 한글
-const C3_CATS = [
-  { id: 'COUPLE',  label: '연인' },
-  { id: 'MARRIED', label: '부부' },
-  { id: 'FRIEND',  label: '친구' },
-  { id: 'FAMILY',  label: '가족' },
-  { id: 'WORK',    label: '직장' },
-  { id: 'OTHER',   label: '기타' },
-];
 
-function getCategoryLabel(categoryId: string): string {
-  const found = C3_CATS.find(c => c.id === (categoryId || '').toUpperCase());
-  return found?.label || '기타';
+// 광장은 홈보다 갱신 빈도가 잦다(새 사연·투표·댓글이 계속 쌓임) — 권장 구간(60~300초) 하단에 가깝게.
+export const revalidate = 90;
+
+// layout.tsx 기본 메타(홈 전용, canonical '/')와 겹치지 않도록 목록 페이지 전용 title/description.
+// title은 layout의 template('%s · 다시봄')이 자동으로 '· 다시봄'을 붙이므로 여기서는 중복 표기하지 않는다.
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: '광장 — 갈등 사연 모아보기',
+    description:
+      '연인·부부·친구·가족·직장에서 생긴 갈등 사연을 모았습니다. 작성자와 상대방 중 '
+      + '어느 쪽에 공감하는지 투표하고 다른 사람들의 생각도 확인해보세요.',
+    alternates: { canonical: '/community' },
+    openGraph: {
+      title: '다시봄 광장 — 갈등 사연 모아보기',
+      description: '이 갈등, 당신은 어느 쪽에 공감하나요? 지금 올라온 사연들을 둘러보세요.',
+      url: '/community',
+      type: 'website',
+    },
+  };
 }
 
-const FEED_PAGE_SIZE = 20;
-
-function mergePosts(prev: PostSummary[], next: PostSummary[]): PostSummary[] {
-  if (prev.length === 0) return next;
-  const seen = new Set(prev.map((post) => post.id));
-  return [...prev, ...next.filter((post) => !seen.has(post.id))];
-}
-
-export default function CommunityFeedPage() {
-  const user = useUserStore((s) => s.user);
-  useGuestInit();
-  const voteStoreVotes = useVoteStore((s) => s.votes);
-  const [posts, setPosts] = useState<PostSummary[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [sort, setSort] = useState<'latest' | 'recommended'>('latest');
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [, setTimeTick] = useState(0);
-  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const feedRequestKeyRef = useRef(0);
-
-  const categoryOptions = [{ id: '', label: '전체' }, ...C3_CATS];
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadPosts = async () => {
-      try {
-        const requestKey = ++feedRequestKeyRef.current;
-        setLoading(true);
-        setLoadingMore(false);
-        setPosts([]);
-        setPage(0);
-        setHasMore(false);
-        setError(null);
-        const result = await postApi.list({
-          category: selectedCategory || undefined,
-          sort,
-          page: 0,
-          size: FEED_PAGE_SIZE,
-        });
-        if (cancelled || requestKey !== feedRequestKeyRef.current) return;
-        setPosts(result.content);
-        setPage(1);
-        setHasMore(result.totalPages > 1);
-      } catch (err) {
-        console.error('Failed to load posts:', err);
-        if (cancelled) return;
-        setError('사연을 불러올 수 없습니다. 다시 시도해주세요.');
-        setPosts([]);
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadPosts();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedCategory, sort]);
-
-  useEffect(() => {
-    const id = setInterval(() => setTimeTick(t => t + 1), 60_000);
-    return () => clearInterval(id);
-  }, []);
-
-  const loadMorePosts = useCallback(async () => {
-    if (loading || loadingMore || !hasMore) return;
-    const requestKey = feedRequestKeyRef.current;
-    const nextPage = page;
-    setLoadingMore(true);
-    try {
-      const result = await postApi.list({
-        category: selectedCategory || undefined,
-        sort,
-        page: nextPage,
-        size: FEED_PAGE_SIZE,
-      });
-      if (requestKey !== feedRequestKeyRef.current) return;
-      setPosts((prev) => mergePosts(prev, result.content));
-      setPage(nextPage + 1);
-      setHasMore(nextPage + 1 < result.totalPages);
-    } catch (err) {
-      console.error('Failed to load more posts:', err);
-    } finally {
-      if (requestKey === feedRequestKeyRef.current) {
-        setLoadingMore(false);
-      }
-    }
-  }, [hasMore, loading, loadingMore, page, selectedCategory, sort]);
-
-  useEffect(() => {
-    const el = loadMoreRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          void loadMorePosts();
-        }
+async function fetchInitialPosts(): Promise<{ content: PostSummary[]; totalPages: number }> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/community/posts?page=0&size=20&sortBy=latest`,
+      {
+        headers: { Accept: 'application/json' },
+        next: { revalidate: 90 },
+        signal: AbortSignal.timeout(2500),
       },
-      { rootMargin: '320px 0px', threshold: 0.01 }
     );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMorePosts]);
+    if (!res.ok) return { content: [], totalPages: 0 };
+    const body = await res.json();
+    return {
+      content: Array.isArray(body?.content) ? body.content : [],
+      totalPages: typeof body?.totalPages === 'number' ? body.totalPages : 0,
+    };
+  } catch {
+    // 광장 렌더가 BE 장애로 막히면 안 된다 — 빈 배열로 폴백, 클라이언트가 재시도한다.
+    return { content: [], totalPages: 0 };
+  }
+}
 
-
-  return (
-    <div style={{ background: 'var(--L-bg)', minHeight: '100vh' }}>
-      <div style={{ padding: '18px 22px 90px' }}>
-        {/* 상단 헤더: 다시봄 광장 + 검색 아이콘 + 유저 칩 */}
-        <BrandBar title="다시봄 광장" user={user} onSearchOpen={() => setSearchPanelOpen(true)} />
-
-        {/* 카테고리 필터 — 가로 스크롤 칩 */}
-        <div style={{ display: 'flex', gap: 7, marginTop: 16, overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {categoryOptions.map((opt) => {
-            const isSelected = selectedCategory === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => setSelectedCategory(opt.id)}
-                style={{
-                  flexShrink: 0,
-                  padding: '6px 13px',
-                  borderRadius: 999,
-                  fontSize: 13,
-                  whiteSpace: 'nowrap',
-                  border: `1px solid ${isSelected ? 'var(--L-ink)' : 'var(--L-border)'}`,
-                  background: isSelected ? 'var(--L-ink)' : 'transparent',
-                  color: isSelected ? 'var(--L-bg)' : 'var(--L-ink)',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sans)',
-                }}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 정렬 토글 */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 14 }}>
-            <button
-              data-testid="feed-sort-latest"
-              onClick={() => setSort('latest')}
-              style={{
-                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                fontSize: 12.5, fontWeight: 500,
-                color: sort === 'latest' ? 'var(--L-ink)' : 'var(--L-sub)',
-              }}
-            >
-              최신순
-            </button>
-            <button
-              data-testid="feed-sort-recommended"
-              onClick={() => setSort('recommended')}
-              style={{
-                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                fontSize: 12.5, fontWeight: sort === 'recommended' ? 500 : 400,
-                color: sort === 'recommended' ? 'var(--L-ink)' : 'var(--L-sub)',
-              }}
-            >
-              추천순
-            </button>
-          </div>
-
-        {/* 로딩 상태 */}
-        {loading && (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--L-sub)' }}>
-            불러오는 중...
-          </div>
-        )}
-
-        {/* 에러 상태 */}
-        {error && (
-          <div style={{
-            marginTop: 16,
-            padding: '16px',
-            background: '#FEE',
-            border: '1px solid #F99',
-            borderRadius: 8,
-            fontSize: 13,
-            color: '#C33',
-          }}>
-            {error}
-          </div>
-        )}
-
-        {/* 사연 목록 */}
-        {!loading && posts.length > 0 && (
-          <div data-testid="feed-post-list" style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {posts.map((post) => (
-              <FeedCard
-                key={post.id}
-                href={`/community/${post.id}`}
-                cat={getCategoryLabel(post.category)}
-                id={post.authorNickname || '익명'}
-                time={timeAgo(post.createdAt)}
-                title={post.title}
-                body={post.bodyPublished}
-                g={resolveAuthorPct({ authorPct: post.authorPct, voteCount: post.voteCount })}
-                votes={post.voteCount || 0}
-                c={post.commentCount || 0}
-                views={post.viewCount || 0}
-                paired={post.paired}
-                voted={!!post.myVoteSide || !!voteStoreVotes[post.id]}
-              />
-            ))}
-            <div ref={loadMoreRef} data-testid="feed-load-more-sentinel" style={{ height: 1 }} />
-            {loadingMore && (
-              <div style={{ textAlign: 'center', padding: '10px 0 2px', color: 'var(--L-sub)', fontSize: 12.5 }}>
-                더 불러오는 중...
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 빈 상태 */}
-        {!loading && posts.length === 0 && !error && (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--L-sub)' }}>
-            <div style={{ fontSize: 14, marginBottom: 12 }}>
-              아직 사연이 없습니다
-            </div>
-            <Link
-              href="/community/new"
-              style={{
-                display: 'inline-block',
-                padding: '10px 16px',
-                background: 'var(--L-ink)',
-                color: 'var(--L-bg)',
-                borderRadius: 6,
-                fontSize: 13,
-                textDecoration: 'none',
-              }}
-            >
-              첫 사연 올리기
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {searchPanelOpen && (
-        <SearchPanel
-          currentCategory={selectedCategory}
-          onCategorySelect={(id) => setSelectedCategory(id)}
-          onClose={() => setSearchPanelOpen(false)}
-        />
-      )}
-    </div>
-  );
+export default async function Page() {
+  const { content, totalPages } = await fetchInitialPosts();
+  return <CommunityFeedClient initialPosts={content} initialHasMore={totalPages > 1} />;
 }

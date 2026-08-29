@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { AcquisitionFunnelPanel } from '@/components/admin/marketing/AcquisitionFunnelPanel';
 import { MarketingStatsHealthBar } from '@/components/admin/marketing/MarketingStatsHealthBar';
 import { MarketingStatsKpiPanel } from '@/components/admin/marketing/MarketingStatsKpiPanel';
 import { MarketingStatsTodoStrip } from '@/components/admin/marketing/MarketingStatsTodoStrip';
@@ -176,6 +177,9 @@ export function MarketingStatsTab() {
         primaryMetric={primaryMetric}
         onPrimaryMetricChange={setPrimaryMetric}
       />
+
+      {/* 2.5. 유입 퍼널 — 발행 다음 칸(방문→가입). 배경: 2026-08-29 */}
+      <AcquisitionFunnelPanel />
 
       {/* 5. Theme matrix + apply */}
       <MarketingThemeMatrixPanel

@@ -316,7 +316,11 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=6000
   메타태그 값(2026-08-29 신설). 비시크릿. 비어 있으면 태그를 아예 렌더하지 않는다(`app/layout.tsx`
   `metadata.verification`). Google Search Console / 네이버 서치어드바이저에서 발급받은 문자열을
   **prod에만** 넣는다 — dev는 `app/robots.ts`가 전체 색인을 차단하므로 등록 대상이 아니다.
-  FE 빌드 타임 주입이라 값 변경 시 프론트엔드 재빌드가 필요하다(`NEXT_PUBLIC_*` 공통).
+  🔴 **빌드 인자로 넘겨야 한다.** `NEXT_PUBLIC_*`는 빌드 타임에 번들로 인라인되므로
+  compose `environment:`에만 두면 항상 `undefined`가 된다. `docker-compose.{dev,prod}.yml`의
+  frontend `build.args`와 `frontend/Dockerfile`의 `ARG`/`ENV` 양쪽에 wiring돼 있어야 하며,
+  값 변경 시 프론트엔드 **재빌드**가 필요하다(재시작만으로는 반영 안 됨).
+  `.env.prod`에 `GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION`로 넣는다.
 
 prod는 OAuth와 메일 관련 값을 모두 실제 값으로 채워야 한다.
 

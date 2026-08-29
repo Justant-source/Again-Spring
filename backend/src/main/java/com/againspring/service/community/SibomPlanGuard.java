@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Schema guard for channel {@code sibom_plan} — normalizes entries in code, never retries LLM.
@@ -59,7 +60,64 @@ public final class SibomPlanGuard {
 
     private static final Set<String> ROLES = Set.of("intro", "peak", "punch", "soft_fill");
 
+    /**
+     * §5.1 caption content gate (2026-08-29, job 01M13K1KH1SYEMYSH5PCFFJP9N incident):
+     * an LLM caption must be an emotion/situation label ("낯섦", "말못함"), never a story
+     * fact lifted verbatim from the post ("상의없이", "오백만원" — copied from the body
+     * "…상의도 없이…오백만원이…"). {@code marketing_generation_trace} confirmed this is an
+     * LLM-output problem, not a fallback path: {@code sibom_plan_llm == sibom_plan_final},
+     * i.e. the schema guard let the leak straight through because it only checked length.
+     * A violation here never blocks the item — it replaces the caption text with the
+     * catalog's own vetted default ({@link SibomCatalog.Entry#caption()}), which is always
+     * ≤ {@link #CAPTION_MAX_CHARS} (see SibomPlanGuardTest#catalogLoaded), so the slide is
+     * never silently dropped and never shows unvetted text.
+     */
+    private static final int LEAK_MIN_CHARS = 3;
+
+    /** Digits (Arabic) are never an emotion label — catches amount-style captions. */
+    private static final Pattern HAS_DIGIT = Pattern.compile(".*[0-9].*");
+
     private SibomPlanGuard() {}
+
+    /**
+     * Build a normalized leak-detection index from the post title/body (never the generated
+     * script — the script can legitimately reuse an emotion word the caption also uses, e.g.
+     * a narration closing on "...그 낯섦이 자리 잡고 있어" is fine even though "낯섦" is also a
+     * caption; only literal story facts from the source post count as a leak). Only whitespace
+     * and quote/punctuation marks are removed — no morphological (particle) stripping, since a
+     * wrong guess there (Korean nouns and josa share syllables, e.g. "정의"/"동의" end in the
+     * possessive particle "의") would risk false positives more than it gains coverage. This
+     * still catches the incident case: "상의없이" appears space-free in the title as written,
+     * and "오백만원" is a substring of the body's "오백만원이" (no particle sits between the
+     * caption text and the rest of the token). Returns {@code null} when nothing to check.
+     */
+    public static String buildLeakIndex(String title, String body) {
+        String combined = (title == null ? "" : title) + "\n" + (body == null ? "" : body);
+        String normalized = combined.replaceAll("[\\s.,!?…\"'\\u201c\\u201d\\u2018\\u2019]+", "");
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    /** True when {@code caption} is a literal chunk lifted from the post title/body. */
+    static boolean isBodyLeak(String caption, String leakIndex) {
+        if (leakIndex == null || caption == null) return false;
+        String stripped = caption.replaceAll("\\s+", "");
+        return stripped.length() >= LEAK_MIN_CHARS && leakIndex.contains(stripped);
+    }
+
+    /** True when {@code caption} contains a digit (never a valid emotion label — amounts/dates). */
+    static boolean isRawNumberCaption(String caption) {
+        return caption != null && HAS_DIGIT.matcher(caption).matches();
+    }
+
+    /** Reuses {@link VideoVariantService#FORBIDDEN} so the 판결/처방/승패 list stays single-sourced. */
+    static boolean isForbiddenCaption(String caption) {
+        if (caption == null || caption.isEmpty()) return false;
+        String lower = caption.toLowerCase(Locale.ROOT);
+        for (String f : VideoVariantService.FORBIDDEN) {
+            if (lower.contains(f.toLowerCase(Locale.ROOT))) return true;
+        }
+        return false;
+    }
 
     public enum Channel {
         REELS,
@@ -93,10 +151,21 @@ public final class SibomPlanGuard {
     }
 
     /**
-     * Guard with audit trail. Like {@link #guard(List, Channel)} but includes log entries
-     * documenting each normalization, deduplication, promotion/demotion, and trim decision.
+     * Guard with audit trail, no source-post leak check (legacy — prefer the 3-arg overload
+     * so §5.1 caption-leak validation runs). Kept for callers/tests without post text on hand.
      */
     public static GuardResult guardWithLog(List<SibomPlanItem> raw, Channel channel) {
+        return guardWithLog(raw, channel, null);
+    }
+
+    /**
+     * Guard with audit trail. Like {@link #guard(List, Channel)} but includes log entries
+     * documenting each normalization, deduplication, promotion/demotion, and trim decision.
+     *
+     * @param leakIndex normalized post title/body index from {@link #buildLeakIndex(String, String)},
+     *                   or {@code null} to skip the §5.1 caption-leak check
+     */
+    public static GuardResult guardWithLog(List<SibomPlanItem> raw, Channel channel, String leakIndex) {
         if (raw == null || raw.isEmpty() || channel == null) {
             return new GuardResult(List.of(), List.of());
         }
@@ -104,7 +173,7 @@ public final class SibomPlanGuard {
         List<GuardLogEntry> log = new ArrayList<>();
         List<SibomPlanItem> working = new ArrayList<>();
         for (SibomPlanItem item : raw) {
-            SibomPlanItem fixed = normalizeAndValidate(item);
+            SibomPlanItem fixed = normalizeAndValidate(item, leakIndex, log);
             if (fixed != null) {
                 working.add(fixed);
             } else if (item != null && blankToNull(item.imageId()) != null) {
@@ -124,7 +193,7 @@ public final class SibomPlanGuard {
         return new GuardResult(List.copyOf(out), List.copyOf(log));
     }
 
-    private static SibomPlanItem normalizeAndValidate(SibomPlanItem item) {
+    private static SibomPlanItem normalizeAndValidate(SibomPlanItem item, String leakIndex, List<GuardLogEntry> log) {
         if (item == null) return null;
         String imageId = blankToNull(item.imageId());
         if (imageId == null || !SibomCatalog.isKnown(imageId)) {
@@ -152,6 +221,22 @@ public final class SibomPlanGuard {
         }
 
         String caption = item.caption() != null ? item.caption().trim() : "";
+
+        // §5.1 caption content gate: never silently pass a story-fact leak, an amount, or a
+        // forbidden word through as a screen label — replace with the catalog's vetted
+        // default caption for this image (always ≤ maxChars) and log it (2026-08-29).
+        if (!caption.isEmpty()) {
+            String violation = isForbiddenCaption(caption) ? "forbidden_word"
+                    : isRawNumberCaption(caption) ? "amount_or_number"
+                    : isBodyLeak(caption, leakIndex) ? "body_leak"
+                    : null;
+            if (violation != null) {
+                log.add(new GuardLogEntry("caption_replaced", imageId,
+                        violation + ": '" + caption + "' replaced with catalog default caption"));
+                caption = entry.caption() != null ? entry.caption().trim() : "";
+            }
+        }
+
         // §5.2.2 caption maxChars=10 → sibling_bottom swap → empty caption
         if (!caption.isEmpty() && caption.length() > entry.maxChars()) {
             String siblingId = entry.siblingBottom();

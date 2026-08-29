@@ -6,6 +6,7 @@
  * 절대 throw 하지 않음 — 오류는 항상 FALLBACK 반환.
  */
 import 'server-only';
+import { SERVER_API_BASE } from '@/lib/serverApiBase';
 
 // 카테고리 enum → 표시 한글 (app/community/[id]/page.tsx CAT_LABELS 와 동일 셋)
 export const OG_CAT_LABELS: Record<string, string> = {
@@ -43,11 +44,8 @@ const FALLBACK: OgPostData = {
   totalVotes: 0,
 };
 
-// 런타임 env 우선, compose 미설정 시 기존 API_BASE_URL fallback, 최종 로컬 dev 기본값
-const BASE =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.API_BASE_URL ||
-  'http://localhost:8080';
+// 해소 순서는 lib/serverApiBase.ts 한 곳에서 관리한다 (같은 식이 흩어지면 한쪽만 틀어진다)
+const BASE = SERVER_API_BASE;
 
 /** 길고 불필요한 공백 제거 후 max 자 이내로 자름 */
 function clipTitle(s: string, max = 38): string {

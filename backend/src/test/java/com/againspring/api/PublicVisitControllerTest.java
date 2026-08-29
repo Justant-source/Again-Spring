@@ -3,11 +3,13 @@ package com.againspring.api;
 import com.againspring.api.visits.PublicVisitController;
 import com.againspring.domain.VisitEvent;
 import com.againspring.repository.VisitEventRepository;
+import com.againspring.service.acquisition.VisitorClassifier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +29,14 @@ class PublicVisitControllerTest {
 
     @Mock
     private VisitEventRepository visitEventRepository;
+
+    /**
+     * 봇 판정은 순수 함수라 목이 아니라 실물을 주입한다. 목으로 두면 기본 반환값(false)
+     * 때문에 "모든 UA가 사람"이 되어, 정작 이 컨트롤러가 봇을 걸러 저장하는지 검증하지
+     * 못한다. @InjectMocks는 @Mock/@Spy로 선언된 필드만 주입하므로 @Spy로 둔다.
+     */
+    @Spy
+    private VisitorClassifier visitorClassifier = new VisitorClassifier();
 
     @InjectMocks
     private PublicVisitController controller;
