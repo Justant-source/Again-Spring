@@ -32,6 +32,9 @@
 | 발행 | T+24h 커밋 후 **채널 렌더 READY 즉시 실발행** (저녁 슬롯 없음) | [`platforms.md`](platforms.md) |
 | UTM | X·YT 등 링크 → 사연 상세 | [`api.md`](api.md) |
 | 텔레그램 | 발행 후 N시간(기본 24h) 신규 댓글 → WaggleBot 텔레그램 · 수동 답글 | [`architecture.md`](architecture.md) |
+| **유입 계측** | 전 페이지뷰 기록 · 봇 분리 · `as_utm` first-touch → 가입 채널 귀속 · 어드민 퍼널 화면 | [`acquisition-measurement.md`](acquisition-measurement.md) |
+| **검색 기반** | robots·sitemap(348 URL)·홈/광장 SSR·구글(DNS)/네이버(HTML 파일) 소유확인 | [`seo.md`](seo.md) |
+| **클릭 경로** | YT = **채널 프로필 링크가 유일**(설명란·고정댓글 불가) · X = 링크를 **첫 답글**에 · IG = 프로필 | [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) §5.2 · [`x-thread-strategy.md`](x-thread-strategy.md) |
 | 고지 | **2027-01**까지 AI/합성 고지 없음 · 배심원 카피 금지 | 본 절 |
 
 ---
@@ -76,9 +79,15 @@ docs/shared/marketing/
 ├── social-poster.md            ← social-poster 서비스 운영 가이드
 ├── x-thread-strategy.md        ← X 스레드 전략 (솔로 3~4 / 양면 최대 6단)
 ├── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (24h · 글 슬롯)
-├── youtube-shorts-strategy.md  ← Shorts/Reels (유니크·길이·TTS 감정)
-└── sibom-video-insertion.md    ← 시봄이 숏폼 삽입 (메타포 금지 · 본문 §6 레이아웃 SSOT)
+├── youtube-shorts-strategy.md  ← Shorts/Reels (유니크·길이·TTS 감정 · §5.2 클릭 경로 제약)
+├── sibom-video-insertion.md    ← 시봄이 숏폼 삽입 (메타포 금지 · 본문 §6 레이아웃 SSOT)
+├── acquisition-measurement.md  ← 🆕 유입 계측 (방문→고유방문자→가입 · 기준선 · 판정 기준)
+└── seo.md                      ← 🆕 검색 유입 기반 (robots·sitemap·SSR·소유확인)
 ```
+
+> **발행 이후를 보려면** [`acquisition-measurement.md`](acquisition-measurement.md)를 읽는다.
+> 플랫폼 지표(조회·도달)까지는 [`api.md`](api.md) §4.2.1이 권위본이고, **클릭·방문·가입은
+> 그 문서**가 권위본이다. 2026-08-29 이전에는 이 구간의 계측이 통째로 깨져 있었다.
 
 ---
 

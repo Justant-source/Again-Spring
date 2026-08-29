@@ -79,6 +79,8 @@
 | YouTube Shorts 전략 (조건부 자동 생성 + 수동 게시) | `docs/shared/marketing/youtube-shorts-strategy.md` | — | `MarketingJobService.maybeTriggerYoutubeShorts` · ASM `youtube_shorts` 파이프 · WaggleBot |
 | 시봄이 숏폼 삽입 (Shorts/Reels) | `docs/shared/marketing/sibom-video-insertion.md` | `youtube-shorts-strategy.md` · `api.md` | AS `sibom_candidates`/`sibom_plan` · WaggleBot sprouts 합성 |
 | **BGM/SFX 관리** (2026-08-23) | `docs/shared/marketing/README.md` (어드민 탭) | — | AS `AdminMarketingController` BGM/SFX 경로 · WaggleBot `renderer/settings.yaml` |
+| **유입 계측** (2026-08-29) | `docs/shared/marketing/acquisition-measurement.md` | `docs/shared/api/database-schema.md` (`visit_events`·users 유입 컬럼) · `marketing/api.md` (`stats/acquisition`) | AS `VisitorClassifier` · `AcquisitionAttribution` · `AcquisitionFunnelService` · FE `VisitTracker`·`AcquisitionFunnelPanel` |
+| **검색 유입 기반** (2026-08-29) | `docs/shared/marketing/seo.md` | `docs/env/environment-variables.md` (`*_SITE_VERIFICATION`) | FE `app/robots.ts`·`app/sitemap.ts`·`app/layout.tsx`·`public/naver*.html` · `lib/serverApiBase.ts` |
 
 ---
 
@@ -105,6 +107,8 @@
 | 코드 영역 (glob) | 갱신 대상 문서 |
 |---|---|
 | `backend/.../db/migration/V*.sql` | `docs/shared/api/database-schema.md` (ER 다이어그램 포함) |
+| `api/visits/**` · `service/acquisition/**` · `AcquisitionFunnelService` · FE `VisitTracker`·`lib/api/visits.ts` | `docs/shared/marketing/acquisition-measurement.md` (필드명 계약·봇 분류·기준선) |
+| FE `app/robots.ts` · `app/sitemap.ts` · `app/layout.tsx` metadata · `public/naver*.html` · 홈/광장 렌더 전략 | `docs/shared/marketing/seo.md` |
 | `backend/.../domain/**/*.java` | `docs/shared/api/database-schema.md` |
 | `backend/.../api/**/*Controller.java` | `docs/shared/api/rest-spec.md` · `docs/shared/api/flows.md` |
 | `ai-user/orchestrator/**/threadplan/**` · `ai-user/llm/**/Structured*` · `ai-user/orchestrator/**/safety/SoftProofread*` · `SelfCritiqueService*` | `docs/ai-user/thread-planning.md` · `docs/ai-user/llm.md` · `docs/ai-user/llm-call-budget.md` · `docs/ai-user/operations.md` · `docs/ai-user/orchestrator.md` |

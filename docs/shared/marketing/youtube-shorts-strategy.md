@@ -169,6 +169,37 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 | 해시태그 | `#Shorts`(YT) + 브랜드 2(`#다시봄` `#againspring`) + 니치. IG ≤5, YT ≤15 |
 | YT description | 위 블록 + `#Shorts` |
 
+### 5.2 🚨 클릭 경로 — 설명란 링크는 클릭되지 않는다
+
+**2026-08-29 실측**: 누적 85,678조회에 사이트 방문 **0**이었다. 원인은 콘텐츠가 아니라
+**시청자가 누를 수 있는 링크가 화면 어디에도 없었다**는 것이다.
+
+| 경로 | 가능 여부 | 근거 |
+|---|---|---|
+| Shorts **설명란** URL | ❌ **클릭 불가** | YouTube가 스팸 방지로 Shorts 설명란·댓글의 링크를 비활성화한다. UTM을 넣어도 시청자는 탭할 수 없다 |
+| Shorts **고정 댓글** | ❌ **API 없음** | Data API v3의 `comments`/`commentThreads`는 `list`/`insert`/`update`/`delete`/`setModerationStatus`만 지원한다. **핀(고정) 엔드포인트가 존재하지 않는다** — Studio UI 전용이라 스코프를 늘려도 해결되지 않는다. 비공식 innertube 우회는 ToS 위반·계정 정지 위험이라 채택하지 않는다 |
+| **채널 프로필 링크** | ✅ **유일한 경로** | YouTube Studio → 채널 맞춤설정 → 기본 정보 → 링크 추가 |
+
+> 🔴 **설명란의 UTM 링크는 버리지 않는다.** 클릭은 안 되지만 (1) 데스크톱 웹에서는
+> 동작하고 (2) 복사·붙여넣기 경로가 남으며 (3) 크롤러가 사연 URL을 발견하는 통로가 된다.
+> 다만 **"링크를 넣었으니 유입 경로가 있다"고 판단하면 안 된다.**
+
+**등록 확인 방법** — 채널 About 페이지 HTML에 `channelExternalLinkViewModel`이 있고
+그 안에 `onTap` 명령(`youtube.com/redirect?...`)이 붙어 있어야 실제 클릭 링크다.
+설명 텍스트에 도메인만 적혀 있는 상태는 링크가 아니다.
+
+```bash
+curl -sL -A "Mozilla/5.0 …" https://www.youtube.com/@againspring_official/about \
+  | grep -o '"channelExternalLinkViewModel":{[^}]*}'
+```
+
+### 5.3 아웃트로 CTA
+
+현재 문구는 `당신은 어느 쪽에 공감하나요?` + 작은 도메인 텍스트다.
+플랫폼 안의 댓글 유도로 읽힐 여지가 있다(실제로 조회 85,678에 YouTube 댓글 63개가 달렸고
+사이트 방문은 0이었다). 변경 시 [`acquisition-measurement.md`](acquisition-measurement.md)의
+기준선과 대조해 효과를 판정할 것.
+
 ---
 
 ## 6. 어드민 UX
