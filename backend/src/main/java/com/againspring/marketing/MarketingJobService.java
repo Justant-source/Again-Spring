@@ -66,6 +66,7 @@ public class MarketingJobService {
     private final MarketingLlmAuthGuard llmAuthGuard;
     private final com.againspring.repository.marketing.MarketingGenerationTraceRepository generationTraceRepository;
     private final com.againspring.service.community.SibomCandidateService sibomCandidateService;
+    private final org.springframework.core.env.Environment environment;
 
     /**
      * 기본 렌더 프로필. Spring 컨텍스트에서는 {@code @Value}가 덮어쓰지만, 필드 이니셜라이저를
@@ -1289,8 +1290,18 @@ public class MarketingJobService {
      * Check if running in production environment.
      */
     private boolean isProductionEnvironment() {
-        String profile = System.getProperty("spring.profiles.active", "");
-        return profile.contains("prod") || profile.contains("production");
+        // 컨테이너는 SPRING_PROFILES_ACTIVE를 환경변수로만 주입 — Spring이 Environment로는 바인딩하지만
+        // JVM 시스템 프로퍼티로는 승격하지 않으므로 System.getProperty가 아닌 Environment를 직접 조회해야 한다.
+        String[] activeProfiles = environment.getActiveProfiles();
+        if (activeProfiles == null) {
+            return false;
+        }
+        for (String activeProfile : activeProfiles) {
+            if (activeProfile.contains("prod") || activeProfile.contains("production")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String serializeJson(Object obj) {

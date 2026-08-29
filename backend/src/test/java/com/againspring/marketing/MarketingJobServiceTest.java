@@ -95,6 +95,9 @@ class MarketingJobServiceTest {
     @Mock
     MarketingPublishSlotService marketingPublishSlotService;
 
+    @Mock
+    org.springframework.core.env.Environment environment;
+
     @InjectMocks
     MarketingJobService marketingJobService;
 
@@ -1754,5 +1757,44 @@ class MarketingJobServiceTest {
         Instant cutoff = cutoffCaptor.getValue();
         long minsDiff = ChronoUnit.MINUTES.between(cutoff, Instant.now());
         assertThat(minsDiff).isGreaterThanOrEqualTo(89).isLessThanOrEqualTo(91);
+    }
+
+    // ── isProductionEnvironment: must read Spring Environment, not System.getProperty ──
+    // 회귀 방지: SPRING_PROFILES_ACTIVE는 컨테이너에서 환경변수로만 주입되며
+    // JVM 시스템 프로퍼티로는 승격되지 않는다. System.getProperty로 읽으면 항상 빈 문자열이라
+    // prod에서도 dev로 오표기되는 버그(marketing_job #919, #921)가 재발한다.
+
+    @Test
+    void buildFailureMessage_activeProfileProd_labelsHeaderAsProd() throws JsonProcessingException {
+        when(environment.getActiveProfiles()).thenReturn(new String[]{"prod"});
+        MarketingJob job = MarketingJob.builder()
+            .id(919L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("FAILED")
+            .targets("[\"x_thread\"]")
+            .build();
+
+        String message = marketingJobService.buildFailureMessage(job);
+
+        assertThat(message).contains("[다시봄 마케팅/prod]");
+        assertThat(message).doesNotContain("[다시봄 마케팅/dev]");
+    }
+
+    @Test
+    void buildFailureMessage_activeProfileDev_labelsHeaderAsDev() throws JsonProcessingException {
+        when(environment.getActiveProfiles()).thenReturn(new String[]{"dev"});
+        MarketingJob job = MarketingJob.builder()
+            .id(122L)
+            .remoteJobId(TEST_JOB_ID)
+            .postId(TEST_POST_ID)
+            .status("FAILED")
+            .targets("[\"x_thread\"]")
+            .build();
+
+        String message = marketingJobService.buildFailureMessage(job);
+
+        assertThat(message).contains("[다시봄 마케팅/dev]");
+        assertThat(message).doesNotContain("[다시봄 마케팅/prod]");
     }
 }
