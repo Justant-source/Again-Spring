@@ -322,6 +322,17 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=6000
   값 변경 시 프론트엔드 **재빌드**가 필요하다(재시작만으로는 반영 안 됨).
   `.env.prod`에 `GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION`로 넣는다.
 
+  **2026-08-29 실제 구성** — 두 검색엔진이 서로 다른 방식으로 확인 중이다:
+  - **구글 = DNS TXT**가 주 수단이다. Cloudflare에 `google-site-verification=0EMRUcCv…`와
+    이전 토큰 `Lu1Xj8bo…` 두 개가 공존한다(구글은 일치하는 것 하나만 있으면 통과).
+    `.env.prod`의 `GOOGLE_SITE_VERIFICATION`에도 DNS 토큰을 넣어 메타태그를 함께 내보내고
+    있는데, 구글은 방식마다 토큰을 따로 발급하므로 **이 메타태그는 검증에 쓰이지 않을 수
+    있다**. 무해하고 DNS가 사라질 경우의 예비책이라 남겨 둔다 — 메타태그만 보고
+    "소유확인이 여기에 걸려 있다"고 판단하지 말 것. 권위는 DNS TXT다.
+  - **네이버 = HTML 파일**이다(`frontend/public/naver79b8914327d3fa9c1bacd9df6b05b40b.html`).
+    이 방식은 토큰을 발급하지 않으므로 `NAVER_SITE_VERIFICATION`은 비어 있는 것이 정상이다.
+    🔴 파일을 지우면 소유확인이 풀린다(네이버가 주기적으로 재확인).
+
 prod는 OAuth와 메일 관련 값을 모두 실제 값으로 채워야 한다.
 
 ## prod 필수 체크리스트
