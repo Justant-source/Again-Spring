@@ -144,6 +144,30 @@ AS `CaptureHeightCalculator` / `MarketingJobService` brief 필드.
 리트윗이 확실히 덜 돈다. 다만 **bio에 다시봄 운영 계정임을 명시**한다 — 순수 큐레이터 위장은
 링크가 전부 자사 도메인이라 금방 들통나고, 들통난 뒤 받는 타격이 크다.
 
+### 2.4 X 운영 설정 (2026-08-30)
+
+어드민 `/admin/marketing` **설정 → X 운영**. API `GET`/`PUT /api/admin/marketing/x-ops`.
+저장 키 `marketing.x.*` (`system_setting`).
+
+| 항목 | 기본 | 키 |
+|---|---|---|
+| 아침 시각 | 07:30 KST | `marketing.x.morning_time` |
+| 밤 시각 | 22:00 KST | `marketing.x.night_time` |
+| 사연 퍼오기 /일 | 2 | `marketing.x.story_scoops_per_day` |
+| 선댓글 /일 | 20 | `marketing.x.outbound_daily_cap` |
+| 우리 글 대댓글 /일 | 40 | `marketing.x.inbound_daily_cap` |
+| 우리 글당 대댓글 | 12 | `marketing.x.inbound_per_post_cap` |
+| 불 난 글 최소 댓글 | 3 | `marketing.x.hot_min_replies` |
+| 불 난 글 최대 나이 | 6시간 | `marketing.x.hot_max_age_hours` |
+| 아침/밤 글 · 대댓글 · 선댓글 | **off** | `marketing.x.{ritual,inbound,outbound}_enabled` |
+| 페르소나 학습 | **on** · 04:30 KST | `marketing.x.persona_learning_enabled` · `persona_learn_at` |
+
+매일 새벽 `personaLearnAt`에 `@againspring_net` 타임라인을 읽어 **운영자가 남에게 단 댓글·인용 평**만 코퍼스에 넣는다. 자동 `x_thread`(자기 체인·링크만·브랜드 해시태그 훅)는 제외. 프로필 JSON은 `marketing.x.persona_profile_json`. **dev는 예시만 적재**(L3, LLM 없음). prod는 Haiku 증류. 수동 실행 `POST /api/admin/marketing/x-ops/learn`.
+
+**발행 파이프는 아직 없음.** 스위치를 켜도 X에 글·댓글이 나가지 않는다. 다음 단계(성장 루프)가 이 플래그를 읽는다.
+
+사연 메인 텍스트는 이후 단계에서 마스터 훅 대신 **페르소나 1~3줄 평 + 스크린샷 1장**으로 바꾼다. 링크·유입은 후순위.
+
 ---
 
 ## 3. 발행 트리거

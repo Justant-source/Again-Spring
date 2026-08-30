@@ -624,6 +624,25 @@ Authorization: Bearer <admin-jwt>
 저장 키: `marketing.cap.{platform}` (기본 **각 3**).  
 레거시 `marketing.daily_text_cap` / `daily_video_cap`는 마이그레이션 후 폐기.
 
+### 4.1.1 X 운영 한도·킬스위치 (2026-08-30)
+
+```
+GET  /api/admin/marketing/x-ops
+PUT  /api/admin/marketing/x-ops
+Authorization: Bearer <admin-jwt>
+```
+
+키 `marketing.x.*`. 기본값: 아침 `07:30` / 밤 `22:00` / 사연 2 / 선댓글 20 / 대댓글 40·글당 12 / 불난글 댓글≥3·6h.  
+`ritualEnabled`·`inboundEnabled`·`outboundEnabled` 기본 **false**. 발행 파이프 연결 전에는 저장만.
+
+`personaLearningEnabled` 기본 **true**, `personaLearnAt` 기본 `04:30` KST. 분 단위 스케줄이 그 시각에 한 번 `@againspring_net` 타임라인(FxTwitter)을 읽어 **남을 향한 수동 댓글·인용**만 코퍼스에 넣고, prod에서만 Haiku로 프로필을 증류한다. 자동 스레드(자기 답글·URL만·`#다시봄`/`#againspring` 훅)는 버린다.
+
+```
+POST /api/admin/marketing/x-ops/learn
+```
+
+지금 학습. 스위치가 꺼져 있으면 400. GET 응답의 `personaLastStatus` / `personaLastNewCount` / `personaLastLearnedAt` / `personaSummary`는 읽기 전용. 상태 예: `NEVER` · `NO_NEW` · `INGESTED_LLM_DISABLED`(dev L3) · `OK`(prod 증류) · `FETCH_FAILED`.
+
 ### 4.2 플랫폼별 점수 가중치 · auto_adjust
 
 ```

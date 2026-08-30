@@ -11,7 +11,8 @@
       "Grep(*)",
       "Skill(update-config)",
       "mcp__claude-design__render_preview",
-      "mcp__claude-design__read_file"
+      "mcp__claude-design__read_file",
+      "Bash(docker exec againspring-ai-user-orchestrator *)"
     ],
     "deny": [
       "Bash(git merge*)",

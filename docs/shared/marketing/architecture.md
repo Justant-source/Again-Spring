@@ -190,7 +190,9 @@ T+24h MarketingHoldingCommitService
             → 주간 리포트 + (auto_adjust on 시) 가중치 소폭 보정
 ```
 
-자동 답글·페르소나·프롬프트 자동 패치는 **후속/금지**. AI 고지는 **2027-01**.
+X 운영 설정(아침/밤·대댓글/선댓글 한도·킬스위치·페르소나 학습)은 어드민 `/admin/marketing` 설정 탭과
+`GET`/`PUT /api/admin/marketing/x-ops`(`marketing.x.*`)에 있다. **발행 스위치 기본 꺼짐.** 페르소나 학습은 기본 켜짐(매일 04:30 KST, FxTwitter 읽기). `POST /x-ops/learn`으로 즉시 실행. 실제 X 발행·댓글 파이프는 아직 미연결이라 스위치를 켜도 글이 나가지 않는다.
+프롬프트 자동 패치는 **금지**. AI 고지는 **2027-01**.
 
 ### 댓글 알림 정확성
 

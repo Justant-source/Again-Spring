@@ -5,7 +5,7 @@
  *    - 미인증 GET /credentials → 401/403 (비-어드민 403은 Journey 09-B2)
  *
  * B. UI 설정 탭 (ASM 불필요) — 항상 실행
- *    - /admin/marketing 「설정」탭 — 자격증명 + 플랫폼 자동 게시 섹션
+ *    - /admin/marketing 「설정」탭 — 자격증명 + 플랫폼 자동 게시 + X 운영 섹션
  *
  * C. 자격증명 조회 (ASM 필요) — ASM_STUB_AVAILABLE=true 시 실행 / **읽기 전용**
  *    - 어드민 GET /credentials → 200 + 8개 플랫폼(숏폼영상 공용 설정 포함)
@@ -43,6 +43,16 @@ test.describe('Journey 14-A: 자격증명 API 인증 가드', () => {
     const res = await request.get(`${BASE}/api/admin/marketing/credentials`)
     expect([401, 403]).toContain(res.status())
   })
+
+  test('미인증 — GET /api/admin/marketing/x-ops → 401/403', async ({ request }) => {
+    const res = await request.get(`${BASE}/api/admin/marketing/x-ops`)
+    expect([401, 403]).toContain(res.status())
+  })
+
+  test('미인증 — POST /api/admin/marketing/x-ops/learn → 401/403', async ({ request }) => {
+    const res = await request.post(`${BASE}/api/admin/marketing/x-ops/learn`)
+    expect([401, 403]).toContain(res.status())
+  })
 })
 
 // ── B. UI 설정 탭 (ASM 불필요) ───────────────────────────────────
@@ -60,6 +70,19 @@ test.describe('Journey 14-B: 설정 탭 (자격증명·자동 게시)', () => {
     // 플랫폼 자동 게시 섹션 (ASM 없이도 섹션 셸 노출; 목록 로드는 ASM 의존 가능)
     await expect(page.locator(ADMIN_MARKETING.platformAutoSection)).toBeVisible({ timeout: 8_000 })
     await expect(page.getByText('자동 게시 대상')).toBeVisible()
+
+    await expect(page.locator(ADMIN_MARKETING.xOpsSection)).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByText('X 운영')).toBeVisible()
+    await expect(page.getByRole('switch', { name: '아침/밤 글' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
+    await expect(page.getByRole('switch', { name: '페르소나 학습' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    await expect(page.getByRole('button', { name: '지금 학습' })).toBeVisible()
+    // 실 X 타임라인을 치지 않는다 — 버튼 노출만 확인
 
     // 숏폼영상 섹션 — 릴스·쇼츠 공용 나레이션 설정 박스 (ASM 없이도 셸 노출)
     await expect(page.locator(ADMIN_MARKETING.shortformVideoSection)).toBeVisible({ timeout: 8_000 })

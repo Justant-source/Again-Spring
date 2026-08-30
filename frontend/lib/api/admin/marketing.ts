@@ -392,6 +392,50 @@ export async function updateMarketingPlatformQuota(caps: {
   return res.data;
 }
 
+// ===== X account ops (ritual / inbound / outbound) =====
+
+export interface MarketingXOpsSettings {
+  morningTime: string;
+  nightTime: string;
+  storyScoopsPerDay: number;
+  outboundDailyCap: number;
+  inboundDailyCap: number;
+  inboundPerPostCap: number;
+  hotMinReplies: number;
+  hotMaxAgeHours: number;
+  ritualEnabled: boolean;
+  inboundEnabled: boolean;
+  outboundEnabled: boolean;
+  personaLearningEnabled: boolean;
+  personaLearnAt: string;
+  personaLastStatus?: string | null;
+  personaLastNewCount?: number | null;
+  personaLastLearnedAt?: string | null;
+  personaSummary?: string | null;
+}
+
+export type MarketingXOpsSettingsUpdate = Omit<
+  MarketingXOpsSettings,
+  'personaLastStatus' | 'personaLastNewCount' | 'personaLastLearnedAt' | 'personaSummary'
+>;
+
+export async function getMarketingXOpsSettings(): Promise<MarketingXOpsSettings> {
+  const res = await api.get<MarketingXOpsSettings>('/api/admin/marketing/x-ops');
+  return res.data;
+}
+
+export async function updateMarketingXOpsSettings(
+  body: MarketingXOpsSettingsUpdate
+): Promise<MarketingXOpsSettings> {
+  const res = await api.put<MarketingXOpsSettings>('/api/admin/marketing/x-ops', body);
+  return res.data;
+}
+
+export async function runMarketingXOpsPersonaLearn(): Promise<MarketingXOpsSettings> {
+  const res = await api.post<MarketingXOpsSettings>('/api/admin/marketing/x-ops/learn');
+  return res.data;
+}
+
 // ===== Admin Posts for Picker (별도 타입 — content.ts의 AdminPost와 구분) =====
 
 export interface PickerPost {

@@ -8,6 +8,7 @@ import { PlatformCredentialsSection } from '@/components/admin/marketing/Platfor
 import { ShortformVideoSection } from '@/components/admin/marketing/ShortformVideoSection';
 import { SfxMappingSection } from '@/components/admin/marketing/SfxMappingSection';
 import { PlatformAutoSection } from '@/components/admin/marketing/PlatformAutoSection';
+import { XOpsSettingsSection } from '@/components/admin/marketing/XOpsSettingsSection';
 import { HoldingControlsBar } from '@/components/admin/marketing/HoldingControlsBar';
 import { HoldingBoard } from '@/components/admin/marketing/HoldingBoard';
 import { HoldingDraftDialog } from '@/components/admin/marketing/HoldingDraftDialog';
@@ -371,6 +372,9 @@ export default function MarketingJobsPage() {
 
         <TabsContent value="settings" className="space-y-8">
           <PlatformAutoSection />
+          <div className="border-t pt-6">
+            <XOpsSettingsSection />
+          </div>
           <div className="border-t pt-6">
             <ShortformVideoSection />
           </div>

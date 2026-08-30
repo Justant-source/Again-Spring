@@ -7,8 +7,10 @@ import com.againspring.api.admin.dto.MarketingPublishSlotsResponse;
 import com.againspring.api.admin.dto.MarketingQuotaResponse;
 import com.againspring.api.admin.dto.MarketingScoreWeightsResponse;
 import com.againspring.api.admin.dto.UpdateMarketingPublishSlotsRequest;
+import com.againspring.api.admin.dto.MarketingXOpsSettingsResponse;
 import com.againspring.api.admin.dto.UpdateMarketingQuotaRequest;
 import com.againspring.api.admin.dto.UpdateMarketingScoreWeightsRequest;
+import com.againspring.api.admin.dto.UpdateMarketingXOpsSettingsRequest;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
@@ -18,6 +20,8 @@ import com.againspring.marketing.MarketingQuotaService;
 import com.againspring.marketing.MarketingScoreAutoAdjustService;
 import com.againspring.marketing.MarketingScoreWeightService;
 import com.againspring.marketing.MarketingWeeklyReportService;
+import com.againspring.marketing.MarketingXOpsSettingsService;
+import com.againspring.marketing.XPersonaLearnService;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.admin.MarketingStatsService;
@@ -64,6 +68,8 @@ public class AdminMarketingController {
     private final MarketingPlatformStatsCollectRunner marketingPlatformStatsCollectRunner;
     private final MarketingWeeklyReportService marketingWeeklyReportService;
     private final MarketingScoreAutoAdjustService marketingScoreAutoAdjustService;
+    private final MarketingXOpsSettingsService marketingXOpsSettingsService;
+    private final XPersonaLearnService xPersonaLearnService;
 
     // ===== Daily auto-publish quota (Phase 2 per-platform) =====
 
@@ -102,6 +108,50 @@ public class AdminMarketingController {
         }
         return ResponseEntity.ok(MarketingQuotaResponse.from(
             marketingQuotaService.updateCaps(req.getDailyTextCap(), req.getDailyVideoCap(), updatedBy)));
+    }
+
+    // ===== X account operating knobs (ritual / inbound / outbound) =====
+
+    @GetMapping("/x-ops")
+    @Operation(summary = "X ops settings",
+        description = "아침/밤 시각·사연 퍼오기 상한·대댓글/선댓글 한도·킬스위치·페르소나 학습. "
+            + "발행 스위치 기본 false. 학습 기본 true(04:30 KST). 발행 파이프가 붙기 전에는 저장만.")
+    @ApiResponse(responseCode = "200", description = "Settings returned")
+    public ResponseEntity<MarketingXOpsSettingsResponse> getXOps() {
+        return ResponseEntity.ok(
+            MarketingXOpsSettingsResponse.from(
+                marketingXOpsSettingsService.get(),
+                xPersonaLearnService.status()));
+    }
+
+    @PutMapping("/x-ops")
+    @Operation(summary = "Update X ops settings",
+        description = "부분 갱신 허용. 생략 필드는 유지. 시각은 HH:mm(KST).")
+    @ApiResponse(responseCode = "200", description = "Settings updated")
+    @ApiResponse(responseCode = "400", description = "Invalid settings")
+    @Auditable(action = "UPDATE_MARKETING_X_OPS")
+    public ResponseEntity<MarketingXOpsSettingsResponse> updateXOps(
+            @Valid @RequestBody UpdateMarketingXOpsSettingsRequest req,
+            Authentication auth) {
+        String updatedBy = auth != null ? auth.getName() : "admin";
+        var next = req.toSettings(marketingXOpsSettingsService.get());
+        return ResponseEntity.ok(MarketingXOpsSettingsResponse.from(
+            marketingXOpsSettingsService.update(next, updatedBy),
+            xPersonaLearnService.status()));
+    }
+
+    @PostMapping("/x-ops/learn")
+    @Operation(summary = "Run X persona learn now",
+        description = "타임라인에서 수동 댓글을 모아 페르소나 프로필을 갱신. 학습 스위치가 꺼져 있으면 400.")
+    @ApiResponse(responseCode = "200", description = "Learn finished")
+    @ApiResponse(responseCode = "400", description = "Learning disabled")
+    @Auditable(action = "RUN_MARKETING_X_PERSONA_LEARN")
+    public ResponseEntity<MarketingXOpsSettingsResponse> learnXOpsNow(Authentication auth) {
+        String updatedBy = auth != null ? auth.getName() : "admin";
+        xPersonaLearnService.requireEnabledThenRun(updatedBy);
+        return ResponseEntity.ok(MarketingXOpsSettingsResponse.from(
+            marketingXOpsSettingsService.get(),
+            xPersonaLearnService.status()));
     }
 
     // ===== Popularity score weights (Phase 2 per-platform) =====
