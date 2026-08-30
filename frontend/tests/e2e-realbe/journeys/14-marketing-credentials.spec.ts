@@ -82,7 +82,7 @@ test.describe('Journey 14-B: 설정 탭 (자격증명·자동 게시)', () => {
       'true'
     )
     await expect(page.getByRole('button', { name: '지금 학습' })).toBeVisible()
-    // 실 X 타임라인을 치지 않는다 — 버튼 노출만 확인
+    // 섹션 존재·기본 스위치·학습 버튼만. inbound/outbound/ritual on 클릭·지금 학습 클릭·실 X 게시 없음
 
     // 숏폼영상 섹션 — 릴스·쇼츠 공용 나레이션 설정 박스 (ASM 없이도 셸 노출)
     await expect(page.locator(ADMIN_MARKETING.shortformVideoSection)).toBeVisible({ timeout: 8_000 })

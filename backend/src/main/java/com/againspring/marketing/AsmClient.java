@@ -3,6 +3,11 @@ package com.againspring.marketing;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.marketing.dto.CreateJobRequest;
 import com.againspring.marketing.dto.CreateJobResponse;
+import com.againspring.marketing.dto.XInboxResponse;
+import com.againspring.marketing.dto.XOutboundCandidatesResponse;
+import com.againspring.marketing.dto.XPublishRequest;
+import com.againspring.marketing.dto.XPublishResponse;
+import com.againspring.marketing.dto.XRitualRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +24,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * HTTP client for ASM (Again-Spring-Marketing) service
@@ -384,6 +392,157 @@ public class AsmClient {
             log.error("Failed to collect ASM platform stats", e);
             throw new AsmUnavailableException("Failed to collect platform stats: " + e.getMessage(), e);
         }
+    }
+
+    public record XPublishResult(boolean ok, String tweetId, String url, String photo) {}
+
+    public record XInboxItem(
+        String tweetId,
+        String parentTweetId,
+        String ourPostTweetId,
+        String authorHandle,
+        String text,
+        Instant createdAt
+    ) {}
+
+    public record XOutboundCandidate(
+        String tweetId,
+        String authorHandle,
+        String text,
+        int replyCount,
+        double ageHours,
+        boolean alreadyRepliedByUs,
+        String ourReplyTweetId
+    ) {}
+
+    /**
+     * Publish text (and optional image) to X. {@code replyToTweetId} null = original post.
+     * Retries network/5xx; 4xx is logged and thrown as {@link AsmUnavailableException}.
+     */
+    public XPublishResult publishX(String text, String replyToTweetId, String imageBase64, String imageMime) {
+        XPublishResponse body = retryWithBackoff(
+            () -> restClient
+                .post()
+                .uri("/api/v1/x/publish")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new XPublishRequest(text, imageBase64, imageMime, replyToTweetId))
+                .retrieve()
+                .body(XPublishResponse.class),
+            "publish X"
+        );
+        return toPublishResult(body);
+    }
+
+    /**
+     * Ritual morning/night photo post via ASM local CC0 pool.
+     */
+    public XPublishResult publishRitual(String slot, String text) {
+        XPublishResponse body = retryWithBackoff(
+            () -> restClient
+                .post()
+                .uri("/api/v1/x/ritual")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new XRitualRequest(slot, text))
+                .retrieve()
+                .body(XPublishResponse.class),
+            "publish X ritual"
+        );
+        return toPublishResult(body);
+    }
+
+    /**
+     * Recent replies on our posts (not our own replies). {@code sinceMinutes} lookback.
+     */
+    public List<XInboxItem> listXInbox(int sinceMinutes) {
+        try {
+            XInboxResponse body = restClient
+                .get()
+                .uri(uriBuilder -> uriBuilder
+                    .path("/api/v1/x/inbox")
+                    .queryParam("sinceMinutes", sinceMinutes)
+                    .build())
+                .retrieve()
+                .body(XInboxResponse.class);
+            return mapInbox(body);
+        } catch (HttpClientErrorException e) {
+            log.error("ASM x inbox 4xx {}: {}", e.getStatusCode(), e.getMessage());
+            throw new AsmUnavailableException("Failed to list X inbox: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Failed to list X inbox", e);
+            throw new AsmUnavailableException("Failed to list X inbox: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Mutual-follow hot posts for outbound replies.
+     */
+    public List<XOutboundCandidate> listXOutboundCandidates(int minReplies, int maxAgeHours) {
+        try {
+            XOutboundCandidatesResponse body = restClient
+                .get()
+                .uri(uriBuilder -> uriBuilder
+                    .path("/api/v1/x/outbound-candidates")
+                    .queryParam("minReplies", minReplies)
+                    .queryParam("maxAgeHours", maxAgeHours)
+                    .build())
+                .retrieve()
+                .body(XOutboundCandidatesResponse.class);
+            return mapOutbound(body);
+        } catch (HttpClientErrorException e) {
+            log.error("ASM x outbound-candidates 4xx {}: {}", e.getStatusCode(), e.getMessage());
+            throw new AsmUnavailableException("Failed to list X outbound candidates: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Failed to list X outbound candidates", e);
+            throw new AsmUnavailableException("Failed to list X outbound candidates: " + e.getMessage(), e);
+        }
+    }
+
+    private static XPublishResult toPublishResult(XPublishResponse body) {
+        if (body == null) {
+            return new XPublishResult(false, null, null, null);
+        }
+        return new XPublishResult(body.succeeded(), body.tweetId(), body.url(), body.photo());
+    }
+
+    private static List<XInboxItem> mapInbox(XInboxResponse body) {
+        if (body == null || body.items() == null) {
+            return List.of();
+        }
+        List<XInboxItem> out = new ArrayList<>();
+        for (XInboxResponse.Item it : body.items()) {
+            if (it == null || it.tweetId() == null || it.tweetId().isBlank()) {
+                continue;
+            }
+            out.add(new XInboxItem(
+                it.tweetId(),
+                it.parentTweetId(),
+                it.ourPostTweetId(),
+                it.authorHandle(),
+                it.text(),
+                it.createdAt()));
+        }
+        return out;
+    }
+
+    private static List<XOutboundCandidate> mapOutbound(XOutboundCandidatesResponse body) {
+        if (body == null || body.items() == null) {
+            return List.of();
+        }
+        List<XOutboundCandidate> out = new ArrayList<>();
+        for (XOutboundCandidatesResponse.Item it : body.items()) {
+            if (it == null || it.tweetId() == null || it.tweetId().isBlank()) {
+                continue;
+            }
+            out.add(new XOutboundCandidate(
+                it.tweetId(),
+                it.authorHandle(),
+                it.text(),
+                it.replyCount() == null ? 0 : it.replyCount(),
+                it.ageHours() == null ? 0.0 : it.ageHours(),
+                Boolean.TRUE.equals(it.alreadyRepliedByUs()),
+                it.ourReplyTweetId()));
+        }
+        return out;
     }
 
     /**

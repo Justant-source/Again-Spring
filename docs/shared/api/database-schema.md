@@ -151,6 +151,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `marketing_stats_event` | 통계 탭 활동 타임라인 (수집·제안·확정) | BIGINT auto **V111** |
 | `visit_events` | 방문 계측 (경로·UTM·referrer·봇 판정·고유방문자) | BIGINT auto · 유입 귀속 확장 **V120** |
 | `marketing_holding_exclusion` | 홀딩 풀 콘텐츠 가드 제외 사유 (조용한 누락 방지) | `post_id` VARCHAR(32) PK **V121** |
+| `x_ops_action` | X 성장 루프 원장 (ritual / inbound / outbound) | BIGINT auto |
 
 ### AI-user 운영 테이블
 
@@ -571,6 +572,25 @@ Phase 1 = VIDEO_VARIANT 스테이지(instagram_reels/youtube_shorts). Phase 2+ �
 | `platform` | VARCHAR(32) NULL | 관련 채널 (`x_thread` 등) |
 | `payload_json` | TEXT NULL | 요약 페이로드 |
 | `created_at` | TIMESTAMP(3) | 인덱스 `idx_mse_created_at` |
+
+### `x_ops_action` (성장 루프 원장)
+
+ritual / inbound / outbound 작문·게시 결과. 어드민 REST 없음 — 일일·글당 cap·중복 답글 조회용 내부 원장.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `kind` | VARCHAR | `RITUAL` \| `INBOUND` \| `OUTBOUND` |
+| `target_tweet_id` | VARCHAR | 답글 대상 트윗. 이미 처리했는지 조회 |
+| `parent_tweet_id` | VARCHAR | 스레드 부모 (outbound 대댓글) |
+| `our_post_tweet_id` | VARCHAR | 우리 글(inbound 글당 cap) |
+| `posted_tweet_id` | VARCHAR | 우리가 게시한 트윗 ID (`POSTED`일 때) |
+| `body` | TEXT | 게시 본문 |
+| `status` | VARCHAR | `POSTED` \| `SKIPPED` \| `FAILED` |
+| `skip_reason` | VARCHAR | `NO_VOICE` \| `SAFETY` \| `LLM_ERROR` \| `CAP` \| `DISABLED` \| `DEV_LLM_OFF` |
+| `created_at` | TIMESTAMP | 일일 cap·글당 cap 집계 |
+
+인덱스: `idx_xoa_kind_created(kind, created_at)` (일일 cap), `idx_xoa_target(target_tweet_id)` (중복 스킵), `idx_xoa_our_post_created(our_post_tweet_id, created_at)` (글당 inbound).
 
 ---
 

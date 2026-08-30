@@ -132,7 +132,9 @@ export function XOpsSettingsSection() {
     setSavedMsg(null);
     try {
       setSettings(await updateMarketingXOpsSettings(writable(settings)));
-      setSavedMsg('저장했습니다. 발행·댓글 파이프가 붙기 전에는 스위치가 켜져도 동작하지 않습니다. 페르소나 학습은 새벽 시각에 돌아갑니다.');
+      setSavedMsg(
+        '저장했습니다. 글·댓글은 해당 스위치가 켜져 있을 때만 나갑니다. dev는 LLM이 꺼져 있어(L3) 작문·발행은 동작하지 않습니다. 페르소나 학습은 새벽 시각에 돌아갑니다.'
+      );
     } catch (err: unknown) {
       setError(`저장에 실패했습니다: ${extractError(err)}`);
     } finally {
@@ -170,9 +172,11 @@ export function XOpsSettingsSection() {
         <div>
           <h3 className="font-semibold text-gray-800">X 운영</h3>
           <p className="mt-1 text-sm text-gray-500">
-            아침·밤 의식 글, 사연 퍼오기, 우리 글 대댓글, 맞팔 선댓글 한도입니다. 값은 바로
-            저장되지만 발행·댓글 연결은 다음 단계에서 붙습니다. 지금은 스위치를 켜도 글이
-            나가지 않습니다.
+            아침·밤 의식 글, 사연 퍼오기, 우리 글 대댓글, 맞팔 선댓글 한도입니다. 저장은 바로
+            반영됩니다. 글·댓글은 해당 스위치가 켜져 있을 때만 나갑니다. dev는 LLM이 꺼져
+            있어(L3) 작문·발행은 동작하지 않습니다. 페르소나 학습은 새벽 시각에 그대로
+            돌아갑니다. 나중에 켤 때는 우리 글 대댓글 → 맞팔 선댓글 → 아침/밤 글 순을
+            권합니다.
           </p>
         </div>
 

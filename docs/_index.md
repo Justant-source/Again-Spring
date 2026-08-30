@@ -75,6 +75,7 @@
 |---|---|---|---|
 | ASM 전체 | `docs/shared/marketing/README.md` | `{api,architecture,platforms,social-poster,asm-setup}.md` | ASM 저장소 (`~/Data/Again-Spring-Marketing`) |
 | X 스레드 전략 (활성) | `docs/shared/marketing/x-thread-strategy.md` | — | ASM `services/social-poster/src/routes/publish-x.js` |
+| X 성장 루프 (댓글·의식) | `docs/shared/marketing/x-thread-strategy.md` §2.4 | `docs/shared/marketing/api.md` · `docs/shared/api/database-schema.md` (`x_ops_action`) | `XGrowthLoop*` · ASM `/api/v1/x/*` |
 | IG 피드 전략 (24h 자동) | `docs/shared/marketing/instagram-feed-strategy.md` | — | ASM `app/worker/ig_feed_pipeline.py` |
 | YouTube Shorts 전략 (조건부 자동 생성 + 수동 게시) | `docs/shared/marketing/youtube-shorts-strategy.md` | — | `MarketingJobService.maybeTriggerYoutubeShorts` · ASM `youtube_shorts` 파이프 · WaggleBot |
 | 시봄이 숏폼 삽입 (Shorts/Reels) | `docs/shared/marketing/sibom-video-insertion.md` | `youtube-shorts-strategy.md` · `api.md` | AS `sibom_candidates`/`sibom_plan` · WaggleBot sprouts 합성 |
@@ -118,6 +119,7 @@
 | `env/scripts/ops-watchdog.sh` · `env/scripts/wsl-ops-watchdog-script.sh` · `scripts/claude-oauth-peer.sh` · `scripts/*claude-creds*` | `docs/env/watchdog.md` · `.claude/rules/multi-agent.md` §5 |
 | `domain/enums/*Status*.java` · `MarketingJob*.java` · orchestrator `ActionStatus*.java` | 해당 모듈의 stateDiagram (`docs/ai-user/orchestrator.md` 등) |
 | `backend/.../marketing/**` · video brief/`sibom_*` · metaphor unplug · `VideoVariantService*` · `AdminMarketingController` BGM/SFX 메서드 | `docs/shared/marketing/sibom-video-insertion.md` · `youtube-shorts-strategy.md` · `api.md` · `docs/ai-user/llm-call-budget.md` §3 · `README.md` (어드민 탭 BGM/SFX) |
+| `XGrowthLoop*` · `XOpsAction*` · `XInbound*` · `XOutbound*` · `XRitual*` · `x_ops_action` | `docs/shared/marketing/x-thread-strategy.md` §2.4 · `docs/shared/api/database-schema.md` · `docs/shared/marketing/api.md` |
 | `MarketingGenerationTrace*` · `MarketingJobService.saveGenerationTrace()` · V119 마이그레이션 | `docs/shared/api/database-schema.md` (테이블 상세) · `docs/shared/marketing/architecture.md` (생성 기록 수집) |
 | WaggleBot 렌더러/SFX/BGM 설정 (`worker/ai_worker/renderer/settings.yaml`) | `docs/shared/marketing/README.md` (컴포넌트 역할·API 경로·환경변수) |
 | `backend/.../safety/**` · `llm/PromptSanitizer*` · `LlmErrorSignature*` · `ContentSafetyGuard*` | `docs/shared/policies/forbidden-words.md` · `.claude/rules/llm-safety.md` |

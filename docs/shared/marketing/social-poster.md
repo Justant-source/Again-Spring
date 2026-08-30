@@ -71,9 +71,12 @@ X(트위터)에 텍스트 + 이미지를 게시합니다.
 {
   "text": "게시할 텍스트 (최대 280자)",
   "imageBase64": "base64 이미지 (선택)",
-  "imageMime": "image/png"
+  "imageMime": "image/png",
+  "replyToTweetId": "답글 대상 트윗 ID (선택)"
 }
 ```
+
+`replyToTweetId`가 있으면 해당 트윗의 답글로 붙인다. 없으면 루트 트윗.
 
 ### POST /instagram/dismiss-restriction
 

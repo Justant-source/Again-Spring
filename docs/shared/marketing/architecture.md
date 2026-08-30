@@ -191,7 +191,10 @@ T+24h MarketingHoldingCommitService
 ```
 
 X 운영 설정(아침/밤·대댓글/선댓글 한도·킬스위치·페르소나 학습)은 어드민 `/admin/marketing` 설정 탭과
-`GET`/`PUT /api/admin/marketing/x-ops`(`marketing.x.*`)에 있다. **발행 스위치 기본 꺼짐.** 페르소나 학습은 기본 켜짐(매일 04:30 KST, FxTwitter 읽기). `POST /x-ops/learn`으로 즉시 실행. 실제 X 발행·댓글 파이프는 아직 미연결이라 스위치를 켜도 글이 나가지 않는다.
+`GET`/`PUT /api/admin/marketing/x-ops`(`marketing.x.*`)에 있다. **발행 스위치 기본 꺼짐.** 페르소나 학습은 기본 켜짐(매일 04:30 KST, FxTwitter 읽기). `POST /x-ops/learn`으로 즉시 실행.
+성장 루프(ritual / inbound / outbound)는 해당 플래그가 켜져 있을 때만 작문·게시한다. **dev는 LLM 꺼짐(L3)이라 작문·발행은 no-op.** 기본 off이므로 prod가 자동 게시 중이라고 보지 않는다. 상세 [`x-thread-strategy.md`](x-thread-strategy.md) §2.4.
+
+댓글 감시 창(발행 후 N시간, 기본 24h)의 텔레그램 노티는 운영자 수동 답용이다. 성장 루프가 이미 같은 트윗에 `x_ops_action` `POSTED`로 자동 답했으면, 미답글로 취급해 운영자를 재촉하지 않는다(스킵하거나 “자동 답함”으로만 표시).
 프롬프트 자동 패치는 **금지**. AI 고지는 **2027-01**.
 
 ### 댓글 알림 정확성

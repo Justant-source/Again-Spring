@@ -633,7 +633,7 @@ Authorization: Bearer <admin-jwt>
 ```
 
 키 `marketing.x.*`. 기본값: 아침 `07:30` / 밤 `22:00` / 사연 2 / 선댓글 20 / 대댓글 40·글당 12 / 불난글 댓글≥3·6h.  
-`ritualEnabled`·`inboundEnabled`·`outboundEnabled` 기본 **false**. 발행 파이프 연결 전에는 저장만.
+`ritualEnabled`·`inboundEnabled`·`outboundEnabled` 기본 **false**. 이 플래그가 성장 루프 발행기를 게이팅한다. 꺼져 있으면 작문·게시 없음. **어드민 REST는 x-ops만** — 게시용 어드민 API는 없다.
 
 `personaLearningEnabled` 기본 **true**, `personaLearnAt` 기본 `04:30` KST. 분 단위 스케줄이 그 시각에 한 번 `@againspring_net` 타임라인(FxTwitter)을 읽어 **남을 향한 수동 댓글·인용**만 코퍼스에 넣고, prod에서만 Haiku로 프로필을 증류한다. 자동 스레드(자기 답글·URL만·`#다시봄`/`#againspring` 훅)는 버린다.
 
@@ -642,6 +642,15 @@ POST /api/admin/marketing/x-ops/learn
 ```
 
 지금 학습. 스위치가 꺼져 있으면 400. GET 응답의 `personaLastStatus` / `personaLastNewCount` / `personaLastLearnedAt` / `personaSummary`는 읽기 전용. 상태 예: `NEVER` · `NO_NEW` · `INGESTED_LLM_DISABLED`(dev L3) · `OK`(prod 증류) · `FETCH_FAILED`.
+
+**ASM 엔드포인트** (AS `AsmClient`가 호출. 어드민 JWT 경로 아님):
+
+- `POST /api/v1/x/publish` — `{ text, imageBase64?, imageMime?, replyToTweetId? }` → social-poster. 성공 시 `{ tweetId, url }`
+- `POST /api/v1/x/ritual` — `{ slot: "morning"|"night", text }` — ASM `assets/x-ritual` 사진 한 장을 붙여 게시
+- `GET /api/v1/x/inbox` — 우리 글에 달린 **남이 단** 최근 댓글 (`tweetId`, `parentId`, `author`, `text`, `createdAt`, `ourPostId`)
+- `GET /api/v1/x/outbound-candidates` — 맞팔 최근 글 중 댓글 수·나이 필터 후보 (`tweetId`, `author`, `text`, `replyCount`, `ageHours`, `alreadyRepliedByUs`)
+
+흐름·한도: [`x-thread-strategy.md`](x-thread-strategy.md) §2.4.
 
 ### 4.2 플랫폼별 점수 가중치 · auto_adjust
 
