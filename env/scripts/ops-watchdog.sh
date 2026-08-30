@@ -10,6 +10,8 @@ set -euo pipefail
 #   3. 컨테이너 헬스 상태 (unhealthy)
 #
 # 자동 복구 (최대 3회, 상태 파일로 추적):
+#   - Claude canary 실패 시 WSL oauth pull 후 ping 재시도
+#   - canary 성공 시 expiresAt 기준 WSL과 reconcile (같은 유효 세션)
 #   - chown for .credentials.json
 #   - docker restart for unhealthy containers
 #
@@ -152,35 +154,51 @@ check_claude_session() {
     local canary_interval=$((600))  # 10분
 
     if [[ $elapsed -lt $canary_interval ]]; then
-        # Canary 실행 시간이 아직 안 됨
         return 0
     fi
 
+    local peer_bin="${PROJECT_ROOT}/scripts/claude-oauth-peer.sh"
+    local wsl_ssh="${WSL_SSH:-justant@100.115.252.61}"
+
     log "INFO" "Claude canary check starting..."
 
-    # Claude 세션 테스트 (최소 토큰)
     if timeout 30 claude -p 'ping' > /dev/null 2>&1; then
         log "INFO" "Claude session OK"
         echo "$now" > "$CANARY_TIMESTAMP_FILE"
         reset_retry_count "claude_session"
-        return 0
-    else
-        log "WARN" "Claude session failed"
-
-        local retry_count=$(get_retry_count "claude_session")
-        log "INFO" "Claude session retry count: $retry_count / 3"
-
-        # 재로그인은 자동화할 수 없음 (headless OAuth 불가) — 감지 즉시 수동 조치 안내.
-        # 3회(각 1시간 간격)까지만 반복 알림, 그 후엔 send_telegram의 1시간 dedup에 맡김.
-        if [[ $retry_count -lt 3 ]]; then
-            send_telegram "⚠️ [Again-Spring] Claude 세션 만료 감지 ($(($retry_count + 1))/3). 수동 조치: 로컬 터미널에서 'claude' 실행 후 브라우저 로그인"
-            increment_retry_count "claude_session"
-        else
-            send_telegram "❌ [Again-Spring] Claude 세션 만료 지속 중 (3회 초과). 수동 조치 필요: 로컬 터미널에서 'claude' 실행 후 브라우저 로그인"
+        if [[ -x "$peer_bin" ]]; then
+            log "INFO" "reconcile Claude oauth with WSL"
+            "$peer_bin" reconcile "$wsl_ssh" >> "$LOG_FILE" 2>&1 || log "WARN" "WSL oauth reconcile failed"
         fi
+        return 0
+    fi
 
+    log "WARN" "Claude session failed — pull WSL session and retry"
+
+    local retry_count
+    retry_count=$(get_retry_count "claude_session")
+    log "INFO" "Claude session retry count: $retry_count / 3"
+
+    if [[ $retry_count -ge 3 ]]; then
+        send_telegram "❌ [Again-Spring] Claude 세션 복구 한계. WSL 복사 후에도 실패. AS/WSL에서 claude 로그인 필요."
         return 1
     fi
+
+    send_telegram "🔧 [Again-Spring] Claude 세션 이상. WSL(100.115.252.61) 세션을 가져와 재시도 ($((retry_count + 1))/3)"
+
+    if [[ -x "$peer_bin" ]] && "$peer_bin" pull "$wsl_ssh" >> "$LOG_FILE" 2>&1 \
+        && timeout 30 claude -p 'ping' > /dev/null 2>&1; then
+        log "INFO" "Claude session recovered from WSL"
+        echo "$now" > "$CANARY_TIMESTAMP_FILE"
+        reset_retry_count "claude_session"
+        "$peer_bin" reconcile "$wsl_ssh" >> "$LOG_FILE" 2>&1 || true
+        send_telegram "✅ [Again-Spring] Claude 세션 복구 (WSL 복사)"
+        return 0
+    fi
+
+    increment_retry_count "claude_session"
+    send_telegram "⚠️ [Again-Spring] Claude 세션 만료. WSL 복사 후에도 실패 ($((retry_count + 1))/3). 한쪽에서 claude 로그인 필요."
+    return 1
 }
 
 check_credentials_ownership() {

@@ -13,6 +13,7 @@
 | [deployment.md](./deployment.md) | dev → main → prod 배포 절차 | 배포 담당자 |
 | [cloudflare.md](./cloudflare.md) | Cloudflare Tunnel 설정 및 운영 | 네트워크 관리자 |
 | [structure.md](./structure.md) | `env/` 디렉토리 구조 | 전체 팀 |
+| [watchdog.md](./watchdog.md) | 로컬·WSL 워치독 · Claude 세션 양방향 pull/retry | 운영 |
 
 ## Source of truth
 
@@ -22,6 +23,7 @@
 - `env/.env*.example` → environment-variables.md
 - `env/nginx/*.conf` → architecture.md, cloudflare.md
 - `backend/Dockerfile`, `frontend/Dockerfile` → docker.md
+- `env/scripts/ops-watchdog.sh` · `env/scripts/wsl-ops-watchdog-script.sh` · `scripts/*claude-creds*` → watchdog.md
 
 ## 다른 문서와의 관계
 

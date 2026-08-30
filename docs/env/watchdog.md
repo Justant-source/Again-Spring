@@ -62,9 +62,13 @@ loginctl enable-linger justant
 - `watchdog-state/watchdog.log` — 실행 로그
 
 **금지 사항**:
-- 재로그인 자동화 (사용자 수동 필요)
+- 브라우저 OAuth 재로그인 자동화 (headless 불가)
 - `docker compose up` 스택 재배포
 - DB/콘텐츠 조작
+
+**허용**: 양쪽 Claude canary가 실패하면 피어에서 `claudeAiOauth`를 가져와 ping 재시도.
+성공한 쪽은 `expiresAt`이 더 큰 oauth를 반대쪽에 push/pull 해서 **같은 유효 세션**을 유지한다
+(`scripts/claude-oauth-peer.sh`). 브라우저 로그인이 아니라 이미 로그인된 세션 복사다.
 
 ---
 
@@ -121,7 +125,8 @@ rm -f watchdog-state/retry-state.json
 
 | 대상 | 감지 방법 | 복구 | 복구 한도 |
 |---|---|---|---|
-| Claude 세션 | `timeout 30 claude -p 'ping'` (10분 주기) | 사용자 수동 (재로그인) | 3회 후 중단 |
+| Claude 세션 (AS) | `timeout 30 claude -p 'ping'` (10분 주기) | **WSL oauth pull 후 ping 재시도**. 성공 시 WSL과 expiresAt reconcile | 3회 |
+| Claude 세션 (WSL) | 동일 canary | **AS oauth pull 후 ping 재시도**. 성공 시 AS와 reconcile | 3회 |
 | 자격증명 소유권 | `stat -c '%U' ~/.claude/.credentials.json` | `chown justant:justant` | 3회 후 중단 |
 | Unhealthy 컨테이너 | `docker ps --filter health=unhealthy` (건강체크 없는 컨테이너는 `.State.Status`) | `docker restart <container>` | 컨테이너당 3회 |
 | WSL 재부팅 | `/proc/sys/kernel/random/boot_id` 비교(2026-08-16, `uptime -s` 초 단위 흔들림으로 인한 중복 알림 수정) | 자동 복구 없음, Telegram 통보만 | — |
@@ -144,9 +149,15 @@ rm -f watchdog-state/retry-state.json
 
 **3단계 흐름**:
 
-1. **⚠️ 발생**: `[Again-Spring] Claude 세션 만료 감지`
-2. **🔧 조치중**: `자동 복구 시도 중... (1/3)`
-3. **✅ 결과**: `복구됨` 또는 `❌ 3회 초과, 수동 조치: claude login`
+1. **⚠️ 발생**: 피어 복사 후에도 canary가 실패할 때만. 먼저 반대쪽 세션 pull을 시도한다
+2. **🔧 조치중**: AS는 WSL에서, WSL은 AS에서 oauth를 가져와 재시도
+3. **✅ 결과**: `Claude 세션 복구 (WSL|AS 복사)` 또는 3회 후 수동. canary가 살아 있으면 텔레그램 없이 expiresAt reconcile만
+
+스크립트:
+- 공통: `scripts/claude-oauth-peer.sh pull|push|reconcile user@host`
+- AS → WSL 수동+검증: `scripts/sync-claude-creds-to-wsl.sh`
+- 래퍼: `scripts/pull-claude-creds-from-as.sh` · `scripts/pull-claude-creds-from-wsl.sh`
+- WSL 워치독 SSOT: `env/scripts/wsl-ops-watchdog-script.sh`
 
 **스팸 방지**:
 - 이미 알린 동일 문제는 반복 발송 안 함
@@ -159,8 +170,9 @@ rm -f watchdog-state/retry-state.json
 
 WSL(`100.115.252.61`)의 watchdog은 동일 구조로 별도 배포.
 - 타이머: `~/.config/systemd/user/wsl-ops-watchdog.timer` (5분 간격)
-- 서비스: `~/.config/systemd/user/wsl-ops-watchdog.service`
-- 스크립트: `~/.config/systemd/user/wsl-ops-watchdog-script.sh`
+- 서비스: `~/.config/systemd/user/wsl-ops-watchdog.service` (`TimeoutStartSec=180s` — pull+재ping 여유. SSOT `env/scripts/wsl-ops-watchdog.service`)
+- 스크립트: `~/.config/systemd/user/wsl-ops-watchdog-script.sh` (SSOT `env/scripts/wsl-ops-watchdog-script.sh`)
+- Claude canary 실패 → 피어 oauth pull → ping 재시도. 성공 시 `expiresAt` reconcile로 양쪽을 맞춤. bind-mount라 llm-bridge 재시작 없음.
 - 상태 파일: `~/.wsl-watchdog/` (canary 타임스탬프, 재시도 카운터, 부팅 식별자, 로그)
   - `boot.ts`: `{"boot_id": "...", "boot_epoch": ...}` — boot_id는 부팅마다 커널이 새로 발급하는
     고정값이라 같은 부팅 중 재확인해도 값이 흔들리지 않는다(2026-08-16, 기존 `uptime -s` 초 단위

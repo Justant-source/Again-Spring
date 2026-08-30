@@ -115,6 +115,7 @@
 | `ai-user/learning/**` · `AiLearningClient*` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
 | `ai-user/tools/**` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
 | `env/docker-compose*` · `env/nginx/*` | `docs/system.md` · `docs/env/architecture.md` · README 포트표 |
+| `env/scripts/ops-watchdog.sh` · `env/scripts/wsl-ops-watchdog-script.sh` · `scripts/claude-oauth-peer.sh` · `scripts/*claude-creds*` | `docs/env/watchdog.md` · `.claude/rules/multi-agent.md` §5 |
 | `domain/enums/*Status*.java` · `MarketingJob*.java` · orchestrator `ActionStatus*.java` | 해당 모듈의 stateDiagram (`docs/ai-user/orchestrator.md` 등) |
 | `backend/.../marketing/**` · video brief/`sibom_*` · metaphor unplug · `VideoVariantService*` · `AdminMarketingController` BGM/SFX 메서드 | `docs/shared/marketing/sibom-video-insertion.md` · `youtube-shorts-strategy.md` · `api.md` · `docs/ai-user/llm-call-budget.md` §3 · `README.md` (어드민 탭 BGM/SFX) |
 | `MarketingGenerationTrace*` · `MarketingJobService.saveGenerationTrace()` · V119 마이그레이션 | `docs/shared/api/database-schema.md` (테이블 상세) · `docs/shared/marketing/architecture.md` (생성 기록 수집) |

@@ -1,0 +1,13 @@
+[Unit]
+Description=WSL Ops Watchdog — Claude, Credentials, Containers, ASM
+After=network.target
+
+[Service]
+Type=oneshot
+# canary 30s + AS pull + retry ping 30s 여유
+TimeoutStartSec=180s
+ExecStart=/bin/bash -c '/bin/bash /home/justant/.config/systemd/user/wsl-ops-watchdog-script.sh >> /home/justant/.wsl-watchdog/watchdog.log 2>&1'
+Restart=no
+
+[Install]
+WantedBy=default.target

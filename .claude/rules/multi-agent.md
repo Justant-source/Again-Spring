@@ -67,11 +67,15 @@ ssh justant@100.115.252.61 "source ~/.nvm/nvm.sh && npm install -g @anthropic-ai
 
 ## 5. WSL로 Claude 세션 복사 — "WSL로 claude 세션 복사해줘"
 
-사용자가 이 요청을 하면 **되묻지 말고 바로 실행**한다:
+사용자가 이 요청을 하면 **되묻지 말고 바로 실행**한다. 워치독은 canary 실패 시
+피어에서 가져와 재시도하고, 성공 시 `expiresAt`이 더 새 쪽을 양쪽에 맞춘다.
 
 ```bash
-scripts/sync-claude-creds-to-wsl.sh            # 복사 + 검증 (멱등, 백업 자동)
-scripts/sync-claude-creds-to-wsl.sh --check    # 복사 없이 현재 상태만 확인
+scripts/claude-oauth-peer.sh reconcile justant@100.115.252.61   # AS에서 WSL과 맞춤
+scripts/claude-oauth-peer.sh reconcile justant@100.81.189.92    # WSL에서 AS와 맞춤
+scripts/sync-claude-creds-to-wsl.sh            # AS에서 밀어넣기 + AUTH_OK 검증
+scripts/pull-claude-creds-from-as.sh           # WSL ← AS
+scripts/pull-claude-creds-from-wsl.sh          # AS ← WSL
 ```
 
 `AUTH_OK`(WSL CLI)와 `BRIDGE_AUTH_OK`(llm-bridge 컨테이너)가 모두 나오면 성공이다.
@@ -93,6 +97,6 @@ ASM 본체 컨테이너엔 claude 바이너리가 없다.
 
 **주의**
 - 토큰 수명이 **하루 단위**다. 로컬이 갱신하면 WSL 사본은 낡는다 → 그때 다시 실행하면 된다.
-- 한 토큰을 두 머신이 공유하므로 refresh 회전 시 한쪽이 끊길 수 있고, 사용량 한도도 공유한다.
+- 한 토큰을 두 머신이 공유한다. refresh 회전 시 한쪽이 끊길 수 있어, 워치독이 **10분마다 expiresAt reconcile**로 더 새 oauth를 반대쪽에 복사한다.
 - 스크립트가 `~/.claude`의 root 소유 항목을 점검한다 — 과거 컨테이너가 root로 써서
   세션이 끊긴 전례가 있다. 경고가 뜨면 소유권을 회수할 것.
