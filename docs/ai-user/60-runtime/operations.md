@@ -327,7 +327,7 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
    thread-plan 프롬프트를 다시 붙이지 않는다.
 4. micro-batch는 활성 페르소나 전체를 5명씩 돌리지 않는다. matcher 상위
    `max(batchSize, ready-min-items)+batchSize`명만 넣고(기본 11), 댓글이 READY 하한(기본 6)에 닿으면
-   후속 HUMAN_POST를 생략한다(2026-08-18). 호출 횟수 SSOT: `docs/ai-user/llm-call-budget.md`.
+   후속 HUMAN_POST를 생략한다(2026-08-18). 호출 횟수 SSOT: `docs/ai-user/70-policy/llm-call-budget.md`.
 
 ## 9. 트러블슈팅
 
@@ -365,7 +365,7 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
 
 saved < N이면 Telegram(기존 TELEGRAM_*). 로그의 attempted/saved·슬롯 이유를 본다.
 
-**2026-08-22 소스 재고 파이프라인 안정화**: 제목 추출 버그부터 광장 흡수까지 여섯 건의 수정이 nightly fill의 근본 원인을 순차 제거했다. 상세: [learning.md 광장 분류 개선 이력](./learning.md#광장-분류-개선-이력-2026-08-22-소스-재고-파이프라인-안정화).
+**2026-08-22 소스 재고 파이프라인 안정화**: 제목 추출 버그부터 광장 흡수까지 여섯 건의 수정이 nightly fill의 근본 원인을 순차 제거했다. 상세: [learning.md 광장 분류 개선 이력](../30-components/learning.md#광장-분류-개선-이력-2026-08-22-소스-재고-파이프라인-안정화).
 
 2026-08-10: claim/crawl은 **source_url 동시성 가드**를 쓴다. 과거 이중 INSERT된
 형제 row가 남아 있어도 claim 가족이 한 번만 잡힌다. 신규 이중 INSERT는

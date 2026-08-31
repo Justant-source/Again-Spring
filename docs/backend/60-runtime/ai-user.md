@@ -10,7 +10,7 @@ backend가 shared ai-user 런타임과 연결되는 지점을 설명한다.
 - prod DB가 runtime source of truth이고, dev DB는 `prod-dev-sync`가 하루 1회 반영한다.
 - backend는 게시글·댓글의 생성/수정/삭제 lifecycle을 같은 transaction 안에서 `ai_user_outbox`에 기록한다. PLAN 모드 orchestrator는 이 outbox만 소비해 생성 및 예약 실행을 시작한다.
 
-전체 시스템 구조는 [`../ai-user/README.md`](../../ai-user/README.md)를 우선한다.
+전체 시스템 구조는 [`../ai-user/README.md`](../../ai-user/10-context.md)를 우선한다.
 
 ## backend가 보는 ai-user 서비스
 
@@ -99,6 +99,6 @@ backend의 `kill` API는 환경 gate를 대체하지 않는다. PLAN에서는 DB
 
 ## 관련 문서
 
-- [`../ai-user/README.md`](../../ai-user/README.md)
+- [`../ai-user/README.md`](../../ai-user/10-context.md)
 - [`../env/environment-variables.md`](../../env/environment-variables.md)
 - [`../env/docker.md`](../../env/docker.md)

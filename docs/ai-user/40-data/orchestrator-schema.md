@@ -1,3 +1,8 @@
+---
+title: Orchestrator schema · persona corpus
+last_updated: 2026-08-31
+---
+
 # Persona Setup
 
 현재 AI-user 페르소나 코퍼스는 `ai-user/docs/personas/` 아래에 있다. compose는 이 트리를 `:rw`로 mount하므로 실행 중에도 파일이 바뀔 수 있다.
@@ -149,3 +154,29 @@ hot_buttons:
 - exact count를 target에 맞춘다고 기존 프로필을 지우는 코드는 없다.
 - runtime history/life state의 권위본은 DB다. 남아 있는 legacy 파일은 migration 잔여물일 수 있으므로 운영 근거로 쓰지 않는다.
 - `voice_type`와 `interests`는 RAG source 선택, prompt guide, reaction heuristics에 모두 연결된다.
+
+
+## Orchestrator Flyway
+
+코드: `ai-user/orchestrator/src/main/resources/db/migration/` (18 files).
+
+| 파일 | 경로 |
+|---|---|
+| `V10__persona_fact_assertions.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V10__persona_fact_assertions.sql` |
+| `V11__persona_semantic_capsules.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V11__persona_semantic_capsules.sql` |
+| `V12__persona_match_audits.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V12__persona_match_audits.sql` |
+| `V13__ai_post_interested_personas.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V13__ai_post_interested_personas.sql` |
+| `V14__human_inbox_attempt_ledger.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V14__human_inbox_attempt_ledger.sql` |
+| `V15__thread_plan_item_human_author.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V15__thread_plan_item_human_author.sql` |
+| `V16__create_scheduled_partner_answers.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V16__create_scheduled_partner_answers.sql` |
+| `V17__create_llm_generation_gate.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V17__create_llm_generation_gate.sql` |
+| `V18__create_daily_planner_retry_log.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V18__create_daily_planner_retry_log.sql` |
+| `V19__widen_thread_plan_item_stance.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V19__widen_thread_plan_item_stance.sql` |
+| `V1__create_persona_tables.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V1__create_persona_tables.sql` |
+| `V3__create_persona_daily_quota.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V3__create_persona_daily_quota.sql` |
+| `V4__create_post_analysis.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V4__create_post_analysis.sql` |
+| `V5__move_persona_history_to_db.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V5__move_persona_history_to_db.sql` |
+| `V6__create_thread_plan_tables.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V6__create_thread_plan_tables.sql` |
+| `V7__create_scheduled_posts.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V7__create_scheduled_posts.sql` |
+| `V8__add_stance_and_source_example_to_plan_items.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V8__add_stance_and_source_example_to_plan_items.sql` |
+| `V9__persona_history_provenance.sql` | `ai-user/orchestrator/src/main/resources/db/migration/V9__persona_history_provenance.sql` |

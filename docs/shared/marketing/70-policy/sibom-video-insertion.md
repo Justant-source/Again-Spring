@@ -91,7 +91,7 @@ WaggleBot `min_sibom` 하드 게이트는 이 최소선(4)과 같아야 한다. 
 
 ## 5. LLM·토큰 계약
 
-상세 횟수: [docs/ai-user/llm-call-budget.md](../../../ai-user/llm-call-budget.md) §3.
+상세 횟수: [docs/ai-user/70-policy/llm-call-budget.md](../../../ai-user/70-policy/llm-call-budget.md) §3.
 
 ```
 [1] 사연 생성 LLM (기존) — ai-user 워커

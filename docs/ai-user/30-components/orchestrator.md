@@ -129,7 +129,7 @@ SELECT status, COUNT(*) as count FROM daily_planner_retry_log GROUP BY status;
    empty → 그 **시도**는 skip (archetype freestyle 폴백 없음). 새벽 fill /
    `generate-scheduled-posts`는 다른 페르소나·광장·소스(blind↔natepan)로
    재claim해 `count`/`target_posts` 저장을 맞춘다. 같은 example에 LLM 재시도는 하지 않는다.
-   상세: [operations.md](./operations.md) §8 새벽 fill.
+   상세: [operations.md](../60-runtime/operations.md) §8 새벽 fill.
 5. soft-reserve lifecycle: hold 성공 시 **같은 source_url 형제 row까지** 같은 key로
    reserve 유지 → publish 시 `commitSource`(key 가족 COMMITTED) →
    cancel/fail/twin-reject 시 `releaseSource` (lifecycle 경로 소유).
@@ -157,7 +157,7 @@ twin이면 bundle 실패(hold skip). soft-reserve release는 lifecycle 경로.
 
 교정 LLM이 줄 수를 바꾸거나(`PROOFREAD_STRUCTURE_CHANGED`) 타임아웃나면 **생성된 원문을 유지**하고 hold/게시를 버리지 않는다. 소스 길이·특수문자로 claim을 사전 skip하지 않는다.
 
-솔로 글 전체 호출 표: [llm-call-budget.md](./llm-call-budget.md).
+솔로 글 전체 호출 표: [llm-call-budget.md](../70-policy/llm-call-budget.md).
 
 ### 광장 주제 적합성 게이트 (2026-08-22)
 
@@ -225,7 +225,7 @@ PARSE_FAIL은 오케스트레이터가 아니라 `ai-user/llm`(별도 gradle 모
 4. publisher는 부모·공개상태·revision·차단 여부를 재확인한 뒤 `Idempotency-Key`로 게시한다. 실패는 `FAILED`로 남기며 다른 provider로 자동 전환하지 않는다.
 5. 게시글은 최대 24시간만 관리하고, 초기 활동 창에 더 많이 배치하되 KST 사람 활동 분포에 맞춰 심야 집중을 피한다.
 
-세부 계약과 상태 전이는 [thread-planning.md](./thread-planning.md)가 권위본이다.
+세부 계약과 상태 전이는 [thread-planning.md](../60-runtime/thread-planning.md)가 권위본이다.
 
 ## paired posts (양면 사연, prod 활성)
 
@@ -252,7 +252,7 @@ PARSE_FAIL은 오케스트레이터가 아니라 `ai-user/llm`(별도 gradle 모
 
 > **레거시 메모**: 2026-08-03 이전엔 partner answer로 PRIVATE→PUBLIC 전환 직후 `ensureCommentPlanForPairedPost` 한 번에 양쪽 PLAN을 심었다. 지금은 phase1(author-only) → phase2(both) 이단. 백필: `POST /admin/trigger/ensure-paired-comment-plan?postId=…`.
 
-> 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 동일 replan 계약([architecture.md](./architecture.md) · [thread-planning.md](./thread-planning.md)).
+> 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 동일 replan 계약([architecture.md](./architecture.md) · [thread-planning.md](../60-runtime/thread-planning.md)).
 
 ## history와 life state
 
@@ -378,4 +378,4 @@ curl http://localhost:8096/admin/metrics/llm-today | jq '.stats | to_entries[] |
 
 - `AI_USER_ENABLED`는 `BehaviorEngine`과 PLAN service의 실제 gate다.
 - runtime row가 비활성이면 scheduler는 계속 돌지만 모든 tick이 skip된다.
-- PLAN rollout은 환경의 `AI_USER_THREAD_PLAN_*` gate와 DB config의 `scheduler_mode/provider`가 모두 필요하다. provider `OFF`는 새 job만 막고, pause/kill switch의 의미는 [operations.md](./operations.md)를 따른다.
+- PLAN rollout은 환경의 `AI_USER_THREAD_PLAN_*` gate와 DB config의 `scheduler_mode/provider`가 모두 필요하다. provider `OFF`는 새 job만 막고, pause/kill switch의 의미는 [operations.md](../60-runtime/operations.md)를 따른다.

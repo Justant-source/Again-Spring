@@ -20,7 +20,7 @@
 > 추가해 글 발행 자체도 생성과 분리했다. 새벽 배치는 이제 `generateAndHold`만
 > 쓴다. 홀딩 시 후보 item에 `scheduledAt`을 심고, `persistResponse`는 저장된
 > 시각을 우선한다(관리자 예약 홀딩 편집용). 상세: `docs/ai-user/operations.md` §8.
-> Hold 직전 맞춤법은 `SoftProofread`: 오탈자 휴리스틱이 있을 때만 LLM 교정, 실패 시 원문 유지. 솔로 글당 LLM 횟수: [llm-call-budget.md](./llm-call-budget.md).
+> Hold 직전 맞춤법은 `SoftProofread`: 오탈자 휴리스틱이 있을 때만 LLM 교정, 실패 시 원문 유지. 솔로 글당 LLM 횟수: [llm-call-budget.md](../70-policy/llm-call-budget.md).
 >
 > **FAMILY 광장 라우팅 (2026-08-22~)**: prod corpus에 가족 갈등 사연이 실제로 부족해 환경변수 `AI_USER_FAMILY_PLAZA_ENABLED`(기본 false)로 꺼져 있다. 꺼지면 페르소나의 최상위 interest가 FAMILY여도 OTHER로 재배치된다. 사용자 대면(검색·카테고리·라벨)은 변화 없음. 코퍼스가 늘어나면 환경변수 하나로 복구.
 
@@ -59,7 +59,7 @@ flowchart LR
 
 기본 후보 풀은 최상위 댓글 14개와 대댓글 10개, 총 24개이며 운영 범위는 8~30개다. 그러나 dev 검증 결과, 기본 24개는 구조화 생성 시 LLM 응답이 5~10분 이상 지연되는 현상이 관찰되었다. 타임아웃 설정(bundleTimeoutMs)을 240초로 확대했으나 응답 시간 개선을 위해 **prod 전환 시 `candidate_pool_size=16`(최상위 14개 + 대댓글 2개)으로 설정할 것을 권고**한다. 후보 전체가 실제 게시되는 것은 아니다. 노출·사람 반응·시간대에 따라 통상 6~20개만 활성화한다.
 
-**Micro-batch (WP4 / 기본 ON)**: 상세 호출 횟수는 [llm-call-budget.md](./llm-call-budget.md) §1.
+**Micro-batch (WP4 / 기본 ON)**: 상세 호출 횟수는 [llm-call-budget.md](../70-policy/llm-call-budget.md) §1.
 
 `AiPostBundleService`는 matcher로 정렬된 comment cast를 **전체 활성 페르소나(~150)가 아니라** `capCommentersForMicroBatch`로 자른다. 예산은 `max(microBatchSize, ready-min-items) + microBatchSize`(기본 5·6 → **11명**). 그다음 `microBatchSize`(clamp 4..6)로 슬라이스한다.
 

@@ -48,7 +48,7 @@ solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워
 - 파싱 가드: AI_POST와 동일(제목 4~40·제목≠본문·promo/capture sanitize·`LlmErrorSignature`/META). 모델은 post-grade(Claude Sonnet / Codex Terra).
 - **마이크로배치**: 논리 단계는 항상 Call1/Call2 두 번. cast가 크면 Call2만 `includePartnerPost=false` 후속으로 쪼갠다(또는 orchestrator가 기존 `thread-plan` HUMAN_POST 후속을 써도 됨).
 
-세부 후보 규칙과 retry·안전 정책은 [thread-planning.md](./thread-planning.md)를 따른다.
+세부 후보 규칙과 retry·안전 정책은 [thread-planning.md](../60-runtime/thread-planning.md)를 따른다.
 
 ### 검증된 세션 smoke 결과
 
@@ -118,7 +118,7 @@ Claude Code CLI는 기본적으로 모든 tool 정의를 프롬프트에 함께 
 1. controller가 prompt를 조립한다.
 2. `LlmWorkerPool`이 sync task를 실행한다.
 3. 글은 `OutputSanitizer.sanitizePost()`, 댓글/대댓글은 `sanitizeComment()`를 거친다.
-4. 글과 댓글은 `SelfCritiqueService`를 통해 재생성 루프를 탈 수 있다. FAIL 재시도는 **이슈 + 원문 전체 + 반말/존댓말 한 줄**만 보낸다. 원본 thread-plan 프롬프트·소스 본문·페르소나 목록·JSON 스키마는 재첨부하지 않는다. 호출 횟수 전체 표: [llm-call-budget.md](./llm-call-budget.md).
+4. 글과 댓글은 `SelfCritiqueService`를 통해 재생성 루프를 탈 수 있다. FAIL 재시도는 **이슈 + 원문 전체 + 반말/존댓말 한 줄**만 보낸다. 원본 thread-plan 프롬프트·소스 본문·페르소나 목록·JSON 스키마는 재첨부하지 않는다. 호출 횟수 전체 표: [llm-call-budget.md](../70-policy/llm-call-budget.md).
 5. 댓글/대댓글은 `<<<REACT>>>` sentinel 뒤 JSON을 분리해 orchestrator로 돌려준다.
 
 ### PLAN `/v2/generate/*` 개행 정규화
@@ -154,7 +154,7 @@ compose는 dev/prod 모두 `SELF_CRITIQUE_ENABLED=true`를 넘긴다. rare vocab
 
 `quickCheck`는 온점·상투구·강조어·ㅠ·쉼표율·casual **반말 위반(`~요`)** 등을 결정론으로 본다. PASS면 CLI를 더 부르지 않는다. FAIL이면 `buildRetryPrompt`로 짧은 본문 rewrite만 돌린다(timeout 90s, 실패 시 초안 유지). `originalPrompt` 인자는 API 호환용이며 **무시**한다.
 
-운영 로그 FAIL 다수는 casual 페르소나 + 존댓말이지, 원문 1000자·특수문자가 아니다. 호출 횟수·솔로 글 파이프라인은 [llm-call-budget.md](./llm-call-budget.md).
+운영 로그 FAIL 다수는 casual 페르소나 + 존댓말이지, 원문 1000자·특수문자가 아니다. 호출 횟수·솔로 글 파이프라인은 [llm-call-budget.md](../70-policy/llm-call-budget.md).
 
 ## prompt source
 

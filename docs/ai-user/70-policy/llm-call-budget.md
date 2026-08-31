@@ -151,7 +151,7 @@ ASM은 이 JSON brief를 받아 렌더만 한다.
 
 ## 6. LLM 관찰성 (Observability)
 
-orchestrator는 모든 LLM 호출을 `[LLMSTATS]` 단일행 로그로 기록한다. 형식은 [`docs/ai-user/orchestrator.md` § admin/metrics](./orchestrator.md)를 참조.
+orchestrator는 모든 LLM 호출을 `[LLMSTATS]` 단일행 로그로 기록한다. 형식은 [`docs/ai-user/orchestrator.md` § admin/metrics](../30-components/orchestrator.md)를 참조.
 
 **실시간 모니터링**:
 

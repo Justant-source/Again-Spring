@@ -194,7 +194,7 @@ Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, wi
 | **카테고리 스코프** | `category`(광장 enum) 지정 시 해당 광장 매핑만. Blind 레거시=`romance`/`marriage`/`workplace` + 신규 광장 enum(FAMILY/FRIEND 포함). Natepan=광장 enum. **미지정 시 필터 없음(레거시)**. 잘못된 enum → 400 |
 | 요청 제외 | `excludeExampleIds` — LLM/세이프가드 실패한 example id. 다음 인기 글을 claim |
 | 순위 | `popularity_pct DESC` (NULL last) |
-| 창 | `created_at` 기준 **14일**. 없으면 **한 번** 30일로 확장. 그래도 없으면 이 요청은 empty. **한 claim 호출이 source를 바꾸지는 않음** — 새벽 배치는 다른 source/plaza/persona로 **새 claim**을 재시도한다 ([operations.md](./operations.md) §8) |
+| 창 | `created_at` 기준 **14일**. 없으면 **한 번** 30일로 확장. 그래도 없으면 이 요청은 empty. **한 claim 호출이 source를 바꾸지는 않음** — 새벽 배치는 다른 source/plaza/persona로 **새 claim**을 재시도한다 ([operations.md](../60-runtime/operations.md) §8) |
 | 영구 제외 | 같은 `source_url`을 가진 **형제** `example_bank` 행이 `posts.source_example_id`로 쓰였거나 `example_source_reservations.status='COMMITTED'` |
 | soft 제외 | 형제 행 중 `status='SOFT'` AND `reserve_until > NOW(3)` |
 | 동시성 | claim 시 동일 `source_url` 가족 전체를 `FOR UPDATE`로 잠그고 같은 `reservationKey`로 SOFT 예약. commit/release도 key 가족 단위 |

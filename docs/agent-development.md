@@ -28,7 +28,7 @@ AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세
 | BE 기능·API | [`docs/backend/10-context.md`](./backend/10-context.md) | `backend/src/main/java/com/againspring/` |
 | API·DB 계약 | [`docs/shared/50-api/README.md`](./shared/50-api/README.md) | `backend/.../*Controller.java`, `backend/src/main/resources/db/migration/` |
 | LLM 브릿지·프롬프트 | [`docs/backend/30-components/llm-bridge.md`](./backend/30-components/llm-bridge.md), [`docs/shared/70-policy/forbidden-words.md`](./shared/70-policy/forbidden-words.md) | `backend/.../llm/`, `docs/shared/prompts/` |
-| AI-user | [`docs/ai-user/README.md`](./ai-user/README.md) | `ai-user/orchestrator/`, `ai-user/llm/`, `ai-user/learning/`, `ai-user/sync/` |
+| AI-user | [`docs/ai-user/10-context.md`](./ai-user/10-context.md) | `ai-user/orchestrator/`, `ai-user/llm/`, `ai-user/learning/`, `ai-user/sync/` |
 | 환경·배포 | [`docs/env/README.md`](./env/README.md) | `env/`, `.env.*.example`, `application*.yml` |
 
 ## Legacy 경로 금지
