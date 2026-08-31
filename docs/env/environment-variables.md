@@ -295,6 +295,11 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=6000
 - OAuth **client ID**는 env에 둘 수 있음. **client secret**은 AS `encrypted_secret`만.
 - `APP_URL`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME` — 비시크릿/식별자. `GMAIL_APP_PASSWORD` → vault `mail.gmail_app_password`.
 - `ASM_BASE_URL`, `ASM_ENABLED`, `ASM_CALLBACK_*` 비시크릿 설정은 env. `ASM_API_TOKEN` / callback token → vault (ASM 권위본=`system_secret`).
+- `ASM_CALLBACK_BASE_URL` — ASM이 종료 콜백·Telegram 재구동 버튼을 보낼 AS 주소.
+  **prod는 `http://100.81.189.92:8091`**, dev는 `:8090`. `application.yml` 기본값은 `:8090`이라
+  compose에 안 넣으면 prod 잡이 dev로 콜백되고 재구동이 `JOB_NOT_FOUND`가 된다
+  (`marketing_job` #974, 2026-08-31). `docker-compose.prod.yml` `backend-prod`와
+  `application-prod.yml`에 기본 `:8091`을 둔다.
 - Instagram/Meta `app_id`·`app_secret`·`access_token`은 **env에 두지 않음** — ASM `instagram_reels` credential(AES-256-GCM)만. 상세 [`docs/shared/marketing/credentials.md`](../shared/marketing/credentials.md)
 - ASM 런타임 (`ASM_BEARER_TOKEN`, `ASM_CALLBACK_TOKEN`, `WAGGLEBOT_API_KEY`, ASM `ANTHROPIC_API_KEY`) → ASM `system_secret`. ASM `.env`에는 `ASM_DATABASE_URL` + `ASM_CREDENTIAL_KEY`만.
 - ASM 로컬 mp4 보존: `VIDEO_RETENTION_DAYS`(기본 30) · `VIDEO_RETENTION_POLL_INTERVAL_SECONDS`(기본 3600). AS env가 아님. 정책 [`docs/shared/marketing/youtube-shorts-strategy.md`](../shared/marketing/youtube-shorts-strategy.md).

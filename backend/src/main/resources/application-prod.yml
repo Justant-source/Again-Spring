@@ -40,3 +40,9 @@ management:
 app:
   features:
     duo-mode: ${DUO_MODE_ENABLED:false}
+
+# Prod jobs must callback :8091. application.yml defaults to :8090 (dev).
+# If this is missing, Telegram 재구동 buttons are labeled env=dev → JOB_NOT_FOUND
+# (marketing_job #974, 2026-08-31).
+asm:
+  callback-base-url: ${ASM_CALLBACK_BASE_URL:http://100.81.189.92:8091}

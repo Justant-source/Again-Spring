@@ -14,7 +14,7 @@
 | 자동 생성 | **활성** — 사연 `+24h` 후 **채널별 popularity·cap**으로 독립 선정 (`MarketingHoldingCommitService`) |
 | 자동 게시 | **활성** — READY 즉시 YT API / Reels Graph 게시 (저녁 슬롯 없음) |
 | 렌더 | WaggleBot (`POST /api/external/jobs`) — LLM은 **Claude CLI 브릿지** (`llm_backend=cli`). **채널별 유니크 렌더** (동일 mp4 공유 금지) |
-| 게시 계정 | 다시봄 전용 YouTube (ASM `youtube_shorts` OAuth) · IG Reels Graph (`instagram_reels` 토큰). Graph 25/2207050이면 scraping_warning 닫기 후 Graph 재시도 |
+| 게시 계정 | 다시봄 전용 YouTube (ASM `youtube_shorts` OAuth) · IG Reels Graph (`instagram_reels` 토큰). rupload `ProcessingFailedError`는 새 컨테이너로 최대 3회. Graph 25/2207050이면 scraping_warning 닫기 후 Graph 재시도 |
 
 `instagram_reels`와 `youtube_shorts`는 **독립 선정**. 같은 사연이 양쪽에 가도 **레이아웃·대사·mp4가 다름**.  
 피드(`instagram_feed`)와 Reels는 **상호배타** (`score_feed` vs `score_reels`, 동점→Reels) — [`platforms.md`](platforms.md).  

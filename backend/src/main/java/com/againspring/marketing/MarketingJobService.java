@@ -674,10 +674,10 @@ public class MarketingJobService {
             compact(title, 500), job.getId() != null ? job.getId() : "?", publicationLines);
     }
 
-    private static String formatFailureAlert(MarketingJob job, String title,
+    static String formatFailureAlert(MarketingJob job, String title,
                                               List<Map<String, Object>> publications) {
         String detail = compact(job.getErrorMessage(), 1200);
-        String publicationLines = publicationLines(publications, false);
+        String publicationLines = failureCauseLine(publications, job.getErrorMessage());
         return String.format(
             "❌ [Again-Spring] 예약 마케팅 게시 %s%n제목: %s%n잡 #%s%n원인: %s%n에러 로그: %s",
             "PARTIAL".equalsIgnoreCase(job.getStatus()) ? "일부 실패" : "실패",
@@ -685,6 +685,16 @@ public class MarketingJobService {
             job.getId() != null ? job.getId() : "?",
             publicationLines,
             detail == null || detail.isBlank() ? "원격 서비스가 상세 오류를 반환하지 않았습니다." : detail);
+    }
+
+    /** When ASM returns only PENDING rows (x_thread cleanup) the FAILED filter is empty. */
+    static String failureCauseLine(List<Map<String, Object>> publications, String errorMessage) {
+        String lines = publicationLines(publications, false);
+        if (lines.contains("원격 서비스 응답에 없음")
+                && errorMessage != null && !errorMessage.isBlank()) {
+            return compact(errorMessage, 300);
+        }
+        return lines;
     }
 
     private static String publicationLines(List<Map<String, Object>> publications, boolean publishedOnly) {

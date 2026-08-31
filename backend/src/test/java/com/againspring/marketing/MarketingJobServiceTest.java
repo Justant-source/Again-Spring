@@ -1797,4 +1797,18 @@ class MarketingJobServiceTest {
         assertThat(message).contains("[다시봄 마케팅/dev]");
         assertThat(message).doesNotContain("[다시봄 마케팅/prod]");
     }
+
+    @Test
+    void failureCauseLine_usesErrorMessageWhenPublicationsHaveNoFailedRows() {
+        List<Map<String, Object>> pendingOnly = List.of(
+            Map.of("platform", "x_thread:main", "state", "PENDING")
+        );
+        assertThat(MarketingJobService.failureCauseLine(
+            pendingOnly, "All publication channels failed"))
+            .isEqualTo("All publication channels failed");
+        assertThat(MarketingJobService.failureCauseLine(
+            List.of(Map.of("platform", "instagram_reels", "state", "FAILED", "error", "rupload 400")),
+            "All publication channels failed"))
+            .contains("instagram_reels");
+    }
 }

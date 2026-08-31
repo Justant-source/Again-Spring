@@ -510,6 +510,7 @@ Authorization: Bearer {ASM_CALLBACK_TOKEN}
 
 **배경**
 Telegram 버튼의 callback_data는 `{env}:{jobId}`를 포함한다. env와 jobId가 다른 소스에서 나오면 불일치할 수 있다. 실제 버그: 버튼이 `dev:698`을 지정했으나 job 698은 prod에만 존재 → dev로 라우팅 시 not found (무해). 위험: dev는 job id를 리셋한 적이 있어(현재 max=65), 재사용되는 id는 스테일 버튼으로 다른 잡을 재구동할 수 있다. 해결책: remoteJobId(ULID)로 신원 증명 → 재사용 불가능.
+ASM은 잡의 `callback_url`로 env를 고른다(`:8091`/`prod` → prod, 그 외 → dev). prod가 `ASM_CALLBACK_BASE_URL` 없이 `:8090` 기본값을 쓰면 버튼이 `env=dev`가 되어 `JOB_NOT_FOUND`(잡 #974). 코드 기본값은 `application-prod.yml` `:8091`. 재구동 핸들러는 `JOB_NOT_FOUND`면 반대 env를 한 번 더 친다.
 
 **성공 로그**
 ```
