@@ -1,131 +1,109 @@
+---
+title: docs — 문서 지도 & Doc-Sync 트리거 맵
+last_updated: 2026-08-31
+---
+
 # docs/_index.md — 문서 지도 & Doc-Sync 트리거 맵
 
-> **충돌 해결**: 코드(runtime) > authority > derived. 두 문서가 같은 사실을 다르게 서술하면
-> `authority` 파일을 따른다. `derived` 파일은 독립 정의 금지 — authority 변경 시 함께 갱신.
->
-> 이 파일은 `docs/shared/manifest.yaml`을 흡수했다 (2026-06-14). `shared/` 모듈은 2026-06-14 삭제되어 `docs/shared/`로 통합됐다.
+> **SSOT 해결 규칙**: 충돌 시 **코드(runtime) > 이 문서 > 다른 문서** 순으로 우선한다.
+> 새 컨텍스트를 시작할 때 이 파일을 첫 번째로 읽는다.
 
----
+## §1. 계층 인덱스 (대분류 × 계층)
 
-## 모듈별 문서 인덱스
+| 계층 | backend/ | frontend/ | shared/ | ai-user/ | env/ | shared/marketing/ |
+|---|---|---|---|---|---|---|
+| 10-context | `10-context.md` 🏛 | `10-context.md` | `10-context.md` 🏛 | `10-context.md` | `10-context.md` | `10-context.md` |
+| 20-containers | — | — | `20-containers.md` 🏛 | `20-containers.md` | `20-containers/` (3) | `20-containers.md` |
+| 30-components | `30-components/` (3) | `30-components/` (4) | — | `30-components/` (4) | — | `30-components.md` |
+| 40-data | `40-data.md` | — | — | `40-data/` (1) | `40-data.md` | `40-data/` (2) |
+| 50-api | `50-api.md` 🏛 | — | `50-api/` (6) 🏛 | — | — | `50-api.md` |
+| 60-runtime | `60-runtime/` (3) | `60-runtime/` (6) | `60-runtime.md` | `60-runtime/` (3) | `60-runtime/` (4) | `60-runtime.md` |
+| 70-policy | `70-policy.md` | `70-policy/` (7) | `70-policy/` (9) | `70-policy/` (2) | — | `70-policy/` (6) |
+| 90-adr | — | — | `90-adr/` (7) 🏛 | — | — | — |
 
-| 모듈 | 경로 | 설명 |
-|---|---|---|
-| AI agent 개발 가이드 | `docs/agent-development.md` | 작업 시작 루프·legacy 금지 경로·검증 명령 |
-| 시스템 전체 | `docs/system.md` | L1 컨텍스트 + L2 토폴로지 다이어그램 (권위본) |
-| FE | `docs/frontend/` | Next.js 14 — 디자인 시스템·UX 원칙·구조·테스트 |
-| BE | `docs/backend/` | Spring Boot 3.3 — llm-bridge·아키텍처·테스트 |
-| AI 유저 | `docs/ai-user/` | 페르소나 생성·오케스트레이션·학습·운영 |
-| 공유 (API·정책·ADR) | `docs/shared/` | REST 명세·DB 스키마·정책·마케팅·ADR |
-| 환경/인프라 | `docs/env/` | 배포·포트·환경변수·Docker·Cloudflare |
-| TODO / 작업 메모 | `docs/todo/` | 재사용할 조사 결과·실험 메모·기능 가설 |
+루트: `docs/_index.md` · `docs/agent-development.md` · `docs/ai-user/history.md` (계층 밖).
+런타임 JSON: `docs/shared/policies/user-permissions.json` (이동 금지).
 
----
+🏛 = 그 주제의 전역 권위본. `(n)` = 디렉터리 안 본문 파일 수(README 제외). ADR 본문은 0000–0006 일곱 개(+ README).
 
-## 문서 권위 그래프 (구 manifest.yaml)
+## §2. 작업별 진입 문서
 
-> `authority` = SSOT · `derived` = authority 기반 파생(독립 정의 금지) · `runtime` = 코드가 항상 우선
-
-### 콘텐츠 정책
-
-| 토픽 | authority | derived | runtime |
+| 작업 | 1차 진입(이것만 읽기) | 2차(필요 시) | 실제 코드 확인 |
 |---|---|---|---|
-| 금지어 | `docs/shared/policies/forbidden-words.md` | `docs/frontend/policies/forbidden-words-lint.md`·`CLAUDE.md` | `frontend/lib/constants/forbiddenWords.ts`·`backend/.../safety/KeywordGuard.java` |
-| 분류 카테고리 | `docs/shared/policies/categories.md` | — | `frontend/lib/constants/categories.ts` |
-| 사용자 권한 | **`docs/shared/policies/user-permissions.json`** (런타임 자산·볼륨마운트) | `docs/shared/policies/user-permissions.md` | `backend/src/main/resources/user-permissions.json` (fallback) |
+| AI agent 작업 루프 | `docs/agent-development.md` | — | — |
+| 시스템 전체 그림 파악 | `docs/shared/10-context.md` + `docs/shared/20-containers.md` | — | — |
+| FE 기능/UI | `docs/frontend/10-context.md` | `docs/frontend/30-components/` | `frontend/app/` · `frontend/components/` |
+| FE 디자인 | `docs/frontend/70-policy/design-system.md` | — | `frontend/tailwind.config.ts` |
+| FE 테스트/e2e | `docs/frontend/70-policy/testing.md` | `docs/frontend/60-runtime/flows/` | `frontend/tests/` |
+| BE 기능/API | `docs/backend/10-context.md` | `docs/backend/30-components/` | `backend/src/` |
+| BE DB 스키마 | `docs/backend/40-data.md` | — | `backend/src/main/resources/db/migration/` |
+| LLM 브릿지 | `docs/backend/30-components/llm-bridge.md` | `docs/ai-user/30-components/llm.md` | `backend/src/main/java/com/againspring/llm/` |
+| AI 유저 생성·오케스트레이션 | `docs/ai-user/10-context.md` | `docs/ai-user/30-components/orchestrator.md` | `ai-user/orchestrator/` |
+| AI 유저 학습 | `docs/ai-user/30-components/learning.md` | `docs/ai-user/70-policy/llm-call-budget.md` | `ai-user/learning/` |
+| API 명세 | `docs/shared/50-api/rest-spec.md` | — | `backend/src/main/java/com/againspring/api/` |
+| 정책 (금지어·인증·권한) | `docs/shared/70-policy/forbidden-words.md` | `docs/shared/70-policy/user-permissions.md` | `docs/shared/policies/user-permissions.json` |
+| 환경/배포 | `docs/env/60-runtime/deployment.md` | `docs/env/20-containers/architecture.md` | `env/docker-compose*.yml` |
+| 마케팅 | `docs/shared/marketing/10-context.md` | `docs/shared/marketing/70-policy/` | ASM: (별도 저장소) |
 
-### 설계 시스템
+## §3. 🚨 런타임 자산 (이동 금지)
 
-| 토픽 | authority | derived | runtime |
+| 경로 | 용도 | 마운트 | 변경 시 조치 |
 |---|---|---|---|
-| 디자인 토큰 | `docs/frontend/design/system.md` | `CLAUDE.md` (진영색 요약) | `frontend/tailwind.config.ts` |
-| UX 원칙 | `docs/frontend/ux/principles.md` | `docs/frontend/ux/hax-checklist.md`·`CLAUDE.md` | — |
+| `docs/shared/prompts/` | LLM 프롬프트 | 컨테이너 `/app/shared/docs/prompts` (backend) | backend restart |
+| `docs/shared/categories.yml` | 분류 정의 | 컨테이너 categories.yml (backend) | backend restart |
+| `docs/shared/policies/user-permissions.json` | 권한 정책 | 컨테이너 policies/ (backend) | backend restart |
+| `docs/shared/templates/` | 마케팅 템플릿 | 컨테이너 templates/ (ASM) | ASM restart |
 
-### API / 데이터
+정책 **문서**는 `docs/shared/70-policy/` 에 있다. JSON 자산은 `docs/shared/policies/` 에 남긴다.
 
-| 토픽 | authority | derived | runtime |
+## §4. 문서 권위 그래프
+
+```
+코드(runtime) > docs/_index.md > AGENTS.md > CLAUDE.md > .cursor/rules/*.mdc
+```
+
+- **코드**: 유일한 진실의 원천. 문서가 코드와 어긋나면 코드를 믿는다.
+- **docs/_index.md**: 트리거 맵·인덱스. 2차 권위본.
+- **AGENTS.md**: AI 에이전트 작업 가이드 정본 (재편 후).
+- **CLAUDE.md**: AGENTS.md 포인터.
+- **.cursor/rules/*.mdc**: IDE 안내. 가장 낮은 우선순위.
+
+## §5. Doc-Sync 트리거 맵
+
+경로는 저장소 루트 기준. 축약 금지. 코드에 없는 glob은 넣지 않는다.
+
+| # | 코드 영역 (glob) | 갱신 대상 문서 | 등급 |
 |---|---|---|---|
-| REST API | `docs/shared/api/rest-spec.md` | derived: auth/user/admin/feedback.md | `backend/.../api/*Controller.java` |
-| DB 스키마 | `docs/shared/api/database-schema.md` | — | `backend/src/main/resources/db/migration/V*.sql` |
+| 1 | `backend/src/main/resources/db/migration/V*.sql` | `docs/backend/40-data.md` | M |
+| 2 | `backend/src/main/java/com/againspring/llm/**` | `docs/backend/30-components/llm-bridge.md` | M |
+| 3 | `backend/src/main/java/com/againspring/service/community/**` | `docs/backend/30-components/architecture.md` | M |
+| 4 | `backend/src/main/java/com/againspring/api/**` | `docs/shared/50-api/rest-spec.md` | M |
+| 5 | `backend/src/main/java/com/againspring/api/AuthController.java` | `docs/shared/70-policy/auth.md` | M |
+| 6 | `backend/src/main/resources/policies/user-permissions.json` | `docs/shared/70-policy/user-permissions.md` | M |
+| 7 | `frontend/components/**` | `docs/frontend/30-components/` | M |
+| 8 | `frontend/app/**` | `docs/frontend/10-context.md` | C |
+| 9 | `frontend/design/**` | `docs/frontend/70-policy/design-system.md` | M |
+| 10 | `frontend/lib/constants/metaphors.ts` | `docs/frontend/70-policy/illustration-metaphor.md` | M |
+| 11 | `frontend/tests/e2e-realbe/**` | `docs/frontend/70-policy/testing.md` | M |
+| 12 | `ai-user/orchestrator/**` | `docs/ai-user/30-components/orchestrator.md` | M |
+| 13 | `ai-user/learning/**` | `docs/ai-user/30-components/learning.md` | M |
+| 14 | `env/docker-compose*.yml` | `docs/env/20-containers/architecture.md` | M |
+| 15 | `backend/src/main/java/com/againspring/safety/KeywordGuard.java` | `docs/shared/70-policy/forbidden-words.md` | M |
+| 16 | `backend/src/main/java/com/againspring/llm/prompt/PromptLoader.java` | `docs/backend/30-components/llm-bridge.md` | M |
+| 17 | `backend/src/main/java/com/againspring/llm/remote/RemoteLlmProvider.java` | `docs/backend/30-components/llm-bridge.md` | M |
 
-### LLM
+등급: **M**=필수 · **C**=조건부.
 
-| 토픽 | authority | derived | runtime |
+## §6. Code → Docs 역인덱스
+
+| 코드 경로 접두 | 소유 모듈 | 먼저 읽을 문서 | 권위본 |
 |---|---|---|---|
-| LLM 프롬프트 | **`docs/shared/prompts/`** (런타임 자산·볼륨마운트) | — | `backend/.../llm/prompt/PromptLoader.java` |
-| LLM 브릿지 | `docs/backend/llm-bridge.md` | `CLAUDE.md` (요약) | `backend/.../llm/remote/RemoteLlmProvider.java` |
-| AI-user·마케팅 **호출 횟수·게이트** (2026-08-18) | `docs/ai-user/70-policy/llm-call-budget.md` | `docs/ai-user/llm.md` · `thread-planning.md` · `docs/shared/marketing/sibom-video-insertion.md` §5 | `AiPostBundleService` · `SoftProofread` · `SelfCritiqueService` · `VideoVariantService` |
-
-### 환경 / 인프라
-
-| 토픽 | authority | derived | runtime |
-|---|---|---|---|
-| 포트·토폴로지 | `docs/system.md`·`docs/env/architecture.md` | `README.md`·`CLAUDE.md` | `env/docker-compose*.yml`·`env/nginx/*.conf` |
-| 배포 절차 | `docs/env/deployment.md` | `CLAUDE.md` (3-step 요약) | — |
-| 환경 변수 | `docs/env/environment-variables.md` | — | `.env.dev`·`.env.prod`·`.env.ai-user`·`application*.yml` |
-
-### 마케팅 (ASM)
-
-> **미공개 초점**: 활성 채널 = **X / `x_thread`만**. IG·네이버·YouTube·Threads 보류
-> (`instagram_feed`는 24h 자동 + 단건 수동 — `instagram-feed-strategy.md`).
-> **접속**: AS(`100.81.189.92`) → `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
-> **⚠️ WaggleBot 단일 공유 인스턴스**: 렌더러 설정(`worker/ai_worker/renderer/settings.yaml`)은 dev/prod 구분 없음. 즉시 반영 — 변경 전 사전 공지 필수.
-
-| 토픽 | authority | derived | runtime |
-|---|---|---|---|
-| ASM 전체 | `docs/shared/marketing/README.md` | `{api,architecture,platforms,social-poster,asm-setup}.md` | ASM 저장소 (`~/Data/Again-Spring-Marketing`) |
-| X 스레드 전략 (활성) | `docs/shared/marketing/x-thread-strategy.md` | — | ASM `services/social-poster/src/routes/publish-x.js` |
-| X 성장 루프 (댓글·의식) | `docs/shared/marketing/x-thread-strategy.md` §2.4 | `docs/shared/marketing/api.md` · `docs/shared/api/database-schema.md` (`x_ops_action`) | `XGrowthLoop*` · ASM `/api/v1/x/*` |
-| IG 피드 전략 (24h 자동) | `docs/shared/marketing/instagram-feed-strategy.md` | — | ASM `app/worker/ig_feed_pipeline.py` |
-| YouTube Shorts 전략 (조건부 자동 생성 + 수동 게시) | `docs/shared/marketing/youtube-shorts-strategy.md` | — | `MarketingJobService.maybeTriggerYoutubeShorts` · ASM `youtube_shorts` 파이프 · WaggleBot |
-| 시봄이 숏폼 삽입 (Shorts/Reels) | `docs/shared/marketing/sibom-video-insertion.md` | `youtube-shorts-strategy.md` · `api.md` | AS `sibom_candidates`/`sibom_plan` · WaggleBot sprouts 합성 |
-| **BGM/SFX 관리** (2026-08-23) | `docs/shared/marketing/README.md` (어드민 탭) | — | AS `AdminMarketingController` BGM/SFX 경로 · WaggleBot `renderer/settings.yaml` |
-| **유입 계측** (2026-08-29) | `docs/shared/marketing/acquisition-measurement.md` | `docs/shared/api/database-schema.md` (`visit_events`·users 유입 컬럼) · `marketing/api.md` (`stats/acquisition`) | AS `VisitorClassifier` · `AcquisitionAttribution` · `AcquisitionFunnelService` · FE `VisitTracker`·`AcquisitionFunnelPanel` |
-| **검색 유입 기반** (2026-08-29) | `docs/shared/marketing/seo.md` | `docs/env/environment-variables.md` (`*_SITE_VERIFICATION`) | FE `app/robots.ts`·`app/sitemap.ts`·`app/layout.tsx`·`public/naver*.html` · `lib/serverApiBase.ts` |
-
----
-
-## 🚨 런타임 자산 (볼륨 마운트 경로 변경 시 docker-compose도 함께 갱신)
-
-아래 파일들은 **볼륨 마운트 + `application.yml`이 참조하는 런타임 자산**이다.
-`docs/shared/` 아래에 위치하며, 컨테이너 내부 경로(`/app/shared/docs/...`)는 변경하지 않는다.
-
-| 경로 (호스트) | 종류 | 컨테이너 내부 경로 | 참조 |
-|---|---|---|---|
-| `docs/shared/prompts/` | LLM 프롬프트 (read-only) | `/app/shared/docs/prompts` | `app.prompts.path` / `PromptLoader` / `AdminAiRulesController` |
-| `docs/shared/templates/first_message/*.json` | 첫 메시지 템플릿 (read-only) | `/app/shared/docs/templates` | `TEMPLATES_PATH` / compose `:ro` |
-| `docs/shared/categories.yml` | 카테고리 마스터 (read-only) | `/app/shared/docs/categories.yml` | `app.categories.path` / compose `:ro` |
-| `docs/shared/policies/user-permissions.json` | 권한 설정 (read-only) | `/app/shared/docs/policies/user-permissions.json` | `UserPermissionsConfig` / compose `:ro` |
-| `ai-user/docs/personas/profiles/` | 페르소나 코퍼스 + 요약 README (read-write!) | `/app/personas` | `AiUserSeedLoader` · `PersonaFactory` · 운영 스크립트 |
-
----
-
-## Doc-Sync 트리거 맵 (코드 변경 → 갱신할 문서)
-
-> SSOT Doc-Sync 게이트(CLAUDE.md 절대 규칙 #8)가 이 표를 참조한다.
-> push 전 `git diff --staged --name-only`로 코드 영역을 식별하고, 아래 표의 대응 문서를 갱신한다.
-
-| 코드 영역 (glob) | 갱신 대상 문서 |
-|---|---|
-| `backend/.../db/migration/V*.sql` | `docs/shared/api/database-schema.md` (ER 다이어그램 포함) |
-| `api/visits/**` · `service/acquisition/**` · `AcquisitionFunnelService` · FE `VisitTracker`·`lib/api/visits.ts` | `docs/shared/marketing/acquisition-measurement.md` (필드명 계약·봇 분류·기준선) |
-| FE `app/robots.ts` · `app/sitemap.ts` · `app/layout.tsx` metadata · `public/naver*.html` · 홈/광장 렌더 전략 | `docs/shared/marketing/seo.md` |
-| `backend/.../domain/**/*.java` | `docs/shared/api/database-schema.md` |
-| `backend/.../api/**/*Controller.java` | `docs/shared/api/rest-spec.md` · `docs/shared/api/flows.md` |
-| `ai-user/orchestrator/**/threadplan/**` · `ai-user/llm/**/Structured*` · `ai-user/orchestrator/**/safety/SoftProofread*` · `SelfCritiqueService*` | `docs/ai-user/thread-planning.md` · `docs/ai-user/llm.md` · `docs/ai-user/70-policy/llm-call-budget.md` · `docs/ai-user/operations.md` · `docs/ai-user/orchestrator.md` |
-| `ai-user/learning/**` · `AiLearningClient*` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
-| `ai-user/tools/**` | `docs/ai-user/learning.md` · `docs/ai-user/operations.md` |
-| `env/docker-compose*` · `env/nginx/*` | `docs/system.md` · `docs/env/architecture.md` · README 포트표 |
-| `env/scripts/ops-watchdog.sh` · `env/scripts/wsl-ops-watchdog-script.sh` · `scripts/claude-oauth-peer.sh` · `scripts/*claude-creds*` | `docs/env/watchdog.md` · `.claude/rules/multi-agent.md` §5 |
-| `domain/enums/*Status*.java` · `MarketingJob*.java` · orchestrator `ActionStatus*.java` | 해당 모듈의 stateDiagram (`docs/ai-user/orchestrator.md` 등) |
-| `backend/.../marketing/**` · video brief/`sibom_*` · metaphor unplug · `VideoVariantService*` · `AdminMarketingController` BGM/SFX 메서드 | `docs/shared/marketing/sibom-video-insertion.md` · `youtube-shorts-strategy.md` · `api.md` · `docs/ai-user/70-policy/llm-call-budget.md` §3 · `README.md` (어드민 탭 BGM/SFX) |
-| `XGrowthLoop*` · `XOpsAction*` · `XInbound*` · `XOutbound*` · `XRitual*` · `x_ops_action` | `docs/shared/marketing/x-thread-strategy.md` §2.4 · `docs/shared/api/database-schema.md` · `docs/shared/marketing/api.md` |
-| `MarketingGenerationTrace*` · `MarketingJobService.saveGenerationTrace()` · V119 마이그레이션 | `docs/shared/api/database-schema.md` (테이블 상세) · `docs/shared/marketing/architecture.md` (생성 기록 수집) |
-| WaggleBot 렌더러/SFX/BGM 설정 (`worker/ai_worker/renderer/settings.yaml`) | `docs/shared/marketing/README.md` (컴포넌트 역할·API 경로·환경변수) |
-| `backend/.../safety/**` · `llm/PromptSanitizer*` · `LlmErrorSignature*` · `ContentSafetyGuard*` | `docs/shared/policies/forbidden-words.md` · `.claude/rules/llm-safety.md` |
-| `docs/shared/policies/forbidden-words.md` | `.claude/rules/llm-safety.md` · `docs/frontend/policies/forbidden-words-lint.md` |
-| `backend/.../llm/**` | `docs/backend/llm-bridge.md` |
-| `frontend/tailwind.config.ts` · `frontend/app/globals.css` | `docs/frontend/design/system.md` |
-| `frontend/app/s/**` · `frontend/**/postInvite*` · `backend/.../PostInvite*` · partner claim/delete | `docs/frontend/ux/flows/09-partner-invite-ownership.md` · `docs/shared/api/rest-spec.md` §2.1 · `docs/frontend/testing.md` (journey 06) |
-| 환경변수 추가/변경 (`.env.*` · `application*.yml`) | `docs/env/environment-variables.md` · README |
-| `docs/shared/policies/user-permissions.json` | `docs/shared/policies/user-permissions.md` · CLAUDE.md |
+| `backend/src/main/java/com/againspring/llm/` | backend | `docs/backend/30-components/llm-bridge.md` | 🏛 |
+| `backend/src/main/resources/db/migration/` | backend | `docs/backend/40-data.md` | 🏛 |
+| `frontend/components/` | frontend | `docs/frontend/30-components/` | 🏛 |
+| `frontend/app/` | frontend | `docs/frontend/10-context.md` | |
+| `ai-user/orchestrator/` | ai-user | `docs/ai-user/30-components/orchestrator.md` | |
+| `ai-user/learning/` | ai-user | `docs/ai-user/30-components/learning.md` | |
+| `env/docker-compose*.yml` | env | `docs/env/20-containers/architecture.md` | 🏛 |
+| `docs/shared/policies/` | shared | `docs/shared/70-policy/` | 🏛 |
+| `backend/src/main/java/com/againspring/safety/KeywordGuard.java` | shared | `docs/shared/70-policy/forbidden-words.md` | 🏛 |
