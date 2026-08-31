@@ -8,8 +8,9 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * One-minute KST tick for ritual / inbound / outbound. Each call is isolated so one
- * failure cannot skip the rest of the tick.
+ * Ritual / inbound stay on a one-minute KST tick (inbound has a 30-minute reply
+ * window). Outbound candidate fetches hit X's session APIs, so they run only
+ * every 30 minutes during 08:00–22:00 KST — one reply per successful tick.
  */
 @Slf4j
 @Component
@@ -33,6 +34,12 @@ public class XGrowthLoopScheduler {
         } catch (Exception e) {
             log.warn("[x-growth] inbound tick failed: {}", e.getMessage());
         }
+    }
+
+    /** 08:00, 08:30, … 22:00, 22:30 KST. */
+    @Scheduled(cron = "0 0,30 8-22 * * *", zone = "Asia/Seoul")
+    public void outboundTick() {
+        Instant now = Instant.now();
         try {
             outboundService.run(now);
         } catch (Exception e) {

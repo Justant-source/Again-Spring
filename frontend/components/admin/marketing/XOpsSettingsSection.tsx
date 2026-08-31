@@ -198,7 +198,7 @@ export function XOpsSettingsSection() {
           <FlagSwitch
             id="x-ops-outbound"
             label="맞팔 선댓글"
-            hint="댓글이 이미 붙은 맞팔 글에만"
+            hint="맞팔·불 난 글만. 주간(08:00–22:00 KST) 30분마다 후보 1회, 틱당 댓글 1개"
             checked={settings.outboundEnabled}
             onChange={() => patch('outboundEnabled', !settings.outboundEnabled)}
           />

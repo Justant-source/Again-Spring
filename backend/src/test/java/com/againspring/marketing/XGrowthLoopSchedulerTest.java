@@ -11,6 +11,7 @@ import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,31 +33,49 @@ class XGrowthLoopSchedulerTest {
     }
 
     @Test
-    void tick_runsRitualThenInboundThenOutbound() {
+    void tick_runsRitualAndInbound_notOutbound() {
         scheduler.tick();
 
         verify(ritualPublisher).runIfDue(any(Instant.class));
         verify(inboundService).run(any(Instant.class));
-        verify(outboundService).run(any(Instant.class));
+        verify(outboundService, never()).run(any(Instant.class));
     }
 
     @Test
-    void tick_ritualFailure_stillRunsInboundAndOutbound() {
+    void tick_ritualFailure_stillRunsInbound_skipsOutbound() {
         doThrow(new RuntimeException("ritual boom")).when(ritualPublisher).runIfDue(any());
 
         scheduler.tick();
 
         verify(inboundService).run(any(Instant.class));
-        verify(outboundService).run(any(Instant.class));
+        verify(outboundService, never()).run(any(Instant.class));
     }
 
     @Test
-    void tick_inboundFailure_stillRunsOutbound() {
+    void tick_inboundFailure_stillSkipsOutbound() {
         doThrow(new RuntimeException("inbound boom")).when(inboundService).run(any());
 
         scheduler.tick();
 
         verify(ritualPublisher).runIfDue(any(Instant.class));
+        verify(outboundService, never()).run(any(Instant.class));
+    }
+
+    @Test
+    void outboundTick_runsOutboundOnly() {
+        scheduler.outboundTick();
+
+        verify(outboundService).run(any(Instant.class));
+        verify(ritualPublisher, never()).runIfDue(any());
+        verify(inboundService, never()).run(any());
+    }
+
+    @Test
+    void outboundTick_failure_isIsolated() {
+        doThrow(new RuntimeException("outbound boom")).when(outboundService).run(any());
+
+        scheduler.outboundTick();
+
         verify(outboundService).run(any(Instant.class));
     }
 }

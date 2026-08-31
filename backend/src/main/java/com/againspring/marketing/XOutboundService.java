@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * One outbound reply per tick on hot mutual posts. First reply hits the root;
+ * One outbound reply per daytime 30-minute tick on hot mutual posts. First reply hits the root;
  * later replies thread under our previous reply. Does not force-fill the daily cap.
  */
 @Slf4j

@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
@@ -48,6 +49,7 @@ const FIELD_LABELS: Record<string, string> = {
   email: '이메일',
   password: '비밀번호',
   totp_secret: '2FA TOTP 시크릿',
+  storage_state: '브라우저 세션 (Playwright storageState JSON)',
   naver_id: '네이버 아이디',
   blog_id: '블로그 ID',
   client_id: 'OAuth Client ID',
@@ -305,6 +307,7 @@ export function PlatformCredentialsSection() {
                     })
                     .map((f) => {
                       const storedSecret = f.secret && editing.secret_set[f.key];
+                      const sessionJson = f.key === 'storage_state';
                       return (
                         <div key={f.key} className="space-y-1">
                           <Label htmlFor={`cred-${f.key}`}>
@@ -312,17 +315,31 @@ export function PlatformCredentialsSection() {
                             {f.required && <span className="ml-1 text-red-500">*</span>}
                             {f.secret && <span className="ml-1 text-xs text-gray-400">(암호화)</span>}
                           </Label>
-                          <Input
-                            id={`cred-${f.key}`}
-                            type={f.secret ? 'password' : 'text'}
-                            autoComplete={f.secret ? 'new-password' : 'off'}
-                            value={formValues[f.key] ?? ''}
-                            onChange={(e) =>
-                              setFormValues((prev) => ({ ...prev, [f.key]: e.target.value }))
-                            }
-                            placeholder={storedSecret ? '설정됨 — 변경하려면 입력' : ''}
-                            className="text-sm"
-                          />
+                          {sessionJson ? (
+                            <Textarea
+                              id={`cred-${f.key}`}
+                              rows={6}
+                              autoComplete="off"
+                              value={formValues[f.key] ?? ''}
+                              onChange={(e) =>
+                                setFormValues((prev) => ({ ...prev, [f.key]: e.target.value }))
+                              }
+                              placeholder={storedSecret ? '설정됨 — seed-cli JSON으로 교체하려면 붙여넣기' : 'seed-cli.js stdout JSON'}
+                              className="font-mono text-xs"
+                            />
+                          ) : (
+                            <Input
+                              id={`cred-${f.key}`}
+                              type={f.secret ? 'password' : 'text'}
+                              autoComplete={f.secret ? 'new-password' : 'off'}
+                              value={formValues[f.key] ?? ''}
+                              onChange={(e) =>
+                                setFormValues((prev) => ({ ...prev, [f.key]: e.target.value }))
+                              }
+                              placeholder={storedSecret ? '설정됨 — 변경하려면 입력' : ''}
+                              className="text-sm"
+                            />
+                          )}
                         </div>
                       );
                     })}
