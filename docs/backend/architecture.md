@@ -161,12 +161,12 @@ flowchart LR
 
 | 컴포넌트 | 역할 | 정책 문서 |
 |---|---|---|
-| `JwtAuthFilter` | 모든 요청에서 토큰 검증 + 폐기 확인 | [`shared/policies/auth.md`](../shared/policies/auth.md) |
-| `RateLimitFilter` | bucket4j 기반 IP/유저별 제한 | [`shared/policies/auth.md`](../shared/policies/auth.md) |
-| `KeywordGuard` | 금지어 검사 (입력+응답 양방향) | [`shared/policies/forbidden-words.md`](../shared/policies/forbidden-words.md) |
-| `CrisisDetector` | 위기 키워드 감지 → 관리자 알림 | `docs/shared/policies/forbidden-words.md` |
+| `JwtAuthFilter` | 모든 요청에서 토큰 검증 + 폐기 확인 | [`shared/policies/auth.md`](../shared/70-policy/auth.md) |
+| `RateLimitFilter` | bucket4j 기반 IP/유저별 제한 | [`shared/policies/auth.md`](../shared/70-policy/auth.md) |
+| `KeywordGuard` | 금지어 검사 (입력+응답 양방향) | [`shared/policies/forbidden-words.md`](../shared/70-policy/forbidden-words.md) |
+| `CrisisDetector` | 위기 키워드 감지 → 관리자 알림 | `docs/shared/70-policy/forbidden-words.md` |
 | `PromptSanitizer` | LLM 입력 inject 방지 | `docs/backend/llm-bridge.md` |
-| `RatioEnforcer` | 공감 비율 범위 강제 (0~100%) | `docs/shared/policies/forbidden-words.md` |
+| `RatioEnforcer` | 공감 비율 범위 강제 (0~100%) | `docs/shared/70-policy/forbidden-words.md` |
 | `SafetyAuditLogger` | 모든 safety 이벤트 마스킹 후 DB | — |
 
 ## 예외 처리
@@ -183,7 +183,7 @@ flowchart LR
 }
 ```
 
-코드 매핑은 `docs/shared/api/rest-spec.md` 에러 코드 표 참조.
+코드 매핑은 `docs/shared/50-api/rest-spec.md` 에러 코드 표 참조.
 
 도메인 예외는 모두 `BusinessException(errorCode, message)` 또는 그 하위. 서비스에서 Bean Validation 실패는 `MethodArgumentNotValidException`으로 자동 처리.
 

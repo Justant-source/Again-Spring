@@ -26,8 +26,8 @@ AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세
 | FE 기능·UI | [`docs/frontend/README.md`](./frontend/README.md) | `frontend/app/`, `frontend/components/`, `frontend/lib/` |
 | FE 디자인·UX | [`docs/frontend/design/system.md`](./frontend/design/system.md), [`docs/frontend/ux/principles.md`](./frontend/ux/principles.md) | `frontend/tailwind.config.ts`, `frontend/app/globals.css` |
 | BE 기능·API | [`docs/backend/README.md`](./backend/README.md) | `backend/src/main/java/com/againspring/` |
-| API·DB 계약 | [`docs/shared/api/README.md`](./shared/api/README.md) | `backend/.../*Controller.java`, `backend/src/main/resources/db/migration/` |
-| LLM 브릿지·프롬프트 | [`docs/backend/llm-bridge.md`](./backend/llm-bridge.md), [`docs/shared/policies/forbidden-words.md`](./shared/policies/forbidden-words.md) | `backend/.../llm/`, `docs/shared/prompts/` |
+| API·DB 계약 | [`docs/shared/api/README.md`](./shared/50-api/README.md) | `backend/.../*Controller.java`, `backend/src/main/resources/db/migration/` |
+| LLM 브릿지·프롬프트 | [`docs/backend/llm-bridge.md`](./backend/llm-bridge.md), [`docs/shared/70-policy/forbidden-words.md`](./shared/70-policy/forbidden-words.md) | `backend/.../llm/`, `docs/shared/prompts/` |
 | AI-user | [`docs/ai-user/README.md`](./ai-user/README.md) | `ai-user/orchestrator/`, `ai-user/llm/`, `ai-user/learning/`, `ai-user/sync/` |
 | 환경·배포 | [`docs/env/README.md`](./env/README.md) | `env/`, `.env.*.example`, `application*.yml` |
 
@@ -47,11 +47,11 @@ AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세
 
 | 변경 유형 | 함께 확인할 문서 |
 |---|---|
-| API 컨트롤러·DTO | `docs/shared/api/rest-spec.md`, 필요 시 도메인별 API 문서 |
-| DB migration·JPA domain | `docs/shared/api/database-schema.md` |
+| API 컨트롤러·DTO | `docs/shared/50-api/rest-spec.md`, 필요 시 도메인별 API 문서 |
+| DB migration·JPA domain | `docs/shared/50-api/database-schema.md` |
 | 포트·compose·nginx | `docs/system.md`, `docs/env/architecture.md`, README 포트표 |
 | 환경변수 | `docs/env/environment-variables.md`, README |
-| LLM 안전·프롬프트·오류 시그니처 | `docs/shared/policies/forbidden-words.md`, `.claude/rules/llm-safety.md` |
+| LLM 안전·프롬프트·오류 시그니처 | `docs/shared/70-policy/forbidden-words.md`, `.claude/rules/llm-safety.md` |
 | FE 디자인 토큰·global style | `docs/frontend/design/system.md` |
 | FE test id·journey 변화 | `frontend/tests/e2e-realbe/support/selectors.ts`, `docs/frontend/testing.md` |
 

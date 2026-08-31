@@ -240,7 +240,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `content_revision` | INT UNSIGNED | V87 | 내용 변경마다 증가. AI thread plan이 참조한 글 revision과 비교하는 optimistic revision |
 | `created_by_admin` | BOOLEAN | **V89** | 관리자가 통합 콘텐츠관리 화면에서 수동 생성한 글 여부. 공개 API 미노출, 어드민 전용 표시(배지)용 |
 | `metaphor_id` | VARCHAR(64) | **V99** | 대표(1순위) 메타포 일러스트 ID. `post_metaphors`에 랭크 0으로 중복 저장(하위호환). **영상 경로에서는 무시**(시봄이 shortlist로 대체, 컬럼 보존) |
-| `sibom_candidates` | JSON | **V112** | 시봄이 캐릭터 이미지 id 숏리스트(≤12). 사연 본문 keyword 스코어(코드, LLM 없음). soft-fill 풀은 미저장. Spec: `docs/shared/marketing/sibom-video-insertion.md` |
+| `sibom_candidates` | JSON | **V112** | 시봄이 캐릭터 이미지 id 숏리스트(≤12). 사연 본문 keyword 스코어(코드, LLM 없음). soft-fill 풀은 미저장. Spec: `docs/shared/marketing/70-policy/sibom-video-insertion.md` |
 | `author_body_deleted_at` | TIMESTAMP(6) | **V107** | 작성자 본문 tombstone. 상대 ACTIVE면 제목·상대 유지; 양쪽 tombstone이면 `deleted_at` soft full-delete |
 | `partner_body_deleted_at` | TIMESTAMP(6) | **V107** | 상대 본문 tombstone. 토큰 유지·재작성 가능 |
 
@@ -606,7 +606,7 @@ ritual / inbound / outbound 작문·게시 결과. 어드민 REST 없음 — 일
 | `users` (탈퇴) | 소프트 삭제 (deleted_at 설정) | 사용자 요청 |
 | 마케팅 테이블 | 별도 정책 | — |
 
-자세한 정책: [`../policies/data-retention.md`](../policies/data-retention.md)
+자세한 정책: [`../70-policy/data-retention.md`](../70-policy/data-retention.md)
 
 ---
 

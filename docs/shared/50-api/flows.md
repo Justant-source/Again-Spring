@@ -2,7 +2,7 @@
 
 > last-verified: 2026-08-02 · code-ref: `backend/src/main/java/com/againspring/api/` · `ai-user/orchestrator/` · `backend/.../llm/`
 >
-> 권위본: `docs/shared/api/rest-spec.md` (엔드포인트 목록). 이 파일은 주요 **시나리오별 흐름**.
+> 권위본: `docs/shared/50-api/rest-spec.md` (엔드포인트 목록). 이 파일은 주요 **시나리오별 흐름**.
 > PLAN 운영 상세: `docs/ai-user/thread-planning.md`.
 
 ---
@@ -140,7 +140,7 @@ flowchart LR
     Note1[저장 시 글 createdAt delta → 댓글·예약 시각 일괄 shift]
 ```
 
-상세 UI: `docs/frontend/ux/flows/09-admin.md`. API: `docs/shared/api/rest-spec.md` §Admin Content.
+상세 UI: `docs/frontend/ux/flows/09-admin.md`. API: `docs/shared/50-api/rest-spec.md` §Admin Content.
 
 ---
 

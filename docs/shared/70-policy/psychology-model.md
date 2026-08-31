@@ -2,7 +2,7 @@
 
 **목적**: AI 생성 콘텐츠(주로 AI-user)와 안전 카피가 참조하는 심리학 프레임워크 요약.
 
-**범위**: AI 출력만 (사용자 입력에 미적용). 과거 매핑 결정은 [`docs/shared/adr/0002`](../adr/0002-psychology-model-repurposed-for-jurors.md)에만 남긴다.
+**범위**: AI 출력만 (사용자 입력에 미적용). 과거 매핑 결정은 [`docs/shared/90-adr/0002`](../90-adr/0002-psychology-model-repurposed-for-jurors.md)에만 남긴다.
 
 ---
 
@@ -43,7 +43,7 @@
 
 ## 관련 문서
 
-- `docs/shared/policies/forbidden-words.md`
+- `docs/shared/70-policy/forbidden-words.md`
 - `.claude/rules/llm-safety.md`
 - ADR-0002 (역사적 결정만)
 

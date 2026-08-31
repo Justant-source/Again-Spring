@@ -204,7 +204,7 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 ### 6.2 런타임 이관 계획 — **재정의 (2026-08-12 그릴링)**
 
 > ⚠️ 아래 구(舊) “60장 확정 후 / WaggleBot이 매칭 SSOT” 계획은 **폐기**.  
-> **현행 SSOT**: [`docs/shared/marketing/sibom-video-insertion.md`](../../../../shared/marketing/sibom-video-insertion.md)  
+> **현행 SSOT**: [`docs/shared/marketing/sibom-video-insertion.md`](../../../../shared/marketing/70-policy/sibom-video-insertion.md)  
 > 요약: **30장으로 즉시 진행** · 메타포 영상 경로 **완전 금지** · **AS**가 shortlist·`sibom_plan`·가드 · WaggleBot은 합성·모션만 · YT/IG 채널별 분리 LLM 각색.
 
 | 단계 | 작업 |

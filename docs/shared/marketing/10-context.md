@@ -14,27 +14,27 @@
 
 | 계약 | 요지 | 상세 |
 |---|---|---|
-| 플랫폼별 점수·cap | X / IG feed / Reels / Shorts **독립 popularity** + **일일 cap 기본 각 3** | [`platforms.md`](platforms.md) §점수·cap |
-| 멀티 플랫폼 | 같은 사연·같은 날 **중복 허용**. **IG feed ⊥ Reels만** 배타 (`score_feed` vs `score_reels`, 동점→Reels) | [`platforms.md`](platforms.md) |
-| 영상 | Reels ≤30s / Shorts ≤45s · **유니크 mp4** · 전문 낭독 폐기 · 비트 = 자극 훅→요약→비율/클리프행어 | [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) |
-| 시봄이 삽입 | 메타포 **금지** · 시봄이 30장 · 인트로+본문 4~7 · 본문 = 1절+캐릭터 카드 / 시봄이 없는 줄만 ≤3블록 | [`sibom-video-insertion.md`](sibom-video-insertion.md) §6 |
-| 2단 훅 | 사연 생성 = 마스터 훅+감정 / **영상 슬롯 확정 시** = `hook_reels`·`hook_shorts` + 스크립트 | [`api.md`](api.md) · [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) |
-| TTS 감정 | `hook_emotion` → WaggleBot S2 Pro (`shock`\|`anger`\|`tension`\|`sad`\|`hype`) | [`api.md`](api.md) |
-| 통계·학습 | 플랫폼 통계 수집 + **주간 리포트** + 가중치 `auto_adjust` on/off (프롬프트 자동 패치 없음) | [`platforms.md`](platforms.md) · [`api.md`](api.md) · [`architecture.md`](architecture.md) |
+| 플랫폼별 점수·cap | X / IG feed / Reels / Shorts **독립 popularity** + **일일 cap 기본 각 3** | [`platforms.md`](70-policy/platforms.md) §점수·cap |
+| 멀티 플랫폼 | 같은 사연·같은 날 **중복 허용**. **IG feed ⊥ Reels만** 배타 (`score_feed` vs `score_reels`, 동점→Reels) | [`platforms.md`](70-policy/platforms.md) |
+| 영상 | Reels ≤30s / Shorts ≤45s · **유니크 mp4** · 전문 낭독 폐기 · 비트 = 자극 훅→요약→비율/클리프행어 | [`youtube-shorts-strategy.md`](70-policy/youtube-shorts-strategy.md) |
+| 시봄이 삽입 | 메타포 **금지** · 시봄이 30장 · 인트로+본문 4~7 · 본문 = 1절+캐릭터 카드 / 시봄이 없는 줄만 ≤3블록 | [`sibom-video-insertion.md`](70-policy/sibom-video-insertion.md) §6 |
+| 2단 훅 | 사연 생성 = 마스터 훅+감정 / **영상 슬롯 확정 시** = `hook_reels`·`hook_shorts` + 스크립트 | [`api.md`](50-api.md) · [`youtube-shorts-strategy.md`](70-policy/youtube-shorts-strategy.md) |
+| TTS 감정 | `hook_emotion` → WaggleBot S2 Pro (`shock`\|`anger`\|`tension`\|`sad`\|`hype`) | [`api.md`](50-api.md) |
+| 통계·학습 | 플랫폼 통계 수집 + **주간 리포트** + 가중치 `auto_adjust` on/off (프롬프트 자동 패치 없음) | [`platforms.md`](70-policy/platforms.md) · [`api.md`](50-api.md) · [`architecture.md`](20-containers.md) |
 
 ### Phase 1 유지 (폐기하지 않음)
 
 | 계약 | 요지 | 상세 |
 |---|---|---|
-| 마스터 훅 | 광장 `title` ≠ SNS 훅. `promoTitle`/`hook*` + `hook_emotion` | 전략 문서·[`api.md`](api.md) |
-| 태그 | 브랜드 항상 `#다시봄`+`#againspring`. X=2개만 / IG≤5 / YT=`#Shorts`+브랜드+니치 | [`platforms.md`](platforms.md) |
-| IG 캡션 | raw URL 제거 · 프로필 링크 | [`instagram-feed-strategy.md`](instagram-feed-strategy.md) |
-| 발행 | T+24h 커밋 후 **채널 렌더 READY 즉시 실발행** (저녁 슬롯 없음) | [`platforms.md`](platforms.md) |
-| UTM | X·YT 등 링크 → 사연 상세 | [`api.md`](api.md) |
-| 텔레그램 | 발행 후 N시간(기본 24h) 신규 댓글 → WaggleBot 텔레그램 · 수동 답글 | [`architecture.md`](architecture.md) |
-| **유입 계측** | 전 페이지뷰 기록 · 봇 분리 · `as_utm` first-touch → 가입 채널 귀속 · 어드민 퍼널 화면 | [`acquisition-measurement.md`](acquisition-measurement.md) |
-| **검색 기반** | robots·sitemap(348 URL)·홈/광장 SSR·구글(DNS)/네이버(HTML 파일) 소유확인 | [`seo.md`](seo.md) |
-| **클릭 경로** | YT = **채널 프로필 링크가 유일**(설명란·고정댓글 불가) · X = 링크를 **첫 답글**에 · IG = 프로필 | [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) §5.2 · [`x-thread-strategy.md`](x-thread-strategy.md) |
+| 마스터 훅 | 광장 `title` ≠ SNS 훅. `promoTitle`/`hook*` + `hook_emotion` | 전략 문서·[`api.md`](50-api.md) |
+| 태그 | 브랜드 항상 `#다시봄`+`#againspring`. X=2개만 / IG≤5 / YT=`#Shorts`+브랜드+니치 | [`platforms.md`](70-policy/platforms.md) |
+| IG 캡션 | raw URL 제거 · 프로필 링크 | [`instagram-feed-strategy.md`](70-policy/instagram-feed-strategy.md) |
+| 발행 | T+24h 커밋 후 **채널 렌더 READY 즉시 실발행** (저녁 슬롯 없음) | [`platforms.md`](70-policy/platforms.md) |
+| UTM | X·YT 등 링크 → 사연 상세 | [`api.md`](50-api.md) |
+| 텔레그램 | 발행 후 N시간(기본 24h) 신규 댓글 → WaggleBot 텔레그램 · 수동 답글 | [`architecture.md`](20-containers.md) |
+| **유입 계측** | 전 페이지뷰 기록 · 봇 분리 · `as_utm` first-touch → 가입 채널 귀속 · 어드민 퍼널 화면 | [`acquisition-measurement.md`](40-data/acquisition-measurement.md) |
+| **검색 기반** | robots·sitemap(348 URL)·홈/광장 SSR·구글(DNS)/네이버(HTML 파일) 소유확인 | [`seo.md`](70-policy/seo.md) |
+| **클릭 경로** | YT = **채널 프로필 링크가 유일**(설명란·고정댓글 불가) · X = 링크를 **첫 답글**에 · IG = 프로필 | [`youtube-shorts-strategy.md`](70-policy/youtube-shorts-strategy.md) §5.2 · [`x-thread-strategy.md`](70-policy/x-thread-strategy.md) |
 | 고지 | **2027-01**까지 AI/합성 고지 없음 · 배심원 카피 금지 | 본 절 |
 
 ---
@@ -85,15 +85,15 @@ docs/shared/marketing/
 └── seo.md                      ← 🆕 검색 유입 기반 (robots·sitemap·SSR·소유확인)
 ```
 
-> **발행 이후를 보려면** [`acquisition-measurement.md`](acquisition-measurement.md)를 읽는다.
-> 플랫폼 지표(조회·도달)까지는 [`api.md`](api.md) §4.2.1이 권위본이고, **클릭·방문·가입은
+> **발행 이후를 보려면** [`acquisition-measurement.md`](40-data/acquisition-measurement.md)를 읽는다.
+> 플랫폼 지표(조회·도달)까지는 [`api.md`](50-api.md) §4.2.1이 권위본이고, **클릭·방문·가입은
 > 그 문서**가 권위본이다. 2026-08-29 이전에는 이 구간의 계측이 통째로 깨져 있었다.
 
 ---
 
 ## 빠른 시작
 
-> **24h 자동 분배 (Phase 2 타깃)**: 대기 보드 → T+24h **커밋**. 채널별 독립 점수·cap(기본 3) · 같은 사연 멀티 플랫폼 허용 · IG feed⊥Reels만 배타. **실발행**은 렌더 READY 즉시. 상세 [`platforms.md`](platforms.md).
+> **24h 자동 분배 (Phase 2 타깃)**: 대기 보드 → T+24h **커밋**. 채널별 독립 점수·cap(기본 3) · 같은 사연 멀티 플랫폼 허용 · IG feed⊥Reels만 배타. **실발행**은 렌더 READY 즉시. 상세 [`platforms.md`](70-policy/platforms.md).
 
 ### 어드민 `/admin/marketing` 탭
 
@@ -123,7 +123,7 @@ docs/shared/marketing/
 2. 빌드 완료 후 아티팩트: `card_01` 훅(4:5) · 중간 장 · 비율카드 · `upload.json` 캡션(**URL 없음**)
 3. 완료 탭에서 잡 상세 → 게시 승인 → 인스타 앱에서 확인
 
-> 중간 장·댓글 글자 크기 규칙: [`instagram-feed-strategy.md`](instagram-feed-strategy.md) §2.1.1–2.1.2 (`commentsReadableBudget`은 IG만, X는 최대 4장 고정).
+> 중간 장·댓글 글자 크기 규칙: [`instagram-feed-strategy.md`](70-policy/instagram-feed-strategy.md) §2.1.1–2.1.2 (`commentsReadableBudget`은 IG만, X는 최대 4장 고정).
 
 ### 잡 상태 흐름
 
@@ -200,7 +200,7 @@ UNKNOWN으로 덮지 않는다.
 | `ASM_REQUEST_TIMEOUT_MS` | `30000` (2026-08-15, 기존 `10000`) | ASM HTTP 타임아웃 |
 
 > **ASM 측 추가 env**: `ASM_CREDENTIAL_KEY` (base64 32바이트) — 플랫폼 계정 자격증명 AES-256-GCM 마스터키.
-> ASM `.env`에만 두고 git 커밋 금지. 생성: `openssl rand -base64 32`. 상세: [`credentials.md`](credentials.md)
+> ASM `.env`에만 두고 git 커밋 금지. 생성: `openssl rand -base64 32`. 상세: [`credentials.md`](40-data/credentials.md)
 
 ---
 

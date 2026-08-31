@@ -1,6 +1,6 @@
 # 사용자 등급별 권한 정책 (User Permissions)
 
-> **권위본 데이터**: [`user-permissions.json`](./user-permissions.json) — 본 문서는 그 사람이 읽기 위한 설명. 코드/UI는 JSON을 직접 참조한다.
+> **권위본 데이터**: [`user-permissions.json`](../policies/user-permissions.json) — 본 문서는 그 사람이 읽기 위한 설명. 코드/UI는 JSON을 직접 참조한다.
 >
 > **변경 절차**: `user-permissions.json` 한 곳만 수정 → BE 컨테이너 재시작 + FE 재빌드 → 변경 반영.
 

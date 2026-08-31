@@ -1,7 +1,7 @@
 # X 스레드 마케팅 전략 — 4단 체인
 
 > **권위본**: 이 문서. X(트위터) 채널의 콘텐츠 포맷·발행 트리거·구현 위치 결정을 담는다.
-> 플랫폼 일반 사양은 [`platforms.md`](platforms.md), 발행기 운영은 [`social-poster.md`](social-poster.md) 참조.
+> 플랫폼 일반 사양은 [`platforms.md`](platforms.md), 발행기 운영은 [`social-poster.md`](../30-components.md) 참조.
 > **작성**: 2026-07-31 · 레퍼런스 실측 30건 기반
 
 ---

@@ -155,7 +155,7 @@ API: `GET`/`PUT /api/admin/marketing/quota` — Body 플랫폼 필드(`xThread` 
 | Threads | `threads` | 텍스트 + 이미지 | Playwright 자동 로그인 (인스타 계정 상속) | 보류 |
 
 > **게시 계정 자격증명**: 어드민 `/admin/marketing` → **설정** 탭(플랫폼 auto + 계정). ASM이 암호화 저장.
-> 필드 스키마·암호화: [`credentials.md`](credentials.md). X 로그인 세션은 ASM credential PK `x`(UI 라벨 「X 4단 스레드」)로 유지.
+> 필드 스키마·암호화: [`credentials.md`](../40-data/credentials.md). X 로그인 세션은 ASM credential PK `x`(UI 라벨 「X 4단 스레드」)로 유지.
 
 ---
 
@@ -196,7 +196,7 @@ AI가 생성하는 모든 텍스트에 적용:
 - **금지어**: `판결`, `처방`, `승패`, `승자`, `패자` (공감·관점 표현 사용)
 - **이모지 금지**: `policy.no_emoji = true`
 - **중립성**: 작성자=A, 상대방=B 균형 유지
-- 권위본: `docs/shared/policies/forbidden-words.md`
+- 권위본: `docs/shared/70-policy/forbidden-words.md`
 
 ---
 

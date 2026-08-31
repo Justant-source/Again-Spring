@@ -227,7 +227,7 @@ flowchart LR
 | `DELETE` | `/api/admin/marketing/holding/{postId}/pin` | 핀 해제 |
 | `GET` | `/api/admin/marketing/completed` | COMMITTED·DROPPED + 잡 요약 (`status`, `limit`). Item: `title`, `committedFormat`, `jobs[].publications[{platform,state,url}]` |
 | `POST` | `/api/admin/marketing/completed/{postId}/force` | Body `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}` — 상한 무시 강제 확정. **COMMITTED 재호출 허용**(아직 잡 없는 채널만 추가). 이미 전 채널 존재 시 400 |
-| 잡·자격증명·통계 | `/api/admin/marketing/jobs*` 등 | ASM 프록시 — [`platforms.md`](../marketing/platforms.md) |
+| 잡·자격증명·통계 | `/api/admin/marketing/jobs*` 등 | ASM 프록시 — [`platforms.md`](../marketing/70-policy/platforms.md) |
 
 24h 분배 Phase 2: 홀딩 확정 · 플랫폼별 popularity + 일일 cap(기본 각 3) · 같은 사연 멀티 플랫폼 허용 · IG feed⊥reels 배타 · Reels/Shorts 별도 잡.
 점수 = `0.1*views + 1.0*top_level_comments + 0.5*votes` (가중치 설정 가능) · tie-break `created_at` DESC. Admin UI 탭: **대기 / 완료 / 설정**.

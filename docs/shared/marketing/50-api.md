@@ -104,7 +104,7 @@ Authorization: Bearer <admin-jwt>
 
 ### 1.5 플랫폼 자격증명 관리
 
-> ASM `/api/v1/credentials`로 투명 프록시. 시크릿은 ASM이 암호화·마스킹. 상세: [`credentials.md`](credentials.md)
+> ASM `/api/v1/credentials`로 투명 프록시. 시크릿은 ASM이 암호화·마스킹. 상세: [`credentials.md`](40-data/credentials.md)
 
 ```
 GET    /api/admin/marketing/credentials             # 7개 플랫폼 상태 (시크릿 마스킹)
@@ -268,14 +268,14 @@ Idempotency-Key: <uuid>
 **Request Header**
 - `Idempotency-Key`: UUID 형식. AS가 생성 시도마다 새로운 UUID를 보냄. ASM은 동일 key로 오는 중복 요청을 감지해 같은 응답 반환 (멱등성).
 
-> `brief.tags`: 브랜드 `#다시봄` + `#againspring` 필수. 24h 홀딩 신규 시드(IG feed용) = `#다시봄` `#againspring` `#공감비율` `#[카테고리]`(≤5, 어드민 대기 탭에서 편집 가능, 기존 홀딩 백필 없음). X = 브랜드 2개만(카테고리 없음). 수동 잡 생성(`/api/admin/marketing/jobs`)은 카테고리명만 채움. 상세 [`platforms.md`](platforms.md).
+> `brief.tags`: 브랜드 `#다시봄` + `#againspring` 필수. 24h 홀딩 신규 시드(IG feed용) = `#다시봄` `#againspring` `#공감비율` `#[카테고리]`(≤5, 어드민 대기 탭에서 편집 가능, 기존 홀딩 백필 없음). X = 브랜드 2개만(카테고리 없음). 수동 잡 생성(`/api/admin/marketing/jobs`)은 카테고리명만 채움. 상세 [`platforms.md`](70-policy/platforms.md).
 >
 > `brief.promo_title`: **마스터 훅** (광장 `title`과 분리). AS `PromoTitleService`/훅 필드.
 > `brief.hook_emotion`: `shock|anger|tension|sad|hype` → **WaggleBot S2 Pro TTS** (Phase 2 SSOT).
 > 영상 슬롯 확정 시: `hook_reels`/`hook_shorts` · `script_reels`/`script_shorts` ·
 > `max_duration_reels_sec`(30) / `max_duration_shorts_sec`(45) 목표 · alone 시 `max_duration_sec`. Reels 32초·Shorts 47초 상한은 본문 TTS에만 적용한다. 댓글 2개와 아웃트로는 이후에 붙고 최종 MP4에는 별도 하드 상한을 적용하지 않는다.
 > 시봄이: `sibom_candidates`(≤12) · `sibom_plan`(채널별). **`metaphor_id`/`metaphor_ids`는 영상 렌더에서 무시**.
-> 삽입 계약 SSOT: [`sibom-video-insertion.md`](sibom-video-insertion.md).
+> 삽입 계약 SSOT: [`sibom-video-insertion.md`](70-policy/sibom-video-insertion.md).
 >
 > UTM (Phase 1 유지): AS가 잡 생성 시 `brief.post_url`(+ `options.post_urls`/`utm_campaign`)에 부착.
 > `utm_source`=`x`|`instagram`|`youtube`, `utm_medium=organic`, `utm_campaign=story_{localJobId}`,
@@ -342,7 +342,7 @@ Idempotency-Key: <uuid>
 | `max_duration_reels_sec` / `max_duration_shorts_sec` | **2 SSOT** | 30 / 45 |
 | `max_duration_sec` | **2 SSOT** | alone 잡 활성 캡 |
 | `sibom_candidates` | **시봄이** | string[] ≤12. 사연 생성 후 코드 shortlist |
-| `sibom_plan` | **시봄이** | 채널별 삽입 플랜 배열. 인트로=`role=intro`. 상세 [`sibom-video-insertion.md`](sibom-video-insertion.md) |
+| `sibom_plan` | **시봄이** | 채널별 삽입 플랜 배열. 인트로=`role=intro`. 상세 [`sibom-video-insertion.md`](70-policy/sibom-video-insertion.md) |
 | `metaphor_id` / `metaphor_ids` | **무시(영상)** | DB 보존만. 영상 렌더·썸네일 경로에서 **사용하지 않음** |
 | `tags` | 1 유지 | 플랫폼 clamp. 브랜드 2 항상 |
 | `post_url` + UTM | 1 유지 | X·YT 출구. `utm_content`의 hookType 구분 |
@@ -410,7 +410,7 @@ Authorization: Bearer <asm-token>
 
 **Response**: 파일 스트림 (FileResponse)
 
-파일이 없으면 404. **영상 mp4**는 게시 직후 삭제하지 않고, 해당 플랫폼이 `PUBLISHED`가 된 시각부터 **30일** 지난 뒤에 ASM 워커가 로컬 바이트만 지운다(메타데이터 row는 유지 → 그 시점부터 이 GET은 404). 권위 정책: [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md) 파이프라인 주석.
+파일이 없으면 404. **영상 mp4**는 게시 직후 삭제하지 않고, 해당 플랫폼이 `PUBLISHED`가 된 시각부터 **30일** 지난 뒤에 ASM 워커가 로컬 바이트만 지운다(메타데이터 row는 유지 → 그 시점부터 이 GET은 404). 권위 정책: [`youtube-shorts-strategy.md`](70-policy/youtube-shorts-strategy.md) 파이프라인 주석.
 
 ---
 
@@ -438,7 +438,7 @@ Again-Spring 측 관리자 UI 경로: `PUT /api/admin/marketing/jobs/{id}/artifa
 
 ### 2.5 자격증명 (credentials)
 
-> AES-256-GCM 암호화 저장. 시크릿은 평문 미반환. 필드 스키마·병합 규칙: [`credentials.md`](credentials.md)
+> AES-256-GCM 암호화 저장. 시크릿은 평문 미반환. 필드 스키마·병합 규칙: [`credentials.md`](40-data/credentials.md)
 
 ```
 GET    /api/v1/credentials             # 7개 플랫폼 전체 상태
@@ -602,7 +602,7 @@ AS polling → GET /api/v1/jobs/{remote_job_id} → ASM
 
 ## 4. Phase 2 어드민 — cap · 점수 · 통계 (타깃 SSOT)
 
-> 경로·DTO 이름은 구현 PR에서 Flyway/컨트롤러와 맞출 수 있다. **의미·기본값**이 계약이다. 상세 식·키: [`platforms.md`](platforms.md).
+> 경로·DTO 이름은 구현 PR에서 Flyway/컨트롤러와 맞출 수 있다. **의미·기본값**이 계약이다. 상세 식·키: [`platforms.md`](70-policy/platforms.md).
 
 ### 4.1 채널별 일일 cap
 
@@ -651,7 +651,7 @@ POST /api/admin/marketing/x-ops/learn
 - `GET /api/v1/x/inbox` — 우리 글에 달린 **남이 단** 최근 댓글 (`tweetId`, `parentId`, `author`, `text`, `createdAt`, `ourPostId`)
 - `GET /api/v1/x/outbound-candidates` — 맞팔 최근 글 중 댓글 수·나이 필터 후보 (`tweetId`, `author`, `text`, `replyCount`, `ageHours`, `alreadyRepliedByUs`)
 
-흐름·한도: [`x-thread-strategy.md`](x-thread-strategy.md) §2.4.
+흐름·한도: [`x-thread-strategy.md`](70-policy/x-thread-strategy.md) §2.4.
 
 ### 4.2 플랫폼별 점수 가중치 · auto_adjust
 
@@ -661,7 +661,7 @@ PUT  /api/admin/marketing/score-weights          // platforms map and/or legacy 
 POST /api/admin/marketing/score-weights/auto-adjust/run   // 1회 실행 (cron도 Mon 09:00 KST)
 ```
 
-가중치 심볼: `hook`, `vote_skew`, `comments`, `votes`, `views`, `has_partner` — 플랫폼마다 독립. 기본 계수는 [`platforms.md`](platforms.md) §popularity 식.  
+가중치 심볼: `hook`, `vote_skew`, `comments`, `votes`, `views`, `has_partner` — 플랫폼마다 독립. 기본 계수는 [`platforms.md`](70-policy/platforms.md) §popularity 식.  
 `marketing.score.auto_adjust` 기본 **`false`**. on이면 주간 통계로 **소폭**(상대 ±5% · 절대 ±0.05) 보정만. **프롬프트 자동 패치 없음(M4)**.
 
 ### 4.2.1 플랫폼 통계 수집 · 주간 리포트 (Phase 2.6–2.7)

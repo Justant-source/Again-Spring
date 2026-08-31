@@ -176,7 +176,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 - `hookEmotion` (String, nullable, **2026-08-11~**, **V108**): 마스터 훅 감정. `shock` \| `anger` \| `tension` \| `sad` \| `hype` only. PLAN 전달 또는 `PromoTitleService`와 동시 생성. 무효값·폴백 시 null.
 - `metaphorId` (String, nullable, **2026-08-05~**, **V99**): 레거시 메타포 일러스트 ID. **영상 경로에서는 무시**(시봄이 shortlist로 대체). 컬럼·필드 하위호환 유지.
 - `metaphorIds` (String[], nullable, **2026-08-09~**, **V105 `post_metaphors`**): 레거시 메타포 랭크 목록. **영상 경로에서는 무시**.
-- `sibomCandidates` (String[], nullable, **2026-08-12~**, **V112**): 시봄이 캐릭터 이미지 id 숏리스트(≤12). 사연 본문(+제목) keyword 스코어로 **코드가** 저장(LLM 없음). soft-fill 풀은 미포함. Spec: `docs/shared/marketing/sibom-video-insertion.md`.
+- `sibomCandidates` (String[], nullable, **2026-08-12~**, **V112**): 시봄이 캐릭터 이미지 id 숏리스트(≤12). 사연 본문(+제목) keyword 스코어로 **코드가** 저장(LLM 없음). soft-fill 풀은 미포함. Spec: `docs/shared/marketing/70-policy/sibom-video-insertion.md`.
 - `voteCloseAt` / `voteDurationHours` (**legacy, 미사용**): 응답에 남을 수 있으나 FE는 투표 마감 UI에 쓰지 않음
 
 **목록(`GET /posts`, `/search`, `/mine`, `/voted`) 응답 필드 (`PostResponse`):**
@@ -387,7 +387,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 | GET | `/api/admin/marketing/completed` | **JWT + ADMIN** | 200 | COMMITTED·DROPPED 홀딩 + 잡 요약. Query: `status`, `limit`(기본 50). Item: `title`, `committedFormat`(VIDEO\|TEXT), `jobs[].publications[{platform,state,url}]` |
 | POST | `/api/admin/marketing/completed/{postId}/force` | **JWT + ADMIN** | 200 / 400 / 404 | Body: `{mode: VIDEO_AND_TEXT\|TEXT_ONLY}`. 상한 무시 강제 COMMITTED + 잡 생성. COMMITTED 재호출 시 미생성 채널만 추가(전부 있으면 400) |
 | POST | `/api/admin/marketing/jobs/{id}/regenerate` | **JWT + ADMIN** | 201 / 409 | `SIBOM_*`·`VARIANT_*`·`DURATION_*`·`LAYOUT_*` 품질 실패 영상 잡만 새 자식 잡으로 재생성한다. 자식은 `autoPublish=true`; 성공 시 즉시 게시. 응답 Job에 `failureCode`, `generationDiagnostics`, `actualDurationMs`, `retryOfJobId`, `generationAttempt`가 추가된다. |
-| POST | `/api/admin/marketing/jobs/redrive` | **JWT + ADMIN** | 200 / 400 | 실패한 마케팅 잡 일괄 재구동(regenerate 또는 recreate). 요청 직후 반환(폴링 진행중). Body: `{jobIds: [1, 2, ...] \| null, filter: {status, since}, skipExisting: bool}`. 응답: `{requested: N, results: [{sourceId, targetId?, action, reason?, platformStates?}]}`. 상세: [marketing/api.md §1.6](../marketing/api.md) |
+| POST | `/api/admin/marketing/jobs/redrive` | **JWT + ADMIN** | 200 / 400 | 실패한 마케팅 잡 일괄 재구동(regenerate 또는 recreate). 요청 직후 반환(폴링 진행중). Body: `{jobIds: [1, 2, ...] \| null, filter: {status, since}, skipExisting: bool}`. 응답: `{requested: N, results: [{sourceId, targetId?, action, reason?, platformStates?}]}`. 상세: [marketing/api.md §1.6](../marketing/50-api.md) |
 | POST | `/api/admin/marketing/stats/collect` | **JWT + ADMIN** | 202 | Phase 2.6: 비동기 수집 시작. Query: `jobIds?`, `lookbackDays`(기본14), `limit`(기본40). 응답 `{runId,status,startedAt}`. ASM `skip_slow=true`(X Playwright 생략) |
 | GET | `/api/admin/marketing/stats/collect/{runId}` | **JWT + ADMIN** | 200 | 수집 폴링. `{runId,status,summary?,error?}`. status=`RUNNING\|COMPLETED\|FAILED` |
 | GET | `/api/admin/marketing/stats/dashboard` | **JWT + ADMIN** | 200 | Phase 3: 통계 탭 대시보드. Query: `platform?`, `weeksAgo`(기본0), `rangeDays`(7\|14\|28), `primaryMetric?`. 응답 `{weekStart,weekEnd,prevWeek*,platforms[{platform,primaryMetric,value,prevValue,deltaPct,series}],utm,health,unknownCounts,todoHints}` |
@@ -398,12 +398,12 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 | GET | `/api/admin/marketing/stats/events` | **JWT + ADMIN** | 200 | Phase 3: 타임라인. Query `limit`(기본50). `[{id,eventType,platform,payloadJson,createdAt}]` |
 | GET | `/api/admin/marketing/weekly-report` | **JWT + ADMIN** | 200 | Phase 2.7: 주간 리포트. Query `weeksAgo`(기본0). top/bottom 사연 · byEmotion · byCategory · utmInflow(`visit_events` utm_campaign=`story_%`) |
 | POST | `/api/admin/marketing/score-weights/auto-adjust/run` | **JWT + ADMIN** | 200 | Phase 2.7: 주간 가중치 보정 1회. `auto_adjust=false`면 applied=false(report-only). 델타 캡 ±5%/±0.05. 프롬프트 패치 없음(M4) |
-| GET/POST/… | `/api/admin/marketing/jobs*` · `/credentials*` · `/performance` · `/timeline` | **JWT + ADMIN** | — | 잡·자격증명·통계 (ASM 프록시). 상세: [platforms.md](../marketing/platforms.md) |
-| PUT | `/api/admin/marketing/jobs/{id}/artifacts/{platform}/thumbnail` | **JWT + ADMIN** | 204 / 400 / 404 | 멀티파트 `file`(image/png\|jpeg, ≤2MB). `platform`=`youtube_shorts`\|`instagram_reels`. ASM `PUT /api/v1/jobs/{jobId}/artifacts/{name}` 프록시. 상세: [marketing/api.md §2.4.1](../marketing/api.md) |
+| GET/POST/… | `/api/admin/marketing/jobs*` · `/credentials*` · `/performance` · `/timeline` | **JWT + ADMIN** | — | 잡·자격증명·통계 (ASM 프록시). 상세: [platforms.md](../marketing/70-policy/platforms.md) |
+| PUT | `/api/admin/marketing/jobs/{id}/artifacts/{platform}/thumbnail` | **JWT + ADMIN** | 204 / 400 / 404 | 멀티파트 `file`(image/png\|jpeg, ≤2MB). `platform`=`youtube_shorts`\|`instagram_reels`. ASM `PUT /api/v1/jobs/{jobId}/artifacts/{name}` 프록시. 상세: [marketing/api.md §2.4.1](../marketing/50-api.md) |
 | GET | `/api/admin/secrets` | **JWT + ADMIN** | 200 | `encrypted_secret` vault 키 존재 여부만 반환 (평문 없음) |
 | POST | `/api/admin/secrets/{key}` | **JWT + ADMIN** | 200 | Body: `{value: string}`. AES-GCM 암호화해 vault에 저장/갱신. 응답에 평문 미포함 |
 
-24h 자동 분배 규칙(홀딩 확정·배분 C·1사연=1칸·피드⊥릴스): [`platforms.md`](../marketing/platforms.md). ASM 잡 API는 Again-Spring-Marketing 문서 참조.
+24h 자동 분배 규칙(홀딩 확정·배분 C·1사연=1칸·피드⊥릴스): [`platforms.md`](../marketing/70-policy/platforms.md). ASM 잡 API는 Again-Spring-Marketing 문서 참조.
 
 ---
 

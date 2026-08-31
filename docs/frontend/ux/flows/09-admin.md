@@ -119,7 +119,7 @@ flowchart TD
 근거: `app/(admin)/admin/marketing/page.tsx`
 
 > dev 전용 (prod 미지원). `app.features.marketing.enabled`로 활성화.
-> **권위본(탭 상세·API)**: [`docs/shared/marketing/README.md`](../../../shared/marketing/README.md) §어드민 탭.
+> **권위본(탭 상세·API)**: [`docs/shared/marketing/README.md`](../../../shared/marketing/10-context.md) §어드민 탭.
 
 | 탭 | 역할 |
 |---|---|

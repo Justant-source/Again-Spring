@@ -2,7 +2,7 @@
 
 > **권위본**: 이 문서. `instagram_feed` 채널의 콘텐츠 포맷·캡션·구현 위치 결정을 담는다.
 > 플랫폼 일반 사양은 [`platforms.md`](platforms.md), X 캡처 소스는 [`x-thread-strategy.md`](x-thread-strategy.md),
-> 발행기 운영은 [`social-poster.md`](social-poster.md) 참조.
+> 발행기 운영은 [`social-poster.md`](../30-components.md) 참조.
 > **작성**: 2026-08-02 · 레퍼런스 `@issue_archive` / `@salonbleuciel` / `@knowing_sister` + 그릴링 확정
 
 ---
