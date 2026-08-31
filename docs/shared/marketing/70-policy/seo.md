@@ -1,7 +1,7 @@
 # 검색 유입 기반 — robots · sitemap · SSR · 소유확인
 
 > **권위본**: 이 문서 (2026-08-29 신설).
-> 관련: [`acquisition-measurement.md`](../40-data/acquisition-measurement.md) (유입 계측) · [`../../../env/environment-variables.md`](../../../env/environment-variables.md) (인증 변수)
+> 관련: [`acquisition-measurement.md`](../40-data/acquisition-measurement.md) (유입 계측) · [`../../../env/40-data.md`](../../../env/40-data.md) (인증 변수)
 > 코드: `frontend/app/robots.ts` · `frontend/app/sitemap.ts` · `frontend/app/layout.tsx` · `frontend/public/naver*.html`
 
 ---

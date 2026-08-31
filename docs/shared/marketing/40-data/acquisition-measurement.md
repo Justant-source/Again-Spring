@@ -138,7 +138,7 @@ GET /api/admin/marketing/stats/acquisition?days=30
 | 함정 | 내용 |
 |---|---|
 | **V120 이전 행** | `user_agent`가 없어 `is_bot`이 기본값 0이다. 사람으로 잡히니 **장기 창(30·90일) 비교 시 주의**. 주 단위 비교는 영향 없음 |
-| **nginx 로그 보존** | 이전엔 docker stdout뿐이라 18일 뒤 소실됐다. 지금은 `env/logs/nginx/`에 90일 보존([`../../../env/deployment.md`](../../../env/deployment.md)) |
+| **nginx 로그 보존** | 이전엔 docker stdout뿐이라 18일 뒤 소실됐다. 지금은 `env/logs/nginx/`에 90일 보존([`../../../env/60-runtime/deployment.md`](../../../env/60-runtime/deployment.md)) |
 | **누적 조회수 비교 금지** | 플랫폼 조회는 시간에 따라 쌓인다. 반드시 **동일 일령**(`DATEDIFF(collected_at, created_at)`)으로 코호트를 맞춰 비교할 것 |
 | **동시 변경** | `utm_source`로 채널 간 구분은 되지만, 같은 채널 안의 두 변경(예: About 링크 vs 훅 보강)은 섞인다 |
 

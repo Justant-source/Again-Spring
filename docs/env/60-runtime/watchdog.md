@@ -236,4 +236,3 @@ stat ~/.claude/.credentials.json
 
 ---
 
-**마지막 업데이트**: 2026-08-15 | **형태**: systemd user timer + bash script

@@ -17,7 +17,7 @@ cd backend
 ./gradlew test
 ```
 
-로컬 절차: [`../env/local-dev.md`](../env/local-dev.md).
+로컬 절차: [`../env/60-runtime/local-dev.md`](../env/60-runtime/local-dev.md).
 
 | 계층 | 경로 |
 |---|---|

@@ -152,7 +152,7 @@ flowchart LR
 - 로그 포맷은 nginx 기본 `main`(`$remote_addr`·`$http_referer`·`$http_user_agent` 포함).
   prod는 `real_ip_header CF-Connecting-IP`로 Cloudflare 뒤에서도 실 클라이언트 IP가 `$remote_addr`에 들어온다.
 - 보존 90일, 호스트 cron + `logrotate`로 회전 (사이드카 컨테이너 아님 — 근거·설정: `env/nginx/logrotate.conf`).
-  운영 절차: `docs/env/deployment.md`.
+  운영 절차: `docs/env/60-runtime/deployment.md`.
 
 ## 운영 사실
 
@@ -184,8 +184,32 @@ docker compose -f env/docker-compose.ai-user.yml --env-file env/.env.ai-user con
 
 ## 상세 문서
 
-- [docker.md](./docker.md)
-- [environment-variables.md](./environment-variables.md)
-- [deployment.md](./deployment.md)
+- [docker.md](docker.md)
+- [environment-variables.md](../40-data.md)
+- [deployment.md](../60-runtime/deployment.md)
 - [cloudflare.md](./cloudflare.md)
-- [local-dev.md](./local-dev.md)
+- [local-dev.md](../60-runtime/local-dev.md)
+
+## 포트 표 (system.md L3)
+
+compose가 권위본이다.
+
+| 서비스 | 스택 | 호스트 포트 | 컨테이너 포트 | 비고 |
+|---|---|---|---|---|
+| `nginx-dev` | dev | `8090` | `80` | `dev.againspring.net` |
+| `nginx-prod` | prod | `8091` | `80` | `againspring.net` |
+| `againspring-mariadb` | base | `3306` | `3306` | 로컬 직접 개발용 |
+| `againspring-mariadb-dev` | dev | `3309` | `3306` | dev DB 접근용 |
+| `againspring-ai-learning` | shared ai-user | `8099` | `8099` | host 공개 |
+
+내부 전용: `againspring-llm:8090`, `llm-ai-user:8092`, `ai-user-orchestrator:8096`, backend/frontend 컨테이너 포트.
+
+## 볼륨 마운트 (이동 금지)
+
+| 경로 (호스트) | 컨테이너 경로 | 읽기 모드 | 용도 |
+|---|---|---|---|
+| `docs/shared/prompts/` | `/app/shared/docs/prompts` | `:ro` | LLM 프롬프트 |
+| `docs/shared/templates/` | `/app/shared/docs/templates` | `:ro` | 템플릿 |
+| `docs/shared/categories.yml` | `/app/shared/docs/categories.yml` | `:ro` | 카테고리 마스터 |
+| `docs/shared/policies/user-permissions.json` | `/app/shared/docs/policies/user-permissions.json` | `:ro` | 권한 정책 |
+| `ai-user/docs/personas/` | `/app/personas` | `:rw` | persona corpus |

@@ -73,4 +73,4 @@ docker compose -f env/docker-compose.ai-user.yml --env-file env/.env.ai-user log
 
 - [`../ai-user/learning.md`](../../ai-user/30-components/learning.md)
 - [`../ai-user/operations.md`](../../ai-user/60-runtime/operations.md)
-- [`../env/environment-variables.md`](../../env/environment-variables.md)
+- [`../env/environment-variables.md`](../../env/40-data.md)

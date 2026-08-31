@@ -1,3 +1,8 @@
+---
+title: L4 Data — environment variables
+last_updated: 2026-08-31
+---
+
 # 환경 변수
 
 ## Source of truth

@@ -100,5 +100,5 @@ backend의 `kill` API는 환경 gate를 대체하지 않는다. PLAN에서는 DB
 ## 관련 문서
 
 - [`../ai-user/README.md`](../../ai-user/10-context.md)
-- [`../env/environment-variables.md`](../../env/environment-variables.md)
-- [`../env/docker.md`](../../env/docker.md)
+- [`../env/environment-variables.md`](../../env/40-data.md)
+- [`../env/docker.md`](../../env/20-containers/docker.md)
