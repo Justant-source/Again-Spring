@@ -5,9 +5,9 @@ alwaysApply: true
 
 # 다시봄 · Cursor 코어
 
-- **권위본**: `CLAUDE.md`. `AGENTS.md`는 경량 엔트리(중복 금지).
-- **충돌 우선순위**: 코드(runtime) > `docs/_index.md` authority > `CLAUDE.md` > `AGENTS.md`
-- **컨텍스트**: `CLAUDE.md` 라우팅 표의 **진입 문서만** 읽는다. `docs/` 전체 스캔 금지.
+- **권위본**: `AGENTS.md`. `CLAUDE.md`는 이 파일을 참조만 한다.
+- **충돌 우선순위**: 코드(runtime) > `docs/_index.md` > `AGENTS.md` > `CLAUDE.md`
+- **컨텍스트**: `AGENTS.md` 라우팅 표의 **진입 문서만** 읽는다. `docs/` 전체 스캔 금지.
 - **부재 확인**: 각 `docs/<module>/30-components/structure.md`의 "부재하는 것" — 삭제된 경로 import 금지.
 - **문서에 없는 사실**은 추측하지 말고 코드에서 `rg`로 확인.
 

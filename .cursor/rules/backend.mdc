@@ -4,6 +4,8 @@ globs: backend/**/*
 alwaysApply: false
 ---
 
+이 프로젝트의 정본 지침은 AGENTS.md 입니다. 작업 전 반드시 ./AGENTS.md 를 읽으세요.
+
 # Backend
 
 진입: `docs/backend/10-context.md` · LLM `docs/backend/30-components/llm-bridge.md` · API `docs/shared/50-api/`

@@ -4,6 +4,8 @@ globs: backend/**/llm/**,backend/**/safety/**,ai-user/**,docs/shared/prompts/**,
 alwaysApply: false
 ---
 
+이 프로젝트의 정본 지침은 AGENTS.md 입니다.
+
 # LLM 안전
 
 상세 권위: `.claude/rules/llm-safety.md` · `docs/shared/70-policy/forbidden-words.md`
