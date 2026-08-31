@@ -3,7 +3,7 @@ package com.againspring.service.community;
 /**
  * One sibom placement on a channel script timeline ({@code sibom_plan[]} item).
  *
- * @see docs/shared/marketing/sibom-video-insertion.md §5.1
+ * @see docs/shared/marketing/70-policy/sibom-video-insertion.md §5.1
  */
 public record SibomPlanItem(
         String role,

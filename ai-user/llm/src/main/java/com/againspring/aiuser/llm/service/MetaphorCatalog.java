@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 60 metaphor illustration IDs (docs/frontend/design/specs/metaphor-illustration-system.md).
+ * 60 metaphor illustration IDs (docs/frontend/70-policy/illustration-metaphor.md).
  * Used to validate PLAN {@code metaphor_id} and inject the compact catalog into prompts.
  */
 public final class MetaphorCatalog {

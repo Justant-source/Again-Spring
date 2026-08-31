@@ -28,20 +28,20 @@
 | 작업 범위 | 코드 위치 | 진입 문서 (이것만 읽기) |
 |---|---|---|
 | AI agent 작업 루프 | — | `docs/agent-development.md` |
-| 시스템 전체 그림 파악 | — | `docs/system.md` |
+| 시스템 전체 그림 파악 | — | `docs/shared/10-context.md` |
 | 문서 권위/충돌 해결 | — | `docs/_index.md` |
-| FE 기능/UI | `frontend/` | `docs/frontend/README.md` |
-| FE 디자인 (톤·색·타이포·시그니처) | — | `docs/frontend/design/system.md` |
-| FE UX 원칙 / PR 체크리스트 | — | `docs/frontend/ux/principles.md` · `ux/hax-checklist.md` |
-| FE 테스트/e2e | `frontend/tests/` | `docs/frontend/testing.md` |
-| BE 기능/API | `backend/` | `docs/backend/README.md` |
-| LLM 브릿지 (메인 시스템) | `backend/.../llm/` | `docs/backend/llm-bridge.md` |
-| AI 유저 (생성·오케스트레이션·학습) | `ai-user/` | `docs/ai-user/README.md` |
+| FE 기능/UI | `frontend/` | `docs/frontend/10-context.md` |
+| FE 디자인 (톤·색·타이포·시그니처) | — | `docs/frontend/70-policy/design-system.md` |
+| FE UX 원칙 / PR 체크리스트 | — | `docs/frontend/70-policy/principles.md` · `docs/frontend/70-policy/hax-checklist.md` |
+| FE 테스트/e2e | `frontend/tests/` | `docs/frontend/70-policy/testing.md` |
+| BE 기능/API | `backend/` | `docs/backend/10-context.md` |
+| LLM 브릿지 (메인 시스템) | `backend/.../llm/` | `docs/backend/30-components/llm-bridge.md` |
+| AI 유저 (생성·오케스트레이션·학습) | `ai-user/` | `docs/ai-user/10-context.md` |
 | API 명세 + DB 스키마 | — | `docs/shared/api/` |
-| 정책 (금지어·인증·약관·권한) | — | `docs/shared/policies/` |
+| 정책 (금지어·인증·약관·권한) | — | `docs/shared/70-policy/` |
 | LLM 프롬프트 (런타임 자산) | `docs/shared/prompts/` | 同 위치 |
-| 환경/인프라/배포 | `env/` | `docs/env/deployment.md` · `docs/env/architecture.md` |
-| 환경 변수 사전 | — | `docs/env/environment-variables.md` |
+| 환경/인프라/배포 | `env/` | `docs/env/60-runtime/deployment.md` · `docs/env/20-containers/architecture.md` |
+| 환경 변수 사전 | — | `docs/env/40-data.md` |
 | **마케팅 (ASM)** | AS `100.81.189.92` → `ssh justant@100.115.252.61`<br>`~/Data/Again-Spring-Marketing` | ASM `CLAUDE.md` · `docs/shared/marketing/x-thread-strategy.md` |
 
 **ASM**: Python 3.12 + FastAPI, 포트 8200. AS 호스트에서 `ssh justant@100.115.252.61` **암호 없이** 접속. **활성 = X / `x_thread` + Instagram / `instagram_feed`** (게시 후 24h 자동). 네이버·YouTube·Threads 보류. Again-Spring 쪽은 thin client만.
@@ -52,7 +52,7 @@
 
 1. **FE는 LLM 직접 호출 금지** — 모든 LLM 요청은 BE 경유 (REST API)
 2. **BE는 RemoteLlmProvider만 사용** — HTTP POST → `againspring-llm:8090/v1/invoke` (base 스택 공유)
-3. **LLM 프롬프트/출력 수정 시** `docs/shared/policies/forbidden-words.md` 확인. AI 출력에 판결/처방/승패 표현 금지 → "공감/관점/작성자/상대방" (상세: `.claude/rules/llm-safety.md`)
+3. **LLM 프롬프트/출력 수정 시** `docs/shared/70-policy/forbidden-words.md` 확인. AI 출력에 판결/처방/승패 표현 금지 → "공감/관점/작성자/상대방" (상세: `.claude/rules/llm-safety.md`)
 4. **🚨 prod 배포** — 명시적 "prod에 배포해줘" 지시 없으면 금지. **dev/prod 완전 격리**. 필수 순서:
    ① local unit/build → ② **dev(:8090) 배포** → ③ 수동 검증 + e2e-realbe (`E2E_BASE_URL=http://localhost:8090`) 전체 통과
    → ④ (명시 지시 시에만) prod DB 백업 → prod(:8091) 배포 → ⑤ main commit & push
@@ -72,7 +72,7 @@
 
 ## 🎨 FE 불변 규칙
 
-> 권위본: `docs/frontend/ux/principles.md` · `docs/frontend/design/system.md`
+> 권위본: `docs/frontend/70-policy/principles.md` · `docs/frontend/70-policy/design-system.md`
 
 - **진영색**: 작성자=피치 `#C9785A` / 상대방=세이지 `#5F8F76` — 앱 전체 일관
 - AI-user·AI 생성 콘텐츠는 AI임을 명확히 구분, 사용자 글과 시각 구분
@@ -80,7 +80,7 @@
 
 ---
 
-## 🧠 LLM 브릿지 (요약 — 상세: `docs/backend/llm-bridge.md`)
+## 🧠 LLM 브릿지 (요약 — 상세: `docs/backend/30-components/llm-bridge.md`)
 
 - `backend` → HTTP → `againspring-llm:8090/v1/invoke` (**base 스택**) · 모델 `claude-haiku-4-5-20251001` · 인증 = 호스트 `~/.claude` 마운트
 - **보안**: 사용자 입력은 반드시 `PromptSanitizer` 경유 후 `<user_input>` 태그로 삽입
@@ -116,11 +116,11 @@ curl localhost:8091/api/health            # prod (명시 배포 후만)
 
 - **e2e ↔ 기능 동기화 (dev 게이트)**: 기능 추가/수정/삭제 시 `frontend/tests/e2e-realbe/journeys/`의 대응 spec을 추가/갱신/제거. e2e-realbe(`:8090`) 전체 통과 = prod 배포 전제 (절대 규칙 #4).
 - e2e는 실 BE(**dev:8090**) 사용하되 **LLM 절대 호출 금지** — 모든 spec은 `support/no-llm-fixture.ts`를 import (분석 엔드포인트 자동 차단).
-- 계층별 커버리지 목표·상세 전략: `docs/frontend/testing.md` · `docs/backend/testing.md`
+- 계층별 커버리지 목표·상세 전략: `docs/frontend/70-policy/testing.md` · `docs/backend/70-policy.md`
 
 ---
 
-## 🚀 배포 (요약 — 절차 권위본: `docs/env/deployment.md`)
+## 🚀 배포 (요약 — 절차 권위본: `docs/env/60-runtime/deployment.md`)
 
 | 환경 | 도메인 | compose | nginx | 상태 |
 |---|---|---|---|---|

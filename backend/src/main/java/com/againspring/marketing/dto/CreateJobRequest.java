@@ -240,7 +240,7 @@ public class CreateJobRequest {
 
     /**
      * One 시봄이 insert beat for Shorts/Reels ({@code sibom_plan*}).
-     * Spec: {@code docs/shared/marketing/sibom-video-insertion.md}.
+     * Spec: {@code docs/shared/marketing/70-policy/sibom-video-insertion.md}.
      */
     @Getter
     @Builder

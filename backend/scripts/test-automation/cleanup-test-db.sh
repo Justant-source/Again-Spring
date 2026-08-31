@@ -3,7 +3,7 @@
 # e2e-realbe가 남긴 테스트 산출물을 삭제한다.
 # (SeedDataLoader idempotent guard: test1@again.com 존재하는 한 재시드 없음)
 #
-# 권위본: docs/frontend/testing.md (e2e-realbe)
+# 권위본: docs/frontend/70-policy/testing.md (e2e-realbe)
 #
 # 삭제 대상:
 #   - test%@again.com 페르소나가 생성한 모든 커뮤니티 데이터

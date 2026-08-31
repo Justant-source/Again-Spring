@@ -28,7 +28,7 @@ public class XThreadPublishTriggerScheduler {
      * Opt-in gate, separate from {@code asmProperties.isEnabled()}.
      *
      * ASM is a single instance shared by dev and prod (one WSL box, one X/IG account —
-     * see docs/shared/marketing/README.md). This scheduler is fully unattended; if it's
+     * see docs/shared/marketing/10-context.md). This scheduler is fully unattended; if it's
      * on, it publishes to the real accounts. Defaults to false so a plain dev redeploy
      * can never auto-publish. Set true only where auto-publish is intentional.
      */

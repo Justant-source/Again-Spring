@@ -210,7 +210,7 @@ async function postStillExists(
 
 // ── 초대 ──────────────────────────────────────────────────────────
 
-/** GET /api/s/{token} ownership · can* 플래그 (docs/frontend/ux/flows/09-partner-invite-ownership.md) */
+/** GET /api/s/{token} ownership · can* 플래그 (docs/frontend/60-runtime/flows/09-partner-invite-ownership.md) */
 export type InviteOwnership = 'UNOWNED' | 'OWNED' | 'OWNED_BY_OTHER' | 'AUTHOR'
 export type PartnerState = 'NONE' | 'ACTIVE' | 'TOMBSTONE'
 

@@ -1,12 +1,12 @@
 ---
 description: LLM·AI 출력 안전 — 금지어, 오류 시그니처, PromptSanitizer
-globs: backend/**/llm/**,backend/**/safety/**,ai-user/**,docs/shared/prompts/**,docs/shared/policies/forbidden-words.md
+globs: backend/**/llm/**,backend/**/safety/**,ai-user/**,docs/shared/prompts/**,docs/shared/70-policy/forbidden-words.md
 alwaysApply: false
 ---
 
 # LLM 안전
 
-상세 권위: `.claude/rules/llm-safety.md` · `docs/shared/policies/forbidden-words.md`
+상세 권위: `.claude/rules/llm-safety.md` · `docs/shared/70-policy/forbidden-words.md`
 
 ## AI 출력 금지 → 대체
 

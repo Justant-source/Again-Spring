@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 /**
  * Schema guard for channel {@code sibom_plan} — normalizes entries in code, never retries LLM.
  *
- * @see docs/shared/marketing/sibom-video-insertion.md §5.2
+ * @see docs/shared/marketing/70-policy/sibom-video-insertion.md §5.2
  */
 public final class SibomPlanGuard {
 

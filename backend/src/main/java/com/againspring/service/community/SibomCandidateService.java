@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * Keyword shortlist for Sibom characters at story create/update — no LLM.
- * Spec: {@code docs/shared/marketing/sibom-video-insertion.md} §5.
+ * Spec: {@code docs/shared/marketing/70-policy/sibom-video-insertion.md} §5.
  */
 @Service
 public class SibomCandidateService {

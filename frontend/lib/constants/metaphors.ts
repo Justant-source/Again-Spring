@@ -1,4 +1,4 @@
-/** Metaphor illustration registry (60). SSOT with docs/frontend/design/specs/metaphor-illustration-system.md */
+/** Metaphor illustration registry (60). SSOT with docs/frontend/70-policy/illustration-metaphor.md */
 export type MetaphorGroup =
   | 'avoidance'
   | 'tension'

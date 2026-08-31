@@ -55,7 +55,7 @@ public class MarketingPlatformAutoService {
 
     /**
      * Runtime publish set (code constant). Matches active channels in
-     * {@code docs/shared/marketing/platforms.md}.
+     * {@code docs/shared/marketing/70-policy/platforms.md}.
      * Unimplemented: naver_blog, naver_clip, threads.
      * Legacy single-tweet {@code x} is not a publish target.
      */

@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Frontend
 
-진입: `docs/frontend/README.md` · 디자인 `docs/frontend/design/system.md` · UX `docs/frontend/ux/principles.md`
+진입: `docs/frontend/10-context.md` · 디자인 `docs/frontend/70-policy/design-system.md` · UX `docs/frontend/70-policy/principles.md`
 
 ## 불변
 

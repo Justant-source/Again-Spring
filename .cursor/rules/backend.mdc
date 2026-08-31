@@ -6,13 +6,13 @@ alwaysApply: false
 
 # Backend
 
-진입: `docs/backend/README.md` · LLM `docs/backend/llm-bridge.md` · API `docs/shared/api/`
+진입: `docs/backend/10-context.md` · LLM `docs/backend/30-components/llm-bridge.md` · API `docs/shared/50-api/`
 
 ## 불변
 
 - LLM: `RemoteLlmProvider`만 → HTTP POST `againspring-llm:8090/v1/invoke`
 - 사용자 입력은 `PromptSanitizer` 경유 필수
-- API/DTO/migration 변경 시 `docs/shared/api/rest-spec.md` · `database-schema.md` Doc-Sync
+- API/DTO/migration 변경 시 `docs/shared/50-api/rest-spec.md` · `docs/backend/40-data.md` Doc-Sync
 
 ## 검증
 
@@ -20,4 +20,4 @@ alwaysApply: false
 cd backend && ./gradlew test
 ```
 
-기능 변경 시 journeys e2e 동기화 (`docs/frontend/testing.md`).
+기능 변경 시 journeys e2e 동기화 (`docs/frontend/70-policy/testing.md`).

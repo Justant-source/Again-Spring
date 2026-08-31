@@ -145,7 +145,7 @@ public class PostComposeService {
                                   String hookEmotion) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
-        // 광장형 정책(docs/frontend/ux/flows/08-crisis.md): 사연·댓글 입력은 차단하지 않는다.
+        // 광장형 정책(docs/frontend/60-runtime/flows/08-crisis.md): 사연·댓글 입력은 차단하지 않는다.
         // KeywordGuard LEVEL1(피해자·소송 등)은 AI 출력 금지어이며 커뮤니티 본문 차단 사유가 아니다.
         // CRISIS 키워드만 관제 이벤트(감사 로그)로 남기고 게시는 계속한다.
         var scanResult = keywordGuard.scanUserInput(bodyRaw, authorId);

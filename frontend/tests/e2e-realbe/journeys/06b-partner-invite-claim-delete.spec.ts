@@ -1,7 +1,7 @@
 /**
  * Journey 06b: 상대 초대 소유권 · claim · tombstone · 완전 삭제
  *
- * 계약: docs/frontend/ux/flows/09-partner-invite-ownership.md
+ * 계약: docs/frontend/60-runtime/flows/09-partner-invite-ownership.md
  *
  * 1. /s/{token} → 로그인 → 같은 토큰 URL 복귀 (홈 금지)
  * 2. 무인증/게스트 답변 후 회원 재방문 → unowned claim CTA
