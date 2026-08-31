@@ -9,6 +9,8 @@
 
 ## 1. 사연 게시 + 공감 투표 준비
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 sequenceDiagram
     participant FE as Frontend
@@ -27,6 +29,8 @@ sequenceDiagram
 
 ## 2. 투표 흐름
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 sequenceDiagram
     participant FE as Frontend
@@ -45,6 +49,8 @@ sequenceDiagram
 > 운영 기본 경로. Legacy `ActionPlanner` tick은 호환용이며 신규 작업의 의존성이 아니다.
 > 새벽 배치는 `generateAndHold()`만 호출한다. `generateAndPublish()`는 생성 즉시 발행이라 홀딩 파이프라인 밖이다.
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 flowchart TB
     subgraph gen["생성 (LLM 1회 구간)"]
@@ -69,6 +75,8 @@ flowchart TB
     end
 ```
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 sequenceDiagram
     participant BAT as nightly / admin trigger
@@ -96,6 +104,8 @@ sequenceDiagram
 
 ## 4. 사람 글 → HUMAN_POST 플랜 · human reply (WP5)
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 sequenceDiagram
     participant FE as Frontend / human
@@ -122,6 +132,8 @@ sequenceDiagram
 
 ## 5. 관리자 — 예약 홀딩 · 공개 스레드 편집 (2026-08-01~)
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 flowchart LR
     subgraph ui["/admin/content"]
@@ -146,6 +158,8 @@ flowchart LR
 
 ## 6. 마케팅 잡 · X 스레드 자동 발행
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 stateDiagram-v2
     [*] --> REQUESTED: POST /api/admin/marketing/jobs<br/>또는 X-thread 자동 트리거
@@ -162,6 +176,8 @@ stateDiagram-v2
 
 ### X / Instagram 자동 발행 자격 (one-shot, 24h)
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 flowchart TD
     P[posts] --> G{createdAt+24h?}
@@ -180,6 +196,8 @@ flowchart TD
 
 ## 7. AI 유저 ActionStatus (legacy tick 호환)
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 stateDiagram-v2
     [*] --> PLANNED: DailyPlanner가 계획 수립

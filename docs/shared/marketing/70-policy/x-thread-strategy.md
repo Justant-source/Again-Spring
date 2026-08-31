@@ -167,7 +167,7 @@ AS `CaptureHeightCalculator` / `MarketingJobService` brief 필드.
 성장 루프 발행기는 위 플래그를 읽는다. 스위치 기본값은 꺼짐이라, 어드민에서 켜기 전에는 X에 글·댓글이 나가지 않는다. **prod가 자동 게시 중이라고 보지 않는다.**
 
 - **inbound** (우리 글 대댓글): 하루 40, 글당 12(설정 기본값). 수신 후 **30분 창**, 지터 **3–25분**은 코드 고정(어드민 UI 없음).
-- **outbound** (맞팔 선댓글): 하루 20, 맞팔만. 최소 댓글 수·최대 나이는 설정의 `hotMinReplies` / `hotMaxAgeHours`. 그 글에 우리 댓글이 없으면 **원글(root)**, 있으면 스레드 대댓글.
+- **outbound** (맞팔 선댓글): 하루 20, 맞팔만. 최소 댓글 수·최대 나이는 설정의 `hotMinReplies` / `hotMaxAgeHours`. 그 글에 우리 댓글이 없으면 **원글(root)**, 있으면 스레드 대댓글. **후보 조회는 1분이 아니다** — `XGrowthLoopScheduler.outboundTick`이 **08:00–22:00 KST 30분 간격**(08:00, 08:30, … 22:30). 틱당 댓글 최대 1개. 밤·심야에는 X 세션 API를 치지 않는다. 의식/대댓글 분 단위 틱과는 분리.
 - **ritual** (아침/밤 글): `morningTime` / `nightTime`에 사진 한 장 + 짧은 격려. 사진은 ASM `assets/x-ritual`.
 - BE는 `RemoteLlmProvider`(Haiku) + `persona_profile_json`으로 작문하고, ASM이 게시한다.
 - **dev는 LLM 꺼짐(L3)** — 작문·발행은 no-op. 페르소나 학습은 새벽에 그대로 돈다.

@@ -35,6 +35,8 @@ backend와 orchestrator가 shared `ai-learning` 서비스와 연결되는 지점
 
 ## 호출 관계
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: ai-user/learning/app/scheduler.py -->
 ```mermaid
 flowchart LR
     ORC[ai-user-orchestrator] -->|HTTP| LEARN[ai-learning :8099]

@@ -41,6 +41,8 @@
 
 근거: `app/(auth)/signup/page.tsx`
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: frontend/app/(auth)/login/page.tsx -->
 ```mermaid
 flowchart TD
     Start(["가입 시작"]) --> Nick["닉네임 입력\n(2~12자)"]
@@ -71,17 +73,16 @@ flowchart TD
 
 근거: `app/(auth)/login/page.tsx`, `lib/api/client.ts`
 
-```mermaid
-flowchart TD
-    Start(["로그인 시작"]) --> Form["이메일 + 비밀번호 입력"]
-    Form --> Submit["POST /api/auth/login"]
-    Submit -->|"성공"| Token["accessToken → localStorage\nsetUser()"]
-    Token --> Redirect["safeRedirect(next)\n오픈리다이렉트 방지"]
-    Submit -->|"EMAIL_NOT_REGISTERED"| CTA1["가입하기 버튼 노출"]
-    Submit -->|"WRONG_PASSWORD"| CTA2["비밀번호 오류 안내"]
-    Submit -->|"OAUTH_LOGIN_REQUIRED"| CTA3["소셜 로그인 버튼 안내"]
-    Submit -->|"ACCOUNT_SUSPENDED"| ErrBox["계정 정지 안내"]
-```
+1. 이메일 + 비밀번호 입력
+2. `POST /api/auth/login`
+3. 성공 시 `accessToken` → localStorage, `setUser()`, `safeRedirect(next)`
+
+| 오류 코드 | UI |
+|---|---|
+| `EMAIL_NOT_REGISTERED` | 가입하기 버튼 |
+| `WRONG_PASSWORD` | 비밀번호 오류 안내 |
+| `OAUTH_LOGIN_REQUIRED` | 소셜 로그인 안내 |
+| `ACCOUNT_SUSPENDED` | 계정 정지 안내 |
 
 `safeRedirect()`: `next` 파라미터가 동일 도메인(상대 경로)인지 검증 후 push. 외부 도메인이면 `/`로 fallback.  
 초대 플로우에서는 `next=/s/{token}`이 반드시 살아 있어야 한다(홈·광장 fallback 금지).
@@ -92,6 +93,8 @@ flowchart TD
 
 근거: `app/(auth)/guest/page.tsx`
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: frontend/app/(auth)/login/page.tsx -->
 ```mermaid
 flowchart TD
     Start(["게스트로 둘러보기 클릭"]) --> GuestPage["/guest"]
@@ -111,6 +114,8 @@ flowchart TD
 
 근거: `app/auth/callback/[provider]/page.tsx`, `lib/auth/oauth.ts`
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: frontend/app/(auth)/login/page.tsx -->
 ```mermaid
 flowchart TD
     Start(["소셜 로그인 버튼 클릭"]) --> OAuthRedirect["/api/auth/oauth2/{provider}\n(Google 등)\nstate 파라미터에 next 인코딩"]
@@ -132,6 +137,8 @@ flowchart TD
 
 근거: `app/(auth)/forgot-password/page.tsx`, `app/(auth)/reset-password/[token]/page.tsx`
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: frontend/app/(auth)/login/page.tsx -->
 ```mermaid
 flowchart TD
     Start(["비밀번호를 잊으셨나요?"]) --> ForgotPage["/forgot-password\n이메일 입력"]

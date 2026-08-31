@@ -13,6 +13,8 @@ last_updated: 2026-08-31
 
 ## 핵심 도메인 ER 다이어그램
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/resources/db/migration -->
 ```mermaid
 erDiagram
     users {

@@ -49,6 +49,8 @@
 
 ## 이메일 회원가입 흐름
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/AuthController.java -->
 ```mermaid
 sequenceDiagram
     participant FE
@@ -72,6 +74,8 @@ sequenceDiagram
 
 ## 게스트 → 회원 마이그레이션 흐름
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/AuthController.java -->
 ```mermaid
 sequenceDiagram
     participant FE
@@ -92,6 +96,8 @@ sequenceDiagram
 
 ## OAuth2 소셜 로그인 흐름
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/AuthController.java -->
 ```mermaid
 sequenceDiagram
     participant FE
@@ -114,6 +120,8 @@ sequenceDiagram
 
 ## 비밀번호 초기화 흐름
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/AuthController.java -->
 ```mermaid
 sequenceDiagram
     participant FE

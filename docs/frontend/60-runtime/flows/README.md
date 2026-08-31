@@ -32,6 +32,8 @@
 
 ## 전체 진입 지도 (광장형)
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: frontend/app/community/page.tsx -->
 ```mermaid
 flowchart TD
     Root(["/ 랜딩"])

@@ -26,6 +26,8 @@
 
 ## 구성과 경계
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: ai-user/orchestrator -->
 ```mermaid
 flowchart LR
   B[Backend: post/comment transaction] --> OX[ai_user_outbox]

@@ -13,6 +13,8 @@
 
 ## 인증 흐름 개요
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/security/JwtAuthFilter.java -->
 ```mermaid
 flowchart TD
     Start([요청]) --> Type{인증 방식}

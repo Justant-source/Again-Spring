@@ -10,6 +10,8 @@
 - shared ai-user의 source of truth는 prod DB와 prod backend다.
 - dev DB는 `prod-dev-sync`가 하루 1회 비식별 upsert를 수행한다.
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: env/docker-compose.dev.yml, env/docker-compose.prod.yml -->
 ```mermaid
 flowchart LR
     User[사용자 브라우저] -->|HTTPS| CF[Cloudflare Tunnel]
@@ -187,7 +189,7 @@ docker compose -f env/docker-compose.ai-user.yml --env-file env/.env.ai-user con
 - [docker.md](docker.md)
 - [environment-variables.md](../40-data.md)
 - [deployment.md](../60-runtime/deployment.md)
-- [cloudflare.md](./cloudflare.md)
+- [cloudflare.md](../60-runtime/cloudflare.md)
 - [local-dev.md](../60-runtime/local-dev.md)
 
 ## 포트 표 (system.md L3)

@@ -21,6 +21,8 @@
 
 ## 레이어 흐름
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/service/community/PostComposeService.java -->
 ```mermaid
 flowchart TB
     Client[Browser/Client]
@@ -90,6 +92,8 @@ MariaDB (Flyway V1~V56 관리 스키마)
 
 `CommunityPostController` + `PostComposeService` + `VoteService`가 제품 경로의 핵심이다.
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/service/community/PostComposeService.java -->
 ```mermaid
 flowchart LR
     Client["사용자"]

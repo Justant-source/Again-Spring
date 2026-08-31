@@ -34,33 +34,6 @@ cd backend
 
 ## 커버리지 목표
 
-```mermaid
-flowchart TD
-    subgraph SAFETY["🔒 Safety — 100% 필수"]
-        S1["KeywordGuard\n금지어 양방향 검사"]
-        S2["CrisisDetector\nLevel 1/2 위기 감지"]
-        S3["RatioEnforcer\nfactual/mixed/difference 클리핑"]
-        S4["PromptSanitizer\nInjection 패턴 + 길이 제한"]
-    end
-    subgraph LLM["LLM Bridge — 90%"]
-        L1["RemoteLlmProvider\n타임아웃·에러 처리"]
-        L2["PromptSanitizer\nInjection 방지"]
-    end
-    subgraph SVC["Service — 80%"]
-        V1["PostComposeService\nVoteService"]
-        V2["CommunityPostService\nCommunityCommentService"]
-    end
-    subgraph CTRL["Controller — 70%"]
-        C1["CommunityPostController\nCommunityCommentController"]
-        C2["UserController\nAuthController"]
-    end
-    subgraph INT["통합 (SpringBootTest) — 80%"]
-        I1["HTTP 종단 검증\nCrisis 시나리오"]
-    end
-
-    INT --> CTRL --> SVC --> LLM --> SAFETY
-```
-
 | 계층 | 목표 |
 |---|---|
 | Service (비즈니스 로직) | 80% |

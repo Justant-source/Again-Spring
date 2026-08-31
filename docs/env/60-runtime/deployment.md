@@ -6,24 +6,17 @@
 > `prod-dev-sync` = **5분 콘텐츠** + **24h full**. **dev LLM 금지(L3)**.
 
 ## 표준 흐름
+1. base 스택 확인 (`docker compose up`)
+2. local unit / build
+3. **dev(:8090)** 배포
+4. 수동 검증
+5. e2e-realbe (`E2E_BASE_URL=http://localhost:8090`)
+6. 명시적 prod 지시가 없으면 여기서 종료
+7. (지시 시) prod DB 백업
+8. prod 스택 배포
+9. ai-user 관련이면 shared ai-user 재배포
+10. commit & push (`main`)
 
-```mermaid
-flowchart LR
-    Code([코드 변경]) --> Base["① base 스택 확인"]
-    Base --> Local["② local unit/build"]
-    Local --> Dev["③ dev(:8090) 배포"]
-    Dev --> Manual["④ 수동 검증"]
-    Manual --> E2E["⑤ e2e-realbe :8090"]
-    E2E --> Gate{명시적 prod 지시?}
-    Gate -->|아니오| DoneD([✅ dev 완료])
-    Gate -->|예| Backup["⑥ prod DB 백업"]
-    Backup --> Prod["⑦ prod 스택 배포"]
-    Prod --> Shared{"ai-user 관련 변경?"}
-    Shared -->|예| Ai["⑧ shared ai-user 재배포"]
-    Shared -->|아니오| Commit
-    Ai --> Commit["⑨ commit & push"]
-    Commit --> DoneP([✅ prod 완료])
-```
 
 prod는 반드시 `main` 기준으로만 배포한다. **prod 배포 전 dev e2e 전체 통과가 전제**다.
 

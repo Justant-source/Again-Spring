@@ -33,6 +33,8 @@
 
 근거: `service/crisis/CrisisDetector.java`, `app/(admin)/admin/crisis/`
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: frontend/app/community/[id]/page.tsx -->
 ```mermaid
 flowchart TD
     Post(["게시글/댓글 작성"]) --> Detect["CrisisDetector.detect()\n키워드 매칭"]
@@ -49,6 +51,8 @@ flowchart TD
 
 근거: `components/shared/CrisisResourceModal.tsx`, `lib/constants/crisisResources.ts`
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: frontend/app/community/[id]/page.tsx -->
 ```mermaid
 flowchart TD
     Trigger(["SOS 버튼 클릭\n또는 crisisFlag 게시글 진입"]) --> Modal["CrisisResourceModal 표시\n(body 스크롤 잠금)"]

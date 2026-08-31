@@ -74,6 +74,8 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 
 ## 데이터 흐름
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: env/docker-compose.ai-user.yml -->
 ```mermaid
 flowchart LR
   ORC[orchestrator-prod] --> LEARN[ai-learning]

@@ -50,22 +50,19 @@
 - 유효하지 않은 카테고리 또는 content 10자 미만 → `IllegalArgumentException` → 400
 
 ## 흐름도
+| 조건 | 처리 |
+|---|---|
+| 인증됨 | `userId = principal` |
+| 미인증 | `userId = null` |
+| 유효성 실패 | 400 |
+| `category=crisis` | Crisis 알림 후 201 |
+| 그 외 저장 성공 | 201 `{id}` |
 
-```mermaid
-flowchart LR
-    FE[FE 피드백 폼] -->|POST /api/feedbacks| CTRL[FeedbackController]
-    CTRL --> AUTH{인증된 사용자?}
-    AUTH -->|Yes| SETUSERID[userId = principal.username]
-    AUTH -->|No| SETNULL[userId = null]
-    SETUSERID & SETNULL --> VALID{유효성 검사}
-    VALID -->|실패| ERR400[400 Bad Request]
-    VALID -->|성공| SAVE[feedbackRepository.save]
-    SAVE --> NOTIFY[CrisisFeedbackNotifier.notifyIfCrisis]
-    NOTIFY --> EMAILOPT{category=crisis?}
-    EMAILOPT -->|Yes| ADMINEMAIL[관리자 이메일 발송]
-    EMAILOPT -->|No| DONE[201 Created - id 반환]
-    ADMINEMAIL --> DONE
-```
+1. FE 폼이 `POST /api/feedbacks` 호출
+2. `FeedbackController` → 유효성 → `feedbackRepository.save`
+3. `CrisisFeedbackNotifier.notifyIfCrisis`
+4. 201 반환
+
 
 ## 변경 시 절차
 

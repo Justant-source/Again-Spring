@@ -19,23 +19,16 @@
 | 관리자 가이드 | `docs/shared/admin-dashboard.md` |
 
 ## 환경별 활성화 규칙
+| 단계 | 결과 |
+|---|---|
+| Spring Security admin 경로 미인증 | 401 |
+| 인증됐으나 ADMIN 아님 | 403 |
+| AdminDashboard / User / Health / Feedback | 항상 활성 |
+| AdminPrompts / SessionContextDebug 이고 `app.admin.enabled=false` | 404 (빈 등록) |
+| 위 컨트롤러이고 `app.admin.enabled=true` | 활성 |
+| AdminTest 이고 prod 프로파일 | 404 |
+| AdminTest 이고 `@Profile(dev)` | 활성 |
 
-```mermaid
-flowchart LR
-    REQ[요청] --> SEC{Spring Security<br/>admin 경로 인증?}
-    SEC -->|미인증| 401[401 Unauthorized]
-    SEC -->|비ADMIN| 403[403 Forbidden]
-    SEC -->|ADMIN| GATE{컨트롤러 게이팅}
-
-    GATE -->|AdminDashboard/User/Health/Feedback| ALWAYS[항상 활성]
-    GATE -->|AdminPrompts/SessionContextDebug| PROP{"app.admin.enabled=true?"}
-    PROP -->|false| 404["404 Not Found<br/>빈 등록 안 됨"]
-    PROP -->|true| ACTIVE[활성]
-    GATE -->|AdminTest| PROFILE{"@Profile(dev)?"}
-
-    PROFILE -->|prod| 404
-    PROFILE -->|dev| ACTIVE
-```
 
 ## Dashboard API — PMF 통계 · 리텐션 · 위기 모니터링
 

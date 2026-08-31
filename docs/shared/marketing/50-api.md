@@ -649,7 +649,7 @@ POST /api/admin/marketing/x-ops/learn
 - `POST /api/v1/x/publish` — `{ text, imageBase64?, imageMime?, replyToTweetId? }` → social-poster. 성공 시 `{ tweetId, url }`
 - `POST /api/v1/x/ritual` — `{ slot: "morning"|"night", text }` — ASM `assets/x-ritual` 사진 한 장을 붙여 게시
 - `GET /api/v1/x/inbox` — 우리 글에 달린 **남이 단** 최근 댓글 (`tweetId`, `parentId`, `author`, `text`, `createdAt`, `ourPostId`)
-- `GET /api/v1/x/outbound-candidates` — 맞팔 최근 글 중 댓글 수·나이 필터 후보 (`tweetId`, `author`, `text`, `replyCount`, `ageHours`, `alreadyRepliedByUs`)
+- `GET /api/v1/x/outbound-candidates` — 맞팔 최근 글 중 댓글 수·나이 필터 후보 (`tweetId`, `author`, `text`, `replyCount`, `ageHours`, `alreadyRepliedByUs`). AS는 **주간 30분 간격**으로만 호출 (`XGrowthLoopScheduler.outboundTick`, 08:00–22:00 KST). 1분 폴링 금지.
 
 흐름·한도: [`x-thread-strategy.md`](70-policy/x-thread-strategy.md) §2.4.
 

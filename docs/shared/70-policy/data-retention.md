@@ -9,19 +9,14 @@
 - DB: `posts.content`, `post_comments.content` (Flyway V48+)
 
 ## 데이터 생명주기
+| 데이터 | 동작 |
+|---|---|
+| 게시글 작성 | `expires_at = now() + 30일`, 원문 보존 |
+| 만료 전 | 조회 가능 |
+| 매일 03:00 UTC retention | `posts.content` · `post_comments.content` NULL |
+| 만료 후 조회 | 원문 삭제 안내 문구 |
+| `DELETE /api/users/me` | `users.deleted_at`, 해당 원문 즉시 NULL, 닉네임 마스킹 |
 
-```mermaid
-flowchart TD
-    A["게시글 작성\nexpires_at = now() + 30일"] --> B["공개 중\n원문 보존"]
-    B --> C{시간 경과?}
-    C -->|아니오| D["조회 가능"]
-    C -->|"예 (매일 03:00 UTC retention)"| E["원문 NULL 처리\nposts.content\npost_comments.content"]
-    E --> F["이후 조회\n'30일이 지나 원문이\n자동 삭제되었어요' 표시"]
-
-    I["사용자 탈퇴\nDELETE /api/users/me"] --> J["즉시 소프트 삭제\nusers.deleted_at = now()"]
-    J --> K["해당 user 게시글/댓글 원문 즉시 NULL"]
-    J --> M["탈퇴 사용자 닉네임\n→ '탈퇴한 사용자' 마스킹"]
-```
 
 ## 30일 원문 만료
 

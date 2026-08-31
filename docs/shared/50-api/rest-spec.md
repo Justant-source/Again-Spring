@@ -52,6 +52,8 @@
 
 ## 인증 · 권한 매트릭스
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: backend/src/main/java/com/againspring/api/community/CommunityPostController.java -->
 ```mermaid
 flowchart LR
     REQ[요청] --> AUTH{JWT 토큰?}
@@ -371,7 +373,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 |---|---|---|---|---|
 | GET | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 | Phase 2 플랫폼별 일일 cap + 오늘(KST) 사용량. 응답: `{platforms:{x_thread:{cap,usedToday,remaining},…}, dailyTextCap, dailyVideoCap, videosToday, textsToday, remainingPool}`. `dailyTextCap`/`dailyVideoCap`은 텍스트/영상 플랫폼 cap **합**(deprecated 파생). 사용량 = COMMITTED + 해당 플랫폼 job targets |
 | PUT | `/api/admin/marketing/quota` | **JWT + ADMIN** | 200 / 400 | Body: `{xThread,instagramFeed,instagramReels,youtubeShorts}` (각 0–50) 또는 legacy `{dailyTextCap,dailyVideoCap}`(분배 저장). 키 `marketing.cap.{platform}`. legacy `marketing.daily_text_cap`/`daily_video_cap`은 플랫폼 키 없을 때 fallback |
-| GET | `/api/admin/marketing/x-ops` | **JWT + ADMIN** | 200 | X 운영 설정. `{morningTime,nightTime,storyScoopsPerDay,outboundDailyCap,inboundDailyCap,inboundPerPostCap,hotMinReplies,hotMaxAgeHours,ritualEnabled,inboundEnabled,outboundEnabled,personaLearningEnabled,personaLearnAt,personaLastStatus,personaLastNewCount,personaLastLearnedAt,personaSummary}`. 키 `marketing.x.*`. 발행 스위치 기본 **false** — `ritual`/`inbound`/`outbound` 플래그가 런타임 발행기를 게이팅. 페르소나 학습 기본 **true**·시각 `04:30` KST. 원장 테이블 `x_ops_action`(어드민 REST 없음) |
+| GET | `/api/admin/marketing/x-ops` | **JWT + ADMIN** | 200 | X 운영 설정. `{morningTime,nightTime,storyScoopsPerDay,outboundDailyCap,inboundDailyCap,inboundPerPostCap,hotMinReplies,hotMaxAgeHours,ritualEnabled,inboundEnabled,outboundEnabled,personaLearningEnabled,personaLearnAt,personaLastStatus,personaLastNewCount,personaLastLearnedAt,personaSummary}`. 키 `marketing.x.*`. 발행 스위치 기본 **false**. **선댓글 후보 조회는 주간 30분 간격**(08:00–22:00 KST), 의식/대댓글만 1분 틱. 페르소나 학습 기본 **true**·시각 `04:30` KST. 원장 테이블 `x_ops_action`(어드민 REST 없음) |
 | PUT | `/api/admin/marketing/x-ops` | **JWT + ADMIN** | 200 / 400 | 부분 갱신. 시각 `HH:mm`(KST). 기본: 아침 07:30 / 밤 22:00 / 사연 2 / 선댓글 20 / 대댓글 40·글당 12 / 불난글 댓글≥3·6h / 학습 04:30 |
 | POST | `/api/admin/marketing/x-ops/learn` | **JWT + ADMIN** | 200 / 400 | 지금 학습. 타임라인에서 수동 댓글만 모아 프로필 갱신. 학습 스위치 off면 400. **dev는 LLM 미호출**(L3, `INGESTED_LLM_DISABLED`) |
 | GET | `/api/admin/marketing/score-weights` | **JWT + ADMIN** | 200 | 인기 점수 가중치. 응답: `{weightViews, weightComments, weightVotes, platforms?, autoAdjust}` (Phase 2 platforms + Phase 2.7 autoAdjust 기본 false) |

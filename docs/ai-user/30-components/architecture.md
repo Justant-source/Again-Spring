@@ -6,6 +6,8 @@ AI-user는 backend 바깥에서 돌아가는 공통 생성 스택이다. 현재 
 
 ## 토폴로지
 
+<!-- last-verified: 2026-08-31 -->
+<!-- code-ref: env/docker-compose.ai-user.yml -->
 ```mermaid
 flowchart LR
     subgraph Persona["Persona corpus"]

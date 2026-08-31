@@ -10,14 +10,11 @@
 
 근거: `lib/constants/userPermissions.ts`
 
-```mermaid
-flowchart TD
-    Feed(["커뮤니티 피드 or 프로필"]) --> PermCheck{"permissionsFor(user)\n.ui.showAdminEntryButton?"}
-    PermCheck -->|"false (guest/registered)"| NoCTA["관리자 진입 버튼 미표시"]
-    PermCheck -->|"true (admin)"| AdminLink["관리자 대시보드 링크 표시"]
-    AdminLink --> Click["클릭"]
-    Click --> Admin["/admin"]
-```
+| 조건 | UI |
+|---|---|
+| `permissionsFor(user).ui.showAdminEntryButton` false | 관리자 진입 버튼 없음 |
+| true (admin) | `/admin` 링크 표시 |
+
 
 > **2026-07-31~**: 랜딩페이지(`/`)의 "마케팅 모드" 진입 카드는 삭제됨. `/admin/marketing` 자체와 `canAccessMarketing` 권한은 그대로 유지되며, `/admin` 진입 후 좌측 nav의 "소통·성장" 그룹 "마케팅"으로만 접근 가능. 근거: `app/page.tsx`.
 
@@ -27,19 +24,13 @@ flowchart TD
 
 근거: `app/(admin)/admin/page.tsx`
 
-```mermaid
-flowchart TD
-    Enter(["/admin 접근"]) --> Guard1["useEffect 가드 1\n(즉시)"]
-    Guard1 -->|"!user"| ToLogin["/login?next=/admin"]
-    Guard1 -->|"user.isGuest"| ToHome["/"]
-    Guard1 -->|"!roles.includes('ADMIN')"| ToHome
+| 가드 | 실패 시 |
+|---|---|
+| `!user` | `/login?next=/admin` |
+| `user.isGuest` 또는 ADMIN 아님 | `/` |
+| `GET /api/admin/me` 403 | `/` |
+| 통과 | 대시보드 |
 
-    Guard1 -->|"통과"| FetchAdmin["GET /api/admin/me\n(isAuthorizedAdmin 확인)"]
-    FetchAdmin -->|"403"| ToHome
-    FetchAdmin -->|"성공"| Guard2["isAuthorizedAdmin 상태 게이트"]
-    Guard2 -->|"false"| Loading["로딩/대기 상태"]
-    Guard2 -->|"true"| Dashboard["대시보드 렌더"]
-```
 
 가드 1 (useEffect): 클라이언트 상태 기반 즉시 리다이렉트.  
 가드 2 (데이터): BE `/api/admin/me` 응답으로 실제 admin 권한 확인.  
@@ -154,14 +145,12 @@ flowchart TD
 
 ## 사용자 관리 흐름
 
-```mermaid
-flowchart TD
-    UserMgmt(["사용자 관리 섹션"]) --> Search["닉네임·이메일 검색\nGET /api/admin/users?q="]
-    Search --> UserList["사용자 목록"]
-    UserList --> DetailModal["상세 모달\n(게시글 수, 가입일 등)"]
-    DetailModal --> TesterToggle["TESTER role 토글\nPATCH /api/admin/users/{id}/roles"]
-    TesterToggle --> Refresh["목록 갱신"]
-```
+| 단계 | API |
+|---|---|
+| 검색 | `GET /api/admin/users?q=` |
+| 상세 | 모달 |
+| TESTER 토글 | `PATCH /api/admin/users/{id}/roles` |
+
 
 ---
 

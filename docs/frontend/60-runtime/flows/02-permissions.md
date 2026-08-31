@@ -10,17 +10,11 @@
 ## permissionsFor() 결정 트리
 
 근거: `lib/constants/userPermissions.ts:246-253`
+1. `user` 가 null/undefined 이면 guest
+2. `user.isGuest === true` 이면 guest
+3. `user.roles` 에 `ADMIN` 이면 admin
+4. 그 외 registered
 
-```mermaid
-flowchart TD
-    Start(["permissionsFor(user)"]) --> NullCheck{"user === null\n또는 undefined?"}
-    NullCheck -->|"예"| Guest["guest 권한 반환"]
-    NullCheck -->|"아니오"| GuestCheck{"user.isGuest === true?"}
-    GuestCheck -->|"예"| Guest
-    GuestCheck -->|"아니오"| AdminCheck{"user.roles?.includes\n('ADMIN')"}
-    AdminCheck -->|"예"| Admin["admin 권한 반환"]
-    AdminCheck -->|"아니오"| Registered["registered 권한 반환"]
-```
 
 3-tier: `guest` / `registered` / `admin`. 동일 함수로 판별 (`lib/constants/userPermissions.ts` `permissionsFor()`).
 
@@ -110,22 +104,10 @@ flowchart TD
 
 Next.js middleware 없음. 모든 가드는 클라이언트 측에서 처리.
 
-```mermaid
-flowchart TD
-    Request(["페이지 접근"]) --> Render["페이지 컴포넌트 마운트"]
-    Render --> UseEffect["useEffect 가드 실행\n(각 보호 페이지 내부)"]
-
-    UseEffect -->|"인증 필요 페이지\nuser 없음"| RedirectLogin["/login?next=현재경로"]
-    UseEffect -->|"게스트 전용 불가"| RedirectHome["/"]
-    UseEffect -->|"admin 전용\nnon-admin"| RedirectHome
-
-    Render --> Interceptor["axios 응답 인터셉터\nlib/api/client.ts"]
-    Interceptor -->|"401·403"| CheckGuest{"isGuest?"}
-    CheckGuest -->|"예"| ToGuest["/guest"]
-    CheckGuest -->|"아니오"| ToLogin["/login"]
-    Interceptor -->|"402\nGUEST_LIMIT_REACHED"| GuestModal["showGuestLimitModal(sessionId)\n(uiStore)"]
-    Interceptor -->|"429\nDAILY_LIMIT_EXCEEDED"| DailyModal["showDailyLimitModal()\n(uiStore)"]
-```
+1. 페이지 마운트
+2. `useEffect` 가드: 인증 필요인데 user 없음 → `/login?next=현재경로`
+3. 게스트 전용 불가 또는 admin 전용인데 non-admin → `/`
+4. axios 인터셉터 (`frontend/lib/api/client.ts`): 401/403 → guest면 `/guest` 아니면 `/login`; 402 → 게스트 한도 모달; 429 → 일일 한도 모달
 
 근거: `lib/api/client.ts:19-51`
 

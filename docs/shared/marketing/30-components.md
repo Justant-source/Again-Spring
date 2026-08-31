@@ -20,7 +20,7 @@ ASM의 M6 파이프라인 단계에서 호출되어 생성된 콘텐츠를 각 �
 services/social-poster/
 ├── Dockerfile
 ├── package.json
-├── extract-session.js        # 세션 쿠키 추출 CLI 도구
+├── extract-session.js        # DEPRECATED — document.cookie 북마클릿. 쓰지 말 것
 ├── src/
 │   ├── server.js             # Express 서버 진입점
 │   ├── seed-cli.js           # 세션 시딩 CLI
@@ -129,36 +129,22 @@ Instagram 피드를 게시합니다. 릴스 영상 업로드는 Graph API만 사
 
 ## 세션 관리
 
-social-poster는 Playwright 세션 쿠키를 파일로 저장하여 재로그인 없이 게시합니다.
+게시용 로그인 세션은 Playwright `storageState`(httpOnly 쿠키 포함)다. ASM `credential.storage_state`에 암호화 저장한다.
 
-### 최초 세션 설정
+**`extract-session.js`는 쓰지 않는다.** 콘솔/`document.cookie` 북마클릿이라 X `auth_token` 같은 httpOnly 쿠키가 빠지고, 그대로 넣으면 로그인 벽으로 발행이 실패한다.
+
+### 재시딩 (권장)
+
+운영자 **화면이 있는 로컬**에서 (Docker 안·헤드리스 SSH 금지):
 
 ```bash
-cd services/social-poster
-
-# X 세션 추출
-node extract-session.js x
-
-# Instagram 세션 추출
-node extract-session.js instagram
-
-# 네이버 세션 추출
-node extract-session.js naver
+cd ~/Data/Again-Spring-Marketing/services/social-poster
+node src/seed-cli.js --platform x
 ```
 
-각 명령은 Chromium 창을 열어 수동 로그인 후 세션을 저장합니다.
+열린 Chromium에서 x.com 로그인·2FA를 끝낸 뒤 **터미널에서 Enter**. stdout JSON을 채팅이 아니라 어드민 `/admin/marketing` → 플랫폼 계정 → **X 4단 스레드** → `브라우저 세션 (Playwright storageState JSON)`에 붙여 넣는다.
 
-### 세션 파일 위치
-
-```
-services/social-poster/
-└── sessions/
-    ├── x-session.json
-    ├── instagram-session.json
-    └── naver-session.json
-```
-
-> **⚠️ 보안**: `sessions/` 디렉터리는 절대 git 커밋하지 않습니다 (`.gitignore` 적용).
+429(Too Many Requests)가 난 직후면 세션이 읽히지 않으니, 홈이 다시 뜬 뒤에 추출한다.
 
 ---
 
@@ -191,7 +177,7 @@ INSTAGRAM_TOTP_SECRET=...
 ### 세션 만료 오류
 
 플랫폼이 세션을 만료시키면 `session-health` 엔드포인트가 `valid: false`를 반환합니다.  
-해결: `extract-session.js [platform]`으로 재로그인.
+해결: `node src/seed-cli.js --platform x`로 재시딩 후 어드민에 storageState를 넣는다. `extract-session.js` 금지.
 
 ### 봇 감지 차단
 
