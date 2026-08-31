@@ -1,3 +1,8 @@
+---
+title: L4 Data — MariaDB 스키마 · Flyway
+last_updated: 2026-08-31
+---
+
 # 데이터베이스 스키마 (MariaDB 11)
 
 > last-verified: 2026-08-08 · code-ref: `backend/src/main/resources/db/migration/V48~V104.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
@@ -606,7 +611,7 @@ ritual / inbound / outbound 작문·게시 결과. 어드민 REST 없음 — 일
 | `users` (탈퇴) | 소프트 삭제 (deleted_at 설정) | 사용자 요청 |
 | 마케팅 테이블 | 별도 정책 | — |
 
-자세한 정책: [`../70-policy/data-retention.md`](../70-policy/data-retention.md)
+자세한 정책: [`../shared/70-policy/data-retention.md`](../shared/70-policy/data-retention.md)
 
 ---
 

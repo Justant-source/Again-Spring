@@ -13,4 +13,3 @@ last_updated: 2026-08-31
 | [feedback.md](feedback.md) | 피드백 API | |
 | [admin.md](admin.md) | 관리자 API | |
 | [flows.md](flows.md) | 시나리오 시퀀스 | |
-| [database-schema.md](database-schema.md) | 스키마 (backend/40-data로 이전 예정) | |

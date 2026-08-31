@@ -180,4 +180,4 @@ docker compose restart againspring-llm   # base 스택 (dev·prod 공유)
 
 ---
 
-**참고**: [CLAUDE.md — LLM 브릿지 핵심](../../CLAUDE.md)
+**참고**: [CLAUDE.md — LLM 브릿지 핵심](../../../CLAUDE.md)

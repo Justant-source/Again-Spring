@@ -9,7 +9,7 @@ backend와 orchestrator가 shared `ai-learning` 서비스와 연결되는 지점
 - DB는 prod MariaDB를 사용한다.
 - scheduler는 env flag로 제어된다.
 
-권위본은 [`../ai-user/README.md`](../ai-user/README.md)와 런타임 코드다.
+권위본은 [`../ai-user/README.md`](../../ai-user/README.md)와 런타임 코드다.
 
 ## 주요 사실
 
@@ -71,6 +71,6 @@ docker compose -f env/docker-compose.ai-user.yml --env-file env/.env.ai-user log
 
 ## 관련 문서
 
-- [`../ai-user/learning.md`](../ai-user/learning.md)
-- [`../ai-user/operations.md`](../ai-user/operations.md)
-- [`../env/environment-variables.md`](../env/environment-variables.md)
+- [`../ai-user/learning.md`](../../ai-user/learning.md)
+- [`../ai-user/operations.md`](../../ai-user/operations.md)
+- [`../env/environment-variables.md`](../../env/environment-variables.md)

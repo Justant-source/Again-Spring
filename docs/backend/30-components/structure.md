@@ -321,10 +321,10 @@ backend/src/main/resources/
 
 | 작업 | 파일 위치 | 참고 docs |
 |---|---|---|
-| 새 API 추가 | `api/*Controller.java` + `api/dto/` | `docs/shared/api/rest-spec.md` |
-| 새 DB 컬럼 | `domain/*.java` + `db/migration/V{n+1}__*.sql` | `docs/shared/api/database-schema.md` |
-| Admin API | `api/admin/*Controller.java` | `docs/shared/api/admin.md` |
-| 광장 게시글 | `service/community/CommunityPostService.java` | `docs/shared/api/rest-spec.md` · `docs/shared/api/flows.md` |
+| 새 API 추가 | `api/*Controller.java` + `api/dto/` | `docs/shared/50-api/rest-spec.md` |
+| 새 DB 컬럼 | `domain/*.java` + `db/migration/V{n+1}__*.sql` | `docs/backend/40-data.md` |
+| Admin API | `api/admin/*Controller.java` | `docs/shared/50-api/admin.md` |
+| 광장 게시글 | `service/community/CommunityPostService.java` | `docs/shared/50-api/rest-spec.md` · `docs/shared/50-api/flows.md` |
 | 보안 정책 | `safety/*.java` + `security/*.java` | `docs/shared/policies/` |
 | 프롬프트 변경 | `docs/shared/prompts/*.md` | `docs/shared/prompts/README.md` |
 | LLM 브릿지 | `llm/remote/*.java` | `docs/backend/llm-bridge.md` |

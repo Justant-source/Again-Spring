@@ -2,7 +2,7 @@
 
 > **권위본**: 이 문서 (2026-08-29 신설).
 > 관련: [`platforms.md`](../70-policy/platforms.md) (발행·점수) · [`api.md`](../50-api.md) §4.2.1 (플랫폼 통계) · [`seo.md`](../70-policy/seo.md) (검색 유입)
-> 스키마: [`../../50-api/database-schema.md`](../../50-api/database-schema.md) `visit_events` · `users` 유입 컬럼
+> 스키마: [`../../../backend/40-data.md`](../../../backend/40-data.md) `visit_events` · `users` 유입 컬럼
 
 ---
 
