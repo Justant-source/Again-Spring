@@ -1,7 +1,7 @@
 # 관리자 흐름
 
 **위치**: `docs/frontend/ux/flows/09-admin.md`  
-**자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [../principles.md](../principles.md)  
+**자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [../principles.md](../../70-policy/principles.md)  
 **기준일**: 2026-07-31 (사이드바 재편·`/admin/community` 삭제·콘텐츠관리 통합테이블·AI 생성관제 PLAN 일원화 반영 — 그 외 섹션은 2026-06-03 기준 그대로, 전면 재작성 필요)
 
 ---

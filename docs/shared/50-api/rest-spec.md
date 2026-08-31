@@ -108,7 +108,7 @@ flowchart LR
 | GET | `/api/community/posts/counts` | 공개 | 200 | 광장별 글 수 (`{"":.., "COUPLE":.., ...}`) |
 | GET | `/api/community/posts/{id}` | 공개 | 200 / 404 | 게시글 상세. soft-delete면 **200 + `{ deleted: true }`**(본문 생략 가능) 또는 기존 404 — FE는 deleted 플래그 우선. 응답에 `authorBodyDeleted` / `partnerBodyDeleted` boolean |
 | PATCH | `/api/community/posts/{id}` | **JWT** | 200 / 403 / 404 | 게시글 수정 (작성자만; 작성자 본문 tombstone 후 재작성 경로 포함) |
-| DELETE | `/api/community/posts/{id}` | **JWT(author)** | 200 / 403 / 404 | 작성자 삭제 — **상대 ACTIVE면 작성자 본문만 tombstone**(`author_body_deleted_at`, 200+상세 플래그); 상대 NONE/미작성 또는 양쪽 tombstone이면 **완전 soft-delete**(`deleted_at`) + 댓글 hard delete → 200 `{deleted:true,id}`. 상세: [09-partner-invite-ownership.md](../../frontend/ux/flows/09-partner-invite-ownership.md) |
+| DELETE | `/api/community/posts/{id}` | **JWT(author)** | 200 / 403 / 404 | 작성자 삭제 — **상대 ACTIVE면 작성자 본문만 tombstone**(`author_body_deleted_at`, 200+상세 플래그); 상대 NONE/미작성 또는 양쪽 tombstone이면 **완전 soft-delete**(`deleted_at`) + 댓글 hard delete → 200 `{deleted:true,id}`. 상세: [09-partner-invite-ownership.md](../../frontend/60-runtime/flows/09-partner-invite-ownership.md) |
 | POST | `/api/community/posts/{id}/comments` | **JWT** | 200 / 400 / 409 / 422 | 댓글 작성 (synthetic bot은 내부 멱등성 헤더 지원). `parentCommentId`가 이미 대댓글이면 `400 COMMENT_DEPTH_EXCEEDED` (UI 2단만) |
 | GET | `/api/community/posts/{id}/comments` | 공개 | 200 | 댓글 목록. 최상위·대댓글 모두 `createdAt DESC`(최신순). `?page=&size=`는 최상위만 페이지네이션 |
 | PATCH | `/api/community/posts/{postId}/comments/{id}` | **JWT** | 200 / 403 / 404 | 댓글 수정 (작성자만) |
@@ -148,7 +148,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 > 파트너 답변은 이미 공개된 글에 상대 본문만 붙인다 — **첫 PUBLIC 게이트가 아니다**.
 > 마이그레이션 **V97**: 잔존 `PRIVATE + WAIT_FOR_PARTNER` 중 비공개 **>30일** → soft-delete(`deleted_at`), 그 외 → PUBLIC.
 >
-> **소유권·삭제 (2026-08-11~)**: UX/API SSOT = [`docs/frontend/ux/flows/09-partner-invite-ownership.md`](../../frontend/ux/flows/09-partner-invite-ownership.md).
+> **소유권·삭제 (2026-08-11~)**: UX/API SSOT = [`docs/frontend/ux/flows/09-partner-invite-ownership.md`](../../frontend/60-runtime/flows/09-partner-invite-ownership.md).
 > 게스트/익명 상대 본문 = 토큰 capability; 「내 계정으로 연결」claim 후에만 회원 소유.
 >
 > **시한부 투표 제거 (2026-08-11~)**: `voteCloseAt` / `voteDurationHours` / `PostStatus.CLOSED` 잠금은 **제품 동작에서 제거(legacy)**.

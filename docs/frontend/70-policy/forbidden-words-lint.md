@@ -97,7 +97,7 @@ frontend/
 아동학대: "아이를 때", "아동학대"
 ```
 
-감지 시 → `CrisisResourceModal` 즉시 표시. 위기 처리 흐름: `docs/frontend/ux/flows/08-crisis.md`
+감지 시 → `CrisisResourceModal` 즉시 표시. 위기 처리 흐름: `docs/frontend/60-runtime/flows/08-crisis.md`
 
 ---
 

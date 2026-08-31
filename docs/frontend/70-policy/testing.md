@@ -19,7 +19,7 @@ npm run lint:words
 - **대상**: `app/`, `components/`, `lib/`, `mocks/`
 - **CI/CD**: PR 마다 실행 필수
 - **실패 조건**: Level 1 금지어 1개 이상 감지
-- **상세**: [`policies/forbidden-words-lint.md`](policies/forbidden-words-lint.md)
+- **상세**: [`forbidden-words-lint.md`](forbidden-words-lint.md)
 
 #### 이모지 검사 (`npm run lint:emoji`)
 

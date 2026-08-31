@@ -1,8 +1,8 @@
 # 다시봄 디자인 시스템 (SSOT)
 
 > **이 문서는 다시봄의 유일한 디자인 정본(Single Source of Truth)입니다.**  
-> 시각 정본(28화면): [`frontend/design/다시봄 광장형 UX (standalone).html`](../../design/다시봄%20광장형%20UX%20(standalone).html)  
-> 짝 문서: [`components.md`](./components.md) (컴포넌트 인벤토리 + 28화면 인덱스)  
+> 시각 정본(28화면): [`frontend/design/다시봄 광장형 UX (standalone).html` (`frontend/design/다시봄 광장형 UX (standalone).html`)  
+> 짝 문서: [`components.md`](../30-components/components.md) (컴포넌트 인벤토리 + 28화면 인덱스)  
 > 제품: 모바일 웹 우선. 목업 프레임 **360 × 760**.  
 > 도메인: **againspring.net** (개발: dev.againspring.net)  
 > 최종 갱신: 2026-06-03
@@ -218,7 +218,7 @@ colors: {
 
 ## 8. 컴포넌트 인벤토리
 
-> 컴포넌트 인벤토리 및 28화면 인덱스: [components.md](./components.md)
+> 컴포넌트 인벤토리 및 28화면 인덱스: [components.md](../30-components/components.md)
 
 ---
 
@@ -254,7 +254,7 @@ colors: {
 - 단순한 원·점·선 위주.
 - **이모지 사용 금지** (잠금 표시 등 불가피한 경우 최소한, 가능하면 SVG로 대체).
 - 진영을 가리키는 점은 7~10px 원, 피치/세이지색.
-- 카탈로그: [icons.md](./icons.md)
+- 카탈로그: [icons.md](../30-components/icons.md)
 
 ---
 

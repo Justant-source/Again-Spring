@@ -1,6 +1,6 @@
 # 컴포넌트 & 인터랙션 (`docs/design/components.md`)
 
-> 디자인 시스템 토큰·철학: [system.md](./system.md) | UX 원칙: [../ux/principles.md](../ux/principles.md) | HAX 체크리스트: [../ux/hax-checklist.md](../ux/hax-checklist.md)
+> 디자인 시스템 토큰·철학: [system.md](../70-policy/design-system.md) | UX 원칙: [../ux/principles.md](../70-policy/principles.md) | HAX 체크리스트: [../ux/hax-checklist.md](../70-policy/hax-checklist.md)
 
 ---
 
@@ -66,7 +66,7 @@
 
 ## 28화면 인덱스 (C3_* 컴포넌트)
 
-> 시각 정본: [`다시봄 광장형 UX (standalone).html`](../../design/다시봄%20광장형%20UX%20(standalone).html)
+> 시각 정본: [`다시봄 광장형 UX (standalone).html` (`frontend/design/다시봄 광장형 UX (standalone).html`)
 > 컴포넌트명은 `ux-c3.jsx` export명과 1:1.
 
 | # | 컴포넌트 | 계열 | 톤 |

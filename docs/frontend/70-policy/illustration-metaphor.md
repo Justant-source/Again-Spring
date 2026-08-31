@@ -2,7 +2,7 @@
 
 > ⚠️ **영상 경로 폐기 안내 (2026-08-12)**  
 > YouTube Shorts / Instagram Reels의 인트로·본문·썸네일은 더 이상 메타포 일러스트를 쓰지 않는다.  
-> **시봄이** 캐릭터 삽입이 SSOT다 → [`docs/shared/marketing/sibom-video-insertion.md`](../../../shared/marketing/70-policy/sibom-video-insertion.md).  
+> **시봄이** 캐릭터 삽입이 SSOT다 → [`docs/shared/marketing/sibom-video-insertion.md`](../../shared/marketing/70-policy/sibom-video-insertion.md).  
 > 메타포 자산(SVG/PNG·`metaphor_id`)은 **영상 파이프라인에 넣지 말 것** (파일·카탈로그는 보관용으로만 유지).  
 > 본 문서는 메타포 디자인/자산 스펙으로 보존한다. 삭제하지 않는다.
 
@@ -47,7 +47,7 @@ xmlns="http://www.w3.org/2000/svg"
 | 세이지 그린 (자연·희망) | `#A8C8B4` | 자연물·회복 |
 | 연크림 (섬세한 fill 변형) | `#FBF3EC` | 안쪽 fill 구분 필요 시 |
 
-> **주의**: 위 살몬(`#F4A896`)·세이지(`#A8C8B4`) 색은 **일러스트 전용 액센트**입니다. 진영색(작성자 피치 `#C9785A` / 상대방 세이지 `#5F8F76`)과 다른 색이며, 혼동하지 마세요. ([system.md §3.4](../system.md))
+> **주의**: 위 살몬(`#F4A896`)·세이지(`#A8C8B4`) 색은 **일러스트 전용 액센트**입니다. 진영색(작성자 피치 `#C9785A` / 상대방 세이지 `#5F8F76`)과 다른 색이며, 혼동하지 마세요. ([system.md §3.4](design-system.md))
 
 **조합 예시**:
 - tension/heavy: `#FFF8F0` + `#A08670` + `#5C4030`

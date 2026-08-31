@@ -1,7 +1,7 @@
 # UX 흐름 인덱스 — 광장형
 
 **위치**: `docs/frontend/ux/flows/README.md`  
-**자매 문서**: [../principles.md](../principles.md) · [../../architecture.md](../../architecture.md)  
+**자매 문서**: [../principles.md](../../70-policy/principles.md) · [../../architecture.md](../../30-components/architecture.md)  
 **성격**: as-is 현행 기준 — 광장 사연 + 커뮤니티 공감 투표.
 
 ---

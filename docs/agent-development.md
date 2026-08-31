@@ -23,8 +23,8 @@ AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세
 | 작업 | 먼저 읽을 문서 | 실제 코드 확인 |
 |---|---|---|
 | 전체 구조·포트·스택 | [`docs/system.md`](./system.md) | `env/docker-compose*.yml`, `env/nginx/*.conf` |
-| FE 기능·UI | [`docs/frontend/README.md`](./frontend/README.md) | `frontend/app/`, `frontend/components/`, `frontend/lib/` |
-| FE 디자인·UX | [`docs/frontend/design/system.md`](./frontend/design/system.md), [`docs/frontend/ux/principles.md`](./frontend/ux/principles.md) | `frontend/tailwind.config.ts`, `frontend/app/globals.css` |
+| FE 기능·UI | [`docs/frontend/10-context.md`](./frontend/10-context.md) | `frontend/app/`, `frontend/components/`, `frontend/lib/` |
+| FE 디자인·UX | [`docs/frontend/70-policy/design-system.md`](./frontend/70-policy/design-system.md), [`docs/frontend/70-policy/principles.md`](./frontend/70-policy/principles.md) | `frontend/tailwind.config.ts`, `frontend/app/globals.css` |
 | BE 기능·API | [`docs/backend/10-context.md`](./backend/10-context.md) | `backend/src/main/java/com/againspring/` |
 | API·DB 계약 | [`docs/shared/50-api/README.md`](./shared/50-api/README.md) | `backend/.../*Controller.java`, `backend/src/main/resources/db/migration/` |
 | LLM 브릿지·프롬프트 | [`docs/backend/30-components/llm-bridge.md`](./backend/30-components/llm-bridge.md), [`docs/shared/70-policy/forbidden-words.md`](./shared/70-policy/forbidden-words.md) | `backend/.../llm/`, `docs/shared/prompts/` |
@@ -52,8 +52,8 @@ AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세
 | 포트·compose·nginx | `docs/system.md`, `docs/env/architecture.md`, README 포트표 |
 | 환경변수 | `docs/env/environment-variables.md`, README |
 | LLM 안전·프롬프트·오류 시그니처 | `docs/shared/70-policy/forbidden-words.md`, `.claude/rules/llm-safety.md` |
-| FE 디자인 토큰·global style | `docs/frontend/design/system.md` |
-| FE test id·journey 변화 | `frontend/tests/e2e-realbe/support/selectors.ts`, `docs/frontend/testing.md` |
+| FE 디자인 토큰·global style | `docs/frontend/70-policy/design-system.md` |
+| FE test id·journey 변화 | `frontend/tests/e2e-realbe/support/selectors.ts`, `docs/frontend/70-policy/testing.md` |
 
 ## 검증 명령
 

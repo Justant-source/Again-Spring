@@ -1,7 +1,7 @@
 # 시봄이 숏폼 삽입 스펙 — Shorts / Reels
 
 > **권위본**: 이 문서 (2026-08-12 그릴링 합의 · **2026-08-16 본문 레이아웃 SSOT**, 검증 job `#669`).  
-> 캐릭터 자산·카탈로그: [`docs/frontend/design/specs/sprout-character-system/`](../../../frontend/design/specs/sprout-character-system/) · 런타임 패키지: `.temp/sprouts/` (승격 예정).  
+> 캐릭터 자산·카탈로그: [`docs/frontend/design/specs/sprout-character-system/`](../../../frontend/assets/sprout-character-system/) · 런타임 패키지: `.temp/sprouts/` (승격 예정).  
 > 채널 계약: [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md).  
 > **메타포 일러스트 60종은 영상 경로에서 완전 사용 금지.**
 

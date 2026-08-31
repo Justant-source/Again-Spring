@@ -2,8 +2,8 @@
 
 > V14 (2026-05-16) 신규 작성. 이후 모든 신규 화면·수정 시 본 흐름을 따릅니다.
 >
-> **자매 문서**: [design/README.md](../design/README.md) — Claude Design 호출 시 제공할 컨텍스트
-> **UX 원칙**: [principles.md](./principles.md) | **디자인 시스템**: [design/system.md](../design/system.md)
+> **자매 문서**: `docs/frontend/70-policy/design-system.md` — Claude Design 호출 시 제공할 컨텍스트
+> **UX 원칙**: [principles.md](./principles.md) | **디자인 시스템**: [design/system.md](design-system.md)
 
 ---
 
@@ -138,7 +138,7 @@ dev에서 시각 확인 + UX 원칙 통과 확인.
 ## 5. 스펙 문서 (화면 추가 시 필수)
 
 **위치**: `docs/design/specs/{화면명}.md`
-**템플릿**: [`docs/design/specs/_TEMPLATE.md`](../design/specs/_TEMPLATE.md)
+**템플릿**: `_TEMPLATE.md` (삭제됨)
 
 스펙 문서는 Claude Code가 Step 2에서 작성. 구현 완료 후 `status: Implemented`로 갱신.
 

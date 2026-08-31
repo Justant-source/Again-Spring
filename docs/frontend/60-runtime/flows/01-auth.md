@@ -1,7 +1,7 @@
 # 인증 흐름
 
 **위치**: `docs/frontend/ux/flows/01-auth.md`  
-**자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [09-partner-invite-ownership.md](./09-partner-invite-ownership.md) · [../principles.md](../principles.md)  
+**자매 문서**: [README.md](./README.md) · [02-permissions.md](./02-permissions.md) · [09-partner-invite-ownership.md](./09-partner-invite-ownership.md) · [../principles.md](../../70-policy/principles.md)  
 **기준일**: 2026-08-11  
 **성격**: as-is 현행 기준
 
